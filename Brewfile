@@ -1,0 +1,6 @@
+brew "ninja"
+brew "llvm"
+brew "lld"
+brew "wasmtime"
+brew "wasi-libc"
+brew "wasi-runtimes"
