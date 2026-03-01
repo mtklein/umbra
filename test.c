@@ -238,7 +238,6 @@ static void test_i32_ops(void) {
     }
 }
 
-#ifndef __wasi__
 static void test_f16_ops(void) {
     // mul
     {
@@ -305,7 +304,6 @@ static void test_f16_ops(void) {
         umbra_program_free(p);
     }
 }
-#endif
 
 static void test_i16_ops(void) {
     // add
@@ -554,9 +552,7 @@ int main(void) {
     test_mul_f32();
     test_f32_ops();
     test_i32_ops();
-#ifndef __wasi__
     test_f16_ops();
-#endif
     test_i16_ops();
     test_imm();
     test_fma_peephole();

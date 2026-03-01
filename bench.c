@@ -1,15 +1,15 @@
+#define _POSIX_C_SOURCE 199309L
 #include "len.h"
 #include "umbra.h"
 #include <stdio.h>
 #include <stdlib.h>
-
-#ifndef __wasi__
 #include <time.h>
+
 static double now(void) {
-    clock_t t = clock();
-    return (double)t / (double)CLOCKS_PER_SEC;
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
 }
-#endif
 
 int main(int argc, char *argv[]) {
     int n = 4096;
@@ -36,7 +36,6 @@ int main(int argc, char *argv[]) {
 
     umbra_program_run(p, n, (void*[]){x, y, z});
 
-#ifndef __wasi__
     int iters = 1;
     for (;;) {
         double start = now();
@@ -52,9 +51,6 @@ int main(int argc, char *argv[]) {
         }
         iters *= 2;
     }
-#else
-    printf("ran %d elements\n", n);
-#endif
 
     umbra_program_free(p);
     free(x);
