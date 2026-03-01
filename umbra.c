@@ -118,7 +118,7 @@ op(store_32) {
 }
 
 // --- f16 <-> f32 conversion ---
-#ifdef __wasm__
+#if !defined(__aarch64__) && !defined(__F16C__)
 
 static F32v f16_to_f32(I16v h) {
     U16v uh = (U16v)h;
@@ -209,7 +209,15 @@ f16_bin(div_f16, /)
 #undef f16_bin
 
 op(fma_f16) {
+#if defined(__aarch64__)
+    _Pragma("clang diagnostic push")
+    _Pragma("clang diagnostic ignored \"-Wdouble-promotion\"")
+    _Pragma("clang diagnostic ignored \"-Wimplicit-float-conversion\"")
+    v->f16 = v[ip->x].f16 * v[ip->y].f16 + v[ip->z].f16;
+    _Pragma("clang diagnostic pop")
+#else
     f16_store(v, to_F32v(v[ip->x]) * to_F32v(v[ip->y]) + to_F32v(v[ip->z]));
+#endif
     next;
 }
 #undef f16_store
