@@ -8,13 +8,20 @@ typedef short          I16v __attribute__((vector_size(K*2)));
 typedef int            I32v __attribute__((vector_size(K*4)));
 typedef unsigned short U16v __attribute__((vector_size(K*2)));
 typedef unsigned int   U32v __attribute__((vector_size(K*4)));
-typedef __fp16         F16v __attribute__((vector_size(K*2)));
 typedef float          F32v __attribute__((vector_size(K*4)));
+
+#if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
+    typedef _Float16 F16v __attribute__((vector_size(K*2)));
+#elif defined(__F16C__)
+    typedef __fp16   F16v __attribute__((vector_size(K*2)));
+#endif
 
 typedef union {
     I16v i16;
     I32v i32;
+#if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) || defined(__F16C__)
     F16v f16;
+#endif
     F32v f32;
 } val;
 
@@ -117,8 +124,44 @@ op(store_32) {
     next;
 }
 
-// --- f16 <-> f32 conversion ---
-#if !defined(__aarch64__) && !defined(__F16C__)
+// --- f16 arithmetic ---
+
+#if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
+
+#define f16_bin(name, OP) \
+    op(name) { v->f16 = v[ip->x].f16 OP v[ip->y].f16; next; }
+f16_bin(add_f16, +)
+f16_bin(sub_f16, -)
+f16_bin(mul_f16, *)
+f16_bin(div_f16, /)
+#undef f16_bin
+
+op(fma_f16) { v->f16 = v[ip->x].f16 * v[ip->y].f16 + v[ip->z].f16; next; }
+
+#elif defined(__F16C__)
+
+#define f16_bin(name, OP) \
+    op(name) { \
+        v->f16 = __builtin_convertvector( \
+            __builtin_convertvector(v[ip->x].f16, F32v) OP \
+            __builtin_convertvector(v[ip->y].f16, F32v), F16v); \
+        next; \
+    }
+f16_bin(add_f16, +)
+f16_bin(sub_f16, -)
+f16_bin(mul_f16, *)
+f16_bin(div_f16, /)
+#undef f16_bin
+
+op(fma_f16) {
+    v->f16 = __builtin_convertvector(
+        __builtin_convertvector(v[ip->x].f16, F32v) *
+        __builtin_convertvector(v[ip->y].f16, F32v) +
+        __builtin_convertvector(v[ip->z].f16, F32v), F16v);
+    next;
+}
+
+#else
 
 static F32v f16_to_f32(I16v h) {
     U16v uh = (U16v)h;
@@ -126,20 +169,14 @@ static F32v f16_to_f32(I16v h) {
     U32v exp  = __builtin_convertvector((uh >> 10) & 0x1f, U32v);
     U32v mant = __builtin_convertvector(uh & 0x3ff, U32v);
 
-    // Normal: rebias exponent (127 - 15 = 112), shift mantissa
     U32v normal = sign | ((exp + 112) << 23) | (mant << 13);
-
-    // Zero/denormal (exp==0): flush to signed zero
-    U32v zero = sign;
-
-    // Inf/NaN (exp==31): all-ones exponent in f32, keep mantissa
+    U32v zero   = sign;
     U32v infnan = sign | (0xffu << 23) | (mant << 13);
 
     U32v is_zero   = (U32v)-(exp == 0);
-    U32v is_infnan  = (U32v)-(exp == 31);
+    U32v is_infnan = (U32v)-(exp == 31);
 
     U32v bits = (is_zero & zero) | (is_infnan & infnan) | (~is_zero & ~is_infnan & normal);
-
     F32v result;
     __builtin_memcpy(&result, &bits, sizeof bits);
     return result;
@@ -153,53 +190,31 @@ static I16v f32_to_f16(F32v f) {
     I32v exp  = (I32v)((bits >> 23) & 0xff) - 127 + 15;
     U32v mant = (bits >> 13) & 0x3ff;
 
-    // Round to nearest even: check bit 12 (round) and bits 0-12 (sticky+guard)
     U32v round_bit = (bits >> 12) & 1;
     U32v sticky    = (U32v)-((bits & 0xfff) != 0);
-    // Round up if round_bit set and (sticky or mantissa LSB set)
     mant += round_bit & (sticky | (mant & 1));
-    // Handle mantissa overflow from rounding
     U32v mant_overflow = mant >> 10;
     exp += (I32v)mant_overflow;
     mant &= 0x3ff;
 
-    U32v normal = sign | (U32v)((U32v)exp << 10) | mant;
-
-    // Overflow -> inf
-    U32v inf = sign | 0x7c00;
-    U32v is_overflow = (U32v)-(exp >= 31);
-
-    // Underflow -> zero
-    U32v is_underflow = (U32v)-(exp <= 0);
-
-    // Source inf/nan (exp==255 in f32)
-    U32v src_exp = (bits >> 23) & 0xff;
-    U32v is_infnan = (U32v)-(src_exp == 0xff);
-    U32v infnan = sign | 0x7c00 | mant;
+    U32v normal       = sign | (U32v)((U32v)exp << 10) | mant;
+    U32v inf           = sign | 0x7c00;
+    U32v is_overflow   = (U32v)-(exp >= 31);
+    U32v is_underflow  = (U32v)-(exp <= 0);
+    U32v src_exp       = (bits >> 23) & 0xff;
+    U32v is_infnan     = (U32v)-(src_exp == 0xff);
+    U32v infnan        = sign | 0x7c00 | mant;
 
     U32v result32 = (is_underflow & sign)
                   | (is_overflow & ~is_infnan & inf)
                   | (is_infnan & infnan)
                   | (~is_underflow & ~is_overflow & ~is_infnan & normal);
-
     return (I16v)__builtin_convertvector(result32, U16v);
 }
 
-#define to_F32v(v)    f16_to_f32((v).i16)
-#define f16_store(dst, expr) (dst)->i16 = f32_to_f16(expr)
-
-#else
-
-#define to_F32v(v)    __builtin_convertvector((v).f16, F32v)
-#define f16_store(dst, expr) (dst)->f16 = __builtin_convertvector(expr, F16v)
-
-#endif
-
-// --- f16 arithmetic ---
-
 #define f16_bin(name, OP) \
     op(name) { \
-        f16_store(v, to_F32v(v[ip->x]) OP to_F32v(v[ip->y])); \
+        v->i16 = f32_to_f16(f16_to_f32(v[ip->x].i16) OP f16_to_f32(v[ip->y].i16)); \
         next; \
     }
 f16_bin(add_f16, +)
@@ -209,18 +224,12 @@ f16_bin(div_f16, /)
 #undef f16_bin
 
 op(fma_f16) {
-#if defined(__aarch64__)
-    _Pragma("clang diagnostic push")
-    _Pragma("clang diagnostic ignored \"-Wdouble-promotion\"")
-    _Pragma("clang diagnostic ignored \"-Wimplicit-float-conversion\"")
-    v->f16 = v[ip->x].f16 * v[ip->y].f16 + v[ip->z].f16;
-    _Pragma("clang diagnostic pop")
-#else
-    f16_store(v, to_F32v(v[ip->x]) * to_F32v(v[ip->y]) + to_F32v(v[ip->z]));
-#endif
+    v->i16 = f32_to_f16(f16_to_f32(v[ip->x].i16) * f16_to_f32(v[ip->y].i16)
+                       + f16_to_f32(v[ip->z].i16));
     next;
 }
-#undef f16_store
+
+#endif
 
 // --- f32 arithmetic ---
 op(add_f32) { v->f32 = v[ip->x].f32 + v[ip->y].f32; next; }
