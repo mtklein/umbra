@@ -1,8 +1,11 @@
 builddir = out
-sysroot  = /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
 
-clang = /opt/homebrew/opt/llvm/bin/clang -fcolor-diagnostics
-warn  = -Weverything
+sysroot = /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
+clang   = /opt/homebrew/opt/llvm/bin/clang -fcolor-diagnostics
+warn    = -Weverything $
+          -Wno-declaration-after-statement $
+          -Wno-switch-default $
+          -Wno-unsafe-buffer-usage
 
 rule compile
     command = $cc -g -O1 -std=c11 -Werror $warn -MD -MF $out.d -c $in -o $out
