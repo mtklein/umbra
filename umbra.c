@@ -1,15 +1,25 @@
 #include "umbra.h"
 #include <stdlib.h>
+#include <string.h>
+
+#define K 8
+
+typedef short          I16v __attribute__((vector_size(K*2)));
+typedef int            I32v __attribute__((vector_size(K*4)));
+typedef unsigned short U16v __attribute__((vector_size(K*2)));
+typedef unsigned int   U32v __attribute__((vector_size(K*4)));
+typedef __fp16         F16v __attribute__((vector_size(K*2)));
+typedef float          F32v __attribute__((vector_size(K*4)));
 
 typedef union {
-    short  i16;
-    int    i32;
-    __fp16 f16;
-    float  f32;
+    I16v i16;
+    I32v i32;
+    F16v f16;
+    F32v f32;
 } val;
 
 struct inst {
-    int  (*fn)(struct inst const *ip, val *v, int i, void* ptr[]);
+    int  (*fn)(struct inst const *ip, val *v, int end, void* ptr[]);
     int    x,y,z;
     int    imm;
     size_t offset;
@@ -21,105 +31,279 @@ struct umbra_program {
     struct inst inst[];
 };
 
-#define op(name) int name(struct inst const *ip, val *v, int i, void* ptr[])
-#define next return ip[1].fn(ip+1, v+1, i, ptr)
+#define op(name) static int name(struct inst const *ip, val *v, int end, void* ptr[])
+#define next return ip[1].fn(ip+1, v+1, end, ptr)
 
-static op(imm) {
-    v->i32 = ip->imm;
+// Tail helpers: when end & (K-1), we're processing a partial vector.
+#define tail16(body) do {                               \
+    int tail = end & (K-1);                             \
+    if (tail) { v->i16 = (I16v){0}; body(tail, 2); }   \
+    else      {                      body(K,    2); }   \
+} while(0)
+
+#define tail32(body) do {                               \
+    int tail = end & (K-1);                             \
+    if (tail) { v->i32 = (I32v){0}; body(tail, 4); }   \
+    else      {                      body(K,    4); }   \
+} while(0)
+
+// --- 16-bit memory ops ---
+op(imm_16) { v->i16 = (I16v){0} + (short)ip->imm; next; }
+
+op(uni_16) {
+    short tmp;
+    memcpy(&tmp, ptr[ip->x], 2);
+    v->i16 = (I16v){0} + tmp;
     next;
 }
 
-static op(uni) {
-    v->i32 = ((int*)ptr[ip->x])[0];
+op(gather_16) {
+    int tail = end & (K-1);
+    int cnt  = tail ? tail : K;
+    v->i16 = (I16v){0};
+    for (int k = 0; k < cnt; k++) {
+        memcpy((char*)&v->i16 + (size_t)k * 2,
+               (char*)ptr[ip->x] + (size_t)v[ip->y].i32[k] * 2, 2);
+    }
     next;
 }
 
-static op(gather) {
-    v->i32 = ((int*)ptr[ip->x])[v[ip->y].i32];
+op(load_16) {
+#define body(n,sz) memcpy(&v->i16, (char*)ptr[ip->x] + (size_t)(end-(n)) * (size_t)(sz), (size_t)(n) * (size_t)(sz))
+    tail16(body);
+#undef body
     next;
 }
 
-static op(load) {
-    v->i32 = ((int*)ptr[ip->x])[i];
+op(store_16) {
+    int tail = end & (K-1);
+    int cnt  = tail ? tail : K;
+    memcpy((char*)ptr[ip->x] + (size_t)(end - cnt) * 2, &v[ip->y].i16, (size_t)cnt * 2);
     next;
 }
 
-static op(store) {
-    ((int*)ptr[ip->x])[i] = v[-1].i32;
+// --- 32-bit memory ops ---
+op(imm_32) { v->i32 = (I32v){0} + ip->imm; next; }
+
+op(uni_32) {
+    int tmp;
+    memcpy(&tmp, ptr[ip->x], 4);
+    v->i32 = (I32v){0} + tmp;
     next;
 }
 
-static op(add_f32) {
-    v->f32 = v[ip->x].f32 + v[ip->y].f32;
+op(gather_32) {
+    int tail = end & (K-1);
+    int cnt  = tail ? tail : K;
+    v->i32 = (I32v){0};
+    for (int k = 0; k < cnt; k++) {
+        memcpy((char*)&v->i32 + (size_t)k * 4,
+               (char*)ptr[ip->x] + (size_t)v[ip->y].i32[k] * 4, 4);
+    }
     next;
 }
 
-static op(sub_f32) {
-    v->f32 = v[ip->x].f32 - v[ip->y].f32;
+op(load_32) {
+#define body(n,sz) memcpy(&v->i32, (char*)ptr[ip->x] + (size_t)(end-(n)) * (size_t)(sz), (size_t)(n) * (size_t)(sz))
+    tail32(body);
+#undef body
     next;
 }
 
-static op(mul_f32) {
-    v->f32 = v[ip->x].f32 * v[ip->y].f32;
+op(store_32) {
+    int tail = end & (K-1);
+    int cnt  = tail ? tail : K;
+    memcpy((char*)ptr[ip->x] + (size_t)(end - cnt) * 4, &v[ip->y].i32, (size_t)cnt * 4);
     next;
 }
 
-static op(div_f32) {
-    v->f32 = v[ip->x].f32 / v[ip->y].f32;
+// --- f16 arithmetic ---
+#define f16_bin(name, OP) \
+    op(name) { \
+        v->f16 = __builtin_convertvector( \
+            __builtin_convertvector(v[ip->x].f16, F32v) OP \
+            __builtin_convertvector(v[ip->y].f16, F32v), F16v); \
+        next; \
+    }
+f16_bin(add_f16, +)
+f16_bin(sub_f16, -)
+f16_bin(mul_f16, *)
+f16_bin(div_f16, /)
+#undef f16_bin
+
+op(fma_f16) {
+    v->f16 = __builtin_convertvector(
+        __builtin_convertvector(v[ip->x].f16, F32v) *
+        __builtin_convertvector(v[ip->y].f16, F32v) +
+        __builtin_convertvector(v[ip->z].f16, F32v), F16v);
     next;
 }
 
-static op(done) {
-    (void)ip;
-    (void)v;
-    (void)i;
-    (void)ptr;
-    return 0;
+// --- f32 arithmetic ---
+op(add_f32) { v->f32 = v[ip->x].f32 + v[ip->y].f32; next; }
+op(sub_f32) { v->f32 = v[ip->x].f32 - v[ip->y].f32; next; }
+op(mul_f32) { v->f32 = v[ip->x].f32 * v[ip->y].f32; next; }
+op(div_f32) { v->f32 = v[ip->x].f32 / v[ip->y].f32; next; }
+op(fma_f32) { v->f32 = v[ip->x].f32 * v[ip->y].f32 + v[ip->z].f32; next; }
+
+// --- i16 arithmetic ---
+op(add_i16) { v->i16 = v[ip->x].i16 + v[ip->y].i16; next; }
+op(sub_i16) { v->i16 = v[ip->x].i16 - v[ip->y].i16; next; }
+op(mul_i16) { v->i16 = v[ip->x].i16 * v[ip->y].i16; next; }
+op(shl_i16) { v->i16 = v[ip->x].i16 << v[ip->y].i16; next; }
+op(shr_i16) { v->i16 = (I16v)((U16v)v[ip->x].i16 >> (U16v)v[ip->y].i16); next; }
+op(sra_i16) { v->i16 = v[ip->x].i16 >> v[ip->y].i16; next; }
+op(and_i16) { v->i16 = v[ip->x].i16 & v[ip->y].i16; next; }
+op( or_i16) { v->i16 = v[ip->x].i16 | v[ip->y].i16; next; }
+op(xor_i16) { v->i16 = v[ip->x].i16 ^ v[ip->y].i16; next; }
+op(sel_i16) { v->i16 = (v[ip->x].i16 & v[ip->y].i16) | (~v[ip->x].i16 & v[ip->z].i16); next; }
+
+// --- i32 arithmetic ---
+op(add_i32) { v->i32 = v[ip->x].i32 + v[ip->y].i32; next; }
+op(sub_i32) { v->i32 = v[ip->x].i32 - v[ip->y].i32; next; }
+op(mul_i32) { v->i32 = v[ip->x].i32 * v[ip->y].i32; next; }
+op(shl_i32) { v->i32 = v[ip->x].i32 << v[ip->y].i32; next; }
+op(shr_i32) { v->i32 = (I32v)((U32v)v[ip->x].i32 >> (U32v)v[ip->y].i32); next; }
+op(sra_i32) { v->i32 = v[ip->x].i32 >> v[ip->y].i32; next; }
+op(and_i32) { v->i32 = v[ip->x].i32 & v[ip->y].i32; next; }
+op( or_i32) { v->i32 = v[ip->x].i32 | v[ip->y].i32; next; }
+op(xor_i32) { v->i32 = v[ip->x].i32 ^ v[ip->y].i32; next; }
+op(sel_i32) { v->i32 = (v[ip->x].i32 & v[ip->y].i32) | (~v[ip->x].i32 & v[ip->z].i32); next; }
+
+op(done) { (void)ip; (void)v; (void)end; (void)ptr; return 0; }
+
+#undef next
+#undef op
+#undef tail32
+#undef tail16
+
+// --- compiler ---
+#define binop(sz, name) \
+    p->inst[i] = (struct inst){.fn=name##_##sz, .x=inst[i].x - i, .y=inst[i].y - i}; break
+#define triop(sz, name) \
+    p->inst[i] = (struct inst){.fn=name##_##sz, .x=inst[i].x - i, .y=inst[i].y - i, .z=inst[i].z - i}; break
+#define memop(sz, name) \
+    p->inst[i] = (struct inst){.fn=name##_##sz, .x=inst[i].ptr}; break
+#define storeop(sz) \
+    p->inst[i] = (struct inst){.fn=store_##sz, .x=inst[i].ptr, .y=inst[i].x - i}; break
+#define immop(sz) \
+    p->inst[i] = (struct inst){.fn=imm_##sz, .imm=inst[i].immi}; break
+#define gatherop(sz) \
+    p->inst[i] = (struct inst){.fn=gather_##sz, .x=inst[i].ptr, .y=inst[i].y - i}; break
+#define uniop(sz) \
+    p->inst[i] = (struct inst){.fn=uni_##sz, .x=inst[i].ptr}; break
+
+// Peephole: fuse mul+add into fma.  Operates on compiled struct inst[].
+static void peephole(struct inst p[], int insts) {
+    for (int i = 0; i < insts; i++) {
+        // add_f32 + mul_f32 -> fma_f32
+        if (p[i].fn == add_f32) {
+            int mx = i + p[i].x, my = i + p[i].y;
+            if (mx >= 0 && mx < insts && p[mx].fn == mul_f32) {
+                int old_y = p[i].y;
+                p[i].fn = fma_f32;
+                p[i].z  = old_y;
+                p[i].y  = p[i].x + p[mx].y;
+                p[i].x  = p[i].x + p[mx].x;
+            } else if (my >= 0 && my < insts && p[my].fn == mul_f32) {
+                int old_x = p[i].x;
+                p[i].fn = fma_f32;
+                p[i].z  = old_x;
+                p[i].x  = p[i].y + p[my].x;
+                p[i].y  = p[i].y + p[my].y;
+            }
+        }
+        // add_f16 + mul_f16 -> fma_f16
+        if (p[i].fn == add_f16) {
+            int mx = i + p[i].x, my = i + p[i].y;
+            if (mx >= 0 && mx < insts && p[mx].fn == mul_f16) {
+                int old_y = p[i].y;
+                p[i].fn = fma_f16;
+                p[i].z  = old_y;
+                p[i].y  = p[i].x + p[mx].y;
+                p[i].x  = p[i].x + p[mx].x;
+            } else if (my >= 0 && my < insts && p[my].fn == mul_f16) {
+                int old_x = p[i].x;
+                p[i].fn = fma_f16;
+                p[i].z  = old_x;
+                p[i].x  = p[i].y + p[my].x;
+                p[i].y  = p[i].y + p[my].y;
+            }
+        }
+    }
 }
 
 struct umbra_program* umbra_program(struct umbra_inst const inst[], int insts) {
     struct umbra_program *p = malloc(sizeof *p + (size_t)(insts+1) * sizeof *p->inst);
     for (int i = 0; i < insts; i++) {
         switch (inst[i].op) {
-            case umbra_imm_32:
-                p->inst[i] = (struct inst){.fn=imm, .imm=inst[i].immi};
-                break;
-            case umbra_uni_32:
-                p->inst[i] = (struct inst){.fn=uni, .x=inst[i].ptr};
-                break;
-            case umbra_gather_32:
-                p->inst[i] = (struct inst){.fn=gather, .x=inst[i].ptr, .y=inst[i].y - i};
-                break;
-            case umbra_load_32:
-                p->inst[i] = (struct inst){.fn=load, .x=inst[i].ptr};
-                break;
-            case umbra_store_32:
-                p->inst[i] = (struct inst){.fn=store, .x=inst[i].ptr};
-                break;
+            case umbra_imm_16:    immop(16);
+            case umbra_uni_16:    uniop(16);
+            case umbra_gather_16: gatherop(16);
+            case umbra_load_16:   memop(16, load);
+            case umbra_store_16:  storeop(16);
 
-            case umbra_add_f32:
-                p->inst[i] = (struct inst){.fn=add_f32, .x=inst[i].x - i, .y=inst[i].y - i};
-                break;
-            case umbra_sub_f32:
-                p->inst[i] = (struct inst){.fn=sub_f32, .x=inst[i].x - i, .y=inst[i].y - i};
-                break;
-            case umbra_mul_f32:
-                p->inst[i] = (struct inst){.fn=mul_f32, .x=inst[i].x - i, .y=inst[i].y - i};
-                break;
-            case umbra_div_f32:
-                p->inst[i] = (struct inst){.fn=div_f32, .x=inst[i].x - i, .y=inst[i].y - i};
-                break;
+            case umbra_imm_32:    immop(32);
+            case umbra_uni_32:    uniop(32);
+            case umbra_gather_32: gatherop(32);
+            case umbra_load_32:   memop(32, load);
+            case umbra_store_32:  storeop(32);
+
+            case umbra_add_f16: binop(f16, add);
+            case umbra_sub_f16: binop(f16, sub);
+            case umbra_mul_f16: binop(f16, mul);
+            case umbra_div_f16: binop(f16, div);
+
+            case umbra_add_f32: binop(f32, add);
+            case umbra_sub_f32: binop(f32, sub);
+            case umbra_mul_f32: binop(f32, mul);
+            case umbra_div_f32: binop(f32, div);
+
+            case umbra_add_i16: binop(i16, add);
+            case umbra_sub_i16: binop(i16, sub);
+            case umbra_mul_i16: binop(i16, mul);
+            case umbra_shl_i16: binop(i16, shl);
+            case umbra_shr_i16: binop(i16, shr);
+            case umbra_sra_i16: binop(i16, sra);
+            case umbra_and_i16: binop(i16, and);
+            case umbra_or_i16:  binop(i16, or);
+            case umbra_xor_i16: binop(i16, xor);
+            case umbra_sel_i16: triop(i16, sel);
+
+            case umbra_add_i32: binop(i32, add);
+            case umbra_sub_i32: binop(i32, sub);
+            case umbra_mul_i32: binop(i32, mul);
+            case umbra_shl_i32: binop(i32, shl);
+            case umbra_shr_i32: binop(i32, shr);
+            case umbra_sra_i32: binop(i32, sra);
+            case umbra_and_i32: binop(i32, and);
+            case umbra_or_i32:  binop(i32, or);
+            case umbra_xor_i32: binop(i32, xor);
+            case umbra_sel_i32: triop(i32, sel);
         }
     }
     p->inst[insts] = (struct inst){.fn=done};
     p->insts = insts+1;
+
+    peephole(p->inst, insts);
+
     return p;
 }
+#undef uniop
+#undef gatherop
+#undef immop
+#undef storeop
+#undef memop
+#undef triop
+#undef binop
 
 void umbra_program_run(struct umbra_program const *p, int n, void *ptr[]) {
     val *v = malloc((size_t)p->insts * sizeof *v);
-    for (int i = 0; i < n; i++) {
-        p->inst[0].fn(p->inst, v, i, ptr);
+    for (int end = K; end <= n; end += K) {
+        p->inst[0].fn(p->inst, v, end, ptr);
+    }
+    if (n & (K-1)) {
+        p->inst[0].fn(p->inst, v, n, ptr);
     }
     free(v);
 }
