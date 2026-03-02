@@ -1037,15 +1037,22 @@ static void test_scatter(void) {
 static void test_canonicalize(void) {
     struct umbra_inst inst[] = {
         {.op=umbra_lane},
-        {.op=umbra_imm_32, .immi=1},
-        {.op=umbra_imm_32, .immi=2},
+        {umbra_load_32, .ptr=0, .x=0},
+        {umbra_load_32, .ptr=1, .x=0},
         {umbra_add_i32, .x=2, .y=1},
-        {umbra_store_32, .ptr=0, .x=0, .y=3},
+        {umbra_store_32, .ptr=2, .x=0, .y=3},
     };
     int n = umbra_optimize(inst, len(inst));
     (n == 5) here;
-    // After canonicalization, the add should have x <= y, i.e. x=1, y=2.
-    (inst[3].x == 1 && inst[3].y == 2) here;
+    // After canonicalization, the add should have x <= y.
+    _Bool found = 0;
+    for (int i = 0; i < n; i++) {
+        if (inst[i].op == umbra_add_i32) {
+            (inst[i].x <= inst[i].y) here;
+            found = 1;
+        }
+    }
+    found here;
 }
 
 static void test_gvn(void) {
@@ -1059,7 +1066,7 @@ static void test_gvn(void) {
     };
     int before = len(inst);
     int after = umbra_optimize(inst, before);
-    (after == before - 1) here;  // one dup removed
+    (after < before) here;  // dups removed, constants folded
 }
 
 static void test_fma_fusion(void) {
@@ -1165,6 +1172,88 @@ static void test_convert(void) {
         equiv(z[2], 100.0f) here;
         umbra_program_free(p);
     }
+}
+
+static void test_constprop(void) {
+    // add_i32(imm(3), imm(5)) → 8
+    {
+        struct umbra_inst inst[] = {
+            {.op=umbra_lane},
+            {umbra_imm_32, .immi=3},
+            {umbra_imm_32, .immi=5},
+            {umbra_add_i32, .x=1, .y=2},
+            {umbra_store_32, .ptr=0, .x=0, .y=3},
+        };
+        int n = umbra_optimize(inst, len(inst));
+        struct umbra_program *p = umbra_program(inst, n);
+        int z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){z});
+        (z[0] == 8) here;
+        (z[1] == 8) here;
+        (z[2] == 8) here;
+        umbra_program_free(p);
+    }
+    // mul_f32(imm(2.0), imm(3.0)) → 6.0
+    {
+        struct umbra_inst inst[] = {
+            {.op=umbra_lane},
+            {umbra_imm_32, .immf=2.0f},
+            {umbra_imm_32, .immf=3.0f},
+            {umbra_mul_f32, .x=1, .y=2},
+            {umbra_store_32, .ptr=0, .x=0, .y=3},
+        };
+        int n = umbra_optimize(inst, len(inst));
+        struct umbra_program *p = umbra_program(inst, n);
+        float z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){z});
+        equiv(z[0], 6) here;
+        equiv(z[1], 6) here;
+        equiv(z[2], 6) here;
+        umbra_program_free(p);
+    }
+    // f32_from_i32(imm(42)) → 42.0
+    {
+        struct umbra_inst inst[] = {
+            {.op=umbra_lane},
+            {umbra_imm_32, .immi=42},
+            {umbra_f32_from_i32, .x=1},
+            {umbra_store_32, .ptr=0, .x=0, .y=2},
+        };
+        int n = umbra_optimize(inst, len(inst));
+        struct umbra_program *p = umbra_program(inst, n);
+        float z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){z});
+        equiv(z[0], 42) here;
+        equiv(z[1], 42) here;
+        equiv(z[2], 42) here;
+        umbra_program_free(p);
+    }
+}
+
+static void test_hoisting(void) {
+    // Mix of imm + lane + load + arith + store.
+    // After optimization, uniforms should be hoisted before varyings.
+    struct umbra_inst inst[] = {
+        {.op=umbra_lane},
+        {umbra_imm_32, .immf=2.0f},
+        {umbra_load_32, .ptr=0, .x=0},
+        {umbra_mul_f32, .x=2, .y=1},
+        {umbra_store_32, .ptr=1, .x=0, .y=3},
+    };
+    int n = umbra_optimize(inst, len(inst));
+    (n == 5) here;  // instruction count unchanged
+
+    // Verify the imm is hoisted before the lane.
+    (inst[0].op == umbra_imm_32) here;
+
+    // Verify correctness.
+    struct umbra_program *p = umbra_program(inst, n);
+    float x[] = {1,2,3,4,5,6,7,8,9,10,11}, z[11] = {0};
+    umbra_program_run(p, 11, (void*[]){x,z});
+    for (int i = 0; i < 11; i++) {
+        equiv(z[i], (float)x[i] * 2.0f) here;
+    }
+    umbra_program_free(p);
 }
 
 static void test_optimize_srcover(void) {
@@ -1296,6 +1385,8 @@ int main(void) {
     test_gvn();
     test_fma_fusion();
     test_dce();
+    test_constprop();
+    test_hoisting();
     test_optimize_srcover();
     return 0;
 }
