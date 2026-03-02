@@ -328,8 +328,6 @@ op(done) { (void)ip; (void)v; (void)end; (void)ptr; return 0; }
 
 typedef enum umbra_op Op;
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wswitch-enum"
 static _Bool commutative(Op op) {
     switch (op) {
         case umbra_add_f16: case umbra_mul_f16: case umbra_min_f16: case umbra_max_f16:
@@ -393,7 +391,6 @@ static _Bool is_16bit_result(Op op) {
             return 0;
     }
 }
-#pragma clang diagnostic pop
 
 static uint32_t fnv1a(void const *data, int len) {
     uint32_t h = 2166136261u;
@@ -406,9 +403,6 @@ static uint32_t fnv1a(void const *data, int len) {
 }
 
 int umbra_optimize(struct umbra_inst inst[], int insts) {
-    int *remap = malloc((size_t)insts * sizeof *remap);
-    for (int i = 0; i < insts; i++) { remap[i] = i; }
-
     // 1. Canonicalize commutative operands: ensure x <= y.
     for (int i = 0; i < insts; i++) {
         if (commutative(inst[i].op) && inst[i].x > inst[i].y) {
@@ -418,15 +412,87 @@ int umbra_optimize(struct umbra_inst inst[], int insts) {
         }
     }
 
-    // 2. GVN (Global Value Numbering).
+    // 2. Constant propagation: fold op(imm, imm, ...) → imm.
+    for (int i = 0; i < insts; i++) {
+        int ar = arity(inst[i].op);
+        if (ar == 0) { continue; }
+        if (is_store(inst[i].op)) { continue; }
+        if (inst[i].op == umbra_load_16 || inst[i].op == umbra_load_32) { continue; }
+
+        _Bool all_imm = 1;
+        if (ar >= 1 && inst[inst[i].x].op != umbra_imm_32
+                     && inst[inst[i].x].op != umbra_imm_16) { all_imm = 0; }
+        if (ar >= 2 && inst[inst[i].y].op != umbra_imm_32
+                     && inst[inst[i].y].op != umbra_imm_16) { all_imm = 0; }
+        if (ar >= 3 && inst[inst[i].z].op != umbra_imm_32
+                     && inst[inst[i].z].op != umbra_imm_16) { all_imm = 0; }
+        if (!all_imm) { continue; }
+
+        _Bool wide = !is_16bit_result(inst[i].op);
+        struct umbra_inst tmp[8];
+        __builtin_memset(tmp, 0, sizeof tmp);
+        int t = 0;
+
+        int ox = 0, oy = 0, oz = 0;
+        if (ar >= 1) { ox = t; tmp[t++] = inst[inst[i].x]; }
+        if (ar >= 2) { oy = t; tmp[t++] = inst[inst[i].y]; }
+        if (ar >= 3) { oz = t; tmp[t++] = inst[inst[i].z]; }
+
+        int op_slot = t;
+        tmp[t] = inst[i];
+        tmp[t].x = ox;
+        tmp[t].y = oy;
+        tmp[t].z = oz;
+        t++;
+
+        int lane_slot = t;
+        tmp[t++].op = umbra_lane;
+
+        tmp[t].op  = wide ? umbra_store_32 : umbra_store_16;
+        tmp[t].ptr = 0;
+        tmp[t].x   = lane_slot;
+        tmp[t].y   = op_slot;
+        t++;
+
+        struct umbra_program *prog = umbra_program(tmp, t);
+        int32_t result = 0;
+        umbra_program_run(prog, 1, (void*[]){&result});
+        umbra_program_free(prog);
+
+        inst[i].op   = wide ? umbra_imm_32 : umbra_imm_16;
+        inst[i].immi = wide ? result : (int16_t)result;
+        inst[i].x = inst[i].y = inst[i].z = 0;
+    }
+
+    // 3. FMA fusion: add(mul(a,b), c) → fma(a, b, c).
+    for (int i = 0; i < insts; i++) {
+        Op fma_op, mul_op;
+        if      (inst[i].op == umbra_add_f32) { fma_op = umbra_fma_f32; mul_op = umbra_mul_f32; }
+        else if (inst[i].op == umbra_add_f16) { fma_op = umbra_fma_f16; mul_op = umbra_mul_f16; }
+        else { continue; }
+
+        int ax = inst[i].x, ay = inst[i].y;
+
+        int mul = -1, other = -1;
+        if      (inst[ax].op == mul_op) { mul = ax; other = ay; }
+        else if (inst[ay].op == mul_op) { mul = ay; other = ax; }
+        if (mul < 0) { continue; }
+
+        inst[i].op = fma_op;
+        inst[i].x = inst[mul].x;
+        inst[i].y = inst[mul].y;
+        inst[i].z = other;
+    }
+
+    // 4. GVN (Global Value Numbering).
+    int *remap = malloc((size_t)insts * sizeof *remap);
+    for (int i = 0; i < insts; i++) { remap[i] = i; }
     {
         int cap = 16;
         while (cap < insts * 2) { cap *= 2; }
         struct { int key; int val; } *ht = calloc((size_t)cap, sizeof *ht);
-        // key=0 means empty, so we store instruction index + 1 as key.
 
         for (int i = 0; i < insts; i++) {
-            // Resolve operands through remap.
             inst[i].x = remap[inst[i].x];
             inst[i].y = remap[inst[i].y];
             inst[i].z = remap[inst[i].z];
@@ -457,111 +523,6 @@ int umbra_optimize(struct umbra_inst inst[], int insts) {
             }
         }
         free(ht);
-    }
-
-    // 3. FMA fusion: add(mul(a,b), c) → fma(a, b, c).
-    for (int i = 0; i < insts; i++) {
-        if (remap[i] != i) { continue; }
-        Op fma_op, mul_op;
-        if      (inst[i].op == umbra_add_f32) { fma_op = umbra_fma_f32; mul_op = umbra_mul_f32; }
-        else if (inst[i].op == umbra_add_f16) { fma_op = umbra_fma_f16; mul_op = umbra_mul_f16; }
-        else { continue; }
-
-        int ax = remap[inst[i].x], ay = remap[inst[i].y];
-
-        int mul = -1, other = -1;
-        if (inst[ax].op == mul_op && remap[ax] == ax) { mul = ax; other = ay; }
-        else if (inst[ay].op == mul_op && remap[ay] == ay) { mul = ay; other = ax; }
-        if (mul < 0) { continue; }
-
-        inst[i].op = fma_op;
-        inst[i].x = inst[mul].x;
-        inst[i].y = inst[mul].y;
-        inst[i].z = other;
-    }
-
-    // 4. Constant propagation: fold op(imm, imm, ...) → imm.
-    for (int i = 0; i < insts; i++) {
-        if (remap[i] != i) { continue; }
-        int ar = arity(inst[i].op);
-        if (ar == 0) { continue; }
-        if (is_store(inst[i].op)) { continue; }
-        if (inst[i].op == umbra_load_16 || inst[i].op == umbra_load_32) { continue; }
-
-        // Check all operands are imm.
-        _Bool all_imm = 1;
-        if (ar >= 1 && inst[remap[inst[i].x]].op != umbra_imm_32
-                     && inst[remap[inst[i].x]].op != umbra_imm_16) { all_imm = 0; }
-        if (ar >= 2 && inst[remap[inst[i].y]].op != umbra_imm_32
-                     && inst[remap[inst[i].y]].op != umbra_imm_16) { all_imm = 0; }
-        if (ar >= 3 && inst[remap[inst[i].z]].op != umbra_imm_32
-                     && inst[remap[inst[i].z]].op != umbra_imm_16) { all_imm = 0; }
-        if (!all_imm) { continue; }
-
-        // Build a tiny pipeline to evaluate via the real interpreter.
-        _Bool wide = !is_16bit_result(inst[i].op);
-        struct umbra_inst tmp[8];
-        __builtin_memset(tmp, 0, sizeof tmp);
-        int t = 0;
-
-        // Emit operand immediates, remapping indices into tmp[].
-        int ox = 0, oy = 0, oz = 0;
-        if (ar >= 1) {
-            ox = t;
-            tmp[t] = inst[remap[inst[i].x]];
-            t++;
-        }
-        if (ar >= 2) {
-            oy = t;
-            tmp[t] = inst[remap[inst[i].y]];
-            t++;
-        }
-        if (ar >= 3) {
-            oz = t;
-            tmp[t] = inst[remap[inst[i].z]];
-            t++;
-        }
-
-        // The operation itself.
-        int op_slot = t;
-        tmp[t] = inst[i];
-        tmp[t].x = ox;
-        tmp[t].y = oy;
-        tmp[t].z = oz;
-        t++;
-
-        // Lane for the store index.
-        int lane_slot = t;
-        tmp[t].op = umbra_lane;
-        t++;
-
-        // Store the result out.
-        if (wide) {
-            tmp[t].op  = umbra_store_32;
-            tmp[t].ptr = 0;
-            tmp[t].x   = lane_slot;
-            tmp[t].y   = op_slot;
-        } else {
-            tmp[t].op  = umbra_store_16;
-            tmp[t].ptr = 0;
-            tmp[t].x   = lane_slot;
-            tmp[t].y   = op_slot;
-        }
-        t++;
-
-        struct umbra_program *prog = umbra_program(tmp, t);
-        int32_t result = 0;
-        umbra_program_run(prog, 1, (void*[]){&result});
-        umbra_program_free(prog);
-
-        if (wide) {
-            inst[i].op   = umbra_imm_32;
-            inst[i].immi = result;
-        } else {
-            inst[i].op   = umbra_imm_16;
-            inst[i].immi = (int16_t)result;
-        }
-        inst[i].x = inst[i].y = inst[i].z = i;
     }
 
     // 5. DCE + compaction.
@@ -618,19 +579,18 @@ int umbra_optimize(struct umbra_inst inst[], int insts) {
         for (int i = 0; i < live; i++) {
             if (inst[i].op == umbra_lane) { varying[i] = 1; continue; }
             if (is_store(inst[i].op))     { varying[i] = 1; continue; }
-            int ar = arity(inst[i].op);
             if (inst[i].op == umbra_load_16 || inst[i].op == umbra_load_32) {
                 varying[i] = varying[inst[i].x];
                 continue;
             }
+            int ar = arity(inst[i].op);
             if (ar >= 1 && varying[inst[i].x]) { varying[i] = 1; }
             if (ar >= 2 && varying[inst[i].y]) { varying[i] = 1; }
             if (ar >= 3 && varying[inst[i].z]) { varying[i] = 1; }
         }
 
-        // Build permutation: uniforms first, then varyings (stable).
         int *order = malloc((size_t)live * sizeof *order);
-        int *back  = malloc((size_t)live * sizeof *back);  // new→old
+        int *back  = malloc((size_t)live * sizeof *back);
         int j = 0;
         for (int i = 0; i < live; i++) { if (!varying[i]) { back[j] = i; order[i] = j; j++; } }
         for (int i = 0; i < live; i++) { if ( varying[i]) { back[j] = i; order[i] = j; j++; } }
