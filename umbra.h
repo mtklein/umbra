@@ -9,7 +9,9 @@ struct umbra_inst {
         umbra_lane,
 
         umbra_add_f16, umbra_sub_f16, umbra_mul_f16, umbra_div_f16,
+        umbra_min_f16, umbra_max_f16, umbra_sqrt_f16, umbra_fma_f16,
         umbra_add_f32, umbra_sub_f32, umbra_mul_f32, umbra_div_f32,
+        umbra_min_f32, umbra_max_f32, umbra_sqrt_f32, umbra_fma_f32,
 
         umbra_add_i16, umbra_sub_i16, umbra_mul_i16,
         umbra_shl_i16, umbra_shr_u16, umbra_shr_s16,

@@ -811,41 +811,142 @@ static void test_imm(void) {
     }
 }
 
-static void test_fma_peephole(void) {
-    // Peephole: mul then add should fuse into fma.
+static void test_fma_f32(void) {
+    struct umbra_inst const inst[] = {
+        {.op=umbra_lane},
+        {umbra_load_32, .ptr=0, .x=0},
+        {umbra_load_32, .ptr=1, .x=0},
+        {umbra_load_32, .ptr=2, .x=0},
+        {umbra_fma_f32, .x=1, .y=2, .z=3},
+        {umbra_store_32, .ptr=3, .x=0, .y=4},
+    };
+    struct umbra_program *p = umbra_program(inst, len(inst));
+    float x[] = {2,3}, y[] = {4,5}, w[] = {10,20}, z[2] = {0};
+    umbra_program_run(p, 2, (void*[]){x,y,w,z});
+    equiv(z[0], 18) here;  // 2*4+10
+    equiv(z[1], 35) here;  // 3*5+20
+    umbra_program_free(p);
+}
+
+static void test_fma_f16(void) {
+    struct umbra_inst const inst[] = {
+        {.op=umbra_lane},
+        {umbra_load_16, .ptr=0, .x=0},
+        {umbra_load_16, .ptr=1, .x=0},
+        {umbra_load_16, .ptr=2, .x=0},
+        {umbra_fma_f16, .x=1, .y=2, .z=3},
+        {umbra_store_16, .ptr=3, .x=0, .y=4},
+    };
+    struct umbra_program *p = umbra_program(inst, len(inst));
+    __fp16 x[] = {2,3}, y[] = {4,5}, w[] = {10,20}, z[2] = {0};
+    umbra_program_run(p, 2, (void*[]){x,y,w,z});
+    equiv((float)z[0], 18) here;
+    equiv((float)z[1], 35) here;
+    umbra_program_free(p);
+}
+
+static void test_min_max_sqrt_f32(void) {
+    // min
     {
         struct umbra_inst const inst[] = {
             {.op=umbra_lane},
             {umbra_load_32, .ptr=0, .x=0},
             {umbra_load_32, .ptr=1, .x=0},
-            {umbra_load_32, .ptr=2, .x=0},
-            {umbra_mul_f32, .x=1, .y=2},
-            {umbra_add_f32, .x=4, .y=3},
-            {umbra_store_32, .ptr=3, .x=0, .y=5},
+            {umbra_min_f32, .x=1, .y=2},
+            {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
         struct umbra_program *p = umbra_program(inst, len(inst));
-        float x[] = {2,3}, y[] = {4,5}, w[] = {10,20}, z[2] = {0};
-        umbra_program_run(p, 2, (void*[]){x,y,w,z});
-        equiv(z[0], 18) here;  // 2*4+10
-        equiv(z[1], 35) here;  // 3*5+20
+        float x[] = {5,1,3}, y[] = {2,4,3}, z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){x,y,z});
+        equiv(z[0], 2) here;
+        equiv(z[1], 1) here;
+        equiv(z[2], 3) here;
         umbra_program_free(p);
     }
-    // Peephole: add where y is the mul.
+    // max
     {
         struct umbra_inst const inst[] = {
             {.op=umbra_lane},
             {umbra_load_32, .ptr=0, .x=0},
             {umbra_load_32, .ptr=1, .x=0},
-            {umbra_load_32, .ptr=2, .x=0},
-            {umbra_mul_f32, .x=1, .y=2},
-            {umbra_add_f32, .x=3, .y=4},
-            {umbra_store_32, .ptr=3, .x=0, .y=5},
+            {umbra_max_f32, .x=1, .y=2},
+            {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
         struct umbra_program *p = umbra_program(inst, len(inst));
-        float x[] = {2,3}, y[] = {4,5}, w[] = {10,20}, z[2] = {0};
-        umbra_program_run(p, 2, (void*[]){x,y,w,z});
-        equiv(z[0], 18) here;
-        equiv(z[1], 35) here;
+        float x[] = {5,1,3}, y[] = {2,4,3}, z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){x,y,z});
+        equiv(z[0], 5) here;
+        equiv(z[1], 4) here;
+        equiv(z[2], 3) here;
+        umbra_program_free(p);
+    }
+    // sqrt
+    {
+        struct umbra_inst const inst[] = {
+            {.op=umbra_lane},
+            {umbra_load_32, .ptr=0, .x=0},
+            {umbra_sqrt_f32, .x=1},
+            {umbra_store_32, .ptr=1, .x=0, .y=2},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        float x[] = {4,9,16}, z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){x,z});
+        equiv(z[0], 2) here;
+        equiv(z[1], 3) here;
+        equiv(z[2], 4) here;
+        umbra_program_free(p);
+    }
+}
+
+static void test_min_max_sqrt_f16(void) {
+    // min
+    {
+        struct umbra_inst const inst[] = {
+            {.op=umbra_lane},
+            {umbra_load_16, .ptr=0, .x=0},
+            {umbra_load_16, .ptr=1, .x=0},
+            {umbra_min_f16, .x=1, .y=2},
+            {umbra_store_16, .ptr=2, .x=0, .y=3},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        __fp16 x[] = {5,1,3}, y[] = {2,4,3}, z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){x,y,z});
+        equiv((float)z[0], 2) here;
+        equiv((float)z[1], 1) here;
+        equiv((float)z[2], 3) here;
+        umbra_program_free(p);
+    }
+    // max
+    {
+        struct umbra_inst const inst[] = {
+            {.op=umbra_lane},
+            {umbra_load_16, .ptr=0, .x=0},
+            {umbra_load_16, .ptr=1, .x=0},
+            {umbra_max_f16, .x=1, .y=2},
+            {umbra_store_16, .ptr=2, .x=0, .y=3},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        __fp16 x[] = {5,1,3}, y[] = {2,4,3}, z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){x,y,z});
+        equiv((float)z[0], 5) here;
+        equiv((float)z[1], 4) here;
+        equiv((float)z[2], 3) here;
+        umbra_program_free(p);
+    }
+    // sqrt
+    {
+        struct umbra_inst const inst[] = {
+            {.op=umbra_lane},
+            {umbra_load_16, .ptr=0, .x=0},
+            {umbra_sqrt_f16, .x=1},
+            {umbra_store_16, .ptr=1, .x=0, .y=2},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        __fp16 x[] = {4,9,16}, z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){x,z});
+        equiv((float)z[0], 2) here;
+        equiv((float)z[1], 3) here;
+        equiv((float)z[2], 4) here;
         umbra_program_free(p);
     }
 }
@@ -943,7 +1044,10 @@ int main(void) {
     test_cmp_f32();
     test_cmp_f16();
     test_imm();
-    test_fma_peephole();
+    test_fma_f32();
+    test_fma_f16();
+    test_min_max_sqrt_f32();
+    test_min_max_sqrt_f16();
     test_large_n();
     test_uni_via_load();
     test_scatter();

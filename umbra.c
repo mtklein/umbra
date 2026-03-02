@@ -123,11 +123,14 @@ op(scatter_32) {
 }
 
 #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) || defined(__F16C__)
-    op(add_f16) { v->f16 = v[ip->x].f16 + v[ip->y].f16               ; next; }
-    op(sub_f16) { v->f16 = v[ip->x].f16 - v[ip->y].f16               ; next; }
-    op(mul_f16) { v->f16 = v[ip->x].f16 * v[ip->y].f16               ; next; }
-    op(div_f16) { v->f16 = v[ip->x].f16 / v[ip->y].f16               ; next; }
-    op(fma_f16) { v->f16 = v[ip->x].f16 * v[ip->y].f16 + v[ip->z].f16; next; }
+    op( add_f16) { v->f16 = v[ip->x].f16 + v[ip->y].f16               ; next; }
+    op( sub_f16) { v->f16 = v[ip->x].f16 - v[ip->y].f16               ; next; }
+    op( mul_f16) { v->f16 = v[ip->x].f16 * v[ip->y].f16               ; next; }
+    op( div_f16) { v->f16 = v[ip->x].f16 / v[ip->y].f16               ; next; }
+    op( min_f16) { v->f16 = __builtin_elementwise_min(v[ip->x].f16, v[ip->y].f16); next; }
+    op( max_f16) { v->f16 = __builtin_elementwise_max(v[ip->x].f16, v[ip->y].f16); next; }
+    op(sqrt_f16) { v->f16 = __builtin_elementwise_sqrt(v[ip->x].f16)  ; next; }
+    op( fma_f16) { v->f16 = v[ip->x].f16 * v[ip->y].f16 + v[ip->z].f16; next; }
 
     #pragma clang diagnostic push
     #pragma clang diagnostic ignored "-Wfloat-equal"
@@ -207,6 +210,20 @@ op(scatter_32) {
         v->u16 = f32_to_f16(f16_to_f32(v[ip->x].u16) / f16_to_f32(v[ip->y].u16));
         next;
     }
+    op(min_f16) {
+        v->u16 = f32_to_f16(__builtin_elementwise_min(f16_to_f32(v[ip->x].u16),
+                                                      f16_to_f32(v[ip->y].u16)));
+        next;
+    }
+    op(max_f16) {
+        v->u16 = f32_to_f16(__builtin_elementwise_max(f16_to_f32(v[ip->x].u16),
+                                                      f16_to_f32(v[ip->y].u16)));
+        next;
+    }
+    op(sqrt_f16) {
+        v->u16 = f32_to_f16(__builtin_elementwise_sqrt(f16_to_f32(v[ip->x].u16)));
+        next;
+    }
     op(fma_f16) {
         v->u16 = f32_to_f16(f16_to_f32(v[ip->x].u16) * f16_to_f32(v[ip->y].u16)
                                                      + f16_to_f32(v[ip->z].u16));
@@ -224,11 +241,14 @@ op(scatter_32) {
     op(ge_f16) { v->i16 = cast(I16, (I32)(f16_to_f32(v[ip->x].u16) >= f16_to_f32(v[ip->y].u16))); next; }
 #endif
 
-op(add_f32) { v->f32 = v[ip->x].f32 + v[ip->y].f32               ; next; }
-op(sub_f32) { v->f32 = v[ip->x].f32 - v[ip->y].f32               ; next; }
-op(mul_f32) { v->f32 = v[ip->x].f32 * v[ip->y].f32               ; next; }
-op(div_f32) { v->f32 = v[ip->x].f32 / v[ip->y].f32               ; next; }
-op(fma_f32) { v->f32 = v[ip->x].f32 * v[ip->y].f32 + v[ip->z].f32; next; }
+op( add_f32) { v->f32 = v[ip->x].f32 + v[ip->y].f32               ; next; }
+op( sub_f32) { v->f32 = v[ip->x].f32 - v[ip->y].f32               ; next; }
+op( mul_f32) { v->f32 = v[ip->x].f32 * v[ip->y].f32               ; next; }
+op( div_f32) { v->f32 = v[ip->x].f32 / v[ip->y].f32               ; next; }
+op( min_f32) { v->f32 = __builtin_elementwise_min(v[ip->x].f32, v[ip->y].f32); next; }
+op( max_f32) { v->f32 = __builtin_elementwise_max(v[ip->x].f32, v[ip->y].f32); next; }
+op(sqrt_f32) { v->f32 = __builtin_elementwise_sqrt(v[ip->x].f32)  ; next; }
+op( fma_f32) { v->f32 = v[ip->x].f32 * v[ip->y].f32 + v[ip->z].f32; next; }
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-equal"
@@ -335,33 +355,23 @@ struct umbra_program* umbra_program(struct umbra_inst const inst[], int insts) {
                     p->inst[i] = (struct inst){.fn=scatter_32, .x=inst[i].ptr, .y=inst[i].y-i, .z=inst[i].x-i};
                 } break;
 
-            case umbra_add_f16:
-                p->inst[i] = (struct inst){.fn=add_f16, .x=inst[i].x-i, .y=inst[i].y-i};
-                if (inst[i].x < i && inst[inst[i].x].op == umbra_mul_f16) {
-                    int m = inst[i].x;
-                    p->inst[i] = (struct inst){.fn=fma_f16, .x=inst[m].x-i, .y=inst[m].y-i, .z=inst[i].y-i};
-                } else if (inst[i].y < i && inst[inst[i].y].op == umbra_mul_f16) {
-                    int m = inst[i].y;
-                    p->inst[i] = (struct inst){.fn=fma_f16, .x=inst[m].x-i, .y=inst[m].y-i, .z=inst[i].x-i};
-                }
-                break;
-            case umbra_sub_f16: p->inst[i] = (struct inst){.fn=sub_f16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
-            case umbra_mul_f16: p->inst[i] = (struct inst){.fn=mul_f16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
-            case umbra_div_f16: p->inst[i] = (struct inst){.fn=div_f16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
+            case umbra_add_f16:  p->inst[i] = (struct inst){.fn= add_f16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
+            case umbra_sub_f16:  p->inst[i] = (struct inst){.fn= sub_f16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
+            case umbra_mul_f16:  p->inst[i] = (struct inst){.fn= mul_f16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
+            case umbra_div_f16:  p->inst[i] = (struct inst){.fn= div_f16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
+            case umbra_min_f16:  p->inst[i] = (struct inst){.fn= min_f16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
+            case umbra_max_f16:  p->inst[i] = (struct inst){.fn= max_f16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
+            case umbra_sqrt_f16: p->inst[i] = (struct inst){.fn=sqrt_f16, .x=inst[i].x-i}; break;
+            case umbra_fma_f16:  p->inst[i] = (struct inst){.fn= fma_f16, .x=inst[i].x-i, .y=inst[i].y-i, .z=inst[i].z-i}; break;
 
-            case umbra_add_f32:
-                p->inst[i] = (struct inst){.fn=add_f32, .x=inst[i].x-i, .y=inst[i].y-i};
-                if (inst[i].x < i && inst[inst[i].x].op == umbra_mul_f32) {
-                    int m = inst[i].x;
-                    p->inst[i] = (struct inst){.fn=fma_f32, .x=inst[m].x-i, .y=inst[m].y-i, .z=inst[i].y-i};
-                } else if (inst[i].y < i && inst[inst[i].y].op == umbra_mul_f32) {
-                    int m = inst[i].y;
-                    p->inst[i] = (struct inst){.fn=fma_f32, .x=inst[m].x-i, .y=inst[m].y-i, .z=inst[i].x-i};
-                }
-                break;
-            case umbra_sub_f32: p->inst[i] = (struct inst){.fn=sub_f32, .x=inst[i].x-i, .y=inst[i].y-i}; break;
-            case umbra_mul_f32: p->inst[i] = (struct inst){.fn=mul_f32, .x=inst[i].x-i, .y=inst[i].y-i}; break;
-            case umbra_div_f32: p->inst[i] = (struct inst){.fn=div_f32, .x=inst[i].x-i, .y=inst[i].y-i}; break;
+            case umbra_add_f32:  p->inst[i] = (struct inst){.fn= add_f32, .x=inst[i].x-i, .y=inst[i].y-i}; break;
+            case umbra_sub_f32:  p->inst[i] = (struct inst){.fn= sub_f32, .x=inst[i].x-i, .y=inst[i].y-i}; break;
+            case umbra_mul_f32:  p->inst[i] = (struct inst){.fn= mul_f32, .x=inst[i].x-i, .y=inst[i].y-i}; break;
+            case umbra_div_f32:  p->inst[i] = (struct inst){.fn= div_f32, .x=inst[i].x-i, .y=inst[i].y-i}; break;
+            case umbra_min_f32:  p->inst[i] = (struct inst){.fn= min_f32, .x=inst[i].x-i, .y=inst[i].y-i}; break;
+            case umbra_max_f32:  p->inst[i] = (struct inst){.fn= max_f32, .x=inst[i].x-i, .y=inst[i].y-i}; break;
+            case umbra_sqrt_f32: p->inst[i] = (struct inst){.fn=sqrt_f32, .x=inst[i].x-i}; break;
+            case umbra_fma_f32:  p->inst[i] = (struct inst){.fn= fma_f32, .x=inst[i].x-i, .y=inst[i].y-i, .z=inst[i].z-i}; break;
 
             case umbra_add_i16: p->inst[i] = (struct inst){.fn=add_i16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
             case umbra_sub_i16: p->inst[i] = (struct inst){.fn=sub_i16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
