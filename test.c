@@ -146,7 +146,7 @@ static void test_i32_ops(void) {
         struct umbra_inst const inst[] = {
             {umbra_load_32, .ptr=0},
             {umbra_load_32, .ptr=1},
-            {umbra_shr_i32, .x=0, .y=1},
+            {umbra_shr_u32, .x=0, .y=1},
             {umbra_store_32, .ptr=2, .x=2},
         };
         struct umbra_program *p = umbra_program(inst, len(inst));
@@ -162,7 +162,7 @@ static void test_i32_ops(void) {
         struct umbra_inst const inst[] = {
             {umbra_load_32, .ptr=0},
             {umbra_load_32, .ptr=1},
-            {umbra_sra_i32, .x=0, .y=1},
+            {umbra_shr_s32, .x=0, .y=1},
             {umbra_store_32, .ptr=2, .x=2},
         };
         struct umbra_program *p = umbra_program(inst, len(inst));
@@ -373,7 +373,7 @@ static void test_i16_ops(void) {
         struct umbra_inst const inst[] = {
             {umbra_load_16, .ptr=0},
             {umbra_load_16, .ptr=1},
-            {umbra_shr_i16, .x=0, .y=1},
+            {umbra_shr_u16, .x=0, .y=1},
             {umbra_store_16, .ptr=2, .x=2},
         };
         struct umbra_program *p = umbra_program(inst, len(inst));
@@ -387,7 +387,7 @@ static void test_i16_ops(void) {
         struct umbra_inst const inst[] = {
             {umbra_load_16, .ptr=0},
             {umbra_load_16, .ptr=1},
-            {umbra_sra_i16, .x=0, .y=1},
+            {umbra_shr_s16, .x=0, .y=1},
             {umbra_store_16, .ptr=2, .x=2},
         };
         struct umbra_program *p = umbra_program(inst, len(inst));
@@ -454,6 +454,288 @@ static void test_i16_ops(void) {
         umbra_program_run(p, 2, (void*[]){cond, a, b, z});
         (z[0] == 10) here;
         (z[1] == 40) here;
+        umbra_program_free(p);
+    }
+}
+
+static void test_cmp_i32(void) {
+    // eq, ne, lt, le, gt, ge produce -1/0 masks; use sel to verify
+    {
+        struct umbra_inst const inst[] = {
+            {umbra_load_32, .ptr=0},
+            {umbra_load_32, .ptr=1},
+            {umbra_eq_i32, .x=0, .y=1},
+            {umbra_store_32, .ptr=2, .x=2},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        int x[] = {1,2,3}, y[] = {1,9,3}, z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){x,y,z});
+        (z[0] == -1) here;
+        (z[1] ==  0) here;
+        (z[2] == -1) here;
+        umbra_program_free(p);
+    }
+    {
+        struct umbra_inst const inst[] = {
+            {umbra_load_32, .ptr=0},
+            {umbra_load_32, .ptr=1},
+            {umbra_ne_i32, .x=0, .y=1},
+            {umbra_store_32, .ptr=2, .x=2},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        int x[] = {1,2}, y[] = {1,9}, z[2] = {0};
+        umbra_program_run(p, 2, (void*[]){x,y,z});
+        (z[0] ==  0) here;
+        (z[1] == -1) here;
+        umbra_program_free(p);
+    }
+    {
+        struct umbra_inst const inst[] = {
+            {umbra_load_32, .ptr=0},
+            {umbra_load_32, .ptr=1},
+            {umbra_lt_s32, .x=0, .y=1},
+            {umbra_store_32, .ptr=2, .x=2},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        int x[] = {1,5,3}, y[] = {2,5,1}, z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){x,y,z});
+        (z[0] == -1) here;
+        (z[1] ==  0) here;
+        (z[2] ==  0) here;
+        umbra_program_free(p);
+    }
+    {
+        struct umbra_inst const inst[] = {
+            {umbra_load_32, .ptr=0},
+            {umbra_load_32, .ptr=1},
+            {umbra_le_s32, .x=0, .y=1},
+            {umbra_store_32, .ptr=2, .x=2},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        int x[] = {1,5,3}, y[] = {2,5,1}, z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){x,y,z});
+        (z[0] == -1) here;
+        (z[1] == -1) here;
+        (z[2] ==  0) here;
+        umbra_program_free(p);
+    }
+    {
+        struct umbra_inst const inst[] = {
+            {umbra_load_32, .ptr=0},
+            {umbra_load_32, .ptr=1},
+            {umbra_gt_s32, .x=0, .y=1},
+            {umbra_store_32, .ptr=2, .x=2},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        int x[] = {3,5,1}, y[] = {2,5,3}, z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){x,y,z});
+        (z[0] == -1) here;
+        (z[1] ==  0) here;
+        (z[2] ==  0) here;
+        umbra_program_free(p);
+    }
+    {
+        struct umbra_inst const inst[] = {
+            {umbra_load_32, .ptr=0},
+            {umbra_load_32, .ptr=1},
+            {umbra_ge_s32, .x=0, .y=1},
+            {umbra_store_32, .ptr=2, .x=2},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        int x[] = {3,5,1}, y[] = {2,5,3}, z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){x,y,z});
+        (z[0] == -1) here;
+        (z[1] == -1) here;
+        (z[2] ==  0) here;
+        umbra_program_free(p);
+    }
+    // unsigned: ltu, leu, gtu, geu
+    {
+        struct umbra_inst const inst[] = {
+            {umbra_load_32, .ptr=0},
+            {umbra_load_32, .ptr=1},
+            {umbra_lt_u32, .x=0, .y=1},
+            {umbra_store_32, .ptr=2, .x=2},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        int x[] = {1, -1}, y[] = {2, 1}, z[2] = {0};
+        umbra_program_run(p, 2, (void*[]){x,y,z});
+        (z[0] == -1) here;  // 1 < 2 unsigned
+        (z[1] ==  0) here;  // 0xFFFFFFFF not < 1 unsigned
+        umbra_program_free(p);
+    }
+    // sel with comparison mask
+    {
+        struct umbra_inst const inst[] = {
+            {umbra_load_32, .ptr=0},
+            {umbra_load_32, .ptr=1},
+            {umbra_lt_s32, .x=0, .y=1},
+            {umbra_sel_i32, .x=2, .y=0, .z=1},  // pick min(x,y)
+            {umbra_store_32, .ptr=2, .x=3},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        int x[] = {5,1,3}, y[] = {2,4,3}, z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){x,y,z});
+        (z[0] == 2) here;
+        (z[1] == 1) here;
+        (z[2] == 3) here;
+        umbra_program_free(p);
+    }
+}
+
+static void test_cmp_i16(void) {
+    {
+        struct umbra_inst const inst[] = {
+            {umbra_load_16, .ptr=0},
+            {umbra_load_16, .ptr=1},
+            {umbra_eq_i16, .x=0, .y=1},
+            {umbra_store_16, .ptr=2, .x=2},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        short x[] = {1,2,3}, y[] = {1,9,3}, z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){x,y,z});
+        (z[0] == -1) here;
+        (z[1] ==  0) here;
+        (z[2] == -1) here;
+        umbra_program_free(p);
+    }
+    {
+        struct umbra_inst const inst[] = {
+            {umbra_load_16, .ptr=0},
+            {umbra_load_16, .ptr=1},
+            {umbra_lt_s16, .x=0, .y=1},
+            {umbra_store_16, .ptr=2, .x=2},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        short x[] = {1,5,3}, y[] = {2,5,1}, z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){x,y,z});
+        (z[0] == -1) here;
+        (z[1] ==  0) here;
+        (z[2] ==  0) here;
+        umbra_program_free(p);
+    }
+    // sel with comparison mask
+    {
+        struct umbra_inst const inst[] = {
+            {umbra_load_16, .ptr=0},
+            {umbra_load_16, .ptr=1},
+            {umbra_lt_s16, .x=0, .y=1},
+            {umbra_sel_i16, .x=2, .y=0, .z=1},
+            {umbra_store_16, .ptr=2, .x=3},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        short x[] = {5,1}, y[] = {2,4}, z[2] = {0};
+        umbra_program_run(p, 2, (void*[]){x,y,z});
+        (z[0] == 2) here;
+        (z[1] == 1) here;
+        umbra_program_free(p);
+    }
+}
+
+static void test_cmp_f32(void) {
+    // eq produces I32 mask
+    {
+        struct umbra_inst const inst[] = {
+            {umbra_load_32, .ptr=0},
+            {umbra_load_32, .ptr=1},
+            {umbra_eq_f32, .x=0, .y=1},
+            {umbra_store_32, .ptr=2, .x=2},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        float x[] = {1,2,3}, y[] = {1,9,3};
+        int z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){x,y,z});
+        (z[0] == -1) here;
+        (z[1] ==  0) here;
+        (z[2] == -1) here;
+        umbra_program_free(p);
+    }
+    // lt
+    {
+        struct umbra_inst const inst[] = {
+            {umbra_load_32, .ptr=0},
+            {umbra_load_32, .ptr=1},
+            {umbra_lt_f32, .x=0, .y=1},
+            {umbra_store_32, .ptr=2, .x=2},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        float x[] = {1,5,3}, y[] = {2,5,1};
+        int z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){x,y,z});
+        (z[0] == -1) here;
+        (z[1] ==  0) here;
+        (z[2] ==  0) here;
+        umbra_program_free(p);
+    }
+    // sel with f32 comparison: pick min
+    {
+        struct umbra_inst const inst[] = {
+            {umbra_load_32, .ptr=0},
+            {umbra_load_32, .ptr=1},
+            {umbra_lt_f32, .x=0, .y=1},
+            {umbra_sel_i32, .x=2, .y=0, .z=1},
+            {umbra_store_32, .ptr=2, .x=3},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        float x[] = {5,1,3}, y[] = {2,4,3}, z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){x,y,z});
+        equiv(z[0], 2) here;
+        equiv(z[1], 1) here;
+        equiv(z[2], 3) here;
+        umbra_program_free(p);
+    }
+}
+
+static void test_cmp_f16(void) {
+    // eq produces I16 mask
+    {
+        struct umbra_inst const inst[] = {
+            {umbra_load_16, .ptr=0},
+            {umbra_load_16, .ptr=1},
+            {umbra_eq_f16, .x=0, .y=1},
+            {umbra_store_16, .ptr=2, .x=2},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        __fp16 x[] = {1,2,3}, y[] = {1,9,3};
+        short z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){x,y,z});
+        (z[0] == -1) here;
+        (z[1] ==  0) here;
+        (z[2] == -1) here;
+        umbra_program_free(p);
+    }
+    // lt
+    {
+        struct umbra_inst const inst[] = {
+            {umbra_load_16, .ptr=0},
+            {umbra_load_16, .ptr=1},
+            {umbra_lt_f16, .x=0, .y=1},
+            {umbra_store_16, .ptr=2, .x=2},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        __fp16 x[] = {1,5,3}, y[] = {2,5,1};
+        short z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){x,y,z});
+        (z[0] == -1) here;
+        (z[1] ==  0) here;
+        (z[2] ==  0) here;
+        umbra_program_free(p);
+    }
+    // sel with f16 comparison: pick min
+    {
+        struct umbra_inst const inst[] = {
+            {umbra_load_16, .ptr=0},
+            {umbra_load_16, .ptr=1},
+            {umbra_lt_f16, .x=0, .y=1},
+            {umbra_sel_i16, .x=2, .y=0, .z=1},
+            {umbra_store_16, .ptr=2, .x=3},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        __fp16 x[] = {5,1}, y[] = {2,4};
+        __fp16 z[2] = {0};
+        umbra_program_run(p, 2, (void*[]){x,y,z});
+        equiv((float)z[0], 2) here;
+        equiv((float)z[1], 1) here;
         umbra_program_free(p);
     }
 }
@@ -554,6 +836,10 @@ int main(void) {
     test_i32_ops();
     test_f16_ops();
     test_i16_ops();
+    test_cmp_i32();
+    test_cmp_i16();
+    test_cmp_f32();
+    test_cmp_f16();
     test_imm();
     test_fma_peephole();
     test_large_n();
