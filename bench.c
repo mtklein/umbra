@@ -18,11 +18,12 @@ int main(int argc, char *argv[]) {
     }
 
     struct umbra_inst const inst[] = {
-        [0] = {umbra_load_32,  .ptr=0},
-        [1] = {umbra_load_32,  .ptr=1},
-        [2] = {umbra_mul_f32,  .x=0, .y=1},
-        [3] = {umbra_add_f32,  .x=0, .y=2},
-        [4] = {umbra_store_32, .ptr=2, .x=3},
+        [0] = {.op=umbra_lane},
+        [1] = {umbra_load_32,  .ptr=0, .x=0},
+        [2] = {umbra_load_32,  .ptr=1, .x=0},
+        [3] = {umbra_mul_f32,  .x=1, .y=2},
+        [4] = {umbra_add_f32,  .x=1, .y=3},
+        [5] = {umbra_store_32, .ptr=2, .x=0, .y=4},
     };
     struct umbra_program *p = umbra_program(inst, len(inst));
 

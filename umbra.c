@@ -44,15 +44,24 @@ struct umbra_program {
 op(imm_16) { v->i16 = (I16){0} + (int16_t)ip->x; next; }
 op(imm_32) { v->i32 = (I32){0} +          ip->x; next; }
 
+op(lane) {
+    if (end & (K-1)) { v->i32 = (I32){0} + (end - 1); }
+    else {
+        I32 iota = {0,1,2,3,4,5,6,7};
+        v->i32 = iota + (end - K);
+    }
+    next;
+}
+
 op(uni_16) {
     int16_t uni;
-    __builtin_memcpy(&uni, ptr[ip->x], sizeof uni);
+    __builtin_memcpy(&uni, (int16_t*)ptr[ip->x] + ip->y, sizeof uni);
     v->i16 = (I16){0} + uni;
     next;
 }
 op(uni_32) {
     int32_t uni;
-    __builtin_memcpy(&uni, ptr[ip->x], sizeof uni);
+    __builtin_memcpy(&uni, (int32_t*)ptr[ip->x] + ip->y, sizeof uni);
     v->i32 = (I32){0} + uni;
     next;
 }
@@ -95,6 +104,21 @@ op(store_32) {
     int32_t *dst = ptr[ip->x];
     if (end & (K-1)) { __builtin_memcpy(dst + end-1, v + ip->y, 4  ); }
     else             { __builtin_memcpy(dst + end-K, v + ip->y, 4*K); }
+    next;
+}
+
+op(scatter_16) {
+    for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
+        __builtin_memcpy((char*)ptr[ip->x] + 2*v[ip->z].i32[l],
+                         (char*)&v[ip->y].i16 + 2*l, 2);
+    }
+    next;
+}
+op(scatter_32) {
+    for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
+        __builtin_memcpy((char*)ptr[ip->x] + 4*v[ip->z].i32[l],
+                         (char*)&v[ip->y].i32 + 4*l, 4);
+    }
     next;
 }
 
@@ -277,17 +301,39 @@ struct umbra_program* umbra_program(struct umbra_inst const inst[], int insts) {
     struct umbra_program *p = malloc(sizeof *p + (size_t)(insts+1) * sizeof *p->inst);
     for (int i = 0; i < insts; i++) {
         switch (inst[i].op) {
-            case umbra_imm_16:    p->inst[i] = (struct inst){.fn=imm_16,    .x=inst[i].immi};              break;
-            case umbra_uni_16:    p->inst[i] = (struct inst){.fn=uni_16,    .x=inst[i].ptr};               break;
-            case umbra_gather_16: p->inst[i] = (struct inst){.fn=gather_16, .x=inst[i].ptr, .y=inst[i].y-i}; break;
-            case umbra_load_16:   p->inst[i] = (struct inst){.fn=load_16,   .x=inst[i].ptr};               break;
-            case umbra_store_16:  p->inst[i] = (struct inst){.fn=store_16,  .x=inst[i].ptr, .y=inst[i].x-i}; break;
+            case umbra_imm_16: p->inst[i] = (struct inst){.fn=imm_16, .x=inst[i].immi}; break;
+            case umbra_imm_32: p->inst[i] = (struct inst){.fn=imm_32, .x=inst[i].immi}; break;
+            case umbra_lane:   p->inst[i] = (struct inst){.fn=lane};                    break;
 
-            case umbra_imm_32:    p->inst[i] = (struct inst){.fn=imm_32,    .x=inst[i].immi};              break;
-            case umbra_uni_32:    p->inst[i] = (struct inst){.fn=uni_32,    .x=inst[i].ptr};               break;
-            case umbra_gather_32: p->inst[i] = (struct inst){.fn=gather_32, .x=inst[i].ptr, .y=inst[i].y-i}; break;
-            case umbra_load_32:   p->inst[i] = (struct inst){.fn=load_32,   .x=inst[i].ptr};               break;
-            case umbra_store_32:  p->inst[i] = (struct inst){.fn=store_32,  .x=inst[i].ptr, .y=inst[i].x-i}; break;
+            case umbra_load_16:
+                if (inst[inst[i].x].op == umbra_lane) {
+                    p->inst[i] = (struct inst){.fn=load_16,   .x=inst[i].ptr};
+                } else if (inst[inst[i].x].op == umbra_imm_32) {
+                    p->inst[i] = (struct inst){.fn=uni_16,    .x=inst[i].ptr, .y=inst[inst[i].x].immi};
+                } else {
+                    p->inst[i] = (struct inst){.fn=gather_16, .x=inst[i].ptr, .y=inst[i].x-i};
+                } break;
+            case umbra_load_32:
+                if (inst[inst[i].x].op == umbra_lane) {
+                    p->inst[i] = (struct inst){.fn=load_32,   .x=inst[i].ptr};
+                } else if (inst[inst[i].x].op == umbra_imm_32) {
+                    p->inst[i] = (struct inst){.fn=uni_32,    .x=inst[i].ptr, .y=inst[inst[i].x].immi};
+                } else {
+                    p->inst[i] = (struct inst){.fn=gather_32, .x=inst[i].ptr, .y=inst[i].x-i};
+                } break;
+
+            case umbra_store_16:
+                if (inst[inst[i].x].op == umbra_lane) {
+                    p->inst[i] = (struct inst){.fn=store_16,   .x=inst[i].ptr, .y=inst[i].y-i};
+                } else {
+                    p->inst[i] = (struct inst){.fn=scatter_16, .x=inst[i].ptr, .y=inst[i].y-i, .z=inst[i].x-i};
+                } break;
+            case umbra_store_32:
+                if (inst[inst[i].x].op == umbra_lane) {
+                    p->inst[i] = (struct inst){.fn=store_32,   .x=inst[i].ptr, .y=inst[i].y-i};
+                } else {
+                    p->inst[i] = (struct inst){.fn=scatter_32, .x=inst[i].ptr, .y=inst[i].y-i, .z=inst[i].x-i};
+                } break;
 
             case umbra_add_f16:
                 p->inst[i] = (struct inst){.fn=add_f16, .x=inst[i].x-i, .y=inst[i].y-i};

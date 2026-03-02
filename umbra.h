@@ -4,8 +4,9 @@
 
 struct umbra_inst {
     enum {
-        umbra_imm_16, umbra_uni_16, umbra_gather_16, umbra_load_16, umbra_store_16,
-        umbra_imm_32, umbra_uni_32, umbra_gather_32, umbra_load_32, umbra_store_32,
+        umbra_imm_16, umbra_load_16, umbra_store_16,
+        umbra_imm_32, umbra_load_32, umbra_store_32,
+        umbra_lane,
 
         umbra_add_f16, umbra_sub_f16, umbra_mul_f16, umbra_div_f16,
         umbra_add_f32, umbra_sub_f32, umbra_mul_f32, umbra_div_f32,
