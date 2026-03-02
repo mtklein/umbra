@@ -21,7 +21,6 @@ struct umbra_inst {
     int    x,y,z;
     union { int immi; float immf; };
     int    ptr;
-    size_t offset;
 };
 
 struct umbra_program* umbra_program     (struct umbra_inst const inst[], int insts);

@@ -1,35 +1,35 @@
 #include "umbra.h"
+#include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
 
 #define K 8
+typedef  int16_t I16 __attribute__((vector_size(K*2)));
+typedef  int32_t I32 __attribute__((vector_size(K*4)));
+typedef uint16_t U16 __attribute__((vector_size(K*2)));
+typedef uint32_t U32 __attribute__((vector_size(K*4)));
+typedef    float F32 __attribute__((vector_size(K*4)));
 
-typedef short          I16v __attribute__((vector_size(K*2)));
-typedef int            I32v __attribute__((vector_size(K*4)));
-typedef unsigned short U16v __attribute__((vector_size(K*2)));
-typedef unsigned int   U32v __attribute__((vector_size(K*4)));
-typedef float          F32v __attribute__((vector_size(K*4)));
-
-#if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
-    typedef _Float16 F16v __attribute__((vector_size(K*2)));
-#elif defined(__F16C__)
-    typedef __fp16   F16v __attribute__((vector_size(K*2)));
+#if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) || defined(__F16C__)
+    typedef _Float16 F16 __attribute__((vector_size(K*2)));
+#else
+    #define cast(T,v) __builtin_convertvector(v,T)
 #endif
 
 typedef union {
-    I16v i16;
-    I32v i32;
+    I16 i16;
+    I32 i32;
+    U16 u16;
+    U32 u32;
 #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) || defined(__F16C__)
-    F16v f16;
+    F16 f16;
 #endif
-    F32v f32;
+    F32 f32;
 } val;
 
 struct inst {
     int  (*fn)(struct inst const *ip, val *v, int end, void* ptr[]);
     int    x,y,z;
-    int    imm;
-    size_t offset;
+    int    :32;
 };
 
 struct umbra_program {
@@ -41,235 +41,186 @@ struct umbra_program {
 #define op(name) static int name(struct inst const *ip, val *v, int end, void* ptr[])
 #define next return ip[1].fn(ip+1, v+1, end, ptr)
 
-// Tail helpers: when end & (K-1), we're processing a partial vector.
-#define tail16(body) do {                               \
-    int tail = end & (K-1);                             \
-    if (tail) { v->i16 = (I16v){0}; body(tail, 2); }   \
-    else      {                      body(K,    2); }   \
-} while(0)
-
-#define tail32(body) do {                               \
-    int tail = end & (K-1);                             \
-    if (tail) { v->i32 = (I32v){0}; body(tail, 4); }   \
-    else      {                      body(K,    4); }   \
-} while(0)
-
-// --- 16-bit memory ops ---
-op(imm_16) { v->i16 = (I16v){0} + (short)ip->imm; next; }
+op(imm_16) { v->i16 = (I16){0} + (int16_t)ip->x; next; }
+op(imm_32) { v->i32 = (I32){0} +          ip->x; next; }
 
 op(uni_16) {
-    short tmp;
-    memcpy(&tmp, ptr[ip->x], 2);
-    v->i16 = (I16v){0} + tmp;
+    int16_t uni;
+    __builtin_memcpy(&uni, ptr[ip->x], sizeof uni);
+    v->i16 = (I16){0} + uni;
+    next;
+}
+op(uni_32) {
+    int32_t uni;
+    __builtin_memcpy(&uni, ptr[ip->x], sizeof uni);
+    v->i32 = (I32){0} + uni;
     next;
 }
 
 op(gather_16) {
-    int tail = end & (K-1);
-    int cnt  = tail ? tail : K;
-    v->i16 = (I16v){0};
-    for (int k = 0; k < cnt; k++) {
-        memcpy((char*)&v->i16 + (size_t)k * 2,
-               (char*)ptr[ip->x] + (size_t)v[ip->y].i32[k] * 2, 2);
+    for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
+        __builtin_memcpy((char*)&v->i16 + 2*l,
+                         (char*)ptr[ip->x] + 2*v[ip->y].i32[l], 2);
+    }
+    next;
+}
+op(gather_32) {
+    for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
+        __builtin_memcpy((char*)&v->i32 + 4*l,
+                         (char*)ptr[ip->x] + 4*v[ip->y].i32[l], 4);
     }
     next;
 }
 
 op(load_16) {
-#define body(n,sz) memcpy(&v->i16, (char*)ptr[ip->x] + (size_t)(end-(n)) * (size_t)(sz), (size_t)(n) * (size_t)(sz))
-    tail16(body);
-#undef body
+    int16_t const *src = ptr[ip->x];
+    if (end & (K-1)) { __builtin_memcpy(v, src + end-1, 2  ); }
+    else             { __builtin_memcpy(v, src + end-K, 2*K); }
+    next;
+}
+op(load_32) {
+    int32_t const *src = ptr[ip->x];
+    if (end & (K-1)) { __builtin_memcpy(v, src + end-1, 4  ); }
+    else             { __builtin_memcpy(v, src + end-K, 4*K); }
     next;
 }
 
 op(store_16) {
-    int tail = end & (K-1);
-    int cnt  = tail ? tail : K;
-    memcpy((char*)ptr[ip->x] + (size_t)(end - cnt) * 2, &v[ip->y].i16, (size_t)cnt * 2);
+    int16_t *dst = ptr[ip->x];
+    if (end & (K-1)) { __builtin_memcpy(dst + end-1, v + ip->y, 2  ); }
+    else             { __builtin_memcpy(dst + end-K, v + ip->y, 2*K); }
     next;
 }
-
-// --- 32-bit memory ops ---
-op(imm_32) { v->i32 = (I32v){0} + ip->imm; next; }
-
-op(uni_32) {
-    int tmp;
-    memcpy(&tmp, ptr[ip->x], 4);
-    v->i32 = (I32v){0} + tmp;
-    next;
-}
-
-op(gather_32) {
-    int tail = end & (K-1);
-    int cnt  = tail ? tail : K;
-    v->i32 = (I32v){0};
-    for (int k = 0; k < cnt; k++) {
-        memcpy((char*)&v->i32 + (size_t)k * 4,
-               (char*)ptr[ip->x] + (size_t)v[ip->y].i32[k] * 4, 4);
-    }
-    next;
-}
-
-op(load_32) {
-#define body(n,sz) memcpy(&v->i32, (char*)ptr[ip->x] + (size_t)(end-(n)) * (size_t)(sz), (size_t)(n) * (size_t)(sz))
-    tail32(body);
-#undef body
-    next;
-}
-
 op(store_32) {
-    int tail = end & (K-1);
-    int cnt  = tail ? tail : K;
-    memcpy((char*)ptr[ip->x] + (size_t)(end - cnt) * 4, &v[ip->y].i32, (size_t)cnt * 4);
+    int32_t *dst = ptr[ip->x];
+    if (end & (K-1)) { __builtin_memcpy(dst + end-1, v + ip->y, 4  ); }
+    else             { __builtin_memcpy(dst + end-K, v + ip->y, 4*K); }
     next;
 }
 
-// --- f16 arithmetic ---
-
-#if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
-
-#define f16_bin(name, OP) \
-    op(name) { v->f16 = v[ip->x].f16 OP v[ip->y].f16; next; }
-f16_bin(add_f16, +)
-f16_bin(sub_f16, -)
-f16_bin(mul_f16, *)
-f16_bin(div_f16, /)
-#undef f16_bin
-
-op(fma_f16) { v->f16 = v[ip->x].f16 * v[ip->y].f16 + v[ip->z].f16; next; }
-
-#elif defined(__F16C__)
-
-#define f16_bin(name, OP) \
-    op(name) { \
-        v->f16 = __builtin_convertvector( \
-            __builtin_convertvector(v[ip->x].f16, F32v) OP \
-            __builtin_convertvector(v[ip->y].f16, F32v), F16v); \
-        next; \
-    }
-f16_bin(add_f16, +)
-f16_bin(sub_f16, -)
-f16_bin(mul_f16, *)
-f16_bin(div_f16, /)
-#undef f16_bin
-
-op(fma_f16) {
-    v->f16 = __builtin_convertvector(
-        __builtin_convertvector(v[ip->x].f16, F32v) *
-        __builtin_convertvector(v[ip->y].f16, F32v) +
-        __builtin_convertvector(v[ip->z].f16, F32v), F16v);
-    next;
-}
+#if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) || defined(__F16C__)
+    op(add_f16) { v->f16 = v[ip->x].f16 + v[ip->y].f16               ; next; }
+    op(sub_f16) { v->f16 = v[ip->x].f16 - v[ip->y].f16               ; next; }
+    op(mul_f16) { v->f16 = v[ip->x].f16 * v[ip->y].f16               ; next; }
+    op(div_f16) { v->f16 = v[ip->x].f16 / v[ip->y].f16               ; next; }
+    op(fma_f16) { v->f16 = v[ip->x].f16 * v[ip->y].f16 + v[ip->z].f16; next; }
 
 #else
 
-static F32v f16_to_f32(I16v h) {
-    U16v uh = (U16v)h;
-    U32v sign = __builtin_convertvector(uh >> 15, U32v) << 31;
-    U32v exp  = __builtin_convertvector((uh >> 10) & 0x1f, U32v);
-    U32v mant = __builtin_convertvector(uh & 0x3ff, U32v);
+    static F32 f16_to_f32(U16 h) {
+        U32 sign = cast(U32, h >> 15) << 31;
+        U32 exp  = cast(U32, (h >> 10) & 0x1f);
+        U32 mant = cast(U32, h & 0x3ff);
 
-    U32v normal = sign | ((exp + 112) << 23) | (mant << 13);
-    U32v zero   = sign;
-    U32v infnan = sign | (0xffu << 23) | (mant << 13);
+        U32 normal = sign | ((exp + 112) << 23) | (mant << 13);
+        U32 zero   = sign;
+        U32 infnan = sign | (0xffu << 23) | (mant << 13);
 
-    U32v is_zero   = (U32v)-(exp == 0);
-    U32v is_infnan = (U32v)-(exp == 31);
+        U32 is_zero   = (U32)-(exp == 0);
+        U32 is_infnan = (U32)-(exp == 31);
 
-    U32v bits = (is_zero & zero) | (is_infnan & infnan) | (~is_zero & ~is_infnan & normal);
-    F32v result;
-    __builtin_memcpy(&result, &bits, sizeof bits);
-    return result;
-}
-
-static I16v f32_to_f16(F32v f) {
-    U32v bits;
-    __builtin_memcpy(&bits, &f, sizeof f);
-
-    U32v sign = (bits >> 31) << 15;
-    I32v exp  = (I32v)((bits >> 23) & 0xff) - 127 + 15;
-    U32v mant = (bits >> 13) & 0x3ff;
-
-    U32v round_bit = (bits >> 12) & 1;
-    U32v sticky    = (U32v)-((bits & 0xfff) != 0);
-    mant += round_bit & (sticky | (mant & 1));
-    U32v mant_overflow = mant >> 10;
-    exp += (I32v)mant_overflow;
-    mant &= 0x3ff;
-
-    U32v normal       = sign | (U32v)((U32v)exp << 10) | mant;
-    U32v inf           = sign | 0x7c00;
-    U32v is_overflow   = (U32v)-(exp >= 31);
-    U32v is_underflow  = (U32v)-(exp <= 0);
-    U32v src_exp       = (bits >> 23) & 0xff;
-    U32v is_infnan     = (U32v)-(src_exp == 0xff);
-    U32v infnan        = sign | 0x7c00 | mant;
-
-    U32v result32 = (is_underflow & sign)
-                  | (is_overflow & ~is_infnan & inf)
-                  | (is_infnan & infnan)
-                  | (~is_underflow & ~is_overflow & ~is_infnan & normal);
-    return (I16v)__builtin_convertvector(result32, U16v);
-}
-
-#define f16_bin(name, OP) \
-    op(name) { \
-        v->i16 = f32_to_f16(f16_to_f32(v[ip->x].i16) OP f16_to_f32(v[ip->y].i16)); \
-        next; \
+        U32 bits = (is_zero & zero)
+                 | (is_infnan & infnan)
+                 | (~is_zero & ~is_infnan & normal);
+        F32 result;
+        __builtin_memcpy(&result, &bits, sizeof bits);
+        return result;
     }
-f16_bin(add_f16, +)
-f16_bin(sub_f16, -)
-f16_bin(mul_f16, *)
-f16_bin(div_f16, /)
-#undef f16_bin
 
-op(fma_f16) {
-    v->i16 = f32_to_f16(f16_to_f32(v[ip->x].i16) * f16_to_f32(v[ip->y].i16)
-                       + f16_to_f32(v[ip->z].i16));
+    static U16 f32_to_f16(F32 f) {
+        U32 bits;
+        __builtin_memcpy(&bits, &f, sizeof f);
+
+        U32 sign = (bits >> 31) << 15;
+        I32 exp  = (I32)((bits >> 23) & 0xff) - 127 + 15;
+        U32 mant = (bits >> 13) & 0x3ff;
+
+        U32 round_bit = (bits >> 12) & 1;
+        U32 sticky    = (U32)-((bits & 0xfff) != 0);
+        mant += round_bit & (sticky | (mant & 1));
+        U32 mant_overflow = mant >> 10;
+        exp += (I32)mant_overflow;
+        mant &= 0x3ff;
+
+        U32 normal        = sign | (U32)((U32)exp << 10) | mant;
+        U32 inf           = sign | 0x7c00;
+        U32 is_overflow   = (U32)-(exp >= 31);
+        U32 is_underflow  = (U32)-(exp <= 0);
+        U32 src_exp       = (bits >> 23) & 0xff;
+        U32 is_infnan     = (U32)-(src_exp == 0xff);
+        U32 infnan        = sign | 0x7c00 | mant;
+
+        U32 result32 = (is_underflow & sign)
+                      | (is_overflow & ~is_infnan & inf)
+                      | (is_infnan & infnan)
+                      | (~is_underflow & ~is_overflow & ~is_infnan & normal);
+        return cast(U16, result32);
+    }
+
+    op(add_f16) {
+        v->u16 = f32_to_f16(f16_to_f32(v[ip->x].u16) + f16_to_f32(v[ip->y].u16));
+        next;
+    }
+    op(sub_f16) {
+        v->u16 = f32_to_f16(f16_to_f32(v[ip->x].u16) - f16_to_f32(v[ip->y].u16));
+        next;
+    }
+    op(mul_f16) {
+        v->u16 = f32_to_f16(f16_to_f32(v[ip->x].u16) * f16_to_f32(v[ip->y].u16));
+        next;
+    }
+    op(div_f16) {
+        v->u16 = f32_to_f16(f16_to_f32(v[ip->x].u16) / f16_to_f32(v[ip->y].u16));
+        next;
+    }
+    op(fma_f16) {
+        v->u16 = f32_to_f16(f16_to_f32(v[ip->x].u16) * f16_to_f32(v[ip->y].u16)
+                                                     + f16_to_f32(v[ip->z].u16));
+        next;
+    }
+#endif
+
+op(add_f32) { v->f32 = v[ip->x].f32 + v[ip->y].f32               ; next; }
+op(sub_f32) { v->f32 = v[ip->x].f32 - v[ip->y].f32               ; next; }
+op(mul_f32) { v->f32 = v[ip->x].f32 * v[ip->y].f32               ; next; }
+op(div_f32) { v->f32 = v[ip->x].f32 / v[ip->y].f32               ; next; }
+op(fma_f32) { v->f32 = v[ip->x].f32 * v[ip->y].f32 + v[ip->z].f32; next; }
+
+op(add_i16) { v->i16 = v[ip->x].i16 +  v[ip->y].i16; next; }
+op(sub_i16) { v->i16 = v[ip->x].i16 -  v[ip->y].i16; next; }
+op(mul_i16) { v->i16 = v[ip->x].i16 *  v[ip->y].i16; next; }
+op(shl_i16) { v->i16 = v[ip->x].i16 << v[ip->y].i16; next; }
+op(shr_i16) { v->u16 = v[ip->x].u16 >> v[ip->y].u16; next; }
+op(sra_i16) { v->i16 = v[ip->x].i16 >> v[ip->y].i16; next; }
+op(and_i16) { v->i16 = v[ip->x].i16 &  v[ip->y].i16; next; }
+op( or_i16) { v->i16 = v[ip->x].i16 |  v[ip->y].i16; next; }
+op(xor_i16) { v->i16 = v[ip->x].i16 ^  v[ip->y].i16; next; }
+op(sel_i16) {
+    v->i16 = ( v[ip->x].i16 & v[ip->y].i16)
+           | (~v[ip->x].i16 & v[ip->z].i16);
     next;
 }
 
-#endif
-
-// --- f32 arithmetic ---
-op(add_f32) { v->f32 = v[ip->x].f32 + v[ip->y].f32; next; }
-op(sub_f32) { v->f32 = v[ip->x].f32 - v[ip->y].f32; next; }
-op(mul_f32) { v->f32 = v[ip->x].f32 * v[ip->y].f32; next; }
-op(div_f32) { v->f32 = v[ip->x].f32 / v[ip->y].f32; next; }
-op(fma_f32) { v->f32 = v[ip->x].f32 * v[ip->y].f32 + v[ip->z].f32; next; }
-
-// --- i16 arithmetic ---
-op(add_i16) { v->i16 = v[ip->x].i16 + v[ip->y].i16; next; }
-op(sub_i16) { v->i16 = v[ip->x].i16 - v[ip->y].i16; next; }
-op(mul_i16) { v->i16 = v[ip->x].i16 * v[ip->y].i16; next; }
-op(shl_i16) { v->i16 = v[ip->x].i16 << v[ip->y].i16; next; }
-op(shr_i16) { v->i16 = (I16v)((U16v)v[ip->x].i16 >> (U16v)v[ip->y].i16); next; }
-op(sra_i16) { v->i16 = v[ip->x].i16 >> v[ip->y].i16; next; }
-op(and_i16) { v->i16 = v[ip->x].i16 & v[ip->y].i16; next; }
-op( or_i16) { v->i16 = v[ip->x].i16 | v[ip->y].i16; next; }
-op(xor_i16) { v->i16 = v[ip->x].i16 ^ v[ip->y].i16; next; }
-op(sel_i16) { v->i16 = (v[ip->x].i16 & v[ip->y].i16) | (~v[ip->x].i16 & v[ip->z].i16); next; }
-
-// --- i32 arithmetic ---
-op(add_i32) { v->i32 = v[ip->x].i32 + v[ip->y].i32; next; }
-op(sub_i32) { v->i32 = v[ip->x].i32 - v[ip->y].i32; next; }
-op(mul_i32) { v->i32 = v[ip->x].i32 * v[ip->y].i32; next; }
+op(add_i32) { v->i32 = v[ip->x].i32 +  v[ip->y].i32; next; }
+op(sub_i32) { v->i32 = v[ip->x].i32 -  v[ip->y].i32; next; }
+op(mul_i32) { v->i32 = v[ip->x].i32 *  v[ip->y].i32; next; }
 op(shl_i32) { v->i32 = v[ip->x].i32 << v[ip->y].i32; next; }
-op(shr_i32) { v->i32 = (I32v)((U32v)v[ip->x].i32 >> (U32v)v[ip->y].i32); next; }
+op(shr_i32) { v->u32 = v[ip->x].u32 >> v[ip->y].u32; next; }
 op(sra_i32) { v->i32 = v[ip->x].i32 >> v[ip->y].i32; next; }
-op(and_i32) { v->i32 = v[ip->x].i32 & v[ip->y].i32; next; }
-op( or_i32) { v->i32 = v[ip->x].i32 | v[ip->y].i32; next; }
-op(xor_i32) { v->i32 = v[ip->x].i32 ^ v[ip->y].i32; next; }
-op(sel_i32) { v->i32 = (v[ip->x].i32 & v[ip->y].i32) | (~v[ip->x].i32 & v[ip->z].i32); next; }
+op(and_i32) { v->i32 = v[ip->x].i32 &  v[ip->y].i32; next; }
+op( or_i32) { v->i32 = v[ip->x].i32 |  v[ip->y].i32; next; }
+op(xor_i32) { v->i32 = v[ip->x].i32 ^  v[ip->y].i32; next; }
+op(sel_i32) {
+    v->i32 = ( v[ip->x].i32 & v[ip->y].i32)
+           | (~v[ip->x].i32 & v[ip->z].i32);
+    next;
+}
 
 op(done) { (void)ip; (void)v; (void)end; (void)ptr; return 0; }
 
 #undef next
 #undef op
-#undef tail32
-#undef tail16
 
-// --- compiler ---
 #define binop(sz, name) \
     p->inst[i] = (struct inst){.fn=name##_##sz, .x=inst[i].x - i, .y=inst[i].y - i}; break
 #define triop(sz, name) \
@@ -279,7 +230,7 @@ op(done) { (void)ip; (void)v; (void)end; (void)ptr; return 0; }
 #define storeop(sz) \
     p->inst[i] = (struct inst){.fn=store_##sz, .x=inst[i].ptr, .y=inst[i].x - i}; break
 #define immop(sz) \
-    p->inst[i] = (struct inst){.fn=imm_##sz, .imm=inst[i].immi}; break
+    p->inst[i] = (struct inst){.fn=imm_##sz, .x=inst[i].immi}; break
 #define gatherop(sz) \
     p->inst[i] = (struct inst){.fn=gather_##sz, .x=inst[i].ptr, .y=inst[i].y - i}; break
 #define uniop(sz) \
@@ -391,12 +342,9 @@ struct umbra_program* umbra_program(struct umbra_inst const inst[], int insts) {
 
 void umbra_program_run(struct umbra_program const *p, int n, void *ptr[]) {
     val *v = malloc((size_t)p->insts * sizeof *v);
-    for (int end = K; end <= n; end += K) {
-        p->inst[0].fn(p->inst, v, end, ptr);
-    }
-    if (n & (K-1)) {
-        p->inst[0].fn(p->inst, v, n, ptr);
-    }
+    int i = 0;
+    while (i+K <= n) { p->inst->fn(p->inst, v, i+K, ptr); i += K; }
+    while (i+1 <= n) { p->inst->fn(p->inst, v, i+1, ptr); i += 1; }
     free(v);
 }
 
