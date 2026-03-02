@@ -189,7 +189,7 @@ static void test_i32_ops(void) {
             {.op=umbra_lane},
             {umbra_load_32, .ptr=0, .x=0},
             {umbra_load_32, .ptr=1, .x=0},
-            {umbra_and_i32, .x=1, .y=2},
+            {umbra_and_32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
         struct umbra_program *p = umbra_program(inst, len(inst));
@@ -204,7 +204,7 @@ static void test_i32_ops(void) {
             {.op=umbra_lane},
             {umbra_load_32, .ptr=0, .x=0},
             {umbra_load_32, .ptr=1, .x=0},
-            {umbra_or_i32, .x=1, .y=2},
+            {umbra_or_32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
         struct umbra_program *p = umbra_program(inst, len(inst));
@@ -219,7 +219,7 @@ static void test_i32_ops(void) {
             {.op=umbra_lane},
             {umbra_load_32, .ptr=0, .x=0},
             {umbra_load_32, .ptr=1, .x=0},
-            {umbra_xor_i32, .x=1, .y=2},
+            {umbra_xor_32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
         struct umbra_program *p = umbra_program(inst, len(inst));
@@ -236,7 +236,7 @@ static void test_i32_ops(void) {
             {umbra_load_32, .ptr=0, .x=0},  // cond
             {umbra_load_32, .ptr=1, .x=0},  // a
             {umbra_load_32, .ptr=2, .x=0},  // b
-            {umbra_sel_i32, .x=1, .y=2, .z=3},
+            {umbra_sel_32, .x=1, .y=2, .z=3},
             {umbra_store_32, .ptr=3, .x=0, .y=4},
         };
         struct umbra_program *p = umbra_program(inst, len(inst));
@@ -427,7 +427,7 @@ static void test_i16_ops(void) {
             {.op=umbra_lane},
             {umbra_load_16, .ptr=0, .x=0},
             {umbra_load_16, .ptr=1, .x=0},
-            {umbra_and_i16, .x=1, .y=2},
+            {umbra_and_16, .x=1, .y=2},
             {umbra_store_16, .ptr=2, .x=0, .y=3},
         };
         struct umbra_program *p = umbra_program(inst, len(inst));
@@ -441,7 +441,7 @@ static void test_i16_ops(void) {
             {.op=umbra_lane},
             {umbra_load_16, .ptr=0, .x=0},
             {umbra_load_16, .ptr=1, .x=0},
-            {umbra_or_i16, .x=1, .y=2},
+            {umbra_or_16, .x=1, .y=2},
             {umbra_store_16, .ptr=2, .x=0, .y=3},
         };
         struct umbra_program *p = umbra_program(inst, len(inst));
@@ -455,7 +455,7 @@ static void test_i16_ops(void) {
             {.op=umbra_lane},
             {umbra_load_16, .ptr=0, .x=0},
             {umbra_load_16, .ptr=1, .x=0},
-            {umbra_xor_i16, .x=1, .y=2},
+            {umbra_xor_16, .x=1, .y=2},
             {umbra_store_16, .ptr=2, .x=0, .y=3},
         };
         struct umbra_program *p = umbra_program(inst, len(inst));
@@ -471,7 +471,7 @@ static void test_i16_ops(void) {
             {umbra_load_16, .ptr=0, .x=0},
             {umbra_load_16, .ptr=1, .x=0},
             {umbra_load_16, .ptr=2, .x=0},
-            {umbra_sel_i16, .x=1, .y=2, .z=3},
+            {umbra_sel_16, .x=1, .y=2, .z=3},
             {umbra_store_16, .ptr=3, .x=0, .y=4},
         };
         struct umbra_program *p = umbra_program(inst, len(inst));
@@ -605,7 +605,7 @@ static void test_cmp_i32(void) {
             {umbra_load_32, .ptr=0, .x=0},
             {umbra_load_32, .ptr=1, .x=0},
             {umbra_lt_s32, .x=1, .y=2},
-            {umbra_sel_i32, .x=3, .y=1, .z=2},  // pick min(x,y)
+            {umbra_sel_32, .x=3, .y=1, .z=2},  // pick min(x,y)
             {umbra_store_32, .ptr=2, .x=0, .y=4},
         };
         struct umbra_program *p = umbra_program(inst, len(inst));
@@ -658,7 +658,7 @@ static void test_cmp_i16(void) {
             {umbra_load_16, .ptr=0, .x=0},
             {umbra_load_16, .ptr=1, .x=0},
             {umbra_lt_s16, .x=1, .y=2},
-            {umbra_sel_i16, .x=3, .y=1, .z=2},
+            {umbra_sel_16, .x=3, .y=1, .z=2},
             {umbra_store_16, .ptr=2, .x=0, .y=4},
         };
         struct umbra_program *p = umbra_program(inst, len(inst));
@@ -712,7 +712,7 @@ static void test_cmp_f32(void) {
             {umbra_load_32, .ptr=0, .x=0},
             {umbra_load_32, .ptr=1, .x=0},
             {umbra_lt_f32, .x=1, .y=2},
-            {umbra_sel_i32, .x=3, .y=1, .z=2},
+            {umbra_sel_32, .x=3, .y=1, .z=2},
             {umbra_store_32, .ptr=2, .x=0, .y=4},
         };
         struct umbra_program *p = umbra_program(inst, len(inst));
@@ -767,7 +767,7 @@ static void test_cmp_f16(void) {
             {umbra_load_16, .ptr=0, .x=0},
             {umbra_load_16, .ptr=1, .x=0},
             {umbra_lt_f16, .x=1, .y=2},
-            {umbra_sel_i16, .x=3, .y=1, .z=2},
+            {umbra_sel_16, .x=3, .y=1, .z=2},
             {umbra_store_16, .ptr=2, .x=0, .y=4},
         };
         struct umbra_program *p = umbra_program(inst, len(inst));

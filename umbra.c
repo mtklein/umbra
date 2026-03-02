@@ -246,10 +246,10 @@ op(mul_i16) { v->i16 = v[ip->x].i16 *  v[ip->y].i16; next; }
 op(shl_i16) { v->i16 = v[ip->x].i16 << v[ip->y].i16; next; }
 op(shr_u16) { v->u16 = v[ip->x].u16 >> v[ip->y].u16; next; }
 op(shr_s16) { v->i16 = v[ip->x].i16 >> v[ip->y].i16; next; }
-op(and_i16) { v->i16 = v[ip->x].i16 &  v[ip->y].i16; next; }
-op( or_i16) { v->i16 = v[ip->x].i16 |  v[ip->y].i16; next; }
-op(xor_i16) { v->i16 = v[ip->x].i16 ^  v[ip->y].i16; next; }
-op(sel_i16) {
+op(and_16) { v->i16 = v[ip->x].i16 &  v[ip->y].i16; next; }
+op( or_16) { v->i16 = v[ip->x].i16 |  v[ip->y].i16; next; }
+op(xor_16) { v->i16 = v[ip->x].i16 ^  v[ip->y].i16; next; }
+op(sel_16) {
     v->i16 = ( v[ip->x].i16 & v[ip->y].i16)
            | (~v[ip->x].i16 & v[ip->z].i16);
     next;
@@ -272,10 +272,10 @@ op(mul_i32) { v->i32 = v[ip->x].i32 *  v[ip->y].i32; next; }
 op(shl_i32) { v->i32 = v[ip->x].i32 << v[ip->y].i32; next; }
 op(shr_u32) { v->u32 = v[ip->x].u32 >> v[ip->y].u32; next; }
 op(shr_s32) { v->i32 = v[ip->x].i32 >> v[ip->y].i32; next; }
-op(and_i32) { v->i32 = v[ip->x].i32 &  v[ip->y].i32; next; }
-op( or_i32) { v->i32 = v[ip->x].i32 |  v[ip->y].i32; next; }
-op(xor_i32) { v->i32 = v[ip->x].i32 ^  v[ip->y].i32; next; }
-op(sel_i32) {
+op(and_32) { v->i32 = v[ip->x].i32 &  v[ip->y].i32; next; }
+op( or_32) { v->i32 = v[ip->x].i32 |  v[ip->y].i32; next; }
+op(xor_32) { v->i32 = v[ip->x].i32 ^  v[ip->y].i32; next; }
+op(sel_32) {
     v->i32 = ( v[ip->x].i32 & v[ip->y].i32)
            | (~v[ip->x].i32 & v[ip->z].i32);
     next;
@@ -369,10 +369,10 @@ struct umbra_program* umbra_program(struct umbra_inst const inst[], int insts) {
             case umbra_shl_i16: p->inst[i] = (struct inst){.fn=shl_i16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
             case umbra_shr_u16: p->inst[i] = (struct inst){.fn=shr_u16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
             case umbra_shr_s16: p->inst[i] = (struct inst){.fn=shr_s16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
-            case umbra_and_i16: p->inst[i] = (struct inst){.fn=and_i16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
-            case umbra_or_i16:  p->inst[i] = (struct inst){.fn= or_i16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
-            case umbra_xor_i16: p->inst[i] = (struct inst){.fn=xor_i16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
-            case umbra_sel_i16: p->inst[i] = (struct inst){.fn=sel_i16, .x=inst[i].x-i, .y=inst[i].y-i, .z=inst[i].z-i}; break;
+            case umbra_and_16: p->inst[i] = (struct inst){.fn=and_16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
+            case umbra_or_16:  p->inst[i] = (struct inst){.fn= or_16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
+            case umbra_xor_16: p->inst[i] = (struct inst){.fn=xor_16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
+            case umbra_sel_16: p->inst[i] = (struct inst){.fn=sel_16, .x=inst[i].x-i, .y=inst[i].y-i, .z=inst[i].z-i}; break;
 
             case umbra_add_i32: p->inst[i] = (struct inst){.fn=add_i32, .x=inst[i].x-i, .y=inst[i].y-i}; break;
             case umbra_sub_i32: p->inst[i] = (struct inst){.fn=sub_i32, .x=inst[i].x-i, .y=inst[i].y-i}; break;
@@ -380,10 +380,10 @@ struct umbra_program* umbra_program(struct umbra_inst const inst[], int insts) {
             case umbra_shl_i32: p->inst[i] = (struct inst){.fn=shl_i32, .x=inst[i].x-i, .y=inst[i].y-i}; break;
             case umbra_shr_u32: p->inst[i] = (struct inst){.fn=shr_u32, .x=inst[i].x-i, .y=inst[i].y-i}; break;
             case umbra_shr_s32: p->inst[i] = (struct inst){.fn=shr_s32, .x=inst[i].x-i, .y=inst[i].y-i}; break;
-            case umbra_and_i32: p->inst[i] = (struct inst){.fn=and_i32, .x=inst[i].x-i, .y=inst[i].y-i}; break;
-            case umbra_or_i32:  p->inst[i] = (struct inst){.fn= or_i32, .x=inst[i].x-i, .y=inst[i].y-i}; break;
-            case umbra_xor_i32: p->inst[i] = (struct inst){.fn=xor_i32, .x=inst[i].x-i, .y=inst[i].y-i}; break;
-            case umbra_sel_i32: p->inst[i] = (struct inst){.fn=sel_i32, .x=inst[i].x-i, .y=inst[i].y-i, .z=inst[i].z-i}; break;
+            case umbra_and_32: p->inst[i] = (struct inst){.fn=and_32, .x=inst[i].x-i, .y=inst[i].y-i}; break;
+            case umbra_or_32:  p->inst[i] = (struct inst){.fn= or_32, .x=inst[i].x-i, .y=inst[i].y-i}; break;
+            case umbra_xor_32: p->inst[i] = (struct inst){.fn=xor_32, .x=inst[i].x-i, .y=inst[i].y-i}; break;
+            case umbra_sel_32: p->inst[i] = (struct inst){.fn=sel_32, .x=inst[i].x-i, .y=inst[i].y-i, .z=inst[i].z-i}; break;
 
             case umbra_eq_f16: p->inst[i] = (struct inst){.fn=eq_f16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
             case umbra_ne_f16: p->inst[i] = (struct inst){.fn=ne_f16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
