@@ -1256,6 +1256,109 @@ static void test_hoisting(void) {
     umbra_program_free(p);
 }
 
+static void test_strength_reduction(void) {
+    // add_i32(load(x), imm(0)) → result == x
+    {
+        struct umbra_inst inst[] = {
+            {.op=umbra_lane},
+            {umbra_load_32, .ptr=0, .x=0},
+            {umbra_imm_32, .immi=0},
+            {umbra_add_i32, .x=1, .y=2},
+            {umbra_store_32, .ptr=1, .x=0, .y=3},
+        };
+        int const n = umbra_optimize(inst, len(inst));
+        struct umbra_program *p = umbra_program(inst, n);
+        int32_t x[] = {1,2,3,4,5}, z[5] = {0};
+        umbra_program_run(p, 5, (void*[]){x,z});
+        for (int i = 0; i < 5; i++) { (z[i] == x[i]) here; }
+        umbra_program_free(p);
+    }
+    // mul_i32(imm(0), load(x)) → result == 0
+    {
+        struct umbra_inst inst[] = {
+            {.op=umbra_lane},
+            {umbra_imm_32, .immi=0},
+            {umbra_load_32, .ptr=0, .x=0},
+            {umbra_mul_i32, .x=1, .y=2},
+            {umbra_store_32, .ptr=1, .x=0, .y=3},
+        };
+        int const n = umbra_optimize(inst, len(inst));
+        struct umbra_program *p = umbra_program(inst, n);
+        int32_t x[] = {1,2,3,4,5}, z[5] = {0};
+        umbra_program_run(p, 5, (void*[]){x,z});
+        for (int i = 0; i < 5; i++) { (z[i] == 0) here; }
+        umbra_program_free(p);
+    }
+    // mul_f32(load(x), imm(1.0)) → result == x
+    {
+        struct umbra_inst inst[] = {
+            {.op=umbra_lane},
+            {umbra_load_32, .ptr=0, .x=0},
+            {umbra_imm_32, .immf=1.0f},
+            {umbra_mul_f32, .x=1, .y=2},
+            {umbra_store_32, .ptr=1, .x=0, .y=3},
+        };
+        int const n = umbra_optimize(inst, len(inst));
+        struct umbra_program *p = umbra_program(inst, n);
+        float x[] = {1,2,3,4,5}, z[5] = {0};
+        umbra_program_run(p, 5, (void*[]){x,z});
+        for (int i = 0; i < 5; i++) { equiv(z[i], x[i]) here; }
+        umbra_program_free(p);
+    }
+    // shl_i32(load(x), imm(0)) → result == x
+    {
+        struct umbra_inst inst[] = {
+            {.op=umbra_lane},
+            {umbra_load_32, .ptr=0, .x=0},
+            {umbra_imm_32, .immi=0},
+            {umbra_shl_i32, .x=1, .y=2},
+            {umbra_store_32, .ptr=1, .x=0, .y=3},
+        };
+        int const n = umbra_optimize(inst, len(inst));
+        struct umbra_program *p = umbra_program(inst, n);
+        int32_t x[] = {1,2,3,4,5}, z[5] = {0};
+        umbra_program_run(p, 5, (void*[]){x,z});
+        for (int i = 0; i < 5; i++) { (z[i] == x[i]) here; }
+        umbra_program_free(p);
+    }
+    // mul_i32(imm(8), load(x)) → result == x*8, check shl present
+    {
+        struct umbra_inst inst[] = {
+            {.op=umbra_lane},
+            {umbra_imm_32, .immi=8},
+            {umbra_load_32, .ptr=0, .x=0},
+            {umbra_mul_i32, .x=1, .y=2},
+            {umbra_store_32, .ptr=1, .x=0, .y=3},
+        };
+        int const n = umbra_optimize(inst, len(inst));
+        _Bool found_shl = 0;
+        for (int j = 0; j < n; j++) {
+            if (inst[j].op == umbra_shl_i32) { found_shl = 1; }
+        }
+        found_shl here;
+        struct umbra_program *p = umbra_program(inst, n);
+        int32_t x[] = {1,2,3,4,5}, z[5] = {0};
+        umbra_program_run(p, 5, (void*[]){x,z});
+        for (int i = 0; i < 5; i++) { (z[i] == x[i] * 8) here; }
+        umbra_program_free(p);
+    }
+    // sub_i32(load(x), load(x)) → result == 0
+    {
+        struct umbra_inst inst[] = {
+            {.op=umbra_lane},
+            {umbra_load_32, .ptr=0, .x=0},
+            {umbra_sub_i32, .x=1, .y=1},
+            {umbra_store_32, .ptr=1, .x=0, .y=2},
+        };
+        int const n = umbra_optimize(inst, len(inst));
+        struct umbra_program *p = umbra_program(inst, n);
+        int32_t x[] = {1,2,3,4,5}, z[5] = {0};
+        umbra_program_run(p, 5, (void*[]){x,z});
+        for (int i = 0; i < 5; i++) { (z[i] == 0) here; }
+        umbra_program_free(p);
+    }
+}
+
 static void test_optimize_srcover(void) {
     // Build a naive SrcOver blend: 8888 src -> f32 dst (simplified).
     // ptr[0]=src(u32 packed RGBA), ptr[1..4]=dst R,G,B,A (fp16), ptr[5..8]=out R,G,B,A (f32).
@@ -1387,6 +1490,7 @@ int main(void) {
     test_dce();
     test_constprop();
     test_hoisting();
+    test_strength_reduction();
     test_optimize_srcover();
     return 0;
 }
