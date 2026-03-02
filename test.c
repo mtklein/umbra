@@ -1,6 +1,7 @@
 #include "len.h"
 #include "test.h"
 #include "umbra.h"
+#include <stdint.h>
 
 static void test_mul_f32(void) {
     struct umbra_inst const inst[] = {
@@ -1033,6 +1034,245 @@ static void test_scatter(void) {
     }
 }
 
+static void test_canonicalize(void) {
+    struct umbra_inst inst[] = {
+        {.op=umbra_lane},
+        {.op=umbra_imm_32, .immi=1},
+        {.op=umbra_imm_32, .immi=2},
+        {umbra_add_i32, .x=2, .y=1},
+        {umbra_store_32, .ptr=0, .x=0, .y=3},
+    };
+    int n = umbra_optimize(inst, len(inst));
+    (n == 5) here;
+    // After canonicalization, the add should have x <= y, i.e. x=1, y=2.
+    (inst[3].x == 1 && inst[3].y == 2) here;
+}
+
+static void test_gvn(void) {
+    struct umbra_inst inst[] = {
+        {.op=umbra_lane},
+        {.op=umbra_imm_32, .immi=42},
+        {.op=umbra_imm_32, .immi=42},  // dup of [1]
+        {.op=umbra_imm_32, .immi=99},
+        {umbra_add_i32, .x=1, .y=3},   // uses 42 and 99
+        {umbra_store_32, .ptr=0, .x=0, .y=4},
+    };
+    int before = len(inst);
+    int after = umbra_optimize(inst, before);
+    (after == before - 1) here;  // one dup removed
+}
+
+static void test_fma_fusion(void) {
+    struct umbra_inst inst[] = {
+        {.op=umbra_lane},
+        {umbra_load_32, .ptr=0, .x=0},
+        {umbra_load_32, .ptr=1, .x=0},
+        {umbra_load_32, .ptr=2, .x=0},
+        {umbra_mul_f32, .x=1, .y=2},
+        {umbra_add_f32, .x=4, .y=3},
+        {umbra_store_32, .ptr=3, .x=0, .y=5},
+    };
+    int n = umbra_optimize(inst, len(inst));
+
+    // Find the fma.
+    _Bool found_fma = 0;
+    for (int i = 0; i < n; i++) {
+        if (inst[i].op == umbra_fma_f32) { found_fma = 1; }
+    }
+    found_fma here;
+
+    // Verify it computes correctly: x*y+z.
+    struct umbra_program *p = umbra_program(inst, n);
+    float x[] = {2,3}, y[] = {4,5}, w[] = {10,20}, z[2] = {0};
+    umbra_program_run(p, 2, (void*[]){x,y,w,z});
+    equiv(z[0], 18) here;
+    equiv(z[1], 35) here;
+    umbra_program_free(p);
+}
+
+static void test_dce(void) {
+    struct umbra_inst inst[] = {
+        {.op=umbra_lane},
+        {umbra_load_32, .ptr=0, .x=0},
+        {umbra_load_32, .ptr=1, .x=0},
+        {umbra_mul_f32, .x=1, .y=2},   // unused
+        {umbra_add_f32, .x=1, .y=2},
+        {umbra_store_32, .ptr=2, .x=0, .y=4},
+    };
+    int before = len(inst);
+    int after = umbra_optimize(inst, before);
+    (after < before) here;  // mul and its dead-only deps should be removed
+
+    // Verify it still computes x+y correctly.
+    struct umbra_program *p = umbra_program(inst, after);
+    float x[] = {1,2}, y[] = {3,4}, z[2] = {0};
+    umbra_program_run(p, 2, (void*[]){x,y,z});
+    equiv(z[0], 4) here;
+    equiv(z[1], 6) here;
+    umbra_program_free(p);
+}
+
+static void test_convert(void) {
+    // f32_from_i32
+    {
+        struct umbra_inst const inst[] = {
+            {.op=umbra_lane},
+            {umbra_load_32, .ptr=0, .x=0},
+            {umbra_f32_from_i32, .x=1},
+            {umbra_store_32, .ptr=1, .x=0, .y=2},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        int x[] = {1, 255, -3};
+        float z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){x,z});
+        equiv(z[0], 1) here;
+        equiv(z[1], 255) here;
+        equiv(z[2], -3) here;
+        umbra_program_free(p);
+    }
+    // i32_from_f32
+    {
+        struct umbra_inst const inst[] = {
+            {.op=umbra_lane},
+            {umbra_load_32, .ptr=0, .x=0},
+            {umbra_i32_from_f32, .x=1},
+            {umbra_store_32, .ptr=1, .x=0, .y=2},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        float x[] = {1.9f, 255.0f, -3.7f};
+        int z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){x,z});
+        (z[0] == 1) here;
+        (z[1] == 255) here;
+        (z[2] == -3) here;
+        umbra_program_free(p);
+    }
+    // f16_from_f32 and f32_from_f16 roundtrip
+    {
+        struct umbra_inst const inst[] = {
+            {.op=umbra_lane},
+            {umbra_load_32, .ptr=0, .x=0},
+            {umbra_f16_from_f32, .x=1},
+            {umbra_f32_from_f16, .x=2},
+            {umbra_store_32, .ptr=1, .x=0, .y=3},
+        };
+        struct umbra_program *p = umbra_program(inst, len(inst));
+        float x[] = {1.0f, 0.5f, 100.0f};
+        float z[3] = {0};
+        umbra_program_run(p, 3, (void*[]){x,z});
+        equiv(z[0], 1.0f) here;
+        equiv(z[1], 0.5f) here;
+        equiv(z[2], 100.0f) here;
+        umbra_program_free(p);
+    }
+}
+
+static void test_optimize_srcover(void) {
+    // Build a naive SrcOver blend: 8888 src -> f32 dst (simplified).
+    // ptr[0]=src(u32 packed RGBA), ptr[1..4]=dst R,G,B,A (fp16), ptr[5..8]=out R,G,B,A (f32).
+    // Written naively with duplicate constants per channel.
+    int n = 0;
+    struct umbra_inst inst[64];
+    __builtin_memset(inst, 0, sizeof inst);
+
+    int lane_  = n; inst[n++] = (struct umbra_inst){.op=umbra_lane};
+    int src_   = n; inst[n++] = (struct umbra_inst){umbra_load_32, .ptr=0, .x=lane_};
+
+    // Extract R (bits 0..7): mask with 0xFF
+    int maskr  = n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immi=0xFF};
+    int ri32   = n; inst[n++] = (struct umbra_inst){umbra_and_32, .x=src_, .y=maskr};
+    int rf32   = n; inst[n++] = (struct umbra_inst){umbra_f32_from_i32, .x=ri32};
+    int inv255r= n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immf=1.0f/255.0f};
+    int srf32  = n; inst[n++] = (struct umbra_inst){umbra_mul_f32, .x=rf32, .y=inv255r};
+
+    // Extract G (bits 8..15)
+    int sh8    = n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immi=8};
+    int gshr   = n; inst[n++] = (struct umbra_inst){umbra_shr_u32, .x=src_, .y=sh8};
+    int maskg  = n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immi=0xFF};
+    int gi32   = n; inst[n++] = (struct umbra_inst){umbra_and_32, .x=gshr, .y=maskg};
+    int gf32   = n; inst[n++] = (struct umbra_inst){umbra_f32_from_i32, .x=gi32};
+    int inv255g= n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immf=1.0f/255.0f};
+    int sgf32  = n; inst[n++] = (struct umbra_inst){umbra_mul_f32, .x=gf32, .y=inv255g};
+
+    // Extract B (bits 16..23)
+    int sh16   = n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immi=16};
+    int bshr   = n; inst[n++] = (struct umbra_inst){umbra_shr_u32, .x=src_, .y=sh16};
+    int maskb  = n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immi=0xFF};
+    int bi32   = n; inst[n++] = (struct umbra_inst){umbra_and_32, .x=bshr, .y=maskb};
+    int bf32   = n; inst[n++] = (struct umbra_inst){umbra_f32_from_i32, .x=bi32};
+    int inv255b= n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immf=1.0f/255.0f};
+    int sbf32  = n; inst[n++] = (struct umbra_inst){umbra_mul_f32, .x=bf32, .y=inv255b};
+
+    // Extract A (bits 24..31)
+    int sh24   = n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immi=24};
+    int ashr   = n; inst[n++] = (struct umbra_inst){umbra_shr_u32, .x=src_, .y=sh24};
+    int maska  = n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immi=0xFF};
+    int ai32   = n; inst[n++] = (struct umbra_inst){umbra_and_32, .x=ashr, .y=maska};
+    int af32   = n; inst[n++] = (struct umbra_inst){umbra_f32_from_i32, .x=ai32};
+    int inv255a= n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immf=1.0f/255.0f};
+    int saf32  = n; inst[n++] = (struct umbra_inst){umbra_mul_f32, .x=af32, .y=inv255a};
+
+    // Load dst fp16, convert to f32
+    int dr16   = n; inst[n++] = (struct umbra_inst){umbra_load_16, .ptr=1, .x=lane_};
+    int drf32  = n; inst[n++] = (struct umbra_inst){umbra_f32_from_f16, .x=dr16};
+    int dg16   = n; inst[n++] = (struct umbra_inst){umbra_load_16, .ptr=2, .x=lane_};
+    int dgf32  = n; inst[n++] = (struct umbra_inst){umbra_f32_from_f16, .x=dg16};
+    int db16   = n; inst[n++] = (struct umbra_inst){umbra_load_16, .ptr=3, .x=lane_};
+    int dbf32  = n; inst[n++] = (struct umbra_inst){umbra_f32_from_f16, .x=db16};
+    int da16   = n; inst[n++] = (struct umbra_inst){umbra_load_16, .ptr=4, .x=lane_};
+    int daf32  = n; inst[n++] = (struct umbra_inst){umbra_f32_from_f16, .x=da16};
+
+    // Blend: out = src + dst * (1 - sa). Each channel gets its own "one" and "inv_a".
+    // R
+    int oner   = n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immf=1.0f};
+    int invar  = n; inst[n++] = (struct umbra_inst){umbra_sub_f32, .x=oner, .y=saf32};
+    int drmul  = n; inst[n++] = (struct umbra_inst){umbra_mul_f32, .x=drf32, .y=invar};
+    int rout   = n; inst[n++] = (struct umbra_inst){umbra_add_f32, .x=srf32, .y=drmul};
+    // G
+    int oneg   = n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immf=1.0f};
+    int invag  = n; inst[n++] = (struct umbra_inst){umbra_sub_f32, .x=oneg, .y=saf32};
+    int dgmul  = n; inst[n++] = (struct umbra_inst){umbra_mul_f32, .x=dgf32, .y=invag};
+    int gout   = n; inst[n++] = (struct umbra_inst){umbra_add_f32, .x=sgf32, .y=dgmul};
+    // B
+    int oneb   = n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immf=1.0f};
+    int invab  = n; inst[n++] = (struct umbra_inst){umbra_sub_f32, .x=oneb, .y=saf32};
+    int dbmul  = n; inst[n++] = (struct umbra_inst){umbra_mul_f32, .x=dbf32, .y=invab};
+    int bout   = n; inst[n++] = (struct umbra_inst){umbra_add_f32, .x=sbf32, .y=dbmul};
+    // A
+    int onea   = n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immf=1.0f};
+    int invaa  = n; inst[n++] = (struct umbra_inst){umbra_sub_f32, .x=onea, .y=saf32};
+    int damul  = n; inst[n++] = (struct umbra_inst){umbra_mul_f32, .x=daf32, .y=invaa};
+    int aout   = n; inst[n++] = (struct umbra_inst){umbra_add_f32, .x=saf32, .y=damul};
+
+    // Store f32 outputs.
+    inst[n++] = (struct umbra_inst){umbra_store_32, .ptr=5, .x=lane_, .y=rout};
+    inst[n++] = (struct umbra_inst){umbra_store_32, .ptr=6, .x=lane_, .y=gout};
+    inst[n++] = (struct umbra_inst){umbra_store_32, .ptr=7, .x=lane_, .y=bout};
+    inst[n++] = (struct umbra_inst){umbra_store_32, .ptr=8, .x=lane_, .y=aout};
+
+    int before = n;
+    int after = umbra_optimize(inst, before);
+    (after < before) here;
+
+    // Verify: src=RGBA(128,64,32,255), alpha=1 → out = src.
+    uint32_t src_px[] = {0xFF204080u, 0xFF204080u, 0xFF204080u};
+    __fp16 dst_r[] = {0.5, 0.5, 0.5};
+    __fp16 dst_g[] = {0.5, 0.5, 0.5};
+    __fp16 dst_b[] = {0.5, 0.5, 0.5};
+    __fp16 dst_a[] = {0.5, 0.5, 0.5};
+    float out_r[3]={0}, out_g[3]={0}, out_b[3]={0}, out_a[3]={0};
+
+    struct umbra_program *p = umbra_program(inst, after);
+    umbra_program_run(p, 3, (void*[]){src_px, dst_r, dst_g, dst_b, dst_a,
+                                      out_r, out_g, out_b, out_a});
+
+    float tol = 0.01f;
+    (out_r[0] > 0.50f - tol && out_r[0] < 0.50f + tol) here;
+    (out_g[0] > 0.25f - tol && out_g[0] < 0.25f + tol) here;
+    (out_b[0] > 0.12f - tol && out_b[0] < 0.13f + tol) here;
+    umbra_program_free(p);
+}
+
 int main(void) {
     test_mul_f32();
     test_f32_ops();
@@ -1051,5 +1291,11 @@ int main(void) {
     test_large_n();
     test_uni_via_load();
     test_scatter();
+    test_convert();
+    test_canonicalize();
+    test_gvn();
+    test_fma_fusion();
+    test_dce();
+    test_optimize_srcover();
     return 0;
 }

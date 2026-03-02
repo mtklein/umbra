@@ -122,7 +122,13 @@ op(scatter_32) {
     next;
 }
 
+op(f32_from_i32) { v->f32 = __builtin_convertvector(v[ip->x].i32, F32); next; }
+op(i32_from_f32) { v->i32 = __builtin_convertvector(v[ip->x].f32, I32); next; }
+
 #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) || defined(__F16C__)
+    op(f16_from_f32) { v->f16 = __builtin_convertvector(v[ip->x].f32, F16); next; }
+    op(f32_from_f16) { v->f32 = __builtin_convertvector(v[ip->x].f16, F32); next; }
+
     op( add_f16) { v->f16 = v[ip->x].f16 + v[ip->y].f16               ; next; }
     op( sub_f16) { v->f16 = v[ip->x].f16 - v[ip->y].f16               ; next; }
     op( mul_f16) { v->f16 = v[ip->x].f16 * v[ip->y].f16               ; next; }
@@ -193,6 +199,9 @@ op(scatter_32) {
                       | (~is_underflow & ~is_overflow & ~is_infnan & normal);
         return cast(U16, result32);
     }
+
+    op(f16_from_f32) { v->u16 = f32_to_f16(v[ip->x].f32); next; }
+    op(f32_from_f16) { v->f32 = f16_to_f32(v[ip->x].u16); next; }
 
     op(add_f16) {
         v->u16 = f32_to_f16(f16_to_f32(v[ip->x].u16) + f16_to_f32(v[ip->y].u16));
@@ -317,6 +326,172 @@ op(done) { (void)ip; (void)v; (void)end; (void)ptr; return 0; }
 #undef next
 #undef op
 
+typedef enum umbra_op Op;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswitch-enum"
+static _Bool commutative(Op op) {
+    switch (op) {
+        case umbra_add_f16: case umbra_mul_f16: case umbra_min_f16: case umbra_max_f16:
+        case umbra_add_f32: case umbra_mul_f32: case umbra_min_f32: case umbra_max_f32:
+        case umbra_add_i16: case umbra_mul_i16:
+        case umbra_and_16:  case umbra_or_16:   case umbra_xor_16:
+        case umbra_add_i32: case umbra_mul_i32:
+        case umbra_and_32:  case umbra_or_32:   case umbra_xor_32:
+        case umbra_eq_f16:  case umbra_ne_f16:
+        case umbra_eq_f32:  case umbra_ne_f32:
+        case umbra_eq_i16:  case umbra_ne_i16:
+        case umbra_eq_i32:  case umbra_ne_i32:
+            return 1;
+        default:
+            return 0;
+    }
+}
+#pragma clang diagnostic pop
+
+static _Bool is_store(Op op) {
+    return op == umbra_store_16 || op == umbra_store_32;
+}
+
+static uint32_t fnv1a(void const *data, int len) {
+    uint32_t h = 2166136261u;
+    unsigned char const *p = data;
+    for (int i = 0; i < len; i++) {
+        h ^= p[i];
+        __builtin_mul_overflow(h, 16777619u, &h);
+    }
+    return h;
+}
+
+int umbra_optimize(struct umbra_inst inst[], int insts) {
+    int *remap = malloc((size_t)insts * sizeof *remap);
+    for (int i = 0; i < insts; i++) { remap[i] = i; }
+
+    // 1. Canonicalize commutative operands: ensure x <= y.
+    for (int i = 0; i < insts; i++) {
+        if (commutative(inst[i].op) && inst[i].x > inst[i].y) {
+            int t = inst[i].x;
+            inst[i].x = inst[i].y;
+            inst[i].y = t;
+        }
+    }
+
+    // 2. GVN (Global Value Numbering).
+    {
+        int cap = 16;
+        while (cap < insts * 2) { cap *= 2; }
+        struct { int key; int val; } *ht = calloc((size_t)cap, sizeof *ht);
+        // key=0 means empty, so we store instruction index + 1 as key.
+
+        for (int i = 0; i < insts; i++) {
+            // Resolve operands through remap.
+            inst[i].x = remap[inst[i].x];
+            inst[i].y = remap[inst[i].y];
+            inst[i].z = remap[inst[i].z];
+
+            if (is_store(inst[i].op)) { continue; }
+
+            struct { Op op; int x, y, z, immi, ptr; } key = {
+                inst[i].op, inst[i].x, inst[i].y, inst[i].z, inst[i].immi, inst[i].ptr
+            };
+            uint32_t h = fnv1a(&key, sizeof key);
+
+            for (int mask = cap - 1;;) {
+                int slot = (int)(h & (uint32_t)mask);
+                if (ht[slot].key == 0) {
+                    ht[slot].key = i + 1;
+                    ht[slot].val = i;
+                    break;
+                }
+                int prev = ht[slot].val;
+                if (inst[prev].op == inst[i].op
+                 && inst[prev].x == inst[i].x && inst[prev].y == inst[i].y
+                 && inst[prev].z == inst[i].z && inst[prev].immi == inst[i].immi
+                 && inst[prev].ptr == inst[i].ptr) {
+                    remap[i] = prev;
+                    break;
+                }
+                h++;
+            }
+        }
+        free(ht);
+    }
+
+    // 3. FMA fusion: add(mul(a,b), c) → fma(a, b, c).
+    for (int i = 0; i < insts; i++) {
+        if (remap[i] != i) { continue; }
+        Op fma_op, mul_op;
+        if      (inst[i].op == umbra_add_f32) { fma_op = umbra_fma_f32; mul_op = umbra_mul_f32; }
+        else if (inst[i].op == umbra_add_f16) { fma_op = umbra_fma_f16; mul_op = umbra_mul_f16; }
+        else { continue; }
+
+        int ax = remap[inst[i].x], ay = remap[inst[i].y];
+
+        int mul = -1, other = -1;
+        if (inst[ax].op == mul_op && remap[ax] == ax) { mul = ax; other = ay; }
+        else if (inst[ay].op == mul_op && remap[ay] == ay) { mul = ay; other = ax; }
+        if (mul < 0) { continue; }
+
+        inst[i].op = fma_op;
+        inst[i].x = inst[mul].x;
+        inst[i].y = inst[mul].y;
+        inst[i].z = other;
+    }
+
+    // 4. DCE + compaction.
+    int *uses = calloc((size_t)insts, sizeof *uses);
+    // Count all uses from non-deduped instructions.
+    for (int i = 0; i < insts; i++) {
+        if (remap[i] != i) { continue; }
+        if (is_store(inst[i].op)) { uses[i]++; }  // stores are always live
+        uses[remap[inst[i].x]]++;
+        uses[remap[inst[i].y]]++;
+        uses[remap[inst[i].z]]++;
+    }
+    // Walk backward: dead instructions cascade.
+    for (int i = insts; i --> 0;) {
+        if (remap[i] != i) { continue; }
+        if (uses[i] == 0 && !is_store(inst[i].op)) {
+            uses[remap[inst[i].x]]--;
+            uses[remap[inst[i].y]]--;
+            uses[remap[inst[i].z]]--;
+        }
+    }
+
+    // Compact: build old→new index map, then copy live instructions forward.
+    int *newix = calloc((size_t)insts, sizeof *newix);
+    int live = 0;
+    for (int i = 0; i < insts; i++) {
+        if (remap[i] == i && (uses[i] > 0 || is_store(inst[i].op))) {
+            newix[i] = live++;
+        } else {
+            newix[i] = -1;
+        }
+    }
+    // Resolve deduped/dead entries: follow remap chain to a live instruction.
+    for (int i = 0; i < insts; i++) {
+        if (newix[i] < 0) {
+            newix[i] = newix[remap[i]];
+        }
+    }
+    // Compact and renumber.
+    live = 0;
+    for (int i = 0; i < insts; i++) {
+        if (remap[i] != i) { continue; }
+        if (uses[i] == 0 && !is_store(inst[i].op)) { continue; }
+        inst[live] = inst[i];
+        inst[live].x = newix[inst[i].x];
+        inst[live].y = newix[inst[i].y];
+        inst[live].z = newix[inst[i].z];
+        live++;
+    }
+    free(newix);
+
+    free(uses);
+    free(remap);
+    return live;
+}
+
 struct umbra_program* umbra_program(struct umbra_inst const inst[], int insts) {
     struct umbra_program *p = malloc(sizeof *p + (size_t)(insts+1) * sizeof *p->inst);
     for (int i = 0; i < insts; i++) {
@@ -354,6 +529,11 @@ struct umbra_program* umbra_program(struct umbra_inst const inst[], int insts) {
                 } else {
                     p->inst[i] = (struct inst){.fn=scatter_32, .x=inst[i].ptr, .y=inst[i].y-i, .z=inst[i].x-i};
                 } break;
+
+            case umbra_f32_from_i32: p->inst[i] = (struct inst){.fn=f32_from_i32, .x=inst[i].x-i}; break;
+            case umbra_i32_from_f32: p->inst[i] = (struct inst){.fn=i32_from_f32, .x=inst[i].x-i}; break;
+            case umbra_f16_from_f32: p->inst[i] = (struct inst){.fn=f16_from_f32, .x=inst[i].x-i}; break;
+            case umbra_f32_from_f16: p->inst[i] = (struct inst){.fn=f32_from_f16, .x=inst[i].x-i}; break;
 
             case umbra_add_f16:  p->inst[i] = (struct inst){.fn= add_f16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
             case umbra_sub_f16:  p->inst[i] = (struct inst){.fn= sub_f16, .x=inst[i].x-i, .y=inst[i].y-i}; break;
