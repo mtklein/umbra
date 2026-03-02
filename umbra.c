@@ -47,7 +47,7 @@ op(imm_32) { v->i32 = (I32){0} +          ip->x; next; }
 op(lane) {
     if (end & (K-1)) { v->i32 = (I32){0} + (end - 1); }
     else {
-        I32 iota = {0,1,2,3,4,5,6,7};
+        I32 const iota = {0,1,2,3,4,5,6,7};
         v->i32 = iota + (end - K);
     }
     next;
@@ -151,18 +151,18 @@ op(i32_from_f32) { v->i32 = __builtin_convertvector(v[ip->x].f32, I32); next; }
 #else
 
     static F32 f16_to_f32(U16 h) {
-        U32 sign = cast(U32, h >> 15) << 31;
-        U32 exp  = cast(U32, (h >> 10) & 0x1f);
-        U32 mant = cast(U32, h & 0x3ff);
+        U32 const sign = cast(U32, h >> 15) << 31;
+        U32 const exp  = cast(U32, (h >> 10) & 0x1f);
+        U32 const mant = cast(U32, h & 0x3ff);
 
-        U32 normal = sign | ((exp + 112) << 23) | (mant << 13);
-        U32 zero   = sign;
-        U32 infnan = sign | (0xffu << 23) | (mant << 13);
+        U32 const normal = sign | ((exp + 112) << 23) | (mant << 13);
+        U32 const zero   = sign;
+        U32 const infnan = sign | (0xffu << 23) | (mant << 13);
 
-        U32 is_zero   = (U32)-(exp == 0);
-        U32 is_infnan = (U32)-(exp == 31);
+        U32 const is_zero   = (U32)-(exp == 0);
+        U32 const is_infnan = (U32)-(exp == 31);
 
-        U32 bits = (is_zero & zero)
+        U32 const bits = (is_zero & zero)
                  | (is_infnan & infnan)
                  | (~is_zero & ~is_infnan & normal);
         F32 result;
@@ -174,26 +174,26 @@ op(i32_from_f32) { v->i32 = __builtin_convertvector(v[ip->x].f32, I32); next; }
         U32 bits;
         __builtin_memcpy(&bits, &f, sizeof f);
 
-        U32 sign = (bits >> 31) << 15;
+        U32 const sign = (bits >> 31) << 15;
         I32 exp  = (I32)((bits >> 23) & 0xff) - 127 + 15;
         U32 mant = (bits >> 13) & 0x3ff;
 
-        U32 round_bit = (bits >> 12) & 1;
-        U32 sticky    = (U32)-((bits & 0xfff) != 0);
+        U32 const round_bit = (bits >> 12) & 1;
+        U32 const sticky    = (U32)-((bits & 0xfff) != 0);
         mant += round_bit & (sticky | (mant & 1));
-        U32 mant_overflow = mant >> 10;
+        U32 const mant_overflow = mant >> 10;
         exp += (I32)mant_overflow;
         mant &= 0x3ff;
 
-        U32 normal        = sign | (U32)((U32)exp << 10) | mant;
-        U32 inf           = sign | 0x7c00;
-        U32 is_overflow   = (U32)-(exp >= 31);
-        U32 is_underflow  = (U32)-(exp <= 0);
-        U32 src_exp       = (bits >> 23) & 0xff;
-        U32 is_infnan     = (U32)-(src_exp == 0xff);
-        U32 infnan        = sign | 0x7c00 | mant;
+        U32 const normal        = sign | (U32)((U32)exp << 10) | mant;
+        U32 const inf           = sign | 0x7c00;
+        U32 const is_overflow   = (U32)-(exp >= 31);
+        U32 const is_underflow  = (U32)-(exp <= 0);
+        U32 const src_exp       = (bits >> 23) & 0xff;
+        U32 const is_infnan     = (U32)-(src_exp == 0xff);
+        U32 const infnan        = sign | 0x7c00 | mant;
 
-        U32 result32 = (is_underflow & sign)
+        U32 const result32 = (is_underflow & sign)
                       | (is_overflow & ~is_infnan & inf)
                       | (is_infnan & infnan)
                       | (~is_underflow & ~is_overflow & ~is_infnan & normal);
@@ -406,7 +406,7 @@ int umbra_optimize(struct umbra_inst inst[], int insts) {
     // 1. Canonicalize commutative operands: ensure x <= y.
     for (int i = 0; i < insts; i++) {
         if (commutative(inst[i].op) && inst[i].x > inst[i].y) {
-            int t = inst[i].x;
+            int const t = inst[i].x;
             inst[i].x = inst[i].y;
             inst[i].y = t;
         }
@@ -414,7 +414,7 @@ int umbra_optimize(struct umbra_inst inst[], int insts) {
 
     // 2. Constant propagation: fold op(imm, imm, ...) → imm.
     for (int i = 0; i < insts; i++) {
-        int ar = arity(inst[i].op);
+        int const ar = arity(inst[i].op);
         if (ar == 0) { continue; }
         if (is_store(inst[i].op)) { continue; }
         if (inst[i].op == umbra_load_16 || inst[i].op == umbra_load_32) { continue; }
@@ -428,7 +428,7 @@ int umbra_optimize(struct umbra_inst inst[], int insts) {
                      && inst[inst[i].z].op != umbra_imm_16) { all_imm = 0; }
         if (!all_imm) { continue; }
 
-        _Bool wide = !is_16bit_result(inst[i].op);
+        _Bool const wide = !is_16bit_result(inst[i].op);
         struct umbra_inst tmp[8];
         __builtin_memset(tmp, 0, sizeof tmp);
         int t = 0;
@@ -438,14 +438,14 @@ int umbra_optimize(struct umbra_inst inst[], int insts) {
         if (ar >= 2) { oy = t; tmp[t++] = inst[inst[i].y]; }
         if (ar >= 3) { oz = t; tmp[t++] = inst[inst[i].z]; }
 
-        int op_slot = t;
+        int const op_slot = t;
         tmp[t] = inst[i];
         tmp[t].x = ox;
         tmp[t].y = oy;
         tmp[t].z = oz;
         t++;
 
-        int lane_slot = t;
+        int const lane_slot = t;
         tmp[t++].op = umbra_lane;
 
         tmp[t].op  = wide ? umbra_store_32 : umbra_store_16;
@@ -471,7 +471,7 @@ int umbra_optimize(struct umbra_inst inst[], int insts) {
         else if (inst[i].op == umbra_add_f16) { fma_op = umbra_fma_f16; mul_op = umbra_mul_f16; }
         else { continue; }
 
-        int ax = inst[i].x, ay = inst[i].y;
+        int const ax = inst[i].x, ay = inst[i].y;
 
         int mul = -1, other = -1;
         if      (inst[ax].op == mul_op) { mul = ax; other = ay; }
@@ -499,19 +499,19 @@ int umbra_optimize(struct umbra_inst inst[], int insts) {
 
             if (is_store(inst[i].op)) { continue; }
 
-            struct { Op op; int x, y, z, immi, ptr; } key = {
+            struct { Op op; int x, y, z, immi, ptr; } const key = {
                 inst[i].op, inst[i].x, inst[i].y, inst[i].z, inst[i].immi, inst[i].ptr
             };
             uint32_t h = fnv1a(&key, sizeof key);
 
-            for (int mask = cap - 1;;) {
-                int slot = (int)(h & (uint32_t)mask);
+            for (int const mask = cap - 1;;) {
+                int const slot = (int)(h & (uint32_t)mask);
                 if (ht[slot].key == 0) {
                     ht[slot].key = i + 1;
                     ht[slot].val = i;
                     break;
                 }
-                int prev = ht[slot].val;
+                int const prev = ht[slot].val;
                 if (inst[prev].op == inst[i].op
                  && inst[prev].x == inst[i].x && inst[prev].y == inst[i].y
                  && inst[prev].z == inst[i].z && inst[prev].immi == inst[i].immi
@@ -529,7 +529,7 @@ int umbra_optimize(struct umbra_inst inst[], int insts) {
     int *uses = calloc((size_t)insts, sizeof *uses);
     for (int i = 0; i < insts; i++) {
         if (remap[i] != i) { continue; }
-        int ar = arity(inst[i].op);
+        int const ar = arity(inst[i].op);
         if (is_store(inst[i].op)) { uses[i]++; }
         if (ar >= 1) { uses[remap[inst[i].x]]++; }
         if (ar >= 2) { uses[remap[inst[i].y]]++; }
@@ -538,7 +538,7 @@ int umbra_optimize(struct umbra_inst inst[], int insts) {
     for (int i = insts; i --> 0;) {
         if (remap[i] != i) { continue; }
         if (uses[i] == 0 && !is_store(inst[i].op)) {
-            int ar = arity(inst[i].op);
+            int const ar = arity(inst[i].op);
             if (ar >= 1) { uses[remap[inst[i].x]]--; }
             if (ar >= 2) { uses[remap[inst[i].y]]--; }
             if (ar >= 3) { uses[remap[inst[i].z]]--; }
@@ -583,7 +583,7 @@ int umbra_optimize(struct umbra_inst inst[], int insts) {
                 varying[i] = varying[inst[i].x];
                 continue;
             }
-            int ar = arity(inst[i].op);
+            int const ar = arity(inst[i].op);
             if (ar >= 1 && varying[inst[i].x]) { varying[i] = 1; }
             if (ar >= 2 && varying[inst[i].y]) { varying[i] = 1; }
             if (ar >= 3 && varying[inst[i].z]) { varying[i] = 1; }
@@ -598,7 +598,7 @@ int umbra_optimize(struct umbra_inst inst[], int insts) {
         struct umbra_inst *tmp = malloc((size_t)live * sizeof *tmp);
         for (int i = 0; i < live; i++) {
             tmp[i] = inst[back[i]];
-            int ar = arity(tmp[i].op);
+            int const ar = arity(tmp[i].op);
             if (ar >= 1) { tmp[i].x = order[inst[back[i]].x]; }
             if (ar >= 2) { tmp[i].y = order[inst[back[i]].y]; }
             if (ar >= 3) { tmp[i].z = order[inst[back[i]].z]; }
@@ -624,7 +624,7 @@ struct umbra_program* umbra_program(struct umbra_inst const inst[], int insts) {
             else if (inst[i].op == umbra_load_16 || inst[i].op == umbra_load_32) {
                 varying[i] = varying[inst[i].x];
             } else {
-                int ar = arity(inst[i].op);
+                int const ar = arity(inst[i].op);
                 if (ar >= 1 && varying[inst[i].x]) { varying[i] = 1; }
                 if (ar >= 2 && varying[inst[i].y]) { varying[i] = 1; }
                 if (ar >= 3 && varying[inst[i].z]) { varying[i] = 1; }
@@ -639,7 +639,7 @@ struct umbra_program* umbra_program(struct umbra_inst const inst[], int insts) {
 
     struct umbra_program *p = malloc(sizeof *p + (size_t)(insts+2) * sizeof *p->inst);
     for (int i = 0; i < insts; i++) {
-        int c = ci(i);
+        int const c = ci(i);
         switch (inst[i].op) {
             case umbra_imm_16: p->inst[c] = (struct inst){.fn=imm_16, .x=inst[i].immi}; break;
             case umbra_imm_32: p->inst[c] = (struct inst){.fn=imm_32, .x=inst[i].immi}; break;
