@@ -37,8 +37,8 @@ struct inst {
 struct umbra_interpreter {
     struct inst *inst;
     val         *v;
-    int          insts;
     int          preamble;
+    int          :32;
 };
 
 #define op(name) static int name(struct inst const *ip, val *v, int end, void* ptr[])
@@ -953,20 +953,15 @@ static struct umbra_interpreter* interp_from_inst(struct umbra_inst const inst[]
         free(varying);
     }
 
-    // ci(j) maps public index j to compiled index,
-    // accounting for the done between preamble and body.
-    #define ci(j) ((j) < P ? (j) : (j) + 1)
-
-    int const total = insts + 2;
+    int const total = insts + 1;
     struct umbra_interpreter *p = malloc(sizeof *p);
     p->inst = malloc((size_t)total * sizeof *p->inst);
     p->v    = malloc((size_t)total * sizeof *p->v);
-    #define emit(...) p->inst[c] = (struct inst){__VA_ARGS__}
+    #define emit(...) p->inst[i] = (struct inst){__VA_ARGS__}
     for (int i = 0; i < insts; i++) {
-        int const c = ci(i);
-        int const X = ci(inst[i].x)-c,
-                  Y = ci(inst[i].y)-c,
-                  Z = ci(inst[i].z)-c;
+        int const X = inst[i].x-i,
+                  Y = inst[i].y-i,
+                  Z = inst[i].z-i;
         switch (inst[i].op) {
             case op_imm_16: emit(.fn=imm_16, .x=inst[i].immi); break;
             case op_imm_32: emit(.fn=imm_32, .x=inst[i].immi); break;
@@ -1014,24 +1009,21 @@ static struct umbra_interpreter* interp_from_inst(struct umbra_inst const inst[]
         }
     }
     #undef emit
-    p->inst[P]       = (struct inst){.fn=done};
-    p->inst[insts+1] = (struct inst){.fn=done};
-    p->insts    = total;
-    p->preamble = P + 1;
-    #undef ci
+    p->inst[insts] = (struct inst){.fn=done};
+    p->preamble = P;
     return p;
 }
 
 static void interp_run(struct umbra_interpreter *p, int n, void *ptr[]) {
-    // Run preamble once.
-    if (p->preamble > 1) {
-        p->inst->fn(p->inst, p->v, 0, ptr);
-    }
-
-    // Run body in loop.
     struct inst const *body = p->inst + p->preamble;
-    val *bv = p->v + p->preamble;
+    val               *bv   = p->v    + p->preamble;
+
+    // First iteration runs preamble+body together.
     int i = 0;
+    if (i+K <= n) { p->inst->fn(p->inst, p->v, i+K, ptr); i += K; }
+    else if (n>0) { p->inst->fn(p->inst, p->v, i+1, ptr); i += 1; }
+
+    // Remaining iterations run body only.
     while (i+K <= n) { body->fn(body, bv, i+K, ptr); i += K; }
     while (i+1 <= n) { body->fn(body, bv, i+1, ptr); i += 1; }
 }
