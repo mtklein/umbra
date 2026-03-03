@@ -368,23 +368,6 @@ static struct umbra_interpreter* interp_from_inst(struct bb_inst const[], int);
 static void interp_run(struct umbra_interpreter*, int, void*[]);
 static void interp_free(struct umbra_interpreter*);
 
-static _Bool commutative(enum op op) {
-    switch (op) {
-        case op_add_f16: case op_mul_f16: case op_min_f16: case op_max_f16:
-        case op_add_f32: case op_mul_f32: case op_min_f32: case op_max_f32:
-        case op_add_i16: case op_mul_i16:
-        case op_and_16:  case op_or_16:   case op_xor_16:
-        case op_add_i32: case op_mul_i32:
-        case op_and_32:  case op_or_32:   case op_xor_32:
-        case op_eq_f16:  case op_ne_f16:
-        case op_eq_f32:  case op_ne_f32:
-        case op_eq_i16:  case op_ne_i16:
-        case op_eq_i32:  case op_ne_i32:
-            return 1;
-        default:
-            return 0;
-    }
-}
 
 static _Bool is_store(enum op op) {
     return op == op_store_16 || op == op_store_32;
@@ -434,12 +417,6 @@ static _Bool is_16bit_result(enum op op) {
 
 static int f32_bits(float f) { int i; __builtin_memcpy(&i, &f, 4); return i; }
 
-static _Bool imm32_is(struct bb_inst const inst[], int j, int val) {
-    return inst[j].op == op_imm_32 && inst[j].immi == val;
-}
-static _Bool imm16_is(struct bb_inst const inst[], int j, int val) {
-    return inst[j].op == op_imm_16 && (int16_t)inst[j].immi == (int16_t)val;
-}
 
 static uint32_t fnv1a(void const *data, int len) {
     uint32_t h = 2166136261u;
@@ -452,378 +429,33 @@ static uint32_t fnv1a(void const *data, int len) {
 }
 
 static int umbra_optimize(struct bb_inst inst[], int insts) {
-    // 1. Canonicalize commutative operands: ensure x <= y.
-    for (int i = 0; i < insts; i++) {
-        if (commutative(inst[i].op) && inst[i].x > inst[i].y) {
-            int const t = inst[i].x;
-            inst[i].x = inst[i].y;
-            inst[i].y = t;
-        }
-    }
-
-    // 2. Constant propagation: fold op(imm, imm, ...) → imm.
-    for (int i = 0; i < insts; i++) {
-        int const ar = arity(inst[i].op);
-        if (ar == 0) { continue; }
-        if (is_store(inst[i].op)) { continue; }
-        if (inst[i].op == op_load_16 || inst[i].op == op_load_32) { continue; }
-
-        _Bool all_imm = 1;
-        if (ar >= 1 && inst[inst[i].x].op != op_imm_32
-                     && inst[inst[i].x].op != op_imm_16) { all_imm = 0; }
-        if (ar >= 2 && inst[inst[i].y].op != op_imm_32
-                     && inst[inst[i].y].op != op_imm_16) { all_imm = 0; }
-        if (ar >= 3 && inst[inst[i].z].op != op_imm_32
-                     && inst[inst[i].z].op != op_imm_16) { all_imm = 0; }
-        if (!all_imm) { continue; }
-
-        _Bool const wide = !is_16bit_result(inst[i].op);
-        struct bb_inst tmp[8];
-        __builtin_memset(tmp, 0, sizeof tmp);
-        int t = 0;
-
-        int ox = 0, oy = 0, oz = 0;
-        if (ar >= 1) { ox = t; tmp[t++] = inst[inst[i].x]; }
-        if (ar >= 2) { oy = t; tmp[t++] = inst[inst[i].y]; }
-        if (ar >= 3) { oz = t; tmp[t++] = inst[inst[i].z]; }
-
-        int const op_slot = t;
-        tmp[t] = inst[i];
-        tmp[t].x = ox;
-        tmp[t].y = oy;
-        tmp[t].z = oz;
-        t++;
-
-        int const lane_slot = t;
-        tmp[t++].op = op_lane;
-
-        tmp[t].op  = wide ? op_store_32 : op_store_16;
-        tmp[t].ptr = 0;
-        tmp[t].x   = lane_slot;
-        tmp[t].y   = op_slot;
-        t++;
-
-        struct umbra_interpreter *prog = interp_from_inst(tmp, t);
-        int32_t result = 0;
-        interp_run(prog, 1, (void*[]){&result});
-        interp_free(prog);
-
-        inst[i].op   = wide ? op_imm_32 : op_imm_16;
-        inst[i].immi = wide ? result : (int16_t)result;
-        inst[i].x = inst[i].y = inst[i].z = 0;
-    }
-
-    // 3. Strength reduction + FMA fusion.
-    {
-        int *uses = calloc((size_t)insts, sizeof *uses);
-        for (int i = 0; i < insts; i++) {
-            int const ar = arity(inst[i].op);
-            if (ar >= 1) { uses[inst[i].x]++; }
-            if (ar >= 2) { uses[inst[i].y]++; }
-            if (ar >= 3) { uses[inst[i].z]++; }
-        }
-
-        for (int i = 0; i < insts; i++) {
-            int const x = inst[i].x, y = inst[i].y, z = inst[i].z;
-            _Bool reduced = 1;
-            switch (inst[i].op) {
-                default: reduced = 0; break;
-
-                case op_add_i32:
-                    if      (imm32_is(inst, y, 0)) { inst[i] = inst[x]; }
-                    else if (imm32_is(inst, x, 0)) { inst[i] = inst[y]; }
-                    else { reduced = 0; }
-                    break;
-                case op_add_i16:
-                    if      (imm16_is(inst, y, 0)) { inst[i] = inst[x]; }
-                    else if (imm16_is(inst, x, 0)) { inst[i] = inst[y]; }
-                    else { reduced = 0; }
-                    break;
-
-                case op_mul_i32:
-                    if      (imm32_is(inst, y, 1)) { inst[i] = inst[x]; }
-                    else if (imm32_is(inst, x, 1)) { inst[i] = inst[y]; }
-                    else if (imm32_is(inst, y, 0)) { inst[i] = inst[y]; }
-                    else if (imm32_is(inst, x, 0)) { inst[i] = inst[x]; }
-                    else {
-                        int imm_idx = -1, val_idx = -1;
-                        if (inst[x].op == op_imm_32 && inst[x].immi > 0
-                            && (inst[x].immi & (inst[x].immi - 1)) == 0 && uses[x] == 1) {
-                            imm_idx = x; val_idx = y;
-                        } else if (inst[y].op == op_imm_32 && inst[y].immi > 0
-                            && (inst[y].immi & (inst[y].immi - 1)) == 0 && uses[y] == 1) {
-                            imm_idx = y; val_idx = x;
-                        }
-                        if (imm_idx >= 0) {
-                            inst[imm_idx].immi = __builtin_ctz(
-                                (unsigned)inst[imm_idx].immi);
-                            inst[i].op = op_shl_i32;
-                            inst[i].x = val_idx;
-                            inst[i].y = imm_idx;
-                        } else { reduced = 0; }
-                    }
-                    break;
-                case op_mul_i16:
-                    if      (imm16_is(inst, y, 1)) { inst[i] = inst[x]; }
-                    else if (imm16_is(inst, x, 1)) { inst[i] = inst[y]; }
-                    else if (imm16_is(inst, y, 0)) { inst[i] = inst[y]; }
-                    else if (imm16_is(inst, x, 0)) { inst[i] = inst[x]; }
-                    else {
-                        int imm_idx = -1, val_idx = -1;
-                        int16_t px = (int16_t)inst[x].immi, py = (int16_t)inst[y].immi;
-                        if (inst[x].op == op_imm_16 && px > 0
-                            && (px & (px - 1)) == 0 && uses[x] == 1) {
-                            imm_idx = x; val_idx = y;
-                        } else if (inst[y].op == op_imm_16 && py > 0
-                            && (py & (py - 1)) == 0 && uses[y] == 1) {
-                            imm_idx = y; val_idx = x;
-                        }
-                        if (imm_idx >= 0) {
-                            inst[imm_idx].immi = __builtin_ctz(
-                                (unsigned)(uint16_t)
-                                (int16_t)inst[imm_idx].immi);
-                            inst[i].op = op_shl_i16;
-                            inst[i].x = val_idx;
-                            inst[i].y = imm_idx;
-                        } else { reduced = 0; }
-                    }
-                    break;
-
-                case op_mul_f32:
-                    if      (imm32_is(inst, y, f32_bits(1.0f))) { inst[i] = inst[x]; }
-                    else if (imm32_is(inst, x, f32_bits(1.0f))) { inst[i] = inst[y]; }
-                    else { reduced = 0; }
-                    break;
-                case op_mul_f16:
-                    if      (imm16_is(inst, y, 0x3c00)) { inst[i] = inst[x]; }
-                    else if (imm16_is(inst, x, 0x3c00)) { inst[i] = inst[y]; }
-                    else { reduced = 0; }
-                    break;
-
-                case op_sub_i32:
-                    if      (imm32_is(inst, y, 0)) { inst[i] = inst[x]; }
-                    else if (x == y) { inst[i].op = op_imm_32; inst[i].immi = 0;
-                                       inst[i].x = inst[i].y = inst[i].z = 0; }
-                    else { reduced = 0; }
-                    break;
-                case op_sub_i16:
-                    if      (imm16_is(inst, y, 0)) { inst[i] = inst[x]; }
-                    else if (x == y) { inst[i].op = op_imm_16; inst[i].immi = 0;
-                                       inst[i].x = inst[i].y = inst[i].z = 0; }
-                    else { reduced = 0; }
-                    break;
-
-                case op_sub_f32:
-                    if (imm32_is(inst, y, 0)) { inst[i] = inst[x]; }
-                    else { reduced = 0; }
-                    break;
-                case op_sub_f16:
-                    if (imm16_is(inst, y, 0)) { inst[i] = inst[x]; }
-                    else { reduced = 0; }
-                    break;
-
-                case op_div_f32:
-                    if (imm32_is(inst, y, f32_bits(1.0f))) { inst[i] = inst[x]; }
-                    else { reduced = 0; }
-                    break;
-                case op_div_f16:
-                    if (imm16_is(inst, y, 0x3c00)) { inst[i] = inst[x]; }
-                    else { reduced = 0; }
-                    break;
-
-                case op_shl_i32: case op_shr_u32: case op_shr_s32:
-                    if (imm32_is(inst, y, 0)) { inst[i] = inst[x]; }
-                    else { reduced = 0; }
-                    break;
-                case op_shl_i16: case op_shr_u16: case op_shr_s16:
-                    if (imm16_is(inst, y, 0)) { inst[i] = inst[x]; }
-                    else { reduced = 0; }
-                    break;
-
-                case op_and_32:
-                    if      (imm32_is(inst, y, -1)) { inst[i] = inst[x]; }
-                    else if (imm32_is(inst, x, -1)) { inst[i] = inst[y]; }
-                    else if (imm32_is(inst, y,  0)) { inst[i] = inst[y]; }
-                    else if (imm32_is(inst, x,  0)) { inst[i] = inst[x]; }
-                    else { reduced = 0; }
-                    break;
-                case op_and_16:
-                    if      (imm16_is(inst, y, -1)) { inst[i] = inst[x]; }
-                    else if (imm16_is(inst, x, -1)) { inst[i] = inst[y]; }
-                    else if (imm16_is(inst, y,  0)) { inst[i] = inst[y]; }
-                    else if (imm16_is(inst, x,  0)) { inst[i] = inst[x]; }
-                    else { reduced = 0; }
-                    break;
-
-                case op_or_32:
-                    if      (imm32_is(inst, y,  0)) { inst[i] = inst[x]; }
-                    else if (imm32_is(inst, x,  0)) { inst[i] = inst[y]; }
-                    else if (imm32_is(inst, y, -1)) { inst[i] = inst[y]; }
-                    else if (imm32_is(inst, x, -1)) { inst[i] = inst[x]; }
-                    else { reduced = 0; }
-                    break;
-                case op_or_16:
-                    if      (imm16_is(inst, y,  0)) { inst[i] = inst[x]; }
-                    else if (imm16_is(inst, x,  0)) { inst[i] = inst[y]; }
-                    else if (imm16_is(inst, y, -1)) { inst[i] = inst[y]; }
-                    else if (imm16_is(inst, x, -1)) { inst[i] = inst[x]; }
-                    else { reduced = 0; }
-                    break;
-
-                case op_xor_32:
-                    if      (imm32_is(inst, y, 0)) { inst[i] = inst[x]; }
-                    else if (imm32_is(inst, x, 0)) { inst[i] = inst[y]; }
-                    else if (x == y) { inst[i].op = op_imm_32; inst[i].immi = 0;
-                                       inst[i].x = inst[i].y = inst[i].z = 0; }
-                    else { reduced = 0; }
-                    break;
-                case op_xor_16:
-                    if      (imm16_is(inst, y, 0)) { inst[i] = inst[x]; }
-                    else if (imm16_is(inst, x, 0)) { inst[i] = inst[y]; }
-                    else if (x == y) { inst[i].op = op_imm_16; inst[i].immi = 0;
-                                       inst[i].x = inst[i].y = inst[i].z = 0; }
-                    else { reduced = 0; }
-                    break;
-
-                case op_sel_32:
-                    if      (y == z)                { inst[i] = inst[y]; }
-                    else if (imm32_is(inst, x, -1)) { inst[i] = inst[y]; }
-                    else if (imm32_is(inst, x,  0)) { inst[i] = inst[z]; }
-                    else { reduced = 0; }
-                    break;
-                case op_sel_16:
-                    if      (y == z)                { inst[i] = inst[y]; }
-                    else if (imm16_is(inst, x, -1)) { inst[i] = inst[y]; }
-                    else if (imm16_is(inst, x,  0)) { inst[i] = inst[z]; }
-                    else { reduced = 0; }
-                    break;
-
-                case op_fma_f32:
-                    if (imm32_is(inst, z, 0)) {
-                        inst[i].op = op_mul_f32; inst[i].z = 0;
-                    } else if (imm32_is(inst, x, f32_bits(1.0f))) {
-                        inst[i].op = op_add_f32;
-                        inst[i].x = y; inst[i].y = z; inst[i].z = 0;
-                    } else if (imm32_is(inst, y, f32_bits(1.0f))) {
-                        inst[i].op = op_add_f32; inst[i].y = z; inst[i].z = 0;
-                    } else { reduced = 0; }
-                    break;
-                case op_fma_f16:
-                    if (imm16_is(inst, z, 0)) {
-                        inst[i].op = op_mul_f16; inst[i].z = 0;
-                    } else if (imm16_is(inst, x, 0x3c00)) {
-                        inst[i].op = op_add_f16;
-                        inst[i].x = y; inst[i].y = z; inst[i].z = 0;
-                    } else if (imm16_is(inst, y, 0x3c00)) {
-                        inst[i].op = op_add_f16; inst[i].y = z; inst[i].z = 0;
-                    } else { reduced = 0; }
-                    break;
-            }
-
-            if (!reduced
-                    && (inst[i].op == op_add_f32
-                     || inst[i].op == op_add_f16)) {
-                enum op fma_op, mul_op;
-                if (inst[i].op == op_add_f32) {
-                    fma_op = op_fma_f32;
-                    mul_op = op_mul_f32;
-                } else {
-                    fma_op = op_fma_f16;
-                    mul_op = op_mul_f16;
-                }
-
-                int const ax = inst[i].x, ay = inst[i].y;
-                int mul = -1, other = -1;
-                if      (inst[ax].op == mul_op) { mul = ax; other = ay; }
-                else if (inst[ay].op == mul_op) { mul = ay; other = ax; }
-                if (mul >= 0) {
-                    inst[i].op = fma_op;
-                    inst[i].x = inst[mul].x;
-                    inst[i].y = inst[mul].y;
-                    inst[i].z = other;
-                }
-            }
-        }
-        free(uses);
-    }
-
-    // 4. GVN (Global Value Numbering).
-    int *remap = malloc((size_t)insts * sizeof *remap);
-    for (int i = 0; i < insts; i++) { remap[i] = i; }
-    {
-        int cap = 16;
-        while (cap < insts * 2) { cap *= 2; }
-        struct { int key; int val; } *ht = calloc((size_t)cap, sizeof *ht);
-
-        for (int i = 0; i < insts; i++) {
-            inst[i].x = remap[inst[i].x];
-            inst[i].y = remap[inst[i].y];
-            inst[i].z = remap[inst[i].z];
-
-            if (is_store(inst[i].op)) { continue; }
-
-            struct { enum op op; int x, y, z, immi; } const key = {
-                inst[i].op, inst[i].x, inst[i].y, inst[i].z, inst[i].immi
-            };
-            uint32_t h = fnv1a(&key, sizeof key);
-
-            for (int const mask = cap - 1;;) {
-                int const slot = (int)(h & (uint32_t)mask);
-                if (ht[slot].key == 0) {
-                    ht[slot].key = i + 1;
-                    ht[slot].val = i;
-                    break;
-                }
-                int const prev = ht[slot].val;
-                if (inst[prev].op == inst[i].op
-                 && inst[prev].x == inst[i].x && inst[prev].y == inst[i].y
-                 && inst[prev].z == inst[i].z && inst[prev].immi == inst[i].immi) {
-                    remap[i] = prev;
-                    break;
-                }
-                h++;
-            }
-        }
-        free(ht);
-    }
-
-    // 5. DCE + compaction.
+    // 1. DCE + compaction.
     int *uses = calloc((size_t)insts, sizeof *uses);
     for (int i = 0; i < insts; i++) {
-        if (remap[i] != i) { continue; }
         int const ar = arity(inst[i].op);
         if (is_store(inst[i].op)) { uses[i]++; }
-        if (ar >= 1) { uses[remap[inst[i].x]]++; }
-        if (ar >= 2) { uses[remap[inst[i].y]]++; }
-        if (ar >= 3) { uses[remap[inst[i].z]]++; }
+        if (ar >= 1) { uses[inst[i].x]++; }
+        if (ar >= 2) { uses[inst[i].y]++; }
+        if (ar >= 3) { uses[inst[i].z]++; }
     }
     for (int i = insts; i --> 0;) {
-        if (remap[i] != i) { continue; }
         if (uses[i] == 0 && !is_store(inst[i].op)) {
             int const ar = arity(inst[i].op);
-            if (ar >= 1) { uses[remap[inst[i].x]]--; }
-            if (ar >= 2) { uses[remap[inst[i].y]]--; }
-            if (ar >= 3) { uses[remap[inst[i].z]]--; }
+            if (ar >= 1) { uses[inst[i].x]--; }
+            if (ar >= 2) { uses[inst[i].y]--; }
+            if (ar >= 3) { uses[inst[i].z]--; }
         }
     }
 
     int *newix = calloc((size_t)insts, sizeof *newix);
     int live = 0;
     for (int i = 0; i < insts; i++) {
-        if (remap[i] == i && (uses[i] > 0 || is_store(inst[i].op))) {
+        if (uses[i] > 0 || is_store(inst[i].op)) {
             newix[i] = live++;
-        } else {
-            newix[i] = -1;
-        }
-    }
-    for (int i = 0; i < insts; i++) {
-        if (newix[i] < 0) {
-            newix[i] = newix[remap[i]];
         }
     }
     live = 0;
     for (int i = 0; i < insts; i++) {
-        if (remap[i] != i) { continue; }
         if (uses[i] == 0 && !is_store(inst[i].op)) { continue; }
         inst[live] = inst[i];
         inst[live].x = newix[inst[i].x];
@@ -833,9 +465,8 @@ static int umbra_optimize(struct bb_inst inst[], int insts) {
     }
     free(newix);
     free(uses);
-    free(remap);
 
-    // 6. Loop invariant hoisting: stable partition uniforms before varyings.
+    // 2. Loop invariant hoisting: stable partition uniforms before varyings.
     {
         _Bool *varying = calloc((size_t)live, sizeof *varying);
         for (int i = 0; i < live; i++) {
@@ -854,10 +485,12 @@ static int umbra_optimize(struct bb_inst inst[], int insts) {
         int *order = malloc((size_t)live * sizeof *order);
         int *back  = malloc((size_t)live * sizeof *back);
         int j = 0;
-        for (int i = 0; i < live; i++)
+        for (int i = 0; i < live; i++) {
             if (!varying[i]) { back[j]=i; order[i]=j; j++; }
-        for (int i = 0; i < live; i++)
+        }
+        for (int i = 0; i < live; i++) {
             if ( varying[i]) { back[j]=i; order[i]=j; j++; }
+        }
 
         struct bb_inst *tmp = malloc((size_t)live * sizeof *tmp);
         for (int i = 0; i < live; i++) {
@@ -1227,9 +860,12 @@ static int bb_constprop(struct umbra_basic_block *bb, enum op op,
     return umbra_imm_16(bb, (uint16_t)(int16_t)result).id;
 }
 
-// Generic binary op builder: canonicalize, constprop, push.
+static void sort(int *a, int *b) {
+    if (*a > *b) { int t = *a; *a = *b; *b = t; }
+}
+
+// Generic binary op builder: constprop, push.
 static int bb_binop(struct umbra_basic_block *bb, enum op op, int x, int y) {
-    if (commutative(op) && x > y) { int t = x; x = y; y = t; }
     int cp = bb_constprop(bb, op, x, y, 0);
     if (cp >= 0) { return cp; }
     return bb_push(bb, bb_rel(bb->insts, op, x, y, 0));
@@ -1252,6 +888,7 @@ static int bb_ternop(struct umbra_basic_block *bb, enum op op, int x, int y, int
 // ── f32 arithmetic ───────────────────────────────────────────────────
 
 umbra_v32 umbra_add_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
+    sort(&a.id, &b.id);
     int x = a.id, y = b.id;
     // FMA peephole: add(mul(a,b), c) → fma(a,b,c)
     if (bb->inst[x].op == op_mul_f32) {
@@ -1271,6 +908,7 @@ umbra_v32 umbra_sub_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) 
 }
 
 umbra_v32 umbra_mul_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
+    sort(&a.id, &b.id);
     if (bb_is_imm32(bb, b.id, f32_bits(1.0f))) { return a; }
     if (bb_is_imm32(bb, a.id, f32_bits(1.0f))) { return b; }
     return (umbra_v32){bb_binop(bb, op_mul_f32, a.id, b.id)};
@@ -1282,10 +920,12 @@ umbra_v32 umbra_div_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) 
 }
 
 umbra_v32 umbra_min_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
+    sort(&a.id, &b.id);
     return (umbra_v32){bb_binop(bb, op_min_f32, a.id, b.id)};
 }
 
 umbra_v32 umbra_max_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
+    sort(&a.id, &b.id);
     return (umbra_v32){bb_binop(bb, op_max_f32, a.id, b.id)};
 }
 
@@ -1296,6 +936,7 @@ umbra_v32 umbra_sqrt_f32(struct umbra_basic_block *bb, umbra_v32 a) {
 // ── f16 arithmetic ───────────────────────────────────────────────────
 
 umbra_v16 umbra_add_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
+    sort(&a.id, &b.id);
     int x = a.id, y = b.id;
     if (bb->inst[x].op == op_mul_f16) {
         int mx = x + bb->inst[x].x, my = x + bb->inst[x].y;
@@ -1314,6 +955,7 @@ umbra_v16 umbra_sub_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) 
 }
 
 umbra_v16 umbra_mul_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
+    sort(&a.id, &b.id);
     if (bb_is_imm16(bb, b.id, 0x3c00)) { return a; }
     if (bb_is_imm16(bb, a.id, 0x3c00)) { return b; }
     return (umbra_v16){bb_binop(bb, op_mul_f16, a.id, b.id)};
@@ -1325,10 +967,12 @@ umbra_v16 umbra_div_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) 
 }
 
 umbra_v16 umbra_min_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
+    sort(&a.id, &b.id);
     return (umbra_v16){bb_binop(bb, op_min_f16, a.id, b.id)};
 }
 
 umbra_v16 umbra_max_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
+    sort(&a.id, &b.id);
     return (umbra_v16){bb_binop(bb, op_max_f16, a.id, b.id)};
 }
 
@@ -1339,6 +983,7 @@ umbra_v16 umbra_sqrt_f16(struct umbra_basic_block *bb, umbra_v16 a) {
 // ── i32 arithmetic ───────────────────────────────────────────────────
 
 umbra_v32 umbra_add_i32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
+    sort(&a.id, &b.id);
     if (bb_is_imm32(bb, b.id, 0)) { return a; }
     if (bb_is_imm32(bb, a.id, 0)) { return b; }
     return (umbra_v32){bb_binop(bb, op_add_i32, a.id, b.id)};
@@ -1351,6 +996,7 @@ umbra_v32 umbra_sub_i32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) 
 }
 
 umbra_v32 umbra_mul_i32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
+    sort(&a.id, &b.id);
     if (bb_is_imm32(bb, b.id, 1)) { return a; }
     if (bb_is_imm32(bb, a.id, 1)) { return b; }
     if (bb_is_imm32(bb, b.id, 0)) { return b; }
@@ -1374,6 +1020,7 @@ umbra_v32 umbra_mul_i32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) 
 // ── i16 arithmetic ───────────────────────────────────────────────────
 
 umbra_v16 umbra_add_i16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
+    sort(&a.id, &b.id);
     if (bb_is_imm16(bb, b.id, 0)) { return a; }
     if (bb_is_imm16(bb, a.id, 0)) { return b; }
     return (umbra_v16){bb_binop(bb, op_add_i16, a.id, b.id)};
@@ -1386,6 +1033,7 @@ umbra_v16 umbra_sub_i16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) 
 }
 
 umbra_v16 umbra_mul_i16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
+    sort(&a.id, &b.id);
     if (bb_is_imm16(bb, b.id, 1)) { return a; }
     if (bb_is_imm16(bb, a.id, 1)) { return b; }
     if (bb_is_imm16(bb, b.id, 0)) { return b; }
@@ -1439,6 +1087,7 @@ umbra_v16 umbra_shr_s16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) 
 // ── bitwise ──────────────────────────────────────────────────────────
 
 umbra_v32 umbra_and_32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
+    sort(&a.id, &b.id);
     if (bb_is_imm32(bb, b.id, -1)) { return a; }
     if (bb_is_imm32(bb, a.id, -1)) { return b; }
     if (bb_is_imm32(bb, b.id,  0)) { return b; }
@@ -1446,6 +1095,7 @@ umbra_v32 umbra_and_32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
     return (umbra_v32){bb_binop(bb, op_and_32, a.id, b.id)};
 }
 umbra_v32 umbra_or_32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
+    sort(&a.id, &b.id);
     if (bb_is_imm32(bb, b.id,  0)) { return a; }
     if (bb_is_imm32(bb, a.id,  0)) { return b; }
     if (bb_is_imm32(bb, b.id, -1)) { return b; }
@@ -1453,6 +1103,7 @@ umbra_v32 umbra_or_32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
     return (umbra_v32){bb_binop(bb, op_or_32, a.id, b.id)};
 }
 umbra_v32 umbra_xor_32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
+    sort(&a.id, &b.id);
     if (bb_is_imm32(bb, b.id, 0)) { return a; }
     if (bb_is_imm32(bb, a.id, 0)) { return b; }
     if (a.id == b.id) { return umbra_imm_32(bb, 0); }
@@ -1466,6 +1117,7 @@ umbra_v32 umbra_sel_32(struct umbra_basic_block *bb, umbra_v32 c, umbra_v32 t, u
 }
 
 umbra_v16 umbra_and_16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
+    sort(&a.id, &b.id);
     if (bb_is_imm16(bb, b.id, -1)) { return a; }
     if (bb_is_imm16(bb, a.id, -1)) { return b; }
     if (bb_is_imm16(bb, b.id,  0)) { return b; }
@@ -1473,6 +1125,7 @@ umbra_v16 umbra_and_16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
     return (umbra_v16){bb_binop(bb, op_and_16, a.id, b.id)};
 }
 umbra_v16 umbra_or_16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
+    sort(&a.id, &b.id);
     if (bb_is_imm16(bb, b.id,  0)) { return a; }
     if (bb_is_imm16(bb, a.id,  0)) { return b; }
     if (bb_is_imm16(bb, b.id, -1)) { return b; }
@@ -1480,6 +1133,7 @@ umbra_v16 umbra_or_16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
     return (umbra_v16){bb_binop(bb, op_or_16, a.id, b.id)};
 }
 umbra_v16 umbra_xor_16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
+    sort(&a.id, &b.id);
     if (bb_is_imm16(bb, b.id, 0)) { return a; }
     if (bb_is_imm16(bb, a.id, 0)) { return b; }
     if (a.id == b.id) { return umbra_imm_16(bb, 0); }
@@ -1509,24 +1163,24 @@ umbra_v32 umbra_i32_from_f32(struct umbra_basic_block *bb, umbra_v32 a) {
 
 // ── comparisons ──────────────────────────────────────────────────────
 
-umbra_v16 umbra_eq_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_binop(bb, op_eq_f16, a.id, b.id)}; }
-umbra_v16 umbra_ne_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_binop(bb, op_ne_f16, a.id, b.id)}; }
+umbra_v16 umbra_eq_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { sort(&a.id, &b.id); return (umbra_v16){bb_binop(bb, op_eq_f16, a.id, b.id)}; }
+umbra_v16 umbra_ne_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { sort(&a.id, &b.id); return (umbra_v16){bb_binop(bb, op_ne_f16, a.id, b.id)}; }
 umbra_v16 umbra_lt_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_binop(bb, op_lt_f16, a.id, b.id)}; }
 umbra_v16 umbra_le_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_binop(bb, op_le_f16, a.id, b.id)}; }
 umbra_v16 umbra_gt_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_binop(bb, op_gt_f16, a.id, b.id)}; }
 umbra_v16 umbra_ge_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_binop(bb, op_ge_f16, a.id, b.id)}; }
 
-umbra_v32 umbra_eq_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_binop(bb, op_eq_f32, a.id, b.id)}; }
-umbra_v32 umbra_ne_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_binop(bb, op_ne_f32, a.id, b.id)}; }
+umbra_v32 umbra_eq_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { sort(&a.id, &b.id); return (umbra_v32){bb_binop(bb, op_eq_f32, a.id, b.id)}; }
+umbra_v32 umbra_ne_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { sort(&a.id, &b.id); return (umbra_v32){bb_binop(bb, op_ne_f32, a.id, b.id)}; }
 umbra_v32 umbra_lt_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_binop(bb, op_lt_f32, a.id, b.id)}; }
 umbra_v32 umbra_le_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_binop(bb, op_le_f32, a.id, b.id)}; }
 umbra_v32 umbra_gt_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_binop(bb, op_gt_f32, a.id, b.id)}; }
 umbra_v32 umbra_ge_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_binop(bb, op_ge_f32, a.id, b.id)}; }
 
-umbra_v16 umbra_eq_i16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_binop(bb, op_eq_i16, a.id, b.id)}; }
-umbra_v16 umbra_ne_i16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_binop(bb, op_ne_i16, a.id, b.id)}; }
-umbra_v32 umbra_eq_i32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_binop(bb, op_eq_i32, a.id, b.id)}; }
-umbra_v32 umbra_ne_i32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_binop(bb, op_ne_i32, a.id, b.id)}; }
+umbra_v16 umbra_eq_i16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { sort(&a.id, &b.id); return (umbra_v16){bb_binop(bb, op_eq_i16, a.id, b.id)}; }
+umbra_v16 umbra_ne_i16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { sort(&a.id, &b.id); return (umbra_v16){bb_binop(bb, op_ne_i16, a.id, b.id)}; }
+umbra_v32 umbra_eq_i32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { sort(&a.id, &b.id); return (umbra_v32){bb_binop(bb, op_eq_i32, a.id, b.id)}; }
+umbra_v32 umbra_ne_i32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { sort(&a.id, &b.id); return (umbra_v32){bb_binop(bb, op_ne_i32, a.id, b.id)}; }
 
 umbra_v16 umbra_lt_s16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_binop(bb, op_lt_s16, a.id, b.id)}; }
 umbra_v16 umbra_le_s16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_binop(bb, op_le_s16, a.id, b.id)}; }
