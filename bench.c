@@ -16,80 +16,80 @@ static double now(void) {
 static int build_srcover(struct umbra_inst inst[]) {
     int n = 0;
 
-    int const lane_  = n; inst[n++] = (struct umbra_inst){.op=umbra_lane};
-    int const src_   = n; inst[n++] = (struct umbra_inst){umbra_load_32, .ptr=0, .x=lane_};
+    int const lane_  = n; inst[n++] = (struct umbra_inst){.op=op_lane};
+    int const src_   = n; inst[n++] = (struct umbra_inst){op_load_32, .ptr=0, .x=lane_};
 
     // Extract R (bits 0..7)
-    int const maskr  = n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immi=0xFF};
-    int const ri32   = n; inst[n++] = (struct umbra_inst){umbra_and_32, .x=src_, .y=maskr};
-    int const rf32   = n; inst[n++] = (struct umbra_inst){umbra_f32_from_i32, .x=ri32};
-    int const inv255r= n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immf=1.0f/255.0f};
-    int const srf32  = n; inst[n++] = (struct umbra_inst){umbra_mul_f32, .x=rf32, .y=inv255r};
-    int const sr16   = n; inst[n++] = (struct umbra_inst){umbra_f16_from_f32, .x=srf32};
+    int const maskr  = n; inst[n++] = (struct umbra_inst){op_imm_32, .immi=0xFF};
+    int const ri32   = n; inst[n++] = (struct umbra_inst){op_and_32, .x=src_, .y=maskr};
+    int const rf32   = n; inst[n++] = (struct umbra_inst){op_f32_from_i32, .x=ri32};
+    int const inv255r= n; inst[n++] = (struct umbra_inst){op_imm_32, .immf=1.0f/255.0f};
+    int const srf32  = n; inst[n++] = (struct umbra_inst){op_mul_f32, .x=rf32, .y=inv255r};
+    int const sr16   = n; inst[n++] = (struct umbra_inst){op_f16_from_f32, .x=srf32};
 
     // Extract G (bits 8..15)
-    int const sh8    = n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immi=8};
-    int const gshr   = n; inst[n++] = (struct umbra_inst){umbra_shr_u32, .x=src_, .y=sh8};
-    int const maskg  = n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immi=0xFF};
-    int const gi32   = n; inst[n++] = (struct umbra_inst){umbra_and_32, .x=gshr, .y=maskg};
-    int const gf32   = n; inst[n++] = (struct umbra_inst){umbra_f32_from_i32, .x=gi32};
-    int const inv255g= n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immf=1.0f/255.0f};
-    int const sgf32  = n; inst[n++] = (struct umbra_inst){umbra_mul_f32, .x=gf32, .y=inv255g};
-    int const sg16   = n; inst[n++] = (struct umbra_inst){umbra_f16_from_f32, .x=sgf32};
+    int const sh8    = n; inst[n++] = (struct umbra_inst){op_imm_32, .immi=8};
+    int const gshr   = n; inst[n++] = (struct umbra_inst){op_shr_u32, .x=src_, .y=sh8};
+    int const maskg  = n; inst[n++] = (struct umbra_inst){op_imm_32, .immi=0xFF};
+    int const gi32   = n; inst[n++] = (struct umbra_inst){op_and_32, .x=gshr, .y=maskg};
+    int const gf32   = n; inst[n++] = (struct umbra_inst){op_f32_from_i32, .x=gi32};
+    int const inv255g= n; inst[n++] = (struct umbra_inst){op_imm_32, .immf=1.0f/255.0f};
+    int const sgf32  = n; inst[n++] = (struct umbra_inst){op_mul_f32, .x=gf32, .y=inv255g};
+    int const sg16   = n; inst[n++] = (struct umbra_inst){op_f16_from_f32, .x=sgf32};
 
     // Extract B (bits 16..23)
-    int const sh16   = n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immi=16};
-    int const bshr   = n; inst[n++] = (struct umbra_inst){umbra_shr_u32, .x=src_, .y=sh16};
-    int const maskb  = n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immi=0xFF};
-    int const bi32   = n; inst[n++] = (struct umbra_inst){umbra_and_32, .x=bshr, .y=maskb};
-    int const bf32   = n; inst[n++] = (struct umbra_inst){umbra_f32_from_i32, .x=bi32};
-    int const inv255b= n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immf=1.0f/255.0f};
-    int const sbf32  = n; inst[n++] = (struct umbra_inst){umbra_mul_f32, .x=bf32, .y=inv255b};
-    int const sb16   = n; inst[n++] = (struct umbra_inst){umbra_f16_from_f32, .x=sbf32};
+    int const sh16   = n; inst[n++] = (struct umbra_inst){op_imm_32, .immi=16};
+    int const bshr   = n; inst[n++] = (struct umbra_inst){op_shr_u32, .x=src_, .y=sh16};
+    int const maskb  = n; inst[n++] = (struct umbra_inst){op_imm_32, .immi=0xFF};
+    int const bi32   = n; inst[n++] = (struct umbra_inst){op_and_32, .x=bshr, .y=maskb};
+    int const bf32   = n; inst[n++] = (struct umbra_inst){op_f32_from_i32, .x=bi32};
+    int const inv255b= n; inst[n++] = (struct umbra_inst){op_imm_32, .immf=1.0f/255.0f};
+    int const sbf32  = n; inst[n++] = (struct umbra_inst){op_mul_f32, .x=bf32, .y=inv255b};
+    int const sb16   = n; inst[n++] = (struct umbra_inst){op_f16_from_f32, .x=sbf32};
 
     // Extract A (bits 24..31)
-    int const sh24   = n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immi=24};
-    int const ashr_  = n; inst[n++] = (struct umbra_inst){umbra_shr_u32, .x=src_, .y=sh24};
-    int const maska  = n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immi=0xFF};
-    int const ai32   = n; inst[n++] = (struct umbra_inst){umbra_and_32, .x=ashr_, .y=maska};
-    int const af32   = n; inst[n++] = (struct umbra_inst){umbra_f32_from_i32, .x=ai32};
-    int const inv255a= n; inst[n++] = (struct umbra_inst){umbra_imm_32, .immf=1.0f/255.0f};
-    int const saf32  = n; inst[n++] = (struct umbra_inst){umbra_mul_f32, .x=af32, .y=inv255a};
-    int const sa16   = n; inst[n++] = (struct umbra_inst){umbra_f16_from_f32, .x=saf32};
+    int const sh24   = n; inst[n++] = (struct umbra_inst){op_imm_32, .immi=24};
+    int const ashr_  = n; inst[n++] = (struct umbra_inst){op_shr_u32, .x=src_, .y=sh24};
+    int const maska  = n; inst[n++] = (struct umbra_inst){op_imm_32, .immi=0xFF};
+    int const ai32   = n; inst[n++] = (struct umbra_inst){op_and_32, .x=ashr_, .y=maska};
+    int const af32   = n; inst[n++] = (struct umbra_inst){op_f32_from_i32, .x=ai32};
+    int const inv255a= n; inst[n++] = (struct umbra_inst){op_imm_32, .immf=1.0f/255.0f};
+    int const saf32  = n; inst[n++] = (struct umbra_inst){op_mul_f32, .x=af32, .y=inv255a};
+    int const sa16   = n; inst[n++] = (struct umbra_inst){op_f16_from_f32, .x=saf32};
 
     // Load dst fp16 channels
-    int const dr16   = n; inst[n++] = (struct umbra_inst){umbra_load_16, .ptr=1, .x=lane_};
-    int const dg16   = n; inst[n++] = (struct umbra_inst){umbra_load_16, .ptr=2, .x=lane_};
-    int const db16   = n; inst[n++] = (struct umbra_inst){umbra_load_16, .ptr=3, .x=lane_};
-    int const da16   = n; inst[n++] = (struct umbra_inst){umbra_load_16, .ptr=4, .x=lane_};
+    int const dr16   = n; inst[n++] = (struct umbra_inst){op_load_16, .ptr=1, .x=lane_};
+    int const dg16   = n; inst[n++] = (struct umbra_inst){op_load_16, .ptr=2, .x=lane_};
+    int const db16   = n; inst[n++] = (struct umbra_inst){op_load_16, .ptr=3, .x=lane_};
+    int const da16   = n; inst[n++] = (struct umbra_inst){op_load_16, .ptr=4, .x=lane_};
 
     // Blend: out = src + dst * (1 - src_alpha), all in fp16
     // inv_alpha = 1 - sa
-    int const one_r  = n; inst[n++] = (struct umbra_inst){umbra_imm_16, .immi=0x3C00};  // 1.0 in fp16
-    int const inva_r = n; inst[n++] = (struct umbra_inst){umbra_sub_f16, .x=one_r, .y=sa16};
-    int const drmul  = n; inst[n++] = (struct umbra_inst){umbra_mul_f16, .x=dr16, .y=inva_r};
-    int const rout   = n; inst[n++] = (struct umbra_inst){umbra_add_f16, .x=sr16, .y=drmul};
+    int const one_r  = n; inst[n++] = (struct umbra_inst){op_imm_16, .immi=0x3C00};  // 1.0 in fp16
+    int const inva_r = n; inst[n++] = (struct umbra_inst){op_sub_f16, .x=one_r, .y=sa16};
+    int const drmul  = n; inst[n++] = (struct umbra_inst){op_mul_f16, .x=dr16, .y=inva_r};
+    int const rout   = n; inst[n++] = (struct umbra_inst){op_add_f16, .x=sr16, .y=drmul};
 
-    int const one_g  = n; inst[n++] = (struct umbra_inst){umbra_imm_16, .immi=0x3C00};
-    int const inva_g = n; inst[n++] = (struct umbra_inst){umbra_sub_f16, .x=one_g, .y=sa16};
-    int const dgmul  = n; inst[n++] = (struct umbra_inst){umbra_mul_f16, .x=dg16, .y=inva_g};
-    int const gout   = n; inst[n++] = (struct umbra_inst){umbra_add_f16, .x=sg16, .y=dgmul};
+    int const one_g  = n; inst[n++] = (struct umbra_inst){op_imm_16, .immi=0x3C00};
+    int const inva_g = n; inst[n++] = (struct umbra_inst){op_sub_f16, .x=one_g, .y=sa16};
+    int const dgmul  = n; inst[n++] = (struct umbra_inst){op_mul_f16, .x=dg16, .y=inva_g};
+    int const gout   = n; inst[n++] = (struct umbra_inst){op_add_f16, .x=sg16, .y=dgmul};
 
-    int const one_b  = n; inst[n++] = (struct umbra_inst){umbra_imm_16, .immi=0x3C00};
-    int const inva_b = n; inst[n++] = (struct umbra_inst){umbra_sub_f16, .x=one_b, .y=sa16};
-    int const dbmul  = n; inst[n++] = (struct umbra_inst){umbra_mul_f16, .x=db16, .y=inva_b};
-    int const bout   = n; inst[n++] = (struct umbra_inst){umbra_add_f16, .x=sb16, .y=dbmul};
+    int const one_b  = n; inst[n++] = (struct umbra_inst){op_imm_16, .immi=0x3C00};
+    int const inva_b = n; inst[n++] = (struct umbra_inst){op_sub_f16, .x=one_b, .y=sa16};
+    int const dbmul  = n; inst[n++] = (struct umbra_inst){op_mul_f16, .x=db16, .y=inva_b};
+    int const bout   = n; inst[n++] = (struct umbra_inst){op_add_f16, .x=sb16, .y=dbmul};
 
-    int const one_a  = n; inst[n++] = (struct umbra_inst){umbra_imm_16, .immi=0x3C00};
-    int const inva_a = n; inst[n++] = (struct umbra_inst){umbra_sub_f16, .x=one_a, .y=sa16};
-    int const damul  = n; inst[n++] = (struct umbra_inst){umbra_mul_f16, .x=da16, .y=inva_a};
-    int const aout   = n; inst[n++] = (struct umbra_inst){umbra_add_f16, .x=sa16, .y=damul};
+    int const one_a  = n; inst[n++] = (struct umbra_inst){op_imm_16, .immi=0x3C00};
+    int const inva_a = n; inst[n++] = (struct umbra_inst){op_sub_f16, .x=one_a, .y=sa16};
+    int const damul  = n; inst[n++] = (struct umbra_inst){op_mul_f16, .x=da16, .y=inva_a};
+    int const aout   = n; inst[n++] = (struct umbra_inst){op_add_f16, .x=sa16, .y=damul};
 
     // Store results
-    inst[n++] = (struct umbra_inst){umbra_store_16, .ptr=1, .x=lane_, .y=rout};
-    inst[n++] = (struct umbra_inst){umbra_store_16, .ptr=2, .x=lane_, .y=gout};
-    inst[n++] = (struct umbra_inst){umbra_store_16, .ptr=3, .x=lane_, .y=bout};
-    inst[n++] = (struct umbra_inst){umbra_store_16, .ptr=4, .x=lane_, .y=aout};
+    inst[n++] = (struct umbra_inst){op_store_16, .ptr=1, .x=lane_, .y=rout};
+    inst[n++] = (struct umbra_inst){op_store_16, .ptr=2, .x=lane_, .y=gout};
+    inst[n++] = (struct umbra_inst){op_store_16, .ptr=3, .x=lane_, .y=bout};
+    inst[n++] = (struct umbra_inst){op_store_16, .ptr=4, .x=lane_, .y=aout};
 
     (void)sr16; (void)sg16; (void)sb16; (void)sa16;
     (void)srf32; (void)sgf32; (void)sbf32; (void)saf32;
