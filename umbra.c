@@ -1011,17 +1011,13 @@ static struct umbra_interpreter* interp_from_inst(struct bb_inst const inst[], i
 }
 
 static void interp_run(struct umbra_interpreter *p, int n, void *ptr[]) {
-    struct interp_inst const *body = p->inst + p->preamble;
-    val                      *bv   = p->v    + p->preamble;
+    struct interp_inst const *start = p->inst;
+    val                      *v     = p->v;
+    int const P = p->preamble;
 
-    // First iteration runs preamble+body together.
     int i = 0;
-    if (i+K <= n) { p->inst->fn(p->inst, p->v, i+K, ptr); i += K; }
-    else if (n>0) { p->inst->fn(p->inst, p->v, i+1, ptr); i += 1; }
-
-    // Remaining iterations run body only.
-    while (i+K <= n) { body->fn(body, bv, i+K, ptr); i += K; }
-    while (i+1 <= n) { body->fn(body, bv, i+1, ptr); i += 1; }
+    while (i+K <= n) { start->fn(start,v,i+K,ptr); i+= K; start = p->inst+P; v = p->v+P; }
+    while (i+1 <= n) { start->fn(start,v,i+1,ptr); i+= 1; start = p->inst+P; v = p->v+P; }
 }
 
 static void interp_free(struct umbra_interpreter *p) {
@@ -1035,26 +1031,21 @@ static void interp_free(struct umbra_interpreter *p) {
 struct umbra_basic_block {
     struct bb_inst *inst;
     int            *ht;
-    int            insts, cap, ht_cap, :32;
+    int             insts, ht_mask;
 };
 
+// Grow inst[] and ht[] when insts is zero or a power of two.
+// Capacity goes 0,1,2,4,8,...; ht is always 2x inst capacity.
 static void bb_grow(struct umbra_basic_block *bb) {
-    if (bb->insts < bb->cap) { return; }
-    bb->cap = bb->cap ? bb->cap * 2 : 16;
-    bb->inst = realloc(bb->inst, (size_t)bb->cap * sizeof *bb->inst);
-}
-
-static void bb_ht_grow(struct umbra_basic_block *bb) {
-    // Rehash when > 50% full.
-    if (bb->insts * 2 < bb->ht_cap) { return; }
-    int old_cap = bb->ht_cap;
-    bb->ht_cap = old_cap ? old_cap * 2 : 32;
-    bb->ht = realloc(bb->ht, (size_t)bb->ht_cap * sizeof *bb->ht);
-    for (int i = 0; i < bb->ht_cap; i++) { bb->ht[i] = -1; }
-    int mask = bb->ht_cap - 1;
+    if (__builtin_popcount((unsigned)bb->insts) > 1) { return; }
+    int inst_cap = bb->insts ? bb->insts * 2 : 1,
+         ht_cap  = inst_cap * 2;
+    bb->inst = realloc(bb->inst, (size_t)inst_cap * sizeof *bb->inst);
+    bb->ht   = realloc(bb->ht,   (size_t) ht_cap  * sizeof *bb->ht);
+    for (int i = 0; i < ht_cap; i++) { bb->ht[i] = -1; }
+    bb->ht_mask = ht_cap - 1;
     for (int i = 0; i < bb->insts; i++) {
         if (is_store(bb->inst[i].op)) { continue; }
-        // Hash using absolute x/y/z.
         struct { enum op op; int x, y, z, immi; } key = {
             bb->inst[i].op,
             bb->inst[i].x ? i + bb->inst[i].x : 0,
@@ -1064,7 +1055,7 @@ static void bb_ht_grow(struct umbra_basic_block *bb) {
         };
         uint32_t h = fnv1a(&key, sizeof key);
         for (;;) {
-            int slot = (int)(h & (uint32_t)mask);
+            int slot = (int)(h & (uint32_t)bb->ht_mask);
             if (bb->ht[slot] < 0) { bb->ht[slot] = i; break; }
             h++;
         }
@@ -1074,8 +1065,9 @@ static void bb_ht_grow(struct umbra_basic_block *bb) {
 // Push a pre-filled instruction. Returns its absolute index.
 // Stores skip dedup. Others get deduped via hash table.
 static int bb_push(struct umbra_basic_block *bb, struct bb_inst inst) {
+    bb_grow(bb);
+
     if (is_store(inst.op)) {
-        bb_grow(bb);
         int id = bb->insts++;
         bb->inst[id] = inst;
         return id;
@@ -1090,13 +1082,11 @@ static int bb_push(struct umbra_basic_block *bb, struct bb_inst inst) {
         inst.z ? cur + inst.z : 0,
         inst.immi,
     };
-    bb_ht_grow(bb);
     uint32_t h = fnv1a(&key, sizeof key);
-    int mask = bb->ht_cap - 1;
+    int mask = bb->ht_mask;
     for (;;) {
         int slot = (int)(h & (uint32_t)mask);
         if (bb->ht[slot] < 0) {
-            bb_grow(bb);
             int id = bb->insts++;
             bb->inst[id] = inst;
             bb->ht[slot] = id;
@@ -1104,7 +1094,6 @@ static int bb_push(struct umbra_basic_block *bb, struct bb_inst inst) {
         }
         int prev = bb->ht[slot];
         struct bb_inst *pi = &bb->inst[prev];
-        // Compare using absolute coordinates.
         struct { enum op op; int x, y, z, immi; } pkey = {
             pi->op,
             pi->x ? prev + pi->x : 0,
