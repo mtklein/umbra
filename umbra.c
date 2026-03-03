@@ -36,9 +36,10 @@ struct inst {
 };
 
 struct umbra_interpreter {
-    int         insts;
-    int         preamble;
-    struct inst inst[];
+    struct inst *inst;
+    val         *v;
+    int          insts;
+    int          preamble;
 };
 
 #define op(name) static int name(struct inst const *ip, val *v, int end, void* ptr[])
@@ -331,7 +332,46 @@ op(done) { (void)ip; (void)v; (void)end; (void)ptr; return 0; }
 #undef next
 #undef op
 
+enum umbra_op {
+    op_lane, op_imm_16, op_imm_32,
+    op_load_16, op_load_32, op_store_16, op_store_32,
+
+    op_add_f16, op_sub_f16, op_mul_f16, op_div_f16,
+    op_min_f16, op_max_f16, op_sqrt_f16, op_fma_f16,
+    op_add_f32, op_sub_f32, op_mul_f32, op_div_f32,
+    op_min_f32, op_max_f32, op_sqrt_f32, op_fma_f32,
+
+    op_add_i16, op_sub_i16, op_mul_i16,
+    op_shl_i16, op_shr_u16, op_shr_s16,
+    op_and_16, op_or_16, op_xor_16, op_sel_16,
+    op_add_i32, op_sub_i32, op_mul_i32,
+    op_shl_i32, op_shr_u32, op_shr_s32,
+    op_and_32, op_or_32, op_xor_32, op_sel_32,
+
+    op_f16_from_f32, op_f32_from_f16,
+    op_f32_from_i32, op_i32_from_f32,
+
+    op_eq_f16, op_ne_f16, op_lt_f16, op_le_f16, op_gt_f16, op_ge_f16,
+    op_eq_f32, op_ne_f32, op_lt_f32, op_le_f32, op_gt_f32, op_ge_f32,
+    op_eq_i16, op_ne_i16,
+    op_lt_s16, op_le_s16, op_gt_s16, op_ge_s16,
+    op_lt_u16, op_le_u16, op_gt_u16, op_ge_u16,
+    op_eq_i32, op_ne_i32,
+    op_lt_s32, op_le_s32, op_gt_s32, op_ge_s32,
+    op_lt_u32, op_le_u32, op_gt_u32, op_ge_u32,
+};
+
+struct umbra_inst {
+    enum umbra_op op;
+    int x,y,z;
+    union { int ptr; int immi; float immf; };
+};
+
 typedef enum umbra_op Op;
+
+static struct umbra_interpreter* interp_from_inst(struct umbra_inst const[], int);
+static void interp_run(struct umbra_interpreter*, int, void*[]);
+static void interp_free(struct umbra_interpreter*);
 
 static _Bool commutative(Op op) {
     switch (op) {
@@ -416,7 +456,7 @@ static uint32_t fnv1a(void const *data, int len) {
     return h;
 }
 
-int umbra_optimize(struct umbra_inst inst[], int insts) {
+static int umbra_optimize(struct umbra_inst inst[], int insts) {
     // 1. Canonicalize commutative operands: ensure x <= y.
     for (int i = 0; i < insts; i++) {
         if (commutative(inst[i].op) && inst[i].x > inst[i].y) {
@@ -468,10 +508,10 @@ int umbra_optimize(struct umbra_inst inst[], int insts) {
         tmp[t].y   = op_slot;
         t++;
 
-        struct umbra_interpreter *prog = umbra_interpreter(tmp, t);
+        struct umbra_interpreter *prog = interp_from_inst(tmp, t);
         int32_t result = 0;
-        umbra_interpreter_run(prog, 1, (void*[]){&result});
-        umbra_interpreter_free(prog);
+        interp_run(prog, 1, (void*[]){&result});
+        interp_free(prog);
 
         inst[i].op   = wide ? op_imm_32 : op_imm_16;
         inst[i].immi = wide ? result : (int16_t)result;
@@ -893,7 +933,7 @@ static Fn const fn[] = {
     [op_gt_u32] = gt_u32, [op_ge_u32] = ge_u32,
 };
 
-struct umbra_interpreter* umbra_interpreter(struct umbra_inst const inst[], int insts) {
+static struct umbra_interpreter* interp_from_inst(struct umbra_inst const inst[], int insts) {
     // Find the split point P: number of leading uniform (non-varying) instructions.
     int P = 0;
     {
@@ -918,7 +958,10 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_inst const inst[], int 
     // accounting for the done between preamble and body.
     #define ci(j) ((j) < P ? (j) : (j) + 1)
 
-    struct umbra_interpreter *p = malloc(sizeof *p + (size_t)(insts+2) * sizeof *p->inst);
+    int const total = insts + 2;
+    struct umbra_interpreter *p = malloc(sizeof *p);
+    p->inst = malloc((size_t)total * sizeof *p->inst);
+    p->v    = malloc((size_t)total * sizeof *p->v);
     #define emit(...) p->inst[c] = (struct inst){__VA_ARGS__}
     for (int i = 0; i < insts; i++) {
         int const c = ci(i);
@@ -974,30 +1017,29 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_inst const inst[], int 
     #undef emit
     p->inst[P]       = (struct inst){.fn=done};
     p->inst[insts+1] = (struct inst){.fn=done};
-    p->insts    = insts + 2;
+    p->insts    = total;
     p->preamble = P + 1;
     #undef ci
     return p;
 }
 
-void umbra_interpreter_run(struct umbra_interpreter const *p, int n, void *ptr[]) {
-    val *v = malloc((size_t)p->insts * sizeof *v);
-
+static void interp_run(struct umbra_interpreter *p, int n, void *ptr[]) {
     // Run preamble once.
     if (p->preamble > 1) {
-        p->inst->fn(p->inst, v, 0, ptr);
+        p->inst->fn(p->inst, p->v, 0, ptr);
     }
 
     // Run body in loop.
     struct inst const *body = p->inst + p->preamble;
-    val *bv = v + p->preamble;
+    val *bv = p->v + p->preamble;
     int i = 0;
     while (i+K <= n) { body->fn(body, bv, i+K, ptr); i += K; }
     while (i+1 <= n) { body->fn(body, bv, i+1, ptr); i += 1; }
-    free(v);
 }
 
-void umbra_interpreter_free(struct umbra_interpreter *p) {
+static void interp_free(struct umbra_interpreter *p) {
+    free(p->inst);
+    free(p->v);
     free(p);
 }
 
@@ -1198,10 +1240,10 @@ static int bb_constprop(struct umbra_basic_block *bb, Op op,
     tmp[t].y   = op_slot;
     t++;
 
-    struct umbra_interpreter *prog = umbra_interpreter(tmp, t);
+    struct umbra_interpreter *prog = interp_from_inst(tmp, t);
     int32_t result = 0;
-    umbra_interpreter_run(prog, 1, (void*[]){&result});
-    umbra_interpreter_free(prog);
+    interp_run(prog, 1, (void*[]){&result});
+    interp_free(prog);
 
     if (wide) {
         uint32_t bits;
@@ -1530,8 +1572,8 @@ umbra_v32 umbra_le_u32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
 umbra_v32 umbra_gt_u32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_binop(bb, op_gt_u32, a.id, b.id)}; }
 umbra_v32 umbra_ge_u32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_binop(bb, op_ge_u32, a.id, b.id)}; }
 
-void umbra_basic_block_exec(struct umbra_basic_block *bb, int n, void *ptr[]) {
-    // Copy and convert relative → absolute for the old optimizer/interpreter path.
+struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) {
+    // Copy and convert relative → absolute.
     int insts = bb->insts;
     struct umbra_inst *copy = malloc((size_t)insts * sizeof *copy);
     __builtin_memcpy(copy, bb->inst, (size_t)insts * sizeof *copy);
@@ -1541,13 +1583,18 @@ void umbra_basic_block_exec(struct umbra_basic_block *bb, int n, void *ptr[]) {
         if (copy[i].z) { copy[i].z += i; }
     }
 
-    // DCE + hoisting (reuses the tail of umbra_optimize: steps 5+6).
-    // We skip canonicalize/constprop/strength-reduction since the builder already did those.
-    // But umbra_optimize is the only entry point, and it's idempotent, so just call it.
+    // DCE + hoisting. Canonicalize/constprop/strength-reduction already done by builder.
     int live = umbra_optimize(copy, insts);
 
-    struct umbra_interpreter *p = umbra_interpreter(copy, live);
+    struct umbra_interpreter *p = interp_from_inst(copy, live);
     free(copy);
-    umbra_interpreter_run(p, n, ptr);
-    umbra_interpreter_free(p);
+    return p;
+}
+
+void umbra_interpreter_run(struct umbra_interpreter *p, int n, void *ptr[]) {
+    interp_run(p, n, ptr);
+}
+
+void umbra_interpreter_free(struct umbra_interpreter *p) {
+    interp_free(p);
 }
