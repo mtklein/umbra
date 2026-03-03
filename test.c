@@ -11,12 +11,12 @@ static void test_mul_f32(void) {
         [3] = {umbra_mul_f32, .x=1, .y=2},
         [4] = {umbra_store_32, .ptr=2, .x=0, .y=3},
     };
-    struct umbra_program *p = umbra_program(inst, len(inst));
+    struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
 
     float x[] = {1,2,3,4,5},
           y[] = {6,7,8,9,0},
           z[len(x)] = {0};
-    umbra_program_run(p,len(z), (void*[]){x,y,z});
+    umbra_interpreter_run(p,len(z), (void*[]){x,y,z});
 
     equiv(z[0],  6) here;
     equiv(z[1], 14) here;
@@ -24,7 +24,7 @@ static void test_mul_f32(void) {
     equiv(z[3], 36) here;
     equiv(z[4],  0) here;
 
-    umbra_program_free(p);
+    umbra_interpreter_free(p);
 }
 
 static void test_f32_ops(void) {
@@ -37,13 +37,13 @@ static void test_f32_ops(void) {
             {umbra_add_f32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         float x[] = {1,2,3}, y[] = {10,20,30}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         equiv(z[0], 11) here;
         equiv(z[1], 22) here;
         equiv(z[2], 33) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // sub
     {
@@ -54,13 +54,13 @@ static void test_f32_ops(void) {
             {umbra_sub_f32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         float x[] = {10,20,30}, y[] = {1,2,3}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         equiv(z[0],  9) here;
         equiv(z[1], 18) here;
         equiv(z[2], 27) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // div
     {
@@ -71,13 +71,13 @@ static void test_f32_ops(void) {
             {umbra_div_f32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         float x[] = {10,20,30}, y[] = {2,4,5}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         equiv(z[0], 5) here;
         equiv(z[1], 5) here;
         equiv(z[2], 6) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
 }
 
@@ -91,13 +91,13 @@ static void test_i32_ops(void) {
             {umbra_add_i32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         int x[] = {1,2,3}, y[] = {10,20,30}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         (z[0] == 11) here;
         (z[1] == 22) here;
         (z[2] == 33) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // sub
     {
@@ -108,13 +108,13 @@ static void test_i32_ops(void) {
             {umbra_sub_i32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         int x[] = {10,20,30}, y[] = {1,2,3}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         (z[0] ==  9) here;
         (z[1] == 18) here;
         (z[2] == 27) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // mul
     {
@@ -125,13 +125,13 @@ static void test_i32_ops(void) {
             {umbra_mul_i32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         int x[] = {2,3,4}, y[] = {5,6,7}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         (z[0] == 10) here;
         (z[1] == 18) here;
         (z[2] == 28) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // shl
     {
@@ -142,13 +142,13 @@ static void test_i32_ops(void) {
             {umbra_shl_i32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         int x[] = {1,3,7}, y[] = {1,2,3}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         (z[0] ==  2) here;
         (z[1] == 12) here;
         (z[2] == 56) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // shr (logical, unsigned)
     {
@@ -159,13 +159,13 @@ static void test_i32_ops(void) {
             {umbra_shr_u32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         int x[] = {-1, 8, 64}, y[] = {1, 1, 3}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         (z[0] == (int)(0xFFFFFFFFu >> 1)) here;  // logical: top bit cleared
         (z[1] == 4) here;
         (z[2] == 8) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // sra (arithmetic, signed)
     {
@@ -176,13 +176,13 @@ static void test_i32_ops(void) {
             {umbra_shr_s32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         int x[] = {-8, 8, 64}, y[] = {1, 1, 3}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         (z[0] == -4) here;  // arithmetic: sign bit preserved
         (z[1] ==  4) here;
         (z[2] ==  8) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // and, or, xor
     {
@@ -193,12 +193,12 @@ static void test_i32_ops(void) {
             {umbra_and_32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         int x[] = {0xFF, 0x0F}, y[] = {0x0F, 0xFF}, z[2] = {0};
-        umbra_program_run(p, 2, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 2, (void*[]){x,y,z});
         (z[0] == 0x0F) here;
         (z[1] == 0x0F) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     {
         struct umbra_inst const inst[] = {
@@ -208,12 +208,12 @@ static void test_i32_ops(void) {
             {umbra_or_32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         int x[] = {0xF0, 0x0F}, y[] = {0x0F, 0xF0}, z[2] = {0};
-        umbra_program_run(p, 2, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 2, (void*[]){x,y,z});
         (z[0] == 0xFF) here;
         (z[1] == 0xFF) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     {
         struct umbra_inst const inst[] = {
@@ -223,12 +223,12 @@ static void test_i32_ops(void) {
             {umbra_xor_32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         int x[] = {0xFF, 0xFF}, y[] = {0x0F, 0xFF}, z[2] = {0};
-        umbra_program_run(p, 2, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 2, (void*[]){x,y,z});
         (z[0] == 0xF0) here;
         (z[1] == 0x00) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // sel: (cond & a) | (~cond & b)
     {
@@ -240,16 +240,16 @@ static void test_i32_ops(void) {
             {umbra_sel_32, .x=1, .y=2, .z=3},
             {umbra_store_32, .ptr=3, .x=0, .y=4},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         int cond[] = {-1, 0, -1},  // -1 = all bits set, 0 = no bits
               a[] = {10, 20, 30},
               b[] = {40, 50, 60},
               z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){cond, a, b, z});
+        umbra_interpreter_run(p, 3, (void*[]){cond, a, b, z});
         (z[0] == 10) here;  // cond=-1: pick a
         (z[1] == 50) here;  // cond=0:  pick b
         (z[2] == 30) here;  // cond=-1: pick a
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
 }
 
@@ -263,13 +263,13 @@ static void test_f16_ops(void) {
             {umbra_mul_f16, .x=1, .y=2},
             {umbra_store_16, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         __fp16 x[] = {2,3,4}, y[] = {5,6,7}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         equiv((float)z[0], 10) here;
         equiv((float)z[1], 18) here;
         equiv((float)z[2], 28) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // add
     {
@@ -280,13 +280,13 @@ static void test_f16_ops(void) {
             {umbra_add_f16, .x=1, .y=2},
             {umbra_store_16, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         __fp16 x[] = {1,2,3}, y[] = {10,20,30}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         equiv((float)z[0], 11) here;
         equiv((float)z[1], 22) here;
         equiv((float)z[2], 33) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // sub
     {
@@ -297,13 +297,13 @@ static void test_f16_ops(void) {
             {umbra_sub_f16, .x=1, .y=2},
             {umbra_store_16, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         __fp16 x[] = {10,20,30}, y[] = {1,2,3}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         equiv((float)z[0],  9) here;
         equiv((float)z[1], 18) here;
         equiv((float)z[2], 27) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // div
     {
@@ -314,13 +314,13 @@ static void test_f16_ops(void) {
             {umbra_div_f16, .x=1, .y=2},
             {umbra_store_16, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         __fp16 x[] = {10,20,30}, y[] = {2,4,5}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         equiv((float)z[0], 5) here;
         equiv((float)z[1], 5) here;
         equiv((float)z[2], 6) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
 }
 
@@ -334,13 +334,13 @@ static void test_i16_ops(void) {
             {umbra_add_i16, .x=1, .y=2},
             {umbra_store_16, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         short x[] = {1,2,3}, y[] = {10,20,30}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         (z[0] == 11) here;
         (z[1] == 22) here;
         (z[2] == 33) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // sub
     {
@@ -351,13 +351,13 @@ static void test_i16_ops(void) {
             {umbra_sub_i16, .x=1, .y=2},
             {umbra_store_16, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         short x[] = {10,20,30}, y[] = {1,2,3}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         (z[0] ==  9) here;
         (z[1] == 18) here;
         (z[2] == 27) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // mul
     {
@@ -368,13 +368,13 @@ static void test_i16_ops(void) {
             {umbra_mul_i16, .x=1, .y=2},
             {umbra_store_16, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         short x[] = {2,3,4}, y[] = {5,6,7}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         (z[0] == 10) here;
         (z[1] == 18) here;
         (z[2] == 28) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // shl, shr, sra
     {
@@ -385,12 +385,12 @@ static void test_i16_ops(void) {
             {umbra_shl_i16, .x=1, .y=2},
             {umbra_store_16, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         short x[] = {1,3}, y[] = {4,2}, z[2] = {0};
-        umbra_program_run(p, 2, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 2, (void*[]){x,y,z});
         (z[0] == 16) here;
         (z[1] == 12) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     {
         struct umbra_inst const inst[] = {
@@ -400,12 +400,12 @@ static void test_i16_ops(void) {
             {umbra_shr_u16, .x=1, .y=2},
             {umbra_store_16, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         short x[] = {-1, 64}, y[] = {1, 3}, z[2] = {0};
-        umbra_program_run(p, 2, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 2, (void*[]){x,y,z});
         (z[0] == (short)(0xFFFFu >> 1)) here;  // logical: top bit cleared
         (z[1] == 8) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     {
         struct umbra_inst const inst[] = {
@@ -415,12 +415,12 @@ static void test_i16_ops(void) {
             {umbra_shr_s16, .x=1, .y=2},
             {umbra_store_16, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         short x[] = {-8, 64}, y[] = {1, 3}, z[2] = {0};
-        umbra_program_run(p, 2, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 2, (void*[]){x,y,z});
         (z[0] == -4) here;  // arithmetic: sign preserved
         (z[1] ==  8) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // and, or, xor
     {
@@ -431,11 +431,11 @@ static void test_i16_ops(void) {
             {umbra_and_16, .x=1, .y=2},
             {umbra_store_16, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         short x[] = {0xFF}, y[] = {0x0F}, z[1] = {0};
-        umbra_program_run(p, 1, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 1, (void*[]){x,y,z});
         (z[0] == 0x0F) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     {
         struct umbra_inst const inst[] = {
@@ -445,11 +445,11 @@ static void test_i16_ops(void) {
             {umbra_or_16, .x=1, .y=2},
             {umbra_store_16, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         short x[] = {0xF0}, y[] = {0x0F}, z[1] = {0};
-        umbra_program_run(p, 1, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 1, (void*[]){x,y,z});
         (z[0] == 0xFF) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     {
         struct umbra_inst const inst[] = {
@@ -459,11 +459,11 @@ static void test_i16_ops(void) {
             {umbra_xor_16, .x=1, .y=2},
             {umbra_store_16, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         short x[] = {0xFF}, y[] = {0x0F}, z[1] = {0};
-        umbra_program_run(p, 1, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 1, (void*[]){x,y,z});
         (z[0] == 0xF0) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // sel
     {
@@ -475,15 +475,15 @@ static void test_i16_ops(void) {
             {umbra_sel_16, .x=1, .y=2, .z=3},
             {umbra_store_16, .ptr=3, .x=0, .y=4},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         short cond[] = {-1, 0},
                  a[] = {10, 20},
                  b[] = {30, 40},
                  z[2] = {0};
-        umbra_program_run(p, 2, (void*[]){cond, a, b, z});
+        umbra_interpreter_run(p, 2, (void*[]){cond, a, b, z});
         (z[0] == 10) here;
         (z[1] == 40) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
 }
 
@@ -496,13 +496,13 @@ static void test_cmp_i32(void) {
             {umbra_eq_i32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         int x[] = {1,2,3}, y[] = {1,9,3}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         (z[0] == -1) here;
         (z[1] ==  0) here;
         (z[2] == -1) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     {
         struct umbra_inst const inst[] = {
@@ -512,12 +512,12 @@ static void test_cmp_i32(void) {
             {umbra_ne_i32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         int x[] = {1,2}, y[] = {1,9}, z[2] = {0};
-        umbra_program_run(p, 2, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 2, (void*[]){x,y,z});
         (z[0] ==  0) here;
         (z[1] == -1) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     {
         struct umbra_inst const inst[] = {
@@ -527,13 +527,13 @@ static void test_cmp_i32(void) {
             {umbra_lt_s32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         int x[] = {1,5,3}, y[] = {2,5,1}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         (z[0] == -1) here;
         (z[1] ==  0) here;
         (z[2] ==  0) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     {
         struct umbra_inst const inst[] = {
@@ -543,13 +543,13 @@ static void test_cmp_i32(void) {
             {umbra_le_s32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         int x[] = {1,5,3}, y[] = {2,5,1}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         (z[0] == -1) here;
         (z[1] == -1) here;
         (z[2] ==  0) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     {
         struct umbra_inst const inst[] = {
@@ -559,13 +559,13 @@ static void test_cmp_i32(void) {
             {umbra_gt_s32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         int x[] = {3,5,1}, y[] = {2,5,3}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         (z[0] == -1) here;
         (z[1] ==  0) here;
         (z[2] ==  0) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     {
         struct umbra_inst const inst[] = {
@@ -575,13 +575,13 @@ static void test_cmp_i32(void) {
             {umbra_ge_s32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         int x[] = {3,5,1}, y[] = {2,5,3}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         (z[0] == -1) here;
         (z[1] == -1) here;
         (z[2] ==  0) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // unsigned
     {
@@ -592,12 +592,12 @@ static void test_cmp_i32(void) {
             {umbra_lt_u32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         int x[] = {1, -1}, y[] = {2, 1}, z[2] = {0};
-        umbra_program_run(p, 2, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 2, (void*[]){x,y,z});
         (z[0] == -1) here;
         (z[1] ==  0) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // sel with comparison mask
     {
@@ -609,13 +609,13 @@ static void test_cmp_i32(void) {
             {umbra_sel_32, .x=3, .y=1, .z=2},  // pick min(x,y)
             {umbra_store_32, .ptr=2, .x=0, .y=4},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         int x[] = {5,1,3}, y[] = {2,4,3}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         (z[0] == 2) here;
         (z[1] == 1) here;
         (z[2] == 3) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
 }
 
@@ -628,13 +628,13 @@ static void test_cmp_i16(void) {
             {umbra_eq_i16, .x=1, .y=2},
             {umbra_store_16, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         short x[] = {1,2,3}, y[] = {1,9,3}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         (z[0] == -1) here;
         (z[1] ==  0) here;
         (z[2] == -1) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     {
         struct umbra_inst const inst[] = {
@@ -644,13 +644,13 @@ static void test_cmp_i16(void) {
             {umbra_lt_s16, .x=1, .y=2},
             {umbra_store_16, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         short x[] = {1,5,3}, y[] = {2,5,1}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         (z[0] == -1) here;
         (z[1] ==  0) here;
         (z[2] ==  0) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // sel with comparison mask
     {
@@ -662,12 +662,12 @@ static void test_cmp_i16(void) {
             {umbra_sel_16, .x=3, .y=1, .z=2},
             {umbra_store_16, .ptr=2, .x=0, .y=4},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         short x[] = {5,1}, y[] = {2,4}, z[2] = {0};
-        umbra_program_run(p, 2, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 2, (void*[]){x,y,z});
         (z[0] == 2) here;
         (z[1] == 1) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
 }
 
@@ -680,14 +680,14 @@ static void test_cmp_f32(void) {
             {umbra_eq_f32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         float x[] = {1,2,3}, y[] = {1,9,3};
         int z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         (z[0] == -1) here;
         (z[1] ==  0) here;
         (z[2] == -1) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     {
         struct umbra_inst const inst[] = {
@@ -697,14 +697,14 @@ static void test_cmp_f32(void) {
             {umbra_lt_f32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         float x[] = {1,5,3}, y[] = {2,5,1};
         int z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         (z[0] == -1) here;
         (z[1] ==  0) here;
         (z[2] ==  0) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // sel with f32 comparison: pick min
     {
@@ -716,13 +716,13 @@ static void test_cmp_f32(void) {
             {umbra_sel_32, .x=3, .y=1, .z=2},
             {umbra_store_32, .ptr=2, .x=0, .y=4},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         float x[] = {5,1,3}, y[] = {2,4,3}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         equiv(z[0], 2) here;
         equiv(z[1], 1) here;
         equiv(z[2], 3) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
 }
 
@@ -735,14 +735,14 @@ static void test_cmp_f16(void) {
             {umbra_eq_f16, .x=1, .y=2},
             {umbra_store_16, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         __fp16 x[] = {1,2,3}, y[] = {1,9,3};
         short z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         (z[0] == -1) here;
         (z[1] ==  0) here;
         (z[2] == -1) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     {
         struct umbra_inst const inst[] = {
@@ -752,14 +752,14 @@ static void test_cmp_f16(void) {
             {umbra_lt_f16, .x=1, .y=2},
             {umbra_store_16, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         __fp16 x[] = {1,5,3}, y[] = {2,5,1};
         short z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         (z[0] == -1) here;
         (z[1] ==  0) here;
         (z[2] ==  0) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // sel with f16 comparison: pick min
     {
@@ -771,13 +771,13 @@ static void test_cmp_f16(void) {
             {umbra_sel_16, .x=3, .y=1, .z=2},
             {umbra_store_16, .ptr=2, .x=0, .y=4},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         __fp16 x[] = {5,1}, y[] = {2,4};
         __fp16 z[2] = {0};
-        umbra_program_run(p, 2, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 2, (void*[]){x,y,z});
         equiv((float)z[0], 2) here;
         equiv((float)z[1], 1) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
 }
 
@@ -788,13 +788,13 @@ static void test_imm(void) {
             {umbra_imm_32, .immi=42},
             {umbra_store_32, .ptr=0, .x=0, .y=1},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         int z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){z});
+        umbra_interpreter_run(p, 3, (void*[]){z});
         (z[0] == 42) here;
         (z[1] == 42) here;
         (z[2] == 42) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     {
         struct umbra_inst const inst[] = {
@@ -802,13 +802,13 @@ static void test_imm(void) {
             {umbra_imm_16, .immi=7},
             {umbra_store_16, .ptr=0, .x=0, .y=1},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         short z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){z});
+        umbra_interpreter_run(p, 3, (void*[]){z});
         (z[0] == 7) here;
         (z[1] == 7) here;
         (z[2] == 7) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
 }
 
@@ -821,12 +821,12 @@ static void test_fma_f32(void) {
         {umbra_fma_f32, .x=1, .y=2, .z=3},
         {umbra_store_32, .ptr=3, .x=0, .y=4},
     };
-    struct umbra_program *p = umbra_program(inst, len(inst));
+    struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
     float x[] = {2,3}, y[] = {4,5}, w[] = {10,20}, z[2] = {0};
-    umbra_program_run(p, 2, (void*[]){x,y,w,z});
+    umbra_interpreter_run(p, 2, (void*[]){x,y,w,z});
     equiv(z[0], 18) here;  // 2*4+10
     equiv(z[1], 35) here;  // 3*5+20
-    umbra_program_free(p);
+    umbra_interpreter_free(p);
 }
 
 static void test_fma_f16(void) {
@@ -838,12 +838,12 @@ static void test_fma_f16(void) {
         {umbra_fma_f16, .x=1, .y=2, .z=3},
         {umbra_store_16, .ptr=3, .x=0, .y=4},
     };
-    struct umbra_program *p = umbra_program(inst, len(inst));
+    struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
     __fp16 x[] = {2,3}, y[] = {4,5}, w[] = {10,20}, z[2] = {0};
-    umbra_program_run(p, 2, (void*[]){x,y,w,z});
+    umbra_interpreter_run(p, 2, (void*[]){x,y,w,z});
     equiv((float)z[0], 18) here;
     equiv((float)z[1], 35) here;
-    umbra_program_free(p);
+    umbra_interpreter_free(p);
 }
 
 static void test_min_max_sqrt_f32(void) {
@@ -856,13 +856,13 @@ static void test_min_max_sqrt_f32(void) {
             {umbra_min_f32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         float x[] = {5,1,3}, y[] = {2,4,3}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         equiv(z[0], 2) here;
         equiv(z[1], 1) here;
         equiv(z[2], 3) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // max
     {
@@ -873,13 +873,13 @@ static void test_min_max_sqrt_f32(void) {
             {umbra_max_f32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         float x[] = {5,1,3}, y[] = {2,4,3}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         equiv(z[0], 5) here;
         equiv(z[1], 4) here;
         equiv(z[2], 3) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // sqrt
     {
@@ -889,13 +889,13 @@ static void test_min_max_sqrt_f32(void) {
             {umbra_sqrt_f32, .x=1},
             {umbra_store_32, .ptr=1, .x=0, .y=2},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         float x[] = {4,9,16}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,z});
         equiv(z[0], 2) here;
         equiv(z[1], 3) here;
         equiv(z[2], 4) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
 }
 
@@ -909,13 +909,13 @@ static void test_min_max_sqrt_f16(void) {
             {umbra_min_f16, .x=1, .y=2},
             {umbra_store_16, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         __fp16 x[] = {5,1,3}, y[] = {2,4,3}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         equiv((float)z[0], 2) here;
         equiv((float)z[1], 1) here;
         equiv((float)z[2], 3) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // max
     {
@@ -926,13 +926,13 @@ static void test_min_max_sqrt_f16(void) {
             {umbra_max_f16, .x=1, .y=2},
             {umbra_store_16, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         __fp16 x[] = {5,1,3}, y[] = {2,4,3}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,y,z});
         equiv((float)z[0], 5) here;
         equiv((float)z[1], 4) here;
         equiv((float)z[2], 3) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // sqrt
     {
@@ -942,13 +942,13 @@ static void test_min_max_sqrt_f16(void) {
             {umbra_sqrt_f16, .x=1},
             {umbra_store_16, .ptr=1, .x=0, .y=2},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         __fp16 x[] = {4,9,16}, z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,z});
         equiv((float)z[0], 2) here;
         equiv((float)z[1], 3) here;
         equiv((float)z[2], 4) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
 }
 
@@ -962,17 +962,17 @@ static void test_large_n(void) {
             {umbra_add_f32, .x=1, .y=2},
             {umbra_store_32, .ptr=2, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         float x[11], y[11], z[11];
         for (int i = 0; i < 11; i++) {
             x[i] = (float)i;
             y[i] = (float)(10 - i);
         }
-        umbra_program_run(p, 11, (void*[]){x,y,z});
+        umbra_interpreter_run(p, 11, (void*[]){x,y,z});
         for (int i = 0; i < 11; i++) {
             equiv(z[i], 10) here;
         }
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
 }
 
@@ -985,14 +985,14 @@ static void test_uni_via_load(void) {
             {umbra_load_32, .ptr=0, .x=1},
             {umbra_store_32, .ptr=1, .x=0, .y=2},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         int src[] = {42, 99, 7};
         int dst[3] = {0};
-        umbra_program_run(p, 3, (void*[]){src, dst});
+        umbra_interpreter_run(p, 3, (void*[]){src, dst});
         (dst[0] == 42) here;
         (dst[1] == 42) here;
         (dst[2] == 42) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // load(ptr, imm(2)) broadcasts element 2
     {
@@ -1002,14 +1002,14 @@ static void test_uni_via_load(void) {
             {umbra_load_32, .ptr=0, .x=1},
             {umbra_store_32, .ptr=1, .x=0, .y=2},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         int src[] = {42, 99, 7};
         int dst[3] = {0};
-        umbra_program_run(p, 3, (void*[]){src, dst});
+        umbra_interpreter_run(p, 3, (void*[]){src, dst});
         (dst[0] == 7) here;
         (dst[1] == 7) here;
         (dst[2] == 7) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
 }
 
@@ -1022,15 +1022,15 @@ static void test_scatter(void) {
             {umbra_load_32, .ptr=1, .x=0},   // load idx contiguously
             {umbra_store_32, .ptr=2, .x=2, .y=1},  // scatter: idx=reg2, data=reg1
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         int src[] = {10, 20, 30};
         int idx[] = {2, 1, 0};
         int dst[3] = {0};
-        umbra_program_run(p, 3, (void*[]){src, idx, dst});
+        umbra_interpreter_run(p, 3, (void*[]){src, idx, dst});
         (dst[0] == 30) here;
         (dst[1] == 20) here;
         (dst[2] == 10) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
 }
 
@@ -1089,12 +1089,12 @@ static void test_fma_fusion(void) {
     found_fma here;
 
     // Verify it computes correctly: x*y+z.
-    struct umbra_program *p = umbra_program(inst, n);
+    struct umbra_interpreter *p = umbra_interpreter(inst, n);
     float x[] = {2,3}, y[] = {4,5}, w[] = {10,20}, z[2] = {0};
-    umbra_program_run(p, 2, (void*[]){x,y,w,z});
+    umbra_interpreter_run(p, 2, (void*[]){x,y,w,z});
     equiv(z[0], 18) here;
     equiv(z[1], 35) here;
-    umbra_program_free(p);
+    umbra_interpreter_free(p);
 }
 
 static void test_dce(void) {
@@ -1111,12 +1111,12 @@ static void test_dce(void) {
     (after < before) here;  // mul and its dead-only deps should be removed
 
     // Verify it still computes x+y correctly.
-    struct umbra_program *p = umbra_program(inst, after);
+    struct umbra_interpreter *p = umbra_interpreter(inst, after);
     float x[] = {1,2}, y[] = {3,4}, z[2] = {0};
-    umbra_program_run(p, 2, (void*[]){x,y,z});
+    umbra_interpreter_run(p, 2, (void*[]){x,y,z});
     equiv(z[0], 4) here;
     equiv(z[1], 6) here;
-    umbra_program_free(p);
+    umbra_interpreter_free(p);
 }
 
 static void test_convert(void) {
@@ -1128,14 +1128,14 @@ static void test_convert(void) {
             {umbra_f32_from_i32, .x=1},
             {umbra_store_32, .ptr=1, .x=0, .y=2},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         int x[] = {1, 255, -3};
         float z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,z});
         equiv(z[0], 1) here;
         equiv(z[1], 255) here;
         equiv(z[2], -3) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // i32_from_f32
     {
@@ -1145,14 +1145,14 @@ static void test_convert(void) {
             {umbra_i32_from_f32, .x=1},
             {umbra_store_32, .ptr=1, .x=0, .y=2},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         float x[] = {1.9f, 255.0f, -3.7f};
         int z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,z});
         (z[0] == 1) here;
         (z[1] == 255) here;
         (z[2] == -3) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // f16_from_f32 and f32_from_f16 roundtrip
     {
@@ -1163,14 +1163,14 @@ static void test_convert(void) {
             {umbra_f32_from_f16, .x=2},
             {umbra_store_32, .ptr=1, .x=0, .y=3},
         };
-        struct umbra_program *p = umbra_program(inst, len(inst));
+        struct umbra_interpreter *p = umbra_interpreter(inst, len(inst));
         float x[] = {1.0f, 0.5f, 100.0f};
         float z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){x,z});
+        umbra_interpreter_run(p, 3, (void*[]){x,z});
         equiv(z[0], 1.0f) here;
         equiv(z[1], 0.5f) here;
         equiv(z[2], 100.0f) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
 }
 
@@ -1185,13 +1185,13 @@ static void test_constprop(void) {
             {umbra_store_32, .ptr=0, .x=0, .y=3},
         };
         int const n = umbra_optimize(inst, len(inst));
-        struct umbra_program *p = umbra_program(inst, n);
+        struct umbra_interpreter *p = umbra_interpreter(inst, n);
         int z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){z});
+        umbra_interpreter_run(p, 3, (void*[]){z});
         (z[0] == 8) here;
         (z[1] == 8) here;
         (z[2] == 8) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // mul_f32(imm(2.0), imm(3.0)) → 6.0
     {
@@ -1203,13 +1203,13 @@ static void test_constprop(void) {
             {umbra_store_32, .ptr=0, .x=0, .y=3},
         };
         int const n = umbra_optimize(inst, len(inst));
-        struct umbra_program *p = umbra_program(inst, n);
+        struct umbra_interpreter *p = umbra_interpreter(inst, n);
         float z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){z});
+        umbra_interpreter_run(p, 3, (void*[]){z});
         equiv(z[0], 6) here;
         equiv(z[1], 6) here;
         equiv(z[2], 6) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // f32_from_i32(imm(42)) → 42.0
     {
@@ -1220,13 +1220,13 @@ static void test_constprop(void) {
             {umbra_store_32, .ptr=0, .x=0, .y=2},
         };
         int const n = umbra_optimize(inst, len(inst));
-        struct umbra_program *p = umbra_program(inst, n);
+        struct umbra_interpreter *p = umbra_interpreter(inst, n);
         float z[3] = {0};
-        umbra_program_run(p, 3, (void*[]){z});
+        umbra_interpreter_run(p, 3, (void*[]){z});
         equiv(z[0], 42) here;
         equiv(z[1], 42) here;
         equiv(z[2], 42) here;
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
 }
 
@@ -1247,13 +1247,13 @@ static void test_hoisting(void) {
     (inst[0].op == umbra_imm_32) here;
 
     // Verify correctness.
-    struct umbra_program *p = umbra_program(inst, n);
+    struct umbra_interpreter *p = umbra_interpreter(inst, n);
     float x[] = {1,2,3,4,5,6,7,8,9,10,11}, z[11] = {0};
-    umbra_program_run(p, 11, (void*[]){x,z});
+    umbra_interpreter_run(p, 11, (void*[]){x,z});
     for (int i = 0; i < 11; i++) {
         equiv(z[i], (float)x[i] * 2.0f) here;
     }
-    umbra_program_free(p);
+    umbra_interpreter_free(p);
 }
 
 static void test_strength_reduction(void) {
@@ -1267,11 +1267,11 @@ static void test_strength_reduction(void) {
             {umbra_store_32, .ptr=1, .x=0, .y=3},
         };
         int const n = umbra_optimize(inst, len(inst));
-        struct umbra_program *p = umbra_program(inst, n);
+        struct umbra_interpreter *p = umbra_interpreter(inst, n);
         int32_t x[] = {1,2,3,4,5}, z[5] = {0};
-        umbra_program_run(p, 5, (void*[]){x,z});
+        umbra_interpreter_run(p, 5, (void*[]){x,z});
         for (int i = 0; i < 5; i++) { (z[i] == x[i]) here; }
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // mul_i32(imm(0), load(x)) → result == 0
     {
@@ -1283,11 +1283,11 @@ static void test_strength_reduction(void) {
             {umbra_store_32, .ptr=1, .x=0, .y=3},
         };
         int const n = umbra_optimize(inst, len(inst));
-        struct umbra_program *p = umbra_program(inst, n);
+        struct umbra_interpreter *p = umbra_interpreter(inst, n);
         int32_t x[] = {1,2,3,4,5}, z[5] = {0};
-        umbra_program_run(p, 5, (void*[]){x,z});
+        umbra_interpreter_run(p, 5, (void*[]){x,z});
         for (int i = 0; i < 5; i++) { (z[i] == 0) here; }
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // mul_f32(load(x), imm(1.0)) → result == x
     {
@@ -1299,11 +1299,11 @@ static void test_strength_reduction(void) {
             {umbra_store_32, .ptr=1, .x=0, .y=3},
         };
         int const n = umbra_optimize(inst, len(inst));
-        struct umbra_program *p = umbra_program(inst, n);
+        struct umbra_interpreter *p = umbra_interpreter(inst, n);
         float x[] = {1,2,3,4,5}, z[5] = {0};
-        umbra_program_run(p, 5, (void*[]){x,z});
+        umbra_interpreter_run(p, 5, (void*[]){x,z});
         for (int i = 0; i < 5; i++) { equiv(z[i], x[i]) here; }
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // shl_i32(load(x), imm(0)) → result == x
     {
@@ -1315,11 +1315,11 @@ static void test_strength_reduction(void) {
             {umbra_store_32, .ptr=1, .x=0, .y=3},
         };
         int const n = umbra_optimize(inst, len(inst));
-        struct umbra_program *p = umbra_program(inst, n);
+        struct umbra_interpreter *p = umbra_interpreter(inst, n);
         int32_t x[] = {1,2,3,4,5}, z[5] = {0};
-        umbra_program_run(p, 5, (void*[]){x,z});
+        umbra_interpreter_run(p, 5, (void*[]){x,z});
         for (int i = 0; i < 5; i++) { (z[i] == x[i]) here; }
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // mul_i32(imm(8), load(x)) → result == x*8, check shl present
     {
@@ -1336,11 +1336,11 @@ static void test_strength_reduction(void) {
             if (inst[j].op == umbra_shl_i32) { found_shl = 1; }
         }
         found_shl here;
-        struct umbra_program *p = umbra_program(inst, n);
+        struct umbra_interpreter *p = umbra_interpreter(inst, n);
         int32_t x[] = {1,2,3,4,5}, z[5] = {0};
-        umbra_program_run(p, 5, (void*[]){x,z});
+        umbra_interpreter_run(p, 5, (void*[]){x,z});
         for (int i = 0; i < 5; i++) { (z[i] == x[i] * 8) here; }
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
     // sub_i32(load(x), load(x)) → result == 0
     {
@@ -1351,11 +1351,11 @@ static void test_strength_reduction(void) {
             {umbra_store_32, .ptr=1, .x=0, .y=2},
         };
         int const n = umbra_optimize(inst, len(inst));
-        struct umbra_program *p = umbra_program(inst, n);
+        struct umbra_interpreter *p = umbra_interpreter(inst, n);
         int32_t x[] = {1,2,3,4,5}, z[5] = {0};
-        umbra_program_run(p, 5, (void*[]){x,z});
+        umbra_interpreter_run(p, 5, (void*[]){x,z});
         for (int i = 0; i < 5; i++) { (z[i] == 0) here; }
-        umbra_program_free(p);
+        umbra_interpreter_free(p);
     }
 }
 
@@ -1454,15 +1454,15 @@ static void test_optimize_srcover(void) {
     __fp16 dst_a[] = {0.5, 0.5, 0.5};
     float out_r[3]={0}, out_g[3]={0}, out_b[3]={0}, out_a[3]={0};
 
-    struct umbra_program *p = umbra_program(inst, after);
-    umbra_program_run(p, 3, (void*[]){src_px, dst_r, dst_g, dst_b, dst_a,
+    struct umbra_interpreter *p = umbra_interpreter(inst, after);
+    umbra_interpreter_run(p, 3, (void*[]){src_px, dst_r, dst_g, dst_b, dst_a,
                                       out_r, out_g, out_b, out_a});
 
     float const tol = 0.01f;
     (out_r[0] > 0.50f - tol && out_r[0] < 0.50f + tol) here;
     (out_g[0] > 0.25f - tol && out_g[0] < 0.25f + tol) here;
     (out_b[0] > 0.12f - tol && out_b[0] < 0.13f + tol) here;
-    umbra_program_free(p);
+    umbra_interpreter_free(p);
 }
 
 int main(void) {

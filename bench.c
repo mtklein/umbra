@@ -97,14 +97,14 @@ static int build_srcover(struct umbra_inst inst[]) {
     return n;
 }
 
-static double bench(struct umbra_program const *p, int pixel_n, void *ptrs[]) {
-    umbra_program_run(p, pixel_n, ptrs);
+static double bench(struct umbra_interpreter const *p, int pixel_n, void *ptrs[]) {
+    umbra_interpreter_run(p, pixel_n, ptrs);
 
     int iters = 1;
     for (;;) {
         double const start = now();
         for (int i = 0; i < iters; i++) {
-            umbra_program_run(p, pixel_n, ptrs);
+            umbra_interpreter_run(p, pixel_n, ptrs);
         }
         double const elapsed = now() - start;
         if (elapsed >= 0.5) {
@@ -126,11 +126,11 @@ int main(int argc, char *argv[]) {
     // Unoptimized
     struct umbra_inst unopt[128];
     memcpy(unopt, inst, sizeof inst);
-    struct umbra_program *p_unopt = umbra_program(unopt, insts);
+    struct umbra_interpreter *p_unopt = umbra_interpreter(unopt, insts);
 
     // Optimized
     int const opt_n = umbra_optimize(inst, insts);
-    struct umbra_program *p_opt = umbra_program(inst, opt_n);
+    struct umbra_interpreter *p_opt = umbra_interpreter(inst, opt_n);
 
     // Allocate pixel buffers
     uint32_t *src = malloc((size_t)pixel_n * sizeof *src);
@@ -165,8 +165,8 @@ int main(int argc, char *argv[]) {
     printf("  optimized:   %d insts, %.2f ns/pixel\n", opt_n, opt_ns);
     printf("  speedup:     %.2fx\n", unopt_ns / opt_ns);
 
-    umbra_program_free(p_unopt);
-    umbra_program_free(p_opt);
+    umbra_interpreter_free(p_unopt);
+    umbra_interpreter_free(p_opt);
     free(src); free(dr); free(dg); free(db); free(da);
     return 0;
 }
