@@ -26,22 +26,20 @@ typedef union {
     F32 f32;
 } val;
 
-struct inst;
-typedef int (*Fn)(struct inst const *ip, val *v, int end, void* ptr[]);
-struct inst {
+struct interp_inst;
+typedef int (*Fn)(struct interp_inst const *ip, val *v, int end, void* ptr[]);
+struct interp_inst {
     Fn  fn;
-    int x,y,z;
-    int :32;
+    int x,y,z,:32;
 };
 
 struct umbra_interpreter {
-    struct inst *inst;
-    val         *v;
-    int          preamble;
-    int          :32;
+    struct interp_inst *inst;
+    val                *v;
+    int                 preamble,:32;
 };
 
-#define op(name) static int name(struct inst const *ip, val *v, int end, void* ptr[])
+#define op(name) static int name(struct interp_inst const *ip, val *v, int end, void* ptr[])
 #define next return ip[1].fn(ip+1, v+1, end, ptr)
 
 op(imm_16) { v->i16 = (I16){0} + (int16_t)ip->x; next; }
@@ -331,7 +329,7 @@ op(done) { (void)ip; (void)v; (void)end; (void)ptr; return 0; }
 #undef next
 #undef op
 
-enum umbra_op {
+enum op {
     op_lane, op_imm_16, op_imm_32,
     op_load_16, op_load_32, op_store_16, op_store_32,
 
@@ -360,19 +358,17 @@ enum umbra_op {
     op_lt_u32, op_le_u32, op_gt_u32, op_ge_u32,
 };
 
-struct umbra_inst {
-    enum umbra_op op;
-    int x,y,z;
+struct bb_inst {
+    enum op op;
+    int     x,y,z;
     union { int ptr; int immi; float immf; };
 };
 
-typedef enum umbra_op Op;
-
-static struct umbra_interpreter* interp_from_inst(struct umbra_inst const[], int);
+static struct umbra_interpreter* interp_from_inst(struct bb_inst const[], int);
 static void interp_run(struct umbra_interpreter*, int, void*[]);
 static void interp_free(struct umbra_interpreter*);
 
-static _Bool commutative(Op op) {
+static _Bool commutative(enum op op) {
     switch (op) {
         case op_add_f16: case op_mul_f16: case op_min_f16: case op_max_f16:
         case op_add_f32: case op_mul_f32: case op_min_f32: case op_max_f32:
@@ -390,11 +386,11 @@ static _Bool commutative(Op op) {
     }
 }
 
-static _Bool is_store(Op op) {
+static _Bool is_store(enum op op) {
     return op == op_store_16 || op == op_store_32;
 }
 
-static int arity(Op op) {
+static int arity(enum op op) {
     switch (op) {
         case op_imm_16:
         case op_imm_32:
@@ -416,7 +412,7 @@ static int arity(Op op) {
     }
 }
 
-static _Bool is_16bit_result(Op op) {
+static _Bool is_16bit_result(enum op op) {
     switch (op) {
         case op_imm_16: case op_load_16: case op_store_16:
         case op_add_f16: case op_sub_f16: case op_mul_f16: case op_div_f16:
@@ -438,10 +434,10 @@ static _Bool is_16bit_result(Op op) {
 
 static int f32_bits(float f) { int i; __builtin_memcpy(&i, &f, 4); return i; }
 
-static _Bool imm32_is(struct umbra_inst const inst[], int j, int val) {
+static _Bool imm32_is(struct bb_inst const inst[], int j, int val) {
     return inst[j].op == op_imm_32 && inst[j].immi == val;
 }
-static _Bool imm16_is(struct umbra_inst const inst[], int j, int val) {
+static _Bool imm16_is(struct bb_inst const inst[], int j, int val) {
     return inst[j].op == op_imm_16 && (int16_t)inst[j].immi == (int16_t)val;
 }
 
@@ -455,7 +451,7 @@ static uint32_t fnv1a(void const *data, int len) {
     return h;
 }
 
-static int umbra_optimize(struct umbra_inst inst[], int insts) {
+static int umbra_optimize(struct bb_inst inst[], int insts) {
     // 1. Canonicalize commutative operands: ensure x <= y.
     for (int i = 0; i < insts; i++) {
         if (commutative(inst[i].op) && inst[i].x > inst[i].y) {
@@ -482,7 +478,7 @@ static int umbra_optimize(struct umbra_inst inst[], int insts) {
         if (!all_imm) { continue; }
 
         _Bool const wide = !is_16bit_result(inst[i].op);
-        struct umbra_inst tmp[8];
+        struct bb_inst tmp[8];
         __builtin_memset(tmp, 0, sizeof tmp);
         int t = 0;
 
@@ -727,7 +723,7 @@ static int umbra_optimize(struct umbra_inst inst[], int insts) {
             if (!reduced
                     && (inst[i].op == op_add_f32
                      || inst[i].op == op_add_f16)) {
-                Op fma_op, mul_op;
+                enum op fma_op, mul_op;
                 if (inst[i].op == op_add_f32) {
                     fma_op = op_fma_f32;
                     mul_op = op_mul_f32;
@@ -766,7 +762,7 @@ static int umbra_optimize(struct umbra_inst inst[], int insts) {
 
             if (is_store(inst[i].op)) { continue; }
 
-            struct { Op op; int x, y, z, immi; } const key = {
+            struct { enum op op; int x, y, z, immi; } const key = {
                 inst[i].op, inst[i].x, inst[i].y, inst[i].z, inst[i].immi
             };
             uint32_t h = fnv1a(&key, sizeof key);
@@ -863,7 +859,7 @@ static int umbra_optimize(struct umbra_inst inst[], int insts) {
         for (int i = 0; i < live; i++)
             if ( varying[i]) { back[j]=i; order[i]=j; j++; }
 
-        struct umbra_inst *tmp = malloc((size_t)live * sizeof *tmp);
+        struct bb_inst *tmp = malloc((size_t)live * sizeof *tmp);
         for (int i = 0; i < live; i++) {
             tmp[i] = inst[back[i]];
             int const ar = arity(tmp[i].op);
@@ -932,7 +928,7 @@ static Fn const fn[] = {
     [op_gt_u32] = gt_u32, [op_ge_u32] = ge_u32,
 };
 
-static struct umbra_interpreter* interp_from_inst(struct umbra_inst const inst[], int insts) {
+static struct umbra_interpreter* interp_from_inst(struct bb_inst const inst[], int insts) {
     // Find the split point P: number of leading uniform (non-varying) instructions.
     int P = 0;
     {
@@ -957,7 +953,7 @@ static struct umbra_interpreter* interp_from_inst(struct umbra_inst const inst[]
     struct umbra_interpreter *p = malloc(sizeof *p);
     p->inst = malloc((size_t)total * sizeof *p->inst);
     p->v    = malloc((size_t)total * sizeof *p->v);
-    #define emit(...) p->inst[i] = (struct inst){__VA_ARGS__}
+    #define emit(...) p->inst[i] = (struct interp_inst){__VA_ARGS__}
     for (int i = 0; i < insts; i++) {
         int const X = inst[i].x-i,
                   Y = inst[i].y-i,
@@ -1009,14 +1005,14 @@ static struct umbra_interpreter* interp_from_inst(struct umbra_inst const inst[]
         }
     }
     #undef emit
-    p->inst[insts] = (struct inst){.fn=done};
+    p->inst[insts] = (struct interp_inst){.fn=done};
     p->preamble = P;
     return p;
 }
 
 static void interp_run(struct umbra_interpreter *p, int n, void *ptr[]) {
-    struct inst const *body = p->inst + p->preamble;
-    val               *bv   = p->v    + p->preamble;
+    struct interp_inst const *body = p->inst + p->preamble;
+    val                      *bv   = p->v    + p->preamble;
 
     // First iteration runs preamble+body together.
     int i = 0;
@@ -1037,11 +1033,9 @@ static void interp_free(struct umbra_interpreter *p) {
 // ── basic block builder ──────────────────────────────────────────────
 
 struct umbra_basic_block {
-    struct umbra_inst *inst;
-    int               *ht;
-    int                insts, cap;
-    int                ht_cap;
-    int                :32;
+    struct bb_inst *inst;
+    int            *ht;
+    int            insts, cap, ht_cap, :32;
 };
 
 static void bb_grow(struct umbra_basic_block *bb) {
@@ -1061,7 +1055,7 @@ static void bb_ht_grow(struct umbra_basic_block *bb) {
     for (int i = 0; i < bb->insts; i++) {
         if (is_store(bb->inst[i].op)) { continue; }
         // Hash using absolute x/y/z.
-        struct { Op op; int x, y, z, immi; } key = {
+        struct { enum op op; int x, y, z, immi; } key = {
             bb->inst[i].op,
             bb->inst[i].x ? i + bb->inst[i].x : 0,
             bb->inst[i].y ? i + bb->inst[i].y : 0,
@@ -1079,7 +1073,7 @@ static void bb_ht_grow(struct umbra_basic_block *bb) {
 
 // Push a pre-filled instruction. Returns its absolute index.
 // Stores skip dedup. Others get deduped via hash table.
-static int bb_push(struct umbra_basic_block *bb, struct umbra_inst inst) {
+static int bb_push(struct umbra_basic_block *bb, struct bb_inst inst) {
     if (is_store(inst.op)) {
         bb_grow(bb);
         int id = bb->insts++;
@@ -1089,7 +1083,7 @@ static int bb_push(struct umbra_basic_block *bb, struct umbra_inst inst) {
 
     // Convert relative→absolute for hashing.
     int cur = bb->insts;
-    struct { Op op; int x, y, z, immi; } key = {
+    struct { enum op op; int x, y, z, immi; } key = {
         inst.op,
         inst.x ? cur + inst.x : 0,
         inst.y ? cur + inst.y : 0,
@@ -1109,9 +1103,9 @@ static int bb_push(struct umbra_basic_block *bb, struct umbra_inst inst) {
             return id;
         }
         int prev = bb->ht[slot];
-        struct umbra_inst *pi = &bb->inst[prev];
+        struct bb_inst *pi = &bb->inst[prev];
         // Compare using absolute coordinates.
-        struct { Op op; int x, y, z, immi; } pkey = {
+        struct { enum op op; int x, y, z, immi; } pkey = {
             pi->op,
             pi->x ? prev + pi->x : 0,
             pi->y ? prev + pi->y : 0,
@@ -1137,8 +1131,8 @@ void umbra_basic_block_free(struct umbra_basic_block *bb) {
 }
 
 // Make a relative instruction from absolute handle IDs.
-static struct umbra_inst bb_rel(int cur, Op op, int x, int y, int z) {
-    return (struct umbra_inst){
+static struct bb_inst bb_rel(int cur, enum op op, int x, int y, int z) {
+    return (struct bb_inst){
         .op = op,
         .x  = x ? x - cur : 0,
         .y  = y ? y - cur : 0,
@@ -1147,46 +1141,46 @@ static struct umbra_inst bb_rel(int cur, Op op, int x, int y, int z) {
 }
 
 umbra_v32 umbra_lane(struct umbra_basic_block *bb) {
-    struct umbra_inst inst = {.op = op_lane};
+    struct bb_inst inst = {.op = op_lane};
     return (umbra_v32){bb_push(bb, inst)};
 }
 
 umbra_v16 umbra_imm_16(struct umbra_basic_block *bb, uint16_t bits) {
-    struct umbra_inst inst = {.op = op_imm_16, .immi = (int16_t)bits};
+    struct bb_inst inst = {.op = op_imm_16, .immi = (int16_t)bits};
     return (umbra_v16){bb_push(bb, inst)};
 }
 
 umbra_v32 umbra_imm_32(struct umbra_basic_block *bb, uint32_t bits) {
     int immi;
     __builtin_memcpy(&immi, &bits, 4);
-    struct umbra_inst inst = {.op = op_imm_32, .immi = immi};
+    struct bb_inst inst = {.op = op_imm_32, .immi = immi};
     return (umbra_v32){bb_push(bb, inst)};
 }
 
 umbra_v16 umbra_load_16(struct umbra_basic_block *bb, umbra_ptr src, umbra_v32 ix) {
     int cur = bb->insts;
-    struct umbra_inst inst = bb_rel(cur, op_load_16, ix.id, 0, 0);
+    struct bb_inst inst = bb_rel(cur, op_load_16, ix.id, 0, 0);
     inst.ptr = src.ix;
     return (umbra_v16){bb_push(bb, inst)};
 }
 
 umbra_v32 umbra_load_32(struct umbra_basic_block *bb, umbra_ptr src, umbra_v32 ix) {
     int cur = bb->insts;
-    struct umbra_inst inst = bb_rel(cur, op_load_32, ix.id, 0, 0);
+    struct bb_inst inst = bb_rel(cur, op_load_32, ix.id, 0, 0);
     inst.ptr = src.ix;
     return (umbra_v32){bb_push(bb, inst)};
 }
 
 void umbra_store_16(struct umbra_basic_block *bb, umbra_ptr dst, umbra_v32 ix, umbra_v16 val) {
     int cur = bb->insts;
-    struct umbra_inst inst = bb_rel(cur, op_store_16, ix.id, val.id, 0);
+    struct bb_inst inst = bb_rel(cur, op_store_16, ix.id, val.id, 0);
     inst.ptr = dst.ix;
     bb_push(bb, inst);
 }
 
 void umbra_store_32(struct umbra_basic_block *bb, umbra_ptr dst, umbra_v32 ix, umbra_v32 val) {
     int cur = bb->insts;
-    struct umbra_inst inst = bb_rel(cur, op_store_32, ix.id, val.id, 0);
+    struct bb_inst inst = bb_rel(cur, op_store_32, ix.id, val.id, 0);
     inst.ptr = dst.ix;
     bb_push(bb, inst);
 }
@@ -1204,7 +1198,7 @@ static _Bool bb_is_imm(struct umbra_basic_block *bb, int id) {
 }
 
 // Const-prop: evaluate op(imm,...) → imm at build time.
-static int bb_constprop(struct umbra_basic_block *bb, Op op,
+static int bb_constprop(struct umbra_basic_block *bb, enum op op,
                         int ax, int ay, int az) {
     int ar = arity(op);
     if (ar == 0 || is_store(op) || op == op_load_16 || op == op_load_32) { return -1; }
@@ -1213,7 +1207,7 @@ static int bb_constprop(struct umbra_basic_block *bb, Op op,
     if (ar >= 3 && !bb_is_imm(bb, az)) { return -1; }
 
     _Bool wide = !is_16bit_result(op);
-    struct umbra_inst tmp[8];
+    struct bb_inst tmp[8];
     __builtin_memset(tmp, 0, sizeof tmp);
     int t = 0;
     int ox = 0, oy = 0, oz = 0;
@@ -1221,7 +1215,7 @@ static int bb_constprop(struct umbra_basic_block *bb, Op op,
     if (ar >= 2) { oy = t; tmp[t++] = bb->inst[ay]; }
     if (ar >= 3) { oz = t; tmp[t++] = bb->inst[az]; }
     int const op_slot = t;
-    tmp[t] = (struct umbra_inst){.op = op, .x = ox, .y = oy, .z = oz};
+    tmp[t] = (struct bb_inst){.op = op, .x = ox, .y = oy, .z = oz};
     t++;
     int const lane_slot = t;
     tmp[t++].op = op_lane;
@@ -1245,7 +1239,7 @@ static int bb_constprop(struct umbra_basic_block *bb, Op op,
 }
 
 // Generic binary op builder: canonicalize, constprop, push.
-static int bb_binop(struct umbra_basic_block *bb, Op op, int x, int y) {
+static int bb_binop(struct umbra_basic_block *bb, enum op op, int x, int y) {
     if (commutative(op) && x > y) { int t = x; x = y; y = t; }
     int cp = bb_constprop(bb, op, x, y, 0);
     if (cp >= 0) { return cp; }
@@ -1253,14 +1247,14 @@ static int bb_binop(struct umbra_basic_block *bb, Op op, int x, int y) {
 }
 
 // Generic unary op builder.
-static int bb_unop(struct umbra_basic_block *bb, Op op, int x) {
+static int bb_unop(struct umbra_basic_block *bb, enum op op, int x) {
     int cp = bb_constprop(bb, op, x, 0, 0);
     if (cp >= 0) { return cp; }
     return bb_push(bb, bb_rel(bb->insts, op, x, 0, 0));
 }
 
 // Generic ternary op builder.
-static int bb_ternop(struct umbra_basic_block *bb, Op op, int x, int y, int z) {
+static int bb_ternop(struct umbra_basic_block *bb, enum op op, int x, int y, int z) {
     int cp = bb_constprop(bb, op, x, y, z);
     if (cp >= 0) { return cp; }
     return bb_push(bb, bb_rel(bb->insts, op, x, y, z));
@@ -1566,7 +1560,7 @@ umbra_v32 umbra_ge_u32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
 struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) {
     // Copy and convert relative → absolute.
     int insts = bb->insts;
-    struct umbra_inst *copy = malloc((size_t)insts * sizeof *copy);
+    struct bb_inst *copy = malloc((size_t)insts * sizeof *copy);
     __builtin_memcpy(copy, bb->inst, (size_t)insts * sizeof *copy);
     for (int i = 0; i < insts; i++) {
         if (copy[i].x) { copy[i].x += i; }
