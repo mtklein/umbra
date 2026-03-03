@@ -1,7 +1,5 @@
 #pragma once
 
-#include <stdint.h>
-
 struct umbra_basic_block* umbra_basic_block(void);
 void umbra_basic_block_free(struct umbra_basic_block*);
 
@@ -11,8 +9,8 @@ typedef struct {int ix;} umbra_ptr;
 
 umbra_v32 umbra_lane(struct umbra_basic_block*);
 
-umbra_v16 umbra_imm_16(struct umbra_basic_block*, uint16_t bits);
-umbra_v32 umbra_imm_32(struct umbra_basic_block*, uint32_t bits);
+umbra_v16 umbra_imm_16(struct umbra_basic_block*, unsigned short bits);
+umbra_v32 umbra_imm_32(struct umbra_basic_block*, unsigned int   bits);
 
 umbra_v16 umbra_load_16(struct umbra_basic_block*, umbra_ptr src, umbra_v32 ix);
 umbra_v32 umbra_load_32(struct umbra_basic_block*, umbra_ptr src, umbra_v32 ix);

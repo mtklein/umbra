@@ -21,39 +21,34 @@ static struct umbra_interpreter* build_srcover(void) {
     umbra_v32 const ix = umbra_lane(bb),
                    src = umbra_load_32(bb, (umbra_ptr){0}, ix),
                  mask8 = umbra_imm_32(bb, 0xff),
-                inv255 = umbra_imm_32(bb, bits(1/255.0f));
+                inv255 = umbra_imm_32(bb, bits(1/255.0f)),
+                    ri = umbra_and_32(bb, src, mask8),
+                    rf = umbra_mul_f32(bb, umbra_f32_from_i32(bb, ri), inv255);
+    umbra_v16 const sr = umbra_f16_from_f32(bb, rf);
+    umbra_v32 const sh8 = umbra_imm_32(bb, 8),
+                     gi = umbra_and_32(bb, umbra_shr_u32(bb, src, sh8), mask8),
+                     gf = umbra_mul_f32(bb, umbra_f32_from_i32(bb, gi), inv255);
+    umbra_v16 const sg = umbra_f16_from_f32(bb, gf);
 
-    umbra_v32 ri = umbra_and_32(bb, src, mask8);
-    umbra_v32 rf = umbra_mul_f32(bb, umbra_f32_from_i32(bb, ri), inv255);
-    umbra_v16 sr = umbra_f16_from_f32(bb, rf);
+    umbra_v32 const sh16 = umbra_imm_32(bb, 16),
+                      bi = umbra_and_32(bb, umbra_shr_u32(bb, src, sh16), mask8),
+                      bf = umbra_mul_f32(bb, umbra_f32_from_i32(bb, bi), inv255);
+    umbra_v16 const sb = umbra_f16_from_f32(bb, bf);
 
-    umbra_v32 sh8 = umbra_imm_32(bb, 8);
-    umbra_v32 gi  = umbra_and_32(bb, umbra_shr_u32(bb, src, sh8), mask8);
-    umbra_v32 gf  = umbra_mul_f32(bb, umbra_f32_from_i32(bb, gi), inv255);
-    umbra_v16 sg  = umbra_f16_from_f32(bb, gf);
-
-    umbra_v32 sh16 = umbra_imm_32(bb, 16);
-    umbra_v32 bi   = umbra_and_32(bb, umbra_shr_u32(bb, src, sh16), mask8);
-    umbra_v32 bf   = umbra_mul_f32(bb, umbra_f32_from_i32(bb, bi), inv255);
-    umbra_v16 sb   = umbra_f16_from_f32(bb, bf);
-
-    umbra_v32 sh24 = umbra_imm_32(bb, 24);
-    umbra_v32 ai   = umbra_and_32(bb, umbra_shr_u32(bb, src, sh24), mask8);
-    umbra_v32 af   = umbra_mul_f32(bb, umbra_f32_from_i32(bb, ai), inv255);
-    umbra_v16 sa   = umbra_f16_from_f32(bb, af);
-
-    umbra_v16 dr = umbra_load_16(bb, (umbra_ptr){1}, ix);
-    umbra_v16 dg = umbra_load_16(bb, (umbra_ptr){2}, ix);
-    umbra_v16 db = umbra_load_16(bb, (umbra_ptr){3}, ix);
-    umbra_v16 da = umbra_load_16(bb, (umbra_ptr){4}, ix);
-
-    umbra_v16 one   = umbra_imm_16(bb, 0x3C00);
-    umbra_v16 inv_a = umbra_sub_f16(bb, one, sa);
-
-    umbra_v16 rout = umbra_add_f16(bb, sr, umbra_mul_f16(bb, dr, inv_a));
-    umbra_v16 gout = umbra_add_f16(bb, sg, umbra_mul_f16(bb, dg, inv_a));
-    umbra_v16 bout = umbra_add_f16(bb, sb, umbra_mul_f16(bb, db, inv_a));
-    umbra_v16 aout = umbra_add_f16(bb, sa, umbra_mul_f16(bb, da, inv_a));
+    umbra_v32 const sh24 = umbra_imm_32(bb, 24),
+                      ai = umbra_and_32(bb, umbra_shr_u32(bb, src, sh24), mask8),
+                      af = umbra_mul_f32(bb, umbra_f32_from_i32(bb, ai), inv255);
+    umbra_v16 const sa = umbra_f16_from_f32(bb, af),
+                    dr = umbra_load_16(bb, (umbra_ptr){1}, ix),
+                    dg = umbra_load_16(bb, (umbra_ptr){2}, ix),
+                    db = umbra_load_16(bb, (umbra_ptr){3}, ix),
+                    da = umbra_load_16(bb, (umbra_ptr){4}, ix),
+                   one = umbra_imm_16(bb, 0x3c00),
+                 inv_a = umbra_sub_f16(bb, one, sa),
+                  rout = umbra_add_f16(bb, sr, umbra_mul_f16(bb, dr, inv_a)),
+                  gout = umbra_add_f16(bb, sg, umbra_mul_f16(bb, dg, inv_a)),
+                  bout = umbra_add_f16(bb, sb, umbra_mul_f16(bb, db, inv_a)),
+                  aout = umbra_add_f16(bb, sa, umbra_mul_f16(bb, da, inv_a));
 
     umbra_store_16(bb, (umbra_ptr){1}, ix, rout);
     umbra_store_16(bb, (umbra_ptr){2}, ix, gout);

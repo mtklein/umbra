@@ -6,10 +6,10 @@
 // Helper: build bb for binop(load(ptr0), load(ptr1)) → store(ptr2), assign interpreter to p_.
 #define BB_BINOP_32(op_fn, p_) do { \
     struct umbra_basic_block *bb_ = umbra_basic_block(); \
-    umbra_v32 ix_ = umbra_lane(bb_); \
-    umbra_v32 a_  = umbra_load_32(bb_, (umbra_ptr){0}, ix_); \
-    umbra_v32 b_  = umbra_load_32(bb_, (umbra_ptr){1}, ix_); \
-    umbra_v32 r_  = op_fn(bb_, a_, b_); \
+    umbra_v32 ix_ = umbra_lane(bb_), \
+              a_  = umbra_load_32(bb_, (umbra_ptr){0}, ix_), \
+              b_  = umbra_load_32(bb_, (umbra_ptr){1}, ix_), \
+              r_  = op_fn(bb_, a_, b_); \
     umbra_store_32(bb_, (umbra_ptr){2}, ix_, r_); \
     p_ = umbra_interpreter(bb_); \
     umbra_basic_block_free(bb_); \
@@ -18,9 +18,9 @@
 #define BB_BINOP_16(op_fn, p_) do { \
     struct umbra_basic_block *bb_ = umbra_basic_block(); \
     umbra_v32 ix_ = umbra_lane(bb_); \
-    umbra_v16 a_  = umbra_load_16(bb_, (umbra_ptr){0}, ix_); \
-    umbra_v16 b_  = umbra_load_16(bb_, (umbra_ptr){1}, ix_); \
-    umbra_v16 r_  = op_fn(bb_, a_, b_); \
+    umbra_v16 a_  = umbra_load_16(bb_, (umbra_ptr){0}, ix_), \
+              b_  = umbra_load_16(bb_, (umbra_ptr){1}, ix_), \
+              r_  = op_fn(bb_, a_, b_); \
     umbra_store_16(bb_, (umbra_ptr){2}, ix_, r_); \
     p_ = umbra_interpreter(bb_); \
     umbra_basic_block_free(bb_); \
@@ -100,7 +100,7 @@ static void test_i32_ops(void) {
         struct umbra_interpreter *p; BB_BINOP_32(umbra_shr_u32, p);
         int x[] = {-1, 8, 64}, y[] = {1, 1, 3}, z[3] = {0};
         umbra_interpreter_run(p, 3, (void*[]){x,y,z});
-        (z[0] == (int)(0xFFFFFFFFu >> 1)) here;
+        (z[0] == (int)(0xffffffffu >> 1)) here;
         (z[1] == 4) here; (z[2] == 8) here;
         umbra_interpreter_free(p);
     }
@@ -115,33 +115,33 @@ static void test_i32_ops(void) {
     // and, or, xor
     {
         struct umbra_interpreter *p; BB_BINOP_32(umbra_and_32, p);
-        int x[] = {0xFF, 0x0F}, y[] = {0x0F, 0xFF}, z[2] = {0};
+        int x[] = {0xff, 0x0f}, y[] = {0x0f, 0xff}, z[2] = {0};
         umbra_interpreter_run(p, 2, (void*[]){x,y,z});
-        (z[0] == 0x0F) here; (z[1] == 0x0F) here;
+        (z[0] == 0x0f) here; (z[1] == 0x0f) here;
         umbra_interpreter_free(p);
     }
     {
         struct umbra_interpreter *p; BB_BINOP_32(umbra_or_32, p);
-        int x[] = {0xF0, 0x0F}, y[] = {0x0F, 0xF0}, z[2] = {0};
+        int x[] = {0xf0, 0x0f}, y[] = {0x0f, 0xf0}, z[2] = {0};
         umbra_interpreter_run(p, 2, (void*[]){x,y,z});
-        (z[0] == 0xFF) here; (z[1] == 0xFF) here;
+        (z[0] == 0xff) here; (z[1] == 0xff) here;
         umbra_interpreter_free(p);
     }
     {
         struct umbra_interpreter *p; BB_BINOP_32(umbra_xor_32, p);
-        int x[] = {0xFF, 0xFF}, y[] = {0x0F, 0xFF}, z[2] = {0};
+        int x[] = {0xff, 0xff}, y[] = {0x0f, 0xff}, z[2] = {0};
         umbra_interpreter_run(p, 2, (void*[]){x,y,z});
-        (z[0] == 0xF0) here; (z[1] == 0x00) here;
+        (z[0] == 0xf0) here; (z[1] == 0x00) here;
         umbra_interpreter_free(p);
     }
     // sel
     {
         struct umbra_basic_block *bb = umbra_basic_block();
-        umbra_v32 ix = umbra_lane(bb);
-        umbra_v32 c  = umbra_load_32(bb, (umbra_ptr){0}, ix);
-        umbra_v32 a  = umbra_load_32(bb, (umbra_ptr){1}, ix);
-        umbra_v32 b  = umbra_load_32(bb, (umbra_ptr){2}, ix);
-        umbra_v32 r  = umbra_sel_32(bb, c, a, b);
+        umbra_v32 ix = umbra_lane(bb),
+                   c = umbra_load_32(bb, (umbra_ptr){0}, ix),
+                   a = umbra_load_32(bb, (umbra_ptr){1}, ix),
+                   b = umbra_load_32(bb, (umbra_ptr){2}, ix),
+                   r = umbra_sel_32(bb, c, a, b);
         umbra_store_32(bb, (umbra_ptr){3}, ix, r);
         struct umbra_interpreter *p = umbra_interpreter(bb);
         umbra_basic_block_free(bb);
@@ -225,7 +225,7 @@ static void test_i16_ops(void) {
         struct umbra_interpreter *p; BB_BINOP_16(umbra_shr_u16, p);
         short x[] = {-1, 64}, y[] = {1, 3}, z[2] = {0};
         umbra_interpreter_run(p, 2, (void*[]){x,y,z});
-        (z[0] == (short)(0xFFFFu >> 1)) here; (z[1] == 8) here;
+        (z[0] == (short)(0xffffu >> 1)) here; (z[1] == 8) here;
         umbra_interpreter_free(p);
     }
     // shr_s
@@ -239,33 +239,33 @@ static void test_i16_ops(void) {
     // and, or, xor
     {
         struct umbra_interpreter *p; BB_BINOP_16(umbra_and_16, p);
-        short x[] = {0xFF}, y[] = {0x0F}, z[1] = {0};
+        short x[] = {0xff}, y[] = {0x0f}, z[1] = {0};
         umbra_interpreter_run(p, 1, (void*[]){x,y,z});
-        (z[0] == 0x0F) here;
+        (z[0] == 0x0f) here;
         umbra_interpreter_free(p);
     }
     {
         struct umbra_interpreter *p; BB_BINOP_16(umbra_or_16, p);
-        short x[] = {0xF0}, y[] = {0x0F}, z[1] = {0};
+        short x[] = {0xf0}, y[] = {0x0f}, z[1] = {0};
         umbra_interpreter_run(p, 1, (void*[]){x,y,z});
-        (z[0] == 0xFF) here;
+        (z[0] == 0xff) here;
         umbra_interpreter_free(p);
     }
     {
         struct umbra_interpreter *p; BB_BINOP_16(umbra_xor_16, p);
-        short x[] = {0xFF}, y[] = {0x0F}, z[1] = {0};
+        short x[] = {0xff}, y[] = {0x0f}, z[1] = {0};
         umbra_interpreter_run(p, 1, (void*[]){x,y,z});
-        (z[0] == 0xF0) here;
+        (z[0] == 0xf0) here;
         umbra_interpreter_free(p);
     }
     // sel
     {
         struct umbra_basic_block *bb = umbra_basic_block();
         umbra_v32 ix = umbra_lane(bb);
-        umbra_v16 c  = umbra_load_16(bb, (umbra_ptr){0}, ix);
-        umbra_v16 a  = umbra_load_16(bb, (umbra_ptr){1}, ix);
-        umbra_v16 b  = umbra_load_16(bb, (umbra_ptr){2}, ix);
-        umbra_v16 r  = umbra_sel_16(bb, c, a, b);
+        umbra_v16 c = umbra_load_16(bb, (umbra_ptr){0}, ix),
+                  a = umbra_load_16(bb, (umbra_ptr){1}, ix),
+                  b = umbra_load_16(bb, (umbra_ptr){2}, ix),
+                  r = umbra_sel_16(bb, c, a, b);
         umbra_store_16(bb, (umbra_ptr){3}, ix, r);
         struct umbra_interpreter *p = umbra_interpreter(bb);
         umbra_basic_block_free(bb);
@@ -388,8 +388,8 @@ static void test_cmp_f16(void) {
 static void test_imm(void) {
     {
         struct umbra_basic_block *bb = umbra_basic_block();
-        umbra_v32 ix = umbra_lane(bb);
-        umbra_v32 v  = umbra_imm_32(bb, 42);
+        umbra_v32 ix = umbra_lane(bb),
+                   v = umbra_imm_32(bb, 42);
         umbra_store_32(bb, (umbra_ptr){0}, ix, v);
         struct umbra_interpreter *p = umbra_interpreter(bb);
         umbra_basic_block_free(bb);
@@ -401,7 +401,7 @@ static void test_imm(void) {
     {
         struct umbra_basic_block *bb = umbra_basic_block();
         umbra_v32 ix = umbra_lane(bb);
-        umbra_v16 v  = umbra_imm_16(bb, 7);
+        umbra_v16 v = umbra_imm_16(bb, 7);
         umbra_store_16(bb, (umbra_ptr){0}, ix, v);
         struct umbra_interpreter *p = umbra_interpreter(bb);
         umbra_basic_block_free(bb);
@@ -414,13 +414,13 @@ static void test_imm(void) {
 
 static void test_fma_f32(void) {
     struct umbra_basic_block *bb = umbra_basic_block();
-    umbra_v32 ix = umbra_lane(bb);
-    umbra_v32 x  = umbra_load_32(bb, (umbra_ptr){0}, ix);
-    umbra_v32 y  = umbra_load_32(bb, (umbra_ptr){1}, ix);
-    umbra_v32 w  = umbra_load_32(bb, (umbra_ptr){2}, ix);
-    // add(mul(x,y), w) → fma(x,y,w)
-    umbra_v32 m  = umbra_mul_f32(bb, x, y);
-    umbra_v32 r  = umbra_add_f32(bb, m, w);
+    umbra_v32 ix = umbra_lane(bb),
+               x = umbra_load_32(bb, (umbra_ptr){0}, ix),
+               y = umbra_load_32(bb, (umbra_ptr){1}, ix),
+               w = umbra_load_32(bb, (umbra_ptr){2}, ix),
+               // add(mul(x,y), w) → fma(x,y,w)
+               m = umbra_mul_f32(bb, x, y),
+               r = umbra_add_f32(bb, m, w);
     umbra_store_32(bb, (umbra_ptr){3}, ix, r);
     struct umbra_interpreter *p = umbra_interpreter(bb);
     umbra_basic_block_free(bb);
@@ -433,11 +433,11 @@ static void test_fma_f32(void) {
 static void test_fma_f16(void) {
     struct umbra_basic_block *bb = umbra_basic_block();
     umbra_v32 ix = umbra_lane(bb);
-    umbra_v16 x  = umbra_load_16(bb, (umbra_ptr){0}, ix);
-    umbra_v16 y  = umbra_load_16(bb, (umbra_ptr){1}, ix);
-    umbra_v16 w  = umbra_load_16(bb, (umbra_ptr){2}, ix);
-    umbra_v16 m  = umbra_mul_f16(bb, x, y);
-    umbra_v16 r  = umbra_add_f16(bb, m, w);
+    umbra_v16 x = umbra_load_16(bb, (umbra_ptr){0}, ix),
+              y = umbra_load_16(bb, (umbra_ptr){1}, ix),
+              w = umbra_load_16(bb, (umbra_ptr){2}, ix),
+              m = umbra_mul_f16(bb, x, y),
+              r = umbra_add_f16(bb, m, w);
     umbra_store_16(bb, (umbra_ptr){3}, ix, r);
     struct umbra_interpreter *p = umbra_interpreter(bb);
     umbra_basic_block_free(bb);
@@ -467,9 +467,9 @@ static void test_min_max_sqrt_f32(void) {
     // sqrt
     {
         struct umbra_basic_block *bb = umbra_basic_block();
-        umbra_v32 ix = umbra_lane(bb);
-        umbra_v32 x  = umbra_load_32(bb, (umbra_ptr){0}, ix);
-        umbra_v32 r  = umbra_sqrt_f32(bb, x);
+        umbra_v32 ix = umbra_lane(bb),
+                   x = umbra_load_32(bb, (umbra_ptr){0}, ix),
+                   r = umbra_sqrt_f32(bb, x);
         umbra_store_32(bb, (umbra_ptr){1}, ix, r);
         struct umbra_interpreter *p = umbra_interpreter(bb);
         umbra_basic_block_free(bb);
@@ -501,8 +501,8 @@ static void test_min_max_sqrt_f16(void) {
     {
         struct umbra_basic_block *bb = umbra_basic_block();
         umbra_v32 ix = umbra_lane(bb);
-        umbra_v16 x  = umbra_load_16(bb, (umbra_ptr){0}, ix);
-        umbra_v16 r  = umbra_sqrt_f16(bb, x);
+        umbra_v16 x = umbra_load_16(bb, (umbra_ptr){0}, ix),
+                  r = umbra_sqrt_f16(bb, x);
         umbra_store_16(bb, (umbra_ptr){1}, ix, r);
         struct umbra_interpreter *p = umbra_interpreter(bb);
         umbra_basic_block_free(bb);
@@ -526,9 +526,9 @@ static void test_convert(void) {
     // f32_from_i32
     {
         struct umbra_basic_block *bb = umbra_basic_block();
-        umbra_v32 ix = umbra_lane(bb);
-        umbra_v32 x  = umbra_load_32(bb, (umbra_ptr){0}, ix);
-        umbra_v32 r  = umbra_f32_from_i32(bb, x);
+        umbra_v32 ix = umbra_lane(bb),
+                   x = umbra_load_32(bb, (umbra_ptr){0}, ix),
+                   r = umbra_f32_from_i32(bb, x);
         umbra_store_32(bb, (umbra_ptr){1}, ix, r);
         struct umbra_interpreter *p = umbra_interpreter(bb);
         umbra_basic_block_free(bb);
@@ -540,9 +540,9 @@ static void test_convert(void) {
     // i32_from_f32
     {
         struct umbra_basic_block *bb = umbra_basic_block();
-        umbra_v32 ix = umbra_lane(bb);
-        umbra_v32 x  = umbra_load_32(bb, (umbra_ptr){0}, ix);
-        umbra_v32 r  = umbra_i32_from_f32(bb, x);
+        umbra_v32 ix = umbra_lane(bb),
+                   x = umbra_load_32(bb, (umbra_ptr){0}, ix),
+                   r = umbra_i32_from_f32(bb, x);
         umbra_store_32(bb, (umbra_ptr){1}, ix, r);
         struct umbra_interpreter *p = umbra_interpreter(bb);
         umbra_basic_block_free(bb);
@@ -554,10 +554,10 @@ static void test_convert(void) {
     // f16↔f32 roundtrip
     {
         struct umbra_basic_block *bb = umbra_basic_block();
-        umbra_v32 ix = umbra_lane(bb);
-        umbra_v32 x  = umbra_load_32(bb, (umbra_ptr){0}, ix);
-        umbra_v16 h  = umbra_f16_from_f32(bb, x);
-        umbra_v32 r  = umbra_f32_from_f16(bb, h);
+        umbra_v32 ix = umbra_lane(bb),
+                   x = umbra_load_32(bb, (umbra_ptr){0}, ix);
+        umbra_v16 h = umbra_f16_from_f32(bb, x);
+        umbra_v32 r = umbra_f32_from_f16(bb, h);
         umbra_store_32(bb, (umbra_ptr){1}, ix, r);
         struct umbra_interpreter *p = umbra_interpreter(bb);
         umbra_basic_block_free(bb);
@@ -570,15 +570,15 @@ static void test_convert(void) {
 
 static void test_dedup(void) {
     struct umbra_basic_block *bb = umbra_basic_block();
-    umbra_v32 a = umbra_imm_32(bb, 42);
-    umbra_v32 b = umbra_imm_32(bb, 42);
+    umbra_v32 a = umbra_imm_32(bb, 42),
+              b = umbra_imm_32(bb, 42);
     (a.id == b.id) here;
     umbra_v32 c = umbra_imm_32(bb, 99);
     (a.id != c.id) here;
-    umbra_v32 ix = umbra_lane(bb);
-    umbra_v32 x  = umbra_load_32(bb, (umbra_ptr){0}, ix);
-    umbra_v32 s1 = umbra_add_i32(bb, x, a);
-    umbra_v32 s2 = umbra_add_i32(bb, x, a);
+    umbra_v32 ix = umbra_lane(bb),
+               x = umbra_load_32(bb, (umbra_ptr){0}, ix),
+              s1 = umbra_add_i32(bb, x, a),
+              s2 = umbra_add_i32(bb, x, a);
     (s1.id == s2.id) here;
     umbra_basic_block_free(bb);
 }
@@ -587,10 +587,10 @@ static void test_constprop(void) {
     // add_i32(imm(3), imm(5)) → 8
     {
         struct umbra_basic_block *bb = umbra_basic_block();
-        umbra_v32 ix = umbra_lane(bb);
-        umbra_v32 a  = umbra_imm_32(bb, 3);
-        umbra_v32 b  = umbra_imm_32(bb, 5);
-        umbra_v32 s  = umbra_add_i32(bb, a, b);
+        umbra_v32 ix = umbra_lane(bb),
+                   a = umbra_imm_32(bb, 3),
+                   b = umbra_imm_32(bb, 5),
+                   s = umbra_add_i32(bb, a, b);
         umbra_store_32(bb, (umbra_ptr){0}, ix, s);
         struct umbra_interpreter *p = umbra_interpreter(bb);
         umbra_basic_block_free(bb);
@@ -606,9 +606,9 @@ static void test_constprop(void) {
         uint32_t two, three;
         { float f = 2.0f; __builtin_memcpy(&two, &f, 4); }
         { float f = 3.0f; __builtin_memcpy(&three, &f, 4); }
-        umbra_v32 a = umbra_imm_32(bb, two);
-        umbra_v32 b = umbra_imm_32(bb, three);
-        umbra_v32 s = umbra_mul_f32(bb, a, b);
+        umbra_v32 a = umbra_imm_32(bb, two),
+                  b = umbra_imm_32(bb, three),
+                  s = umbra_mul_f32(bb, a, b);
         umbra_store_32(bb, (umbra_ptr){0}, ix, s);
         struct umbra_interpreter *p = umbra_interpreter(bb);
         umbra_basic_block_free(bb);
@@ -623,30 +623,30 @@ static void test_strength_reduction(void) {
     // add(x, 0) → x
     {
         struct umbra_basic_block *bb = umbra_basic_block();
-        umbra_v32 ix = umbra_lane(bb);
-        umbra_v32 x  = umbra_load_32(bb, (umbra_ptr){0}, ix);
-        umbra_v32 z  = umbra_imm_32(bb, 0);
-        umbra_v32 s  = umbra_add_i32(bb, x, z);
+        umbra_v32 ix = umbra_lane(bb),
+                   x = umbra_load_32(bb, (umbra_ptr){0}, ix),
+                   z = umbra_imm_32(bb, 0),
+                   s = umbra_add_i32(bb, x, z);
         (s.id == x.id) here;
         umbra_basic_block_free(bb);
     }
     // mul(x, 1) → x
     {
         struct umbra_basic_block *bb = umbra_basic_block();
-        umbra_v32 ix = umbra_lane(bb);
-        umbra_v32 x  = umbra_load_32(bb, (umbra_ptr){0}, ix);
-        umbra_v32 one = umbra_imm_32(bb, 1);
-        umbra_v32 s  = umbra_mul_i32(bb, x, one);
+        umbra_v32 ix  = umbra_lane(bb),
+                   x  = umbra_load_32(bb, (umbra_ptr){0}, ix),
+                  one = umbra_imm_32(bb, 1),
+                   s  = umbra_mul_i32(bb, x, one);
         (s.id == x.id) here;
         umbra_basic_block_free(bb);
     }
     // mul(x, 8) → shl(x, 3)
     {
         struct umbra_basic_block *bb = umbra_basic_block();
-        umbra_v32 ix    = umbra_lane(bb);
-        umbra_v32 x     = umbra_load_32(bb, (umbra_ptr){0}, ix);
-        umbra_v32 eight = umbra_imm_32(bb, 8);
-        umbra_v32 s     = umbra_mul_i32(bb, x, eight);
+        umbra_v32 ix    = umbra_lane(bb),
+                  x     = umbra_load_32(bb, (umbra_ptr){0}, ix),
+                  eight = umbra_imm_32(bb, 8),
+                  s     = umbra_mul_i32(bb, x, eight);
         umbra_store_32(bb, (umbra_ptr){1}, ix, s);
         struct umbra_interpreter *p = umbra_interpreter(bb);
         umbra_basic_block_free(bb);
@@ -658,9 +658,9 @@ static void test_strength_reduction(void) {
     // sub(x, x) → 0
     {
         struct umbra_basic_block *bb = umbra_basic_block();
-        umbra_v32 ix = umbra_lane(bb);
-        umbra_v32 x  = umbra_load_32(bb, (umbra_ptr){0}, ix);
-        umbra_v32 s  = umbra_sub_i32(bb, x, x);
+        umbra_v32 ix = umbra_lane(bb),
+                   x = umbra_load_32(bb, (umbra_ptr){0}, ix),
+                   s = umbra_sub_i32(bb, x, x);
         umbra_store_32(bb, (umbra_ptr){1}, ix, s);
         struct umbra_interpreter *p = umbra_interpreter(bb);
         umbra_basic_block_free(bb);
@@ -673,44 +673,38 @@ static void test_strength_reduction(void) {
 
 static void test_srcover(void) {
     struct umbra_basic_block *bb = umbra_basic_block();
-    umbra_v32 ix = umbra_lane(bb);
-
-    umbra_v32 src = umbra_load_32(bb, (umbra_ptr){0}, ix);
-
-    umbra_v32 mask8  = umbra_imm_32(bb, 0xFF);
-    umbra_v32 inv255 = umbra_imm_32(bb, 0x3B808081u); // 1.0f/255.0f
-
-    umbra_v32 ri = umbra_and_32(bb, src, mask8);
-    umbra_v32 rf = umbra_mul_f32(bb, umbra_f32_from_i32(bb, ri), inv255);
+    umbra_v32 ix     = umbra_lane(bb),
+              src    = umbra_load_32(bb, (umbra_ptr){0}, ix),
+              mask8  = umbra_imm_32(bb, 0xff),
+              inv255 = umbra_imm_32(bb, 0x3b808081u), // 1.0f/255.0f
+              ri     = umbra_and_32(bb, src, mask8),
+              rf     = umbra_mul_f32(bb, umbra_f32_from_i32(bb, ri), inv255);
     umbra_v16 sr = umbra_f16_from_f32(bb, rf);
 
-    umbra_v32 sh8 = umbra_imm_32(bb, 8);
-    umbra_v32 gi  = umbra_and_32(bb, umbra_shr_u32(bb, src, sh8), mask8);
-    umbra_v32 gf  = umbra_mul_f32(bb, umbra_f32_from_i32(bb, gi), inv255);
-    umbra_v16 sg  = umbra_f16_from_f32(bb, gf);
+    umbra_v32 sh8 = umbra_imm_32(bb, 8),
+              gi  = umbra_and_32(bb, umbra_shr_u32(bb, src, sh8), mask8),
+              gf  = umbra_mul_f32(bb, umbra_f32_from_i32(bb, gi), inv255);
+    umbra_v16 sg = umbra_f16_from_f32(bb, gf);
 
-    umbra_v32 sh16 = umbra_imm_32(bb, 16);
-    umbra_v32 bi   = umbra_and_32(bb, umbra_shr_u32(bb, src, sh16), mask8);
-    umbra_v32 bf   = umbra_mul_f32(bb, umbra_f32_from_i32(bb, bi), inv255);
-    umbra_v16 sb   = umbra_f16_from_f32(bb, bf);
+    umbra_v32 sh16 = umbra_imm_32(bb, 16),
+              bi   = umbra_and_32(bb, umbra_shr_u32(bb, src, sh16), mask8),
+              bf   = umbra_mul_f32(bb, umbra_f32_from_i32(bb, bi), inv255);
+    umbra_v16 sb = umbra_f16_from_f32(bb, bf);
 
-    umbra_v32 sh24 = umbra_imm_32(bb, 24);
-    umbra_v32 ai   = umbra_and_32(bb, umbra_shr_u32(bb, src, sh24), mask8);
-    umbra_v32 af   = umbra_mul_f32(bb, umbra_f32_from_i32(bb, ai), inv255);
-    umbra_v16 sa   = umbra_f16_from_f32(bb, af);
-
-    umbra_v16 dr = umbra_load_16(bb, (umbra_ptr){1}, ix);
-    umbra_v16 dg = umbra_load_16(bb, (umbra_ptr){2}, ix);
-    umbra_v16 db = umbra_load_16(bb, (umbra_ptr){3}, ix);
-    umbra_v16 da = umbra_load_16(bb, (umbra_ptr){4}, ix);
-
-    umbra_v16 one   = umbra_imm_16(bb, 0x3C00);
-    umbra_v16 inv_a = umbra_sub_f16(bb, one, sa);
-
-    umbra_v16 rout = umbra_add_f16(bb, sr, umbra_mul_f16(bb, dr, inv_a));
-    umbra_v16 gout = umbra_add_f16(bb, sg, umbra_mul_f16(bb, dg, inv_a));
-    umbra_v16 bout = umbra_add_f16(bb, sb, umbra_mul_f16(bb, db, inv_a));
-    umbra_v16 aout = umbra_add_f16(bb, sa, umbra_mul_f16(bb, da, inv_a));
+    umbra_v32 sh24 = umbra_imm_32(bb, 24),
+              ai   = umbra_and_32(bb, umbra_shr_u32(bb, src, sh24), mask8),
+              af   = umbra_mul_f32(bb, umbra_f32_from_i32(bb, ai), inv255);
+    umbra_v16 sa    = umbra_f16_from_f32(bb, af),
+              dr    = umbra_load_16(bb, (umbra_ptr){1}, ix),
+              dg    = umbra_load_16(bb, (umbra_ptr){2}, ix),
+              db    = umbra_load_16(bb, (umbra_ptr){3}, ix),
+              da    = umbra_load_16(bb, (umbra_ptr){4}, ix),
+              one   = umbra_imm_16(bb, 0x3c00),
+              inv_a = umbra_sub_f16(bb, one, sa),
+              rout  = umbra_add_f16(bb, sr, umbra_mul_f16(bb, dr, inv_a)),
+              gout  = umbra_add_f16(bb, sg, umbra_mul_f16(bb, dg, inv_a)),
+              bout  = umbra_add_f16(bb, sb, umbra_mul_f16(bb, db, inv_a)),
+              aout  = umbra_add_f16(bb, sa, umbra_mul_f16(bb, da, inv_a));
 
     umbra_store_16(bb, (umbra_ptr){1}, ix, rout);
     umbra_store_16(bb, (umbra_ptr){2}, ix, gout);
@@ -721,10 +715,10 @@ static void test_srcover(void) {
     umbra_basic_block_free(bb);
 
     uint32_t src_px[] = {0x80402010u, 0x80402010u, 0x80402010u};
-    __fp16 dst_r[] = {0.5, 0.5, 0.5};
-    __fp16 dst_g[] = {0.5, 0.5, 0.5};
-    __fp16 dst_b[] = {0.5, 0.5, 0.5};
-    __fp16 dst_a[] = {0.5, 0.5, 0.5};
+    __fp16 dst_r[] = {0.5, 0.5, 0.5},
+           dst_g[] = {0.5, 0.5, 0.5},
+           dst_b[] = {0.5, 0.5, 0.5},
+           dst_a[] = {0.5, 0.5, 0.5};
 
     umbra_interpreter_run(p, 3, (void*[]){src_px, dst_r, dst_g, dst_b, dst_a});
 

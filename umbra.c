@@ -27,12 +27,11 @@ typedef union {
 } val;
 
 struct inst;
-typedef int (*Fn)(struct inst const *ip,
-                  val *v, int end, void* ptr[]);
+typedef int (*Fn)(struct inst const *ip, val *v, int end, void* ptr[]);
 struct inst {
-    Fn     fn;
-    int    x,y,z;
-    int    :32;
+    Fn  fn;
+    int x,y,z;
+    int :32;
 };
 
 struct umbra_interpreter {
@@ -600,8 +599,8 @@ static int umbra_optimize(struct umbra_inst inst[], int insts) {
                     else { reduced = 0; }
                     break;
                 case op_mul_f16:
-                    if      (imm16_is(inst, y, 0x3C00)) { inst[i] = inst[x]; }
-                    else if (imm16_is(inst, x, 0x3C00)) { inst[i] = inst[y]; }
+                    if      (imm16_is(inst, y, 0x3c00)) { inst[i] = inst[x]; }
+                    else if (imm16_is(inst, x, 0x3c00)) { inst[i] = inst[y]; }
                     else { reduced = 0; }
                     break;
 
@@ -632,7 +631,7 @@ static int umbra_optimize(struct umbra_inst inst[], int insts) {
                     else { reduced = 0; }
                     break;
                 case op_div_f16:
-                    if (imm16_is(inst, y, 0x3C00)) { inst[i] = inst[x]; }
+                    if (imm16_is(inst, y, 0x3c00)) { inst[i] = inst[x]; }
                     else { reduced = 0; }
                     break;
 
@@ -716,10 +715,10 @@ static int umbra_optimize(struct umbra_inst inst[], int insts) {
                 case op_fma_f16:
                     if (imm16_is(inst, z, 0)) {
                         inst[i].op = op_mul_f16; inst[i].z = 0;
-                    } else if (imm16_is(inst, x, 0x3C00)) {
+                    } else if (imm16_is(inst, x, 0x3c00)) {
                         inst[i].op = op_add_f16;
                         inst[i].x = y; inst[i].y = z; inst[i].z = 0;
-                    } else if (imm16_is(inst, y, 0x3C00)) {
+                    } else if (imm16_is(inst, y, 0x3c00)) {
                         inst[i].op = op_add_f16; inst[i].y = z; inst[i].z = 0;
                     } else { reduced = 0; }
                     break;
@@ -1340,13 +1339,13 @@ umbra_v16 umbra_sub_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) 
 }
 
 umbra_v16 umbra_mul_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
-    if (bb_is_imm16(bb, b.id, 0x3C00)) { return a; }
-    if (bb_is_imm16(bb, a.id, 0x3C00)) { return b; }
+    if (bb_is_imm16(bb, b.id, 0x3c00)) { return a; }
+    if (bb_is_imm16(bb, a.id, 0x3c00)) { return b; }
     return (umbra_v16){bb_binop(bb, op_mul_f16, a.id, b.id)};
 }
 
 umbra_v16 umbra_div_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
-    if (bb_is_imm16(bb, b.id, 0x3C00)) { return a; }
+    if (bb_is_imm16(bb, b.id, 0x3c00)) { return a; }
     return (umbra_v16){bb_binop(bb, op_div_f16, a.id, b.id)};
 }
 
