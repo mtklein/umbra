@@ -77,6 +77,25 @@ static double bench(struct umbra_interpreter *p, int pixel_n, void *ptrs[]) {
     }
 }
 
+static double bench_build(void) {
+    struct umbra_interpreter *p = build_srcover();
+    umbra_interpreter_free(p);
+
+    int iters = 1;
+    for (;;) {
+        double const start = now();
+        for (int i = 0; i < iters; i++) {
+            p = build_srcover();
+            umbra_interpreter_free(p);
+        }
+        double const elapsed = now() - start;
+        if (elapsed >= 0.5) {
+            return elapsed / (double)iters * 1e9;
+        }
+        iters *= 2;
+    }
+}
+
 int main(int argc, char *argv[]) {
     int pixel_n = 4096;
     if (argc > 1) {
@@ -99,9 +118,11 @@ int main(int argc, char *argv[]) {
     }
 
     void *ptrs[] = {src, dr, dg, db, da};
+    double const build_ns = bench_build();
     double const ns = bench(p, pixel_n, ptrs);
 
-    printf("SrcOver 8888->fp16, %d pixels: %.2f ns/pixel\n", pixel_n, ns);
+    printf("SrcOver 8888->fp16: %.0f ns/build, %.2f ns/pixel (%d pixels)\n",
+           build_ns, ns, pixel_n);
 
     umbra_interpreter_free(p);
     free(src); free(dr); free(dg); free(db); free(da);

@@ -139,13 +139,13 @@ op(i32_from_f32) { v->i32 = cast(I32, v[ip->x].f32); next; }
 
     #pragma clang diagnostic push
     #pragma clang diagnostic ignored "-Wfloat-equal"
-    op(eq_f16) { v->i16 = (I16)(v[ip->x].f16 == v[ip->y].f16); next; }
-    op(ne_f16) { v->i16 = (I16)(v[ip->x].f16 != v[ip->y].f16); next; }
+    op(eq_f16) { v->i16 = v[ip->x].f16 == v[ip->y].f16; next; }
+    op(ne_f16) { v->i16 = v[ip->x].f16 != v[ip->y].f16; next; }
     #pragma clang diagnostic pop
-    op(lt_f16) { v->i16 = (I16)(v[ip->x].f16 <  v[ip->y].f16); next; }
-    op(le_f16) { v->i16 = (I16)(v[ip->x].f16 <= v[ip->y].f16); next; }
-    op(gt_f16) { v->i16 = (I16)(v[ip->x].f16 >  v[ip->y].f16); next; }
-    op(ge_f16) { v->i16 = (I16)(v[ip->x].f16 >= v[ip->y].f16); next; }
+    op(lt_f16) { v->i16 = v[ip->x].f16 <  v[ip->y].f16; next; }
+    op(le_f16) { v->i16 = v[ip->x].f16 <= v[ip->y].f16; next; }
+    op(gt_f16) { v->i16 = v[ip->x].f16 >  v[ip->y].f16; next; }
+    op(ge_f16) { v->i16 = v[ip->x].f16 >= v[ip->y].f16; next; }
 
 #else
 
@@ -240,17 +240,13 @@ op(i32_from_f32) { v->i32 = cast(I32, v[ip->x].f32); next; }
 
     #pragma clang diagnostic push
     #pragma clang diagnostic ignored "-Wfloat-equal"
-    #define a f16_to_f32(v[ip->x].u16)
-    #define b f16_to_f32(v[ip->y].u16)
-    op(eq_f16) { v->i16 = cast(I16, (I32)(a == b)); next; }
-    op(ne_f16) { v->i16 = cast(I16, (I32)(a != b)); next; }
+    op(eq_f16) { v->i16 = cast(I16, f16_to_f32(v[ip->x].u16) == f16_to_f32(v[ip->y].u16)); next; }
+    op(ne_f16) { v->i16 = cast(I16, f16_to_f32(v[ip->x].u16) != f16_to_f32(v[ip->y].u16)); next; }
     #pragma clang diagnostic pop
-    op(lt_f16) { v->i16 = cast(I16, (I32)(a <  b)); next; }
-    op(le_f16) { v->i16 = cast(I16, (I32)(a <= b)); next; }
-    op(gt_f16) { v->i16 = cast(I16, (I32)(a >  b)); next; }
-    op(ge_f16) { v->i16 = cast(I16, (I32)(a >= b)); next; }
-    #undef a
-    #undef b
+    op(lt_f16) { v->i16 = cast(I16, f16_to_f32(v[ip->x].u16) <  f16_to_f32(v[ip->y].u16)); next; }
+    op(le_f16) { v->i16 = cast(I16, f16_to_f32(v[ip->x].u16) <= f16_to_f32(v[ip->y].u16)); next; }
+    op(gt_f16) { v->i16 = cast(I16, f16_to_f32(v[ip->x].u16) >  f16_to_f32(v[ip->y].u16)); next; }
+    op(ge_f16) { v->i16 = cast(I16, f16_to_f32(v[ip->x].u16) >= f16_to_f32(v[ip->y].u16)); next; }
 #endif
 
 op( add_f32) { v->f32 = v[ip->x].f32 + v[ip->y].f32               ; next; }
@@ -287,8 +283,8 @@ op(sel_16) {
     next;
 }
 
-op( eq_i16) { v->i16 = (I16)(v[ip->x].i16 == v[ip->y].i16); next; }
-op( ne_i16) { v->i16 = (I16)(v[ip->x].i16 != v[ip->y].i16); next; }
+op(eq_i16) { v->i16 = (I16)(v[ip->x].i16 == v[ip->y].i16); next; }
+op(ne_i16) { v->i16 = (I16)(v[ip->x].i16 != v[ip->y].i16); next; }
 op(lt_s16) { v->i16 = (I16)(v[ip->x].i16 <  v[ip->y].i16); next; }
 op(le_s16) { v->i16 = (I16)(v[ip->x].i16 <= v[ip->y].i16); next; }
 op(gt_s16) { v->i16 = (I16)(v[ip->x].i16 >  v[ip->y].i16); next; }
@@ -313,8 +309,8 @@ op(sel_32) {
     next;
 }
 
-op( eq_i32) { v->i32 = (I32)(v[ip->x].i32 == v[ip->y].i32); next; }
-op( ne_i32) { v->i32 = (I32)(v[ip->x].i32 != v[ip->y].i32); next; }
+op(eq_i32) { v->i32 = (I32)(v[ip->x].i32 == v[ip->y].i32); next; }
+op(ne_i32) { v->i32 = (I32)(v[ip->x].i32 != v[ip->y].i32); next; }
 op(lt_s32) { v->i32 = (I32)(v[ip->x].i32 <  v[ip->y].i32); next; }
 op(le_s32) { v->i32 = (I32)(v[ip->x].i32 <= v[ip->y].i32); next; }
 op(gt_s32) { v->i32 = (I32)(v[ip->x].i32 >  v[ip->y].i32); next; }
@@ -363,10 +359,6 @@ struct bb_inst {
     int     x,y,z;
     union { int ptr; int immi; float immf; };
 };
-
-static struct umbra_interpreter* interp_from_inst(struct bb_inst const[], int);
-static void interp_run(struct umbra_interpreter*, int, void*[]);
-static void interp_free(struct umbra_interpreter*);
 
 
 static _Bool is_store(enum op op) {
@@ -428,88 +420,6 @@ static uint32_t fnv1a(void const *data, int len) {
     return h;
 }
 
-static int umbra_optimize(struct bb_inst inst[], int insts) {
-    // 1. DCE + compaction.
-    int *uses = calloc((size_t)insts, sizeof *uses);
-    for (int i = 0; i < insts; i++) {
-        int const ar = arity(inst[i].op);
-        if (is_store(inst[i].op)) { uses[i]++; }
-        if (ar >= 1) { uses[inst[i].x]++; }
-        if (ar >= 2) { uses[inst[i].y]++; }
-        if (ar >= 3) { uses[inst[i].z]++; }
-    }
-    for (int i = insts; i --> 0;) {
-        if (uses[i] == 0 && !is_store(inst[i].op)) {
-            int const ar = arity(inst[i].op);
-            if (ar >= 1) { uses[inst[i].x]--; }
-            if (ar >= 2) { uses[inst[i].y]--; }
-            if (ar >= 3) { uses[inst[i].z]--; }
-        }
-    }
-
-    int *newix = calloc((size_t)insts, sizeof *newix);
-    int live = 0;
-    for (int i = 0; i < insts; i++) {
-        if (uses[i] > 0 || is_store(inst[i].op)) {
-            newix[i] = live++;
-        }
-    }
-    live = 0;
-    for (int i = 0; i < insts; i++) {
-        if (uses[i] == 0 && !is_store(inst[i].op)) { continue; }
-        inst[live] = inst[i];
-        inst[live].x = newix[inst[i].x];
-        inst[live].y = newix[inst[i].y];
-        inst[live].z = newix[inst[i].z];
-        live++;
-    }
-    free(newix);
-    free(uses);
-
-    // 2. Loop invariant hoisting: stable partition uniforms before varyings.
-    {
-        _Bool *varying = calloc((size_t)live, sizeof *varying);
-        for (int i = 0; i < live; i++) {
-            if (inst[i].op == op_lane) { varying[i] = 1; continue; }
-            if (is_store(inst[i].op))     { varying[i] = 1; continue; }
-            if (inst[i].op == op_load_16 || inst[i].op == op_load_32) {
-                varying[i] = varying[inst[i].x];
-                continue;
-            }
-            int const ar = arity(inst[i].op);
-            if (ar >= 1 && varying[inst[i].x]) { varying[i] = 1; }
-            if (ar >= 2 && varying[inst[i].y]) { varying[i] = 1; }
-            if (ar >= 3 && varying[inst[i].z]) { varying[i] = 1; }
-        }
-
-        int *order = malloc((size_t)live * sizeof *order);
-        int *back  = malloc((size_t)live * sizeof *back);
-        int j = 0;
-        for (int i = 0; i < live; i++) {
-            if (!varying[i]) { back[j]=i; order[i]=j; j++; }
-        }
-        for (int i = 0; i < live; i++) {
-            if ( varying[i]) { back[j]=i; order[i]=j; j++; }
-        }
-
-        struct bb_inst *tmp = malloc((size_t)live * sizeof *tmp);
-        for (int i = 0; i < live; i++) {
-            tmp[i] = inst[back[i]];
-            int const ar = arity(tmp[i].op);
-            if (ar >= 1) { tmp[i].x = order[inst[back[i]].x]; }
-            if (ar >= 2) { tmp[i].y = order[inst[back[i]].y]; }
-            if (ar >= 3) { tmp[i].z = order[inst[back[i]].z]; }
-        }
-        __builtin_memcpy(inst, tmp, (size_t)live * sizeof *inst);
-        free(tmp);
-        free(back);
-        free(order);
-        free(varying);
-    }
-
-    return live;
-}
-
 static Fn const fn[] = {
     [op_add_f16] =  add_f16, [op_sub_f16] =  sub_f16,
     [op_mul_f16] =  mul_f16, [op_div_f16] =  div_f16,
@@ -561,27 +471,8 @@ static Fn const fn[] = {
     [op_gt_u32] = gt_u32, [op_ge_u32] = ge_u32,
 };
 
-static struct umbra_interpreter* interp_from_inst(struct bb_inst const inst[], int insts) {
-    // Find the split point P: number of leading uniform (non-varying) instructions.
-    int P = 0;
-    {
-        _Bool *varying = calloc((size_t)insts, sizeof *varying);
-        for (int i = 0; i < insts; i++) {
-            if (inst[i].op == op_lane) { varying[i] = 1; }
-            else if (is_store(inst[i].op)) { varying[i] = 1; }
-            else if (inst[i].op == op_load_16 || inst[i].op == op_load_32) {
-                varying[i] = varying[inst[i].x];
-            } else {
-                int const ar = arity(inst[i].op);
-                if (ar >= 1 && varying[inst[i].x]) { varying[i] = 1; }
-                if (ar >= 2 && varying[inst[i].y]) { varying[i] = 1; }
-                if (ar >= 3 && varying[inst[i].z]) { varying[i] = 1; }
-            }
-        }
-        while (P < insts && !varying[P]) { P++; }
-        free(varying);
-    }
-
+static struct umbra_interpreter* interp_from_bb_insts(struct bb_inst const inst[], int insts,
+                                                      int preamble) {
     int const total = insts + 1;
     struct umbra_interpreter *p = malloc(sizeof *p);
     p->inst = malloc((size_t)total * sizeof *p->inst);
@@ -639,24 +530,8 @@ static struct umbra_interpreter* interp_from_inst(struct bb_inst const inst[], i
     }
     #undef emit
     p->inst[insts] = (struct interp_inst){.fn=done};
-    p->preamble = P;
+    p->preamble = preamble;
     return p;
-}
-
-static void interp_run(struct umbra_interpreter *p, int n, void *ptr[]) {
-    struct interp_inst const *start = p->inst;
-    val                      *v     = p->v;
-    int const P = p->preamble;
-
-    int i = 0;
-    while (i+K <= n) { start->fn(start,v,i+K,ptr); i+= K; start = p->inst+P; v = p->v+P; }
-    while (i+1 <= n) { start->fn(start,v,i+1,ptr); i+= 1; start = p->inst+P; v = p->v+P; }
-}
-
-static void interp_free(struct umbra_interpreter *p) {
-    free(p->inst);
-    free(p->v);
-    free(p);
 }
 
 // ── basic block builder ──────────────────────────────────────────────
@@ -667,38 +542,35 @@ struct umbra_basic_block {
     int             insts, ht_mask;
 };
 
-// Grow inst[] and ht[] when insts is zero or a power of two.
-// Capacity goes 0,1,2,4,8,...; ht is always 2x inst capacity.
-static void bb_grow(struct umbra_basic_block *bb) {
-    if (__builtin_popcount((unsigned)bb->insts) > 1) { return; }
-    int inst_cap = bb->insts ? bb->insts * 2 : 1,
-         ht_cap  = inst_cap * 2;
-    bb->inst = realloc(bb->inst, (size_t)inst_cap * sizeof *bb->inst);
-    bb->ht   = realloc(bb->ht,   (size_t) ht_cap  * sizeof *bb->ht);
-    for (int i = 0; i < ht_cap; i++) { bb->ht[i] = -1; }
-    bb->ht_mask = ht_cap - 1;
-    for (int i = 0; i < bb->insts; i++) {
-        if (is_store(bb->inst[i].op)) { continue; }
-        struct { enum op op; int x, y, z, immi; } key = {
-            bb->inst[i].op,
-            bb->inst[i].x ? i + bb->inst[i].x : 0,
-            bb->inst[i].y ? i + bb->inst[i].y : 0,
-            bb->inst[i].z ? i + bb->inst[i].z : 0,
-            bb->inst[i].immi,
-        };
-        uint32_t h = fnv1a(&key, sizeof key);
-        for (;;) {
-            int slot = (int)(h & (uint32_t)bb->ht_mask);
-            if (bb->ht[slot] < 0) { bb->ht[slot] = i; break; }
-            h++;
-        }
-    }
-}
-
 // Push a pre-filled instruction. Returns its absolute index.
 // Stores skip dedup. Others get deduped via hash table.
 static int bb_push(struct umbra_basic_block *bb, struct bb_inst inst) {
-    bb_grow(bb);
+    // Grow inst[] and ht[] when insts is zero or a power of two.
+    // Capacity goes 0,1,2,4,8,...; ht is always 2x inst capacity.
+    if (__builtin_popcount((unsigned)bb->insts) < 2) {
+        int inst_cap = bb->insts ? bb->insts * 2 : 1,
+             ht_cap  = inst_cap * 2;
+        bb->inst = realloc(bb->inst, (size_t)inst_cap * sizeof *bb->inst);
+        bb->ht   = realloc(bb->ht,   (size_t) ht_cap  * sizeof *bb->ht);
+        for (int i = 0; i < ht_cap; i++) { bb->ht[i] = -1; }
+        bb->ht_mask = ht_cap - 1;
+        for (int i = 0; i < bb->insts; i++) {
+            if (is_store(bb->inst[i].op)) { continue; }
+            struct { enum op op; int x, y, z, immi; } key = {
+                bb->inst[i].op,
+                bb->inst[i].x ? i + bb->inst[i].x : 0,
+                bb->inst[i].y ? i + bb->inst[i].y : 0,
+                bb->inst[i].z ? i + bb->inst[i].z : 0,
+                bb->inst[i].immi,
+            };
+            uint32_t h = fnv1a(&key, sizeof key);
+            for (;;) {
+                int slot = (int)(h & (uint32_t)bb->ht_mask);
+                if (bb->ht[slot] < 0) { bb->ht[slot] = i; break; }
+                h++;
+            }
+        }
+    }
 
     if (is_store(inst.op)) {
         int id = bb->insts++;
@@ -819,7 +691,7 @@ static _Bool bb_is_imm(struct umbra_basic_block *bb, int id) {
     return bb->inst[id].op == op_imm_32 || bb->inst[id].op == op_imm_16;
 }
 
-// Const-prop: evaluate op(imm,...) → imm at build time.
+// Const-prop: evaluate op(imm,...) → imm at build time.  Zero mallocs.
 static int bb_constprop(struct umbra_basic_block *bb, enum op op,
                         int ax, int ay, int az) {
     int ar = arity(op);
@@ -828,36 +700,36 @@ static int bb_constprop(struct umbra_basic_block *bb, enum op op,
     if (ar >= 2 && !bb_is_imm(bb, ay)) { return -1; }
     if (ar >= 3 && !bb_is_imm(bb, az)) { return -1; }
 
-    _Bool wide = !is_16bit_result(op);
-    struct bb_inst tmp[8];
-    __builtin_memset(tmp, 0, sizeof tmp);
+    val v[4] = {0};
     int t = 0;
-    int ox = 0, oy = 0, oz = 0;
-    if (ar >= 1) { ox = t; tmp[t++] = bb->inst[ax]; }
-    if (ar >= 2) { oy = t; tmp[t++] = bb->inst[ay]; }
-    if (ar >= 3) { oz = t; tmp[t++] = bb->inst[az]; }
-    int const op_slot = t;
-    tmp[t] = (struct bb_inst){.op = op, .x = ox, .y = oy, .z = oz};
-    t++;
-    int const lane_slot = t;
-    tmp[t++].op = op_lane;
-    tmp[t].op  = wide ? op_store_32 : op_store_16;
-    tmp[t].ptr = 0;
-    tmp[t].x   = lane_slot;
-    tmp[t].y   = op_slot;
-    t++;
+    if (ar >= 1) {
+        if (bb->inst[ax].op == op_imm_16) { v[t].i16 = (I16){0} + (int16_t)bb->inst[ax].immi; }
+        else                              { v[t].i32 = (I32){0} +          bb->inst[ax].immi; }
+        t++;
+    }
+    if (ar >= 2) {
+        if (bb->inst[ay].op == op_imm_16) { v[t].i16 = (I16){0} + (int16_t)bb->inst[ay].immi; }
+        else                              { v[t].i32 = (I32){0} +          bb->inst[ay].immi; }
+        t++;
+    }
+    if (ar >= 3) {
+        if (bb->inst[az].op == op_imm_16) { v[t].i16 = (I16){0} + (int16_t)bb->inst[az].immi; }
+        else                              { v[t].i32 = (I32){0} +          bb->inst[az].immi; }
+        t++;
+    }
 
-    struct umbra_interpreter *prog = interp_from_inst(tmp, t);
-    int32_t result = 0;
-    interp_run(prog, 1, (void*[]){&result});
-    interp_free(prog);
+    struct interp_inst prog[2] = {
+        {.fn = fn[op], .x = -t, .y = ar >= 2 ? 1-t : 0, .z = ar >= 3 ? 2-t : 0},
+        {.fn = done},
+    };
+    prog[0].fn(prog, v+t, 0, NULL);
 
-    if (wide) {
+    if (!is_16bit_result(op)) {
         uint32_t bits;
-        __builtin_memcpy(&bits, &result, 4);
+        __builtin_memcpy(&bits, &v[t], 4);
         return umbra_imm_32(bb, bits).id;
     }
-    return umbra_imm_16(bb, (uint16_t)(int16_t)result).id;
+    return umbra_imm_16(bb, (uint16_t)v[t].i16[0]).id;
 }
 
 static void sort(int *a, int *b) {
@@ -1203,26 +1075,111 @@ umbra_v32 umbra_ge_u32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
 struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) {
     // Copy and convert relative → absolute.
     int insts = bb->insts;
-    struct bb_inst *copy = malloc((size_t)insts * sizeof *copy);
-    __builtin_memcpy(copy, bb->inst, (size_t)insts * sizeof *copy);
+    struct bb_inst *inst = malloc((size_t)insts * sizeof *inst);
+    __builtin_memcpy(inst, bb->inst, (size_t)insts * sizeof *inst);
     for (int i = 0; i < insts; i++) {
-        if (copy[i].x) { copy[i].x += i; }
-        if (copy[i].y) { copy[i].y += i; }
-        if (copy[i].z) { copy[i].z += i; }
+        if (inst[i].x) { inst[i].x += i; }
+        if (inst[i].y) { inst[i].y += i; }
+        if (inst[i].z) { inst[i].z += i; }
     }
 
-    // DCE + hoisting. Canonicalize/constprop/strength-reduction already done by builder.
-    int live = umbra_optimize(copy, insts);
+    // 1. DCE + compaction.
+    int *uses = calloc((size_t)insts, sizeof *uses);
+    for (int i = 0; i < insts; i++) {
+        int const ar = arity(inst[i].op);
+        if (is_store(inst[i].op)) { uses[i]++; }
+        if (ar >= 1) { uses[inst[i].x]++; }
+        if (ar >= 2) { uses[inst[i].y]++; }
+        if (ar >= 3) { uses[inst[i].z]++; }
+    }
+    for (int i = insts; i --> 0;) {
+        if (uses[i] == 0 && !is_store(inst[i].op)) {
+            int const ar = arity(inst[i].op);
+            if (ar >= 1) { uses[inst[i].x]--; }
+            if (ar >= 2) { uses[inst[i].y]--; }
+            if (ar >= 3) { uses[inst[i].z]--; }
+        }
+    }
 
-    struct umbra_interpreter *p = interp_from_inst(copy, live);
-    free(copy);
+    int *newix = calloc((size_t)insts, sizeof *newix);
+    int live = 0;
+    for (int i = 0; i < insts; i++) {
+        if (uses[i] > 0 || is_store(inst[i].op)) {
+            newix[i] = live++;
+        }
+    }
+    live = 0;
+    for (int i = 0; i < insts; i++) {
+        if (uses[i] == 0 && !is_store(inst[i].op)) { continue; }
+        inst[live] = inst[i];
+        inst[live].x = newix[inst[i].x];
+        inst[live].y = newix[inst[i].y];
+        inst[live].z = newix[inst[i].z];
+        live++;
+    }
+    free(newix);
+    free(uses);
+
+    // 2. Loop invariant hoisting: stable partition uniforms before varyings.
+    int preamble;
+    {
+        _Bool *varying = calloc((size_t)live, sizeof *varying);
+        for (int i = 0; i < live; i++) {
+            if (inst[i].op == op_lane) { varying[i] = 1; continue; }
+            if (is_store(inst[i].op))     { varying[i] = 1; continue; }
+            if (inst[i].op == op_load_16 || inst[i].op == op_load_32) {
+                varying[i] = varying[inst[i].x];
+                continue;
+            }
+            int const ar = arity(inst[i].op);
+            if (ar >= 1 && varying[inst[i].x]) { varying[i] = 1; }
+            if (ar >= 2 && varying[inst[i].y]) { varying[i] = 1; }
+            if (ar >= 3 && varying[inst[i].z]) { varying[i] = 1; }
+        }
+
+        int *order = malloc((size_t)live * sizeof *order);
+        int *back  = malloc((size_t)live * sizeof *back);
+        int j = 0;
+        for (int i = 0; i < live; i++) {
+            if (!varying[i]) { back[j]=i; order[i]=j; j++; }
+        }
+        preamble = j;
+        for (int i = 0; i < live; i++) {
+            if ( varying[i]) { back[j]=i; order[i]=j; j++; }
+        }
+
+        struct bb_inst *tmp = malloc((size_t)live * sizeof *tmp);
+        for (int i = 0; i < live; i++) {
+            tmp[i] = inst[back[i]];
+            int const ar = arity(tmp[i].op);
+            if (ar >= 1) { tmp[i].x = order[inst[back[i]].x]; }
+            if (ar >= 2) { tmp[i].y = order[inst[back[i]].y]; }
+            if (ar >= 3) { tmp[i].z = order[inst[back[i]].z]; }
+        }
+        __builtin_memcpy(inst, tmp, (size_t)live * sizeof *inst);
+        free(tmp);
+        free(back);
+        free(order);
+        free(varying);
+    }
+
+    struct umbra_interpreter *p = interp_from_bb_insts(inst, live, preamble);
+    free(inst);
     return p;
 }
 
 void umbra_interpreter_run(struct umbra_interpreter *p, int n, void *ptr[]) {
-    interp_run(p, n, ptr);
+    struct interp_inst const *start = p->inst;
+    val                      *v     = p->v;
+    int const P = p->preamble;
+
+    int i = 0;
+    while (i+K <= n) { start->fn(start,v,i+K,ptr); i+= K; start = p->inst+P; v = p->v+P; }
+    while (i+1 <= n) { start->fn(start,v,i+1,ptr); i+= 1; start = p->inst+P; v = p->v+P; }
 }
 
 void umbra_interpreter_free(struct umbra_interpreter *p) {
-    interp_free(p);
+    free(p->inst);
+    free(p->v);
+    free(p);
 }
