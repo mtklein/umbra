@@ -534,17 +534,27 @@ struct umbra_basic_block {
     int             insts, ht_mask;
 };
 
-static uint32_t fnv1a(void const *data, int len) {
-    uint32_t h = 2166136261u;
-    unsigned char const *p = data;
-    for (int i = 0; i < len; i++) {
-        h ^= p[i];
-        __builtin_mul_overflow(h, 16777619u, &h);
-    }
-    return h;
-}
+// murmur3-32, specialized for 20 bytes.
 static uint32_t bb_hash(struct bb_inst const *inst) {
-    uint32_t h = fnv1a(inst, sizeof *inst);
+    uint32_t const w[] = {
+        (uint32_t)inst->op, (uint32_t)inst->x, (uint32_t)inst->y,
+        (uint32_t)inst->z, (uint32_t)inst->immi,
+    };
+    uint32_t h = 0;
+    for (int i = 0; i < 5; i++) {
+        uint32_t k = w[i];
+        __builtin_mul_overflow(k, 0xcc9e2d51u, &k);
+        k = __builtin_rotateleft32(k, 15);
+        __builtin_mul_overflow(k, 0x1b873593u, &k);
+        h ^= k;
+        h = __builtin_rotateleft32(h, 13);
+        __builtin_mul_overflow(h, 5, &h);
+        __builtin_add_overflow(h, 0xe6546b64u, &h);
+    }
+    h ^= 20;
+    h ^= h >> 16; __builtin_mul_overflow(h, 0x85ebca6bu, &h);
+    h ^= h >> 13; __builtin_mul_overflow(h, 0xc2b2ae35u, &h);
+    h ^= h >> 16;
     return h ? h : 1;  // 0 means empty
 }
 
@@ -580,16 +590,16 @@ static int bb_push(struct umbra_basic_block *bb, struct bb_inst inst) {
         return id;
     }
 
-    uint32_t h = bb_hash(&inst);
+    uint32_t h = bb_hash(&inst), h0 = h;
     for (;;) {
         int slot = (int)(h & (uint32_t)bb->ht_mask);
         if (!bb->ht[slot].hash) {
             int id = bb->insts++;
             bb->inst[id] = inst;
-            bb->ht[slot] = (struct bb_slot){h, id};
+            bb->ht[slot] = (struct bb_slot){h0, id};
             return id;
         }
-        if (bb->ht[slot].hash == h
+        if (bb->ht[slot].hash == h0
          && __builtin_memcmp(&inst, &bb->inst[bb->ht[slot].ix], sizeof inst) == 0) {
             return bb->ht[slot].ix;
         }
