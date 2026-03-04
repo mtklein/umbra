@@ -69,6 +69,6 @@ static inline _Bool is_store(enum op op) {
     return op == op_store_16 || op == op_store_32;
 }
 
-static inline _Bool is_16bit_result(enum op op) {
+static inline _Bool is_16bit(enum op op) {
     return op & 1;
 }

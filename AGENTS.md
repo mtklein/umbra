@@ -1,3 +1,1 @@
-Use `ninja` to test.
-
-Follow existing code style and level of abstraction.
+Always use a full run of `ninja` to build and test all targets before you are done.

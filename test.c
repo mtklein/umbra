@@ -764,6 +764,33 @@ static void test_srcover(void) {
     umbra_interpreter_free(p);
 }
 
+static void test_hash_quality(void) {
+    struct umbra_basic_block *bb = umbra_basic_block();
+    enum { N = 1000 };
+    int ids[N];
+    for (int i = 0; i < N; i++) {
+        ids[i] = umbra_imm_32(bb, (uint32_t)i).id;
+    }
+    // Re-pushing should dedup to same IDs.
+    for (int i = 0; i < N; i++) {
+        (umbra_imm_32(bb, (uint32_t)i).id == ids[i]) here;
+    }
+    // Adjacent IDs should differ (no false collisions).
+    for (int i = 1; i < N; i++) {
+        (ids[i] != ids[i-1]) here;
+    }
+    // Also stress-test with computed values, not just immediates.
+    umbra_v32 ix = umbra_lane(bb),
+               x = umbra_load_32(bb, (umbra_ptr){0}, ix);
+    for (int i = 0; i < N; i++) {
+        umbra_v32 c    = umbra_imm_32(bb, (uint32_t)i);
+        umbra_v32 sum  = umbra_add_i32(bb, x, c);
+        umbra_v32 sum2 = umbra_add_i32(bb, x, c);
+        (sum.id == sum2.id) here;
+    }
+    umbra_basic_block_free(bb);
+}
+
 static void test_codegen(void) {
     // f32 add
     {
@@ -910,6 +937,7 @@ int main(void) {
     test_constprop();
     test_strength_reduction();
     test_zero_imm();
+    test_hash_quality();
     test_srcover();
     test_codegen();
     return 0;

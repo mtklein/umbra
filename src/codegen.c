@@ -147,7 +147,7 @@ struct umbra_codegen* umbra_codegen(struct umbra_basic_block const *bb) {
     for (int i = 0; i < bb->insts; i++) {
         if (!live[i] || varying[i] || is_store(bb->inst[i].op)) { continue; }
         struct bb_inst const *inst = &bb->inst[i];
-        _Bool is16 = is_16bit_result(inst->op);
+        _Bool is16 = is_16bit(inst->op);
         char const *ty = is16 ? "u16" : "u32";
 
         switch (inst->op) {
@@ -286,7 +286,7 @@ struct umbra_codegen* umbra_codegen(struct umbra_basic_block const *bb) {
     for (int i = 0; i < bb->insts; i++) {
         if (!live[i] || !varying[i]) { continue; }
         struct bb_inst const *inst = &bb->inst[i];
-        _Bool is16 = is_16bit_result(inst->op);
+        _Bool is16 = is_16bit(inst->op);
         char const *ty = is16 ? "u16" : "u32";
 
         switch (inst->op) {
