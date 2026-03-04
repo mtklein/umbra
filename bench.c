@@ -24,36 +24,36 @@ static struct umbra_basic_block* build_srcover_bb(void) {
                 inv255 = umbra_imm_32(bb, bits(1/255.0f)),
                     ri = umbra_and_32(bb, src, mask8),
                     rf = umbra_mul_f32(bb, umbra_f32_from_i32(bb, ri), inv255);
-    umbra_v16 const sr = umbra_f16_from_f32(bb, rf);
+    umbra_half const sr = umbra_half_from_f32(bb, rf);
     umbra_v32 const sh8 = umbra_imm_32(bb, 8),
                      gi = umbra_and_32(bb, umbra_shr_u32(bb, src, sh8), mask8),
                      gf = umbra_mul_f32(bb, umbra_f32_from_i32(bb, gi), inv255);
-    umbra_v16 const sg = umbra_f16_from_f32(bb, gf);
+    umbra_half const sg = umbra_half_from_f32(bb, gf);
 
     umbra_v32 const sh16 = umbra_imm_32(bb, 16),
                       bi = umbra_and_32(bb, umbra_shr_u32(bb, src, sh16), mask8),
                       bf = umbra_mul_f32(bb, umbra_f32_from_i32(bb, bi), inv255);
-    umbra_v16 const sb = umbra_f16_from_f32(bb, bf);
+    umbra_half const sb = umbra_half_from_f32(bb, bf);
 
     umbra_v32 const sh24 = umbra_imm_32(bb, 24),
                       ai = umbra_and_32(bb, umbra_shr_u32(bb, src, sh24), mask8),
                       af = umbra_mul_f32(bb, umbra_f32_from_i32(bb, ai), inv255);
-    umbra_v16 const sa = umbra_f16_from_f32(bb, af),
-                    dr = umbra_load_16(bb, (umbra_ptr){1}, ix),
-                    dg = umbra_load_16(bb, (umbra_ptr){2}, ix),
-                    db = umbra_load_16(bb, (umbra_ptr){3}, ix),
-                    da = umbra_load_16(bb, (umbra_ptr){4}, ix),
-                   one = umbra_imm_16(bb, 0x3c00),
-                 inv_a = umbra_sub_f16(bb, one, sa),
-                  rout = umbra_add_f16(bb, sr, umbra_mul_f16(bb, dr, inv_a)),
-                  gout = umbra_add_f16(bb, sg, umbra_mul_f16(bb, dg, inv_a)),
-                  bout = umbra_add_f16(bb, sb, umbra_mul_f16(bb, db, inv_a)),
-                  aout = umbra_add_f16(bb, sa, umbra_mul_f16(bb, da, inv_a));
+    umbra_half const sa = umbra_half_from_f32(bb, af),
+                    dr = umbra_load_half(bb, (umbra_ptr){1}, ix),
+                    dg = umbra_load_half(bb, (umbra_ptr){2}, ix),
+                    db = umbra_load_half(bb, (umbra_ptr){3}, ix),
+                    da = umbra_load_half(bb, (umbra_ptr){4}, ix),
+                   one = umbra_imm_half(bb, 0x3c00),
+                 inv_a = umbra_sub_half(bb, one, sa),
+                  rout = umbra_add_half(bb, sr, umbra_mul_half(bb, dr, inv_a)),
+                  gout = umbra_add_half(bb, sg, umbra_mul_half(bb, dg, inv_a)),
+                  bout = umbra_add_half(bb, sb, umbra_mul_half(bb, db, inv_a)),
+                  aout = umbra_add_half(bb, sa, umbra_mul_half(bb, da, inv_a));
 
-    umbra_store_16(bb, (umbra_ptr){1}, ix, rout);
-    umbra_store_16(bb, (umbra_ptr){2}, ix, gout);
-    umbra_store_16(bb, (umbra_ptr){3}, ix, bout);
-    umbra_store_16(bb, (umbra_ptr){4}, ix, aout);
+    umbra_store_half(bb, (umbra_ptr){1}, ix, rout);
+    umbra_store_half(bb, (umbra_ptr){2}, ix, gout);
+    umbra_store_half(bb, (umbra_ptr){3}, ix, bout);
+    umbra_store_half(bb, (umbra_ptr){4}, ix, aout);
 
     return bb;
 }

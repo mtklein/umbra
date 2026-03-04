@@ -4,8 +4,9 @@
 #include <stdlib.h>
 
 typedef struct umbra_basic_block BB;
-typedef umbra_v16 v16;
-typedef umbra_v32 v32;
+typedef umbra_v16  v16;
+typedef umbra_v32  v32;
+typedef umbra_half vh;
 
 static _Bool is_pow2        (int x) { return __builtin_popcount((unsigned)x) == 1; }
 static _Bool is_pow2_or_zero(int x) { return __builtin_popcount((unsigned)x) <= 1; }
@@ -36,17 +37,17 @@ static int const_eval(enum op op, int xb, int yb, int zb) {
         case op_sqrt_f32: return f32_bits(sqrtf(xf));
         case op_fma_f32:  return f32_bits(xf * yf + zf);
 
-        case op_add_f16:  return scalar_f32_to_f16(scalar_f16_to_f32(xh) + scalar_f16_to_f32(yh));
-        case op_sub_f16:  return scalar_f32_to_f16(scalar_f16_to_f32(xh) - scalar_f16_to_f32(yh));
-        case op_mul_f16:  return scalar_f32_to_f16(scalar_f16_to_f32(xh) * scalar_f16_to_f32(yh));
-        case op_div_f16:  return scalar_f32_to_f16(scalar_f16_to_f32(xh) / scalar_f16_to_f32(yh));
-        case op_min_f16:  return scalar_f32_to_f16(fminf(scalar_f16_to_f32(xh),
-                                                         scalar_f16_to_f32(yh)));
-        case op_max_f16:  return scalar_f32_to_f16(fmaxf(scalar_f16_to_f32(xh),
-                                                         scalar_f16_to_f32(yh)));
-        case op_sqrt_f16: return scalar_f32_to_f16(sqrtf(scalar_f16_to_f32(xh)));
-        case op_fma_f16:  return scalar_f32_to_f16(scalar_f16_to_f32(xh) * scalar_f16_to_f32(yh)
-                                                                         + scalar_f16_to_f32(zh));
+        case op_add_half:  return scalar_f32_to_f16(scalar_f16_to_f32(xh) + scalar_f16_to_f32(yh));
+        case op_sub_half:  return scalar_f32_to_f16(scalar_f16_to_f32(xh) - scalar_f16_to_f32(yh));
+        case op_mul_half:  return scalar_f32_to_f16(scalar_f16_to_f32(xh) * scalar_f16_to_f32(yh));
+        case op_div_half:  return scalar_f32_to_f16(scalar_f16_to_f32(xh) / scalar_f16_to_f32(yh));
+        case op_min_half:  return scalar_f32_to_f16(fminf(scalar_f16_to_f32(xh),
+                                                          scalar_f16_to_f32(yh)));
+        case op_max_half:  return scalar_f32_to_f16(fmaxf(scalar_f16_to_f32(xh),
+                                                          scalar_f16_to_f32(yh)));
+        case op_sqrt_half: return scalar_f32_to_f16(sqrtf(scalar_f16_to_f32(xh)));
+        case op_fma_half:  return scalar_f32_to_f16(scalar_f16_to_f32(xh) * scalar_f16_to_f32(yh)
+                                                                          + scalar_f16_to_f32(zh));
 
         case op_add_i32: return xb + yb;
         case op_sub_i32: return xb - yb;
@@ -70,8 +71,13 @@ static int const_eval(enum op op, int xb, int yb, int zb) {
         case op_xor_16:  return (uint16_t)(xh ^ yh);
         case op_sel_16:  return (uint16_t)((xh & yh) | (~xh & zh));
 
-        case op_f16_from_f32: return scalar_f32_to_f16(xf);
-        case op_f32_from_f16: return f32_bits(scalar_f16_to_f32(xh));
+        case op_and_half: return (uint16_t)(xh & yh);
+        case op_or_half:  return (uint16_t)(xh | yh);
+        case op_xor_half: return (uint16_t)(xh ^ yh);
+        case op_sel_half: return (uint16_t)((xh & yh) | (~xh & zh));
+
+        case op_half_from_f32: return scalar_f32_to_f16(xf);
+        case op_f32_from_half: return f32_bits(scalar_f16_to_f32(xh));
         case op_f32_from_i32: return f32_bits((float)xb);
         case op_i32_from_f32: return (int)xf;
 
@@ -87,13 +93,13 @@ static int const_eval(enum op op, int xb, int yb, int zb) {
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-equal"
-        case op_eq_f16: return (uint16_t)-(int)(scalar_f16_to_f32(xh) == scalar_f16_to_f32(yh));
-        case op_ne_f16: return (uint16_t)-(int)(scalar_f16_to_f32(xh) != scalar_f16_to_f32(yh));
+        case op_eq_half: return (uint16_t)-(int)(scalar_f16_to_f32(xh) == scalar_f16_to_f32(yh));
+        case op_ne_half: return (uint16_t)-(int)(scalar_f16_to_f32(xh) != scalar_f16_to_f32(yh));
 #pragma clang diagnostic pop
-        case op_lt_f16: return (uint16_t)-(int)(scalar_f16_to_f32(xh) <  scalar_f16_to_f32(yh));
-        case op_le_f16: return (uint16_t)-(int)(scalar_f16_to_f32(xh) <= scalar_f16_to_f32(yh));
-        case op_gt_f16: return (uint16_t)-(int)(scalar_f16_to_f32(xh) >  scalar_f16_to_f32(yh));
-        case op_ge_f16: return (uint16_t)-(int)(scalar_f16_to_f32(xh) >= scalar_f16_to_f32(yh));
+        case op_lt_half: return (uint16_t)-(int)(scalar_f16_to_f32(xh) <  scalar_f16_to_f32(yh));
+        case op_le_half: return (uint16_t)-(int)(scalar_f16_to_f32(xh) <= scalar_f16_to_f32(yh));
+        case op_gt_half: return (uint16_t)-(int)(scalar_f16_to_f32(xh) >  scalar_f16_to_f32(yh));
+        case op_ge_half: return (uint16_t)-(int)(scalar_f16_to_f32(xh) >= scalar_f16_to_f32(yh));
 
         case op_eq_i32: return -(int)(xb == yb);
         case op_ne_i32: return -(int)(xb != yb);
@@ -196,8 +202,9 @@ v32 umbra_lane(BB *bb) {
     return (v32){push(bb, op_lane)};
 }
 
-v16 umbra_imm_16(BB *bb, uint16_t bits) { return (v16){push(bb, op_imm_16, .imm=(int16_t)bits)}; }
-v32 umbra_imm_32(BB *bb, uint32_t bits) { return (v32){push(bb, op_imm_32, .imm=(int)    bits)}; }
+v16 umbra_imm_16  (BB *bb, uint16_t bits) { return (v16){push(bb, op_imm_16  , .imm=(int)bits)}; }
+v32 umbra_imm_32  (BB *bb, uint32_t bits) { return (v32){push(bb, op_imm_32  , .imm=(int)bits)}; }
+vh  umbra_imm_half(BB *bb, uint16_t bits) { return (vh ){push(bb, op_imm_half, .imm=(int)bits)}; }
 
 v16 umbra_load_16(BB *bb, umbra_ptr src, v32 ix) {
     return (v16){push(bb, op_load_16, .x=ix.id, .ptr=src.ix)};
@@ -205,12 +212,18 @@ v16 umbra_load_16(BB *bb, umbra_ptr src, v32 ix) {
 v32 umbra_load_32(BB *bb, umbra_ptr src, v32 ix) {
     return (v32){push(bb, op_load_32, .x=ix.id, .ptr=src.ix)};
 }
+vh umbra_load_half(BB *bb, umbra_ptr src, v32 ix) {
+    return (vh){push(bb, op_load_half, .x=ix.id, .ptr=src.ix)};
+}
 
 void umbra_store_16(BB *bb, umbra_ptr dst, v32 ix, v16 val) {
     push(bb, op_store_16, .x=ix.id, .y=val.id, .ptr=dst.ix);
 }
 void umbra_store_32(BB *bb, umbra_ptr dst, v32 ix, v32 val) {
     push(bb, op_store_32, .x=ix.id, .y=val.id, .ptr=dst.ix);
+}
+void umbra_store_half(BB *bb, umbra_ptr dst, v32 ix, vh val) {
+    push(bb, op_store_half, .x=ix.id, .y=val.id, .ptr=dst.ix);
 }
 
 static _Bool is_imm16(BB *bb, int id, int val) {
@@ -221,20 +234,25 @@ static _Bool is_imm32(BB *bb, int id, int val) {
     return bb->inst[id].op  == op_imm_32
         && bb->inst[id].imm == val;
 }
+static _Bool is_imm_half(BB *bb, int id, int val) {
+    return bb->inst[id].op  == op_imm_half
+        && bb->inst[id].imm == val;
+}
 
 static _Bool is_imm(BB *bb, int id) {
     return bb->inst[id].op == op_imm_16
-        || bb->inst[id].op == op_imm_32;
+        || bb->inst[id].op == op_imm_32
+        || bb->inst[id].op == op_imm_half;
 }
 
 static int math_(BB *bb, struct bb_inst inst) {
     if (is_imm(bb, inst.x) && is_imm(bb, inst.y) && is_imm(bb, inst.z)) {
-        int const result = const_eval(inst.op,
-                                      bb->inst[inst.x].imm,
-                                      bb->inst[inst.y].imm,
-                                      bb->inst[inst.z].imm);
-        return is_16bit(inst.op) ? umbra_imm_16(bb, (uint16_t)result).id
-                                 : umbra_imm_32(bb, (uint32_t)result).id;
+        int const result = const_eval(inst.op, bb->inst[inst.x].imm
+                                             , bb->inst[inst.y].imm
+                                             , bb->inst[inst.z].imm);
+        return op_type(inst.op) == OP_HALF ? umbra_imm_half(bb, (uint16_t)result).id
+             : op_type(inst.op) == OP_16   ? umbra_imm_16  (bb, (uint16_t)result).id
+             :                               umbra_imm_32  (bb, (uint32_t)result).id;
     }
     return push_(bb, inst);
 }
@@ -292,48 +310,48 @@ v32 umbra_sqrt_f32(BB *bb, v32 a) {
     return (v32){math(bb, op_sqrt_f32, .x=a.id)};
 }
 
-v16 umbra_add_f16(BB *bb, v16 a, v16 b) {
+vh umbra_add_half(BB *bb, vh a, vh b) {
     sort(&a.id, &b.id);
     int const x = a.id,
               y = b.id;
-    if (bb->inst[x].op == op_mul_f16) {
-        return (v16){math(bb, op_fma_f16, .x=bb->inst[x].x, .y=bb->inst[x].y, .z=y)};
+    if (bb->inst[x].op == op_mul_half) {
+        return (vh){math(bb, op_fma_half, .x=bb->inst[x].x, .y=bb->inst[x].y, .z=y)};
     }
-    if (bb->inst[y].op == op_mul_f16) {
-        return (v16){math(bb, op_fma_f16, .x=bb->inst[y].x, .y=bb->inst[y].y, .z=x)};
+    if (bb->inst[y].op == op_mul_half) {
+        return (vh){math(bb, op_fma_half, .x=bb->inst[y].x, .y=bb->inst[y].y, .z=x)};
     }
-    return (v16){math(bb, op_add_f16, .x=x, .y=y)};
+    return (vh){math(bb, op_add_half, .x=x, .y=y)};
 }
 
-v16 umbra_sub_f16(BB *bb, v16 a, v16 b) {
-    if (is_imm16(bb, b.id, 0)) { return a; }
-    return (v16){math(bb, op_sub_f16, .x=a.id, .y=b.id)};
+vh umbra_sub_half(BB *bb, vh a, vh b) {
+    if (is_imm_half(bb, b.id, 0)) { return a; }
+    return (vh){math(bb, op_sub_half, .x=a.id, .y=b.id)};
 }
 
-v16 umbra_mul_f16(BB *bb, v16 a, v16 b) {
+vh umbra_mul_half(BB *bb, vh a, vh b) {
     sort(&a.id, &b.id);
-    if (is_imm16(bb, a.id, 0x3c00)) { return b; }
-    if (is_imm16(bb, b.id, 0x3c00)) { return a; }
-    return (v16){math(bb, op_mul_f16, .x=a.id, .y=b.id)};
+    if (is_imm_half(bb, a.id, 0x3c00)) { return b; }
+    if (is_imm_half(bb, b.id, 0x3c00)) { return a; }
+    return (vh){math(bb, op_mul_half, .x=a.id, .y=b.id)};
 }
 
-v16 umbra_div_f16(BB *bb, v16 a, v16 b) {
-    if (is_imm16(bb, b.id, 0x3c00)) { return a; }
-    return (v16){math(bb, op_div_f16, .x=a.id, .y=b.id)};
+vh umbra_div_half(BB *bb, vh a, vh b) {
+    if (is_imm_half(bb, b.id, 0x3c00)) { return a; }
+    return (vh){math(bb, op_div_half, .x=a.id, .y=b.id)};
 }
 
-v16 umbra_min_f16(BB *bb, v16 a, v16 b) {
+vh umbra_min_half(BB *bb, vh a, vh b) {
     sort(&a.id, &b.id);
-    return (v16){math(bb, op_min_f16, .x=a.id, .y=b.id)};
+    return (vh){math(bb, op_min_half, .x=a.id, .y=b.id)};
 }
 
-v16 umbra_max_f16(BB *bb, v16 a, v16 b) {
+vh umbra_max_half(BB *bb, vh a, vh b) {
     sort(&a.id, &b.id);
-    return (v16){math(bb, op_max_f16, .x=a.id, .y=b.id)};
+    return (vh){math(bb, op_max_half, .x=a.id, .y=b.id)};
 }
 
-v16 umbra_sqrt_f16(BB *bb, v16 a) {
-    return (v16){math(bb, op_sqrt_f16, .x=a.id)};
+vh umbra_sqrt_half(BB *bb, vh a) {
+    return (vh){math(bb, op_sqrt_half, .x=a.id)};
 }
 
 v32 umbra_add_i32(BB *bb, v32 a, v32 b) {
@@ -482,11 +500,41 @@ v16 umbra_sel_16(BB *bb, v16 c, v16 t, v16 f) {
     return (v16){math(bb, op_sel_16, .x=c.id, .y=t.id, .z=f.id)};
 }
 
-v16 umbra_f16_from_f32(BB *bb, v32 a) {
-    return (v16){math(bb, op_f16_from_f32, .x=a.id)};
+vh umbra_and_half(BB *bb, vh a, vh b) {
+    sort(&a.id, &b.id);
+    if (is_imm_half(bb, a.id, -1)) { return b; }
+    if (is_imm_half(bb, b.id, -1)) { return a; }
+    if (is_imm_half(bb, a.id,  0)) { return a; }
+    if (is_imm_half(bb, b.id,  0)) { return b; }
+    return (vh){math(bb, op_and_half, .x=a.id, .y=b.id)};
 }
-v32 umbra_f32_from_f16(BB *bb, v16 a) {
-    return (v32){math(bb, op_f32_from_f16, .x=a.id)};
+vh umbra_or_half(BB *bb, vh a, vh b) {
+    sort(&a.id, &b.id);
+    if (is_imm_half(bb, a.id,  0)) { return b; }
+    if (is_imm_half(bb, b.id,  0)) { return a; }
+    if (is_imm_half(bb, a.id, -1)) { return a; }
+    if (is_imm_half(bb, b.id, -1)) { return b; }
+    return (vh){math(bb, op_or_half, .x=a.id, .y=b.id)};
+}
+vh umbra_xor_half(BB *bb, vh a, vh b) {
+    sort(&a.id, &b.id);
+    if (is_imm_half(bb, a.id, 0)) { return b; }
+    if (is_imm_half(bb, b.id, 0)) { return a; }
+    if (a.id == b.id) { return umbra_imm_half(bb, 0); }
+    return (vh){math(bb, op_xor_half, .x=a.id, .y=b.id)};
+}
+vh umbra_sel_half(BB *bb, vh c, vh t, vh f) {
+    if (t.id == f.id) { return t; }
+    if (is_imm_half(bb, c.id, -1)) { return t; }
+    if (is_imm_half(bb, c.id,  0)) { return f; }
+    return (vh){math(bb, op_sel_half, .x=c.id, .y=t.id, .z=f.id)};
+}
+
+vh umbra_half_from_f32(BB *bb, v32 a) {
+    return (vh){math(bb, op_half_from_f32, .x=a.id)};
+}
+v32 umbra_f32_from_half(BB *bb, vh a) {
+    return (v32){math(bb, op_f32_from_half, .x=a.id)};
 }
 v32 umbra_f32_from_i32(BB *bb, v32 a) {
     return (v32){math(bb, op_f32_from_i32, .x=a.id)};
@@ -495,18 +543,18 @@ v32 umbra_i32_from_f32(BB *bb, v32 a) {
     return (v32){math(bb, op_i32_from_f32, .x=a.id)};
 }
 
-v16 umbra_eq_f16(BB *bb, v16 a, v16 b) {
+vh umbra_eq_half(BB *bb, vh a, vh b) {
     sort(&a.id, &b.id);
-    return (v16){math(bb, op_eq_f16, .x=a.id, .y=b.id)};
+    return (vh){math(bb, op_eq_half, .x=a.id, .y=b.id)};
 }
-v16 umbra_ne_f16(BB *bb, v16 a, v16 b) {
+vh umbra_ne_half(BB *bb, vh a, vh b) {
     sort(&a.id, &b.id);
-    return (v16){math(bb, op_ne_f16, .x=a.id, .y=b.id)};
+    return (vh){math(bb, op_ne_half, .x=a.id, .y=b.id)};
 }
-v16 umbra_lt_f16(BB *bb, v16 a, v16 b) { return (v16){math(bb, op_lt_f16, .x=a.id, .y=b.id)}; }
-v16 umbra_le_f16(BB *bb, v16 a, v16 b) { return (v16){math(bb, op_le_f16, .x=a.id, .y=b.id)}; }
-v16 umbra_gt_f16(BB *bb, v16 a, v16 b) { return (v16){math(bb, op_gt_f16, .x=a.id, .y=b.id)}; }
-v16 umbra_ge_f16(BB *bb, v16 a, v16 b) { return (v16){math(bb, op_ge_f16, .x=a.id, .y=b.id)}; }
+vh umbra_lt_half(BB *bb, vh a, vh b) { return (vh){math(bb, op_lt_half, .x=a.id, .y=b.id)}; }
+vh umbra_le_half(BB *bb, vh a, vh b) { return (vh){math(bb, op_le_half, .x=a.id, .y=b.id)}; }
+vh umbra_gt_half(BB *bb, vh a, vh b) { return (vh){math(bb, op_gt_half, .x=a.id, .y=b.id)}; }
+vh umbra_ge_half(BB *bb, vh a, vh b) { return (vh){math(bb, op_ge_half, .x=a.id, .y=b.id)}; }
 
 v32 umbra_eq_f32(BB *bb, v32 a, v32 b) {
     sort(&a.id, &b.id);
