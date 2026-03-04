@@ -365,27 +365,6 @@ static _Bool is_store(enum op op) {
     return op == op_store_16 || op == op_store_32;
 }
 
-static int arity(enum op op) {
-    switch (op) {
-        case op_imm_16:
-        case op_imm_32:
-        case op_lane:
-            return 0;
-
-        case op_sqrt_f16: case op_sqrt_f32:
-        case op_f32_from_i32: case op_i32_from_f32:
-        case op_f16_from_f32: case op_f32_from_f16:
-        case op_load_16: case op_load_32:
-            return 1;
-
-        case op_fma_f16: case op_fma_f32:
-        case op_sel_16:  case op_sel_32:
-            return 3;
-
-        default:
-            return 2;
-    }
-}
 
 static _Bool is_16bit_result(enum op op) {
     switch (op) {
@@ -511,11 +490,7 @@ static struct umbra_interpreter* interp_from_bb_insts(struct bb_inst const inst[
                                          .y=Y, .z=X);
                 } break;
 
-            default: switch (arity(inst[i].op)) {
-                case 1: emit(.fn=fn[inst[i].op], .x=X);              break;
-                case 2: emit(.fn=fn[inst[i].op], .x=X, .y=Y);       break;
-                case 3: emit(.fn=fn[inst[i].op], .x=X, .y=Y, .z=Z); break;
-            }
+            default: emit(.fn=fn[inst[i].op], .x=X, .y=Y, .z=Z);
         }
     }
     #undef emit
@@ -608,7 +583,9 @@ static int bb_push(struct umbra_basic_block *bb, struct bb_inst inst) {
 }
 
 struct umbra_basic_block* umbra_basic_block(void) {
-    return calloc(1, sizeof(struct umbra_basic_block));
+    struct umbra_basic_block *bb = calloc(1, sizeof *bb);
+    bb_push(bb, (struct bb_inst){.op = op_imm_32});  // ID 0 = zero constant; unused fields point here.
+    return bb;
 }
 
 void umbra_basic_block_free(struct umbra_basic_block *bb) {
@@ -662,45 +639,23 @@ static _Bool bb_is_imm(struct umbra_basic_block *bb, int id) {
     return bb->inst[id].op == op_imm_32 || bb->inst[id].op == op_imm_16;
 }
 
-// Const-prop: evaluate op(imm,...) → imm at build time.  Zero mallocs.
 static int bb_constprop(struct umbra_basic_block *bb, enum op op,
                         int ax, int ay, int az) {
-    int ar = arity(op);
-    if (ar == 0 || is_store(op) || op == op_load_16 || op == op_load_32) { return -1; }
-    if (ar >= 1 && !bb_is_imm(bb, ax)) { return -1; }
-    if (ar >= 2 && !bb_is_imm(bb, ay)) { return -1; }
-    if (ar >= 3 && !bb_is_imm(bb, az)) { return -1; }
-
-    val v[4] = {0};
-    int t = 0;
-    if (ar >= 1) {
-        if (bb->inst[ax].op == op_imm_16) { v[t].i16 = (I16){0} + (int16_t)bb->inst[ax].immi; }
-        else                              { v[t].i32 = (I32){0} +          bb->inst[ax].immi; }
-        t++;
+    if (bb_is_imm(bb, ax) && bb_is_imm(bb, ay) && bb_is_imm(bb, az)) {
+        val v[4] = {
+            {.i32={bb->inst[ax].immi}},
+            {.i32={bb->inst[ay].immi}},
+            {.i32={bb->inst[az].immi}},
+        };
+        struct interp_inst prog[2] = {
+            {.fn = fn[op], .x = -3, .y = -2, .z = -1},
+            {.fn = done},
+        };
+        prog->fn(prog,v+3,0,NULL);
+        return is_16bit_result(op) ? umbra_imm_16(bb, v[3].u16[0]).id
+                                   : umbra_imm_32(bb, v[3].u32[0]).id;
     }
-    if (ar >= 2) {
-        if (bb->inst[ay].op == op_imm_16) { v[t].i16 = (I16){0} + (int16_t)bb->inst[ay].immi; }
-        else                              { v[t].i32 = (I32){0} +          bb->inst[ay].immi; }
-        t++;
-    }
-    if (ar >= 3) {
-        if (bb->inst[az].op == op_imm_16) { v[t].i16 = (I16){0} + (int16_t)bb->inst[az].immi; }
-        else                              { v[t].i32 = (I32){0} +          bb->inst[az].immi; }
-        t++;
-    }
-
-    struct interp_inst prog[2] = {
-        {.fn = fn[op], .x = -t, .y = ar >= 2 ? 1-t : 0, .z = ar >= 3 ? 2-t : 0},
-        {.fn = done},
-    };
-    prog[0].fn(prog, v+t, 0, NULL);
-
-    if (!is_16bit_result(op)) {
-        uint32_t bits;
-        __builtin_memcpy(&bits, &v[t], 4);
-        return umbra_imm_32(bb, bits).id;
-    }
-    return umbra_imm_16(bb, (uint16_t)v[t].i16[0]).id;
+    return -1;
 }
 
 static void sort(int *a, int *b) {
@@ -710,22 +665,22 @@ static void sort(int *a, int *b) {
 // Generic binary op builder: constprop, push.
 static int bb_binop(struct umbra_basic_block *bb, enum op op, int x, int y) {
     int cp = bb_constprop(bb, op, x, y, 0);
-    if (cp >= 0) { return cp; }
-    return bb_push(bb, (struct bb_inst){.op=op, .x=x, .y=y});
+    return cp >= 0 ? cp
+                   : bb_push(bb, (struct bb_inst){.op=op, .x=x, .y=y});
 }
 
 // Generic unary op builder.
 static int bb_unop(struct umbra_basic_block *bb, enum op op, int x) {
     int cp = bb_constprop(bb, op, x, 0, 0);
-    if (cp >= 0) { return cp; }
-    return bb_push(bb, (struct bb_inst){.op=op, .x=x});
+    return cp >= 0 ? cp
+                   : bb_push(bb, (struct bb_inst){.op=op, .x=x});
 }
 
 // Generic ternary op builder.
 static int bb_ternop(struct umbra_basic_block *bb, enum op op, int x, int y, int z) {
     int cp = bb_constprop(bb, op, x, y, z);
-    if (cp >= 0) { return cp; }
-    return bb_push(bb, (struct bb_inst){.op=op, .x=x, .y=y, .z=z});
+    return cp >= 0 ? cp
+                   : bb_push(bb, (struct bb_inst){.op=op, .x=x, .y=y, .z=z});
 }
 
 // ── f32 arithmetic ───────────────────────────────────────────────────
@@ -1044,34 +999,27 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
     struct bb_inst *inst = malloc((size_t)insts * sizeof *inst);
     __builtin_memcpy(inst, bb->inst, (size_t)insts * sizeof *inst);
 
-    // 1. DCE + compaction.
-    int *uses = calloc((size_t)insts, sizeof *uses);
+    // 1. DCE + compaction.  Walk backwards: stores are live, inputs of live instructions are live.
+    //    Unused x/y/z fields are 0 (the zero constant), so it's naturally kept alive.
+    _Bool *alive = calloc((size_t)insts, sizeof *alive);
     for (int i = 0; i < insts; i++) {
-        int const ar = arity(inst[i].op);
-        if (is_store(inst[i].op)) { uses[i]++; }
-        if (ar >= 1) { uses[inst[i].x]++; }
-        if (ar >= 2) { uses[inst[i].y]++; }
-        if (ar >= 3) { uses[inst[i].z]++; }
+        if (is_store(inst[i].op)) { alive[i] = 1; }
     }
     for (int i = insts; i --> 0;) {
-        if (uses[i] == 0 && !is_store(inst[i].op)) {
-            int const ar = arity(inst[i].op);
-            if (ar >= 1) { uses[inst[i].x]--; }
-            if (ar >= 2) { uses[inst[i].y]--; }
-            if (ar >= 3) { uses[inst[i].z]--; }
-        }
+        if (!alive[i]) { continue; }
+        alive[inst[i].x] = 1;
+        alive[inst[i].y] = 1;
+        alive[inst[i].z] = 1;
     }
 
     int *newix = calloc((size_t)insts, sizeof *newix);
     int live = 0;
     for (int i = 0; i < insts; i++) {
-        if (uses[i] > 0 || is_store(inst[i].op)) {
-            newix[i] = live++;
-        }
+        if (alive[i]) { newix[i] = live++; }
     }
     live = 0;
     for (int i = 0; i < insts; i++) {
-        if (uses[i] == 0 && !is_store(inst[i].op)) { continue; }
+        if (!alive[i]) { continue; }
         inst[live] = inst[i];
         inst[live].x = newix[inst[i].x];
         inst[live].y = newix[inst[i].y];
@@ -1079,7 +1027,7 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
         live++;
     }
     free(newix);
-    free(uses);
+    free(alive);
 
     // 2. Loop invariant hoisting: stable partition uniforms before varyings.
     int preamble;
@@ -1092,10 +1040,9 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                 varying[i] = varying[inst[i].x];
                 continue;
             }
-            int const ar = arity(inst[i].op);
-            if (ar >= 1 && varying[inst[i].x]) { varying[i] = 1; }
-            if (ar >= 2 && varying[inst[i].y]) { varying[i] = 1; }
-            if (ar >= 3 && varying[inst[i].z]) { varying[i] = 1; }
+            if (varying[inst[i].x] || varying[inst[i].y] || varying[inst[i].z]) {
+                varying[i] = 1;
+            }
         }
 
         int *order = malloc((size_t)live * sizeof *order);
@@ -1112,10 +1059,9 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
         struct bb_inst *tmp = malloc((size_t)live * sizeof *tmp);
         for (int i = 0; i < live; i++) {
             tmp[i] = inst[back[i]];
-            int const ar = arity(tmp[i].op);
-            if (ar >= 1) { tmp[i].x = order[inst[back[i]].x]; }
-            if (ar >= 2) { tmp[i].y = order[inst[back[i]].y]; }
-            if (ar >= 3) { tmp[i].z = order[inst[back[i]].z]; }
+            tmp[i].x = order[inst[back[i]].x];
+            tmp[i].y = order[inst[back[i]].y];
+            tmp[i].z = order[inst[back[i]].z];
         }
         __builtin_memcpy(inst, tmp, (size_t)live * sizeof *inst);
         free(tmp);

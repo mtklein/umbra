@@ -671,6 +671,25 @@ static void test_strength_reduction(void) {
     }
 }
 
+static void test_zero_imm(void) {
+    // imm_32(0) should dedup to the zero constant at index 0.
+    struct umbra_basic_block *bb = umbra_basic_block();
+    umbra_v32 zero = umbra_imm_32(bb, 0);
+    (zero.id == 0) here;  // deduplicates to the zero constant
+    umbra_v32 ix = umbra_lane(bb),
+               x = umbra_load_32(bb, (umbra_ptr){0}, ix),
+               r = umbra_eq_i32(bb, x, zero);
+    umbra_store_32(bb, (umbra_ptr){1}, ix, r);
+    struct umbra_interpreter *p = umbra_interpreter(bb);
+    umbra_basic_block_free(bb);
+    int a[] = {0, 1, 0}, z[3] = {0};
+    umbra_interpreter_run(p, 3, (void*[]){a, z});
+    (z[0] == -1) here;  // 0 == 0 → true
+    (z[1] ==  0) here;  // 1 == 0 → false
+    (z[2] == -1) here;  // 0 == 0 → true
+    umbra_interpreter_free(p);
+}
+
 static void test_srcover(void) {
     struct umbra_basic_block *bb = umbra_basic_block();
     umbra_v32 ix     = umbra_lane(bb),
@@ -746,6 +765,7 @@ int main(void) {
     test_dedup();
     test_constprop();
     test_strength_reduction();
+    test_zero_imm();
     test_srcover();
     return 0;
 }
