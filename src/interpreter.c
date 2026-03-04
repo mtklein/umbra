@@ -21,7 +21,7 @@ typedef union {
     I32 i32;
     U16 u16;
     U32 u32;
-#if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) || defined(__F16C__)
+#if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
     F16 f16;
 #endif
     F32 f32;
@@ -125,95 +125,113 @@ op(scatter_32) {
 op(f32_from_i32) { v->f32 = cast(F32, v[ip->x].i32); next; }
 op(i32_from_f32) { v->i32 = cast(I32, v[ip->x].f32); next; }
 
-#if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) || defined(__F16C__)
-    op(f16_from_f32) { v->f16 = cast(F16, v[ip->x].f32); next; }
-    op(f32_from_f16) { v->f32 = cast(F32, v[ip->x].f16); next; }
+#if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
+    op(half_from_f32) { v->f16 = cast(F16, v[ip->x].f32); next; }
+    op(f32_from_half) { v->f32 = cast(F32, v[ip->x].f16); next; }
 
-    op( add_f16) { v->f16 = v[ip->x].f16 + v[ip->y].f16                          ; next; }
-    op( sub_f16) { v->f16 = v[ip->x].f16 - v[ip->y].f16                          ; next; }
-    op( mul_f16) { v->f16 = v[ip->x].f16 * v[ip->y].f16                          ; next; }
-    op( div_f16) { v->f16 = v[ip->x].f16 / v[ip->y].f16                          ; next; }
-    op( fma_f16) { v->f16 = v[ip->x].f16 * v[ip->y].f16 + v[ip->z].f16           ; next; }
-    op( min_f16) { v->f16 = __builtin_elementwise_min(v[ip->x].f16, v[ip->y].f16); next; }
-    op( max_f16) { v->f16 = __builtin_elementwise_max(v[ip->x].f16, v[ip->y].f16); next; }
-    op(sqrt_f16) { v->f16 = __builtin_elementwise_sqrt(v[ip->x].f16)             ; next; }
+    op( add_half) { v->f16 = v[ip->x].f16 + v[ip->y].f16                          ; next; }
+    op( sub_half) { v->f16 = v[ip->x].f16 - v[ip->y].f16                          ; next; }
+    op( mul_half) { v->f16 = v[ip->x].f16 * v[ip->y].f16                          ; next; }
+    op( div_half) { v->f16 = v[ip->x].f16 / v[ip->y].f16                          ; next; }
+    op( fma_half) { v->f16 = v[ip->x].f16 * v[ip->y].f16 + v[ip->z].f16           ; next; }
+    op( min_half) { v->f16 = __builtin_elementwise_min(v[ip->x].f16, v[ip->y].f16); next; }
+    op( max_half) { v->f16 = __builtin_elementwise_max(v[ip->x].f16, v[ip->y].f16); next; }
+    op(sqrt_half) { v->f16 = __builtin_elementwise_sqrt(v[ip->x].f16)             ; next; }
+
+    op(and_half) { v->i16 = v[ip->x].i16 &  v[ip->y].i16; next; }
+    op( or_half) { v->i16 = v[ip->x].i16 |  v[ip->y].i16; next; }
+    op(xor_half) { v->i16 = v[ip->x].i16 ^  v[ip->y].i16; next; }
+    op(sel_half) {
+        v->i16 = ( v[ip->x].i16 & v[ip->y].i16)
+               | (~v[ip->x].i16 & v[ip->z].i16);
+        next;
+    }
 
     #pragma clang diagnostic push
     #pragma clang diagnostic ignored "-Wfloat-equal"
-    op(eq_f16) { v->i16 = v[ip->x].f16 == v[ip->y].f16; next; }
-    op(ne_f16) { v->i16 = v[ip->x].f16 != v[ip->y].f16; next; }
+    op(eq_half) { v->i16 = v[ip->x].f16 == v[ip->y].f16; next; }
+    op(ne_half) { v->i16 = v[ip->x].f16 != v[ip->y].f16; next; }
     #pragma clang diagnostic pop
-    op(lt_f16) { v->i16 = v[ip->x].f16 <  v[ip->y].f16; next; }
-    op(le_f16) { v->i16 = v[ip->x].f16 <= v[ip->y].f16; next; }
-    op(gt_f16) { v->i16 = v[ip->x].f16 >  v[ip->y].f16; next; }
-    op(ge_f16) { v->i16 = v[ip->x].f16 >= v[ip->y].f16; next; }
+    op(lt_half) { v->i16 = v[ip->x].f16 <  v[ip->y].f16; next; }
+    op(le_half) { v->i16 = v[ip->x].f16 <= v[ip->y].f16; next; }
+    op(gt_half) { v->i16 = v[ip->x].f16 >  v[ip->y].f16; next; }
+    op(ge_half) { v->i16 = v[ip->x].f16 >= v[ip->y].f16; next; }
 
 #else
 
-    static F32 f16_to_f32(U16 h) {
-        U32 const sign = cast(U32, h >> 15) << 31;
-        U32 const exp  = cast(U32, (h >> 10) & 0x1f);
-        U32 const mant = cast(U32, h & 0x3ff);
+    #if defined(__F16C__)
+        static F32 f16_to_f32(U16 h) {
+            F16 tmp; __builtin_memcpy(&tmp, &h, sizeof h);
+            return cast(F32, tmp);
+        }
+        static U16 f32_to_f16(F32 f) {
+            F16 tmp = cast(F16, f);
+            U16 result; __builtin_memcpy(&result, &tmp, sizeof tmp);
+            return result;
+        }
+    #else
+        static F32 f16_to_f32(U16 h) {
+            U32 const sign = cast(U32, h >> 15) << 31;
+            U32 const exp  = cast(U32, (h >> 10) & 0x1f);
+            U32 const mant = cast(U32, h & 0x3ff);
 
-        U32 const normal = sign | ((exp + 112) << 23) | (mant << 13);
-        U32 const zero   = sign;
-        U32 const infnan = sign | (0xffu << 23) | (mant << 13);
+            U32 const normal = sign | ((exp + 112) << 23) | (mant << 13);
+            U32 const zero   = sign;
+            U32 const infnan = sign | (0xffu << 23) | (mant << 13);
 
-        U32 const is_zero   = (U32)(exp == 0);
-        U32 const is_infnan = (U32)(exp == 31);
+            U32 const is_zero   = (U32)(exp == 0);
+            U32 const is_infnan = (U32)(exp == 31);
 
-        U32 const bits = (is_zero & zero)
-                 | (is_infnan & infnan)
-                 | (~is_zero & ~is_infnan & normal);
-        F32 result;
-        __builtin_memcpy(&result, &bits, sizeof bits);
-        return result;
+            U32 const bits = (is_zero & zero)
+                     | (is_infnan & infnan)
+                     | (~is_zero & ~is_infnan & normal);
+            F32 result;
+            __builtin_memcpy(&result, &bits, sizeof bits);
+            return result;
+        }
+
+        static U16 f32_to_f16(F32 f) {
+            U32 bits;
+            __builtin_memcpy(&bits, &f, sizeof f);
+
+            U32 const sign = (bits >> 31) << 15;
+            I32 exp  = (I32)((bits >> 23) & 0xff) - 127 + 15;
+            U32 mant = (bits >> 13) & 0x3ff;
+
+            U32 const round_bit = (bits >> 12) & 1;
+            U32 const sticky    = (U32)((bits & 0xfff) != 0);
+            mant += round_bit & (sticky | (mant & 1));
+            U32 const mant_overflow = mant >> 10;
+            exp += (I32)mant_overflow;
+            mant &= 0x3ff;
+
+            U32 const normal        = sign | (U32)((U32)exp << 10) | mant;
+            U32 const inf           = sign | 0x7c00;
+            U32 const is_overflow   = (U32)(exp >= 31);
+            U32 const is_underflow  = (U32)(exp <= 0);
+            U32 const src_exp       = (bits >> 23) & 0xff;
+            U32 const is_infnan     = (U32)(src_exp == 0xff);
+            U32 const infnan        = sign | 0x7c00 | mant;
+
+            U32 const result32 = (is_underflow & sign)
+                          | (is_overflow & ~is_infnan & inf)
+                          | (is_infnan & infnan)
+                          | (~is_underflow & ~is_overflow & ~is_infnan & normal);
+            return cast(U16, result32);
+        }
+    #endif
+
+    op(imm_half) {
+        int16_t imm = (int16_t)ip->x;
+        __fp16 h; __builtin_memcpy(&h, &imm, 2);
+        v->f32 = (F32){0} + (float)h;
+        next;
     }
 
-    static U16 f32_to_f16(F32 f) {
-        U32 bits;
-        __builtin_memcpy(&bits, &f, sizeof f);
-
-        U32 const sign = (bits >> 31) << 15;
-        I32 exp  = (I32)((bits >> 23) & 0xff) - 127 + 15;
-        U32 mant = (bits >> 13) & 0x3ff;
-
-        U32 const round_bit = (bits >> 12) & 1;
-        U32 const sticky    = (U32)((bits & 0xfff) != 0);
-        mant += round_bit & (sticky | (mant & 1));
-        U32 const mant_overflow = mant >> 10;
-        exp += (I32)mant_overflow;
-        mant &= 0x3ff;
-
-        U32 const normal        = sign | (U32)((U32)exp << 10) | mant;
-        U32 const inf           = sign | 0x7c00;
-        U32 const is_overflow   = (U32)(exp >= 31);
-        U32 const is_underflow  = (U32)(exp <= 0);
-        U32 const src_exp       = (bits >> 23) & 0xff;
-        U32 const is_infnan     = (U32)(src_exp == 0xff);
-        U32 const infnan        = sign | 0x7c00 | mant;
-
-        U32 const result32 = (is_underflow & sign)
-                      | (is_overflow & ~is_infnan & inf)
-                      | (is_infnan & infnan)
-                      | (~is_underflow & ~is_overflow & ~is_infnan & normal);
-        return cast(U16, result32);
-    }
-
-    // TODO: take a pass through here replacing uint16_t with __fp16 and fold away some of the awkwardness
-
-    static float h2f_scalar(uint16_t h) {
-        union { __fp16 h; uint16_t u; } v = {.u = h};
-        return (float)v.h;
-    }
-
-    op(imm_16_promote) { v->f32 = (F32){0} + h2f_scalar((uint16_t)ip->x); next; }
-
-    op(load_16_promote) {
-        int16_t const *src = ptr[ip->x];
+    op(load_half) {
+        __fp16 const *src = ptr[ip->x];
         if (end & (K-1)) {
-            uint16_t tmp; __builtin_memcpy(&tmp, src + end-1, 2);
-            v->f32 = (F32){0} + h2f_scalar(tmp);
+            v->f32 = (F32){0} + (float)src[end-1];
         } else {
             U16 tmp; __builtin_memcpy(&tmp, src + end-K, 2*K);
             v->f32 = f16_to_f32(tmp);
@@ -221,8 +239,8 @@ op(i32_from_f32) { v->i32 = cast(I32, v[ip->x].f32); next; }
         next;
     }
 
-    op(store_16_demote) {
-        int16_t *dst = ptr[ip->x];
+    op(store_half) {
+        __fp16 *dst = ptr[ip->x];
         if (end & (K-1)) {
             U16 tmp = f32_to_f16(v[ip->y].f32);
             __builtin_memcpy(dst + end-1, &tmp, 2);
@@ -233,24 +251,24 @@ op(i32_from_f32) { v->i32 = cast(I32, v[ip->x].f32); next; }
         next;
     }
 
-    op(uni_16_promote) {
-        uint16_t uni;
-        __builtin_memcpy(&uni, (uint16_t const*)ptr[ip->x] + ip->y, sizeof uni);
-        v->f32 = (F32){0} + h2f_scalar(uni);
+    op(uni_half) {
+        __fp16 h;
+        __builtin_memcpy(&h, (__fp16 const*)ptr[ip->x] + ip->y, sizeof h);
+        v->f32 = (F32){0} + (float)h;
         next;
     }
 
-    op(gather_16_promote) {
+    op(gather_half) {
         for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
-            uint16_t tmp;
-            __builtin_memcpy(&tmp, (char const*)ptr[ip->x] + 2*v[ip->y].i32[l], 2);
-            float f = h2f_scalar(tmp);
+            __fp16 h;
+            __builtin_memcpy(&h, (char const*)ptr[ip->x] + 2*v[ip->y].i32[l], 2);
+            float f = (float)h;
             __builtin_memcpy((char*)&v->f32 + 4*l, &f, 4);
         }
         next;
     }
 
-    op(scatter_16_demote) {
+    op(scatter_half) {
         U16 tmp = f32_to_f16(v[ip->y].f32);
         for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
             __builtin_memcpy((char*)ptr[ip->x] + 2*v[ip->z].i32[l],
@@ -259,10 +277,26 @@ op(i32_from_f32) { v->i32 = cast(I32, v[ip->x].f32); next; }
         next;
     }
 
-    // TODO: these names seem a little wrong, should be like half_from_f32 / f32_from_half,
-    // but furthermore they're such noops they shouldn't need to exist!
-    op(f16_from_f32_promote) { v->f32 = v[ip->x].f32; next; }
-    op(f32_from_f16_promote) { v->f32 = v[ip->x].f32; next; }
+    op(half_from_f32) { v->f32 = v[ip->x].f32; next; }
+    op(f32_from_half) { v->f32 = v[ip->x].f32; next; }
+
+    op( add_half) { v->f32 = v[ip->x].f32 + v[ip->y].f32               ; next; }
+    op( sub_half) { v->f32 = v[ip->x].f32 - v[ip->y].f32               ; next; }
+    op( mul_half) { v->f32 = v[ip->x].f32 * v[ip->y].f32               ; next; }
+    op( div_half) { v->f32 = v[ip->x].f32 / v[ip->y].f32               ; next; }
+    op( fma_half) { v->f32 = v[ip->x].f32 * v[ip->y].f32 + v[ip->z].f32; next; }
+    op( min_half) { v->f32 = __builtin_elementwise_min(v[ip->x].f32, v[ip->y].f32); next; }
+    op( max_half) { v->f32 = __builtin_elementwise_max(v[ip->x].f32, v[ip->y].f32); next; }
+    op(sqrt_half) { v->f32 = __builtin_elementwise_sqrt(v[ip->x].f32)             ; next; }
+
+    op(and_half) { v->u32 = v[ip->x].u32 &  v[ip->y].u32; next; }
+    op( or_half) { v->u32 = v[ip->x].u32 |  v[ip->y].u32; next; }
+    op(xor_half) { v->u32 = v[ip->x].u32 ^  v[ip->y].u32; next; }
+    op(sel_half) {
+        v->u32 = ( v[ip->x].u32 & v[ip->y].u32)
+               | (~v[ip->x].u32 & v[ip->z].u32);
+        next;
+    }
 
     #pragma clang diagnostic push
     #pragma clang diagnostic ignored "-Wfloat-equal"
@@ -390,31 +424,16 @@ static Fn const fn[] = {
     [op_lt_u32] = lt_u32, [op_le_u32] = le_u32,
     [op_gt_u32] = gt_u32, [op_ge_u32] = ge_u32,
 
-    // TODO: match more of these names up in the #if and #else branches above,
-    // so that we don't need to check the defines again here.
-#if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) || defined(__F16C__)
-    [op_half_from_f32] = f16_from_f32, [op_f32_from_half] = f32_from_f16,
-    [op_add_half] = add_f16, [op_sub_half] = sub_f16,
-    [op_mul_half] = mul_f16, [op_div_half] = div_f16,
-    [op_min_half] = min_f16, [op_max_half] = max_f16,
-    [op_sqrt_half] = sqrt_f16, [op_fma_half] = fma_f16,
-    [op_and_half] = and_16, [op_or_half]  =  or_16,
-    [op_xor_half] = xor_16, [op_sel_half] = sel_16,
-    [op_eq_half] = eq_f16, [op_ne_half] = ne_f16,
-    [op_lt_half] = lt_f16, [op_le_half] = le_f16,
-    [op_gt_half] = gt_f16, [op_ge_half] = ge_f16,
-#else
-    [op_half_from_f32] = f16_from_f32_promote, [op_f32_from_half] = f32_from_f16_promote,
-    [op_add_half] = add_f32, [op_sub_half] = sub_f32,
-    [op_mul_half] = mul_f32, [op_div_half] = div_f32,
-    [op_min_half] = min_f32, [op_max_half] = max_f32,
-    [op_sqrt_half] = sqrt_f32, [op_fma_half] = fma_f32,
-    [op_and_half] = and_32, [op_or_half]  =  or_32,
-    [op_xor_half] = xor_32, [op_sel_half] = sel_32,
+    [op_half_from_f32] = half_from_f32, [op_f32_from_half] = f32_from_half,
+    [op_add_half] =  add_half, [op_sub_half] =  sub_half,
+    [op_mul_half] =  mul_half, [op_div_half] =  div_half,
+    [op_min_half] =  min_half, [op_max_half] =  max_half,
+    [op_sqrt_half] = sqrt_half, [op_fma_half] = fma_half,
+    [op_and_half] = and_half, [op_or_half]  =  or_half,
+    [op_xor_half] = xor_half, [op_sel_half] = sel_half,
     [op_eq_half] = eq_half, [op_ne_half] = ne_half,
     [op_lt_half] = lt_half, [op_le_half] = le_half,
     [op_gt_half] = gt_half, [op_ge_half] = ge_half,
-#endif
 };
 
 struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) {
@@ -465,10 +484,10 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                     case op_imm_32: emit(.fn=imm_32, .x=inst->imm); break;
 
                     case op_imm_half:
-                    #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) || defined(__F16C__)
+                    #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
                         emit(.fn=imm_16, .x=inst->imm);
                     #else
-                        emit(.fn=imm_16_promote, .x=inst->imm);
+                        emit(.fn=imm_half, .x=inst->imm);
                     #endif
                         break;
 
@@ -483,7 +502,7 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                         } break;
 
                     case op_load_half:
-                    #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) || defined(__F16C__)
+                    #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
                         if (bb->inst[inst->x].op == op_lane) {
                             emit(.fn=load_16, .x=inst->ptr);
                         } else if (bb->inst[inst->x].op == op_imm_32) {
@@ -494,12 +513,12 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                         }
                     #else
                         if (bb->inst[inst->x].op == op_lane) {
-                            emit(.fn=load_16_promote, .x=inst->ptr);
+                            emit(.fn=load_half, .x=inst->ptr);
                         } else if (bb->inst[inst->x].op == op_imm_32) {
-                            emit(.fn=uni_16_promote, .x=inst->ptr
-                                                   , .y=bb->inst[inst->x].imm);
+                            emit(.fn=uni_half, .x=inst->ptr
+                                             , .y=bb->inst[inst->x].imm);
                         } else {
-                            emit(.fn=gather_16_promote, .x=inst->ptr, .y=X);
+                            emit(.fn=gather_half, .x=inst->ptr, .y=X);
                         }
                     #endif
                         break;
@@ -522,7 +541,7 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                         } break;
 
                     case op_store_half:
-                    #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) || defined(__F16C__)
+                    #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
                         if (bb->inst[inst->x].op == op_lane) {
                             emit(.fn=store_16, .x=inst->ptr, .y=Y);
                         } else {
@@ -530,9 +549,9 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                         }
                     #else
                         if (bb->inst[inst->x].op == op_lane) {
-                            emit(.fn=store_16_demote, .x=inst->ptr, .y=Y);
+                            emit(.fn=store_half, .x=inst->ptr, .y=Y);
                         } else {
-                            emit(.fn=scatter_16_demote, .x=inst->ptr, .y=Y, .z=X);
+                            emit(.fn=scatter_half, .x=inst->ptr, .y=Y, .z=X);
                         }
                     #endif
                         break;
@@ -543,6 +562,16 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                         } else {
                             emit(.fn=scatter_32, .x=inst->ptr, .y=Y, .z=X);
                         } break;
+
+                    case op_half_from_f32:
+                    case op_f32_from_half:
+                    #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
+                        emit(.fn=fn[inst->op], .x=X);
+                        break;
+                    #else
+                        meta[i].id = meta[inst->x].id;
+                        continue;
+                    #endif
 
                     default:
                         emit(.fn=fn[inst->op], .x=X, .y=Y, .z=Z);
