@@ -410,16 +410,6 @@ static _Bool is_16bit_result(enum op op) {
 static int f32_bits(float f) { int i; __builtin_memcpy(&i, &f, 4); return i; }
 
 
-static uint32_t fnv1a(void const *data, int len) {
-    uint32_t h = 2166136261u;
-    unsigned char const *p = data;
-    for (int i = 0; i < len; i++) {
-        h ^= p[i];
-        __builtin_mul_overflow(h, 16777619u, &h);
-    }
-    return h;
-}
-
 static Fn const fn[] = {
     [op_add_f16] =  add_f16, [op_sub_f16] =  sub_f16,
     [op_mul_f16] =  mul_f16, [op_div_f16] =  div_f16,
@@ -536,11 +526,27 @@ static struct umbra_interpreter* interp_from_bb_insts(struct bb_inst const inst[
 
 // ── basic block builder ──────────────────────────────────────────────
 
+struct bb_slot { uint32_t hash; int ix; };
+
 struct umbra_basic_block {
     struct bb_inst *inst;
-    int            *ht;
+    struct bb_slot *ht;
     int             insts, ht_mask;
 };
+
+static uint32_t fnv1a(void const *data, int len) {
+    uint32_t h = 2166136261u;
+    unsigned char const *p = data;
+    for (int i = 0; i < len; i++) {
+        h ^= p[i];
+        __builtin_mul_overflow(h, 16777619u, &h);
+    }
+    return h;
+}
+static uint32_t bb_hash(struct bb_inst const *inst) {
+    uint32_t h = fnv1a(inst, sizeof *inst);
+    return h ? h : 1;  // 0 means empty
+}
 
 // Push a pre-filled instruction (absolute indices). Returns its index.
 // Stores skip dedup. Others get deduped via hash table.
@@ -551,18 +557,21 @@ static int bb_push(struct umbra_basic_block *bb, struct bb_inst inst) {
         int inst_cap = bb->insts ? bb->insts * 2 : 1,
              ht_cap  = inst_cap * 2;
         bb->inst = realloc(bb->inst, (size_t)inst_cap * sizeof *bb->inst);
-        bb->ht   = realloc(bb->ht,   (size_t) ht_cap  * sizeof *bb->ht);
-        for (int i = 0; i < ht_cap; i++) { bb->ht[i] = -1; }
+
+        struct bb_slot *old = bb->ht;
+        int old_cap = bb->ht ? bb->ht_mask + 1 : 0;
+        bb->ht      = calloc((size_t)ht_cap, sizeof *bb->ht);
         bb->ht_mask = ht_cap - 1;
-        for (int i = 0; i < bb->insts; i++) {
-            if (is_store(bb->inst[i].op)) { continue; }
-            uint32_t h = fnv1a(&bb->inst[i], sizeof bb->inst[i]);
+        for (int i = 0; i < old_cap; i++) {
+            if (!old[i].hash) { continue; }
+            uint32_t h = old[i].hash;
             for (;;) {
                 int slot = (int)(h & (uint32_t)bb->ht_mask);
-                if (bb->ht[slot] < 0) { bb->ht[slot] = i; break; }
+                if (!bb->ht[slot].hash) { bb->ht[slot] = old[i]; break; }
                 h++;
             }
         }
+        free(old);
     }
 
     if (is_store(inst.op)) {
@@ -571,18 +580,18 @@ static int bb_push(struct umbra_basic_block *bb, struct bb_inst inst) {
         return id;
     }
 
-    uint32_t h = fnv1a(&inst, sizeof inst);
+    uint32_t h = bb_hash(&inst);
     for (;;) {
         int slot = (int)(h & (uint32_t)bb->ht_mask);
-        if (bb->ht[slot] < 0) {
+        if (!bb->ht[slot].hash) {
             int id = bb->insts++;
             bb->inst[id] = inst;
-            bb->ht[slot] = id;
+            bb->ht[slot] = (struct bb_slot){h, id};
             return id;
         }
-        int prev = bb->ht[slot];
-        if (__builtin_memcmp(&inst, &bb->inst[prev], sizeof inst) == 0) {
-            return prev;
+        if (bb->ht[slot].hash == h
+         && __builtin_memcmp(&inst, &bb->inst[bb->ht[slot].ix], sizeof inst) == 0) {
+            return bb->ht[slot].ix;
         }
         h++;
     }
