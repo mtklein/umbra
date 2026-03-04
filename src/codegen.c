@@ -73,6 +73,90 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
         }
     }
 
+    _Bool *promoted = calloc((size_t)bb->insts, 1);
+    // Forward pass: mark potential promotions.
+    for (int i = 0; i < bb->insts; i++) {
+        if (!live[i]) continue;
+        struct bb_inst const *inst = &bb->inst[i];
+        switch (inst->op) {
+            case op_load_16:      promoted[i] = 1; break;
+            case op_imm_16:       promoted[i] = 1; break;
+            case op_f16_from_f32: promoted[i] = 1; break;
+            case op_add_f16: case op_sub_f16: case op_mul_f16: case op_div_f16:
+            case op_min_f16: case op_max_f16: case op_sqrt_f16:
+                promoted[i] = promoted[inst->x] & promoted[inst->y];
+                break;
+            case op_fma_f16:
+                promoted[i] = promoted[inst->x] & promoted[inst->y] & promoted[inst->z];
+                break;
+            default: break;
+        }
+    }
+    // Backward pass: clear promotion for values consumed by i16 integer/bitwise ops.
+    for (int i = 0; i < bb->insts; i++) {
+        if (!live[i]) continue;
+        enum op op = bb->inst[i].op;
+        if (is_16bit(op) && op >= op_add_i16 && op <= op_sel_16) {
+            promoted[bb->inst[i].x] = 0;
+            promoted[bb->inst[i].y] = 0;
+            promoted[bb->inst[i].z] = 0;
+        }
+        if (op >= op_eq_i16 && op <= op_ge_u16) {
+            promoted[bb->inst[i].x] = 0;
+            promoted[bb->inst[i].y] = 0;
+        }
+    }
+    // Demand pass: only keep promotion if demanded by an f16 float op.
+    {
+        _Bool *demanded = calloc((size_t)bb->insts, 1);
+        for (int i = bb->insts; i --> 0;) {
+            if (!live[i] || !promoted[i]) continue;
+            struct bb_inst const *inst = &bb->inst[i];
+            switch (inst->op) {
+                case op_add_f16: case op_sub_f16: case op_mul_f16: case op_div_f16:
+                case op_min_f16: case op_max_f16: case op_sqrt_f16:
+                    demanded[i] = 1;
+                    demanded[inst->x] = 1;
+                    demanded[inst->y] = 1;
+                    break;
+                case op_fma_f16:
+                    demanded[i] = 1;
+                    demanded[inst->x] = 1;
+                    demanded[inst->y] = 1;
+                    demanded[inst->z] = 1;
+                    break;
+                case op_eq_f16: case op_ne_f16: case op_lt_f16: case op_le_f16:
+                case op_gt_f16: case op_ge_f16:
+                    demanded[inst->x] = 1;
+                    demanded[inst->y] = 1;
+                    break;
+                case op_f32_from_f16:
+                    if (promoted[inst->x]) demanded[inst->x] = 1;
+                    break;
+                default: break;
+            }
+        }
+        for (int i = 0; i < bb->insts; i++) {
+            if (promoted[i] && !demanded[i]) promoted[i] = 0;
+        }
+        free(demanded);
+    }
+    // Re-run forward pass to cascade cleared promotions.
+    for (int i = 0; i < bb->insts; i++) {
+        if (!live[i]) continue;
+        struct bb_inst const *inst = &bb->inst[i];
+        switch (inst->op) {
+            case op_add_f16: case op_sub_f16: case op_mul_f16: case op_div_f16:
+            case op_min_f16: case op_max_f16: case op_sqrt_f16:
+                promoted[i] &= promoted[inst->x] & promoted[inst->y];
+                break;
+            case op_fma_f16:
+                promoted[i] &= promoted[inst->x] & promoted[inst->y] & promoted[inst->z];
+                break;
+            default: break;
+        }
+    }
+
     _Bool *ptr_16 = calloc((size_t)(max_ptr + 2), 1);
     _Bool *ptr_32 = calloc((size_t)(max_ptr + 2), 1);
     for (int i = 0; i < bb->insts; i++) {
@@ -136,20 +220,49 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
     for (int i = 0; i < bb->insts; i++) {
         if (!live[i] || varying[i] || is_store(bb->inst[i].op)) { continue; }
         struct bb_inst const *inst = &bb->inst[i];
+        char const *pad = "    ";
+
+        if (promoted[i]) {
+            switch (inst->op) {
+                case op_imm_16:
+                    emit(&b, "%sfloat v%d = h2f(%u);\n", pad, i, (uint16_t)inst->imm);
+                    break;
+                case op_load_16:
+                    if (bb->inst[inst->x].op == op_imm_32) {
+                        int p = inst->ptr;
+                        _Bool mixed = ptr_32[p] && ptr_16[p];
+                        emit(&b, mixed ? "%sfloat v%d = h2f(p%d_16[%d]);\n"
+                                       : "%sfloat v%d = h2f(p%d[%d]);\n",
+                             pad, i, p, bb->inst[inst->x].imm);
+                    } break;
+                case op_add_f16:  emit(&b, "%sfloat v%d = v%d + v%d;\n",              pad, i, inst->x, inst->y); break;
+                case op_sub_f16:  emit(&b, "%sfloat v%d = v%d - v%d;\n",              pad, i, inst->x, inst->y); break;
+                case op_mul_f16:  emit(&b, "%sfloat v%d = v%d * v%d;\n",              pad, i, inst->x, inst->y); break;
+                case op_div_f16:  emit(&b, "%sfloat v%d = v%d / v%d;\n",              pad, i, inst->x, inst->y); break;
+                case op_min_f16:  emit(&b, "%sfloat v%d = fminf(v%d, v%d);\n",        pad, i, inst->x, inst->y); break;
+                case op_max_f16:  emit(&b, "%sfloat v%d = fmaxf(v%d, v%d);\n",        pad, i, inst->x, inst->y); break;
+                case op_sqrt_f16: emit(&b, "%sfloat v%d = sqrtf(v%d);\n",             pad, i, inst->x); break;
+                case op_fma_f16:  emit(&b, "%sfloat v%d = v%d * v%d + v%d;\n",        pad, i, inst->x, inst->y, inst->z); break;
+                case op_f16_from_f32: emit(&b, "%sfloat v%d = u2f(v%d);\n",           pad, i, inst->x); break;
+                default: break;
+            }
+            continue;
+        }
+
         _Bool is16 = is_16bit(inst->op);
         char const *ty = is16 ? "u16" : "u32";
 
         switch (inst->op) {
-            case op_imm_16: emit(&b, "    %s v%d = %u;\n", ty, i, (uint16_t)inst->imm); break;
-            case op_imm_32: emit(&b, "    %s v%d = %uu;\n", ty, i, (uint32_t)inst->imm); break;
+            case op_imm_16: emit(&b, "%s%s v%d = %u;\n", pad, ty, i, (uint16_t)inst->imm); break;
+            case op_imm_32: emit(&b, "%s%s v%d = %uu;\n", pad, ty, i, (uint32_t)inst->imm); break;
 
             case op_load_16:
                 if (bb->inst[inst->x].op == op_imm_32) {
                     int p = inst->ptr;
                     if (ptr_32[p] && ptr_16[p]) {
-                        emit(&b, "    u16 v%d = p%d_16[%d];\n", i, p, bb->inst[inst->x].imm);
+                        emit(&b, "%su16 v%d = p%d_16[%d];\n", pad, i, p, bb->inst[inst->x].imm);
                     } else {
-                        emit(&b, "    u16 v%d = p%d[%d];\n", i, p, bb->inst[inst->x].imm);
+                        emit(&b, "%su16 v%d = p%d[%d];\n", pad, i, p, bb->inst[inst->x].imm);
                     }
                 }
                 break;
@@ -157,15 +270,15 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
                 if (bb->inst[inst->x].op == op_imm_32) {
                     int p = inst->ptr;
                     if (ptr_32[p] && ptr_16[p]) {
-                        emit(&b, "    u32 v%d = p%d_32[%d];\n", i, p, bb->inst[inst->x].imm);
+                        emit(&b, "%su32 v%d = p%d_32[%d];\n", pad, i, p, bb->inst[inst->x].imm);
                     } else {
-                        emit(&b, "    u32 v%d = p%d[%d];\n", i, p, bb->inst[inst->x].imm);
+                        emit(&b, "%su32 v%d = p%d[%d];\n", pad, i, p, bb->inst[inst->x].imm);
                     }
                 }
                 break;
 
-            #define BINOP(OP, EXPR) case OP: emit(&b, "    %s v%d = " EXPR ";\n", ty, i, inst->x, inst->y); break;
-            #define UNOP(OP, EXPR)  case OP: emit(&b, "    %s v%d = " EXPR ";\n", ty, i, inst->x); break;
+            #define BINOP(OP, EXPR) case OP: emit(&b, "%s%s v%d = " EXPR ";\n", pad, ty, i, inst->x, inst->y); break;
+            #define UNOP(OP, EXPR)  case OP: emit(&b, "%s%s v%d = " EXPR ";\n", pad, ty, i, inst->x); break;
 
             BINOP(op_add_f32, "f2u(u2f(v%d) + u2f(v%d))")
             BINOP(op_sub_f32, "f2u(u2f(v%d) - u2f(v%d))")
@@ -204,9 +317,15 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
             BINOP(op_xor_16,  "(u16)(v%d ^ v%d)")
 
             UNOP(op_f16_from_f32, "f2h(u2f(v%d))")
-            UNOP(op_f32_from_f16, "f2u(h2f(v%d))")
             UNOP(op_f32_from_i32, "f2u((float)(s32)v%d)")
             UNOP(op_i32_from_f32, "(u32)(s32)u2f(v%d)")
+
+            case op_f32_from_f16:
+                if (promoted[inst->x])
+                    emit(&b, "%su32 v%d = f2u(v%d);\n", pad, i, inst->x);
+                else
+                    emit(&b, "%su32 v%d = f2u(h2f(v%d));\n", pad, i, inst->x);
+                break;
 
             BINOP(op_eq_f32, "(u32)-(s32)(u2f(v%d) == u2f(v%d))")
             BINOP(op_ne_f32, "(u32)-(s32)(u2f(v%d) != u2f(v%d))")
@@ -215,13 +334,21 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
             BINOP(op_gt_f32, "(u32)-(s32)(u2f(v%d) >  u2f(v%d))")
             BINOP(op_ge_f32, "(u32)-(s32)(u2f(v%d) >= u2f(v%d))")
 
-            BINOP(op_eq_f16, "(u16)-(s16)(h2f(v%d) == h2f(v%d))")
-            BINOP(op_ne_f16, "(u16)-(s16)(h2f(v%d) != h2f(v%d))")
-            BINOP(op_lt_f16, "(u16)-(s16)(h2f(v%d) <  h2f(v%d))")
-            BINOP(op_le_f16, "(u16)-(s16)(h2f(v%d) <= h2f(v%d))")
-            BINOP(op_gt_f16, "(u16)-(s16)(h2f(v%d) >  h2f(v%d))")
-            BINOP(op_ge_f16, "(u16)-(s16)(h2f(v%d) >= h2f(v%d))")
+            #undef BINOP
+            #undef UNOP
 
+            #define CMP_F16(OP, C) case OP: \
+                if (promoted[inst->x] & promoted[inst->y]) \
+                    emit(&b, "%su16 v%d = (u16)-(s16)(v%d " C " v%d);\n", pad, i, inst->x, inst->y); \
+                else \
+                    emit(&b, "%su16 v%d = (u16)-(s16)(h2f(v%d) " C " h2f(v%d));\n", pad, i, inst->x, inst->y); \
+                break;
+            CMP_F16(op_eq_f16, "==") CMP_F16(op_ne_f16, "!=")
+            CMP_F16(op_lt_f16, "<")  CMP_F16(op_le_f16, "<=")
+            CMP_F16(op_gt_f16, ">")  CMP_F16(op_ge_f16, ">=")
+            #undef CMP_F16
+
+            #define BINOP(OP, EXPR) case OP: emit(&b, "%s%s v%d = " EXPR ";\n", pad, "u32", i, inst->x, inst->y); break;
             BINOP(op_eq_i32, "(u32)-(s32)((s32)v%d == (s32)v%d)")
             BINOP(op_ne_i32, "(u32)-(s32)((s32)v%d != (s32)v%d)")
             BINOP(op_lt_s32, "(u32)-(s32)((s32)v%d <  (s32)v%d)")
@@ -232,7 +359,9 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
             BINOP(op_le_u32, "(u32)-(s32)(v%d <= v%d)")
             BINOP(op_gt_u32, "(u32)-(s32)(v%d >  v%d)")
             BINOP(op_ge_u32, "(u32)-(s32)(v%d >= v%d)")
+            #undef BINOP
 
+            #define BINOP(OP, EXPR) case OP: emit(&b, "%s%s v%d = " EXPR ";\n", pad, "u16", i, inst->x, inst->y); break;
             BINOP(op_eq_i16, "(u16)-(s16)((s16)v%d == (s16)v%d)")
             BINOP(op_ne_i16, "(u16)-(s16)((s16)v%d != (s16)v%d)")
             BINOP(op_lt_s16, "(u16)-(s16)((s16)v%d <  (s16)v%d)")
@@ -243,26 +372,27 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
             BINOP(op_le_u16, "(u16)-(s16)(v%d <= v%d)")
             BINOP(op_gt_u16, "(u16)-(s16)(v%d >  v%d)")
             BINOP(op_ge_u16, "(u16)-(s16)(v%d >= v%d)")
-
             #undef BINOP
-            #undef UNOP
 
             case op_sel_32:
-                emit(&b, "    %s v%d = (v%d & v%d) | (~v%d & v%d);\n",
-                     ty, i, inst->x, inst->y, inst->x, inst->z);
+                emit(&b, "%su32 v%d = (v%d & v%d) | (~v%d & v%d);\n",
+                     pad, i, inst->x, inst->y, inst->x, inst->z);
                 break;
             case op_sel_16:
-                emit(&b, "    %s v%d = (v%d & v%d) | (~v%d & v%d);\n",
-                     ty, i, inst->x, inst->y, inst->x, inst->z);
+                emit(&b, "%su16 v%d = (v%d & ", pad, i, inst->x);
+                emit(&b, promoted[inst->y] ? "f2h(v%d)" : "v%d", inst->y);
+                emit(&b, ") | (~v%d & ", inst->x);
+                emit(&b, promoted[inst->z] ? "f2h(v%d)" : "v%d", inst->z);
+                emit(&b, ");\n");
                 break;
 
             case op_fma_f32:
-                emit(&b, "    %s v%d = f2u(u2f(v%d) * u2f(v%d) + u2f(v%d));\n",
-                     ty, i, inst->x, inst->y, inst->z);
+                emit(&b, "%su32 v%d = f2u(u2f(v%d) * u2f(v%d) + u2f(v%d));\n",
+                     pad, i, inst->x, inst->y, inst->z);
                 break;
             case op_fma_f16:
-                emit(&b, "    %s v%d = f2h(h2f(v%d) * h2f(v%d) + h2f(v%d));\n",
-                     ty, i, inst->x, inst->y, inst->z);
+                emit(&b, "%su16 v%d = f2h(h2f(v%d) * h2f(v%d) + h2f(v%d));\n",
+                     pad, i, inst->x, inst->y, inst->z);
                 break;
 
             case op_lane: case op_store_16: case op_store_32: break;
@@ -274,84 +404,97 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
     for (int i = 0; i < bb->insts; i++) {
         if (!live[i] || !varying[i]) { continue; }
         struct bb_inst const *inst = &bb->inst[i];
+        char const *pad = "        ";
+
+        if (promoted[i]) {
+            switch (inst->op) {
+                case op_imm_16:
+                    emit(&b, "%sfloat v%d = h2f(%u);\n", pad, i, (uint16_t)inst->imm);
+                    break;
+                case op_load_16: {
+                    int p = inst->ptr;
+                    _Bool mixed = ptr_32[p] && ptr_16[p];
+                    if (bb->inst[inst->x].op == op_lane) {
+                        emit(&b, mixed ? "%sfloat v%d = h2f(p%d_16[i]);\n"
+                                       : "%sfloat v%d = h2f(p%d[i]);\n", pad, i, p);
+                    } else {
+                        emit(&b, mixed ? "%sfloat v%d = h2f(p%d_16[v%d]);\n"
+                                       : "%sfloat v%d = h2f(p%d[v%d]);\n", pad, i, p, inst->x);
+                    }
+                } break;
+                case op_add_f16:  emit(&b, "%sfloat v%d = v%d + v%d;\n",              pad, i, inst->x, inst->y); break;
+                case op_sub_f16:  emit(&b, "%sfloat v%d = v%d - v%d;\n",              pad, i, inst->x, inst->y); break;
+                case op_mul_f16:  emit(&b, "%sfloat v%d = v%d * v%d;\n",              pad, i, inst->x, inst->y); break;
+                case op_div_f16:  emit(&b, "%sfloat v%d = v%d / v%d;\n",              pad, i, inst->x, inst->y); break;
+                case op_min_f16:  emit(&b, "%sfloat v%d = fminf(v%d, v%d);\n",        pad, i, inst->x, inst->y); break;
+                case op_max_f16:  emit(&b, "%sfloat v%d = fmaxf(v%d, v%d);\n",        pad, i, inst->x, inst->y); break;
+                case op_sqrt_f16: emit(&b, "%sfloat v%d = sqrtf(v%d);\n",             pad, i, inst->x); break;
+                case op_fma_f16:  emit(&b, "%sfloat v%d = v%d * v%d + v%d;\n",        pad, i, inst->x, inst->y, inst->z); break;
+                case op_f16_from_f32: emit(&b, "%sfloat v%d = u2f(v%d);\n",           pad, i, inst->x); break;
+                default: break;
+            }
+            continue;
+        }
+
         _Bool is16 = is_16bit(inst->op);
         char const *ty = is16 ? "u16" : "u32";
 
         switch (inst->op) {
-            case op_lane: emit(&b, "        u32 v%d = (u32)i;\n", i); break;
+            case op_lane: emit(&b, "%su32 v%d = (u32)i;\n", pad, i); break;
 
             case op_load_16: {
                 int p = inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 if (bb->inst[inst->x].op == op_lane) {
-                    if (mixed) {
-                        emit(&b, "        u16 v%d = p%d_16[i];\n", i, p);
-                    } else {
-                        emit(&b, "        u16 v%d = p%d[i];\n", i, p);
-                    }
+                    emit(&b, mixed ? "%su16 v%d = p%d_16[i];\n"
+                                   : "%su16 v%d = p%d[i];\n", pad, i, p);
                 } else {
-                    if (mixed) {
-                        emit(&b, "        u16 v%d = p%d_16[v%d];\n", i, p, inst->x);
-                    } else {
-                        emit(&b, "        u16 v%d = p%d[v%d];\n", i, p, inst->x);
-                    }
+                    emit(&b, mixed ? "%su16 v%d = p%d_16[v%d];\n"
+                                   : "%su16 v%d = p%d[v%d];\n", pad, i, p, inst->x);
                 }
             } break;
             case op_load_32: {
                 int p = inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 if (bb->inst[inst->x].op == op_lane) {
-                    if (mixed) {
-                        emit(&b, "        u32 v%d = p%d_32[i];\n", i, p);
-                    } else {
-                        emit(&b, "        u32 v%d = p%d[i];\n", i, p);
-                    }
+                    emit(&b, mixed ? "%su32 v%d = p%d_32[i];\n"
+                                   : "%su32 v%d = p%d[i];\n", pad, i, p);
                 } else {
-                    if (mixed) {
-                        emit(&b, "        u32 v%d = p%d_32[v%d];\n", i, p, inst->x);
-                    } else {
-                        emit(&b, "        u32 v%d = p%d[v%d];\n", i, p, inst->x);
-                    }
+                    emit(&b, mixed ? "%su32 v%d = p%d_32[v%d];\n"
+                                   : "%su32 v%d = p%d[v%d];\n", pad, i, p, inst->x);
                 }
             } break;
 
             case op_store_16: {
                 int p = inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
+                _Bool demote = promoted[inst->y];
                 if (bb->inst[inst->x].op == op_lane) {
-                    if (mixed) {
-                        emit(&b, "        p%d_16[i] = v%d;\n", p, inst->y);
-                    } else {
-                        emit(&b, "        p%d[i] = v%d;\n", p, inst->y);
-                    }
+                    if (demote)
+                        emit(&b, mixed ? "%sp%d_16[i] = f2h(v%d);\n" : "%sp%d[i] = f2h(v%d);\n", pad, p, inst->y);
+                    else
+                        emit(&b, mixed ? "%sp%d_16[i] = v%d;\n" : "%sp%d[i] = v%d;\n", pad, p, inst->y);
                 } else {
-                    if (mixed) {
-                        emit(&b, "        p%d_16[v%d] = v%d;\n", p, inst->x, inst->y);
-                    } else {
-                        emit(&b, "        p%d[v%d] = v%d;\n", p, inst->x, inst->y);
-                    }
+                    if (demote)
+                        emit(&b, mixed ? "%sp%d_16[v%d] = f2h(v%d);\n" : "%sp%d[v%d] = f2h(v%d);\n", pad, p, inst->x, inst->y);
+                    else
+                        emit(&b, mixed ? "%sp%d_16[v%d] = v%d;\n" : "%sp%d[v%d] = v%d;\n", pad, p, inst->x, inst->y);
                 }
             } break;
             case op_store_32: {
                 int p = inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 if (bb->inst[inst->x].op == op_lane) {
-                    if (mixed) {
-                        emit(&b, "        p%d_32[i] = v%d;\n", p, inst->y);
-                    } else {
-                        emit(&b, "        p%d[i] = v%d;\n", p, inst->y);
-                    }
+                    emit(&b, mixed ? "%sp%d_32[i] = v%d;\n"
+                                   : "%sp%d[i] = v%d;\n", pad, p, inst->y);
                 } else {
-                    if (mixed) {
-                        emit(&b, "        p%d_32[v%d] = v%d;\n", p, inst->x, inst->y);
-                    } else {
-                        emit(&b, "        p%d[v%d] = v%d;\n", p, inst->x, inst->y);
-                    }
+                    emit(&b, mixed ? "%sp%d_32[v%d] = v%d;\n"
+                                   : "%sp%d[v%d] = v%d;\n", pad, p, inst->x, inst->y);
                 }
             } break;
 
-            #define BINOP(OP, EXPR) case OP: emit(&b, "        %s v%d = " EXPR ";\n", ty, i, inst->x, inst->y); break;
-            #define UNOP(OP, EXPR)  case OP: emit(&b, "        %s v%d = " EXPR ";\n", ty, i, inst->x); break;
+            #define BINOP(OP, EXPR) case OP: emit(&b, "%s%s v%d = " EXPR ";\n", pad, ty, i, inst->x, inst->y); break;
+            #define UNOP(OP, EXPR)  case OP: emit(&b, "%s%s v%d = " EXPR ";\n", pad, ty, i, inst->x); break;
 
             BINOP(op_add_f32, "f2u(u2f(v%d) + u2f(v%d))")
             BINOP(op_sub_f32, "f2u(u2f(v%d) - u2f(v%d))")
@@ -390,9 +533,15 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
             BINOP(op_xor_16,  "(u16)(v%d ^ v%d)")
 
             UNOP(op_f16_from_f32, "f2h(u2f(v%d))")
-            UNOP(op_f32_from_f16, "f2u(h2f(v%d))")
             UNOP(op_f32_from_i32, "f2u((float)(s32)v%d)")
             UNOP(op_i32_from_f32, "(u32)(s32)u2f(v%d)")
+
+            case op_f32_from_f16:
+                if (promoted[inst->x])
+                    emit(&b, "%su32 v%d = f2u(v%d);\n", pad, i, inst->x);
+                else
+                    emit(&b, "%su32 v%d = f2u(h2f(v%d));\n", pad, i, inst->x);
+                break;
 
             BINOP(op_eq_f32, "(u32)-(s32)(u2f(v%d) == u2f(v%d))")
             BINOP(op_ne_f32, "(u32)-(s32)(u2f(v%d) != u2f(v%d))")
@@ -401,13 +550,21 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
             BINOP(op_gt_f32, "(u32)-(s32)(u2f(v%d) >  u2f(v%d))")
             BINOP(op_ge_f32, "(u32)-(s32)(u2f(v%d) >= u2f(v%d))")
 
-            BINOP(op_eq_f16, "(u16)-(s16)(h2f(v%d) == h2f(v%d))")
-            BINOP(op_ne_f16, "(u16)-(s16)(h2f(v%d) != h2f(v%d))")
-            BINOP(op_lt_f16, "(u16)-(s16)(h2f(v%d) <  h2f(v%d))")
-            BINOP(op_le_f16, "(u16)-(s16)(h2f(v%d) <= h2f(v%d))")
-            BINOP(op_gt_f16, "(u16)-(s16)(h2f(v%d) >  h2f(v%d))")
-            BINOP(op_ge_f16, "(u16)-(s16)(h2f(v%d) >= h2f(v%d))")
+            #undef BINOP
+            #undef UNOP
 
+            #define CMP_F16(OP, C) case OP: \
+                if (promoted[inst->x] & promoted[inst->y]) \
+                    emit(&b, "%su16 v%d = (u16)-(s16)(v%d " C " v%d);\n", pad, i, inst->x, inst->y); \
+                else \
+                    emit(&b, "%su16 v%d = (u16)-(s16)(h2f(v%d) " C " h2f(v%d));\n", pad, i, inst->x, inst->y); \
+                break;
+            CMP_F16(op_eq_f16, "==") CMP_F16(op_ne_f16, "!=")
+            CMP_F16(op_lt_f16, "<")  CMP_F16(op_le_f16, "<=")
+            CMP_F16(op_gt_f16, ">")  CMP_F16(op_ge_f16, ">=")
+            #undef CMP_F16
+
+            #define BINOP(OP, EXPR) case OP: emit(&b, "%s%s v%d = " EXPR ";\n", pad, "u32", i, inst->x, inst->y); break;
             BINOP(op_eq_i32, "(u32)-(s32)((s32)v%d == (s32)v%d)")
             BINOP(op_ne_i32, "(u32)-(s32)((s32)v%d != (s32)v%d)")
             BINOP(op_lt_s32, "(u32)-(s32)((s32)v%d <  (s32)v%d)")
@@ -418,7 +575,9 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
             BINOP(op_le_u32, "(u32)-(s32)(v%d <= v%d)")
             BINOP(op_gt_u32, "(u32)-(s32)(v%d >  v%d)")
             BINOP(op_ge_u32, "(u32)-(s32)(v%d >= v%d)")
+            #undef BINOP
 
+            #define BINOP(OP, EXPR) case OP: emit(&b, "%s%s v%d = " EXPR ";\n", pad, "u16", i, inst->x, inst->y); break;
             BINOP(op_eq_i16, "(u16)-(s16)((s16)v%d == (s16)v%d)")
             BINOP(op_ne_i16, "(u16)-(s16)((s16)v%d != (s16)v%d)")
             BINOP(op_lt_s16, "(u16)-(s16)((s16)v%d <  (s16)v%d)")
@@ -429,33 +588,34 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
             BINOP(op_le_u16, "(u16)-(s16)(v%d <= v%d)")
             BINOP(op_gt_u16, "(u16)-(s16)(v%d >  v%d)")
             BINOP(op_ge_u16, "(u16)-(s16)(v%d >= v%d)")
-
             #undef BINOP
-            #undef UNOP
 
             case op_sel_32:
-                emit(&b, "        %s v%d = (v%d & v%d) | (~v%d & v%d);\n",
-                     ty, i, inst->x, inst->y, inst->x, inst->z);
+                emit(&b, "%su32 v%d = (v%d & v%d) | (~v%d & v%d);\n",
+                     pad, i, inst->x, inst->y, inst->x, inst->z);
                 break;
             case op_sel_16:
-                emit(&b, "        %s v%d = (v%d & v%d) | (~v%d & v%d);\n",
-                     ty, i, inst->x, inst->y, inst->x, inst->z);
+                emit(&b, "%su16 v%d = (v%d & ", pad, i, inst->x);
+                emit(&b, promoted[inst->y] ? "f2h(v%d)" : "v%d", inst->y);
+                emit(&b, ") | (~v%d & ", inst->x);
+                emit(&b, promoted[inst->z] ? "f2h(v%d)" : "v%d", inst->z);
+                emit(&b, ");\n");
                 break;
 
             case op_fma_f32:
-                emit(&b, "        %s v%d = f2u(u2f(v%d) * u2f(v%d) + u2f(v%d));\n",
-                     ty, i, inst->x, inst->y, inst->z);
+                emit(&b, "%su32 v%d = f2u(u2f(v%d) * u2f(v%d) + u2f(v%d));\n",
+                     pad, i, inst->x, inst->y, inst->z);
                 break;
             case op_fma_f16:
-                emit(&b, "        %s v%d = f2h(h2f(v%d) * h2f(v%d) + h2f(v%d));\n",
-                     ty, i, inst->x, inst->y, inst->z);
+                emit(&b, "%su16 v%d = f2h(h2f(v%d) * h2f(v%d) + h2f(v%d));\n",
+                     pad, i, inst->x, inst->y, inst->z);
                 break;
 
             case op_imm_16:
-                emit(&b, "        u16 v%d = %u;\n", i, (uint16_t)inst->imm);
+                emit(&b, "%su16 v%d = %u;\n", pad, i, (uint16_t)inst->imm);
                 break;
             case op_imm_32:
-                emit(&b, "        u32 v%d = %uu;\n", i, (uint32_t)inst->imm);
+                emit(&b, "%su32 v%d = %uu;\n", pad, i, (uint32_t)inst->imm);
                 break;
         }
     }
@@ -463,6 +623,7 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
 
     free(live);
     free(varying);
+    free(promoted);
     free(ptr_16);
     free(ptr_32);
 

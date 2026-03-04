@@ -248,6 +248,91 @@ op(i32_from_f32) { v->i32 = cast(I32, v[ip->x].f32); next; }
     op(le_f16) { v->i16 = cast(I16, f16_to_f32(v[ip->x].u16) <= f16_to_f32(v[ip->y].u16)); next; }
     op(gt_f16) { v->i16 = cast(I16, f16_to_f32(v[ip->x].u16) >  f16_to_f32(v[ip->y].u16)); next; }
     op(ge_f16) { v->i16 = cast(I16, f16_to_f32(v[ip->x].u16) >= f16_to_f32(v[ip->y].u16)); next; }
+
+    // Promoted f16 ops: values live as f32, avoiding redundant f16<->f32 round-trips.
+    static float h2f_scalar(uint16_t h) {
+        uint32_t sign=((uint32_t)h>>15)<<31, exp=((uint32_t)h>>10)&0x1f, mant=(uint32_t)h&0x3ff;
+        uint32_t normal = sign | ((exp+112)<<23) | (mant<<13);
+        uint32_t zero   = sign;
+        uint32_t infnan = sign | (0xffu<<23) | (mant<<13);
+        uint32_t is_zero   = -(uint32_t)(exp==0);
+        uint32_t is_infnan = -(uint32_t)(exp==31);
+        uint32_t bits = (is_zero&zero) | (is_infnan&infnan) | (~is_zero&~is_infnan&normal);
+        float f; __builtin_memcpy(&f, &bits, 4); return f;
+    }
+
+    op(imm_16_promote) { v->f32 = (F32){0} + h2f_scalar((uint16_t)ip->x); next; }
+
+    op(load_16_promote) {
+        int16_t const *src = ptr[ip->x];
+        if (end & (K-1)) {
+            uint16_t tmp; __builtin_memcpy(&tmp, src + end-1, 2);
+            v->f32 = (F32){0} + h2f_scalar(tmp);
+        } else {
+            U16 tmp; __builtin_memcpy(&tmp, src + end-K, 2*K);
+            v->f32 = f16_to_f32(tmp);
+        }
+        next;
+    }
+
+    op(store_16_demote) {
+        int16_t *dst = ptr[ip->x];
+        if (end & (K-1)) {
+            U16 tmp = f32_to_f16(v[ip->y].f32);
+            __builtin_memcpy(dst + end-1, &tmp, 2);
+        } else {
+            U16 tmp = f32_to_f16(v[ip->y].f32);
+            __builtin_memcpy(dst + end-K, &tmp, 2*K);
+        }
+        next;
+    }
+
+    op(uni_16_promote) {
+        uint16_t uni;
+        __builtin_memcpy(&uni, (uint16_t const*)ptr[ip->x] + ip->y, sizeof uni);
+        v->f32 = (F32){0} + h2f_scalar(uni);
+        next;
+    }
+
+    op(gather_16_promote) {
+        for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
+            uint16_t tmp;
+            __builtin_memcpy(&tmp, (char const*)ptr[ip->x] + 2*v[ip->y].i32[l], 2);
+            float f = h2f_scalar(tmp);
+            __builtin_memcpy((char*)&v->f32 + 4*l, &f, 4);
+        }
+        next;
+    }
+
+    op(scatter_16_demote) {
+        U16 tmp = f32_to_f16(v[ip->y].f32);
+        for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
+            __builtin_memcpy((char*)ptr[ip->x] + 2*v[ip->z].i32[l],
+                             (char*)&tmp + 2*l, 2);
+        }
+        next;
+    }
+
+    op(f16_from_f32_promote) { v->f32 = v[ip->x].f32; next; }
+    op(f32_from_f16_promote) { v->f32 = v[ip->x].f32; next; }
+
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wfloat-equal"
+    op(eq_f16_promote) { v->i16 = cast(I16, v[ip->x].f32 == v[ip->y].f32); next; }
+    op(ne_f16_promote) { v->i16 = cast(I16, v[ip->x].f32 != v[ip->y].f32); next; }
+    #pragma clang diagnostic pop
+    op(lt_f16_promote) { v->i16 = cast(I16, v[ip->x].f32 <  v[ip->y].f32); next; }
+    op(le_f16_promote) { v->i16 = cast(I16, v[ip->x].f32 <= v[ip->y].f32); next; }
+    op(gt_f16_promote) { v->i16 = cast(I16, v[ip->x].f32 >  v[ip->y].f32); next; }
+    op(ge_f16_promote) { v->i16 = cast(I16, v[ip->x].f32 >= v[ip->y].f32); next; }
+
+    op(sel_16_demote) {
+        // x=mask (i16), y and z may be promoted (f32) — demote them to u16
+        U16 yy = f32_to_f16(v[ip->y].f32);
+        U16 zz = f32_to_f16(v[ip->z].f32);
+        v->i16 = (cast(I16,yy) & v[ip->x].i16) | (~v[ip->x].i16 & cast(I16,zz));
+        next;
+    }
 #endif
 
 op( add_f32) { v->f32 = v[ip->x].f32 + v[ip->y].f32               ; next; }
@@ -379,7 +464,7 @@ static Fn const fn[] = {
 
 struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) {
     struct {
-        _Bool live, varying, unused[2];
+        _Bool live, varying, promoted, unused;
         int id;
     } *meta = calloc((size_t)bb->insts, sizeof *meta);
 
@@ -403,6 +488,93 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                         | meta[bb->inst[i].z].varying;
     }
 
+#if !defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) && !defined(__F16C__)
+    // Forward pass: mark potential promotions.
+    for (int i = 0; i < bb->insts; i++) {
+        if (!meta[i].live) continue;
+        struct bb_inst const *inst = &bb->inst[i];
+        switch (inst->op) {
+            case op_load_16:      meta[i].promoted = 1; break;
+            case op_imm_16:       meta[i].promoted = 1; break;
+            case op_f16_from_f32: meta[i].promoted = 1; break;
+            case op_add_f16: case op_sub_f16: case op_mul_f16: case op_div_f16:
+            case op_min_f16: case op_max_f16: case op_sqrt_f16:
+                meta[i].promoted = meta[inst->x].promoted & meta[inst->y].promoted;
+                break;
+            case op_fma_f16:
+                meta[i].promoted = meta[inst->x].promoted & meta[inst->y].promoted
+                                 & meta[inst->z].promoted;
+                break;
+            default: break;
+        }
+    }
+    // Backward pass: clear promotion for values consumed by i16 integer/bitwise ops.
+    for (int i = 0; i < bb->insts; i++) {
+        if (!meta[i].live) continue;
+        enum op op = bb->inst[i].op;
+        if (is_16bit(op) && op >= op_add_i16 && op <= op_sel_16) {
+            meta[bb->inst[i].x].promoted = 0;
+            meta[bb->inst[i].y].promoted = 0;
+            meta[bb->inst[i].z].promoted = 0;
+        }
+        if (op >= op_eq_i16 && op <= op_ge_u16) {
+            meta[bb->inst[i].x].promoted = 0;
+            meta[bb->inst[i].y].promoted = 0;
+        }
+    }
+    // Demand pass: only keep promotion if demanded by an f16 float op.
+    {
+        _Bool *demanded = calloc((size_t)bb->insts, 1);
+        for (int i = bb->insts; i --> 0;) {
+            if (!meta[i].live || !meta[i].promoted) continue;
+            struct bb_inst const *inst = &bb->inst[i];
+            switch (inst->op) {
+                case op_add_f16: case op_sub_f16: case op_mul_f16: case op_div_f16:
+                case op_min_f16: case op_max_f16: case op_sqrt_f16:
+                    demanded[i] = 1;
+                    demanded[inst->x] = 1;
+                    demanded[inst->y] = 1;
+                    break;
+                case op_fma_f16:
+                    demanded[i] = 1;
+                    demanded[inst->x] = 1;
+                    demanded[inst->y] = 1;
+                    demanded[inst->z] = 1;
+                    break;
+                case op_eq_f16: case op_ne_f16: case op_lt_f16: case op_le_f16:
+                case op_gt_f16: case op_ge_f16:
+                    demanded[inst->x] = 1;
+                    demanded[inst->y] = 1;
+                    break;
+                case op_f32_from_f16:
+                    if (meta[inst->x].promoted) demanded[inst->x] = 1;
+                    break;
+                default: break;
+            }
+        }
+        for (int i = 0; i < bb->insts; i++) {
+            if (meta[i].promoted && !demanded[i]) meta[i].promoted = 0;
+        }
+        free(demanded);
+    }
+    // Re-run forward pass to cascade cleared promotions.
+    for (int i = 0; i < bb->insts; i++) {
+        if (!meta[i].live) continue;
+        struct bb_inst const *inst = &bb->inst[i];
+        switch (inst->op) {
+            case op_add_f16: case op_sub_f16: case op_mul_f16: case op_div_f16:
+            case op_min_f16: case op_max_f16: case op_sqrt_f16:
+                meta[i].promoted &= meta[inst->x].promoted & meta[inst->y].promoted;
+                break;
+            case op_fma_f16:
+                meta[i].promoted &= meta[inst->x].promoted & meta[inst->y].promoted
+                                  & meta[inst->z].promoted;
+                break;
+            default: break;
+        }
+    }
+#endif
+
     struct umbra_interpreter *p = malloc(sizeof *p);
     p->inst = malloc((size_t)(live + 1) * sizeof *p->inst);
     p->v    = malloc((size_t)(live + 1) * sizeof *p->v);
@@ -419,12 +591,34 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                 int const X = meta[inst->x].id - n,
                           Y = meta[inst->y].id - n,
                           Z = meta[inst->z].id - n;
+                #if !defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) && !defined(__F16C__)
+                _Bool pi = meta[i].promoted;
+                _Bool px = meta[inst->x].promoted;
+                _Bool py = meta[inst->y].promoted;
+                #endif
                 switch (inst->op) {
                     case op_lane:   emit(.fn=lane);                 break;
-                    case op_imm_16: emit(.fn=imm_16, .x=inst->imm); break;
+                    case op_imm_16:
+                    #if !defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) && !defined(__F16C__)
+                        if (pi) { emit(.fn=imm_16_promote, .x=inst->imm); break; }
+                    #endif
+                        emit(.fn=imm_16, .x=inst->imm); break;
                     case op_imm_32: emit(.fn=imm_32, .x=inst->imm); break;
 
                     case op_load_16:
+                    #if !defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) && !defined(__F16C__)
+                        if (pi) {
+                            if (bb->inst[inst->x].op == op_lane) {
+                                emit(.fn=load_16_promote, .x=inst->ptr);
+                            } else if (bb->inst[inst->x].op == op_imm_32) {
+                                emit(.fn=uni_16_promote, .x=inst->ptr
+                                                       , .y=bb->inst[inst->x].imm);
+                            } else {
+                                emit(.fn=gather_16_promote, .x=inst->ptr, .y=X);
+                            }
+                            break;
+                        }
+                    #endif
                         if (bb->inst[inst->x].op == op_lane) {
                             emit(.fn=load_16, .x=inst->ptr);
                         } else if (bb->inst[inst->x].op == op_imm_32) {
@@ -444,6 +638,16 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                         } break;
 
                     case op_store_16:
+                    #if !defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) && !defined(__F16C__)
+                        if (py) {
+                            if (bb->inst[inst->x].op == op_lane) {
+                                emit(.fn=store_16_demote, .x=inst->ptr, .y=Y);
+                            } else {
+                                emit(.fn=scatter_16_demote, .x=inst->ptr, .y=Y, .z=X);
+                            }
+                            break;
+                        }
+                    #endif
                         if (bb->inst[inst->x].op == op_lane) {
                             emit(.fn=store_16, .x=inst->ptr, .y=Y);
                         } else {
@@ -456,7 +660,42 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                             emit(.fn=scatter_32, .x=inst->ptr, .y=Y, .z=X);
                         } break;
 
-                    default: emit(.fn=fn[inst->op], .x=X, .y=Y, .z=Z);
+                    default:
+                    #if !defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) && !defined(__F16C__)
+                        if (pi) {
+                            // Promoted f16 arithmetic → dispatch to f32 ops
+                            static Fn const promoted_arith[] = {
+                                [op_add_f16]  = add_f32,  [op_sub_f16]  = sub_f32,
+                                [op_mul_f16]  = mul_f32,  [op_div_f16]  = div_f32,
+                                [op_min_f16]  = min_f32,  [op_max_f16]  = max_f32,
+                                [op_sqrt_f16] = sqrt_f32, [op_fma_f16]  = fma_f32,
+                                [op_f16_from_f32] = f16_from_f32_promote,
+                            };
+                            emit(.fn=promoted_arith[inst->op], .x=X, .y=Y, .z=Z);
+                            break;
+                        }
+                        if (px & py) {
+                            // Promoted f16 comparison inputs
+                            static Fn const promoted_cmp[] = {
+                                [op_eq_f16] = eq_f16_promote, [op_ne_f16] = ne_f16_promote,
+                                [op_lt_f16] = lt_f16_promote, [op_le_f16] = le_f16_promote,
+                                [op_gt_f16] = gt_f16_promote, [op_ge_f16] = ge_f16_promote,
+                            };
+                            if (inst->op >= op_eq_f16 && inst->op <= op_ge_f16) {
+                                emit(.fn=promoted_cmp[inst->op], .x=X, .y=Y, .z=Z);
+                                break;
+                            }
+                        }
+                        if (px && inst->op == op_f32_from_f16) {
+                            emit(.fn=f32_from_f16_promote, .x=X, .y=Y, .z=Z);
+                            break;
+                        }
+                        if ((py || meta[inst->z].promoted) && inst->op == op_sel_16) {
+                            emit(.fn=sel_16_demote, .x=X, .y=Y, .z=Z);
+                            break;
+                        }
+                    #endif
+                        emit(.fn=fn[inst->op], .x=X, .y=Y, .z=Z);
                 }
                 meta[i].id = n++;
             }
