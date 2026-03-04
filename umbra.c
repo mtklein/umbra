@@ -474,53 +474,52 @@ static uint32_t bb_hash(struct bb_inst const *inst) {
     return h ? h : 1;  // 0 means empty
 }
 
-// Push a pre-filled instruction (absolute indices). Returns its index.
-// Stores skip dedup. Others get deduped via hash table.
 static int push(struct umbra_basic_block *bb, struct bb_inst inst) {
-    // Grow inst[] and ht[] when insts is zero or a power of two.
-    // Capacity goes 0,1,2,4,8,...; ht is always 2x inst capacity.
+    uint32_t const h = bb_hash(&inst);
+
+    for (int slot = (int)h; bb->ht_mask; slot++) {
+        if (bb->ht[slot & bb->ht_mask].hash == 0) {
+            break;
+        }
+        if (h == bb->ht[slot & bb->ht_mask].hash &&
+            0 == __builtin_memcmp(&inst,
+                                  &bb->inst[bb->ht[slot & bb->ht_mask].ix],
+                                  sizeof inst)) {
+            return bb->ht[slot & bb->ht_mask].ix;
+        }
+    }
+
     if (__builtin_popcount((unsigned)bb->insts) < 2) {
-        int inst_cap = bb->insts ? bb->insts * 2 : 1,
-             ht_cap  = inst_cap * 2;
+        int const inst_cap = bb->insts ? 2*bb->insts : 1,
+                    ht_cap = 2*inst_cap;
         bb->inst = realloc(bb->inst, (size_t)inst_cap * sizeof *bb->inst);
 
-        struct bb_slot *old = bb->ht;
-        int old_cap = bb->ht ? bb->ht_mask + 1 : 0;
+        struct bb_slot *old     = bb->ht;
+        int const       old_cap = bb->ht ? bb->ht_mask + 1 : 0;
         bb->ht      = calloc((size_t)ht_cap, sizeof *bb->ht);
         bb->ht_mask = ht_cap - 1;
         for (int i = 0; i < old_cap; i++) {
-            if (!old[i].hash) { continue; }
-            uint32_t h = old[i].hash;
-            for (;;) {
-                int slot = (int)(h & (uint32_t)bb->ht_mask);
-                if (!bb->ht[slot].hash) { bb->ht[slot] = old[i]; break; }
-                h++;
+            for (int slot = (int)old[i].hash; old[i].hash; slot++) {
+                if (bb->ht[slot & bb->ht_mask].hash == 0) {
+                    bb->ht[slot & bb->ht_mask] = old[i];
+                    break;
+                }
             }
         }
         free(old);
     }
 
-    if (is_store(inst.op)) {
-        int id = bb->insts++;
-        bb->inst[id] = inst;
-        return id;
-    }
-
-    uint32_t h = bb_hash(&inst), h0 = h;
-    for (;;) {
-        int slot = (int)(h & (uint32_t)bb->ht_mask);
-        if (!bb->ht[slot].hash) {
-            int id = bb->insts++;
-            bb->inst[id] = inst;
-            bb->ht[slot] = (struct bb_slot){h0, id};
-            return id;
+    int const id = bb->insts++;
+    bb->inst[id] = inst;
+    if (!is_store(inst.op)) {
+        for (int slot = (int)h; ; slot++) {
+            if (bb->ht[slot & bb->ht_mask].hash == 0) {
+                bb->ht[slot & bb->ht_mask] = (struct bb_slot){h, id};
+                break;
+            }
         }
-        if (bb->ht[slot].hash == h0
-         && __builtin_memcmp(&inst, &bb->inst[bb->ht[slot].ix], sizeof inst) == 0) {
-            return bb->ht[slot].ix;
-        }
-        h++;
     }
+    return id;
 }
 
 struct umbra_basic_block* umbra_basic_block(void) {
