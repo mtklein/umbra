@@ -92,6 +92,29 @@ static double bench_codegen(struct umbra_codegen *cg, int pixel_n, void *ptrs[])
     }
 }
 
+static double bench_codegen_compile(void) {
+    struct umbra_basic_block *bb = build_srcover_bb();
+    struct umbra_codegen *cg = umbra_codegen(bb);
+    umbra_basic_block_free(bb);
+    if (cg) { umbra_codegen_free(cg); }
+
+    int iters = 1;
+    for (;;) {
+        double const start = now();
+        for (int i = 0; i < iters; i++) {
+            bb = build_srcover_bb();
+            cg = umbra_codegen(bb);
+            umbra_basic_block_free(bb);
+            if (cg) { umbra_codegen_free(cg); }
+        }
+        double const elapsed = now() - start;
+        if (elapsed >= 0.5) {
+            return elapsed / (double)iters * 1e9;
+        }
+        iters *= 2;
+    }
+}
+
 static double bench_build(void) {
     struct umbra_basic_block *bb = build_srcover_bb();
     struct umbra_interpreter *p = umbra_interpreter(bb);
@@ -145,8 +168,9 @@ int main(int argc, char *argv[]) {
 
     printf("SrcOver 8888->fp16: %.0f ns/build, %.2f ns/pixel interp", build_ns, interp_ns);
     if (cg) {
-        double const cg_ns = bench_codegen(cg, pixel_n, ptrs);
-        printf(", %.2f ns/pixel codegen", cg_ns);
+        double const compile_ns = bench_codegen_compile();
+        double const cg_ns      = bench_codegen(cg, pixel_n, ptrs);
+        printf(", %.0f ns/compile, %.2f ns/pixel codegen", compile_ns, cg_ns);
     }
     printf(" (%d pixels)\n", pixel_n);
 
