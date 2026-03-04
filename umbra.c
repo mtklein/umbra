@@ -476,7 +476,7 @@ static uint32_t bb_hash(struct bb_inst const *inst) {
 
 // Push a pre-filled instruction (absolute indices). Returns its index.
 // Stores skip dedup. Others get deduped via hash table.
-static int bb_push(struct umbra_basic_block *bb, struct bb_inst inst) {
+static int push(struct umbra_basic_block *bb, struct bb_inst inst) {
     // Grow inst[] and ht[] when insts is zero or a power of two.
     // Capacity goes 0,1,2,4,8,...; ht is always 2x inst capacity.
     if (__builtin_popcount((unsigned)bb->insts) < 2) {
@@ -525,7 +525,7 @@ static int bb_push(struct umbra_basic_block *bb, struct bb_inst inst) {
 
 struct umbra_basic_block* umbra_basic_block(void) {
     struct umbra_basic_block *bb = calloc(1, sizeof *bb);
-    bb_push(bb, (struct bb_inst){.op = op_imm_32});  // ID 0 = zero constant; unused fields point here.
+    push(bb, (struct bb_inst){.op = op_imm_32});
     return bb;
 }
 
@@ -537,35 +537,35 @@ void umbra_basic_block_free(struct umbra_basic_block *bb) {
 
 umbra_v32 umbra_lane(struct umbra_basic_block *bb) {
     struct bb_inst inst = {.op = op_lane};
-    return (umbra_v32){bb_push(bb, inst)};
+    return (umbra_v32){push(bb, inst)};
 }
 
 umbra_v16 umbra_imm_16(struct umbra_basic_block *bb, uint16_t bits) {
     struct bb_inst inst = {.op = op_imm_16, .immi = (int16_t)bits};
-    return (umbra_v16){bb_push(bb, inst)};
+    return (umbra_v16){push(bb, inst)};
 }
 
 umbra_v32 umbra_imm_32(struct umbra_basic_block *bb, uint32_t bits) {
     int immi;
     __builtin_memcpy(&immi, &bits, 4);
     struct bb_inst inst = {.op = op_imm_32, .immi = immi};
-    return (umbra_v32){bb_push(bb, inst)};
+    return (umbra_v32){push(bb, inst)};
 }
 
 umbra_v16 umbra_load_16(struct umbra_basic_block *bb, umbra_ptr src, umbra_v32 ix) {
-    return (umbra_v16){bb_push(bb, (struct bb_inst){.op=op_load_16, .x=ix.id, .ptr=src.ix})};
+    return (umbra_v16){push(bb, (struct bb_inst){.op=op_load_16, .x=ix.id, .ptr=src.ix})};
 }
 
 umbra_v32 umbra_load_32(struct umbra_basic_block *bb, umbra_ptr src, umbra_v32 ix) {
-    return (umbra_v32){bb_push(bb, (struct bb_inst){.op=op_load_32, .x=ix.id, .ptr=src.ix})};
+    return (umbra_v32){push(bb, (struct bb_inst){.op=op_load_32, .x=ix.id, .ptr=src.ix})};
 }
 
 void umbra_store_16(struct umbra_basic_block *bb, umbra_ptr dst, umbra_v32 ix, umbra_v16 val) {
-    bb_push(bb, (struct bb_inst){.op=op_store_16, .x=ix.id, .y=val.id, .ptr=dst.ix});
+    push(bb, (struct bb_inst){.op=op_store_16, .x=ix.id, .y=val.id, .ptr=dst.ix});
 }
 
 void umbra_store_32(struct umbra_basic_block *bb, umbra_ptr dst, umbra_v32 ix, umbra_v32 val) {
-    bb_push(bb, (struct bb_inst){.op=op_store_32, .x=ix.id, .y=val.id, .ptr=dst.ix});
+    push(bb, (struct bb_inst){.op=op_store_32, .x=ix.id, .y=val.id, .ptr=dst.ix});
 }
 
 // Helpers for builder-time const prop and strength reduction.
@@ -606,7 +606,7 @@ static void sort(int *a, int *b) {
 static int bb_op(struct umbra_basic_block *bb, enum op op, int x, int y, int z) {
     int cp = bb_constprop(bb, op, x, y, z);
     return cp >= 0 ? cp
-                   : bb_push(bb, (struct bb_inst){.op=op, .x=x, .y=y, .z=z});
+                   : push(bb, (struct bb_inst){.op=op, .x=x, .y=y, .z=z});
 }
 
 // ── f32 arithmetic ───────────────────────────────────────────────────
