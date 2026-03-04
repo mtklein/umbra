@@ -662,22 +662,7 @@ static void sort(int *a, int *b) {
     if (*a > *b) { int t = *a; *a = *b; *b = t; }
 }
 
-// Generic binary op builder: constprop, push.
-static int bb_binop(struct umbra_basic_block *bb, enum op op, int x, int y) {
-    int cp = bb_constprop(bb, op, x, y, 0);
-    return cp >= 0 ? cp
-                   : bb_push(bb, (struct bb_inst){.op=op, .x=x, .y=y});
-}
-
-// Generic unary op builder.
-static int bb_unop(struct umbra_basic_block *bb, enum op op, int x) {
-    int cp = bb_constprop(bb, op, x, 0, 0);
-    return cp >= 0 ? cp
-                   : bb_push(bb, (struct bb_inst){.op=op, .x=x});
-}
-
-// Generic ternary op builder.
-static int bb_ternop(struct umbra_basic_block *bb, enum op op, int x, int y, int z) {
+static int bb_op(struct umbra_basic_block *bb, enum op op, int x, int y, int z) {
     int cp = bb_constprop(bb, op, x, y, z);
     return cp >= 0 ? cp
                    : bb_push(bb, (struct bb_inst){.op=op, .x=x, .y=y, .z=z});
@@ -690,43 +675,43 @@ umbra_v32 umbra_add_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) 
     int x = a.id, y = b.id;
     // FMA peephole: add(mul(a,b), c) → fma(a,b,c)
     if (bb->inst[x].op == op_mul_f32) {
-        return (umbra_v32){bb_ternop(bb, op_fma_f32, bb->inst[x].x, bb->inst[x].y, y)};
+        return (umbra_v32){bb_op(bb, op_fma_f32, bb->inst[x].x, bb->inst[x].y, y)};
     }
     if (bb->inst[y].op == op_mul_f32) {
-        return (umbra_v32){bb_ternop(bb, op_fma_f32, bb->inst[y].x, bb->inst[y].y, x)};
+        return (umbra_v32){bb_op(bb, op_fma_f32, bb->inst[y].x, bb->inst[y].y, x)};
     }
-    return (umbra_v32){bb_binop(bb, op_add_f32, x, y)};
+    return (umbra_v32){bb_op(bb, op_add_f32, x, y, 0)};
 }
 
 umbra_v32 umbra_sub_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
     if (bb_is_imm32(bb, b.id, 0)) { return a; }
-    return (umbra_v32){bb_binop(bb, op_sub_f32, a.id, b.id)};
+    return (umbra_v32){bb_op(bb, op_sub_f32, a.id, b.id, 0)};
 }
 
 umbra_v32 umbra_mul_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
     sort(&a.id, &b.id);
     if (bb_is_imm32(bb, a.id, f32_bits(1.0f))) { return b; }
     if (bb_is_imm32(bb, b.id, f32_bits(1.0f))) { return a; }
-    return (umbra_v32){bb_binop(bb, op_mul_f32, a.id, b.id)};
+    return (umbra_v32){bb_op(bb, op_mul_f32, a.id, b.id, 0)};
 }
 
 umbra_v32 umbra_div_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
     if (bb_is_imm32(bb, b.id, f32_bits(1.0f))) { return a; }
-    return (umbra_v32){bb_binop(bb, op_div_f32, a.id, b.id)};
+    return (umbra_v32){bb_op(bb, op_div_f32, a.id, b.id, 0)};
 }
 
 umbra_v32 umbra_min_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
     sort(&a.id, &b.id);
-    return (umbra_v32){bb_binop(bb, op_min_f32, a.id, b.id)};
+    return (umbra_v32){bb_op(bb, op_min_f32, a.id, b.id, 0)};
 }
 
 umbra_v32 umbra_max_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
     sort(&a.id, &b.id);
-    return (umbra_v32){bb_binop(bb, op_max_f32, a.id, b.id)};
+    return (umbra_v32){bb_op(bb, op_max_f32, a.id, b.id, 0)};
 }
 
 umbra_v32 umbra_sqrt_f32(struct umbra_basic_block *bb, umbra_v32 a) {
-    return (umbra_v32){bb_unop(bb, op_sqrt_f32, a.id)};
+    return (umbra_v32){bb_op(bb, op_sqrt_f32, a.id, 0, 0)};
 }
 
 // ── f16 arithmetic ───────────────────────────────────────────────────
@@ -735,43 +720,43 @@ umbra_v16 umbra_add_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) 
     sort(&a.id, &b.id);
     int x = a.id, y = b.id;
     if (bb->inst[x].op == op_mul_f16) {
-        return (umbra_v16){bb_ternop(bb, op_fma_f16, bb->inst[x].x, bb->inst[x].y, y)};
+        return (umbra_v16){bb_op(bb, op_fma_f16, bb->inst[x].x, bb->inst[x].y, y)};
     }
     if (bb->inst[y].op == op_mul_f16) {
-        return (umbra_v16){bb_ternop(bb, op_fma_f16, bb->inst[y].x, bb->inst[y].y, x)};
+        return (umbra_v16){bb_op(bb, op_fma_f16, bb->inst[y].x, bb->inst[y].y, x)};
     }
-    return (umbra_v16){bb_binop(bb, op_add_f16, x, y)};
+    return (umbra_v16){bb_op(bb, op_add_f16, x, y, 0)};
 }
 
 umbra_v16 umbra_sub_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
     if (bb_is_imm16(bb, b.id, 0)) { return a; }
-    return (umbra_v16){bb_binop(bb, op_sub_f16, a.id, b.id)};
+    return (umbra_v16){bb_op(bb, op_sub_f16, a.id, b.id, 0)};
 }
 
 umbra_v16 umbra_mul_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
     sort(&a.id, &b.id);
     if (bb_is_imm16(bb, a.id, 0x3c00)) { return b; }
     if (bb_is_imm16(bb, b.id, 0x3c00)) { return a; }
-    return (umbra_v16){bb_binop(bb, op_mul_f16, a.id, b.id)};
+    return (umbra_v16){bb_op(bb, op_mul_f16, a.id, b.id, 0)};
 }
 
 umbra_v16 umbra_div_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
     if (bb_is_imm16(bb, b.id, 0x3c00)) { return a; }
-    return (umbra_v16){bb_binop(bb, op_div_f16, a.id, b.id)};
+    return (umbra_v16){bb_op(bb, op_div_f16, a.id, b.id, 0)};
 }
 
 umbra_v16 umbra_min_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
     sort(&a.id, &b.id);
-    return (umbra_v16){bb_binop(bb, op_min_f16, a.id, b.id)};
+    return (umbra_v16){bb_op(bb, op_min_f16, a.id, b.id, 0)};
 }
 
 umbra_v16 umbra_max_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
     sort(&a.id, &b.id);
-    return (umbra_v16){bb_binop(bb, op_max_f16, a.id, b.id)};
+    return (umbra_v16){bb_op(bb, op_max_f16, a.id, b.id, 0)};
 }
 
 umbra_v16 umbra_sqrt_f16(struct umbra_basic_block *bb, umbra_v16 a) {
-    return (umbra_v16){bb_unop(bb, op_sqrt_f16, a.id)};
+    return (umbra_v16){bb_op(bb, op_sqrt_f16, a.id, 0, 0)};
 }
 
 // ── i32 arithmetic ───────────────────────────────────────────────────
@@ -780,13 +765,13 @@ umbra_v32 umbra_add_i32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) 
     sort(&a.id, &b.id);
     if (bb_is_imm32(bb, a.id, 0)) { return b; }
     if (bb_is_imm32(bb, b.id, 0)) { return a; }
-    return (umbra_v32){bb_binop(bb, op_add_i32, a.id, b.id)};
+    return (umbra_v32){bb_op(bb, op_add_i32, a.id, b.id, 0)};
 }
 
 umbra_v32 umbra_sub_i32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
     if (bb_is_imm32(bb, b.id, 0)) { return a; }
     if (a.id == b.id) { return umbra_imm_32(bb, 0); }
-    return (umbra_v32){bb_binop(bb, op_sub_i32, a.id, b.id)};
+    return (umbra_v32){bb_op(bb, op_sub_i32, a.id, b.id, 0)};
 }
 
 umbra_v32 umbra_mul_i32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
@@ -800,15 +785,15 @@ umbra_v32 umbra_mul_i32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) 
         && (bb->inst[a.id].immi & (bb->inst[a.id].immi - 1)) == 0) {
         umbra_v32 shift = umbra_imm_32(bb, (uint32_t)__builtin_ctz(
             (unsigned)bb->inst[a.id].immi));
-        return (umbra_v32){bb_binop(bb, op_shl_i32, b.id, shift.id)};
+        return (umbra_v32){bb_op(bb, op_shl_i32, b.id, shift.id, 0)};
     }
     if (bb->inst[b.id].op == op_imm_32 && bb->inst[b.id].immi > 0
         && (bb->inst[b.id].immi & (bb->inst[b.id].immi - 1)) == 0) {
         umbra_v32 shift = umbra_imm_32(bb, (uint32_t)__builtin_ctz(
             (unsigned)bb->inst[b.id].immi));
-        return (umbra_v32){bb_binop(bb, op_shl_i32, a.id, shift.id)};
+        return (umbra_v32){bb_op(bb, op_shl_i32, a.id, shift.id, 0)};
     }
-    return (umbra_v32){bb_binop(bb, op_mul_i32, a.id, b.id)};
+    return (umbra_v32){bb_op(bb, op_mul_i32, a.id, b.id, 0)};
 }
 
 // ── i16 arithmetic ───────────────────────────────────────────────────
@@ -817,13 +802,13 @@ umbra_v16 umbra_add_i16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) 
     sort(&a.id, &b.id);
     if (bb_is_imm16(bb, a.id, 0)) { return b; }
     if (bb_is_imm16(bb, b.id, 0)) { return a; }
-    return (umbra_v16){bb_binop(bb, op_add_i16, a.id, b.id)};
+    return (umbra_v16){bb_op(bb, op_add_i16, a.id, b.id, 0)};
 }
 
 umbra_v16 umbra_sub_i16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
     if (bb_is_imm16(bb, b.id, 0)) { return a; }
     if (a.id == b.id) { return umbra_imm_16(bb, 0); }
-    return (umbra_v16){bb_binop(bb, op_sub_i16, a.id, b.id)};
+    return (umbra_v16){bb_op(bb, op_sub_i16, a.id, b.id, 0)};
 }
 
 umbra_v16 umbra_mul_i16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
@@ -837,45 +822,45 @@ umbra_v16 umbra_mul_i16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) 
         int16_t av = (int16_t)bb->inst[a.id].immi;
         if (bb->inst[a.id].op == op_imm_16 && av > 0 && (av & (av - 1)) == 0) {
             umbra_v16 shift = umbra_imm_16(bb, (uint16_t)__builtin_ctz((unsigned)(uint16_t)av));
-            return (umbra_v16){bb_binop(bb, op_shl_i16, b.id, shift.id)};
+            return (umbra_v16){bb_op(bb, op_shl_i16, b.id, shift.id, 0)};
         }
     }
     {
         int16_t bv = (int16_t)bb->inst[b.id].immi;
         if (bb->inst[b.id].op == op_imm_16 && bv > 0 && (bv & (bv - 1)) == 0) {
             umbra_v16 shift = umbra_imm_16(bb, (uint16_t)__builtin_ctz((unsigned)(uint16_t)bv));
-            return (umbra_v16){bb_binop(bb, op_shl_i16, a.id, shift.id)};
+            return (umbra_v16){bb_op(bb, op_shl_i16, a.id, shift.id, 0)};
         }
     }
-    return (umbra_v16){bb_binop(bb, op_mul_i16, a.id, b.id)};
+    return (umbra_v16){bb_op(bb, op_mul_i16, a.id, b.id, 0)};
 }
 
 // ── shifts ───────────────────────────────────────────────────────────
 
 umbra_v32 umbra_shl_i32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
     if (bb_is_imm32(bb, b.id, 0)) { return a; }
-    return (umbra_v32){bb_binop(bb, op_shl_i32, a.id, b.id)};
+    return (umbra_v32){bb_op(bb, op_shl_i32, a.id, b.id, 0)};
 }
 umbra_v32 umbra_shr_u32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
     if (bb_is_imm32(bb, b.id, 0)) { return a; }
-    return (umbra_v32){bb_binop(bb, op_shr_u32, a.id, b.id)};
+    return (umbra_v32){bb_op(bb, op_shr_u32, a.id, b.id, 0)};
 }
 umbra_v32 umbra_shr_s32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
     if (bb_is_imm32(bb, b.id, 0)) { return a; }
-    return (umbra_v32){bb_binop(bb, op_shr_s32, a.id, b.id)};
+    return (umbra_v32){bb_op(bb, op_shr_s32, a.id, b.id, 0)};
 }
 
 umbra_v16 umbra_shl_i16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
     if (bb_is_imm16(bb, b.id, 0)) { return a; }
-    return (umbra_v16){bb_binop(bb, op_shl_i16, a.id, b.id)};
+    return (umbra_v16){bb_op(bb, op_shl_i16, a.id, b.id, 0)};
 }
 umbra_v16 umbra_shr_u16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
     if (bb_is_imm16(bb, b.id, 0)) { return a; }
-    return (umbra_v16){bb_binop(bb, op_shr_u16, a.id, b.id)};
+    return (umbra_v16){bb_op(bb, op_shr_u16, a.id, b.id, 0)};
 }
 umbra_v16 umbra_shr_s16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
     if (bb_is_imm16(bb, b.id, 0)) { return a; }
-    return (umbra_v16){bb_binop(bb, op_shr_s16, a.id, b.id)};
+    return (umbra_v16){bb_op(bb, op_shr_s16, a.id, b.id, 0)};
 }
 
 // ── bitwise ──────────────────────────────────────────────────────────
@@ -886,7 +871,7 @@ umbra_v32 umbra_and_32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
     if (bb_is_imm32(bb, b.id, -1)) { return a; }
     if (bb_is_imm32(bb, a.id,  0)) { return a; }
     if (bb_is_imm32(bb, b.id,  0)) { return b; }
-    return (umbra_v32){bb_binop(bb, op_and_32, a.id, b.id)};
+    return (umbra_v32){bb_op(bb, op_and_32, a.id, b.id, 0)};
 }
 umbra_v32 umbra_or_32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
     sort(&a.id, &b.id);
@@ -894,20 +879,20 @@ umbra_v32 umbra_or_32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
     if (bb_is_imm32(bb, b.id,  0)) { return a; }
     if (bb_is_imm32(bb, a.id, -1)) { return a; }
     if (bb_is_imm32(bb, b.id, -1)) { return b; }
-    return (umbra_v32){bb_binop(bb, op_or_32, a.id, b.id)};
+    return (umbra_v32){bb_op(bb, op_or_32, a.id, b.id, 0)};
 }
 umbra_v32 umbra_xor_32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
     sort(&a.id, &b.id);
     if (bb_is_imm32(bb, a.id, 0)) { return b; }
     if (bb_is_imm32(bb, b.id, 0)) { return a; }
     if (a.id == b.id) { return umbra_imm_32(bb, 0); }
-    return (umbra_v32){bb_binop(bb, op_xor_32, a.id, b.id)};
+    return (umbra_v32){bb_op(bb, op_xor_32, a.id, b.id, 0)};
 }
 umbra_v32 umbra_sel_32(struct umbra_basic_block *bb, umbra_v32 c, umbra_v32 t, umbra_v32 f) {
     if (t.id == f.id) { return t; }
     if (bb_is_imm32(bb, c.id, -1)) { return t; }
     if (bb_is_imm32(bb, c.id,  0)) { return f; }
-    return (umbra_v32){bb_ternop(bb, op_sel_32, c.id, t.id, f.id)};
+    return (umbra_v32){bb_op(bb, op_sel_32, c.id, t.id, f.id)};
 }
 
 umbra_v16 umbra_and_16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
@@ -916,7 +901,7 @@ umbra_v16 umbra_and_16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
     if (bb_is_imm16(bb, b.id, -1)) { return a; }
     if (bb_is_imm16(bb, a.id,  0)) { return a; }
     if (bb_is_imm16(bb, b.id,  0)) { return b; }
-    return (umbra_v16){bb_binop(bb, op_and_16, a.id, b.id)};
+    return (umbra_v16){bb_op(bb, op_and_16, a.id, b.id, 0)};
 }
 umbra_v16 umbra_or_16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
     sort(&a.id, &b.id);
@@ -924,75 +909,75 @@ umbra_v16 umbra_or_16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
     if (bb_is_imm16(bb, b.id,  0)) { return a; }
     if (bb_is_imm16(bb, a.id, -1)) { return a; }
     if (bb_is_imm16(bb, b.id, -1)) { return b; }
-    return (umbra_v16){bb_binop(bb, op_or_16, a.id, b.id)};
+    return (umbra_v16){bb_op(bb, op_or_16, a.id, b.id, 0)};
 }
 umbra_v16 umbra_xor_16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) {
     sort(&a.id, &b.id);
     if (bb_is_imm16(bb, a.id, 0)) { return b; }
     if (bb_is_imm16(bb, b.id, 0)) { return a; }
     if (a.id == b.id) { return umbra_imm_16(bb, 0); }
-    return (umbra_v16){bb_binop(bb, op_xor_16, a.id, b.id)};
+    return (umbra_v16){bb_op(bb, op_xor_16, a.id, b.id, 0)};
 }
 umbra_v16 umbra_sel_16(struct umbra_basic_block *bb, umbra_v16 c, umbra_v16 t, umbra_v16 f) {
     if (t.id == f.id) { return t; }
     if (bb_is_imm16(bb, c.id, -1)) { return t; }
     if (bb_is_imm16(bb, c.id,  0)) { return f; }
-    return (umbra_v16){bb_ternop(bb, op_sel_16, c.id, t.id, f.id)};
+    return (umbra_v16){bb_op(bb, op_sel_16, c.id, t.id, f.id)};
 }
 
 // ── conversions ──────────────────────────────────────────────────────
 
 umbra_v16 umbra_f16_from_f32(struct umbra_basic_block *bb, umbra_v32 a) {
-    return (umbra_v16){bb_unop(bb, op_f16_from_f32, a.id)};
+    return (umbra_v16){bb_op(bb, op_f16_from_f32, a.id, 0, 0)};
 }
 umbra_v32 umbra_f32_from_f16(struct umbra_basic_block *bb, umbra_v16 a) {
-    return (umbra_v32){bb_unop(bb, op_f32_from_f16, a.id)};
+    return (umbra_v32){bb_op(bb, op_f32_from_f16, a.id, 0, 0)};
 }
 umbra_v32 umbra_f32_from_i32(struct umbra_basic_block *bb, umbra_v32 a) {
-    return (umbra_v32){bb_unop(bb, op_f32_from_i32, a.id)};
+    return (umbra_v32){bb_op(bb, op_f32_from_i32, a.id, 0, 0)};
 }
 umbra_v32 umbra_i32_from_f32(struct umbra_basic_block *bb, umbra_v32 a) {
-    return (umbra_v32){bb_unop(bb, op_i32_from_f32, a.id)};
+    return (umbra_v32){bb_op(bb, op_i32_from_f32, a.id, 0, 0)};
 }
 
 // ── comparisons ──────────────────────────────────────────────────────
 
-umbra_v16 umbra_eq_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { sort(&a.id, &b.id); return (umbra_v16){bb_binop(bb, op_eq_f16, a.id, b.id)}; }
-umbra_v16 umbra_ne_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { sort(&a.id, &b.id); return (umbra_v16){bb_binop(bb, op_ne_f16, a.id, b.id)}; }
-umbra_v16 umbra_lt_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_binop(bb, op_lt_f16, a.id, b.id)}; }
-umbra_v16 umbra_le_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_binop(bb, op_le_f16, a.id, b.id)}; }
-umbra_v16 umbra_gt_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_binop(bb, op_gt_f16, a.id, b.id)}; }
-umbra_v16 umbra_ge_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_binop(bb, op_ge_f16, a.id, b.id)}; }
+umbra_v16 umbra_eq_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { sort(&a.id, &b.id); return (umbra_v16){bb_op(bb, op_eq_f16, a.id, b.id, 0)}; }
+umbra_v16 umbra_ne_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { sort(&a.id, &b.id); return (umbra_v16){bb_op(bb, op_ne_f16, a.id, b.id, 0)}; }
+umbra_v16 umbra_lt_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_op(bb, op_lt_f16, a.id, b.id, 0)}; }
+umbra_v16 umbra_le_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_op(bb, op_le_f16, a.id, b.id, 0)}; }
+umbra_v16 umbra_gt_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_op(bb, op_gt_f16, a.id, b.id, 0)}; }
+umbra_v16 umbra_ge_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_op(bb, op_ge_f16, a.id, b.id, 0)}; }
 
-umbra_v32 umbra_eq_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { sort(&a.id, &b.id); return (umbra_v32){bb_binop(bb, op_eq_f32, a.id, b.id)}; }
-umbra_v32 umbra_ne_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { sort(&a.id, &b.id); return (umbra_v32){bb_binop(bb, op_ne_f32, a.id, b.id)}; }
-umbra_v32 umbra_lt_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_binop(bb, op_lt_f32, a.id, b.id)}; }
-umbra_v32 umbra_le_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_binop(bb, op_le_f32, a.id, b.id)}; }
-umbra_v32 umbra_gt_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_binop(bb, op_gt_f32, a.id, b.id)}; }
-umbra_v32 umbra_ge_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_binop(bb, op_ge_f32, a.id, b.id)}; }
+umbra_v32 umbra_eq_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { sort(&a.id, &b.id); return (umbra_v32){bb_op(bb, op_eq_f32, a.id, b.id, 0)}; }
+umbra_v32 umbra_ne_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { sort(&a.id, &b.id); return (umbra_v32){bb_op(bb, op_ne_f32, a.id, b.id, 0)}; }
+umbra_v32 umbra_lt_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_op(bb, op_lt_f32, a.id, b.id, 0)}; }
+umbra_v32 umbra_le_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_op(bb, op_le_f32, a.id, b.id, 0)}; }
+umbra_v32 umbra_gt_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_op(bb, op_gt_f32, a.id, b.id, 0)}; }
+umbra_v32 umbra_ge_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_op(bb, op_ge_f32, a.id, b.id, 0)}; }
 
-umbra_v16 umbra_eq_i16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { sort(&a.id, &b.id); return (umbra_v16){bb_binop(bb, op_eq_i16, a.id, b.id)}; }
-umbra_v16 umbra_ne_i16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { sort(&a.id, &b.id); return (umbra_v16){bb_binop(bb, op_ne_i16, a.id, b.id)}; }
-umbra_v32 umbra_eq_i32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { sort(&a.id, &b.id); return (umbra_v32){bb_binop(bb, op_eq_i32, a.id, b.id)}; }
-umbra_v32 umbra_ne_i32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { sort(&a.id, &b.id); return (umbra_v32){bb_binop(bb, op_ne_i32, a.id, b.id)}; }
+umbra_v16 umbra_eq_i16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { sort(&a.id, &b.id); return (umbra_v16){bb_op(bb, op_eq_i16, a.id, b.id, 0)}; }
+umbra_v16 umbra_ne_i16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { sort(&a.id, &b.id); return (umbra_v16){bb_op(bb, op_ne_i16, a.id, b.id, 0)}; }
+umbra_v32 umbra_eq_i32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { sort(&a.id, &b.id); return (umbra_v32){bb_op(bb, op_eq_i32, a.id, b.id, 0)}; }
+umbra_v32 umbra_ne_i32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { sort(&a.id, &b.id); return (umbra_v32){bb_op(bb, op_ne_i32, a.id, b.id, 0)}; }
 
-umbra_v16 umbra_lt_s16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_binop(bb, op_lt_s16, a.id, b.id)}; }
-umbra_v16 umbra_le_s16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_binop(bb, op_le_s16, a.id, b.id)}; }
-umbra_v16 umbra_gt_s16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_binop(bb, op_gt_s16, a.id, b.id)}; }
-umbra_v16 umbra_ge_s16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_binop(bb, op_ge_s16, a.id, b.id)}; }
-umbra_v32 umbra_lt_s32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_binop(bb, op_lt_s32, a.id, b.id)}; }
-umbra_v32 umbra_le_s32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_binop(bb, op_le_s32, a.id, b.id)}; }
-umbra_v32 umbra_gt_s32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_binop(bb, op_gt_s32, a.id, b.id)}; }
-umbra_v32 umbra_ge_s32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_binop(bb, op_ge_s32, a.id, b.id)}; }
+umbra_v16 umbra_lt_s16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_op(bb, op_lt_s16, a.id, b.id, 0)}; }
+umbra_v16 umbra_le_s16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_op(bb, op_le_s16, a.id, b.id, 0)}; }
+umbra_v16 umbra_gt_s16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_op(bb, op_gt_s16, a.id, b.id, 0)}; }
+umbra_v16 umbra_ge_s16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_op(bb, op_ge_s16, a.id, b.id, 0)}; }
+umbra_v32 umbra_lt_s32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_op(bb, op_lt_s32, a.id, b.id, 0)}; }
+umbra_v32 umbra_le_s32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_op(bb, op_le_s32, a.id, b.id, 0)}; }
+umbra_v32 umbra_gt_s32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_op(bb, op_gt_s32, a.id, b.id, 0)}; }
+umbra_v32 umbra_ge_s32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_op(bb, op_ge_s32, a.id, b.id, 0)}; }
 
-umbra_v16 umbra_lt_u16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_binop(bb, op_lt_u16, a.id, b.id)}; }
-umbra_v16 umbra_le_u16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_binop(bb, op_le_u16, a.id, b.id)}; }
-umbra_v16 umbra_gt_u16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_binop(bb, op_gt_u16, a.id, b.id)}; }
-umbra_v16 umbra_ge_u16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_binop(bb, op_ge_u16, a.id, b.id)}; }
-umbra_v32 umbra_lt_u32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_binop(bb, op_lt_u32, a.id, b.id)}; }
-umbra_v32 umbra_le_u32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_binop(bb, op_le_u32, a.id, b.id)}; }
-umbra_v32 umbra_gt_u32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_binop(bb, op_gt_u32, a.id, b.id)}; }
-umbra_v32 umbra_ge_u32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_binop(bb, op_ge_u32, a.id, b.id)}; }
+umbra_v16 umbra_lt_u16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_op(bb, op_lt_u16, a.id, b.id, 0)}; }
+umbra_v16 umbra_le_u16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_op(bb, op_le_u16, a.id, b.id, 0)}; }
+umbra_v16 umbra_gt_u16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_op(bb, op_gt_u16, a.id, b.id, 0)}; }
+umbra_v16 umbra_ge_u16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) { return (umbra_v16){bb_op(bb, op_ge_u16, a.id, b.id, 0)}; }
+umbra_v32 umbra_lt_u32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_op(bb, op_lt_u32, a.id, b.id, 0)}; }
+umbra_v32 umbra_le_u32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_op(bb, op_le_u32, a.id, b.id, 0)}; }
+umbra_v32 umbra_gt_u32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_op(bb, op_gt_u32, a.id, b.id, 0)}; }
+umbra_v32 umbra_ge_u32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_op(bb, op_ge_u32, a.id, b.id, 0)}; }
 
 struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) {
     int insts = bb->insts;
@@ -1002,14 +987,15 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
     // 1. DCE + compaction.  Walk backwards: stores are live, inputs of live instructions are live.
     //    Unused x/y/z fields are 0 (the zero constant), so it's naturally kept alive.
     _Bool *alive = calloc((size_t)insts, sizeof *alive);
-    for (int i = 0; i < insts; i++) {
-        if (is_store(inst[i].op)) { alive[i] = 1; }
-    }
     for (int i = insts; i --> 0;) {
-        if (!alive[i]) { continue; }
-        alive[inst[i].x] = 1;
-        alive[inst[i].y] = 1;
-        alive[inst[i].z] = 1;
+        if (is_store(inst[i].op)) {
+            alive[i] = 1;
+        }
+        if (alive[i]) {
+            alive[inst[i].x] = 1;
+            alive[inst[i].y] = 1;
+            alive[inst[i].z] = 1;
+        }
     }
 
     int *newix = calloc((size_t)insts, sizeof *newix);
