@@ -980,84 +980,56 @@ umbra_v32 umbra_gt_u32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
 umbra_v32 umbra_ge_u32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_op(bb, op_ge_u32, a.id, b.id, 0)}; }
 
 struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) {
-    int insts = bb->insts;
-    struct bb_inst *inst = malloc((size_t)insts * sizeof *inst);
-    __builtin_memcpy(inst, bb->inst, (size_t)insts * sizeof *inst);
+    struct {
+        _Bool live, varying;
+        _Bool unused[2];
+        int id;
+    } *meta = calloc((size_t)bb->insts, sizeof *meta);
 
-    // 1. DCE + compaction.  Walk backwards: stores are live, inputs of live instructions are live.
-    //    Unused x/y/z fields are 0 (the zero constant), so it's naturally kept alive.
-    _Bool *alive = calloc((size_t)insts, sizeof *alive);
-    for (int i = insts; i --> 0;) {
-        if (is_store(inst[i].op)) {
-            alive[i] = 1;
-        }
-        if (alive[i]) {
-            alive[inst[i].x] = 1;
-            alive[inst[i].y] = 1;
-            alive[inst[i].z] = 1;
-        }
-    }
-
-    int *newix = calloc((size_t)insts, sizeof *newix);
     int live = 0;
-    for (int i = 0; i < insts; i++) {
-        if (alive[i]) { newix[i] = live++; }
+    for (int i = bb->insts; i --> 0;) {
+        if (is_store(bb->inst[i].op)) {
+            meta[i].live = 1;
+        }
+        if (meta[i].live) {
+            meta[bb->inst[i].x].live = 1;
+            meta[bb->inst[i].y].live = 1;
+            meta[bb->inst[i].z].live = 1;
+        }
+        live += meta[i].live;
     }
-    live = 0;
-    for (int i = 0; i < insts; i++) {
-        if (!alive[i]) { continue; }
-        inst[live] = inst[i];
-        inst[live].x = newix[inst[i].x];
-        inst[live].y = newix[inst[i].y];
-        inst[live].z = newix[inst[i].z];
-        live++;
-    }
-    free(newix);
-    free(alive);
 
-    // 2. Loop invariant hoisting: stable partition uniforms before varyings.
-    int preamble;
-    {
-        _Bool *varying = calloc((size_t)live, sizeof *varying);
-        for (int i = 0; i < live; i++) {
-            if (inst[i].op == op_lane) { varying[i] = 1; continue; }
-            if (is_store(inst[i].op))     { varying[i] = 1; continue; }
-            if (inst[i].op == op_load_16 || inst[i].op == op_load_32) {
-                varying[i] = varying[inst[i].x];
-                continue;
+    for (int i = 0; i < bb->insts; i++) {
+        if (bb->inst[i].op == op_lane) {
+            meta[i].varying = 1;
+        }
+        if (0 || meta[bb->inst[i].x].varying
+              || meta[bb->inst[i].y].varying
+              || meta[bb->inst[i].z].varying) {
+            meta[i].varying = 1;
+        }
+    }
+
+    struct bb_inst *out = malloc((size_t)live * sizeof *out);
+    int n = 0, preamble = 0;
+    for (int varying = 0; varying < 2; varying++) {
+        if (varying) {
+            preamble = n;
+        }
+        for (int i = 0; i < bb->insts; i++) {
+            if (meta[i].live && meta[i].varying == varying) {
+                out[n]   = bb->inst[i];
+                out[n].x = meta[bb->inst[i].x].id;
+                out[n].y = meta[bb->inst[i].y].id;
+                out[n].z = meta[bb->inst[i].z].id;
+                meta[i].id = n++;
             }
-            if (varying[inst[i].x] || varying[inst[i].y] || varying[inst[i].z]) {
-                varying[i] = 1;
-            }
         }
-
-        int *order = malloc((size_t)live * sizeof *order);
-        int *back  = malloc((size_t)live * sizeof *back);
-        int j = 0;
-        for (int i = 0; i < live; i++) {
-            if (!varying[i]) { back[j]=i; order[i]=j; j++; }
-        }
-        preamble = j;
-        for (int i = 0; i < live; i++) {
-            if ( varying[i]) { back[j]=i; order[i]=j; j++; }
-        }
-
-        struct bb_inst *tmp = malloc((size_t)live * sizeof *tmp);
-        for (int i = 0; i < live; i++) {
-            tmp[i] = inst[back[i]];
-            tmp[i].x = order[inst[back[i]].x];
-            tmp[i].y = order[inst[back[i]].y];
-            tmp[i].z = order[inst[back[i]].z];
-        }
-        __builtin_memcpy(inst, tmp, (size_t)live * sizeof *inst);
-        free(tmp);
-        free(back);
-        free(order);
-        free(varying);
     }
+    free(meta);
 
-    struct umbra_interpreter *p = interp_from_bb_insts(inst, live, preamble);
-    free(inst);
+    struct umbra_interpreter *p = interp_from_bb_insts(out, live, preamble);
+    free(out);
     return p;
 }
 
