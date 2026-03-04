@@ -440,65 +440,6 @@ static Fn const fn[] = {
     [op_gt_u32] = gt_u32, [op_ge_u32] = ge_u32,
 };
 
-static struct umbra_interpreter* interp_from_bb_insts(struct bb_inst const inst[], int insts,
-                                                      int preamble) {
-    int const total = insts + 1;
-    struct umbra_interpreter *p = malloc(sizeof *p);
-    p->inst = malloc((size_t)total * sizeof *p->inst);
-    p->v    = malloc((size_t)total * sizeof *p->v);
-    #define emit(...) p->inst[i] = (struct interp_inst){__VA_ARGS__}
-    for (int i = 0; i < insts; i++) {
-        int const X = inst[i].x-i,
-                  Y = inst[i].y-i,
-                  Z = inst[i].z-i;
-        switch (inst[i].op) {
-            case op_imm_16: emit(.fn=imm_16, .x=inst[i].immi); break;
-            case op_imm_32: emit(.fn=imm_32, .x=inst[i].immi); break;
-            case op_lane:   emit(.fn=lane);                     break;
-
-            case op_load_16:
-                if (inst[inst[i].x].op == op_lane) {
-                    emit(.fn=load_16, .x=inst[i].ptr);
-                } else if (inst[inst[i].x].op == op_imm_32) {
-                    emit(.fn=uni_16, .x=inst[i].ptr,
-                                     .y=inst[inst[i].x].immi);
-                } else {
-                    emit(.fn=gather_16, .x=inst[i].ptr, .y=X);
-                } break;
-            case op_load_32:
-                if (inst[inst[i].x].op == op_lane) {
-                    emit(.fn=load_32, .x=inst[i].ptr);
-                } else if (inst[inst[i].x].op == op_imm_32) {
-                    emit(.fn=uni_32, .x=inst[i].ptr,
-                                     .y=inst[inst[i].x].immi);
-                } else {
-                    emit(.fn=gather_32, .x=inst[i].ptr, .y=X);
-                } break;
-
-            case op_store_16:
-                if (inst[inst[i].x].op == op_lane) {
-                    emit(.fn=store_16, .x=inst[i].ptr, .y=Y);
-                } else {
-                    emit(.fn=scatter_16, .x=inst[i].ptr,
-                                         .y=Y, .z=X);
-                } break;
-            case op_store_32:
-                if (inst[inst[i].x].op == op_lane) {
-                    emit(.fn=store_32, .x=inst[i].ptr, .y=Y);
-                } else {
-                    emit(.fn=scatter_32, .x=inst[i].ptr,
-                                         .y=Y, .z=X);
-                } break;
-
-            default: emit(.fn=fn[inst[i].op], .x=X, .y=Y, .z=Z);
-        }
-    }
-    #undef emit
-    p->inst[insts] = (struct interp_inst){.fn=done};
-    p->preamble = preamble;
-    return p;
-}
-
 // ── basic block builder ──────────────────────────────────────────────
 
 struct bb_slot { uint32_t hash; int ix; };
@@ -981,8 +922,7 @@ umbra_v32 umbra_ge_u32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
 
 struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) {
     struct {
-        _Bool live, varying;
-        _Bool unused[2];
+        _Bool live, varying, unused[2];
         int id;
     } *meta = calloc((size_t)bb->insts, sizeof *meta);
 
@@ -1000,36 +940,74 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
     }
 
     for (int i = 0; i < bb->insts; i++) {
-        if (bb->inst[i].op == op_lane) {
-            meta[i].varying = 1;
-        }
-        if (0 || meta[bb->inst[i].x].varying
-              || meta[bb->inst[i].y].varying
-              || meta[bb->inst[i].z].varying) {
-            meta[i].varying = 1;
-        }
+        meta[i].varying = (bb->inst[i].op == op_lane)
+                        | meta[bb->inst[i].x].varying
+                        | meta[bb->inst[i].y].varying
+                        | meta[bb->inst[i].z].varying;
     }
 
-    struct bb_inst *out = malloc((size_t)live * sizeof *out);
-    int n = 0, preamble = 0;
+    struct umbra_interpreter *p = malloc(sizeof *p);
+    p->inst = malloc((size_t)(live + 1) * sizeof *p->inst);
+    p->v    = malloc((size_t)(live + 1) * sizeof *p->v);
+
+    int n = 0;
+    #define emit(...) p->inst[n] = (struct interp_inst){__VA_ARGS__}
     for (int varying = 0; varying < 2; varying++) {
         if (varying) {
-            preamble = n;
+            p->preamble = n;
         }
         for (int i = 0; i < bb->insts; i++) {
             if (meta[i].live && meta[i].varying == varying) {
-                out[n]   = bb->inst[i];
-                out[n].x = meta[bb->inst[i].x].id;
-                out[n].y = meta[bb->inst[i].y].id;
-                out[n].z = meta[bb->inst[i].z].id;
+                struct bb_inst const *inst = &bb->inst[i];
+                int const X = meta[inst->x].id - n,
+                          Y = meta[inst->y].id - n,
+                          Z = meta[inst->z].id - n;
+                switch (inst->op) {
+                    case op_lane:   emit(.fn=lane);                  break;
+                    case op_imm_16: emit(.fn=imm_16, .x=inst->immi); break;
+                    case op_imm_32: emit(.fn=imm_32, .x=inst->immi); break;
+
+                    case op_load_16:
+                        if (bb->inst[inst->x].op == op_lane) {
+                            emit(.fn=load_16, .x=inst->ptr);
+                        } else if (bb->inst[inst->x].op == op_imm_32) {
+                            emit(.fn=uni_16, .x=inst->ptr
+                                           , .y=bb->inst[inst->x].immi);
+                        } else {
+                            emit(.fn=gather_16, .x=inst->ptr, .y=X);
+                        } break;
+                    case op_load_32:
+                        if (bb->inst[inst->x].op == op_lane) {
+                            emit(.fn=load_32, .x=inst->ptr);
+                        } else if (bb->inst[inst->x].op == op_imm_32) {
+                            emit(.fn=uni_32, .x=inst->ptr
+                                           , .y=bb->inst[inst->x].immi);
+                        } else {
+                            emit(.fn=gather_32, .x=inst->ptr, .y=X);
+                        } break;
+
+                    case op_store_16:
+                        if (bb->inst[inst->x].op == op_lane) {
+                            emit(.fn=store_16, .x=inst->ptr, .y=Y);
+                        } else {
+                            emit(.fn=scatter_16, .x=inst->ptr, .y=Y, .z=X);
+                        } break;
+                    case op_store_32:
+                        if (bb->inst[inst->x].op == op_lane) {
+                            emit(.fn=store_32, .x=inst->ptr, .y=Y);
+                        } else {
+                            emit(.fn=scatter_32, .x=inst->ptr, .y=Y, .z=X);
+                        } break;
+
+                    default: emit(.fn=fn[inst->op], .x=X, .y=Y, .z=Z);
+                }
                 meta[i].id = n++;
             }
         }
     }
+    #undef emit
+    p->inst[n] = (struct interp_inst){.fn=done};
     free(meta);
-
-    struct umbra_interpreter *p = interp_from_bb_insts(out, live, preamble);
-    free(out);
     return p;
 }
 
