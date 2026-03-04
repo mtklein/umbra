@@ -14,7 +14,8 @@ void umbra_codegen_free(struct umbra_codegen *cg) { (void)cg; }
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+
+typedef struct umbra_basic_block BB;
 
 struct umbra_codegen {
     void *dl;
@@ -43,8 +44,7 @@ static void emit(Buf *b, char const *fmt, ...) {
     }
 }
 
-struct umbra_codegen* umbra_codegen(struct umbra_basic_block const *bb) {
-    // Liveness
+struct umbra_codegen* umbra_codegen(BB const *bb) {
     _Bool *live    = calloc((size_t)bb->insts, 1);
     _Bool *varying = calloc((size_t)bb->insts, 1);
 
@@ -63,7 +63,6 @@ struct umbra_codegen* umbra_codegen(struct umbra_basic_block const *bb) {
                     | varying[bb->inst[i].z];
     }
 
-    // Per-ptr: track which widths are used
     int max_ptr = -1;
     for (int i = 0; i < bb->insts; i++) {
         if (!live[i]) { continue; }
@@ -86,17 +85,14 @@ struct umbra_codegen* umbra_codegen(struct umbra_basic_block const *bb) {
 
     Buf b = {0};
 
-    // Preamble
     emit(&b, "#include <stdint.h>\n");
     emit(&b, "#include <math.h>\n\n");
 
     emit(&b, "typedef uint32_t u32;\ntypedef uint16_t u16;\ntypedef  int32_t s32;\ntypedef  int16_t s16;\n\n");
 
-    // Type-pun helpers (union punning is defined in C99)
     emit(&b, "static inline u32 f2u(float f) { union{float f;u32 u;} x; x.f=f; return x.u; }\n");
     emit(&b, "static inline float u2f(u32 u) { union{float f;u32 u;} x; x.u=u; return x.f; }\n\n");
 
-    // Branchless f16↔f32 helpers
     emit(&b, "static inline float h2f(u16 h) {\n");
     emit(&b, "    u32 sign=((u32)h>>15)<<31, exp=((u32)h>>10)&0x1f, mant=(u32)h&0x3ff;\n");
     emit(&b, "    u32 normal = sign | ((exp+112)<<23) | (mant<<13);\n");
@@ -123,10 +119,8 @@ struct umbra_codegen* umbra_codegen(struct umbra_basic_block const *bb) {
     emit(&b, "    u32 r = (is_uf&sign) | (is_of&~is_in&inf) | (is_in&infnan) | (~is_uf&~is_of&~is_in&normal);\n");
     emit(&b, "    return (u16)r;\n}\n\n");
 
-    // Function signature
     emit(&b, "void umbra_entry(int n, void* ptr[]) {\n");
 
-    // Typed restrict pointer aliases
     for (int p = 0; p <= max_ptr; p++) {
         if (ptr_32[p] && ptr_16[p]) {
             // Mixed: emit both, no restrict (they alias)
@@ -139,11 +133,6 @@ struct umbra_codegen* umbra_codegen(struct umbra_basic_block const *bb) {
         }
     }
 
-    // Helper: pointer name for a given ptr index and width
-    // For mixed ptrs we need p%d_32 or p%d_16; for single-type just p%d.
-    // We'll handle this inline below using ptr_16/ptr_32 flags.
-
-    // Emit uniform (non-varying) values before the loop
     for (int i = 0; i < bb->insts; i++) {
         if (!live[i] || varying[i] || is_store(bb->inst[i].op)) { continue; }
         struct bb_inst const *inst = &bb->inst[i];
@@ -280,7 +269,6 @@ struct umbra_codegen* umbra_codegen(struct umbra_basic_block const *bb) {
         }
     }
 
-    // Loop over elements
     emit(&b, "    for (int i = 0; i < n; i++) {\n");
 
     for (int i = 0; i < bb->insts; i++) {
@@ -478,7 +466,6 @@ struct umbra_codegen* umbra_codegen(struct umbra_basic_block const *bb) {
     free(ptr_16);
     free(ptr_32);
 
-    // Write temp .c file via mkstemp
     char tpl[] = "/tmp/umbra_XXXXXX";
     int fd = mkstemp(tpl);
     if (fd < 0) { free(b.buf); return 0; }
@@ -493,17 +480,15 @@ struct umbra_codegen* umbra_codegen(struct umbra_basic_block const *bb) {
     fclose(fp);
     free(b.buf);
 
-    // Derive .so path
-    size_t slen = strlen(c_path);
+    size_t slen = __builtin_strlen(c_path);
     char *so_path = malloc(slen + 8);
-    memcpy(so_path, c_path, slen - 2);
+    __builtin_memcpy(so_path, c_path, slen - 2);
     #ifdef __APPLE__
-    memcpy(so_path + slen - 2, ".dylib", 7);
+    __builtin_memcpy(so_path + slen - 2, ".dylib", 7);
     #else
-    memcpy(so_path + slen - 2, ".so", 4);
+    __builtin_memcpy(so_path + slen - 2, ".so", 4);
     #endif
 
-    // Compile
     char cmd[512];
     snprintf(cmd, sizeof cmd, "cc -O2 -std=c99 -shared -o %s %s 2>&1", so_path, c_path);
     int rc = system(cmd);
@@ -513,7 +498,6 @@ struct umbra_codegen* umbra_codegen(struct umbra_basic_block const *bb) {
         return 0;
     }
 
-    // dlopen
     void *dl = dlopen(so_path, RTLD_NOW);
     if (!dl) {
         remove(c_path);
@@ -535,7 +519,7 @@ struct umbra_codegen* umbra_codegen(struct umbra_basic_block const *bb) {
     cg->dl       = dl;
     cg->entry    = entry;
     cg->src_path = malloc(slen + 1);
-    memcpy(cg->src_path, c_path, slen + 1);
+    __builtin_memcpy(cg->src_path, c_path, slen + 1);
     cg->so_path  = so_path;
     return cg;
 }

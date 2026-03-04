@@ -3,7 +3,6 @@
 #include "umbra.h"
 #include <stdint.h>
 
-// Helper: build bb for binop(load(ptr0), load(ptr1)) → store(ptr2), assign interpreter to p_.
 #define BB_BUILD_BINOP_32(op_fn, bb_) do { \
     bb_ = umbra_basic_block(); \
     umbra_v32 ix_ = umbra_lane(bb_), \
@@ -45,7 +44,6 @@
 } while(0)
 
 static void test_f32_ops(void) {
-    // mul
     {
         struct umbra_interpreter *p; BB_BINOP_32(umbra_mul_f32, p);
         float x[] = {1,2,3,4,5}, y[] = {6,7,8,9,0}, z[5] = {0};
@@ -54,7 +52,6 @@ static void test_f32_ops(void) {
         equiv(z[3], 36) here; equiv(z[4],  0) here;
         umbra_interpreter_free(p);
     }
-    // add
     {
         struct umbra_interpreter *p; BB_BINOP_32(umbra_add_f32, p);
         float x[] = {1,2,3}, y[] = {10,20,30}, z[3] = {0};
@@ -62,7 +59,6 @@ static void test_f32_ops(void) {
         equiv(z[0], 11) here; equiv(z[1], 22) here; equiv(z[2], 33) here;
         umbra_interpreter_free(p);
     }
-    // sub
     {
         struct umbra_interpreter *p; BB_BINOP_32(umbra_sub_f32, p);
         float x[] = {10,20,30}, y[] = {1,2,3}, z[3] = {0};
@@ -70,7 +66,6 @@ static void test_f32_ops(void) {
         equiv(z[0], 9) here; equiv(z[1], 18) here; equiv(z[2], 27) here;
         umbra_interpreter_free(p);
     }
-    // div
     {
         struct umbra_interpreter *p; BB_BINOP_32(umbra_div_f32, p);
         float x[] = {10,20,30}, y[] = {2,4,5}, z[3] = {0};
@@ -81,7 +76,6 @@ static void test_f32_ops(void) {
 }
 
 static void test_i32_ops(void) {
-    // add
     {
         struct umbra_interpreter *p; BB_BINOP_32(umbra_add_i32, p);
         int x[] = {1,2,3}, y[] = {10,20,30}, z[3] = {0};
@@ -89,7 +83,6 @@ static void test_i32_ops(void) {
         (z[0] == 11) here; (z[1] == 22) here; (z[2] == 33) here;
         umbra_interpreter_free(p);
     }
-    // sub
     {
         struct umbra_interpreter *p; BB_BINOP_32(umbra_sub_i32, p);
         int x[] = {10,20,30}, y[] = {1,2,3}, z[3] = {0};
@@ -97,7 +90,6 @@ static void test_i32_ops(void) {
         (z[0] == 9) here; (z[1] == 18) here; (z[2] == 27) here;
         umbra_interpreter_free(p);
     }
-    // mul
     {
         struct umbra_interpreter *p; BB_BINOP_32(umbra_mul_i32, p);
         int x[] = {2,3,4}, y[] = {5,6,7}, z[3] = {0};
@@ -105,7 +97,6 @@ static void test_i32_ops(void) {
         (z[0] == 10) here; (z[1] == 18) here; (z[2] == 28) here;
         umbra_interpreter_free(p);
     }
-    // shl
     {
         struct umbra_interpreter *p; BB_BINOP_32(umbra_shl_i32, p);
         int x[] = {1,3,7}, y[] = {1,2,3}, z[3] = {0};
@@ -113,7 +104,6 @@ static void test_i32_ops(void) {
         (z[0] == 2) here; (z[1] == 12) here; (z[2] == 56) here;
         umbra_interpreter_free(p);
     }
-    // shr_u
     {
         struct umbra_interpreter *p; BB_BINOP_32(umbra_shr_u32, p);
         int x[] = {-1, 8, 64}, y[] = {1, 1, 3}, z[3] = {0};
@@ -122,7 +112,6 @@ static void test_i32_ops(void) {
         (z[1] == 4) here; (z[2] == 8) here;
         umbra_interpreter_free(p);
     }
-    // shr_s
     {
         struct umbra_interpreter *p; BB_BINOP_32(umbra_shr_s32, p);
         int x[] = {-8, 8, 64}, y[] = {1, 1, 3}, z[3] = {0};
@@ -130,7 +119,6 @@ static void test_i32_ops(void) {
         (z[0] == -4) here; (z[1] == 4) here; (z[2] == 8) here;
         umbra_interpreter_free(p);
     }
-    // and, or, xor
     {
         struct umbra_interpreter *p; BB_BINOP_32(umbra_and_32, p);
         int x[] = {0xff, 0x0f}, y[] = {0x0f, 0xff}, z[2] = {0};
@@ -152,7 +140,6 @@ static void test_i32_ops(void) {
         (z[0] == 0xf0) here; (z[1] == 0x00) here;
         umbra_interpreter_free(p);
     }
-    // sel
     {
         struct umbra_basic_block *bb = umbra_basic_block();
         umbra_v32 ix = umbra_lane(bb),
@@ -171,7 +158,6 @@ static void test_i32_ops(void) {
 }
 
 static void test_f16_ops(void) {
-    // mul
     {
         struct umbra_interpreter *p; BB_BINOP_16(umbra_mul_f16, p);
         __fp16 x[] = {2,3,4}, y[] = {5,6,7}, z[3] = {0};
@@ -179,7 +165,6 @@ static void test_f16_ops(void) {
         equiv((float)z[0], 10) here; equiv((float)z[1], 18) here; equiv((float)z[2], 28) here;
         umbra_interpreter_free(p);
     }
-    // add
     {
         struct umbra_interpreter *p; BB_BINOP_16(umbra_add_f16, p);
         __fp16 x[] = {1,2,3}, y[] = {10,20,30}, z[3] = {0};
@@ -187,7 +172,6 @@ static void test_f16_ops(void) {
         equiv((float)z[0], 11) here; equiv((float)z[1], 22) here; equiv((float)z[2], 33) here;
         umbra_interpreter_free(p);
     }
-    // sub
     {
         struct umbra_interpreter *p; BB_BINOP_16(umbra_sub_f16, p);
         __fp16 x[] = {10,20,30}, y[] = {1,2,3}, z[3] = {0};
@@ -195,7 +179,6 @@ static void test_f16_ops(void) {
         equiv((float)z[0], 9) here; equiv((float)z[1], 18) here; equiv((float)z[2], 27) here;
         umbra_interpreter_free(p);
     }
-    // div
     {
         struct umbra_interpreter *p; BB_BINOP_16(umbra_div_f16, p);
         __fp16 x[] = {10,20,30}, y[] = {2,4,5}, z[3] = {0};
@@ -206,7 +189,6 @@ static void test_f16_ops(void) {
 }
 
 static void test_i16_ops(void) {
-    // add
     {
         struct umbra_interpreter *p; BB_BINOP_16(umbra_add_i16, p);
         short x[] = {1,2,3}, y[] = {10,20,30}, z[3] = {0};
@@ -214,7 +196,6 @@ static void test_i16_ops(void) {
         (z[0] == 11) here; (z[1] == 22) here; (z[2] == 33) here;
         umbra_interpreter_free(p);
     }
-    // sub
     {
         struct umbra_interpreter *p; BB_BINOP_16(umbra_sub_i16, p);
         short x[] = {10,20,30}, y[] = {1,2,3}, z[3] = {0};
@@ -222,7 +203,6 @@ static void test_i16_ops(void) {
         (z[0] == 9) here; (z[1] == 18) here; (z[2] == 27) here;
         umbra_interpreter_free(p);
     }
-    // mul
     {
         struct umbra_interpreter *p; BB_BINOP_16(umbra_mul_i16, p);
         short x[] = {2,3,4}, y[] = {5,6,7}, z[3] = {0};
@@ -230,7 +210,6 @@ static void test_i16_ops(void) {
         (z[0] == 10) here; (z[1] == 18) here; (z[2] == 28) here;
         umbra_interpreter_free(p);
     }
-    // shl
     {
         struct umbra_interpreter *p; BB_BINOP_16(umbra_shl_i16, p);
         short x[] = {1,3}, y[] = {4,2}, z[2] = {0};
@@ -238,7 +217,6 @@ static void test_i16_ops(void) {
         (z[0] == 16) here; (z[1] == 12) here;
         umbra_interpreter_free(p);
     }
-    // shr_u
     {
         struct umbra_interpreter *p; BB_BINOP_16(umbra_shr_u16, p);
         short x[] = {-1, 64}, y[] = {1, 3}, z[2] = {0};
@@ -246,7 +224,6 @@ static void test_i16_ops(void) {
         (z[0] == (short)(0xffffu >> 1)) here; (z[1] == 8) here;
         umbra_interpreter_free(p);
     }
-    // shr_s
     {
         struct umbra_interpreter *p; BB_BINOP_16(umbra_shr_s16, p);
         short x[] = {-8, 64}, y[] = {1, 3}, z[2] = {0};
@@ -254,7 +231,6 @@ static void test_i16_ops(void) {
         (z[0] == -4) here; (z[1] == 8) here;
         umbra_interpreter_free(p);
     }
-    // and, or, xor
     {
         struct umbra_interpreter *p; BB_BINOP_16(umbra_and_16, p);
         short x[] = {0xff}, y[] = {0x0f}, z[1] = {0};
@@ -276,7 +252,6 @@ static void test_i16_ops(void) {
         (z[0] == 0xf0) here;
         umbra_interpreter_free(p);
     }
-    // sel
     {
         struct umbra_basic_block *bb = umbra_basic_block();
         umbra_v32 ix = umbra_lane(bb);
@@ -295,7 +270,6 @@ static void test_i16_ops(void) {
 }
 
 static void test_cmp_i32(void) {
-    // eq
     {
         struct umbra_interpreter *p; BB_BINOP_32(umbra_eq_i32, p);
         int x[] = {1,2,3}, y[] = {1,9,3}, z[3] = {0};
@@ -303,7 +277,6 @@ static void test_cmp_i32(void) {
         (z[0] == -1) here; (z[1] == 0) here; (z[2] == -1) here;
         umbra_interpreter_free(p);
     }
-    // ne
     {
         struct umbra_interpreter *p; BB_BINOP_32(umbra_ne_i32, p);
         int x[] = {1,2}, y[] = {1,9}, z[2] = {0};
@@ -311,7 +284,6 @@ static void test_cmp_i32(void) {
         (z[0] == 0) here; (z[1] == -1) here;
         umbra_interpreter_free(p);
     }
-    // lt_s, le_s, gt_s, ge_s
     {
         struct umbra_interpreter *p; BB_BINOP_32(umbra_lt_s32, p);
         int x[] = {1,5,3}, y[] = {2,5,1}, z[3] = {0};
@@ -368,7 +340,6 @@ static void test_cmp_i16(void) {
 }
 
 static void test_cmp_f32(void) {
-    // eq
     {
         struct umbra_interpreter *p; BB_BINOP_32(umbra_eq_f32, p);
         float x[] = {1,2,3}, y[] = {1,9,3}; int z[3] = {0};
@@ -376,7 +347,6 @@ static void test_cmp_f32(void) {
         (z[0] == -1) here; (z[1] == 0) here; (z[2] == -1) here;
         umbra_interpreter_free(p);
     }
-    // lt
     {
         struct umbra_interpreter *p; BB_BINOP_32(umbra_lt_f32, p);
         float x[] = {1,5,3}, y[] = {2,5,1}; int z[3] = {0};
@@ -466,7 +436,6 @@ static void test_fma_f16(void) {
 }
 
 static void test_min_max_sqrt_f32(void) {
-    // min
     {
         struct umbra_interpreter *p; BB_BINOP_32(umbra_min_f32, p);
         float x[] = {5,1,3}, y[] = {2,4,3}, z[3] = {0};
@@ -474,7 +443,6 @@ static void test_min_max_sqrt_f32(void) {
         equiv(z[0], 2) here; equiv(z[1], 1) here; equiv(z[2], 3) here;
         umbra_interpreter_free(p);
     }
-    // max
     {
         struct umbra_interpreter *p; BB_BINOP_32(umbra_max_f32, p);
         float x[] = {5,1,3}, y[] = {2,4,3}, z[3] = {0};
@@ -482,7 +450,6 @@ static void test_min_max_sqrt_f32(void) {
         equiv(z[0], 5) here; equiv(z[1], 4) here; equiv(z[2], 3) here;
         umbra_interpreter_free(p);
     }
-    // sqrt
     {
         struct umbra_basic_block *bb = umbra_basic_block();
         umbra_v32 ix = umbra_lane(bb),
@@ -499,7 +466,6 @@ static void test_min_max_sqrt_f32(void) {
 }
 
 static void test_min_max_sqrt_f16(void) {
-    // min
     {
         struct umbra_interpreter *p; BB_BINOP_16(umbra_min_f16, p);
         __fp16 x[] = {5,1,3}, y[] = {2,4,3}, z[3] = {0};
@@ -507,7 +473,6 @@ static void test_min_max_sqrt_f16(void) {
         equiv((float)z[0], 2) here; equiv((float)z[1], 1) here; equiv((float)z[2], 3) here;
         umbra_interpreter_free(p);
     }
-    // max
     {
         struct umbra_interpreter *p; BB_BINOP_16(umbra_max_f16, p);
         __fp16 x[] = {5,1,3}, y[] = {2,4,3}, z[3] = {0};
@@ -515,7 +480,6 @@ static void test_min_max_sqrt_f16(void) {
         equiv((float)z[0], 5) here; equiv((float)z[1], 4) here; equiv((float)z[2], 3) here;
         umbra_interpreter_free(p);
     }
-    // sqrt
     {
         struct umbra_basic_block *bb = umbra_basic_block();
         umbra_v32 ix = umbra_lane(bb);
@@ -541,7 +505,6 @@ static void test_large_n(void) {
 }
 
 static void test_convert(void) {
-    // f32_from_i32
     {
         struct umbra_basic_block *bb = umbra_basic_block();
         umbra_v32 ix = umbra_lane(bb),
@@ -555,7 +518,6 @@ static void test_convert(void) {
         equiv(z[0], 1) here; equiv(z[1], 255) here; equiv(z[2], -3) here;
         umbra_interpreter_free(p);
     }
-    // i32_from_f32
     {
         struct umbra_basic_block *bb = umbra_basic_block();
         umbra_v32 ix = umbra_lane(bb),
@@ -569,7 +531,6 @@ static void test_convert(void) {
         (z[0] == 1) here; (z[1] == 255) here; (z[2] == -3) here;
         umbra_interpreter_free(p);
     }
-    // f16↔f32 roundtrip
     {
         struct umbra_basic_block *bb = umbra_basic_block();
         umbra_v32 ix = umbra_lane(bb),
@@ -693,7 +654,7 @@ static void test_zero_imm(void) {
     // imm_32(0) should dedup to the zero constant at index 0.
     struct umbra_basic_block *bb = umbra_basic_block();
     umbra_v32 zero = umbra_imm_32(bb, 0);
-    (zero.id == 0) here;  // deduplicates to the zero constant
+    (zero.id == 0) here;
     umbra_v32 ix = umbra_lane(bb),
                x = umbra_load_32(bb, (umbra_ptr){0}, ix),
                r = umbra_eq_i32(bb, x, zero);
@@ -702,9 +663,9 @@ static void test_zero_imm(void) {
     umbra_basic_block_free(bb);
     int a[] = {0, 1, 0}, z[3] = {0};
     umbra_interpreter_run(p, 3, (void*[]){a, z});
-    (z[0] == -1) here;  // 0 == 0 → true
-    (z[1] ==  0) here;  // 1 == 0 → false
-    (z[2] == -1) here;  // 0 == 0 → true
+    (z[0] == -1) here;
+    (z[1] ==  0) here;
+    (z[2] == -1) here;
     umbra_interpreter_free(p);
 }
 
@@ -771,15 +732,12 @@ static void test_hash_quality(void) {
     for (int i = 0; i < N; i++) {
         ids[i] = umbra_imm_32(bb, (uint32_t)i).id;
     }
-    // Re-pushing should dedup to same IDs.
     for (int i = 0; i < N; i++) {
         (umbra_imm_32(bb, (uint32_t)i).id == ids[i]) here;
     }
-    // Adjacent IDs should differ (no false collisions).
     for (int i = 1; i < N; i++) {
         (ids[i] != ids[i-1]) here;
     }
-    // Also stress-test with computed values, not just immediates.
     umbra_v32 ix = umbra_lane(bb),
                x = umbra_load_32(bb, (umbra_ptr){0}, ix);
     for (int i = 0; i < N; i++) {
@@ -792,7 +750,6 @@ static void test_hash_quality(void) {
 }
 
 static void test_codegen(void) {
-    // f32 add
     {
         struct umbra_basic_block *bb;
         BB_BUILD_BINOP_32(umbra_add_f32, bb);
@@ -804,7 +761,6 @@ static void test_codegen(void) {
         equiv(z[0], 11) here; equiv(z[1], 22) here; equiv(z[2], 33) here;
         umbra_codegen_free(cg);
     }
-    // f32 mul
     {
         struct umbra_basic_block *bb;
         BB_BUILD_BINOP_32(umbra_mul_f32, bb);
@@ -816,7 +772,6 @@ static void test_codegen(void) {
         equiv(z[0], 10) here; equiv(z[1], 18) here; equiv(z[2], 28) here;
         umbra_codegen_free(cg);
     }
-    // i32 add
     {
         struct umbra_basic_block *bb;
         BB_BUILD_BINOP_32(umbra_add_i32, bb);
@@ -828,7 +783,6 @@ static void test_codegen(void) {
         (z[0] == 11) here; (z[1] == 22) here; (z[2] == 33) here;
         umbra_codegen_free(cg);
     }
-    // i32 shr_u
     {
         struct umbra_basic_block *bb;
         BB_BUILD_BINOP_32(umbra_shr_u32, bb);
@@ -841,7 +795,6 @@ static void test_codegen(void) {
         (z[1] == 4) here; (z[2] == 8) here;
         umbra_codegen_free(cg);
     }
-    // f16 mul
     {
         struct umbra_basic_block *bb;
         BB_BUILD_BINOP_16(umbra_mul_f16, bb);
@@ -853,7 +806,6 @@ static void test_codegen(void) {
         equiv((float)z[0], 10) here; equiv((float)z[1], 18) here; equiv((float)z[2], 28) here;
         umbra_codegen_free(cg);
     }
-    // srcover blend
     {
         struct umbra_basic_block *bb = umbra_basic_block();
         umbra_v32 ix     = umbra_lane(bb),
@@ -902,7 +854,6 @@ static void test_codegen(void) {
         ((float)dst_r[0] > 0.28f - tol && (float)dst_r[0] < 0.34f + tol) here;
         umbra_codegen_free(cg);
     }
-    // large n
     {
         struct umbra_basic_block *bb;
         BB_BUILD_BINOP_32(umbra_add_f32, bb);
