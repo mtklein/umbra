@@ -490,7 +490,15 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
     #endif
 
     char cmd[512];
-    snprintf(cmd, sizeof cmd, "cc -O2 -std=c99 -shared -o %s %s 2>&1", so_path, c_path);
+    #ifdef __APPLE__
+    snprintf(cmd, sizeof cmd,
+             "cc -O2 -g -std=c99 -shared -Wl,-install_name,umbra_codegen -o %s %s 2>&1",
+             so_path, c_path);
+    #else
+    snprintf(cmd, sizeof cmd,
+             "cc -O2 -g -std=c99 -shared -o %s %s 2>&1",
+             so_path, c_path);
+    #endif
     int rc = system(cmd);
     if (rc != 0) {
         remove(c_path);
