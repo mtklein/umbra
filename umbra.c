@@ -542,7 +542,7 @@ struct umbra_basic_block {
     int             insts, ht_mask;
 };
 
-// Push a pre-filled instruction. Returns its absolute index.
+// Push a pre-filled instruction (absolute indices). Returns its index.
 // Stores skip dedup. Others get deduped via hash table.
 static int bb_push(struct umbra_basic_block *bb, struct bb_inst inst) {
     // Grow inst[] and ht[] when insts is zero or a power of two.
@@ -556,14 +556,7 @@ static int bb_push(struct umbra_basic_block *bb, struct bb_inst inst) {
         bb->ht_mask = ht_cap - 1;
         for (int i = 0; i < bb->insts; i++) {
             if (is_store(bb->inst[i].op)) { continue; }
-            struct { enum op op; int x, y, z, immi; } key = {
-                bb->inst[i].op,
-                bb->inst[i].x ? i + bb->inst[i].x : 0,
-                bb->inst[i].y ? i + bb->inst[i].y : 0,
-                bb->inst[i].z ? i + bb->inst[i].z : 0,
-                bb->inst[i].immi,
-            };
-            uint32_t h = fnv1a(&key, sizeof key);
+            uint32_t h = fnv1a(&bb->inst[i], sizeof bb->inst[i]);
             for (;;) {
                 int slot = (int)(h & (uint32_t)bb->ht_mask);
                 if (bb->ht[slot] < 0) { bb->ht[slot] = i; break; }
@@ -578,19 +571,9 @@ static int bb_push(struct umbra_basic_block *bb, struct bb_inst inst) {
         return id;
     }
 
-    // Convert relative→absolute for hashing.
-    int cur = bb->insts;
-    struct { enum op op; int x, y, z, immi; } key = {
-        inst.op,
-        inst.x ? cur + inst.x : 0,
-        inst.y ? cur + inst.y : 0,
-        inst.z ? cur + inst.z : 0,
-        inst.immi,
-    };
-    uint32_t h = fnv1a(&key, sizeof key);
-    int mask = bb->ht_mask;
+    uint32_t h = fnv1a(&inst, sizeof inst);
     for (;;) {
-        int slot = (int)(h & (uint32_t)mask);
+        int slot = (int)(h & (uint32_t)bb->ht_mask);
         if (bb->ht[slot] < 0) {
             int id = bb->insts++;
             bb->inst[id] = inst;
@@ -598,16 +581,7 @@ static int bb_push(struct umbra_basic_block *bb, struct bb_inst inst) {
             return id;
         }
         int prev = bb->ht[slot];
-        struct bb_inst *pi = &bb->inst[prev];
-        struct { enum op op; int x, y, z, immi; } pkey = {
-            pi->op,
-            pi->x ? prev + pi->x : 0,
-            pi->y ? prev + pi->y : 0,
-            pi->z ? prev + pi->z : 0,
-            pi->immi,
-        };
-        if (key.op == pkey.op && key.x == pkey.x && key.y == pkey.y
-         && key.z == pkey.z && key.immi == pkey.immi) {
+        if (__builtin_memcmp(&inst, &bb->inst[prev], sizeof inst) == 0) {
             return prev;
         }
         h++;
@@ -622,16 +596,6 @@ void umbra_basic_block_free(struct umbra_basic_block *bb) {
     free(bb->inst);
     free(bb->ht);
     free(bb);
-}
-
-// Make a relative instruction from absolute handle IDs.
-static struct bb_inst bb_rel(int cur, enum op op, int x, int y, int z) {
-    return (struct bb_inst){
-        .op = op,
-        .x  = x ? x - cur : 0,
-        .y  = y ? y - cur : 0,
-        .z  = z ? z - cur : 0,
-    };
 }
 
 umbra_v32 umbra_lane(struct umbra_basic_block *bb) {
@@ -652,31 +616,19 @@ umbra_v32 umbra_imm_32(struct umbra_basic_block *bb, uint32_t bits) {
 }
 
 umbra_v16 umbra_load_16(struct umbra_basic_block *bb, umbra_ptr src, umbra_v32 ix) {
-    int cur = bb->insts;
-    struct bb_inst inst = bb_rel(cur, op_load_16, ix.id, 0, 0);
-    inst.ptr = src.ix;
-    return (umbra_v16){bb_push(bb, inst)};
+    return (umbra_v16){bb_push(bb, (struct bb_inst){.op=op_load_16, .x=ix.id, .ptr=src.ix})};
 }
 
 umbra_v32 umbra_load_32(struct umbra_basic_block *bb, umbra_ptr src, umbra_v32 ix) {
-    int cur = bb->insts;
-    struct bb_inst inst = bb_rel(cur, op_load_32, ix.id, 0, 0);
-    inst.ptr = src.ix;
-    return (umbra_v32){bb_push(bb, inst)};
+    return (umbra_v32){bb_push(bb, (struct bb_inst){.op=op_load_32, .x=ix.id, .ptr=src.ix})};
 }
 
 void umbra_store_16(struct umbra_basic_block *bb, umbra_ptr dst, umbra_v32 ix, umbra_v16 val) {
-    int cur = bb->insts;
-    struct bb_inst inst = bb_rel(cur, op_store_16, ix.id, val.id, 0);
-    inst.ptr = dst.ix;
-    bb_push(bb, inst);
+    bb_push(bb, (struct bb_inst){.op=op_store_16, .x=ix.id, .y=val.id, .ptr=dst.ix});
 }
 
 void umbra_store_32(struct umbra_basic_block *bb, umbra_ptr dst, umbra_v32 ix, umbra_v32 val) {
-    int cur = bb->insts;
-    struct bb_inst inst = bb_rel(cur, op_store_32, ix.id, val.id, 0);
-    inst.ptr = dst.ix;
-    bb_push(bb, inst);
+    bb_push(bb, (struct bb_inst){.op=op_store_32, .x=ix.id, .y=val.id, .ptr=dst.ix});
 }
 
 // Helpers for builder-time const prop and strength reduction.
@@ -740,21 +692,21 @@ static void sort(int *a, int *b) {
 static int bb_binop(struct umbra_basic_block *bb, enum op op, int x, int y) {
     int cp = bb_constprop(bb, op, x, y, 0);
     if (cp >= 0) { return cp; }
-    return bb_push(bb, bb_rel(bb->insts, op, x, y, 0));
+    return bb_push(bb, (struct bb_inst){.op=op, .x=x, .y=y});
 }
 
 // Generic unary op builder.
 static int bb_unop(struct umbra_basic_block *bb, enum op op, int x) {
     int cp = bb_constprop(bb, op, x, 0, 0);
     if (cp >= 0) { return cp; }
-    return bb_push(bb, bb_rel(bb->insts, op, x, 0, 0));
+    return bb_push(bb, (struct bb_inst){.op=op, .x=x});
 }
 
 // Generic ternary op builder.
 static int bb_ternop(struct umbra_basic_block *bb, enum op op, int x, int y, int z) {
     int cp = bb_constprop(bb, op, x, y, z);
     if (cp >= 0) { return cp; }
-    return bb_push(bb, bb_rel(bb->insts, op, x, y, z));
+    return bb_push(bb, (struct bb_inst){.op=op, .x=x, .y=y, .z=z});
 }
 
 // ── f32 arithmetic ───────────────────────────────────────────────────
@@ -764,12 +716,10 @@ umbra_v32 umbra_add_f32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) 
     int x = a.id, y = b.id;
     // FMA peephole: add(mul(a,b), c) → fma(a,b,c)
     if (bb->inst[x].op == op_mul_f32) {
-        int mx = x + bb->inst[x].x, my = x + bb->inst[x].y;
-        return (umbra_v32){bb_ternop(bb, op_fma_f32, mx, my, y)};
+        return (umbra_v32){bb_ternop(bb, op_fma_f32, bb->inst[x].x, bb->inst[x].y, y)};
     }
     if (bb->inst[y].op == op_mul_f32) {
-        int mx = y + bb->inst[y].x, my = y + bb->inst[y].y;
-        return (umbra_v32){bb_ternop(bb, op_fma_f32, mx, my, x)};
+        return (umbra_v32){bb_ternop(bb, op_fma_f32, bb->inst[y].x, bb->inst[y].y, x)};
     }
     return (umbra_v32){bb_binop(bb, op_add_f32, x, y)};
 }
@@ -811,12 +761,10 @@ umbra_v16 umbra_add_f16(struct umbra_basic_block *bb, umbra_v16 a, umbra_v16 b) 
     sort(&a.id, &b.id);
     int x = a.id, y = b.id;
     if (bb->inst[x].op == op_mul_f16) {
-        int mx = x + bb->inst[x].x, my = x + bb->inst[x].y;
-        return (umbra_v16){bb_ternop(bb, op_fma_f16, mx, my, y)};
+        return (umbra_v16){bb_ternop(bb, op_fma_f16, bb->inst[x].x, bb->inst[x].y, y)};
     }
     if (bb->inst[y].op == op_mul_f16) {
-        int mx = y + bb->inst[y].x, my = y + bb->inst[y].y;
-        return (umbra_v16){bb_ternop(bb, op_fma_f16, mx, my, x)};
+        return (umbra_v16){bb_ternop(bb, op_fma_f16, bb->inst[y].x, bb->inst[y].y, x)};
     }
     return (umbra_v16){bb_binop(bb, op_add_f16, x, y)};
 }
@@ -1073,15 +1021,9 @@ umbra_v32 umbra_gt_u32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) {
 umbra_v32 umbra_ge_u32(struct umbra_basic_block *bb, umbra_v32 a, umbra_v32 b) { return (umbra_v32){bb_binop(bb, op_ge_u32, a.id, b.id)}; }
 
 struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) {
-    // Copy and convert relative → absolute.
     int insts = bb->insts;
     struct bb_inst *inst = malloc((size_t)insts * sizeof *inst);
     __builtin_memcpy(inst, bb->inst, (size_t)insts * sizeof *inst);
-    for (int i = 0; i < insts; i++) {
-        if (inst[i].x) { inst[i].x += i; }
-        if (inst[i].y) { inst[i].y += i; }
-        if (inst[i].z) { inst[i].z += i; }
-    }
 
     // 1. DCE + compaction.
     int *uses = calloc((size_t)insts, sizeof *uses);
