@@ -63,7 +63,7 @@ struct umbra_codegen* umbra_codegen(struct umbra_basic_block const *bb) {
                     | varying[bb->inst[i].z];
     }
 
-    // Find max ptr index used
+    // Per-ptr: track which widths are used
     int max_ptr = -1;
     for (int i = 0; i < bb->insts; i++) {
         if (!live[i]) { continue; }
@@ -74,58 +74,74 @@ struct umbra_codegen* umbra_codegen(struct umbra_basic_block const *bb) {
         }
     }
 
+    _Bool *ptr_16 = calloc((size_t)(max_ptr + 2), 1);
+    _Bool *ptr_32 = calloc((size_t)(max_ptr + 2), 1);
+    for (int i = 0; i < bb->insts; i++) {
+        if (!live[i]) { continue; }
+        int p = bb->inst[i].ptr;
+        enum op op = bb->inst[i].op;
+        if (op == op_load_16 || op == op_store_16) { ptr_16[p] = 1; }
+        if (op == op_load_32 || op == op_store_32) { ptr_32[p] = 1; }
+    }
+
     Buf b = {0};
 
     // Preamble
     emit(&b, "#include <stdint.h>\n");
-    emit(&b, "#include <string.h>\n");
     emit(&b, "#include <math.h>\n\n");
 
     emit(&b, "typedef uint32_t u32;\ntypedef uint16_t u16;\ntypedef  int32_t s32;\ntypedef  int16_t s16;\n\n");
 
-    emit(&b, "static inline u32 f2u(float  f) { u32 u; memcpy(&u,&f,4); return u; }\n");
-    emit(&b, "static inline float u2f(u32  u) { float f; memcpy(&f,&u,4); return f; }\n\n");
+    // Type-pun helpers (union punning is defined in C99)
+    emit(&b, "static inline u32 f2u(float f) { union{float f;u32 u;} x; x.f=f; return x.u; }\n");
+    emit(&b, "static inline float u2f(u32 u) { union{float f;u32 u;} x; x.u=u; return x.f; }\n\n");
 
-    // Scalar f16 helpers
+    // Branchless f16↔f32 helpers
     emit(&b, "static inline float h2f(u16 h) {\n");
     emit(&b, "    u32 sign=((u32)h>>15)<<31, exp=((u32)h>>10)&0x1f, mant=(u32)h&0x3ff;\n");
-    emit(&b, "    u32 bits;\n");
-    emit(&b, "    if(exp==0) bits=sign;\n");
-    emit(&b, "    else if(exp==31) bits=sign|(0xffu<<23)|(mant<<13);\n");
-    emit(&b, "    else bits=sign|((exp+112)<<23)|(mant<<13);\n");
+    emit(&b, "    u32 normal = sign | ((exp+112)<<23) | (mant<<13);\n");
+    emit(&b, "    u32 zero   = sign;\n");
+    emit(&b, "    u32 infnan = sign | (0xffu<<23) | (mant<<13);\n");
+    emit(&b, "    u32 is_zero   = -(u32)(exp==0);\n");
+    emit(&b, "    u32 is_infnan = -(u32)(exp==31);\n");
+    emit(&b, "    u32 bits = (is_zero&zero) | (is_infnan&infnan) | (~is_zero&~is_infnan&normal);\n");
     emit(&b, "    return u2f(bits);\n}\n\n");
 
     emit(&b, "static inline u16 f2h(float f) {\n");
     emit(&b, "    u32 bits=f2u(f), sign=(bits>>31)<<15;\n");
-    emit(&b, "    int exp=(int)((bits>>23)&0xff)-127+15;\n");
-    emit(&b, "    u32 mant=(bits>>13)&0x3ff, rb=(bits>>12)&1, st=(bits&0xfff)!=0?1:0;\n");
-    emit(&b, "    mant+=rb&(st|(mant&1)); if(mant>>10){exp++;mant&=0x3ff;}\n");
+    emit(&b, "    s32 exp=(s32)((bits>>23)&0xff)-127+15;\n");
+    emit(&b, "    u32 mant=(bits>>13)&0x3ff, rb=(bits>>12)&1, st=-(u32)((bits&0xfff)!=0);\n");
+    emit(&b, "    mant+=rb&(st|(mant&1));\n");
+    emit(&b, "    u32 mo=mant>>10; exp+=(s32)mo; mant&=0x3ff;\n");
+    emit(&b, "    u32 normal = sign|((u32)exp<<10)|mant;\n");
+    emit(&b, "    u32 inf    = sign|0x7c00;\n");
+    emit(&b, "    u32 infnan = sign|0x7c00|mant;\n");
+    emit(&b, "    u32 is_of = -(u32)(exp>=31);\n");
+    emit(&b, "    u32 is_uf = -(u32)(exp<=0);\n");
     emit(&b, "    u32 se=(bits>>23)&0xff;\n");
-    emit(&b, "    if(se==0xff) return (u16)(sign|0x7c00|mant);\n");
-    emit(&b, "    if(exp>=31)  return (u16)(sign|0x7c00);\n");
-    emit(&b, "    if(exp<=0)   return (u16)sign;\n");
-    emit(&b, "    return (u16)(sign|((u32)exp<<10)|mant);\n}\n\n");
+    emit(&b, "    u32 is_in = -(u32)(se==0xff);\n");
+    emit(&b, "    u32 r = (is_uf&sign) | (is_of&~is_in&inf) | (is_in&infnan) | (~is_uf&~is_of&~is_in&normal);\n");
+    emit(&b, "    return (u16)r;\n}\n\n");
 
     // Function signature
     emit(&b, "void umbra_entry(int n, void* ptr[]) {\n");
 
-    // restrict pointer aliases
+    // Typed restrict pointer aliases
     for (int p = 0; p <= max_ptr; p++) {
-        // Check if this ptr is used for 16-bit or 32-bit (check stores and loads)
-        _Bool used16 = 0, used32 = 0;
-        for (int i = 0; i < bb->insts; i++) {
-            if (!live[i]) { continue; }
-            if (bb->inst[i].ptr != p) { continue; }
-            enum op op = bb->inst[i].op;
-            if (op == op_load_16 || op == op_store_16) { used16 = 1; }
-            if (op == op_load_32 || op == op_store_32) { used32 = 1; }
-        }
-        if (used32) {
-            emit(&b, "    char* restrict p%d = ptr[%d];\n", p, p);
-        } else if (used16) {
-            emit(&b, "    char* restrict p%d = ptr[%d];\n", p, p);
+        if (ptr_32[p] && ptr_16[p]) {
+            // Mixed: emit both, no restrict (they alias)
+            emit(&b, "    u32* p%d_32 = (u32*)ptr[%d];\n", p, p);
+            emit(&b, "    u16* p%d_16 = (u16*)ptr[%d];\n", p, p);
+        } else if (ptr_32[p]) {
+            emit(&b, "    u32* restrict p%d = (u32*)ptr[%d];\n", p, p);
+        } else if (ptr_16[p]) {
+            emit(&b, "    u16* restrict p%d = (u16*)ptr[%d];\n", p, p);
         }
     }
+
+    // Helper: pointer name for a given ptr index and width
+    // For mixed ptrs we need p%d_32 or p%d_16; for single-type just p%d.
+    // We'll handle this inline below using ptr_16/ptr_32 flags.
 
     // Emit uniform (non-varying) values before the loop
     for (int i = 0; i < bb->insts; i++) {
@@ -140,14 +156,22 @@ struct umbra_codegen* umbra_codegen(struct umbra_basic_block const *bb) {
 
             case op_load_16:
                 if (bb->inst[inst->x].op == op_imm_32) {
-                    emit(&b, "    u16 v%d; memcpy(&v%d, p%d+2*%d, 2);\n",
-                         i, i, inst->ptr, bb->inst[inst->x].imm);
+                    int p = inst->ptr;
+                    if (ptr_32[p] && ptr_16[p]) {
+                        emit(&b, "    u16 v%d = p%d_16[%d];\n", i, p, bb->inst[inst->x].imm);
+                    } else {
+                        emit(&b, "    u16 v%d = p%d[%d];\n", i, p, bb->inst[inst->x].imm);
+                    }
                 }
                 break;
             case op_load_32:
                 if (bb->inst[inst->x].op == op_imm_32) {
-                    emit(&b, "    u32 v%d; memcpy(&v%d, p%d+4*%d, 4);\n",
-                         i, i, inst->ptr, bb->inst[inst->x].imm);
+                    int p = inst->ptr;
+                    if (ptr_32[p] && ptr_16[p]) {
+                        emit(&b, "    u32 v%d = p%d_32[%d];\n", i, p, bb->inst[inst->x].imm);
+                    } else {
+                        emit(&b, "    u32 v%d = p%d[%d];\n", i, p, bb->inst[inst->x].imm);
+                    }
                 }
                 break;
 
@@ -268,39 +292,75 @@ struct umbra_codegen* umbra_codegen(struct umbra_basic_block const *bb) {
         switch (inst->op) {
             case op_lane: emit(&b, "        u32 v%d = (u32)i;\n", i); break;
 
-            case op_load_16:
+            case op_load_16: {
+                int p = inst->ptr;
+                _Bool mixed = ptr_32[p] && ptr_16[p];
                 if (bb->inst[inst->x].op == op_lane) {
-                    emit(&b, "        u16 v%d; memcpy(&v%d, p%d+2*i, 2);\n", i, i, inst->ptr);
+                    if (mixed) {
+                        emit(&b, "        u16 v%d = p%d_16[i];\n", i, p);
+                    } else {
+                        emit(&b, "        u16 v%d = p%d[i];\n", i, p);
+                    }
                 } else {
-                    emit(&b, "        u16 v%d; memcpy(&v%d, p%d+2*v%d, 2);\n",
-                         i, i, inst->ptr, inst->x);
+                    if (mixed) {
+                        emit(&b, "        u16 v%d = p%d_16[v%d];\n", i, p, inst->x);
+                    } else {
+                        emit(&b, "        u16 v%d = p%d[v%d];\n", i, p, inst->x);
+                    }
                 }
-                break;
-            case op_load_32:
+            } break;
+            case op_load_32: {
+                int p = inst->ptr;
+                _Bool mixed = ptr_32[p] && ptr_16[p];
                 if (bb->inst[inst->x].op == op_lane) {
-                    emit(&b, "        u32 v%d; memcpy(&v%d, p%d+4*i, 4);\n", i, i, inst->ptr);
+                    if (mixed) {
+                        emit(&b, "        u32 v%d = p%d_32[i];\n", i, p);
+                    } else {
+                        emit(&b, "        u32 v%d = p%d[i];\n", i, p);
+                    }
                 } else {
-                    emit(&b, "        u32 v%d; memcpy(&v%d, p%d+4*v%d, 4);\n",
-                         i, i, inst->ptr, inst->x);
+                    if (mixed) {
+                        emit(&b, "        u32 v%d = p%d_32[v%d];\n", i, p, inst->x);
+                    } else {
+                        emit(&b, "        u32 v%d = p%d[v%d];\n", i, p, inst->x);
+                    }
                 }
-                break;
+            } break;
 
-            case op_store_16:
+            case op_store_16: {
+                int p = inst->ptr;
+                _Bool mixed = ptr_32[p] && ptr_16[p];
                 if (bb->inst[inst->x].op == op_lane) {
-                    emit(&b, "        memcpy(p%d+2*i, &v%d, 2);\n", inst->ptr, inst->y);
+                    if (mixed) {
+                        emit(&b, "        p%d_16[i] = v%d;\n", p, inst->y);
+                    } else {
+                        emit(&b, "        p%d[i] = v%d;\n", p, inst->y);
+                    }
                 } else {
-                    emit(&b, "        memcpy(p%d+2*v%d, &v%d, 2);\n",
-                         inst->ptr, inst->x, inst->y);
+                    if (mixed) {
+                        emit(&b, "        p%d_16[v%d] = v%d;\n", p, inst->x, inst->y);
+                    } else {
+                        emit(&b, "        p%d[v%d] = v%d;\n", p, inst->x, inst->y);
+                    }
                 }
-                break;
-            case op_store_32:
+            } break;
+            case op_store_32: {
+                int p = inst->ptr;
+                _Bool mixed = ptr_32[p] && ptr_16[p];
                 if (bb->inst[inst->x].op == op_lane) {
-                    emit(&b, "        memcpy(p%d+4*i, &v%d, 4);\n", inst->ptr, inst->y);
+                    if (mixed) {
+                        emit(&b, "        p%d_32[i] = v%d;\n", p, inst->y);
+                    } else {
+                        emit(&b, "        p%d[i] = v%d;\n", p, inst->y);
+                    }
                 } else {
-                    emit(&b, "        memcpy(p%d+4*v%d, &v%d, 4);\n",
-                         inst->ptr, inst->x, inst->y);
+                    if (mixed) {
+                        emit(&b, "        p%d_32[v%d] = v%d;\n", p, inst->x, inst->y);
+                    } else {
+                        emit(&b, "        p%d[v%d] = v%d;\n", p, inst->x, inst->y);
+                    }
                 }
-                break;
+            } break;
 
             #define BINOP(OP, EXPR) case OP: emit(&b, "        %s v%d = " EXPR ";\n", ty, i, inst->x, inst->y); break;
             #define UNOP(OP, EXPR)  case OP: emit(&b, "        %s v%d = " EXPR ";\n", ty, i, inst->x); break;
@@ -415,6 +475,8 @@ struct umbra_codegen* umbra_codegen(struct umbra_basic_block const *bb) {
 
     free(live);
     free(varying);
+    free(ptr_16);
+    free(ptr_32);
 
     // Write temp .c file via mkstemp
     char tpl[] = "/tmp/umbra_XXXXXX";
