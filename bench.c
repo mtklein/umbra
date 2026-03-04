@@ -15,7 +15,7 @@ static uint32_t bits(float f) {
     return (union{float f; uint32_t bits;}){f}.bits;
 }
 
-static struct umbra_interpreter* build_srcover(void) {
+static struct umbra_basic_block* build_srcover_bb(void) {
     struct umbra_basic_block *bb = umbra_basic_block();
 
     umbra_v32 const ix = umbra_lane(bb),
@@ -55,12 +55,10 @@ static struct umbra_interpreter* build_srcover(void) {
     umbra_store_16(bb, (umbra_ptr){3}, ix, bout);
     umbra_store_16(bb, (umbra_ptr){4}, ix, aout);
 
-    struct umbra_interpreter *p = umbra_interpreter(bb);
-    umbra_basic_block_free(bb);
-    return p;
+    return bb;
 }
 
-static double bench(struct umbra_interpreter *p, int pixel_n, void *ptrs[]) {
+static double bench_interp(struct umbra_interpreter *p, int pixel_n, void *ptrs[]) {
     umbra_interpreter_run(p, pixel_n, ptrs);
 
     int iters = 1;
@@ -77,15 +75,36 @@ static double bench(struct umbra_interpreter *p, int pixel_n, void *ptrs[]) {
     }
 }
 
+static double bench_codegen(struct umbra_codegen *cg, int pixel_n, void *ptrs[]) {
+    umbra_codegen_run(cg, pixel_n, ptrs);
+
+    int iters = 1;
+    for (;;) {
+        double const start = now();
+        for (int i = 0; i < iters; i++) {
+            umbra_codegen_run(cg, pixel_n, ptrs);
+        }
+        double const elapsed = now() - start;
+        if (elapsed >= 0.5) {
+            return elapsed / ((double)iters * (double)pixel_n) * 1e9;
+        }
+        iters *= 2;
+    }
+}
+
 static double bench_build(void) {
-    struct umbra_interpreter *p = build_srcover();
+    struct umbra_basic_block *bb = build_srcover_bb();
+    struct umbra_interpreter *p = umbra_interpreter(bb);
+    umbra_basic_block_free(bb);
     umbra_interpreter_free(p);
 
     int iters = 1;
     for (;;) {
         double const start = now();
         for (int i = 0; i < iters; i++) {
-            p = build_srcover();
+            bb = build_srcover_bb();
+            p = umbra_interpreter(bb);
+            umbra_basic_block_free(bb);
             umbra_interpreter_free(p);
         }
         double const elapsed = now() - start;
@@ -102,7 +121,10 @@ int main(int argc, char *argv[]) {
         pixel_n = atoi(argv[1]);
     }
 
-    struct umbra_interpreter *p = build_srcover();
+    struct umbra_basic_block *bb = build_srcover_bb();
+    struct umbra_interpreter *p = umbra_interpreter(bb);
+    struct umbra_codegen     *cg = umbra_codegen(bb);
+    umbra_basic_block_free(bb);
 
     uint32_t *src = malloc((size_t)pixel_n * sizeof *src);
     __fp16   *dr  = malloc((size_t)pixel_n * sizeof *dr);
@@ -118,13 +140,18 @@ int main(int argc, char *argv[]) {
     }
 
     void *ptrs[] = {src, dr, dg, db, da};
-    double const build_ns = bench_build();
-    double const ns = bench(p, pixel_n, ptrs);
+    double const build_ns   = bench_build();
+    double const interp_ns  = bench_interp(p, pixel_n, ptrs);
 
-    printf("SrcOver 8888->fp16: %.0f ns/build, %.2f ns/pixel (%d pixels)\n",
-           build_ns, ns, pixel_n);
+    printf("SrcOver 8888->fp16: %.0f ns/build, %.2f ns/pixel interp", build_ns, interp_ns);
+    if (cg) {
+        double const cg_ns = bench_codegen(cg, pixel_n, ptrs);
+        printf(", %.2f ns/pixel codegen", cg_ns);
+    }
+    printf(" (%d pixels)\n", pixel_n);
 
     umbra_interpreter_free(p);
+    if (cg) { umbra_codegen_free(cg); }
     free(src); free(dr); free(dg); free(db); free(da);
     return 0;
 }

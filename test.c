@@ -4,6 +4,24 @@
 #include <stdint.h>
 
 // Helper: build bb for binop(load(ptr0), load(ptr1)) → store(ptr2), assign interpreter to p_.
+#define BB_BUILD_BINOP_32(op_fn, bb_) do { \
+    bb_ = umbra_basic_block(); \
+    umbra_v32 ix_ = umbra_lane(bb_), \
+              a_  = umbra_load_32(bb_, (umbra_ptr){0}, ix_), \
+              b_  = umbra_load_32(bb_, (umbra_ptr){1}, ix_), \
+              r_  = op_fn(bb_, a_, b_); \
+    umbra_store_32(bb_, (umbra_ptr){2}, ix_, r_); \
+} while(0)
+
+#define BB_BUILD_BINOP_16(op_fn, bb_) do { \
+    bb_ = umbra_basic_block(); \
+    umbra_v32 ix_ = umbra_lane(bb_); \
+    umbra_v16 a_  = umbra_load_16(bb_, (umbra_ptr){0}, ix_), \
+              b_  = umbra_load_16(bb_, (umbra_ptr){1}, ix_), \
+              r_  = op_fn(bb_, a_, b_); \
+    umbra_store_16(bb_, (umbra_ptr){2}, ix_, r_); \
+} while(0)
+
 #define BB_BINOP_32(op_fn, p_) do { \
     struct umbra_basic_block *bb_ = umbra_basic_block(); \
     umbra_v32 ix_ = umbra_lane(bb_), \
@@ -746,6 +764,132 @@ static void test_srcover(void) {
     umbra_interpreter_free(p);
 }
 
+static void test_codegen(void) {
+    // f32 add
+    {
+        struct umbra_basic_block *bb;
+        BB_BUILD_BINOP_32(umbra_add_f32, bb);
+        struct umbra_codegen *cg = umbra_codegen(bb);
+        umbra_basic_block_free(bb);
+        if (!cg) { return; }
+        float x[] = {1,2,3}, y[] = {10,20,30}, z[3] = {0};
+        umbra_codegen_run(cg, 3, (void*[]){x,y,z});
+        equiv(z[0], 11) here; equiv(z[1], 22) here; equiv(z[2], 33) here;
+        umbra_codegen_free(cg);
+    }
+    // f32 mul
+    {
+        struct umbra_basic_block *bb;
+        BB_BUILD_BINOP_32(umbra_mul_f32, bb);
+        struct umbra_codegen *cg = umbra_codegen(bb);
+        umbra_basic_block_free(bb);
+        if (!cg) { return; }
+        float x[] = {2,3,4}, y[] = {5,6,7}, z[3] = {0};
+        umbra_codegen_run(cg, 3, (void*[]){x,y,z});
+        equiv(z[0], 10) here; equiv(z[1], 18) here; equiv(z[2], 28) here;
+        umbra_codegen_free(cg);
+    }
+    // i32 add
+    {
+        struct umbra_basic_block *bb;
+        BB_BUILD_BINOP_32(umbra_add_i32, bb);
+        struct umbra_codegen *cg = umbra_codegen(bb);
+        umbra_basic_block_free(bb);
+        if (!cg) { return; }
+        int x[] = {1,2,3}, y[] = {10,20,30}, z[3] = {0};
+        umbra_codegen_run(cg, 3, (void*[]){x,y,z});
+        (z[0] == 11) here; (z[1] == 22) here; (z[2] == 33) here;
+        umbra_codegen_free(cg);
+    }
+    // i32 shr_u
+    {
+        struct umbra_basic_block *bb;
+        BB_BUILD_BINOP_32(umbra_shr_u32, bb);
+        struct umbra_codegen *cg = umbra_codegen(bb);
+        umbra_basic_block_free(bb);
+        if (!cg) { return; }
+        int x[] = {-1, 8, 64}, y[] = {1, 1, 3}, z[3] = {0};
+        umbra_codegen_run(cg, 3, (void*[]){x,y,z});
+        (z[0] == (int)(0xffffffffu >> 1)) here;
+        (z[1] == 4) here; (z[2] == 8) here;
+        umbra_codegen_free(cg);
+    }
+    // f16 mul
+    {
+        struct umbra_basic_block *bb;
+        BB_BUILD_BINOP_16(umbra_mul_f16, bb);
+        struct umbra_codegen *cg = umbra_codegen(bb);
+        umbra_basic_block_free(bb);
+        if (!cg) { return; }
+        __fp16 x[] = {2,3,4}, y[] = {5,6,7}, z[3] = {0};
+        umbra_codegen_run(cg, 3, (void*[]){x,y,z});
+        equiv((float)z[0], 10) here; equiv((float)z[1], 18) here; equiv((float)z[2], 28) here;
+        umbra_codegen_free(cg);
+    }
+    // srcover blend
+    {
+        struct umbra_basic_block *bb = umbra_basic_block();
+        umbra_v32 ix     = umbra_lane(bb),
+                  src    = umbra_load_32(bb, (umbra_ptr){0}, ix),
+                  mask8  = umbra_imm_32(bb, 0xff),
+                  inv255 = umbra_imm_32(bb, 0x3b808081u),
+                  ri     = umbra_and_32(bb, src, mask8),
+                  rf     = umbra_mul_f32(bb, umbra_f32_from_i32(bb, ri), inv255);
+        umbra_v16 sr = umbra_f16_from_f32(bb, rf);
+        umbra_v32 sh8 = umbra_imm_32(bb, 8),
+                  gi  = umbra_and_32(bb, umbra_shr_u32(bb, src, sh8), mask8),
+                  gf  = umbra_mul_f32(bb, umbra_f32_from_i32(bb, gi), inv255);
+        umbra_v16 sg = umbra_f16_from_f32(bb, gf);
+        umbra_v32 sh16 = umbra_imm_32(bb, 16),
+                  bi   = umbra_and_32(bb, umbra_shr_u32(bb, src, sh16), mask8),
+                  bf   = umbra_mul_f32(bb, umbra_f32_from_i32(bb, bi), inv255);
+        umbra_v16 sb = umbra_f16_from_f32(bb, bf);
+        umbra_v32 sh24 = umbra_imm_32(bb, 24),
+                  ai   = umbra_and_32(bb, umbra_shr_u32(bb, src, sh24), mask8),
+                  af   = umbra_mul_f32(bb, umbra_f32_from_i32(bb, ai), inv255);
+        umbra_v16 sa    = umbra_f16_from_f32(bb, af),
+                  dr    = umbra_load_16(bb, (umbra_ptr){1}, ix),
+                  dg    = umbra_load_16(bb, (umbra_ptr){2}, ix),
+                  db    = umbra_load_16(bb, (umbra_ptr){3}, ix),
+                  da    = umbra_load_16(bb, (umbra_ptr){4}, ix),
+                  one   = umbra_imm_16(bb, 0x3c00),
+                  inv_a = umbra_sub_f16(bb, one, sa),
+                  rout  = umbra_add_f16(bb, sr, umbra_mul_f16(bb, dr, inv_a)),
+                  gout  = umbra_add_f16(bb, sg, umbra_mul_f16(bb, dg, inv_a)),
+                  bout  = umbra_add_f16(bb, sb, umbra_mul_f16(bb, db, inv_a)),
+                  aout  = umbra_add_f16(bb, sa, umbra_mul_f16(bb, da, inv_a));
+        umbra_store_16(bb, (umbra_ptr){1}, ix, rout);
+        umbra_store_16(bb, (umbra_ptr){2}, ix, gout);
+        umbra_store_16(bb, (umbra_ptr){3}, ix, bout);
+        umbra_store_16(bb, (umbra_ptr){4}, ix, aout);
+        struct umbra_codegen *cg = umbra_codegen(bb);
+        umbra_basic_block_free(bb);
+        if (!cg) { return; }
+        uint32_t src_px[] = {0x80402010u, 0x80402010u, 0x80402010u};
+        __fp16 dst_r[] = {0.5, 0.5, 0.5},
+               dst_g[] = {0.5, 0.5, 0.5},
+               dst_b[] = {0.5, 0.5, 0.5},
+               dst_a[] = {0.5, 0.5, 0.5};
+        umbra_codegen_run(cg, 3, (void*[]){src_px, dst_r, dst_g, dst_b, dst_a});
+        float const tol = 0.02f;
+        ((float)dst_r[0] > 0.28f - tol && (float)dst_r[0] < 0.34f + tol) here;
+        umbra_codegen_free(cg);
+    }
+    // large n
+    {
+        struct umbra_basic_block *bb;
+        BB_BUILD_BINOP_32(umbra_add_f32, bb);
+        struct umbra_codegen *cg = umbra_codegen(bb);
+        umbra_basic_block_free(bb);
+        if (!cg) { return; }
+        float x[100], y[100], z[100];
+        for (int j = 0; j < 100; j++) { x[j] = (float)j; y[j] = (float)(100-j); }
+        umbra_codegen_run(cg, 100, (void*[]){x,y,z});
+        for (int j = 0; j < 100; j++) { equiv(z[j], 100) here; }
+        umbra_codegen_free(cg);
+    }
+}
+
 int main(void) {
     test_f32_ops();
     test_i32_ops();
@@ -767,5 +911,6 @@ int main(void) {
     test_strength_reduction();
     test_zero_imm();
     test_srcover();
+    test_codegen();
     return 0;
 }
