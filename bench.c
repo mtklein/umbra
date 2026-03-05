@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 static double now(void) {
@@ -165,15 +166,37 @@ static void fmt_ns(char buf[16], double ns) {
 
 int main(int argc, char *argv[]) {
     int pixel_n = 4096;
-    if (argc > 1) {
-        pixel_n = atoi(argv[1]);
+    _Bool dump = 0;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-d") == 0) { dump = 1; }
+        else { pixel_n = atoi(argv[i]); }
     }
 
     struct umbra_basic_block *bb = build_srcover_bb();
+
+    if (dump) {
+        printf("=== IR ===\n");
+        umbra_basic_block_dump(bb, stdout);
+        printf("\n");
+    }
+
     struct umbra_interpreter *p   = umbra_interpreter(bb);
     struct umbra_codegen     *cg  = umbra_codegen(bb);
     struct umbra_jit         *jit = umbra_jit(bb);
     umbra_basic_block_free(bb);
+
+    if (dump) {
+        if (cg) {
+            printf("=== Codegen C ===\n");
+            umbra_codegen_dump(cg, stdout);
+            printf("\n");
+        }
+        if (jit) {
+            printf("=== JIT ===\n");
+            umbra_jit_dump(jit, stdout);
+            printf("\n");
+        }
+    }
 
     uint32_t *src = malloc((size_t)pixel_n * sizeof *src);
     __fp16   *dr  = malloc((size_t)pixel_n * sizeof *dr);

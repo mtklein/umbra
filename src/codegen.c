@@ -9,6 +9,7 @@ void umbra_codegen_run (struct umbra_codegen *cg, int n, void *p0, void *p1, voi
     (void)cg; (void)n; (void)p0; (void)p1; (void)p2; (void)p3; (void)p4; (void)p5;
 }
 void umbra_codegen_free(struct umbra_codegen *cg) { (void)cg; }
+void umbra_codegen_dump(struct umbra_codegen const *cg, FILE *f) { (void)cg; (void)f; }
 
 #else
 
@@ -22,7 +23,7 @@ typedef struct umbra_basic_block BB;
 struct umbra_codegen {
     void *dl;
     void (*entry)(int, void*, void*, void*, void*, void*, void*);
-    char *src_path, *so_path;
+    char *src_path, *so_path, *src;
 };
 
 typedef struct {
@@ -539,6 +540,10 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
     if (!fp) { free(b.buf); remove(c_path); return 0; }
     fwrite(b.buf, 1, (size_t)b.len, fp);
     fclose(fp);
+
+    char *src_copy = malloc((size_t)b.len + 1);
+    __builtin_memcpy(src_copy, b.buf, (size_t)b.len);
+    src_copy[b.len] = '\0';
     free(b.buf);
 
     size_t slen = __builtin_strlen(c_path);
@@ -564,6 +569,7 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
     if (rc != 0) {
         remove(c_path);
         free(so_path);
+        free(src_copy);
         return 0;
     }
 
@@ -572,6 +578,7 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
         remove(c_path);
         remove(so_path);
         free(so_path);
+        free(src_copy);
         return 0;
     }
 
@@ -582,6 +589,7 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
         remove(c_path);
         remove(so_path);
         free(so_path);
+        free(src_copy);
         return 0;
     }
 
@@ -591,6 +599,7 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
     cg->src_path = malloc(slen + 1);
     __builtin_memcpy(cg->src_path, c_path, slen + 1);
     cg->so_path  = so_path;
+    cg->src      = src_copy;
     return cg;
 }
 
@@ -604,7 +613,12 @@ void umbra_codegen_free(struct umbra_codegen *cg) {
     if (cg->dl) { dlclose(cg->dl); }
     if (cg->src_path) { remove(cg->src_path); free(cg->src_path); }
     if (cg->so_path)  { remove(cg->so_path);  free(cg->so_path);  }
+    free(cg->src);
     free(cg);
+}
+
+void umbra_codegen_dump(struct umbra_codegen const *cg, FILE *f) {
+    if (cg && cg->src) { fputs(cg->src, f); }
 }
 
 #endif

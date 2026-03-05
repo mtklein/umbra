@@ -120,3 +120,8 @@ void umbra_codegen_free(struct umbra_codegen*);
 struct umbra_jit* umbra_jit(struct umbra_basic_block const*);
 void umbra_jit_run (struct umbra_jit*, int n, void*, void*, void*, void*, void*, void*);
 void umbra_jit_free(struct umbra_jit*);
+
+#include <stdio.h>
+void umbra_basic_block_dump(struct umbra_basic_block const*, FILE*);
+void umbra_codegen_dump    (struct umbra_codegen const*, FILE*);
+void umbra_jit_dump        (struct umbra_jit const*, FILE*);

@@ -9,13 +9,16 @@ void umbra_jit_run (struct umbra_jit *j, int n, void *p0, void *p1, void *p2, vo
     (void)j; (void)n; (void)p0; (void)p1; (void)p2; (void)p3; (void)p4; (void)p5;
 }
 void umbra_jit_free(struct umbra_jit *j) { (void)j; }
+void umbra_jit_dump(struct umbra_jit const *j, FILE *f) { (void)j; (void)f; }
 
 #else
 
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <pthread.h>
+#include <unistd.h>
 #include <libkern/OSCacheControl.h>
 
 typedef struct { uint32_t *buf; int len,cap; } Buf;
@@ -633,6 +636,59 @@ void umbra_jit_free(struct umbra_jit *j) {
     if (!j) return;
     munmap(j->code, j->code_size);
     free(j);
+}
+
+void umbra_jit_dump(struct umbra_jit const *j, FILE *f) {
+    if (!j) return;
+    size_t code_bytes = j->code_size;
+    // Count actual instructions (find last non-zero or just use code_size)
+    uint32_t const *words = (uint32_t const *)j->code;
+    size_t nwords = code_bytes / 4;
+
+    // Write .s file with .inst directives, assemble, then objdump
+    char tmp[] = "/tmp/umbra_jit_XXXXXX.s";
+    int fd = mkstemps(tmp, 2);
+    if (fd >= 0) {
+        FILE *fp = fdopen(fd, "w");
+        if (fp) {
+            for (size_t i = 0; i < nwords; i++) {
+                fprintf(fp, ".inst 0x%08x\n", words[i]);
+            }
+            fclose(fp);
+
+            char opath[sizeof tmp + 2];
+            snprintf(opath, sizeof opath, "%.*s.o", (int)(sizeof tmp - 3), tmp);
+
+            char cmd[1024];
+            snprintf(cmd, sizeof cmd,
+                     "as -o %s %s 2>/dev/null && "
+                     "/opt/homebrew/opt/llvm/bin/llvm-objdump -d --no-show-raw-insn %s 2>/dev/null",
+                     opath, tmp, opath);
+            FILE *p = popen(cmd, "r");
+            if (p) {
+                char line[256];
+                _Bool ok = 0;
+                while (fgets(line, (int)sizeof line, p)) {
+                    fputs(line, f);
+                    ok = 1;
+                }
+                int rc = pclose(p);
+                remove(tmp);
+                remove(opath);
+                if (ok && rc == 0) return;
+            }
+            remove(tmp);
+            remove(opath);
+        } else {
+            close(fd);
+            remove(tmp);
+        }
+    }
+
+    // Fallback: hex dump
+    for (size_t i = 0; i < nwords; i++) {
+        fprintf(f, "  %04zx: %08x\n", i * 4, words[i]);
+    }
 }
 
 #endif
