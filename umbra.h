@@ -132,3 +132,4 @@ void umbra_jit_free(struct umbra_jit*);
 void umbra_basic_block_dump(struct umbra_basic_block const*, FILE*);
 void umbra_codegen_dump    (struct umbra_codegen const*, FILE*);
 void umbra_jit_dump        (struct umbra_jit const*, FILE*);
+void umbra_jit_mca         (struct umbra_jit const*, FILE*);

@@ -10,6 +10,7 @@ void umbra_jit_run (struct umbra_jit *j, int n, void *p0, void *p1, void *p2, vo
 }
 void umbra_jit_free(struct umbra_jit *j) { (void)j; }
 void umbra_jit_dump(struct umbra_jit const *j, FILE *f) { (void)j; (void)f; }
+void umbra_jit_mca (struct umbra_jit const *j, FILE *f) { (void)j; (void)f; }
 
 #else
 
@@ -416,6 +417,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 struct umbra_jit {
     void  *code;
     size_t code_size;
+    int    loop_start, loop_end;
     void (*entry)(int, void*, void*, void*, void*, void*, void*);
 };
 
@@ -457,7 +459,9 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, LSL_xi(XW, XI, 2));  // x12 = i*4  (32-bit byte offset)
 
     // Vector loop: uniforms already in registers from preamble.
+    int loop_body_start = c.len;
     emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0);
+    int loop_body_end = c.len;
 
     put(&c, ADD_xi(XI,XI,4));
     put(&c, B(loop_top - c.len));
@@ -508,6 +512,8 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     struct umbra_jit *j = malloc(sizeof *j);
     j->code = mem;
     j->code_size = alloc;
+    j->loop_start = loop_body_start;
+    j->loop_end   = loop_body_end;
     j->entry = (void(*)(int,void*,void*,void*,void*,void*,void*))mem;
     return j;
 }
@@ -678,6 +684,70 @@ void umbra_jit_dump(struct umbra_jit const *j, FILE *f) {
     for (size_t i = 0; i < nwords; i++) {
         fprintf(f, "  %04zx: %08x\n", i * 4, words[i]);
     }
+}
+
+void umbra_jit_mca(struct umbra_jit const *j, FILE *f) {
+    if (!j || j->loop_start >= j->loop_end) return;
+    uint32_t const *words = (uint32_t const *)j->code;
+
+    // Write loop body as .inst directives, assemble, disassemble to get mnemonics,
+    // then feed mnemonics to llvm-mca.
+    char tmp[] = "/tmp/umbra_mca_XXXXXX.s";
+    int fd = mkstemps(tmp, 2);
+    if (fd < 0) return;
+    FILE *fp = fdopen(fd, "w");
+    if (!fp) { close(fd); remove(tmp); return; }
+    for (int i = j->loop_start; i < j->loop_end; i++) {
+        fprintf(fp, ".inst 0x%08x\n", words[i]);
+    }
+    fclose(fp);
+
+    char opath[sizeof tmp + 2];
+    snprintf(opath, sizeof opath, "%.*s.o", (int)(sizeof tmp - 3), tmp);
+
+    char asm_path[] = "/tmp/umbra_mca_loop_XXXXXX.s";
+    int afd = mkstemps(asm_path, 2);
+    if (afd < 0) { remove(tmp); return; }
+
+    char cmd[1024];
+    snprintf(cmd, sizeof cmd,
+             "as -o %s %s 2>/dev/null && "
+             "/opt/homebrew/opt/llvm/bin/llvm-objdump -d --no-show-raw-insn --no-leading-addr %s 2>/dev/null",
+             opath, tmp, opath);
+    FILE *p = popen(cmd, "r");
+    if (!p) { close(afd); remove(tmp); remove(opath); remove(asm_path); return; }
+
+    FILE *afp = fdopen(afd, "w");
+    char line[256];
+    _Bool past_header = 0;
+    while (fgets(line, (int)sizeof line, p)) {
+        if (!past_header) {
+            if (__builtin_strstr(line, "<")) past_header = 1;
+            continue;
+        }
+        if (line[0] == '\n' || line[0] == '<') continue;
+        fputs(line, afp);
+    }
+    pclose(p);
+    fclose(afp);
+    remove(tmp);
+    remove(opath);
+
+    snprintf(cmd, sizeof cmd,
+             "/opt/homebrew/opt/llvm/bin/llvm-mca"
+             " -mcpu=apple-m4"
+             " -iterations=100"
+             " -bottleneck-analysis"
+             " %s 2>&1",
+             asm_path);
+    p = popen(cmd, "r");
+    if (p) {
+        while (fgets(line, (int)sizeof line, p)) {
+            fputs(line, f);
+        }
+        pclose(p);
+    }
+    remove(asm_path);
 }
 
 #endif

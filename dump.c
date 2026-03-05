@@ -15,6 +15,8 @@ int main(void) {
     if (cg)  { FILE *f = fopen("dumps/srcover.c",     "w"); umbra_codegen_dump(cg,  f); fclose(f); }
     if (jit) { FILE *f = fopen("dumps/srcover.arm64", "w"); umbra_jit_dump    (jit, f); fclose(f); }
 
+    if (jit) { FILE *f = fopen("dumps/srcover.mca",   "w"); umbra_jit_mca     (jit, f); fclose(f); }
+
     if (cg)  { umbra_codegen_free(cg); }
     if (jit) { umbra_jit_free(jit); }
     return 0;
