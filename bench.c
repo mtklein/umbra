@@ -147,6 +147,7 @@ int main(int argc, char *argv[]) {
     struct umbra_basic_block *bb = build_srcover_bb();
     struct umbra_interpreter *p = umbra_interpreter(bb);
     struct umbra_codegen     *cg = umbra_codegen(bb);
+    struct umbra_jit         *jit = umbra_jit(bb);
     umbra_basic_block_free(bb);
 
     uint32_t *src = malloc((size_t)pixel_n * sizeof *src);
@@ -172,10 +173,27 @@ int main(int argc, char *argv[]) {
         double const cg_ns      = bench_codegen(cg, pixel_n, ptrs);
         printf(", %.0f ns/compile, %.2f ns/pixel codegen", compile_ns, cg_ns);
     }
+    if (jit) {
+        umbra_jit_run(jit, pixel_n, ptrs);
+        int iters = 1;
+        for (;;) {
+            double const start = now();
+            for (int i = 0; i < iters; i++) {
+                umbra_jit_run(jit, pixel_n, ptrs);
+            }
+            double const elapsed = now() - start;
+            if (elapsed >= 0.5) {
+                printf(", %.2f ns/pixel jit", elapsed / ((double)iters * (double)pixel_n) * 1e9);
+                break;
+            }
+            iters *= 2;
+        }
+    }
     printf(" (%d pixels)\n", pixel_n);
 
     umbra_interpreter_free(p);
     if (cg) { umbra_codegen_free(cg); }
+    if (jit) { umbra_jit_free(jit); }
     free(src); free(dr); free(dg); free(db); free(da);
     return 0;
 }

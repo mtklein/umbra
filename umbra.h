@@ -116,3 +116,7 @@ void umbra_interpreter_free(struct umbra_interpreter*);
 struct umbra_codegen* umbra_codegen(struct umbra_basic_block const*);
 void umbra_codegen_run (struct umbra_codegen*, int n, void* ptr[]);
 void umbra_codegen_free(struct umbra_codegen*);
+
+struct umbra_jit* umbra_jit(struct umbra_basic_block const*);
+void umbra_jit_run (struct umbra_jit*, int n, void* ptr[]);
+void umbra_jit_free(struct umbra_jit*);
