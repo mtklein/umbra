@@ -322,8 +322,9 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_max_f32: put(c, FMAXNM_4s(d,x,y)); return 1;
     case op_sqrt_f32: put(c, FSQRT_4s(d,x)); return 1;
     case op_fma_f32:
-        put(c, ORR_16b(0,z,z)); put(c, FMLA_4s(0,x,y));
-        put(c, ORR_16b(d,0,0)); return 1;
+        if (d==z) { put(c, FMLA_4s(d,x,y)); }
+        else { put(c, ORR_16b(0,z,z)); put(c, FMLA_4s(0,x,y)); put(c, ORR_16b(d,0,0)); }
+        return 1;
 
     case op_add_i32: put(c, ADD_4s(d,x,y)); return 1;
     case op_sub_i32: put(c, SUB_4s(d,x,y)); return 1;
@@ -336,8 +337,9 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_or_32:  put(c, ORR_16b(d,x,y)); return 1;
     case op_xor_32: put(c, EOR_16b(d,x,y)); return 1;
     case op_sel_32:
-        put(c, ORR_16b(0,x,x)); put(c, BSL_16b(0,y,z));
-        put(c, ORR_16b(d,0,0)); return 1;
+        if (d==x) { put(c, BSL_16b(d,y,z)); }
+        else { put(c, ORR_16b(0,x,x)); put(c, BSL_16b(0,y,z)); put(c, ORR_16b(d,0,0)); }
+        return 1;
 
     case op_f32_from_i32: put(c, SCVTF_4s(d,x)); return 1;
     case op_i32_from_f32: put(c, FCVTZS_4s(d,x)); return 1;
@@ -372,8 +374,9 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_or_16:  put(c, ORR_8b(d,x,y)); return 1;
     case op_xor_16: put(c, EOR_8b(d,x,y)); return 1;
     case op_sel_16:
-        put(c, ORR_8b(0,x,x)); put(c, BSL_8b(0,y,z));
-        put(c, ORR_8b(d,0,0)); return 1;
+        if (d==x) { put(c, BSL_8b(d,y,z)); }
+        else { put(c, ORR_8b(0,x,x)); put(c, BSL_8b(0,y,z)); put(c, ORR_8b(d,0,0)); }
+        return 1;
     case op_eq_i16: put(c, CMEQ_4h(d,x,y)); return 1;
     case op_ne_i16: put(c, CMEQ_4h(d,x,y)); put(c, MVN_8b(d,d)); return 1;
     case op_gt_s16: put(c, CMGT_4h(d,x,y)); return 1;
@@ -393,14 +396,16 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_max_half: put(c, FMAXNM_4h(d,x,y)); return 1;
     case op_sqrt_half: put(c, FSQRT_4h(d,x)); return 1;
     case op_fma_half:
-        put(c, ORR_8b(0,z,z)); put(c, FMLA_4h(0,x,y));
-        put(c, ORR_8b(d,0,0)); return 1;
+        if (d==z) { put(c, FMLA_4h(d,x,y)); }
+        else { put(c, ORR_8b(0,z,z)); put(c, FMLA_4h(0,x,y)); put(c, ORR_8b(d,0,0)); }
+        return 1;
     case op_and_half: put(c, AND_8b(d,x,y)); return 1;
     case op_or_half:  put(c, ORR_8b(d,x,y)); return 1;
     case op_xor_half: put(c, EOR_8b(d,x,y)); return 1;
     case op_sel_half:
-        put(c, ORR_8b(0,x,x)); put(c, BSL_8b(0,y,z));
-        put(c, ORR_8b(d,0,0)); return 1;
+        if (d==x) { put(c, BSL_8b(d,y,z)); }
+        else { put(c, ORR_8b(0,x,x)); put(c, BSL_8b(0,y,z)); put(c, ORR_8b(d,0,0)); }
+        return 1;
     case op_eq_half: put(c, FCMEQ_4h(d,x,y)); return 1;
     case op_ne_half: put(c, FCMEQ_4h(d,x,y)); put(c, MVN_8b(d,d)); return 1;
     case op_gt_half: put(c, FCMGT_4h(d,x,y)); return 1;
@@ -464,7 +469,7 @@ static void ra_free_reg(struct ra *ra, int val) {
     ra->reg[val] = -1;
 }
 
-static int8_t ra_alloc(Buf *c, struct ra *ra, int *sl) {
+static int8_t ra_alloc(Buf *c, struct ra *ra, int *sl, int *ns) {
     if (ra->nfree > 0) return ra->free_stack[--ra->nfree];
 
     // Evict: find register whose owner has farthest last_use (Belady-like)
@@ -475,23 +480,33 @@ static int8_t ra_alloc(Buf *c, struct ra *ra, int *sl) {
         if (ra->last_use[val] > best_lu) { best_lu = ra->last_use[val]; best_r = r; }
     }
     int evicted = ra->owner[best_r];
-    if (sl[evicted] >= 0) vst(c, best_r, sl[evicted]);
+    if (sl[evicted] < 0) sl[evicted] = (*ns)++;
+    vst(c, best_r, sl[evicted]);
     ra->reg[evicted] = -1;
     ra->owner[best_r] = -1;
     return (int8_t)best_r;
 }
 
-static int8_t ra_ensure(Buf *c, struct ra *ra, int *sl, int val) {
+static int8_t ra_ensure(Buf *c, struct ra *ra, int *sl, int *ns, int val) {
     if (ra->reg[val] >= 0) return ra->reg[val];
-    int8_t r = ra_alloc(c, ra, sl);
+    int8_t r = ra_alloc(c, ra, sl, ns);
     if (sl[val] >= 0) vld(c, r, sl[val]);
     ra->reg[val] = r;
     ra->owner[(int)r] = val;
     return r;
 }
 
+// Claim a dying input's register for the output, transferring ownership without free/alloc.
+static int8_t ra_claim(struct ra *ra, int old_val, int new_val) {
+    int8_t r = ra->reg[old_val];
+    ra->reg[old_val] = -1;
+    ra->reg[new_val] = r;
+    ra->owner[(int)r] = new_val;
+    return r;
+}
+
 static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
-                              _Bool *live, _Bool *varying, int *sl,
+                              _Bool *live, _Bool *varying, int *sl, int *ns,
                               struct ra *ra, _Bool scalar);
 
 struct umbra_jit {
@@ -520,9 +535,13 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
                     | varying[bb->inst[i].z];
     }
 
-    int ns=0;
+    int ns=0, ns_frame=0;
     for (int i=0; i<bb->insts; i++) {
-        if (live[i] && !is_store(bb->inst[i].op)) sl[i]=ns++;
+        if (live[i] && !is_store(bb->inst[i].op)) {
+            if (!varying[i]) sl[i]=ns++;
+            else sl[i]=-1;
+            ns_frame++;
+        }
         else sl[i]=-1;
     }
 
@@ -540,8 +559,8 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
 
     put(&c, STP_pre(29,30,31,-2));
     put(&c, ADD_xi(29,31,0));
-    if (ns>0) {
-        int bytes = ns*16;
+    if (ns_frame>0) {
+        int bytes = ns_frame*16;
         while (bytes>4095) { put(&c, SUB_xi(31,31,4095)); bytes-=4095; }
         if (bytes>0) put(&c, SUB_xi(31,31,bytes));
     }
@@ -568,7 +587,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     int br_tail = c.len;
     put(&c, Bcond(0xB,0));  // B.LT tail (patch later)
     struct ra *ra = ra_create(bb, live, varying);
-    emit_varying_ops(&c, bb, live, varying, sl, ra, 0);
+    emit_varying_ops(&c, bb, live, varying, sl, &ns, ra, 0);
 
     put(&c, ADD_xi(XI,XI,4));
     put(&c, B(loop_top - c.len));
@@ -586,7 +605,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     ra->nfree = RA_NREGS;
     for (int i = 0; i < RA_NREGS; i++) ra->free_stack[i] = ra_pool[RA_NREGS - 1 - i];
 
-    emit_varying_ops(&c, bb, live, varying, sl, ra, 1);
+    emit_varying_ops(&c, bb, live, varying, sl, &ns, ra, 1);
 
     put(&c, ADD_xi(XI,XI,1));
     put(&c, B(tail_top - c.len));
@@ -622,7 +641,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
 }
 
 static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
-                              _Bool *live, _Bool *varying, int *sl,
+                              _Bool *live, _Bool *varying, int *sl, int *ns,
                               struct ra *ra, _Bool scalar)
 {
     int *lu = ra->last_use;
@@ -633,7 +652,7 @@ static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
 
         switch (inst->op) {
         case op_lane: {
-            int8_t rd = ra_alloc(c, ra, sl);
+            int8_t rd = ra_alloc(c, ra, sl, ns);
             ra->reg[i] = rd; ra->owner[(int)rd] = i;
             if (scalar) {
                 put(c, DUP_4s_w(rd, XI));
@@ -644,7 +663,7 @@ static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
         } break;
 
         case op_load_32: {
-            int8_t rd = ra_alloc(c, ra, sl);
+            int8_t rd = ra_alloc(c, ra, sl, ns);
             ra->reg[i] = rd; ra->owner[(int)rd] = i;
             if (bb->inst[inst->x].op == op_lane) {
                 int p=inst->ptr;
@@ -659,7 +678,7 @@ static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
             }
         } break;
         case op_load_16: case op_load_half: {
-            int8_t rd = ra_alloc(c, ra, sl);
+            int8_t rd = ra_alloc(c, ra, sl, ns);
             ra->reg[i] = rd; ra->owner[(int)rd] = i;
             if (bb->inst[inst->x].op == op_lane) {
                 int p=inst->ptr;
@@ -675,7 +694,7 @@ static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
         } break;
 
         case op_store_32: {
-            int8_t ry = ra_ensure(c, ra, sl, inst->y);
+            int8_t ry = ra_ensure(c, ra, sl, ns, inst->y);
             if (bb->inst[inst->x].op == op_lane) {
                 int p=inst->ptr;
                 if (scalar) {
@@ -688,7 +707,7 @@ static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
             if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
         } break;
         case op_store_16: case op_store_half: {
-            int8_t ry = ra_ensure(c, ra, sl, inst->y);
+            int8_t ry = ra_ensure(c, ra, sl, ns, inst->y);
             if (bb->inst[inst->x].op == op_lane) {
                 int p=inst->ptr;
                 if (scalar) {
@@ -702,17 +721,42 @@ static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
         } break;
 
         default: {
-            int8_t rx = ra_ensure(c, ra, sl, inst->x);
-            int8_t ry = ra_ensure(c, ra, sl, inst->y);
-            int8_t rz = ra_ensure(c, ra, sl, inst->z);
+            int8_t rx = ra_ensure(c, ra, sl, ns, inst->x);
+            int8_t ry = ra_ensure(c, ra, sl, ns, inst->y);
+            int8_t rz = ra_ensure(c, ra, sl, ns, inst->z);
 
-            // Free dead inputs before allocating output
-            if (lu[inst->x] <= i) ra_free_reg(ra, inst->x);
-            if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
-            if (lu[inst->z] <= i) ra_free_reg(ra, inst->z);
+            _Bool x_dead = lu[inst->x] <= i;
+            _Bool y_dead = lu[inst->y] <= i;
+            _Bool z_dead = lu[inst->z] <= i;
+            // Don't double-free when multiple args reference the same value
+            if (inst->y == inst->x) y_dead = 0;
+            if (inst->z == inst->x) z_dead = 0;
+            if (inst->z == inst->y) z_dead = 0;
 
-            int8_t rd = ra_alloc(c, ra, sl);
-            ra->reg[i] = rd; ra->owner[(int)rd] = i;
+            // Try to claim a dying input's register for the output.
+            // For destructive ops, prefer the specific input (x for BSL, z for FMLA).
+            int8_t rd = -1;
+            enum op op = inst->op;
+            if ((op==op_fma_f32 || op==op_fma_half) && z_dead)
+                { rd = ra_claim(ra, inst->z, i); z_dead = 0; }
+            else if ((op==op_sel_32 || op==op_sel_16 || op==op_sel_half) && x_dead)
+                { rd = ra_claim(ra, inst->x, i); x_dead = 0; }
+
+            // Fall back to any dead input's register
+            if (rd < 0 && x_dead) { rd = ra_claim(ra, inst->x, i); x_dead = 0; }
+            if (rd < 0 && y_dead) { rd = ra_claim(ra, inst->y, i); y_dead = 0; }
+            if (rd < 0 && z_dead) { rd = ra_claim(ra, inst->z, i); z_dead = 0; }
+
+            // Free remaining dead inputs
+            if (x_dead) ra_free_reg(ra, inst->x);
+            if (y_dead) ra_free_reg(ra, inst->y);
+            if (z_dead) ra_free_reg(ra, inst->z);
+
+            // If no dead input available, allocate fresh
+            if (rd < 0) {
+                rd = ra_alloc(c, ra, sl, ns);
+                ra->reg[i] = rd; ra->owner[(int)rd] = i;
+            }
 
             emit_alu_reg(c, inst->op, rd, rx, ry, rz, inst->imm);
         } break;
