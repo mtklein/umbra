@@ -489,77 +489,52 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                     #endif
                         break;
 
-                    case op_load_16:
-                        if (bb->inst[inst->x].op == op_lane) {
-                            emit(.fn=load_16, .x=inst->ptr);
-                        } else if (bb->inst[inst->x].op == op_imm_32) {
-                            emit(.fn=uni_16, .x=inst->ptr
-                                           , .y=bb->inst[inst->x].imm);
-                        } else {
-                            emit(.fn=gather_16, .x=inst->ptr, .y=X);
-                        } break;
+                    case op_uni_16:  emit(.fn=uni_16,  .x=inst->ptr, .y=bb->inst[inst->x].imm); break;
+                    case op_uni_32:  emit(.fn=uni_32,  .x=inst->ptr, .y=bb->inst[inst->x].imm); break;
+                    case op_load_16: emit(.fn=load_16, .x=inst->ptr); break;
+                    case op_load_32: emit(.fn=load_32, .x=inst->ptr); break;
+                    case op_gather_16: emit(.fn=gather_16, .x=inst->ptr, .y=X); break;
+                    case op_gather_32: emit(.fn=gather_32, .x=inst->ptr, .y=X); break;
+                    case op_store_16:   emit(.fn=store_16,   .x=inst->ptr, .y=Y); break;
+                    case op_store_32:   emit(.fn=store_32,   .x=inst->ptr, .y=Y); break;
+                    case op_scatter_16: emit(.fn=scatter_16, .x=inst->ptr, .y=Y, .z=X); break;
+                    case op_scatter_32: emit(.fn=scatter_32, .x=inst->ptr, .y=Y, .z=X); break;
 
+                    case op_uni_half:
+                    #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
+                        emit(.fn=uni_16, .x=inst->ptr, .y=bb->inst[inst->x].imm);
+                    #else
+                        emit(.fn=uni_half, .x=inst->ptr, .y=bb->inst[inst->x].imm);
+                    #endif
+                        break;
                     case op_load_half:
                     #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
-                        if (bb->inst[inst->x].op == op_lane) {
-                            emit(.fn=load_16, .x=inst->ptr);
-                        } else if (bb->inst[inst->x].op == op_imm_32) {
-                            emit(.fn=uni_16, .x=inst->ptr
-                                           , .y=bb->inst[inst->x].imm);
-                        } else {
-                            emit(.fn=gather_16, .x=inst->ptr, .y=X);
-                        }
+                        emit(.fn=load_16, .x=inst->ptr);
                     #else
-                        if (bb->inst[inst->x].op == op_lane) {
-                            emit(.fn=load_half, .x=inst->ptr);
-                        } else if (bb->inst[inst->x].op == op_imm_32) {
-                            emit(.fn=uni_half, .x=inst->ptr
-                                             , .y=bb->inst[inst->x].imm);
-                        } else {
-                            emit(.fn=gather_half, .x=inst->ptr, .y=X);
-                        }
+                        emit(.fn=load_half, .x=inst->ptr);
                     #endif
                         break;
-
-                    case op_load_32:
-                        if (bb->inst[inst->x].op == op_lane) {
-                            emit(.fn=load_32, .x=inst->ptr);
-                        } else if (bb->inst[inst->x].op == op_imm_32) {
-                            emit(.fn=uni_32, .x=inst->ptr
-                                           , .y=bb->inst[inst->x].imm);
-                        } else {
-                            emit(.fn=gather_32, .x=inst->ptr, .y=X);
-                        } break;
-
-                    case op_store_16:
-                        if (bb->inst[inst->x].op == op_lane) {
-                            emit(.fn=store_16, .x=inst->ptr, .y=Y);
-                        } else {
-                            emit(.fn=scatter_16, .x=inst->ptr, .y=Y, .z=X);
-                        } break;
-
+                    case op_gather_half:
+                    #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
+                        emit(.fn=gather_16, .x=inst->ptr, .y=X);
+                    #else
+                        emit(.fn=gather_half, .x=inst->ptr, .y=X);
+                    #endif
+                        break;
                     case op_store_half:
                     #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
-                        if (bb->inst[inst->x].op == op_lane) {
-                            emit(.fn=store_16, .x=inst->ptr, .y=Y);
-                        } else {
-                            emit(.fn=scatter_16, .x=inst->ptr, .y=Y, .z=X);
-                        }
+                        emit(.fn=store_16, .x=inst->ptr, .y=Y);
                     #else
-                        if (bb->inst[inst->x].op == op_lane) {
-                            emit(.fn=store_half, .x=inst->ptr, .y=Y);
-                        } else {
-                            emit(.fn=scatter_half, .x=inst->ptr, .y=Y, .z=X);
-                        }
+                        emit(.fn=store_half, .x=inst->ptr, .y=Y);
                     #endif
                         break;
-
-                    case op_store_32:
-                        if (bb->inst[inst->x].op == op_lane) {
-                            emit(.fn=store_32, .x=inst->ptr, .y=Y);
-                        } else {
-                            emit(.fn=scatter_32, .x=inst->ptr, .y=Y, .z=X);
-                        } break;
+                    case op_scatter_half:
+                    #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
+                        emit(.fn=scatter_16, .x=inst->ptr, .y=Y, .z=X);
+                    #else
+                        emit(.fn=scatter_half, .x=inst->ptr, .y=Y, .z=X);
+                    #endif
+                        break;
 
                     case op_half_from_f32:
                     case op_f32_from_half:

@@ -214,23 +214,32 @@ v32 umbra_imm_32  (BB *bb, uint32_t bits) { return (v32){push(bb, op_imm_32  , .
 vh  umbra_imm_half(BB *bb, uint16_t bits) { return (vh ){push(bb, op_imm_half, .imm=(int)bits)}; }
 
 v16 umbra_load_16(BB *bb, umbra_ptr src, v32 ix) {
-    return (v16){push(bb, op_load_16, .x=ix.id, .ptr=src.ix)};
+    if (bb->inst[ix.id].op == op_lane  ) return (v16){push(bb,op_load_16,           .ptr=src.ix)};
+    if (bb->inst[ix.id].op == op_imm_32) return (v16){push(bb,op_uni_16,   .x=ix.id,.ptr=src.ix)};
+    return                                      (v16){push(bb,op_gather_16,.x=ix.id,.ptr=src.ix)};
 }
 v32 umbra_load_32(BB *bb, umbra_ptr src, v32 ix) {
-    return (v32){push(bb, op_load_32, .x=ix.id, .ptr=src.ix)};
+    if (bb->inst[ix.id].op == op_lane  ) return (v32){push(bb,op_load_32,           .ptr=src.ix)};
+    if (bb->inst[ix.id].op == op_imm_32) return (v32){push(bb,op_uni_32,   .x=ix.id,.ptr=src.ix)};
+    return                                      (v32){push(bb,op_gather_32,.x=ix.id,.ptr=src.ix)};
 }
 vh umbra_load_half(BB *bb, umbra_ptr src, v32 ix) {
-    return (vh){push(bb, op_load_half, .x=ix.id, .ptr=src.ix)};
+    if (bb->inst[ix.id].op == op_lane  ) return (vh){push(bb,op_load_half,           .ptr=src.ix)};
+    if (bb->inst[ix.id].op == op_imm_32) return (vh){push(bb,op_uni_half,   .x=ix.id,.ptr=src.ix)};
+    return                                      (vh){push(bb,op_gather_half,.x=ix.id,.ptr=src.ix)};
 }
 
 void umbra_store_16(BB *bb, umbra_ptr dst, v32 ix, v16 val) {
-    push(bb, op_store_16, .x=ix.id, .y=val.id, .ptr=dst.ix);
+    if (bb->inst[ix.id].op == op_lane) push(bb, op_store_16,             .y=val.id, .ptr=dst.ix);
+    else                               push(bb, op_scatter_16, .x=ix.id, .y=val.id, .ptr=dst.ix);
 }
 void umbra_store_32(BB *bb, umbra_ptr dst, v32 ix, v32 val) {
-    push(bb, op_store_32, .x=ix.id, .y=val.id, .ptr=dst.ix);
+    if (bb->inst[ix.id].op == op_lane) push(bb, op_store_32,             .y=val.id, .ptr=dst.ix);
+    else                               push(bb, op_scatter_32, .x=ix.id, .y=val.id, .ptr=dst.ix);
 }
 void umbra_store_half(BB *bb, umbra_ptr dst, v32 ix, vh val) {
-    push(bb, op_store_half, .x=ix.id, .y=val.id, .ptr=dst.ix);
+    if (bb->inst[ix.id].op == op_lane) push(bb, op_store_half,             .y=val.id, .ptr=dst.ix);
+    else                               push(bb, op_scatter_half, .x=ix.id, .y=val.id, .ptr=dst.ix);
 }
 
 static _Bool is_imm16(BB *bb, int id, int val) {
@@ -635,12 +644,21 @@ static char const* op_name(enum op op) {
         case op_imm_32:     return "imm_32";
         case op_imm_16:     return "imm_16";
         case op_imm_half:   return "imm_half";
+        case op_uni_32:     return "uni_32";
         case op_load_32:    return "load_32";
-        case op_load_16:    return "load_16";
-        case op_load_half:  return "load_half";
+        case op_gather_32:  return "gather_32";
         case op_store_32:   return "store_32";
+        case op_scatter_32: return "scatter_32";
+        case op_uni_16:     return "uni_16";
+        case op_load_16:    return "load_16";
+        case op_gather_16:  return "gather_16";
         case op_store_16:   return "store_16";
-        case op_store_half: return "store_half";
+        case op_scatter_16: return "scatter_16";
+        case op_uni_half:     return "uni_half";
+        case op_load_half:    return "load_half";
+        case op_gather_half:  return "gather_half";
+        case op_store_half:   return "store_half";
+        case op_scatter_half: return "scatter_half";
         case op_add_f32:    return "add_f32";
         case op_sub_f32:    return "sub_f32";
         case op_mul_f32:    return "mul_f32";
@@ -759,10 +777,10 @@ void umbra_basic_block_optimize(BB *bb) {
         }
     }
     for (int i = 0; i < n; i++) {
-        varying[i] = (bb->inst[i].op == op_lane)
-                    | varying[bb->inst[i].x]
-                    | varying[bb->inst[i].y]
-                    | varying[bb->inst[i].z];
+        varying[i] = is_varying(bb->inst[i].op)
+                    |   varying[bb->inst[i].x]
+                    |   varying[bb->inst[i].y]
+                    |   varying[bb->inst[i].z];
     }
 
     int total = 0;
@@ -814,9 +832,11 @@ void umbra_basic_block_dump(struct umbra_basic_block const *bb, FILE *f) {
         enum op op = inst->op;
 
         if (is_store(op)) {
-            fprintf(f, "      store_%s p%d v%d v%d\n",
-                    op == op_store_32 ? "32" : op == op_store_16 ? "16" : "half",
-                    inst->ptr, inst->x, inst->y);
+            fprintf(f, "      %-15s p%d", op_name(op), inst->ptr);
+            if (op == op_scatter_16 || op == op_scatter_32 || op == op_scatter_half) {
+                fprintf(f, " v%d", inst->x);
+            }
+            fprintf(f, " v%d\n", inst->y);
             continue;
         }
 
@@ -826,8 +846,12 @@ void umbra_basic_block_dump(struct umbra_basic_block const *bb, FILE *f) {
             case op_imm_32:   fprintf(f, " 0x%x",  (uint32_t)inst->imm); break;
             case op_imm_16:   fprintf(f, " 0x%x",  (uint16_t)inst->imm); break;
             case op_imm_half: fprintf(f, " 0x%x",  (uint16_t)inst->imm); break;
-            case op_load_32: case op_load_16: case op_load_half:
+            case op_uni_32: case op_uni_16: case op_uni_half:
+            case op_gather_32: case op_gather_16: case op_gather_half:
                 fprintf(f, " p%d v%d", inst->ptr, inst->x);
+                break;
+            case op_load_32: case op_load_16: case op_load_half:
+                fprintf(f, " p%d", inst->ptr);
                 break;
             case op_lane: break;
             default: {

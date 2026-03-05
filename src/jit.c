@@ -428,9 +428,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
 
     int max_ptr=-1;
     for (int i=0; i<bb->insts; i++) {
-        enum op op=bb->inst[i].op;
-        if (op==op_load_16||op==op_load_32||op==op_load_half||
-            op==op_store_16||op==op_store_32||op==op_store_half)
+        if (has_ptr(bb->inst[i].op))
             if (bb->inst[i].ptr>max_ptr) max_ptr=bb->inst[i].ptr;
     }
     if (max_ptr>5) { free(sl); return 0; }
@@ -545,30 +543,35 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_load_32: case op_load_16: case op_load_half: {
             int8_t rd = ra_alloc(c, ra, sl, ns);
             ra->reg[i] = rd; ra->owner[(int)rd] = i;
-            if (bb->inst[inst->x].op == op_lane) {
-                int p=inst->ptr;
-                _Bool wide = (inst->op == op_load_32);
-                if (scalar) {
-                    put(c, wide ? LDR_sx(rd,1+p,XI) : LDR_hx(rd,1+p,XI));
-                } else {
-                    put(c, wide ? LDR_q(rd,1+p,XW) : LDR_d(rd,1+p,XH));
-                }
+            int p=inst->ptr;
+            _Bool wide = (inst->op == op_load_32);
+            if (scalar) {
+                put(c, wide ? LDR_sx(rd,1+p,XI) : LDR_hx(rd,1+p,XI));
             } else {
-                put(c, MOVI_4s_0(rd));
+                put(c, wide ? LDR_q(rd,1+p,XW) : LDR_d(rd,1+p,XH));
             }
+        } break;
+
+        case op_uni_32: case op_uni_16: case op_uni_half:
+        case op_gather_32: case op_gather_16: case op_gather_half: {
+            int8_t rd = ra_alloc(c, ra, sl, ns);
+            ra->reg[i] = rd; ra->owner[(int)rd] = i;
+            put(c, MOVI_4s_0(rd));
         } break;
 
         case op_store_32: case op_store_16: case op_store_half: {
             int8_t ry = ra_ensure(c, ra, sl, ns, inst->y);
-            if (bb->inst[inst->x].op == op_lane) {
-                int p=inst->ptr;
-                _Bool wide = (inst->op == op_store_32);
-                if (scalar) {
-                    put(c, wide ? STR_sx(ry,1+p,XI) : STR_hx(ry,1+p,XI));
-                } else {
-                    put(c, wide ? STR_q(ry,1+p,XW) : STR_d(ry,1+p,XH));
-                }
+            int p=inst->ptr;
+            _Bool wide = (inst->op == op_store_32);
+            if (scalar) {
+                put(c, wide ? STR_sx(ry,1+p,XI) : STR_hx(ry,1+p,XI));
+            } else {
+                put(c, wide ? STR_q(ry,1+p,XW) : STR_d(ry,1+p,XH));
             }
+            if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
+        } break;
+
+        case op_scatter_32: case op_scatter_16: case op_scatter_half: {
             if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
         } break;
 

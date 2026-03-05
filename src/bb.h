@@ -4,7 +4,7 @@
 enum op {
     // 32-bit ops
     op_lane,
-    op_imm_32, op_load_32, op_store_32,
+    op_imm_32, op_uni_32, op_load_32, op_gather_32, op_store_32, op_scatter_32,
     op_add_f32, op_sub_f32, op_mul_f32, op_div_f32,
     op_min_f32, op_max_f32, op_sqrt_f32, op_fma_f32,
     op_add_i32, op_sub_i32, op_mul_i32,
@@ -17,7 +17,7 @@ enum op {
     op_lt_u32, op_le_u32, op_gt_u32, op_ge_u32,
 
     // 16-bit ops
-    op_imm_16, op_load_16, op_store_16,
+    op_imm_16, op_uni_16, op_load_16, op_gather_16, op_store_16, op_scatter_16,
     op_add_i16, op_sub_i16, op_mul_i16,
     op_shl_i16, op_shr_u16, op_shr_s16,
     op_and_16, op_or_16, op_xor_16, op_sel_16,
@@ -27,7 +27,7 @@ enum op {
     op_lt_u16, op_le_u16, op_gt_u16, op_ge_u16,
 
     // Half ops (fp16 in memory, unspecified width in registers)
-    op_imm_half, op_load_half, op_store_half,
+    op_imm_half, op_uni_half, op_load_half, op_gather_half, op_store_half, op_scatter_half,
     op_add_half, op_sub_half, op_mul_half, op_div_half,
     op_min_half, op_max_half, op_sqrt_half, op_fma_half,
     op_and_half, op_or_half, op_xor_half, op_sel_half,
@@ -51,7 +51,20 @@ struct umbra_basic_block {
 };
 
 static inline _Bool is_store(enum op op) {
-    return op == op_store_16 || op == op_store_32 || op == op_store_half;
+    return op == op_store_16 || op == op_store_32 || op == op_store_half
+        || op == op_scatter_16 || op == op_scatter_32 || op == op_scatter_half;
+}
+
+static inline _Bool has_ptr(enum op op) {
+    return (op >= op_uni_32 && op <= op_scatter_32)
+        || (op >= op_uni_16 && op <= op_scatter_16)
+        || (op >= op_uni_half && op <= op_scatter_half);
+}
+
+static inline _Bool is_varying(enum op op) {
+    return op == op_lane
+        || op == op_load_16 || op == op_load_32 || op == op_load_half
+        || op == op_store_16 || op == op_store_32 || op == op_store_half;
 }
 
 enum op_type { OP_32, OP_16, OP_HALF };
