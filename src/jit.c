@@ -183,123 +183,6 @@ static void load_imm_w(Buf *c, int rd, uint32_t v) {
 static void vld(Buf *c, int vd, int s) { put(c, LDR_qi(vd, XS, s)); }
 static void vst(Buf *c, int vd, int s) { put(c, STR_qi(vd, XS, s)); }
 
-static _Bool emit_alu(Buf *c, enum op op, int d, int x, int y, int z, int imm) {
-    switch (op) {
-    case op_imm_32: {
-        uint32_t v=(uint32_t)imm;
-        if (v==0) { put(c, MOVI_4s_0(0)); }
-        else { load_imm_w(c,XT,v); put(c, DUP_4s_w(0,XT)); }
-        vst(c,0,d);
-    } return 1;
-    case op_imm_16: case op_imm_half: {
-        uint16_t v=(uint16_t)imm;
-        put(c, MOVZ_w(XT,v));
-        put(c, DUP_4h_w(0,XT));
-        vst(c,0,d);
-    } return 1;
-
-    case op_add_f32: vld(c,0,x); vld(c,1,y); put(c, FADD_4s(2,0,1));  vst(c,2,d); return 1;
-    case op_sub_f32: vld(c,0,x); vld(c,1,y); put(c, FSUB_4s(2,0,1));  vst(c,2,d); return 1;
-    case op_mul_f32: vld(c,0,x); vld(c,1,y); put(c, FMUL_4s(2,0,1));  vst(c,2,d); return 1;
-    case op_div_f32: vld(c,0,x); vld(c,1,y); put(c, FDIV_4s(2,0,1));  vst(c,2,d); return 1;
-    case op_min_f32: vld(c,0,x); vld(c,1,y); put(c, FMINNM_4s(2,0,1));vst(c,2,d); return 1;
-    case op_max_f32: vld(c,0,x); vld(c,1,y); put(c, FMAXNM_4s(2,0,1));vst(c,2,d); return 1;
-    case op_sqrt_f32: vld(c,0,x); put(c, FSQRT_4s(2,0)); vst(c,2,d); return 1;
-    case op_fma_f32:
-        vld(c,2,z); vld(c,0,x); vld(c,1,y);
-        put(c, FMLA_4s(2,0,1)); vst(c,2,d); return 1;
-
-    case op_add_i32: vld(c,0,x); vld(c,1,y); put(c, ADD_4s(2,0,1)); vst(c,2,d); return 1;
-    case op_sub_i32: vld(c,0,x); vld(c,1,y); put(c, SUB_4s(2,0,1)); vst(c,2,d); return 1;
-    case op_mul_i32: vld(c,0,x); vld(c,1,y); put(c, MUL_4s(2,0,1)); vst(c,2,d); return 1;
-    case op_shl_i32: vld(c,0,x); vld(c,1,y); put(c, USHL_4s(2,0,1)); vst(c,2,d); return 1;
-    case op_shr_u32:
-        vld(c,0,x); vld(c,1,y); put(c, NEG_4s(1,1));
-        put(c, USHL_4s(2,0,1)); vst(c,2,d); return 1;
-    case op_shr_s32:
-        vld(c,0,x); vld(c,1,y); put(c, NEG_4s(1,1));
-        put(c, SSHL_4s(2,0,1)); vst(c,2,d); return 1;
-
-    case op_and_32: vld(c,0,x); vld(c,1,y); put(c, AND_16b(2,0,1)); vst(c,2,d); return 1;
-    case op_or_32:  vld(c,0,x); vld(c,1,y); put(c, ORR_16b(2,0,1)); vst(c,2,d); return 1;
-    case op_xor_32: vld(c,0,x); vld(c,1,y); put(c, EOR_16b(2,0,1)); vst(c,2,d); return 1;
-    case op_sel_32:
-        vld(c,3,x); vld(c,1,y); vld(c,2,z);
-        put(c, BSL_16b(3,1,2)); vst(c,3,d); return 1;
-
-    case op_f32_from_i32: vld(c,0,x); put(c, SCVTF_4s(2,0)); vst(c,2,d); return 1;
-    case op_i32_from_f32: vld(c,0,x); put(c, FCVTZS_4s(2,0)); vst(c,2,d); return 1;
-    case op_half_from_f32: vld(c,0,x); put(c, FCVTN_4h(2,0)); vst(c,2,d); return 1;
-    case op_f32_from_half: vld(c,0,x); put(c, FCVTL_4s(2,0)); vst(c,2,d); return 1;
-
-    case op_eq_f32: vld(c,0,x); vld(c,1,y); put(c, FCMEQ_4s(2,0,1)); vst(c,2,d); return 1;
-    case op_ne_f32: vld(c,0,x); vld(c,1,y); put(c, FCMEQ_4s(2,0,1)); put(c, MVN_16b(2,2)); vst(c,2,d); return 1;
-    case op_gt_f32: vld(c,0,x); vld(c,1,y); put(c, FCMGT_4s(2,0,1)); vst(c,2,d); return 1;
-    case op_ge_f32: vld(c,0,x); vld(c,1,y); put(c, FCMGE_4s(2,0,1)); vst(c,2,d); return 1;
-    case op_lt_f32: vld(c,0,x); vld(c,1,y); put(c, FCMGT_4s(2,1,0)); vst(c,2,d); return 1;
-    case op_le_f32: vld(c,0,x); vld(c,1,y); put(c, FCMGE_4s(2,1,0)); vst(c,2,d); return 1;
-
-    case op_eq_i32: vld(c,0,x); vld(c,1,y); put(c, CMEQ_4s(2,0,1)); vst(c,2,d); return 1;
-    case op_ne_i32: vld(c,0,x); vld(c,1,y); put(c, CMEQ_4s(2,0,1)); put(c, MVN_16b(2,2)); vst(c,2,d); return 1;
-    case op_gt_s32: vld(c,0,x); vld(c,1,y); put(c, CMGT_4s(2,0,1)); vst(c,2,d); return 1;
-    case op_ge_s32: vld(c,0,x); vld(c,1,y); put(c, CMGE_4s(2,0,1)); vst(c,2,d); return 1;
-    case op_lt_s32: vld(c,0,x); vld(c,1,y); put(c, CMGT_4s(2,1,0)); vst(c,2,d); return 1;
-    case op_le_s32: vld(c,0,x); vld(c,1,y); put(c, CMGE_4s(2,1,0)); vst(c,2,d); return 1;
-    case op_gt_u32: vld(c,0,x); vld(c,1,y); put(c, CMHI_4s(2,0,1)); vst(c,2,d); return 1;
-    case op_ge_u32: vld(c,0,x); vld(c,1,y); put(c, CMHS_4s(2,0,1)); vst(c,2,d); return 1;
-    case op_lt_u32: vld(c,0,x); vld(c,1,y); put(c, CMHI_4s(2,1,0)); vst(c,2,d); return 1;
-    case op_le_u32: vld(c,0,x); vld(c,1,y); put(c, CMHS_4s(2,1,0)); vst(c,2,d); return 1;
-
-    case op_add_i16: vld(c,0,x); vld(c,1,y); put(c, ADD_4h(2,0,1)); vst(c,2,d); return 1;
-    case op_sub_i16: vld(c,0,x); vld(c,1,y); put(c, SUB_4h(2,0,1)); vst(c,2,d); return 1;
-    case op_mul_i16: vld(c,0,x); vld(c,1,y); put(c, MUL_4h(2,0,1)); vst(c,2,d); return 1;
-    case op_shl_i16: vld(c,0,x); vld(c,1,y); put(c, USHL_4h(2,0,1)); vst(c,2,d); return 1;
-    case op_shr_u16: vld(c,0,x); vld(c,1,y); put(c, NEG_4h(1,1)); put(c, USHL_4h(2,0,1)); vst(c,2,d); return 1;
-    case op_shr_s16: vld(c,0,x); vld(c,1,y); put(c, NEG_4h(1,1)); put(c, SSHL_4h(2,0,1)); vst(c,2,d); return 1;
-    case op_and_16: vld(c,0,x); vld(c,1,y); put(c, AND_8b(2,0,1)); vst(c,2,d); return 1;
-    case op_or_16:  vld(c,0,x); vld(c,1,y); put(c, ORR_8b(2,0,1)); vst(c,2,d); return 1;
-    case op_xor_16: vld(c,0,x); vld(c,1,y); put(c, EOR_8b(2,0,1)); vst(c,2,d); return 1;
-    case op_sel_16:
-        vld(c,3,x); vld(c,1,y); vld(c,2,z);
-        put(c, BSL_8b(3,1,2)); vst(c,3,d); return 1;
-    case op_eq_i16: vld(c,0,x); vld(c,1,y); put(c, CMEQ_4h(2,0,1)); vst(c,2,d); return 1;
-    case op_ne_i16: vld(c,0,x); vld(c,1,y); put(c, CMEQ_4h(2,0,1)); put(c, MVN_8b(2,2)); vst(c,2,d); return 1;
-    case op_gt_s16: vld(c,0,x); vld(c,1,y); put(c, CMGT_4h(2,0,1)); vst(c,2,d); return 1;
-    case op_ge_s16: vld(c,0,x); vld(c,1,y); put(c, CMGE_4h(2,0,1)); vst(c,2,d); return 1;
-    case op_lt_s16: vld(c,0,x); vld(c,1,y); put(c, CMGT_4h(2,1,0)); vst(c,2,d); return 1;
-    case op_le_s16: vld(c,0,x); vld(c,1,y); put(c, CMGE_4h(2,1,0)); vst(c,2,d); return 1;
-    case op_gt_u16: vld(c,0,x); vld(c,1,y); put(c, CMHI_4h(2,0,1)); vst(c,2,d); return 1;
-    case op_ge_u16: vld(c,0,x); vld(c,1,y); put(c, CMHS_4h(2,0,1)); vst(c,2,d); return 1;
-    case op_lt_u16: vld(c,0,x); vld(c,1,y); put(c, CMHI_4h(2,1,0)); vst(c,2,d); return 1;
-    case op_le_u16: vld(c,0,x); vld(c,1,y); put(c, CMHS_4h(2,1,0)); vst(c,2,d); return 1;
-
-    case op_add_half: vld(c,0,x); vld(c,1,y); put(c, FADD_4h(2,0,1)); vst(c,2,d); return 1;
-    case op_sub_half: vld(c,0,x); vld(c,1,y); put(c, FSUB_4h(2,0,1)); vst(c,2,d); return 1;
-    case op_mul_half: vld(c,0,x); vld(c,1,y); put(c, FMUL_4h(2,0,1)); vst(c,2,d); return 1;
-    case op_div_half: vld(c,0,x); vld(c,1,y); put(c, FDIV_4h(2,0,1)); vst(c,2,d); return 1;
-    case op_min_half: vld(c,0,x); vld(c,1,y); put(c, FMINNM_4h(2,0,1)); vst(c,2,d); return 1;
-    case op_max_half: vld(c,0,x); vld(c,1,y); put(c, FMAXNM_4h(2,0,1)); vst(c,2,d); return 1;
-    case op_sqrt_half: vld(c,0,x); put(c, FSQRT_4h(2,0)); vst(c,2,d); return 1;
-    case op_fma_half:
-        vld(c,2,z); vld(c,0,x); vld(c,1,y);
-        put(c, FMLA_4h(2,0,1)); vst(c,2,d); return 1;
-    case op_and_half: vld(c,0,x); vld(c,1,y); put(c, AND_8b(2,0,1)); vst(c,2,d); return 1;
-    case op_or_half:  vld(c,0,x); vld(c,1,y); put(c, ORR_8b(2,0,1)); vst(c,2,d); return 1;
-    case op_xor_half: vld(c,0,x); vld(c,1,y); put(c, EOR_8b(2,0,1)); vst(c,2,d); return 1;
-    case op_sel_half:
-        vld(c,3,x); vld(c,1,y); vld(c,2,z);
-        put(c, BSL_8b(3,1,2)); vst(c,3,d); return 1;
-    case op_eq_half: vld(c,0,x); vld(c,1,y); put(c, FCMEQ_4h(2,0,1)); vst(c,2,d); return 1;
-    case op_ne_half: vld(c,0,x); vld(c,1,y); put(c, FCMEQ_4h(2,0,1)); put(c, MVN_8b(2,2)); vst(c,2,d); return 1;
-    case op_gt_half: vld(c,0,x); vld(c,1,y); put(c, FCMGT_4h(2,0,1)); vst(c,2,d); return 1;
-    case op_ge_half: vld(c,0,x); vld(c,1,y); put(c, FCMGE_4h(2,0,1)); vst(c,2,d); return 1;
-    case op_lt_half: vld(c,0,x); vld(c,1,y); put(c, FCMGT_4h(2,1,0)); vst(c,2,d); return 1;
-    case op_le_half: vld(c,0,x); vld(c,1,y); put(c, FCMGE_4h(2,1,0)); vst(c,2,d); return 1;
-
-    default: return 0;
-    }
-}
-
 // Register-to-register ALU emission (d,x,y,z are NEON register numbers).
 // v0 is scratch for destructive ops (BSL, FMLA, shift-right).
 static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm) {
@@ -571,7 +454,11 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
         struct bb_inst const *inst = &bb->inst[i];
         int d=sl[i], x=sl[inst->x], y=sl[inst->y], z=sl[inst->z];
 
-        emit_alu(&c, inst->op, d, x, y, z, inst->imm);
+        if (x >= 0) vld(&c, 1, x);
+        if (y >= 0) vld(&c, 2, y);
+        if (z >= 0) vld(&c, 3, z);
+        emit_alu_reg(&c, inst->op, 4, 1, 2, 3, inst->imm);
+        vst(&c, 4, d);
     }
 
     put(&c, MOVZ_x(XI,0));
@@ -662,59 +549,33 @@ static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
             }
         } break;
 
-        case op_load_32: {
+        case op_load_32: case op_load_16: case op_load_half: {
             int8_t rd = ra_alloc(c, ra, sl, ns);
             ra->reg[i] = rd; ra->owner[(int)rd] = i;
             if (bb->inst[inst->x].op == op_lane) {
                 int p=inst->ptr;
+                _Bool wide = (inst->op == op_load_32);
                 if (scalar) {
-                    put(c, LDR_sx(rd, 1+p, XI));
+                    put(c, wide ? LDR_sx(rd,1+p,XI) : LDR_hx(rd,1+p,XI));
                 } else {
-                    put(c, LSL_xi(XT, XI, 2));
-                    put(c, LDR_q(rd, 1+p, XT));
-                }
-            } else {
-                put(c, MOVI_4s_0(rd));
-            }
-        } break;
-        case op_load_16: case op_load_half: {
-            int8_t rd = ra_alloc(c, ra, sl, ns);
-            ra->reg[i] = rd; ra->owner[(int)rd] = i;
-            if (bb->inst[inst->x].op == op_lane) {
-                int p=inst->ptr;
-                if (scalar) {
-                    put(c, LDR_hx(rd, 1+p, XI));
-                } else {
-                    put(c, LSL_xi(XT, XI, 1));
-                    put(c, LDR_d(rd, 1+p, XT));
+                    put(c, LSL_xi(XT, XI, wide ? 2 : 1));
+                    put(c, wide ? LDR_q(rd,1+p,XT) : LDR_d(rd,1+p,XT));
                 }
             } else {
                 put(c, MOVI_4s_0(rd));
             }
         } break;
 
-        case op_store_32: {
+        case op_store_32: case op_store_16: case op_store_half: {
             int8_t ry = ra_ensure(c, ra, sl, ns, inst->y);
             if (bb->inst[inst->x].op == op_lane) {
                 int p=inst->ptr;
+                _Bool wide = (inst->op == op_store_32);
                 if (scalar) {
-                    put(c, STR_sx(ry, 1+p, XI));
+                    put(c, wide ? STR_sx(ry,1+p,XI) : STR_hx(ry,1+p,XI));
                 } else {
-                    put(c, LSL_xi(XT, XI, 2));
-                    put(c, STR_q(ry, 1+p, XT));
-                }
-            }
-            if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
-        } break;
-        case op_store_16: case op_store_half: {
-            int8_t ry = ra_ensure(c, ra, sl, ns, inst->y);
-            if (bb->inst[inst->x].op == op_lane) {
-                int p=inst->ptr;
-                if (scalar) {
-                    put(c, STR_hx(ry, 1+p, XI));
-                } else {
-                    put(c, LSL_xi(XT, XI, 1));
-                    put(c, STR_d(ry, 1+p, XT));
+                    put(c, LSL_xi(XT, XI, wide ? 2 : 1));
+                    put(c, wide ? STR_q(ry,1+p,XT) : STR_d(ry,1+p,XT));
                 }
             }
             if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
