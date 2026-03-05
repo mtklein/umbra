@@ -697,6 +697,23 @@ static char const* op_name(enum op op) {
     return "?";
 }
 
+static void schedule(int id, struct bb_inst const *in, struct bb_inst *out,
+                     int *old_to_new, int *j) {
+    if (old_to_new[id] >= 0) { return; }
+
+    // Schedule inputs first, in ascending original order for readability.
+    int inputs[] = {in[id].x, in[id].y, in[id].z};
+    if (inputs[0] > inputs[1]) { int t=inputs[0]; inputs[0]=inputs[1]; inputs[1]=t; }
+    if (inputs[1] > inputs[2]) { int t=inputs[1]; inputs[1]=inputs[2]; inputs[2]=t; }
+    if (inputs[0] > inputs[1]) { int t=inputs[0]; inputs[0]=inputs[1]; inputs[1]=t; }
+    for (int k = 0; k < 3; k++) {
+        schedule(inputs[k], in, out, old_to_new, j);
+    }
+
+    old_to_new[id] = *j;
+    out[(*j)++] = in[id];
+}
+
 void umbra_basic_block_optimize(BB *bb) {
     int const n = bb->insts;
 
@@ -725,6 +742,7 @@ void umbra_basic_block_optimize(BB *bb) {
     int *old_to_new = malloc((size_t)n * sizeof *old_to_new);
     for (int i = 0; i < n; i++) { old_to_new[i] = -1; }
 
+    // Emit uniform (non-varying, non-store) instructions first.
     int j = 0;
     for (int i = 0; i < n; i++) {
         if (!live[i] || varying[i] || is_store(bb->inst[i].op)) { continue; }
@@ -732,11 +750,13 @@ void umbra_basic_block_optimize(BB *bb) {
         out[j++] = bb->inst[i];
     }
     int const preamble = j;
+
+    // Late-schedule varying instructions: walk stores in order,
+    // recursively pulling each input in just before it's needed.
     for (int i = 0; i < n; i++) {
-        if (!live[i]) { continue; }
-        if (!varying[i] && !is_store(bb->inst[i].op)) { continue; }
-        old_to_new[i] = j;
-        out[j++] = bb->inst[i];
+        if (live[i] && is_store(bb->inst[i].op)) {
+            schedule(i, bb->inst, out, old_to_new, &j);
+        }
     }
 
     for (int i = 0; i < total; i++) {
