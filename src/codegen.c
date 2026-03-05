@@ -5,7 +5,9 @@
 
 struct umbra_codegen { int dummy; };
 struct umbra_codegen* umbra_codegen(struct umbra_basic_block const *bb) { (void)bb; return 0; }
-void umbra_codegen_run (struct umbra_codegen *cg, int n, void *ptr[]) { (void)cg; (void)n; (void)ptr; }
+void umbra_codegen_run (struct umbra_codegen *cg, int n, void *p0, void *p1, void *p2, void *p3, void *p4, void *p5) {
+    (void)cg; (void)n; (void)p0; (void)p1; (void)p2; (void)p3; (void)p4; (void)p5;
+}
 void umbra_codegen_free(struct umbra_codegen *cg) { (void)cg; }
 
 #else
@@ -19,7 +21,7 @@ typedef struct umbra_basic_block BB;
 
 struct umbra_codegen {
     void *dl;
-    void (*entry)(int n, void* ptr[]);
+    void (*entry)(int, void*, void*, void*, void*, void*, void*);
     char *src_path, *so_path;
 };
 
@@ -120,16 +122,16 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
     emit(&b, "    u32 r = (is_uf&sign) | (is_of&~is_in&inf) | (is_in&infnan) | (~is_uf&~is_of&~is_in&normal);\n");
     emit(&b, "    return (u16)r;\n}\n\n");
 
-    emit(&b, "void umbra_entry(int n, void* ptr[]) {\n");
+    emit(&b, "void umbra_entry(int n, void *a0, void *a1, void *a2, void *a3, void *a4, void *a5) {\n");
 
     for (int p = 0; p <= max_ptr; p++) {
         if (ptr_32[p] && ptr_16[p]) {
-            emit(&b, "    u32* p%d_32 = (u32*)ptr[%d];\n", p, p);
-            emit(&b, "    u16* p%d_16 = (u16*)ptr[%d];\n", p, p);
+            emit(&b, "    u32* p%d_32 = (u32*)a%d;\n", p, p);
+            emit(&b, "    u16* p%d_16 = (u16*)a%d;\n", p, p);
         } else if (ptr_32[p]) {
-            emit(&b, "    u32* restrict p%d = (u32*)ptr[%d];\n", p, p);
+            emit(&b, "    u32* restrict p%d = (u32*)a%d;\n", p, p);
         } else if (ptr_16[p]) {
-            emit(&b, "    u16* restrict p%d = (u16*)ptr[%d];\n", p, p);
+            emit(&b, "    u16* restrict p%d = (u16*)a%d;\n", p, p);
         }
     }
 
@@ -573,7 +575,8 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
         return 0;
     }
 
-    void (*entry)(int, void*[]) = (void (*)(int, void*[]))dlsym(dl, "umbra_entry");
+    void (*entry)(int, void*, void*, void*, void*, void*, void*) =
+        (void (*)(int, void*, void*, void*, void*, void*, void*))dlsym(dl, "umbra_entry");
     if (!entry) {
         dlclose(dl);
         remove(c_path);
@@ -591,8 +594,9 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
     return cg;
 }
 
-void umbra_codegen_run(struct umbra_codegen *cg, int n, void *ptr[]) {
-    if (cg) { cg->entry(n, ptr); }
+void umbra_codegen_run(struct umbra_codegen *cg, int n,
+                       void *p0, void *p1, void *p2, void *p3, void *p4, void *p5) {
+    if (cg) { cg->entry(n, p0, p1, p2, p3, p4, p5); }
 }
 
 void umbra_codegen_free(struct umbra_codegen *cg) {

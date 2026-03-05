@@ -586,7 +586,9 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
     return p;
 }
 
-void umbra_interpreter_run(struct umbra_interpreter *p, int n, void *ptr[]) {
+void umbra_interpreter_run(struct umbra_interpreter *p, int n,
+                           void *p0, void *p1, void *p2, void *p3, void *p4, void *p5) {
+    void *ptr[] = {p0, p1, p2, p3, p4, p5};
     struct interp_inst const *start = p->inst;
     val                      *v     = p->v;
     int const P = p->preamble;

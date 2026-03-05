@@ -110,13 +110,13 @@ umbra_v16 umbra_gt_u16(struct umbra_basic_block*, umbra_v16, umbra_v16);
 umbra_v16 umbra_ge_u16(struct umbra_basic_block*, umbra_v16, umbra_v16);
 
 struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const*);
-void umbra_interpreter_run (struct umbra_interpreter*, int n, void* ptr[]);
+void umbra_interpreter_run (struct umbra_interpreter*, int n, void*, void*, void*, void*, void*, void*);
 void umbra_interpreter_free(struct umbra_interpreter*);
 
 struct umbra_codegen* umbra_codegen(struct umbra_basic_block const*);
-void umbra_codegen_run (struct umbra_codegen*, int n, void* ptr[]);
+void umbra_codegen_run (struct umbra_codegen*, int n, void*, void*, void*, void*, void*, void*);
 void umbra_codegen_free(struct umbra_codegen*);
 
 struct umbra_jit* umbra_jit(struct umbra_basic_block const*);
-void umbra_jit_run (struct umbra_jit*, int n, void* ptr[]);
+void umbra_jit_run (struct umbra_jit*, int n, void*, void*, void*, void*, void*, void*);
 void umbra_jit_free(struct umbra_jit*);

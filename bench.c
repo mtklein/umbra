@@ -58,20 +58,27 @@ static struct umbra_basic_block* build_srcover_bb(void) {
     return bb;
 }
 
-typedef void (*run_fn)(void*, int, void*[]);
+typedef void (*run_fn)(void*, int, void*, void*, void*, void*, void*, void*);
 
-static void run_interp(void *ctx, int n, void *p[]) { umbra_interpreter_run(ctx, n, p); }
-static void run_cg    (void *ctx, int n, void *p[]) { umbra_codegen_run(ctx, n, p); }
-static void run_jit   (void *ctx, int n, void *p[]) { umbra_jit_run(ctx, n, p); }
+static void run_interp(void *ctx, int n, void *p0, void *p1, void *p2, void *p3, void *p4, void *p5) {
+    umbra_interpreter_run(ctx, n, p0,p1,p2,p3,p4,p5);
+}
+static void run_cg(void *ctx, int n, void *p0, void *p1, void *p2, void *p3, void *p4, void *p5) {
+    umbra_codegen_run(ctx, n, p0,p1,p2,p3,p4,p5);
+}
+static void run_jit(void *ctx, int n, void *p0, void *p1, void *p2, void *p3, void *p4, void *p5) {
+    umbra_jit_run(ctx, n, p0,p1,p2,p3,p4,p5);
+}
 
-static double bench_run(run_fn fn, void *ctx, int pixel_n, void *ptrs[]) {
-    fn(ctx, pixel_n, ptrs);
+static double bench_run(run_fn fn, void *ctx, int pixel_n,
+                        void *p0, void *p1, void *p2, void *p3, void *p4, void *p5) {
+    fn(ctx, pixel_n, p0,p1,p2,p3,p4,p5);
 
     int iters = 1;
     for (;;) {
         double const start = now();
         for (int i = 0; i < iters; i++) {
-            fn(ctx, pixel_n, ptrs);
+            fn(ctx, pixel_n, p0,p1,p2,p3,p4,p5);
         }
         double const elapsed = now() - start;
         if (elapsed >= 0.5) {
@@ -180,26 +187,24 @@ int main(int argc, char *argv[]) {
         db[i] = (__fp16)0.5f;
         da[i] = (__fp16)0.5f;
     }
-    void *ptrs[] = {src, dr, dg, db, da};
-
     char build_buf[16], run_buf[16];
 
     printf("SrcOver 8888->fp16, %d pixels:\n", pixel_n);
     printf("             build        run\n");
 
     fmt_ns(build_buf, bench_build_interp());
-    sprintf(run_buf, "%5.2f ns/px", bench_run(run_interp, p, pixel_n, ptrs));
+    sprintf(run_buf, "%5.2f ns/px", bench_run(run_interp, p, pixel_n, src, dr, dg, db, da, 0));
     printf("  interp  %s  %s\n", build_buf, run_buf);
 
     if (cg) {
         fmt_ns(build_buf, bench_build_codegen());
-        sprintf(run_buf, "%5.2f ns/px", bench_run(run_cg, cg, pixel_n, ptrs));
+        sprintf(run_buf, "%5.2f ns/px", bench_run(run_cg, cg, pixel_n, src, dr, dg, db, da, 0));
         printf("  codegen %s  %s\n", build_buf, run_buf);
     }
 
     if (jit) {
         fmt_ns(build_buf, bench_build_jit());
-        sprintf(run_buf, "%5.2f ns/px", bench_run(run_jit, jit, pixel_n, ptrs));
+        sprintf(run_buf, "%5.2f ns/px", bench_run(run_jit, jit, pixel_n, src, dr, dg, db, da, 0));
         printf("  jit     %s  %s\n", build_buf, run_buf);
     }
 

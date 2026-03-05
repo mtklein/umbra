@@ -5,7 +5,9 @@
 
 struct umbra_jit { int dummy; };
 struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) { (void)bb; return 0; }
-void umbra_jit_run (struct umbra_jit *j, int n, void *ptr[]) { (void)j; (void)n; (void)ptr; }
+void umbra_jit_run (struct umbra_jit *j, int n, void *p0, void *p1, void *p2, void *p3, void *p4, void *p5) {
+    (void)j; (void)n; (void)p0; (void)p1; (void)p2; (void)p3; (void)p4; (void)p5;
+}
 void umbra_jit_free(struct umbra_jit *j) { (void)j; }
 
 #else
@@ -45,9 +47,6 @@ static uint32_t MOVZ_w(int d, uint16_t imm) {
 }
 static uint32_t MOVK_w16(int d, uint16_t imm) {
     return 0x72A00000u | ((uint32_t)imm<<5) | (uint32_t)d;
-}
-static uint32_t LDR_xi(int d, int n, int imm12) {  // LDR Xd,[Xn,#imm*8]
-    return 0xF9400000u | ((uint32_t)imm12<<10) | ((uint32_t)n<<5) | (uint32_t)d;
 }
 static uint32_t STP_pre(int t1, int t2, int n, int imm7) {
     return 0xA9800000u | ((uint32_t)(imm7&0x7f)<<15) | ((uint32_t)t2<<10) | ((uint32_t)n<<5) | (uint32_t)t1;
@@ -173,7 +172,7 @@ static uint32_t INS_s(int d, int idx, int n) {
     return 0x4E001C00u|(imm5<<16)|((uint32_t)n<<5)|(uint32_t)d;
 }
 
-// x0=n, x1=ptr[], x2..x8=ptr[0..6], x9=loop i, x10=scratch, x15=stack base
+// x0=n, x1..x6=p0..p5, x9=loop i, x10=scratch, x15=stack base
 enum { XI=9, XT=10, XS=15 };
 
 static void load_imm_w(Buf *c, int rd, uint32_t v) {
@@ -184,13 +183,130 @@ static void load_imm_w(Buf *c, int rd, uint32_t v) {
 static void vld(Buf *c, int vd, int s) { put(c, LDR_qi(vd, XS, s)); }
 static void vst(Buf *c, int vd, int s) { put(c, STR_qi(vd, XS, s)); }
 
+static _Bool emit_alu(Buf *c, enum op op, int d, int x, int y, int z, int imm) {
+    switch (op) {
+    case op_imm_32: {
+        uint32_t v=(uint32_t)imm;
+        if (v==0) { put(c, MOVI_4s_0(0)); }
+        else { load_imm_w(c,XT,v); put(c, DUP_4s_w(0,XT)); }
+        vst(c,0,d);
+    } return 1;
+    case op_imm_16: case op_imm_half: {
+        uint16_t v=(uint16_t)imm;
+        put(c, MOVZ_w(XT,v));
+        put(c, DUP_4h_w(0,XT));
+        vst(c,0,d);
+    } return 1;
+
+    case op_add_f32: vld(c,0,x); vld(c,1,y); put(c, FADD_4s(2,0,1));  vst(c,2,d); return 1;
+    case op_sub_f32: vld(c,0,x); vld(c,1,y); put(c, FSUB_4s(2,0,1));  vst(c,2,d); return 1;
+    case op_mul_f32: vld(c,0,x); vld(c,1,y); put(c, FMUL_4s(2,0,1));  vst(c,2,d); return 1;
+    case op_div_f32: vld(c,0,x); vld(c,1,y); put(c, FDIV_4s(2,0,1));  vst(c,2,d); return 1;
+    case op_min_f32: vld(c,0,x); vld(c,1,y); put(c, FMINNM_4s(2,0,1));vst(c,2,d); return 1;
+    case op_max_f32: vld(c,0,x); vld(c,1,y); put(c, FMAXNM_4s(2,0,1));vst(c,2,d); return 1;
+    case op_sqrt_f32: vld(c,0,x); put(c, FSQRT_4s(2,0)); vst(c,2,d); return 1;
+    case op_fma_f32:
+        vld(c,2,z); vld(c,0,x); vld(c,1,y);
+        put(c, FMLA_4s(2,0,1)); vst(c,2,d); return 1;
+
+    case op_add_i32: vld(c,0,x); vld(c,1,y); put(c, ADD_4s(2,0,1)); vst(c,2,d); return 1;
+    case op_sub_i32: vld(c,0,x); vld(c,1,y); put(c, SUB_4s(2,0,1)); vst(c,2,d); return 1;
+    case op_mul_i32: vld(c,0,x); vld(c,1,y); put(c, MUL_4s(2,0,1)); vst(c,2,d); return 1;
+    case op_shl_i32: vld(c,0,x); vld(c,1,y); put(c, USHL_4s(2,0,1)); vst(c,2,d); return 1;
+    case op_shr_u32:
+        vld(c,0,x); vld(c,1,y); put(c, NEG_4s(1,1));
+        put(c, USHL_4s(2,0,1)); vst(c,2,d); return 1;
+    case op_shr_s32:
+        vld(c,0,x); vld(c,1,y); put(c, NEG_4s(1,1));
+        put(c, SSHL_4s(2,0,1)); vst(c,2,d); return 1;
+
+    case op_and_32: vld(c,0,x); vld(c,1,y); put(c, AND_16b(2,0,1)); vst(c,2,d); return 1;
+    case op_or_32:  vld(c,0,x); vld(c,1,y); put(c, ORR_16b(2,0,1)); vst(c,2,d); return 1;
+    case op_xor_32: vld(c,0,x); vld(c,1,y); put(c, EOR_16b(2,0,1)); vst(c,2,d); return 1;
+    case op_sel_32:
+        vld(c,3,x); vld(c,1,y); vld(c,2,z);
+        put(c, BSL_16b(3,1,2)); vst(c,3,d); return 1;
+
+    case op_f32_from_i32: vld(c,0,x); put(c, SCVTF_4s(2,0)); vst(c,2,d); return 1;
+    case op_i32_from_f32: vld(c,0,x); put(c, FCVTZS_4s(2,0)); vst(c,2,d); return 1;
+    case op_half_from_f32: vld(c,0,x); put(c, FCVTN_4h(2,0)); vst(c,2,d); return 1;
+    case op_f32_from_half: vld(c,0,x); put(c, FCVTL_4s(2,0)); vst(c,2,d); return 1;
+
+    case op_eq_f32: vld(c,0,x); vld(c,1,y); put(c, FCMEQ_4s(2,0,1)); vst(c,2,d); return 1;
+    case op_ne_f32: vld(c,0,x); vld(c,1,y); put(c, FCMEQ_4s(2,0,1)); put(c, MVN_16b(2,2)); vst(c,2,d); return 1;
+    case op_gt_f32: vld(c,0,x); vld(c,1,y); put(c, FCMGT_4s(2,0,1)); vst(c,2,d); return 1;
+    case op_ge_f32: vld(c,0,x); vld(c,1,y); put(c, FCMGE_4s(2,0,1)); vst(c,2,d); return 1;
+    case op_lt_f32: vld(c,0,x); vld(c,1,y); put(c, FCMGT_4s(2,1,0)); vst(c,2,d); return 1;
+    case op_le_f32: vld(c,0,x); vld(c,1,y); put(c, FCMGE_4s(2,1,0)); vst(c,2,d); return 1;
+
+    case op_eq_i32: vld(c,0,x); vld(c,1,y); put(c, CMEQ_4s(2,0,1)); vst(c,2,d); return 1;
+    case op_ne_i32: vld(c,0,x); vld(c,1,y); put(c, CMEQ_4s(2,0,1)); put(c, MVN_16b(2,2)); vst(c,2,d); return 1;
+    case op_gt_s32: vld(c,0,x); vld(c,1,y); put(c, CMGT_4s(2,0,1)); vst(c,2,d); return 1;
+    case op_ge_s32: vld(c,0,x); vld(c,1,y); put(c, CMGE_4s(2,0,1)); vst(c,2,d); return 1;
+    case op_lt_s32: vld(c,0,x); vld(c,1,y); put(c, CMGT_4s(2,1,0)); vst(c,2,d); return 1;
+    case op_le_s32: vld(c,0,x); vld(c,1,y); put(c, CMGE_4s(2,1,0)); vst(c,2,d); return 1;
+    case op_gt_u32: vld(c,0,x); vld(c,1,y); put(c, CMHI_4s(2,0,1)); vst(c,2,d); return 1;
+    case op_ge_u32: vld(c,0,x); vld(c,1,y); put(c, CMHS_4s(2,0,1)); vst(c,2,d); return 1;
+    case op_lt_u32: vld(c,0,x); vld(c,1,y); put(c, CMHI_4s(2,1,0)); vst(c,2,d); return 1;
+    case op_le_u32: vld(c,0,x); vld(c,1,y); put(c, CMHS_4s(2,1,0)); vst(c,2,d); return 1;
+
+    case op_add_i16: vld(c,0,x); vld(c,1,y); put(c, ADD_4h(2,0,1)); vst(c,2,d); return 1;
+    case op_sub_i16: vld(c,0,x); vld(c,1,y); put(c, SUB_4h(2,0,1)); vst(c,2,d); return 1;
+    case op_mul_i16: vld(c,0,x); vld(c,1,y); put(c, MUL_4h(2,0,1)); vst(c,2,d); return 1;
+    case op_shl_i16: vld(c,0,x); vld(c,1,y); put(c, USHL_4h(2,0,1)); vst(c,2,d); return 1;
+    case op_shr_u16: vld(c,0,x); vld(c,1,y); put(c, NEG_4h(1,1)); put(c, USHL_4h(2,0,1)); vst(c,2,d); return 1;
+    case op_shr_s16: vld(c,0,x); vld(c,1,y); put(c, NEG_4h(1,1)); put(c, SSHL_4h(2,0,1)); vst(c,2,d); return 1;
+    case op_and_16: vld(c,0,x); vld(c,1,y); put(c, AND_8b(2,0,1)); vst(c,2,d); return 1;
+    case op_or_16:  vld(c,0,x); vld(c,1,y); put(c, ORR_8b(2,0,1)); vst(c,2,d); return 1;
+    case op_xor_16: vld(c,0,x); vld(c,1,y); put(c, EOR_8b(2,0,1)); vst(c,2,d); return 1;
+    case op_sel_16:
+        vld(c,3,x); vld(c,1,y); vld(c,2,z);
+        put(c, BSL_8b(3,1,2)); vst(c,3,d); return 1;
+    case op_eq_i16: vld(c,0,x); vld(c,1,y); put(c, CMEQ_4h(2,0,1)); vst(c,2,d); return 1;
+    case op_ne_i16: vld(c,0,x); vld(c,1,y); put(c, CMEQ_4h(2,0,1)); put(c, MVN_8b(2,2)); vst(c,2,d); return 1;
+    case op_gt_s16: vld(c,0,x); vld(c,1,y); put(c, CMGT_4h(2,0,1)); vst(c,2,d); return 1;
+    case op_ge_s16: vld(c,0,x); vld(c,1,y); put(c, CMGE_4h(2,0,1)); vst(c,2,d); return 1;
+    case op_lt_s16: vld(c,0,x); vld(c,1,y); put(c, CMGT_4h(2,1,0)); vst(c,2,d); return 1;
+    case op_le_s16: vld(c,0,x); vld(c,1,y); put(c, CMGE_4h(2,1,0)); vst(c,2,d); return 1;
+    case op_gt_u16: vld(c,0,x); vld(c,1,y); put(c, CMHI_4h(2,0,1)); vst(c,2,d); return 1;
+    case op_ge_u16: vld(c,0,x); vld(c,1,y); put(c, CMHS_4h(2,0,1)); vst(c,2,d); return 1;
+    case op_lt_u16: vld(c,0,x); vld(c,1,y); put(c, CMHI_4h(2,1,0)); vst(c,2,d); return 1;
+    case op_le_u16: vld(c,0,x); vld(c,1,y); put(c, CMHS_4h(2,1,0)); vst(c,2,d); return 1;
+
+    case op_add_half: vld(c,0,x); vld(c,1,y); put(c, FADD_4h(2,0,1)); vst(c,2,d); return 1;
+    case op_sub_half: vld(c,0,x); vld(c,1,y); put(c, FSUB_4h(2,0,1)); vst(c,2,d); return 1;
+    case op_mul_half: vld(c,0,x); vld(c,1,y); put(c, FMUL_4h(2,0,1)); vst(c,2,d); return 1;
+    case op_div_half: vld(c,0,x); vld(c,1,y); put(c, FDIV_4h(2,0,1)); vst(c,2,d); return 1;
+    case op_min_half: vld(c,0,x); vld(c,1,y); put(c, FMINNM_4h(2,0,1)); vst(c,2,d); return 1;
+    case op_max_half: vld(c,0,x); vld(c,1,y); put(c, FMAXNM_4h(2,0,1)); vst(c,2,d); return 1;
+    case op_sqrt_half: vld(c,0,x); put(c, FSQRT_4h(2,0)); vst(c,2,d); return 1;
+    case op_fma_half:
+        vld(c,2,z); vld(c,0,x); vld(c,1,y);
+        put(c, FMLA_4h(2,0,1)); vst(c,2,d); return 1;
+    case op_and_half: vld(c,0,x); vld(c,1,y); put(c, AND_8b(2,0,1)); vst(c,2,d); return 1;
+    case op_or_half:  vld(c,0,x); vld(c,1,y); put(c, ORR_8b(2,0,1)); vst(c,2,d); return 1;
+    case op_xor_half: vld(c,0,x); vld(c,1,y); put(c, EOR_8b(2,0,1)); vst(c,2,d); return 1;
+    case op_sel_half:
+        vld(c,3,x); vld(c,1,y); vld(c,2,z);
+        put(c, BSL_8b(3,1,2)); vst(c,3,d); return 1;
+    case op_eq_half: vld(c,0,x); vld(c,1,y); put(c, FCMEQ_4h(2,0,1)); vst(c,2,d); return 1;
+    case op_ne_half: vld(c,0,x); vld(c,1,y); put(c, FCMEQ_4h(2,0,1)); put(c, MVN_8b(2,2)); vst(c,2,d); return 1;
+    case op_gt_half: vld(c,0,x); vld(c,1,y); put(c, FCMGT_4h(2,0,1)); vst(c,2,d); return 1;
+    case op_ge_half: vld(c,0,x); vld(c,1,y); put(c, FCMGE_4h(2,0,1)); vst(c,2,d); return 1;
+    case op_lt_half: vld(c,0,x); vld(c,1,y); put(c, FCMGT_4h(2,1,0)); vst(c,2,d); return 1;
+    case op_le_half: vld(c,0,x); vld(c,1,y); put(c, FCMGE_4h(2,1,0)); vst(c,2,d); return 1;
+
+    default: return 0;
+    }
+}
+
 static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
                               _Bool *live, _Bool *varying, int *sl, _Bool scalar);
 
 struct umbra_jit {
     void  *code;
     size_t code_size;
-    void (*entry)(int n, void* ptr[]);
+    void (*entry)(int, void*, void*, void*, void*, void*, void*);
 };
 
 struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
@@ -227,7 +343,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
             op==op_store_16||op==op_store_32||op==op_store_half)
             if (bb->inst[i].ptr>max_ptr) max_ptr=bb->inst[i].ptr;
     }
-    if (max_ptr>6) { free(live); free(varying); free(sl); return 0; }
+    if (max_ptr>5) { free(live); free(varying); free(sl); return 0; }
 
     Buf c={0};
 
@@ -239,129 +355,13 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
         if (bytes>0) put(&c, SUB_xi(31,31,bytes));
     }
     put(&c, ADD_xi(XS,31,0));
-    for (int p=0; p<=max_ptr; p++) put(&c, LDR_xi(2+p,1,p));
 
     for (int i=0; i<bb->insts; i++) {
         if (!live[i] || varying[i] || is_store(bb->inst[i].op)) continue;
         struct bb_inst const *inst = &bb->inst[i];
         int d=sl[i], x=sl[inst->x], y=sl[inst->y], z=sl[inst->z];
 
-        switch (inst->op) {
-        case op_imm_32: {
-            uint32_t imm=(uint32_t)inst->imm;
-            if (imm==0) { put(&c, MOVI_4s_0(0)); }
-            else { load_imm_w(&c,XT,imm); put(&c, DUP_4s_w(0,XT)); }
-            vst(&c,0,d);
-        } break;
-        case op_imm_16: case op_imm_half: {
-            uint16_t imm=(uint16_t)inst->imm;
-            put(&c, MOVZ_w(XT,imm));
-            put(&c, DUP_4h_w(0,XT));
-            vst(&c,0,d);
-        } break;
-
-        case op_add_f32: vld(&c,0,x); vld(&c,1,y); put(&c, FADD_4s(2,0,1));  vst(&c,2,d); break;
-        case op_sub_f32: vld(&c,0,x); vld(&c,1,y); put(&c, FSUB_4s(2,0,1));  vst(&c,2,d); break;
-        case op_mul_f32: vld(&c,0,x); vld(&c,1,y); put(&c, FMUL_4s(2,0,1));  vst(&c,2,d); break;
-        case op_div_f32: vld(&c,0,x); vld(&c,1,y); put(&c, FDIV_4s(2,0,1));  vst(&c,2,d); break;
-        case op_min_f32: vld(&c,0,x); vld(&c,1,y); put(&c, FMINNM_4s(2,0,1));vst(&c,2,d); break;
-        case op_max_f32: vld(&c,0,x); vld(&c,1,y); put(&c, FMAXNM_4s(2,0,1));vst(&c,2,d); break;
-        case op_sqrt_f32: vld(&c,0,x); put(&c, FSQRT_4s(2,0)); vst(&c,2,d); break;
-        case op_fma_f32:
-            vld(&c,2,z); vld(&c,0,x); vld(&c,1,y);
-            put(&c, FMLA_4s(2,0,1)); vst(&c,2,d); break;
-
-        case op_add_i32: vld(&c,0,x); vld(&c,1,y); put(&c, ADD_4s(2,0,1)); vst(&c,2,d); break;
-        case op_sub_i32: vld(&c,0,x); vld(&c,1,y); put(&c, SUB_4s(2,0,1)); vst(&c,2,d); break;
-        case op_mul_i32: vld(&c,0,x); vld(&c,1,y); put(&c, MUL_4s(2,0,1)); vst(&c,2,d); break;
-        case op_shl_i32: vld(&c,0,x); vld(&c,1,y); put(&c, USHL_4s(2,0,1)); vst(&c,2,d); break;
-        case op_shr_u32:
-            vld(&c,0,x); vld(&c,1,y); put(&c, NEG_4s(1,1));
-            put(&c, USHL_4s(2,0,1)); vst(&c,2,d); break;
-        case op_shr_s32:
-            vld(&c,0,x); vld(&c,1,y); put(&c, NEG_4s(1,1));
-            put(&c, SSHL_4s(2,0,1)); vst(&c,2,d); break;
-
-        case op_and_32: vld(&c,0,x); vld(&c,1,y); put(&c, AND_16b(2,0,1)); vst(&c,2,d); break;
-        case op_or_32:  vld(&c,0,x); vld(&c,1,y); put(&c, ORR_16b(2,0,1)); vst(&c,2,d); break;
-        case op_xor_32: vld(&c,0,x); vld(&c,1,y); put(&c, EOR_16b(2,0,1)); vst(&c,2,d); break;
-        case op_sel_32:
-            vld(&c,3,x); vld(&c,1,y); vld(&c,2,z);
-            put(&c, BSL_16b(3,1,2)); vst(&c,3,d); break;
-
-        case op_f32_from_i32: vld(&c,0,x); put(&c, SCVTF_4s(2,0)); vst(&c,2,d); break;
-        case op_i32_from_f32: vld(&c,0,x); put(&c, FCVTZS_4s(2,0)); vst(&c,2,d); break;
-        case op_half_from_f32: vld(&c,0,x); put(&c, FCVTN_4h(2,0)); vst(&c,2,d); break;
-        case op_f32_from_half: vld(&c,0,x); put(&c, FCVTL_4s(2,0)); vst(&c,2,d); break;
-
-        case op_eq_f32: vld(&c,0,x); vld(&c,1,y); put(&c, FCMEQ_4s(2,0,1)); vst(&c,2,d); break;
-        case op_ne_f32: vld(&c,0,x); vld(&c,1,y); put(&c, FCMEQ_4s(2,0,1)); put(&c, MVN_16b(2,2)); vst(&c,2,d); break;
-        case op_gt_f32: vld(&c,0,x); vld(&c,1,y); put(&c, FCMGT_4s(2,0,1)); vst(&c,2,d); break;
-        case op_ge_f32: vld(&c,0,x); vld(&c,1,y); put(&c, FCMGE_4s(2,0,1)); vst(&c,2,d); break;
-        case op_lt_f32: vld(&c,0,x); vld(&c,1,y); put(&c, FCMGT_4s(2,1,0)); vst(&c,2,d); break;
-        case op_le_f32: vld(&c,0,x); vld(&c,1,y); put(&c, FCMGE_4s(2,1,0)); vst(&c,2,d); break;
-
-        case op_eq_i32: vld(&c,0,x); vld(&c,1,y); put(&c, CMEQ_4s(2,0,1)); vst(&c,2,d); break;
-        case op_ne_i32: vld(&c,0,x); vld(&c,1,y); put(&c, CMEQ_4s(2,0,1)); put(&c, MVN_16b(2,2)); vst(&c,2,d); break;
-        case op_gt_s32: vld(&c,0,x); vld(&c,1,y); put(&c, CMGT_4s(2,0,1)); vst(&c,2,d); break;
-        case op_ge_s32: vld(&c,0,x); vld(&c,1,y); put(&c, CMGE_4s(2,0,1)); vst(&c,2,d); break;
-        case op_lt_s32: vld(&c,0,x); vld(&c,1,y); put(&c, CMGT_4s(2,1,0)); vst(&c,2,d); break;
-        case op_le_s32: vld(&c,0,x); vld(&c,1,y); put(&c, CMGE_4s(2,1,0)); vst(&c,2,d); break;
-        case op_gt_u32: vld(&c,0,x); vld(&c,1,y); put(&c, CMHI_4s(2,0,1)); vst(&c,2,d); break;
-        case op_ge_u32: vld(&c,0,x); vld(&c,1,y); put(&c, CMHS_4s(2,0,1)); vst(&c,2,d); break;
-        case op_lt_u32: vld(&c,0,x); vld(&c,1,y); put(&c, CMHI_4s(2,1,0)); vst(&c,2,d); break;
-        case op_le_u32: vld(&c,0,x); vld(&c,1,y); put(&c, CMHS_4s(2,1,0)); vst(&c,2,d); break;
-
-        case op_add_i16: vld(&c,0,x); vld(&c,1,y); put(&c, ADD_4h(2,0,1)); vst(&c,2,d); break;
-        case op_sub_i16: vld(&c,0,x); vld(&c,1,y); put(&c, SUB_4h(2,0,1)); vst(&c,2,d); break;
-        case op_mul_i16: vld(&c,0,x); vld(&c,1,y); put(&c, MUL_4h(2,0,1)); vst(&c,2,d); break;
-        case op_shl_i16: vld(&c,0,x); vld(&c,1,y); put(&c, USHL_4h(2,0,1)); vst(&c,2,d); break;
-        case op_shr_u16: vld(&c,0,x); vld(&c,1,y); put(&c, NEG_4h(1,1)); put(&c, USHL_4h(2,0,1)); vst(&c,2,d); break;
-        case op_shr_s16: vld(&c,0,x); vld(&c,1,y); put(&c, NEG_4h(1,1)); put(&c, SSHL_4h(2,0,1)); vst(&c,2,d); break;
-        case op_and_16: vld(&c,0,x); vld(&c,1,y); put(&c, AND_8b(2,0,1)); vst(&c,2,d); break;
-        case op_or_16:  vld(&c,0,x); vld(&c,1,y); put(&c, ORR_8b(2,0,1)); vst(&c,2,d); break;
-        case op_xor_16: vld(&c,0,x); vld(&c,1,y); put(&c, EOR_8b(2,0,1)); vst(&c,2,d); break;
-        case op_sel_16:
-            vld(&c,3,x); vld(&c,1,y); vld(&c,2,z);
-            put(&c, BSL_8b(3,1,2)); vst(&c,3,d); break;
-        case op_eq_i16: vld(&c,0,x); vld(&c,1,y); put(&c, CMEQ_4h(2,0,1)); vst(&c,2,d); break;
-        case op_ne_i16: vld(&c,0,x); vld(&c,1,y); put(&c, CMEQ_4h(2,0,1)); put(&c, MVN_8b(2,2)); vst(&c,2,d); break;
-        case op_gt_s16: vld(&c,0,x); vld(&c,1,y); put(&c, CMGT_4h(2,0,1)); vst(&c,2,d); break;
-        case op_ge_s16: vld(&c,0,x); vld(&c,1,y); put(&c, CMGE_4h(2,0,1)); vst(&c,2,d); break;
-        case op_lt_s16: vld(&c,0,x); vld(&c,1,y); put(&c, CMGT_4h(2,1,0)); vst(&c,2,d); break;
-        case op_le_s16: vld(&c,0,x); vld(&c,1,y); put(&c, CMGE_4h(2,1,0)); vst(&c,2,d); break;
-        case op_gt_u16: vld(&c,0,x); vld(&c,1,y); put(&c, CMHI_4h(2,0,1)); vst(&c,2,d); break;
-        case op_ge_u16: vld(&c,0,x); vld(&c,1,y); put(&c, CMHS_4h(2,0,1)); vst(&c,2,d); break;
-        case op_lt_u16: vld(&c,0,x); vld(&c,1,y); put(&c, CMHI_4h(2,1,0)); vst(&c,2,d); break;
-        case op_le_u16: vld(&c,0,x); vld(&c,1,y); put(&c, CMHS_4h(2,1,0)); vst(&c,2,d); break;
-
-        case op_add_half: vld(&c,0,x); vld(&c,1,y); put(&c, FADD_4h(2,0,1)); vst(&c,2,d); break;
-        case op_sub_half: vld(&c,0,x); vld(&c,1,y); put(&c, FSUB_4h(2,0,1)); vst(&c,2,d); break;
-        case op_mul_half: vld(&c,0,x); vld(&c,1,y); put(&c, FMUL_4h(2,0,1)); vst(&c,2,d); break;
-        case op_div_half: vld(&c,0,x); vld(&c,1,y); put(&c, FDIV_4h(2,0,1)); vst(&c,2,d); break;
-        case op_min_half: vld(&c,0,x); vld(&c,1,y); put(&c, FMINNM_4h(2,0,1)); vst(&c,2,d); break;
-        case op_max_half: vld(&c,0,x); vld(&c,1,y); put(&c, FMAXNM_4h(2,0,1)); vst(&c,2,d); break;
-        case op_sqrt_half: vld(&c,0,x); put(&c, FSQRT_4h(2,0)); vst(&c,2,d); break;
-        case op_fma_half:
-            vld(&c,2,z); vld(&c,0,x); vld(&c,1,y);
-            put(&c, FMLA_4h(2,0,1)); vst(&c,2,d); break;
-        case op_and_half: vld(&c,0,x); vld(&c,1,y); put(&c, AND_8b(2,0,1)); vst(&c,2,d); break;
-        case op_or_half:  vld(&c,0,x); vld(&c,1,y); put(&c, ORR_8b(2,0,1)); vst(&c,2,d); break;
-        case op_xor_half: vld(&c,0,x); vld(&c,1,y); put(&c, EOR_8b(2,0,1)); vst(&c,2,d); break;
-        case op_sel_half:
-            vld(&c,3,x); vld(&c,1,y); vld(&c,2,z);
-            put(&c, BSL_8b(3,1,2)); vst(&c,3,d); break;
-        case op_eq_half: vld(&c,0,x); vld(&c,1,y); put(&c, FCMEQ_4h(2,0,1)); vst(&c,2,d); break;
-        case op_ne_half: vld(&c,0,x); vld(&c,1,y); put(&c, FCMEQ_4h(2,0,1)); put(&c, MVN_8b(2,2)); vst(&c,2,d); break;
-        case op_gt_half: vld(&c,0,x); vld(&c,1,y); put(&c, FCMGT_4h(2,0,1)); vst(&c,2,d); break;
-        case op_ge_half: vld(&c,0,x); vld(&c,1,y); put(&c, FCMGE_4h(2,0,1)); vst(&c,2,d); break;
-        case op_lt_half: vld(&c,0,x); vld(&c,1,y); put(&c, FCMGT_4h(2,1,0)); vst(&c,2,d); break;
-        case op_le_half: vld(&c,0,x); vld(&c,1,y); put(&c, FCMGE_4h(2,1,0)); vst(&c,2,d); break;
-
-        case op_lane: case op_load_16: case op_load_32: case op_load_half:
-        case op_store_16: case op_store_32: case op_store_half:
-            break;
-        }
+        emit_alu(&c, inst->op, d, x, y, z, inst->imm);
     }
 
     put(&c, MOVZ_x(XI,0));
@@ -419,7 +419,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     struct umbra_jit *j = malloc(sizeof *j);
     j->code = mem;
     j->code_size = alloc;
-    j->entry = (void(*)(int,void*[]))mem;
+    j->entry = (void(*)(int,void*,void*,void*,void*,void*,void*))mem;
     return j;
 }
 
@@ -446,10 +446,10 @@ static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
             if (bb->inst[inst->x].op == op_lane) {
                 int p=inst->ptr;
                 if (scalar) {
-                    put(c, LDR_sx(0, 2+p, XI));
+                    put(c, LDR_sx(0, 1+p, XI));
                 } else {
                     put(c, LSL_xi(XT, XI, 2));  // byte offset = i*4
-                    put(c, LDR_q(0, 2+p, XT));
+                    put(c, LDR_q(0, 1+p, XT));
                 }
                 vst(c,0,d);
             } else {
@@ -459,10 +459,10 @@ static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
             if (bb->inst[inst->x].op == op_lane) {
                 int p=inst->ptr;
                 if (scalar) {
-                    put(c, LDR_hx(0, 2+p, XI));
+                    put(c, LDR_hx(0, 1+p, XI));
                 } else {
                     put(c, LSL_xi(XT, XI, 1));  // byte offset = i*2
-                    put(c, LDR_d(0, 2+p, XT));
+                    put(c, LDR_d(0, 1+p, XT));
                 }
                 vst(c,0,d);
             } else {
@@ -472,10 +472,10 @@ static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
             if (bb->inst[inst->x].op == op_lane) {
                 int p=inst->ptr;
                 if (scalar) {
-                    put(c, LDR_hx(0, 2+p, XI));
+                    put(c, LDR_hx(0, 1+p, XI));
                 } else {
                     put(c, LSL_xi(XT, XI, 1));  // byte offset = i*2
-                    put(c, LDR_d(0, 2+p, XT));
+                    put(c, LDR_d(0, 1+p, XT));
                 }
                 vst(c,0,d);
             } else {
@@ -487,10 +487,10 @@ static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
                 int p=inst->ptr;
                 vld(c,0,y);
                 if (scalar) {
-                    put(c, STR_sx(0, 2+p, XI));
+                    put(c, STR_sx(0, 1+p, XI));
                 } else {
                     put(c, LSL_xi(XT, XI, 2));
-                    put(c, STR_q(0, 2+p, XT));
+                    put(c, STR_q(0, 1+p, XT));
                 }
             } break;
         case op_store_16:
@@ -498,10 +498,10 @@ static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
                 int p=inst->ptr;
                 vld(c,0,y);
                 if (scalar) {
-                    put(c, STR_hx(0, 2+p, XI));
+                    put(c, STR_hx(0, 1+p, XI));
                 } else {
                     put(c, LSL_xi(XT, XI, 1));
-                    put(c, STR_d(0, 2+p, XT));
+                    put(c, STR_d(0, 1+p, XT));
                 }
             } break;
         case op_store_half:
@@ -509,129 +509,20 @@ static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
                 int p=inst->ptr;
                 vld(c,0,y);
                 if (scalar) {
-                    put(c, STR_hx(0, 2+p, XI));
+                    put(c, STR_hx(0, 1+p, XI));
                 } else {
                     put(c, LSL_xi(XT, XI, 1));
-                    put(c, STR_d(0, 2+p, XT));
+                    put(c, STR_d(0, 1+p, XT));
                 }
             } break;
 
-        case op_imm_32: {
-            uint32_t imm=(uint32_t)inst->imm;
-            if (imm==0) put(c, MOVI_4s_0(0));
-            else { load_imm_w(c,XT,imm); put(c, DUP_4s_w(0,XT)); }
-            vst(c,0,d);
-        } break;
-        case op_imm_16: case op_imm_half: {
-            uint16_t imm=(uint16_t)inst->imm;
-            put(c, MOVZ_w(XT,imm));
-            put(c, DUP_4h_w(0,XT));
-            vst(c,0,d);
-        } break;
-
-        case op_add_f32: vld(c,0,x); vld(c,1,y); put(c, FADD_4s(2,0,1));  vst(c,2,d); break;
-        case op_sub_f32: vld(c,0,x); vld(c,1,y); put(c, FSUB_4s(2,0,1));  vst(c,2,d); break;
-        case op_mul_f32: vld(c,0,x); vld(c,1,y); put(c, FMUL_4s(2,0,1));  vst(c,2,d); break;
-        case op_div_f32: vld(c,0,x); vld(c,1,y); put(c, FDIV_4s(2,0,1));  vst(c,2,d); break;
-        case op_min_f32: vld(c,0,x); vld(c,1,y); put(c, FMINNM_4s(2,0,1));vst(c,2,d); break;
-        case op_max_f32: vld(c,0,x); vld(c,1,y); put(c, FMAXNM_4s(2,0,1));vst(c,2,d); break;
-        case op_sqrt_f32: vld(c,0,x); put(c, FSQRT_4s(2,0)); vst(c,2,d); break;
-        case op_fma_f32:
-            vld(c,2,z); vld(c,0,x); vld(c,1,y);
-            put(c, FMLA_4s(2,0,1)); vst(c,2,d); break;
-
-        case op_add_i32: vld(c,0,x); vld(c,1,y); put(c, ADD_4s(2,0,1)); vst(c,2,d); break;
-        case op_sub_i32: vld(c,0,x); vld(c,1,y); put(c, SUB_4s(2,0,1)); vst(c,2,d); break;
-        case op_mul_i32: vld(c,0,x); vld(c,1,y); put(c, MUL_4s(2,0,1)); vst(c,2,d); break;
-        case op_shl_i32: vld(c,0,x); vld(c,1,y); put(c, USHL_4s(2,0,1)); vst(c,2,d); break;
-        case op_shr_u32:
-            vld(c,0,x); vld(c,1,y); put(c, NEG_4s(1,1));
-            put(c, USHL_4s(2,0,1)); vst(c,2,d); break;
-        case op_shr_s32:
-            vld(c,0,x); vld(c,1,y); put(c, NEG_4s(1,1));
-            put(c, SSHL_4s(2,0,1)); vst(c,2,d); break;
-
-        case op_and_32: vld(c,0,x); vld(c,1,y); put(c, AND_16b(2,0,1)); vst(c,2,d); break;
-        case op_or_32:  vld(c,0,x); vld(c,1,y); put(c, ORR_16b(2,0,1)); vst(c,2,d); break;
-        case op_xor_32: vld(c,0,x); vld(c,1,y); put(c, EOR_16b(2,0,1)); vst(c,2,d); break;
-        case op_sel_32:
-            vld(c,3,x); vld(c,1,y); vld(c,2,z);
-            put(c, BSL_16b(3,1,2)); vst(c,3,d); break;
-
-        case op_f32_from_i32: vld(c,0,x); put(c, SCVTF_4s(2,0)); vst(c,2,d); break;
-        case op_i32_from_f32: vld(c,0,x); put(c, FCVTZS_4s(2,0)); vst(c,2,d); break;
-        case op_half_from_f32: vld(c,0,x); put(c, FCVTN_4h(2,0)); vst(c,2,d); break;
-        case op_f32_from_half: vld(c,0,x); put(c, FCVTL_4s(2,0)); vst(c,2,d); break;
-
-        case op_eq_f32: vld(c,0,x); vld(c,1,y); put(c, FCMEQ_4s(2,0,1)); vst(c,2,d); break;
-        case op_ne_f32: vld(c,0,x); vld(c,1,y); put(c, FCMEQ_4s(2,0,1)); put(c, MVN_16b(2,2)); vst(c,2,d); break;
-        case op_gt_f32: vld(c,0,x); vld(c,1,y); put(c, FCMGT_4s(2,0,1)); vst(c,2,d); break;
-        case op_ge_f32: vld(c,0,x); vld(c,1,y); put(c, FCMGE_4s(2,0,1)); vst(c,2,d); break;
-        case op_lt_f32: vld(c,0,x); vld(c,1,y); put(c, FCMGT_4s(2,1,0)); vst(c,2,d); break;
-        case op_le_f32: vld(c,0,x); vld(c,1,y); put(c, FCMGE_4s(2,1,0)); vst(c,2,d); break;
-
-        case op_eq_i32: vld(c,0,x); vld(c,1,y); put(c, CMEQ_4s(2,0,1)); vst(c,2,d); break;
-        case op_ne_i32: vld(c,0,x); vld(c,1,y); put(c, CMEQ_4s(2,0,1)); put(c, MVN_16b(2,2)); vst(c,2,d); break;
-        case op_gt_s32: vld(c,0,x); vld(c,1,y); put(c, CMGT_4s(2,0,1)); vst(c,2,d); break;
-        case op_ge_s32: vld(c,0,x); vld(c,1,y); put(c, CMGE_4s(2,0,1)); vst(c,2,d); break;
-        case op_lt_s32: vld(c,0,x); vld(c,1,y); put(c, CMGT_4s(2,1,0)); vst(c,2,d); break;
-        case op_le_s32: vld(c,0,x); vld(c,1,y); put(c, CMGE_4s(2,1,0)); vst(c,2,d); break;
-        case op_gt_u32: vld(c,0,x); vld(c,1,y); put(c, CMHI_4s(2,0,1)); vst(c,2,d); break;
-        case op_ge_u32: vld(c,0,x); vld(c,1,y); put(c, CMHS_4s(2,0,1)); vst(c,2,d); break;
-        case op_lt_u32: vld(c,0,x); vld(c,1,y); put(c, CMHI_4s(2,1,0)); vst(c,2,d); break;
-        case op_le_u32: vld(c,0,x); vld(c,1,y); put(c, CMHS_4s(2,1,0)); vst(c,2,d); break;
-
-        case op_add_i16: vld(c,0,x); vld(c,1,y); put(c, ADD_4h(2,0,1)); vst(c,2,d); break;
-        case op_sub_i16: vld(c,0,x); vld(c,1,y); put(c, SUB_4h(2,0,1)); vst(c,2,d); break;
-        case op_mul_i16: vld(c,0,x); vld(c,1,y); put(c, MUL_4h(2,0,1)); vst(c,2,d); break;
-        case op_shl_i16: vld(c,0,x); vld(c,1,y); put(c, USHL_4h(2,0,1)); vst(c,2,d); break;
-        case op_shr_u16: vld(c,0,x); vld(c,1,y); put(c, NEG_4h(1,1)); put(c, USHL_4h(2,0,1)); vst(c,2,d); break;
-        case op_shr_s16: vld(c,0,x); vld(c,1,y); put(c, NEG_4h(1,1)); put(c, SSHL_4h(2,0,1)); vst(c,2,d); break;
-        case op_and_16: vld(c,0,x); vld(c,1,y); put(c, AND_8b(2,0,1)); vst(c,2,d); break;
-        case op_or_16:  vld(c,0,x); vld(c,1,y); put(c, ORR_8b(2,0,1)); vst(c,2,d); break;
-        case op_xor_16: vld(c,0,x); vld(c,1,y); put(c, EOR_8b(2,0,1)); vst(c,2,d); break;
-        case op_sel_16:
-            vld(c,3,x); vld(c,1,y); vld(c,2,z);
-            put(c, BSL_8b(3,1,2)); vst(c,3,d); break;
-        case op_eq_i16: vld(c,0,x); vld(c,1,y); put(c, CMEQ_4h(2,0,1)); vst(c,2,d); break;
-        case op_ne_i16: vld(c,0,x); vld(c,1,y); put(c, CMEQ_4h(2,0,1)); put(c, MVN_8b(2,2)); vst(c,2,d); break;
-        case op_gt_s16: vld(c,0,x); vld(c,1,y); put(c, CMGT_4h(2,0,1)); vst(c,2,d); break;
-        case op_ge_s16: vld(c,0,x); vld(c,1,y); put(c, CMGE_4h(2,0,1)); vst(c,2,d); break;
-        case op_lt_s16: vld(c,0,x); vld(c,1,y); put(c, CMGT_4h(2,1,0)); vst(c,2,d); break;
-        case op_le_s16: vld(c,0,x); vld(c,1,y); put(c, CMGE_4h(2,1,0)); vst(c,2,d); break;
-        case op_gt_u16: vld(c,0,x); vld(c,1,y); put(c, CMHI_4h(2,0,1)); vst(c,2,d); break;
-        case op_ge_u16: vld(c,0,x); vld(c,1,y); put(c, CMHS_4h(2,0,1)); vst(c,2,d); break;
-        case op_lt_u16: vld(c,0,x); vld(c,1,y); put(c, CMHI_4h(2,1,0)); vst(c,2,d); break;
-        case op_le_u16: vld(c,0,x); vld(c,1,y); put(c, CMHS_4h(2,1,0)); vst(c,2,d); break;
-
-        case op_add_half: vld(c,0,x); vld(c,1,y); put(c, FADD_4h(2,0,1)); vst(c,2,d); break;
-        case op_sub_half: vld(c,0,x); vld(c,1,y); put(c, FSUB_4h(2,0,1)); vst(c,2,d); break;
-        case op_mul_half: vld(c,0,x); vld(c,1,y); put(c, FMUL_4h(2,0,1)); vst(c,2,d); break;
-        case op_div_half: vld(c,0,x); vld(c,1,y); put(c, FDIV_4h(2,0,1)); vst(c,2,d); break;
-        case op_min_half: vld(c,0,x); vld(c,1,y); put(c, FMINNM_4h(2,0,1)); vst(c,2,d); break;
-        case op_max_half: vld(c,0,x); vld(c,1,y); put(c, FMAXNM_4h(2,0,1)); vst(c,2,d); break;
-        case op_sqrt_half: vld(c,0,x); put(c, FSQRT_4h(2,0)); vst(c,2,d); break;
-        case op_fma_half:
-            vld(c,2,z); vld(c,0,x); vld(c,1,y);
-            put(c, FMLA_4h(2,0,1)); vst(c,2,d); break;
-        case op_and_half: vld(c,0,x); vld(c,1,y); put(c, AND_8b(2,0,1)); vst(c,2,d); break;
-        case op_or_half:  vld(c,0,x); vld(c,1,y); put(c, ORR_8b(2,0,1)); vst(c,2,d); break;
-        case op_xor_half: vld(c,0,x); vld(c,1,y); put(c, EOR_8b(2,0,1)); vst(c,2,d); break;
-        case op_sel_half:
-            vld(c,3,x); vld(c,1,y); vld(c,2,z);
-            put(c, BSL_8b(3,1,2)); vst(c,3,d); break;
-        case op_eq_half: vld(c,0,x); vld(c,1,y); put(c, FCMEQ_4h(2,0,1)); vst(c,2,d); break;
-        case op_ne_half: vld(c,0,x); vld(c,1,y); put(c, FCMEQ_4h(2,0,1)); put(c, MVN_8b(2,2)); vst(c,2,d); break;
-        case op_gt_half: vld(c,0,x); vld(c,1,y); put(c, FCMGT_4h(2,0,1)); vst(c,2,d); break;
-        case op_ge_half: vld(c,0,x); vld(c,1,y); put(c, FCMGE_4h(2,0,1)); vst(c,2,d); break;
-        case op_lt_half: vld(c,0,x); vld(c,1,y); put(c, FCMGT_4h(2,1,0)); vst(c,2,d); break;
-        case op_le_half: vld(c,0,x); vld(c,1,y); put(c, FCMGE_4h(2,1,0)); vst(c,2,d); break;
+        default: emit_alu(c, inst->op, d, x, y, z, inst->imm); break;
         }
     }
 }
 
-void umbra_jit_run(struct umbra_jit *j, int n, void *ptr[]) {
-    if (j) j->entry(n, ptr);
+void umbra_jit_run(struct umbra_jit *j, int n, void *p0, void *p1, void *p2, void *p3, void *p4, void *p5) {
+    if (j) j->entry(n, p0, p1, p2, p3, p4, p5);
 }
 
 void umbra_jit_free(struct umbra_jit *j) {
