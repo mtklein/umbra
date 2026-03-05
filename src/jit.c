@@ -145,6 +145,8 @@ enum {
 
     // conversions
     FCVTN_4h_=0x0E216800u, FCVTL_4s_=0x0E217800u,
+    SCVTF_4h_=0x0E79D800u, FCVTZS_4h_=0x0EF9B800u,
+    XTN_4h_  =0x0E612800u, SXTL_4s_  =0x0F10A400u,
 };
 
 V3(FADD_4s)  V3(FSUB_4s)  V3(FMUL_4s) V3(FDIV_4s)  V3(FMLA_4s)
@@ -162,6 +164,7 @@ V3(USHL_4h) V3(SSHL_4h) V2(NEG_4h)
 V3(CMEQ_4h) V3(CMGT_4h) V3(CMGE_4h) V3(CMHI_4h) V3(CMHS_4h)
 V3(AND_8b) V3(ORR_8b) V3(EOR_8b) V3(BSL_8b) V2(MVN_8b)
 V2(FCVTN_4h) V2(FCVTL_4s)
+V2(SCVTF_4h) V2(FCVTZS_4h) V2(XTN_4h) V2(SXTL_4s)
 
 #undef V3
 #undef V2
@@ -235,6 +238,10 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_half_from_i32: put(c, SCVTF_4s(0,x)); put(c, FCVTN_4h(d,0)); return 1;
     case op_f32_from_half: put(c, FCVTL_4s(d,x)); return 1;
     case op_i32_from_half: put(c, FCVTL_4s(0,x)); put(c, FCVTZS_4s(d,0)); return 1;
+    case op_half_from_i16: put(c, SCVTF_4h(d,x)); return 1;
+    case op_i16_from_half: put(c, FCVTZS_4h(d,x)); return 1;
+    case op_i16_from_i32: put(c, XTN_4h(d,x)); return 1;
+    case op_i32_from_i16: put(c, SXTL_4s(d,x)); return 1;
 
     case op_eq_f32: put(c, FCMEQ_4s(d,x,y)); return 1;
     case op_ne_f32: put(c, FCMEQ_4s(d,x,y)); put(c, MVN_16b(d,d)); return 1;

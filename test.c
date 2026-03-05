@@ -986,6 +986,79 @@ static void test_convert_half_i32(void) {
   }
 }
 
+static void test_convert_i16_half(void) {
+  for (int opt = 0; opt < 2; opt++) {
+    {
+        struct umbra_basic_block *bb = umbra_basic_block();
+        umbra_v32  ix = umbra_lane(bb);
+        umbra_v16  x = umbra_load_16(bb, (umbra_ptr){0}, ix);
+        umbra_half h = umbra_half_from_i16(bb, x);
+        umbra_store_half(bb, (umbra_ptr){1}, ix, h);
+        backends B = make(bb, opt);
+        for (int bi = 0; bi < 3; bi++) {
+            short a[] = {0, 1, 100, 255}; __fp16 z[4] = {0};
+            if (!run(&B, bi,4, a,z, 0,0,0,0)) continue;
+            equiv((float)z[0],   0) here;
+            equiv((float)z[1],   1) here;
+            equiv((float)z[2], 100) here;
+            equiv((float)z[3], 255) here;
+        }
+        cleanup(&B);
+    }
+    {
+        struct umbra_basic_block *bb = umbra_basic_block();
+        umbra_v32  ix = umbra_lane(bb);
+        umbra_half x = umbra_load_half(bb, (umbra_ptr){0}, ix);
+        umbra_v16  r = umbra_i16_from_half(bb, x);
+        umbra_store_16(bb, (umbra_ptr){1}, ix, r);
+        backends B = make(bb, opt);
+        for (int bi = 0; bi < 3; bi++) {
+            __fp16 a[] = {0, 1, 100.5, 255}; short z[4] = {0};
+            if (!run(&B, bi,4, a,z, 0,0,0,0)) continue;
+            (z[0] ==   0) here;
+            (z[1] ==   1) here;
+            (z[2] == 100) here;
+            (z[3] == 255) here;
+        }
+        cleanup(&B);
+    }
+    {
+        struct umbra_basic_block *bb = umbra_basic_block();
+        umbra_v32 ix = umbra_lane(bb),
+                   x = umbra_load_32(bb, (umbra_ptr){0}, ix);
+        umbra_v16 r = umbra_i16_from_i32(bb, x);
+        umbra_store_16(bb, (umbra_ptr){1}, ix, r);
+        backends B = make(bb, opt);
+        for (int bi = 0; bi < 3; bi++) {
+            int a[] = {0, 1, 255, 1000}; short z[4] = {0};
+            if (!run(&B, bi,4, a,z, 0,0,0,0)) continue;
+            (z[0] ==    0) here;
+            (z[1] ==    1) here;
+            (z[2] ==  255) here;
+            (z[3] == 1000) here;
+        }
+        cleanup(&B);
+    }
+    {
+        struct umbra_basic_block *bb = umbra_basic_block();
+        umbra_v32 ix = umbra_lane(bb);
+        umbra_v16 x = umbra_load_16(bb, (umbra_ptr){0}, ix);
+        umbra_v32 r = umbra_i32_from_i16(bb, x);
+        umbra_store_32(bb, (umbra_ptr){1}, ix, r);
+        backends B = make(bb, opt);
+        for (int bi = 0; bi < 3; bi++) {
+            short a[] = {0, 1, -1, 255}; int z[4] = {0};
+            if (!run(&B, bi,4, a,z, 0,0,0,0)) continue;
+            (z[0] ==   0) here;
+            (z[1] ==   1) here;
+            (z[2] ==  -1) here;
+            (z[3] == 255) here;
+        }
+        cleanup(&B);
+    }
+  }
+}
+
 static void test_dedup(void) {
     struct umbra_basic_block *bb = umbra_basic_block();
     umbra_v32 a = umbra_imm_32(bb, 42),
@@ -1173,6 +1246,7 @@ int main(void) {
     test_large_n();
     test_convert();
     test_convert_half_i32();
+    test_convert_i16_half();
     test_dedup();
     test_constprop();
     test_strength_reduction();

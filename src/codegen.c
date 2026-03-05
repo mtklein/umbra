@@ -108,6 +108,8 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                     break;
                 case op_half_from_f32: emit(b, "%sfloat v%d = u2f(v%d);\n", pad, i, inst->x); break;
                 case op_half_from_i32: emit(b, "%sfloat v%d = (float)(s32)v%d;\n", pad, i, inst->x); break;
+                case op_half_from_i16: emit(b, "%sfloat v%d = (float)(s16)v%d;\n", pad, i, inst->x); break;
+                case op_i16_from_half: emit(b, "%su16 v%d = (u16)(s16)v%d;\n", pad, i, inst->x); break;
                 case op_eq_half: emit(b, "%sfloat v%d = h2f((u16)-(s16)(v%d == v%d));\n", pad, i, inst->x, inst->y); break;
                 case op_ne_half: emit(b, "%sfloat v%d = h2f((u16)-(s16)(v%d != v%d));\n", pad, i, inst->x, inst->y); break;
                 case op_lt_half: emit(b, "%sfloat v%d = h2f((u16)-(s16)(v%d <  v%d));\n", pad, i, inst->x, inst->y); break;
@@ -215,6 +217,8 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             UNOP(op_i32_from_f32,  "(u32)(s32)u2f(v%d)")
             UNOP(op_f32_from_half, "f2u(v%d)")
             UNOP(op_i32_from_half, "(u32)(s32)v%d")
+            UNOP(op_i16_from_i32,  "(u16)(s16)v%d")
+            UNOP(op_i32_from_i16,  "(u32)(s32)(s16)v%d")
 
             BINOP(op_eq_f32, "(u32)-(s32)(u2f(v%d) == u2f(v%d))")
             BINOP(op_ne_f32, "(u32)-(s32)(u2f(v%d) != u2f(v%d))")

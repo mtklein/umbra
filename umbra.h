@@ -73,8 +73,12 @@ umbra_v32  umbra_f32_from_i32 (struct umbra_basic_block*, umbra_v32);
 umbra_v32  umbra_i32_from_f32 (struct umbra_basic_block*, umbra_v32);
 umbra_half umbra_half_from_f32(struct umbra_basic_block*, umbra_v32);
 umbra_half umbra_half_from_i32(struct umbra_basic_block*, umbra_v32);
+umbra_half umbra_half_from_i16(struct umbra_basic_block*, umbra_v16);
 umbra_v32  umbra_f32_from_half(struct umbra_basic_block*, umbra_half);
 umbra_v32  umbra_i32_from_half(struct umbra_basic_block*, umbra_half);
+umbra_v16  umbra_i16_from_half(struct umbra_basic_block*, umbra_half);
+umbra_v16  umbra_i16_from_i32 (struct umbra_basic_block*, umbra_v32);
+umbra_v32  umbra_i32_from_i16 (struct umbra_basic_block*, umbra_v16);
 
 umbra_v32 umbra_eq_f32(struct umbra_basic_block*, umbra_v32, umbra_v32);
 umbra_v32 umbra_ne_f32(struct umbra_basic_block*, umbra_v32, umbra_v32);
