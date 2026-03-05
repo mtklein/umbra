@@ -300,8 +300,199 @@ static _Bool emit_alu(Buf *c, enum op op, int d, int x, int y, int z, int imm) {
     }
 }
 
+// Register-to-register ALU emission (d,x,y,z are NEON register numbers).
+// v0 is scratch for destructive ops (BSL, FMLA, shift-right).
+static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm) {
+    switch (op) {
+    case op_imm_32: {
+        uint32_t v=(uint32_t)imm;
+        if (v==0) { put(c, MOVI_4s_0(d)); }
+        else { load_imm_w(c,XT,v); put(c, DUP_4s_w(d,XT)); }
+    } return 1;
+    case op_imm_16: case op_imm_half:
+        put(c, MOVZ_w(XT,(uint16_t)imm));
+        put(c, DUP_4h_w(d,XT));
+        return 1;
+
+    case op_add_f32: put(c, FADD_4s(d,x,y)); return 1;
+    case op_sub_f32: put(c, FSUB_4s(d,x,y)); return 1;
+    case op_mul_f32: put(c, FMUL_4s(d,x,y)); return 1;
+    case op_div_f32: put(c, FDIV_4s(d,x,y)); return 1;
+    case op_min_f32: put(c, FMINNM_4s(d,x,y)); return 1;
+    case op_max_f32: put(c, FMAXNM_4s(d,x,y)); return 1;
+    case op_sqrt_f32: put(c, FSQRT_4s(d,x)); return 1;
+    case op_fma_f32:
+        put(c, ORR_16b(0,z,z)); put(c, FMLA_4s(0,x,y));
+        put(c, ORR_16b(d,0,0)); return 1;
+
+    case op_add_i32: put(c, ADD_4s(d,x,y)); return 1;
+    case op_sub_i32: put(c, SUB_4s(d,x,y)); return 1;
+    case op_mul_i32: put(c, MUL_4s(d,x,y)); return 1;
+    case op_shl_i32: put(c, USHL_4s(d,x,y)); return 1;
+    case op_shr_u32: put(c, NEG_4s(0,y)); put(c, USHL_4s(d,x,0)); return 1;
+    case op_shr_s32: put(c, NEG_4s(0,y)); put(c, SSHL_4s(d,x,0)); return 1;
+
+    case op_and_32: put(c, AND_16b(d,x,y)); return 1;
+    case op_or_32:  put(c, ORR_16b(d,x,y)); return 1;
+    case op_xor_32: put(c, EOR_16b(d,x,y)); return 1;
+    case op_sel_32:
+        put(c, ORR_16b(0,x,x)); put(c, BSL_16b(0,y,z));
+        put(c, ORR_16b(d,0,0)); return 1;
+
+    case op_f32_from_i32: put(c, SCVTF_4s(d,x)); return 1;
+    case op_i32_from_f32: put(c, FCVTZS_4s(d,x)); return 1;
+    case op_half_from_f32: put(c, FCVTN_4h(d,x)); return 1;
+    case op_f32_from_half: put(c, FCVTL_4s(d,x)); return 1;
+
+    case op_eq_f32: put(c, FCMEQ_4s(d,x,y)); return 1;
+    case op_ne_f32: put(c, FCMEQ_4s(d,x,y)); put(c, MVN_16b(d,d)); return 1;
+    case op_gt_f32: put(c, FCMGT_4s(d,x,y)); return 1;
+    case op_ge_f32: put(c, FCMGE_4s(d,x,y)); return 1;
+    case op_lt_f32: put(c, FCMGT_4s(d,y,x)); return 1;
+    case op_le_f32: put(c, FCMGE_4s(d,y,x)); return 1;
+
+    case op_eq_i32: put(c, CMEQ_4s(d,x,y)); return 1;
+    case op_ne_i32: put(c, CMEQ_4s(d,x,y)); put(c, MVN_16b(d,d)); return 1;
+    case op_gt_s32: put(c, CMGT_4s(d,x,y)); return 1;
+    case op_ge_s32: put(c, CMGE_4s(d,x,y)); return 1;
+    case op_lt_s32: put(c, CMGT_4s(d,y,x)); return 1;
+    case op_le_s32: put(c, CMGE_4s(d,y,x)); return 1;
+    case op_gt_u32: put(c, CMHI_4s(d,x,y)); return 1;
+    case op_ge_u32: put(c, CMHS_4s(d,x,y)); return 1;
+    case op_lt_u32: put(c, CMHI_4s(d,y,x)); return 1;
+    case op_le_u32: put(c, CMHS_4s(d,y,x)); return 1;
+
+    case op_add_i16: put(c, ADD_4h(d,x,y)); return 1;
+    case op_sub_i16: put(c, SUB_4h(d,x,y)); return 1;
+    case op_mul_i16: put(c, MUL_4h(d,x,y)); return 1;
+    case op_shl_i16: put(c, USHL_4h(d,x,y)); return 1;
+    case op_shr_u16: put(c, NEG_4h(0,y)); put(c, USHL_4h(d,x,0)); return 1;
+    case op_shr_s16: put(c, NEG_4h(0,y)); put(c, SSHL_4h(d,x,0)); return 1;
+    case op_and_16: put(c, AND_8b(d,x,y)); return 1;
+    case op_or_16:  put(c, ORR_8b(d,x,y)); return 1;
+    case op_xor_16: put(c, EOR_8b(d,x,y)); return 1;
+    case op_sel_16:
+        put(c, ORR_8b(0,x,x)); put(c, BSL_8b(0,y,z));
+        put(c, ORR_8b(d,0,0)); return 1;
+    case op_eq_i16: put(c, CMEQ_4h(d,x,y)); return 1;
+    case op_ne_i16: put(c, CMEQ_4h(d,x,y)); put(c, MVN_8b(d,d)); return 1;
+    case op_gt_s16: put(c, CMGT_4h(d,x,y)); return 1;
+    case op_ge_s16: put(c, CMGE_4h(d,x,y)); return 1;
+    case op_lt_s16: put(c, CMGT_4h(d,y,x)); return 1;
+    case op_le_s16: put(c, CMGE_4h(d,y,x)); return 1;
+    case op_gt_u16: put(c, CMHI_4h(d,x,y)); return 1;
+    case op_ge_u16: put(c, CMHS_4h(d,x,y)); return 1;
+    case op_lt_u16: put(c, CMHI_4h(d,y,x)); return 1;
+    case op_le_u16: put(c, CMHS_4h(d,y,x)); return 1;
+
+    case op_add_half: put(c, FADD_4h(d,x,y)); return 1;
+    case op_sub_half: put(c, FSUB_4h(d,x,y)); return 1;
+    case op_mul_half: put(c, FMUL_4h(d,x,y)); return 1;
+    case op_div_half: put(c, FDIV_4h(d,x,y)); return 1;
+    case op_min_half: put(c, FMINNM_4h(d,x,y)); return 1;
+    case op_max_half: put(c, FMAXNM_4h(d,x,y)); return 1;
+    case op_sqrt_half: put(c, FSQRT_4h(d,x)); return 1;
+    case op_fma_half:
+        put(c, ORR_8b(0,z,z)); put(c, FMLA_4h(0,x,y));
+        put(c, ORR_8b(d,0,0)); return 1;
+    case op_and_half: put(c, AND_8b(d,x,y)); return 1;
+    case op_or_half:  put(c, ORR_8b(d,x,y)); return 1;
+    case op_xor_half: put(c, EOR_8b(d,x,y)); return 1;
+    case op_sel_half:
+        put(c, ORR_8b(0,x,x)); put(c, BSL_8b(0,y,z));
+        put(c, ORR_8b(d,0,0)); return 1;
+    case op_eq_half: put(c, FCMEQ_4h(d,x,y)); return 1;
+    case op_ne_half: put(c, FCMEQ_4h(d,x,y)); put(c, MVN_8b(d,d)); return 1;
+    case op_gt_half: put(c, FCMGT_4h(d,x,y)); return 1;
+    case op_ge_half: put(c, FCMGE_4h(d,x,y)); return 1;
+    case op_lt_half: put(c, FCMGT_4h(d,y,x)); return 1;
+    case op_le_half: put(c, FCMGE_4h(d,y,x)); return 1;
+
+    default: return 0;
+    }
+}
+
+// Register allocator: v0=scratch, v5=iota, v1-v4,v6-v7,v16-v31 = 22 allocatable
+static const int8_t ra_pool[] = {1,2,3,4,6,7,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31};
+#define RA_NREGS 22
+
+struct ra {
+    int    *last_use;     // [insts] last varying op that reads each value
+    int8_t *reg;          // [insts] NEON register for value i, or -1
+    int     nfree;
+    int     owner[32];    // owner[v] = inst whose value is in Vv, or -1
+    int8_t  free_stack[RA_NREGS];
+    int8_t  pad_[6];
+};
+
+static struct ra* ra_create(struct umbra_basic_block const *bb,
+                            _Bool *live, _Bool *varying) {
+    int n = bb->insts;
+    struct ra *ra = malloc(sizeof *ra);
+    ra->reg      = malloc((size_t)n * sizeof *ra->reg);
+    ra->last_use = malloc((size_t)n * sizeof *ra->last_use);
+
+    for (int i = 0; i < n; i++) ra->reg[i] = -1;
+    for (int i = 0; i < 32; i++) ra->owner[i] = -1;
+
+    for (int i = 0; i < n; i++) ra->last_use[i] = -1;
+    for (int i = 0; i < n; i++) {
+        if (!live[i] || !varying[i]) continue;
+        struct bb_inst const *inst = &bb->inst[i];
+        if (live[inst->x]) ra->last_use[inst->x] = i;
+        if (live[inst->y]) ra->last_use[inst->y] = i;
+        if (live[inst->z]) ra->last_use[inst->z] = i;
+    }
+
+    ra->nfree = RA_NREGS;
+    for (int i = 0; i < RA_NREGS; i++) ra->free_stack[i] = ra_pool[RA_NREGS - 1 - i];
+
+    return ra;
+}
+
+static void ra_destroy(struct ra *ra) {
+    free(ra->reg);
+    free(ra->last_use);
+    free(ra);
+}
+
+static void ra_free_reg(struct ra *ra, int val) {
+    int8_t r = ra->reg[val];
+    if (r < 0) return;
+    ra->free_stack[ra->nfree++] = r;
+    ra->owner[(int)r] = -1;
+    ra->reg[val] = -1;
+}
+
+static int8_t ra_alloc(Buf *c, struct ra *ra, int *sl) {
+    if (ra->nfree > 0) return ra->free_stack[--ra->nfree];
+
+    // Evict: find register whose owner has farthest last_use (Belady-like)
+    int best_r = -1, best_lu = -1;
+    for (int r = 0; r < 32; r++) {
+        if (ra->owner[r] < 0) continue;
+        int val = ra->owner[r];
+        if (ra->last_use[val] > best_lu) { best_lu = ra->last_use[val]; best_r = r; }
+    }
+    int evicted = ra->owner[best_r];
+    if (sl[evicted] >= 0) vst(c, best_r, sl[evicted]);
+    ra->reg[evicted] = -1;
+    ra->owner[best_r] = -1;
+    return (int8_t)best_r;
+}
+
+static int8_t ra_ensure(Buf *c, struct ra *ra, int *sl, int val) {
+    if (ra->reg[val] >= 0) return ra->reg[val];
+    int8_t r = ra_alloc(c, ra, sl);
+    if (sl[val] >= 0) vld(c, r, sl[val]);
+    ra->reg[val] = r;
+    ra->owner[(int)r] = val;
+    return r;
+}
+
 static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
-                              _Bool *live, _Bool *varying, int *sl, _Bool scalar);
+                              _Bool *live, _Bool *varying, int *sl,
+                              struct ra *ra, _Bool scalar);
 
 struct umbra_jit {
     void  *code;
@@ -376,7 +567,8 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, SUBS_xi(31,XT,4));
     int br_tail = c.len;
     put(&c, Bcond(0xB,0));  // B.LT tail (patch later)
-    emit_varying_ops(&c, bb, live, varying, sl, 0);
+    struct ra *ra = ra_create(bb, live, varying);
+    emit_varying_ops(&c, bb, live, varying, sl, ra, 0);
 
     put(&c, ADD_xi(XI,XI,4));
     put(&c, B(loop_top - c.len));
@@ -388,7 +580,13 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     int br_epi = c.len;
     put(&c, Bcond(0xD,0));  // B.LE (patch later)
 
-    emit_varying_ops(&c, bb, live, varying, sl, 1);
+    // Reset allocator for scalar tail loop
+    for (int i = 0; i < bb->insts; i++) ra->reg[i] = -1;
+    for (int i = 0; i < 32; i++) ra->owner[i] = -1;
+    ra->nfree = RA_NREGS;
+    for (int i = 0; i < RA_NREGS; i++) ra->free_stack[i] = ra_pool[RA_NREGS - 1 - i];
+
+    emit_varying_ops(&c, bb, live, varying, sl, ra, 1);
 
     put(&c, ADD_xi(XI,XI,1));
     put(&c, B(tail_top - c.len));
@@ -400,7 +598,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, LDP_post(29,30,31,2));
     put(&c, RET());
 
-    free(live); free(varying); free(sl);
+    ra_destroy(ra); free(live); free(varying); free(sl);
 
     size_t code_sz = (size_t)c.len * 4;
     size_t pg = 16384;
@@ -424,99 +622,100 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
 }
 
 static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
-                              _Bool *live, _Bool *varying, int *sl, _Bool scalar)
+                              _Bool *live, _Bool *varying, int *sl,
+                              struct ra *ra, _Bool scalar)
 {
+    int *lu = ra->last_use;
+
     for (int i=0; i<bb->insts; i++) {
         if (!live[i] || !varying[i]) continue;
         struct bb_inst const *inst = &bb->inst[i];
-        int d = is_store(inst->op) ? -1 : sl[i];
-        int x = sl[inst->x], y = sl[inst->y], z = sl[inst->z];
 
         switch (inst->op) {
-        case op_lane:
+        case op_lane: {
+            int8_t rd = ra_alloc(c, ra, sl);
+            ra->reg[i] = rd; ra->owner[(int)rd] = i;
             if (scalar) {
-                put(c, DUP_4s_w(0, XI));
+                put(c, DUP_4s_w(rd, XI));
             } else {
-                put(c, DUP_4s_w(0, XI));
-                put(c, ADD_4s(0, 0, 5)); // add iota
+                put(c, DUP_4s_w(rd, XI));
+                put(c, ADD_4s(rd, rd, 5));
             }
-            vst(c,0,d); break;
+        } break;
 
-        case op_load_32:
+        case op_load_32: {
+            int8_t rd = ra_alloc(c, ra, sl);
+            ra->reg[i] = rd; ra->owner[(int)rd] = i;
             if (bb->inst[inst->x].op == op_lane) {
                 int p=inst->ptr;
                 if (scalar) {
-                    put(c, LDR_sx(0, 1+p, XI));
-                } else {
-                    put(c, LSL_xi(XT, XI, 2));  // byte offset = i*4
-                    put(c, LDR_q(0, 1+p, XT));
-                }
-                vst(c,0,d);
-            } else {
-                put(c, MOVI_4s_0(0)); vst(c,0,d);
-            } break;
-        case op_load_16:
-            if (bb->inst[inst->x].op == op_lane) {
-                int p=inst->ptr;
-                if (scalar) {
-                    put(c, LDR_hx(0, 1+p, XI));
-                } else {
-                    put(c, LSL_xi(XT, XI, 1));  // byte offset = i*2
-                    put(c, LDR_d(0, 1+p, XT));
-                }
-                vst(c,0,d);
-            } else {
-                put(c, MOVI_4s_0(0)); vst(c,0,d);
-            } break;
-        case op_load_half:
-            if (bb->inst[inst->x].op == op_lane) {
-                int p=inst->ptr;
-                if (scalar) {
-                    put(c, LDR_hx(0, 1+p, XI));
-                } else {
-                    put(c, LSL_xi(XT, XI, 1));  // byte offset = i*2
-                    put(c, LDR_d(0, 1+p, XT));
-                }
-                vst(c,0,d);
-            } else {
-                put(c, MOVI_4s_0(0)); vst(c,0,d);
-            } break;
-
-        case op_store_32:
-            if (bb->inst[inst->x].op == op_lane) {
-                int p=inst->ptr;
-                vld(c,0,y);
-                if (scalar) {
-                    put(c, STR_sx(0, 1+p, XI));
+                    put(c, LDR_sx(rd, 1+p, XI));
                 } else {
                     put(c, LSL_xi(XT, XI, 2));
-                    put(c, STR_q(0, 1+p, XT));
+                    put(c, LDR_q(rd, 1+p, XT));
                 }
-            } break;
-        case op_store_16:
+            } else {
+                put(c, MOVI_4s_0(rd));
+            }
+        } break;
+        case op_load_16: case op_load_half: {
+            int8_t rd = ra_alloc(c, ra, sl);
+            ra->reg[i] = rd; ra->owner[(int)rd] = i;
             if (bb->inst[inst->x].op == op_lane) {
                 int p=inst->ptr;
-                vld(c,0,y);
                 if (scalar) {
-                    put(c, STR_hx(0, 1+p, XI));
+                    put(c, LDR_hx(rd, 1+p, XI));
                 } else {
                     put(c, LSL_xi(XT, XI, 1));
-                    put(c, STR_d(0, 1+p, XT));
+                    put(c, LDR_d(rd, 1+p, XT));
                 }
-            } break;
-        case op_store_half:
-            if (bb->inst[inst->x].op == op_lane) {
-                int p=inst->ptr;
-                vld(c,0,y);
-                if (scalar) {
-                    put(c, STR_hx(0, 1+p, XI));
-                } else {
-                    put(c, LSL_xi(XT, XI, 1));
-                    put(c, STR_d(0, 1+p, XT));
-                }
-            } break;
+            } else {
+                put(c, MOVI_4s_0(rd));
+            }
+        } break;
 
-        default: emit_alu(c, inst->op, d, x, y, z, inst->imm); break;
+        case op_store_32: {
+            int8_t ry = ra_ensure(c, ra, sl, inst->y);
+            if (bb->inst[inst->x].op == op_lane) {
+                int p=inst->ptr;
+                if (scalar) {
+                    put(c, STR_sx(ry, 1+p, XI));
+                } else {
+                    put(c, LSL_xi(XT, XI, 2));
+                    put(c, STR_q(ry, 1+p, XT));
+                }
+            }
+            if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
+        } break;
+        case op_store_16: case op_store_half: {
+            int8_t ry = ra_ensure(c, ra, sl, inst->y);
+            if (bb->inst[inst->x].op == op_lane) {
+                int p=inst->ptr;
+                if (scalar) {
+                    put(c, STR_hx(ry, 1+p, XI));
+                } else {
+                    put(c, LSL_xi(XT, XI, 1));
+                    put(c, STR_d(ry, 1+p, XT));
+                }
+            }
+            if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
+        } break;
+
+        default: {
+            int8_t rx = ra_ensure(c, ra, sl, inst->x);
+            int8_t ry = ra_ensure(c, ra, sl, inst->y);
+            int8_t rz = ra_ensure(c, ra, sl, inst->z);
+
+            // Free dead inputs before allocating output
+            if (lu[inst->x] <= i) ra_free_reg(ra, inst->x);
+            if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
+            if (lu[inst->z] <= i) ra_free_reg(ra, inst->z);
+
+            int8_t rd = ra_alloc(c, ra, sl);
+            ra->reg[i] = rd; ra->owner[(int)rd] = i;
+
+            emit_alu_reg(c, inst->op, rd, rx, ry, rz, inst->imm);
+        } break;
         }
     }
 }
