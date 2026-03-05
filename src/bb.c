@@ -473,18 +473,18 @@ v32 umbra_sel_32(BB *bb, v32 c, v32 t, v32 f) {
 
 v16 umbra_and_16(BB *bb, v16 a, v16 b) {
     sort(&a.id, &b.id);
-    if (is_imm16(bb, a.id, -1)) { return b; }
-    if (is_imm16(bb, b.id, -1)) { return a; }
-    if (is_imm16(bb, a.id,  0)) { return a; }
-    if (is_imm16(bb, b.id,  0)) { return b; }
+    if (is_imm16(bb, a.id, 0xffff)) { return b; }
+    if (is_imm16(bb, b.id, 0xffff)) { return a; }
+    if (is_imm16(bb, a.id,      0)) { return a; }
+    if (is_imm16(bb, b.id,      0)) { return b; }
     return (v16){math(bb, op_and_16, .x=a.id, .y=b.id)};
 }
 v16 umbra_or_16(BB *bb, v16 a, v16 b) {
     sort(&a.id, &b.id);
-    if (is_imm16(bb, a.id,  0)) { return b; }
-    if (is_imm16(bb, b.id,  0)) { return a; }
-    if (is_imm16(bb, a.id, -1)) { return a; }
-    if (is_imm16(bb, b.id, -1)) { return b; }
+    if (is_imm16(bb, a.id,      0)) { return b; }
+    if (is_imm16(bb, b.id,      0)) { return a; }
+    if (is_imm16(bb, a.id, 0xffff)) { return a; }
+    if (is_imm16(bb, b.id, 0xffff)) { return b; }
     return (v16){math(bb, op_or_16, .x=a.id, .y=b.id)};
 }
 v16 umbra_xor_16(BB *bb, v16 a, v16 b) {
@@ -496,25 +496,25 @@ v16 umbra_xor_16(BB *bb, v16 a, v16 b) {
 }
 v16 umbra_sel_16(BB *bb, v16 c, v16 t, v16 f) {
     if (t.id == f.id) { return t; }
-    if (is_imm16(bb, c.id, -1)) { return t; }
-    if (is_imm16(bb, c.id,  0)) { return f; }
+    if (is_imm16(bb, c.id, 0xffff)) { return t; }
+    if (is_imm16(bb, c.id,      0)) { return f; }
     return (v16){math(bb, op_sel_16, .x=c.id, .y=t.id, .z=f.id)};
 }
 
 vh umbra_and_half(BB *bb, vh a, vh b) {
     sort(&a.id, &b.id);
-    if (is_imm_half(bb, a.id, -1)) { return b; }
-    if (is_imm_half(bb, b.id, -1)) { return a; }
-    if (is_imm_half(bb, a.id,  0)) { return a; }
-    if (is_imm_half(bb, b.id,  0)) { return b; }
+    if (is_imm_half(bb, a.id, 0xffff)) { return b; }
+    if (is_imm_half(bb, b.id, 0xffff)) { return a; }
+    if (is_imm_half(bb, a.id,      0)) { return a; }
+    if (is_imm_half(bb, b.id,      0)) { return b; }
     return (vh){math(bb, op_and_half, .x=a.id, .y=b.id)};
 }
 vh umbra_or_half(BB *bb, vh a, vh b) {
     sort(&a.id, &b.id);
-    if (is_imm_half(bb, a.id,  0)) { return b; }
-    if (is_imm_half(bb, b.id,  0)) { return a; }
-    if (is_imm_half(bb, a.id, -1)) { return a; }
-    if (is_imm_half(bb, b.id, -1)) { return b; }
+    if (is_imm_half(bb, a.id,      0)) { return b; }
+    if (is_imm_half(bb, b.id,      0)) { return a; }
+    if (is_imm_half(bb, a.id, 0xffff)) { return a; }
+    if (is_imm_half(bb, b.id, 0xffff)) { return b; }
     return (vh){math(bb, op_or_half, .x=a.id, .y=b.id)};
 }
 vh umbra_xor_half(BB *bb, vh a, vh b) {
@@ -526,8 +526,8 @@ vh umbra_xor_half(BB *bb, vh a, vh b) {
 }
 vh umbra_sel_half(BB *bb, vh c, vh t, vh f) {
     if (t.id == f.id) { return t; }
-    if (is_imm_half(bb, c.id, -1)) { return t; }
-    if (is_imm_half(bb, c.id,  0)) { return f; }
+    if (is_imm_half(bb, c.id, 0xffff)) { return t; }
+    if (is_imm_half(bb, c.id,      0)) { return f; }
     return (vh){math(bb, op_sel_half, .x=c.id, .y=t.id, .z=f.id)};
 }
 

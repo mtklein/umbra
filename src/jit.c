@@ -646,8 +646,9 @@ void umbra_jit_dump(struct umbra_jit const *j, FILE *f) {
                 char line[256];
                 _Bool ok = 0;
                 while (fgets(line, (int)sizeof line, p)) {
+                    // Skip the "file.o: file format ..." header line.
+                    if (!ok && __builtin_strstr(line, "file format")) { ok = 1; continue; }
                     fputs(line, f);
-                    ok = 1;
                 }
                 int rc = pclose(p);
                 remove(tmp);

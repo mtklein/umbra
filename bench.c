@@ -1,5 +1,5 @@
 #define _POSIX_C_SOURCE 199309L
-#include "umbra.h"
+#include "srcover.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,52 +12,6 @@ static double now(void) {
     return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
 }
 
-static uint32_t bits(float f) {
-    return (union{float f; uint32_t bits;}){f}.bits;
-}
-
-static struct umbra_basic_block* build_srcover_bb(void) {
-    struct umbra_basic_block *bb = umbra_basic_block();
-
-    umbra_v32 const ix = umbra_lane(bb),
-                   src = umbra_load_32(bb, (umbra_ptr){0}, ix),
-                 mask8 = umbra_imm_32(bb, 0xff),
-                inv255 = umbra_imm_32(bb, bits(1/255.0f)),
-                    ri = umbra_and_32(bb, src, mask8),
-                    rf = umbra_mul_f32(bb, umbra_f32_from_i32(bb, ri), inv255);
-    umbra_half const sr = umbra_half_from_f32(bb, rf);
-    umbra_v32 const sh8 = umbra_imm_32(bb, 8),
-                     gi = umbra_and_32(bb, umbra_shr_u32(bb, src, sh8), mask8),
-                     gf = umbra_mul_f32(bb, umbra_f32_from_i32(bb, gi), inv255);
-    umbra_half const sg = umbra_half_from_f32(bb, gf);
-
-    umbra_v32 const sh16 = umbra_imm_32(bb, 16),
-                      bi = umbra_and_32(bb, umbra_shr_u32(bb, src, sh16), mask8),
-                      bf = umbra_mul_f32(bb, umbra_f32_from_i32(bb, bi), inv255);
-    umbra_half const sb = umbra_half_from_f32(bb, bf);
-
-    umbra_v32 const sh24 = umbra_imm_32(bb, 24),
-                      ai = umbra_and_32(bb, umbra_shr_u32(bb, src, sh24), mask8),
-                      af = umbra_mul_f32(bb, umbra_f32_from_i32(bb, ai), inv255);
-    umbra_half const sa = umbra_half_from_f32(bb, af),
-                    dr = umbra_load_half(bb, (umbra_ptr){1}, ix),
-                    dg = umbra_load_half(bb, (umbra_ptr){2}, ix),
-                    db = umbra_load_half(bb, (umbra_ptr){3}, ix),
-                    da = umbra_load_half(bb, (umbra_ptr){4}, ix),
-                   one = umbra_imm_half(bb, 0x3c00),
-                 inv_a = umbra_sub_half(bb, one, sa),
-                  rout = umbra_add_half(bb, sr, umbra_mul_half(bb, dr, inv_a)),
-                  gout = umbra_add_half(bb, sg, umbra_mul_half(bb, dg, inv_a)),
-                  bout = umbra_add_half(bb, sb, umbra_mul_half(bb, db, inv_a)),
-                  aout = umbra_add_half(bb, sa, umbra_mul_half(bb, da, inv_a));
-
-    umbra_store_half(bb, (umbra_ptr){1}, ix, rout);
-    umbra_store_half(bb, (umbra_ptr){2}, ix, gout);
-    umbra_store_half(bb, (umbra_ptr){3}, ix, bout);
-    umbra_store_half(bb, (umbra_ptr){4}, ix, aout);
-
-    return bb;
-}
 
 typedef void (*run_fn)(void*, int, void*, void*, void*, void*, void*, void*);
 
@@ -90,7 +44,7 @@ static double bench_run(run_fn fn, void *ctx, int pixel_n,
 }
 
 static double bench_build_interp(void) {
-    struct umbra_basic_block *bb = build_srcover_bb();
+    struct umbra_basic_block *bb = build_srcover();
     umbra_basic_block_optimize(bb);
     struct umbra_interpreter *p = umbra_interpreter(bb);
     umbra_basic_block_free(bb);
@@ -100,7 +54,7 @@ static double bench_build_interp(void) {
     for (;;) {
         double const start = now();
         for (int i = 0; i < iters; i++) {
-            bb = build_srcover_bb();
+            bb = build_srcover();
             umbra_basic_block_optimize(bb);
             p = umbra_interpreter(bb);
             umbra_basic_block_free(bb);
@@ -115,7 +69,7 @@ static double bench_build_interp(void) {
 }
 
 static double bench_build_codegen(void) {
-    struct umbra_basic_block *bb = build_srcover_bb();
+    struct umbra_basic_block *bb = build_srcover();
     umbra_basic_block_optimize(bb);
     struct umbra_codegen *cg = umbra_codegen(bb);
     umbra_basic_block_free(bb);
@@ -125,7 +79,7 @@ static double bench_build_codegen(void) {
     for (;;) {
         double const start = now();
         for (int i = 0; i < iters; i++) {
-            bb = build_srcover_bb();
+            bb = build_srcover();
             umbra_basic_block_optimize(bb);
             cg = umbra_codegen(bb);
             umbra_basic_block_free(bb);
@@ -140,7 +94,7 @@ static double bench_build_codegen(void) {
 }
 
 static double bench_build_jit(void) {
-    struct umbra_basic_block *bb = build_srcover_bb();
+    struct umbra_basic_block *bb = build_srcover();
     umbra_basic_block_optimize(bb);
     struct umbra_jit *j = umbra_jit(bb);
     umbra_basic_block_free(bb);
@@ -150,7 +104,7 @@ static double bench_build_jit(void) {
     for (;;) {
         double const start = now();
         for (int i = 0; i < iters; i++) {
-            bb = build_srcover_bb();
+            bb = build_srcover();
             umbra_basic_block_optimize(bb);
             j = umbra_jit(bb);
             umbra_basic_block_free(bb);
@@ -165,7 +119,7 @@ static double bench_build_jit(void) {
 }
 
 static double bench_optimize(void) {
-    struct umbra_basic_block *bb = build_srcover_bb();
+    struct umbra_basic_block *bb = build_srcover();
     umbra_basic_block_optimize(bb);
     umbra_basic_block_free(bb);
 
@@ -173,7 +127,7 @@ static double bench_optimize(void) {
     for (;;) {
         double const start = now();
         for (int i = 0; i < iters; i++) {
-            bb = build_srcover_bb();
+            bb = build_srcover();
             umbra_basic_block_optimize(bb);
             umbra_basic_block_free(bb);
         }
@@ -197,7 +151,7 @@ int main(int argc, char *argv[]) {
         pixel_n = atoi(argv[i]);
     }
 
-    struct umbra_basic_block *bb = build_srcover_bb();
+    struct umbra_basic_block *bb = build_srcover();
     { FILE *f = fopen("dumps/srcover.bb", "w"); umbra_basic_block_dump(bb, f); fclose(f); }
 
     umbra_basic_block_optimize(bb);
