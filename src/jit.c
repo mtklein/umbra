@@ -659,7 +659,7 @@ void umbra_jit_dump(struct umbra_jit const *j, FILE *f) {
             char cmd[1024];
             snprintf(cmd, sizeof cmd,
                      "as -o %s %s 2>/dev/null && "
-                     "/opt/homebrew/opt/llvm/bin/llvm-objdump -d --no-show-raw-insn %s 2>/dev/null",
+                     "/opt/homebrew/opt/llvm/bin/llvm-objdump -d --no-show-raw-insn --no-leading-addr %s 2>/dev/null",
                      opath, tmp, opath);
             FILE *p = popen(cmd, "r");
             if (p) {
