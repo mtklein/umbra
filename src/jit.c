@@ -178,8 +178,8 @@ static uint32_t INS_s(int d, int idx, int n) {
     return 0x4E001C00u|(imm5<<16)|((uint32_t)n<<5)|(uint32_t)d;
 }
 
-// x0=n, x1..x6=p0..p5, x9=loop i, x10=scratch, x15=stack base
-enum { XI=9, XT=10, XS=15 };
+// x0=n, x1..x6=p0..p5, x9=loop i, x10=scratch, x11/x12=byte offsets, x15=stack base
+enum { XI=9, XT=10, XH=11, XW=12, XS=15 };
 
 static void load_imm_w(Buf *c, int rd, uint32_t v) {
     put(c, MOVZ_w(rd, (uint16_t)(v&0xffff)));
@@ -468,6 +468,8 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, SUBS_xi(31,XT,4));
     int br_tail = c.len;
     put(&c, Bcond(0xB,0));  // B.LT tail (patch later)
+    put(&c, LSL_xi(XH, XI, 1));  // x11 = i*2  (half byte offset)
+    put(&c, LSL_xi(XW, XI, 2));  // x12 = i*4  (32-bit byte offset)
     struct ra *ra = ra_create(bb);
     emit_varying_ops(&c, bb, sl, &ns, ra, 0);
 
@@ -552,8 +554,7 @@ static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
                 if (scalar) {
                     put(c, wide ? LDR_sx(rd,1+p,XI) : LDR_hx(rd,1+p,XI));
                 } else {
-                    put(c, LSL_xi(XT, XI, wide ? 2 : 1));
-                    put(c, wide ? LDR_q(rd,1+p,XT) : LDR_d(rd,1+p,XT));
+                    put(c, wide ? LDR_q(rd,1+p,XW) : LDR_d(rd,1+p,XH));
                 }
             } else {
                 put(c, MOVI_4s_0(rd));
@@ -568,8 +569,7 @@ static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
                 if (scalar) {
                     put(c, wide ? STR_sx(ry,1+p,XI) : STR_hx(ry,1+p,XI));
                 } else {
-                    put(c, LSL_xi(XT, XI, wide ? 2 : 1));
-                    put(c, wide ? STR_q(ry,1+p,XT) : STR_d(ry,1+p,XT));
+                    put(c, wide ? STR_q(ry,1+p,XW) : STR_d(ry,1+p,XH));
                 }
             }
             if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
