@@ -317,9 +317,9 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     }
 }
 
-// Register allocator: v0=scratch, v5=iota, v1-v4,v6-v7,v16-v31 = 22 allocatable
-static const int8_t ra_pool[] = {1,2,3,4,6,7,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31};
-#define RA_NREGS 22
+// Register allocator: v0=scratch, v1-v7,v16-v31 = 23 allocatable
+static const int8_t ra_pool[] = {1,2,3,4,5,6,7,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31};
+#define RA_NREGS 23
 
 struct ra {
     int    *last_use;     // [insts] last varying op that reads each value
@@ -327,7 +327,7 @@ struct ra {
     int     nfree;
     int     owner[32];    // owner[v] = inst whose value is in Vv, or -1
     int8_t  free_stack[RA_NREGS];
-    int8_t  pad_[6];
+    int8_t  pad_[5];
 };
 
 static struct ra* ra_create(struct umbra_basic_block const *bb) {
@@ -438,20 +438,14 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
 
     put(&c, STP_pre(29,30,31,-2));
     put(&c, ADD_xi(29,31,0));
-    { int bytes = bb->insts*16;
-      while (bytes>4095) { put(&c, SUB_xi(31,31,4095)); bytes-=4095; }
-      if (bytes>0) put(&c, SUB_xi(31,31,bytes));
-    }
-    put(&c, ADD_xi(XS,31,0));
+    int stack_patch = c.len;
+    put(&c, 0xD503201Fu);  // NOP placeholder: patched to SUB SP if spills needed
+    put(&c, 0xD503201Fu);  // NOP placeholder: patched to MOV XS,SP if spills needed
 
     // Preamble: uniforms go straight into registers via RA.
     emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0);
 
     put(&c, MOVZ_x(XI,0));
-    put(&c, MOVI_4s_0(5));  // v5 = iota {0,1,2,3}
-    put(&c, MOVZ_w(XT,1)); put(&c, INS_s(5,1,XT));
-    put(&c, MOVZ_w(XT,2)); put(&c, INS_s(5,2,XT));
-    put(&c, MOVZ_w(XT,3)); put(&c, INS_s(5,3,XT));
 
     int loop_top = c.len;
 
@@ -491,6 +485,10 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, LDP_post(29,30,31,2));
     put(&c, RET());
 
+    if (ns > 0) {
+        c.buf[stack_patch  ] = SUB_xi(31,31,ns*16);
+        c.buf[stack_patch+1] = ADD_xi(XS,31,0);
+    }
     ra_destroy(ra); free(sl);
 
     size_t code_sz = (size_t)c.len * 4;
@@ -528,11 +526,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_lane: {
             int8_t rd = ra_alloc(c, ra, sl, ns);
             ra->reg[i] = rd; ra->owner[(int)rd] = i;
-            if (scalar) {
-                put(c, DUP_4s_w(rd, XI));
-            } else {
-                put(c, DUP_4s_w(rd, XI));
-                put(c, ADD_4s(rd, rd, 5));
+            put(c, DUP_4s_w(rd, XI));
+            if (!scalar) {
+                put(c, MOVI_4s_0(0));
+                put(c, MOVZ_w(XT,1)); put(c, INS_s(0,1,XT));
+                put(c, MOVZ_w(XT,2)); put(c, INS_s(0,2,XT));
+                put(c, MOVZ_w(XT,3)); put(c, INS_s(0,3,XT));
+                put(c, ADD_4s(rd, rd, 0));
             }
         } break;
 
