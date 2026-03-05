@@ -48,27 +48,8 @@ static void emit(Buf *b, char const *fmt, ...) {
 }
 
 struct umbra_codegen* umbra_codegen(BB const *bb) {
-    _Bool *live    = calloc((size_t)bb->insts, 1);
-    _Bool *varying = calloc((size_t)bb->insts, 1);
-
-    for (int i = bb->insts; i --> 0;) {
-        if (is_store(bb->inst[i].op)) { live[i] = 1; }
-        if (live[i]) {
-            live[bb->inst[i].x] = 1;
-            live[bb->inst[i].y] = 1;
-            live[bb->inst[i].z] = 1;
-        }
-    }
-    for (int i = 0; i < bb->insts; i++) {
-        varying[i] = (bb->inst[i].op == op_lane)
-                    | varying[bb->inst[i].x]
-                    | varying[bb->inst[i].y]
-                    | varying[bb->inst[i].z];
-    }
-
     int max_ptr = -1;
     for (int i = 0; i < bb->insts; i++) {
-        if (!live[i]) { continue; }
         enum op op = bb->inst[i].op;
         if (op == op_load_16 || op == op_load_32 || op == op_load_half ||
             op == op_store_16 || op == op_store_32 || op == op_store_half) {
@@ -79,7 +60,6 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
     _Bool *ptr_16 = calloc((size_t)(max_ptr + 2), 1);
     _Bool *ptr_32 = calloc((size_t)(max_ptr + 2), 1);
     for (int i = 0; i < bb->insts; i++) {
-        if (!live[i]) { continue; }
         int p = bb->inst[i].ptr;
         enum op op = bb->inst[i].op;
         if (op == op_load_16 || op == op_store_16 ||
@@ -137,8 +117,7 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
     }
 
     // Emit uniform (non-varying, non-store) instructions.
-    for (int i = 0; i < bb->insts; i++) {
-        if (!live[i] || varying[i] || is_store(bb->inst[i].op)) { continue; }
+    for (int i = 0; i < bb->preamble; i++) {
         struct bb_inst const *inst = &bb->inst[i];
         char const *pad = "    ";
 
@@ -310,8 +289,7 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
     emit(&b, "    for (int i = 0; i < n; i++) {\n");
 
     // Emit varying instructions.
-    for (int i = 0; i < bb->insts; i++) {
-        if (!live[i] || !varying[i]) { continue; }
+    for (int i = bb->preamble; i < bb->insts; i++) {
         struct bb_inst const *inst = &bb->inst[i];
         char const *pad = "        ";
 
@@ -523,8 +501,6 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
     }
     emit(&b, "    }\n}\n");
 
-    free(live);
-    free(varying);
     free(ptr_16);
     free(ptr_32);
 

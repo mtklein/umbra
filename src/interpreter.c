@@ -437,47 +437,26 @@ static Fn const fn[] = {
 };
 
 struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) {
-    struct {
-        _Bool live, varying; int16_t pad_;
-        int id;
-    } *meta = calloc((size_t)bb->insts, sizeof *meta);
-
-    int live = 0;
-    for (int i = bb->insts; i --> 0;) {
-        if (is_store(bb->inst[i].op)) {
-            meta[i].live = 1;
-        }
-        if (meta[i].live) {
-            meta[bb->inst[i].x].live = 1;
-            meta[bb->inst[i].y].live = 1;
-            meta[bb->inst[i].z].live = 1;
-        }
-        live += meta[i].live;
-    }
-
-    for (int i = 0; i < bb->insts; i++) {
-        meta[i].varying = (bb->inst[i].op == op_lane)
-                        | meta[bb->inst[i].x].varying
-                        | meta[bb->inst[i].y].varying
-                        | meta[bb->inst[i].z].varying;
-    }
+    int *id = calloc((size_t)bb->insts, sizeof *id);
 
     struct umbra_interpreter *p = malloc(sizeof *p);
-    p->inst = malloc((size_t)(live + 1) * sizeof *p->inst);
-    p->v    = malloc((size_t)(live + 1) * sizeof *p->v);
+    p->inst = malloc((size_t)(bb->insts + 1) * sizeof *p->inst);
+    p->v    = malloc((size_t)(bb->insts + 1) * sizeof *p->v);
 
     int n = 0;
     #define emit(...) p->inst[n] = (struct interp_inst){__VA_ARGS__}
-    for (int varying = 0; varying < 2; varying++) {
-        if (varying) {
+    for (int pass = 0; pass < 2; pass++) {
+        int const lo = pass ? bb->preamble : 0,
+                  hi = pass ? bb->insts    : bb->preamble;
+        if (pass) {
             p->preamble = n;
         }
-        for (int i = 0; i < bb->insts; i++) {
-            if (meta[i].live && meta[i].varying == varying) {
+        for (int i = lo; i < hi; i++) {
+            {
                 struct bb_inst const *inst = &bb->inst[i];
-                int const X = meta[inst->x].id - n,
-                          Y = meta[inst->y].id - n,
-                          Z = meta[inst->z].id - n;
+                int const X = id[inst->x] - n,
+                          Y = id[inst->y] - n,
+                          Z = id[inst->z] - n;
                 switch (inst->op) {
                     case op_lane:   emit(.fn=lane);                 break;
                     case op_imm_16: emit(.fn=imm_16, .x=inst->imm); break;
@@ -569,20 +548,20 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                         emit(.fn=fn[inst->op], .x=X);
                         break;
                     #else
-                        meta[i].id = meta[inst->x].id;
+                        id[i] = id[inst->x];
                         continue;
                     #endif
 
                     default:
                         emit(.fn=fn[inst->op], .x=X, .y=Y, .z=Z);
                 }
-                meta[i].id = n++;
+                id[i] = n++;
             }
         }
     }
     #undef emit
     p->inst[n] = (struct interp_inst){.fn=done};
-    free(meta);
+    free(id);
     return p;
 }
 

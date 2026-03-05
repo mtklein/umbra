@@ -46,7 +46,7 @@ struct hash_slot { uint32_t hash; int ix; };
 struct umbra_basic_block {
     struct bb_inst   *inst;
     struct hash_slot *ht;
-    int               insts, ht_mask;
+    int               insts, ht_mask, preamble, :32;
 };
 
 static inline _Bool is_store(enum op op) {

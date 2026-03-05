@@ -316,8 +316,7 @@ struct ra {
     int8_t  pad_[6];
 };
 
-static struct ra* ra_create(struct umbra_basic_block const *bb,
-                            _Bool *live, _Bool *varying) {
+static struct ra* ra_create(struct umbra_basic_block const *bb) {
     int n = bb->insts;
     struct ra *ra = malloc(sizeof *ra);
     ra->reg      = malloc((size_t)n * sizeof *ra->reg);
@@ -327,12 +326,11 @@ static struct ra* ra_create(struct umbra_basic_block const *bb,
     for (int i = 0; i < 32; i++) ra->owner[i] = -1;
 
     for (int i = 0; i < n; i++) ra->last_use[i] = -1;
-    for (int i = 0; i < n; i++) {
-        if (!live[i] || !varying[i]) continue;
+    for (int i = bb->preamble; i < n; i++) {
         struct bb_inst const *inst = &bb->inst[i];
-        if (live[inst->x]) ra->last_use[inst->x] = i;
-        if (live[inst->y]) ra->last_use[inst->y] = i;
-        if (live[inst->z]) ra->last_use[inst->z] = i;
+        ra->last_use[inst->x] = i;
+        ra->last_use[inst->y] = i;
+        ra->last_use[inst->z] = i;
     }
 
     ra->nfree = RA_NREGS;
@@ -392,8 +390,7 @@ static int8_t ra_claim(struct ra *ra, int old_val, int new_val) {
 }
 
 static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
-                              _Bool *live, _Bool *varying, int *sl, int *ns,
-                              struct ra *ra, _Bool scalar);
+                              int *sl, int *ns, struct ra *ra, _Bool scalar);
 
 struct umbra_jit {
     void  *code;
@@ -402,29 +399,12 @@ struct umbra_jit {
 };
 
 struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
-    _Bool *live    = calloc((size_t)bb->insts, 1);
-    _Bool *varying = calloc((size_t)bb->insts, 1);
     int   *sl      = calloc((size_t)bb->insts, sizeof(int));
-
-    for (int i = bb->insts; i-->0;) {
-        if (is_store(bb->inst[i].op)) live[i]=1;
-        if (live[i]) {
-            live[bb->inst[i].x]=1;
-            live[bb->inst[i].y]=1;
-            live[bb->inst[i].z]=1;
-        }
-    }
-    for (int i=0; i<bb->insts; i++) {
-        varying[i] = (bb->inst[i].op==op_lane)
-                    | varying[bb->inst[i].x]
-                    | varying[bb->inst[i].y]
-                    | varying[bb->inst[i].z];
-    }
 
     int ns=0, ns_frame=0;
     for (int i=0; i<bb->insts; i++) {
-        if (live[i] && !is_store(bb->inst[i].op)) {
-            if (!varying[i]) sl[i]=ns++;
+        if (!is_store(bb->inst[i].op)) {
+            if (i < bb->preamble) sl[i]=ns++;
             else sl[i]=-1;
             ns_frame++;
         }
@@ -433,13 +413,12 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
 
     int max_ptr=-1;
     for (int i=0; i<bb->insts; i++) {
-        if (!live[i]) continue;
         enum op op=bb->inst[i].op;
         if (op==op_load_16||op==op_load_32||op==op_load_half||
             op==op_store_16||op==op_store_32||op==op_store_half)
             if (bb->inst[i].ptr>max_ptr) max_ptr=bb->inst[i].ptr;
     }
-    if (max_ptr>5) { free(live); free(varying); free(sl); return 0; }
+    if (max_ptr>5) { free(sl); return 0; }
 
     Buf c={0};
 
@@ -452,8 +431,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     }
     put(&c, ADD_xi(XS,31,0));
 
-    for (int i=0; i<bb->insts; i++) {
-        if (!live[i] || varying[i] || is_store(bb->inst[i].op)) continue;
+    for (int i=0; i<bb->preamble; i++) {
         struct bb_inst const *inst = &bb->inst[i];
         int d=sl[i], x=sl[inst->x], y=sl[inst->y], z=sl[inst->z];
 
@@ -476,8 +454,8 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, SUBS_xi(31,XT,4));
     int br_tail = c.len;
     put(&c, Bcond(0xB,0));  // B.LT tail (patch later)
-    struct ra *ra = ra_create(bb, live, varying);
-    emit_varying_ops(&c, bb, live, varying, sl, &ns, ra, 0);
+    struct ra *ra = ra_create(bb);
+    emit_varying_ops(&c, bb, sl, &ns, ra, 0);
 
     put(&c, ADD_xi(XI,XI,4));
     put(&c, B(loop_top - c.len));
@@ -495,7 +473,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     ra->nfree = RA_NREGS;
     for (int i = 0; i < RA_NREGS; i++) ra->free_stack[i] = ra_pool[RA_NREGS - 1 - i];
 
-    emit_varying_ops(&c, bb, live, varying, sl, &ns, ra, 1);
+    emit_varying_ops(&c, bb, sl, &ns, ra, 1);
 
     put(&c, ADD_xi(XI,XI,1));
     put(&c, B(tail_top - c.len));
@@ -507,7 +485,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, LDP_post(29,30,31,2));
     put(&c, RET());
 
-    ra_destroy(ra); free(live); free(varying); free(sl);
+    ra_destroy(ra); free(sl);
 
     size_t code_sz = (size_t)c.len * 4;
     size_t pg = 16384;
@@ -531,13 +509,12 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
 }
 
 static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
-                              _Bool *live, _Bool *varying, int *sl, int *ns,
+                              int *sl, int *ns,
                               struct ra *ra, _Bool scalar)
 {
     int *lu = ra->last_use;
 
-    for (int i=0; i<bb->insts; i++) {
-        if (!live[i] || !varying[i]) continue;
+    for (int i=bb->preamble; i<bb->insts; i++) {
         struct bb_inst const *inst = &bb->inst[i];
 
         switch (inst->op) {

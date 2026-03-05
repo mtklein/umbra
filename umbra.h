@@ -2,6 +2,7 @@
 
 struct umbra_basic_block* umbra_basic_block(void);
 void umbra_basic_block_free(struct umbra_basic_block*);
+void umbra_basic_block_optimize(struct umbra_basic_block*);
 
 typedef struct {int id;} umbra_v16;
 typedef struct {int id;} umbra_v32;

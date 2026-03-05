@@ -697,6 +697,67 @@ static char const* op_name(enum op op) {
     return "?";
 }
 
+void umbra_basic_block_optimize(BB *bb) {
+    int const n = bb->insts;
+
+    _Bool *live    = calloc((size_t)n, 1);
+    _Bool *varying = calloc((size_t)n, 1);
+
+    for (int i = n; i --> 0;) {
+        if (is_store(bb->inst[i].op)) { live[i] = 1; }
+        if (live[i]) {
+            live[bb->inst[i].x] = 1;
+            live[bb->inst[i].y] = 1;
+            live[bb->inst[i].z] = 1;
+        }
+    }
+    for (int i = 0; i < n; i++) {
+        varying[i] = (bb->inst[i].op == op_lane)
+                    | varying[bb->inst[i].x]
+                    | varying[bb->inst[i].y]
+                    | varying[bb->inst[i].z];
+    }
+
+    int total = 0;
+    for (int i = 0; i < n; i++) { total += live[i]; }
+
+    struct bb_inst *out = malloc((size_t)total * sizeof *out);
+    int *old_to_new = malloc((size_t)n * sizeof *old_to_new);
+    for (int i = 0; i < n; i++) { old_to_new[i] = -1; }
+
+    int j = 0;
+    for (int i = 0; i < n; i++) {
+        if (!live[i] || varying[i] || is_store(bb->inst[i].op)) { continue; }
+        old_to_new[i] = j;
+        out[j++] = bb->inst[i];
+    }
+    int const preamble = j;
+    for (int i = 0; i < n; i++) {
+        if (!live[i]) { continue; }
+        if (!varying[i] && !is_store(bb->inst[i].op)) { continue; }
+        old_to_new[i] = j;
+        out[j++] = bb->inst[i];
+    }
+
+    for (int i = 0; i < total; i++) {
+        out[i].x = old_to_new[out[i].x];
+        out[i].y = old_to_new[out[i].y];
+        out[i].z = old_to_new[out[i].z];
+    }
+
+    free(bb->inst);
+    free(bb->ht);
+    bb->inst     = out;
+    bb->ht       = NULL;
+    bb->ht_mask  = 0;
+    bb->insts    = total;
+    bb->preamble = preamble;
+
+    free(live);
+    free(varying);
+    free(old_to_new);
+}
+
 void umbra_basic_block_dump(struct umbra_basic_block const *bb, FILE *f) {
     for (int i = 0; i < bb->insts; i++) {
         struct bb_inst const *inst = &bb->inst[i];

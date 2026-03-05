@@ -91,6 +91,7 @@ static double bench_run(run_fn fn, void *ctx, int pixel_n,
 
 static double bench_build_interp(void) {
     struct umbra_basic_block *bb = build_srcover_bb();
+    umbra_basic_block_optimize(bb);
     struct umbra_interpreter *p = umbra_interpreter(bb);
     umbra_basic_block_free(bb);
     umbra_interpreter_free(p);
@@ -100,6 +101,7 @@ static double bench_build_interp(void) {
         double const start = now();
         for (int i = 0; i < iters; i++) {
             bb = build_srcover_bb();
+            umbra_basic_block_optimize(bb);
             p = umbra_interpreter(bb);
             umbra_basic_block_free(bb);
             umbra_interpreter_free(p);
@@ -114,6 +116,7 @@ static double bench_build_interp(void) {
 
 static double bench_build_codegen(void) {
     struct umbra_basic_block *bb = build_srcover_bb();
+    umbra_basic_block_optimize(bb);
     struct umbra_codegen *cg = umbra_codegen(bb);
     umbra_basic_block_free(bb);
     if (cg) { umbra_codegen_free(cg); }
@@ -123,6 +126,7 @@ static double bench_build_codegen(void) {
         double const start = now();
         for (int i = 0; i < iters; i++) {
             bb = build_srcover_bb();
+            umbra_basic_block_optimize(bb);
             cg = umbra_codegen(bb);
             umbra_basic_block_free(bb);
             if (cg) { umbra_codegen_free(cg); }
@@ -137,6 +141,7 @@ static double bench_build_codegen(void) {
 
 static double bench_build_jit(void) {
     struct umbra_basic_block *bb = build_srcover_bb();
+    umbra_basic_block_optimize(bb);
     struct umbra_jit *j = umbra_jit(bb);
     umbra_basic_block_free(bb);
     if (j) { umbra_jit_free(j); }
@@ -146,9 +151,31 @@ static double bench_build_jit(void) {
         double const start = now();
         for (int i = 0; i < iters; i++) {
             bb = build_srcover_bb();
+            umbra_basic_block_optimize(bb);
             j = umbra_jit(bb);
             umbra_basic_block_free(bb);
             if (j) { umbra_jit_free(j); }
+        }
+        double const elapsed = now() - start;
+        if (elapsed >= 0.5) {
+            return elapsed / (double)iters * 1e9;
+        }
+        iters *= 2;
+    }
+}
+
+static double bench_optimize(void) {
+    struct umbra_basic_block *bb = build_srcover_bb();
+    umbra_basic_block_optimize(bb);
+    umbra_basic_block_free(bb);
+
+    int iters = 1;
+    for (;;) {
+        double const start = now();
+        for (int i = 0; i < iters; i++) {
+            bb = build_srcover_bb();
+            umbra_basic_block_optimize(bb);
+            umbra_basic_block_free(bb);
         }
         double const elapsed = now() - start;
         if (elapsed >= 0.5) {
@@ -176,6 +203,14 @@ int main(int argc, char *argv[]) {
 
     if (dump) {
         printf("=== IR ===\n");
+        umbra_basic_block_dump(bb, stdout);
+        printf("\n");
+    }
+
+    umbra_basic_block_optimize(bb);
+
+    if (dump) {
+        printf("=== IR (optimized) ===\n");
         umbra_basic_block_dump(bb, stdout);
         printf("\n");
     }
@@ -214,6 +249,9 @@ int main(int argc, char *argv[]) {
 
     printf("SrcOver 8888->fp16, %d pixels:\n", pixel_n);
     printf("             build        run\n");
+
+    fmt_ns(build_buf, bench_optimize());
+    printf("  optimize%s\n", build_buf);
 
     fmt_ns(build_buf, bench_build_interp());
     sprintf(run_buf, "%5.2f ns/px", bench_run(run_interp, p, pixel_n, src, dr, dg, db, da, 0));
