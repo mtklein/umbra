@@ -340,11 +340,17 @@ static struct ra* ra_create(struct umbra_basic_block const *bb) {
     for (int i = 0; i < 32; i++) ra->owner[i] = -1;
 
     for (int i = 0; i < n; i++) ra->last_use[i] = -1;
-    for (int i = bb->preamble; i < n; i++) {
+    for (int i = 0; i < n; i++) {
         struct bb_inst const *inst = &bb->inst[i];
         ra->last_use[inst->x] = i;
         ra->last_use[inst->y] = i;
         ra->last_use[inst->z] = i;
+    }
+    // Preamble values used in the varying loop persist across iterations.
+    for (int i = 0; i < bb->preamble; i++) {
+        if (ra->last_use[i] >= bb->preamble) {
+            ra->last_use[i] = n;
+        }
     }
 
     ra->nfree = RA_NREGS;
@@ -403,8 +409,9 @@ static int8_t ra_claim(struct ra *ra, int old_val, int new_val) {
     return r;
 }
 
-static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
-                              int *sl, int *ns, struct ra *ra, _Bool scalar);
+static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
+                     int from, int to,
+                     int *sl, int *ns, struct ra *ra, _Bool scalar);
 
 struct umbra_jit {
     void  *code;
@@ -413,17 +420,9 @@ struct umbra_jit {
 };
 
 struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
-    int   *sl      = calloc((size_t)bb->insts, sizeof(int));
-
-    int ns=0, ns_frame=0;
-    for (int i=0; i<bb->insts; i++) {
-        if (!is_store(bb->inst[i].op)) {
-            if (i < bb->preamble) sl[i]=ns++;
-            else sl[i]=-1;
-            ns_frame++;
-        }
-        else sl[i]=-1;
-    }
+    int *sl = malloc((size_t)bb->insts * sizeof(int));
+    for (int i = 0; i < bb->insts; i++) sl[i] = -1;
+    int ns = 0;
 
     int max_ptr=-1;
     for (int i=0; i<bb->insts; i++) {
@@ -435,26 +434,18 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     if (max_ptr>5) { free(sl); return 0; }
 
     Buf c={0};
+    struct ra *ra = ra_create(bb);
 
     put(&c, STP_pre(29,30,31,-2));
     put(&c, ADD_xi(29,31,0));
-    if (ns_frame>0) {
-        int bytes = ns_frame*16;
-        while (bytes>4095) { put(&c, SUB_xi(31,31,4095)); bytes-=4095; }
-        if (bytes>0) put(&c, SUB_xi(31,31,bytes));
+    { int bytes = bb->insts*16;
+      while (bytes>4095) { put(&c, SUB_xi(31,31,4095)); bytes-=4095; }
+      if (bytes>0) put(&c, SUB_xi(31,31,bytes));
     }
     put(&c, ADD_xi(XS,31,0));
 
-    for (int i=0; i<bb->preamble; i++) {
-        struct bb_inst const *inst = &bb->inst[i];
-        int d=sl[i], x=sl[inst->x], y=sl[inst->y], z=sl[inst->z];
-
-        if (x >= 0) vld(&c, 1, x);
-        if (y >= 0) vld(&c, 2, y);
-        if (z >= 0) vld(&c, 3, z);
-        emit_alu_reg(&c, inst->op, 4, 1, 2, 3, inst->imm);
-        vst(&c, 4, d);
-    }
+    // Preamble: uniforms go straight into registers via RA.
+    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0);
 
     put(&c, MOVZ_x(XI,0));
     put(&c, MOVI_4s_0(5));  // v5 = iota {0,1,2,3}
@@ -470,8 +461,9 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, Bcond(0xB,0));  // B.LT tail (patch later)
     put(&c, LSL_xi(XH, XI, 1));  // x11 = i*2  (half byte offset)
     put(&c, LSL_xi(XW, XI, 2));  // x12 = i*4  (32-bit byte offset)
-    struct ra *ra = ra_create(bb);
-    emit_varying_ops(&c, bb, sl, &ns, ra, 0);
+
+    // Vector loop: uniforms already in registers from preamble.
+    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0);
 
     put(&c, ADD_xi(XI,XI,4));
     put(&c, B(loop_top - c.len));
@@ -483,13 +475,11 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     int br_epi = c.len;
     put(&c, Bcond(0xD,0));  // B.LE (patch later)
 
-    // Reset allocator for scalar tail loop
-    for (int i = 0; i < bb->insts; i++) ra->reg[i] = -1;
-    for (int i = 0; i < 32; i++) ra->owner[i] = -1;
-    ra->nfree = RA_NREGS;
-    for (int i = 0; i < RA_NREGS; i++) ra->free_stack[i] = ra_pool[RA_NREGS - 1 - i];
+    // Scalar tail: RA state is back to post-preamble (all varyings freed).
+    // Clear varying spill slots so they don't alias vector loop spills.
+    for (int i = bb->preamble; i < bb->insts; i++) sl[i] = -1;
 
-    emit_varying_ops(&c, bb, sl, &ns, ra, 1);
+    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 1);
 
     put(&c, ADD_xi(XI,XI,1));
     put(&c, B(tail_top - c.len));
@@ -524,13 +514,14 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     return j;
 }
 
-static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
-                              int *sl, int *ns,
-                              struct ra *ra, _Bool scalar)
+static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
+                     int from, int to,
+                     int *sl, int *ns,
+                     struct ra *ra, _Bool scalar)
 {
     int *lu = ra->last_use;
 
-    for (int i=bb->preamble; i<bb->insts; i++) {
+    for (int i=from; i<to; i++) {
         struct bb_inst const *inst = &bb->inst[i];
 
         switch (inst->op) {
@@ -576,13 +567,13 @@ static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
         } break;
 
         default: {
-            int8_t rx = ra_ensure(c, ra, sl, ns, inst->x);
-            int8_t ry = ra_ensure(c, ra, sl, ns, inst->y);
-            int8_t rz = ra_ensure(c, ra, sl, ns, inst->z);
+            int8_t rx = inst->x < i ? ra_ensure(c, ra, sl, ns, inst->x) : 0;
+            int8_t ry = inst->y < i ? ra_ensure(c, ra, sl, ns, inst->y) : 0;
+            int8_t rz = inst->z < i ? ra_ensure(c, ra, sl, ns, inst->z) : 0;
 
-            _Bool x_dead = lu[inst->x] <= i;
-            _Bool y_dead = lu[inst->y] <= i;
-            _Bool z_dead = lu[inst->z] <= i;
+            _Bool x_dead = inst->x < i && lu[inst->x] <= i;
+            _Bool y_dead = inst->y < i && lu[inst->y] <= i;
+            _Bool z_dead = inst->z < i && lu[inst->z] <= i;
             // Don't double-free when multiple args reference the same value
             if (inst->y == inst->x) y_dead = 0;
             if (inst->z == inst->x) z_dead = 0;
