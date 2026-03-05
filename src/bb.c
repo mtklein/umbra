@@ -78,9 +78,11 @@ static int const_eval(enum op op, int xb, int yb, int zb) {
         case op_sel_half: return (uint16_t)((xh & yh) | (~xh & zh));
 
         case op_half_from_f32: return scalar_f32_to_f16(xf);
+        case op_half_from_i32: return scalar_f32_to_f16((float)xb);
         case op_f32_from_half: return f32_bits(scalar_f16_to_f32(xh));
         case op_f32_from_i32: return f32_bits((float)xb);
         case op_i32_from_f32: return (int)xf;
+        case op_i32_from_half: { float t = scalar_f16_to_f32(xh); return (int)t; }
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-equal"
@@ -543,6 +545,12 @@ v32 umbra_f32_from_i32(BB *bb, v32 a) {
 v32 umbra_i32_from_f32(BB *bb, v32 a) {
     return (v32){math(bb, op_i32_from_f32, .x=a.id)};
 }
+vh umbra_half_from_i32(BB *bb, v32 a) {
+    return (vh){math(bb, op_half_from_i32, .x=a.id)};
+}
+v32 umbra_i32_from_half(BB *bb, vh a) {
+    return (v32){math(bb, op_i32_from_half, .x=a.id)};
+}
 
 vh umbra_eq_half(BB *bb, vh a, vh b) {
     sort(&a.id, &b.id);
@@ -638,7 +646,9 @@ static char const* op_name(enum op op) {
         case op_f32_from_i32:  return "f32_from_i32";
         case op_i32_from_f32:  return "i32_from_f32";
         case op_f32_from_half: return "f32_from_half";
+        case op_i32_from_half: return "i32_from_half";
         case op_half_from_f32: return "half_from_f32";
+        case op_half_from_i32: return "half_from_i32";
         case op_eq_f32:     return "eq_f32";
         case op_ne_f32:     return "ne_f32";
         case op_lt_f32:     return "lt_f32";

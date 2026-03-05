@@ -45,7 +45,7 @@ void umbra_entry(int n, void *a0, void *a1, void *a2, void *a3, void *a4, void *
     u16* restrict p4 = (u16*)a4;
     u32 v0 = 0u;
     u32 v1 = 255u;
-    u32 v2 = 998277249u;
+    float v2 = h2f(7172);
     u32 v3 = 8u;
     u32 v4 = 16u;
     u32 v5 = 24u;
@@ -55,39 +55,36 @@ void umbra_entry(int n, void *a0, void *a1, void *a2, void *a3, void *a4, void *
         u32 v7 = (u32)i;
         u32 v8 = p0[i];
         u32 v9 = (u32)(v8 & v1);
-        u32 v10 = f2u((float)(s32)v9);
-        u32 v11 = f2u(u2f(v2) * u2f(v10));
-        float v12 = u2f(v11);
-        float v13 = h2f(p1[i]);
-        u32 v14 = (u32)(v8 >> v5);
-        u32 v15 = (u32)(v1 & v14);
-        u32 v16 = f2u((float)(s32)v15);
-        u32 v17 = f2u(u2f(v2) * u2f(v16));
-        float v18 = u2f(v17);
-        float v19 = v6 - v18;
-        float v20 = v13 * v19 + v12;
-        p1[i] = f2h(v20);
+        float v10 = (float)(s32)v9;
+        float v11 = h2f(p1[i]);
+        u32 v12 = (u32)(v8 >> v5);
+        u32 v13 = (u32)(v1 & v12);
+        float v14 = (float)(s32)v13;
+        float v15 = v2 * v14;
+        float v16 = v6 - v15;
+        float v17 = v11 * v16;
+        float v18 = v2 * v10 + v17;
+        p1[i] = f2h(v18);
 
-        u32 v22 = (u32)(v8 >> v3);
-        u32 v23 = (u32)(v1 & v22);
-        u32 v24 = f2u((float)(s32)v23);
-        u32 v25 = f2u(u2f(v2) * u2f(v24));
-        float v26 = u2f(v25);
-        float v27 = h2f(p2[i]);
-        float v28 = v27 * v19 + v26;
-        p2[i] = f2h(v28);
+        u32 v20 = (u32)(v8 >> v3);
+        u32 v21 = (u32)(v1 & v20);
+        float v22 = (float)(s32)v21;
+        float v23 = h2f(p2[i]);
+        float v24 = v23 * v16;
+        float v25 = v2 * v22 + v24;
+        p2[i] = f2h(v25);
 
-        u32 v30 = (u32)(v8 >> v4);
-        u32 v31 = (u32)(v1 & v30);
-        u32 v32 = f2u((float)(s32)v31);
-        u32 v33 = f2u(u2f(v2) * u2f(v32));
-        float v34 = u2f(v33);
-        float v35 = h2f(p3[i]);
-        float v36 = v35 * v19 + v34;
-        p3[i] = f2h(v36);
+        u32 v27 = (u32)(v8 >> v4);
+        u32 v28 = (u32)(v1 & v27);
+        float v29 = (float)(s32)v28;
+        float v30 = h2f(p3[i]);
+        float v31 = v30 * v16;
+        float v32 = v2 * v29 + v31;
+        p3[i] = f2h(v32);
 
-        float v38 = h2f(p4[i]);
-        float v39 = v38 * v19 + v18;
-        p4[i] = f2h(v39);
+        float v34 = h2f(p4[i]);
+        float v35 = v34 * v16;
+        float v36 = v2 * v14 + v35;
+        p4[i] = f2h(v36);
     }
 }

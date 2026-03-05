@@ -10,7 +10,7 @@ enum op {
     op_add_i32, op_sub_i32, op_mul_i32,
     op_shl_i32, op_shr_u32, op_shr_s32,
     op_and_32, op_or_32, op_xor_32, op_sel_32,
-    op_f32_from_i32, op_i32_from_f32, op_f32_from_half,
+    op_f32_from_i32, op_i32_from_f32, op_f32_from_half, op_i32_from_half,
     op_eq_f32, op_ne_f32, op_lt_f32, op_le_f32, op_gt_f32, op_ge_f32,
     op_eq_i32, op_ne_i32,
     op_lt_s32, op_le_s32, op_gt_s32, op_ge_s32,
@@ -30,7 +30,7 @@ enum op {
     op_add_half, op_sub_half, op_mul_half, op_div_half,
     op_min_half, op_max_half, op_sqrt_half, op_fma_half,
     op_and_half, op_or_half, op_xor_half, op_sel_half,
-    op_half_from_f32,
+    op_half_from_f32, op_half_from_i32,
     op_eq_half, op_ne_half,
     op_lt_half, op_le_half, op_gt_half, op_ge_half,
 };

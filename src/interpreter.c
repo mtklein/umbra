@@ -127,7 +127,9 @@ op(i32_from_f32) { v->i32 = cast(I32, v[ip->x].f32); next; }
 
 #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
     op(half_from_f32) { v->f16 = cast(F16, v[ip->x].f32); next; }
+    op(half_from_i32) { v->f16 = cast(F16, v[ip->x].i32); next; }
     op(f32_from_half) { v->f32 = cast(F32, v[ip->x].f16); next; }
+    op(i32_from_half) { v->i32 = cast(I32, v[ip->x].f16); next; }
 
     op( add_half) { v->f16 = v[ip->x].f16 + v[ip->y].f16                          ; next; }
     op( sub_half) { v->f16 = v[ip->x].f16 - v[ip->y].f16                          ; next; }
@@ -278,7 +280,9 @@ op(i32_from_f32) { v->i32 = cast(I32, v[ip->x].f32); next; }
     }
 
     op(half_from_f32) { v->f32 = v[ip->x].f32; next; }
+    op(half_from_i32) { v->f32 = cast(F32, v[ip->x].i32); next; }
     op(f32_from_half) { v->f32 = v[ip->x].f32; next; }
+    op(i32_from_half) { v->i32 = cast(I32, v[ip->x].f32); next; }
 
     op( add_half) { v->f32 = v[ip->x].f32 + v[ip->y].f32               ; next; }
     op( sub_half) { v->f32 = v[ip->x].f32 - v[ip->y].f32               ; next; }
@@ -424,7 +428,8 @@ static Fn const fn[] = {
     [op_lt_u32] = lt_u32, [op_le_u32] = le_u32,
     [op_gt_u32] = gt_u32, [op_ge_u32] = ge_u32,
 
-    [op_half_from_f32] = half_from_f32, [op_f32_from_half] = f32_from_half,
+    [op_half_from_f32] = half_from_f32, [op_half_from_i32] = half_from_i32,
+    [op_f32_from_half] = f32_from_half, [op_i32_from_half] = i32_from_half,
     [op_add_half] =  add_half, [op_sub_half] =  sub_half,
     [op_mul_half] =  mul_half, [op_div_half] =  div_half,
     [op_min_half] =  min_half, [op_max_half] =  max_half,

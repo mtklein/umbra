@@ -232,7 +232,9 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_f32_from_i32: put(c, SCVTF_4s(d,x)); return 1;
     case op_i32_from_f32: put(c, FCVTZS_4s(d,x)); return 1;
     case op_half_from_f32: put(c, FCVTN_4h(d,x)); return 1;
+    case op_half_from_i32: put(c, SCVTF_4s(0,x)); put(c, FCVTN_4h(d,0)); return 1;
     case op_f32_from_half: put(c, FCVTL_4s(d,x)); return 1;
+    case op_i32_from_half: put(c, FCVTL_4s(0,x)); put(c, FCVTZS_4s(d,0)); return 1;
 
     case op_eq_f32: put(c, FCMEQ_4s(d,x,y)); return 1;
     case op_ne_f32: put(c, FCMEQ_4s(d,x,y)); put(c, MVN_16b(d,d)); return 1;
