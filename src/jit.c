@@ -209,6 +209,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_sqrt_f32: put(c, FSQRT_4s(d,x)); return 1;
     case op_fma_f32:
         if (d==z) { put(c, FMLA_4s(d,x,y)); }
+        else if (d!=x && d!=y) { put(c, ORR_16b(d,z,z)); put(c, FMLA_4s(d,x,y)); }
         else { put(c, ORR_16b(0,z,z)); put(c, FMLA_4s(0,x,y)); put(c, ORR_16b(d,0,0)); }
         return 1;
 
@@ -224,6 +225,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_xor_32: put(c, EOR_16b(d,x,y)); return 1;
     case op_sel_32:
         if (d==x) { put(c, BSL_16b(d,y,z)); }
+        else if (d!=y && d!=z) { put(c, ORR_16b(d,x,x)); put(c, BSL_16b(d,y,z)); }
         else { put(c, ORR_16b(0,x,x)); put(c, BSL_16b(0,y,z)); put(c, ORR_16b(d,0,0)); }
         return 1;
 
@@ -261,6 +263,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_xor_16: put(c, EOR_8b(d,x,y)); return 1;
     case op_sel_16:
         if (d==x) { put(c, BSL_8b(d,y,z)); }
+        else if (d!=y && d!=z) { put(c, ORR_8b(d,x,x)); put(c, BSL_8b(d,y,z)); }
         else { put(c, ORR_8b(0,x,x)); put(c, BSL_8b(0,y,z)); put(c, ORR_8b(d,0,0)); }
         return 1;
     case op_eq_i16: put(c, CMEQ_4h(d,x,y)); return 1;
@@ -283,6 +286,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_sqrt_half: put(c, FSQRT_4h(d,x)); return 1;
     case op_fma_half:
         if (d==z) { put(c, FMLA_4h(d,x,y)); }
+        else if (d!=x && d!=y) { put(c, ORR_8b(d,z,z)); put(c, FMLA_4h(d,x,y)); }
         else { put(c, ORR_8b(0,z,z)); put(c, FMLA_4h(0,x,y)); put(c, ORR_8b(d,0,0)); }
         return 1;
     case op_and_half: put(c, AND_8b(d,x,y)); return 1;
@@ -290,6 +294,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_xor_half: put(c, EOR_8b(d,x,y)); return 1;
     case op_sel_half:
         if (d==x) { put(c, BSL_8b(d,y,z)); }
+        else if (d!=y && d!=z) { put(c, ORR_8b(d,x,x)); put(c, BSL_8b(d,y,z)); }
         else { put(c, ORR_8b(0,x,x)); put(c, BSL_8b(0,y,z)); put(c, ORR_8b(d,0,0)); }
         return 1;
     case op_eq_half: put(c, FCMEQ_4h(d,x,y)); return 1;
@@ -575,18 +580,24 @@ static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
             if (inst->z == inst->y) z_dead = 0;
 
             // Try to claim a dying input's register for the output.
-            // For destructive ops, prefer the specific input (x for BSL, z for FMLA).
+            // For destructive ops (FMA, BSL), prefer the accumulator/condition input
+            // and avoid claiming the other inputs to prevent d aliasing them.
             int8_t rd = -1;
             enum op op = inst->op;
+            _Bool destructive = op==op_fma_f32 || op==op_fma_half
+                             || op==op_sel_32  || op==op_sel_16 || op==op_sel_half;
             if ((op==op_fma_f32 || op==op_fma_half) && z_dead)
                 { rd = ra_claim(ra, inst->z, i); z_dead = 0; }
             else if ((op==op_sel_32 || op==op_sel_16 || op==op_sel_half) && x_dead)
                 { rd = ra_claim(ra, inst->x, i); x_dead = 0; }
 
-            // Fall back to any dead input's register
-            if (rd < 0 && x_dead) { rd = ra_claim(ra, inst->x, i); x_dead = 0; }
-            if (rd < 0 && y_dead) { rd = ra_claim(ra, inst->y, i); y_dead = 0; }
-            if (rd < 0 && z_dead) { rd = ra_claim(ra, inst->z, i); z_dead = 0; }
+            // For non-destructive ops, fall back to any dead input's register.
+            // For destructive ops, skip this to avoid d aliasing non-accumulator inputs.
+            if (!destructive) {
+                if (rd < 0 && x_dead) { rd = ra_claim(ra, inst->x, i); x_dead = 0; }
+                if (rd < 0 && y_dead) { rd = ra_claim(ra, inst->y, i); y_dead = 0; }
+                if (rd < 0 && z_dead) { rd = ra_claim(ra, inst->z, i); z_dead = 0; }
+            }
 
             // Free remaining dead inputs
             if (x_dead) ra_free_reg(ra, inst->x);
