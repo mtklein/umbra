@@ -50,6 +50,7 @@ void umbra_entry(int n, void *a0, void *a1, void *a2, void *a3, void *a4, void *
     u32 v4 = 16u;
     u32 v5 = 24u;
     float v6 = h2f(15360);
+
     for (int i = 0; i < n; i++) {
         u32 v7 = (u32)i;
         u32 v8 = p0[i];
@@ -66,6 +67,7 @@ void umbra_entry(int n, void *a0, void *a1, void *a2, void *a3, void *a4, void *
         float v19 = v6 - v18;
         float v20 = v13 * v19 + v12;
         p1[i] = f2h(v20);
+
         u32 v22 = (u32)(v8 >> v3);
         u32 v23 = (u32)(v1 & v22);
         u32 v24 = f2u((float)(s32)v23);
@@ -74,6 +76,7 @@ void umbra_entry(int n, void *a0, void *a1, void *a2, void *a3, void *a4, void *
         float v27 = h2f(p2[i]);
         float v28 = v27 * v19 + v26;
         p2[i] = f2h(v28);
+
         u32 v30 = (u32)(v8 >> v4);
         u32 v31 = (u32)(v1 & v30);
         u32 v32 = f2u((float)(s32)v31);
@@ -82,6 +85,7 @@ void umbra_entry(int n, void *a0, void *a1, void *a2, void *a3, void *a4, void *
         float v35 = h2f(p3[i]);
         float v36 = v35 * v19 + v34;
         p3[i] = f2h(v36);
+
         float v38 = h2f(p4[i]);
         float v39 = v38 * v19 + v18;
         p4[i] = f2h(v39);

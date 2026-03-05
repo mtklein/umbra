@@ -115,6 +115,7 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                 case op_ge_half: emit(b, "%sfloat v%d = h2f((u16)-(s16)(v%d >= v%d));\n", pad, i, inst->x, inst->y); break;
                 default: break;
             }
+            if (is_store(inst->op) && i+1 < hi) { emit(b, "\n"); }
             continue;
         }
 
@@ -266,6 +267,8 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             case op_store_half: break;
             default: break;
         }
+
+        if (is_store(inst->op) && i+1 < hi) { emit(b, "\n"); }
     }
 }
 
@@ -340,6 +343,7 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
 
     emit_ops(&b, bb, ptr_16, ptr_32, 0, bb->preamble, "    ", 0);
 
+    if (bb->preamble) { emit(&b, "\n"); }
     emit(&b, "    for (int i = 0; i < n; i++) {\n");
     emit_ops(&b, bb, ptr_16, ptr_32, bb->preamble, bb->insts, "        ", 1);
     emit(&b, "    }\n}\n");
