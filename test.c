@@ -8,9 +8,15 @@ typedef struct {
     struct umbra_jit         *jit;
 } backends;
 
-static backends make(struct umbra_basic_block *bb, _Bool opt) {
+static backends make_full(struct umbra_basic_block *bb, _Bool opt) {
     if (opt) { umbra_basic_block_optimize(bb); }
     backends B = {umbra_interpreter(bb), umbra_codegen(bb), umbra_jit(bb)};
+    umbra_basic_block_free(bb);
+    return B;
+}
+static backends make(struct umbra_basic_block *bb, _Bool opt) {
+    if (opt) { umbra_basic_block_optimize(bb); }
+    backends B = {umbra_interpreter(bb), NULL, umbra_jit(bb)};
     umbra_basic_block_free(bb);
     return B;
 }
@@ -1071,7 +1077,7 @@ static void test_zero_imm(void) {
 static void test_srcover(void) {
   for (int opt = 0; opt < 2; opt++) {
     struct umbra_basic_block *bb = build_srcover();
-    backends B = make(bb, opt);
+    backends B = make_full(bb, opt);
     float const tol = 0.02f;
     for (int bi = 0; bi < 3; bi++) {
         uint32_t src_px[] = {0x80402010u, 0x80402010u, 0x80402010u};
