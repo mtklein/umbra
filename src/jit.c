@@ -12,12 +12,9 @@ void umbra_jit_free(struct umbra_jit *j) { (void)j; }
 
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/mman.h>
 #include <pthread.h>
 #include <libkern/OSCacheControl.h>
-
-// --- Code buffer ---
 
 typedef struct { uint32_t *buf; int len,cap; } Buf;
 
@@ -28,9 +25,6 @@ static void put(Buf *b, uint32_t w) {
     }
     b->buf[b->len++] = w;
 }
-
-// --- ARM64 encoding helpers ---
-// X-register GP instructions
 
 static uint32_t RET(void) { return 0xD65F03C0u; }
 
@@ -68,7 +62,6 @@ static uint32_t Bcond(int cond, int off19) {
     return 0x54000000u | ((uint32_t)(off19&0x7ffff)<<5) | (uint32_t)cond;
 }
 
-// NEON load/store with register offset
 static uint32_t LDR_sx(int d, int n, int m) {  // LDR Sd,[Xn,Xm,LSL#2]
     return 0xBC607800u | ((uint32_t)m<<16) | ((uint32_t)n<<5) | (uint32_t)d;
 }
@@ -82,7 +75,6 @@ static uint32_t STR_hx(int d, int n, int m) {
     return 0x7C207800u | ((uint32_t)m<<16) | ((uint32_t)n<<5) | (uint32_t)d;
 }
 
-// NEON load/store with register offset, no shift (LSL #0)
 static uint32_t LDR_q(int d, int n, int m) {  // LDR Qd,[Xn,Xm]
     return 0x3CE06800u | ((uint32_t)m<<16) | ((uint32_t)n<<5) | (uint32_t)d;
 }
@@ -103,7 +95,6 @@ static uint32_t LSL_xi(int d, int n, int shift) {
          | ((uint32_t)n<<5) | (uint32_t)d;
 }
 
-// NEON unsigned imm offset
 static uint32_t LDR_qi(int d, int n, int imm) { // LDR Qd,[Xn,#imm*16]
     return 0x3DC00000u | ((uint32_t)imm<<10) | ((uint32_t)n<<5) | (uint32_t)d;
 }
@@ -111,7 +102,6 @@ static uint32_t STR_qi(int d, int n, int imm) {
     return 0x3D800000u | ((uint32_t)imm<<10) | ((uint32_t)n<<5) | (uint32_t)d;
 }
 
-// NEON data processing
 #define V3(enc) static uint32_t enc(int d,int n,int m){return enc##_ | ((uint32_t)m<<16)|((uint32_t)n<<5)|(uint32_t)d;}
 #define V2(enc) static uint32_t enc(int d,int n){return enc##_ | ((uint32_t)n<<5)|(uint32_t)d;}
 
@@ -136,7 +126,7 @@ enum {
 
     // float 4H (FEAT_FP16)
     FADD_4h_  =0x0E401400u, FSUB_4h_  =0x0EC01400u, FMUL_4h_  =0x2E401C00u,
-    FDIV_4h_  =0x2EC03C00u, FMLA_4h_  =0x0E400C00u,
+    FDIV_4h_  =0x2E403C00u, FMLA_4h_  =0x0E400C00u,
     FMINNM_4h_=0x0EC00400u, FMAXNM_4h_=0x0E400400u,
     FSQRT_4h_ =0x2EF9F800u,
     FCMEQ_4h_ =0x0E402400u, FCMGT_4h_ =0x2EC02400u, FCMGE_4h_ =0x2E402400u,
@@ -178,16 +168,12 @@ static uint32_t MOVI_4s_0(int d) { return 0x4F000400u|(uint32_t)d; }
 static uint32_t DUP_4s_w(int d, int n)  { return 0x4E040C00u|((uint32_t)n<<5)|(uint32_t)d; }
 static uint32_t DUP_4h_w(int d, int n)  { return 0x0E020C00u|((uint32_t)n<<5)|(uint32_t)d; }
 
-// INS Vd.S[idx], Wn
 static uint32_t INS_s(int d, int idx, int n) {
     uint32_t imm5 = (uint32_t)(idx<<3)|4;
     return 0x4E001C00u|(imm5<<16)|((uint32_t)n<<5)|(uint32_t)d;
 }
 
-// --- Register conventions ---
-// x0=n, x1=ptr[], x2..x8=ptr[0..6], x9=loop i, x10=scratch, x15=value stack base
-// v0..v5=scratch, stack slots at [x15, #slot*16]
-
+// x0=n, x1=ptr[], x2..x8=ptr[0..6], x9=loop i, x10=scratch, x15=stack base
 enum { XI=9, XT=10, XS=15 };
 
 static void load_imm_w(Buf *c, int rd, uint32_t v) {
@@ -197,10 +183,6 @@ static void load_imm_w(Buf *c, int rd, uint32_t v) {
 
 static void vld(Buf *c, int vd, int s) { put(c, LDR_qi(vd, XS, s)); }
 static void vst(Buf *c, int vd, int s) { put(c, STR_qi(vd, XS, s)); }
-
-// --- Emitter macros for op dispatch ---
-
-typedef void (*emit_fn)(Buf*,struct bb_inst const*,int const*);
 
 static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
                               _Bool *live, _Bool *varying, int *sl, _Bool scalar);
@@ -249,21 +231,16 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
 
     Buf c={0};
 
-    // Prologue: save fp/lr, allocate value stack
-    put(&c, STP_pre(29,30,31,-2));  // sp -= 16, save fp/lr
-    put(&c, ADD_xi(29,31,0)); // mov fp, sp
+    put(&c, STP_pre(29,30,31,-2));
+    put(&c, ADD_xi(29,31,0));
     if (ns>0) {
         int bytes = ns*16;
-        // SUB SP, SP, #bytes  (may need multiple SUBs for >4095)
         while (bytes>4095) { put(&c, SUB_xi(31,31,4095)); bytes-=4095; }
         if (bytes>0) put(&c, SUB_xi(31,31,bytes));
     }
-    put(&c, ADD_xi(XS,31,0)); // x15 = sp (base of value stack)
-
-    // Load ptr[] entries
+    put(&c, ADD_xi(XS,31,0));
     for (int p=0; p<=max_ptr; p++) put(&c, LDR_xi(2+p,1,p));
 
-    // --- Uniform ops ---
     for (int i=0; i<bb->insts; i++) {
         if (!live[i] || varying[i] || is_store(bb->inst[i].op)) continue;
         struct bb_inst const *inst = &bb->inst[i];
@@ -335,7 +312,6 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
         case op_lt_u32: vld(&c,0,x); vld(&c,1,y); put(&c, CMHI_4s(2,1,0)); vst(&c,2,d); break;
         case op_le_u32: vld(&c,0,x); vld(&c,1,y); put(&c, CMHS_4s(2,1,0)); vst(&c,2,d); break;
 
-        // 16-bit integer
         case op_add_i16: vld(&c,0,x); vld(&c,1,y); put(&c, ADD_4h(2,0,1)); vst(&c,2,d); break;
         case op_sub_i16: vld(&c,0,x); vld(&c,1,y); put(&c, SUB_4h(2,0,1)); vst(&c,2,d); break;
         case op_mul_i16: vld(&c,0,x); vld(&c,1,y); put(&c, MUL_4h(2,0,1)); vst(&c,2,d); break;
@@ -359,7 +335,6 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
         case op_lt_u16: vld(&c,0,x); vld(&c,1,y); put(&c, CMHI_4h(2,1,0)); vst(&c,2,d); break;
         case op_le_u16: vld(&c,0,x); vld(&c,1,y); put(&c, CMHS_4h(2,1,0)); vst(&c,2,d); break;
 
-        // half-precision float
         case op_add_half: vld(&c,0,x); vld(&c,1,y); put(&c, FADD_4h(2,0,1)); vst(&c,2,d); break;
         case op_sub_half: vld(&c,0,x); vld(&c,1,y); put(&c, FSUB_4h(2,0,1)); vst(&c,2,d); break;
         case op_mul_half: vld(&c,0,x); vld(&c,1,y); put(&c, FMUL_4h(2,0,1)); vst(&c,2,d); break;
@@ -389,68 +364,44 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
         }
     }
 
-    // --- Main loop (K=4) ---
-    put(&c, MOVZ_x(XI,0));     // x9 = i = 0
-
-    // Build iota {0,1,2,3} in slot for V4 usage
-    // We'll keep iota in v6 across the loop by rebuilding each iter? No, just use INS.
-    // Actually simpler: build once in v6, save/restore around loop isn't needed since
-    // we only use v0-v5 as scratch and can reserve v6 for iota.
-    // But vld/vst use the same slot range... let's just build iota into v4 each loop iter.
-    // Or: build once before the loop. We only use v0-v3 as scratch in the loop body
-    // and v4 for iota. Fine if we keep iota in v4.
-
-    // Actually, we use v0-v5 as scratch. Let's just store iota in a stack slot and load it.
-    // Or, just build it before the loop and leave it in v4 (won't be clobbered if
-    // the varying ops only use v0-v3... but some ops use v3 too).
-    // Safest: allocate an extra stack slot for iota and reload before use.
-    // But that's wasteful. Instead, build iota in v5 and only use v0-v4 as scratch.
-
-    // Build iota {0,1,2,3} in v5
-    put(&c, MOVI_4s_0(5));
+    put(&c, MOVZ_x(XI,0));
+    put(&c, MOVI_4s_0(5));  // v5 = iota {0,1,2,3}
     put(&c, MOVZ_w(XT,1)); put(&c, INS_s(5,1,XT));
     put(&c, MOVZ_w(XT,2)); put(&c, INS_s(5,2,XT));
     put(&c, MOVZ_w(XT,3)); put(&c, INS_s(5,3,XT));
 
     int loop_top = c.len;
 
-    // remaining = x0 - x9; if remaining < 4, goto tail
-    put(&c, 0xCB090000u|(uint32_t)XT); // SUB X10, X0, X9
-    put(&c, SUBS_xi(31,XT,4));          // CMP X10, #4 (SUBS XZR)
+    put(&c, 0xCB090000u|(uint32_t)XT);  // SUB X10, X0, X9
+    put(&c, SUBS_xi(31,XT,4));
     int br_tail = c.len;
-    put(&c, Bcond(0xB,0));              // B.LT tail (patch later)
-
-    // --- Varying ops (vector, K=4) ---
+    put(&c, Bcond(0xB,0));  // B.LT tail (patch later)
     emit_varying_ops(&c, bb, live, varying, sl, 0);
 
     put(&c, ADD_xi(XI,XI,4));
     put(&c, B(loop_top - c.len));
 
-    // --- Tail (scalar, one at a time) ---
     int tail_top = c.len;
     c.buf[br_tail] = Bcond(0xB, tail_top - br_tail);
 
-    // CMP X0, X9; B.LE epilogue
-    put(&c, 0xEB09001Fu); // SUBS XZR, X0, X9
+    put(&c, 0xEB09001Fu);  // SUBS XZR, X0, X9
     int br_epi = c.len;
-    put(&c, Bcond(0xD,0)); // B.LE epilogue (patch later)
+    put(&c, Bcond(0xD,0));  // B.LE (patch later)
 
     emit_varying_ops(&c, bb, live, varying, sl, 1);
 
     put(&c, ADD_xi(XI,XI,1));
     put(&c, B(tail_top - c.len));
 
-    // --- Epilogue ---
     int epi = c.len;
     c.buf[br_epi] = Bcond(0xD, epi - br_epi);
 
-    put(&c, ADD_xi(31,29,0)); // mov sp, fp
+    put(&c, ADD_xi(31,29,0));
     put(&c, LDP_post(29,30,31,2));
     put(&c, RET());
 
     free(live); free(varying); free(sl);
 
-    // Map executable memory
     size_t code_sz = (size_t)c.len * 4;
     size_t pg = 16384;
     size_t alloc = (code_sz + pg-1) & ~(pg-1);
@@ -460,7 +411,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     if (mem==MAP_FAILED) { free(c.buf); return 0; }
 
     pthread_jit_write_protect_np(0);
-    memcpy(mem, c.buf, code_sz);
+    __builtin_memcpy(mem, c.buf, code_sz);
     pthread_jit_write_protect_np(1);
     sys_icache_invalidate(mem, code_sz);
     free(c.buf);
@@ -630,7 +581,6 @@ static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_lt_u32: vld(c,0,x); vld(c,1,y); put(c, CMHI_4s(2,1,0)); vst(c,2,d); break;
         case op_le_u32: vld(c,0,x); vld(c,1,y); put(c, CMHS_4s(2,1,0)); vst(c,2,d); break;
 
-        // 16-bit integer
         case op_add_i16: vld(c,0,x); vld(c,1,y); put(c, ADD_4h(2,0,1)); vst(c,2,d); break;
         case op_sub_i16: vld(c,0,x); vld(c,1,y); put(c, SUB_4h(2,0,1)); vst(c,2,d); break;
         case op_mul_i16: vld(c,0,x); vld(c,1,y); put(c, MUL_4h(2,0,1)); vst(c,2,d); break;
@@ -654,7 +604,6 @@ static void emit_varying_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_lt_u16: vld(c,0,x); vld(c,1,y); put(c, CMHI_4h(2,1,0)); vst(c,2,d); break;
         case op_le_u16: vld(c,0,x); vld(c,1,y); put(c, CMHS_4h(2,1,0)); vst(c,2,d); break;
 
-        // half-precision float
         case op_add_half: vld(c,0,x); vld(c,1,y); put(c, FADD_4h(2,0,1)); vst(c,2,d); break;
         case op_sub_half: vld(c,0,x); vld(c,1,y); put(c, FSUB_4h(2,0,1)); vst(c,2,d); break;
         case op_mul_half: vld(c,0,x); vld(c,1,y); put(c, FMUL_4h(2,0,1)); vst(c,2,d); break;

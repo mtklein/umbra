@@ -58,14 +58,20 @@ static struct umbra_basic_block* build_srcover_bb(void) {
     return bb;
 }
 
-static double bench_interp(struct umbra_interpreter *p, int pixel_n, void *ptrs[]) {
-    umbra_interpreter_run(p, pixel_n, ptrs);
+typedef void (*run_fn)(void*, int, void*[]);
+
+static void run_interp(void *ctx, int n, void *p[]) { umbra_interpreter_run(ctx, n, p); }
+static void run_cg    (void *ctx, int n, void *p[]) { umbra_codegen_run(ctx, n, p); }
+static void run_jit   (void *ctx, int n, void *p[]) { umbra_jit_run(ctx, n, p); }
+
+static double bench_run(run_fn fn, void *ctx, int pixel_n, void *ptrs[]) {
+    fn(ctx, pixel_n, ptrs);
 
     int iters = 1;
     for (;;) {
         double const start = now();
         for (int i = 0; i < iters; i++) {
-            umbra_interpreter_run(p, pixel_n, ptrs);
+            fn(ctx, pixel_n, ptrs);
         }
         double const elapsed = now() - start;
         if (elapsed >= 0.5) {
@@ -75,47 +81,7 @@ static double bench_interp(struct umbra_interpreter *p, int pixel_n, void *ptrs[
     }
 }
 
-static double bench_codegen(struct umbra_codegen *cg, int pixel_n, void *ptrs[]) {
-    umbra_codegen_run(cg, pixel_n, ptrs);
-
-    int iters = 1;
-    for (;;) {
-        double const start = now();
-        for (int i = 0; i < iters; i++) {
-            umbra_codegen_run(cg, pixel_n, ptrs);
-        }
-        double const elapsed = now() - start;
-        if (elapsed >= 0.5) {
-            return elapsed / ((double)iters * (double)pixel_n) * 1e9;
-        }
-        iters *= 2;
-    }
-}
-
-static double bench_codegen_compile(void) {
-    struct umbra_basic_block *bb = build_srcover_bb();
-    struct umbra_codegen *cg = umbra_codegen(bb);
-    umbra_basic_block_free(bb);
-    if (cg) { umbra_codegen_free(cg); }
-
-    int iters = 1;
-    for (;;) {
-        double const start = now();
-        for (int i = 0; i < iters; i++) {
-            bb = build_srcover_bb();
-            cg = umbra_codegen(bb);
-            umbra_basic_block_free(bb);
-            if (cg) { umbra_codegen_free(cg); }
-        }
-        double const elapsed = now() - start;
-        if (elapsed >= 0.5) {
-            return elapsed / (double)iters * 1e9;
-        }
-        iters *= 2;
-    }
-}
-
-static double bench_build(void) {
+static double bench_build_interp(void) {
     struct umbra_basic_block *bb = build_srcover_bb();
     struct umbra_interpreter *p = umbra_interpreter(bb);
     umbra_basic_block_free(bb);
@@ -138,6 +104,58 @@ static double bench_build(void) {
     }
 }
 
+static double bench_build_codegen(void) {
+    struct umbra_basic_block *bb = build_srcover_bb();
+    struct umbra_codegen *cg = umbra_codegen(bb);
+    umbra_basic_block_free(bb);
+    if (cg) { umbra_codegen_free(cg); }
+
+    int iters = 1;
+    for (;;) {
+        double const start = now();
+        for (int i = 0; i < iters; i++) {
+            bb = build_srcover_bb();
+            cg = umbra_codegen(bb);
+            umbra_basic_block_free(bb);
+            if (cg) { umbra_codegen_free(cg); }
+        }
+        double const elapsed = now() - start;
+        if (elapsed >= 0.5) {
+            return elapsed / (double)iters * 1e9;
+        }
+        iters *= 2;
+    }
+}
+
+static double bench_build_jit(void) {
+    struct umbra_basic_block *bb = build_srcover_bb();
+    struct umbra_jit *j = umbra_jit(bb);
+    umbra_basic_block_free(bb);
+    if (j) { umbra_jit_free(j); }
+
+    int iters = 1;
+    for (;;) {
+        double const start = now();
+        for (int i = 0; i < iters; i++) {
+            bb = build_srcover_bb();
+            j = umbra_jit(bb);
+            umbra_basic_block_free(bb);
+            if (j) { umbra_jit_free(j); }
+        }
+        double const elapsed = now() - start;
+        if (elapsed >= 0.5) {
+            return elapsed / (double)iters * 1e9;
+        }
+        iters *= 2;
+    }
+}
+
+static void fmt_ns(char buf[16], double ns) {
+    if      (ns >= 1e6) sprintf(buf, "%7.1f ms", ns * 1e-6);
+    else if (ns >= 1e3) sprintf(buf, "%7.1f us", ns * 1e-3);
+    else                sprintf(buf, "%7.0f ns", ns);
+}
+
 int main(int argc, char *argv[]) {
     int pixel_n = 4096;
     if (argc > 1) {
@@ -145,8 +163,8 @@ int main(int argc, char *argv[]) {
     }
 
     struct umbra_basic_block *bb = build_srcover_bb();
-    struct umbra_interpreter *p = umbra_interpreter(bb);
-    struct umbra_codegen     *cg = umbra_codegen(bb);
+    struct umbra_interpreter *p   = umbra_interpreter(bb);
+    struct umbra_codegen     *cg  = umbra_codegen(bb);
     struct umbra_jit         *jit = umbra_jit(bb);
     umbra_basic_block_free(bb);
 
@@ -162,34 +180,28 @@ int main(int argc, char *argv[]) {
         db[i] = (__fp16)0.5f;
         da[i] = (__fp16)0.5f;
     }
-
     void *ptrs[] = {src, dr, dg, db, da};
-    double const build_ns   = bench_build();
-    double const interp_ns  = bench_interp(p, pixel_n, ptrs);
 
-    printf("SrcOver 8888->fp16: %.0f ns/build, %.2f ns/pixel interp", build_ns, interp_ns);
+    char build_buf[16], run_buf[16];
+
+    printf("SrcOver 8888->fp16, %d pixels:\n", pixel_n);
+    printf("             build        run\n");
+
+    fmt_ns(build_buf, bench_build_interp());
+    sprintf(run_buf, "%5.2f ns/px", bench_run(run_interp, p, pixel_n, ptrs));
+    printf("  interp  %s  %s\n", build_buf, run_buf);
+
     if (cg) {
-        double const compile_ns = bench_codegen_compile();
-        double const cg_ns      = bench_codegen(cg, pixel_n, ptrs);
-        printf(", %.0f ns/compile, %.2f ns/pixel codegen", compile_ns, cg_ns);
+        fmt_ns(build_buf, bench_build_codegen());
+        sprintf(run_buf, "%5.2f ns/px", bench_run(run_cg, cg, pixel_n, ptrs));
+        printf("  codegen %s  %s\n", build_buf, run_buf);
     }
+
     if (jit) {
-        umbra_jit_run(jit, pixel_n, ptrs);
-        int iters = 1;
-        for (;;) {
-            double const start = now();
-            for (int i = 0; i < iters; i++) {
-                umbra_jit_run(jit, pixel_n, ptrs);
-            }
-            double const elapsed = now() - start;
-            if (elapsed >= 0.5) {
-                printf(", %.2f ns/pixel jit", elapsed / ((double)iters * (double)pixel_n) * 1e9);
-                break;
-            }
-            iters *= 2;
-        }
+        fmt_ns(build_buf, bench_build_jit());
+        sprintf(run_buf, "%5.2f ns/px", bench_run(run_jit, jit, pixel_n, ptrs));
+        printf("  jit     %s  %s\n", build_buf, run_buf);
     }
-    printf(" (%d pixels)\n", pixel_n);
 
     umbra_interpreter_free(p);
     if (cg) { umbra_codegen_free(cg); }
