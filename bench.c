@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <time.h>
 
 static double now(void) {
@@ -152,18 +151,12 @@ int main(int argc, char *argv[]) {
     }
 
     struct umbra_basic_block *bb = build_srcover();
-    { FILE *f = fopen("dumps/srcover.bb", "w"); umbra_basic_block_dump(bb, f); fclose(f); }
-
     umbra_basic_block_optimize(bb);
-    { FILE *f = fopen("dumps/srcover.opt", "w"); umbra_basic_block_dump(bb, f); fclose(f); }
 
     struct umbra_interpreter *p   = umbra_interpreter(bb);
     struct umbra_codegen     *cg  = umbra_codegen(bb);
     struct umbra_jit         *jit = umbra_jit(bb);
     umbra_basic_block_free(bb);
-
-    if (cg)  { FILE *f = fopen("dumps/srcover.c",     "w"); umbra_codegen_dump(cg,  f); fclose(f); }
-    if (jit) { FILE *f = fopen("dumps/srcover.arm64", "w"); umbra_jit_dump    (jit, f); fclose(f); }
 
     uint32_t *src = malloc((size_t)pixel_n * sizeof *src);
     __fp16   *dr  = malloc((size_t)pixel_n * sizeof *dr);
