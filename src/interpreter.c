@@ -404,14 +404,13 @@ op(ge_u32) { v->i32 = (I32)(v[ip->x].u32 >= v[ip->y].u32); next; }
 
 op(bytes_32) {
     int ctrl = ip->y;
-    for (int l = 0; l < K; l++) {
-        uint32_t x = v[ip->x].u32[l];
-        uint8_t b[] = {0, x&0xff, (x>>8)&0xff, (x>>16)&0xff, (x>>24)&0xff};
-        v->u32[l] = (uint32_t)b[(ctrl>> 0)&0xf] <<  0
-                  | (uint32_t)b[(ctrl>> 4)&0xf] <<  8
-                  | (uint32_t)b[(ctrl>> 8)&0xf] << 16
-                  | (uint32_t)b[(ctrl>>12)&0xf] << 24;
+    U32 x = v[ip->x].u32;
+    U32 r = (U32){0};
+    for (int b = 0; b < 4; b++) {
+        int nib = (ctrl >> (b*4)) & 0xf;
+        if (nib) { r |= ((x >> ((nib-1)*8)) & 0xffu) << (b*8); }
     }
+    v->u32 = r;
     next;
 }
 
