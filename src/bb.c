@@ -589,6 +589,9 @@ typedef umbra_v8 v8;
 v16 umbra_i16_from_u8(BB *bb, v8 a) {
     return (v16){math(bb, op_i16_from_u8, .x=a.id)};
 }
+v8 umbra_u8_from_i16(BB *bb, v16 a) {
+    return (v8){push(bb, op_u8_from_i16, .x=a.id)};
+}
 
 void umbra_load_8x4(BB *bb, umbra_ptr src, v32 ix, v8 out[4]) {
     (void)ix;
@@ -596,6 +599,14 @@ void umbra_load_8x4(BB *bb, umbra_ptr src, v32 ix, v8 out[4]) {
     out[1] = (v8){push(bb, op_load_8x4_1, .ptr=src.ix)};
     out[2] = (v8){push(bb, op_load_8x4_2, .ptr=src.ix)};
     out[3] = (v8){push(bb, op_load_8x4_3, .ptr=src.ix)};
+}
+
+void umbra_store_8x4(BB *bb, umbra_ptr dst, v32 ix, v8 in[4]) {
+    (void)ix;
+    push(bb, op_store_8x4_0, .y=in[0].id, .ptr=dst.ix);
+    push(bb, op_store_8x4_1, .y=in[1].id, .ptr=dst.ix);
+    push(bb, op_store_8x4_2, .y=in[2].id, .ptr=dst.ix);
+    push(bb, op_store_8x4_3, .y=in[3].id, .ptr=dst.ix);
 }
 
 v32 umbra_bytes(BB *bb, v32 x, int control) {
@@ -745,6 +756,11 @@ static char const* op_name(enum op op) {
         case op_load_8x4_1: return "load_8x4_1";
         case op_load_8x4_2: return "load_8x4_2";
         case op_load_8x4_3: return "load_8x4_3";
+        case op_store_8x4_0: return "store_8x4_0";
+        case op_store_8x4_1: return "store_8x4_1";
+        case op_store_8x4_2: return "store_8x4_2";
+        case op_store_8x4_3: return "store_8x4_3";
+        case op_u8_from_i16:  return "u8_from_i16";
         case op_add_i16:    return "add_i16";
         case op_sub_i16:    return "sub_i16";
         case op_mul_i16:    return "mul_i16";

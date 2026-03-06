@@ -19,6 +19,8 @@ enum op {
 
     // 8-bit ops
     op_load_8x4_0, op_load_8x4_1, op_load_8x4_2, op_load_8x4_3,
+    op_store_8x4_0, op_store_8x4_1, op_store_8x4_2, op_store_8x4_3,
+    op_u8_from_i16,
 
     // 16-bit ops
     op_imm_16, op_uni_16, op_load_16, op_gather_16, op_store_16, op_scatter_16,
@@ -56,12 +58,13 @@ struct umbra_basic_block {
 
 static inline _Bool is_store(enum op op) {
     return op == op_store_16 || op == op_store_32 || op == op_store_half
-        || op == op_scatter_16 || op == op_scatter_32 || op == op_scatter_half;
+        || op == op_scatter_16 || op == op_scatter_32 || op == op_scatter_half
+        || (op >= op_store_8x4_0 && op <= op_store_8x4_3);
 }
 
 static inline _Bool has_ptr(enum op op) {
     return (op >= op_uni_32 && op <= op_scatter_32)
-        || (op >= op_load_8x4_0 && op <= op_load_8x4_3)
+        || (op >= op_load_8x4_0 && op <= op_store_8x4_3)
         || (op >= op_uni_16 && op <= op_scatter_16)
         || (op >= op_uni_half && op <= op_scatter_half);
 }
@@ -70,7 +73,7 @@ static inline _Bool is_varying(enum op op) {
     return op == op_lane
         || op == op_load_16 || op == op_load_32 || op == op_load_half
         || op == op_store_16 || op == op_store_32 || op == op_store_half
-        || (op >= op_load_8x4_0 && op <= op_load_8x4_3);
+        || (op >= op_load_8x4_0 && op <= op_store_8x4_3);
 }
 
 enum op_type { OP_32, OP_8, OP_16, OP_HALF };

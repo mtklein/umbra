@@ -302,6 +302,14 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             case op_i16_from_u8:
                 emit(b, "%su16 v%d = (u16)v%d;\n", pad, i, inst->x);
                 break;
+            case op_u8_from_i16:
+                emit(b, "%su32 v%d = (u32)(unsigned char)v%d;\n", pad, i, inst->x);
+                break;
+            case op_store_8x4_0: case op_store_8x4_1: case op_store_8x4_2: case op_store_8x4_3: {
+                int ch = (int)(inst->op - op_store_8x4_0);
+                int p = inst->ptr;
+                emit(b, "%s((unsigned char*)a%d)[i*4+%d] = (unsigned char)v%d;\n", pad, p, ch, inst->y);
+            } break;
 
             case op_store_half: case op_scatter_half: break;
             case op_uni_half: case op_load_half: case op_gather_half: break;

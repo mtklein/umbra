@@ -435,6 +435,24 @@ op(i16_from_u8) {
     next;
 }
 
+op(u8_from_i16) {
+    for (int l = 0; l < K; l++) { v->u8[l] = (uint8_t)v[ip->x].u16[l]; }
+    next;
+}
+
+op(store_8x4) {
+    uint8_t *dst = ptr[ip->x];
+    int ch = ip->z;
+    if (end & (K-1)) {
+        dst[(end-1)*4 + ch] = v[ip->y].u8[0];
+    } else {
+        for (int l = 0; l < K; l++) {
+            dst[(end-K+l)*4 + ch] = v[ip->y].u8[l];
+        }
+    }
+    next;
+}
+
 op(done) { (void)ip; (void)v; (void)end; (void)ptr; return 0; }
 
 #undef next
@@ -487,9 +505,11 @@ static Fn const fn[] = {
     [op_half_from_i16] = half_from_i16, [op_i16_from_half] = i16_from_half,
     [op_f32_from_half] = f32_from_half, [op_i32_from_half] = i32_from_half,
     [op_i16_from_i32] = i16_from_i32, [op_i32_from_i16] = i32_from_i16,
-    [op_i16_from_u8] = i16_from_u8,
+    [op_i16_from_u8] = i16_from_u8, [op_u8_from_i16] = u8_from_i16,
     [op_load_8x4_0] = load_8x4, [op_load_8x4_1] = load_8x4,
     [op_load_8x4_2] = load_8x4, [op_load_8x4_3] = load_8x4,
+    [op_store_8x4_0] = store_8x4, [op_store_8x4_1] = store_8x4,
+    [op_store_8x4_2] = store_8x4, [op_store_8x4_3] = store_8x4,
     [op_bytes] = bytes_32,
     [op_add_half] =  add_half, [op_sub_half] =  sub_half,
     [op_mul_half] =  mul_half, [op_div_half] =  div_half,
@@ -587,6 +607,11 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                     case op_load_8x4_1: emit(.fn=load_8x4, .x=inst->ptr, .y=1); break;
                     case op_load_8x4_2: emit(.fn=load_8x4, .x=inst->ptr, .y=2); break;
                     case op_load_8x4_3: emit(.fn=load_8x4, .x=inst->ptr, .y=3); break;
+
+                    case op_store_8x4_0: emit(.fn=store_8x4, .x=inst->ptr, .y=Y, .z=0); break;
+                    case op_store_8x4_1: emit(.fn=store_8x4, .x=inst->ptr, .y=Y, .z=1); break;
+                    case op_store_8x4_2: emit(.fn=store_8x4, .x=inst->ptr, .y=Y, .z=2); break;
+                    case op_store_8x4_3: emit(.fn=store_8x4, .x=inst->ptr, .y=Y, .z=3); break;
 
                     case op_shl_i32_imm: case op_shr_u32_imm: case op_shr_s32_imm:
                     case op_shl_i16_imm: case op_shr_u16_imm: case op_shr_s16_imm:

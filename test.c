@@ -1278,6 +1278,38 @@ static void test_load_8x4(void) {
   }
 }
 
+static void test_store_8x4(void) {
+  for (int opt = 0; opt < 2; opt++) {
+    struct umbra_basic_block *bb = umbra_basic_block();
+    umbra_v32 ix = umbra_lane(bb);
+    // Load 4 channels as i16, convert to u8, store interleaved
+    umbra_v16 r = umbra_load_16(bb, (umbra_ptr){0}, ix),
+              g = umbra_load_16(bb, (umbra_ptr){1}, ix),
+              b = umbra_load_16(bb, (umbra_ptr){2}, ix),
+              a = umbra_load_16(bb, (umbra_ptr){3}, ix);
+    umbra_v8 ch[4] = {
+        umbra_u8_from_i16(bb, r),
+        umbra_u8_from_i16(bb, g),
+        umbra_u8_from_i16(bb, b),
+        umbra_u8_from_i16(bb, a),
+    };
+    umbra_store_8x4(bb, (umbra_ptr){4}, ix, ch);
+    backends B = make(bb, opt);
+    for (int bi = 0; bi < 3; bi++) {
+        int16_t rr[] = {0xDD, 0x44, 0x00};
+        int16_t gg[] = {0xCC, 0x33, 0xFF};
+        int16_t bb_[]= {0xBB, 0x22, 0x00};
+        int16_t aa[] = {0xAA, 0x11, 0xFF};
+        uint32_t dst[3] = {0};
+        if (!run(&B, bi,3, rr, gg, bb_, aa, dst, 0)) continue;
+        (dst[0] == 0xAABBCCDDu) here;
+        (dst[1] == 0x11223344u) here;
+        (dst[2] == 0xFF00FF00u) here;
+    }
+    cleanup(&B);
+  }
+}
+
 static void test_srcover(void) {
   for (int opt = 0; opt < 2; opt++) {
     struct umbra_basic_block *bb = build_srcover();
@@ -1345,6 +1377,7 @@ int main(void) {
     test_zero_imm();
     test_bytes();
     test_load_8x4();
+    test_store_8x4();
     test_srcover();
     test_hash_quality();
     return 0;

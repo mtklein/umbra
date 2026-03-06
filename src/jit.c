@@ -34,6 +34,9 @@ static void put(Buf *b, uint32_t w) {
 
 static uint32_t RET(void) { return 0xD65F03C0u; }
 
+static uint32_t ADD_xr(int d, int n, int m) {
+    return 0x8B000000u | ((uint32_t)m<<16) | ((uint32_t)n<<5) | (uint32_t)d;
+}
 static uint32_t ADD_xi(int d, int n, int imm12) {
     return 0x91000000u | ((uint32_t)imm12<<10) | ((uint32_t)n<<5) | (uint32_t)d;
 }
@@ -187,6 +190,17 @@ static uint32_t INS_d(int d, int idx, int n) {
     return 0x4E001C00u|(imm5<<16)|((uint32_t)n<<5)|(uint32_t)d;
 }
 
+// ST1 {Vt.B}[idx], [Xn]
+static uint32_t ST1_b(int t, int idx, int n) {
+    uint32_t Q = ((uint32_t)idx >> 3) & 1;
+    uint32_t S = ((uint32_t)idx >> 2) & 1;
+    uint32_t sz = (uint32_t)idx & 3;
+    return 0x0D000000u | (Q<<30) | (S<<12) | (sz<<10) | ((uint32_t)n<<5) | (uint32_t)t;
+}
+
+// XTN Vd.8B, Vn.8H (narrow i16→i8)
+static uint32_t XTN_8b(int d, int n) { return 0x0E212800u | ((uint32_t)n<<5) | (uint32_t)d; }
+
 static uint32_t MOVI_4s_0(int d) { return 0x4F000400u|(uint32_t)d; }
 static uint32_t DUP_4s_w(int d, int n)  { return 0x4E040C00u|((uint32_t)n<<5)|(uint32_t)d; }
 static uint32_t DUP_4h_w(int d, int n)  { return 0x0E020C00u|((uint32_t)n<<5)|(uint32_t)d; }
@@ -269,6 +283,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_i16_from_half: put(c, FCVTZS_4h(d,x)); return 1;
     case op_i16_from_i32: put(c, XTN_4h(d,x)); return 1;
     case op_i16_from_u8:  put(c, UXTL_8h(d,x)); return 1;
+    case op_u8_from_i16:  put(c, XTN_8b(d,x)); return 1;
     case op_i32_from_i16: put(c, SXTL_4s(d,x)); return 1;
 
     case op_eq_f32: put(c, FCMEQ_4s(d,x,y)); return 1;
@@ -692,6 +707,30 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 // TBL Vd.16B, {V0.16B}, Vctrl.16B
                 put(c, TBL_16b(rd, 0, ra->ld4_ctrl[ch]));
             }
+        } break;
+
+        case op_store_8x4_0: case op_store_8x4_1: case op_store_8x4_2: case op_store_8x4_3: {
+            int ch = (int)(inst->op - op_store_8x4_0);
+            int p = inst->ptr;
+            int8_t ry = ra_ensure(c, ra, sl, ns, inst->y);
+            if (scalar) {
+                // byte offset = ix * 4 + ch
+                put(c, LSL_xi(XT, XI, 2));
+                if (ch) put(c, ADD_xi(XT, XT, ch));
+                // ST1 {Vy.B}[0], [Xn + offset]
+                put(c, ADD_xr(XT, 1+p, XT));
+                put(c, ST1_b(ry, 0, XT));
+            } else {
+                // Compute base: ptr + ix*4 + ch
+                put(c, ADD_xr(XT, 1+p, XW));
+                if (ch) put(c, ADD_xi(XT, XT, ch));
+                // ST1 per lane with stride 4
+                for (int lane = 0; lane < 4; lane++) {
+                    put(c, ST1_b(ry, lane, XT));
+                    if (lane < 3) put(c, ADD_xi(XT, XT, 4));
+                }
+            }
+            if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
         } break;
 
         case op_shr_u32_imm: {
