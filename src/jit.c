@@ -341,25 +341,6 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_lt_half: put(c, FCMGT_4h(d,y,x)); return 1;
     case op_le_half: put(c, FCMGE_4h(d,y,x)); return 1;
 
-    case op_bytes: {
-        uint8_t tbl[16];
-        for (int lane = 0; lane < 4; lane++) {
-            for (int b = 0; b < 4; b++) {
-                int nibble = (imm >> (b*4)) & 0xf;
-                tbl[lane*4+b] = nibble ? (uint8_t)(lane*4 + nibble - 1) : 16;
-            }
-        }
-        uint64_t lo, hi;
-        __builtin_memcpy(&lo, tbl+0, 8);
-        __builtin_memcpy(&hi, tbl+8, 8);
-        load_imm_x(c, XT, lo);
-        put(c, FMOV_d_x(0, XT));
-        load_imm_x(c, XT, hi);
-        put(c, INS_d(0, 1, XT));
-        put(c, TBL_16b(d, x, 0));
-        return 1;
-    }
-
     default: return 0;
     }
 }
@@ -372,9 +353,12 @@ struct ra {
     int    *last_use;     // [insts] last varying op that reads each value
     int8_t *reg;          // [insts] NEON register for value i, or -1
     int     nfree;
+    int     bytes_ctrl_n;
     int     owner[32];    // owner[v] = inst whose value is in Vv, or -1
+    int     bytes_ctrl[16];
     int8_t  free_stack[RA_NREGS];
-    int8_t  pad_[5];
+    int8_t  bytes_reg[16];
+    int8_t  pad_;
 };
 
 static struct ra* ra_create(struct umbra_basic_block const *bb) {
@@ -385,6 +369,7 @@ static struct ra* ra_create(struct umbra_basic_block const *bb) {
 
     for (int i = 0; i < n; i++) ra->reg[i] = -1;
     for (int i = 0; i < 32; i++) ra->owner[i] = -1;
+    ra->bytes_ctrl_n = 0;
 
     for (int i = 0; i < n; i++) ra->last_use[i] = -1;
     for (int i = 0; i < n; i++) {
@@ -456,6 +441,23 @@ static int8_t ra_claim(struct ra *ra, int old_val, int new_val) {
     return r;
 }
 
+static void emit_tbl_ctrl(Buf *c, int vd, int ctrl) {
+    uint8_t tbl[16];
+    for (int lane = 0; lane < 4; lane++) {
+        for (int b = 0; b < 4; b++) {
+            int nibble = (ctrl >> (b*4)) & 0xf;
+            tbl[lane*4+b] = nibble ? (uint8_t)(lane*4 + nibble - 1) : 16;
+        }
+    }
+    uint64_t lo, hi;
+    __builtin_memcpy(&lo, tbl+0, 8);
+    __builtin_memcpy(&hi, tbl+8, 8);
+    load_imm_x(c, XT, lo);
+    put(c, FMOV_d_x(vd, XT));
+    load_imm_x(c, XT, hi);
+    put(c, INS_d(vd, 1, XT));
+}
+
 static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                      int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar);
@@ -490,6 +492,24 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
 
     // Preamble: uniforms go straight into registers via RA.
     emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0);
+
+    // Pre-load TBL control vectors for op_bytes in the loop body.
+    for (int i = bb->preamble; i < bb->insts; i++) {
+        if (bb->inst[i].op != op_bytes) continue;
+        int ctrl = bb->inst[i].imm;
+        _Bool found = 0;
+        for (int j = 0; j < ra->bytes_ctrl_n; j++) {
+            if (ra->bytes_ctrl[j] == ctrl) { found = 1; break; }
+        }
+        if (!found) {
+            int8_t r = ra_alloc(&c, ra, sl, &ns);
+            ra->owner[(int)r] = -2;
+            emit_tbl_ctrl(&c, r, ctrl);
+            ra->bytes_ctrl[ra->bytes_ctrl_n] = ctrl;
+            ra->bytes_reg[ra->bytes_ctrl_n] = r;
+            ra->bytes_ctrl_n++;
+        }
+    }
 
     put(&c, MOVZ_x(XI,0));
 
@@ -619,6 +639,23 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         case op_scatter_32: case op_scatter_16: case op_scatter_half: {
             if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
+        } break;
+
+        case op_bytes: {
+            int ctrl = inst->imm;
+            int8_t ctrl_r = -1;
+            for (int j = 0; j < ra->bytes_ctrl_n; j++) {
+                if (ra->bytes_ctrl[j] == ctrl) { ctrl_r = ra->bytes_reg[j]; break; }
+            }
+            int8_t rx = ra_ensure(c, ra, sl, ns, inst->x);
+            _Bool x_dead = lu[inst->x] <= i;
+            int8_t rd;
+            if (x_dead) { rd = ra_claim(ra, inst->x, i); }
+            else {
+                rd = ra_alloc(c, ra, sl, ns);
+                ra->reg[i] = rd; ra->owner[(int)rd] = i;
+            }
+            put(c, TBL_16b(rd, rx, ctrl_r));
         } break;
 
         default: {
