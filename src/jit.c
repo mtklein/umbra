@@ -87,12 +87,6 @@ static uint32_t LDR_q(int d, int n, int m) {  // LDR Qd,[Xn,Xm]
 static uint32_t STR_q(int d, int n, int m) {
     return 0x3CA06800u | ((uint32_t)m<<16) | ((uint32_t)n<<5) | (uint32_t)d;
 }
-static uint32_t LDR_d(int d, int n, int m) {  // LDR Dd,[Xn,Xm]
-    return 0xFC606800u | ((uint32_t)m<<16) | ((uint32_t)n<<5) | (uint32_t)d;
-}
-static uint32_t STR_d(int d, int n, int m) {
-    return 0xFC206800u | ((uint32_t)m<<16) | ((uint32_t)n<<5) | (uint32_t)d;
-}
 
 // LSL Xd, Xn, #imm  (UBFM alias)
 static uint32_t LSL_xi(int d, int n, int shift) {
@@ -107,6 +101,24 @@ static uint32_t LDR_qi(int d, int n, int imm) { // LDR Qd,[Xn,#imm*16]
 static uint32_t STR_qi(int d, int n, int imm) {
     return 0x3D800000u | ((uint32_t)imm<<10) | ((uint32_t)n<<5) | (uint32_t)d;
 }
+
+// LDP Qt1, Qt2, [Xn, #imm*16]
+static uint32_t LDP_qi(int t1, int t2, int n, int imm) {
+    return 0xAD400000u | ((uint32_t)(imm&0x7f)<<15) | ((uint32_t)t2<<10) | ((uint32_t)n<<5) | (uint32_t)t1;
+}
+// STP Qt1, Qt2, [Xn, #imm*16]
+static uint32_t STP_qi(int t1, int t2, int n, int imm) {
+    return 0xAD000000u | ((uint32_t)(imm&0x7f)<<15) | ((uint32_t)t2<<10) | ((uint32_t)n<<5) | (uint32_t)t1;
+}
+
+// LD4 {Vt.8B, Vt+1.8B, Vt+2.8B, Vt+3.8B}, [Xn]
+static uint32_t LD4_8b(int t, int n) { return 0x0C400000u | ((uint32_t)n<<5) | (uint32_t)t; }
+// ST4 {Vt.8B, Vt+1.8B, Vt+2.8B, Vt+3.8B}, [Xn]
+static uint32_t ST4_8b(int t, int n) { return 0x0C000000u | ((uint32_t)n<<5) | (uint32_t)t; }
+
+// Promote D-register (64-bit) NEON op to Q-register (128-bit) by setting bit 30.
+// Turns 4H->8H, 8B->16B, FCVTN->FCVTN2, FCVTL->FCVTL2, XTN->XTN2, SXTL->SXTL2, etc.
+static uint32_t W(uint32_t insn) { return insn | 0x40000000u; }
 
 #define V3(enc) static uint32_t enc(int d,int n,int m){return enc##_ | ((uint32_t)m<<16)|((uint32_t)n<<5)|(uint32_t)d;}
 #define V2(enc) static uint32_t enc(int d,int n){return enc##_ | ((uint32_t)n<<5)|(uint32_t)d;}
@@ -143,10 +155,6 @@ enum {
     CMEQ_4h_=0x2E608C00u, CMGT_4h_=0x0E603400u, CMGE_4h_=0x0E603C00u,
     CMHI_4h_=0x2E603400u, CMHS_4h_=0x2E603C00u,
 
-    // bitwise 8B
-    AND_8b_=0x0E201C00u, ORR_8b_=0x0EA01C00u, EOR_8b_=0x2E201C00u,
-    BSL_8b_=0x2E601C00u, MVN_8b_=0x2E205800u,
-
     // conversions
     FCVTN_4h_=0x0E216800u, FCVTL_4s_=0x0E217800u,
     SCVTF_4h_=0x0E79D800u, FCVTZS_4h_=0x0EF9B800u,
@@ -167,7 +175,6 @@ V3(FCMEQ_4h) V3(FCMGT_4h) V3(FCMGE_4h)
 V3(ADD_4h) V3(SUB_4h) V3(MUL_4h)
 V3(USHL_4h) V3(SSHL_4h) V2(NEG_4h)
 V3(CMEQ_4h) V3(CMGT_4h) V3(CMGE_4h) V3(CMHI_4h) V3(CMHS_4h)
-V3(AND_8b) V3(ORR_8b) V3(EOR_8b) V3(BSL_8b) V2(MVN_8b)
 V2(FCVTN_4h) V2(FCVTL_4s)
 V2(SCVTF_4h) V2(FCVTZS_4h) V2(XTN_4h) V2(SXTL_4s) V2(UXTL_8h)
 
@@ -198,7 +205,7 @@ static uint32_t ST1_b(int t, int idx, int n) {
     return 0x0D000000u | (Q<<30) | (S<<12) | (sz<<10) | ((uint32_t)n<<5) | (uint32_t)t;
 }
 
-// XTN Vd.8B, Vn.8H (narrow i16→i8)
+// XTN Vd.8B, Vn.8H (narrow i16->i8)
 static uint32_t XTN_8b(int d, int n) { return 0x0E212800u | ((uint32_t)n<<5) | (uint32_t)d; }
 
 static uint32_t MOVI_4s_0(int d) { return 0x4F000400u|(uint32_t)d; }
@@ -229,6 +236,8 @@ static void vst(Buf *c, int vd, int s) { put(c, STR_qi(vd, XS, s)); }
 
 // Register-to-register ALU emission (d,x,y,z are NEON register numbers).
 // v0 is scratch for destructive ops (BSL, FMLA, shift-right).
+// At K=8: 32-bit ops use 4S (caller emits twice for lo/hi pairs).
+//         16-bit/half ops use 8H (W() promotes 4H->8H) and 16B bitwise.
 static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm) {
     switch (op) {
     case op_imm_32: {
@@ -238,7 +247,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     } return 1;
     case op_imm_16: case op_imm_half:
         put(c, MOVZ_w(XT,(uint16_t)imm));
-        put(c, DUP_4h_w(d,XT));
+        put(c, W(DUP_4h_w(d,XT)));
         return 1;
 
     case op_add_f32: put(c, FADD_4s(d,x,y)); return 1;
@@ -275,16 +284,6 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
 
     case op_f32_from_i32: put(c, SCVTF_4s(d,x)); return 1;
     case op_i32_from_f32: put(c, FCVTZS_4s(d,x)); return 1;
-    case op_half_from_f32: put(c, FCVTN_4h(d,x)); return 1;
-    case op_half_from_i32: put(c, SCVTF_4s(0,x)); put(c, FCVTN_4h(d,0)); return 1;
-    case op_f32_from_half: put(c, FCVTL_4s(d,x)); return 1;
-    case op_i32_from_half: put(c, FCVTL_4s(0,x)); put(c, FCVTZS_4s(d,0)); return 1;
-    case op_half_from_i16: put(c, SCVTF_4h(d,x)); return 1;
-    case op_i16_from_half: put(c, FCVTZS_4h(d,x)); return 1;
-    case op_i16_from_i32: put(c, XTN_4h(d,x)); return 1;
-    case op_i16_from_u8:  put(c, UXTL_8h(d,x)); return 1;
-    case op_u8_from_i16:  put(c, XTN_8b(d,x)); return 1;
-    case op_i32_from_i16: put(c, SXTL_4s(d,x)); return 1;
 
     case op_eq_f32: put(c, FCMEQ_4s(d,x,y)); return 1;
     case op_ne_f32: put(c, FCMEQ_4s(d,x,y)); put(c, MVN_16b(d,d)); return 1;
@@ -304,92 +303,112 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_lt_u32: put(c, CMHI_4s(d,y,x)); return 1;
     case op_le_u32: put(c, CMHS_4s(d,y,x)); return 1;
 
-    case op_add_i16: put(c, ADD_4h(d,x,y)); return 1;
-    case op_sub_i16: put(c, SUB_4h(d,x,y)); return 1;
-    case op_mul_i16: put(c, MUL_4h(d,x,y)); return 1;
-    case op_shl_i16: put(c, USHL_4h(d,x,y)); return 1;
-    case op_shr_u16: put(c, NEG_4h(0,y)); put(c, USHL_4h(d,x,0)); return 1;
-    case op_shr_s16: put(c, NEG_4h(0,y)); put(c, SSHL_4h(d,x,0)); return 1;
-    case op_shl_i16_imm: put(c, SHL_4h_imm(d,x,imm)); return 1;
-    case op_shr_u16_imm: put(c, USHR_4h_imm(d,x,imm)); return 1;
-    case op_shr_s16_imm: put(c, SSHR_4h_imm(d,x,imm)); return 1;
-    case op_and_16: put(c, AND_8b(d,x,y)); return 1;
-    case op_or_16:  put(c, ORR_8b(d,x,y)); return 1;
-    case op_xor_16: put(c, EOR_8b(d,x,y)); return 1;
+    // 16-bit integer ops: W() promotes 4H->8H for K=8
+    case op_add_i16: put(c, W(ADD_4h(d,x,y))); return 1;
+    case op_sub_i16: put(c, W(SUB_4h(d,x,y))); return 1;
+    case op_mul_i16: put(c, W(MUL_4h(d,x,y))); return 1;
+    case op_shl_i16: put(c, W(USHL_4h(d,x,y))); return 1;
+    case op_shr_u16: put(c, W(NEG_4h(0,y))); put(c, W(USHL_4h(d,x,0))); return 1;
+    case op_shr_s16: put(c, W(NEG_4h(0,y))); put(c, W(SSHL_4h(d,x,0))); return 1;
+    case op_shl_i16_imm: put(c, W(SHL_4h_imm(d,x,imm))); return 1;
+    case op_shr_u16_imm: put(c, W(USHR_4h_imm(d,x,imm))); return 1;
+    case op_shr_s16_imm: put(c, W(SSHR_4h_imm(d,x,imm))); return 1;
+    // 16-bit bitwise: use 16B (full 128-bit Q register)
+    case op_and_16: put(c, AND_16b(d,x,y)); return 1;
+    case op_or_16:  put(c, ORR_16b(d,x,y)); return 1;
+    case op_xor_16: put(c, EOR_16b(d,x,y)); return 1;
     case op_sel_16:
-        if (d==x) { put(c, BSL_8b(d,y,z)); }
-        else if (d!=y && d!=z) { put(c, ORR_8b(d,x,x)); put(c, BSL_8b(d,y,z)); }
-        else { put(c, ORR_8b(0,x,x)); put(c, BSL_8b(0,y,z)); put(c, ORR_8b(d,0,0)); }
+        if (d==x) { put(c, BSL_16b(d,y,z)); }
+        else if (d!=y && d!=z) { put(c, ORR_16b(d,x,x)); put(c, BSL_16b(d,y,z)); }
+        else { put(c, ORR_16b(0,x,x)); put(c, BSL_16b(0,y,z)); put(c, ORR_16b(d,0,0)); }
         return 1;
-    case op_eq_i16: put(c, CMEQ_4h(d,x,y)); return 1;
-    case op_ne_i16: put(c, CMEQ_4h(d,x,y)); put(c, MVN_8b(d,d)); return 1;
-    case op_gt_s16: put(c, CMGT_4h(d,x,y)); return 1;
-    case op_ge_s16: put(c, CMGE_4h(d,x,y)); return 1;
-    case op_lt_s16: put(c, CMGT_4h(d,y,x)); return 1;
-    case op_le_s16: put(c, CMGE_4h(d,y,x)); return 1;
-    case op_gt_u16: put(c, CMHI_4h(d,x,y)); return 1;
-    case op_ge_u16: put(c, CMHS_4h(d,x,y)); return 1;
-    case op_lt_u16: put(c, CMHI_4h(d,y,x)); return 1;
-    case op_le_u16: put(c, CMHS_4h(d,y,x)); return 1;
+    case op_eq_i16: put(c, W(CMEQ_4h(d,x,y))); return 1;
+    case op_ne_i16: put(c, W(CMEQ_4h(d,x,y))); put(c, MVN_16b(d,d)); return 1;
+    case op_gt_s16: put(c, W(CMGT_4h(d,x,y))); return 1;
+    case op_ge_s16: put(c, W(CMGE_4h(d,x,y))); return 1;
+    case op_lt_s16: put(c, W(CMGT_4h(d,y,x))); return 1;
+    case op_le_s16: put(c, W(CMGE_4h(d,y,x))); return 1;
+    case op_gt_u16: put(c, W(CMHI_4h(d,x,y))); return 1;
+    case op_ge_u16: put(c, W(CMHS_4h(d,x,y))); return 1;
+    case op_lt_u16: put(c, W(CMHI_4h(d,y,x))); return 1;
+    case op_le_u16: put(c, W(CMHS_4h(d,y,x))); return 1;
 
-    case op_add_half: put(c, FADD_4h(d,x,y)); return 1;
-    case op_sub_half: put(c, FSUB_4h(d,x,y)); return 1;
-    case op_mul_half: put(c, FMUL_4h(d,x,y)); return 1;
-    case op_div_half: put(c, FDIV_4h(d,x,y)); return 1;
-    case op_min_half: put(c, FMINNM_4h(d,x,y)); return 1;
-    case op_max_half: put(c, FMAXNM_4h(d,x,y)); return 1;
-    case op_sqrt_half: put(c, FSQRT_4h(d,x)); return 1;
+    // Half float ops: W() promotes 4H->8H
+    case op_add_half: put(c, W(FADD_4h(d,x,y))); return 1;
+    case op_sub_half: put(c, W(FSUB_4h(d,x,y))); return 1;
+    case op_mul_half: put(c, W(FMUL_4h(d,x,y))); return 1;
+    case op_div_half: put(c, W(FDIV_4h(d,x,y))); return 1;
+    case op_min_half: put(c, W(FMINNM_4h(d,x,y))); return 1;
+    case op_max_half: put(c, W(FMAXNM_4h(d,x,y))); return 1;
+    case op_sqrt_half: put(c, W(FSQRT_4h(d,x))); return 1;
     case op_fma_half:
-        if (d==z) { put(c, FMLA_4h(d,x,y)); }
-        else if (d!=x && d!=y) { put(c, ORR_8b(d,z,z)); put(c, FMLA_4h(d,x,y)); }
-        else { put(c, ORR_8b(0,z,z)); put(c, FMLA_4h(0,x,y)); put(c, ORR_8b(d,0,0)); }
+        if (d==z) { put(c, W(FMLA_4h(d,x,y))); }
+        else if (d!=x && d!=y) { put(c, ORR_16b(d,z,z)); put(c, W(FMLA_4h(d,x,y))); }
+        else { put(c, ORR_16b(0,z,z)); put(c, W(FMLA_4h(0,x,y))); put(c, ORR_16b(d,0,0)); }
         return 1;
-    case op_and_half: put(c, AND_8b(d,x,y)); return 1;
-    case op_or_half:  put(c, ORR_8b(d,x,y)); return 1;
-    case op_xor_half: put(c, EOR_8b(d,x,y)); return 1;
+    // Half bitwise: use 16B (full Q register)
+    case op_and_half: put(c, AND_16b(d,x,y)); return 1;
+    case op_or_half:  put(c, ORR_16b(d,x,y)); return 1;
+    case op_xor_half: put(c, EOR_16b(d,x,y)); return 1;
     case op_sel_half:
-        if (d==x) { put(c, BSL_8b(d,y,z)); }
-        else if (d!=y && d!=z) { put(c, ORR_8b(d,x,x)); put(c, BSL_8b(d,y,z)); }
-        else { put(c, ORR_8b(0,x,x)); put(c, BSL_8b(0,y,z)); put(c, ORR_8b(d,0,0)); }
+        if (d==x) { put(c, BSL_16b(d,y,z)); }
+        else if (d!=y && d!=z) { put(c, ORR_16b(d,x,x)); put(c, BSL_16b(d,y,z)); }
+        else { put(c, ORR_16b(0,x,x)); put(c, BSL_16b(0,y,z)); put(c, ORR_16b(d,0,0)); }
         return 1;
-    case op_eq_half: put(c, FCMEQ_4h(d,x,y)); return 1;
-    case op_ne_half: put(c, FCMEQ_4h(d,x,y)); put(c, MVN_8b(d,d)); return 1;
-    case op_gt_half: put(c, FCMGT_4h(d,x,y)); return 1;
-    case op_ge_half: put(c, FCMGE_4h(d,x,y)); return 1;
-    case op_lt_half: put(c, FCMGT_4h(d,y,x)); return 1;
-    case op_le_half: put(c, FCMGE_4h(d,y,x)); return 1;
+    case op_eq_half: put(c, W(FCMEQ_4h(d,x,y))); return 1;
+    case op_ne_half: put(c, W(FCMEQ_4h(d,x,y))); put(c, MVN_16b(d,d)); return 1;
+    case op_gt_half: put(c, W(FCMGT_4h(d,x,y))); return 1;
+    case op_ge_half: put(c, W(FCMGE_4h(d,x,y))); return 1;
+    case op_lt_half: put(c, W(FCMGT_4h(d,y,x))); return 1;
+    case op_le_half: put(c, W(FCMGE_4h(d,y,x))); return 1;
+
+    // Conversions within same width
+    case op_half_from_i16: put(c, W(SCVTF_4h(d,x))); return 1;
+    case op_i16_from_half: put(c, W(FCVTZS_4h(d,x))); return 1;
+    // 8-bit <-> 16-bit (unchanged: UXTL reads D->Q, XTN reads Q->D)
+    case op_i16_from_u8:  put(c, UXTL_8h(d,x)); return 1;
+    case op_u8_from_i16:  put(c, XTN_8b(d,x)); return 1;
 
     default: return 0;
     }
 }
 
-// Register allocator: v0=scratch, v1-v7,v16-v31 = 23 allocatable
-static const int8_t ra_pool[] = {1,2,3,4,5,6,7,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31};
-#define RA_NREGS 23
+// Register allocator: v0-v3 reserved (scratch + LD4/ST4), v4-v7,v16-v31 = 20 allocatable
+static const int8_t ra_pool[] = {4,5,6,7,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31};
+#define RA_NREGS 20
 
 struct ra {
     int    *last_use;     // [insts] last varying op that reads each value
     int8_t *reg;          // [insts] NEON register for value i, or -1
+    int8_t *reg_hi;       // [insts] hi register for OP_32 pairs, or -1
+    _Bool  *is_pair;      // [insts] true if value needs register pair (varying OP_32)
     int     nfree;
     int     bytes_ctrl_n;
     int     owner[32];    // owner[v] = inst whose value is in Vv, or -1
     int     bytes_ctrl[16];
     int8_t  free_stack[RA_NREGS];
     int8_t  bytes_reg[16];
-    int8_t  ld4_ctrl[4];  // NEON reg holding TBL control for channels 0-3
+    int8_t  st4_ch[3];   // saved NEON regs for store_8x4 channels 0-2
     int8_t  pad_[5];
+    int     st4_ptr;      // ptr index for buffered ST4
 };
 
 static struct ra* ra_create(struct umbra_basic_block const *bb) {
     int n = bb->insts;
     struct ra *ra = malloc(sizeof *ra);
     ra->reg      = malloc((size_t)n * sizeof *ra->reg);
+    ra->reg_hi   = malloc((size_t)n * sizeof *ra->reg_hi);
     ra->last_use = malloc((size_t)n * sizeof *ra->last_use);
+    ra->is_pair  = malloc((size_t)n * sizeof *ra->is_pair);
 
-    for (int i = 0; i < n; i++) ra->reg[i] = -1;
+    for (int i = 0; i < n; i++) {
+        ra->reg[i] = -1;
+        ra->reg_hi[i] = -1;
+        ra->is_pair[i] = (op_type(bb->inst[i].op) == OP_32) && (i >= bb->preamble);
+    }
     for (int i = 0; i < 32; i++) ra->owner[i] = -1;
     ra->bytes_ctrl_n = 0;
-    for (int i = 0; i < 4; i++) ra->ld4_ctrl[i] = -1;
+    ra->st4_ptr = -1;
 
     for (int i = 0; i < n; i++) ra->last_use[i] = -1;
     for (int i = 0; i < n; i++) {
@@ -413,7 +432,9 @@ static struct ra* ra_create(struct umbra_basic_block const *bb) {
 
 static void ra_destroy(struct ra *ra) {
     free(ra->reg);
+    free(ra->reg_hi);
     free(ra->last_use);
+    free(ra->is_pair);
     free(ra);
 }
 
@@ -423,6 +444,12 @@ static void ra_free_reg(struct ra *ra, int val) {
     ra->free_stack[ra->nfree++] = r;
     ra->owner[(int)r] = -1;
     ra->reg[val] = -1;
+    int8_t rh = ra->reg_hi[val];
+    if (rh >= 0) {
+        ra->free_stack[ra->nfree++] = rh;
+        ra->owner[(int)rh] = -1;
+        ra->reg_hi[val] = -1;
+    }
 }
 
 static int8_t ra_alloc(Buf *c, struct ra *ra, int *sl, int *ns) {
@@ -436,11 +463,24 @@ static int8_t ra_alloc(Buf *c, struct ra *ra, int *sl, int *ns) {
         if (ra->last_use[val] > best_lu) { best_lu = ra->last_use[val]; best_r = r; }
     }
     int evicted = ra->owner[best_r];
-    if (sl[evicted] < 0) sl[evicted] = (*ns)++;
-    vst(c, best_r, sl[evicted]);
+    if (sl[evicted] < 0) {
+        if (ra->is_pair[evicted]) { sl[evicted] = *ns; *ns += 2; }
+        else { sl[evicted] = (*ns)++; }
+    }
+    // Spill lo
+    vst(c, ra->reg[evicted], sl[evicted]);
+    ra->owner[(int)ra->reg[evicted]] = -1;
+    // Spill hi if pair
+    if (ra->reg_hi[evicted] >= 0) {
+        vst(c, ra->reg_hi[evicted], sl[evicted]+1);
+        int8_t rh = ra->reg_hi[evicted];
+        ra->owner[(int)rh] = -1;
+        ra->reg_hi[evicted] = -1;
+        ra->free_stack[ra->nfree++] = rh;
+    }
+    int8_t r = ra->reg[evicted];
     ra->reg[evicted] = -1;
-    ra->owner[best_r] = -1;
-    return (int8_t)best_r;
+    return r;
 }
 
 static int8_t ra_ensure(Buf *c, struct ra *ra, int *sl, int *ns, int val) {
@@ -449,6 +489,13 @@ static int8_t ra_ensure(Buf *c, struct ra *ra, int *sl, int *ns, int val) {
     if (sl[val] >= 0) vld(c, r, sl[val]);
     ra->reg[val] = r;
     ra->owner[(int)r] = val;
+    // Also restore hi register if this is a pair
+    if (ra->is_pair[val]) {
+        int8_t rh = ra_alloc(c, ra, sl, ns);
+        if (sl[val] >= 0) vld(c, rh, sl[val]+1);
+        ra->reg_hi[val] = rh;
+        ra->owner[(int)rh] = val;
+    }
     return r;
 }
 
@@ -458,7 +505,19 @@ static int8_t ra_claim(struct ra *ra, int old_val, int new_val) {
     ra->reg[old_val] = -1;
     ra->reg[new_val] = r;
     ra->owner[(int)r] = new_val;
+    // Transfer hi register too if old was a pair
+    if (ra->reg_hi[old_val] >= 0) {
+        int8_t rh = ra->reg_hi[old_val];
+        ra->reg_hi[old_val] = -1;
+        ra->reg_hi[new_val] = rh;
+        ra->owner[(int)rh] = new_val;
+    }
     return r;
+}
+
+// Get the hi register for a value, falling back to lo if not a pair.
+static int8_t hi(struct ra *ra, int val) {
+    return ra->reg_hi[val] >= 0 ? ra->reg_hi[val] : ra->reg[val];
 }
 
 static void emit_tbl_ctrl(Buf *c, int vd, int ctrl) {
@@ -469,25 +528,12 @@ static void emit_tbl_ctrl(Buf *c, int vd, int ctrl) {
             tbl[lane*4+b] = nibble ? (uint8_t)(lane*4 + nibble - 1) : 16;
         }
     }
-    uint64_t lo, hi;
+    uint64_t lo, h;
     __builtin_memcpy(&lo, tbl+0, 8);
-    __builtin_memcpy(&hi, tbl+8, 8);
+    __builtin_memcpy(&h, tbl+8, 8);
     load_imm_x(c, XT, lo);
     put(c, FMOV_d_x(vd, XT));
-    load_imm_x(c, XT, hi);
-    put(c, INS_d(vd, 1, XT));
-}
-
-static void emit_ld4_ctrl(Buf *c, int vd, int ch) {
-    uint8_t tbl[16];
-    for (int i = 0; i < 4; i++) tbl[i] = (uint8_t)(i*4 + ch);
-    for (int i = 4; i < 16; i++) tbl[i] = 16;
-    uint64_t lo, hi;
-    __builtin_memcpy(&lo, tbl, 8);
-    __builtin_memcpy(&hi, tbl+8, 8);
-    load_imm_x(c, XT, lo);
-    put(c, FMOV_d_x(vd, XT));
-    load_imm_x(c, XT, hi);
+    load_imm_x(c, XT, h);
     put(c, INS_d(vd, 1, XT));
 }
 
@@ -544,26 +590,12 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
         }
     }
 
-    // Pre-load LD4 TBL controls for load_8x4 ops.
-    for (int ch = 0; ch < 4; ch++) {
-        _Bool needed = 0;
-        for (int i = bb->preamble; i < bb->insts; i++) {
-            if ((int)bb->inst[i].op == (int)op_load_8x4_0 + ch) { needed = 1; break; }
-        }
-        if (needed) {
-            int8_t r = ra_alloc(&c, ra, sl, &ns);
-            ra->owner[(int)r] = -2;
-            emit_ld4_ctrl(&c, r, ch);
-            ra->ld4_ctrl[ch] = r;
-        }
-    }
-
     put(&c, MOVZ_x(XI,0));
 
     int loop_top = c.len;
 
     put(&c, 0xCB090000u|(uint32_t)XT);  // SUB X10, X0, X9
-    put(&c, SUBS_xi(31,XT,4));
+    put(&c, SUBS_xi(31,XT,8));           // K=8: need 8 remaining
     int br_tail = c.len;
     put(&c, Bcond(0xB,0));  // B.LT tail (patch later)
     put(&c, LSL_xi(XH, XI, 1));  // x11 = i*2  (half byte offset)
@@ -574,7 +606,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0);
     int loop_body_end = c.len;
 
-    put(&c, ADD_xi(XI,XI,4));
+    put(&c, ADD_xi(XI,XI,8));   // K=8: advance by 8
     put(&c, B(loop_top - c.len));
 
     int tail_top = c.len;
@@ -584,9 +616,14 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     int br_epi = c.len;
     put(&c, Bcond(0xD,0));  // B.LE (patch later)
 
-    // Scalar tail: RA state is back to post-preamble (all varyings freed).
+    // Scalar tail: free all varying values' registers from the vector loop.
+    for (int i = bb->preamble; i < bb->insts; i++) ra_free_reg(ra, i);
+
     // Clear varying spill slots so they don't alias vector loop spills.
     for (int i = bb->preamble; i < bb->insts; i++) sl[i] = -1;
+
+    // In scalar tail, disable pairs (single-element processing).
+    for (int i = bb->preamble; i < bb->insts; i++) ra->is_pair[i] = 0;
 
     emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 1);
 
@@ -641,27 +678,64 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         switch (inst->op) {
         case op_lane: {
-            int8_t rd = ra_alloc(c, ra, sl, ns);
-            ra->reg[i] = rd; ra->owner[(int)rd] = i;
-            put(c, DUP_4s_w(rd, XI));
-            if (!scalar) {
+            if (!scalar && ra->is_pair[i]) {
+                // K=8 vector: lo=[i,i+1,i+2,i+3], hi=[i+4,i+5,i+6,i+7]
+                int8_t rd = ra_alloc(c, ra, sl, ns);
+                int8_t rdh = ra_alloc(c, ra, sl, ns);
+                ra->reg[i] = rd; ra->reg_hi[i] = rdh;
+                ra->owner[(int)rd] = i; ra->owner[(int)rdh] = i;
+                put(c, DUP_4s_w(rd, XI));
                 put(c, MOVI_4s_0(0));
                 put(c, MOVZ_w(XT,1)); put(c, INS_s(0,1,XT));
                 put(c, MOVZ_w(XT,2)); put(c, INS_s(0,2,XT));
                 put(c, MOVZ_w(XT,3)); put(c, INS_s(0,3,XT));
                 put(c, ADD_4s(rd, rd, 0));
+                // hi = lo + [4,4,4,4]
+                put(c, MOVZ_w(XT,4));
+                put(c, DUP_4s_w(0, XT));
+                put(c, ADD_4s(rdh, rd, 0));
+            } else {
+                // scalar or preamble: single register
+                int8_t rd = ra_alloc(c, ra, sl, ns);
+                ra->reg[i] = rd; ra->owner[(int)rd] = i;
+                put(c, DUP_4s_w(rd, XI));
+                if (!scalar) {
+                    put(c, MOVI_4s_0(0));
+                    put(c, MOVZ_w(XT,1)); put(c, INS_s(0,1,XT));
+                    put(c, MOVZ_w(XT,2)); put(c, INS_s(0,2,XT));
+                    put(c, MOVZ_w(XT,3)); put(c, INS_s(0,3,XT));
+                    put(c, ADD_4s(rd, rd, 0));
+                }
             }
         } break;
 
-        case op_load_32: case op_load_16: case op_load_half: {
+        case op_load_32: {
+            int p = inst->ptr;
+            if (!scalar && ra->is_pair[i]) {
+                int8_t rd = ra_alloc(c, ra, sl, ns);
+                int8_t rdh = ra_alloc(c, ra, sl, ns);
+                ra->reg[i] = rd; ra->reg_hi[i] = rdh;
+                ra->owner[(int)rd] = i; ra->owner[(int)rdh] = i;
+                // LDP Qlo, Qhi, [base + XW]
+                put(c, ADD_xr(XT, 1+p, XW));
+                put(c, LDP_qi(rd, rdh, XT, 0));
+            } else {
+                int8_t rd = ra_alloc(c, ra, sl, ns);
+                ra->reg[i] = rd; ra->owner[(int)rd] = i;
+                if (scalar) put(c, LDR_sx(rd, 1+p, XI));
+                else        put(c, LDR_q(rd, 1+p, XW));
+            }
+        } break;
+
+        case op_load_16: case op_load_half: {
             int8_t rd = ra_alloc(c, ra, sl, ns);
             ra->reg[i] = rd; ra->owner[(int)rd] = i;
-            int p=inst->ptr;
-            _Bool wide = (inst->op == op_load_32);
+            int p = inst->ptr;
             if (scalar) {
-                put(c, wide ? LDR_sx(rd,1+p,XI) : LDR_hx(rd,1+p,XI));
+                put(c, LDR_hx(rd, 1+p, XI));
             } else {
-                put(c, wide ? LDR_q(rd,1+p,XW) : LDR_d(rd,1+p,XH));
+                // K=8: 8 x 16-bit = 16 bytes = 1 Q register
+                put(c, LDR_q(rd, 1+p, XH));
             }
         } break;
 
@@ -670,16 +744,36 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             int8_t rd = ra_alloc(c, ra, sl, ns);
             ra->reg[i] = rd; ra->owner[(int)rd] = i;
             put(c, MOVI_4s_0(rd));
+            // Pairs for uni/gather 32-bit: broadcast same zero to both halves
+            if (ra->is_pair[i]) {
+                int8_t rdh = ra_alloc(c, ra, sl, ns);
+                ra->reg_hi[i] = rdh; ra->owner[(int)rdh] = i;
+                put(c, MOVI_4s_0(rdh));
+            }
         } break;
 
-        case op_store_32: case op_store_16: case op_store_half: {
+        case op_store_32: {
             int8_t ry = ra_ensure(c, ra, sl, ns, inst->y);
-            int p=inst->ptr;
-            _Bool wide = (inst->op == op_store_32);
-            if (scalar) {
-                put(c, wide ? STR_sx(ry,1+p,XI) : STR_hx(ry,1+p,XI));
+            int p = inst->ptr;
+            if (!scalar && ra->is_pair[inst->y]) {
+                int8_t ryh = ra->reg_hi[inst->y];
+                put(c, ADD_xr(XT, 1+p, XW));
+                put(c, STP_qi(ry, ryh, XT, 0));
             } else {
-                put(c, wide ? STR_q(ry,1+p,XW) : STR_d(ry,1+p,XH));
+                if (scalar) put(c, STR_sx(ry, 1+p, XI));
+                else        put(c, STR_q(ry, 1+p, XW));
+            }
+            if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
+        } break;
+
+        case op_store_16: case op_store_half: {
+            int8_t ry = ra_ensure(c, ra, sl, ns, inst->y);
+            int p = inst->ptr;
+            if (scalar) {
+                put(c, STR_hx(ry, 1+p, XI));
+            } else {
+                // K=8: Q register store
+                put(c, STR_q(ry, 1+p, XH));
             }
             if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
         } break;
@@ -701,11 +795,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 put(c, 0x38606800u | ((uint32_t)XT << 16) | ((uint32_t)(1+p) << 5) | (uint32_t)XT);
                 // DUP Vd.8B, Wt
                 put(c, 0x0E010C00u | ((uint32_t)XT << 5) | (uint32_t)rd);
+            } else if (ch == 0) {
+                // First channel: emit LD4 into V0-V3, then MOV result
+                put(c, ADD_xr(XT, 1+p, XW));
+                put(c, LD4_8b(0, XT));
+                put(c, ORR_16b(rd, 0, 0));  // MOV Vd, V0 (channel 0)
             } else {
-                // LDR Q0, [Xn, XW]  — load 16 bytes (4 pixels RGBA)
-                put(c, LDR_q(0, 1+p, XW));
-                // TBL Vd.16B, {V0.16B}, Vctrl.16B
-                put(c, TBL_16b(rd, 0, ra->ld4_ctrl[ch]));
+                // Subsequent channels: result already in V1/V2/V3 from prior LD4
+                put(c, ORR_16b(rd, ch, ch));  // MOV Vd, V{ch}
             }
         } break;
 
@@ -717,39 +814,176 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 // byte offset = ix * 4 + ch
                 put(c, LSL_xi(XT, XI, 2));
                 if (ch) put(c, ADD_xi(XT, XT, ch));
-                // ST1 {Vy.B}[0], [Xn + offset]
                 put(c, ADD_xr(XT, 1+p, XT));
                 put(c, ST1_b(ry, 0, XT));
+            } else if (ch < 3) {
+                // Buffer channel into V0-V2 for later ST4
+                put(c, ORR_16b(ch, ry, ry));  // MOV V{ch}, Vy
+                ra->st4_ch[ch] = ry;
+                ra->st4_ptr = p;
             } else {
-                // Compute base: ptr + ix*4 + ch
+                // Last channel: MOV to V3 and emit ST4
+                put(c, ORR_16b(3, ry, ry));   // MOV V3, Vy
                 put(c, ADD_xr(XT, 1+p, XW));
-                if (ch) put(c, ADD_xi(XT, XT, ch));
-                // ST1 per lane with stride 4
-                for (int lane = 0; lane < 4; lane++) {
-                    put(c, ST1_b(ry, lane, XT));
-                    if (lane < 3) put(c, ADD_xi(XT, XT, 4));
-                }
+                put(c, ST4_8b(0, XT));
             }
             if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
+        } break;
+
+        // Cross-width conversions between 32-bit (pairs) and 16-bit (single Q)
+        case op_half_from_f32: {
+            int8_t rx = ra_ensure(c, ra, sl, ns, inst->x);
+            int8_t rxh = hi(ra, inst->x);
+            _Bool x_dead = lu[inst->x] <= i;
+            int8_t rd;
+            if (x_dead) {
+                rd = ra_claim(ra, inst->x, i);
+                // Pair freed, we keep lo; hi was freed by claim
+            } else {
+                rd = ra_alloc(c, ra, sl, ns);
+                ra->reg[i] = rd; ra->owner[(int)rd] = i;
+            }
+            if (!scalar && rxh != rx) {
+                // Pair: FCVTN lo, FCVTN2 hi
+                put(c, FCVTN_4h(rd, rx));
+                put(c, W(FCVTN_4h(rd, rxh)));  // FCVTN2
+            } else {
+                put(c, FCVTN_4h(rd, rx));
+            }
+        } break;
+
+        case op_f32_from_half: {
+            int8_t rx = ra_ensure(c, ra, sl, ns, inst->x);
+            _Bool x_dead = lu[inst->x] <= i;
+            if (!scalar && ra->is_pair[i]) {
+                int8_t rd = ra_alloc(c, ra, sl, ns);
+                int8_t rdh = ra_alloc(c, ra, sl, ns);
+                ra->reg[i] = rd; ra->reg_hi[i] = rdh;
+                ra->owner[(int)rd] = i; ra->owner[(int)rdh] = i;
+                put(c, FCVTL_4s(rd, rx));       // lo from lower 4H
+                put(c, W(FCVTL_4s(rdh, rx)));   // FCVTL2: hi from upper 4H
+                if (x_dead) ra_free_reg(ra, inst->x);
+            } else {
+                int8_t rd;
+                if (x_dead) { rd = ra_claim(ra, inst->x, i); }
+                else { rd = ra_alloc(c, ra, sl, ns); ra->reg[i] = rd; ra->owner[(int)rd] = i; }
+                put(c, FCVTL_4s(rd, rx));
+            }
+        } break;
+
+        case op_half_from_i32: {
+            int8_t rx = ra_ensure(c, ra, sl, ns, inst->x);
+            int8_t rxh = hi(ra, inst->x);
+            _Bool x_dead = lu[inst->x] <= i;
+            int8_t rd;
+            if (x_dead) { rd = ra_claim(ra, inst->x, i); }
+            else { rd = ra_alloc(c, ra, sl, ns); ra->reg[i] = rd; ra->owner[(int)rd] = i; }
+            if (!scalar && rxh != rx) {
+                // SCVTF + FCVTN for lo, SCVTF + FCVTN2 for hi
+                put(c, SCVTF_4s(0, rx));
+                put(c, FCVTN_4h(rd, 0));
+                put(c, SCVTF_4s(0, rxh));
+                put(c, W(FCVTN_4h(rd, 0)));   // FCVTN2
+            } else {
+                put(c, SCVTF_4s(0, rx));
+                put(c, FCVTN_4h(rd, 0));
+            }
+        } break;
+
+        case op_i32_from_half: {
+            int8_t rx = ra_ensure(c, ra, sl, ns, inst->x);
+            _Bool x_dead = lu[inst->x] <= i;
+            if (!scalar && ra->is_pair[i]) {
+                int8_t rd = ra_alloc(c, ra, sl, ns);
+                int8_t rdh = ra_alloc(c, ra, sl, ns);
+                ra->reg[i] = rd; ra->reg_hi[i] = rdh;
+                ra->owner[(int)rd] = i; ra->owner[(int)rdh] = i;
+                put(c, FCVTL_4s(rd, rx));       // widen lower 4H to 4S
+                put(c, FCVTZS_4s(rd, rd));      // convert to int
+                put(c, W(FCVTL_4s(rdh, rx)));   // FCVTL2: widen upper 4H
+                put(c, FCVTZS_4s(rdh, rdh));
+                if (x_dead) ra_free_reg(ra, inst->x);
+            } else {
+                int8_t rd;
+                if (x_dead) { rd = ra_claim(ra, inst->x, i); }
+                else { rd = ra_alloc(c, ra, sl, ns); ra->reg[i] = rd; ra->owner[(int)rd] = i; }
+                put(c, FCVTL_4s(0, rx));
+                put(c, FCVTZS_4s(rd, 0));
+            }
+        } break;
+
+        case op_i16_from_i32: {
+            int8_t rx = ra_ensure(c, ra, sl, ns, inst->x);
+            int8_t rxh = hi(ra, inst->x);
+            _Bool x_dead = lu[inst->x] <= i;
+            int8_t rd;
+            if (x_dead) { rd = ra_claim(ra, inst->x, i); }
+            else { rd = ra_alloc(c, ra, sl, ns); ra->reg[i] = rd; ra->owner[(int)rd] = i; }
+            if (!scalar && rxh != rx) {
+                put(c, XTN_4h(rd, rx));
+                put(c, W(XTN_4h(rd, rxh)));   // XTN2
+            } else {
+                put(c, XTN_4h(rd, rx));
+            }
+        } break;
+
+        case op_i32_from_i16: {
+            int8_t rx = ra_ensure(c, ra, sl, ns, inst->x);
+            _Bool x_dead = lu[inst->x] <= i;
+            if (!scalar && ra->is_pair[i]) {
+                int8_t rd = ra_alloc(c, ra, sl, ns);
+                int8_t rdh = ra_alloc(c, ra, sl, ns);
+                ra->reg[i] = rd; ra->reg_hi[i] = rdh;
+                ra->owner[(int)rd] = i; ra->owner[(int)rdh] = i;
+                put(c, SXTL_4s(rd, rx));        // lo from lower 4H
+                put(c, W(SXTL_4s(rdh, rx)));    // SXTL2: hi from upper 4H
+                if (x_dead) ra_free_reg(ra, inst->x);
+            } else {
+                int8_t rd;
+                if (x_dead) { rd = ra_claim(ra, inst->x, i); }
+                else { rd = ra_alloc(c, ra, sl, ns); ra->reg[i] = rd; ra->owner[(int)rd] = i; }
+                put(c, SXTL_4s(rd, rx));
+            }
         } break;
 
         case op_shr_u32_imm: {
             int sh = inst->imm;
             int8_t rx = ra_ensure(c, ra, sl, ns, inst->x);
             _Bool x_dead = lu[inst->x] <= i;
+            _Bool pair = ra->is_pair[i] && !scalar;
             // Fuse shr_u32_imm + i16_from_i32 into SHRN when shift fits
             if (sh >= 1 && sh <= 16 && i+1 < to &&
                 bb->inst[i+1].op == op_i16_from_i32 &&
                 bb->inst[i+1].x == i && lu[i] == i+1)
             {
+                int8_t rxh = hi(ra, inst->x);
                 int8_t rd;
                 if (x_dead) { rd = ra_claim(ra, inst->x, i+1); }
                 else {
                     rd = ra_alloc(c, ra, sl, ns);
                     ra->reg[i+1] = rd; ra->owner[(int)rd] = i+1;
                 }
-                put(c, SHRN_4h(rd, rx, sh));
+                if (pair && rxh != rx) {
+                    put(c, SHRN_4h(rd, rx, sh));
+                    put(c, W(SHRN_4h(rd, rxh, sh)));  // SHRN2
+                } else {
+                    put(c, SHRN_4h(rd, rx, sh));
+                }
                 i++;
+            } else if (pair) {
+                int8_t rxh = hi(ra, inst->x);
+                int8_t rd, rdh;
+                if (x_dead) {
+                    rd = ra_claim(ra, inst->x, i);
+                    rdh = ra->reg_hi[i];
+                } else {
+                    rd = ra_alloc(c, ra, sl, ns);
+                    rdh = ra_alloc(c, ra, sl, ns);
+                    ra->reg[i] = rd; ra->reg_hi[i] = rdh;
+                    ra->owner[(int)rd] = i; ra->owner[(int)rdh] = i;
+                }
+                put(c, USHR_4s_imm(rd, rx, sh));
+                put(c, USHR_4s_imm(rdh, rxh, sh));
             } else {
                 int8_t rd;
                 if (x_dead) { rd = ra_claim(ra, inst->x, i); }
@@ -769,31 +1003,51 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             }
             int8_t rx = ra_ensure(c, ra, sl, ns, inst->x);
             _Bool x_dead = lu[inst->x] <= i;
-            int8_t rd;
-            if (x_dead) { rd = ra_claim(ra, inst->x, i); }
-            else {
-                rd = ra_alloc(c, ra, sl, ns);
-                ra->reg[i] = rd; ra->owner[(int)rd] = i;
+            _Bool pair = ra->is_pair[i] && !scalar;
+            if (pair) {
+                int8_t rxh = hi(ra, inst->x);
+                int8_t rd, rdh;
+                if (x_dead) {
+                    rd = ra_claim(ra, inst->x, i);
+                    rdh = ra->reg_hi[i];
+                } else {
+                    rd = ra_alloc(c, ra, sl, ns);
+                    rdh = ra_alloc(c, ra, sl, ns);
+                    ra->reg[i] = rd; ra->reg_hi[i] = rdh;
+                    ra->owner[(int)rd] = i; ra->owner[(int)rdh] = i;
+                }
+                put(c, TBL_16b(rd, rx, ctrl_r));
+                put(c, TBL_16b(rdh, rxh, ctrl_r));
+            } else {
+                int8_t rd;
+                if (x_dead) { rd = ra_claim(ra, inst->x, i); }
+                else {
+                    rd = ra_alloc(c, ra, sl, ns);
+                    ra->reg[i] = rd; ra->owner[(int)rd] = i;
+                }
+                put(c, TBL_16b(rd, rx, ctrl_r));
             }
-            put(c, TBL_16b(rd, rx, ctrl_r));
         } break;
 
         default: {
+            enum op_type ot = op_type(inst->op);
+            _Bool pair = (ot == OP_32) && ra->is_pair[i] && !scalar;
+
             int8_t rx = inst->x < i ? ra_ensure(c, ra, sl, ns, inst->x) : 0;
             int8_t ry = inst->y < i ? ra_ensure(c, ra, sl, ns, inst->y) : 0;
             int8_t rz = inst->z < i ? ra_ensure(c, ra, sl, ns, inst->z) : 0;
+            // Capture hi registers now, before claims/frees invalidate them.
+            int8_t rxh = inst->x < i ? hi(ra, inst->x) : 0;
+            int8_t ryh = inst->y < i ? hi(ra, inst->y) : 0;
+            int8_t rzh = inst->z < i ? hi(ra, inst->z) : 0;
 
             _Bool x_dead = inst->x < i && lu[inst->x] <= i;
             _Bool y_dead = inst->y < i && lu[inst->y] <= i;
             _Bool z_dead = inst->z < i && lu[inst->z] <= i;
-            // Don't double-free when multiple args reference the same value
             if (inst->y == inst->x) y_dead = 0;
             if (inst->z == inst->x) z_dead = 0;
             if (inst->z == inst->y) z_dead = 0;
 
-            // Try to claim a dying input's register for the output.
-            // For destructive ops (FMA, BSL), prefer the accumulator/condition input
-            // and avoid claiming the other inputs to prevent d aliasing them.
             int8_t rd = -1;
             enum op op = inst->op;
             _Bool destructive = op==op_fma_f32 || op==op_fma_half
@@ -803,26 +1057,31 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             else if ((op==op_sel_32 || op==op_sel_16 || op==op_sel_half) && x_dead)
                 { rd = ra_claim(ra, inst->x, i); x_dead = 0; }
 
-            // For non-destructive ops, fall back to any dead input's register.
-            // For destructive ops, skip this to avoid d aliasing non-accumulator inputs.
             if (!destructive) {
                 if (rd < 0 && x_dead) { rd = ra_claim(ra, inst->x, i); x_dead = 0; }
                 if (rd < 0 && y_dead) { rd = ra_claim(ra, inst->y, i); y_dead = 0; }
                 if (rd < 0 && z_dead) { rd = ra_claim(ra, inst->z, i); z_dead = 0; }
             }
 
-            // Free remaining dead inputs
             if (x_dead) ra_free_reg(ra, inst->x);
             if (y_dead) ra_free_reg(ra, inst->y);
             if (z_dead) ra_free_reg(ra, inst->z);
 
-            // If no dead input available, allocate fresh
             if (rd < 0) {
                 rd = ra_alloc(c, ra, sl, ns);
                 ra->reg[i] = rd; ra->owner[(int)rd] = i;
             }
+            if (pair && ra->reg_hi[i] < 0) {
+                int8_t rdh = ra_alloc(c, ra, sl, ns);
+                ra->reg_hi[i] = rdh; ra->owner[(int)rdh] = i;
+            }
 
             emit_alu_reg(c, inst->op, rd, rx, ry, rz, inst->imm);
+
+            if (pair) {
+                int8_t rdh = ra->reg_hi[i];
+                emit_alu_reg(c, inst->op, rdh, rxh, ryh, rzh, inst->imm);
+            }
         } break;
         }
     }
@@ -841,11 +1100,9 @@ void umbra_jit_free(struct umbra_jit *j) {
 void umbra_jit_dump(struct umbra_jit const *j, FILE *f) {
     if (!j) return;
     size_t code_bytes = j->code_size;
-    // Count actual instructions (find last non-zero or just use code_size)
     uint32_t const *words = (uint32_t const *)j->code;
     size_t nwords = code_bytes / 4;
 
-    // Write .s file with .inst directives, assemble, then objdump
     char tmp[] = "/tmp/umbra_jit_XXXXXX.s";
     int fd = mkstemps(tmp, 2);
     if (fd >= 0) {
@@ -869,7 +1126,6 @@ void umbra_jit_dump(struct umbra_jit const *j, FILE *f) {
                 char line[256];
                 _Bool ok = 0;
                 while (fgets(line, (int)sizeof line, p)) {
-                    // Skip the "file.o: file format ..." header line.
                     if (!ok && __builtin_strstr(line, "file format")) { ok = 1; continue; }
                     fputs(line, f);
                 }
@@ -886,7 +1142,6 @@ void umbra_jit_dump(struct umbra_jit const *j, FILE *f) {
         }
     }
 
-    // Fallback: hex dump
     for (size_t i = 0; i < nwords; i++) {
         fprintf(f, "  %04zx: %08x\n", i * 4, words[i]);
     }
@@ -896,8 +1151,6 @@ void umbra_jit_mca(struct umbra_jit const *j, FILE *f) {
     if (!j || j->loop_start >= j->loop_end) return;
     uint32_t const *words = (uint32_t const *)j->code;
 
-    // Write loop body as .inst directives, assemble, disassemble to get mnemonics,
-    // then feed mnemonics to llvm-mca.
     char tmp[] = "/tmp/umbra_mca_XXXXXX.s";
     int fd = mkstemps(tmp, 2);
     if (fd < 0) return;
