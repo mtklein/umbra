@@ -174,6 +174,7 @@ V2(SCVTF_4h) V2(FCVTZS_4h) V2(XTN_4h) V2(SXTL_4s)
 static uint32_t SHL_4s_imm (int d, int n, int sh) { return 0x4F005400u|((uint32_t)(sh+32)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
 static uint32_t USHR_4s_imm(int d, int n, int sh) { return 0x6F000400u|((uint32_t)(64-sh)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
 static uint32_t SSHR_4s_imm(int d, int n, int sh) { return 0x4F000400u|((uint32_t)(64-sh)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
+static uint32_t SHRN_4h    (int d, int n, int sh) { return 0x0F008400u|((uint32_t)(32-sh)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
 static uint32_t SHL_4h_imm (int d, int n, int sh) { return 0x0F005400u|((uint32_t)(sh+16)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
 static uint32_t USHR_4h_imm(int d, int n, int sh) { return 0x2F000400u|((uint32_t)(32-sh)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
 static uint32_t SSHR_4h_imm(int d, int n, int sh) { return 0x0F000400u|((uint32_t)(32-sh)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
@@ -639,6 +640,34 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         case op_scatter_32: case op_scatter_16: case op_scatter_half: {
             if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
+        } break;
+
+        case op_shr_u32_imm: {
+            int sh = inst->imm;
+            int8_t rx = ra_ensure(c, ra, sl, ns, inst->x);
+            _Bool x_dead = lu[inst->x] <= i;
+            // Fuse shr_u32_imm + i16_from_i32 into SHRN when shift fits
+            if (sh >= 1 && sh <= 16 && i+1 < to &&
+                bb->inst[i+1].op == op_i16_from_i32 &&
+                bb->inst[i+1].x == i && lu[i] == i+1)
+            {
+                int8_t rd;
+                if (x_dead) { rd = ra_claim(ra, inst->x, i+1); }
+                else {
+                    rd = ra_alloc(c, ra, sl, ns);
+                    ra->reg[i+1] = rd; ra->owner[(int)rd] = i+1;
+                }
+                put(c, SHRN_4h(rd, rx, sh));
+                i++;
+            } else {
+                int8_t rd;
+                if (x_dead) { rd = ra_claim(ra, inst->x, i); }
+                else {
+                    rd = ra_alloc(c, ra, sl, ns);
+                    ra->reg[i] = rd; ra->owner[(int)rd] = i;
+                }
+                put(c, USHR_4s_imm(rd, rx, sh));
+            }
         } break;
 
         case op_bytes: {
