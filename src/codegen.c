@@ -218,6 +218,7 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             case op_shl_i32_imm: emit(b, "%su32 v%d = (u32)(v%d << %d);\n", pad, i, inst->x, inst->imm); break;
             case op_shr_u32_imm: emit(b, "%su32 v%d = (u32)(v%d >> %d);\n", pad, i, inst->x, inst->imm); break;
             case op_shr_s32_imm: emit(b, "%su32 v%d = (u32)((s32)v%d >> %d);\n", pad, i, inst->x, inst->imm); break;
+            case op_bytes: emit(b, "%su32 v%d = bytes(v%d, 0x%x);\n", pad, i, inst->x, (uint16_t)inst->imm); break;
             BINOP(op_and_32,  "(u32)(v%d & v%d)")
             BINOP(op_or_32,   "(u32)(v%d | v%d)")
             BINOP(op_xor_32,  "(u32)(v%d ^ v%d)")
@@ -329,7 +330,11 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
     emit(&b, "typedef uint32_t u32;\ntypedef uint16_t u16;\ntypedef  int32_t s32;\ntypedef  int16_t s16;\n\n");
 
     emit(&b, "static inline u32 f2u(float f) { union{float f;u32 u;} x; x.f=f; return x.u; }\n");
-    emit(&b, "static inline float u2f(u32 u) { union{float f;u32 u;} x; x.u=u; return x.f; }\n\n");
+    emit(&b, "static inline float u2f(u32 u) { union{float f;u32 u;} x; x.u=u; return x.f; }\n");
+    emit(&b, "static inline u32 bytes(u32 x, int c) {\n");
+    emit(&b, "    unsigned char b[] = {0, x&0xff, (x>>8)&0xff, (x>>16)&0xff, (x>>24)&0xff};\n");
+    emit(&b, "    return (u32)b[c&0xf] | (u32)b[(c>>4)&0xf]<<8 | (u32)b[(c>>8)&0xf]<<16 | (u32)b[(c>>12)&0xf]<<24;\n");
+    emit(&b, "}\n\n");
 
     emit(&b, "static inline float h2f(u16 h) {\n");
     emit(&b, "    u32 sign=((u32)h>>15)<<31, exp=((u32)h>>10)&0x1f, mant=(u32)h&0x3ff;\n");

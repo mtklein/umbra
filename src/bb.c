@@ -583,6 +583,20 @@ v32 umbra_i32_from_i16(BB *bb, v16 a) {
     return (v32){math(bb, op_i32_from_i16, .x=a.id)};
 }
 
+v32 umbra_bytes(BB *bb, v32 x, int control) {
+    if (bb->inst[x.id].op == op_imm_32) {
+        uint32_t xv = (uint32_t)bb->inst[x.id].imm;
+        uint8_t b[] = {0, xv&0xff, (xv>>8)&0xff, (xv>>16)&0xff, (xv>>24)&0xff};
+        uint32_t result = (uint32_t)b[(control>> 0)&0xf] <<  0
+                        | (uint32_t)b[(control>> 4)&0xf] <<  8
+                        | (uint32_t)b[(control>> 8)&0xf] << 16
+                        | (uint32_t)b[(control>>12)&0xf] << 24;
+        return umbra_imm_32(bb, result);
+    }
+    if (control == 0x4321) { return x; }
+    return (v32){push(bb, op_bytes, .x=x.id, .imm=control)};
+}
+
 vh umbra_eq_half(BB *bb, vh a, vh b) {
     sort(&a.id, &b.id);
     return (vh){math(bb, op_eq_half, .x=a.id, .y=b.id)};
@@ -711,6 +725,7 @@ static char const* op_name(enum op op) {
         case op_le_u32:     return "le_u32";
         case op_gt_u32:     return "gt_u32";
         case op_ge_u32:     return "ge_u32";
+        case op_bytes:      return "bytes";
         case op_add_i16:    return "add_i16";
         case op_sub_i16:    return "sub_i16";
         case op_mul_i16:    return "mul_i16";
@@ -868,6 +883,9 @@ void umbra_basic_block_dump(struct umbra_basic_block const *bb, FILE *f) {
             case op_shl_i32_imm: case op_shr_u32_imm: case op_shr_s32_imm:
             case op_shl_i16_imm: case op_shr_u16_imm: case op_shr_s16_imm:
                 fprintf(f, " v%d %d", inst->x, inst->imm);
+                break;
+            case op_bytes:
+                fprintf(f, " v%d 0x%x", inst->x, (uint16_t)inst->imm);
                 break;
             case op_lane: break;
             default: {

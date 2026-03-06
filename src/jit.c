@@ -178,6 +178,13 @@ static uint32_t SHL_4h_imm (int d, int n, int sh) { return 0x0F005400u|((uint32_
 static uint32_t USHR_4h_imm(int d, int n, int sh) { return 0x2F000400u|((uint32_t)(32-sh)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
 static uint32_t SSHR_4h_imm(int d, int n, int sh) { return 0x0F000400u|((uint32_t)(32-sh)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
 
+static uint32_t TBL_16b(int d, int n, int m) { return 0x4E000000u|((uint32_t)m<<16)|((uint32_t)n<<5)|(uint32_t)d; }
+static uint32_t FMOV_d_x(int d, int n) { return 0x9E670000u|((uint32_t)n<<5)|(uint32_t)d; }
+static uint32_t INS_d(int d, int idx, int n) {
+    uint32_t imm5 = (uint32_t)(idx<<4)|8;
+    return 0x4E001C00u|(imm5<<16)|((uint32_t)n<<5)|(uint32_t)d;
+}
+
 static uint32_t MOVI_4s_0(int d) { return 0x4F000400u|(uint32_t)d; }
 static uint32_t DUP_4s_w(int d, int n)  { return 0x4E040C00u|((uint32_t)n<<5)|(uint32_t)d; }
 static uint32_t DUP_4h_w(int d, int n)  { return 0x0E020C00u|((uint32_t)n<<5)|(uint32_t)d; }
@@ -193,6 +200,12 @@ enum { XI=9, XT=10, XH=11, XW=12, XS=15 };
 static void load_imm_w(Buf *c, int rd, uint32_t v) {
     put(c, MOVZ_w(rd, (uint16_t)(v&0xffff)));
     if (v>>16) put(c, MOVK_w16(rd, (uint16_t)(v>>16)));
+}
+static void load_imm_x(Buf *c, int rd, uint64_t v) {
+    put(c, MOVZ_x(rd, (uint16_t)v));
+    if ((v>>16)&0xffff) put(c, 0xF2A00000u|((uint32_t)((v>>16)&0xffff)<<5)|(uint32_t)rd);
+    if ((v>>32)&0xffff) put(c, 0xF2C00000u|((uint32_t)((v>>32)&0xffff)<<5)|(uint32_t)rd);
+    if ((v>>48)&0xffff) put(c, 0xF2E00000u|((uint32_t)((v>>48)&0xffff)<<5)|(uint32_t)rd);
 }
 
 static void vld(Buf *c, int vd, int s) { put(c, LDR_qi(vd, XS, s)); }
@@ -327,6 +340,25 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_ge_half: put(c, FCMGE_4h(d,x,y)); return 1;
     case op_lt_half: put(c, FCMGT_4h(d,y,x)); return 1;
     case op_le_half: put(c, FCMGE_4h(d,y,x)); return 1;
+
+    case op_bytes: {
+        uint8_t tbl[16];
+        for (int lane = 0; lane < 4; lane++) {
+            for (int b = 0; b < 4; b++) {
+                int nibble = (imm >> (b*4)) & 0xf;
+                tbl[lane*4+b] = nibble ? (uint8_t)(lane*4 + nibble - 1) : 16;
+            }
+        }
+        uint64_t lo, hi;
+        __builtin_memcpy(&lo, tbl+0, 8);
+        __builtin_memcpy(&hi, tbl+8, 8);
+        load_imm_x(c, XT, lo);
+        put(c, FMOV_d_x(0, XT));
+        load_imm_x(c, XT, hi);
+        put(c, INS_d(0, 1, XT));
+        put(c, TBL_16b(d, x, 0));
+        return 1;
+    }
 
     default: return 0;
     }

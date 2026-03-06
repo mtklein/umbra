@@ -15,6 +15,7 @@ enum op {
     op_eq_i32, op_ne_i32,
     op_lt_s32, op_le_s32, op_gt_s32, op_ge_s32,
     op_lt_u32, op_le_u32, op_gt_u32, op_ge_u32,
+    op_bytes,
 
     // 16-bit ops
     op_imm_16, op_uni_16, op_load_16, op_gather_16, op_store_16, op_scatter_16,

@@ -402,6 +402,19 @@ op(le_u32) { v->i32 = (I32)(v[ip->x].u32 <= v[ip->y].u32); next; }
 op(gt_u32) { v->i32 = (I32)(v[ip->x].u32 >  v[ip->y].u32); next; }
 op(ge_u32) { v->i32 = (I32)(v[ip->x].u32 >= v[ip->y].u32); next; }
 
+op(bytes_32) {
+    int ctrl = ip->y;
+    for (int l = 0; l < K; l++) {
+        uint32_t x = v[ip->x].u32[l];
+        uint8_t b[] = {0, x&0xff, (x>>8)&0xff, (x>>16)&0xff, (x>>24)&0xff};
+        v->u32[l] = (uint32_t)b[(ctrl>> 0)&0xf] <<  0
+                  | (uint32_t)b[(ctrl>> 4)&0xf] <<  8
+                  | (uint32_t)b[(ctrl>> 8)&0xf] << 16
+                  | (uint32_t)b[(ctrl>>12)&0xf] << 24;
+    }
+    next;
+}
+
 op(done) { (void)ip; (void)v; (void)end; (void)ptr; return 0; }
 
 #undef next
@@ -454,6 +467,7 @@ static Fn const fn[] = {
     [op_half_from_i16] = half_from_i16, [op_i16_from_half] = i16_from_half,
     [op_f32_from_half] = f32_from_half, [op_i32_from_half] = i32_from_half,
     [op_i16_from_i32] = i16_from_i32, [op_i32_from_i16] = i32_from_i16,
+    [op_bytes] = bytes_32,
     [op_add_half] =  add_half, [op_sub_half] =  sub_half,
     [op_mul_half] =  mul_half, [op_div_half] =  div_half,
     [op_min_half] =  min_half, [op_max_half] =  max_half,
@@ -548,6 +562,7 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
 
                     case op_shl_i32_imm: case op_shr_u32_imm: case op_shr_s32_imm:
                     case op_shl_i16_imm: case op_shr_u16_imm: case op_shr_s16_imm:
+                    case op_bytes:
                         emit(.fn=fn[inst->op], .x=X, .y=inst->imm);
                         break;
 
