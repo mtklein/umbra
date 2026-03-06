@@ -10,6 +10,7 @@ typedef  int16_t I16 __attribute__((vector_size(K*2)));
 typedef  int32_t I32 __attribute__((vector_size(K*4)));
 typedef uint16_t U16 __attribute__((vector_size(K*2)));
 typedef uint32_t U32 __attribute__((vector_size(K*4)));
+typedef  uint8_t U8  __attribute__((vector_size(K)));
 typedef    float F32 __attribute__((vector_size(K*4)));
 
 #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) || defined(__F16C__)
@@ -17,6 +18,7 @@ typedef    float F32 __attribute__((vector_size(K*4)));
 #endif
 
 typedef union {
+    U8  u8;
     I16 i16;
     I32 i32;
     U16 u16;
@@ -414,6 +416,25 @@ op(bytes_32) {
     next;
 }
 
+op(load_8x4) {
+    uint8_t const *src = ptr[ip->x];
+    int ch = ip->y;
+    if (end & (K-1)) {
+        v->u8 = (U8){0};
+        v->u8[0] = src[(end-1)*4 + ch];
+    } else {
+        for (int l = 0; l < K; l++) {
+            v->u8[l] = src[(end-K+l)*4 + ch];
+        }
+    }
+    next;
+}
+
+op(i16_from_u8) {
+    for (int l = 0; l < K; l++) { v->u16[l] = (uint16_t)v[ip->x].u8[l]; }
+    next;
+}
+
 op(done) { (void)ip; (void)v; (void)end; (void)ptr; return 0; }
 
 #undef next
@@ -466,6 +487,9 @@ static Fn const fn[] = {
     [op_half_from_i16] = half_from_i16, [op_i16_from_half] = i16_from_half,
     [op_f32_from_half] = f32_from_half, [op_i32_from_half] = i32_from_half,
     [op_i16_from_i32] = i16_from_i32, [op_i32_from_i16] = i32_from_i16,
+    [op_i16_from_u8] = i16_from_u8,
+    [op_load_8x4_0] = load_8x4, [op_load_8x4_1] = load_8x4,
+    [op_load_8x4_2] = load_8x4, [op_load_8x4_3] = load_8x4,
     [op_bytes] = bytes_32,
     [op_add_half] =  add_half, [op_sub_half] =  sub_half,
     [op_mul_half] =  mul_half, [op_div_half] =  div_half,
@@ -558,6 +582,11 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                         emit(.fn=scatter_half, .x=inst->ptr, .y=Y, .z=X);
                     #endif
                         break;
+
+                    case op_load_8x4_0: emit(.fn=load_8x4, .x=inst->ptr, .y=0); break;
+                    case op_load_8x4_1: emit(.fn=load_8x4, .x=inst->ptr, .y=1); break;
+                    case op_load_8x4_2: emit(.fn=load_8x4, .x=inst->ptr, .y=2); break;
+                    case op_load_8x4_3: emit(.fn=load_8x4, .x=inst->ptr, .y=3); break;
 
                     case op_shl_i32_imm: case op_shr_u32_imm: case op_shr_s32_imm:
                     case op_shl_i16_imm: case op_shr_u16_imm: case op_shr_s16_imm:

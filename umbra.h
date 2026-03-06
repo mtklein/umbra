@@ -4,6 +4,7 @@ struct umbra_basic_block* umbra_basic_block(void);
 void umbra_basic_block_free(struct umbra_basic_block*);
 void umbra_basic_block_optimize(struct umbra_basic_block*);
 
+typedef struct {int id;} umbra_v8;
 typedef struct {int id;} umbra_v16;
 typedef struct {int id;} umbra_v32;
 typedef struct {int id;} umbra_half;
@@ -80,6 +81,9 @@ umbra_v16  umbra_i16_from_half(struct umbra_basic_block*, umbra_half);
 umbra_v16  umbra_i16_from_i32 (struct umbra_basic_block*, umbra_v32);
 umbra_v32  umbra_i32_from_i16 (struct umbra_basic_block*, umbra_v16);
 umbra_v32  umbra_bytes       (struct umbra_basic_block*, umbra_v32, int control);
+umbra_v16  umbra_i16_from_u8 (struct umbra_basic_block*, umbra_v8);
+
+void umbra_load_8x4(struct umbra_basic_block*, umbra_ptr src, umbra_v32 ix, umbra_v8 out[4]);
 
 umbra_v32 umbra_eq_f32(struct umbra_basic_block*, umbra_v32, umbra_v32);
 umbra_v32 umbra_ne_f32(struct umbra_basic_block*, umbra_v32, umbra_v32);

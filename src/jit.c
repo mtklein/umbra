@@ -148,6 +148,7 @@ enum {
     FCVTN_4h_=0x0E216800u, FCVTL_4s_=0x0E217800u,
     SCVTF_4h_=0x0E79D800u, FCVTZS_4h_=0x0EF9B800u,
     XTN_4h_  =0x0E612800u, SXTL_4s_  =0x0F10A400u,
+    UXTL_8h_ =0x2F08A400u,
 };
 
 V3(FADD_4s)  V3(FSUB_4s)  V3(FMUL_4s) V3(FDIV_4s)  V3(FMLA_4s)
@@ -165,7 +166,7 @@ V3(USHL_4h) V3(SSHL_4h) V2(NEG_4h)
 V3(CMEQ_4h) V3(CMGT_4h) V3(CMGE_4h) V3(CMHI_4h) V3(CMHS_4h)
 V3(AND_8b) V3(ORR_8b) V3(EOR_8b) V3(BSL_8b) V2(MVN_8b)
 V2(FCVTN_4h) V2(FCVTL_4s)
-V2(SCVTF_4h) V2(FCVTZS_4h) V2(XTN_4h) V2(SXTL_4s)
+V2(SCVTF_4h) V2(FCVTZS_4h) V2(XTN_4h) V2(SXTL_4s) V2(UXTL_8h)
 
 #undef V3
 #undef V2
@@ -267,6 +268,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_half_from_i16: put(c, SCVTF_4h(d,x)); return 1;
     case op_i16_from_half: put(c, FCVTZS_4h(d,x)); return 1;
     case op_i16_from_i32: put(c, XTN_4h(d,x)); return 1;
+    case op_i16_from_u8:  put(c, UXTL_8h(d,x)); return 1;
     case op_i32_from_i16: put(c, SXTL_4s(d,x)); return 1;
 
     case op_eq_f32: put(c, FCMEQ_4s(d,x,y)); return 1;
@@ -359,7 +361,8 @@ struct ra {
     int     bytes_ctrl[16];
     int8_t  free_stack[RA_NREGS];
     int8_t  bytes_reg[16];
-    int8_t  pad_;
+    int8_t  ld4_ctrl[4];  // NEON reg holding TBL control for channels 0-3
+    int8_t  pad_[5];
 };
 
 static struct ra* ra_create(struct umbra_basic_block const *bb) {
@@ -371,6 +374,7 @@ static struct ra* ra_create(struct umbra_basic_block const *bb) {
     for (int i = 0; i < n; i++) ra->reg[i] = -1;
     for (int i = 0; i < 32; i++) ra->owner[i] = -1;
     ra->bytes_ctrl_n = 0;
+    for (int i = 0; i < 4; i++) ra->ld4_ctrl[i] = -1;
 
     for (int i = 0; i < n; i++) ra->last_use[i] = -1;
     for (int i = 0; i < n; i++) {
@@ -459,6 +463,19 @@ static void emit_tbl_ctrl(Buf *c, int vd, int ctrl) {
     put(c, INS_d(vd, 1, XT));
 }
 
+static void emit_ld4_ctrl(Buf *c, int vd, int ch) {
+    uint8_t tbl[16];
+    for (int i = 0; i < 4; i++) tbl[i] = (uint8_t)(i*4 + ch);
+    for (int i = 4; i < 16; i++) tbl[i] = 16;
+    uint64_t lo, hi;
+    __builtin_memcpy(&lo, tbl, 8);
+    __builtin_memcpy(&hi, tbl+8, 8);
+    load_imm_x(c, XT, lo);
+    put(c, FMOV_d_x(vd, XT));
+    load_imm_x(c, XT, hi);
+    put(c, INS_d(vd, 1, XT));
+}
+
 static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                      int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar);
@@ -509,6 +526,20 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
             ra->bytes_ctrl[ra->bytes_ctrl_n] = ctrl;
             ra->bytes_reg[ra->bytes_ctrl_n] = r;
             ra->bytes_ctrl_n++;
+        }
+    }
+
+    // Pre-load LD4 TBL controls for load_8x4 ops.
+    for (int ch = 0; ch < 4; ch++) {
+        _Bool needed = 0;
+        for (int i = bb->preamble; i < bb->insts; i++) {
+            if ((int)bb->inst[i].op == (int)op_load_8x4_0 + ch) { needed = 1; break; }
+        }
+        if (needed) {
+            int8_t r = ra_alloc(&c, ra, sl, &ns);
+            ra->owner[(int)r] = -2;
+            emit_ld4_ctrl(&c, r, ch);
+            ra->ld4_ctrl[ch] = r;
         }
     }
 
@@ -640,6 +671,27 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         case op_scatter_32: case op_scatter_16: case op_scatter_half: {
             if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
+        } break;
+
+        case op_load_8x4_0: case op_load_8x4_1: case op_load_8x4_2: case op_load_8x4_3: {
+            int ch = (int)(inst->op - op_load_8x4_0);
+            int p = inst->ptr;
+            int8_t rd = ra_alloc(c, ra, sl, ns);
+            ra->reg[i] = rd; ra->owner[(int)rd] = i;
+            if (scalar) {
+                // byte offset = ix * 4 + ch
+                put(c, LSL_xi(XT, XI, 2));
+                if (ch) put(c, ADD_xi(XT, XT, ch));
+                // LDRB Wt, [Xn, Xm]
+                put(c, 0x38606800u | ((uint32_t)XT << 16) | ((uint32_t)(1+p) << 5) | (uint32_t)XT);
+                // DUP Vd.8B, Wt
+                put(c, 0x0E010C00u | ((uint32_t)XT << 5) | (uint32_t)rd);
+            } else {
+                // LDR Q0, [Xn, XW]  — load 16 bytes (4 pixels RGBA)
+                put(c, LDR_q(0, 1+p, XW));
+                // TBL Vd.16B, {V0.16B}, Vctrl.16B
+                put(c, TBL_16b(rd, 0, ra->ld4_ctrl[ch]));
+            }
         } break;
 
         case op_shr_u32_imm: {

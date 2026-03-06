@@ -86,6 +86,7 @@ static int const_eval(enum op op, int xb, int yb, int zb) {
         case op_i32_from_f32: return (int)xf;
         case op_i32_from_half: { float t = scalar_f16_to_f32(xh); return (int)t; }
         case op_i16_from_i32: return (uint16_t)xb;
+        case op_i16_from_u8:  return (uint16_t)(uint8_t)xb;
         case op_i32_from_i16: return (int32_t)(int16_t)xh;
 
 #pragma clang diagnostic push
@@ -583,6 +584,20 @@ v32 umbra_i32_from_i16(BB *bb, v16 a) {
     return (v32){math(bb, op_i32_from_i16, .x=a.id)};
 }
 
+typedef umbra_v8 v8;
+
+v16 umbra_i16_from_u8(BB *bb, v8 a) {
+    return (v16){math(bb, op_i16_from_u8, .x=a.id)};
+}
+
+void umbra_load_8x4(BB *bb, umbra_ptr src, v32 ix, v8 out[4]) {
+    (void)ix;
+    out[0] = (v8){push(bb, op_load_8x4_0, .ptr=src.ix)};
+    out[1] = (v8){push(bb, op_load_8x4_1, .ptr=src.ix)};
+    out[2] = (v8){push(bb, op_load_8x4_2, .ptr=src.ix)};
+    out[3] = (v8){push(bb, op_load_8x4_3, .ptr=src.ix)};
+}
+
 v32 umbra_bytes(BB *bb, v32 x, int control) {
     if (bb->inst[x.id].op == op_imm_32) {
         uint32_t xv = (uint32_t)bb->inst[x.id].imm;
@@ -726,6 +741,10 @@ static char const* op_name(enum op op) {
         case op_gt_u32:     return "gt_u32";
         case op_ge_u32:     return "ge_u32";
         case op_bytes:      return "bytes";
+        case op_load_8x4_0: return "load_8x4_0";
+        case op_load_8x4_1: return "load_8x4_1";
+        case op_load_8x4_2: return "load_8x4_2";
+        case op_load_8x4_3: return "load_8x4_3";
         case op_add_i16:    return "add_i16";
         case op_sub_i16:    return "sub_i16";
         case op_mul_i16:    return "mul_i16";
@@ -740,6 +759,7 @@ static char const* op_name(enum op op) {
         case op_xor_16:     return "xor_16";
         case op_sel_16:     return "sel_16";
         case op_i16_from_i32: return "i16_from_i32";
+        case op_i16_from_u8:  return "i16_from_u8";
         case op_eq_i16:     return "eq_i16";
         case op_ne_i16:     return "ne_i16";
         case op_lt_s16:     return "lt_s16";
@@ -877,6 +897,7 @@ void umbra_basic_block_dump(struct umbra_basic_block const *bb, FILE *f) {
             case op_gather_32: case op_gather_16: case op_gather_half:
                 fprintf(f, " p%d v%d", inst->ptr, inst->x);
                 break;
+            case op_load_8x4_0: case op_load_8x4_1: case op_load_8x4_2: case op_load_8x4_3:
             case op_load_32: case op_load_16: case op_load_half:
                 fprintf(f, " p%d", inst->ptr);
                 break;

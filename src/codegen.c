@@ -294,6 +294,15 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                      pad, i, inst->x, inst->y, inst->z);
                 break;
 
+            case op_load_8x4_0: case op_load_8x4_1: case op_load_8x4_2: case op_load_8x4_3: {
+                int ch = (int)(inst->op - op_load_8x4_0);
+                int p = inst->ptr;
+                emit(b, "%su16 v%d = ((unsigned char*)a%d)[i*4+%d];\n", pad, i, p, ch);
+            } break;
+            case op_i16_from_u8:
+                emit(b, "%su16 v%d = (u16)v%d;\n", pad, i, inst->x);
+                break;
+
             case op_store_half: case op_scatter_half: break;
             case op_uni_half: case op_load_half: case op_gather_half: break;
             default: break;
@@ -317,8 +326,8 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
         enum op op = bb->inst[i].op;
         if (has_ptr(op)) {
             int p = bb->inst[i].ptr;
-            if (op_type(op) == OP_32) { ptr_32[p] = 1; }
-            else                      { ptr_16[p] = 1; }
+            if (op_type(op) == OP_32)      { ptr_32[p] = 1; }
+            else if (op_type(op) != OP_8)  { ptr_16[p] = 1; }
         }
     }
 

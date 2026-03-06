@@ -1250,6 +1250,34 @@ static void test_bytes(void) {
   }
 }
 
+static void test_load_8x4(void) {
+  for (int opt = 0; opt < 2; opt++) {
+    struct umbra_basic_block *bb = umbra_basic_block();
+    umbra_v32 ix = umbra_lane(bb);
+    umbra_v8 ch[4];
+    umbra_load_8x4(bb, (umbra_ptr){0}, ix, ch);
+    umbra_v16 r = umbra_i16_from_u8(bb, ch[0]),
+              g = umbra_i16_from_u8(bb, ch[1]),
+              b = umbra_i16_from_u8(bb, ch[2]),
+              a = umbra_i16_from_u8(bb, ch[3]);
+    umbra_store_16(bb, (umbra_ptr){1}, ix, r);
+    umbra_store_16(bb, (umbra_ptr){2}, ix, g);
+    umbra_store_16(bb, (umbra_ptr){3}, ix, b);
+    umbra_store_16(bb, (umbra_ptr){4}, ix, a);
+    backends B = make(bb, opt);
+    for (int bi = 0; bi < 3; bi++) {
+        uint32_t src[] = {0xAABBCCDD, 0x11223344, 0xFF00FF00};
+        int16_t rr[3]={0}, gg[3]={0}, bb_[3]={0}, aa[3]={0};
+        if (!run(&B, bi,3, src, rr, gg, bb_, aa, 0)) continue;
+        // RGBA: byte 0=R, 1=G, 2=B, 3=A  (little-endian: 0xAABBCCDD → R=DD, G=CC, B=BB, A=AA)
+        (rr[0] == 0xDD) here; (gg[0] == 0xCC) here; (bb_[0] == 0xBB) here; (aa[0] == 0xAA) here;
+        (rr[1] == 0x44) here; (gg[1] == 0x33) here; (bb_[1] == 0x22) here; (aa[1] == 0x11) here;
+        (rr[2] == 0x00) here; (gg[2] == 0xFF) here; (bb_[2] == 0x00) here; (aa[2] == 0xFF) here;
+    }
+    cleanup(&B);
+  }
+}
+
 static void test_srcover(void) {
   for (int opt = 0; opt < 2; opt++) {
     struct umbra_basic_block *bb = build_srcover();
@@ -1316,6 +1344,7 @@ int main(void) {
     test_strength_reduction();
     test_zero_imm();
     test_bytes();
+    test_load_8x4();
     test_srcover();
     test_hash_quality();
     return 0;

@@ -1,42 +1,37 @@
   v0   = imm_32          0x0
   v1   = lane           
-  v2   = load_32         p0
-  v3   = imm_half        0x1c04
-  v4   = imm_32          0xff00ff
-  v5   = and_32          v2 v4
-  v6   = imm_32          0x8
-  v7   = shr_u32_imm     v2 8
-  v8   = and_32          v4 v7
-  v9   = i16_from_i32    v5
-  v10  = half_from_i16   v9
-  v11  = mul_half        v3 v10
-  v12  = i16_from_i32    v8
-  v13  = half_from_i16   v12
-  v14  = mul_half        v3 v13
-  v15  = imm_32          0x10
-  v16  = shr_u32_imm     v5 16
-  v17  = i16_from_i32    v16
-  v18  = half_from_i16   v17
-  v19  = mul_half        v3 v18
-  v20  = shr_u32_imm     v8 16
-  v21  = i16_from_i32    v20
-  v22  = half_from_i16   v21
-  v23  = mul_half        v3 v22
-  v24  = load_half       p1
-  v25  = load_half       p2
-  v26  = load_half       p3
-  v27  = load_half       p4
-  v28  = imm_half        0x3c00
-  v29  = sub_half        v28 v23
-  v30  = mul_half        v24 v29
-  v31  = fma_half        v3 v10 v30
-  v32  = mul_half        v25 v29
-  v33  = fma_half        v3 v13 v32
-  v34  = mul_half        v26 v29
-  v35  = fma_half        v3 v18 v34
-  v36  = mul_half        v27 v29
-  v37  = fma_half        v3 v22 v36
-      store_half      p1 v31
-      store_half      p2 v33
-      store_half      p3 v35
-      store_half      p4 v37
+  v2   = load_8x4_0      p0
+  v3   = load_8x4_1      p0
+  v4   = load_8x4_2      p0
+  v5   = load_8x4_3      p0
+  v6   = imm_half        0x1c04
+  v7   = i16_from_u8     v2
+  v8   = half_from_i16   v7
+  v9   = mul_half        v6 v8
+  v10  = i16_from_u8     v3
+  v11  = half_from_i16   v10
+  v12  = mul_half        v6 v11
+  v13  = i16_from_u8     v4
+  v14  = half_from_i16   v13
+  v15  = mul_half        v6 v14
+  v16  = i16_from_u8     v5
+  v17  = half_from_i16   v16
+  v18  = mul_half        v6 v17
+  v19  = load_half       p1
+  v20  = load_half       p2
+  v21  = load_half       p3
+  v22  = load_half       p4
+  v23  = imm_half        0x3c00
+  v24  = sub_half        v23 v18
+  v25  = mul_half        v19 v24
+  v26  = fma_half        v6 v8 v25
+  v27  = mul_half        v20 v24
+  v28  = fma_half        v6 v11 v27
+  v29  = mul_half        v21 v24
+  v30  = fma_half        v6 v14 v29
+  v31  = mul_half        v22 v24
+  v32  = fma_half        v6 v17 v31
+      store_half      p1 v26
+      store_half      p2 v28
+      store_half      p3 v30
+      store_half      p4 v32
