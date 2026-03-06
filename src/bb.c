@@ -432,27 +432,33 @@ v16 umbra_mul_i16(BB *bb, v16 a, v16 b) {
 
 v32 umbra_shl_i32(BB *bb, v32 a, v32 b) {
     if (is_imm32(bb, b.id, 0)) { return a; }
+    if (is_imm(bb, b.id)) return (v32){push(bb, op_shl_i32_imm, .x=a.id, .imm=bb->inst[b.id].imm)};
     return (v32){math(bb, op_shl_i32, .x=a.id, .y=b.id)};
 }
 v32 umbra_shr_u32(BB *bb, v32 a, v32 b) {
     if (is_imm32(bb, b.id, 0)) { return a; }
+    if (is_imm(bb, b.id)) return (v32){push(bb, op_shr_u32_imm, .x=a.id, .imm=bb->inst[b.id].imm)};
     return (v32){math(bb, op_shr_u32, .x=a.id, .y=b.id)};
 }
 v32 umbra_shr_s32(BB *bb, v32 a, v32 b) {
     if (is_imm32(bb, b.id, 0)) { return a; }
+    if (is_imm(bb, b.id)) return (v32){push(bb, op_shr_s32_imm, .x=a.id, .imm=bb->inst[b.id].imm)};
     return (v32){math(bb, op_shr_s32, .x=a.id, .y=b.id)};
 }
 
 v16 umbra_shl_i16(BB *bb, v16 a, v16 b) {
     if (is_imm16(bb, b.id, 0)) { return a; }
+    if (is_imm(bb, b.id)) return (v16){push(bb, op_shl_i16_imm, .x=a.id, .imm=bb->inst[b.id].imm)};
     return (v16){math(bb, op_shl_i16, .x=a.id, .y=b.id)};
 }
 v16 umbra_shr_u16(BB *bb, v16 a, v16 b) {
     if (is_imm16(bb, b.id, 0)) { return a; }
+    if (is_imm(bb, b.id)) return (v16){push(bb, op_shr_u16_imm, .x=a.id, .imm=bb->inst[b.id].imm)};
     return (v16){math(bb, op_shr_u16, .x=a.id, .y=b.id)};
 }
 v16 umbra_shr_s16(BB *bb, v16 a, v16 b) {
     if (is_imm16(bb, b.id, 0)) { return a; }
+    if (is_imm(bb, b.id)) return (v16){push(bb, op_shr_s16_imm, .x=a.id, .imm=bb->inst[b.id].imm)};
     return (v16){math(bb, op_shr_s16, .x=a.id, .y=b.id)};
 }
 
@@ -670,9 +676,12 @@ static char const* op_name(enum op op) {
         case op_add_i32:    return "add_i32";
         case op_sub_i32:    return "sub_i32";
         case op_mul_i32:    return "mul_i32";
-        case op_shl_i32:    return "shl_i32";
-        case op_shr_u32:    return "shr_u32";
-        case op_shr_s32:    return "shr_s32";
+        case op_shl_i32:     return "shl_i32";
+        case op_shr_u32:     return "shr_u32";
+        case op_shr_s32:     return "shr_s32";
+        case op_shl_i32_imm: return "shl_i32_imm";
+        case op_shr_u32_imm: return "shr_u32_imm";
+        case op_shr_s32_imm: return "shr_s32_imm";
         case op_and_32:     return "and_32";
         case op_or_32:      return "or_32";
         case op_xor_32:     return "xor_32";
@@ -705,9 +714,12 @@ static char const* op_name(enum op op) {
         case op_add_i16:    return "add_i16";
         case op_sub_i16:    return "sub_i16";
         case op_mul_i16:    return "mul_i16";
-        case op_shl_i16:    return "shl_i16";
-        case op_shr_u16:    return "shr_u16";
-        case op_shr_s16:    return "shr_s16";
+        case op_shl_i16:     return "shl_i16";
+        case op_shr_u16:     return "shr_u16";
+        case op_shr_s16:     return "shr_s16";
+        case op_shl_i16_imm: return "shl_i16_imm";
+        case op_shr_u16_imm: return "shr_u16_imm";
+        case op_shr_s16_imm: return "shr_s16_imm";
         case op_and_16:     return "and_16";
         case op_or_16:      return "or_16";
         case op_xor_16:     return "xor_16";
@@ -852,6 +864,10 @@ void umbra_basic_block_dump(struct umbra_basic_block const *bb, FILE *f) {
                 break;
             case op_load_32: case op_load_16: case op_load_half:
                 fprintf(f, " p%d", inst->ptr);
+                break;
+            case op_shl_i32_imm: case op_shr_u32_imm: case op_shr_s32_imm:
+            case op_shl_i16_imm: case op_shr_u16_imm: case op_shr_s16_imm:
+                fprintf(f, " v%d %d", inst->x, inst->imm);
                 break;
             case op_lane: break;
             default: {

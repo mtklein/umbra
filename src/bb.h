@@ -8,7 +8,7 @@ enum op {
     op_add_f32, op_sub_f32, op_mul_f32, op_div_f32,
     op_min_f32, op_max_f32, op_sqrt_f32, op_fma_f32,
     op_add_i32, op_sub_i32, op_mul_i32,
-    op_shl_i32, op_shr_u32, op_shr_s32,
+    op_shl_i32, op_shr_u32, op_shr_s32, op_shl_i32_imm, op_shr_u32_imm, op_shr_s32_imm,
     op_and_32, op_or_32, op_xor_32, op_sel_32,
     op_f32_from_i32, op_i32_from_f32, op_f32_from_half, op_i32_from_half, op_i32_from_i16,
     op_eq_f32, op_ne_f32, op_lt_f32, op_le_f32, op_gt_f32, op_ge_f32,
@@ -19,7 +19,7 @@ enum op {
     // 16-bit ops
     op_imm_16, op_uni_16, op_load_16, op_gather_16, op_store_16, op_scatter_16,
     op_add_i16, op_sub_i16, op_mul_i16,
-    op_shl_i16, op_shr_u16, op_shr_s16,
+    op_shl_i16, op_shr_u16, op_shr_s16, op_shl_i16_imm, op_shr_u16_imm, op_shr_s16_imm,
     op_and_16, op_or_16, op_xor_16, op_sel_16,
     op_i16_from_i32,
     op_eq_i16, op_ne_i16,

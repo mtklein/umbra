@@ -214,6 +214,10 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             BINOP(op_shl_i32, "(u32)(v%d << v%d)")
             BINOP(op_shr_u32, "(u32)(v%d >> v%d)")
             BINOP(op_shr_s32, "(u32)((s32)v%d >> (s32)v%d)")
+
+            case op_shl_i32_imm: emit(b, "%su32 v%d = (u32)(v%d << %d);\n", pad, i, inst->x, inst->imm); break;
+            case op_shr_u32_imm: emit(b, "%su32 v%d = (u32)(v%d >> %d);\n", pad, i, inst->x, inst->imm); break;
+            case op_shr_s32_imm: emit(b, "%su32 v%d = (u32)((s32)v%d >> %d);\n", pad, i, inst->x, inst->imm); break;
             BINOP(op_and_32,  "(u32)(v%d & v%d)")
             BINOP(op_or_32,   "(u32)(v%d | v%d)")
             BINOP(op_xor_32,  "(u32)(v%d ^ v%d)")
@@ -224,6 +228,10 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             BINOP(op_shl_i16, "(u16)(v%d << v%d)")
             BINOP(op_shr_u16, "(u16)(v%d >> v%d)")
             BINOP(op_shr_s16, "(u16)((s16)v%d >> (s16)v%d)")
+
+            case op_shl_i16_imm: emit(b, "%su16 v%d = (u16)(v%d << %d);\n", pad, i, inst->x, inst->imm); break;
+            case op_shr_u16_imm: emit(b, "%su16 v%d = (u16)(v%d >> %d);\n", pad, i, inst->x, inst->imm); break;
+            case op_shr_s16_imm: emit(b, "%su16 v%d = (u16)((s16)v%d >> %d);\n", pad, i, inst->x, inst->imm); break;
             BINOP(op_and_16,  "(u16)(v%d & v%d)")
             BINOP(op_or_16,   "(u16)(v%d | v%d)")
             BINOP(op_xor_16,  "(u16)(v%d ^ v%d)")

@@ -170,6 +170,14 @@ V2(SCVTF_4h) V2(FCVTZS_4h) V2(XTN_4h) V2(SXTL_4s)
 #undef V3
 #undef V2
 
+// Shift-by-immediate: immh:immb at bits 22:16
+static uint32_t SHL_4s_imm (int d, int n, int sh) { return 0x4F005400u|((uint32_t)(sh+32)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
+static uint32_t USHR_4s_imm(int d, int n, int sh) { return 0x6F000400u|((uint32_t)(64-sh)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
+static uint32_t SSHR_4s_imm(int d, int n, int sh) { return 0x4F000400u|((uint32_t)(64-sh)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
+static uint32_t SHL_4h_imm (int d, int n, int sh) { return 0x0F005400u|((uint32_t)(sh+16)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
+static uint32_t USHR_4h_imm(int d, int n, int sh) { return 0x2F000400u|((uint32_t)(32-sh)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
+static uint32_t SSHR_4h_imm(int d, int n, int sh) { return 0x0F000400u|((uint32_t)(32-sh)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
+
 static uint32_t MOVI_4s_0(int d) { return 0x4F000400u|(uint32_t)d; }
 static uint32_t DUP_4s_w(int d, int n)  { return 0x4E040C00u|((uint32_t)n<<5)|(uint32_t)d; }
 static uint32_t DUP_4h_w(int d, int n)  { return 0x0E020C00u|((uint32_t)n<<5)|(uint32_t)d; }
@@ -223,6 +231,9 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_shl_i32: put(c, USHL_4s(d,x,y)); return 1;
     case op_shr_u32: put(c, NEG_4s(0,y)); put(c, USHL_4s(d,x,0)); return 1;
     case op_shr_s32: put(c, NEG_4s(0,y)); put(c, SSHL_4s(d,x,0)); return 1;
+    case op_shl_i32_imm: put(c, SHL_4s_imm(d,x,imm)); return 1;
+    case op_shr_u32_imm: put(c, USHR_4s_imm(d,x,imm)); return 1;
+    case op_shr_s32_imm: put(c, SSHR_4s_imm(d,x,imm)); return 1;
 
     case op_and_32: put(c, AND_16b(d,x,y)); return 1;
     case op_or_32:  put(c, ORR_16b(d,x,y)); return 1;
@@ -268,6 +279,9 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_shl_i16: put(c, USHL_4h(d,x,y)); return 1;
     case op_shr_u16: put(c, NEG_4h(0,y)); put(c, USHL_4h(d,x,0)); return 1;
     case op_shr_s16: put(c, NEG_4h(0,y)); put(c, SSHL_4h(d,x,0)); return 1;
+    case op_shl_i16_imm: put(c, SHL_4h_imm(d,x,imm)); return 1;
+    case op_shr_u16_imm: put(c, USHR_4h_imm(d,x,imm)); return 1;
+    case op_shr_s16_imm: put(c, SSHR_4h_imm(d,x,imm)); return 1;
     case op_and_16: put(c, AND_8b(d,x,y)); return 1;
     case op_or_16:  put(c, ORR_8b(d,x,y)); return 1;
     case op_xor_16: put(c, EOR_8b(d,x,y)); return 1;

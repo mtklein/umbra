@@ -350,6 +350,9 @@ op(mul_i16) { v->i16 = v[ip->x].i16 *  v[ip->y].i16; next; }
 op(shl_i16) { v->i16 = v[ip->x].i16 << v[ip->y].i16; next; }
 op(shr_u16) { v->u16 = v[ip->x].u16 >> v[ip->y].u16; next; }
 op(shr_s16) { v->i16 = v[ip->x].i16 >> v[ip->y].i16; next; }
+op(shl_i16_imm) { v->u16 = v[ip->x].u16 << (unsigned)ip->y; next; }
+op(shr_u16_imm) { v->u16 = v[ip->x].u16 >> (unsigned)ip->y; next; }
+op(shr_s16_imm) { v->i16 = v[ip->x].i16 >> ip->y; next; }
 op(and_16)  { v->i16 = v[ip->x].i16 &  v[ip->y].i16; next; }
 op( or_16)  { v->i16 = v[ip->x].i16 |  v[ip->y].i16; next; }
 op(xor_16)  { v->i16 = v[ip->x].i16 ^  v[ip->y].i16; next; }
@@ -376,6 +379,9 @@ op(mul_i32) { v->i32 = v[ip->x].i32 *  v[ip->y].i32; next; }
 op(shl_i32) { v->i32 = v[ip->x].i32 << v[ip->y].i32; next; }
 op(shr_u32) { v->u32 = v[ip->x].u32 >> v[ip->y].u32; next; }
 op(shr_s32) { v->i32 = v[ip->x].i32 >> v[ip->y].i32; next; }
+op(shl_i32_imm) { v->u32 = v[ip->x].u32 << (unsigned)ip->y; next; }
+op(shr_u32_imm) { v->u32 = v[ip->x].u32 >> (unsigned)ip->y; next; }
+op(shr_s32_imm) { v->i32 = v[ip->x].i32 >> ip->y; next; }
 op(and_32)  { v->i32 = v[ip->x].i32 &  v[ip->y].i32; next; }
 op( or_32)  { v->i32 = v[ip->x].i32 |  v[ip->y].i32; next; }
 op(xor_32)  { v->i32 = v[ip->x].i32 ^  v[ip->y].i32; next; }
@@ -411,6 +417,8 @@ static Fn const fn[] = {
     [op_mul_i16] = mul_i16,
     [op_shl_i16] = shl_i16, [op_shr_u16] = shr_u16,
     [op_shr_s16] = shr_s16,
+    [op_shl_i16_imm] = shl_i16_imm, [op_shr_u16_imm] = shr_u16_imm,
+    [op_shr_s16_imm] = shr_s16_imm,
     [op_and_16] = and_16, [op_or_16]  =  or_16,
     [op_xor_16] = xor_16, [op_sel_16] = sel_16,
 
@@ -418,6 +426,8 @@ static Fn const fn[] = {
     [op_mul_i32] = mul_i32,
     [op_shl_i32] = shl_i32, [op_shr_u32] = shr_u32,
     [op_shr_s32] = shr_s32,
+    [op_shl_i32_imm] = shl_i32_imm, [op_shr_u32_imm] = shr_u32_imm,
+    [op_shr_s32_imm] = shr_s32_imm,
     [op_and_32] = and_32, [op_or_32]  =  or_32,
     [op_xor_32] = xor_32, [op_sel_32] = sel_32,
 
@@ -534,6 +544,11 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                     #else
                         emit(.fn=scatter_half, .x=inst->ptr, .y=Y, .z=X);
                     #endif
+                        break;
+
+                    case op_shl_i32_imm: case op_shr_u32_imm: case op_shr_s32_imm:
+                    case op_shl_i16_imm: case op_shr_u16_imm: case op_shr_s16_imm:
+                        emit(.fn=fn[inst->op], .x=X, .y=inst->imm);
                         break;
 
                     case op_half_from_f32:
