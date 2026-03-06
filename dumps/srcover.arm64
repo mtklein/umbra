@@ -11,7 +11,8 @@ Disassembly of section __TEXT,__text:
                	mov	w10, #0x1c04            ; =7172
                	dup.4h	v2, w10
                	mov	w10, #0xff              ; =255
-               	dup.4h	v3, w10
+               	movk	w10, #0xff, lsl #16
+               	dup.4s	v3, w10
                	mov	w10, #0x3c00            ; =15360
                	dup.4h	v4, w10
                	mov	x9, #0x0                ; =0
@@ -21,71 +22,69 @@ Disassembly of section __TEXT,__text:
                	lsl	x11, x9, #1
                	lsl	x12, x9, #2
                	ldr	q5, [x1, x12]
-               	xtn.4h	v6, v5
-               	and.8b	v6, v3, v6
-               	scvtf.4h	v6, v6
-               	ldr	d7, [x2, x11]
-               	ushr.4s	v16, v5, #0x18
-               	xtn.4h	v16, v16
-               	scvtf.4h	v16, v16
-               	fmul.4h	v17, v2, v16
-               	fsub.4h	v17, v4, v17
-               	fmul.4h	v7, v7, v17
-               	fmla.4h	v7, v2, v6
-               	str	d7, [x2, x11]
-               	shrn.4h	v7, v5, #0x8
-               	and.8b	v7, v3, v7
+               	and.16b	v6, v5, v3
+               	xtn.4h	v7, v6
                	scvtf.4h	v7, v7
-               	ldr	d6, [x3, x11]
-               	fmul.4h	v6, v6, v17
-               	fmla.4h	v6, v2, v7
-               	str	d6, [x3, x11]
-               	shrn.4h	v5, v5, #0x10
-               	and.8b	v5, v3, v5
-               	scvtf.4h	v5, v5
-               	ldr	d6, [x4, x11]
-               	fmul.4h	v6, v6, v17
-               	fmla.4h	v6, v2, v5
-               	str	d6, [x4, x11]
-               	ldr	d6, [x5, x11]
-               	fmul.4h	v6, v6, v17
-               	fmla.4h	v6, v2, v16
-               	str	d6, [x5, x11]
-               	add	x9, x9, #0x4
-               	b	0x30 <ltmp0+0x30>
-               	cmp	x0, x9
-               	b.le	0x154 <ltmp0+0x154>
-               	ldr	s6, [x1, x9, lsl #2]
-               	xtn.4h	v16, v6
-               	and.8b	v16, v3, v16
-               	scvtf.4h	v16, v16
-               	ldr	h17, [x2, x9, lsl #1]
-               	ushr.4s	v5, v6, #0x18
+               	ldr	d16, [x2, x11]
+               	ushr.4s	v5, v5, #0x8
+               	and.16b	v5, v3, v5
+               	shrn.4h	v17, v5, #0x10
+               	scvtf.4h	v17, v17
+               	fmul.4h	v18, v2, v17
+               	fsub.4h	v18, v4, v18
+               	fmul.4h	v16, v16, v18
+               	fmla.4h	v16, v2, v7
+               	str	d16, [x2, x11]
                	xtn.4h	v5, v5
+               	scvtf.4h	v5, v5
+               	ldr	d16, [x3, x11]
+               	fmul.4h	v16, v16, v18
+               	fmla.4h	v16, v2, v5
+               	str	d16, [x3, x11]
+               	shrn.4h	v6, v6, #0x10
+               	scvtf.4h	v6, v6
+               	ldr	d16, [x4, x11]
+               	fmul.4h	v16, v16, v18
+               	fmla.4h	v16, v2, v6
+               	str	d16, [x4, x11]
+               	ldr	d16, [x5, x11]
+               	fmul.4h	v16, v16, v18
+               	fmla.4h	v16, v2, v17
+               	str	d16, [x5, x11]
+               	add	x9, x9, #0x4
+               	b	0x34 <ltmp0+0x34>
+               	cmp	x0, x9
+               	b.le	0x150 <ltmp0+0x150>
+               	ldr	s16, [x1, x9, lsl #2]
+               	and.16b	v17, v16, v3
+               	xtn.4h	v18, v17
+               	scvtf.4h	v18, v18
+               	ldr	h6, [x2, x9, lsl #1]
+               	ushr.4s	v16, v16, #0x8
+               	and.16b	v16, v3, v16
+               	shrn.4h	v5, v16, #0x10
                	scvtf.4h	v5, v5
                	fmul.4h	v7, v2, v5
                	fsub.4h	v7, v4, v7
-               	fmul.4h	v17, v17, v7
-               	fmla.4h	v17, v2, v16
-               	str	h17, [x2, x9, lsl #1]
-               	shrn.4h	v17, v6, #0x8
-               	and.8b	v17, v3, v17
+               	fmul.4h	v6, v6, v7
+               	fmla.4h	v6, v2, v18
+               	str	h6, [x2, x9, lsl #1]
+               	xtn.4h	v16, v16
+               	scvtf.4h	v16, v16
+               	ldr	h6, [x3, x9, lsl #1]
+               	fmul.4h	v6, v6, v7
+               	fmla.4h	v6, v2, v16
+               	str	h6, [x3, x9, lsl #1]
+               	shrn.4h	v17, v17, #0x10
                	scvtf.4h	v17, v17
-               	ldr	h16, [x3, x9, lsl #1]
-               	fmul.4h	v16, v16, v7
-               	fmla.4h	v16, v2, v17
-               	str	h16, [x3, x9, lsl #1]
-               	shrn.4h	v6, v6, #0x10
-               	and.8b	v6, v3, v6
-               	scvtf.4h	v6, v6
-               	ldr	h16, [x4, x9, lsl #1]
-               	fmul.4h	v16, v16, v7
-               	fmla.4h	v16, v2, v6
-               	str	h16, [x4, x9, lsl #1]
-               	ldr	h16, [x5, x9, lsl #1]
-               	fmul.4h	v16, v16, v7
-               	fmla.4h	v16, v2, v5
-               	str	h16, [x5, x9, lsl #1]
+               	ldr	h6, [x4, x9, lsl #1]
+               	fmul.4h	v6, v6, v7
+               	fmla.4h	v6, v2, v17
+               	str	h6, [x4, x9, lsl #1]
+               	ldr	h6, [x5, x9, lsl #1]
+               	fmul.4h	v6, v6, v7
+               	fmla.4h	v6, v2, v5
+               	str	h6, [x5, x9, lsl #1]
                	add	x9, x9, #0x1
                	b	0xc8 <ltmp0+0xc8>
                	mov	sp, x29

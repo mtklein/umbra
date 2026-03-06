@@ -1,37 +1,36 @@
   v0   = imm_32          0x0
   v1   = imm_half        0x1c04
-  v2   = imm_16          0xff
+  v2   = imm_32          0xff00ff
   v3   = imm_half        0x3c00
   v4   = load_32         p0
-  v5   = i16_from_i32    v4
-  v6   = and_16          v2 v5
+  v5   = and_32          v4 v2
+  v6   = i16_from_i32    v5
   v7   = half_from_i16   v6
   v8   = load_half       p1
-  v9   = shr_u32_imm     v4 24
-  v10  = i16_from_i32    v9
-  v11  = half_from_i16   v10
-  v12  = mul_half        v1 v11
-  v13  = sub_half        v3 v12
-  v14  = mul_half        v8 v13
-  v15  = fma_half        v1 v7 v14
-      store_half      p1 v15
-  v17  = shr_u32_imm     v4 8
-  v18  = i16_from_i32    v17
-  v19  = and_16          v2 v18
+  v9   = shr_u32_imm     v4 8
+  v10  = and_32          v2 v9
+  v11  = shr_u32_imm     v10 16
+  v12  = i16_from_i32    v11
+  v13  = half_from_i16   v12
+  v14  = mul_half        v1 v13
+  v15  = sub_half        v3 v14
+  v16  = mul_half        v8 v15
+  v17  = fma_half        v1 v7 v16
+      store_half      p1 v17
+  v19  = i16_from_i32    v10
   v20  = half_from_i16   v19
   v21  = load_half       p2
-  v22  = mul_half        v21 v13
+  v22  = mul_half        v21 v15
   v23  = fma_half        v1 v20 v22
       store_half      p2 v23
-  v25  = shr_u32_imm     v4 16
+  v25  = shr_u32_imm     v5 16
   v26  = i16_from_i32    v25
-  v27  = and_16          v2 v26
-  v28  = half_from_i16   v27
-  v29  = load_half       p3
-  v30  = mul_half        v29 v13
-  v31  = fma_half        v1 v28 v30
-      store_half      p3 v31
-  v33  = load_half       p4
-  v34  = mul_half        v33 v13
-  v35  = fma_half        v1 v11 v34
-      store_half      p4 v35
+  v27  = half_from_i16   v26
+  v28  = load_half       p3
+  v29  = mul_half        v28 v15
+  v30  = fma_half        v1 v27 v29
+      store_half      p3 v30
+  v32  = load_half       p4
+  v33  = mul_half        v32 v15
+  v34  = fma_half        v1 v13 v33
+      store_half      p4 v34
