@@ -33,7 +33,7 @@ struct interp_inst;
 typedef int (*Fn)(struct interp_inst const *ip, val *v, int end, void* ptr[]);
 struct interp_inst {
     Fn  fn;
-    int x,y,z,:32;
+    int x,y,z,w;
 };
 
 struct umbra_interpreter {
@@ -425,14 +425,13 @@ op(load_8x4) {
             v[ch].u8[0] = px[ch];
         }
     } else {
-        uint8_t buf[K*4];
-        __builtin_memcpy(buf, src + (end-K)*4, K*4);
-        for (int l = 0; l < K; l++) {
-            v[0].u8[l] = buf[l*4+0];
-            v[1].u8[l] = buf[l*4+1];
-            v[2].u8[l] = buf[l*4+2];
-            v[3].u8[l] = buf[l*4+3];
-        }
+        typedef uint8_t B32 __attribute__((vector_size(32)));
+        B32 all;
+        __builtin_memcpy(&all, src + (end-K)*4, 32);
+        v[0].u8 = __builtin_shufflevector(all, all,  0, 4, 8,12,16,20,24,28);
+        v[1].u8 = __builtin_shufflevector(all, all,  1, 5, 9,13,17,21,25,29);
+        v[2].u8 = __builtin_shufflevector(all, all,  2, 6,10,14,18,22,26,30);
+        v[3].u8 = __builtin_shufflevector(all, all,  3, 7,11,15,19,23,27,31);
     }
     return ip[4].fn(ip+4, v+4, end, ptr);
 }
@@ -449,15 +448,25 @@ op(u8_from_i16) {
 
 op(store_8x4) {
     uint8_t *dst = ptr[ip->x];
-    int ch = ip->z;
+    U8 r = v[ip->y].u8, g = v[ip->z].u8, b = v[ip->w].u8, a = v[(int)ip[1].x].u8;
     if (end & (K-1)) {
-        dst[(end-1)*4 + ch] = v[ip->y].u8[0];
+        dst[(end-1)*4+0] = r[0];
+        dst[(end-1)*4+1] = g[0];
+        dst[(end-1)*4+2] = b[0];
+        dst[(end-1)*4+3] = a[0];
     } else {
-        for (int l = 0; l < K; l++) {
-            dst[(end-K+l)*4 + ch] = v[ip->y].u8[l];
-        }
+        // Interleave: rg = r0 g0 r1 g1 ..., ba = b0 a0 b1 a1 ...
+        typedef uint8_t B16 __attribute__((vector_size(16)));
+        B16 rg = __builtin_shufflevector(r, g, 0,8, 1,9, 2,10, 3,11, 4,12, 5,13, 6,14, 7,15);
+        B16 ba = __builtin_shufflevector(b, a, 0,8, 1,9, 2,10, 3,11, 4,12, 5,13, 6,14, 7,15);
+        // Final interleave: rgba = r0 g0 b0 a0 r1 g1 b1 a1 ...
+        typedef uint8_t B32 __attribute__((vector_size(32)));
+        B32 rgba = __builtin_shufflevector(rg, ba,
+             0,16, 1,17,  2,18, 3,19,  4,20, 5,21,  6,22, 7,23,
+             8,24, 9,25, 10,26,11,27, 12,28,13,29, 14,30,15,31);
+        __builtin_memcpy(dst + (end-K)*4, &rgba, 32);
     }
-    next;
+    return ip[2].fn(ip+2, v+2, end, ptr);
 }
 
 op(done) { (void)ip; (void)v; (void)end; (void)ptr; return 0; }
@@ -533,7 +542,7 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
     struct umbra_interpreter *p = malloc(sizeof *p);
     int num_insts = bb->insts + 1;  // +1 for trailing done sentinel
     for (int i = 0; i < bb->insts; i++) {
-        if (bb->inst[i].op == op_store_8x4) num_insts += 3;  // expands to 4 interp insts
+        if (bb->inst[i].op == op_store_8x4) num_insts += 1;  // uses 2 slots (inst + overflow)
 #if !defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
         if (bb->inst[i].op == op_half_from_f32 || bb->inst[i].op == op_f32_from_half) num_insts--;
 #endif
@@ -628,14 +637,15 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                     }
 
                     case op_store_8x4: {
-                        int const inputs[] = {inst->x, inst->y, inst->z, inst->w};
-                        for (int ch = 0; ch < 4; ch++) {
-                            int val_off = id[inputs[ch]] - n;
-                            emit(.fn=store_8x4, .x=inst->ptr, .y=val_off, .z=ch);
-                            n++;
-                        }
-                        n--;  // the outer id[i]=n++ will add the last one back
-                    } break;
+                        emit(.fn=store_8x4,
+                             .x=inst->ptr,
+                             .y=id[inst->x] - n,
+                             .z=id[inst->y] - n,
+                             .w=id[inst->z] - n);
+                        p->inst[n+1] = (struct interp_inst){.x=id[inst->w] - n};
+                        n += 2;
+                        continue;  // skip id[i]=n++ below
+                    }
 
                     case op_shl_i32_imm: case op_shr_u32_imm: case op_shr_s32_imm:
                     case op_shl_i16_imm: case op_shr_u16_imm: case op_shr_s16_imm:
