@@ -140,7 +140,8 @@ enum {
 
     // bitwise 16B
     AND_16b_=0x4E201C00u, ORR_16b_=0x4EA01C00u, EOR_16b_=0x6E201C00u,
-    BSL_16b_=0x6E601C00u, MVN_16b_=0x6E205800u,
+    BSL_16b_=0x6E601C00u, BIT_16b_=0x6EA01C00u, BIF_16b_=0x6EE01C00u,
+    MVN_16b_=0x6E205800u,
 
     // float 4H (FEAT_FP16)
     FADD_4h_  =0x0E401400u, FSUB_4h_  =0x0EC01400u, FMUL_4h_  =0x2E401C00u,
@@ -168,7 +169,7 @@ V3(FCMEQ_4s) V3(FCMGT_4s) V3(FCMGE_4s)
 V3(ADD_4s) V3(SUB_4s) V3(MUL_4s)
 V3(USHL_4s) V3(SSHL_4s) V2(NEG_4s)
 V3(CMEQ_4s) V3(CMGT_4s) V3(CMGE_4s) V3(CMHI_4s) V3(CMHS_4s)
-V3(AND_16b) V3(ORR_16b) V3(EOR_16b) V3(BSL_16b) V2(MVN_16b)
+V3(AND_16b) V3(ORR_16b) V3(EOR_16b) V3(BSL_16b) V3(BIT_16b) V3(BIF_16b) V2(MVN_16b)
 V3(FADD_4h)  V3(FSUB_4h)  V3(FMUL_4h) V3(FDIV_4h)  V3(FMLA_4h)
 V3(FMINNM_4h) V3(FMAXNM_4h) V2(FSQRT_4h)
 V3(FCMEQ_4h) V3(FCMGT_4h) V3(FCMGE_4h)
@@ -235,10 +236,10 @@ static void vld(Buf *c, int vd, int s) { put(c, LDR_qi(vd, XS, s)); }
 static void vst(Buf *c, int vd, int s) { put(c, STR_qi(vd, XS, s)); }
 
 // Register-to-register ALU emission (d,x,y,z are NEON register numbers).
-// v0 is scratch for destructive ops (BSL, FMLA, shift-right).
+// scratch is a free NEON register for destructive ops (FMLA, variable shift-right).
 // At K=8: 32-bit ops use 4S (caller emits twice for lo/hi pairs).
 //         16-bit/half ops use 8H (W() promotes 4H->8H) and 16B bitwise.
-static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm) {
+static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm, int scratch) {
     switch (op) {
     case op_imm_32: {
         uint32_t v=(uint32_t)imm;
@@ -260,15 +261,15 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_fma_f32:
         if (d==z) { put(c, FMLA_4s(d,x,y)); }
         else if (d!=x && d!=y) { put(c, ORR_16b(d,z,z)); put(c, FMLA_4s(d,x,y)); }
-        else { put(c, ORR_16b(0,z,z)); put(c, FMLA_4s(0,x,y)); put(c, ORR_16b(d,0,0)); }
+        else { put(c, ORR_16b(scratch,z,z)); put(c, FMLA_4s(scratch,x,y)); put(c, ORR_16b(d,scratch,scratch)); }
         return 1;
 
     case op_add_i32: put(c, ADD_4s(d,x,y)); return 1;
     case op_sub_i32: put(c, SUB_4s(d,x,y)); return 1;
     case op_mul_i32: put(c, MUL_4s(d,x,y)); return 1;
     case op_shl_i32: put(c, USHL_4s(d,x,y)); return 1;
-    case op_shr_u32: put(c, NEG_4s(0,y)); put(c, USHL_4s(d,x,0)); return 1;
-    case op_shr_s32: put(c, NEG_4s(0,y)); put(c, SSHL_4s(d,x,0)); return 1;
+    case op_shr_u32: put(c, NEG_4s(scratch,y)); put(c, USHL_4s(d,x,scratch)); return 1;
+    case op_shr_s32: put(c, NEG_4s(scratch,y)); put(c, SSHL_4s(d,x,scratch)); return 1;
     case op_shl_i32_imm: put(c, SHL_4s_imm(d,x,imm)); return 1;
     case op_shr_u32_imm: put(c, USHR_4s_imm(d,x,imm)); return 1;
     case op_shr_s32_imm: put(c, SSHR_4s_imm(d,x,imm)); return 1;
@@ -278,8 +279,9 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_xor_32: put(c, EOR_16b(d,x,y)); return 1;
     case op_sel_32:
         if (d==x) { put(c, BSL_16b(d,y,z)); }
-        else if (d!=y && d!=z) { put(c, ORR_16b(d,x,x)); put(c, BSL_16b(d,y,z)); }
-        else { put(c, ORR_16b(0,x,x)); put(c, BSL_16b(0,y,z)); put(c, ORR_16b(d,0,0)); }
+        else if (d==y) { put(c, BIF_16b(d,z,x)); }
+        else if (d==z) { put(c, BIT_16b(d,y,x)); }
+        else { put(c, ORR_16b(d,z,z)); put(c, BIT_16b(d,y,x)); }
         return 1;
 
     case op_f32_from_i32: put(c, SCVTF_4s(d,x)); return 1;
@@ -308,8 +310,8 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_sub_i16: put(c, W(SUB_4h(d,x,y))); return 1;
     case op_mul_i16: put(c, W(MUL_4h(d,x,y))); return 1;
     case op_shl_i16: put(c, W(USHL_4h(d,x,y))); return 1;
-    case op_shr_u16: put(c, W(NEG_4h(0,y))); put(c, W(USHL_4h(d,x,0))); return 1;
-    case op_shr_s16: put(c, W(NEG_4h(0,y))); put(c, W(SSHL_4h(d,x,0))); return 1;
+    case op_shr_u16: put(c, W(NEG_4h(scratch,y))); put(c, W(USHL_4h(d,x,scratch))); return 1;
+    case op_shr_s16: put(c, W(NEG_4h(scratch,y))); put(c, W(SSHL_4h(d,x,scratch))); return 1;
     case op_shl_i16_imm: put(c, W(SHL_4h_imm(d,x,imm))); return 1;
     case op_shr_u16_imm: put(c, W(USHR_4h_imm(d,x,imm))); return 1;
     case op_shr_s16_imm: put(c, W(SSHR_4h_imm(d,x,imm))); return 1;
@@ -319,8 +321,9 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_xor_16: put(c, EOR_16b(d,x,y)); return 1;
     case op_sel_16:
         if (d==x) { put(c, BSL_16b(d,y,z)); }
-        else if (d!=y && d!=z) { put(c, ORR_16b(d,x,x)); put(c, BSL_16b(d,y,z)); }
-        else { put(c, ORR_16b(0,x,x)); put(c, BSL_16b(0,y,z)); put(c, ORR_16b(d,0,0)); }
+        else if (d==y) { put(c, BIF_16b(d,z,x)); }
+        else if (d==z) { put(c, BIT_16b(d,y,x)); }
+        else { put(c, ORR_16b(d,z,z)); put(c, BIT_16b(d,y,x)); }
         return 1;
     case op_eq_i16: put(c, W(CMEQ_4h(d,x,y))); return 1;
     case op_ne_i16: put(c, W(CMEQ_4h(d,x,y))); put(c, MVN_16b(d,d)); return 1;
@@ -344,7 +347,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_fma_half:
         if (d==z) { put(c, W(FMLA_4h(d,x,y))); }
         else if (d!=x && d!=y) { put(c, ORR_16b(d,z,z)); put(c, W(FMLA_4h(d,x,y))); }
-        else { put(c, ORR_16b(0,z,z)); put(c, W(FMLA_4h(0,x,y))); put(c, ORR_16b(d,0,0)); }
+        else { put(c, ORR_16b(scratch,z,z)); put(c, W(FMLA_4h(scratch,x,y))); put(c, ORR_16b(d,scratch,scratch)); }
         return 1;
     // Half bitwise: use 16B (full Q register)
     case op_and_half: put(c, AND_16b(d,x,y)); return 1;
@@ -352,8 +355,9 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_xor_half: put(c, EOR_16b(d,x,y)); return 1;
     case op_sel_half:
         if (d==x) { put(c, BSL_16b(d,y,z)); }
-        else if (d!=y && d!=z) { put(c, ORR_16b(d,x,x)); put(c, BSL_16b(d,y,z)); }
-        else { put(c, ORR_16b(0,x,x)); put(c, BSL_16b(0,y,z)); put(c, ORR_16b(d,0,0)); }
+        else if (d==y) { put(c, BIF_16b(d,z,x)); }
+        else if (d==z) { put(c, BIT_16b(d,y,x)); }
+        else { put(c, ORR_16b(d,z,z)); put(c, BIT_16b(d,y,x)); }
         return 1;
     case op_eq_half: put(c, W(FCMEQ_4h(d,x,y))); return 1;
     case op_ne_half: put(c, W(FCMEQ_4h(d,x,y))); put(c, MVN_16b(d,d)); return 1;
@@ -373,7 +377,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     }
 }
 
-// Register allocator: v0-v3 reserved (scratch + LD4/ST4), v4-v7,v16-v31 = 20 allocatable
+// Register allocator: v4-v7,v16-v31 in initial pool; v0-v3 injected after LD4.
 static const int8_t ra_pool[] = {4,5,6,7,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31};
 #define RA_NREGS 20
 
@@ -386,11 +390,8 @@ struct ra {
     int     bytes_ctrl_n;
     int     owner[32];    // owner[v] = inst whose value is in Vv, or -1
     int     bytes_ctrl[16];
-    int8_t  free_stack[RA_NREGS];
+    int8_t  free_stack[32];
     int8_t  bytes_reg[16];
-    int8_t  st4_ch[3];   // saved NEON regs for store_8x4 channels 0-2
-    int8_t  pad_[5];
-    int     st4_ptr;      // ptr index for buffered ST4
 };
 
 static struct ra* ra_create(struct umbra_basic_block const *bb) {
@@ -408,14 +409,15 @@ static struct ra* ra_create(struct umbra_basic_block const *bb) {
     }
     for (int i = 0; i < 32; i++) ra->owner[i] = -1;
     ra->bytes_ctrl_n = 0;
-    ra->st4_ptr = -1;
 
     for (int i = 0; i < n; i++) ra->last_use[i] = -1;
     for (int i = 0; i < n; i++) {
         struct bb_inst const *inst = &bb->inst[i];
-        ra->last_use[inst->x] = i;
+        // load_8x4 continuations use .x as metadata (base index), not a data dependency.
+        if (!(inst->op == op_load_8x4 && inst->x)) ra->last_use[inst->x] = i;
         ra->last_use[inst->y] = i;
         ra->last_use[inst->z] = i;
+        ra->last_use[inst->w] = i;
     }
     // Preamble values used in the varying loop persist across iterations.
     for (int i = 0; i < bb->preamble; i++) {
@@ -513,6 +515,19 @@ static int8_t ra_claim(struct ra *ra, int old_val, int new_val) {
         ra->owner[(int)rh] = new_val;
     }
     return r;
+}
+
+// Evict any values living in V0-V3 (needed before LD4/ST4 which use these as fixed destinations).
+static void evict_scratch(Buf *c, struct ra *ra, int *sl, int *ns) {
+    for (int r = 0; r < 4; r++) {
+        int val = ra->owner[r];
+        if (val < 0) continue;
+        int8_t new_r = ra_alloc(c, ra, sl, ns);
+        put(c, ORR_16b(new_r, r, r));
+        ra->reg[val] = new_r;
+        ra->owner[(int)new_r] = val;
+        ra->owner[r] = -1;
+    }
 }
 
 // Get the hi register for a value, falling back to lo if not a pair.
@@ -782,52 +797,73 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
         } break;
 
-        case op_load_8x4_0: case op_load_8x4_1: case op_load_8x4_2: case op_load_8x4_3: {
-            int ch = (int)(inst->op - op_load_8x4_0);
-            int p = inst->ptr;
-            int8_t rd = ra_alloc(c, ra, sl, ns);
-            ra->reg[i] = rd; ra->owner[(int)rd] = i;
+        case op_load_8x4: {
+            _Bool is_base = inst->x == 0;
+            int ch = is_base ? 0 : inst->imm;
+            int p  = is_base ? inst->ptr : bb->inst[inst->x].ptr;
+
             if (scalar) {
-                // byte offset = ix * 4 + ch
+                int8_t rd = ra_alloc(c, ra, sl, ns);
+                ra->reg[i] = rd; ra->owner[(int)rd] = i;
                 put(c, LSL_xi(XT, XI, 2));
                 if (ch) put(c, ADD_xi(XT, XT, ch));
                 // LDRB Wt, [Xn, Xm]
                 put(c, 0x38606800u | ((uint32_t)XT << 16) | ((uint32_t)(1+p) << 5) | (uint32_t)XT);
                 // DUP Vd.8B, Wt
                 put(c, 0x0E010C00u | ((uint32_t)XT << 5) | (uint32_t)rd);
-            } else if (ch == 0) {
-                // First channel: emit LD4 into V0-V3, then MOV result
+            } else if (is_base) {
+                evict_scratch(c, ra, sl, ns);
                 put(c, ADD_xr(XT, 1+p, XW));
                 put(c, LD4_8b(0, XT));
-                put(c, ORR_16b(rd, 0, 0));  // MOV Vd, V0 (channel 0)
-            } else {
-                // Subsequent channels: result already in V1/V2/V3 from prior LD4
-                put(c, ORR_16b(rd, ch, ch));  // MOV Vd, V{ch}
+                // Claim V0 for the base (ch0).
+                ra->reg[i] = 0;
+                ra->owner[0] = i;
+                // Find continuations and claim V1-V3 for them.
+                // Unclaimed channels go to the free stack.
+                _Bool ch_claimed[] = {1, 0, 0, 0};
+                for (int j = i+1; j < to; j++) {
+                    if (bb->inst[j].op == op_load_8x4 && bb->inst[j].x == i) {
+                        int c2 = bb->inst[j].imm;
+                        ra->reg[j] = (int8_t)c2;
+                        ra->owner[c2] = j;
+                        ch_claimed[c2] = 1;
+                    }
+                }
+                for (int c2 = 0; c2 < 4; c2++) {
+                    if (!ch_claimed[c2]) ra->free_stack[ra->nfree++] = (int8_t)c2;
+                }
             }
+            // Continuation slots: already claimed by base, nothing to emit.
         } break;
 
-        case op_store_8x4_0: case op_store_8x4_1: case op_store_8x4_2: case op_store_8x4_3: {
-            int ch = (int)(inst->op - op_store_8x4_0);
+        case op_store_8x4: {
             int p = inst->ptr;
-            int8_t ry = ra_ensure(c, ra, sl, ns, inst->y);
+            int const inputs[] = {inst->x, inst->y, inst->z, inst->w};
             if (scalar) {
-                // byte offset = ix * 4 + ch
-                put(c, LSL_xi(XT, XI, 2));
-                if (ch) put(c, ADD_xi(XT, XT, ch));
-                put(c, ADD_xr(XT, 1+p, XT));
-                put(c, ST1_b(ry, 0, XT));
-            } else if (ch < 3) {
-                // Buffer channel into V0-V2 for later ST4
-                put(c, ORR_16b(ch, ry, ry));  // MOV V{ch}, Vy
-                ra->st4_ch[ch] = ry;
-                ra->st4_ptr = p;
+                for (int ch = 0; ch < 4; ch++) {
+                    int8_t ry = ra_ensure(c, ra, sl, ns, inputs[ch]);
+                    put(c, LSL_xi(XT, XI, 2));
+                    if (ch) put(c, ADD_xi(XT, XT, ch));
+                    put(c, ADD_xr(XT, 1+p, XT));
+                    put(c, ST1_b(ry, 0, XT));
+                }
             } else {
-                // Last channel: MOV to V3 and emit ST4
-                put(c, ORR_16b(3, ry, ry));   // MOV V3, Vy
+                evict_scratch(c, ra, sl, ns);
+                for (int ch = 0; ch < 4; ch++) {
+                    int8_t ry = ra_ensure(c, ra, sl, ns, inputs[ch]);
+                    if (ry != (int8_t)ch) put(c, ORR_16b(ch, ry, ry));
+                }
                 put(c, ADD_xr(XT, 1+p, XW));
                 put(c, ST4_8b(0, XT));
+                // V0-V3 now hold interleaved data, return them to pool.
+                for (int r = 0; r < 4; r++) {
+                    ra->owner[r] = -1;
+                    ra->free_stack[ra->nfree++] = (int8_t)r;
+                }
             }
-            if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
+            for (int ch = 0; ch < 4; ch++) {
+                if (lu[inputs[ch]] <= i) ra_free_reg(ra, inputs[ch]);
+            }
         } break;
 
         // Cross-width conversions between 32-bit (pairs) and 16-bit (single Q)
@@ -1076,11 +1112,23 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 ra->reg_hi[i] = rdh; ra->owner[(int)rdh] = i;
             }
 
-            emit_alu_reg(c, inst->op, rd, rx, ry, rz, inst->imm);
+            _Bool needs_scratch = op==op_fma_f32 || op==op_fma_half
+                               || op==op_shr_u32 || op==op_shr_s32
+                               || op==op_shr_u16 || op==op_shr_s16;
+            int8_t scratch_reg = -1;
+            if (needs_scratch) {
+                scratch_reg = ra_alloc(c, ra, sl, ns);
+            }
+
+            emit_alu_reg(c, inst->op, rd, rx, ry, rz, inst->imm, scratch_reg);
 
             if (pair) {
                 int8_t rdh = ra->reg_hi[i];
-                emit_alu_reg(c, inst->op, rdh, rxh, ryh, rzh, inst->imm);
+                emit_alu_reg(c, inst->op, rdh, rxh, ryh, rzh, inst->imm, scratch_reg);
+            }
+
+            if (scratch_reg >= 0) {
+                ra->free_stack[ra->nfree++] = scratch_reg;
             }
         } break;
         }

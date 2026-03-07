@@ -33,7 +33,7 @@ struct interp_inst;
 typedef int (*Fn)(struct interp_inst const *ip, val *v, int end, void* ptr[]);
 struct interp_inst {
     Fn  fn;
-    int x,y,z,:32;
+    int x,y,z,w;
 };
 
 struct umbra_interpreter {
@@ -506,10 +506,8 @@ static Fn const fn[] = {
     [op_f32_from_half] = f32_from_half, [op_i32_from_half] = i32_from_half,
     [op_i16_from_i32] = i16_from_i32, [op_i32_from_i16] = i32_from_i16,
     [op_i16_from_u8] = i16_from_u8, [op_u8_from_i16] = u8_from_i16,
-    [op_load_8x4_0] = load_8x4, [op_load_8x4_1] = load_8x4,
-    [op_load_8x4_2] = load_8x4, [op_load_8x4_3] = load_8x4,
-    [op_store_8x4_0] = store_8x4, [op_store_8x4_1] = store_8x4,
-    [op_store_8x4_2] = store_8x4, [op_store_8x4_3] = store_8x4,
+    [op_load_8x4] = load_8x4,
+    [op_store_8x4] = store_8x4,
     [op_bytes] = bytes_32,
     [op_add_half] =  add_half, [op_sub_half] =  sub_half,
     [op_mul_half] =  mul_half, [op_div_half] =  div_half,
@@ -526,8 +524,10 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
     int *id = calloc((size_t)bb->insts, sizeof *id);
 
     struct umbra_interpreter *p = malloc(sizeof *p);
-    p->inst = malloc((size_t)(bb->insts + 1) * sizeof *p->inst);
-    p->v    = malloc((size_t)(bb->insts + 1) * sizeof *p->v);
+    // store_8x4 expands to 4 interp instructions, so over-allocate by 3x per inst.
+    int const max_insts = bb->insts * 4 + 1;
+    p->inst = malloc((size_t)max_insts * sizeof *p->inst);
+    p->v    = malloc((size_t)max_insts * sizeof *p->v);
 
     int n = 0;
     #define emit(...) p->inst[n] = (struct interp_inst){__VA_ARGS__}
@@ -603,15 +603,21 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                     #endif
                         break;
 
-                    case op_load_8x4_0: emit(.fn=load_8x4, .x=inst->ptr, .y=0); break;
-                    case op_load_8x4_1: emit(.fn=load_8x4, .x=inst->ptr, .y=1); break;
-                    case op_load_8x4_2: emit(.fn=load_8x4, .x=inst->ptr, .y=2); break;
-                    case op_load_8x4_3: emit(.fn=load_8x4, .x=inst->ptr, .y=3); break;
+                    case op_load_8x4: {
+                        int ch  = inst->x ? inst->imm : 0;
+                        int ptr = inst->x ? bb->inst[inst->x].ptr : inst->ptr;
+                        emit(.fn=load_8x4, .x=ptr, .y=ch);
+                    } break;
 
-                    case op_store_8x4_0: emit(.fn=store_8x4, .x=inst->ptr, .y=Y, .z=0); break;
-                    case op_store_8x4_1: emit(.fn=store_8x4, .x=inst->ptr, .y=Y, .z=1); break;
-                    case op_store_8x4_2: emit(.fn=store_8x4, .x=inst->ptr, .y=Y, .z=2); break;
-                    case op_store_8x4_3: emit(.fn=store_8x4, .x=inst->ptr, .y=Y, .z=3); break;
+                    case op_store_8x4: {
+                        int const inputs[] = {inst->x, inst->y, inst->z, inst->w};
+                        for (int ch = 0; ch < 4; ch++) {
+                            int val_off = id[inputs[ch]] - n;
+                            emit(.fn=store_8x4, .x=inst->ptr, .y=val_off, .z=ch);
+                            n++;
+                        }
+                        n--;  // the outer id[i]=n++ will add the last one back
+                    } break;
 
                     case op_shl_i32_imm: case op_shr_u32_imm: case op_shr_s32_imm:
                     case op_shl_i16_imm: case op_shr_u16_imm: case op_shr_s16_imm:

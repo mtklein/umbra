@@ -1,9 +1,9 @@
   v0   = imm_32          0x0
   v1   = lane           
-  v2   = load_8x4_0      p0
-  v3   = load_8x4_1      p0
-  v4   = load_8x4_2      p0
-  v5   = load_8x4_3      p0
+  v2   = load_8x4        p0
+  v3   = load_8x4        v2 ch1
+  v4   = load_8x4        v2 ch2
+  v5   = load_8x4        v2 ch3
   v6   = imm_half        0x1c04
   v7   = i16_from_u8     v2
   v8   = half_from_i16   v7

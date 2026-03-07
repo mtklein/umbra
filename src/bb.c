@@ -140,6 +140,7 @@ static uint32_t bb_inst_hash(struct bb_inst const *inst) {
     __builtin_mul_overflow(h ^ (uint32_t)inst->x  ,  0x9e3779b9u, &h);
     __builtin_mul_overflow(h ^ (uint32_t)inst->y  ,  0x9e3779b9u, &h);
     __builtin_mul_overflow(h ^ (uint32_t)inst->z  ,  0x9e3779b9u, &h);
+    __builtin_mul_overflow(h ^ (uint32_t)inst->w  ,  0x9e3779b9u, &h);
     __builtin_mul_overflow(h ^ (uint32_t)inst->imm,  0x9e3779b9u, &h);
     h ^= h >> 16;
     return h ? h : 1;
@@ -193,6 +194,7 @@ static int push_(BB *bb, struct bb_inst inst) {
     return id;
 }
 #define push(bb,...) push_(bb, (struct bb_inst){.op=__VA_ARGS__})
+
 
 BB* umbra_basic_block(void) {
     BB *bb = calloc(1, sizeof *bb);
@@ -595,18 +597,19 @@ v8 umbra_u8_from_i16(BB *bb, v16 a) {
 
 void umbra_load_8x4(BB *bb, umbra_ptr src, v32 ix, v8 out[4]) {
     (void)ix;
-    out[0] = (v8){push(bb, op_load_8x4_0, .ptr=src.ix)};
-    out[1] = (v8){push(bb, op_load_8x4_1, .ptr=src.ix)};
-    out[2] = (v8){push(bb, op_load_8x4_2, .ptr=src.ix)};
-    out[3] = (v8){push(bb, op_load_8x4_3, .ptr=src.ix)};
+    // Allocate 4 consecutive slots.  The first is the real load_8x4;
+    // the remaining 3 are inert extra-output slots that just hold their channel index.
+    int base = push(bb, op_load_8x4, .ptr=src.ix);
+    // Push 3 continuation slots directly (unique x=base prevents dedup).
+    for (int ch = 1; ch <= 3; ch++) {
+        push(bb, op_load_8x4, .x=base, .imm=ch);
+    }
+    for (int ch = 0; ch < 4; ch++) { out[ch] = (v8){base + ch}; }
 }
 
 void umbra_store_8x4(BB *bb, umbra_ptr dst, v32 ix, v8 in[4]) {
     (void)ix;
-    push(bb, op_store_8x4_0, .y=in[0].id, .ptr=dst.ix);
-    push(bb, op_store_8x4_1, .y=in[1].id, .ptr=dst.ix);
-    push(bb, op_store_8x4_2, .y=in[2].id, .ptr=dst.ix);
-    push(bb, op_store_8x4_3, .y=in[3].id, .ptr=dst.ix);
+    push(bb, op_store_8x4, .x=in[0].id, .y=in[1].id, .z=in[2].id, .w=in[3].id, .ptr=dst.ix);
 }
 
 v32 umbra_bytes(BB *bb, v32 x, int control) {
@@ -752,14 +755,8 @@ static char const* op_name(enum op op) {
         case op_gt_u32:     return "gt_u32";
         case op_ge_u32:     return "ge_u32";
         case op_bytes:      return "bytes";
-        case op_load_8x4_0: return "load_8x4_0";
-        case op_load_8x4_1: return "load_8x4_1";
-        case op_load_8x4_2: return "load_8x4_2";
-        case op_load_8x4_3: return "load_8x4_3";
-        case op_store_8x4_0: return "store_8x4_0";
-        case op_store_8x4_1: return "store_8x4_1";
-        case op_store_8x4_2: return "store_8x4_2";
-        case op_store_8x4_3: return "store_8x4_3";
+        case op_load_8x4:  return "load_8x4";
+        case op_store_8x4: return "store_8x4";
         case op_u8_from_i16:  return "u8_from_i16";
         case op_add_i16:    return "add_i16";
         case op_sub_i16:    return "sub_i16";
@@ -813,11 +810,11 @@ static void schedule(int id, struct bb_inst const *in, struct bb_inst *out,
     if (old_to_new[id] >= 0) { return; }
 
     // Schedule inputs first, in ascending original order for readability.
-    int inputs[] = {in[id].x, in[id].y, in[id].z};
-    if (inputs[0] > inputs[1]) { int t=inputs[0]; inputs[0]=inputs[1]; inputs[1]=t; }
-    if (inputs[1] > inputs[2]) { int t=inputs[1]; inputs[1]=inputs[2]; inputs[2]=t; }
-    if (inputs[0] > inputs[1]) { int t=inputs[0]; inputs[0]=inputs[1]; inputs[1]=t; }
-    for (int k = 0; k < 3; k++) {
+    int inputs[] = {in[id].x, in[id].y, in[id].z, in[id].w};
+    for (int a = 0; a < 3; a++)
+        for (int b = a+1; b < 4; b++)
+            if (inputs[a] > inputs[b]) { int t=inputs[a]; inputs[a]=inputs[b]; inputs[b]=t; }
+    for (int k = 0; k < 4; k++) {
         schedule(inputs[k], in, out, old_to_new, j);
     }
 
@@ -837,13 +834,15 @@ void umbra_basic_block_optimize(BB *bb) {
             live[bb->inst[i].x] = 1;
             live[bb->inst[i].y] = 1;
             live[bb->inst[i].z] = 1;
+            live[bb->inst[i].w] = 1;
         }
     }
     for (int i = 0; i < n; i++) {
         varying[i] = is_varying(bb->inst[i].op)
                     |   varying[bb->inst[i].x]
                     |   varying[bb->inst[i].y]
-                    |   varying[bb->inst[i].z];
+                    |   varying[bb->inst[i].z]
+                    |   varying[bb->inst[i].w];
     }
 
     int total = 0;
@@ -874,6 +873,7 @@ void umbra_basic_block_optimize(BB *bb) {
         out[i].x = old_to_new[out[i].x];
         out[i].y = old_to_new[out[i].y];
         out[i].z = old_to_new[out[i].z];
+        out[i].w = old_to_new[out[i].w];
     }
 
     free(bb->inst);
@@ -895,11 +895,16 @@ void umbra_basic_block_dump(struct umbra_basic_block const *bb, FILE *f) {
         enum op op = inst->op;
 
         if (is_store(op)) {
-            fprintf(f, "      %-15s p%d", op_name(op), inst->ptr);
-            if (op == op_scatter_16 || op == op_scatter_32 || op == op_scatter_half) {
-                fprintf(f, " v%d", inst->x);
+            if (op == op_store_8x4) {
+                fprintf(f, "      %-15s p%d v%d v%d v%d v%d\n",
+                        op_name(op), inst->ptr, inst->x, inst->y, inst->z, inst->w);
+            } else {
+                fprintf(f, "      %-15s p%d", op_name(op), inst->ptr);
+                if (op == op_scatter_16 || op == op_scatter_32 || op == op_scatter_half) {
+                    fprintf(f, " v%d", inst->x);
+                }
+                fprintf(f, " v%d\n", inst->y);
             }
-            fprintf(f, " v%d\n", inst->y);
             continue;
         }
 
@@ -913,9 +918,15 @@ void umbra_basic_block_dump(struct umbra_basic_block const *bb, FILE *f) {
             case op_gather_32: case op_gather_16: case op_gather_half:
                 fprintf(f, " p%d v%d", inst->ptr, inst->x);
                 break;
-            case op_load_8x4_0: case op_load_8x4_1: case op_load_8x4_2: case op_load_8x4_3:
             case op_load_32: case op_load_16: case op_load_half:
                 fprintf(f, " p%d", inst->ptr);
+                break;
+            case op_load_8x4:
+                if (inst->x == 0) {
+                    fprintf(f, " p%d", inst->ptr);
+                } else {
+                    fprintf(f, " v%d ch%d", inst->x, inst->imm);
+                }
                 break;
             case op_shl_i32_imm: case op_shr_u32_imm: case op_shr_s32_imm:
             case op_shl_i16_imm: case op_shr_u16_imm: case op_shr_s16_imm:

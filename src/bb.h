@@ -18,8 +18,8 @@ enum op {
     op_bytes,
 
     // 8-bit ops
-    op_load_8x4_0, op_load_8x4_1, op_load_8x4_2, op_load_8x4_3,
-    op_store_8x4_0, op_store_8x4_1, op_store_8x4_2, op_store_8x4_3,
+    op_load_8x4,   // produces 4 consecutive outputs (channels 0-3)
+    op_store_8x4,  // consumes 4 inputs (x=ch0, y=ch1, z=ch2, w=ch3)
     op_u8_from_i16,
 
     // 16-bit ops
@@ -44,7 +44,7 @@ enum op {
 
 struct bb_inst {
     enum op op;
-    int     x,y,z;
+    int     x,y,z,w;
     union { int ptr; int imm; };
 };
 
@@ -59,12 +59,12 @@ struct umbra_basic_block {
 static inline _Bool is_store(enum op op) {
     return op == op_store_16 || op == op_store_32 || op == op_store_half
         || op == op_scatter_16 || op == op_scatter_32 || op == op_scatter_half
-        || (op >= op_store_8x4_0 && op <= op_store_8x4_3);
+        || op == op_store_8x4;
 }
 
 static inline _Bool has_ptr(enum op op) {
     return (op >= op_uni_32 && op <= op_scatter_32)
-        || (op >= op_load_8x4_0 && op <= op_store_8x4_3)
+        || op == op_load_8x4 || op == op_store_8x4
         || (op >= op_uni_16 && op <= op_scatter_16)
         || (op >= op_uni_half && op <= op_scatter_half);
 }
@@ -73,7 +73,7 @@ static inline _Bool is_varying(enum op op) {
     return op == op_lane
         || op == op_load_16 || op == op_load_32 || op == op_load_half
         || op == op_store_16 || op == op_store_32 || op == op_store_half
-        || (op >= op_load_8x4_0 && op <= op_store_8x4_3);
+        || op == op_load_8x4 || op == op_store_8x4;
 }
 
 enum op_type { OP_32, OP_8, OP_16, OP_HALF };
@@ -81,6 +81,6 @@ enum op_type { OP_32, OP_8, OP_16, OP_HALF };
 static inline enum op_type op_type(enum op op) {
     if (op >= op_imm_half)    return OP_HALF;
     if (op >= op_imm_16)      return OP_16;
-    if (op >= op_load_8x4_0)  return OP_8;
+    if (op >= op_load_8x4)    return OP_8;
     return OP_32;
 }

@@ -1,67 +1,63 @@
 Iterations:        100
-Instructions:      3200
-Total Cycles:      975
-Total uOps:        4500
+Instructions:      2800
+Total Cycles:      846
+Total uOps:        4100
 
 Dispatch Width:    6
-uOps Per Cycle:    4.62
-IPC:               3.28
-Block RThroughput: 8.7
+uOps Per Cycle:    4.85
+IPC:               3.31
+Block RThroughput: 7.3
 
 
-Cycles with backend pressure increase [ 65.03% ]
+Cycles with backend pressure increase [ 63.71% ]
 Throughput Bottlenecks: 
-  Resource Pressure       [ 55.59% ]
-  - CyUnitIS  [ 5.64% ]
-  - CyUnitLS  [ 12.41% ]
-  - CyUnitV  [ 49.23% ]
-  Data Dependencies:      [ 28.10% ]
-  - Register Dependencies [ 28.10% ]
+  Resource Pressure       [ 57.80% ]
+  - CyUnitIS  [ 7.80% ]
+  - CyUnitLS  [ 17.14% ]
+  - CyUnitV  [ 46.69% ]
+  Data Dependencies:      [ 30.26% ]
+  - Register Dependencies [ 30.26% ]
   - Memory Dependencies   [ 0.00% ]
 
 Critical sequence based on the simulation:
 
               Instruction                                 Dependency Information
- +----< 21.   mov.16b	v7, v2
+ +----< 27.   str	q7, [x5, x11]
  |
  |    < loop carried > 
  |
  |      0.    add	x10, x1, x12
- +----> 1.    ld4.8b	{ v0, v1, v2, v3 }, [x10]         ## RESOURCE interference:  CyUnitV [ probability: 41% ]
- +----> 2.    mov.16b	v7, v0                            ## REGISTER dependency:  D0_D1_D2_D3
- +----> 3.    ushll.8h	v7, v7, #0                        ## REGISTER dependency:  q7
- +----> 4.    scvtf.8h	v7, v7                            ## REGISTER dependency:  q7
- |      5.    ldr	q16, [x2, x11]
- +----> 6.    mov.16b	v17, v3                           ## RESOURCE interference:  CyUnitV [ probability: 7% ]
- +----> 7.    ushll.8h	v17, v17, #0                      ## REGISTER dependency:  q17
- +----> 8.    scvtf.8h	v17, v17                          ## REGISTER dependency:  q17
- +----> 9.    fmul.8h	v18, v5, v17                      ## REGISTER dependency:  q17
- |      10.   fsub.8h	v18, v6, v18
- |      11.   fmul.8h	v16, v16, v18
- |      12.   fmla.8h	v16, v5, v7
- |      13.   str	q16, [x2, x11]
- +----> 14.   mov.16b	v16, v1                           ## RESOURCE interference:  CyUnitV [ probability: 28% ]
- |      15.   ushll.8h	v16, v16, #0
- |      16.   scvtf.8h	v16, v16
- |      17.   ldr	q7, [x3, x11]
- |      18.   fmul.8h	v7, v7, v18
- |      19.   fmla.8h	v7, v5, v16
- |      20.   str	q7, [x3, x11]
- +----> 21.   mov.16b	v7, v2                            ## RESOURCE interference:  CyUnitV [ probability: 71% ]
- +----> 22.   ushll.8h	v7, v7, #0                        ## REGISTER dependency:  q7
- +----> 23.   scvtf.8h	v7, v7                            ## REGISTER dependency:  q7
- |      24.   ldr	q16, [x4, x11]
- |      25.   fmul.8h	v16, v16, v18
- +----> 26.   fmla.8h	v16, v5, v7                       ## REGISTER dependency:  q7
- +----> 27.   str	q16, [x4, x11]                    ## REGISTER dependency:  q16
- |      28.   ldr	q16, [x5, x11]
- |      29.   fmul.8h	v16, v16, v18
- |      30.   fmla.8h	v16, v5, v17
- +----> 31.   str	q16, [x5, x11]                    ## RESOURCE interference:  CyUnitLS [ probability: 14% ]
+ +----> 1.    ld4.8b	{ v0, v1, v2, v3 }, [x10]         ## RESOURCE interference:  CyUnitLS [ probability: 66% ]
+ +----> 2.    ushll.8h	v0, v0, #0                        ## REGISTER dependency:  D0_D1_D2_D3
+ |      3.    scvtf.8h	v0, v0
+ |      4.    ldr	q7, [x2, x11]
+ +----> 5.    ushll.8h	v3, v3, #0                        ## RESOURCE interference:  CyUnitV [ probability: 44% ]
+ +----> 6.    scvtf.8h	v3, v3                            ## REGISTER dependency:  q3
+ +----> 7.    fmul.8h	v16, v5, v3                       ## REGISTER dependency:  q3
+ +----> 8.    fsub.8h	v16, v6, v16                      ## REGISTER dependency:  q16
+ |      9.    fmul.8h	v7, v7, v16
+ |      10.   fmla.8h	v7, v5, v0
+ |      11.   str	q7, [x2, x11]
+ +----> 12.   ushll.8h	v1, v1, #0                        ## RESOURCE interference:  CyUnitV [ probability: 14% ]
+ +----> 13.   scvtf.8h	v1, v1                            ## REGISTER dependency:  q1
+ |      14.   ldr	q7, [x3, x11]
+ |      15.   fmul.8h	v7, v7, v16
+ |      16.   fmla.8h	v7, v5, v1
+ |      17.   str	q7, [x3, x11]
+ +----> 18.   ushll.8h	v2, v2, #0                        ## RESOURCE interference:  CyUnitV [ probability: 27% ]
+ +----> 19.   scvtf.8h	v2, v2                            ## REGISTER dependency:  q2
+ |      20.   ldr	q7, [x4, x11]
+ |      21.   fmul.8h	v7, v7, v16
+ +----> 22.   fmla.8h	v7, v5, v2                        ## REGISTER dependency:  q2
+ +----> 23.   str	q7, [x4, x11]                     ## REGISTER dependency:  q7
+ |      24.   ldr	q7, [x5, x11]
+ |      25.   fmul.8h	v7, v7, v16
+ |      26.   fmla.8h	v7, v5, v3
+ |      27.   str	q7, [x5, x11]
  |
  |    < loop carried > 
  |
- +----> 1.    ld4.8b	{ v0, v1, v2, v3 }, [x10]         ## RESOURCE interference:  CyUnitLS [ probability: 35% ]
+ +----> 1.    ld4.8b	{ v0, v1, v2, v3 }, [x10]         ## RESOURCE interference:  CyUnitLS [ probability: 40% ]
 
 
 Instruction Info:
@@ -75,36 +71,32 @@ Instruction Info:
 [1]    [2]    [3]    [4]    [5]    [6]    Instructions:
  1      2     1.00                        add	x10, x1, x12
  6      7     1.33    *                   ld4.8b	{ v0, v1, v2, v3 }, [x10]
- 1      2     0.33                        mov.16b	v7, v0
- 1      2     0.33                        ushll.8h	v7, v7, #0
- 1      2     0.33                        scvtf.8h	v7, v7
- 2      5     0.50    *                   ldr	q16, [x2, x11]
- 1      2     0.33                        mov.16b	v17, v3
- 1      2     0.33                        ushll.8h	v17, v17, #0
- 1      2     0.33                        scvtf.8h	v17, v17
- 1      2     0.33                        fmul.8h	v18, v5, v17
- 1      2     0.33                        fsub.8h	v18, v6, v18
- 1      2     0.33                        fmul.8h	v16, v16, v18
- 1      2     0.33                        fmla.8h	v16, v5, v7
- 2      5     0.50           *            str	q16, [x2, x11]
- 1      2     0.33                        mov.16b	v16, v1
- 1      2     0.33                        ushll.8h	v16, v16, #0
- 1      2     0.33                        scvtf.8h	v16, v16
+ 1      2     0.33                        ushll.8h	v0, v0, #0
+ 1      2     0.33                        scvtf.8h	v0, v0
+ 2      5     0.50    *                   ldr	q7, [x2, x11]
+ 1      2     0.33                        ushll.8h	v3, v3, #0
+ 1      2     0.33                        scvtf.8h	v3, v3
+ 1      2     0.33                        fmul.8h	v16, v5, v3
+ 1      2     0.33                        fsub.8h	v16, v6, v16
+ 1      2     0.33                        fmul.8h	v7, v7, v16
+ 1      2     0.33                        fmla.8h	v7, v5, v0
+ 2      5     0.50           *            str	q7, [x2, x11]
+ 1      2     0.33                        ushll.8h	v1, v1, #0
+ 1      2     0.33                        scvtf.8h	v1, v1
  2      5     0.50    *                   ldr	q7, [x3, x11]
- 1      2     0.33                        fmul.8h	v7, v7, v18
- 1      2     0.33                        fmla.8h	v7, v5, v16
+ 1      2     0.33                        fmul.8h	v7, v7, v16
+ 1      2     0.33                        fmla.8h	v7, v5, v1
  2      5     0.50           *            str	q7, [x3, x11]
- 1      2     0.33                        mov.16b	v7, v2
- 1      2     0.33                        ushll.8h	v7, v7, #0
- 1      2     0.33                        scvtf.8h	v7, v7
- 2      5     0.50    *                   ldr	q16, [x4, x11]
- 1      2     0.33                        fmul.8h	v16, v16, v18
- 1      2     0.33                        fmla.8h	v16, v5, v7
- 2      5     0.50           *            str	q16, [x4, x11]
- 2      5     0.50    *                   ldr	q16, [x5, x11]
- 1      2     0.33                        fmul.8h	v16, v16, v18
- 1      2     0.33                        fmla.8h	v16, v5, v17
- 2      5     0.50           *            str	q16, [x5, x11]
+ 1      2     0.33                        ushll.8h	v2, v2, #0
+ 1      2     0.33                        scvtf.8h	v2, v2
+ 2      5     0.50    *                   ldr	q7, [x4, x11]
+ 1      2     0.33                        fmul.8h	v7, v7, v16
+ 1      2     0.33                        fmla.8h	v7, v5, v2
+ 2      5     0.50           *            str	q7, [x4, x11]
+ 2      5     0.50    *                   ldr	q7, [x5, x11]
+ 1      2     0.33                        fmul.8h	v7, v7, v16
+ 1      2     0.33                        fmla.8h	v7, v5, v3
+ 2      5     0.50           *            str	q7, [x5, x11]
 
 
 Resources:
@@ -135,39 +127,35 @@ Resources:
 
 Resource pressure per iteration:
 [0.0]  [0.1]  [1]    [2.0]  [2.1]  [3.0]  [3.1]  [3.2]  [3.3]  [4]    [5]    [6.0]  [6.1]  [7]    [8.0]  [8.1]  [9.0]  [9.1]  [9.2]  [10]   [11]   [12.0] [12.1] 
- -      -      -      -      -     2.46   2.54   2.47   2.53    -      -     4.93   5.07    -     4.99   5.01   8.65   8.69   8.66    -      -      -      -     
+ -      -      -      -      -     2.51   2.50   2.50   2.49    -      -     5.01   4.99    -     5.10   4.90   7.56   7.27   7.17    -      -      -      -     
 
 Resource pressure by instruction:
 [0.0]  [0.1]  [1]    [2.0]  [2.1]  [3.0]  [3.1]  [3.2]  [3.3]  [4]    [5]    [6.0]  [6.1]  [7]    [8.0]  [8.1]  [9.0]  [9.1]  [9.2]  [10]   [11]   [12.0] [12.1] Instructions:
- -      -      -      -      -     0.42   0.58   0.44   0.56    -      -     0.86   1.14    -      -      -      -      -      -      -      -      -      -     add	x10, x1, x12
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.98   1.02   1.32   1.40   1.28    -      -      -      -     ld4.8b	{ v0, v1, v2, v3 }, [x10]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.31   0.34   0.35    -      -      -      -     mov.16b	v7, v0
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.31   0.35    -      -      -      -     ushll.8h	v7, v7, #0
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.31   0.35    -      -      -      -     scvtf.8h	v7, v7
- -      -      -      -      -     0.25   0.26   0.25   0.24    -      -     0.50   0.50    -     0.49   0.51    -      -      -      -      -      -      -     ldr	q16, [x2, x11]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.33   0.33    -      -      -      -     mov.16b	v17, v3
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.34   0.34    -      -      -      -     ushll.8h	v17, v17, #0
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.34   0.33    -      -      -      -     scvtf.8h	v17, v17
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.34   0.31    -      -      -      -     fmul.8h	v18, v5, v17
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.35   0.31    -      -      -      -     fsub.8h	v18, v6, v18
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.34   0.32    -      -      -      -     fmul.8h	v16, v16, v18
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.36   0.31    -      -      -      -     fmla.8h	v16, v5, v7
- -      -      -      -      -     0.36   0.15   0.32   0.17    -      -     0.68   0.32    -     0.52   0.48    -      -      -      -      -      -      -     str	q16, [x2, x11]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.32   0.36    -      -      -      -     mov.16b	v16, v1
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.31   0.35    -      -      -      -     ushll.8h	v16, v16, #0
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.33   0.34    -      -      -      -     scvtf.8h	v16, v16
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -     0.52   0.48    -      -      -      -      -      -      -     ldr	q7, [x3, x11]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.36   0.31   0.33    -      -      -      -     fmul.8h	v7, v7, v18
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.33   0.33    -      -      -      -     fmla.8h	v7, v5, v16
- -      -      -      -      -     0.19   0.30   0.20   0.31    -      -     0.39   0.61    -     0.48   0.52    -      -      -      -      -      -      -     str	q7, [x3, x11]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.33   0.35    -      -      -      -     mov.16b	v7, v2
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.31   0.36    -      -      -      -     ushll.8h	v7, v7, #0
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.36   0.32   0.32    -      -      -      -     scvtf.8h	v7, v7
- -      -      -      -      -     0.21   0.28   0.22   0.29    -      -     0.43   0.57    -     0.48   0.52    -      -      -      -      -      -      -     ldr	q16, [x4, x11]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.30   0.33   0.37    -      -      -      -     fmul.8h	v16, v16, v18
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.34   0.34    -      -      -      -     fmla.8h	v16, v5, v7
- -      -      -      -      -     0.37   0.13   0.37   0.13    -      -     0.74   0.26    -     0.53   0.47    -      -      -      -      -      -      -     str	q16, [x4, x11]
- -      -      -      -      -     0.28   0.22   0.29   0.21    -      -     0.57   0.43    -     0.52   0.48    -      -      -      -      -      -      -     ldr	q16, [x5, x11]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.35   0.31    -      -      -      -     fmul.8h	v16, v16, v18
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.35   0.32    -      -      -      -     fmla.8h	v16, v5, v17
- -      -      -      -      -     0.13   0.37   0.13   0.37    -      -     0.26   0.74    -     0.47   0.53    -      -      -      -      -      -      -     str	q16, [x5, x11]
+ -      -      -      -      -     0.52   0.50   0.50   0.48    -      -     1.02   0.98    -      -      -      -      -      -      -      -      -      -     add	x10, x1, x12
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.06   0.94   1.72   1.64   0.64    -      -      -      -     ld4.8b	{ v0, v1, v2, v3 }, [x10]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.12   0.46   0.42    -      -      -      -     ushll.8h	v0, v0, #0
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.40   0.29   0.31    -      -      -      -     scvtf.8h	v0, v0
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -     0.45   0.55    -      -      -      -      -      -      -     ldr	q7, [x2, x11]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.19   0.44   0.37    -      -      -      -     ushll.8h	v3, v3, #0
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.30   0.44   0.26    -      -      -      -     scvtf.8h	v3, v3
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.28   0.28   0.44    -      -      -      -     fmul.8h	v16, v5, v3
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.40   0.18   0.42    -      -      -      -     fsub.8h	v16, v6, v16
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.44   0.25   0.31    -      -      -      -     fmul.8h	v7, v7, v16
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.31   0.39   0.30    -      -      -      -     fmla.8h	v7, v5, v0
+ -      -      -      -      -     0.25   0.27   0.23   0.25    -      -     0.48   0.52    -     0.21   0.79    -      -      -      -      -      -      -     str	q7, [x2, x11]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.44   0.02   0.54    -      -      -      -     ushll.8h	v1, v1, #0
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.31   0.40   0.29    -      -      -      -     scvtf.8h	v1, v1
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -     0.71   0.29    -      -      -      -      -      -      -     ldr	q7, [x3, x11]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.25   0.20   0.55    -      -      -      -     fmul.8h	v7, v7, v16
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.38   0.30   0.32    -      -      -      -     fmla.8h	v7, v5, v1
+ -      -      -      -      -     0.27   0.23   0.25   0.25    -      -     0.52   0.48    -     0.55   0.45    -      -      -      -      -      -      -     str	q7, [x3, x11]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.27   0.30   0.43    -      -      -      -     ushll.8h	v2, v2, #0
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.41   0.16   0.43    -      -      -      -     scvtf.8h	v2, v2
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -     0.43   0.57    -      -      -      -      -      -      -     ldr	q7, [x4, x11]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.43   0.29   0.28    -      -      -      -     fmul.8h	v7, v7, v16
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.18   0.44   0.38    -      -      -      -     fmla.8h	v7, v5, v2
+ -      -      -      -      -     0.23   0.25   0.25   0.27    -      -     0.48   0.52    -     0.33   0.67    -      -      -      -      -      -      -     str	q7, [x4, x11]
+ -      -      -      -      -     0.24   0.25   0.25   0.26    -      -     0.49   0.51    -     0.69   0.31    -      -      -      -      -      -      -     ldr	q7, [x5, x11]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.30   0.41   0.29    -      -      -      -     fmul.8h	v7, v7, v16
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.43   0.38   0.19    -      -      -      -     fmla.8h	v7, v5, v3
+ -      -      -      -      -     0.25   0.25   0.27   0.23    -      -     0.52   0.48    -     0.67   0.33    -      -      -      -      -      -      -     str	q7, [x5, x11]

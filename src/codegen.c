@@ -294,9 +294,9 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                      pad, i, inst->x, inst->y, inst->z);
                 break;
 
-            case op_load_8x4_0: case op_load_8x4_1: case op_load_8x4_2: case op_load_8x4_3: {
-                int ch = (int)(inst->op - op_load_8x4_0);
-                int p = inst->ptr;
+            case op_load_8x4: {
+                int ch = inst->x ? inst->imm : 0;
+                int p  = inst->x ? bb->inst[inst->x].ptr : inst->ptr;
                 emit(b, "%su16 v%d = ((unsigned char*)a%d)[i*4+%d];\n", pad, i, p, ch);
             } break;
             case op_i16_from_u8:
@@ -305,10 +305,12 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             case op_u8_from_i16:
                 emit(b, "%su32 v%d = (u32)(unsigned char)v%d;\n", pad, i, inst->x);
                 break;
-            case op_store_8x4_0: case op_store_8x4_1: case op_store_8x4_2: case op_store_8x4_3: {
-                int ch = (int)(inst->op - op_store_8x4_0);
+            case op_store_8x4: {
                 int p = inst->ptr;
-                emit(b, "%s((unsigned char*)a%d)[i*4+%d] = (unsigned char)v%d;\n", pad, p, ch, inst->y);
+                emit(b, "%s((unsigned char*)a%d)[i*4+0] = (unsigned char)v%d;\n", pad, p, inst->x);
+                emit(b, "%s((unsigned char*)a%d)[i*4+1] = (unsigned char)v%d;\n", pad, p, inst->y);
+                emit(b, "%s((unsigned char*)a%d)[i*4+2] = (unsigned char)v%d;\n", pad, p, inst->z);
+                emit(b, "%s((unsigned char*)a%d)[i*4+3] = (unsigned char)v%d;\n", pad, p, inst->w);
             } break;
 
             case op_store_half: case op_scatter_half: break;
