@@ -11,6 +11,10 @@ static double now(void) {
     return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
 }
 
+static int cmp_double(void const *a, void const *b) {
+    double const x = *(double const*)a, y = *(double const*)b;
+    return (x > y) - (x < y);
+}
 
 typedef void (*run_fn)(void*, int, void*, void*, void*, void*, void*, void*);
 
@@ -146,8 +150,14 @@ static void fmt_ns(char buf[16], double ns) {
 
 int main(int argc, char *argv[]) {
     int pixel_n = 4096;
+    int samples = 1;
     for (int i = 1; i < argc; i++) {
-        pixel_n = atoi(argv[i]);
+        if (argv[i][0] == '-' && argv[i][1] == 's') {
+            samples = atoi(argv[i]+2);
+            if (samples < 1) samples = 1;
+        } else {
+            pixel_n = atoi(argv[i]);
+        }
     }
 
     struct umbra_basic_block *bb = build_srcover();
@@ -170,28 +180,63 @@ int main(int argc, char *argv[]) {
         db[i] = (__fp16)0.5f;
         da[i] = (__fp16)0.5f;
     }
-    char build_buf[16], run_buf[16];
 
-    printf("SrcOver 8888->fp16, %d pixels:\n", pixel_n);
-    printf("             build        run\n");
+    printf("SrcOver 8888->fp16, %d pixels", pixel_n);
+    if (samples > 1) printf(", %d samples", samples);
+    printf(":\n");
 
-    fmt_ns(build_buf, bench_optimize());
-    printf("  optimize%s\n", build_buf);
+    if (samples <= 1) {
+        char build_buf[16], run_buf[16];
+        printf("             build        run\n");
 
-    fmt_ns(build_buf, bench_build_interp());
-    sprintf(run_buf, "%5.2f ns/px", bench_run(run_interp, p, pixel_n, src, dr, dg, db, da, 0));
-    printf("  interp  %s  %s\n", build_buf, run_buf);
+        fmt_ns(build_buf, bench_optimize());
+        printf("  optimize%s\n", build_buf);
 
-    if (cg) {
-        fmt_ns(build_buf, bench_build_codegen());
-        sprintf(run_buf, "%5.2f ns/px", bench_run(run_cg, cg, pixel_n, src, dr, dg, db, da, 0));
-        printf("  codegen %s  %s\n", build_buf, run_buf);
-    }
+        fmt_ns(build_buf, bench_build_interp());
+        sprintf(run_buf, "%5.2f ns/px", bench_run(run_interp, p, pixel_n, src, dr, dg, db, da, 0));
+        printf("  interp  %s  %s\n", build_buf, run_buf);
 
-    if (jit) {
-        fmt_ns(build_buf, bench_build_jit());
-        sprintf(run_buf, "%5.2f ns/px", bench_run(run_jit, jit, pixel_n, src, dr, dg, db, da, 0));
-        printf("  jit     %s  %s\n", build_buf, run_buf);
+        if (cg) {
+            fmt_ns(build_buf, bench_build_codegen());
+            sprintf(run_buf, "%5.2f ns/px", bench_run(run_cg, cg, pixel_n, src, dr, dg, db, da, 0));
+            printf("  codegen %s  %s\n", build_buf, run_buf);
+        }
+
+        if (jit) {
+            fmt_ns(build_buf, bench_build_jit());
+            sprintf(run_buf, "%5.2f ns/px", bench_run(run_jit, jit, pixel_n, src, dr, dg, db, da, 0));
+            printf("  jit     %s  %s\n", build_buf, run_buf);
+        }
+    } else {
+        double *s = malloc((size_t)samples * sizeof *s);
+
+        printf("             min     median     max\n");
+
+        for (int i = 0; i < samples; i++) s[i] = bench_optimize();
+        qsort(s, (size_t)samples, sizeof *s, cmp_double);
+        printf("  optimize  %5.2f     %5.2f    %5.2f  us\n",
+               s[0]*1e-3, s[samples/2]*1e-3, s[samples-1]*1e-3);
+
+        for (int i = 0; i < samples; i++) s[i] = bench_run(run_interp, p, pixel_n, src,dr,dg,db,da,0);
+        qsort(s, (size_t)samples, sizeof *s, cmp_double);
+        printf("  interp    %5.2f     %5.2f    %5.2f  ns/px\n",
+               s[0], s[samples/2], s[samples-1]);
+
+        if (cg) {
+            for (int i = 0; i < samples; i++) s[i] = bench_run(run_cg, cg, pixel_n, src,dr,dg,db,da,0);
+            qsort(s, (size_t)samples, sizeof *s, cmp_double);
+            printf("  codegen   %5.2f     %5.2f    %5.2f  ns/px\n",
+                   s[0], s[samples/2], s[samples-1]);
+        }
+
+        if (jit) {
+            for (int i = 0; i < samples; i++) s[i] = bench_run(run_jit, jit, pixel_n, src,dr,dg,db,da,0);
+            qsort(s, (size_t)samples, sizeof *s, cmp_double);
+            printf("  jit       %5.2f     %5.2f    %5.2f  ns/px\n",
+                   s[0], s[samples/2], s[samples-1]);
+        }
+
+        free(s);
     }
 
     umbra_interpreter_free(p);

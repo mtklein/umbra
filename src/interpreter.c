@@ -418,16 +418,23 @@ op(bytes_32) {
 
 op(load_8x4) {
     uint8_t const *src = ptr[ip->x];
-    int ch = ip->y;
     if (end & (K-1)) {
-        v->u8 = (U8){0};
-        v->u8[0] = src[(end-1)*4 + ch];
+        uint8_t const *px = src + (end-1)*4;
+        for (int ch = 0; ch < 4; ch++) {
+            v[ch].u8 = (U8){0};
+            v[ch].u8[0] = px[ch];
+        }
     } else {
+        uint8_t buf[K*4];
+        __builtin_memcpy(buf, src + (end-K)*4, K*4);
         for (int l = 0; l < K; l++) {
-            v->u8[l] = src[(end-K+l)*4 + ch];
+            v[0].u8[l] = buf[l*4+0];
+            v[1].u8[l] = buf[l*4+1];
+            v[2].u8[l] = buf[l*4+2];
+            v[3].u8[l] = buf[l*4+3];
         }
     }
-    next;
+    return ip[4].fn(ip+4, v+4, end, ptr);
 }
 
 op(i16_from_u8) {
@@ -609,10 +616,16 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                         break;
 
                     case op_load_8x4: {
-                        int ch  = inst->x ? inst->imm : 0;
-                        int ptr = inst->x ? bb->inst[inst->x].ptr : inst->ptr;
-                        emit(.fn=load_8x4, .x=ptr, .y=ch);
-                    } break;
+                        if (inst->x) {
+                            // continuation: alias to base's val slot + channel
+                            id[i] = id[inst->x] + inst->imm;
+                            continue;
+                        }
+                        emit(.fn=load_8x4, .x=inst->ptr);
+                        id[i] = n;
+                        n += 4;  // reserves 4 val slots
+                        continue;  // skip the id[i]=n++ below
+                    }
 
                     case op_store_8x4: {
                         int const inputs[] = {inst->x, inst->y, inst->z, inst->w};
