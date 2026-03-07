@@ -33,7 +33,7 @@ struct interp_inst;
 typedef int (*Fn)(struct interp_inst const *ip, val *v, int end, void* ptr[]);
 struct interp_inst {
     Fn  fn;
-    int x,y,z,w;
+    int x,y,z,:32;
 };
 
 struct umbra_interpreter {
@@ -524,10 +524,15 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
     int *id = calloc((size_t)bb->insts, sizeof *id);
 
     struct umbra_interpreter *p = malloc(sizeof *p);
-    // store_8x4 expands to 4 interp instructions, so over-allocate by 3x per inst.
-    int const max_insts = bb->insts * 4 + 1;
-    p->inst = malloc((size_t)max_insts * sizeof *p->inst);
-    p->v    = malloc((size_t)max_insts * sizeof *p->v);
+    int num_insts = bb->insts + 1;  // +1 for trailing done sentinel
+    for (int i = 0; i < bb->insts; i++) {
+        if (bb->inst[i].op == op_store_8x4) num_insts += 3;  // expands to 4 interp insts
+#if !defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
+        if (bb->inst[i].op == op_half_from_f32 || bb->inst[i].op == op_f32_from_half) num_insts--;
+#endif
+    }
+    p->inst = malloc((size_t)num_insts * sizeof *p->inst);
+    p->v    = malloc((size_t)num_insts * sizeof *p->v);
 
     int n = 0;
     #define emit(...) p->inst[n] = (struct interp_inst){__VA_ARGS__}

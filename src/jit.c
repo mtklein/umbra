@@ -855,10 +855,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 }
                 put(c, ADD_xr(XT, 1+p, XW));
                 put(c, ST4_8b(0, XT));
-                // V0-V3 now hold interleaved data, return them to pool.
+                // V0-V3 now hold interleaved data; clear ownership.
+                // Don't push to free stack — they may already be there from
+                // ra_free_reg of earlier LD4 outputs.  They'll re-enter the
+                // pool naturally when future values in them die.
                 for (int r = 0; r < 4; r++) {
                     ra->owner[r] = -1;
-                    ra->free_stack[ra->nfree++] = (int8_t)r;
                 }
             }
             for (int ch = 0; ch < 4; ch++) {
@@ -1112,9 +1114,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 ra->reg_hi[i] = rdh; ra->owner[(int)rdh] = i;
             }
 
-            _Bool needs_scratch = op==op_fma_f32 || op==op_fma_half
-                               || op==op_shr_u32 || op==op_shr_s32
-                               || op==op_shr_u16 || op==op_shr_s16;
+            _Bool needs_scratch = op==op_shr_u32 || op==op_shr_s32
+                               || op==op_shr_u16 || op==op_shr_s16
+                               || ((op==op_fma_f32 || op==op_fma_half)
+                                   && rd!=rz && (rd==rx || rd==ry));
             int8_t scratch_reg = -1;
             if (needs_scratch) {
                 scratch_reg = ra_alloc(c, ra, sl, ns);
