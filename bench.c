@@ -1,8 +1,10 @@
 #define _POSIX_C_SOURCE 199309L
 #include "srcover.h"
+#include "umbra_draw.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 static double now(void) {
@@ -41,132 +43,46 @@ static double bench_run(run_fn fn, void *ctx, int pixel_n, umbra_buf buf[]) {
             fn(ctx, pixel_n, buf);
         }
         double const elapsed = now() - start;
-        if (elapsed >= 0.5) {
+        if (elapsed >= 0.1) {
             return elapsed / ((double)iters * (double)pixel_n) * 1e9;
         }
         iters *= 2;
     }
 }
 
-static double bench_build_interp(void) {
-    struct umbra_basic_block *bb = build_srcover();
+typedef struct umbra_basic_block* (*build_fn)(void);
+
+static double bench_build(build_fn build, void (*compile_and_free)(struct umbra_basic_block*)) {
+    // Single-shot: build + optimize + compile + free, timed once.
+    double const start = now();
+    struct umbra_basic_block *bb = build();
     umbra_basic_block_optimize(bb);
+    compile_and_free(bb);
+    return (now() - start) * 1e9;
+}
+
+static void build_optimize_only(struct umbra_basic_block *bb) {
+    umbra_basic_block_free(bb);
+}
+static void build_interp(struct umbra_basic_block *bb) {
     struct umbra_interpreter *p = umbra_interpreter(bb);
     umbra_basic_block_free(bb);
     umbra_interpreter_free(p);
-
-    int iters = 1;
-    for (;;) {
-        double const start = now();
-        for (int i = 0; i < iters; i++) {
-            bb = build_srcover();
-            umbra_basic_block_optimize(bb);
-            p = umbra_interpreter(bb);
-            umbra_basic_block_free(bb);
-            umbra_interpreter_free(p);
-        }
-        double const elapsed = now() - start;
-        if (elapsed >= 0.5) {
-            return elapsed / (double)iters * 1e9;
-        }
-        iters *= 2;
-    }
 }
-
-static double bench_build_codegen(void) {
-    struct umbra_basic_block *bb = build_srcover();
-    umbra_basic_block_optimize(bb);
+static void build_codegen(struct umbra_basic_block *bb) {
     struct umbra_codegen *cg = umbra_codegen(bb);
     umbra_basic_block_free(bb);
     if (cg) { umbra_codegen_free(cg); }
-
-    int iters = 1;
-    for (;;) {
-        double const start = now();
-        for (int i = 0; i < iters; i++) {
-            bb = build_srcover();
-            umbra_basic_block_optimize(bb);
-            cg = umbra_codegen(bb);
-            umbra_basic_block_free(bb);
-            if (cg) { umbra_codegen_free(cg); }
-        }
-        double const elapsed = now() - start;
-        if (elapsed >= 0.5) {
-            return elapsed / (double)iters * 1e9;
-        }
-        iters *= 2;
-    }
 }
-
-static double bench_build_jit(void) {
-    struct umbra_basic_block *bb = build_srcover();
-    umbra_basic_block_optimize(bb);
+static void build_jit(struct umbra_basic_block *bb) {
     struct umbra_jit *j = umbra_jit(bb);
     umbra_basic_block_free(bb);
     if (j) { umbra_jit_free(j); }
-
-    int iters = 1;
-    for (;;) {
-        double const start = now();
-        for (int i = 0; i < iters; i++) {
-            bb = build_srcover();
-            umbra_basic_block_optimize(bb);
-            j = umbra_jit(bb);
-            umbra_basic_block_free(bb);
-            if (j) { umbra_jit_free(j); }
-        }
-        double const elapsed = now() - start;
-        if (elapsed >= 0.5) {
-            return elapsed / (double)iters * 1e9;
-        }
-        iters *= 2;
-    }
 }
-
-static double bench_build_metal(void) {
-    struct umbra_basic_block *bb = build_srcover();
-    umbra_basic_block_optimize(bb);
+static void build_metal(struct umbra_basic_block *bb) {
     struct umbra_metal *m = umbra_metal(bb);
     umbra_basic_block_free(bb);
     if (m) { umbra_metal_free(m); }
-
-    int iters = 1;
-    for (;;) {
-        double const start = now();
-        for (int i = 0; i < iters; i++) {
-            bb = build_srcover();
-            umbra_basic_block_optimize(bb);
-            m = umbra_metal(bb);
-            umbra_basic_block_free(bb);
-            if (m) { umbra_metal_free(m); }
-        }
-        double const elapsed = now() - start;
-        if (elapsed >= 0.5) {
-            return elapsed / (double)iters * 1e9;
-        }
-        iters *= 2;
-    }
-}
-
-static double bench_optimize(void) {
-    struct umbra_basic_block *bb = build_srcover();
-    umbra_basic_block_optimize(bb);
-    umbra_basic_block_free(bb);
-
-    int iters = 1;
-    for (;;) {
-        double const start = now();
-        for (int i = 0; i < iters; i++) {
-            bb = build_srcover();
-            umbra_basic_block_optimize(bb);
-            umbra_basic_block_free(bb);
-        }
-        double const elapsed = now() - start;
-        if (elapsed >= 0.5) {
-            return elapsed / (double)iters * 1e9;
-        }
-        iters *= 2;
-    }
 }
 
 static void fmt_ns(char buf[16], double ns) {
@@ -225,27 +141,27 @@ int main(int argc, char *argv[]) {
         char build_buf[16], run_buf[16];
         printf("             build        run\n");
 
-        fmt_ns(build_buf, bench_optimize());
+        fmt_ns(build_buf, bench_build(build_srcover, build_optimize_only));
         printf("  optimize%s\n", build_buf);
 
-        fmt_ns(build_buf, bench_build_interp());
+        fmt_ns(build_buf, bench_build(build_srcover, build_interp));
         sprintf(run_buf, "%5.2f ns/px", bench_run(run_interp, p, pixel_n, buf));
         printf("  interp  %s  %s\n", build_buf, run_buf);
 
         if (cg) {
-            fmt_ns(build_buf, bench_build_codegen());
+            fmt_ns(build_buf, bench_build(build_srcover, build_codegen));
             sprintf(run_buf, "%5.2f ns/px", bench_run(run_cg, cg, pixel_n, buf));
             printf("  codegen %s  %s\n", build_buf, run_buf);
         }
 
         if (jit) {
-            fmt_ns(build_buf, bench_build_jit());
+            fmt_ns(build_buf, bench_build(build_srcover, build_jit));
             sprintf(run_buf, "%5.2f ns/px", bench_run(run_jit, jit, pixel_n, buf));
             printf("  jit     %s  %s\n", build_buf, run_buf);
         }
 
         if (mtl) {
-            fmt_ns(build_buf, bench_build_metal());
+            fmt_ns(build_buf, bench_build(build_srcover, build_metal));
             sprintf(run_buf, "%5.2f ns/px", bench_run(run_mtl, mtl, pixel_n, buf));
             printf("  metal   %s  %s\n", build_buf, run_buf);
         }
@@ -253,11 +169,6 @@ int main(int argc, char *argv[]) {
         double *s = malloc((size_t)samples * sizeof *s);
 
         printf("             min     median     max\n");
-
-        for (int i = 0; i < samples; i++) s[i] = bench_optimize();
-        qsort(s, (size_t)samples, sizeof *s, cmp_double);
-        printf("  optimize  %5.2f     %5.2f    %5.2f  us\n",
-               s[0]*1e-3, s[samples/2]*1e-3, s[samples-1]*1e-3);
 
         for (int i = 0; i < samples; i++) s[i] = bench_run(run_interp, p, pixel_n, buf);
         qsort(s, (size_t)samples, sizeof *s, cmp_double);
@@ -293,5 +204,76 @@ int main(int argc, char *argv[]) {
     if (jit) { umbra_jit_free(jit); }
     if (mtl) { umbra_metal_free(mtl); }
     free(src); free(dr); free(dg); free(db); free(da);
+
+    // --- Draw API benchmarks ---
+    typedef struct {
+        const char              *name;
+        umbra_shader_fn          shader;
+        umbra_coverage_fn        coverage;
+        umbra_blend_fn           blend;
+        umbra_load_fn            load;
+        umbra_store_fn           store;
+    } draw_config;
+    draw_config draws[] = {
+        {"solid src 8888",     umbra_shader_solid, NULL, umbra_blend_src,     umbra_load_8888, umbra_store_8888},
+        {"solid srcover 8888", umbra_shader_solid, NULL, umbra_blend_srcover, umbra_load_8888, umbra_store_8888},
+        {"solid src fp16",     umbra_shader_solid, NULL, umbra_blend_src,     umbra_load_fp16, umbra_store_fp16},
+        {"solid srcover fp16", umbra_shader_solid, NULL, umbra_blend_srcover, umbra_load_fp16, umbra_store_fp16},
+    };
+
+    for (int di = 0; di < (int)(sizeof draws / sizeof draws[0]); di++) {
+        draw_config *d = &draws[di];
+        struct umbra_basic_block *dbb = umbra_draw_build(
+            d->shader, d->coverage, d->blend, d->load, d->store);
+        umbra_basic_block_optimize(dbb);
+
+        struct umbra_interpreter *dp   = umbra_interpreter(dbb);
+        struct umbra_codegen     *dcg  = umbra_codegen(dbb);
+        struct umbra_jit         *djit = umbra_jit(dbb);
+        struct umbra_metal       *dmtl = umbra_metal(dbb);
+        umbra_basic_block_free(dbb);
+
+        // Allocate pixel buffers — 8888 needs 4 bytes/px, fp16 needs 8 bytes/px.
+        int px_bytes = (d->load == umbra_load_fp16) ? 8 : 4;
+        void *dst_px = malloc((size_t)pixel_n * (size_t)px_bytes);
+        memset(dst_px, 0x80, (size_t)pixel_n * (size_t)px_bytes);
+
+        int32_t x0 = 0, y0 = 0;
+        __fp16  color[4] = {(__fp16)0.25f, (__fp16)0.5f, (__fp16)0.125f, (__fp16)0.5f};
+
+        umbra_buf dbuf[] = {
+            {dst_px, pixel_n * px_bytes},
+            {&x0,   -4},
+            {&y0,   -4},
+            {color, -8},
+        };
+
+        printf("\nDraw %s, %d pixels:\n", d->name, pixel_n);
+        printf("             run\n");
+
+        char rbuf[16];
+        sprintf(rbuf, "%5.2f ns/px", bench_run(run_interp, dp, pixel_n, dbuf));
+        printf("  interp    %s\n", rbuf);
+
+        if (dcg) {
+            sprintf(rbuf, "%5.2f ns/px", bench_run(run_cg, dcg, pixel_n, dbuf));
+            printf("  codegen   %s\n", rbuf);
+        }
+        if (djit) {
+            sprintf(rbuf, "%5.2f ns/px", bench_run(run_jit, djit, pixel_n, dbuf));
+            printf("  jit       %s\n", rbuf);
+        }
+        if (dmtl) {
+            sprintf(rbuf, "%5.2f ns/px", bench_run(run_mtl, dmtl, pixel_n, dbuf));
+            printf("  metal     %s\n", rbuf);
+        }
+
+        umbra_interpreter_free(dp);
+        if (dcg)  { umbra_codegen_free(dcg); }
+        if (djit) { umbra_jit_free(djit); }
+        if (dmtl) { umbra_metal_free(dmtl); }
+        free(dst_px);
+    }
+
     return 0;
 }
