@@ -1,0 +1,111 @@
+Iterations:        100
+Instructions:      1300
+Total Cycles:      457
+Total uOps:        1300
+
+Dispatch Width:    6
+uOps Per Cycle:    2.84
+IPC:               2.84
+Block RThroughput: 4.0
+
+
+Cycles with backend pressure increase [ 91.90% ]
+Throughput Bottlenecks: 
+  Resource Pressure       [ 91.90% ]
+  - Zn4FP1  [ 91.90% ]
+  - Zn4FP2  [ 91.90% ]
+  Data Dependencies:      [ 20.35% ]
+  - Register Dependencies [ 20.35% ]
+  - Memory Dependencies   [ 0.00% ]
+
+Critical sequence based on the simulation:
+
+              Instruction                                 Dependency Information
+ +----< 5.    vpackuswb	%xmm2, %xmm8, %xmm4
+ |
+ |    < loop carried > 
+ |
+ |      0.    vpxor	%xmm2, %xmm2, %xmm2
+ +----> 1.    vpackuswb	%xmm2, %xmm9, %xmm0               ## RESOURCE interference:  Zn4FP2 [ probability: 49% ]
+ +----> 2.    vpackuswb	%xmm2, %xmm3, %xmm1               ## RESOURCE interference:  Zn4FP2 [ probability: 49% ]
+ |      3.    vpunpcklbw	%xmm1, %xmm0, %xmm0
+ +----> 4.    vpackuswb	%xmm2, %xmm5, %xmm1               ## RESOURCE interference:  Zn4FP1 [ probability: 100% ]
+        5.    vpackuswb	%xmm2, %xmm8, %xmm4
+        6.    vpunpcklbw	%xmm4, %xmm1, %xmm1
+        7.    vmovaps	%xmm0, %xmm2
+        8.    vpunpcklwd	%xmm1, %xmm2, %xmm0
+        9.    vpunpckhwd	%xmm1, %xmm2, %xmm1
+        10.   vinserti128	$1, %xmm1, %ymm0, %ymm0
+        11.   movq	(%rsi), %r11
+        12.   vmovdqu	%ymm0, (%r11,%r10,4)
+
+
+Instruction Info:
+[1]: #uOps
+[2]: Latency
+[3]: RThroughput
+[4]: MayLoad
+[5]: MayStore
+[6]: HasSideEffects (U)
+
+[1]    [2]    [3]    [4]    [5]    [6]    Instructions:
+ 1      0     0.17                        vpxor	%xmm2, %xmm2, %xmm2
+ 1      2     0.50                        vpackuswb	%xmm2, %xmm9, %xmm0
+ 1      2     0.50                        vpackuswb	%xmm2, %xmm3, %xmm1
+ 1      1     0.50                        vpunpcklbw	%xmm1, %xmm0, %xmm0
+ 1      2     0.50                        vpackuswb	%xmm2, %xmm5, %xmm1
+ 1      2     0.50                        vpackuswb	%xmm2, %xmm8, %xmm4
+ 1      1     0.50                        vpunpcklbw	%xmm4, %xmm1, %xmm1
+ 1      0     0.17                        vmovaps	%xmm0, %xmm2
+ 1      1     0.50                        vpunpcklwd	%xmm1, %xmm2, %xmm0
+ 1      1     0.50                        vpunpckhwd	%xmm1, %xmm2, %xmm1
+ 1      1     1.00                        vinserti128	$1, %xmm1, %ymm0, %ymm0
+ 1      5     0.33    *                   movq	(%rsi), %r11
+ 1      1     1.00           *            vmovdqu	%ymm0, (%r11,%r10,4)
+
+
+Resources:
+[0]   - Zn4AGU0
+[1]   - Zn4AGU1
+[2]   - Zn4AGU2
+[3]   - Zn4ALU0
+[4]   - Zn4ALU1
+[5]   - Zn4ALU2
+[6]   - Zn4ALU3
+[7]   - Zn4BRU1
+[8]   - Zn4FP0
+[9]   - Zn4FP1
+[10]  - Zn4FP2
+[11]  - Zn4FP3
+[12.0] - Zn4FP45
+[12.1] - Zn4FP45
+[13]  - Zn4FPSt
+[14.0] - Zn4LSU
+[14.1] - Zn4LSU
+[14.2] - Zn4LSU
+[15.0] - Zn4Load
+[15.1] - Zn4Load
+[15.2] - Zn4Load
+[16.0] - Zn4Store
+[16.1] - Zn4Store
+
+
+Resource pressure per iteration:
+[0]    [1]    [2]    [3]    [4]    [5]    [6]    [7]    [8]    [9]    [10]   [11]   [12.0] [12.1] [13]   [14.0] [14.1] [14.2] [15.0] [15.1] [15.2] [16.0] [16.1] 
+0.33   0.33   0.34    -      -      -      -      -      -     4.50   4.50    -     0.50   0.50   1.00   0.66   0.67   0.67   0.33   0.33   0.34   0.50   0.50   
+
+Resource pressure by instruction:
+[0]    [1]    [2]    [3]    [4]    [5]    [6]    [7]    [8]    [9]    [10]   [11]   [12.0] [12.1] [13]   [14.0] [14.1] [14.2] [15.0] [15.1] [15.2] [16.0] [16.1] Instructions:
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vpxor	%xmm2, %xmm2, %xmm2
+ -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -      -      -      -      -      -     vpackuswb	%xmm2, %xmm9, %xmm0
+ -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -     vpackuswb	%xmm2, %xmm3, %xmm1
+ -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -      -     vpunpcklbw	%xmm1, %xmm0, %xmm0
+ -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -      -     vpackuswb	%xmm2, %xmm5, %xmm1
+ -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -      -      -     vpackuswb	%xmm2, %xmm8, %xmm4
+ -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpunpcklbw	%xmm4, %xmm1, %xmm1
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vmovaps	%xmm0, %xmm2
+ -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -      -      -      -      -      -     vpunpcklwd	%xmm1, %xmm2, %xmm0
+ -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpunpckhwd	%xmm1, %xmm2, %xmm1
+ -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -     vinserti128	$1, %xmm1, %ymm0, %ymm0
+0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.35   0.31   0.33   0.33   0.34    -      -     movq	(%rsi), %r11
+ -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50   1.00   0.32   0.32   0.36    -      -      -     0.50   0.50   vmovdqu	%ymm0, (%r11,%r10,4)
