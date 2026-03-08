@@ -27,6 +27,9 @@ static void run_cg(void *ctx, int n, void *p0, void *p1, void *p2, void *p3, voi
 static void run_jit(void *ctx, int n, void *p0, void *p1, void *p2, void *p3, void *p4, void *p5) {
     umbra_jit_run(ctx, n, p0,p1,p2,p3,p4,p5);
 }
+static void run_mtl(void *ctx, int n, void *p0, void *p1, void *p2, void *p3, void *p4, void *p5) {
+    umbra_metal_run(ctx, n, p0,p1,p2,p3,p4,p5);
+}
 
 static double bench_run(run_fn fn, void *ctx, int pixel_n,
                         void *p0, void *p1, void *p2, void *p3, void *p4, void *p5) {
@@ -121,6 +124,31 @@ static double bench_build_jit(void) {
     }
 }
 
+static double bench_build_metal(void) {
+    struct umbra_basic_block *bb = build_srcover();
+    umbra_basic_block_optimize(bb);
+    struct umbra_metal *m = umbra_metal(bb);
+    umbra_basic_block_free(bb);
+    if (m) { umbra_metal_free(m); }
+
+    int iters = 1;
+    for (;;) {
+        double const start = now();
+        for (int i = 0; i < iters; i++) {
+            bb = build_srcover();
+            umbra_basic_block_optimize(bb);
+            m = umbra_metal(bb);
+            umbra_basic_block_free(bb);
+            if (m) { umbra_metal_free(m); }
+        }
+        double const elapsed = now() - start;
+        if (elapsed >= 0.5) {
+            return elapsed / (double)iters * 1e9;
+        }
+        iters *= 2;
+    }
+}
+
 static double bench_optimize(void) {
     struct umbra_basic_block *bb = build_srcover();
     umbra_basic_block_optimize(bb);
@@ -166,6 +194,7 @@ int main(int argc, char *argv[]) {
     struct umbra_interpreter *p   = umbra_interpreter(bb);
     struct umbra_codegen     *cg  = umbra_codegen(bb);
     struct umbra_jit         *jit = umbra_jit(bb);
+    struct umbra_metal       *mtl = umbra_metal(bb);
     umbra_basic_block_free(bb);
 
     uint32_t *src = malloc((size_t)pixel_n * sizeof *src);
@@ -207,6 +236,12 @@ int main(int argc, char *argv[]) {
             sprintf(run_buf, "%5.2f ns/px", bench_run(run_jit, jit, pixel_n, src, dr, dg, db, da, 0));
             printf("  jit     %s  %s\n", build_buf, run_buf);
         }
+
+        if (mtl) {
+            fmt_ns(build_buf, bench_build_metal());
+            sprintf(run_buf, "%5.2f ns/px", bench_run(run_mtl, mtl, pixel_n, src, dr, dg, db, da, 0));
+            printf("  metal   %s  %s\n", build_buf, run_buf);
+        }
     } else {
         double *s = malloc((size_t)samples * sizeof *s);
 
@@ -236,12 +271,20 @@ int main(int argc, char *argv[]) {
                    s[0], s[samples/2], s[samples-1]);
         }
 
+        if (mtl) {
+            for (int i = 0; i < samples; i++) s[i] = bench_run(run_mtl, mtl, pixel_n, src,dr,dg,db,da,0);
+            qsort(s, (size_t)samples, sizeof *s, cmp_double);
+            printf("  metal     %5.2f     %5.2f    %5.2f  ns/px\n",
+                   s[0], s[samples/2], s[samples-1]);
+        }
+
         free(s);
     }
 
     umbra_interpreter_free(p);
-    if (cg) { umbra_codegen_free(cg); }
+    if (cg)  { umbra_codegen_free(cg); }
     if (jit) { umbra_jit_free(jit); }
+    if (mtl) { umbra_metal_free(mtl); }
     free(src); free(dr); free(dg); free(db); free(da);
     return 0;
 }

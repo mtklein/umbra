@@ -15,8 +15,13 @@ rule compile
     depfile = $out.d
     deps    = gcc
 
+rule compile_m
+    command = $cc -g -O1 -fobjc-arc -Werror $warn -MD -MF $out.d -c $in -o $out
+    depfile = $out.d
+    deps    = gcc
+
 rule link
-    command = $cc $in -o $out
+    command = $cc $in $frameworks -o $out
 
 rule run
     command = env UBSAN_OPTIONS=print_stacktrace=1 $exec ./$in $args > $out
