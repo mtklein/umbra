@@ -5,8 +5,8 @@
 
 struct umbra_metal { int dummy; };
 struct umbra_metal* umbra_metal(struct umbra_basic_block const *bb) { (void)bb; return 0; }
-void umbra_metal_run(struct umbra_metal *m, int n, void *p0, void *p1, void *p2, void *p3, void *p4, void *p5) {
-    (void)m; (void)n; (void)p0; (void)p1; (void)p2; (void)p3; (void)p4; (void)p5;
+void umbra_metal_run(struct umbra_metal *m, int n, umbra_buf buf[]) {
+    (void)m; (void)n; (void)buf;
 }
 void umbra_metal_free(struct umbra_metal *m) { (void)m; }
 void umbra_metal_dump(struct umbra_metal const *m, FILE *f) { (void)m; (void)f; }
@@ -25,9 +25,8 @@ struct umbra_metal {
     void *pipeline;
     void *queue;
     void *n_buf;
-    void *bufs[6];
-    int   buf_cap[6];
-    int   elem_sz[6];
+    void *bufs[16];
+    long  buf_cap[16];
     char *src;
     int   max_ptr;
     int   tg_size;
@@ -420,18 +419,6 @@ struct umbra_metal* umbra_metal(BB const *bb) {
         id<MTLBuffer> n_buf = [device newBufferWithLength:sizeof(uint32_t)
                                                    options:MTLResourceStorageModeShared];
 
-        // Determine element size per pointer from the ops that access it.
-        int elem_sz[6] = {0,0,0,0,0,0};
-        for (int i = 0; i < bb->insts; i++) {
-            enum op op = bb->inst[i].op;
-            if (!has_ptr(op)) continue;
-            int p = bb->inst[i].ptr;
-            if (p >= 6) continue;
-            if (op == op_load_8x4 || op == op_store_8x4) { if (elem_sz[p] < 4) elem_sz[p] = 4; }
-            else if (op_type(op) == OP_32)                { if (elem_sz[p] < 4) elem_sz[p] = 4; }
-            else                                          { if (elem_sz[p] < 2) elem_sz[p] = 2; }
-        }
-
         struct umbra_metal *m = calloc(1, sizeof *m);
         m->device   = (__bridge_retained void*)device;
         m->pipeline = (__bridge_retained void*)pipeline;
@@ -443,13 +430,11 @@ struct umbra_metal* umbra_metal(BB const *bb) {
 
         m->max_ptr  = max_ptr;
         m->tg_size  = (int)tg;
-        for (int p = 0; p < 6; p++) { m->elem_sz[p] = elem_sz[p]; }
         return m;
     }
 }
 
-void umbra_metal_run(struct umbra_metal *m, int n,
-                     void *p0, void *p1, void *p2, void *p3, void *p4, void *p5) {
+void umbra_metal_run(struct umbra_metal *m, int n, umbra_buf buf[]) {
     if (!m || n <= 0) return;
 
     @autoreleasepool {
@@ -460,28 +445,26 @@ void umbra_metal_run(struct umbra_metal *m, int n,
 
         *(uint32_t*)n_buf.contents = (uint32_t)n;
 
-        void *ptrs[] = {p0, p1, p2, p3, p4, p5};
-
-        for (int p = 0; p <= m->max_ptr && p < 6; p++) {
-            if (!ptrs[p]) continue;
-            int const sz = n * m->elem_sz[p];
-            if (sz > m->buf_cap[p]) {
-                if (m->bufs[p]) { (void)(__bridge_transfer id)m->bufs[p]; }
-                m->buf_cap[p] = sz;
-                id<MTLBuffer> buf = [device newBufferWithLength:(NSUInteger)sz
-                                                       options:MTLResourceStorageModeShared];
-                m->bufs[p] = (__bridge_retained void*)buf;
+        for (int i = 0; i <= m->max_ptr; i++) {
+            if (!buf[i].ptr || !buf[i].sz) continue;
+            long bytes = buf[i].sz < 0 ? -buf[i].sz : buf[i].sz;
+            if (bytes > m->buf_cap[i]) {
+                if (m->bufs[i]) { (void)(__bridge_transfer id)m->bufs[i]; }
+                m->buf_cap[i] = bytes;
+                id<MTLBuffer> b = [device newBufferWithLength:(NSUInteger)bytes
+                                                      options:MTLResourceStorageModeShared];
+                m->bufs[i] = (__bridge_retained void*)b;
             }
-            __builtin_memcpy(((__bridge id<MTLBuffer>)m->bufs[p]).contents, ptrs[p], (size_t)sz);
+            __builtin_memcpy(((__bridge id<MTLBuffer>)m->bufs[i]).contents, buf[i].ptr, (size_t)bytes);
         }
 
         id<MTLCommandBuffer> cmdbuf = [queue commandBufferWithUnretainedReferences];
         id<MTLComputeCommandEncoder> enc = [cmdbuf computeCommandEncoder];
         [enc setComputePipelineState:pipeline];
         [enc setBuffer:n_buf offset:0 atIndex:0];
-        for (int p = 0; p <= m->max_ptr && p < 6; p++) {
-            if (m->bufs[p]) [enc setBuffer:(__bridge id<MTLBuffer>)m->bufs[p]
-                                    offset:0 atIndex:(NSUInteger)(p + 1)];
+        for (int i = 0; i <= m->max_ptr; i++) {
+            if (m->bufs[i]) [enc setBuffer:(__bridge id<MTLBuffer>)m->bufs[i]
+                                    offset:0 atIndex:(NSUInteger)(i + 1)];
         }
 
         MTLSize grid = MTLSizeMake((NSUInteger)n, 1, 1);
@@ -491,10 +474,10 @@ void umbra_metal_run(struct umbra_metal *m, int n,
         [cmdbuf commit];
         [cmdbuf waitUntilCompleted];
 
-        for (int p = 0; p <= m->max_ptr && p < 6; p++) {
-            if (!ptrs[p] || !m->bufs[p]) continue;
-            __builtin_memcpy(ptrs[p], ((__bridge id<MTLBuffer>)m->bufs[p]).contents,
-                             (size_t)(n * m->elem_sz[p]));
+        // Copy back only pointers with positive sizes (negative = read-only).
+        for (int i = 0; i <= m->max_ptr; i++) {
+            if (!buf[i].ptr || !m->bufs[i] || buf[i].sz <= 0) continue;
+            __builtin_memcpy(buf[i].ptr, ((__bridge id<MTLBuffer>)m->bufs[i]).contents, (size_t)buf[i].sz);
         }
     }
 }

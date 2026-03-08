@@ -119,20 +119,22 @@ umbra_v16 umbra_le_u16(struct umbra_basic_block*, umbra_v16, umbra_v16);
 umbra_v16 umbra_gt_u16(struct umbra_basic_block*, umbra_v16, umbra_v16);
 umbra_v16 umbra_ge_u16(struct umbra_basic_block*, umbra_v16, umbra_v16);
 
+typedef struct { void *ptr; long sz; } umbra_buf;
+
 struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const*);
-void umbra_interpreter_run (struct umbra_interpreter*, int n, void*, void*, void*, void*, void*, void*);
+void umbra_interpreter_run (struct umbra_interpreter*, int n, umbra_buf[]);
 void umbra_interpreter_free(struct umbra_interpreter*);
 
 struct umbra_codegen* umbra_codegen(struct umbra_basic_block const*);
-void umbra_codegen_run (struct umbra_codegen*, int n, void*, void*, void*, void*, void*, void*);
+void umbra_codegen_run (struct umbra_codegen*, int n, umbra_buf[]);
 void umbra_codegen_free(struct umbra_codegen*);
 
 struct umbra_jit* umbra_jit(struct umbra_basic_block const*);
-void umbra_jit_run (struct umbra_jit*, int n, void*, void*, void*, void*, void*, void*);
+void umbra_jit_run (struct umbra_jit*, int n, umbra_buf[]);
 void umbra_jit_free(struct umbra_jit*);
 
 struct umbra_metal* umbra_metal(struct umbra_basic_block const*);
-void umbra_metal_run (struct umbra_metal*, int n, void*, void*, void*, void*, void*, void*);
+void umbra_metal_run (struct umbra_metal*, int n, umbra_buf[]);
 void umbra_metal_free(struct umbra_metal*);
 
 #include <stdio.h>

@@ -37,7 +37,7 @@ struct interp_inst {
 struct umbra_interpreter {
     struct interp_inst *inst;
     val                *v;
-    int                 preamble,:32;
+    int                 preamble, nptr;
 };
 
 #define op(name) static int name(struct interp_inst const *ip, val *v, int end, void* ptr[])
@@ -423,8 +423,8 @@ op(store_8x4) {
         B16 ba = __builtin_shufflevector(b8, a8, 0,8, 1,9, 2,10, 3,11, 4,12, 5,13, 6,14, 7,15);
         typedef uint8_t B32 __attribute__((vector_size(32)));
         B32 rgba = __builtin_shufflevector(rg, ba,
-             0,16, 1,17,  2,18, 3,19,  4,20, 5,21,  6,22, 7,23,
-             8,24, 9,25, 10,26,11,27, 12,28,13,29, 14,30,15,31);
+             0, 1,16,17,  2, 3,18,19,  4, 5,20,21,  6, 7,22,23,
+             8, 9,24,25, 10,11,26,27, 12,13,28,29, 14,15,30,31);
         __builtin_memcpy(dst + (end-K)*4, &rgba, 32);
     }
     return ip[2].fn(ip+2, v+2, end, ptr);
@@ -631,13 +631,20 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
     }
     #undef emit
     p->inst[n] = (struct interp_inst){.fn=done};
+
+    int max_ptr = -1;
+    for (int i = 0; i < bb->insts; i++)
+        if (has_ptr(bb->inst[i].op) && bb->inst[i].ptr > max_ptr)
+            max_ptr = bb->inst[i].ptr;
+    p->nptr = max_ptr + 1;
+
     free(id);
     return p;
 }
 
-void umbra_interpreter_run(struct umbra_interpreter *p, int n,
-                           void *p0, void *p1, void *p2, void *p3, void *p4, void *p5) {
-    void *ptr[] = {p0, p1, p2, p3, p4, p5};
+void umbra_interpreter_run(struct umbra_interpreter *p, int n, umbra_buf buf[]) {
+    void *ptr[16] = {0};
+    for (int i = 0; i < p->nptr && i < 16; i++) ptr[i] = buf[i].ptr;
     struct interp_inst const *start = p->inst;
     val                      *v     = p->v;
     int const P = p->preamble;

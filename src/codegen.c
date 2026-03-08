@@ -5,8 +5,8 @@
 
 struct umbra_codegen { int dummy; };
 struct umbra_codegen* umbra_codegen(struct umbra_basic_block const *bb) { (void)bb; return 0; }
-void umbra_codegen_run (struct umbra_codegen *cg, int n, void *p0, void *p1, void *p2, void *p3, void *p4, void *p5) {
-    (void)cg; (void)n; (void)p0; (void)p1; (void)p2; (void)p3; (void)p4; (void)p5;
+void umbra_codegen_run (struct umbra_codegen *cg, int n, umbra_buf buf[]) {
+    (void)cg; (void)n; (void)buf;
 }
 void umbra_codegen_free(struct umbra_codegen *cg) { (void)cg; }
 void umbra_codegen_dump(struct umbra_codegen const *cg, FILE *f) { (void)cg; (void)f; }
@@ -22,8 +22,9 @@ typedef struct umbra_basic_block BB;
 
 struct umbra_codegen {
     void *dl;
-    void (*entry)(int, void*, void*, void*, void*, void*, void*);
+    void (*entry)(int, void**);
     char *src_path, *so_path, *src;
+    int   nptr, :32;
 };
 
 typedef struct {
@@ -284,14 +285,14 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             case op_load_8x4: {
                 int ch = inst->x ? inst->imm : 0;
                 int p  = inst->x ? bb->inst[inst->x].ptr : inst->ptr;
-                emit(b, "%su16 v%d = (u16)((unsigned char*)a%d)[i*4+%d];\n", pad, i, p, ch);
+                emit(b, "%su16 v%d = (u16)((unsigned char*)ptrs[%d])[i*4+%d];\n", pad, i, p, ch);
             } break;
             case op_store_8x4: {
                 int p = inst->ptr;
-                emit(b, "%s((unsigned char*)a%d)[i*4+0] = (unsigned char)v%d;\n", pad, p, inst->x);
-                emit(b, "%s((unsigned char*)a%d)[i*4+1] = (unsigned char)v%d;\n", pad, p, inst->y);
-                emit(b, "%s((unsigned char*)a%d)[i*4+2] = (unsigned char)v%d;\n", pad, p, inst->z);
-                emit(b, "%s((unsigned char*)a%d)[i*4+3] = (unsigned char)v%d;\n", pad, p, inst->w);
+                emit(b, "%s((unsigned char*)ptrs[%d])[i*4+0] = (unsigned char)v%d;\n", pad, p, inst->x);
+                emit(b, "%s((unsigned char*)ptrs[%d])[i*4+1] = (unsigned char)v%d;\n", pad, p, inst->y);
+                emit(b, "%s((unsigned char*)ptrs[%d])[i*4+2] = (unsigned char)v%d;\n", pad, p, inst->z);
+                emit(b, "%s((unsigned char*)ptrs[%d])[i*4+3] = (unsigned char)v%d;\n", pad, p, inst->w);
             } break;
 
             case op_store_half: case op_scatter_half: break;
@@ -358,16 +359,16 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
     emit(&b, "    u32 r = (is_uf&sign) | (is_of&~is_in&inf) | (is_in&infnan) | (~is_uf&~is_of&~is_in&normal);\n");
     emit(&b, "    return (u16)r;\n}\n\n");
 
-    emit(&b, "void umbra_entry(int n, void *a0, void *a1, void *a2, void *a3, void *a4, void *a5) {\n");
+    emit(&b, "void umbra_entry(int n, void **ptrs) {\n");
 
     for (int p = 0; p <= max_ptr; p++) {
         if (ptr_32[p] && ptr_16[p]) {
-            emit(&b, "    u32* p%d_32 = (u32*)a%d;\n", p, p);
-            emit(&b, "    u16* p%d_16 = (u16*)a%d;\n", p, p);
+            emit(&b, "    u32* p%d_32 = (u32*)ptrs[%d];\n", p, p);
+            emit(&b, "    u16* p%d_16 = (u16*)ptrs[%d];\n", p, p);
         } else if (ptr_32[p]) {
-            emit(&b, "    u32* restrict p%d = (u32*)a%d;\n", p, p);
+            emit(&b, "    u32* restrict p%d = (u32*)ptrs[%d];\n", p, p);
         } else if (ptr_16[p]) {
-            emit(&b, "    u16* restrict p%d = (u16*)a%d;\n", p, p);
+            emit(&b, "    u16* restrict p%d = (u16*)ptrs[%d];\n", p, p);
         }
     }
 
@@ -435,8 +436,8 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
         return 0;
     }
 
-    void (*entry)(int, void*, void*, void*, void*, void*, void*) =
-        (void (*)(int, void*, void*, void*, void*, void*, void*))dlsym(dl, "umbra_entry");
+    void (*entry)(int, void**) =
+        (void (*)(int, void**))dlsym(dl, "umbra_entry");
     if (!entry) {
         dlclose(dl);
         remove(c_path);
@@ -453,12 +454,15 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
     __builtin_memcpy(cg->src_path, c_path, slen + 1);
     cg->so_path  = so_path;
     cg->src      = src_copy;
+    cg->nptr     = max_ptr + 1;
     return cg;
 }
 
-void umbra_codegen_run(struct umbra_codegen *cg, int n,
-                       void *p0, void *p1, void *p2, void *p3, void *p4, void *p5) {
-    if (cg) { cg->entry(n, p0, p1, p2, p3, p4, p5); }
+void umbra_codegen_run(struct umbra_codegen *cg, int n, umbra_buf buf[]) {
+    if (!cg) return;
+    void *ptrs[16] = {0};
+    for (int i = 0; i < cg->nptr && i < 16; i++) ptrs[i] = buf[i].ptr;
+    cg->entry(n, ptrs);
 }
 
 void umbra_codegen_free(struct umbra_codegen *cg) {

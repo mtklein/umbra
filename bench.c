@@ -16,30 +16,29 @@ static int cmp_double(void const *a, void const *b) {
     return (x > y) - (x < y);
 }
 
-typedef void (*run_fn)(void*, int, void*, void*, void*, void*, void*, void*);
+typedef void (*run_fn)(void*, int, umbra_buf[]);
 
-static void run_interp(void *ctx, int n, void *p0, void *p1, void *p2, void *p3, void *p4, void *p5) {
-    umbra_interpreter_run(ctx, n, p0,p1,p2,p3,p4,p5);
+static void run_interp(void *ctx, int n, umbra_buf buf[]) {
+    umbra_interpreter_run(ctx, n, buf);
 }
-static void run_cg(void *ctx, int n, void *p0, void *p1, void *p2, void *p3, void *p4, void *p5) {
-    umbra_codegen_run(ctx, n, p0,p1,p2,p3,p4,p5);
+static void run_cg(void *ctx, int n, umbra_buf buf[]) {
+    umbra_codegen_run(ctx, n, buf);
 }
-static void run_jit(void *ctx, int n, void *p0, void *p1, void *p2, void *p3, void *p4, void *p5) {
-    umbra_jit_run(ctx, n, p0,p1,p2,p3,p4,p5);
+static void run_jit(void *ctx, int n, umbra_buf buf[]) {
+    umbra_jit_run(ctx, n, buf);
 }
-static void run_mtl(void *ctx, int n, void *p0, void *p1, void *p2, void *p3, void *p4, void *p5) {
-    umbra_metal_run(ctx, n, p0,p1,p2,p3,p4,p5);
+static void run_mtl(void *ctx, int n, umbra_buf buf[]) {
+    umbra_metal_run(ctx, n, buf);
 }
 
-static double bench_run(run_fn fn, void *ctx, int pixel_n,
-                        void *p0, void *p1, void *p2, void *p3, void *p4, void *p5) {
-    fn(ctx, pixel_n, p0,p1,p2,p3,p4,p5);
+static double bench_run(run_fn fn, void *ctx, int pixel_n, umbra_buf buf[]) {
+    fn(ctx, pixel_n, buf);
 
     int iters = 1;
     for (;;) {
         double const start = now();
         for (int i = 0; i < iters; i++) {
-            fn(ctx, pixel_n, p0,p1,p2,p3,p4,p5);
+            fn(ctx, pixel_n, buf);
         }
         double const elapsed = now() - start;
         if (elapsed >= 0.5) {
@@ -210,6 +209,14 @@ int main(int argc, char *argv[]) {
         da[i] = (__fp16)0.5f;
     }
 
+    umbra_buf buf[] = {
+        {src, pixel_n*4},
+        {dr,  pixel_n*2},
+        {dg,  pixel_n*2},
+        {db,  pixel_n*2},
+        {da,  pixel_n*2},
+    };
+
     printf("SrcOver 8888->fp16, %d pixels", pixel_n);
     if (samples > 1) printf(", %d samples", samples);
     printf(":\n");
@@ -222,24 +229,24 @@ int main(int argc, char *argv[]) {
         printf("  optimize%s\n", build_buf);
 
         fmt_ns(build_buf, bench_build_interp());
-        sprintf(run_buf, "%5.2f ns/px", bench_run(run_interp, p, pixel_n, src, dr, dg, db, da, 0));
+        sprintf(run_buf, "%5.2f ns/px", bench_run(run_interp, p, pixel_n, buf));
         printf("  interp  %s  %s\n", build_buf, run_buf);
 
         if (cg) {
             fmt_ns(build_buf, bench_build_codegen());
-            sprintf(run_buf, "%5.2f ns/px", bench_run(run_cg, cg, pixel_n, src, dr, dg, db, da, 0));
+            sprintf(run_buf, "%5.2f ns/px", bench_run(run_cg, cg, pixel_n, buf));
             printf("  codegen %s  %s\n", build_buf, run_buf);
         }
 
         if (jit) {
             fmt_ns(build_buf, bench_build_jit());
-            sprintf(run_buf, "%5.2f ns/px", bench_run(run_jit, jit, pixel_n, src, dr, dg, db, da, 0));
+            sprintf(run_buf, "%5.2f ns/px", bench_run(run_jit, jit, pixel_n, buf));
             printf("  jit     %s  %s\n", build_buf, run_buf);
         }
 
         if (mtl) {
             fmt_ns(build_buf, bench_build_metal());
-            sprintf(run_buf, "%5.2f ns/px", bench_run(run_mtl, mtl, pixel_n, src, dr, dg, db, da, 0));
+            sprintf(run_buf, "%5.2f ns/px", bench_run(run_mtl, mtl, pixel_n, buf));
             printf("  metal   %s  %s\n", build_buf, run_buf);
         }
     } else {
@@ -252,27 +259,27 @@ int main(int argc, char *argv[]) {
         printf("  optimize  %5.2f     %5.2f    %5.2f  us\n",
                s[0]*1e-3, s[samples/2]*1e-3, s[samples-1]*1e-3);
 
-        for (int i = 0; i < samples; i++) s[i] = bench_run(run_interp, p, pixel_n, src,dr,dg,db,da,0);
+        for (int i = 0; i < samples; i++) s[i] = bench_run(run_interp, p, pixel_n, buf);
         qsort(s, (size_t)samples, sizeof *s, cmp_double);
         printf("  interp    %5.2f     %5.2f    %5.2f  ns/px\n",
                s[0], s[samples/2], s[samples-1]);
 
         if (cg) {
-            for (int i = 0; i < samples; i++) s[i] = bench_run(run_cg, cg, pixel_n, src,dr,dg,db,da,0);
+            for (int i = 0; i < samples; i++) s[i] = bench_run(run_cg, cg, pixel_n, buf);
             qsort(s, (size_t)samples, sizeof *s, cmp_double);
             printf("  codegen   %5.2f     %5.2f    %5.2f  ns/px\n",
                    s[0], s[samples/2], s[samples-1]);
         }
 
         if (jit) {
-            for (int i = 0; i < samples; i++) s[i] = bench_run(run_jit, jit, pixel_n, src,dr,dg,db,da,0);
+            for (int i = 0; i < samples; i++) s[i] = bench_run(run_jit, jit, pixel_n, buf);
             qsort(s, (size_t)samples, sizeof *s, cmp_double);
             printf("  jit       %5.2f     %5.2f    %5.2f  ns/px\n",
                    s[0], s[samples/2], s[samples-1]);
         }
 
         if (mtl) {
-            for (int i = 0; i < samples; i++) s[i] = bench_run(run_mtl, mtl, pixel_n, src,dr,dg,db,da,0);
+            for (int i = 0; i < samples; i++) s[i] = bench_run(run_mtl, mtl, pixel_n, buf);
             qsort(s, (size_t)samples, sizeof *s, cmp_double);
             printf("  metal     %5.2f     %5.2f    %5.2f  ns/px\n",
                    s[0], s[samples/2], s[samples-1]);

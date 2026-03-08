@@ -21,13 +21,12 @@ static backends make(struct umbra_basic_block *bb, _Bool opt) {
     umbra_basic_block_free(bb);
     return B;
 }
-static _Bool run(backends *B, int b, int n,
-                 void *p0, void *p1, void *p2, void *p3, void *p4, void *p5) {
+static _Bool run(backends *B, int b, int n, umbra_buf buf[]) {
     switch (b) {
-    case 0: umbra_interpreter_run(B->interp, n, p0,p1,p2,p3,p4,p5); return 1;
-    case 1: if (B->cg)  { umbra_codegen_run(B->cg,  n, p0,p1,p2,p3,p4,p5); return 1; } return 0;
-    case 2: if (B->jit) { umbra_jit_run    (B->jit, n, p0,p1,p2,p3,p4,p5); return 1; } return 0;
-    case 3: if (B->mtl) { umbra_metal_run  (B->mtl, n, p0,p1,p2,p3,p4,p5); return 1; } return 0;
+    case 0: umbra_interpreter_run(B->interp, n, buf); return 1;
+    case 1: if (B->cg)  { umbra_codegen_run(B->cg,  n, buf); return 1; } return 0;
+    case 2: if (B->jit) { umbra_jit_run    (B->jit, n, buf); return 1; } return 0;
+    case 3: if (B->mtl) { umbra_metal_run  (B->mtl, n, buf); return 1; } return 0;
     }
     return 0;
 }
@@ -74,7 +73,7 @@ static void test_f32_ops(void) {
         backends B; BINOP_32(umbra_mul_f32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             float x[] = {1,2,3,4,5}, y[] = {6,7,8,9,0}, z[5] = {0};
-            if (!run(&B, bi,5, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 5, (umbra_buf[]){{x,5*4},{y,5*4},{z,5*4}})) continue;
             equiv(z[0],  6) here; equiv(z[1], 14) here; equiv(z[2], 24) here;
             equiv(z[3], 36) here; equiv(z[4],  0) here;
         }
@@ -84,7 +83,7 @@ static void test_f32_ops(void) {
         backends B; BINOP_32(umbra_add_f32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             float x[] = {1,2,3}, y[] = {10,20,30}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             equiv(z[0], 11) here; equiv(z[1], 22) here; equiv(z[2], 33) here;
         }
         cleanup(&B);
@@ -93,7 +92,7 @@ static void test_f32_ops(void) {
         backends B; BINOP_32(umbra_sub_f32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             float x[] = {10,20,30}, y[] = {1,2,3}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             equiv(z[0], 9) here; equiv(z[1], 18) here; equiv(z[2], 27) here;
         }
         cleanup(&B);
@@ -102,7 +101,7 @@ static void test_f32_ops(void) {
         backends B; BINOP_32(umbra_div_f32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             float x[] = {10,20,30}, y[] = {2,4,5}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             equiv(z[0], 5) here; equiv(z[1], 5) here; equiv(z[2], 6) here;
         }
         cleanup(&B);
@@ -116,7 +115,7 @@ static void test_i32_ops(void) {
         backends B; BINOP_32(umbra_add_i32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             int x[] = {1,2,3}, y[] = {10,20,30}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             (z[0] == 11) here; (z[1] == 22) here; (z[2] == 33) here;
         }
         cleanup(&B);
@@ -125,7 +124,7 @@ static void test_i32_ops(void) {
         backends B; BINOP_32(umbra_sub_i32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             int x[] = {10,20,30}, y[] = {1,2,3}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             (z[0] == 9) here; (z[1] == 18) here; (z[2] == 27) here;
         }
         cleanup(&B);
@@ -134,7 +133,7 @@ static void test_i32_ops(void) {
         backends B; BINOP_32(umbra_mul_i32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             int x[] = {2,3,4}, y[] = {5,6,7}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             (z[0] == 10) here; (z[1] == 18) here; (z[2] == 28) here;
         }
         cleanup(&B);
@@ -143,7 +142,7 @@ static void test_i32_ops(void) {
         backends B; BINOP_32(umbra_shl_i32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             int x[] = {1,3,7}, y[] = {1,2,3}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             (z[0] == 2) here; (z[1] == 12) here; (z[2] == 56) here;
         }
         cleanup(&B);
@@ -152,7 +151,7 @@ static void test_i32_ops(void) {
         backends B; BINOP_32(umbra_shr_u32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             int x[] = {-1, 8, 64}, y[] = {1, 1, 3}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             (z[0] == (int)(0xffffffffu >> 1)) here;
             (z[1] == 4) here; (z[2] == 8) here;
         }
@@ -162,7 +161,7 @@ static void test_i32_ops(void) {
         backends B; BINOP_32(umbra_shr_s32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             int x[] = {-8, 8, 64}, y[] = {1, 1, 3}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             (z[0] == -4) here; (z[1] == 4) here; (z[2] == 8) here;
         }
         cleanup(&B);
@@ -171,7 +170,7 @@ static void test_i32_ops(void) {
         backends B; BINOP_32(umbra_and_32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             int x[] = {0xff, 0x0f}, y[] = {0x0f, 0xff}, z[2] = {0};
-            if (!run(&B, bi,2, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 2, (umbra_buf[]){{x,2*4},{y,2*4},{z,2*4}})) continue;
             (z[0] == 0x0f) here; (z[1] == 0x0f) here;
         }
         cleanup(&B);
@@ -180,7 +179,7 @@ static void test_i32_ops(void) {
         backends B; BINOP_32(umbra_or_32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             int x[] = {0xf0, 0x0f}, y[] = {0x0f, 0xf0}, z[2] = {0};
-            if (!run(&B, bi,2, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 2, (umbra_buf[]){{x,2*4},{y,2*4},{z,2*4}})) continue;
             (z[0] == 0xff) here; (z[1] == 0xff) here;
         }
         cleanup(&B);
@@ -189,7 +188,7 @@ static void test_i32_ops(void) {
         backends B; BINOP_32(umbra_xor_32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             int x[] = {0xff, 0xff}, y[] = {0x0f, 0xff}, z[2] = {0};
-            if (!run(&B, bi,2, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 2, (umbra_buf[]){{x,2*4},{y,2*4},{z,2*4}})) continue;
             (z[0] == 0xf0) here; (z[1] == 0x00) here;
         }
         cleanup(&B);
@@ -205,7 +204,7 @@ static void test_i32_ops(void) {
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
             int cond[] = {-1, 0, -1}, va[] = {10, 20, 30}, vb[] = {40, 50, 60}, z[3] = {0};
-            if (!run(&B, bi,3, cond, va, vb, z, 0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{cond,3*4},{va,3*4},{vb,3*4},{z,3*4}})) continue;
             (z[0] == 10) here; (z[1] == 50) here; (z[2] == 30) here;
         }
         cleanup(&B);
@@ -219,7 +218,7 @@ static void test_half_ops(void) {
         backends B; BINOP_HALF(umbra_mul_half, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             __fp16 x[] = {2,3,4}, y[] = {5,6,7}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*2},{y,3*2},{z,3*2}})) continue;
             equiv((float)z[0], 10) here; equiv((float)z[1], 18) here; equiv((float)z[2], 28) here;
         }
         cleanup(&B);
@@ -228,7 +227,7 @@ static void test_half_ops(void) {
         backends B; BINOP_HALF(umbra_add_half, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             __fp16 x[] = {1,2,3}, y[] = {10,20,30}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*2},{y,3*2},{z,3*2}})) continue;
             equiv((float)z[0], 11) here; equiv((float)z[1], 22) here; equiv((float)z[2], 33) here;
         }
         cleanup(&B);
@@ -237,7 +236,7 @@ static void test_half_ops(void) {
         backends B; BINOP_HALF(umbra_sub_half, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             __fp16 x[] = {10,20,30}, y[] = {1,2,3}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*2},{y,3*2},{z,3*2}})) continue;
             equiv((float)z[0], 9) here; equiv((float)z[1], 18) here; equiv((float)z[2], 27) here;
         }
         cleanup(&B);
@@ -246,7 +245,7 @@ static void test_half_ops(void) {
         backends B; BINOP_HALF(umbra_div_half, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             __fp16 x[] = {10,20,30}, y[] = {2,4,5}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*2},{y,3*2},{z,3*2}})) continue;
             equiv((float)z[0], 5) here; equiv((float)z[1], 5) here; equiv((float)z[2], 6) here;
         }
         cleanup(&B);
@@ -263,7 +262,7 @@ static void test_half_bitwise(void) {
             uint16_t xb = 0xff00, yb = 0x0ff0;
             __builtin_memcpy(x, &xb, 2);
             __builtin_memcpy(y, &yb, 2);
-            if (!run(&B, bi,1, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 1, (umbra_buf[]){{x,1*2},{y,1*2},{z,1*2}})) continue;
             uint16_t zb; __builtin_memcpy(&zb, z, 2);
             (zb == 0x0f00) here;
         }
@@ -276,7 +275,7 @@ static void test_half_bitwise(void) {
             uint16_t xb = 0xf000, yb = 0x0f00;
             __builtin_memcpy(x, &xb, 2);
             __builtin_memcpy(y, &yb, 2);
-            if (!run(&B, bi,1, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 1, (umbra_buf[]){{x,1*2},{y,1*2},{z,1*2}})) continue;
             uint16_t zb; __builtin_memcpy(&zb, z, 2);
             (zb == 0xff00) here;
         }
@@ -289,7 +288,7 @@ static void test_half_bitwise(void) {
             uint16_t xb = 0xff00, yb = 0x0f00;
             __builtin_memcpy(x, &xb, 2);
             __builtin_memcpy(y, &yb, 2);
-            if (!run(&B, bi,1, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 1, (umbra_buf[]){{x,1*2},{y,1*2},{z,1*2}})) continue;
             uint16_t zb; __builtin_memcpy(&zb, z, 2);
             (zb == 0xf000) here;
         }
@@ -312,7 +311,7 @@ static void test_half_bitwise(void) {
             __builtin_memcpy(cond, cb, 4);
             __builtin_memcpy(va, ab, 4);
             __builtin_memcpy(vb, bb_, 4);
-            if (!run(&B, bi,2, cond, va, vb, z, 0,0)) continue;
+            if (!run(&B, bi, 2, (umbra_buf[]){{cond,2*2},{va,2*2},{vb,2*2},{z,2*2}})) continue;
             uint16_t z0, z1; __builtin_memcpy(&z0, &z[0], 2); __builtin_memcpy(&z1, &z[1], 2);
             (z0 == 0x1234) here; (z1 == 0x5678) here;
         }
@@ -327,7 +326,7 @@ static void test_i16_ops(void) {
         backends B; BINOP_16(umbra_add_i16, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             short x[] = {1,2,3}, y[] = {10,20,30}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*2},{y,3*2},{z,3*2}})) continue;
             (z[0] == 11) here; (z[1] == 22) here; (z[2] == 33) here;
         }
         cleanup(&B);
@@ -336,7 +335,7 @@ static void test_i16_ops(void) {
         backends B; BINOP_16(umbra_sub_i16, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             short x[] = {10,20,30}, y[] = {1,2,3}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*2},{y,3*2},{z,3*2}})) continue;
             (z[0] == 9) here; (z[1] == 18) here; (z[2] == 27) here;
         }
         cleanup(&B);
@@ -345,7 +344,7 @@ static void test_i16_ops(void) {
         backends B; BINOP_16(umbra_mul_i16, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             short x[] = {2,3,4}, y[] = {5,6,7}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*2},{y,3*2},{z,3*2}})) continue;
             (z[0] == 10) here; (z[1] == 18) here; (z[2] == 28) here;
         }
         cleanup(&B);
@@ -354,7 +353,7 @@ static void test_i16_ops(void) {
         backends B; BINOP_16(umbra_shl_i16, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             short x[] = {1,3}, y[] = {4,2}, z[2] = {0};
-            if (!run(&B, bi,2, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 2, (umbra_buf[]){{x,2*2},{y,2*2},{z,2*2}})) continue;
             (z[0] == 16) here; (z[1] == 12) here;
         }
         cleanup(&B);
@@ -363,7 +362,7 @@ static void test_i16_ops(void) {
         backends B; BINOP_16(umbra_shr_u16, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             short x[] = {-1, 64}, y[] = {1, 3}, z[2] = {0};
-            if (!run(&B, bi,2, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 2, (umbra_buf[]){{x,2*2},{y,2*2},{z,2*2}})) continue;
             (z[0] == (short)(0xffffu >> 1)) here; (z[1] == 8) here;
         }
         cleanup(&B);
@@ -372,7 +371,7 @@ static void test_i16_ops(void) {
         backends B; BINOP_16(umbra_shr_s16, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             short x[] = {-8, 64}, y[] = {1, 3}, z[2] = {0};
-            if (!run(&B, bi,2, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 2, (umbra_buf[]){{x,2*2},{y,2*2},{z,2*2}})) continue;
             (z[0] == -4) here; (z[1] == 8) here;
         }
         cleanup(&B);
@@ -381,7 +380,7 @@ static void test_i16_ops(void) {
         backends B; BINOP_16(umbra_and_16, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             short x[] = {0xff}, y[] = {0x0f}, z[1] = {0};
-            if (!run(&B, bi,1, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 1, (umbra_buf[]){{x,1*2},{y,1*2},{z,1*2}})) continue;
             (z[0] == 0x0f) here;
         }
         cleanup(&B);
@@ -390,7 +389,7 @@ static void test_i16_ops(void) {
         backends B; BINOP_16(umbra_or_16, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             short x[] = {0xf0}, y[] = {0x0f}, z[1] = {0};
-            if (!run(&B, bi,1, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 1, (umbra_buf[]){{x,1*2},{y,1*2},{z,1*2}})) continue;
             (z[0] == 0xff) here;
         }
         cleanup(&B);
@@ -399,7 +398,7 @@ static void test_i16_ops(void) {
         backends B; BINOP_16(umbra_xor_16, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             short x[] = {0xff}, y[] = {0x0f}, z[1] = {0};
-            if (!run(&B, bi,1, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 1, (umbra_buf[]){{x,1*2},{y,1*2},{z,1*2}})) continue;
             (z[0] == 0xf0) here;
         }
         cleanup(&B);
@@ -415,7 +414,7 @@ static void test_i16_ops(void) {
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
             short cond[] = {-1, 0}, va[] = {10, 20}, vb[] = {30, 40}, z[2] = {0};
-            if (!run(&B, bi,2, cond, va, vb, z, 0,0)) continue;
+            if (!run(&B, bi, 2, (umbra_buf[]){{cond,2*2},{va,2*2},{vb,2*2},{z,2*2}})) continue;
             (z[0] == 10) here; (z[1] == 40) here;
         }
         cleanup(&B);
@@ -429,7 +428,7 @@ static void test_cmp_i32(void) {
         backends B; BINOP_32(umbra_eq_i32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             int x[] = {1,2,3}, y[] = {1,9,3}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             (z[0] == -1) here; (z[1] == 0) here; (z[2] == -1) here;
         }
         cleanup(&B);
@@ -438,7 +437,7 @@ static void test_cmp_i32(void) {
         backends B; BINOP_32(umbra_ne_i32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             int x[] = {1,2}, y[] = {1,9}, z[2] = {0};
-            if (!run(&B, bi,2, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 2, (umbra_buf[]){{x,2*4},{y,2*4},{z,2*4}})) continue;
             (z[0] == 0) here; (z[1] == -1) here;
         }
         cleanup(&B);
@@ -447,7 +446,7 @@ static void test_cmp_i32(void) {
         backends B; BINOP_32(umbra_lt_s32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             int x[] = {1,5,3}, y[] = {2,5,1}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             (z[0] == -1) here; (z[1] == 0) here; (z[2] == 0) here;
         }
         cleanup(&B);
@@ -456,7 +455,7 @@ static void test_cmp_i32(void) {
         backends B; BINOP_32(umbra_le_s32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             int x[] = {1,5,3}, y[] = {2,5,1}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             (z[0] == -1) here; (z[1] == -1) here; (z[2] == 0) here;
         }
         cleanup(&B);
@@ -465,7 +464,7 @@ static void test_cmp_i32(void) {
         backends B; BINOP_32(umbra_gt_s32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             int x[] = {3,5,1}, y[] = {2,5,3}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             (z[0] == -1) here; (z[1] == 0) here; (z[2] == 0) here;
         }
         cleanup(&B);
@@ -474,7 +473,7 @@ static void test_cmp_i32(void) {
         backends B; BINOP_32(umbra_ge_s32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             int x[] = {3,5,1}, y[] = {2,5,3}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             (z[0] == -1) here; (z[1] == -1) here; (z[2] == 0) here;
         }
         cleanup(&B);
@@ -483,7 +482,7 @@ static void test_cmp_i32(void) {
         backends B; BINOP_32(umbra_lt_u32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             int x[] = {1, -1}, y[] = {2, 1}, z[2] = {0};
-            if (!run(&B, bi,2, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 2, (umbra_buf[]){{x,2*4},{y,2*4},{z,2*4}})) continue;
             (z[0] == -1) here; (z[1] == 0) here;
         }
         cleanup(&B);
@@ -492,7 +491,7 @@ static void test_cmp_i32(void) {
         backends B; BINOP_32(umbra_le_u32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             int x[] = {1, 2, -1}, y[] = {2, 2, 1}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             (z[0] == -1) here; (z[1] == -1) here; (z[2] == 0) here;
         }
         cleanup(&B);
@@ -501,7 +500,7 @@ static void test_cmp_i32(void) {
         backends B; BINOP_32(umbra_gt_u32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             int x[] = {2, -1, 1}, y[] = {1, 1, 2}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             (z[0] == -1) here; (z[1] == -1) here; (z[2] == 0) here;
         }
         cleanup(&B);
@@ -510,7 +509,7 @@ static void test_cmp_i32(void) {
         backends B; BINOP_32(umbra_ge_u32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             int x[] = {2, 2, 1}, y[] = {1, 2, -1}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             (z[0] == -1) here; (z[1] == -1) here; (z[2] == 0) here;
         }
         cleanup(&B);
@@ -524,7 +523,7 @@ static void test_cmp_i16(void) {
         backends B; BINOP_16(umbra_eq_i16, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             short x[] = {1,2,3}, y[] = {1,9,3}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*2},{y,3*2},{z,3*2}})) continue;
             (z[0] == -1) here; (z[1] == 0) here; (z[2] == -1) here;
         }
         cleanup(&B);
@@ -533,7 +532,7 @@ static void test_cmp_i16(void) {
         backends B; BINOP_16(umbra_ne_i16, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             short x[] = {1,2}, y[] = {1,9}, z[2] = {0};
-            if (!run(&B, bi,2, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 2, (umbra_buf[]){{x,2*2},{y,2*2},{z,2*2}})) continue;
             (z[0] == 0) here; (z[1] == -1) here;
         }
         cleanup(&B);
@@ -542,7 +541,7 @@ static void test_cmp_i16(void) {
         backends B; BINOP_16(umbra_lt_s16, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             short x[] = {1,5,3}, y[] = {2,5,1}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*2},{y,3*2},{z,3*2}})) continue;
             (z[0] == -1) here; (z[1] == 0) here; (z[2] == 0) here;
         }
         cleanup(&B);
@@ -551,7 +550,7 @@ static void test_cmp_i16(void) {
         backends B; BINOP_16(umbra_le_s16, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             short x[] = {1,5,3}, y[] = {2,5,1}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*2},{y,3*2},{z,3*2}})) continue;
             (z[0] == -1) here; (z[1] == -1) here; (z[2] == 0) here;
         }
         cleanup(&B);
@@ -560,7 +559,7 @@ static void test_cmp_i16(void) {
         backends B; BINOP_16(umbra_gt_s16, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             short x[] = {3,5,1}, y[] = {2,5,3}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*2},{y,3*2},{z,3*2}})) continue;
             (z[0] == -1) here; (z[1] == 0) here; (z[2] == 0) here;
         }
         cleanup(&B);
@@ -569,7 +568,7 @@ static void test_cmp_i16(void) {
         backends B; BINOP_16(umbra_ge_s16, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             short x[] = {3,5,1}, y[] = {2,5,3}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*2},{y,3*2},{z,3*2}})) continue;
             (z[0] == -1) here; (z[1] == -1) here; (z[2] == 0) here;
         }
         cleanup(&B);
@@ -578,7 +577,7 @@ static void test_cmp_i16(void) {
         backends B; BINOP_16(umbra_lt_u16, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             short x[] = {1, -1}, y[] = {2, 1}, z[2] = {0};
-            if (!run(&B, bi,2, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 2, (umbra_buf[]){{x,2*2},{y,2*2},{z,2*2}})) continue;
             (z[0] == -1) here; (z[1] == 0) here;
         }
         cleanup(&B);
@@ -587,7 +586,7 @@ static void test_cmp_i16(void) {
         backends B; BINOP_16(umbra_le_u16, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             short x[] = {1, 2, -1}, y[] = {2, 2, 1}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*2},{y,3*2},{z,3*2}})) continue;
             (z[0] == -1) here; (z[1] == -1) here; (z[2] == 0) here;
         }
         cleanup(&B);
@@ -596,7 +595,7 @@ static void test_cmp_i16(void) {
         backends B; BINOP_16(umbra_gt_u16, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             short x[] = {2, -1, 1}, y[] = {1, 1, 2}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*2},{y,3*2},{z,3*2}})) continue;
             (z[0] == -1) here; (z[1] == -1) here; (z[2] == 0) here;
         }
         cleanup(&B);
@@ -605,7 +604,7 @@ static void test_cmp_i16(void) {
         backends B; BINOP_16(umbra_ge_u16, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             short x[] = {2, 2, 1}, y[] = {1, 2, -1}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*2},{y,3*2},{z,3*2}})) continue;
             (z[0] == -1) here; (z[1] == -1) here; (z[2] == 0) here;
         }
         cleanup(&B);
@@ -619,7 +618,7 @@ static void test_cmp_f32(void) {
         backends B; BINOP_32(umbra_eq_f32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             float x[] = {1,2,3}, y[] = {1,9,3}; int z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             (z[0] == -1) here; (z[1] == 0) here; (z[2] == -1) here;
         }
         cleanup(&B);
@@ -628,7 +627,7 @@ static void test_cmp_f32(void) {
         backends B; BINOP_32(umbra_ne_f32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             float x[] = {1,2}, y[] = {1,9}; int z[2] = {0};
-            if (!run(&B, bi,2, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 2, (umbra_buf[]){{x,2*4},{y,2*4},{z,2*4}})) continue;
             (z[0] == 0) here; (z[1] == -1) here;
         }
         cleanup(&B);
@@ -637,7 +636,7 @@ static void test_cmp_f32(void) {
         backends B; BINOP_32(umbra_lt_f32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             float x[] = {1,5,3}, y[] = {2,5,1}; int z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             (z[0] == -1) here; (z[1] == 0) here; (z[2] == 0) here;
         }
         cleanup(&B);
@@ -646,7 +645,7 @@ static void test_cmp_f32(void) {
         backends B; BINOP_32(umbra_le_f32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             float x[] = {1,5,3}, y[] = {2,5,1}; int z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             (z[0] == -1) here; (z[1] == -1) here; (z[2] == 0) here;
         }
         cleanup(&B);
@@ -655,7 +654,7 @@ static void test_cmp_f32(void) {
         backends B; BINOP_32(umbra_gt_f32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             float x[] = {3,5,1}, y[] = {2,5,3}; int z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             (z[0] == -1) here; (z[1] == 0) here; (z[2] == 0) here;
         }
         cleanup(&B);
@@ -664,7 +663,7 @@ static void test_cmp_f32(void) {
         backends B; BINOP_32(umbra_ge_f32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             float x[] = {3,5,1}, y[] = {2,5,3}; int z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             (z[0] == -1) here; (z[1] == -1) here; (z[2] == 0) here;
         }
         cleanup(&B);
@@ -689,14 +688,14 @@ static void test_cmp_f32(void) {
 
 static void test_cmp_half(void) {
   for (int opt = 0; opt < 2; opt++) {
-    // sel_half(cmp(a,b), 1.0h, 0.0h) → check result as uint16_t (0x3c00 or 0x0000)
+    // sel_half(cmp(a,b), 1.0h, 0.0h) -> check result as uint16_t (0x3c00 or 0x0000)
     #define H_TRUE  0x3c00  /* fp16 1.0 */
     #define H_FALSE 0x0000  /* fp16 0.0 */
     {
         backends B; CMP_HALF_TEST(umbra_eq_half, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             __fp16 x[] = {1,2,3}, y[] = {1,9,3}; uint16_t z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*2},{y,3*2},{z,3*2}})) continue;
             (z[0] == H_TRUE) here; (z[1] == H_FALSE) here; (z[2] == H_TRUE) here;
         }
         cleanup(&B);
@@ -705,7 +704,7 @@ static void test_cmp_half(void) {
         backends B; CMP_HALF_TEST(umbra_ne_half, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             __fp16 x[] = {1,2}, y[] = {1,9}; uint16_t z[2] = {0};
-            if (!run(&B, bi,2, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 2, (umbra_buf[]){{x,2*2},{y,2*2},{z,2*2}})) continue;
             (z[0] == H_FALSE) here; (z[1] == H_TRUE) here;
         }
         cleanup(&B);
@@ -714,7 +713,7 @@ static void test_cmp_half(void) {
         backends B; CMP_HALF_TEST(umbra_lt_half, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             __fp16 x[] = {1,5,3}, y[] = {2,5,1}; uint16_t z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*2},{y,3*2},{z,3*2}})) continue;
             (z[0] == H_TRUE) here; (z[1] == H_FALSE) here; (z[2] == H_FALSE) here;
         }
         cleanup(&B);
@@ -723,7 +722,7 @@ static void test_cmp_half(void) {
         backends B; CMP_HALF_TEST(umbra_le_half, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             __fp16 x[] = {1,5,3}, y[] = {2,5,1}; uint16_t z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*2},{y,3*2},{z,3*2}})) continue;
             (z[0] == H_TRUE) here; (z[1] == H_TRUE) here; (z[2] == H_FALSE) here;
         }
         cleanup(&B);
@@ -732,7 +731,7 @@ static void test_cmp_half(void) {
         backends B; CMP_HALF_TEST(umbra_gt_half, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             __fp16 x[] = {3,5,1}, y[] = {2,5,3}; uint16_t z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*2},{y,3*2},{z,3*2}})) continue;
             (z[0] == H_TRUE) here; (z[1] == H_FALSE) here; (z[2] == H_FALSE) here;
         }
         cleanup(&B);
@@ -741,7 +740,7 @@ static void test_cmp_half(void) {
         backends B; CMP_HALF_TEST(umbra_ge_half, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             __fp16 x[] = {3,5,1}, y[] = {2,5,3}; uint16_t z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*2},{y,3*2},{z,3*2}})) continue;
             (z[0] == H_TRUE) here; (z[1] == H_TRUE) here; (z[2] == H_FALSE) here;
         }
         cleanup(&B);
@@ -761,7 +760,7 @@ static void test_imm(void) {
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
             int z[3] = {0};
-            if (!run(&B, bi,3, z, 0,0,0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{z,3*4}})) continue;
             (z[0] == 42) here; (z[1] == 42) here; (z[2] == 42) here;
         }
         cleanup(&B);
@@ -774,7 +773,7 @@ static void test_imm(void) {
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
             short z[3] = {0};
-            if (!run(&B, bi,3, z, 0,0,0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{z,3*2}})) continue;
             (z[0] == 7) here; (z[1] == 7) here; (z[2] == 7) here;
         }
         cleanup(&B);
@@ -787,7 +786,7 @@ static void test_imm(void) {
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
             __fp16 z[3] = {0};
-            if (!run(&B, bi,3, z, 0,0,0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{z,3*2}})) continue;
             equiv((float)z[0], 3) here; equiv((float)z[1], 3) here; equiv((float)z[2], 3) here;
         }
         cleanup(&B);
@@ -808,7 +807,7 @@ static void test_fma_f32(void) {
     backends B = make(bb, opt);
     for (int bi = 0; bi < 4; bi++) {
         float a[] = {2,3}, c[] = {4,5}, d[] = {10,20}, z[2] = {0};
-        if (!run(&B, bi,2, a,c,d,z, 0,0)) continue;
+        if (!run(&B, bi, 2, (umbra_buf[]){{a,2*4},{c,2*4},{d,2*4},{z,2*4}})) continue;
         equiv(z[0], 18) here; equiv(z[1], 35) here;
     }
     cleanup(&B);
@@ -828,7 +827,7 @@ static void test_fma_half(void) {
     backends B = make(bb, opt);
     for (int bi = 0; bi < 4; bi++) {
         __fp16 a[] = {2,3}, c[] = {4,5}, d[] = {10,20}, z[2] = {0};
-        if (!run(&B, bi,2, a,c,d,z, 0,0)) continue;
+        if (!run(&B, bi, 2, (umbra_buf[]){{a,2*2},{c,2*2},{d,2*2},{z,2*2}})) continue;
         equiv((float)z[0], 18) here; equiv((float)z[1], 35) here;
     }
     cleanup(&B);
@@ -841,7 +840,7 @@ static void test_min_max_sqrt_f32(void) {
         backends B; BINOP_32(umbra_min_f32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             float x[] = {5,1,3}, y[] = {2,4,3}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             equiv(z[0], 2) here; equiv(z[1], 1) here; equiv(z[2], 3) here;
         }
         cleanup(&B);
@@ -850,7 +849,7 @@ static void test_min_max_sqrt_f32(void) {
         backends B; BINOP_32(umbra_max_f32, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             float x[] = {5,1,3}, y[] = {2,4,3}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4},{z,3*4}})) continue;
             equiv(z[0], 5) here; equiv(z[1], 4) here; equiv(z[2], 3) here;
         }
         cleanup(&B);
@@ -864,7 +863,7 @@ static void test_min_max_sqrt_f32(void) {
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
             float a[] = {4,9,16}, z[3] = {0};
-            if (!run(&B, bi,3, a,z, 0,0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{a,3*4},{z,3*4}})) continue;
             equiv(z[0], 2) here; equiv(z[1], 3) here; equiv(z[2], 4) here;
         }
         cleanup(&B);
@@ -878,7 +877,7 @@ static void test_min_max_sqrt_half(void) {
         backends B; BINOP_HALF(umbra_min_half, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             __fp16 x[] = {5,1,3}, y[] = {2,4,3}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*2},{y,3*2},{z,3*2}})) continue;
             equiv((float)z[0], 2) here; equiv((float)z[1], 1) here; equiv((float)z[2], 3) here;
         }
         cleanup(&B);
@@ -887,7 +886,7 @@ static void test_min_max_sqrt_half(void) {
         backends B; BINOP_HALF(umbra_max_half, B, opt);
         for (int bi = 0; bi < 4; bi++) {
             __fp16 x[] = {5,1,3}, y[] = {2,4,3}, z[3] = {0};
-            if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*2},{y,3*2},{z,3*2}})) continue;
             equiv((float)z[0], 5) here; equiv((float)z[1], 4) here; equiv((float)z[2], 3) here;
         }
         cleanup(&B);
@@ -901,7 +900,7 @@ static void test_min_max_sqrt_half(void) {
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
             __fp16 a[] = {4,9,16}, z[3] = {0};
-            if (!run(&B, bi,3, a,z, 0,0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{a,3*2},{z,3*2}})) continue;
             equiv((float)z[0], 2) here; equiv((float)z[1], 3) here; equiv((float)z[2], 4) here;
         }
         cleanup(&B);
@@ -915,7 +914,7 @@ static void test_large_n(void) {
     for (int bi = 0; bi < 4; bi++) {
         float x[100], y[100], z[100];
         for (int i = 0; i < 100; i++) { x[i] = (float)i; y[i] = (float)(100-i); }
-        if (!run(&B, bi,100, x,y,z, 0,0,0)) continue;
+        if (!run(&B, bi, 100, (umbra_buf[]){{x,100*4},{y,100*4},{z,100*4}})) continue;
         for (int i = 0; i < 100; i++) { equiv(z[i], 100) here; }
     }
     cleanup(&B);
@@ -933,7 +932,7 @@ static void test_convert(void) {
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
             int a[] = {1, 255, -3}; float z[3] = {0};
-            if (!run(&B, bi,3, a,z, 0,0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{a,3*4},{z,3*4}})) continue;
             equiv(z[0], 1) here; equiv(z[1], 255) here; equiv(z[2], -3) here;
         }
         cleanup(&B);
@@ -947,7 +946,7 @@ static void test_convert(void) {
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
             float a[] = {1.9f, 255.0f, -3.7f}; int z[3] = {0};
-            if (!run(&B, bi,3, a,z, 0,0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{a,3*4},{z,3*4}})) continue;
             (z[0] == 1) here; (z[1] == 255) here; (z[2] == -3) here;
         }
         cleanup(&B);
@@ -962,7 +961,7 @@ static void test_convert(void) {
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
             float a[] = {1.0f, 0.5f, 100.0f}, z[3] = {0};
-            if (!run(&B, bi,3, a,z, 0,0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{a,3*4},{z,3*4}})) continue;
             equiv(z[0], 1.0f) here; equiv(z[1], 0.5f) here; equiv(z[2], 100.0f) here;
         }
         cleanup(&B);
@@ -981,7 +980,7 @@ static void test_convert_half_i32(void) {
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
             int a[] = {0, 1, 100, 255}; __fp16 z[4] = {0};
-            if (!run(&B, bi,4, a,z, 0,0,0,0)) continue;
+            if (!run(&B, bi, 4, (umbra_buf[]){{a,4*4},{z,4*2}})) continue;
             equiv((float)z[0],   0) here;
             equiv((float)z[1],   1) here;
             equiv((float)z[2], 100) here;
@@ -998,7 +997,7 @@ static void test_convert_half_i32(void) {
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
             __fp16 a[] = {0, 1, 100.5, 255}; int z[4] = {0};
-            if (!run(&B, bi,4, a,z, 0,0,0,0)) continue;
+            if (!run(&B, bi, 4, (umbra_buf[]){{a,4*2},{z,4*4}})) continue;
             (z[0] ==   0) here;
             (z[1] ==   1) here;
             (z[2] == 100) here;
@@ -1020,7 +1019,7 @@ static void test_convert_i16_half(void) {
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
             short a[] = {0, 1, 100, 255}; __fp16 z[4] = {0};
-            if (!run(&B, bi,4, a,z, 0,0,0,0)) continue;
+            if (!run(&B, bi, 4, (umbra_buf[]){{a,4*2},{z,4*2}})) continue;
             equiv((float)z[0],   0) here;
             equiv((float)z[1],   1) here;
             equiv((float)z[2], 100) here;
@@ -1037,7 +1036,7 @@ static void test_convert_i16_half(void) {
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
             __fp16 a[] = {0, 1, 100.5, 255}; short z[4] = {0};
-            if (!run(&B, bi,4, a,z, 0,0,0,0)) continue;
+            if (!run(&B, bi, 4, (umbra_buf[]){{a,4*2},{z,4*2}})) continue;
             (z[0] ==   0) here;
             (z[1] ==   1) here;
             (z[2] == 100) here;
@@ -1054,7 +1053,7 @@ static void test_convert_i16_half(void) {
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
             int a[] = {0, 1, 255, 1000}; short z[4] = {0};
-            if (!run(&B, bi,4, a,z, 0,0,0,0)) continue;
+            if (!run(&B, bi, 4, (umbra_buf[]){{a,4*4},{z,4*2}})) continue;
             (z[0] ==    0) here;
             (z[1] ==    1) here;
             (z[2] ==  255) here;
@@ -1071,7 +1070,7 @@ static void test_convert_i16_half(void) {
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
             short a[] = {0, 1, -1, 255}; int z[4] = {0};
-            if (!run(&B, bi,4, a,z, 0,0,0,0)) continue;
+            if (!run(&B, bi, 4, (umbra_buf[]){{a,4*2},{z,4*4}})) continue;
             (z[0] ==   0) here;
             (z[1] ==   1) here;
             (z[2] ==  -1) here;
@@ -1109,7 +1108,7 @@ static void test_constprop(void) {
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
             int z[3] = {0};
-            if (!run(&B, bi,3, z, 0,0,0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{z,3*4}})) continue;
             (z[0] == 8) here; (z[1] == 8) here; (z[2] == 8) here;
         }
         cleanup(&B);
@@ -1127,7 +1126,7 @@ static void test_constprop(void) {
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
             float z[3] = {0};
-            if (!run(&B, bi,3, z, 0,0,0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{z,3*4}})) continue;
             equiv(z[0], 6) here; equiv(z[1], 6) here; equiv(z[2], 6) here;
         }
         cleanup(&B);
@@ -1165,7 +1164,7 @@ static void test_strength_reduction(void) {
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
             int32_t a[] = {1,2,3,4,5}, c[5] = {0};
-            if (!run(&B, bi,5, a,c, 0,0,0,0)) continue;
+            if (!run(&B, bi, 5, (umbra_buf[]){{a,5*4},{c,5*4}})) continue;
             for (int i = 0; i < 5; i++) { (c[i] == a[i] * 8) here; }
         }
         cleanup(&B);
@@ -1179,7 +1178,7 @@ static void test_strength_reduction(void) {
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
             int32_t a[] = {1,2,3}, c[3] = {0};
-            if (!run(&B, bi,3, a,c, 0,0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{a,3*4},{c,3*4}})) continue;
             for (int i = 0; i < 3; i++) { (c[i] == 0) here; }
         }
         cleanup(&B);
@@ -1199,7 +1198,7 @@ static void test_zero_imm(void) {
     backends B = make(bb, opt);
     for (int bi = 0; bi < 4; bi++) {
         int a[] = {0, 1, 0}, z[3] = {0};
-        if (!run(&B, bi,3, a, z, 0,0,0,0)) continue;
+        if (!run(&B, bi, 3, (umbra_buf[]){{a,3*4},{z,3*4}})) continue;
         (z[0] == -1) here;
         (z[1] ==  0) here;
         (z[2] == -1) here;
@@ -1227,8 +1226,8 @@ static void test_load_8x4(void) {
     for (int bi = 0; bi < 4; bi++) {
         uint32_t src[] = {0xAABBCCDD, 0x11223344, 0xFF00FF00};
         int16_t rr[3]={0}, gg[3]={0}, bb_[3]={0}, aa[3]={0};
-        if (!run(&B, bi,3, src, rr, gg, bb_, aa, 0)) continue;
-        // RGBA: byte 0=R, 1=G, 2=B, 3=A  (little-endian: 0xAABBCCDD → R=DD, G=CC, B=BB, A=AA)
+        if (!run(&B, bi, 3, (umbra_buf[]){{src,3*4},{rr,3*2},{gg,3*2},{bb_,3*2},{aa,3*2}})) continue;
+        // RGBA: byte 0=R, 1=G, 2=B, 3=A  (little-endian: 0xAABBCCDD -> R=DD, G=CC, B=BB, A=AA)
         (rr[0] == 0xDD) here; (gg[0] == 0xCC) here; (bb_[0] == 0xBB) here; (aa[0] == 0xAA) here;
         (rr[1] == 0x44) here; (gg[1] == 0x33) here; (bb_[1] == 0x22) here; (aa[1] == 0x11) here;
         (rr[2] == 0x00) here; (gg[2] == 0xFF) here; (bb_[2] == 0x00) here; (aa[2] == 0xFF) here;
@@ -1255,7 +1254,7 @@ static void test_store_8x4(void) {
         int16_t bb_[]= {0xBB, 0x22, 0x00};
         int16_t aa[] = {0xAA, 0x11, 0xFF};
         uint32_t dst[3] = {0};
-        if (!run(&B, bi,3, rr, gg, bb_, aa, dst, 0)) continue;
+        if (!run(&B, bi, 3, (umbra_buf[]){{rr,3*2},{gg,3*2},{bb_,3*2},{aa,3*2},{dst,3*4}})) continue;
         (dst[0] == 0xAABBCCDDu) here;
         (dst[1] == 0x11223344u) here;
         (dst[2] == 0xFF00FF00u) here;
@@ -1275,7 +1274,7 @@ static void test_srcover(void) {
                dst_g[] = {0.5, 0.5, 0.5},
                dst_b[] = {0.5, 0.5, 0.5},
                dst_a[] = {0.5, 0.5, 0.5};
-        if (!run(&B, bi,3, src_px, dst_r, dst_g, dst_b, dst_a, 0)) continue;
+        if (!run(&B, bi, 3, (umbra_buf[]){{src_px,3*4},{dst_r,3*2},{dst_g,3*2},{dst_b,3*2},{dst_a,3*2}})) continue;
         ((float)dst_r[0] > 0.28f - tol && (float)dst_r[0] < 0.34f + tol) here;
     }
     cleanup(&B);
@@ -1319,7 +1318,7 @@ static void test_mixed_ptr_sizes(void) {
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
             uint32_t x[] = {10, 20, 30}, y[3] = {0};
-            if (!run(&B, bi,3, x,y, 0,0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*4},{y,3*4}})) continue;
             (y[0] == 11) here; (y[1] == 21) here; (y[2] == 31) here;
         }
         cleanup(&B);
@@ -1334,13 +1333,14 @@ static void test_mixed_ptr_sizes(void) {
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
             __fp16 x[] = {1, 2, 3}, y[3] = {0};
-            if (!run(&B, bi,3, x,y, 0,0,0,0)) continue;
+            if (!run(&B, bi, 3, (umbra_buf[]){{x,3*2},{y,3*2}})) continue;
             equiv((float)y[0], 2) here; equiv((float)y[1], 3) here; equiv((float)y[2], 4) here;
         }
         cleanup(&B);
     }
   }
 }
+
 
 int main(void) {
     test_f32_ops();
