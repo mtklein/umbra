@@ -212,11 +212,20 @@ static uint32_t INS_s(int d, int idx, int n) {
 }
 
 // x0=n, x1..x6=p0..p5, x9=loop i, x10=scratch, x11/x12=byte offsets, x15=stack base
-enum { XI=9, XT=10, XH=11, XW=12, XS=15 };
+enum { XP=8, XI=9, XT=10, XH=11, XW=12, XS=15 };
 
 static void load_imm_w(Buf *c, int rd, uint32_t v) {
     put(c, MOVZ_w(rd, (uint16_t)(v&0xffff)));
     if (v>>16) put(c, MOVK_w16(rd, (uint16_t)(v>>16)));
+}
+
+// Load buf[p].ptr into XP.  X1 = buf array base, umbra_buf is 16 bytes.
+// Skips the load if XP already holds pointer p (tracked by *last_ptr).
+static void load_ptr(Buf *c, int p, int *last_ptr) {
+    if (*last_ptr == p) return;
+    *last_ptr = p;
+    int disp = p * 16;
+    put(c, 0xF9400020u | ((uint32_t)(disp/8)<<10) | (1u<<5) | (uint32_t)XP);
 }
 
 static void vld(Buf *c, int vd, int s) { put(c, LDR_qi(vd, XS, s)); }
@@ -501,21 +510,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 struct umbra_jit {
     void  *code;
     size_t code_size;
-    void (*entry)(int, void**);
-    int    loop_start, loop_end, nptr, :32;
+    void (*entry)(int, umbra_buf*);
+    int    loop_start, loop_end;
 };
 
 struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     int *sl = malloc((size_t)bb->insts * sizeof(int));
     for (int i = 0; i < bb->insts; i++) sl[i] = -1;
     int ns = 0;
-
-    int max_ptr=-1;
-    for (int i=0; i<bb->insts; i++) {
-        if (has_ptr(bb->inst[i].op))
-            if (bb->inst[i].ptr>max_ptr) max_ptr=bb->inst[i].ptr;
-    }
-    if (max_ptr>5) { free(sl); return 0; }
 
     Buf c={0};
     struct ra *ra = ra_create(bb);
@@ -526,13 +528,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, 0xD503201Fu);  // NOP placeholder: patched to SUB SP if spills needed
     put(&c, 0xD503201Fu);  // NOP placeholder: patched to MOV XS,SP if spills needed
 
-    // x0=n, x1=ptrs[]. Load pointers from array into x1..x(max_ptr+1).
-    // Load in reverse so x1 (the array base) is overwritten last.
-    for (int p = max_ptr; p >= 0; p--) {
-        // LDR X(p+1), [X1, #p*8]
-        int disp = p * 8;
-        put(&c, 0xF9400020u | ((uint32_t)(disp/8)<<10) | (1u<<5) | (uint32_t)(p+1));
-    }
+    // x0=n, x1=buf[].  Pointers loaded on demand via load_ptr().
 
     // Preamble: uniforms go straight into registers via RA.
     emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0);
@@ -609,8 +605,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     j->code_size = alloc;
     j->loop_start = loop_body_start;
     j->loop_end   = loop_body_end;
-    j->nptr  = max_ptr + 1;
-    j->entry = (void(*)(int,void**))mem;
+    j->entry = (void(*)(int,umbra_buf*))mem;
     return j;
 }
 
@@ -620,6 +615,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                      struct ra *ra, _Bool scalar)
 {
     int *lu = ra->last_use;
+    int last_ptr = -1;  // cached pointer index in XP
 
     for (int i=from; i<to; i++) {
         struct bb_inst const *inst = &bb->inst[i];
@@ -659,19 +655,20 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         case op_load_32: {
             int p = inst->ptr;
+            load_ptr(c, p, &last_ptr);
             if (!scalar && ra->is_pair[i]) {
                 int8_t rd = ra_alloc(c, ra, sl, ns);
                 int8_t rdh = ra_alloc(c, ra, sl, ns);
                 ra->reg[i] = rd; ra->reg_hi[i] = rdh;
                 ra->owner[(int)rd] = i; ra->owner[(int)rdh] = i;
                 // LDP Qlo, Qhi, [base + XW]
-                put(c, ADD_xr(XT, 1+p, XW));
+                put(c, ADD_xr(XT, XP, XW));
                 put(c, LDP_qi(rd, rdh, XT, 0));
             } else {
                 int8_t rd = ra_alloc(c, ra, sl, ns);
                 ra->reg[i] = rd; ra->owner[(int)rd] = i;
-                if (scalar) put(c, LDR_sx(rd, 1+p, XI));
-                else        put(c, LDR_q(rd, 1+p, XW));
+                if (scalar) put(c, LDR_sx(rd, XP, XI));
+                else        put(c, LDR_q(rd, XP, XW));
             }
         } break;
 
@@ -679,11 +676,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             int8_t rd = ra_alloc(c, ra, sl, ns);
             ra->reg[i] = rd; ra->owner[(int)rd] = i;
             int p = inst->ptr;
+            load_ptr(c, p, &last_ptr);
             if (scalar) {
-                put(c, LDR_hx(rd, 1+p, XI));
+                put(c, LDR_hx(rd, XP, XI));
             } else {
                 // K=8: 8 x 16-bit = 16 bytes = 1 Q register
-                put(c, LDR_q(rd, 1+p, XH));
+                put(c, LDR_q(rd, XP, XH));
             }
         } break;
 
@@ -691,9 +689,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             int8_t rd = ra_alloc(c, ra, sl, ns);
             ra->reg[i] = rd; ra->owner[(int)rd] = i;
             int p = inst->ptr;
+            load_ptr(c, p, &last_ptr);
             int idx = bb->inst[inst->x].imm;
             load_imm_w(c, XT, (uint32_t)idx);
-            put(c, LDR_sx(rd, 1+p, XT));  // Sd = ptr[idx] (LSL#2)
+            put(c, LDR_sx(rd, XP, XT));  // Sd = ptr[idx] (LSL#2)
             // DUP Vd.4S, Vn.S[0] — broadcast scalar to all 4 lanes
             put(c, 0x4E040400u | ((uint32_t)rd<<5) | (uint32_t)rd);
             if (ra->is_pair[i]) {
@@ -707,9 +706,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             int8_t rd = ra_alloc(c, ra, sl, ns);
             ra->reg[i] = rd; ra->owner[(int)rd] = i;
             int p = inst->ptr;
+            load_ptr(c, p, &last_ptr);
             int idx = bb->inst[inst->x].imm;
             load_imm_w(c, XT, (uint32_t)idx);
-            put(c, LDR_hx(rd, 1+p, XT));  // Hd = ptr[idx] (LSL#1)
+            put(c, LDR_hx(rd, XP, XT));  // Hd = ptr[idx] (LSL#1)
             // DUP Vd.8H, Vn.H[0]
             put(c, W(0x0E020400u | ((uint32_t)rd<<5) | (uint32_t)rd));
         } break;
@@ -728,13 +728,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_store_32: {
             int8_t ry = ra_ensure(c, ra, sl, ns, inst->y);
             int p = inst->ptr;
+            load_ptr(c, p, &last_ptr);
             if (!scalar && ra->is_pair[inst->y]) {
                 int8_t ryh = ra->reg_hi[inst->y];
-                put(c, ADD_xr(XT, 1+p, XW));
+                put(c, ADD_xr(XT, XP, XW));
                 put(c, STP_qi(ry, ryh, XT, 0));
             } else {
-                if (scalar) put(c, STR_sx(ry, 1+p, XI));
-                else        put(c, STR_q(ry, 1+p, XW));
+                if (scalar) put(c, STR_sx(ry, XP, XI));
+                else        put(c, STR_q(ry, XP, XW));
             }
             if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
         } break;
@@ -742,11 +743,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_store_16: case op_store_half: {
             int8_t ry = ra_ensure(c, ra, sl, ns, inst->y);
             int p = inst->ptr;
+            load_ptr(c, p, &last_ptr);
             if (scalar) {
-                put(c, STR_hx(ry, 1+p, XI));
+                put(c, STR_hx(ry, XP, XI));
             } else {
                 // K=8: Q register store
-                put(c, STR_q(ry, 1+p, XH));
+                put(c, STR_q(ry, XP, XH));
             }
             if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
         } break;
@@ -761,17 +763,19 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             int p  = is_base ? inst->ptr : bb->inst[inst->x].ptr;
 
             if (scalar) {
+                load_ptr(c, p, &last_ptr);
                 int8_t rd = ra_alloc(c, ra, sl, ns);
                 ra->reg[i] = rd; ra->owner[(int)rd] = i;
                 put(c, LSL_xi(XT, XI, 2));
                 if (ch) put(c, ADD_xi(XT, XT, ch));
                 // LDRB Wt, [Xn, Xm]
-                put(c, 0x38606800u | ((uint32_t)XT << 16) | ((uint32_t)(1+p) << 5) | (uint32_t)XT);
+                put(c, 0x38606800u | ((uint32_t)XT << 16) | ((uint32_t)XP << 5) | (uint32_t)XT);
                 // DUP Vd.8H, Wt (broadcast byte as u16)
                 put(c, W(0x0E020C00u) | ((uint32_t)XT << 5) | (uint32_t)rd);
             } else if (is_base) {
+                load_ptr(c, p, &last_ptr);
                 evict_scratch(c, ra, sl, ns);
-                put(c, ADD_xr(XT, 1+p, XW));
+                put(c, ADD_xr(XT, XP, XW));
                 put(c, LD4_8b(0, XT));
                 // Widen u8->u16: UXTL Vd.8H, Vn.8B (in-place)
                 for (int c2 = 0; c2 < 4; c2++) {
@@ -800,13 +804,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         case op_store_8x4: {
             int p = inst->ptr;
+            load_ptr(c, p, &last_ptr);
             int const inputs[] = {inst->x, inst->y, inst->z, inst->w};
             if (scalar) {
                 for (int ch = 0; ch < 4; ch++) {
                     int8_t ry = ra_ensure(c, ra, sl, ns, inputs[ch]);
                     put(c, LSL_xi(XT, XI, 2));
                     if (ch) put(c, ADD_xi(XT, XT, ch));
-                    put(c, ADD_xr(XT, 1+p, XT));
+                    put(c, ADD_xr(XT, XP, XT));
                     put(c, ST1_b(ry, 0, XT));
                 }
             } else {
@@ -819,7 +824,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 for (int ch = 0; ch < 4; ch++) {
                     put(c, XTN_8b(ch, ch));
                 }
-                put(c, ADD_xr(XT, 1+p, XW));
+                put(c, ADD_xr(XT, XP, XW));
                 put(c, ST4_8b(0, XT));
                 // V0-V3 now hold interleaved data; clear ownership.
                 // Don't push to free stack — they may already be there from
@@ -1072,9 +1077,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
 void umbra_jit_run(struct umbra_jit *j, int n, umbra_buf buf[]) {
     if (!j) return;
-    void *ptrs[16] = {0};
-    for (int i = 0; i < j->nptr && i < 16; i++) ptrs[i] = buf[i].ptr;
-    j->entry(n, ptrs);
+    j->entry(n, buf);
 }
 
 void umbra_jit_free(struct umbra_jit *j) {
@@ -1346,16 +1349,6 @@ static void mov_rr(Buf *b, int d, int s) {
     emit1(b, 0x89);
     emit1(b, (uint8_t)(0xC0 | ((s&7)<<3) | (d&7)));
 }
-// PUSH r64
-static void push_r(Buf *b, int r) {
-    if (r >= 8) emit1(b, (uint8_t)(0x41));
-    emit1(b, (uint8_t)(0x50 | (r&7)));
-}
-// POP r64
-static void pop_r(Buf *b, int r) {
-    if (r >= 8) emit1(b, (uint8_t)(0x41));
-    emit1(b, (uint8_t)(0x58 | (r&7)));
-}
 // MOV r64, [r64+disp]
 static void mov_load(Buf *b, int d, int base, int disp) {
     rex_w(b, d, base);
@@ -1399,12 +1392,18 @@ static void nop(Buf *b) { emit1(b, 0x90); }
 enum { RAX=0,RCX=1,RDX=2,RBX=3,RSP=4,RBP=5,RSI=6,RDI=7,
        R8=8,R9=9,R10=10,R11=11,R12=12,R13=13,R14=14,R15=15 };
 
-// x0=RDI(n), x1=RSI(p0), x2=RDX(p1), x3=RCX(p2), x4=R8(p3), x5=R9(p4), x6=R12(p5 from stack)
+// x0=RDI(n), x1=RSI(buf[])
 // R10=loop counter, R11/RAX=scratch
 enum { XI=R10 };  // loop counter
-static int ptr_gpr(int p) {
-    static const int map[] = {RSI,RDX,RCX,R8,R9,R12};
-    return map[p];
+
+// Load buf[p].ptr into R11.  RSI = buf array base, umbra_buf is 16 bytes.
+// Skips the load if R11 already holds pointer p (tracked by *last_ptr).
+static int load_ptr_x86(Buf *c, int p, int *last_ptr) {
+    if (*last_ptr != p) {
+        *last_ptr = p;
+        mov_load(c, R11, RSI, p * 16);
+    }
+    return R11;
 }
 
 // ---- Spill: VMOVDQU [RSP+slot*32], ymm or VMOVDQU ymm, [RSP+slot*32] ----
@@ -1867,8 +1866,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 struct umbra_jit {
     void  *code;
     size_t code_size, code_len;
-    void (*entry)(int, void**);
-    int    loop_start, loop_end, nptr, :32;
+    void (*entry)(int, umbra_buf*);
+    int    loop_start, loop_end;
 };
 
 struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
@@ -1876,25 +1875,10 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     for (int i = 0; i < bb->insts; i++) sl[i] = -1;
     int ns = 0;
 
-    int max_ptr = -1;
-    for (int i = 0; i < bb->insts; i++) {
-        if (has_ptr(bb->inst[i].op))
-            if (bb->inst[i].ptr > max_ptr) max_ptr = bb->inst[i].ptr;
-    }
-    if (max_ptr > 5) { free(sl); return 0; }
-
     Buf c = {0};
     struct ra *ra = ra_create(bb);
 
-    // Prologue: save R12
-    push_r(&c, R12);
-
-    // SysV ABI: RDI=n, RSI=ptrs[]. Load pointers from array in reverse
-    // so RSI (ptr[0]) is overwritten last.
-    static const int ptr_map[] = {RSI,RDX,RCX,R8,R9,R12};
-    for (int p = max_ptr; p >= 0; p--) {
-        mov_load(&c, ptr_map[p], RSI, p * 8);
-    }
+    // SysV ABI: RDI=n, RSI=buf[].  Pointers loaded on demand via load_ptr_x86().
 
     // Reserve stack space for spills (patched later)
     int stack_patch = c.len;
@@ -1966,7 +1950,6 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
         add_ri(&c, RSP, ns * 32);
     }
     vzeroupper(&c);
-    pop_r(&c, R12);
     ret(&c);
 
     // Patch stack allocation
@@ -2000,8 +1983,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     j->code_size = alloc; j->code_len = code_sz;
     j->loop_start = loop_body_start;
     j->loop_end   = loop_body_end;
-    j->nptr  = max_ptr + 1;
-    j->entry = (void(*)(int,void**))mem;
+    j->entry = (void(*)(int,umbra_buf*))mem;
     return j;
 }
 
@@ -2011,6 +1993,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                      struct ra *ra, _Bool scalar)
 {
     int *lu = ra->last_use;
+    int last_ptr = -1;  // cached pointer index in R11
 
     for (int i = from; i < to; i++) {
         struct bb_inst const *inst = &bb->inst[i];
@@ -2048,10 +2031,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             int p = inst->ptr;
             if (scalar) {
                 // VMOVD xmm, [base + R10*4]
-                vex_mem(c, 1, 1, 0, 0, rd, 0, 0x6E, ptr_gpr(p), XI, 4, 0);
+                vex_mem(c, 1, 1, 0, 0, rd, 0, 0x6E, load_ptr_x86(c, p, &last_ptr), XI, 4, 0);
             } else {
                 // VMOVDQU ymm, [base + R10*4]
-                vmov_load(c, 1, rd, ptr_gpr(p), XI, 4, 0);
+                vmov_load(c, 1, rd, load_ptr_x86(c, p, &last_ptr), XI, 4, 0);
             }
         } break;
 
@@ -2062,7 +2045,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             if (scalar) {
                 // MOVZX eax, word [base + R10*2]; VMOVD xmm, eax
                 {
-                    int base = ptr_gpr(p);
+                    int base = load_ptr_x86(c, p, &last_ptr);
                     uint8_t rex = 0x40;
                     if (XI >= 8) rex |= 0x02;
                     if (base >= 8) rex |= 0x01;
@@ -2074,7 +2057,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 vex(c, 1, 1, 0, 0, rd, 0, RAX, 0x6E);
             } else {
                 // VMOVDQU xmm, [base + R10*2] — 8 × 16-bit = 16 bytes
-                vmov_load(c, 0, rd, ptr_gpr(p), XI, 2, 0);
+                vmov_load(c, 0, rd, load_ptr_x86(c, p, &last_ptr), XI, 2, 0);
             }
         } break;
 
@@ -2086,7 +2069,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 // Load single fp16, convert to f32
                 // MOVZX eax, word [base + R10*2]
                 {
-                    int base = ptr_gpr(p);
+                    int base = load_ptr_x86(c, p, &last_ptr);
                     uint8_t rex = 0x40;
                     if (XI >= 8) rex |= 0x02;
                     if (base >= 8) rex |= 0x01;
@@ -2099,7 +2082,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 vcvtph2ps(c, rd, 0);                      // VCVTPH2PS xmm_rd, xmm0
             } else {
                 // Load 8 × fp16 = 16 bytes into xmm, then VCVTPH2PS to ymm
-                vmov_load(c, 0, 0, ptr_gpr(p), XI, 2, 0);  // xmm0
+                vmov_load(c, 0, 0, load_ptr_x86(c, p, &last_ptr), XI, 2, 0);  // xmm0
                 vcvtph2ps(c, rd, 0);                         // ymm_rd
             }
         } break;
@@ -2109,9 +2092,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             int p = inst->ptr;
             if (scalar) {
                 // VMOVD [base + R10*4], xmm
-                vex_mem(c, 1, 1, 0, 0, ry, 0, 0x7E, ptr_gpr(p), XI, 4, 0);
+                vex_mem(c, 1, 1, 0, 0, ry, 0, 0x7E, load_ptr_x86(c, p, &last_ptr), XI, 4, 0);
             } else {
-                vmov_store(c, 1, ry, ptr_gpr(p), XI, 4, 0);
+                vmov_store(c, 1, ry, load_ptr_x86(c, p, &last_ptr), XI, 4, 0);
             }
             if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
         } break;
@@ -2124,7 +2107,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 vex(c, 1, 1, 0, 0, ry, 0, RAX, 0x7E);  // VMOVD eax, xmm
                 // MOV [base + R10*2], ax (16-bit store)
                 {
-                    int base = ptr_gpr(p);
+                    int base = load_ptr_x86(c, p, &last_ptr);
                     emit1(c, 0x66);  // operand-size prefix for 16-bit
                     uint8_t rex = 0x40;
                     if (XI >= 8) rex |= 0x02;
@@ -2135,7 +2118,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     emit1(c, (uint8_t)((1<<6) | ((XI&7)<<3) | (base&7)));
                 }
             } else {
-                vmov_store(c, 0, ry, ptr_gpr(p), XI, 2, 0);
+                vmov_store(c, 0, ry, load_ptr_x86(c, p, &last_ptr), XI, 2, 0);
             }
             if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
         } break;
@@ -2149,7 +2132,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 // VMOVD eax, xmm0; MOV word [base + R10*2], ax
                 vex(c, 1, 1, 0, 0, 0, 0, RAX, 0x7E);
                 {
-                    int base = ptr_gpr(p);
+                    int base = load_ptr_x86(c, p, &last_ptr);
                     emit1(c, 0x66);
                     uint8_t rex = 0x40;
                     if (XI >= 8) rex |= 0x02;
@@ -2163,7 +2146,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 // VCVTPS2PH xmm0, ymm_ry, 4
                 vcvtps2ph(c, 0, ry, 4);
                 // Store 16 bytes (8 × fp16) to [base + R10*2]
-                vmov_store(c, 0, 0, ptr_gpr(p), XI, 2, 0);
+                vmov_store(c, 0, 0, load_ptr_x86(c, p, &last_ptr), XI, 2, 0);
             }
             if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
         } break;
@@ -2173,7 +2156,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             ra->reg[i] = rd; ra->owner[(int)rd] = i;
             int p = inst->ptr;
             int idx = bb->inst[inst->x].imm;
-            int base = ptr_gpr(p);
+            int base = load_ptr_x86(c, p, &last_ptr);
             int disp = idx * 4;
             // VBROADCASTSS ymm_rd, dword [base + disp]
             // VEX.256.66.0F38 18 /r with memory operand
@@ -2206,7 +2189,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             ra->reg[i] = rd; ra->owner[(int)rd] = i;
             int p = inst->ptr;
             int idx = bb->inst[inst->x].imm;
-            int base = ptr_gpr(p);
+            int base = load_ptr_x86(c, p, &last_ptr);
             // MOVZX eax, word [base + idx*2]
             {
                 uint8_t rex = 0x40;
@@ -2235,7 +2218,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             ra->reg[i] = rd; ra->owner[(int)rd] = i;
             int p = inst->ptr;
             int idx = bb->inst[inst->x].imm;
-            int base = ptr_gpr(p);
+            int base = load_ptr_x86(c, p, &last_ptr);
             // MOVZX eax, word [base + idx*2]
             {
                 uint8_t rex = 0x40;
@@ -2279,7 +2262,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 ra->reg[i] = rd; ra->owner[(int)rd] = i;
                 // Load single byte: MOVZX eax, byte [base + R10*4 + ch]
                 {
-                    int base = ptr_gpr(p);
+                    int base = load_ptr_x86(c, p, &last_ptr);
                     uint8_t rex = 0x40;
                     if (XI >= 8) rex |= 0x02;
                     if (base >= 8) rex |= 0x01;
@@ -2308,7 +2291,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
                 int8_t ch_regs[4];
                 int8_t loaded = ra_alloc(c, ra, sl, ns);
-                vmov_load(c, 1, loaded, ptr_gpr(p), XI, 4, 0);   // ymm_loaded = 8 RGBA pixels
+                vmov_load(c, 1, loaded, load_ptr_x86(c, p, &last_ptr), XI, 4, 0);   // ymm_loaded = 8 RGBA pixels
                 for (int ch2 = 0; ch2 < 4; ch2++) {
                     if (ch2 == 0) vpand(c, 1, 0, loaded, 1);     // ymm0 = loaded & 0xFF
                     else {
@@ -2350,7 +2333,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     vex(c, 1, 1, 0, 0, ry, 0, RAX, 0x7E);
                     // MOV byte [base + R10*4 + ch], al
                     {
-                        int base = ptr_gpr(p);
+                        int base = load_ptr_x86(c, p, &last_ptr);
                         uint8_t rex = 0x40;
                         if (XI >= 8) rex |= 0x02;
                         if (base >= 8) rex |= 0x01;
@@ -2395,7 +2378,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     ra->free_stack[ra->nfree++] = stmp;
                 }
                 vinserti128(c, 0, 0, 1, 1);            // ymm0 = [first4 | last4]
-                vmov_store(c, 1, 0, ptr_gpr(p), XI, 4, 0);
+                vmov_store(c, 1, 0, load_ptr_x86(c, p, &last_ptr), XI, 4, 0);
             }
             for (int ch = 0; ch < 4; ch++) {
                 if (lu[inputs[ch]] <= i) ra_free_reg(ra, inputs[ch]);
@@ -2529,9 +2512,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
 void umbra_jit_run(struct umbra_jit *j, int n, umbra_buf buf[]) {
     if (!j) return;
-    void *ptrs[16] = {0};
-    for (int i = 0; i < j->nptr && i < 16; i++) ptrs[i] = buf[i].ptr;
-    j->entry(n, ptrs);
+    j->entry(n, buf);
 }
 
 void umbra_jit_free(struct umbra_jit *j) {
