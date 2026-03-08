@@ -1254,12 +1254,12 @@ static void test_load_8x4(void) {
   for (int opt = 0; opt < 2; opt++) {
     struct umbra_basic_block *bb = umbra_basic_block();
     umbra_v32 ix = umbra_lane(bb);
-    umbra_v8 ch[4];
+    umbra_v16 ch[4];
     umbra_load_8x4(bb, (umbra_ptr){0}, ix, ch);
-    umbra_v16 r = umbra_i16_from_u8(bb, ch[0]),
-              g = umbra_i16_from_u8(bb, ch[1]),
-              b = umbra_i16_from_u8(bb, ch[2]),
-              a = umbra_i16_from_u8(bb, ch[3]);
+    umbra_v16 r = ch[0],
+              g = ch[1],
+              b = ch[2],
+              a = ch[3];
     umbra_store_16(bb, (umbra_ptr){1}, ix, r);
     umbra_store_16(bb, (umbra_ptr){2}, ix, g);
     umbra_store_16(bb, (umbra_ptr){3}, ix, b);
@@ -1287,12 +1287,7 @@ static void test_store_8x4(void) {
               g = umbra_load_16(bb, (umbra_ptr){1}, ix),
               b = umbra_load_16(bb, (umbra_ptr){2}, ix),
               a = umbra_load_16(bb, (umbra_ptr){3}, ix);
-    umbra_v8 ch[4] = {
-        umbra_u8_from_i16(bb, r),
-        umbra_u8_from_i16(bb, g),
-        umbra_u8_from_i16(bb, b),
-        umbra_u8_from_i16(bb, a),
-    };
+    umbra_v16 ch[4] = {r, g, b, a};
     umbra_store_8x4(bb, (umbra_ptr){4}, ix, ch);
     backends B = make(bb, opt);
     for (int bi = 0; bi < 3; bi++) {

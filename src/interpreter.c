@@ -10,7 +10,6 @@ typedef  int16_t I16 __attribute__((vector_size(K*2)));
 typedef  int32_t I32 __attribute__((vector_size(K*4)));
 typedef uint16_t U16 __attribute__((vector_size(K*2)));
 typedef uint32_t U32 __attribute__((vector_size(K*4)));
-typedef  uint8_t U8  __attribute__((vector_size(K)));
 typedef    float F32 __attribute__((vector_size(K*4)));
 
 #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) || defined(__F16C__)
@@ -18,7 +17,6 @@ typedef    float F32 __attribute__((vector_size(K*4)));
 #endif
 
 typedef union {
-    U8  u8;
     I16 i16;
     I32 i32;
     U16 u16;
@@ -421,45 +419,43 @@ op(load_8x4) {
     if (end & (K-1)) {
         uint8_t const *px = src + (end-1)*4;
         for (int ch = 0; ch < 4; ch++) {
-            v[ch].u8 = (U8){0};
-            v[ch].u8[0] = px[ch];
+            v[ch].u16 = (U16){0};
+            v[ch].u16[0] = px[ch];
         }
     } else {
         typedef uint8_t B32 __attribute__((vector_size(32)));
+        typedef uint8_t B8  __attribute__((vector_size(K)));
         B32 all;
         __builtin_memcpy(&all, src + (end-K)*4, 32);
-        v[0].u8 = __builtin_shufflevector(all, all,  0, 4, 8,12,16,20,24,28);
-        v[1].u8 = __builtin_shufflevector(all, all,  1, 5, 9,13,17,21,25,29);
-        v[2].u8 = __builtin_shufflevector(all, all,  2, 6,10,14,18,22,26,30);
-        v[3].u8 = __builtin_shufflevector(all, all,  3, 7,11,15,19,23,27,31);
+        B8 c0 = __builtin_shufflevector(all, all,  0, 4, 8,12,16,20,24,28);
+        B8 c1 = __builtin_shufflevector(all, all,  1, 5, 9,13,17,21,25,29);
+        B8 c2 = __builtin_shufflevector(all, all,  2, 6,10,14,18,22,26,30);
+        B8 c3 = __builtin_shufflevector(all, all,  3, 7,11,15,19,23,27,31);
+        v[0].u16 = __builtin_convertvector(c0, U16);
+        v[1].u16 = __builtin_convertvector(c1, U16);
+        v[2].u16 = __builtin_convertvector(c2, U16);
+        v[3].u16 = __builtin_convertvector(c3, U16);
     }
     return ip[4].fn(ip+4, v+4, end, ptr);
 }
 
-op(i16_from_u8) {
-    for (int l = 0; l < K; l++) { v->u16[l] = (uint16_t)v[ip->x].u8[l]; }
-    next;
-}
-
-op(u8_from_i16) {
-    for (int l = 0; l < K; l++) { v->u8[l] = (uint8_t)v[ip->x].u16[l]; }
-    next;
-}
-
 op(store_8x4) {
     uint8_t *dst = ptr[ip->x];
-    U8 r = v[ip->y].u8, g = v[ip->z].u8, b = v[ip->w].u8, a = v[(int)ip[1].x].u8;
+    U16 r = v[ip->y].u16, g = v[ip->z].u16, b = v[ip->w].u16, a = v[(int)ip[1].x].u16;
     if (end & (K-1)) {
-        dst[(end-1)*4+0] = r[0];
-        dst[(end-1)*4+1] = g[0];
-        dst[(end-1)*4+2] = b[0];
-        dst[(end-1)*4+3] = a[0];
+        dst[(end-1)*4+0] = (uint8_t)r[0];
+        dst[(end-1)*4+1] = (uint8_t)g[0];
+        dst[(end-1)*4+2] = (uint8_t)b[0];
+        dst[(end-1)*4+3] = (uint8_t)a[0];
     } else {
-        // Interleave: rg = r0 g0 r1 g1 ..., ba = b0 a0 b1 a1 ...
+        typedef uint8_t B8  __attribute__((vector_size(K)));
+        B8 r8 = __builtin_convertvector(r, B8);
+        B8 g8 = __builtin_convertvector(g, B8);
+        B8 b8 = __builtin_convertvector(b, B8);
+        B8 a8 = __builtin_convertvector(a, B8);
         typedef uint8_t B16 __attribute__((vector_size(16)));
-        B16 rg = __builtin_shufflevector(r, g, 0,8, 1,9, 2,10, 3,11, 4,12, 5,13, 6,14, 7,15);
-        B16 ba = __builtin_shufflevector(b, a, 0,8, 1,9, 2,10, 3,11, 4,12, 5,13, 6,14, 7,15);
-        // Final interleave: rgba = r0 g0 b0 a0 r1 g1 b1 a1 ...
+        B16 rg = __builtin_shufflevector(r8, g8, 0,8, 1,9, 2,10, 3,11, 4,12, 5,13, 6,14, 7,15);
+        B16 ba = __builtin_shufflevector(b8, a8, 0,8, 1,9, 2,10, 3,11, 4,12, 5,13, 6,14, 7,15);
         typedef uint8_t B32 __attribute__((vector_size(32)));
         B32 rgba = __builtin_shufflevector(rg, ba,
              0,16, 1,17,  2,18, 3,19,  4,20, 5,21,  6,22, 7,23,
@@ -521,7 +517,6 @@ static Fn const fn[] = {
     [op_half_from_i16] = half_from_i16, [op_i16_from_half] = i16_from_half,
     [op_f32_from_half] = f32_from_half, [op_i32_from_half] = i32_from_half,
     [op_i16_from_i32] = i16_from_i32, [op_i32_from_i16] = i32_from_i16,
-    [op_i16_from_u8] = i16_from_u8, [op_u8_from_i16] = u8_from_i16,
     [op_load_8x4] = load_8x4,
     [op_store_8x4] = store_8x4,
     [op_bytes] = bytes_32,

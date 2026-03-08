@@ -51,38 +51,34 @@ void umbra_entry(int n, void *a0, void *a1, void *a2, void *a3, void *a4, void *
     float v2 = h2f(15360);
 
     for (int i = 0; i < n; i++) {
-        u16 v3 = ((unsigned char*)a0)[i*4+0];
-        u16 v4 = (u16)v3;
-        float v5 = (float)(s16)v4;
-        float v6 = h2f(p1[i]);
-        u16 v7 = ((unsigned char*)a0)[i*4+3];
-        u16 v8 = (u16)v7;
-        float v9 = (float)(s16)v8;
-        float v10 = v1 * v9;
-        float v11 = v2 - v10;
-        float v12 = v6 * v11;
-        float v13 = v1 * v5 + v12;
-        p1[i] = f2h(v13);
+        u16 v3 = (u16)((unsigned char*)a0)[i*4+0];
+        float v4 = (float)(s16)v3;
+        float v5 = h2f(p1[i]);
+        u16 v6 = (u16)((unsigned char*)a0)[i*4+3];
+        float v7 = (float)(s16)v6;
+        float v8 = v1 * v7;
+        float v9 = v2 - v8;
+        float v10 = v5 * v9;
+        float v11 = v1 * v4 + v10;
+        p1[i] = f2h(v11);
 
-        u16 v15 = ((unsigned char*)a0)[i*4+1];
-        u16 v16 = (u16)v15;
-        float v17 = (float)(s16)v16;
-        float v18 = h2f(p2[i]);
-        float v19 = v18 * v11;
-        float v20 = v1 * v17 + v19;
-        p2[i] = f2h(v20);
+        u16 v13 = (u16)((unsigned char*)a0)[i*4+1];
+        float v14 = (float)(s16)v13;
+        float v15 = h2f(p2[i]);
+        float v16 = v15 * v9;
+        float v17 = v1 * v14 + v16;
+        p2[i] = f2h(v17);
 
-        u16 v22 = ((unsigned char*)a0)[i*4+2];
-        u16 v23 = (u16)v22;
-        float v24 = (float)(s16)v23;
-        float v25 = h2f(p3[i]);
-        float v26 = v25 * v11;
-        float v27 = v1 * v24 + v26;
-        p3[i] = f2h(v27);
+        u16 v19 = (u16)((unsigned char*)a0)[i*4+2];
+        float v20 = (float)(s16)v19;
+        float v21 = h2f(p3[i]);
+        float v22 = v21 * v9;
+        float v23 = v1 * v20 + v22;
+        p3[i] = f2h(v23);
 
-        float v29 = h2f(p4[i]);
-        float v30 = v29 * v11;
-        float v31 = v1 * v9 + v30;
-        p4[i] = f2h(v31);
+        float v25 = h2f(p4[i]);
+        float v26 = v25 * v9;
+        float v27 = v1 * v7 + v26;
+        p4[i] = f2h(v27);
     }
 }

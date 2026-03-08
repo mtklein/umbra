@@ -17,17 +17,14 @@ enum op {
     op_lt_u32, op_le_u32, op_gt_u32, op_ge_u32,
     op_bytes,
 
-    // 8-bit ops
-    op_load_8x4,   // produces 4 consecutive outputs (channels 0-3)
-    op_store_8x4,  // consumes 4 inputs (x=ch0, y=ch1, z=ch2, w=ch3)
-    op_u8_from_i16,
-
     // 16-bit ops
     op_imm_16, op_uni_16, op_load_16, op_gather_16, op_store_16, op_scatter_16,
+    op_load_8x4,   // produces 4 outputs (u8->u16 widened); continuations reference base
+    op_store_8x4,  // consumes 4 u16 inputs (x=ch0, y=ch1, z=ch2, w=ch3), narrowed to u8
     op_add_i16, op_sub_i16, op_mul_i16,
     op_shl_i16, op_shr_u16, op_shr_s16, op_shl_i16_imm, op_shr_u16_imm, op_shr_s16_imm,
     op_and_16, op_or_16, op_xor_16, op_sel_16,
-    op_i16_from_i32, op_i16_from_u8,
+    op_i16_from_i32,
     op_eq_i16, op_ne_i16,
     op_lt_s16, op_le_s16, op_gt_s16, op_ge_s16,
     op_lt_u16, op_le_u16, op_gt_u16, op_ge_u16,
@@ -76,11 +73,10 @@ static inline _Bool is_varying(enum op op) {
         || op == op_load_8x4 || op == op_store_8x4;
 }
 
-enum op_type { OP_32, OP_8, OP_16, OP_HALF };
+enum op_type { OP_32, OP_16, OP_HALF };
 
 static inline enum op_type op_type(enum op op) {
     if (op >= op_imm_half)    return OP_HALF;
     if (op >= op_imm_16)      return OP_16;
-    if (op >= op_load_8x4)    return OP_8;
     return OP_32;
 }

@@ -297,14 +297,8 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             case op_load_8x4: {
                 int ch = inst->x ? inst->imm : 0;
                 int p  = inst->x ? bb->inst[inst->x].ptr : inst->ptr;
-                emit(b, "%su16 v%d = ((unsigned char*)a%d)[i*4+%d];\n", pad, i, p, ch);
+                emit(b, "%su16 v%d = (u16)((unsigned char*)a%d)[i*4+%d];\n", pad, i, p, ch);
             } break;
-            case op_i16_from_u8:
-                emit(b, "%su16 v%d = (u16)v%d;\n", pad, i, inst->x);
-                break;
-            case op_u8_from_i16:
-                emit(b, "%su32 v%d = (u32)(unsigned char)v%d;\n", pad, i, inst->x);
-                break;
             case op_store_8x4: {
                 int p = inst->ptr;
                 emit(b, "%s((unsigned char*)a%d)[i*4+0] = (unsigned char)v%d;\n", pad, p, inst->x);
@@ -336,8 +330,9 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
         enum op op = bb->inst[i].op;
         if (has_ptr(op)) {
             int p = bb->inst[i].ptr;
-            if (op_type(op) == OP_32)      { ptr_32[p] = 1; }
-            else if (op_type(op) != OP_8)  { ptr_16[p] = 1; }
+            if (op == op_load_8x4 || op == op_store_8x4) { /* uses (unsigned char*) cast */ }
+            else if (op_type(op) == OP_32) { ptr_32[p] = 1; }
+            else                           { ptr_16[p] = 1; }
         }
     }
 

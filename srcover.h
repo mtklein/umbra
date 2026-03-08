@@ -4,13 +4,13 @@
 static inline struct umbra_basic_block* build_srcover(void) {
     struct umbra_basic_block *bb = umbra_basic_block();
     umbra_v32  ix     = umbra_lane(bb);
-    umbra_v8   rgba[4];
+    umbra_v16  rgba[4];
     umbra_load_8x4(bb, (umbra_ptr){0}, ix, rgba);
     umbra_half inv255 = umbra_imm_half(bb, 0x1C04);
-    umbra_half sr     = umbra_mul_half(bb, umbra_half_from_i16(bb, umbra_i16_from_u8(bb, rgba[0])), inv255),
-               sg     = umbra_mul_half(bb, umbra_half_from_i16(bb, umbra_i16_from_u8(bb, rgba[1])), inv255),
-               sb     = umbra_mul_half(bb, umbra_half_from_i16(bb, umbra_i16_from_u8(bb, rgba[2])), inv255),
-               sa     = umbra_mul_half(bb, umbra_half_from_i16(bb, umbra_i16_from_u8(bb, rgba[3])), inv255),
+    umbra_half sr     = umbra_mul_half(bb, umbra_half_from_i16(bb, rgba[0]), inv255),
+               sg     = umbra_mul_half(bb, umbra_half_from_i16(bb, rgba[1]), inv255),
+               sb     = umbra_mul_half(bb, umbra_half_from_i16(bb, rgba[2]), inv255),
+               sa     = umbra_mul_half(bb, umbra_half_from_i16(bb, rgba[3]), inv255),
                dr     = umbra_load_half(bb, (umbra_ptr){1}, ix),
                dg     = umbra_load_half(bb, (umbra_ptr){2}, ix),
                db     = umbra_load_half(bb, (umbra_ptr){3}, ix),

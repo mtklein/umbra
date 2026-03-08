@@ -369,9 +369,6 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     // Conversions within same width
     case op_half_from_i16: put(c, W(SCVTF_4h(d,x))); return 1;
     case op_i16_from_half: put(c, W(FCVTZS_4h(d,x))); return 1;
-    // 8-bit <-> 16-bit (unchanged: UXTL reads D->Q, XTN reads Q->D)
-    case op_i16_from_u8:  put(c, UXTL_8h(d,x)); return 1;
-    case op_u8_from_i16:  put(c, XTN_8b(d,x)); return 1;
 
     default: return 0;
     }
@@ -809,12 +806,16 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 if (ch) put(c, ADD_xi(XT, XT, ch));
                 // LDRB Wt, [Xn, Xm]
                 put(c, 0x38606800u | ((uint32_t)XT << 16) | ((uint32_t)(1+p) << 5) | (uint32_t)XT);
-                // DUP Vd.8B, Wt
-                put(c, 0x0E010C00u | ((uint32_t)XT << 5) | (uint32_t)rd);
+                // DUP Vd.8H, Wt (broadcast byte as u16)
+                put(c, W(0x0E020C00u) | ((uint32_t)XT << 5) | (uint32_t)rd);
             } else if (is_base) {
                 evict_scratch(c, ra, sl, ns);
                 put(c, ADD_xr(XT, 1+p, XW));
                 put(c, LD4_8b(0, XT));
+                // Widen u8->u16: UXTL Vd.8H, Vn.8B (in-place)
+                for (int c2 = 0; c2 < 4; c2++) {
+                    put(c, UXTL_8h(c2, c2));
+                }
                 // Claim V0 for the base (ch0).
                 ra->reg[i] = 0;
                 ra->owner[0] = i;
@@ -852,6 +853,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 for (int ch = 0; ch < 4; ch++) {
                     int8_t ry = ra_ensure(c, ra, sl, ns, inputs[ch]);
                     if (ry != (int8_t)ch) put(c, ORR_16b(ch, ry, ry));
+                }
+                // Narrow u16->u8: XTN Vd.8B, Vn.8H (in-place)
+                for (int ch = 0; ch < 4; ch++) {
+                    put(c, XTN_8b(ch, ch));
                 }
                 put(c, ADD_xr(XT, 1+p, XW));
                 put(c, ST4_8b(0, XT));

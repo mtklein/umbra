@@ -86,7 +86,6 @@ static int const_eval(enum op op, int xb, int yb, int zb) {
         case op_i32_from_f32: return (int)xf;
         case op_i32_from_half: { float t = scalar_f16_to_f32(xh); return (int)t; }
         case op_i16_from_i32: return (uint16_t)xb;
-        case op_i16_from_u8:  return (uint16_t)(uint8_t)xb;
         case op_i32_from_i16: return (int32_t)(int16_t)xh;
 
 #pragma clang diagnostic push
@@ -586,28 +585,16 @@ v32 umbra_i32_from_i16(BB *bb, v16 a) {
     return (v32){math(bb, op_i32_from_i16, .x=a.id)};
 }
 
-typedef umbra_v8 v8;
-
-v16 umbra_i16_from_u8(BB *bb, v8 a) {
-    return (v16){math(bb, op_i16_from_u8, .x=a.id)};
-}
-v8 umbra_u8_from_i16(BB *bb, v16 a) {
-    return (v8){push(bb, op_u8_from_i16, .x=a.id)};
-}
-
-void umbra_load_8x4(BB *bb, umbra_ptr src, v32 ix, v8 out[4]) {
+void umbra_load_8x4(BB *bb, umbra_ptr src, v32 ix, v16 out[4]) {
     (void)ix;
-    // Allocate 4 consecutive slots.  The first is the real load_8x4;
-    // the remaining 3 are inert extra-output slots that just hold their channel index.
     int base = push(bb, op_load_8x4, .ptr=src.ix);
-    // Push 3 continuation slots directly (unique x=base prevents dedup).
     for (int ch = 1; ch <= 3; ch++) {
         push(bb, op_load_8x4, .x=base, .imm=ch);
     }
-    for (int ch = 0; ch < 4; ch++) { out[ch] = (v8){base + ch}; }
+    for (int ch = 0; ch < 4; ch++) { out[ch] = (v16){base + ch}; }
 }
 
-void umbra_store_8x4(BB *bb, umbra_ptr dst, v32 ix, v8 in[4]) {
+void umbra_store_8x4(BB *bb, umbra_ptr dst, v32 ix, v16 in[4]) {
     (void)ix;
     push(bb, op_store_8x4, .x=in[0].id, .y=in[1].id, .z=in[2].id, .w=in[3].id, .ptr=dst.ix);
 }
@@ -757,7 +744,6 @@ static char const* op_name(enum op op) {
         case op_bytes:      return "bytes";
         case op_load_8x4:  return "load_8x4";
         case op_store_8x4: return "store_8x4";
-        case op_u8_from_i16:  return "u8_from_i16";
         case op_add_i16:    return "add_i16";
         case op_sub_i16:    return "sub_i16";
         case op_mul_i16:    return "mul_i16";
@@ -772,7 +758,6 @@ static char const* op_name(enum op op) {
         case op_xor_16:     return "xor_16";
         case op_sel_16:     return "sel_16";
         case op_i16_from_i32: return "i16_from_i32";
-        case op_i16_from_u8:  return "i16_from_u8";
         case op_eq_i16:     return "eq_i16";
         case op_ne_i16:     return "ne_i16";
         case op_lt_s16:     return "lt_s16";
