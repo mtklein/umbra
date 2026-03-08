@@ -116,7 +116,7 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                 case op_half_from_i16: emit(b, "%sfloat v%d = (float)(s16)v%d;\n", pad, i, inst->x); break;
                 case op_i16_from_half: emit(b, "%su16 v%d = (u16)(s16)v%d;\n", pad, i, inst->x); break;
                 case op_eq_half: emit(b, "%sfloat v%d = u2f((u32)-(s32)(v%d == v%d));\n", pad, i, inst->x, inst->y); break;
-                case op_ne_half: emit(b, "%sfloat v%d = u2f((u32)-(s32)(v%d != v%d));\n", pad, i, inst->x, inst->y); break;
+
                 case op_lt_half: emit(b, "%sfloat v%d = u2f((u32)-(s32)(v%d <  v%d));\n", pad, i, inst->x, inst->y); break;
                 case op_le_half: emit(b, "%sfloat v%d = u2f((u32)-(s32)(v%d <= v%d));\n", pad, i, inst->x, inst->y); break;
                 default: break;
@@ -242,7 +242,7 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             UNOP(op_i32_from_i16,  "(u32)(s32)(s16)v%d")
 
             BINOP(op_eq_f32, "(u32)-(s32)(u2f(v%d) == u2f(v%d))")
-            BINOP(op_ne_f32, "(u32)-(s32)(u2f(v%d) != u2f(v%d))")
+
             BINOP(op_lt_f32, "(u32)-(s32)(u2f(v%d) <  u2f(v%d))")
             BINOP(op_le_f32, "(u32)-(s32)(u2f(v%d) <= u2f(v%d))")
 
@@ -251,7 +251,7 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
 
             #define BINOP(OP, EXPR) case OP: emit(b, "%s%s v%d = " EXPR ";\n", pad, "u32", i, inst->x, inst->y); break;
             BINOP(op_eq_i32, "(u32)-(s32)((s32)v%d == (s32)v%d)")
-            BINOP(op_ne_i32, "(u32)-(s32)((s32)v%d != (s32)v%d)")
+
             BINOP(op_lt_s32, "(u32)-(s32)((s32)v%d <  (s32)v%d)")
             BINOP(op_le_s32, "(u32)-(s32)((s32)v%d <= (s32)v%d)")
             BINOP(op_lt_u32, "(u32)-(s32)(v%d <  v%d)")
@@ -260,7 +260,7 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
 
             #define BINOP(OP, EXPR) case OP: emit(b, "%s%s v%d = " EXPR ";\n", pad, "u16", i, inst->x, inst->y); break;
             BINOP(op_eq_i16, "(u16)-(s16)((s16)v%d == (s16)v%d)")
-            BINOP(op_ne_i16, "(u16)-(s16)((s16)v%d != (s16)v%d)")
+
             BINOP(op_lt_s16, "(u16)-(s16)((s16)v%d <  (s16)v%d)")
             BINOP(op_le_s16, "(u16)-(s16)((s16)v%d <= (s16)v%d)")
             BINOP(op_lt_u16, "(u16)-(s16)(v%d <  v%d)")

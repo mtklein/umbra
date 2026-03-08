@@ -135,10 +135,7 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                     emit(b, "%shalf v%d = as_type<half>((ushort)(v%d == v%d ? 0xffff : 0));\n",
                          pad, i, inst->x, inst->y);
                     break;
-                case op_ne_half:
-                    emit(b, "%shalf v%d = as_type<half>((ushort)(v%d != v%d ? 0xffff : 0));\n",
-                         pad, i, inst->x, inst->y);
-                    break;
+
                 case op_lt_half:
                     emit(b, "%shalf v%d = as_type<half>((ushort)(v%d < v%d ? 0xffff : 0));\n",
                          pad, i, inst->x, inst->y);
@@ -296,19 +293,19 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                 break;
 
             case op_eq_f32: emit(b, "%suint v%d = as_type<float>(v%d) == as_type<float>(v%d) ? 0xffffffffu : 0u;\n", pad, i, inst->x, inst->y); break;
-            case op_ne_f32: emit(b, "%suint v%d = as_type<float>(v%d) != as_type<float>(v%d) ? 0xffffffffu : 0u;\n", pad, i, inst->x, inst->y); break;
+
             case op_lt_f32: emit(b, "%suint v%d = as_type<float>(v%d) <  as_type<float>(v%d) ? 0xffffffffu : 0u;\n", pad, i, inst->x, inst->y); break;
             case op_le_f32: emit(b, "%suint v%d = as_type<float>(v%d) <= as_type<float>(v%d) ? 0xffffffffu : 0u;\n", pad, i, inst->x, inst->y); break;
 
             case op_eq_i32: emit(b, "%suint v%d = (int)v%d == (int)v%d ? 0xffffffffu : 0u;\n", pad, i, inst->x, inst->y); break;
-            case op_ne_i32: emit(b, "%suint v%d = (int)v%d != (int)v%d ? 0xffffffffu : 0u;\n", pad, i, inst->x, inst->y); break;
+
             case op_lt_s32: emit(b, "%suint v%d = (int)v%d <  (int)v%d ? 0xffffffffu : 0u;\n", pad, i, inst->x, inst->y); break;
             case op_le_s32: emit(b, "%suint v%d = (int)v%d <= (int)v%d ? 0xffffffffu : 0u;\n", pad, i, inst->x, inst->y); break;
             case op_lt_u32: emit(b, "%suint v%d = v%d <  v%d ? 0xffffffffu : 0u;\n", pad, i, inst->x, inst->y); break;
             case op_le_u32: emit(b, "%suint v%d = v%d <= v%d ? 0xffffffffu : 0u;\n", pad, i, inst->x, inst->y); break;
 
             case op_eq_i16: emit(b, "%sushort v%d = (short)v%d == (short)v%d ? 0xffffu : 0u;\n", pad, i, inst->x, inst->y); break;
-            case op_ne_i16: emit(b, "%sushort v%d = (short)v%d != (short)v%d ? 0xffffu : 0u;\n", pad, i, inst->x, inst->y); break;
+
             case op_lt_s16: emit(b, "%sushort v%d = (short)v%d <  (short)v%d ? 0xffffu : 0u;\n", pad, i, inst->x, inst->y); break;
             case op_le_s16: emit(b, "%sushort v%d = (short)v%d <= (short)v%d ? 0xffffu : 0u;\n", pad, i, inst->x, inst->y); break;
             case op_lt_u16: emit(b, "%sushort v%d = v%d <  v%d ? 0xffffu : 0u;\n", pad, i, inst->x, inst->y); break;

@@ -91,7 +91,6 @@ static int const_eval(enum op op, int xb, int yb, int zb) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-equal"
         case op_eq_f32: return -(int)(xf == yf);
-        case op_ne_f32: return -(int)(xf != yf);
 #pragma clang diagnostic pop
         case op_lt_f32: return -(int)(xf <  yf);
         case op_le_f32: return -(int)(xf <= yf);
@@ -99,20 +98,17 @@ static int const_eval(enum op op, int xb, int yb, int zb) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-equal"
         case op_eq_half: return (uint16_t)-(int)(scalar_f16_to_f32(xh) == scalar_f16_to_f32(yh));
-        case op_ne_half: return (uint16_t)-(int)(scalar_f16_to_f32(xh) != scalar_f16_to_f32(yh));
 #pragma clang diagnostic pop
         case op_lt_half: return (uint16_t)-(int)(scalar_f16_to_f32(xh) <  scalar_f16_to_f32(yh));
         case op_le_half: return (uint16_t)-(int)(scalar_f16_to_f32(xh) <= scalar_f16_to_f32(yh));
 
         case op_eq_i32: return -(int)(xb == yb);
-        case op_ne_i32: return -(int)(xb != yb);
         case op_lt_s32: return -(int)(xb <  yb);
         case op_le_s32: return -(int)(xb <= yb);
         case op_lt_u32: return -(int)(xu <  yu);
         case op_le_u32: return -(int)(xu <= yu);
 
         case op_eq_i16: return (uint16_t)-(int)((int16_t)xh == (int16_t)yh);
-        case op_ne_i16: return (uint16_t)-(int)((int16_t)xh != (int16_t)yh);
         case op_lt_s16: return (uint16_t)-(int)((int16_t)xh <  (int16_t)yh);
         case op_le_s16: return (uint16_t)-(int)((int16_t)xh <= (int16_t)yh);
         case op_lt_u16: return (uint16_t)-(int)(xh <  yh);
@@ -403,6 +399,7 @@ v16 umbra_sub_i16(BB *bb, v16 a, v16 b) {
     return (v16){math(bb, op_sub_i16, .x=a.id, .y=b.id)};
 }
 
+
 v16 umbra_mul_i16(BB *bb, v16 a, v16 b) {
     sort(&a.id, &b.id);
     if (is_imm16(bb, a.id, 1)) { return b; }
@@ -454,6 +451,7 @@ v16 umbra_shr_s16(BB *bb, v16 a, v16 b) {
 
 v32 umbra_and_32(BB *bb, v32 a, v32 b) {
     sort(&a.id, &b.id);
+    if (a.id == b.id) { return a; }
     if (is_imm32(bb, a.id, -1)) { return b; }
     if (is_imm32(bb, b.id, -1)) { return a; }
     if (is_imm32(bb, a.id,  0)) { return a; }
@@ -462,6 +460,7 @@ v32 umbra_and_32(BB *bb, v32 a, v32 b) {
 }
 v32 umbra_or_32(BB *bb, v32 a, v32 b) {
     sort(&a.id, &b.id);
+    if (a.id == b.id) { return a; }
     if (is_imm32(bb, a.id,  0)) { return b; }
     if (is_imm32(bb, b.id,  0)) { return a; }
     if (is_imm32(bb, a.id, -1)) { return a; }
@@ -484,6 +483,7 @@ v32 umbra_sel_32(BB *bb, v32 c, v32 t, v32 f) {
 
 v16 umbra_and_16(BB *bb, v16 a, v16 b) {
     sort(&a.id, &b.id);
+    if (a.id == b.id) { return a; }
     if (is_imm16(bb, a.id, 0xffff)) { return b; }
     if (is_imm16(bb, b.id, 0xffff)) { return a; }
     if (is_imm16(bb, a.id,      0)) { return a; }
@@ -492,6 +492,7 @@ v16 umbra_and_16(BB *bb, v16 a, v16 b) {
 }
 v16 umbra_or_16(BB *bb, v16 a, v16 b) {
     sort(&a.id, &b.id);
+    if (a.id == b.id) { return a; }
     if (is_imm16(bb, a.id,      0)) { return b; }
     if (is_imm16(bb, b.id,      0)) { return a; }
     if (is_imm16(bb, a.id, 0xffff)) { return a; }
@@ -514,6 +515,7 @@ v16 umbra_sel_16(BB *bb, v16 c, v16 t, v16 f) {
 
 vh umbra_and_half(BB *bb, vh a, vh b) {
     sort(&a.id, &b.id);
+    if (a.id == b.id) { return a; }
     if (is_imm_half(bb, a.id, 0xffff)) { return b; }
     if (is_imm_half(bb, b.id, 0xffff)) { return a; }
     if (is_imm_half(bb, a.id,      0)) { return a; }
@@ -522,6 +524,7 @@ vh umbra_and_half(BB *bb, vh a, vh b) {
 }
 vh umbra_or_half(BB *bb, vh a, vh b) {
     sort(&a.id, &b.id);
+    if (a.id == b.id) { return a; }
     if (is_imm_half(bb, a.id,      0)) { return b; }
     if (is_imm_half(bb, b.id,      0)) { return a; }
     if (is_imm_half(bb, a.id, 0xffff)) { return a; }
@@ -567,6 +570,7 @@ v16 umbra_i16_from_half(BB *bb, vh a) {
     return (v16){math(bb, op_i16_from_half, .x=a.id)};
 }
 v16 umbra_i16_from_i32(BB *bb, v32 a) {
+    if (bb->inst[a.id].op == op_i32_from_i16) { return (v16){bb->inst[a.id].x}; }
     return (v16){math(bb, op_i16_from_i32, .x=a.id)};
 }
 v32 umbra_i32_from_i16(BB *bb, v16 a) {
@@ -593,8 +597,7 @@ vh umbra_eq_half(BB *bb, vh a, vh b) {
     return (vh){math(bb, op_eq_half, .x=a.id, .y=b.id)};
 }
 vh umbra_ne_half(BB *bb, vh a, vh b) {
-    sort(&a.id, &b.id);
-    return (vh){math(bb, op_ne_half, .x=a.id, .y=b.id)};
+    return umbra_xor_half(bb, umbra_eq_half(bb, a, b), umbra_imm_half(bb, 0xFFFF));
 }
 vh umbra_lt_half(BB *bb, vh a, vh b) { return (vh){math(bb, op_lt_half, .x=a.id, .y=b.id)}; }
 vh umbra_le_half(BB *bb, vh a, vh b) { return (vh){math(bb, op_le_half, .x=a.id, .y=b.id)}; }
@@ -606,8 +609,7 @@ v32 umbra_eq_f32(BB *bb, v32 a, v32 b) {
     return (v32){math(bb, op_eq_f32, .x=a.id, .y=b.id)};
 }
 v32 umbra_ne_f32(BB *bb, v32 a, v32 b) {
-    sort(&a.id, &b.id);
-    return (v32){math(bb, op_ne_f32, .x=a.id, .y=b.id)};
+    return umbra_xor_32(bb, umbra_eq_f32(bb, a, b), umbra_imm_32(bb, 0xFFFFFFFF));
 }
 v32 umbra_lt_f32(BB *bb, v32 a, v32 b) { return (v32){math(bb, op_lt_f32, .x=a.id, .y=b.id)}; }
 v32 umbra_le_f32(BB *bb, v32 a, v32 b) { return (v32){math(bb, op_le_f32, .x=a.id, .y=b.id)}; }
@@ -616,19 +618,19 @@ v32 umbra_ge_f32(BB *bb, v32 a, v32 b) { return umbra_le_f32(bb, b, a); }
 
 v16 umbra_eq_i16(BB *bb, v16 a, v16 b) {
     sort(&a.id, &b.id);
+    if (a.id == b.id) { return umbra_imm_16(bb, 0xFFFF); }
     return (v16){math(bb, op_eq_i16, .x=a.id, .y=b.id)};
 }
 v16 umbra_ne_i16(BB *bb, v16 a, v16 b) {
-    sort(&a.id, &b.id);
-    return (v16){math(bb, op_ne_i16, .x=a.id, .y=b.id)};
+    return umbra_xor_16(bb, umbra_eq_i16(bb, a, b), umbra_imm_16(bb, 0xFFFF));
 }
 v32 umbra_eq_i32(BB *bb, v32 a, v32 b) {
     sort(&a.id, &b.id);
+    if (a.id == b.id) { return umbra_imm_32(bb, 0xFFFFFFFF); }
     return (v32){math(bb, op_eq_i32, .x=a.id, .y=b.id)};
 }
 v32 umbra_ne_i32(BB *bb, v32 a, v32 b) {
-    sort(&a.id, &b.id);
-    return (v32){math(bb, op_ne_i32, .x=a.id, .y=b.id)};
+    return umbra_xor_32(bb, umbra_eq_i32(bb, a, b), umbra_imm_32(bb, 0xFFFFFFFF));
 }
 
 v16 umbra_lt_s16(BB *bb, v16 a, v16 b) { return (v16){math(bb, op_lt_s16, .x=a.id, .y=b.id)}; }
