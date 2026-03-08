@@ -24,8 +24,13 @@ struct umbra_metal {
     void *device;
     void *pipeline;
     void *queue;
+    void *n_buf;
+    void *bufs[6];
+    int   buf_cap[6];
+    int   elem_sz[6];
     char *src;
-    int   max_ptr, :32;
+    int   max_ptr;
+    int   tg_size;
 };
 
 typedef struct {
@@ -412,12 +417,33 @@ struct umbra_metal* umbra_metal(BB const *bb) {
         id<MTLCommandQueue> queue = [device newCommandQueue];
         if (!queue) { free(src); return 0; }
 
-        struct umbra_metal *m = malloc(sizeof *m);
+        id<MTLBuffer> n_buf = [device newBufferWithLength:sizeof(uint32_t)
+                                                   options:MTLResourceStorageModeShared];
+
+        // Determine element size per pointer from the ops that access it.
+        int elem_sz[6] = {0,0,0,0,0,0};
+        for (int i = 0; i < bb->insts; i++) {
+            enum op op = bb->inst[i].op;
+            if (!has_ptr(op)) continue;
+            int p = bb->inst[i].ptr;
+            if (p >= 6) continue;
+            if (op == op_load_8x4 || op == op_store_8x4) { if (elem_sz[p] < 4) elem_sz[p] = 4; }
+            else if (op_type(op) == OP_32)                { if (elem_sz[p] < 4) elem_sz[p] = 4; }
+            else                                          { if (elem_sz[p] < 2) elem_sz[p] = 2; }
+        }
+
+        struct umbra_metal *m = calloc(1, sizeof *m);
         m->device   = (__bridge_retained void*)device;
         m->pipeline = (__bridge_retained void*)pipeline;
         m->queue    = (__bridge_retained void*)queue;
+        m->n_buf    = (__bridge_retained void*)n_buf;
         m->src      = src;
+        NSUInteger tg = pipeline.maxTotalThreadsPerThreadgroup;
+        if (tg > 256) tg = 256;
+
         m->max_ptr  = max_ptr;
+        m->tg_size  = (int)tg;
+        for (int p = 0; p < 6; p++) { m->elem_sz[p] = elem_sz[p]; }
         return m;
     }
 }
@@ -430,57 +456,45 @@ void umbra_metal_run(struct umbra_metal *m, int n,
         id<MTLDevice> device = (__bridge id<MTLDevice>)m->device;
         id<MTLComputePipelineState> pipeline = (__bridge id<MTLComputePipelineState>)m->pipeline;
         id<MTLCommandQueue> queue = (__bridge id<MTLCommandQueue>)m->queue;
+        id<MTLBuffer> n_buf = (__bridge id<MTLBuffer>)m->n_buf;
+
+        *(uint32_t*)n_buf.contents = (uint32_t)n;
 
         void *ptrs[] = {p0, p1, p2, p3, p4, p5};
 
-        // Figure out buffer sizes. We need to know how big each pointer's data is.
-        // Conservatively: scan the program for max access per pointer.
-        // For simplicity, use n * max-element-size per pointer. The caller knows the real sizes.
-        // We'll use n * 4 bytes as a safe upper bound (32-bit elements, or n*4 for 8x4).
-        uint32_t n_val = (uint32_t)n;
-
-        id<MTLBuffer> n_buf = [device newBufferWithBytes:&n_val length:sizeof(n_val)
-                                                 options:MTLResourceStorageModeShared];
-
-        id<MTLBuffer> bufs[6] = {nil,nil,nil,nil,nil,nil};
         for (int p = 0; p <= m->max_ptr && p < 6; p++) {
             if (!ptrs[p]) continue;
-            // We need the actual data size. Use n*4 as conservative estimate
-            // (covers uint32, 2xhalf, 4xuchar per pixel).
-            NSUInteger sz = (NSUInteger)n * 4;
-            bufs[p] = [device newBufferWithBytesNoCopy:ptrs[p] length:sz
-                                               options:MTLResourceStorageModeShared
-                                           deallocator:nil];
-            if (!bufs[p]) {
-                // Fallback: copy
-                bufs[p] = [device newBufferWithBytes:ptrs[p] length:sz
-                                             options:MTLResourceStorageModeShared];
+            int const sz = n * m->elem_sz[p];
+            if (sz > m->buf_cap[p]) {
+                if (m->bufs[p]) { (void)(__bridge_transfer id)m->bufs[p]; }
+                m->buf_cap[p] = sz;
+                id<MTLBuffer> buf = [device newBufferWithLength:(NSUInteger)sz
+                                                       options:MTLResourceStorageModeShared];
+                m->bufs[p] = (__bridge_retained void*)buf;
             }
+            __builtin_memcpy(((__bridge id<MTLBuffer>)m->bufs[p]).contents, ptrs[p], (size_t)sz);
         }
 
-        id<MTLCommandBuffer> cmdbuf = [queue commandBuffer];
+        id<MTLCommandBuffer> cmdbuf = [queue commandBufferWithUnretainedReferences];
         id<MTLComputeCommandEncoder> enc = [cmdbuf computeCommandEncoder];
         [enc setComputePipelineState:pipeline];
         [enc setBuffer:n_buf offset:0 atIndex:0];
         for (int p = 0; p <= m->max_ptr && p < 6; p++) {
-            if (bufs[p]) [enc setBuffer:bufs[p] offset:0 atIndex:(NSUInteger)(p + 1)];
+            if (m->bufs[p]) [enc setBuffer:(__bridge id<MTLBuffer>)m->bufs[p]
+                                    offset:0 atIndex:(NSUInteger)(p + 1)];
         }
 
-        NSUInteger threadGroupSize = pipeline.maxTotalThreadsPerThreadgroup;
-        if (threadGroupSize > 256) threadGroupSize = 256;
         MTLSize grid = MTLSizeMake((NSUInteger)n, 1, 1);
-        MTLSize group = MTLSizeMake(threadGroupSize, 1, 1);
+        MTLSize group = MTLSizeMake((NSUInteger)m->tg_size, 1, 1);
         [enc dispatchThreads:grid threadsPerThreadgroup:group];
         [enc endEncoding];
         [cmdbuf commit];
         [cmdbuf waitUntilCompleted];
 
-        // Copy results back for buffers that were copied (not NoCopy)
         for (int p = 0; p <= m->max_ptr && p < 6; p++) {
-            if (!bufs[p] || !ptrs[p]) continue;
-            if (bufs[p].contents != ptrs[p]) {
-                __builtin_memcpy(ptrs[p], bufs[p].contents, (size_t)n * 4);
-            }
+            if (!ptrs[p] || !m->bufs[p]) continue;
+            __builtin_memcpy(ptrs[p], ((__bridge id<MTLBuffer>)m->bufs[p]).contents,
+                             (size_t)(n * m->elem_sz[p]));
         }
     }
 }
@@ -491,6 +505,10 @@ void umbra_metal_free(struct umbra_metal *m) {
         if (m->device)   { (void)(__bridge_transfer id)m->device; }
         if (m->pipeline) { (void)(__bridge_transfer id)m->pipeline; }
         if (m->queue)    { (void)(__bridge_transfer id)m->queue; }
+        if (m->n_buf)    { (void)(__bridge_transfer id)m->n_buf; }
+        for (int p = 0; p < 6; p++) {
+            if (m->bufs[p]) { (void)(__bridge_transfer id)m->bufs[p]; }
+        }
     }
     free(m->src);
     free(m);

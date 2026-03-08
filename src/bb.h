@@ -45,7 +45,7 @@ enum op {
 struct bb_inst {
     enum op op;
     int     x,y,z,w;
-    union { int ptr; int imm; };
+    int     ptr, imm;
 };
 
 struct hash_slot { uint32_t hash; int ix; };

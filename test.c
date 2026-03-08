@@ -1306,6 +1306,42 @@ static void test_hash_quality(void) {
     umbra_basic_block_free(bb);
 }
 
+static void test_mixed_ptr_sizes(void) {
+  // Same pointer slot (p0) used as uint32_t in one program, __fp16 in another.
+  for (int opt = 0; opt < 2; opt++) {
+    // Program 1: p0 is uint32_t*, p1 is uint32_t*
+    {
+        struct umbra_basic_block *bb = umbra_basic_block();
+        umbra_v32 ix = umbra_lane(bb);
+        umbra_v32 a  = umbra_load_32(bb, (umbra_ptr){0}, ix);
+        umbra_v32 b  = umbra_add_i32(bb, a, umbra_imm_32(bb, 1));
+        umbra_store_32(bb, (umbra_ptr){1}, ix, b);
+        backends B = make(bb, opt);
+        for (int bi = 0; bi < 4; bi++) {
+            uint32_t x[] = {10, 20, 30}, y[3] = {0};
+            if (!run(&B, bi,3, x,y, 0,0,0,0)) continue;
+            (y[0] == 11) here; (y[1] == 21) here; (y[2] == 31) here;
+        }
+        cleanup(&B);
+    }
+    // Program 2: p0 is __fp16*, p1 is __fp16*
+    {
+        struct umbra_basic_block *bb = umbra_basic_block();
+        umbra_v32  ix = umbra_lane(bb);
+        umbra_half a  = umbra_load_half(bb, (umbra_ptr){0}, ix);
+        umbra_half b  = umbra_add_half(bb, a, umbra_imm_half(bb, 0x3c00));
+        umbra_store_half(bb, (umbra_ptr){1}, ix, b);
+        backends B = make(bb, opt);
+        for (int bi = 0; bi < 4; bi++) {
+            __fp16 x[] = {1, 2, 3}, y[3] = {0};
+            if (!run(&B, bi,3, x,y, 0,0,0,0)) continue;
+            equiv((float)y[0], 2) here; equiv((float)y[1], 3) here; equiv((float)y[2], 4) here;
+        }
+        cleanup(&B);
+    }
+  }
+}
+
 int main(void) {
     test_f32_ops();
     test_i32_ops();
@@ -1333,5 +1369,6 @@ int main(void) {
     test_store_8x4();
     test_srcover();
     test_hash_quality();
+    test_mixed_ptr_sizes();
     return 0;
 }

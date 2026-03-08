@@ -124,6 +124,7 @@ static uint32_t bb_inst_hash(struct bb_inst const *inst) {
     __builtin_mul_overflow(h ^ (uint32_t)inst->y  ,  0x9e3779b9u, &h);
     __builtin_mul_overflow(h ^ (uint32_t)inst->z  ,  0x9e3779b9u, &h);
     __builtin_mul_overflow(h ^ (uint32_t)inst->w  ,  0x9e3779b9u, &h);
+    __builtin_mul_overflow(h ^ (uint32_t)inst->ptr,  0x9e3779b9u, &h);
     __builtin_mul_overflow(h ^ (uint32_t)inst->imm,  0x9e3779b9u, &h);
     h ^= h >> 16;
     return h ? h : 1;
