@@ -675,118 +675,12 @@ v32 umbra_gt_u32(BB *bb, v32 a, v32 b) { return (v32){math(bb, op_gt_u32, .x=a.i
 v32 umbra_ge_u32(BB *bb, v32 a, v32 b) { return (v32){math(bb, op_ge_u32, .x=a.id, .y=b.id)}; }
 
 static char const* op_name(enum op op) {
-    switch (op) {
-        case op_lane:       return "lane";
-        case op_imm_32:     return "imm_32";
-        case op_imm_16:     return "imm_16";
-        case op_imm_half:   return "imm_half";
-        case op_uni_32:     return "uni_32";
-        case op_load_32:    return "load_32";
-        case op_gather_32:  return "gather_32";
-        case op_store_32:   return "store_32";
-        case op_scatter_32: return "scatter_32";
-        case op_uni_16:     return "uni_16";
-        case op_load_16:    return "load_16";
-        case op_gather_16:  return "gather_16";
-        case op_store_16:   return "store_16";
-        case op_scatter_16: return "scatter_16";
-        case op_uni_half:     return "uni_half";
-        case op_load_half:    return "load_half";
-        case op_gather_half:  return "gather_half";
-        case op_store_half:   return "store_half";
-        case op_scatter_half: return "scatter_half";
-        case op_add_f32:    return "add_f32";
-        case op_sub_f32:    return "sub_f32";
-        case op_mul_f32:    return "mul_f32";
-        case op_div_f32:    return "div_f32";
-        case op_min_f32:    return "min_f32";
-        case op_max_f32:    return "max_f32";
-        case op_sqrt_f32:   return "sqrt_f32";
-        case op_fma_f32:    return "fma_f32";
-        case op_add_i32:    return "add_i32";
-        case op_sub_i32:    return "sub_i32";
-        case op_mul_i32:    return "mul_i32";
-        case op_shl_i32:     return "shl_i32";
-        case op_shr_u32:     return "shr_u32";
-        case op_shr_s32:     return "shr_s32";
-        case op_shl_i32_imm: return "shl_i32_imm";
-        case op_shr_u32_imm: return "shr_u32_imm";
-        case op_shr_s32_imm: return "shr_s32_imm";
-        case op_and_32:     return "and_32";
-        case op_or_32:      return "or_32";
-        case op_xor_32:     return "xor_32";
-        case op_sel_32:     return "sel_32";
-        case op_f32_from_i32:  return "f32_from_i32";
-        case op_i32_from_f32:  return "i32_from_f32";
-        case op_f32_from_half: return "f32_from_half";
-        case op_i32_from_half: return "i32_from_half";
-        case op_i32_from_i16: return "i32_from_i16";
-        case op_half_from_f32: return "half_from_f32";
-        case op_half_from_i32: return "half_from_i32";
-        case op_half_from_i16: return "half_from_i16";
-        case op_i16_from_half: return "i16_from_half";
-        case op_eq_f32:     return "eq_f32";
-        case op_ne_f32:     return "ne_f32";
-        case op_lt_f32:     return "lt_f32";
-        case op_le_f32:     return "le_f32";
-        case op_gt_f32:     return "gt_f32";
-        case op_ge_f32:     return "ge_f32";
-        case op_eq_i32:     return "eq_i32";
-        case op_ne_i32:     return "ne_i32";
-        case op_lt_s32:     return "lt_s32";
-        case op_le_s32:     return "le_s32";
-        case op_gt_s32:     return "gt_s32";
-        case op_ge_s32:     return "ge_s32";
-        case op_lt_u32:     return "lt_u32";
-        case op_le_u32:     return "le_u32";
-        case op_gt_u32:     return "gt_u32";
-        case op_ge_u32:     return "ge_u32";
-        case op_bytes:      return "bytes";
-        case op_load_8x4:  return "load_8x4";
-        case op_store_8x4: return "store_8x4";
-        case op_add_i16:    return "add_i16";
-        case op_sub_i16:    return "sub_i16";
-        case op_mul_i16:    return "mul_i16";
-        case op_shl_i16:     return "shl_i16";
-        case op_shr_u16:     return "shr_u16";
-        case op_shr_s16:     return "shr_s16";
-        case op_shl_i16_imm: return "shl_i16_imm";
-        case op_shr_u16_imm: return "shr_u16_imm";
-        case op_shr_s16_imm: return "shr_s16_imm";
-        case op_and_16:     return "and_16";
-        case op_or_16:      return "or_16";
-        case op_xor_16:     return "xor_16";
-        case op_sel_16:     return "sel_16";
-        case op_i16_from_i32: return "i16_from_i32";
-        case op_eq_i16:     return "eq_i16";
-        case op_ne_i16:     return "ne_i16";
-        case op_lt_s16:     return "lt_s16";
-        case op_le_s16:     return "le_s16";
-        case op_gt_s16:     return "gt_s16";
-        case op_ge_s16:     return "ge_s16";
-        case op_lt_u16:     return "lt_u16";
-        case op_le_u16:     return "le_u16";
-        case op_gt_u16:     return "gt_u16";
-        case op_ge_u16:     return "ge_u16";
-        case op_add_half:   return "add_half";
-        case op_sub_half:   return "sub_half";
-        case op_mul_half:   return "mul_half";
-        case op_div_half:   return "div_half";
-        case op_min_half:   return "min_half";
-        case op_max_half:   return "max_half";
-        case op_sqrt_half:  return "sqrt_half";
-        case op_fma_half:   return "fma_half";
-        case op_and_half:   return "and_half";
-        case op_or_half:    return "or_half";
-        case op_xor_half:   return "xor_half";
-        case op_sel_half:   return "sel_half";
-        case op_eq_half:    return "eq_half";
-        case op_ne_half:    return "ne_half";
-        case op_lt_half:    return "lt_half";
-        case op_le_half:    return "le_half";
-        case op_gt_half:    return "gt_half";
-        case op_ge_half:    return "ge_half";
-    }
+    static char const *names[] = {
+        #define OP_NAME(name) [op_##name] = #name,
+        OP_LIST(OP_NAME)
+        #undef OP_NAME
+    };
+    if ((unsigned)op < sizeof names/sizeof *names && names[op]) return names[op];
     return "?";
 }
 

@@ -1,42 +1,46 @@
 #pragma once
 #include <stdint.h>
 
+// X(name) — order matters: op_type() relies on 32-bit < 16-bit < half.
+#define OP_LIST(X) \
+    /* 32-bit ops */ \
+    X(lane) \
+    X(imm_32) X(uni_32) X(load_32) X(gather_32) X(store_32) X(scatter_32) \
+    X(add_f32) X(sub_f32) X(mul_f32) X(div_f32) \
+    X(min_f32) X(max_f32) X(sqrt_f32) X(fma_f32) \
+    X(add_i32) X(sub_i32) X(mul_i32) \
+    X(shl_i32) X(shr_u32) X(shr_s32) X(shl_i32_imm) X(shr_u32_imm) X(shr_s32_imm) \
+    X(and_32) X(or_32) X(xor_32) X(sel_32) \
+    X(f32_from_i32) X(i32_from_f32) X(f32_from_half) X(i32_from_half) X(i32_from_i16) \
+    X(eq_f32) X(ne_f32) X(lt_f32) X(le_f32) X(gt_f32) X(ge_f32) \
+    X(eq_i32) X(ne_i32) \
+    X(lt_s32) X(le_s32) X(gt_s32) X(ge_s32) \
+    X(lt_u32) X(le_u32) X(gt_u32) X(ge_u32) \
+    X(bytes) \
+    /* 16-bit ops */ \
+    X(imm_16) X(uni_16) X(load_16) X(gather_16) X(store_16) X(scatter_16) \
+    X(load_8x4)  /* produces 4 outputs (u8->u16 widened); continuations reference base */ \
+    X(store_8x4) /* consumes 4 u16 inputs (x=ch0, y=ch1, z=ch2, w=ch3), narrowed to u8 */ \
+    X(add_i16) X(sub_i16) X(mul_i16) \
+    X(shl_i16) X(shr_u16) X(shr_s16) X(shl_i16_imm) X(shr_u16_imm) X(shr_s16_imm) \
+    X(and_16) X(or_16) X(xor_16) X(sel_16) \
+    X(i16_from_i32) \
+    X(eq_i16) X(ne_i16) \
+    X(lt_s16) X(le_s16) X(gt_s16) X(ge_s16) \
+    X(lt_u16) X(le_u16) X(gt_u16) X(ge_u16) \
+    /* Half ops (fp16 in memory, unspecified width in registers) */ \
+    X(imm_half) X(uni_half) X(load_half) X(gather_half) X(store_half) X(scatter_half) \
+    X(add_half) X(sub_half) X(mul_half) X(div_half) \
+    X(min_half) X(max_half) X(sqrt_half) X(fma_half) \
+    X(and_half) X(or_half) X(xor_half) X(sel_half) \
+    X(half_from_f32) X(half_from_i32) X(half_from_i16) X(i16_from_half) \
+    X(eq_half) X(ne_half) \
+    X(lt_half) X(le_half) X(gt_half) X(ge_half)
+
 enum op {
-    // 32-bit ops
-    op_lane,
-    op_imm_32, op_uni_32, op_load_32, op_gather_32, op_store_32, op_scatter_32,
-    op_add_f32, op_sub_f32, op_mul_f32, op_div_f32,
-    op_min_f32, op_max_f32, op_sqrt_f32, op_fma_f32,
-    op_add_i32, op_sub_i32, op_mul_i32,
-    op_shl_i32, op_shr_u32, op_shr_s32, op_shl_i32_imm, op_shr_u32_imm, op_shr_s32_imm,
-    op_and_32, op_or_32, op_xor_32, op_sel_32,
-    op_f32_from_i32, op_i32_from_f32, op_f32_from_half, op_i32_from_half, op_i32_from_i16,
-    op_eq_f32, op_ne_f32, op_lt_f32, op_le_f32, op_gt_f32, op_ge_f32,
-    op_eq_i32, op_ne_i32,
-    op_lt_s32, op_le_s32, op_gt_s32, op_ge_s32,
-    op_lt_u32, op_le_u32, op_gt_u32, op_ge_u32,
-    op_bytes,
-
-    // 16-bit ops
-    op_imm_16, op_uni_16, op_load_16, op_gather_16, op_store_16, op_scatter_16,
-    op_load_8x4,   // produces 4 outputs (u8->u16 widened); continuations reference base
-    op_store_8x4,  // consumes 4 u16 inputs (x=ch0, y=ch1, z=ch2, w=ch3), narrowed to u8
-    op_add_i16, op_sub_i16, op_mul_i16,
-    op_shl_i16, op_shr_u16, op_shr_s16, op_shl_i16_imm, op_shr_u16_imm, op_shr_s16_imm,
-    op_and_16, op_or_16, op_xor_16, op_sel_16,
-    op_i16_from_i32,
-    op_eq_i16, op_ne_i16,
-    op_lt_s16, op_le_s16, op_gt_s16, op_ge_s16,
-    op_lt_u16, op_le_u16, op_gt_u16, op_ge_u16,
-
-    // Half ops (fp16 in memory, unspecified width in registers)
-    op_imm_half, op_uni_half, op_load_half, op_gather_half, op_store_half, op_scatter_half,
-    op_add_half, op_sub_half, op_mul_half, op_div_half,
-    op_min_half, op_max_half, op_sqrt_half, op_fma_half,
-    op_and_half, op_or_half, op_xor_half, op_sel_half,
-    op_half_from_f32, op_half_from_i32, op_half_from_i16, op_i16_from_half,
-    op_eq_half, op_ne_half,
-    op_lt_half, op_le_half, op_gt_half, op_ge_half,
+    #define OP_ENUM(name) op_##name,
+    OP_LIST(OP_ENUM)
+    #undef OP_ENUM
 };
 
 struct bb_inst {
