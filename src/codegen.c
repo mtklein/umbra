@@ -115,10 +115,10 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                 case op_half_from_i32: emit(b, "%sfloat v%d = (float)(s32)v%d;\n", pad, i, inst->x); break;
                 case op_half_from_i16: emit(b, "%sfloat v%d = (float)(s16)v%d;\n", pad, i, inst->x); break;
                 case op_i16_from_half: emit(b, "%su16 v%d = (u16)(s16)v%d;\n", pad, i, inst->x); break;
-                case op_eq_half: emit(b, "%sfloat v%d = h2f((u16)-(s16)(v%d == v%d));\n", pad, i, inst->x, inst->y); break;
-                case op_ne_half: emit(b, "%sfloat v%d = h2f((u16)-(s16)(v%d != v%d));\n", pad, i, inst->x, inst->y); break;
-                case op_lt_half: emit(b, "%sfloat v%d = h2f((u16)-(s16)(v%d <  v%d));\n", pad, i, inst->x, inst->y); break;
-                case op_le_half: emit(b, "%sfloat v%d = h2f((u16)-(s16)(v%d <= v%d));\n", pad, i, inst->x, inst->y); break;
+                case op_eq_half: emit(b, "%sfloat v%d = u2f((u32)-(s32)(v%d == v%d));\n", pad, i, inst->x, inst->y); break;
+                case op_ne_half: emit(b, "%sfloat v%d = u2f((u32)-(s32)(v%d != v%d));\n", pad, i, inst->x, inst->y); break;
+                case op_lt_half: emit(b, "%sfloat v%d = u2f((u32)-(s32)(v%d <  v%d));\n", pad, i, inst->x, inst->y); break;
+                case op_le_half: emit(b, "%sfloat v%d = u2f((u32)-(s32)(v%d <= v%d));\n", pad, i, inst->x, inst->y); break;
                 default: break;
             }
             if (is_store(inst->op) && i+1 < hi) { emit(b, "\n"); }

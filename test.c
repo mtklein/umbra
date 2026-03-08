@@ -672,62 +672,82 @@ static void test_cmp_f32(void) {
   }
 }
 
+// Test half comparisons by using sel_half to select between known values.
+// Comparison masks are intermediate values, not stored directly.
+#define CMP_HALF_TEST(cmp_fn, B, opt) do { \
+    struct umbra_basic_block *bb_ = umbra_basic_block(); \
+    umbra_v32  ix_ = umbra_lane(bb_); \
+    umbra_half a_  = umbra_load_half(bb_, (umbra_ptr){0}, ix_), \
+               b_  = umbra_load_half(bb_, (umbra_ptr){1}, ix_), \
+               one_  = umbra_imm_half(bb_, 0x3c00), \
+               zero_ = umbra_imm_half(bb_, 0x0000), \
+               mask_ = cmp_fn(bb_, a_, b_), \
+               r_    = umbra_sel_half(bb_, mask_, one_, zero_); \
+    umbra_store_half(bb_, (umbra_ptr){2}, ix_, r_); \
+    B = make(bb_, opt); \
+} while(0)
+
 static void test_cmp_half(void) {
   for (int opt = 0; opt < 2; opt++) {
+    // sel_half(cmp(a,b), 1.0h, 0.0h) → check result as uint16_t (0x3c00 or 0x0000)
+    #define H_TRUE  0x3c00  /* fp16 1.0 */
+    #define H_FALSE 0x0000  /* fp16 0.0 */
     {
-        backends B; BINOP_HALF(umbra_eq_half, B, opt);
+        backends B; CMP_HALF_TEST(umbra_eq_half, B, opt);
         for (int bi = 0; bi < 4; bi++) {
-            __fp16 x[] = {1,2,3}, y[] = {1,9,3}; short z[3] = {0};
+            __fp16 x[] = {1,2,3}, y[] = {1,9,3}; uint16_t z[3] = {0};
             if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
-            (z[0] == -1) here; (z[1] == 0) here; (z[2] == -1) here;
+            (z[0] == H_TRUE) here; (z[1] == H_FALSE) here; (z[2] == H_TRUE) here;
         }
         cleanup(&B);
     }
     {
-        backends B; BINOP_HALF(umbra_ne_half, B, opt);
+        backends B; CMP_HALF_TEST(umbra_ne_half, B, opt);
         for (int bi = 0; bi < 4; bi++) {
-            __fp16 x[] = {1,2}, y[] = {1,9}; short z[2] = {0};
+            __fp16 x[] = {1,2}, y[] = {1,9}; uint16_t z[2] = {0};
             if (!run(&B, bi,2, x,y,z, 0,0,0)) continue;
-            (z[0] == 0) here; (z[1] == -1) here;
+            (z[0] == H_FALSE) here; (z[1] == H_TRUE) here;
         }
         cleanup(&B);
     }
     {
-        backends B; BINOP_HALF(umbra_lt_half, B, opt);
+        backends B; CMP_HALF_TEST(umbra_lt_half, B, opt);
         for (int bi = 0; bi < 4; bi++) {
-            __fp16 x[] = {1,5,3}, y[] = {2,5,1}; short z[3] = {0};
+            __fp16 x[] = {1,5,3}, y[] = {2,5,1}; uint16_t z[3] = {0};
             if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
-            (z[0] == -1) here; (z[1] == 0) here; (z[2] == 0) here;
+            (z[0] == H_TRUE) here; (z[1] == H_FALSE) here; (z[2] == H_FALSE) here;
         }
         cleanup(&B);
     }
     {
-        backends B; BINOP_HALF(umbra_le_half, B, opt);
+        backends B; CMP_HALF_TEST(umbra_le_half, B, opt);
         for (int bi = 0; bi < 4; bi++) {
-            __fp16 x[] = {1,5,3}, y[] = {2,5,1}; short z[3] = {0};
+            __fp16 x[] = {1,5,3}, y[] = {2,5,1}; uint16_t z[3] = {0};
             if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
-            (z[0] == -1) here; (z[1] == -1) here; (z[2] == 0) here;
+            (z[0] == H_TRUE) here; (z[1] == H_TRUE) here; (z[2] == H_FALSE) here;
         }
         cleanup(&B);
     }
     {
-        backends B; BINOP_HALF(umbra_gt_half, B, opt);
+        backends B; CMP_HALF_TEST(umbra_gt_half, B, opt);
         for (int bi = 0; bi < 4; bi++) {
-            __fp16 x[] = {3,5,1}, y[] = {2,5,3}; short z[3] = {0};
+            __fp16 x[] = {3,5,1}, y[] = {2,5,3}; uint16_t z[3] = {0};
             if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
-            (z[0] == -1) here; (z[1] == 0) here; (z[2] == 0) here;
+            (z[0] == H_TRUE) here; (z[1] == H_FALSE) here; (z[2] == H_FALSE) here;
         }
         cleanup(&B);
     }
     {
-        backends B; BINOP_HALF(umbra_ge_half, B, opt);
+        backends B; CMP_HALF_TEST(umbra_ge_half, B, opt);
         for (int bi = 0; bi < 4; bi++) {
-            __fp16 x[] = {3,5,1}, y[] = {2,5,3}; short z[3] = {0};
+            __fp16 x[] = {3,5,1}, y[] = {2,5,3}; uint16_t z[3] = {0};
             if (!run(&B, bi,3, x,y,z, 0,0,0)) continue;
-            (z[0] == -1) here; (z[1] == -1) here; (z[2] == 0) here;
+            (z[0] == H_TRUE) here; (z[1] == H_TRUE) here; (z[2] == H_FALSE) here;
         }
         cleanup(&B);
     }
+    #undef H_TRUE
+    #undef H_FALSE
   }
 }
 

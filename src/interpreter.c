@@ -315,11 +315,11 @@ op(i32_from_i16) {
 
     #pragma clang diagnostic push
     #pragma clang diagnostic ignored "-Wfloat-equal"
-    op(eq_half) { v->f32 = f16_to_f32(cast(U16, v[ip->x].f32 == v[ip->y].f32)); next; }
-    op(ne_half) { v->f32 = f16_to_f32(cast(U16, v[ip->x].f32 != v[ip->y].f32)); next; }
+    op(eq_half) { v->u32 = cast(U32, v[ip->x].f32 == v[ip->y].f32); next; }
+    op(ne_half) { v->u32 = cast(U32, v[ip->x].f32 != v[ip->y].f32); next; }
     #pragma clang diagnostic pop
-    op(lt_half) { v->f32 = f16_to_f32(cast(U16, v[ip->x].f32 <  v[ip->y].f32)); next; }
-    op(le_half) { v->f32 = f16_to_f32(cast(U16, v[ip->x].f32 <= v[ip->y].f32)); next; }
+    op(lt_half) { v->u32 = cast(U32, v[ip->x].f32 <  v[ip->y].f32); next; }
+    op(le_half) { v->u32 = cast(U32, v[ip->x].f32 <= v[ip->y].f32); next; }
 
 #endif
 
