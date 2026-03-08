@@ -79,7 +79,6 @@ umbra_v32  umbra_i32_from_half(struct umbra_basic_block*, umbra_half);
 umbra_v16  umbra_i16_from_half(struct umbra_basic_block*, umbra_half);
 umbra_v16  umbra_i16_from_i32 (struct umbra_basic_block*, umbra_v32);
 umbra_v32  umbra_i32_from_i16 (struct umbra_basic_block*, umbra_v16);
-umbra_v32  umbra_bytes       (struct umbra_basic_block*, umbra_v32, int control);
 
 void umbra_load_8x4 (struct umbra_basic_block*, umbra_ptr src, umbra_v32 ix, umbra_v16 out[4]);
 void umbra_store_8x4(struct umbra_basic_block*, umbra_ptr dst, umbra_v32 ix, umbra_v16 in[4]);

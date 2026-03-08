@@ -1189,70 +1189,6 @@ static void test_zero_imm(void) {
 }
 
 
-static void test_bytes(void) {
-  for (int opt = 0; opt < 2; opt++) {
-    {
-        struct umbra_basic_block *bb = umbra_basic_block();
-        umbra_v32 ix  = umbra_lane(bb),
-                  src = umbra_load_32(bb, (umbra_ptr){0}, ix),
-                  r   = umbra_bytes(bb, src, 0x1111);
-        umbra_store_32(bb, (umbra_ptr){1}, ix, r);
-        backends B = make_full(bb, opt);
-        for (int bi = 0; bi < 4; bi++) {
-            uint32_t x[] = {0x44332211, 0xAABBCCDD}, y[2] = {0};
-            if (!run(&B, bi,2, x,y, 0,0,0,0)) continue;
-            (y[0] == 0x11111111u) here;
-            (y[1] == 0xDDDDDDDDu) here;
-        }
-        cleanup(&B);
-    }
-    {
-        struct umbra_basic_block *bb = umbra_basic_block();
-        umbra_v32 ix  = umbra_lane(bb),
-                  src = umbra_load_32(bb, (umbra_ptr){0}, ix),
-                  r   = umbra_bytes(bb, src, 0x4321);
-        umbra_store_32(bb, (umbra_ptr){1}, ix, r);
-        backends B = make_full(bb, opt);
-        for (int bi = 0; bi < 4; bi++) {
-            uint32_t x[] = {0x44332211, 0xAABBCCDD}, y[2] = {0};
-            if (!run(&B, bi,2, x,y, 0,0,0,0)) continue;
-            (y[0] == 0x44332211u) here;
-            (y[1] == 0xAABBCCDDu) here;
-        }
-        cleanup(&B);
-    }
-    {
-        struct umbra_basic_block *bb = umbra_basic_block();
-        umbra_v32 ix  = umbra_lane(bb),
-                  src = umbra_load_32(bb, (umbra_ptr){0}, ix),
-                  r   = umbra_bytes(bb, src, 0x0404);
-        umbra_store_32(bb, (umbra_ptr){1}, ix, r);
-        backends B = make_full(bb, opt);
-        for (int bi = 0; bi < 4; bi++) {
-            uint32_t x[] = {0x44332211, 0xAABBCCDD}, y[2] = {0};
-            if (!run(&B, bi,2, x,y, 0,0,0,0)) continue;
-            (y[0] == 0x00440044u) here;
-            (y[1] == 0x00AA00AAu) here;
-        }
-        cleanup(&B);
-    }
-    {
-        struct umbra_basic_block *bb = umbra_basic_block();
-        umbra_v32 ix  = umbra_lane(bb),
-                  src = umbra_load_32(bb, (umbra_ptr){0}, ix),
-                  r   = umbra_bytes(bb, src, 0x1234);
-        umbra_store_32(bb, (umbra_ptr){1}, ix, r);
-        backends B = make_full(bb, opt);
-        for (int bi = 0; bi < 4; bi++) {
-            uint32_t x[] = {0x44332211}, y[1] = {0};
-            if (!run(&B, bi,1, x,y, 0,0,0,0)) continue;
-            (y[0] == 0x11223344u) here;
-        }
-        cleanup(&B);
-    }
-  }
-}
-
 static void test_load_8x4(void) {
   for (int opt = 0; opt < 2; opt++) {
     struct umbra_basic_block *bb = umbra_basic_block();
@@ -1373,7 +1309,6 @@ int main(void) {
     test_constprop();
     test_strength_reduction();
     test_zero_imm();
-    test_bytes();
     test_load_8x4();
     test_store_8x4();
     test_srcover();

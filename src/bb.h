@@ -16,7 +16,6 @@
     X(eq_i32) X(ne_i32) \
     X(lt_s32) X(le_s32) X(gt_s32) X(ge_s32) \
     X(lt_u32) X(le_u32) X(gt_u32) X(ge_u32) \
-    X(bytes) \
     /* 16-bit ops */ \
     X(imm_16) X(uni_16) X(load_16) X(gather_16) X(store_16) X(scatter_16) \
     X(load_8x4)  /* produces 4 outputs (u8->u16 widened); continuations reference base */ \

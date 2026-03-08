@@ -1,11 +1,6 @@
 #include <metal_stdlib>
 using namespace metal;
 
-static inline uint bytes(uint x, int c) {
-    uchar b[] = {0, uchar(x&0xff), uchar((x>>8)&0xff), uchar((x>>16)&0xff), uchar((x>>24)&0xff)};
-    return uint(b[c&0xf]) | (uint(b[(c>>4)&0xf])<<8) | (uint(b[(c>>8)&0xf])<<16) | (uint(b[(c>>12)&0xf])<<24);
-}
-
 kernel void umbra_entry(
     constant uint &n [[buffer(0)]],
     device uchar *p0 [[buffer(1)]],

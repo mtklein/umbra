@@ -191,12 +191,6 @@ static uint32_t SHL_4h_imm (int d, int n, int sh) { return 0x0F005400u|((uint32_
 static uint32_t USHR_4h_imm(int d, int n, int sh) { return 0x2F000400u|((uint32_t)(32-sh)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
 static uint32_t SSHR_4h_imm(int d, int n, int sh) { return 0x0F000400u|((uint32_t)(32-sh)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
 
-static uint32_t TBL_16b(int d, int n, int m) { return 0x4E000000u|((uint32_t)m<<16)|((uint32_t)n<<5)|(uint32_t)d; }
-static uint32_t FMOV_d_x(int d, int n) { return 0x9E670000u|((uint32_t)n<<5)|(uint32_t)d; }
-static uint32_t INS_d(int d, int idx, int n) {
-    uint32_t imm5 = (uint32_t)(idx<<4)|8;
-    return 0x4E001C00u|(imm5<<16)|((uint32_t)n<<5)|(uint32_t)d;
-}
 
 // ST1 {Vt.B}[idx], [Xn]
 static uint32_t ST1_b(int t, int idx, int n) {
@@ -224,12 +218,6 @@ enum { XI=9, XT=10, XH=11, XW=12, XS=15 };
 static void load_imm_w(Buf *c, int rd, uint32_t v) {
     put(c, MOVZ_w(rd, (uint16_t)(v&0xffff)));
     if (v>>16) put(c, MOVK_w16(rd, (uint16_t)(v>>16)));
-}
-static void load_imm_x(Buf *c, int rd, uint64_t v) {
-    put(c, MOVZ_x(rd, (uint16_t)v));
-    if ((v>>16)&0xffff) put(c, 0xF2A00000u|((uint32_t)((v>>16)&0xffff)<<5)|(uint32_t)rd);
-    if ((v>>32)&0xffff) put(c, 0xF2C00000u|((uint32_t)((v>>32)&0xffff)<<5)|(uint32_t)rd);
-    if ((v>>48)&0xffff) put(c, 0xF2E00000u|((uint32_t)((v>>48)&0xffff)<<5)|(uint32_t)rd);
 }
 
 static void vld(Buf *c, int vd, int s) { put(c, LDR_qi(vd, XS, s)); }
@@ -384,11 +372,9 @@ struct ra {
     int8_t *reg_hi;       // [insts] hi register for OP_32 pairs, or -1
     _Bool  *is_pair;      // [insts] true if value needs register pair (varying OP_32)
     int     nfree;
-    int     bytes_ctrl_n;
     int     owner[32];    // owner[v] = inst whose value is in Vv, or -1
-    int     bytes_ctrl[16];
     int8_t  free_stack[32];
-    int8_t  bytes_reg[16];
+    int     _pad;
 };
 
 static struct ra* ra_create(struct umbra_basic_block const *bb) {
@@ -405,7 +391,6 @@ static struct ra* ra_create(struct umbra_basic_block const *bb) {
         ra->is_pair[i] = (op_type(bb->inst[i].op) == OP_32) && (i >= bb->preamble);
     }
     for (int i = 0; i < 32; i++) ra->owner[i] = -1;
-    ra->bytes_ctrl_n = 0;
 
     for (int i = 0; i < n; i++) ra->last_use[i] = -1;
     for (int i = 0; i < n; i++) {
@@ -532,23 +517,6 @@ static int8_t hi(struct ra *ra, int val) {
     return ra->reg_hi[val] >= 0 ? ra->reg_hi[val] : ra->reg[val];
 }
 
-static void emit_tbl_ctrl(Buf *c, int vd, int ctrl) {
-    uint8_t tbl[16];
-    for (int lane = 0; lane < 4; lane++) {
-        for (int b = 0; b < 4; b++) {
-            int nibble = (ctrl >> (b*4)) & 0xf;
-            tbl[lane*4+b] = nibble ? (uint8_t)(lane*4 + nibble - 1) : 16;
-        }
-    }
-    uint64_t lo, h;
-    __builtin_memcpy(&lo, tbl+0, 8);
-    __builtin_memcpy(&h, tbl+8, 8);
-    load_imm_x(c, XT, lo);
-    put(c, FMOV_d_x(vd, XT));
-    load_imm_x(c, XT, h);
-    put(c, INS_d(vd, 1, XT));
-}
-
 static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                      int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar);
@@ -583,24 +551,6 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
 
     // Preamble: uniforms go straight into registers via RA.
     emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0);
-
-    // Pre-load TBL control vectors for op_bytes in the loop body.
-    for (int i = bb->preamble; i < bb->insts; i++) {
-        if (bb->inst[i].op != op_bytes) continue;
-        int ctrl = bb->inst[i].imm;
-        _Bool found = 0;
-        for (int j = 0; j < ra->bytes_ctrl_n; j++) {
-            if (ra->bytes_ctrl[j] == ctrl) { found = 1; break; }
-        }
-        if (!found) {
-            int8_t r = ra_alloc(&c, ra, sl, &ns);
-            ra->owner[(int)r] = -2;
-            emit_tbl_ctrl(&c, r, ctrl);
-            ra->bytes_ctrl[ra->bytes_ctrl_n] = ctrl;
-            ra->bytes_reg[ra->bytes_ctrl_n] = r;
-            ra->bytes_ctrl_n++;
-        }
-    }
 
     put(&c, MOVZ_x(XI,0));
 
@@ -1038,40 +988,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             }
         } break;
 
-        case op_bytes: {
-            int ctrl = inst->imm;
-            int8_t ctrl_r = -1;
-            for (int j = 0; j < ra->bytes_ctrl_n; j++) {
-                if (ra->bytes_ctrl[j] == ctrl) { ctrl_r = ra->bytes_reg[j]; break; }
-            }
-            int8_t rx = ra_ensure(c, ra, sl, ns, inst->x);
-            _Bool x_dead = lu[inst->x] <= i;
-            _Bool pair = ra->is_pair[i] && !scalar;
-            if (pair) {
-                int8_t rxh = hi(ra, inst->x);
-                int8_t rd, rdh;
-                if (x_dead) {
-                    rd = ra_claim(ra, inst->x, i);
-                    rdh = ra->reg_hi[i];
-                } else {
-                    rd = ra_alloc(c, ra, sl, ns);
-                    rdh = ra_alloc(c, ra, sl, ns);
-                    ra->reg[i] = rd; ra->reg_hi[i] = rdh;
-                    ra->owner[(int)rd] = i; ra->owner[(int)rdh] = i;
-                }
-                put(c, TBL_16b(rd, rx, ctrl_r));
-                put(c, TBL_16b(rdh, rxh, ctrl_r));
-            } else {
-                int8_t rd;
-                if (x_dead) { rd = ra_claim(ra, inst->x, i); }
-                else {
-                    rd = ra_alloc(c, ra, sl, ns);
-                    ra->reg[i] = rd; ra->owner[(int)rd] = i;
-                }
-                put(c, TBL_16b(rd, rx, ctrl_r));
-            }
-        } break;
-
         default: {
             enum op_type ot = op_type(inst->op);
             _Bool pair = (ot == OP_32) && ra->is_pair[i] && !scalar;
@@ -1358,12 +1274,6 @@ static void vmov_store(Buf *b, int L, int reg, int base, int index, int scale, i
 // REX prefix helpers
 static void rex_w(Buf *b, int r, int b_) {
     emit1(b, (uint8_t)(0x48 | ((r>>3)<<2) | (b_>>3)));
-}
-// MOV r64, imm64
-static void mov_ri64(Buf *b, int rd, uint64_t v) {
-    rex_w(b, 0, rd);
-    emit1(b, (uint8_t)(0xB8 | (rd&7)));
-    for (int i=0;i<8;i++) emit1(b, (uint8_t)(v>>(i*8)));
 }
 // XOR r32,r32 (zero register)
 static void xor_rr(Buf *b, int d, int s) {
@@ -1657,7 +1567,6 @@ static void vpmovsxwd(Buf *b, int d, int s) { vex_rr(b,1,2,1,0x23,d,s); }
 static void vpmovzxwd(Buf *b, int d, int s) { vex_rr(b,1,2,1,0x33,d,s); }
 static void vpackuswb(Buf *b, int d, int v, int s) { vex_rrr(b,1,1,0,0x67,d,v,s); }
 static void vpunpcklbw(Buf *b, int d, int v, int s) { vex_rrr(b,1,1,0,0x60,d,v,s); }
-static void vpshufb(Buf *b, int L, int d, int v, int s) { vex_rrr(b,1,2,L,0x00,d,v,s); }
 
 // VEXTRACTI128 xmm,ymm,imm8 — VEX.256.66.0F3A 39
 static void vextracti128(Buf *b, int d, int s, uint8_t imm) {
@@ -1676,11 +1585,9 @@ struct ra {
     int    *last_use;
     int8_t *reg;
     int     nfree;
-    int     bytes_ctrl_n;
     int     owner[16];       // owner[ymm] = inst whose value is in that reg, or -1
-    int     bytes_ctrl[16];
     int8_t  free_stack[16];
-    int8_t  bytes_reg[16];
+    int     _pad;
 };
 
 static struct ra* ra_create(struct umbra_basic_block const *bb) {
@@ -1691,7 +1598,6 @@ static struct ra* ra_create(struct umbra_basic_block const *bb) {
 
     for (int i = 0; i < n; i++) ra->reg[i] = -1;
     for (int i = 0; i < 16; i++) ra->owner[i] = -1;
-    ra->bytes_ctrl_n = 0;
 
     for (int i = 0; i < n; i++) ra->last_use[i] = -1;
     for (int i = 0; i < n; i++) {
@@ -2032,56 +1938,6 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
 
     // Preamble
     emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0);
-
-    // Pre-load VPSHUFB control vectors for op_bytes
-    for (int i = bb->preamble; i < bb->insts; i++) {
-        if (bb->inst[i].op != op_bytes) continue;
-        int ctrl = bb->inst[i].imm;
-        _Bool found = 0;
-        for (int j = 0; j < ra->bytes_ctrl_n; j++) {
-            if (ra->bytes_ctrl[j] == ctrl) { found = 1; break; }
-        }
-        if (!found) {
-            // Build VPSHUFB control vector for this bytes op
-            // Each lane of 4 bytes maps nibble 0→0x80(zero), nibble k(1-4)→byte index within element
-            uint8_t tbl[32];
-            for (int lane = 0; lane < 8; lane++) {
-                int off = (lane % 4) * 4;  // offset within 128-bit lane
-                for (int b = 0; b < 4; b++) {
-                    int nibble = (ctrl >> (b*4)) & 0xf;
-                    tbl[lane*4+b] = nibble ? (uint8_t)(off + nibble - 1) : 0x80;
-                }
-            }
-
-            int8_t r = ra_alloc(&c, ra, sl, &ns);
-            ra->owner[(int)r] = -2;
-
-            // Load 32-byte constant into YMM register via two 8-byte loads
-            uint64_t lo, hi, lo2, hi2;
-            __builtin_memcpy(&lo, tbl+0, 8);
-            __builtin_memcpy(&hi, tbl+8, 8);
-            __builtin_memcpy(&lo2, tbl+16, 8);
-            __builtin_memcpy(&hi2, tbl+24, 8);
-
-            mov_ri64(&c, RAX, lo);
-            // VMOVQ xmm_r, rax — VEX.128.66.0F 6E with W=1
-            vex(&c, 1, 1, 1, 0, r, 0, RAX, 0x6E);
-            mov_ri64(&c, RAX, hi);
-            // VPINSRQ xmm_r, xmm_r, rax, 1 — VEX.128.66.0F3A 22 W1
-            vex(&c, 1, 3, 1, 0, r, r, RAX, 0x22); emit1(&c, 1);
-
-            // Now load upper 128 bits into xmm0, then VINSERTI128
-            mov_ri64(&c, RAX, lo2);
-            vex(&c, 1, 1, 1, 0, 0, 0, RAX, 0x6E);
-            mov_ri64(&c, RAX, hi2);
-            vex(&c, 1, 3, 1, 0, 0, 0, RAX, 0x22); emit1(&c, 1);
-            vinserti128(&c, r, r, 0, 1);
-
-            ra->bytes_ctrl[ra->bytes_ctrl_n] = ctrl;
-            ra->bytes_reg[ra->bytes_ctrl_n] = r;
-            ra->bytes_ctrl_n++;
-        }
-    }
 
     // Loop counter = 0
     xor_rr(&c, XI, XI);
@@ -2545,25 +2401,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             else { rd = ra_alloc(c, ra, sl, ns); ra->reg[i] = rd; ra->owner[(int)rd] = i; }
             // Widen 8×i16 in XMM → 8×i32 in YMM
             vpmovsxwd(c, rd, rx);
-        } break;
-
-        case op_bytes: {
-            int ctrl = inst->imm;
-            int8_t ctrl_r = -1;
-            for (int j = 0; j < ra->bytes_ctrl_n; j++) {
-                if (ra->bytes_ctrl[j] == ctrl) { ctrl_r = ra->bytes_reg[j]; break; }
-            }
-            int8_t rx = ra_ensure(c, ra, sl, ns, inst->x);
-            _Bool x_dead = lu[inst->x] <= i;
-            int8_t rd;
-            if (x_dead) { rd = ra_claim(ra, inst->x, i); }
-            else { rd = ra_alloc(c, ra, sl, ns); ra->reg[i] = rd; ra->owner[(int)rd] = i; }
-            if (scalar) {
-                // For scalar, still use VPSHUFB on the single element
-                vpshufb(c, 0, rd, rx, ctrl_r);  // XMM-width
-            } else {
-                vpshufb(c, 1, rd, rx, ctrl_r);  // YMM-width
-            }
         } break;
 
         default: {

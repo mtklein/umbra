@@ -294,10 +294,6 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                 emit(b, "%suint v%d = (uint)(int)(short)v%d;\n", pad, i, inst->x);
                 break;
 
-            case op_bytes:
-                emit(b, "%suint v%d = bytes(v%d, 0x%x);\n", pad, i, inst->x, (uint16_t)inst->imm);
-                break;
-
             case op_sel_32:
                 emit(b, "%suint v%d = (v%d & v%d) | (~v%d & v%d);\n",
                      pad, i, inst->x, inst->y, inst->x, inst->z);
@@ -382,11 +378,6 @@ static char* build_source(BB const *bb, int *out_max_ptr) {
     Buf b = {0};
 
     emit(&b, "#include <metal_stdlib>\nusing namespace metal;\n\n");
-
-    emit(&b, "static inline uint bytes(uint x, int c) {\n");
-    emit(&b, "    uchar b[] = {0, uchar(x&0xff), uchar((x>>8)&0xff), uchar((x>>16)&0xff), uchar((x>>24)&0xff)};\n");
-    emit(&b, "    return uint(b[c&0xf]) | (uint(b[(c>>4)&0xf])<<8) | (uint(b[(c>>8)&0xf])<<16) | (uint(b[(c>>12)&0xf])<<24);\n");
-    emit(&b, "}\n\n");
 
     emit(&b, "kernel void umbra_entry(\n");
     emit(&b, "    constant uint &n [[buffer(0)]]");

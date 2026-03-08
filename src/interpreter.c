@@ -402,17 +402,6 @@ op(le_u32) { v->i32 = (I32)(v[ip->x].u32 <= v[ip->y].u32); next; }
 op(gt_u32) { v->i32 = (I32)(v[ip->x].u32 >  v[ip->y].u32); next; }
 op(ge_u32) { v->i32 = (I32)(v[ip->x].u32 >= v[ip->y].u32); next; }
 
-op(bytes_32) {
-    int ctrl = ip->y;
-    U32 x = v[ip->x].u32;
-    U32 r = (U32){0};
-    for (int b = 0; b < 4; b++) {
-        int nib = (ctrl >> (b*4)) & 0xf;
-        if (nib) { r |= ((x >> ((nib-1)*8)) & 0xffu) << (b*8); }
-    }
-    v->u32 = r;
-    next;
-}
 
 op(load_8x4) {
     uint8_t const *src = ptr[ip->x];
@@ -519,7 +508,6 @@ static Fn const fn[] = {
     [op_i16_from_i32] = i16_from_i32, [op_i32_from_i16] = i32_from_i16,
     [op_load_8x4] = load_8x4,
     [op_store_8x4] = store_8x4,
-    [op_bytes] = bytes_32,
     [op_add_half] =  add_half, [op_sub_half] =  sub_half,
     [op_mul_half] =  mul_half, [op_div_half] =  div_half,
     [op_min_half] =  min_half, [op_max_half] =  max_half,
@@ -644,7 +632,6 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
 
                     case op_shl_i32_imm: case op_shr_u32_imm: case op_shr_s32_imm:
                     case op_shl_i16_imm: case op_shr_u16_imm: case op_shr_s16_imm:
-                    case op_bytes:
                         emit(.fn=fn[inst->op], .x=X, .y=inst->imm);
                         break;
 

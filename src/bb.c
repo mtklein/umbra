@@ -599,19 +599,6 @@ void umbra_store_8x4(BB *bb, umbra_ptr dst, v32 ix, v16 in[4]) {
     push(bb, op_store_8x4, .x=in[0].id, .y=in[1].id, .z=in[2].id, .w=in[3].id, .ptr=dst.ix);
 }
 
-v32 umbra_bytes(BB *bb, v32 x, int control) {
-    if (bb->inst[x.id].op == op_imm_32) {
-        uint32_t xv = (uint32_t)bb->inst[x.id].imm;
-        uint8_t b[] = {0, xv&0xff, (xv>>8)&0xff, (xv>>16)&0xff, (xv>>24)&0xff};
-        uint32_t result = (uint32_t)b[(control>> 0)&0xf] <<  0
-                        | (uint32_t)b[(control>> 4)&0xf] <<  8
-                        | (uint32_t)b[(control>> 8)&0xf] << 16
-                        | (uint32_t)b[(control>>12)&0xf] << 24;
-        return umbra_imm_32(bb, result);
-    }
-    if (control == 0x4321) { return x; }
-    return (v32){push(bb, op_bytes, .x=x.id, .imm=control)};
-}
 
 vh umbra_eq_half(BB *bb, vh a, vh b) {
     sort(&a.id, &b.id);
@@ -810,9 +797,6 @@ void umbra_basic_block_dump(struct umbra_basic_block const *bb, FILE *f) {
             case op_shl_i32_imm: case op_shr_u32_imm: case op_shr_s32_imm:
             case op_shl_i16_imm: case op_shr_u16_imm: case op_shr_s16_imm:
                 fprintf(f, " v%d %d", inst->x, inst->imm);
-                break;
-            case op_bytes:
-                fprintf(f, " v%d 0x%x", inst->x, (uint16_t)inst->imm);
                 break;
             case op_lane: break;
             default: {

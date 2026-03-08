@@ -8,11 +8,6 @@ typedef  int16_t s16;
 
 static inline u32 f2u(float f) { union{float f;u32 u;} x; x.f=f; return x.u; }
 static inline float u2f(u32 u) { union{float f;u32 u;} x; x.u=u; return x.f; }
-static inline u32 bytes(u32 x, int c) {
-    unsigned char b[] = {0, x&0xff, (x>>8)&0xff, (x>>16)&0xff, (x>>24)&0xff};
-    return (u32)b[c&0xf] | (u32)b[(c>>4)&0xf]<<8 | (u32)b[(c>>8)&0xf]<<16 | (u32)b[(c>>12)&0xf]<<24;
-}
-
 static inline float h2f(u16 h) {
     u32 sign=((u32)h>>15)<<31, exp=((u32)h>>10)&0x1f, mant=(u32)h&0x3ff;
     u32 normal = sign | ((exp+112)<<23) | (mant<<13);
