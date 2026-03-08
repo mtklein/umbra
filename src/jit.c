@@ -815,7 +815,21 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     put(c, ST1_b(ry, 0, XT));
                 }
             } else {
-                evict_scratch(c, ra, sl, ns);
+                // Evict V0-V3 values that aren't one of our 4 inputs.
+                _Bool is_input[4] = {0,0,0,0};
+                for (int ch = 0; ch < 4; ch++) {
+                    int8_t ry = ra->reg[inputs[ch]];
+                    if (ry >= 0 && ry < 4) is_input[ry] = 1;
+                }
+                for (int r = 0; r < 4; r++) {
+                    int val = ra->owner[r];
+                    if (val < 0 || is_input[r]) continue;
+                    int8_t new_r = ra_alloc(c, ra, sl, ns);
+                    put(c, ORR_16b(new_r, r, r));
+                    ra->reg[val] = new_r;
+                    ra->owner[(int)new_r] = val;
+                    ra->owner[r] = -1;
+                }
                 for (int ch = 0; ch < 4; ch++) {
                     int8_t ry = ra_ensure(c, ra, sl, ns, inputs[ch]);
                     if (ry != (int8_t)ch) put(c, ORR_16b(ch, ry, ry));
@@ -827,9 +841,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 put(c, ADD_xr(XT, XP, XW));
                 put(c, ST4_8b(0, XT));
                 // V0-V3 now hold interleaved data; clear ownership.
-                // Don't push to free stack — they may already be there from
-                // ra_free_reg of earlier LD4 outputs.  They'll re-enter the
-                // pool naturally when future values in them die.
                 for (int r = 0; r < 4; r++) {
                     ra->owner[r] = -1;
                 }
@@ -1027,8 +1038,15 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             enum op op = inst->op;
             _Bool destructive = op==op_fma_f32 || op==op_fma_half
                              || op==op_sel_32  || op==op_sel_16 || op==op_sel_half;
-            if ((op==op_fma_f32 || op==op_fma_half) && z_dead)
+            _Bool fma = op==op_fma_f32 || op==op_fma_half;
+            if (fma && z_dead)
                 { rd = ra_claim(ra, inst->z, i); z_dead = 0; }
+            else if (fma && !z_dead) {
+                // Allocate rd before freeing x/y so it doesn't collide with rx/ry.
+                // This avoids the scratch+3-MOV path in emit_alu_reg.
+                rd = ra_alloc(c, ra, sl, ns);
+                ra->reg[i] = rd; ra->owner[(int)rd] = i;
+            }
             else if ((op==op_sel_32 || op==op_sel_16 || op==op_sel_half) && x_dead)
                 { rd = ra_claim(ra, inst->x, i); x_dead = 0; }
 
@@ -1053,8 +1071,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
             _Bool needs_scratch = op==op_shr_u32 || op==op_shr_s32
                                || op==op_shr_u16 || op==op_shr_s16
-                               || ((op==op_fma_f32 || op==op_fma_half)
-                                   && rd!=rz && (rd==rx || rd==ry));
+                               || (fma && rd!=rz && (rd==rx || rd==ry));
             int8_t scratch_reg = -1;
             if (needs_scratch) {
                 scratch_reg = ra_alloc(c, ra, sl, ns);
@@ -2467,9 +2484,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             enum op op2 = inst->op;
             _Bool destructive = op2==op_fma_f32 || op2==op_fma_half
                              || op2==op_sel_32  || op2==op_sel_16 || op2==op_sel_half;
+            _Bool fma2 = op2==op_fma_f32 || op2==op_fma_half;
 
-            if ((op2==op_fma_f32 || op2==op_fma_half) && z_dead)
+            if (fma2 && z_dead)
                 { rd = ra_claim(ra, inst->z, i); z_dead = 0; }
+            else if (fma2 && !z_dead) {
+                rd = ra_alloc(c, ra, sl, ns);
+                ra->reg[i] = rd; ra->owner[(int)rd] = i;
+            }
             else if ((op2==op_sel_32 || op2==op_sel_16 || op2==op_sel_half) && x_dead)
                 { rd = ra_claim(ra, inst->x, i); x_dead = 0; }
 
@@ -2489,7 +2511,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                                || op2==op_lt_u32 || op2==op_le_u32
                                || op2==op_le_s16
                                || op2==op_lt_u16 || op2==op_le_u16
-                               || ((op2==op_fma_f32 || op2==op_fma_half) && rd!=rz && (rd==rx || rd==ry));
+                               || (fma2 && rd!=rz && (rd==rx || rd==ry));
             int8_t scratch_reg = -1;
             if (needs_scratch) {
                 scratch_reg = ra_alloc(c, ra, sl, ns);
