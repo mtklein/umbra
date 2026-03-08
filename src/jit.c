@@ -2251,16 +2251,23 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 vex_rr(c, 1, 2, 1, 0x58, 1, 1);                  // VPBROADCASTD ymm1, xmm1
 
                 int8_t ch_regs[4];
+                int8_t loaded = ra_alloc(c, ra, sl, ns);
+                vmov_load(c, 1, loaded, ptr_gpr(p), XI, 4, 0);   // ymm_loaded = 8 RGBA pixels
                 for (int ch2 = 0; ch2 < 4; ch2++) {
-                    vmov_load(c, 1, 0, ptr_gpr(p), XI, 4, 0);   // ymm0 = 8 RGBA pixels
-                    if (ch2 > 0) vpsrld_i(c, 0, 0, (uint8_t)(ch2*8));
-                    vpand(c, 1, 0, 0, 1);                        // ymm0 &= 0xFF
+                    if (ch2 == 0) vpand(c, 1, 0, loaded, 1);     // ymm0 = loaded & 0xFF
+                    else {
+                        vpsrld_i(c, 0, loaded, (uint8_t)(ch2*8));
+                        vpand(c, 1, 0, 0, 1);                    // ymm0 &= 0xFF
+                    }
 
                     int8_t rd = ra_alloc(c, ra, sl, ns);
                     ch_regs[ch2] = rd;
                     vextracti128(c, rd, 0, 1);                    // xmm_rd = hi128 of ymm0
                     vex_rrr(c, 1, 2, 0, 0x2B, rd, 0, rd);        // VPACKUSDW: 4+4 u32 → 8 u16
                 }
+
+                // Free the temp register holding the loaded data
+                ra_free_reg(ra, loaded);
 
                 // Fix up: base instruction owns ch0
                 ra->reg[i] = ch_regs[0]; ra->owner[(int)ch_regs[0]] = i;
