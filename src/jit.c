@@ -2473,52 +2473,129 @@ void umbra_jit_free(struct umbra_jit *j) {
     free(j);
 }
 
+// Write .byte directives for code bytes, assemble, disassemble.
+// Returns 1 on success with disassembly written to out_path .o, 0 on failure.
+static _Bool x86_disasm(uint8_t const *code, size_t n,
+                        char const *spath, char const *opath, FILE *f) {
+    FILE *fp = fopen(spath, "w");
+    if (!fp) return 0;
+    for (size_t i = 0; i < n; i++) fprintf(fp, ".byte 0x%02x\n", code[i]);
+    fclose(fp);
+
+    char cmd[1024];
+    snprintf(cmd, sizeof cmd,
+             "/opt/homebrew/opt/llvm/bin/clang"
+             " -target x86_64-apple-macos13 -c %s -o %s 2>/dev/null &&"
+             " /opt/homebrew/opt/llvm/bin/llvm-objdump"
+             " -d --no-show-raw-insn --no-leading-addr %s 2>/dev/null",
+             spath, opath, opath);
+    FILE *p = popen(cmd, "r");
+    if (!p) return 0;
+    char line[256];
+    _Bool ok = 0;
+    while (fgets(line, (int)sizeof line, p)) {
+        if (!ok && __builtin_strstr(line, "file format")) { ok = 1; continue; }
+        if (f) fputs(line, f);
+    }
+    return pclose(p) == 0 && ok;
+}
+
 void umbra_jit_dump(struct umbra_jit const *j, FILE *f) {
     if (!j) return;
-    uint8_t const *bytes = (uint8_t const *)j->code;
-    size_t nbytes = j->code_len;
+    uint8_t const *code = (uint8_t const *)j->code;
+    size_t n = j->code_len;
 
-    char tmp[] = "/tmp/umbra_jit_XXXXXX";
-    int fd = mkstemp(tmp);
-    if (fd >= 0) {
-        FILE *fp = fdopen(fd, "w");
-        if (fp) {
-            fwrite(bytes, 1, nbytes, fp);
-            fclose(fp);
+    char spath[] = "/tmp/umbra_jit_XXXXXX.s";
+    int fd = mkstemps(spath, 2);
+    if (fd < 0) goto fallback;
+    close(fd);
 
-            char cmd[1024];
-            snprintf(cmd, sizeof cmd,
-                     "llvm-objdump -D -b binary -m x86-64 --no-show-raw-insn --no-leading-addr %s 2>/dev/null || "
-                     "/opt/homebrew/opt/llvm/bin/llvm-objdump -D -b binary -m x86-64 --no-show-raw-insn --no-leading-addr %s 2>/dev/null",
-                     tmp, tmp);
-            FILE *p = popen(cmd, "r");
-            if (p) {
-                char line[256];
-                _Bool ok = 0;
-                while (fgets(line, (int)sizeof line, p)) {
-                    if (!ok && __builtin_strstr(line, "file format")) { ok = 1; continue; }
-                    fputs(line, f);
-                }
-                int rc = pclose(p);
-                remove(tmp);
-                if (ok && rc == 0) return;
-            }
-            remove(tmp);
-        } else {
-            close(fd);
-            remove(tmp);
-        }
+    char opath[sizeof spath + 2];
+    snprintf(opath, sizeof opath, "%.*s.o", (int)(sizeof spath - 3), spath);
+
+    if (x86_disasm(code, n, spath, opath, f)) {
+        remove(spath); remove(opath);
+        return;
     }
+    remove(spath); remove(opath);
 
-    for (size_t i = 0; i < nbytes; i++) {
-        fprintf(f, "%02x ", bytes[i]);
-        if ((i & 15) == 15 || i == nbytes-1) fputc('\n', f);
+fallback:
+    for (size_t i = 0; i < n; i++) {
+        fprintf(f, "%02x ", code[i]);
+        if ((i & 15) == 15 || i == n-1) fputc('\n', f);
     }
 }
 
 void umbra_jit_mca(struct umbra_jit const *j, FILE *f) {
-    (void)j; (void)f;
-    // MCA not yet implemented for x86-64
+    if (!j || j->loop_start >= j->loop_end) return;
+    uint8_t const *code = (uint8_t const *)j->code;
+    size_t n = (size_t)(j->loop_end - j->loop_start);
+
+    // Disassemble loop body to .s file
+    char spath[] = "/tmp/umbra_mca_XXXXXX.s";
+    int fd = mkstemps(spath, 2);
+    if (fd < 0) return;
+    close(fd);
+
+    char opath[sizeof spath + 2];
+    snprintf(opath, sizeof opath, "%.*s.o", (int)(sizeof spath - 3), spath);
+
+    // First pass: disassemble to get AT&T asm
+    char asmpath[] = "/tmp/umbra_mca_asm_XXXXXX.s";
+    int afd = mkstemps(asmpath, 2);
+    if (afd < 0) { remove(spath); return; }
+    close(afd);
+    FILE *afp = fopen(asmpath, "w");
+    if (!afp) { remove(spath); remove(asmpath); return; }
+
+    if (!x86_disasm(code + j->loop_start, n, spath, opath, afp)) {
+        fclose(afp);
+        remove(spath); remove(opath); remove(asmpath);
+        return;
+    }
+    fclose(afp);
+    remove(spath); remove(opath);
+
+    // Strip the disassembly down to just instructions (remove blank lines, labels)
+    char cleanpath[] = "/tmp/umbra_mca_clean_XXXXXX.s";
+    int cfd = mkstemps(cleanpath, 2);
+    if (cfd < 0) { remove(asmpath); return; }
+    FILE *cfp = fdopen(cfd, "w");
+    if (!cfp) { close(cfd); remove(asmpath); remove(cleanpath); return; }
+
+    afp = fopen(asmpath, "r");
+    if (afp) {
+        char line[256];
+        _Bool past_header = 0;
+        while (fgets(line, (int)sizeof line, afp)) {
+            if (!past_header) {
+                if (__builtin_strstr(line, "<")) past_header = 1;
+                continue;
+            }
+            if (line[0] == '\n' || line[0] == '<') continue;
+            fputs(line, cfp);
+        }
+        fclose(afp);
+    }
+    fclose(cfp);
+    remove(asmpath);
+
+    char cmd[1024];
+    snprintf(cmd, sizeof cmd,
+             "/opt/homebrew/opt/llvm/bin/llvm-mca"
+             " -mcpu=znver4"
+             " -iterations=100"
+             " -bottleneck-analysis"
+             " -mtriple=x86_64"
+             " %s 2>&1",
+             cleanpath);
+    FILE *p = popen(cmd, "r");
+    if (p) {
+        char line[256];
+        while (fgets(line, (int)sizeof line, p)) fputs(line, f);
+        pclose(p);
+    }
+    remove(cleanpath);
 }
 
 #endif
