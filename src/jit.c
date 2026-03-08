@@ -2314,20 +2314,20 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 int8_t r2 = ra->reg[inputs[2]], r3 = ra->reg[inputs[3]];
 
                 // Pack each channel u16→u8 individually (with zero high half):
-                vpxor(c, 0, 1, 1, 1);
-                vpackuswb(c, 0, r0, 1);              // xmm0 = [R0..R7, 0..0]
-                vpackuswb(c, 1, r1, 1);              // xmm1 = [G0..G7, 0..0]
+                int8_t zero = ra_alloc(c, ra, sl, ns);
+                vpxor(c, 0, zero, zero, zero);
+                vpackuswb(c, 0, r0, zero);            // xmm0 = [R0..R7, 0..0]
+                vpackuswb(c, 1, r1, zero);            // xmm1 = [G0..G7, 0..0]
                 vpunpcklbw(c, 0, 0, 1);               // xmm0 = [R0,G0,R1,G1,...,R7,G7]
 
-                vpxor(c, 0, 1, 1, 1);
-                vpackuswb(c, 1, r2, 1);               // xmm1 = [B0..B7, 0..0]
+                vpackuswb(c, 1, r2, zero);            // xmm1 = [B0..B7, 0..0]
                 {
                     int8_t tmp = ra_alloc(c, ra, sl, ns);
-                    vpxor(c, 0, tmp, tmp, tmp);
-                    vpackuswb(c, tmp, r3, tmp);        // tmp  = [A0..A7, 0..0]
+                    vpackuswb(c, tmp, r3, zero);       // tmp  = [A0..A7, 0..0]
                     vpunpcklbw(c, 1, 1, tmp);          // xmm1 = [B0,A0,B1,A1,...,B7,A7]
                     ra->free_stack[ra->nfree++] = tmp;
                 }
+                ra->free_stack[ra->nfree++] = zero;
 
                 // xmm0=[RG pairs], xmm1=[BA pairs] → interleave words for RGBA pixels
                 {
