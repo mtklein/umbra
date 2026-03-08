@@ -12,6 +12,13 @@ static draw_backends make_draw(struct umbra_basic_block *bb) {
     umbra_basic_block_optimize(bb);
     draw_backends B = {umbra_interpreter(bb), umbra_jit(bb), umbra_metal(bb)};
     umbra_basic_block_free(bb);
+    (B.interp != 0) here;
+#if defined(__aarch64__) || defined(__AVX2__)
+    (B.jit != 0) here;
+#endif
+#if defined(__APPLE__) && !defined(__wasm__)
+    (B.mtl != 0) here;
+#endif
     return B;
 }
 static _Bool run_draw(draw_backends *B, int b, int n, umbra_buf buf[]) {

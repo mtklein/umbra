@@ -9,16 +9,32 @@ typedef struct {
     struct umbra_metal       *mtl;
 } backends;
 
+static void check_backends(backends *B, _Bool expect_cg) {
+    (B->interp != 0) here;
+#if !defined(__wasm__)
+    (!expect_cg || B->cg != 0) here;
+#else
+    (void)expect_cg;
+#endif
+#if defined(__aarch64__) || defined(__AVX2__)
+    (B->jit != 0) here;
+#endif
+#if defined(__APPLE__) && !defined(__wasm__)
+    (B->mtl != 0) here;
+#endif
+}
 static backends make_full(struct umbra_basic_block *bb, _Bool opt) {
     if (opt) { umbra_basic_block_optimize(bb); }
     backends B = {umbra_interpreter(bb), umbra_codegen(bb), umbra_jit(bb), umbra_metal(bb)};
     umbra_basic_block_free(bb);
+    check_backends(&B, 1);
     return B;
 }
 static backends make(struct umbra_basic_block *bb, _Bool opt) {
     if (opt) { umbra_basic_block_optimize(bb); }
     backends B = {umbra_interpreter(bb), NULL, umbra_jit(bb), umbra_metal(bb)};
     umbra_basic_block_free(bb);
+    check_backends(&B, 0);
     return B;
 }
 static _Bool run(backends *B, int b, int n, umbra_buf buf[]) {
