@@ -12,10 +12,10 @@
     X(shl_i32) X(shr_u32) X(shr_s32) X(shl_i32_imm) X(shr_u32_imm) X(shr_s32_imm) \
     X(and_32) X(or_32) X(xor_32) X(sel_32) \
     X(f32_from_i32) X(i32_from_f32) X(f32_from_half) X(i32_from_half) X(i32_from_i16) \
-    X(eq_f32) X(ne_f32) X(lt_f32) X(le_f32) X(gt_f32) X(ge_f32) \
+    X(eq_f32) X(ne_f32) X(lt_f32) X(le_f32) \
     X(eq_i32) X(ne_i32) \
-    X(lt_s32) X(le_s32) X(gt_s32) X(ge_s32) \
-    X(lt_u32) X(le_u32) X(gt_u32) X(ge_u32) \
+    X(lt_s32) X(le_s32) \
+    X(lt_u32) X(le_u32) \
     /* 16-bit ops */ \
     X(imm_16) X(uni_16) X(load_16) X(gather_16) X(store_16) X(scatter_16) \
     X(load_8x4)  /* produces 4 outputs (u8->u16 widened); continuations reference base */ \
@@ -25,8 +25,8 @@
     X(and_16) X(or_16) X(xor_16) X(sel_16) \
     X(i16_from_i32) \
     X(eq_i16) X(ne_i16) \
-    X(lt_s16) X(le_s16) X(gt_s16) X(ge_s16) \
-    X(lt_u16) X(le_u16) X(gt_u16) X(ge_u16) \
+    X(lt_s16) X(le_s16) \
+    X(lt_u16) X(le_u16) \
     /* Half ops (fp16 in memory, unspecified width in registers) */ \
     X(imm_half) X(uni_half) X(load_half) X(gather_half) X(store_half) X(scatter_half) \
     X(add_half) X(sub_half) X(mul_half) X(div_half) \
@@ -34,7 +34,7 @@
     X(and_half) X(or_half) X(xor_half) X(sel_half) \
     X(half_from_f32) X(half_from_i32) X(half_from_i16) X(i16_from_half) \
     X(eq_half) X(ne_half) \
-    X(lt_half) X(le_half) X(gt_half) X(ge_half)
+    X(lt_half) X(le_half)
 
 enum op {
     #define OP_ENUM(name) op_##name,

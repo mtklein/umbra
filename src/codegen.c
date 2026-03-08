@@ -119,8 +119,6 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                 case op_ne_half: emit(b, "%sfloat v%d = h2f((u16)-(s16)(v%d != v%d));\n", pad, i, inst->x, inst->y); break;
                 case op_lt_half: emit(b, "%sfloat v%d = h2f((u16)-(s16)(v%d <  v%d));\n", pad, i, inst->x, inst->y); break;
                 case op_le_half: emit(b, "%sfloat v%d = h2f((u16)-(s16)(v%d <= v%d));\n", pad, i, inst->x, inst->y); break;
-                case op_gt_half: emit(b, "%sfloat v%d = h2f((u16)-(s16)(v%d >  v%d));\n", pad, i, inst->x, inst->y); break;
-                case op_ge_half: emit(b, "%sfloat v%d = h2f((u16)-(s16)(v%d >= v%d));\n", pad, i, inst->x, inst->y); break;
                 default: break;
             }
             if (is_store(inst->op) && i+1 < hi) { emit(b, "\n"); }
@@ -247,8 +245,6 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             BINOP(op_ne_f32, "(u32)-(s32)(u2f(v%d) != u2f(v%d))")
             BINOP(op_lt_f32, "(u32)-(s32)(u2f(v%d) <  u2f(v%d))")
             BINOP(op_le_f32, "(u32)-(s32)(u2f(v%d) <= u2f(v%d))")
-            BINOP(op_gt_f32, "(u32)-(s32)(u2f(v%d) >  u2f(v%d))")
-            BINOP(op_ge_f32, "(u32)-(s32)(u2f(v%d) >= u2f(v%d))")
 
             #undef BINOP
             #undef UNOP
@@ -258,12 +254,8 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             BINOP(op_ne_i32, "(u32)-(s32)((s32)v%d != (s32)v%d)")
             BINOP(op_lt_s32, "(u32)-(s32)((s32)v%d <  (s32)v%d)")
             BINOP(op_le_s32, "(u32)-(s32)((s32)v%d <= (s32)v%d)")
-            BINOP(op_gt_s32, "(u32)-(s32)((s32)v%d >  (s32)v%d)")
-            BINOP(op_ge_s32, "(u32)-(s32)((s32)v%d >= (s32)v%d)")
             BINOP(op_lt_u32, "(u32)-(s32)(v%d <  v%d)")
             BINOP(op_le_u32, "(u32)-(s32)(v%d <= v%d)")
-            BINOP(op_gt_u32, "(u32)-(s32)(v%d >  v%d)")
-            BINOP(op_ge_u32, "(u32)-(s32)(v%d >= v%d)")
             #undef BINOP
 
             #define BINOP(OP, EXPR) case OP: emit(b, "%s%s v%d = " EXPR ";\n", pad, "u16", i, inst->x, inst->y); break;
@@ -271,12 +263,8 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             BINOP(op_ne_i16, "(u16)-(s16)((s16)v%d != (s16)v%d)")
             BINOP(op_lt_s16, "(u16)-(s16)((s16)v%d <  (s16)v%d)")
             BINOP(op_le_s16, "(u16)-(s16)((s16)v%d <= (s16)v%d)")
-            BINOP(op_gt_s16, "(u16)-(s16)((s16)v%d >  (s16)v%d)")
-            BINOP(op_ge_s16, "(u16)-(s16)((s16)v%d >= (s16)v%d)")
             BINOP(op_lt_u16, "(u16)-(s16)(v%d <  v%d)")
             BINOP(op_le_u16, "(u16)-(s16)(v%d <= v%d)")
-            BINOP(op_gt_u16, "(u16)-(s16)(v%d >  v%d)")
-            BINOP(op_ge_u16, "(u16)-(s16)(v%d >= v%d)")
             #undef BINOP
 
             case op_sel_32:

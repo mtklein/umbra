@@ -166,8 +166,7 @@ op(i32_from_i16) {
     #pragma clang diagnostic pop
     op(lt_half) { v->i16 = v[ip->x].f16 <  v[ip->y].f16; next; }
     op(le_half) { v->i16 = v[ip->x].f16 <= v[ip->y].f16; next; }
-    op(gt_half) { v->i16 = v[ip->x].f16 >  v[ip->y].f16; next; }
-    op(ge_half) { v->i16 = v[ip->x].f16 >= v[ip->y].f16; next; }
+
 
 #else
 
@@ -321,8 +320,7 @@ op(i32_from_i16) {
     #pragma clang diagnostic pop
     op(lt_half) { v->f32 = f16_to_f32(cast(U16, v[ip->x].f32 <  v[ip->y].f32)); next; }
     op(le_half) { v->f32 = f16_to_f32(cast(U16, v[ip->x].f32 <= v[ip->y].f32)); next; }
-    op(gt_half) { v->f32 = f16_to_f32(cast(U16, v[ip->x].f32 >  v[ip->y].f32)); next; }
-    op(ge_half) { v->f32 = f16_to_f32(cast(U16, v[ip->x].f32 >= v[ip->y].f32)); next; }
+
 #endif
 
 op( add_f32) { v->f32 = v[ip->x].f32 + v[ip->y].f32               ; next; }
@@ -341,8 +339,7 @@ op(ne_f32) { v->i32 = (I32)(v[ip->x].f32 != v[ip->y].f32); next; }
 #pragma clang diagnostic pop
 op(lt_f32) { v->i32 = (I32)(v[ip->x].f32 <  v[ip->y].f32); next; }
 op(le_f32) { v->i32 = (I32)(v[ip->x].f32 <= v[ip->y].f32); next; }
-op(gt_f32) { v->i32 = (I32)(v[ip->x].f32 >  v[ip->y].f32); next; }
-op(ge_f32) { v->i32 = (I32)(v[ip->x].f32 >= v[ip->y].f32); next; }
+
 
 op(add_i16) { v->i16 = v[ip->x].i16 +  v[ip->y].i16; next; }
 op(sub_i16) { v->i16 = v[ip->x].i16 -  v[ip->y].i16; next; }
@@ -366,12 +363,10 @@ op(eq_i16) { v->i16 = (I16)(v[ip->x].i16 == v[ip->y].i16); next; }
 op(ne_i16) { v->i16 = (I16)(v[ip->x].i16 != v[ip->y].i16); next; }
 op(lt_s16) { v->i16 = (I16)(v[ip->x].i16 <  v[ip->y].i16); next; }
 op(le_s16) { v->i16 = (I16)(v[ip->x].i16 <= v[ip->y].i16); next; }
-op(gt_s16) { v->i16 = (I16)(v[ip->x].i16 >  v[ip->y].i16); next; }
-op(ge_s16) { v->i16 = (I16)(v[ip->x].i16 >= v[ip->y].i16); next; }
+
 op(lt_u16) { v->i16 = (I16)(v[ip->x].u16 <  v[ip->y].u16); next; }
 op(le_u16) { v->i16 = (I16)(v[ip->x].u16 <= v[ip->y].u16); next; }
-op(gt_u16) { v->i16 = (I16)(v[ip->x].u16 >  v[ip->y].u16); next; }
-op(ge_u16) { v->i16 = (I16)(v[ip->x].u16 >= v[ip->y].u16); next; }
+
 
 op(add_i32) { v->i32 = v[ip->x].i32 +  v[ip->y].i32; next; }
 op(sub_i32) { v->i32 = v[ip->x].i32 -  v[ip->y].i32; next; }
@@ -395,12 +390,10 @@ op(eq_i32) { v->i32 = (I32)(v[ip->x].i32 == v[ip->y].i32); next; }
 op(ne_i32) { v->i32 = (I32)(v[ip->x].i32 != v[ip->y].i32); next; }
 op(lt_s32) { v->i32 = (I32)(v[ip->x].i32 <  v[ip->y].i32); next; }
 op(le_s32) { v->i32 = (I32)(v[ip->x].i32 <= v[ip->y].i32); next; }
-op(gt_s32) { v->i32 = (I32)(v[ip->x].i32 >  v[ip->y].i32); next; }
-op(ge_s32) { v->i32 = (I32)(v[ip->x].i32 >= v[ip->y].i32); next; }
+
 op(lt_u32) { v->i32 = (I32)(v[ip->x].u32 <  v[ip->y].u32); next; }
 op(le_u32) { v->i32 = (I32)(v[ip->x].u32 <= v[ip->y].u32); next; }
-op(gt_u32) { v->i32 = (I32)(v[ip->x].u32 >  v[ip->y].u32); next; }
-op(ge_u32) { v->i32 = (I32)(v[ip->x].u32 >= v[ip->y].u32); next; }
+
 
 
 op(load_8x4) {
@@ -488,19 +481,14 @@ static Fn const fn[] = {
 
     [op_eq_f32] = eq_f32, [op_ne_f32] = ne_f32,
     [op_lt_f32] = lt_f32, [op_le_f32] = le_f32,
-    [op_gt_f32] = gt_f32, [op_ge_f32] = ge_f32,
 
     [op_eq_i16] = eq_i16, [op_ne_i16] = ne_i16,
     [op_lt_s16] = lt_s16, [op_le_s16] = le_s16,
-    [op_gt_s16] = gt_s16, [op_ge_s16] = ge_s16,
     [op_lt_u16] = lt_u16, [op_le_u16] = le_u16,
-    [op_gt_u16] = gt_u16, [op_ge_u16] = ge_u16,
 
     [op_eq_i32] = eq_i32, [op_ne_i32] = ne_i32,
     [op_lt_s32] = lt_s32, [op_le_s32] = le_s32,
-    [op_gt_s32] = gt_s32, [op_ge_s32] = ge_s32,
     [op_lt_u32] = lt_u32, [op_le_u32] = le_u32,
-    [op_gt_u32] = gt_u32, [op_ge_u32] = ge_u32,
 
     [op_half_from_f32] = half_from_f32, [op_half_from_i32] = half_from_i32,
     [op_half_from_i16] = half_from_i16, [op_i16_from_half] = i16_from_half,
@@ -516,7 +504,6 @@ static Fn const fn[] = {
     [op_xor_half] = xor_half, [op_sel_half] = sel_half,
     [op_eq_half] = eq_half, [op_ne_half] = ne_half,
     [op_lt_half] = lt_half, [op_le_half] = le_half,
-    [op_gt_half] = gt_half, [op_ge_half] = ge_half,
 };
 
 struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) {

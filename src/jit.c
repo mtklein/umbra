@@ -277,19 +277,13 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
 
     case op_eq_f32: put(c, FCMEQ_4s(d,x,y)); return 1;
     case op_ne_f32: put(c, FCMEQ_4s(d,x,y)); put(c, MVN_16b(d,d)); return 1;
-    case op_gt_f32: put(c, FCMGT_4s(d,x,y)); return 1;
-    case op_ge_f32: put(c, FCMGE_4s(d,x,y)); return 1;
     case op_lt_f32: put(c, FCMGT_4s(d,y,x)); return 1;
     case op_le_f32: put(c, FCMGE_4s(d,y,x)); return 1;
 
     case op_eq_i32: put(c, CMEQ_4s(d,x,y)); return 1;
     case op_ne_i32: put(c, CMEQ_4s(d,x,y)); put(c, MVN_16b(d,d)); return 1;
-    case op_gt_s32: put(c, CMGT_4s(d,x,y)); return 1;
-    case op_ge_s32: put(c, CMGE_4s(d,x,y)); return 1;
     case op_lt_s32: put(c, CMGT_4s(d,y,x)); return 1;
     case op_le_s32: put(c, CMGE_4s(d,y,x)); return 1;
-    case op_gt_u32: put(c, CMHI_4s(d,x,y)); return 1;
-    case op_ge_u32: put(c, CMHS_4s(d,x,y)); return 1;
     case op_lt_u32: put(c, CMHI_4s(d,y,x)); return 1;
     case op_le_u32: put(c, CMHS_4s(d,y,x)); return 1;
 
@@ -315,12 +309,8 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
         return 1;
     case op_eq_i16: put(c, W(CMEQ_4h(d,x,y))); return 1;
     case op_ne_i16: put(c, W(CMEQ_4h(d,x,y))); put(c, MVN_16b(d,d)); return 1;
-    case op_gt_s16: put(c, W(CMGT_4h(d,x,y))); return 1;
-    case op_ge_s16: put(c, W(CMGE_4h(d,x,y))); return 1;
     case op_lt_s16: put(c, W(CMGT_4h(d,y,x))); return 1;
     case op_le_s16: put(c, W(CMGE_4h(d,y,x))); return 1;
-    case op_gt_u16: put(c, W(CMHI_4h(d,x,y))); return 1;
-    case op_ge_u16: put(c, W(CMHS_4h(d,x,y))); return 1;
     case op_lt_u16: put(c, W(CMHI_4h(d,y,x))); return 1;
     case op_le_u16: put(c, W(CMHS_4h(d,y,x))); return 1;
 
@@ -349,8 +339,6 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
         return 1;
     case op_eq_half: put(c, W(FCMEQ_4h(d,x,y))); return 1;
     case op_ne_half: put(c, W(FCMEQ_4h(d,x,y))); put(c, MVN_16b(d,d)); return 1;
-    case op_gt_half: put(c, W(FCMGT_4h(d,x,y))); return 1;
-    case op_ge_half: put(c, W(FCMGE_4h(d,x,y))); return 1;
     case op_lt_half: put(c, W(FCMGT_4h(d,y,x))); return 1;
     case op_le_half: put(c, W(FCMGE_4h(d,y,x))); return 1;
 
@@ -1722,8 +1710,6 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_ne_f32: vcmpps(c,d,x,y,4);  return 1;  // NEQ_UQ
     case op_lt_f32: vcmpps(c,d,x,y,1);  return 1;  // LT_OS
     case op_le_f32: vcmpps(c,d,x,y,2);  return 1;  // LE_OS
-    case op_gt_f32: vcmpps(c,d,y,x,1);  return 1;  // swap: LT_OS
-    case op_ge_f32: vcmpps(c,d,y,x,2);  return 1;  // swap: LE_OS
 
     // i32 compare
     case op_eq_i32: vpcmpeqd(c,d,x,y); return 1;
@@ -1733,28 +1719,11 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
         vpcmpeqd(c,scratch,scratch,scratch);  // all-1s
         vpxor_3(c,1,d,d,scratch);
         return 1;
-    case op_gt_s32: vpcmpgtd(c,d,x,y); return 1;
     case op_lt_s32: vpcmpgtd(c,d,y,x); return 1;
-    case op_ge_s32:
-        // ge = NOT lt = NOT gt(y,x)
-        vpcmpgtd(c,d,y,x);
-        vpcmpeqd(c,scratch,scratch,scratch);
-        vpxor_3(c,1,d,d,scratch);
-        return 1;
     case op_le_s32:
         vpcmpgtd(c,d,x,y);
         vpcmpeqd(c,scratch,scratch,scratch);
         vpxor_3(c,1,d,d,scratch);
-        return 1;
-    case op_gt_u32:  // x >u y  ≡  ¬(x == min_u(x,y))
-        vex_rrr(c,1,2,1,0x3B,0,x,y);   // VPMINUD ymm0, x, y
-        vpcmpeqd(c,d,x,0);              // d = (x == min) = (x <= y)
-        vpcmpeqd(c,scratch,scratch,scratch);
-        vpxor_3(c,1,d,d,scratch);        // NOT
-        return 1;
-    case op_ge_u32:  // x >=u y  ≡  x == max_u(x,y)
-        vex_rrr(c,1,2,1,0x3F,0,x,y);   // VPMAXUD ymm0, x, y
-        vpcmpeqd(c,d,x,0);
         return 1;
     case op_lt_u32:  // x <u y  ≡  ¬(y == min_u(x,y))
         vex_rrr(c,1,2,1,0x3B,0,x,y);   // VPMINUD ymm0, x, y
@@ -1816,27 +1785,11 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
         vpcmpeqw(c,scratch,scratch,scratch);
         vpxor_3(c,0,d,d,scratch);
         return 1;
-    case op_gt_s16: vpcmpgtw(c,d,x,y); return 1;
     case op_lt_s16: vpcmpgtw(c,d,y,x); return 1;
-    case op_ge_s16:
-        vpcmpgtw(c,d,y,x);
-        vpcmpeqw(c,scratch,scratch,scratch);
-        vpxor_3(c,0,d,d,scratch);
-        return 1;
     case op_le_s16:
         vpcmpgtw(c,d,x,y);
         vpcmpeqw(c,scratch,scratch,scratch);
         vpxor_3(c,0,d,d,scratch);
-        return 1;
-    case op_gt_u16:  // x >u y  ≡  ¬(x == min_u(x,y))
-        vex_rrr(c,1,2,0,0x3A,0,x,y);   // VPMINUW xmm0, x, y
-        vpcmpeqw(c,d,x,0);
-        vpcmpeqw(c,scratch,scratch,scratch);
-        vpxor_3(c,0,d,d,scratch);
-        return 1;
-    case op_ge_u16:  // x >=u y  ≡  x == max_u(x,y)
-        vex_rrr(c,1,2,0,0x3E,0,x,y);   // VPMAXUW xmm0, x, y
-        vpcmpeqw(c,d,x,0);
         return 1;
     case op_lt_u16:  // x <u y  ≡  ¬(y == min_u(x,y))
         vex_rrr(c,1,2,0,0x3A,0,x,y);   // VPMINUW xmm0, x, y
@@ -1878,8 +1831,6 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_ne_half: vcmpps(c,d,x,y,4); return 1;
     case op_lt_half: vcmpps(c,d,x,y,1); return 1;
     case op_le_half: vcmpps(c,d,x,y,2); return 1;
-    case op_gt_half: vcmpps(c,d,y,x,1); return 1;
-    case op_ge_half: vcmpps(c,d,y,x,2); return 1;
 
     // ---- Cross-width conversions ----
     // half_from_i16: i16 in XMM → f32 in YMM (sign-extend to i32, then cvt)
@@ -2445,10 +2396,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             }
 
             _Bool needs_scratch = op2==op_sel_32 || op2==op_sel_16 || op2==op_sel_half
-                               || op2==op_ne_i32 || op2==op_ge_s32 || op2==op_le_s32
-                               || op2==op_gt_u32 || op2==op_ge_u32 || op2==op_lt_u32 || op2==op_le_u32
-                               || op2==op_ne_i16 || op2==op_ge_s16 || op2==op_le_s16
-                               || op2==op_gt_u16 || op2==op_ge_u16 || op2==op_lt_u16 || op2==op_le_u16
+                               || op2==op_ne_i32 || op2==op_le_s32
+                               || op2==op_lt_u32 || op2==op_le_u32
+                               || op2==op_ne_i16 || op2==op_le_s16
+                               || op2==op_lt_u16 || op2==op_le_u16
                                || ((op2==op_fma_f32 || op2==op_fma_half) && rd!=rz && (rd==rx || rd==ry));
             int8_t scratch_reg = -1;
             if (needs_scratch) {

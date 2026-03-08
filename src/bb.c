@@ -95,8 +95,6 @@ static int const_eval(enum op op, int xb, int yb, int zb) {
 #pragma clang diagnostic pop
         case op_lt_f32: return -(int)(xf <  yf);
         case op_le_f32: return -(int)(xf <= yf);
-        case op_gt_f32: return -(int)(xf >  yf);
-        case op_ge_f32: return -(int)(xf >= yf);
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-equal"
@@ -105,30 +103,20 @@ static int const_eval(enum op op, int xb, int yb, int zb) {
 #pragma clang diagnostic pop
         case op_lt_half: return (uint16_t)-(int)(scalar_f16_to_f32(xh) <  scalar_f16_to_f32(yh));
         case op_le_half: return (uint16_t)-(int)(scalar_f16_to_f32(xh) <= scalar_f16_to_f32(yh));
-        case op_gt_half: return (uint16_t)-(int)(scalar_f16_to_f32(xh) >  scalar_f16_to_f32(yh));
-        case op_ge_half: return (uint16_t)-(int)(scalar_f16_to_f32(xh) >= scalar_f16_to_f32(yh));
 
         case op_eq_i32: return -(int)(xb == yb);
         case op_ne_i32: return -(int)(xb != yb);
         case op_lt_s32: return -(int)(xb <  yb);
         case op_le_s32: return -(int)(xb <= yb);
-        case op_gt_s32: return -(int)(xb >  yb);
-        case op_ge_s32: return -(int)(xb >= yb);
         case op_lt_u32: return -(int)(xu <  yu);
         case op_le_u32: return -(int)(xu <= yu);
-        case op_gt_u32: return -(int)(xu >  yu);
-        case op_ge_u32: return -(int)(xu >= yu);
 
         case op_eq_i16: return (uint16_t)-(int)((int16_t)xh == (int16_t)yh);
         case op_ne_i16: return (uint16_t)-(int)((int16_t)xh != (int16_t)yh);
         case op_lt_s16: return (uint16_t)-(int)((int16_t)xh <  (int16_t)yh);
         case op_le_s16: return (uint16_t)-(int)((int16_t)xh <= (int16_t)yh);
-        case op_gt_s16: return (uint16_t)-(int)((int16_t)xh >  (int16_t)yh);
-        case op_ge_s16: return (uint16_t)-(int)((int16_t)xh >= (int16_t)yh);
         case op_lt_u16: return (uint16_t)-(int)(xh <  yh);
         case op_le_u16: return (uint16_t)-(int)(xh <= yh);
-        case op_gt_u16: return (uint16_t)-(int)(xh >  yh);
-        case op_ge_u16: return (uint16_t)-(int)(xh >= yh);
 
         default: return 0;
     }
@@ -610,8 +598,8 @@ vh umbra_ne_half(BB *bb, vh a, vh b) {
 }
 vh umbra_lt_half(BB *bb, vh a, vh b) { return (vh){math(bb, op_lt_half, .x=a.id, .y=b.id)}; }
 vh umbra_le_half(BB *bb, vh a, vh b) { return (vh){math(bb, op_le_half, .x=a.id, .y=b.id)}; }
-vh umbra_gt_half(BB *bb, vh a, vh b) { return (vh){math(bb, op_gt_half, .x=a.id, .y=b.id)}; }
-vh umbra_ge_half(BB *bb, vh a, vh b) { return (vh){math(bb, op_ge_half, .x=a.id, .y=b.id)}; }
+vh umbra_gt_half(BB *bb, vh a, vh b) { return umbra_lt_half(bb, b, a); }
+vh umbra_ge_half(BB *bb, vh a, vh b) { return umbra_le_half(bb, b, a); }
 
 v32 umbra_eq_f32(BB *bb, v32 a, v32 b) {
     sort(&a.id, &b.id);
@@ -623,8 +611,8 @@ v32 umbra_ne_f32(BB *bb, v32 a, v32 b) {
 }
 v32 umbra_lt_f32(BB *bb, v32 a, v32 b) { return (v32){math(bb, op_lt_f32, .x=a.id, .y=b.id)}; }
 v32 umbra_le_f32(BB *bb, v32 a, v32 b) { return (v32){math(bb, op_le_f32, .x=a.id, .y=b.id)}; }
-v32 umbra_gt_f32(BB *bb, v32 a, v32 b) { return (v32){math(bb, op_gt_f32, .x=a.id, .y=b.id)}; }
-v32 umbra_ge_f32(BB *bb, v32 a, v32 b) { return (v32){math(bb, op_ge_f32, .x=a.id, .y=b.id)}; }
+v32 umbra_gt_f32(BB *bb, v32 a, v32 b) { return umbra_lt_f32(bb, b, a); }
+v32 umbra_ge_f32(BB *bb, v32 a, v32 b) { return umbra_le_f32(bb, b, a); }
 
 v16 umbra_eq_i16(BB *bb, v16 a, v16 b) {
     sort(&a.id, &b.id);
@@ -645,21 +633,21 @@ v32 umbra_ne_i32(BB *bb, v32 a, v32 b) {
 
 v16 umbra_lt_s16(BB *bb, v16 a, v16 b) { return (v16){math(bb, op_lt_s16, .x=a.id, .y=b.id)}; }
 v16 umbra_le_s16(BB *bb, v16 a, v16 b) { return (v16){math(bb, op_le_s16, .x=a.id, .y=b.id)}; }
-v16 umbra_gt_s16(BB *bb, v16 a, v16 b) { return (v16){math(bb, op_gt_s16, .x=a.id, .y=b.id)}; }
-v16 umbra_ge_s16(BB *bb, v16 a, v16 b) { return (v16){math(bb, op_ge_s16, .x=a.id, .y=b.id)}; }
+v16 umbra_gt_s16(BB *bb, v16 a, v16 b) { return umbra_lt_s16(bb, b, a); }
+v16 umbra_ge_s16(BB *bb, v16 a, v16 b) { return umbra_le_s16(bb, b, a); }
 v32 umbra_lt_s32(BB *bb, v32 a, v32 b) { return (v32){math(bb, op_lt_s32, .x=a.id, .y=b.id)}; }
 v32 umbra_le_s32(BB *bb, v32 a, v32 b) { return (v32){math(bb, op_le_s32, .x=a.id, .y=b.id)}; }
-v32 umbra_gt_s32(BB *bb, v32 a, v32 b) { return (v32){math(bb, op_gt_s32, .x=a.id, .y=b.id)}; }
-v32 umbra_ge_s32(BB *bb, v32 a, v32 b) { return (v32){math(bb, op_ge_s32, .x=a.id, .y=b.id)}; }
+v32 umbra_gt_s32(BB *bb, v32 a, v32 b) { return umbra_lt_s32(bb, b, a); }
+v32 umbra_ge_s32(BB *bb, v32 a, v32 b) { return umbra_le_s32(bb, b, a); }
 
 v16 umbra_lt_u16(BB *bb, v16 a, v16 b) { return (v16){math(bb, op_lt_u16, .x=a.id, .y=b.id)}; }
 v16 umbra_le_u16(BB *bb, v16 a, v16 b) { return (v16){math(bb, op_le_u16, .x=a.id, .y=b.id)}; }
-v16 umbra_gt_u16(BB *bb, v16 a, v16 b) { return (v16){math(bb, op_gt_u16, .x=a.id, .y=b.id)}; }
-v16 umbra_ge_u16(BB *bb, v16 a, v16 b) { return (v16){math(bb, op_ge_u16, .x=a.id, .y=b.id)}; }
+v16 umbra_gt_u16(BB *bb, v16 a, v16 b) { return umbra_lt_u16(bb, b, a); }
+v16 umbra_ge_u16(BB *bb, v16 a, v16 b) { return umbra_le_u16(bb, b, a); }
 v32 umbra_lt_u32(BB *bb, v32 a, v32 b) { return (v32){math(bb, op_lt_u32, .x=a.id, .y=b.id)}; }
 v32 umbra_le_u32(BB *bb, v32 a, v32 b) { return (v32){math(bb, op_le_u32, .x=a.id, .y=b.id)}; }
-v32 umbra_gt_u32(BB *bb, v32 a, v32 b) { return (v32){math(bb, op_gt_u32, .x=a.id, .y=b.id)}; }
-v32 umbra_ge_u32(BB *bb, v32 a, v32 b) { return (v32){math(bb, op_ge_u32, .x=a.id, .y=b.id)}; }
+v32 umbra_gt_u32(BB *bb, v32 a, v32 b) { return umbra_lt_u32(bb, b, a); }
+v32 umbra_ge_u32(BB *bb, v32 a, v32 b) { return umbra_le_u32(bb, b, a); }
 
 static char const* op_name(enum op op) {
     static char const *names[] = {
