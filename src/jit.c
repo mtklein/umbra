@@ -860,52 +860,32 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             }
         } break;
 
-        case op_shr_u32_imm: {
+        case op_shr_narrow_u32: {
+            // shr_narrow_u32: (u16)(u32 >> imm). Input x is 32-bit, output is 16-bit.
             int sh = inst->imm;
             int8_t rx = ra_ensure(ra, sl, ns, inst->x);
+            int8_t rxh = hi(ra, inst->x);
             _Bool x_dead = lu[inst->x] <= i;
-            _Bool pair = ra->is_pair[i] && !scalar;
-            // Fuse shr_u32_imm + i16_from_i32 into SHRN when shift fits
-            if (sh >= 1 && sh <= 16 && i+1 < to &&
-                bb->inst[i+1].op == op_i16_from_i32 &&
-                bb->inst[i+1].x == i && lu[i] == i+1)
-            {
-                int8_t rxh = hi(ra, inst->x);
-                int8_t rd;
-                if (x_dead) { rd = ra_claim(ra, inst->x, i+1); }
-                else {
-                    rd = ra_alloc(ra, sl, ns);
-                    ra->reg[i+1] = rd; ra->owner[(int)rd] = i+1;
-                }
-                if (pair && rxh != rx) {
+            int8_t rd;
+            if (x_dead) { rd = ra_claim(ra, inst->x, i); }
+            else { rd = ra_alloc(ra, sl, ns); ra->reg[i] = rd; ra->owner[(int)rd] = i; }
+            if (!scalar && rxh != rx) {
+                if (sh >= 1 && sh <= 16) {
                     put(c, SHRN_4h(rd, rx, sh));
-                    put(c, W(SHRN_4h(rd, rxh, sh)));  // SHRN2
+                    put(c, W(SHRN_4h(rd, rxh, sh)));
                 } else {
-                    put(c, SHRN_4h(rd, rx, sh));
+                    put(c, USHR_4s_imm(0, rx, sh));
+                    put(c, XTN_4h(rd, 0));
+                    put(c, USHR_4s_imm(0, rxh, sh));
+                    put(c, W(XTN_4h(rd, 0)));
                 }
-                i++;
-            } else if (pair) {
-                int8_t rxh = hi(ra, inst->x);
-                int8_t rd, rdh;
-                if (x_dead) {
-                    rd = ra_claim(ra, inst->x, i);
-                    rdh = ra->reg_hi[i];
-                } else {
-                    rd = ra_alloc(ra, sl, ns);
-                    rdh = ra_alloc(ra, sl, ns);
-                    ra->reg[i] = rd; ra->reg_hi[i] = rdh;
-                    ra->owner[(int)rd] = i; ra->owner[(int)rdh] = i;
-                }
-                put(c, USHR_4s_imm(rd, rx, sh));
-                put(c, USHR_4s_imm(rdh, rxh, sh));
             } else {
-                int8_t rd;
-                if (x_dead) { rd = ra_claim(ra, inst->x, i); }
-                else {
-                    rd = ra_alloc(ra, sl, ns);
-                    ra->reg[i] = rd; ra->owner[(int)rd] = i;
+                if (sh >= 1 && sh <= 16) {
+                    put(c, SHRN_4h(rd, rx, sh));
+                } else {
+                    put(c, USHR_4s_imm(0, rx, sh));
+                    put(c, XTN_4h(rd, 0));
                 }
-                put(c, USHR_4s_imm(rd, rx, sh));
             }
         } break;
 
@@ -2295,6 +2275,19 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             // VEXTRACTI128 + VPACKSSDW
             vextracti128(c, 0, rx, 1);         // xmm0 = hi 4 dwords
             vex_rrr(c, 1, 1, 0, 0x6B, rd, rx, 0);  // VPACKSSDW xmm_rd, xmm_rx, xmm0
+        } break;
+
+        case op_shr_narrow_u32: {
+            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
+            _Bool x_dead = lu[inst->x] <= i;
+            int8_t rd;
+            if (x_dead) { rd = ra_claim(ra, inst->x, i); }
+            else { rd = ra_alloc(ra, sl, ns); ra->reg[i] = rd; ra->owner[(int)rd] = i; }
+            // Shift 8×u32 right by imm, then narrow to 8×u16
+            // VPSRLD + VEXTRACTI128 + VPACKSSDW
+            vpsrld_i(c, 0, rx, (uint8_t)inst->imm);
+            vextracti128(c, 1, 0, 1);               // xmm1 = hi 4 dwords of shifted
+            vex_rrr(c, 1, 1, 0, 0x6B, rd, 0, 1);   // VPACKSSDW xmm_rd, xmm0, xmm1
         } break;
 
         case op_i32_from_i16: {

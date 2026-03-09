@@ -89,6 +89,7 @@ static int const_eval(enum op op, int xb, int yb, int zb) {
         case op_i32_from_f32: return (int)xf;
         case op_i32_from_half: { float t = scalar_f16_to_f32(xh); return (int)t; }
         case op_i16_from_i32: return (uint16_t)xb;
+        case op_shr_narrow_u32: return (uint16_t)(xu >> yu);
         case op_i32_from_i16: return (int32_t)(int16_t)xh;
 
 #pragma clang diagnostic push
@@ -581,6 +582,9 @@ v16 umbra_i16_from_half(BB *bb, vh a) {
 }
 v16 umbra_i16_from_i32(BB *bb, v32 a) {
     if (bb->inst[a.id].op == op_i32_from_i16) { return (v16){bb->inst[a.id].x}; }
+    if (bb->inst[a.id].op == op_shr_u32_imm) {
+        return (v16){push(bb, op_shr_narrow_u32, .x=bb->inst[a.id].x, .imm=bb->inst[a.id].imm)};
+    }
     return (v16){math(bb, op_i16_from_i32, .x=a.id)};
 }
 v32 umbra_i32_from_i16(BB *bb, v16 a) {

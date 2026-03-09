@@ -243,6 +243,7 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             UNOP(op_f32_from_half, "f2u(v%d)")
             UNOP(op_i32_from_half, "(u32)(s32)v%d")
             UNOP(op_i16_from_i32,  "(u16)(s16)v%d")
+            case op_shr_narrow_u32: emit(b, "%su16 v%d = (u16)(v%d >> %d);\n", pad, i, inst->x, inst->imm); break;
             UNOP(op_i32_from_i16,  "(u32)(s32)(s16)v%d")
 
             BINOP(op_eq_f32, "(u32)-(s32)(u2f(v%d) == u2f(v%d))")

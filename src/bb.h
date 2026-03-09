@@ -23,7 +23,7 @@
     X(add_i16) X(sub_i16) X(mul_i16) \
     X(shl_i16) X(shr_u16) X(shr_s16) X(shl_i16_imm) X(shr_u16_imm) X(shr_s16_imm) \
     X(and_16) X(or_16) X(xor_16) X(sel_16) \
-    X(i16_from_i32) \
+    X(i16_from_i32) X(shr_narrow_u32) /* (u16)(u32 >> imm); input x is 32-bit */ \
     X(eq_i16) \
     X(lt_s16) X(le_s16) \
     X(lt_u16) X(le_u16) \

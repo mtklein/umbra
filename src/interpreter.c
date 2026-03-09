@@ -128,6 +128,10 @@ op(i16_from_i32) {
     for (int l = 0; l < K; l++) { v->i16[l] = (int16_t)v[ip->x].i32[l]; }
     next;
 }
+op(shr_narrow_u32) {
+    for (int l = 0; l < K; l++) { v->u16[l] = (uint16_t)(v[ip->x].u32[l] >> (unsigned)ip->y); }
+    next;
+}
 op(i32_from_i16) {
     for (int l = 0; l < K; l++) { v->i32[l] = (int32_t)v[ip->x].i16[l]; }
     next;
@@ -479,7 +483,8 @@ static Fn const fn[] = {
     [op_half_from_f32] = half_from_f32, [op_half_from_i32] = half_from_i32,
     [op_half_from_i16] = half_from_i16, [op_i16_from_half] = i16_from_half,
     [op_f32_from_half] = f32_from_half, [op_i32_from_half] = i32_from_half,
-    [op_i16_from_i32] = i16_from_i32, [op_i32_from_i16] = i32_from_i16,
+    [op_i16_from_i32] = i16_from_i32, [op_shr_narrow_u32] = shr_narrow_u32,
+    [op_i32_from_i16] = i32_from_i16,
     [op_load_8x4] = load_8x4,
     [op_store_8x4] = store_8x4,
     [op_add_half] =  add_half, [op_sub_half] =  sub_half,
@@ -612,6 +617,7 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
 
                     case op_shl_i32_imm: case op_shr_u32_imm: case op_shr_s32_imm:
                     case op_shl_i16_imm: case op_shr_u16_imm: case op_shr_s16_imm:
+                    case op_shr_narrow_u32:
                         emit(.fn=fn[inst->op], .x=X, .y=inst->imm);
                         break;
 
