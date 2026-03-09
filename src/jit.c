@@ -869,23 +869,17 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             int8_t rd;
             if (x_dead) { rd = ra_claim(ra, inst->x, i); }
             else { rd = ra_alloc(ra, sl, ns); ra->reg[i] = rd; ra->owner[(int)rd] = i; }
+            // Use SHRN for sh 1-16 directly; for sh 17-31, SHRN by 16 then 16-bit shift.
+            int shrn_sh = sh <= 16 ? sh : 16;
+            int extra   = sh - shrn_sh;
             if (!scalar && rxh != rx) {
-                if (sh >= 1 && sh <= 16) {
-                    put(c, SHRN_4h(rd, rx, sh));
-                    put(c, W(SHRN_4h(rd, rxh, sh)));
-                } else {
-                    put(c, USHR_4s_imm(0, rx, sh));
-                    put(c, XTN_4h(rd, 0));
-                    put(c, USHR_4s_imm(0, rxh, sh));
-                    put(c, W(XTN_4h(rd, 0)));
-                }
+                put(c, SHRN_4h(rd, rx, shrn_sh));
+                put(c, W(SHRN_4h(rd, rxh, shrn_sh)));
             } else {
-                if (sh >= 1 && sh <= 16) {
-                    put(c, SHRN_4h(rd, rx, sh));
-                } else {
-                    put(c, USHR_4s_imm(0, rx, sh));
-                    put(c, XTN_4h(rd, 0));
-                }
+                put(c, SHRN_4h(rd, rx, shrn_sh));
+            }
+            if (extra) {
+                put(c, W(USHR_4h_imm(rd, rd, extra)));
             }
         } break;
 
