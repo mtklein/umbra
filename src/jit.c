@@ -584,8 +584,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             ra->reg[i] = rd; ra->owner[(int)rd] = i;
             int p = inst->ptr;
             load_ptr(c, p, &last_ptr);
-            int idx = bb->inst[inst->x].imm;
-            load_imm_w(c, XT, (uint32_t)idx);
+            load_imm_w(c, XT, (uint32_t)inst->imm);
             put(c, LDR_sx(rd, XP, XT));  // Sd = ptr[idx] (LSL#2)
             // DUP Vd.4S, Vn.S[0] — broadcast scalar to all 4 lanes
             put(c, 0x4E040400u | ((uint32_t)rd<<5) | (uint32_t)rd);
@@ -601,8 +600,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             ra->reg[i] = rd; ra->owner[(int)rd] = i;
             int p = inst->ptr;
             load_ptr(c, p, &last_ptr);
-            int idx = bb->inst[inst->x].imm;
-            load_imm_w(c, XT, (uint32_t)idx);
+            load_imm_w(c, XT, (uint32_t)inst->imm);
             put(c, LDR_hx(rd, XP, XT));  // Hd = ptr[idx] (LSL#1)
             // DUP Vd.8H, Vn.H[0]
             put(c, W(0x0E020400u | ((uint32_t)rd<<5) | (uint32_t)rd));
@@ -1986,9 +1984,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             int8_t rd = ra_alloc(ra, sl, ns);
             ra->reg[i] = rd; ra->owner[(int)rd] = i;
             int p = inst->ptr;
-            int idx = bb->inst[inst->x].imm;
             int base = load_ptr_x86(c, p, &last_ptr);
-            int disp = idx * 4;
+            int disp = inst->imm * 4;
             // VBROADCASTSS ymm_rd, dword [base + disp]
             // VEX.256.66.0F38 18 /r with memory operand
             {
@@ -2012,22 +2009,20 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     emit4(c, (uint32_t)disp);
                 }
             }
-            if (lu[inst->x] <= i) ra_free_reg(ra, inst->x);
         } break;
 
         case op_uni_16: {
             int8_t rd = ra_alloc(ra, sl, ns);
             ra->reg[i] = rd; ra->owner[(int)rd] = i;
             int p = inst->ptr;
-            int idx = bb->inst[inst->x].imm;
             int base = load_ptr_x86(c, p, &last_ptr);
-            // MOVZX eax, word [base + idx*2]
+            // MOVZX eax, word [base + imm*2]
             {
                 uint8_t rex = 0x40;
                 if (base >= 8) rex |= 0x01;
                 emit1(c, rex);
                 emit1(c, 0x0F); emit1(c, 0xB7);
-                int disp = idx * 2;
+                int disp = inst->imm * 2;
                 if (disp == 0 && (base & 7) != RBP) {
                     emit1(c, (uint8_t)(((RAX & 7) << 3) | (base & 7)));
                     if ((base & 7) == RSP) emit1(c, 0x24);
@@ -2041,22 +2036,20 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             vex(c, 1, 1, 0, 0, 0, 0, RAX, 0x6E);
             // VPBROADCASTW xmm_rd, xmm0
             vex_rr(c, 1, 2, 0, 0x79, rd, 0);
-            if (lu[inst->x] <= i) ra_free_reg(ra, inst->x);
         } break;
 
         case op_uni_half: {
             int8_t rd = ra_alloc(ra, sl, ns);
             ra->reg[i] = rd; ra->owner[(int)rd] = i;
             int p = inst->ptr;
-            int idx = bb->inst[inst->x].imm;
             int base = load_ptr_x86(c, p, &last_ptr);
-            // MOVZX eax, word [base + idx*2]
+            // MOVZX eax, word [base + imm*2]
             {
                 uint8_t rex = 0x40;
                 if (base >= 8) rex |= 0x01;
                 emit1(c, rex);
                 emit1(c, 0x0F); emit1(c, 0xB7);
-                int disp = idx * 2;
+                int disp = inst->imm * 2;
                 if (disp == 0 && (base & 7) != RBP) {
                     emit1(c, (uint8_t)(((RAX & 7) << 3) | (base & 7)));
                     if ((base & 7) == RSP) emit1(c, 0x24);
@@ -2070,7 +2063,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             vex(c, 1, 1, 0, 0, 0, 0, RAX, 0x6E);
             vex_rr(c, 1, 2, 0, 0x79, 0, 0);
             vcvtph2ps(c, rd, 0);
-            if (lu[inst->x] <= i) ra_free_reg(ra, inst->x);
         } break;
 
         case op_gather_32: case op_gather_16: case op_gather_half: {

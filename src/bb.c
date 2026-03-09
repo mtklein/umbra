@@ -206,17 +206,17 @@ vh  umbra_imm_half(BB *bb, uint16_t bits) { return (vh ){push(bb, op_imm_half, .
 
 v16 umbra_load_16(BB *bb, umbra_ptr src, v32 ix) {
     if (bb->inst[ix.id].op == op_lane  ) return (v16){push(bb,op_load_16,           .ptr=src.ix)};
-    if (bb->inst[ix.id].op == op_imm_32) return (v16){push(bb,op_uni_16,   .x=ix.id,.ptr=src.ix)};
+    if (bb->inst[ix.id].op == op_imm_32) return (v16){push(bb,op_uni_16,   .imm=bb->inst[ix.id].imm,.ptr=src.ix)};
     return                                      (v16){push(bb,op_gather_16,.x=ix.id,.ptr=src.ix)};
 }
 v32 umbra_load_32(BB *bb, umbra_ptr src, v32 ix) {
     if (bb->inst[ix.id].op == op_lane  ) return (v32){push(bb,op_load_32,           .ptr=src.ix)};
-    if (bb->inst[ix.id].op == op_imm_32) return (v32){push(bb,op_uni_32,   .x=ix.id,.ptr=src.ix)};
+    if (bb->inst[ix.id].op == op_imm_32) return (v32){push(bb,op_uni_32,   .imm=bb->inst[ix.id].imm,.ptr=src.ix)};
     return                                      (v32){push(bb,op_gather_32,.x=ix.id,.ptr=src.ix)};
 }
 vh umbra_load_half(BB *bb, umbra_ptr src, v32 ix) {
     if (bb->inst[ix.id].op == op_lane  ) return (vh){push(bb,op_load_half,           .ptr=src.ix)};
-    if (bb->inst[ix.id].op == op_imm_32) return (vh){push(bb,op_uni_half,   .x=ix.id,.ptr=src.ix)};
+    if (bb->inst[ix.id].op == op_imm_32) return (vh){push(bb,op_uni_half,   .imm=bb->inst[ix.id].imm,.ptr=src.ix)};
     return                                      (vh){push(bb,op_gather_half,.x=ix.id,.ptr=src.ix)};
 }
 
@@ -785,6 +785,8 @@ void umbra_basic_block_dump(struct umbra_basic_block const *bb, FILE *f) {
             case op_imm_16:   fprintf(f, " 0x%x",  (uint16_t)inst->imm); break;
             case op_imm_half: fprintf(f, " 0x%x",  (uint16_t)inst->imm); break;
             case op_uni_32: case op_uni_16: case op_uni_half:
+                fprintf(f, " p%d[%d]", inst->ptr, inst->imm);
+                break;
             case op_gather_32: case op_gather_16: case op_gather_half:
                 fprintf(f, " p%d v%d", inst->ptr, inst->x);
                 break;

@@ -21,7 +21,7 @@ Throughput Bottlenecks:
 Critical sequence based on the simulation:
 
               Instruction                                 Dependency Information
- +----< 5.    vpackuswb	%xmm2, %xmm8, %xmm4
+ +----< 5.    vpackuswb	%xmm2, %xmm8, %xmm7
  |
  |    < loop carried > 
  |
@@ -29,9 +29,9 @@ Critical sequence based on the simulation:
  +----> 1.    vpackuswb	%xmm2, %xmm9, %xmm0               ## RESOURCE interference:  Zn4FP2 [ probability: 49% ]
  +----> 2.    vpackuswb	%xmm2, %xmm3, %xmm1               ## RESOURCE interference:  Zn4FP2 [ probability: 49% ]
  |      3.    vpunpcklbw	%xmm1, %xmm0, %xmm0
- +----> 4.    vpackuswb	%xmm2, %xmm5, %xmm1               ## RESOURCE interference:  Zn4FP1 [ probability: 100% ]
-        5.    vpackuswb	%xmm2, %xmm8, %xmm4
-        6.    vpunpcklbw	%xmm4, %xmm1, %xmm1
+ +----> 4.    vpackuswb	%xmm2, %xmm4, %xmm1               ## RESOURCE interference:  Zn4FP1 [ probability: 100% ]
+        5.    vpackuswb	%xmm2, %xmm8, %xmm7
+        6.    vpunpcklbw	%xmm7, %xmm1, %xmm1
         7.    vmovaps	%xmm0, %xmm2
         8.    vpunpcklwd	%xmm1, %xmm2, %xmm0
         9.    vpunpckhwd	%xmm1, %xmm2, %xmm1
@@ -53,9 +53,9 @@ Instruction Info:
  1      2     0.50                        vpackuswb	%xmm2, %xmm9, %xmm0
  1      2     0.50                        vpackuswb	%xmm2, %xmm3, %xmm1
  1      1     0.50                        vpunpcklbw	%xmm1, %xmm0, %xmm0
- 1      2     0.50                        vpackuswb	%xmm2, %xmm5, %xmm1
- 1      2     0.50                        vpackuswb	%xmm2, %xmm8, %xmm4
- 1      1     0.50                        vpunpcklbw	%xmm4, %xmm1, %xmm1
+ 1      2     0.50                        vpackuswb	%xmm2, %xmm4, %xmm1
+ 1      2     0.50                        vpackuswb	%xmm2, %xmm8, %xmm7
+ 1      1     0.50                        vpunpcklbw	%xmm7, %xmm1, %xmm1
  1      0     0.17                        vmovaps	%xmm0, %xmm2
  1      1     0.50                        vpunpcklwd	%xmm1, %xmm2, %xmm0
  1      1     0.50                        vpunpckhwd	%xmm1, %xmm2, %xmm1
@@ -100,9 +100,9 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -      -      -      -      -      -     vpackuswb	%xmm2, %xmm9, %xmm0
  -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -     vpackuswb	%xmm2, %xmm3, %xmm1
  -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -      -     vpunpcklbw	%xmm1, %xmm0, %xmm0
- -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -      -     vpackuswb	%xmm2, %xmm5, %xmm1
- -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -      -      -     vpackuswb	%xmm2, %xmm8, %xmm4
- -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpunpcklbw	%xmm4, %xmm1, %xmm1
+ -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -      -     vpackuswb	%xmm2, %xmm4, %xmm1
+ -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -      -      -     vpackuswb	%xmm2, %xmm8, %xmm7
+ -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpunpcklbw	%xmm7, %xmm1, %xmm1
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vmovaps	%xmm0, %xmm2
  -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -      -      -      -      -      -     vpunpcklwd	%xmm1, %xmm2, %xmm0
  -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpunpckhwd	%xmm1, %xmm2, %xmm1

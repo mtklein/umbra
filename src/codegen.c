@@ -63,7 +63,7 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                     _Bool mixed = ptr_32[p] && ptr_16[p];
                     emit(b, mixed ? "%sfloat v%d = h2f(p%d_16[%d]);\n"
                                   : "%sfloat v%d = h2f(p%d[%d]);\n",
-                         pad, i, p, bb->inst[inst->x].imm);
+                         pad, i, p, inst->imm);
                 } break;
                 case op_load_half: {
                     int p = inst->ptr;
@@ -143,7 +143,7 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                 int p = inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 emit(b, mixed ? "%su16 v%d = p%d_16[%d];\n"
-                              : "%su16 v%d = p%d[%d];\n", pad, i, p, bb->inst[inst->x].imm);
+                              : "%su16 v%d = p%d[%d];\n", pad, i, p, inst->imm);
             } break;
             case op_load_16: {
                 int p = inst->ptr;
@@ -161,7 +161,7 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                 int p = inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 emit(b, mixed ? "%su32 v%d = p%d_32[%d];\n"
-                              : "%su32 v%d = p%d[%d];\n", pad, i, p, bb->inst[inst->x].imm);
+                              : "%su32 v%d = p%d[%d];\n", pad, i, p, inst->imm);
             } break;
             case op_load_32: {
                 int p = inst->ptr;

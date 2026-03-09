@@ -40,27 +40,24 @@ void umbra_entry(int n, void **ptrs) {
     u16* restrict p3 = (u16*)ptrs[3];
     u32 v0 = 0u;
     float v1 = h2f(p3[0]);
-    u32 v2 = 1u;
-    float v3 = h2f(p3[1]);
-    u32 v4 = 2u;
-    float v5 = h2f(p3[2]);
-    u32 v6 = 3u;
-    float v7 = h2f(p3[3]);
-    float v8 = h2f(23544);
-    float v9 = h2f(14336);
-    float v10 = v1 * v8 + v9;
-    u16 v11 = (u16)(s16)v10;
-    float v12 = v3 * v8 + v9;
-    u16 v13 = (u16)(s16)v12;
-    float v14 = v5 * v8 + v9;
-    u16 v15 = (u16)(s16)v14;
-    float v16 = v7 * v8 + v9;
-    u16 v17 = (u16)(s16)v16;
+    float v2 = h2f(p3[1]);
+    float v3 = h2f(p3[2]);
+    float v4 = h2f(p3[3]);
+    float v5 = h2f(23544);
+    float v6 = h2f(14336);
+    float v7 = v1 * v5 + v6;
+    u16 v8 = (u16)(s16)v7;
+    float v9 = v2 * v5 + v6;
+    u16 v10 = (u16)(s16)v9;
+    float v11 = v3 * v5 + v6;
+    u16 v12 = (u16)(s16)v11;
+    float v13 = v4 * v5 + v6;
+    u16 v14 = (u16)(s16)v13;
 
     for (int i = 0; i < n; i++) {
-        ((unsigned char*)ptrs[0])[i*4+0] = (unsigned char)v11;
-        ((unsigned char*)ptrs[0])[i*4+1] = (unsigned char)v13;
-        ((unsigned char*)ptrs[0])[i*4+2] = (unsigned char)v15;
-        ((unsigned char*)ptrs[0])[i*4+3] = (unsigned char)v17;
+        ((unsigned char*)ptrs[0])[i*4+0] = (unsigned char)v8;
+        ((unsigned char*)ptrs[0])[i*4+1] = (unsigned char)v10;
+        ((unsigned char*)ptrs[0])[i*4+2] = (unsigned char)v12;
+        ((unsigned char*)ptrs[0])[i*4+3] = (unsigned char)v14;
     }
 }

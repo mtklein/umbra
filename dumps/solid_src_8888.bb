@@ -6,13 +6,13 @@
   v5   = load_32         p2
   v6   = f32_from_i32    v5
   v7   = imm_half        0x0
-  v8   = uni_half        p3 v0
+  v8   = uni_half        p3[0]
   v9   = imm_32          0x1
-  v10  = uni_half        p3 v9
+  v10  = uni_half        p3[1]
   v11  = imm_32          0x2
-  v12  = uni_half        p3 v11
+  v12  = uni_half        p3[2]
   v13  = imm_32          0x3
-  v14  = uni_half        p3 v13
+  v14  = uni_half        p3[3]
   v15  = load_8x4        p0
   v16  = load_8x4        v15 ch1
   v17  = load_8x4        v15 ch2

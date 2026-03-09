@@ -545,8 +545,8 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                     #endif
                         break;
 
-                    case op_uni_16:  emit(.fn=uni_16,  .x=inst->ptr, .y=bb->inst[inst->x].imm); break;
-                    case op_uni_32:  emit(.fn=uni_32,  .x=inst->ptr, .y=bb->inst[inst->x].imm); break;
+                    case op_uni_16:  emit(.fn=uni_16,  .x=inst->ptr, .y=inst->imm); break;
+                    case op_uni_32:  emit(.fn=uni_32,  .x=inst->ptr, .y=inst->imm); break;
                     case op_load_16: emit(.fn=load_16, .x=inst->ptr); break;
                     case op_load_32: emit(.fn=load_32, .x=inst->ptr); break;
                     case op_gather_16: emit(.fn=gather_16, .x=inst->ptr, .y=X); break;
@@ -558,9 +558,9 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
 
                     case op_uni_half:
                     #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
-                        emit(.fn=uni_16, .x=inst->ptr, .y=bb->inst[inst->x].imm);
+                        emit(.fn=uni_16, .x=inst->ptr, .y=inst->imm);
                     #else
-                        emit(.fn=uni_half, .x=inst->ptr, .y=bb->inst[inst->x].imm);
+                        emit(.fn=uni_half, .x=inst->ptr, .y=inst->imm);
                     #endif
                         break;
                     case op_load_half:

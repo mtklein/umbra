@@ -68,7 +68,7 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                     _Bool mixed = ptr_32[p] && ptr_16[p];
                     emit(b, mixed ? "%shalf v%d = as_type<half>(p%d_16[%d]);\n"
                                   : "%shalf v%d = as_type<half>(((device const ushort*)p%d)[%d]);\n",
-                         pad, i, p, bb->inst[inst->x].imm);
+                         pad, i, p, inst->imm);
                 } break;
                 case op_load_half: {
                     int p = inst->ptr;
@@ -170,7 +170,7 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 emit(b, mixed ? "%sushort v%d = p%d_16[%d];\n"
                               : "%sushort v%d = ((device const ushort*)p%d)[%d];\n",
-                     pad, i, p, bb->inst[inst->x].imm);
+                     pad, i, p, inst->imm);
             } break;
             case op_load_16: {
                 int p = inst->ptr;
@@ -189,7 +189,7 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 emit(b, mixed ? "%suint v%d = p%d_32[%d];\n"
                               : "%suint v%d = ((device const uint*)p%d)[%d];\n",
-                     pad, i, p, bb->inst[inst->x].imm);
+                     pad, i, p, inst->imm);
             } break;
             case op_load_32: {
                 int p = inst->ptr;
