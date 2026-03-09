@@ -37,6 +37,7 @@ static int const_eval(enum op op, int xb, int yb, int zb) {
         case op_max_f32:  return f32_bits(fmaxf(xf, yf));
         case op_sqrt_f32: return f32_bits(sqrtf(xf));
         case op_fma_f32:  return f32_bits(xf * yf + zf);
+        case op_fms_f32:  return f32_bits(zf - xf * yf);
 
         case op_add_half:  return scalar_f32_to_f16(scalar_f16_to_f32(xh) + scalar_f16_to_f32(yh));
         case op_sub_half:  return scalar_f32_to_f16(scalar_f16_to_f32(xh) - scalar_f16_to_f32(yh));
@@ -49,6 +50,8 @@ static int const_eval(enum op op, int xb, int yb, int zb) {
         case op_sqrt_half: return scalar_f32_to_f16(sqrtf(scalar_f16_to_f32(xh)));
         case op_fma_half:  return scalar_f32_to_f16(scalar_f16_to_f32(xh) * scalar_f16_to_f32(yh)
                                                                           + scalar_f16_to_f32(zh));
+        case op_fms_half:  return scalar_f32_to_f16(scalar_f16_to_f32(zh)
+                                                  - scalar_f16_to_f32(xh) * scalar_f16_to_f32(yh));
 
         case op_add_i32: return xb + yb;
         case op_sub_i32: return xb - yb;
@@ -284,6 +287,9 @@ v32 umbra_add_f32(BB *bb, v32 a, v32 b) {
 
 v32 umbra_sub_f32(BB *bb, v32 a, v32 b) {
     if (is_imm32(bb, b.id, 0)) { return a; }
+    if (bb->inst[b.id].op == op_mul_f32) {
+        return (v32){math(bb, op_fms_f32, .x=bb->inst[b.id].x, .y=bb->inst[b.id].y, .z=a.id)};
+    }
     return (v32){math(bb, op_sub_f32, .x=a.id, .y=b.id)};
 }
 
@@ -328,6 +334,9 @@ vh umbra_add_half(BB *bb, vh a, vh b) {
 
 vh umbra_sub_half(BB *bb, vh a, vh b) {
     if (is_imm_half(bb, b.id, 0)) { return a; }
+    if (bb->inst[b.id].op == op_mul_half) {
+        return (vh){math(bb, op_fms_half, .x=bb->inst[b.id].x, .y=bb->inst[b.id].y, .z=a.id)};
+    }
     return (vh){math(bb, op_sub_half, .x=a.id, .y=b.id)};
 }
 

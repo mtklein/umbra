@@ -146,6 +146,7 @@ op(i32_from_i16) {
     op( mul_half) { v->f16 = v[ip->x].f16 * v[ip->y].f16                          ; next; }
     op( div_half) { v->f16 = v[ip->x].f16 / v[ip->y].f16                          ; next; }
     op( fma_half) { v->f16 = v[ip->x].f16 * v[ip->y].f16 + v[ip->z].f16           ; next; }
+    op( fms_half) { v->f16 = v[ip->z].f16 - v[ip->x].f16 * v[ip->y].f16           ; next; }
     op( min_half) { v->f16 = __builtin_elementwise_min(v[ip->x].f16, v[ip->y].f16); next; }
     op( max_half) { v->f16 = __builtin_elementwise_max(v[ip->x].f16, v[ip->y].f16); next; }
     op(sqrt_half) { v->f16 = __builtin_elementwise_sqrt(v[ip->x].f16)             ; next; }
@@ -293,6 +294,7 @@ op(i32_from_i16) {
     op( mul_half) { v->f32 = v[ip->x].f32 * v[ip->y].f32               ; next; }
     op( div_half) { v->f32 = v[ip->x].f32 / v[ip->y].f32               ; next; }
     op( fma_half) { v->f32 = v[ip->x].f32 * v[ip->y].f32 + v[ip->z].f32; next; }
+    op( fms_half) { v->f32 = v[ip->z].f32 - v[ip->x].f32 * v[ip->y].f32; next; }
     op( min_half) { v->f32 = __builtin_elementwise_min(v[ip->x].f32, v[ip->y].f32); next; }
     op( max_half) { v->f32 = __builtin_elementwise_max(v[ip->x].f32, v[ip->y].f32); next; }
     op(sqrt_half) { v->f32 = __builtin_elementwise_sqrt(v[ip->x].f32)             ; next; }
@@ -314,6 +316,7 @@ op( sub_f32) { v->f32 = v[ip->x].f32 - v[ip->y].f32               ; next; }
 op( mul_f32) { v->f32 = v[ip->x].f32 * v[ip->y].f32               ; next; }
 op( div_f32) { v->f32 = v[ip->x].f32 / v[ip->y].f32               ; next; }
 op( fma_f32) { v->f32 = v[ip->x].f32 * v[ip->y].f32 + v[ip->z].f32; next; }
+op( fms_f32) { v->f32 = v[ip->z].f32 - v[ip->x].f32 * v[ip->y].f32; next; }
 op(sqrt_f32) { v->f32 = __builtin_elementwise_sqrt(v[ip->x].f32)  ; next; }
 op( min_f32) { v->f32 = __builtin_elementwise_min(v[ip->x].f32, v[ip->y].f32); next; }
 op( max_f32) { v->f32 = __builtin_elementwise_max(v[ip->x].f32, v[ip->y].f32); next; }
@@ -439,7 +442,7 @@ static Fn const fn[] = {
     [op_add_f32] =  add_f32, [op_sub_f32] =  sub_f32,
     [op_mul_f32] =  mul_f32, [op_div_f32] =  div_f32,
     [op_min_f32] =  min_f32, [op_max_f32] =  max_f32,
-    [op_sqrt_f32] = sqrt_f32, [op_fma_f32] = fma_f32,
+    [op_sqrt_f32] = sqrt_f32, [op_fma_f32] = fma_f32, [op_fms_f32] = fms_f32,
 
     [op_add_i16] = add_i16, [op_sub_i16] = sub_i16,
     [op_mul_i16] = mul_i16,
@@ -482,7 +485,7 @@ static Fn const fn[] = {
     [op_add_half] =  add_half, [op_sub_half] =  sub_half,
     [op_mul_half] =  mul_half, [op_div_half] =  div_half,
     [op_min_half] =  min_half, [op_max_half] =  max_half,
-    [op_sqrt_half] = sqrt_half, [op_fma_half] = fma_half,
+    [op_sqrt_half] = sqrt_half, [op_fma_half] = fma_half, [op_fms_half] = fms_half,
 #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
     // native f16: half bitwise is identical to i16 bitwise
     [op_and_half] = and_16, [op_or_half]  =  or_16,

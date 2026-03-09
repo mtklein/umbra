@@ -126,7 +126,7 @@ static uint32_t W(uint32_t insn) { return insn | 0x40000000u; }
 enum {
     // float 4S
     FADD_4s_  =0x4E20D400u, FSUB_4s_  =0x4EA0D400u, FMUL_4s_  =0x6E20DC00u,
-    FDIV_4s_  =0x6E20FC00u, FMLA_4s_  =0x4E20CC00u,
+    FDIV_4s_  =0x6E20FC00u, FMLA_4s_  =0x4E20CC00u, FMLS_4s_  =0x4EA0CC00u,
     FMINNM_4s_=0x4EA0C400u, FMAXNM_4s_=0x4E20C400u,
     FSQRT_4s_ =0x6EA1F800u,
     SCVTF_4s_ =0x4E21D800u, FCVTZS_4s_=0x4EA1B800u,
@@ -144,7 +144,7 @@ enum {
 
     // float 4H (FEAT_FP16)
     FADD_4h_  =0x0E401400u, FSUB_4h_  =0x0EC01400u, FMUL_4h_  =0x2E401C00u,
-    FDIV_4h_  =0x2E403C00u, FMLA_4h_  =0x0E400C00u,
+    FDIV_4h_  =0x2E403C00u, FMLA_4h_  =0x0E400C00u, FMLS_4h_  =0x0EC00C00u,
     FMINNM_4h_=0x0EC00400u, FMAXNM_4h_=0x0E400400u,
     FSQRT_4h_ =0x2EF9F800u,
     FCMEQ_4h_ =0x0E402400u, FCMGT_4h_ =0x2EC02400u, FCMGE_4h_ =0x2E402400u,
@@ -162,14 +162,14 @@ enum {
     UXTL_8h_ =0x2F08A400u,
 };
 
-V3(FADD_4s)  V3(FSUB_4s)  V3(FMUL_4s) V3(FDIV_4s)  V3(FMLA_4s)
+V3(FADD_4s)  V3(FSUB_4s)  V3(FMUL_4s) V3(FDIV_4s)  V3(FMLA_4s) V3(FMLS_4s)
 V3(FMINNM_4s) V3(FMAXNM_4s) V2(FSQRT_4s) V2(SCVTF_4s) V2(FCVTZS_4s)
 V3(FCMEQ_4s) V3(FCMGT_4s) V3(FCMGE_4s)
 V3(ADD_4s) V3(SUB_4s) V3(MUL_4s)
 V3(USHL_4s) V3(SSHL_4s) V2(NEG_4s)
 V3(CMEQ_4s) V3(CMGT_4s) V3(CMGE_4s) V3(CMHI_4s) V3(CMHS_4s)
 V3(AND_16b) V3(ORR_16b) V3(EOR_16b) V3(BSL_16b) V3(BIT_16b) V3(BIF_16b)
-V3(FADD_4h)  V3(FSUB_4h)  V3(FMUL_4h) V3(FDIV_4h)  V3(FMLA_4h)
+V3(FADD_4h)  V3(FSUB_4h)  V3(FMUL_4h) V3(FDIV_4h)  V3(FMLA_4h) V3(FMLS_4h)
 V3(FMINNM_4h) V3(FMAXNM_4h) V2(FSQRT_4h)
 V3(FCMEQ_4h) V3(FCMGT_4h) V3(FCMGE_4h)
 V3(ADD_4h) V3(SUB_4h) V3(MUL_4h)
@@ -259,6 +259,11 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
         else if (d!=x && d!=y) { put(c, ORR_16b(d,z,z)); put(c, FMLA_4s(d,x,y)); }
         else { put(c, ORR_16b(scratch,z,z)); put(c, FMLA_4s(scratch,x,y)); put(c, ORR_16b(d,scratch,scratch)); }
         return 1;
+    case op_fms_f32:
+        if (d==z) { put(c, FMLS_4s(d,x,y)); }
+        else if (d!=x && d!=y) { put(c, ORR_16b(d,z,z)); put(c, FMLS_4s(d,x,y)); }
+        else { put(c, ORR_16b(scratch,z,z)); put(c, FMLS_4s(scratch,x,y)); put(c, ORR_16b(d,scratch,scratch)); }
+        return 1;
 
     case op_add_i32: put(c, ADD_4s(d,x,y)); return 1;
     case op_sub_i32: put(c, SUB_4s(d,x,y)); return 1;
@@ -335,6 +340,11 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
         if (d==z) { put(c, W(FMLA_4h(d,x,y))); }
         else if (d!=x && d!=y) { put(c, ORR_16b(d,z,z)); put(c, W(FMLA_4h(d,x,y))); }
         else { put(c, ORR_16b(scratch,z,z)); put(c, W(FMLA_4h(scratch,x,y))); put(c, ORR_16b(d,scratch,scratch)); }
+        return 1;
+    case op_fms_half:
+        if (d==z) { put(c, W(FMLS_4h(d,x,y))); }
+        else if (d!=x && d!=y) { put(c, ORR_16b(d,z,z)); put(c, W(FMLS_4h(d,x,y))); }
+        else { put(c, ORR_16b(scratch,z,z)); put(c, W(FMLS_4h(scratch,x,y))); put(c, ORR_16b(d,scratch,scratch)); }
         return 1;
     case op_eq_half: put(c, W(FCMEQ_4h(d,x,y))); return 1;
     case op_lt_half: put(c, W(FCMGT_4h(d,y,x))); return 1;
@@ -425,12 +435,14 @@ static void ra_free_reg(struct ra *ra, int val) {
 static int8_t ra_alloc(Buf *c, struct ra *ra, int *sl, int *ns) {
     if (ra->nfree > 0) return ra->free_stack[--ra->nfree];
 
-    // Evict: find register whose owner has farthest last_use (Belady-like)
+    // Evict: find register whose owner has farthest last_use (Belady-like).
+    // Dead values (last_use < 0) are evicted first since they'll never be used.
     int best_r = -1, best_lu = -1;
     for (int r = 0; r < 32; r++) {
         if (ra->owner[r] < 0) continue;
         int val = ra->owner[r];
-        if (ra->last_use[val] > best_lu) { best_lu = ra->last_use[val]; best_r = r; }
+        int lu = ra->last_use[val] < 0 ? __INT_MAX__ : ra->last_use[val];
+        if (lu > best_lu) { best_lu = lu; best_r = r; }
     }
     int evicted = ra->owner[best_r];
     if (sl[evicted] < 0) {
@@ -1036,9 +1048,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
             int8_t rd = -1;
             enum op op = inst->op;
-            _Bool destructive = op==op_fma_f32 || op==op_fma_half
+            _Bool fma = op==op_fma_f32 || op==op_fma_half
+                     || op==op_fms_f32 || op==op_fms_half;
+            _Bool destructive = fma
                              || op==op_sel_32  || op==op_sel_16 || op==op_sel_half;
-            _Bool fma = op==op_fma_f32 || op==op_fma_half;
             if (fma && z_dead)
                 { rd = ra_claim(ra, inst->z, i); z_dead = 0; }
             else if (fma && !z_dead) {
@@ -1534,6 +1547,10 @@ static void vsqrtps(Buf *b, int d, int s)       { vex_rr (b,0,1,1,0x51,d,s); }
 static void vfmadd231ps(Buf *b, int d, int v, int s) {
     vex(b,1,2,0,1,d,v,s,0xB8);
 }
+// VFNMADD231PS: d = -v*s + d = d - v*s — VEX.256.66.0F38.W0 BC
+static void vfnmadd231ps(Buf *b, int d, int v, int s) {
+    vex(b,1,2,0,1,d,v,s,0xBC);
+}
 // VCVTDQ2PS ymm,ymm — VEX.256.0F 5B
 static void vcvtdq2ps(Buf *b, int d, int s) { vex_rr(b,0,1,1,0x5B,d,s); }
 // VCVTTPS2DQ ymm,ymm — VEX.256.F3.0F 5B
@@ -1665,12 +1682,14 @@ static void ra_free_reg(struct ra *ra, int val) {
 
 static int8_t ra_alloc(Buf *c, struct ra *ra, int *sl, int *ns) {
     if (ra->nfree > 0) return ra->free_stack[--ra->nfree];
-    // Evict farthest-used (Belady)
+    // Evict farthest-used (Belady).
+    // Dead values (last_use < 0) are evicted first since they'll never be used.
     int best_r = -1, best_lu = -1;
     for (int r = 0; r < 16; r++) {
         if (ra->owner[r] < 0) continue;
         int val = ra->owner[r];
-        if (ra->last_use[val] > best_lu) { best_lu = ra->last_use[val]; best_r = r; }
+        int lu = ra->last_use[val] < 0 ? __INT_MAX__ : ra->last_use[val];
+        if (lu > best_lu) { best_lu = lu; best_r = r; }
     }
     int evicted = ra->owner[best_r];
     if (sl[evicted] < 0) sl[evicted] = (*ns)++;
@@ -1719,6 +1738,12 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
         if (d == z) { vfmadd231ps(c,d,x,y); }
         else if (d != x && d != y) { vmovaps(c,d,z); vfmadd231ps(c,d,x,y); }
         else { vmovaps(c,scratch,z); vfmadd231ps(c,scratch,x,y); vmovaps(c,d,scratch); }
+        return 1;
+    case op_fms_f32:
+        // VFNMADD231PS d,x,y : d = d - x*y, so z must be in d
+        if (d == z) { vfnmadd231ps(c,d,x,y); }
+        else if (d != x && d != y) { vmovaps(c,d,z); vfnmadd231ps(c,d,x,y); }
+        else { vmovaps(c,scratch,z); vfnmadd231ps(c,scratch,x,y); vmovaps(c,d,scratch); }
         return 1;
 
     // i32 arithmetic (YMM)
@@ -1848,6 +1873,11 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
         if (d == z) { vfmadd231ps(c,d,x,y); }
         else if (d != x && d != y) { vmovaps(c,d,z); vfmadd231ps(c,d,x,y); }
         else { vmovaps(c,scratch,z); vfmadd231ps(c,scratch,x,y); vmovaps(c,d,scratch); }
+        return 1;
+    case op_fms_half:
+        if (d == z) { vfnmadd231ps(c,d,x,y); }
+        else if (d != x && d != y) { vmovaps(c,d,z); vfnmadd231ps(c,d,x,y); }
+        else { vmovaps(c,scratch,z); vfnmadd231ps(c,scratch,x,y); vmovaps(c,d,scratch); }
         return 1;
 
     // Half bitwise: handled above with 32-bit bitwise (both YMM)
@@ -2482,9 +2512,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
             int8_t rd = -1;
             enum op op2 = inst->op;
-            _Bool destructive = op2==op_fma_f32 || op2==op_fma_half
+            _Bool fma2 = op2==op_fma_f32 || op2==op_fma_half
+                      || op2==op_fms_f32 || op2==op_fms_half;
+            _Bool destructive = fma2
                              || op2==op_sel_32  || op2==op_sel_16 || op2==op_sel_half;
-            _Bool fma2 = op2==op_fma_f32 || op2==op_fma_half;
 
             if (fma2 && z_dead)
                 { rd = ra_claim(ra, inst->z, i); z_dead = 0; }

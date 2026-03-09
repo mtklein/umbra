@@ -51,29 +51,28 @@ void umbra_entry(int n, void **ptrs) {
         float v5 = h2f(p1[i]);
         u16 v6 = (u16)((unsigned char*)ptrs[0])[i*4+3];
         float v7 = (float)(s16)v6;
-        float v8 = v1 * v7;
-        float v9 = v2 - v8;
-        float v10 = v5 * v9;
-        float v11 = v1 * v4 + v10;
-        p1[i] = f2h(v11);
+        float v8 = v2 - v1 * v7;
+        float v9 = v5 * v8;
+        float v10 = v1 * v4 + v9;
+        p1[i] = f2h(v10);
 
-        u16 v13 = (u16)((unsigned char*)ptrs[0])[i*4+1];
-        float v14 = (float)(s16)v13;
-        float v15 = h2f(p2[i]);
-        float v16 = v15 * v9;
-        float v17 = v1 * v14 + v16;
-        p2[i] = f2h(v17);
+        u16 v12 = (u16)((unsigned char*)ptrs[0])[i*4+1];
+        float v13 = (float)(s16)v12;
+        float v14 = h2f(p2[i]);
+        float v15 = v14 * v8;
+        float v16 = v1 * v13 + v15;
+        p2[i] = f2h(v16);
 
-        u16 v19 = (u16)((unsigned char*)ptrs[0])[i*4+2];
-        float v20 = (float)(s16)v19;
-        float v21 = h2f(p3[i]);
-        float v22 = v21 * v9;
-        float v23 = v1 * v20 + v22;
-        p3[i] = f2h(v23);
+        u16 v18 = (u16)((unsigned char*)ptrs[0])[i*4+2];
+        float v19 = (float)(s16)v18;
+        float v20 = h2f(p3[i]);
+        float v21 = v20 * v8;
+        float v22 = v1 * v19 + v21;
+        p3[i] = f2h(v22);
 
-        float v25 = h2f(p4[i]);
-        float v26 = v25 * v9;
-        float v27 = v1 * v7 + v26;
-        p4[i] = f2h(v27);
+        float v24 = h2f(p4[i]);
+        float v25 = v24 * v8;
+        float v26 = v1 * v7 + v25;
+        p4[i] = f2h(v26);
     }
 }

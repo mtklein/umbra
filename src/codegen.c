@@ -99,6 +99,9 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                 case op_fma_half:
                     emit(b, "%sfloat v%d = v%d * v%d + v%d;\n", pad, i, inst->x, inst->y, inst->z);
                     break;
+                case op_fms_half:
+                    emit(b, "%sfloat v%d = v%d - v%d * v%d;\n", pad, i, inst->z, inst->x, inst->y);
+                    break;
                 case op_and_half:
                     emit(b, "%sfloat v%d = u2f(f2u(v%d) & f2u(v%d));\n", pad, i, inst->x, inst->y);
                     break;
@@ -280,6 +283,10 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             case op_fma_f32:
                 emit(b, "%su32 v%d = f2u(u2f(v%d) * u2f(v%d) + u2f(v%d));\n",
                      pad, i, inst->x, inst->y, inst->z);
+                break;
+            case op_fms_f32:
+                emit(b, "%su32 v%d = f2u(u2f(v%d) - u2f(v%d) * u2f(v%d));\n",
+                     pad, i, inst->z, inst->x, inst->y);
                 break;
 
             case op_load_8x4: {

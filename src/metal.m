@@ -106,6 +106,9 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                 case op_fma_half:
                     emit(b, "%shalf v%d = fma(v%d, v%d, v%d);\n", pad, i, inst->x, inst->y, inst->z);
                     break;
+                case op_fms_half:
+                    emit(b, "%shalf v%d = v%d - v%d * v%d;\n", pad, i, inst->z, inst->x, inst->y);
+                    break;
                 case op_and_half:
                     emit(b, "%shalf v%d = as_type<half>((ushort)(as_type<ushort>(v%d) & as_type<ushort>(v%d)));\n",
                          pad, i, inst->x, inst->y);
@@ -236,6 +239,10 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             case op_fma_f32:
                 emit(b, "%suint v%d = as_type<uint>(fma(as_type<float>(v%d), as_type<float>(v%d), as_type<float>(v%d)));\n",
                      pad, i, inst->x, inst->y, inst->z);
+                break;
+            case op_fms_f32:
+                emit(b, "%suint v%d = as_type<uint>(as_type<float>(v%d) - as_type<float>(v%d) * as_type<float>(v%d));\n",
+                     pad, i, inst->z, inst->x, inst->y);
                 break;
 
             case op_add_i32: emit(b, "%suint v%d = v%d + v%d;\n", pad, i, inst->x, inst->y); break;
