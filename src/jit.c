@@ -392,10 +392,8 @@ static void evict_scratch(Buf *c, struct ra *ra, int *sl, int *ns) {
     }
 }
 
-// Get the hi register for a value, falling back to lo if not a pair.
-static int8_t hi(struct ra *ra, int val) {
-    return ra->reg_hi[val] >= 0 ? ra->reg_hi[val] : ra->reg[val];
-}
+// Alias for brevity.
+#define hi ra_hi
 
 static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                      int from, int to,
@@ -516,113 +514,85 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         switch (inst->op) {
         case op_lane: {
-            if (!scalar && ra->is_pair[i]) {
-                // K=8 vector: lo=[i,i+1,i+2,i+3], hi=[i+4,i+5,i+6,i+7]
-                int8_t rd = ra_alloc(ra, sl, ns);
-                int8_t rdh = ra_alloc(ra, sl, ns);
-                ra->reg[i] = rd; ra->reg_hi[i] = rdh;
-                ra->owner[(int)rd] = i; ra->owner[(int)rdh] = i;
-                put(c, DUP_4s_w(rd, XI));
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            if (s.rdh >= 0) {
+                put(c, DUP_4s_w(s.rd, XI));
                 put(c, MOVI_4s_0(0));
                 put(c, MOVZ_w(XT,1)); put(c, INS_s(0,1,XT));
                 put(c, MOVZ_w(XT,2)); put(c, INS_s(0,2,XT));
                 put(c, MOVZ_w(XT,3)); put(c, INS_s(0,3,XT));
-                put(c, ADD_4s(rd, rd, 0));
-                // hi = lo + [4,4,4,4]
+                put(c, ADD_4s(s.rd, s.rd, 0));
                 put(c, MOVZ_w(XT,4));
                 put(c, DUP_4s_w(0, XT));
-                put(c, ADD_4s(rdh, rd, 0));
+                put(c, ADD_4s(s.rdh, s.rd, 0));
             } else {
-                // scalar or preamble: single register
-                int8_t rd = ra_alloc(ra, sl, ns);
-                ra->reg[i] = rd; ra->owner[(int)rd] = i;
-                put(c, DUP_4s_w(rd, XI));
+                put(c, DUP_4s_w(s.rd, XI));
                 if (!scalar) {
                     put(c, MOVI_4s_0(0));
                     put(c, MOVZ_w(XT,1)); put(c, INS_s(0,1,XT));
                     put(c, MOVZ_w(XT,2)); put(c, INS_s(0,2,XT));
                     put(c, MOVZ_w(XT,3)); put(c, INS_s(0,3,XT));
-                    put(c, ADD_4s(rd, rd, 0));
+                    put(c, ADD_4s(s.rd, s.rd, 0));
                 }
             }
         } break;
 
         case op_load_32: {
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int p = inst->ptr;
             load_ptr(c, p, &last_ptr);
-            if (!scalar && ra->is_pair[i]) {
-                int8_t rd = ra_alloc(ra, sl, ns);
-                int8_t rdh = ra_alloc(ra, sl, ns);
-                ra->reg[i] = rd; ra->reg_hi[i] = rdh;
-                ra->owner[(int)rd] = i; ra->owner[(int)rdh] = i;
-                // LDP Qlo, Qhi, [base + XW]
+            if (s.rdh >= 0) {
                 put(c, ADD_xr(XT, XP, XW));
-                put(c, LDP_qi(rd, rdh, XT, 0));
+                put(c, LDP_qi(s.rd, s.rdh, XT, 0));
             } else {
-                int8_t rd = ra_alloc(ra, sl, ns);
-                ra->reg[i] = rd; ra->owner[(int)rd] = i;
-                if (scalar) put(c, LDR_sx(rd, XP, XI));
-                else        put(c, LDR_q(rd, XP, XW));
+                if (scalar) put(c, LDR_sx(s.rd, XP, XI));
+                else        put(c, LDR_q(s.rd, XP, XW));
             }
         } break;
 
         case op_load_16: case op_load_half: {
-            int8_t rd = ra_alloc(ra, sl, ns);
-            ra->reg[i] = rd; ra->owner[(int)rd] = i;
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int p = inst->ptr;
             load_ptr(c, p, &last_ptr);
-            if (scalar) {
-                put(c, LDR_hx(rd, XP, XI));
-            } else {
-                // K=8: 8 x 16-bit = 16 bytes = 1 Q register
-                put(c, LDR_q(rd, XP, XH));
-            }
+            if (scalar) put(c, LDR_hx(s.rd, XP, XI));
+            else        put(c, LDR_q(s.rd, XP, XH));
         } break;
 
         case op_uni_32: {
-            int8_t rd = ra_alloc(ra, sl, ns);
-            ra->reg[i] = rd; ra->owner[(int)rd] = i;
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int p = inst->ptr;
             load_ptr(c, p, &last_ptr);
             load_imm_w(c, XT, (uint32_t)inst->imm);
-            put(c, LDR_sx(rd, XP, XT));  // Sd = ptr[idx] (LSL#2)
-            // DUP Vd.4S, Vn.S[0] — broadcast scalar to all 4 lanes
-            put(c, 0x4E040400u | ((uint32_t)rd<<5) | (uint32_t)rd);
-            if (ra->is_pair[i]) {
-                int8_t rdh = ra_alloc(ra, sl, ns);
-                ra->reg_hi[i] = rdh; ra->owner[(int)rdh] = i;
-                put(c, 0x4EA01C00u | ((uint32_t)rd<<5) | (uint32_t)rdh); // MOV rdh=rd
+            put(c, LDR_sx(s.rd, XP, XT));
+            put(c, 0x4E040400u | ((uint32_t)s.rd<<5) | (uint32_t)s.rd);
+            if (s.rdh >= 0) {
+                put(c, 0x4EA01C00u | ((uint32_t)s.rd<<5) | (uint32_t)s.rdh);
             }
         } break;
 
         case op_uni_16: case op_uni_half: {
-            int8_t rd = ra_alloc(ra, sl, ns);
-            ra->reg[i] = rd; ra->owner[(int)rd] = i;
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int p = inst->ptr;
             load_ptr(c, p, &last_ptr);
             load_imm_w(c, XT, (uint32_t)inst->imm);
-            put(c, LDR_hx(rd, XP, XT));  // Hd = ptr[idx] (LSL#1)
-            // DUP Vd.8H, Vn.H[0]
-            put(c, W(0x0E020400u | ((uint32_t)rd<<5) | (uint32_t)rd));
+            put(c, LDR_hx(s.rd, XP, XT));
+            put(c, W(0x0E020400u | ((uint32_t)s.rd<<5) | (uint32_t)s.rd));
         } break;
 
         case op_gather_32: case op_gather_16: case op_gather_half: {
-            int8_t rd = ra_alloc(ra, sl, ns);
-            ra->reg[i] = rd; ra->owner[(int)rd] = i;
-            put(c, MOVI_4s_0(rd));
-            if (ra->is_pair[i]) {
-                int8_t rdh = ra_alloc(ra, sl, ns);
-                ra->reg_hi[i] = rdh; ra->owner[(int)rdh] = i;
-                put(c, MOVI_4s_0(rdh));
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            put(c, MOVI_4s_0(s.rd));
+            if (s.rdh >= 0) {
+                put(c, MOVI_4s_0(s.rdh));
             }
         } break;
 
         case op_store_32: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
+            int8_t ryh = hi(ra, inst->y);
             int p = inst->ptr;
             load_ptr(c, p, &last_ptr);
-            if (!scalar && ra->is_pair[inst->y]) {
-                int8_t ryh = ra->reg_hi[inst->y];
+            if (!scalar && ryh != ry) {
                 put(c, ADD_xr(XT, XP, XW));
                 put(c, STP_qi(ry, ryh, XT, 0));
             } else {
@@ -636,12 +606,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
             int p = inst->ptr;
             load_ptr(c, p, &last_ptr);
-            if (scalar) {
-                put(c, STR_hx(ry, XP, XI));
-            } else {
-                // K=8: Q register store
-                put(c, STR_q(ry, XP, XH));
-            }
+            if (scalar) put(c, STR_hx(ry, XP, XI));
+            else        put(c, STR_q(ry, XP, XH));
             if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
         } break;
 
@@ -744,215 +710,99 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         // Cross-width conversions between 32-bit (pairs) and 16-bit (single Q)
         case op_half_from_f32: {
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-            int8_t rxh = hi(ra, inst->x);
-            _Bool x_dead = lu[inst->x] <= i;
-            int8_t rd;
-            if (x_dead) {
-                rd = ra_claim(ra, inst->x, i);
-                // Pair freed, we keep lo; hi was freed by claim
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            if (!scalar && s.rxh != s.rx) {
+                put(c, FCVTN_4h(s.rd, s.rx));
+                put(c, W(FCVTN_4h(s.rd, s.rxh)));
             } else {
-                rd = ra_alloc(ra, sl, ns);
-                ra->reg[i] = rd; ra->owner[(int)rd] = i;
-            }
-            if (!scalar && rxh != rx) {
-                // Pair: FCVTN lo, FCVTN2 hi
-                put(c, FCVTN_4h(rd, rx));
-                put(c, W(FCVTN_4h(rd, rxh)));  // FCVTN2
-            } else {
-                put(c, FCVTN_4h(rd, rx));
+                put(c, FCVTN_4h(s.rd, s.rx));
             }
         } break;
 
         case op_f32_from_half: {
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-            _Bool x_dead = lu[inst->x] <= i;
-            if (!scalar && ra->is_pair[i]) {
-                int8_t rd = ra_alloc(ra, sl, ns);
-                int8_t rdh = ra_alloc(ra, sl, ns);
-                ra->reg[i] = rd; ra->reg_hi[i] = rdh;
-                ra->owner[(int)rd] = i; ra->owner[(int)rdh] = i;
-                put(c, FCVTL_4s(rd, rx));       // lo from lower 4H
-                put(c, W(FCVTL_4s(rdh, rx)));   // FCVTL2: hi from upper 4H
-                if (x_dead) ra_free_reg(ra, inst->x);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            if (s.rdh >= 0) {
+                put(c, FCVTL_4s(s.rd, s.rx));
+                put(c, W(FCVTL_4s(s.rdh, s.rx)));
             } else {
-                int8_t rd;
-                if (x_dead) { rd = ra_claim(ra, inst->x, i); }
-                else { rd = ra_alloc(ra, sl, ns); ra->reg[i] = rd; ra->owner[(int)rd] = i; }
-                put(c, FCVTL_4s(rd, rx));
+                put(c, FCVTL_4s(s.rd, s.rx));
             }
         } break;
 
         case op_half_from_i32: {
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-            int8_t rxh = hi(ra, inst->x);
-            _Bool x_dead = lu[inst->x] <= i;
-            int8_t rd;
-            if (x_dead) { rd = ra_claim(ra, inst->x, i); }
-            else { rd = ra_alloc(ra, sl, ns); ra->reg[i] = rd; ra->owner[(int)rd] = i; }
-            if (!scalar && rxh != rx) {
-                // SCVTF + FCVTN for lo, SCVTF + FCVTN2 for hi
-                put(c, SCVTF_4s(0, rx));
-                put(c, FCVTN_4h(rd, 0));
-                put(c, SCVTF_4s(0, rxh));
-                put(c, W(FCVTN_4h(rd, 0)));   // FCVTN2
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            if (!scalar && s.rxh != s.rx) {
+                put(c, SCVTF_4s(0, s.rx));
+                put(c, FCVTN_4h(s.rd, 0));
+                put(c, SCVTF_4s(0, s.rxh));
+                put(c, W(FCVTN_4h(s.rd, 0)));
             } else {
-                put(c, SCVTF_4s(0, rx));
-                put(c, FCVTN_4h(rd, 0));
+                put(c, SCVTF_4s(0, s.rx));
+                put(c, FCVTN_4h(s.rd, 0));
             }
         } break;
 
         case op_i32_from_half: {
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-            _Bool x_dead = lu[inst->x] <= i;
-            if (!scalar && ra->is_pair[i]) {
-                int8_t rd = ra_alloc(ra, sl, ns);
-                int8_t rdh = ra_alloc(ra, sl, ns);
-                ra->reg[i] = rd; ra->reg_hi[i] = rdh;
-                ra->owner[(int)rd] = i; ra->owner[(int)rdh] = i;
-                put(c, FCVTL_4s(rd, rx));       // widen lower 4H to 4S
-                put(c, FCVTZS_4s(rd, rd));      // convert to int
-                put(c, W(FCVTL_4s(rdh, rx)));   // FCVTL2: widen upper 4H
-                put(c, FCVTZS_4s(rdh, rdh));
-                if (x_dead) ra_free_reg(ra, inst->x);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            if (s.rdh >= 0) {
+                put(c, FCVTL_4s(s.rd, s.rx));
+                put(c, FCVTZS_4s(s.rd, s.rd));
+                put(c, W(FCVTL_4s(s.rdh, s.rx)));
+                put(c, FCVTZS_4s(s.rdh, s.rdh));
             } else {
-                int8_t rd;
-                if (x_dead) { rd = ra_claim(ra, inst->x, i); }
-                else { rd = ra_alloc(ra, sl, ns); ra->reg[i] = rd; ra->owner[(int)rd] = i; }
-                put(c, FCVTL_4s(0, rx));
-                put(c, FCVTZS_4s(rd, 0));
+                put(c, FCVTL_4s(0, s.rx));
+                put(c, FCVTZS_4s(s.rd, 0));
             }
         } break;
 
         case op_i16_from_i32: {
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-            int8_t rxh = hi(ra, inst->x);
-            _Bool x_dead = lu[inst->x] <= i;
-            int8_t rd;
-            if (x_dead) { rd = ra_claim(ra, inst->x, i); }
-            else { rd = ra_alloc(ra, sl, ns); ra->reg[i] = rd; ra->owner[(int)rd] = i; }
-            if (!scalar && rxh != rx) {
-                put(c, XTN_4h(rd, rx));
-                put(c, W(XTN_4h(rd, rxh)));   // XTN2
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            if (!scalar && s.rxh != s.rx) {
+                put(c, XTN_4h(s.rd, s.rx));
+                put(c, W(XTN_4h(s.rd, s.rxh)));
             } else {
-                put(c, XTN_4h(rd, rx));
+                put(c, XTN_4h(s.rd, s.rx));
             }
         } break;
 
         case op_i32_from_i16: {
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-            _Bool x_dead = lu[inst->x] <= i;
-            if (!scalar && ra->is_pair[i]) {
-                int8_t rd = ra_alloc(ra, sl, ns);
-                int8_t rdh = ra_alloc(ra, sl, ns);
-                ra->reg[i] = rd; ra->reg_hi[i] = rdh;
-                ra->owner[(int)rd] = i; ra->owner[(int)rdh] = i;
-                put(c, SXTL_4s(rd, rx));        // lo from lower 4H
-                put(c, W(SXTL_4s(rdh, rx)));    // SXTL2: hi from upper 4H
-                if (x_dead) ra_free_reg(ra, inst->x);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            if (s.rdh >= 0) {
+                put(c, SXTL_4s(s.rd, s.rx));
+                put(c, W(SXTL_4s(s.rdh, s.rx)));
             } else {
-                int8_t rd;
-                if (x_dead) { rd = ra_claim(ra, inst->x, i); }
-                else { rd = ra_alloc(ra, sl, ns); ra->reg[i] = rd; ra->owner[(int)rd] = i; }
-                put(c, SXTL_4s(rd, rx));
+                put(c, SXTL_4s(s.rd, s.rx));
             }
         } break;
 
         case op_shr_narrow_u32: {
-            // shr_narrow_u32: (u16)(u32 >> imm). Input x is 32-bit, output is 16-bit.
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
             int sh = inst->imm;
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-            int8_t rxh = hi(ra, inst->x);
-            _Bool x_dead = lu[inst->x] <= i;
-            int8_t rd;
-            if (x_dead) { rd = ra_claim(ra, inst->x, i); }
-            else { rd = ra_alloc(ra, sl, ns); ra->reg[i] = rd; ra->owner[(int)rd] = i; }
-            // Use SHRN for sh 1-16 directly; for sh 17-31, SHRN by 16 then 16-bit shift.
             int shrn_sh = sh <= 16 ? sh : 16;
             int extra   = sh - shrn_sh;
-            if (!scalar && rxh != rx) {
-                put(c, SHRN_4h(rd, rx, shrn_sh));
-                put(c, W(SHRN_4h(rd, rxh, shrn_sh)));
+            if (!scalar && s.rxh != s.rx) {
+                put(c, SHRN_4h(s.rd, s.rx, shrn_sh));
+                put(c, W(SHRN_4h(s.rd, s.rxh, shrn_sh)));
             } else {
-                put(c, SHRN_4h(rd, rx, shrn_sh));
+                put(c, SHRN_4h(s.rd, s.rx, shrn_sh));
             }
             if (extra) {
-                put(c, W(USHR_4h_imm(rd, rd, extra)));
+                put(c, W(USHR_4h_imm(s.rd, s.rd, extra)));
             }
         } break;
 
         default: {
-            enum op_type ot = op_type(inst->op);
-            _Bool pair = (ot == OP_32) && ra->is_pair[i] && !scalar;
-
-            int8_t rx = inst->x < i ? ra_ensure(ra, sl, ns, inst->x) : 0;
-            int8_t ry = inst->y < i ? ra_ensure(ra, sl, ns, inst->y) : 0;
-            int8_t rz = inst->z < i ? ra_ensure(ra, sl, ns, inst->z) : 0;
-            // Capture hi registers now, before claims/frees invalidate them.
-            int8_t rxh = inst->x < i ? hi(ra, inst->x) : 0;
-            int8_t ryh = inst->y < i ? hi(ra, inst->y) : 0;
-            int8_t rzh = inst->z < i ? hi(ra, inst->z) : 0;
-
-            _Bool x_dead = inst->x < i && lu[inst->x] <= i;
-            _Bool y_dead = inst->y < i && lu[inst->y] <= i;
-            _Bool z_dead = inst->z < i && lu[inst->z] <= i;
-            if (inst->y == inst->x) y_dead = 0;
-            if (inst->z == inst->x) z_dead = 0;
-            if (inst->z == inst->y) z_dead = 0;
-
-            int8_t rd = -1;
             enum op op = inst->op;
-            _Bool fma = op==op_fma_f32 || op==op_fma_half
-                     || op==op_fms_f32 || op==op_fms_half;
-            _Bool destructive = fma
-                             || op==op_sel_32  || op==op_sel_16 || op==op_sel_half;
-            if (fma && z_dead)
-                { rd = ra_claim(ra, inst->z, i); z_dead = 0; }
-            else if (fma && !z_dead) {
-                // Allocate rd before freeing x/y so it doesn't collide with rx/ry.
-                // This avoids the scratch+3-MOV path in emit_alu_reg.
-                rd = ra_alloc(ra, sl, ns);
-                ra->reg[i] = rd; ra->owner[(int)rd] = i;
+            _Bool arch_scratch = op==op_shr_u32 || op==op_shr_s32
+                              || op==op_shr_u16 || op==op_shr_s16;
+            struct ra_step s = ra_step_alu(ra, sl, ns, inst, i, scalar, arch_scratch);
+
+            emit_alu_reg(c, inst->op, s.rd, s.rx, s.ry, s.rz, inst->imm, s.scratch);
+            if (s.rdh >= 0) {
+                emit_alu_reg(c, inst->op, s.rdh, s.rxh, s.ryh, s.rzh, inst->imm, s.scratch);
             }
-            else if ((op==op_sel_32 || op==op_sel_16 || op==op_sel_half) && x_dead)
-                { rd = ra_claim(ra, inst->x, i); x_dead = 0; }
-
-            if (!destructive) {
-                if (rd < 0 && x_dead) { rd = ra_claim(ra, inst->x, i); x_dead = 0; }
-                if (rd < 0 && y_dead) { rd = ra_claim(ra, inst->y, i); y_dead = 0; }
-                if (rd < 0 && z_dead) { rd = ra_claim(ra, inst->z, i); z_dead = 0; }
-            }
-
-            if (x_dead) ra_free_reg(ra, inst->x);
-            if (y_dead) ra_free_reg(ra, inst->y);
-            if (z_dead) ra_free_reg(ra, inst->z);
-
-            if (rd < 0) {
-                rd = ra_alloc(ra, sl, ns);
-                ra->reg[i] = rd; ra->owner[(int)rd] = i;
-            }
-            if (pair && ra->reg_hi[i] < 0) {
-                int8_t rdh = ra_alloc(ra, sl, ns);
-                ra->reg_hi[i] = rdh; ra->owner[(int)rdh] = i;
-            }
-
-            _Bool needs_scratch = op==op_shr_u32 || op==op_shr_s32
-                               || op==op_shr_u16 || op==op_shr_s16
-                               || (fma && rd!=rz && (rd==rx || rd==ry));
-            int8_t scratch_reg = -1;
-            if (needs_scratch) {
-                scratch_reg = ra_alloc(ra, sl, ns);
-            }
-
-            emit_alu_reg(c, inst->op, rd, rx, ry, rz, inst->imm, scratch_reg);
-
-            if (pair) {
-                int8_t rdh = ra->reg_hi[i];
-                emit_alu_reg(c, inst->op, rdh, rxh, ryh, rzh, inst->imm, scratch_reg);
-            }
-
-            if (scratch_reg >= 0) {
-                ra->free_stack[ra->nfree++] = scratch_reg;
+            if (s.scratch >= 0) {
+                ra->free_stack[ra->nfree++] = s.scratch;
             }
         } break;
         }
@@ -1828,19 +1678,15 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         struct bb_inst const *inst = &bb->inst[i];
         switch (inst->op) {
         case op_lane: {
-            int8_t rd = ra_alloc(ra, sl, ns);
-            ra->reg[i] = rd; ra->owner[(int)rd] = i;
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             if (scalar) {
-                vex(c, 1, 1, 0, 0, rd, 0, XI, 0x6E);   // VMOVD xmm_rd, R10d
+                vex(c, 1, 1, 0, 0, s.rd, 0, XI, 0x6E);
             } else {
-                // ymm_rd = broadcast(R10d) + [0,1,2,3,4,5,6,7]
-                vex(c, 1, 1, 0, 0, rd, 0, XI, 0x6E);   // VMOVD xmm_rd, r10d
-                vbroadcastss(c, rd, rd);
-
-                // Build [0..7] on stack, load into ymm0
+                vex(c, 1, 1, 0, 0, s.rd, 0, XI, 0x6E);
+                vbroadcastss(c, s.rd, s.rd);
                 sub_ri(c, RSP, 32);
                 for (int k = 0; k < 8; k++) {
-                    emit1(c, 0xC7);                      // MOV dword [RSP+k*4], k
+                    emit1(c, 0xC7);
                     if (k == 0) {
                         emit1(c, 0x04); emit1(c, 0x24);
                     } else {
@@ -1848,28 +1694,24 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     }
                     emit4(c, (uint32_t)k);
                 }
-                vfill(c, 0, 0);                          // VMOVDQU ymm0, [RSP]
-                vpaddd(c, rd, rd, 0);
+                vfill(c, 0, 0);
+                vpaddd(c, s.rd, s.rd, 0);
                 add_ri(c, RSP, 32);
             }
         } break;
 
         case op_load_32: {
-            int8_t rd = ra_alloc(ra, sl, ns);
-            ra->reg[i] = rd; ra->owner[(int)rd] = i;
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int p = inst->ptr;
             if (scalar) {
-                // VMOVD xmm, [base + R10*4]
-                vex_mem(c, 1, 1, 0, 0, rd, 0, 0x6E, load_ptr_x86(c, p, &last_ptr), XI, 4, 0);
+                vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6E, load_ptr_x86(c, p, &last_ptr), XI, 4, 0);
             } else {
-                // VMOVDQU ymm, [base + R10*4]
-                vmov_load(c, 1, rd, load_ptr_x86(c, p, &last_ptr), XI, 4, 0);
+                vmov_load(c, 1, s.rd, load_ptr_x86(c, p, &last_ptr), XI, 4, 0);
             }
         } break;
 
         case op_load_16: {
-            int8_t rd = ra_alloc(ra, sl, ns);
-            ra->reg[i] = rd; ra->owner[(int)rd] = i;
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int p = inst->ptr;
             if (scalar) {
                 // MOVZX eax, word [base + R10*2]; VMOVD xmm, eax
@@ -1883,16 +1725,15 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     emit1(c, (uint8_t)(((RAX&7)<<3) | 4));
                     emit1(c, (uint8_t)((1<<6) | ((XI&7)<<3) | (base&7)));
                 }
-                vex(c, 1, 1, 0, 0, rd, 0, RAX, 0x6E);
+                vex(c, 1, 1, 0, 0, s.rd, 0, RAX, 0x6E);
             } else {
                 // VMOVDQU xmm, [base + R10*2] — 8 × 16-bit = 16 bytes
-                vmov_load(c, 0, rd, load_ptr_x86(c, p, &last_ptr), XI, 2, 0);
+                vmov_load(c, 0, s.rd, load_ptr_x86(c, p, &last_ptr), XI, 2, 0);
             }
         } break;
 
         case op_load_half: {
-            int8_t rd = ra_alloc(ra, sl, ns);
-            ra->reg[i] = rd; ra->owner[(int)rd] = i;
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int p = inst->ptr;
             if (scalar) {
                 // Load single fp16, convert to f32
@@ -1908,11 +1749,11 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     emit1(c, (uint8_t)((1<<6) | ((XI&7)<<3) | (base&7)));
                 }
                 vex(c, 1, 1, 0, 0, 0, 0, RAX, 0x6E);   // VMOVD xmm0, eax
-                vcvtph2ps(c, rd, 0);                      // VCVTPH2PS xmm_rd, xmm0
+                vcvtph2ps(c, s.rd, 0);                      // VCVTPH2PS xmm_rd, xmm0
             } else {
                 // Load 8 × fp16 = 16 bytes into xmm, then VCVTPH2PS to ymm
                 vmov_load(c, 0, 0, load_ptr_x86(c, p, &last_ptr), XI, 2, 0);  // xmm0
-                vcvtph2ps(c, rd, 0);                         // ymm_rd
+                vcvtph2ps(c, s.rd, 0);                         // ymm_rd
             }
         } break;
 
@@ -1981,15 +1822,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         } break;
 
         case op_uni_32: {
-            int8_t rd = ra_alloc(ra, sl, ns);
-            ra->reg[i] = rd; ra->owner[(int)rd] = i;
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int p = inst->ptr;
             int base = load_ptr_x86(c, p, &last_ptr);
             int disp = inst->imm * 4;
             // VBROADCASTSS ymm_rd, dword [base + disp]
             // VEX.256.66.0F38 18 /r with memory operand
             {
-                uint8_t R = (uint8_t)(~rd >> 3) & 1;
+                uint8_t R = (uint8_t)(~s.rd >> 3) & 1;
                 uint8_t B = (uint8_t)(~base >> 3) & 1;
                 // 3-byte VEX: C4 RXBmmmmm WvvvvLpp
                 emit1(c, 0xC4);
@@ -1997,14 +1837,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 emit1(c, (uint8_t)(0x7D));  // W=0, vvvv=1111, L=1(256), pp=01 → 0.1111.1.01=0x7D
                 emit1(c, 0x18);
                 if (disp == 0 && (base & 7) != RBP) {
-                    emit1(c, (uint8_t)(((rd & 7) << 3) | (base & 7)));
+                    emit1(c, (uint8_t)(((s.rd & 7) << 3) | (base & 7)));
                     if ((base & 7) == RSP) emit1(c, 0x24);
                 } else if (disp >= -128 && disp <= 127) {
-                    emit1(c, (uint8_t)(0x40 | ((rd & 7) << 3) | (base & 7)));
+                    emit1(c, (uint8_t)(0x40 | ((s.rd & 7) << 3) | (base & 7)));
                     if ((base & 7) == RSP) emit1(c, 0x24);
                     emit1(c, (uint8_t)disp);
                 } else {
-                    emit1(c, (uint8_t)(0x80 | ((rd & 7) << 3) | (base & 7)));
+                    emit1(c, (uint8_t)(0x80 | ((s.rd & 7) << 3) | (base & 7)));
                     if ((base & 7) == RSP) emit1(c, 0x24);
                     emit4(c, (uint32_t)disp);
                 }
@@ -2012,8 +1852,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         } break;
 
         case op_uni_16: {
-            int8_t rd = ra_alloc(ra, sl, ns);
-            ra->reg[i] = rd; ra->owner[(int)rd] = i;
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int p = inst->ptr;
             int base = load_ptr_x86(c, p, &last_ptr);
             // MOVZX eax, word [base + imm*2]
@@ -2035,12 +1874,11 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             // VMOVD xmm0, eax
             vex(c, 1, 1, 0, 0, 0, 0, RAX, 0x6E);
             // VPBROADCASTW xmm_rd, xmm0
-            vex_rr(c, 1, 2, 0, 0x79, rd, 0);
+            vex_rr(c, 1, 2, 0, 0x79, s.rd, 0);
         } break;
 
         case op_uni_half: {
-            int8_t rd = ra_alloc(ra, sl, ns);
-            ra->reg[i] = rd; ra->owner[(int)rd] = i;
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int p = inst->ptr;
             int base = load_ptr_x86(c, p, &last_ptr);
             // MOVZX eax, word [base + imm*2]
@@ -2062,13 +1900,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             // VMOVD xmm0, eax; VPBROADCASTW xmm0, xmm0; VCVTPH2PS ymm_rd, xmm0
             vex(c, 1, 1, 0, 0, 0, 0, RAX, 0x6E);
             vex_rr(c, 1, 2, 0, 0x79, 0, 0);
-            vcvtph2ps(c, rd, 0);
+            vcvtph2ps(c, s.rd, 0);
         } break;
 
         case op_gather_32: case op_gather_16: case op_gather_half: {
-            int8_t rd = ra_alloc(ra, sl, ns);
-            ra->reg[i] = rd; ra->owner[(int)rd] = i;
-            vpxor(c, 1, rd, rd, rd);
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            vpxor(c, 1, s.rd, s.rd, s.rd);
         } break;
 
         case op_scatter_32: case op_scatter_16: case op_scatter_half: {
@@ -2210,142 +2047,59 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         // Halfs are carried as f32 in YMM. Round to fp16 precision via VCVTPS2PH+VCVTPH2PS.
         case op_half_from_f32: {
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-            _Bool x_dead = lu[inst->x] <= i;
-            int8_t rd;
-            if (x_dead) { rd = ra_claim(ra, inst->x, i); }
-            else { rd = ra_alloc(ra, sl, ns); ra->reg[i] = rd; ra->owner[(int)rd] = i; }
-            // Round to fp16 precision: f32 → fp16 → f32
-            vcvtps2ph(c, 0, rx, 4);   // xmm0 = fp16
-            vcvtph2ps(c, rd, 0);      // ymm_rd = f32
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            vcvtps2ph(c, 0, s.rx, 4);
+            vcvtph2ps(c, s.rd, 0);
         } break;
 
         case op_f32_from_half: {
-            // Half is already f32 in YMM. This is a no-op (or just a move).
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-            _Bool x_dead = lu[inst->x] <= i;
-            int8_t rd;
-            if (x_dead) { rd = ra_claim(ra, inst->x, i); }
-            else { rd = ra_alloc(ra, sl, ns); ra->reg[i] = rd; ra->owner[(int)rd] = i; }
-            if (rd != rx) vmovaps(c, rd, rx);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            if (s.rd != s.rx) vmovaps(c, s.rd, s.rx);
         } break;
 
         case op_half_from_i32: {
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-            _Bool x_dead = lu[inst->x] <= i;
-            int8_t rd;
-            if (x_dead) { rd = ra_claim(ra, inst->x, i); }
-            else { rd = ra_alloc(ra, sl, ns); ra->reg[i] = rd; ra->owner[(int)rd] = i; }
-            vcvtdq2ps(c, rd, rx);     // i32 → f32
-            // Round through fp16 for precision
-            vcvtps2ph(c, 0, rd, 4);
-            vcvtph2ps(c, rd, 0);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            vcvtdq2ps(c, s.rd, s.rx);
+            vcvtps2ph(c, 0, s.rd, 4);
+            vcvtph2ps(c, s.rd, 0);
         } break;
 
         case op_i32_from_half: {
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-            _Bool x_dead = lu[inst->x] <= i;
-            int8_t rd;
-            if (x_dead) { rd = ra_claim(ra, inst->x, i); }
-            else { rd = ra_alloc(ra, sl, ns); ra->reg[i] = rd; ra->owner[(int)rd] = i; }
-            vcvttps2dq(c, rd, rx);    // f32 → i32
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            vcvttps2dq(c, s.rd, s.rx);
         } break;
 
         case op_i16_from_i32: {
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-            _Bool x_dead = lu[inst->x] <= i;
-            int8_t rd;
-            if (x_dead) { rd = ra_claim(ra, inst->x, i); }
-            else { rd = ra_alloc(ra, sl, ns); ra->reg[i] = rd; ra->owner[(int)rd] = i; }
-            // Narrow 8×i32 in YMM → 8×i16 in XMM
-            // VEXTRACTI128 + VPACKSSDW
-            vextracti128(c, 0, rx, 1);         // xmm0 = hi 4 dwords
-            vex_rrr(c, 1, 1, 0, 0x6B, rd, rx, 0);  // VPACKSSDW xmm_rd, xmm_rx, xmm0
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            vextracti128(c, 0, s.rx, 1);
+            vex_rrr(c, 1, 1, 0, 0x6B, s.rd, s.rx, 0);
         } break;
 
         case op_shr_narrow_u32: {
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-            _Bool x_dead = lu[inst->x] <= i;
-            int8_t rd;
-            if (x_dead) { rd = ra_claim(ra, inst->x, i); }
-            else { rd = ra_alloc(ra, sl, ns); ra->reg[i] = rd; ra->owner[(int)rd] = i; }
-            // Shift 8×u32 right by imm, then narrow to 8×u16
-            // VPSRLD + VEXTRACTI128 + VPACKSSDW
-            vpsrld_i(c, 0, rx, (uint8_t)inst->imm);
-            vextracti128(c, 1, 0, 1);               // xmm1 = hi 4 dwords of shifted
-            vex_rrr(c, 1, 1, 0, 0x6B, rd, 0, 1);   // VPACKSSDW xmm_rd, xmm0, xmm1
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            vpsrld_i(c, 0, s.rx, (uint8_t)inst->imm);
+            vextracti128(c, 1, 0, 1);
+            vex_rrr(c, 1, 1, 0, 0x6B, s.rd, 0, 1);
         } break;
 
         case op_i32_from_i16: {
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-            _Bool x_dead = lu[inst->x] <= i;
-            int8_t rd;
-            if (x_dead) { rd = ra_claim(ra, inst->x, i); }
-            else { rd = ra_alloc(ra, sl, ns); ra->reg[i] = rd; ra->owner[(int)rd] = i; }
-            // Widen 8×i16 in XMM → 8×i32 in YMM
-            vpmovsxwd(c, rd, rx);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            vpmovsxwd(c, s.rd, s.rx);
         } break;
 
         default: {
-            // Generic ALU ops
-            int8_t rx = inst->x < i ? ra_ensure(ra, sl, ns, inst->x) : 0;
-            int8_t ry = inst->y < i ? ra_ensure(ra, sl, ns, inst->y) : 0;
-            int8_t rz = inst->z < i ? ra_ensure(ra, sl, ns, inst->z) : 0;
-
-            _Bool x_dead = inst->x < i && lu[inst->x] <= i;
-            _Bool y_dead = inst->y < i && lu[inst->y] <= i;
-            _Bool z_dead = inst->z < i && lu[inst->z] <= i;
-            if (inst->y == inst->x) y_dead = 0;
-            if (inst->z == inst->x) z_dead = 0;
-            if (inst->z == inst->y) z_dead = 0;
-
-            int8_t rd = -1;
             enum op op2 = inst->op;
-            _Bool fma2 = op2==op_fma_f32 || op2==op_fma_half
-                      || op2==op_fms_f32 || op2==op_fms_half;
-            _Bool destructive = fma2
-                             || op2==op_sel_32  || op2==op_sel_16 || op2==op_sel_half;
+            _Bool arch_scratch = op2==op_sel_32 || op2==op_sel_16 || op2==op_sel_half
+                              || op2==op_le_s32
+                              || op2==op_lt_u32 || op2==op_le_u32
+                              || op2==op_le_s16
+                              || op2==op_lt_u16 || op2==op_le_u16;
+            struct ra_step s = ra_step_alu(ra, sl, ns, inst, i, scalar, arch_scratch);
 
-            if (fma2 && z_dead)
-                { rd = ra_claim(ra, inst->z, i); z_dead = 0; }
-            else if (fma2 && !z_dead) {
-                rd = ra_alloc(ra, sl, ns);
-                ra->reg[i] = rd; ra->owner[(int)rd] = i;
-            }
-            else if ((op2==op_sel_32 || op2==op_sel_16 || op2==op_sel_half) && x_dead)
-                { rd = ra_claim(ra, inst->x, i); x_dead = 0; }
-
-            if (!destructive) {
-                if (rd < 0 && x_dead) { rd = ra_claim(ra, inst->x, i); x_dead = 0; }
-                if (rd < 0 && y_dead) { rd = ra_claim(ra, inst->y, i); y_dead = 0; }
-                if (rd < 0 && z_dead) { rd = ra_claim(ra, inst->z, i); z_dead = 0; }
-            }
-
-            if (rd < 0) {
-                rd = ra_alloc(ra, sl, ns);
-                ra->reg[i] = rd; ra->owner[(int)rd] = i;
-            }
-
-            _Bool needs_scratch = op2==op_sel_32 || op2==op_sel_16 || op2==op_sel_half
-                               || op2==op_le_s32
-                               || op2==op_lt_u32 || op2==op_le_u32
-                               || op2==op_le_s16
-                               || op2==op_lt_u16 || op2==op_le_u16
-                               || (fma2 && rd!=rz && (rd==rx || rd==ry));
-            int8_t scratch_reg = -1;
-            if (needs_scratch) {
-                scratch_reg = ra_alloc(ra, sl, ns);
-            }
-
-            // Free dead inputs AFTER allocating scratch to prevent alias
-            if (x_dead) ra_free_reg(ra, inst->x);
-            if (y_dead) ra_free_reg(ra, inst->y);
-            if (z_dead) ra_free_reg(ra, inst->z);
-
-            emit_alu_reg(c, inst->op, rd, rx, ry, rz, inst->imm, scratch_reg >= 0 ? scratch_reg : 0);
-
-            if (scratch_reg >= 0) {
-                ra->free_stack[ra->nfree++] = scratch_reg;
+            emit_alu_reg(c, inst->op, s.rd, s.rx, s.ry, s.rz, inst->imm,
+                         s.scratch >= 0 ? s.scratch : 0);
+            if (s.scratch >= 0) {
+                ra->free_stack[ra->nfree++] = s.scratch;
             }
         } break;
         }

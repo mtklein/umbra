@@ -30,3 +30,30 @@ void       ra_free_reg(struct ra *ra, int val);
 int8_t     ra_alloc  (struct ra *ra, int *sl, int *ns);
 int8_t     ra_ensure (struct ra *ra, int *sl, int *ns, int val);
 int8_t     ra_claim  (struct ra *ra, int old_val, int new_val);
+
+static inline int8_t ra_hi(struct ra const *ra, int val) {
+    return ra->reg_hi[val] >= 0 ? ra->reg_hi[val] : ra->reg[val];
+}
+
+struct ra_step {
+    int8_t rd, rdh;
+    int8_t rx, ry, rz;
+    int8_t rxh, ryh, rzh;
+    int8_t scratch;
+    int8_t :8;
+};
+
+// Allocate output register(s) for instruction i (no inputs).
+struct ra_step ra_step_alloc(struct ra *ra, int *sl, int *ns, int i);
+
+// Unary conversion: ensure x, claim rd if x dead, else alloc rd.
+// Handles pair narrowing (32→16) and widening (16→32).
+struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns,
+                             struct bb_inst const *inst, int i, _Bool scalar);
+
+// Full ALU: ensure x/y/z, dead analysis, claim/alloc rd,
+// alloc scratch if arch_scratch, free dead inputs.
+// FMA accumulator targeting and sel mask claiming are handled internally.
+struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns,
+                           struct bb_inst const *inst, int i, _Bool scalar,
+                           _Bool arch_scratch);

@@ -129,3 +129,129 @@ int8_t ra_claim(struct ra *ra, int old_val, int new_val) {
     }
     return r;
 }
+
+static struct ra_step step0(void) {
+    return (struct ra_step){ .rd=-1,.rdh=-1, .rx=-1,.ry=-1,.rz=-1,
+                             .rxh=-1,.ryh=-1,.rzh=-1, .scratch=-1 };
+}
+
+struct ra_step ra_step_alloc(struct ra *ra, int *sl, int *ns, int i) {
+    struct ra_step s = step0();
+    s.rd = ra_alloc(ra, sl, ns);
+    ra->reg[i] = s.rd; ra->owner[(int)s.rd] = i;
+    if (ra->is_pair[i]) {
+        s.rdh = ra_alloc(ra, sl, ns);
+        ra->reg_hi[i] = s.rdh; ra->owner[(int)s.rdh] = i;
+    }
+    return s;
+}
+
+struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns,
+                             struct bb_inst const *inst, int i, _Bool scalar) {
+    struct ra_step s = step0();
+    s.rx = ra_ensure(ra, sl, ns, inst->x);
+    s.rxh = ra_hi(ra, inst->x);
+    _Bool x_dead = ra->last_use[inst->x] <= i;
+
+    _Bool out_pair  = ra->is_pair[i] && !scalar;
+    _Bool in_pair   = ra->is_pair[inst->x] && !scalar;
+
+    if (out_pair && !in_pair) {
+        // Widening (16→32): can't claim (need 2 regs from 1). Alloc both.
+        s.rd  = ra_alloc(ra, sl, ns);
+        s.rdh = ra_alloc(ra, sl, ns);
+        ra->reg[i] = s.rd; ra->reg_hi[i] = s.rdh;
+        ra->owner[(int)s.rd] = i; ra->owner[(int)s.rdh] = i;
+        if (x_dead) ra_free_reg(ra, inst->x);
+    } else if (x_dead) {
+        s.rd = ra_claim(ra, inst->x, i);
+        s.rdh = ra->reg_hi[i];
+        // For narrowing (pair→single), free the unneeded hi register.
+        if (in_pair && !out_pair && s.rdh >= 0) {
+            ra->free_stack[ra->nfree++] = s.rdh;
+            ra->owner[(int)s.rdh] = -1;
+            ra->reg_hi[i] = -1;
+            s.rdh = -1;
+        }
+    } else {
+        s.rd = ra_alloc(ra, sl, ns);
+        ra->reg[i] = s.rd; ra->owner[(int)s.rd] = i;
+        if (out_pair) {
+            s.rdh = ra_alloc(ra, sl, ns);
+            ra->reg_hi[i] = s.rdh; ra->owner[(int)s.rdh] = i;
+        }
+    }
+    return s;
+}
+
+struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns,
+                           struct bb_inst const *inst, int i, _Bool scalar,
+                           _Bool arch_scratch) {
+    int *lu = ra->last_use;
+    struct ra_step s = step0();
+    _Bool pair = ra->is_pair[i] && !scalar;
+
+    // 1. Ensure inputs.
+    s.rx = inst->x < i ? ra_ensure(ra, sl, ns, inst->x) : 0;
+    s.ry = inst->y < i ? ra_ensure(ra, sl, ns, inst->y) : 0;
+    s.rz = inst->z < i ? ra_ensure(ra, sl, ns, inst->z) : 0;
+    s.rxh = inst->x < i ? ra_hi(ra, inst->x) : 0;
+    s.ryh = inst->y < i ? ra_hi(ra, inst->y) : 0;
+    s.rzh = inst->z < i ? ra_hi(ra, inst->z) : 0;
+
+    // 2. Dead analysis (prevent double-free of aliased operands).
+    _Bool x_dead = inst->x < i && lu[inst->x] <= i;
+    _Bool y_dead = inst->y < i && lu[inst->y] <= i;
+    _Bool z_dead = inst->z < i && lu[inst->z] <= i;
+    if (inst->y == inst->x) y_dead = 0;
+    if (inst->z == inst->x) z_dead = 0;
+    if (inst->z == inst->y) z_dead = 0;
+
+    // 3. Claim/alloc rd with op-specific preferences.
+    enum op op = inst->op;
+    _Bool fma = op==op_fma_f32 || op==op_fma_half
+             || op==op_fms_f32 || op==op_fms_half;
+    _Bool destructive = fma
+                     || op==op_sel_32 || op==op_sel_16 || op==op_sel_half;
+
+    if (fma && z_dead)
+        { s.rd = ra_claim(ra, inst->z, i); z_dead = 0; }
+    else if (fma && !z_dead) {
+        // Pre-allocate rd to avoid rd aliasing rx/ry (avoids scratch+3-MOV path).
+        s.rd = ra_alloc(ra, sl, ns);
+        ra->reg[i] = s.rd; ra->owner[(int)s.rd] = i;
+    }
+    else if ((op==op_sel_32 || op==op_sel_16 || op==op_sel_half) && x_dead)
+        { s.rd = ra_claim(ra, inst->x, i); x_dead = 0; }
+
+    if (!destructive) {
+        if (s.rd < 0 && x_dead) { s.rd = ra_claim(ra, inst->x, i); x_dead = 0; }
+        if (s.rd < 0 && y_dead) { s.rd = ra_claim(ra, inst->y, i); y_dead = 0; }
+        if (s.rd < 0 && z_dead) { s.rd = ra_claim(ra, inst->z, i); z_dead = 0; }
+    }
+
+    // 4. Alloc rd if not yet assigned.
+    if (s.rd < 0) {
+        s.rd = ra_alloc(ra, sl, ns);
+        ra->reg[i] = s.rd; ra->owner[(int)s.rd] = i;
+    }
+    if (pair && ra->reg_hi[i] < 0) {
+        s.rdh = ra_alloc(ra, sl, ns);
+        ra->reg_hi[i] = s.rdh; ra->owner[(int)s.rdh] = i;
+    } else if (pair) {
+        s.rdh = ra->reg_hi[i];
+    }
+
+    // 5. Scratch allocation (before freeing dead inputs to prevent aliasing).
+    _Bool fma_scratch = fma && s.rd != s.rz && (s.rd == s.rx || s.rd == s.ry);
+    if (arch_scratch || fma_scratch) {
+        s.scratch = ra_alloc(ra, sl, ns);
+    }
+
+    // 6. Free dead inputs.
+    if (x_dead) ra_free_reg(ra, inst->x);
+    if (y_dead) ra_free_reg(ra, inst->y);
+    if (z_dead) ra_free_reg(ra, inst->z);
+
+    return s;
+}
