@@ -192,7 +192,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     }
 }
 
-// Register allocator: v4-v7,v16-v31 in initial pool; v0-v3 injected after LD4.
+// Register allocator: v4-v7,v16-v31 in pool; v0-v3 reserved for LD4/ST4.
 static const int8_t ra_pool[] = {4,5,6,7,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31};
 #define RA_NREGS 20
 
