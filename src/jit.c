@@ -203,7 +203,26 @@ static uint32_t ST1_b(int t, int idx, int n) {
 // XTN Vd.8B, Vn.8H (narrow i16->i8)
 static uint32_t XTN_8b(int d, int n) { return 0x0E212800u | ((uint32_t)n<<5) | (uint32_t)d; }
 
-static uint32_t MOVI_4s_0(int d) { return 0x4F000400u|(uint32_t)d; }
+// MOVI Vd.4S, #imm8{, LSL #shift}  — shift=0,8,16,24 → cmode=0,2,4,6
+static uint32_t MOVI_4s(int d, uint8_t imm8, int shift) {
+    int cmode = (shift/8) * 2;
+    uint32_t abc = (imm8 >> 5) & 7, defgh = imm8 & 0x1F;
+    return 0x4F000400u | (abc<<16) | ((uint32_t)cmode<<12) | (defgh<<5) | (uint32_t)d;
+}
+// MVNI Vd.4S, #imm8{, LSL #shift}  — NOT of MOVI
+static uint32_t MVNI_4s(int d, uint8_t imm8, int shift) {
+    return MOVI_4s(d, imm8, shift) | (1u<<29);  // op=1
+}
+// MOVI Vd.8H, #imm8{, LSL #shift}  — shift=0,8 → cmode=8,10
+static uint32_t MOVI_8h(int d, uint8_t imm8, int shift) {
+    int cmode = 8 + (shift/8) * 2;
+    uint32_t abc = (imm8 >> 5) & 7, defgh = imm8 & 0x1F;
+    return 0x4F000400u | (abc<<16) | ((uint32_t)cmode<<12) | (defgh<<5) | (uint32_t)d;
+}
+// MVNI Vd.8H, #imm8{, LSL #shift}
+static uint32_t MVNI_8h(int d, uint8_t imm8, int shift) {
+    return MOVI_8h(d, imm8, shift) | (1u<<29);
+}
 static uint32_t DUP_4s_w(int d, int n)  { return 0x4E040C00u|((uint32_t)n<<5)|(uint32_t)d; }
 static uint32_t DUP_4h_w(int d, int n)  { return 0x0E020C00u|((uint32_t)n<<5)|(uint32_t)d; }
 
@@ -240,10 +259,27 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     switch (op) {
     case op_imm_32: {
         uint32_t v=(uint32_t)imm;
-        if (v==0) { put(c, MOVI_4s_0(d)); }
+        if      (v == 0)                          { put(c, MOVI_4s(d, 0, 0)); }
+        else if (v == (v & 0x000000FFu))          { put(c, MOVI_4s(d, (uint8_t)v,  0)); }
+        else if (v == (v & 0x0000FF00u))          { put(c, MOVI_4s(d, (uint8_t)(v>> 8),  8)); }
+        else if (v == (v & 0x00FF0000u))          { put(c, MOVI_4s(d, (uint8_t)(v>>16), 16)); }
+        else if (v == (v & 0xFF000000u))          { put(c, MOVI_4s(d, (uint8_t)(v>>24), 24)); }
+        else if ((~v) == ((~v) & 0x000000FFu))    { put(c, MVNI_4s(d, (uint8_t)~v,  0)); }
+        else if ((~v) == ((~v) & 0x0000FF00u))    { put(c, MVNI_4s(d, (uint8_t)(~v>> 8),  8)); }
+        else if ((~v) == ((~v) & 0x00FF0000u))    { put(c, MVNI_4s(d, (uint8_t)(~v>>16), 16)); }
+        else if ((~v) == ((~v) & 0xFF000000u))    { put(c, MVNI_4s(d, (uint8_t)(~v>>24), 24)); }
         else { load_imm_w(c,XT,v); put(c, DUP_4s_w(d,XT)); }
     } return 1;
-    case op_imm_16: case op_imm_half:
+    case op_imm_16: {
+        uint16_t v=(uint16_t)imm;
+        if      (v == 0)                     { put(c, W(MOVI_8h(d, 0, 0))); }
+        else if (v == (v & 0x00FFu))         { put(c, W(MOVI_8h(d, (uint8_t)v, 0))); }
+        else if (v == (v & 0xFF00u))         { put(c, W(MOVI_8h(d, (uint8_t)(v>>8), 8))); }
+        else if ((uint16_t)~v == ((uint16_t)~v & 0x00FFu)) { put(c, W(MVNI_8h(d, (uint8_t)~v, 0))); }
+        else if ((uint16_t)~v == ((uint16_t)~v & 0xFF00u)) { put(c, W(MVNI_8h(d, (uint8_t)(~v>>8), 8))); }
+        else { put(c, MOVZ_w(XT,v)); put(c, W(DUP_4h_w(d,XT))); }
+    } return 1;
+    case op_imm_half:
         put(c, MOVZ_w(XT,(uint16_t)imm));
         put(c, W(DUP_4h_w(d,XT)));
         return 1;
@@ -517,7 +553,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             if (s.rdh >= 0) {
                 put(c, DUP_4s_w(s.rd, XI));
-                put(c, MOVI_4s_0(0));
+                put(c, MOVI_4s(0, 0, 0));
                 put(c, MOVZ_w(XT,1)); put(c, INS_s(0,1,XT));
                 put(c, MOVZ_w(XT,2)); put(c, INS_s(0,2,XT));
                 put(c, MOVZ_w(XT,3)); put(c, INS_s(0,3,XT));
@@ -528,7 +564,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             } else {
                 put(c, DUP_4s_w(s.rd, XI));
                 if (!scalar) {
-                    put(c, MOVI_4s_0(0));
+                    put(c, MOVI_4s(0, 0, 0));
                     put(c, MOVZ_w(XT,1)); put(c, INS_s(0,1,XT));
                     put(c, MOVZ_w(XT,2)); put(c, INS_s(0,2,XT));
                     put(c, MOVZ_w(XT,3)); put(c, INS_s(0,3,XT));
@@ -581,9 +617,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         case op_gather_32: case op_gather_16: case op_gather_half: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            put(c, MOVI_4s_0(s.rd));
+            put(c, MOVI_4s(s.rd, 0, 0));
             if (s.rdh >= 0) {
-                put(c, MOVI_4s_0(s.rdh));
+                put(c, MOVI_4s(s.rdh, 0, 0));
             }
         } break;
 
@@ -1196,30 +1232,43 @@ static void vpxor(Buf *b, int L, int d, int v, int s) { vex_rrr(b,1,1,L,0xEF,d,v
 // VBROADCASTSS ymm, xmm  — VEX.256.66.0F38 18 /r (from reg: VEX.W=0)
 static void vbroadcastss(Buf *b, int d, int s) { vex_rrr(b,1,2,1,0x18,d,0,s); }
 
-// Load immediate into xmm0 low dword then broadcast to ymm
+// Forward declarations for idioms used in broadcast helpers below.
+static void vpcmpeqd(Buf*, int, int, int);
+static void vpslld_i(Buf*, int, int, uint8_t);
+static void vpsrld_i(Buf*, int, int, uint8_t);
+static void vpcmpeqw(Buf*, int, int, int);
+static void vpsllw_i(Buf*, int, int, uint8_t);
+static void vpsrlw_i(Buf*, int, int, uint8_t);
+
+// Load immediate into xmm0 low dword then broadcast to ymm.
+// Uses instruction idioms for common patterns to avoid the mov+vmovd+broadcast sequence.
 static void broadcast_imm32(Buf *b, int d, uint32_t v) {
-    if (v == 0) {
-        vpxor(b, 1, d, d, d);
-    } else {
-        // MOV eax, imm32
+    int shr = v ? __builtin_clz(v) : 0;  // ~0u >> shr == v when low bits contiguous
+    int shl = v ? __builtin_ctz(v) : 0;  // ~0u << shl == v when high bits contiguous
+
+    if      (v == 0)           { vpxor(b,1,d,d,d); }
+    else if (v == 0xFFFFFFFFu) { vpcmpeqd(b,d,d,d); }
+    else if (v == 0xFFFFFFFFu >> shr) { vpcmpeqd(b,d,d,d); vpsrld_i(b,d,d,(uint8_t)shr); }
+    else if (v == 0xFFFFFFFFu << shl) { vpcmpeqd(b,d,d,d); vpslld_i(b,d,d,(uint8_t)shl); }
+    else {
         emit1(b, 0xB8); emit4(b, v);
-        // VMOVD xmm0, eax — VEX.128.66.0F 6E /r
         vex(b, 1, 1, 0, 0, 0, 0, RAX, 0x6E);
-        // VBROADCASTSS ymm_d, xmm0
         vbroadcastss(b, d, 0);
     }
 }
 
-// Broadcast 16-bit immediate to all 8 words of xmm
+// Broadcast 16-bit immediate to all 8 words of xmm.
 static void broadcast_imm16(Buf *b, int d, uint16_t v) {
-    if (v == 0) {
-        vpxor(b, 0, d, d, d);
-    } else {
-        // MOV eax, v
+    int shr = v ? __builtin_clz(v) - 16 : 0;  // (uint16_t)~0 >> shr == v
+    int shl = v ? __builtin_ctz(v) : 0;        // (uint16_t)~0 << shl == v
+
+    if      (v == 0)      { vpxor(b,0,d,d,d); }
+    else if (v == 0xFFFFu) { vpcmpeqw(b,d,d,d); }
+    else if (v == (uint16_t)(0xFFFFu >> shr)) { vpcmpeqw(b,d,d,d); vpsrlw_i(b,d,d,(uint8_t)shr); }
+    else if (v == (uint16_t)(0xFFFFu << shl)) { vpcmpeqw(b,d,d,d); vpsllw_i(b,d,d,(uint8_t)shl); }
+    else {
         emit1(b, 0xB8); emit4(b, (uint32_t)v);
-        // VMOVD xmm0, eax
         vex(b, 1, 1, 0, 0, 0, 0, RAX, 0x6E);
-        // VPBROADCASTW xmm_d, xmm0 — VEX.128.66.0F38 79
         vex_rr(b, 1, 2, 0, 0x79, d, 0);
     }
 }
