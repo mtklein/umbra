@@ -19,28 +19,27 @@ kernel void umbra_entry(
     half v5 = as_type<half>(((device ushort*)p1)[i]);
     ushort v6 = (ushort)((device uchar*)p0)[i*4+3];
     half v7 = (half)(short)v6;
-    half v8 = v1 * v7;
-    half v9 = v2 - v8;
-    half v10 = v5 * v9;
-    half v11 = fma(v1, v4, v10);
-    ((device ushort*)p1)[i] = as_type<ushort>(v11);
+    half v8 = v2 - v1 * v7;
+    half v9 = v5 * v8;
+    half v10 = fma(v1, v4, v9);
+    ((device ushort*)p1)[i] = as_type<ushort>(v10);
 
-    ushort v13 = (ushort)((device uchar*)p0)[i*4+1];
-    half v14 = (half)(short)v13;
-    half v15 = as_type<half>(((device ushort*)p2)[i]);
-    half v16 = v15 * v9;
-    half v17 = fma(v1, v14, v16);
-    ((device ushort*)p2)[i] = as_type<ushort>(v17);
+    ushort v12 = (ushort)((device uchar*)p0)[i*4+1];
+    half v13 = (half)(short)v12;
+    half v14 = as_type<half>(((device ushort*)p2)[i]);
+    half v15 = v14 * v8;
+    half v16 = fma(v1, v13, v15);
+    ((device ushort*)p2)[i] = as_type<ushort>(v16);
 
-    ushort v19 = (ushort)((device uchar*)p0)[i*4+2];
-    half v20 = (half)(short)v19;
-    half v21 = as_type<half>(((device ushort*)p3)[i]);
-    half v22 = v21 * v9;
-    half v23 = fma(v1, v20, v22);
-    ((device ushort*)p3)[i] = as_type<ushort>(v23);
+    ushort v18 = (ushort)((device uchar*)p0)[i*4+2];
+    half v19 = (half)(short)v18;
+    half v20 = as_type<half>(((device ushort*)p3)[i]);
+    half v21 = v20 * v8;
+    half v22 = fma(v1, v19, v21);
+    ((device ushort*)p3)[i] = as_type<ushort>(v22);
 
-    half v25 = as_type<half>(((device ushort*)p4)[i]);
-    half v26 = v25 * v9;
-    half v27 = fma(v1, v7, v26);
-    ((device ushort*)p4)[i] = as_type<ushort>(v27);
+    half v24 = as_type<half>(((device ushort*)p4)[i]);
+    half v25 = v24 * v8;
+    half v26 = fma(v1, v7, v25);
+    ((device ushort*)p4)[i] = as_type<ushort>(v26);
 }

@@ -635,8 +635,7 @@ static void test_coverage_rect_white_dst(void) {
         }
     }
 
-    // JIT — known bug: coverage lerp corrupts outside-rect pixels with non-zero dst.
-    // TODO: fix JIT fma pair-scratch allocation, then enable this block.
+    // JIT — test coverage lerp with non-zero dst (2 iterations).
     if (jit) {
         uint32_t dst[16];
         memset(dst, 0xFF, sizeof dst);
@@ -645,7 +644,33 @@ static void test_coverage_rect_white_dst(void) {
         float    rect[4] = {4.0f, 0.0f, 12.0f, 1.0f};
         umbra_jit_run(jit, 16, (umbra_buf[]){
             {dst, (long)sizeof dst}, {&x0, -4}, {&y, -4}, {color, -8}, {rect, -16}});
-        (void)dst; // TODO: check results once fixed
+        for (int i = 0; i < 16; i++) {
+            if (i >= 4 && i < 12) {
+                (( dst[i]        & 0xFF) >= 0xFE) here;
+                (((dst[i] >> 24) & 0xFF) >= 0xFE) here;
+            } else {
+                (dst[i] == 0xFFFFFFFF) here;
+            }
+        }
+    }
+
+    // JIT — 3 iterations: tests preamble register reconciliation across loop back-edges.
+    if (jit) {
+        uint32_t dst[24];
+        memset(dst, 0xFF, sizeof dst);
+        int32_t  x0 = 0, y = 0;
+        __fp16   color[4] = {1, 0, 0, 1};
+        float    rect[4] = {4.0f, 0.0f, 20.0f, 1.0f};
+        umbra_jit_run(jit, 24, (umbra_buf[]){
+            {dst, (long)sizeof dst}, {&x0, -4}, {&y, -4}, {color, -8}, {rect, -16}});
+        for (int i = 0; i < 24; i++) {
+            if (i >= 4 && i < 20) {
+                (( dst[i]        & 0xFF) >= 0xFE) here;
+                (((dst[i] >> 24) & 0xFF) >= 0xFE) here;
+            } else {
+                (dst[i] == 0xFFFFFFFF) here;
+            }
+        }
     }
 
     // Metal — should work.

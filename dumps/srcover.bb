@@ -18,7 +18,7 @@
   v17  = load_half       p3
   v18  = load_half       p4
   v19  = imm_half        0x3c00
-  v20  = sub_half        v19 v14
+  v20  = fms_half        v6 v13 v19
   v21  = mul_half        v15 v20
   v22  = fma_half        v6 v7 v21
   v23  = mul_half        v16 v20

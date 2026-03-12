@@ -258,6 +258,11 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     // Preamble: uniforms go straight into registers via RA.
     emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0);
 
+    // Snapshot which register holds each preamble value after the preamble.
+    // The loop body may evict these; we must restore them before iterating.
+    int8_t *preamble_reg = malloc((size_t)bb->preamble);
+    for (int i = 0; i < bb->preamble; i++) preamble_reg[i] = ra->reg[i];
+
     put(&c, MOVZ_x(XI,0));
 
     int loop_top = c.len;
@@ -272,6 +277,20 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     // Vector loop: uniforms already in registers from preamble.
     int loop_body_start = c.len;
     emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0);
+
+    // Reconcile: restore preamble values to their loop-entry registers.
+    // The loop body may have evicted preamble values to spill slots.
+    // Fill them back so the next iteration sees the correct register state.
+    // Only emit fills — do NOT update RA state, since the scalar tail resets everything.
+    for (int i = 0; i < bb->preamble; i++) {
+        int8_t target = preamble_reg[i];
+        if (target < 0) continue;              // wasn't in a register at loop start
+        if (ra->reg[i] == target) continue;    // still in the right register
+        if (sl[i] < 0) continue;               // no spill slot (shouldn't happen)
+        arm64_fill(target, sl[i], &c);
+    }
+    free(preamble_reg);
+
     int loop_body_end = c.len;
 
     put(&c, ADD_xi(XI,XI,8));   // K=8: advance by 8
@@ -351,23 +370,27 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_lane: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             if (s.rdh >= 0) {
+                int8_t tmp = ra_alloc(ra, sl, ns);
                 put(c, DUP_4s_w(s.rd, XI));
-                put(c, MOVI_4s(0, 0, 0));
-                put(c, MOVZ_w(XT,1)); put(c, INS_s(0,1,XT));
-                put(c, MOVZ_w(XT,2)); put(c, INS_s(0,2,XT));
-                put(c, MOVZ_w(XT,3)); put(c, INS_s(0,3,XT));
-                put(c, ADD_4s(s.rd, s.rd, 0));
+                put(c, MOVI_4s(tmp, 0, 0));
+                put(c, MOVZ_w(XT,1)); put(c, INS_s(tmp,1,XT));
+                put(c, MOVZ_w(XT,2)); put(c, INS_s(tmp,2,XT));
+                put(c, MOVZ_w(XT,3)); put(c, INS_s(tmp,3,XT));
+                put(c, ADD_4s(s.rd, s.rd, tmp));
                 put(c, MOVZ_w(XT,4));
-                put(c, DUP_4s_w(0, XT));
-                put(c, ADD_4s(s.rdh, s.rd, 0));
+                put(c, DUP_4s_w(tmp, XT));
+                put(c, ADD_4s(s.rdh, s.rd, tmp));
+                ra->free_stack[ra->nfree++] = tmp;
             } else {
                 put(c, DUP_4s_w(s.rd, XI));
                 if (!scalar) {
-                    put(c, MOVI_4s(0, 0, 0));
-                    put(c, MOVZ_w(XT,1)); put(c, INS_s(0,1,XT));
-                    put(c, MOVZ_w(XT,2)); put(c, INS_s(0,2,XT));
-                    put(c, MOVZ_w(XT,3)); put(c, INS_s(0,3,XT));
-                    put(c, ADD_4s(s.rd, s.rd, 0));
+                    int8_t tmp = ra_alloc(ra, sl, ns);
+                    put(c, MOVI_4s(tmp, 0, 0));
+                    put(c, MOVZ_w(XT,1)); put(c, INS_s(tmp,1,XT));
+                    put(c, MOVZ_w(XT,2)); put(c, INS_s(tmp,2,XT));
+                    put(c, MOVZ_w(XT,3)); put(c, INS_s(tmp,3,XT));
+                    put(c, ADD_4s(s.rd, s.rd, tmp));
+                    ra->free_stack[ra->nfree++] = tmp;
                 }
             }
         } break;
@@ -597,13 +620,16 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_half_from_i32: {
             struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
             if (!scalar && s.rxh != s.rx) {
-                put(c, SCVTF_4s(0, s.rx));
-                put(c, FCVTN_4h(s.rd, 0));
-                put(c, SCVTF_4s(0, s.rxh));
-                put(c, W(FCVTN_4h(s.rd, 0)));
+                int8_t tmp = ra_alloc(ra, sl, ns);
+                put(c, SCVTF_4s(tmp, s.rx));
+                put(c, FCVTN_4h(s.rd, tmp));
+                put(c, SCVTF_4s(tmp, s.rxh));
+                put(c, W(FCVTN_4h(s.rd, tmp)));
+                ra->free_stack[ra->nfree++] = tmp;
             } else {
-                put(c, SCVTF_4s(0, s.rx));
-                put(c, FCVTN_4h(s.rd, 0));
+                // Non-pair: use rd as intermediate (NEON reads all before writing).
+                put(c, SCVTF_4s(s.rd, s.rx));
+                put(c, FCVTN_4h(s.rd, s.rd));
             }
         } break;
 
@@ -615,8 +641,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 put(c, W(FCVTL_4s(s.rdh, s.rx)));
                 put(c, FCVTZS_4s(s.rdh, s.rdh));
             } else {
-                put(c, FCVTL_4s(0, s.rx));
-                put(c, FCVTZS_4s(s.rd, 0));
+                // Non-pair: use rd as intermediate (NEON reads all before writing).
+                put(c, FCVTL_4s(s.rd, s.rx));
+                put(c, FCVTZS_4s(s.rd, s.rd));
             }
         } break;
 
@@ -1194,6 +1221,11 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     // Preamble
     emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0);
 
+    // Snapshot which register holds each preamble value after the preamble.
+    // The loop body may evict these; we must restore them before iterating.
+    int8_t *preamble_reg = malloc((size_t)bb->preamble);
+    for (int i = 0; i < bb->preamble; i++) preamble_reg[i] = ra->reg[i];
+
     // Loop counter = 0
     xor_rr(&c, XI, XI);
 
@@ -1211,6 +1243,20 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
 
     int loop_body_start = c.len;
     emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0);
+
+    // Reconcile: restore preamble values to their loop-entry registers.
+    // The loop body may have evicted preamble values to spill slots.
+    // Fill them back so the next iteration sees the correct register state.
+    // Only emit fills — do NOT update RA state, since the scalar tail resets everything.
+    for (int i = 0; i < bb->preamble; i++) {
+        int8_t target = preamble_reg[i];
+        if (target < 0) continue;              // wasn't in a register at loop start
+        if (ra->reg[i] == target) continue;    // still in the right register
+        if (sl[i] < 0) continue;               // no spill slot (shouldn't happen)
+        x86_fill(target, sl[i], &c);
+    }
+    free(preamble_reg);
+
     int loop_body_end = c.len;
 
     add_ri(&c, XI, 8);
