@@ -345,9 +345,11 @@ vh umbra_add_half(BB *bb, vh a, vh b) {
 
 vh umbra_sub_half(BB *bb, vh a, vh b) {
     if (is_imm_half(bb, b.id, 0)) { return a; }
-    if (bb->inst[a.id].op == op_mul_half) {
-        return (vh){math(bb, op_fms_half, .x=bb->inst[a.id].x, .y=bb->inst[a.id].y, .z=b.id)};
-    }
+    // sub(a, mul(p,q)) = a - p*q = fms(p,q,a) since fms(x,y,z) = z - x*y.
+    // TODO: this triggers a JIT bug (likely pair-scratch aliasing).  Disabled for now.
+    // if (bb->inst[b.id].op == op_mul_half) {
+    //     return (vh){math(bb, op_fms_half, .x=bb->inst[b.id].x, .y=bb->inst[b.id].y, .z=a.id)};
+    // }
     return (vh){math(bb, op_sub_half, .x=a.id, .y=b.id)};
 }
 

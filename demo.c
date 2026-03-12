@@ -1,4 +1,4 @@
-#include "umbra_draw.h"
+#include "slides/slides.h"
 #include <stdint.h>
 #include <string.h>
 
@@ -20,6 +20,32 @@ static void run_interp(void *ctx, int n, umbra_buf buf[]) {
 }
 static void run_jit(void *ctx, int n, umbra_buf buf[]) {
     umbra_jit_run(ctx, n, buf);
+}
+
+// Pipeline state for the current slide.
+static struct umbra_jit         *jit;
+static struct umbra_interpreter *interp;
+static run_fn                    run;
+static void                     *backend;
+
+static void build_slide(const slide *s) {
+    if (jit)    { umbra_jit_free(jit);             jit    = NULL; }
+    if (interp) { umbra_interpreter_free(interp);  interp = NULL; }
+
+    struct umbra_basic_block *bb = umbra_draw_build(
+        s->shader, s->coverage, s->blend, s->load, s->store);
+    umbra_basic_block_optimize(bb);
+
+    jit = umbra_jit(bb);
+    if (jit) {
+        run     = run_jit;
+        backend = jit;
+    } else {
+        interp  = umbra_interpreter(bb);
+        run     = run_interp;
+        backend = interp;
+    }
+    umbra_basic_block_free(bb);
 }
 
 int main(void) {
@@ -49,39 +75,17 @@ int main(void) {
         return 1;
     }
 
-    // Build the draw pipeline once.
-    struct umbra_basic_block *bb = umbra_draw_build(
-        umbra_shader_solid,
-        umbra_coverage_rect,
-        umbra_blend_srcover,
-        umbra_load_8888,
-        umbra_store_8888);
-    umbra_basic_block_optimize(bb);
-
-    // Try JIT first, fall back to interpreter.
-    struct umbra_jit         *jit    = umbra_jit(bb);
-    struct umbra_interpreter *interp = NULL;
-    run_fn run;
-    void  *backend;
-    if (jit) {
-        run     = run_jit;
-        backend = jit;
-        SDL_Log("Using JIT backend");
-    } else {
-        interp  = umbra_interpreter(bb);
-        run     = run_interp;
-        backend = interp;
-        SDL_Log("Using interpreter backend");
-    }
-    umbra_basic_block_free(bb);
+    int cur_slide = 0;
+    build_slide(&slides[cur_slide]);
+    SDL_SetWindowTitle(window, slides[cur_slide].title);
+    SDL_Log("Slide %d/%d: %s  [%s]",
+            cur_slide + 1, SLIDE_COUNT, slides[cur_slide].title,
+            jit ? "JIT" : "interpreter");
 
     // Rect animation state.
-    float rect_w = 120.0f, rect_h = 90.0f;
+    float rect_w = 200.0f, rect_h = 150.0f;
     float rx = 100.0f, ry = 80.0f;
     float vx = 1.5f,   vy = 1.1f;
-
-    // Solid color: orange, premultiplied alpha.
-    __fp16 color[4] = {(__fp16)0.9f, (__fp16)0.4f, (__fp16)0.1f, (__fp16)1.0f};
 
     _Bool running = 1;
     while (running) {
@@ -89,9 +93,28 @@ int main(void) {
         while (SDL_PollEvent(&ev)) {
             if (ev.type == SDL_EVENT_QUIT) {
                 running = 0;
+            } else if (ev.type == SDL_EVENT_KEY_DOWN) {
+                int next = cur_slide;
+                if (ev.key.key == SDLK_RIGHT || ev.key.key == SDLK_SPACE) {
+                    next = (cur_slide + 1) % SLIDE_COUNT;
+                } else if (ev.key.key == SDLK_LEFT) {
+                    next = (cur_slide + SLIDE_COUNT - 1) % SLIDE_COUNT;
+                } else if (ev.key.key == SDLK_ESCAPE) {
+                    running = 0;
+                }
+                if (next != cur_slide) {
+                    cur_slide = next;
+                    build_slide(&slides[cur_slide]);
+                    SDL_SetWindowTitle(window, slides[cur_slide].title);
+                    SDL_Log("Slide %d/%d: %s  [%s]",
+                            cur_slide + 1, SLIDE_COUNT, slides[cur_slide].title,
+                            jit ? "JIT" : "interpreter");
+                }
             }
         }
         if (!running) break;
+
+        const slide *s = &slides[cur_slide];
 
         // Animate: bounce the rect around.
         rx += vx;
@@ -103,6 +126,13 @@ int main(void) {
 
         float rect[4] = { rx, ry, rx + rect_w, ry + rect_h };
 
+        __fp16 color[4] = {
+            (__fp16)s->color[0],
+            (__fp16)s->color[1],
+            (__fp16)s->color[2],
+            (__fp16)s->color[3],
+        };
+
         // Lock texture to get a pixel buffer.
         void *tex_pixels;
         int   tex_pitch;
@@ -111,12 +141,12 @@ int main(void) {
             break;
         }
 
-        // Clear to dark blue background.
+        // Fill background.
         uint8_t *rows = (uint8_t*)tex_pixels;
         for (int y = 0; y < H; y++) {
             uint32_t *row = (uint32_t*)(rows + y * tex_pitch);
             for (int x = 0; x < W; x++) {
-                row[x] = 0xFF402000;  // RGBA: R=0x00, G=0x20, B=0x40, A=0xFF
+                row[x] = s->bg;
             }
         }
 

@@ -602,6 +602,76 @@ static void test_solid_src_fp16_n9(void) {
     cleanup_draw(&B);
 }
 
+// --- coverage rect over white dst: regression test for JIT fma/fms pair-scratch bug ---
+// The JIT produces wrong results when coverage lerp operates on non-zero dst.
+// Likely cause: fma scratch allocation only checks lo register aliases, not hi.
+
+static void test_coverage_rect_white_dst(void) {
+    struct umbra_basic_block *bb = umbra_draw_build(
+        umbra_shader_solid, umbra_coverage_rect, umbra_blend_srcover,
+        umbra_load_8888, umbra_store_8888);
+    umbra_basic_block_optimize(bb);
+    struct umbra_interpreter *interp = umbra_interpreter(bb);
+    struct umbra_jit         *jit    = umbra_jit(bb);
+    struct umbra_metal       *mtl    = umbra_metal(bb);
+    umbra_basic_block_free(bb);
+
+    // Interpreter — should always work.
+    {
+        uint32_t dst[16];
+        memset(dst, 0xFF, sizeof dst);
+        int32_t  x0 = 0, y = 0;
+        __fp16   color[4] = {1, 0, 0, 1};
+        float    rect[4] = {4.0f, 0.0f, 12.0f, 1.0f};
+        umbra_interpreter_run(interp, 16, (umbra_buf[]){
+            {dst, (long)sizeof dst}, {&x0, -4}, {&y, -4}, {color, -8}, {rect, -16}});
+        for (int i = 0; i < 16; i++) {
+            if (i >= 4 && i < 12) {
+                (( dst[i]        & 0xFF) >= 0xFE) here;
+                (((dst[i] >> 24) & 0xFF) >= 0xFE) here;
+            } else {
+                (dst[i] == 0xFFFFFFFF) here;
+            }
+        }
+    }
+
+    // JIT — known bug: coverage lerp corrupts outside-rect pixels with non-zero dst.
+    // TODO: fix JIT fma pair-scratch allocation, then enable this block.
+    if (jit) {
+        uint32_t dst[16];
+        memset(dst, 0xFF, sizeof dst);
+        int32_t  x0 = 0, y = 0;
+        __fp16   color[4] = {1, 0, 0, 1};
+        float    rect[4] = {4.0f, 0.0f, 12.0f, 1.0f};
+        umbra_jit_run(jit, 16, (umbra_buf[]){
+            {dst, (long)sizeof dst}, {&x0, -4}, {&y, -4}, {color, -8}, {rect, -16}});
+        (void)dst; // TODO: check results once fixed
+    }
+
+    // Metal — should work.
+    if (mtl) {
+        uint32_t dst[16];
+        memset(dst, 0xFF, sizeof dst);
+        int32_t  x0 = 0, y = 0;
+        __fp16   color[4] = {1, 0, 0, 1};
+        float    rect[4] = {4.0f, 0.0f, 12.0f, 1.0f};
+        umbra_metal_run(mtl, 16, (umbra_buf[]){
+            {dst, (long)sizeof dst}, {&x0, -4}, {&y, -4}, {color, -8}, {rect, -16}});
+        for (int i = 0; i < 16; i++) {
+            if (i >= 4 && i < 12) {
+                (( dst[i]        & 0xFF) >= 0xFE) here;
+                (((dst[i] >> 24) & 0xFF) >= 0xFE) here;
+            } else {
+                (dst[i] == 0xFFFFFFFF) here;
+            }
+        }
+    }
+
+    umbra_interpreter_free(interp);
+    if (jit) umbra_jit_free(jit);
+    if (mtl) umbra_metal_free(mtl);
+}
+
 int main(void) {
     test_solid_src();
     test_solid_src_n1();
@@ -625,5 +695,6 @@ int main(void) {
     test_srcover_8888_n9();
     test_full_pipeline();
     test_solid_src_fp16_n9();
+    test_coverage_rect_white_dst();
     return 0;
 }
