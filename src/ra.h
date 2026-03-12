@@ -45,8 +45,7 @@ struct ra_step {
     int8_t rd, rdh;
     int8_t rx, ry, rz;
     int8_t rxh, ryh, rzh;
-    int8_t scratch;
-    int8_t :8;
+    int8_t scratch, scratch2;
 };
 
 // Allocate output register(s) for instruction i (no inputs).
@@ -62,4 +61,4 @@ struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns,
 // FMA accumulator targeting and sel mask claiming are handled internally.
 struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns,
                            struct bb_inst const *inst, int i, _Bool scalar,
-                           _Bool arch_scratch);
+                           int nscratch);

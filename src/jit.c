@@ -797,10 +797,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_and_half: case op_or_half: case op_xor_half: case op_sel_half:
         case op_half_from_i16: case op_i16_from_half:
         default_alu: {
-            enum op op = inst->op;
-            _Bool arch_scratch = op==op_shr_u32 || op==op_shr_s32
-                              || op==op_shr_u16 || op==op_shr_s16;
-            struct ra_step s = ra_step_alu(ra, sl, ns, inst, i, scalar, arch_scratch);
+            enum op op2 = inst->op;
+            int nscratch = (op2==op_shr_u32 || op2==op_shr_s32
+                         || op2==op_shr_u16 || op2==op_shr_s16) ? 1 : 0;
+            struct ra_step s = ra_step_alu(ra, sl, ns, inst, i, scalar, nscratch);
 
             emit_alu_reg(c, inst->op, s.rd, s.rx, s.ry, s.rz, inst->imm, s.scratch);
             if (s.rdh >= 0) {
@@ -968,8 +968,8 @@ static int load_ptr_x86(Buf *c, int p, int *last_ptr) {
 }
 
 // ---- Register allocator ----
-static const int8_t ra_pool[] = {2,3,4,5,6,7,8,9,10,11,12,13,14,15};
-#define RA_NREGS 14
+static const int8_t ra_pool[] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
+#define RA_NREGS 16
 
 static void x86_spill(int reg, int slot, void *ctx) { vspill((Buf*)ctx, reg, slot); }
 static void x86_fill (int reg, int slot, void *ctx) { vfill ((Buf*)ctx, reg, slot); }
@@ -988,8 +988,9 @@ static struct ra* ra_create_x86(struct umbra_basic_block const *bb, Buf *c) {
 }
 
 // ---- ALU emission ----
-// d,x,y,z are YMM/XMM register numbers.  scratch is a free register.
-static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm, int scratch) {
+// d,x,y,z are YMM/XMM register numbers.  scratch/scratch2 are free registers (-1 if unused).
+static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm,
+                          int scratch, int scratch2) {
     switch (op) {
     case op_imm_32: broadcast_imm32(c, d, (uint32_t)imm); return 1;
     case op_imm_16: broadcast_imm16(c, d, (uint16_t)imm); return 1;
@@ -1057,14 +1058,14 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
         vpxor_3(c,1,d,d,scratch);
         return 1;
     case op_lt_u32:  // x <u y  ≡  ¬(y == min_u(x,y))
-        vex_rrr(c,1,2,1,0x3B,0,x,y);   // VPMINUD ymm0, x, y
-        vpcmpeqd(c,d,y,0);
+        vex_rrr(c,1,2,1,0x3B,scratch2,x,y);  // VPMINUD scratch2, x, y
+        vpcmpeqd(c,d,y,scratch2);
         vpcmpeqd(c,scratch,scratch,scratch);
         vpxor_3(c,1,d,d,scratch);
         return 1;
     case op_le_u32:  // x <=u y  ≡  y == max_u(x,y)
-        vex_rrr(c,1,2,1,0x3F,0,x,y);   // VPMAXUD ymm0, x, y
-        vpcmpeqd(c,d,y,0);
+        vex_rrr(c,1,2,1,0x3F,scratch,x,y);   // VPMAXUD scratch, x, y
+        vpcmpeqd(c,d,y,scratch);
         return 1;
 
     // ---- i16 arithmetic (XMM, L=0) ----
@@ -1077,26 +1078,26 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
 
     // Variable i16 shifts: widen to i32, shift, narrow back via 128-bit pack
     case op_shl_i16:
-        vpmovzxwd(c,0,x);              // ymm0 = 8×i32 data (zero-extended)
-        vpmovzxwd(c,1,y);              // ymm1 = 8×i32 shifts
-        vpsllvd(c,0,0,1);              // ymm0 = shifted results
-        vextracti128(c,1,0,1);         // xmm1 = hi 4 dwords
-        // VPACKUSDW xmm_d, xmm0, xmm1: VEX.128.66.0F38 2B
-        vex_rrr(c,1,2,0,0x2B,d,0,1);
+        vpmovzxwd(c,scratch,x);               // scratch = 8×i32 data (zero-extended)
+        vpmovzxwd(c,scratch2,y);              // scratch2 = 8×i32 shifts
+        vpsllvd(c,scratch,scratch,scratch2);  // scratch = shifted results
+        vextracti128(c,scratch2,scratch,1);   // scratch2 = hi 4 dwords
+        // VPACKUSDW xmm_d, xmm_scratch, xmm_scratch2
+        vex_rrr(c,1,2,0,0x2B,d,scratch,scratch2);
         return 1;
     case op_shr_u16:
-        vpmovzxwd(c,0,x);
-        vpmovzxwd(c,1,y);
-        vpsrlvd(c,0,0,1);
-        vextracti128(c,1,0,1);
-        vex_rrr(c,1,2,0,0x2B,d,0,1);  // VPACKUSDW xmm
+        vpmovzxwd(c,scratch,x);
+        vpmovzxwd(c,scratch2,y);
+        vpsrlvd(c,scratch,scratch,scratch2);
+        vextracti128(c,scratch2,scratch,1);
+        vex_rrr(c,1,2,0,0x2B,d,scratch,scratch2);
         return 1;
     case op_shr_s16:
-        vpmovsxwd(c,0,x);              // sign-extend for signed shift
-        vpmovzxwd(c,1,y);
-        vpsravd(c,0,0,1);
-        vextracti128(c,1,0,1);
-        vex_rrr(c,1,1,0,0x6B,d,0,1);  // VPACKSSDW xmm (signed saturation ok for shift right)
+        vpmovsxwd(c,scratch,x);              // sign-extend for signed shift
+        vpmovzxwd(c,scratch2,y);
+        vpsravd(c,scratch,scratch,scratch2);
+        vextracti128(c,scratch2,scratch,1);
+        vex_rrr(c,1,1,0,0x6B,d,scratch,scratch2);  // VPACKSSDW xmm
         return 1;
 
     // i16 bitwise (XMM)
@@ -1114,14 +1115,14 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
         vpxor_3(c,0,d,d,scratch);
         return 1;
     case op_lt_u16:  // x <u y  ≡  ¬(y == min_u(x,y))
-        vex_rrr(c,1,2,0,0x3A,0,x,y);   // VPMINUW xmm0, x, y
-        vpcmpeqw(c,d,y,0);
+        vex_rrr(c,1,2,0,0x3A,scratch2,x,y);  // VPMINUW scratch2, x, y
+        vpcmpeqw(c,d,y,scratch2);
         vpcmpeqw(c,scratch,scratch,scratch);
         vpxor_3(c,0,d,d,scratch);
         return 1;
     case op_le_u16:  // x <=u y  ≡  y == max_u(x,y)
-        vex_rrr(c,1,2,0,0x3E,0,x,y);   // VPMAXUW xmm0, x, y
-        vpcmpeqw(c,d,y,0);
+        vex_rrr(c,1,2,0,0x3E,scratch,x,y);   // VPMAXUW scratch, x, y
+        vpcmpeqw(c,d,y,scratch);
         return 1;
 
     // ---- Half ops: carried as f32 in YMM, arithmetic uses f32 instructions ----
@@ -1333,6 +1334,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             } else {
                 vex(c, 1, 1, 0, 0, s.rd, 0, XI, 0x6E);
                 vbroadcastss(c, s.rd, s.rd);
+                int8_t tmp = ra_alloc(ra, sl, ns);
                 sub_ri(c, RSP, 32);
                 for (int k = 0; k < 8; k++) {
                     emit1(c, 0xC7);
@@ -1343,9 +1345,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     }
                     emit4(c, (uint32_t)k);
                 }
-                vfill(c, 0, 0);
-                vpaddd(c, s.rd, s.rd, 0);
+                vfill(c, tmp, 0);
+                vpaddd(c, s.rd, s.rd, tmp);
                 add_ri(c, RSP, 32);
+                ra->free_stack[ra->nfree++] = tmp;
             }
         } break;
 
@@ -1397,12 +1400,16 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     emit1(c, (uint8_t)(((RAX&7)<<3) | 4));
                     emit1(c, (uint8_t)((1<<6) | ((XI&7)<<3) | (base&7)));
                 }
-                vex(c, 1, 1, 0, 0, 0, 0, RAX, 0x6E);   // VMOVD xmm0, eax
-                vcvtph2ps(c, s.rd, 0);                      // VCVTPH2PS xmm_rd, xmm0
+                int8_t tmp = ra_alloc(ra, sl, ns);
+                vex(c, 1, 1, 0, 0, tmp, 0, RAX, 0x6E);  // VMOVD xmm_tmp, eax
+                vcvtph2ps(c, s.rd, tmp);                  // VCVTPH2PS xmm_rd, xmm_tmp
+                ra->free_stack[ra->nfree++] = tmp;
             } else {
                 // Load 8 × fp16 = 16 bytes into xmm, then VCVTPH2PS to ymm
-                vmov_load(c, 0, 0, load_ptr_x86(c, p, &last_ptr), XI, 2, 0);  // xmm0
-                vcvtph2ps(c, s.rd, 0);                         // ymm_rd
+                int8_t tmp = ra_alloc(ra, sl, ns);
+                vmov_load(c, 0, tmp, load_ptr_x86(c, p, &last_ptr), XI, 2, 0);
+                vcvtph2ps(c, s.rd, tmp);
+                ra->free_stack[ra->nfree++] = tmp;
             }
         } break;
 
@@ -1445,11 +1452,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_store_half: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
             int p = inst->ptr;
+            int8_t tmp = ra_alloc(ra, sl, ns);
             if (scalar) {
-                // VCVTPS2PH xmm0, xmm_ry, 0 (round to nearest)
-                vcvtps2ph(c, 0, ry, 4);  // imm8=4: _MM_FROUND_CUR_DIRECTION
-                // VMOVD eax, xmm0; MOV word [base + R10*2], ax
-                vex(c, 1, 1, 0, 0, 0, 0, RAX, 0x7E);
+                vcvtps2ph(c, tmp, ry, 4);
+                vex(c, 1, 1, 0, 0, tmp, 0, RAX, 0x7E);  // VMOVD eax, xmm_tmp
                 {
                     int base = load_ptr_x86(c, p, &last_ptr);
                     emit1(c, 0x66);
@@ -1462,11 +1468,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     emit1(c, (uint8_t)((1<<6) | ((XI&7)<<3) | (base&7)));
                 }
             } else {
-                // VCVTPS2PH xmm0, ymm_ry, 4
-                vcvtps2ph(c, 0, ry, 4);
-                // Store 16 bytes (8 × fp16) to [base + R10*2]
-                vmov_store(c, 0, 0, load_ptr_x86(c, p, &last_ptr), XI, 2, 0);
+                vcvtps2ph(c, tmp, ry, 4);
+                vmov_store(c, 0, tmp, load_ptr_x86(c, p, &last_ptr), XI, 2, 0);
             }
+            ra->free_stack[ra->nfree++] = tmp;
             if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
         } break;
 
@@ -1520,10 +1525,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     emit1(c, (uint8_t)disp);
                 }
             }
-            // VMOVD xmm0, eax
-            vex(c, 1, 1, 0, 0, 0, 0, RAX, 0x6E);
-            // VPBROADCASTW xmm_rd, xmm0
-            vex_rr(c, 1, 2, 0, 0x79, s.rd, 0);
+            {
+                int8_t tmp = ra_alloc(ra, sl, ns);
+                vex(c, 1, 1, 0, 0, tmp, 0, RAX, 0x6E);   // VMOVD xmm_tmp, eax
+                vex_rr(c, 1, 2, 0, 0x79, s.rd, tmp);      // VPBROADCASTW xmm_rd, xmm_tmp
+                ra->free_stack[ra->nfree++] = tmp;
+            }
         } break;
 
         case op_uni_half: {
@@ -1546,10 +1553,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     emit1(c, (uint8_t)disp);
                 }
             }
-            // VMOVD xmm0, eax; VPBROADCASTW xmm0, xmm0; VCVTPH2PS ymm_rd, xmm0
-            vex(c, 1, 1, 0, 0, 0, 0, RAX, 0x6E);
-            vex_rr(c, 1, 2, 0, 0x79, 0, 0);
-            vcvtph2ps(c, s.rd, 0);
+            {
+                int8_t tmp = ra_alloc(ra, sl, ns);
+                vex(c, 1, 1, 0, 0, tmp, 0, RAX, 0x6E);   // VMOVD xmm_tmp, eax
+                vex_rr(c, 1, 2, 0, 0x79, tmp, tmp);       // VPBROADCASTW xmm_tmp, xmm_tmp
+                vcvtph2ps(c, s.rd, tmp);                   // VCVTPH2PS ymm_rd, xmm_tmp
+                ra->free_stack[ra->nfree++] = tmp;
+            }
         } break;
 
         case op_gather_32: case op_gather_16: case op_gather_half: {
@@ -1585,8 +1595,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                         emit1(c, (uint8_t)(((RAX&7)<<3) | 4));
                         emit1(c, (uint8_t)((1<<6) | ((RAX&7)<<3) | (base&7)));
                     }
-                    vex(c, 1, 1, 0, 0, 0, 0, RAX, 0x6E);  // VMOVD xmm0, eax
-                    vcvtph2ps(c, s.rd, 0);
+                    {
+                        int8_t tmp = ra_alloc(ra, sl, ns);
+                        vex(c, 1, 1, 0, 0, tmp, 0, RAX, 0x6E);  // VMOVD xmm_tmp, eax
+                        vcvtph2ps(c, s.rd, tmp);
+                        ra->free_stack[ra->nfree++] = tmp;
+                    }
                 }
             } else {
                 if (lu[inst->x] <= i) ra_free_reg(ra, inst->x);
@@ -1615,10 +1629,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     last_ptr = -1;
                 } else {
                     // scatter_half: VCVTPS2PH then LEA+extract+store as above.
-                    vcvtps2ph(c, 0, ry, 4);
+                    int8_t tmp = ra_alloc(ra, sl, ns);
+                    vcvtps2ph(c, tmp, ry, 4);
                     emit1(c, 0x4D); emit1(c, 0x8D); emit1(c, 0x1C); emit1(c, 0x43);
-                    vex(c, 1, 1, 0, 0, 0, 0, RAX, 0x7E);
+                    vex(c, 1, 1, 0, 0, tmp, 0, RAX, 0x7E);
                     emit1(c, 0x66); emit1(c, 0x41); emit1(c, 0x89); emit1(c, 0x03);
+                    ra->free_stack[ra->nfree++] = tmp;
                     last_ptr = -1;
                 }
             } else {
@@ -1659,30 +1675,31 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 // to isolate one channel in each of 8 dwords (YMM). Then narrow
                 // 8×u32(YMM) → 8×u16(XMM) via VEXTRACTI128 + VPACKUSDW.
 
-                // ymm1 = broadcast 0xFF mask
+                int8_t mask = ra_alloc(ra, sl, ns);  // broadcast 0xFF mask
                 emit1(c, 0xB8); emit4(c, 0x000000FFu);           // MOV eax, 0xFF
-                vex(c, 1, 1, 1, 0, 1, 0, RAX, 0x6E);            // VMOVD xmm1, eax
-                vex_rr(c, 1, 2, 1, 0x58, 1, 1);                  // VPBROADCASTD ymm1, xmm1
+                vex(c, 1, 1, 1, 0, mask, 0, RAX, 0x6E);         // VMOVD xmm_mask, eax
+                vex_rr(c, 1, 2, 1, 0x58, mask, mask);            // VPBROADCASTD ymm_mask
 
+                int8_t s0 = ra_alloc(ra, sl, ns);  // scratch for shifted/masked channel
                 int8_t ch_regs[4];
                 int8_t loaded = ra_alloc(ra, sl, ns);
-                vmov_load(c, 1, loaded, load_ptr_x86(c, p, &last_ptr), XI, 4, 0);   // ymm_loaded = 8 RGBA pixels
+                vmov_load(c, 1, loaded, load_ptr_x86(c, p, &last_ptr), XI, 4, 0);
                 for (int ch2 = 0; ch2 < 4; ch2++) {
-                    if (ch2 == 0) vpand(c, 1, 0, loaded, 1);     // ymm0 = loaded & 0xFF
+                    if (ch2 == 0) vpand(c, 1, s0, loaded, mask);
                     else {
-                        vpsrld_i(c, 0, loaded, (uint8_t)(ch2*8));
-                        vpand(c, 1, 0, 0, 1);                    // ymm0 &= 0xFF
+                        vpsrld_i(c, s0, loaded, (uint8_t)(ch2*8));
+                        vpand(c, 1, s0, s0, mask);
                     }
 
-                    int8_t rd = ra_alloc(ra, sl, ns);
-                    ch_regs[ch2] = rd;
-                    vextracti128(c, rd, 0, 1);                    // xmm_rd = hi128 of ymm0
-                    vex_rrr(c, 1, 2, 0, 0x2B, rd, 0, rd);        // VPACKUSDW: 4+4 u32 → 8 u16
+                    int8_t rd2 = ra_alloc(ra, sl, ns);
+                    ch_regs[ch2] = rd2;
+                    vextracti128(c, rd2, s0, 1);                    // xmm_rd = hi128 of s0
+                    vex_rrr(c, 1, 2, 0, 0x2B, rd2, s0, rd2);      // VPACKUSDW: 4+4 u32 → 8 u16
                 }
 
-                // Free the temp register holding the loaded data.
-                // loaded is a register number, not a value index, so free directly.
                 ra->free_stack[ra->nfree++] = loaded;
+                ra->free_stack[ra->nfree++] = s0;
+                ra->free_stack[ra->nfree++] = mask;
 
                 // Fix up: base instruction owns ch0
                 ra->reg[i] = ch_regs[0]; ra->owner[(int)ch_regs[0]] = i;
@@ -1724,36 +1741,41 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 }
             } else {
                 // Narrow 4 × 8×u16(XMM) channels to u8, interleave to RGBA, store 32 bytes.
-                for (int ch = 0; ch < 4; ch++) ra_ensure(ra, sl, ns, inputs[ch]);
+                for (int ch2 = 0; ch2 < 4; ch2++) ra_ensure(ra, sl, ns, inputs[ch2]);
                 int8_t r0 = ra->reg[inputs[0]], r1 = ra->reg[inputs[1]];
                 int8_t r2 = ra->reg[inputs[2]], r3 = ra->reg[inputs[3]];
+
+                int8_t s0 = ra_alloc(ra, sl, ns);
+                int8_t s1 = ra_alloc(ra, sl, ns);
 
                 // Pack each channel u16→u8 individually (with zero high half):
                 int8_t zero = ra_alloc(ra, sl, ns);
                 vpxor(c, 0, zero, zero, zero);
-                vpackuswb(c, 0, r0, zero);            // xmm0 = [R0..R7, 0..0]
-                vpackuswb(c, 1, r1, zero);            // xmm1 = [G0..G7, 0..0]
-                vpunpcklbw(c, 0, 0, 1);               // xmm0 = [R0,G0,R1,G1,...,R7,G7]
+                vpackuswb(c, s0, r0, zero);            // s0 = [R0..R7, 0..0]
+                vpackuswb(c, s1, r1, zero);            // s1 = [G0..G7, 0..0]
+                vpunpcklbw(c, s0, s0, s1);             // s0 = [R0,G0,R1,G1,...,R7,G7]
 
-                vpackuswb(c, 1, r2, zero);            // xmm1 = [B0..B7, 0..0]
+                vpackuswb(c, s1, r2, zero);            // s1 = [B0..B7, 0..0]
                 {
-                    int8_t tmp = ra_alloc(ra, sl, ns);
-                    vpackuswb(c, tmp, r3, zero);       // tmp  = [A0..A7, 0..0]
-                    vpunpcklbw(c, 1, 1, tmp);          // xmm1 = [B0,A0,B1,A1,...,B7,A7]
-                    ra->free_stack[ra->nfree++] = tmp;
+                    int8_t atmp = ra_alloc(ra, sl, ns);
+                    vpackuswb(c, atmp, r3, zero);       // atmp = [A0..A7, 0..0]
+                    vpunpcklbw(c, s1, s1, atmp);        // s1 = [B0,A0,...,B7,A7]
+                    ra->free_stack[ra->nfree++] = atmp;
                 }
                 ra->free_stack[ra->nfree++] = zero;
 
-                // xmm0=[RG pairs], xmm1=[BA pairs] → interleave words for RGBA pixels
+                // s0=[RG pairs], s1=[BA pairs] → interleave words for RGBA pixels
                 {
                     int8_t stmp = ra_alloc(ra, sl, ns);
-                    vmovaps_x(c, stmp, 0);
-                    vex_rrr(c, 1, 1, 0, 0x61, 0, stmp, 1);  // VPUNPCKLWD → first 4 pixels
-                    vex_rrr(c, 1, 1, 0, 0x69, 1, stmp, 1);  // VPUNPCKHWD → last 4 pixels
+                    vmovaps_x(c, stmp, s0);
+                    vex_rrr(c, 1, 1, 0, 0x61, s0, stmp, s1);  // VPUNPCKLWD → first 4 pixels
+                    vex_rrr(c, 1, 1, 0, 0x69, s1, stmp, s1);  // VPUNPCKHWD → last 4 pixels
                     ra->free_stack[ra->nfree++] = stmp;
                 }
-                vinserti128(c, 0, 0, 1, 1);            // ymm0 = [first4 | last4]
-                vmov_store(c, 1, 0, load_ptr_x86(c, p, &last_ptr), XI, 4, 0);
+                vinserti128(c, s0, s0, s1, 1);         // ymm_s0 = [first4 | last4]
+                vmov_store(c, 1, s0, load_ptr_x86(c, p, &last_ptr), XI, 4, 0);
+                ra->free_stack[ra->nfree++] = s0;
+                ra->free_stack[ra->nfree++] = s1;
             }
             for (int ch = 0; ch < 4; ch++) {
                 if (lu[inputs[ch]] <= i) ra_free_reg(ra, inputs[ch]);
@@ -1763,8 +1785,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         // Halfs are carried as f32 in YMM. Round to fp16 precision via VCVTPS2PH+VCVTPH2PS.
         case op_half_from_f32: {
             struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
-            vcvtps2ph(c, 0, s.rx, 4);
-            vcvtph2ps(c, s.rd, 0);
+            int8_t tmp = ra_alloc(ra, sl, ns);
+            vcvtps2ph(c, tmp, s.rx, 4);
+            vcvtph2ps(c, s.rd, tmp);
+            ra->free_stack[ra->nfree++] = tmp;
         } break;
 
         case op_f32_from_half: {
@@ -1774,9 +1798,11 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         case op_half_from_i32: {
             struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            int8_t tmp = ra_alloc(ra, sl, ns);
             vcvtdq2ps(c, s.rd, s.rx);
-            vcvtps2ph(c, 0, s.rd, 4);
-            vcvtph2ps(c, s.rd, 0);
+            vcvtps2ph(c, tmp, s.rd, 4);
+            vcvtph2ps(c, s.rd, tmp);
+            ra->free_stack[ra->nfree++] = tmp;
         } break;
 
         case op_i32_from_half: {
@@ -1786,15 +1812,21 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         case op_i16_from_i32: {
             struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
-            vextracti128(c, 0, s.rx, 1);
-            vex_rrr(c, 1, 1, 0, 0x6B, s.rd, s.rx, 0);
+            int8_t tmp = ra_alloc(ra, sl, ns);
+            vextracti128(c, tmp, s.rx, 1);
+            vex_rrr(c, 1, 1, 0, 0x6B, s.rd, s.rx, tmp);
+            ra->free_stack[ra->nfree++] = tmp;
         } break;
 
         case op_shr_narrow_u32: {
             struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
-            vpsrld_i(c, 0, s.rx, (uint8_t)inst->imm);
-            vextracti128(c, 1, 0, 1);
-            vex_rrr(c, 1, 1, 0, 0x6B, s.rd, 0, 1);
+            int8_t t0 = ra_alloc(ra, sl, ns);
+            int8_t t1 = ra_alloc(ra, sl, ns);
+            vpsrld_i(c, t0, s.rx, (uint8_t)inst->imm);
+            vextracti128(c, t1, t0, 1);
+            vex_rrr(c, 1, 1, 0, 0x6B, s.rd, t0, t1);
+            ra->free_stack[ra->nfree++] = t0;
+            ra->free_stack[ra->nfree++] = t1;
         } break;
 
         case op_i32_from_i16: {
@@ -1823,17 +1855,17 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_eq_half: case op_lt_half: case op_le_half:
         case op_half_from_i16: case op_i16_from_half: {
             enum op op2 = inst->op;
-            _Bool arch_scratch = op2==op_le_s32
-                              || op2==op_lt_u32
-                              || op2==op_le_s16
-                              || op2==op_lt_u16;
-            struct ra_step s = ra_step_alu(ra, sl, ns, inst, i, scalar, arch_scratch);
+            int nscratch = (op2==op_lt_u32 || op2==op_lt_u16
+                         || op2==op_shl_i16 || op2==op_shr_u16 || op2==op_shr_s16) ? 2
+                         : (op2==op_le_s32 || op2==op_le_u32
+                         || op2==op_le_s16 || op2==op_le_u16
+                         || op2==op_i16_from_half) ? 1 : 0;
+            struct ra_step s = ra_step_alu(ra, sl, ns, inst, i, scalar, nscratch);
 
             emit_alu_reg(c, inst->op, s.rd, s.rx, s.ry, s.rz, inst->imm,
-                         s.scratch >= 0 ? s.scratch : 0);
-            if (s.scratch >= 0) {
-                ra->free_stack[ra->nfree++] = s.scratch;
-            }
+                         s.scratch, s.scratch2);
+            if (s.scratch >= 0) ra->free_stack[ra->nfree++] = s.scratch;
+            if (s.scratch2 >= 0) ra->free_stack[ra->nfree++] = s.scratch2;
         } break;
         }
     }

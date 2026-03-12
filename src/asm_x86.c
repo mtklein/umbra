@@ -221,9 +221,9 @@ void broadcast_imm32(Buf *b, int d, uint32_t v) {
     else if (v == 0xFFFFFFFFu >> shr) { vpcmpeqd(b,d,d,d); vpsrld_i(b,d,d,(uint8_t)shr); }
     else if (v == 0xFFFFFFFFu << shl) { vpcmpeqd(b,d,d,d); vpslld_i(b,d,d,(uint8_t)shl); }
     else {
-        emit1(b, 0xB8); emit4(b, v);
-        vex(b, 1, 1, 0, 0, 0, 0, RAX, 0x6E);
-        vbroadcastss(b, d, 0);
+        emit1(b, 0xB8); emit4(b, v);           // MOV eax, v
+        vex(b, 1, 1, 0, 0, d, 0, RAX, 0x6E);  // VMOVD xmm_d, eax
+        vbroadcastss(b, d, d);                  // VBROADCASTSS ymm_d, xmm_d
     }
 }
 
@@ -236,9 +236,9 @@ void broadcast_imm16(Buf *b, int d, uint16_t v) {
     else if (v == (uint16_t)(0xFFFFu >> shr)) { vpcmpeqw(b,d,d,d); vpsrlw_i(b,d,d,(uint8_t)shr); }
     else if (v == (uint16_t)(0xFFFFu << shl)) { vpcmpeqw(b,d,d,d); vpsllw_i(b,d,d,(uint8_t)shl); }
     else {
-        emit1(b, 0xB8); emit4(b, (uint32_t)v);
-        vex(b, 1, 1, 0, 0, 0, 0, RAX, 0x6E);
-        vex_rr(b, 1, 2, 0, 0x79, d, 0);
+        emit1(b, 0xB8); emit4(b, (uint32_t)v);        // MOV eax, v
+        vex(b, 1, 1, 0, 0, d, 0, RAX, 0x6E);          // VMOVD xmm_d, eax
+        vex_rr(b, 1, 2, 0, 0x79, d, d);                // VPBROADCASTW xmm_d, xmm_d
     }
 }
 
@@ -246,10 +246,10 @@ void broadcast_half_imm(Buf *b, int d, uint16_t bits) {
     if (bits == 0) {
         vpxor(b, 1, d, d, d);
     } else {
-        emit1(b, 0xB8); emit4(b, (uint32_t)bits);
-        vex(b, 1, 1, 0, 0, 0, 0, RAX, 0x6E);
-        vex_rr(b, 1, 2, 0, 0x13, 0, 0);
-        vbroadcastss(b, d, 0);
+        emit1(b, 0xB8); emit4(b, (uint32_t)bits);     // MOV eax, bits
+        vex(b, 1, 1, 0, 0, d, 0, RAX, 0x6E);          // VMOVD xmm_d, eax
+        vex_rr(b, 1, 2, 0, 0x13, d, d);                // VCVTPH2PS ymm_d, xmm_d
+        vbroadcastss(b, d, d);                          // VBROADCASTSS ymm_d, xmm_d
     }
 }
 

@@ -157,7 +157,7 @@ int8_t ra_claim(struct ra *ra, int old_val, int new_val) {
 
 static struct ra_step step0(void) {
     return (struct ra_step){ .rd=-1,.rdh=-1, .rx=-1,.ry=-1,.rz=-1,
-                             .rxh=-1,.ryh=-1,.rzh=-1, .scratch=-1 };
+                             .rxh=-1,.ryh=-1,.rzh=-1, .scratch=-1,.scratch2=-1 };
 }
 
 struct ra_step ra_step_alloc(struct ra *ra, int *sl, int *ns, int i) {
@@ -211,7 +211,7 @@ struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns,
 
 struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns,
                            struct bb_inst const *inst, int i, _Bool scalar,
-                           _Bool arch_scratch) {
+                           int nscratch) {
     int *lu = ra->last_use;
     struct ra_step s = step0();
     _Bool pair = ra->is_pair[i] && !scalar;
@@ -279,8 +279,11 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns,
 
     // 5. Scratch allocation (before freeing dead inputs to prevent aliasing).
     _Bool fma_scratch = fma && s.rd != s.rz && (s.rd == s.rx || s.rd == s.ry);
-    if (arch_scratch || fma_scratch) {
+    if (nscratch >= 1 || fma_scratch) {
         s.scratch = ra_alloc(ra, sl, ns);
+    }
+    if (nscratch >= 2) {
+        s.scratch2 = ra_alloc(ra, sl, ns);
     }
 
     // 6. Free dead inputs.
