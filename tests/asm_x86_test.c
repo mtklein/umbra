@@ -1,6 +1,7 @@
-#pragma clang diagnostic ignored "-Wunused-function"
 #include "../src/asm_x86.h"
 #include "test.h"
+#include <stdlib.h>
+#include <string.h>
 
 // All encodings verified against clang -target x86_64 + llvm-objdump.
 
