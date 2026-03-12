@@ -156,6 +156,17 @@ enum {
     CMEQ_4h_=0x2E608C00u, CMGT_4h_=0x0E603400u, CMGE_4h_=0x0E603C00u,
     CMHI_4h_=0x2E603400u, CMHS_4h_=0x2E603C00u,
 
+    // compare against zero (2-operand)
+    CMEQ_4s_z_=0x4EA09800u, CMGT_4s_z_=0x4EA08800u, CMGE_4s_z_=0x6EA08800u,
+    CMLE_4s_z_=0x6EA09800u, CMLT_4s_z_=0x4EA0A800u,
+    FCMEQ_4s_z_=0x4EA0D800u, FCMGT_4s_z_=0x4EA0C800u, FCMGE_4s_z_=0x6EA0C800u,
+    FCMLE_4s_z_=0x6EA0D800u, FCMLT_4s_z_=0x4EA0E800u,
+
+    CMEQ_4h_z_=0x0E609800u, CMGT_4h_z_=0x0E608800u, CMGE_4h_z_=0x2E608800u,
+    CMLE_4h_z_=0x2E609800u, CMLT_4h_z_=0x0E60A800u,
+    FCMEQ_4h_z_=0x0EF8D800u, FCMGT_4h_z_=0x0EF8C800u, FCMGE_4h_z_=0x2EF8C800u,
+    FCMLE_4h_z_=0x2EF8D800u, FCMLT_4h_z_=0x0EF8E800u,
+
     // conversions
     FCVTN_4h_=0x0E216800u, FCVTL_4s_=0x0E217800u,
     SCVTF_4h_=0x0E79D800u, FCVTZS_4h_=0x0EF9B800u,
@@ -176,6 +187,10 @@ V3(FCMEQ_4h) V3(FCMGT_4h) V3(FCMGE_4h)
 V3(ADD_4h) V3(SUB_4h) V3(MUL_4h)
 V3(USHL_4h) V3(SSHL_4h) V2(NEG_4h)
 V3(CMEQ_4h) V3(CMGT_4h) V3(CMGE_4h) V3(CMHI_4h) V3(CMHS_4h)
+V2(CMEQ_4s_z) V2(CMGT_4s_z) V2(CMGE_4s_z) V2(CMLE_4s_z) V2(CMLT_4s_z)
+V2(FCMEQ_4s_z) V2(FCMGT_4s_z) V2(FCMGE_4s_z) V2(FCMLE_4s_z) V2(FCMLT_4s_z)
+V2(CMEQ_4h_z) V2(CMGT_4h_z) V2(CMGE_4h_z) V2(CMLE_4h_z) V2(CMLT_4h_z)
+V2(FCMEQ_4h_z) V2(FCMGT_4h_z) V2(FCMGE_4h_z) V2(FCMLE_4h_z) V2(FCMLT_4h_z)
 V2(FCVTN_4h) V2(FCVTL_4s)
 V2(SCVTF_4h) V2(FCVTZS_4h) V2(XTN_4h) V2(SXTL_4s) V2(UXTL_8h)
 
@@ -827,7 +842,92 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             }
         } break;
 
-        default: {
+        // Compare-against-zero: use 2-operand forms when one input is imm=0.
+        case op_eq_f32: case op_lt_f32: case op_le_f32:
+        case op_eq_i32: case op_lt_s32: case op_le_s32:
+        case op_eq_i16: case op_lt_s16: case op_le_s16:
+        case op_eq_half: case op_lt_half: case op_le_half: {
+            // Check if x or y is an immediate zero.
+            _Bool x_is_0 = (bb->inst[inst->x].op == op_imm_32   && bb->inst[inst->x].imm == 0)
+                        || (bb->inst[inst->x].op == op_imm_16   && bb->inst[inst->x].imm == 0)
+                        || (bb->inst[inst->x].op == op_imm_half && bb->inst[inst->x].imm == 0);
+            _Bool y_is_0 = (bb->inst[inst->y].op == op_imm_32   && bb->inst[inst->y].imm == 0)
+                        || (bb->inst[inst->y].op == op_imm_16   && bb->inst[inst->y].imm == 0)
+                        || (bb->inst[inst->y].op == op_imm_half && bb->inst[inst->y].imm == 0);
+
+            if (x_is_0 || y_is_0) {
+                // Unary compare against zero: only need one input register.
+                int val = x_is_0 ? inst->y : inst->x;
+                struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+                // s.rx holds the non-zero operand (ra_step_unary ensures inst->x).
+                // But we may need inst->y instead. Re-map:
+                (void)s;  // We'll do custom RA here.
+                // Actually, ra_step_unary ensures inst->x. If x_is_0, we need inst->y.
+                // Let's do manual RA for clarity.
+                int8_t rv = ra_ensure(ra, sl, ns, val);
+                int8_t rvh = hi(ra, val);
+                _Bool v_dead = lu[val] <= i;
+
+                int8_t rd;
+                _Bool pair = ra->is_pair[i] && !scalar;
+                if (v_dead) {
+                    rd = ra_claim(ra, val, i);
+                } else {
+                    rd = ra_alloc(ra, sl, ns);
+                    ra->reg[i] = rd; ra->owner[(int)rd] = i;
+                }
+                int8_t rdh = -1;
+                if (pair) {
+                    if (ra->reg_hi[i] < 0) {
+                        rdh = ra_alloc(ra, sl, ns);
+                        ra->reg_hi[i] = rdh; ra->owner[(int)rdh] = i;
+                    } else {
+                        rdh = ra->reg_hi[i];
+                    }
+                }
+
+                // Emit the compare-against-zero instruction.
+                // x_is_0: cmp(0,y) — y is non-zero, "zero is on the left"
+                // y_is_0: cmp(x,0) — x is non-zero, "zero is on the right"
+                #define CZ(op_name, z_right, z_left) \
+                    case op_name: put(c, y_is_0 ? z_right(rd, rv) : z_left(rd, rv)); \
+                                  if (rdh>=0) put(c, y_is_0 ? z_right(rdh,rvh) : z_left(rdh,rvh)); \
+                                  break;
+                #define CZh(op_name, z_right, z_left) \
+                    case op_name: put(c, y_is_0 ? W(z_right(rd, rv)) : W(z_left(rd, rv))); break;
+
+                switch (inst->op) {
+                // eq is symmetric, both sides are the same
+                CZ(op_eq_f32,  FCMEQ_4s_z, FCMEQ_4s_z)
+                CZ(op_eq_i32,  CMEQ_4s_z,  CMEQ_4s_z)
+                // lt(x,0) = x<0 → CMLT; lt(0,y) = 0<y = y>0 → CMGT
+                CZ(op_lt_f32,  FCMLT_4s_z, FCMGT_4s_z)
+                CZ(op_lt_s32,  CMLT_4s_z,  CMGT_4s_z)
+                // le(x,0) = x<=0 → CMLE; le(0,y) = 0<=y = y>=0 → CMGE
+                CZ(op_le_f32,  FCMLE_4s_z, FCMGE_4s_z)
+                CZ(op_le_s32,  CMLE_4s_z,  CMGE_4s_z)
+                // 16-bit
+                CZh(op_eq_i16, CMEQ_4h_z,  CMEQ_4h_z)
+                CZh(op_lt_s16, CMLT_4h_z,  CMGT_4h_z)
+                CZh(op_le_s16, CMLE_4h_z,  CMGE_4h_z)
+                // half
+                CZh(op_eq_half, FCMEQ_4h_z, FCMEQ_4h_z)
+                CZh(op_lt_half, FCMLT_4h_z, FCMGT_4h_z)
+                CZh(op_le_half, FCMLE_4h_z, FCMGE_4h_z)
+                default: break;
+                }
+                #undef CZ
+                #undef CZh
+
+                // Free the zero input if it's dead.
+                int zero_val = x_is_0 ? inst->x : inst->y;
+                if (lu[zero_val] <= i) ra_free_reg(ra, zero_val);
+                break;
+            }
+            goto default_alu;
+        }
+
+        default: default_alu: {
             enum op op = inst->op;
             _Bool arch_scratch = op==op_shr_u32 || op==op_shr_s32
                               || op==op_shr_u16 || op==op_shr_s16;
