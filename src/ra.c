@@ -2,6 +2,67 @@
 #include <limits.h>
 #include <stdlib.h>
 
+struct ra {
+    int    *last_use;
+    int8_t *reg;
+    int8_t *reg_hi;
+    _Bool  *is_pair;
+    int    *owner;
+    int8_t *free_stack;
+    int8_t *loop_reg;       // snapshot of reg[0..preamble-1] at loop entry
+    struct ra_config cfg;
+    int     nfree;
+    int     preamble;
+    int     pinned[4];
+    int     npinned, :32;
+};
+
+// ---- Accessors ----
+
+int8_t ra_hi(struct ra const *ra, int val) {
+    return ra->reg_hi[val] >= 0 ? ra->reg_hi[val] : ra->reg[val];
+}
+
+int8_t ra_reg(struct ra const *ra, int val) {
+    return ra->reg[val];
+}
+
+int8_t ra_reg_hi(struct ra const *ra, int val) {
+    return ra->reg_hi[val];
+}
+
+int ra_last_use(struct ra const *ra, int val) {
+    return ra->last_use[val];
+}
+
+_Bool ra_is_pair(struct ra const *ra, int val) {
+    return ra->is_pair[val];
+}
+
+void ra_set_last_use(struct ra *ra, int val, int lu) {
+    ra->last_use[val] = lu;
+}
+
+void ra_set_pair(struct ra *ra, int val, _Bool p) {
+    ra->is_pair[val] = p;
+}
+
+void ra_return_reg(struct ra *ra, int8_t r) {
+    ra->free_stack[ra->nfree++] = r;
+}
+
+void ra_assign(struct ra *ra, int val, int8_t r) {
+    ra->reg[val] = r;
+    ra->owner[(int)r] = val;
+}
+
+void ra_assign_hi(struct ra *ra, int val, int8_t r) {
+    ra->reg_hi[val] = r;
+    ra->owner[(int)r] = val;
+}
+
+// ---- Core ----
+
 struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const *cfg) {
     int n = bb->insts;
     struct ra *ra = malloc(sizeof *ra);

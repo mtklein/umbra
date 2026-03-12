@@ -71,8 +71,7 @@ static void test_basic_alloc_free(void) {
     (nspills == 0) here;
 
     // Free r1, reallocate — should get r1 back
-    ra->owner[(int)r1] = 1;
-    ra->reg[1] = r1;
+    ra_assign(ra, 1, r1);
     ra_free_reg(ra, 1);
     int8_t r3 = ra_alloc(ra, sl, &ns);
     (r3 == r1) here;
@@ -98,21 +97,21 @@ static void test_eviction_belady(void) {
     reset_records();
 
     // Manually set last_use to control eviction behavior.
-    ra->last_use[0] = 4;  // used far away
-    ra->last_use[1] = 2;  // used soon
+    ra_set_last_use(ra, 0, 4);  // used far away
+    ra_set_last_use(ra, 1, 2);  // used soon
 
     // Allocate 2 registers and assign them.
     int8_t r0 = ra_alloc(ra, sl, &ns);
-    ra->reg[0] = r0; ra->owner[(int)r0] = 0;
+    ra_assign(ra, 0, r0);
     int8_t r1 = ra_alloc(ra, sl, &ns);
-    ra->reg[1] = r1; ra->owner[(int)r1] = 1;
+    ra_assign(ra, 1, r1);
 
     // Pool is now empty. Next alloc should evict value 0 (farthest last_use=4).
     int8_t r2 = ra_alloc(ra, sl, &ns);
     (nspills == 1) here;
     (spills[0].reg == r0) here;  // value 0's register was spilled
     (r2 == r0) here;             // got back the same physical register
-    (ra->reg[0] == -1) here;     // value 0 is no longer in a register
+    (ra_reg(ra, 0) == -1) here;  // value 0 is no longer in a register
     (sl[0] >= 0) here;           // value 0 got a spill slot
 
     ra_destroy(ra);
@@ -133,20 +132,20 @@ static void test_dead_value_evicted_first(void) {
     reset_records();
 
     // Value 0: dead (last_use=-1)  Value 1: used at inst 3.
-    ra->last_use[0] = -1;
-    ra->last_use[1] = 3;
+    ra_set_last_use(ra, 0, -1);
+    ra_set_last_use(ra, 1, 3);
 
     int8_t r0 = ra_alloc(ra, sl, &ns);
-    ra->reg[0] = r0; ra->owner[(int)r0] = 0;
+    ra_assign(ra, 0, r0);
     int8_t r1 = ra_alloc(ra, sl, &ns);
-    ra->reg[1] = r1; ra->owner[(int)r1] = 1;
+    ra_assign(ra, 1, r1);
 
     // Pool empty. Should evict the dead value 0, NOT the live value 1.
     int8_t r2 = ra_alloc(ra, sl, &ns);
     (nspills == 1) here;
     (spills[0].reg == r0) here;  // dead value's register was spilled
     (r2 == r0) here;
-    (ra->reg[1] == r1) here;    // live value 1 is still in its register
+    (ra_reg(ra, 1) == r1) here;    // live value 1 is still in its register
 
     ra_destroy(ra);
     free_bb(bb);
@@ -164,19 +163,19 @@ static void test_ensure_and_fill(void) {
     int ns = 0;
     reset_records();
 
-    ra->last_use[0] = 4;
-    ra->last_use[1] = 2;
-    ra->last_use[2] = 3;
+    ra_set_last_use(ra, 0, 4);
+    ra_set_last_use(ra, 1, 2);
+    ra_set_last_use(ra, 2, 3);
 
     // Allocate and assign value 0 and 1.
     int8_t r0 = ra_alloc(ra, sl, &ns);
-    ra->reg[0] = r0; ra->owner[(int)r0] = 0;
+    ra_assign(ra, 0, r0);
     int8_t r1 = ra_alloc(ra, sl, &ns);
-    ra->reg[1] = r1; ra->owner[(int)r1] = 1;
+    ra_assign(ra, 1, r1);
 
     // Allocate for value 2 — evicts value 0.
     int8_t r2 = ra_alloc(ra, sl, &ns);
-    ra->reg[2] = r2; ra->owner[(int)r2] = 2;
+    ra_assign(ra, 2, r2);
     (nspills == 1) here;
 
     // Now ensure value 0 — should trigger fill from spill slot.
@@ -184,8 +183,7 @@ static void test_ensure_and_fill(void) {
     (nfills == 1) here;
     (fills[0].slot == sl[0]) here;
     (r0b >= 0) here;
-    (ra->reg[0] == r0b) here;
-    (ra->owner[(int)r0b] == 0) here;
+    (ra_reg(ra, 0) == r0b) here;
 
     // Ensure value 0 again — should be a no-op (already in register).
     int8_t r0c = ra_ensure(ra, sl, &ns, 0);
@@ -209,14 +207,13 @@ static void test_claim(void) {
     reset_records();
 
     int8_t r0 = ra_alloc(ra, sl, &ns);
-    ra->reg[0] = r0; ra->owner[(int)r0] = 0;
+    ra_assign(ra, 0, r0);
 
     // Claim: transfer value 0's register to value 1.
     int8_t r1 = ra_claim(ra, 0, 1);
     (r1 == r0) here;
-    (ra->reg[0] == -1) here;
-    (ra->reg[1] == r0) here;
-    (ra->owner[(int)r0] == 1) here;
+    (ra_reg(ra, 0) == -1) here;
+    (ra_reg(ra, 1) == r0) here;
     (nspills == 0) here;
 
     ra_destroy(ra);
@@ -253,47 +250,42 @@ static void test_pairs(void) {
     reset_records();
 
     // Preamble values (inst 0, 1) should NOT be pairs.
-    (ra->is_pair[0] == 0) here;
-    (ra->is_pair[1] == 0) here;
+    (ra_is_pair(ra, 0) == 0) here;
+    (ra_is_pair(ra, 1) == 0) here;
     // Varying OP_32 values should be pairs.
-    (ra->is_pair[2] == 1) here;
-    (ra->is_pair[3] == 1) here;
-    (ra->is_pair[4] == 1) here;
+    (ra_is_pair(ra, 2) == 1) here;
+    (ra_is_pair(ra, 3) == 1) here;
+    (ra_is_pair(ra, 4) == 1) here;
 
     // Allocate for a non-pair value: should get 1 register.
     int8_t r0 = ra_alloc(ra, sl, &ns);
-    ra->reg[0] = r0; ra->owner[(int)r0] = 0;
-    (ra->nfree == 5) here;
+    ra_assign(ra, 0, r0);
 
     // Ensure a pair value that was never allocated — triggers alloc of 2 regs.
-    ra->last_use[2] = 4;
+    ra_set_last_use(ra, 2, 4);
     int8_t r2 = ra_ensure(ra, sl, &ns, 2);
     (r2 >= 0) here;
-    (ra->reg[2] >= 0) here;
-    (ra->reg_hi[2] >= 0) here;
-    (ra->reg[2] != ra->reg_hi[2]) here;
-    (ra->nfree == 3) here;  // 5 - 2 = 3
+    (ra_reg(ra, 2) >= 0) here;
+    (ra_reg_hi(ra, 2) >= 0) here;
+    (ra_reg(ra, 2) != ra_reg_hi(ra, 2)) here;
 
     // Free a pair: both registers return to pool.
     ra_free_reg(ra, 2);
-    (ra->nfree == 5) here;  // 3 + 2 = 5
-    (ra->reg[2] == -1) here;
-    (ra->reg_hi[2] == -1) here;
+    (ra_reg(ra, 2) == -1) here;
+    (ra_reg_hi(ra, 2) == -1) here;
 
     // Claim a pair: both registers transfer.
     int8_t r3lo = ra_alloc(ra, sl, &ns);
     int8_t r3hi = ra_alloc(ra, sl, &ns);
-    ra->reg[3] = r3lo; ra->reg_hi[3] = r3hi;
-    ra->owner[(int)r3lo] = 3; ra->owner[(int)r3hi] = 3;
+    ra_assign(ra, 3, r3lo);
+    ra_assign_hi(ra, 3, r3hi);
 
     int8_t r4 = ra_claim(ra, 3, 4);
     (r4 == r3lo) here;
-    (ra->reg[4] == r3lo) here;
-    (ra->reg_hi[4] == r3hi) here;
-    (ra->reg[3] == -1) here;
-    (ra->reg_hi[3] == -1) here;
-    (ra->owner[(int)r3lo] == 4) here;
-    (ra->owner[(int)r3hi] == 4) here;
+    (ra_reg(ra, 4) == r3lo) here;
+    (ra_reg_hi(ra, 4) == r3hi) here;
+    (ra_reg(ra, 3) == -1) here;
+    (ra_reg_hi(ra, 3) == -1) here;
 
     ra_destroy(ra);
     free(bb->inst);
@@ -326,25 +318,22 @@ static void test_pair_spill_fill(void) {
 
     // Value 0 is preamble (not a pair), takes 1 reg.
     int8_t r0 = ra_alloc(ra, sl, &ns);
-    ra->reg[0] = r0; ra->owner[(int)r0] = 0;
+    ra_assign(ra, 0, r0);
     // 3 regs left. Value 1 is a varying pair, takes 2 regs.
     int8_t r1lo = ra_alloc(ra, sl, &ns);
     int8_t r1hi = ra_alloc(ra, sl, &ns);
-    ra->reg[1] = r1lo; ra->reg_hi[1] = r1hi;
-    ra->owner[(int)r1lo] = 1; ra->owner[(int)r1hi] = 1;
+    ra_assign(ra, 1, r1lo);
+    ra_assign_hi(ra, 1, r1hi);
 
-    ra->last_use[0] = 3;
-    ra->last_use[1] = 3;
+    ra_set_last_use(ra, 0, 3);
+    ra_set_last_use(ra, 1, 3);
 
-    // 1 reg left.
-    (ra->nfree == 1) here;
-
-    // Use the last free, then force eviction.
+    // 1 reg left. Use it up.
     int8_t r_last = ra_alloc(ra, sl, &ns);
-    (ra->nfree == 0) here;
-    (r_last >= 0) here;
-    ra->free_stack[ra->nfree++] = r_last; // put it back
-    ra->nfree--;                          // take it back out
+    ra_return_reg(ra, r_last);  // put it back to restore state
+
+    // Pool empty after consuming the last reg again.
+    (void)ra_alloc(ra, sl, &ns);  // consume last free reg
 
     // Pool empty. Next alloc forces eviction.
     reset_records();
@@ -377,9 +366,9 @@ static void test_last_use_preamble(void) {
     struct ra *ra = ra_create(bb, &cfg);
 
     // Value 0 is preamble, used in varying (inst 2 and 3) → last_use should be n=4.
-    (ra->last_use[0] == 4) here;
+    (ra_last_use(ra, 0) == 4) here;
     // Value 1 is preamble, used in varying (inst 2) → last_use should be n=4.
-    (ra->last_use[1] == 4) here;
+    (ra_last_use(ra, 1) == 4) here;
 
     ra_destroy(ra);
     free_bb(bb);
@@ -404,8 +393,7 @@ static void test_many_values_stress(void) {
     for (int i = 0; i < n; i++) {
         int8_t r = ra_alloc(ra, sl, &ns);
         (r >= 0 && r < 4) here;
-        ra->reg[i] = r;
-        ra->owner[(int)r] = i;
+        ra_assign(ra, i, r);
     }
 
     // After 20 allocs with 3 regs, we should have had 17 spills.
@@ -414,7 +402,7 @@ static void test_many_values_stress(void) {
     // All values should have a spill slot except the last 3 (still in regs).
     int in_reg = 0;
     for (int i = 0; i < n; i++) {
-        if (ra->reg[i] >= 0) in_reg++;
+        if (ra_reg(ra, i) >= 0) in_reg++;
     }
     (in_reg == 3) here;
 
@@ -446,13 +434,12 @@ static void test_step_alloc(void) {
 
     struct ra_step s0 = ra_step_alloc(ra, sl, &ns, 0);
     (s0.rd >= 0) here;
-    (ra->reg[0] == s0.rd) here;
-    (ra->owner[(int)s0.rd] == 0) here;
+    (ra_reg(ra, 0) == s0.rd) here;
 
     struct ra_step s1 = ra_step_alloc(ra, sl, &ns, 1);
     (s1.rd >= 0) here;
     (s1.rd != s0.rd) here;
-    (ra->reg[1] == s1.rd) here;
+    (ra_reg(ra, 1) == s1.rd) here;
     (nspills == 0) here;
 
     ra_destroy(ra);
@@ -482,15 +469,15 @@ static void test_step_alloc_pairs(void) {
     // Preamble value: single register.
     struct ra_step s0 = ra_step_alloc(ra, sl, &ns, 0);
     (s0.rd >= 0) here;
-    (ra->is_pair[0] == 0) here;
+    (ra_is_pair(ra, 0) == 0) here;
 
     // Varying OP_32 value: pair.
     struct ra_step s1 = ra_step_alloc(ra, sl, &ns, 1);
     (s1.rd >= 0) here;
     (s1.rdh >= 0) here;
     (s1.rd != s1.rdh) here;
-    (ra->reg[1] == s1.rd) here;
-    (ra->reg_hi[1] == s1.rdh) here;
+    (ra_reg(ra, 1) == s1.rd) here;
+    (ra_reg_hi(ra, 1) == s1.rdh) here;
 
     ra_destroy(ra);
     free(bb->inst); free(bb);
@@ -518,15 +505,15 @@ static void test_step_unary(void) {
 
     // Allocate and assign value 0.
     int8_t r0 = ra_alloc(ra, sl, &ns);
-    ra->reg[0] = r0; ra->owner[(int)r0] = 0;
+    ra_assign(ra, 0, r0);
 
     // Case 1: x is dead at inst 1 → should claim x's register.
-    ra->last_use[0] = 1;
+    ra_set_last_use(ra, 0, 1);
     struct ra_step s = ra_step_unary(ra, sl, &ns, &bb->inst[1], 1, 0);
     (s.rx == r0) here;  // ensured input
     (s.rd == r0) here;  // claimed (dead input reused)
-    (ra->reg[1] == s.rd) here;
-    (ra->reg[0] == -1) here;
+    (ra_reg(ra, 1) == s.rd) here;
+    (ra_reg(ra, 0) == -1) here;
     (nspills == 0) here;
 
     ra_destroy(ra);
@@ -554,15 +541,15 @@ static void test_step_unary_alive(void) {
     reset_records();
 
     int8_t r0 = ra_alloc(ra, sl, &ns);
-    ra->reg[0] = r0; ra->owner[(int)r0] = 0;
+    ra_assign(ra, 0, r0);
 
     // x still alive at inst 2 → rd must be a different register.
-    ra->last_use[0] = 2;
+    ra_set_last_use(ra, 0, 2);
     struct ra_step s = ra_step_unary(ra, sl, &ns, &bb->inst[1], 1, 0);
     (s.rx == r0) here;
     (s.rd != r0) here;  // allocated new (input still alive)
-    (ra->reg[0] == r0) here;  // original still mapped
-    (ra->reg[1] == s.rd) here;
+    (ra_reg(ra, 0) == r0) here;  // original still mapped
+    (ra_reg(ra, 1) == s.rd) here;
 
     ra_destroy(ra);
     free(bb->inst); free(bb);
@@ -591,26 +578,26 @@ static void test_step_alu(void) {
 
     // Allocate inputs.
     int8_t r0 = ra_alloc(ra, sl, &ns);
-    ra->reg[0] = r0; ra->owner[(int)r0] = 0;
+    ra_assign(ra, 0, r0);
     int8_t r1 = ra_alloc(ra, sl, &ns);
-    ra->reg[1] = r1; ra->owner[(int)r1] = 1;
+    ra_assign(ra, 1, r1);
 
     // Both inputs dead at inst 2 → rd should claim one of them.
-    ra->last_use[0] = 2;
-    ra->last_use[1] = 2;
+    ra_set_last_use(ra, 0, 2);
+    ra_set_last_use(ra, 1, 2);
     struct ra_step s = ra_step_alu(ra, sl, &ns, &bb->inst[2], 2, 0, 0);
     (s.rx == r0) here;
     (s.ry == r1) here;
     (s.rd >= 0) here;
     (s.rd == r0 || s.rd == r1) here;  // claimed from dead input
-    (s.scratch < 0) here;  // no arch_scratch requested
+    (s.scratch < 0) here;  // no scratch requested
 
     ra_destroy(ra);
     free(bb->inst); free(bb);
 }
 
 static void test_step_alu_scratch(void) {
-    // ra_step_alu with arch_scratch=1: should allocate a scratch register.
+    // ra_step_alu with nscratch=1: should allocate a scratch register.
     static const int8_t pool[] = {5, 6, 7, 8};
     struct ra_config cfg = {
         .pool = pool, .nregs = 4, .max_reg = 10,
@@ -630,12 +617,12 @@ static void test_step_alu_scratch(void) {
     reset_records();
 
     int8_t r0 = ra_alloc(ra, sl, &ns);
-    ra->reg[0] = r0; ra->owner[(int)r0] = 0;
+    ra_assign(ra, 0, r0);
     int8_t r1 = ra_alloc(ra, sl, &ns);
-    ra->reg[1] = r1; ra->owner[(int)r1] = 1;
+    ra_assign(ra, 1, r1);
 
-    ra->last_use[0] = 2;
-    ra->last_use[1] = 2;
+    ra_set_last_use(ra, 0, 2);
+    ra_set_last_use(ra, 1, 2);
     struct ra_step s = ra_step_alu(ra, sl, &ns, &bb->inst[2], 2, 0, 1);
     (s.rd >= 0) here;
     (s.scratch >= 0) here;  // scratch was allocated

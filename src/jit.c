@@ -212,19 +212,6 @@ static struct ra* ra_create_arm64(struct umbra_basic_block const *bb, Buf *c) {
     return ra_create(bb, &cfg);
 }
 
-// Evict any values living in V0-V3 (needed before LD4/ST4 which use these as fixed destinations).
-static void evict_scratch(Buf *c, struct ra *ra, int *sl, int *ns) {
-    for (int r = 0; r < 4; r++) {
-        int val = ra->owner[r];
-        if (val < 0) continue;
-        int8_t new_r = ra_alloc(ra, sl, ns);
-        put(c, ORR_16b(new_r, r, r));
-        ra->reg[val] = new_r;
-        ra->owner[(int)new_r] = val;
-        ra->owner[r] = -1;
-    }
-}
-
 // Alias for brevity.
 #define hi ra_hi
 
@@ -297,7 +284,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     for (int i = 0; i < bb->insts; i++) sl[i] = -1;
 
     // In scalar tail, disable pairs (single-element processing).
-    for (int i = bb->preamble; i < bb->insts; i++) ra->is_pair[i] = 0;
+    for (int i = bb->preamble; i < bb->insts; i++) ra_set_pair(ra, i, 0);
 
     emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0);
     emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 1);
@@ -346,7 +333,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                      int *sl, int *ns,
                      struct ra *ra, _Bool scalar)
 {
-    int *lu = ra->last_use;
+    #define lu(v) ra_last_use(ra, (v))
     int last_ptr = -1;  // cached pointer index in XP
 
     for (int i=from; i<to; i++) {
@@ -366,7 +353,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 put(c, MOVZ_w(XT,4));
                 put(c, DUP_4s_w(tmp, XT));
                 put(c, ADD_4s(s.rdh, s.rd, tmp));
-                ra->free_stack[ra->nfree++] = tmp;
+                ra_return_reg(ra, tmp);
             } else {
                 put(c, DUP_4s_w(s.rd, XI));
                 if (!scalar) {
@@ -376,7 +363,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     put(c, MOVZ_w(XT,2)); put(c, INS_s(tmp,2,XT));
                     put(c, MOVZ_w(XT,3)); put(c, INS_s(tmp,3,XT));
                     put(c, ADD_4s(s.rd, s.rd, tmp));
-                    ra->free_stack[ra->nfree++] = tmp;
+                    ra_return_reg(ra, tmp);
                 }
             }
         } break;
@@ -429,7 +416,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 // Extract index from NEON to GPR, then load.
                 int8_t rx = ra_ensure(ra, sl, ns, inst->x);
                 put(c, UMOV_ws(XT, rx));
-                if (lu[inst->x] <= i) ra_free_reg(ra, inst->x);
+                if (lu(inst->x) <= i) ra_free_reg(ra, inst->x);
                 int p = inst->ptr;
                 load_ptr(c, p, &last_ptr);
                 if (inst->op == op_gather_32) {
@@ -438,7 +425,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     put(c, LDR_hx(s.rd, XP, XT));
                 }
             } else {
-                if (lu[inst->x] <= i) ra_free_reg(ra, inst->x);
+                if (lu(inst->x) <= i) ra_free_reg(ra, inst->x);
                 put(c, MOVI_4s(s.rd, 0, 0));
                 if (s.rdh >= 0) {
                     put(c, MOVI_4s(s.rdh, 0, 0));
@@ -458,7 +445,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 if (scalar) put(c, STR_sx(ry, XP, XI));
                 else        put(c, STR_q(ry, XP, XW));
             }
-            if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
+            if (lu(inst->y) <= i) ra_free_reg(ra, inst->y);
         } break;
 
         case op_store_16: case op_store_half: {
@@ -467,7 +454,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             load_ptr(c, p, &last_ptr);
             if (scalar) put(c, STR_hx(ry, XP, XI));
             else        put(c, STR_q(ry, XP, XH));
-            if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
+            if (lu(inst->y) <= i) ra_free_reg(ra, inst->y);
         } break;
 
         case op_scatter_32: case op_scatter_16: case op_scatter_half: {
@@ -475,7 +462,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 int8_t rx = ra_ensure(ra, sl, ns, inst->x);
                 int8_t ry = ra_ensure(ra, sl, ns, inst->y);
                 put(c, UMOV_ws(XT, rx));
-                if (lu[inst->x] <= i) ra_free_reg(ra, inst->x);
+                if (lu(inst->x) <= i) ra_free_reg(ra, inst->x);
                 int p = inst->ptr;
                 load_ptr(c, p, &last_ptr);
                 if (inst->op == op_scatter_32) {
@@ -484,9 +471,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     put(c, STR_hx(ry, XP, XT));
                 }
             } else {
-                if (lu[inst->x] <= i) ra_free_reg(ra, inst->x);
+                if (lu(inst->x) <= i) ra_free_reg(ra, inst->x);
             }
-            if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
+            if (lu(inst->y) <= i) ra_free_reg(ra, inst->y);
         } break;
 
         case op_load_8x4: {
@@ -496,39 +483,43 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
             if (scalar) {
                 load_ptr(c, p, &last_ptr);
-                int8_t rd = ra_alloc(ra, sl, ns);
-                ra->reg[i] = rd; ra->owner[(int)rd] = i;
+                struct ra_step s = ra_step_alloc(ra, sl, ns, i);
                 put(c, LSL_xi(XT, XI, 2));
                 if (ch) put(c, ADD_xi(XT, XT, ch));
                 // LDRB Wt, [Xn, Xm]
                 put(c, 0x38606800u | ((uint32_t)XT << 16) | ((uint32_t)XP << 5) | (uint32_t)XT);
                 // DUP Vd.8H, Wt (broadcast byte as u16)
-                put(c, W(0x0E020C00u) | ((uint32_t)XT << 5) | (uint32_t)rd);
+                put(c, W(0x0E020C00u) | ((uint32_t)XT << 5) | (uint32_t)s.rd);
             } else if (is_base) {
                 load_ptr(c, p, &last_ptr);
-                evict_scratch(c, ra, sl, ns);
+                // V0-V3 are scratch for LD4/ST4, not in the RA pool.
                 put(c, ADD_xr(XT, XP, XW));
                 put(c, LD4_8b(0, XT));
-                // Widen u8->u16: UXTL Vd.8H, Vn.8B (in-place)
+                // Widen u8->u16 in-place in V0-V3.
                 for (int c2 = 0; c2 < 4; c2++) {
                     put(c, UXTL_8h(c2, c2));
                 }
-                // Claim V0 for the base (ch0).
-                ra->reg[i] = 0;
-                ra->owner[0] = i;
-                // Find continuations and claim V1-V3 for them.
-                // Unclaimed channels go to the free stack.
-                _Bool ch_claimed[] = {1, 0, 0, 0};
+                // Determine which channels are needed.
+                _Bool ch_needed[] = {1, 0, 0, 0};
+                for (int j = i+1; j < to; j++) {
+                    if (bb->inst[j].op == op_load_8x4 && bb->inst[j].x == i) {
+                        ch_needed[bb->inst[j].imm] = 1;
+                    }
+                }
+                // Copy needed channels from V0-V3 into RA-allocated registers.
+                int8_t ch_regs[] = {-1, -1, -1, -1};
+                for (int c2 = 0; c2 < 4; c2++) {
+                    if (!ch_needed[c2]) continue;
+                    ch_regs[c2] = ra_alloc(ra, sl, ns);
+                    put(c, ORR_16b(ch_regs[c2], c2, c2));
+                }
+                // Assign RA ownership.
+                ra_assign(ra, i, ch_regs[0]);
                 for (int j = i+1; j < to; j++) {
                     if (bb->inst[j].op == op_load_8x4 && bb->inst[j].x == i) {
                         int c2 = bb->inst[j].imm;
-                        ra->reg[j] = (int8_t)c2;
-                        ra->owner[c2] = j;
-                        ch_claimed[c2] = 1;
+                        ra_assign(ra, j, ch_regs[c2]);
                     }
-                }
-                for (int c2 = 0; c2 < 4; c2++) {
-                    if (!ch_claimed[c2]) ra->free_stack[ra->nfree++] = (int8_t)c2;
                 }
             }
             // Continuation slots: already claimed by base, nothing to emit.
@@ -547,24 +538,11 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     put(c, ST1_b(ry, 0, XT));
                 }
             } else {
-                // Evict V0-V3 values that aren't one of our 4 inputs.
-                _Bool is_input[4] = {0,0,0,0};
-                for (int ch = 0; ch < 4; ch++) {
-                    int8_t ry = ra->reg[inputs[ch]];
-                    if (ry >= 0 && ry < 4) is_input[ry] = 1;
-                }
-                for (int r = 0; r < 4; r++) {
-                    int val = ra->owner[r];
-                    if (val < 0 || is_input[r]) continue;
-                    int8_t new_r = ra_alloc(ra, sl, ns);
-                    put(c, ORR_16b(new_r, r, r));
-                    ra->reg[val] = new_r;
-                    ra->owner[(int)new_r] = val;
-                    ra->owner[r] = -1;
-                }
+                // V0-V3 are scratch for LD4/ST4, not in the RA pool.
+                // Copy inputs from RA registers into V0-V3.
                 for (int ch = 0; ch < 4; ch++) {
                     int8_t ry = ra_ensure(ra, sl, ns, inputs[ch]);
-                    if (ry != (int8_t)ch) put(c, ORR_16b(ch, ry, ry));
+                    put(c, ORR_16b(ch, ry, ry));
                 }
                 // Narrow u16->u8: XTN Vd.8B, Vn.8H (in-place)
                 for (int ch = 0; ch < 4; ch++) {
@@ -572,13 +550,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 }
                 put(c, ADD_xr(XT, XP, XW));
                 put(c, ST4_8b(0, XT));
-                // V0-V3 now hold interleaved data; clear ownership.
-                for (int r = 0; r < 4; r++) {
-                    ra->owner[r] = -1;
-                }
             }
             for (int ch = 0; ch < 4; ch++) {
-                if (lu[inputs[ch]] <= i) ra_free_reg(ra, inputs[ch]);
+                if (lu(inputs[ch]) <= i) ra_free_reg(ra, inputs[ch]);
             }
         } break;
 
@@ -611,7 +585,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 put(c, FCVTN_4h(s.rd, tmp));
                 put(c, SCVTF_4s(tmp, s.rxh));
                 put(c, W(FCVTN_4h(s.rd, tmp)));
-                ra->free_stack[ra->nfree++] = tmp;
+                ra_return_reg(ra, tmp);
             } else {
                 // Non-pair: use rd as intermediate (NEON reads all before writing).
                 put(c, SCVTF_4s(s.rd, s.rx));
@@ -685,31 +659,24 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             if (x_is_0 || y_is_0) {
                 // Unary compare against zero: only need one input register.
                 int val = x_is_0 ? inst->y : inst->x;
-                struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
-                // s.rx holds the non-zero operand (ra_step_unary ensures inst->x).
-                // But we may need inst->y instead. Re-map:
-                (void)s;  // We'll do custom RA here.
-                // Actually, ra_step_unary ensures inst->x. If x_is_0, we need inst->y.
-                // Let's do manual RA for clarity.
                 int8_t rv = ra_ensure(ra, sl, ns, val);
                 int8_t rvh = hi(ra, val);
-                _Bool v_dead = lu[val] <= i;
+                _Bool v_dead = lu(val) <= i;
 
                 int8_t rd;
-                _Bool pair = ra->is_pair[i] && !scalar;
+                _Bool pair = ra_is_pair(ra, i) && !scalar;
                 if (v_dead) {
                     rd = ra_claim(ra, val, i);
                 } else {
                     rd = ra_alloc(ra, sl, ns);
-                    ra->reg[i] = rd; ra->owner[(int)rd] = i;
+                    ra_assign(ra, i, rd);
                 }
                 int8_t rdh = -1;
                 if (pair) {
-                    if (ra->reg_hi[i] < 0) {
+                    rdh = ra_reg_hi(ra, i);
+                    if (rdh < 0) {
                         rdh = ra_alloc(ra, sl, ns);
-                        ra->reg_hi[i] = rdh; ra->owner[(int)rdh] = i;
-                    } else {
-                        rdh = ra->reg_hi[i];
+                        ra_assign_hi(ra, i, rdh);
                     }
                 }
 
@@ -772,7 +739,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
                 // Free the zero input if it's dead.
                 int zero_val = x_is_0 ? inst->x : inst->y;
-                if (lu[zero_val] <= i) ra_free_reg(ra, zero_val);
+                if (lu(zero_val) <= i) ra_free_reg(ra, zero_val);
                 break;
             }
             goto default_alu;
@@ -807,11 +774,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 emit_alu_reg(c, inst->op, s.rdh, s.rxh, s.ryh, s.rzh, inst->imm, s.scratch);
             }
             if (s.scratch >= 0) {
-                ra->free_stack[ra->nfree++] = s.scratch;
+                ra_return_reg(ra, s.scratch);
             }
         } break;
         }
     }
+    #undef lu
 }
 
 void umbra_jit_run(struct umbra_jit *j, int n, umbra_buf buf[]) {
@@ -1321,7 +1289,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                      int *sl, int *ns,
                      struct ra *ra, _Bool scalar)
 {
-    int *lu = ra->last_use;
+    #define lu(v) ra_last_use(ra, (v))
     int last_ptr = -1;  // cached pointer index in R11
 
     for (int i = from; i < to; i++) {
@@ -1348,7 +1316,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 vfill(c, tmp, 0);
                 vpaddd(c, s.rd, s.rd, tmp);
                 add_ri(c, RSP, 32);
-                ra->free_stack[ra->nfree++] = tmp;
+                ra_return_reg(ra, tmp);
             }
         } break;
 
@@ -1403,13 +1371,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 int8_t tmp = ra_alloc(ra, sl, ns);
                 vex(c, 1, 1, 0, 0, tmp, 0, RAX, 0x6E);  // VMOVD xmm_tmp, eax
                 vcvtph2ps(c, s.rd, tmp);                  // VCVTPH2PS xmm_rd, xmm_tmp
-                ra->free_stack[ra->nfree++] = tmp;
+                ra_return_reg(ra, tmp);
             } else {
                 // Load 8 × fp16 = 16 bytes into xmm, then VCVTPH2PS to ymm
                 int8_t tmp = ra_alloc(ra, sl, ns);
                 vmov_load(c, 0, tmp, load_ptr_x86(c, p, &last_ptr), XI, 2, 0);
                 vcvtph2ps(c, s.rd, tmp);
-                ra->free_stack[ra->nfree++] = tmp;
+                ra_return_reg(ra, tmp);
             }
         } break;
 
@@ -1422,7 +1390,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             } else {
                 vmov_store(c, 1, ry, load_ptr_x86(c, p, &last_ptr), XI, 4, 0);
             }
-            if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
+            if (lu(inst->y) <= i) ra_free_reg(ra, inst->y);
         } break;
 
         case op_store_16: {
@@ -1446,7 +1414,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             } else {
                 vmov_store(c, 0, ry, load_ptr_x86(c, p, &last_ptr), XI, 2, 0);
             }
-            if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
+            if (lu(inst->y) <= i) ra_free_reg(ra, inst->y);
         } break;
 
         case op_store_half: {
@@ -1471,8 +1439,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 vcvtps2ph(c, tmp, ry, 4);
                 vmov_store(c, 0, tmp, load_ptr_x86(c, p, &last_ptr), XI, 2, 0);
             }
-            ra->free_stack[ra->nfree++] = tmp;
-            if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
+            ra_return_reg(ra, tmp);
+            if (lu(inst->y) <= i) ra_free_reg(ra, inst->y);
         } break;
 
         case op_uni_32: {
@@ -1529,7 +1497,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 int8_t tmp = ra_alloc(ra, sl, ns);
                 vex(c, 1, 1, 0, 0, tmp, 0, RAX, 0x6E);   // VMOVD xmm_tmp, eax
                 vex_rr(c, 1, 2, 0, 0x79, s.rd, tmp);      // VPBROADCASTW xmm_rd, xmm_tmp
-                ra->free_stack[ra->nfree++] = tmp;
+                ra_return_reg(ra, tmp);
             }
         } break;
 
@@ -1558,7 +1526,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 vex(c, 1, 1, 0, 0, tmp, 0, RAX, 0x6E);   // VMOVD xmm_tmp, eax
                 vex_rr(c, 1, 2, 0, 0x79, tmp, tmp);       // VPBROADCASTW xmm_tmp, xmm_tmp
                 vcvtph2ps(c, s.rd, tmp);                   // VCVTPH2PS ymm_rd, xmm_tmp
-                ra->free_stack[ra->nfree++] = tmp;
+                ra_return_reg(ra, tmp);
             }
         } break;
 
@@ -1568,7 +1536,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 // Extract index to RAX, then load from ptr + rax * elem_size
                 int8_t rx = ra_ensure(ra, sl, ns, inst->x);
                 vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7E);  // VMOVD eax, xmm_rx
-                if (lu[inst->x] <= i) ra_free_reg(ra, inst->x);
+                if (lu(inst->x) <= i) ra_free_reg(ra, inst->x);
                 int p = inst->ptr;
                 int base = load_ptr_x86(c, p, &last_ptr);
                 if (inst->op == op_gather_32) {
@@ -1599,11 +1567,11 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                         int8_t tmp = ra_alloc(ra, sl, ns);
                         vex(c, 1, 1, 0, 0, tmp, 0, RAX, 0x6E);  // VMOVD xmm_tmp, eax
                         vcvtph2ps(c, s.rd, tmp);
-                        ra->free_stack[ra->nfree++] = tmp;
+                        ra_return_reg(ra, tmp);
                     }
                 }
             } else {
-                if (lu[inst->x] <= i) ra_free_reg(ra, inst->x);
+                if (lu(inst->x) <= i) ra_free_reg(ra, inst->x);
                 vpxor(c, 1, s.rd, s.rd, s.rd);
             }
         } break;
@@ -1614,7 +1582,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 int8_t ry = ra_ensure(ra, sl, ns, inst->y);
                 // Extract index to RAX
                 vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7E);  // VMOVD eax, xmm_rx
-                if (lu[inst->x] <= i) ra_free_reg(ra, inst->x);
+                if (lu(inst->x) <= i) ra_free_reg(ra, inst->x);
                 int p = inst->ptr;
                 int base = load_ptr_x86(c, p, &last_ptr);
                 if (inst->op == op_scatter_32) {
@@ -1634,13 +1602,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     emit1(c, 0x4D); emit1(c, 0x8D); emit1(c, 0x1C); emit1(c, 0x43);
                     vex(c, 1, 1, 0, 0, tmp, 0, RAX, 0x7E);
                     emit1(c, 0x66); emit1(c, 0x41); emit1(c, 0x89); emit1(c, 0x03);
-                    ra->free_stack[ra->nfree++] = tmp;
+                    ra_return_reg(ra, tmp);
                     last_ptr = -1;
                 }
             } else {
-                if (lu[inst->x] <= i) ra_free_reg(ra, inst->x);
+                if (lu(inst->x) <= i) ra_free_reg(ra, inst->x);
             }
-            if (lu[inst->y] <= i) ra_free_reg(ra, inst->y);
+            if (lu(inst->y) <= i) ra_free_reg(ra, inst->y);
         } break;
 
         case op_load_8x4: {
@@ -1649,8 +1617,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             int p = is_base ? inst->ptr : bb->inst[inst->x].ptr;
 
             if (scalar) {
-                int8_t rd = ra_alloc(ra, sl, ns);
-                ra->reg[i] = rd; ra->owner[(int)rd] = i;
+                struct ra_step rs = ra_step_alloc(ra, sl, ns, i);
                 // Load single byte: MOVZX eax, byte [base + R10*4 + ch]
                 {
                     int base = load_ptr_x86(c, p, &last_ptr);
@@ -1667,7 +1634,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     if (mod == 1) emit1(c, (uint8_t)disp);
                     else if (mod == 2) emit4(c, (uint32_t)disp);
                 }
-                vex(c, 1, 1, 0, 0, rd, 0, RAX, 0x6E);  // VMOVD xmm, eax (as u16, zero-extended)
+                vex(c, 1, 1, 0, 0, rs.rd, 0, RAX, 0x6E);  // VMOVD xmm, eax (as u16, zero-extended)
             } else if (is_base) {
                 // Load 8 pixels × 4 channels = 32 bytes of interleaved RGBA u8 data.
                 // Deinterleave into 4 × 8-element u16 XMM registers.
@@ -1697,19 +1664,16 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     vex_rrr(c, 1, 2, 0, 0x2B, rd2, s0, rd2);      // VPACKUSDW: 4+4 u32 → 8 u16
                 }
 
-                ra->free_stack[ra->nfree++] = loaded;
-                ra->free_stack[ra->nfree++] = s0;
-                ra->free_stack[ra->nfree++] = mask;
+                ra_return_reg(ra, loaded);
+                ra_return_reg(ra, s0);
+                ra_return_reg(ra, mask);
 
-                // Fix up: base instruction owns ch0
-                ra->reg[i] = ch_regs[0]; ra->owner[(int)ch_regs[0]] = i;
-
-                // Assign continuation channels
+                // Assign RA ownership.
+                ra_assign(ra, i, ch_regs[0]);
                 for (int j = i+1; j < to; j++) {
                     if (bb->inst[j].op == op_load_8x4 && bb->inst[j].x == i) {
                         int c2 = bb->inst[j].imm;
-                        ra->reg[j] = ch_regs[c2];
-                        ra->owner[(int)ch_regs[c2]] = j;
+                        ra_assign(ra, j, ch_regs[c2]);
                     }
                 }
             }
@@ -1742,8 +1706,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             } else {
                 // Narrow 4 × 8×u16(XMM) channels to u8, interleave to RGBA, store 32 bytes.
                 for (int ch2 = 0; ch2 < 4; ch2++) ra_ensure(ra, sl, ns, inputs[ch2]);
-                int8_t r0 = ra->reg[inputs[0]], r1 = ra->reg[inputs[1]];
-                int8_t r2 = ra->reg[inputs[2]], r3 = ra->reg[inputs[3]];
+                int8_t r0 = ra_reg(ra, inputs[0]), r1 = ra_reg(ra, inputs[1]);
+                int8_t r2 = ra_reg(ra, inputs[2]), r3 = ra_reg(ra, inputs[3]);
 
                 int8_t s0 = ra_alloc(ra, sl, ns);
                 int8_t s1 = ra_alloc(ra, sl, ns);
@@ -1760,9 +1724,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     int8_t atmp = ra_alloc(ra, sl, ns);
                     vpackuswb(c, atmp, r3, zero);       // atmp = [A0..A7, 0..0]
                     vpunpcklbw(c, s1, s1, atmp);        // s1 = [B0,A0,...,B7,A7]
-                    ra->free_stack[ra->nfree++] = atmp;
+                    ra_return_reg(ra, atmp);
                 }
-                ra->free_stack[ra->nfree++] = zero;
+                ra_return_reg(ra, zero);
 
                 // s0=[RG pairs], s1=[BA pairs] → interleave words for RGBA pixels
                 {
@@ -1770,15 +1734,15 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     vmovaps_x(c, stmp, s0);
                     vex_rrr(c, 1, 1, 0, 0x61, s0, stmp, s1);  // VPUNPCKLWD → first 4 pixels
                     vex_rrr(c, 1, 1, 0, 0x69, s1, stmp, s1);  // VPUNPCKHWD → last 4 pixels
-                    ra->free_stack[ra->nfree++] = stmp;
+                    ra_return_reg(ra, stmp);
                 }
                 vinserti128(c, s0, s0, s1, 1);         // ymm_s0 = [first4 | last4]
                 vmov_store(c, 1, s0, load_ptr_x86(c, p, &last_ptr), XI, 4, 0);
-                ra->free_stack[ra->nfree++] = s0;
-                ra->free_stack[ra->nfree++] = s1;
+                ra_return_reg(ra, s0);
+                ra_return_reg(ra, s1);
             }
             for (int ch = 0; ch < 4; ch++) {
-                if (lu[inputs[ch]] <= i) ra_free_reg(ra, inputs[ch]);
+                if (lu(inputs[ch]) <= i) ra_free_reg(ra, inputs[ch]);
             }
         } break;
 
@@ -1788,7 +1752,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             int8_t tmp = ra_alloc(ra, sl, ns);
             vcvtps2ph(c, tmp, s.rx, 4);
             vcvtph2ps(c, s.rd, tmp);
-            ra->free_stack[ra->nfree++] = tmp;
+            ra_return_reg(ra, tmp);
         } break;
 
         case op_f32_from_half: {
@@ -1802,7 +1766,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             vcvtdq2ps(c, s.rd, s.rx);
             vcvtps2ph(c, tmp, s.rd, 4);
             vcvtph2ps(c, s.rd, tmp);
-            ra->free_stack[ra->nfree++] = tmp;
+            ra_return_reg(ra, tmp);
         } break;
 
         case op_i32_from_half: {
@@ -1815,7 +1779,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             int8_t tmp = ra_alloc(ra, sl, ns);
             vextracti128(c, tmp, s.rx, 1);
             vex_rrr(c, 1, 1, 0, 0x6B, s.rd, s.rx, tmp);
-            ra->free_stack[ra->nfree++] = tmp;
+            ra_return_reg(ra, tmp);
         } break;
 
         case op_shr_narrow_u32: {
@@ -1825,8 +1789,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             vpsrld_i(c, t0, s.rx, (uint8_t)inst->imm);
             vextracti128(c, t1, t0, 1);
             vex_rrr(c, 1, 1, 0, 0x6B, s.rd, t0, t1);
-            ra->free_stack[ra->nfree++] = t0;
-            ra->free_stack[ra->nfree++] = t1;
+            ra_return_reg(ra, t0);
+            ra_return_reg(ra, t1);
         } break;
 
         case op_i32_from_i16: {
@@ -1864,11 +1828,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
             emit_alu_reg(c, inst->op, s.rd, s.rx, s.ry, s.rz, inst->imm,
                          s.scratch, s.scratch2);
-            if (s.scratch >= 0) ra->free_stack[ra->nfree++] = s.scratch;
-            if (s.scratch2 >= 0) ra->free_stack[ra->nfree++] = s.scratch2;
+            if (s.scratch >= 0) ra_return_reg(ra, s.scratch);
+            if (s.scratch2 >= 0) ra_return_reg(ra, s.scratch2);
         } break;
         }
     }
+    #undef lu
 }
 
 void umbra_jit_run(struct umbra_jit *j, int n, umbra_buf buf[]) {
