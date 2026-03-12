@@ -118,7 +118,17 @@ static int const_eval(enum op op, int xb, int yb, int zb) {
         case op_lt_u16: return (uint16_t)-(int)(xh <  yh);
         case op_le_u16: return (uint16_t)-(int)(xh <= yh);
 
-        default: return 0;
+        case op_lane:
+        case op_imm_16: case op_imm_32: case op_imm_half:
+        case op_uni_16: case op_uni_32: case op_uni_half:
+        case op_load_16: case op_load_32: case op_load_half:
+        case op_gather_16: case op_gather_32: case op_gather_half:
+        case op_store_16: case op_store_32: case op_store_half:
+        case op_scatter_16: case op_scatter_32: case op_scatter_half:
+        case op_shl_i32_imm: case op_shr_u32_imm: case op_shr_s32_imm:
+        case op_shl_i16_imm: case op_shr_u16_imm: case op_shr_s16_imm:
+        case op_load_8x4: case op_store_8x4:
+            return 0;
     }
 }
 
@@ -802,14 +812,44 @@ void umbra_basic_block_dump(struct umbra_basic_block const *bb, FILE *f) {
                 break;
             case op_shl_i32_imm: case op_shr_u32_imm: case op_shr_s32_imm:
             case op_shl_i16_imm: case op_shr_u16_imm: case op_shr_s16_imm:
+            case op_shr_narrow_u32:
                 fprintf(f, " v%d %d", inst->x, inst->imm);
                 break;
             case op_lane: break;
-            default: {
+
+            case op_store_16: case op_store_32: case op_store_half:
+            case op_scatter_16: case op_scatter_32: case op_scatter_half:
+            case op_store_8x4:
+                break;
+
+            case op_add_f32: case op_sub_f32: case op_mul_f32: case op_div_f32:
+            case op_min_f32: case op_max_f32: case op_sqrt_f32:
+            case op_fma_f32: case op_fms_f32:
+            case op_add_i32: case op_sub_i32: case op_mul_i32:
+            case op_shl_i32: case op_shr_u32: case op_shr_s32:
+            case op_and_32: case op_or_32: case op_xor_32: case op_sel_32:
+            case op_f32_from_i32: case op_i32_from_f32:
+            case op_f32_from_half: case op_i32_from_half: case op_i32_from_i16:
+            case op_eq_f32: case op_lt_f32: case op_le_f32:
+            case op_eq_i32: case op_lt_s32: case op_le_s32:
+            case op_lt_u32: case op_le_u32:
+            case op_add_i16: case op_sub_i16: case op_mul_i16:
+            case op_shl_i16: case op_shr_u16: case op_shr_s16:
+            case op_and_16: case op_or_16: case op_xor_16: case op_sel_16:
+            case op_i16_from_i32:
+            case op_eq_i16: case op_lt_s16: case op_le_s16:
+            case op_lt_u16: case op_le_u16:
+            case op_add_half: case op_sub_half: case op_mul_half: case op_div_half:
+            case op_min_half: case op_max_half: case op_sqrt_half:
+            case op_fma_half: case op_fms_half:
+            case op_and_half: case op_or_half: case op_xor_half: case op_sel_half:
+            case op_half_from_f32: case op_half_from_i32: case op_half_from_i16:
+            case op_i16_from_half:
+            case op_eq_half: case op_lt_half: case op_le_half:
                 fprintf(f, " v%d", inst->x);
                 if (inst->y) fprintf(f, " v%d", inst->y);
                 if (inst->z) fprintf(f, " v%d", inst->z);
-            } break;
+                break;
         }
         fprintf(f, "\n");
     }

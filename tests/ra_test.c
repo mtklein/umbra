@@ -431,6 +431,222 @@ static void test_many_values_stress(void) {
     free_bb(bb);
 }
 
+static void test_step_alloc(void) {
+    // ra_step_alloc: allocate output register(s) for instruction i.
+    static const int8_t pool[] = {5, 6, 7, 8};
+    struct ra_config cfg = {
+        .pool = pool, .nregs = 4, .max_reg = 10,
+        .has_pairs = 0, .spill = test_spill, .fill = test_fill, .ctx = 0,
+    };
+    struct umbra_basic_block *bb = make_bb(3, 0);
+    struct ra *ra = ra_create(bb, &cfg);
+    int sl[3] = {-1,-1,-1};
+    int ns = 0;
+    reset_records();
+
+    struct ra_step s0 = ra_step_alloc(ra, sl, &ns, 0);
+    (s0.rd >= 0) here;
+    (ra->reg[0] == s0.rd) here;
+    (ra->owner[(int)s0.rd] == 0) here;
+
+    struct ra_step s1 = ra_step_alloc(ra, sl, &ns, 1);
+    (s1.rd >= 0) here;
+    (s1.rd != s0.rd) here;
+    (ra->reg[1] == s1.rd) here;
+    (nspills == 0) here;
+
+    ra_destroy(ra);
+    free_bb(bb);
+}
+
+static void test_step_alloc_pairs(void) {
+    // ra_step_alloc with pairs: varying OP_32 values get 2 registers.
+    static const int8_t pool[] = {4, 5, 6, 7};
+    struct ra_config cfg = {
+        .pool = pool, .nregs = 4, .max_reg = 8,
+        .has_pairs = 1, .spill = test_spill, .fill = test_fill, .ctx = 0,
+    };
+    struct umbra_basic_block *bb = malloc(sizeof *bb);
+    bb->inst = calloc(3, sizeof *bb->inst);
+    bb->insts = 3; bb->preamble = 1;
+    bb->ht = 0; bb->ht_mask = 0;
+    bb->inst[0].op = op_imm_32; bb->inst[0].imm = 1;
+    bb->inst[1].op = op_add_f32; bb->inst[1].x = 0; bb->inst[1].y = 0;
+    bb->inst[2].op = op_add_f32; bb->inst[2].x = 1; bb->inst[2].y = 0;
+
+    struct ra *ra = ra_create(bb, &cfg);
+    int sl[3] = {-1,-1,-1};
+    int ns = 0;
+    reset_records();
+
+    // Preamble value: single register.
+    struct ra_step s0 = ra_step_alloc(ra, sl, &ns, 0);
+    (s0.rd >= 0) here;
+    (ra->is_pair[0] == 0) here;
+
+    // Varying OP_32 value: pair.
+    struct ra_step s1 = ra_step_alloc(ra, sl, &ns, 1);
+    (s1.rd >= 0) here;
+    (s1.rdh >= 0) here;
+    (s1.rd != s1.rdh) here;
+    (ra->reg[1] == s1.rd) here;
+    (ra->reg_hi[1] == s1.rdh) here;
+
+    ra_destroy(ra);
+    free(bb->inst); free(bb);
+}
+
+static void test_step_unary(void) {
+    // ra_step_unary: ensure input, claim if dead, else alloc.
+    static const int8_t pool[] = {5, 6, 7, 8};
+    struct ra_config cfg = {
+        .pool = pool, .nregs = 4, .max_reg = 10,
+        .has_pairs = 0, .spill = test_spill, .fill = test_fill, .ctx = 0,
+    };
+    // BB: inst 0 = imm_16, inst 1 = i32_from_i16(v0) — unary conversion.
+    struct umbra_basic_block *bb = malloc(sizeof *bb);
+    bb->inst = calloc(2, sizeof *bb->inst);
+    bb->insts = 2; bb->preamble = 0;
+    bb->ht = 0; bb->ht_mask = 0;
+    bb->inst[0].op = op_imm_16; bb->inst[0].imm = 42;
+    bb->inst[1].op = op_i32_from_i16; bb->inst[1].x = 0;
+
+    struct ra *ra = ra_create(bb, &cfg);
+    int sl[2] = {-1,-1};
+    int ns = 0;
+    reset_records();
+
+    // Allocate and assign value 0.
+    int8_t r0 = ra_alloc(ra, sl, &ns);
+    ra->reg[0] = r0; ra->owner[(int)r0] = 0;
+
+    // Case 1: x is dead at inst 1 → should claim x's register.
+    ra->last_use[0] = 1;
+    struct ra_step s = ra_step_unary(ra, sl, &ns, &bb->inst[1], 1, 0);
+    (s.rx == r0) here;  // ensured input
+    (s.rd == r0) here;  // claimed (dead input reused)
+    (ra->reg[1] == s.rd) here;
+    (ra->reg[0] == -1) here;
+    (nspills == 0) here;
+
+    ra_destroy(ra);
+    free(bb->inst); free(bb);
+}
+
+static void test_step_unary_alive(void) {
+    // ra_step_unary: input still alive → must alloc new register.
+    static const int8_t pool[] = {5, 6, 7, 8};
+    struct ra_config cfg = {
+        .pool = pool, .nregs = 4, .max_reg = 10,
+        .has_pairs = 0, .spill = test_spill, .fill = test_fill, .ctx = 0,
+    };
+    struct umbra_basic_block *bb = malloc(sizeof *bb);
+    bb->inst = calloc(3, sizeof *bb->inst);
+    bb->insts = 3; bb->preamble = 0;
+    bb->ht = 0; bb->ht_mask = 0;
+    bb->inst[0].op = op_imm_16; bb->inst[0].imm = 42;
+    bb->inst[1].op = op_i32_from_i16; bb->inst[1].x = 0;
+    bb->inst[2].op = op_add_i16; bb->inst[2].x = 0; bb->inst[2].y = 0;
+
+    struct ra *ra = ra_create(bb, &cfg);
+    int sl[3] = {-1,-1,-1};
+    int ns = 0;
+    reset_records();
+
+    int8_t r0 = ra_alloc(ra, sl, &ns);
+    ra->reg[0] = r0; ra->owner[(int)r0] = 0;
+
+    // x still alive at inst 2 → rd must be a different register.
+    ra->last_use[0] = 2;
+    struct ra_step s = ra_step_unary(ra, sl, &ns, &bb->inst[1], 1, 0);
+    (s.rx == r0) here;
+    (s.rd != r0) here;  // allocated new (input still alive)
+    (ra->reg[0] == r0) here;  // original still mapped
+    (ra->reg[1] == s.rd) here;
+
+    ra_destroy(ra);
+    free(bb->inst); free(bb);
+}
+
+static void test_step_alu(void) {
+    // ra_step_alu: ensure two inputs, dead analysis, claim/alloc rd.
+    static const int8_t pool[] = {5, 6, 7, 8};
+    struct ra_config cfg = {
+        .pool = pool, .nregs = 4, .max_reg = 10,
+        .has_pairs = 0, .spill = test_spill, .fill = test_fill, .ctx = 0,
+    };
+    // BB: inst 0 = imm_16(1), inst 1 = imm_16(2), inst 2 = add_i16(v0, v1)
+    struct umbra_basic_block *bb = malloc(sizeof *bb);
+    bb->inst = calloc(3, sizeof *bb->inst);
+    bb->insts = 3; bb->preamble = 0;
+    bb->ht = 0; bb->ht_mask = 0;
+    bb->inst[0].op = op_imm_16; bb->inst[0].imm = 1;
+    bb->inst[1].op = op_imm_16; bb->inst[1].imm = 2;
+    bb->inst[2].op = op_add_i16; bb->inst[2].x = 0; bb->inst[2].y = 1;
+
+    struct ra *ra = ra_create(bb, &cfg);
+    int sl[3] = {-1,-1,-1};
+    int ns = 0;
+    reset_records();
+
+    // Allocate inputs.
+    int8_t r0 = ra_alloc(ra, sl, &ns);
+    ra->reg[0] = r0; ra->owner[(int)r0] = 0;
+    int8_t r1 = ra_alloc(ra, sl, &ns);
+    ra->reg[1] = r1; ra->owner[(int)r1] = 1;
+
+    // Both inputs dead at inst 2 → rd should claim one of them.
+    ra->last_use[0] = 2;
+    ra->last_use[1] = 2;
+    struct ra_step s = ra_step_alu(ra, sl, &ns, &bb->inst[2], 2, 0, 0);
+    (s.rx == r0) here;
+    (s.ry == r1) here;
+    (s.rd >= 0) here;
+    (s.rd == r0 || s.rd == r1) here;  // claimed from dead input
+    (s.scratch < 0) here;  // no arch_scratch requested
+
+    ra_destroy(ra);
+    free(bb->inst); free(bb);
+}
+
+static void test_step_alu_scratch(void) {
+    // ra_step_alu with arch_scratch=1: should allocate a scratch register.
+    static const int8_t pool[] = {5, 6, 7, 8};
+    struct ra_config cfg = {
+        .pool = pool, .nregs = 4, .max_reg = 10,
+        .has_pairs = 0, .spill = test_spill, .fill = test_fill, .ctx = 0,
+    };
+    struct umbra_basic_block *bb = malloc(sizeof *bb);
+    bb->inst = calloc(3, sizeof *bb->inst);
+    bb->insts = 3; bb->preamble = 0;
+    bb->ht = 0; bb->ht_mask = 0;
+    bb->inst[0].op = op_imm_16; bb->inst[0].imm = 1;
+    bb->inst[1].op = op_imm_16; bb->inst[1].imm = 2;
+    bb->inst[2].op = op_add_i16; bb->inst[2].x = 0; bb->inst[2].y = 1;
+
+    struct ra *ra = ra_create(bb, &cfg);
+    int sl[3] = {-1,-1,-1};
+    int ns = 0;
+    reset_records();
+
+    int8_t r0 = ra_alloc(ra, sl, &ns);
+    ra->reg[0] = r0; ra->owner[(int)r0] = 0;
+    int8_t r1 = ra_alloc(ra, sl, &ns);
+    ra->reg[1] = r1; ra->owner[(int)r1] = 1;
+
+    ra->last_use[0] = 2;
+    ra->last_use[1] = 2;
+    struct ra_step s = ra_step_alu(ra, sl, &ns, &bb->inst[2], 2, 0, 1);
+    (s.rd >= 0) here;
+    (s.scratch >= 0) here;  // scratch was allocated
+    (s.scratch != s.rd) here;
+    (s.scratch != s.rx) here;
+    (s.scratch != s.ry) here;
+
+    ra_destroy(ra);
+    free(bb->inst); free(bb);
+}
+
 int main(void) {
     test_basic_alloc_free();
     test_eviction_belady();
@@ -441,5 +657,11 @@ int main(void) {
     test_pair_spill_fill();
     test_last_use_preamble();
     test_many_values_stress();
+    test_step_alloc();
+    test_step_alloc_pairs();
+    test_step_unary();
+    test_step_unary_alive();
+    test_step_alu();
+    test_step_alu_scratch();
     return 0;
 }

@@ -1357,6 +1357,97 @@ static void test_mixed_ptr_sizes(void) {
   }
 }
 
+// Regression test: shr_narrow_u32 is (u16)(u32 >> imm), fused from i16_from_i32(shr_u32_imm).
+// This op was missing from metal.m's emit_ops, silently producing wrong GPU results.
+static void test_shr_narrow_u32(void) {
+  for (int opt = 0; opt < 2; opt++) {
+    struct umbra_basic_block *bb = umbra_basic_block();
+    umbra_v32 ix  = umbra_lane(bb);
+    umbra_v32 x   = umbra_load_32(bb, (umbra_ptr){0}, ix);
+    umbra_v32 shr = umbra_shr_u32(bb, x, umbra_imm_32(bb, 8));
+    umbra_v16 r   = umbra_i16_from_i32(bb, shr);
+    umbra_store_16(bb, (umbra_ptr){1}, ix, r);
+    backends B = make(bb, opt);
+    for (int bi = 0; bi < 4; bi++) {
+        // N=9: exercises vector path (8) + scalar tail (1).
+        uint32_t a[9]; int16_t z[9];
+        for (int i = 0; i < 9; i++) { a[i] = (uint32_t)(i * 256 + 42); z[i] = 0; }
+        if (!run(&B, bi, 9, (umbra_buf[]){{a,9*4},{z,9*2}})) continue;
+        for (int i = 0; i < 9; i++) {
+            ((uint16_t)z[i] == (uint16_t)(a[i] >> 8)) here;
+        }
+    }
+    cleanup(&B);
+  }
+}
+
+// N=9 tests: K=8, so N=9 exercises one full vector iteration + one scalar tail element.
+// Each test runs the same BB through all backends and checks that results match the interpreter.
+static void test_n9(void) {
+  for (int opt = 0; opt < 2; opt++) {
+    // f32: add
+    {
+        backends B; BINOP_32(umbra_add_f32, B, opt);
+        for (int bi = 0; bi < 4; bi++) {
+            float x[9], y[9], z[9] = {0};
+            for (int i = 0; i < 9; i++) { x[i] = (float)(i+1); y[i] = (float)(10*(i+1)); }
+            if (!run(&B, bi, 9, (umbra_buf[]){{x,9*4},{y,9*4},{z,9*4}})) continue;
+            for (int i = 0; i < 9; i++) equiv(z[i], x[i]+y[i]) here;
+        }
+        cleanup(&B);
+    }
+    // i32: mul
+    {
+        backends B; BINOP_32(umbra_mul_i32, B, opt);
+        for (int bi = 0; bi < 4; bi++) {
+            int x[9], y[9], z[9] = {0};
+            for (int i = 0; i < 9; i++) { x[i] = i+1; y[i] = i+2; }
+            if (!run(&B, bi, 9, (umbra_buf[]){{x,9*4},{y,9*4},{z,9*4}})) continue;
+            for (int i = 0; i < 9; i++) (z[i] == x[i]*y[i]) here;
+        }
+        cleanup(&B);
+    }
+    // i16: add
+    {
+        backends B; BINOP_16(umbra_add_i16, B, opt);
+        for (int bi = 0; bi < 4; bi++) {
+            int16_t x[9], y[9], z[9] = {0};
+            for (int i = 0; i < 9; i++) { x[i] = (int16_t)(i+1); y[i] = (int16_t)(100+i); }
+            if (!run(&B, bi, 9, (umbra_buf[]){{x,9*2},{y,9*2},{z,9*2}})) continue;
+            for (int i = 0; i < 9; i++) (z[i] == (int16_t)(x[i]+y[i])) here;
+        }
+        cleanup(&B);
+    }
+    // half: mul
+    {
+        backends B; BINOP_HALF(umbra_mul_half, B, opt);
+        for (int bi = 0; bi < 4; bi++) {
+            __fp16 x[9], y[9], z[9];
+            for (int i = 0; i < 9; i++) { x[i] = (__fp16)(i+1); y[i] = (__fp16)2; z[i] = 0; }
+            if (!run(&B, bi, 9, (umbra_buf[]){{x,9*2},{y,9*2},{z,9*2}})) continue;
+            for (int i = 0; i < 9; i++) equiv((float)z[i], (float)(2*(i+1))) here;
+        }
+        cleanup(&B);
+    }
+    // load_8x4 / store_8x4 at N=9
+    {
+        struct umbra_basic_block *bb = umbra_basic_block();
+        umbra_v32 ix = umbra_lane(bb);
+        umbra_v16 ch[4];
+        umbra_load_8x4(bb, (umbra_ptr){0}, ix, ch);
+        umbra_v16 out[4] = {ch[0], ch[1], ch[2], ch[3]};
+        umbra_store_8x4(bb, (umbra_ptr){1}, ix, out);
+        backends B = make(bb, opt);
+        for (int bi = 0; bi < 4; bi++) {
+            uint32_t src[9], dst[9] = {0};
+            for (int i = 0; i < 9; i++) src[i] = 0xAABBCC00u + (uint32_t)i;
+            if (!run(&B, bi, 9, (umbra_buf[]){{src,9*4},{dst,9*4}})) continue;
+            for (int i = 0; i < 9; i++) (dst[i] == src[i]) here;
+        }
+        cleanup(&B);
+    }
+  }
+}
 
 int main(void) {
     test_f32_ops();
@@ -1386,5 +1477,7 @@ int main(void) {
     test_srcover();
     test_hash_quality();
     test_mixed_ptr_sizes();
+    test_shr_narrow_u32();
+    test_n9();
     return 0;
 }

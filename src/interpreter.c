@@ -631,8 +631,34 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                         continue;
                     #endif
 
-                    default:
+                    case op_add_f32: case op_sub_f32: case op_mul_f32: case op_div_f32:
+                    case op_min_f32: case op_max_f32: case op_sqrt_f32:
+                    case op_fma_f32: case op_fms_f32:
+
+                    case op_add_i32: case op_sub_i32: case op_mul_i32:
+                    case op_shl_i32: case op_shr_u32: case op_shr_s32:
+                    case op_and_32:  case op_or_32:   case op_xor_32: case op_sel_32:
+
+                    case op_add_i16: case op_sub_i16: case op_mul_i16:
+                    case op_shl_i16: case op_shr_u16: case op_shr_s16:
+                    case op_and_16:  case op_or_16:   case op_xor_16: case op_sel_16:
+
+                    case op_add_half: case op_sub_half: case op_mul_half: case op_div_half:
+                    case op_min_half: case op_max_half: case op_sqrt_half:
+                    case op_fma_half: case op_fms_half:
+                    case op_and_half: case op_or_half:  case op_xor_half: case op_sel_half:
+
+                    case op_f32_from_i32: case op_i32_from_f32:
+                    case op_i32_from_half: case op_half_from_i32:
+                    case op_half_from_i16: case op_i16_from_half:
+                    case op_i16_from_i32:  case op_i32_from_i16:
+
+                    case op_eq_f32: case op_lt_f32: case op_le_f32:
+                    case op_eq_i32: case op_lt_s32: case op_le_s32: case op_lt_u32: case op_le_u32:
+                    case op_eq_i16: case op_lt_s16: case op_le_s16: case op_lt_u16: case op_le_u16:
+                    case op_eq_half: case op_lt_half: case op_le_half:
                         emit(.fn=fn[inst->op], .x=X, .y=Y, .z=Z);
+                        break;
                 }
                 id[i] = n++;
             }

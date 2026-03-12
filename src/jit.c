@@ -181,7 +181,14 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_half_from_i16: put(c, W(SCVTF_4h(d,x))); return 1;
     case op_i16_from_half: put(c, W(FCVTZS_4h(d,x))); return 1;
 
-    default: return 0;
+    case op_lane:
+    case op_uni_32:    case op_load_32:    case op_gather_32:  case op_store_32:  case op_scatter_32:
+    case op_uni_16:    case op_load_16:    case op_gather_16:  case op_store_16:  case op_scatter_16:
+    case op_uni_half:  case op_load_half:  case op_gather_half: case op_store_half: case op_scatter_half:
+    case op_load_8x4:  case op_store_8x4:
+    case op_half_from_f32: case op_f32_from_half: case op_half_from_i32: case op_i32_from_half:
+    case op_i16_from_i32: case op_i32_from_i16: case op_shr_narrow_u32:
+        return 0;
     }
 }
 
@@ -721,7 +728,31 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 CZh(op_eq_half, FCMEQ_4h_z, FCMEQ_4h_z)
                 CZh(op_lt_half, FCMLT_4h_z, FCMGT_4h_z)
                 CZh(op_le_half, FCMLE_4h_z, FCMGE_4h_z)
-                default: break;
+                case op_lane:
+                case op_imm_32: case op_uni_32: case op_load_32: case op_gather_32: case op_store_32: case op_scatter_32:
+                case op_add_f32: case op_sub_f32: case op_mul_f32: case op_div_f32:
+                case op_min_f32: case op_max_f32: case op_sqrt_f32: case op_fma_f32: case op_fms_f32:
+                case op_add_i32: case op_sub_i32: case op_mul_i32:
+                case op_shl_i32: case op_shr_u32: case op_shr_s32:
+                case op_shl_i32_imm: case op_shr_u32_imm: case op_shr_s32_imm:
+                case op_and_32: case op_or_32: case op_xor_32: case op_sel_32:
+                case op_f32_from_i32: case op_i32_from_f32: case op_f32_from_half:
+                case op_i32_from_half: case op_i32_from_i16:
+                case op_lt_u32: case op_le_u32:
+                case op_imm_16: case op_uni_16: case op_load_16: case op_gather_16: case op_store_16: case op_scatter_16:
+                case op_load_8x4: case op_store_8x4:
+                case op_add_i16: case op_sub_i16: case op_mul_i16:
+                case op_shl_i16: case op_shr_u16: case op_shr_s16:
+                case op_shl_i16_imm: case op_shr_u16_imm: case op_shr_s16_imm:
+                case op_and_16: case op_or_16: case op_xor_16: case op_sel_16:
+                case op_i16_from_i32: case op_shr_narrow_u32:
+                case op_lt_u16: case op_le_u16:
+                case op_imm_half: case op_uni_half: case op_load_half: case op_gather_half: case op_store_half: case op_scatter_half:
+                case op_add_half: case op_sub_half: case op_mul_half: case op_div_half:
+                case op_min_half: case op_max_half: case op_sqrt_half: case op_fma_half: case op_fms_half:
+                case op_and_half: case op_or_half: case op_xor_half: case op_sel_half:
+                case op_half_from_f32: case op_half_from_i32: case op_half_from_i16: case op_i16_from_half:
+                    break;
                 }
                 #undef CZ
                 #undef CZh
@@ -734,7 +765,25 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             goto default_alu;
         }
 
-        default: default_alu: {
+        case op_imm_32: case op_imm_16: case op_imm_half:
+        case op_add_f32: case op_sub_f32: case op_mul_f32: case op_div_f32:
+        case op_min_f32: case op_max_f32: case op_sqrt_f32: case op_fma_f32: case op_fms_f32:
+        case op_add_i32: case op_sub_i32: case op_mul_i32:
+        case op_shl_i32: case op_shr_u32: case op_shr_s32:
+        case op_shl_i32_imm: case op_shr_u32_imm: case op_shr_s32_imm:
+        case op_and_32: case op_or_32: case op_xor_32: case op_sel_32:
+        case op_f32_from_i32: case op_i32_from_f32:
+        case op_lt_u32: case op_le_u32:
+        case op_add_i16: case op_sub_i16: case op_mul_i16:
+        case op_shl_i16: case op_shr_u16: case op_shr_s16:
+        case op_shl_i16_imm: case op_shr_u16_imm: case op_shr_s16_imm:
+        case op_and_16: case op_or_16: case op_xor_16: case op_sel_16:
+        case op_lt_u16: case op_le_u16:
+        case op_add_half: case op_sub_half: case op_mul_half: case op_div_half:
+        case op_min_half: case op_max_half: case op_sqrt_half: case op_fma_half: case op_fms_half:
+        case op_and_half: case op_or_half: case op_xor_half: case op_sel_half:
+        case op_half_from_i16: case op_i16_from_half:
+        default_alu: {
             enum op op = inst->op;
             _Bool arch_scratch = op==op_shr_u32 || op==op_shr_s32
                               || op==op_shr_u16 || op==op_shr_s16;
@@ -1104,7 +1153,14 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
         vex_rrr(c,1,1,0,0x6B,d,d,scratch);  // VPACKSSDW xmm
         return 1;
 
-    default: return 0;
+    case op_lane:
+    case op_uni_32:    case op_load_32:    case op_gather_32:  case op_store_32:  case op_scatter_32:
+    case op_uni_16:    case op_load_16:    case op_gather_16:  case op_store_16:  case op_scatter_16:
+    case op_uni_half:  case op_load_half:  case op_gather_half: case op_store_half: case op_scatter_half:
+    case op_load_8x4:  case op_store_8x4:
+    case op_half_from_f32: case op_f32_from_half: case op_half_from_i32: case op_i32_from_half:
+    case op_i16_from_i32: case op_i32_from_i16: case op_shr_narrow_u32:
+        return 0;
     }
 }
 
@@ -1728,7 +1784,26 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             vpmovsxwd(c, s.rd, s.rx);
         } break;
 
-        default: {
+        case op_imm_32: case op_imm_16: case op_imm_half:
+        case op_add_f32: case op_sub_f32: case op_mul_f32: case op_div_f32:
+        case op_min_f32: case op_max_f32: case op_sqrt_f32: case op_fma_f32: case op_fms_f32:
+        case op_add_i32: case op_sub_i32: case op_mul_i32:
+        case op_shl_i32: case op_shr_u32: case op_shr_s32:
+        case op_shl_i32_imm: case op_shr_u32_imm: case op_shr_s32_imm:
+        case op_and_32: case op_or_32: case op_xor_32: case op_sel_32:
+        case op_f32_from_i32: case op_i32_from_f32:
+        case op_eq_f32: case op_lt_f32: case op_le_f32:
+        case op_eq_i32: case op_lt_s32: case op_le_s32: case op_lt_u32: case op_le_u32:
+        case op_add_i16: case op_sub_i16: case op_mul_i16:
+        case op_shl_i16: case op_shr_u16: case op_shr_s16:
+        case op_shl_i16_imm: case op_shr_u16_imm: case op_shr_s16_imm:
+        case op_and_16: case op_or_16: case op_xor_16: case op_sel_16:
+        case op_eq_i16: case op_lt_s16: case op_le_s16: case op_lt_u16: case op_le_u16:
+        case op_add_half: case op_sub_half: case op_mul_half: case op_div_half:
+        case op_min_half: case op_max_half: case op_sqrt_half: case op_fma_half: case op_fms_half:
+        case op_and_half: case op_or_half: case op_xor_half: case op_sel_half:
+        case op_eq_half: case op_lt_half: case op_le_half:
+        case op_half_from_i16: case op_i16_from_half: {
             enum op op2 = inst->op;
             _Bool arch_scratch = op2==op_le_s32
                               || op2==op_lt_u32
