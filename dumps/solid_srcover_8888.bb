@@ -1,10 +1,10 @@
   v0   = imm_32          0x0
   v1   = lane           
-  v2   = load_32         p1
-  v3   = add_i32         v1 v2
-  v4   = f32_from_i32    v3
-  v5   = load_32         p2
-  v6   = f32_from_i32    v5
+  v2   = uni_32          p1[0]
+  v3   = uni_32          p2[0]
+  v4   = add_i32         v1 v2
+  v5   = f32_from_i32    v4
+  v6   = f32_from_i32    v3
   v7   = imm_half        0x0
   v8   = uni_half        p3[0]
   v9   = imm_32          0x1

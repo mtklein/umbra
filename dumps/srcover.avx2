@@ -85,7 +85,16 @@ Disassembly of section __TEXT,__text:
                	addq	$0x8, %r10
                	jmp	0x34 <__text+0x34>
                	cmpq	%rdi, %r10
-               	jge	0x297 <__text+0x297>
+               	jge	0x2c1 <__text+0x2c1>
+               	vpxor	%ymm4, %ymm4, %ymm4
+               	movl	$0x1c04, %eax           ## imm = 0x1C04
+               	vmovd	%eax, %xmm0
+               	vcvtph2ps	%xmm0, %xmm0
+               	vbroadcastss	%xmm0, %ymm3
+               	movl	$0x3c00, %eax           ## imm = 0x3C00
+               	vmovd	%eax, %xmm0
+               	vcvtph2ps	%xmm0, %xmm0
+               	vbroadcastss	%xmm0, %ymm2
                	movq	(%rsi), %r11
                	movzbl	(%r11,%r10,4), %eax
                	vmovd	%eax, %xmm5
@@ -100,7 +109,7 @@ Disassembly of section __TEXT,__text:
                	vmovd	%eax, %xmm10
                	vpmovsxwd	%xmm10, %ymm10
                	vcvtdq2ps	%ymm10, %ymm10
-               	vmovaps	%ymm4, %ymm8
+               	vmovaps	%ymm2, %ymm8
                	vfnmadd231ps	%ymm10, %ymm3, %ymm8 ## ymm8 = -(ymm3 * ymm10) + ymm8
                	vmulps	%ymm8, %ymm9, %ymm9
                	vfmadd231ps	%ymm5, %ymm3, %ymm9 ## ymm9 = (ymm3 * ymm5) + ymm9

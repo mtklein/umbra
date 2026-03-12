@@ -4,6 +4,10 @@ cc      = $clang -momit-leaf-frame-pointer -target x86_64-apple-macos13 -isysroo
 ldflags = -framework Metal -framework Foundation
 include build/project.ninja
 
+build $out/asm_x86_test.o: compile asm_x86_test.c
+build $out/asm_x86_test:   link    $out/asm_x86_test.o
+build $out/asm_x86_test.log: run $out/asm_x86_test
+
 build $out/dump.log | $
       dumps/srcover.avx2 $
       dumps/srcover.avx2.mca $

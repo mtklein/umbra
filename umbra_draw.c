@@ -12,13 +12,12 @@ struct umbra_basic_block* umbra_draw_build(umbra_shader_fn   shader,
     BB *bb = umbra_basic_block();
     umbra_v32 ix = umbra_lane(bb);
 
-    // x = x0 + lane (x0 is uniform from p1)
-    umbra_v32 x0 = umbra_load_32(bb, (umbra_ptr){1}, ix);
-    umbra_v32 x  = umbra_add_i32(bb, x0, ix);
-    umbra_v32 xf = umbra_f32_from_i32(bb, x);
+    // x0 and y are uniforms (single values), loaded at constant index 0.
+    umbra_v32 x0 = umbra_load_32(bb, (umbra_ptr){1}, umbra_imm_32(bb, 0));
+    umbra_v32 y  = umbra_load_32(bb, (umbra_ptr){2}, umbra_imm_32(bb, 0));
 
-    // y is uniform from p2
-    umbra_v32 y  = umbra_load_32(bb, (umbra_ptr){2}, ix);
+    // x = x0 + lane gives the global x coordinate for each pixel.
+    umbra_v32 xf = umbra_f32_from_i32(bb, umbra_add_i32(bb, x0, ix));
     umbra_v32 yf = umbra_f32_from_i32(bb, y);
 
     // Coverage first — enables future early-out if all zero.
@@ -102,6 +101,58 @@ umbra_color umbra_blend_srcover(BB *bb, umbra_color src, umbra_color dst) {
         umbra_add_half(bb, src.b, umbra_mul_half(bb, dst.b, inv_a)),
         umbra_add_half(bb, src.a, umbra_mul_half(bb, dst.a, inv_a)),
     };
+}
+
+umbra_color umbra_blend_dstover(BB *bb, umbra_color src, umbra_color dst) {
+    umbra_half one   = umbra_imm_half(bb, 0x3c00);
+    umbra_half inv_a = umbra_sub_half(bb, one, dst.a);
+    return (umbra_color){
+        umbra_add_half(bb, dst.r, umbra_mul_half(bb, src.r, inv_a)),
+        umbra_add_half(bb, dst.g, umbra_mul_half(bb, src.g, inv_a)),
+        umbra_add_half(bb, dst.b, umbra_mul_half(bb, src.b, inv_a)),
+        umbra_add_half(bb, dst.a, umbra_mul_half(bb, src.a, inv_a)),
+    };
+}
+
+umbra_color umbra_blend_multiply(BB *bb, umbra_color src, umbra_color dst) {
+    // multiply: src * dst + src * (1 - dst.a) + dst * (1 - src.a)
+    // Simplified: src*dst + src*(1-da) + dst*(1-sa)
+    umbra_half one = umbra_imm_half(bb, 0x3c00);
+    umbra_half inv_sa = umbra_sub_half(bb, one, src.a);
+    umbra_half inv_da = umbra_sub_half(bb, one, dst.a);
+    umbra_half r = umbra_add_half(bb, umbra_mul_half(bb, src.r, dst.r),
+                   umbra_add_half(bb, umbra_mul_half(bb, src.r, inv_da),
+                                      umbra_mul_half(bb, dst.r, inv_sa)));
+    umbra_half g = umbra_add_half(bb, umbra_mul_half(bb, src.g, dst.g),
+                   umbra_add_half(bb, umbra_mul_half(bb, src.g, inv_da),
+                                      umbra_mul_half(bb, dst.g, inv_sa)));
+    umbra_half b = umbra_add_half(bb, umbra_mul_half(bb, src.b, dst.b),
+                   umbra_add_half(bb, umbra_mul_half(bb, src.b, inv_da),
+                                      umbra_mul_half(bb, dst.b, inv_sa)));
+    umbra_half a = umbra_add_half(bb, umbra_mul_half(bb, src.a, dst.a),
+                   umbra_add_half(bb, umbra_mul_half(bb, src.a, inv_da),
+                                      umbra_mul_half(bb, dst.a, inv_sa)));
+    return (umbra_color){r, g, b, a};
+}
+
+// --- Built-in coverage ---
+
+umbra_half umbra_coverage_rect(BB *bb, umbra_v32 x, umbra_v32 y) {
+    // Rect bounds from p4: {left, top, right, bottom} as f32.
+    umbra_v32 ix = umbra_lane(bb);
+    umbra_v32 l = umbra_load_32(bb, (umbra_ptr){4}, umbra_imm_32(bb, 0));
+    umbra_v32 t = umbra_load_32(bb, (umbra_ptr){4}, umbra_imm_32(bb, 1));
+    umbra_v32 r = umbra_load_32(bb, (umbra_ptr){4}, umbra_imm_32(bb, 2));
+    umbra_v32 b = umbra_load_32(bb, (umbra_ptr){4}, umbra_imm_32(bb, 3));
+    (void)ix;
+    // 1.0 if inside, 0.0 if outside.
+    umbra_v32 inside = umbra_and_32(bb,
+        umbra_and_32(bb, umbra_ge_f32(bb, x, l), umbra_lt_f32(bb, x, r)),
+        umbra_and_32(bb, umbra_ge_f32(bb, y, t), umbra_lt_f32(bb, y, b)));
+    // Convert all-ones mask to 1.0h
+    umbra_half one = umbra_imm_half(bb, 0x3c00);
+    umbra_half zero = umbra_imm_half(bb, 0);
+    return umbra_sel_half(bb, umbra_half_from_f32(bb, inside), one, zero);
 }
 
 // --- Built-in pixel formats ---

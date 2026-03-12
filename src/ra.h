@@ -21,7 +21,9 @@ struct ra {
     int    *owner;
     int8_t *free_stack;
     struct ra_config cfg;
-    int     nfree, :32;
+    int     nfree;
+    int     pinned[4];
+    int     npinned;
 };
 
 struct ra* ra_create (struct umbra_basic_block const *bb, struct ra_config const *cfg);

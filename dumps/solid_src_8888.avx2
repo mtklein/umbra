@@ -76,15 +76,60 @@ Disassembly of section __TEXT,__text:
                	addq	$0x8, %r10
                	jmp	0xe0 <__text+0xe0>
                	cmpq	%rdi, %r10
-               	jge	0x168 <__text+0x168>
-               	vmovd	%xmm9, %eax
+               	jge	0x23a <__text+0x23a>
+               	vpxor	%ymm8, %ymm8, %ymm8
+               	movq	0x30(%rsi), %r11
+               	movzwl	(%r11), %eax
+               	vmovd	%eax, %xmm0
+               	vpbroadcastw	%xmm0, %xmm0
+               	vcvtph2ps	%xmm0, %ymm4
+               	movzwl	0x2(%r11), %eax
+               	vmovd	%eax, %xmm0
+               	vpbroadcastw	%xmm0, %xmm0
+               	vcvtph2ps	%xmm0, %ymm3
+               	movzwl	0x4(%r11), %eax
+               	vmovd	%eax, %xmm0
+               	vpbroadcastw	%xmm0, %xmm0
+               	vcvtph2ps	%xmm0, %ymm9
+               	movzwl	0x6(%r11), %eax
+               	vmovd	%eax, %xmm0
+               	vpbroadcastw	%xmm0, %xmm0
+               	vcvtph2ps	%xmm0, %ymm2
+               	movl	$0x5bf8, %eax           ## imm = 0x5BF8
+               	vmovd	%eax, %xmm0
+               	vcvtph2ps	%xmm0, %xmm0
+               	vbroadcastss	%xmm0, %ymm7
+               	movl	$0x3800, %eax           ## imm = 0x3800
+               	vmovd	%eax, %xmm0
+               	vcvtph2ps	%xmm0, %xmm0
+               	vbroadcastss	%xmm0, %ymm6
+               	vmovaps	%ymm6, %ymm5
+               	vfmadd231ps	%ymm7, %ymm4, %ymm5 ## ymm5 = (ymm4 * ymm7) + ymm5
+               	vcvttps2dq	%ymm5, %ymm5
+               	vextracti128	$0x1, %ymm5, %xmm0
+               	vpackssdw	%xmm0, %xmm5, %xmm5
+               	vmovaps	%ymm6, %ymm4
+               	vfmadd231ps	%ymm7, %ymm3, %ymm4 ## ymm4 = (ymm3 * ymm7) + ymm4
+               	vcvttps2dq	%ymm4, %ymm4
+               	vextracti128	$0x1, %ymm4, %xmm0
+               	vpackssdw	%xmm0, %xmm4, %xmm4
+               	vmovaps	%ymm6, %ymm3
+               	vfmadd231ps	%ymm7, %ymm9, %ymm3 ## ymm3 = (ymm9 * ymm7) + ymm3
+               	vcvttps2dq	%ymm3, %ymm3
+               	vextracti128	$0x1, %ymm3, %xmm0
+               	vpackssdw	%xmm0, %xmm3, %xmm3
+               	vfmadd231ps	%ymm7, %ymm2, %ymm6 ## ymm6 = (ymm2 * ymm7) + ymm6
+               	vcvttps2dq	%ymm6, %ymm6
+               	vextracti128	$0x1, %ymm6, %xmm0
+               	vpackssdw	%xmm0, %xmm6, %xmm6
+               	vmovd	%xmm5, %eax
                	movq	(%rsi), %r11
                	movb	%al, (%r11,%r10,4)
-               	vmovd	%xmm3, %eax
-               	movb	%al, 0x1(%r11,%r10,4)
                	vmovd	%xmm4, %eax
+               	movb	%al, 0x1(%r11,%r10,4)
+               	vmovd	%xmm3, %eax
                	movb	%al, 0x2(%r11,%r10,4)
-               	vmovd	%xmm8, %eax
+               	vmovd	%xmm6, %eax
                	movb	%al, 0x3(%r11,%r10,4)
                	addq	$0x1, %r10
                	jmp	0x130 <__text+0x130>

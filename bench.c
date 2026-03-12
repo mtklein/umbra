@@ -1,6 +1,9 @@
-#define _POSIX_C_SOURCE 199309L
+#define _POSIX_C_SOURCE 200809L
 #include "srcover.h"
 #include "umbra_draw.h"
+#if !defined(__wasm__)
+#include <dlfcn.h>
+#endif
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,6 +35,46 @@ static void run_jit(void *ctx, int n, umbra_buf buf[]) {
 static void run_mtl(void *ctx, int n, umbra_buf buf[]) {
     umbra_metal_run(ctx, n, buf);
 }
+
+// --- incbin/dlopen mode ---
+// Wraps JIT machine code in a .dylib with a named symbol for profiler visibility.
+#if !defined(__wasm__)
+
+typedef void (*jit_entry_fn)(int, umbra_buf*);
+
+static jit_entry_fn incbin_load(struct umbra_jit *jit, const char *sym) {
+    char bin_path[128], s_path[128], dylib_path[128], cmd[512];
+    snprintf(bin_path,   sizeof bin_path,   "/tmp/umbra_%s.bin",   sym);
+    snprintf(s_path,     sizeof s_path,     "/tmp/umbra_%s.S",     sym);
+    snprintf(dylib_path, sizeof dylib_path, "/tmp/umbra_%s.dylib", sym);
+
+    FILE *f = fopen(bin_path, "wb");
+    if (!f) return NULL;
+    umbra_jit_dump_bin(jit, f);
+    fclose(f);
+
+    f = fopen(s_path, "w");
+    if (!f) return NULL;
+    fprintf(f, ".text\n.globl _%s\n.p2align 4\n_%s:\n.incbin \"%s\"\n", sym, sym, bin_path);
+    fclose(f);
+
+    snprintf(cmd, sizeof cmd, "cc -shared -o %s %s 2>/dev/null", dylib_path, s_path);
+    if (system(cmd) != 0) return NULL;
+
+    void *handle = dlopen(dylib_path, RTLD_LAZY);
+    if (!handle) return NULL;
+    return (jit_entry_fn)dlsym(handle, sym);
+}
+
+static jit_entry_fn incbin_fn_ctx;
+static void run_incbin(void *ctx, int n, umbra_buf buf[]) {
+    (void)ctx;
+    incbin_fn_ctx(n, buf);
+}
+
+#endif // !__wasm__
+
+// --- bench helpers ---
 
 static double bench_run(run_fn fn, void *ctx, int pixel_n, umbra_buf buf[]) {
     fn(ctx, pixel_n, buf);
@@ -94,10 +137,15 @@ static void fmt_ns(char buf[16], double ns) {
 int main(int argc, char *argv[]) {
     int pixel_n = 4096;
     int samples = 1;
+    int incbin  = 0;
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] == '-' && argv[i][1] == 's') {
             samples = atoi(argv[i]+2);
             if (samples < 1) samples = 1;
+#if !defined(__wasm__)
+        } else if (strcmp(argv[i], "-incbin") == 0) {
+            incbin = 1;
+#endif
         } else {
             pixel_n = atoi(argv[i]);
         }
@@ -111,6 +159,14 @@ int main(int argc, char *argv[]) {
     struct umbra_jit         *jit = umbra_jit(bb);
     struct umbra_metal       *mtl = umbra_metal(bb);
     umbra_basic_block_free(bb);
+
+#if !defined(__wasm__)
+    jit_entry_fn srcover_incbin = NULL;
+    if (incbin && jit) {
+        srcover_incbin = incbin_load(jit, "srcover");
+        if (!srcover_incbin) fprintf(stderr, "warning: incbin load failed for srcover\n");
+    }
+#endif
 
     uint32_t *src = malloc((size_t)pixel_n * sizeof *src);
     __fp16   *dr  = malloc((size_t)pixel_n * sizeof *dr);
@@ -135,6 +191,7 @@ int main(int argc, char *argv[]) {
 
     printf("SrcOver 8888->fp16, %d pixels", pixel_n);
     if (samples > 1) printf(", %d samples", samples);
+    if (incbin) printf(", incbin mode");
     printf(":\n");
 
     if (samples <= 1) {
@@ -159,6 +216,14 @@ int main(int argc, char *argv[]) {
             sprintf(run_buf, "%5.2f ns/px", bench_run(run_jit, jit, pixel_n, buf));
             printf("  jit     %s  %s\n", build_buf, run_buf);
         }
+
+#if !defined(__wasm__)
+        if (srcover_incbin) {
+            incbin_fn_ctx = srcover_incbin;
+            sprintf(run_buf, "%5.2f ns/px", bench_run(run_incbin, NULL, pixel_n, buf));
+            printf("  incbin             %s\n", run_buf);
+        }
+#endif
 
         if (mtl) {
             fmt_ns(build_buf, bench_build(build_srcover, build_metal));
@@ -189,6 +254,16 @@ int main(int argc, char *argv[]) {
                    s[0], s[samples/2], s[samples-1]);
         }
 
+#if !defined(__wasm__)
+        if (srcover_incbin) {
+            incbin_fn_ctx = srcover_incbin;
+            for (int i = 0; i < samples; i++) s[i] = bench_run(run_incbin, NULL, pixel_n, buf);
+            qsort(s, (size_t)samples, sizeof *s, cmp_double);
+            printf("  incbin    %5.2f     %5.2f    %5.2f  ns/px\n",
+                   s[0], s[samples/2], s[samples-1]);
+        }
+#endif
+
         if (mtl) {
             for (int i = 0; i < samples; i++) s[i] = bench_run(run_mtl, mtl, pixel_n, buf);
             qsort(s, (size_t)samples, sizeof *s, cmp_double);
@@ -208,6 +283,7 @@ int main(int argc, char *argv[]) {
     // --- Draw API benchmarks ---
     typedef struct {
         const char              *name;
+        const char              *sym;
         umbra_shader_fn          shader;
         umbra_coverage_fn        coverage;
         umbra_blend_fn           blend;
@@ -215,10 +291,10 @@ int main(int argc, char *argv[]) {
         umbra_store_fn           store;
     } draw_config;
     draw_config draws[] = {
-        {"solid src 8888",     umbra_shader_solid, NULL, umbra_blend_src,     umbra_load_8888, umbra_store_8888},
-        {"solid srcover 8888", umbra_shader_solid, NULL, umbra_blend_srcover, umbra_load_8888, umbra_store_8888},
-        {"solid src fp16",     umbra_shader_solid, NULL, umbra_blend_src,     umbra_load_fp16, umbra_store_fp16},
-        {"solid srcover fp16", umbra_shader_solid, NULL, umbra_blend_srcover, umbra_load_fp16, umbra_store_fp16},
+        {"solid src 8888",     "solid_src_8888",     umbra_shader_solid, NULL, umbra_blend_src,     umbra_load_8888, umbra_store_8888},
+        {"solid srcover 8888", "solid_srcover_8888", umbra_shader_solid, NULL, umbra_blend_srcover, umbra_load_8888, umbra_store_8888},
+        {"solid src fp16",     "solid_src_fp16",     umbra_shader_solid, NULL, umbra_blend_src,     umbra_load_fp16, umbra_store_fp16},
+        {"solid srcover fp16", "solid_srcover_fp16", umbra_shader_solid, NULL, umbra_blend_srcover, umbra_load_fp16, umbra_store_fp16},
     };
 
     for (int di = 0; di < (int)(sizeof draws / sizeof draws[0]); di++) {
@@ -232,6 +308,14 @@ int main(int argc, char *argv[]) {
         struct umbra_jit         *djit = umbra_jit(dbb);
         struct umbra_metal       *dmtl = umbra_metal(dbb);
         umbra_basic_block_free(dbb);
+
+#if !defined(__wasm__)
+        jit_entry_fn draw_incbin_fn = NULL;
+        if (incbin && djit) {
+            draw_incbin_fn = incbin_load(djit, d->sym);
+            if (!draw_incbin_fn) fprintf(stderr, "warning: incbin load failed for %s\n", d->sym);
+        }
+#endif
 
         // Allocate pixel buffers — 8888 needs 4 bytes/px, fp16 needs 8 bytes/px.
         int px_bytes = (d->load == umbra_load_fp16) ? 8 : 4;
@@ -263,6 +347,13 @@ int main(int argc, char *argv[]) {
             sprintf(rbuf, "%5.2f ns/px", bench_run(run_jit, djit, pixel_n, dbuf));
             printf("  jit       %s\n", rbuf);
         }
+#if !defined(__wasm__)
+        if (draw_incbin_fn) {
+            incbin_fn_ctx = draw_incbin_fn;
+            sprintf(rbuf, "%5.2f ns/px", bench_run(run_incbin, NULL, pixel_n, dbuf));
+            printf("  incbin    %s\n", rbuf);
+        }
+#endif
         if (dmtl) {
             sprintf(rbuf, "%5.2f ns/px", bench_run(run_mtl, dmtl, pixel_n, dbuf));
             printf("  metal     %s\n", rbuf);

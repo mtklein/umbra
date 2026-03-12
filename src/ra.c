@@ -37,6 +37,7 @@ struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const 
     }
 
     ra->nfree = cfg->nregs;
+    ra->npinned = 0;
     for (int i = 0; i < cfg->nregs; i++) {
         ra->free_stack[i] = cfg->pool[cfg->nregs - 1 - i];
     }
@@ -73,10 +74,14 @@ int8_t ra_alloc(struct ra *ra, int *sl, int *ns) {
 
     // Evict: find register whose owner has farthest last_use (Belady-like).
     // Dead values (last_use < 0) are evicted first since they'll never be used.
+    // Pinned values (inputs being ensured for the current instruction) are skipped.
     int best_r = -1, best_lu = -1;
     for (int r = 0; r < ra->cfg.max_reg; r++) {
         if (ra->owner[r] < 0) continue;
         int val = ra->owner[r];
+        _Bool skip = 0;
+        for (int p = 0; p < ra->npinned; p++) if (ra->pinned[p] == val) { skip = 1; break; }
+        if (skip) continue;
         int lu = ra->last_use[val] < 0 ? INT_MAX : ra->last_use[val];
         if (lu > best_lu) { best_lu = lu; best_r = r; }
     }
@@ -191,10 +196,20 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns,
     struct ra_step s = step0();
     _Bool pair = ra->is_pair[i] && !scalar;
 
-    // 1. Ensure inputs.
-    s.rx = inst->x < i ? ra_ensure(ra, sl, ns, inst->x) : 0;
-    s.ry = inst->y < i ? ra_ensure(ra, sl, ns, inst->y) : 0;
-    s.rz = inst->z < i ? ra_ensure(ra, sl, ns, inst->z) : 0;
+    // 1. Ensure inputs, pinning each so later ensures can't evict earlier ones.
+    ra->npinned = 0;
+    if (inst->x < i) {
+        s.rx = ra_ensure(ra, sl, ns, inst->x);
+        ra->pinned[ra->npinned++] = inst->x;
+    }
+    if (inst->y < i) {
+        s.ry = ra_ensure(ra, sl, ns, inst->y);
+        if (inst->y != inst->x) ra->pinned[ra->npinned++] = inst->y;
+    }
+    if (inst->z < i) {
+        s.rz = ra_ensure(ra, sl, ns, inst->z);
+    }
+    ra->npinned = 0;
     s.rxh = inst->x < i ? ra_hi(ra, inst->x) : 0;
     s.ryh = inst->y < i ? ra_hi(ra, inst->y) : 0;
     s.rzh = inst->z < i ? ra_hi(ra, inst->z) : 0;
