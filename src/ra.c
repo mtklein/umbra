@@ -36,6 +36,9 @@ struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const 
         }
     }
 
+    ra->preamble = bb->preamble;
+    ra->loop_reg = malloc((size_t)bb->preamble * sizeof *ra->loop_reg);
+
     ra->nfree = cfg->nregs;
     ra->npinned = 0;
     for (int i = 0; i < cfg->nregs; i++) {
@@ -52,7 +55,24 @@ void ra_destroy(struct ra *ra) {
     free(ra->is_pair);
     free(ra->owner);
     free(ra->free_stack);
+    free(ra->loop_reg);
     free(ra);
+}
+
+void ra_begin_loop(struct ra *ra) {
+    for (int i = 0; i < ra->preamble; i++) {
+        ra->loop_reg[i] = ra->reg[i];
+    }
+}
+
+void ra_end_loop(struct ra *ra, int *sl) {
+    for (int i = 0; i < ra->preamble; i++) {
+        int8_t target = ra->loop_reg[i];
+        if (target < 0) continue;
+        if (ra->reg[i] == target) continue;
+        if (sl[i] < 0) continue;
+        ra->cfg.fill(target, sl[i], ra->cfg.ctx);
+    }
 }
 
 void ra_free_reg(struct ra *ra, int val) {

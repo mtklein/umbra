@@ -258,10 +258,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     // Preamble: uniforms go straight into registers via RA.
     emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0);
 
-    // Snapshot which register holds each preamble value after the preamble.
-    // The loop body may evict these; we must restore them before iterating.
-    int8_t *preamble_reg = malloc((size_t)bb->preamble);
-    for (int i = 0; i < bb->preamble; i++) preamble_reg[i] = ra->reg[i];
+    ra_begin_loop(ra);
 
     put(&c, MOVZ_x(XI,0));
 
@@ -278,18 +275,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     int loop_body_start = c.len;
     emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0);
 
-    // Reconcile: restore preamble values to their loop-entry registers.
-    // The loop body may have evicted preamble values to spill slots.
-    // Fill them back so the next iteration sees the correct register state.
-    // Only emit fills — do NOT update RA state, since the scalar tail resets everything.
-    for (int i = 0; i < bb->preamble; i++) {
-        int8_t target = preamble_reg[i];
-        if (target < 0) continue;              // wasn't in a register at loop start
-        if (ra->reg[i] == target) continue;    // still in the right register
-        if (sl[i] < 0) continue;               // no spill slot (shouldn't happen)
-        arm64_fill(target, sl[i], &c);
-    }
-    free(preamble_reg);
+    ra_end_loop(ra, sl);
 
     int loop_body_end = c.len;
 
@@ -1221,10 +1207,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     // Preamble
     emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0);
 
-    // Snapshot which register holds each preamble value after the preamble.
-    // The loop body may evict these; we must restore them before iterating.
-    int8_t *preamble_reg = malloc((size_t)bb->preamble);
-    for (int i = 0; i < bb->preamble; i++) preamble_reg[i] = ra->reg[i];
+    ra_begin_loop(ra);
 
     // Loop counter = 0
     xor_rr(&c, XI, XI);
@@ -1244,18 +1227,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     int loop_body_start = c.len;
     emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0);
 
-    // Reconcile: restore preamble values to their loop-entry registers.
-    // The loop body may have evicted preamble values to spill slots.
-    // Fill them back so the next iteration sees the correct register state.
-    // Only emit fills — do NOT update RA state, since the scalar tail resets everything.
-    for (int i = 0; i < bb->preamble; i++) {
-        int8_t target = preamble_reg[i];
-        if (target < 0) continue;              // wasn't in a register at loop start
-        if (ra->reg[i] == target) continue;    // still in the right register
-        if (sl[i] < 0) continue;               // no spill slot (shouldn't happen)
-        x86_fill(target, sl[i], &c);
-    }
-    free(preamble_reg);
+    ra_end_loop(ra, sl);
 
     int loop_body_end = c.len;
 
