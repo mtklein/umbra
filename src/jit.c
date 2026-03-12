@@ -1248,14 +1248,16 @@ static void vdivps(Buf *b, int d, int v, int s) { vex_rrr(b,0,1,1,0x5E,d,v,s); }
 static void vminps(Buf *b, int d, int v, int s) { vex_rrr(b,0,1,1,0x5D,d,v,s); }
 static void vmaxps(Buf *b, int d, int v, int s) { vex_rrr(b,0,1,1,0x5F,d,v,s); }
 static void vsqrtps(Buf *b, int d, int s)       { vex_rr (b,0,1,1,0x51,d,s); }
-// VFMADD231PS: d = v*s + d — VEX.256.66.0F38.W0 B8
-static void vfmadd231ps(Buf *b, int d, int v, int s) {
-    vex(b,1,2,0,1,d,v,s,0xB8);
-}
-// VFNMADD231PS: d = -v*s + d = d - v*s — VEX.256.66.0F38.W0 BC
-static void vfnmadd231ps(Buf *b, int d, int v, int s) {
-    vex(b,1,2,0,1,d,v,s,0xBC);
-}
+// VFMADD{132,213,231}PS: fused multiply-add variants
+// 132: d = d*s + v   213: d = v*d + s   231: d = v*s + d
+static void vfmadd132ps(Buf *b, int d, int v, int s) { vex(b,1,2,0,1,d,v,s,0x98); }
+static void vfmadd213ps(Buf *b, int d, int v, int s) { vex(b,1,2,0,1,d,v,s,0xA8); }
+static void vfmadd231ps(Buf *b, int d, int v, int s) { vex(b,1,2,0,1,d,v,s,0xB8); }
+// VFNMADD{132,213,231}PS: fused negate-multiply-add variants
+// 132: d = -(d*s) + v   213: d = -(v*d) + s   231: d = -(v*s) + d
+static void vfnmadd132ps(Buf *b, int d, int v, int s) { vex(b,1,2,0,1,d,v,s,0x9C); }
+static void vfnmadd213ps(Buf *b, int d, int v, int s) { vex(b,1,2,0,1,d,v,s,0xAC); }
+static void vfnmadd231ps(Buf *b, int d, int v, int s) { vex(b,1,2,0,1,d,v,s,0xBC); }
 // VCVTDQ2PS ymm,ymm — VEX.256.0F 5B
 static void vcvtdq2ps(Buf *b, int d, int s) { vex_rr(b,0,1,1,0x5B,d,s); }
 // VCVTTPS2DQ ymm,ymm — VEX.256.F3.0F 5B
@@ -1291,7 +1293,10 @@ static void vpsrad_i(Buf *b, int d, int s, uint8_t imm) { vex_shift(b,1,1,1,0x72
 static void vpand(Buf *b, int L, int d, int v, int s)  { vex_rrr(b,1,1,L,0xDB,d,v,s); }
 static void vpor(Buf *b, int L, int d, int v, int s)   { vex_rrr(b,1,1,L,0xEB,d,v,s); }
 static void vpxor_3(Buf *b, int L, int d, int v, int s) { vex_rrr(b,1,1,L,0xEF,d,v,s); }
-static void vpandn(Buf *b, int L, int d, int v, int s) { vex_rrr(b,1,1,L,0xDF,d,v,s); } // ~v & s
+// VPBLENDVB d,z,y,x: d = x[i]&0x80 ? y[i] : z[i] — VEX.NDS.{L}.66.0F3A 4C /r /is4
+static void vpblendvb(Buf *b, int L, int d, int z, int y, int x) {
+    vex_rrr(b,1,3,L,0x4C,d,z,y); emit1(b, (uint8_t)(x<<4));
+}
 
 // ---- I32 compare ----
 // VPCMPEQD: VEX.256.66.0F 76
@@ -1365,17 +1370,19 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_min_f32: vminps(c,d,x,y); return 1;
     case op_max_f32: vmaxps(c,d,x,y); return 1;
     case op_sqrt_f32: vsqrtps(c,d,x); return 1;
+    // fma(x,y,z) = x*y + z
     case op_fma_f32:
-        // VFMADD231PS d,x,y : d = x*y + d, so z must be in d
-        if (d == z) { vfmadd231ps(c,d,x,y); }
-        else if (d != x && d != y) { vmovaps(c,d,z); vfmadd231ps(c,d,x,y); }
-        else { vmovaps(c,scratch,z); vfmadd231ps(c,scratch,x,y); vmovaps(c,d,scratch); }
+        if      (d == x) { vfmadd132ps(c,d,z,y); }  // d = d*y + z
+        else if (d == y) { vfmadd213ps(c,d,x,z); }  // d = x*d + z
+        else if (d == z) { vfmadd231ps(c,d,x,y); }  // d = x*y + d
+        else             { vmovaps(c,d,z); vfmadd231ps(c,d,x,y); }
         return 1;
+    // fms(x,y,z) = z - x*y
     case op_fms_f32:
-        // VFNMADD231PS d,x,y : d = d - x*y, so z must be in d
-        if (d == z) { vfnmadd231ps(c,d,x,y); }
-        else if (d != x && d != y) { vmovaps(c,d,z); vfnmadd231ps(c,d,x,y); }
-        else { vmovaps(c,scratch,z); vfnmadd231ps(c,scratch,x,y); vmovaps(c,d,scratch); }
+        if      (d == x) { vfnmadd132ps(c,d,z,y); }  // d = -(d*y) + z
+        else if (d == y) { vfnmadd213ps(c,d,x,z); }  // d = -(x*d) + z
+        else if (d == z) { vfnmadd231ps(c,d,x,y); }  // d = -(x*y) + d
+        else             { vmovaps(c,d,z); vfnmadd231ps(c,d,x,y); }
         return 1;
 
     // i32 arithmetic (YMM)
@@ -1397,12 +1404,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_xor_half: // promoted to f32, same as xor_32
     case op_xor_32: vpxor_3(c,1,d,x,y); return 1;
     case op_sel_half: // promoted to f32, same as sel_32
-    case op_sel_32:
-        // sel(mask=x, true=y, false=z) = (x & y) | (~x & z)
-        vpand(c,1,scratch,x,y);
-        vpandn(c,1,d,x,z);
-        vpor(c,1,d,d,scratch);
-        return 1;
+    case op_sel_32: vpblendvb(c,1,d,z,y,x); return 1;
 
     // conversions
     case op_f32_from_i32: vcvtdq2ps(c,d,x); return 1;
@@ -1468,11 +1470,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_and_16: vpand(c,0,d,x,y); return 1;
     case op_or_16:  vpor(c,0,d,x,y);  return 1;
     case op_xor_16: vpxor_3(c,0,d,x,y); return 1;
-    case op_sel_16:
-        vpand(c,0,scratch,x,y);
-        vpandn(c,0,d,x,z);
-        vpor(c,0,d,d,scratch);
-        return 1;
+    case op_sel_16: vpblendvb(c,0,d,z,y,x); return 1;
 
     // i16 compare (XMM)
     case op_eq_i16: vpcmpeqw(c,d,x,y); return 1;
@@ -1502,14 +1500,16 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_max_half: vmaxps(c,d,x,y); return 1;
     case op_sqrt_half: vsqrtps(c,d,x); return 1;
     case op_fma_half:
-        if (d == z) { vfmadd231ps(c,d,x,y); }
-        else if (d != x && d != y) { vmovaps(c,d,z); vfmadd231ps(c,d,x,y); }
-        else { vmovaps(c,scratch,z); vfmadd231ps(c,scratch,x,y); vmovaps(c,d,scratch); }
+        if      (d == x) { vfmadd132ps(c,d,z,y); }
+        else if (d == y) { vfmadd213ps(c,d,x,z); }
+        else if (d == z) { vfmadd231ps(c,d,x,y); }
+        else             { vmovaps(c,d,z); vfmadd231ps(c,d,x,y); }
         return 1;
     case op_fms_half:
-        if (d == z) { vfnmadd231ps(c,d,x,y); }
-        else if (d != x && d != y) { vmovaps(c,d,z); vfnmadd231ps(c,d,x,y); }
-        else { vmovaps(c,scratch,z); vfnmadd231ps(c,scratch,x,y); vmovaps(c,d,scratch); }
+        if      (d == x) { vfnmadd132ps(c,d,z,y); }
+        else if (d == y) { vfnmadd213ps(c,d,x,z); }
+        else if (d == z) { vfnmadd231ps(c,d,x,y); }
+        else             { vmovaps(c,d,z); vfnmadd231ps(c,d,x,y); }
         return 1;
 
     // Half bitwise: handled above with 32-bit bitwise (both YMM)
@@ -2089,11 +2089,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         default: {
             enum op op2 = inst->op;
-            _Bool arch_scratch = op2==op_sel_32 || op2==op_sel_16 || op2==op_sel_half
-                              || op2==op_le_s32
-                              || op2==op_lt_u32 || op2==op_le_u32
+            _Bool arch_scratch = op2==op_le_s32
+                              || op2==op_lt_u32
                               || op2==op_le_s16
-                              || op2==op_lt_u16 || op2==op_le_u16;
+                              || op2==op_lt_u16;
             struct ra_step s = ra_step_alu(ra, sl, ns, inst, i, scalar, arch_scratch);
 
             emit_alu_reg(c, inst->op, s.rd, s.rx, s.ry, s.rz, inst->imm,
