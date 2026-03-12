@@ -5,6 +5,15 @@ include build/project.ninja
 
 build $out/bench.signed: sign $out/bench
 
+build $out/hdr.o:  compile hdr.c
+build $out/hdr:    link $out/hdr.o  $out/bb.o $out/ra.o $out/interpreter.o $out/codegen.o $out/jit.o $out/asm_arm64.o $out/asm_x86.o $out/metal.o $out/draw.o
+build $out/hdr.log: run $out/hdr
+
+build $out/demo.o: compile demo.c
+    cflags = -I/opt/homebrew/include -Wno-cast-align
+build $out/demo:   link $out/demo.o $out/bb.o $out/ra.o $out/interpreter.o $out/codegen.o $out/jit.o $out/asm_arm64.o $out/asm_x86.o $out/metal.o $out/draw.o
+    ldflags = -framework Metal -framework Foundation -L/opt/homebrew/lib -lSDL3
+
 build $out/dump.log | $
       dumps/srcover.bb $
       dumps/srcover.opt $
