@@ -1,4 +1,4 @@
-#include "srcover.h"
+#include "../srcover.h"
 #include "test.h"
 #include <stdint.h>
 

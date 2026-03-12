@@ -1,4 +1,4 @@
-#include "src/ra.h"
+#include "../src/ra.h"
 #include "test.h"
 #include <stdlib.h>
 #include <string.h>
