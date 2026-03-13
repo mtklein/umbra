@@ -495,10 +495,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 // V0-V3 are scratch for LD4/ST4, not in the RA pool.
                 put(c, ADD_xr(XT, XP, XW));
                 put(c, LD4_8b(0, XT));
-                // Widen u8->u16 in-place in V0-V3.
-                for (int c2 = 0; c2 < 4; c2++) {
-                    put(c, UXTL_8h(c2, c2));
-                }
                 // Determine which channels are needed.
                 _Bool ch_needed[] = {1, 0, 0, 0};
                 for (int j = i+1; j < to; j++) {
@@ -506,12 +502,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                         ch_needed[bb->inst[j].imm] = 1;
                     }
                 }
-                // Copy needed channels from V0-V3 into RA-allocated registers.
+                // Widen u8->u16 from V0-V3 scratch directly into RA pool registers.
                 int8_t ch_regs[] = {-1, -1, -1, -1};
                 for (int c2 = 0; c2 < 4; c2++) {
                     if (!ch_needed[c2]) continue;
                     ch_regs[c2] = ra_alloc(ra, sl, ns);
-                    put(c, ORR_16b(ch_regs[c2], c2, c2));
+                    put(c, UXTL_8h(ch_regs[c2], c2));
                 }
                 // Assign RA ownership.
                 ra_assign(ra, i, ch_regs[0]);
@@ -538,15 +534,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     put(c, ST1_b(ry, 0, XT));
                 }
             } else {
-                // V0-V3 are scratch for LD4/ST4, not in the RA pool.
-                // Copy inputs from RA registers into V0-V3.
+                // Narrow u16->u8 from RA pool registers directly into V0-V3 scratch.
                 for (int ch = 0; ch < 4; ch++) {
                     int8_t ry = ra_ensure(ra, sl, ns, inputs[ch]);
-                    put(c, ORR_16b(ch, ry, ry));
-                }
-                // Narrow u16->u8: XTN Vd.8B, Vn.8H (in-place)
-                for (int ch = 0; ch < 4; ch++) {
-                    put(c, XTN_8b(ch, ch));
+                    put(c, XTN_8b(ch, ry));
                 }
                 put(c, ADD_xr(XT, XP, XW));
                 put(c, ST4_8b(0, XT));

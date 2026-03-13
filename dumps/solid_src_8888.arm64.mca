@@ -1,44 +1,40 @@
 Iterations:        100
-Instructions:      1100
-Total Cycles:      412
-Total uOps:        1600
+Instructions:      700
+Total Cycles:      279
+Total uOps:        1200
 
 Dispatch Width:    6
-uOps Per Cycle:    3.88
-IPC:               2.67
-Block RThroughput: 4.0
+uOps Per Cycle:    4.30
+IPC:               2.51
+Block RThroughput: 2.7
 
 
-Cycles with backend pressure increase [ 68.69% ]
+Cycles with backend pressure increase [ 39.07% ]
 Throughput Bottlenecks: 
-  Resource Pressure       [ 67.48% ]
-  - CyUnitV  [ 67.48% ]
-  Data Dependencies:      [ 49.51% ]
-  - Register Dependencies [ 49.51% ]
+  Resource Pressure       [ 37.63% ]
+  - CyUnitV  [ 37.63% ]
+  Data Dependencies:      [ 39.07% ]
+  - Register Dependencies [ 39.07% ]
   - Memory Dependencies   [ 0.00% ]
 
 Critical sequence based on the simulation:
 
               Instruction                                 Dependency Information
- +----< 10.   st4.8b	{ v0, v1, v2, v3 }, [x10]
+ +----< 6.    st4.8b	{ v0, v1, v2, v3 }, [x10]
  |
  |    < loop carried > 
  |
  |      0.    ldr	x8, [x1]
- +----> 1.    mov.16b	v0, v19                           ## RESOURCE interference:  CyUnitV [ probability: 98% ]
- +----> 2.    mov.16b	v1, v5                            ## RESOURCE interference:  CyUnitV [ probability: 98% ]
- +----> 3.    mov.16b	v2, v6                            ## RESOURCE interference:  CyUnitV [ probability: 99% ]
- +----> 4.    mov.16b	v3, v18                           ## RESOURCE interference:  CyUnitV [ probability: 100% ]
- |      5.    xtn.8b	v0, v0
- |      6.    xtn.8b	v1, v1
- |      7.    xtn.8b	v2, v2
- +----> 8.    xtn.8b	v3, v3                            ## REGISTER dependency:  q3
- |      9.    add	x10, x8, x12
- |      10.   st4.8b	{ v0, v1, v2, v3 }, [x10]
+ +----> 1.    xtn.8b	v0, v19                           ## RESOURCE interference:  CyUnitV [ probability: 159% ]
+ +----> 2.    xtn.8b	v1, v5                            ## RESOURCE interference:  CyUnitV [ probability: 96% ]
+ +----> 3.    xtn.8b	v2, v6                            ## RESOURCE interference:  CyUnitV [ probability: 97% ]
+ +----> 4.    xtn.8b	v3, v18                           ## RESOURCE interference:  CyUnitV [ probability: 100% ]
+ |      5.    add	x10, x8, x12
+ |      6.    st4.8b	{ v0, v1, v2, v3 }, [x10]
  |
  |    < loop carried > 
  |
- +----> 2.    mov.16b	v1, v5                            ## RESOURCE interference:  CyUnitV [ probability: 98% ]
+ +----> 2.    xtn.8b	v1, v5                            ## RESOURCE interference:  CyUnitV [ probability: 94% ]
 
 
 Instruction Info:
@@ -51,14 +47,10 @@ Instruction Info:
 
 [1]    [2]    [3]    [4]    [5]    [6]    Instructions:
  1      4     0.50    *                   ldr	x8, [x1]
- 1      2     0.33                        mov.16b	v0, v19
- 1      2     0.33                        mov.16b	v1, v5
- 1      2     0.33                        mov.16b	v2, v6
- 1      2     0.33                        mov.16b	v3, v18
- 1      2     0.33                        xtn.8b	v0, v0
- 1      2     0.33                        xtn.8b	v1, v1
- 1      2     0.33                        xtn.8b	v2, v2
- 1      2     0.33                        xtn.8b	v3, v3
+ 1      2     0.33                        xtn.8b	v0, v19
+ 1      2     0.33                        xtn.8b	v1, v5
+ 1      2     0.33                        xtn.8b	v2, v6
+ 1      2     0.33                        xtn.8b	v3, v18
  1      2     1.00                        add	x10, x8, x12
  6      8     1.33           *            st4.8b	{ v0, v1, v2, v3 }, [x10]
 
@@ -91,18 +83,14 @@ Resources:
 
 Resource pressure per iteration:
 [0.0]  [0.1]  [1]    [2.0]  [2.1]  [3.0]  [3.1]  [3.2]  [3.3]  [4]    [5]    [6.0]  [6.1]  [7]    [8.0]  [8.1]  [9.0]  [9.1]  [9.2]  [10]   [11]   [12.0] [12.1] 
- -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -     1.89   1.11   3.99   4.02   3.99    -      -      -      -     
+ -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -     1.62   1.38   2.68   2.65   2.67    -      -      -      -     
 
 Resource pressure by instruction:
 [0.0]  [0.1]  [1]    [2.0]  [2.1]  [3.0]  [3.1]  [3.2]  [3.3]  [4]    [5]    [6.0]  [6.1]  [7]    [8.0]  [8.1]  [9.0]  [9.1]  [9.2]  [10]   [11]   [12.0] [12.1] Instructions:
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.11   0.89    -      -      -      -      -      -      -     ldr	x8, [x1]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.01   0.97   0.02    -      -      -      -     mov.16b	v0, v19
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.01   0.02   0.97    -      -      -      -     mov.16b	v1, v5
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.01   0.98   0.01    -      -      -      -     mov.16b	v2, v6
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.01   0.01   0.98    -      -      -      -     mov.16b	v3, v18
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -     xtn.8b	v0, v0
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.02   0.01   0.97    -      -      -      -     xtn.8b	v1, v1
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.98   0.02    -      -      -      -     xtn.8b	v2, v2
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.01   0.02   0.97    -      -      -      -     xtn.8b	v3, v3
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.38   0.62    -      -      -      -      -      -      -     ldr	x8, [x1]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.34   0.32    -      -      -      -     xtn.8b	v0, v19
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.67   0.16   0.17    -      -      -      -     xtn.8b	v1, v5
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.97   0.02   0.01    -      -      -      -     xtn.8b	v2, v6
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.66   0.17   0.17    -      -      -      -     xtn.8b	v3, v18
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x12
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.78   0.22   3.92   0.04   0.04    -      -      -      -     st4.8b	{ v0, v1, v2, v3 }, [x10]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.24   0.76   0.04   1.96   2.00    -      -      -      -     st4.8b	{ v0, v1, v2, v3 }, [x10]
