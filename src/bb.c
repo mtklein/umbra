@@ -70,15 +70,10 @@ static int const_eval(enum op op, int xb, int yb, int zb) {
         case op_shl_i16: return (uint16_t)(xh << yh);
         case op_shr_u16: return (uint16_t)(xh >> yh);
         case op_shr_s16: return (uint16_t)((int16_t)xh >> yh);
-        case op_and_16:  return (uint16_t)(xh & yh);
-        case op_or_16:   return (uint16_t)(xh | yh);
-        case op_xor_16:  return (uint16_t)(xh ^ yh);
-        case op_sel_16:  return (uint16_t)((xh & yh) | (~xh & zh));
-
-        case op_and_half: return (uint16_t)(xh & yh);
-        case op_or_half:  return (uint16_t)(xh | yh);
-        case op_xor_half: return (uint16_t)(xh ^ yh);
-        case op_sel_half: return (uint16_t)((xh & yh) | (~xh & zh));
+        case op_and_half: case op_and_16: return (uint16_t)(xh & yh);
+        case op_or_half:  case op_or_16:  return (uint16_t)(xh | yh);
+        case op_xor_half: case op_xor_16: return (uint16_t)(xh ^ yh);
+        case op_sel_half: case op_sel_16: return (uint16_t)((xh & yh) | (~xh & zh));
 
         case op_half_from_f32: return scalar_f32_to_f16(xf);
         case op_half_from_i32: return scalar_f32_to_f16((float)xb);

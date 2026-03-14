@@ -102,16 +102,6 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_shr_u32_imm: put(c, USHR_4s_imm(d,x,imm)); return 1;
     case op_shr_s32_imm: put(c, SSHR_4s_imm(d,x,imm)); return 1;
 
-    case op_and_32: put(c, AND_16b(d,x,y)); return 1;
-    case op_or_32:  put(c, ORR_16b(d,x,y)); return 1;
-    case op_xor_32: put(c, EOR_16b(d,x,y)); return 1;
-    case op_sel_32:
-        if (d==x) { put(c, BSL_16b(d,y,z)); }
-        else if (d==y) { put(c, BIF_16b(d,z,x)); }
-        else if (d==z) { put(c, BIT_16b(d,y,x)); }
-        else { put(c, ORR_16b(d,z,z)); put(c, BIT_16b(d,y,x)); }
-        return 1;
-
     case op_f32_from_i32: put(c, SCVTF_4s(d,x)); return 1;
     case op_i32_from_f32: put(c, FCVTZS_4s(d,x)); return 1;
 
@@ -136,14 +126,11 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_shr_u16_imm: put(c, W(USHR_4h_imm(d,x,imm))); return 1;
     case op_shr_s16_imm: put(c, W(SSHR_4h_imm(d,x,imm))); return 1;
     // 16-bit and half bitwise: both use 16B ops on full Q register
-    case op_and_half: // same encoding as and_16
-    case op_and_16: put(c, AND_16b(d,x,y)); return 1;
-    case op_or_half:  // same encoding as or_16
-    case op_or_16:  put(c, ORR_16b(d,x,y)); return 1;
-    case op_xor_half: // same encoding as xor_16
-    case op_xor_16: put(c, EOR_16b(d,x,y)); return 1;
-    case op_sel_half: // same encoding as sel_16
-    case op_sel_16:
+    // Bitwise: all widths use 128-bit register ops
+    case op_and_half: case op_and_32: case op_and_16: put(c, AND_16b(d,x,y)); return 1;
+    case op_or_half:  case op_or_32:  case op_or_16:  put(c, ORR_16b(d,x,y)); return 1;
+    case op_xor_half: case op_xor_32: case op_xor_16: put(c, EOR_16b(d,x,y)); return 1;
+    case op_sel_half: case op_sel_32: case op_sel_16:
         if (d==x) { put(c, BSL_16b(d,y,z)); }
         else if (d==y) { put(c, BIF_16b(d,z,x)); }
         else if (d==z) { put(c, BIT_16b(d,y,x)); }
@@ -955,26 +942,26 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_imm_16: broadcast_imm16(c, d, (uint16_t)imm); return 1;
     case op_imm_half: broadcast_half_imm(c, d, (uint16_t)imm); return 1;
 
-    // f32 arithmetic (YMM)
-    case op_add_f32: vaddps(c,d,x,y); return 1;
-    case op_sub_f32: vsubps(c,d,x,y); return 1;
-    case op_mul_f32: vmulps(c,d,x,y); return 1;
-    case op_div_f32: vdivps(c,d,x,y); return 1;
-    case op_min_f32: vminps(c,d,x,y); return 1;
-    case op_max_f32: vmaxps(c,d,x,y); return 1;
-    case op_sqrt_f32: vsqrtps(c,d,x); return 1;
-    // fma(x,y,z) = x*y + z
+    // f32 and half arithmetic (both YMM; half promoted to f32)
+    case op_add_half:  case op_add_f32:  vaddps(c,d,x,y); return 1;
+    case op_sub_half:  case op_sub_f32:  vsubps(c,d,x,y); return 1;
+    case op_mul_half:  case op_mul_f32:  vmulps(c,d,x,y); return 1;
+    case op_div_half:  case op_div_f32:  vdivps(c,d,x,y); return 1;
+    case op_min_half:  case op_min_f32:  vminps(c,d,x,y); return 1;
+    case op_max_half:  case op_max_f32:  vmaxps(c,d,x,y); return 1;
+    case op_sqrt_half: case op_sqrt_f32: vsqrtps(c,d,x);  return 1;
+    case op_fma_half:
     case op_fma_f32:
-        if      (d == x) { vfmadd132ps(c,d,z,y); }  // d = d*y + z
-        else if (d == y) { vfmadd213ps(c,d,x,z); }  // d = x*d + z
-        else if (d == z) { vfmadd231ps(c,d,x,y); }  // d = x*y + d
+        if      (d == x) { vfmadd132ps(c,d,z,y); }
+        else if (d == y) { vfmadd213ps(c,d,x,z); }
+        else if (d == z) { vfmadd231ps(c,d,x,y); }
         else             { vmovaps(c,d,z); vfmadd231ps(c,d,x,y); }
         return 1;
-    // fms(x,y,z) = z - x*y
+    case op_fms_half:
     case op_fms_f32:
-        if      (d == x) { vfnmadd132ps(c,d,z,y); }  // d = -(d*y) + z
-        else if (d == y) { vfnmadd213ps(c,d,x,z); }  // d = -(x*d) + z
-        else if (d == z) { vfnmadd231ps(c,d,x,y); }  // d = -(x*y) + d
+        if      (d == x) { vfnmadd132ps(c,d,z,y); }
+        else if (d == y) { vfnmadd213ps(c,d,x,z); }
+        else if (d == z) { vfnmadd231ps(c,d,x,y); }
         else             { vmovaps(c,d,z); vfnmadd231ps(c,d,x,y); }
         return 1;
 
@@ -1003,10 +990,10 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_f32_from_i32: vcvtdq2ps(c,d,x); return 1;
     case op_i32_from_f32: vcvttps2dq(c,d,x); return 1;
 
-    // f32 compare (YMM) — produces all-1/all-0 mask
-    case op_eq_f32: vcmpps(c,d,x,y,0);  return 1;  // EQ_OQ
-    case op_lt_f32: vcmpps(c,d,x,y,1);  return 1;  // LT_OS
-    case op_le_f32: vcmpps(c,d,x,y,2);  return 1;  // LE_OS
+    // f32 and half compare (both YMM)
+    case op_eq_half: case op_eq_f32: vcmpps(c,d,x,y,0);  return 1;
+    case op_lt_half: case op_lt_f32: vcmpps(c,d,x,y,1);  return 1;
+    case op_le_half: case op_le_f32: vcmpps(c,d,x,y,2);  return 1;
 
     // i32 compare
     case op_eq_i32: vpcmpeqd(c,d,x,y); return 1;
@@ -1083,34 +1070,6 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
         vex_rrr(c,1,2,0,0x3E,scratch,x,y);   // VPMAXUW scratch, x, y
         vpcmpeqw(c,d,y,scratch);
         return 1;
-
-    // ---- Half ops: carried as f32 in YMM, arithmetic uses f32 instructions ----
-    case op_add_half: vaddps(c,d,x,y); return 1;
-    case op_sub_half: vsubps(c,d,x,y); return 1;
-    case op_mul_half: vmulps(c,d,x,y); return 1;
-    case op_div_half: vdivps(c,d,x,y); return 1;
-    case op_min_half: vminps(c,d,x,y); return 1;
-    case op_max_half: vmaxps(c,d,x,y); return 1;
-    case op_sqrt_half: vsqrtps(c,d,x); return 1;
-    case op_fma_half:
-        if      (d == x) { vfmadd132ps(c,d,z,y); }
-        else if (d == y) { vfmadd213ps(c,d,x,z); }
-        else if (d == z) { vfmadd231ps(c,d,x,y); }
-        else             { vmovaps(c,d,z); vfmadd231ps(c,d,x,y); }
-        return 1;
-    case op_fms_half:
-        if      (d == x) { vfnmadd132ps(c,d,z,y); }
-        else if (d == y) { vfnmadd213ps(c,d,x,z); }
-        else if (d == z) { vfnmadd231ps(c,d,x,y); }
-        else             { vmovaps(c,d,z); vfnmadd231ps(c,d,x,y); }
-        return 1;
-
-    // Half bitwise: handled above with 32-bit bitwise (both YMM)
-
-    // Half compare: use f32 compare
-    case op_eq_half: vcmpps(c,d,x,y,0); return 1;
-    case op_lt_half: vcmpps(c,d,x,y,1); return 1;
-    case op_le_half: vcmpps(c,d,x,y,2); return 1;
 
     // ---- Cross-width conversions ----
     // half_from_i16: i16 in XMM → f32 in YMM (sign-extend to i32, then cvt)

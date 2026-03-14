@@ -287,31 +287,12 @@ op(i32_from_i16) {
     }
 
     op(half_from_f32) { v->f32 = v[ip->x].f32; next; }
-    op(half_from_i32) { v->f32 = cast(F32, v[ip->x].i32); next; }
     op(f32_from_half) { v->f32 = v[ip->x].f32; next; }
-    op(i32_from_half) { v->i32 = cast(I32, v[ip->x].f32); next; }
     op(half_from_i16) { v->f32 = cast(F32, v[ip->x].i16); next; }
     op(i16_from_half) { v->i16 = cast(I16, v[ip->x].f32); next; }
 
-    op( add_half) { v->f32 = v[ip->x].f32 + v[ip->y].f32               ; next; }
-    op( sub_half) { v->f32 = v[ip->x].f32 - v[ip->y].f32               ; next; }
-    op( mul_half) { v->f32 = v[ip->x].f32 * v[ip->y].f32               ; next; }
-    op( div_half) { v->f32 = v[ip->x].f32 / v[ip->y].f32               ; next; }
-    op( fma_half) { v->f32 = v[ip->x].f32 * v[ip->y].f32 + v[ip->z].f32; next; }
-    op( fms_half) { v->f32 = v[ip->z].f32 - v[ip->x].f32 * v[ip->y].f32; next; }
-    op( min_half) { v->f32 = __builtin_elementwise_min(v[ip->x].f32, v[ip->y].f32); next; }
-    op( max_half) { v->f32 = __builtin_elementwise_max(v[ip->x].f32, v[ip->y].f32); next; }
-    op(sqrt_half) { v->f32 = __builtin_elementwise_sqrt(v[ip->x].f32)             ; next; }
-
-    // half bitwise: identical to i32 bitwise on software f16 (both use .u32)
-    // dispatch table maps and_half->and_32, or_half->or_32, etc.
-
-    #pragma clang diagnostic push
-    #pragma clang diagnostic ignored "-Wfloat-equal"
-    op(eq_half) { v->u32 = cast(U32, v[ip->x].f32 == v[ip->y].f32); next; }
-    #pragma clang diagnostic pop
-    op(lt_half) { v->u32 = cast(U32, v[ip->x].f32 <  v[ip->y].f32); next; }
-    op(le_half) { v->u32 = cast(U32, v[ip->x].f32 <= v[ip->y].f32); next; }
+    // software f16: half promoted to f32, so half arithmetic/compare/bitwise/conversions
+    // are identical to their f32/i32 counterparts.  dispatch table maps them directly.
 
 #endif
 
@@ -480,28 +461,36 @@ static Fn const fn[] = {
     [op_lt_s32] = lt_s32, [op_le_s32] = le_s32,
     [op_lt_u32] = lt_u32, [op_le_u32] = le_u32,
 
-    [op_half_from_f32] = half_from_f32, [op_half_from_i32] = half_from_i32,
+    [op_half_from_f32] = half_from_f32,
     [op_half_from_i16] = half_from_i16, [op_i16_from_half] = i16_from_half,
-    [op_f32_from_half] = f32_from_half, [op_i32_from_half] = i32_from_half,
+    [op_f32_from_half] = f32_from_half,
     [op_i16_from_i32] = i16_from_i32, [op_shr_narrow_u32] = shr_narrow_u32,
     [op_i32_from_i16] = i32_from_i16,
     [op_load_8x4] = load_8x4,
     [op_store_8x4] = store_8x4,
+#if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
     [op_add_half] =  add_half, [op_sub_half] =  sub_half,
     [op_mul_half] =  mul_half, [op_div_half] =  div_half,
     [op_min_half] =  min_half, [op_max_half] =  max_half,
     [op_sqrt_half] = sqrt_half, [op_fma_half] = fma_half, [op_fms_half] = fms_half,
-#if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
-    // native f16: half bitwise is identical to i16 bitwise
     [op_and_half] = and_16, [op_or_half]  =  or_16,
     [op_xor_half] = xor_16, [op_sel_half] = sel_16,
-#else
-    // software f16: half promoted to f32, bitwise is identical to i32 bitwise
-    [op_and_half] = and_32, [op_or_half]  =  or_32,
-    [op_xor_half] = xor_32, [op_sel_half] = sel_32,
-#endif
+    [op_half_from_i32] = half_from_i32, [op_i32_from_half] = i32_from_half,
     [op_eq_half] = eq_half,
     [op_lt_half] = lt_half, [op_le_half] = le_half,
+#else
+    // software f16: half promoted to f32, so half ops map to f32/i32 equivalents
+    [op_add_half] =  add_f32, [op_sub_half] =  sub_f32,
+    [op_mul_half] =  mul_f32, [op_div_half] =  div_f32,
+    [op_min_half] =  min_f32, [op_max_half] =  max_f32,
+    [op_sqrt_half] = sqrt_f32, [op_fma_half] = fma_f32, [op_fms_half] = fms_f32,
+    [op_and_half] = and_32, [op_or_half]  =  or_32,
+    [op_xor_half] = xor_32, [op_sel_half] = sel_32,
+    [op_half_from_i32] = f32_from_i32,
+    [op_i32_from_half] = i32_from_f32,
+    [op_eq_half] = eq_f32,
+    [op_lt_half] = lt_f32, [op_le_half] = le_f32,
+#endif
 };
 
 struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) {
