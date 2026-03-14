@@ -697,6 +697,61 @@ static void test_coverage_rect_white_dst(void) {
     if (mtl) umbra_metal_free(mtl);
 }
 
+// --- coverage_bitmap: 8-bit AA text coverage ---
+
+static void test_coverage_bitmap(void) {
+    draw_backends B = make_draw(umbra_draw_build(
+        umbra_shader_solid, umbra_coverage_bitmap, umbra_blend_srcover,
+        umbra_load_8888, umbra_store_8888));
+
+    for (int bi = 0; bi < 3; bi++) {
+        uint32_t dst[8];
+        memset(dst, 0, sizeof dst);
+        int32_t  x0 = 0, y = 0;
+        __fp16   color[4] = {1, 1, 1, 1};
+        // Coverage: pixel 0=0, pixel 1=128, pixel 2=255, rest=0.
+        uint16_t cov[8] = {0, 128, 255, 0, 0, 0, 0, 0};
+        if (!run_draw(&B, bi, 8, (umbra_buf[]){
+            {dst, (long)sizeof dst}, {&x0,-4}, {&y,-4}, {color,-8}, {cov, -(long)sizeof cov}
+        })) { continue; }
+        // Pixel 0: coverage=0, dst=black → stays black.
+        (dst[0] == 0) here;
+        // Pixel 1: coverage=128/255 ≈ 0.502 → ~128 per channel.
+        ((dst[1] & 0xff) >= 120 && (dst[1] & 0xff) <= 136) here;
+        // Pixel 2: coverage=255/255=1.0 → white.
+        ((dst[2] & 0xff) >= 0xfe) here;
+        // Pixel 3: coverage=0 → stays black.
+        (dst[3] == 0) here;
+    }
+    cleanup_draw(&B);
+}
+
+// --- coverage_sdf: SDF text coverage ---
+
+static void test_coverage_sdf(void) {
+    draw_backends B = make_draw(umbra_draw_build(
+        umbra_shader_solid, umbra_coverage_sdf, umbra_blend_srcover,
+        umbra_load_8888, umbra_store_8888));
+
+    for (int bi = 0; bi < 3; bi++) {
+        uint32_t dst[8];
+        memset(dst, 0, sizeof dst);
+        int32_t  x0 = 0, y = 0;
+        __fp16   color[4] = {1, 1, 1, 1};
+        // SDF values: 0 = far outside, 128 = edge (~0.502), 255 = far inside.
+        // Threshold ~0.45, scale 10.0 → smoothstep ramp from ~115 to ~140.
+        uint16_t cov[8] = {0, 100, 128, 200, 255, 0, 0, 0};
+        if (!run_draw(&B, bi, 8, (umbra_buf[]){
+            {dst, (long)sizeof dst}, {&x0,-4}, {&y,-4}, {color,-8}, {cov, -(long)sizeof cov}
+        })) { continue; }
+        // Pixel 0: SDF=0 → far outside → coverage=0.
+        (dst[0] == 0) here;
+        // Pixel 4: SDF=255 → far inside → full coverage → white.
+        ((dst[4] & 0xff) >= 0xfe) here;
+    }
+    cleanup_draw(&B);
+}
+
 int main(void) {
     test_solid_src();
     test_solid_src_n1();
@@ -721,5 +776,7 @@ int main(void) {
     test_full_pipeline();
     test_solid_src_fp16_n9();
     test_coverage_rect_white_dst();
+    test_coverage_bitmap();
+    test_coverage_sdf();
     return 0;
 }

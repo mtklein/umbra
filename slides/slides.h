@@ -1,5 +1,6 @@
 #pragma once
 #include "../umbra_draw.h"
+#include "text.h"
 #include <stdint.h>
 
 // Each slide demonstrates a different pipeline configuration.
@@ -26,7 +27,7 @@ static const slide slides[] = {
         .load     = umbra_load_8888,
         .store    = umbra_store_8888,
         .color    = {0.0f, 0.6f, 1.0f, 1.0f},
-        .bg       = 0xFF202020,
+        .bg       = 0xff202020,
     },
     {
         .title    = "2. Source Over (srcover)",
@@ -36,7 +37,7 @@ static const slide slides[] = {
         .load     = umbra_load_8888,
         .store    = umbra_store_8888,
         .color    = {0.45f, 0.0f, 0.0f, 0.5f},
-        .bg       = 0xFF00FF00,
+        .bg       = 0xff00ff00,
     },
     {
         .title    = "3. Destination Over (dstover)",
@@ -46,7 +47,7 @@ static const slide slides[] = {
         .load     = umbra_load_8888,
         .store    = umbra_store_8888,
         .color    = {0.0f, 0.0f, 0.9f, 0.9f},
-        .bg       = 0xC0008000,
+        .bg       = 0xc0008000,
     },
     {
         .title    = "4. Multiply Blend",
@@ -56,7 +57,7 @@ static const slide slides[] = {
         .load     = umbra_load_8888,
         .store    = umbra_store_8888,
         .color    = {1.0f, 0.5f, 0.0f, 1.0f},
-        .bg       = 0xFF804020,
+        .bg       = 0xff804020,
     },
     {
         .title    = "5. Full Coverage (no rect clip)",
@@ -66,7 +67,7 @@ static const slide slides[] = {
         .load     = umbra_load_8888,
         .store    = umbra_store_8888,
         .color    = {0.15f, 0.0f, 0.3f, 0.3f},
-        .bg       = 0xFFFFFFFF,
+        .bg       = 0xffffffff,
     },
     {
         .title    = "6. No Blend (direct paint)",
@@ -76,7 +77,27 @@ static const slide slides[] = {
         .load     = NULL,
         .store    = umbra_store_8888,
         .color    = {0.9f, 0.4f, 0.1f, 1.0f},
-        .bg       = 0xFF000000,
+        .bg       = 0xff000000,
+    },
+    {
+        .title    = "7. Text (8-bit AA)",
+        .shader   = umbra_shader_solid,
+        .coverage = umbra_coverage_bitmap,
+        .blend    = umbra_blend_srcover,
+        .load     = umbra_load_8888,
+        .store    = umbra_store_8888,
+        .color    = {1.0f, 1.0f, 1.0f, 1.0f},
+        .bg       = 0xff1a1a2e,
+    },
+    {
+        .title    = "8. Text (SDF)",
+        .shader   = umbra_shader_solid,
+        .coverage = umbra_coverage_sdf,
+        .blend    = umbra_blend_srcover,
+        .load     = umbra_load_8888,
+        .store    = umbra_store_8888,
+        .color    = {0.2f, 0.8f, 1.0f, 1.0f},
+        .bg       = 0xff1a1a2e,
     },
 };
 

@@ -55,7 +55,9 @@ struct umbra_basic_block* umbra_draw_build(umbra_shader_fn   shader,
 umbra_color umbra_shader_solid(struct umbra_basic_block*, umbra_v32 x, umbra_v32 y);
 
 // Coverage
-umbra_half umbra_coverage_rect(struct umbra_basic_block*, umbra_v32 x, umbra_v32 y);
+umbra_half umbra_coverage_rect   (struct umbra_basic_block*, umbra_v32 x, umbra_v32 y);
+umbra_half umbra_coverage_bitmap (struct umbra_basic_block*, umbra_v32 x, umbra_v32 y);
+umbra_half umbra_coverage_sdf    (struct umbra_basic_block*, umbra_v32 x, umbra_v32 y);
 
 // Blend modes
 umbra_color umbra_blend_src     (struct umbra_basic_block*, umbra_color src, umbra_color dst);

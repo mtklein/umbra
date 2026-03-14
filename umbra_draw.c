@@ -155,6 +155,29 @@ umbra_half umbra_coverage_rect(BB *bb, umbra_v32 x, umbra_v32 y) {
     return umbra_sel_half(bb, umbra_half_from_f32(bb, inside), one, zero);
 }
 
+umbra_half umbra_coverage_bitmap(BB *bb, umbra_v32 x, umbra_v32 y) {
+    (void)x; (void)y;
+    umbra_v32 ix = umbra_lane(bb);
+    umbra_v16 val = umbra_load_16(bb, (umbra_ptr){4}, ix);
+    umbra_half inv255 = umbra_imm_half(bb, 0x1c04);
+    return umbra_mul_half(bb, umbra_half_from_i16(bb, val), inv255);
+}
+
+umbra_half umbra_coverage_sdf(BB *bb, umbra_v32 x, umbra_v32 y) {
+    (void)x; (void)y;
+    umbra_v32 ix = umbra_lane(bb);
+    umbra_v16 raw = umbra_load_16(bb, (umbra_ptr){4}, ix);
+    umbra_half inv255 = umbra_imm_half(bb, 0x1c04);
+    umbra_half dist = umbra_mul_half(bb, umbra_half_from_i16(bb, raw), inv255);
+    umbra_half lo    = umbra_imm_half(bb, 0x3733);   // ~0.45
+    umbra_half scale = umbra_imm_half(bb, 0x4900);   // 10.0
+    umbra_half shifted = umbra_sub_half(bb, dist, lo);
+    umbra_half scaled  = umbra_mul_half(bb, shifted, scale);
+    umbra_half zero = umbra_imm_half(bb, 0);
+    umbra_half one  = umbra_imm_half(bb, 0x3c00);
+    return umbra_min_half(bb, umbra_max_half(bb, scaled, zero), one);
+}
+
 // --- Built-in pixel formats ---
 
 umbra_color umbra_load_8888(BB *bb, umbra_ptr ptr, umbra_v32 ix) {
