@@ -78,7 +78,7 @@ struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const 
         ra->reg[i] = -1;
         ra->reg_hi[i] = -1;
         ra->is_pair[i] = cfg->has_pairs
-                       && (op_type(bb->inst[i].op) == OP_32)
+                       && (output_type(bb->inst[i].op) == OP_32)
                        && (i >= bb->preamble);
     }
     for (int i = 0; i < cfg->max_reg; i++) ra->owner[i] = -1;

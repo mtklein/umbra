@@ -1,7 +1,7 @@
 #pragma once
 #include <stdint.h>
 
-// X(name) — order matters: op_type() relies on 32-bit < 16-bit < half.
+// X(name) — order matters: output_type() relies on 32-bit < 16-bit < half.
 #define OP_LIST(X) \
     /* 32-bit ops */ \
     X(lane) \
@@ -76,10 +76,22 @@ static inline _Bool is_varying(enum op op) {
         || op == op_load_8x4 || op == op_store_8x4;
 }
 
+int umbra_const_eval(enum op, int, int, int);
+
 enum op_type { OP_32, OP_16, OP_HALF };
 
-static inline enum op_type op_type(enum op op) {
+static inline enum op_type output_type(enum op op) {
     if (op >= op_imm_half)    return OP_HALF;
     if (op >= op_imm_16)      return OP_16;
     return OP_32;
+}
+
+static inline enum op_type input_type(enum op op) {
+    if (op == op_f32_from_half || op == op_i32_from_half) return OP_HALF;
+    if (op == op_i32_from_i16)                            return OP_16;
+    if (op == op_i16_from_i32  || op == op_shr_narrow_u32) return OP_32;
+    if (op == op_half_from_f32 || op == op_half_from_i32) return OP_32;
+    if (op == op_half_from_i16) return OP_16;
+    if (op == op_i16_from_half) return OP_HALF;
+    return output_type(op);
 }

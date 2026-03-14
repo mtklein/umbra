@@ -493,6 +493,52 @@ static Fn const fn[] = {
 #endif
 };
 
+static void fill_val(val *v, int bits, enum op_type t) {
+#if !defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
+    if (t == OP_HALF) {
+        union { __fp16 h; uint16_t u; } h = {.u=(uint16_t)bits};
+        float f = (float)h.h;
+        __builtin_memcpy(v, &f, 4);
+        return;
+    }
+#endif
+    (void)t;
+    __builtin_memcpy(v, &bits, 4);
+}
+
+static int read_val(val const *v, enum op_type t) {
+#if !defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
+    if (t == OP_HALF) {
+        float f;
+        __builtin_memcpy(&f, v, 4);
+        union { __fp16 h; uint16_t u; } r;
+        r.h = (__fp16)f;
+        return r.u;
+    }
+#endif
+    (void)t;
+    int r;
+    __builtin_memcpy(&r, v, 4);
+    return r;
+}
+
+int umbra_const_eval(enum op op, int xb, int yb, int zb) {
+    val v[4] = {0};
+    struct interp_inst inst[2] = {
+        {.fn = fn[op], .x = -3, .y = -2, .z = -1},
+        {.fn = done},
+    };
+
+    enum op_type it = input_type(op);
+    fill_val(&v[0], xb, it);
+    fill_val(&v[1], yb, it);
+    fill_val(&v[2], zb, it);
+
+    inst[0].fn(inst, v+3, K, (void*[]){0});
+
+    return read_val(&v[3], output_type(op));
+}
+
 struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) {
     int *id = calloc((size_t)bb->insts, sizeof *id);
 

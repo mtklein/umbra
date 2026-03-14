@@ -1,6 +1,5 @@
 #include "../umbra.h"
 #include "bb.h"
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -12,120 +11,7 @@ typedef umbra_half vh;
 static _Bool is_pow2        (int x) { return __builtin_popcount((unsigned)x) == 1; }
 static _Bool is_pow2_or_zero(int x) { return __builtin_popcount((unsigned)x) <= 1; }
 
-static int   f32_bits     (float v) { union { float f; int i; } u = {.f=v}; return u.i; }
-static float f32_from_bits(int   v) { union { float f; int i; } u = {.i=v}; return u.f; }
-
-static float scalar_f16_to_f32(uint16_t h) {
-    union { __fp16 h; uint16_t u; } v = {.u = h};
-    return (float)v.h;
-}
-static uint16_t scalar_f32_to_f16(float f) {
-    union { __fp16 h; uint16_t u; } v = {.h = (__fp16)f};
-    return v.u;
-}
-
-static int const_eval(enum op op, int xb, int yb, int zb) {
-    float xf = f32_from_bits(xb), yf = f32_from_bits(yb), zf = f32_from_bits(zb);
-    uint32_t xu = (uint32_t)xb, yu = (uint32_t)yb;
-    uint16_t xh = (uint16_t)xb, yh = (uint16_t)yb, zh = (uint16_t)zb;
-    switch (op) {
-        case op_add_f32:  return f32_bits(xf + yf);
-        case op_sub_f32:  return f32_bits(xf - yf);
-        case op_mul_f32:  return f32_bits(xf * yf);
-        case op_div_f32:  return f32_bits(xf / yf);
-        case op_min_f32:  return f32_bits(fminf(xf, yf));
-        case op_max_f32:  return f32_bits(fmaxf(xf, yf));
-        case op_sqrt_f32: return f32_bits(sqrtf(xf));
-        case op_fma_f32:  return f32_bits(xf * yf + zf);
-        case op_fms_f32:  return f32_bits(zf - xf * yf);
-
-        case op_add_half:  return scalar_f32_to_f16(scalar_f16_to_f32(xh) + scalar_f16_to_f32(yh));
-        case op_sub_half:  return scalar_f32_to_f16(scalar_f16_to_f32(xh) - scalar_f16_to_f32(yh));
-        case op_mul_half:  return scalar_f32_to_f16(scalar_f16_to_f32(xh) * scalar_f16_to_f32(yh));
-        case op_div_half:  return scalar_f32_to_f16(scalar_f16_to_f32(xh) / scalar_f16_to_f32(yh));
-        case op_min_half:  return scalar_f32_to_f16(fminf(scalar_f16_to_f32(xh),
-                                                          scalar_f16_to_f32(yh)));
-        case op_max_half:  return scalar_f32_to_f16(fmaxf(scalar_f16_to_f32(xh),
-                                                          scalar_f16_to_f32(yh)));
-        case op_sqrt_half: return scalar_f32_to_f16(sqrtf(scalar_f16_to_f32(xh)));
-        case op_fma_half:  return scalar_f32_to_f16(scalar_f16_to_f32(xh) * scalar_f16_to_f32(yh)
-                                                                          + scalar_f16_to_f32(zh));
-        case op_fms_half:  return scalar_f32_to_f16(scalar_f16_to_f32(zh)
-                                                  - scalar_f16_to_f32(xh) * scalar_f16_to_f32(yh));
-
-        case op_add_i32: return xb + yb;
-        case op_sub_i32: return xb - yb;
-        case op_mul_i32: return xb * yb;
-        case op_shl_i32: return (int)(xu << yu);
-        case op_shr_u32: return (int)(xu >> yu);
-        case op_shr_s32: return xb >> yb;
-        case op_and_32:  return xb & yb;
-        case op_or_32:   return xb | yb;
-        case op_xor_32:  return xb ^ yb;
-        case op_sel_32:  return (xb & yb) | (~xb & zb);
-
-        case op_add_i16: return (uint16_t)(xh + yh);
-        case op_sub_i16: return (uint16_t)(xh - yh);
-        case op_mul_i16: return (uint16_t)(xh * yh);
-        case op_shl_i16: return (uint16_t)(xh << yh);
-        case op_shr_u16: return (uint16_t)(xh >> yh);
-        case op_shr_s16: return (uint16_t)((int16_t)xh >> yh);
-        case op_and_half: case op_and_16: return (uint16_t)(xh & yh);
-        case op_or_half:  case op_or_16:  return (uint16_t)(xh | yh);
-        case op_xor_half: case op_xor_16: return (uint16_t)(xh ^ yh);
-        case op_sel_half: case op_sel_16: return (uint16_t)((xh & yh) | (~xh & zh));
-
-        case op_half_from_f32: return scalar_f32_to_f16(xf);
-        case op_half_from_i32: return scalar_f32_to_f16((float)xb);
-        case op_half_from_i16: return scalar_f32_to_f16((float)(int16_t)xh);
-        case op_i16_from_half: { float t = scalar_f16_to_f32(xh); return (int16_t)t; }
-        case op_f32_from_half: return f32_bits(scalar_f16_to_f32(xh));
-        case op_f32_from_i32: return f32_bits((float)xb);
-        case op_i32_from_f32: return (int)xf;
-        case op_i32_from_half: { float t = scalar_f16_to_f32(xh); return (int)t; }
-        case op_i16_from_i32: return (uint16_t)xb;
-        case op_shr_narrow_u32: return (uint16_t)(xu >> yu);
-        case op_i32_from_i16: return (int32_t)(int16_t)xh;
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wfloat-equal"
-        case op_eq_f32: return -(int)(xf == yf);
-#pragma clang diagnostic pop
-        case op_lt_f32: return -(int)(xf <  yf);
-        case op_le_f32: return -(int)(xf <= yf);
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wfloat-equal"
-        case op_eq_half: return (uint16_t)-(int)(scalar_f16_to_f32(xh) == scalar_f16_to_f32(yh));
-#pragma clang diagnostic pop
-        case op_lt_half: return (uint16_t)-(int)(scalar_f16_to_f32(xh) <  scalar_f16_to_f32(yh));
-        case op_le_half: return (uint16_t)-(int)(scalar_f16_to_f32(xh) <= scalar_f16_to_f32(yh));
-
-        case op_eq_i32: return -(int)(xb == yb);
-        case op_lt_s32: return -(int)(xb <  yb);
-        case op_le_s32: return -(int)(xb <= yb);
-        case op_lt_u32: return -(int)(xu <  yu);
-        case op_le_u32: return -(int)(xu <= yu);
-
-        case op_eq_i16: return (uint16_t)-(int)((int16_t)xh == (int16_t)yh);
-        case op_lt_s16: return (uint16_t)-(int)((int16_t)xh <  (int16_t)yh);
-        case op_le_s16: return (uint16_t)-(int)((int16_t)xh <= (int16_t)yh);
-        case op_lt_u16: return (uint16_t)-(int)(xh <  yh);
-        case op_le_u16: return (uint16_t)-(int)(xh <= yh);
-
-        case op_lane:
-        case op_imm_16: case op_imm_32: case op_imm_half:
-        case op_uni_16: case op_uni_32: case op_uni_half:
-        case op_load_16: case op_load_32: case op_load_half:
-        case op_gather_16: case op_gather_32: case op_gather_half:
-        case op_store_16: case op_store_32: case op_store_half:
-        case op_scatter_16: case op_scatter_32: case op_scatter_half:
-        case op_shl_i32_imm: case op_shr_u32_imm: case op_shr_s32_imm:
-        case op_shl_i16_imm: case op_shr_u16_imm: case op_shr_s16_imm:
-        case op_load_8x4: case op_store_8x4:
-            return 0;
-    }
-}
+static int f32_bits(float v) { union { float f; int i; } u = {.f=v}; return u.i; }
 
 static uint32_t bb_inst_hash(struct bb_inst const *inst) {
     uint32_t               h = (uint32_t)inst->op;
@@ -259,11 +145,11 @@ static _Bool is_imm(BB *bb, int id) {
 
 static int math_(BB *bb, struct bb_inst inst) {
     if (is_imm(bb, inst.x) && is_imm(bb, inst.y) && is_imm(bb, inst.z)) {
-        int const result = const_eval(inst.op, bb->inst[inst.x].imm
+        int const result = umbra_const_eval(inst.op, bb->inst[inst.x].imm
                                              , bb->inst[inst.y].imm
                                              , bb->inst[inst.z].imm);
-        return op_type(inst.op) == OP_HALF ? umbra_imm_half(bb, (uint16_t)result).id
-             : op_type(inst.op) == OP_16   ? umbra_imm_16  (bb, (uint16_t)result).id
+        return output_type(inst.op) == OP_HALF ? umbra_imm_half(bb, (uint16_t)result).id
+             : output_type(inst.op) == OP_16   ? umbra_imm_16  (bb, (uint16_t)result).id
              :                               umbra_imm_32  (bb, (uint32_t)result).id;
     }
     return push_(bb, inst);

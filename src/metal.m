@@ -58,7 +58,7 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
     for (int i = lo; i < hi; i++) {
         struct bb_inst const *inst = &bb->inst[i];
 
-        if (op_type(inst->op) == OP_HALF) {
+        if (output_type(inst->op) == OP_HALF) {
             switch (inst->op) {
                 case op_imm_half:
                     emit(b, "%shalf v%d = as_type<half>((ushort)%uu);\n", pad, i, (uint16_t)inst->imm);
@@ -393,7 +393,7 @@ static char* build_source(BB const *bb, int *out_max_ptr) {
         if (has_ptr(op)) {
             int p = bb->inst[i].ptr;
             if (op == op_load_8x4 || op == op_store_8x4) { /* uses (uchar*) cast */ }
-            else if (op_type(op) == OP_32) { ptr_32[p] = 1; }
+            else if (output_type(op) == OP_32) { ptr_32[p] = 1; }
             else                           { ptr_16[p] = 1; }
         }
     }
