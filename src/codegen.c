@@ -491,9 +491,9 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
 }
 
 void umbra_codegen_run(struct umbra_codegen *cg, int n, umbra_buf buf[]) {
-    if (!cg) return;
+    if (!cg) { return; }
     void *ptrs[16] = {0};
-    for (int i = 0; i < cg->nptr && i < 16; i++) ptrs[i] = buf[i].ptr;
+    for (int i = 0; i < cg->nptr && i < 16; i++) { ptrs[i] = buf[i].ptr; }
     cg->entry(n, ptrs);
 }
 

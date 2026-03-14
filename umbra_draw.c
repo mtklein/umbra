@@ -160,7 +160,7 @@ umbra_half umbra_coverage_rect(BB *bb, umbra_v32 x, umbra_v32 y) {
 umbra_color umbra_load_8888(BB *bb, umbra_ptr ptr, umbra_v32 ix) {
     umbra_v16 ch[4];
     umbra_load_8x4(bb, ptr, ix, ch);
-    umbra_half inv255 = umbra_imm_half(bb, 0x1C04);  // 1/255 in fp16
+    umbra_half inv255 = umbra_imm_half(bb, 0x1c04);  // 1/255 in fp16
     return (umbra_color){
         umbra_mul_half(bb, umbra_half_from_i16(bb, ch[0]), inv255),
         umbra_mul_half(bb, umbra_half_from_i16(bb, ch[1]), inv255),
@@ -170,7 +170,7 @@ umbra_color umbra_load_8888(BB *bb, umbra_ptr ptr, umbra_v32 ix) {
 }
 
 void umbra_store_8888(BB *bb, umbra_ptr ptr, umbra_v32 ix, umbra_color c) {
-    umbra_half scale = umbra_imm_half(bb, 0x5BF8);  // 255.0 in fp16
+    umbra_half scale = umbra_imm_half(bb, 0x5bf8);  // 255.0 in fp16
     umbra_half half_ = umbra_imm_half(bb, 0x3800);   // 0.5 in fp16
     umbra_v16 ch[4] = {
         umbra_i16_from_half(bb, umbra_add_half(bb, umbra_mul_half(bb, c.r, scale), half_)),

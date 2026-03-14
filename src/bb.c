@@ -96,32 +96,32 @@ v32 umbra_imm_32  (BB *bb, uint32_t bits) { return (v32){push(bb, op_imm_32  , .
 vh  umbra_imm_half(BB *bb, uint16_t bits) { return (vh ){push(bb, op_imm_half, .imm=(int)bits)}; }
 
 v16 umbra_load_16(BB *bb, umbra_ptr src, v32 ix) {
-    if (bb->inst[ix.id].op == op_lane  ) return (v16){push(bb,op_load_16,           .ptr=src.ix)};
-    if (bb->inst[ix.id].op == op_imm_32) return (v16){push(bb,op_uni_16,   .imm=bb->inst[ix.id].imm,.ptr=src.ix)};
-    return                                      (v16){push(bb,op_gather_16,.x=ix.id,.ptr=src.ix)};
+    if (bb->inst[ix.id].op == op_lane  ) { return (v16){push(bb,op_load_16,           .ptr=src.ix)}; }
+    if (bb->inst[ix.id].op == op_imm_32) { return (v16){push(bb,op_uni_16,   .imm=bb->inst[ix.id].imm,.ptr=src.ix)}; }
+    return                                        (v16){push(bb,op_gather_16,.x=ix.id,.ptr=src.ix)};
 }
 v32 umbra_load_32(BB *bb, umbra_ptr src, v32 ix) {
-    if (bb->inst[ix.id].op == op_lane  ) return (v32){push(bb,op_load_32,           .ptr=src.ix)};
-    if (bb->inst[ix.id].op == op_imm_32) return (v32){push(bb,op_uni_32,   .imm=bb->inst[ix.id].imm,.ptr=src.ix)};
-    return                                      (v32){push(bb,op_gather_32,.x=ix.id,.ptr=src.ix)};
+    if (bb->inst[ix.id].op == op_lane  ) { return (v32){push(bb,op_load_32,           .ptr=src.ix)}; }
+    if (bb->inst[ix.id].op == op_imm_32) { return (v32){push(bb,op_uni_32,   .imm=bb->inst[ix.id].imm,.ptr=src.ix)}; }
+    return                                        (v32){push(bb,op_gather_32,.x=ix.id,.ptr=src.ix)};
 }
 vh umbra_load_half(BB *bb, umbra_ptr src, v32 ix) {
-    if (bb->inst[ix.id].op == op_lane  ) return (vh){push(bb,op_load_half,           .ptr=src.ix)};
-    if (bb->inst[ix.id].op == op_imm_32) return (vh){push(bb,op_uni_half,   .imm=bb->inst[ix.id].imm,.ptr=src.ix)};
-    return                                      (vh){push(bb,op_gather_half,.x=ix.id,.ptr=src.ix)};
+    if (bb->inst[ix.id].op == op_lane  ) { return (vh){push(bb,op_load_half,           .ptr=src.ix)}; }
+    if (bb->inst[ix.id].op == op_imm_32) { return (vh){push(bb,op_uni_half,   .imm=bb->inst[ix.id].imm,.ptr=src.ix)}; }
+    return                                        (vh){push(bb,op_gather_half,.x=ix.id,.ptr=src.ix)};
 }
 
 void umbra_store_16(BB *bb, umbra_ptr dst, v32 ix, v16 val) {
-    if (bb->inst[ix.id].op == op_lane) push(bb, op_store_16,             .y=val.id, .ptr=dst.ix);
-    else                               push(bb, op_scatter_16, .x=ix.id, .y=val.id, .ptr=dst.ix);
+    if (bb->inst[ix.id].op == op_lane) { push(bb, op_store_16,             .y=val.id, .ptr=dst.ix); }
+    else                               { push(bb, op_scatter_16, .x=ix.id, .y=val.id, .ptr=dst.ix); }
 }
 void umbra_store_32(BB *bb, umbra_ptr dst, v32 ix, v32 val) {
-    if (bb->inst[ix.id].op == op_lane) push(bb, op_store_32,             .y=val.id, .ptr=dst.ix);
-    else                               push(bb, op_scatter_32, .x=ix.id, .y=val.id, .ptr=dst.ix);
+    if (bb->inst[ix.id].op == op_lane) { push(bb, op_store_32,             .y=val.id, .ptr=dst.ix); }
+    else                               { push(bb, op_scatter_32, .x=ix.id, .y=val.id, .ptr=dst.ix); }
 }
 void umbra_store_half(BB *bb, umbra_ptr dst, v32 ix, vh val) {
-    if (bb->inst[ix.id].op == op_lane) push(bb, op_store_half,             .y=val.id, .ptr=dst.ix);
-    else                               push(bb, op_scatter_half, .x=ix.id, .y=val.id, .ptr=dst.ix);
+    if (bb->inst[ix.id].op == op_lane) { push(bb, op_store_half,             .y=val.id, .ptr=dst.ix); }
+    else                               { push(bb, op_scatter_half, .x=ix.id, .y=val.id, .ptr=dst.ix); }
 }
 
 static _Bool is_imm16(BB *bb, int id, int val) {
@@ -322,33 +322,33 @@ v16 umbra_mul_i16(BB *bb, v16 a, v16 b) {
 
 v32 umbra_shl_i32(BB *bb, v32 a, v32 b) {
     if (is_imm32(bb, b.id, 0)) { return a; }
-    if (is_imm(bb, b.id)) return (v32){push(bb, op_shl_i32_imm, .x=a.id, .imm=bb->inst[b.id].imm)};
+    if (is_imm(bb, b.id)) { return (v32){push(bb, op_shl_i32_imm, .x=a.id, .imm=bb->inst[b.id].imm)}; }
     return (v32){math(bb, op_shl_i32, .x=a.id, .y=b.id)};
 }
 v32 umbra_shr_u32(BB *bb, v32 a, v32 b) {
     if (is_imm32(bb, b.id, 0)) { return a; }
-    if (is_imm(bb, b.id)) return (v32){push(bb, op_shr_u32_imm, .x=a.id, .imm=bb->inst[b.id].imm)};
+    if (is_imm(bb, b.id)) { return (v32){push(bb, op_shr_u32_imm, .x=a.id, .imm=bb->inst[b.id].imm)}; }
     return (v32){math(bb, op_shr_u32, .x=a.id, .y=b.id)};
 }
 v32 umbra_shr_s32(BB *bb, v32 a, v32 b) {
     if (is_imm32(bb, b.id, 0)) { return a; }
-    if (is_imm(bb, b.id)) return (v32){push(bb, op_shr_s32_imm, .x=a.id, .imm=bb->inst[b.id].imm)};
+    if (is_imm(bb, b.id)) { return (v32){push(bb, op_shr_s32_imm, .x=a.id, .imm=bb->inst[b.id].imm)}; }
     return (v32){math(bb, op_shr_s32, .x=a.id, .y=b.id)};
 }
 
 v16 umbra_shl_i16(BB *bb, v16 a, v16 b) {
     if (is_imm16(bb, b.id, 0)) { return a; }
-    if (is_imm(bb, b.id)) return (v16){push(bb, op_shl_i16_imm, .x=a.id, .imm=bb->inst[b.id].imm)};
+    if (is_imm(bb, b.id)) { return (v16){push(bb, op_shl_i16_imm, .x=a.id, .imm=bb->inst[b.id].imm)}; }
     return (v16){math(bb, op_shl_i16, .x=a.id, .y=b.id)};
 }
 v16 umbra_shr_u16(BB *bb, v16 a, v16 b) {
     if (is_imm16(bb, b.id, 0)) { return a; }
-    if (is_imm(bb, b.id)) return (v16){push(bb, op_shr_u16_imm, .x=a.id, .imm=bb->inst[b.id].imm)};
+    if (is_imm(bb, b.id)) { return (v16){push(bb, op_shr_u16_imm, .x=a.id, .imm=bb->inst[b.id].imm)}; }
     return (v16){math(bb, op_shr_u16, .x=a.id, .y=b.id)};
 }
 v16 umbra_shr_s16(BB *bb, v16 a, v16 b) {
     if (is_imm16(bb, b.id, 0)) { return a; }
-    if (is_imm(bb, b.id)) return (v16){push(bb, op_shr_s16_imm, .x=a.id, .imm=bb->inst[b.id].imm)};
+    if (is_imm(bb, b.id)) { return (v16){push(bb, op_shr_s16_imm, .x=a.id, .imm=bb->inst[b.id].imm)}; }
     return (v16){math(bb, op_shr_s16, .x=a.id, .y=b.id)};
 }
 
@@ -503,7 +503,7 @@ vh umbra_eq_half(BB *bb, vh a, vh b) {
     return (vh){math(bb, op_eq_half, .x=a.id, .y=b.id)};
 }
 vh umbra_ne_half(BB *bb, vh a, vh b) {
-    return umbra_xor_half(bb, umbra_eq_half(bb, a, b), umbra_imm_half(bb, 0xFFFF));
+    return umbra_xor_half(bb, umbra_eq_half(bb, a, b), umbra_imm_half(bb, 0xffff));
 }
 vh umbra_lt_half(BB *bb, vh a, vh b) { return (vh){math(bb, op_lt_half, .x=a.id, .y=b.id)}; }
 vh umbra_le_half(BB *bb, vh a, vh b) { return (vh){math(bb, op_le_half, .x=a.id, .y=b.id)}; }
@@ -515,7 +515,7 @@ v32 umbra_eq_f32(BB *bb, v32 a, v32 b) {
     return (v32){math(bb, op_eq_f32, .x=a.id, .y=b.id)};
 }
 v32 umbra_ne_f32(BB *bb, v32 a, v32 b) {
-    return umbra_xor_32(bb, umbra_eq_f32(bb, a, b), umbra_imm_32(bb, 0xFFFFFFFF));
+    return umbra_xor_32(bb, umbra_eq_f32(bb, a, b), umbra_imm_32(bb, 0xffffffff));
 }
 v32 umbra_lt_f32(BB *bb, v32 a, v32 b) { return (v32){math(bb, op_lt_f32, .x=a.id, .y=b.id)}; }
 v32 umbra_le_f32(BB *bb, v32 a, v32 b) { return (v32){math(bb, op_le_f32, .x=a.id, .y=b.id)}; }
@@ -524,19 +524,19 @@ v32 umbra_ge_f32(BB *bb, v32 a, v32 b) { return umbra_le_f32(bb, b, a); }
 
 v16 umbra_eq_i16(BB *bb, v16 a, v16 b) {
     sort(&a.id, &b.id);
-    if (a.id == b.id) { return umbra_imm_16(bb, 0xFFFF); }
+    if (a.id == b.id) { return umbra_imm_16(bb, 0xffff); }
     return (v16){math(bb, op_eq_i16, .x=a.id, .y=b.id)};
 }
 v16 umbra_ne_i16(BB *bb, v16 a, v16 b) {
-    return umbra_xor_16(bb, umbra_eq_i16(bb, a, b), umbra_imm_16(bb, 0xFFFF));
+    return umbra_xor_16(bb, umbra_eq_i16(bb, a, b), umbra_imm_16(bb, 0xffff));
 }
 v32 umbra_eq_i32(BB *bb, v32 a, v32 b) {
     sort(&a.id, &b.id);
-    if (a.id == b.id) { return umbra_imm_32(bb, 0xFFFFFFFF); }
+    if (a.id == b.id) { return umbra_imm_32(bb, 0xffffffff); }
     return (v32){math(bb, op_eq_i32, .x=a.id, .y=b.id)};
 }
 v32 umbra_ne_i32(BB *bb, v32 a, v32 b) {
-    return umbra_xor_32(bb, umbra_eq_i32(bb, a, b), umbra_imm_32(bb, 0xFFFFFFFF));
+    return umbra_xor_32(bb, umbra_eq_i32(bb, a, b), umbra_imm_32(bb, 0xffffffff));
 }
 
 v16 umbra_lt_s16(BB *bb, v16 a, v16 b) { return (v16){math(bb, op_lt_s16, .x=a.id, .y=b.id)}; }
@@ -563,7 +563,7 @@ static char const* op_name(enum op op) {
         OP_LIST(OP_NAME)
         #undef OP_NAME
     };
-    if ((unsigned)op < sizeof names/sizeof *names && names[op]) return names[op];
+    if ((unsigned)op < sizeof names/sizeof *names && names[op]) { return names[op]; }
     return "?";
 }
 

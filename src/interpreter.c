@@ -545,9 +545,9 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
     struct umbra_interpreter *p = malloc(sizeof *p);
     int num_insts = bb->insts + 1;  // +1 for trailing done sentinel
     for (int i = 0; i < bb->insts; i++) {
-        if (bb->inst[i].op == op_store_8x4) num_insts += 1;  // uses 2 slots (inst + overflow)
+        if (bb->inst[i].op == op_store_8x4) { num_insts += 1; }  // uses 2 slots (inst + overflow)
 #if !defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
-        if (bb->inst[i].op == op_half_from_f32 || bb->inst[i].op == op_f32_from_half) num_insts--;
+        if (bb->inst[i].op == op_half_from_f32 || bb->inst[i].op == op_f32_from_half) { num_insts--; }
 #endif
     }
     p->inst = malloc((size_t)num_insts * sizeof *p->inst);
@@ -703,9 +703,9 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
     p->inst[n] = (struct interp_inst){.fn=done};
 
     int max_ptr = -1;
-    for (int i = 0; i < bb->insts; i++)
-        if (has_ptr(bb->inst[i].op) && bb->inst[i].ptr > max_ptr)
-            max_ptr = bb->inst[i].ptr;
+    for (int i = 0; i < bb->insts; i++) {
+        if (has_ptr(bb->inst[i].op) && bb->inst[i].ptr > max_ptr) { max_ptr = bb->inst[i].ptr; }
+    }
     p->nptr = max_ptr + 1;
 
     free(id);
@@ -714,7 +714,7 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
 
 void umbra_interpreter_run(struct umbra_interpreter *p, int n, umbra_buf buf[]) {
     void *ptr[16] = {0};
-    for (int i = 0; i < p->nptr && i < 16; i++) ptr[i] = buf[i].ptr;
+    for (int i = 0; i < p->nptr && i < 16; i++) { ptr[i] = buf[i].ptr; }
     struct interp_inst const *start = p->inst;
     val                      *v     = p->v;
     int const P = p->preamble;

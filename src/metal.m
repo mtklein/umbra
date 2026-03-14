@@ -433,7 +433,7 @@ static char* build_source(BB const *bb, int *out_max_ptr) {
 struct umbra_metal* umbra_metal(BB const *bb) {
     @autoreleasepool {
         id<MTLDevice> device = MTLCreateSystemDefaultDevice();
-        if (!device) return 0;
+        if (!device) { return 0; }
 
         int max_ptr = -1;
         char *src = build_source(bb, &max_ptr);
@@ -466,7 +466,7 @@ struct umbra_metal* umbra_metal(BB const *bb) {
         m->n_buf    = (__bridge_retained void*)n_buf;
         m->src      = src;
         NSUInteger tg = pipeline.maxTotalThreadsPerThreadgroup;
-        if (tg > 256) tg = 256;
+        if (tg > 256) { tg = 256; }
 
         m->max_ptr  = max_ptr;
         m->tg_size  = (int)tg;
@@ -475,7 +475,7 @@ struct umbra_metal* umbra_metal(BB const *bb) {
 }
 
 void umbra_metal_run(struct umbra_metal *m, int n, umbra_buf buf[]) {
-    if (!m || n <= 0) return;
+    if (!m || n <= 0) { return; }
 
     @autoreleasepool {
         id<MTLDevice> device = (__bridge id<MTLDevice>)m->device;
@@ -486,7 +486,7 @@ void umbra_metal_run(struct umbra_metal *m, int n, umbra_buf buf[]) {
         *(uint32_t*)n_buf.contents = (uint32_t)n;
 
         for (int i = 0; i <= m->max_ptr; i++) {
-            if (!buf[i].ptr || !buf[i].sz) continue;
+            if (!buf[i].ptr || !buf[i].sz) { continue; }
             long bytes = buf[i].sz < 0 ? -buf[i].sz : buf[i].sz;
             if (bytes > m->buf_cap[i]) {
                 if (m->bufs[i]) { (void)(__bridge_transfer id)m->bufs[i]; }
@@ -516,14 +516,14 @@ void umbra_metal_run(struct umbra_metal *m, int n, umbra_buf buf[]) {
 
         // Copy back only pointers with positive sizes (negative = read-only).
         for (int i = 0; i <= m->max_ptr; i++) {
-            if (!buf[i].ptr || !m->bufs[i] || buf[i].sz <= 0) continue;
+            if (!buf[i].ptr || !m->bufs[i] || buf[i].sz <= 0) { continue; }
             __builtin_memcpy(buf[i].ptr, ((__bridge id<MTLBuffer>)m->bufs[i]).contents, (size_t)buf[i].sz);
         }
     }
 }
 
 void umbra_metal_free(struct umbra_metal *m) {
-    if (!m) return;
+    if (!m) { return; }
     @autoreleasepool {
         if (m->device)   { (void)(__bridge_transfer id)m->device; }
         if (m->pipeline) { (void)(__bridge_transfer id)m->pipeline; }

@@ -54,12 +54,38 @@ No `<stdbool.h>`.
 
 ## Union type-punning over memcpy
 
+Not `memcpy(&i, &f, 4)`.  Avoids `#include <string.h>` entirely.
+
+## Always use braces
+
+Always use braces around the body of `if`, `for`, `while`, `else`,
+even for one-line bodies, even for a bare `return`:
+
 ```c
-static int   f32_bits     (float v) { union { float f; int i; } u = {.f=v}; return u.i; }
-static float f32_from_bits(int   v) { union { float f; int i; } u = {.i=v}; return u.f; }
+if (x_dead) { ra_free_reg(ra, inst->x); }       // yes
+if (x_dead) ra_free_reg(ra, inst->x);            // no
 ```
 
-Not `memcpy(&i, &f, 4)`.  Avoids `#include <string.h>` entirely.
+When a braced block spills past one line, use at least three:
+the opening line with `{`, the body, and `}` alone (or with `else`/`else if`):
+
+```c
+if (condition) {                                 // yes
+    do_something();
+}
+
+if (condition) {                                 // no — two-line form
+    do_something(); }
+```
+
+## Positive-path-first returns
+
+Prefer `if (relevant) { ... return 1; } return 0;`
+over `if (!relevant) { return 0; } ... return 1;`.
+
+## Lowercase hex constants
+
+`0x3f800000`, `0xffff`, `0x9e3779b9u` — never `0x3F800000` or `0xFFFF`.
 
 ## Alignment for visual grouping
 
