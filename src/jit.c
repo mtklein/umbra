@@ -539,21 +539,19 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
                 put(c, LSL_xi(XT, XT, 2));
                 put(c, ADD_xr(XT, XP, XT));
-                if (!scalar && ryh != ry) {
+                if (scalar) {
+                    put(c, STR_sx(ry, XT, XI));
+                } else {
                     put(c, ADD_xr(XT, XT, XW));
                     put(c, STP_qi(ry, ryh, XT, 0));
-                } else {
-                    if (scalar) { put(c, STR_sx(ry, XT, XI)); }
-                    else { put(c, STR_q(ry, XT, XW)); }
                 }
                 last_ptr = -999;
             } else {
-                if (!scalar && ryh != ry) {
+                if (scalar) {
+                    put(c, STR_sx(ry, XP, XI));
+                } else {
                     put(c, ADD_xr(XT, XP, XW));
                     put(c, STP_qi(ry, ryh, XT, 0));
-                } else {
-                    if (scalar) { put(c, STR_sx(ry, XP, XI)); }
-                    else { put(c, STR_q(ry, XP, XW)); }
                 }
             }
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
@@ -580,15 +578,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         } break;
 
         case op_scatter_32: case op_scatter_16: case op_scatter_half: {
+            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
+            int8_t ry = ra_ensure(ra, sl, ns, inst->y);
+            int p = inst->ptr;
+            resolve_ptr(c, p, &last_ptr, deref_gpr);
+            int eshift = inst->op == op_scatter_32 ? 2 : 1;
+            load_max_ix(c, p, eshift, deref_gpr);
             if (scalar) {
-                int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-                int8_t ry = ra_ensure(ra, sl, ns, inst->y);
                 put(c, UMOV_ws(XT, rx));
-                if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
-                int p = inst->ptr;
-                resolve_ptr(c, p, &last_ptr, deref_gpr);
-                int eshift = inst->op == op_scatter_32 ? 2 : 1;
-                load_max_ix(c, p, eshift, deref_gpr);
                 clamp_wt(c);
                 if (inst->op == op_scatter_32) {
                     put(c, STR_sx(ry, XP, XT));
@@ -596,8 +593,29 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     put(c, STR_hx(ry, XP, XT));
                 }
             } else {
-                if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
+                int8_t rxh = hi(ra, inst->x);
+                int8_t ryh = hi(ra, inst->y);
+                for (int l = 0; l < 8; l++) {
+                    int8_t ir = l < 4 ? rx : rxh;
+                    int lane = l & 3;
+                    uint32_t ix_imm5 = inst->op == op_scatter_32
+                        ? (uint32_t)(lane << 3) | 4
+                        : (uint32_t)(lane << 2) | 2;
+                    put(c, 0x0e003c00u | (ix_imm5 << 16) | ((uint32_t)ir << 5) | (uint32_t)XT);
+                    clamp_wt(c);
+                    if (inst->op == op_scatter_32) {
+                        int8_t vr = l < 4 ? ry : ryh;
+                        uint32_t v_imm5 = (uint32_t)(lane << 3) | 4;
+                        put(c, 0x0e003c00u | (v_imm5 << 16) | ((uint32_t)vr << 5) | (uint32_t)XH);
+                        put(c, 0xb8206800u | ((uint32_t)XT << 16) | ((uint32_t)XP << 5) | (uint32_t)XH);
+                    } else {
+                        uint32_t v_imm5 = (uint32_t)(lane << 2) | 2;
+                        put(c, 0x0e003c00u | (v_imm5 << 16) | ((uint32_t)ry << 5) | (uint32_t)XH);
+                        put(c, 0x78206800u | ((uint32_t)XT << 16) | ((uint32_t)XP << 5) | (uint32_t)XH);
+                    }
+                }
             }
+            if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
         } break;
 
