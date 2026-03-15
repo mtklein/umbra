@@ -54,3 +54,16 @@ umbra_color umbra_load_fp16        (struct umbra_basic_block*, umbra_ptr ptr, um
 void        umbra_store_fp16       (struct umbra_basic_block*, umbra_ptr ptr, umbra_i32 ix, umbra_color);
 umbra_color umbra_load_fp16_planar (struct umbra_basic_block*, umbra_ptr ptr, umbra_i32 ix);
 void        umbra_store_fp16_planar(struct umbra_basic_block*, umbra_ptr ptr, umbra_i32 ix, umbra_color);
+
+typedef struct {
+    float a, b, c, d, e, f, g;
+} umbra_transfer;
+
+extern umbra_transfer const umbra_transfer_srgb;
+extern umbra_transfer const umbra_transfer_gamma22;
+
+umbra_color umbra_transfer_apply (struct umbra_basic_block*, umbra_color, umbra_transfer const*);
+umbra_color umbra_transfer_invert(struct umbra_basic_block*, umbra_color, umbra_transfer const*);
+
+void umbra_transfer_lut_invert(float out[256], umbra_transfer const*);
+void umbra_transfer_lut_apply (float out[256], umbra_transfer const*);
