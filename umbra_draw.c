@@ -302,9 +302,15 @@ umbra_half umbra_coverage_bitmap_matrix(BB *bb, umbra_v32 x, umbra_v32 y) {
         umbra_and_32(bb, umbra_ge_f32(bb, xp, zero_f), umbra_lt_f32(bb, xp, bw)),
         umbra_and_32(bb, umbra_ge_f32(bb, yp, zero_f), umbra_lt_f32(bb, yp, bh)));
 
-    // Nearest-neighbor sample: ix = (int)y' * (int)bw + (int)x'.
-    umbra_v32 xi = umbra_i32_from_f32(bb, xp);
-    umbra_v32 yi = umbra_i32_from_f32(bb, yp);
+    // Clamp coords to valid range so gather never touches out-of-bounds memory.
+    // The sel_half at the end zeros out-of-bounds results anyway.
+    umbra_v32 one_f = umbra_imm_32(bb, 0x3f800000);
+    umbra_v32 xc = umbra_min_f32(bb, umbra_max_f32(bb, xp, zero_f),
+                                      umbra_sub_f32(bb, bw, one_f));
+    umbra_v32 yc = umbra_min_f32(bb, umbra_max_f32(bb, yp, zero_f),
+                                      umbra_sub_f32(bb, bh, one_f));
+    umbra_v32 xi = umbra_i32_from_f32(bb, xc);
+    umbra_v32 yi = umbra_i32_from_f32(bb, yc);
     umbra_v32 bwi = umbra_i32_from_f32(bb, bw);
     umbra_v32 idx = umbra_add_i32(bb, umbra_mul_i32(bb, yi, bwi), xi);
 

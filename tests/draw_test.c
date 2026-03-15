@@ -782,6 +782,32 @@ static void test_coverage_bitmap_matrix(void) {
     cleanup_draw(&B);
 }
 
+// Regression: out-of-bounds gather indices from perspective transform must not SIGBUS.
+// A matrix that maps some pixels far outside the bitmap exercises the index clamping.
+static void test_coverage_bitmap_matrix_oob(void) {
+    draw_backends B = make_draw(umbra_draw_build(
+        umbra_shader_solid, umbra_coverage_bitmap_matrix, umbra_blend_srcover,
+        umbra_load_8888, umbra_store_8888));
+
+    for (int bi = 0; bi < 3; bi++) {
+        uint32_t dst[8];
+        memset(dst, 0, sizeof dst);
+        int32_t  x0 = 0, y = 0;
+        __fp16   color[4] = {1, 1, 1, 1};
+        uint16_t bmp[4] = {255, 0, 0, 0};
+        // Matrix with perspective: w = 0.001*x + 1, so x>0 gets wild bitmap coords.
+        // Only pixel 0 should map near (0,0); others go out of bounds.
+        float mat[11] = {1, 0, 0,  0, 1, 0,  0.001f, 0, 1,  2, 2};
+        if (!run_draw(&B, bi, 8, (umbra_buf[]){
+            {dst, (long)sizeof dst}, {&x0,-4}, {&y,-4}, {color,-8},
+            {bmp, -(long)sizeof bmp}, {mat, -(long)sizeof mat}
+        })) { continue; }
+        // Just surviving without SIGBUS is the test. Pixel 0 should have coverage.
+        ((dst[0] & 0xff) >= 0xfc) here;
+    }
+    cleanup_draw(&B);
+}
+
 // --- linear 2-stop gradient ---
 
 static void test_linear_2(void) {
@@ -947,6 +973,7 @@ int main(void) {
     test_coverage_bitmap();
     test_coverage_sdf();
     test_coverage_bitmap_matrix();
+    test_coverage_bitmap_matrix_oob();
     test_linear_2();
     test_radial_2();
     test_linear_grad();
