@@ -1381,6 +1381,65 @@ static void test_shr_narrow_u32(void) {
   }
 }
 
+// Regression: half_from_f32 and half_from_i32 under heavy register pressure.
+// With 16+ preamble values, ra_alloc(tmp) could evict the just-allocated s.rd,
+// spilling stale data.  Fixed by eliminating the tmp and using s.rd in-place.
+static void test_half_convert_pressure(void) {
+  for (int opt = 0; opt < 2; opt++) {
+    {
+        struct umbra_basic_block *bb = umbra_basic_block();
+        umbra_v32 ix = umbra_lane(bb);
+        umbra_v32 x  = umbra_load_32(bb, (umbra_ptr){0}, ix);
+        // 16 distinct preamble half constants to exhaust the register file.
+        umbra_half h[16];
+        for (int i = 0; i < 16; i++) {
+            h[i] = umbra_imm_half(bb, (unsigned short)(0x3c00 + i * 0x100));
+        }
+        // Sum them all to keep them live through the conversion.
+        umbra_half sum = h[0];
+        for (int i = 1; i < 16; i++) { sum = umbra_add_half(bb, sum, h[i]); }
+        // half_from_f32 under pressure: this was the buggy path.
+        umbra_half conv = umbra_half_from_f32(bb, x);
+        umbra_half res  = umbra_add_half(bb, sum, conv);
+        umbra_store_half(bb, (umbra_ptr){1}, ix, res);
+        backends B = make(bb, opt);
+        for (int bi = 0; bi < 4; bi++) {
+            float a[] = {1.0f, 2.0f, 0.0f}; __fp16 z[3] = {0};
+            if (!run(&B, bi, 3, (umbra_buf[]){{a,3*4},{z,3*2}})) { continue; }
+            // All backends must agree with the interpreter.
+            __fp16 ref[3] = {0};
+            umbra_interpreter_run(B.interp, 3, (umbra_buf[]){{a,3*4},{ref,3*2}});
+            for (int i = 0; i < 3; i++) { equiv((float)z[i], (float)ref[i]) here; }
+        }
+        cleanup(&B);
+    }
+    {
+        struct umbra_basic_block *bb = umbra_basic_block();
+        umbra_v32 ix = umbra_lane(bb);
+        umbra_v32 x  = umbra_load_32(bb, (umbra_ptr){0}, ix);
+        umbra_half h[16];
+        for (int i = 0; i < 16; i++) {
+            h[i] = umbra_imm_half(bb, (unsigned short)(0x3c00 + i * 0x100));
+        }
+        umbra_half sum = h[0];
+        for (int i = 1; i < 16; i++) { sum = umbra_add_half(bb, sum, h[i]); }
+        // half_from_i32 under pressure: this was the other buggy path.
+        umbra_half conv = umbra_half_from_i32(bb, x);
+        umbra_half res  = umbra_add_half(bb, sum, conv);
+        umbra_store_half(bb, (umbra_ptr){1}, ix, res);
+        backends B = make(bb, opt);
+        for (int bi = 0; bi < 4; bi++) {
+            int a[] = {1, 2, 0}; __fp16 z[3] = {0};
+            if (!run(&B, bi, 3, (umbra_buf[]){{a,3*4},{z,3*2}})) { continue; }
+            __fp16 ref[3] = {0};
+            umbra_interpreter_run(B.interp, 3, (umbra_buf[]){{a,3*4},{ref,3*2}});
+            for (int i = 0; i < 3; i++) { equiv((float)z[i], (float)ref[i]) here; }
+        }
+        cleanup(&B);
+    }
+  }
+}
+
 // N=9 tests: K=8, so N=9 exercises one full vector iteration + one scalar tail element.
 // Each test runs the same BB through all backends and checks that results match the interpreter.
 static void test_n9(void) {
@@ -1478,6 +1537,7 @@ int main(void) {
     test_hash_quality();
     test_mixed_ptr_sizes();
     test_shr_narrow_u32();
+    test_half_convert_pressure();
     test_n9();
     return 0;
 }

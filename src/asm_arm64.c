@@ -179,6 +179,21 @@ uint32_t SSHR_4h_imm(int d, int n, int sh) { return 0x0f000400u|((uint32_t)(32-s
 uint32_t UMOV_ws(int d, int n) {
     return 0x0e043c00u | ((uint32_t)n<<5) | (uint32_t)d;
 }
+uint32_t UMOV_ws_lane(int d, int n, int lane) {
+    uint32_t imm5 = (uint32_t)((lane << 3) | 4);
+    return 0x0e003c00u | (imm5<<16) | ((uint32_t)n<<5) | (uint32_t)d;
+}
+uint32_t LD1_h(int t, int idx, int n) {
+    uint32_t Q  = ((uint32_t)idx >> 2) & 1;
+    uint32_t S  = ((uint32_t)idx >> 1) & 1;
+    uint32_t sz = (uint32_t)idx & 1;
+    return 0x0d404000u | (Q<<30) | (S<<12) | (sz<<11) | ((uint32_t)n<<5) | (uint32_t)t;
+}
+uint32_t LD1_s(int t, int idx, int n) {
+    uint32_t Q = ((uint32_t)idx >> 1) & 1;
+    uint32_t S = (uint32_t)idx & 1;
+    return 0x0d408000u | (Q<<30) | (S<<12) | ((uint32_t)n<<5) | (uint32_t)t;
+}
 
 uint32_t ST1_b(int t, int idx, int n) {
     uint32_t Q = ((uint32_t)idx >> 3) & 1;

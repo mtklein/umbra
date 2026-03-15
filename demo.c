@@ -1,4 +1,5 @@
 #include "slides/slides.h"
+#include <math.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -75,6 +76,47 @@ static int next_backend(int cur) {
     return cur;
 }
 
+// Build a 3x3 inverse projective matrix for mapping screen→bitmap coords.
+// Animates a gentle perspective tilt around the center of the screen.
+static void build_perspective_matrix(float out[11], float t, int sw, int sh, int bw, int bh) {
+    float cx = (float)sw * 0.5f, cy = (float)sh * 0.5f;
+    float bx = (float)bw * 0.5f, by = (float)bh * 0.5f;
+
+    // Animated rotation and perspective tilt.
+    float angle = t * 0.3f;
+    float tilt  = sinf(t * 0.7f) * 0.0008f;
+    float sc    = 1.0f + 0.2f * sinf(t * 0.5f);
+    float ca = cosf(angle), sa = sinf(angle);
+
+    // Forward: translate to center, scale+rotate, apply perspective, translate to bitmap.
+    // We directly build the inverse: bitmap→screen, then invert.
+    // Simpler: build screen→bitmap directly.
+    //   1. Translate screen origin to center: x' = x - cx, y' = y - cy
+    //   2. Apply perspective divisor: w = 1 + tilt*x' (simple 1D perspective)
+    //   3. Scale and rotate: x'' = (ca*x'/w + sa*y'/w) * sc, y'' = (-sa*x'/w + ca*y'/w) * sc
+    //   4. Translate to bitmap center: x''' = x'' + bx, y''' = y'' + by
+    //
+    // As a projective matrix [x_out, y_out, w_out] = M * [x, y, 1]:
+    //   Row 2 (w): [tilt, 0, 1 - tilt*cx]
+    //   Row 0 (x): [ca*sc, sa*sc, -cx*ca*sc - cy*sa*sc + bx*(1 - tilt*cx)]
+    //   Row 1 (y): [-sa*sc, ca*sc, cx*sa*sc - cy*ca*sc + by*(1 - tilt*cx)]
+    // But we want screen→bitmap, so the division happens on output.
+
+    float w0 = 1.0f - tilt * cx;
+
+    out[0] = ca * sc;
+    out[1] = sa * sc;
+    out[2] = -cx * ca * sc - cy * sa * sc + bx * w0;
+    out[3] = -sa * sc;
+    out[4] = ca * sc;
+    out[5] = cx * sa * sc - cy * ca * sc + by * w0;
+    out[6] = tilt;
+    out[7] = 0.0f;
+    out[8] = w0;
+    out[9]  = (float)bw;
+    out[10] = (float)bh;
+}
+
 static void update_title(SDL_Window *w, slide const *s, int bi, double fps) {
     char title[256];
     SDL_snprintf(title, sizeof title, "%s  [%s]  %.0f fps", s->title, backend_name[bi], fps);
@@ -124,6 +166,9 @@ int main(void) {
     float rect_w = 200.0f, rect_h = 150.0f;
     float rx = 100.0f, ry = 80.0f;
     float vx = 1.5f,   vy = 1.1f;
+
+    // Perspective animation time.
+    float persp_t = 0.0f;
 
     update_title(window, &slides[cur_slide], cur_backend, fps);
 
@@ -183,17 +228,34 @@ int main(void) {
 
         int32_t x0 = 0;
 
-        if (s->coverage == umbra_coverage_bitmap || s->coverage == umbra_coverage_sdf) {
+        if (s->coverage == umbra_coverage_bitmap_matrix) {
+            persp_t += 0.016f;
+            float mat[11];
+            build_perspective_matrix(mat, persp_t, W, H, bitmap_cov.w, bitmap_cov.h);
+            for (int y = 0; y < H; y++) {
+                int32_t yval = y;
+                uint32_t *row = (uint32_t*)(rows + y * tex_pitch);
+                umbra_buf buf[] = {
+                    { row,            W * 4               },
+                    { &x0,           -4                   },
+                    { &yval,         -4                   },
+                    { color,         -8                   },
+                    { bitmap_cov.data, -(W * H * 2)       },
+                    { mat,           -(int)(sizeof mat)    },
+                };
+                run(ctx, W, buf);
+            }
+        } else if (s->coverage == umbra_coverage_bitmap || s->coverage == umbra_coverage_sdf) {
             text_cov *tc = (s->coverage == umbra_coverage_bitmap) ? &bitmap_cov : &sdf_cov;
             for (int y = 0; y < H; y++) {
                 int32_t yval = y;
                 uint32_t *row = (uint32_t*)(rows + y * tex_pitch);
                 umbra_buf buf[] = {
-                    { row,              W * 4  },
-                    { &x0,             -4      },
-                    { &yval,           -4      },
-                    { color,           -8      },
-                    { tc->data + y * W, -(W * 2) },
+                    { row,              W * 4     },
+                    { &x0,             -4         },
+                    { &yval,           -4         },
+                    { color,           -8         },
+                    { tc->data + y * W, -(W * 2)  },
                 };
                 run(ctx, W, buf);
             }

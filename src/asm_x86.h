@@ -98,5 +98,8 @@ void vpmovzxwd(Buf *b, int d, int s);
 void vpackuswb(Buf *b, int d, int v, int s);
 void vpunpcklbw(Buf *b, int d, int v, int s);
 
+void vpgatherdd(Buf *b, int dst, int base, int idx, int scale, int mask);
+void vpextrd(Buf *b, int gpr, int xmm, uint8_t imm);
+void vpinsrw(Buf *b, int d, int v, int gpr, uint8_t imm);
 void vextracti128(Buf *b, int d, int s, uint8_t imm);
 void vinserti128(Buf *b, int d, int v, int s, uint8_t imm);

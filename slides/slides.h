@@ -99,6 +99,16 @@ static const slide slides[] = {
         .color    = {0.2f, 0.8f, 1.0f, 1.0f},
         .bg       = 0xff1a1a2e,
     },
+    {
+        .title    = "9. Perspective Text",
+        .shader   = umbra_shader_solid,
+        .coverage = umbra_coverage_bitmap_matrix,
+        .blend    = umbra_blend_srcover,
+        .load     = umbra_load_8888,
+        .store    = umbra_store_8888,
+        .color    = {1.0f, 0.8f, 0.2f, 1.0f},
+        .bg       = 0xff0a0a1e,
+    },
 };
 
 #define SLIDE_COUNT ((int)(sizeof slides / sizeof slides[0]))

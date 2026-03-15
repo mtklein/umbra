@@ -52,12 +52,33 @@ struct umbra_basic_block* umbra_draw_build(umbra_shader_fn   shader,
 // --- Built-in stages ---
 
 // Shaders
-umbra_color umbra_shader_solid(struct umbra_basic_block*, umbra_v32 x, umbra_v32 y);
+//   solid:        p3 = __fp16[4] {r,g,b,a}
+//   linear_2:     p3 = __fp16[8] {r0,g0,b0,a0, r1,g1,b1,a1}, p5 = float[3] {a,b,c}
+//   radial_2:     p3 = __fp16[8] {r0,g0,b0,a0, r1,g1,b1,a1}, p5 = float[3] {cx,cy,inv_r}
+//   linear_grad:  p3 = __fp16[N*4] RGBA LUT,                  p5 = float[4] {a,b,c,N}
+//   radial_grad:  p3 = __fp16[N*4] RGBA LUT,                  p5 = float[4] {cx,cy,inv_r,N}
+umbra_color umbra_shader_solid      (struct umbra_basic_block*, umbra_v32 x, umbra_v32 y);
+umbra_color umbra_shader_linear_2   (struct umbra_basic_block*, umbra_v32 x, umbra_v32 y);
+umbra_color umbra_shader_radial_2   (struct umbra_basic_block*, umbra_v32 x, umbra_v32 y);
+umbra_color umbra_shader_linear_grad(struct umbra_basic_block*, umbra_v32 x, umbra_v32 y);
+umbra_color umbra_shader_radial_grad(struct umbra_basic_block*, umbra_v32 x, umbra_v32 y);
+
+// Build an evenly-spaced gradient LUT from N color stops.
+// out must hold lut_n * 4 __fp16 values (RGBA interleaved).
+void umbra_gradient_lut_even(__fp16 *out, int lut_n,
+                             int n_stops, __fp16 const colors[][4]);
+
+// Build a gradient LUT from N color stops at arbitrary positions.
+// positions[i] in [0,1], must be sorted ascending.
+void umbra_gradient_lut(__fp16 *out, int lut_n,
+                        int n_stops, float const positions[],
+                        __fp16 const colors[][4]);
 
 // Coverage
 umbra_half umbra_coverage_rect   (struct umbra_basic_block*, umbra_v32 x, umbra_v32 y);
 umbra_half umbra_coverage_bitmap (struct umbra_basic_block*, umbra_v32 x, umbra_v32 y);
-umbra_half umbra_coverage_sdf    (struct umbra_basic_block*, umbra_v32 x, umbra_v32 y);
+umbra_half umbra_coverage_sdf           (struct umbra_basic_block*, umbra_v32 x, umbra_v32 y);
+umbra_half umbra_coverage_bitmap_matrix(struct umbra_basic_block*, umbra_v32 x, umbra_v32 y);
 
 // Blend modes
 umbra_color umbra_blend_src     (struct umbra_basic_block*, umbra_color src, umbra_color dst);

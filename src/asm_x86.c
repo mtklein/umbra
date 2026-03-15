@@ -319,6 +319,16 @@ void vpmovzxwd(Buf *b, int d, int s) { vex_rr(b,1,2,1,0x33,d,s); }
 void vpackuswb(Buf *b, int d, int v, int s) { vex_rrr(b,1,1,0,0x67,d,v,s); }
 void vpunpcklbw(Buf *b, int d, int v, int s) { vex_rrr(b,1,1,0,0x60,d,v,s); }
 
+void vpgatherdd(Buf *b, int dst, int base, int idx, int scale, int mask) {
+    vex_mem(b, 1, 2, 0, 1, dst, mask, 0x90, base, idx, scale, 0);
+}
+void vpextrd(Buf *b, int gpr, int xmm, uint8_t imm) {
+    vex(b, 1, 3, 0, 0, xmm, 0, gpr, 0x16); emit1(b, imm);
+}
+void vpinsrw(Buf *b, int d, int v, int gpr, uint8_t imm) {
+    vex(b, 1, 1, 0, 0, d, v, gpr, 0xc4); emit1(b, imm);
+}
+
 void vextracti128(Buf *b, int d, int s, uint8_t imm) {
     vex_rrr(b,1,3,1,0x39,s,0,d); emit1(b, imm);
 }

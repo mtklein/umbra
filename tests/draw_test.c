@@ -752,6 +752,174 @@ static void test_coverage_sdf(void) {
     cleanup_draw(&B);
 }
 
+// --- coverage_bitmap_matrix: perspective-mapped bitmap coverage ---
+
+static void test_coverage_bitmap_matrix(void) {
+    draw_backends B = make_draw(umbra_draw_build(
+        umbra_shader_solid, umbra_coverage_bitmap_matrix, umbra_blend_srcover,
+        umbra_load_8888, umbra_store_8888));
+
+    for (int bi = 0; bi < 3; bi++) {
+        uint32_t dst[8];
+        memset(dst, 0, sizeof dst);
+        int32_t  x0 = 0, y = 0;
+        __fp16   color[4] = {1, 1, 1, 1};
+        // 8x1 bitmap: pixel 0=0, pixel 2=255, rest=0.
+        uint16_t bmp[8] = {0, 0, 255, 0, 0, 0, 0, 0};
+        // Identity matrix: screen coords = bitmap coords.
+        float mat[11] = {1, 0, 0,  0, 1, 0,  0, 0, 1,  8, 1};
+        if (!run_draw(&B, bi, 8, (umbra_buf[]){
+            {dst, (long)sizeof dst}, {&x0,-4}, {&y,-4}, {color,-8},
+            {bmp, -(long)sizeof bmp}, {mat, -(long)sizeof mat}
+        })) { continue; }
+        // Pixel 0: coverage=0 → black.
+        (dst[0] == 0) here;
+        // Pixel 2: coverage=255/255=1.0 → white.
+        ((dst[2] & 0xff) >= 0xfe) here;
+        // Pixel 3: coverage=0 → black.
+        (dst[3] == 0) here;
+    }
+    cleanup_draw(&B);
+}
+
+// --- linear 2-stop gradient ---
+
+static void test_linear_2(void) {
+    draw_backends B = make_draw(umbra_draw_build(
+        umbra_shader_linear_2, NULL, umbra_blend_src, NULL, umbra_store_8888));
+
+    for (int bi = 0; bi < 3; bi++) {
+        uint32_t dst[4] = {0};
+        int32_t  x0 = 0, y = 0;
+        // Red → blue, horizontal, across 4 pixels.
+        // t = (1/4)*x + 0*y + 0, so a=0.25, b=0, c=0.
+        __fp16 colors[8] = {1,0,0,1, 0,0,1,1};
+        float params[3];
+        params[0] = 0.25f; params[1] = 0; params[2] = 0;
+        if (!run_draw(&B, bi, 4, (umbra_buf[]){
+            {dst, (long)sizeof dst}, {&x0,-4}, {&y,-4},
+            {colors, -(long)sizeof colors}, {0,0}, {params, -(long)sizeof params}
+        })) { continue; }
+        // Pixel 0: t=0 → red (R=255, B=0)
+        ((dst[0] & 0xff) >= 0xfc) here;
+        (((dst[0] >> 16) & 0xff) <= 2) here;
+        // Pixel 3: t=0.75 → mostly blue
+        ((dst[3] & 0xff) <= 66) here;
+        (((dst[3] >> 16) & 0xff) >= 189) here;
+        // All full alpha
+        for (int i = 0; i < 4; i++) { (((dst[i] >> 24) & 0xff) >= 0xfc) here; }
+    }
+    cleanup_draw(&B);
+}
+
+// --- radial 2-stop gradient ---
+
+static void test_radial_2(void) {
+    draw_backends B = make_draw(umbra_draw_build(
+        umbra_shader_radial_2, NULL, umbra_blend_src, NULL, umbra_store_8888));
+
+    for (int bi = 0; bi < 3; bi++) {
+        uint32_t dst[1] = {0};
+        int32_t  x0 = 0, y = 0;
+        // White → black, center at (0,0), radius=10.
+        __fp16 colors[8] = {1,1,1,1, 0,0,0,1};
+        float params[3] = {0, 0, 0.1f};
+        if (!run_draw(&B, bi, 1, (umbra_buf[]){
+            {dst, 4}, {&x0,-4}, {&y,-4},
+            {colors, -(long)sizeof colors}, {0,0}, {params, -(long)sizeof params}
+        })) { continue; }
+        // Pixel at (0,0): t=0 → white (R=255)
+        ((dst[0] & 0xff) >= 0xfc) here;
+        (((dst[0] >> 24) & 0xff) >= 0xfc) here;
+    }
+    cleanup_draw(&B);
+}
+
+// --- linear N-stop gradient (LUT) ---
+
+static void test_linear_grad(void) {
+    // 3-stop: red → green → blue, evenly spaced.
+    __fp16 stop_colors[][4] = {{1,0,0,1}, {0,1,0,1}, {0,0,1,1}};
+    __fp16 lut[256*4];
+    umbra_gradient_lut_even(lut, 256, 3, stop_colors);
+
+    draw_backends B = make_draw(umbra_draw_build(
+        umbra_shader_linear_grad, NULL, umbra_blend_src, NULL, umbra_store_8888));
+
+    for (int bi = 0; bi < 3; bi++) {
+        uint32_t dst[8] = {0};
+        int32_t  x0 = 0, y = 0;
+        // t = x/8, so a=0.125, b=0, c=0.
+        float params[4] = {0.125f, 0, 0, 256};
+        if (!run_draw(&B, bi, 8, (umbra_buf[]){
+            {dst, (long)sizeof dst}, {&x0,-4}, {&y,-4},
+            {lut, -(long)sizeof lut}, {0,0}, {params, -(long)sizeof params}
+        })) { continue; }
+        // Pixel 0: t=0 → red
+        ((dst[0] & 0xff) >= 0xfc) here;
+        (((dst[0] >> 8) & 0xff) <= 2) here;
+        // Pixel 7: t=0.875 → mostly blue
+        (((dst[7] >> 16) & 0xff) >= 180) here;
+    }
+    cleanup_draw(&B);
+}
+
+// --- radial N-stop gradient (LUT) ---
+
+static void test_radial_grad(void) {
+    // 4-stop: red → yellow → green → blue, evenly spaced.
+    __fp16 stop_colors[][4] = {{1,0,0,1}, {1,1,0,1}, {0,1,0,1}, {0,0,1,1}};
+    __fp16 lut[64*4];
+    umbra_gradient_lut_even(lut, 64, 4, stop_colors);
+
+    draw_backends B = make_draw(umbra_draw_build(
+        umbra_shader_radial_grad, NULL, umbra_blend_src, NULL, umbra_store_8888));
+
+    for (int bi = 0; bi < 3; bi++) {
+        uint32_t dst[1] = {0};
+        int32_t  x0 = 5, y = 5;
+        // Center at (5,5), radius=10, inv_r=0.1.
+        float params[4] = {5, 5, 0.1f, 64};
+        if (!run_draw(&B, bi, 1, (umbra_buf[]){
+            {dst, 4}, {&x0,-4}, {&y,-4},
+            {lut, -(long)sizeof lut}, {0,0}, {params, -(long)sizeof params}
+        })) { continue; }
+        // Pixel at (5,5) = center: t=0 → red
+        ((dst[0] & 0xff) >= 0xfc) here;
+        (((dst[0] >> 16) & 0xff) <= 2) here;
+    }
+    cleanup_draw(&B);
+}
+
+// --- gradient LUT with non-uniform stop positions ---
+
+static void test_gradient_lut_nonuniform(void) {
+    // 3-stop: red(0) → green(0.2) → blue(1.0). Green band is narrow.
+    __fp16 stop_colors[][4] = {{1,0,0,1}, {0,1,0,1}, {0,0,1,1}};
+    float  positions[] = {0, 0.2f, 1.0f};
+    __fp16 lut[64*4];
+    umbra_gradient_lut(lut, 64, 3, positions, stop_colors);
+
+    draw_backends B = make_draw(umbra_draw_build(
+        umbra_shader_linear_grad, NULL, umbra_blend_src, NULL, umbra_store_8888));
+
+    for (int bi = 0; bi < 3; bi++) {
+        uint32_t dst[8] = {0};
+        int32_t  x0 = 0, y = 0;
+        // t = x/8, so pixel 0→t=0, pixel 7→t=0.875.
+        float params[4] = {0.125f, 0, 0, 64};
+        if (!run_draw(&B, bi, 8, (umbra_buf[]){
+            {dst, (long)sizeof dst}, {&x0,-4}, {&y,-4},
+            {lut, -(long)sizeof lut}, {0,0}, {params, -(long)sizeof params}
+        })) { continue; }
+        // Pixel 0: t=0 → red
+        ((dst[0] & 0xff) >= 0xfc) here;
+        // Pixel 7: t=0.875 → mostly blue (well past the green-to-blue transition at 0.2)
+        (((dst[7] >> 16) & 0xff) >= 180) here;
+    }
+    cleanup_draw(&B);
+}
+
 int main(void) {
     test_solid_src();
     test_solid_src_n1();
@@ -778,5 +946,11 @@ int main(void) {
     test_coverage_rect_white_dst();
     test_coverage_bitmap();
     test_coverage_sdf();
+    test_coverage_bitmap_matrix();
+    test_linear_2();
+    test_radial_2();
+    test_linear_grad();
+    test_radial_grad();
+    test_gradient_lut_nonuniform();
     return 0;
 }
