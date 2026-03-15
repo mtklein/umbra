@@ -77,8 +77,13 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                 case op_load_half: {
                     int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
                     _Bool mixed = ptr_32[p] && ptr_16[p];
-                    emit(b, mixed ? "%shalf v%d = as_type<half>(p%d_16[i]);\n"
-                                  : "%shalf v%d = as_type<half>(((device ushort*)p%d)[i]);\n", pad, i, p);
+                    if (inst->x) {
+                        emit(b, mixed ? "%shalf v%d = as_type<half>(p%d_16[i+(int)v%d]);\n"
+                                      : "%shalf v%d = as_type<half>(((device ushort*)p%d)[i+(int)v%d]);\n", pad, i, p, inst->x);
+                    } else {
+                        emit(b, mixed ? "%shalf v%d = as_type<half>(p%d_16[i]);\n"
+                                      : "%shalf v%d = as_type<half>(((device ushort*)p%d)[i]);\n", pad, i, p);
+                    }
                 } break;
                 case op_gather_half: {
                     int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
@@ -90,8 +95,13 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                 case op_store_half: {
                     int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
                     _Bool mixed = ptr_32[p] && ptr_16[p];
-                    emit(b, mixed ? "%sp%d_16[i] = as_type<ushort>(v%d);\n"
-                                  : "%s((device ushort*)p%d)[i] = as_type<ushort>(v%d);\n", pad, p, inst->y);
+                    if (inst->x) {
+                        emit(b, mixed ? "%sp%d_16[i+(int)v%d] = as_type<ushort>(v%d);\n"
+                                      : "%s((device ushort*)p%d)[i+(int)v%d] = as_type<ushort>(v%d);\n", pad, p, inst->x, inst->y);
+                    } else {
+                        emit(b, mixed ? "%sp%d_16[i] = as_type<ushort>(v%d);\n"
+                                      : "%s((device ushort*)p%d)[i] = as_type<ushort>(v%d);\n", pad, p, inst->y);
+                    }
                 } break;
                 case op_scatter_half: {
                     int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
@@ -206,8 +216,13 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             case op_load_16: {
                 int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%sushort v%d = p%d_16[i];\n"
-                              : "%sushort v%d = ((device ushort*)p%d)[i];\n", pad, i, p);
+                if (inst->x) {
+                    emit(b, mixed ? "%sushort v%d = p%d_16[i+(int)v%d];\n"
+                                  : "%sushort v%d = ((device ushort*)p%d)[i+(int)v%d];\n", pad, i, p, inst->x);
+                } else {
+                    emit(b, mixed ? "%sushort v%d = p%d_16[i];\n"
+                                  : "%sushort v%d = ((device ushort*)p%d)[i];\n", pad, i, p);
+                }
             } break;
             case op_gather_16: {
                 int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
@@ -225,8 +240,13 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             case op_load_32: {
                 int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%suint v%d = p%d_32[i];\n"
-                              : "%suint v%d = ((device uint*)p%d)[i];\n", pad, i, p);
+                if (inst->x) {
+                    emit(b, mixed ? "%suint v%d = p%d_32[i+(int)v%d];\n"
+                                  : "%suint v%d = ((device uint*)p%d)[i+(int)v%d];\n", pad, i, p, inst->x);
+                } else {
+                    emit(b, mixed ? "%suint v%d = p%d_32[i];\n"
+                                  : "%suint v%d = ((device uint*)p%d)[i];\n", pad, i, p);
+                }
             } break;
             case op_gather_32: {
                 int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
@@ -238,8 +258,13 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             case op_store_16: {
                 int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%sp%d_16[i] = v%d;\n"
-                              : "%s((device ushort*)p%d)[i] = v%d;\n", pad, p, inst->y);
+                if (inst->x) {
+                    emit(b, mixed ? "%sp%d_16[i+(int)v%d] = v%d;\n"
+                                  : "%s((device ushort*)p%d)[i+(int)v%d] = v%d;\n", pad, p, inst->x, inst->y);
+                } else {
+                    emit(b, mixed ? "%sp%d_16[i] = v%d;\n"
+                                  : "%s((device ushort*)p%d)[i] = v%d;\n", pad, p, inst->y);
+                }
             } break;
             case op_scatter_16: {
                 int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
@@ -250,8 +275,13 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             case op_store_32: {
                 int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%sp%d_32[i] = v%d;\n"
-                              : "%s((device uint*)p%d)[i] = v%d;\n", pad, p, inst->y);
+                if (inst->x) {
+                    emit(b, mixed ? "%sp%d_32[i+(int)v%d] = v%d;\n"
+                                  : "%s((device uint*)p%d)[i+(int)v%d] = v%d;\n", pad, p, inst->x, inst->y);
+                } else {
+                    emit(b, mixed ? "%sp%d_32[i] = v%d;\n"
+                                  : "%s((device uint*)p%d)[i] = v%d;\n", pad, p, inst->y);
+                }
             } break;
             case op_scatter_32: {
                 int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;

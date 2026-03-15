@@ -129,42 +129,58 @@ umbra_ptr umbra_deref_ptr(BB *bb, umbra_ptr buf, int byte_off) {
 }
 int umbra_uni_len(BB const *bb) { return bb->uni_len; }
 
+static int lane_plus_off(BB *bb, int ix) {
+    if (bb->inst[ix].op != op_add_i32) { return -1; }
+    int a = bb->inst[ix].x, b = bb->inst[ix].y;
+    if (bb->inst[a].op == op_lane) { return b; }
+    if (bb->inst[b].op == op_lane) { return a; }
+    return -1;
+}
+
 i16 umbra_load_i16(BB *bb, umbra_ptr src, i32 ix) {
     if (bb->inst[ix.id].op == op_lane  ) { return (i16){push(bb,op_load_16,           .ptr=src.ix)}; }
     if (bb->inst[ix.id].op == op_imm_32) { return (i16){push(bb,op_uni_16,   .imm=bb->inst[ix.id].imm,.ptr=src.ix)}; }
+    { int off = lane_plus_off(bb, ix.id); if (off >= 0) { return (i16){push(bb,op_load_16,.x=off,.ptr=src.ix)}; } }
     return                                        (i16){push(bb,op_gather_16,.x=ix.id,.ptr=src.ix)};
 }
 i32 umbra_load_i32(BB *bb, umbra_ptr src, i32 ix) {
     if (bb->inst[ix.id].op == op_lane  ) { return (i32){push(bb,op_load_32,           .ptr=src.ix)}; }
     if (bb->inst[ix.id].op == op_imm_32) { return (i32){push(bb,op_uni_32,   .imm=bb->inst[ix.id].imm,.ptr=src.ix)}; }
+    { int off = lane_plus_off(bb, ix.id); if (off >= 0) { return (i32){push(bb,op_load_32,.x=off,.ptr=src.ix)}; } }
     return                                        (i32){push(bb,op_gather_32,.x=ix.id,.ptr=src.ix)};
 }
 f32 umbra_load_f32(BB *bb, umbra_ptr src, i32 ix) {
     if (bb->inst[ix.id].op == op_lane  ) { return (f32){push(bb,op_load_32,           .ptr=src.ix)}; }
     if (bb->inst[ix.id].op == op_imm_32) { return (f32){push(bb,op_uni_32,   .imm=bb->inst[ix.id].imm,.ptr=src.ix)}; }
+    { int off = lane_plus_off(bb, ix.id); if (off >= 0) { return (f32){push(bb,op_load_32,.x=off,.ptr=src.ix)}; } }
     return                                        (f32){push(bb,op_gather_32,.x=ix.id,.ptr=src.ix)};
 }
 vh umbra_load_half(BB *bb, umbra_ptr src, i32 ix) {
     if (bb->inst[ix.id].op == op_lane  ) { return (vh){push(bb,op_load_half,           .ptr=src.ix)}; }
     if (bb->inst[ix.id].op == op_imm_32) { return (vh){push(bb,op_uni_half,   .imm=bb->inst[ix.id].imm,.ptr=src.ix)}; }
+    { int off = lane_plus_off(bb, ix.id); if (off >= 0) { return (vh){push(bb,op_load_half,.x=off,.ptr=src.ix)}; } }
     return                                        (vh){push(bb,op_gather_half,.x=ix.id,.ptr=src.ix)};
 }
 
 void umbra_store_i16(BB *bb, umbra_ptr dst, i32 ix, i16 val) {
-    if (bb->inst[ix.id].op == op_lane) { push(bb, op_store_16,             .y=val.id, .ptr=dst.ix); }
-    else                               { push(bb, op_scatter_16, .x=ix.id, .y=val.id, .ptr=dst.ix); }
+    if (bb->inst[ix.id].op == op_lane) { push(bb, op_store_16,             .y=val.id, .ptr=dst.ix); return; }
+    { int off = lane_plus_off(bb, ix.id); if (off >= 0) { push(bb, op_store_16, .x=off, .y=val.id, .ptr=dst.ix); return; } }
+    push(bb, op_scatter_16, .x=ix.id, .y=val.id, .ptr=dst.ix);
 }
 void umbra_store_i32(BB *bb, umbra_ptr dst, i32 ix, i32 val) {
-    if (bb->inst[ix.id].op == op_lane) { push(bb, op_store_32,             .y=val.id, .ptr=dst.ix); }
-    else                               { push(bb, op_scatter_32, .x=ix.id, .y=val.id, .ptr=dst.ix); }
+    if (bb->inst[ix.id].op == op_lane) { push(bb, op_store_32,             .y=val.id, .ptr=dst.ix); return; }
+    { int off = lane_plus_off(bb, ix.id); if (off >= 0) { push(bb, op_store_32, .x=off, .y=val.id, .ptr=dst.ix); return; } }
+    push(bb, op_scatter_32, .x=ix.id, .y=val.id, .ptr=dst.ix);
 }
 void umbra_store_f32(BB *bb, umbra_ptr dst, i32 ix, f32 val) {
-    if (bb->inst[ix.id].op == op_lane) { push(bb, op_store_32,             .y=val.id, .ptr=dst.ix); }
-    else                               { push(bb, op_scatter_32, .x=ix.id, .y=val.id, .ptr=dst.ix); }
+    if (bb->inst[ix.id].op == op_lane) { push(bb, op_store_32,             .y=val.id, .ptr=dst.ix); return; }
+    { int off = lane_plus_off(bb, ix.id); if (off >= 0) { push(bb, op_store_32, .x=off, .y=val.id, .ptr=dst.ix); return; } }
+    push(bb, op_scatter_32, .x=ix.id, .y=val.id, .ptr=dst.ix);
 }
 void umbra_store_half(BB *bb, umbra_ptr dst, i32 ix, vh val) {
-    if (bb->inst[ix.id].op == op_lane) { push(bb, op_store_half,             .y=val.id, .ptr=dst.ix); }
-    else                               { push(bb, op_scatter_half, .x=ix.id, .y=val.id, .ptr=dst.ix); }
+    if (bb->inst[ix.id].op == op_lane) { push(bb, op_store_half,             .y=val.id, .ptr=dst.ix); return; }
+    { int off = lane_plus_off(bb, ix.id); if (off >= 0) { push(bb, op_store_half, .x=off, .y=val.id, .ptr=dst.ix); return; } }
+    push(bb, op_scatter_half, .x=ix.id, .y=val.id, .ptr=dst.ix);
 }
 
 static _Bool is_imm16(BB *bb, int id, int val) {
@@ -713,6 +729,8 @@ void umbra_basic_block_dump(struct umbra_basic_block const *bb, FILE *f) {
                 fprintf(f, "      %-15s p%d", op_name(op), inst->ptr);
                 if (op == op_scatter_16 || op == op_scatter_32 || op == op_scatter_half) {
                     fprintf(f, " v%d", inst->x);
+                } else if (inst->x && (op == op_store_16 || op == op_store_32 || op == op_store_half)) {
+                    fprintf(f, " +v%d", inst->x);
                 }
                 fprintf(f, " v%d\n", inst->y);
             }
@@ -733,6 +751,7 @@ void umbra_basic_block_dump(struct umbra_basic_block const *bb, FILE *f) {
                 break;
             case op_load_32: case op_load_16: case op_load_half:
                 fprintf(f, " p%d", inst->ptr);
+                if (inst->x) { fprintf(f, " +v%d", inst->x); }
                 break;
             case op_load_8x4:
                 if (inst->x == 0) {

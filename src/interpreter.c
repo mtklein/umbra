@@ -94,26 +94,26 @@ op(gather_32) {
 }
 
 op(load_16) {
-    int16_t const *src = ptr[ip->x];
+    int16_t const *src = (int16_t const*)ptr[ip->x] + v[ip->y].i32[0];
     if (end & (K-1)) { __builtin_memcpy(v, src + end-1, 2  ); }
     else             { __builtin_memcpy(v, src + end-K, 2*K); }
     next;
 }
 op(load_32) {
-    int32_t const *src = ptr[ip->x];
+    int32_t const *src = (int32_t const*)ptr[ip->x] + v[ip->y].i32[0];
     if (end & (K-1)) { __builtin_memcpy(v, src + end-1, 4  ); }
     else             { __builtin_memcpy(v, src + end-K, 4*K); }
     next;
 }
 
 op(store_16) {
-    int16_t *dst = ptr[ip->x];
+    int16_t *dst = (int16_t*)ptr[ip->x] + v[ip->z].i32[0];
     if (end & (K-1)) { __builtin_memcpy(dst + end-1, v + ip->y, 2  ); }
     else             { __builtin_memcpy(dst + end-K, v + ip->y, 2*K); }
     next;
 }
 op(store_32) {
-    int32_t *dst = ptr[ip->x];
+    int32_t *dst = (int32_t*)ptr[ip->x] + v[ip->z].i32[0];
     if (end & (K-1)) { __builtin_memcpy(dst + end-1, v + ip->y, 4  ); }
     else             { __builtin_memcpy(dst + end-K, v + ip->y, 4*K); }
     next;
@@ -252,7 +252,7 @@ op(i32_from_i16) {
     }
 
     op(load_half) {
-        __fp16 const *src = ptr[ip->x];
+        __fp16 const *src = (__fp16 const*)ptr[ip->x] + v[ip->y].i32[0];
         if (end & (K-1)) {
             v->f32 = (F32){0} + (float)src[end-1];
         } else {
@@ -263,7 +263,7 @@ op(i32_from_i16) {
     }
 
     op(store_half) {
-        __fp16 *dst = ptr[ip->x];
+        __fp16 *dst = (__fp16*)ptr[ip->x] + v[ip->z].i32[0];
         if (end & (K-1)) {
             U16 tmp = f32_to_f16(v[ip->y].f32);
             __builtin_memcpy(dst + end-1, &tmp, 2);
@@ -634,12 +634,12 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                     #define RESOLVE_PTR(inst) ((inst)->ptr < 0 ? deref_slot[~(inst)->ptr] : (inst)->ptr)
                     case op_uni_16:  emit(.fn=uni_16,  .x=RESOLVE_PTR(inst), .y=inst->imm); break;
                     case op_uni_32:  emit(.fn=uni_32,  .x=RESOLVE_PTR(inst), .y=inst->imm); break;
-                    case op_load_16: emit(.fn=load_16, .x=RESOLVE_PTR(inst)); break;
-                    case op_load_32: emit(.fn=load_32, .x=RESOLVE_PTR(inst)); break;
+                    case op_load_16: emit(.fn=load_16, .x=RESOLVE_PTR(inst), .y=X); break;
+                    case op_load_32: emit(.fn=load_32, .x=RESOLVE_PTR(inst), .y=X); break;
                     case op_gather_16: emit(.fn=gather_16, .x=RESOLVE_PTR(inst), .y=X); break;
                     case op_gather_32: emit(.fn=gather_32, .x=RESOLVE_PTR(inst), .y=X); break;
-                    case op_store_16:   emit(.fn=store_16,   .x=RESOLVE_PTR(inst), .y=Y); break;
-                    case op_store_32:   emit(.fn=store_32,   .x=RESOLVE_PTR(inst), .y=Y); break;
+                    case op_store_16:   emit(.fn=store_16,   .x=RESOLVE_PTR(inst), .y=Y, .z=X); break;
+                    case op_store_32:   emit(.fn=store_32,   .x=RESOLVE_PTR(inst), .y=Y, .z=X); break;
                     case op_scatter_16: emit(.fn=scatter_16, .x=RESOLVE_PTR(inst), .y=Y, .z=X); break;
                     case op_scatter_32: emit(.fn=scatter_32, .x=RESOLVE_PTR(inst), .y=Y, .z=X); break;
 
@@ -652,9 +652,9 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                         break;
                     case op_load_half:
                     #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
-                        emit(.fn=load_16, .x=RESOLVE_PTR(inst));
+                        emit(.fn=load_16, .x=RESOLVE_PTR(inst), .y=X);
                     #else
-                        emit(.fn=load_half, .x=RESOLVE_PTR(inst));
+                        emit(.fn=load_half, .x=RESOLVE_PTR(inst), .y=X);
                     #endif
                         break;
                     case op_gather_half:
@@ -666,9 +666,9 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                         break;
                     case op_store_half:
                     #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
-                        emit(.fn=store_16, .x=RESOLVE_PTR(inst), .y=Y);
+                        emit(.fn=store_16, .x=RESOLVE_PTR(inst), .y=Y, .z=X);
                     #else
-                        emit(.fn=store_half, .x=RESOLVE_PTR(inst), .y=Y);
+                        emit(.fn=store_half, .x=RESOLVE_PTR(inst), .y=Y, .z=X);
                     #endif
                         break;
                     case op_scatter_half:

@@ -1672,6 +1672,98 @@ static void test_scatter_clamp(void) {
   }
 }
 
+static void test_offset_load_store(void) {
+  for (int opt = 0; opt < 2; opt++) {
+    {
+        struct umbra_basic_block *bb = umbra_basic_block();
+        umbra_i32 ix  = umbra_lane(bb);
+        umbra_i32 off = umbra_load_i32(bb, (umbra_ptr){1}, umbra_imm_i32(bb, 0));
+        umbra_i32 ixo = umbra_add_i32(bb, ix, off);
+        umbra_i16 val = umbra_load_i16(bb, (umbra_ptr){0}, ixo);
+        umbra_store_i16(bb, (umbra_ptr){2}, ix, val);
+        backends B = make_full(bb, opt);
+        for (int bi = 0; bi < 4; bi++) {
+            int16_t src[16] = {10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25};
+            int32_t uni[1]  = {4};
+            int16_t dst[8]  = {0};
+            if (!run(&B, bi, 8, (umbra_buf[]){
+                {src, (long)sizeof src},
+                {uni, -(long)sizeof uni},
+                {dst, (long)sizeof dst},
+            })) { continue; }
+            for (int k = 0; k < 8; k++) { (dst[k] == (int16_t)(14 + k)) here; }
+        }
+        cleanup(&B);
+    }
+    {
+        struct umbra_basic_block *bb = umbra_basic_block();
+        umbra_i32 ix  = umbra_lane(bb);
+        umbra_i32 off = umbra_load_i32(bb, (umbra_ptr){1}, umbra_imm_i32(bb, 0));
+        umbra_i32 ixo = umbra_add_i32(bb, ix, off);
+        umbra_i32 val = umbra_load_i32(bb, (umbra_ptr){0}, ixo);
+        umbra_store_i32(bb, (umbra_ptr){2}, ix, val);
+        backends B = make_full(bb, opt);
+        for (int bi = 0; bi < 4; bi++) {
+            int32_t src[16] = {100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115};
+            int32_t uni[1]  = {3};
+            int32_t dst[8]  = {0};
+            if (!run(&B, bi, 8, (umbra_buf[]){
+                {src, (long)sizeof src},
+                {uni, -(long)sizeof uni},
+                {dst, (long)sizeof dst},
+            })) { continue; }
+            for (int k = 0; k < 8; k++) { (dst[k] == 103 + k) here; }
+        }
+        cleanup(&B);
+    }
+    {
+        struct umbra_basic_block *bb = umbra_basic_block();
+        umbra_i32 ix  = umbra_lane(bb);
+        umbra_i32 off = umbra_load_i32(bb, (umbra_ptr){1}, umbra_imm_i32(bb, 0));
+        umbra_i32 ixo = umbra_add_i32(bb, ix, off);
+        umbra_i32 val = umbra_load_i32(bb, (umbra_ptr){0}, ix);
+        umbra_store_i32(bb, (umbra_ptr){2}, ixo, val);
+        backends B = make_full(bb, opt);
+        for (int bi = 0; bi < 4; bi++) {
+            int32_t src[8]  = {10,11,12,13,14,15,16,17};
+            int32_t uni[1]  = {2};
+            int32_t dst[16] = {0};
+            if (!run(&B, bi, 8, (umbra_buf[]){
+                {src, (long)sizeof src},
+                {uni, -(long)sizeof uni},
+                {dst, (long)sizeof dst},
+            })) { continue; }
+            for (int k = 0; k < 8; k++) { (dst[k + 2] == 10 + k) here; }
+        }
+        cleanup(&B);
+    }
+    {
+        struct umbra_basic_block *bb = umbra_basic_block();
+        umbra_i32 ix  = umbra_lane(bb);
+        umbra_i32 off = umbra_load_i32(bb, (umbra_ptr){1}, umbra_imm_i32(bb, 0));
+        umbra_i32 ixo = umbra_add_i32(bb, ix, off);
+        umbra_half val = umbra_load_half(bb, (umbra_ptr){0}, ixo);
+        umbra_store_half(bb, (umbra_ptr){2}, ix, val);
+        backends B = make_full(bb, opt);
+        for (int bi = 0; bi < 4; bi++) {
+            uint16_t src[16]; for (int k = 0; k < 16; k++) { __fp16 h = (__fp16)(k + 10); __builtin_memcpy(&src[k], &h, 2); }
+            int32_t  uni[1]  = {5};
+            uint16_t dst[8]  = {0};
+            if (!run(&B, bi, 8, (umbra_buf[]){
+                {src, (long)sizeof src},
+                {uni, -(long)sizeof uni},
+                {dst, (long)sizeof dst},
+            })) { continue; }
+            for (int k = 0; k < 8; k++) {
+                __fp16 h; __builtin_memcpy(&h, &dst[k], 2);
+                equiv((float)h, (float)(15 + k)) here;
+            }
+        }
+        cleanup(&B);
+    }
+  }
+}
+
 int main(void) {
     test_f32_ops();
     test_i32_ops();
@@ -1706,5 +1798,6 @@ int main(void) {
     test_preamble_pair_alias();
     test_gather_clamp();
     test_scatter_clamp();
+    test_offset_load_store();
     return 0;
 }
