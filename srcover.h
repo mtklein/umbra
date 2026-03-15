@@ -3,8 +3,8 @@
 
 static inline struct umbra_basic_block* build_srcover(void) {
     struct umbra_basic_block *bb = umbra_basic_block();
-    umbra_v32  ix     = umbra_lane(bb);
-    umbra_v16  rgba[4];
+    umbra_i32  ix     = umbra_lane(bb);
+    umbra_i16  rgba[4];
     umbra_load_8x4(bb, (umbra_ptr){0}, ix, rgba);
     umbra_half inv255 = umbra_imm_half(bb, 0x1c04);
     umbra_half sr     = umbra_mul_half(bb, umbra_half_from_i16(bb, rgba[0]), inv255),

@@ -433,13 +433,13 @@ static void test_no_blend(void) {
 
 // --- custom gradient shader ---
 
-static umbra_color gradient_shader(struct umbra_basic_block *bb, umbra_v32 x, umbra_v32 y) {
+static umbra_color gradient_shader(struct umbra_basic_block *bb, umbra_f32 x, umbra_f32 y) {
     (void)y;
     // Load width and alpha from p3 as f32 uniforms.
-    umbra_v32 w = umbra_load_32(bb, (umbra_ptr){3}, umbra_imm_32(bb, 0));
-    umbra_v32 a = umbra_load_32(bb, (umbra_ptr){3}, umbra_imm_32(bb, 1));
+    umbra_f32 w = umbra_load_f32(bb, (umbra_ptr){3}, umbra_imm_i32(bb, 0));
+    umbra_f32 a = umbra_load_f32(bb, (umbra_ptr){3}, umbra_imm_i32(bb, 1));
     // r = x / width
-    umbra_v32 t = umbra_div_f32(bb, x, w);
+    umbra_f32 t = umbra_div_f32(bb, x, w);
     umbra_half r = umbra_half_from_f32(bb, t);
     umbra_half zero = umbra_imm_half(bb, 0);
     umbra_half alpha = umbra_half_from_f32(bb, a);
