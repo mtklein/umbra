@@ -577,55 +577,55 @@ void umbra_transfer_lut_apply(float out[256], umbra_transfer const *tf) {
     }
 }
 
-#define POLY_DEG 6
+#define POLY_N 10
 
-static void fit_pow_poly(float gamma, float coeffs[POLY_DEG + 1]) {
-    enum { N = 256, D = POLY_DEG + 1 };
-    double ata[D][D] = {{0}};
-    double atb[D]    = {0};
+static void fit_poly(double gamma, int n, double coeffs[]) {
+    enum { N = 512 };
+    double ata[POLY_N][POLY_N] = {{0}};
+    double atb[POLY_N]         = {0};
     for (int i = 0; i < N; i++) {
         double x = (double)i / (double)(N - 1);
-        double y = pow(x, (double)gamma);
-        double xp[D];
-        xp[0] = 1;
-        for (int j = 1; j < D; j++) { xp[j] = xp[j-1] * x; }
-        for (int r = 0; r < D; r++) {
-            for (int c = 0; c < D; c++) { ata[r][c] += xp[r] * xp[c]; }
-            atb[r] += xp[r] * y;
+        double y = pow(x, gamma);
+        double xp = 1;
+        for (int r = 0; r < n; r++) {
+            double xq = 1;
+            for (int c = 0; c < n; c++) { ata[r][c] += xp * xq; xq *= x; }
+            atb[r] += xp * y;
+            xp *= x;
         }
     }
-    for (int k = 0; k < D; k++) {
+    for (int k = 0; k < n; k++) {
         int mx = k;
-        for (int r = k+1; r < D; r++) {
-            if (ata[r][k] > ata[mx][k] || -ata[r][k] > ata[mx][k]) { mx = r; }
+        for (int r = k+1; r < n; r++) {
+            if (fabs(ata[r][k]) > fabs(ata[mx][k])) { mx = r; }
         }
-        for (int c = 0; c < D; c++) { double t = ata[k][c]; ata[k][c] = ata[mx][c]; ata[mx][c] = t; }
+        for (int c = 0; c < n; c++) { double t = ata[k][c]; ata[k][c] = ata[mx][c]; ata[mx][c] = t; }
         { double t = atb[k]; atb[k] = atb[mx]; atb[mx] = t; }
-        for (int r = k+1; r < D; r++) {
+        for (int r = k+1; r < n; r++) {
             double f = ata[r][k] / ata[k][k];
-            for (int c = k; c < D; c++) { ata[r][c] -= f * ata[k][c]; }
+            for (int c = k; c < n; c++) { ata[r][c] -= f * ata[k][c]; }
             atb[r] -= f * atb[k];
         }
     }
-    for (int k = D-1; k >= 0; k--) {
+    for (int k = n-1; k >= 0; k--) {
         double s = atb[k];
-        for (int c = k+1; c < D; c++) { s -= ata[k][c] * atb[c]; }
-        atb[k] = s / ata[k][k];
+        for (int c = k+1; c < n; c++) { s -= ata[k][c] * coeffs[c]; }
+        coeffs[k] = s / ata[k][k];
     }
-    for (int i = 0; i < D; i++) { coeffs[i] = (float)atb[i]; }
 }
 
-static umbra_f32 eval_poly(BB *bb, umbra_f32 x, float const coeffs[POLY_DEG + 1]) {
-    umbra_f32 r = umbra_imm_f32(bb, f2b(coeffs[POLY_DEG]));
-    for (int i = POLY_DEG - 1; i >= 0; i--) {
-        r = umbra_add_f32(bb, umbra_mul_f32(bb, r, x), umbra_imm_f32(bb, f2b(coeffs[i])));
+static umbra_f32 eval_poly_ir(BB *bb, umbra_f32 x, int n, double const coeffs[]) {
+    umbra_f32 r = umbra_imm_f32(bb, f2b((float)coeffs[n-1]));
+    for (int i = n - 2; i >= 0; i--) {
+        r = umbra_add_f32(bb, umbra_mul_f32(bb, r, x), umbra_imm_f32(bb, f2b((float)coeffs[i])));
     }
     return r;
 }
 
 umbra_color umbra_transfer_invert(BB *bb, umbra_color c, umbra_transfer const *tf) {
-    float poly[POLY_DEG + 1];
-    fit_pow_poly(tf->g, poly);
+    double poly[POLY_N];
+    int deg = 7;
+    fit_poly((double)tf->g, deg, poly);
 
     for (int ch = 0; ch < 3; ch++) {
         umbra_half *h = ch == 0 ? &c.r : ch == 1 ? &c.g : &c.b;
@@ -639,7 +639,7 @@ umbra_color umbra_transfer_invert(BB *bb, umbra_color c, umbra_transfer const *t
             umbra_mul_f32(bb, x, umbra_imm_f32(bb, f2b(tf->a))),
             umbra_imm_f32(bb, f2b(tf->b)));
         t = umbra_max_f32(bb, t, umbra_imm_f32(bb, 0));
-        umbra_f32 cur = umbra_add_f32(bb, eval_poly(bb, t, poly),
+        umbra_f32 cur = umbra_add_f32(bb, eval_poly_ir(bb, t, deg, poly),
                                            umbra_imm_f32(bb, f2b(tf->e)));
 
         umbra_i32 mask = umbra_ge_f32(bb, x, umbra_imm_f32(bb, f2b(tf->d)));
@@ -649,8 +649,9 @@ umbra_color umbra_transfer_invert(BB *bb, umbra_color c, umbra_transfer const *t
 }
 
 umbra_color umbra_transfer_apply(BB *bb, umbra_color c, umbra_transfer const *tf) {
-    float poly[POLY_DEG + 1];
-    fit_pow_poly(1.0f / tf->g, poly);
+    double poly[POLY_N];
+    int deg = 10;
+    fit_poly(2.0 / (double)tf->g, deg, poly);
 
     float lin_thresh = tf->c * tf->d + tf->f;
     float inv_c = tf->c > 0 ? 1.0f / tf->c : 0;
@@ -665,8 +666,9 @@ umbra_color umbra_transfer_apply(BB *bb, umbra_color c, umbra_transfer const *tf
 
         umbra_f32 t = umbra_sub_f32(bb, y, umbra_imm_f32(bb, f2b(tf->e)));
         t = umbra_max_f32(bb, t, umbra_imm_f32(bb, 0));
+        umbra_f32 s = umbra_sqrt_f32(bb, t);
         umbra_f32 cur = umbra_mul_f32(bb,
-            umbra_sub_f32(bb, eval_poly(bb, t, poly), umbra_imm_f32(bb, f2b(tf->b))),
+            umbra_sub_f32(bb, eval_poly_ir(bb, s, deg, poly), umbra_imm_f32(bb, f2b(tf->b))),
             umbra_imm_f32(bb, f2b(inv_a)));
 
         umbra_i32 mask = umbra_ge_f32(bb, y, umbra_imm_f32(bb, f2b(lin_thresh)));

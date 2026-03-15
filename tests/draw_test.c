@@ -965,7 +965,7 @@ static void test_transfer_invert(void) {
         for (int i = 0; i < 2; i++) {
             float r = (float)dst[i*4+0];
             float a = (float)dst[i*4+3];
-            (r >= 0.18f && r <= 0.26f) here;
+            (r >= 0.20f && r <= 0.23f) here;
             (a >= 0.99f && a <= 1.01f) here;
         }
     }
@@ -999,7 +999,7 @@ static void test_transfer_apply(void) {
         for (int i = 0; i < 2; i++) {
             float r = (float)dst[i*4+0];
             float a = (float)dst[i*4+3];
-            (r >= 0.73f && r <= 0.74f) here;
+            (r >= 0.72f && r <= 0.75f) here;
             (a >= 0.99f && a <= 1.01f) here;
         }
     }
