@@ -43,7 +43,11 @@ umbra_color umbra_blend_srcover (struct umbra_basic_block*, umbra_color src, umb
 umbra_color umbra_blend_dstover (struct umbra_basic_block*, umbra_color src, umbra_color dst);
 umbra_color umbra_blend_multiply(struct umbra_basic_block*, umbra_color src, umbra_color dst);
 
-umbra_color umbra_load_8888 (struct umbra_basic_block*, umbra_ptr ptr, umbra_i32 ix);
-void        umbra_store_8888(struct umbra_basic_block*, umbra_ptr ptr, umbra_i32 ix, umbra_color);
-umbra_color umbra_load_fp16 (struct umbra_basic_block*, umbra_ptr ptr, umbra_i32 ix);
-void        umbra_store_fp16(struct umbra_basic_block*, umbra_ptr ptr, umbra_i32 ix, umbra_color);
+umbra_color umbra_load_8888   (struct umbra_basic_block*, umbra_ptr ptr, umbra_i32 ix);
+void        umbra_store_8888  (struct umbra_basic_block*, umbra_ptr ptr, umbra_i32 ix, umbra_color);
+umbra_color umbra_load_565    (struct umbra_basic_block*, umbra_ptr ptr, umbra_i32 ix);
+void        umbra_store_565   (struct umbra_basic_block*, umbra_ptr ptr, umbra_i32 ix, umbra_color);
+umbra_color umbra_load_1010102(struct umbra_basic_block*, umbra_ptr ptr, umbra_i32 ix);
+void        umbra_store_1010102(struct umbra_basic_block*,umbra_ptr ptr, umbra_i32 ix, umbra_color);
+umbra_color umbra_load_fp16   (struct umbra_basic_block*, umbra_ptr ptr, umbra_i32 ix);
+void        umbra_store_fp16  (struct umbra_basic_block*, umbra_ptr ptr, umbra_i32 ix, umbra_color);

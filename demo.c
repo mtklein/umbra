@@ -1,6 +1,7 @@
 #include "slides/slides.h"
 #include <math.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #if defined(__wasm__)
@@ -43,11 +44,19 @@ static void free_backends(void) {
     for (int i = 0; i < NUM_BACKENDS; i++) { backends[i] = NULL; }
 }
 
-static void build_slide(slide const *s) {
+enum { FMT_8888, FMT_565, FMT_FP16, FMT_1010102, NUM_FMTS };
+static char const     *fmt_name[]  = {"8888",           "565",           "fp16",          "1010102"};
+static umbra_load_fn   fmt_load[]  = {umbra_load_8888,  umbra_load_565,  umbra_load_fp16,  umbra_load_1010102};
+static umbra_store_fn  fmt_store[] = {umbra_store_8888, umbra_store_565, umbra_store_fp16, umbra_store_1010102};
+static int             fmt_bpp[]   = {4,                2,               8,                4};
+
+static void build_slide_fmt(slide const *s, int fmt) {
     free_backends();
+    umbra_load_fn  load  = s->load  ? fmt_load[fmt]  : NULL;
+    umbra_store_fn store = fmt_store[fmt];
 
     struct umbra_basic_block *bb = umbra_draw_build(
-        s->shader, s->coverage, s->blend, s->load, s->store);
+        s->shader, s->coverage, s->blend, load, store);
     umbra_basic_block_optimize(bb);
 
     interp  = umbra_interpreter(bb);
@@ -100,9 +109,10 @@ static void build_perspective_matrix(float out[11], float t, int sw, int sh, int
     out[10] = (float)bh;
 }
 
-static void update_title(SDL_Window *w, slide const *s, int bi, double fps) {
+static void update_title(SDL_Window *w, slide const *s, int bi, int fi, double fps) {
     char title[256];
-    SDL_snprintf(title, sizeof title, "%s  [%s]  %.0f fps", s->title, backend_name[bi], fps);
+    SDL_snprintf(title, sizeof title, "%s  [%s/%s]  %.0f fps",
+                 s->title, backend_name[bi], fmt_name[fi], fps);
     SDL_SetWindowTitle(w, title);
 }
 
@@ -128,6 +138,110 @@ static void build_luts(void) {
         {(__fp16)0.05f, (__fp16)0.0f, (__fp16)0.15f, (__fp16)1.0f},
     };
     umbra_gradient_lut_even(radial_lut, LUT_N, 4, radial_stops);
+}
+
+static void fill_bg_row(void *dst, int n, uint32_t bg, int fmt) {
+    uint8_t r = (uint8_t)(bg >>  0);
+    uint8_t g = (uint8_t)(bg >>  8);
+    uint8_t b = (uint8_t)(bg >> 16);
+    uint8_t a = (uint8_t)(bg >> 24);
+    switch (fmt) {
+    case FMT_8888:
+        for (int i = 0; i < n; i++) { ((uint32_t*)dst)[i] = bg; }
+        break;
+    case FMT_565: {
+        uint16_t px = (uint16_t)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+        for (int i = 0; i < n; i++) { ((uint16_t*)dst)[i] = px; }
+    } break;
+    case FMT_FP16: {
+        __fp16 hc[4] = {(__fp16)(r/255.0f), (__fp16)(g/255.0f),
+                        (__fp16)(b/255.0f), (__fp16)(a/255.0f)};
+        for (int i = 0; i < n; i++) { __builtin_memcpy((__fp16*)dst + i*4, hc, 8); }
+    } break;
+    case FMT_1010102: {
+        uint32_t px = ((uint32_t)(r * 1023 / 255))
+                    | ((uint32_t)(g * 1023 / 255) << 10)
+                    | ((uint32_t)(b * 1023 / 255) << 20)
+                    | ((uint32_t)(a * 3 / 255) << 30);
+        for (int i = 0; i < n; i++) { ((uint32_t*)dst)[i] = px; }
+    } break;
+    }
+}
+
+static void readback_row(uint32_t *dst, void const *src, int n, int fmt) {
+    switch (fmt) {
+    case FMT_8888:
+        __builtin_memcpy(dst, src, (size_t)(n * 4));
+        break;
+    case FMT_565: {
+        uint16_t const *s = src;
+        for (int i = 0; i < n; i++) {
+            uint32_t ri = ((s[i] >> 11) & 0x1fu) * 255 / 31;
+            uint32_t gi = ((s[i] >>  5) & 0x3fu) * 255 / 63;
+            uint32_t bi = ( s[i]        & 0x1fu) * 255 / 31;
+            dst[i] = ri | (gi << 8) | (bi << 16) | 0xff000000u;
+        }
+    } break;
+    case FMT_FP16: {
+        __fp16 const *s = src;
+        for (int i = 0; i < n; i++) {
+            float rf = (float)s[i*4+0], gf = (float)s[i*4+1];
+            float bf = (float)s[i*4+2], af = (float)s[i*4+3];
+            if (rf < 0) { rf = 0; } if (rf > 1) { rf = 1; }
+            if (gf < 0) { gf = 0; } if (gf > 1) { gf = 1; }
+            if (bf < 0) { bf = 0; } if (bf > 1) { bf = 1; }
+            if (af < 0) { af = 0; } if (af > 1) { af = 1; }
+            dst[i] = (uint32_t)(rf*255+.5f) | ((uint32_t)(gf*255+.5f) << 8)
+                   | ((uint32_t)(bf*255+.5f) << 16) | ((uint32_t)(af*255+.5f) << 24);
+        }
+    } break;
+    case FMT_1010102: {
+        uint32_t const *s = src;
+        for (int i = 0; i < n; i++) {
+            uint32_t ri = ((s[i] >>  0) & 0x3ffu) * 255 / 1023;
+            uint32_t gi = ((s[i] >> 10) & 0x3ffu) * 255 / 1023;
+            uint32_t bi = ((s[i] >> 20) & 0x3ffu) * 255 / 1023;
+            uint32_t ai = ((s[i] >> 30) & 0x3u)   * 255 / 3;
+            dst[i] = ri | (gi << 8) | (bi << 16) | (ai << 24);
+        }
+    } break;
+    }
+}
+
+static void to_hdr_row(float *dst, void const *src, int n, int fmt) {
+    switch (fmt) {
+    case FMT_8888: {
+        uint8_t const *s = src;
+        for (int i = 0; i < n; i++) {
+            dst[i*4+0] = s[i*4+0] / 255.0f;
+            dst[i*4+1] = s[i*4+1] / 255.0f;
+            dst[i*4+2] = s[i*4+2] / 255.0f;
+            dst[i*4+3] = 1.0f;
+        }
+    } break;
+    case FMT_565: {
+        uint16_t const *s = src;
+        for (int i = 0; i < n; i++) {
+            dst[i*4+0] = ((s[i] >> 11) & 0x1f) / 31.0f;
+            dst[i*4+1] = ((s[i] >>  5) & 0x3f) / 63.0f;
+            dst[i*4+2] = ( s[i]        & 0x1f) / 31.0f;
+            dst[i*4+3] = 1.0f;
+        }
+    } break;
+    case FMT_FP16: {
+        __fp16 const *s = src;
+        for (int i = 0; i < n*4; i++) { dst[i] = (float)s[i]; }
+    } break;
+    case FMT_1010102: {
+        uint32_t const *s = src;
+        for (int i = 0; i < n; i++) {
+            dst[i*4+0] = ((s[i] >>  0) & 0x3ff) / 1023.0f;
+            dst[i*4+1] = ((s[i] >> 10) & 0x3ff) / 1023.0f;
+            dst[i*4+2] = ((s[i] >> 20) & 0x3ff) / 1023.0f;
+            dst[i*4+3] = ((s[i] >> 30) & 0x3)   / 3.0f;
+        }
+    } break;
+    }
 }
 
 int main(void) {
@@ -161,8 +275,11 @@ int main(void) {
     text_cov sdf_cov    = text_rasterize(W, H, 72.0f, 1);
     build_luts();
 
-    int cur_slide = 0;
-    build_slide(&slides[cur_slide]);
+    void *pixbuf = malloc(W * H * 8);
+
+    int cur_slide   = 0;
+    int cur_fmt     = FMT_8888;
+    build_slide_fmt(&slides[cur_slide], cur_fmt);
     int cur_backend = pick_backend(1);
 
     uint64_t fps_start  = SDL_GetPerformanceCounter();
@@ -177,7 +294,7 @@ int main(void) {
 
     _Bool want_dump = 0;
 
-    update_title(window, &slides[cur_slide], cur_backend, fps);
+    update_title(window, &slides[cur_slide], cur_backend, cur_fmt, fps);
 
     _Bool running = 1;
     while (running) {
@@ -193,7 +310,10 @@ int main(void) {
                     next = (cur_slide + SLIDE_COUNT - 1) % SLIDE_COUNT;
                 } else if (ev.key.key == SDLK_B) {
                     cur_backend = next_backend(cur_backend);
-                    update_title(window, &slides[cur_slide], cur_backend, fps);
+                } else if (ev.key.key == SDLK_C) {
+                    cur_fmt = (cur_fmt + 1) % NUM_FMTS;
+                    build_slide_fmt(&slides[cur_slide], cur_fmt);
+                    cur_backend = pick_backend(cur_backend);
                 } else if (ev.key.key == SDLK_S) {
                     want_dump = 1;
                 } else if (ev.key.key == SDLK_ESCAPE) {
@@ -201,10 +321,10 @@ int main(void) {
                 }
                 if (next != cur_slide) {
                     cur_slide = next;
-                    build_slide(&slides[cur_slide]);
+                    build_slide_fmt(&slides[cur_slide], cur_fmt);
                     cur_backend = pick_backend(cur_backend);
-                    update_title(window, &slides[cur_slide], cur_backend, fps);
                 }
+                update_title(window, &slides[cur_slide], cur_backend, cur_fmt, fps);
             }
         }
         if (!running) { break; }
@@ -213,19 +333,10 @@ int main(void) {
         run_fn run = run_fns[cur_backend];
         void  *ctx = backends[cur_backend];
 
-        void *tex_pixels;
-        int   tex_pitch;
-        if (!SDL_LockTexture(texture, NULL, &tex_pixels, &tex_pitch)) {
-            SDL_Log("SDL_LockTexture failed: %s", SDL_GetError());
-            break;
-        }
+        int bpp = fmt_bpp[cur_fmt];
 
-        uint8_t *rows = (uint8_t*)tex_pixels;
         for (int y = 0; y < H; y++) {
-            uint32_t *row = (uint32_t*)(rows + y * tex_pitch);
-            for (int x = 0; x < W; x++) {
-                row[x] = s->bg;
-            }
+            fill_bg_row((uint8_t*)pixbuf + y * W * bpp, W, s->bg, cur_fmt);
         }
 
         int32_t x0 = 0;
@@ -238,9 +349,9 @@ int main(void) {
             for (int i = 0; i < 4; i++) { hc[i] = (__fp16)s->color[i]; }
             for (int y = 0; y < H; y++) {
                 int32_t yval = y;
-                uint32_t *row = (uint32_t*)(rows + y * tex_pitch);
+                void *row = (uint8_t*)pixbuf + y * W * bpp;
                 umbra_buf buf[] = {
-                    { row,            W * 4               },
+                    { row,            W * bpp             },
                     { &x0,           -4                   },
                     { &yval,         -4                   },
                     { hc,            -8                   },
@@ -255,9 +366,9 @@ int main(void) {
             for (int i = 0; i < 4; i++) { hc[i] = (__fp16)s->color[i]; }
             for (int y = 0; y < H; y++) {
                 int32_t yval = y;
-                uint32_t *row = (uint32_t*)(rows + y * tex_pitch);
+                void *row = (uint8_t*)pixbuf + y * W * bpp;
                 umbra_buf buf[] = {
-                    { row,              W * 4     },
+                    { row,              W * bpp   },
                     { &x0,             -4         },
                     { &yval,           -4         },
                     { hc,              -8         },
@@ -279,9 +390,9 @@ int main(void) {
 
             for (int y = 0; y < H; y++) {
                 int32_t yval = y;
-                uint32_t *row = (uint32_t*)(rows + y * tex_pitch);
+                void *row = (uint8_t*)pixbuf + y * W * bpp;
                 umbra_buf buf[] = {
-                    {row,   W * 4},
+                    {row,   W * bpp},
                     {&x0,  -4},
                     {&yval, -4},
                     {p3,   -p3sz},
@@ -305,21 +416,40 @@ int main(void) {
 
             for (int y = 0; y < H; y++) {
                 int32_t yval = y;
-                uint32_t *row = (uint32_t*)(rows + y * tex_pitch);
+                void *row = (uint8_t*)pixbuf + y * W * bpp;
                 umbra_buf buf[] = {
-                    { row,   W * 4 },
-                    { &x0,  -4     },
-                    { &yval,-4     },
-                    { hc,   -8     },
-                    { rect, -16    },
+                    { row,   W * bpp },
+                    { &x0,  -4       },
+                    { &yval,-4       },
+                    { hc,   -8       },
+                    { rect, -16      },
                 };
                 run(ctx, W, buf);
             }
         }
 
+        void *tex_pixels;
+        int   tex_pitch;
+        if (!SDL_LockTexture(texture, NULL, &tex_pixels, &tex_pitch)) {
+            SDL_Log("SDL_LockTexture failed: %s", SDL_GetError());
+            break;
+        }
+
+        uint8_t *rows = (uint8_t*)tex_pixels;
+        for (int y = 0; y < H; y++) {
+            readback_row((uint32_t*)(rows + y * tex_pitch),
+                         (uint8_t*)pixbuf + y * W * bpp, W, cur_fmt);
+        }
+
         if (want_dump) {
-            stbi_write_png("screenshot.png", W, H, 4, tex_pixels, tex_pitch);
-            SDL_Log("saved screenshot.png");
+            float *fdata = malloc((size_t)(W * H) * 4 * sizeof(float));
+            for (int y = 0; y < H; y++) {
+                to_hdr_row(fdata + y * W * 4,
+                           (uint8_t*)pixbuf + y * W * bpp, W, cur_fmt);
+            }
+            stbi_write_hdr("dump.hdr", W, H, 4, fdata);
+            SDL_Log("saved dump.hdr (%s)", fmt_name[cur_fmt]);
+            free(fdata);
             want_dump = 0;
         }
 
@@ -335,10 +465,11 @@ int main(void) {
             fps = (double)fps_frames / elapsed;
             fps_frames = 0;
             fps_start  = now;
-            update_title(window, &slides[cur_slide], cur_backend, fps);
+            update_title(window, &slides[cur_slide], cur_backend, cur_fmt, fps);
         }
     }
 
+    free(pixbuf);
     text_cov_free(&bitmap_cov);
     text_cov_free(&sdf_cov);
     free_backends();

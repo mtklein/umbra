@@ -314,6 +314,66 @@ void umbra_store_8888(BB *bb, umbra_ptr ptr, umbra_i32 ix, umbra_color c) {
     umbra_store_8x4(bb, ptr, ix, ch);
 }
 
+umbra_color umbra_load_565(BB *bb, umbra_ptr ptr, umbra_i32 ix) {
+    umbra_i16 px = umbra_load_i16(bb, ptr, ix);
+    umbra_i16 r16 = umbra_shr_u16(bb, px, umbra_imm_i16(bb, 11));
+    umbra_i16 g16 = umbra_and_16(bb, umbra_shr_u16(bb, px, umbra_imm_i16(bb, 5)),
+                                      umbra_imm_i16(bb, 0x3f));
+    umbra_i16 b16 = umbra_and_16(bb, px, umbra_imm_i16(bb, 0x1f));
+    umbra_half inv31 = umbra_imm_half(bb, 0x2821);
+    umbra_half inv63 = umbra_imm_half(bb, 0x2410);
+    return (umbra_color){
+        umbra_mul_half(bb, umbra_half_from_i16(bb, r16), inv31),
+        umbra_mul_half(bb, umbra_half_from_i16(bb, g16), inv63),
+        umbra_mul_half(bb, umbra_half_from_i16(bb, b16), inv31),
+        umbra_imm_half(bb, 0x3c00),
+    };
+}
+
+void umbra_store_565(BB *bb, umbra_ptr ptr, umbra_i32 ix, umbra_color c) {
+    umbra_half s31   = umbra_imm_half(bb, 0x4fc0);
+    umbra_half s63   = umbra_imm_half(bb, 0x53e0);
+    umbra_half half_ = umbra_imm_half(bb, 0x3800);
+    umbra_i16 r = umbra_i16_from_half(bb, umbra_add_half(bb, umbra_mul_half(bb, c.r, s31), half_));
+    umbra_i16 g = umbra_i16_from_half(bb, umbra_add_half(bb, umbra_mul_half(bb, c.g, s63), half_));
+    umbra_i16 b = umbra_i16_from_half(bb, umbra_add_half(bb, umbra_mul_half(bb, c.b, s31), half_));
+    umbra_i16 px = umbra_or_16(bb, umbra_or_16(bb, umbra_shl_i16(bb, r, umbra_imm_i16(bb, 11)),
+                                                    umbra_shl_i16(bb, g, umbra_imm_i16(bb, 5))), b);
+    umbra_store_i16(bb, ptr, ix, px);
+}
+
+umbra_color umbra_load_1010102(BB *bb, umbra_ptr ptr, umbra_i32 ix) {
+    umbra_i32 px    = umbra_load_i32(bb, ptr, ix);
+    umbra_i32 m10   = umbra_imm_i32(bb, 0x3ff);
+    umbra_i32 r32   = umbra_and_32(bb, px, m10);
+    umbra_i32 g32   = umbra_and_32(bb, umbra_shr_u32(bb, px, umbra_imm_i32(bb, 10)), m10);
+    umbra_i32 b32   = umbra_and_32(bb, umbra_shr_u32(bb, px, umbra_imm_i32(bb, 20)), m10);
+    umbra_i32 a32   = umbra_shr_u32(bb, px, umbra_imm_i32(bb, 30));
+    umbra_half inv1023 = umbra_imm_half(bb, 0x1401);
+    umbra_half inv3    = umbra_imm_half(bb, 0x3555);
+    return (umbra_color){
+        umbra_mul_half(bb, umbra_half_from_i32(bb, r32), inv1023),
+        umbra_mul_half(bb, umbra_half_from_i32(bb, g32), inv1023),
+        umbra_mul_half(bb, umbra_half_from_i32(bb, b32), inv1023),
+        umbra_mul_half(bb, umbra_half_from_i32(bb, a32), inv3),
+    };
+}
+
+void umbra_store_1010102(BB *bb, umbra_ptr ptr, umbra_i32 ix, umbra_color c) {
+    umbra_half s1023 = umbra_imm_half(bb, 0x63fe);
+    umbra_half s3    = umbra_imm_half(bb, 0x4200);
+    umbra_half half_ = umbra_imm_half(bb, 0x3800);
+    umbra_i32 r = umbra_i32_from_half(bb, umbra_add_half(bb, umbra_mul_half(bb, c.r, s1023), half_));
+    umbra_i32 g = umbra_i32_from_half(bb, umbra_add_half(bb, umbra_mul_half(bb, c.g, s1023), half_));
+    umbra_i32 b = umbra_i32_from_half(bb, umbra_add_half(bb, umbra_mul_half(bb, c.b, s1023), half_));
+    umbra_i32 a = umbra_i32_from_half(bb, umbra_add_half(bb, umbra_mul_half(bb, c.a, s3),    half_));
+    umbra_i32 px = umbra_or_32(bb,
+        umbra_or_32(bb, r, umbra_shl_i32(bb, g, umbra_imm_i32(bb, 10))),
+        umbra_or_32(bb, umbra_shl_i32(bb, b, umbra_imm_i32(bb, 20)),
+                         umbra_shl_i32(bb, a, umbra_imm_i32(bb, 30))));
+    umbra_store_i32(bb, ptr, ix, px);
+}
+
 umbra_color umbra_load_fp16(BB *bb, umbra_ptr ptr, umbra_i32 ix) {
     umbra_i32 ix4 = umbra_shl_i32(bb, ix, umbra_imm_i32(bb, 2));
     return (umbra_color){
