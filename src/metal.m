@@ -8,6 +8,8 @@ struct umbra_metal* umbra_metal(struct umbra_basic_block const *bb) { (void)bb; 
 void umbra_metal_run(struct umbra_metal *m, int n, umbra_buf buf[]) {
     (void)m; (void)n; (void)buf;
 }
+void umbra_metal_begin_batch(struct umbra_metal *m) { (void)m; }
+void umbra_metal_flush(struct umbra_metal *m) { (void)m; }
 void umbra_metal_free(struct umbra_metal *m) { (void)m; }
 void umbra_metal_dump(struct umbra_metal const *m, FILE *f) { (void)m; (void)f; }
 
@@ -19,6 +21,12 @@ void umbra_metal_dump(struct umbra_metal const *m, FILE *f) { (void)m; (void)f; 
 #include <stdlib.h>
 
 typedef struct umbra_basic_block BB;
+
+struct copyback {
+    void *host;
+    void *mtlbuf;
+    long  bytes;
+};
 
 struct umbra_metal {
     void *device;
@@ -34,6 +42,13 @@ struct umbra_metal {
     int   tg_size;
     int   n_deref;
     struct { int buf_idx, src_buf, byte_off; } deref[8];
+
+    void           *batch_cmdbuf;
+    void           *batch_enc;
+    void          **batch_bufs;
+    int             batch_nbufs, batch_bufs_cap;
+    struct copyback *batch_copy;
+    int             batch_ncopy, batch_copy_cap;
 };
 
 typedef struct {
@@ -548,31 +563,61 @@ struct umbra_metal* umbra_metal(BB const *bb) {
     }
 }
 
-void umbra_metal_run(struct umbra_metal *m, int n, umbra_buf buf[]) {
-    if (!m || n <= 0) { return; }
+static void batch_retain_buf(struct umbra_metal *m, void *retained) {
+    if (m->batch_nbufs >= m->batch_bufs_cap) {
+        m->batch_bufs_cap = m->batch_bufs_cap ? 2 * m->batch_bufs_cap : 64;
+        m->batch_bufs = realloc(m->batch_bufs, (size_t)m->batch_bufs_cap * sizeof(void*));
+    }
+    m->batch_bufs[m->batch_nbufs++] = retained;
+}
 
-    @autoreleasepool {
-        id<MTLDevice> device = (__bridge id<MTLDevice>)m->device;
-        id<MTLComputePipelineState> pipeline = (__bridge id<MTLComputePipelineState>)m->pipeline;
-        id<MTLCommandQueue> queue = (__bridge id<MTLCommandQueue>)m->queue;
-        id<MTLBuffer> n_buf = (__bridge id<MTLBuffer>)m->n_buf;
+static void batch_add_copy(struct umbra_metal *m, void *host, void *raw_ptr, long bytes) {
+    if (m->batch_ncopy >= m->batch_copy_cap) {
+        m->batch_copy_cap = m->batch_copy_cap ? 2 * m->batch_copy_cap : 64;
+        m->batch_copy = realloc(m->batch_copy, (size_t)m->batch_copy_cap * sizeof(struct copyback));
+    }
+    m->batch_copy[m->batch_ncopy++] = (struct copyback){host, raw_ptr, bytes};
+}
 
-        id<MTLBuffer> sz_buf = (__bridge id<MTLBuffer>)m->sz_buf;
+static void encode_dispatch(struct umbra_metal *m, int n, umbra_buf buf[],
+                            id<MTLComputeCommandEncoder> enc, _Bool batching) {
+    id<MTLDevice> device = (__bridge id<MTLDevice>)m->device;
 
-        *(uint32_t*)n_buf.contents = (uint32_t)n;
-
-        uint32_t *szs = (uint32_t*)sz_buf.contents;
-        __builtin_memset(szs, 0, 16 * sizeof(uint32_t));
-        for (int i = 0; i <= m->max_ptr; i++) {
-            if (buf[i].ptr && buf[i].sz) {
-                long bytes = buf[i].sz < 0 ? -buf[i].sz : buf[i].sz;
-                szs[i] = (uint32_t)bytes;
-            }
-        }
-
-        for (int i = 0; i <= m->max_ptr; i++) {
-            if (!buf[i].ptr || !buf[i].sz) { continue; }
+    uint32_t szs_data[16] = {0};
+    for (int i = 0; i <= m->max_ptr; i++) {
+        if (buf[i].ptr && buf[i].sz) {
             long bytes = buf[i].sz < 0 ? -buf[i].sz : buf[i].sz;
+            szs_data[i] = (uint32_t)bytes;
+        }
+    }
+
+    id<MTLBuffer> per_n = nil;
+    id<MTLBuffer> per_bufs[16] = {0};
+
+    if (batching) {
+        uint32_t n32 = (uint32_t)n;
+        per_n = [device newBufferWithBytes:&n32
+                                    length:sizeof n32
+                                   options:MTLResourceStorageModeShared];
+        batch_retain_buf(m, (__bridge_retained void*)per_n);
+    } else {
+        per_n = (__bridge id<MTLBuffer>)m->n_buf;
+        *(uint32_t*)per_n.contents = (uint32_t)n;
+    }
+
+    for (int i = 0; i <= m->max_ptr; i++) {
+        if (!buf[i].ptr || !buf[i].sz) { continue; }
+        long bytes = buf[i].sz < 0 ? -buf[i].sz : buf[i].sz;
+        if (batching) {
+            per_bufs[i] = [device newBufferWithBytes:buf[i].ptr
+                                              length:(NSUInteger)bytes
+                                             options:MTLResourceStorageModeShared];
+            void *retained = (__bridge_retained void*)per_bufs[i];
+            batch_retain_buf(m, retained);
+            if (buf[i].sz > 0) {
+                batch_add_copy(m, buf[i].ptr, retained, buf[i].sz);
+            }
+        } else {
             if (bytes > m->buf_cap[i]) {
                 if (m->bufs[i]) { (void)(__bridge_transfer id)m->bufs[i]; }
                 m->buf_cap[i] = bytes;
@@ -580,17 +625,30 @@ void umbra_metal_run(struct umbra_metal *m, int n, umbra_buf buf[]) {
                                                       options:MTLResourceStorageModeShared];
                 m->bufs[i] = (__bridge_retained void*)b;
             }
-            __builtin_memcpy(((__bridge id<MTLBuffer>)m->bufs[i]).contents, buf[i].ptr, (size_t)bytes);
+            __builtin_memcpy(((__bridge id<MTLBuffer>)m->bufs[i]).contents,
+                             buf[i].ptr, (size_t)bytes);
+            per_bufs[i] = (__bridge id<MTLBuffer>)m->bufs[i];
         }
+    }
 
-        for (int d = 0; d < m->n_deref; d++) {
-            void *base = buf[m->deref[d].src_buf].ptr;
-            void *derived;
-            long  dsz;
-            __builtin_memcpy(&derived, (char*)base + m->deref[d].byte_off, sizeof derived);
-            __builtin_memcpy(&dsz,     (char*)base + m->deref[d].byte_off + 8, sizeof dsz);
-            long bytes = dsz < 0 ? -dsz : dsz;
-            int bi = m->deref[d].buf_idx;
+    for (int d = 0; d < m->n_deref; d++) {
+        void *base = buf[m->deref[d].src_buf].ptr;
+        void *derived;
+        long  dsz;
+        __builtin_memcpy(&derived, (char*)base + m->deref[d].byte_off, sizeof derived);
+        __builtin_memcpy(&dsz,     (char*)base + m->deref[d].byte_off + 8, sizeof dsz);
+        long bytes = dsz < 0 ? -dsz : dsz;
+        int bi = m->deref[d].buf_idx;
+        if (batching) {
+            per_bufs[bi] = [device newBufferWithBytes:derived
+                                               length:(NSUInteger)bytes
+                                              options:MTLResourceStorageModeShared];
+            void *retained = (__bridge_retained void*)per_bufs[bi];
+            batch_retain_buf(m, retained);
+            if (dsz > 0) {
+                batch_add_copy(m, derived, retained, dsz);
+            }
+        } else {
             if (bytes > m->buf_cap[bi]) {
                 if (m->bufs[bi]) { (void)(__bridge_transfer id)m->bufs[bi]; }
                 m->buf_cap[bi] = bytes;
@@ -598,32 +656,68 @@ void umbra_metal_run(struct umbra_metal *m, int n, umbra_buf buf[]) {
                                                       options:MTLResourceStorageModeShared];
                 m->bufs[bi] = (__bridge_retained void*)b;
             }
-            __builtin_memcpy(((__bridge id<MTLBuffer>)m->bufs[bi]).contents, derived, (size_t)bytes);
-            szs[bi] = (uint32_t)bytes;
+            __builtin_memcpy(((__bridge id<MTLBuffer>)m->bufs[bi]).contents,
+                             derived, (size_t)bytes);
+            per_bufs[bi] = (__bridge id<MTLBuffer>)m->bufs[bi];
         }
+        szs_data[bi] = (uint32_t)bytes;
+    }
+
+    id<MTLBuffer> per_sz;
+    if (batching) {
+        per_sz = [device newBufferWithBytes:szs_data
+                                    length:sizeof szs_data
+                                   options:MTLResourceStorageModeShared];
+        batch_retain_buf(m, (__bridge_retained void*)per_sz);
+    } else {
+        per_sz = (__bridge id<MTLBuffer>)m->sz_buf;
+        __builtin_memcpy(per_sz.contents, szs_data, sizeof szs_data);
+    }
+
+    [enc setBuffer:per_n offset:0 atIndex:0];
+    for (int i = 0; i < m->total_bufs; i++) {
+        if (per_bufs[i]) {
+            [enc setBuffer:per_bufs[i] offset:0 atIndex:(NSUInteger)(i + 1)];
+        }
+    }
+    [enc setBuffer:per_sz offset:0 atIndex:(NSUInteger)(m->total_bufs + 1)];
+
+    MTLSize grid  = MTLSizeMake((NSUInteger)n, 1, 1);
+    MTLSize group = MTLSizeMake((NSUInteger)m->tg_size, 1, 1);
+    [enc dispatchThreads:grid threadsPerThreadgroup:group];
+}
+
+void umbra_metal_run(struct umbra_metal *m, int n, umbra_buf buf[]) {
+    if (!m || n <= 0) { return; }
+
+    if (m->batch_cmdbuf) {
+        @autoreleasepool {
+            id<MTLComputeCommandEncoder> enc =
+                (__bridge id<MTLComputeCommandEncoder>)m->batch_enc;
+            encode_dispatch(m, n, buf, enc, 1);
+        }
+        return;
+    }
+
+    @autoreleasepool {
+        id<MTLCommandQueue> queue = (__bridge id<MTLCommandQueue>)m->queue;
 
         id<MTLCommandBuffer> cmdbuf = [queue commandBufferWithUnretainedReferences];
         id<MTLComputeCommandEncoder> enc = [cmdbuf computeCommandEncoder];
-        [enc setComputePipelineState:pipeline];
-        [enc setBuffer:n_buf offset:0 atIndex:0];
-        for (int i = 0; i < m->total_bufs; i++) {
-            if (m->bufs[i]) {
-                [enc setBuffer:(__bridge id<MTLBuffer>)m->bufs[i]
-                        offset:0 atIndex:(NSUInteger)(i + 1)];
-            }
-        }
-        [enc setBuffer:sz_buf offset:0 atIndex:(NSUInteger)(m->total_bufs + 1)];
+        [enc setComputePipelineState:
+            (__bridge id<MTLComputePipelineState>)m->pipeline];
 
-        MTLSize grid = MTLSizeMake((NSUInteger)n, 1, 1);
-        MTLSize group = MTLSizeMake((NSUInteger)m->tg_size, 1, 1);
-        [enc dispatchThreads:grid threadsPerThreadgroup:group];
+        encode_dispatch(m, n, buf, enc, 0);
+
         [enc endEncoding];
         [cmdbuf commit];
         [cmdbuf waitUntilCompleted];
 
         for (int i = 0; i <= m->max_ptr; i++) {
             if (!buf[i].ptr || !m->bufs[i] || buf[i].sz <= 0) { continue; }
-            __builtin_memcpy(buf[i].ptr, ((__bridge id<MTLBuffer>)m->bufs[i]).contents, (size_t)buf[i].sz);
+            __builtin_memcpy(buf[i].ptr,
+                             ((__bridge id<MTLBuffer>)m->bufs[i]).contents,
+                             (size_t)buf[i].sz);
         }
 
         for (int d = 0; d < m->n_deref; d++) {
@@ -634,13 +728,57 @@ void umbra_metal_run(struct umbra_metal *m, int n, umbra_buf buf[]) {
             void *derived;
             __builtin_memcpy(&derived, (char*)base + m->deref[d].byte_off, sizeof derived);
             int bi = m->deref[d].buf_idx;
-            __builtin_memcpy(derived, ((__bridge id<MTLBuffer>)m->bufs[bi]).contents, (size_t)dsz);
+            __builtin_memcpy(derived,
+                             ((__bridge id<MTLBuffer>)m->bufs[bi]).contents,
+                             (size_t)dsz);
         }
+    }
+}
+
+void umbra_metal_begin_batch(struct umbra_metal *m) {
+    if (!m || m->batch_cmdbuf) { return; }
+    @autoreleasepool {
+        id<MTLCommandQueue> queue = (__bridge id<MTLCommandQueue>)m->queue;
+        id<MTLCommandBuffer> cmdbuf = [queue commandBufferWithUnretainedReferences];
+        id<MTLComputeCommandEncoder> enc = [cmdbuf computeCommandEncoder];
+        [enc setComputePipelineState:
+            (__bridge id<MTLComputePipelineState>)m->pipeline];
+        m->batch_cmdbuf = (__bridge_retained void*)cmdbuf;
+        m->batch_enc    = (__bridge_retained void*)enc;
+    }
+}
+
+void umbra_metal_flush(struct umbra_metal *m) {
+    if (!m || !m->batch_cmdbuf) { return; }
+    @autoreleasepool {
+        id<MTLComputeCommandEncoder> enc =
+            (__bridge_transfer id<MTLComputeCommandEncoder>)m->batch_enc;
+        id<MTLCommandBuffer> cmdbuf =
+            (__bridge_transfer id<MTLCommandBuffer>)m->batch_cmdbuf;
+        m->batch_enc    = NULL;
+        m->batch_cmdbuf = NULL;
+
+        [enc endEncoding];
+        [cmdbuf commit];
+        [cmdbuf waitUntilCompleted];
+
+        for (int i = 0; i < m->batch_ncopy; i++) {
+            struct copyback *c = &m->batch_copy[i];
+            id<MTLBuffer> mtlbuf = (__bridge id<MTLBuffer>)c->mtlbuf;
+            __builtin_memcpy(c->host, mtlbuf.contents, (size_t)c->bytes);
+        }
+        m->batch_ncopy = 0;
+
+        for (int i = 0; i < m->batch_nbufs; i++) {
+            (void)(__bridge_transfer id)m->batch_bufs[i];
+        }
+        m->batch_nbufs = 0;
     }
 }
 
 void umbra_metal_free(struct umbra_metal *m) {
     if (!m) { return; }
+    umbra_metal_flush(m);
     @autoreleasepool {
         if (m->device)   { (void)(__bridge_transfer id)m->device; }
         if (m->pipeline) { (void)(__bridge_transfer id)m->pipeline; }
@@ -651,6 +789,8 @@ void umbra_metal_free(struct umbra_metal *m) {
             if (m->bufs[p]) { (void)(__bridge_transfer id)m->bufs[p]; }
         }
     }
+    free(m->batch_bufs);
+    free(m->batch_copy);
     free(m->src);
     free(m);
 }

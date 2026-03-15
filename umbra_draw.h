@@ -28,6 +28,9 @@ umbra_color umbra_shader_radial_2   (struct umbra_basic_block*, umbra_f32 x, umb
 umbra_color umbra_shader_linear_grad(struct umbra_basic_block*, umbra_f32 x, umbra_f32 y);
 umbra_color umbra_shader_radial_grad(struct umbra_basic_block*, umbra_f32 x, umbra_f32 y);
 
+umbra_color umbra_supersample(struct umbra_basic_block*, umbra_f32 x, umbra_f32 y,
+                              umbra_shader_fn inner, int n);
+
 void umbra_gradient_lut_even(__fp16 *out, int lut_n,
                              int n_stops, __fp16 const colors[][4]);
 void umbra_gradient_lut(__fp16 *out, int lut_n,

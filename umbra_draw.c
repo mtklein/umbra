@@ -6,6 +6,8 @@ typedef struct umbra_basic_block BB;
 
 #define imm(bb,v) umbra_imm_i32(bb, (uint32_t)(v))
 
+static uint32_t f2b(float f) { union { float f; uint32_t u; } v = {.f=f}; return v.u; }
+
 struct umbra_basic_block* umbra_draw_build(umbra_shader_fn   shader,
                                            umbra_coverage_fn coverage,
                                            umbra_blend_fn    blend,
@@ -185,6 +187,48 @@ umbra_color umbra_shader_radial_grad(BB *bb, umbra_f32 x, umbra_f32 y) {
     int lut_off = umbra_reserve_ptr(bb);
     umbra_ptr lut = umbra_deref_ptr(bb, (umbra_ptr){1}, lut_off);
     return sample_lut_(bb, radial_t_(bb, fi, x, y), fi, lut);
+}
+
+umbra_color umbra_supersample(BB *bb, umbra_f32 x, umbra_f32 y,
+                              umbra_shader_fn inner, int n) {
+    static float const jitter[][2] = {
+        {-0.375f, -0.125f}, { 0.125f, -0.375f},
+        { 0.375f,  0.125f}, {-0.125f,  0.375f},
+        {-0.250f,  0.375f}, { 0.250f, -0.250f},
+        { 0.375f,  0.250f}, {-0.375f, -0.250f},
+    };
+    if (n < 1) { n = 1; }
+    if (n > 8) { n = 8; }
+
+    int saved = umbra_uni_len(bb);
+    umbra_color sum = inner(bb, x, y);
+
+    for (int s = 1; s < n; s++) {
+        umbra_set_uni_len(bb, saved);
+        umbra_f32 sx = umbra_add_f32(bb, x, umbra_imm_f32(bb, f2b(jitter[s-1][0])));
+        umbra_f32 sy = umbra_add_f32(bb, y, umbra_imm_f32(bb, f2b(jitter[s-1][1])));
+        umbra_color c = inner(bb, sx, sy);
+        sum.r = umbra_add_half(bb, sum.r, c.r);
+        sum.g = umbra_add_half(bb, sum.g, c.g);
+        sum.b = umbra_add_half(bb, sum.b, c.b);
+        sum.a = umbra_add_half(bb, sum.a, c.a);
+    }
+
+    uint16_t inv_bits = n == 1 ? 0x3c00
+                      : n == 2 ? 0x3800
+                      : n == 3 ? 0x3555
+                      : n == 4 ? 0x3400
+                      : n == 5 ? 0x3266
+                      : n == 6 ? 0x3155
+                      : n == 7 ? 0x3092
+                      :          0x3000;
+    umbra_half inv = umbra_imm_half(bb, inv_bits);
+    return (umbra_color){
+        umbra_mul_half(bb, sum.r, inv),
+        umbra_mul_half(bb, sum.g, inv),
+        umbra_mul_half(bb, sum.b, inv),
+        umbra_mul_half(bb, sum.a, inv),
+    };
 }
 
 umbra_color umbra_blend_src(BB *bb, umbra_color src, umbra_color dst) {
@@ -506,19 +550,19 @@ umbra_transfer const umbra_transfer_gamma22 = {
     .g = 2.2f,
 };
 
-static float tf_apply_scalar(umbra_transfer const *tf, float x) {
-    if (x < tf->d) { return tf->c * x + tf->f; }
-    return powf(tf->a * x + tf->b, 1.0f / tf->g) + tf->e;
+static float tf_invert_scalar(umbra_transfer const *tf, float x) {
+    if (x >= tf->d) { return powf(tf->a * x + tf->b, tf->g) + tf->e; }
+    return tf->c * x + tf->f;
 }
 
-static float tf_invert_scalar(umbra_transfer const *tf, float x) {
-    float threshold = tf->c * tf->d + tf->f;
-    if (x < threshold) {
-        if (tf->c <= 0) { return 0; }
-        return (x - tf->f) / tf->c;
+static float tf_apply_scalar(umbra_transfer const *tf, float y) {
+    float lin_thresh = tf->c * tf->d + tf->f;
+    if (y >= lin_thresh) {
+        if (tf->a <= 0) { return 0; }
+        return (powf(y - tf->e, 1.0f / tf->g) - tf->b) / tf->a;
     }
-    if (tf->a <= 0) { return 0; }
-    return (powf(x - tf->e, tf->g) - tf->b) / tf->a;
+    if (tf->c <= 0) { return 0; }
+    return (y - tf->f) / tf->c;
 }
 
 void umbra_transfer_lut_invert(float out[256], umbra_transfer const *tf) {
@@ -571,8 +615,6 @@ static void fit_pow_poly(float gamma, float coeffs[POLY_DEG + 1]) {
     for (int i = 0; i < D; i++) { coeffs[i] = (float)atb[i]; }
 }
 
-static uint32_t f2b(float f) { union { float f; uint32_t u; } v = {.f=f}; return v.u; }
-
 static umbra_f32 eval_poly(BB *bb, umbra_f32 x, float const coeffs[POLY_DEG + 1]) {
     umbra_f32 r = umbra_imm_f32(bb, f2b(coeffs[POLY_DEG]));
     for (int i = POLY_DEG - 1; i >= 0; i--) {
@@ -581,69 +623,54 @@ static umbra_f32 eval_poly(BB *bb, umbra_f32 x, float const coeffs[POLY_DEG + 1]
     return r;
 }
 
-static umbra_f32 transfer_channel(BB *bb, umbra_f32 x,
-                                  float threshold, float lin_scale, float lin_off,
-                                  float a, float b, float e,
-                                  float const poly[POLY_DEG + 1]) {
-    umbra_f32 zero = umbra_imm_f32(bb, 0);
-    umbra_f32 one  = umbra_imm_f32(bb, 0x3f800000);
-    umbra_f32 xc   = umbra_min_f32(bb, umbra_max_f32(bb, x, zero), one);
+umbra_color umbra_transfer_invert(BB *bb, umbra_color c, umbra_transfer const *tf) {
+    float poly[POLY_DEG + 1];
+    fit_pow_poly(tf->g, poly);
 
-    umbra_f32 lin = umbra_add_f32(bb, umbra_mul_f32(bb, xc, umbra_imm_f32(bb, f2b(lin_scale))),
-                                       umbra_imm_f32(bb, f2b(lin_off)));
+    for (int ch = 0; ch < 3; ch++) {
+        umbra_half *h = ch == 0 ? &c.r : ch == 1 ? &c.g : &c.b;
+        umbra_f32 x = clamp01(bb, umbra_f32_from_half(bb, *h));
 
-    umbra_f32 t   = umbra_add_f32(bb, umbra_mul_f32(bb, xc, umbra_imm_f32(bb, f2b(a))),
-                                       umbra_imm_f32(bb, f2b(b)));
-    t = umbra_max_f32(bb, t, zero);
-    umbra_f32 cur = umbra_add_f32(bb, eval_poly(bb, t, poly), umbra_imm_f32(bb, f2b(e)));
+        umbra_f32 lin = umbra_add_f32(bb,
+            umbra_mul_f32(bb, x, umbra_imm_f32(bb, f2b(tf->c))),
+            umbra_imm_f32(bb, f2b(tf->f)));
 
-    umbra_i32 mask = umbra_ge_f32(bb, xc, umbra_imm_f32(bb, f2b(threshold)));
-    return umbra_sel_f32(bb, mask, cur, lin);
+        umbra_f32 t = umbra_add_f32(bb,
+            umbra_mul_f32(bb, x, umbra_imm_f32(bb, f2b(tf->a))),
+            umbra_imm_f32(bb, f2b(tf->b)));
+        t = umbra_max_f32(bb, t, umbra_imm_f32(bb, 0));
+        umbra_f32 cur = umbra_add_f32(bb, eval_poly(bb, t, poly),
+                                           umbra_imm_f32(bb, f2b(tf->e)));
+
+        umbra_i32 mask = umbra_ge_f32(bb, x, umbra_imm_f32(bb, f2b(tf->d)));
+        *h = umbra_half_from_f32(bb, umbra_sel_f32(bb, mask, cur, lin));
+    }
+    return c;
 }
 
 umbra_color umbra_transfer_apply(BB *bb, umbra_color c, umbra_transfer const *tf) {
     float poly[POLY_DEG + 1];
     fit_pow_poly(1.0f / tf->g, poly);
 
-    for (int ch = 0; ch < 3; ch++) {
-        umbra_half *h = ch == 0 ? &c.r : ch == 1 ? &c.g : &c.b;
-        umbra_f32 x = umbra_f32_from_half(bb, *h);
-        umbra_f32 r = transfer_channel(bb, x, tf->d, tf->c, tf->f, tf->a, tf->b, tf->e, poly);
-        *h = umbra_half_from_f32(bb, r);
-    }
-    return c;
-}
-
-umbra_color umbra_transfer_invert(BB *bb, umbra_color c, umbra_transfer const *tf) {
-    float poly[POLY_DEG + 1];
-    fit_pow_poly(tf->g, poly);
-
-    float threshold = tf->c * tf->d + tf->f;
+    float lin_thresh = tf->c * tf->d + tf->f;
     float inv_c = tf->c > 0 ? 1.0f / tf->c : 0;
     float inv_a = tf->a > 0 ? 1.0f / tf->a : 0;
-    float neg_f_over_c = -tf->f * inv_c;
-    float neg_b_over_a = -tf->b * inv_a;
 
     for (int ch = 0; ch < 3; ch++) {
         umbra_half *h = ch == 0 ? &c.r : ch == 1 ? &c.g : &c.b;
-        umbra_f32 x = umbra_f32_from_half(bb, *h);
-        umbra_f32 zero = umbra_imm_f32(bb, 0);
-        umbra_f32 one  = umbra_imm_f32(bb, 0x3f800000);
-        umbra_f32 xc   = umbra_min_f32(bb, umbra_max_f32(bb, x, zero), one);
+        umbra_f32 y = clamp01(bb, umbra_f32_from_half(bb, *h));
 
-        umbra_f32 lin = umbra_add_f32(bb,
-            umbra_mul_f32(bb, xc, umbra_imm_f32(bb, f2b(inv_c))),
-            umbra_imm_f32(bb, f2b(neg_f_over_c)));
+        umbra_f32 lin = umbra_mul_f32(bb, umbra_sub_f32(bb, y,
+            umbra_imm_f32(bb, f2b(tf->f))), umbra_imm_f32(bb, f2b(inv_c)));
 
-        umbra_f32 t = umbra_sub_f32(bb, xc, umbra_imm_f32(bb, f2b(tf->e)));
-        t = umbra_max_f32(bb, t, zero);
-        umbra_f32 cur = umbra_add_f32(bb,
-            umbra_mul_f32(bb, eval_poly(bb, t, poly), umbra_imm_f32(bb, f2b(inv_a))),
-            umbra_imm_f32(bb, f2b(neg_b_over_a)));
+        umbra_f32 t = umbra_sub_f32(bb, y, umbra_imm_f32(bb, f2b(tf->e)));
+        t = umbra_max_f32(bb, t, umbra_imm_f32(bb, 0));
+        umbra_f32 cur = umbra_mul_f32(bb,
+            umbra_sub_f32(bb, eval_poly(bb, t, poly), umbra_imm_f32(bb, f2b(tf->b))),
+            umbra_imm_f32(bb, f2b(inv_a)));
 
-        umbra_i32 mask = umbra_ge_f32(bb, xc, umbra_imm_f32(bb, f2b(threshold)));
-        umbra_f32 r = umbra_sel_f32(bb, mask, cur, lin);
-        *h = umbra_half_from_f32(bb, r);
+        umbra_i32 mask = umbra_ge_f32(bb, y, umbra_imm_f32(bb, f2b(lin_thresh)));
+        *h = umbra_half_from_f32(bb, umbra_sel_f32(bb, mask, cur, lin));
     }
     return c;
 }

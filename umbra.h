@@ -19,6 +19,7 @@ int       umbra_reserve_half(struct umbra_basic_block*, int n);
 int       umbra_reserve_ptr (struct umbra_basic_block*);
 umbra_ptr umbra_deref_ptr   (struct umbra_basic_block*, umbra_ptr buf, int byte_off);
 int       umbra_uni_len    (struct umbra_basic_block const*);
+void      umbra_set_uni_len(struct umbra_basic_block*, int);
 
 umbra_i32       umbra_imm_i32      (struct umbra_basic_block*, unsigned int   bits);
 umbra_f32       umbra_imm_f32      (struct umbra_basic_block*, unsigned int   bits);
@@ -149,8 +150,10 @@ void umbra_jit_run (struct umbra_jit*, int n, umbra_buf[]);
 void umbra_jit_free(struct umbra_jit*);
 
 struct umbra_metal* umbra_metal(struct umbra_basic_block const*);
-void umbra_metal_run (struct umbra_metal*, int n, umbra_buf[]);
-void umbra_metal_free(struct umbra_metal*);
+void umbra_metal_run        (struct umbra_metal*, int n, umbra_buf[]);
+void umbra_metal_begin_batch(struct umbra_metal*);
+void umbra_metal_flush      (struct umbra_metal*);
+void umbra_metal_free       (struct umbra_metal*);
 
 #include <stdio.h>
 void umbra_basic_block_dump(struct umbra_basic_block const*, FILE*);

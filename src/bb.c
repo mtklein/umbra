@@ -127,7 +127,8 @@ umbra_ptr umbra_deref_ptr(BB *bb, umbra_ptr buf, int byte_off) {
     int id = push(bb, op_deref_ptr, .ptr=buf.ix, .imm=byte_off);
     return (umbra_ptr){~id};
 }
-int umbra_uni_len(BB const *bb) { return bb->uni_len; }
+int  umbra_uni_len    (BB const *bb) { return bb->uni_len; }
+void umbra_set_uni_len(BB *bb, int len) { bb->uni_len = len; }
 
 static int lane_plus_off(BB *bb, int ix) {
     if (bb->inst[ix].op != op_add_i32) { return -1; }

@@ -919,6 +919,160 @@ static void test_gradient_lut_nonuniform(void) {
     cleanup_draw(&B);
 }
 
+static void test_transfer_lut(void) {
+    float inv[256], fwd[256];
+    umbra_transfer_lut_invert(inv, &umbra_transfer_srgb);
+    umbra_transfer_lut_apply(fwd, &umbra_transfer_srgb);
+
+    (equiv(inv[0], 0.0f)) here;
+    (inv[255] >= 0.999f && inv[255] <= 1.001f) here;
+    (inv[128] > inv[64]) here;
+
+    (equiv(fwd[0], 0.0f)) here;
+    (fwd[255] >= 0.999f && fwd[255] <= 1.001f) here;
+    (fwd[128] > fwd[64]) here;
+
+    for (int i = 0; i < 256; i++) {
+        (inv[i] >= 0.0f && inv[i] <= 1.0f) here;
+        (fwd[i] >= 0.0f && fwd[i] <= 1.0f) here;
+    }
+}
+
+static umbra_color srgb_invert_shader(struct umbra_basic_block *bb, umbra_f32 x, umbra_f32 y) {
+    (void)x; (void)y;
+    int hi = umbra_reserve_half(bb, 4);
+    umbra_half r = umbra_load_half(bb, (umbra_ptr){1}, umbra_imm_i32(bb, (uint32_t)(hi+0)));
+    umbra_half g = umbra_load_half(bb, (umbra_ptr){1}, umbra_imm_i32(bb, (uint32_t)(hi+1)));
+    umbra_half b = umbra_load_half(bb, (umbra_ptr){1}, umbra_imm_i32(bb, (uint32_t)(hi+2)));
+    umbra_half a = umbra_load_half(bb, (umbra_ptr){1}, umbra_imm_i32(bb, (uint32_t)(hi+3)));
+    umbra_color c = {r, g, b, a};
+    return umbra_transfer_invert(bb, c, &umbra_transfer_srgb);
+}
+
+static void test_transfer_invert(void) {
+    draw_backends B = make_draw(umbra_draw_build(
+        srgb_invert_shader, NULL, umbra_blend_src, NULL, umbra_store_fp16, NULL));
+
+    for (int bi = 0; bi < 3; bi++) {
+        __fp16 dst[4*2];
+        __builtin_memset(dst, 0, sizeof dst);
+        __fp16 color0[4] = {(__fp16)0.5f, (__fp16)0.5f, (__fp16)0.5f, 1};
+        long long uni_[2] = {0}; char *uni = (char*)uni_;
+        uni_i32(uni, 0, 0);
+        uni_i32(uni, 4, 0);
+        uni_h4(uni, 8, color0);
+        if (!run_draw(&B, bi, 2, (umbra_buf[]){{dst,(long)sizeof dst},{uni,-16}})) { continue; }
+        for (int i = 0; i < 2; i++) {
+            float r = (float)dst[i*4+0];
+            float a = (float)dst[i*4+3];
+            (r >= 0.18f && r <= 0.26f) here;
+            (a >= 0.99f && a <= 1.01f) here;
+        }
+    }
+    cleanup_draw(&B);
+}
+
+static umbra_color srgb_apply_shader(struct umbra_basic_block *bb, umbra_f32 x, umbra_f32 y) {
+    (void)x; (void)y;
+    int hi = umbra_reserve_half(bb, 4);
+    umbra_half r = umbra_load_half(bb, (umbra_ptr){1}, umbra_imm_i32(bb, (uint32_t)(hi+0)));
+    umbra_half g = umbra_load_half(bb, (umbra_ptr){1}, umbra_imm_i32(bb, (uint32_t)(hi+1)));
+    umbra_half b = umbra_load_half(bb, (umbra_ptr){1}, umbra_imm_i32(bb, (uint32_t)(hi+2)));
+    umbra_half a = umbra_load_half(bb, (umbra_ptr){1}, umbra_imm_i32(bb, (uint32_t)(hi+3)));
+    umbra_color c = {r, g, b, a};
+    return umbra_transfer_apply(bb, c, &umbra_transfer_srgb);
+}
+
+static void test_transfer_apply(void) {
+    draw_backends B = make_draw(umbra_draw_build(
+        srgb_apply_shader, NULL, umbra_blend_src, NULL, umbra_store_fp16, NULL));
+
+    for (int bi = 0; bi < 3; bi++) {
+        __fp16 dst[4*2];
+        __builtin_memset(dst, 0, sizeof dst);
+        __fp16 color0[4] = {(__fp16)0.5f, (__fp16)0.5f, (__fp16)0.5f, 1};
+        long long uni_[2] = {0}; char *uni = (char*)uni_;
+        uni_i32(uni, 0, 0);
+        uni_i32(uni, 4, 0);
+        uni_h4(uni, 8, color0);
+        if (!run_draw(&B, bi, 2, (umbra_buf[]){{dst,(long)sizeof dst},{uni,-16}})) { continue; }
+        for (int i = 0; i < 2; i++) {
+            float r = (float)dst[i*4+0];
+            float a = (float)dst[i*4+3];
+            (r >= 0.73f && r <= 0.74f) here;
+            (a >= 0.99f && a <= 1.01f) here;
+        }
+    }
+    cleanup_draw(&B);
+}
+
+static umbra_color srgb_roundtrip_shader(struct umbra_basic_block *bb, umbra_f32 x, umbra_f32 y) {
+    (void)x; (void)y;
+    int hi = umbra_reserve_half(bb, 4);
+    umbra_half r = umbra_load_half(bb, (umbra_ptr){1}, umbra_imm_i32(bb, (uint32_t)(hi+0)));
+    umbra_half g = umbra_load_half(bb, (umbra_ptr){1}, umbra_imm_i32(bb, (uint32_t)(hi+1)));
+    umbra_half b = umbra_load_half(bb, (umbra_ptr){1}, umbra_imm_i32(bb, (uint32_t)(hi+2)));
+    umbra_half a = umbra_load_half(bb, (umbra_ptr){1}, umbra_imm_i32(bb, (uint32_t)(hi+3)));
+    umbra_color c = {r, g, b, a};
+    c = umbra_transfer_apply(bb, c, &umbra_transfer_srgb);
+    c = umbra_transfer_invert(bb, c, &umbra_transfer_srgb);
+    return c;
+}
+
+static void test_transfer_roundtrip(void) {
+    draw_backends B = make_draw(umbra_draw_build(
+        srgb_roundtrip_shader, NULL, umbra_blend_src, NULL, umbra_store_fp16, NULL));
+
+    for (int bi = 0; bi < 3; bi++) {
+        __fp16 dst[4*4];
+        __builtin_memset(dst, 0, sizeof dst);
+        __fp16 color0[4] = {(__fp16)0.25f, (__fp16)0.5f, (__fp16)0.75f, 1};
+        long long uni_[2] = {0}; char *uni = (char*)uni_;
+        uni_i32(uni, 0, 0);
+        uni_i32(uni, 4, 0);
+        uni_h4(uni, 8, color0);
+        if (!run_draw(&B, bi, 4, (umbra_buf[]){{dst,(long)sizeof dst},{uni,-16}})) { continue; }
+        for (int i = 0; i < 4; i++) {
+            float r = (float)dst[i*4+0];
+            float g = (float)dst[i*4+1];
+            float b = (float)dst[i*4+2];
+            float a = (float)dst[i*4+3];
+            (r >= 0.24f && r <= 0.26f) here;
+            (g >= 0.49f && g <= 0.51f) here;
+            (b >= 0.74f && b <= 0.76f) here;
+            (a >= 0.99f && a <= 1.01f) here;
+        }
+    }
+    cleanup_draw(&B);
+}
+
+static umbra_shader_fn ss_inner_;
+static int ss_n_;
+static umbra_color ss_shader_(struct umbra_basic_block *bb, umbra_f32 x, umbra_f32 y) {
+    return umbra_supersample(bb, x, y, ss_inner_, ss_n_);
+}
+
+static void test_supersample(void) {
+    ss_inner_ = umbra_shader_solid;
+    ss_n_ = 4;
+    draw_backends B = make_draw(umbra_draw_build(
+        ss_shader_, NULL, umbra_blend_src, umbra_load_8888, umbra_store_8888, NULL));
+
+    for (int bi = 0; bi < 3; bi++) {
+        uint32_t dst[4] = {0};
+        long long uni_[2] = {0};
+        char *uni = (char*)uni_;
+        __fp16 color[4] = {1, 0, 0, 1};
+        __builtin_memcpy(uni + 8, color, 8);
+        if (!run_draw(&B, bi, 4, (umbra_buf[]){{dst,4*4},{uni,-16}})) { continue; }
+        for (int i = 0; i < 4; i++) {
+            (( dst[i]        & 0xFF) >= 0xFE) here;
+            (((dst[i] >> 24) & 0xFF) >= 0xFE) here;
+        }
+    }
+    cleanup_draw(&B);
+}
+
 int main(void) {
     test_solid_src();
     test_solid_src_n1();
@@ -952,5 +1106,10 @@ int main(void) {
     test_linear_grad();
     test_radial_grad();
     test_gradient_lut_nonuniform();
+    test_supersample();
+    test_transfer_lut();
+    test_transfer_invert();
+    test_transfer_apply();
+    test_transfer_roundtrip();
     return 0;
 }

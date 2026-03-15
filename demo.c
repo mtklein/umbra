@@ -17,6 +17,9 @@ int main(void) { return 0; }
 #include <SDL3/SDL.h>
 #pragma clang diagnostic pop
 
+typedef struct umbra_basic_block BB;
+#define imm(bb,v) umbra_imm_i32(bb, (uint32_t)(v))
+
 enum { NUM_BACKENDS = 4 };
 static char const *backend_name[NUM_BACKENDS] = {"interp", "jit", "codegen", "metal"};
 
@@ -51,6 +54,86 @@ static umbra_load_fn   fmt_load[]  = {umbra_load_8888,  umbra_load_565,  umbra_l
 static umbra_store_fn  fmt_store[] = {umbra_store_8888, umbra_store_565, umbra_store_fp16, umbra_store_fp16_planar, umbra_store_1010102};
 static int             fmt_bpp[]   = {4,                2,               8,                2,                       4};
 
+typedef struct {
+    struct umbra_interpreter *interp;
+    struct umbra_jit         *jit;
+    void                     *ctx;
+    run_fn                    run;
+    int                       uni_len;
+    int                       pad_;
+} pipe;
+
+static pipe fill_pipe, readback_pipe, hdr_pipe;
+
+static void free_pipe(pipe *p) {
+    if (p->interp) { umbra_interpreter_free(p->interp); }
+    if (p->jit)    { umbra_jit_free(p->jit); }
+    *p = (pipe){0};
+}
+
+static void finish_pipe(pipe *p, BB *bb) {
+    umbra_basic_block_optimize(bb);
+    p->uni_len = umbra_uni_len(bb);
+    p->interp  = umbra_interpreter(bb);
+    p->jit     = umbra_jit(bb);
+    p->ctx     = p->jit ? (void*)p->jit : (void*)p->interp;
+    p->run     = p->jit ? run_jit        : run_interp;
+    umbra_basic_block_free(bb);
+}
+
+static void build_fill(int fmt) {
+    free_pipe(&fill_pipe);
+    BB *bb = umbra_basic_block();
+    umbra_i32 ix = umbra_lane(bb);
+    int hi = umbra_reserve_half(bb, 4);
+    umbra_color c = {
+        umbra_load_half(bb, (umbra_ptr){1}, imm(bb, hi+0)),
+        umbra_load_half(bb, (umbra_ptr){1}, imm(bb, hi+1)),
+        umbra_load_half(bb, (umbra_ptr){1}, imm(bb, hi+2)),
+        umbra_load_half(bb, (umbra_ptr){1}, imm(bb, hi+3)),
+    };
+    fmt_store[fmt](bb, (umbra_ptr){0}, ix, c);
+    finish_pipe(&fill_pipe, bb);
+}
+
+static void build_readback(int fmt) {
+    free_pipe(&readback_pipe);
+    BB *bb = umbra_basic_block();
+    umbra_i32 ix = umbra_lane(bb);
+    umbra_color c = fmt_load[fmt](bb, (umbra_ptr){0}, ix);
+    umbra_store_8888(bb, (umbra_ptr){2}, ix, c);
+    finish_pipe(&readback_pipe, bb);
+}
+
+static void build_hdr(int fmt) {
+    free_pipe(&hdr_pipe);
+    BB *bb = umbra_basic_block();
+    umbra_i32 ix = umbra_lane(bb);
+    umbra_color c = fmt_load[fmt](bb, (umbra_ptr){0}, ix);
+    umbra_f32 rf = umbra_f32_from_half(bb, c.r);
+    umbra_f32 gf = umbra_f32_from_half(bb, c.g);
+    umbra_f32 bf = umbra_f32_from_half(bb, c.b);
+    umbra_f32 af = umbra_f32_from_half(bb, c.a);
+    umbra_i32 ix4 = umbra_shl_i32(bb, ix, imm(bb, 2));
+    umbra_store_f32(bb, (umbra_ptr){2}, umbra_add_i32(bb, ix4, imm(bb, 0)), rf);
+    umbra_store_f32(bb, (umbra_ptr){2}, umbra_add_i32(bb, ix4, imm(bb, 1)), gf);
+    umbra_store_f32(bb, (umbra_ptr){2}, umbra_add_i32(bb, ix4, imm(bb, 2)), bf);
+    umbra_store_f32(bb, (umbra_ptr){2}, umbra_add_i32(bb, ix4, imm(bb, 3)), af);
+    finish_pipe(&hdr_pipe, bb);
+}
+
+static void build_pipes(int fmt) {
+    build_fill(fmt);
+    build_readback(fmt);
+    build_hdr(fmt);
+}
+
+static void free_pipes(void) {
+    free_pipe(&fill_pipe);
+    free_pipe(&readback_pipe);
+    free_pipe(&hdr_pipe);
+}
+
 static void uni_i32(char *u, int off, int32_t v) { __builtin_memcpy(u+off, &v, 4); }
 static void uni_h4 (char *u, int off, __fp16 const c[4]) { __builtin_memcpy(u+off, c, 8); }
 static void uni_h8 (char *u, int off, __fp16 const c[8]) { __builtin_memcpy(u+off, c, 16); }
@@ -65,7 +148,7 @@ static void build_slide_fmt(slide const *s, int fmt) {
     umbra_load_fn  load  = s->load  ? fmt_load[fmt]  : NULL;
     umbra_store_fn store = fmt_store[fmt];
 
-    struct umbra_basic_block *bb = umbra_draw_build(
+    BB *bb = umbra_draw_build(
         s->shader, s->coverage, s->blend, load, store, &draw_layout);
     umbra_basic_block_optimize(bb);
 
@@ -79,6 +162,8 @@ static void build_slide_fmt(slide const *s, int fmt) {
     backends[1] = jit;
     backends[2] = codegen;
     backends[3] = mtl;
+
+    build_pipes(fmt);
 }
 
 static int pick_backend(int cur) {
@@ -150,141 +235,49 @@ static void build_luts(void) {
     umbra_gradient_lut_even(radial_lut, LUT_N, 4, radial_stops);
 }
 
-static void fill_bg_row(void *dst, int n, uint32_t bg, int fmt, int stride) {
-    uint8_t r = (uint8_t)(bg >>  0);
-    uint8_t g = (uint8_t)(bg >>  8);
-    uint8_t b = (uint8_t)(bg >> 16);
-    uint8_t a = (uint8_t)(bg >> 24);
-    switch (fmt) {
-    case FMT_8888:
-        for (int i = 0; i < n; i++) { ((uint32_t*)dst)[i] = bg; }
-        break;
-    case FMT_565: {
-        uint16_t px = (uint16_t)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
-        for (int i = 0; i < n; i++) { ((uint16_t*)dst)[i] = px; }
-    } break;
-    case FMT_FP16: {
-        __fp16 hc[4] = {(__fp16)(r/255.0f), (__fp16)(g/255.0f),
-                        (__fp16)(b/255.0f), (__fp16)(a/255.0f)};
-        for (int i = 0; i < n; i++) { __builtin_memcpy((__fp16*)dst + i*4, hc, 8); }
-    } break;
-    case FMT_FP16P: {
-        __fp16 hr = (__fp16)(r/255.0f), hg = (__fp16)(g/255.0f);
-        __fp16 hb = (__fp16)(b/255.0f), ha = (__fp16)(a/255.0f);
-        __fp16 *p = dst;
-        for (int i = 0; i < n; i++) {
-            p[i]            = hr;
-            p[i + stride]   = hg;
-            p[i + stride*2] = hb;
-            p[i + stride*3] = ha;
-        }
-    } break;
-    case FMT_1010102: {
-        uint32_t px = ((uint32_t)(r * 1023 / 255))
-                    | ((uint32_t)(g * 1023 / 255) << 10)
-                    | ((uint32_t)(b * 1023 / 255) << 20)
-                    | ((uint32_t)(a * 3 / 255) << 30);
-        for (int i = 0; i < n; i++) { ((uint32_t*)dst)[i] = px; }
-    } break;
+static void fill_bg_row(void *dst, int n, uint32_t bg, long row_sz, int32_t stride) {
+    __fp16 hc[4] = {
+        (__fp16)(( bg        & 0xffu) / 255.0f),
+        (__fp16)(((bg >>  8) & 0xffu) / 255.0f),
+        (__fp16)(((bg >> 16) & 0xffu) / 255.0f),
+        (__fp16)(((bg >> 24) & 0xffu) / 255.0f),
+    };
+    long long uni_[4] = {0}; char *uni = (char*)uni_;
+    uni_h4(uni, 0, hc);
+    if (fill_pipe.uni_len > 8) {
+        uni_i32(uni, 8, stride);
     }
+    umbra_buf buf[] = {
+        { dst,  row_sz },
+        { uni, -(long)fill_pipe.uni_len },
+    };
+    fill_pipe.run(fill_pipe.ctx, n, buf);
 }
 
-static void readback_row(uint32_t *dst, void const *src, int n, int fmt, int stride) {
-    switch (fmt) {
-    case FMT_8888:
-        __builtin_memcpy(dst, src, (size_t)(n * 4));
-        break;
-    case FMT_565: {
-        uint16_t const *s = src;
-        for (int i = 0; i < n; i++) {
-            uint32_t ri = ((s[i] >> 11) & 0x1fu) * 255 / 31;
-            uint32_t gi = ((s[i] >>  5) & 0x3fu) * 255 / 63;
-            uint32_t bi = ( s[i]        & 0x1fu) * 255 / 31;
-            dst[i] = ri | (gi << 8) | (bi << 16) | 0xff000000u;
-        }
-    } break;
-    case FMT_FP16: {
-        __fp16 const *s = src;
-        for (int i = 0; i < n; i++) {
-            float rf = (float)s[i*4+0], gf = (float)s[i*4+1];
-            float bf = (float)s[i*4+2], af = (float)s[i*4+3];
-            if (rf < 0) { rf = 0; } if (rf > 1) { rf = 1; }
-            if (gf < 0) { gf = 0; } if (gf > 1) { gf = 1; }
-            if (bf < 0) { bf = 0; } if (bf > 1) { bf = 1; }
-            if (af < 0) { af = 0; } if (af > 1) { af = 1; }
-            dst[i] = (uint32_t)(rf*255+.5f) | ((uint32_t)(gf*255+.5f) << 8)
-                   | ((uint32_t)(bf*255+.5f) << 16) | ((uint32_t)(af*255+.5f) << 24);
-        }
-    } break;
-    case FMT_FP16P: {
-        __fp16 const *s = src;
-        for (int i = 0; i < n; i++) {
-            float rf = (float)s[i],            gf = (float)s[i + stride];
-            float bf = (float)s[i + stride*2], af = (float)s[i + stride*3];
-            if (rf < 0) { rf = 0; } if (rf > 1) { rf = 1; }
-            if (gf < 0) { gf = 0; } if (gf > 1) { gf = 1; }
-            if (bf < 0) { bf = 0; } if (bf > 1) { bf = 1; }
-            if (af < 0) { af = 0; } if (af > 1) { af = 1; }
-            dst[i] = (uint32_t)(rf*255+.5f) | ((uint32_t)(gf*255+.5f) << 8)
-                   | ((uint32_t)(bf*255+.5f) << 16) | ((uint32_t)(af*255+.5f) << 24);
-        }
-    } break;
-    case FMT_1010102: {
-        uint32_t const *s = src;
-        for (int i = 0; i < n; i++) {
-            uint32_t ri = ((s[i] >>  0) & 0x3ffu) * 255 / 1023;
-            uint32_t gi = ((s[i] >> 10) & 0x3ffu) * 255 / 1023;
-            uint32_t bi = ((s[i] >> 20) & 0x3ffu) * 255 / 1023;
-            uint32_t ai = ((s[i] >> 30) & 0x3u)   * 255 / 3;
-            dst[i] = ri | (gi << 8) | (bi << 16) | (ai << 24);
-        }
-    } break;
+static void readback_row(uint32_t *dst, void *src, int n, long src_sz, int32_t stride) {
+    long long uni_[2] = {0}; char *uni = (char*)uni_;
+    if (readback_pipe.uni_len > 0) {
+        uni_i32(uni, 0, stride);
     }
+    umbra_buf buf[] = {
+        { src,  -src_sz },
+        { uni,  -(long)readback_pipe.uni_len },
+        { dst,  (long)(n * 4) },
+    };
+    readback_pipe.run(readback_pipe.ctx, n, buf);
 }
 
-static void to_hdr_row(float *dst, void const *src, int n, int fmt, int stride) {
-    switch (fmt) {
-    case FMT_8888: {
-        uint8_t const *s = src;
-        for (int i = 0; i < n; i++) {
-            dst[i*4+0] = s[i*4+0] / 255.0f;
-            dst[i*4+1] = s[i*4+1] / 255.0f;
-            dst[i*4+2] = s[i*4+2] / 255.0f;
-            dst[i*4+3] = 1.0f;
-        }
-    } break;
-    case FMT_565: {
-        uint16_t const *s = src;
-        for (int i = 0; i < n; i++) {
-            dst[i*4+0] = ((s[i] >> 11) & 0x1f) / 31.0f;
-            dst[i*4+1] = ((s[i] >>  5) & 0x3f) / 63.0f;
-            dst[i*4+2] = ( s[i]        & 0x1f) / 31.0f;
-            dst[i*4+3] = 1.0f;
-        }
-    } break;
-    case FMT_FP16: {
-        __fp16 const *s = src;
-        for (int i = 0; i < n*4; i++) { dst[i] = (float)s[i]; }
-    } break;
-    case FMT_FP16P: {
-        __fp16 const *s = src;
-        for (int i = 0; i < n; i++) {
-            dst[i*4+0] = (float)s[i];
-            dst[i*4+1] = (float)s[i + stride];
-            dst[i*4+2] = (float)s[i + stride*2];
-            dst[i*4+3] = (float)s[i + stride*3];
-        }
-    } break;
-    case FMT_1010102: {
-        uint32_t const *s = src;
-        for (int i = 0; i < n; i++) {
-            dst[i*4+0] = ((s[i] >>  0) & 0x3ff) / 1023.0f;
-            dst[i*4+1] = ((s[i] >> 10) & 0x3ff) / 1023.0f;
-            dst[i*4+2] = ((s[i] >> 20) & 0x3ff) / 1023.0f;
-            dst[i*4+3] = ((s[i] >> 30) & 0x3)   / 3.0f;
-        }
-    } break;
+static void to_hdr_row(float *dst, void *src, int n, long src_sz, int32_t stride) {
+    long long uni_[2] = {0}; char *uni = (char*)uni_;
+    if (hdr_pipe.uni_len > 0) {
+        uni_i32(uni, 0, stride);
     }
+    umbra_buf buf[] = {
+        { src,  -src_sz },
+        { uni,  -(long)hdr_pipe.uni_len },
+        { dst,  (long)(n * 16) },
+    };
+    hdr_pipe.run(hdr_pipe.ctx, n, buf);
 }
 
 int main(void) {
@@ -385,11 +378,13 @@ int main(void) {
         long row_sz = planar ? (long)(W * H * 4) * 2 : (long)(W * bpp);
 
         for (int y = 0; y < H; y++) {
-            fill_bg_row(ROW(y), W, s->bg, cur_fmt, planar_stride);
+            fill_bg_row(ROW(y), W, s->bg, row_sz, planar_stride);
         }
 
         int uni_len = draw_layout.uni_len;
         int planar_strides = planar ? (s->load ? 2 : 1) : 0;
+
+        if (cur_backend == 3 && mtl) { umbra_metal_begin_batch(mtl); }
 
         if (s->coverage == umbra_coverage_bitmap_matrix) {
             persp_t += 0.016f;
@@ -493,6 +488,8 @@ int main(void) {
                 run(ctx, W, buf);
             }
         }
+
+        if (cur_backend == 3 && mtl) { umbra_metal_flush(mtl); }
         #undef ROW
 
         void *tex_pixels;
@@ -506,7 +503,7 @@ int main(void) {
         for (int y = 0; y < H; y++) {
             void *src = planar ? (void*)((__fp16*)pixbuf + y * W)
                                : (void*)((uint8_t*)pixbuf + y * W * bpp);
-            readback_row((uint32_t*)(rows + y * tex_pitch), src, W, cur_fmt, planar_stride);
+            readback_row((uint32_t*)(rows + y * tex_pitch), src, W, row_sz, planar_stride);
         }
 
         if (want_dump) {
@@ -514,7 +511,7 @@ int main(void) {
             for (int y = 0; y < H; y++) {
                 void *src = planar ? (void*)((__fp16*)pixbuf + y * W)
                                    : (void*)((uint8_t*)pixbuf + y * W * bpp);
-                to_hdr_row(fdata + y * W * 4, src, W, cur_fmt, planar_stride);
+                to_hdr_row(fdata + y * W * 4, src, W, row_sz, planar_stride);
             }
             stbi_write_hdr("dump.hdr", W, H, 4, fdata);
             SDL_Log("saved dump.hdr (%s)", fmt_name[cur_fmt]);
@@ -542,6 +539,7 @@ int main(void) {
     text_cov_free(&bitmap_cov);
     text_cov_free(&sdf_cov);
     free_backends();
+    free_pipes();
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
