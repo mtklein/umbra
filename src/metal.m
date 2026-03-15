@@ -466,7 +466,6 @@ struct umbra_metal* umbra_metal(BB const *bb) {
         m->n_buf    = (__bridge_retained void*)n_buf;
         m->src      = src;
         NSUInteger tg = pipeline.maxTotalThreadsPerThreadgroup;
-        if (tg > 256) { tg = 256; }
 
         m->max_ptr  = max_ptr;
         m->tg_size  = (int)tg;
