@@ -596,22 +596,20 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 int8_t rxh = hi(ra, inst->x);
                 int8_t ryh = hi(ra, inst->y);
                 for (int l = 0; l < 8; l++) {
+                    int ix_lane = l & 3;
                     int8_t ir = l < 4 ? rx : rxh;
-                    int lane = l & 3;
-                    uint32_t ix_imm5 = inst->op == op_scatter_32
-                        ? (uint32_t)(lane << 3) | 4
-                        : (uint32_t)(lane << 2) | 2;
+                    uint32_t ix_imm5 = (uint32_t)(ix_lane << 3) | 4;
                     put(c, 0x0e003c00u | (ix_imm5 << 16) | ((uint32_t)ir << 5) | (uint32_t)XT);
                     clamp_wt(c);
                     if (inst->op == op_scatter_32) {
                         int8_t vr = l < 4 ? ry : ryh;
-                        uint32_t v_imm5 = (uint32_t)(lane << 3) | 4;
+                        uint32_t v_imm5 = (uint32_t)(ix_lane << 3) | 4;
                         put(c, 0x0e003c00u | (v_imm5 << 16) | ((uint32_t)vr << 5) | (uint32_t)XH);
                         put(c, 0xb8206800u | ((uint32_t)XT << 16) | ((uint32_t)XP << 5) | (uint32_t)XH);
                     } else {
-                        uint32_t v_imm5 = (uint32_t)(lane << 2) | 2;
+                        uint32_t v_imm5 = (uint32_t)(l << 2) | 2;
                         put(c, 0x0e003c00u | (v_imm5 << 16) | ((uint32_t)ry << 5) | (uint32_t)XH);
-                        put(c, 0x78206800u | ((uint32_t)XT << 16) | ((uint32_t)XP << 5) | (uint32_t)XH);
+                        put(c, 0x78207800u | ((uint32_t)XT << 16) | ((uint32_t)XP << 5) | (uint32_t)XH);
                     }
                 }
             }

@@ -12,9 +12,11 @@ int main(void) { return 0; }
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Weverything"
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb/stb_image_write.h"
 #include <SDL3/SDL.h>
+#pragma clang diagnostic pop
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+#include "stb/stb_image_write.h"
 #pragma clang diagnostic pop
 
 typedef struct umbra_basic_block BB;

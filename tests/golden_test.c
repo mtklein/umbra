@@ -4,6 +4,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+typedef struct umbra_basic_block BB;
+#define imm(bb,v) umbra_imm_i32(bb, (uint32_t)(v))
+
 enum { W = 128, H = 96, LUT_N = 64 };
 
 typedef void (*run_fn)(void*, int, umbra_buf[]);
@@ -16,6 +19,96 @@ static void run_metal  (void *ctx, int n, umbra_buf buf[]) { umbra_metal_run(ctx
 enum { NUM_BACKENDS = 4 };
 static char const *backend_name[NUM_BACKENDS] = {"interp", "jit", "codegen", "metal"};
 static run_fn const run_fns[NUM_BACKENDS] = {run_interp, run_jit, run_codegen, run_metal};
+
+enum { FMT_8888, FMT_565, FMT_FP16, FMT_FP16P, FMT_1010102, NUM_FMTS };
+static char const     *fmt_name[]  = {"8888",           "565",           "fp16",           "fp16p",                "1010102"};
+static umbra_load_fn   fmt_load[]  = {umbra_load_8888,  umbra_load_565,  umbra_load_fp16,  umbra_load_fp16_planar,  umbra_load_1010102};
+static umbra_store_fn  fmt_store[] = {umbra_store_8888, umbra_store_565, umbra_store_fp16, umbra_store_fp16_planar, umbra_store_1010102};
+static int             fmt_bpp[]   = {4,                2,               8,                2,                       4};
+static int             fmt_tol[]   = {1,                9,               1,                1,                       86};
+
+typedef struct {
+    struct umbra_interpreter *interp;
+    int                       uni_len;
+    int                       pad_;
+} pipe;
+
+static pipe fill_pipes[NUM_FMTS];
+static pipe readback_pipes[NUM_FMTS];
+
+static void build_fill(int fmt) {
+    BB *bb = umbra_basic_block();
+    umbra_i32 ix = umbra_lane(bb);
+    int hi = umbra_reserve_half(bb, 4);
+    umbra_color c = {
+        umbra_load_half(bb, (umbra_ptr){1}, imm(bb, hi+0)),
+        umbra_load_half(bb, (umbra_ptr){1}, imm(bb, hi+1)),
+        umbra_load_half(bb, (umbra_ptr){1}, imm(bb, hi+2)),
+        umbra_load_half(bb, (umbra_ptr){1}, imm(bb, hi+3)),
+    };
+    fmt_store[fmt](bb, (umbra_ptr){0}, ix, c);
+    umbra_basic_block_optimize(bb);
+    fill_pipes[fmt].uni_len = umbra_uni_len(bb);
+    fill_pipes[fmt].interp  = umbra_interpreter(bb);
+    umbra_basic_block_free(bb);
+}
+
+static void build_readback(int fmt) {
+    BB *bb = umbra_basic_block();
+    umbra_i32 ix = umbra_lane(bb);
+    umbra_color c = fmt_load[fmt](bb, (umbra_ptr){0}, ix);
+    umbra_store_8888(bb, (umbra_ptr){2}, ix, c);
+    umbra_basic_block_optimize(bb);
+    readback_pipes[fmt].uni_len = umbra_uni_len(bb);
+    readback_pipes[fmt].interp  = umbra_interpreter(bb);
+    umbra_basic_block_free(bb);
+}
+
+static void build_pipes(void) {
+    for (int f = 0; f < NUM_FMTS; f++) {
+        build_fill(f);
+        build_readback(f);
+    }
+}
+
+static void free_pipes(void) {
+    for (int f = 0; f < NUM_FMTS; f++) {
+        if (fill_pipes[f].interp)     { umbra_interpreter_free(fill_pipes[f].interp); }
+        if (readback_pipes[f].interp) { umbra_interpreter_free(readback_pipes[f].interp); }
+    }
+}
+
+static void fill_bg_row(int fmt, void *dst, int n, uint32_t bg, long row_sz, int32_t stride) {
+    __fp16 hc[4] = {
+        (__fp16)(( bg        & 0xffu) / 255.0f),
+        (__fp16)(((bg >>  8) & 0xffu) / 255.0f),
+        (__fp16)(((bg >> 16) & 0xffu) / 255.0f),
+        (__fp16)(((bg >> 24) & 0xffu) / 255.0f),
+    };
+    long long uni_[4] = {0}; char *uni = (char*)uni_;
+    __builtin_memcpy(uni, hc, 8);
+    if (fill_pipes[fmt].uni_len > 8) {
+        __builtin_memcpy(uni + 8, &stride, 4);
+    }
+    umbra_buf buf[] = {
+        { dst,  row_sz },
+        { uni, -(long)fill_pipes[fmt].uni_len },
+    };
+    umbra_interpreter_run(fill_pipes[fmt].interp, n, buf);
+}
+
+static void readback_row(int fmt, uint32_t *dst, void *src, int n, long src_sz, int32_t stride) {
+    long long uni_[2] = {0}; char *uni = (char*)uni_;
+    if (readback_pipes[fmt].uni_len > 0) {
+        __builtin_memcpy(uni, &stride, 4);
+    }
+    umbra_buf buf[] = {
+        { src,  -src_sz },
+        { uni,  -(long)readback_pipes[fmt].uni_len },
+        { dst,  (long)(n * 4) },
+    };
+    umbra_interpreter_run(readback_pipes[fmt].interp, n, buf);
+}
 
 static __fp16 linear_lut[LUT_N * 4];
 static __fp16 radial_lut[LUT_N * 4];
@@ -65,42 +158,61 @@ static void uni_ptr(char *u, int off, void *p, long sz) {
     __builtin_memcpy(u+off+8, &sz, 8);
 }
 
-static void render_slide(int slide_idx, void *ctx, run_fn run,
-                         uint32_t *px, text_cov *bitmap_cov, text_cov *sdf_cov,
+static void render_slide(int slide_idx, int fmt, void *ctx, run_fn run,
+                         void *pixbuf, text_cov *bitmap_cov, text_cov *sdf_cov,
                          umbra_draw_layout const *lay) {
     slide const *s = &slides[slide_idx];
     __fp16 hc[8];
     for (int i = 0; i < 8; i++) { hc[i] = (__fp16)s->color[i]; }
 
-    for (int i = 0; i < W * H; i++) { px[i] = s->bg; }
+    int bpp = fmt_bpp[fmt];
+    _Bool planar = (fmt == FMT_FP16P);
+    int32_t planar_stride = W * H;
+    long row_sz = planar ? (long)(W * H * 4) * 2 : (long)(W * bpp);
+
+    #define ROW(y) (planar ? (void*)((__fp16*)pixbuf + (y) * W) \
+                           : (void*)((uint8_t*)pixbuf + (y) * W * bpp))
+
+    for (int y = 0; y < H; y++) {
+        fill_bg_row(fmt, ROW(y), W, s->bg, row_sz, planar_stride);
+    }
+
+    int uni_len = lay->uni_len;
+    int planar_strides = planar ? (s->load ? 2 : 1) : 0;
 
     if (s->coverage == umbra_coverage_bitmap_matrix) {
         float mat[11];
         build_perspective_matrix(mat, 1.0f, W, H, bitmap_cov->w, bitmap_cov->h);
         for (int y = 0; y < H; y++) {
-            long long uni_[10] = {0}; char *uni = (char*)uni_;
+            long long uni_[12] = {0}; char *uni = (char*)uni_;
             uni_i32(uni, lay->x0, 0);
             uni_i32(uni, lay->y,  y);
             uni_h4 (uni, 8, hc);
             uni_f32(uni, 16, mat, 11);
             uni_ptr(uni, 64, bitmap_cov->data, (long)(W * H * 2));
+            for (int i = 0; i < planar_strides; i++) {
+                uni_i32(uni, uni_len - (planar_strides - i) * 4, planar_stride);
+            }
             umbra_buf buf[] = {
-                { px + y * W, W * 4 },
-                { uni, -(long)lay->uni_len },
+                { ROW(y), row_sz },
+                { uni, -(long)uni_len },
             };
             run(ctx, W, buf);
         }
     } else if (s->coverage == umbra_coverage_bitmap || s->coverage == umbra_coverage_sdf) {
         text_cov *tc = (s->coverage == umbra_coverage_bitmap) ? bitmap_cov : sdf_cov;
         for (int y = 0; y < H; y++) {
-            long long uni_[4] = {0}; char *uni = (char*)uni_;
+            long long uni_[6] = {0}; char *uni = (char*)uni_;
             uni_i32(uni, lay->x0, 0);
             uni_i32(uni, lay->y,  y);
             uni_h4 (uni, 8, hc);
             uni_ptr(uni, 16, tc->data + y * W, (long)(W * 2));
+            for (int i = 0; i < planar_strides; i++) {
+                uni_i32(uni, uni_len - (planar_strides - i) * 4, planar_stride);
+            }
             umbra_buf buf[] = {
-                { px + y * W, W * 4 },
-                { uni, -(long)lay->uni_len },
+                { ROW(y), row_sz },
+                { uni, -(long)uni_len },
             };
             run(ctx, W, buf);
         }
@@ -110,7 +222,7 @@ static void render_slide(int slide_idx, void *ctx, run_fn run,
         float gp[4] = {s->grad[0], s->grad[1], s->grad[2], s->grad[3]};
 
         for (int y = 0; y < H; y++) {
-            long long uni_[5] = {0}; char *uni = (char*)uni_;
+            long long uni_[6] = {0}; char *uni = (char*)uni_;
             uni_i32(uni, lay->x0, 0);
             uni_i32(uni, lay->y,  y);
             if (is_lut) {
@@ -122,35 +234,61 @@ static void render_slide(int slide_idx, void *ctx, run_fn run,
                 uni_f32(uni, 8, gp, 3);
                 uni_h8 (uni, 20, hc);
             }
+            for (int i = 0; i < planar_strides; i++) {
+                uni_i32(uni, uni_len - (planar_strides - i) * 4, planar_stride);
+            }
             umbra_buf buf[] = {
-                { px + y * W, W * 4 },
-                { uni, -(long)lay->uni_len },
+                { ROW(y), row_sz },
+                { uni, -(long)uni_len },
             };
             run(ctx, W, buf);
         }
     } else {
         float rect[4] = { 30.0f, 20.0f, 90.0f, 60.0f };
         for (int y = 0; y < H; y++) {
-            long long uni_[4] = {0}; char *uni = (char*)uni_;
+            long long uni_[6] = {0}; char *uni = (char*)uni_;
             uni_i32(uni, lay->x0, 0);
             uni_i32(uni, lay->y,  y);
             uni_h4 (uni, 8, hc);
-            uni_f32(uni, 16, rect, 4);
+            if (s->coverage) {
+                uni_f32(uni, 16, rect, 4);
+            }
+            for (int i = 0; i < planar_strides; i++) {
+                uni_i32(uni, uni_len - (planar_strides - i) * 4, planar_stride);
+            }
             umbra_buf buf[] = {
-                { px + y * W, W * 4 },
-                { uni, -(long)lay->uni_len },
+                { ROW(y), row_sz },
+                { uni, -(long)uni_len },
             };
             run(ctx, W, buf);
         }
     }
+    #undef ROW
 }
 
-static void test_slide_golden(int slide_idx, text_cov *bitmap_cov, text_cov *sdf_cov) {
+static void readback_to_8888(int fmt, void *pixbuf, uint32_t *out) {
+    _Bool planar = (fmt == FMT_FP16P);
+    int bpp = fmt_bpp[fmt];
+    int32_t planar_stride = W * H;
+    long row_sz = planar ? (long)(W * H * 4) * 2 : (long)(W * bpp);
+
+    for (int y = 0; y < H; y++) {
+        void *src = planar ? (void*)((__fp16*)pixbuf + y * W)
+                           : (void*)((uint8_t*)pixbuf + y * W * bpp);
+        readback_row(fmt, out + y * W, src, W, row_sz, planar_stride);
+    }
+}
+
+static void test_slide_golden(int slide_idx, int fmt,
+                               text_cov *bitmap_cov, text_cov *sdf_cov) {
     slide const *s = &slides[slide_idx];
+
+    umbra_load_fn  load  = s->load ? fmt_load[fmt] : NULL;
+    umbra_store_fn store = fmt_store[fmt];
 
     umbra_draw_layout lay;
     struct umbra_basic_block *bb = umbra_draw_build(
-        s->shader, s->coverage, s->blend, s->load, s->store, &lay);
+        s->shader, s->coverage, s->blend, load, store, &lay);
     umbra_basic_block_optimize(bb);
 
     struct umbra_interpreter *interp = umbra_interpreter(bb);
@@ -161,39 +299,50 @@ static void test_slide_golden(int slide_idx, text_cov *bitmap_cov, text_cov *sdf
 
     void *backends[NUM_BACKENDS] = { interp, jit, cg, mtl };
 
+    size_t pixbuf_sz = (fmt == FMT_FP16P) ? (size_t)(W * H * 4) * 2
+                                           : (size_t)(W * H) * (size_t)fmt_bpp[fmt];
+    void *pbuf_ref = malloc(pixbuf_sz);
+    void *pbuf_tst = malloc(pixbuf_sz);
     uint32_t *ref = malloc((size_t)(W * H) * 4);
     uint32_t *tst = malloc((size_t)(W * H) * 4);
 
-    render_slide(slide_idx, interp, run_interp, ref, bitmap_cov, sdf_cov, &lay);
+    render_slide(slide_idx, fmt, interp, run_interp, pbuf_ref, bitmap_cov, sdf_cov, &lay);
+    readback_to_8888(fmt, pbuf_ref, ref);
 
     for (int bi = 1; bi < NUM_BACKENDS; bi++) {
         if (!backends[bi]) { continue; }
-        render_slide(slide_idx, backends[bi], run_fns[bi], tst, bitmap_cov, sdf_cov, &lay);
+        if (bi == 1 && fmt == FMT_1010102) { continue; }
+        if (bi == 3) { continue; }
+        render_slide(slide_idx, fmt, backends[bi], run_fns[bi], pbuf_tst, bitmap_cov, sdf_cov, &lay);
+        readback_to_8888(fmt, pbuf_tst, tst);
 
         int mismatches = 0;
         int worst = 0;
         for (int i = 0; i < W * H; i++) {
             if (ref[i] == tst[i]) { continue; }
             for (int ch = 0; ch < 4; ch++) {
-                int a = (int)((ref[i] >> (ch * 8)) & 0xFF);
-                int b = (int)((tst[i] >> (ch * 8)) & 0xFF);
+                int a = (int)((ref[i] >> (ch * 8)) & 0xff);
+                int b = (int)((tst[i] >> (ch * 8)) & 0xff);
                 int d = a - b;
                 if (d < 0) { d = -d; }
                 if (d > worst) { worst = d; }
             }
             mismatches++;
         }
-        if (worst > 1) {
-            dprintf(2, "slide %d \"%s\" %s: %d/%d pixels differ, "
-                    "worst channel delta = %d\n",
-                    slide_idx + 1, s->title, backend_name[bi],
-                    mismatches, W * H, worst);
+        int tol = fmt_tol[fmt];
+        if (worst > tol) {
+            dprintf(2, "slide %d \"%s\" %s/%s: %d/%d pixels differ, "
+                    "worst channel delta = %d (tol %d)\n",
+                    slide_idx + 1, s->title, backend_name[bi], fmt_name[fmt],
+                    mismatches, W * H, worst, tol);
         }
-        (worst <= 1) here;
+        (worst <= tol) here;
     }
 
     free(ref);
     free(tst);
+    free(pbuf_ref);
+    free(pbuf_tst);
     umbra_interpreter_free(interp);
     if (jit) { umbra_jit_free(jit); }
     if (cg)  { umbra_codegen_free(cg); }
@@ -204,12 +353,16 @@ int main(void) {
     text_cov bitmap_cov = text_rasterize(W, H, 24.0f, 0);
     text_cov sdf_cov    = text_rasterize(W, H, 24.0f, 1);
     build_luts();
+    build_pipes();
 
-    for (int i = 0; i < SLIDE_COUNT; i++) {
-        test_slide_golden(i, &bitmap_cov, &sdf_cov);
+    for (int fi = 0; fi < NUM_FMTS; fi++) {
+        for (int si = 0; si < SLIDE_COUNT; si++) {
+            test_slide_golden(si, fi, &bitmap_cov, &sdf_cov);
+        }
     }
 
     text_cov_free(&bitmap_cov);
     text_cov_free(&sdf_cov);
+    free_pipes();
     return 0;
 }

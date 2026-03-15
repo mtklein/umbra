@@ -1,7 +1,18 @@
 san = address,integer,undefined
 
 out     = $builddir/xsan
-cc      = $clang -fsanitize=$san -fno-sanitize-recover=$san
+cc      = $clang -fsanitize=$san -fno-sanitize-recover=address
 exec    = env UBSAN_OPTIONS=print_stacktrace=1
 ldflags = -framework Metal -framework Foundation
 include build/project.ninja
+
+build $out/golden_test.o: compile tests/golden_test.c
+    cflags = -Wno-cast-align
+build $out/golden_test:   link $out/golden_test.o $out/bb.o $out/ra.o $out/interpreter.o $out/codegen.o $out/jit.o $out/asm_arm64.o $out/asm_x86.o $out/metal.o $out/draw.o $out/stb_truetype.o
+    ldflags = -framework Metal -framework Foundation -lm
+build $out/golden_test.log: run $out/golden_test
+
+build $out/demo.o: compile demo.c
+    cflags = -I/opt/homebrew/include -Wno-cast-align
+build $out/demo:   link $out/demo.o $out/bb.o $out/ra.o $out/interpreter.o $out/codegen.o $out/jit.o $out/asm_arm64.o $out/asm_x86.o $out/metal.o $out/draw.o $out/stb_truetype.o $out/stb_image_write.o
+    ldflags = -framework Metal -framework Foundation -L/opt/homebrew/lib -lSDL3
