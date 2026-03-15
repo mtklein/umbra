@@ -11,6 +11,8 @@ int main(void) { return 0; }
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Weverything"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb/stb_image_write.h"
 #include <SDL3/SDL.h>
 #pragma clang diagnostic pop
 
@@ -76,32 +78,13 @@ static int next_backend(int cur) {
     return cur;
 }
 
-// Build a 3x3 inverse projective matrix for mapping screen→bitmap coords.
-// Animates a gentle perspective tilt around the center of the screen.
 static void build_perspective_matrix(float out[11], float t, int sw, int sh, int bw, int bh) {
     float cx = (float)sw * 0.5f, cy = (float)sh * 0.5f;
     float bx = (float)bw * 0.5f, by = (float)bh * 0.5f;
-
-    // Animated rotation and perspective tilt.
     float angle = t * 0.3f;
     float tilt  = sinf(t * 0.7f) * 0.0008f;
     float sc    = 1.0f + 0.2f * sinf(t * 0.5f);
     float ca = cosf(angle), sa = sinf(angle);
-
-    // Forward: translate to center, scale+rotate, apply perspective, translate to bitmap.
-    // We directly build the inverse: bitmap→screen, then invert.
-    // Simpler: build screen→bitmap directly.
-    //   1. Translate screen origin to center: x' = x - cx, y' = y - cy
-    //   2. Apply perspective divisor: w = 1 + tilt*x' (simple 1D perspective)
-    //   3. Scale and rotate: x'' = (ca*x'/w + sa*y'/w) * sc, y'' = (-sa*x'/w + ca*y'/w) * sc
-    //   4. Translate to bitmap center: x''' = x'' + bx, y''' = y'' + by
-    //
-    // As a projective matrix [x_out, y_out, w_out] = M * [x, y, 1]:
-    //   Row 2 (w): [tilt, 0, 1 - tilt*cx]
-    //   Row 0 (x): [ca*sc, sa*sc, -cx*ca*sc - cy*sa*sc + bx*(1 - tilt*cx)]
-    //   Row 1 (y): [-sa*sc, ca*sc, cx*sa*sc - cy*ca*sc + by*(1 - tilt*cx)]
-    // But we want screen→bitmap, so the division happens on output.
-
     float w0 = 1.0f - tilt * cx;
 
     out[0] = ca * sc;
@@ -121,6 +104,30 @@ static void update_title(SDL_Window *w, slide const *s, int bi, double fps) {
     char title[256];
     SDL_snprintf(title, sizeof title, "%s  [%s]  %.0f fps", s->title, backend_name[bi], fps);
     SDL_SetWindowTitle(w, title);
+}
+
+enum { LUT_N = 64 };
+static __fp16 linear_lut[LUT_N * 4];
+static __fp16 radial_lut[LUT_N * 4];
+
+static void build_luts(void) {
+    __fp16 const linear_stops[][4] = {
+        {(__fp16)1.2f, (__fp16)0.0f, (__fp16)0.0f, (__fp16)1.0f},
+        {(__fp16)1.0f, (__fp16)0.8f, (__fp16)0.0f, (__fp16)1.0f},
+        {(__fp16)0.0f, (__fp16)1.2f, (__fp16)0.0f, (__fp16)1.0f},
+        {(__fp16)0.0f, (__fp16)0.8f, (__fp16)1.2f, (__fp16)1.0f},
+        {(__fp16)0.0f, (__fp16)0.0f, (__fp16)1.2f, (__fp16)1.0f},
+        {(__fp16)0.8f, (__fp16)0.0f, (__fp16)1.0f, (__fp16)1.0f},
+    };
+    umbra_gradient_lut_even(linear_lut, LUT_N, 6, linear_stops);
+
+    __fp16 const radial_stops[][4] = {
+        {(__fp16)1.5f, (__fp16)1.5f, (__fp16)1.2f, (__fp16)1.0f},
+        {(__fp16)1.2f, (__fp16)0.8f, (__fp16)0.0f, (__fp16)1.0f},
+        {(__fp16)0.8f, (__fp16)0.0f, (__fp16)0.2f, (__fp16)1.0f},
+        {(__fp16)0.05f, (__fp16)0.0f, (__fp16)0.15f, (__fp16)1.0f},
+    };
+    umbra_gradient_lut_even(radial_lut, LUT_N, 4, radial_stops);
 }
 
 int main(void) {
@@ -152,23 +159,23 @@ int main(void) {
 
     text_cov bitmap_cov = text_rasterize(W, H, 72.0f, 0);
     text_cov sdf_cov    = text_rasterize(W, H, 72.0f, 1);
+    build_luts();
 
     int cur_slide = 0;
     build_slide(&slides[cur_slide]);
     int cur_backend = pick_backend(1);
 
-    // FPS tracking.
     uint64_t fps_start  = SDL_GetPerformanceCounter();
     int      fps_frames = 0;
     double   fps        = 0.0;
 
-    // Rect animation state.
     float rect_w = 200.0f, rect_h = 150.0f;
     float rx = 100.0f, ry = 80.0f;
     float vx = 1.5f,   vy = 1.1f;
 
-    // Perspective animation time.
     float persp_t = 0.0f;
+
+    _Bool want_dump = 0;
 
     update_title(window, &slides[cur_slide], cur_backend, fps);
 
@@ -187,6 +194,8 @@ int main(void) {
                 } else if (ev.key.key == SDLK_B) {
                     cur_backend = next_backend(cur_backend);
                     update_title(window, &slides[cur_slide], cur_backend, fps);
+                } else if (ev.key.key == SDLK_S) {
+                    want_dump = 1;
                 } else if (ev.key.key == SDLK_ESCAPE) {
                     running = 0;
                 }
@@ -203,13 +212,6 @@ int main(void) {
         slide const *s = &slides[cur_slide];
         run_fn run = run_fns[cur_backend];
         void  *ctx = backends[cur_backend];
-
-        __fp16 color[4] = {
-            (__fp16)s->color[0],
-            (__fp16)s->color[1],
-            (__fp16)s->color[2],
-            (__fp16)s->color[3],
-        };
 
         void *tex_pixels;
         int   tex_pitch;
@@ -232,6 +234,8 @@ int main(void) {
             persp_t += 0.016f;
             float mat[11];
             build_perspective_matrix(mat, persp_t, W, H, bitmap_cov.w, bitmap_cov.h);
+            __fp16 hc[4];
+            for (int i = 0; i < 4; i++) { hc[i] = (__fp16)s->color[i]; }
             for (int y = 0; y < H; y++) {
                 int32_t yval = y;
                 uint32_t *row = (uint32_t*)(rows + y * tex_pitch);
@@ -239,7 +243,7 @@ int main(void) {
                     { row,            W * 4               },
                     { &x0,           -4                   },
                     { &yval,         -4                   },
-                    { color,         -8                   },
+                    { hc,            -8                   },
                     { bitmap_cov.data, -(W * H * 2)       },
                     { mat,           -(int)(sizeof mat)    },
                 };
@@ -247,6 +251,8 @@ int main(void) {
             }
         } else if (s->coverage == umbra_coverage_bitmap || s->coverage == umbra_coverage_sdf) {
             text_cov *tc = (s->coverage == umbra_coverage_bitmap) ? &bitmap_cov : &sdf_cov;
+            __fp16 hc[4];
+            for (int i = 0; i < 4; i++) { hc[i] = (__fp16)s->color[i]; }
             for (int y = 0; y < H; y++) {
                 int32_t yval = y;
                 uint32_t *row = (uint32_t*)(rows + y * tex_pitch);
@@ -254,8 +260,33 @@ int main(void) {
                     { row,              W * 4     },
                     { &x0,             -4         },
                     { &yval,           -4         },
-                    { color,           -8         },
+                    { hc,              -8         },
                     { tc->data + y * W, -(W * 2)  },
+                };
+                run(ctx, W, buf);
+            }
+        } else if (s->shader != umbra_shader_solid) {
+            __fp16 hc[8];
+            for (int i = 0; i < 8; i++) { hc[i] = (__fp16)s->color[i]; }
+
+            _Bool is_lut = (s->shader == umbra_shader_linear_grad ||
+                            s->shader == umbra_shader_radial_grad);
+            __fp16 *p3   = is_lut ? (s->shader == umbra_shader_linear_grad ? linear_lut
+                                                                           : radial_lut)
+                                  : hc;
+            int     p3sz = is_lut ? (int)(LUT_N * 4 * 2) : 16;
+            float   gp[4] = {s->grad[0], s->grad[1], s->grad[2], s->grad[3]};
+
+            for (int y = 0; y < H; y++) {
+                int32_t yval = y;
+                uint32_t *row = (uint32_t*)(rows + y * tex_pitch);
+                umbra_buf buf[] = {
+                    {row,   W * 4},
+                    {&x0,  -4},
+                    {&yval, -4},
+                    {p3,   -p3sz},
+                    {NULL,  0},
+                    {gp,   -(int)sizeof gp},
                 };
                 run(ctx, W, buf);
             }
@@ -269,6 +300,9 @@ int main(void) {
 
             float rect[4] = { rx, ry, rx + rect_w, ry + rect_h };
 
+            __fp16 hc[4];
+            for (int i = 0; i < 4; i++) { hc[i] = (__fp16)s->color[i]; }
+
             for (int y = 0; y < H; y++) {
                 int32_t yval = y;
                 uint32_t *row = (uint32_t*)(rows + y * tex_pitch);
@@ -276,18 +310,23 @@ int main(void) {
                     { row,   W * 4 },
                     { &x0,  -4     },
                     { &yval,-4     },
-                    { color,-8     },
+                    { hc,   -8     },
                     { rect, -16    },
                 };
                 run(ctx, W, buf);
             }
         }
 
+        if (want_dump) {
+            stbi_write_png("screenshot.png", W, H, 4, tex_pixels, tex_pitch);
+            SDL_Log("saved screenshot.png");
+            want_dump = 0;
+        }
+
         SDL_UnlockTexture(texture);
         SDL_RenderTexture(renderer, texture, NULL, NULL);
         SDL_RenderPresent(renderer);
 
-        // Update FPS every ~0.5 seconds.
         fps_frames++;
         uint64_t now = SDL_GetPerformanceCounter();
         uint64_t freq = SDL_GetPerformanceFrequency();

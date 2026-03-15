@@ -5,7 +5,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-enum { W = 128, H = 96 };
+enum { W = 128, H = 96, LUT_N = 64 };
 
 typedef void (*run_fn)(void*, int, umbra_buf[]);
 
@@ -17,6 +17,29 @@ static void run_metal  (void *ctx, int n, umbra_buf buf[]) { umbra_metal_run(ctx
 enum { NUM_BACKENDS = 4 };
 static char const *backend_name[NUM_BACKENDS] = {"interp", "jit", "codegen", "metal"};
 static run_fn const run_fns[NUM_BACKENDS] = {run_interp, run_jit, run_codegen, run_metal};
+
+static __fp16 linear_lut[LUT_N * 4];
+static __fp16 radial_lut[LUT_N * 4];
+
+static void build_luts(void) {
+    __fp16 const linear_stops[][4] = {
+        {(__fp16)1.2f, (__fp16)0.0f, (__fp16)0.0f, (__fp16)1.0f},
+        {(__fp16)1.0f, (__fp16)0.8f, (__fp16)0.0f, (__fp16)1.0f},
+        {(__fp16)0.0f, (__fp16)1.2f, (__fp16)0.0f, (__fp16)1.0f},
+        {(__fp16)0.0f, (__fp16)0.8f, (__fp16)1.2f, (__fp16)1.0f},
+        {(__fp16)0.0f, (__fp16)0.0f, (__fp16)1.2f, (__fp16)1.0f},
+        {(__fp16)0.8f, (__fp16)0.0f, (__fp16)1.0f, (__fp16)1.0f},
+    };
+    umbra_gradient_lut_even(linear_lut, LUT_N, 6, linear_stops);
+
+    __fp16 const radial_stops[][4] = {
+        {(__fp16)1.5f, (__fp16)1.5f, (__fp16)1.2f, (__fp16)1.0f},
+        {(__fp16)1.2f, (__fp16)0.8f, (__fp16)0.0f, (__fp16)1.0f},
+        {(__fp16)0.8f, (__fp16)0.0f, (__fp16)0.2f, (__fp16)1.0f},
+        {(__fp16)0.05f, (__fp16)0.0f, (__fp16)0.15f, (__fp16)1.0f},
+    };
+    umbra_gradient_lut_even(radial_lut, LUT_N, 4, radial_stops);
+}
 
 static void build_perspective_matrix(float out[11], float t, int sw, int sh, int bw, int bh) {
     float cx = (float)sw * 0.5f, cy = (float)sh * 0.5f;
@@ -37,12 +60,9 @@ static void build_perspective_matrix(float out[11], float t, int sw, int sh, int
 static void render_slide(int slide_idx, void *ctx, run_fn run,
                          uint32_t *px, text_cov *bitmap_cov, text_cov *sdf_cov) {
     slide const *s = &slides[slide_idx];
-    __fp16 color[4] = {
-        (__fp16)s->color[0], (__fp16)s->color[1],
-        (__fp16)s->color[2], (__fp16)s->color[3],
-    };
+    __fp16 hc[8];
+    for (int i = 0; i < 8; i++) { hc[i] = (__fp16)s->color[i]; }
 
-    // Fill background.
     for (int i = 0; i < W * H; i++) { px[i] = s->bg; }
 
     int32_t x0 = 0;
@@ -56,7 +76,7 @@ static void render_slide(int slide_idx, void *ctx, run_fn run,
                 { px + y * W,       W * 4                },
                 { &x0,             -4                    },
                 { &yval,           -4                    },
-                { color,           -8                    },
+                { hc,              -8                    },
                 { bitmap_cov->data, -(W * H * 2)         },
                 { mat,             -(int)(sizeof mat)     },
             };
@@ -70,13 +90,33 @@ static void render_slide(int slide_idx, void *ctx, run_fn run,
                 { px + y * W,        W * 4    },
                 { &x0,              -4        },
                 { &yval,            -4        },
-                { color,            -8        },
+                { hc,               -8        },
                 { tc->data + y * W, -(W * 2)  },
             };
             run(ctx, W, buf);
         }
+    } else if (s->shader != umbra_shader_solid) {
+        _Bool is_lut = (s->shader == umbra_shader_linear_grad ||
+                        s->shader == umbra_shader_radial_grad);
+        __fp16 *p3   = is_lut ? (s->shader == umbra_shader_linear_grad ? linear_lut
+                                                                       : radial_lut)
+                              : hc;
+        int     p3sz = is_lut ? (int)(LUT_N * 4 * 2) : 16;
+        float   gp[4] = {s->grad[0], s->grad[1], s->grad[2], s->grad[3]};
+
+        for (int y = 0; y < H; y++) {
+            int32_t yval = y;
+            umbra_buf buf[] = {
+                {px + y * W,  W * 4},
+                {&x0,        -4},
+                {&yval,      -4},
+                {p3,         -p3sz},
+                {NULL,        0},
+                {gp,         -(int)sizeof gp},
+            };
+            run(ctx, W, buf);
+        }
     } else {
-        // Rect slides: fixed rect position.
         float rect[4] = { 30.0f, 20.0f, 90.0f, 60.0f };
         for (int y = 0; y < H; y++) {
             int32_t yval = y;
@@ -84,7 +124,7 @@ static void render_slide(int slide_idx, void *ctx, run_fn run,
                 { px + y * W,  W * 4 },
                 { &x0,        -4     },
                 { &yval,      -4     },
-                { color,      -8     },
+                { hc,         -8     },
                 { rect,       -16    },
             };
             run(ctx, W, buf);
@@ -110,10 +150,8 @@ static void test_slide_golden(int slide_idx, text_cov *bitmap_cov, text_cov *sdf
     uint32_t *ref = malloc((size_t)(W * H) * 4);
     uint32_t *tst = malloc((size_t)(W * H) * 4);
 
-    // Render reference with interpreter.
     render_slide(slide_idx, interp, run_interp, ref, bitmap_cov, sdf_cov);
 
-    // Compare each other backend against interpreter.
     for (int bi = 1; bi < NUM_BACKENDS; bi++) {
         if (!backends[bi]) { continue; }
         render_slide(slide_idx, backends[bi], run_fns[bi], tst, bitmap_cov, sdf_cov);
@@ -151,6 +189,7 @@ static void test_slide_golden(int slide_idx, text_cov *bitmap_cov, text_cov *sdf
 int main(void) {
     text_cov bitmap_cov = text_rasterize(W, H, 24.0f, 0);
     text_cov sdf_cov    = text_rasterize(W, H, 24.0f, 1);
+    build_luts();
 
     for (int i = 0; i < SLIDE_COUNT; i++) {
         test_slide_golden(i, &bitmap_cov, &sdf_cov);

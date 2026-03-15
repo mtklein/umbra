@@ -3,22 +3,20 @@
 #include "text.h"
 #include <stdint.h>
 
-// Each slide demonstrates a different pipeline configuration.
-// The demo cycles through these on left/right arrow keys.
-
 typedef struct {
-    const char        *title;
+    char const        *title;
     umbra_shader_fn    shader;
     umbra_coverage_fn  coverage;
     umbra_blend_fn     blend;
     umbra_load_fn      load;
     umbra_store_fn     store;
-    float              color[4];   // premultiplied RGBA as float (converted to fp16 at runtime)
-    uint32_t           bg;         // background fill, RGBA8888
+    float              color[8];   // RGBA; 2-stop gradients use all 8
+    float              grad[4];    // gradient spatial params (p5)
+    uint32_t           bg;
     uint32_t           pad_;
 } slide;
 
-static const slide slides[] = {
+static slide const slides[] = {
     {
         .title    = "1. Solid Fill (src)",
         .shader   = umbra_shader_solid,
@@ -108,6 +106,36 @@ static const slide slides[] = {
         .store    = umbra_store_8888,
         .color    = {1.0f, 0.8f, 0.2f, 1.0f},
         .bg       = 0xff0a0a1e,
+    },
+    {
+        .title    = "10. Linear Gradient (2-stop)",
+        .shader   = umbra_shader_linear_2,
+        .store    = umbra_store_8888,
+        .color    = {1.0f, 0.4f, 0.0f, 1.0f,   0.0f, 0.3f, 1.0f, 1.0f},
+        .grad     = {1.0f/640.0f, 0.0f, 0.0f},
+        .bg       = 0xff000000,
+    },
+    {
+        .title    = "11. Radial Gradient (2-stop)",
+        .shader   = umbra_shader_radial_2,
+        .store    = umbra_store_8888,
+        .color    = {1.0f, 1.0f, 0.9f, 1.0f,   0.05f, 0.0f, 0.15f, 1.0f},
+        .grad     = {320.0f, 240.0f, 1.0f/300.0f},
+        .bg       = 0xff000000,
+    },
+    {
+        .title    = "12. Linear Gradient (wide gamut)",
+        .shader   = umbra_shader_linear_grad,
+        .store    = umbra_store_8888,
+        .grad     = {1.0f/640.0f, 0.0f, 0.0f, 64.0f},
+        .bg       = 0xff000000,
+    },
+    {
+        .title    = "13. Radial Gradient (wide gamut)",
+        .shader   = umbra_shader_radial_grad,
+        .store    = umbra_store_8888,
+        .grad     = {320.0f, 240.0f, 1.0f/280.0f, 64.0f},
+        .bg       = 0xff000000,
     },
 };
 
