@@ -28,7 +28,7 @@ typedef union {
 } val;
 
 struct interp_inst;
-typedef int (*Fn)(struct interp_inst const *ip, val *v, int end, void* ptr[]);
+typedef int (*Fn)(struct interp_inst const *ip, val *v, int end, void* ptr[], long sz[]);
 struct interp_inst {
     Fn  fn;
     int x,y,z,w;
@@ -40,8 +40,16 @@ struct umbra_interpreter {
     int                 preamble, nptr;
 };
 
-#define op(name) static int name(struct interp_inst const *ip, val *v, int end, void* ptr[])
-#define next return ip[1].fn(ip+1, v+1, end, ptr)
+#define op(name) static int name(struct interp_inst const *ip, val *v, int end, void* ptr[], long sz[])
+#define next return ip[1].fn(ip+1, v+1, end, ptr, sz)
+
+static int clamp_ix(int ix, long bytes, int elem) {
+    int max_ix = (int)(bytes / elem) - 1;
+    if (max_ix < 0) { max_ix = 0; }
+    if (ix < 0)      { return 0; }
+    if (ix > max_ix)  { return max_ix; }
+    return ix;
+}
 
 op(imm_16) { v->i16 = (I16){0} + (int16_t)ip->x; next; }
 op(imm_32) { v->i32 = (I32){0} +          ip->x; next; }
@@ -68,15 +76,17 @@ op(uni_32) {
 
 op(gather_16) {
     for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
+        int ix = clamp_ix(v[ip->y].i32[l], sz[ip->x], 2);
         __builtin_memcpy((char*)&v->i16 + 2*l,
-                         (char const*)ptr[ip->x] + 2*v[ip->y].i32[l], 2);
+                         (char const*)ptr[ip->x] + 2*ix, 2);
     }
     next;
 }
 op(gather_32) {
     for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
+        int ix = clamp_ix(v[ip->y].i32[l], sz[ip->x], 4);
         __builtin_memcpy((char*)&v->i32 + 4*l,
-                         (char const*)ptr[ip->x] + 4*v[ip->y].i32[l], 4);
+                         (char const*)ptr[ip->x] + 4*ix, 4);
     }
     next;
 }
@@ -109,14 +119,16 @@ op(store_32) {
 
 op(scatter_16) {
     for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
-        __builtin_memcpy((char*)ptr[ip->x] + 2*v[ip->z].i32[l],
+        int ix = clamp_ix(v[ip->z].i32[l], sz[ip->x], 2);
+        __builtin_memcpy((char*)ptr[ip->x] + 2*ix,
                          (char*)&v[ip->y].i16 + 2*l, 2);
     }
     next;
 }
 op(scatter_32) {
     for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
-        __builtin_memcpy((char*)ptr[ip->x] + 4*v[ip->z].i32[l],
+        int ix = clamp_ix(v[ip->z].i32[l], sz[ip->x], 4);
+        __builtin_memcpy((char*)ptr[ip->x] + 4*ix,
                          (char*)&v[ip->y].i32 + 4*l, 4);
     }
     next;
@@ -269,8 +281,9 @@ op(i32_from_i16) {
 
     op(gather_half) {
         for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
+            int ix = clamp_ix(v[ip->y].i32[l], sz[ip->x], 2);
             __fp16 h;
-            __builtin_memcpy(&h, (char const*)ptr[ip->x] + 2*v[ip->y].i32[l], 2);
+            __builtin_memcpy(&h, (char const*)ptr[ip->x] + 2*ix, 2);
             float f = (float)h;
             __builtin_memcpy((char*)&v->f32 + 4*l, &f, 4);
         }
@@ -280,7 +293,8 @@ op(i32_from_i16) {
     op(scatter_half) {
         U16 tmp = f32_to_f16(v[ip->y].f32);
         for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
-            __builtin_memcpy((char*)ptr[ip->x] + 2*v[ip->z].i32[l],
+            int ix = clamp_ix(v[ip->z].i32[l], sz[ip->x], 2);
+            __builtin_memcpy((char*)ptr[ip->x] + 2*ix,
                              (char*)&tmp + 2*l, 2);
         }
         next;
@@ -389,7 +403,7 @@ op(load_8x4) {
         v[2].u16 = __builtin_convertvector(c2, U16);
         v[3].u16 = __builtin_convertvector(c3, U16);
     }
-    return ip[4].fn(ip+4, v+4, end, ptr);
+    return ip[4].fn(ip+4, v+4, end, ptr, sz);
 }
 
 op(store_8x4) {
@@ -415,10 +429,10 @@ op(store_8x4) {
              8, 9,24,25, 10,11,26,27, 12,13,28,29, 14,15,30,31);
         __builtin_memcpy(dst + (end-K)*4, &rgba, 32);
     }
-    return ip[2].fn(ip+2, v+2, end, ptr);
+    return ip[2].fn(ip+2, v+2, end, ptr, sz);
 }
 
-op(done) { (void)ip; (void)v; (void)end; (void)ptr; return 0; }
+op(done) { (void)ip; (void)v; (void)end; (void)ptr; (void)sz; return 0; }
 
 #undef next
 #undef op
@@ -534,7 +548,7 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     fill_val(&v[1], yb, it);
     fill_val(&v[2], zb, it);
 
-    inst[0].fn(inst, v+3, K, (void*[]){0});
+    inst[0].fn(inst, v+3, K, (void*[]){0}, (long[]){0});
 
     return read_val(&v[3], output_type(op));
 }
@@ -714,14 +728,18 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
 
 void umbra_interpreter_run(struct umbra_interpreter *p, int n, umbra_buf buf[]) {
     void *ptr[16] = {0};
-    for (int i = 0; i < p->nptr && i < 16; i++) { ptr[i] = buf[i].ptr; }
+    long  sz[16]  = {0};
+    for (int i = 0; i < p->nptr && i < 16; i++) {
+        ptr[i] = buf[i].ptr;
+        sz[i]  = buf[i].sz < 0 ? -buf[i].sz : buf[i].sz;
+    }
     struct interp_inst const *start = p->inst;
     val                      *v     = p->v;
     int const P = p->preamble;
 
     int i = 0;
-    while (i+K <= n) { start->fn(start,v,i+K,ptr); i+= K; start = p->inst+P; v = p->v+P; }
-    while (i+1 <= n) { start->fn(start,v,i+1,ptr); i+= 1; start = p->inst+P; v = p->v+P; }
+    while (i+K <= n) { start->fn(start,v,i+K,ptr,sz); i+= K; start = p->inst+P; v = p->v+P; }
+    while (i+1 <= n) { start->fn(start,v,i+1,ptr,sz); i+= 1; start = p->inst+P; v = p->v+P; }
 }
 
 void umbra_interpreter_free(struct umbra_interpreter *p) {
