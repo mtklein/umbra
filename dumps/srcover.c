@@ -36,11 +36,24 @@ static inline u16 f2h(float f) {
     return (u16)r;
 }
 
-void umbra_entry(int n, void **ptrs) {
+static inline s32 clamp_ix(s32 ix, long bytes, int elem) {
+    s32 hi = (s32)(bytes / elem) - 1;
+    if (hi < 0) hi = 0;
+    if (ix < 0) ix = 0;
+    if (ix > hi) ix = hi;
+    return ix;
+}
+
+void umbra_entry(int n, void **ptrs, long *szs) {
     u16* restrict p1 = (u16*)ptrs[1];
     u16* restrict p2 = (u16*)ptrs[2];
     u16* restrict p3 = (u16*)ptrs[3];
     u16* restrict p4 = (u16*)ptrs[4];
+    long sz0 = szs[0];
+    long sz1 = szs[1];
+    long sz2 = szs[2];
+    long sz3 = szs[3];
+    long sz4 = szs[4];
     u32 v0 = 0u;
     float v1 = h2f(7172);
     float v2 = h2f(15360);

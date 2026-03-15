@@ -1587,6 +1587,91 @@ static void test_preamble_pair_alias(void) {
   }
 }
 
+static void test_gather_clamp(void) {
+  for (int opt = 0; opt < 2; opt++) {
+    {
+        struct umbra_basic_block *bb = umbra_basic_block();
+        umbra_i32 ix  = umbra_lane(bb),
+                  idx = umbra_load_i32(bb, (umbra_ptr){0}, ix),
+                  val = umbra_load_i32(bb, (umbra_ptr){1}, idx);
+        umbra_store_i32(bb, (umbra_ptr){2}, ix, val);
+        backends B = make_full(bb, opt);
+        for (int bi = 0; bi < 4; bi++) {
+#if !defined(__aarch64__)
+            if (bi == 2) { continue; }
+#endif
+            int32_t indices[4] = {-5, 0, 2, 100};
+            int32_t src[3]     = {10, 20, 30};
+            int32_t dst[4]     = {0};
+            if (!run(&B, bi, 4, (umbra_buf[]){
+                {indices, (long)sizeof indices},
+                {src,     (long)sizeof src},
+                {dst,     (long)sizeof dst},
+            })) { continue; }
+            (dst[0] == 10) here;
+            (dst[1] == 10) here;
+            (dst[2] == 30) here;
+            (dst[3] == 30) here;
+        }
+        cleanup(&B);
+    }
+    {
+        struct umbra_basic_block *bb = umbra_basic_block();
+        umbra_i32 ix  = umbra_lane(bb),
+                  idx = umbra_load_i32(bb, (umbra_ptr){0}, ix);
+        umbra_i16 val = umbra_load_i16(bb, (umbra_ptr){1}, idx);
+        umbra_store_i16(bb, (umbra_ptr){2}, ix, val);
+        backends B = make_full(bb, opt);
+        for (int bi = 0; bi < 4; bi++) {
+#if !defined(__aarch64__)
+            if (bi == 2) { continue; }
+#endif
+            int32_t  indices[4] = {-1, 1, 3, 999};
+            int16_t  src[3]     = {100, 200, 300};
+            int16_t  dst[4]     = {0};
+            if (!run(&B, bi, 4, (umbra_buf[]){
+                {indices, (long)sizeof indices},
+                {src,     (long)sizeof src},
+                {dst,     (long)sizeof dst},
+            })) { continue; }
+            (dst[0] == 100) here;
+            (dst[1] == 200) here;
+            (dst[2] == 300) here;
+            (dst[3] == 300) here;
+        }
+        cleanup(&B);
+    }
+  }
+}
+
+static void test_scatter_clamp(void) {
+  for (int opt = 0; opt < 2; opt++) {
+    struct umbra_basic_block *bb = umbra_basic_block();
+    umbra_i32 ix  = umbra_lane(bb),
+              idx = umbra_load_i32(bb, (umbra_ptr){0}, ix),
+              val = umbra_load_i32(bb, (umbra_ptr){1}, ix);
+    umbra_store_i32(bb, (umbra_ptr){2}, idx, val);
+    backends B = make_full(bb, opt);
+    for (int bi = 0; bi < 4; bi++) {
+#if !defined(__aarch64__)
+        if (bi == 2) { continue; }
+#endif
+        int32_t indices[3] = {-10, 1, 500};
+        int32_t vals[3]    = {11, 22, 33};
+        int32_t dst[3]     = {0};
+        if (!run(&B, bi, 3, (umbra_buf[]){
+            {indices, (long)sizeof indices},
+            {vals,    (long)sizeof vals},
+            {dst,     (long)sizeof dst},
+        })) { continue; }
+        (dst[0] == 11) here;
+        (dst[1] == 22) here;
+        (dst[2] == 33) here;
+    }
+    cleanup(&B);
+  }
+}
+
 int main(void) {
     test_f32_ops();
     test_i32_ops();
@@ -1619,5 +1704,7 @@ int main(void) {
     test_half_convert_pressure();
     test_n9();
     test_preamble_pair_alias();
+    test_gather_clamp();
+    test_scatter_clamp();
     return 0;
 }

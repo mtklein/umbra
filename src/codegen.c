@@ -22,7 +22,7 @@ typedef struct umbra_basic_block BB;
 
 struct umbra_codegen {
     void *dl;
-    void (*entry)(int, void**);
+    void (*entry)(int, void**, long*);
     char *src_path, *so_path, *src;
     int   nptr, :32;
 };
@@ -82,11 +82,11 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                 case op_gather_half: {
                     int p = inst->ptr;
                     if (p < 0) {
-                        emit(b, "%sfloat v%d = h2f(((u16*)pd%d)[v%d]);\n", pad, i, ~p, inst->x);
+                        emit(b, "%sfloat v%d = h2f(((u16*)pd%d)[clamp_ix((s32)v%d,szd%d,2)]);\n", pad, i, ~p, inst->x, ~p);
                     } else {
                         _Bool mixed = ptr_32[p] && ptr_16[p];
-                        emit(b, mixed ? "%sfloat v%d = h2f(p%d_16[v%d]);\n"
-                                      : "%sfloat v%d = h2f(p%d[v%d]);\n", pad, i, p, inst->x);
+                        emit(b, mixed ? "%sfloat v%d = h2f(p%d_16[clamp_ix((s32)v%d,sz%d,2)]);\n"
+                                      : "%sfloat v%d = h2f(p%d[clamp_ix((s32)v%d,sz%d,2)]);\n", pad, i, p, inst->x, p);
                     }
                 } break;
                 case op_store_half: {
@@ -102,11 +102,11 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                 case op_scatter_half: {
                     int p = inst->ptr;
                     if (p < 0) {
-                        emit(b, "%s((u16*)pd%d)[v%d] = f2h(v%d);\n", pad, ~p, inst->x, inst->y);
+                        emit(b, "%s((u16*)pd%d)[clamp_ix((s32)v%d,szd%d,2)] = f2h(v%d);\n", pad, ~p, inst->x, ~p, inst->y);
                     } else {
                         _Bool mixed = ptr_32[p] && ptr_16[p];
-                        emit(b, mixed ? "%sp%d_16[v%d] = f2h(v%d);\n"
-                                      : "%sp%d[v%d] = f2h(v%d);\n", pad, p, inst->x, inst->y);
+                        emit(b, mixed ? "%sp%d_16[clamp_ix((s32)v%d,sz%d,2)] = f2h(v%d);\n"
+                                      : "%sp%d[clamp_ix((s32)v%d,sz%d,2)] = f2h(v%d);\n", pad, p, inst->x, p, inst->y);
                     }
                 } break;
                 case op_add_half:  emit(b, "%sfloat v%d = v%d + v%d;\n",       pad, i, inst->x, inst->y); break;
@@ -187,6 +187,8 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             case op_deref_ptr: {
                 int p = inst->ptr;
                 emit(b, "%svoid *pd%d = *(void**)((char*)ptrs[%d] + %d);\n", pad, i, p, inst->imm);
+                emit(b, "%slong szd%d = *(long*)((char*)ptrs[%d] + %d);\n", pad, i, p, inst->imm + 8);
+                emit(b, "%sif (szd%d < 0) szd%d = -szd%d;\n", pad, i, i, i);
             } break;
 
             case op_uni_16: {
@@ -212,11 +214,11 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             case op_gather_16: {
                 int p = inst->ptr;
                 if (p < 0) {
-                    emit(b, "%su16 v%d = ((u16*)pd%d)[v%d];\n", pad, i, ~p, inst->x);
+                    emit(b, "%su16 v%d = ((u16*)pd%d)[clamp_ix((s32)v%d,szd%d,2)];\n", pad, i, ~p, inst->x, ~p);
                 } else {
                     _Bool mixed = ptr_32[p] && ptr_16[p];
-                    emit(b, mixed ? "%su16 v%d = p%d_16[v%d];\n"
-                                  : "%su16 v%d = p%d[v%d];\n", pad, i, p, inst->x);
+                    emit(b, mixed ? "%su16 v%d = p%d_16[clamp_ix((s32)v%d,sz%d,2)];\n"
+                                  : "%su16 v%d = p%d[clamp_ix((s32)v%d,sz%d,2)];\n", pad, i, p, inst->x, p);
                 }
             } break;
             case op_uni_32: {
@@ -242,11 +244,11 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             case op_gather_32: {
                 int p = inst->ptr;
                 if (p < 0) {
-                    emit(b, "%su32 v%d = ((u32*)pd%d)[v%d];\n", pad, i, ~p, inst->x);
+                    emit(b, "%su32 v%d = ((u32*)pd%d)[clamp_ix((s32)v%d,szd%d,4)];\n", pad, i, ~p, inst->x, ~p);
                 } else {
                     _Bool mixed = ptr_32[p] && ptr_16[p];
-                    emit(b, mixed ? "%su32 v%d = p%d_32[v%d];\n"
-                                  : "%su32 v%d = p%d[v%d];\n", pad, i, p, inst->x);
+                    emit(b, mixed ? "%su32 v%d = p%d_32[clamp_ix((s32)v%d,sz%d,4)];\n"
+                                  : "%su32 v%d = p%d[clamp_ix((s32)v%d,sz%d,4)];\n", pad, i, p, inst->x, p);
                 }
             } break;
 
@@ -262,10 +264,11 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             case op_scatter_16: {
                 int p = inst->ptr;
                 if (p < 0) {
-                    emit(b, "%s((u16*)pd%d)[v%d] = v%d;\n", pad, ~p, inst->x, inst->y);
+                    emit(b, "%s((u16*)pd%d)[clamp_ix((s32)v%d,szd%d,2)] = v%d;\n", pad, ~p, inst->x, ~p, inst->y);
                 } else {
                     _Bool mixed = ptr_32[p] && ptr_16[p];
-                    emit(b, mixed ? "%sp%d_16[v%d] = v%d;\n" : "%sp%d[v%d] = v%d;\n", pad, p, inst->x, inst->y);
+                    emit(b, mixed ? "%sp%d_16[clamp_ix((s32)v%d,sz%d,2)] = v%d;\n"
+                                  : "%sp%d[clamp_ix((s32)v%d,sz%d,2)] = v%d;\n", pad, p, inst->x, p, inst->y);
                 }
             } break;
             case op_store_32: {
@@ -281,11 +284,11 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             case op_scatter_32: {
                 int p = inst->ptr;
                 if (p < 0) {
-                    emit(b, "%s((u32*)pd%d)[v%d] = v%d;\n", pad, ~p, inst->x, inst->y);
+                    emit(b, "%s((u32*)pd%d)[clamp_ix((s32)v%d,szd%d,4)] = v%d;\n", pad, ~p, inst->x, ~p, inst->y);
                 } else {
                     _Bool mixed = ptr_32[p] && ptr_16[p];
-                    emit(b, mixed ? "%sp%d_32[v%d] = v%d;\n"
-                                  : "%sp%d[v%d] = v%d;\n", pad, p, inst->x, inst->y);
+                    emit(b, mixed ? "%sp%d_32[clamp_ix((s32)v%d,sz%d,4)] = v%d;\n"
+                                  : "%sp%d[clamp_ix((s32)v%d,sz%d,4)] = v%d;\n", pad, p, inst->x, p, inst->y);
                 }
             } break;
 
@@ -468,7 +471,14 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
     emit(&b, "    u32 r = (is_uf&sign) | (is_of&~is_in&inf) | (is_in&infnan) | (~is_uf&~is_of&~is_in&normal);\n");
     emit(&b, "    return (u16)r;\n}\n\n");
 
-    emit(&b, "void umbra_entry(int n, void **ptrs) {\n");
+    emit(&b, "static inline s32 clamp_ix(s32 ix, long bytes, int elem) {\n");
+    emit(&b, "    s32 hi = (s32)(bytes / elem) - 1;\n");
+    emit(&b, "    if (hi < 0) hi = 0;\n");
+    emit(&b, "    if (ix < 0) ix = 0;\n");
+    emit(&b, "    if (ix > hi) ix = hi;\n");
+    emit(&b, "    return ix;\n}\n\n");
+
+    emit(&b, "void umbra_entry(int n, void **ptrs, long *szs) {\n");
 
     for (int p = 0; p <= max_ptr; p++) {
         if (ptr_32[p] && ptr_16[p]) {
@@ -479,6 +489,9 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
         } else if (ptr_16[p]) {
             emit(&b, "    u16* restrict p%d = (u16*)ptrs[%d];\n", p, p);
         }
+    }
+    for (int p = 0; p <= max_ptr; p++) {
+        emit(&b, "    long sz%d = szs[%d];\n", p, p);
     }
 
     emit_ops(&b, bb, ptr_16, ptr_32, 0, bb->preamble, "    ", 0);
@@ -545,8 +558,8 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
         return 0;
     }
 
-    void (*entry)(int, void**) =
-        (void (*)(int, void**))dlsym(dl, "umbra_entry");
+    void (*entry)(int, void**, long*) =
+        (void (*)(int, void**, long*))dlsym(dl, "umbra_entry");
     if (!entry) {
         dlclose(dl);
         remove(c_path);
@@ -570,8 +583,12 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
 void umbra_codegen_run(struct umbra_codegen *cg, int n, umbra_buf buf[]) {
     if (!cg) { return; }
     void *ptrs[16] = {0};
-    for (int i = 0; i < cg->nptr && i < 16; i++) { ptrs[i] = buf[i].ptr; }
-    cg->entry(n, ptrs);
+    long  szs[16]  = {0};
+    for (int i = 0; i < cg->nptr && i < 16; i++) {
+        ptrs[i] = buf[i].ptr;
+        szs[i]  = buf[i].sz < 0 ? -buf[i].sz : buf[i].sz;
+    }
+    cg->entry(n, ptrs, szs);
 }
 
 void umbra_codegen_free(struct umbra_codegen *cg) {

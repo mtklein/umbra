@@ -25,6 +25,7 @@ struct umbra_metal {
     void *pipeline;
     void *queue;
     void *n_buf;
+    void *sz_buf;
     void *bufs[16];
     long  buf_cap[16];
     char *src;
@@ -82,9 +83,9 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                 case op_gather_half: {
                     int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
                     _Bool mixed = ptr_32[p] && ptr_16[p];
-                    emit(b, mixed ? "%shalf v%d = as_type<half>(p%d_16[v%d]);\n"
-                                  : "%shalf v%d = as_type<half>(((device ushort*)p%d)[v%d]);\n",
-                         pad, i, p, inst->x);
+                    emit(b, mixed ? "%shalf v%d = as_type<half>(p%d_16[clamp_ix((int)v%d,buf_szs[%d],2)]);\n"
+                                  : "%shalf v%d = as_type<half>(((device ushort*)p%d)[clamp_ix((int)v%d,buf_szs[%d],2)]);\n",
+                         pad, i, p, inst->x, p);
                 } break;
                 case op_store_half: {
                     int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
@@ -95,9 +96,9 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                 case op_scatter_half: {
                     int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
                     _Bool mixed = ptr_32[p] && ptr_16[p];
-                    emit(b, mixed ? "%sp%d_16[v%d] = as_type<ushort>(v%d);\n"
-                                  : "%s((device ushort*)p%d)[v%d] = as_type<ushort>(v%d);\n",
-                         pad, p, inst->x, inst->y);
+                    emit(b, mixed ? "%sp%d_16[clamp_ix((int)v%d,buf_szs[%d],2)] = as_type<ushort>(v%d);\n"
+                                  : "%s((device ushort*)p%d)[clamp_ix((int)v%d,buf_szs[%d],2)] = as_type<ushort>(v%d);\n",
+                         pad, p, inst->x, p, inst->y);
                 } break;
                 case op_add_half:  emit(b, "%shalf v%d = v%d + v%d;\n",       pad, i, inst->x, inst->y); break;
                 case op_sub_half:  emit(b, "%shalf v%d = v%d - v%d;\n",       pad, i, inst->x, inst->y); break;
@@ -211,8 +212,8 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             case op_gather_16: {
                 int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%sushort v%d = p%d_16[v%d];\n"
-                              : "%sushort v%d = ((device ushort*)p%d)[v%d];\n", pad, i, p, inst->x);
+                emit(b, mixed ? "%sushort v%d = p%d_16[clamp_ix((int)v%d,buf_szs[%d],2)];\n"
+                              : "%sushort v%d = ((device ushort*)p%d)[clamp_ix((int)v%d,buf_szs[%d],2)];\n", pad, i, p, inst->x, p);
             } break;
             case op_uni_32: {
                 int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
@@ -230,8 +231,8 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             case op_gather_32: {
                 int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%suint v%d = p%d_32[v%d];\n"
-                              : "%suint v%d = ((device uint*)p%d)[v%d];\n", pad, i, p, inst->x);
+                emit(b, mixed ? "%suint v%d = p%d_32[clamp_ix((int)v%d,buf_szs[%d],4)];\n"
+                              : "%suint v%d = ((device uint*)p%d)[clamp_ix((int)v%d,buf_szs[%d],4)];\n", pad, i, p, inst->x, p);
             } break;
 
             case op_store_16: {
@@ -243,8 +244,8 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             case op_scatter_16: {
                 int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%sp%d_16[v%d] = v%d;\n"
-                              : "%s((device ushort*)p%d)[v%d] = v%d;\n", pad, p, inst->x, inst->y);
+                emit(b, mixed ? "%sp%d_16[clamp_ix((int)v%d,buf_szs[%d],2)] = v%d;\n"
+                              : "%s((device ushort*)p%d)[clamp_ix((int)v%d,buf_szs[%d],2)] = v%d;\n", pad, p, inst->x, p, inst->y);
             } break;
             case op_store_32: {
                 int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
@@ -255,8 +256,8 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             case op_scatter_32: {
                 int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%sp%d_32[v%d] = v%d;\n"
-                              : "%s((device uint*)p%d)[v%d] = v%d;\n", pad, p, inst->x, inst->y);
+                emit(b, mixed ? "%sp%d_32[clamp_ix((int)v%d,buf_szs[%d],4)] = v%d;\n"
+                              : "%s((device uint*)p%d)[clamp_ix((int)v%d,buf_szs[%d],4)] = v%d;\n", pad, p, inst->x, p, inst->y);
             } break;
 
             case op_add_f32: emit(b, "%suint v%d = as_type<uint>(as_type<float>(v%d) + as_type<float>(v%d));\n", pad, i, inst->x, inst->y); break;
@@ -418,6 +419,11 @@ static char* build_source(BB const *bb, int *out_max_ptr, int *out_total_bufs,
 
     emit(&b, "#include <metal_stdlib>\nusing namespace metal;\n\n");
 
+    emit(&b, "static inline int clamp_ix(int ix, uint bytes, int elem) {\n");
+    emit(&b, "    int hi = (int)(bytes / (uint)elem) - 1;\n");
+    emit(&b, "    if (hi < 0) hi = 0;\n");
+    emit(&b, "    return clamp(ix, 0, hi);\n}\n\n");
+
     emit(&b, "kernel void umbra_entry(\n");
     emit(&b, "    constant uint &n [[buffer(0)]]");
     for (int p = 0; p <= max_ptr; p++) {
@@ -428,6 +434,7 @@ static char* build_source(BB const *bb, int *out_max_ptr, int *out_total_bufs,
             emit(&b, ",\n    device uchar *p%d [[buffer(%d)]]", deref_buf[i], deref_buf[i] + 1);
         }
     }
+    emit(&b, ",\n    constant uint *buf_szs [[buffer(%d)]]", total_bufs + 1);
     emit(&b, ",\n    uint i [[thread_position_in_grid]]\n) {\n");
     emit(&b, "    if (i >= n) return;\n");
 
@@ -481,12 +488,15 @@ struct umbra_metal* umbra_metal(BB const *bb) {
 
         id<MTLBuffer> n_buf = [device newBufferWithLength:sizeof(uint32_t)
                                                    options:MTLResourceStorageModeShared];
+        id<MTLBuffer> sz_buf = [device newBufferWithLength:16 * sizeof(uint32_t)
+                                                    options:MTLResourceStorageModeShared];
 
         struct umbra_metal *m = calloc(1, sizeof *m);
         m->device     = (__bridge_retained void*)device;
         m->pipeline   = (__bridge_retained void*)pipeline;
         m->queue      = (__bridge_retained void*)queue;
         m->n_buf      = (__bridge_retained void*)n_buf;
+        m->sz_buf     = (__bridge_retained void*)sz_buf;
         m->src        = src;
         m->max_ptr    = max_ptr;
         m->total_bufs = total_bufs;
@@ -517,7 +527,18 @@ void umbra_metal_run(struct umbra_metal *m, int n, umbra_buf buf[]) {
         id<MTLCommandQueue> queue = (__bridge id<MTLCommandQueue>)m->queue;
         id<MTLBuffer> n_buf = (__bridge id<MTLBuffer>)m->n_buf;
 
+        id<MTLBuffer> sz_buf = (__bridge id<MTLBuffer>)m->sz_buf;
+
         *(uint32_t*)n_buf.contents = (uint32_t)n;
+
+        uint32_t *szs = (uint32_t*)sz_buf.contents;
+        __builtin_memset(szs, 0, 16 * sizeof(uint32_t));
+        for (int i = 0; i <= m->max_ptr; i++) {
+            if (buf[i].ptr && buf[i].sz) {
+                long bytes = buf[i].sz < 0 ? -buf[i].sz : buf[i].sz;
+                szs[i] = (uint32_t)bytes;
+            }
+        }
 
         for (int i = 0; i <= m->max_ptr; i++) {
             if (!buf[i].ptr || !buf[i].sz) { continue; }
@@ -548,6 +569,7 @@ void umbra_metal_run(struct umbra_metal *m, int n, umbra_buf buf[]) {
                 m->bufs[bi] = (__bridge_retained void*)b;
             }
             __builtin_memcpy(((__bridge id<MTLBuffer>)m->bufs[bi]).contents, derived, (size_t)bytes);
+            szs[bi] = (uint32_t)bytes;
         }
 
         id<MTLCommandBuffer> cmdbuf = [queue commandBufferWithUnretainedReferences];
@@ -560,6 +582,7 @@ void umbra_metal_run(struct umbra_metal *m, int n, umbra_buf buf[]) {
                         offset:0 atIndex:(NSUInteger)(i + 1)];
             }
         }
+        [enc setBuffer:sz_buf offset:0 atIndex:(NSUInteger)(m->total_bufs + 1)];
 
         MTLSize grid = MTLSizeMake((NSUInteger)n, 1, 1);
         MTLSize group = MTLSizeMake((NSUInteger)m->tg_size, 1, 1);
@@ -593,6 +616,7 @@ void umbra_metal_free(struct umbra_metal *m) {
         if (m->pipeline) { (void)(__bridge_transfer id)m->pipeline; }
         if (m->queue)    { (void)(__bridge_transfer id)m->queue; }
         if (m->n_buf)    { (void)(__bridge_transfer id)m->n_buf; }
+        if (m->sz_buf)   { (void)(__bridge_transfer id)m->sz_buf; }
         for (int p = 0; p < 16; p++) {
             if (m->bufs[p]) { (void)(__bridge_transfer id)m->bufs[p]; }
         }

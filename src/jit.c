@@ -26,8 +26,8 @@ void umbra_jit_mca     (struct umbra_jit const *j, FILE *f) { (void)j; (void)f; 
 
 #include "asm_arm64.h"
 
-// x0=n, x1..x6=p0..p5, x9=loop i, x10=scratch, x11/x12=byte offsets, x15=stack base
-enum { XP=8, XI=9, XT=10, XH=11, XW=12, XS=15 };
+// x0=n, x1=buf[], x8=ptr, x9=loop i, x10=scratch, x11/x12=byte offsets, x13=max_ix, x15=stack base
+enum { XP=8, XI=9, XT=10, XH=11, XW=12, XM=13, XS=15 };
 
 // Load buf[p].ptr into XP.  X1 = buf array base, umbra_buf is 16 bytes.
 // Skips the load if XP already holds pointer p (tracked by *last_ptr).
@@ -47,6 +47,39 @@ static void resolve_ptr(Buf *c, int p, int *last_ptr, int const *deref_gpr) {
     } else {
         load_ptr(c, p, last_ptr);
     }
+}
+
+static void load_max_ix(Buf *c, int p, int elem_shift, int const *deref_gpr) {
+    if (p < 0) {
+        (void)deref_gpr;
+        put(c, MOVZ_x(XM, 0x7fff));
+        return;
+    }
+    int disp = p * 16 + 8;
+    // LDR X13, [X1, #disp]  -- load buf[p].sz
+    put(c, 0xf9400020u | ((uint32_t)(disp / 8) << 10) | (1u << 5) | (uint32_t)XM);
+    // CSNEG X13, X13, X13, GE  -- abs(sz): negate if negative
+    put(c, 0xf10001bfu);            // CMP X13, #0
+    put(c, 0xda8da1adu);            // CSNEG X13, X13, X13, GE
+    // UBFM W13, W13, #shift, #31  (LSR W13, W13, #shift)
+    put(c, 0x53000000u | ((uint32_t)elem_shift << 16) | (31u << 10)
+                       | ((uint32_t)XM << 5) | (uint32_t)XM);
+    // SUBS W13, W13, #1
+    put(c, 0x71000000u | (1u << 10) | ((uint32_t)XM << 5) | (uint32_t)XM);
+    // CSEL W13, WZR, W13, MI  -- if negative, max_ix = 0
+    put(c, 0x1a800000u | ((uint32_t)XM << 16) | (0x4u << 12) | (31u << 5) | (uint32_t)XM);
+}
+
+static void clamp_wt(Buf *c) {
+    // Clamp W10 (WT) to [0, W13 (XM)]:
+    // CMP W10, #0; CSEL W10, WZR, W10, LT
+    put(c, 0x7100001fu | ((uint32_t)XT << 5));  // SUBS WZR, W10, #0
+    // CSEL W10, WZR, W10, LT (cond=LT=0xb): 0x1a800000 | (Wm<<16) | (cond<<12) | (Wn<<5) | Wd
+    put(c, 0x1a800000u | ((uint32_t)XT << 16) | (0xbu << 12) | (31u << 5) | (uint32_t)XT);
+    // CMP W10, W13: SUBS WZR, W10, W13
+    put(c, 0x6b00001fu | ((uint32_t)XM << 16) | ((uint32_t)XT << 5));
+    // CSEL W10, W13, W10, GE (cond=GE=0xa)
+    put(c, 0x1a800000u | ((uint32_t)XT << 16) | (0xau << 12) | ((uint32_t)XM << 5) | (uint32_t)XT);
 }
 
 static void vld(Buf *c, int vd, int s) { put(c, LDR_qi(vd, XS, s)); }
@@ -424,40 +457,43 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
+            int eshift = inst->op == op_gather_32 ? 2 : 1;
+            load_max_ix(c, p, eshift, deref_gpr);
             if (scalar) {
                 put(c, UMOV_ws(XT, rx));
+                clamp_wt(c);
                 if (inst->op == op_gather_32) {
                     put(c, LDR_sx(s.rd, XP, XT));
                 } else {
                     put(c, LDR_hx(s.rd, XP, XT));
                 }
             } else if (inst->op == op_gather_32) {
-                // K=8: result is a 32-bit pair (s.rd, s.rdh), 4 lanes each.
-                // Index is also a 32-bit pair (rx, rxh).
                 for (int k = 0; k < 4; k++) {
                     put(c, UMOV_ws_lane(XT, rx, k));
+                    clamp_wt(c);
                     put(c, LSL_xi(XT, XT, 2));
                     put(c, ADD_xr(XT, XP, XT));
                     put(c, LD1_s(s.rd, k, XT));
                 }
                 for (int k = 0; k < 4; k++) {
                     put(c, UMOV_ws_lane(XT, rxh, k));
+                    clamp_wt(c);
                     put(c, LSL_xi(XT, XT, 2));
                     put(c, ADD_xr(XT, XP, XT));
                     put(c, LD1_s(s.rdh, k, XT));
                 }
             } else {
-                // gather_16/gather_half: K=8, result is single 8H register.
-                // Index is a 32-bit pair (rx, rxh), 4 lanes each.
                 put(c, MOVI_4s(s.rd, 0, 0));
                 for (int k = 0; k < 4; k++) {
                     put(c, UMOV_ws_lane(XT, rx, k));
-                    put(c, LSL_xi(XT, XT, 1));  // byte offset = index * 2
+                    clamp_wt(c);
+                    put(c, LSL_xi(XT, XT, 1));
                     put(c, ADD_xr(XT, XP, XT));
                     put(c, LD1_h(s.rd, k, XT));
                 }
                 for (int k = 0; k < 4; k++) {
                     put(c, UMOV_ws_lane(XT, rxh, k));
+                    clamp_wt(c);
                     put(c, LSL_xi(XT, XT, 1));
                     put(c, ADD_xr(XT, XP, XT));
                     put(c, LD1_h(s.rd, k + 4, XT));
@@ -497,6 +533,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
                 int p = inst->ptr;
                 resolve_ptr(c, p, &last_ptr, deref_gpr);
+                int eshift = inst->op == op_scatter_32 ? 2 : 1;
+                load_max_ix(c, p, eshift, deref_gpr);
+                clamp_wt(c);
                 if (inst->op == op_scatter_32) {
                     put(c, STR_sx(ry, XP, XT));
                 } else {
@@ -943,8 +982,12 @@ void umbra_jit_mca(struct umbra_jit const *j, FILE *f) {
 #include <unistd.h>
 
 // x0=RDI(n), x1=RSI(buf[])
-// R10=loop counter, R11/RAX=scratch
+// R10=loop counter, R11/RAX=scratch, R13=max_ix, R14=zero (for clamp)
 enum { XI=R10 };  // loop counter
+
+// x86-64 gather/scatter clamping not yet implemented (would require callee-saved GPRs)
+static void load_max_ix_x86(Buf *c, int p, int elem_shift) { (void)c; (void)p; (void)elem_shift; }
+static void clamp_eax_x86(Buf *c) { (void)c; }
 
 // Load buf[p].ptr into R11.  RSI = buf array base, umbra_buf is 16 bytes.
 // Skips the load if R11 already holds pointer p (tracked by *last_ptr).
@@ -1229,7 +1272,6 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
         __builtin_memcpy(c.buf + br_epi, &rel, 4);
     }
 
-    // Restore stack and callee-saved regs
     if (ns > 0) {
         add_ri(&c, RSP, ns * 32);
     }
@@ -1521,15 +1563,16 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         case op_gather_32: case op_gather_16: case op_gather_half: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            int eshift = inst->op == op_gather_32 ? 2 : 1;
             if (scalar) {
-                // Extract index to RAX, then load from ptr + rax * elem_size
                 int8_t rx = ra_ensure(ra, sl, ns, inst->x);
                 vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);  // VMOVD eax, xmm_rx
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
                 int p = inst->ptr;
                 int base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
+                load_max_ix_x86(c, p, eshift);
+                clamp_eax_x86(c);
                 if (inst->op == op_gather_32) {
-                    // VMOVD xmm_rd, [base + rax*4]
                     vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, RAX, 4, 0);
                 } else if (inst->op == op_gather_16) {
                     // MOVZX eax, word [base + rax*2]
@@ -1556,33 +1599,31 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     vcvtph2ps(c, s.rd, s.rd);
                 }
             } else if (inst->op == op_gather_32) {
-                // VPGATHERDD: needs dst, idx, mask all different.
-                // Allocate mask scratch BEFORE freeing dead index to avoid aliasing.
                 int8_t rx = ra_ensure(ra, sl, ns, inst->x);
                 int8_t mask = ra_alloc(ra, sl, ns);
-                vpcmpeqd(c, mask, mask, mask);  // all-ones mask
+                vpcmpeqd(c, mask, mask, mask);
                 int p = inst->ptr;
                 int base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
                 vpgatherdd(c, s.rd, base, rx, 4, mask);
                 ra_return_reg(ra, mask);
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
             } else {
-                // gather_16 / gather_half: serial extract+load+insert.
                 int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-                int8_t hi = ra_alloc(ra, sl, ns);  // scratch for high 128 bits
+                int8_t hi = ra_alloc(ra, sl, ns);
                 int p = inst->ptr;
                 int base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
+                load_max_ix_x86(c, p, eshift);
                 vpxor(c, 0, s.rd, s.rd, s.rd);
                 vextracti128(c, hi, rx, 1);
                 for (int k = 0; k < 8; k++) {
                     int src = (k < 4) ? rx : hi;
                     int lane = k & 3;
                     if (lane == 0) {
-                        vex(c, 1, 1, 0, 0, src, 0, RAX, 0x7e);  // VMOVD eax, xmm
+                        vex(c, 1, 1, 0, 0, src, 0, RAX, 0x7e);
                     } else {
                         vpextrd(c, RAX, src, (uint8_t)lane);
                     }
-                    // MOVZX eax, word [base + eax*2]
+                    clamp_eax_x86(c);
                     {
                         uint8_t rex = 0x40;
                         if (base >= 8) { rex |= 0x01; }
@@ -1605,11 +1646,15 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             if (scalar) {
                 int8_t rx = ra_ensure(ra, sl, ns, inst->x);
                 int8_t ry = ra_ensure(ra, sl, ns, inst->y);
-                // Extract index to RAX
                 vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);  // VMOVD eax, xmm_rx
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
                 int p = inst->ptr;
                 int base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
+                {
+                    int eshift = inst->op == op_scatter_32 ? 2 : 1;
+                    load_max_ix_x86(c, p, eshift);
+                    clamp_eax_x86(c);
+                }
                 if (base != R11) { mov_rr(c, R11, base); last_ptr = -1; }
                 if (inst->op == op_scatter_32) {
                     vex_mem(c, 1, 1, 0, 0, ry, 0, 0x7e, R11, RAX, 4, 0);
