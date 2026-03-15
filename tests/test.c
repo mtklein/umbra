@@ -1508,6 +1508,53 @@ static void test_n9(void) {
   }
 }
 
+// Regression: paired f32 op with non-paired preamble operand under register pressure.
+// The RA could evict the preamble operand and reuse its register for the paired result.
+// The lo-half emit reads the operand before writing (correct), but the hi-half emit
+// then reads from the same register which now contains the lo result (wrong).
+// This bug only manifested with K=8 (ARM64 JIT) and high preamble count.
+static void test_preamble_pair_alias(void) {
+  for (int opt = 0; opt < 2; opt++) {
+    struct umbra_basic_block *bb = umbra_basic_block();
+    umbra_v32 ix = umbra_lane(bb);
+
+    // Create many preamble f32 values to exhaust the register file.
+    // ARM64 JIT has 20 registers; we need >20 preamble values.
+    enum { N_PRE = 24 };
+    umbra_v32 pre[N_PRE];
+    for (int i = 0; i < N_PRE; i++) {
+        // Each value is a different float: 1.0, 2.0, 3.0, ...
+        union { float f; unsigned u; } v = { .f = (float)(i + 1) };
+        pre[i] = umbra_imm_32(bb, v.u);
+    }
+
+    // Varying: load x from memory (this is the first varying instruction).
+    umbra_v32 x = umbra_load_32(bb, (umbra_ptr){0}, ix);
+
+    // Multiply x by each preamble value and sum the results.
+    // This forces the RA to juggle preamble registers during paired f32 ops.
+    umbra_v32 sum = umbra_mul_f32(bb, x, pre[0]);
+    for (int i = 1; i < N_PRE; i++) {
+        sum = umbra_add_f32(bb, sum, umbra_mul_f32(bb, x, pre[i]));
+    }
+
+    umbra_store_32(bb, (umbra_ptr){1}, ix, sum);
+    backends B = make(bb, opt);
+
+    for (int bi = 0; bi < 4; bi++) {
+        // N=16: two full vector iterations on K=8 JIT.
+        float in[16], out[16] = {0};
+        for (int i = 0; i < 16; i++) { in[i] = (float)(i + 1); }
+        if (!run(&B, bi, 16, (umbra_buf[]){{in, 16*4}, {out, 16*4}})) { continue; }
+        // Expected: sum = x * (1 + 2 + ... + 24) = x * 300
+        float ref[16];
+        umbra_interpreter_run(B.interp, 16, (umbra_buf[]){{in, 16*4}, {ref, 16*4}});
+        for (int i = 0; i < 16; i++) { equiv(out[i], ref[i]) here; }
+    }
+    cleanup(&B);
+  }
+}
+
 int main(void) {
     test_f32_ops();
     test_i32_ops();
@@ -1539,5 +1586,6 @@ int main(void) {
     test_shr_narrow_u32();
     test_half_convert_pressure();
     test_n9();
+    test_preamble_pair_alias();
     return 0;
 }

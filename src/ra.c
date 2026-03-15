@@ -277,7 +277,9 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns,
     struct ra_step s = step0();
     _Bool pair = ra->is_pair[i] && !scalar;
 
-    // 1. Ensure inputs, pinning each so later ensures can't evict earlier ones.
+    // 1. Ensure inputs, pinning each so later ensures/allocs can't evict them.
+    //    Pins stay active through step 5 so that hi-half register captures
+    //    (rxh/ryh/rzh) remain valid across rd/rdh/scratch allocation.
     ra->npinned = 0;
     if (inst->x < i) {
         s.rx = ra_ensure(ra, sl, ns, inst->x);
@@ -289,8 +291,10 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns,
     }
     if (inst->z < i) {
         s.rz = ra_ensure(ra, sl, ns, inst->z);
+        if (inst->z != inst->x && inst->z != inst->y) {
+            ra->pinned[ra->npinned++] = inst->z;
+        }
     }
-    ra->npinned = 0;
     s.rxh = inst->x < i ? ra_hi(ra, inst->x) : 0;
     s.ryh = inst->y < i ? ra_hi(ra, inst->y) : 0;
     s.rzh = inst->z < i ? ra_hi(ra, inst->z) : 0;
@@ -304,26 +308,33 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns,
     if (inst->z == inst->y) { z_dead = 0; }
 
     // 3. Claim/alloc rd with op-specific preferences.
+    //    When the output is paired, don't claim a non-paired input's register —
+    //    it would alias rxh/ryh/rzh, causing the hi-half emit to read stale data
+    //    after the lo-half emit overwrites rd.
     enum op op = inst->op;
     _Bool fma = op==op_fma_f32 || op==op_fma_half
              || op==op_fms_f32 || op==op_fms_half;
     _Bool destructive = fma
                      || op==op_sel_32 || op==op_sel_16 || op==op_sel_half;
 
-    if (fma && z_dead) {
+    _Bool can_claim_x = !pair || ra->is_pair[inst->x];
+    _Bool can_claim_y = !pair || ra->is_pair[inst->y];
+    _Bool can_claim_z = !pair || ra->is_pair[inst->z];
+
+    if (fma && z_dead && can_claim_z) {
         s.rd = ra_claim(ra, inst->z, i); z_dead = 0;
     } else if (fma && !z_dead) {
         // Pre-allocate rd to avoid rd aliasing rx/ry (avoids scratch+3-MOV path).
         s.rd = ra_alloc(ra, sl, ns);
         ra->reg[i] = s.rd; ra->owner[(int)s.rd] = i;
-    } else if ((op==op_sel_32 || op==op_sel_16 || op==op_sel_half) && x_dead) {
+    } else if ((op==op_sel_32 || op==op_sel_16 || op==op_sel_half) && x_dead && can_claim_x) {
         s.rd = ra_claim(ra, inst->x, i); x_dead = 0;
     }
 
     if (!destructive) {
-        if (s.rd < 0 && x_dead) { s.rd = ra_claim(ra, inst->x, i); x_dead = 0; }
-        if (s.rd < 0 && y_dead) { s.rd = ra_claim(ra, inst->y, i); y_dead = 0; }
-        if (s.rd < 0 && z_dead) { s.rd = ra_claim(ra, inst->z, i); z_dead = 0; }
+        if (s.rd < 0 && x_dead && can_claim_x) { s.rd = ra_claim(ra, inst->x, i); x_dead = 0; }
+        if (s.rd < 0 && y_dead && can_claim_y) { s.rd = ra_claim(ra, inst->y, i); y_dead = 0; }
+        if (s.rd < 0 && z_dead && can_claim_z) { s.rd = ra_claim(ra, inst->z, i); z_dead = 0; }
     }
 
     // 4. Alloc rd if not yet assigned.
@@ -347,7 +358,8 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns,
         s.scratch2 = ra_alloc(ra, sl, ns);
     }
 
-    // 6. Free dead inputs.
+    // 6. Clear pins and free dead inputs.
+    ra->npinned = 0;
     if (x_dead) { ra_free_reg(ra, inst->x); }
     if (y_dead) { ra_free_reg(ra, inst->y); }
     if (z_dead) { ra_free_reg(ra, inst->z); }

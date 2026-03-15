@@ -319,8 +319,11 @@ umbra_half umbra_coverage_bitmap_matrix(BB *bb, umbra_v32 x, umbra_v32 y) {
     umbra_half cov = umbra_mul_half(bb, umbra_half_from_i16(bb, val), inv255);
 
     // Zero out-of-bounds pixels.
-    umbra_half zero_h = umbra_imm_half(bb, 0);
-    return umbra_sel_half(bb, umbra_half_from_f32(bb, in), cov, zero_h);
+    // Select in f32 to avoid converting a 32-bit mask through float→half,
+    // which produces NaN whose bit pattern is GPU-dependent.
+    umbra_v32 cov_f32 = umbra_f32_from_half(bb, cov);
+    umbra_v32 masked  = umbra_sel_32(bb, in, cov_f32, umbra_imm_32(bb, 0));
+    return umbra_half_from_f32(bb, masked);
 }
 
 // --- Built-in pixel formats ---
