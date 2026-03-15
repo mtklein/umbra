@@ -99,6 +99,36 @@ f32 umbra_imm_f32      (BB *bb, uint32_t bits) { return (f32){push(bb, op_imm_32
 vh  umbra_imm_half     (BB *bb, uint16_t bits) { return (vh ){push(bb, op_imm_half, .imm=(int)bits)}; }
 vm  umbra_imm_half_mask(BB *bb, uint16_t bits) { return (vm ){push(bb, op_imm_half, .imm=(int)bits)}; }
 
+int umbra_reserve_i32(BB *bb, int n) {
+    bb->uni_len = (bb->uni_len + 3) & ~3;
+    int ix = bb->uni_len / 4;
+    bb->uni_len += n * 4;
+    return ix;
+}
+int umbra_reserve_f32(BB *bb, int n) {
+    bb->uni_len = (bb->uni_len + 3) & ~3;
+    int ix = bb->uni_len / 4;
+    bb->uni_len += n * 4;
+    return ix;
+}
+int umbra_reserve_half(BB *bb, int n) {
+    bb->uni_len = (bb->uni_len + 1) & ~1;
+    int ix = bb->uni_len / 2;
+    bb->uni_len += n * 2;
+    return ix;
+}
+int umbra_reserve_ptr(BB *bb) {
+    bb->uni_len = (bb->uni_len + 7) & ~7;
+    int off = bb->uni_len;
+    bb->uni_len += 16;
+    return off;
+}
+umbra_ptr umbra_deref_ptr(BB *bb, umbra_ptr buf, int byte_off) {
+    int id = push(bb, op_deref_ptr, .ptr=buf.ix, .imm=byte_off);
+    return (umbra_ptr){~id};
+}
+int umbra_uni_len(BB const *bb) { return bb->uni_len; }
+
 i16 umbra_load_i16(BB *bb, umbra_ptr src, i32 ix) {
     if (bb->inst[ix.id].op == op_lane  ) { return (i16){push(bb,op_load_16,           .ptr=src.ix)}; }
     if (bb->inst[ix.id].op == op_imm_32) { return (i16){push(bb,op_uni_16,   .imm=bb->inst[ix.id].imm,.ptr=src.ix)}; }
@@ -617,6 +647,7 @@ void umbra_basic_block_optimize(BB *bb) {
             live[bb->inst[i].y] = 1;
             live[bb->inst[i].z] = 1;
             live[bb->inst[i].w] = 1;
+            if (bb->inst[i].ptr < 0) { live[~bb->inst[i].ptr] = 1; }
         }
     }
     for (int i = 0; i < n; i++) {
@@ -653,6 +684,7 @@ void umbra_basic_block_optimize(BB *bb) {
         out[i].y = old_to_new[out[i].y];
         out[i].z = old_to_new[out[i].z];
         out[i].w = old_to_new[out[i].w];
+        if (out[i].ptr < 0) { out[i].ptr = ~old_to_new[~out[i].ptr]; }
     }
 
     free(bb->inst);
@@ -708,6 +740,9 @@ void umbra_basic_block_dump(struct umbra_basic_block const *bb, FILE *f) {
                 } else {
                     fprintf(f, " v%d ch%d", inst->x, inst->imm);
                 }
+                break;
+            case op_deref_ptr:
+                fprintf(f, " p%d byte%d", inst->ptr, inst->imm);
                 break;
             case op_shl_i32_imm: case op_shr_u32_imm: case op_shr_s32_imm:
             case op_shl_i16_imm: case op_shr_u16_imm: case op_shr_s16_imm:

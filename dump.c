@@ -11,7 +11,7 @@
 static void dump(const char *name,
                  umbra_shader_fn shader, umbra_coverage_fn coverage,
                  umbra_blend_fn blend, umbra_load_fn load, umbra_store_fn store) {
-    struct umbra_basic_block *bb = umbra_draw_build(shader, coverage, blend, load, store);
+    struct umbra_basic_block *bb = umbra_draw_build(shader, coverage, blend, load, store, NULL);
     { char p[64]; snprintf(p,sizeof p,"dumps/%s.bb",name);
       FILE *f = fopen(p,"w"); umbra_basic_block_dump(bb,f); fclose(f); }
 

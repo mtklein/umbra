@@ -300,7 +300,7 @@ int main(int argc, char *argv[]) {
     for (int di = 0; di < (int)(sizeof draws / sizeof draws[0]); di++) {
         draw_config *d = &draws[di];
         struct umbra_basic_block *dbb = umbra_draw_build(
-            d->shader, d->coverage, d->blend, d->load, d->store);
+            d->shader, d->coverage, d->blend, d->load, d->store, NULL);
         umbra_basic_block_optimize(dbb);
 
         struct umbra_interpreter *dp   = umbra_interpreter(dbb);
@@ -322,14 +322,14 @@ int main(int argc, char *argv[]) {
         void *dst_px = malloc((size_t)pixel_n * (size_t)px_bytes);
         memset(dst_px, 0x80, (size_t)pixel_n * (size_t)px_bytes);
 
-        int32_t x0 = 0, y0 = 0;
-        __fp16  color[4] = {(__fp16)0.25f, (__fp16)0.5f, (__fp16)0.125f, (__fp16)0.5f};
+        __fp16 color[4] = {(__fp16)0.25f, (__fp16)0.5f, (__fp16)0.125f, (__fp16)0.5f};
+        long long uni_[2] = {0};
+        char *uni = (char*)uni_;
+        __builtin_memcpy(uni + 8, color, 8);
 
         umbra_buf dbuf[] = {
             {dst_px, pixel_n * px_bytes},
-            {&x0,   -4},
-            {&y0,   -4},
-            {color, -8},
+            {uni,   -16},
         };
 
         printf("\nDraw %s, %d pixels:\n", d->name, pixel_n);

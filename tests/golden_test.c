@@ -2,7 +2,6 @@
 #include "test.h"
 #include <math.h>
 #include <stdint.h>
-#include <string.h>
 #include <stdlib.h>
 
 enum { W = 128, H = 96, LUT_N = 64 };
@@ -57,75 +56,89 @@ static void build_perspective_matrix(float out[11], float t, int sw, int sh, int
     out[9] = (float)bw;   out[10] = (float)bh;
 }
 
+static void uni_i32(char *u, int off, int32_t v) { __builtin_memcpy(u+off, &v, 4); }
+static void uni_h4 (char *u, int off, __fp16 const c[4]) { __builtin_memcpy(u+off, c, 8); }
+static void uni_h8 (char *u, int off, __fp16 const c[8]) { __builtin_memcpy(u+off, c, 16); }
+static void uni_f32(char *u, int off, float const *v, int n) { __builtin_memcpy(u+off, v, (unsigned long)n*4); }
+static void uni_ptr(char *u, int off, void *p, long sz) {
+    __builtin_memcpy(u+off,   &p,  8);
+    __builtin_memcpy(u+off+8, &sz, 8);
+}
+
 static void render_slide(int slide_idx, void *ctx, run_fn run,
-                         uint32_t *px, text_cov *bitmap_cov, text_cov *sdf_cov) {
+                         uint32_t *px, text_cov *bitmap_cov, text_cov *sdf_cov,
+                         umbra_draw_layout const *lay) {
     slide const *s = &slides[slide_idx];
     __fp16 hc[8];
     for (int i = 0; i < 8; i++) { hc[i] = (__fp16)s->color[i]; }
 
     for (int i = 0; i < W * H; i++) { px[i] = s->bg; }
 
-    int32_t x0 = 0;
-
     if (s->coverage == umbra_coverage_bitmap_matrix) {
         float mat[11];
         build_perspective_matrix(mat, 1.0f, W, H, bitmap_cov->w, bitmap_cov->h);
         for (int y = 0; y < H; y++) {
-            int32_t yval = y;
+            long long uni_[10] = {0}; char *uni = (char*)uni_;
+            uni_i32(uni, lay->x0, 0);
+            uni_i32(uni, lay->y,  y);
+            uni_h4 (uni, 8, hc);
+            uni_f32(uni, 16, mat, 11);
+            uni_ptr(uni, 64, bitmap_cov->data, (long)(W * H * 2));
             umbra_buf buf[] = {
-                { px + y * W,       W * 4                },
-                { &x0,             -4                    },
-                { &yval,           -4                    },
-                { hc,              -8                    },
-                { bitmap_cov->data, -(W * H * 2)         },
-                { mat,             -(int)(sizeof mat)     },
+                { px + y * W, W * 4 },
+                { uni, -(long)lay->uni_len },
             };
             run(ctx, W, buf);
         }
     } else if (s->coverage == umbra_coverage_bitmap || s->coverage == umbra_coverage_sdf) {
         text_cov *tc = (s->coverage == umbra_coverage_bitmap) ? bitmap_cov : sdf_cov;
         for (int y = 0; y < H; y++) {
-            int32_t yval = y;
+            long long uni_[4] = {0}; char *uni = (char*)uni_;
+            uni_i32(uni, lay->x0, 0);
+            uni_i32(uni, lay->y,  y);
+            uni_h4 (uni, 8, hc);
+            uni_ptr(uni, 16, tc->data + y * W, (long)(W * 2));
             umbra_buf buf[] = {
-                { px + y * W,        W * 4    },
-                { &x0,              -4        },
-                { &yval,            -4        },
-                { hc,               -8        },
-                { tc->data + y * W, -(W * 2)  },
+                { px + y * W, W * 4 },
+                { uni, -(long)lay->uni_len },
             };
             run(ctx, W, buf);
         }
     } else if (s->shader != umbra_shader_solid) {
         _Bool is_lut = (s->shader == umbra_shader_linear_grad ||
                         s->shader == umbra_shader_radial_grad);
-        __fp16 *p3   = is_lut ? (s->shader == umbra_shader_linear_grad ? linear_lut
-                                                                       : radial_lut)
-                              : hc;
-        int     p3sz = is_lut ? (int)(LUT_N * 4 * 2) : 16;
-        float   gp[4] = {s->grad[0], s->grad[1], s->grad[2], s->grad[3]};
+        float gp[4] = {s->grad[0], s->grad[1], s->grad[2], s->grad[3]};
 
         for (int y = 0; y < H; y++) {
-            int32_t yval = y;
+            long long uni_[5] = {0}; char *uni = (char*)uni_;
+            uni_i32(uni, lay->x0, 0);
+            uni_i32(uni, lay->y,  y);
+            if (is_lut) {
+                __fp16 *lut = (s->shader == umbra_shader_linear_grad) ? linear_lut
+                                                                      : radial_lut;
+                uni_f32(uni, 8, gp, 4);
+                uni_ptr(uni, 24, lut, (long)(LUT_N * 4 * 2));
+            } else {
+                uni_f32(uni, 8, gp, 3);
+                uni_h8 (uni, 20, hc);
+            }
             umbra_buf buf[] = {
-                {px + y * W,  W * 4},
-                {&x0,        -4},
-                {&yval,      -4},
-                {p3,         -p3sz},
-                {NULL,        0},
-                {gp,         -(int)sizeof gp},
+                { px + y * W, W * 4 },
+                { uni, -(long)lay->uni_len },
             };
             run(ctx, W, buf);
         }
     } else {
         float rect[4] = { 30.0f, 20.0f, 90.0f, 60.0f };
         for (int y = 0; y < H; y++) {
-            int32_t yval = y;
+            long long uni_[4] = {0}; char *uni = (char*)uni_;
+            uni_i32(uni, lay->x0, 0);
+            uni_i32(uni, lay->y,  y);
+            uni_h4 (uni, 8, hc);
+            uni_f32(uni, 16, rect, 4);
             umbra_buf buf[] = {
-                { px + y * W,  W * 4 },
-                { &x0,        -4     },
-                { &yval,      -4     },
-                { hc,         -8     },
-                { rect,       -16    },
+                { px + y * W, W * 4 },
+                { uni, -(long)lay->uni_len },
             };
             run(ctx, W, buf);
         }
@@ -135,8 +148,9 @@ static void render_slide(int slide_idx, void *ctx, run_fn run,
 static void test_slide_golden(int slide_idx, text_cov *bitmap_cov, text_cov *sdf_cov) {
     slide const *s = &slides[slide_idx];
 
+    umbra_draw_layout lay;
     struct umbra_basic_block *bb = umbra_draw_build(
-        s->shader, s->coverage, s->blend, s->load, s->store);
+        s->shader, s->coverage, s->blend, s->load, s->store, &lay);
     umbra_basic_block_optimize(bb);
 
     struct umbra_interpreter *interp = umbra_interpreter(bb);
@@ -150,11 +164,11 @@ static void test_slide_golden(int slide_idx, text_cov *bitmap_cov, text_cov *sdf
     uint32_t *ref = malloc((size_t)(W * H) * 4);
     uint32_t *tst = malloc((size_t)(W * H) * 4);
 
-    render_slide(slide_idx, interp, run_interp, ref, bitmap_cov, sdf_cov);
+    render_slide(slide_idx, interp, run_interp, ref, bitmap_cov, sdf_cov, &lay);
 
     for (int bi = 1; bi < NUM_BACKENDS; bi++) {
         if (!backends[bi]) { continue; }
-        render_slide(slide_idx, backends[bi], run_fns[bi], tst, bitmap_cov, sdf_cov);
+        render_slide(slide_idx, backends[bi], run_fns[bi], tst, bitmap_cov, sdf_cov, &lay);
 
         int mismatches = 0;
         int worst = 0;

@@ -60,34 +60,54 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                     break;
                 case op_uni_half: {
                     int p = inst->ptr;
-                    _Bool mixed = ptr_32[p] && ptr_16[p];
-                    emit(b, mixed ? "%sfloat v%d = h2f(p%d_16[%d]);\n"
-                                  : "%sfloat v%d = h2f(p%d[%d]);\n",
-                         pad, i, p, inst->imm);
+                    if (p < 0) {
+                        emit(b, "%sfloat v%d = h2f(((u16*)pd%d)[%d]);\n", pad, i, ~p, inst->imm);
+                    } else {
+                        _Bool mixed = ptr_32[p] && ptr_16[p];
+                        emit(b, mixed ? "%sfloat v%d = h2f(p%d_16[%d]);\n"
+                                      : "%sfloat v%d = h2f(p%d[%d]);\n",
+                             pad, i, p, inst->imm);
+                    }
                 } break;
                 case op_load_half: {
                     int p = inst->ptr;
-                    _Bool mixed = ptr_32[p] && ptr_16[p];
-                    emit(b, mixed ? "%sfloat v%d = h2f(p%d_16[i]);\n"
-                                  : "%sfloat v%d = h2f(p%d[i]);\n", pad, i, p);
+                    if (p < 0) {
+                        emit(b, "%sfloat v%d = h2f(((u16*)pd%d)[i]);\n", pad, i, ~p);
+                    } else {
+                        _Bool mixed = ptr_32[p] && ptr_16[p];
+                        emit(b, mixed ? "%sfloat v%d = h2f(p%d_16[i]);\n"
+                                      : "%sfloat v%d = h2f(p%d[i]);\n", pad, i, p);
+                    }
                 } break;
                 case op_gather_half: {
                     int p = inst->ptr;
-                    _Bool mixed = ptr_32[p] && ptr_16[p];
-                    emit(b, mixed ? "%sfloat v%d = h2f(p%d_16[v%d]);\n"
-                                  : "%sfloat v%d = h2f(p%d[v%d]);\n", pad, i, p, inst->x);
+                    if (p < 0) {
+                        emit(b, "%sfloat v%d = h2f(((u16*)pd%d)[v%d]);\n", pad, i, ~p, inst->x);
+                    } else {
+                        _Bool mixed = ptr_32[p] && ptr_16[p];
+                        emit(b, mixed ? "%sfloat v%d = h2f(p%d_16[v%d]);\n"
+                                      : "%sfloat v%d = h2f(p%d[v%d]);\n", pad, i, p, inst->x);
+                    }
                 } break;
                 case op_store_half: {
                     int p = inst->ptr;
-                    _Bool mixed = ptr_32[p] && ptr_16[p];
-                    emit(b, mixed ? "%sp%d_16[i] = f2h(v%d);\n"
-                                  : "%sp%d[i] = f2h(v%d);\n", pad, p, inst->y);
+                    if (p < 0) {
+                        emit(b, "%s((u16*)pd%d)[i] = f2h(v%d);\n", pad, ~p, inst->y);
+                    } else {
+                        _Bool mixed = ptr_32[p] && ptr_16[p];
+                        emit(b, mixed ? "%sp%d_16[i] = f2h(v%d);\n"
+                                      : "%sp%d[i] = f2h(v%d);\n", pad, p, inst->y);
+                    }
                 } break;
                 case op_scatter_half: {
                     int p = inst->ptr;
-                    _Bool mixed = ptr_32[p] && ptr_16[p];
-                    emit(b, mixed ? "%sp%d_16[v%d] = f2h(v%d);\n"
-                                  : "%sp%d[v%d] = f2h(v%d);\n", pad, p, inst->x, inst->y);
+                    if (p < 0) {
+                        emit(b, "%s((u16*)pd%d)[v%d] = f2h(v%d);\n", pad, ~p, inst->x, inst->y);
+                    } else {
+                        _Bool mixed = ptr_32[p] && ptr_16[p];
+                        emit(b, mixed ? "%sp%d_16[v%d] = f2h(v%d);\n"
+                                      : "%sp%d[v%d] = f2h(v%d);\n", pad, p, inst->x, inst->y);
+                    }
                 } break;
                 case op_add_half:  emit(b, "%sfloat v%d = v%d + v%d;\n",       pad, i, inst->x, inst->y); break;
                 case op_sub_half:  emit(b, "%sfloat v%d = v%d - v%d;\n",       pad, i, inst->x, inst->y); break;
@@ -125,6 +145,7 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
                 case op_le_half: emit(b, "%sfloat v%d = u2f((u32)-(s32)(v%d <= v%d));\n", pad, i, inst->x, inst->y); break;
                 case op_lane:
                 case op_imm_16: case op_imm_32:
+                case op_deref_ptr:
                 case op_uni_16: case op_uni_32:
                 case op_load_16: case op_load_32:
                 case op_gather_16: case op_gather_32:
@@ -163,64 +184,109 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             case op_imm_16: emit(b, "%s%s v%d = %u;\n", pad, ty, i, (uint16_t)inst->imm); break;
             case op_imm_32: emit(b, "%s%s v%d = %uu;\n", pad, ty, i, (uint32_t)inst->imm); break;
 
+            case op_deref_ptr: {
+                int p = inst->ptr;
+                emit(b, "%svoid *pd%d = *(void**)((char*)ptrs[%d] + %d);\n", pad, i, p, inst->imm);
+            } break;
+
             case op_uni_16: {
                 int p = inst->ptr;
-                _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%su16 v%d = p%d_16[%d];\n"
-                              : "%su16 v%d = p%d[%d];\n", pad, i, p, inst->imm);
+                if (p < 0) {
+                    emit(b, "%su16 v%d = ((u16*)pd%d)[%d];\n", pad, i, ~p, inst->imm);
+                } else {
+                    _Bool mixed = ptr_32[p] && ptr_16[p];
+                    emit(b, mixed ? "%su16 v%d = p%d_16[%d];\n"
+                                  : "%su16 v%d = p%d[%d];\n", pad, i, p, inst->imm);
+                }
             } break;
             case op_load_16: {
                 int p = inst->ptr;
-                _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%su16 v%d = p%d_16[i];\n"
-                              : "%su16 v%d = p%d[i];\n", pad, i, p);
+                if (p < 0) {
+                    emit(b, "%su16 v%d = ((u16*)pd%d)[i];\n", pad, i, ~p);
+                } else {
+                    _Bool mixed = ptr_32[p] && ptr_16[p];
+                    emit(b, mixed ? "%su16 v%d = p%d_16[i];\n"
+                                  : "%su16 v%d = p%d[i];\n", pad, i, p);
+                }
             } break;
             case op_gather_16: {
                 int p = inst->ptr;
-                _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%su16 v%d = p%d_16[v%d];\n"
-                              : "%su16 v%d = p%d[v%d];\n", pad, i, p, inst->x);
+                if (p < 0) {
+                    emit(b, "%su16 v%d = ((u16*)pd%d)[v%d];\n", pad, i, ~p, inst->x);
+                } else {
+                    _Bool mixed = ptr_32[p] && ptr_16[p];
+                    emit(b, mixed ? "%su16 v%d = p%d_16[v%d];\n"
+                                  : "%su16 v%d = p%d[v%d];\n", pad, i, p, inst->x);
+                }
             } break;
             case op_uni_32: {
                 int p = inst->ptr;
-                _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%su32 v%d = p%d_32[%d];\n"
-                              : "%su32 v%d = p%d[%d];\n", pad, i, p, inst->imm);
+                if (p < 0) {
+                    emit(b, "%su32 v%d = ((u32*)pd%d)[%d];\n", pad, i, ~p, inst->imm);
+                } else {
+                    _Bool mixed = ptr_32[p] && ptr_16[p];
+                    emit(b, mixed ? "%su32 v%d = p%d_32[%d];\n"
+                                  : "%su32 v%d = p%d[%d];\n", pad, i, p, inst->imm);
+                }
             } break;
             case op_load_32: {
                 int p = inst->ptr;
-                _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%su32 v%d = p%d_32[i];\n"
-                              : "%su32 v%d = p%d[i];\n", pad, i, p);
+                if (p < 0) {
+                    emit(b, "%su32 v%d = ((u32*)pd%d)[i];\n", pad, i, ~p);
+                } else {
+                    _Bool mixed = ptr_32[p] && ptr_16[p];
+                    emit(b, mixed ? "%su32 v%d = p%d_32[i];\n"
+                                  : "%su32 v%d = p%d[i];\n", pad, i, p);
+                }
             } break;
             case op_gather_32: {
                 int p = inst->ptr;
-                _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%su32 v%d = p%d_32[v%d];\n"
-                              : "%su32 v%d = p%d[v%d];\n", pad, i, p, inst->x);
+                if (p < 0) {
+                    emit(b, "%su32 v%d = ((u32*)pd%d)[v%d];\n", pad, i, ~p, inst->x);
+                } else {
+                    _Bool mixed = ptr_32[p] && ptr_16[p];
+                    emit(b, mixed ? "%su32 v%d = p%d_32[v%d];\n"
+                                  : "%su32 v%d = p%d[v%d];\n", pad, i, p, inst->x);
+                }
             } break;
 
             case op_store_16: {
                 int p = inst->ptr;
-                _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%sp%d_16[i] = v%d;\n" : "%sp%d[i] = v%d;\n", pad, p, inst->y);
+                if (p < 0) {
+                    emit(b, "%s((u16*)pd%d)[i] = v%d;\n", pad, ~p, inst->y);
+                } else {
+                    _Bool mixed = ptr_32[p] && ptr_16[p];
+                    emit(b, mixed ? "%sp%d_16[i] = v%d;\n" : "%sp%d[i] = v%d;\n", pad, p, inst->y);
+                }
             } break;
             case op_scatter_16: {
                 int p = inst->ptr;
-                _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%sp%d_16[v%d] = v%d;\n" : "%sp%d[v%d] = v%d;\n", pad, p, inst->x, inst->y);
+                if (p < 0) {
+                    emit(b, "%s((u16*)pd%d)[v%d] = v%d;\n", pad, ~p, inst->x, inst->y);
+                } else {
+                    _Bool mixed = ptr_32[p] && ptr_16[p];
+                    emit(b, mixed ? "%sp%d_16[v%d] = v%d;\n" : "%sp%d[v%d] = v%d;\n", pad, p, inst->x, inst->y);
+                }
             } break;
             case op_store_32: {
                 int p = inst->ptr;
-                _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%sp%d_32[i] = v%d;\n"
-                              : "%sp%d[i] = v%d;\n", pad, p, inst->y);
+                if (p < 0) {
+                    emit(b, "%s((u32*)pd%d)[i] = v%d;\n", pad, ~p, inst->y);
+                } else {
+                    _Bool mixed = ptr_32[p] && ptr_16[p];
+                    emit(b, mixed ? "%sp%d_32[i] = v%d;\n"
+                                  : "%sp%d[i] = v%d;\n", pad, p, inst->y);
+                }
             } break;
             case op_scatter_32: {
                 int p = inst->ptr;
-                _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%sp%d_32[v%d] = v%d;\n"
-                              : "%sp%d[v%d] = v%d;\n", pad, p, inst->x, inst->y);
+                if (p < 0) {
+                    emit(b, "%s((u32*)pd%d)[v%d] = v%d;\n", pad, ~p, inst->x, inst->y);
+                } else {
+                    _Bool mixed = ptr_32[p] && ptr_16[p];
+                    emit(b, mixed ? "%sp%d_32[v%d] = v%d;\n"
+                                  : "%sp%d[v%d] = v%d;\n", pad, p, inst->x, inst->y);
+                }
             } break;
 
             #define BINOP(OP, EXPR) case OP: emit(b, "%s%s v%d = " EXPR ";\n", pad, ty, i, inst->x, inst->y); break;
@@ -311,14 +377,25 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
             case op_load_8x4: {
                 int ch = inst->x ? inst->imm : 0;
                 int p  = inst->x ? bb->inst[inst->x].ptr : inst->ptr;
-                emit(b, "%su16 v%d = (u16)((unsigned char*)ptrs[%d])[i*4+%d];\n", pad, i, p, ch);
+                if (p < 0) {
+                    emit(b, "%su16 v%d = (u16)((unsigned char*)pd%d)[i*4+%d];\n", pad, i, ~p, ch);
+                } else {
+                    emit(b, "%su16 v%d = (u16)((unsigned char*)ptrs[%d])[i*4+%d];\n", pad, i, p, ch);
+                }
             } break;
             case op_store_8x4: {
                 int p = inst->ptr;
-                emit(b, "%s((unsigned char*)ptrs[%d])[i*4+0] = (unsigned char)v%d;\n", pad, p, inst->x);
-                emit(b, "%s((unsigned char*)ptrs[%d])[i*4+1] = (unsigned char)v%d;\n", pad, p, inst->y);
-                emit(b, "%s((unsigned char*)ptrs[%d])[i*4+2] = (unsigned char)v%d;\n", pad, p, inst->z);
-                emit(b, "%s((unsigned char*)ptrs[%d])[i*4+3] = (unsigned char)v%d;\n", pad, p, inst->w);
+                if (p < 0) {
+                    emit(b, "%s((unsigned char*)pd%d)[i*4+0] = (unsigned char)v%d;\n", pad, ~p, inst->x);
+                    emit(b, "%s((unsigned char*)pd%d)[i*4+1] = (unsigned char)v%d;\n", pad, ~p, inst->y);
+                    emit(b, "%s((unsigned char*)pd%d)[i*4+2] = (unsigned char)v%d;\n", pad, ~p, inst->z);
+                    emit(b, "%s((unsigned char*)pd%d)[i*4+3] = (unsigned char)v%d;\n", pad, ~p, inst->w);
+                } else {
+                    emit(b, "%s((unsigned char*)ptrs[%d])[i*4+0] = (unsigned char)v%d;\n", pad, p, inst->x);
+                    emit(b, "%s((unsigned char*)ptrs[%d])[i*4+1] = (unsigned char)v%d;\n", pad, p, inst->y);
+                    emit(b, "%s((unsigned char*)ptrs[%d])[i*4+2] = (unsigned char)v%d;\n", pad, p, inst->z);
+                    emit(b, "%s((unsigned char*)ptrs[%d])[i*4+3] = (unsigned char)v%d;\n", pad, p, inst->w);
+                }
             } break;
 
             case op_store_half: case op_scatter_half: break;
@@ -339,7 +416,7 @@ static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
 struct umbra_codegen* umbra_codegen(BB const *bb) {
     int max_ptr = -1;
     for (int i = 0; i < bb->insts; i++) {
-        if (has_ptr(bb->inst[i].op)) {
+        if (has_ptr(bb->inst[i].op) && bb->inst[i].ptr >= 0) {
             if (bb->inst[i].ptr > max_ptr) { max_ptr = bb->inst[i].ptr; }
         }
     }
@@ -348,11 +425,11 @@ struct umbra_codegen* umbra_codegen(BB const *bb) {
     _Bool *ptr_32 = calloc((size_t)(max_ptr + 2), 1);
     for (int i = 0; i < bb->insts; i++) {
         enum op op = bb->inst[i].op;
-        if (has_ptr(op)) {
+        if (has_ptr(op) && bb->inst[i].ptr >= 0) {
             int p = bb->inst[i].ptr;
-            if (op == op_load_8x4 || op == op_store_8x4) { /* uses (unsigned char*) cast */ }
+            if (op == op_deref_ptr || op == op_load_8x4 || op == op_store_8x4) { /* uses cast */ }
             else if (output_type(op) == OP_32) { ptr_32[p] = 1; }
-            else                           { ptr_16[p] = 1; }
+            else                               { ptr_16[p] = 1; }
         }
     }
 

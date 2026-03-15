@@ -37,17 +37,19 @@ struct interp_inst {
 struct umbra_interpreter {
     struct interp_inst *inst;
     val                *v;
-    int                 preamble, nptr;
+    int                 preamble, nptr, n_deref, pad_;
 };
 
 #define op(name) static int name(struct interp_inst const *ip, val *v, int end, void* ptr[], long sz[])
 #define next return ip[1].fn(ip+1, v+1, end, ptr, sz)
 
-static int clamp_ix(int ix, long bytes, int elem) {
-    int max_ix = (int)(bytes / elem) - 1;
-    if (max_ix < 0) { max_ix = 0; }
-    if (ix < 0)      { return 0; }
-    if (ix > max_ix)  { return max_ix; }
+static I32 clamp_ix(I32 ix, long bytes, int elem) {
+    I32 zero = {0};
+    int hi = (int)(bytes / elem) - 1;
+    if (hi < 0) { hi = 0; }
+    I32 max_ix = zero + hi;
+    ix = (I32)((ix > zero) & ix) | (I32)((ix <= zero) & zero);
+    ix = (I32)((ix < max_ix) & ix) | (I32)((ix >= max_ix) & max_ix);
     return ix;
 }
 
@@ -75,18 +77,18 @@ op(uni_32) {
 }
 
 op(gather_16) {
+    I32 ix = clamp_ix(v[ip->y].i32, sz[ip->x], 2);
     for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
-        int ix = clamp_ix(v[ip->y].i32[l], sz[ip->x], 2);
         __builtin_memcpy((char*)&v->i16 + 2*l,
-                         (char const*)ptr[ip->x] + 2*ix, 2);
+                         (char const*)ptr[ip->x] + 2*ix[l], 2);
     }
     next;
 }
 op(gather_32) {
+    I32 ix = clamp_ix(v[ip->y].i32, sz[ip->x], 4);
     for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
-        int ix = clamp_ix(v[ip->y].i32[l], sz[ip->x], 4);
         __builtin_memcpy((char*)&v->i32 + 4*l,
-                         (char const*)ptr[ip->x] + 4*ix, 4);
+                         (char const*)ptr[ip->x] + 4*ix[l], 4);
     }
     next;
 }
@@ -118,17 +120,17 @@ op(store_32) {
 }
 
 op(scatter_16) {
+    I32 ix = clamp_ix(v[ip->z].i32, sz[ip->x], 2);
     for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
-        int ix = clamp_ix(v[ip->z].i32[l], sz[ip->x], 2);
-        __builtin_memcpy((char*)ptr[ip->x] + 2*ix,
+        __builtin_memcpy((char*)ptr[ip->x] + 2*ix[l],
                          (char*)&v[ip->y].i16 + 2*l, 2);
     }
     next;
 }
 op(scatter_32) {
+    I32 ix = clamp_ix(v[ip->z].i32, sz[ip->x], 4);
     for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
-        int ix = clamp_ix(v[ip->z].i32[l], sz[ip->x], 4);
-        __builtin_memcpy((char*)ptr[ip->x] + 4*ix,
+        __builtin_memcpy((char*)ptr[ip->x] + 4*ix[l],
                          (char*)&v[ip->y].i32 + 4*l, 4);
     }
     next;
@@ -280,10 +282,10 @@ op(i32_from_i16) {
     }
 
     op(gather_half) {
+        I32 ix = clamp_ix(v[ip->y].i32, sz[ip->x], 2);
         for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
-            int ix = clamp_ix(v[ip->y].i32[l], sz[ip->x], 2);
             __fp16 h;
-            __builtin_memcpy(&h, (char const*)ptr[ip->x] + 2*ix, 2);
+            __builtin_memcpy(&h, (char const*)ptr[ip->x] + 2*ix[l], 2);
             float f = (float)h;
             __builtin_memcpy((char*)&v->f32 + 4*l, &f, 4);
         }
@@ -292,9 +294,9 @@ op(i32_from_i16) {
 
     op(scatter_half) {
         U16 tmp = f32_to_f16(v[ip->y].f32);
+        I32 ix = clamp_ix(v[ip->z].i32, sz[ip->x], 2);
         for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
-            int ix = clamp_ix(v[ip->z].i32[l], sz[ip->x], 2);
-            __builtin_memcpy((char*)ptr[ip->x] + 2*ix,
+            __builtin_memcpy((char*)ptr[ip->x] + 2*ix[l],
                              (char*)&tmp + 2*l, 2);
         }
         next;
@@ -434,6 +436,17 @@ op(store_8x4) {
 
 op(done) { (void)ip; (void)v; (void)end; (void)ptr; (void)sz; return 0; }
 
+op(deref_ptr_handler) {
+    void *base = ptr[ip->x];
+    void *derived;
+    long dsz;
+    __builtin_memcpy(&derived, (char*)base + ip->y, sizeof derived);
+    __builtin_memcpy(&dsz, (char*)base + ip->y + 8, sizeof dsz);
+    ptr[ip->z] = derived;
+    sz[ip->z] = dsz;
+    next;
+}
+
 #undef next
 #undef op
 
@@ -480,6 +493,7 @@ static Fn const fn[] = {
     [op_f32_from_half] = f32_from_half,
     [op_i16_from_i32] = i16_from_i32, [op_shr_narrow_u32] = shr_narrow_u32,
     [op_i32_from_i16] = i32_from_i16,
+    [op_deref_ptr] = deref_ptr_handler,
     [op_load_8x4] = load_8x4,
     [op_store_8x4] = store_8x4,
 #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
@@ -567,6 +581,25 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
     p->inst = malloc((size_t)num_insts * sizeof *p->inst);
     p->v    = malloc((size_t)num_insts * sizeof *p->v);
 
+    int max_ptr = -1;
+    int n_deref = 0;
+    for (int i = 0; i < bb->insts; i++) {
+        if (has_ptr(bb->inst[i].op) && bb->inst[i].ptr >= 0 && bb->inst[i].ptr > max_ptr) {
+            max_ptr = bb->inst[i].ptr;
+        }
+        if (bb->inst[i].op == op_deref_ptr) { n_deref++; }
+    }
+    p->nptr    = max_ptr + 1;
+    p->n_deref = n_deref;
+
+    int *deref_slot = calloc((size_t)bb->insts, sizeof *deref_slot);
+    {
+        int di = 0;
+        for (int i = 0; i < bb->insts; i++) {
+            if (bb->inst[i].op == op_deref_ptr) { deref_slot[i] = p->nptr + di++; }
+        }
+    }
+
     int n = 0;
     #define emit(...) p->inst[n] = (struct interp_inst){__VA_ARGS__}
     for (int pass = 0; pass < 2; pass++) {
@@ -594,75 +627,80 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                     #endif
                         break;
 
-                    case op_uni_16:  emit(.fn=uni_16,  .x=inst->ptr, .y=inst->imm); break;
-                    case op_uni_32:  emit(.fn=uni_32,  .x=inst->ptr, .y=inst->imm); break;
-                    case op_load_16: emit(.fn=load_16, .x=inst->ptr); break;
-                    case op_load_32: emit(.fn=load_32, .x=inst->ptr); break;
-                    case op_gather_16: emit(.fn=gather_16, .x=inst->ptr, .y=X); break;
-                    case op_gather_32: emit(.fn=gather_32, .x=inst->ptr, .y=X); break;
-                    case op_store_16:   emit(.fn=store_16,   .x=inst->ptr, .y=Y); break;
-                    case op_store_32:   emit(.fn=store_32,   .x=inst->ptr, .y=Y); break;
-                    case op_scatter_16: emit(.fn=scatter_16, .x=inst->ptr, .y=Y, .z=X); break;
-                    case op_scatter_32: emit(.fn=scatter_32, .x=inst->ptr, .y=Y, .z=X); break;
+                    case op_deref_ptr:
+                        emit(.fn=deref_ptr_handler, .x=inst->ptr, .y=inst->imm, .z=deref_slot[i]);
+                        break;
+
+                    #define RESOLVE_PTR(inst) ((inst)->ptr < 0 ? deref_slot[~(inst)->ptr] : (inst)->ptr)
+                    case op_uni_16:  emit(.fn=uni_16,  .x=RESOLVE_PTR(inst), .y=inst->imm); break;
+                    case op_uni_32:  emit(.fn=uni_32,  .x=RESOLVE_PTR(inst), .y=inst->imm); break;
+                    case op_load_16: emit(.fn=load_16, .x=RESOLVE_PTR(inst)); break;
+                    case op_load_32: emit(.fn=load_32, .x=RESOLVE_PTR(inst)); break;
+                    case op_gather_16: emit(.fn=gather_16, .x=RESOLVE_PTR(inst), .y=X); break;
+                    case op_gather_32: emit(.fn=gather_32, .x=RESOLVE_PTR(inst), .y=X); break;
+                    case op_store_16:   emit(.fn=store_16,   .x=RESOLVE_PTR(inst), .y=Y); break;
+                    case op_store_32:   emit(.fn=store_32,   .x=RESOLVE_PTR(inst), .y=Y); break;
+                    case op_scatter_16: emit(.fn=scatter_16, .x=RESOLVE_PTR(inst), .y=Y, .z=X); break;
+                    case op_scatter_32: emit(.fn=scatter_32, .x=RESOLVE_PTR(inst), .y=Y, .z=X); break;
 
                     case op_uni_half:
                     #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
-                        emit(.fn=uni_16, .x=inst->ptr, .y=inst->imm);
+                        emit(.fn=uni_16, .x=RESOLVE_PTR(inst), .y=inst->imm);
                     #else
-                        emit(.fn=uni_half, .x=inst->ptr, .y=inst->imm);
+                        emit(.fn=uni_half, .x=RESOLVE_PTR(inst), .y=inst->imm);
                     #endif
                         break;
                     case op_load_half:
                     #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
-                        emit(.fn=load_16, .x=inst->ptr);
+                        emit(.fn=load_16, .x=RESOLVE_PTR(inst));
                     #else
-                        emit(.fn=load_half, .x=inst->ptr);
+                        emit(.fn=load_half, .x=RESOLVE_PTR(inst));
                     #endif
                         break;
                     case op_gather_half:
                     #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
-                        emit(.fn=gather_16, .x=inst->ptr, .y=X);
+                        emit(.fn=gather_16, .x=RESOLVE_PTR(inst), .y=X);
                     #else
-                        emit(.fn=gather_half, .x=inst->ptr, .y=X);
+                        emit(.fn=gather_half, .x=RESOLVE_PTR(inst), .y=X);
                     #endif
                         break;
                     case op_store_half:
                     #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
-                        emit(.fn=store_16, .x=inst->ptr, .y=Y);
+                        emit(.fn=store_16, .x=RESOLVE_PTR(inst), .y=Y);
                     #else
-                        emit(.fn=store_half, .x=inst->ptr, .y=Y);
+                        emit(.fn=store_half, .x=RESOLVE_PTR(inst), .y=Y);
                     #endif
                         break;
                     case op_scatter_half:
                     #if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
-                        emit(.fn=scatter_16, .x=inst->ptr, .y=Y, .z=X);
+                        emit(.fn=scatter_16, .x=RESOLVE_PTR(inst), .y=Y, .z=X);
                     #else
-                        emit(.fn=scatter_half, .x=inst->ptr, .y=Y, .z=X);
+                        emit(.fn=scatter_half, .x=RESOLVE_PTR(inst), .y=Y, .z=X);
                     #endif
                         break;
 
                     case op_load_8x4: {
                         if (inst->x) {
-                            // continuation: alias to base's val slot + channel
                             id[i] = id[inst->x] + inst->imm;
                             continue;
                         }
-                        emit(.fn=load_8x4, .x=inst->ptr);
+                        emit(.fn=load_8x4, .x=RESOLVE_PTR(inst));
                         id[i] = n;
-                        n += 4;  // reserves 4 val slots
-                        continue;  // skip the id[i]=n++ below
+                        n += 4;
+                        continue;
                     }
 
                     case op_store_8x4: {
                         emit(.fn=store_8x4,
-                             .x=inst->ptr,
+                             .x=RESOLVE_PTR(inst),
                              .y=id[inst->x] - n,
                              .z=id[inst->y] - n,
                              .w=id[inst->z] - n);
                         p->inst[n+1] = (struct interp_inst){.x=id[inst->w] - n};
                         n += 2;
-                        continue;  // skip id[i]=n++ below
+                        continue;
                     }
+                    #undef RESOLVE_PTR
 
                     case op_shl_i32_imm: case op_shr_u32_imm: case op_shr_s32_imm:
                     case op_shl_i16_imm: case op_shr_u16_imm: case op_shr_s16_imm:
@@ -716,20 +754,15 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
     #undef emit
     p->inst[n] = (struct interp_inst){.fn=done};
 
-    int max_ptr = -1;
-    for (int i = 0; i < bb->insts; i++) {
-        if (has_ptr(bb->inst[i].op) && bb->inst[i].ptr > max_ptr) { max_ptr = bb->inst[i].ptr; }
-    }
-    p->nptr = max_ptr + 1;
-
+    free(deref_slot);
     free(id);
     return p;
 }
 
 void umbra_interpreter_run(struct umbra_interpreter *p, int n, umbra_buf buf[]) {
-    void *ptr[16] = {0};
-    long  sz[16]  = {0};
-    for (int i = 0; i < p->nptr && i < 16; i++) {
+    void *ptr[32] = {0};
+    long  sz[32]  = {0};
+    for (int i = 0; i < p->nptr && i < 32; i++) {
         ptr[i] = buf[i].ptr;
         sz[i]  = buf[i].sz < 0 ? -buf[i].sz : buf[i].sz;
     }

@@ -6,6 +6,7 @@
     /* 32-bit ops */ \
     X(lane) \
     X(imm_32) X(uni_32) X(load_32) X(gather_32) X(store_32) X(scatter_32) \
+    X(deref_ptr) \
     X(add_f32) X(sub_f32) X(mul_f32) X(div_f32) \
     X(min_f32) X(max_f32) X(sqrt_f32) X(fma_f32) X(fms_f32) \
     X(add_i32) X(sub_i32) X(mul_i32) \
@@ -53,7 +54,7 @@ struct hash_slot { uint32_t hash; int ix; };
 struct umbra_basic_block {
     struct bb_inst   *inst;
     struct hash_slot *ht;
-    int               insts, ht_mask, preamble, :32;
+    int               insts, ht_mask, preamble, uni_len;
 };
 
 static inline _Bool is_store(enum op op) {
@@ -63,7 +64,8 @@ static inline _Bool is_store(enum op op) {
 }
 
 static inline _Bool has_ptr(enum op op) {
-    return (op >= op_uni_32 && op <= op_scatter_32)
+    return op == op_deref_ptr
+        || (op >= op_uni_32 && op <= op_scatter_32)
         || op == op_load_8x4 || op == op_store_8x4
         || (op >= op_uni_16 && op <= op_scatter_16)
         || (op >= op_uni_half && op <= op_scatter_half);

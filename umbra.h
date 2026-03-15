@@ -13,6 +13,13 @@ typedef struct {int ix;} umbra_ptr;
 
 umbra_i32 umbra_lane(struct umbra_basic_block*);
 
+int       umbra_reserve_i32 (struct umbra_basic_block*, int n);
+int       umbra_reserve_f32 (struct umbra_basic_block*, int n);
+int       umbra_reserve_half(struct umbra_basic_block*, int n);
+int       umbra_reserve_ptr (struct umbra_basic_block*);
+umbra_ptr umbra_deref_ptr   (struct umbra_basic_block*, umbra_ptr buf, int byte_off);
+int       umbra_uni_len    (struct umbra_basic_block const*);
+
 umbra_i32       umbra_imm_i32      (struct umbra_basic_block*, unsigned int   bits);
 umbra_f32       umbra_imm_f32      (struct umbra_basic_block*, unsigned int   bits);
 umbra_i16       umbra_imm_i16      (struct umbra_basic_block*, unsigned short bits);

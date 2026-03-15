@@ -37,12 +37,12 @@ static inline u16 f2h(float f) {
 }
 
 void umbra_entry(int n, void **ptrs) {
-    u16* restrict p3 = (u16*)ptrs[3];
+    u16* restrict p1 = (u16*)ptrs[1];
     u32 v0 = 0u;
-    float v1 = h2f(p3[0]);
-    float v2 = h2f(p3[1]);
-    float v3 = h2f(p3[2]);
-    float v4 = h2f(p3[3]);
+    float v1 = h2f(p1[4]);
+    float v2 = h2f(p1[5]);
+    float v3 = h2f(p1[6]);
+    float v4 = h2f(p1[7]);
     float v5 = h2f(7172);
     float v6 = h2f(15360);
     float v7 = v6 - v4;

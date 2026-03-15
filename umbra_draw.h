@@ -10,17 +10,18 @@ typedef umbra_color (*umbra_load_fn)   (struct umbra_basic_block*, umbra_ptr ptr
 typedef void        (*umbra_store_fn)  (struct umbra_basic_block*, umbra_ptr ptr, umbra_i32 ix,
                                         umbra_color);
 
+typedef struct {
+    int x0, y;
+    int uni_len;
+} umbra_draw_layout;
+
 struct umbra_basic_block* umbra_draw_build(umbra_shader_fn   shader,
                                            umbra_coverage_fn coverage,
                                            umbra_blend_fn    blend,
                                            umbra_load_fn     load,
-                                           umbra_store_fn    store);
+                                           umbra_store_fn    store,
+                                           umbra_draw_layout *layout);
 
-//   solid:        p3 = __fp16[4] {r,g,b,a}
-//   linear_2:     p3 = __fp16[8] {r0,g0,b0,a0, r1,g1,b1,a1}, p5 = float[3] {a,b,c}
-//   radial_2:     p3 = __fp16[8] {r0,g0,b0,a0, r1,g1,b1,a1}, p5 = float[3] {cx,cy,inv_r}
-//   linear_grad:  p3 = __fp16[N*4] RGBA LUT,                  p5 = float[4] {a,b,c,N}
-//   radial_grad:  p3 = __fp16[N*4] RGBA LUT,                  p5 = float[4] {cx,cy,inv_r,N}
 umbra_color umbra_shader_solid      (struct umbra_basic_block*, umbra_f32 x, umbra_f32 y);
 umbra_color umbra_shader_linear_2   (struct umbra_basic_block*, umbra_f32 x, umbra_f32 y);
 umbra_color umbra_shader_radial_2   (struct umbra_basic_block*, umbra_f32 x, umbra_f32 y);
