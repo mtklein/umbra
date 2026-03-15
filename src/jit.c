@@ -1035,13 +1035,42 @@ void umbra_jit_mca(struct umbra_jit const *j, FILE *f) {
 #include <sys/mman.h>
 #include <unistd.h>
 
-// x0=RDI(n), x1=RSI(buf[])
-// R10=loop counter, R11/RAX=scratch, R13=max_ix, R14=zero (for clamp)
-enum { XI=R10 };  // loop counter
+enum { XI=R10, XM=R13 };
 
-// x86-64 gather/scatter clamping not yet implemented (would require callee-saved GPRs)
-static void load_max_ix_x86(Buf *c, int p, int elem_shift) { (void)c; (void)p; (void)elem_shift; }
-static void clamp_eax_x86(Buf *c) { (void)c; }
+static void patch_jcc(Buf *c, int fixup) {
+    int32_t rel = (int32_t)(c->len - (fixup + 4));
+    __builtin_memcpy(c->buf + fixup, &rel, 4);
+}
+
+static void load_max_ix_x86(Buf *c, int p, int elem_shift) {
+    if (p < 0) {
+        mov_ri(c, XM, 0x7fffffff);
+        return;
+    }
+    mov_load(c, XM, RSI, p * 16 + 8);
+    test_rr(c, XM, XM);
+    int skip_neg = jcc(c, 0x09);
+    neg_r(c, XM);
+    patch_jcc(c, skip_neg);
+    if (elem_shift) { shr_ri(c, XM, (uint8_t)elem_shift); }
+    sub_ri(c, XM, 1);
+    test_rr(c, XM, XM);
+    int skip_zero = jcc(c, 0x09);
+    xor_rr(c, XM, XM);
+    patch_jcc(c, skip_zero);
+}
+
+static void clamp_eax_x86(Buf *c) {
+    emit1(c, 0x48); emit1(c, 0x63); emit1(c, 0xc0);
+    test_rr(c, RAX, RAX);
+    int skip_lo = jcc(c, 0x09);
+    xor_rr(c, RAX, RAX);
+    patch_jcc(c, skip_lo);
+    cmp_rr(c, RAX, XM);
+    int skip_hi = jcc(c, 0x0e);
+    mov_rr(c, RAX, XM);
+    patch_jcc(c, skip_hi);
+}
 
 static void apply_offset_x86(Buf *c, int8_t off_reg, int elem_shift) {
     vex(c, 1, 1, 0, 0, off_reg, 0, RAX, 0x7e);  // VMOVD eax, xmm_off
@@ -1274,6 +1303,8 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     Buf c = {0};
     struct ra *ra = ra_create_x86(bb, &c);
 
+    push_r(&c, XM);
+
     int stack_patch = c.len;
     for (int i = 0; i < 7; i++) { nop(&c); }
 
@@ -1339,6 +1370,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     if (ns > 0) {
         add_ri(&c, RSP, ns * 32);
     }
+    pop_r(&c, XM);
     vzeroupper(&c);
     ret(&c);
 
@@ -1707,10 +1739,18 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             } else if (inst->op == op_gather_32) {
                 int8_t rx = ra_ensure(ra, sl, ns, inst->x);
                 int8_t mask = ra_alloc(ra, sl, ns);
-                vpcmpeqd(c, mask, mask, mask);
+                int8_t clamped = ra_alloc(ra, sl, ns);
                 int p = inst->ptr;
                 int base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
-                vpgatherdd(c, s.rd, base, rx, 4, mask);
+                load_max_ix_x86(c, p, eshift);
+                vpxor(c, 1, mask, mask, mask);
+                vpmaxsd(c, clamped, rx, mask);
+                vex(c, 1, 1, 0, 0, mask, 0, XM, 0x6e);
+                vbroadcastss(c, mask, mask);
+                vpminsd(c, clamped, clamped, mask);
+                vpcmpeqd(c, mask, mask, mask);
+                vpgatherdd(c, s.rd, base, clamped, 4, mask);
+                ra_return_reg(ra, clamped);
                 ra_return_reg(ra, mask);
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
             } else {

@@ -1597,9 +1597,6 @@ static void test_gather_clamp(void) {
         umbra_store_i32(bb, (umbra_ptr){2}, ix, val);
         backends B = make_full(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
-#if !defined(__aarch64__)
-            if (bi == 2) { continue; }
-#endif
             int32_t indices[4] = {-5, 0, 2, 100};
             int32_t src[3]     = {10, 20, 30};
             int32_t dst[4]     = {0};
@@ -1623,9 +1620,6 @@ static void test_gather_clamp(void) {
         umbra_store_i16(bb, (umbra_ptr){2}, ix, val);
         backends B = make_full(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
-#if !defined(__aarch64__)
-            if (bi == 2) { continue; }
-#endif
             int32_t  indices[4] = {-1, 1, 3, 999};
             int16_t  src[3]     = {100, 200, 300};
             int16_t  dst[4]     = {0};
@@ -1653,9 +1647,6 @@ static void test_scatter_clamp(void) {
     umbra_store_i32(bb, (umbra_ptr){2}, idx, val);
     backends B = make_full(bb, opt);
     for (int bi = 0; bi < 4; bi++) {
-#if !defined(__aarch64__)
-        if (bi == 2) { continue; }
-#endif
         int32_t indices[3] = {-10, 1, 500};
         int32_t vals[3]    = {11, 22, 33};
         int32_t dst[3]     = {0};

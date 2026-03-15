@@ -17,11 +17,19 @@ void vmov_load(Buf *b, int L, int reg, int base, int index, int scale, int disp)
 void vmov_store(Buf *b, int L, int reg, int base, int index, int scale, int disp);
 
 void rex_w(Buf *b, int r, int b_);
+void push_r(Buf *b, int r);
+void pop_r(Buf *b, int r);
 void xor_rr(Buf *b, int d, int s);
 void add_ri(Buf *b, int d, int32_t imm);
 void sub_ri(Buf *b, int d, int32_t imm);
 void cmp_rr(Buf *b, int a, int c);
 void cmp_ri(Buf *b, int a, int32_t imm);
+void test_rr(Buf *b, int a, int c);
+void cmovl_rr(Buf *b, int d, int s);
+void cmovg_rr(Buf *b, int d, int s);
+void neg_r(Buf *b, int r);
+void shr_ri(Buf *b, int r, uint8_t imm);
+void mov_ri(Buf *b, int d, int32_t imm);
 void mov_rr(Buf *b, int d, int s);
 void mov_load(Buf *b, int d, int base, int disp);
 int  jcc(Buf *b, uint8_t cc);
@@ -82,6 +90,8 @@ void vpblendvb(Buf *b, int L, int d, int z, int y, int x);
 
 void vpcmpeqd(Buf *b, int d, int v, int s);
 void vpcmpgtd(Buf *b, int d, int v, int s);
+void vpminsd(Buf *b, int d, int v, int s);
+void vpmaxsd(Buf *b, int d, int v, int s);
 
 void vpaddw(Buf *b, int d, int v, int s);
 void vpsubw(Buf *b, int d, int v, int s);
