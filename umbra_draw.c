@@ -392,6 +392,28 @@ void umbra_store_fp16(BB *bb, umbra_ptr ptr, umbra_i32 ix, umbra_color c) {
     umbra_store_half(bb, ptr, umbra_add_i32(bb, ix4, umbra_imm_i32(bb, 3)), c.a);
 }
 
+umbra_color umbra_load_fp16_planar(BB *bb, umbra_ptr ptr, umbra_i32 ix) {
+    umbra_i32 stride = umbra_load_i32(bb, (umbra_ptr){6}, umbra_imm_i32(bb, 0));
+    umbra_i32 s2 = umbra_mul_i32(bb, stride, umbra_imm_i32(bb, 2));
+    umbra_i32 s3 = umbra_mul_i32(bb, stride, umbra_imm_i32(bb, 3));
+    return (umbra_color){
+        umbra_load_half(bb, ptr, ix),
+        umbra_load_half(bb, ptr, umbra_add_i32(bb, ix, stride)),
+        umbra_load_half(bb, ptr, umbra_add_i32(bb, ix, s2)),
+        umbra_load_half(bb, ptr, umbra_add_i32(bb, ix, s3)),
+    };
+}
+
+void umbra_store_fp16_planar(BB *bb, umbra_ptr ptr, umbra_i32 ix, umbra_color c) {
+    umbra_i32 stride = umbra_load_i32(bb, (umbra_ptr){6}, umbra_imm_i32(bb, 0));
+    umbra_i32 s2 = umbra_mul_i32(bb, stride, umbra_imm_i32(bb, 2));
+    umbra_i32 s3 = umbra_mul_i32(bb, stride, umbra_imm_i32(bb, 3));
+    umbra_store_half(bb, ptr, ix, c.r);
+    umbra_store_half(bb, ptr, umbra_add_i32(bb, ix, stride), c.g);
+    umbra_store_half(bb, ptr, umbra_add_i32(bb, ix, s2), c.b);
+    umbra_store_half(bb, ptr, umbra_add_i32(bb, ix, s3), c.a);
+}
+
 void umbra_gradient_lut_even(__fp16 *out, int lut_n,
                              int n_stops, __fp16 const colors[][4]) {
     for (int i = 0; i < lut_n; i++) {

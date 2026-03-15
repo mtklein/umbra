@@ -44,11 +44,11 @@ static void free_backends(void) {
     for (int i = 0; i < NUM_BACKENDS; i++) { backends[i] = NULL; }
 }
 
-enum { FMT_8888, FMT_565, FMT_FP16, FMT_1010102, NUM_FMTS };
-static char const     *fmt_name[]  = {"8888",           "565",           "fp16",          "1010102"};
-static umbra_load_fn   fmt_load[]  = {umbra_load_8888,  umbra_load_565,  umbra_load_fp16,  umbra_load_1010102};
-static umbra_store_fn  fmt_store[] = {umbra_store_8888, umbra_store_565, umbra_store_fp16, umbra_store_1010102};
-static int             fmt_bpp[]   = {4,                2,               8,                4};
+enum { FMT_8888, FMT_565, FMT_FP16, FMT_FP16P, FMT_1010102, NUM_FMTS };
+static char const     *fmt_name[]  = {"8888",           "565",           "fp16",           "fp16p",                "1010102"};
+static umbra_load_fn   fmt_load[]  = {umbra_load_8888,  umbra_load_565,  umbra_load_fp16,  umbra_load_fp16_planar,  umbra_load_1010102};
+static umbra_store_fn  fmt_store[] = {umbra_store_8888, umbra_store_565, umbra_store_fp16, umbra_store_fp16_planar, umbra_store_1010102};
+static int             fmt_bpp[]   = {4,                2,               8,                2,                       4};
 
 static void build_slide_fmt(slide const *s, int fmt) {
     free_backends();
@@ -140,7 +140,7 @@ static void build_luts(void) {
     umbra_gradient_lut_even(radial_lut, LUT_N, 4, radial_stops);
 }
 
-static void fill_bg_row(void *dst, int n, uint32_t bg, int fmt) {
+static void fill_bg_row(void *dst, int n, uint32_t bg, int fmt, int stride) {
     uint8_t r = (uint8_t)(bg >>  0);
     uint8_t g = (uint8_t)(bg >>  8);
     uint8_t b = (uint8_t)(bg >> 16);
@@ -158,6 +158,17 @@ static void fill_bg_row(void *dst, int n, uint32_t bg, int fmt) {
                         (__fp16)(b/255.0f), (__fp16)(a/255.0f)};
         for (int i = 0; i < n; i++) { __builtin_memcpy((__fp16*)dst + i*4, hc, 8); }
     } break;
+    case FMT_FP16P: {
+        __fp16 hr = (__fp16)(r/255.0f), hg = (__fp16)(g/255.0f);
+        __fp16 hb = (__fp16)(b/255.0f), ha = (__fp16)(a/255.0f);
+        __fp16 *p = dst;
+        for (int i = 0; i < n; i++) {
+            p[i]            = hr;
+            p[i + stride]   = hg;
+            p[i + stride*2] = hb;
+            p[i + stride*3] = ha;
+        }
+    } break;
     case FMT_1010102: {
         uint32_t px = ((uint32_t)(r * 1023 / 255))
                     | ((uint32_t)(g * 1023 / 255) << 10)
@@ -168,7 +179,7 @@ static void fill_bg_row(void *dst, int n, uint32_t bg, int fmt) {
     }
 }
 
-static void readback_row(uint32_t *dst, void const *src, int n, int fmt) {
+static void readback_row(uint32_t *dst, void const *src, int n, int fmt, int stride) {
     switch (fmt) {
     case FMT_8888:
         __builtin_memcpy(dst, src, (size_t)(n * 4));
@@ -195,6 +206,19 @@ static void readback_row(uint32_t *dst, void const *src, int n, int fmt) {
                    | ((uint32_t)(bf*255+.5f) << 16) | ((uint32_t)(af*255+.5f) << 24);
         }
     } break;
+    case FMT_FP16P: {
+        __fp16 const *s = src;
+        for (int i = 0; i < n; i++) {
+            float rf = (float)s[i],            gf = (float)s[i + stride];
+            float bf = (float)s[i + stride*2], af = (float)s[i + stride*3];
+            if (rf < 0) { rf = 0; } if (rf > 1) { rf = 1; }
+            if (gf < 0) { gf = 0; } if (gf > 1) { gf = 1; }
+            if (bf < 0) { bf = 0; } if (bf > 1) { bf = 1; }
+            if (af < 0) { af = 0; } if (af > 1) { af = 1; }
+            dst[i] = (uint32_t)(rf*255+.5f) | ((uint32_t)(gf*255+.5f) << 8)
+                   | ((uint32_t)(bf*255+.5f) << 16) | ((uint32_t)(af*255+.5f) << 24);
+        }
+    } break;
     case FMT_1010102: {
         uint32_t const *s = src;
         for (int i = 0; i < n; i++) {
@@ -208,7 +232,7 @@ static void readback_row(uint32_t *dst, void const *src, int n, int fmt) {
     }
 }
 
-static void to_hdr_row(float *dst, void const *src, int n, int fmt) {
+static void to_hdr_row(float *dst, void const *src, int n, int fmt, int stride) {
     switch (fmt) {
     case FMT_8888: {
         uint8_t const *s = src;
@@ -231,6 +255,15 @@ static void to_hdr_row(float *dst, void const *src, int n, int fmt) {
     case FMT_FP16: {
         __fp16 const *s = src;
         for (int i = 0; i < n*4; i++) { dst[i] = (float)s[i]; }
+    } break;
+    case FMT_FP16P: {
+        __fp16 const *s = src;
+        for (int i = 0; i < n; i++) {
+            dst[i*4+0] = (float)s[i];
+            dst[i*4+1] = (float)s[i + stride];
+            dst[i*4+2] = (float)s[i + stride*2];
+            dst[i*4+3] = (float)s[i + stride*3];
+        }
     } break;
     case FMT_1010102: {
         uint32_t const *s = src;
@@ -276,6 +309,7 @@ int main(void) {
     build_luts();
 
     void *pixbuf = malloc(W * H * 8);
+    int32_t planar_stride = W * H;
 
     int cur_slide   = 0;
     int cur_fmt     = FMT_8888;
@@ -333,10 +367,15 @@ int main(void) {
         run_fn run = run_fns[cur_backend];
         void  *ctx = backends[cur_backend];
 
-        int bpp = fmt_bpp[cur_fmt];
+        int bpp    = fmt_bpp[cur_fmt];
+        _Bool planar = (cur_fmt == FMT_FP16P);
+
+        #define ROW(y) (planar ? (void*)((__fp16*)pixbuf + (y) * W) \
+                               : (void*)((uint8_t*)pixbuf + (y) * W * bpp))
+        long row_sz = planar ? (long)(W * H * 4) * 2 : (long)(W * bpp);
 
         for (int y = 0; y < H; y++) {
-            fill_bg_row((uint8_t*)pixbuf + y * W * bpp, W, s->bg, cur_fmt);
+            fill_bg_row(ROW(y), W, s->bg, cur_fmt, planar_stride);
         }
 
         int32_t x0 = 0;
@@ -349,14 +388,14 @@ int main(void) {
             for (int i = 0; i < 4; i++) { hc[i] = (__fp16)s->color[i]; }
             for (int y = 0; y < H; y++) {
                 int32_t yval = y;
-                void *row = (uint8_t*)pixbuf + y * W * bpp;
                 umbra_buf buf[] = {
-                    { row,            W * bpp             },
+                    { ROW(y),          row_sz              },
                     { &x0,           -4                   },
                     { &yval,         -4                   },
                     { hc,            -8                   },
                     { bitmap_cov.data, -(W * H * 2)       },
                     { mat,           -(int)(sizeof mat)    },
+                    { &planar_stride, -4                   },
                 };
                 run(ctx, W, buf);
             }
@@ -366,13 +405,14 @@ int main(void) {
             for (int i = 0; i < 4; i++) { hc[i] = (__fp16)s->color[i]; }
             for (int y = 0; y < H; y++) {
                 int32_t yval = y;
-                void *row = (uint8_t*)pixbuf + y * W * bpp;
                 umbra_buf buf[] = {
-                    { row,              W * bpp   },
+                    { ROW(y),           row_sz    },
                     { &x0,             -4         },
                     { &yval,           -4         },
                     { hc,              -8         },
                     { tc->data + y * W, -(W * 2)  },
+                    { NULL,             0         },
+                    { &planar_stride,  -4         },
                 };
                 run(ctx, W, buf);
             }
@@ -390,14 +430,14 @@ int main(void) {
 
             for (int y = 0; y < H; y++) {
                 int32_t yval = y;
-                void *row = (uint8_t*)pixbuf + y * W * bpp;
                 umbra_buf buf[] = {
-                    {row,   W * bpp},
+                    {ROW(y), row_sz},
                     {&x0,  -4},
                     {&yval, -4},
                     {p3,   -p3sz},
                     {NULL,  0},
                     {gp,   -(int)sizeof gp},
+                    {&planar_stride, -4},
                 };
                 run(ctx, W, buf);
             }
@@ -416,17 +456,19 @@ int main(void) {
 
             for (int y = 0; y < H; y++) {
                 int32_t yval = y;
-                void *row = (uint8_t*)pixbuf + y * W * bpp;
                 umbra_buf buf[] = {
-                    { row,   W * bpp },
-                    { &x0,  -4       },
-                    { &yval,-4       },
-                    { hc,   -8       },
-                    { rect, -16      },
+                    { ROW(y), row_sz },
+                    { &x0,   -4      },
+                    { &yval, -4      },
+                    { hc,    -8      },
+                    { rect,  -16     },
+                    { NULL,   0      },
+                    { &planar_stride, -4 },
                 };
                 run(ctx, W, buf);
             }
         }
+        #undef ROW
 
         void *tex_pixels;
         int   tex_pitch;
@@ -437,15 +479,17 @@ int main(void) {
 
         uint8_t *rows = (uint8_t*)tex_pixels;
         for (int y = 0; y < H; y++) {
-            readback_row((uint32_t*)(rows + y * tex_pitch),
-                         (uint8_t*)pixbuf + y * W * bpp, W, cur_fmt);
+            void *src = planar ? (void*)((__fp16*)pixbuf + y * W)
+                               : (void*)((uint8_t*)pixbuf + y * W * bpp);
+            readback_row((uint32_t*)(rows + y * tex_pitch), src, W, cur_fmt, planar_stride);
         }
 
         if (want_dump) {
             float *fdata = malloc((size_t)(W * H) * 4 * sizeof(float));
             for (int y = 0; y < H; y++) {
-                to_hdr_row(fdata + y * W * 4,
-                           (uint8_t*)pixbuf + y * W * bpp, W, cur_fmt);
+                void *src = planar ? (void*)((__fp16*)pixbuf + y * W)
+                                   : (void*)((uint8_t*)pixbuf + y * W * bpp);
+                to_hdr_row(fdata + y * W * 4, src, W, cur_fmt, planar_stride);
             }
             stbi_write_hdr("dump.hdr", W, H, 4, fdata);
             SDL_Log("saved dump.hdr (%s)", fmt_name[cur_fmt]);
