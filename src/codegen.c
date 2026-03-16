@@ -68,12 +68,7 @@ static _Bool is_16bit_mem_op(enum op op) {
         || op == op_load_16
         || op == op_store_16
         || op == op_gather_16
-        || op == op_scatter_16
-        || op == op_uni_f16
-        || op == op_load_f16
-        || op == op_store_f16
-        || op == op_gather_f16
-        || op == op_scatter_f16;
+        || op == op_scatter_16;
 }
 
 static _Bool is_32bit_mem_op(enum op op) {
@@ -438,173 +433,18 @@ static void emit_ops(Buf *b, BB const *bb,
                 }
             } break;
 
-            case op_uni_f16: {
-                int p = inst->ptr;
-                if (p < 0) {
-                    emit(b,
-                        "%su32 v%d ="
-                        " f2u(h2f("
-                        "((u16*)pd%d)[%d]));\n",
-                        pad, i, ~p, inst->imm);
-                } else {
-                    _Bool mx =
-                        ptr_32[p] && ptr_16[p];
-                    emit(b,
-                        mx
-                        ? "%su32 v%d ="
-                          " f2u(h2f("
-                          "p%d_16[%d]));\n"
-                        : "%su32 v%d ="
-                          " f2u(h2f("
-                          "p%d[%d]));\n",
-                        pad, i, p, inst->imm);
-                }
-            } break;
-            case op_load_f16: {
-                int p = inst->ptr;
-                if (inst->x) {
-                    if (p < 0) {
-                        emit(b,
-                            "%su32 v%d ="
-                            " f2u(h2f("
-                            "((u16*)pd%d)"
-                            "[i+(s32)v%d]));\n",
-                            pad, i, ~p, inst->x);
-                    } else {
-                        _Bool mx =
-                            ptr_32[p] && ptr_16[p];
-                        emit(b,
-                            mx
-                            ? "%su32 v%d ="
-                              " f2u(h2f("
-                              "p%d_16"
-                              "[i+(s32)v%d]));\n"
-                            : "%su32 v%d ="
-                              " f2u(h2f("
-                              "p%d"
-                              "[i+(s32)v%d]));\n",
-                            pad, i, p, inst->x);
-                    }
-                } else {
-                    if (p < 0) {
-                        emit(b,
-                            "%su32 v%d ="
-                            " f2u(h2f("
-                            "((u16*)pd%d)"
-                            "[i]));\n",
-                            pad, i, ~p);
-                    } else {
-                        _Bool mx =
-                            ptr_32[p] && ptr_16[p];
-                        emit(b,
-                            mx
-                            ? "%su32 v%d ="
-                              " f2u(h2f("
-                              "p%d_16[i]));\n"
-                            : "%su32 v%d ="
-                              " f2u(h2f("
-                              "p%d[i]));\n",
-                            pad, i, p);
-                    }
-                }
-            } break;
-            case op_gather_f16: {
-                int p = inst->ptr;
-                if (p < 0) {
-                    emit(b,
-                        "%su32 v%d ="
-                        " f2u(h2f("
-                        "((u16*)pd%d)"
-                        "[clamp_ix((s32)v%d"
-                        ",szd%d,2)]));\n",
-                        pad, i, ~p, inst->x, ~p);
-                } else {
-                    _Bool mx =
-                        ptr_32[p] && ptr_16[p];
-                    emit(b,
-                        mx
-                        ? "%su32 v%d ="
-                          " f2u(h2f("
-                          "p%d_16"
-                          "[clamp_ix((s32)v%d"
-                          ",sz%d,2)]));\n"
-                        : "%su32 v%d ="
-                          " f2u(h2f("
-                          "p%d"
-                          "[clamp_ix((s32)v%d"
-                          ",sz%d,2)]));\n",
-                        pad, i, p, inst->x, p);
-                }
-            } break;
-            case op_store_f16: {
-                int p = inst->ptr;
-                if (inst->x) {
-                    if (p < 0) {
-                        emit(b,
-                            "%s((u16*)pd%d)"
-                            "[i+(s32)v%d]"
-                            " = f2h(u2f(v%d));\n",
-                            pad, ~p, inst->x,
-                            inst->y);
-                    } else {
-                        _Bool mx =
-                            ptr_32[p] && ptr_16[p];
-                        emit(b,
-                            mx
-                            ? "%sp%d_16"
-                              "[i+(s32)v%d]"
-                              " = f2h(u2f(v%d));\n"
-                            : "%sp%d[i+(s32)v%d]"
-                              " = f2h(u2f(v%d));\n",
-                            pad, p, inst->x,
-                            inst->y);
-                    }
-                } else {
-                    if (p < 0) {
-                        emit(b,
-                            "%s((u16*)pd%d)[i]"
-                            " = f2h(u2f(v%d));\n",
-                            pad, ~p, inst->y);
-                    } else {
-                        _Bool mx =
-                            ptr_32[p] && ptr_16[p];
-                        emit(b,
-                            mx
-                            ? "%sp%d_16[i]"
-                              " = f2h(u2f(v%d));\n"
-                            : "%sp%d[i]"
-                              " = f2h(u2f(v%d));\n",
-                            pad, p, inst->y);
-                    }
-                }
-            } break;
-            case op_scatter_f16: {
-                int p = inst->ptr;
-                if (p < 0) {
-                    emit(b,
-                        "%s((u16*)pd%d)"
-                        "[clamp_ix((s32)v%d"
-                        ",szd%d,2)]"
-                        " = f2h(u2f(v%d));\n",
-                        pad, ~p, inst->x,
-                        ~p, inst->y);
-                } else {
-                    _Bool mx =
-                        ptr_32[p] && ptr_16[p];
-                    emit(b,
-                        mx
-                        ? "%sp%d_16"
-                          "[clamp_ix((s32)v%d"
-                          ",sz%d,2)]"
-                          " = f2h(u2f(v%d));\n"
-                        : "%sp%d"
-                          "[clamp_ix((s32)v%d"
-                          ",sz%d,2)]"
-                          " = f2h(u2f(v%d));\n",
-                        pad, p, inst->x,
-                        p, inst->y);
-                }
-            } break;
+            case op_htof:
+                emit(b,
+                    "%su32 v%d ="
+                    " f2u(h2f((u16)v%d));\n",
+                    pad, i, inst->x);
+                break;
+            case op_ftoh:
+                emit(b,
+                    "%su32 v%d ="
+                    " (u32)f2h(u2f(v%d));\n",
+                    pad, i, inst->x);
+                break;
 
             #define BINOP(OP, EXPR) \
                 case OP: \

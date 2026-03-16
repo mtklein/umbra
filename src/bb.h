@@ -20,8 +20,7 @@
     X(lt_u32) X(le_u32)                                  \
     X(uni_16) X(load_16) X(store_16)                     \
     X(gather_16) X(scatter_16)                           \
-    X(uni_f16) X(load_f16) X(store_f16)                  \
-    X(gather_f16) X(scatter_f16)                         \
+    X(htof) X(ftoh)                                      \
     X(load_8x4)                                          \
     X(store_8x4)
 
@@ -48,10 +47,8 @@ struct umbra_basic_block {
 static inline _Bool is_store(enum op op) {
     return op == op_store_16
         || op == op_store_32
-        || op == op_store_f16
         || op == op_scatter_16
         || op == op_scatter_32
-        || op == op_scatter_f16
         || op == op_store_8x4;
 }
 
@@ -60,18 +57,15 @@ static inline _Bool has_ptr(enum op op) {
         || (op >= op_uni_32 && op <= op_scatter_32)
         || op == op_load_8x4
         || op == op_store_8x4
-        || (op >= op_uni_16 && op <= op_scatter_16)
-        || (op >= op_uni_f16 && op <= op_scatter_f16);
+        || (op >= op_uni_16 && op <= op_scatter_16);
 }
 
 static inline _Bool is_varying(enum op op) {
     return op == op_lane
         || op == op_load_16
         || op == op_load_32
-        || op == op_load_f16
         || op == op_store_16
         || op == op_store_32
-        || op == op_store_f16
         || op == op_load_8x4
         || op == op_store_8x4;
 }

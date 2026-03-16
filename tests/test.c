@@ -86,8 +86,8 @@ static void cleanup(backends *B) {
 #define BINOP_F32(op, B, opt) do {                   \
     struct umbra_basic_block *bb_ =                  \
         umbra_basic_block();                         \
-    umbra_v32 ix_ = umbra_lane(bb_);                 \
-    umbra_v32 a_ = umbra_load32(bb_,                 \
+    umbra_val ix_ = umbra_lane(bb_);                 \
+    umbra_val a_ = umbra_load32(bb_,                 \
                        (umbra_ptr){0}, ix_),         \
               b_ = umbra_load32(bb_,                 \
                        (umbra_ptr){1}, ix_),         \
@@ -99,7 +99,7 @@ static void cleanup(backends *B) {
 #define BINOP_I32(op, B, opt) do {                   \
     struct umbra_basic_block *bb_ =                  \
         umbra_basic_block();                         \
-    umbra_v32 ix_ = umbra_lane(bb_),                 \
+    umbra_val ix_ = umbra_lane(bb_),                 \
               a_ = umbra_load32(bb_,                 \
                        (umbra_ptr){0}, ix_),         \
               b_ = umbra_load32(bb_,                 \
@@ -112,12 +112,12 @@ static void cleanup(backends *B) {
 #define BINOP_CMP_F32(op, B, opt) do {               \
     struct umbra_basic_block *bb_ =                  \
         umbra_basic_block();                         \
-    umbra_v32 ix_ = umbra_lane(bb_);                 \
-    umbra_v32 a_ = umbra_load32(bb_,                 \
+    umbra_val ix_ = umbra_lane(bb_);                 \
+    umbra_val a_ = umbra_load32(bb_,                 \
                        (umbra_ptr){0}, ix_),         \
               b_ = umbra_load32(bb_,                 \
                        (umbra_ptr){1}, ix_);         \
-    umbra_v32 r_ = op(bb_, a_, b_);                  \
+    umbra_val r_ = op(bb_, a_, b_);                  \
     umbra_store32(bb_, (umbra_ptr){2}, ix_, r_);     \
     B = make(bb_, opt);                              \
 } while(0)
@@ -313,7 +313,7 @@ static void test_i32_ops(void) {
     {
         struct umbra_basic_block *bb =
             umbra_basic_block();
-        umbra_v32 ix = umbra_lane(bb),
+        umbra_val ix = umbra_lane(bb),
                    c = umbra_load32(bb,
                            (umbra_ptr){0}, ix),
                    a = umbra_load32(bb,
@@ -583,8 +583,8 @@ static void test_imm(void) {
     {
         struct umbra_basic_block *bb =
             umbra_basic_block();
-        umbra_v32 ix = umbra_lane(bb),
-                   v = umbra_iimm(bb, 42);
+        umbra_val ix = umbra_lane(bb),
+                   v = umbra_imm(bb, 42);
         umbra_store32(bb, (umbra_ptr){0}, ix, v);
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
@@ -605,8 +605,8 @@ static void test_fma_f32(void) {
   for (int opt = 0; opt < 2; opt++) {
     struct umbra_basic_block *bb =
         umbra_basic_block();
-    umbra_v32 ix = umbra_lane(bb);
-    umbra_v32 x = umbra_load32(bb,
+    umbra_val ix = umbra_lane(bb);
+    umbra_val x = umbra_load32(bb,
                       (umbra_ptr){0}, ix),
               y = umbra_load32(bb,
                       (umbra_ptr){1}, ix),
@@ -664,10 +664,10 @@ static void test_min_max_sqrt_f32(void) {
     {
         struct umbra_basic_block *bb =
             umbra_basic_block();
-        umbra_v32 ix = umbra_lane(bb);
-        umbra_v32 x = umbra_load32(bb,
+        umbra_val ix = umbra_lane(bb);
+        umbra_val x = umbra_load32(bb,
                           (umbra_ptr){0}, ix),
-                  r = umbra_fsqrt(bb, x);
+                  r = umbra_sqrt(bb, x);
         umbra_store32(bb, (umbra_ptr){1}, ix, r);
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
@@ -709,10 +709,10 @@ static void test_convert(void) {
     {
         struct umbra_basic_block *bb =
             umbra_basic_block();
-        umbra_v32 ix = umbra_lane(bb),
+        umbra_val ix = umbra_lane(bb),
                    x = umbra_load32(bb,
                            (umbra_ptr){0}, ix);
-        umbra_v32 r  = umbra_itof(bb, x);
+        umbra_val r  = umbra_itof(bb, x);
         umbra_store32(bb, (umbra_ptr){1}, ix, r);
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
@@ -730,10 +730,10 @@ static void test_convert(void) {
     {
         struct umbra_basic_block *bb =
             umbra_basic_block();
-        umbra_v32 ix = umbra_lane(bb);
-        umbra_v32 x = umbra_load32(bb,
+        umbra_val ix = umbra_lane(bb);
+        umbra_val x = umbra_load32(bb,
                           (umbra_ptr){0}, ix);
-        umbra_v32 r  = umbra_ftoi(bb, x);
+        umbra_val r  = umbra_ftoi(bb, x);
         umbra_store32(bb, (umbra_ptr){1}, ix, r);
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
@@ -754,12 +754,12 @@ static void test_convert(void) {
 static void test_dedup(void) {
     struct umbra_basic_block *bb =
         umbra_basic_block();
-    umbra_v32 a = umbra_iimm(bb, 42),
-              b = umbra_iimm(bb, 42);
+    umbra_val a = umbra_imm(bb, 42),
+              b = umbra_imm(bb, 42);
     (a.id == b.id) here;
-    umbra_v32 c = umbra_iimm(bb, 99);
+    umbra_val c = umbra_imm(bb, 99);
     (a.id != c.id) here;
-    umbra_v32 ix = umbra_lane(bb),
+    umbra_val ix = umbra_lane(bb),
                x = umbra_load32(bb,
                        (umbra_ptr){0}, ix),
               s1 = umbra_iadd(bb, x, a),
@@ -773,9 +773,9 @@ static void test_constprop(void) {
     {
         struct umbra_basic_block *bb =
             umbra_basic_block();
-        umbra_v32 ix = umbra_lane(bb),
-                   a = umbra_iimm(bb, 3),
-                   b = umbra_iimm(bb, 5),
+        umbra_val ix = umbra_lane(bb),
+                   a = umbra_imm(bb, 3),
+                   b = umbra_imm(bb, 5),
                    s = umbra_iadd(bb, a, b);
         umbra_store32(bb, (umbra_ptr){0}, ix, s);
         backends B = make(bb, opt);
@@ -793,9 +793,9 @@ static void test_constprop(void) {
     {
         struct umbra_basic_block *bb =
             umbra_basic_block();
-        umbra_v32 ix = umbra_lane(bb);
-        umbra_v32 a = umbra_fimm(bb, 2.0f),
-                  b = umbra_fimm(bb, 3.0f),
+        umbra_val ix = umbra_lane(bb);
+        umbra_val a = umbra_float(bb, 2.0f),
+                  b = umbra_float(bb, 3.0f),
                   s = umbra_fmul(bb, a, b);
         umbra_store32(bb, (umbra_ptr){0}, ix, s);
         backends B = make(bb, opt);
@@ -817,10 +817,10 @@ static void test_strength_reduction(void) {
     {
         struct umbra_basic_block *bb =
             umbra_basic_block();
-        umbra_v32 ix = umbra_lane(bb),
+        umbra_val ix = umbra_lane(bb),
                    x = umbra_load32(bb,
                            (umbra_ptr){0}, ix),
-                   z = umbra_iimm(bb, 0),
+                   z = umbra_imm(bb, 0),
                    s = umbra_iadd(bb, x, z);
         (s.id == x.id) here;
         umbra_basic_block_free(bb);
@@ -828,10 +828,10 @@ static void test_strength_reduction(void) {
     {
         struct umbra_basic_block *bb =
             umbra_basic_block();
-        umbra_v32 ix  = umbra_lane(bb),
+        umbra_val ix  = umbra_lane(bb),
                    x  = umbra_load32(bb,
                             (umbra_ptr){0}, ix),
-                  one = umbra_iimm(bb, 1),
+                  one = umbra_imm(bb, 1),
                    s  = umbra_imul(bb, x, one);
         (s.id == x.id) here;
         umbra_basic_block_free(bb);
@@ -840,10 +840,10 @@ static void test_strength_reduction(void) {
     {
         struct umbra_basic_block *bb =
             umbra_basic_block();
-        umbra_v32 ix    = umbra_lane(bb),
+        umbra_val ix    = umbra_lane(bb),
                   x     = umbra_load32(bb,
                               (umbra_ptr){0}, ix),
-                  eight = umbra_iimm(bb, 8),
+                  eight = umbra_imm(bb, 8),
                   s     = umbra_imul(bb, x, eight);
         umbra_store32(bb, (umbra_ptr){1}, ix, s);
         backends B = make(bb, opt);
@@ -861,7 +861,7 @@ static void test_strength_reduction(void) {
     {
         struct umbra_basic_block *bb =
             umbra_basic_block();
-        umbra_v32 ix = umbra_lane(bb),
+        umbra_val ix = umbra_lane(bb),
                    x = umbra_load32(bb,
                            (umbra_ptr){0}, ix),
                    s = umbra_isub(bb, x, x);
@@ -885,9 +885,9 @@ static void test_zero_imm(void) {
   for (int opt = 0; opt < 2; opt++) {
     struct umbra_basic_block *bb =
         umbra_basic_block();
-    umbra_v32 zero = umbra_iimm(bb, 0);
+    umbra_val zero = umbra_imm(bb, 0);
     (zero.id == 0) here;
-    umbra_v32 ix = umbra_lane(bb),
+    umbra_val ix = umbra_lane(bb),
                x = umbra_load32(bb,
                        (umbra_ptr){0}, ix),
                r = umbra_ieq(bb, x, zero);
@@ -911,10 +911,10 @@ static void test_load_8x4(void) {
   for (int opt = 0; opt < 2; opt++) {
     struct umbra_basic_block *bb =
         umbra_basic_block();
-    umbra_v32 ix = umbra_lane(bb);
-    umbra_v32 ch[4];
+    umbra_val ix = umbra_lane(bb);
+    umbra_val ch[4];
     umbra_load8x4(bb, (umbra_ptr){0}, ix, ch);
-    umbra_v32 r = ch[0],
+    umbra_val r = ch[0],
               g = ch[1],
               b = ch[2],
               a = ch[3];
@@ -954,8 +954,8 @@ static void test_store_8x4(void) {
   for (int opt = 0; opt < 2; opt++) {
     struct umbra_basic_block *bb =
         umbra_basic_block();
-    umbra_v32 ix = umbra_lane(bb);
-    umbra_v32 r = umbra_load32(bb,
+    umbra_val ix = umbra_lane(bb);
+    umbra_val r = umbra_load32(bb,
                       (umbra_ptr){0}, ix),
               g = umbra_load32(bb,
                       (umbra_ptr){1}, ix),
@@ -963,7 +963,7 @@ static void test_store_8x4(void) {
                       (umbra_ptr){2}, ix),
               a = umbra_load32(bb,
                       (umbra_ptr){3}, ix);
-    umbra_v32 ch[4] = {r, g, b, a};
+    umbra_val ch[4] = {r, g, b, a};
     umbra_store8x4(bb, (umbra_ptr){4}, ix, ch);
     backends B = make(bb, opt);
     for (int bi = 0; bi < 4; bi++) {
@@ -1015,21 +1015,21 @@ static void test_hash_quality(void) {
     enum { N = 1000 };
     int ids[N];
     for (int i = 0; i < N; i++) {
-        ids[i] = umbra_iimm(bb, i).id;
+        ids[i] = umbra_imm(bb, i).id;
     }
     for (int i = 0; i < N; i++) {
-        (umbra_iimm(bb, i).id == ids[i]) here;
+        (umbra_imm(bb, i).id == ids[i]) here;
     }
     for (int i = 1; i < N; i++) {
         (ids[i] != ids[i-1]) here;
     }
-    umbra_v32 ix = umbra_lane(bb),
+    umbra_val ix = umbra_lane(bb),
                x = umbra_load32(bb,
                        (umbra_ptr){0}, ix);
     for (int i = 0; i < N; i++) {
-        umbra_v32 c    = umbra_iimm(bb, i);
-        umbra_v32 sum  = umbra_iadd(bb, x, c);
-        umbra_v32 sum2 = umbra_iadd(bb, x, c);
+        umbra_val c    = umbra_imm(bb, i);
+        umbra_val sum  = umbra_iadd(bb, x, c);
+        umbra_val sum2 = umbra_iadd(bb, x, c);
         (sum.id == sum2.id) here;
     }
     umbra_basic_block_free(bb);
@@ -1040,11 +1040,11 @@ static void test_mixed_ptr_sizes(void) {
     {
         struct umbra_basic_block *bb =
             umbra_basic_block();
-        umbra_v32 ix = umbra_lane(bb);
-        umbra_v32 a = umbra_load32(bb,
+        umbra_val ix = umbra_lane(bb);
+        umbra_val a = umbra_load32(bb,
                           (umbra_ptr){0}, ix);
-        umbra_v32 b = umbra_iadd(bb, a,
-                          umbra_iimm(bb, 1));
+        umbra_val b = umbra_iadd(bb, a,
+                          umbra_imm(bb, 1));
         umbra_store32(bb, (umbra_ptr){1}, ix, b);
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
@@ -1062,11 +1062,11 @@ static void test_mixed_ptr_sizes(void) {
     {
         struct umbra_basic_block *bb =
             umbra_basic_block();
-        umbra_v32 ix = umbra_lane(bb);
-        umbra_v32 a = umbra_load_f16(bb,
+        umbra_val ix = umbra_lane(bb);
+        umbra_val a = umbra_load_f16(bb,
                           (umbra_ptr){0}, ix);
-        umbra_v32 b = umbra_fadd(bb, a,
-                          umbra_fimm(bb, 1.0f));
+        umbra_val b = umbra_fadd(bb, a,
+                          umbra_float(bb, 1.0f));
         umbra_store_f16(bb, (umbra_ptr){1}, ix, b);
         backends B = make(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
@@ -1123,10 +1123,10 @@ static void test_n9(void) {
     {
         struct umbra_basic_block *bb =
             umbra_basic_block();
-        umbra_v32 ix = umbra_lane(bb);
-        umbra_v32 ch[4];
+        umbra_val ix = umbra_lane(bb);
+        umbra_val ch[4];
         umbra_load8x4(bb, (umbra_ptr){0}, ix, ch);
-        umbra_v32 out[4] = {
+        umbra_val out[4] = {
             ch[0], ch[1], ch[2], ch[3],
         };
         umbra_store8x4(bb,
@@ -1153,18 +1153,18 @@ static void test_preamble_pair_alias(void) {
   for (int opt = 0; opt < 2; opt++) {
     struct umbra_basic_block *bb =
         umbra_basic_block();
-    umbra_v32 ix = umbra_lane(bb);
+    umbra_val ix = umbra_lane(bb);
 
     enum { N_PRE = 24 };
-    umbra_v32 pre[N_PRE];
+    umbra_val pre[N_PRE];
     for (int i = 0; i < N_PRE; i++) {
-        pre[i] = umbra_fimm(bb, (float)(i + 1));
+        pre[i] = umbra_float(bb, (float)(i + 1));
     }
 
-    umbra_v32 x = umbra_load32(bb,
+    umbra_val x = umbra_load32(bb,
                       (umbra_ptr){0}, ix);
 
-    umbra_v32 sum = umbra_fmul(bb, x, pre[0]);
+    umbra_val sum = umbra_fmul(bb, x, pre[0]);
     for (int i = 1; i < N_PRE; i++) {
         sum = umbra_fadd(bb, sum,
                   umbra_fmul(bb, x, pre[i]));
@@ -1199,7 +1199,7 @@ static void test_gather_clamp(void) {
     {
         struct umbra_basic_block *bb =
             umbra_basic_block();
-        umbra_v32 ix  = umbra_lane(bb),
+        umbra_val ix  = umbra_lane(bb),
                   idx = umbra_load32(bb,
                             (umbra_ptr){0}, ix),
                   val = umbra_load32(bb,
@@ -1225,10 +1225,10 @@ static void test_gather_clamp(void) {
     {
         struct umbra_basic_block *bb =
             umbra_basic_block();
-        umbra_v32 ix  = umbra_lane(bb),
+        umbra_val ix  = umbra_lane(bb),
                   idx = umbra_load32(bb,
                             (umbra_ptr){0}, ix);
-        umbra_v32 val = umbra_i16load(bb,
+        umbra_val val = umbra_load16(bb,
                             (umbra_ptr){1}, idx);
         umbra_store32(bb, (umbra_ptr){2}, ix, val);
         backends B = make_full(bb, opt);
@@ -1255,7 +1255,7 @@ static void test_scatter_clamp(void) {
   for (int opt = 0; opt < 2; opt++) {
     struct umbra_basic_block *bb =
         umbra_basic_block();
-    umbra_v32 ix  = umbra_lane(bb),
+    umbra_val ix  = umbra_lane(bb),
               idx = umbra_load32(bb,
                         (umbra_ptr){0}, ix),
               val = umbra_load32(bb,
@@ -1284,11 +1284,11 @@ static void test_offset_load_store(void) {
     {
         struct umbra_basic_block *bb =
             umbra_basic_block();
-        umbra_v32 ix  = umbra_lane(bb);
-        umbra_v32 off = umbra_load32(bb,
-            (umbra_ptr){1}, umbra_iimm(bb, 0));
-        umbra_v32 ixo = umbra_iadd(bb, ix, off);
-        umbra_v32 val = umbra_i16load(bb,
+        umbra_val ix  = umbra_lane(bb);
+        umbra_val off = umbra_load32(bb,
+            (umbra_ptr){1}, umbra_imm(bb, 0));
+        umbra_val ixo = umbra_iadd(bb, ix, off);
+        umbra_val val = umbra_load16(bb,
             (umbra_ptr){0}, ixo);
         umbra_store32(bb, (umbra_ptr){2}, ix, val);
         backends B = make_full(bb, opt);
@@ -1313,11 +1313,11 @@ static void test_offset_load_store(void) {
     {
         struct umbra_basic_block *bb =
             umbra_basic_block();
-        umbra_v32 ix  = umbra_lane(bb);
-        umbra_v32 off = umbra_load32(bb,
-            (umbra_ptr){1}, umbra_iimm(bb, 0));
-        umbra_v32 ixo = umbra_iadd(bb, ix, off);
-        umbra_v32 val = umbra_load32(bb,
+        umbra_val ix  = umbra_lane(bb);
+        umbra_val off = umbra_load32(bb,
+            (umbra_ptr){1}, umbra_imm(bb, 0));
+        umbra_val ixo = umbra_iadd(bb, ix, off);
+        umbra_val val = umbra_load32(bb,
             (umbra_ptr){0}, ixo);
         umbra_store32(bb, (umbra_ptr){2}, ix, val);
         backends B = make_full(bb, opt);
@@ -1344,11 +1344,11 @@ static void test_offset_load_store(void) {
     {
         struct umbra_basic_block *bb =
             umbra_basic_block();
-        umbra_v32 ix  = umbra_lane(bb);
-        umbra_v32 off = umbra_load32(bb,
-            (umbra_ptr){1}, umbra_iimm(bb, 0));
-        umbra_v32 ixo = umbra_iadd(bb, ix, off);
-        umbra_v32 val = umbra_load32(bb,
+        umbra_val ix  = umbra_lane(bb);
+        umbra_val off = umbra_load32(bb,
+            (umbra_ptr){1}, umbra_imm(bb, 0));
+        umbra_val ixo = umbra_iadd(bb, ix, off);
+        umbra_val val = umbra_load32(bb,
             (umbra_ptr){0}, ix);
         umbra_store32(bb,
             (umbra_ptr){2}, ixo, val);
@@ -1373,11 +1373,11 @@ static void test_offset_load_store(void) {
     {
         struct umbra_basic_block *bb =
             umbra_basic_block();
-        umbra_v32 ix  = umbra_lane(bb);
-        umbra_v32 off = umbra_load32(bb,
-            (umbra_ptr){1}, umbra_iimm(bb, 0));
-        umbra_v32 ixo = umbra_iadd(bb, ix, off);
-        umbra_v32 val = umbra_load_f16(bb,
+        umbra_val ix  = umbra_lane(bb);
+        umbra_val off = umbra_load32(bb,
+            (umbra_ptr){1}, umbra_imm(bb, 0));
+        umbra_val ixo = umbra_iadd(bb, ix, off);
+        umbra_val val = umbra_load_f16(bb,
             (umbra_ptr){0}, ixo);
         umbra_store_f16(bb,
             (umbra_ptr){2}, ix, val);

@@ -4,10 +4,10 @@ struct umbra_basic_block* umbra_basic_block(void);
 void umbra_basic_block_free(struct umbra_basic_block*);
 void umbra_basic_block_optimize(struct umbra_basic_block*);
 
-typedef struct {int id;} umbra_v32;
+typedef struct {int id;} umbra_val;
 typedef struct {int ix;} umbra_ptr;
 
-umbra_v32 umbra_lane(struct umbra_basic_block*);
+umbra_val umbra_lane(struct umbra_basic_block*);
 
 int       umbra_reserve    (struct umbra_basic_block*, int n);
 int       umbra_reserve_ptr(struct umbra_basic_block*);
@@ -17,74 +17,120 @@ umbra_ptr umbra_deref_ptr(struct umbra_basic_block*,
 int       umbra_uni_len    (struct umbra_basic_block const*);
 void      umbra_set_uni_len(struct umbra_basic_block*, int);
 
-umbra_v32 umbra_iimm(struct umbra_basic_block*, int);
-umbra_v32 umbra_fimm(struct umbra_basic_block*, float);
+umbra_val umbra_imm(struct umbra_basic_block*, int bits);
 
-umbra_v32 umbra_load32(struct umbra_basic_block*,
-                       umbra_ptr src, umbra_v32 ix);
-umbra_v32 umbra_i16load(struct umbra_basic_block*,
-                        umbra_ptr src, umbra_v32 ix);
-umbra_v32 umbra_load_f16(struct umbra_basic_block*,
-                         umbra_ptr src, umbra_v32 ix);
+static inline umbra_val umbra_float(
+    struct umbra_basic_block *bb, float v) {
+    union { float f; int i; } u = {.f=v};
+    return umbra_imm(bb, u.i);
+}
+
+umbra_val umbra_load32(struct umbra_basic_block*,
+                       umbra_ptr src, umbra_val ix);
+umbra_val umbra_load16(struct umbra_basic_block*,
+                       umbra_ptr src, umbra_val ix);
+umbra_val umbra_load_f16(struct umbra_basic_block*,
+                         umbra_ptr src, umbra_val ix);
 
 void umbra_store32(struct umbra_basic_block*,
-                   umbra_ptr dst, umbra_v32 ix,
-                   umbra_v32);
-void umbra_i16store(struct umbra_basic_block*,
-                    umbra_ptr dst, umbra_v32 ix,
-                    umbra_v32);
+                   umbra_ptr dst, umbra_val ix,
+                   umbra_val);
+void umbra_store16(struct umbra_basic_block*,
+                   umbra_ptr dst, umbra_val ix,
+                   umbra_val);
 void umbra_store_f16(struct umbra_basic_block*,
-                     umbra_ptr dst, umbra_v32 ix,
-                     umbra_v32);
+                     umbra_ptr dst, umbra_val ix,
+                     umbra_val);
 
-umbra_v32 umbra_fadd(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_fsub(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_fmul(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_fdiv(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_fmin(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_fmax(struct umbra_basic_block*, umbra_v32, umbra_v32);
+umbra_val umbra_htof(struct umbra_basic_block*,
+                     umbra_val);
+umbra_val umbra_ftoh(struct umbra_basic_block*,
+                     umbra_val);
 
-umbra_v32 umbra_fsqrt(struct umbra_basic_block*, umbra_v32);
+umbra_val umbra_fadd(struct umbra_basic_block*,
+                     umbra_val, umbra_val);
+umbra_val umbra_fsub(struct umbra_basic_block*,
+                     umbra_val, umbra_val);
+umbra_val umbra_fmul(struct umbra_basic_block*,
+                     umbra_val, umbra_val);
+umbra_val umbra_fdiv(struct umbra_basic_block*,
+                     umbra_val, umbra_val);
+umbra_val umbra_fmin(struct umbra_basic_block*,
+                     umbra_val, umbra_val);
+umbra_val umbra_fmax(struct umbra_basic_block*,
+                     umbra_val, umbra_val);
 
-umbra_v32 umbra_iadd(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_isub(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_imul(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_ishl(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_ushr(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_sshr(struct umbra_basic_block*, umbra_v32, umbra_v32);
+umbra_val umbra_sqrt(struct umbra_basic_block*,
+                     umbra_val);
 
-umbra_v32 umbra_and(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_or (struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_xor(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_sel(struct umbra_basic_block*, umbra_v32, umbra_v32, umbra_v32);
+umbra_val umbra_iadd(struct umbra_basic_block*,
+                     umbra_val, umbra_val);
+umbra_val umbra_isub(struct umbra_basic_block*,
+                     umbra_val, umbra_val);
+umbra_val umbra_imul(struct umbra_basic_block*,
+                     umbra_val, umbra_val);
+umbra_val umbra_ishl(struct umbra_basic_block*,
+                     umbra_val, umbra_val);
+umbra_val umbra_ushr(struct umbra_basic_block*,
+                     umbra_val, umbra_val);
+umbra_val umbra_sshr(struct umbra_basic_block*,
+                     umbra_val, umbra_val);
 
-umbra_v32 umbra_itof(struct umbra_basic_block*, umbra_v32);
-umbra_v32 umbra_ftoi(struct umbra_basic_block*, umbra_v32);
+umbra_val umbra_and(struct umbra_basic_block*,
+                    umbra_val, umbra_val);
+umbra_val umbra_or (struct umbra_basic_block*,
+                    umbra_val, umbra_val);
+umbra_val umbra_xor(struct umbra_basic_block*,
+                    umbra_val, umbra_val);
+umbra_val umbra_sel(struct umbra_basic_block*,
+                    umbra_val, umbra_val, umbra_val);
+
+
+umbra_val umbra_itof(struct umbra_basic_block*,
+                     umbra_val);
+umbra_val umbra_ftoi(struct umbra_basic_block*,
+                     umbra_val);
 
 void umbra_load8x4(struct umbra_basic_block*,
-                   umbra_ptr src, umbra_v32 ix,
-                   umbra_v32 out[4]);
+                   umbra_ptr src, umbra_val ix,
+                   umbra_val out[4]);
 void umbra_store8x4(struct umbra_basic_block*,
-                    umbra_ptr dst, umbra_v32 ix,
-                    umbra_v32 in[4]);
+                    umbra_ptr dst, umbra_val ix,
+                    umbra_val in[4]);
 
-umbra_v32 umbra_feq(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_fne(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_flt(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_fle(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_fgt(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_fge(struct umbra_basic_block*, umbra_v32, umbra_v32);
+umbra_val umbra_feq(struct umbra_basic_block*,
+                    umbra_val, umbra_val);
+umbra_val umbra_fne(struct umbra_basic_block*,
+                    umbra_val, umbra_val);
+umbra_val umbra_flt(struct umbra_basic_block*,
+                    umbra_val, umbra_val);
+umbra_val umbra_fle(struct umbra_basic_block*,
+                    umbra_val, umbra_val);
+umbra_val umbra_fgt(struct umbra_basic_block*,
+                    umbra_val, umbra_val);
+umbra_val umbra_fge(struct umbra_basic_block*,
+                    umbra_val, umbra_val);
 
-umbra_v32 umbra_ieq(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_ine(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_slt(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_sle(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_sgt(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_sge(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_ult(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_ule(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_ugt(struct umbra_basic_block*, umbra_v32, umbra_v32);
-umbra_v32 umbra_uge(struct umbra_basic_block*, umbra_v32, umbra_v32);
+umbra_val umbra_ieq(struct umbra_basic_block*,
+                    umbra_val, umbra_val);
+umbra_val umbra_ine(struct umbra_basic_block*,
+                    umbra_val, umbra_val);
+umbra_val umbra_slt(struct umbra_basic_block*,
+                    umbra_val, umbra_val);
+umbra_val umbra_sle(struct umbra_basic_block*,
+                    umbra_val, umbra_val);
+umbra_val umbra_sgt(struct umbra_basic_block*,
+                    umbra_val, umbra_val);
+umbra_val umbra_sge(struct umbra_basic_block*,
+                    umbra_val, umbra_val);
+umbra_val umbra_ult(struct umbra_basic_block*,
+                    umbra_val, umbra_val);
+umbra_val umbra_ule(struct umbra_basic_block*,
+                    umbra_val, umbra_val);
+umbra_val umbra_ugt(struct umbra_basic_block*,
+                    umbra_val, umbra_val);
+umbra_val umbra_uge(struct umbra_basic_block*,
+                    umbra_val, umbra_val);
 
 typedef struct { void *ptr; long sz; } umbra_buf;
 

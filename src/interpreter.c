@@ -107,14 +107,6 @@ op(uni_32) {
     v->i32 = (I32){0} + uni;
     next;
 }
-op(uni_f16) {
-    __fp16 h;
-    __builtin_memcpy(&h,
-                     (__fp16 const*)ptr[ip->x] + ip->y,
-                     sizeof h);
-    v->f32 = (F32){0} + (float)h;
-    next;
-}
 
 op(load_16) {
     int16_t const *src =
@@ -139,18 +131,6 @@ op(load_32) {
         __builtin_memcpy(v, src + end-1, 4);
     } else {
         __builtin_memcpy(v, src + end-K, 4*K);
-    }
-    next;
-}
-op(load_f16) {
-    __fp16 const *src =
-        (__fp16 const*)ptr[ip->x] + v[ip->y].i32[0];
-    if (end & (K-1)) {
-        v->f32 = (F32){0} + (float)src[end-1];
-    } else {
-        U16 tmp;
-        __builtin_memcpy(&tmp, src + end-K, 2*K);
-        v->f32 = f16_to_f32(tmp);
     }
     next;
 }
@@ -180,18 +160,6 @@ op(store_32) {
     }
     next;
 }
-op(store_f16) {
-    __fp16 *dst =
-        (__fp16*)ptr[ip->x] + v[ip->z].i32[0];
-    if (end & (K-1)) {
-        U16 tmp = f32_to_f16(v[ip->y].f32);
-        __builtin_memcpy(dst + end-1, &tmp, 2);
-    } else {
-        U16 tmp = f32_to_f16(v[ip->y].f32);
-        __builtin_memcpy(dst + end-K, &tmp, 2*K);
-    }
-    next;
-}
 
 op(gather_16) {
     I32 ix = clamp_ix(v[ip->y].i32, sz[ip->x], 2);
@@ -209,18 +177,6 @@ op(gather_32) {
         __builtin_memcpy(
             (char*)&v->i32 + 4*l,
             (char const*)ptr[ip->x] + 4*ix[l], 4);
-    }
-    next;
-}
-op(gather_f16) {
-    I32 ix = clamp_ix(v[ip->y].i32, sz[ip->x], 2);
-    for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
-        __fp16 h;
-        __builtin_memcpy(&h,
-            (char const*)ptr[ip->x] + 2*ix[l], 2);
-        float f = (float)h;
-        __builtin_memcpy(
-            (char*)&v->f32 + 4*l, &f, 4);
     }
     next;
 }
@@ -243,13 +199,34 @@ op(scatter_32) {
     }
     next;
 }
-op(scatter_f16) {
-    U16 tmp = f32_to_f16(v[ip->y].f32);
-    I32 ix = clamp_ix(v[ip->z].i32, sz[ip->x], 2);
-    for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
-        __builtin_memcpy(
-            (char*)ptr[ip->x] + 2*ix[l],
-            (char*)&tmp + 2*l, 2);
+
+op(htof_fn) {
+    if (end & (K-1)) {
+        uint16_t h = (uint16_t)(uint32_t)v[ip->x].i32[0];
+        __fp16 tmp;
+        __builtin_memcpy(&tmp, &h, 2);
+        v->f32 = (F32){0} + (float)tmp;
+    } else {
+        U16 h = {0};
+        for (int l = 0; l < K; l++) {
+            h[l] = (uint16_t)(uint32_t)v[ip->x].i32[l];
+        }
+        v->f32 = f16_to_f32(h);
+    }
+    next;
+}
+
+op(ftoh_fn) {
+    if (end & (K-1)) {
+        __fp16 tmp = (__fp16)v[ip->x].f32[0];
+        uint16_t h;
+        __builtin_memcpy(&h, &tmp, 2);
+        v->u32 = (U32){0} + (uint32_t)h;
+    } else {
+        U16 h = f32_to_f16(v[ip->x].f32);
+        for (int l = 0; l < K; l++) {
+            v->u32[l] = (uint32_t)h[l];
+        }
     }
     next;
 }
@@ -520,6 +497,9 @@ static Fn const fn[] = {
     [op_f32_from_i32] = f32_from_i32,
     [op_i32_from_f32] = i32_from_f32,
 
+    [op_htof] = htof_fn,
+    [op_ftoh] = ftoh_fn,
+
     [op_eq_f32] = eq_f32,
     [op_lt_f32] = lt_f32,
     [op_le_f32] = le_f32,
@@ -644,11 +624,6 @@ struct umbra_interpreter* umbra_interpreter(
                              .x=RESOLVE_PTR(inst),
                              .y=inst->imm);
                         break;
-                    case op_uni_f16:
-                        emit(.fn=uni_f16,
-                             .x=RESOLVE_PTR(inst),
-                             .y=inst->imm);
-                        break;
 
                     case op_load_16:
                         emit(.fn=load_16,
@@ -657,11 +632,6 @@ struct umbra_interpreter* umbra_interpreter(
                         break;
                     case op_load_32:
                         emit(.fn=load_32,
-                             .x=RESOLVE_PTR(inst),
-                             .y=X);
-                        break;
-                    case op_load_f16:
-                        emit(.fn=load_f16,
                              .x=RESOLVE_PTR(inst),
                              .y=X);
                         break;
@@ -676,11 +646,6 @@ struct umbra_interpreter* umbra_interpreter(
                              .x=RESOLVE_PTR(inst),
                              .y=X);
                         break;
-                    case op_gather_f16:
-                        emit(.fn=gather_f16,
-                             .x=RESOLVE_PTR(inst),
-                             .y=X);
-                        break;
 
                     case op_store_16:
                         emit(.fn=store_16,
@@ -692,11 +657,6 @@ struct umbra_interpreter* umbra_interpreter(
                              .x=RESOLVE_PTR(inst),
                              .y=Y, .z=X);
                         break;
-                    case op_store_f16:
-                        emit(.fn=store_f16,
-                             .x=RESOLVE_PTR(inst),
-                             .y=Y, .z=X);
-                        break;
 
                     case op_scatter_16:
                         emit(.fn=scatter_16,
@@ -705,11 +665,6 @@ struct umbra_interpreter* umbra_interpreter(
                         break;
                     case op_scatter_32:
                         emit(.fn=scatter_32,
-                             .x=RESOLVE_PTR(inst),
-                             .y=Y, .z=X);
-                        break;
-                    case op_scatter_f16:
-                        emit(.fn=scatter_f16,
                              .x=RESOLVE_PTR(inst),
                              .y=Y, .z=X);
                         break;
@@ -771,6 +726,9 @@ struct umbra_interpreter* umbra_interpreter(
 
                     case op_f32_from_i32:
                     case op_i32_from_f32:
+
+                    case op_htof:
+                    case op_ftoh:
 
                     case op_eq_f32:
                     case op_lt_f32:

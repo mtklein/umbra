@@ -66,17 +66,17 @@ static pipe readback_pipes[NUM_FMTS];
 
 static void build_fill(int fmt) {
     BB *bb = umbra_basic_block();
-    umbra_v32 ix = umbra_lane(bb);
+    umbra_val ix = umbra_lane(bb);
     int fi = umbra_reserve(bb, 4);
     umbra_color c = {
         umbra_load32(bb, (umbra_ptr){1},
-                     umbra_iimm(bb, fi)),
+                     umbra_imm(bb, fi)),
         umbra_load32(bb, (umbra_ptr){1},
-                     umbra_iimm(bb, fi+1)),
+                     umbra_imm(bb, fi+1)),
         umbra_load32(bb, (umbra_ptr){1},
-                     umbra_iimm(bb, fi+2)),
+                     umbra_imm(bb, fi+2)),
         umbra_load32(bb, (umbra_ptr){1},
-                     umbra_iimm(bb, fi+3)),
+                     umbra_imm(bb, fi+3)),
     };
     fmt_store[fmt](bb, (umbra_ptr){0}, ix, c);
     umbra_basic_block_optimize(bb);
@@ -87,7 +87,7 @@ static void build_fill(int fmt) {
 
 static void build_readback(int fmt) {
     BB *bb = umbra_basic_block();
-    umbra_v32 ix = umbra_lane(bb);
+    umbra_val ix = umbra_lane(bb);
     umbra_color c =
         fmt_load[fmt](bb, (umbra_ptr){0}, ix);
     umbra_store_8888(bb, (umbra_ptr){2}, ix, c);

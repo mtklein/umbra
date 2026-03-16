@@ -627,15 +627,15 @@ static void test_no_blend(void) {
 
 static umbra_color gradient_shader(
         struct umbra_basic_block *bb,
-        umbra_v32 x, umbra_v32 y) {
+        umbra_val x, umbra_val y) {
     (void)y;
     int fi = umbra_reserve(bb, 2);
-    umbra_v32 w = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_iimm(bb, fi));
-    umbra_v32 a = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_iimm(bb, fi+1));
-    umbra_v32 t = umbra_fdiv(bb, x, w);
-    umbra_v32 zero = umbra_fimm(bb, 0.0f);
+    umbra_val w = umbra_load32(bb,
+        (umbra_ptr){1}, umbra_imm(bb, fi));
+    umbra_val a = umbra_load32(bb,
+        (umbra_ptr){1}, umbra_imm(bb, fi+1));
+    umbra_val t = umbra_fdiv(bb, x, w);
+    umbra_val zero = umbra_float(bb, 0.0f);
     return (umbra_color){t, zero, zero, a};
 }
 
@@ -1285,17 +1285,17 @@ static void test_transfer_lut(void) {
 
 static umbra_color srgb_invert_shader(
         struct umbra_basic_block *bb,
-        umbra_v32 x, umbra_v32 y) {
+        umbra_val x, umbra_val y) {
     (void)x; (void)y;
     int fi = umbra_reserve(bb, 4);
-    umbra_v32 r = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_iimm(bb, fi));
-    umbra_v32 g = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_iimm(bb, fi+1));
-    umbra_v32 b = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_iimm(bb, fi+2));
-    umbra_v32 a = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_iimm(bb, fi+3));
+    umbra_val r = umbra_load32(bb,
+        (umbra_ptr){1}, umbra_imm(bb, fi));
+    umbra_val g = umbra_load32(bb,
+        (umbra_ptr){1}, umbra_imm(bb, fi+1));
+    umbra_val b = umbra_load32(bb,
+        (umbra_ptr){1}, umbra_imm(bb, fi+2));
+    umbra_val a = umbra_load32(bb,
+        (umbra_ptr){1}, umbra_imm(bb, fi+3));
     umbra_color c = {r, g, b, a};
     return umbra_transfer_invert(bb, c,
                                  &umbra_transfer_srgb);
@@ -1334,17 +1334,17 @@ static void test_transfer_invert(void) {
 
 static umbra_color srgb_apply_shader(
         struct umbra_basic_block *bb,
-        umbra_v32 x, umbra_v32 y) {
+        umbra_val x, umbra_val y) {
     (void)x; (void)y;
     int fi = umbra_reserve(bb, 4);
-    umbra_v32 r = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_iimm(bb, fi));
-    umbra_v32 g = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_iimm(bb, fi+1));
-    umbra_v32 b = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_iimm(bb, fi+2));
-    umbra_v32 a = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_iimm(bb, fi+3));
+    umbra_val r = umbra_load32(bb,
+        (umbra_ptr){1}, umbra_imm(bb, fi));
+    umbra_val g = umbra_load32(bb,
+        (umbra_ptr){1}, umbra_imm(bb, fi+1));
+    umbra_val b = umbra_load32(bb,
+        (umbra_ptr){1}, umbra_imm(bb, fi+2));
+    umbra_val a = umbra_load32(bb,
+        (umbra_ptr){1}, umbra_imm(bb, fi+3));
     umbra_color c = {r, g, b, a};
     return umbra_transfer_apply(bb, c,
                                 &umbra_transfer_srgb);
@@ -1383,17 +1383,17 @@ static void test_transfer_apply(void) {
 
 static umbra_color srgb_roundtrip_shader(
         struct umbra_basic_block *bb,
-        umbra_v32 x, umbra_v32 y) {
+        umbra_val x, umbra_val y) {
     (void)x; (void)y;
     int fi = umbra_reserve(bb, 4);
-    umbra_v32 r = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_iimm(bb, fi));
-    umbra_v32 g = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_iimm(bb, fi+1));
-    umbra_v32 b = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_iimm(bb, fi+2));
-    umbra_v32 a = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_iimm(bb, fi+3));
+    umbra_val r = umbra_load32(bb,
+        (umbra_ptr){1}, umbra_imm(bb, fi));
+    umbra_val g = umbra_load32(bb,
+        (umbra_ptr){1}, umbra_imm(bb, fi+1));
+    umbra_val b = umbra_load32(bb,
+        (umbra_ptr){1}, umbra_imm(bb, fi+2));
+    umbra_val a = umbra_load32(bb,
+        (umbra_ptr){1}, umbra_imm(bb, fi+3));
     umbra_color c = {r, g, b, a};
     c = umbra_transfer_apply(bb, c,
                              &umbra_transfer_srgb);
@@ -1441,7 +1441,7 @@ static umbra_shader_fn ss_inner_;
 static int ss_n_;
 static umbra_color ss_shader_(
         struct umbra_basic_block *bb,
-        umbra_v32 x, umbra_v32 y) {
+        umbra_val x, umbra_val y) {
     return umbra_supersample(bb, x, y,
                              ss_inner_, ss_n_);
 }
