@@ -29,18 +29,12 @@ umbra_val umbra_load_i32(struct umbra_basic_block*,
                        umbra_ptr src, umbra_val ix);
 umbra_val umbra_load_i16(struct umbra_basic_block*,
                        umbra_ptr src, umbra_val ix);
-umbra_val umbra_load_f16(struct umbra_basic_block*,
-                         umbra_ptr src, umbra_val ix);
-
 void umbra_store_i32(struct umbra_basic_block*,
                    umbra_ptr dst, umbra_val ix,
                    umbra_val);
 void umbra_store_i16(struct umbra_basic_block*,
                    umbra_ptr dst, umbra_val ix,
                    umbra_val);
-void umbra_store_f16(struct umbra_basic_block*,
-                     umbra_ptr dst, umbra_val ix,
-                     umbra_val);
 
 umbra_val umbra_widen_s16(struct umbra_basic_block*,
                         umbra_val);
@@ -53,6 +47,17 @@ umbra_val umbra_widen_f16(struct umbra_basic_block*,
                      umbra_val);
 umbra_val umbra_narrow_f32(struct umbra_basic_block*,
                      umbra_val);
+
+static inline umbra_val umbra_load_f16(
+    struct umbra_basic_block *bb,
+    umbra_ptr src, umbra_val ix) {
+    return umbra_widen_f16(bb, umbra_load_i16(bb, src, ix));
+}
+static inline void umbra_store_f16(
+    struct umbra_basic_block *bb,
+    umbra_ptr dst, umbra_val ix, umbra_val v) {
+    umbra_store_i16(bb, dst, ix, umbra_narrow_f32(bb, v));
+}
 
 umbra_val umbra_add_f32(struct umbra_basic_block*,
                      umbra_val, umbra_val);

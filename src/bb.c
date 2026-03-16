@@ -182,10 +182,6 @@ val umbra_load_i32(BB *bb, umbra_ptr src, val ix) {
     return (val){push(bb, op_gather_32,
                       .x=ix.id, .ptr=src.ix)};
 }
-val umbra_load_f16(BB *bb, umbra_ptr src, val ix) {
-    return umbra_widen_f16(bb, umbra_load_i16(bb, src, ix));
-}
-
 void umbra_store_i16(BB *bb, umbra_ptr dst,
                    val ix, val v) {
     if (bb->inst[ix.id].op == op_lane) {
@@ -222,11 +218,6 @@ void umbra_store_i32(BB *bb, umbra_ptr dst,
     push(bb, op_scatter_32,
          .x=ix.id, .y=v.id, .ptr=dst.ix);
 }
-void umbra_store_f16(BB *bb, umbra_ptr dst,
-                     val ix, val v) {
-    umbra_store_i16(bb, dst, ix, umbra_narrow_f32(bb, v));
-}
-
 val umbra_widen_s16(BB *bb, val a) {
     return (val){push(bb, op_widen_s16, .x=a.id)};
 }
