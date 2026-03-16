@@ -94,6 +94,13 @@ uint32_t STP_qi(int t1, int t2, int n, int imm) {
 uint32_t LD4_8b(int t, int n) { return 0x0c400000u | ((uint32_t)n<<5) | (uint32_t)t; }
 uint32_t ST4_8b(int t, int n) { return 0x0c000000u | ((uint32_t)n<<5) | (uint32_t)t; }
 
+uint32_t SLI_4s_imm(int d, int n, int shift) {
+    return 0x6f005400u
+        | ((uint32_t)(shift + 32) << 16)
+        | ((uint32_t)n << 5)
+        | (uint32_t)d;
+}
+
 uint32_t W(uint32_t insn) { return insn | 0x40000000u; }
 
 // Encoding constants for macro-generated NEON functions.

@@ -411,6 +411,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
+            int base16 = XP;
             if (inst->x) {
                 int8_t ro = ra_ensure(ra, sl, ns, inst->x);
                 put(c, UMOV_ws(XT, ro));
@@ -418,17 +419,16 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 put(c, LSL_xi(XT, XT, 1));
                 put(c, ADD_xr(XT, XP, XT));
                 last_ptr = -999;
-            } else {
-                put(c, ADD_xi(XT, XP, 0));
+                base16 = XT;
             }
             if (scalar) {
                 put(c, 0x78607800u
                     | ((uint32_t)XI << 16)
-                    | ((uint32_t)XT << 5)
+                    | ((uint32_t)base16 << 5)
                     | (uint32_t)XT);
                 put(c, DUP_4s_w(s.rd, XT));
             } else {
-                put(c, LDR_d(s.rd, XT, XH));
+                put(c, LDR_d(s.rd, base16, XH));
             }
         } break;
 
@@ -526,6 +526,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
+            int sbase = XP;
             if (inst->x) {
                 int8_t ro = ra_ensure(ra, sl, ns, inst->x);
                 put(c, UMOV_ws(XT, ro));
@@ -533,13 +534,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 put(c, LSL_xi(XT, XT, 1));
                 put(c, ADD_xr(XT, XP, XT));
                 last_ptr = -999;
-            } else {
-                put(c, ADD_xi(XT, XP, 0));
+                sbase = XT;
             }
             if (scalar) {
-                put(c, STR_hx(ry, XT, XI));
+                put(c, STR_hx(ry, sbase, XI));
             } else {
-                put(c, STR_d(ry, XT, XH));
+                put(c, STR_d(ry, sbase, XH));
             }
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
         } break;
@@ -728,21 +728,11 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 int8_t r1 = ra_ensure(ra,sl,ns,inputs[1]);
                 int8_t r2 = ra_ensure(ra,sl,ns,inputs[2]);
                 int8_t r3 = ra_ensure(ra,sl,ns,inputs[3]);
-                int8_t mask = ra_alloc(ra, sl, ns);
-                put(c, MOVI_4s(mask, 0xff, 0));
                 int8_t tmp = ra_alloc(ra, sl, ns);
-                put(c, AND_16b(tmp, r0, mask));
-                int8_t tmp2 = ra_alloc(ra, sl, ns);
-                put(c, AND_16b(tmp2, r1, mask));
-                put(c, SHL_4s_imm(tmp2, tmp2, 8));
-                put(c, ORR_16b(tmp, tmp, tmp2));
-                put(c, AND_16b(tmp2, r2, mask));
-                put(c, SHL_4s_imm(tmp2, tmp2, 16));
-                put(c, ORR_16b(tmp, tmp, tmp2));
-                put(c, SHL_4s_imm(tmp2, r3, 24));
-                put(c, ORR_16b(tmp, tmp, tmp2));
-                ra_return_reg(ra, tmp2);
-                ra_return_reg(ra, mask);
+                put(c, ORR_16b(tmp, r0, r0));
+                put(c, SLI_4s_imm(tmp, r1, 8));
+                put(c, SLI_4s_imm(tmp, r2, 16));
+                put(c, SLI_4s_imm(tmp, r3, 24));
                 put(c, STR_q(tmp, XP, XW));
                 ra_return_reg(ra, tmp);
             }

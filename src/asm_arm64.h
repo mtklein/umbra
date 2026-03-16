@@ -54,6 +54,7 @@ V2(CMEQ_4h_z) V2(CMGT_4h_z) V2(CMGE_4h_z) V2(CMLE_4h_z) V2(CMLT_4h_z)
 V2(FCMEQ_4h_z) V2(FCMGT_4h_z) V2(FCMGE_4h_z) V2(FCMLE_4h_z) V2(FCMLT_4h_z)
 V2(FCVTN_4h) V2(FCVTL_4s)
 V2(SCVTF_4h) V2(FCVTZS_4h) V2(XTN_4h) V2(SXTL_4s) V2(UXTL_8h)
+uint32_t SLI_4s_imm(int d, int n, int shift);
 #undef V3
 #undef V2
 
