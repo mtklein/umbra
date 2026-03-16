@@ -704,10 +704,10 @@ static void test_hash_quality(void) {
     enum { N = 1000 };
     int ids[N];
     for (int i = 0; i < N; i++) {
-        ids[i] = umbra_iimm(bb, (uint32_t)i).id;
+        ids[i] = umbra_iimm(bb, i).id;
     }
     for (int i = 0; i < N; i++) {
-        (umbra_iimm(bb, (uint32_t)i).id == ids[i]) here;
+        (umbra_iimm(bb, i).id == ids[i]) here;
     }
     for (int i = 1; i < N; i++) {
         (ids[i] != ids[i-1]) here;
@@ -715,7 +715,7 @@ static void test_hash_quality(void) {
     umbra_i32 ix = umbra_lane(bb),
                x = umbra_iload(bb, (umbra_ptr){0}, ix);
     for (int i = 0; i < N; i++) {
-        umbra_i32 c    = umbra_iimm(bb, (uint32_t)i);
+        umbra_i32 c    = umbra_iimm(bb, i);
         umbra_i32 sum  = umbra_iadd(bb, x, c);
         umbra_i32 sum2 = umbra_iadd(bb, x, c);
         (sum.id == sum2.id) here;

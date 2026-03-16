@@ -11,8 +11,8 @@ typedef uint32_t U32 __attribute__((vector_size(K*4)));
 typedef    float F32 __attribute__((vector_size(K*4)));
 typedef uint16_t U16 __attribute__((vector_size(K*2)));
 
-#if defined(__F16C__)
-    typedef _Float16 F16 __attribute__((vector_size(K*2)));
+#if !defined(__wasm__)
+    typedef __fp16 F16 __attribute__((vector_size(K*2)));
     static F32 f16_to_f32(U16 h) {
         F16 tmp; __builtin_memcpy(&tmp, &h, sizeof h);
         return cast(F32, tmp);
@@ -24,53 +24,20 @@ typedef uint16_t U16 __attribute__((vector_size(K*2)));
     }
 #else
     static F32 f16_to_f32(U16 h) {
-        U32 const sign = cast(U32, h >> 15) << 31;
-        U32 const exp  = cast(U32, (h >> 10) & 0x1f);
-        U32 const mant = cast(U32, h & 0x3ff);
-
-        U32 const normal = sign | ((exp + 112) << 23) | (mant << 13);
-        U32 const zero   = sign;
-        U32 const infnan = sign | (0xffu << 23) | (mant << 13);
-
-        U32 const is_zero   = (U32)(exp == 0);
-        U32 const is_infnan = (U32)(exp == 31);
-
-        U32 const bits = (is_zero & zero)
-                 | (is_infnan & infnan)
-                 | (~is_zero & ~is_infnan & normal);
-        F32 result;
-        __builtin_memcpy(&result, &bits, sizeof bits);
-        return result;
+        F32 r = {0};
+        for (int i = 0; i < K; i++) {
+            __fp16 tmp; __builtin_memcpy(&tmp, (char*)&h + 2*i, 2);
+            r[i] = (float)tmp;
+        }
+        return r;
     }
-
     static U16 f32_to_f16(F32 f) {
-        U32 bits;
-        __builtin_memcpy(&bits, &f, sizeof f);
-
-        U32 const sign = (bits >> 31) << 15;
-        I32 exp  = (I32)((bits >> 23) & 0xff) - 127 + 15;
-        U32 mant = (bits >> 13) & 0x3ff;
-
-        U32 const round_bit = (bits >> 12) & 1;
-        U32 const sticky    = (U32)((bits & 0xfff) != 0);
-        mant += round_bit & (sticky | (mant & 1));
-        U32 const mant_overflow = mant >> 10;
-        exp += (I32)mant_overflow;
-        mant &= 0x3ff;
-
-        U32 const normal        = sign | (U32)((U32)exp << 10) | mant;
-        U32 const inf           = sign | 0x7c00;
-        U32 const is_overflow   = (U32)(exp >= 31);
-        U32 const is_underflow  = (U32)(exp <= 0);
-        U32 const src_exp       = (bits >> 23) & 0xff;
-        U32 const is_infnan     = (U32)(src_exp == 0xff);
-        U32 const infnan        = sign | 0x7c00 | mant;
-
-        U32 const result32 = (is_underflow & sign)
-                      | (is_overflow & ~is_infnan & inf)
-                      | (is_infnan & infnan)
-                      | (~is_underflow & ~is_overflow & ~is_infnan & normal);
-        return cast(U16, result32);
+        U16 r = {0};
+        for (int i = 0; i < K; i++) {
+            __fp16 tmp = (__fp16)f[i];
+            __builtin_memcpy((char*)&r + 2*i, &tmp, 2);
+        }
+        return r;
     }
 #endif
 

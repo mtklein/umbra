@@ -5,7 +5,6 @@
 #include <stdlib.h>
 
 typedef struct umbra_basic_block BB;
-#define imm(bb,v) umbra_iimm(bb, (uint32_t)(v))
 
 enum { W = 128, H = 96, LUT_N = 64 };
 
@@ -41,10 +40,10 @@ static void build_fill(int fmt) {
     umbra_i32 ix = umbra_lane(bb);
     int fi = umbra_reserve_f32(bb, 4);
     umbra_color c = {
-        umbra_fload(bb, (umbra_ptr){1}, imm(bb, fi+0)),
-        umbra_fload(bb, (umbra_ptr){1}, imm(bb, fi+1)),
-        umbra_fload(bb, (umbra_ptr){1}, imm(bb, fi+2)),
-        umbra_fload(bb, (umbra_ptr){1}, imm(bb, fi+3)),
+        umbra_fload(bb, (umbra_ptr){1}, umbra_iimm(bb, fi)),
+        umbra_fload(bb, (umbra_ptr){1}, umbra_iimm(bb, fi+1)),
+        umbra_fload(bb, (umbra_ptr){1}, umbra_iimm(bb, fi+2)),
+        umbra_fload(bb, (umbra_ptr){1}, umbra_iimm(bb, fi+3)),
     };
     fmt_store[fmt](bb, (umbra_ptr){0}, ix, c);
     umbra_basic_block_optimize(bb);
@@ -185,9 +184,9 @@ static void render_slide(int slide_idx, int fmt, void *ctx, run_fn run,
             long long uni_[12] = {0}; char *uni = (char*)uni_;
             uni_i32(uni, lay->x0, 0);
             uni_i32(uni, lay->y,  y);
-            uni_f32(uni, 8, hc, 4);
-            uni_f32(uni, 24, mat, 11);
-            uni_ptr(uni, 72, bitmap_cov->data, (long)(W * H * 2));
+            uni_f32(uni, lay->shader, hc, 4);
+            uni_f32(uni, lay->coverage, mat, 11);
+            uni_ptr(uni, (lay->coverage + 11*4 + 7) & ~7, bitmap_cov->data, (long)(W * H * 2));
             for (int i = 0; i < planar_strides; i++) {
                 uni_i32(uni, uni_len - (planar_strides - i) * 4, planar_stride);
             }
@@ -203,8 +202,8 @@ static void render_slide(int slide_idx, int fmt, void *ctx, run_fn run,
             long long uni_[6] = {0}; char *uni = (char*)uni_;
             uni_i32(uni, lay->x0, 0);
             uni_i32(uni, lay->y,  y);
-            uni_f32(uni, 8, hc, 4);
-            uni_ptr(uni, 24, tc->data + y * W, (long)(W * 2));
+            uni_f32(uni, lay->shader, hc, 4);
+            uni_ptr(uni, lay->coverage, tc->data + y * W, (long)(W * 2));
             for (int i = 0; i < planar_strides; i++) {
                 uni_i32(uni, uni_len - (planar_strides - i) * 4, planar_stride);
             }
@@ -226,11 +225,11 @@ static void render_slide(int slide_idx, int fmt, void *ctx, run_fn run,
             if (is_lut) {
                 float *lut = (s->shader == umbra_shader_linear_grad) ? linear_lut
                                                                       : radial_lut;
-                uni_f32(uni, 8, gp, 4);
-                uni_ptr(uni, 24, lut, (long)(LUT_N * 4 * 4));
+                uni_f32(uni, lay->shader, gp, 4);
+                uni_ptr(uni, (lay->shader + 16 + 7) & ~7, lut, (long)(LUT_N * 4 * 4));
             } else {
-                uni_f32(uni, 8, gp, 3);
-                uni_f32(uni, 20, hc, 8);
+                uni_f32(uni, lay->shader, gp, 3);
+                uni_f32(uni, lay->shader + 12, hc, 8);
             }
             for (int i = 0; i < planar_strides; i++) {
                 uni_i32(uni, uni_len - (planar_strides - i) * 4, planar_stride);
@@ -247,9 +246,9 @@ static void render_slide(int slide_idx, int fmt, void *ctx, run_fn run,
             long long uni_[6] = {0}; char *uni = (char*)uni_;
             uni_i32(uni, lay->x0, 0);
             uni_i32(uni, lay->y,  y);
-            uni_f32(uni, 8, hc, 4);
+            uni_f32(uni, lay->shader, hc, 4);
             if (s->coverage) {
-                uni_f32(uni, 24, rect, 4);
+                uni_f32(uni, lay->coverage, rect, 4);
             }
             for (int i = 0; i < planar_strides; i++) {
                 uni_i32(uni, uni_len - (planar_strides - i) * 4, planar_stride);

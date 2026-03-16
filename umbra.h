@@ -17,7 +17,7 @@ umbra_ptr umbra_deref_ptr   (struct umbra_basic_block*, umbra_ptr buf, int byte_
 int       umbra_uni_len    (struct umbra_basic_block const*);
 void      umbra_set_uni_len(struct umbra_basic_block*, int);
 
-umbra_i32 umbra_iimm(struct umbra_basic_block*, unsigned int   bits);
+umbra_i32 umbra_iimm(struct umbra_basic_block*, int);
 umbra_f32 umbra_fimm(struct umbra_basic_block*, float);
 
 umbra_i32 umbra_iload (struct umbra_basic_block*, umbra_ptr src, umbra_i32 ix);

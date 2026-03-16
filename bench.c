@@ -299,8 +299,9 @@ int main(int argc, char *argv[]) {
 
     for (int di = 0; di < (int)(sizeof draws / sizeof draws[0]); di++) {
         draw_config *d = &draws[di];
+        umbra_draw_layout dlay;
         struct umbra_basic_block *dbb = umbra_draw_build(
-            d->shader, d->coverage, d->blend, d->load, d->store, NULL);
+            d->shader, d->coverage, d->blend, d->load, d->store, &dlay);
         umbra_basic_block_optimize(dbb);
 
         struct umbra_interpreter *dp   = umbra_interpreter(dbb);
@@ -325,11 +326,11 @@ int main(int argc, char *argv[]) {
         float color[4] = {0.25f, 0.5f, 0.125f, 0.5f};
         long long uni_[3] = {0};
         char *uni = (char*)uni_;
-        __builtin_memcpy(uni + 8, color, 16);
+        __builtin_memcpy(uni + dlay.shader, color, 16);
 
         umbra_buf dbuf[] = {
             {dst_px, pixel_n * px_bytes},
-            {uni,   -24},
+            {uni,   -(long)dlay.uni_len},
         };
 
         printf("\nDraw %s, %d pixels:\n", d->name, pixel_n);

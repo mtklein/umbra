@@ -90,7 +90,7 @@ i32 umbra_lane(BB *bb) {
     return (i32){push(bb, op_lane)};
 }
 
-i32 umbra_iimm(BB *bb, uint32_t bits) { return (i32){push(bb, op_imm_32, .imm=(int)bits)}; }
+i32 umbra_iimm(BB *bb, int bits) { return (i32){push(bb, op_imm_32, .imm=bits)}; }
 f32 umbra_fimm(BB *bb, float v) { uint32_t bits; __builtin_memcpy(&bits, &v, 4); return (f32){push(bb, op_imm_32, .imm=(int)bits)}; }
 
 int umbra_reserve_i32(BB *bb, int n) {
@@ -186,7 +186,7 @@ static int math_(BB *bb, struct bb_inst inst) {
         int const result = umbra_const_eval(inst.op, bb->inst[inst.x].imm
                                              , bb->inst[inst.y].imm
                                              , bb->inst[inst.z].imm);
-        return umbra_iimm(bb, (uint32_t)result).id;
+        return umbra_iimm(bb, result).id;
     }
     return push_(bb, inst);
 }
@@ -268,11 +268,11 @@ i32 umbra_imul(BB *bb, i32 a, i32 b) {
     if (is_imm32(bb, b.id, 0)) { return b; }
     if (bb->inst[a.id].op == op_imm_32 && is_pow2(bb->inst[a.id].imm)) {
         int const shift = __builtin_ctz((unsigned)bb->inst[a.id].imm);
-        return umbra_ishl(bb, b, umbra_iimm(bb, (uint32_t)shift));
+        return umbra_ishl(bb, b, umbra_iimm(bb, shift));
     }
     if (bb->inst[b.id].op == op_imm_32 && is_pow2(bb->inst[b.id].imm)) {
         int const shift = __builtin_ctz((unsigned)bb->inst[b.id].imm);
-        return umbra_ishl(bb, a, umbra_iimm(bb, (uint32_t)shift));
+        return umbra_ishl(bb, a, umbra_iimm(bb, shift));
     }
     return (i32){math(bb, op_mul_i32, .x=a.id, .y=b.id)};
 }
@@ -357,7 +357,7 @@ i32 umbra_feq(BB *bb, f32 a, f32 b) {
     return (i32){math(bb, op_eq_f32, .x=a.id, .y=b.id)};
 }
 i32 umbra_fne(BB *bb, f32 a, f32 b) {
-    return umbra_xor(bb, umbra_feq(bb, a, b), umbra_iimm(bb, 0xffffffff));
+    return umbra_xor(bb, umbra_feq(bb, a, b), umbra_iimm(bb, -1));
 }
 i32 umbra_flt(BB *bb, f32 a, f32 b) { return (i32){math(bb, op_lt_f32, .x=a.id, .y=b.id)}; }
 i32 umbra_fle(BB *bb, f32 a, f32 b) { return (i32){math(bb, op_le_f32, .x=a.id, .y=b.id)}; }
@@ -366,11 +366,11 @@ i32 umbra_fge(BB *bb, f32 a, f32 b) { return umbra_fle(bb, b, a); }
 
 i32 umbra_ieq(BB *bb, i32 a, i32 b) {
     sort(&a.id, &b.id);
-    if (a.id == b.id) { return umbra_iimm(bb, 0xffffffff); }
+    if (a.id == b.id) { return umbra_iimm(bb, -1); }
     return (i32){math(bb, op_eq_i32, .x=a.id, .y=b.id)};
 }
 i32 umbra_ine(BB *bb, i32 a, i32 b) {
-    return umbra_xor(bb, umbra_ieq(bb, a, b), umbra_iimm(bb, 0xffffffff));
+    return umbra_xor(bb, umbra_ieq(bb, a, b), umbra_iimm(bb, -1));
 }
 
 i32 umbra_slt(BB *bb, i32 a, i32 b) { return (i32){math(bb, op_lt_s32, .x=a.id, .y=b.id)}; }

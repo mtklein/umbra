@@ -12,6 +12,7 @@ typedef void        (*umbra_store_fn)  (struct umbra_basic_block*, umbra_ptr ptr
 
 typedef struct {
     int x0, y;
+    int shader, coverage;
     int uni_len;
 } umbra_draw_layout;
 
