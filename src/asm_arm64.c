@@ -58,6 +58,12 @@ uint32_t STR_hx(int d, int n, int m) {
     return 0x7c207800u | ((uint32_t)m<<16) | ((uint32_t)n<<5) | (uint32_t)d;
 }
 
+uint32_t LDR_d(int d, int n, int m) {
+    return 0xfc606800u | ((uint32_t)m<<16) | ((uint32_t)n<<5) | (uint32_t)d;
+}
+uint32_t STR_d(int d, int n, int m) {
+    return 0xfc206800u | ((uint32_t)m<<16) | ((uint32_t)n<<5) | (uint32_t)d;
+}
 uint32_t LDR_q(int d, int n, int m) {
     return 0x3ce06800u | ((uint32_t)m<<16) | ((uint32_t)n<<5) | (uint32_t)d;
 }

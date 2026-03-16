@@ -38,29 +38,26 @@ Disassembly of section __TEXT,__text:
                	fcvtzs.4s	v18, v18
                	mov	x9, #0x0                ; =0
                	sub	x10, x0, x9
-               	cmp	x10, #0x8
-               	b.lt	0xe0 <ltmp0+0xe0>
+               	cmp	x10, #0x4
+               	b.lt	0xd4 <ltmp0+0xd4>
                	lsl	x11, x9, #1
                	lsl	x12, x9, #2
                	ldr	x8, [x1]
-               	xtn.4h	v4, v19
-               	xtn2.8h	v4, v19
-               	xtn.8b	v0, v4
-               	xtn.4h	v4, v5
-               	xtn2.8h	v4, v5
-               	xtn.8b	v1, v4
-               	xtn.4h	v4, v6
-               	xtn2.8h	v4, v6
-               	xtn.8b	v2, v4
-               	xtn.4h	v4, v18
-               	xtn2.8h	v4, v18
-               	xtn.8b	v3, v4
-               	add	x10, x8, x12
-               	st4.8b	{ v0, v1, v2, v3 }, [x10]
-               	add	x9, x9, #0x8
+               	movi.4s	v4, #0xff
+               	and.16b	v17, v19, v4
+               	and.16b	v16, v5, v4
+               	shl.4s	v16, v16, #0x8
+               	orr.16b	v17, v17, v16
+               	and.16b	v16, v6, v4
+               	shl.4s	v16, v16, #0x10
+               	orr.16b	v17, v17, v16
+               	shl.4s	v16, v18, #0x18
+               	orr.16b	v17, v17, v16
+               	str	q17, [x8, x12]
+               	add	x9, x9, #0x4
                	b	0x88 <ltmp0+0x88>
                	cmp	x0, x9
-               	b.le	0x1a4 <ltmp0+0x1a4>
+               	b.le	0x198 <ltmp0+0x198>
                	movi.4s	v18, #0x0
                	ldr	x8, [x1, #0x10]
                	mov	w10, #0x2               ; =2
@@ -73,22 +70,22 @@ Disassembly of section __TEXT,__text:
                	ldr	s19, [x8, x10, lsl #2]
                	dup.4s	v19, v19[0]
                	mov	w10, #0x5               ; =5
-               	ldr	s4, [x8, x10, lsl #2]
-               	dup.4s	v4, v4[0]
+               	ldr	s17, [x8, x10, lsl #2]
+               	dup.4s	v17, v17[0]
                	mov	w10, #0x0               ; =0
                	movk	w10, #0x437f, lsl #16
-               	dup.4s	v17, w10
+               	dup.4s	v4, w10
                	movi.4s	v16, #0x3f, lsl #24
                	mov.16b	v7, v16
-               	fmla.4s	v7, v6, v17
+               	fmla.4s	v7, v6, v4
                	fcvtzs.4s	v7, v7
                	mov.16b	v6, v16
-               	fmla.4s	v6, v5, v17
+               	fmla.4s	v6, v5, v4
                	fcvtzs.4s	v6, v6
                	mov.16b	v5, v16
-               	fmla.4s	v5, v19, v17
+               	fmla.4s	v5, v19, v4
                	fcvtzs.4s	v5, v5
-               	fmla.4s	v16, v4, v17
+               	fmla.4s	v16, v17, v4
                	fcvtzs.4s	v16, v16
                	ldr	x8, [x1]
                	lsl	x10, x9, #2
@@ -107,7 +104,7 @@ Disassembly of section __TEXT,__text:
                	add	x10, x8, x10
                	st1.b	{ v16 }[0], [x10]
                	add	x9, x9, #0x1
-               	b	0xe0 <ltmp0+0xe0>
+               	b	0xd4 <ltmp0+0xd4>
                	mov	sp, x29
                	ldp	x29, x30, [sp], #0x10
                	ret
