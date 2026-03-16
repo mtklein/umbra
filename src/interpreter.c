@@ -92,11 +92,11 @@ op(lane) {
 }
 
 op(uni_16) {
-    int16_t uni;
+    uint16_t uni;
     __builtin_memcpy(&uni,
-                     (int16_t const*)ptr[ip->x] + ip->y,
+                     (uint16_t const*)ptr[ip->x] + ip->y,
                      sizeof uni);
-    v->i32 = (I32){0} + (int32_t)uni;
+    v->u32 = (U32){0} + (uint32_t)uni;
     next;
 }
 op(uni_32) {
@@ -109,18 +109,18 @@ op(uni_32) {
 }
 
 op(load_16) {
-    int16_t const *src =
-        (int16_t const*)ptr[ip->x] + v[ip->y].i32[0];
+    uint16_t const *src =
+        (uint16_t const*)ptr[ip->x] + v[ip->y].i32[0];
     if (end & (K-1)) {
-        int16_t s;
+        uint16_t s;
         __builtin_memcpy(&s, src + end-1, 2);
-        v->i32 = (I32){0} + (int32_t)s;
+        v->u32 = (U32){0};
+        v->u32[0] = (uint32_t)s;
     } else {
-        typedef int16_t S16
-            __attribute__((vector_size(K*2)));
-        S16 tmp;
+        U16 tmp;
         __builtin_memcpy(&tmp, src + end-K, 2*K);
-        v->i32 = cast(I32, tmp);
+        v->u32 = (U32){0};
+        __builtin_memcpy(v, &tmp, sizeof tmp);
     }
     next;
 }
@@ -136,17 +136,14 @@ op(load_32) {
 }
 
 op(store_16) {
-    I32 src32 = v[ip->y].i32;
-    int16_t *dst =
-        (int16_t*)ptr[ip->x] + v[ip->z].i32[0];
+    uint16_t *dst =
+        (uint16_t*)ptr[ip->x] + v[ip->z].i32[0];
     if (end & (K-1)) {
-        int16_t s = (int16_t)src32[0];
+        uint16_t s;
+        __builtin_memcpy(&s, &v[ip->y], 2);
         __builtin_memcpy(dst + end-1, &s, 2);
     } else {
-        for (int l = 0; l < K; l++) {
-            int16_t s = (int16_t)src32[l];
-            __builtin_memcpy(dst + end-K+l, &s, 2);
-        }
+        __builtin_memcpy(dst + end-K, &v[ip->y], 2*K);
     }
     next;
 }
@@ -163,11 +160,13 @@ op(store_32) {
 
 op(gather_16) {
     I32 ix = clamp_ix(v[ip->y].i32, sz[ip->x], 2);
+    v->u32 = (U32){0};
     for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
-        int16_t s;
+        uint16_t s;
         __builtin_memcpy(&s,
             (char const*)ptr[ip->x] + 2*ix[l], 2);
-        v->i32[l] = (int32_t)s;
+        __builtin_memcpy(
+            (char*)v + 2*l, &s, 2);
     }
     next;
 }
@@ -184,7 +183,9 @@ op(gather_32) {
 op(scatter_16) {
     I32 ix = clamp_ix(v[ip->z].i32, sz[ip->x], 2);
     for (int l = 0; l < (end & (K-1) ? 1 : K); l++) {
-        int16_t s = (int16_t)v[ip->y].i32[l];
+        uint16_t s;
+        __builtin_memcpy(&s,
+            (char*)&v[ip->y] + 2*l, 2);
         __builtin_memcpy(
             (char*)ptr[ip->x] + 2*ix[l], &s, 2);
     }
@@ -202,15 +203,14 @@ op(scatter_32) {
 
 op(htof_fn) {
     if (end & (K-1)) {
-        uint16_t h = (uint16_t)(uint32_t)v[ip->x].i32[0];
+        uint16_t h;
+        __builtin_memcpy(&h, &v[ip->x], 2);
         __fp16 tmp;
         __builtin_memcpy(&tmp, &h, 2);
         v->f32 = (F32){0} + (float)tmp;
     } else {
-        U16 h = {0};
-        for (int l = 0; l < K; l++) {
-            h[l] = (uint16_t)(uint32_t)v[ip->x].i32[l];
-        }
+        U16 h;
+        __builtin_memcpy(&h, &v[ip->x], sizeof h);
         v->f32 = f16_to_f32(h);
     }
     next;
@@ -221,12 +221,56 @@ op(ftoh_fn) {
         __fp16 tmp = (__fp16)v[ip->x].f32[0];
         uint16_t h;
         __builtin_memcpy(&h, &tmp, 2);
-        v->u32 = (U32){0} + (uint32_t)h;
+        v->u32 = (U32){0};
+        __builtin_memcpy(v, &h, 2);
     } else {
         U16 h = f32_to_f16(v[ip->x].f32);
+        v->u32 = (U32){0};
+        __builtin_memcpy(v, &h, sizeof h);
+    }
+    next;
+}
+
+op(widen_s16) {
+    if (end & (K-1)) {
+        int16_t s;
+        __builtin_memcpy(&s, &v[ip->x], 2);
+        v->i32 = (I32){0} + (int32_t)s;
+    } else {
+        U16 tmp;
+        __builtin_memcpy(&tmp, &v[ip->x], sizeof tmp);
+        typedef int16_t S16
+            __attribute__((vector_size(K*2)));
+        S16 stmp;
+        __builtin_memcpy(&stmp, &tmp, sizeof tmp);
+        v->i32 = cast(I32, stmp);
+    }
+    next;
+}
+op(widen_u16) {
+    if (end & (K-1)) {
+        uint16_t s;
+        __builtin_memcpy(&s, &v[ip->x], 2);
+        v->u32 = (U32){0} + (uint32_t)s;
+    } else {
+        U16 tmp;
+        __builtin_memcpy(&tmp, &v[ip->x], sizeof tmp);
+        v->u32 = cast(U32, tmp);
+    }
+    next;
+}
+op(narrow_16) {
+    if (end & (K-1)) {
+        uint16_t s = (uint16_t)v[ip->x].u32[0];
+        v->u32 = (U32){0};
+        __builtin_memcpy(v, &s, 2);
+    } else {
+        U16 tmp;
         for (int l = 0; l < K; l++) {
-            v->u32[l] = (uint32_t)h[l];
+            tmp[l] = (uint16_t)v[ip->x].u32[l];
         }
+        v->u32 = (U32){0};
+        __builtin_memcpy(v, &tmp, sizeof tmp);
     }
     next;
 }
@@ -488,6 +532,10 @@ static Fn const fn[] = {
     [op_htof] = htof_fn,
     [op_ftoh] = ftoh_fn,
 
+    [op_widen_s16] = widen_s16,
+    [op_widen_u16] = widen_u16,
+    [op_narrow_16] = narrow_16,
+
     [op_eq_f32] = eq_f32,
     [op_lt_f32] = lt_f32,
     [op_le_f32] = le_f32,
@@ -710,6 +758,10 @@ struct umbra_interpreter* umbra_interpreter(
 
                     case op_htof:
                     case op_ftoh:
+
+                    case op_widen_s16:
+                    case op_widen_u16:
+                    case op_narrow_16:
 
                     case op_eq_f32:
                     case op_lt_f32:

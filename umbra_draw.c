@@ -297,7 +297,8 @@ umbra_val umbra_coverage_bitmap(BB *bb, umbra_val x, umbra_val y) {
     int bmp_off = umbra_reserve_ptr(bb);
     umbra_ptr bmp = umbra_deref_ptr(bb, (umbra_ptr){1}, bmp_off);
     umbra_val ix = umbra_lane(bb);
-    umbra_val val = umbra_load16(bb, bmp, ix);
+    umbra_val val = umbra_swiden16(bb,
+                        umbra_load16(bb, bmp, ix));
     umbra_val inv255 = umbra_float(bb, 1.0f / 255.0f);
     return umbra_fmul(bb, umbra_itof(bb, val), inv255);
 }
@@ -307,7 +308,8 @@ umbra_val umbra_coverage_sdf(BB *bb, umbra_val x, umbra_val y) {
     int bmp_off = umbra_reserve_ptr(bb);
     umbra_ptr bmp = umbra_deref_ptr(bb, (umbra_ptr){1}, bmp_off);
     umbra_val ix = umbra_lane(bb);
-    umbra_val raw = umbra_load16(bb, bmp, ix);
+    umbra_val raw = umbra_swiden16(bb,
+                        umbra_load16(bb, bmp, ix));
     umbra_val inv255 = umbra_float(bb, 1.0f / 255.0f);
     umbra_val dist = umbra_fmul(bb, umbra_itof(bb, raw), inv255);
     umbra_val lo    = umbra_float(bb, 0.4375f);
@@ -363,7 +365,8 @@ umbra_val umbra_coverage_bitmap_matrix(BB *bb, umbra_val x, umbra_val y) {
     umbra_val bwi = umbra_ftoi(bb, bw);
     umbra_val idx = umbra_iadd(bb, umbra_imul(bb, yi, bwi), xi);
 
-    umbra_val val = umbra_load16(bb, bmp, idx);
+    umbra_val val = umbra_swiden16(bb,
+                        umbra_load16(bb, bmp, idx));
     umbra_val inv255 = umbra_float(bb, 1.0f / 255.0f);
     umbra_val cov = umbra_fmul(bb, umbra_itof(bb, val), inv255);
 
@@ -395,7 +398,8 @@ void umbra_store_8888(BB *bb, umbra_ptr ptr, umbra_val ix, umbra_color c) {
 }
 
 umbra_color umbra_load_565(BB *bb, umbra_ptr ptr, umbra_val ix) {
-    umbra_val px = umbra_load16(bb, ptr, ix);
+    umbra_val px = umbra_uwiden16(bb,
+                       umbra_load16(bb, ptr, ix));
     umbra_val r32 = umbra_ushr(bb, px, umbra_imm(bb, 11));
     umbra_val g32 = umbra_and(bb, umbra_ushr(bb, px, umbra_imm(bb, 5)),
                                       umbra_imm(bb, 0x3f));
@@ -423,7 +427,8 @@ void umbra_store_565(BB *bb, umbra_ptr ptr, umbra_val ix, umbra_color c) {
     umbra_val r11 = umbra_ishl(bb, r, umbra_imm(bb, 11));
     umbra_val g5  = umbra_ishl(bb, g, umbra_imm(bb, 5));
     umbra_val px  = umbra_or(bb, umbra_or(bb, r11, g5), b);
-    umbra_store16(bb, ptr, ix, px);
+    umbra_store16(bb, ptr, ix,
+                  umbra_narrow16(bb, px));
 }
 
 umbra_color umbra_load_1010102(BB *bb, umbra_ptr ptr, umbra_val ix) {

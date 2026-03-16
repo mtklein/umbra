@@ -61,7 +61,7 @@ void umbra_entry(int n, void **ptrs, long *szs) {
     for (int i = 0; i < n; i++) {
         u32 v3 = (u32)((unsigned char*)ptrs[0])[i*4+0];
         u32 v4 = f2u((float)(s32)v3);
-        u32 v5 = (u32)(s32)(s16)p1[i];
+        u32 v5 = (u32)(u16)p1[i];
         u32 v6 = f2u(h2f((u16)v5));
         u32 v7 = (u32)((unsigned char*)ptrs[0])[i*4+3];
         u32 v8 = f2u((float)(s32)v7);
@@ -73,7 +73,7 @@ void umbra_entry(int n, void **ptrs, long *szs) {
 
         u32 v14 = (u32)((unsigned char*)ptrs[0])[i*4+1];
         u32 v15 = f2u((float)(s32)v14);
-        u32 v16 = (u32)(s32)(s16)p2[i];
+        u32 v16 = (u32)(u16)p2[i];
         u32 v17 = f2u(h2f((u16)v16));
         u32 v18 = f2u(u2f(v17) * u2f(v9));
         u32 v19 = f2u(fmaf(u2f(v1), u2f(v15), u2f(v18)));
@@ -82,14 +82,14 @@ void umbra_entry(int n, void **ptrs, long *szs) {
 
         u32 v22 = (u32)((unsigned char*)ptrs[0])[i*4+2];
         u32 v23 = f2u((float)(s32)v22);
-        u32 v24 = (u32)(s32)(s16)p3[i];
+        u32 v24 = (u32)(u16)p3[i];
         u32 v25 = f2u(h2f((u16)v24));
         u32 v26 = f2u(u2f(v25) * u2f(v9));
         u32 v27 = f2u(fmaf(u2f(v1), u2f(v23), u2f(v26)));
         u32 v28 = (u32)f2h(u2f(v27));
         p3[i] = (u16)v28;
 
-        u32 v30 = (u32)(s32)(s16)p4[i];
+        u32 v30 = (u32)(u16)p4[i];
         u32 v31 = f2u(h2f((u16)v30));
         u32 v32 = f2u(u2f(v31) * u2f(v9));
         u32 v33 = f2u(fmaf(u2f(v1), u2f(v8), u2f(v32)));

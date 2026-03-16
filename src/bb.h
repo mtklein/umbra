@@ -19,6 +19,7 @@
     X(lt_u32) X(le_u32)                                  \
     X(uni_16) X(load_16) X(store_16)                     \
     X(gather_16) X(scatter_16)                           \
+    X(widen_s16) X(widen_u16) X(narrow_16)                \
     X(htof) X(ftoh)                                      \
     X(load_8x4)                                          \
     X(store_8x4)

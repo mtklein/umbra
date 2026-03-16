@@ -42,6 +42,13 @@ void umbra_store_f16(struct umbra_basic_block*,
                      umbra_ptr dst, umbra_val ix,
                      umbra_val);
 
+umbra_val umbra_swiden16(struct umbra_basic_block*,
+                        umbra_val);
+umbra_val umbra_uwiden16(struct umbra_basic_block*,
+                         umbra_val);
+umbra_val umbra_narrow16(struct umbra_basic_block*,
+                         umbra_val);
+
 umbra_val umbra_htof(struct umbra_basic_block*,
                      umbra_val);
 umbra_val umbra_ftoh(struct umbra_basic_block*,

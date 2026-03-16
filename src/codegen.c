@@ -271,7 +271,7 @@ static void emit_ops(Buf *b, BB const *bb,
                 if (p < 0) {
                     emit(b,
                         "%su32 v%d ="
-                        " (u32)(s32)(s16)"
+                        " (u32)(u16)"
                         "((u16*)pd%d)[%d];\n",
                         pad, i, ~p, inst->imm);
                 } else {
@@ -280,10 +280,10 @@ static void emit_ops(Buf *b, BB const *bb,
                     emit(b,
                         mx
                         ? "%su32 v%d ="
-                          " (u32)(s32)(s16)"
+                          " (u32)(u16)"
                           "p%d_16[%d];\n"
                         : "%su32 v%d ="
-                          " (u32)(s32)(s16)"
+                          " (u32)(u16)"
                           "p%d[%d];\n",
                         pad, i, p, inst->imm);
                 }
@@ -294,7 +294,7 @@ static void emit_ops(Buf *b, BB const *bb,
                     if (p < 0) {
                         emit(b,
                             "%su32 v%d ="
-                            " (u32)(s32)(s16)"
+                            " (u32)(u16)"
                             "((u16*)pd%d)"
                             "[i+(s32)v%d];\n",
                             pad, i, ~p, inst->x);
@@ -304,11 +304,11 @@ static void emit_ops(Buf *b, BB const *bb,
                         emit(b,
                             mx
                             ? "%su32 v%d ="
-                              " (u32)(s32)(s16)"
+                              " (u32)(u16)"
                               "p%d_16"
                               "[i+(s32)v%d];\n"
                             : "%su32 v%d ="
-                              " (u32)(s32)(s16)"
+                              " (u32)(u16)"
                               "p%d"
                               "[i+(s32)v%d];\n",
                             pad, i, p, inst->x);
@@ -317,7 +317,7 @@ static void emit_ops(Buf *b, BB const *bb,
                     if (p < 0) {
                         emit(b,
                             "%su32 v%d ="
-                            " (u32)(s32)(s16)"
+                            " (u32)(u16)"
                             "((u16*)pd%d)[i];\n",
                             pad, i, ~p);
                     } else {
@@ -326,10 +326,10 @@ static void emit_ops(Buf *b, BB const *bb,
                         emit(b,
                             mx
                             ? "%su32 v%d ="
-                              " (u32)(s32)(s16)"
+                              " (u32)(u16)"
                               "p%d_16[i];\n"
                             : "%su32 v%d ="
-                              " (u32)(s32)(s16)"
+                              " (u32)(u16)"
                               "p%d[i];\n",
                             pad, i, p);
                     }
@@ -340,7 +340,7 @@ static void emit_ops(Buf *b, BB const *bb,
                 if (p < 0) {
                     emit(b,
                         "%su32 v%d ="
-                        " (u32)(s32)(s16)"
+                        " (u32)(u16)"
                         "((u16*)pd%d)"
                         "[clamp_ix((s32)v%d"
                         ",szd%d,2)];\n",
@@ -351,12 +351,12 @@ static void emit_ops(Buf *b, BB const *bb,
                     emit(b,
                         mx
                         ? "%su32 v%d ="
-                          " (u32)(s32)(s16)"
+                          " (u32)(u16)"
                           "p%d_16"
                           "[clamp_ix((s32)v%d"
                           ",sz%d,2)];\n"
                         : "%su32 v%d ="
-                          " (u32)(s32)(s16)"
+                          " (u32)(u16)"
                           "p%d"
                           "[clamp_ix((s32)v%d"
                           ",sz%d,2)];\n",
@@ -443,6 +443,25 @@ static void emit_ops(Buf *b, BB const *bb,
                 emit(b,
                     "%su32 v%d ="
                     " (u32)f2h(u2f(v%d));\n",
+                    pad, i, inst->x);
+                break;
+
+            case op_widen_s16:
+                emit(b,
+                    "%su32 v%d ="
+                    " (u32)(s32)(s16)(u16)v%d;\n",
+                    pad, i, inst->x);
+                break;
+            case op_widen_u16:
+                emit(b,
+                    "%su32 v%d ="
+                    " (u32)(u16)v%d;\n",
+                    pad, i, inst->x);
+                break;
+            case op_narrow_16:
+                emit(b,
+                    "%su32 v%d ="
+                    " (u32)(u16)v%d;\n",
                     pad, i, inst->x);
                 break;
 

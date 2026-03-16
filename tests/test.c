@@ -1228,8 +1228,9 @@ static void test_gather_clamp(void) {
         umbra_val ix  = umbra_lane(bb),
                   idx = umbra_load32(bb,
                             (umbra_ptr){0}, ix);
-        umbra_val val = umbra_load16(bb,
-                            (umbra_ptr){1}, idx);
+        umbra_val val = umbra_swiden16(bb,
+                            umbra_load16(bb,
+                                (umbra_ptr){1}, idx));
         umbra_store32(bb, (umbra_ptr){2}, ix, val);
         backends B = make_full(bb, opt);
         for (int bi = 0; bi < 4; bi++) {
@@ -1288,8 +1289,9 @@ static void test_offset_load_store(void) {
         umbra_val off = umbra_load32(bb,
             (umbra_ptr){1}, umbra_imm(bb, 0));
         umbra_val ixo = umbra_iadd(bb, ix, off);
-        umbra_val val = umbra_load16(bb,
-            (umbra_ptr){0}, ixo);
+        umbra_val val = umbra_swiden16(bb,
+            umbra_load16(bb,
+                (umbra_ptr){0}, ixo));
         umbra_store32(bb, (umbra_ptr){2}, ix, val);
         backends B = make_full(bb, opt);
         for (int bi = 0; bi < 4; bi++) {

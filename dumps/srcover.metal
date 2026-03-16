@@ -23,7 +23,7 @@ kernel void umbra_entry(
     uint v2 = 1065353216u;
     uint v3 = (uint)((device uchar*)p0)[i*4+0];
     uint v4 = as_type<uint>((float)(int)v3);
-    uint v5 = (uint)(int)((device short*)p1)[i];
+    uint v5 = (uint)((device ushort*)p1)[i];
     uint v6 = as_type<uint>((float)as_type<half>((ushort)v5));
     uint v7 = (uint)((device uchar*)p0)[i*4+3];
     uint v8 = as_type<uint>((float)(int)v7);
@@ -35,7 +35,7 @@ kernel void umbra_entry(
 
     uint v14 = (uint)((device uchar*)p0)[i*4+1];
     uint v15 = as_type<uint>((float)(int)v14);
-    uint v16 = (uint)(int)((device short*)p2)[i];
+    uint v16 = (uint)((device ushort*)p2)[i];
     uint v17 = as_type<uint>((float)as_type<half>((ushort)v16));
     uint v18 = as_type<uint>(as_type<float>(v17) * as_type<float>(v9));
     uint v19 = as_type<uint>(fma(as_type<float>(v1), as_type<float>(v15), as_type<float>(v18)));
@@ -44,14 +44,14 @@ kernel void umbra_entry(
 
     uint v22 = (uint)((device uchar*)p0)[i*4+2];
     uint v23 = as_type<uint>((float)(int)v22);
-    uint v24 = (uint)(int)((device short*)p3)[i];
+    uint v24 = (uint)((device ushort*)p3)[i];
     uint v25 = as_type<uint>((float)as_type<half>((ushort)v24));
     uint v26 = as_type<uint>(as_type<float>(v25) * as_type<float>(v9));
     uint v27 = as_type<uint>(fma(as_type<float>(v1), as_type<float>(v23), as_type<float>(v26)));
     uint v28 = (uint)as_type<ushort>((half)as_type<float>(v27));
     ((device ushort*)p3)[i] = (ushort)v28;
 
-    uint v30 = (uint)(int)((device short*)p4)[i];
+    uint v30 = (uint)((device ushort*)p4)[i];
     uint v31 = as_type<uint>((float)as_type<half>((ushort)v30));
     uint v32 = as_type<uint>(as_type<float>(v31) * as_type<float>(v9));
     uint v33 = as_type<uint>(fma(as_type<float>(v1), as_type<float>(v8), as_type<float>(v32)));

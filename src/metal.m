@@ -197,9 +197,9 @@ static void emit_ops(Buf *b, BB const *bb,
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 emit(b, mixed
                     ? "%suint v%d = "
-                      "(uint)(int)(short)p%d_16[%d];\n"
-                    : "%suint v%d = (uint)(int)"
-                      "((device const short*)"
+                      "(uint)(ushort)p%d_16[%d];\n"
+                    : "%suint v%d = (uint)"
+                      "((device const ushort*)"
                       "p%d)[%d];\n",
                      pad, i, p, inst->imm);
             } break;
@@ -209,19 +209,19 @@ static void emit_ops(Buf *b, BB const *bb,
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 if (inst->x) {
                     emit(b, mixed
-                        ? "%suint v%d = (uint)(int)"
-                          "(short)p%d_16"
+                        ? "%suint v%d = (uint)"
+                          "(ushort)p%d_16"
                           "[i+(int)v%d];\n"
-                        : "%suint v%d = (uint)(int)"
-                          "((device short*)p%d)"
+                        : "%suint v%d = (uint)"
+                          "((device ushort*)p%d)"
                           "[i+(int)v%d];\n",
                          pad, i, p, inst->x);
                 } else {
                     emit(b, mixed
-                        ? "%suint v%d = (uint)(int)"
-                          "(short)p%d_16[i];\n"
-                        : "%suint v%d = (uint)(int)"
-                          "((device short*)p%d)"
+                        ? "%suint v%d = (uint)"
+                          "(ushort)p%d_16[i];\n"
+                        : "%suint v%d = (uint)"
+                          "((device ushort*)p%d)"
                           "[i];\n",
                          pad, i, p);
                 }
@@ -231,11 +231,11 @@ static void emit_ops(Buf *b, BB const *bb,
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 emit(b, mixed
-                    ? "%suint v%d = (uint)(int)(short)"
+                    ? "%suint v%d = (uint)(ushort)"
                       "p%d_16[clamp_ix((int)v%d,"
                       "buf_szs[%d],2)];\n"
-                    : "%suint v%d = (uint)(int)"
-                      "((device short*)p%d)"
+                    : "%suint v%d = (uint)"
+                      "((device ushort*)p%d)"
                       "[clamp_ix((int)v%d,"
                       "buf_szs[%d],2)];\n",
                      pad, i, p, inst->x, p);
@@ -289,6 +289,25 @@ static void emit_ops(Buf *b, BB const *bb,
                     "as_type<ushort>"
                     "((half)as_type<float>"
                     "(v%d));\n",
+                     pad, i, inst->x);
+                break;
+
+            case op_widen_s16:
+                emit(b,
+                    "%suint v%d = (uint)(int)"
+                    "(short)(ushort)v%d;\n",
+                     pad, i, inst->x);
+                break;
+            case op_widen_u16:
+                emit(b,
+                    "%suint v%d = (uint)"
+                    "(ushort)v%d;\n",
+                     pad, i, inst->x);
+                break;
+            case op_narrow_16:
+                emit(b,
+                    "%suint v%d = (uint)"
+                    "(ushort)v%d;\n",
                      pad, i, inst->x);
                 break;
 

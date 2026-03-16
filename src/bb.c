@@ -227,6 +227,16 @@ void umbra_store_f16(BB *bb, umbra_ptr dst,
     umbra_store16(bb, dst, ix, umbra_ftoh(bb, v));
 }
 
+val umbra_swiden16(BB *bb, val a) {
+    return (val){push(bb, op_widen_s16, .x=a.id)};
+}
+val umbra_uwiden16(BB *bb, val a) {
+    return (val){push(bb, op_widen_u16, .x=a.id)};
+}
+val umbra_narrow16(BB *bb, val a) {
+    return (val){push(bb, op_narrow_16, .x=a.id)};
+}
+
 val umbra_htof(BB *bb, val a) {
     return (val){push(bb, op_htof, .x=a.id)};
 }
@@ -703,6 +713,9 @@ void umbra_basic_block_dump(BB const *bb, FILE *f) {
             case op_sqrt_f32:
             case op_f32_from_i32:
             case op_i32_from_f32:
+            case op_widen_s16:
+            case op_widen_u16:
+            case op_narrow_16:
             case op_htof:
             case op_ftoh:
                 fprintf(f, " v%d", inst->x);
