@@ -4,14 +4,26 @@
 #if !defined(__APPLE__) || defined(__wasm__)
 
 struct umbra_metal { int dummy; };
-struct umbra_metal* umbra_metal(struct umbra_basic_block const *bb) { (void)bb; return 0; }
-void umbra_metal_run(struct umbra_metal *m, int n, umbra_buf buf[]) {
+struct umbra_metal* umbra_metal(
+    struct umbra_basic_block const *bb
+) { (void)bb; return 0; }
+void umbra_metal_run(
+    struct umbra_metal *m, int n, umbra_buf buf[]
+) {
     (void)m; (void)n; (void)buf;
 }
-void umbra_metal_begin_batch(struct umbra_metal *m) { (void)m; }
-void umbra_metal_flush(struct umbra_metal *m) { (void)m; }
-void umbra_metal_free(struct umbra_metal *m) { (void)m; }
-void umbra_metal_dump(struct umbra_metal const *m, FILE *f) { (void)m; (void)f; }
+void umbra_metal_begin_batch(struct umbra_metal *m) {
+    (void)m;
+}
+void umbra_metal_flush(struct umbra_metal *m) {
+    (void)m;
+}
+void umbra_metal_free(struct umbra_metal *m) {
+    (void)m;
+}
+void umbra_metal_dump(
+    struct umbra_metal const *m, FILE *f
+) { (void)m; (void)f; }
 
 #else
 
@@ -61,7 +73,9 @@ static void emit(Buf *b, char const *fmt, ...) {
     va_list ap;
     for (;;) {
         va_start(ap, fmt);
-        int n = vsnprintf(b->buf + b->len, (size_t)(b->cap - b->len), fmt, ap);
+        int n = vsnprintf(b->buf + b->len,
+                          (size_t)(b->cap - b->len),
+                          fmt, ap);
         va_end(ap);
         if (b->len + n < b->cap) {
             b->len += n;
@@ -80,231 +94,528 @@ static _Bool is_32(enum op op) {
     return op >= op_uni_32 && op <= op_scatter_32;
 }
 
-static void emit_ops(Buf *b, BB const *bb, _Bool *ptr_16, _Bool *ptr_32,
-                     int const *deref_buf, int lo, int hi, char const *pad) {
+static void emit_ops(Buf *b, BB const *bb,
+                     _Bool *ptr_16, _Bool *ptr_32,
+                     int const *deref_buf,
+                     int lo, int hi,
+                     char const *pad) {
     for (int i = lo; i < hi; i++) {
         struct bb_inst const *inst = &bb->inst[i];
 
         switch (inst->op) {
             case op_lane:
-                emit(b, "%suint v%d = i;\n", pad, i);
+                emit(b, "%suint v%d = i;\n",
+                     pad, i);
                 break;
 
-            case op_imm_32: emit(b, "%suint v%d = %uu;\n", pad, i, (uint32_t)inst->imm); break;
+            case op_imm_32:
+                emit(b, "%suint v%d = %uu;\n",
+                     pad, i, (uint32_t)inst->imm);
+                break;
 
             case op_deref_ptr: break;
 
             case op_uni_32: {
-                int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%suint v%d = p%d_32[%d];\n"
-                              : "%suint v%d = ((device const uint*)p%d)[%d];\n",
+                emit(b, mixed
+                    ? "%suint v%d = p%d_32[%d];\n"
+                    : "%suint v%d = "
+                      "((device const uint*)p%d)[%d];\n",
                      pad, i, p, inst->imm);
             } break;
             case op_load_32: {
-                int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 if (inst->x) {
-                    emit(b, mixed ? "%suint v%d = p%d_32[i+(int)v%d];\n"
-                                  : "%suint v%d = ((device uint*)p%d)[i+(int)v%d];\n", pad, i, p, inst->x);
+                    emit(b, mixed
+                        ? "%suint v%d = "
+                          "p%d_32[i+(int)v%d];\n"
+                        : "%suint v%d = "
+                          "((device uint*)p%d)"
+                          "[i+(int)v%d];\n",
+                         pad, i, p, inst->x);
                 } else {
-                    emit(b, mixed ? "%suint v%d = p%d_32[i];\n"
-                                  : "%suint v%d = ((device uint*)p%d)[i];\n", pad, i, p);
+                    emit(b, mixed
+                        ? "%suint v%d = p%d_32[i];\n"
+                        : "%suint v%d = "
+                          "((device uint*)p%d)[i];\n",
+                         pad, i, p);
                 }
             } break;
             case op_gather_32: {
-                int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%suint v%d = p%d_32[clamp_ix((int)v%d,buf_szs[%d],4)];\n"
-                              : "%suint v%d = ((device uint*)p%d)[clamp_ix((int)v%d,buf_szs[%d],4)];\n", pad, i, p, inst->x, p);
+                emit(b, mixed
+                    ? "%suint v%d = p%d_32"
+                      "[clamp_ix((int)v%d,"
+                      "buf_szs[%d],4)];\n"
+                    : "%suint v%d = "
+                      "((device uint*)p%d)"
+                      "[clamp_ix((int)v%d,"
+                      "buf_szs[%d],4)];\n",
+                     pad, i, p, inst->x, p);
             } break;
             case op_store_32: {
-                int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 if (inst->x) {
-                    emit(b, mixed ? "%sp%d_32[i+(int)v%d] = v%d;\n"
-                                  : "%s((device uint*)p%d)[i+(int)v%d] = v%d;\n", pad, p, inst->x, inst->y);
+                    emit(b, mixed
+                        ? "%sp%d_32[i+(int)v%d]"
+                          " = v%d;\n"
+                        : "%s((device uint*)p%d)"
+                          "[i+(int)v%d] = v%d;\n",
+                         pad, p, inst->x, inst->y);
                 } else {
-                    emit(b, mixed ? "%sp%d_32[i] = v%d;\n"
-                                  : "%s((device uint*)p%d)[i] = v%d;\n", pad, p, inst->y);
+                    emit(b, mixed
+                        ? "%sp%d_32[i] = v%d;\n"
+                        : "%s((device uint*)p%d)"
+                          "[i] = v%d;\n",
+                         pad, p, inst->y);
                 }
             } break;
             case op_scatter_32: {
-                int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%sp%d_32[clamp_ix((int)v%d,buf_szs[%d],4)] = v%d;\n"
-                              : "%s((device uint*)p%d)[clamp_ix((int)v%d,buf_szs[%d],4)] = v%d;\n", pad, p, inst->x, p, inst->y);
+                emit(b, mixed
+                    ? "%sp%d_32"
+                      "[clamp_ix((int)v%d,"
+                      "buf_szs[%d],4)] = v%d;\n"
+                    : "%s((device uint*)p%d)"
+                      "[clamp_ix((int)v%d,"
+                      "buf_szs[%d],4)] = v%d;\n",
+                     pad, p, inst->x, p, inst->y);
             } break;
 
             case op_uni_16: {
-                int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%suint v%d = (uint)(int)(short)p%d_16[%d];\n"
-                              : "%suint v%d = (uint)(int)((device const short*)p%d)[%d];\n",
+                emit(b, mixed
+                    ? "%suint v%d = "
+                      "(uint)(int)(short)p%d_16[%d];\n"
+                    : "%suint v%d = (uint)(int)"
+                      "((device const short*)"
+                      "p%d)[%d];\n",
                      pad, i, p, inst->imm);
             } break;
             case op_load_16: {
-                int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 if (inst->x) {
-                    emit(b, mixed ? "%suint v%d = (uint)(int)(short)p%d_16[i+(int)v%d];\n"
-                                  : "%suint v%d = (uint)(int)((device short*)p%d)[i+(int)v%d];\n", pad, i, p, inst->x);
+                    emit(b, mixed
+                        ? "%suint v%d = (uint)(int)"
+                          "(short)p%d_16"
+                          "[i+(int)v%d];\n"
+                        : "%suint v%d = (uint)(int)"
+                          "((device short*)p%d)"
+                          "[i+(int)v%d];\n",
+                         pad, i, p, inst->x);
                 } else {
-                    emit(b, mixed ? "%suint v%d = (uint)(int)(short)p%d_16[i];\n"
-                                  : "%suint v%d = (uint)(int)((device short*)p%d)[i];\n", pad, i, p);
+                    emit(b, mixed
+                        ? "%suint v%d = (uint)(int)"
+                          "(short)p%d_16[i];\n"
+                        : "%suint v%d = (uint)(int)"
+                          "((device short*)p%d)"
+                          "[i];\n",
+                         pad, i, p);
                 }
             } break;
             case op_gather_16: {
-                int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%suint v%d = (uint)(int)(short)p%d_16[clamp_ix((int)v%d,buf_szs[%d],2)];\n"
-                              : "%suint v%d = (uint)(int)((device short*)p%d)[clamp_ix((int)v%d,buf_szs[%d],2)];\n",
+                emit(b, mixed
+                    ? "%suint v%d = (uint)(int)(short)"
+                      "p%d_16[clamp_ix((int)v%d,"
+                      "buf_szs[%d],2)];\n"
+                    : "%suint v%d = (uint)(int)"
+                      "((device short*)p%d)"
+                      "[clamp_ix((int)v%d,"
+                      "buf_szs[%d],2)];\n",
                      pad, i, p, inst->x, p);
             } break;
             case op_store_16: {
-                int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 if (inst->x) {
-                    emit(b, mixed ? "%sp%d_16[i+(int)v%d] = (ushort)v%d;\n"
-                                  : "%s((device ushort*)p%d)[i+(int)v%d] = (ushort)v%d;\n", pad, p, inst->x, inst->y);
+                    emit(b, mixed
+                        ? "%sp%d_16[i+(int)v%d]"
+                          " = (ushort)v%d;\n"
+                        : "%s((device ushort*)p%d)"
+                          "[i+(int)v%d]"
+                          " = (ushort)v%d;\n",
+                         pad, p, inst->x, inst->y);
                 } else {
-                    emit(b, mixed ? "%sp%d_16[i] = (ushort)v%d;\n"
-                                  : "%s((device ushort*)p%d)[i] = (ushort)v%d;\n", pad, p, inst->y);
+                    emit(b, mixed
+                        ? "%sp%d_16[i]"
+                          " = (ushort)v%d;\n"
+                        : "%s((device ushort*)p%d)"
+                          "[i] = (ushort)v%d;\n",
+                         pad, p, inst->y);
                 }
             } break;
             case op_scatter_16: {
-                int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%sp%d_16[clamp_ix((int)v%d,buf_szs[%d],2)] = (ushort)v%d;\n"
-                              : "%s((device ushort*)p%d)[clamp_ix((int)v%d,buf_szs[%d],2)] = (ushort)v%d;\n",
+                emit(b, mixed
+                    ? "%sp%d_16[clamp_ix((int)v%d,"
+                      "buf_szs[%d],2)]"
+                      " = (ushort)v%d;\n"
+                    : "%s((device ushort*)p%d)"
+                      "[clamp_ix((int)v%d,"
+                      "buf_szs[%d],2)]"
+                      " = (ushort)v%d;\n",
                      pad, p, inst->x, p, inst->y);
             } break;
 
             case op_uni_f16: {
-                int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%suint v%d = as_type<uint>((float)as_type<half>(p%d_16[%d]));\n"
-                              : "%suint v%d = as_type<uint>((float)as_type<half>(((device const ushort*)p%d)[%d]));\n",
+                emit(b, mixed
+                    ? "%suint v%d = as_type<uint>"
+                      "((float)as_type<half>"
+                      "(p%d_16[%d]));\n"
+                    : "%suint v%d = as_type<uint>"
+                      "((float)as_type<half>"
+                      "(((device const ushort*)"
+                      "p%d)[%d]));\n",
                      pad, i, p, inst->imm);
             } break;
             case op_load_f16: {
-                int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 if (inst->x) {
-                    emit(b, mixed ? "%suint v%d = as_type<uint>((float)as_type<half>(p%d_16[i+(int)v%d]));\n"
-                                  : "%suint v%d = as_type<uint>((float)as_type<half>(((device ushort*)p%d)[i+(int)v%d]));\n",
+                    emit(b, mixed
+                        ? "%suint v%d = as_type<uint>"
+                          "((float)as_type<half>"
+                          "(p%d_16[i+(int)v%d]));\n"
+                        : "%suint v%d = as_type<uint>"
+                          "((float)as_type<half>"
+                          "(((device ushort*)p%d)"
+                          "[i+(int)v%d]));\n",
                          pad, i, p, inst->x);
                 } else {
-                    emit(b, mixed ? "%suint v%d = as_type<uint>((float)as_type<half>(p%d_16[i]));\n"
-                                  : "%suint v%d = as_type<uint>((float)as_type<half>(((device ushort*)p%d)[i]));\n",
+                    emit(b, mixed
+                        ? "%suint v%d = as_type<uint>"
+                          "((float)as_type<half>"
+                          "(p%d_16[i]));\n"
+                        : "%suint v%d = as_type<uint>"
+                          "((float)as_type<half>"
+                          "(((device ushort*)p%d)"
+                          "[i]));\n",
                          pad, i, p);
                 }
             } break;
             case op_gather_f16: {
-                int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%suint v%d = as_type<uint>((float)as_type<half>(p%d_16[clamp_ix((int)v%d,buf_szs[%d],2)]));\n"
-                              : "%suint v%d = as_type<uint>((float)as_type<half>(((device ushort*)p%d)[clamp_ix((int)v%d,buf_szs[%d],2)]));\n",
+                emit(b, mixed
+                    ? "%suint v%d = as_type<uint>"
+                      "((float)as_type<half>"
+                      "(p%d_16[clamp_ix((int)v%d,"
+                      "buf_szs[%d],2)]));\n"
+                    : "%suint v%d = as_type<uint>"
+                      "((float)as_type<half>"
+                      "(((device ushort*)p%d)"
+                      "[clamp_ix((int)v%d,"
+                      "buf_szs[%d],2)]));\n",
                      pad, i, p, inst->x, p);
             } break;
             case op_store_f16: {
-                int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 if (inst->x) {
-                    emit(b, mixed ? "%sp%d_16[i+(int)v%d] = as_type<ushort>((half)as_type<float>(v%d));\n"
-                                  : "%s((device ushort*)p%d)[i+(int)v%d] = as_type<ushort>((half)as_type<float>(v%d));\n",
+                    emit(b, mixed
+                        ? "%sp%d_16[i+(int)v%d] = "
+                          "as_type<ushort>"
+                          "((half)as_type<float>"
+                          "(v%d));\n"
+                        : "%s((device ushort*)p%d)"
+                          "[i+(int)v%d] = "
+                          "as_type<ushort>"
+                          "((half)as_type<float>"
+                          "(v%d));\n",
                          pad, p, inst->x, inst->y);
                 } else {
-                    emit(b, mixed ? "%sp%d_16[i] = as_type<ushort>((half)as_type<float>(v%d));\n"
-                                  : "%s((device ushort*)p%d)[i] = as_type<ushort>((half)as_type<float>(v%d));\n",
+                    emit(b, mixed
+                        ? "%sp%d_16[i] = "
+                          "as_type<ushort>"
+                          "((half)as_type<float>"
+                          "(v%d));\n"
+                        : "%s((device ushort*)p%d)"
+                          "[i] = as_type<ushort>"
+                          "((half)as_type<float>"
+                          "(v%d));\n",
                          pad, p, inst->y);
                 }
             } break;
             case op_scatter_f16: {
-                int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed ? "%sp%d_16[clamp_ix((int)v%d,buf_szs[%d],2)] = as_type<ushort>((half)as_type<float>(v%d));\n"
-                              : "%s((device ushort*)p%d)[clamp_ix((int)v%d,buf_szs[%d],2)] = as_type<ushort>((half)as_type<float>(v%d));\n",
+                emit(b, mixed
+                    ? "%sp%d_16"
+                      "[clamp_ix((int)v%d,"
+                      "buf_szs[%d],2)] = "
+                      "as_type<ushort>"
+                      "((half)as_type<float>"
+                      "(v%d));\n"
+                    : "%s((device ushort*)p%d)"
+                      "[clamp_ix((int)v%d,"
+                      "buf_szs[%d],2)] = "
+                      "as_type<ushort>"
+                      "((half)as_type<float>"
+                      "(v%d));\n",
                      pad, p, inst->x, p, inst->y);
             } break;
 
-            case op_add_f32: emit(b, "%suint v%d = as_type<uint>(as_type<float>(v%d) + as_type<float>(v%d));\n", pad, i, inst->x, inst->y); break;
-            case op_sub_f32: emit(b, "%suint v%d = as_type<uint>(as_type<float>(v%d) - as_type<float>(v%d));\n", pad, i, inst->x, inst->y); break;
-            case op_mul_f32: emit(b, "%suint v%d = as_type<uint>(as_type<float>(v%d) * as_type<float>(v%d));\n", pad, i, inst->x, inst->y); break;
-            case op_div_f32: emit(b, "%suint v%d = as_type<uint>(as_type<float>(v%d) / as_type<float>(v%d));\n", pad, i, inst->x, inst->y); break;
-            case op_min_f32: emit(b, "%suint v%d = as_type<uint>(min(as_type<float>(v%d), as_type<float>(v%d)));\n", pad, i, inst->x, inst->y); break;
-            case op_max_f32: emit(b, "%suint v%d = as_type<uint>(max(as_type<float>(v%d), as_type<float>(v%d)));\n", pad, i, inst->x, inst->y); break;
-            case op_sqrt_f32: emit(b, "%suint v%d = as_type<uint>(sqrt(as_type<float>(v%d)));\n", pad, i, inst->x); break;
+            case op_add_f32:
+                emit(b, "%suint v%d = as_type<uint>"
+                        "(as_type<float>(v%d)"
+                        " + as_type<float>(v%d));\n",
+                     pad, i, inst->x, inst->y);
+                break;
+            case op_sub_f32:
+                emit(b, "%suint v%d = as_type<uint>"
+                        "(as_type<float>(v%d)"
+                        " - as_type<float>(v%d));\n",
+                     pad, i, inst->x, inst->y);
+                break;
+            case op_mul_f32:
+                emit(b, "%suint v%d = as_type<uint>"
+                        "(as_type<float>(v%d)"
+                        " * as_type<float>(v%d));\n",
+                     pad, i, inst->x, inst->y);
+                break;
+            case op_div_f32:
+                emit(b, "%suint v%d = as_type<uint>"
+                        "(as_type<float>(v%d)"
+                        " / as_type<float>(v%d));\n",
+                     pad, i, inst->x, inst->y);
+                break;
+            case op_min_f32:
+                emit(b, "%suint v%d = as_type<uint>"
+                        "(min(as_type<float>(v%d),"
+                        " as_type<float>(v%d)));\n",
+                     pad, i, inst->x, inst->y);
+                break;
+            case op_max_f32:
+                emit(b, "%suint v%d = as_type<uint>"
+                        "(max(as_type<float>(v%d),"
+                        " as_type<float>(v%d)));\n",
+                     pad, i, inst->x, inst->y);
+                break;
+            case op_sqrt_f32:
+                emit(b, "%suint v%d = as_type<uint>"
+                        "(sqrt("
+                        "as_type<float>(v%d)));\n",
+                     pad, i, inst->x);
+                break;
             case op_fma_f32:
-                emit(b, "%suint v%d = as_type<uint>(fma(as_type<float>(v%d), as_type<float>(v%d), as_type<float>(v%d)));\n",
-                     pad, i, inst->x, inst->y, inst->z);
+                emit(b, "%suint v%d = as_type<uint>"
+                        "(fma(as_type<float>(v%d),"
+                        " as_type<float>(v%d),"
+                        " as_type<float>(v%d)));\n",
+                     pad, i,
+                     inst->x, inst->y, inst->z);
                 break;
             case op_fms_f32:
-                emit(b, "%suint v%d = as_type<uint>(as_type<float>(v%d) - as_type<float>(v%d) * as_type<float>(v%d));\n",
-                     pad, i, inst->z, inst->x, inst->y);
+                emit(b, "%suint v%d = as_type<uint>"
+                        "(as_type<float>(v%d)"
+                        " - as_type<float>(v%d)"
+                        " * as_type<float>(v%d));\n",
+                     pad, i,
+                     inst->z, inst->x, inst->y);
                 break;
 
-            case op_add_i32: emit(b, "%suint v%d = v%d + v%d;\n", pad, i, inst->x, inst->y); break;
-            case op_sub_i32: emit(b, "%suint v%d = v%d - v%d;\n", pad, i, inst->x, inst->y); break;
-            case op_mul_i32: emit(b, "%suint v%d = v%d * v%d;\n", pad, i, inst->x, inst->y); break;
-            case op_shl_i32: emit(b, "%suint v%d = v%d << v%d;\n", pad, i, inst->x, inst->y); break;
-            case op_shr_u32: emit(b, "%suint v%d = v%d >> v%d;\n", pad, i, inst->x, inst->y); break;
-            case op_shr_s32: emit(b, "%suint v%d = (uint)((int)v%d >> (int)v%d);\n", pad, i, inst->x, inst->y); break;
+            case op_add_i32:
+                emit(b, "%suint v%d = v%d + v%d;\n",
+                     pad, i, inst->x, inst->y);
+                break;
+            case op_sub_i32:
+                emit(b, "%suint v%d = v%d - v%d;\n",
+                     pad, i, inst->x, inst->y);
+                break;
+            case op_mul_i32:
+                emit(b, "%suint v%d = v%d * v%d;\n",
+                     pad, i, inst->x, inst->y);
+                break;
+            case op_shl_i32:
+                emit(b, "%suint v%d = v%d << v%d;\n",
+                     pad, i, inst->x, inst->y);
+                break;
+            case op_shr_u32:
+                emit(b, "%suint v%d = v%d >> v%d;\n",
+                     pad, i, inst->x, inst->y);
+                break;
+            case op_shr_s32:
+                emit(b, "%suint v%d = "
+                        "(uint)((int)v%d"
+                        " >> (int)v%d);\n",
+                     pad, i, inst->x, inst->y);
+                break;
 
-            case op_shl_i32_imm: emit(b, "%suint v%d = v%d << %d;\n", pad, i, inst->x, inst->imm); break;
-            case op_shr_u32_imm: emit(b, "%suint v%d = v%d >> %d;\n", pad, i, inst->x, inst->imm); break;
-            case op_shr_s32_imm: emit(b, "%suint v%d = (uint)((int)v%d >> %d);\n", pad, i, inst->x, inst->imm); break;
+            case op_shl_i32_imm:
+                emit(b, "%suint v%d = v%d << %d;\n",
+                     pad, i, inst->x, inst->imm);
+                break;
+            case op_shr_u32_imm:
+                emit(b, "%suint v%d = v%d >> %d;\n",
+                     pad, i, inst->x, inst->imm);
+                break;
+            case op_shr_s32_imm:
+                emit(b, "%suint v%d = "
+                        "(uint)((int)v%d >> %d);\n",
+                     pad, i, inst->x, inst->imm);
+                break;
 
-            case op_and_32: emit(b, "%suint v%d = v%d & v%d;\n", pad, i, inst->x, inst->y); break;
-            case op_or_32:  emit(b, "%suint v%d = v%d | v%d;\n", pad, i, inst->x, inst->y); break;
-            case op_xor_32: emit(b, "%suint v%d = v%d ^ v%d;\n", pad, i, inst->x, inst->y); break;
+            case op_and_32:
+                emit(b, "%suint v%d = v%d & v%d;\n",
+                     pad, i, inst->x, inst->y);
+                break;
+            case op_or_32:
+                emit(b, "%suint v%d = v%d | v%d;\n",
+                     pad, i, inst->x, inst->y);
+                break;
+            case op_xor_32:
+                emit(b, "%suint v%d = v%d ^ v%d;\n",
+                     pad, i, inst->x, inst->y);
+                break;
             case op_sel_32:
-                emit(b, "%suint v%d = (v%d & v%d) | (~v%d & v%d);\n",
-                     pad, i, inst->x, inst->y, inst->x, inst->z);
+                emit(b, "%suint v%d = "
+                        "(v%d & v%d) | (~v%d & v%d);\n",
+                     pad, i,
+                     inst->x, inst->y,
+                     inst->x, inst->z);
                 break;
 
             case op_f32_from_i32:
-                emit(b, "%suint v%d = as_type<uint>((float)(int)v%d);\n", pad, i, inst->x);
+                emit(b, "%suint v%d = "
+                        "as_type<uint>"
+                        "((float)(int)v%d);\n",
+                     pad, i, inst->x);
                 break;
             case op_i32_from_f32:
-                emit(b, "%suint v%d = (uint)(int)as_type<float>(v%d);\n", pad, i, inst->x);
+                emit(b, "%suint v%d = "
+                        "(uint)(int)"
+                        "as_type<float>(v%d);\n",
+                     pad, i, inst->x);
                 break;
 
-            case op_eq_f32: emit(b, "%suint v%d = as_type<float>(v%d) == as_type<float>(v%d) ? 0xffffffffu : 0u;\n", pad, i, inst->x, inst->y); break;
-            case op_lt_f32: emit(b, "%suint v%d = as_type<float>(v%d) <  as_type<float>(v%d) ? 0xffffffffu : 0u;\n", pad, i, inst->x, inst->y); break;
-            case op_le_f32: emit(b, "%suint v%d = as_type<float>(v%d) <= as_type<float>(v%d) ? 0xffffffffu : 0u;\n", pad, i, inst->x, inst->y); break;
+            case op_eq_f32:
+                emit(b, "%suint v%d = "
+                        "as_type<float>(v%d) == "
+                        "as_type<float>(v%d)"
+                        " ? 0xffffffffu : 0u;\n",
+                     pad, i, inst->x, inst->y);
+                break;
+            case op_lt_f32:
+                emit(b, "%suint v%d = "
+                        "as_type<float>(v%d) <  "
+                        "as_type<float>(v%d)"
+                        " ? 0xffffffffu : 0u;\n",
+                     pad, i, inst->x, inst->y);
+                break;
+            case op_le_f32:
+                emit(b, "%suint v%d = "
+                        "as_type<float>(v%d) <= "
+                        "as_type<float>(v%d)"
+                        " ? 0xffffffffu : 0u;\n",
+                     pad, i, inst->x, inst->y);
+                break;
 
-            case op_eq_i32: emit(b, "%suint v%d = (int)v%d == (int)v%d ? 0xffffffffu : 0u;\n", pad, i, inst->x, inst->y); break;
-            case op_lt_s32: emit(b, "%suint v%d = (int)v%d <  (int)v%d ? 0xffffffffu : 0u;\n", pad, i, inst->x, inst->y); break;
-            case op_le_s32: emit(b, "%suint v%d = (int)v%d <= (int)v%d ? 0xffffffffu : 0u;\n", pad, i, inst->x, inst->y); break;
-            case op_lt_u32: emit(b, "%suint v%d = v%d <  v%d ? 0xffffffffu : 0u;\n", pad, i, inst->x, inst->y); break;
-            case op_le_u32: emit(b, "%suint v%d = v%d <= v%d ? 0xffffffffu : 0u;\n", pad, i, inst->x, inst->y); break;
+            case op_eq_i32:
+                emit(b, "%suint v%d = "
+                        "(int)v%d == (int)v%d"
+                        " ? 0xffffffffu : 0u;\n",
+                     pad, i, inst->x, inst->y);
+                break;
+            case op_lt_s32:
+                emit(b, "%suint v%d = "
+                        "(int)v%d <  (int)v%d"
+                        " ? 0xffffffffu : 0u;\n",
+                     pad, i, inst->x, inst->y);
+                break;
+            case op_le_s32:
+                emit(b, "%suint v%d = "
+                        "(int)v%d <= (int)v%d"
+                        " ? 0xffffffffu : 0u;\n",
+                     pad, i, inst->x, inst->y);
+                break;
+            case op_lt_u32:
+                emit(b, "%suint v%d = "
+                        "v%d <  v%d"
+                        " ? 0xffffffffu : 0u;\n",
+                     pad, i, inst->x, inst->y);
+                break;
+            case op_le_u32:
+                emit(b, "%suint v%d = "
+                        "v%d <= v%d"
+                        " ? 0xffffffffu : 0u;\n",
+                     pad, i, inst->x, inst->y);
+                break;
 
             case op_load_8x4: {
                 int ch  = inst->x ? inst->imm : 0;
-                int raw = inst->x ? bb->inst[inst->x].ptr : inst->ptr;
-                int p   = raw < 0 ? deref_buf[~raw] : raw;
-                emit(b, "%suint v%d = (uint)((device uchar*)p%d)[i*4+%d];\n", pad, i, p, ch);
+                int raw = inst->x
+                    ? bb->inst[inst->x].ptr
+                    : inst->ptr;
+                int p = raw < 0
+                    ? deref_buf[~raw] : raw;
+                emit(b, "%suint v%d = (uint)"
+                        "((device uchar*)p%d)"
+                        "[i*4+%d];\n",
+                     pad, i, p, ch);
             } break;
             case op_store_8x4: {
-                int p = inst->ptr < 0 ? deref_buf[~inst->ptr] : inst->ptr;
-                emit(b, "%s((device uchar*)p%d)[i*4+0] = (uchar)v%d;\n", pad, p, inst->x);
-                emit(b, "%s((device uchar*)p%d)[i*4+1] = (uchar)v%d;\n", pad, p, inst->y);
-                emit(b, "%s((device uchar*)p%d)[i*4+2] = (uchar)v%d;\n", pad, p, inst->z);
-                emit(b, "%s((device uchar*)p%d)[i*4+3] = (uchar)v%d;\n", pad, p, inst->w);
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr]
+                    : inst->ptr;
+                emit(b, "%s((device uchar*)p%d)"
+                        "[i*4+0] = (uchar)v%d;\n",
+                     pad, p, inst->x);
+                emit(b, "%s((device uchar*)p%d)"
+                        "[i*4+1] = (uchar)v%d;\n",
+                     pad, p, inst->y);
+                emit(b, "%s((device uchar*)p%d)"
+                        "[i*4+2] = (uchar)v%d;\n",
+                     pad, p, inst->z);
+                emit(b, "%s((device uchar*)p%d)"
+                        "[i*4+3] = (uchar)v%d;\n",
+                     pad, p, inst->w);
             } break;
         }
 
-        if (is_store(inst->op) && i+1 < hi) { emit(b, "\n"); }
+        if (is_store(inst->op) && i+1 < hi) {
+            emit(b, "\n");
+        }
     }
 }
 
-static char* build_source(BB const *bb, int *out_max_ptr, int *out_total_bufs,
-                          int *out_deref_buf) {
+static char* build_source(BB const *bb,
+                           int *out_max_ptr,
+                           int *out_total_bufs,
+                           int *out_deref_buf) {
     int max_ptr = -1;
     for (int i = 0; i < bb->insts; i++) {
-        if (has_ptr(bb->inst[i].op) && bb->inst[i].ptr >= 0) {
-            if (bb->inst[i].ptr > max_ptr) { max_ptr = bb->inst[i].ptr; }
+        if (has_ptr(bb->inst[i].op)
+                && bb->inst[i].ptr >= 0) {
+            if (bb->inst[i].ptr > max_ptr) {
+                max_ptr = bb->inst[i].ptr;
+            }
         }
     }
     *out_max_ptr = max_ptr;
@@ -312,7 +623,9 @@ static char* build_source(BB const *bb, int *out_max_ptr, int *out_total_bufs,
     int *deref_buf = out_deref_buf;
     int next_buf = max_ptr + 1;
     for (int i = 0; i < bb->insts; i++) {
-        if (bb->inst[i].op == op_deref_ptr) { deref_buf[i] = next_buf++; }
+        if (bb->inst[i].op == op_deref_ptr) {
+            deref_buf[i] = next_buf++;
+        }
     }
     int total_bufs = next_buf;
     *out_total_bufs = total_bufs;
@@ -322,8 +635,11 @@ static char* build_source(BB const *bb, int *out_max_ptr, int *out_total_bufs,
     for (int i = 0; i < bb->insts; i++) {
         enum op op = bb->inst[i].op;
         if (has_ptr(op) && op != op_deref_ptr) {
-            int p = bb->inst[i].ptr < 0 ? deref_buf[~bb->inst[i].ptr] : bb->inst[i].ptr;
-            if (op == op_load_8x4 || op == op_store_8x4) {}
+            int p = bb->inst[i].ptr < 0
+                ? deref_buf[~bb->inst[i].ptr]
+                : bb->inst[i].ptr;
+            if (op == op_load_8x4
+                    || op == op_store_8x4) {}
             else if (is_32(op)) { ptr_32[p] = 1; }
             else if (is_16(op)) { ptr_16[p] = 1; }
         }
@@ -331,35 +647,62 @@ static char* build_source(BB const *bb, int *out_max_ptr, int *out_total_bufs,
 
     Buf b = {0};
 
-    emit(&b, "#include <metal_stdlib>\nusing namespace metal;\n\n");
+    emit(&b,
+         "#include <metal_stdlib>\n"
+         "using namespace metal;\n\n");
 
-    emit(&b, "static inline int clamp_ix(int ix, uint bytes, int elem) {\n");
-    emit(&b, "    int hi = (int)(bytes / (uint)elem) - 1;\n");
+    emit(&b,
+         "static inline int clamp_ix"
+         "(int ix, uint bytes, int elem) {\n");
+    emit(&b,
+         "    int hi = (int)"
+         "(bytes / (uint)elem) - 1;\n");
     emit(&b, "    if (hi < 0) hi = 0;\n");
-    emit(&b, "    return clamp(ix, 0, hi);\n}\n\n");
+    emit(&b,
+         "    return clamp(ix, 0, hi);\n}\n\n");
 
     emit(&b, "kernel void umbra_entry(\n");
-    emit(&b, "    constant uint &n [[buffer(0)]]");
+    emit(&b,
+         "    constant uint &n [[buffer(0)]]");
     for (int p = 0; p <= max_ptr; p++) {
-        emit(&b, ",\n    device uchar *p%d [[buffer(%d)]]", p, p + 1);
+        emit(&b,
+             ",\n    device uchar *p%d"
+             " [[buffer(%d)]]",
+             p, p + 1);
     }
     for (int i = 0; i < bb->insts; i++) {
         if (bb->inst[i].op == op_deref_ptr) {
-            emit(&b, ",\n    device uchar *p%d [[buffer(%d)]]", deref_buf[i], deref_buf[i] + 1);
+            emit(&b,
+                 ",\n    device uchar *p%d"
+                 " [[buffer(%d)]]",
+                 deref_buf[i],
+                 deref_buf[i] + 1);
         }
     }
-    emit(&b, ",\n    constant uint *buf_szs [[buffer(%d)]]", total_bufs + 1);
-    emit(&b, ",\n    uint i [[thread_position_in_grid]]\n) {\n");
+    emit(&b,
+         ",\n    constant uint *buf_szs"
+         " [[buffer(%d)]]",
+         total_bufs + 1);
+    emit(&b,
+         ",\n    uint i"
+         " [[thread_position_in_grid]]\n) {\n");
     emit(&b, "    if (i >= n) return;\n");
 
     for (int p = 0; p < total_bufs; p++) {
         if (ptr_32[p] && ptr_16[p]) {
-            emit(&b, "    device uint   *p%d_32 = (device uint*)p%d;\n", p, p);
-            emit(&b, "    device ushort *p%d_16 = (device ushort*)p%d;\n", p, p);
+            emit(&b,
+                 "    device uint   *p%d_32"
+                 " = (device uint*)p%d;\n",
+                 p, p);
+            emit(&b,
+                 "    device ushort *p%d_16"
+                 " = (device ushort*)p%d;\n",
+                 p, p);
         }
     }
 
-    emit_ops(&b, bb, ptr_16, ptr_32, deref_buf, 0, bb->insts, "    ");
+    emit_ops(&b, bb, ptr_16, ptr_32,
+             deref_buf, 0, bb->insts, "    ");
     emit(&b, "}\n");
 
     free(ptr_16);
@@ -374,16 +717,23 @@ static char* build_source(BB const *bb, int *out_max_ptr, int *out_total_bufs,
 
 struct umbra_metal* umbra_metal(BB const *bb) {
     @autoreleasepool {
-        id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+        id<MTLDevice> device =
+            MTLCreateSystemDefaultDevice();
         if (!device) { return 0; }
 
-        int *deref_buf = calloc((size_t)bb->insts, sizeof *deref_buf);
+        int *deref_buf = calloc(
+            (size_t)bb->insts, sizeof *deref_buf);
         int max_ptr = -1, total_bufs = 0;
-        char *src = build_source(bb, &max_ptr, &total_bufs, deref_buf);
+        char *src = build_source(
+            bb, &max_ptr, &total_bufs, deref_buf);
 
-        NSString *source = [NSString stringWithUTF8String:src];
+        NSString *source =
+            [NSString stringWithUTF8String:src];
         NSError *error = nil;
-        id<MTLLibrary> library = [device newLibraryWithSource:source options:nil error:&error];
+        id<MTLLibrary> library =
+            [device newLibraryWithSource:source
+                                 options:nil
+                                   error:&error];
         if (!library) {
             NSLog(@"Metal compile error: %@", error);
             free(deref_buf);
@@ -391,37 +741,64 @@ struct umbra_metal* umbra_metal(BB const *bb) {
             return 0;
         }
 
-        id<MTLFunction> func = [library newFunctionWithName:@"umbra_entry"];
-        if (!func) { free(deref_buf); free(src); return 0; }
+        id<MTLFunction> func =
+            [library
+             newFunctionWithName:@"umbra_entry"];
+        if (!func) {
+            free(deref_buf); free(src); return 0;
+        }
 
-        id<MTLComputePipelineState> pipeline = [device newComputePipelineStateWithFunction:func error:&error];
-        if (!pipeline) { free(deref_buf); free(src); return 0; }
+        id<MTLComputePipelineState> pipeline =
+            [device
+             newComputePipelineStateWithFunction:func
+                                           error:&error];
+        if (!pipeline) {
+            free(deref_buf); free(src); return 0;
+        }
 
-        id<MTLCommandQueue> queue = [device newCommandQueue];
-        if (!queue) { free(deref_buf); free(src); return 0; }
+        id<MTLCommandQueue> queue =
+            [device newCommandQueue];
+        if (!queue) {
+            free(deref_buf); free(src); return 0;
+        }
 
-        id<MTLBuffer> n_buf = [device newBufferWithLength:sizeof(uint32_t)
-                                                   options:MTLResourceStorageModeShared];
-        id<MTLBuffer> sz_buf = [device newBufferWithLength:16 * sizeof(uint32_t)
-                                                    options:MTLResourceStorageModeShared];
+        id<MTLBuffer> n_buf =
+            [device
+             newBufferWithLength:sizeof(uint32_t)
+             options:MTLResourceStorageModeShared];
+        id<MTLBuffer> sz_buf =
+            [device
+             newBufferWithLength:
+                 16 * sizeof(uint32_t)
+             options:MTLResourceStorageModeShared];
 
-        struct umbra_metal *m = calloc(1, sizeof *m);
-        m->device     = (__bridge_retained void*)device;
-        m->pipeline   = (__bridge_retained void*)pipeline;
-        m->queue      = (__bridge_retained void*)queue;
-        m->n_buf      = (__bridge_retained void*)n_buf;
-        m->sz_buf     = (__bridge_retained void*)sz_buf;
+        struct umbra_metal *m =
+            calloc(1, sizeof *m);
+        m->device   =
+            (__bridge_retained void*)device;
+        m->pipeline =
+            (__bridge_retained void*)pipeline;
+        m->queue    =
+            (__bridge_retained void*)queue;
+        m->n_buf    =
+            (__bridge_retained void*)n_buf;
+        m->sz_buf   =
+            (__bridge_retained void*)sz_buf;
         m->src        = src;
         m->max_ptr    = max_ptr;
         m->total_bufs = total_bufs;
-        m->tg_size    = (int)pipeline.maxTotalThreadsPerThreadgroup;
+        m->tg_size    =
+            (int)pipeline.maxTotalThreadsPerThreadgroup;
 
         int di = 0;
         for (int i = 0; i < bb->insts; i++) {
             if (bb->inst[i].op == op_deref_ptr) {
-                m->deref[di].buf_idx  = deref_buf[i];
-                m->deref[di].src_buf  = bb->inst[i].ptr;
-                m->deref[di].byte_off = bb->inst[i].imm;
+                m->deref[di].buf_idx  =
+                    deref_buf[i];
+                m->deref[di].src_buf  =
+                    bb->inst[i].ptr;
+                m->deref[di].byte_off =
+                    bb->inst[i].imm;
                 di++;
             }
         }
@@ -432,30 +809,49 @@ struct umbra_metal* umbra_metal(BB const *bb) {
     }
 }
 
-static void batch_retain_buf(struct umbra_metal *m, void *retained) {
+static void batch_retain_buf(
+    struct umbra_metal *m, void *retained
+) {
     if (m->batch_nbufs >= m->batch_bufs_cap) {
-        m->batch_bufs_cap = m->batch_bufs_cap ? 2 * m->batch_bufs_cap : 64;
-        m->batch_bufs = realloc(m->batch_bufs, (size_t)m->batch_bufs_cap * sizeof(void*));
+        m->batch_bufs_cap = m->batch_bufs_cap
+            ? 2 * m->batch_bufs_cap : 64;
+        m->batch_bufs = realloc(
+            m->batch_bufs,
+            (size_t)m->batch_bufs_cap
+                * sizeof(void*));
     }
     m->batch_bufs[m->batch_nbufs++] = retained;
 }
 
-static void batch_add_copy(struct umbra_metal *m, void *host, void *raw_ptr, long bytes) {
+static void batch_add_copy(
+    struct umbra_metal *m,
+    void *host, void *raw_ptr, long bytes
+) {
     if (m->batch_ncopy >= m->batch_copy_cap) {
-        m->batch_copy_cap = m->batch_copy_cap ? 2 * m->batch_copy_cap : 64;
-        m->batch_copy = realloc(m->batch_copy, (size_t)m->batch_copy_cap * sizeof(struct copyback));
+        m->batch_copy_cap = m->batch_copy_cap
+            ? 2 * m->batch_copy_cap : 64;
+        m->batch_copy = realloc(
+            m->batch_copy,
+            (size_t)m->batch_copy_cap
+                * sizeof(struct copyback));
     }
-    m->batch_copy[m->batch_ncopy++] = (struct copyback){host, raw_ptr, bytes};
+    m->batch_copy[m->batch_ncopy++] =
+        (struct copyback){host, raw_ptr, bytes};
 }
 
-static void encode_dispatch(struct umbra_metal *m, int n, umbra_buf buf[],
-                            id<MTLComputeCommandEncoder> enc, _Bool batching) {
-    id<MTLDevice> device = (__bridge id<MTLDevice>)m->device;
+static void encode_dispatch(
+    struct umbra_metal *m, int n, umbra_buf buf[],
+    id<MTLComputeCommandEncoder> enc,
+    _Bool batching
+) {
+    id<MTLDevice> device =
+        (__bridge id<MTLDevice>)m->device;
 
     uint32_t szs_data[16] = {0};
     for (int i = 0; i <= m->max_ptr; i++) {
         if (buf[i].ptr && buf[i].sz) {
-            long bytes = buf[i].sz < 0 ? -buf[i].sz : buf[i].sz;
+            long bytes = buf[i].sz < 0
+                ? -buf[i].sz : buf[i].sz;
             szs_data[i] = (uint32_t)bytes;
         }
     }
@@ -465,38 +861,60 @@ static void encode_dispatch(struct umbra_metal *m, int n, umbra_buf buf[],
 
     if (batching) {
         uint32_t n32 = (uint32_t)n;
-        per_n = [device newBufferWithBytes:&n32
-                                    length:sizeof n32
-                                   options:MTLResourceStorageModeShared];
-        batch_retain_buf(m, (__bridge_retained void*)per_n);
+        per_n =
+            [device newBufferWithBytes:&n32
+                    length:sizeof n32
+                    options:
+                        MTLResourceStorageModeShared];
+        batch_retain_buf(
+            m, (__bridge_retained void*)per_n);
     } else {
-        per_n = (__bridge id<MTLBuffer>)m->n_buf;
+        per_n =
+            (__bridge id<MTLBuffer>)m->n_buf;
         *(uint32_t*)per_n.contents = (uint32_t)n;
     }
 
     for (int i = 0; i <= m->max_ptr; i++) {
         if (!buf[i].ptr || !buf[i].sz) { continue; }
-        long bytes = buf[i].sz < 0 ? -buf[i].sz : buf[i].sz;
+        long bytes = buf[i].sz < 0
+            ? -buf[i].sz : buf[i].sz;
         if (batching) {
-            per_bufs[i] = [device newBufferWithBytes:buf[i].ptr
-                                              length:(NSUInteger)bytes
-                                             options:MTLResourceStorageModeShared];
-            void *retained = (__bridge_retained void*)per_bufs[i];
+            per_bufs[i] =
+                [device
+                 newBufferWithBytes:buf[i].ptr
+                 length:(NSUInteger)bytes
+                 options:
+                     MTLResourceStorageModeShared];
+            void *retained =
+                (__bridge_retained void*)per_bufs[i];
             batch_retain_buf(m, retained);
             if (buf[i].sz > 0) {
-                batch_add_copy(m, buf[i].ptr, retained, buf[i].sz);
+                batch_add_copy(
+                    m, buf[i].ptr,
+                    retained, buf[i].sz);
             }
         } else {
             if (bytes > m->buf_cap[i]) {
-                if (m->bufs[i]) { (void)(__bridge_transfer id)m->bufs[i]; }
+                if (m->bufs[i]) {
+                    (void)(__bridge_transfer id)
+                        m->bufs[i];
+                }
                 m->buf_cap[i] = bytes;
-                id<MTLBuffer> b = [device newBufferWithLength:(NSUInteger)bytes
-                                                      options:MTLResourceStorageModeShared];
-                m->bufs[i] = (__bridge_retained void*)b;
+                id<MTLBuffer> b =
+                    [device
+                     newBufferWithLength:
+                         (NSUInteger)bytes
+                     options:
+                         MTLResourceStorageModeShared];
+                m->bufs[i] =
+                    (__bridge_retained void*)b;
             }
-            __builtin_memcpy(((__bridge id<MTLBuffer>)m->bufs[i]).contents,
-                             buf[i].ptr, (size_t)bytes);
-            per_bufs[i] = (__bridge id<MTLBuffer>)m->bufs[i];
+            __builtin_memcpy(
+                ((__bridge id<MTLBuffer>)
+                    m->bufs[i]).contents,
+                buf[i].ptr, (size_t)bytes);
+            per_bufs[i] =
+                (__bridge id<MTLBuffer>)m->bufs[i];
         }
     }
 
@@ -504,77 +922,124 @@ static void encode_dispatch(struct umbra_metal *m, int n, umbra_buf buf[],
         void *base = buf[m->deref[d].src_buf].ptr;
         void *derived;
         long  dsz;
-        __builtin_memcpy(&derived, (char*)base + m->deref[d].byte_off, sizeof derived);
-        __builtin_memcpy(&dsz,     (char*)base + m->deref[d].byte_off + 8, sizeof dsz);
+        __builtin_memcpy(
+            &derived,
+            (char*)base + m->deref[d].byte_off,
+            sizeof derived);
+        __builtin_memcpy(
+            &dsz,
+            (char*)base + m->deref[d].byte_off + 8,
+            sizeof dsz);
         long bytes = dsz < 0 ? -dsz : dsz;
         int bi = m->deref[d].buf_idx;
         if (batching) {
-            per_bufs[bi] = [device newBufferWithBytes:derived
-                                               length:(NSUInteger)bytes
-                                              options:MTLResourceStorageModeShared];
-            void *retained = (__bridge_retained void*)per_bufs[bi];
+            per_bufs[bi] =
+                [device
+                 newBufferWithBytes:derived
+                 length:(NSUInteger)bytes
+                 options:
+                     MTLResourceStorageModeShared];
+            void *retained =
+                (__bridge_retained void*)
+                    per_bufs[bi];
             batch_retain_buf(m, retained);
             if (dsz > 0) {
-                batch_add_copy(m, derived, retained, dsz);
+                batch_add_copy(
+                    m, derived, retained, dsz);
             }
         } else {
             if (bytes > m->buf_cap[bi]) {
-                if (m->bufs[bi]) { (void)(__bridge_transfer id)m->bufs[bi]; }
+                if (m->bufs[bi]) {
+                    (void)(__bridge_transfer id)
+                        m->bufs[bi];
+                }
                 m->buf_cap[bi] = bytes;
-                id<MTLBuffer> b = [device newBufferWithLength:(NSUInteger)bytes
-                                                      options:MTLResourceStorageModeShared];
-                m->bufs[bi] = (__bridge_retained void*)b;
+                id<MTLBuffer> b =
+                    [device
+                     newBufferWithLength:
+                         (NSUInteger)bytes
+                     options:
+                         MTLResourceStorageModeShared];
+                m->bufs[bi] =
+                    (__bridge_retained void*)b;
             }
-            __builtin_memcpy(((__bridge id<MTLBuffer>)m->bufs[bi]).contents,
-                             derived, (size_t)bytes);
-            per_bufs[bi] = (__bridge id<MTLBuffer>)m->bufs[bi];
+            __builtin_memcpy(
+                ((__bridge id<MTLBuffer>)
+                    m->bufs[bi]).contents,
+                derived, (size_t)bytes);
+            per_bufs[bi] =
+                (__bridge id<MTLBuffer>)m->bufs[bi];
         }
         szs_data[bi] = (uint32_t)bytes;
     }
 
     id<MTLBuffer> per_sz;
     if (batching) {
-        per_sz = [device newBufferWithBytes:szs_data
-                                    length:sizeof szs_data
-                                   options:MTLResourceStorageModeShared];
-        batch_retain_buf(m, (__bridge_retained void*)per_sz);
+        per_sz =
+            [device newBufferWithBytes:szs_data
+                    length:sizeof szs_data
+                    options:
+                        MTLResourceStorageModeShared];
+        batch_retain_buf(
+            m, (__bridge_retained void*)per_sz);
     } else {
-        per_sz = (__bridge id<MTLBuffer>)m->sz_buf;
-        __builtin_memcpy(per_sz.contents, szs_data, sizeof szs_data);
+        per_sz =
+            (__bridge id<MTLBuffer>)m->sz_buf;
+        __builtin_memcpy(
+            per_sz.contents,
+            szs_data, sizeof szs_data);
     }
 
     [enc setBuffer:per_n offset:0 atIndex:0];
     for (int i = 0; i < m->total_bufs; i++) {
         if (per_bufs[i]) {
-            [enc setBuffer:per_bufs[i] offset:0 atIndex:(NSUInteger)(i + 1)];
+            [enc setBuffer:per_bufs[i]
+                    offset:0
+                   atIndex:(NSUInteger)(i + 1)];
         }
     }
-    [enc setBuffer:per_sz offset:0 atIndex:(NSUInteger)(m->total_bufs + 1)];
+    [enc setBuffer:per_sz
+            offset:0
+           atIndex:(NSUInteger)(m->total_bufs + 1)];
 
-    MTLSize grid  = MTLSizeMake((NSUInteger)n, 1, 1);
-    MTLSize group = MTLSizeMake((NSUInteger)m->tg_size, 1, 1);
-    [enc dispatchThreads:grid threadsPerThreadgroup:group];
+    MTLSize grid =
+        MTLSizeMake((NSUInteger)n, 1, 1);
+    MTLSize group =
+        MTLSizeMake((NSUInteger)m->tg_size, 1, 1);
+    [enc dispatchThreads:grid
+       threadsPerThreadgroup:group];
 }
 
-void umbra_metal_run(struct umbra_metal *m, int n, umbra_buf buf[]) {
+void umbra_metal_run(
+    struct umbra_metal *m, int n, umbra_buf buf[]
+) {
     if (!m || n <= 0) { return; }
 
     if (m->batch_cmdbuf) {
         @autoreleasepool {
             id<MTLComputeCommandEncoder> enc =
-                (__bridge id<MTLComputeCommandEncoder>)m->batch_enc;
+                (__bridge
+                 id<MTLComputeCommandEncoder>)
+                    m->batch_enc;
             encode_dispatch(m, n, buf, enc, 1);
         }
         return;
     }
 
     @autoreleasepool {
-        id<MTLCommandQueue> queue = (__bridge id<MTLCommandQueue>)m->queue;
+        id<MTLCommandQueue> queue =
+            (__bridge id<MTLCommandQueue>)
+                m->queue;
 
-        id<MTLCommandBuffer> cmdbuf = [queue commandBufferWithUnretainedReferences];
-        id<MTLComputeCommandEncoder> enc = [cmdbuf computeCommandEncoder];
+        id<MTLCommandBuffer> cmdbuf =
+            [queue
+             commandBufferWithUnretainedReferences];
+        id<MTLComputeCommandEncoder> enc =
+            [cmdbuf computeCommandEncoder];
         [enc setComputePipelineState:
-            (__bridge id<MTLComputePipelineState>)m->pipeline];
+            (__bridge
+             id<MTLComputePipelineState>)
+                m->pipeline];
 
         encode_dispatch(m, n, buf, enc, 0);
 
@@ -583,37 +1048,64 @@ void umbra_metal_run(struct umbra_metal *m, int n, umbra_buf buf[]) {
         [cmdbuf waitUntilCompleted];
 
         for (int i = 0; i <= m->max_ptr; i++) {
-            if (!buf[i].ptr || !m->bufs[i] || buf[i].sz <= 0) { continue; }
-            __builtin_memcpy(buf[i].ptr,
-                             ((__bridge id<MTLBuffer>)m->bufs[i]).contents,
-                             (size_t)buf[i].sz);
+            if (!buf[i].ptr || !m->bufs[i]
+                    || buf[i].sz <= 0) {
+                continue;
+            }
+            __builtin_memcpy(
+                buf[i].ptr,
+                ((__bridge id<MTLBuffer>)
+                    m->bufs[i]).contents,
+                (size_t)buf[i].sz);
         }
 
         for (int d = 0; d < m->n_deref; d++) {
-            void *base = buf[m->deref[d].src_buf].ptr;
+            void *base =
+                buf[m->deref[d].src_buf].ptr;
             long dsz;
-            __builtin_memcpy(&dsz, (char*)base + m->deref[d].byte_off + 8, sizeof dsz);
+            __builtin_memcpy(
+                &dsz,
+                (char*)base
+                    + m->deref[d].byte_off + 8,
+                sizeof dsz);
             if (dsz <= 0) { continue; }
             void *derived;
-            __builtin_memcpy(&derived, (char*)base + m->deref[d].byte_off, sizeof derived);
+            __builtin_memcpy(
+                &derived,
+                (char*)base
+                    + m->deref[d].byte_off,
+                sizeof derived);
             int bi = m->deref[d].buf_idx;
-            __builtin_memcpy(derived,
-                             ((__bridge id<MTLBuffer>)m->bufs[bi]).contents,
-                             (size_t)dsz);
+            __builtin_memcpy(
+                derived,
+                ((__bridge id<MTLBuffer>)
+                    m->bufs[bi]).contents,
+                (size_t)dsz);
         }
     }
 }
 
-void umbra_metal_begin_batch(struct umbra_metal *m) {
+void umbra_metal_begin_batch(
+    struct umbra_metal *m
+) {
     if (!m || m->batch_cmdbuf) { return; }
     @autoreleasepool {
-        id<MTLCommandQueue> queue = (__bridge id<MTLCommandQueue>)m->queue;
-        id<MTLCommandBuffer> cmdbuf = [queue commandBufferWithUnretainedReferences];
-        id<MTLComputeCommandEncoder> enc = [cmdbuf computeCommandEncoder];
+        id<MTLCommandQueue> queue =
+            (__bridge id<MTLCommandQueue>)
+                m->queue;
+        id<MTLCommandBuffer> cmdbuf =
+            [queue
+             commandBufferWithUnretainedReferences];
+        id<MTLComputeCommandEncoder> enc =
+            [cmdbuf computeCommandEncoder];
         [enc setComputePipelineState:
-            (__bridge id<MTLComputePipelineState>)m->pipeline];
-        m->batch_cmdbuf = (__bridge_retained void*)cmdbuf;
-        m->batch_enc    = (__bridge_retained void*)enc;
+            (__bridge
+             id<MTLComputePipelineState>)
+                m->pipeline];
+        m->batch_cmdbuf =
+            (__bridge_retained void*)cmdbuf;
+        m->batch_enc =
+            (__bridge_retained void*)enc;
     }
 }
 
@@ -621,9 +1113,12 @@ void umbra_metal_flush(struct umbra_metal *m) {
     if (!m || !m->batch_cmdbuf) { return; }
     @autoreleasepool {
         id<MTLComputeCommandEncoder> enc =
-            (__bridge_transfer id<MTLComputeCommandEncoder>)m->batch_enc;
+            (__bridge_transfer
+             id<MTLComputeCommandEncoder>)
+                m->batch_enc;
         id<MTLCommandBuffer> cmdbuf =
-            (__bridge_transfer id<MTLCommandBuffer>)m->batch_cmdbuf;
+            (__bridge_transfer id<MTLCommandBuffer>)
+                m->batch_cmdbuf;
         m->batch_enc    = NULL;
         m->batch_cmdbuf = NULL;
 
@@ -632,14 +1127,20 @@ void umbra_metal_flush(struct umbra_metal *m) {
         [cmdbuf waitUntilCompleted];
 
         for (int i = 0; i < m->batch_ncopy; i++) {
-            struct copyback *c = &m->batch_copy[i];
-            id<MTLBuffer> mtlbuf = (__bridge id<MTLBuffer>)c->mtlbuf;
-            __builtin_memcpy(c->host, mtlbuf.contents, (size_t)c->bytes);
+            struct copyback *c =
+                &m->batch_copy[i];
+            id<MTLBuffer> mtlbuf =
+                (__bridge id<MTLBuffer>)c->mtlbuf;
+            __builtin_memcpy(
+                c->host,
+                mtlbuf.contents,
+                (size_t)c->bytes);
         }
         m->batch_ncopy = 0;
 
         for (int i = 0; i < m->batch_nbufs; i++) {
-            (void)(__bridge_transfer id)m->batch_bufs[i];
+            (void)(__bridge_transfer id)
+                m->batch_bufs[i];
         }
         m->batch_nbufs = 0;
     }
@@ -649,13 +1150,27 @@ void umbra_metal_free(struct umbra_metal *m) {
     if (!m) { return; }
     umbra_metal_flush(m);
     @autoreleasepool {
-        if (m->device)   { (void)(__bridge_transfer id)m->device; }
-        if (m->pipeline) { (void)(__bridge_transfer id)m->pipeline; }
-        if (m->queue)    { (void)(__bridge_transfer id)m->queue; }
-        if (m->n_buf)    { (void)(__bridge_transfer id)m->n_buf; }
-        if (m->sz_buf)   { (void)(__bridge_transfer id)m->sz_buf; }
+        if (m->device) {
+            (void)(__bridge_transfer id)m->device;
+        }
+        if (m->pipeline) {
+            (void)(__bridge_transfer id)
+                m->pipeline;
+        }
+        if (m->queue) {
+            (void)(__bridge_transfer id)m->queue;
+        }
+        if (m->n_buf) {
+            (void)(__bridge_transfer id)m->n_buf;
+        }
+        if (m->sz_buf) {
+            (void)(__bridge_transfer id)m->sz_buf;
+        }
         for (int p = 0; p < 16; p++) {
-            if (m->bufs[p]) { (void)(__bridge_transfer id)m->bufs[p]; }
+            if (m->bufs[p]) {
+                (void)(__bridge_transfer id)
+                    m->bufs[p];
+            }
         }
     }
     free(m->batch_bufs);
@@ -664,7 +1179,9 @@ void umbra_metal_free(struct umbra_metal *m) {
     free(m);
 }
 
-void umbra_metal_dump(struct umbra_metal const *m, FILE *f) {
+void umbra_metal_dump(
+    struct umbra_metal const *m, FILE *f
+) {
     if (m && m->src) { fputs(m->src, f); }
 }
 

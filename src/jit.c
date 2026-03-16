@@ -4,14 +4,22 @@
 #if !defined(__aarch64__) && !defined(__AVX2__)
 
 struct umbra_jit { int dummy; };
-struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) { (void)bb; return 0; }
+struct umbra_jit* umbra_jit(
+    struct umbra_basic_block const *bb
+) { (void)bb; return 0; }
 void umbra_jit_run (struct umbra_jit *j, int n, umbra_buf buf[]) {
     (void)j; (void)n; (void)buf;
 }
 void umbra_jit_free(struct umbra_jit *j) { (void)j; }
-void umbra_jit_dump    (struct umbra_jit const *j, FILE *f) { (void)j; (void)f; }
-void umbra_jit_dump_bin(struct umbra_jit const *j, FILE *f) { (void)j; (void)f; }
-void umbra_jit_mca     (struct umbra_jit const *j, FILE *f) { (void)j; (void)f; }
+void umbra_jit_dump(
+    struct umbra_jit const *j, FILE *f
+) { (void)j; (void)f; }
+void umbra_jit_dump_bin(
+    struct umbra_jit const *j, FILE *f
+) { (void)j; (void)f; }
+void umbra_jit_mca(
+    struct umbra_jit const *j, FILE *f
+) { (void)j; (void)f; }
 
 #elif defined(__aarch64__)
 
@@ -53,39 +61,64 @@ static void load_max_ix(Buf *c, int p, int elem_shift, int const *deref_gpr) {
         return;
     }
     int disp = p * 16 + 8;
-    put(c, 0xf9400020u | ((uint32_t)(disp / 8) << 10) | (1u << 5) | (uint32_t)XM);
+    put(c, 0xf9400020u | ((uint32_t)(disp / 8) << 10)
+                       | (1u << 5) | (uint32_t)XM);
     put(c, 0xf10001bfu);
     put(c, 0xda8da1adu);
     put(c, 0x53000000u | ((uint32_t)elem_shift << 16) | (31u << 10)
                        | ((uint32_t)XM << 5) | (uint32_t)XM);
     put(c, 0x71000000u | (1u << 10) | ((uint32_t)XM << 5) | (uint32_t)XM);
-    put(c, 0x1a800000u | ((uint32_t)XM << 16) | (0x4u << 12) | (31u << 5) | (uint32_t)XM);
+    put(c, 0x1a800000u | ((uint32_t)XM << 16)
+                       | (0x4u << 12)
+                       | (31u << 5)
+                       | (uint32_t)XM);
 }
 
 static void clamp_wt(Buf *c) {
     put(c, 0x7100001fu | ((uint32_t)XT << 5));
-    put(c, 0x1a800000u | ((uint32_t)XT << 16) | (0xbu << 12) | (31u << 5) | (uint32_t)XT);
+    put(c, 0x1a800000u | ((uint32_t)XT << 16)
+                       | (0xbu << 12)
+                       | (31u << 5)
+                       | (uint32_t)XT);
     put(c, 0x6b00001fu | ((uint32_t)XM << 16) | ((uint32_t)XT << 5));
-    put(c, 0x1a800000u | ((uint32_t)XT << 16) | (0xau << 12) | ((uint32_t)XM << 5) | (uint32_t)XT);
+    put(c, 0x1a800000u | ((uint32_t)XT << 16)
+                       | (0xau << 12)
+                       | ((uint32_t)XM << 5)
+                       | (uint32_t)XT);
 }
 
 static void vld(Buf *c, int vd, int s) { put(c, LDR_qi(vd, XS, s)); }
 static void vst(Buf *c, int vd, int s) { put(c, STR_qi(vd, XS, s)); }
 
-static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm, int scratch) {
+static _Bool emit_alu_reg(Buf *c, enum op op,
+                          int d, int x, int y,
+                          int z, int imm,
+                          int scratch) {
     switch (op) {
     case op_imm_32: {
         uint32_t v=(uint32_t)imm;
-        if      (v == 0)                          { put(c, MOVI_4s(d, 0, 0)); }
-        else if (v == (v & 0x000000ffu))          { put(c, MOVI_4s(d, (uint8_t)v,  0)); }
-        else if (v == (v & 0x0000ff00u))          { put(c, MOVI_4s(d, (uint8_t)(v>> 8),  8)); }
-        else if (v == (v & 0x00ff0000u))          { put(c, MOVI_4s(d, (uint8_t)(v>>16), 16)); }
-        else if (v == (v & 0xff000000u))          { put(c, MOVI_4s(d, (uint8_t)(v>>24), 24)); }
-        else if ((~v) == ((~v) & 0x000000ffu))    { put(c, MVNI_4s(d, (uint8_t)~v,  0)); }
-        else if ((~v) == ((~v) & 0x0000ff00u))    { put(c, MVNI_4s(d, (uint8_t)(~v>> 8),  8)); }
-        else if ((~v) == ((~v) & 0x00ff0000u))    { put(c, MVNI_4s(d, (uint8_t)(~v>>16), 16)); }
-        else if ((~v) == ((~v) & 0xff000000u))    { put(c, MVNI_4s(d, (uint8_t)(~v>>24), 24)); }
-        else { load_imm_w(c,XT,v); put(c, DUP_4s_w(d,XT)); }
+        if (v == 0) {
+            put(c, MOVI_4s(d, 0, 0));
+        } else if (v == (v & 0x000000ffu)) {
+            put(c, MOVI_4s(d, (uint8_t)v, 0));
+        } else if (v == (v & 0x0000ff00u)) {
+            put(c, MOVI_4s(d, (uint8_t)(v>>8), 8));
+        } else if (v == (v & 0x00ff0000u)) {
+            put(c, MOVI_4s(d,(uint8_t)(v>>16),16));
+        } else if (v == (v & 0xff000000u)) {
+            put(c, MOVI_4s(d,(uint8_t)(v>>24),24));
+        } else if ((~v) == ((~v) & 0x000000ffu)) {
+            put(c, MVNI_4s(d, (uint8_t)~v, 0));
+        } else if ((~v) == ((~v) & 0x0000ff00u)) {
+            put(c, MVNI_4s(d,(uint8_t)(~v>>8), 8));
+        } else if ((~v) == ((~v) & 0x00ff0000u)) {
+            put(c, MVNI_4s(d,(uint8_t)(~v>>16),16));
+        } else if ((~v) == ((~v) & 0xff000000u)) {
+            put(c, MVNI_4s(d,(uint8_t)(~v>>24),24));
+        } else {
+            load_imm_w(c,XT,v);
+            put(c, DUP_4s_w(d,XT));
+        }
     } return 1;
 
     case op_add_f32: put(c, FADD_4s(d,x,y)); return 1;
@@ -96,22 +129,42 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_max_f32: put(c, FMAXNM_4s(d,x,y)); return 1;
     case op_sqrt_f32: put(c, FSQRT_4s(d,x)); return 1;
     case op_fma_f32:
-        if (d==z) { put(c, FMLA_4s(d,x,y)); }
-        else if (d!=x && d!=y) { put(c, ORR_16b(d,z,z)); put(c, FMLA_4s(d,x,y)); }
-        else { put(c, ORR_16b(scratch,z,z)); put(c, FMLA_4s(scratch,x,y)); put(c, ORR_16b(d,scratch,scratch)); }
+        if (d==z) {
+            put(c, FMLA_4s(d,x,y));
+        } else if (d!=x && d!=y) {
+            put(c, ORR_16b(d,z,z));
+            put(c, FMLA_4s(d,x,y));
+        } else {
+            put(c, ORR_16b(scratch,z,z));
+            put(c, FMLA_4s(scratch,x,y));
+            put(c, ORR_16b(d,scratch,scratch));
+        }
         return 1;
     case op_fms_f32:
-        if (d==z) { put(c, FMLS_4s(d,x,y)); }
-        else if (d!=x && d!=y) { put(c, ORR_16b(d,z,z)); put(c, FMLS_4s(d,x,y)); }
-        else { put(c, ORR_16b(scratch,z,z)); put(c, FMLS_4s(scratch,x,y)); put(c, ORR_16b(d,scratch,scratch)); }
+        if (d==z) {
+            put(c, FMLS_4s(d,x,y));
+        } else if (d!=x && d!=y) {
+            put(c, ORR_16b(d,z,z));
+            put(c, FMLS_4s(d,x,y));
+        } else {
+            put(c, ORR_16b(scratch,z,z));
+            put(c, FMLS_4s(scratch,x,y));
+            put(c, ORR_16b(d,scratch,scratch));
+        }
         return 1;
 
     case op_add_i32: put(c, ADD_4s(d,x,y)); return 1;
     case op_sub_i32: put(c, SUB_4s(d,x,y)); return 1;
     case op_mul_i32: put(c, MUL_4s(d,x,y)); return 1;
     case op_shl_i32: put(c, USHL_4s(d,x,y)); return 1;
-    case op_shr_u32: put(c, NEG_4s(scratch,y)); put(c, USHL_4s(d,x,scratch)); return 1;
-    case op_shr_s32: put(c, NEG_4s(scratch,y)); put(c, SSHL_4s(d,x,scratch)); return 1;
+    case op_shr_u32:
+        put(c, NEG_4s(scratch,y));
+        put(c, USHL_4s(d,x,scratch));
+        return 1;
+    case op_shr_s32:
+        put(c, NEG_4s(scratch,y));
+        put(c, SSHL_4s(d,x,scratch));
+        return 1;
     case op_shl_i32_imm: put(c, SHL_4s_imm(d,x,imm)); return 1;
     case op_shr_u32_imm: put(c, USHR_4s_imm(d,x,imm)); return 1;
     case op_shr_s32_imm: put(c, SSHR_4s_imm(d,x,imm)); return 1;
@@ -141,18 +194,33 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
 
     case op_lane:
     case op_deref_ptr:
-    case op_uni_32:    case op_load_32:    case op_gather_32:  case op_store_32:  case op_scatter_32:
-    case op_uni_16:    case op_load_16:    case op_gather_16:  case op_store_16:  case op_scatter_16:
-    case op_uni_f16:  case op_load_f16:  case op_gather_f16: case op_store_f16: case op_scatter_f16:
-    case op_load_8x4:  case op_store_8x4:
+    case op_uni_32:   case op_load_32:
+    case op_gather_32: case op_store_32:
+    case op_scatter_32:
+    case op_uni_16:   case op_load_16:
+    case op_gather_16: case op_store_16:
+    case op_scatter_16:
+    case op_uni_f16:  case op_load_f16:
+    case op_gather_f16: case op_store_f16:
+    case op_scatter_f16:
+    case op_load_8x4: case op_store_8x4:
         return 0;
     }
 }
 
-static int8_t const ra_pool[] = {4,5,6,7,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31};
+static int8_t const ra_pool[] = {
+    4,5,6,7,16,17,18,19,20,21,
+    22,23,24,25,26,27,28,29,30,31,
+};
 
-static void arm64_spill(int reg, int slot, void *ctx) { vst((Buf*)ctx, reg, slot); }
-static void arm64_fill (int reg, int slot, void *ctx) { vld((Buf*)ctx, reg, slot); }
+static void arm64_spill(int reg, int slot,
+                        void *ctx) {
+    vst((Buf*)ctx, reg, slot);
+}
+static void arm64_fill(int reg, int slot,
+                       void *ctx) {
+    vld((Buf*)ctx, reg, slot);
+}
 
 static struct ra* ra_create_arm64(struct umbra_basic_block const *bb, Buf *c) {
     struct ra_config cfg = {
@@ -375,7 +443,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             }
             if (scalar) {
                 // LDRSH W10, [XT, X9, LSL#1]
-                put(c, 0x78a07800u | ((uint32_t)XI << 16) | ((uint32_t)XT << 5) | (uint32_t)XT);
+                put(c, 0x78a07800u
+                    | ((uint32_t)XI << 16)
+                    | ((uint32_t)XT << 5)
+                    | (uint32_t)XT);
                 put(c, DUP_4s_w(s.rd, XT));
             } else if (s.rdh >= 0) {
                 int8_t tmp = ra_alloc(ra, sl, ns);
@@ -436,7 +507,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             resolve_ptr(c, p, &last_ptr, deref_gpr);
             load_imm_w(c, XT, (uint32_t)(inst->imm * 2));
             // LDRSH W10, [XP, XT] (no shift, byte offset already computed)
-            put(c, 0x78a06800u | ((uint32_t)XT << 16) | ((uint32_t)XP << 5) | (uint32_t)XT);
+            put(c, 0x78a06800u
+                | ((uint32_t)XT << 16)
+                | ((uint32_t)XP << 5)
+                | (uint32_t)XT);
             put(c, DUP_4s_w(s.rd, XT));
             if (s.rdh >= 0) {
                 put(c, 0x4ea01c00u | ((uint32_t)s.rd<<5) | (uint32_t)s.rdh);
@@ -538,7 +612,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 put(c, LDR_hx(s.rd, XP, XT));
                 put(c, FCVTL_4s(s.rd, s.rd));
             } else {
-                // Gather 8 halfs into V0 (scratch), then FCVTL/FCVTL2 into pair.
+                // Gather 8 halfs into V0, then
+                // FCVTL/FCVTL2 into pair.
                 put(c, MOVI_4s(0, 0, 0));
                 for (int k = 0; k < 4; k++) {
                     put(c, UMOV_ws_lane(XT, rx, k));
@@ -664,11 +739,18 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     int8_t ir = l < 4 ? rx : rxh;
                     int8_t vr = l < 4 ? ry : ryh;
                     uint32_t imm5 = (uint32_t)(lane << 3) | 4;
-                    put(c, 0x0e003c00u | (imm5 << 16) | ((uint32_t)ir << 5) | (uint32_t)XT);
+                    put(c, 0x0e003c00u | (imm5 << 16)
+                        | ((uint32_t)ir << 5)
+                        | (uint32_t)XT);
                     clamp_wt(c);
                     uint32_t v_imm5 = (uint32_t)(lane << 3) | 4;
-                    put(c, 0x0e003c00u | (v_imm5 << 16) | ((uint32_t)vr << 5) | (uint32_t)XH);
-                    put(c, 0xb8206800u | ((uint32_t)XT << 16) | ((uint32_t)XP << 5) | (uint32_t)XH);
+                    put(c, 0x0e003c00u | (v_imm5 << 16)
+                        | ((uint32_t)vr << 5)
+                        | (uint32_t)XH);
+                    put(c, 0xb8206800u
+                        | ((uint32_t)XT << 16)
+                        | ((uint32_t)XP << 5)
+                        | (uint32_t)XH);
                 }
             }
             if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
@@ -685,8 +767,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 put(c, UMOV_ws(XT, rx));
                 clamp_wt(c);
                 // STRH W_val, [XP, XT, LSL#1]
-                put(c, 0x0e003c00u | (4u << 16) | ((uint32_t)ry << 5) | (uint32_t)XH);
-                put(c, 0x78207800u | ((uint32_t)XT << 16) | ((uint32_t)XP << 5) | (uint32_t)XH);
+                put(c, 0x0e003c00u | (4u << 16)
+                    | ((uint32_t)ry << 5)
+                    | (uint32_t)XH);
+                put(c, 0x78207800u
+                    | ((uint32_t)XT << 16)
+                    | ((uint32_t)XP << 5)
+                    | (uint32_t)XH);
             } else {
                 int8_t rxh = hi(ra, inst->x);
                 int8_t ryh = hi(ra, inst->y);
@@ -695,12 +782,19 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     int8_t ir = l < 4 ? rx : rxh;
                     int8_t vr = l < 4 ? ry : ryh;
                     uint32_t imm5 = (uint32_t)(lane << 3) | 4;
-                    put(c, 0x0e003c00u | (imm5 << 16) | ((uint32_t)ir << 5) | (uint32_t)XT);
+                    put(c, 0x0e003c00u | (imm5 << 16)
+                        | ((uint32_t)ir << 5)
+                        | (uint32_t)XT);
                     clamp_wt(c);
                     // Extract i32 value, truncate to i16, store
                     uint32_t v_imm5 = (uint32_t)(lane << 3) | 4;
-                    put(c, 0x0e003c00u | (v_imm5 << 16) | ((uint32_t)vr << 5) | (uint32_t)XH);
-                    put(c, 0x78207800u | ((uint32_t)XT << 16) | ((uint32_t)XP << 5) | (uint32_t)XH);
+                    put(c, 0x0e003c00u | (v_imm5 << 16)
+                        | ((uint32_t)vr << 5)
+                        | (uint32_t)XH);
+                    put(c, 0x78207800u
+                    | ((uint32_t)XT << 16)
+                    | ((uint32_t)XP << 5)
+                    | (uint32_t)XH);
                 }
             }
             if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
@@ -720,7 +814,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 put(c, FCVTN_4h(0, ry));
                 // UMOV W_XH, V0.H[0]
                 put(c, 0x0e023c00u | (0u << 5) | (uint32_t)XH);
-                put(c, 0x78207800u | ((uint32_t)XT << 16) | ((uint32_t)XP << 5) | (uint32_t)XH);
+                put(c, 0x78207800u
+                    | ((uint32_t)XT << 16)
+                    | ((uint32_t)XP << 5)
+                    | (uint32_t)XH);
             } else {
                 int8_t rxh = hi(ra, inst->x);
                 int8_t ryh = hi(ra, inst->y);
@@ -729,19 +826,26 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     int8_t ir = l < 4 ? rx : rxh;
                     int8_t vr = l < 4 ? ry : ryh;
                     uint32_t imm5 = (uint32_t)(lane << 3) | 4;
-                    put(c, 0x0e003c00u | (imm5 << 16) | ((uint32_t)ir << 5) | (uint32_t)XT);
+                    put(c, 0x0e003c00u | (imm5 << 16)
+                        | ((uint32_t)ir << 5)
+                        | (uint32_t)XT);
                     clamp_wt(c);
                     // Extract f32 lane, convert to f16, store
                     uint32_t v_imm5 = (uint32_t)(lane << 3) | 4;
-                    put(c, 0x0e003c00u | (v_imm5 << 16) | ((uint32_t)vr << 5) | (uint32_t)XH);
-                    // Convert S->H: FCVT H_XH, S_XH (but XH is GPR... need NEON)
+                    put(c, 0x0e003c00u | (v_imm5 << 16)
+                        | ((uint32_t)vr << 5)
+                        | (uint32_t)XH);
+                    // FCVT H_XH, S_XH via NEON
                     // Actually we have the f32 value in GPR XH (W12).
                     // Move to V0.S[0], FCVTN, UMOV back.
                     // Simpler: just use INS to put into V0 then FCVTN + UMOV
                     put(c, INS_s(0, 0, XH));
                     put(c, FCVTN_4h(0, 0));
                     put(c, 0x0e023c00u | (0u << 5) | (uint32_t)XH);
-                    put(c, 0x78207800u | ((uint32_t)XT << 16) | ((uint32_t)XP << 5) | (uint32_t)XH);
+                    put(c, 0x78207800u
+                    | ((uint32_t)XT << 16)
+                    | ((uint32_t)XP << 5)
+                    | (uint32_t)XH);
                 }
             }
             if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
@@ -758,7 +862,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 struct ra_step s = ra_step_alloc(ra, sl, ns, i);
                 put(c, LSL_xi(XT, XI, 2));
                 if (ch) { put(c, ADD_xi(XT, XT, ch)); }
-                put(c, 0x38606800u | ((uint32_t)XT << 16) | ((uint32_t)XP << 5) | (uint32_t)XT);
+                put(c, 0x38606800u
+                    | ((uint32_t)XT << 16)
+                    | ((uint32_t)XP << 5)
+                    | (uint32_t)XT);
                 // Zero-extend u8 to u32: already zero in upper bits from LDRB
                 put(c, DUP_4s_w(s.rd, XT));
             } else if (is_base) {
@@ -766,7 +873,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 put(c, ADD_xr(XT, XP, XW));
                 put(c, LD4_8b(0, XT));
                 // LD4 puts 8 bytes per channel in V0-V3.
-                // Widen each: 8B->8H (UXTL_8h), then lo 4H->4S (UXTL/SXTL), hi 4H->4S.
+                // Widen: 8B->8H, lo 4H->4S, hi 4H->4S.
                 _Bool ch_needed[] = {1, 0, 0, 0};
                 for (int j = i+1; j < to; j++) {
                     if (bb->inst[j].op == op_load_8x4 && bb->inst[j].x == i) {
@@ -783,10 +890,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     // Now widen 8H to two 4S regs.
                     ch_lo[c2] = ra_alloc(ra, sl, ns);
                     // USHLL Vd.4S, Vn.4H, #0 (zero-extend lo 4H -> 4S)
-                    put(c, 0x2f10a400u | ((uint32_t)t << 5) | (uint32_t)ch_lo[c2]);
+                    put(c, 0x2f10a400u
+                        | ((uint32_t)t << 5)
+                        | (uint32_t)ch_lo[c2]);
                     // USHLL2 Vd.4S, Vn.8H, #0 (zero-extend hi 4H -> 4S)
                     ch_hi[c2] = ra_alloc(ra, sl, ns);
-                    put(c, 0x6f10a400u | ((uint32_t)t << 5) | (uint32_t)ch_hi[c2]);
+                    put(c, 0x6f10a400u
+                        | ((uint32_t)t << 5)
+                        | (uint32_t)ch_hi[c2]);
                     ra_return_reg(ra, t);
                 }
                 // Assign RA ownership for pairs.
@@ -837,8 +948,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         case op_eq_f32: case op_lt_f32: case op_le_f32:
         case op_eq_i32: case op_lt_s32: case op_le_s32: {
-            _Bool x_is_0 = bb->inst[inst->x].op == op_imm_32 && bb->inst[inst->x].imm == 0;
-            _Bool y_is_0 = bb->inst[inst->y].op == op_imm_32 && bb->inst[inst->y].imm == 0;
+            _Bool x_is_0 = bb->inst[inst->x].op == op_imm_32
+                        && bb->inst[inst->x].imm == 0;
+            _Bool y_is_0 = bb->inst[inst->y].op == op_imm_32
+                        && bb->inst[inst->y].imm == 0;
 
             if (x_is_0 || y_is_0) {
                 int val = x_is_0 ? inst->y : inst->x;
@@ -863,10 +976,16 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     }
                 }
 
-                #define CZ(op_name, z_right, z_left) \
-                    case op_name: put(c, y_is_0 ? z_right(rd, rv) : z_left(rd, rv)); \
-                                  if (rdh>=0) { put(c, y_is_0 ? z_right(rdh,rvh) : z_left(rdh,rvh)); } \
-                                  break;
+                #define CZ(op_name, zr, zl) \
+                    case op_name:       \
+                        put(c, y_is_0   \
+                            ? zr(rd,rv) \
+                            : zl(rd,rv)); \
+                        if (rdh>=0) {   \
+                            put(c, y_is_0 \
+                                ? zr(rdh,rvh) \
+                                : zl(rdh,rvh)); \
+                        } break;
 
                 switch (inst->op) {
                 CZ(op_eq_f32,  FCMEQ_4s_z, FCMEQ_4s_z)
@@ -875,20 +994,37 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 CZ(op_lt_s32,  CMLT_4s_z,  CMGT_4s_z)
                 CZ(op_le_f32,  FCMLE_4s_z, FCMGE_4s_z)
                 CZ(op_le_s32,  CMLE_4s_z,  CMGE_4s_z)
-                case op_lane:
-                case op_imm_32: case op_uni_32: case op_load_32: case op_gather_32: case op_store_32: case op_scatter_32:
-                case op_deref_ptr:
-                case op_add_f32: case op_sub_f32: case op_mul_f32: case op_div_f32:
-                case op_min_f32: case op_max_f32: case op_sqrt_f32: case op_fma_f32: case op_fms_f32:
-                case op_add_i32: case op_sub_i32: case op_mul_i32:
-                case op_shl_i32: case op_shr_u32: case op_shr_s32:
-                case op_shl_i32_imm: case op_shr_u32_imm: case op_shr_s32_imm:
-                case op_and_32: case op_or_32: case op_xor_32: case op_sel_32:
-                case op_f32_from_i32: case op_i32_from_f32:
+                case op_lane: case op_deref_ptr:
+                case op_imm_32:
+                case op_uni_32: case op_load_32:
+                case op_gather_32: case op_store_32:
+                case op_scatter_32:
+                case op_add_f32: case op_sub_f32:
+                case op_mul_f32: case op_div_f32:
+                case op_min_f32: case op_max_f32:
+                case op_sqrt_f32:
+                case op_fma_f32: case op_fms_f32:
+                case op_add_i32: case op_sub_i32:
+                case op_mul_i32:
+                case op_shl_i32: case op_shr_u32:
+                case op_shr_s32:
+                case op_shl_i32_imm:
+                case op_shr_u32_imm:
+                case op_shr_s32_imm:
+                case op_and_32: case op_or_32:
+                case op_xor_32: case op_sel_32:
+                case op_f32_from_i32:
+                case op_i32_from_f32:
                 case op_lt_u32: case op_le_u32:
-                case op_uni_16: case op_load_16: case op_gather_16: case op_store_16: case op_scatter_16:
-                case op_uni_f16: case op_load_f16: case op_gather_f16: case op_store_f16: case op_scatter_f16:
-                case op_load_8x4: case op_store_8x4:
+                case op_uni_16: case op_load_16:
+                case op_gather_16: case op_store_16:
+                case op_scatter_16:
+                case op_uni_f16: case op_load_f16:
+                case op_gather_f16:
+                case op_store_f16:
+                case op_scatter_f16:
+                case op_load_8x4:
+                case op_store_8x4:
                     break;
                 }
                 #undef CZ
@@ -901,22 +1037,39 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         }
 
         case op_imm_32:
-        case op_add_f32: case op_sub_f32: case op_mul_f32: case op_div_f32:
-        case op_min_f32: case op_max_f32: case op_sqrt_f32: case op_fma_f32: case op_fms_f32:
-        case op_add_i32: case op_sub_i32: case op_mul_i32:
-        case op_shl_i32: case op_shr_u32: case op_shr_s32:
-        case op_shl_i32_imm: case op_shr_u32_imm: case op_shr_s32_imm:
-        case op_and_32: case op_or_32: case op_xor_32: case op_sel_32:
-        case op_f32_from_i32: case op_i32_from_f32:
+        case op_add_f32: case op_sub_f32:
+        case op_mul_f32: case op_div_f32:
+        case op_min_f32: case op_max_f32:
+        case op_sqrt_f32:
+        case op_fma_f32: case op_fms_f32:
+        case op_add_i32: case op_sub_i32:
+        case op_mul_i32:
+        case op_shl_i32: case op_shr_u32:
+        case op_shr_s32:
+        case op_shl_i32_imm:
+        case op_shr_u32_imm:
+        case op_shr_s32_imm:
+        case op_and_32: case op_or_32:
+        case op_xor_32: case op_sel_32:
+        case op_f32_from_i32:
+        case op_i32_from_f32:
         case op_lt_u32: case op_le_u32:
         default_alu: {
             enum op op2 = inst->op;
-            int nscratch = (op2==op_shr_u32 || op2==op_shr_s32) ? 1 : 0;
-            struct ra_step s = ra_step_alu(ra, sl, ns, inst, i, scalar, nscratch);
+            int nscratch =
+                (op2==op_shr_u32 || op2==op_shr_s32)
+                ? 1 : 0;
+            struct ra_step s = ra_step_alu(
+                ra, sl, ns, inst, i,
+                scalar, nscratch);
 
-            emit_alu_reg(c, inst->op, s.rd, s.rx, s.ry, s.rz, inst->imm, s.scratch);
+            emit_alu_reg(c, inst->op,
+                s.rd, s.rx, s.ry, s.rz,
+                inst->imm, s.scratch);
             if (s.rdh >= 0) {
-                emit_alu_reg(c, inst->op, s.rdh, s.rxh, s.ryh, s.rzh, inst->imm, s.scratch);
+                emit_alu_reg(c, inst->op,
+                    s.rdh, s.rxh, s.ryh, s.rzh,
+                    inst->imm, s.scratch);
             }
             if (s.scratch >= 0) {
                 ra_return_reg(ra, s.scratch);
@@ -960,14 +1113,21 @@ void umbra_jit_dump(struct umbra_jit const *j, FILE *f) {
             char cmd[1024];
             snprintf(cmd, sizeof cmd,
                      "as -o %s %s 2>/dev/null && "
-                     "/opt/homebrew/opt/llvm/bin/llvm-objdump -d --no-show-raw-insn --no-leading-addr %s 2>/dev/null",
+                     "/opt/homebrew/opt/llvm/bin/"
+                     "llvm-objdump -d"
+                     " --no-show-raw-insn"
+                     " --no-leading-addr"
+                     " %s 2>/dev/null",
                      opath, tmp, opath);
             FILE *p = popen(cmd, "r");
             if (p) {
                 char line[256];
                 _Bool ok = 0;
                 while (fgets(line, (int)sizeof line, p)) {
-                    if (!ok && __builtin_strstr(line, "file format")) { ok = 1; continue; }
+                    if (!ok && __builtin_strstr(
+                            line, "file format")) {
+                        ok = 1; continue;
+                    }
                     fputs(line, f);
                 }
                 int rc = pclose(p);
@@ -1017,10 +1177,19 @@ void umbra_jit_mca(struct umbra_jit const *j, FILE *f) {
     char cmd[1024];
     snprintf(cmd, sizeof cmd,
              "as -o %s %s 2>/dev/null && "
-             "/opt/homebrew/opt/llvm/bin/llvm-objdump -d --no-show-raw-insn --no-leading-addr %s 2>/dev/null",
+             "/opt/homebrew/opt/llvm/bin/"
+             "llvm-objdump -d"
+             " --no-show-raw-insn"
+             " --no-leading-addr"
+             " %s 2>/dev/null",
              opath, tmp, opath);
     FILE *p = popen(cmd, "r");
-    if (!p) { close(afd); remove(tmp); remove(opath); remove(asm_path); return; }
+    if (!p) {
+        close(afd);
+        remove(tmp); remove(opath);
+        remove(asm_path);
+        return;
+    }
 
     FILE *afp = fdopen(afd, "w");
     char line[256];
@@ -1107,7 +1276,9 @@ static void apply_offset_x86(Buf *c, int8_t off_reg, int elem_shift) {
     vex(c, 1, 1, 0, 0, off_reg, 0, RAX, 0x7e);
     emit1(c, 0x48); emit1(c, 0x63); emit1(c, 0xc0);
     if (elem_shift) {
-        emit1(c, 0x48); emit1(c, 0xc1); emit1(c, 0xe0); emit1(c, (uint8_t)elem_shift);
+        emit1(c, 0x48); emit1(c, 0xc1);
+        emit1(c, 0xe0);
+        emit1(c, (uint8_t)elem_shift);
     }
     emit1(c, 0x49); emit1(c, 0x01); emit1(c, 0xc3);
 }
@@ -1122,8 +1293,14 @@ static int load_ptr_x86(Buf *c, int p, int *last_ptr) {
 
 static int8_t const ra_pool_x86[] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
 
-static void x86_spill(int reg, int slot, void *ctx) { vspill((Buf*)ctx, reg, slot); }
-static void x86_fill (int reg, int slot, void *ctx) { vfill ((Buf*)ctx, reg, slot); }
+static void x86_spill(int reg, int slot,
+                      void *ctx) {
+    vspill((Buf*)ctx, reg, slot);
+}
+static void x86_fill(int reg, int slot,
+                     void *ctx) {
+    vfill((Buf*)ctx, reg, slot);
+}
 
 static struct ra* ra_create_x86(struct umbra_basic_block const *bb, Buf *c) {
     struct ra_config cfg = {
@@ -1138,7 +1315,9 @@ static struct ra* ra_create_x86(struct umbra_basic_block const *bb, Buf *c) {
     return ra_create(bb, &cfg);
 }
 
-static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm,
+static _Bool emit_alu_reg(Buf *c, enum op op,
+                          int d, int x, int y,
+                          int z, int imm,
                           int scratch, int scratch2) {
     switch (op) {
     case op_imm_32: broadcast_imm32(c, d, (uint32_t)imm); return 1;
@@ -1205,18 +1384,27 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
 
     case op_lane:
     case op_deref_ptr:
-    case op_uni_32:    case op_load_32:    case op_gather_32:  case op_store_32:  case op_scatter_32:
-    case op_uni_16:    case op_load_16:    case op_gather_16:  case op_store_16:  case op_scatter_16:
-    case op_uni_f16:  case op_load_f16:  case op_gather_f16: case op_store_f16: case op_scatter_f16:
-    case op_load_8x4:  case op_store_8x4:
+    case op_uni_32:   case op_load_32:
+    case op_gather_32: case op_store_32:
+    case op_scatter_32:
+    case op_uni_16:   case op_load_16:
+    case op_gather_16: case op_store_16:
+    case op_scatter_16:
+    case op_uni_f16:  case op_load_f16:
+    case op_gather_f16: case op_store_f16:
+    case op_scatter_f16:
+    case op_load_8x4: case op_store_8x4:
         return 0;
     }
 }
 
-static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
-                     int from, int to,
-                     int *sl, int *ns, struct ra *ra, _Bool scalar,
-                     int *deref_gpr);
+static void emit_ops(
+    Buf *c,
+    struct umbra_basic_block const *bb,
+    int from, int to,
+    int *sl, int *ns,
+    struct ra *ra, _Bool scalar,
+    int *deref_gpr);
 
 static int resolve_ptr_x86(Buf *c, int p, int *last_ptr, int const *deref_gpr) {
     if (p < 0) { return deref_gpr[~p]; }
@@ -1324,7 +1512,10 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     size_t pg = (size_t)sysconf(_SC_PAGESIZE);
     size_t alloc = (code_sz + pg-1) & ~(pg-1);
 
-    void *mem = mmap(NULL, alloc, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANON, -1, 0);
+    void *mem = mmap(NULL, alloc,
+                     PROT_READ|PROT_WRITE,
+                     MAP_PRIVATE|MAP_ANON,
+                     -1, 0);
     if (mem == MAP_FAILED) { free(c.buf); return 0; }
     __builtin_memcpy(mem, c.buf, code_sz);
     if (mprotect(mem, alloc, PROT_READ|PROT_EXEC) != 0) {
@@ -1378,7 +1569,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     if (k == 0) {
                         emit1(c, 0x04); emit1(c, 0x24);
                     } else {
-                        emit1(c, 0x44); emit1(c, 0x24); emit1(c, (uint8_t)(k*4));
+                        emit1(c, 0x44);
+                        emit1(c, 0x24);
+                        emit1(c, (uint8_t)(k*4));
                     }
                     emit4(c, (uint32_t)k);
                 }
@@ -1521,7 +1714,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 // Narrow 8xi32 -> 8xi16: VPACKSSDW + VPERMQ
                 int8_t tmp = ra_alloc(ra, sl, ns);
                 vextracti128(c, tmp, ry, 1);
-                vex_rrr(c, 1, 1, 0, 0x6b, tmp, ry, tmp);  // VPACKSSDW xmm_tmp, xmm_ry, xmm_tmp
+                vex_rrr(c, 1, 1, 0, 0x6b,
+                        tmp, ry, tmp);
                 vmov_store(c, 0, tmp, base, XI, 2, 0);
                 ra_return_reg(ra, tmp);
             }
@@ -1712,16 +1906,23 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                             uint8_t rex2 = 0x48;
                             if (base >= 8) { rex2 |= 0x01; }
                             emit1(c, rex2);
-                            emit1(c, 0x0f); emit1(c, 0xbf);
-                            emit1(c, (uint8_t)(((RAX&7)<<3) | 4));
-                            emit1(c, (uint8_t)((1<<6) | ((RAX&7)<<3) | (base&7)));
+                            emit1(c, 0x0f);
+                            emit1(c, 0xbf);
+                            emit1(c, (uint8_t)(
+                                ((RAX&7)<<3) | 4));
+                            emit1(c, (uint8_t)(
+                                (1<<6)
+                                | ((RAX&7)<<3)
+                                | (base&7)));
                         }
                         // MOV [RSP + k*4], eax
                         emit1(c, 0x89);
                         if (k == 0) {
                             emit1(c, 0x04); emit1(c, 0x24);
                         } else {
-                            emit1(c, 0x44); emit1(c, 0x24); emit1(c, (uint8_t)(k*4));
+                            emit1(c, 0x44);
+                        emit1(c, 0x24);
+                        emit1(c, (uint8_t)(k*4));
                         }
                     }
                     // Load result from stack
@@ -1744,11 +1945,15 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                             uint8_t rex2 = 0x40;
                             if (base >= 8) { rex2 |= 0x01; }
                             if (rex2 != 0x40) { emit1(c, rex2); }
-                            emit1(c, 0x0f); emit1(c, 0xb7);
-                            emit1(c, (uint8_t)(((RAX&7)<<3) | 4));
-                            emit1(c, (uint8_t)((1<<6) | ((RAX&7)<<3) | (base&7)));
+                            emit1(c, 0x0f);
+                            emit1(c, 0xb7);
+                            emit1(c, (uint8_t)(
+                                ((RAX&7)<<3) | 4));
+                            emit1(c, (uint8_t)(
+                                (1<<6)
+                                | ((RAX&7)<<3)
+                                | (base&7)));
                         }
-                        // VMOVD xmm_s.rd, eax; VCVTPH2PS; VMOVD eax, xmm_s.rd
                         vex(c, 1, 1, 0, 0, s.rd, 0, RAX, 0x6e);
                         vcvtph2ps(c, s.rd, s.rd);
                         vex(c, 1, 1, 0, 0, s.rd, 0, RAX, 0x7e);
@@ -1757,7 +1962,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                         if (k == 0) {
                             emit1(c, 0x04); emit1(c, 0x24);
                         } else {
-                            emit1(c, 0x44); emit1(c, 0x24); emit1(c, (uint8_t)(k*4));
+                            emit1(c, 0x44);
+                        emit1(c, 0x24);
+                        emit1(c, (uint8_t)(k*4));
                         }
                     }
                     vfill(c, s.rd, 0);
@@ -1799,20 +2006,32 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 clamp_eax_x86(c);
                 if (base != R11) { mov_rr(c, R11, base); last_ptr = -1; }
                 if (inst->op == op_scatter_16) {
-                    // Narrow i32 to i16: VMOVD eax, xmm; MOV word [R11+rax*2], ax
-                    vex(c, 1, 1, 0, 0, ry, 0, RAX, 0x7e);
-                    // But RAX is the clamped index. Need a different approach.
-                    // LEA R11, [R11 + RAX*2]
-                    emit1(c, 0x4d); emit1(c, 0x8d); emit1(c, 0x1c); emit1(c, 0x43);
-                    vex(c, 1, 1, 0, 0, ry, 0, RAX, 0x7e);
-                    emit1(c, 0x66); emit1(c, 0x41); emit1(c, 0x89); emit1(c, 0x03);
+                    vex(c, 1, 1, 0, 0,
+                        ry, 0, RAX, 0x7e);
+                    emit1(c, 0x4d);
+                    emit1(c, 0x8d);
+                    emit1(c, 0x1c);
+                    emit1(c, 0x43);
+                    vex(c, 1, 1, 0, 0,
+                        ry, 0, RAX, 0x7e);
+                    emit1(c, 0x66);
+                    emit1(c, 0x41);
+                    emit1(c, 0x89);
+                    emit1(c, 0x03);
                     last_ptr = -1;
                 } else {
                     int8_t tmp = ra_alloc(ra, sl, ns);
                     vcvtps2ph(c, tmp, ry, 4);
-                    emit1(c, 0x4d); emit1(c, 0x8d); emit1(c, 0x1c); emit1(c, 0x43);
-                    vex(c, 1, 1, 0, 0, tmp, 0, RAX, 0x7e);
-                    emit1(c, 0x66); emit1(c, 0x41); emit1(c, 0x89); emit1(c, 0x03);
+                    emit1(c, 0x4d);
+                    emit1(c, 0x8d);
+                    emit1(c, 0x1c);
+                    emit1(c, 0x43);
+                    vex(c, 1, 1, 0, 0,
+                        tmp, 0, RAX, 0x7e);
+                    emit1(c, 0x66);
+                    emit1(c, 0x41);
+                    emit1(c, 0x89);
+                    emit1(c, 0x03);
                     ra_return_reg(ra, tmp);
                     last_ptr = -1;
                 }
@@ -1858,7 +2077,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 int8_t s0 = ra_alloc(ra, sl, ns);
                 int8_t ch_regs[4];
                 int8_t loaded = ra_alloc(ra, sl, ns);
-                vmov_load(c, 1, loaded, resolve_ptr_x86(c, p, &last_ptr, deref_gpr), XI, 4, 0);
+                vmov_load(c, 1, loaded,
+                    resolve_ptr_x86(
+                        c, p, &last_ptr, deref_gpr),
+                    XI, 4, 0);
                 for (int ch2 = 0; ch2 < 4; ch2++) {
                     if (ch2 == 0) { vpand(c, 1, s0, loaded, mask); }
                     else {
@@ -1907,10 +2129,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     }
                 }
             } else {
-                // Narrow 4 x 8xu32(YMM) channels to u8, interleave to RGBA, store 32 bytes.
+                // Narrow 4x8xu32 to u8, interleave
+                // to RGBA, store 32 bytes.
                 // Each channel is 8 x u32. Need to pack to u8 and interleave.
-                // Strategy: mask each to 0xFF (already should be), pack pairs of channels.
-                for (int ch2 = 0; ch2 < 4; ch2++) { ra_ensure(ra, sl, ns, inputs[ch2]); }
+                // Mask to 0xFF, pack pairs of channels.
+                for (int ch2 = 0; ch2 < 4; ch2++) {
+                    ra_ensure(ra, sl, ns,
+                              inputs[ch2]);
+                }
                 int8_t r0 = ra_reg(ra, inputs[0]), r1 = ra_reg(ra, inputs[1]);
                 int8_t r2 = ra_reg(ra, inputs[2]), r3 = ra_reg(ra, inputs[3]);
 
@@ -1929,7 +2155,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     int8_t t = ra_alloc(ra, sl, ns);
                     vextracti128(c, t, r0, 1);
                     vex_rrr(c, 1, 2, 0, 0x2b, t, r0, t);   // VPACKUSDW
-                    vpackuswb(c, s0, t, zero);               // 8xu16 -> 16xu8 (low 8 valid)
+                    vpackuswb(c, s0, t, zero);
                     ra_return_reg(ra, t);
                 }
                 // Narrow r1
@@ -1972,7 +2198,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     ra_return_reg(ra, stmp);
                 }
                 vinserti128(c, s0, s0, s1, 1);
-                vmov_store(c, 1, s0, resolve_ptr_x86(c, p, &last_ptr, deref_gpr), XI, 4, 0);
+                vmov_store(c, 1, s0,
+                    resolve_ptr_x86(
+                        c, p, &last_ptr, deref_gpr),
+                    XI, 4, 0);
                 ra_return_reg(ra, s0);
                 ra_return_reg(ra, s1);
             }
@@ -1982,19 +2211,35 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         } break;
 
         case op_imm_32:
-        case op_add_f32: case op_sub_f32: case op_mul_f32: case op_div_f32:
-        case op_min_f32: case op_max_f32: case op_sqrt_f32: case op_fma_f32: case op_fms_f32:
-        case op_add_i32: case op_sub_i32: case op_mul_i32:
-        case op_shl_i32: case op_shr_u32: case op_shr_s32:
-        case op_shl_i32_imm: case op_shr_u32_imm: case op_shr_s32_imm:
-        case op_and_32: case op_or_32: case op_xor_32: case op_sel_32:
-        case op_f32_from_i32: case op_i32_from_f32:
-        case op_eq_f32: case op_lt_f32: case op_le_f32:
-        case op_eq_i32: case op_lt_s32: case op_le_s32: case op_lt_u32: case op_le_u32: {
+        case op_add_f32: case op_sub_f32:
+        case op_mul_f32: case op_div_f32:
+        case op_min_f32: case op_max_f32:
+        case op_sqrt_f32:
+        case op_fma_f32: case op_fms_f32:
+        case op_add_i32: case op_sub_i32:
+        case op_mul_i32:
+        case op_shl_i32: case op_shr_u32:
+        case op_shr_s32:
+        case op_shl_i32_imm:
+        case op_shr_u32_imm:
+        case op_shr_s32_imm:
+        case op_and_32: case op_or_32:
+        case op_xor_32: case op_sel_32:
+        case op_f32_from_i32:
+        case op_i32_from_f32:
+        case op_eq_f32: case op_lt_f32:
+        case op_le_f32:
+        case op_eq_i32: case op_lt_s32:
+        case op_le_s32:
+        case op_lt_u32: case op_le_u32: {
             enum op op2 = inst->op;
             int nscratch = (op2==op_lt_u32) ? 2
-                         : (op2==op_le_s32 || op2==op_le_u32) ? 1 : 0;
-            struct ra_step s = ra_step_alu(ra, sl, ns, inst, i, scalar, nscratch);
+                : (op2==op_le_s32
+                    || op2==op_le_u32)
+                ? 1 : 0;
+            struct ra_step s = ra_step_alu(
+                ra, sl, ns, inst,
+                i, scalar, nscratch);
 
             emit_alu_reg(c, inst->op, s.rd, s.rx, s.ry, s.rz, inst->imm,
                          s.scratch, s.scratch2);

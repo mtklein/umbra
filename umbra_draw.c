@@ -4,7 +4,6 @@
 
 typedef struct umbra_basic_block BB;
 
-
 struct umbra_basic_block* umbra_draw_build(umbra_shader_fn   shader,
                                            umbra_coverage_fn coverage,
                                            umbra_blend_fn    blend,
@@ -58,10 +57,14 @@ struct umbra_basic_block* umbra_draw_build(umbra_shader_fn   shader,
     }
 
     if (coverage) {
-        out.r = umbra_fadd(bb, dst.r, umbra_fmul(bb, umbra_fsub(bb, out.r, dst.r), cov));
-        out.g = umbra_fadd(bb, dst.g, umbra_fmul(bb, umbra_fsub(bb, out.g, dst.g), cov));
-        out.b = umbra_fadd(bb, dst.b, umbra_fmul(bb, umbra_fsub(bb, out.b, dst.b), cov));
-        out.a = umbra_fadd(bb, dst.a, umbra_fmul(bb, umbra_fsub(bb, out.a, dst.a), cov));
+        out.r = umbra_fadd(bb, dst.r,
+            umbra_fmul(bb, umbra_fsub(bb, out.r, dst.r), cov));
+        out.g = umbra_fadd(bb, dst.g,
+            umbra_fmul(bb, umbra_fsub(bb, out.g, dst.g), cov));
+        out.b = umbra_fadd(bb, dst.b,
+            umbra_fmul(bb, umbra_fsub(bb, out.b, dst.b), cov));
+        out.a = umbra_fadd(bb, dst.a,
+            umbra_fmul(bb, umbra_fsub(bb, out.a, dst.a), cov));
     }
 
     if (store) {
@@ -102,8 +105,10 @@ static umbra_v32 linear_t_(BB *bb, int fi, umbra_v32 x, umbra_v32 y) {
     umbra_v32 a = umbra_load32(bb, (umbra_ptr){1}, umbra_iimm(bb, fi));
     umbra_v32 b = umbra_load32(bb, (umbra_ptr){1}, umbra_iimm(bb, fi+1));
     umbra_v32 c = umbra_load32(bb, (umbra_ptr){1}, umbra_iimm(bb, fi+2));
-    return clamp01(bb, umbra_fadd(bb, umbra_fadd(bb, umbra_fmul(bb, a, x),
-                                                            umbra_fmul(bb, b, y)), c));
+    umbra_v32 t = umbra_fadd(bb,
+        umbra_fadd(bb, umbra_fmul(bb, a, x),
+                       umbra_fmul(bb, b, y)), c);
+    return clamp01(bb, t);
 }
 
 static umbra_v32 radial_t_(BB *bb, int fi, umbra_v32 x, umbra_v32 y) {
@@ -112,7 +117,8 @@ static umbra_v32 radial_t_(BB *bb, int fi, umbra_v32 x, umbra_v32 y) {
     umbra_v32 inv_r = umbra_load32(bb, (umbra_ptr){1}, umbra_iimm(bb, fi+2));
     umbra_v32 dx = umbra_fsub(bb, x, cx);
     umbra_v32 dy = umbra_fsub(bb, y, cy);
-    umbra_v32 d2 = umbra_fadd(bb, umbra_fmul(bb, dx, dx), umbra_fmul(bb, dy, dy));
+    umbra_v32 d2 = umbra_fadd(bb,
+        umbra_fmul(bb, dx, dx), umbra_fmul(bb, dy, dy));
     return clamp01(bb, umbra_fmul(bb, umbra_fsqrt(bb, d2), inv_r));
 }
 
@@ -141,21 +147,25 @@ static umbra_color sample_lut_(BB *bb, umbra_v32 t_f32, int fi, umbra_ptr lut) {
     umbra_v32 N_m2  = umbra_fsub(bb, N_f, two_f);
 
     umbra_v32 t_sc  = umbra_fmul(bb, t_f32, N_m1);
-    umbra_v32 idx_f = umbra_fmin(bb, umbra_itof(bb, umbra_ftoi(bb, t_sc)), N_m2);
+    umbra_v32 idx_f = umbra_fmin(bb,
+        umbra_itof(bb, umbra_ftoi(bb, t_sc)), N_m2);
     umbra_v32 frac  = umbra_fsub(bb, t_sc, idx_f);
 
     umbra_v32 idx  = umbra_ftoi(bb, idx_f);
     umbra_v32 base = umbra_ishl(bb, idx, umbra_iimm(bb, 2));
     umbra_v32 nxt  = umbra_iadd(bb, base, umbra_iimm(bb, 4));
 
+    umbra_v32 off1 = umbra_iimm(bb, 1);
+    umbra_v32 off2 = umbra_iimm(bb, 2);
+    umbra_v32 off3 = umbra_iimm(bb, 3);
     umbra_v32 r0 = umbra_load32(bb, lut, base);
-    umbra_v32 g0 = umbra_load32(bb, lut, umbra_iadd(bb, base, umbra_iimm(bb,1)));
-    umbra_v32 b0 = umbra_load32(bb, lut, umbra_iadd(bb, base, umbra_iimm(bb,2)));
-    umbra_v32 a0 = umbra_load32(bb, lut, umbra_iadd(bb, base, umbra_iimm(bb,3)));
+    umbra_v32 g0 = umbra_load32(bb, lut, umbra_iadd(bb, base, off1));
+    umbra_v32 b0 = umbra_load32(bb, lut, umbra_iadd(bb, base, off2));
+    umbra_v32 a0 = umbra_load32(bb, lut, umbra_iadd(bb, base, off3));
     umbra_v32 r1 = umbra_load32(bb, lut, nxt);
-    umbra_v32 g1 = umbra_load32(bb, lut, umbra_iadd(bb, nxt,  umbra_iimm(bb,1)));
-    umbra_v32 b1 = umbra_load32(bb, lut, umbra_iadd(bb, nxt,  umbra_iimm(bb,2)));
-    umbra_v32 a1 = umbra_load32(bb, lut, umbra_iadd(bb, nxt,  umbra_iimm(bb,3)));
+    umbra_v32 g1 = umbra_load32(bb, lut, umbra_iadd(bb, nxt, off1));
+    umbra_v32 b1 = umbra_load32(bb, lut, umbra_iadd(bb, nxt, off2));
+    umbra_v32 a1 = umbra_load32(bb, lut, umbra_iadd(bb, nxt, off3));
 
     return (umbra_color){
         lerp_f(bb, r0, r1, frac),
@@ -326,14 +336,17 @@ umbra_v32 umbra_coverage_bitmap_matrix(BB *bb, umbra_v32 x, umbra_v32 y) {
     umbra_v32 bw = umbra_load32(bb, (umbra_ptr){1}, umbra_iimm(bb, fi+9));
     umbra_v32 bh = umbra_load32(bb, (umbra_ptr){1}, umbra_iimm(bb, fi+10));
 
-    umbra_v32 w = umbra_fadd(bb, umbra_fadd(bb, umbra_fmul(bb, m6, x),
-                                                       umbra_fmul(bb, m7, y)), m8);
+    umbra_v32 w = umbra_fadd(bb,
+        umbra_fadd(bb, umbra_fmul(bb, m6, x),
+                       umbra_fmul(bb, m7, y)), m8);
     umbra_v32 xp = umbra_fdiv(bb,
-        umbra_fadd(bb, umbra_fadd(bb, umbra_fmul(bb, m0, x),
-                                             umbra_fmul(bb, m1, y)), m2), w);
+        umbra_fadd(bb,
+            umbra_fadd(bb, umbra_fmul(bb, m0, x),
+                           umbra_fmul(bb, m1, y)), m2), w);
     umbra_v32 yp = umbra_fdiv(bb,
-        umbra_fadd(bb, umbra_fadd(bb, umbra_fmul(bb, m3, x),
-                                             umbra_fmul(bb, m4, y)), m5), w);
+        umbra_fadd(bb,
+            umbra_fadd(bb, umbra_fmul(bb, m3, x),
+                           umbra_fmul(bb, m4, y)), m5), w);
 
     umbra_v32 zero_f = umbra_fimm(bb, 0.0f);
     umbra_v32 in = umbra_and(bb,
@@ -401,11 +414,15 @@ void umbra_store_565(BB *bb, umbra_ptr ptr, umbra_v32 ix, umbra_color c) {
     umbra_v32 s31   = umbra_fimm(bb, 31.0f);
     umbra_v32 s63   = umbra_fimm(bb, 63.0f);
     umbra_v32 half_ = umbra_fimm(bb, 0.5f);
-    umbra_v32 r = umbra_ftoi(bb, umbra_fadd(bb, umbra_fmul(bb, c.r, s31), half_));
-    umbra_v32 g = umbra_ftoi(bb, umbra_fadd(bb, umbra_fmul(bb, c.g, s63), half_));
-    umbra_v32 b = umbra_ftoi(bb, umbra_fadd(bb, umbra_fmul(bb, c.b, s31), half_));
-    umbra_v32 px = umbra_or(bb, umbra_or(bb, umbra_ishl(bb, r, umbra_iimm(bb, 11)),
-                                                    umbra_ishl(bb, g, umbra_iimm(bb, 5))), b);
+    umbra_v32 r = umbra_ftoi(bb,
+        umbra_fadd(bb, umbra_fmul(bb, c.r, s31), half_));
+    umbra_v32 g = umbra_ftoi(bb,
+        umbra_fadd(bb, umbra_fmul(bb, c.g, s63), half_));
+    umbra_v32 b = umbra_ftoi(bb,
+        umbra_fadd(bb, umbra_fmul(bb, c.b, s31), half_));
+    umbra_v32 r11 = umbra_ishl(bb, r, umbra_iimm(bb, 11));
+    umbra_v32 g5  = umbra_ishl(bb, g, umbra_iimm(bb, 5));
+    umbra_v32 px  = umbra_or(bb, umbra_or(bb, r11, g5), b);
     umbra_i16store(bb, ptr, ix, px);
 }
 
@@ -413,8 +430,10 @@ umbra_color umbra_load_1010102(BB *bb, umbra_ptr ptr, umbra_v32 ix) {
     umbra_v32 px    = umbra_load32(bb, ptr, ix);
     umbra_v32 m10   = umbra_iimm(bb, 0x3ff);
     umbra_v32 r32   = umbra_and(bb, px, m10);
-    umbra_v32 g32   = umbra_and(bb, umbra_ushr(bb, px, umbra_iimm(bb, 10)), m10);
-    umbra_v32 b32   = umbra_and(bb, umbra_ushr(bb, px, umbra_iimm(bb, 20)), m10);
+    umbra_v32 s10   = umbra_iimm(bb, 10);
+    umbra_v32 g32   = umbra_and(bb, umbra_ushr(bb, px, s10), m10);
+    umbra_v32 b32   = umbra_and(bb,
+        umbra_ushr(bb, px, umbra_iimm(bb, 20)), m10);
     umbra_v32 a32   = umbra_ushr(bb, px, umbra_iimm(bb, 30));
     umbra_v32 inv1023 = umbra_fimm(bb, 1.0f / 1023.0f);
     umbra_v32 inv3    = umbra_fimm(bb, 1.0f / 3.0f);
@@ -430,10 +449,14 @@ void umbra_store_1010102(BB *bb, umbra_ptr ptr, umbra_v32 ix, umbra_color c) {
     umbra_v32 s1023 = umbra_fimm(bb, 1023.0f);
     umbra_v32 s3    = umbra_fimm(bb, 3.0f);
     umbra_v32 half_ = umbra_fimm(bb, 0.5f);
-    umbra_v32 r = umbra_ftoi(bb, umbra_fadd(bb, umbra_fmul(bb, c.r, s1023), half_));
-    umbra_v32 g = umbra_ftoi(bb, umbra_fadd(bb, umbra_fmul(bb, c.g, s1023), half_));
-    umbra_v32 b = umbra_ftoi(bb, umbra_fadd(bb, umbra_fmul(bb, c.b, s1023), half_));
-    umbra_v32 a = umbra_ftoi(bb, umbra_fadd(bb, umbra_fmul(bb, c.a, s3),    half_));
+    umbra_v32 r = umbra_ftoi(bb,
+        umbra_fadd(bb, umbra_fmul(bb, c.r, s1023), half_));
+    umbra_v32 g = umbra_ftoi(bb,
+        umbra_fadd(bb, umbra_fmul(bb, c.g, s1023), half_));
+    umbra_v32 b = umbra_ftoi(bb,
+        umbra_fadd(bb, umbra_fmul(bb, c.b, s1023), half_));
+    umbra_v32 a = umbra_ftoi(bb,
+        umbra_fadd(bb, umbra_fmul(bb, c.a, s3), half_));
     umbra_v32 px = umbra_or(bb,
         umbra_or(bb, r, umbra_ishl(bb, g, umbra_iimm(bb, 10))),
         umbra_or(bb, umbra_ishl(bb, b, umbra_iimm(bb, 20)),
@@ -472,7 +495,8 @@ umbra_color umbra_load_fp16_planar(BB *bb, umbra_ptr ptr, umbra_v32 ix) {
     };
 }
 
-void umbra_store_fp16_planar(BB *bb, umbra_ptr ptr, umbra_v32 ix, umbra_color c) {
+void umbra_store_fp16_planar(BB *bb, umbra_ptr ptr,
+                             umbra_v32 ix, umbra_color c) {
     int si = umbra_reserve(bb, 1);
     umbra_v32 stride = umbra_load32(bb, (umbra_ptr){1}, umbra_iimm(bb, si));
     umbra_v32 s2 = umbra_imul(bb, stride, umbra_iimm(bb, 2));
@@ -588,7 +612,11 @@ static void fit_poly(double gamma, int n, double coeffs[]) {
         for (int r = k+1; r < n; r++) {
             if (fabs(ata[r][k]) > fabs(ata[mx][k])) { mx = r; }
         }
-        for (int c = 0; c < n; c++) { double t = ata[k][c]; ata[k][c] = ata[mx][c]; ata[mx][c] = t; }
+        for (int c = 0; c < n; c++) {
+            double t = ata[k][c];
+            ata[k][c] = ata[mx][c];
+            ata[mx][c] = t;
+        }
         { double t = atb[k]; atb[k] = atb[mx]; atb[mx] = t; }
         for (int r = k+1; r < n; r++) {
             double f = ata[r][k] / ata[k][k];
@@ -603,15 +631,18 @@ static void fit_poly(double gamma, int n, double coeffs[]) {
     }
 }
 
-static umbra_v32 eval_poly_ir(BB *bb, umbra_v32 x, int n, double const coeffs[]) {
+static umbra_v32 eval_poly_ir(BB *bb, umbra_v32 x,
+                              int n, double const coeffs[]) {
     umbra_v32 r = umbra_fimm(bb, (float)coeffs[n-1]);
     for (int i = n - 2; i >= 0; i--) {
-        r = umbra_fadd(bb, umbra_fmul(bb, r, x), umbra_fimm(bb, (float)coeffs[i]));
+        r = umbra_fadd(bb, umbra_fmul(bb, r, x),
+            umbra_fimm(bb, (float)coeffs[i]));
     }
     return r;
 }
 
-umbra_color umbra_transfer_invert(BB *bb, umbra_color c, umbra_transfer const *tf) {
+umbra_color umbra_transfer_invert(BB *bb, umbra_color c,
+                                  umbra_transfer const *tf) {
     double poly[POLY_N];
     int deg = 7;
     fit_poly((double)tf->g, deg, poly);
@@ -637,7 +668,8 @@ umbra_color umbra_transfer_invert(BB *bb, umbra_color c, umbra_transfer const *t
     return c;
 }
 
-umbra_color umbra_transfer_apply(BB *bb, umbra_color c, umbra_transfer const *tf) {
+umbra_color umbra_transfer_apply(BB *bb, umbra_color c,
+                                 umbra_transfer const *tf) {
     double poly[POLY_N];
     int deg = 10;
     fit_poly(2.0 / (double)tf->g, deg, poly);
@@ -657,7 +689,8 @@ umbra_color umbra_transfer_apply(BB *bb, umbra_color c, umbra_transfer const *tf
         t = umbra_fmax(bb, t, umbra_fimm(bb, 0.0f));
         umbra_v32 s = umbra_fsqrt(bb, t);
         umbra_v32 cur = umbra_fmul(bb,
-            umbra_fsub(bb, eval_poly_ir(bb, s, deg, poly), umbra_fimm(bb, tf->b)),
+            umbra_fsub(bb, eval_poly_ir(bb, s, deg, poly),
+                           umbra_fimm(bb, tf->b)),
             umbra_fimm(bb, inv_a));
 
         umbra_v32 mask = umbra_fge(bb, y, umbra_fimm(bb, lin_thresh));
