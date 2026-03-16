@@ -45,24 +45,24 @@ static inline s32 clamp_ix(s32 ix, long bytes, int elem) {
 }
 
 void umbra_entry(int n, void **ptrs, long *szs) {
-    u16* restrict p1 = (u16*)ptrs[1];
+    u32* restrict p1 = (u32*)ptrs[1];
     long sz0 = szs[0];
     long sz1 = szs[1];
     u32 v0 = 0u;
-    float v1 = h2f(p1[4]);
-    float v2 = h2f(p1[5]);
-    float v3 = h2f(p1[6]);
-    float v4 = h2f(p1[7]);
-    float v5 = h2f(23544);
-    float v6 = h2f(14336);
-    float v7 = v1 * v5 + v6;
-    u16 v8 = (u16)(s16)v7;
-    float v9 = v2 * v5 + v6;
-    u16 v10 = (u16)(s16)v9;
-    float v11 = v3 * v5 + v6;
-    u16 v12 = (u16)(s16)v11;
-    float v13 = v4 * v5 + v6;
-    u16 v14 = (u16)(s16)v13;
+    u32 v1 = p1[2];
+    u32 v2 = p1[3];
+    u32 v3 = p1[4];
+    u32 v4 = p1[5];
+    u32 v5 = 1132396544u;
+    u32 v6 = 1056964608u;
+    u32 v7 = f2u(u2f(v1) * u2f(v5) + u2f(v6));
+    u32 v8 = (u32)(s32)u2f(v7);
+    u32 v9 = f2u(u2f(v2) * u2f(v5) + u2f(v6));
+    u32 v10 = (u32)(s32)u2f(v9);
+    u32 v11 = f2u(u2f(v3) * u2f(v5) + u2f(v6));
+    u32 v12 = (u32)(s32)u2f(v11);
+    u32 v13 = f2u(u2f(v4) * u2f(v5) + u2f(v6));
+    u32 v14 = (u32)(s32)u2f(v13);
 
     for (int i = 0; i < n; i++) {
         ((unsigned char*)ptrs[0])[i*4+0] = (unsigned char)v8;

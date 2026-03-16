@@ -30,12 +30,12 @@ static struct umbra_basic_block* make_bb(int n, int preamble_n) {
     bb->ht_mask = 0;
 
     // inst 0: imm_16 (preamble or varying depending on preamble_n)
-    bb->inst[0].op = op_imm_16;
+    bb->inst[0].op = op_imm_32;
     bb->inst[0].imm = 42;
 
     // remaining: add_i16 chaining
     for (int i = 1; i < n; i++) {
-        bb->inst[i].op = op_add_i16;
+        bb->inst[i].op = op_add_i32;
         bb->inst[i].x = i-1;
         bb->inst[i].y = 0;
     }
@@ -495,8 +495,8 @@ static void test_step_unary(void) {
     bb->inst = calloc(2, sizeof *bb->inst);
     bb->insts = 2; bb->preamble = 0;
     bb->ht = 0; bb->ht_mask = 0;
-    bb->inst[0].op = op_imm_16; bb->inst[0].imm = 42;
-    bb->inst[1].op = op_i32_from_i16; bb->inst[1].x = 0;
+    bb->inst[0].op = op_imm_32; bb->inst[0].imm = 42;
+    bb->inst[1].op = op_f32_from_i32; bb->inst[1].x = 0;
 
     struct ra *ra = ra_create(bb, &cfg);
     int sl[2] = {-1,-1};
@@ -531,9 +531,9 @@ static void test_step_unary_alive(void) {
     bb->inst = calloc(3, sizeof *bb->inst);
     bb->insts = 3; bb->preamble = 0;
     bb->ht = 0; bb->ht_mask = 0;
-    bb->inst[0].op = op_imm_16; bb->inst[0].imm = 42;
-    bb->inst[1].op = op_i32_from_i16; bb->inst[1].x = 0;
-    bb->inst[2].op = op_add_i16; bb->inst[2].x = 0; bb->inst[2].y = 0;
+    bb->inst[0].op = op_imm_32; bb->inst[0].imm = 42;
+    bb->inst[1].op = op_f32_from_i32; bb->inst[1].x = 0;
+    bb->inst[2].op = op_add_i32; bb->inst[2].x = 0; bb->inst[2].y = 0;
 
     struct ra *ra = ra_create(bb, &cfg);
     int sl[3] = {-1,-1,-1};
@@ -567,9 +567,9 @@ static void test_step_alu(void) {
     bb->inst = calloc(3, sizeof *bb->inst);
     bb->insts = 3; bb->preamble = 0;
     bb->ht = 0; bb->ht_mask = 0;
-    bb->inst[0].op = op_imm_16; bb->inst[0].imm = 1;
-    bb->inst[1].op = op_imm_16; bb->inst[1].imm = 2;
-    bb->inst[2].op = op_add_i16; bb->inst[2].x = 0; bb->inst[2].y = 1;
+    bb->inst[0].op = op_imm_32; bb->inst[0].imm = 1;
+    bb->inst[1].op = op_imm_32; bb->inst[1].imm = 2;
+    bb->inst[2].op = op_add_i32; bb->inst[2].x = 0; bb->inst[2].y = 1;
 
     struct ra *ra = ra_create(bb, &cfg);
     int sl[3] = {-1,-1,-1};
@@ -607,9 +607,9 @@ static void test_step_alu_scratch(void) {
     bb->inst = calloc(3, sizeof *bb->inst);
     bb->insts = 3; bb->preamble = 0;
     bb->ht = 0; bb->ht_mask = 0;
-    bb->inst[0].op = op_imm_16; bb->inst[0].imm = 1;
-    bb->inst[1].op = op_imm_16; bb->inst[1].imm = 2;
-    bb->inst[2].op = op_add_i16; bb->inst[2].x = 0; bb->inst[2].y = 1;
+    bb->inst[0].op = op_imm_32; bb->inst[0].imm = 1;
+    bb->inst[1].op = op_imm_32; bb->inst[1].imm = 2;
+    bb->inst[2].op = op_add_i32; bb->inst[2].x = 0; bb->inst[2].y = 1;
 
     struct ra *ra = ra_create(bb, &cfg);
     int sl[3] = {-1,-1,-1};

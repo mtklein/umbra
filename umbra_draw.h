@@ -1,10 +1,10 @@
 #pragma once
 #include "umbra.h"
 
-typedef struct { umbra_half r, g, b, a; } umbra_color;
+typedef struct { umbra_f32 r, g, b, a; } umbra_color;
 
 typedef umbra_color (*umbra_shader_fn) (struct umbra_basic_block*, umbra_f32 x, umbra_f32 y);
-typedef umbra_half  (*umbra_coverage_fn)(struct umbra_basic_block*, umbra_f32 x, umbra_f32 y);
+typedef umbra_f32   (*umbra_coverage_fn)(struct umbra_basic_block*, umbra_f32 x, umbra_f32 y);
 typedef umbra_color (*umbra_blend_fn)  (struct umbra_basic_block*, umbra_color src, umbra_color dst);
 typedef umbra_color (*umbra_load_fn)   (struct umbra_basic_block*, umbra_ptr ptr, umbra_i32 ix);
 typedef void        (*umbra_store_fn)  (struct umbra_basic_block*, umbra_ptr ptr, umbra_i32 ix,
@@ -31,16 +31,16 @@ umbra_color umbra_shader_radial_grad(struct umbra_basic_block*, umbra_f32 x, umb
 umbra_color umbra_supersample(struct umbra_basic_block*, umbra_f32 x, umbra_f32 y,
                               umbra_shader_fn inner, int n);
 
-void umbra_gradient_lut_even(__fp16 *out, int lut_n,
-                             int n_stops, __fp16 const colors[][4]);
-void umbra_gradient_lut(__fp16 *out, int lut_n,
+void umbra_gradient_lut_even(float *out, int lut_n,
+                             int n_stops, float const colors[][4]);
+void umbra_gradient_lut(float *out, int lut_n,
                         int n_stops, float const positions[],
-                        __fp16 const colors[][4]);
+                        float const colors[][4]);
 
-umbra_half umbra_coverage_rect         (struct umbra_basic_block*, umbra_f32 x, umbra_f32 y);
-umbra_half umbra_coverage_bitmap       (struct umbra_basic_block*, umbra_f32 x, umbra_f32 y);
-umbra_half umbra_coverage_sdf          (struct umbra_basic_block*, umbra_f32 x, umbra_f32 y);
-umbra_half umbra_coverage_bitmap_matrix(struct umbra_basic_block*, umbra_f32 x, umbra_f32 y);
+umbra_f32 umbra_coverage_rect         (struct umbra_basic_block*, umbra_f32 x, umbra_f32 y);
+umbra_f32 umbra_coverage_bitmap       (struct umbra_basic_block*, umbra_f32 x, umbra_f32 y);
+umbra_f32 umbra_coverage_sdf          (struct umbra_basic_block*, umbra_f32 x, umbra_f32 y);
+umbra_f32 umbra_coverage_bitmap_matrix(struct umbra_basic_block*, umbra_f32 x, umbra_f32 y);
 
 umbra_color umbra_blend_src     (struct umbra_basic_block*, umbra_color src, umbra_color dst);
 umbra_color umbra_blend_srcover (struct umbra_basic_block*, umbra_color src, umbra_color dst);

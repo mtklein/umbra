@@ -55,37 +55,37 @@ void umbra_entry(int n, void **ptrs, long *szs) {
     long sz3 = szs[3];
     long sz4 = szs[4];
     u32 v0 = 0u;
-    float v1 = h2f(7172);
-    float v2 = h2f(15360);
+    u32 v1 = 998277249u;
+    u32 v2 = 1065353216u;
 
     for (int i = 0; i < n; i++) {
-        u16 v3 = (u16)((unsigned char*)ptrs[0])[i*4+0];
-        float v4 = (float)(s16)v3;
-        float v5 = h2f(p1[i]);
-        u16 v6 = (u16)((unsigned char*)ptrs[0])[i*4+3];
-        float v7 = (float)(s16)v6;
-        float v8 = v2 - v1 * v7;
-        float v9 = v5 * v8;
-        float v10 = v1 * v4 + v9;
-        p1[i] = f2h(v10);
+        u32 v3 = (u32)((unsigned char*)ptrs[0])[i*4+0];
+        u32 v4 = f2u((float)(s32)v3);
+        u32 v5 = f2u(h2f(p1[i]));
+        u32 v6 = (u32)((unsigned char*)ptrs[0])[i*4+3];
+        u32 v7 = f2u((float)(s32)v6);
+        u32 v8 = f2u(u2f(v2) - u2f(v1) * u2f(v7));
+        u32 v9 = f2u(u2f(v5) * u2f(v8));
+        u32 v10 = f2u(u2f(v1) * u2f(v4) + u2f(v9));
+        p1[i] = f2h(u2f(v10));
 
-        u16 v12 = (u16)((unsigned char*)ptrs[0])[i*4+1];
-        float v13 = (float)(s16)v12;
-        float v14 = h2f(p2[i]);
-        float v15 = v14 * v8;
-        float v16 = v1 * v13 + v15;
-        p2[i] = f2h(v16);
+        u32 v12 = (u32)((unsigned char*)ptrs[0])[i*4+1];
+        u32 v13 = f2u((float)(s32)v12);
+        u32 v14 = f2u(h2f(p2[i]));
+        u32 v15 = f2u(u2f(v14) * u2f(v8));
+        u32 v16 = f2u(u2f(v1) * u2f(v13) + u2f(v15));
+        p2[i] = f2h(u2f(v16));
 
-        u16 v18 = (u16)((unsigned char*)ptrs[0])[i*4+2];
-        float v19 = (float)(s16)v18;
-        float v20 = h2f(p3[i]);
-        float v21 = v20 * v8;
-        float v22 = v1 * v19 + v21;
-        p3[i] = f2h(v22);
+        u32 v18 = (u32)((unsigned char*)ptrs[0])[i*4+2];
+        u32 v19 = f2u((float)(s32)v18);
+        u32 v20 = f2u(h2f(p3[i]));
+        u32 v21 = f2u(u2f(v20) * u2f(v8));
+        u32 v22 = f2u(u2f(v1) * u2f(v19) + u2f(v21));
+        p3[i] = f2h(u2f(v22));
 
-        float v24 = h2f(p4[i]);
-        float v25 = v24 * v8;
-        float v26 = v1 * v7 + v25;
-        p4[i] = f2h(v26);
+        u32 v24 = f2u(h2f(p4[i]));
+        u32 v25 = f2u(u2f(v24) * u2f(v8));
+        u32 v26 = f2u(u2f(v1) * u2f(v7) + u2f(v25));
+        p4[i] = f2h(u2f(v26));
     }
 }

@@ -317,19 +317,19 @@ int main(int argc, char *argv[]) {
         }
 #endif
 
-        // Allocate pixel buffers — 8888 needs 4 bytes/px, fp16 needs 8 bytes/px.
+        // Allocate pixel buffers -- 8888 needs 4 bytes/px, fp16 needs 8 bytes/px.
         int px_bytes = (d->load == umbra_load_fp16) ? 8 : 4;
         void *dst_px = malloc((size_t)pixel_n * (size_t)px_bytes);
         memset(dst_px, 0x80, (size_t)pixel_n * (size_t)px_bytes);
 
-        __fp16 color[4] = {(__fp16)0.25f, (__fp16)0.5f, (__fp16)0.125f, (__fp16)0.5f};
-        long long uni_[2] = {0};
+        float color[4] = {0.25f, 0.5f, 0.125f, 0.5f};
+        long long uni_[3] = {0};
         char *uni = (char*)uni_;
-        __builtin_memcpy(uni + 8, color, 8);
+        __builtin_memcpy(uni + 8, color, 16);
 
         umbra_buf dbuf[] = {
             {dst_px, pixel_n * px_bytes},
-            {uni,   -16},
+            {uni,   -24},
         };
 
         printf("\nDraw %s, %d pixels:\n", d->name, pixel_n);

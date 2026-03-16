@@ -78,7 +78,6 @@ struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const 
         ra->reg[i] = -1;
         ra->reg_hi[i] = -1;
         ra->is_pair[i] = cfg->has_pairs
-                       && (output_type(bb->inst[i].op) == OP_32)
                        && (i >= bb->preamble);
     }
     for (int i = 0; i < cfg->max_reg; i++) { ra->owner[i] = -1; }
@@ -312,10 +311,8 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns,
     //    it would alias rxh/ryh/rzh, causing the hi-half emit to read stale data
     //    after the lo-half emit overwrites rd.
     enum op op = inst->op;
-    _Bool fma = op==op_fma_f32 || op==op_fma_half
-             || op==op_fms_f32 || op==op_fms_half;
-    _Bool destructive = fma
-                     || op==op_sel_32 || op==op_sel_16 || op==op_sel_half;
+    _Bool fma = op==op_fma_f32 || op==op_fms_f32;
+    _Bool destructive = fma || op==op_sel_32;
 
     _Bool can_claim_x = !pair || ra->is_pair[inst->x];
     _Bool can_claim_y = !pair || ra->is_pair[inst->y];
@@ -327,7 +324,7 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns,
         // Pre-allocate rd to avoid rd aliasing rx/ry (avoids scratch+3-MOV path).
         s.rd = ra_alloc(ra, sl, ns);
         ra->reg[i] = s.rd; ra->owner[(int)s.rd] = i;
-    } else if ((op==op_sel_32 || op==op_sel_16 || op==op_sel_half) && x_dead && can_claim_x) {
+    } else if (op==op_sel_32 && x_dead && can_claim_x) {
         s.rd = ra_claim(ra, inst->x, i); x_dead = 0;
     }
 

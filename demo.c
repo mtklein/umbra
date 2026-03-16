@@ -20,7 +20,7 @@ int main(void) { return 0; }
 #pragma clang diagnostic pop
 
 typedef struct umbra_basic_block BB;
-#define imm(bb,v) umbra_imm_i32(bb, (uint32_t)(v))
+#define imm(bb,v) umbra_iimm(bb, (uint32_t)(v))
 
 enum { NUM_BACKENDS = 4 };
 static char const *backend_name[NUM_BACKENDS] = {"interp", "jit", "codegen", "metal"};
@@ -87,12 +87,12 @@ static void build_fill(int fmt) {
     free_pipe(&fill_pipe);
     BB *bb = umbra_basic_block();
     umbra_i32 ix = umbra_lane(bb);
-    int hi = umbra_reserve_half(bb, 4);
+    int fi = umbra_reserve_f32(bb, 4);
     umbra_color c = {
-        umbra_load_half(bb, (umbra_ptr){1}, imm(bb, hi+0)),
-        umbra_load_half(bb, (umbra_ptr){1}, imm(bb, hi+1)),
-        umbra_load_half(bb, (umbra_ptr){1}, imm(bb, hi+2)),
-        umbra_load_half(bb, (umbra_ptr){1}, imm(bb, hi+3)),
+        umbra_fload(bb, (umbra_ptr){1}, imm(bb, fi+0)),
+        umbra_fload(bb, (umbra_ptr){1}, imm(bb, fi+1)),
+        umbra_fload(bb, (umbra_ptr){1}, imm(bb, fi+2)),
+        umbra_fload(bb, (umbra_ptr){1}, imm(bb, fi+3)),
     };
     fmt_store[fmt](bb, (umbra_ptr){0}, ix, c);
     finish_pipe(&fill_pipe, bb);
@@ -112,15 +112,11 @@ static void build_hdr(int fmt) {
     BB *bb = umbra_basic_block();
     umbra_i32 ix = umbra_lane(bb);
     umbra_color c = fmt_load[fmt](bb, (umbra_ptr){0}, ix);
-    umbra_f32 rf = umbra_f32_from_half(bb, c.r);
-    umbra_f32 gf = umbra_f32_from_half(bb, c.g);
-    umbra_f32 bf = umbra_f32_from_half(bb, c.b);
-    umbra_f32 af = umbra_f32_from_half(bb, c.a);
-    umbra_i32 ix4 = umbra_shl_i32(bb, ix, imm(bb, 2));
-    umbra_store_f32(bb, (umbra_ptr){2}, umbra_add_i32(bb, ix4, imm(bb, 0)), rf);
-    umbra_store_f32(bb, (umbra_ptr){2}, umbra_add_i32(bb, ix4, imm(bb, 1)), gf);
-    umbra_store_f32(bb, (umbra_ptr){2}, umbra_add_i32(bb, ix4, imm(bb, 2)), bf);
-    umbra_store_f32(bb, (umbra_ptr){2}, umbra_add_i32(bb, ix4, imm(bb, 3)), af);
+    umbra_i32 ix4 = umbra_ishl(bb, ix, imm(bb, 2));
+    umbra_fstore(bb, (umbra_ptr){2}, umbra_iadd(bb, ix4, imm(bb, 0)), c.r);
+    umbra_fstore(bb, (umbra_ptr){2}, umbra_iadd(bb, ix4, imm(bb, 1)), c.g);
+    umbra_fstore(bb, (umbra_ptr){2}, umbra_iadd(bb, ix4, imm(bb, 2)), c.b);
+    umbra_fstore(bb, (umbra_ptr){2}, umbra_iadd(bb, ix4, imm(bb, 3)), c.a);
     finish_pipe(&hdr_pipe, bb);
 }
 
@@ -137,8 +133,6 @@ static void free_pipes(void) {
 }
 
 static void uni_i32(char *u, int off, int32_t v) { __builtin_memcpy(u+off, &v, 4); }
-static void uni_h4 (char *u, int off, __fp16 const c[4]) { __builtin_memcpy(u+off, c, 8); }
-static void uni_h8 (char *u, int off, __fp16 const c[8]) { __builtin_memcpy(u+off, c, 16); }
 static void uni_f32(char *u, int off, float const *v, int n) { __builtin_memcpy(u+off, v, (unsigned long)n*4); }
 static void uni_ptr(char *u, int off, void *p, long sz) {
     __builtin_memcpy(u+off,   &p,  8);
@@ -214,40 +208,40 @@ static void update_title(SDL_Window *w, slide const *s, int bi, int fi, double f
 }
 
 enum { LUT_N = 64 };
-static __fp16 linear_lut[LUT_N * 4];
-static __fp16 radial_lut[LUT_N * 4];
+static float linear_lut[LUT_N * 4];
+static float radial_lut[LUT_N * 4];
 
 static void build_luts(void) {
-    __fp16 const linear_stops[][4] = {
-        {(__fp16)1.2f, (__fp16)0.0f, (__fp16)0.0f, (__fp16)1.0f},
-        {(__fp16)1.0f, (__fp16)0.8f, (__fp16)0.0f, (__fp16)1.0f},
-        {(__fp16)0.0f, (__fp16)1.2f, (__fp16)0.0f, (__fp16)1.0f},
-        {(__fp16)0.0f, (__fp16)0.8f, (__fp16)1.2f, (__fp16)1.0f},
-        {(__fp16)0.0f, (__fp16)0.0f, (__fp16)1.2f, (__fp16)1.0f},
-        {(__fp16)0.8f, (__fp16)0.0f, (__fp16)1.0f, (__fp16)1.0f},
+    float const linear_stops[][4] = {
+        {1.2f, 0.0f, 0.0f, 1.0f},
+        {1.0f, 0.8f, 0.0f, 1.0f},
+        {0.0f, 1.2f, 0.0f, 1.0f},
+        {0.0f, 0.8f, 1.2f, 1.0f},
+        {0.0f, 0.0f, 1.2f, 1.0f},
+        {0.8f, 0.0f, 1.0f, 1.0f},
     };
     umbra_gradient_lut_even(linear_lut, LUT_N, 6, linear_stops);
 
-    __fp16 const radial_stops[][4] = {
-        {(__fp16)1.5f, (__fp16)1.5f, (__fp16)1.2f, (__fp16)1.0f},
-        {(__fp16)1.2f, (__fp16)0.8f, (__fp16)0.0f, (__fp16)1.0f},
-        {(__fp16)0.8f, (__fp16)0.0f, (__fp16)0.2f, (__fp16)1.0f},
-        {(__fp16)0.05f, (__fp16)0.0f, (__fp16)0.15f, (__fp16)1.0f},
+    float const radial_stops[][4] = {
+        {1.5f, 1.5f, 1.2f, 1.0f},
+        {1.2f, 0.8f, 0.0f, 1.0f},
+        {0.8f, 0.0f, 0.2f, 1.0f},
+        {0.05f, 0.0f, 0.15f, 1.0f},
     };
     umbra_gradient_lut_even(radial_lut, LUT_N, 4, radial_stops);
 }
 
 static void fill_bg_row(void *dst, int n, uint32_t bg, long row_sz, int32_t stride) {
-    __fp16 hc[4] = {
-        (__fp16)(( bg        & 0xffu) / 255.0f),
-        (__fp16)(((bg >>  8) & 0xffu) / 255.0f),
-        (__fp16)(((bg >> 16) & 0xffu) / 255.0f),
-        (__fp16)(((bg >> 24) & 0xffu) / 255.0f),
+    float hc[4] = {
+        (float)( bg        & 0xffu) / 255.0f,
+        (float)((bg >>  8) & 0xffu) / 255.0f,
+        (float)((bg >> 16) & 0xffu) / 255.0f,
+        (float)((bg >> 24) & 0xffu) / 255.0f,
     };
     long long uni_[4] = {0}; char *uni = (char*)uni_;
-    uni_h4(uni, 0, hc);
-    if (fill_pipe.uni_len > 8) {
-        uni_i32(uni, 8, stride);
+    uni_f32(uni, 0, hc, 4);
+    if (fill_pipe.uni_len > 16) {
+        uni_i32(uni, 16, stride);
     }
     umbra_buf buf[] = {
         { dst,  row_sz },
@@ -392,15 +386,15 @@ int main(void) {
             persp_t += 0.016f;
             float mat[11];
             build_perspective_matrix(mat, persp_t, W, H, bitmap_cov.w, bitmap_cov.h);
-            __fp16 hc[4];
-            for (int i = 0; i < 4; i++) { hc[i] = (__fp16)s->color[i]; }
+            float hc[4];
+            for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
             for (int y = 0; y < H; y++) {
                 long long uni_[12] = {0}; char *uni = (char*)uni_;
                 uni_i32(uni, draw_layout.x0, 0);
                 uni_i32(uni, draw_layout.y,  y);
-                uni_h4 (uni, 8, hc);
-                uni_f32(uni, 16, mat, 11);
-                uni_ptr(uni, 64, bitmap_cov.data, (long)(W * H * 2));
+                uni_f32(uni, 8, hc, 4);
+                uni_f32(uni, 24, mat, 11);
+                uni_ptr(uni, 72, bitmap_cov.data, (long)(W * H * 2));
                 for (int i = 0; i < planar_strides; i++) {
                     uni_i32(uni, uni_len - (planar_strides - i) * 4, planar_stride);
                 }
@@ -412,14 +406,14 @@ int main(void) {
             }
         } else if (s->coverage == umbra_coverage_bitmap || s->coverage == umbra_coverage_sdf) {
             text_cov *tc = (s->coverage == umbra_coverage_bitmap) ? &bitmap_cov : &sdf_cov;
-            __fp16 hc[4];
-            for (int i = 0; i < 4; i++) { hc[i] = (__fp16)s->color[i]; }
+            float hc[4];
+            for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
             for (int y = 0; y < H; y++) {
                 long long uni_[6] = {0}; char *uni = (char*)uni_;
                 uni_i32(uni, draw_layout.x0, 0);
                 uni_i32(uni, draw_layout.y,  y);
-                uni_h4 (uni, 8, hc);
-                uni_ptr(uni, 16, tc->data + y * W, (long)(W * 2));
+                uni_f32(uni, 8, hc, 4);
+                uni_ptr(uni, 24, tc->data + y * W, (long)(W * 2));
                 for (int i = 0; i < planar_strides; i++) {
                     uni_i32(uni, uni_len - (planar_strides - i) * 4, planar_stride);
                 }
@@ -430,25 +424,25 @@ int main(void) {
                 run(ctx, W, buf);
             }
         } else if (s->shader != umbra_shader_solid) {
-            __fp16 hc[8];
-            for (int i = 0; i < 8; i++) { hc[i] = (__fp16)s->color[i]; }
+            float hc[8];
+            for (int i = 0; i < 8; i++) { hc[i] = s->color[i]; }
 
             _Bool is_lut = (s->shader == umbra_shader_linear_grad ||
                             s->shader == umbra_shader_radial_grad);
             float gp[4] = {s->grad[0], s->grad[1], s->grad[2], s->grad[3]};
 
             for (int y = 0; y < H; y++) {
-                long long uni_[6] = {0}; char *uni = (char*)uni_;
+                long long uni_[8] = {0}; char *uni = (char*)uni_;
                 uni_i32(uni, draw_layout.x0, 0);
                 uni_i32(uni, draw_layout.y,  y);
                 if (is_lut) {
-                    __fp16 *lut = (s->shader == umbra_shader_linear_grad) ? linear_lut
+                    float *lut = (s->shader == umbra_shader_linear_grad) ? linear_lut
                                                                           : radial_lut;
                     uni_f32(uni, 8, gp, 4);
-                    uni_ptr(uni, 24, lut, (long)(LUT_N * 4 * 2));
+                    uni_ptr(uni, 24, lut, (long)(LUT_N * 4 * 4));
                 } else {
                     uni_f32(uni, 8, gp, 3);
-                    uni_h8 (uni, 20, hc);
+                    uni_f32(uni, 20, hc, 8);
                 }
                 for (int i = 0; i < planar_strides; i++) {
                     uni_i32(uni, uni_len - (planar_strides - i) * 4, planar_stride);
@@ -469,16 +463,16 @@ int main(void) {
 
             float rect[4] = { rx, ry, rx + rect_w, ry + rect_h };
 
-            __fp16 hc[4];
-            for (int i = 0; i < 4; i++) { hc[i] = (__fp16)s->color[i]; }
+            float hc[4];
+            for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
 
             for (int y = 0; y < H; y++) {
                 long long uni_[6] = {0}; char *uni = (char*)uni_;
                 uni_i32(uni, draw_layout.x0, 0);
                 uni_i32(uni, draw_layout.y,  y);
-                uni_h4 (uni, 8, hc);
+                uni_f32(uni, 8, hc, 4);
                 if (s->coverage) {
-                    uni_f32(uni, 16, rect, 4);
+                    uni_f32(uni, 24, rect, 4);
                 }
                 for (int i = 0; i < planar_strides; i++) {
                     uni_i32(uni, uni_len - (planar_strides - i) * 4, planar_stride);
