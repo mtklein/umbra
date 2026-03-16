@@ -105,7 +105,7 @@ val umbra_lane(BB *bb) {
     return (val){push(bb, op_lane)};
 }
 
-val umbra_imm(BB *bb, int bits) {
+val umbra_imm_i32(BB *bb, int bits) {
     return (val){push(bb, op_imm_32, .imm=bits)};
 }
 
@@ -142,7 +142,7 @@ static int lane_plus_off(BB *bb, int ix) {
     return -1;
 }
 
-val umbra_load16(BB *bb, umbra_ptr src, val ix) {
+val umbra_load_i16(BB *bb, umbra_ptr src, val ix) {
     if (bb->inst[ix.id].op == op_lane) {
         return (val){push(bb, op_load_16,
                          .ptr=src.ix)};
@@ -162,7 +162,7 @@ val umbra_load16(BB *bb, umbra_ptr src, val ix) {
     return (val){push(bb, op_gather_16,
                       .x=ix.id, .ptr=src.ix)};
 }
-val umbra_load32(BB *bb, umbra_ptr src, val ix) {
+val umbra_load_i32(BB *bb, umbra_ptr src, val ix) {
     if (bb->inst[ix.id].op == op_lane) {
         return (val){push(bb, op_load_32,
                          .ptr=src.ix)};
@@ -183,10 +183,10 @@ val umbra_load32(BB *bb, umbra_ptr src, val ix) {
                       .x=ix.id, .ptr=src.ix)};
 }
 val umbra_load_f16(BB *bb, umbra_ptr src, val ix) {
-    return umbra_htof(bb, umbra_load16(bb, src, ix));
+    return umbra_cvt_f32_f16(bb, umbra_load_i16(bb, src, ix));
 }
 
-void umbra_store16(BB *bb, umbra_ptr dst,
+void umbra_store_i16(BB *bb, umbra_ptr dst,
                    val ix, val v) {
     if (bb->inst[ix.id].op == op_lane) {
         push(bb, op_store_16,
@@ -204,7 +204,7 @@ void umbra_store16(BB *bb, umbra_ptr dst,
     push(bb, op_scatter_16,
          .x=ix.id, .y=v.id, .ptr=dst.ix);
 }
-void umbra_store32(BB *bb, umbra_ptr dst,
+void umbra_store_i32(BB *bb, umbra_ptr dst,
                    val ix, val v) {
     if (bb->inst[ix.id].op == op_lane) {
         push(bb, op_store_32,
@@ -224,23 +224,23 @@ void umbra_store32(BB *bb, umbra_ptr dst,
 }
 void umbra_store_f16(BB *bb, umbra_ptr dst,
                      val ix, val v) {
-    umbra_store16(bb, dst, ix, umbra_ftoh(bb, v));
+    umbra_store_i16(bb, dst, ix, umbra_cvt_f16_f32(bb, v));
 }
 
-val umbra_swiden16(BB *bb, val a) {
+val umbra_widen_s16(BB *bb, val a) {
     return (val){push(bb, op_widen_s16, .x=a.id)};
 }
-val umbra_uwiden16(BB *bb, val a) {
+val umbra_widen_u16(BB *bb, val a) {
     return (val){push(bb, op_widen_u16, .x=a.id)};
 }
-val umbra_narrow16(BB *bb, val a) {
+val umbra_narrow_i16(BB *bb, val a) {
     return (val){push(bb, op_narrow_16, .x=a.id)};
 }
 
-val umbra_htof(BB *bb, val a) {
+val umbra_cvt_f32_f16(BB *bb, val a) {
     return (val){push(bb, op_htof, .x=a.id)};
 }
-val umbra_ftoh(BB *bb, val a) {
+val umbra_cvt_f16_f32(BB *bb, val a) {
     return (val){push(bb, op_ftoh, .x=a.id)};
 }
 
@@ -262,7 +262,7 @@ static int math_(BB *bb, struct bb_inst inst) {
             bb->inst[inst.x].imm,
             bb->inst[inst.y].imm,
             bb->inst[inst.z].imm);
-        return umbra_imm(bb, result).id;
+        return umbra_imm_i32(bb, result).id;
     }
     return push_(bb, inst);
 }
@@ -277,7 +277,7 @@ static void sort(int *a, int *b) {
     }
 }
 
-val umbra_fadd(BB *bb, val a, val b) {
+val umbra_add_f32(BB *bb, val a, val b) {
     sort(&a.id, &b.id);
     int const x = a.id,
               y = b.id;
@@ -294,7 +294,7 @@ val umbra_fadd(BB *bb, val a, val b) {
     return (val){math(bb, op_add_f32, .x=x, .y=y)};
 }
 
-val umbra_fsub(BB *bb, val a, val b) {
+val umbra_sub_f32(BB *bb, val a, val b) {
     if (is_imm32(bb, b.id, 0)) { return a; }
     if (bb->inst[b.id].op == op_mul_f32) {
         return (val){math(bb, op_fms_f32,
@@ -305,7 +305,7 @@ val umbra_fsub(BB *bb, val a, val b) {
                       .x=a.id, .y=b.id)};
 }
 
-val umbra_fmul(BB *bb, val a, val b) {
+val umbra_mul_f32(BB *bb, val a, val b) {
     sort(&a.id, &b.id);
     if (is_imm32(bb, a.id, 0x3f800000)) { return b; }
     if (is_imm32(bb, b.id, 0x3f800000)) { return a; }
@@ -313,29 +313,29 @@ val umbra_fmul(BB *bb, val a, val b) {
                       .x=a.id, .y=b.id)};
 }
 
-val umbra_fdiv(BB *bb, val a, val b) {
+val umbra_div_f32(BB *bb, val a, val b) {
     if (is_imm32(bb, b.id, 0x3f800000)) { return a; }
     return (val){math(bb, op_div_f32,
                       .x=a.id, .y=b.id)};
 }
 
-val umbra_fmin(BB *bb, val a, val b) {
+val umbra_min_f32(BB *bb, val a, val b) {
     sort(&a.id, &b.id);
     return (val){math(bb, op_min_f32,
                       .x=a.id, .y=b.id)};
 }
 
-val umbra_fmax(BB *bb, val a, val b) {
+val umbra_max_f32(BB *bb, val a, val b) {
     sort(&a.id, &b.id);
     return (val){math(bb, op_max_f32,
                       .x=a.id, .y=b.id)};
 }
 
-val umbra_sqrt(BB *bb, val a) {
+val umbra_sqrt_f32(BB *bb, val a) {
     return (val){math(bb, op_sqrt_f32, .x=a.id)};
 }
 
-val umbra_iadd(BB *bb, val a, val b) {
+val umbra_add_i32(BB *bb, val a, val b) {
     sort(&a.id, &b.id);
     if (is_imm32(bb, a.id, 0)) { return b; }
     if (is_imm32(bb, b.id, 0)) { return a; }
@@ -343,14 +343,14 @@ val umbra_iadd(BB *bb, val a, val b) {
                       .x=a.id, .y=b.id)};
 }
 
-val umbra_isub(BB *bb, val a, val b) {
+val umbra_sub_i32(BB *bb, val a, val b) {
     if (is_imm32(bb, b.id, 0)) { return a; }
-    if (a.id == b.id) { return umbra_imm(bb, 0); }
+    if (a.id == b.id) { return umbra_imm_i32(bb, 0); }
     return (val){math(bb, op_sub_i32,
                       .x=a.id, .y=b.id)};
 }
 
-val umbra_imul(BB *bb, val a, val b) {
+val umbra_mul_i32(BB *bb, val a, val b) {
     sort(&a.id, &b.id);
     if (is_imm32(bb, a.id, 1)) { return b; }
     if (is_imm32(bb, b.id, 1)) { return a; }
@@ -360,37 +360,37 @@ val umbra_imul(BB *bb, val a, val b) {
      && is_pow2(bb->inst[a.id].imm)) {
         int const shift =
             __builtin_ctz((unsigned)bb->inst[a.id].imm);
-        return umbra_ishl(bb, b,
-                          umbra_imm(bb, shift));
+        return umbra_shl_i32(bb, b,
+                          umbra_imm_i32(bb, shift));
     }
     if (bb->inst[b.id].op == op_imm_32
      && is_pow2(bb->inst[b.id].imm)) {
         int const shift =
             __builtin_ctz((unsigned)bb->inst[b.id].imm);
-        return umbra_ishl(bb, a,
-                          umbra_imm(bb, shift));
+        return umbra_shl_i32(bb, a,
+                          umbra_imm_i32(bb, shift));
     }
     return (val){math(bb, op_mul_i32,
                       .x=a.id, .y=b.id)};
 }
 
-val umbra_ishl(BB *bb, val a, val b) {
+val umbra_shl_i32(BB *bb, val a, val b) {
     if (is_imm32(bb, b.id, 0)) { return a; }
     return (val){math(bb, op_shl_i32,
                       .x=a.id, .y=b.id)};
 }
-val umbra_ushr(BB *bb, val a, val b) {
+val umbra_shr_u32(BB *bb, val a, val b) {
     if (is_imm32(bb, b.id, 0)) { return a; }
     return (val){math(bb, op_shr_u32,
                       .x=a.id, .y=b.id)};
 }
-val umbra_sshr(BB *bb, val a, val b) {
+val umbra_shr_s32(BB *bb, val a, val b) {
     if (is_imm32(bb, b.id, 0)) { return a; }
     return (val){math(bb, op_shr_s32,
                       .x=a.id, .y=b.id)};
 }
 
-val umbra_and(BB *bb, val a, val b) {
+val umbra_and_i32(BB *bb, val a, val b) {
     sort(&a.id, &b.id);
     if (a.id == b.id)              { return a; }
     if (is_imm32(bb, a.id, -1))    { return b; }
@@ -400,7 +400,7 @@ val umbra_and(BB *bb, val a, val b) {
     return (val){math(bb, op_and_32,
                       .x=a.id, .y=b.id)};
 }
-val umbra_or(BB *bb, val a, val b) {
+val umbra_or_i32(BB *bb, val a, val b) {
     sort(&a.id, &b.id);
     if (a.id == b.id)              { return a; }
     if (is_imm32(bb, a.id,  0))    { return b; }
@@ -410,15 +410,15 @@ val umbra_or(BB *bb, val a, val b) {
     return (val){math(bb, op_or_32,
                       .x=a.id, .y=b.id)};
 }
-val umbra_xor(BB *bb, val a, val b) {
+val umbra_xor_i32(BB *bb, val a, val b) {
     sort(&a.id, &b.id);
     if (is_imm32(bb, a.id, 0))    { return b; }
     if (is_imm32(bb, b.id, 0))    { return a; }
-    if (a.id == b.id) { return umbra_imm(bb, 0); }
+    if (a.id == b.id) { return umbra_imm_i32(bb, 0); }
     return (val){math(bb, op_xor_32,
                       .x=a.id, .y=b.id)};
 }
-val umbra_sel(BB *bb, val c, val t, val fv) {
+val umbra_sel_i32(BB *bb, val c, val t, val fv) {
     if (t.id == fv.id)             { return t; }
     if (is_imm32(bb, c.id, -1))    { return t; }
     if (is_imm32(bb, c.id,  0))    { return fv; }
@@ -426,14 +426,14 @@ val umbra_sel(BB *bb, val c, val t, val fv) {
                       .x=c.id, .y=t.id, .z=fv.id)};
 }
 
-val umbra_itof(BB *bb, val a) {
+val umbra_cvt_f32_i32(BB *bb, val a) {
     return (val){math(bb, op_f32_from_i32, .x=a.id)};
 }
-val umbra_ftoi(BB *bb, val a) {
+val umbra_cvt_i32_f32(BB *bb, val a) {
     return (val){math(bb, op_i32_from_f32, .x=a.id)};
 }
 
-void umbra_load8x4(BB *bb, umbra_ptr src,
+void umbra_load_u8x4(BB *bb, umbra_ptr src,
                    val ix, val out[4]) {
     (void)ix;
     int base = push(bb, op_load_8x4, .ptr=src.ix);
@@ -445,7 +445,7 @@ void umbra_load8x4(BB *bb, umbra_ptr src,
     }
 }
 
-void umbra_store8x4(BB *bb, umbra_ptr dst,
+void umbra_store_u8x4(BB *bb, umbra_ptr dst,
                     val ix, val in[4]) {
     (void)ix;
     push(bb, op_store_8x4,
@@ -453,69 +453,69 @@ void umbra_store8x4(BB *bb, umbra_ptr dst,
          .z=in[2].id, .w=in[3].id, .ptr=dst.ix);
 }
 
-val umbra_feq(BB *bb, val a, val b) {
+val umbra_eq_f32(BB *bb, val a, val b) {
     sort(&a.id, &b.id);
     return (val){math(bb, op_eq_f32,
                       .x=a.id, .y=b.id)};
 }
-val umbra_fne(BB *bb, val a, val b) {
-    return umbra_xor(bb, umbra_feq(bb, a, b),
-                     umbra_imm(bb, -1));
+val umbra_ne_f32(BB *bb, val a, val b) {
+    return umbra_xor_i32(bb, umbra_eq_f32(bb, a, b),
+                     umbra_imm_i32(bb, -1));
 }
-val umbra_flt(BB *bb, val a, val b) {
+val umbra_lt_f32(BB *bb, val a, val b) {
     return (val){math(bb, op_lt_f32,
                       .x=a.id, .y=b.id)};
 }
-val umbra_fle(BB *bb, val a, val b) {
+val umbra_le_f32(BB *bb, val a, val b) {
     return (val){math(bb, op_le_f32,
                       .x=a.id, .y=b.id)};
 }
-val umbra_fgt(BB *bb, val a, val b) {
-    return umbra_flt(bb, b, a);
+val umbra_gt_f32(BB *bb, val a, val b) {
+    return umbra_lt_f32(bb, b, a);
 }
-val umbra_fge(BB *bb, val a, val b) {
-    return umbra_fle(bb, b, a);
+val umbra_ge_f32(BB *bb, val a, val b) {
+    return umbra_le_f32(bb, b, a);
 }
 
-val umbra_ieq(BB *bb, val a, val b) {
+val umbra_eq_i32(BB *bb, val a, val b) {
     sort(&a.id, &b.id);
-    if (a.id == b.id) { return umbra_imm(bb, -1); }
+    if (a.id == b.id) { return umbra_imm_i32(bb, -1); }
     return (val){math(bb, op_eq_i32,
                       .x=a.id, .y=b.id)};
 }
-val umbra_ine(BB *bb, val a, val b) {
-    return umbra_xor(bb, umbra_ieq(bb, a, b),
-                     umbra_imm(bb, -1));
+val umbra_ne_i32(BB *bb, val a, val b) {
+    return umbra_xor_i32(bb, umbra_eq_i32(bb, a, b),
+                     umbra_imm_i32(bb, -1));
 }
 
-val umbra_slt(BB *bb, val a, val b) {
+val umbra_lt_s32(BB *bb, val a, val b) {
     return (val){math(bb, op_lt_s32,
                       .x=a.id, .y=b.id)};
 }
-val umbra_sle(BB *bb, val a, val b) {
+val umbra_le_s32(BB *bb, val a, val b) {
     return (val){math(bb, op_le_s32,
                       .x=a.id, .y=b.id)};
 }
-val umbra_sgt(BB *bb, val a, val b) {
-    return umbra_slt(bb, b, a);
+val umbra_gt_s32(BB *bb, val a, val b) {
+    return umbra_lt_s32(bb, b, a);
 }
-val umbra_sge(BB *bb, val a, val b) {
-    return umbra_sle(bb, b, a);
+val umbra_ge_s32(BB *bb, val a, val b) {
+    return umbra_le_s32(bb, b, a);
 }
 
-val umbra_ult(BB *bb, val a, val b) {
+val umbra_lt_u32(BB *bb, val a, val b) {
     return (val){math(bb, op_lt_u32,
                       .x=a.id, .y=b.id)};
 }
-val umbra_ule(BB *bb, val a, val b) {
+val umbra_le_u32(BB *bb, val a, val b) {
     return (val){math(bb, op_le_u32,
                       .x=a.id, .y=b.id)};
 }
-val umbra_ugt(BB *bb, val a, val b) {
-    return umbra_ult(bb, b, a);
+val umbra_gt_u32(BB *bb, val a, val b) {
+    return umbra_lt_u32(bb, b, a);
 }
-val umbra_uge(BB *bb, val a, val b) {
-    return umbra_ule(bb, b, a);
+val umbra_ge_u32(BB *bb, val a, val b) {
+    return umbra_le_u32(bb, b, a);
 }
 
 static char const* op_name(enum op op) {

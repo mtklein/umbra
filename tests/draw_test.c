@@ -630,12 +630,12 @@ static umbra_color gradient_shader(
         umbra_val x, umbra_val y) {
     (void)y;
     int fi = umbra_reserve(bb, 2);
-    umbra_val w = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_imm(bb, fi));
-    umbra_val a = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_imm(bb, fi+1));
-    umbra_val t = umbra_fdiv(bb, x, w);
-    umbra_val zero = umbra_float(bb, 0.0f);
+    umbra_val w = umbra_load_i32(bb,
+        (umbra_ptr){1}, umbra_imm_i32(bb, fi));
+    umbra_val a = umbra_load_i32(bb,
+        (umbra_ptr){1}, umbra_imm_i32(bb, fi+1));
+    umbra_val t = umbra_div_f32(bb, x, w);
+    umbra_val zero = umbra_imm_f32(bb, 0.0f);
     return (umbra_color){t, zero, zero, a};
 }
 
@@ -1288,14 +1288,14 @@ static umbra_color srgb_invert_shader(
         umbra_val x, umbra_val y) {
     (void)x; (void)y;
     int fi = umbra_reserve(bb, 4);
-    umbra_val r = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_imm(bb, fi));
-    umbra_val g = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_imm(bb, fi+1));
-    umbra_val b = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_imm(bb, fi+2));
-    umbra_val a = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_imm(bb, fi+3));
+    umbra_val r = umbra_load_i32(bb,
+        (umbra_ptr){1}, umbra_imm_i32(bb, fi));
+    umbra_val g = umbra_load_i32(bb,
+        (umbra_ptr){1}, umbra_imm_i32(bb, fi+1));
+    umbra_val b = umbra_load_i32(bb,
+        (umbra_ptr){1}, umbra_imm_i32(bb, fi+2));
+    umbra_val a = umbra_load_i32(bb,
+        (umbra_ptr){1}, umbra_imm_i32(bb, fi+3));
     umbra_color c = {r, g, b, a};
     return umbra_transfer_invert(bb, c,
                                  &umbra_transfer_srgb);
@@ -1337,14 +1337,14 @@ static umbra_color srgb_apply_shader(
         umbra_val x, umbra_val y) {
     (void)x; (void)y;
     int fi = umbra_reserve(bb, 4);
-    umbra_val r = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_imm(bb, fi));
-    umbra_val g = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_imm(bb, fi+1));
-    umbra_val b = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_imm(bb, fi+2));
-    umbra_val a = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_imm(bb, fi+3));
+    umbra_val r = umbra_load_i32(bb,
+        (umbra_ptr){1}, umbra_imm_i32(bb, fi));
+    umbra_val g = umbra_load_i32(bb,
+        (umbra_ptr){1}, umbra_imm_i32(bb, fi+1));
+    umbra_val b = umbra_load_i32(bb,
+        (umbra_ptr){1}, umbra_imm_i32(bb, fi+2));
+    umbra_val a = umbra_load_i32(bb,
+        (umbra_ptr){1}, umbra_imm_i32(bb, fi+3));
     umbra_color c = {r, g, b, a};
     return umbra_transfer_apply(bb, c,
                                 &umbra_transfer_srgb);
@@ -1386,14 +1386,14 @@ static umbra_color srgb_roundtrip_shader(
         umbra_val x, umbra_val y) {
     (void)x; (void)y;
     int fi = umbra_reserve(bb, 4);
-    umbra_val r = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_imm(bb, fi));
-    umbra_val g = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_imm(bb, fi+1));
-    umbra_val b = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_imm(bb, fi+2));
-    umbra_val a = umbra_load32(bb,
-        (umbra_ptr){1}, umbra_imm(bb, fi+3));
+    umbra_val r = umbra_load_i32(bb,
+        (umbra_ptr){1}, umbra_imm_i32(bb, fi));
+    umbra_val g = umbra_load_i32(bb,
+        (umbra_ptr){1}, umbra_imm_i32(bb, fi+1));
+    umbra_val b = umbra_load_i32(bb,
+        (umbra_ptr){1}, umbra_imm_i32(bb, fi+2));
+    umbra_val a = umbra_load_i32(bb,
+        (umbra_ptr){1}, umbra_imm_i32(bb, fi+3));
     umbra_color c = {r, g, b, a};
     c = umbra_transfer_apply(bb, c,
                              &umbra_transfer_srgb);

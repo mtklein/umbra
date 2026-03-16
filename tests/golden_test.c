@@ -69,14 +69,14 @@ static void build_fill(int fmt) {
     umbra_val ix = umbra_lane(bb);
     int fi = umbra_reserve(bb, 4);
     umbra_color c = {
-        umbra_load32(bb, (umbra_ptr){1},
-                     umbra_imm(bb, fi)),
-        umbra_load32(bb, (umbra_ptr){1},
-                     umbra_imm(bb, fi+1)),
-        umbra_load32(bb, (umbra_ptr){1},
-                     umbra_imm(bb, fi+2)),
-        umbra_load32(bb, (umbra_ptr){1},
-                     umbra_imm(bb, fi+3)),
+        umbra_load_i32(bb, (umbra_ptr){1},
+                     umbra_imm_i32(bb, fi)),
+        umbra_load_i32(bb, (umbra_ptr){1},
+                     umbra_imm_i32(bb, fi+1)),
+        umbra_load_i32(bb, (umbra_ptr){1},
+                     umbra_imm_i32(bb, fi+2)),
+        umbra_load_i32(bb, (umbra_ptr){1},
+                     umbra_imm_i32(bb, fi+3)),
     };
     fmt_store[fmt](bb, (umbra_ptr){0}, ix, c);
     umbra_basic_block_optimize(bb);

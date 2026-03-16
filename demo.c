@@ -134,14 +134,14 @@ static void build_fill(int fmt) {
     umbra_val ix = umbra_lane(bb);
     int fi = umbra_reserve(bb, 4);
     umbra_color c = {
-        umbra_load32(bb, (umbra_ptr){1},
-                     umbra_imm(bb, fi)),
-        umbra_load32(bb, (umbra_ptr){1},
-                     umbra_imm(bb, fi+1)),
-        umbra_load32(bb, (umbra_ptr){1},
-                     umbra_imm(bb, fi+2)),
-        umbra_load32(bb, (umbra_ptr){1},
-                     umbra_imm(bb, fi+3)),
+        umbra_load_i32(bb, (umbra_ptr){1},
+                     umbra_imm_i32(bb, fi)),
+        umbra_load_i32(bb, (umbra_ptr){1},
+                     umbra_imm_i32(bb, fi+1)),
+        umbra_load_i32(bb, (umbra_ptr){1},
+                     umbra_imm_i32(bb, fi+2)),
+        umbra_load_i32(bb, (umbra_ptr){1},
+                     umbra_imm_i32(bb, fi+3)),
     };
     fmt_store[fmt](bb, (umbra_ptr){0}, ix, c);
     finish_pipe(&fill_pipe, bb);
@@ -163,20 +163,20 @@ static void build_hdr(int fmt) {
     umbra_val ix = umbra_lane(bb);
     umbra_color c =
         fmt_load[fmt](bb, (umbra_ptr){0}, ix);
-    umbra_val ix4 = umbra_ishl(bb, ix,
-                        umbra_imm(bb, 2));
-    umbra_store32(bb, (umbra_ptr){2},
-        umbra_iadd(bb, ix4,
-                   umbra_imm(bb, 0)), c.r);
-    umbra_store32(bb, (umbra_ptr){2},
-        umbra_iadd(bb, ix4,
-                   umbra_imm(bb, 1)), c.g);
-    umbra_store32(bb, (umbra_ptr){2},
-        umbra_iadd(bb, ix4,
-                   umbra_imm(bb, 2)), c.b);
-    umbra_store32(bb, (umbra_ptr){2},
-        umbra_iadd(bb, ix4,
-                   umbra_imm(bb, 3)), c.a);
+    umbra_val ix4 = umbra_shl_i32(bb, ix,
+                        umbra_imm_i32(bb, 2));
+    umbra_store_i32(bb, (umbra_ptr){2},
+        umbra_add_i32(bb, ix4,
+                   umbra_imm_i32(bb, 0)), c.r);
+    umbra_store_i32(bb, (umbra_ptr){2},
+        umbra_add_i32(bb, ix4,
+                   umbra_imm_i32(bb, 1)), c.g);
+    umbra_store_i32(bb, (umbra_ptr){2},
+        umbra_add_i32(bb, ix4,
+                   umbra_imm_i32(bb, 2)), c.b);
+    umbra_store_i32(bb, (umbra_ptr){2},
+        umbra_add_i32(bb, ix4,
+                   umbra_imm_i32(bb, 3)), c.a);
     finish_pipe(&hdr_pipe, bb);
 }
 
