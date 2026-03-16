@@ -11,7 +11,6 @@
     X(fma_f32) X(fms_f32)                               \
     X(add_i32) X(sub_i32) X(mul_i32)                    \
     X(shl_i32) X(shr_u32) X(shr_s32)                    \
-    X(shl_i32_imm) X(shr_u32_imm) X(shr_s32_imm)       \
     X(and_32) X(or_32) X(xor_32) X(sel_32)              \
     X(f32_from_i32) X(i32_from_f32)                     \
     X(eq_f32) X(lt_f32) X(le_f32)                       \

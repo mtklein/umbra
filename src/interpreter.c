@@ -325,15 +325,6 @@ op(shr_u32) {
 op(shr_s32) {
     v->i32 = v[ip->x].i32 >> v[ip->y].i32; next;
 }
-op(shl_i32_imm) {
-    v->u32 = v[ip->x].u32 << (unsigned)ip->y; next;
-}
-op(shr_u32_imm) {
-    v->u32 = v[ip->x].u32 >> (unsigned)ip->y; next;
-}
-op(shr_s32_imm) {
-    v->i32 = v[ip->x].i32 >> ip->y; next;
-}
 op(and_32) {
     v->i32 = v[ip->x].i32 & v[ip->y].i32; next;
 }
@@ -486,9 +477,6 @@ static Fn const fn[] = {
     [op_shl_i32] = shl_i32,
     [op_shr_u32] = shr_u32,
     [op_shr_s32] = shr_s32,
-    [op_shl_i32_imm] = shl_i32_imm,
-    [op_shr_u32_imm] = shr_u32_imm,
-    [op_shr_s32_imm] = shr_s32_imm,
     [op_and_32]  = and_32,
     [op_or_32]   = or_32,
     [op_xor_32]  = xor_32,
@@ -695,13 +683,6 @@ struct umbra_interpreter* umbra_interpreter(
                         continue;
                     }
                     #undef RESOLVE_PTR
-
-                    case op_shl_i32_imm:
-                    case op_shr_u32_imm:
-                    case op_shr_s32_imm:
-                        emit(.fn=fn[inst->op],
-                             .x=X, .y=inst->imm);
-                        break;
 
                     case op_add_f32:
                     case op_sub_f32:

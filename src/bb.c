@@ -366,31 +366,16 @@ val umbra_imul(BB *bb, val a, val b) {
 
 val umbra_ishl(BB *bb, val a, val b) {
     if (is_imm32(bb, b.id, 0)) { return a; }
-    if (is_imm(bb, b.id)) {
-        return (val){push(bb, op_shl_i32_imm,
-                         .x=a.id,
-                         .imm=bb->inst[b.id].imm)};
-    }
     return (val){math(bb, op_shl_i32,
                       .x=a.id, .y=b.id)};
 }
 val umbra_ushr(BB *bb, val a, val b) {
     if (is_imm32(bb, b.id, 0)) { return a; }
-    if (is_imm(bb, b.id)) {
-        return (val){push(bb, op_shr_u32_imm,
-                         .x=a.id,
-                         .imm=bb->inst[b.id].imm)};
-    }
     return (val){math(bb, op_shr_u32,
                       .x=a.id, .y=b.id)};
 }
 val umbra_sshr(BB *bb, val a, val b) {
     if (is_imm32(bb, b.id, 0)) { return a; }
-    if (is_imm(bb, b.id)) {
-        return (val){push(bb, op_shr_s32_imm,
-                         .x=a.id,
-                         .imm=bb->inst[b.id].imm)};
-    }
     return (val){math(bb, op_shr_s32,
                       .x=a.id, .y=b.id)};
 }
@@ -705,12 +690,6 @@ void umbra_basic_block_dump(BB const *bb, FILE *f) {
             case op_deref_ptr:
                 fprintf(f, " p%d byte%d",
                         inst->ptr, inst->imm);
-                break;
-            case op_shl_i32_imm:
-            case op_shr_u32_imm:
-            case op_shr_s32_imm:
-                fprintf(f, " v%d %d",
-                        inst->x, inst->imm);
                 break;
             case op_lane: break;
 
