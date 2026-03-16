@@ -55,13 +55,13 @@ void umbra_entry(int n, void **ptrs, long *szs) {
     u32 v4 = p1[5];
     u32 v5 = 1132396544u;
     u32 v6 = 1056964608u;
-    u32 v7 = f2u(u2f(v1) * u2f(v5) + u2f(v6));
+    u32 v7 = f2u(fmaf(u2f(v1), u2f(v5), u2f(v6)));
     u32 v8 = (u32)(s32)u2f(v7);
-    u32 v9 = f2u(u2f(v2) * u2f(v5) + u2f(v6));
+    u32 v9 = f2u(fmaf(u2f(v2), u2f(v5), u2f(v6)));
     u32 v10 = (u32)(s32)u2f(v9);
-    u32 v11 = f2u(u2f(v3) * u2f(v5) + u2f(v6));
+    u32 v11 = f2u(fmaf(u2f(v3), u2f(v5), u2f(v6)));
     u32 v12 = (u32)(s32)u2f(v11);
-    u32 v13 = f2u(u2f(v4) * u2f(v5) + u2f(v6));
+    u32 v13 = f2u(fmaf(u2f(v4), u2f(v5), u2f(v6)));
     u32 v14 = (u32)(s32)u2f(v13);
 
     for (int i = 0; i < n; i++) {

@@ -273,16 +273,32 @@ op( mul_f32) {
 op( div_f32) {
     v->f32 = v[ip->x].f32 / v[ip->y].f32; next;
 }
-op( fma_f32) {
-    v->f32 = v[ip->x].f32 * v[ip->y].f32
-           + v[ip->z].f32;
-    next;
-}
-op( fms_f32) {
-    v->f32 = v[ip->z].f32
-           - v[ip->x].f32 * v[ip->y].f32;
-    next;
-}
+#if defined(__ARM_FEATURE_FMA) || defined(__FMA__)
+    op( fma_f32) {
+        v->f32 = v[ip->z].f32 + v[ip->x].f32 * v[ip->y].f32;
+        next;
+    }
+    op( fms_f32) {
+        v->f32 = v[ip->z].f32 - v[ip->x].f32 * v[ip->y].f32;
+        next;
+    }
+#else
+    typedef double F64 __attribute__((vector_size(K*8)));
+    op( fma_f32) {
+        F64 x = cast(F64, v[ip->x].f32),
+            y = cast(F64, v[ip->y].f32),
+            z = cast(F64, v[ip->z].f32);
+        v->f32 = cast(F32, x * y + z);
+        next;
+    }
+    op( fms_f32) {
+        F64 x = cast(F64, v[ip->x].f32),
+            y = cast(F64, v[ip->y].f32),
+            z = cast(F64, v[ip->z].f32);
+        v->f32 = cast(F32, z - x * y);
+        next;
+    }
+#endif
 op(sqrt_f32) {
     v->f32 = __builtin_elementwise_sqrt(v[ip->x].f32);
     next;

@@ -218,10 +218,10 @@ static void test_srcover_8888(void) {
             int g = (int)((dst[i] >>  8) & 0xFF);
             int b = (int)((dst[i] >> 16) & 0xFF);
             int a = (int)((dst[i] >> 24) & 0xFF);
-            (r >= 127 && r <= 129) here;
-            (g >= 254 && g <= 255) here;
-            (b >= 127 && b <= 129) here;
-            (a >= 254 && a <= 255) here;
+            (r == 128) here;
+            (g == 255) here;
+            (b == 128) here;
+            (a == 255) here;
         }
     }
     cleanup_draw(&B);
@@ -277,8 +277,8 @@ static void test_dstover_transparent(void) {
             {uni, -(long)B.lay.uni_len},
         })) { continue; }
         for (int i = 0; i < 2; i++) {
-            (( dst[i]        & 0xFF) >= 0xFE) here;
-            (((dst[i] >> 24) & 0xFF) >= 0xFE) here;
+            (( dst[i]        & 0xFF) == 0xFF) here;
+            (((dst[i] >> 24) & 0xFF) == 0xFF) here;
         }
     }
     cleanup_draw(&B);
@@ -313,7 +313,7 @@ static void test_multiply_8888(void) {
             (r >= 0x1E && r <= 0x22) here;
             (g >= 0x3E && g <= 0x42) here;
             (b >= 0x7E && b <= 0x82) here;
-            (a >= 0xFE)              here;
+            (a == 0xFF)              here;
         }
     }
     cleanup_draw(&B);
@@ -381,10 +381,10 @@ static void test_srcover_fp16(void) {
             float g = (float)dst[i*4+1];
             float b = (float)dst[i*4+2];
             float a = (float)dst[i*4+3];
-            (r >= 0.49f && r <= 0.51f) here;
-            (g >= 0.99f && g <= 1.01f) here;
-            (b >= 0.49f && b <= 0.51f) here;
-            (a >= 0.99f && a <= 1.01f) here;
+            (equiv(r, 0.5f))  here;
+            (equiv(g, 1.0f))  here;
+            (equiv(b, 0.5f))  here;
+            (equiv(a, 1.0f))  here;
         }
     }
     cleanup_draw(&B);
@@ -417,8 +417,8 @@ static void test_coverage_rect(void) {
         })) { continue; }
         for (int i = 0; i < 8; i++) {
             if (i >= 2 && i < 5) {
-                (( dst[i]      & 0xFF) >= 0xFE) here;
-                (((dst[i]>>24) & 0xFF) >= 0xFE) here;
+                (( dst[i]      & 0xFF) == 0xFF) here;
+                (((dst[i]>>24) & 0xFF) == 0xFF) here;
             } else {
                 (dst[i] == 0) here;
             }
@@ -453,10 +453,10 @@ static void test_coverage_rect_scalar(void) {
             {uni, -(long)B.lay.uni_len},
         })) { continue; }
         (dst[0] == 0) here;
-        (( dst[1]        & 0xFF) >= 0xFE) here;
-        (((dst[1] >> 24) & 0xFF) >= 0xFE) here;
-        (( dst[2]        & 0xFF) >= 0xFE) here;
-        (((dst[2] >> 24) & 0xFF) >= 0xFE) here;
+        (( dst[1]        & 0xFF) == 0xFF) here;
+        (((dst[1] >> 24) & 0xFF) == 0xFF) here;
+        (( dst[2]        & 0xFF) == 0xFF) here;
+        (((dst[2] >> 24) & 0xFF) == 0xFF) here;
         (dst[3] == 0) here;
     }
     cleanup_draw(&B);
@@ -489,7 +489,7 @@ static void test_coverage_rect_n9(void) {
         })) { continue; }
         for (int i = 0; i < 9; i++) {
             if (i >= 3 && i < 7) {
-                (((dst[i]>>8) & 0xFF) >= 0xFE) here;
+                (((dst[i]>>8) & 0xFF) == 0xFF) here;
             } else {
                 (dst[i] == 0) here;
             }
@@ -526,8 +526,8 @@ static void test_x0_offset(void) {
             {uni, -(long)B.lay.uni_len},
         })) { continue; }
         (dst[0] == 0) here;
-        (((dst[1] >> 8) & 0xFF) >= 0xFE) here;
-        (((dst[2] >> 8) & 0xFF) >= 0xFE) here;
+        (((dst[1] >> 8) & 0xFF) == 0xFF) here;
+        (((dst[2] >> 8) & 0xFF) == 0xFF) here;
         (dst[3] == 0) here;
     }
     cleanup_draw(&B);
@@ -616,10 +616,10 @@ static void test_no_blend(void) {
             {uni, -(long)B.lay.uni_len},
         })) { continue; }
         for (int i = 0; i < 2; i++) {
-            (( dst[i]        & 0xFF) >= 0xFE) here;
+            (( dst[i]        & 0xFF) == 0xFF) here;
             (((dst[i] >>  8) & 0xFF) == 0x00) here;
-            (((dst[i] >> 16) & 0xFF) >= 0xFE) here;
-            (((dst[i] >> 24) & 0xFF) >= 0xFE) here;
+            (((dst[i] >> 16) & 0xFF) == 0xFF) here;
+            (((dst[i] >> 24) & 0xFF) == 0xFF) here;
         }
     }
     cleanup_draw(&B);
@@ -662,10 +662,10 @@ static void test_gradient_shader(void) {
         })) { continue; }
         int r0 = (int)( dst[0]       & 0xFF);
         int r3 = (int)( dst[3]       & 0xFF);
-        (r0 <= 2)                  here;
-        (r3 >= 189 && r3 <= 193)   here;
+        (r0 == 0)                  here;
+        (r3 == 191)                here;
         for (int i = 0; i < 4; i++) {
-            (((dst[i]>>24) & 0xFF) >= 0xFE) here;
+            (((dst[i]>>24) & 0xFF) == 0xFF) here;
         }
     }
     cleanup_draw(&B);
@@ -697,10 +697,10 @@ static void test_multiply_half_alpha(void) {
             int g = (int)((dst[i] >>  8) & 0xFF);
             int b = (int)((dst[i] >> 16) & 0xFF);
             int a = (int)((dst[i] >> 24) & 0xFF);
-            (r >= 125 && r <= 131) here;
-            (g <= 2) here;
-            (b >= 125 && b <= 131) here;
-            (a >= 189 && a <= 195) here;
+            r == 127 here;
+            g == 0 here;
+            b == 128 here;
+            a == 192 here;
         }
     }
     cleanup_draw(&B);
@@ -731,8 +731,8 @@ static void test_srcover_8888_n9(void) {
         for (int i = 0; i < 9; i++) {
             int r = (int)( dst[i]        & 0xFF);
             int a = (int)((dst[i] >> 24) & 0xFF);
-            (r >= 0xFE)              here;
-            (a >= 126 && a <= 130)   here;
+            (r == 0xFF)              here;
+            (a == 128)               here;
         }
     }
     cleanup_draw(&B);
@@ -769,10 +769,10 @@ static void test_full_pipeline(void) {
                 int g = (int)((dst[i]>> 8) & 0xFF);
                 int b = (int)((dst[i]>>16) & 0xFF);
                 int a = (int)((dst[i]>>24) & 0xFF);
-                (r >= 0xFE) here;
-                (g <= 1)    here;
-                (b <= 1)    here;
-                (a >= 0xFE) here;
+                (r == 0xFF) here;
+                (g == 0)    here;
+                (b == 0)    here;
+                (a == 0xFF) here;
             } else {
                 (dst[i] == 0) here;
             }
@@ -850,8 +850,8 @@ static void test_coverage_rect_white_dst(void) {
             });
         for (int i = 0; i < 16; i++) {
             if (i >= 4 && i < 12) {
-                (( dst[i]      & 0xFF) >= 0xFE) here;
-                (((dst[i]>>24) & 0xFF) >= 0xFE) here;
+                (( dst[i]      & 0xFF) == 0xFF) here;
+                (((dst[i]>>24) & 0xFF) == 0xFF) here;
             } else {
                 (dst[i] == 0xFFFFFFFF) here;
             }
@@ -877,8 +877,8 @@ static void test_coverage_rect_white_dst(void) {
         });
         for (int i = 0; i < 16; i++) {
             if (i >= 4 && i < 12) {
-                (( dst[i]      & 0xFF) >= 0xFE) here;
-                (((dst[i]>>24) & 0xFF) >= 0xFE) here;
+                (( dst[i]      & 0xFF) == 0xFF) here;
+                (((dst[i]>>24) & 0xFF) == 0xFF) here;
             } else {
                 (dst[i] == 0xFFFFFFFF) here;
             }
@@ -904,8 +904,8 @@ static void test_coverage_rect_white_dst(void) {
         });
         for (int i = 0; i < 24; i++) {
             if (i >= 4 && i < 20) {
-                (( dst[i]      & 0xFF) >= 0xFE) here;
-                (((dst[i]>>24) & 0xFF) >= 0xFE) here;
+                (( dst[i]      & 0xFF) == 0xFF) here;
+                (((dst[i]>>24) & 0xFF) == 0xFF) here;
             } else {
                 (dst[i] == 0xFFFFFFFF) here;
             }
@@ -931,8 +931,8 @@ static void test_coverage_rect_white_dst(void) {
         });
         for (int i = 0; i < 16; i++) {
             if (i >= 4 && i < 12) {
-                (( dst[i]      & 0xFF) >= 0xFE) here;
-                (((dst[i]>>24) & 0xFF) >= 0xFE) here;
+                (( dst[i]      & 0xFF) == 0xFF) here;
+                (((dst[i]>>24) & 0xFF) == 0xFF) here;
             } else {
                 (dst[i] == 0xFFFFFFFF) here;
             }
@@ -1083,7 +1083,7 @@ static void test_coverage_bitmap_matrix_oob(void) {
             {dst, (long)sizeof dst},
             {uni, -(long)B.lay.uni_len},
         })) { continue; }
-        ((dst[0] & 0xff) >= 0xfc) here;
+        ((dst[0] & 0xff) == 0xFF) here;
     }
     cleanup_draw(&B);
 }
@@ -1110,12 +1110,12 @@ static void test_linear_2(void) {
             {dst, (long)sizeof dst},
             {uni, -(long)B.lay.uni_len},
         })) { continue; }
-        ((dst[0] & 0xff) >= 0xfc) here;
-        (((dst[0]>>16) & 0xff) <= 2) here;
+        ((dst[0] & 0xff) == 0xFF) here;
+        (((dst[0]>>16) & 0xff) == 0) here;
         ((dst[3] & 0xff) <= 66) here;
         (((dst[3]>>16) & 0xff) >= 189) here;
         for (int i = 0; i < 4; i++) {
-            (((dst[i]>>24) & 0xff) >= 0xfc) here;
+            (((dst[i]>>24) & 0xff) == 0xFF) here;
         }
     }
     cleanup_draw(&B);
@@ -1143,8 +1143,8 @@ static void test_radial_2(void) {
             {dst, 4},
             {uni, -(long)B.lay.uni_len},
         })) { continue; }
-        ((dst[0] & 0xff) >= 0xfc) here;
-        (((dst[0]>>24) & 0xff) >= 0xfc) here;
+        ((dst[0] & 0xff) == 0xFF) here;
+        (((dst[0]>>24) & 0xff) == 0xFF) here;
     }
     cleanup_draw(&B);
 }
@@ -1179,8 +1179,8 @@ static void test_linear_grad(void) {
             {dst, (long)sizeof dst},
             {uni, -(long)B.lay.uni_len},
         })) { continue; }
-        ((dst[0] & 0xff) >= 0xfc) here;
-        (((dst[0]>>8) & 0xff) <= 2) here;
+        ((dst[0] & 0xff) == 0xFF) here;
+        (((dst[0]>>8) & 0xff) == 0) here;
         (((dst[7]>>16) & 0xff) >= 180) here;
     }
     cleanup_draw(&B);
@@ -1217,8 +1217,8 @@ static void test_radial_grad(void) {
             {dst, 4},
             {uni, -(long)B.lay.uni_len},
         })) { continue; }
-        ((dst[0] & 0xff) >= 0xfc) here;
-        (((dst[0]>>16) & 0xff) <= 2) here;
+        ((dst[0] & 0xff) == 0xFF) here;
+        (((dst[0]>>16) & 0xff) == 0) here;
     }
     cleanup_draw(&B);
 }
@@ -1254,7 +1254,7 @@ static void test_gradient_lut_nonuniform(void) {
             {dst, (long)sizeof dst},
             {uni, -(long)B.lay.uni_len},
         })) { continue; }
-        ((dst[0] & 0xff) >= 0xfc) here;
+        ((dst[0] & 0xff) == 0xFF) here;
         (((dst[7]>>16) & 0xff) >= 180) here;
     }
     cleanup_draw(&B);
@@ -1325,8 +1325,8 @@ static void test_transfer_invert(void) {
         for (int i = 0; i < 2; i++) {
             float r = (float)dst[i*4+0];
             float a = (float)dst[i*4+3];
-            (r >= 0.20f && r <= 0.23f) here;
-            (a >= 0.99f && a <= 1.01f) here;
+            equiv(r, 0.2141113281f) here;
+            (equiv(a, 1.0f))   here;
         }
     }
     cleanup_draw(&B);
@@ -1428,10 +1428,10 @@ static void test_transfer_roundtrip(void) {
             float g = (float)dst[i*4+1];
             float b = (float)dst[i*4+2];
             float a = (float)dst[i*4+3];
-            (r >= 0.24f && r <= 0.26f) here;
-            (g >= 0.49f && g <= 0.51f) here;
-            (b >= 0.74f && b <= 0.76f) here;
-            (a >= 0.99f && a <= 1.01f) here;
+            equiv(r, 0.2498779297f) here;
+            equiv(g, 0.5f)         here;
+            equiv(b, 0.75f)        here;
+            equiv(a, 1.0f)         here;
         }
     }
     cleanup_draw(&B);
@@ -1470,8 +1470,8 @@ static void test_supersample(void) {
             {uni, -(long)B.lay.uni_len},
         })) { continue; }
         for (int i = 0; i < 4; i++) {
-            (( dst[i]        & 0xFF) >= 0xFE) here;
-            (((dst[i] >> 24) & 0xFF) >= 0xFE) here;
+            (( dst[i]        & 0xFF) == 0xFF) here;
+            (((dst[i] >> 24) & 0xFF) == 0xFF) here;
         }
     }
     cleanup_draw(&B);

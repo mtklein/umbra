@@ -695,18 +695,18 @@ static void emit_ops(Buf *b, BB const *bb,
             case op_fma_f32:
                 emit(b,
                     "%su32 v%d = f2u("
-                    "u2f(v%d) * u2f(v%d)"
-                    " + u2f(v%d));\n",
+                    "fmaf(u2f(v%d), u2f(v%d),"
+                    " u2f(v%d)));\n",
                     pad, i,
                     inst->x, inst->y, inst->z);
                 break;
             case op_fms_f32:
                 emit(b,
                     "%su32 v%d = f2u("
-                    "u2f(v%d) - u2f(v%d)"
-                    " * u2f(v%d));\n",
+                    "fmaf(-u2f(v%d), u2f(v%d),"
+                    " u2f(v%d)));\n",
                     pad, i,
-                    inst->z, inst->x, inst->y);
+                    inst->x, inst->y, inst->z);
                 break;
 
             case op_eq_f32:

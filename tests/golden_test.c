@@ -53,7 +53,7 @@ static umbra_store_fn fmt_store[] = {
     umbra_store_1010102,
 };
 static int fmt_bpp[] = {4, 2, 8, 2, 4};
-static int fmt_tol[] = {1, 9, 1, 1, 86};
+static int fmt_tol[] = {0, 0, 0, 0, 0};
 
 typedef struct {
     struct umbra_interpreter *interp;

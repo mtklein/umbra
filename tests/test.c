@@ -988,7 +988,7 @@ static void test_srcover(void) {
   for (int opt = 0; opt < 2; opt++) {
     struct umbra_basic_block *bb = build_srcover();
     backends B = make_full(bb, opt);
-    float const tol = 0.02f;
+    float const tol = 0;
     for (int bi = 0; bi < 4; bi++) {
         uint32_t src_px[] = {
             0x80402010u, 0x80402010u, 0x80402010u,
