@@ -210,7 +210,6 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
     case op_narrow_f32:
     case op_widen_s16: case op_widen_u16:
     case op_narrow_16:
-    case op_load_8x4: case op_store_8x4:
         return 0;
     }
 }
@@ -648,101 +647,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             put(c, XTN_4h(s.rd, s.rx));
         } break;
 
-        case op_load_8x4: {
-            _Bool is_base = inst->x == 0;
-            int ch = is_base ? 0 : inst->imm;
-            int p  = is_base ? inst->ptr : bb->inst[inst->x].ptr;
-
-            if (scalar) {
-                resolve_ptr(c, p, &last_ptr, deref_gpr);
-                struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-                put(c, LSL_xi(XT, XI, 2));
-                if (ch) { put(c, ADD_xi(XT, XT, ch)); }
-                put(c, 0x38606800u
-                    | ((uint32_t)XT << 16)
-                    | ((uint32_t)XP << 5)
-                    | (uint32_t)XT);
-                put(c, DUP_4s_w(s.rd, XT));
-            } else if (is_base) {
-                resolve_ptr(c, p, &last_ptr, deref_gpr);
-                int8_t pixels = ra_alloc(ra, sl, ns);
-                put(c, LDR_q(pixels, XP, XW));
-                int8_t mask = ra_alloc(ra, sl, ns);
-                put(c, MOVI_4s(mask, 0xff, 0));
-                _Bool ch_needed[] = {1, 0, 0, 0};
-                for (int j = i+1; j < to; j++) {
-                    if (bb->inst[j].op == op_load_8x4
-                     && bb->inst[j].x == i) {
-                        ch_needed[bb->inst[j].imm] = 1;
-                    }
-                }
-                int8_t ch_reg[4];
-                for (int c2 = 0; c2 < 4; c2++) {
-                    ch_reg[c2] = -1;
-                    if (!ch_needed[c2]) { continue; }
-                    ch_reg[c2] = ra_alloc(ra, sl, ns);
-                    if (c2 == 0) {
-                        put(c, AND_16b(ch_reg[0],
-                                       pixels, mask));
-                    } else if (c2 < 3) {
-                        put(c, USHR_4s_imm(ch_reg[c2],
-                                           pixels,
-                                           c2*8));
-                        put(c, AND_16b(ch_reg[c2],
-                                       ch_reg[c2],
-                                       mask));
-                    } else {
-                        put(c, USHR_4s_imm(ch_reg[3],
-                                           pixels, 24));
-                    }
-                }
-                ra_return_reg(ra, mask);
-                ra_return_reg(ra, pixels);
-                ra_assign(ra, i, ch_reg[0]);
-                for (int j = i+1; j < to; j++) {
-                    if (bb->inst[j].op == op_load_8x4
-                     && bb->inst[j].x == i) {
-                        ra_assign(ra, j,
-                                  ch_reg[bb->inst[j].imm]);
-                    }
-                }
-            }
-        } break;
-
-        case op_store_8x4: {
-            int p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr);
-            int const inputs[] = {
-                inst->x, inst->y, inst->z, inst->w};
-            if (scalar) {
-                for (int ch2 = 0; ch2 < 4; ch2++) {
-                    int8_t ry = ra_ensure(
-                        ra, sl, ns, inputs[ch2]);
-                    put(c, LSL_xi(XT, XI, 2));
-                    if (ch2) { put(c, ADD_xi(XT, XT, ch2)); }
-                    put(c, ADD_xr(XT, XP, XT));
-                    put(c, ST1_b(ry, 0, XT));
-                }
-            } else {
-                int8_t r0 = ra_ensure(ra,sl,ns,inputs[0]);
-                int8_t r1 = ra_ensure(ra,sl,ns,inputs[1]);
-                int8_t r2 = ra_ensure(ra,sl,ns,inputs[2]);
-                int8_t r3 = ra_ensure(ra,sl,ns,inputs[3]);
-                int8_t tmp = ra_alloc(ra, sl, ns);
-                put(c, ORR_16b(tmp, r0, r0));
-                put(c, SLI_4s_imm(tmp, r1, 8));
-                put(c, SLI_4s_imm(tmp, r2, 16));
-                put(c, SLI_4s_imm(tmp, r3, 24));
-                put(c, STR_q(tmp, XP, XW));
-                ra_return_reg(ra, tmp);
-            }
-            for (int ch2 = 0; ch2 < 4; ch2++) {
-                if (lu(inputs[ch2]) <= i) {
-                    ra_free_reg(ra, inputs[ch2]);
-                }
-            }
-        } break;
-
         case op_eq_f32: case op_lt_f32: case op_le_f32:
         case op_eq_i32: case op_lt_s32: case op_le_s32: {
             _Bool x_is_0 = bb->inst[inst->x].op == op_imm_32
@@ -802,8 +706,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 case op_widen_f16: case op_narrow_f32:
                 case op_widen_s16: case op_widen_u16:
                 case op_narrow_16:
-                case op_load_8x4:
-                case op_store_8x4:
                     break;
                 }
                 #undef CZ
@@ -1179,7 +1081,6 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
     case op_widen_f16: case op_narrow_f32:
     case op_widen_s16: case op_widen_u16:
     case op_narrow_16:
-    case op_load_8x4: case op_store_8x4:
         return 0;
     }
 }
@@ -1709,175 +1610,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 vex_rrr(c, 1, 2, 0, 0x2b,
                     s.rd, s.rx, tmp);
                 ra_return_reg(ra, tmp);
-            }
-        } break;
-
-        case op_load_8x4: {
-            _Bool is_base = inst->x == 0;
-            int ch = is_base ? 0 : inst->imm;
-            int p = is_base ? inst->ptr : bb->inst[inst->x].ptr;
-
-            if (scalar) {
-                struct ra_step rs = ra_step_alloc(ra, sl, ns, i);
-                int base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
-                // MOVZX eax, byte [base + R10*4 + ch]
-                {
-                    uint8_t rex = 0x40;
-                    if (XI >= 8) { rex |= 0x02; }
-                    if (base >= 8) { rex |= 0x01; }
-                    if (rex != 0x40) { emit1(c, rex); }
-                    emit1(c, 0x0f); emit1(c, 0xb6);
-                    int disp2 = ch;
-                    int mod = disp2 ? ((disp2 < 128) ? 1 : 2) : 0;
-                    if (mod == 0 && (base&7) == 5) { mod = 1; }
-                    emit1(c, (uint8_t)((mod<<6) | ((RAX&7)<<3) | 4));
-                    emit1(c, (uint8_t)((2<<6) | ((XI&7)<<3) | (base&7)));
-                    if (mod == 1) { emit1(c, (uint8_t)disp2); }
-                    else if (mod == 2) { emit4(c, (uint32_t)disp2); }
-                }
-                vex(c, 1, 1, 0, 0, rs.rd, 0, RAX, 0x6e);
-            } else if (is_base) {
-                // Load 32 bytes (8 pixels * 4 channels), deinterleave.
-                // Each pixel is a dword. Shift right by ch*8 and mask 0xFF.
-                // Result is 8 x u32 in YMM.
-                int8_t mask = ra_alloc(ra, sl, ns);
-                emit1(c, 0xb8); emit4(c, 0x000000ffu);
-                vex(c, 1, 1, 1, 0, mask, 0, RAX, 0x6e);
-                vex_rr(c, 1, 2, 1, 0x58, mask, mask);
-
-                int8_t s0 = ra_alloc(ra, sl, ns);
-                int8_t ch_regs[4];
-                int8_t loaded = ra_alloc(ra, sl, ns);
-                vmov_load(c, 1, loaded,
-                    resolve_ptr_x86(
-                        c, p, &last_ptr, deref_gpr),
-                    XI, 4, 0);
-                for (int ch2 = 0; ch2 < 4; ch2++) {
-                    if (ch2 == 0) { vpand(c, 1, s0, loaded, mask); }
-                    else {
-                        vpsrld_i(c, s0, loaded, (uint8_t)(ch2*8));
-                        vpand(c, 1, s0, s0, mask);
-                    }
-                    int8_t rd2 = ra_alloc(ra, sl, ns);
-                    ch_regs[ch2] = rd2;
-                    vmovaps(c, rd2, s0);
-                }
-
-                ra_return_reg(ra, loaded);
-                ra_return_reg(ra, s0);
-                ra_return_reg(ra, mask);
-
-                ra_assign(ra, i, ch_regs[0]);
-                for (int j = i+1; j < to; j++) {
-                    if (bb->inst[j].op == op_load_8x4 && bb->inst[j].x == i) {
-                        int c2 = bb->inst[j].imm;
-                        ra_assign(ra, j, ch_regs[c2]);
-                    }
-                }
-            }
-        } break;
-
-        case op_store_8x4: {
-            int p = inst->ptr;
-            int const inputs[] = {inst->x, inst->y, inst->z, inst->w};
-            if (scalar) {
-                for (int ch2 = 0; ch2 < 4; ch2++) {
-                    int8_t ry = ra_ensure(ra, sl, ns, inputs[ch2]);
-                    vex(c, 1, 1, 0, 0, ry, 0, RAX, 0x7e);
-                    int base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
-                    {
-                        uint8_t rex = 0x40;
-                        if (XI >= 8) { rex |= 0x02; }
-                        if (base >= 8) { rex |= 0x01; }
-                        if (rex != 0x40) { emit1(c, rex); }
-                        emit1(c, 0x88);
-                        int disp2 = ch2;
-                        int mod = disp2 ? 1 : 0;
-                        if (mod == 0 && (base&7) == 5) { mod = 1; }
-                        emit1(c, (uint8_t)((mod<<6) | ((RAX&7)<<3) | 4));
-                        emit1(c, (uint8_t)((2<<6) | ((XI&7)<<3) | (base&7)));
-                        if (mod == 1) { emit1(c, (uint8_t)disp2); }
-                    }
-                }
-            } else {
-                // Narrow 4x8xu32 to u8, interleave
-                // to RGBA, store 32 bytes.
-                // Each channel is 8 x u32. Need to pack to u8 and interleave.
-                // Mask to 0xFF, pack pairs of channels.
-                for (int ch2 = 0; ch2 < 4; ch2++) {
-                    ra_ensure(ra, sl, ns,
-                              inputs[ch2]);
-                }
-                int8_t r0 = ra_reg(ra, inputs[0]), r1 = ra_reg(ra, inputs[1]);
-                int8_t r2 = ra_reg(ra, inputs[2]), r3 = ra_reg(ra, inputs[3]);
-
-                // Pack 8xu32 -> 8xu8 per channel, then interleave.
-                // First narrow each 8xu32 -> 8xu16 -> 8xu8.
-                int8_t s0 = ra_alloc(ra, sl, ns);
-                int8_t s1 = ra_alloc(ra, sl, ns);
-
-                // For each channel: extract hi128, VPACKUSDW to get 8xu16,
-                // then VPACKUSWB with zero to get 8xu8.
-                int8_t zero = ra_alloc(ra, sl, ns);
-                vpxor(c, 1, zero, zero, zero);
-
-                // Narrow r0: 8xu32 -> 8xu16 -> 8xu8
-                {
-                    int8_t t = ra_alloc(ra, sl, ns);
-                    vextracti128(c, t, r0, 1);
-                    vex_rrr(c, 1, 2, 0, 0x2b, t, r0, t);   // VPACKUSDW
-                    vpackuswb(c, s0, t, zero);
-                    ra_return_reg(ra, t);
-                }
-                // Narrow r1
-                {
-                    int8_t t = ra_alloc(ra, sl, ns);
-                    vextracti128(c, t, r1, 1);
-                    vex_rrr(c, 1, 2, 0, 0x2b, t, r1, t);
-                    vpackuswb(c, s1, t, zero);
-                    ra_return_reg(ra, t);
-                }
-                vpunpcklbw(c, s0, s0, s1);  // [R0,G0,R1,G1,...,R7,G7]
-
-                // Narrow r2
-                {
-                    int8_t t = ra_alloc(ra, sl, ns);
-                    vextracti128(c, t, r2, 1);
-                    vex_rrr(c, 1, 2, 0, 0x2b, t, r2, t);
-                    vpackuswb(c, s1, t, zero);
-                    ra_return_reg(ra, t);
-                }
-                // Narrow r3
-                {
-                    int8_t t = ra_alloc(ra, sl, ns);
-                    int8_t atmp = ra_alloc(ra, sl, ns);
-                    vextracti128(c, t, r3, 1);
-                    vex_rrr(c, 1, 2, 0, 0x2b, t, r3, t);
-                    vpackuswb(c, atmp, t, zero);
-                    vpunpcklbw(c, s1, s1, atmp);  // [B0,A0,...,B7,A7]
-                    ra_return_reg(ra, t);
-                    ra_return_reg(ra, atmp);
-                }
-                ra_return_reg(ra, zero);
-
-                // s0=[RG pairs], s1=[BA pairs] -> interleave words
-                {
-                    int8_t stmp = ra_alloc(ra, sl, ns);
-                    vmovaps_x(c, stmp, s0);
-                    vex_rrr(c, 1, 1, 0, 0x61, s0, stmp, s1);  // VPUNPCKLWD
-                    vex_rrr(c, 1, 1, 0, 0x69, s1, stmp, s1);  // VPUNPCKHWD
-                    ra_return_reg(ra, stmp);
-                }
-                vinserti128(c, s0, s0, s1, 1);
-                vmov_store(c, 1, s0,
-                    resolve_ptr_x86(
-                        c, p, &last_ptr, deref_gpr),
-                    XI, 4, 0);
-                ra_return_reg(ra, s0);
-                ra_return_reg(ra, s1);
-            }
-            for (int ch2 = 0; ch2 < 4; ch2++) {
-                if (lu(inputs[ch2]) <= i) { ra_free_reg(ra, inputs[ch2]); }
             }
         } break;
 

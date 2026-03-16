@@ -45,6 +45,7 @@ static inline s32 clamp_ix(s32 ix, long bytes, int elem) {
 }
 
 void umbra_entry(int n, void **ptrs, long *szs) {
+    u32* restrict p0 = (u32*)ptrs[0];
     u32* restrict p1 = (u32*)ptrs[1];
     long sz0 = szs[0];
     long sz1 = szs[1];
@@ -53,21 +54,31 @@ void umbra_entry(int n, void **ptrs, long *szs) {
     u32 v2 = p1[3];
     u32 v3 = p1[4];
     u32 v4 = p1[5];
-    u32 v5 = 1132396544u;
-    u32 v6 = 1056964608u;
-    u32 v7 = f2u(fmaf(u2f(v1), u2f(v5), u2f(v6)));
-    u32 v8 = (u32)(s32)u2f(v7);
-    u32 v9 = f2u(fmaf(u2f(v2), u2f(v5), u2f(v6)));
-    u32 v10 = (u32)(s32)u2f(v9);
-    u32 v11 = f2u(fmaf(u2f(v3), u2f(v5), u2f(v6)));
+    u32 v5 = 255u;
+    u32 v6 = 8u;
+    u32 v7 = 16u;
+    u32 v8 = 24u;
+    u32 v9 = 1132396544u;
+    u32 v10 = 1056964608u;
+    u32 v11 = f2u(fmaf(u2f(v1), u2f(v9), u2f(v10)));
     u32 v12 = (u32)(s32)u2f(v11);
-    u32 v13 = f2u(fmaf(u2f(v4), u2f(v5), u2f(v6)));
+    u32 v13 = f2u(fmaf(u2f(v2), u2f(v9), u2f(v10)));
     u32 v14 = (u32)(s32)u2f(v13);
+    u32 v15 = f2u(fmaf(u2f(v3), u2f(v9), u2f(v10)));
+    u32 v16 = (u32)(s32)u2f(v15);
+    u32 v17 = f2u(fmaf(u2f(v4), u2f(v9), u2f(v10)));
+    u32 v18 = (u32)(s32)u2f(v17);
+    u32 v19 = (u32)(v5 & v12);
+    u32 v20 = (u32)(v5 & v14);
+    u32 v21 = (u32)(v20 << v6);
+    u32 v22 = (u32)(v19 | v21);
+    u32 v23 = (u32)(v5 & v16);
+    u32 v24 = (u32)(v23 << v7);
+    u32 v25 = (u32)(v22 | v24);
+    u32 v26 = (u32)(v18 << v8);
+    u32 v27 = (u32)(v25 | v26);
 
     for (int i = 0; i < n; i++) {
-        ((unsigned char*)ptrs[0])[i*4+0] = (unsigned char)v8;
-        ((unsigned char*)ptrs[0])[i*4+1] = (unsigned char)v10;
-        ((unsigned char*)ptrs[0])[i*4+2] = (unsigned char)v12;
-        ((unsigned char*)ptrs[0])[i*4+3] = (unsigned char)v14;
+        p0[i] = v27;
     }
 }

@@ -606,79 +606,6 @@ static void emit_ops(Buf *b, BB const *bb,
                     pad, i, inst->x, inst->y);
                 break;
 
-            case op_load_8x4: {
-                int ch = inst->x ? inst->imm : 0;
-                int p  = inst->x
-                    ? bb->inst[inst->x].ptr
-                    : inst->ptr;
-                if (p < 0) {
-                    emit(b,
-                        "%su32 v%d ="
-                        " (u32)((unsigned char*)"
-                        "pd%d)[i*4+%d];\n",
-                        pad, i, ~p, ch);
-                } else {
-                    emit(b,
-                        "%su32 v%d ="
-                        " (u32)((unsigned char*)"
-                        "ptrs[%d])[i*4+%d];\n",
-                        pad, i, p, ch);
-                }
-            } break;
-            case op_store_8x4: {
-                int p = inst->ptr;
-                if (p < 0) {
-                    emit(b,
-                        "%s((unsigned char*)pd%d)"
-                        "[i*4+0]"
-                        " = (unsigned char)"
-                        "v%d;\n",
-                        pad, ~p, inst->x);
-                    emit(b,
-                        "%s((unsigned char*)pd%d)"
-                        "[i*4+1]"
-                        " = (unsigned char)"
-                        "v%d;\n",
-                        pad, ~p, inst->y);
-                    emit(b,
-                        "%s((unsigned char*)pd%d)"
-                        "[i*4+2]"
-                        " = (unsigned char)"
-                        "v%d;\n",
-                        pad, ~p, inst->z);
-                    emit(b,
-                        "%s((unsigned char*)pd%d)"
-                        "[i*4+3]"
-                        " = (unsigned char)"
-                        "v%d;\n",
-                        pad, ~p, inst->w);
-                } else {
-                    emit(b,
-                        "%s((unsigned char*)"
-                        "ptrs[%d])[i*4+0]"
-                        " = (unsigned char)"
-                        "v%d;\n",
-                        pad, p, inst->x);
-                    emit(b,
-                        "%s((unsigned char*)"
-                        "ptrs[%d])[i*4+1]"
-                        " = (unsigned char)"
-                        "v%d;\n",
-                        pad, p, inst->y);
-                    emit(b,
-                        "%s((unsigned char*)"
-                        "ptrs[%d])[i*4+2]"
-                        " = (unsigned char)"
-                        "v%d;\n",
-                        pad, p, inst->z);
-                    emit(b,
-                        "%s((unsigned char*)"
-                        "ptrs[%d])[i*4+3]"
-                        " = (unsigned char)"
-                        "v%d;\n",
-                        pad, p, inst->w);
-                }
-            } break;
         }
 
         if (is_store(inst->op) && i+1 < hi) {
@@ -706,9 +633,7 @@ struct umbra_codegen* umbra_codegen(
         enum op op = bb->inst[i].op;
         if (has_ptr(op) && bb->inst[i].ptr >= 0) {
             int p = bb->inst[i].ptr;
-            if (op == op_deref_ptr
-                || op == op_load_8x4
-                || op == op_store_8x4) {
+            if (op == op_deref_ptr) {
             } else if (is_32bit_mem_op(op)) {
                 ptr_32[p] = 1;
             } else if (is_16bit_mem_op(op)) {

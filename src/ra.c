@@ -87,9 +87,7 @@ struct ra* ra_create(struct umbra_basic_block const *bb,
     }
     for (int i = 0; i < n; i++) {
         struct bb_inst const *inst = &bb->inst[i];
-        if (!(inst->op == op_load_8x4 && inst->x)) {
-            ra->last_use[inst->x] = i;
-        }
+        ra->last_use[inst->x] = i;
         ra->last_use[inst->y] = i;
         ra->last_use[inst->z] = i;
         ra->last_use[inst->w] = i;

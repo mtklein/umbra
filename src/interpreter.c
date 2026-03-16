@@ -406,80 +406,6 @@ op(le_u32) {
     next;
 }
 
-op(load_8x4) {
-    uint8_t const *src = ptr[ip->x];
-    if (end & (K-1)) {
-        uint8_t const *px = src + (end-1)*4;
-        for (int ch = 0; ch < 4; ch++) {
-            v[ch].u32 = (U32){0};
-            v[ch].u32[0] = px[ch];
-        }
-    } else {
-        typedef uint8_t B32
-            __attribute__((vector_size(32)));
-        typedef uint8_t B8
-            __attribute__((vector_size(K)));
-        B32 all;
-        __builtin_memcpy(&all, src + (end-K)*4, 32);
-        B8 c0 = __builtin_shufflevector(
-            all, all,  0, 4, 8,12,16,20,24,28);
-        B8 c1 = __builtin_shufflevector(
-            all, all,  1, 5, 9,13,17,21,25,29);
-        B8 c2 = __builtin_shufflevector(
-            all, all,  2, 6,10,14,18,22,26,30);
-        B8 c3 = __builtin_shufflevector(
-            all, all,  3, 7,11,15,19,23,27,31);
-        v[0].u32 = __builtin_convertvector(c0, U32);
-        v[1].u32 = __builtin_convertvector(c1, U32);
-        v[2].u32 = __builtin_convertvector(c2, U32);
-        v[3].u32 = __builtin_convertvector(c3, U32);
-    }
-    return ip[4].fn(ip+4, v+4, end, ptr, sz);
-}
-
-op(store_8x4) {
-    uint8_t *dst = ptr[ip->x];
-    U32 r = v[ip->y].u32, g = v[ip->z].u32,
-        b = v[ip->w].u32, a = v[(int)ip[1].x].u32;
-    if (end & (K-1)) {
-        dst[(end-1)*4+0] = (uint8_t)r[0];
-        dst[(end-1)*4+1] = (uint8_t)g[0];
-        dst[(end-1)*4+2] = (uint8_t)b[0];
-        dst[(end-1)*4+3] = (uint8_t)a[0];
-    } else {
-        typedef uint8_t B8
-            __attribute__((vector_size(K)));
-        B8 r8 = __builtin_convertvector(
-            cast(U16, r), B8);
-        B8 g8 = __builtin_convertvector(
-            cast(U16, g), B8);
-        B8 b8 = __builtin_convertvector(
-            cast(U16, b), B8);
-        B8 a8 = __builtin_convertvector(
-            cast(U16, a), B8);
-        typedef uint8_t B16
-            __attribute__((vector_size(16)));
-        B16 rg = __builtin_shufflevector(
-            r8, g8,
-            0,8, 1,9, 2,10, 3,11,
-            4,12, 5,13, 6,14, 7,15);
-        B16 ba = __builtin_shufflevector(
-            b8, a8,
-            0,8, 1,9, 2,10, 3,11,
-            4,12, 5,13, 6,14, 7,15);
-        typedef uint8_t B32
-            __attribute__((vector_size(32)));
-        B32 rgba = __builtin_shufflevector(
-            rg, ba,
-             0, 1,16,17,  2, 3,18,19,
-             4, 5,20,21,  6, 7,22,23,
-             8, 9,24,25, 10,11,26,27,
-            12,13,28,29, 14,15,30,31);
-        __builtin_memcpy(dst + (end-K)*4, &rgba, 32);
-    }
-    return ip[2].fn(ip+2, v+2, end, ptr, sz);
-}
-
 op(done) {
     (void)ip; (void)v; (void)end;
     (void)ptr; (void)sz;
@@ -547,8 +473,6 @@ static Fn const fn[] = {
     [op_le_u32] = le_u32,
 
     [op_deref_ptr]  = deref_ptr_handler,
-    [op_load_8x4]   = load_8x4,
-    [op_store_8x4]  = store_8x4,
 };
 
 int umbra_const_eval(enum op op, int xb,
@@ -578,11 +502,6 @@ struct umbra_interpreter* umbra_interpreter(
 
     struct umbra_interpreter *p = malloc(sizeof *p);
     int num_insts = bb->insts + 1;
-    for (int i = 0; i < bb->insts; i++) {
-        if (bb->inst[i].op == op_store_8x4) {
-            num_insts += 1;
-        }
-    }
     p->inst = malloc(
         (size_t)num_insts * sizeof *p->inst);
     p->v = malloc(
@@ -705,31 +624,6 @@ struct umbra_interpreter* umbra_interpreter(
                              .y=Y, .z=X);
                         break;
 
-                    case op_load_8x4: {
-                        if (inst->x) {
-                            id[i] = id[inst->x]
-                                  + inst->imm;
-                            continue;
-                        }
-                        emit(.fn=load_8x4,
-                             .x=RESOLVE_PTR(inst));
-                        id[i] = n;
-                        n += 4;
-                        continue;
-                    }
-
-                    case op_store_8x4: {
-                        emit(.fn=store_8x4,
-                             .x=RESOLVE_PTR(inst),
-                             .y=id[inst->x] - n,
-                             .z=id[inst->y] - n,
-                             .w=id[inst->z] - n);
-                        p->inst[n+1] =
-                            (struct interp_inst){
-                                .x=id[inst->w] - n};
-                        n += 2;
-                        continue;
-                    }
                     #undef RESOLVE_PTR
 
                     case op_add_f32:

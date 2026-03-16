@@ -424,26 +424,6 @@ val umbra_cvt_i32_f32(BB *bb, val a) {
     return (val){math(bb, op_i32_from_f32, .x=a.id)};
 }
 
-void umbra_load_u8x4(BB *bb, umbra_ptr src,
-                   val ix, val out[4]) {
-    (void)ix;
-    int base = push(bb, op_load_8x4, .ptr=src.ix);
-    for (int ch = 1; ch <= 3; ch++) {
-        push(bb, op_load_8x4, .x=base, .imm=ch);
-    }
-    for (int ch = 0; ch < 4; ch++) {
-        out[ch] = (val){base + ch};
-    }
-}
-
-void umbra_store_u8x4(BB *bb, umbra_ptr dst,
-                    val ix, val in[4]) {
-    (void)ix;
-    push(bb, op_store_8x4,
-         .x=in[0].id, .y=in[1].id,
-         .z=in[2].id, .w=in[3].id, .ptr=dst.ix);
-}
-
 val umbra_eq_f32(BB *bb, val a, val b) {
     sort(&a.id, &b.id);
     return (val){math(bb, op_eq_f32,
@@ -632,14 +612,7 @@ void umbra_basic_block_dump(BB const *bb, FILE *f) {
         enum op op = inst->op;
 
         if (is_store(op)) {
-            if (op == op_store_8x4) {
-                fprintf(f,
-                    "      %-15s p%d"
-                    " v%d v%d v%d v%d\n",
-                    op_name(op), inst->ptr,
-                    inst->x, inst->y,
-                    inst->z, inst->w);
-            } else {
+            {
                 fprintf(f, "      %-15s p%d",
                         op_name(op), inst->ptr);
                 if (op == op_scatter_16
@@ -680,14 +653,6 @@ void umbra_basic_block_dump(BB const *bb, FILE *f) {
                     fprintf(f, " +v%d", inst->x);
                 }
                 break;
-            case op_load_8x4:
-                if (inst->x == 0) {
-                    fprintf(f, " p%d", inst->ptr);
-                } else {
-                    fprintf(f, " v%d ch%d",
-                            inst->x, inst->imm);
-                }
-                break;
             case op_deref_ptr:
                 fprintf(f, " p%d byte%d",
                         inst->ptr, inst->imm);
@@ -698,7 +663,6 @@ void umbra_basic_block_dump(BB const *bb, FILE *f) {
             case op_store_32:
             case op_scatter_16:
             case op_scatter_32:
-            case op_store_8x4:
                 break;
 
             case op_sqrt_f32:

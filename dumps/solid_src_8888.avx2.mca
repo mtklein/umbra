@@ -1,56 +1,36 @@
 Iterations:        100
-Instructions:      2100
-Total Cycles:      663
-Total uOps:        2100
+Instructions:      200
+Total Cycles:      108
+Total uOps:        200
 
 Dispatch Width:    6
-uOps Per Cycle:    3.17
-IPC:               3.17
-Block RThroughput: 6.0
+uOps Per Cycle:    1.85
+IPC:               1.85
+Block RThroughput: 1.0
 
 
-Cycles with backend pressure increase [ 94.42% ]
+Cycles with backend pressure increase [ 34.26% ]
 Throughput Bottlenecks: 
-  Resource Pressure       [ 94.42% ]
-  - Zn4FP0  [ 5.43% ]
-  - Zn4FP1  [ 93.06% ]
-  - Zn4FP2  [ 93.06% ]
-  Data Dependencies:      [ 15.08% ]
-  - Register Dependencies [ 15.08% ]
+  Resource Pressure       [ 34.26% ]
+  - Zn4FPSt  [ 34.26% ]
+  - Zn4LSU  [ 34.26% ]
+  Data Dependencies:      [ 0.00% ]
+  - Register Dependencies [ 0.00% ]
   - Memory Dependencies   [ 0.00% ]
 
 Critical sequence based on the simulation:
 
               Instruction                                 Dependency Information
- +----< 12.   vpackusdw	%xmm3, %xmm6, %xmm3
+ +----< 0.    movq	(%rsi), %r11
  |
  |    < loop carried > 
  |
- |      0.    vpxor	%ymm4, %ymm4, %ymm4
- |      1.    vextracti128	$1, %ymm7, %xmm3
- +----> 2.    vpackusdw	%xmm3, %xmm7, %xmm3               ## RESOURCE interference:  Zn4FP2 [ probability: 49% ]
- |      3.    vpackuswb	%xmm4, %xmm3, %xmm0
- |      4.    vextracti128	$1, %ymm1, %xmm3
- +----> 5.    vpackusdw	%xmm3, %xmm1, %xmm3               ## RESOURCE interference:  Zn4FP2 [ probability: 48% ]
- |      6.    vpackuswb	%xmm4, %xmm3, %xmm5
- |      7.    vpunpcklbw	%xmm5, %xmm0, %xmm0
- |      8.    vextracti128	$1, %ymm2, %xmm3
- +----> 9.    vpackusdw	%xmm3, %xmm2, %xmm3               ## RESOURCE interference:  Zn4FP1 [ probability: 97% ]
- +----> 10.   vpackuswb	%xmm4, %xmm3, %xmm5               ## REGISTER dependency:  %xmm3
- |      11.   vextracti128	$1, %ymm6, %xmm3
- |      12.   vpackusdw	%xmm3, %xmm6, %xmm3
- |      13.   vpackuswb	%xmm4, %xmm3, %xmm8
- |      14.   vpunpcklbw	%xmm8, %xmm5, %xmm5
- |      15.   vmovaps	%xmm0, %xmm4
- |      16.   vpunpcklwd	%xmm5, %xmm4, %xmm0
- |      17.   vpunpckhwd	%xmm5, %xmm4, %xmm5
- |      18.   vinserti128	$1, %xmm5, %ymm0, %ymm0
- |      19.   movq	(%rsi), %r11
- |      20.   vmovdqu	%ymm0, (%r11,%r10,4)
+ +----> 0.    movq	(%rsi), %r11                      ## RESOURCE interference:  Zn4LSU [ probability: 164% ]
+ |      1.    vmovdqu	%ymm11, (%r11,%r10,4)
  |
  |    < loop carried > 
  |
- +----> 2.    vpackusdw	%xmm3, %xmm7, %xmm3               ## RESOURCE interference:  Zn4FP2 [ probability: 1% ]
+ +----> 0.    movq	(%rsi), %r11                      ## RESOURCE interference:  Zn4LSU [ probability: 164% ]
 
 
 Instruction Info:
@@ -62,27 +42,8 @@ Instruction Info:
 [6]: HasSideEffects (U)
 
 [1]    [2]    [3]    [4]    [5]    [6]    Instructions:
- 1      0     0.17                        vpxor	%ymm4, %ymm4, %ymm4
- 1      4     1.00                        vextracti128	$1, %ymm7, %xmm3
- 1      2     0.50                        vpackusdw	%xmm3, %xmm7, %xmm3
- 1      2     0.50                        vpackuswb	%xmm4, %xmm3, %xmm0
- 1      4     1.00                        vextracti128	$1, %ymm1, %xmm3
- 1      2     0.50                        vpackusdw	%xmm3, %xmm1, %xmm3
- 1      2     0.50                        vpackuswb	%xmm4, %xmm3, %xmm5
- 1      1     0.50                        vpunpcklbw	%xmm5, %xmm0, %xmm0
- 1      4     1.00                        vextracti128	$1, %ymm2, %xmm3
- 1      2     0.50                        vpackusdw	%xmm3, %xmm2, %xmm3
- 1      2     0.50                        vpackuswb	%xmm4, %xmm3, %xmm5
- 1      4     1.00                        vextracti128	$1, %ymm6, %xmm3
- 1      2     0.50                        vpackusdw	%xmm3, %xmm6, %xmm3
- 1      2     0.50                        vpackuswb	%xmm4, %xmm3, %xmm8
- 1      1     0.50                        vpunpcklbw	%xmm8, %xmm5, %xmm5
- 1      0     0.17                        vmovaps	%xmm0, %xmm4
- 1      1     0.50                        vpunpcklwd	%xmm5, %xmm4, %xmm0
- 1      1     0.50                        vpunpckhwd	%xmm5, %xmm4, %xmm5
- 1      1     1.00                        vinserti128	$1, %xmm5, %ymm0, %ymm0
  1      5     0.33    *                   movq	(%rsi), %r11
- 1      1     1.00           *            vmovdqu	%ymm0, (%r11,%r10,4)
+ 1      1     1.00           *            vmovdqu	%ymm11, (%r11,%r10,4)
 
 
 Resources:
@@ -113,28 +74,9 @@ Resources:
 
 Resource pressure per iteration:
 [0]    [1]    [2]    [3]    [4]    [5]    [6]    [7]    [8]    [9]    [10]   [11]   [12.0] [12.1] [13]   [14.0] [14.1] [14.2] [15.0] [15.1] [15.2] [16.0] [16.1] 
-0.33   0.33   0.34    -      -      -      -      -     4.00   6.50   6.50    -     0.50   0.50   1.00   0.66   0.67   0.67   0.33   0.33   0.34   0.50   0.50   
+0.33   0.33   0.34    -      -      -      -      -      -      -      -      -     0.50   0.50   1.00   0.66   0.67   0.67   0.33   0.33   0.34   0.50   0.50   
 
 Resource pressure by instruction:
 [0]    [1]    [2]    [3]    [4]    [5]    [6]    [7]    [8]    [9]    [10]   [11]   [12.0] [12.1] [13]   [14.0] [14.1] [14.2] [15.0] [15.1] [15.2] [16.0] [16.1] Instructions:
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vpxor	%ymm4, %ymm4, %ymm4
- -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     vextracti128	$1, %ymm7, %xmm3
- -      -      -      -      -      -      -      -      -     0.03   0.97    -      -      -      -      -      -      -      -      -      -      -      -     vpackusdw	%xmm3, %xmm7, %xmm3
- -      -      -      -      -      -      -      -      -     0.02   0.98    -      -      -      -      -      -      -      -      -      -      -      -     vpackuswb	%xmm4, %xmm3, %xmm0
- -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     vextracti128	$1, %ymm1, %xmm3
- -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -      -     vpackusdw	%xmm3, %xmm1, %xmm3
- -      -      -      -      -      -      -      -      -     0.98   0.02    -      -      -      -      -      -      -      -      -      -      -      -     vpackuswb	%xmm4, %xmm3, %xmm5
- -      -      -      -      -      -      -      -      -     0.97   0.03    -      -      -      -      -      -      -      -      -      -      -      -     vpunpcklbw	%xmm5, %xmm0, %xmm0
- -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     vextracti128	$1, %ymm2, %xmm3
- -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -      -     vpackusdw	%xmm3, %xmm2, %xmm3
- -      -      -      -      -      -      -      -      -     0.98   0.02    -      -      -      -      -      -      -      -      -      -      -      -     vpackuswb	%xmm4, %xmm3, %xmm5
- -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     vextracti128	$1, %ymm6, %xmm3
- -      -      -      -      -      -      -      -      -     0.51   0.49    -      -      -      -      -      -      -      -      -      -      -      -     vpackusdw	%xmm3, %xmm6, %xmm3
- -      -      -      -      -      -      -      -      -     0.02   0.98    -      -      -      -      -      -      -      -      -      -      -      -     vpackuswb	%xmm4, %xmm3, %xmm8
- -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpunpcklbw	%xmm8, %xmm5, %xmm5
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vmovaps	%xmm0, %xmm4
- -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -      -      -      -      -      -     vpunpcklwd	%xmm5, %xmm4, %xmm0
- -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpunpckhwd	%xmm5, %xmm4, %xmm5
- -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -     vinserti128	$1, %xmm5, %ymm0, %ymm0
-0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.33   0.34   0.33   0.33   0.34    -      -     movq	(%rsi), %r11
- -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50   1.00   0.33   0.34   0.33    -      -      -     0.50   0.50   vmovdqu	%ymm0, (%r11,%r10,4)
+0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.47   0.48   0.05   0.33   0.33   0.34    -      -     movq	(%rsi), %r11
+ -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50   1.00   0.19   0.19   0.62    -      -      -     0.50   0.50   vmovdqu	%ymm11, (%r11,%r10,4)

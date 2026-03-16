@@ -483,35 +483,6 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i, inst->x, inst->y);
                 break;
 
-            case op_load_8x4: {
-                int ch  = inst->x ? inst->imm : 0;
-                int raw = inst->x
-                    ? bb->inst[inst->x].ptr
-                    : inst->ptr;
-                int p = raw < 0
-                    ? deref_buf[~raw] : raw;
-                emit(b, "%suint v%d = (uint)"
-                        "((device uchar*)p%d)"
-                        "[i*4+%d];\n",
-                     pad, i, p, ch);
-            } break;
-            case op_store_8x4: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr]
-                    : inst->ptr;
-                emit(b, "%s((device uchar*)p%d)"
-                        "[i*4+0] = (uchar)v%d;\n",
-                     pad, p, inst->x);
-                emit(b, "%s((device uchar*)p%d)"
-                        "[i*4+1] = (uchar)v%d;\n",
-                     pad, p, inst->y);
-                emit(b, "%s((device uchar*)p%d)"
-                        "[i*4+2] = (uchar)v%d;\n",
-                     pad, p, inst->z);
-                emit(b, "%s((device uchar*)p%d)"
-                        "[i*4+3] = (uchar)v%d;\n",
-                     pad, p, inst->w);
-            } break;
         }
 
         if (is_store(inst->op) && i+1 < hi) {
@@ -553,9 +524,7 @@ static char* build_source(BB const *bb,
             int p = bb->inst[i].ptr < 0
                 ? deref_buf[~bb->inst[i].ptr]
                 : bb->inst[i].ptr;
-            if (op == op_load_8x4
-                    || op == op_store_8x4) {}
-            else if (is_32(op)) { ptr_32[p] = 1; }
+            if (is_32(op)) { ptr_32[p] = 1; }
             else if (is_16(op)) { ptr_16[p] = 1; }
         }
     }

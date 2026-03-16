@@ -20,9 +20,7 @@
     X(uni_16) X(load_16) X(store_16)                     \
     X(gather_16) X(scatter_16)                           \
     X(widen_s16) X(widen_u16) X(narrow_16)                \
-    X(widen_f16) X(narrow_f32)                            \
-    X(load_8x4)                                          \
-    X(store_8x4)
+    X(widen_f16) X(narrow_f32)
 
 enum op {
     #define OP_ENUM(name) op_##name,
@@ -48,15 +46,12 @@ static inline _Bool is_store(enum op op) {
     return op == op_store_16
         || op == op_store_32
         || op == op_scatter_16
-        || op == op_scatter_32
-        || op == op_store_8x4;
+        || op == op_scatter_32;
 }
 
 static inline _Bool has_ptr(enum op op) {
     return op == op_deref_ptr
         || (op >= op_uni_32 && op <= op_scatter_32)
-        || op == op_load_8x4
-        || op == op_store_8x4
         || (op >= op_uni_16 && op <= op_scatter_16);
 }
 
@@ -65,9 +60,7 @@ static inline _Bool is_varying(enum op op) {
         || op == op_load_16
         || op == op_load_32
         || op == op_store_16
-        || op == op_store_32
-        || op == op_load_8x4
-        || op == op_store_8x4;
+        || op == op_store_32;
 }
 
 int umbra_const_eval(enum op, int, int, int);

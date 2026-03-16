@@ -103,12 +103,43 @@ umbra_val umbra_cvt_f32_i32(struct umbra_basic_block*,
 umbra_val umbra_cvt_i32_f32(struct umbra_basic_block*,
                      umbra_val);
 
-void umbra_load_u8x4(struct umbra_basic_block*,
-                   umbra_ptr src, umbra_val ix,
-                   umbra_val out[4]);
-void umbra_store_u8x4(struct umbra_basic_block*,
-                    umbra_ptr dst, umbra_val ix,
-                    umbra_val in[4]);
+static inline void umbra_load_u8x4(
+    struct umbra_basic_block *bb,
+    umbra_ptr src, umbra_val ix,
+    umbra_val out[4])
+{
+    umbra_val px   = umbra_load_i32(bb, src, ix);
+    umbra_val mask = umbra_imm_i32(bb, 0xFF);
+    out[0] = umbra_and_i32(bb, px, mask);
+    out[1] = umbra_and_i32(bb,
+        umbra_shr_u32(bb, px, umbra_imm_i32(bb, 8)),
+        mask);
+    out[2] = umbra_and_i32(bb,
+        umbra_shr_u32(bb, px, umbra_imm_i32(bb,16)),
+        mask);
+    out[3] = umbra_shr_u32(bb, px,
+        umbra_imm_i32(bb, 24));
+}
+static inline void umbra_store_u8x4(
+    struct umbra_basic_block *bb,
+    umbra_ptr dst, umbra_val ix,
+    umbra_val in[4])
+{
+    umbra_val mask = umbra_imm_i32(bb, 0xFF);
+    umbra_val px = umbra_and_i32(bb, in[0], mask);
+    px = umbra_or_i32(bb, px,
+        umbra_shl_i32(bb,
+            umbra_and_i32(bb, in[1], mask),
+            umbra_imm_i32(bb, 8)));
+    px = umbra_or_i32(bb, px,
+        umbra_shl_i32(bb,
+            umbra_and_i32(bb, in[2], mask),
+            umbra_imm_i32(bb, 16)));
+    px = umbra_or_i32(bb, px,
+        umbra_shl_i32(bb, in[3],
+            umbra_imm_i32(bb, 24)));
+    umbra_store_i32(bb, dst, ix, px);
+}
 
 umbra_val umbra_eq_f32(struct umbra_basic_block*,
                     umbra_val, umbra_val);
