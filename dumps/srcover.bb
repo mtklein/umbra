@@ -14,13 +14,13 @@
   v13  = f32_from_i32    v5
   v14  = mul_f32         v6 v13
   v15  = load_16         p1
-  v16  = htof            v15
+  v16  = widen_f16       v15
   v17  = load_16         p2
-  v18  = htof            v17
+  v18  = widen_f16       v17
   v19  = load_16         p3
-  v20  = htof            v19
+  v20  = widen_f16       v19
   v21  = load_16         p4
-  v22  = htof            v21
+  v22  = widen_f16       v21
   v23  = imm_32          0x3f800000
   v24  = fms_f32         v6 v13 v23
   v25  = mul_f32         v16 v24
@@ -31,11 +31,11 @@
   v30  = fma_f32         v6 v11 v29
   v31  = mul_f32         v22 v24
   v32  = fma_f32         v6 v13 v31
-  v33  = ftoh            v26
+  v33  = narrow_f32      v26
       store_16        p1 v33
-  v35  = ftoh            v28
+  v35  = narrow_f32      v28
       store_16        p2 v35
-  v37  = ftoh            v30
+  v37  = narrow_f32      v30
       store_16        p3 v37
-  v39  = ftoh            v32
+  v39  = narrow_f32      v32
       store_16        p4 v39

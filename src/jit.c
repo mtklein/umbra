@@ -206,8 +206,8 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
     case op_uni_16:   case op_load_16:
     case op_gather_16: case op_store_16:
     case op_scatter_16:
-    case op_htof:
-    case op_ftoh:
+    case op_widen_f16:
+    case op_narrow_f32:
     case op_widen_s16: case op_widen_u16:
     case op_narrow_16:
     case op_load_8x4: case op_store_8x4:
@@ -616,13 +616,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
         } break;
 
-        case op_htof: {
+        case op_widen_f16: {
             struct ra_step s = ra_step_unary(
                 ra, sl, ns, inst, i, scalar);
             put(c, FCVTL_4s(s.rd, s.rx));
         } break;
 
-        case op_ftoh: {
+        case op_narrow_f32: {
             struct ra_step s = ra_step_unary(
                 ra, sl, ns, inst, i, scalar);
             put(c, FCVTN_4h(s.rd, s.rx));
@@ -809,7 +809,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 case op_uni_16: case op_load_16:
                 case op_gather_16: case op_store_16:
                 case op_scatter_16:
-                case op_htof: case op_ftoh:
+                case op_widen_f16: case op_narrow_f32:
                 case op_widen_s16: case op_widen_u16:
                 case op_narrow_16:
                 case op_load_8x4:
@@ -1186,7 +1186,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
     case op_uni_16:   case op_load_16:
     case op_gather_16: case op_store_16:
     case op_scatter_16:
-    case op_htof: case op_ftoh:
+    case op_widen_f16: case op_narrow_f32:
     case op_widen_s16: case op_widen_u16:
     case op_narrow_16:
     case op_load_8x4: case op_store_8x4:
@@ -1683,13 +1683,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
         } break;
 
-        case op_htof: {
+        case op_widen_f16: {
             struct ra_step s = ra_step_unary(
                 ra, sl, ns, inst, i, scalar);
             vcvtph2ps(c, s.rd, s.rx);
         } break;
 
-        case op_ftoh: {
+        case op_narrow_f32: {
             struct ra_step s = ra_step_unary(
                 ra, sl, ns, inst, i, scalar);
             vcvtps2ph(c, s.rd, s.rx, 4);

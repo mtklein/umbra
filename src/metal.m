@@ -276,14 +276,14 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, p, inst->x, p, inst->y);
             } break;
 
-            case op_htof:
+            case op_widen_f16:
                 emit(b,
                     "%suint v%d = as_type<uint>"
                     "((float)as_type<half>"
                     "((ushort)v%d));\n",
                      pad, i, inst->x);
                 break;
-            case op_ftoh:
+            case op_narrow_f32:
                 emit(b,
                     "%suint v%d = (uint)"
                     "as_type<ushort>"

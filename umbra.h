@@ -49,9 +49,9 @@ umbra_val umbra_widen_u16(struct umbra_basic_block*,
 umbra_val umbra_narrow_i16(struct umbra_basic_block*,
                          umbra_val);
 
-umbra_val umbra_cvt_f32_f16(struct umbra_basic_block*,
+umbra_val umbra_widen_f16(struct umbra_basic_block*,
                      umbra_val);
-umbra_val umbra_cvt_f16_f32(struct umbra_basic_block*,
+umbra_val umbra_narrow_f32(struct umbra_basic_block*,
                      umbra_val);
 
 umbra_val umbra_add_f32(struct umbra_basic_block*,

@@ -201,7 +201,7 @@ op(scatter_32) {
     next;
 }
 
-op(htof_fn) {
+op(widen_f16_fn) {
     if (end & (K-1)) {
         uint16_t h;
         __builtin_memcpy(&h, &v[ip->x], 2);
@@ -216,7 +216,7 @@ op(htof_fn) {
     next;
 }
 
-op(ftoh_fn) {
+op(narrow_f32_fn) {
     if (end & (K-1)) {
         __fp16 tmp = (__fp16)v[ip->x].f32[0];
         uint16_t h;
@@ -529,8 +529,8 @@ static Fn const fn[] = {
     [op_f32_from_i32] = f32_from_i32,
     [op_i32_from_f32] = i32_from_f32,
 
-    [op_htof] = htof_fn,
-    [op_ftoh] = ftoh_fn,
+    [op_widen_f16] = widen_f16_fn,
+    [op_narrow_f32] = narrow_f32_fn,
 
     [op_widen_s16] = widen_s16,
     [op_widen_u16] = widen_u16,
@@ -756,8 +756,8 @@ struct umbra_interpreter* umbra_interpreter(
                     case op_f32_from_i32:
                     case op_i32_from_f32:
 
-                    case op_htof:
-                    case op_ftoh:
+                    case op_widen_f16:
+                    case op_narrow_f32:
 
                     case op_widen_s16:
                     case op_widen_u16:

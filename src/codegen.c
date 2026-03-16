@@ -433,13 +433,13 @@ static void emit_ops(Buf *b, BB const *bb,
                 }
             } break;
 
-            case op_htof:
+            case op_widen_f16:
                 emit(b,
                     "%su32 v%d ="
                     " f2u(h2f((u16)v%d));\n",
                     pad, i, inst->x);
                 break;
-            case op_ftoh:
+            case op_narrow_f32:
                 emit(b,
                     "%su32 v%d ="
                     " (u32)f2h(u2f(v%d));\n",

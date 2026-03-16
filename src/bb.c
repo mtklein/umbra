@@ -183,7 +183,7 @@ val umbra_load_i32(BB *bb, umbra_ptr src, val ix) {
                       .x=ix.id, .ptr=src.ix)};
 }
 val umbra_load_f16(BB *bb, umbra_ptr src, val ix) {
-    return umbra_cvt_f32_f16(bb, umbra_load_i16(bb, src, ix));
+    return umbra_widen_f16(bb, umbra_load_i16(bb, src, ix));
 }
 
 void umbra_store_i16(BB *bb, umbra_ptr dst,
@@ -224,7 +224,7 @@ void umbra_store_i32(BB *bb, umbra_ptr dst,
 }
 void umbra_store_f16(BB *bb, umbra_ptr dst,
                      val ix, val v) {
-    umbra_store_i16(bb, dst, ix, umbra_cvt_f16_f32(bb, v));
+    umbra_store_i16(bb, dst, ix, umbra_narrow_f32(bb, v));
 }
 
 val umbra_widen_s16(BB *bb, val a) {
@@ -237,11 +237,11 @@ val umbra_narrow_i16(BB *bb, val a) {
     return (val){push(bb, op_narrow_16, .x=a.id)};
 }
 
-val umbra_cvt_f32_f16(BB *bb, val a) {
-    return (val){push(bb, op_htof, .x=a.id)};
+val umbra_widen_f16(BB *bb, val a) {
+    return (val){push(bb, op_widen_f16, .x=a.id)};
 }
-val umbra_cvt_f16_f32(BB *bb, val a) {
-    return (val){push(bb, op_ftoh, .x=a.id)};
+val umbra_narrow_f32(BB *bb, val a) {
+    return (val){push(bb, op_narrow_f32, .x=a.id)};
 }
 
 static _Bool is_imm32(BB *bb, int id, int v) {
@@ -716,8 +716,8 @@ void umbra_basic_block_dump(BB const *bb, FILE *f) {
             case op_widen_s16:
             case op_widen_u16:
             case op_narrow_16:
-            case op_htof:
-            case op_ftoh:
+            case op_widen_f16:
+            case op_narrow_f32:
                 fprintf(f, " v%d", inst->x);
                 break;
 
