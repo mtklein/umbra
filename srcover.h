@@ -3,11 +3,11 @@
 
 static inline struct umbra_basic_block* build_srcover(void) {
     struct umbra_basic_block *bb = umbra_basic_block();
-    umbra_i32  ix     = umbra_lane(bb);
-    umbra_i32  rgba[4];
+    umbra_v32  ix     = umbra_lane(bb);
+    umbra_v32  rgba[4];
     umbra_load8x4(bb, (umbra_ptr){0}, ix, rgba);
-    umbra_f32 inv255 = umbra_fimm(bb, 1.0f/255.0f);
-    umbra_f32 sr     = umbra_fmul(bb, umbra_itof(bb, rgba[0]), inv255),
+    umbra_v32 inv255 = umbra_fimm(bb, 1.0f/255.0f);
+    umbra_v32 sr     = umbra_fmul(bb, umbra_itof(bb, rgba[0]), inv255),
               sg     = umbra_fmul(bb, umbra_itof(bb, rgba[1]), inv255),
               sb     = umbra_fmul(bb, umbra_itof(bb, rgba[2]), inv255),
               sa     = umbra_fmul(bb, umbra_itof(bb, rgba[3]), inv255),
