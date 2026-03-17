@@ -79,6 +79,31 @@ static _Bool is_32bit_mem_op(enum op op) {
         || op == op_scatter_32;
 }
 
+static char const *pname(int p, _Bool *p16, _Bool *p32,
+                         _Bool is16,
+                         char *buf, int sz) {
+    if (p < 0) {
+        snprintf(buf, (size_t)sz,
+                 is16 ? "((u16*)pd%d)"
+                      : "((u32*)pd%d)", ~p);
+    } else if (p32[p] && p16[p]) {
+        snprintf(buf, (size_t)sz,
+                 is16 ? "p%d_16" : "p%d_32", p);
+    } else {
+        snprintf(buf, (size_t)sz, "p%d", p);
+    }
+    return buf;
+}
+
+static char const *sname(int p, char *buf, int sz) {
+    if (p < 0) {
+        snprintf(buf, (size_t)sz, "szd%d", ~p);
+    } else {
+        snprintf(buf, (size_t)sz, "sz%d", p);
+    }
+    return buf;
+}
+
 static void emit_ops(Buf *b, BB const *bb,
                      _Bool *ptr_16, _Bool *ptr_32,
                      int lo, int hi,
@@ -119,318 +144,127 @@ static void emit_ops(Buf *b, BB const *bb,
             } break;
 
             case op_uni_32: {
-                int p = inst->ptr;
-                if (p < 0) {
-                    emit(b,
-                        "%su32 v%d ="
-                        " ((u32*)pd%d)[%d];\n",
-                        pad, i, ~p, inst->imm);
-                } else {
-                    _Bool mx = ptr_32[p] && ptr_16[p];
-                    emit(b,
-                        mx ? "%su32 v%d ="
-                             " p%d_32[%d];\n"
-                           : "%su32 v%d ="
-                             " p%d[%d];\n",
-                        pad, i, p, inst->imm);
-                }
+                char nm[32];
+                pname(inst->ptr, ptr_16, ptr_32, 0,
+                      nm, sizeof nm);
+                emit(b, "%su32 v%d = %s[%d];\n",
+                     pad, i, nm, inst->imm);
             } break;
             case op_load_32: {
-                int p = inst->ptr;
+                char nm[32];
+                pname(inst->ptr, ptr_16, ptr_32, 0,
+                      nm, sizeof nm);
                 if (inst->x) {
-                    if (p < 0) {
-                        emit(b,
-                            "%su32 v%d = ((u32*)"
-                            "pd%d)[i+(s32)v%d];\n",
-                            pad, i, ~p, inst->x);
-                    } else {
-                        _Bool mx =
-                            ptr_32[p] && ptr_16[p];
-                        emit(b,
-                            mx
-                            ? "%su32 v%d ="
-                              " p%d_32"
-                              "[i+(s32)v%d];\n"
-                            : "%su32 v%d ="
-                              " p%d"
-                              "[i+(s32)v%d];\n",
-                            pad, i, p, inst->x);
-                    }
+                    emit(b,
+                        "%su32 v%d = %s"
+                        "[i+(s32)v%d];\n",
+                        pad, i, nm, inst->x);
                 } else {
-                    if (p < 0) {
-                        emit(b,
-                            "%su32 v%d ="
-                            " ((u32*)pd%d)[i];\n",
-                            pad, i, ~p);
-                    } else {
-                        _Bool mx =
-                            ptr_32[p] && ptr_16[p];
-                        emit(b,
-                            mx
-                            ? "%su32 v%d ="
-                              " p%d_32[i];\n"
-                            : "%su32 v%d ="
-                              " p%d[i];\n",
-                            pad, i, p);
-                    }
+                    emit(b,
+                        "%su32 v%d = %s[i];\n",
+                        pad, i, nm);
                 }
             } break;
             case op_gather_32: {
-                int p = inst->ptr;
-                if (p < 0) {
-                    emit(b,
-                        "%su32 v%d = ((u32*)pd%d)"
-                        "[clamp_ix((s32)v%d"
-                        ",szd%d,4)];\n",
-                        pad, i, ~p, inst->x, ~p);
-                } else {
-                    _Bool mx =
-                        ptr_32[p] && ptr_16[p];
-                    emit(b,
-                        mx
-                        ? "%su32 v%d = p%d_32"
-                          "[clamp_ix((s32)v%d"
-                          ",sz%d,4)];\n"
-                        : "%su32 v%d = p%d"
-                          "[clamp_ix((s32)v%d"
-                          ",sz%d,4)];\n",
-                        pad, i, p, inst->x, p);
-                }
+                char nm[32], sz[32];
+                pname(inst->ptr, ptr_16, ptr_32, 0,
+                      nm, sizeof nm);
+                sname(inst->ptr, sz, sizeof sz);
+                emit(b,
+                    "%su32 v%d = %s"
+                    "[clamp_ix((s32)v%d,%s,4)];\n",
+                    pad, i, nm, inst->x, sz);
             } break;
             case op_store_32: {
-                int p = inst->ptr;
+                char nm[32];
+                pname(inst->ptr, ptr_16, ptr_32, 0,
+                      nm, sizeof nm);
                 if (inst->x) {
-                    if (p < 0) {
-                        emit(b,
-                            "%s((u32*)pd%d)"
-                            "[i+(s32)v%d]"
-                            " = v%d;\n",
-                            pad, ~p, inst->x,
-                            inst->y);
-                    } else {
-                        _Bool mx =
-                            ptr_32[p] && ptr_16[p];
-                        emit(b,
-                            mx
-                            ? "%sp%d_32"
-                              "[i+(s32)v%d]"
-                              " = v%d;\n"
-                            : "%sp%d[i+(s32)v%d]"
-                              " = v%d;\n",
-                            pad, p, inst->x,
-                            inst->y);
-                    }
+                    emit(b,
+                        "%s%s[i+(s32)v%d]"
+                        " = v%d;\n",
+                        pad, nm, inst->x,
+                        inst->y);
                 } else {
-                    if (p < 0) {
-                        emit(b,
-                            "%s((u32*)pd%d)[i]"
-                            " = v%d;\n",
-                            pad, ~p, inst->y);
-                    } else {
-                        _Bool mx =
-                            ptr_32[p] && ptr_16[p];
-                        emit(b,
-                            mx
-                            ? "%sp%d_32[i]"
-                              " = v%d;\n"
-                            : "%sp%d[i] = v%d;\n",
-                            pad, p, inst->y);
-                    }
+                    emit(b,
+                        "%s%s[i] = v%d;\n",
+                        pad, nm, inst->y);
                 }
             } break;
             case op_scatter_32: {
-                int p = inst->ptr;
-                if (p < 0) {
-                    emit(b,
-                        "%s((u32*)pd%d)"
-                        "[clamp_ix((s32)v%d"
-                        ",szd%d,4)]"
-                        " = v%d;\n",
-                        pad, ~p, inst->x,
-                        ~p, inst->y);
-                } else {
-                    _Bool mx =
-                        ptr_32[p] && ptr_16[p];
-                    emit(b,
-                        mx
-                        ? "%sp%d_32"
-                          "[clamp_ix((s32)v%d"
-                          ",sz%d,4)]"
-                          " = v%d;\n"
-                        : "%sp%d"
-                          "[clamp_ix((s32)v%d"
-                          ",sz%d,4)]"
-                          " = v%d;\n",
-                        pad, p, inst->x,
-                        p, inst->y);
-                }
+                char nm[32], sz[32];
+                pname(inst->ptr, ptr_16, ptr_32, 0,
+                      nm, sizeof nm);
+                sname(inst->ptr, sz, sizeof sz);
+                emit(b,
+                    "%s%s[clamp_ix((s32)v%d,%s,4)]"
+                    " = v%d;\n",
+                    pad, nm, inst->x, sz, inst->y);
             } break;
 
             case op_uni_16: {
-                int p = inst->ptr;
-                if (p < 0) {
-                    emit(b,
-                        "%su32 v%d ="
-                        " (u32)(u16)"
-                        "((u16*)pd%d)[%d];\n",
-                        pad, i, ~p, inst->imm);
-                } else {
-                    _Bool mx =
-                        ptr_32[p] && ptr_16[p];
-                    emit(b,
-                        mx
-                        ? "%su32 v%d ="
-                          " (u32)(u16)"
-                          "p%d_16[%d];\n"
-                        : "%su32 v%d ="
-                          " (u32)(u16)"
-                          "p%d[%d];\n",
-                        pad, i, p, inst->imm);
-                }
+                char nm[32];
+                pname(inst->ptr, ptr_16, ptr_32, 1,
+                      nm, sizeof nm);
+                emit(b,
+                    "%su32 v%d ="
+                    " (u32)(u16)%s[%d];\n",
+                    pad, i, nm, inst->imm);
             } break;
             case op_load_16: {
-                int p = inst->ptr;
+                char nm[32];
+                pname(inst->ptr, ptr_16, ptr_32, 1,
+                      nm, sizeof nm);
                 if (inst->x) {
-                    if (p < 0) {
-                        emit(b,
-                            "%su32 v%d ="
-                            " (u32)(u16)"
-                            "((u16*)pd%d)"
-                            "[i+(s32)v%d];\n",
-                            pad, i, ~p, inst->x);
-                    } else {
-                        _Bool mx =
-                            ptr_32[p] && ptr_16[p];
-                        emit(b,
-                            mx
-                            ? "%su32 v%d ="
-                              " (u32)(u16)"
-                              "p%d_16"
-                              "[i+(s32)v%d];\n"
-                            : "%su32 v%d ="
-                              " (u32)(u16)"
-                              "p%d"
-                              "[i+(s32)v%d];\n",
-                            pad, i, p, inst->x);
-                    }
+                    emit(b,
+                        "%su32 v%d ="
+                        " (u32)(u16)%s"
+                        "[i+(s32)v%d];\n",
+                        pad, i, nm, inst->x);
                 } else {
-                    if (p < 0) {
-                        emit(b,
-                            "%su32 v%d ="
-                            " (u32)(u16)"
-                            "((u16*)pd%d)[i];\n",
-                            pad, i, ~p);
-                    } else {
-                        _Bool mx =
-                            ptr_32[p] && ptr_16[p];
-                        emit(b,
-                            mx
-                            ? "%su32 v%d ="
-                              " (u32)(u16)"
-                              "p%d_16[i];\n"
-                            : "%su32 v%d ="
-                              " (u32)(u16)"
-                              "p%d[i];\n",
-                            pad, i, p);
-                    }
+                    emit(b,
+                        "%su32 v%d ="
+                        " (u32)(u16)%s[i];\n",
+                        pad, i, nm);
                 }
             } break;
             case op_gather_16: {
-                int p = inst->ptr;
-                if (p < 0) {
-                    emit(b,
-                        "%su32 v%d ="
-                        " (u32)(u16)"
-                        "((u16*)pd%d)"
-                        "[clamp_ix((s32)v%d"
-                        ",szd%d,2)];\n",
-                        pad, i, ~p, inst->x, ~p);
-                } else {
-                    _Bool mx =
-                        ptr_32[p] && ptr_16[p];
-                    emit(b,
-                        mx
-                        ? "%su32 v%d ="
-                          " (u32)(u16)"
-                          "p%d_16"
-                          "[clamp_ix((s32)v%d"
-                          ",sz%d,2)];\n"
-                        : "%su32 v%d ="
-                          " (u32)(u16)"
-                          "p%d"
-                          "[clamp_ix((s32)v%d"
-                          ",sz%d,2)];\n",
-                        pad, i, p, inst->x, p);
-                }
+                char nm[32], sz[32];
+                pname(inst->ptr, ptr_16, ptr_32, 1,
+                      nm, sizeof nm);
+                sname(inst->ptr, sz, sizeof sz);
+                emit(b,
+                    "%su32 v%d ="
+                    " (u32)(u16)%s"
+                    "[clamp_ix((s32)v%d,%s,2)];\n",
+                    pad, i, nm, inst->x, sz);
             } break;
             case op_store_16: {
-                int p = inst->ptr;
+                char nm[32];
+                pname(inst->ptr, ptr_16, ptr_32, 1,
+                      nm, sizeof nm);
                 if (inst->x) {
-                    if (p < 0) {
-                        emit(b,
-                            "%s((u16*)pd%d)"
-                            "[i+(s32)v%d]"
-                            " = (u16)v%d;\n",
-                            pad, ~p, inst->x,
-                            inst->y);
-                    } else {
-                        _Bool mx =
-                            ptr_32[p] && ptr_16[p];
-                        emit(b,
-                            mx
-                            ? "%sp%d_16"
-                              "[i+(s32)v%d]"
-                              " = (u16)v%d;\n"
-                            : "%sp%d[i+(s32)v%d]"
-                              " = (u16)v%d;\n",
-                            pad, p, inst->x,
-                            inst->y);
-                    }
+                    emit(b,
+                        "%s%s[i+(s32)v%d]"
+                        " = (u16)v%d;\n",
+                        pad, nm, inst->x,
+                        inst->y);
                 } else {
-                    if (p < 0) {
-                        emit(b,
-                            "%s((u16*)pd%d)[i]"
-                            " = (u16)v%d;\n",
-                            pad, ~p, inst->y);
-                    } else {
-                        _Bool mx =
-                            ptr_32[p] && ptr_16[p];
-                        emit(b,
-                            mx
-                            ? "%sp%d_16[i]"
-                              " = (u16)v%d;\n"
-                            : "%sp%d[i]"
-                              " = (u16)v%d;\n",
-                            pad, p, inst->y);
-                    }
+                    emit(b,
+                        "%s%s[i] = (u16)v%d;\n",
+                        pad, nm, inst->y);
                 }
             } break;
             case op_scatter_16: {
-                int p = inst->ptr;
-                if (p < 0) {
-                    emit(b,
-                        "%s((u16*)pd%d)"
-                        "[clamp_ix((s32)v%d"
-                        ",szd%d,2)]"
-                        " = (u16)v%d;\n",
-                        pad, ~p, inst->x,
-                        ~p, inst->y);
-                } else {
-                    _Bool mx =
-                        ptr_32[p] && ptr_16[p];
-                    emit(b,
-                        mx
-                        ? "%sp%d_16"
-                          "[clamp_ix((s32)v%d"
-                          ",sz%d,2)]"
-                          " = (u16)v%d;\n"
-                        : "%sp%d"
-                          "[clamp_ix((s32)v%d"
-                          ",sz%d,2)]"
-                          " = (u16)v%d;\n",
-                        pad, p, inst->x,
-                        p, inst->y);
-                }
+                char nm[32], sz[32];
+                pname(inst->ptr, ptr_16, ptr_32, 1,
+                      nm, sizeof nm);
+                sname(inst->ptr, sz, sizeof sz);
+                emit(b,
+                    "%s%s[clamp_ix((s32)v%d,%s,2)]"
+                    " = (u16)v%d;\n",
+                    pad, nm, inst->x, sz,
+                    inst->y);
             } break;
 
             case op_widen_f16:
