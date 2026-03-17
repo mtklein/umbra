@@ -630,17 +630,44 @@ static char* build_source(BB const *bb,
     return src;
 }
 
+static _Bool always_x(struct bb_inst const *insts,
+                      int join_id) {
+    (void)insts; (void)join_id;
+    return 0;
+}
+
 struct umbra_metal* umbra_metal(BB const *bb) {
     @autoreleasepool {
         id<MTLDevice> device =
             MTLCreateSystemDefaultDevice();
         if (!device) { return 0; }
 
+        BB *resolved =
+            umbra_resolve_joins(bb, always_x);
+
         int *deref_buf = calloc(
-            (size_t)bb->insts, sizeof *deref_buf);
+            (size_t)resolved->insts,
+            sizeof *deref_buf);
         int max_ptr = -1, total_bufs = 0;
         char *src = build_source(
-            bb, &max_ptr, &total_bufs, deref_buf);
+            resolved, &max_ptr, &total_bufs,
+            deref_buf);
+
+        int deref_buf_idx[8]={0}, deref_src[8]={0},
+            deref_off[8]={0};
+        int n_deref = 0;
+        for (int i = 0; i < resolved->insts; i++) {
+            if (resolved->inst[i].op == op_deref_ptr) {
+                deref_buf_idx[n_deref] =
+                    deref_buf[i];
+                deref_src[n_deref] =
+                    resolved->inst[i].ptr;
+                deref_off[n_deref] =
+                    resolved->inst[i].imm;
+                n_deref++;
+            }
+        }
+        umbra_basic_block_free(resolved);
 
         NSString *source =
             [NSString stringWithUTF8String:src];
@@ -705,19 +732,12 @@ struct umbra_metal* umbra_metal(BB const *bb) {
         m->tg_size    =
             (int)pipeline.maxTotalThreadsPerThreadgroup;
 
-        int di = 0;
-        for (int i = 0; i < bb->insts; i++) {
-            if (bb->inst[i].op == op_deref_ptr) {
-                m->deref[di].buf_idx  =
-                    deref_buf[i];
-                m->deref[di].src_buf  =
-                    bb->inst[i].ptr;
-                m->deref[di].byte_off =
-                    bb->inst[i].imm;
-                di++;
-            }
+        for (int k = 0; k < n_deref; k++) {
+            m->deref[k].buf_idx  = deref_buf_idx[k];
+            m->deref[k].src_buf  = deref_src[k];
+            m->deref[k].byte_off = deref_off[k];
         }
-        m->n_deref = di;
+        m->n_deref = n_deref;
 
         free(deref_buf);
         return m;

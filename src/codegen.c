@@ -479,9 +479,18 @@ static void emit_ops(Buf *b, BB const *bb,
     }
 }
 
+static _Bool always_x(struct bb_inst const *insts,
+                      int join_id) {
+    (void)insts; (void)join_id;
+    return 0;
+}
+
 struct umbra_codegen* umbra_codegen(
     BB const *bb)
 {
+    BB *resolved = umbra_resolve_joins(bb, always_x);
+    bb = resolved;
+
     int max_ptr = -1;
     for (int i = 0; i < bb->insts; i++) {
         if (has_ptr(bb->inst[i].op)
@@ -649,6 +658,7 @@ struct umbra_codegen* umbra_codegen(
 
     free(ptr_16);
     free(ptr_32);
+    umbra_basic_block_free(resolved);
 
     char tpl[] = "/tmp/umbra_XXXXXX";
     int fd = mkstemp(tpl);
