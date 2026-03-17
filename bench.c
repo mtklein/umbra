@@ -60,7 +60,7 @@ static jit_entry_fn incbin_load(
 
     FILE *f = fopen(bin_path, "wb");
     if (!f) { return NULL; }
-    umbra_jit_dump_bin(jit, f);
+    umbra_dump_jit_bin(jit, f);
     fclose(f);
 
     f = fopen(s_path, "w");

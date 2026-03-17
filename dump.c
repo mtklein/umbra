@@ -20,7 +20,7 @@ static void dump(char const *name,
     { char p[64];
       snprintf(p, sizeof p, "dumps/%s.bb", name);
       FILE *f = fopen(p, "w");
-      umbra_builder_dump(builder, f);
+      umbra_dump_builder(builder, f);
       fclose(f); }
 
     struct umbra_basic_block *bb = umbra_basic_block(builder);
@@ -28,7 +28,7 @@ static void dump(char const *name,
     { char p[64];
       snprintf(p, sizeof p, "dumps/%s.opt", name);
       FILE *f = fopen(p, "w");
-      umbra_basic_block_dump(bb, f);
+      umbra_dump_basic_block(bb, f);
       fclose(f); }
 
     struct umbra_codegen *cg  = umbra_codegen(bb);
@@ -40,7 +40,7 @@ static void dump(char const *name,
         char p[64];
         snprintf(p, sizeof p, "dumps/%s.c", name);
         FILE *f = fopen(p, "w");
-        umbra_codegen_dump(cg, f);
+        umbra_dump_codegen(cg, f);
         fclose(f);
     }
 #ifdef JIT_EXT
@@ -49,7 +49,7 @@ static void dump(char const *name,
         snprintf(p, sizeof p,
                  "dumps/%s." JIT_EXT, name);
         FILE *f = fopen(p, "w");
-        umbra_jit_dump(jit, f);
+        umbra_dump_jit(jit, f);
         fclose(f);
     }
     if (jit) {
@@ -57,7 +57,7 @@ static void dump(char const *name,
         snprintf(p, sizeof p,
                  "dumps/%s." JIT_EXT ".mca", name);
         FILE *f = fopen(p, "w");
-        umbra_jit_mca(jit, f);
+        umbra_dump_jit_mca(jit, f);
         fclose(f);
     }
 #endif
@@ -65,7 +65,7 @@ static void dump(char const *name,
         char p[64];
         snprintf(p, sizeof p, "dumps/%s.metal", name);
         FILE *f = fopen(p, "w");
-        umbra_metal_dump(mtl, f);
+        umbra_dump_metal(mtl, f);
         fclose(f);
     }
 
@@ -77,13 +77,13 @@ static void dump(char const *name,
 int main(void) {
     struct umbra_builder *builder = build_srcover();
     { FILE *f = fopen("dumps/srcover.bb", "w");
-      umbra_builder_dump(builder, f);
+      umbra_dump_builder(builder, f);
       fclose(f); }
 
     struct umbra_basic_block *bb = umbra_basic_block(builder);
     umbra_builder_free(builder);
     { FILE *f = fopen("dumps/srcover.opt", "w");
-      umbra_basic_block_dump(bb, f);
+      umbra_dump_basic_block(bb, f);
       fclose(f); }
 
     struct umbra_codegen *cg  = umbra_codegen(bb);
@@ -93,25 +93,25 @@ int main(void) {
 
     if (cg) {
         FILE *f = fopen("dumps/srcover.c", "w");
-        umbra_codegen_dump(cg, f);
+        umbra_dump_codegen(cg, f);
         fclose(f);
     }
 #ifdef JIT_EXT
     if (jit) {
         FILE *f = fopen("dumps/srcover." JIT_EXT, "w");
-        umbra_jit_dump(jit, f);
+        umbra_dump_jit(jit, f);
         fclose(f);
     }
     if (jit) {
         FILE *f =
             fopen("dumps/srcover." JIT_EXT ".mca", "w");
-        umbra_jit_mca(jit, f);
+        umbra_dump_jit_mca(jit, f);
         fclose(f);
     }
 #endif
     if (mtl) {
         FILE *f = fopen("dumps/srcover.metal", "w");
-        umbra_metal_dump(mtl, f);
+        umbra_dump_metal(mtl, f);
         fclose(f);
     }
 

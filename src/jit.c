@@ -11,13 +11,13 @@ void umbra_jit_run (struct umbra_jit *j, int n, umbra_buf buf[]) {
     (void)j; (void)n; (void)buf;
 }
 void umbra_jit_free(struct umbra_jit *j) { (void)j; }
-void umbra_jit_dump(
+void umbra_dump_jit(
     struct umbra_jit const *j, FILE *f
 ) { (void)j; (void)f; }
-void umbra_jit_dump_bin(
+void umbra_dump_jit_bin(
     struct umbra_jit const *j, FILE *f
 ) { (void)j; (void)f; }
-void umbra_jit_mca(
+void umbra_dump_jit_mca(
     struct umbra_jit const *j, FILE *f
 ) { (void)j; (void)f; }
 
@@ -773,7 +773,7 @@ void umbra_jit_free(struct umbra_jit *j) {
     free(j);
 }
 
-void umbra_jit_dump(struct umbra_jit const *j, FILE *f) {
+void umbra_dump_jit(struct umbra_jit const *j, FILE *f) {
     if (!j) { return; }
     size_t code_bytes = j->code_size;
     uint32_t const *words = (uint32_t const *)j->code;
@@ -830,12 +830,12 @@ void umbra_jit_dump(struct umbra_jit const *j, FILE *f) {
     }
 }
 
-void umbra_jit_dump_bin(struct umbra_jit const *j, FILE *f) {
+void umbra_dump_jit_bin(struct umbra_jit const *j, FILE *f) {
     if (!j) { return; }
     fwrite(j->code, 1, j->code_size, f);
 }
 
-void umbra_jit_mca(struct umbra_jit const *j, FILE *f) {
+void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
     if (!j || j->loop_start >= j->loop_end) { return; }
     uint32_t const *words = (uint32_t const *)j->code;
 
@@ -1695,7 +1695,7 @@ static _Bool x86_disasm(uint8_t const *code, size_t n,
     return pclose(p) == 0 && ok;
 }
 
-void umbra_jit_dump(struct umbra_jit const *j, FILE *f) {
+void umbra_dump_jit(struct umbra_jit const *j, FILE *f) {
     if (!j) { return; }
     uint8_t const *code = (uint8_t const *)j->code;
     size_t n = j->code_len;
@@ -1721,12 +1721,12 @@ fallback:
     }
 }
 
-void umbra_jit_dump_bin(struct umbra_jit const *j, FILE *f) {
+void umbra_dump_jit_bin(struct umbra_jit const *j, FILE *f) {
     if (!j) { return; }
     fwrite(j->code, 1, j->code_len, f);
 }
 
-void umbra_jit_mca(struct umbra_jit const *j, FILE *f) {
+void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
     if (!j || j->loop_start >= j->loop_end) { return; }
     uint8_t const *code = (uint8_t const *)j->code;
     size_t n = (size_t)(j->loop_end - j->loop_start);

@@ -18,7 +18,7 @@ void umbra_codegen_run(
 void umbra_codegen_free(struct umbra_codegen *cg) {
     (void)cg;
 }
-void umbra_codegen_dump(
+void umbra_dump_codegen(
     struct umbra_codegen const *cg, FILE *f)
 {
     (void)cg; (void)f;
@@ -901,7 +901,7 @@ void umbra_codegen_free(struct umbra_codegen *cg) {
     free(cg);
 }
 
-void umbra_codegen_dump(
+void umbra_dump_codegen(
     struct umbra_codegen const *cg, FILE *f)
 {
     if (cg && cg->src) { fputs(cg->src, f); }

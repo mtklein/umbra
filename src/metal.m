@@ -21,7 +21,7 @@ void umbra_metal_flush(struct umbra_metal *m) {
 void umbra_metal_free(struct umbra_metal *m) {
     (void)m;
 }
-void umbra_metal_dump(
+void umbra_dump_metal(
     struct umbra_metal const *m, FILE *f
 ) { (void)m; (void)f; }
 
@@ -1063,7 +1063,7 @@ void umbra_metal_free(struct umbra_metal *m) {
     free(m);
 }
 
-void umbra_metal_dump(
+void umbra_dump_metal(
     struct umbra_metal const *m, FILE *f
 ) {
     if (m && m->src) { fputs(m->src, f); }
