@@ -90,7 +90,6 @@ struct ra* ra_create(struct umbra_basic_block const *bb,
         ra->last_use[inst->x] = i;
         ra->last_use[inst->y] = i;
         ra->last_use[inst->z] = i;
-        ra->last_use[inst->w] = i;
     }
     for (int i = 0; i < bb->preamble; i++) {
         if (ra->last_use[i] >= bb->preamble) {

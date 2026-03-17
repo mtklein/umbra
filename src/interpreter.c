@@ -55,7 +55,7 @@ typedef int (*Fn)(struct interp_inst const *ip,
                   void* ptr[], long sz[]);
 struct interp_inst {
     Fn  fn;
-    int x,y,z,w;
+    int x,y,z, :32;
 };
 
 struct umbra_interpreter {

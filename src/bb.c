@@ -21,8 +21,6 @@ static uint32_t bb_inst_hash(struct bb_inst const *inst) {
                            0x9e3779b9u, &h);
     __builtin_mul_overflow(h ^ (uint32_t)inst->z  ,
                            0x9e3779b9u, &h);
-    __builtin_mul_overflow(h ^ (uint32_t)inst->w  ,
-                           0x9e3779b9u, &h);
     __builtin_mul_overflow(h ^ (uint32_t)inst->ptr,
                            0x9e3779b9u, &h);
     __builtin_mul_overflow(h ^ (uint32_t)inst->imm,
@@ -507,10 +505,10 @@ static void schedule(int id,
     if (old_to_new[id] >= 0) { return; }
 
     int inputs[] = {
-        in[id].x, in[id].y, in[id].z, in[id].w,
+        in[id].x, in[id].y, in[id].z,
     };
-    for (int a = 0; a < 3; a++) {
-        for (int b = a+1; b < 4; b++) {
+    for (int a = 0; a < 2; a++) {
+        for (int b = a+1; b < 3; b++) {
             if (inputs[a] > inputs[b]) {
                 int t = inputs[a];
                 inputs[a] = inputs[b];
@@ -518,7 +516,7 @@ static void schedule(int id,
             }
         }
     }
-    for (int k = 0; k < 4; k++) {
+    for (int k = 0; k < 3; k++) {
         schedule(inputs[k], in, out, old_to_new, j);
     }
 
@@ -538,7 +536,6 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
             live[b->inst[i].x] = 1;
             live[b->inst[i].y] = 1;
             live[b->inst[i].z] = 1;
-            live[b->inst[i].w] = 1;
             if (b->inst[i].ptr < 0) {
                 live[~b->inst[i].ptr] = 1;
             }
@@ -548,8 +545,7 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
         varying[i] = is_varying(b->inst[i].op)
                    | varying[b->inst[i].x]
                    | varying[b->inst[i].y]
-                   | varying[b->inst[i].z]
-                   | varying[b->inst[i].w];
+                   | varying[b->inst[i].z];
     }
 
     int total = 0;
@@ -585,7 +581,6 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
         out[i].x = old_to_new[out[i].x];
         out[i].y = old_to_new[out[i].y];
         out[i].z = old_to_new[out[i].z];
-        out[i].w = old_to_new[out[i].w];
         if (out[i].ptr < 0) {
             out[i].ptr = ~old_to_new[~out[i].ptr];
         }

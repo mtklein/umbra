@@ -30,7 +30,7 @@ enum op {
 
 struct bb_inst {
     enum op op;
-    int     x,y,z,w;
+    int     x,y,z;
     int     ptr, imm;
 };
 
