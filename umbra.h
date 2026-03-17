@@ -74,36 +74,6 @@ umbra_val umbra_le_u32(struct umbra_builder*, umbra_val, umbra_val);
 umbra_val umbra_gt_u32(struct umbra_builder*, umbra_val, umbra_val);
 umbra_val umbra_ge_u32(struct umbra_builder*, umbra_val, umbra_val);
 
-static inline umbra_val umbra_load_f16(struct umbra_builder *b,
-                                       umbra_ptr src, umbra_val ix) {
-    return umbra_widen_f16(b, umbra_load_i16(b, src, ix));
-}
-static inline void umbra_store_f16(struct umbra_builder *b,
-                                   umbra_ptr dst, umbra_val ix, umbra_val v) {
-    umbra_store_i16(b, dst, ix, umbra_narrow_f32(b, v));
-}
-
-static inline void umbra_load_u8x4(struct umbra_builder *b,
-                                   umbra_ptr src, umbra_val ix, umbra_val out[4]) {
-    umbra_val const px = umbra_load_i32(b, src, ix),
-                  mask = umbra_imm_i32(b, 0xFF);
-    out[0] = umbra_and_i32(b, px, mask);
-    out[1] = umbra_and_i32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 8)), mask);
-    out[2] = umbra_and_i32(b, umbra_shr_u32(b, px, umbra_imm_i32(b,16)), mask);
-    out[3] = umbra_shr_u32(b, px, umbra_imm_i32(b, 24));
-}
-static inline void umbra_store_u8x4(struct umbra_builder *b,
-                                    umbra_ptr dst, umbra_val ix, umbra_val in[4]) {
-    umbra_val const mask = umbra_imm_i32(b, 0xFF);
-    umbra_val         px = umbra_and_i32(b, in[0], mask);
-    px = umbra_or_i32(b, px, umbra_shl_i32(b, umbra_and_i32(b, in[1], mask)
-                                            , umbra_imm_i32(b, 8)));
-    px = umbra_or_i32(b, px, umbra_shl_i32(b, umbra_and_i32(b, in[2], mask)
-                                            , umbra_imm_i32(b, 16)));
-    px = umbra_or_i32(b, px, umbra_shl_i32(b, in[3], umbra_imm_i32(b, 24)));
-    umbra_store_i32(b, dst, ix, px);
-}
-
 struct umbra_basic_block* umbra_basic_block(struct umbra_builder*);
 void   umbra_basic_block_free(struct umbra_basic_block*);
 
@@ -127,12 +97,11 @@ void   umbra_metal_begin_batch(struct umbra_metal*);
 void   umbra_metal_flush      (struct umbra_metal*);
 void   umbra_metal_free       (struct umbra_metal*);
 
-// TODO: rename each to umbra_dump_foo
 #include <stdio.h>
-void umbra_builder_dump    (struct umbra_builder const*, FILE*);
-void umbra_basic_block_dump(struct umbra_basic_block const*, FILE*);
-void umbra_codegen_dump    (struct umbra_codegen const*, FILE*);
-void umbra_jit_dump        (struct umbra_jit const*, FILE*);
-void umbra_jit_dump_bin    (struct umbra_jit const*, FILE*);
-void umbra_jit_mca         (struct umbra_jit const*, FILE*);
-void umbra_metal_dump      (struct umbra_metal const*, FILE*);
+void umbra_dump_builder    (struct umbra_builder const*, FILE*);
+void umbra_dump_basic_block(struct umbra_basic_block const*, FILE*);
+void umbra_dump_codegen    (struct umbra_codegen const*, FILE*);
+void umbra_dump_jit        (struct umbra_jit const*, FILE*);
+void umbra_dump_jit_bin    (struct umbra_jit const*, FILE*);
+void umbra_dump_jit_mca    (struct umbra_jit const*, FILE*);
+void umbra_dump_metal      (struct umbra_metal const*, FILE*);

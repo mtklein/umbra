@@ -636,7 +636,7 @@ static umbra_color gradient_shader(
     umbra_val a = umbra_load_i32(builder,
         (umbra_ptr){1}, umbra_imm_i32(builder, fi+1));
     umbra_val t = umbra_div_f32(builder, x, w);
-    umbra_val zero = umbra_imm_f32(builder, 0.0f);
+    umbra_val zero = umbra_imm_i32(builder, 0);
     return (umbra_color){t, zero, zero, a};
 }
 
