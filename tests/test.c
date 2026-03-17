@@ -1535,6 +1535,52 @@ static void test_shift_imm(void) {
   }
 }
 
+static void test_pack_channels(void) {
+  for (int opt = 0; opt < 2; opt++) {
+    struct umbra_builder *builder =
+        umbra_builder();
+    umbra_val ix = umbra_lane(builder);
+    umbra_val r = umbra_load_i32(builder,
+                      (umbra_ptr){0}, ix);
+    umbra_val g = umbra_load_i32(builder,
+                      (umbra_ptr){1}, ix);
+    umbra_val b = umbra_load_i32(builder,
+                      (umbra_ptr){2}, ix);
+    umbra_val a = umbra_load_i32(builder,
+                      (umbra_ptr){3}, ix);
+    umbra_val mask = umbra_imm_i32(builder, 0xff);
+    umbra_val px = umbra_and_i32(builder, r, mask);
+    px = umbra_or_i32(builder, px,
+        umbra_shl_i32(builder,
+            umbra_and_i32(builder, g, mask),
+            umbra_imm_i32(builder, 8)));
+    px = umbra_or_i32(builder, px,
+        umbra_shl_i32(builder,
+            umbra_and_i32(builder, b, mask),
+            umbra_imm_i32(builder, 16)));
+    px = umbra_or_i32(builder, px,
+        umbra_shl_i32(builder, a,
+            umbra_imm_i32(builder, 24)));
+    umbra_store_i32(builder, (umbra_ptr){4}, ix, px);
+    backends B = make(builder, opt);
+    for (int bi = 0; bi < 4; bi++) {
+        uint32_t rr[] = {0xAA, 0x11, 0xFF};
+        uint32_t gg[] = {0xBB, 0x22, 0x00};
+        uint32_t bb_[] = {0xCC, 0x33, 0xFF};
+        uint32_t aa[] = {0xDD, 0x44, 0x00};
+        uint32_t dst[3] = {0};
+        if (!run(&B, bi, 3, (umbra_buf[]){
+            {rr,3*4},{gg,3*4},{bb_,3*4},
+            {aa,3*4},{dst,3*4},
+        })) { continue; }
+        (dst[0] == 0xDDCCBBAAu) here;
+        (dst[1] == 0x44332211u) here;
+        (dst[2] == 0x00FF00FFu) here;
+    }
+    cleanup(&B);
+  }
+}
+
 int main(void) {
     test_f32_ops();
     test_i32_ops();
@@ -1560,5 +1606,6 @@ int main(void) {
     test_scatter_clamp();
     test_offset_load_store();
     test_shift_imm();
+    test_pack_channels();
     return 0;
 }
