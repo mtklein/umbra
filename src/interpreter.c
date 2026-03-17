@@ -422,6 +422,11 @@ op(shr_s32_imm_fn) {
     v->i32 = v[ip->x].i32 >> sh;
     next;
 }
+op(and_imm_fn) {
+    U32 m = (U32){0} + (uint32_t)ip->y;
+    v->u32 = v[ip->x].u32 & m;
+    next;
+}
 op(sli_fn) {
     I32 sh = (I32){0} + ip->z;
     U32 shifted = (U32)(v[ip->y].i32 << sh);
@@ -503,6 +508,7 @@ static Fn const fn[] = {
     [op_shr_u32_imm] = shr_u32_imm_fn,
     [op_shr_s32_imm] = shr_s32_imm_fn,
     [op_sli]         = sli_fn,
+    [op_and_imm]     = and_imm_fn,
 };
 
 int umbra_const_eval(enum op op, int xb,
@@ -527,7 +533,9 @@ int umbra_const_eval(enum op op, int xb,
 
 static _Bool interp_chooser(struct bb_inst const *insts,
                             int join_id) {
-    return insts[insts[join_id].y].op == op_sli;
+    enum op y_op = insts[insts[join_id].y].op;
+    return y_op == op_sli
+        || y_op == op_and_imm;
 }
 
 struct umbra_interpreter* umbra_interpreter(
@@ -712,6 +720,7 @@ struct umbra_interpreter* umbra_interpreter(
                     case op_shl_imm:
                     case op_shr_u32_imm:
                     case op_shr_s32_imm:
+                    case op_and_imm:
                         emit(.fn=fn[inst->op],
                              .x=X, .y=inst->imm);
                         break;

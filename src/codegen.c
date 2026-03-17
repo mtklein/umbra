@@ -318,6 +318,12 @@ static void emit_ops(Buf *b, BB const *bb,
                     " (u32)((s32)v%d >> %d);\n",
                     pad, i, inst->x, inst->imm);
                 break;
+            case op_and_imm:
+                emit(b, "%su32 v%d = v%d & %uu;\n",
+                     pad, i, inst->x,
+                     (uint32_t)inst->imm);
+                break;
+
             case op_sli: {
                 int sh = inst->imm;
                 uint32_t mask =

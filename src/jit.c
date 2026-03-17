@@ -213,6 +213,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
         }
         return 1;
 
+    case op_and_imm:
     case op_lane:
     case op_deref_ptr:
     case op_uni_32:   case op_load_32:
@@ -733,6 +734,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 case op_join:
                 case op_shl_imm: case op_shr_u32_imm:
                 case op_shr_s32_imm: case op_sli:
+                case op_and_imm:
                     break;
                 }
                 #undef CZ
@@ -760,6 +762,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_i32_from_f32:
         case op_lt_u32: case op_le_u32:
         case op_join:
+        case op_and_imm:
         default_alu: {
             int nscratch =
                 (inst->op==op_shr_u32
@@ -1113,6 +1116,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
         vpsrad_i(c,d,x,(uint8_t)imm);
         return 1;
     case op_sli:
+    case op_and_imm:
         return 0;
 
     case op_lane:
@@ -1682,7 +1686,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_eq_i32: case op_lt_s32:
         case op_le_s32:
         case op_lt_u32: case op_le_u32:
-        case op_join: {
+        case op_join:
+        case op_and_imm: {
             int nscratch = (inst->op==op_lt_u32) ? 2
                 : (inst->op==op_le_s32
                     || inst->op==op_le_u32)

@@ -399,8 +399,20 @@ val umbra_and_i32(builder *b, val x, val y) {
     if (is_imm32(b, y.id, -1))    { return x; }
     if (is_imm32(b, x.id,  0))    { return x; }
     if (is_imm32(b, y.id,  0))    { return y; }
-    return math(b, op_and_32,
-                      .x=x.id, .y=y.id);
+    val d = math(b, op_and_32, .x=x.id, .y=y.id);
+    if (is_imm(b, x.id)) {
+        val f = push(b, op_and_imm,
+                     .x=y.id,
+                     .imm=b->inst[x.id].imm);
+        return push(b, op_join, .x=d.id, .y=f.id);
+    }
+    if (is_imm(b, y.id)) {
+        val f = push(b, op_and_imm,
+                     .x=x.id,
+                     .imm=b->inst[y.id].imm);
+        return push(b, op_join, .x=d.id, .y=f.id);
+    }
+    return (val){d.id};
 }
 static int known_top_bit(builder *b, int id) {
     if (b->inst[id].op == op_imm_32) {
@@ -413,6 +425,13 @@ static int known_top_bit(builder *b, int id) {
         if (ta && tb) { return ta < tb ? ta : tb; }
         if (ta)       { return ta; }
         return tb;
+    }
+    if (b->inst[id].op == op_and_imm) {
+        uint32_t m = (uint32_t)b->inst[id].imm;
+        int tm = m ? 32 - __builtin_clz(m) : 0,
+            tx = known_top_bit(b, b->inst[id].x);
+        if (tm && tx) { return tm < tx ? tm : tx; }
+        return tm ? tm : tx;
     }
     if (b->inst[id].op == op_or_32) {
         int ta = known_top_bit(b, b->inst[id].x),
@@ -869,6 +888,11 @@ static void dump_insts(struct bb_inst const *inst,
             case op_shr_s32_imm:
                 fprintf(f, " v%d %d",
                         ip->x, ip->imm);
+                break;
+            case op_and_imm:
+                fprintf(f, " v%d 0x%x",
+                        ip->x,
+                        (uint32_t)ip->imm);
                 break;
             case op_sli:
                 fprintf(f, " v%d v%d %d",
