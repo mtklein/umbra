@@ -8,6 +8,8 @@ typedef struct umbra_builder builder;
 
 enum { W = 128, H = 96, LUT_N = 64 };
 
+static slug_curves gt_slug;
+
 typedef void (*run_fn)(void*, int, umbra_buf[]);
 
 static void run_interp(void *ctx, int n,
@@ -281,6 +283,35 @@ static void render_slide(
             run(ctx, W, buf);
         }
     } else if (s->coverage ==
+                   umbra_coverage_slug) {
+        float mat[11];
+        build_perspective_matrix(mat, 1.0f,
+            W, H, (int)gt_slug.w, (int)gt_slug.h);
+        mat[9]  = gt_slug.w;
+        mat[10] = gt_slug.h;
+        for (int y = 0; y < H; y++) {
+            long long uni_[12] = {0};
+            char *uni = (char*)uni_;
+            uni_i32(uni, lay->x0, 0);
+            uni_i32(uni, lay->y,  y);
+            uni_f32(uni, lay->shader, hc, 4);
+            uni_f32(uni, lay->coverage, mat, 11);
+            uni_ptr(uni,
+                (lay->coverage + 11*4 + 7) & ~7,
+                gt_slug.data,
+                (long)(gt_slug.count * 6 * 4));
+            for (int i = 0; i < ps; i++) {
+                uni_i32(uni,
+                    uni_len - (ps - i) * 4,
+                    planar_stride);
+            }
+            umbra_buf buf[] = {
+                { ROW(y), row_sz },
+                { uni, -(long)uni_len },
+            };
+            run(ctx, W, buf);
+        }
+    } else if (s->coverage ==
                    umbra_coverage_bitmap ||
                s->coverage ==
                    umbra_coverage_sdf) {
@@ -496,6 +527,8 @@ int main(void) {
         text_rasterize(W, H, 24.0f, 0);
     text_cov sdf_cov =
         text_rasterize(W, H, 24.0f, 1);
+    gt_slug = slug_extract("Hi", 24.0f);
+    slug_n_curves = gt_slug.count;
     build_luts();
     build_pipes();
 
@@ -508,6 +541,7 @@ int main(void) {
 
     text_cov_free(&bitmap_cov);
     text_cov_free(&sdf_cov);
+    slug_free(&gt_slug);
     free_pipes();
     return 0;
 }

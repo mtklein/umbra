@@ -407,6 +407,9 @@ int main(void) {
         text_rasterize(W, H, 72.0f, 0);
     text_cov sdf_cov =
         text_rasterize(W, H, 72.0f, 1);
+    slug_curves slug =
+        slug_extract("Hi", 150.0f);
+    slug_n_curves = slug.count;
     build_luts();
 
     void *pixbuf = malloc(W * H * 8);
@@ -540,6 +543,46 @@ int main(void) {
                      + 11*4 + 7) & ~7,
                     bitmap_cov.data,
                     (long)(W * H * 2));
+                for (int i = 0; i < ps; i++) {
+                    uni_i32(uni,
+                        uni_len - (ps-i) * 4,
+                        planar_stride);
+                }
+                umbra_buf buf[] = {
+                    { ROW(y), row_sz },
+                    { uni, -(long)uni_len },
+                };
+                run(ctx, W, buf);
+            }
+        } else if (s->coverage ==
+                       umbra_coverage_slug) {
+            persp_t += 0.016f;
+            float mat[11];
+            build_perspective_matrix(mat, persp_t,
+                W, H, (int)slug.w, (int)slug.h);
+            mat[9]  = slug.w;
+            mat[10] = slug.h;
+            float hc[4];
+            for (int i = 0; i < 4; i++) {
+                hc[i] = s->color[i];
+            }
+            for (int y = 0; y < H; y++) {
+                long long uni_[12] = {0};
+                char *uni = (char*)uni_;
+                uni_i32(uni,
+                    draw_layout.x0, 0);
+                uni_i32(uni,
+                    draw_layout.y, y);
+                uni_f32(uni,
+                    draw_layout.shader, hc, 4);
+                uni_f32(uni,
+                    draw_layout.coverage,
+                    mat, 11);
+                uni_ptr(uni,
+                    (draw_layout.coverage
+                     + 11*4 + 7) & ~7,
+                    slug.data,
+                    (long)(slug.count * 6 * 4));
                 for (int i = 0; i < ps; i++) {
                     uni_i32(uni,
                         uni_len - (ps-i) * 4,
@@ -774,6 +817,7 @@ int main(void) {
     free(pixbuf);
     text_cov_free(&bitmap_cov);
     text_cov_free(&sdf_cov);
+    slug_free(&slug);
     free_backends();
     free_pipes();
     SDL_DestroyTexture(texture);

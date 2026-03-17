@@ -1,6 +1,7 @@
 #pragma once
 #include "../umbra_draw.h"
 #include "text.h"
+#include "slug.h"
 #include <stdint.h>
 
 typedef struct {
@@ -136,6 +137,16 @@ static slide const slides[] = {
         .store    = umbra_store_8888,
         .grad     = {320.0f, 240.0f, 1.0f/280.0f, 64.0f},
         .bg       = 0xff000000,
+    },
+    {
+        .title    = "14. Slug Text (Bezier)",
+        .shader   = umbra_shader_solid,
+        .coverage = umbra_coverage_slug,
+        .blend    = umbra_blend_srcover,
+        .load     = umbra_load_8888,
+        .store    = umbra_store_8888,
+        .color    = {0.2f, 1.0f, 0.6f, 1.0f},
+        .bg       = 0xff0a0a1e,
     },
 };
 
