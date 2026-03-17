@@ -488,7 +488,8 @@ static _Bool always_x(struct bb_inst const *insts,
 struct umbra_codegen* umbra_codegen(
     BB const *bb)
 {
-    BB *resolved = umbra_resolve_joins(bb, always_x);
+    BB *resolved =
+        umbra_resolve_joins(bb, always_x);
     bb = resolved;
 
     int max_ptr = -1;

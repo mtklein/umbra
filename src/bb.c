@@ -363,39 +363,33 @@ val umbra_mul_i32(builder *b, val x, val y) {
 
 val umbra_shl_i32(builder *b, val x, val y) {
     if (is_imm32(b, y.id, 0)) { return x; }
-    int d = math(b, op_shl_i32, .x=x.id, .y=y.id);
     if (is_imm(b, y.id)) {
-        int f = push(b, op_shl_imm,
-                     .x=x.id,
-                     .imm=b->inst[y.id].imm);
-        return (val){push(b, op_join,
-                          .x=d, .y=f)};
+        return (val){push(b, op_shl_imm,
+                         .x=x.id,
+                         .imm=b->inst[y.id].imm)};
     }
-    return (val){d};
+    return (val){math(b, op_shl_i32,
+                      .x=x.id, .y=y.id)};
 }
 val umbra_shr_u32(builder *b, val x, val y) {
     if (is_imm32(b, y.id, 0)) { return x; }
-    int d = math(b, op_shr_u32, .x=x.id, .y=y.id);
     if (is_imm(b, y.id)) {
-        int f = push(b, op_shr_u32_imm,
-                     .x=x.id,
-                     .imm=b->inst[y.id].imm);
-        return (val){push(b, op_join,
-                          .x=d, .y=f)};
+        return (val){push(b, op_shr_u32_imm,
+                         .x=x.id,
+                         .imm=b->inst[y.id].imm)};
     }
-    return (val){d};
+    return (val){math(b, op_shr_u32,
+                      .x=x.id, .y=y.id)};
 }
 val umbra_shr_s32(builder *b, val x, val y) {
     if (is_imm32(b, y.id, 0)) { return x; }
-    int d = math(b, op_shr_s32, .x=x.id, .y=y.id);
     if (is_imm(b, y.id)) {
-        int f = push(b, op_shr_s32_imm,
-                     .x=x.id,
-                     .imm=b->inst[y.id].imm);
-        return (val){push(b, op_join,
-                          .x=d, .y=f)};
+        return (val){push(b, op_shr_s32_imm,
+                         .x=x.id,
+                         .imm=b->inst[y.id].imm)};
     }
-    return (val){d};
+    return (val){math(b, op_shr_s32,
+                      .x=x.id, .y=y.id)};
 }
 
 val umbra_and_i32(builder *b, val x, val y) {
@@ -409,19 +403,12 @@ val umbra_and_i32(builder *b, val x, val y) {
                       .x=x.id, .y=y.id)};
 }
 static int shl_imm_amount(builder *b, int id) {
-    if (b->inst[id].op == op_join) {
-        id = b->inst[id].x;
-    }
-    if (b->inst[id].op == op_shl_i32
-     && is_imm(b, b->inst[id].y)) {
-        return b->inst[b->inst[id].y].imm;
+    if (b->inst[id].op == op_shl_imm) {
+        return b->inst[id].imm;
     }
     return -1;
 }
 static int shl_imm_operand(builder *b, int id) {
-    if (b->inst[id].op == op_join) {
-        id = b->inst[id].x;
-    }
     return b->inst[id].x;
 }
 static int known_top_bit(builder *b, int id) {
@@ -442,11 +429,10 @@ static int known_top_bit(builder *b, int id) {
         if (ta && tb) { return ta > tb ? ta : tb; }
         return 0;
     }
-    if (b->inst[id].op == op_shl_i32
-     && is_imm(b, b->inst[id].y)) {
+    if (b->inst[id].op == op_shl_imm) {
         int t = known_top_bit(b, b->inst[id].x);
         if (t) {
-            int sh = b->inst[b->inst[id].y].imm;
+            int sh = b->inst[id].imm;
             return t + sh > 32 ? 32 : t + sh;
         }
     }

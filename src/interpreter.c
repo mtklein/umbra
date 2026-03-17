@@ -527,11 +527,7 @@ int umbra_const_eval(enum op op, int xb,
 
 static _Bool interp_chooser(struct bb_inst const *insts,
                             int join_id) {
-    enum op y_op = insts[insts[join_id].y].op;
-    return y_op == op_shl_imm
-        || y_op == op_shr_u32_imm
-        || y_op == op_shr_s32_imm
-        || y_op == op_sli;
+    return insts[insts[join_id].y].op == op_sli;
 }
 
 struct umbra_interpreter* umbra_interpreter(
