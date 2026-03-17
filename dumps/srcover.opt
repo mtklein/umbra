@@ -11,33 +11,39 @@
   v10  = load_16         p1
   v11  = widen_f16       v10
   v12  = shr_u32         v7 v4
-  v13  = f32_from_i32    v12
-  v14  = fms_f32         v5 v13 v6
-  v15  = mul_f32         v11 v14
-  v16  = fma_f32         v5 v9 v15
-  v17  = narrow_f32      v16
-      store_16        p1 v17
-  v19  = shr_u32         v7 v2
-  v20  = and_32          v1 v19
-  v21  = f32_from_i32    v20
-  v22  = load_16         p2
-  v23  = widen_f16       v22
-  v24  = mul_f32         v23 v14
-  v25  = fma_f32         v5 v21 v24
-  v26  = narrow_f32      v25
-      store_16        p2 v26
-  v28  = shr_u32         v7 v3
-  v29  = and_32          v1 v28
-  v30  = f32_from_i32    v29
-  v31  = load_16         p3
-  v32  = widen_f16       v31
-  v33  = mul_f32         v32 v14
-  v34  = fma_f32         v5 v30 v33
-  v35  = narrow_f32      v34
-      store_16        p3 v35
-  v37  = load_16         p4
+  v13  = shr_u32_imm     v7 24
+  v14  = join            v12 v13
+  v15  = f32_from_i32    v14
+  v16  = fms_f32         v5 v15 v6
+  v17  = mul_f32         v11 v16
+  v18  = fma_f32         v5 v9 v17
+  v19  = narrow_f32      v18
+      store_16        p1 v19
+  v21  = shr_u32         v7 v2
+  v22  = shr_u32_imm     v7 8
+  v23  = join            v21 v22
+  v24  = and_32          v1 v23
+  v25  = f32_from_i32    v24
+  v26  = load_16         p2
+  v27  = widen_f16       v26
+  v28  = mul_f32         v27 v16
+  v29  = fma_f32         v5 v25 v28
+  v30  = narrow_f32      v29
+      store_16        p2 v30
+  v32  = shr_u32         v7 v3
+  v33  = shr_u32_imm     v7 16
+  v34  = join            v32 v33
+  v35  = and_32          v1 v34
+  v36  = f32_from_i32    v35
+  v37  = load_16         p3
   v38  = widen_f16       v37
-  v39  = mul_f32         v38 v14
-  v40  = fma_f32         v5 v13 v39
+  v39  = mul_f32         v38 v16
+  v40  = fma_f32         v5 v36 v39
   v41  = narrow_f32      v40
-      store_16        p4 v41
+      store_16        p3 v41
+  v43  = load_16         p4
+  v44  = widen_f16       v43
+  v45  = mul_f32         v44 v16
+  v46  = fma_f32         v5 v15 v45
+  v47  = narrow_f32      v46
+      store_16        p4 v47

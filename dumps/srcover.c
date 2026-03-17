@@ -70,38 +70,44 @@ void umbra_entry(int n, void **ptrs, long *szs) {
         u32 v10 = (u32)(u16)p1[i];
         u32 v11 = f2u(h2f((u16)v10));
         u32 v12 = (u32)(v7 >> v4);
-        u32 v13 = f2u((float)(s32)v12);
-        u32 v14 = f2u(fmaf(-u2f(v5), u2f(v13), u2f(v6)));
-        u32 v15 = f2u(u2f(v11) * u2f(v14));
-        u32 v16 = f2u(fmaf(u2f(v5), u2f(v9), u2f(v15)));
-        u32 v17 = (u32)f2h(u2f(v16));
-        p1[i] = (u16)v17;
+        u32 v13 = (u32)(v7 >> 24);
+        u32 v14 = v12;
+        u32 v15 = f2u((float)(s32)v14);
+        u32 v16 = f2u(fmaf(-u2f(v5), u2f(v15), u2f(v6)));
+        u32 v17 = f2u(u2f(v11) * u2f(v16));
+        u32 v18 = f2u(fmaf(u2f(v5), u2f(v9), u2f(v17)));
+        u32 v19 = (u32)f2h(u2f(v18));
+        p1[i] = (u16)v19;
 
-        u32 v19 = (u32)(v7 >> v2);
-        u32 v20 = (u32)(v1 & v19);
-        u32 v21 = f2u((float)(s32)v20);
-        u32 v22 = (u32)(u16)p2[i];
-        u32 v23 = f2u(h2f((u16)v22));
-        u32 v24 = f2u(u2f(v23) * u2f(v14));
-        u32 v25 = f2u(fmaf(u2f(v5), u2f(v21), u2f(v24)));
-        u32 v26 = (u32)f2h(u2f(v25));
-        p2[i] = (u16)v26;
+        u32 v21 = (u32)(v7 >> v2);
+        u32 v22 = (u32)(v7 >> 8);
+        u32 v23 = v21;
+        u32 v24 = (u32)(v1 & v23);
+        u32 v25 = f2u((float)(s32)v24);
+        u32 v26 = (u32)(u16)p2[i];
+        u32 v27 = f2u(h2f((u16)v26));
+        u32 v28 = f2u(u2f(v27) * u2f(v16));
+        u32 v29 = f2u(fmaf(u2f(v5), u2f(v25), u2f(v28)));
+        u32 v30 = (u32)f2h(u2f(v29));
+        p2[i] = (u16)v30;
 
-        u32 v28 = (u32)(v7 >> v3);
-        u32 v29 = (u32)(v1 & v28);
-        u32 v30 = f2u((float)(s32)v29);
-        u32 v31 = (u32)(u16)p3[i];
-        u32 v32 = f2u(h2f((u16)v31));
-        u32 v33 = f2u(u2f(v32) * u2f(v14));
-        u32 v34 = f2u(fmaf(u2f(v5), u2f(v30), u2f(v33)));
-        u32 v35 = (u32)f2h(u2f(v34));
-        p3[i] = (u16)v35;
-
-        u32 v37 = (u32)(u16)p4[i];
+        u32 v32 = (u32)(v7 >> v3);
+        u32 v33 = (u32)(v7 >> 16);
+        u32 v34 = v32;
+        u32 v35 = (u32)(v1 & v34);
+        u32 v36 = f2u((float)(s32)v35);
+        u32 v37 = (u32)(u16)p3[i];
         u32 v38 = f2u(h2f((u16)v37));
-        u32 v39 = f2u(u2f(v38) * u2f(v14));
-        u32 v40 = f2u(fmaf(u2f(v5), u2f(v13), u2f(v39)));
+        u32 v39 = f2u(u2f(v38) * u2f(v16));
+        u32 v40 = f2u(fmaf(u2f(v5), u2f(v36), u2f(v39)));
         u32 v41 = (u32)f2h(u2f(v40));
-        p4[i] = (u16)v41;
+        p3[i] = (u16)v41;
+
+        u32 v43 = (u32)(u16)p4[i];
+        u32 v44 = f2u(h2f((u16)v43));
+        u32 v45 = f2u(u2f(v44) * u2f(v16));
+        u32 v46 = f2u(fmaf(u2f(v5), u2f(v15), u2f(v45)));
+        u32 v47 = (u32)f2h(u2f(v46));
+        p4[i] = (u16)v47;
     }
 }
