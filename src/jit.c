@@ -156,23 +156,14 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
     case op_add_i32: put(c, ADD_4s(d,x,y)); return 1;
     case op_sub_i32: put(c, SUB_4s(d,x,y)); return 1;
     case op_mul_i32: put(c, MUL_4s(d,x,y)); return 1;
-    case op_shl_i32:
-        if (imm) { put(c, SHL_4s_imm(d,x,imm)); }
-        else     { put(c, USHL_4s(d,x,y)); }
-        return 1;
+    case op_shl_i32: put(c, USHL_4s(d,x,y)); return 1;
     case op_shr_u32:
-        if (imm) { put(c, USHR_4s_imm(d,x,imm)); }
-        else {
-            put(c, NEG_4s(scratch,y));
-            put(c, USHL_4s(d,x,scratch));
-        }
+        put(c, NEG_4s(scratch,y));
+        put(c, USHL_4s(d,x,scratch));
         return 1;
     case op_shr_s32:
-        if (imm) { put(c, SSHR_4s_imm(d,x,imm)); }
-        else {
-            put(c, NEG_4s(scratch,y));
-            put(c, SSHL_4s(d,x,scratch));
-        }
+        put(c, NEG_4s(scratch,y));
+        put(c, SSHL_4s(d,x,scratch));
         return 1;
 
     case op_f32_from_i32: put(c, SCVTF_4s(d,x)); return 1;
@@ -774,26 +765,16 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_lt_u32: case op_le_u32:
         case op_join:
         default_alu: {
-            enum op op2 = inst->op;
-            _Bool shift_imm =
-                (op2==op_shl_i32
-              || op2==op_shr_u32
-              || op2==op_shr_s32)
-             && bb->inst[inst->y].op == op_imm_32;
             int nscratch =
-                (op2==op_shr_u32
-              || op2==op_shr_s32)
-             && !shift_imm ? 1 : 0;
+                (inst->op==op_shr_u32
+              || inst->op==op_shr_s32)
+                ? 1 : 0;
             struct ra_step s = ra_step_alu(
                 ra, sl, ns, inst, i,
                 scalar, nscratch);
-
-            int alu_imm = shift_imm
-                ? bb->inst[inst->y].imm
-                : inst->imm;
             emit_alu_reg(c, inst->op,
                 s.rd, s.rx, s.ry, s.rz,
-                alu_imm, s.scratch);
+                inst->imm, s.scratch);
             if (s.scratch >= 0) {
                 ra_return_reg(ra, s.scratch);
             }
@@ -1089,17 +1070,9 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
     case op_add_i32: vpaddd(c,d,x,y); return 1;
     case op_sub_i32: vpsubd(c,d,x,y); return 1;
     case op_mul_i32: vpmulld(c,d,x,y); return 1;
-    case op_shl_i32:
-        if (imm) { vpslld_i(c,d,x,(uint8_t)imm); }
-        else     { vpsllvd(c,d,x,y); }
-        return 1;
-    case op_shr_u32:
-        if (imm) { vpsrld_i(c,d,x,(uint8_t)imm); }
-        else     { vpsrlvd(c,d,x,y); }
-        return 1;
-    case op_shr_s32:
-        if (imm) { vpsrad_i(c,d,x,(uint8_t)imm); }
-        else     { vpsravd(c,d,x,y); }
+    case op_shl_i32: vpsllvd(c,d,x,y); return 1;
+    case op_shr_u32: vpsrlvd(c,d,x,y); return 1;
+    case op_shr_s32: vpsravd(c,d,x,y);
         return 1;
 
     case op_and_32: vpand(c,1,d,x,y); return 1;
@@ -1722,25 +1695,16 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_le_s32:
         case op_lt_u32: case op_le_u32:
         case op_join: {
-            enum op op2 = inst->op;
-            _Bool shift_imm =
-                (op2==op_shl_i32
-              || op2==op_shr_u32
-              || op2==op_shr_s32)
-             && bb->inst[inst->y].op == op_imm_32;
-            int nscratch = (op2==op_lt_u32) ? 2
-                : (op2==op_le_s32
-                    || op2==op_le_u32)
+            int nscratch = (inst->op==op_lt_u32) ? 2
+                : (inst->op==op_le_s32
+                    || inst->op==op_le_u32)
                 ? 1 : 0;
             struct ra_step s = ra_step_alu(
                 ra, sl, ns, inst,
                 i, scalar, nscratch);
-
-            int alu_imm = shift_imm
-                ? bb->inst[inst->y].imm
-                : inst->imm;
-            emit_alu_reg(c, inst->op, s.rd, s.rx, s.ry, s.rz, alu_imm,
-                         s.scratch, s.scratch2);
+            emit_alu_reg(c, inst->op, s.rd, s.rx,
+                s.ry, s.rz, inst->imm,
+                s.scratch, s.scratch2);
             if (s.scratch >= 0) { ra_return_reg(ra, s.scratch); }
             if (s.scratch2 >= 0) { ra_return_reg(ra, s.scratch2); }
         } break;
