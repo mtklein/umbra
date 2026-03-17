@@ -1,5 +1,3 @@
-brew "claude"
-brew "claude-code"
 brew "lld"
 brew "llvm"
 brew "ninja"
