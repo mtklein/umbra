@@ -70,13 +70,19 @@
   v69  = shl_imm         v67 8
   v70  = join            v68 v69
   v71  = or_32           v66 v70
-  v72  = and_32          v17 v62
-  v73  = shl_i32         v72 v24
-  v74  = shl_imm         v72 16
-  v75  = join            v73 v74
-  v76  = or_32           v71 v75
-  v77  = shl_i32         v65 v29
-  v78  = shl_imm         v65 24
-  v79  = join            v77 v78
-  v80  = or_32           v76 v79
-      store_32        p0 v80
+  v72  = sli             v66 v67 8
+  v73  = join            v71 v72
+  v74  = and_32          v17 v62
+  v75  = shl_i32         v74 v24
+  v76  = shl_imm         v74 16
+  v77  = join            v75 v76
+  v78  = or_32           v73 v77
+  v79  = sli             v73 v74 16
+  v80  = join            v78 v79
+  v81  = shl_i32         v65 v29
+  v82  = shl_imm         v65 24
+  v83  = join            v81 v82
+  v84  = or_32           v80 v83
+  v85  = sli             v80 v65 24
+  v86  = join            v84 v85
+      store_32        p0 v86

@@ -442,6 +442,14 @@ static int known_top_bit(builder *b, int id) {
         if (ta && tb) { return ta > tb ? ta : tb; }
         return 0;
     }
+    if (b->inst[id].op == op_shl_i32
+     && is_imm(b, b->inst[id].y)) {
+        int t = known_top_bit(b, b->inst[id].x);
+        if (t) {
+            int sh = b->inst[b->inst[id].y].imm;
+            return t + sh > 32 ? 32 : t + sh;
+        }
+    }
     if (b->inst[id].op == op_join) {
         return known_top_bit(b, b->inst[id].x);
     }

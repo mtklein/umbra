@@ -37,17 +37,11 @@ kernel void umbra_entry(
     uint v19 = v5 & v12;
     uint v20 = v5 & v14;
     uint v21 = v20 << v6;
-    uint v22 = v20 << 8u;
-    uint v23 = v21;
-    uint v24 = v19 | v23;
-    uint v25 = v5 & v16;
-    uint v26 = v25 << v7;
-    uint v27 = v25 << 16u;
-    uint v28 = v26;
-    uint v29 = v24 | v28;
-    uint v30 = v18 << v8;
-    uint v31 = v18 << 24u;
-    uint v32 = v30;
-    uint v33 = v29 | v32;
-    ((device uint*)p0)[i] = v33;
+    uint v22 = v19 | v21;
+    uint v23 = v5 & v16;
+    uint v24 = v23 << v7;
+    uint v25 = v22 | v24;
+    uint v26 = v18 << v8;
+    uint v27 = v25 | v26;
+    ((device uint*)p0)[i] = v27;
 }
