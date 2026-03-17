@@ -50,6 +50,7 @@ umbra_val umbra_shr_s32(struct umbra_builder*, umbra_val, umbra_val);
 
 umbra_val umbra_and_i32(struct umbra_builder*, umbra_val, umbra_val);
 umbra_val umbra_or_i32 (struct umbra_builder*, umbra_val, umbra_val);
+umbra_val umbra_pack   (struct umbra_builder*, umbra_val base, umbra_val val, int shift);
 umbra_val umbra_xor_i32(struct umbra_builder*, umbra_val, umbra_val);
 umbra_val umbra_sel_i32(struct umbra_builder*, umbra_val, umbra_val, umbra_val);
 

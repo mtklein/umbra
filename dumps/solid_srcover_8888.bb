@@ -72,17 +72,17 @@
   v71  = join            v69 v70
   v72  = shl_imm         v71 8
   v73  = or_32           v68 v72
-  v74  = sli             v68 v71 8
+  v74  = pack            v68 v71 8
   v75  = join            v73 v74
   v76  = and_32          v17 v62
   v77  = and_imm         v62 0xff
   v78  = join            v76 v77
   v79  = shl_imm         v78 16
   v80  = or_32           v75 v79
-  v81  = sli             v75 v78 16
+  v81  = pack            v75 v78 16
   v82  = join            v80 v81
   v83  = shl_imm         v65 24
   v84  = or_32           v82 v83
-  v85  = sli             v82 v65 24
+  v85  = pack            v82 v65 24
   v86  = join            v84 v85
       store_32        p0 v86

@@ -458,17 +458,11 @@ void umbra_store_8888(builder *builder,
     };
     umbra_val mask = umbra_imm_i32(builder, 0xFF);
     umbra_val px = umbra_and_i32(builder,ch[0],mask);
-    px = umbra_or_i32(builder, px,
-        umbra_shl_i32(builder,
-            umbra_and_i32(builder, ch[1], mask),
-            umbra_imm_i32(builder, 8)));
-    px = umbra_or_i32(builder, px,
-        umbra_shl_i32(builder,
-            umbra_and_i32(builder, ch[2], mask),
-            umbra_imm_i32(builder, 16)));
-    px = umbra_or_i32(builder, px,
-        umbra_shl_i32(builder, ch[3],
-            umbra_imm_i32(builder, 24)));
+    px = umbra_pack(builder, px,
+             umbra_and_i32(builder, ch[1], mask), 8);
+    px = umbra_pack(builder, px,
+             umbra_and_i32(builder, ch[2], mask), 16);
+    px = umbra_pack(builder, px, ch[3], 24);
     umbra_store_i32(builder, ptr, ix, px);
 }
 
@@ -503,9 +497,8 @@ void umbra_store_565(builder *builder, umbra_ptr ptr, umbra_val ix, umbra_color 
         umbra_add_f32(builder, umbra_mul_f32(builder, c.g, s63), half_));
     umbra_val b = umbra_cvt_i32_f32(builder,
         umbra_add_f32(builder, umbra_mul_f32(builder, c.b, s31), half_));
-    umbra_val r11 = umbra_shl_i32(builder, r, umbra_imm_i32(builder, 11));
-    umbra_val g5  = umbra_shl_i32(builder, g, umbra_imm_i32(builder, 5));
-    umbra_val px  = umbra_or_i32(builder, umbra_or_i32(builder, r11, g5), b);
+    umbra_val px = umbra_pack(builder,
+        umbra_pack(builder, b, g, 5), r, 11);
     umbra_store_i16(builder, ptr, ix,
                   umbra_narrow_i16(builder, px));
 }
@@ -551,10 +544,11 @@ void umbra_store_1010102(builder *builder, umbra_ptr ptr, umbra_val ix, umbra_co
         umbra_add_f32(builder, umbra_mul_f32(builder, c.b, s1023), half_));
     umbra_val a = umbra_cvt_i32_f32(builder,
         umbra_add_f32(builder, umbra_mul_f32(builder, c.a, s3), half_));
-    umbra_val px = umbra_or_i32(builder,
-        umbra_or_i32(builder, r, umbra_shl_i32(builder, g, umbra_imm_i32(builder, 10))),
-        umbra_or_i32(builder, umbra_shl_i32(builder, b, umbra_imm_i32(builder, 20)),
-                         umbra_shl_i32(builder, a, umbra_imm_i32(builder, 30))));
+    umbra_val px = umbra_pack(builder,
+        umbra_pack(builder,
+            umbra_pack(builder, r, g, 10),
+            b, 20),
+        a, 30);
     umbra_store_i32(builder, ptr, ix, px);
 }
 

@@ -23,7 +23,8 @@
     X(widen_f16) X(narrow_f32)                       \
     X(join)                                          \
     X(shl_imm) X(shr_u32_imm) X(shr_s32_imm)       \
-    X(sli) X(and_imm)
+    X(and_imm)                                      \
+    X(pack)
 
 enum op {
     #define OP_ENUM(name) op_##name,

@@ -1550,17 +1550,11 @@ static void test_pack_channels(void) {
                       (umbra_ptr){3}, ix);
     umbra_val mask = umbra_imm_i32(builder, 0xff);
     umbra_val px = umbra_and_i32(builder, r, mask);
-    px = umbra_or_i32(builder, px,
-        umbra_shl_i32(builder,
-            umbra_and_i32(builder, g, mask),
-            umbra_imm_i32(builder, 8)));
-    px = umbra_or_i32(builder, px,
-        umbra_shl_i32(builder,
-            umbra_and_i32(builder, b, mask),
-            umbra_imm_i32(builder, 16)));
-    px = umbra_or_i32(builder, px,
-        umbra_shl_i32(builder, a,
-            umbra_imm_i32(builder, 24)));
+    px = umbra_pack(builder, px,
+             umbra_and_i32(builder, g, mask), 8);
+    px = umbra_pack(builder, px,
+             umbra_and_i32(builder, b, mask), 16);
+    px = umbra_pack(builder, px, a, 24);
     umbra_store_i32(builder, (umbra_ptr){4}, ix, px);
     backends B = make(builder, opt);
     for (int bi = 0; bi < 4; bi++) {

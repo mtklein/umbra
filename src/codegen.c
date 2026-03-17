@@ -324,17 +324,13 @@ static void emit_ops(Buf *b, BB const *bb,
                      (uint32_t)inst->imm);
                 break;
 
-            case op_sli: {
-                int sh = inst->imm;
-                uint32_t mask =
-                    (1u << sh) - 1u;
+            case op_pack:
                 emit(b,
                     "%su32 v%d ="
-                    " (v%d & %uu)"
-                    " | (v%d << %d);\n",
-                    pad, i, inst->x, mask,
-                    inst->y, sh);
-            } break;
+                    " v%d | (v%d << %d);\n",
+                    pad, i, inst->x,
+                    inst->y, inst->imm);
+                break;
 
             #define BINOP(OP, EXPR) \
                 case OP: \

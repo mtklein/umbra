@@ -62,17 +62,17 @@
   v61  = join            v59 v60
   v62  = shl_imm         v61 8
   v63  = or_32           v58 v62
-  v64  = sli             v58 v61 8
+  v64  = pack            v58 v61 8
   v65  = join            v63 v64
   v66  = and_32          v17 v52
   v67  = and_imm         v52 0xff
   v68  = join            v66 v67
   v69  = shl_imm         v68 16
   v70  = or_32           v65 v69
-  v71  = sli             v65 v68 16
+  v71  = pack            v65 v68 16
   v72  = join            v70 v71
   v73  = shl_imm         v55 24
   v74  = or_32           v72 v73
-  v75  = sli             v72 v55 24
+  v75  = pack            v72 v55 24
   v76  = join            v74 v75
       store_32        p0 v76

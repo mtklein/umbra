@@ -200,7 +200,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
     case op_shr_s32_imm:
         put(c, SSHR_4s_imm(d,x,imm));
         return 1;
-    case op_sli:
+    case op_pack:
         if (d == x) {
             put(c, SLI_4s_imm(d,y,imm));
         } else if (d != y) {
@@ -271,7 +271,7 @@ struct umbra_jit {
 
 static _Bool arm64_chooser(struct bb_inst const *insts,
                            int join_id) {
-    return insts[insts[join_id].y].op == op_sli;
+    return insts[insts[join_id].y].op == op_pack;
 }
 
 struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
@@ -733,7 +733,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 case op_narrow_16:
                 case op_join:
                 case op_shl_imm: case op_shr_u32_imm:
-                case op_shr_s32_imm: case op_sli:
+                case op_shr_s32_imm: case op_pack:
                 case op_and_imm:
                     break;
                 }
@@ -789,7 +789,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 inst->imm, -1);
         } break;
 
-        case op_sli: {
+        case op_pack: {
             struct ra_step s = ra_step_alu(
                 ra, sl, ns, inst, i,
                 scalar, 1);
@@ -1115,7 +1115,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
     case op_shr_s32_imm:
         vpsrad_i(c,d,x,(uint8_t)imm);
         return 1;
-    case op_sli:
+    case op_pack:
     case op_and_imm:
         return 0;
 
@@ -1712,7 +1712,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 inst->imm, -1, -1);
         } break;
 
-        case op_sli: break;
+        case op_pack: break;
         }
     }
     #undef lu

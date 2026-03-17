@@ -414,43 +414,6 @@ val umbra_and_i32(builder *b, val x, val y) {
     }
     return (val){d.id};
 }
-static int known_top_bit(builder *b, int id) {
-    if (b->inst[id].op == op_imm_32) {
-        uint32_t v = (uint32_t)b->inst[id].imm;
-        return v ? 32 - __builtin_clz(v) : 0;
-    }
-    if (b->inst[id].op == op_and_32) {
-        int ta = known_top_bit(b, b->inst[id].x),
-            tb = known_top_bit(b, b->inst[id].y);
-        if (ta && tb) { return ta < tb ? ta : tb; }
-        if (ta)       { return ta; }
-        return tb;
-    }
-    if (b->inst[id].op == op_and_imm) {
-        uint32_t m = (uint32_t)b->inst[id].imm;
-        int tm = m ? 32 - __builtin_clz(m) : 0,
-            tx = known_top_bit(b, b->inst[id].x);
-        if (tm && tx) { return tm < tx ? tm : tx; }
-        return tm ? tm : tx;
-    }
-    if (b->inst[id].op == op_or_32) {
-        int ta = known_top_bit(b, b->inst[id].x),
-            tb = known_top_bit(b, b->inst[id].y);
-        if (ta && tb) { return ta > tb ? ta : tb; }
-        return 0;
-    }
-    if (b->inst[id].op == op_shl_imm) {
-        int t = known_top_bit(b, b->inst[id].x);
-        if (t) {
-            int sh = b->inst[id].imm;
-            return t + sh > 32 ? 32 : t + sh;
-        }
-    }
-    if (b->inst[id].op == op_join) {
-        return known_top_bit(b, b->inst[id].x);
-    }
-    return 0;
-}
 val umbra_or_i32(builder *b, val x, val y) {
     sort(&x.id, &y.id);
     if (x.id == y.id)              { return x; }
@@ -458,25 +421,17 @@ val umbra_or_i32(builder *b, val x, val y) {
     if (is_imm32(b, y.id,  0))    { return x; }
     if (is_imm32(b, x.id, -1))    { return x; }
     if (is_imm32(b, y.id, -1))    { return y; }
-    val d = math(b, op_or_32, .x=x.id, .y=y.id);
-    for (int pass = 0; pass < 2; pass++) {
-        int sh_id = pass ? x.id : y.id,
-            lo_id = pass ? y.id : x.id;
-        if (b->inst[sh_id].op != op_shl_imm) {
-            continue;
-        }
-        int amt = b->inst[sh_id].imm,
-            top = known_top_bit(b, lo_id);
-        if (amt > 0 && top && top <= amt) {
-            val f = push(b, op_sli,
-                         .x=lo_id,
-                         .y=b->inst[sh_id].x,
-                         .imm=amt);
-            return push(b, op_join,
-                        .x=d.id, .y=f.id);
-        }
-    }
-    return (val){d.id};
+    return math(b, op_or_32, .x=x.id, .y=y.id);
+}
+val umbra_pack(builder *b, val base,
+               val v, int shift) {
+    val shifted = umbra_shl_i32(b, v,
+                      umbra_imm_i32(b, shift));
+    val d = umbra_or_i32(b, base, shifted);
+    val f = push(b, op_pack,
+                 .x=base.id, .y=v.id,
+                 .imm=shift);
+    return push(b, op_join, .x=d.id, .y=f.id);
 }
 val umbra_xor_i32(builder *b, val x, val y) {
     sort(&x.id, &y.id);
@@ -894,7 +849,7 @@ static void dump_insts(struct bb_inst const *inst,
                         ip->x,
                         (uint32_t)ip->imm);
                 break;
-            case op_sli:
+            case op_pack:
                 fprintf(f, " v%d v%d %d",
                         ip->x, ip->y, ip->imm);
                 break;

@@ -336,17 +336,13 @@ static void emit_ops(Buf *b, BB const *bb,
                      (uint32_t)inst->imm);
                 break;
 
-            case op_sli: {
-                int sh = inst->imm;
-                uint32_t mask =
-                    (1u << sh) - 1u;
+            case op_pack:
                 emit(b,
                     "%suint v%d ="
-                    " (v%d & %uu)"
-                    " | (v%d << %du);\n",
-                    pad, i, inst->x, mask,
-                    inst->y, sh);
-            } break;
+                    " v%d | (v%d << %du);\n",
+                    pad, i, inst->x,
+                    inst->y, inst->imm);
+                break;
 
             case op_add_f32:
                 emit(b, "%suint v%d = as_type<uint>"
