@@ -103,7 +103,7 @@ static _Bool is_pow2_or_zero(int x) { ... }
 ```
 
 ```c
-void   umbra_builder_free(struct umbra_builder*);
+struct umbra_jit* umbra_jit(struct umbra_basic_block const*);
 void   umbra_jit_run (struct umbra_jit*, int n, umbra_buf[]);
 void   umbra_jit_free(struct umbra_jit*);
 ```
