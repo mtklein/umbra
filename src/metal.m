@@ -630,12 +630,6 @@ static char* build_source(BB const *bb,
     return src;
 }
 
-static _Bool always_x(struct bb_inst const *insts,
-                      int join_id) {
-    (void)insts; (void)join_id;
-    return 0;
-}
-
 struct umbra_metal* umbra_metal(BB const *bb) {
     @autoreleasepool {
         id<MTLDevice> device =
@@ -643,7 +637,7 @@ struct umbra_metal* umbra_metal(BB const *bb) {
         if (!device) { return 0; }
 
         BB *resolved =
-            umbra_resolve_joins(bb, always_x);
+            umbra_resolve_joins(bb, NULL);
 
         int *deref_buf = calloc(
             (size_t)resolved->insts,

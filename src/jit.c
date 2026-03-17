@@ -1150,15 +1150,9 @@ struct umbra_jit {
     int    loop_start, loop_end;
 };
 
-static _Bool always_x(struct bb_inst const *insts,
-                      int join_id) {
-    (void)insts; (void)join_id;
-    return 0;
-}
-
 struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     struct umbra_basic_block *resolved =
-        umbra_resolve_joins(bb, always_x);
+        umbra_resolve_joins(bb, NULL);
     bb = resolved;
 
     int *sl = malloc((size_t)bb->insts * sizeof(int));
