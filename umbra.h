@@ -15,9 +15,9 @@ void  umbra_set_uni_len(struct umbra_builder*, int);
 
 umbra_val umbra_lane(struct umbra_builder*);
 umbra_val umbra_imm_i32(struct umbra_builder*, int bits);
-static inline umbra_val umbra_imm_f32(struct umbra_builder *bb, float v) {
+static inline umbra_val umbra_imm_f32(struct umbra_builder *b, float v) {
     union { float f; int i; } u = {.f=v};
-    return umbra_imm_i32(bb, u.i);
+    return umbra_imm_i32(b, u.i);
 }
 
 umbra_val umbra_load_i32 (struct umbra_builder*, umbra_ptr, umbra_val ix);

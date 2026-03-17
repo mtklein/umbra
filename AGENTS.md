@@ -15,7 +15,9 @@ they often differ from typical AI-generated C.
 ## Brevity
 
 - Typedef long types at the top of each .c:
-  `typedef struct umbra_builder BB;` or `typedef struct umbra_basic_block BB;`
+  `typedef struct umbra_builder builder;` or `typedef struct umbra_basic_block BB;`
+- Builder instances are `builder` (or `b` in internal bb.c functions where there's
+  no conflict with blue channel variables). Basic block instances are `bb`.
 - Short names: `bb`, `h`, `p`, `xf`, `ty`, not `basic_block`, `hash_value`,
   `ptr_index`, `x_float`, `type_name`.
 - Prefer `is_16bit` over `is_16bit_result`.

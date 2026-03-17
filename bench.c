@@ -120,9 +120,9 @@ static double bench_build(
         void (*compile_and_free)(
             struct umbra_basic_block*)) {
     double const start = now();
-    struct umbra_builder *b = build();
-    struct umbra_basic_block *bb = umbra_basic_block(b);
-    umbra_builder_free(b);
+    struct umbra_builder *builder = build();
+    struct umbra_basic_block *bb = umbra_basic_block(builder);
+    umbra_builder_free(builder);
     compile_and_free(bb);
     return (now() - start) * 1e9;
 }
@@ -186,9 +186,9 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    struct umbra_builder *b = build_srcover();
-    struct umbra_basic_block *bb = umbra_basic_block(b);
-    umbra_builder_free(b);
+    struct umbra_builder *builder = build_srcover();
+    struct umbra_basic_block *bb = umbra_basic_block(builder);
+    umbra_builder_free(builder);
 
     struct umbra_interpreter *p =
         umbra_interpreter(bb);

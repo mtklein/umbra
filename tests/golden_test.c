@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-typedef struct umbra_builder BB;
+typedef struct umbra_builder builder;
 
 enum { W = 128, H = 96, LUT_N = 64 };
 
@@ -65,36 +65,36 @@ static pipe fill_pipes[NUM_FMTS];
 static pipe readback_pipes[NUM_FMTS];
 
 static void build_fill(int fmt) {
-    BB *bb = umbra_builder();
-    umbra_val ix = umbra_lane(bb);
-    int fi = umbra_reserve(bb, 4);
+    builder *builder = umbra_builder();
+    umbra_val ix = umbra_lane(builder);
+    int fi = umbra_reserve(builder, 4);
     umbra_color c = {
-        umbra_load_i32(bb, (umbra_ptr){1},
-                     umbra_imm_i32(bb, fi)),
-        umbra_load_i32(bb, (umbra_ptr){1},
-                     umbra_imm_i32(bb, fi+1)),
-        umbra_load_i32(bb, (umbra_ptr){1},
-                     umbra_imm_i32(bb, fi+2)),
-        umbra_load_i32(bb, (umbra_ptr){1},
-                     umbra_imm_i32(bb, fi+3)),
+        umbra_load_i32(builder, (umbra_ptr){1},
+                     umbra_imm_i32(builder, fi)),
+        umbra_load_i32(builder, (umbra_ptr){1},
+                     umbra_imm_i32(builder, fi+1)),
+        umbra_load_i32(builder, (umbra_ptr){1},
+                     umbra_imm_i32(builder, fi+2)),
+        umbra_load_i32(builder, (umbra_ptr){1},
+                     umbra_imm_i32(builder, fi+3)),
     };
-    fmt_store[fmt](bb, (umbra_ptr){0}, ix, c);
-    fill_pipes[fmt].uni_len = umbra_uni_len(bb);
-    struct umbra_basic_block *opt = umbra_basic_block(bb);
-    umbra_builder_free(bb);
+    fmt_store[fmt](builder, (umbra_ptr){0}, ix, c);
+    fill_pipes[fmt].uni_len = umbra_uni_len(builder);
+    struct umbra_basic_block *opt = umbra_basic_block(builder);
+    umbra_builder_free(builder);
     fill_pipes[fmt].interp = umbra_interpreter(opt);
     umbra_basic_block_free(opt);
 }
 
 static void build_readback(int fmt) {
-    BB *bb = umbra_builder();
-    umbra_val ix = umbra_lane(bb);
+    builder *builder = umbra_builder();
+    umbra_val ix = umbra_lane(builder);
     umbra_color c =
-        fmt_load[fmt](bb, (umbra_ptr){0}, ix);
-    umbra_store_8888(bb, (umbra_ptr){2}, ix, c);
-    readback_pipes[fmt].uni_len = umbra_uni_len(bb);
-    struct umbra_basic_block *opt = umbra_basic_block(bb);
-    umbra_builder_free(bb);
+        fmt_load[fmt](builder, (umbra_ptr){0}, ix);
+    umbra_store_8888(builder, (umbra_ptr){2}, ix, c);
+    readback_pipes[fmt].uni_len = umbra_uni_len(builder);
+    struct umbra_basic_block *opt = umbra_basic_block(builder);
+    umbra_builder_free(builder);
     readback_pipes[fmt].interp =
         umbra_interpreter(opt);
     umbra_basic_block_free(opt);

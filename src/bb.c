@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-typedef struct umbra_builder BB;
+typedef struct umbra_builder builder;
 typedef umbra_val val;
 
 static _Bool is_pow2(int x) {
@@ -31,40 +31,40 @@ static uint32_t bb_inst_hash(struct bb_inst const *inst) {
     return h ? h : 1;
 }
 
-static int push_(BB *bb, struct bb_inst inst) {
+static int push_(builder *b, struct bb_inst inst) {
     uint32_t const h = bb_inst_hash(&inst);
 
-    for (int slot = (int)h; bb->ht_mask; slot++) {
-        if (bb->ht[slot & bb->ht_mask].hash == 0) {
+    for (int slot = (int)h; b->ht_mask; slot++) {
+        if (b->ht[slot & b->ht_mask].hash == 0) {
             break;
         }
-        if (h == bb->ht[slot & bb->ht_mask].hash &&
+        if (h == b->ht[slot & b->ht_mask].hash &&
             0 == __builtin_memcmp(
                      &inst,
-                     &bb->inst[bb->ht[slot & bb->ht_mask].ix],
+                     &b->inst[b->ht[slot & b->ht_mask].ix],
                      sizeof inst)) {
-            return bb->ht[slot & bb->ht_mask].ix;
+            return b->ht[slot & b->ht_mask].ix;
         }
     }
 
-    if (is_pow2_or_zero(bb->insts)) {
-        int const inst_cap = bb->insts ? 2*bb->insts : 1,
+    if (is_pow2_or_zero(b->insts)) {
+        int const inst_cap = b->insts ? 2*b->insts : 1,
                     ht_cap = 2*inst_cap;
-        bb->inst = realloc(bb->inst,
-                           (size_t)inst_cap * sizeof *bb->inst);
+        b->inst = realloc(b->inst,
+                           (size_t)inst_cap * sizeof *b->inst);
 
-        struct hash_slot *old     = bb->ht;
-        int const         old_cap = bb->ht
-                                  ? bb->ht_mask + 1
+        struct hash_slot *old     = b->ht;
+        int const         old_cap = b->ht
+                                  ? b->ht_mask + 1
                                   : 0;
-        bb->ht      = calloc((size_t)ht_cap, sizeof *bb->ht);
-        bb->ht_mask = ht_cap - 1;
+        b->ht      = calloc((size_t)ht_cap, sizeof *b->ht);
+        b->ht_mask = ht_cap - 1;
         for (int i = 0; i < old_cap; i++) {
             for (int slot = (int)old[i].hash;
                  old[i].hash;
                  slot++) {
-                if (bb->ht[slot & bb->ht_mask].hash == 0) {
-                    bb->ht[slot & bb->ht_mask] = old[i];
+                if (b->ht[slot & b->ht_mask].hash == 0) {
+                    b->ht[slot & b->ht_mask] = old[i];
                     break;
                 }
             }
@@ -72,12 +72,12 @@ static int push_(BB *bb, struct bb_inst inst) {
         free(old);
     }
 
-    int const id = bb->insts++;
-    bb->inst[id] = inst;
+    int const id = b->insts++;
+    b->inst[id] = inst;
     if (!is_store(inst.op)) {
         for (int slot = (int)h; ; slot++) {
-            if (bb->ht[slot & bb->ht_mask].hash == 0) {
-                bb->ht[slot & bb->ht_mask] =
+            if (b->ht[slot & b->ht_mask].hash == 0) {
+                b->ht[slot & b->ht_mask] =
                     (struct hash_slot){h, id};
                 break;
             }
@@ -85,180 +85,180 @@ static int push_(BB *bb, struct bb_inst inst) {
     }
     return id;
 }
-#define push(bb,...) push_(bb, (struct bb_inst){.op=__VA_ARGS__})
+#define push(b,...) push_(b, (struct bb_inst){.op=__VA_ARGS__})
 
 
-BB* umbra_builder(void) {
-    BB *bb = calloc(1, sizeof *bb);
+builder* umbra_builder(void) {
+    builder *b = calloc(1, sizeof *b);
     // Simplifies liveness analysis to know id 0 is imm=0.
-    push(bb, op_imm_32, .imm=0);
-    return bb;
+    push(b, op_imm_32, .imm=0);
+    return b;
 }
 
-void umbra_builder_free(BB *bb) {
-    free(bb->inst);
-    free(bb->ht);
-    free(bb);
+void umbra_builder_free(builder *b) {
+    free(b->inst);
+    free(b->ht);
+    free(b);
 }
 
-val umbra_lane(BB *bb) {
-    return (val){push(bb, op_lane)};
+val umbra_lane(builder *b) {
+    return (val){push(b, op_lane)};
 }
 
-val umbra_imm_i32(BB *bb, int bits) {
-    return (val){push(bb, op_imm_32, .imm=bits)};
+val umbra_imm_i32(builder *b, int bits) {
+    return (val){push(b, op_imm_32, .imm=bits)};
 }
 
-int umbra_reserve(BB *bb, int n) {
-    bb->uni_len = (bb->uni_len + 3) & ~3;
-    int ix = bb->uni_len / 4;
-    bb->uni_len += n * 4;
+int umbra_reserve(builder *b, int n) {
+    b->uni_len = (b->uni_len + 3) & ~3;
+    int ix = b->uni_len / 4;
+    b->uni_len += n * 4;
     return ix;
 }
-int umbra_reserve_ptr(BB *bb) {
-    bb->uni_len = (bb->uni_len + 7) & ~7;
-    int off = bb->uni_len;
-    bb->uni_len += 16;
+int umbra_reserve_ptr(builder *b) {
+    b->uni_len = (b->uni_len + 7) & ~7;
+    int off = b->uni_len;
+    b->uni_len += 16;
     return off;
 }
-umbra_ptr umbra_deref_ptr(BB *bb, umbra_ptr buf,
+umbra_ptr umbra_deref_ptr(builder *b, umbra_ptr buf,
                           int byte_off) {
-    int id = push(bb, op_deref_ptr,
+    int id = push(b, op_deref_ptr,
                   .ptr=buf.ix, .imm=byte_off);
     return (umbra_ptr){~id};
 }
-int umbra_uni_len(BB const *bb) {
-    return bb->uni_len;
+int umbra_uni_len(builder const *b) {
+    return b->uni_len;
 }
-void umbra_set_uni_len(BB *bb, int len) {
-    bb->uni_len = len;
+void umbra_set_uni_len(builder *b, int len) {
+    b->uni_len = len;
 }
 
-static int lane_plus_off(BB *bb, int ix) {
-    if (bb->inst[ix].op != op_add_i32) { return -1; }
-    int a = bb->inst[ix].x, b = bb->inst[ix].y;
-    if (bb->inst[a].op == op_lane) { return b; }
-    if (bb->inst[b].op == op_lane) { return a; }
+static int lane_plus_off(builder *b, int ix) {
+    if (b->inst[ix].op != op_add_i32) { return -1; }
+    int p = b->inst[ix].x, q = b->inst[ix].y;
+    if (b->inst[p].op == op_lane) { return q; }
+    if (b->inst[q].op == op_lane) { return p; }
     return -1;
 }
 
-val umbra_load_i16(BB *bb, umbra_ptr src, val ix) {
-    if (bb->inst[ix.id].op == op_lane) {
-        return (val){push(bb, op_load_16,
+val umbra_load_i16(builder *b, umbra_ptr src, val ix) {
+    if (b->inst[ix.id].op == op_lane) {
+        return (val){push(b, op_load_16,
                          .ptr=src.ix)};
     }
-    if (bb->inst[ix.id].op == op_imm_32) {
-        return (val){push(bb, op_uni_16,
-                         .imm=bb->inst[ix.id].imm,
-                         .ptr=src.ix)};
-    }
-    {
-        int off = lane_plus_off(bb, ix.id);
-        if (off >= 0) {
-            return (val){push(bb, op_load_16,
-                             .x=off, .ptr=src.ix)};
-        }
-    }
-    return (val){push(bb, op_gather_16,
-                      .x=ix.id, .ptr=src.ix)};
-}
-val umbra_load_i32(BB *bb, umbra_ptr src, val ix) {
-    if (bb->inst[ix.id].op == op_lane) {
-        return (val){push(bb, op_load_32,
-                         .ptr=src.ix)};
-    }
-    if (bb->inst[ix.id].op == op_imm_32) {
-        return (val){push(bb, op_uni_32,
-                         .imm=bb->inst[ix.id].imm,
+    if (b->inst[ix.id].op == op_imm_32) {
+        return (val){push(b, op_uni_16,
+                         .imm=b->inst[ix.id].imm,
                          .ptr=src.ix)};
     }
     {
-        int off = lane_plus_off(bb, ix.id);
+        int off = lane_plus_off(b, ix.id);
         if (off >= 0) {
-            return (val){push(bb, op_load_32,
+            return (val){push(b, op_load_16,
                              .x=off, .ptr=src.ix)};
         }
     }
-    return (val){push(bb, op_gather_32,
+    return (val){push(b, op_gather_16,
                       .x=ix.id, .ptr=src.ix)};
 }
-void umbra_store_i16(BB *bb, umbra_ptr dst,
+val umbra_load_i32(builder *b, umbra_ptr src, val ix) {
+    if (b->inst[ix.id].op == op_lane) {
+        return (val){push(b, op_load_32,
+                         .ptr=src.ix)};
+    }
+    if (b->inst[ix.id].op == op_imm_32) {
+        return (val){push(b, op_uni_32,
+                         .imm=b->inst[ix.id].imm,
+                         .ptr=src.ix)};
+    }
+    {
+        int off = lane_plus_off(b, ix.id);
+        if (off >= 0) {
+            return (val){push(b, op_load_32,
+                             .x=off, .ptr=src.ix)};
+        }
+    }
+    return (val){push(b, op_gather_32,
+                      .x=ix.id, .ptr=src.ix)};
+}
+void umbra_store_i16(builder *b, umbra_ptr dst,
                    val ix, val v) {
-    if (bb->inst[ix.id].op == op_lane) {
-        push(bb, op_store_16,
+    if (b->inst[ix.id].op == op_lane) {
+        push(b, op_store_16,
              .y=v.id, .ptr=dst.ix);
         return;
     }
     {
-        int off = lane_plus_off(bb, ix.id);
+        int off = lane_plus_off(b, ix.id);
         if (off >= 0) {
-            push(bb, op_store_16,
+            push(b, op_store_16,
                  .x=off, .y=v.id, .ptr=dst.ix);
             return;
         }
     }
-    push(bb, op_scatter_16,
+    push(b, op_scatter_16,
          .x=ix.id, .y=v.id, .ptr=dst.ix);
 }
-void umbra_store_i32(BB *bb, umbra_ptr dst,
+void umbra_store_i32(builder *b, umbra_ptr dst,
                    val ix, val v) {
-    if (bb->inst[ix.id].op == op_lane) {
-        push(bb, op_store_32,
+    if (b->inst[ix.id].op == op_lane) {
+        push(b, op_store_32,
              .y=v.id, .ptr=dst.ix);
         return;
     }
     {
-        int off = lane_plus_off(bb, ix.id);
+        int off = lane_plus_off(b, ix.id);
         if (off >= 0) {
-            push(bb, op_store_32,
+            push(b, op_store_32,
                  .x=off, .y=v.id, .ptr=dst.ix);
             return;
         }
     }
-    push(bb, op_scatter_32,
+    push(b, op_scatter_32,
          .x=ix.id, .y=v.id, .ptr=dst.ix);
 }
-val umbra_widen_s16(BB *bb, val a) {
-    return (val){push(bb, op_widen_s16, .x=a.id)};
+val umbra_widen_s16(builder *b, val x) {
+    return (val){push(b, op_widen_s16, .x=x.id)};
 }
-val umbra_widen_u16(BB *bb, val a) {
-    return (val){push(bb, op_widen_u16, .x=a.id)};
+val umbra_widen_u16(builder *b, val x) {
+    return (val){push(b, op_widen_u16, .x=x.id)};
 }
-val umbra_narrow_i16(BB *bb, val a) {
-    return (val){push(bb, op_narrow_16, .x=a.id)};
-}
-
-val umbra_widen_f16(BB *bb, val a) {
-    return (val){push(bb, op_widen_f16, .x=a.id)};
-}
-val umbra_narrow_f32(BB *bb, val a) {
-    return (val){push(bb, op_narrow_f32, .x=a.id)};
+val umbra_narrow_i16(builder *b, val x) {
+    return (val){push(b, op_narrow_16, .x=x.id)};
 }
 
-static _Bool is_imm32(BB *bb, int id, int v) {
-    return bb->inst[id].op  == op_imm_32
-        && bb->inst[id].imm == v;
+val umbra_widen_f16(builder *b, val x) {
+    return (val){push(b, op_widen_f16, .x=x.id)};
+}
+val umbra_narrow_f32(builder *b, val x) {
+    return (val){push(b, op_narrow_f32, .x=x.id)};
 }
 
-static _Bool is_imm(BB *bb, int id) {
-    return bb->inst[id].op == op_imm_32;
+static _Bool is_imm32(builder *b, int id, int v) {
+    return b->inst[id].op  == op_imm_32
+        && b->inst[id].imm == v;
 }
 
-static int math_(BB *bb, struct bb_inst inst) {
-    if (is_imm(bb, inst.x)
-     && is_imm(bb, inst.y)
-     && is_imm(bb, inst.z)) {
+static _Bool is_imm(builder *b, int id) {
+    return b->inst[id].op == op_imm_32;
+}
+
+static int math_(builder *b, struct bb_inst inst) {
+    if (is_imm(b, inst.x)
+     && is_imm(b, inst.y)
+     && is_imm(b, inst.z)) {
         int const result = umbra_const_eval(
             inst.op,
-            bb->inst[inst.x].imm,
-            bb->inst[inst.y].imm,
-            bb->inst[inst.z].imm);
-        return umbra_imm_i32(bb, result).id;
+            b->inst[inst.x].imm,
+            b->inst[inst.y].imm,
+            b->inst[inst.z].imm);
+        return umbra_imm_i32(b, result).id;
     }
-    return push_(bb, inst);
+    return push_(b, inst);
 }
-#define math(bb,...) \
-    math_(bb, (struct bb_inst){.op=__VA_ARGS__})
+#define math(b,...) \
+    math_(b, (struct bb_inst){.op=__VA_ARGS__})
 
 static void sort(int *a, int *b) {
     if (*a > *b) {
@@ -268,225 +268,223 @@ static void sort(int *a, int *b) {
     }
 }
 
-val umbra_add_f32(BB *bb, val a, val b) {
-    sort(&a.id, &b.id);
-    int const x = a.id,
-              y = b.id;
-    if (bb->inst[x].op == op_mul_f32) {
-        return (val){math(bb, op_fma_f32,
-            .x=bb->inst[x].x,
-            .y=bb->inst[x].y, .z=y)};
+val umbra_add_f32(builder *b, val x, val y) {
+    sort(&x.id, &y.id);
+    if (b->inst[x.id].op == op_mul_f32) {
+        return (val){math(b, op_fma_f32,
+            .x=b->inst[x.id].x,
+            .y=b->inst[x.id].y, .z=y.id)};
     }
-    if (bb->inst[y].op == op_mul_f32) {
-        return (val){math(bb, op_fma_f32,
-            .x=bb->inst[y].x,
-            .y=bb->inst[y].y, .z=x)};
+    if (b->inst[y.id].op == op_mul_f32) {
+        return (val){math(b, op_fma_f32,
+            .x=b->inst[y.id].x,
+            .y=b->inst[y.id].y, .z=x.id)};
     }
-    return (val){math(bb, op_add_f32, .x=x, .y=y)};
+    return (val){math(b, op_add_f32, .x=x.id, .y=y.id)};
 }
 
-val umbra_sub_f32(BB *bb, val a, val b) {
-    if (is_imm32(bb, b.id, 0)) { return a; }
-    if (bb->inst[b.id].op == op_mul_f32) {
-        return (val){math(bb, op_fms_f32,
-            .x=bb->inst[b.id].x,
-            .y=bb->inst[b.id].y, .z=a.id)};
+val umbra_sub_f32(builder *b, val x, val y) {
+    if (is_imm32(b, y.id, 0)) { return x; }
+    if (b->inst[y.id].op == op_mul_f32) {
+        return (val){math(b, op_fms_f32,
+            .x=b->inst[y.id].x,
+            .y=b->inst[y.id].y, .z=x.id)};
     }
-    return (val){math(bb, op_sub_f32,
-                      .x=a.id, .y=b.id)};
+    return (val){math(b, op_sub_f32,
+                      .x=x.id, .y=y.id)};
 }
 
-val umbra_mul_f32(BB *bb, val a, val b) {
-    sort(&a.id, &b.id);
-    if (is_imm32(bb, a.id, 0x3f800000)) { return b; }
-    if (is_imm32(bb, b.id, 0x3f800000)) { return a; }
-    return (val){math(bb, op_mul_f32,
-                      .x=a.id, .y=b.id)};
+val umbra_mul_f32(builder *b, val x, val y) {
+    sort(&x.id, &y.id);
+    if (is_imm32(b, x.id, 0x3f800000)) { return y; }
+    if (is_imm32(b, y.id, 0x3f800000)) { return x; }
+    return (val){math(b, op_mul_f32,
+                      .x=x.id, .y=y.id)};
 }
 
-val umbra_div_f32(BB *bb, val a, val b) {
-    if (is_imm32(bb, b.id, 0x3f800000)) { return a; }
-    return (val){math(bb, op_div_f32,
-                      .x=a.id, .y=b.id)};
+val umbra_div_f32(builder *b, val x, val y) {
+    if (is_imm32(b, y.id, 0x3f800000)) { return x; }
+    return (val){math(b, op_div_f32,
+                      .x=x.id, .y=y.id)};
 }
 
-val umbra_min_f32(BB *bb, val a, val b) {
-    sort(&a.id, &b.id);
-    return (val){math(bb, op_min_f32,
-                      .x=a.id, .y=b.id)};
+val umbra_min_f32(builder *b, val x, val y) {
+    sort(&x.id, &y.id);
+    return (val){math(b, op_min_f32,
+                      .x=x.id, .y=y.id)};
 }
 
-val umbra_max_f32(BB *bb, val a, val b) {
-    sort(&a.id, &b.id);
-    return (val){math(bb, op_max_f32,
-                      .x=a.id, .y=b.id)};
+val umbra_max_f32(builder *b, val x, val y) {
+    sort(&x.id, &y.id);
+    return (val){math(b, op_max_f32,
+                      .x=x.id, .y=y.id)};
 }
 
-val umbra_sqrt_f32(BB *bb, val a) {
-    return (val){math(bb, op_sqrt_f32, .x=a.id)};
+val umbra_sqrt_f32(builder *b, val x) {
+    return (val){math(b, op_sqrt_f32, .x=x.id)};
 }
 
-val umbra_add_i32(BB *bb, val a, val b) {
-    sort(&a.id, &b.id);
-    if (is_imm32(bb, a.id, 0)) { return b; }
-    if (is_imm32(bb, b.id, 0)) { return a; }
-    return (val){math(bb, op_add_i32,
-                      .x=a.id, .y=b.id)};
+val umbra_add_i32(builder *b, val x, val y) {
+    sort(&x.id, &y.id);
+    if (is_imm32(b, x.id, 0)) { return y; }
+    if (is_imm32(b, y.id, 0)) { return x; }
+    return (val){math(b, op_add_i32,
+                      .x=x.id, .y=y.id)};
 }
 
-val umbra_sub_i32(BB *bb, val a, val b) {
-    if (is_imm32(bb, b.id, 0)) { return a; }
-    if (a.id == b.id) { return umbra_imm_i32(bb, 0); }
-    return (val){math(bb, op_sub_i32,
-                      .x=a.id, .y=b.id)};
+val umbra_sub_i32(builder *b, val x, val y) {
+    if (is_imm32(b, y.id, 0)) { return x; }
+    if (x.id == y.id) { return umbra_imm_i32(b, 0); }
+    return (val){math(b, op_sub_i32,
+                      .x=x.id, .y=y.id)};
 }
 
-val umbra_mul_i32(BB *bb, val a, val b) {
-    sort(&a.id, &b.id);
-    if (is_imm32(bb, a.id, 1)) { return b; }
-    if (is_imm32(bb, b.id, 1)) { return a; }
-    if (is_imm32(bb, a.id, 0)) { return a; }
-    if (is_imm32(bb, b.id, 0)) { return b; }
-    if (bb->inst[a.id].op == op_imm_32
-     && is_pow2(bb->inst[a.id].imm)) {
+val umbra_mul_i32(builder *b, val x, val y) {
+    sort(&x.id, &y.id);
+    if (is_imm32(b, x.id, 1)) { return y; }
+    if (is_imm32(b, y.id, 1)) { return x; }
+    if (is_imm32(b, x.id, 0)) { return x; }
+    if (is_imm32(b, y.id, 0)) { return y; }
+    if (b->inst[x.id].op == op_imm_32
+     && is_pow2(b->inst[x.id].imm)) {
         int const shift =
-            __builtin_ctz((unsigned)bb->inst[a.id].imm);
-        return umbra_shl_i32(bb, b,
-                          umbra_imm_i32(bb, shift));
+            __builtin_ctz((unsigned)b->inst[x.id].imm);
+        return umbra_shl_i32(b, y,
+                          umbra_imm_i32(b, shift));
     }
-    if (bb->inst[b.id].op == op_imm_32
-     && is_pow2(bb->inst[b.id].imm)) {
+    if (b->inst[y.id].op == op_imm_32
+     && is_pow2(b->inst[y.id].imm)) {
         int const shift =
-            __builtin_ctz((unsigned)bb->inst[b.id].imm);
-        return umbra_shl_i32(bb, a,
-                          umbra_imm_i32(bb, shift));
+            __builtin_ctz((unsigned)b->inst[y.id].imm);
+        return umbra_shl_i32(b, x,
+                          umbra_imm_i32(b, shift));
     }
-    return (val){math(bb, op_mul_i32,
-                      .x=a.id, .y=b.id)};
+    return (val){math(b, op_mul_i32,
+                      .x=x.id, .y=y.id)};
 }
 
-val umbra_shl_i32(BB *bb, val a, val b) {
-    if (is_imm32(bb, b.id, 0)) { return a; }
-    return (val){math(bb, op_shl_i32,
-                      .x=a.id, .y=b.id)};
+val umbra_shl_i32(builder *b, val x, val y) {
+    if (is_imm32(b, y.id, 0)) { return x; }
+    return (val){math(b, op_shl_i32,
+                      .x=x.id, .y=y.id)};
 }
-val umbra_shr_u32(BB *bb, val a, val b) {
-    if (is_imm32(bb, b.id, 0)) { return a; }
-    return (val){math(bb, op_shr_u32,
-                      .x=a.id, .y=b.id)};
+val umbra_shr_u32(builder *b, val x, val y) {
+    if (is_imm32(b, y.id, 0)) { return x; }
+    return (val){math(b, op_shr_u32,
+                      .x=x.id, .y=y.id)};
 }
-val umbra_shr_s32(BB *bb, val a, val b) {
-    if (is_imm32(bb, b.id, 0)) { return a; }
-    return (val){math(bb, op_shr_s32,
-                      .x=a.id, .y=b.id)};
+val umbra_shr_s32(builder *b, val x, val y) {
+    if (is_imm32(b, y.id, 0)) { return x; }
+    return (val){math(b, op_shr_s32,
+                      .x=x.id, .y=y.id)};
 }
 
-val umbra_and_i32(BB *bb, val a, val b) {
-    sort(&a.id, &b.id);
-    if (a.id == b.id)              { return a; }
-    if (is_imm32(bb, a.id, -1))    { return b; }
-    if (is_imm32(bb, b.id, -1))    { return a; }
-    if (is_imm32(bb, a.id,  0))    { return a; }
-    if (is_imm32(bb, b.id,  0))    { return b; }
-    return (val){math(bb, op_and_32,
-                      .x=a.id, .y=b.id)};
+val umbra_and_i32(builder *b, val x, val y) {
+    sort(&x.id, &y.id);
+    if (x.id == y.id)              { return x; }
+    if (is_imm32(b, x.id, -1))    { return y; }
+    if (is_imm32(b, y.id, -1))    { return x; }
+    if (is_imm32(b, x.id,  0))    { return x; }
+    if (is_imm32(b, y.id,  0))    { return y; }
+    return (val){math(b, op_and_32,
+                      .x=x.id, .y=y.id)};
 }
-val umbra_or_i32(BB *bb, val a, val b) {
-    sort(&a.id, &b.id);
-    if (a.id == b.id)              { return a; }
-    if (is_imm32(bb, a.id,  0))    { return b; }
-    if (is_imm32(bb, b.id,  0))    { return a; }
-    if (is_imm32(bb, a.id, -1))    { return a; }
-    if (is_imm32(bb, b.id, -1))    { return b; }
-    return (val){math(bb, op_or_32,
-                      .x=a.id, .y=b.id)};
+val umbra_or_i32(builder *b, val x, val y) {
+    sort(&x.id, &y.id);
+    if (x.id == y.id)              { return x; }
+    if (is_imm32(b, x.id,  0))    { return y; }
+    if (is_imm32(b, y.id,  0))    { return x; }
+    if (is_imm32(b, x.id, -1))    { return x; }
+    if (is_imm32(b, y.id, -1))    { return y; }
+    return (val){math(b, op_or_32,
+                      .x=x.id, .y=y.id)};
 }
-val umbra_xor_i32(BB *bb, val a, val b) {
-    sort(&a.id, &b.id);
-    if (is_imm32(bb, a.id, 0))    { return b; }
-    if (is_imm32(bb, b.id, 0))    { return a; }
-    if (a.id == b.id) { return umbra_imm_i32(bb, 0); }
-    return (val){math(bb, op_xor_32,
-                      .x=a.id, .y=b.id)};
+val umbra_xor_i32(builder *b, val x, val y) {
+    sort(&x.id, &y.id);
+    if (is_imm32(b, x.id, 0))    { return y; }
+    if (is_imm32(b, y.id, 0))    { return x; }
+    if (x.id == y.id) { return umbra_imm_i32(b, 0); }
+    return (val){math(b, op_xor_32,
+                      .x=x.id, .y=y.id)};
 }
-val umbra_sel_i32(BB *bb, val c, val t, val fv) {
+val umbra_sel_i32(builder *b, val c, val t, val fv) {
     if (t.id == fv.id)             { return t; }
-    if (is_imm32(bb, c.id, -1))    { return t; }
-    if (is_imm32(bb, c.id,  0))    { return fv; }
-    return (val){math(bb, op_sel_32,
+    if (is_imm32(b, c.id, -1))    { return t; }
+    if (is_imm32(b, c.id,  0))    { return fv; }
+    return (val){math(b, op_sel_32,
                       .x=c.id, .y=t.id, .z=fv.id)};
 }
 
-val umbra_cvt_f32_i32(BB *bb, val a) {
-    return (val){math(bb, op_f32_from_i32, .x=a.id)};
+val umbra_cvt_f32_i32(builder *b, val x) {
+    return (val){math(b, op_f32_from_i32, .x=x.id)};
 }
-val umbra_cvt_i32_f32(BB *bb, val a) {
-    return (val){math(bb, op_i32_from_f32, .x=a.id)};
-}
-
-val umbra_eq_f32(BB *bb, val a, val b) {
-    sort(&a.id, &b.id);
-    return (val){math(bb, op_eq_f32,
-                      .x=a.id, .y=b.id)};
-}
-val umbra_ne_f32(BB *bb, val a, val b) {
-    return umbra_xor_i32(bb, umbra_eq_f32(bb, a, b),
-                     umbra_imm_i32(bb, -1));
-}
-val umbra_lt_f32(BB *bb, val a, val b) {
-    return (val){math(bb, op_lt_f32,
-                      .x=a.id, .y=b.id)};
-}
-val umbra_le_f32(BB *bb, val a, val b) {
-    return (val){math(bb, op_le_f32,
-                      .x=a.id, .y=b.id)};
-}
-val umbra_gt_f32(BB *bb, val a, val b) {
-    return umbra_lt_f32(bb, b, a);
-}
-val umbra_ge_f32(BB *bb, val a, val b) {
-    return umbra_le_f32(bb, b, a);
+val umbra_cvt_i32_f32(builder *b, val x) {
+    return (val){math(b, op_i32_from_f32, .x=x.id)};
 }
 
-val umbra_eq_i32(BB *bb, val a, val b) {
-    sort(&a.id, &b.id);
-    if (a.id == b.id) { return umbra_imm_i32(bb, -1); }
-    return (val){math(bb, op_eq_i32,
-                      .x=a.id, .y=b.id)};
+val umbra_eq_f32(builder *b, val x, val y) {
+    sort(&x.id, &y.id);
+    return (val){math(b, op_eq_f32,
+                      .x=x.id, .y=y.id)};
 }
-val umbra_ne_i32(BB *bb, val a, val b) {
-    return umbra_xor_i32(bb, umbra_eq_i32(bb, a, b),
-                     umbra_imm_i32(bb, -1));
+val umbra_ne_f32(builder *b, val x, val y) {
+    return umbra_xor_i32(b, umbra_eq_f32(b, x, y),
+                     umbra_imm_i32(b, -1));
 }
-
-val umbra_lt_s32(BB *bb, val a, val b) {
-    return (val){math(bb, op_lt_s32,
-                      .x=a.id, .y=b.id)};
+val umbra_lt_f32(builder *b, val x, val y) {
+    return (val){math(b, op_lt_f32,
+                      .x=x.id, .y=y.id)};
 }
-val umbra_le_s32(BB *bb, val a, val b) {
-    return (val){math(bb, op_le_s32,
-                      .x=a.id, .y=b.id)};
+val umbra_le_f32(builder *b, val x, val y) {
+    return (val){math(b, op_le_f32,
+                      .x=x.id, .y=y.id)};
 }
-val umbra_gt_s32(BB *bb, val a, val b) {
-    return umbra_lt_s32(bb, b, a);
+val umbra_gt_f32(builder *b, val x, val y) {
+    return umbra_lt_f32(b, y, x);
 }
-val umbra_ge_s32(BB *bb, val a, val b) {
-    return umbra_le_s32(bb, b, a);
+val umbra_ge_f32(builder *b, val x, val y) {
+    return umbra_le_f32(b, y, x);
 }
 
-val umbra_lt_u32(BB *bb, val a, val b) {
-    return (val){math(bb, op_lt_u32,
-                      .x=a.id, .y=b.id)};
+val umbra_eq_i32(builder *b, val x, val y) {
+    sort(&x.id, &y.id);
+    if (x.id == y.id) { return umbra_imm_i32(b, -1); }
+    return (val){math(b, op_eq_i32,
+                      .x=x.id, .y=y.id)};
 }
-val umbra_le_u32(BB *bb, val a, val b) {
-    return (val){math(bb, op_le_u32,
-                      .x=a.id, .y=b.id)};
+val umbra_ne_i32(builder *b, val x, val y) {
+    return umbra_xor_i32(b, umbra_eq_i32(b, x, y),
+                     umbra_imm_i32(b, -1));
 }
-val umbra_gt_u32(BB *bb, val a, val b) {
-    return umbra_lt_u32(bb, b, a);
+
+val umbra_lt_s32(builder *b, val x, val y) {
+    return (val){math(b, op_lt_s32,
+                      .x=x.id, .y=y.id)};
 }
-val umbra_ge_u32(BB *bb, val a, val b) {
-    return umbra_le_u32(bb, b, a);
+val umbra_le_s32(builder *b, val x, val y) {
+    return (val){math(b, op_le_s32,
+                      .x=x.id, .y=y.id)};
+}
+val umbra_gt_s32(builder *b, val x, val y) {
+    return umbra_lt_s32(b, y, x);
+}
+val umbra_ge_s32(builder *b, val x, val y) {
+    return umbra_le_s32(b, y, x);
+}
+
+val umbra_lt_u32(builder *b, val x, val y) {
+    return (val){math(b, op_lt_u32,
+                      .x=x.id, .y=y.id)};
+}
+val umbra_le_u32(builder *b, val x, val y) {
+    return (val){math(b, op_le_u32,
+                      .x=x.id, .y=y.id)};
+}
+val umbra_gt_u32(builder *b, val x, val y) {
+    return umbra_lt_u32(b, y, x);
+}
+val umbra_ge_u32(builder *b, val x, val y) {
+    return umbra_le_u32(b, y, x);
 }
 
 static char const* op_name(enum op op) {
@@ -528,30 +526,30 @@ static void schedule(int id,
     out[(*j)++] = in[id];
 }
 
-struct umbra_basic_block* umbra_basic_block(BB *bb) {
-    int const n = bb->insts;
+struct umbra_basic_block* umbra_basic_block(builder *b) {
+    int const n = b->insts;
 
     _Bool *live    = calloc((size_t)n, 1);
     _Bool *varying = calloc((size_t)n, 1);
 
     for (int i = n; i --> 0;) {
-        if (is_store(bb->inst[i].op)) { live[i] = 1; }
+        if (is_store(b->inst[i].op)) { live[i] = 1; }
         if (live[i]) {
-            live[bb->inst[i].x] = 1;
-            live[bb->inst[i].y] = 1;
-            live[bb->inst[i].z] = 1;
-            live[bb->inst[i].w] = 1;
-            if (bb->inst[i].ptr < 0) {
-                live[~bb->inst[i].ptr] = 1;
+            live[b->inst[i].x] = 1;
+            live[b->inst[i].y] = 1;
+            live[b->inst[i].z] = 1;
+            live[b->inst[i].w] = 1;
+            if (b->inst[i].ptr < 0) {
+                live[~b->inst[i].ptr] = 1;
             }
         }
     }
     for (int i = 0; i < n; i++) {
-        varying[i] = is_varying(bb->inst[i].op)
-                   | varying[bb->inst[i].x]
-                   | varying[bb->inst[i].y]
-                   | varying[bb->inst[i].z]
-                   | varying[bb->inst[i].w];
+        varying[i] = is_varying(b->inst[i].op)
+                   | varying[b->inst[i].x]
+                   | varying[b->inst[i].y]
+                   | varying[b->inst[i].z]
+                   | varying[b->inst[i].w];
     }
 
     int total = 0;
@@ -568,17 +566,17 @@ struct umbra_basic_block* umbra_basic_block(BB *bb) {
     int j = 0;
     for (int i = 0; i < n; i++) {
         if (!live[i] || varying[i]
-         || is_store(bb->inst[i].op)) {
+         || is_store(b->inst[i].op)) {
             continue;
         }
         old_to_new[i] = j;
-        out[j++] = bb->inst[i];
+        out[j++] = b->inst[i];
     }
     int const preamble = j;
 
     for (int i = 0; i < n; i++) {
-        if (live[i] && is_store(bb->inst[i].op)) {
-            schedule(i, bb->inst, out,
+        if (live[i] && is_store(b->inst[i].op)) {
+            schedule(i, b->inst, out,
                      old_to_new, &j);
         }
     }
@@ -602,7 +600,7 @@ struct umbra_basic_block* umbra_basic_block(BB *bb) {
     result->inst     = out;
     result->insts    = total;
     result->preamble = preamble;
-    result->uni_len  = bb->uni_len;
+    result->uni_len  = b->uni_len;
     return result;
 }
 
@@ -710,8 +708,8 @@ static void dump_insts(struct bb_inst const *inst,
     }
 }
 
-void umbra_builder_dump(BB const *bb, FILE *f) {
-    dump_insts(bb->inst, bb->insts, f);
+void umbra_builder_dump(builder const *b, FILE *f) {
+    dump_insts(b->inst, b->insts, f);
 }
 
 void umbra_basic_block_dump(

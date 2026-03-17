@@ -19,7 +19,7 @@ int main(void) { return 0; }
 #include "stb/stb_image_write.h"
 #pragma clang diagnostic pop
 
-typedef struct umbra_builder BB;
+typedef struct umbra_builder builder;
 
 enum { NUM_BACKENDS = 4 };
 static char const *backend_name[NUM_BACKENDS] = {
@@ -117,10 +117,10 @@ static void free_pipe(pipe *p) {
     *p = (pipe){0};
 }
 
-static void finish_pipe(pipe *p, BB *b) {
-    p->uni_len = umbra_uni_len(b);
-    struct umbra_basic_block *bb = umbra_basic_block(b);
-    umbra_builder_free(b);
+static void finish_pipe(pipe *p, builder *builder) {
+    p->uni_len = umbra_uni_len(builder);
+    struct umbra_basic_block *bb = umbra_basic_block(builder);
+    umbra_builder_free(builder);
     p->interp  = umbra_interpreter(bb);
     p->jit     = umbra_jit(bb);
     p->ctx = p->jit
@@ -131,54 +131,54 @@ static void finish_pipe(pipe *p, BB *b) {
 
 static void build_fill(int fmt) {
     free_pipe(&fill_pipe);
-    BB *bb = umbra_builder();
-    umbra_val ix = umbra_lane(bb);
-    int fi = umbra_reserve(bb, 4);
+    builder *builder = umbra_builder();
+    umbra_val ix = umbra_lane(builder);
+    int fi = umbra_reserve(builder, 4);
     umbra_color c = {
-        umbra_load_i32(bb, (umbra_ptr){1},
-                     umbra_imm_i32(bb, fi)),
-        umbra_load_i32(bb, (umbra_ptr){1},
-                     umbra_imm_i32(bb, fi+1)),
-        umbra_load_i32(bb, (umbra_ptr){1},
-                     umbra_imm_i32(bb, fi+2)),
-        umbra_load_i32(bb, (umbra_ptr){1},
-                     umbra_imm_i32(bb, fi+3)),
+        umbra_load_i32(builder, (umbra_ptr){1},
+                     umbra_imm_i32(builder, fi)),
+        umbra_load_i32(builder, (umbra_ptr){1},
+                     umbra_imm_i32(builder, fi+1)),
+        umbra_load_i32(builder, (umbra_ptr){1},
+                     umbra_imm_i32(builder, fi+2)),
+        umbra_load_i32(builder, (umbra_ptr){1},
+                     umbra_imm_i32(builder, fi+3)),
     };
-    fmt_store[fmt](bb, (umbra_ptr){0}, ix, c);
-    finish_pipe(&fill_pipe, bb);
+    fmt_store[fmt](builder, (umbra_ptr){0}, ix, c);
+    finish_pipe(&fill_pipe, builder);
 }
 
 static void build_readback(int fmt) {
     free_pipe(&readback_pipe);
-    BB *bb = umbra_builder();
-    umbra_val ix = umbra_lane(bb);
+    builder *builder = umbra_builder();
+    umbra_val ix = umbra_lane(builder);
     umbra_color c =
-        fmt_load[fmt](bb, (umbra_ptr){0}, ix);
-    umbra_store_8888(bb, (umbra_ptr){2}, ix, c);
-    finish_pipe(&readback_pipe, bb);
+        fmt_load[fmt](builder, (umbra_ptr){0}, ix);
+    umbra_store_8888(builder, (umbra_ptr){2}, ix, c);
+    finish_pipe(&readback_pipe, builder);
 }
 
 static void build_hdr(int fmt) {
     free_pipe(&hdr_pipe);
-    BB *bb = umbra_builder();
-    umbra_val ix = umbra_lane(bb);
+    builder *builder = umbra_builder();
+    umbra_val ix = umbra_lane(builder);
     umbra_color c =
-        fmt_load[fmt](bb, (umbra_ptr){0}, ix);
-    umbra_val ix4 = umbra_shl_i32(bb, ix,
-                        umbra_imm_i32(bb, 2));
-    umbra_store_i32(bb, (umbra_ptr){2},
-        umbra_add_i32(bb, ix4,
-                   umbra_imm_i32(bb, 0)), c.r);
-    umbra_store_i32(bb, (umbra_ptr){2},
-        umbra_add_i32(bb, ix4,
-                   umbra_imm_i32(bb, 1)), c.g);
-    umbra_store_i32(bb, (umbra_ptr){2},
-        umbra_add_i32(bb, ix4,
-                   umbra_imm_i32(bb, 2)), c.b);
-    umbra_store_i32(bb, (umbra_ptr){2},
-        umbra_add_i32(bb, ix4,
-                   umbra_imm_i32(bb, 3)), c.a);
-    finish_pipe(&hdr_pipe, bb);
+        fmt_load[fmt](builder, (umbra_ptr){0}, ix);
+    umbra_val ix4 = umbra_shl_i32(builder, ix,
+                        umbra_imm_i32(builder, 2));
+    umbra_store_i32(builder, (umbra_ptr){2},
+        umbra_add_i32(builder, ix4,
+                   umbra_imm_i32(builder, 0)), c.r);
+    umbra_store_i32(builder, (umbra_ptr){2},
+        umbra_add_i32(builder, ix4,
+                   umbra_imm_i32(builder, 1)), c.g);
+    umbra_store_i32(builder, (umbra_ptr){2},
+        umbra_add_i32(builder, ix4,
+                   umbra_imm_i32(builder, 2)), c.b);
+    umbra_store_i32(builder, (umbra_ptr){2},
+        umbra_add_i32(builder, ix4,
+                   umbra_imm_i32(builder, 3)), c.a);
+    finish_pipe(&hdr_pipe, builder);
 }
 
 static void build_pipes(int fmt) {
@@ -213,11 +213,11 @@ static void build_slide_fmt(slide const *s,
         s->load ? fmt_load[fmt] : NULL;
     umbra_store_fn store = fmt_store[fmt];
 
-    BB *b = umbra_draw_build(
+    builder *builder = umbra_draw_build(
         s->shader, s->coverage, s->blend,
         load, store, &draw_layout);
-    struct umbra_basic_block *bb = umbra_basic_block(b);
-    umbra_builder_free(b);
+    struct umbra_basic_block *bb = umbra_basic_block(builder);
+    umbra_builder_free(builder);
 
     interp  = umbra_interpreter(bb);
     jit     = umbra_jit(bb);
