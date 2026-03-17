@@ -1464,6 +1464,77 @@ static void test_offset_load_store(void) {
   }
 }
 
+static void test_shift_imm(void) {
+  for (int opt = 0; opt < 2; opt++) {
+    {
+        struct umbra_builder *builder =
+            umbra_builder();
+        umbra_val ix = umbra_lane(builder);
+        umbra_val x = umbra_load_i32(builder,
+                          (umbra_ptr){0}, ix);
+        umbra_val r = umbra_shl_i32(builder, x,
+                          umbra_imm_i32(builder, 8));
+        umbra_store_i32(builder, (umbra_ptr){1}, ix, r);
+        backends B = make(builder, opt);
+        for (int bi = 0; bi < 4; bi++) {
+            uint32_t src[] = {1, 2, 3, 0xff};
+            uint32_t dst[4] = {0};
+            if (!run(&B, bi, 4, (umbra_buf[]){
+                {src,4*4},{dst,4*4},
+            })) { continue; }
+            (dst[0] == 0x100u)  here;
+            (dst[1] == 0x200u)  here;
+            (dst[2] == 0x300u)  here;
+            (dst[3] == 0xff00u) here;
+        }
+        cleanup(&B);
+    }
+    {
+        struct umbra_builder *builder =
+            umbra_builder();
+        umbra_val ix = umbra_lane(builder);
+        umbra_val x = umbra_load_i32(builder,
+                          (umbra_ptr){0}, ix);
+        umbra_val r = umbra_shr_u32(builder, x,
+                          umbra_imm_i32(builder, 8));
+        umbra_store_i32(builder, (umbra_ptr){1}, ix, r);
+        backends B = make(builder, opt);
+        for (int bi = 0; bi < 4; bi++) {
+            uint32_t src[] = {0x100, 0x200, 0xff00};
+            uint32_t dst[3] = {0};
+            if (!run(&B, bi, 3, (umbra_buf[]){
+                {src,3*4},{dst,3*4},
+            })) { continue; }
+            (dst[0] == 1)    here;
+            (dst[1] == 2)    here;
+            (dst[2] == 0xff) here;
+        }
+        cleanup(&B);
+    }
+    {
+        struct umbra_builder *builder =
+            umbra_builder();
+        umbra_val ix = umbra_lane(builder);
+        umbra_val x = umbra_load_i32(builder,
+                          (umbra_ptr){0}, ix);
+        umbra_val r = umbra_shr_s32(builder, x,
+                          umbra_imm_i32(builder, 4));
+        umbra_store_i32(builder, (umbra_ptr){1}, ix, r);
+        backends B = make(builder, opt);
+        for (int bi = 0; bi < 4; bi++) {
+            uint32_t src[] = {0x80, 0xfffffff0u};
+            uint32_t dst[2] = {0};
+            if (!run(&B, bi, 2, (umbra_buf[]){
+                {src,2*4},{dst,2*4},
+            })) { continue; }
+            (dst[0] == 8) here;
+            (dst[1] == 0xffffffffu) here;
+        }
+        cleanup(&B);
+    }
+  }
+}
+
 int main(void) {
     test_f32_ops();
     test_i32_ops();
@@ -1488,5 +1559,6 @@ int main(void) {
     test_gather_clamp();
     test_scatter_clamp();
     test_offset_load_store();
+    test_shift_imm();
     return 0;
 }

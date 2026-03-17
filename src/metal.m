@@ -311,6 +311,11 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i, inst->x);
                 break;
 
+            case op_join:
+                emit(b, "%suint v%d = v%d;\n",
+                     pad, i, inst->x);
+                break;
+
             case op_add_f32:
                 emit(b, "%suint v%d = as_type<uint>"
                         "(as_type<float>(v%d)"

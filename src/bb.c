@@ -698,6 +698,11 @@ static void dump_insts(struct bb_inst const *inst,
                 fprintf(f, " v%d v%d v%d",
                         ip->x, ip->y, ip->z);
                 break;
+
+            case op_join:
+                fprintf(f, " v%d v%d",
+                        ip->x, ip->y);
+                break;
         }
         fprintf(f, "\n");
     }

@@ -197,6 +197,9 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
         else if (d==z) { put(c, BIT_16b(d,y,x)); }
         else { put(c, ORR_16b(d,z,z)); put(c, BIT_16b(d,y,x)); }
         return 1;
+    case op_join:
+        if (d != x) { put(c, ORR_16b(d,x,x)); }
+        return 1;
 
     case op_lane:
     case op_deref_ptr:
@@ -705,6 +708,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 case op_widen_f16: case op_narrow_f32:
                 case op_widen_s16: case op_widen_u16:
                 case op_narrow_16:
+                case op_join:
                     break;
                 }
                 #undef CZ
@@ -731,6 +735,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_f32_from_i32:
         case op_i32_from_f32:
         case op_lt_u32: case op_le_u32:
+        case op_join:
         default_alu: {
             enum op op2 = inst->op;
             _Bool shift_imm =
@@ -1066,6 +1071,9 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
     case op_le_u32:
         vex_rrr(c,1,2,1,0x3f,scratch,x,y);
         vpcmpeqd(c,d,y,scratch);
+        return 1;
+    case op_join:
+        if (d != x) { vmovaps(c,d,x); }
         return 1;
 
     case op_lane:
@@ -1629,7 +1637,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_le_f32:
         case op_eq_i32: case op_lt_s32:
         case op_le_s32:
-        case op_lt_u32: case op_le_u32: {
+        case op_lt_u32: case op_le_u32:
+        case op_join: {
             enum op op2 = inst->op;
             _Bool shift_imm =
                 (op2==op_shl_i32

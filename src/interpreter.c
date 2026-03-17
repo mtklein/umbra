@@ -406,6 +406,8 @@ op(le_u32) {
     next;
 }
 
+op(join_fn) { v->i32 = v[ip->x].i32; next; }
+
 op(done) {
     (void)ip; (void)v; (void)end;
     (void)ptr; (void)sz;
@@ -473,6 +475,7 @@ static Fn const fn[] = {
     [op_le_u32] = le_u32,
 
     [op_deref_ptr]  = deref_ptr_handler,
+    [op_join]       = join_fn,
 };
 
 int umbra_const_eval(enum op op, int xb,
@@ -665,6 +668,7 @@ struct umbra_interpreter* umbra_interpreter(
                     case op_le_s32:
                     case op_lt_u32:
                     case op_le_u32:
+                    case op_join:
                         emit(.fn=fn[inst->op],
                              .x=X, .y=Y, .z=Z);
                         break;

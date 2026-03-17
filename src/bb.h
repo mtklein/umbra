@@ -20,7 +20,8 @@
     X(uni_16) X(load_16) X(store_16)                     \
     X(gather_16) X(scatter_16)                           \
     X(widen_s16) X(widen_u16) X(narrow_16)                \
-    X(widen_f16) X(narrow_f32)
+    X(widen_f16) X(narrow_f32)                       \
+    X(join)
 
 enum op {
     #define OP_ENUM(name) op_##name,

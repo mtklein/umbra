@@ -299,6 +299,11 @@ static void emit_ops(Buf *b, BB const *bb,
                     pad, i, inst->x);
                 break;
 
+            case op_join:
+                emit(b, "%su32 v%d = v%d;\n",
+                     pad, i, inst->x);
+                break;
+
             #define BINOP(OP, EXPR) \
                 case OP: \
                     emit(b, "%su32 v%d = " \
