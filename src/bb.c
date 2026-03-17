@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-typedef struct umbra_basic_block BB;
+typedef struct umbra_builder BB;
 typedef umbra_val val;
 
 static _Bool is_pow2(int x) {
@@ -88,14 +88,14 @@ static int push_(BB *bb, struct bb_inst inst) {
 #define push(bb,...) push_(bb, (struct bb_inst){.op=__VA_ARGS__})
 
 
-BB* umbra_basic_block(void) {
+BB* umbra_builder(void) {
     BB *bb = calloc(1, sizeof *bb);
     // Simplifies liveness analysis to know id 0 is imm=0.
     push(bb, op_imm_32, .imm=0);
     return bb;
 }
 
-void umbra_basic_block_free(BB *bb) {
+void umbra_builder_free(BB *bb) {
     free(bb->inst);
     free(bb->ht);
     free(bb);
@@ -528,7 +528,7 @@ static void schedule(int id,
     out[(*j)++] = in[id];
 }
 
-void umbra_basic_block_optimize(BB *bb) {
+struct umbra_basic_block* umbra_basic_block(BB *bb) {
     int const n = bb->insts;
 
     _Bool *live    = calloc((size_t)n, 1);
@@ -593,37 +593,43 @@ void umbra_basic_block_optimize(BB *bb) {
         }
     }
 
-    free(bb->inst);
-    free(bb->ht);
-    bb->inst     = out;
-    bb->ht       = NULL;
-    bb->ht_mask  = 0;
-    bb->insts    = total;
-    bb->preamble = preamble;
-
     free(live);
     free(varying);
     free(old_to_new);
+
+    struct umbra_basic_block *result =
+        malloc(sizeof *result);
+    result->inst     = out;
+    result->insts    = total;
+    result->preamble = preamble;
+    result->uni_len  = bb->uni_len;
+    return result;
 }
 
-void umbra_basic_block_dump(BB const *bb, FILE *f) {
-    for (int i = 0; i < bb->insts; i++) {
-        struct bb_inst const *inst = &bb->inst[i];
-        enum op op = inst->op;
+void umbra_basic_block_free(struct umbra_basic_block *bb) {
+    free(bb->inst);
+    free(bb);
+}
+
+static void dump_insts(struct bb_inst const *inst,
+                       int insts, FILE *f) {
+    for (int i = 0; i < insts; i++) {
+        struct bb_inst const *ip = &inst[i];
+        enum op op = ip->op;
 
         if (is_store(op)) {
             {
                 fprintf(f, "      %-15s p%d",
-                        op_name(op), inst->ptr);
+                        op_name(op), ip->ptr);
                 if (op == op_scatter_16
                  || op == op_scatter_32) {
-                    fprintf(f, " v%d", inst->x);
-                } else if (inst->x
+                    fprintf(f, " v%d", ip->x);
+                } else if (ip->x
                         && (op == op_store_16
                          || op == op_store_32)) {
-                    fprintf(f, " +v%d", inst->x);
+                    fprintf(f, " +v%d", ip->x);
                 }
-                fprintf(f, " v%d\n", inst->y);
+                fprintf(f, " v%d\n", ip->y);
             }
             continue;
         }
@@ -634,28 +640,28 @@ void umbra_basic_block_dump(BB const *bb, FILE *f) {
         switch (op) {
             case op_imm_32:
                 fprintf(f, " 0x%x",
-                        (uint32_t)inst->imm);
+                        (uint32_t)ip->imm);
                 break;
             case op_uni_32:
             case op_uni_16:
                 fprintf(f, " p%d[%d]",
-                        inst->ptr, inst->imm);
+                        ip->ptr, ip->imm);
                 break;
             case op_gather_32:
             case op_gather_16:
                 fprintf(f, " p%d v%d",
-                        inst->ptr, inst->x);
+                        ip->ptr, ip->x);
                 break;
             case op_load_32:
             case op_load_16:
-                fprintf(f, " p%d", inst->ptr);
-                if (inst->x) {
-                    fprintf(f, " +v%d", inst->x);
+                fprintf(f, " p%d", ip->ptr);
+                if (ip->x) {
+                    fprintf(f, " +v%d", ip->x);
                 }
                 break;
             case op_deref_ptr:
                 fprintf(f, " p%d byte%d",
-                        inst->ptr, inst->imm);
+                        ip->ptr, ip->imm);
                 break;
             case op_lane: break;
 
@@ -673,7 +679,7 @@ void umbra_basic_block_dump(BB const *bb, FILE *f) {
             case op_narrow_16:
             case op_widen_f16:
             case op_narrow_f32:
-                fprintf(f, " v%d", inst->x);
+                fprintf(f, " v%d", ip->x);
                 break;
 
             case op_add_f32: case op_sub_f32:
@@ -691,15 +697,24 @@ void umbra_basic_block_dump(BB const *bb, FILE *f) {
             case op_le_s32:
             case op_lt_u32: case op_le_u32:
                 fprintf(f, " v%d v%d",
-                        inst->x, inst->y);
+                        ip->x, ip->y);
                 break;
 
             case op_fma_f32: case op_fms_f32:
             case op_sel_32:
                 fprintf(f, " v%d v%d v%d",
-                        inst->x, inst->y, inst->z);
+                        ip->x, ip->y, ip->z);
                 break;
         }
         fprintf(f, "\n");
     }
+}
+
+void umbra_builder_dump(BB const *bb, FILE *f) {
+    dump_insts(bb->inst, bb->insts, f);
+}
+
+void umbra_basic_block_dump(
+        struct umbra_basic_block const *bb, FILE *f) {
+    dump_insts(bb->inst, bb->insts, f);
 }

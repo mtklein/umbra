@@ -23,8 +23,6 @@ static struct umbra_basic_block* make_bb(int n, int pre) {
     bb->inst = calloc((size_t)n, sizeof *bb->inst);
     bb->insts = n;
     bb->preamble = pre;
-    bb->ht = 0;
-    bb->ht_mask = 0;
 
     bb->inst[0].op = op_imm_32;
     bb->inst[0].imm = 42;
@@ -223,8 +221,6 @@ static void test_pairs(void) {
     bb->inst = calloc(5, sizeof *bb->inst);
     bb->insts = 5;
     bb->preamble = 2;
-    bb->ht = 0;
-    bb->ht_mask = 0;
 
     bb->inst[0].op = op_imm_32;
     bb->inst[0].imm = 1;
@@ -293,8 +289,6 @@ static void test_pair_spill_fill(void) {
     bb->inst = calloc(4, sizeof *bb->inst);
     bb->insts = 4;
     bb->preamble = 1;
-    bb->ht = 0;
-    bb->ht_mask = 0;
 
     bb->inst[0].op = op_imm_32;
     bb->inst[1].op = op_add_f32;
@@ -439,7 +433,7 @@ static void test_step_alloc_pairs(void) {
     struct umbra_basic_block *bb = malloc(sizeof *bb);
     bb->inst = calloc(3, sizeof *bb->inst);
     bb->insts = 3; bb->preamble = 1;
-    bb->ht = 0; bb->ht_mask = 0;
+
     bb->inst[0].op = op_imm_32;
     bb->inst[0].imm = 1;
     bb->inst[1].op = op_add_f32;
@@ -480,7 +474,7 @@ static void test_step_unary(void) {
     struct umbra_basic_block *bb = malloc(sizeof *bb);
     bb->inst = calloc(2, sizeof *bb->inst);
     bb->insts = 2; bb->preamble = 0;
-    bb->ht = 0; bb->ht_mask = 0;
+
     bb->inst[0].op = op_imm_32;
     bb->inst[0].imm = 42;
     bb->inst[1].op = op_f32_from_i32;
@@ -520,7 +514,7 @@ static void test_step_unary_alive(void) {
     struct umbra_basic_block *bb = malloc(sizeof *bb);
     bb->inst = calloc(3, sizeof *bb->inst);
     bb->insts = 3; bb->preamble = 0;
-    bb->ht = 0; bb->ht_mask = 0;
+
     bb->inst[0].op = op_imm_32;
     bb->inst[0].imm = 42;
     bb->inst[1].op = op_f32_from_i32;
@@ -561,7 +555,7 @@ static void test_step_alu(void) {
     struct umbra_basic_block *bb = malloc(sizeof *bb);
     bb->inst = calloc(3, sizeof *bb->inst);
     bb->insts = 3; bb->preamble = 0;
-    bb->ht = 0; bb->ht_mask = 0;
+
     bb->inst[0].op = op_imm_32;
     bb->inst[0].imm = 1;
     bb->inst[1].op = op_imm_32;
@@ -606,7 +600,7 @@ static void test_step_alu_scratch(void) {
     struct umbra_basic_block *bb = malloc(sizeof *bb);
     bb->inst = calloc(3, sizeof *bb->inst);
     bb->insts = 3; bb->preamble = 0;
-    bb->ht = 0; bb->ht_mask = 0;
+
     bb->inst[0].op = op_imm_32;
     bb->inst[0].imm = 1;
     bb->inst[1].op = op_imm_32;

@@ -36,10 +36,15 @@ struct bb_inst {
 
 struct hash_slot { uint32_t hash; int ix; };
 
-struct umbra_basic_block {
+struct umbra_builder {
     struct bb_inst   *inst;
     struct hash_slot *ht;
-    int               insts, ht_mask, preamble, uni_len;
+    int               insts, ht_mask, uni_len, :32;
+};
+
+struct umbra_basic_block {
+    struct bb_inst *inst;
+    int             insts, preamble, uni_len, :32;
 };
 
 static inline _Bool is_store(enum op op) {

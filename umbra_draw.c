@@ -2,15 +2,15 @@
 #include <math.h>
 #include <stdint.h>
 
-typedef struct umbra_basic_block BB;
+typedef struct umbra_builder BB;
 
-struct umbra_basic_block* umbra_draw_build(umbra_shader_fn   shader,
-                                           umbra_coverage_fn coverage,
-                                           umbra_blend_fn    blend,
-                                           umbra_load_fn     load,
-                                           umbra_store_fn    store,
-                                           umbra_draw_layout *layout) {
-    BB *bb = umbra_basic_block();
+struct umbra_builder* umbra_draw_build(umbra_shader_fn   shader,
+                                       umbra_coverage_fn coverage,
+                                       umbra_blend_fn    blend,
+                                       umbra_load_fn     load,
+                                       umbra_store_fn    store,
+                                       umbra_draw_layout *layout) {
+    BB *bb = umbra_builder();
     umbra_val ix = umbra_lane(bb);
 
     int x0_ix = umbra_reserve(bb, 1);

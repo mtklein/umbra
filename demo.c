@@ -19,7 +19,7 @@ int main(void) { return 0; }
 #include "stb/stb_image_write.h"
 #pragma clang diagnostic pop
 
-typedef struct umbra_basic_block BB;
+typedef struct umbra_builder BB;
 
 enum { NUM_BACKENDS = 4 };
 static char const *backend_name[NUM_BACKENDS] = {
@@ -117,9 +117,10 @@ static void free_pipe(pipe *p) {
     *p = (pipe){0};
 }
 
-static void finish_pipe(pipe *p, BB *bb) {
-    umbra_basic_block_optimize(bb);
-    p->uni_len = umbra_uni_len(bb);
+static void finish_pipe(pipe *p, BB *b) {
+    p->uni_len = umbra_uni_len(b);
+    struct umbra_basic_block *bb = umbra_basic_block(b);
+    umbra_builder_free(b);
     p->interp  = umbra_interpreter(bb);
     p->jit     = umbra_jit(bb);
     p->ctx = p->jit
@@ -130,7 +131,7 @@ static void finish_pipe(pipe *p, BB *bb) {
 
 static void build_fill(int fmt) {
     free_pipe(&fill_pipe);
-    BB *bb = umbra_basic_block();
+    BB *bb = umbra_builder();
     umbra_val ix = umbra_lane(bb);
     int fi = umbra_reserve(bb, 4);
     umbra_color c = {
@@ -149,7 +150,7 @@ static void build_fill(int fmt) {
 
 static void build_readback(int fmt) {
     free_pipe(&readback_pipe);
-    BB *bb = umbra_basic_block();
+    BB *bb = umbra_builder();
     umbra_val ix = umbra_lane(bb);
     umbra_color c =
         fmt_load[fmt](bb, (umbra_ptr){0}, ix);
@@ -159,7 +160,7 @@ static void build_readback(int fmt) {
 
 static void build_hdr(int fmt) {
     free_pipe(&hdr_pipe);
-    BB *bb = umbra_basic_block();
+    BB *bb = umbra_builder();
     umbra_val ix = umbra_lane(bb);
     umbra_color c =
         fmt_load[fmt](bb, (umbra_ptr){0}, ix);
@@ -212,10 +213,11 @@ static void build_slide_fmt(slide const *s,
         s->load ? fmt_load[fmt] : NULL;
     umbra_store_fn store = fmt_store[fmt];
 
-    BB *bb = umbra_draw_build(
+    BB *b = umbra_draw_build(
         s->shader, s->coverage, s->blend,
         load, store, &draw_layout);
-    umbra_basic_block_optimize(bb);
+    struct umbra_basic_block *bb = umbra_basic_block(b);
+    umbra_builder_free(b);
 
     interp  = umbra_interpreter(bb);
     jit     = umbra_jit(bb);

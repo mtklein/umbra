@@ -14,16 +14,17 @@ static void dump(char const *name,
                  umbra_blend_fn    blend,
                  umbra_load_fn     load,
                  umbra_store_fn    store) {
-    struct umbra_basic_block *bb =
+    struct umbra_builder *b =
         umbra_draw_build(shader, coverage,
                          blend, load, store, NULL);
     { char p[64];
       snprintf(p, sizeof p, "dumps/%s.bb", name);
       FILE *f = fopen(p, "w");
-      umbra_basic_block_dump(bb, f);
+      umbra_builder_dump(b, f);
       fclose(f); }
 
-    umbra_basic_block_optimize(bb);
+    struct umbra_basic_block *bb = umbra_basic_block(b);
+    umbra_builder_free(b);
     { char p[64];
       snprintf(p, sizeof p, "dumps/%s.opt", name);
       FILE *f = fopen(p, "w");
@@ -74,12 +75,13 @@ static void dump(char const *name,
 }
 
 int main(void) {
-    struct umbra_basic_block *bb = build_srcover();
+    struct umbra_builder *b = build_srcover();
     { FILE *f = fopen("dumps/srcover.bb", "w");
-      umbra_basic_block_dump(bb, f);
+      umbra_builder_dump(b, f);
       fclose(f); }
 
-    umbra_basic_block_optimize(bb);
+    struct umbra_basic_block *bb = umbra_basic_block(b);
+    umbra_builder_free(b);
     { FILE *f = fopen("dumps/srcover.opt", "w");
       umbra_basic_block_dump(bb, f);
       fclose(f); }

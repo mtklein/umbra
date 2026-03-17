@@ -1,8 +1,8 @@
 #pragma once
 #include "umbra.h"
 
-static inline struct umbra_basic_block* build_srcover(void) {
-    struct umbra_basic_block *bb = umbra_basic_block();
+static inline struct umbra_builder* build_srcover(void) {
+    struct umbra_builder *bb = umbra_builder();
     umbra_val  ix     = umbra_lane(bb);
     umbra_val  rgba[4];
     umbra_load_u8x4(bb, (umbra_ptr){0}, ix, rgba);

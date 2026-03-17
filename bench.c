@@ -113,15 +113,16 @@ static double bench_run(run_fn fn, void *ctx,
     }
 }
 
-typedef struct umbra_basic_block* (*build_fn)(void);
+typedef struct umbra_builder* (*build_fn)(void);
 
 static double bench_build(
         build_fn build,
         void (*compile_and_free)(
             struct umbra_basic_block*)) {
     double const start = now();
-    struct umbra_basic_block *bb = build();
-    umbra_basic_block_optimize(bb);
+    struct umbra_builder *b = build();
+    struct umbra_basic_block *bb = umbra_basic_block(b);
+    umbra_builder_free(b);
     compile_and_free(bb);
     return (now() - start) * 1e9;
 }
@@ -185,8 +186,9 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    struct umbra_basic_block *bb = build_srcover();
-    umbra_basic_block_optimize(bb);
+    struct umbra_builder *b = build_srcover();
+    struct umbra_basic_block *bb = umbra_basic_block(b);
+    umbra_builder_free(b);
 
     struct umbra_interpreter *p =
         umbra_interpreter(bb);
@@ -415,12 +417,14 @@ int main(int argc, char *argv[]) {
     for (int di = 0; di < ndraws; di++) {
         draw_config *d = &draws[di];
         umbra_draw_layout dlay;
-        struct umbra_basic_block *dbb =
+        struct umbra_builder *dbld =
             umbra_draw_build(
                 d->shader, d->coverage,
                 d->blend, d->load, d->store,
                 &dlay);
-        umbra_basic_block_optimize(dbb);
+        struct umbra_basic_block *dbb =
+            umbra_basic_block(dbld);
+        umbra_builder_free(dbld);
 
         struct umbra_interpreter *dp =
             umbra_interpreter(dbb);

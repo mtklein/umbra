@@ -24,9 +24,10 @@ static void uni_ptr(char *u, int off,
 }
 
 static draw_backends make_draw(
-        struct umbra_basic_block *bb,
+        struct umbra_builder *b,
         umbra_draw_layout lay) {
-    umbra_basic_block_optimize(bb);
+    struct umbra_basic_block *bb = umbra_basic_block(b);
+    umbra_builder_free(b);
     draw_backends B = {
         umbra_interpreter(bb),
         umbra_jit(bb),
@@ -626,7 +627,7 @@ static void test_no_blend(void) {
 }
 
 static umbra_color gradient_shader(
-        struct umbra_basic_block *bb,
+        struct umbra_builder *bb,
         umbra_val x, umbra_val y) {
     (void)y;
     int fi = umbra_reserve(bb, 2);
@@ -816,14 +817,15 @@ static void test_solid_src_fp16_n9(void) {
 
 static void test_coverage_rect_white_dst(void) {
     umbra_draw_layout lay;
-    struct umbra_basic_block *bb =
+    struct umbra_builder *b =
         umbra_draw_build(
             umbra_shader_solid,
             umbra_coverage_rect,
             umbra_blend_srcover,
             umbra_load_8888,
             umbra_store_8888, &lay);
-    umbra_basic_block_optimize(bb);
+    struct umbra_basic_block *bb = umbra_basic_block(b);
+    umbra_builder_free(b);
     struct umbra_interpreter *interp =
         umbra_interpreter(bb);
     struct umbra_jit *jit = umbra_jit(bb);
@@ -1284,7 +1286,7 @@ static void test_transfer_lut(void) {
 }
 
 static umbra_color srgb_invert_shader(
-        struct umbra_basic_block *bb,
+        struct umbra_builder *bb,
         umbra_val x, umbra_val y) {
     (void)x; (void)y;
     int fi = umbra_reserve(bb, 4);
@@ -1333,7 +1335,7 @@ static void test_transfer_invert(void) {
 }
 
 static umbra_color srgb_apply_shader(
-        struct umbra_basic_block *bb,
+        struct umbra_builder *bb,
         umbra_val x, umbra_val y) {
     (void)x; (void)y;
     int fi = umbra_reserve(bb, 4);
@@ -1382,7 +1384,7 @@ static void test_transfer_apply(void) {
 }
 
 static umbra_color srgb_roundtrip_shader(
-        struct umbra_basic_block *bb,
+        struct umbra_builder *bb,
         umbra_val x, umbra_val y) {
     (void)x; (void)y;
     int fi = umbra_reserve(bb, 4);
@@ -1440,7 +1442,7 @@ static void test_transfer_roundtrip(void) {
 static umbra_shader_fn ss_inner_;
 static int ss_n_;
 static umbra_color ss_shader_(
-        struct umbra_basic_block *bb,
+        struct umbra_builder *bb,
         umbra_val x, umbra_val y) {
     return umbra_supersample(bb, x, y,
                              ss_inner_, ss_n_);

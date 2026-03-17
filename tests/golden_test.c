@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-typedef struct umbra_basic_block BB;
+typedef struct umbra_builder BB;
 
 enum { W = 128, H = 96, LUT_N = 64 };
 
@@ -65,7 +65,7 @@ static pipe fill_pipes[NUM_FMTS];
 static pipe readback_pipes[NUM_FMTS];
 
 static void build_fill(int fmt) {
-    BB *bb = umbra_basic_block();
+    BB *bb = umbra_builder();
     umbra_val ix = umbra_lane(bb);
     int fi = umbra_reserve(bb, 4);
     umbra_color c = {
@@ -79,23 +79,25 @@ static void build_fill(int fmt) {
                      umbra_imm_i32(bb, fi+3)),
     };
     fmt_store[fmt](bb, (umbra_ptr){0}, ix, c);
-    umbra_basic_block_optimize(bb);
     fill_pipes[fmt].uni_len = umbra_uni_len(bb);
-    fill_pipes[fmt].interp = umbra_interpreter(bb);
-    umbra_basic_block_free(bb);
+    struct umbra_basic_block *opt = umbra_basic_block(bb);
+    umbra_builder_free(bb);
+    fill_pipes[fmt].interp = umbra_interpreter(opt);
+    umbra_basic_block_free(opt);
 }
 
 static void build_readback(int fmt) {
-    BB *bb = umbra_basic_block();
+    BB *bb = umbra_builder();
     umbra_val ix = umbra_lane(bb);
     umbra_color c =
         fmt_load[fmt](bb, (umbra_ptr){0}, ix);
     umbra_store_8888(bb, (umbra_ptr){2}, ix, c);
-    umbra_basic_block_optimize(bb);
     readback_pipes[fmt].uni_len = umbra_uni_len(bb);
+    struct umbra_basic_block *opt = umbra_basic_block(bb);
+    umbra_builder_free(bb);
     readback_pipes[fmt].interp =
-        umbra_interpreter(bb);
-    umbra_basic_block_free(bb);
+        umbra_interpreter(opt);
+    umbra_basic_block_free(opt);
 }
 
 static void build_pipes(void) {
@@ -404,11 +406,12 @@ static void test_slide_golden(
     umbra_store_fn store = fmt_store[fmt];
 
     umbra_draw_layout lay;
-    struct umbra_basic_block *bb =
+    struct umbra_builder *bld =
         umbra_draw_build(s->shader, s->coverage,
                          s->blend, load, store,
                          &lay);
-    umbra_basic_block_optimize(bb);
+    struct umbra_basic_block *bb = umbra_basic_block(bld);
+    umbra_builder_free(bld);
 
     struct umbra_interpreter *interp =
         umbra_interpreter(bb);
