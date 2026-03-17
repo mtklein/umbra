@@ -407,6 +407,28 @@ op(le_u32) {
 }
 
 op(join_fn) { v->i32 = v[ip->x].i32; next; }
+op(shl_imm_fn) {
+    I32 sh = (I32){0} + ip->y;
+    v->i32 = v[ip->x].i32 << sh;
+    next;
+}
+op(shr_u32_imm_fn) {
+    U32 sh = (U32){0} + (uint32_t)ip->y;
+    v->u32 = v[ip->x].u32 >> sh;
+    next;
+}
+op(shr_s32_imm_fn) {
+    I32 sh = (I32){0} + ip->y;
+    v->i32 = v[ip->x].i32 >> sh;
+    next;
+}
+op(sli_fn) {
+    I32 sh = (I32){0} + ip->z;
+    U32 shifted = (U32)(v[ip->y].i32 << sh);
+    U32 mask = ((U32){0} + 1u << sh) - 1u;
+    v->u32 = (v[ip->x].u32 & mask) | shifted;
+    next;
+}
 
 op(done) {
     (void)ip; (void)v; (void)end;
@@ -476,6 +498,11 @@ static Fn const fn[] = {
 
     [op_deref_ptr]  = deref_ptr_handler,
     [op_join]       = join_fn,
+
+    [op_shl_imm]     = shl_imm_fn,
+    [op_shr_u32_imm] = shr_u32_imm_fn,
+    [op_shr_s32_imm] = shr_s32_imm_fn,
+    [op_sli]         = sli_fn,
 };
 
 int umbra_const_eval(enum op op, int xb,
@@ -671,6 +698,18 @@ struct umbra_interpreter* umbra_interpreter(
                     case op_join:
                         emit(.fn=fn[inst->op],
                              .x=X, .y=Y, .z=Z);
+                        break;
+
+                    case op_shl_imm:
+                    case op_shr_u32_imm:
+                    case op_shr_s32_imm:
+                        emit(.fn=fn[inst->op],
+                             .x=X, .y=inst->imm);
+                        break;
+                    case op_sli:
+                        emit(.fn=fn[inst->op],
+                             .x=X, .y=Y,
+                             .z=inst->imm);
                         break;
                 }
                 id[i] = n++;

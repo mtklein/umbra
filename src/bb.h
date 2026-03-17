@@ -21,7 +21,9 @@
     X(gather_16) X(scatter_16)                           \
     X(widen_s16) X(widen_u16) X(narrow_16)                \
     X(widen_f16) X(narrow_f32)                       \
-    X(join)
+    X(join)                                          \
+    X(shl_imm) X(shr_u32_imm) X(shr_s32_imm)       \
+    X(sli)
 
 enum op {
     #define OP_ENUM(name) op_##name,
@@ -70,3 +72,10 @@ static inline _Bool is_varying(enum op op) {
 }
 
 int umbra_const_eval(enum op, int, int, int);
+
+typedef _Bool (*join_chooser)(
+    struct bb_inst const *insts, int join_id);
+
+struct umbra_basic_block* umbra_resolve_joins(
+    struct umbra_basic_block const *bb,
+    join_chooser choose_y);

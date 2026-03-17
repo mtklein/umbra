@@ -200,6 +200,27 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
     case op_join:
         if (d != x) { put(c, ORR_16b(d,x,x)); }
         return 1;
+    case op_shl_imm:
+        put(c, SHL_4s_imm(d,x,imm));
+        return 1;
+    case op_shr_u32_imm:
+        put(c, USHR_4s_imm(d,x,imm));
+        return 1;
+    case op_shr_s32_imm:
+        put(c, SSHR_4s_imm(d,x,imm));
+        return 1;
+    case op_sli:
+        if (d == x) {
+            put(c, SLI_4s_imm(d,y,imm));
+        } else if (d != y) {
+            put(c, ORR_16b(d,x,x));
+            put(c, SLI_4s_imm(d,y,imm));
+        } else {
+            put(c, ORR_16b(scratch,x,x));
+            put(c, SLI_4s_imm(scratch,y,imm));
+            put(c, ORR_16b(d,scratch,scratch));
+        }
+        return 1;
 
     case op_lane:
     case op_deref_ptr:
@@ -256,7 +277,20 @@ struct umbra_jit {
     int    loop_start, loop_end;
 };
 
+static _Bool arm64_chooser(struct bb_inst const *insts,
+                           int join_id) {
+    enum op y_op = insts[insts[join_id].y].op;
+    return y_op == op_shl_imm
+        || y_op == op_shr_u32_imm
+        || y_op == op_shr_s32_imm
+        || y_op == op_sli;
+}
+
 struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
+    struct umbra_basic_block *resolved =
+        umbra_resolve_joins(bb, arm64_chooser);
+    bb = resolved;
+
     int *sl = malloc((size_t)bb->insts * sizeof(int));
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
     int ns = 0;
@@ -324,6 +358,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
         c.buf[stack_patch+1] = ADD_xi(XS,31,0);
     }
     ra_destroy(ra); free(sl); free(deref_gpr);
+    umbra_basic_block_free(resolved);
 
     size_t code_sz = (size_t)c.len * 4;
     size_t pg = 16384;
@@ -709,6 +744,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 case op_widen_s16: case op_widen_u16:
                 case op_narrow_16:
                 case op_join:
+                case op_shl_imm: case op_shr_u32_imm:
+                case op_shr_s32_imm: case op_sli:
                     break;
                 }
                 #undef CZ
@@ -757,6 +794,28 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             emit_alu_reg(c, inst->op,
                 s.rd, s.rx, s.ry, s.rz,
                 alu_imm, s.scratch);
+            if (s.scratch >= 0) {
+                ra_return_reg(ra, s.scratch);
+            }
+        } break;
+
+        case op_shl_imm:
+        case op_shr_u32_imm:
+        case op_shr_s32_imm: {
+            struct ra_step s = ra_step_unary(
+                ra, sl, ns, inst, i, scalar);
+            emit_alu_reg(c, inst->op,
+                s.rd, s.rx, 0, 0,
+                inst->imm, -1);
+        } break;
+
+        case op_sli: {
+            struct ra_step s = ra_step_alu(
+                ra, sl, ns, inst, i,
+                scalar, 1);
+            emit_alu_reg(c, inst->op,
+                s.rd, s.rx, s.ry, 0,
+                inst->imm, s.scratch);
             if (s.scratch >= 0) {
                 ra_return_reg(ra, s.scratch);
             }
@@ -1075,6 +1134,17 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
     case op_join:
         if (d != x) { vmovaps(c,d,x); }
         return 1;
+    case op_shl_imm:
+        vpslld_i(c,d,x,(uint8_t)imm);
+        return 1;
+    case op_shr_u32_imm:
+        vpsrld_i(c,d,x,(uint8_t)imm);
+        return 1;
+    case op_shr_s32_imm:
+        vpsrad_i(c,d,x,(uint8_t)imm);
+        return 1;
+    case op_sli:
+        return 0;
 
     case op_lane:
     case op_deref_ptr:
@@ -1111,7 +1181,19 @@ struct umbra_jit {
     int    loop_start, loop_end;
 };
 
+static _Bool x86_chooser(struct bb_inst const *insts,
+                         int join_id) {
+    enum op y_op = insts[insts[join_id].y].op;
+    return y_op == op_shl_imm
+        || y_op == op_shr_u32_imm
+        || y_op == op_shr_s32_imm;
+}
+
 struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
+    struct umbra_basic_block *resolved =
+        umbra_resolve_joins(bb, x86_chooser);
+    bb = resolved;
+
     int *sl = malloc((size_t)bb->insts * sizeof(int));
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
     int ns = 0;
@@ -1200,6 +1282,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     }
 
     ra_destroy(ra); free(sl); free(deref_gpr);
+    umbra_basic_block_free(resolved);
 
     size_t code_sz = (size_t)c.len;
     size_t pg = (size_t)sysconf(_SC_PAGESIZE);
@@ -1661,6 +1744,18 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             if (s.scratch >= 0) { ra_return_reg(ra, s.scratch); }
             if (s.scratch2 >= 0) { ra_return_reg(ra, s.scratch2); }
         } break;
+
+        case op_shl_imm:
+        case op_shr_u32_imm:
+        case op_shr_s32_imm: {
+            struct ra_step s = ra_step_unary(
+                ra, sl, ns, inst, i, scalar);
+            emit_alu_reg(c, inst->op,
+                s.rd, s.rx, 0, 0,
+                inst->imm, -1, -1);
+        } break;
+
+        case op_sli: break;
         }
     }
     #undef lu

@@ -316,6 +316,32 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i, inst->x);
                 break;
 
+            case op_shl_imm:
+                emit(b, "%suint v%d = v%d << %du;\n",
+                     pad, i, inst->x, inst->imm);
+                break;
+            case op_shr_u32_imm:
+                emit(b, "%suint v%d = v%d >> %du;\n",
+                     pad, i, inst->x, inst->imm);
+                break;
+            case op_shr_s32_imm:
+                emit(b,
+                    "%suint v%d ="
+                    " (uint)((int)v%d >> %d);\n",
+                    pad, i, inst->x, inst->imm);
+                break;
+            case op_sli: {
+                int sh = inst->imm;
+                uint32_t mask =
+                    (1u << sh) - 1u;
+                emit(b,
+                    "%suint v%d ="
+                    " (v%d & %uu)"
+                    " | (v%d << %du);\n",
+                    pad, i, inst->x, mask,
+                    inst->y, sh);
+            } break;
+
             case op_add_f32:
                 emit(b, "%suint v%d = as_type<uint>"
                         "(as_type<float>(v%d)"

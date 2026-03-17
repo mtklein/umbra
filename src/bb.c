@@ -363,18 +363,39 @@ val umbra_mul_i32(builder *b, val x, val y) {
 
 val umbra_shl_i32(builder *b, val x, val y) {
     if (is_imm32(b, y.id, 0)) { return x; }
-    return (val){math(b, op_shl_i32,
-                      .x=x.id, .y=y.id)};
+    int d = math(b, op_shl_i32, .x=x.id, .y=y.id);
+    if (is_imm(b, y.id)) {
+        int f = push(b, op_shl_imm,
+                     .x=x.id,
+                     .imm=b->inst[y.id].imm);
+        return (val){push(b, op_join,
+                          .x=d, .y=f)};
+    }
+    return (val){d};
 }
 val umbra_shr_u32(builder *b, val x, val y) {
     if (is_imm32(b, y.id, 0)) { return x; }
-    return (val){math(b, op_shr_u32,
-                      .x=x.id, .y=y.id)};
+    int d = math(b, op_shr_u32, .x=x.id, .y=y.id);
+    if (is_imm(b, y.id)) {
+        int f = push(b, op_shr_u32_imm,
+                     .x=x.id,
+                     .imm=b->inst[y.id].imm);
+        return (val){push(b, op_join,
+                          .x=d, .y=f)};
+    }
+    return (val){d};
 }
 val umbra_shr_s32(builder *b, val x, val y) {
     if (is_imm32(b, y.id, 0)) { return x; }
-    return (val){math(b, op_shr_s32,
-                      .x=x.id, .y=y.id)};
+    int d = math(b, op_shr_s32, .x=x.id, .y=y.id);
+    if (is_imm(b, y.id)) {
+        int f = push(b, op_shr_s32_imm,
+                     .x=x.id,
+                     .imm=b->inst[y.id].imm);
+        return (val){push(b, op_join,
+                          .x=d, .y=f)};
+    }
+    return (val){d};
 }
 
 val umbra_and_i32(builder *b, val x, val y) {
@@ -604,6 +625,103 @@ void umbra_basic_block_free(struct umbra_basic_block *bb) {
     free(bb);
 }
 
+struct umbra_basic_block* umbra_resolve_joins(
+    struct umbra_basic_block const *bb,
+    join_chooser choose_y)
+{
+    int const n = bb->insts;
+    int *remap = malloc((size_t)n * sizeof *remap);
+    for (int i = 0; i < n; i++) { remap[i] = i; }
+
+    for (int i = 0; i < n; i++) {
+        if (bb->inst[i].op == op_join) {
+            int pick = choose_y(bb->inst, i)
+                     ? bb->inst[i].y
+                     : bb->inst[i].x;
+            remap[i] = pick;
+        }
+    }
+    for (int i = 0; i < n; i++) {
+        while (remap[i] != remap[remap[i]]) {
+            remap[i] = remap[remap[i]];
+        }
+    }
+
+    _Bool *live = calloc((size_t)n, 1);
+    for (int i = n; i --> 0;) {
+        if (is_store(bb->inst[i].op)) { live[i] = 1; }
+        if (live[i] && remap[i] != i) {
+            live[remap[i]] = 1;
+            continue;
+        }
+        if (live[i]) {
+            live[bb->inst[i].x] = 1;
+            live[bb->inst[i].y] = 1;
+            live[bb->inst[i].z] = 1;
+            if (bb->inst[i].ptr < 0) {
+                live[~bb->inst[i].ptr] = 1;
+            }
+        }
+    }
+
+    int total = 0;
+    for (int i = 0; i < n; i++) {
+        if (live[i] && remap[i] == i) { total++; }
+    }
+
+    struct bb_inst *out =
+        malloc((size_t)total * sizeof *out);
+    int *old_to_new =
+        malloc((size_t)n * sizeof *old_to_new);
+    for (int i = 0; i < n; i++) {
+        old_to_new[i] = -1;
+    }
+
+    int j = 0;
+    for (int i = 0; i < bb->preamble; i++) {
+        if (live[i] && remap[i] == i
+         && !is_store(bb->inst[i].op)) {
+            old_to_new[i] = j;
+            out[j++] = bb->inst[i];
+        }
+    }
+    int preamble = j;
+
+    for (int i = bb->preamble; i < n; i++) {
+        if (live[i] && remap[i] == i) {
+            old_to_new[i] = j;
+            out[j++] = bb->inst[i];
+        }
+    }
+
+    for (int i = 0; i < n; i++) {
+        if (remap[i] != i) {
+            old_to_new[i] = old_to_new[remap[i]];
+        }
+    }
+
+    for (int i = 0; i < total; i++) {
+        out[i].x = old_to_new[out[i].x];
+        out[i].y = old_to_new[out[i].y];
+        out[i].z = old_to_new[out[i].z];
+        if (out[i].ptr < 0) {
+            out[i].ptr = ~old_to_new[~out[i].ptr];
+        }
+    }
+
+    free(remap);
+    free(live);
+    free(old_to_new);
+
+    struct umbra_basic_block *result =
+        malloc(sizeof *result);
+    result->inst     = out;
+    result->insts    = total;
+    result->preamble = preamble;
+    result->uni_len  = bb->uni_len;
+    return result;
+}
+
 static void dump_insts(struct bb_inst const *inst,
                        int insts, FILE *f) {
     for (int i = 0; i < insts; i++) {
@@ -702,6 +820,17 @@ static void dump_insts(struct bb_inst const *inst,
             case op_join:
                 fprintf(f, " v%d v%d",
                         ip->x, ip->y);
+                break;
+
+            case op_shl_imm:
+            case op_shr_u32_imm:
+            case op_shr_s32_imm:
+                fprintf(f, " v%d %d",
+                        ip->x, ip->imm);
+                break;
+            case op_sli:
+                fprintf(f, " v%d v%d %d",
+                        ip->x, ip->y, ip->imm);
                 break;
         }
         fprintf(f, "\n");

@@ -304,6 +304,32 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i, inst->x);
                 break;
 
+            case op_shl_imm:
+                emit(b, "%su32 v%d = (u32)(v%d << %d);\n",
+                     pad, i, inst->x, inst->imm);
+                break;
+            case op_shr_u32_imm:
+                emit(b, "%su32 v%d = (u32)(v%d >> %d);\n",
+                     pad, i, inst->x, inst->imm);
+                break;
+            case op_shr_s32_imm:
+                emit(b,
+                    "%su32 v%d ="
+                    " (u32)((s32)v%d >> %d);\n",
+                    pad, i, inst->x, inst->imm);
+                break;
+            case op_sli: {
+                int sh = inst->imm;
+                uint32_t mask =
+                    (1u << sh) - 1u;
+                emit(b,
+                    "%su32 v%d ="
+                    " (v%d & %uu)"
+                    " | (v%d << %d);\n",
+                    pad, i, inst->x, mask,
+                    inst->y, sh);
+            } break;
+
             #define BINOP(OP, EXPR) \
                 case OP: \
                     emit(b, "%su32 v%d = " \
