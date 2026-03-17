@@ -33,10 +33,14 @@ uint32_t MOVK_w16(int d, uint16_t imm) {
     return 0x72a00000u | ((uint32_t)imm<<5) | (uint32_t)d;
 }
 uint32_t STP_pre(int t1, int t2, int n, int imm7) {
-    return 0xa9800000u | ((uint32_t)(imm7&0x7f)<<15) | ((uint32_t)t2<<10) | ((uint32_t)n<<5) | (uint32_t)t1;
+    return 0xa9800000u | ((uint32_t)(imm7&0x7f)<<15)
+         | ((uint32_t)t2<<10) | ((uint32_t)n<<5)
+         | (uint32_t)t1;
 }
 uint32_t LDP_post(int t1, int t2, int n, int imm7) {
-    return 0xa8c00000u | ((uint32_t)(imm7&0x7f)<<15) | ((uint32_t)t2<<10) | ((uint32_t)n<<5) | (uint32_t)t1;
+    return 0xa8c00000u | ((uint32_t)(imm7&0x7f)<<15)
+         | ((uint32_t)t2<<10) | ((uint32_t)n<<5)
+         | (uint32_t)t1;
 }
 uint32_t B(int off26) {
     return 0x14000000u | (uint32_t)(off26 & 0x3ffffff);
@@ -85,10 +89,14 @@ uint32_t STR_qi(int d, int n, int imm) {
 }
 
 uint32_t LDP_qi(int t1, int t2, int n, int imm) {
-    return 0xad400000u | ((uint32_t)(imm&0x7f)<<15) | ((uint32_t)t2<<10) | ((uint32_t)n<<5) | (uint32_t)t1;
+    return 0xad400000u | ((uint32_t)(imm&0x7f)<<15)
+         | ((uint32_t)t2<<10) | ((uint32_t)n<<5)
+         | (uint32_t)t1;
 }
 uint32_t STP_qi(int t1, int t2, int n, int imm) {
-    return 0xad000000u | ((uint32_t)(imm&0x7f)<<15) | ((uint32_t)t2<<10) | ((uint32_t)n<<5) | (uint32_t)t1;
+    return 0xad000000u | ((uint32_t)(imm&0x7f)<<15)
+         | ((uint32_t)t2<<10) | ((uint32_t)n<<5)
+         | (uint32_t)t1;
 }
 
 uint32_t LD4_8b(int t, int n) { return 0x0c400000u | ((uint32_t)n<<5) | (uint32_t)t; }
@@ -154,7 +162,10 @@ enum {
     UXTL_8h_ =0x2f08a400u,
 };
 
-#define V3(enc) uint32_t enc(int d,int n,int m){return enc##_ | ((uint32_t)m<<16)|((uint32_t)n<<5)|(uint32_t)d;}
+#define V3(enc) uint32_t enc(int d,int n,int m){\
+    return enc##_ | ((uint32_t)m<<16)\
+                  | ((uint32_t)n<<5)\
+                  | (uint32_t)d;}
 #define V2(enc) uint32_t enc(int d,int n){return enc##_ | ((uint32_t)n<<5)|(uint32_t)d;}
 
 V3(FADD_4s)  V3(FSUB_4s)  V3(FMUL_4s) V3(FDIV_4s)  V3(FMLA_4s) V3(FMLS_4s)
@@ -181,13 +192,34 @@ V2(SCVTF_4h) V2(FCVTZS_4h) V2(XTN_4h) V2(SXTL_4s) V2(UXTL_8h)
 #undef V2
 
 // Shift-by-immediate: immh:immb at bits 22:16
-uint32_t SHL_4s_imm (int d, int n, int sh) { return 0x4f005400u|((uint32_t)(sh+32)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
-uint32_t USHR_4s_imm(int d, int n, int sh) { return 0x6f000400u|((uint32_t)(64-sh)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
-uint32_t SSHR_4s_imm(int d, int n, int sh) { return 0x4f000400u|((uint32_t)(64-sh)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
-uint32_t SHRN_4h    (int d, int n, int sh) { return 0x0f008400u|((uint32_t)(32-sh)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
-uint32_t SHL_4h_imm (int d, int n, int sh) { return 0x0f005400u|((uint32_t)(sh+16)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
-uint32_t USHR_4h_imm(int d, int n, int sh) { return 0x2f000400u|((uint32_t)(32-sh)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
-uint32_t SSHR_4h_imm(int d, int n, int sh) { return 0x0f000400u|((uint32_t)(32-sh)<<16)|((uint32_t)n<<5)|(uint32_t)d; }
+uint32_t SHL_4s_imm (int d, int n, int sh) {
+    return 0x4f005400u | ((uint32_t)(sh+32)<<16)
+         | ((uint32_t)n<<5) | (uint32_t)d;
+}
+uint32_t USHR_4s_imm(int d, int n, int sh) {
+    return 0x6f000400u | ((uint32_t)(64-sh)<<16)
+         | ((uint32_t)n<<5) | (uint32_t)d;
+}
+uint32_t SSHR_4s_imm(int d, int n, int sh) {
+    return 0x4f000400u | ((uint32_t)(64-sh)<<16)
+         | ((uint32_t)n<<5) | (uint32_t)d;
+}
+uint32_t SHRN_4h    (int d, int n, int sh) {
+    return 0x0f008400u | ((uint32_t)(32-sh)<<16)
+         | ((uint32_t)n<<5) | (uint32_t)d;
+}
+uint32_t SHL_4h_imm (int d, int n, int sh) {
+    return 0x0f005400u | ((uint32_t)(sh+16)<<16)
+         | ((uint32_t)n<<5) | (uint32_t)d;
+}
+uint32_t USHR_4h_imm(int d, int n, int sh) {
+    return 0x2f000400u | ((uint32_t)(32-sh)<<16)
+         | ((uint32_t)n<<5) | (uint32_t)d;
+}
+uint32_t SSHR_4h_imm(int d, int n, int sh) {
+    return 0x0f000400u | ((uint32_t)(32-sh)<<16)
+         | ((uint32_t)n<<5) | (uint32_t)d;
+}
 
 uint32_t UMOV_ws(int d, int n) {
     return 0x0e043c00u | ((uint32_t)n<<5) | (uint32_t)d;

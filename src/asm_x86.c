@@ -12,7 +12,10 @@ void emit1(Buf *b, uint8_t v) {
     b->buf[b->len++] = v;
 }
 void emit4(Buf *b, uint32_t v) {
-    emit1(b,(uint8_t)v); emit1(b,(uint8_t)(v>>8)); emit1(b,(uint8_t)(v>>16)); emit1(b,(uint8_t)(v>>24));
+    emit1(b,(uint8_t)v);
+    emit1(b,(uint8_t)(v>>8));
+    emit1(b,(uint8_t)(v>>16));
+    emit1(b,(uint8_t)(v>>24));
 }
 
 // ---- VEX encoding ----
@@ -42,7 +45,9 @@ void vex_rr(Buf *b, int pp, int mm, int L, uint8_t op, int d, int s) {
     vex(b,pp,mm,0,L,d,0,s,op);
 }
 // shift-by-immediate: ModRM.reg=ext, VEX.vvvv=d(dest), ModRM.rm=s(src), +imm8
-void vex_shift(Buf *b, int pp, int mm, int L, uint8_t op, int ext, int d, int s, uint8_t imm) {
+void vex_shift(Buf *b, int pp, int mm, int L,
+               uint8_t op, int ext, int d, int s,
+               uint8_t imm) {
     vex(b,pp,mm,0,L,ext,d,s,op);
     emit1(b, imm);
 }
@@ -278,8 +283,12 @@ void broadcast_imm16(Buf *b, int d, uint16_t v) {
 
     if      (v == 0)      { vpxor(b,0,d,d,d); }
     else if (v == 0xffffu) { vpcmpeqw(b,d,d,d); }
-    else if (v == (uint16_t)(0xffffu >> shr)) { vpcmpeqw(b,d,d,d); vpsrlw_i(b,d,d,(uint8_t)shr); }
-    else if (v == (uint16_t)(0xffffu << shl)) { vpcmpeqw(b,d,d,d); vpsllw_i(b,d,d,(uint8_t)shl); }
+    else if (v == (uint16_t)(0xffffu >> shr)) {
+        vpcmpeqw(b,d,d,d); vpsrlw_i(b,d,d,(uint8_t)shr);
+    }
+    else if (v == (uint16_t)(0xffffu << shl)) {
+        vpcmpeqw(b,d,d,d); vpsllw_i(b,d,d,(uint8_t)shl);
+    }
     else {
         emit1(b, 0xb8); emit4(b, (uint32_t)v);        // MOV eax, v
         vex(b, 1, 1, 0, 0, d, 0, RAX, 0x6e);          // VMOVD xmm_d, eax

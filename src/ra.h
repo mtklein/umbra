@@ -38,8 +38,10 @@ _Bool      ra_is_pair  (struct ra const *ra, int val);
 void       ra_set_last_use(struct ra *ra, int val, int lu);
 void       ra_set_pair  (struct ra *ra, int val, _Bool p);
 void       ra_return_reg(struct ra *ra, int8_t r);     // return scratch to free pool
-void       ra_assign    (struct ra *ra, int val, int8_t r);   // set reg[val]=r, owner[r]=val
-void       ra_assign_hi (struct ra *ra, int val, int8_t r);   // set reg_hi[val]=r, owner[r]=val
+void       ra_assign    (struct ra *ra, int val,
+                         int8_t r);   // reg[val]=r
+void       ra_assign_hi (struct ra *ra, int val,
+                         int8_t r);   // reg_hi[val]=r
 
 struct ra_step {
     int8_t rd, rdh;

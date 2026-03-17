@@ -9,7 +9,9 @@ void emit4(Buf *b, uint32_t v);
 void vex(Buf *b, int pp, int mm, int W, int L, int d, int v, int s, uint8_t op);
 void vex_rrr(Buf *b, int pp, int mm, int L, uint8_t op, int d, int v, int s);
 void vex_rr(Buf *b, int pp, int mm, int L, uint8_t op, int d, int s);
-void vex_shift(Buf *b, int pp, int mm, int L, uint8_t op, int ext, int d, int s, uint8_t imm);
+void vex_shift(Buf *b, int pp, int mm, int L,
+               uint8_t op, int ext, int d, int s,
+               uint8_t imm);
 void vex_mem(Buf *b, int pp, int mm, int W, int L, int reg, int v, uint8_t op,
              int base, int index, int scale, int disp);
 

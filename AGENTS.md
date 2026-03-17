@@ -30,7 +30,7 @@ Put a function on one line when the body is a single short expression:
 v16 umbra_lt_f16(BB *bb, v16 a, v16 b) { return (v16){math(bb, op_lt_f16, .x=a.id, .y=b.id)}; }
 ```
 
-Only break to multiple lines when there is control flow or the line exceeds ~100 cols.
+Only break to multiple lines when there is control flow or the line exceeds ~90 cols.
 
 ## Grouping and blank lines
 
@@ -89,16 +89,27 @@ over `if (!relevant) { return 0; } ... return 1;`.
 
 `0x3f800000`, `0xffff`, `0x9e3779b9u` — never `0x3F800000` or `0xFFFF`.
 
+## Column width
+
+Target 90 columns.  Break long lines; prefer breaking after `(` or `,`.
+
 ## Alignment for visual grouping
 
-Pad with spaces to align related declarations:
+Pad with spaces to align related declarations and prototypes:
 
 ```c
-static _Bool is_pow2        (int x) { return __builtin_popcount((unsigned)x) == 1; }
-static _Bool is_pow2_or_zero(int x) { return __builtin_popcount((unsigned)x) <= 1; }
+static _Bool is_pow2        (int x) { ... }
+static _Bool is_pow2_or_zero(int x) { ... }
+```
+
+```c
+void   umbra_builder_free(struct umbra_builder*);
+void   umbra_jit_run (struct umbra_jit*, int n, umbra_buf[]);
+void   umbra_jit_free(struct umbra_jit*);
 ```
 
 Same in enums (see bb.h) and struct fields.
+Align return types within a group when it helps readability.
 
 ## Designated initializer spacing
 
