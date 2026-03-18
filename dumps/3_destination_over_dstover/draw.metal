@@ -1,12 +1,6 @@
 #include <metal_stdlib>
 using namespace metal;
 
-static inline int clamp_ix(int ix, uint bytes, int elem) {
-    int hi = (int)(bytes / (uint)elem) - 1;
-    if (hi < 0) hi = 0;
-    return clamp(ix, 0, hi);
-}
-
 kernel void umbra_entry(
     constant uint &n [[buffer(0)]],
     device uchar *p0 [[buffer(1)]],

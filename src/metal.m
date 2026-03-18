@@ -611,16 +611,6 @@ static char* build_source(BB const *bb,
          "#include <metal_stdlib>\n"
          "using namespace metal;\n\n");
 
-    emit(&b,
-         "static inline int clamp_ix"
-         "(int ix, uint bytes, int elem) {\n");
-    emit(&b,
-         "    int hi = (int)"
-         "(bytes / (uint)elem) - 1;\n");
-    emit(&b, "    if (hi < 0) hi = 0;\n");
-    emit(&b,
-         "    return clamp(ix, 0, hi);\n}\n\n");
-
     emit(&b, "kernel void umbra_entry(\n");
     emit(&b,
          "    constant uint &n [[buffer(0)]]");
