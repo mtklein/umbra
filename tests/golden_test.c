@@ -120,7 +120,7 @@ static void fill_bg_row(int fmt, void *dst,
         { dst,  row_sz },
         { uni, -(long)fill_pipes[fmt].uni_len },
     };
-    umbra_backend_run(
+    umbra_backend_queue(
         fill_pipes[fmt].back, n, buf);
 }
 
@@ -138,7 +138,7 @@ static void readback_row(int fmt, uint32_t *dst,
         { uni,  -(long)readback_pipes[fmt].uni_len },
         { dst,  (long)(n * 4) },
     };
-    umbra_backend_run(
+    umbra_backend_queue(
         readback_pipes[fmt].back, n, buf);
 }
 
@@ -237,7 +237,6 @@ static void test_slide_golden(
 
     for (int bi = 1; bi < N_BACKS; bi++) {
         if (!backs[bi]) { continue; }
-        umbra_backend_begin_batch(backs[bi]);
         render_slide(slide_idx, fmt,
                      backs[bi], pbuf_tst, &lay);
         umbra_backend_flush(backs[bi]);
@@ -341,8 +340,9 @@ static void test_slug_rect(void) {
             __builtin_memcpy(
                 au + alay.loop_off,
                 &j32, 4);
-            umbra_backend_run(acc, W, abuf);
+            umbra_backend_queue(acc, W, abuf);
         }
+        umbra_backend_flush(acc);
 
         long long uni_[12] = {0};
         char *uni = (char*)uni_;
@@ -355,7 +355,8 @@ static void test_slug_rect(void) {
             { pixels + y * W, (long)(W * 4) },
             { uni, -(long)lay.uni_len },
         };
-        umbra_backend_run(interp, W, buf);
+        umbra_backend_queue(interp, W, buf);
+        umbra_backend_flush(interp);
     }
 
     uint32_t bg = 0xff000000;
@@ -414,7 +415,8 @@ static void test_perspective_text(void) {
         { pixels, (long)sizeof pixels },
         { uni, -(long)lay.uni_len },
     };
-    umbra_backend_run(interp, BW, buf);
+    umbra_backend_queue(interp, BW, buf);
+    umbra_backend_flush(interp);
 
     (pixels[8] == 0xffffffff) here;
     (pixels[0] == 0xff000000) here;
@@ -457,7 +459,8 @@ static void test_perspective_text(void) {
             { px2 + y * W, (long)(W * 4) },
             { u2, -(long)lay2.uni_len },
         };
-        umbra_backend_run(interp, W, b2);
+        umbra_backend_queue(interp, W, b2);
+        umbra_backend_flush(interp);
     }
     int changed = 0;
     for (int i = 0; i < W * H; i++) {

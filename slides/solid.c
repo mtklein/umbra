@@ -76,7 +76,7 @@ static void solid_render_row(
         { row,  row_sz },
         { uni, -(long)uni_len },
     };
-    umbra_backend_run(backend, w, buf);
+    umbra_backend_queue(backend, w, buf);
 }
 
 static void solid_cleanup(slide *s) {

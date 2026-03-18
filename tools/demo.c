@@ -211,7 +211,7 @@ static void fill_bg_row(void *dst, int n,
         { dst,  row_sz },
         { uni, -(long)fill_pipe.uni_len },
     };
-    umbra_backend_run(fill_pipe.backend, n, buf);
+    umbra_backend_queue(fill_pipe.backend, n, buf);
 }
 
 static void readback_row(uint32_t *dst,
@@ -228,7 +228,7 @@ static void readback_row(uint32_t *dst,
         { uni,  -(long)readback_pipe.uni_len },
         { dst,  (long)(n * 4) },
     };
-    umbra_backend_run(readback_pipe.backend, n, buf);
+    umbra_backend_queue(readback_pipe.backend, n, buf);
 }
 
 static void to_hdr_row(float *dst, void *src,
@@ -244,7 +244,7 @@ static void to_hdr_row(float *dst, void *src,
         { uni,  -(long)hdr_pipe.uni_len },
         { dst,  (long)(n * 16) },
     };
-    umbra_backend_run(hdr_pipe.backend, n, buf);
+    umbra_backend_queue(hdr_pipe.backend, n, buf);
 }
 
 int main(void) {
@@ -377,7 +377,6 @@ int main(void) {
 
         if (s->animate) { s->animate(s, 0.016f); }
 
-        umbra_backend_begin_batch(b);
 
         for (int y = 0; y < H; y++) {
             s->render_row(s, y, W,

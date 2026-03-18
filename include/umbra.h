@@ -103,9 +103,8 @@ struct umbra_backend* umbra_backend_metal (struct umbra_basic_block const*);
 typedef struct umbra_backend*
     (*umbra_backend_ctor_fn)(struct umbra_basic_block const*);
 umbra_backend_ctor_fn umbra_backend_ctor(struct umbra_backend const*);
-void umbra_backend_run        (struct umbra_backend*, int n, umbra_buf[]);
-void umbra_backend_begin_batch(struct umbra_backend*);
-void umbra_backend_flush      (struct umbra_backend*);
+void umbra_backend_queue(struct umbra_backend*, int n, umbra_buf[]);
+void umbra_backend_flush(struct umbra_backend*);
 void umbra_backend_free       (struct umbra_backend*);
 
 #include <stdio.h>

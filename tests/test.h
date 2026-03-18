@@ -36,7 +36,8 @@ static inline _Bool test_backends_run(
         test_backends *B, int bi,
         int n, umbra_buf buf[]) {
     if (!B->b[bi]) { return 0; }
-    umbra_backend_run(B->b[bi], n, buf);
+    umbra_backend_queue(B->b[bi], n, buf);
+    umbra_backend_flush(B->b[bi]);
     return 1;
 }
 

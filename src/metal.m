@@ -1056,74 +1056,15 @@ void umbra_metal_run(
     struct umbra_metal *m, int n, umbra_buf buf[]
 ) {
     if (!m || n <= 0) { return; }
-
-    if (m->batch_cmdbuf) {
-        @autoreleasepool {
-            id<MTLComputeCommandEncoder> enc =
-                (__bridge
-                 id<MTLComputeCommandEncoder>)
-                    m->batch_enc;
-            encode_dispatch(m, n, buf, enc, 1);
-        }
-        return;
+    if (!m->batch_cmdbuf) {
+        umbra_metal_begin_batch(m);
     }
-
     @autoreleasepool {
-        id<MTLCommandQueue> queue =
-            (__bridge id<MTLCommandQueue>)
-                m->queue;
-
-        id<MTLCommandBuffer> cmdbuf =
-            [queue
-             commandBufferWithUnretainedReferences];
         id<MTLComputeCommandEncoder> enc =
-            [cmdbuf computeCommandEncoder];
-        [enc setComputePipelineState:
             (__bridge
-             id<MTLComputePipelineState>)
-                m->pipeline];
-
-        encode_dispatch(m, n, buf, enc, 0);
-
-        [enc endEncoding];
-        [cmdbuf commit];
-        [cmdbuf waitUntilCompleted];
-
-        for (int i = 0; i <= m->max_ptr; i++) {
-            if (!buf[i].ptr || !m->bufs[i]
-                    || buf[i].sz <= 0) {
-                continue;
-            }
-            __builtin_memcpy(
-                buf[i].ptr,
-                ((__bridge id<MTLBuffer>)
-                    m->bufs[i]).contents,
-                (size_t)buf[i].sz);
-        }
-
-        for (int d = 0; d < m->n_deref; d++) {
-            void *base =
-                buf[m->deref[d].src_buf].ptr;
-            long dsz;
-            __builtin_memcpy(
-                &dsz,
-                (char*)base
-                    + m->deref[d].byte_off + 8,
-                sizeof dsz);
-            if (dsz <= 0) { continue; }
-            void *derived;
-            __builtin_memcpy(
-                &derived,
-                (char*)base
-                    + m->deref[d].byte_off,
-                sizeof derived);
-            int bi = m->deref[d].buf_idx;
-            __builtin_memcpy(
-                derived,
-                ((__bridge id<MTLBuffer>)
-                    m->bufs[bi]).contents,
-                (size_t)dsz);
-        }
+             id<MTLComputeCommandEncoder>)
+                m->batch_enc;
+        encode_dispatch(m, n, buf, enc, 1);
     }
 }
 

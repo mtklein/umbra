@@ -6,11 +6,10 @@ typedef struct umbra_backend*
 
 struct umbra_backend {
     void    *ctx;
-    void   (*run)        (void*, int, umbra_buf[]);
-    void   (*begin_batch)(void*);
-    void   (*flush)      (void*);
-    void   (*dump)       (void const*, FILE*);
-    void   (*free_fn)    (void*);
+    void   (*queue)   (void*, int, umbra_buf[]);
+    void   (*flush)   (void*);
+    void   (*dump)    (void const*, FILE*);
+    void   (*free_fn) (void*);
     build_fn build;
 };
 
@@ -30,7 +29,7 @@ struct umbra_backend* umbra_backend_interp(
     struct umbra_backend *b = malloc(sizeof *b);
     *b = (struct umbra_backend){
         .ctx     = p,
-        .run     = run_interp,
+        .queue   = run_interp,
         .free_fn = free_interp,
         .build   = umbra_backend_interp,
     };
@@ -55,7 +54,7 @@ struct umbra_backend* umbra_backend_jit(
     struct umbra_backend *b = malloc(sizeof *b);
     *b = (struct umbra_backend){
         .ctx     = j,
-        .run     = run_jit,
+        .queue   = run_jit,
         .dump    = dump_jit,
         .free_fn = free_jit,
         .build   = umbra_backend_jit,
@@ -66,9 +65,6 @@ struct umbra_backend* umbra_backend_jit(
 static void run_metal(void *ctx, int n,
                       umbra_buf buf[]) {
     umbra_metal_run(ctx, n, buf);
-}
-static void batch_metal(void *ctx) {
-    umbra_metal_begin_batch(ctx);
 }
 static void flush_metal(void *ctx) {
     umbra_metal_flush(ctx);
@@ -86,27 +82,19 @@ struct umbra_backend* umbra_backend_metal(
     if (!m) { return NULL; }
     struct umbra_backend *b = malloc(sizeof *b);
     *b = (struct umbra_backend){
-        .ctx         = m,
-        .run         = run_metal,
-        .begin_batch = batch_metal,
-        .flush       = flush_metal,
-        .dump        = dump_metal,
-        .free_fn     = free_metal,
-        .build       = umbra_backend_metal,
+        .ctx     = m,
+        .queue   = run_metal,
+        .flush   = flush_metal,
+        .dump    = dump_metal,
+        .free_fn = free_metal,
+        .build   = umbra_backend_metal,
     };
     return b;
 }
 
-void umbra_backend_run(struct umbra_backend *b,
-                       int n, umbra_buf buf[]) {
-    b->run(b->ctx, n, buf);
-}
-
-void umbra_backend_begin_batch(
-        struct umbra_backend *b) {
-    if (b && b->begin_batch) {
-        b->begin_batch(b->ctx);
-    }
+void umbra_backend_queue(struct umbra_backend *b,
+                        int n, umbra_buf buf[]) {
+    b->queue(b->ctx, n, buf);
 }
 
 void umbra_backend_flush(struct umbra_backend *b) {

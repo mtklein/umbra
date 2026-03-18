@@ -77,13 +77,12 @@ static void slug_render_row(
           (long)((int)sizeof(float) * w) },
         { au, -(long)st->acc_lay.uni_len },
     };
-    umbra_backend_begin_batch(st->acc);
     for (int j = 0; j < st->slug->count; j++) {
         int32_t j32 = j;
         __builtin_memcpy(
             au + st->acc_lay.loop_off,
             &j32, 4);
-        umbra_backend_run(st->acc, w, abuf);
+        umbra_backend_queue(st->acc, w, abuf);
     }
     umbra_backend_flush(st->acc);
 
@@ -108,7 +107,7 @@ static void slug_render_row(
         { row,  row_sz },
         { uni, -(long)uni_len },
     };
-    umbra_backend_run(backend, w, buf);
+    umbra_backend_queue(backend, w, buf);
 }
 
 static void slug_cleanup(slide *s) {

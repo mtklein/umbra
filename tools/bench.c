@@ -19,13 +19,11 @@ static double bench(slide *s, int w, int h,
                     int ps, int32_t stride,
                     void *row, long row_sz,
                     struct umbra_backend *be) {
-    umbra_backend_begin_batch(be);
     s->render_row(s, h/2, w, row, row_sz,
                   lay, ps, stride, be);
     umbra_backend_flush(be);
     int iters = 1;
     for (;;) {
-        umbra_backend_begin_batch(be);
         double const start = now();
         for (int it = 0; it < iters; it++) {
             s->render_row(s, h/2, w, row, row_sz,
@@ -169,12 +167,12 @@ int main(int argc, char *argv[]) {
                 printf(" %12s", "-");
                 continue;
             }
-            umbra_backend_run(bes[bi], W, abuf);
+            umbra_backend_queue(bes[bi], W, abuf);
             int iters = 1;
             for (;;) {
                 double const start = now();
                 for (int it = 0; it < iters; it++) {
-                    umbra_backend_run(
+                    umbra_backend_queue(
                         bes[bi], W, abuf);
                 }
                 double const elapsed = now()-start;
