@@ -25,7 +25,9 @@
     X(shl_imm) X(shr_u32_imm) X(shr_s32_imm)       \
     X(and_imm)                                      \
     X(pack)                                         \
-    X(mul_f32_imm)
+    X(add_f32_imm) X(sub_f32_imm)                  \
+    X(mul_f32_imm) X(div_f32_imm)                  \
+    X(min_f32_imm) X(max_f32_imm)
 
 enum op {
     #define OP_ENUM(name) op_##name,

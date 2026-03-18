@@ -439,10 +439,42 @@ op(and_imm_fn) {
     v->u32 = v[ip->x].u32 & m;
     next;
 }
+op(add_f32_imm_fn) {
+    union { int i; float f; } u = {.i=ip->y};
+    F32 imm = (F32){0} + u.f;
+    v->f32 = v[ip->x].f32 + imm;
+    next;
+}
+op(sub_f32_imm_fn) {
+    union { int i; float f; } u = {.i=ip->y};
+    F32 imm = (F32){0} + u.f;
+    v->f32 = v[ip->x].f32 - imm;
+    next;
+}
 op(mul_f32_imm_fn) {
     union { int i; float f; } u = {.i=ip->y};
     F32 imm = (F32){0} + u.f;
     v->f32 = v[ip->x].f32 * imm;
+    next;
+}
+op(div_f32_imm_fn) {
+    union { int i; float f; } u = {.i=ip->y};
+    F32 imm = (F32){0} + u.f;
+    v->f32 = v[ip->x].f32 / imm;
+    next;
+}
+op(min_f32_imm_fn) {
+    union { int i; float f; } u = {.i=ip->y};
+    F32 imm = (F32){0} + u.f;
+    v->f32 = __builtin_elementwise_min(
+        v[ip->x].f32, imm);
+    next;
+}
+op(max_f32_imm_fn) {
+    union { int i; float f; } u = {.i=ip->y};
+    F32 imm = (F32){0} + u.f;
+    v->f32 = __builtin_elementwise_max(
+        v[ip->x].f32, imm);
     next;
 }
 op(pack_fn) {
@@ -525,7 +557,12 @@ static Fn const fn[] = {
     [op_shr_s32_imm] = shr_s32_imm_fn,
     [op_pack]        = pack_fn,
     [op_and_imm]     = and_imm_fn,
+    [op_add_f32_imm] = add_f32_imm_fn,
+    [op_sub_f32_imm] = sub_f32_imm_fn,
     [op_mul_f32_imm] = mul_f32_imm_fn,
+    [op_div_f32_imm] = div_f32_imm_fn,
+    [op_min_f32_imm] = min_f32_imm_fn,
+    [op_max_f32_imm] = max_f32_imm_fn,
 };
 
 int umbra_const_eval(enum op op, int xb,
@@ -553,7 +590,8 @@ static _Bool interp_chooser(struct bb_inst const *insts,
     enum op y_op = insts[insts[join_id].y].op;
     return y_op == op_pack
         || y_op == op_and_imm
-        || y_op == op_mul_f32_imm;
+        || (y_op >= op_add_f32_imm
+         && y_op <= op_max_f32_imm);
 }
 
 struct umbra_interpreter* umbra_interpreter(
@@ -756,7 +794,12 @@ struct umbra_interpreter* umbra_interpreter(
                     case op_shr_u32_imm:
                     case op_shr_s32_imm:
                     case op_and_imm:
+                    case op_add_f32_imm:
+                    case op_sub_f32_imm:
                     case op_mul_f32_imm:
+                    case op_div_f32_imm:
+                    case op_min_f32_imm:
+                    case op_max_f32_imm:
                         emit(.fn=fn[inst->op],
                              .x=X, .y=inst->imm);
                         break;

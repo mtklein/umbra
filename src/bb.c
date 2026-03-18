@@ -285,6 +285,22 @@ static val math_(builder *b, struct bb_inst inst) {
 #define math(b,...) \
     math_(b, (struct bb_inst){.op=__VA_ARGS__})
 
+static val try_imm(builder *b, val d,
+                   enum op fused,
+                   int x, int y) {
+    int imm_id = is_imm(b, x) ? x
+               : is_imm(b, y) ? y : -1;
+    if (imm_id >= 0) {
+        int other = imm_id == x ? y : x;
+        val f = push(b, fused,
+                     .x=other,
+                     .imm=b->inst[imm_id].imm);
+        return push(b, op_join,
+                    .x=d.id, .y=f.id);
+    }
+    return (val){d.id};
+}
+
 static void sort(int *a, int *b) {
     if (*a > *b) {
         int const t = *a;
@@ -305,7 +321,9 @@ val umbra_add_f32(builder *b, val x, val y) {
             .x=b->inst[y.id].x,
             .y=b->inst[y.id].y, .z=x.id);
     }
-    return math(b, op_add_f32, .x=x.id, .y=y.id);
+    return try_imm(b,
+        math(b, op_add_f32, .x=x.id, .y=y.id),
+        op_add_f32_imm, x.id, y.id);
 }
 
 val umbra_sub_f32(builder *b, val x, val y) {
@@ -315,44 +333,53 @@ val umbra_sub_f32(builder *b, val x, val y) {
             .x=b->inst[y.id].x,
             .y=b->inst[y.id].y, .z=x.id);
     }
-    return math(b, op_sub_f32,
-                      .x=x.id, .y=y.id);
+    val d = math(b, op_sub_f32,
+                       .x=x.id, .y=y.id);
+    if (is_imm(b, y.id)) {
+        val f = push(b, op_sub_f32_imm,
+                     .x=x.id,
+                     .imm=b->inst[y.id].imm);
+        return push(b, op_join,
+                    .x=d.id, .y=f.id);
+    }
+    return (val){d.id};
 }
 
 val umbra_mul_f32(builder *b, val x, val y) {
     sort(&x.id, &y.id);
     if (is_imm32(b, x.id, 0x3f800000)) { return y; }
     if (is_imm32(b, y.id, 0x3f800000)) { return x; }
-    val d = math(b, op_mul_f32,
-                       .x=x.id, .y=y.id);
-    int imm_id = is_imm(b, x.id) ? x.id
-               : is_imm(b, y.id) ? y.id : -1;
-    if (imm_id >= 0) {
-        int other = imm_id == x.id ? y.id : x.id;
-        val f = push(b, op_mul_f32_imm,
-                     .x=other,
-                     .imm=b->inst[imm_id].imm);
-        return push(b, op_join, .x=d.id, .y=f.id);
-    }
-    return (val){d.id};
+    return try_imm(b,
+        math(b, op_mul_f32, .x=x.id, .y=y.id),
+        op_mul_f32_imm, x.id, y.id);
 }
 
 val umbra_div_f32(builder *b, val x, val y) {
     if (is_imm32(b, y.id, 0x3f800000)) { return x; }
-    return math(b, op_div_f32,
-                      .x=x.id, .y=y.id);
+    val d = math(b, op_div_f32,
+                       .x=x.id, .y=y.id);
+    if (is_imm(b, y.id)) {
+        val f = push(b, op_div_f32_imm,
+                     .x=x.id,
+                     .imm=b->inst[y.id].imm);
+        return push(b, op_join,
+                    .x=d.id, .y=f.id);
+    }
+    return (val){d.id};
 }
 
 val umbra_min_f32(builder *b, val x, val y) {
     sort(&x.id, &y.id);
-    return math(b, op_min_f32,
-                      .x=x.id, .y=y.id);
+    return try_imm(b,
+        math(b, op_min_f32, .x=x.id, .y=y.id),
+        op_min_f32_imm, x.id, y.id);
 }
 
 val umbra_max_f32(builder *b, val x, val y) {
     sort(&x.id, &y.id);
-    return math(b, op_max_f32,
-                      .x=x.id, .y=y.id);
+    return try_imm(b,
+        math(b, op_max_f32, .x=x.id, .y=y.id),
+        op_max_f32_imm, x.id, y.id);
 }
 
 val umbra_sqrt_f32(builder *b, val x) {
@@ -907,7 +934,12 @@ static void dump_insts(struct bb_inst const *inst,
                 fprintf(f, " v%d v%d %d",
                         ip->x, ip->y, ip->imm);
                 break;
+            case op_add_f32_imm:
+            case op_sub_f32_imm:
             case op_mul_f32_imm:
+            case op_div_f32_imm:
+            case op_min_f32_imm:
+            case op_max_f32_imm:
                 fprintf(f, " v%d 0x%x",
                         ip->x,
                         (uint32_t)ip->imm);
