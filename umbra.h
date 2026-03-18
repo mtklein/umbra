@@ -96,6 +96,15 @@ void   umbra_metal_begin_batch(struct umbra_metal*);
 void   umbra_metal_flush      (struct umbra_metal*);
 void   umbra_metal_free       (struct umbra_metal*);
 
+struct umbra_backend* umbra_backend_interp(struct umbra_basic_block const*);
+struct umbra_backend* umbra_backend_jit   (struct umbra_basic_block const*);
+struct umbra_backend* umbra_backend_metal (struct umbra_basic_block const*);
+
+void umbra_backend_run        (struct umbra_backend*, int n, umbra_buf[]);
+void umbra_backend_begin_batch(struct umbra_backend*);
+void umbra_backend_flush      (struct umbra_backend*);
+void umbra_backend_free       (struct umbra_backend*);
+
 #include <stdio.h>
 void umbra_dump_builder    (struct umbra_builder const*, FILE*);
 void umbra_dump_basic_block(struct umbra_basic_block const*, FILE*);

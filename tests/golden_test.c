@@ -23,11 +23,11 @@ static void run_metal(void *ctx, int n,
     umbra_metal_run(ctx, n, buf);
 }
 
-enum { NUM_BACKENDS = 3 };
-static char const *backend_name[NUM_BACKENDS] = {
+enum { N_BACKS = 3 };
+static char const *backend_name[N_BACKS] = {
     "interp", "jit", "metal",
 };
-static slide_run_fn const run_fns[NUM_BACKENDS] = {
+static slide_run_fn const run_fns[N_BACKS] = {
     run_interp, run_jit, run_metal,
 };
 
@@ -241,7 +241,7 @@ static void test_slide_golden(
     struct umbra_metal *mtl = umbra_metal(bb);
     umbra_basic_block_free(bb);
 
-    void *backs[NUM_BACKENDS] = {
+    void *backs[N_BACKS] = {
         interp, jit, mtl,
     };
 
@@ -261,7 +261,7 @@ static void test_slide_golden(
                  pbuf_ref, &lay);
     readback_to_8888(fmt, pbuf_ref, ref);
 
-    for (int bi = 1; bi < NUM_BACKENDS; bi++) {
+    for (int bi = 1; bi < N_BACKS; bi++) {
         if (!backs[bi]) { continue; }
         if (bi == 2 && mtl) {
             umbra_metal_begin_batch(mtl);

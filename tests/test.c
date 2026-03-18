@@ -1225,7 +1225,7 @@ static void test_preamble_pair_alias(void) {
             {in, 16*4}, {out, 16*4},
         })) { continue; }
         float ref[16];
-        umbra_interpreter_run(B.interp, 16,
+        umbra_backend_run(B.b[0], 16,
             (umbra_buf[]){
                 {in, 16*4}, {ref, 16*4},
             });
