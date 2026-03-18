@@ -341,7 +341,7 @@ int main(void) {
     void *pixbuf = malloc(W * H * 8);
     int32_t planar_stride = W * H;
 
-    int cur_slide   = 0;
+    int cur_slide   = slide_count() - 1;
     int cur_fmt     = FMT_8888;
     build_slide_fmt(slide_get(cur_slide), cur_fmt);
     int cur_backend = pick_backend(1);

@@ -22,6 +22,7 @@ extern slide slide_gradient_lut(char const*, uint32_t,
                                 float const[4],
                                 float*, int);
 extern slide slide_slug_wind(slug_curves*);
+extern slide slide_overview(void);
 
 static text_cov bitmap_cov, sdf_cov;
 static slug_curves slug;
@@ -30,7 +31,7 @@ enum { LUT_N = 64 };
 static float linear_lut[LUT_N * 4];
 static float radial_lut[LUT_N * 4];
 
-static slide all[16];
+static slide all[18];
 static int   count;
 
 int    slide_count(void) { return count; }
@@ -136,6 +137,9 @@ void slides_init(int w, int h) {
             all[i].init(&all[i], w, h);
         }
     }
+
+    all[count++] = slide_overview();
+    all[count - 1].init(&all[count - 1], w, h);
 }
 
 void slides_cleanup(void) {

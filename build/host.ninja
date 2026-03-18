@@ -6,28 +6,16 @@ include build/project.ninja
 
 build $out/tests/golden_test.o: compile tests/golden_test.c
     cflags = -Wno-cast-align
-build $out/golden_test:   link $out/tests/golden_test.o $out/src/bb.o $out/src/ra.o $out/src/interpreter.o $out/src/codegen.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/umbra_draw.o $out/stb_truetype.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o
+build $out/golden_test:   link $out/tests/golden_test.o $out/src/bb.o $out/src/ra.o $out/src/interpreter.o $out/src/codegen.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/umbra_draw.o $out/stb_truetype.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/overview.o
     ldflags = -framework Metal -framework Foundation -lm
 build $out/golden_test.log: run $out/golden_test
 
 build $out/demo.o: compile demo.c
     cflags = -I/opt/homebrew/include -Wno-cast-align
-build $out/demo:   link $out/demo.o $out/src/bb.o $out/src/ra.o $out/src/interpreter.o $out/src/codegen.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/umbra_draw.o $out/stb_truetype.o $out/stb_image_write.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o
+build $out/demo:   link $out/demo.o $out/src/bb.o $out/src/ra.o $out/src/interpreter.o $out/src/codegen.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/umbra_draw.o $out/stb_truetype.o $out/stb_image_write.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/overview.o
     ldflags = -framework Metal -framework Foundation -L/opt/homebrew/lib -lSDL3
 
 build $out/dump.log | $
-      dumps/solid_src_8888.arm64 $
-      dumps/solid_src_8888.arm64.mca $
-      dumps/solid_src_8888.bb $
-      dumps/solid_src_8888.builder $
-      dumps/solid_src_8888.c $
-      dumps/solid_src_8888.metal $
-      dumps/solid_srcover_8888.arm64 $
-      dumps/solid_srcover_8888.arm64.mca $
-      dumps/solid_srcover_8888.bb $
-      dumps/solid_srcover_8888.builder $
-      dumps/solid_srcover_8888.c $
-      dumps/solid_srcover_8888.metal $
       dumps/srcover.arm64 $
       dumps/srcover.arm64.mca $
       dumps/srcover.bb $
@@ -40,9 +28,87 @@ build $out/dump.log | $
       dumps/slug_acc.builder $
       dumps/slug_acc.c $
       dumps/slug_acc.metal $
-      dumps/slug_render.arm64 $
-      dumps/slug_render.arm64.mca $
-      dumps/slug_render.bb $
-      dumps/slug_render.builder $
-      dumps/slug_render.c $
-      dumps/slug_render.metal: run $out/dump
+      dumps/1_solid_fill_src/draw.arm64 $
+      dumps/1_solid_fill_src/draw.arm64.mca $
+      dumps/1_solid_fill_src/draw.bb $
+      dumps/1_solid_fill_src/draw.builder $
+      dumps/1_solid_fill_src/draw.c $
+      dumps/1_solid_fill_src/draw.metal $
+      dumps/2_source_over_srcover/draw.arm64 $
+      dumps/2_source_over_srcover/draw.arm64.mca $
+      dumps/2_source_over_srcover/draw.bb $
+      dumps/2_source_over_srcover/draw.builder $
+      dumps/2_source_over_srcover/draw.c $
+      dumps/2_source_over_srcover/draw.metal $
+      dumps/3_destination_over_dstover/draw.arm64 $
+      dumps/3_destination_over_dstover/draw.arm64.mca $
+      dumps/3_destination_over_dstover/draw.bb $
+      dumps/3_destination_over_dstover/draw.builder $
+      dumps/3_destination_over_dstover/draw.c $
+      dumps/3_destination_over_dstover/draw.metal $
+      dumps/4_multiply_blend/draw.arm64 $
+      dumps/4_multiply_blend/draw.arm64.mca $
+      dumps/4_multiply_blend/draw.bb $
+      dumps/4_multiply_blend/draw.builder $
+      dumps/4_multiply_blend/draw.c $
+      dumps/4_multiply_blend/draw.metal $
+      dumps/5_full_coverage_no_rect_clip/draw.arm64 $
+      dumps/5_full_coverage_no_rect_clip/draw.arm64.mca $
+      dumps/5_full_coverage_no_rect_clip/draw.bb $
+      dumps/5_full_coverage_no_rect_clip/draw.builder $
+      dumps/5_full_coverage_no_rect_clip/draw.c $
+      dumps/5_full_coverage_no_rect_clip/draw.metal $
+      dumps/6_no_blend_direct_paint/draw.arm64 $
+      dumps/6_no_blend_direct_paint/draw.arm64.mca $
+      dumps/6_no_blend_direct_paint/draw.bb $
+      dumps/6_no_blend_direct_paint/draw.builder $
+      dumps/6_no_blend_direct_paint/draw.c $
+      dumps/6_no_blend_direct_paint/draw.metal $
+      dumps/7_text_8_bit_aa/draw.arm64 $
+      dumps/7_text_8_bit_aa/draw.arm64.mca $
+      dumps/7_text_8_bit_aa/draw.bb $
+      dumps/7_text_8_bit_aa/draw.builder $
+      dumps/7_text_8_bit_aa/draw.c $
+      dumps/7_text_8_bit_aa/draw.metal $
+      dumps/8_text_sdf/draw.arm64 $
+      dumps/8_text_sdf/draw.arm64.mca $
+      dumps/8_text_sdf/draw.bb $
+      dumps/8_text_sdf/draw.builder $
+      dumps/8_text_sdf/draw.c $
+      dumps/8_text_sdf/draw.metal $
+      dumps/9_perspective_text/draw.arm64 $
+      dumps/9_perspective_text/draw.arm64.mca $
+      dumps/9_perspective_text/draw.bb $
+      dumps/9_perspective_text/draw.builder $
+      dumps/9_perspective_text/draw.c $
+      dumps/9_perspective_text/draw.metal $
+      dumps/10_linear_gradient_2_stop/draw.arm64 $
+      dumps/10_linear_gradient_2_stop/draw.arm64.mca $
+      dumps/10_linear_gradient_2_stop/draw.bb $
+      dumps/10_linear_gradient_2_stop/draw.builder $
+      dumps/10_linear_gradient_2_stop/draw.c $
+      dumps/10_linear_gradient_2_stop/draw.metal $
+      dumps/11_radial_gradient_2_stop/draw.arm64 $
+      dumps/11_radial_gradient_2_stop/draw.arm64.mca $
+      dumps/11_radial_gradient_2_stop/draw.bb $
+      dumps/11_radial_gradient_2_stop/draw.builder $
+      dumps/11_radial_gradient_2_stop/draw.c $
+      dumps/11_radial_gradient_2_stop/draw.metal $
+      dumps/12_linear_gradient_wide_gamut/draw.arm64 $
+      dumps/12_linear_gradient_wide_gamut/draw.arm64.mca $
+      dumps/12_linear_gradient_wide_gamut/draw.bb $
+      dumps/12_linear_gradient_wide_gamut/draw.builder $
+      dumps/12_linear_gradient_wide_gamut/draw.c $
+      dumps/12_linear_gradient_wide_gamut/draw.metal $
+      dumps/13_radial_gradient_wide_gamut/draw.arm64 $
+      dumps/13_radial_gradient_wide_gamut/draw.arm64.mca $
+      dumps/13_radial_gradient_wide_gamut/draw.bb $
+      dumps/13_radial_gradient_wide_gamut/draw.builder $
+      dumps/13_radial_gradient_wide_gamut/draw.c $
+      dumps/13_radial_gradient_wide_gamut/draw.metal $
+      dumps/14_slug_text_bezier/draw.arm64 $
+      dumps/14_slug_text_bezier/draw.arm64.mca $
+      dumps/14_slug_text_bezier/draw.bb $
+      dumps/14_slug_text_bezier/draw.builder $
+      dumps/14_slug_text_bezier/draw.c $
+      dumps/14_slug_text_bezier/draw.metal: run $out/dump

@@ -511,7 +511,7 @@ int main(void) {
     test_slug_rect();
 
     for (int fi = 0; fi < NUM_FMTS; fi++) {
-        for (int si = 0; si < slide_count(); si++) {
+        for (int si = 0; si < slide_count() - 1; si++) {
             test_slide_golden(si, fi);
         }
     }

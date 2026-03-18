@@ -1,0 +1,180 @@
+#include "slide.h"
+#include <stdlib.h>
+
+enum { COLS = 4, ROWS = 4 };
+
+static uint8_t const font3x5[10][5] = {
+    {7,5,5,5,7}, {2,6,2,2,7}, {7,1,7,4,7},
+    {7,1,7,1,7}, {5,5,7,1,1}, {7,4,7,1,7},
+    {7,4,7,5,7}, {7,1,1,1,1}, {7,5,7,5,7},
+    {7,5,7,1,7},
+};
+
+typedef struct {
+    int       w, h, cw, ch;
+    int       n_real;
+    int       pad_;
+    uint32_t *fb;
+} overview_state;
+
+static void run_interp_(void *ctx, int n,
+                        umbra_buf buf[]) {
+    umbra_interpreter_run(ctx, n, buf);
+}
+
+static void draw_digit(uint32_t *fb, int stride,
+                       int ox, int oy,
+                       int digit, uint32_t color) {
+    for (int dy = 0; dy < 10; dy++) {
+        uint8_t bits = font3x5[digit][dy / 2];
+        for (int dx = 0; dx < 6; dx++) {
+            if (bits & (4 >> (dx / 2))) {
+                fb[(oy + dy) * stride + ox + dx] =
+                    color;
+            }
+        }
+    }
+}
+
+static void draw_number(uint32_t *fb, int stride,
+                        int ox, int oy,
+                        int num, uint32_t color) {
+    if (num >= 10) {
+        draw_digit(fb, stride,
+            ox, oy, num / 10, color);
+        ox += 7;
+    }
+    draw_digit(fb, stride,
+        ox, oy, num % 10, color);
+}
+
+static void draw_xbox(uint32_t *fb, int stride,
+                      int x0, int y0,
+                      int cw, int ch,
+                      uint32_t color) {
+    for (int x = 0; x < cw; x++) {
+        fb[y0 * stride + x0 + x] = color;
+        fb[(y0 + ch - 1) * stride + x0 + x] = color;
+    }
+    for (int y = 0; y < ch; y++) {
+        fb[(y0 + y) * stride + x0] = color;
+        fb[(y0 + y) * stride + x0 + cw - 1] = color;
+        int xd = y * (cw - 1) / (ch - 1);
+        fb[(y0 + y) * stride + x0 + xd] = color;
+        fb[(y0 + y) * stride + x0 + cw-1 - xd] =
+            color;
+    }
+}
+
+static void overview_init(slide *s, int w, int h) {
+    overview_state *st = s->state;
+    st->w  = w;
+    st->h  = h;
+    st->cw = w / COLS;
+    st->ch = h / ROWS;
+    st->fb = calloc((size_t)(w * h), 4);
+    st->n_real = slide_count() - 1;
+
+    uint32_t *tmp = calloc((size_t)(w * h), 4);
+
+    for (int idx = 0; idx < ROWS * COLS; idx++) {
+        int col = idx % COLS;
+        int row = idx / COLS;
+        int x0 = col * st->cw;
+        int y0 = row * st->ch;
+
+        if (idx >= st->n_real) {
+            for (int y = 0; y < st->ch; y++) {
+                for (int x = 0; x < st->cw; x++) {
+                    st->fb[(y0+y)*w + x0+x] =
+                        0xff181818;
+                }
+            }
+            draw_xbox(st->fb, w,
+                x0, y0, st->cw, st->ch,
+                0xff404040);
+            continue;
+        }
+
+        slide *sub = slide_get(idx);
+
+        umbra_draw_layout lay;
+        struct umbra_builder *b = umbra_draw_build(
+            sub->shader, sub->coverage,
+            sub->blend, sub->load, sub->store,
+            &lay);
+        struct umbra_basic_block *bb =
+            umbra_basic_block(b);
+        umbra_builder_free(b);
+        struct umbra_interpreter *interp =
+            umbra_interpreter(bb);
+        umbra_basic_block_free(bb);
+
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                tmp[y * w + x] = sub->bg;
+            }
+        }
+        for (int y = 0; y < h; y++) {
+            sub->render_row(sub, y, w,
+                tmp + y * w, (long)(w * 4),
+                &lay, 0, 0,
+                interp, run_interp_);
+        }
+        umbra_interpreter_free(interp);
+
+        for (int cy = 0; cy < st->ch; cy++) {
+            for (int cx = 0; cx < st->cw; cx++) {
+                int sx = cx * w / st->cw;
+                int sy = cy * h / st->ch;
+                st->fb[(y0+cy)*w + x0+cx] =
+                    tmp[sy * w + sx];
+            }
+        }
+
+        draw_number(st->fb, w,
+            x0 + 3, y0 + 3,
+            idx + 1, 0x80000000);
+        draw_number(st->fb, w,
+            x0 + 2, y0 + 2,
+            idx + 1, 0xffffffff);
+    }
+
+    free(tmp);
+}
+
+static void overview_render_row(
+        slide *s, int y, int w,
+        void *row, long row_sz,
+        umbra_draw_layout const *lay,
+        int ps, int32_t stride,
+        void *ctx, slide_run_fn run) {
+    overview_state *st = s->state;
+    (void)w; (void)row_sz; (void)lay;
+    (void)ps; (void)stride; (void)ctx; (void)run;
+    __builtin_memcpy(row, st->fb + y * st->w,
+        (size_t)st->w * 4);
+}
+
+static void overview_cleanup(slide *s) {
+    overview_state *st = s->state;
+    free(st->fb);
+    free(st);
+    s->state = NULL;
+}
+
+slide slide_overview(void);
+
+slide slide_overview(void) {
+    overview_state *st = calloc(1, sizeof *st);
+    return (slide){
+        .title="Overview",
+        .shader=umbra_shader_solid,
+        .store=umbra_store_8888,
+        .bg=0xff101010,
+        .init=overview_init,
+        .render_row=overview_render_row,
+        .cleanup=overview_cleanup,
+        .state=st,
+    };
+}
