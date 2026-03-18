@@ -90,6 +90,11 @@ op(iota_fn) {
     else             { v->i32 = seq + (end - K); }
     next;
 }
+op(lane_fn) {
+    I32 const seq = {0,1,2,3,4,5,6,7};
+    v->i32 = seq;
+    next;
+}
 
 op(uni_16) {
     uint16_t uni;
@@ -598,6 +603,9 @@ struct umbra_interpreter* umbra_interpreter(
                     case op_iota:
                         emit(.fn=iota_fn);
                         break;
+                    case op_lane:
+                        emit(.fn=lane_fn);
+                        break;
                     case op_imm_32:
                         emit(.fn=imm_32,
                              .x=inst->imm);
@@ -771,17 +779,21 @@ void umbra_interpreter_run(
     }
 }
 
-void umbra_interpreter_run_m(
+int umbra_interpreter_step(
     struct umbra_interpreter *p,
-    int n, int m, int loop_off, umbra_buf buf[])
+    int n, umbra_buf buf[])
 {
-    for (int j = 0; j < m; j++) {
-        int32_t j32 = j;
-        __builtin_memcpy(
-            (char*)buf[1].ptr + loop_off,
-            &j32, 4);
-        umbra_interpreter_run(p, n, buf);
+    if (n <= 0) { return 0; }
+    void *ptr[32] = {0};
+    long  sz[32]  = {0};
+    for (int i = 0; i < p->nptr && i < 32; i++) {
+        ptr[i] = buf[i].ptr;
+        sz[i]  = buf[i].sz < 0
+               ? -buf[i].sz : buf[i].sz;
     }
+    int k = n >= K ? K : 1;
+    p->inst[0].fn(p->inst, p->v, k, ptr, sz);
+    return k;
 }
 
 void umbra_interpreter_free(

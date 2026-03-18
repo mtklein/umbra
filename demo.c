@@ -576,29 +576,41 @@ int main(void) {
             for (int y = 0; y < H; y++) {
                 __builtin_memset(wind_buf, 0,
                     sizeof wind_buf);
-                long long au_[12] = {0};
-                char *au = (char*)au_;
-                uni_i32(au, acc_lay.x0, 0);
-                uni_i32(au, acc_lay.y, y);
-                uni_f32(au, acc_lay.mat, mat, 11);
-                uni_ptr(au, acc_lay.curves_off,
-                    slug.data,
-                    (long)(slug.count * 6 * 4));
-                umbra_buf abuf[] = {
-                    { wind_buf,
-                      (long)sizeof wind_buf },
-                    { au,
-                      -(long)acc_lay.uni_len },
-                };
-                if (acc_pipe.jit) {
-                    umbra_jit_run_m(acc_pipe.jit,
-                        W, slug.count,
-                        acc_lay.loop_off, abuf);
-                } else {
-                    umbra_interpreter_run_m(
-                        acc_pipe.interp,
-                        W, slug.count,
-                        acc_lay.loop_off, abuf);
+                int ax = 0;
+                while (ax < W) {
+                    long long au_[12] = {0};
+                    char *au = (char*)au_;
+                    uni_i32(au, acc_lay.x0, ax);
+                    uni_i32(au, acc_lay.y, y);
+                    uni_f32(au, acc_lay.mat,
+                        mat, 11);
+                    uni_ptr(au,
+                        acc_lay.curves_off,
+                        slug.data,
+                        (long)(slug.count*6*4));
+                    int k = 0;
+                    for (int j = 0;
+                         j < slug.count; j++) {
+                        int32_t j32 = j;
+                        __builtin_memcpy(
+                            au + acc_lay.loop_off,
+                            &j32, 4);
+                        umbra_buf abuf[] = {
+                            { wind_buf + ax,
+                              (long)((W-ax)*4) },
+                            { au,
+                              -(long)acc_lay
+                                  .uni_len },
+                        };
+                        k = acc_pipe.jit
+                            ? umbra_jit_step(
+                                acc_pipe.jit,
+                                W - ax, abuf)
+                            : umbra_interpreter_step(
+                                acc_pipe.interp,
+                                W - ax, abuf);
+                    }
+                    ax += k;
                 }
 
                 long long uni_[12] = {0};
@@ -608,14 +620,15 @@ int main(void) {
                 uni_i32(uni,
                     draw_layout.y, y);
                 uni_f32(uni,
-                    draw_layout.shader, hc, 4);
+                    draw_layout.shader,
+                    hc, 4);
                 uni_ptr(uni,
                     draw_layout.coverage,
                     wind_buf,
                     -(long)sizeof wind_buf);
                 for (int i = 0; i < ps; i++) {
                     uni_i32(uni,
-                        uni_len - (ps-i) * 4,
+                        uni_len - (ps-i)*4,
                         planar_stride);
                 }
                 umbra_buf buf[] = {

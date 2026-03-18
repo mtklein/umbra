@@ -15,12 +15,12 @@ void umbra_codegen_run(
 {
     (void)cg; (void)n; (void)buf;
 }
-void umbra_codegen_run_m(
+int umbra_codegen_step(
     struct umbra_codegen *cg,
-    int n, int m, int loop_off, umbra_buf buf[])
+    int n, umbra_buf buf[])
 {
-    (void)cg; (void)n; (void)m;
-    (void)loop_off; (void)buf;
+    (void)cg; (void)n; (void)buf;
+    return 0;
 }
 void umbra_codegen_free(struct umbra_codegen *cg) {
     (void)cg;
@@ -125,6 +125,10 @@ static void emit_ops(Buf *b, BB const *bb,
                     emit(b, "%su32 v%d = (u32)i;\n",
                          pad, i);
                 }
+                break;
+            case op_lane:
+                emit(b, "%su32 v%d = 0u;\n",
+                     pad, i);
                 break;
 
             case op_imm_32:
@@ -765,17 +769,13 @@ void umbra_codegen_run(
     cg->entry(n, ptrs, szs);
 }
 
-void umbra_codegen_run_m(
+int umbra_codegen_step(
     struct umbra_codegen *cg,
-    int n, int m, int loop_off, umbra_buf buf[])
+    int n, umbra_buf buf[])
 {
-    for (int j = 0; j < m; j++) {
-        int32_t j32 = j;
-        __builtin_memcpy(
-            (char*)buf[1].ptr + loop_off,
-            &j32, 4);
-        umbra_codegen_run(cg, n, buf);
-    }
+    if (!cg || n <= 0) { return 0; }
+    umbra_codegen_run(cg, 1, buf);
+    return 1;
 }
 
 void umbra_codegen_free(struct umbra_codegen *cg) {

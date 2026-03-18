@@ -295,24 +295,38 @@ static void render_slide(
         for (int y = 0; y < H; y++) {
             __builtin_memset(wind_buf, 0,
                 sizeof wind_buf);
-            long long au_[12] = {0};
-            char *au = (char*)au_;
-            uni_i32(au, gt_acc_lay.x0, 0);
-            uni_i32(au, gt_acc_lay.y, y);
-            uni_f32(au, gt_acc_lay.mat, mat, 11);
-            uni_ptr(au, gt_acc_lay.curves_off,
-                gt_slug.data,
-                (long)(gt_slug.count * 6 * 4));
-            umbra_buf abuf[] = {
-                { wind_buf,
-                  (long)sizeof wind_buf },
-                { au,
-                  -(long)gt_acc_lay.uni_len },
-            };
-            umbra_interpreter_run_m(gt_acc_interp,
-                W, gt_slug.count,
-                gt_acc_lay.loop_off, abuf);
-
+            int ax = 0;
+            while (ax < W) {
+                long long au_[12] = {0};
+                char *au = (char*)au_;
+                uni_i32(au, gt_acc_lay.x0, ax);
+                uni_i32(au, gt_acc_lay.y, y);
+                uni_f32(au, gt_acc_lay.mat,
+                    mat, 11);
+                uni_ptr(au,
+                    gt_acc_lay.curves_off,
+                    gt_slug.data,
+                    (long)(gt_slug.count*6*4));
+                int k = 0;
+                for (int j = 0;
+                     j < gt_slug.count; j++) {
+                    int32_t j32 = j;
+                    __builtin_memcpy(
+                        au + gt_acc_lay.loop_off,
+                        &j32, 4);
+                    umbra_buf abuf[] = {
+                        { wind_buf + ax,
+                          (long)((W-ax)*4) },
+                        { au,
+                          -(long)gt_acc_lay
+                              .uni_len },
+                    };
+                    k = umbra_interpreter_step(
+                        gt_acc_interp,
+                        W - ax, abuf);
+                }
+                ax += k;
+            }
             long long uni_[12] = {0};
             char *uni = (char*)uni_;
             uni_i32(uni, lay->x0, 0);
@@ -323,7 +337,7 @@ static void render_slide(
                 -(long)sizeof wind_buf);
             for (int i = 0; i < ps; i++) {
                 uni_i32(uni,
-                    uni_len - (ps - i) * 4,
+                    uni_len - (ps-i) * 4,
                     planar_stride);
             }
             umbra_buf buf[] = {
@@ -581,26 +595,37 @@ static void test_slug_rect(void) {
         1,0,0, 0,1,0, 0,0,1, 60,40,
     };
     float color[4] = {1,1,1,1};
-    float wind_buf[W];
 
+    float wind_buf[W];
     for (int y = 0; y < H; y++) {
         __builtin_memset(wind_buf, 0,
             sizeof wind_buf);
-        long long au_[12] = {0};
-        char *au = (char*)au_;
-        uni_i32(au, alay.x0, 0);
-        uni_i32(au, alay.y, y);
-        uni_f32(au, alay.mat, mat, 11);
-        uni_ptr(au, alay.curves_off,
-            rect, (long)sizeof rect);
-        umbra_buf abuf[] = {
-            { wind_buf,
-              (long)sizeof wind_buf },
-            { au,
-              -(long)alay.uni_len },
-        };
-        umbra_interpreter_run_m(acc, W, 4,
-            alay.loop_off, abuf);
+        int ax = 0;
+        while (ax < W) {
+            long long au_[12] = {0};
+            char *au = (char*)au_;
+            uni_i32(au, alay.x0, ax);
+            uni_i32(au, alay.y, y);
+            uni_f32(au, alay.mat, mat, 11);
+            uni_ptr(au, alay.curves_off,
+                rect, (long)sizeof rect);
+            int k = 0;
+            for (int j = 0; j < 4; j++) {
+                int32_t j32 = j;
+                __builtin_memcpy(
+                    au + alay.loop_off,
+                    &j32, 4);
+                umbra_buf abuf[] = {
+                    { wind_buf + ax,
+                      (long)((W-ax) * 4) },
+                    { au,
+                      -(long)alay.uni_len },
+                };
+                k = umbra_interpreter_step(
+                    acc, W - ax, abuf);
+            }
+            ax += k;
+        }
 
         long long uni_[12] = {0};
         char *uni = (char*)uni_;

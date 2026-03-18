@@ -10,8 +10,9 @@ struct umbra_jit* umbra_jit(
 void umbra_jit_run (struct umbra_jit *j, int n, umbra_buf buf[]) {
     (void)j; (void)n; (void)buf;
 }
-void umbra_jit_run_m(struct umbra_jit *j, int n, int m, int loop_off, umbra_buf buf[]) {
-    (void)j; (void)n; (void)m; (void)loop_off; (void)buf;
+int umbra_jit_step(struct umbra_jit *j, int n, umbra_buf buf[]) {
+    (void)j; (void)n; (void)buf;
+    return 0;
 }
 void umbra_jit_free(struct umbra_jit *j) { (void)j; }
 void umbra_dump_jit(
@@ -219,7 +220,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
         return 1;
 
     case op_and_imm:
-    case op_iota:
+    case op_iota: case op_lane:
     case op_deref_ptr:
     case op_uni_32:   case op_load_32:
     case op_gather_32: case op_store_32:
@@ -417,6 +418,18 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             }
         } break;
 
+        case op_lane: {
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            if (scalar) {
+                put(c, MOVI_4s(s.rd, 0, 0));
+            } else {
+                put(c, MOVI_4s(s.rd, 0, 0));
+                put(c, MOVZ_w(XT,1)); put(c, INS_s(s.rd,1,XT));
+                put(c, MOVZ_w(XT,2)); put(c, INS_s(s.rd,2,XT));
+                put(c, MOVZ_w(XT,3)); put(c, INS_s(s.rd,3,XT));
+            }
+        } break;
+
         case op_load_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int p = inst->ptr;
@@ -593,7 +606,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     put(c, 0x0e003c00u | (imm5 << 16)
                         | ((uint32_t)ry << 5)
                         | (uint32_t)XH);
-                    put(c, 0xb8206800u
+                    put(c, 0xb8207800u
                         | ((uint32_t)XT << 16)
                         | ((uint32_t)XP << 5)
                         | (uint32_t)XH);
@@ -711,7 +724,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 CZ(op_lt_s32,  CMLT_4s_z,  CMGT_4s_z)
                 CZ(op_le_f32,  FCMLE_4s_z, FCMGE_4s_z)
                 CZ(op_le_s32,  CMLE_4s_z,  CMGE_4s_z)
-                case op_iota: case op_deref_ptr:
+                case op_iota: case op_lane:
+                case op_deref_ptr:
                 case op_imm_32:
                 case op_uni_32: case op_load_32:
                 case op_gather_32: case op_store_32:
@@ -814,14 +828,11 @@ void umbra_jit_run(struct umbra_jit *j, int n, umbra_buf buf[]) {
     if (!j) { return; }
     j->entry(n, buf);
 }
-void umbra_jit_run_m(struct umbra_jit *j, int n, int m, int loop_off, umbra_buf buf[]) {
-    for (int ji = 0; ji < m; ji++) {
-        int32_t j32 = ji;
-        __builtin_memcpy(
-            (char*)buf[1].ptr + loop_off,
-            &j32, 4);
-        umbra_jit_run(j, n, buf);
-    }
+int umbra_jit_step(struct umbra_jit *j, int n, umbra_buf buf[]) {
+    if (!j || n <= 0) { return 0; }
+    int k = n >= 4 ? 4 : 1;
+    j->entry(k, buf);
+    return k;
 }
 
 void umbra_jit_free(struct umbra_jit *j) {
@@ -1133,7 +1144,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
     case op_and_imm:
         return 0;
 
-    case op_iota:
+    case op_iota: case op_lane:
     case op_deref_ptr:
     case op_uni_32:   case op_load_32:
     case op_gather_32: case op_store_32:
@@ -1334,6 +1345,28 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 vpaddd(c, s.rd, s.rd, tmp);
                 add_ri(c, RSP, 32);
                 ra_return_reg(ra, tmp);
+            }
+        } break;
+
+        case op_lane: {
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            if (scalar) {
+                vpxor(c, 1, s.rd, s.rd, s.rd);
+            } else {
+                sub_ri(c, RSP, 32);
+                for (int k = 0; k < 8; k++) {
+                    emit1(c, 0xc7);
+                    if (k == 0) {
+                        emit1(c, 0x04); emit1(c, 0x24);
+                    } else {
+                        emit1(c, 0x44);
+                        emit1(c, 0x24);
+                        emit1(c, (uint8_t)(k*4));
+                    }
+                    emit4(c, (uint32_t)k);
+                }
+                vfill(c, s.rd, 0);
+                add_ri(c, RSP, 32);
             }
         } break;
 
@@ -1594,19 +1627,45 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         } break;
 
         case op_scatter_32: {
+            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
+            int8_t ry = ra_ensure(ra, sl, ns, inst->y);
+            int p = inst->ptr;
+            int base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
+            load_max_ix_x86(c, p, 2);
             if (scalar) {
-                int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-                int8_t ry = ra_ensure(ra, sl, ns, inst->y);
                 vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
-                int p = inst->ptr;
-                int base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
-                load_max_ix_x86(c, p, 2);
                 clamp_eax_x86(c);
                 if (base != R11) { mov_rr(c, R11, base); last_ptr = -1; }
                 vex_mem(c, 1, 1, 0, 0, ry, 0, 0x7e, R11, RAX, 4, 0);
             } else {
-                if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
+                sub_ri(c, RSP, 64);
+                vmov_store(c,1,ry,RSP,RSP,0,0);
+                vmov_store(c,1,rx,RSP,RSP,0,32);
+                if (lu(inst->x) <= i) {
+                    ra_free_reg(ra, inst->x);
+                }
+                if (base != R11) {
+                    mov_rr(c, R11, base);
+                    last_ptr = -1;
+                }
+                for (int k = 0; k < 8; k++) {
+                    emit1(c, 0x8b);
+                    emit1(c, 0x44);
+                    emit1(c, 0x24);
+                    emit1(c,(uint8_t)(32+k*4));
+                    clamp_eax_x86(c);
+                    emit1(c, 0x44);
+                    emit1(c, 0x8b);
+                    emit1(c, 0x54);
+                    emit1(c, 0x24);
+                    emit1(c, (uint8_t)(k*4));
+                    emit1(c, 0x45);
+                    emit1(c, 0x89);
+                    emit1(c, 0x14);
+                    emit1(c, 0x83);
+                }
+                add_ri(c, RSP, 64);
             }
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
         } break;
@@ -1736,14 +1795,11 @@ void umbra_jit_run(struct umbra_jit *j, int n, umbra_buf buf[]) {
     if (!j) { return; }
     j->entry(n, buf);
 }
-void umbra_jit_run_m(struct umbra_jit *j, int n, int m, int loop_off, umbra_buf buf[]) {
-    for (int ji = 0; ji < m; ji++) {
-        int32_t j32 = ji;
-        __builtin_memcpy(
-            (char*)buf[1].ptr + loop_off,
-            &j32, 4);
-        umbra_jit_run(j, n, buf);
-    }
+int umbra_jit_step(struct umbra_jit *j, int n, umbra_buf buf[]) {
+    if (!j || n <= 0) { return 0; }
+    int k = n >= 8 ? 8 : 1;
+    j->entry(k, buf);
+    return k;
 }
 
 void umbra_jit_free(struct umbra_jit *j) {

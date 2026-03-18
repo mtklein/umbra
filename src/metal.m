@@ -12,12 +12,11 @@ void umbra_metal_run(
 ) {
     (void)m; (void)n; (void)buf;
 }
-void umbra_metal_run_m(
-    struct umbra_metal *m, int n, int mm,
-    int loop_off, umbra_buf buf[]
+int umbra_metal_step(
+    struct umbra_metal *m, int n, umbra_buf buf[]
 ) {
-    (void)m; (void)n; (void)mm;
-    (void)loop_off; (void)buf;
+    (void)m; (void)n; (void)buf;
+    return 0;
 }
 void umbra_metal_begin_batch(struct umbra_metal *m) {
     (void)m;
@@ -111,6 +110,10 @@ static void emit_ops(Buf *b, BB const *bb,
         switch (inst->op) {
             case op_iota:
                 emit(b, "%suint v%d = i;\n",
+                     pad, i);
+                break;
+            case op_lane:
+                emit(b, "%suint v%d = 0u;\n",
                      pad, i);
                 break;
 
@@ -1023,17 +1026,12 @@ void umbra_metal_run(
     }
 }
 
-void umbra_metal_run_m(
-    struct umbra_metal *m, int n, int mm,
-    int loop_off, umbra_buf buf[]
+int umbra_metal_step(
+    struct umbra_metal *m, int n, umbra_buf buf[]
 ) {
-    for (int j = 0; j < mm; j++) {
-        int32_t j32 = j;
-        __builtin_memcpy(
-            (char*)buf[1].ptr + loop_off,
-            &j32, 4);
-        umbra_metal_run(m, n, buf);
-    }
+    if (!m || n <= 0) { return 0; }
+    umbra_metal_run(m, 1, buf);
+    return 1;
 }
 
 void umbra_metal_begin_batch(
