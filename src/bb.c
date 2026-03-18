@@ -311,6 +311,7 @@ static void sort(int *a, int *b) {
 
 val umbra_add_f32(builder *b, val x, val y) {
     sort(&x.id, &y.id);
+    if (is_imm32(b, x.id, 0)) { return y; }
     if (b->inst[x.id].op == op_mul_f32) {
         return math(b, op_fma_f32,
             .x=b->inst[x.id].x,

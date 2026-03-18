@@ -25,7 +25,7 @@
   v24  = and_32          v22 v23
   v25  = and_32          v24 v14
   v26  = sel_32          v25 v15 v0
-  v27  = fma_f32         v4 v26 v0
+  v27  = mul_f32         v4 v26
   v28  = mul_f32         v27 v16
   v29  = mul_f32_imm     v27 0x437f0000
   v30  = join            v28 v29
@@ -36,7 +36,7 @@
   v35  = and_32          v34 v18
   v36  = and_imm         v34 0xff
   v37  = join            v35 v36
-  v38  = fma_f32         v5 v26 v0
+  v38  = mul_f32         v5 v26
   v39  = mul_f32         v38 v16
   v40  = mul_f32_imm     v38 0x437f0000
   v41  = join            v39 v40
@@ -51,7 +51,7 @@
   v50  = or_32           v37 v49
   v51  = pack            v37 v48 8
   v52  = join            v50 v51
-  v53  = fma_f32         v6 v26 v0
+  v53  = mul_f32         v6 v26
   v54  = mul_f32         v53 v16
   v55  = mul_f32_imm     v53 0x437f0000
   v56  = join            v54 v55
@@ -66,7 +66,7 @@
   v65  = or_32           v52 v64
   v66  = pack            v52 v63 16
   v67  = join            v65 v66
-  v68  = fma_f32         v7 v26 v0
+  v68  = mul_f32         v7 v26
   v69  = mul_f32         v68 v16
   v70  = mul_f32_imm     v68 0x437f0000
   v71  = join            v69 v70
