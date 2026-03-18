@@ -1,6 +1,7 @@
 #include "../srcover.h"
 #include "test.h"
 #include <stdint.h>
+#include <stdlib.h>
 
 typedef struct {
     struct umbra_interpreter *interp;
@@ -1707,8 +1708,7 @@ static void test_gather_deref_large(void) {
     backends B = make_full(b, 0);
 
     enum { N = 33000 };
-    static int16_t data[N];
-    __builtin_memset(data, 0, sizeof data);
+    int16_t *data = calloc(N, sizeof(int16_t));
     data[0]     = 10;
     data[100]   = 20;
     data[32800] = 30;
@@ -1739,6 +1739,7 @@ static void test_gather_deref_large(void) {
         (dst[3] == 42) here;
     }
 
+    free(data);
     cleanup(&B);
 }
 
