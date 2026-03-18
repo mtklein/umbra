@@ -1,5 +1,4 @@
-#include "slides/slides.h"
-#include <math.h>
+#include "slides/slide.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,8 +25,6 @@ static char const *backend_name[NUM_BACKENDS] = {
     "interp", "jit", "codegen", "metal",
 };
 
-typedef void (*run_fn)(void*, int, umbra_buf[]);
-
 static void run_interp(void *ctx, int n,
                        umbra_buf buf[]) {
     umbra_interpreter_run(ctx, n, buf);
@@ -45,7 +42,7 @@ static void run_metal(void *ctx, int n,
     umbra_metal_run(ctx, n, buf);
 }
 
-static run_fn const run_fns[NUM_BACKENDS] = {
+static slide_run_fn const run_fns[NUM_BACKENDS] = {
     run_interp, run_jit, run_codegen, run_metal,
 };
 
@@ -102,13 +99,12 @@ typedef struct {
     struct umbra_interpreter *interp;
     struct umbra_jit         *jit;
     void                     *ctx;
-    run_fn                    run;
+    slide_run_fn              run;
     int                       uni_len;
     int                       pad_;
 } pipe;
 
-static pipe fill_pipe, readback_pipe, hdr_pipe,
-           acc_pipe;
+static pipe fill_pipe, readback_pipe, hdr_pipe;
 
 static void free_pipe(pipe *p) {
     if (p->interp) {
@@ -120,7 +116,8 @@ static void free_pipe(pipe *p) {
 
 static void finish_pipe(pipe *p, builder *builder) {
     p->uni_len = umbra_uni_len(builder);
-    struct umbra_basic_block *bb = umbra_basic_block(builder);
+    struct umbra_basic_block *bb =
+        umbra_basic_block(builder);
     umbra_builder_free(builder);
     p->interp  = umbra_interpreter(bb);
     p->jit     = umbra_jit(bb);
@@ -194,21 +191,7 @@ static void free_pipes(void) {
     free_pipe(&hdr_pipe);
 }
 
-static void uni_i32(char *u, int off, int32_t v) {
-    __builtin_memcpy(u+off, &v, 4);
-}
-static void uni_f32(char *u, int off,
-                    float const *v, int n) {
-    __builtin_memcpy(u+off, v, (unsigned long)n*4);
-}
-static void uni_ptr(char *u, int off,
-                    void *p, long sz) {
-    __builtin_memcpy(u+off,   &p,  8);
-    __builtin_memcpy(u+off+8, &sz, 8);
-}
-
-static void build_slide_fmt(slide const *s,
-                            int fmt) {
+static void build_slide_fmt(slide *s, int fmt) {
     free_backends();
     umbra_load_fn  load =
         s->load ? fmt_load[fmt] : NULL;
@@ -217,7 +200,8 @@ static void build_slide_fmt(slide const *s,
     builder *builder = umbra_draw_build(
         s->shader, s->coverage, s->blend,
         load, store, &draw_layout);
-    struct umbra_basic_block *bb = umbra_basic_block(builder);
+    struct umbra_basic_block *bb =
+        umbra_basic_block(builder);
     umbra_builder_free(builder);
 
     interp  = umbra_interpreter(bb);
@@ -250,34 +234,8 @@ static int next_backend(int cur) {
     return cur;
 }
 
-static void build_perspective_matrix(
-        float out[11], float t,
-        int sw, int sh, int bw, int bh) {
-    float cx = (float)sw * 0.5f;
-    float cy = (float)sh * 0.5f;
-    float bx = (float)bw * 0.5f;
-    float by = (float)bh * 0.5f;
-    float angle = t * 0.3f;
-    float tilt  = sinf(t * 0.7f) * 0.0008f;
-    float sc    = 1.0f + 0.2f * sinf(t * 0.5f);
-    float ca = cosf(angle), sa = sinf(angle);
-    float w0 = 1.0f - tilt * cx;
-
-    out[0] = ca * sc;
-    out[1] = sa * sc;
-    out[2] = -cx*ca*sc - cy*sa*sc + bx*w0;
-    out[3] = -sa * sc;
-    out[4] = ca * sc;
-    out[5] = cx*sa*sc - cy*ca*sc + by*w0;
-    out[6] = tilt;
-    out[7] = 0.0f;
-    out[8] = w0;
-    out[9]  = (float)bw;
-    out[10] = (float)bh;
-}
-
 static void update_title(SDL_Window *w,
-                         slide const *s,
+                         slide *s,
                          int bi, int fi,
                          double fps) {
     char title[256];
@@ -286,32 +244,6 @@ static void update_title(SDL_Window *w,
         s->title, backend_name[bi],
         fmt_name[fi], fps);
     SDL_SetWindowTitle(w, title);
-}
-
-enum { LUT_N = 64 };
-static float linear_lut[LUT_N * 4];
-static float radial_lut[LUT_N * 4];
-
-static void build_luts(void) {
-    float const linear_stops[][4] = {
-        {1.2f, 0.0f, 0.0f, 1.0f},
-        {1.0f, 0.8f, 0.0f, 1.0f},
-        {0.0f, 1.2f, 0.0f, 1.0f},
-        {0.0f, 0.8f, 1.2f, 1.0f},
-        {0.0f, 0.0f, 1.2f, 1.0f},
-        {0.8f, 0.0f, 1.0f, 1.0f},
-    };
-    umbra_gradient_lut_even(linear_lut, LUT_N,
-                            6, linear_stops);
-
-    float const radial_stops[][4] = {
-        {1.5f, 1.5f, 1.2f, 1.0f},
-        {1.2f, 0.8f, 0.0f, 1.0f},
-        {0.8f, 0.0f, 0.2f, 1.0f},
-        {0.05f, 0.0f, 0.15f, 1.0f},
-    };
-    umbra_gradient_lut_even(radial_lut, LUT_N,
-                            4, radial_stops);
 }
 
 static void fill_bg_row(void *dst, int n,
@@ -326,9 +258,9 @@ static void fill_bg_row(void *dst, int n,
     };
     long long uni_[4] = {0};
     char *uni = (char*)uni_;
-    uni_f32(uni, 0, hc, 4);
+    slide_uni_f32(uni, 0, hc, 4);
     if (fill_pipe.uni_len > 16) {
-        uni_i32(uni, 16, stride);
+        slide_uni_i32(uni, 16, stride);
     }
     umbra_buf buf[] = {
         { dst,  row_sz },
@@ -344,7 +276,7 @@ static void readback_row(uint32_t *dst,
     long long uni_[2] = {0};
     char *uni = (char*)uni_;
     if (readback_pipe.uni_len > 0) {
-        uni_i32(uni, 0, stride);
+        slide_uni_i32(uni, 0, stride);
     }
     umbra_buf buf[] = {
         { src,  -src_sz },
@@ -360,7 +292,7 @@ static void to_hdr_row(float *dst, void *src,
     long long uni_[2] = {0};
     char *uni = (char*)uni_;
     if (hdr_pipe.uni_len > 0) {
-        uni_i32(uni, 0, stride);
+        slide_uni_i32(uni, 0, stride);
     }
     umbra_buf buf[] = {
         { src,  -src_sz },
@@ -404,26 +336,14 @@ int main(void) {
         return 1;
     }
 
-    text_cov bitmap_cov =
-        text_rasterize(W, H, 72.0f, 0);
-    text_cov sdf_cov =
-        text_rasterize(W, H, 72.0f, 1);
-    slug_curves slug =
-        slug_extract("Slug", 150.0f);
-    build_luts();
-
-    slug_acc_layout acc_lay;
-    {
-        builder *b = slug_build_acc(&acc_lay);
-        finish_pipe(&acc_pipe, b);
-    }
+    slides_init(W, H);
 
     void *pixbuf = malloc(W * H * 8);
     int32_t planar_stride = W * H;
 
     int cur_slide   = 0;
     int cur_fmt     = FMT_8888;
-    build_slide_fmt(&slides[cur_slide], cur_fmt);
+    build_slide_fmt(slide_get(cur_slide), cur_fmt);
     int cur_backend = pick_backend(1);
 
     uint64_t fps_start  =
@@ -431,15 +351,9 @@ int main(void) {
     int      fps_frames = 0;
     double   fps        = 0.0;
 
-    float rect_w = 200.0f, rect_h = 150.0f;
-    float rx = 100.0f, ry = 80.0f;
-    float vx = 1.5f,   vy = 1.1f;
-
-    float persp_t = 0.0f;
-
     _Bool want_dump = 0;
 
-    update_title(window, &slides[cur_slide],
+    update_title(window, slide_get(cur_slide),
                  cur_backend, cur_fmt, fps);
 
     _Bool running = 1;
@@ -454,12 +368,12 @@ int main(void) {
                 if (ev.key.key == SDLK_RIGHT
                  || ev.key.key == SDLK_SPACE) {
                     next = (cur_slide + 1)
-                         % SLIDE_COUNT;
+                         % slide_count();
                 } else if (ev.key.key ==
                                SDLK_LEFT) {
                     next = (cur_slide
-                            + SLIDE_COUNT - 1)
-                         % SLIDE_COUNT;
+                            + slide_count() - 1)
+                         % slide_count();
                 } else if (ev.key.key == SDLK_B) {
                     cur_backend =
                         next_backend(cur_backend);
@@ -467,7 +381,7 @@ int main(void) {
                     cur_fmt =
                         (cur_fmt + 1) % NUM_FMTS;
                     build_slide_fmt(
-                        &slides[cur_slide],
+                        slide_get(cur_slide),
                         cur_fmt);
                     cur_backend =
                         pick_backend(cur_backend);
@@ -480,20 +394,20 @@ int main(void) {
                 if (next != cur_slide) {
                     cur_slide = next;
                     build_slide_fmt(
-                        &slides[cur_slide],
+                        slide_get(cur_slide),
                         cur_fmt);
                     cur_backend =
                         pick_backend(cur_backend);
                 }
                 update_title(window,
-                    &slides[cur_slide],
+                    slide_get(cur_slide),
                     cur_backend, cur_fmt, fps);
             }
         }
         if (!running) { break; }
 
-        slide const *s = &slides[cur_slide];
-        run_fn run = run_fns[cur_backend];
+        slide *s = slide_get(cur_slide);
+        slide_run_fn run = run_fns[cur_backend];
         void  *ctx = backends[cur_backend];
 
         int bpp = fmt_bpp[cur_fmt];
@@ -513,267 +427,20 @@ int main(void) {
                         row_sz, planar_stride);
         }
 
-        int uni_len = draw_layout.uni_len;
         int ps = planar
             ? (s->load ? 2 : 1) : 0;
+
+        if (s->animate) { s->animate(s, 0.016f); }
 
         if (cur_backend == 3 && mtl) {
             umbra_metal_begin_batch(mtl);
         }
 
-        if (s->coverage ==
-                umbra_coverage_bitmap_matrix) {
-            persp_t += 0.016f;
-            float mat[11];
-            build_perspective_matrix(mat, persp_t,
-                W, H,
-                bitmap_cov.w, bitmap_cov.h);
-            float hc[4];
-            for (int i = 0; i < 4; i++) {
-                hc[i] = s->color[i];
-            }
-            for (int y = 0; y < H; y++) {
-                long long uni_[12] = {0};
-                char *uni = (char*)uni_;
-                uni_i32(uni,
-                    draw_layout.x0, 0);
-                uni_i32(uni,
-                    draw_layout.y, y);
-                uni_f32(uni,
-                    draw_layout.shader, hc, 4);
-                uni_f32(uni,
-                    draw_layout.coverage,
-                    mat, 11);
-                uni_ptr(uni,
-                    (draw_layout.coverage
-                     + 11*4 + 7) & ~7,
-                    bitmap_cov.data,
-                    (long)(W * H * 2));
-                for (int i = 0; i < ps; i++) {
-                    uni_i32(uni,
-                        uni_len - (ps-i) * 4,
-                        planar_stride);
-                }
-                umbra_buf buf[] = {
-                    { ROW(y), row_sz },
-                    { uni, -(long)uni_len },
-                };
-                run(ctx, W, buf);
-            }
-        } else if (s->coverage ==
-                       umbra_coverage_wind) {
-            persp_t += 0.016f;
-            float mat[11];
-            build_perspective_matrix(mat, persp_t,
-                W, H, (int)slug.w, (int)slug.h);
-            mat[9]  = slug.w;
-            mat[10] = slug.h;
-            float hc[4];
-            for (int i = 0; i < 4; i++) {
-                hc[i] = s->color[i];
-            }
-            float wind_buf[W];
-            for (int y = 0; y < H; y++) {
-                __builtin_memset(wind_buf, 0,
-                    sizeof wind_buf);
-                long long au_[12] = {0};
-                char *au = (char*)au_;
-                uni_i32(au, acc_lay.x0, 0);
-                uni_i32(au, acc_lay.y, y);
-                uni_f32(au, acc_lay.mat,
-                    mat, 11);
-                uni_ptr(au,
-                    acc_lay.curves_off,
-                    slug.data,
-                    (long)(slug.count*6*4));
-                umbra_buf abuf[] = {
-                    { wind_buf,
-                      (long)sizeof wind_buf },
-                    { au,
-                      -(long)acc_lay.uni_len },
-                };
-                for (int j = 0;
-                     j < slug.count; j++) {
-                    int32_t j32 = j;
-                    __builtin_memcpy(
-                        au + acc_lay.loop_off,
-                        &j32, 4);
-                    acc_pipe.run(acc_pipe.ctx,
-                        W, abuf);
-                }
-
-                long long uni_[12] = {0};
-                char *uni = (char*)uni_;
-                uni_i32(uni,
-                    draw_layout.x0, 0);
-                uni_i32(uni,
-                    draw_layout.y, y);
-                uni_f32(uni,
-                    draw_layout.shader,
-                    hc, 4);
-                uni_ptr(uni,
-                    draw_layout.coverage,
-                    wind_buf,
-                    -(long)sizeof wind_buf);
-                for (int i = 0; i < ps; i++) {
-                    uni_i32(uni,
-                        uni_len - (ps-i)*4,
-                        planar_stride);
-                }
-                umbra_buf buf[] = {
-                    { ROW(y), row_sz },
-                    { uni, -(long)uni_len },
-                };
-                run(ctx, W, buf);
-            }
-        } else if (
-                s->coverage ==
-                    umbra_coverage_bitmap
-             || s->coverage ==
-                    umbra_coverage_sdf) {
-            text_cov *tc =
-                (s->coverage ==
-                     umbra_coverage_bitmap)
-                    ? &bitmap_cov : &sdf_cov;
-            float hc[4];
-            for (int i = 0; i < 4; i++) {
-                hc[i] = s->color[i];
-            }
-            for (int y = 0; y < H; y++) {
-                long long uni_[6] = {0};
-                char *uni = (char*)uni_;
-                uni_i32(uni,
-                    draw_layout.x0, 0);
-                uni_i32(uni,
-                    draw_layout.y, y);
-                uni_f32(uni,
-                    draw_layout.shader, hc, 4);
-                uni_ptr(uni,
-                    draw_layout.coverage,
-                    tc->data + y * W,
-                    (long)(W * 2));
-                for (int i = 0; i < ps; i++) {
-                    uni_i32(uni,
-                        uni_len - (ps-i) * 4,
-                        planar_stride);
-                }
-                umbra_buf buf[] = {
-                    { ROW(y), row_sz },
-                    { uni, -(long)uni_len },
-                };
-                run(ctx, W, buf);
-            }
-        } else if (s->shader !=
-                       umbra_shader_solid) {
-            float hc[8];
-            for (int i = 0; i < 8; i++) {
-                hc[i] = s->color[i];
-            }
-
-            _Bool is_lut =
-                (s->shader ==
-                     umbra_shader_linear_grad
-              || s->shader ==
-                     umbra_shader_radial_grad);
-            float gp[4] = {
-                s->grad[0], s->grad[1],
-                s->grad[2], s->grad[3],
-            };
-
-            for (int y = 0; y < H; y++) {
-                long long uni_[8] = {0};
-                char *uni = (char*)uni_;
-                uni_i32(uni,
-                    draw_layout.x0, 0);
-                uni_i32(uni,
-                    draw_layout.y, y);
-                if (is_lut) {
-                    float *lut =
-                        (s->shader ==
-                         umbra_shader_linear_grad)
-                            ? linear_lut
-                            : radial_lut;
-                    uni_f32(uni,
-                        draw_layout.shader,
-                        gp, 4);
-                    uni_ptr(uni,
-                        (draw_layout.shader
-                         + 16 + 7) & ~7,
-                        lut,
-                        (long)(LUT_N * 4 * 4));
-                } else {
-                    uni_f32(uni,
-                        draw_layout.shader,
-                        gp, 3);
-                    uni_f32(uni,
-                        draw_layout.shader + 12,
-                        hc, 8);
-                }
-                for (int i = 0; i < ps; i++) {
-                    uni_i32(uni,
-                        uni_len - (ps-i) * 4,
-                        planar_stride);
-                }
-                umbra_buf buf[] = {
-                    { ROW(y), row_sz },
-                    { uni, -(long)uni_len },
-                };
-                run(ctx, W, buf);
-            }
-        } else {
-            rx += vx;
-            ry += vy;
-            if (rx < 0.0f) {
-                rx = 0.0f;
-                vx = -vx;
-            }
-            if (rx + rect_w > (float)W) {
-                rx = (float)W - rect_w;
-                vx = -vx;
-            }
-            if (ry < 0.0f) {
-                ry = 0.0f;
-                vy = -vy;
-            }
-            if (ry + rect_h > (float)H) {
-                ry = (float)H - rect_h;
-                vy = -vy;
-            }
-
-            float rect[4] = {
-                rx, ry, rx + rect_w, ry + rect_h,
-            };
-
-            float hc[4];
-            for (int i = 0; i < 4; i++) {
-                hc[i] = s->color[i];
-            }
-
-            for (int y = 0; y < H; y++) {
-                long long uni_[6] = {0};
-                char *uni = (char*)uni_;
-                uni_i32(uni,
-                    draw_layout.x0, 0);
-                uni_i32(uni,
-                    draw_layout.y, y);
-                uni_f32(uni,
-                    draw_layout.shader, hc, 4);
-                if (s->coverage) {
-                    uni_f32(uni,
-                        draw_layout.coverage,
-                        rect, 4);
-                }
-                for (int i = 0; i < ps; i++) {
-                    uni_i32(uni,
-                        uni_len - (ps-i) * 4,
-                        planar_stride);
-                }
-                umbra_buf buf[] = {
-                    { ROW(y), row_sz },
-                    { uni, -(long)uni_len },
-                };
-                run(ctx, W, buf);
-            }
+        for (int y = 0; y < H; y++) {
+            s->render_row(s, y, W,
+                ROW(y), row_sz,
+                &draw_layout, ps, planar_stride,
+                ctx, run);
         }
 
         if (cur_backend == 3 && mtl) {
@@ -841,18 +508,15 @@ int main(void) {
             fps_frames = 0;
             fps_start  = now;
             update_title(window,
-                &slides[cur_slide],
+                slide_get(cur_slide),
                 cur_backend, cur_fmt, fps);
         }
     }
 
     free(pixbuf);
-    text_cov_free(&bitmap_cov);
-    text_cov_free(&sdf_cov);
-    slug_free(&slug);
     free_backends();
     free_pipes();
-    free_pipe(&acc_pipe);
+    slides_cleanup();
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);

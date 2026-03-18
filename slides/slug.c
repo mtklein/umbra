@@ -1,0 +1,152 @@
+#include "slide.h"
+#include "slug.h"
+
+typedef struct {
+    float         persp_t;
+    float         mat[11];
+    slug_curves  *slug;
+    int           w, h;
+    float        *wind_buf;
+    slug_acc_layout      acc_lay;
+    struct umbra_interpreter *acc_interp;
+    struct umbra_jit         *acc_jit;
+    void                     *acc_ctx;
+    void (*acc_run)(void*, int, umbra_buf[]);
+} slug_state;
+
+static void acc_run_interp(void *ctx, int n,
+                           umbra_buf buf[]) {
+    umbra_interpreter_run(ctx, n, buf);
+}
+static void acc_run_jit(void *ctx, int n,
+                        umbra_buf buf[]) {
+    umbra_jit_run(ctx, n, buf);
+}
+
+static void slug_init(slide *s, int w, int h) {
+    slug_state *st = s->state;
+    st->w = w;
+    st->h = h;
+    st->persp_t = 0.0f;
+    st->wind_buf = malloc((size_t)w * sizeof(float));
+
+    struct umbra_builder *b =
+        slug_build_acc(&st->acc_lay);
+    struct umbra_basic_block *bb =
+        umbra_basic_block(b);
+    umbra_builder_free(b);
+    st->acc_interp = umbra_interpreter(bb);
+    st->acc_jit    = umbra_jit(bb);
+    umbra_basic_block_free(bb);
+
+    if (st->acc_jit) {
+        st->acc_ctx = st->acc_jit;
+        st->acc_run = acc_run_jit;
+    } else {
+        st->acc_ctx = st->acc_interp;
+        st->acc_run = acc_run_interp;
+    }
+
+    slide_perspective_matrix(st->mat, 0.0f,
+        w, h, (int)st->slug->w, (int)st->slug->h);
+    st->mat[9]  = st->slug->w;
+    st->mat[10] = st->slug->h;
+}
+
+static void slug_animate(slide *s, float dt) {
+    slug_state *st = s->state;
+    (void)dt;
+    st->persp_t += 0.016f;
+    slide_perspective_matrix(st->mat, st->persp_t,
+        st->w, st->h,
+        (int)st->slug->w, (int)st->slug->h);
+    st->mat[9]  = st->slug->w;
+    st->mat[10] = st->slug->h;
+}
+
+static void slug_render_row(
+        slide *s, int y, int w,
+        void *row, long row_sz,
+        umbra_draw_layout const *lay,
+        int ps, int32_t stride,
+        void *ctx, slide_run_fn run) {
+    slug_state *st = s->state;
+    __builtin_memset(st->wind_buf, 0,
+        (size_t)w * sizeof(float));
+
+    long long au_[12] = {0};
+    char *au = (char*)au_;
+    slide_uni_i32(au, st->acc_lay.x0, 0);
+    slide_uni_i32(au, st->acc_lay.y, y);
+    slide_uni_f32(au, st->acc_lay.mat,
+        st->mat, 11);
+    slide_uni_ptr(au, st->acc_lay.curves_off,
+        st->slug->data,
+        (long)(st->slug->count * 6 * 4));
+    umbra_buf abuf[] = {
+        { st->wind_buf,
+          (long)((int)sizeof(float) * w) },
+        { au, -(long)st->acc_lay.uni_len },
+    };
+    for (int j = 0; j < st->slug->count; j++) {
+        int32_t j32 = j;
+        __builtin_memcpy(
+            au + st->acc_lay.loop_off,
+            &j32, 4);
+        st->acc_run(st->acc_ctx, w, abuf);
+    }
+
+    float hc[4];
+    for (int i = 0; i < 4; i++) {
+        hc[i] = s->color[i];
+    }
+    int uni_len = lay->uni_len;
+    long long uni_[12] = {0};
+    char *uni = (char*)uni_;
+    slide_uni_i32(uni, lay->x0, 0);
+    slide_uni_i32(uni, lay->y,  y);
+    slide_uni_f32(uni, lay->shader, hc, 4);
+    slide_uni_ptr(uni, lay->coverage,
+        st->wind_buf,
+        -(long)((int)sizeof(float) * w));
+    for (int i = 0; i < ps; i++) {
+        slide_uni_i32(uni,
+            uni_len - (ps-i) * 4, stride);
+    }
+    umbra_buf buf[] = {
+        { row,  row_sz },
+        { uni, -(long)uni_len },
+    };
+    run(ctx, w, buf);
+}
+
+static void slug_cleanup(slide *s) {
+    slug_state *st = s->state;
+    free(st->wind_buf);
+    if (st->acc_jit) { umbra_jit_free(st->acc_jit); }
+    umbra_interpreter_free(st->acc_interp);
+    free(st);
+    s->state = NULL;
+}
+
+slide slide_slug_wind(slug_curves*);
+
+slide slide_slug_wind(slug_curves *sc) {
+    slug_state *st = calloc(1, sizeof *st);
+    st->slug = sc;
+    return (slide){
+        .title="14. Slug Text (Bezier)",
+        .shader=umbra_shader_solid,
+        .coverage=umbra_coverage_wind,
+        .blend=umbra_blend_srcover,
+        .load=umbra_load_8888,
+        .store=umbra_store_8888,
+        .color={0.2f, 1.0f, 0.6f, 1.0f},
+        .bg=0xff0a0a1e,
+        .init=slug_init,
+        .animate=slug_animate,
+        .render_row=slug_render_row,
+        .cleanup=slug_cleanup,
+        .state=st,
+    };
+}

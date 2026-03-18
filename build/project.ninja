@@ -1,31 +1,39 @@
-build $out/stb_truetype.o:   compile stb_truetype.c
+build $out/stb_truetype.o:       compile stb_truetype.c
     cflags = -Wno-everything -fno-sanitize=all
-build $out/stb_image_write.o: compile stb_image_write.c
+build $out/stb_image_write.o:   compile stb_image_write.c
     cflags = -Wno-everything -fno-sanitize=all
 
-build $out/bb.o:          compile   src/bb.c
-build $out/ra.o:          compile   src/ra.c
-build $out/interpreter.o: compile   src/interpreter.c
-build $out/codegen.o:     compile   src/codegen.c
-build $out/jit.o:         compile   src/jit.c
-build $out/asm_arm64.o:   compile   src/asm_arm64.c
-build $out/asm_x86.o:     compile   src/asm_x86.c
-build $out/metal.o:       compile_m src/metal.m
-build $out/draw.o:        compile   umbra_draw.c
-build $out/test.o:        compile   tests/test.c
-build $out/ra_test.o:     compile   tests/ra_test.c
-build $out/draw_test.o:   compile   tests/draw_test.c
-build $out/bench.o:       compile   bench.c
-build $out/dump.o:        compile   dump.c
-build $out/test:          link $out/test.o      $out/bb.o $out/ra.o $out/interpreter.o $out/codegen.o $out/jit.o $out/asm_arm64.o $out/asm_x86.o $out/metal.o
-build $out/ra_test:       link $out/ra_test.o   $out/bb.o $out/ra.o $out/interpreter.o
-build $out/draw_test:     link $out/draw_test.o $out/bb.o $out/ra.o $out/interpreter.o $out/codegen.o $out/jit.o $out/asm_arm64.o $out/asm_x86.o $out/metal.o $out/draw.o
-build $out/bench:         link $out/bench.o     $out/bb.o $out/ra.o $out/interpreter.o $out/codegen.o $out/jit.o $out/asm_arm64.o $out/asm_x86.o $out/metal.o $out/draw.o
-build $out/dump:          link $out/dump.o      $out/bb.o $out/ra.o $out/interpreter.o $out/codegen.o $out/jit.o $out/asm_arm64.o $out/asm_x86.o $out/metal.o $out/draw.o
-build $out/asm_arm64_test.o: compile tests/asm_arm64_test.c
-build $out/asm_x86_test.o:  compile tests/asm_x86_test.c
-build $out/asm_arm64_test:  link $out/asm_arm64_test.o $out/asm_arm64.o
-build $out/asm_x86_test:    link $out/asm_x86_test.o   $out/asm_x86.o
+build $out/src/bb.o:             compile   src/bb.c
+build $out/src/ra.o:             compile   src/ra.c
+build $out/src/interpreter.o:    compile   src/interpreter.c
+build $out/src/codegen.o:        compile   src/codegen.c
+build $out/src/jit.o:            compile   src/jit.c
+build $out/src/asm_arm64.o:      compile   src/asm_arm64.c
+build $out/src/asm_x86.o:        compile   src/asm_x86.c
+build $out/src/metal.o:          compile_m src/metal.m
+build $out/umbra_draw.o:         compile   umbra_draw.c
+build $out/tests/test.o:         compile   tests/test.c
+build $out/tests/ra_test.o:      compile   tests/ra_test.c
+build $out/tests/draw_test.o:    compile   tests/draw_test.c
+build $out/bench.o:              compile   bench.c
+build $out/dump.o:               compile   dump.c
+build $out/slides/slides.o:      compile   slides/slides.c
+build $out/slides/solid.o:       compile   slides/solid.c
+build $out/slides/text.o:        compile   slides/text.c
+build $out/slides/persp.o:       compile   slides/persp.c
+build $out/slides/gradient.o:    compile   slides/gradient.c
+build $out/slides/slug.o:        compile   slides/slug.c
+build $out/tests/asm_arm64_test.o: compile tests/asm_arm64_test.c
+build $out/tests/asm_x86_test.o:   compile tests/asm_x86_test.c
+
+build $out/test:      link $out/tests/test.o      $out/src/bb.o $out/src/ra.o $out/src/interpreter.o $out/src/codegen.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o
+build $out/ra_test:   link $out/tests/ra_test.o   $out/src/bb.o $out/src/ra.o $out/src/interpreter.o
+build $out/draw_test: link $out/tests/draw_test.o $out/src/bb.o $out/src/ra.o $out/src/interpreter.o $out/src/codegen.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/umbra_draw.o
+build $out/bench:     link $out/bench.o           $out/src/bb.o $out/src/ra.o $out/src/interpreter.o $out/src/codegen.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/umbra_draw.o
+build $out/dump:      link $out/dump.o            $out/src/bb.o $out/src/ra.o $out/src/interpreter.o $out/src/codegen.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/umbra_draw.o
+build $out/asm_arm64_test:  link $out/tests/asm_arm64_test.o $out/src/asm_arm64.o
+build $out/asm_x86_test:    link $out/tests/asm_x86_test.o   $out/src/asm_x86.o
+
 build $out/test.log:             run  $out/test
 build $out/ra_test.log:          run  $out/ra_test
 build $out/draw_test.log:        run  $out/draw_test

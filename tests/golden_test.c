@@ -1,4 +1,6 @@
-#include "../slides/slides.h"
+#include "../slides/slide.h"
+#include "../slides/text.h"
+#include "../slides/slug.h"
 #include "test.h"
 #include <math.h>
 #include <stdint.h>
@@ -6,13 +8,7 @@
 
 typedef struct umbra_builder builder;
 
-enum { W = 128, H = 96, LUT_N = 64 };
-
-static slug_curves gt_slug;
-static struct umbra_interpreter *gt_acc_interp;
-static slug_acc_layout gt_acc_lay;
-
-typedef void (*run_fn)(void*, int, umbra_buf[]);
+enum { W = 128, H = 96 };
 
 static void run_interp(void *ctx, int n,
                        umbra_buf buf[]) {
@@ -35,7 +31,7 @@ enum { NUM_BACKENDS = 4 };
 static char const *backend_name[NUM_BACKENDS] = {
     "interp", "jit", "codegen", "metal",
 };
-static run_fn const run_fns[NUM_BACKENDS] = {
+static slide_run_fn const run_fns[NUM_BACKENDS] = {
     run_interp, run_jit, run_codegen, run_metal,
 };
 
@@ -83,10 +79,13 @@ static void build_fill(int fmt) {
                      umbra_imm_i32(builder, fi+3)),
     };
     fmt_store[fmt](builder, (umbra_ptr){0}, ix, c);
-    fill_pipes[fmt].uni_len = umbra_uni_len(builder);
-    struct umbra_basic_block *opt = umbra_basic_block(builder);
+    fill_pipes[fmt].uni_len =
+        umbra_uni_len(builder);
+    struct umbra_basic_block *opt =
+        umbra_basic_block(builder);
     umbra_builder_free(builder);
-    fill_pipes[fmt].interp = umbra_interpreter(opt);
+    fill_pipes[fmt].interp =
+        umbra_interpreter(opt);
     umbra_basic_block_free(opt);
 }
 
@@ -95,9 +94,12 @@ static void build_readback(int fmt) {
     umbra_val ix = umbra_iota(builder);
     umbra_color c =
         fmt_load[fmt](builder, (umbra_ptr){0}, ix);
-    umbra_store_8888(builder, (umbra_ptr){2}, ix, c);
-    readback_pipes[fmt].uni_len = umbra_uni_len(builder);
-    struct umbra_basic_block *opt = umbra_basic_block(builder);
+    umbra_store_8888(builder,
+        (umbra_ptr){2}, ix, c);
+    readback_pipes[fmt].uni_len =
+        umbra_uni_len(builder);
+    struct umbra_basic_block *opt =
+        umbra_basic_block(builder);
     umbra_builder_free(builder);
     readback_pipes[fmt].interp =
         umbra_interpreter(opt);
@@ -124,19 +126,6 @@ static void free_pipes(void) {
     }
 }
 
-static void uni_f32(char *u, int off,
-                    float const *v, int n) {
-    __builtin_memcpy(u+off, v, (unsigned long)n*4);
-}
-static void uni_i32(char *u, int off, int32_t v) {
-    __builtin_memcpy(u+off, &v, 4);
-}
-static void uni_ptr(char *u, int off,
-                    void *p, long sz) {
-    __builtin_memcpy(u+off,   &p,  8);
-    __builtin_memcpy(u+off+8, &sz, 8);
-}
-
 static void fill_bg_row(int fmt, void *dst,
                         int n, uint32_t bg,
                         long row_sz,
@@ -149,9 +138,9 @@ static void fill_bg_row(int fmt, void *dst,
     };
     long long uni_[4] = {0};
     char *uni = (char*)uni_;
-    uni_f32(uni, 0, hc, 4);
+    slide_uni_f32(uni, 0, hc, 4);
     if (fill_pipes[fmt].uni_len > 16) {
-        uni_i32(uni, 16, stride);
+        slide_uni_i32(uni, 16, stride);
     }
     umbra_buf buf[] = {
         { dst,  row_sz },
@@ -179,62 +168,12 @@ static void readback_row(int fmt, uint32_t *dst,
         readback_pipes[fmt].interp, n, buf);
 }
 
-static float linear_lut[LUT_N * 4];
-static float radial_lut[LUT_N * 4];
-
-static void build_luts(void) {
-    float const linear_stops[][4] = {
-        {1.2f, 0.0f, 0.0f, 1.0f},
-        {1.0f, 0.8f, 0.0f, 1.0f},
-        {0.0f, 1.2f, 0.0f, 1.0f},
-        {0.0f, 0.8f, 1.2f, 1.0f},
-        {0.0f, 0.0f, 1.2f, 1.0f},
-        {0.8f, 0.0f, 1.0f, 1.0f},
-    };
-    umbra_gradient_lut_even(linear_lut, LUT_N,
-                            6, linear_stops);
-
-    float const radial_stops[][4] = {
-        {1.5f, 1.5f, 1.2f, 1.0f},
-        {1.2f, 0.8f, 0.0f, 1.0f},
-        {0.8f, 0.0f, 0.2f, 1.0f},
-        {0.05f, 0.0f, 0.15f, 1.0f},
-    };
-    umbra_gradient_lut_even(radial_lut, LUT_N,
-                            4, radial_stops);
-}
-
-static void build_perspective_matrix(
-        float out[11], float t,
-        int sw, int sh, int bw, int bh) {
-    float cx = (float)sw * 0.5f;
-    float cy = (float)sh * 0.5f;
-    float bx = (float)bw * 0.5f;
-    float by = (float)bh * 0.5f;
-    float angle = t * 0.3f;
-    float tilt  = sinf(t * 0.7f) * 0.0008f;
-    float sc    = 1.0f + 0.2f * sinf(t * 0.5f);
-    float ca = cosf(angle), sa = sinf(angle);
-    float w0 = 1.0f - tilt * cx;
-    out[0] = ca * sc;     out[1] = sa * sc;
-    out[2] = -cx*ca*sc - cy*sa*sc + bx*w0;
-    out[3] = -sa * sc;    out[4] = ca * sc;
-    out[5] = cx*sa*sc - cy*ca*sc + by*w0;
-    out[6] = tilt;  out[7] = 0.0f;  out[8] = w0;
-    out[9] = (float)bw; out[10] = (float)bh;
-}
-
 static void render_slide(
         int slide_idx, int fmt,
-        void *ctx, run_fn run,
+        void *ctx, slide_run_fn run,
         void *pixbuf,
-        text_cov *bitmap_cov, text_cov *sdf_cov,
         umbra_draw_layout const *lay) {
-    slide const *s = &slides[slide_idx];
-    float hc[8];
-    for (int i = 0; i < 8; i++) {
-        hc[i] = s->color[i];
-    }
+    slide *s = slide_get(slide_idx);
 
     int bpp = fmt_bpp[fmt];
     _Bool planar = (fmt == FMT_FP16P);
@@ -242,6 +181,7 @@ static void render_slide(
     long row_sz = planar
         ? (long)(W * H * 4) * 2
         : (long)(W * bpp);
+    int ps = planar ? (s->load ? 2 : 1) : 0;
 
     #define ROW(y) (planar \
         ? (void*)((__fp16*)pixbuf + (y) * W) \
@@ -253,181 +193,11 @@ static void render_slide(
                     s->bg, row_sz,
                     planar_stride);
     }
-
-    int uni_len = lay->uni_len;
-    int ps = planar ? (s->load ? 2 : 1) : 0;
-
-    if (s->coverage ==
-            umbra_coverage_bitmap_matrix) {
-        float mat[11];
-        build_perspective_matrix(mat, 1.0f,
-            W, H, bitmap_cov->w, bitmap_cov->h);
-        for (int y = 0; y < H; y++) {
-            long long uni_[12] = {0};
-            char *uni = (char*)uni_;
-            uni_i32(uni, lay->x0, 0);
-            uni_i32(uni, lay->y,  y);
-            uni_f32(uni, lay->shader, hc, 4);
-            uni_f32(uni, lay->coverage, mat, 11);
-            uni_ptr(uni,
-                (lay->coverage + 11*4 + 7) & ~7,
-                bitmap_cov->data,
-                (long)(W * H * 2));
-            for (int i = 0; i < ps; i++) {
-                uni_i32(uni,
-                    uni_len - (ps - i) * 4,
-                    planar_stride);
-            }
-            umbra_buf buf[] = {
-                { ROW(y), row_sz },
-                { uni, -(long)uni_len },
-            };
-            run(ctx, W, buf);
-        }
-    } else if (s->coverage ==
-                   umbra_coverage_wind) {
-        float mat[11];
-        build_perspective_matrix(mat, 1.0f,
-            W, H, (int)gt_slug.w, (int)gt_slug.h);
-        mat[9]  = gt_slug.w;
-        mat[10] = gt_slug.h;
-        float wind_buf[W];
-        for (int y = 0; y < H; y++) {
-            __builtin_memset(wind_buf, 0,
-                sizeof wind_buf);
-            long long au_[12] = {0};
-            char *au = (char*)au_;
-            uni_i32(au, gt_acc_lay.x0, 0);
-            uni_i32(au, gt_acc_lay.y, y);
-            uni_f32(au, gt_acc_lay.mat, mat, 11);
-            uni_ptr(au, gt_acc_lay.curves_off,
-                gt_slug.data,
-                (long)(gt_slug.count * 6 * 4));
-            umbra_buf abuf[] = {
-                { wind_buf,
-                  (long)sizeof wind_buf },
-                { au,
-                  -(long)gt_acc_lay.uni_len },
-            };
-            for (int j = 0;
-                 j < gt_slug.count; j++) {
-                int32_t j32 = j;
-                __builtin_memcpy(
-                    au + gt_acc_lay.loop_off,
-                    &j32, 4);
-                umbra_interpreter_run(
-                    gt_acc_interp, W, abuf);
-            }
-            long long uni_[12] = {0};
-            char *uni = (char*)uni_;
-            uni_i32(uni, lay->x0, 0);
-            uni_i32(uni, lay->y,  y);
-            uni_f32(uni, lay->shader, hc, 4);
-            uni_ptr(uni, lay->coverage,
-                wind_buf,
-                -(long)sizeof wind_buf);
-            for (int i = 0; i < ps; i++) {
-                uni_i32(uni,
-                    uni_len - (ps-i) * 4,
-                    planar_stride);
-            }
-            umbra_buf buf[] = {
-                { ROW(y), row_sz },
-                { uni, -(long)uni_len },
-            };
-            run(ctx, W, buf);
-        }
-    } else if (s->coverage ==
-                   umbra_coverage_bitmap ||
-               s->coverage ==
-                   umbra_coverage_sdf) {
-        text_cov *tc =
-            (s->coverage == umbra_coverage_bitmap)
-                ? bitmap_cov : sdf_cov;
-        for (int y = 0; y < H; y++) {
-            long long uni_[6] = {0};
-            char *uni = (char*)uni_;
-            uni_i32(uni, lay->x0, 0);
-            uni_i32(uni, lay->y,  y);
-            uni_f32(uni, lay->shader, hc, 4);
-            uni_ptr(uni, lay->coverage,
-                    tc->data + y * W,
-                    (long)(W * 2));
-            for (int i = 0; i < ps; i++) {
-                uni_i32(uni,
-                    uni_len - (ps - i) * 4,
-                    planar_stride);
-            }
-            umbra_buf buf[] = {
-                { ROW(y), row_sz },
-                { uni, -(long)uni_len },
-            };
-            run(ctx, W, buf);
-        }
-    } else if (s->shader != umbra_shader_solid) {
-        _Bool is_lut =
-            (s->shader == umbra_shader_linear_grad
-          || s->shader == umbra_shader_radial_grad);
-        float gp[4] = {
-            s->grad[0], s->grad[1],
-            s->grad[2], s->grad[3],
-        };
-
-        for (int y = 0; y < H; y++) {
-            long long uni_[8] = {0};
-            char *uni = (char*)uni_;
-            uni_i32(uni, lay->x0, 0);
-            uni_i32(uni, lay->y,  y);
-            if (is_lut) {
-                float *lut =
-                    (s->shader ==
-                     umbra_shader_linear_grad)
-                        ? linear_lut : radial_lut;
-                uni_f32(uni, lay->shader, gp, 4);
-                uni_ptr(uni,
-                    (lay->shader + 16 + 7) & ~7,
-                    lut, (long)(LUT_N * 4 * 4));
-            } else {
-                uni_f32(uni, lay->shader, gp, 3);
-                uni_f32(uni,
-                    lay->shader + 12, hc, 8);
-            }
-            for (int i = 0; i < ps; i++) {
-                uni_i32(uni,
-                    uni_len - (ps - i) * 4,
-                    planar_stride);
-            }
-            umbra_buf buf[] = {
-                { ROW(y), row_sz },
-                { uni, -(long)uni_len },
-            };
-            run(ctx, W, buf);
-        }
-    } else {
-        float rect[4] = {
-            30.0f, 20.0f, 90.0f, 60.0f,
-        };
-        for (int y = 0; y < H; y++) {
-            long long uni_[6] = {0};
-            char *uni = (char*)uni_;
-            uni_i32(uni, lay->x0, 0);
-            uni_i32(uni, lay->y,  y);
-            uni_f32(uni, lay->shader, hc, 4);
-            if (s->coverage) {
-                uni_f32(uni, lay->coverage,
-                        rect, 4);
-            }
-            for (int i = 0; i < ps; i++) {
-                uni_i32(uni,
-                    uni_len - (ps - i) * 4,
-                    planar_stride);
-            }
-            umbra_buf buf[] = {
-                { ROW(y), row_sz },
-                { uni, -(long)uni_len },
-            };
-            run(ctx, W, buf);
-        }
+    for (int y = 0; y < H; y++) {
+        s->render_row(s, y, W,
+            ROW(y), row_sz,
+            lay, ps, planar_stride,
+            ctx, run);
     }
     #undef ROW
 }
@@ -453,10 +223,8 @@ static void readback_to_8888(int fmt,
 }
 
 static void test_slide_golden(
-        int slide_idx, int fmt,
-        text_cov *bitmap_cov,
-        text_cov *sdf_cov) {
-    slide const *s = &slides[slide_idx];
+        int slide_idx, int fmt) {
+    slide *s = slide_get(slide_idx);
 
     umbra_load_fn  load =
         s->load ? fmt_load[fmt] : NULL;
@@ -467,7 +235,8 @@ static void test_slide_golden(
         umbra_draw_build(s->shader, s->coverage,
                          s->blend, load, store,
                          &lay);
-    struct umbra_basic_block *bb = umbra_basic_block(bld);
+    struct umbra_basic_block *bb =
+        umbra_basic_block(bld);
     umbra_builder_free(bld);
 
     struct umbra_interpreter *interp =
@@ -493,8 +262,7 @@ static void test_slide_golden(
 
     render_slide(slide_idx, fmt,
                  interp, run_interp,
-                 pbuf_ref,
-                 bitmap_cov, sdf_cov, &lay);
+                 pbuf_ref, &lay);
     readback_to_8888(fmt, pbuf_ref, ref);
 
     for (int bi = 1; bi < NUM_BACKENDS; bi++) {
@@ -505,8 +273,7 @@ static void test_slide_golden(
         if (bi == 3) { continue; }
         render_slide(slide_idx, fmt,
                      backs[bi], run_fns[bi],
-                     pbuf_tst,
-                     bitmap_cov, sdf_cov, &lay);
+                     pbuf_tst, &lay);
         readback_to_8888(fmt, pbuf_tst, tst);
 
         int mismatches = 0;
@@ -593,10 +360,10 @@ static void test_slug_rect(void) {
             sizeof wind_buf);
         long long au_[12] = {0};
         char *au = (char*)au_;
-        uni_i32(au, alay.x0, 0);
-        uni_i32(au, alay.y, y);
-        uni_f32(au, alay.mat, mat, 11);
-        uni_ptr(au, alay.curves_off,
+        slide_uni_i32(au, alay.x0, 0);
+        slide_uni_i32(au, alay.y, y);
+        slide_uni_f32(au, alay.mat, mat, 11);
+        slide_uni_ptr(au, alay.curves_off,
             rect, (long)sizeof rect);
         umbra_buf abuf[] = {
             { wind_buf,
@@ -613,10 +380,10 @@ static void test_slug_rect(void) {
 
         long long uni_[12] = {0};
         char *uni = (char*)uni_;
-        uni_i32(uni, lay.x0, 0);
-        uni_i32(uni, lay.y, y);
-        uni_f32(uni, lay.shader, color, 4);
-        uni_ptr(uni, lay.coverage,
+        slide_uni_i32(uni, lay.x0, 0);
+        slide_uni_i32(uni, lay.y, y);
+        slide_uni_f32(uni, lay.shader, color, 4);
+        slide_uni_ptr(uni, lay.coverage,
             wind_buf, -(long)sizeof wind_buf);
         umbra_buf buf[] = {
             { pixels + y * W, (long)(W * 4) },
@@ -638,8 +405,7 @@ static void test_slug_rect(void) {
     umbra_interpreter_free(interp);
 }
 
-static void test_perspective_text(
-        text_cov *bitmap_cov) {
+static void test_perspective_text(void) {
     enum { BW = 16, BH = 8 };
     uint16_t bmp[BW * BH];
     __builtin_memset(bmp, 0, sizeof bmp);
@@ -671,11 +437,11 @@ static void test_perspective_text(
 
     long long uni_[12] = {0};
     char *uni = (char*)uni_;
-    uni_i32(uni, lay.x0, 0);
-    uni_i32(uni, lay.y, 4);
-    uni_f32(uni, lay.shader, color, 4);
-    uni_f32(uni, lay.coverage, mat, 11);
-    uni_ptr(uni,
+    slide_uni_i32(uni, lay.x0, 0);
+    slide_uni_i32(uni, lay.y, 4);
+    slide_uni_f32(uni, lay.shader, color, 4);
+    slide_uni_f32(uni, lay.coverage, mat, 11);
+    slide_uni_ptr(uni,
         (lay.coverage + 11*4 + 7) & ~7,
         bmp, (long)sizeof bmp);
     umbra_buf buf[] = {
@@ -688,6 +454,8 @@ static void test_perspective_text(
     (pixels[0] == 0xff000000) here;
 
     umbra_interpreter_free(interp);
+
+    text_cov tc = text_rasterize(W, H, 24.0f, 0);
 
     umbra_draw_layout lay2;
     bld = umbra_draw_build(
@@ -705,19 +473,19 @@ static void test_perspective_text(
         px2[i] = 0xff0a0a1e;
     }
     float mat2[11];
-    build_perspective_matrix(mat2, 1.0f,
-        W, H, bitmap_cov->w, bitmap_cov->h);
+    slide_perspective_matrix(mat2, 1.0f,
+        W, H, tc.w, tc.h);
     float hc2[4] = {1,0.8f,0.2f,1};
     for (int y = 0; y < H; y++) {
         long long u2_[12] = {0};
         char *u2 = (char*)u2_;
-        uni_i32(u2, lay2.x0, 0);
-        uni_i32(u2, lay2.y, y);
-        uni_f32(u2, lay2.shader, hc2, 4);
-        uni_f32(u2, lay2.coverage, mat2, 11);
-        uni_ptr(u2,
+        slide_uni_i32(u2, lay2.x0, 0);
+        slide_uni_i32(u2, lay2.y, y);
+        slide_uni_f32(u2, lay2.shader, hc2, 4);
+        slide_uni_f32(u2, lay2.coverage, mat2, 11);
+        slide_uni_ptr(u2,
             (lay2.coverage + 11*4 + 7) & ~7,
-            bitmap_cov->data,
+            tc.data,
             (long)(W * H * 2));
         umbra_buf b2[] = {
             { px2 + y * W, (long)(W * 4) },
@@ -732,40 +500,23 @@ static void test_perspective_text(
     (changed > 0) here;
 
     umbra_interpreter_free(interp);
+    text_cov_free(&tc);
 }
 
 int main(void) {
-    text_cov bitmap_cov =
-        text_rasterize(W, H, 24.0f, 0);
-    text_cov sdf_cov =
-        text_rasterize(W, H, 24.0f, 1);
-    gt_slug = slug_extract("Hi", 24.0f);
-    build_luts();
+    slides_init(W, H);
     build_pipes();
 
-    {
-        builder *ab = slug_build_acc(&gt_acc_lay);
-        struct umbra_basic_block *abb =
-            umbra_basic_block(ab);
-        umbra_builder_free(ab);
-        gt_acc_interp = umbra_interpreter(abb);
-        umbra_basic_block_free(abb);
-    }
-
-    test_perspective_text(&bitmap_cov);
+    test_perspective_text();
     test_slug_rect();
 
     for (int fi = 0; fi < NUM_FMTS; fi++) {
-        for (int si = 0; si < SLIDE_COUNT; si++) {
-            test_slide_golden(si, fi,
-                &bitmap_cov, &sdf_cov);
+        for (int si = 0; si < slide_count(); si++) {
+            test_slide_golden(si, fi);
         }
     }
 
-    text_cov_free(&bitmap_cov);
-    text_cov_free(&sdf_cov);
-    slug_free(&gt_slug);
-    umbra_interpreter_free(gt_acc_interp);
     free_pipes();
+    slides_cleanup();
     return 0;
 }
