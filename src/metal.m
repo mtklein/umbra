@@ -46,20 +46,22 @@ struct copyback {
     long  bytes;
 };
 
+struct deref_info { int buf_idx, src_buf, byte_off; };
+
 struct umbra_metal {
     void *device;
     void *pipeline;
     void *queue;
     void *n_buf;
     void *sz_buf;
-    void *bufs[16];
-    long  buf_cap[16];
-    char *src;
-    int   max_ptr;
-    int   total_bufs;
-    int   tg_size;
-    int   n_deref;
-    struct { int buf_idx, src_buf, byte_off; } deref[8];
+    void **bufs;
+    long  *buf_cap;
+    char  *src;
+    int    max_ptr;
+    int    total_bufs;
+    int    tg_size;
+    int    n_deref;
+    struct deref_info *deref;
 
     void           *batch_cmdbuf;
     void           *batch_enc;
@@ -659,18 +661,28 @@ struct umbra_metal* umbra_metal(BB const *bb) {
             resolved, &max_ptr, &total_bufs,
             deref_buf);
 
-        int deref_buf_idx[8]={0}, deref_src[8]={0},
-            deref_off[8]={0};
         int n_deref = 0;
         for (int i = 0; i < resolved->insts; i++) {
             if (resolved->inst[i].op == op_deref_ptr) {
-                deref_buf_idx[n_deref] =
-                    deref_buf[i];
-                deref_src[n_deref] =
-                    resolved->inst[i].ptr;
-                deref_off[n_deref] =
-                    resolved->inst[i].imm;
                 n_deref++;
+            }
+        }
+        struct deref_info *di = calloc(
+            (size_t)(n_deref ? n_deref : 1),
+            sizeof *di);
+        {
+            int d = 0;
+            for (int i = 0;
+                 i < resolved->insts; i++) {
+                if (resolved->inst[i].op
+                        == op_deref_ptr) {
+                    di[d].buf_idx = deref_buf[i];
+                    di[d].src_buf =
+                        resolved->inst[i].ptr;
+                    di[d].byte_off =
+                        resolved->inst[i].imm;
+                    d++;
+                }
             }
         }
         umbra_basic_block_free(resolved);
@@ -717,7 +729,8 @@ struct umbra_metal* umbra_metal(BB const *bb) {
         id<MTLBuffer> sz_buf =
             [device
              newBufferWithLength:
-                 16 * sizeof(uint32_t)
+                 (NSUInteger)(total_bufs + 1)
+                 * sizeof(uint32_t)
              options:MTLResourceStorageModeShared];
 
         struct umbra_metal *m =
@@ -737,12 +750,11 @@ struct umbra_metal* umbra_metal(BB const *bb) {
         m->total_bufs = total_bufs;
         m->tg_size    =
             (int)pipeline.maxTotalThreadsPerThreadgroup;
-
-        for (int k = 0; k < n_deref; k++) {
-            m->deref[k].buf_idx  = deref_buf_idx[k];
-            m->deref[k].src_buf  = deref_src[k];
-            m->deref[k].byte_off = deref_off[k];
-        }
+        m->bufs    = calloc((size_t)total_bufs,
+                            sizeof *m->bufs);
+        m->buf_cap = calloc((size_t)total_bufs,
+                            sizeof *m->buf_cap);
+        m->deref   = di;
         m->n_deref = n_deref;
 
         free(deref_buf);
@@ -788,7 +800,9 @@ static void encode_dispatch(
     id<MTLDevice> device =
         (__bridge id<MTLDevice>)m->device;
 
-    uint32_t szs_data[16] = {0};
+    int tb = m->total_bufs;
+    uint32_t *szs_data = calloc((size_t)(tb + 1),
+                                sizeof *szs_data);
     for (int i = 0; i <= m->max_ptr; i++) {
         if (buf[i].ptr && buf[i].sz) {
             long bytes = buf[i].sz < 0
@@ -798,7 +812,9 @@ static void encode_dispatch(
     }
 
     id<MTLBuffer> per_n = nil;
-    id<MTLBuffer> per_bufs[16] = {0};
+    id<MTLBuffer> per_bufs[16];
+    __builtin_memset(per_bufs, 0,
+                     sizeof per_bufs);
 
     if (batching) {
         uint32_t n32 = (uint32_t)n;
@@ -914,11 +930,13 @@ static void encode_dispatch(
         szs_data[bi] = (uint32_t)bytes;
     }
 
+    size_t sz_bytes = (size_t)(tb + 1)
+                    * sizeof(uint32_t);
     id<MTLBuffer> per_sz;
     if (batching) {
         per_sz =
             [device newBufferWithBytes:szs_data
-                    length:sizeof szs_data
+                    length:sz_bytes
                     options:
                         MTLResourceStorageModeShared];
         batch_retain_buf(
@@ -928,7 +946,7 @@ static void encode_dispatch(
             (__bridge id<MTLBuffer>)m->sz_buf;
         __builtin_memcpy(
             per_sz.contents,
-            szs_data, sizeof szs_data);
+            szs_data, sz_bytes);
     }
 
     [enc setBuffer:per_n offset:0 atIndex:0];
@@ -949,6 +967,7 @@ static void encode_dispatch(
         MTLSizeMake((NSUInteger)m->tg_size, 1, 1);
     [enc dispatchThreads:grid
        threadsPerThreadgroup:group];
+    free(szs_data);
 }
 
 void umbra_metal_run(
@@ -1115,13 +1134,16 @@ void umbra_metal_free(struct umbra_metal *m) {
         if (m->sz_buf) {
             (void)(__bridge_transfer id)m->sz_buf;
         }
-        for (int p = 0; p < 16; p++) {
+        for (int p = 0; p < m->total_bufs; p++) {
             if (m->bufs[p]) {
                 (void)(__bridge_transfer id)
                     m->bufs[p];
             }
         }
     }
+    free(m->bufs);
+    free(m->buf_cap);
+    free(m->deref);
     free(m->batch_bufs);
     free(m->batch_copy);
     free(m->src);

@@ -61,6 +61,8 @@ struct interp_inst {
 struct umbra_interpreter {
     struct interp_inst *inst;
     val                *v;
+    void              **ptr;
+    long               *sz;
     int                 preamble, nptr, n_deref, pad_;
 };
 
@@ -571,6 +573,11 @@ struct umbra_interpreter* umbra_interpreter(
     }
     p->nptr    = max_ptr + 1;
     p->n_deref = n_deref;
+    int total_ptrs = p->nptr + n_deref;
+    p->ptr = calloc((size_t)total_ptrs,
+                    sizeof *p->ptr);
+    p->sz  = calloc((size_t)total_ptrs,
+                    sizeof *p->sz);
 
     int *deref_slot =
         calloc((size_t)bb->insts, sizeof *deref_slot);
@@ -749,30 +756,33 @@ struct umbra_interpreter* umbra_interpreter(
     return p;
 }
 
+static void load_bufs(struct umbra_interpreter *p,
+                      umbra_buf buf[]) {
+    for (int i = 0; i < p->nptr; i++) {
+        p->ptr[i] = buf[i].ptr;
+        p->sz[i]  = buf[i].sz < 0
+                  ? -buf[i].sz : buf[i].sz;
+    }
+}
+
 void umbra_interpreter_run(
     struct umbra_interpreter *p,
     int n, umbra_buf buf[])
 {
-    void *ptr[32] = {0};
-    long  sz[32]  = {0};
-    for (int i = 0; i < p->nptr && i < 32; i++) {
-        ptr[i] = buf[i].ptr;
-        sz[i]  = buf[i].sz < 0
-               ? -buf[i].sz : buf[i].sz;
-    }
+    load_bufs(p, buf);
     struct interp_inst const *start = p->inst;
     val                      *v     = p->v;
     int const P = p->preamble;
 
     int i = 0;
     while (i+K <= n) {
-        start->fn(start, v, i+K, ptr, sz);
+        start->fn(start, v, i+K, p->ptr, p->sz);
         i += K;
         start = p->inst+P;
         v     = p->v+P;
     }
     while (i+1 <= n) {
-        start->fn(start, v, i+1, ptr, sz);
+        start->fn(start, v, i+1, p->ptr, p->sz);
         i += 1;
         start = p->inst+P;
         v     = p->v+P;
@@ -784,21 +794,18 @@ int umbra_interpreter_step(
     int n, umbra_buf buf[])
 {
     if (n <= 0) { return 0; }
-    void *ptr[32] = {0};
-    long  sz[32]  = {0};
-    for (int i = 0; i < p->nptr && i < 32; i++) {
-        ptr[i] = buf[i].ptr;
-        sz[i]  = buf[i].sz < 0
-               ? -buf[i].sz : buf[i].sz;
-    }
+    load_bufs(p, buf);
     int k = n >= K ? K : 1;
-    p->inst[0].fn(p->inst, p->v, k, ptr, sz);
+    p->inst[0].fn(p->inst, p->v, k,
+                  p->ptr, p->sz);
     return k;
 }
 
 void umbra_interpreter_free(
     struct umbra_interpreter *p)
 {
+    free(p->ptr);
+    free(p->sz);
     free(p->inst);
     free(p->v);
     free(p);

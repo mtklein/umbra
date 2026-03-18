@@ -41,10 +41,12 @@ void umbra_dump_codegen(
 typedef struct umbra_basic_block BB;
 
 struct umbra_codegen {
-    void *dl;
+    void  *dl;
     void (*entry)(int, void**, long*);
-    char *src_path, *so_path, *src;
-    int   nptr, :32;
+    char  *src_path, *so_path, *src;
+    void **ptrs;
+    long  *szs;
+    int    nptr, :32;
 };
 
 typedef struct {
@@ -751,6 +753,10 @@ struct umbra_codegen* umbra_codegen(
     cg->so_path  = so_path;
     cg->src      = src_copy;
     cg->nptr     = max_ptr + 1;
+    cg->ptrs     = calloc((size_t)cg->nptr,
+                          sizeof *cg->ptrs);
+    cg->szs      = calloc((size_t)cg->nptr,
+                          sizeof *cg->szs);
     return cg;
 }
 
@@ -759,14 +765,12 @@ void umbra_codegen_run(
     int n, umbra_buf buf[])
 {
     if (!cg) { return; }
-    void *ptrs[16] = {0};
-    long  szs[16]  = {0};
-    for (int i = 0; i < cg->nptr && i < 16; i++) {
-        ptrs[i] = buf[i].ptr;
-        szs[i]  = buf[i].sz < 0
-                 ? -buf[i].sz : buf[i].sz;
+    for (int i = 0; i < cg->nptr; i++) {
+        cg->ptrs[i] = buf[i].ptr;
+        cg->szs[i]  = buf[i].sz < 0
+                     ? -buf[i].sz : buf[i].sz;
     }
-    cg->entry(n, ptrs, szs);
+    cg->entry(n, cg->ptrs, cg->szs);
 }
 
 int umbra_codegen_step(
@@ -789,6 +793,8 @@ void umbra_codegen_free(struct umbra_codegen *cg) {
         remove(cg->so_path);
         free(cg->so_path);
     }
+    free(cg->ptrs);
+    free(cg->szs);
     free(cg->src);
     free(cg);
 }
