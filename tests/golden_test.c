@@ -295,37 +295,28 @@ static void render_slide(
         for (int y = 0; y < H; y++) {
             __builtin_memset(wind_buf, 0,
                 sizeof wind_buf);
-            int ax = 0;
-            while (ax < W) {
-                long long au_[12] = {0};
-                char *au = (char*)au_;
-                uni_i32(au, gt_acc_lay.x0, ax);
-                uni_i32(au, gt_acc_lay.y, y);
-                uni_f32(au, gt_acc_lay.mat,
-                    mat, 11);
-                uni_ptr(au,
-                    gt_acc_lay.curves_off,
-                    gt_slug.data,
-                    (long)(gt_slug.count*6*4));
-                int k = 0;
-                for (int j = 0;
-                     j < gt_slug.count; j++) {
-                    int32_t j32 = j;
-                    __builtin_memcpy(
-                        au + gt_acc_lay.loop_off,
-                        &j32, 4);
-                    umbra_buf abuf[] = {
-                        { wind_buf + ax,
-                          (long)((W-ax)*4) },
-                        { au,
-                          -(long)gt_acc_lay
-                              .uni_len },
-                    };
-                    k = umbra_interpreter_step(
-                        gt_acc_interp,
-                        W - ax, abuf);
-                }
-                ax += k;
+            long long au_[12] = {0};
+            char *au = (char*)au_;
+            uni_i32(au, gt_acc_lay.x0, 0);
+            uni_i32(au, gt_acc_lay.y, y);
+            uni_f32(au, gt_acc_lay.mat, mat, 11);
+            uni_ptr(au, gt_acc_lay.curves_off,
+                gt_slug.data,
+                (long)(gt_slug.count * 6 * 4));
+            umbra_buf abuf[] = {
+                { wind_buf,
+                  (long)sizeof wind_buf },
+                { au,
+                  -(long)gt_acc_lay.uni_len },
+            };
+            for (int j = 0;
+                 j < gt_slug.count; j++) {
+                int32_t j32 = j;
+                __builtin_memcpy(
+                    au + gt_acc_lay.loop_off,
+                    &j32, 4);
+                umbra_interpreter_run(
+                    gt_acc_interp, W, abuf);
             }
             long long uni_[12] = {0};
             char *uni = (char*)uni_;
@@ -600,31 +591,24 @@ static void test_slug_rect(void) {
     for (int y = 0; y < H; y++) {
         __builtin_memset(wind_buf, 0,
             sizeof wind_buf);
-        int ax = 0;
-        while (ax < W) {
-            long long au_[12] = {0};
-            char *au = (char*)au_;
-            uni_i32(au, alay.x0, ax);
-            uni_i32(au, alay.y, y);
-            uni_f32(au, alay.mat, mat, 11);
-            uni_ptr(au, alay.curves_off,
-                rect, (long)sizeof rect);
-            int k = 0;
-            for (int j = 0; j < 4; j++) {
-                int32_t j32 = j;
-                __builtin_memcpy(
-                    au + alay.loop_off,
-                    &j32, 4);
-                umbra_buf abuf[] = {
-                    { wind_buf + ax,
-                      (long)((W-ax) * 4) },
-                    { au,
-                      -(long)alay.uni_len },
-                };
-                k = umbra_interpreter_step(
-                    acc, W - ax, abuf);
-            }
-            ax += k;
+        long long au_[12] = {0};
+        char *au = (char*)au_;
+        uni_i32(au, alay.x0, 0);
+        uni_i32(au, alay.y, y);
+        uni_f32(au, alay.mat, mat, 11);
+        uni_ptr(au, alay.curves_off,
+            rect, (long)sizeof rect);
+        umbra_buf abuf[] = {
+            { wind_buf,
+              (long)sizeof wind_buf },
+            { au, -(long)alay.uni_len },
+        };
+        for (int j = 0; j < 4; j++) {
+            int32_t j32 = j;
+            __builtin_memcpy(
+                au + alay.loop_off,
+                &j32, 4);
+            umbra_interpreter_run(acc, W, abuf);
         }
 
         long long uni_[12] = {0};

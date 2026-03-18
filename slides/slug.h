@@ -155,7 +155,6 @@ static struct umbra_builder *slug_build_acc(
         slug_acc_layout *lay) {
     struct umbra_builder *b = umbra_builder();
     umbra_val ix = umbra_iota(b);
-    umbra_val ln = umbra_lane(b);
 
     int x0i = umbra_reserve(b, 1);
     int yi  = umbra_reserve(b, 1);
@@ -329,9 +328,9 @@ static struct umbra_builder *slug_build_acc(
         umbra_add_f32(b, w1, w2), z);
 
     umbra_val acc = umbra_load_i32(b,
-                        (umbra_ptr){0}, ln);
+                        (umbra_ptr){0}, ix);
     acc = umbra_add_f32(b, acc, dw);
-    umbra_store_i32(b, (umbra_ptr){0}, ln, acc);
+    umbra_store_i32(b, (umbra_ptr){0}, ix, acc);
 
     if (lay) {
         lay->x0         = x0i * 4;
