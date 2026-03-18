@@ -1,4 +1,4 @@
-#include "slides/slide.h"
+#include "../slides/slide.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,7 +15,7 @@ int main(void) { return 0; }
 #pragma clang diagnostic pop
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Weverything"
-#include "stb/stb_image_write.h"
+#include "../stb/stb_image_write.h"
 #pragma clang diagnostic pop
 
 typedef struct umbra_builder builder;

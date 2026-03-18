@@ -1,5 +1,5 @@
 #pragma once
-#include "../umbra.h"
+#include "../include/umbra.h"
 
 struct umbra_interpreter* umbra_interpreter(
         struct umbra_basic_block const*);
