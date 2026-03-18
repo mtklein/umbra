@@ -787,133 +787,58 @@ static void test_solid_src_fp16_n9(void) {
 
 static void test_coverage_rect_white_dst(void) {
     umbra_draw_layout lay;
-    struct umbra_builder *builder =
+    draw_backends B = make_draw(
         umbra_draw_build(
             umbra_shader_solid,
             umbra_coverage_rect,
             umbra_blend_srcover,
             umbra_load_8888,
-            umbra_store_8888, &lay);
-    struct umbra_basic_block *bb = umbra_basic_block(builder);
-    umbra_builder_free(builder);
-    struct umbra_interpreter *interp =
-        umbra_interpreter(bb);
-    struct umbra_jit *jit = umbra_jit(bb);
-    struct umbra_metal *mtl = umbra_metal(bb);
-    umbra_basic_block_free(bb);
+            umbra_store_8888, &lay), lay);
 
-    {
-        uint32_t dst[16];
-        __builtin_memset(dst, 0xFF, sizeof dst);
-        float color[4] = {1, 0, 0, 1};
-        float rect[4] = {
-            4.0f, 0.0f, 12.0f, 1.0f,
-        };
-        long long uni_[5] = {0};
-        char *uni = (char*)uni_;
-        uni_i32(uni, lay.x0, 0);
-        uni_i32(uni, lay.y, 0);
-        uni_f32(uni, lay.shader, color, 4);
-        uni_f32(uni, lay.coverage, rect, 4);
-        umbra_interpreter_run(interp, 16,
-            (umbra_buf[]){
-                {dst, (long)sizeof dst},
-                {uni, -(long)lay.uni_len},
-            });
-        for (int i = 0; i < 16; i++) {
-            if (i >= 4 && i < 12) {
-                (( dst[i]      & 0xFF) == 0xFF) here;
-                (((dst[i]>>24) & 0xFF) == 0xFF) here;
-            } else {
-                (dst[i] == 0xFFFFFFFF) here;
+    typedef struct { int n; float x0; float x1; }
+        rect_case;
+    rect_case cases[] = {
+        {16, 4.0f, 12.0f},
+        {24, 4.0f, 20.0f},
+    };
+    int ncases =
+        (int)(sizeof cases / sizeof cases[0]);
+
+    for (int ci = 0; ci < ncases; ci++) {
+        rect_case rc = cases[ci];
+        for (int bi = 0; bi < 3; bi++) {
+            uint32_t dst[24];
+            __builtin_memset(dst, 0xFF,
+                (size_t)rc.n * 4);
+            float color[4] = {1, 0, 0, 1};
+            float rect[4] = {
+                rc.x0, 0.0f, rc.x1, 1.0f,
+            };
+            long long uni_[5] = {0};
+            char *uni = (char*)uni_;
+            uni_i32(uni, B.lay.x0, 0);
+            uni_i32(uni, B.lay.y, 0);
+            uni_f32(uni, B.lay.shader, color, 4);
+            uni_f32(uni, B.lay.coverage, rect, 4);
+            if (!run_draw(&B, bi, rc.n,
+                    (umbra_buf[]){
+                {dst, (long)(rc.n * 4)},
+                {uni, -(long)B.lay.uni_len},
+            })) { continue; }
+            for (int i = 0; i < rc.n; i++) {
+                if (i >= 4
+                        && i < (int)rc.x1) {
+                    (( dst[i]      & 0xFF)
+                        == 0xFF) here;
+                    (((dst[i]>>24) & 0xFF)
+                        == 0xFF) here;
+                } else {
+                    (dst[i] == 0xFFFFFFFF) here;
+                }
             }
         }
     }
-
-    if (jit) {
-        uint32_t dst[16];
-        __builtin_memset(dst, 0xFF, sizeof dst);
-        float color[4] = {1, 0, 0, 1};
-        float rect[4] = {
-            4.0f, 0.0f, 12.0f, 1.0f,
-        };
-        long long uni_[5] = {0};
-        char *uni = (char*)uni_;
-        uni_i32(uni, lay.x0, 0);
-        uni_i32(uni, lay.y, 0);
-        uni_f32(uni, lay.shader, color, 4);
-        uni_f32(uni, lay.coverage, rect, 4);
-        umbra_jit_run(jit, 16, (umbra_buf[]){
-            {dst, (long)sizeof dst},
-            {uni, -(long)lay.uni_len},
-        });
-        for (int i = 0; i < 16; i++) {
-            if (i >= 4 && i < 12) {
-                (( dst[i]      & 0xFF) == 0xFF) here;
-                (((dst[i]>>24) & 0xFF) == 0xFF) here;
-            } else {
-                (dst[i] == 0xFFFFFFFF) here;
-            }
-        }
-    }
-
-    if (jit) {
-        uint32_t dst[24];
-        __builtin_memset(dst, 0xFF, sizeof dst);
-        float color[4] = {1, 0, 0, 1};
-        float rect[4] = {
-            4.0f, 0.0f, 20.0f, 1.0f,
-        };
-        long long uni_[5] = {0};
-        char *uni = (char*)uni_;
-        uni_i32(uni, lay.x0, 0);
-        uni_i32(uni, lay.y, 0);
-        uni_f32(uni, lay.shader, color, 4);
-        uni_f32(uni, lay.coverage, rect, 4);
-        umbra_jit_run(jit, 24, (umbra_buf[]){
-            {dst, (long)sizeof dst},
-            {uni, -(long)lay.uni_len},
-        });
-        for (int i = 0; i < 24; i++) {
-            if (i >= 4 && i < 20) {
-                (( dst[i]      & 0xFF) == 0xFF) here;
-                (((dst[i]>>24) & 0xFF) == 0xFF) here;
-            } else {
-                (dst[i] == 0xFFFFFFFF) here;
-            }
-        }
-    }
-
-    if (mtl) {
-        uint32_t dst[16];
-        __builtin_memset(dst, 0xFF, sizeof dst);
-        float color[4] = {1, 0, 0, 1};
-        float rect[4] = {
-            4.0f, 0.0f, 12.0f, 1.0f,
-        };
-        long long uni_[5] = {0};
-        char *uni = (char*)uni_;
-        uni_i32(uni, lay.x0, 0);
-        uni_i32(uni, lay.y, 0);
-        uni_f32(uni, lay.shader, color, 4);
-        uni_f32(uni, lay.coverage, rect, 4);
-        umbra_metal_run(mtl, 16, (umbra_buf[]){
-            {dst, (long)sizeof dst},
-            {uni, -(long)lay.uni_len},
-        });
-        for (int i = 0; i < 16; i++) {
-            if (i >= 4 && i < 12) {
-                (( dst[i]      & 0xFF) == 0xFF) here;
-                (((dst[i]>>24) & 0xFF) == 0xFF) here;
-            } else {
-                (dst[i] == 0xFFFFFFFF) here;
-            }
-        }
-    }
-
-    umbra_interpreter_free(interp);
-    if (jit) { umbra_jit_free(jit); }
-    if (mtl) { umbra_metal_free(mtl); }
+    cleanup_draw(&B);
 }
 
 static void test_coverage_bitmap(void) {
