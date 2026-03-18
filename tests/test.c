@@ -1755,6 +1755,41 @@ static void test_oob_load_store(void) {
   }
 }
 
+static void test_store16_multi_tail(void) {
+  for (int opt = 0; opt < 2; opt++) {
+    for (int n = 1; n <= 17; n++) {
+        struct umbra_builder *b = umbra_builder();
+        umbra_val ix = umbra_iota(b);
+        umbra_val c0 = umbra_imm_f32(b, 0.25f),
+                  c1 = umbra_imm_f32(b, 0.5f);
+        umbra_store_i16(b, (umbra_ptr){0}, ix,
+            umbra_narrow_f32(b, c0));
+        umbra_store_i16(b, (umbra_ptr){1}, ix,
+            umbra_narrow_f32(b, c1));
+        backends B = make(b, opt);
+        for (int bi = 0; bi < 3; bi++) {
+            uint16_t *d0 = calloc((size_t)n, 2);
+            uint16_t *d1 = calloc((size_t)n, 2);
+            if (!run(&B, bi, n, (umbra_buf[]){
+                {d0, n*2}, {d1, n*2},
+            })) { free(d0); free(d1); continue; }
+            __fp16 h0 = (__fp16)0.25f,
+                   h1 = (__fp16)0.5f;
+            uint16_t e0, e1;
+            __builtin_memcpy(&e0, &h0, 2);
+            __builtin_memcpy(&e1, &h1, 2);
+            for (int j = 0; j < n; j++) {
+                (d0[j] == e0) here;
+                (d1[j] == e1) here;
+            }
+            free(d0);
+            free(d1);
+        }
+        cleanup(&B);
+    }
+  }
+}
+
 static void test_store16_tail(void) {
   for (int opt = 0; opt < 2; opt++) {
     for (int n = 1; n <= 17; n++) {
@@ -1816,5 +1851,6 @@ int main(void) {
     test_gather_deref_large();
     test_oob_load_store();
     test_store16_tail();
+    test_store16_multi_tail();
     return 0;
 }
