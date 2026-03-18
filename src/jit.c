@@ -32,6 +32,41 @@ void umbra_dump_jit_mca(
 #include <unistd.h>
 #include <libkern/OSCacheControl.h>
 
+struct pool_ref { int entry, code_pos; };
+struct pool {
+    uint32_t       *vals;
+    struct pool_ref *refs;
+    int nvals, nrefs, cap_vals, cap_refs;
+};
+static int pool_intern(struct pool *p, uint32_t v) {
+    for (int i = 0; i < p->nvals; i++) {
+        if (p->vals[i] == v) { return i; }
+    }
+    if (p->nvals == p->cap_vals) {
+        p->cap_vals = p->cap_vals ? 2*p->cap_vals : 16;
+        p->vals = realloc(p->vals,
+            (size_t)p->cap_vals * sizeof *p->vals);
+    }
+    int idx = p->nvals++;
+    p->vals[idx] = v;
+    return idx;
+}
+static void pool_ref(struct pool *p,
+                     uint32_t v, int code_pos) {
+    int entry = pool_intern(p, v);
+    if (p->nrefs == p->cap_refs) {
+        p->cap_refs = p->cap_refs ? 2*p->cap_refs : 32;
+        p->refs = realloc(p->refs,
+            (size_t)p->cap_refs * sizeof *p->refs);
+    }
+    p->refs[p->nrefs++] =
+        (struct pool_ref){entry, code_pos};
+}
+static void pool_free(struct pool *p) {
+    free(p->vals);
+    free(p->refs);
+}
+
 #include "asm_arm64.h"
 
 enum { XP=8, XI=9, XT=10, XH=11, XW=12, XM=13, XS=15 };
@@ -240,6 +275,7 @@ static int8_t const ra_pool[] = {
 struct jit_ctx {
     Buf *c;
     struct umbra_basic_block const *bb;
+    struct pool pool;
 };
 
 static void arm64_spill(int reg, int slot,
@@ -250,12 +286,42 @@ static void arm64_fill(int reg, int slot,
                        void *ctx) {
     vld(((struct jit_ctx*)ctx)->c, reg, slot);
 }
+static _Bool arm64_movi(Buf *c, int d, uint32_t v) {
+    if (v == 0) {
+        put(c, MOVI_4s(d, 0, 0));
+    } else if (v == (v & 0x000000ffu)) {
+        put(c, MOVI_4s(d, (uint8_t)v, 0));
+    } else if (v == (v & 0x0000ff00u)) {
+        put(c, MOVI_4s(d, (uint8_t)(v>>8), 8));
+    } else if (v == (v & 0x00ff0000u)) {
+        put(c, MOVI_4s(d,(uint8_t)(v>>16),16));
+    } else if (v == (v & 0xff000000u)) {
+        put(c, MOVI_4s(d,(uint8_t)(v>>24),24));
+    } else if ((~v) == ((~v) & 0x000000ffu)) {
+        put(c, MVNI_4s(d, (uint8_t)~v, 0));
+    } else if ((~v) == ((~v) & 0x0000ff00u)) {
+        put(c, MVNI_4s(d,(uint8_t)(~v>>8), 8));
+    } else if ((~v) == ((~v) & 0x00ff0000u)) {
+        put(c, MVNI_4s(d,(uint8_t)(~v>>16),16));
+    } else if ((~v) == ((~v) & 0xff000000u)) {
+        put(c, MVNI_4s(d,(uint8_t)(~v>>24),24));
+    } else {
+        return 0;
+    }
+    return 1;
+}
+static void arm64_pool_load(Buf *c, struct pool *p,
+                            int d, uint32_t v) {
+    if (arm64_movi(c, d, v)) { return; }
+    pool_ref(p, v, c->len);
+    put(c, 0x9c000000u | (uint32_t)d);
+}
 static void arm64_remat(int reg, int val,
                         void *ctx) {
     struct jit_ctx *j = ctx;
-    emit_alu_reg(j->c, op_imm_32,
-                 reg, 0, 0, 0,
-                 j->bb->inst[val].imm, -1);
+    arm64_pool_load(j->c, &j->pool,
+                    reg,
+                    (uint32_t)j->bb->inst[val].imm);
 }
 
 static struct ra* ra_create_arm64(
@@ -278,7 +344,8 @@ static struct ra* ra_create_arm64(
 static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                      int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar,
-                     int *deref_gpr);
+                     int *deref_gpr,
+                     struct jit_ctx *jc);
 
 struct umbra_jit {
     void  *code;
@@ -303,7 +370,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     int *deref_gpr = calloc((size_t)bb->insts, sizeof(int));
 
     Buf c={0};
-    struct jit_ctx jc = {.c=&c, .bb=bb};
+    struct jit_ctx jc = {.c=&c, .bb=bb, .pool={0}};
     struct ra *ra = ra_create_arm64(bb, &jc);
 
     put(&c, STP_pre(29,30,31,-2));
@@ -312,7 +379,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, 0xd503201fu);
     put(&c, 0xd503201fu);
 
-    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr);
+    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, &jc);
 
     ra_begin_loop(ra);
 
@@ -328,7 +395,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, LSL_xi(XW, XI, 2));
 
     int loop_body_start = c.len;
-    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0, deref_gpr);
+    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0, deref_gpr, &jc);
 
     ra_end_loop(ra, sl);
 
@@ -347,8 +414,8 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     for (int i = 0; i < bb->insts; i++) { ra_free_reg(ra, i); }
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
 
-    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr);
-    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 1, deref_gpr);
+    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, &jc);
+    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 1, deref_gpr, &jc);
 
     put(&c, ADD_xi(XI,XI,1));
     put(&c, B(tail_top - c.len));
@@ -364,6 +431,22 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
         c.buf[stack_patch  ] = SUB_xi(31,31,ns*16);
         c.buf[stack_patch+1] = ADD_xi(XS,31,0);
     }
+    while (c.len & 3) { put(&c, 0xd503201fu); }
+    int pool_start = c.len;
+    for (int pi = 0; pi < jc.pool.nvals; pi++) {
+        uint32_t v = jc.pool.vals[pi];
+        put(&c, v); put(&c, v); put(&c, v); put(&c, v);
+    }
+    for (int pi = 0; pi < jc.pool.nrefs; pi++) {
+        struct pool_ref *r = &jc.pool.refs[pi];
+        int entry = pool_start + r->entry * 4;
+        int imm19 = entry - r->code_pos;
+        c.buf[r->code_pos] = 0x9c000000u
+            | ((uint32_t)(imm19 & 0x7ffff) << 5)
+            | (c.buf[r->code_pos] & 0x1fu);
+    }
+    pool_free(&jc.pool);
+
     ra_destroy(ra); free(sl); free(deref_gpr);
     umbra_basic_block_free(resolved);
 
@@ -394,7 +477,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                      int from, int to,
                      int *sl, int *ns,
                      struct ra *ra, _Bool scalar,
-                     int *deref_gpr)
+                     int *deref_gpr,
+                     struct jit_ctx *jc)
 {
     #define lu(v) ra_last_use(ra, (v))
     int last_ptr = -1;
@@ -782,7 +866,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             goto default_alu;
         }
 
-        case op_imm_32:
+        case op_imm_32: {
+            struct ra_step s = ra_step_alloc(
+                ra, sl, ns, i);
+            arm64_pool_load(c, &jc->pool,
+                s.rd, (uint32_t)inst->imm);
+        } break;
+
         case op_add_f32: case op_sub_f32:
         case op_mul_f32: case op_div_f32:
         case op_min_f32: case op_max_f32:
@@ -995,6 +1085,41 @@ void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
 #include <sys/mman.h>
 #include <unistd.h>
 
+struct pool_ref { int entry, code_pos; };
+struct pool {
+    uint32_t       *vals;
+    struct pool_ref *refs;
+    int nvals, nrefs, cap_vals, cap_refs;
+};
+static int pool_intern(struct pool *p, uint32_t v) {
+    for (int i = 0; i < p->nvals; i++) {
+        if (p->vals[i] == v) { return i; }
+    }
+    if (p->nvals == p->cap_vals) {
+        p->cap_vals = p->cap_vals ? 2*p->cap_vals : 16;
+        p->vals = realloc(p->vals,
+            (size_t)p->cap_vals * sizeof *p->vals);
+    }
+    int idx = p->nvals++;
+    p->vals[idx] = v;
+    return idx;
+}
+static void pool_ref(struct pool *p,
+                     uint32_t v, int code_pos) {
+    int entry = pool_intern(p, v);
+    if (p->nrefs == p->cap_refs) {
+        p->cap_refs = p->cap_refs ? 2*p->cap_refs : 32;
+        p->refs = realloc(p->refs,
+            (size_t)p->cap_refs * sizeof *p->refs);
+    }
+    p->refs[p->nrefs++] =
+        (struct pool_ref){entry, code_pos};
+}
+static void pool_free(struct pool *p) {
+    free(p->vals);
+    free(p->refs);
+}
+
 enum { XI=R10, XM=R13 };
 
 static void patch_jcc(Buf *c, int fixup) {
@@ -1056,6 +1181,7 @@ static int8_t const ra_pool_x86[] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
 struct jit_ctx {
     Buf *c;
     struct umbra_basic_block const *bb;
+    struct pool pool;
 };
 
 static void x86_spill(int reg, int slot,
@@ -1066,16 +1192,34 @@ static void x86_fill(int reg, int slot,
                      void *ctx) {
     vfill(((struct jit_ctx*)ctx)->c, reg, slot);
 }
-static _Bool emit_alu_reg(Buf *c, enum op op,
-                          int d, int x, int y,
-                          int z, int imm,
-                          int scratch, int scratch2);
+
+static void pool_broadcast(Buf *c, struct pool *p,
+                           int d, uint32_t v) {
+    int shr = v ? __builtin_clz(v) : 0;
+    int shl = v ? __builtin_ctz(v) : 0;
+    if      (v == 0)           { vpxor(c,1,d,d,d); }
+    else if (v == 0xffffffffu) { vpcmpeqd(c,d,d,d); }
+    else if (v == 0xffffffffu >> shr) {
+        vpcmpeqd(c,d,d,d);
+        vpsrld_i(c,d,d,(uint8_t)shr);
+    }
+    else if (v == 0xffffffffu << shl) {
+        vpcmpeqd(c,d,d,d);
+        vpslld_i(c,d,d,(uint8_t)shl);
+    }
+    else {
+        int pos = vex_rip(c, 1, 2, 0, 1,
+                          d, 0, 0x18);
+        pool_ref(p, v, pos);
+    }
+}
+
 static void x86_remat(int reg, int val,
                       void *ctx) {
     struct jit_ctx *j = ctx;
-    emit_alu_reg(j->c, op_imm_32,
-                 reg, 0, 0, 0,
-                 j->bb->inst[val].imm, -1, -1);
+    pool_broadcast(j->c, &j->pool,
+                   reg,
+                   (uint32_t)j->bb->inst[val].imm);
 }
 
 static struct ra* ra_create_x86(
@@ -1195,7 +1339,8 @@ static void emit_ops(
     int from, int to,
     int *sl, int *ns,
     struct ra *ra, _Bool scalar,
-    int *deref_gpr);
+    int *deref_gpr,
+    struct jit_ctx *jc);
 
 static int resolve_ptr_x86(Buf *c, int p, int *last_ptr, int const *deref_gpr) {
     if (p < 0) { return deref_gpr[~p]; }
@@ -1220,7 +1365,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     int *deref_gpr = calloc((size_t)bb->insts, sizeof(int));
 
     Buf c = {0};
-    struct jit_ctx jc = {.c=&c, .bb=bb};
+    struct jit_ctx jc = {.c=&c, .bb=bb, .pool={0}};
     struct ra *ra = ra_create_x86(bb, &jc);
 
     push_r(&c, XM);
@@ -1228,7 +1373,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     int stack_patch = c.len;
     for (int i = 0; i < 7; i++) { nop(&c); }
 
-    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr);
+    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, &jc);
 
     ra_begin_loop(ra);
 
@@ -1245,7 +1390,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     int br_tail = jcc(&c, 0x0c);
 
     int loop_body_start = c.len;
-    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0, deref_gpr);
+    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0, deref_gpr, &jc);
 
     ra_end_loop(ra, sl);
 
@@ -1270,8 +1415,8 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     for (int i = 0; i < bb->insts; i++) { ra_free_reg(ra, i); }
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
 
-    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr);
-    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 1, deref_gpr);
+    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, &jc);
+    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 1, deref_gpr, &jc);
 
     add_ri(&c, XI, 1);
     {
@@ -1301,6 +1446,20 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
         int32_t sz = ns * 32;
         __builtin_memcpy(c.buf + pos, &sz, 4);
     }
+
+    int pool_start = c.len;
+    for (int i = 0; i < jc.pool.nvals; i++) {
+        emit4(&c, jc.pool.vals[i]);
+    }
+    for (int i = 0; i < jc.pool.nrefs; i++) {
+        struct pool_ref *r = &jc.pool.refs[i];
+        int entry_off = pool_start + r->entry * 4;
+        int32_t rel = (int32_t)(entry_off
+            - (r->code_pos + 4));
+        __builtin_memcpy(c.buf + r->code_pos,
+                         &rel, 4);
+    }
+    pool_free(&jc.pool);
 
     ra_destroy(ra); free(sl); free(deref_gpr);
     umbra_basic_block_free(resolved);
@@ -1335,7 +1494,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                      int from, int to,
                      int *sl, int *ns,
                      struct ra *ra, _Bool scalar,
-                     int *deref_gpr)
+                     int *deref_gpr,
+                     struct jit_ctx *jc)
 {
     #define lu(v) ra_last_use(ra, (v))
     int last_ptr = -1;
@@ -1793,7 +1953,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             }
         } break;
 
-        case op_imm_32:
+        case op_imm_32: {
+            struct ra_step s = ra_step_alloc(
+                ra, sl, ns, i);
+            pool_broadcast(c, &jc->pool,
+                s.rd, (uint32_t)inst->imm);
+        } break;
+
         case op_add_f32: case op_sub_f32:
         case op_mul_f32: case op_div_f32:
         case op_min_f32: case op_max_f32:

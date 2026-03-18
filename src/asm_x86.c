@@ -73,6 +73,19 @@ void vex_mem(Buf *b, int pp, int mm, int W, int L, int reg, int v, uint8_t op,
     else if (mod == 2) { emit4(b, (uint32_t)disp); }
 }
 
+int vex_rip(Buf *b, int pp, int mm, int W, int L,
+            int reg, int v, uint8_t op) {
+    int R = ~reg >> 3;
+    emit1(b, 0xc4);
+    emit1(b, (uint8_t)(((R&1)<<7) | (1<<6) | (1<<5) | mm));
+    emit1(b, (uint8_t)((W<<7) | ((~v&0xf)<<3) | (L<<2) | pp));
+    emit1(b, op);
+    emit1(b, (uint8_t)(((reg&7)<<3) | 5));
+    int pos = b->len;
+    emit4(b, 0);
+    return pos;
+}
+
 // Load: VMOVDQU ymm, [base+index*scale+disp]
 void vmov_load(Buf *b, int L, int reg, int base, int index, int scale, int disp) {
     vex_mem(b, 2, 1, 0, L, reg, 0, 0x6f, base, index, scale, disp);

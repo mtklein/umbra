@@ -15,6 +15,7 @@ void vex_shift(Buf *b, int pp, int mm, int L,
 void vex_mem(Buf *b, int pp, int mm, int W, int L, int reg, int v, uint8_t op,
              int base, int index, int scale, int disp);
 
+int  vex_rip(Buf *b, int pp, int mm, int W, int L, int reg, int v, uint8_t op);
 void vmov_load(Buf *b, int L, int reg, int base, int index, int scale, int disp);
 void vmov_store(Buf *b, int L, int reg, int base, int index, int scale, int disp);
 
