@@ -338,6 +338,18 @@ umbra_val umbra_coverage_sdf(builder *builder, umbra_val x, umbra_val y) {
     return umbra_min_f32(builder, umbra_max_f32(builder, scaled, zero), one);
 }
 
+umbra_val umbra_coverage_wind(builder *builder, umbra_val x, umbra_val y) {
+    (void)x; (void)y;
+    int off = umbra_reserve_ptr(builder);
+    umbra_ptr w = umbra_deref_ptr(builder,
+                      (umbra_ptr){1}, off);
+    umbra_val ix = umbra_lane(builder);
+    umbra_val raw = umbra_load_i32(builder, w, ix);
+    return umbra_min_f32(builder,
+        umbra_abs_f32(builder, raw),
+        umbra_imm_f32(builder, 1.0f));
+}
+
 umbra_val umbra_coverage_bitmap_matrix(builder *builder, umbra_val x, umbra_val y) {
     int fi = umbra_reserve(builder, 11);
     int bmp_off = umbra_reserve_ptr(builder);

@@ -15,8 +15,6 @@ typedef struct {
     float  w, h;
 } slug_curves;
 
-static int slug_n_curves;
-
 static slug_curves slug_extract(
         char const *text, float font_size) {
     slug_curves sc = {0};
@@ -149,26 +147,87 @@ static void slug_free(slug_curves *sc) {
     *sc = (slug_curves){0};
 }
 
-static void slug_ray_(
-        struct umbra_builder *b,
-        umbra_ptr buf, int i,
-        umbra_val gx, umbra_val gy,
-        umbra_val *wind,
-        umbra_val z, umbra_val o,
-        umbra_val tw, umbra_val ep) {
-    int k = i * 6;
-    umbra_val p0x = umbra_load_i32(b, buf,
-                        umbra_imm_i32(b, k));
-    umbra_val p0y = umbra_load_i32(b, buf,
-                        umbra_imm_i32(b, k+1));
-    umbra_val p1x = umbra_load_i32(b, buf,
-                        umbra_imm_i32(b, k+2));
-    umbra_val p1y = umbra_load_i32(b, buf,
-                        umbra_imm_i32(b, k+3));
-    umbra_val p2x = umbra_load_i32(b, buf,
-                        umbra_imm_i32(b, k+4));
-    umbra_val p2y = umbra_load_i32(b, buf,
-                        umbra_imm_i32(b, k+5));
+typedef struct {
+    int x0, y, mat, curves_off, loop_off, uni_len;
+} slug_acc_layout;
+
+static struct umbra_builder *slug_build_acc(
+        slug_acc_layout *lay) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_val ix = umbra_lane(b);
+
+    int x0i = umbra_reserve(b, 1);
+    int yi  = umbra_reserve(b, 1);
+    int fi  = umbra_reserve(b, 11);
+    int co  = umbra_reserve_ptr(b);
+    umbra_ptr curves = umbra_deref_ptr(b,
+        (umbra_ptr){1}, co);
+    int ji = umbra_reserve(b, 1);
+
+    umbra_val x0 = umbra_load_i32(b, (umbra_ptr){1},
+                       umbra_imm_i32(b, x0i));
+    umbra_val y  = umbra_load_i32(b, (umbra_ptr){1},
+                       umbra_imm_i32(b, yi));
+    umbra_val xf = umbra_cvt_f32_i32(b,
+                       umbra_add_i32(b, x0, ix));
+    umbra_val yf = umbra_cvt_f32_i32(b, y);
+
+    umbra_val m[9];
+    for (int i = 0; i < 9; i++) {
+        m[i] = umbra_load_i32(b, (umbra_ptr){1},
+                   umbra_imm_i32(b, fi+i));
+    }
+    umbra_val bw = umbra_load_i32(b, (umbra_ptr){1},
+                       umbra_imm_i32(b, fi+9));
+    umbra_val bh = umbra_load_i32(b, (umbra_ptr){1},
+                       umbra_imm_i32(b, fi+10));
+
+    umbra_val pw = umbra_add_f32(b,
+        umbra_add_f32(b,
+            umbra_mul_f32(b, m[6], xf),
+            umbra_mul_f32(b, m[7], yf)), m[8]);
+    umbra_val gx = umbra_div_f32(b,
+        umbra_add_f32(b,
+            umbra_add_f32(b,
+                umbra_mul_f32(b, m[0], xf),
+                umbra_mul_f32(b, m[1], yf)),
+            m[2]), pw);
+    umbra_val gy = umbra_div_f32(b,
+        umbra_add_f32(b,
+            umbra_add_f32(b,
+                umbra_mul_f32(b, m[3], xf),
+                umbra_mul_f32(b, m[4], yf)),
+            m[5]), pw);
+
+    umbra_val z  = umbra_imm_f32(b, 0.0f);
+    umbra_val o  = umbra_imm_f32(b, 1.0f);
+    umbra_val tw = umbra_imm_f32(b, 2.0f);
+    umbra_val ep = umbra_imm_f32(b, 1.0f/65536.0f);
+
+    umbra_val in = umbra_and_i32(b,
+        umbra_and_i32(b,
+            umbra_ge_f32(b, gx, z),
+            umbra_lt_f32(b, gx, bw)),
+        umbra_and_i32(b,
+            umbra_ge_f32(b, gy, z),
+            umbra_lt_f32(b, gy, bh)));
+
+    umbra_val j = umbra_load_i32(b, (umbra_ptr){1},
+                      umbra_imm_i32(b, ji));
+    umbra_val k = umbra_mul_i32(b, j,
+                      umbra_imm_i32(b, 6));
+
+    umbra_val p0x = umbra_load_i32(b, curves, k);
+    umbra_val p0y = umbra_load_i32(b, curves,
+        umbra_add_i32(b, k, umbra_imm_i32(b, 1)));
+    umbra_val p1x = umbra_load_i32(b, curves,
+        umbra_add_i32(b, k, umbra_imm_i32(b, 2)));
+    umbra_val p1y = umbra_load_i32(b, curves,
+        umbra_add_i32(b, k, umbra_imm_i32(b, 3)));
+    umbra_val p2x = umbra_load_i32(b, curves,
+        umbra_add_i32(b, k, umbra_imm_i32(b, 4)));
+    umbra_val p2y = umbra_load_i32(b, curves,
+        umbra_add_i32(b, k, umbra_imm_i32(b, 5)));
 
     umbra_val q0y = umbra_sub_f32(b, p0y, gy);
     umbra_val q1y = umbra_sub_f32(b, p1y, gy);
@@ -177,10 +236,10 @@ static void slug_ray_(
     umbra_val a = umbra_add_f32(b,
         umbra_sub_f32(b, q0y,
             umbra_mul_f32(b, tw, q1y)), q2y);
-    umbra_val bh = umbra_sub_f32(b, q0y, q1y);
+    umbra_val bv = umbra_sub_f32(b, q0y, q1y);
 
     umbra_val disc = umbra_sub_f32(b,
-        umbra_mul_f32(b, bh, bh),
+        umbra_mul_f32(b, bv, bv),
         umbra_mul_f32(b, a, q0y));
     umbra_val ok = umbra_ge_f32(b, disc, z);
     umbra_val sd = umbra_sqrt_f32(b,
@@ -194,16 +253,16 @@ static void slug_ray_(
         umbra_sel_i32(b, is_quad, a, o));
 
     umbra_val qt1 = umbra_mul_f32(b,
-        umbra_sub_f32(b, bh, sd), ia);
+        umbra_sub_f32(b, bv, sd), ia);
     umbra_val qt2 = umbra_mul_f32(b,
-        umbra_add_f32(b, bh, sd), ia);
+        umbra_add_f32(b, bv, sd), ia);
 
-    umbra_val abs_bh = umbra_max_f32(b, bh,
-        umbra_sub_f32(b, z, bh));
+    umbra_val abs_bv = umbra_max_f32(b, bv,
+        umbra_sub_f32(b, z, bv));
     umbra_val lt = umbra_div_f32(b, q0y,
         umbra_sel_i32(b,
-            umbra_gt_f32(b, abs_bh, ep),
-            umbra_mul_f32(b, tw, bh), o));
+            umbra_gt_f32(b, abs_bv, ep),
+            umbra_mul_f32(b, tw, bv), o));
 
     umbra_val t1 = umbra_sel_i32(b,
         is_quad, qt1, lt);
@@ -240,9 +299,9 @@ static void slug_ray_(
             t2), q0x);
 
     umbra_val dy1 = umbra_sub_f32(b,
-        umbra_mul_f32(b, a, t1), bh);
+        umbra_mul_f32(b, a, t1), bv);
     umbra_val dy2 = umbra_sub_f32(b,
-        umbra_mul_f32(b, a, t2), bh);
+        umbra_mul_f32(b, a, t2), bv);
 
     umbra_val po = umbra_imm_f32(b, 1.0f);
     umbra_val no = umbra_imm_f32(b, -1.0f);
@@ -265,76 +324,22 @@ static void slug_ray_(
             umbra_gt_f32(b, x2, z)),
         dir2, z);
 
-    *wind = umbra_add_f32(b, *wind,
-        umbra_add_f32(b, w1, w2));
-}
+    umbra_val dw = umbra_sel_i32(b, in,
+        umbra_add_f32(b, w1, w2), z);
 
-static umbra_val umbra_coverage_slug(
-        struct umbra_builder *b,
-        umbra_val x, umbra_val y) {
-    int fi = umbra_reserve(b, 11);
-    int buf_off = umbra_reserve_ptr(b);
-    umbra_ptr curves = umbra_deref_ptr(b,
-        (umbra_ptr){1}, buf_off);
+    umbra_val acc = umbra_load_i32(b,
+                        (umbra_ptr){0}, ix);
+    acc = umbra_add_f32(b, acc, dw);
+    umbra_store_i32(b, (umbra_ptr){0}, ix, acc);
 
-    umbra_val m0 = umbra_load_i32(b, (umbra_ptr){1},
-                       umbra_imm_i32(b, fi));
-    umbra_val m1 = umbra_load_i32(b, (umbra_ptr){1},
-                       umbra_imm_i32(b, fi+1));
-    umbra_val m2 = umbra_load_i32(b, (umbra_ptr){1},
-                       umbra_imm_i32(b, fi+2));
-    umbra_val m3 = umbra_load_i32(b, (umbra_ptr){1},
-                       umbra_imm_i32(b, fi+3));
-    umbra_val m4 = umbra_load_i32(b, (umbra_ptr){1},
-                       umbra_imm_i32(b, fi+4));
-    umbra_val m5 = umbra_load_i32(b, (umbra_ptr){1},
-                       umbra_imm_i32(b, fi+5));
-    umbra_val m6 = umbra_load_i32(b, (umbra_ptr){1},
-                       umbra_imm_i32(b, fi+6));
-    umbra_val m7 = umbra_load_i32(b, (umbra_ptr){1},
-                       umbra_imm_i32(b, fi+7));
-    umbra_val m8 = umbra_load_i32(b, (umbra_ptr){1},
-                       umbra_imm_i32(b, fi+8));
-    umbra_val bw = umbra_load_i32(b, (umbra_ptr){1},
-                       umbra_imm_i32(b, fi+9));
-    umbra_val bh = umbra_load_i32(b, (umbra_ptr){1},
-                       umbra_imm_i32(b, fi+10));
-
-    umbra_val w = umbra_add_f32(b,
-        umbra_add_f32(b,
-            umbra_mul_f32(b, m6, x),
-            umbra_mul_f32(b, m7, y)), m8);
-    umbra_val gx = umbra_div_f32(b,
-        umbra_add_f32(b,
-            umbra_add_f32(b,
-                umbra_mul_f32(b, m0, x),
-                umbra_mul_f32(b, m1, y)), m2), w);
-    umbra_val gy = umbra_div_f32(b,
-        umbra_add_f32(b,
-            umbra_add_f32(b,
-                umbra_mul_f32(b, m3, x),
-                umbra_mul_f32(b, m4, y)), m5), w);
-
-    umbra_val z  = umbra_imm_f32(b, 0.0f);
-    umbra_val o  = umbra_imm_f32(b, 1.0f);
-    umbra_val tw = umbra_imm_f32(b, 2.0f);
-    umbra_val ep = umbra_imm_f32(b, 1.0f/65536.0f);
-
-    umbra_val in = umbra_and_i32(b,
-        umbra_and_i32(b,
-            umbra_ge_f32(b, gx, z),
-            umbra_lt_f32(b, gx, bw)),
-        umbra_and_i32(b,
-            umbra_ge_f32(b, gy, z),
-            umbra_lt_f32(b, gy, bh)));
-
-    umbra_val wind = z;
-    for (int i = 0; i < slug_n_curves; i++) {
-        slug_ray_(b, curves, i, gx, gy, &wind,
-                  z, o, tw, ep);
+    if (lay) {
+        lay->x0         = x0i * 4;
+        lay->y          = yi  * 4;
+        lay->mat        = fi  * 4;
+        lay->curves_off = co;
+        lay->loop_off   = ji  * 4;
+        lay->uni_len    = umbra_uni_len(b);
     }
 
-    umbra_val cov = umbra_min_f32(b,
-        umbra_abs_f32(b, wind), o);
-    return umbra_sel_i32(b, in, cov, z);
+    return b;
 }

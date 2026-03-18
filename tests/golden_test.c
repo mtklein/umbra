@@ -9,6 +9,8 @@ typedef struct umbra_builder builder;
 enum { W = 128, H = 96, LUT_N = 64 };
 
 static slug_curves gt_slug;
+static struct umbra_interpreter *gt_acc_interp;
+static slug_acc_layout gt_acc_lay;
 
 typedef void (*run_fn)(void*, int, umbra_buf[]);
 
@@ -283,23 +285,42 @@ static void render_slide(
             run(ctx, W, buf);
         }
     } else if (s->coverage ==
-                   umbra_coverage_slug) {
+                   umbra_coverage_wind) {
         float mat[11];
         build_perspective_matrix(mat, 1.0f,
             W, H, (int)gt_slug.w, (int)gt_slug.h);
         mat[9]  = gt_slug.w;
         mat[10] = gt_slug.h;
+        float wind_buf[W];
         for (int y = 0; y < H; y++) {
+            __builtin_memset(wind_buf, 0,
+                sizeof wind_buf);
+            long long au_[12] = {0};
+            char *au = (char*)au_;
+            uni_i32(au, gt_acc_lay.x0, 0);
+            uni_i32(au, gt_acc_lay.y, y);
+            uni_f32(au, gt_acc_lay.mat, mat, 11);
+            uni_ptr(au, gt_acc_lay.curves_off,
+                gt_slug.data,
+                (long)(gt_slug.count * 6 * 4));
+            umbra_buf abuf[] = {
+                { wind_buf,
+                  (long)sizeof wind_buf },
+                { au,
+                  -(long)gt_acc_lay.uni_len },
+            };
+            umbra_interpreter_run_m(gt_acc_interp,
+                W, gt_slug.count,
+                gt_acc_lay.loop_off, abuf);
+
             long long uni_[12] = {0};
             char *uni = (char*)uni_;
             uni_i32(uni, lay->x0, 0);
             uni_i32(uni, lay->y,  y);
             uni_f32(uni, lay->shader, hc, 4);
-            uni_f32(uni, lay->coverage, mat, 11);
-            uni_ptr(uni,
-                (lay->coverage + 11*4 + 7) & ~7,
-                gt_slug.data,
-                (long)(gt_slug.count * 6 * 4));
+            uni_ptr(uni, lay->coverage,
+                wind_buf,
+                -(long)sizeof wind_buf);
             for (int i = 0; i < ps; i++) {
                 uni_i32(uni,
                     uni_len - (ps - i) * 4,
@@ -523,19 +544,25 @@ static void test_slide_golden(
 }
 
 static void test_slug_rect(void) {
-    int saved_n = slug_n_curves;
-
     static float rect[] = {
          5, 5,  5,20,  5,35,
          5,35, 30,35, 55,35,
         55,35, 55,20, 55, 5,
         55, 5, 30, 5,  5, 5,
     };
-    slug_n_curves = 4;
+
+    slug_acc_layout alay;
+    builder *ab = slug_build_acc(&alay);
+    struct umbra_basic_block *abb =
+        umbra_basic_block(ab);
+    umbra_builder_free(ab);
+    struct umbra_interpreter *acc =
+        umbra_interpreter(abb);
+    umbra_basic_block_free(abb);
 
     umbra_draw_layout lay;
     builder *bld = umbra_draw_build(
-        umbra_shader_solid, umbra_coverage_slug,
+        umbra_shader_solid, umbra_coverage_wind,
         umbra_blend_srcover, umbra_load_8888,
         umbra_store_8888, &lay);
     struct umbra_basic_block *bb =
@@ -554,17 +581,34 @@ static void test_slug_rect(void) {
         1,0,0, 0,1,0, 0,0,1, 60,40,
     };
     float color[4] = {1,1,1,1};
+    float wind_buf[W];
 
     for (int y = 0; y < H; y++) {
+        __builtin_memset(wind_buf, 0,
+            sizeof wind_buf);
+        long long au_[12] = {0};
+        char *au = (char*)au_;
+        uni_i32(au, alay.x0, 0);
+        uni_i32(au, alay.y, y);
+        uni_f32(au, alay.mat, mat, 11);
+        uni_ptr(au, alay.curves_off,
+            rect, (long)sizeof rect);
+        umbra_buf abuf[] = {
+            { wind_buf,
+              (long)sizeof wind_buf },
+            { au,
+              -(long)alay.uni_len },
+        };
+        umbra_interpreter_run_m(acc, W, 4,
+            alay.loop_off, abuf);
+
         long long uni_[12] = {0};
         char *uni = (char*)uni_;
         uni_i32(uni, lay.x0, 0);
         uni_i32(uni, lay.y, y);
         uni_f32(uni, lay.shader, color, 4);
-        uni_f32(uni, lay.coverage, mat, 11);
-        uni_ptr(uni,
-            (lay.coverage + 11*4 + 7) & ~7,
-            rect, (long)sizeof rect);
+        uni_ptr(uni, lay.coverage,
+            wind_buf, -(long)sizeof wind_buf);
         umbra_buf buf[] = {
             { pixels + y * W, (long)(W * 4) },
             { uni, -(long)lay.uni_len },
@@ -581,8 +625,8 @@ static void test_slug_rect(void) {
     (pixels[38*W + 30] == bg) here;
     (pixels[20*W + 70] == bg) here;
 
+    umbra_interpreter_free(acc);
     umbra_interpreter_free(interp);
-    slug_n_curves = saved_n;
 }
 
 int main(void) {
@@ -591,9 +635,17 @@ int main(void) {
     text_cov sdf_cov =
         text_rasterize(W, H, 24.0f, 1);
     gt_slug = slug_extract("Hi", 24.0f);
-    slug_n_curves = gt_slug.count;
     build_luts();
     build_pipes();
+
+    {
+        builder *ab = slug_build_acc(&gt_acc_lay);
+        struct umbra_basic_block *abb =
+            umbra_basic_block(ab);
+        umbra_builder_free(ab);
+        gt_acc_interp = umbra_interpreter(abb);
+        umbra_basic_block_free(abb);
+    }
 
     test_slug_rect();
 
@@ -607,6 +659,7 @@ int main(void) {
     text_cov_free(&bitmap_cov);
     text_cov_free(&sdf_cov);
     slug_free(&gt_slug);
+    umbra_interpreter_free(gt_acc_interp);
     free_pipes();
     return 0;
 }

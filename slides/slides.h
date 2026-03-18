@@ -141,7 +141,7 @@ static slide const slides[] = {
     {
         .title    = "14. Slug Text (Bezier)",
         .shader   = umbra_shader_solid,
-        .coverage = umbra_coverage_slug,
+        .coverage = umbra_coverage_wind,
         .blend    = umbra_blend_srcover,
         .load     = umbra_load_8888,
         .store    = umbra_store_8888,

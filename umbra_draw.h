@@ -66,6 +66,8 @@ umbra_val umbra_coverage_sdf(struct umbra_builder*,
 umbra_val
 umbra_coverage_bitmap_matrix(struct umbra_builder*,
                              umbra_val x, umbra_val y);
+umbra_val umbra_coverage_wind(struct umbra_builder*,
+                              umbra_val x, umbra_val y);
 
 umbra_color umbra_blend_src(struct umbra_builder*,
                             umbra_color src,
