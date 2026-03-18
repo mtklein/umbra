@@ -1507,7 +1507,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, XI, 4, 0);
                 vpand(c, 0, s.rd, s.rd, rz);
             } else {
-                vpmaskmov_load(c, s.rd, rz, base, XI, 4, 0);
+                vpmaskmov_load(c, 1, s.rd, rz, base, XI, 4, 0);
             }
             if (lu(inst->z) <= i) { ra_free_reg(ra, inst->z); }
         } break;
@@ -1562,7 +1562,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 vex_mem(c, 1, 1, 0, 0, ry, 0, 0x7e, base, XI, 4, 0);
                 patch_jcc(c, skip);
             } else {
-                vpmaskmov_store(c, rz, ry, base, XI, 4, 0);
+                vpmaskmov_store(c, 1, rz, ry, base, XI, 4, 0);
             }
             if (lu(inst->z) <= i) { ra_free_reg(ra, inst->z); }
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
