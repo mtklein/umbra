@@ -688,6 +688,55 @@ static void test_min_max_sqrt_f32(void) {
   }
 }
 
+static void test_abs_sign_f32(void) {
+  for (int opt = 0; opt < 2; opt++) {
+    {
+        struct umbra_builder *builder =
+            umbra_builder();
+        umbra_val ix = umbra_lane(builder);
+        umbra_val x = umbra_load_i32(builder,
+                          (umbra_ptr){0}, ix),
+                  r = umbra_abs_f32(builder, x);
+        umbra_store_i32(builder,
+            (umbra_ptr){1}, ix, r);
+        backends B = make(builder, opt);
+        for (int bi = 0; bi < 4; bi++) {
+            float a[] = {-1.5f, 2.5f, -0.0f};
+            float z[3] = {0};
+            if (!run(&B, bi, 3, (umbra_buf[]){
+                {a,3*4},{z,3*4},
+            })) { continue; }
+            equiv(z[0], 1.5f) here;
+            equiv(z[1], 2.5f) here;
+            equiv(z[2], 0.0f) here;
+        }
+        cleanup(&B);
+    }
+    {
+        struct umbra_builder *builder =
+            umbra_builder();
+        umbra_val ix = umbra_lane(builder);
+        umbra_val x = umbra_load_i32(builder,
+                          (umbra_ptr){0}, ix),
+                  r = umbra_sign_f32(builder, x);
+        umbra_store_i32(builder,
+            (umbra_ptr){1}, ix, r);
+        backends B = make(builder, opt);
+        for (int bi = 0; bi < 4; bi++) {
+            float a[] = {-3.0f, 7.0f, 0.0f};
+            float z[3] = {0};
+            if (!run(&B, bi, 3, (umbra_buf[]){
+                {a,3*4},{z,3*4},
+            })) { continue; }
+            equiv(z[0], -1.0f) here;
+            equiv(z[1],  1.0f) here;
+            equiv(z[2],  0.0f) here;
+        }
+        cleanup(&B);
+    }
+  }
+}
+
 static void test_large_n(void) {
   for (int opt = 0; opt < 2; opt++) {
     backends B; BINOP_F32(umbra_add_f32, B, opt);
@@ -1583,6 +1632,7 @@ int main(void) {
     test_imm();
     test_fma_f32();
     test_min_max_sqrt_f32();
+    test_abs_sign_f32();
     test_large_n();
     test_convert();
     test_dedup();

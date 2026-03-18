@@ -321,6 +321,18 @@ val umbra_max_f32(builder *b, val x, val y) {
 val umbra_sqrt_f32(builder *b, val x) {
     return math(b, op_sqrt_f32, .x=x.id);
 }
+val umbra_abs_f32(builder *b, val x) {
+    return umbra_and_i32(b, x,
+        umbra_imm_i32(b, 0x7fffffff));
+}
+val umbra_sign_f32(builder *b, val x) {
+    val z = umbra_imm_f32(b, 0.0f);
+    return umbra_or_i32(b,
+        umbra_and_i32(b, umbra_gt_f32(b, x, z),
+            umbra_imm_i32(b, 0x3f800000)),
+        umbra_and_i32(b, umbra_lt_f32(b, x, z),
+            umbra_imm_i32(b, (int)0xbf800000)));
+}
 
 val umbra_add_i32(builder *b, val x, val y) {
     sort(&x.id, &y.id);

@@ -334,8 +334,7 @@ static umbra_val umbra_coverage_slug(
                   z, o, tw, ep);
     }
 
-    umbra_val aw = umbra_max_f32(b, wind,
-        umbra_sub_f32(b, z, wind));
-    umbra_val cov = umbra_min_f32(b, aw, o);
+    umbra_val cov = umbra_min_f32(b,
+        umbra_abs_f32(b, wind), o);
     return umbra_sel_i32(b, in, cov, z);
 }
