@@ -4,7 +4,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <time.h>
 
 static double now(void) {
@@ -12,6 +11,30 @@ static double now(void) {
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (double)ts.tv_sec
          + (double)ts.tv_nsec * 1e-9;
+}
+
+static double bench(slide *s, int w, int h,
+                    umbra_draw_layout const *lay,
+                    int ps, int32_t stride,
+                    void *row, long row_sz,
+                    struct umbra_backend *be) {
+    s->render_row(s, h/2, w, row, row_sz,
+                  lay, ps, stride, be);
+    int iters = 1;
+    for (;;) {
+        double const start = now();
+        for (int it = 0; it < iters; it++) {
+            s->render_row(s, h/2, w, row, row_sz,
+                          lay, ps, stride, be);
+        }
+        double const elapsed = now() - start;
+        if (elapsed >= 0.1) {
+            return elapsed
+                 / ((double)iters * (double)w)
+                 * 1e9;
+        }
+        iters *= 2;
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -23,11 +46,12 @@ int main(int argc, char *argv[]) {
     slides_init(W, H);
 
     int ns = slide_count() - 1;
-    printf("%-40s %12s %12s\n",
-           "", "interp", "jit");
+    printf("%-40s %12s %12s %12s\n",
+           "", "interp", "jit", "metal");
 
     for (int si = 0; si < ns; si++) {
         slide *s = slide_get(si);
+        if (!s->render_row) { continue; }
 
         umbra_draw_layout lay;
         struct umbra_builder *bld =
@@ -43,6 +67,8 @@ int main(int argc, char *argv[]) {
             umbra_backend_interp(bb);
         struct umbra_backend *jit =
             umbra_backend_jit(bb);
+        struct umbra_backend *mtl =
+            umbra_backend_metal(bb);
         umbra_basic_block_free(bb);
 
         _Bool planar =
@@ -53,61 +79,37 @@ int main(int argc, char *argv[]) {
         long row_sz = W * px;
         int32_t stride = (int32_t)W;
 
-        if (!s->render_row) {
-            printf("%-40s   (no render)\n",
-                   s->title);
-            umbra_backend_free(interp);
-            umbra_backend_free(jit);
-            free(row);
-            continue;
-        }
-        s->render_row(s, H/2, W, row, row_sz,
-                      &lay, ps, stride, interp);
+        char tmp[32];
+        printf("%-40s", s->title);
 
-        int iters = 1;
-        for (;;) {
-            double const start = now();
-            for (int it = 0; it < iters; it++) {
-                s->render_row(s, H/2, W,
-                    row, row_sz,
-                    &lay, ps, stride, interp);
-            }
-            double const elapsed = now() - start;
-            if (elapsed >= 0.1) {
-                double ns_px = elapsed
-                    / ((double)iters * (double)W)
-                    * 1e9;
-                printf("%-40s %9.2f ns", s->title,
-                       ns_px);
-                break;
-            }
-            iters *= 2;
-        }
+        sprintf(tmp, "%5.2f ns/px",
+                bench(s, W, H, &lay, ps, stride,
+                      row, row_sz, interp));
+        printf(" %12s", tmp);
 
         if (jit) {
-            iters = 1;
-            for (;;) {
-                double const start = now();
-                for (int it = 0; it < iters; it++) {
-                    s->render_row(s, H/2, W,
-                        row, row_sz,
-                        &lay, ps, stride, jit);
-                }
-                double const elapsed = now()-start;
-                if (elapsed >= 0.1) {
-                    double ns_px = elapsed
-                        / ((double)iters*(double)W)
-                        * 1e9;
-                    printf(" %9.2f ns", ns_px);
-                    break;
-                }
-                iters *= 2;
-            }
+            sprintf(tmp, "%5.2f ns/px",
+                    bench(s, W, H, &lay, ps, stride,
+                          row, row_sz, jit));
+            printf(" %12s", tmp);
+        } else {
+            printf(" %12s", "-");
         }
+
+        if (mtl) {
+            sprintf(tmp, "%5.2f ns/px",
+                    bench(s, W, H, &lay, ps, stride,
+                          row, row_sz, mtl));
+            printf(" %12s", tmp);
+        } else {
+            printf(" %12s", "-");
+        }
+
         printf("\n");
 
         umbra_backend_free(interp);
         umbra_backend_free(jit);
+        umbra_backend_free(mtl);
         free(row);
     }
 
