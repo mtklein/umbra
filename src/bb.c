@@ -728,9 +728,11 @@ static void schedule(struct bb_inst const *in, int n,
                     kills++;
                 }
             }
-            int score = kills * 1000
-                - (last_use[id] < 0
-                    ? total : last_use[id]);
+            int defines = is_store(in[id].op) ? 0 : 1;
+            int net = kills - defines;
+            int lu = last_use[id] < 0
+                   ? total : last_use[id];
+            int score = net * total - lu;
             if (score > best_score) {
                 best_score = score;
                 best = r;
