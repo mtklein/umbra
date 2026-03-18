@@ -254,6 +254,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
         return 1;
 
     case op_and_imm:
+    case op_mul_f32_imm:
     case op_iota:
     case op_deref_ptr:
     case op_uni_32:   case op_load_32:
@@ -876,7 +877,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 case op_join:
                 case op_shl_imm: case op_shr_u32_imm:
                 case op_shr_s32_imm: case op_pack:
-                case op_and_imm:
+                case op_and_imm: case op_mul_f32_imm:
                     break;
                 }
                 #undef CZ
@@ -948,6 +949,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 ra_return_reg(ra, s.scratch);
             }
         } break;
+        case op_mul_f32_imm: break;
         }
     }
     #undef lu
@@ -1344,6 +1346,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
         return 1;
     case op_pack:
     case op_and_imm:
+    case op_mul_f32_imm:
         return 0;
 
     case op_iota:
@@ -1382,9 +1385,15 @@ struct umbra_jit {
     int    loop_start, loop_end;
 };
 
+static _Bool x86_chooser(struct bb_inst const *insts,
+                         int join_id) {
+    enum op y_op = insts[insts[join_id].y].op;
+    return y_op == op_mul_f32_imm;
+}
+
 struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     struct umbra_basic_block *resolved =
-        umbra_resolve_joins(bb, NULL);
+        umbra_resolve_joins(bb, x86_chooser);
     bb = resolved;
 
     int *sl = malloc((size_t)bb->insts * sizeof(int));
@@ -1982,6 +1991,18 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 ra, sl, ns, i);
             pool_broadcast(c, &jc->pool,
                 s.rd, (uint32_t)inst->imm);
+        } break;
+
+        case op_mul_f32_imm: {
+            struct ra_step s = ra_step_unary(
+                ra, sl, ns, inst, i, scalar);
+            uint32_t v = (uint32_t)inst->imm;
+            uint32_t bcast[8] = {v,v,v,v,v,v,v,v};
+            int off = pool_add(&jc->pool,
+                               bcast, 32);
+            int pos = vex_rip(c, 0, 1, 0, 1,
+                s.rd, s.rx, 0x59);
+            pool_ref_at(&jc->pool, off, pos);
         } break;
 
         case op_add_f32: case op_sub_f32:

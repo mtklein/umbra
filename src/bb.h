@@ -24,7 +24,8 @@
     X(join)                                          \
     X(shl_imm) X(shr_u32_imm) X(shr_s32_imm)       \
     X(and_imm)                                      \
-    X(pack)
+    X(pack)                                         \
+    X(mul_f32_imm)
 
 enum op {
     #define OP_ENUM(name) op_##name,

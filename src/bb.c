@@ -323,8 +323,18 @@ val umbra_mul_f32(builder *b, val x, val y) {
     sort(&x.id, &y.id);
     if (is_imm32(b, x.id, 0x3f800000)) { return y; }
     if (is_imm32(b, y.id, 0x3f800000)) { return x; }
-    return math(b, op_mul_f32,
-                      .x=x.id, .y=y.id);
+    val d = math(b, op_mul_f32,
+                       .x=x.id, .y=y.id);
+    int imm_id = is_imm(b, x.id) ? x.id
+               : is_imm(b, y.id) ? y.id : -1;
+    if (imm_id >= 0) {
+        int other = imm_id == x.id ? y.id : x.id;
+        val f = push(b, op_mul_f32_imm,
+                     .x=other,
+                     .imm=b->inst[imm_id].imm);
+        return push(b, op_join, .x=d.id, .y=f.id);
+    }
+    return (val){d.id};
 }
 
 val umbra_div_f32(builder *b, val x, val y) {
@@ -896,6 +906,11 @@ static void dump_insts(struct bb_inst const *inst,
             case op_pack:
                 fprintf(f, " v%d v%d %d",
                         ip->x, ip->y, ip->imm);
+                break;
+            case op_mul_f32_imm:
+                fprintf(f, " v%d 0x%x",
+                        ip->x,
+                        (uint32_t)ip->imm);
                 break;
         }
         fprintf(f, "\n");

@@ -377,6 +377,7 @@ static void emit_ops(Buf *b, BB const *bb,
                     inst->y, inst->imm);
                 break;
 
+            case op_mul_f32_imm: break;
             case op_add_f32:
                 emit(b, "%suint v%d = as_type<uint>"
                         "(as_type<float>(v%d)"

@@ -752,6 +752,7 @@ struct umbra_interpreter* umbra_interpreter(
                              .x=X, .y=inst->imm);
                         break;
                     case op_pack:
+                    case op_mul_f32_imm:
                         emit(.fn=fn[inst->op],
                              .x=X, .y=Y,
                              .z=inst->imm);
