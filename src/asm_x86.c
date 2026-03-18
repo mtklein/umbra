@@ -378,6 +378,14 @@ void vpunpcklbw(Buf *b, int d, int v, int s) { vex_rrr(b,1,1,0,0x60,d,v,s); }
 void vpgatherdd(Buf *b, int dst, int base, int idx, int scale, int mask) {
     vex_mem(b, 1, 2, 0, 1, dst, mask, 0x90, base, idx, scale, 0);
 }
+void vpmaskmov_load(Buf *b, int dst, int mask,
+                    int base, int index, int scale, int disp) {
+    vex_mem(b, 1, 2, 0, 1, dst, mask, 0x8c, base, index, scale, disp);
+}
+void vpmaskmov_store(Buf *b, int mask, int src,
+                     int base, int index, int scale, int disp) {
+    vex_mem(b, 1, 2, 0, 1, src, mask, 0x8e, base, index, scale, disp);
+}
 void vpextrd(Buf *b, int gpr, int xmm, uint8_t imm) {
     vex(b, 1, 3, 0, 0, xmm, 0, gpr, 0x16); emit1(b, imm);
 }

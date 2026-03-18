@@ -111,6 +111,10 @@ void vpackuswb(Buf *b, int d, int v, int s);
 void vpunpcklbw(Buf *b, int d, int v, int s);
 
 void vpgatherdd(Buf *b, int dst, int base, int idx, int scale, int mask);
+void vpmaskmov_load(Buf *b, int dst, int mask,
+                    int base, int index, int scale, int disp);
+void vpmaskmov_store(Buf *b, int mask, int src,
+                     int base, int index, int scale, int disp);
 void vpextrd(Buf *b, int gpr, int xmm, uint8_t imm);
 void vpinsrw(Buf *b, int d, int v, int gpr, uint8_t imm);
 void vextracti128(Buf *b, int d, int s, uint8_t imm);
