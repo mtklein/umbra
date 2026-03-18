@@ -160,10 +160,20 @@ static int iota_plus_off(builder *b, int ix) {
     return -1;
 }
 
+static val mem_mask(builder *b, umbra_ptr ptr,
+                    int elem_shift, val ix) {
+    val bn = push(b, op_buf_n,
+                  .ptr=ptr.ix, .imm=elem_shift);
+    val lm = push(b, op_lane_mask);
+    return umbra_and_i32(b, lm,
+               umbra_lt_u32(b, ix, bn));
+}
+
 val umbra_load_i16(builder *b, umbra_ptr src, val ix) {
     if (b->inst[ix.id].op == op_iota) {
+        val m = mem_mask(b, src, 1, ix);
         return push(b, op_load_16,
-                         .ptr=src.ix);
+                         .z=m.id, .ptr=src.ix);
     }
     if (b->inst[ix.id].op == op_imm_32) {
         return push(b, op_uni_16,
@@ -173,21 +183,28 @@ val umbra_load_i16(builder *b, umbra_ptr src, val ix) {
     {
         int off = iota_plus_off(b, ix.id);
         if (off >= 0) {
+            val m = mem_mask(b, src, 1, ix);
             return push(b, op_load_16,
-                             .x=off, .ptr=src.ix);
+                             .x=off, .z=m.id,
+                             .ptr=src.ix);
         }
     }
     if (b->inst[ix.id].uniform) {
         return push(b, op_uni_16,
                          .x=ix.id, .ptr=src.ix);
     }
-    return push(b, op_gather_16,
-                      .x=ix.id, .ptr=src.ix);
+    {
+        val m = mem_mask(b, src, 1, ix);
+        return push(b, op_gather_16,
+                          .x=ix.id, .z=m.id,
+                          .ptr=src.ix);
+    }
 }
 val umbra_load_i32(builder *b, umbra_ptr src, val ix) {
     if (b->inst[ix.id].op == op_iota) {
+        val m = mem_mask(b, src, 2, ix);
         return push(b, op_load_32,
-                         .ptr=src.ix);
+                         .z=m.id, .ptr=src.ix);
     }
     if (b->inst[ix.id].op == op_imm_32) {
         return push(b, op_uni_32,
@@ -197,52 +214,72 @@ val umbra_load_i32(builder *b, umbra_ptr src, val ix) {
     {
         int off = iota_plus_off(b, ix.id);
         if (off >= 0) {
+            val m = mem_mask(b, src, 2, ix);
             return push(b, op_load_32,
-                             .x=off, .ptr=src.ix);
+                             .x=off, .z=m.id,
+                             .ptr=src.ix);
         }
     }
     if (b->inst[ix.id].uniform) {
         return push(b, op_uni_32,
                          .x=ix.id, .ptr=src.ix);
     }
-    return push(b, op_gather_32,
-                      .x=ix.id, .ptr=src.ix);
+    {
+        val m = mem_mask(b, src, 2, ix);
+        return push(b, op_gather_32,
+                          .x=ix.id, .z=m.id,
+                          .ptr=src.ix);
+    }
 }
 void umbra_store_i16(builder *b, umbra_ptr dst,
                    val ix, val v) {
     if (b->inst[ix.id].op == op_iota) {
+        val m = mem_mask(b, dst, 1, ix);
         push(b, op_store_16,
-             .y=v.id, .ptr=dst.ix);
+             .y=v.id, .z=m.id, .ptr=dst.ix);
         return;
     }
     {
         int off = iota_plus_off(b, ix.id);
         if (off >= 0) {
+            val m = mem_mask(b, dst, 1, ix);
             push(b, op_store_16,
-                 .x=off, .y=v.id, .ptr=dst.ix);
+                 .x=off, .y=v.id, .z=m.id,
+                 .ptr=dst.ix);
             return;
         }
     }
-    push(b, op_scatter_16,
-         .x=ix.id, .y=v.id, .ptr=dst.ix);
+    {
+        val m = mem_mask(b, dst, 1, ix);
+        push(b, op_scatter_16,
+             .x=ix.id, .y=v.id, .z=m.id,
+             .ptr=dst.ix);
+    }
 }
 void umbra_store_i32(builder *b, umbra_ptr dst,
                    val ix, val v) {
     if (b->inst[ix.id].op == op_iota) {
+        val m = mem_mask(b, dst, 2, ix);
         push(b, op_store_32,
-             .y=v.id, .ptr=dst.ix);
+             .y=v.id, .z=m.id, .ptr=dst.ix);
         return;
     }
     {
         int off = iota_plus_off(b, ix.id);
         if (off >= 0) {
+            val m = mem_mask(b, dst, 2, ix);
             push(b, op_store_32,
-                 .x=off, .y=v.id, .ptr=dst.ix);
+                 .x=off, .y=v.id, .z=m.id,
+                 .ptr=dst.ix);
             return;
         }
     }
-    push(b, op_scatter_32,
-         .x=ix.id, .y=v.id, .ptr=dst.ix);
+    {
+        val m = mem_mask(b, dst, 2, ix);
+        push(b, op_scatter_32,
+             .x=ix.id, .y=v.id, .z=m.id,
+             .ptr=dst.ix);
+    }
 }
 val umbra_widen_s16(builder *b, val x) {
     return push(b, op_widen_s16, .x=x.id);
@@ -796,7 +833,11 @@ static void dump_insts(struct bb_inst const *inst,
                          || op == op_store_32)) {
                     fprintf(f, " +v%d", ip->x);
                 }
-                fprintf(f, " v%d\n", ip->y);
+                fprintf(f, " v%d", ip->y);
+                if (ip->z) {
+                    fprintf(f, " mask v%d", ip->z);
+                }
+                fprintf(f, "\n");
             }
             continue;
         }
@@ -821,14 +862,19 @@ static void dump_insts(struct bb_inst const *inst,
                 break;
             case op_gather_32:
             case op_gather_16:
-                fprintf(f, " p%d v%d",
-                        ip->ptr, ip->x);
+                fprintf(f, " p%d v%d", ip->ptr, ip->x);
+                if (ip->z) {
+                    fprintf(f, " mask v%d", ip->z);
+                }
                 break;
             case op_load_32:
             case op_load_16:
                 fprintf(f, " p%d", ip->ptr);
                 if (ip->x) {
                     fprintf(f, " +v%d", ip->x);
+                }
+                if (ip->z) {
+                    fprintf(f, " mask v%d", ip->z);
                 }
                 break;
             case op_deref_ptr:

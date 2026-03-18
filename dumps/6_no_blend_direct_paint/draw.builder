@@ -77,4 +77,8 @@
   v76  = or_32           v73 v75
   v77  = pack            v73 v54 24
   v78  = join            v76 v77
-      store_32        p0 v78
+  v79  = buf_n           p0 >>2
+  v80  = lane_mask      
+  v81  = lt_u32          v1 v79
+  v82  = and_32          v80 v81
+      store_32        p0 v78 mask v82

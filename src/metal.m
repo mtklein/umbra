@@ -123,8 +123,19 @@ static void emit_ops(Buf *b, BB const *bb,
                 break;
 
             case op_deref_ptr: break;
-            case op_buf_n: break;
-            case op_lane_mask: break;
+            case op_buf_n: {
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr]
+                    : inst->ptr;
+                emit(b, "%suint v%d = "
+                     "buf_szs[%d] >> %du;\n",
+                     pad, i, p, inst->imm);
+            } break;
+            case op_lane_mask:
+                emit(b, "%suint v%d = "
+                     "0xffffffffu;\n",
+                     pad, i);
+                break;
 
             case op_uni_32: {
                 int p = inst->ptr < 0
@@ -172,14 +183,12 @@ static void emit_ops(Buf *b, BB const *bb,
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 emit(b, mixed
-                    ? "%suint v%d = p%d_32"
-                      "[clamp_ix((int)v%d,"
-                      "buf_szs[%d],4)];\n"
-                    : "%suint v%d = "
-                      "((device uint*)p%d)"
-                      "[clamp_ix((int)v%d,"
-                      "buf_szs[%d],4)];\n",
-                     pad, i, p, inst->x, p);
+                    ? "%suint v%d = v%d"
+                      " ? p%d_32[(int)v%d] : 0u;\n"
+                    : "%suint v%d = v%d"
+                      " ? ((device uint*)p%d)"
+                      "[(int)v%d] : 0u;\n",
+                     pad, i, inst->z, p, inst->x);
             } break;
             case op_store_32: {
                 int p = inst->ptr < 0
@@ -205,13 +214,12 @@ static void emit_ops(Buf *b, BB const *bb,
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 emit(b, mixed
-                    ? "%sp%d_32"
-                      "[clamp_ix((int)v%d,"
-                      "buf_szs[%d],4)] = v%d;\n"
-                    : "%s((device uint*)p%d)"
-                      "[clamp_ix((int)v%d,"
-                      "buf_szs[%d],4)] = v%d;\n",
-                     pad, p, inst->x, p, inst->y);
+                    ? "%sif (v%d) p%d_32"
+                      "[(int)v%d] = v%d;\n"
+                    : "%sif (v%d) ((device uint*)p%d)"
+                      "[(int)v%d] = v%d;\n",
+                     pad, inst->z, p, inst->x,
+                     inst->y);
             } break;
 
             case op_uni_16: {
@@ -266,14 +274,14 @@ static void emit_ops(Buf *b, BB const *bb,
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 emit(b, mixed
-                    ? "%suint v%d = (uint)(ushort)"
-                      "p%d_16[clamp_ix((int)v%d,"
-                      "buf_szs[%d],2)];\n"
-                    : "%suint v%d = (uint)"
+                    ? "%suint v%d = v%d"
+                      " ? (uint)(ushort)"
+                      "p%d_16[(int)v%d] : 0u;\n"
+                    : "%suint v%d = v%d"
+                      " ? (uint)"
                       "((device ushort*)p%d)"
-                      "[clamp_ix((int)v%d,"
-                      "buf_szs[%d],2)];\n",
-                     pad, i, p, inst->x, p);
+                      "[(int)v%d] : 0u;\n",
+                     pad, i, inst->z, p, inst->x);
             } break;
             case op_store_16: {
                 int p = inst->ptr < 0
@@ -301,14 +309,14 @@ static void emit_ops(Buf *b, BB const *bb,
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 emit(b, mixed
-                    ? "%sp%d_16[clamp_ix((int)v%d,"
-                      "buf_szs[%d],2)]"
+                    ? "%sif (v%d) p%d_16"
+                      "[(int)v%d]"
                       " = (ushort)v%d;\n"
-                    : "%s((device ushort*)p%d)"
-                      "[clamp_ix((int)v%d,"
-                      "buf_szs[%d],2)]"
+                    : "%sif (v%d) ((device ushort*)p%d)"
+                      "[(int)v%d]"
                       " = (ushort)v%d;\n",
-                     pad, p, inst->x, p, inst->y);
+                     pad, inst->z, p, inst->x,
+                     inst->y);
             } break;
 
             case op_widen_f16:

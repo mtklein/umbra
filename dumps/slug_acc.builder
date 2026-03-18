@@ -142,6 +142,10 @@
   v141 = sel_32          v140 v135 v0
   v142 = add_f32         v138 v141
   v143 = sel_32          v54 v142 v0
-  v144 = load_32         p0
-  v145 = add_f32         v143 v144
-      store_32        p0 v145
+  v144 = buf_n           p0 >>2
+  v145 = lane_mask      
+  v146 = lt_u32          v1 v144
+  v147 = and_32          v145 v146
+  v148 = load_32         p0 mask v147
+  v149 = add_f32         v143 v148
+      store_32        p0 v149 mask v147

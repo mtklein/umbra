@@ -1320,10 +1320,10 @@ static void test_gather_clamp(void) {
                 {src,     (long)sizeof src},
                 {dst,     (long)sizeof dst},
             })) { continue; }
-            (dst[0] == 10) here;
+            (dst[0] ==  0) here;
             (dst[1] == 10) here;
             (dst[2] == 30) here;
-            (dst[3] == 30) here;
+            (dst[3] ==  0) here;
         }
         cleanup(&B);
     }
@@ -1347,10 +1347,10 @@ static void test_gather_clamp(void) {
                 {src,     (long)sizeof src},
                 {dst,     (long)sizeof dst},
             })) { continue; }
-            (dst[0] == 100) here;
+            (dst[0] ==   0) here;
             (dst[1] == 200) here;
-            (dst[2] == 300) here;
-            (dst[3] == 300) here;
+            (dst[2] ==   0) here;
+            (dst[3] ==   0) here;
         }
         cleanup(&B);
     }
@@ -1377,9 +1377,9 @@ static void test_scatter_clamp(void) {
             {vals,    (long)sizeof vals},
             {dst,     (long)sizeof dst},
         })) { continue; }
-        (dst[0] == 11) here;
+        (dst[0] ==  0) here;
         (dst[1] == 22) here;
-        (dst[2] == 33) here;
+        (dst[2] ==  0) here;
     }
     cleanup(&B);
   }
