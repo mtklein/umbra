@@ -99,8 +99,8 @@ void umbra_builder_free(builder *b) {
     free(b);
 }
 
-val umbra_lane(builder *b) {
-    return push(b, op_lane);
+val umbra_iota(builder *b) {
+    return push(b, op_iota);
 }
 
 val umbra_imm_i32(builder *b, int bits) {
@@ -132,16 +132,16 @@ void umbra_set_uni_len(builder *b, int len) {
     b->uni_len = len;
 }
 
-static int lane_plus_off(builder *b, int ix) {
+static int iota_plus_off(builder *b, int ix) {
     if (b->inst[ix].op != op_add_i32) { return -1; }
     int p = b->inst[ix].x, q = b->inst[ix].y;
-    if (b->inst[p].op == op_lane) { return q; }
-    if (b->inst[q].op == op_lane) { return p; }
+    if (b->inst[p].op == op_iota) { return q; }
+    if (b->inst[q].op == op_iota) { return p; }
     return -1;
 }
 
 val umbra_load_i16(builder *b, umbra_ptr src, val ix) {
-    if (b->inst[ix.id].op == op_lane) {
+    if (b->inst[ix.id].op == op_iota) {
         return push(b, op_load_16,
                          .ptr=src.ix);
     }
@@ -151,7 +151,7 @@ val umbra_load_i16(builder *b, umbra_ptr src, val ix) {
                          .ptr=src.ix);
     }
     {
-        int off = lane_plus_off(b, ix.id);
+        int off = iota_plus_off(b, ix.id);
         if (off >= 0) {
             return push(b, op_load_16,
                              .x=off, .ptr=src.ix);
@@ -161,7 +161,7 @@ val umbra_load_i16(builder *b, umbra_ptr src, val ix) {
                       .x=ix.id, .ptr=src.ix);
 }
 val umbra_load_i32(builder *b, umbra_ptr src, val ix) {
-    if (b->inst[ix.id].op == op_lane) {
+    if (b->inst[ix.id].op == op_iota) {
         return push(b, op_load_32,
                          .ptr=src.ix);
     }
@@ -171,7 +171,7 @@ val umbra_load_i32(builder *b, umbra_ptr src, val ix) {
                          .ptr=src.ix);
     }
     {
-        int off = lane_plus_off(b, ix.id);
+        int off = iota_plus_off(b, ix.id);
         if (off >= 0) {
             return push(b, op_load_32,
                              .x=off, .ptr=src.ix);
@@ -182,13 +182,13 @@ val umbra_load_i32(builder *b, umbra_ptr src, val ix) {
 }
 void umbra_store_i16(builder *b, umbra_ptr dst,
                    val ix, val v) {
-    if (b->inst[ix.id].op == op_lane) {
+    if (b->inst[ix.id].op == op_iota) {
         push(b, op_store_16,
              .y=v.id, .ptr=dst.ix);
         return;
     }
     {
-        int off = lane_plus_off(b, ix.id);
+        int off = iota_plus_off(b, ix.id);
         if (off >= 0) {
             push(b, op_store_16,
                  .x=off, .y=v.id, .ptr=dst.ix);
@@ -200,13 +200,13 @@ void umbra_store_i16(builder *b, umbra_ptr dst,
 }
 void umbra_store_i32(builder *b, umbra_ptr dst,
                    val ix, val v) {
-    if (b->inst[ix.id].op == op_lane) {
+    if (b->inst[ix.id].op == op_iota) {
         push(b, op_store_32,
              .y=v.id, .ptr=dst.ix);
         return;
     }
     {
-        int off = lane_plus_off(b, ix.id);
+        int off = iota_plus_off(b, ix.id);
         if (off >= 0) {
             push(b, op_store_32,
                  .x=off, .y=v.id, .ptr=dst.ix);
@@ -802,7 +802,7 @@ static void dump_insts(struct bb_inst const *inst,
                 fprintf(f, " p%d byte%d",
                         ip->ptr, ip->imm);
                 break;
-            case op_lane: break;
+            case op_iota: break;
 
             case op_store_16:
             case op_store_32:

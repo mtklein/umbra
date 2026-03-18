@@ -1,0 +1,13 @@
+Iota plan:
+    - rename lane to iota [0..N)
+    - introduce new lane op, always [0..K)
+    - use this to do the Slug accumulation by loading and storing to ptr+lane
+    - clear away the _m() APIs
+    - (This is a bit like allowing the user to allocate stack slots, but done externally.)
+
+Out of bounds handling:
+    - idea: instead of clamping load indices, load only in-bounds lanes, otherwise zero?
+    - idea: instead of clamping stores, store only in-bounds lanes, skipping others?
+    - we can obviously use avx mask-store ops for these, and I think avx gather ops too
+      but how can we do these efficiently on other platforms?  can we do a quick [i..i+K)
+      bounds check to still hit the full slab instructions most of the time?

@@ -120,7 +120,7 @@ static void emit_ops(Buf *b, BB const *bb,
         struct bb_inst const *inst = &bb->inst[i];
 
         switch (inst->op) {
-            case op_lane:
+            case op_iota:
                 if (varying) {
                     emit(b, "%su32 v%d = (u32)i;\n",
                          pad, i);

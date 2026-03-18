@@ -3,7 +3,7 @@
 
 static inline struct umbra_builder* build_srcover(void) {
     struct umbra_builder *b = umbra_builder();
-    umbra_val ix = umbra_lane(b);
+    umbra_val ix = umbra_iota(b);
 
     umbra_val px = umbra_load_i32(b, (umbra_ptr){0}, ix),
             mask = umbra_imm_i32(b, 0xFF);

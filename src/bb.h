@@ -2,7 +2,7 @@
 #include <stdint.h>
 
 #define OP_LIST(X)                                       \
-    X(lane)                                              \
+    X(iota)                                              \
     X(imm_32) X(uni_32) X(load_32)                      \
     X(gather_32) X(store_32) X(scatter_32)               \
     X(deref_ptr)                                         \
@@ -65,7 +65,7 @@ static inline _Bool has_ptr(enum op op) {
 }
 
 static inline _Bool is_varying(enum op op) {
-    return op == op_lane
+    return op == op_iota
         || op == op_load_16
         || op == op_load_32
         || op == op_store_16

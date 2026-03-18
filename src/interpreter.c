@@ -84,10 +84,10 @@ static I32 clamp_ix(I32 ix, long bytes, int elem) {
 
 op(imm_32) { v->i32 = (I32){0} + ip->x; next; }
 
-op(lane) {
-    I32 const iota = {0,1,2,3,4,5,6,7};
-    if (end & (K-1)) { v->i32 = iota + (end - 1); }
-    else             { v->i32 = iota + (end - K); }
+op(iota_fn) {
+    I32 const seq = {0,1,2,3,4,5,6,7};
+    if (end & (K-1)) { v->i32 = seq + (end - 1); }
+    else             { v->i32 = seq + (end - K); }
     next;
 }
 
@@ -595,8 +595,8 @@ struct umbra_interpreter* umbra_interpreter(
                           Y = id[inst->y] - n,
                           Z = id[inst->z] - n;
                 switch (inst->op) {
-                    case op_lane:
-                        emit(.fn=lane);
+                    case op_iota:
+                        emit(.fn=iota_fn);
                         break;
                     case op_imm_32:
                         emit(.fn=imm_32,

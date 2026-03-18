@@ -11,7 +11,7 @@ struct umbra_builder* umbra_draw_build(umbra_shader_fn   shader,
                                        umbra_store_fn    store,
                                        umbra_draw_layout *layout) {
     builder *builder = umbra_builder();
-    umbra_val ix = umbra_lane(builder);
+    umbra_val ix = umbra_iota(builder);
 
     int x0_ix = umbra_reserve(builder, 1);
     int y_ix  = umbra_reserve(builder, 1);
@@ -309,7 +309,7 @@ umbra_val umbra_coverage_bitmap(builder *builder, umbra_val x, umbra_val y) {
     int bmp_off = umbra_reserve_ptr(builder);
     umbra_ptr bmp = umbra_deref_ptr(builder,
                         (umbra_ptr){1}, bmp_off);
-    umbra_val ix = umbra_lane(builder);
+    umbra_val ix = umbra_iota(builder);
     umbra_val val = umbra_widen_s16(builder,
                         umbra_load_i16(builder, bmp, ix));
     umbra_val inv255 = umbra_imm_f32(builder,
@@ -322,7 +322,7 @@ umbra_val umbra_coverage_sdf(builder *builder, umbra_val x, umbra_val y) {
     (void)x; (void)y;
     int bmp_off = umbra_reserve_ptr(builder);
     umbra_ptr bmp = umbra_deref_ptr(builder, (umbra_ptr){1}, bmp_off);
-    umbra_val ix = umbra_lane(builder);
+    umbra_val ix = umbra_iota(builder);
     umbra_val raw = umbra_widen_s16(builder,
                         umbra_load_i16(builder, bmp, ix));
     umbra_val inv255 = umbra_imm_f32(builder,1.0f/255.0f);
@@ -343,7 +343,7 @@ umbra_val umbra_coverage_wind(builder *builder, umbra_val x, umbra_val y) {
     int off = umbra_reserve_ptr(builder);
     umbra_ptr w = umbra_deref_ptr(builder,
                       (umbra_ptr){1}, off);
-    umbra_val ix = umbra_lane(builder);
+    umbra_val ix = umbra_iota(builder);
     umbra_val raw = umbra_load_i32(builder, w, ix);
     return umbra_min_f32(builder,
         umbra_abs_f32(builder, raw),

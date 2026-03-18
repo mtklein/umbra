@@ -1,5 +1,5 @@
   v0   = imm_32          0x0
-  v1   = lane           
+  v1   = iota           
   v2   = uni_32          p1[0]
   v3   = imm_32          0x1
   v4   = uni_32          p1[1]

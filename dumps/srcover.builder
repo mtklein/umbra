@@ -1,5 +1,5 @@
   v0   = imm_32          0x0
-  v1   = lane           
+  v1   = iota           
   v2   = load_32         p0
   v3   = imm_32          0xff
   v4   = and_32          v2 v3

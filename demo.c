@@ -133,7 +133,7 @@ static void finish_pipe(pipe *p, builder *builder) {
 static void build_fill(int fmt) {
     free_pipe(&fill_pipe);
     builder *builder = umbra_builder();
-    umbra_val ix = umbra_lane(builder);
+    umbra_val ix = umbra_iota(builder);
     int fi = umbra_reserve(builder, 4);
     umbra_color c = {
         umbra_load_i32(builder, (umbra_ptr){1},
@@ -152,7 +152,7 @@ static void build_fill(int fmt) {
 static void build_readback(int fmt) {
     free_pipe(&readback_pipe);
     builder *builder = umbra_builder();
-    umbra_val ix = umbra_lane(builder);
+    umbra_val ix = umbra_iota(builder);
     umbra_color c =
         fmt_load[fmt](builder, (umbra_ptr){0}, ix);
     umbra_store_8888(builder, (umbra_ptr){2}, ix, c);
@@ -162,7 +162,7 @@ static void build_readback(int fmt) {
 static void build_hdr(int fmt) {
     free_pipe(&hdr_pipe);
     builder *builder = umbra_builder();
-    umbra_val ix = umbra_lane(builder);
+    umbra_val ix = umbra_iota(builder);
     umbra_color c =
         fmt_load[fmt](builder, (umbra_ptr){0}, ix);
     umbra_val ix4 = umbra_shl_i32(builder, ix,
