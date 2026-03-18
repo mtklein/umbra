@@ -106,6 +106,7 @@ void umbra_backend_flush      (struct umbra_backend*);
 void umbra_backend_free       (struct umbra_backend*);
 
 #include <stdio.h>
+void umbra_backend_dump       (struct umbra_backend*, FILE*);
 void umbra_dump_builder    (struct umbra_builder const*, FILE*);
 void umbra_dump_basic_block(struct umbra_basic_block const*, FILE*);
 void umbra_dump_jit        (struct umbra_jit const*, FILE*);

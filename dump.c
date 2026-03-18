@@ -2,7 +2,6 @@
 #include "umbra_draw.h"
 #include "slides/slide.h"
 #include "slides/slug.h"
-#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -13,9 +12,9 @@
   #define JIT_EXT "avx2"
 #endif
 
-static void dump_builder(char const *dir,
-                         char const *name,
-                         struct umbra_builder *b) {
+static void dump_bb(char const *dir,
+                    char const *name,
+                    struct umbra_builder *b) {
     char p[128];
     { snprintf(p, sizeof p,
                "%s/%s.builder", dir, name);
@@ -31,36 +30,30 @@ static void dump_builder(char const *dir,
       umbra_dump_basic_block(bb, f);
       fclose(f); }
 
-    struct umbra_jit   *jit = umbra_jit(bb);
-    struct umbra_metal *mtl = umbra_metal(bb);
+    struct umbra_backend *backs[] = {
+#ifdef JIT_EXT
+        umbra_backend_jit(bb),
+#endif
+        umbra_backend_metal(bb),
+    };
+    char const *exts[] = {
+#ifdef JIT_EXT
+        JIT_EXT ".mca",
+#endif
+        "metal",
+    };
     umbra_basic_block_free(bb);
 
-#ifdef JIT_EXT
-    if (jit) {
+    int nb = (int)(sizeof backs / sizeof backs[0]);
+    for (int i = 0; i < nb; i++) {
+        if (!backs[i]) { continue; }
         snprintf(p, sizeof p,
-                 "%s/%s." JIT_EXT, dir, name);
+                 "%s/%s.%s", dir, name, exts[i]);
         FILE *f = fopen(p, "w");
-        umbra_dump_jit(jit, f);
+        umbra_backend_dump(backs[i], f);
         fclose(f);
+        umbra_backend_free(backs[i]);
     }
-    if (jit) {
-        snprintf(p, sizeof p,
-                 "%s/%s." JIT_EXT ".mca", dir, name);
-        FILE *f = fopen(p, "w");
-        umbra_dump_jit_mca(jit, f);
-        fclose(f);
-    }
-#endif
-    if (mtl) {
-        snprintf(p, sizeof p,
-                 "%s/%s.metal", dir, name);
-        FILE *f = fopen(p, "w");
-        umbra_dump_metal(mtl, f);
-        fclose(f);
-    }
-
-    if (jit) { umbra_jit_free(jit); }
-    if (mtl) { umbra_metal_free(mtl); }
 }
 
 static void slugify(char const *title,
@@ -82,7 +75,7 @@ static void slugify(char const *title,
 }
 
 int main(void) {
-    dump_builder("dumps", "srcover",
+    dump_bb("dumps", "srcover",
         build_srcover());
 
     slides_init_for_dump();
@@ -93,14 +86,14 @@ int main(void) {
         slugify(s->title, dir, sizeof dir);
         mkdir(dir, 0755);
 
-        dump_builder(dir, "draw",
+        dump_bb(dir, "draw",
             umbra_draw_build(
                 s->shader, s->coverage,
                 s->blend, s->load, s->store,
                 NULL));
     }
 
-    dump_builder("dumps", "slug_acc",
+    dump_bb("dumps", "slug_acc",
         slug_build_acc(NULL));
 
     slides_cleanup();
