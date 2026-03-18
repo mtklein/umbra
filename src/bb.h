@@ -34,6 +34,7 @@ enum op {
 
 struct bb_inst {
     enum op op;
+    _Bool   uniform, pad_[3];
     int     x,y,z;
     int     ptr, imm;
 };

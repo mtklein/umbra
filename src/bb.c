@@ -30,6 +30,25 @@ static uint32_t bb_inst_hash(struct bb_inst const *inst) {
 }
 
 static val push_(builder *b, struct bb_inst inst) {
+    {
+        enum op op = inst.op;
+        if (op == op_imm_32 || op == op_uni_32
+         || op == op_uni_16 || op == op_deref_ptr) {
+            inst.uniform = 1;
+        } else if (is_varying(op) || op == op_iota
+                || op == op_gather_32
+                || op == op_gather_16
+                || op == op_scatter_32
+                || op == op_scatter_16) {
+            inst.uniform = 0;
+        } else {
+            inst.uniform =
+                (!inst.x || b->inst[inst.x].uniform)
+             && (!inst.y || b->inst[inst.y].uniform)
+             && (!inst.z || b->inst[inst.z].uniform);
+        }
+    }
+
     uint32_t const h = bb_inst_hash(&inst);
 
     for (int slot = (int)h; b->ht_mask; slot++) {
@@ -132,24 +151,6 @@ void umbra_set_uni_len(builder *b, int len) {
     b->uni_len = len;
 }
 
-static _Bool is_uniform(builder *b, int ix) {
-    enum op op = b->inst[ix].op;
-    if (op == op_imm_32 || op == op_uni_32
-     || op == op_uni_16 || op == op_deref_ptr) {
-        return 1;
-    }
-    if (is_varying(op) || op == op_iota
-     || op == op_gather_32 || op == op_gather_16
-     || op == op_scatter_32 || op == op_scatter_16) {
-        return 0;
-    }
-    struct bb_inst const *inst = &b->inst[ix];
-    if (inst->x && !is_uniform(b, inst->x)) { return 0; }
-    if (inst->y && !is_uniform(b, inst->y)) { return 0; }
-    if (inst->z && !is_uniform(b, inst->z)) { return 0; }
-    return 1;
-}
-
 static int iota_plus_off(builder *b, int ix) {
     if (b->inst[ix].op != op_add_i32) { return -1; }
     int p = b->inst[ix].x, q = b->inst[ix].y;
@@ -175,7 +176,7 @@ val umbra_load_i16(builder *b, umbra_ptr src, val ix) {
                              .x=off, .ptr=src.ix);
         }
     }
-    if (is_uniform(b, ix.id)) {
+    if (b->inst[ix.id].uniform) {
         return push(b, op_uni_16,
                          .x=ix.id, .ptr=src.ix);
     }
@@ -199,7 +200,7 @@ val umbra_load_i32(builder *b, umbra_ptr src, val ix) {
                              .x=off, .ptr=src.ix);
         }
     }
-    if (is_uniform(b, ix.id)) {
+    if (b->inst[ix.id].uniform) {
         return push(b, op_uni_32,
                          .x=ix.id, .ptr=src.ix);
     }
