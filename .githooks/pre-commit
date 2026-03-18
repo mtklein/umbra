@@ -1,4 +1,11 @@
 #!/bin/sh
-ninja               || exit 1
-git diff --quiet    || { git diff --stat; exit 1; }
-ninja 2>&1 | grep -q 'no work to do' || { echo "ninja not a no-op"; exit 1; }
+if ! ninja; then
+    echo "pre-commit: ninja failed, commit rejected"
+    exit 1
+fi
+if ! git diff --quiet; then
+    echo "pre-commit: unstaged changes remain after ninja"
+    git diff --stat
+    echo "Did you forget to 'git add' updated dumps?"
+    exit 1
+fi
