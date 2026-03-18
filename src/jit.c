@@ -405,10 +405,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             put(c, DUP_4s_w(s.rd, XI));
             if (!scalar) {
                 int8_t tmp = ra_alloc(ra, sl, ns);
-                put(c, MOVI_4s(tmp, 0, 0));
-                put(c, MOVZ_w(XT,1)); put(c, INS_s(tmp,1,XT));
-                put(c, MOVZ_w(XT,2)); put(c, INS_s(tmp,2,XT));
-                put(c, MOVZ_w(XT,3)); put(c, INS_s(tmp,3,XT));
+                load_imm_w(c, XT, 0x03020100u);
+                put(c, DUP_4s_w(tmp, XT));
+                put(c, 0x2f08a400u
+                    | ((uint32_t)tmp << 5)
+                    | (uint32_t)tmp);
+                put(c, 0x2f10a400u
+                    | ((uint32_t)tmp << 5)
+                    | (uint32_t)tmp);
                 put(c, ADD_4s(s.rd, s.rd, tmp));
                 ra_return_reg(ra, tmp);
             }
