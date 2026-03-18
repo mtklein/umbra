@@ -1,25 +1,335 @@
-/tmp/umbra_mca_loop_LEttD1.s:26:43: error: unknown token in expression
-                cbz     w11, 0x70 <ltmp0+0x70>
-                                              ^
-/tmp/umbra_mca_loop_LEttD1.s:30:43: error: unknown token in expression
-                cbz     w11, 0x80 <ltmp0+0x80>
-                                              ^
-/tmp/umbra_mca_loop_LEttD1.s:34:43: error: unknown token in expression
-                cbz     w11, 0x90 <ltmp0+0x90>
-                                              ^
-/tmp/umbra_mca_loop_LEttD1.s:38:43: error: unknown token in expression
-                cbz     w11, 0xa0 <ltmp0+0xa0>
-                                              ^
-/tmp/umbra_mca_loop_LEttD1.s:127:45: error: unknown token in expression
-                cbz     w11, 0x204 <ltmp0+0x204>
-                                                ^
-/tmp/umbra_mca_loop_LEttD1.s:131:45: error: unknown token in expression
-                cbz     w11, 0x214 <ltmp0+0x214>
-                                                ^
-/tmp/umbra_mca_loop_LEttD1.s:135:45: error: unknown token in expression
-                cbz     w11, 0x224 <ltmp0+0x224>
-                                                ^
-/tmp/umbra_mca_loop_LEttD1.s:139:45: error: unknown token in expression
-                cbz     w11, 0x234 <ltmp0+0x234>
-                                                ^
-error: Assembly input parsing had errors, use -skip-unsupported-instructions=parse-failure to drop failing lines from the input.
+Iterations:        100
+Instructions:      8600
+Total Cycles:      3080
+Total uOps:        9200
+
+Dispatch Width:    6
+uOps Per Cycle:    2.99
+IPC:               2.79
+Block RThroughput: 23.7
+
+
+Cycles with backend pressure increase [ 86.14% ]
+Throughput Bottlenecks: 
+  Resource Pressure       [ 48.77% ]
+  - CyUnitLS  [ 12.56% ]
+  - CyUnitV  [ 36.30% ]
+  - CyUnitVM  [ 7.69% ]
+  Data Dependencies:      [ 57.44% ]
+  - Register Dependencies [ 57.44% ]
+  - Memory Dependencies   [ 0.00% ]
+
+Critical sequence based on the simulation:
+
+              Instruction                                 Dependency Information
+ +----< 85.   ldr	q6, [x15, #32]
+ |
+ |    < loop carried > 
+ |
+ +----> 0.    ldr	x8, [x1]                          ## RESOURCE interference:  CyUnitLS [ probability: 99% ]
+ +----> 1.    ldr	q27, [x8, x12]                    ## REGISTER dependency:  x8
+ +----> 2.    and.16b	v28, v27, v22                     ## REGISTER dependency:  q27
+ +----> 3.    scvtf.4s	v28, v28                          ## REGISTER dependency:  q28
+ |      4.    dup.4s	v29, w9
+ |      5.    movi.4s	v30, #0
+ |      6.    mov	w10, #1
+ |      7.    mov.s	v30[1], w10
+ |      8.    mov	w10, #2
+ |      9.    mov.s	v30[2], w10
+ |      10.   mov	w10, #3
+ |      11.   mov.s	v30[3], w10
+ |      12.   add.4s	v29, v29, v30
+ |      13.   add.4s	v29, v29, v5
+ |      14.   scvtf.4s	v29, v29
+ |      15.   fcmge.4s	v30, v29, v19
+ |      16.   fcmgt.4s	v29, v21, v29
+ |      17.   and.16b	v30, v30, v29
+ |      18.   and.16b	v30, v30, v20
+ |      19.   bsl.16b	v30, v6, v4
+ +----> 20.   fmul.4s	v29, v23, v28                     ## REGISTER dependency:  q28
+ |      21.   ushr.4s	v31, v27, #24
+ |      22.   scvtf.4s	v31, v31
+ |      23.   str	q4, [x15]
+ |      24.   mov.16b	v4, v6
+ |      25.   fmls.4s	v4, v23, v31
+ |      26.   str	q5, [x15, #16]
+ |      27.   ldr	q5, [x15]
+ |      28.   str	q6, [x15, #32]
+ +----> 29.   fmul.4s	v6, v29, v24                      ## REGISTER dependency:  q29
+ |      30.   fmla.4s	v6, v7, v4
+ |      31.   fmla.4s	v6, v7, v29
+ |      32.   fmls.4s	v6, v23, v28
+ |      33.   fmul.4s	v6, v30, v6
+ |      34.   fmla.4s	v6, v23, v28
+ |      35.   mov.16b	v28, v26
+ |      36.   fmla.4s	v28, v6, v25
+ |      37.   fcvtzs.4s	v28, v28
+ |      38.   and.16b	v28, v22, v28
+ |      39.   ushr.4s	v6, v27, #8
+ +----> 40.   and.16b	v6, v22, v6                       ## RESOURCE interference:  CyUnitV [ probability: 93% ]
+ +----> 41.   scvtf.4s	v6, v6                            ## REGISTER dependency:  q6
+ |      42.   fmul.4s	v29, v23, v6
+ |      43.   str	q7, [x15, #48]
+ |      44.   fmul.4s	v7, v29, v24
+ |      45.   fmla.4s	v7, v16, v4
+ |      46.   fmla.4s	v7, v16, v29
+ |      47.   fmls.4s	v7, v23, v6
+ |      48.   fmul.4s	v7, v30, v7
+ +----> 49.   fmla.4s	v7, v23, v6                       ## REGISTER dependency:  q6
+ |      50.   mov.16b	v6, v26
+ +----> 51.   fmla.4s	v6, v7, v25                       ## REGISTER dependency:  q7
+ +----> 52.   fcvtzs.4s	v6, v6                            ## REGISTER dependency:  q6
+ +----> 53.   and.16b	v6, v22, v6                       ## REGISTER dependency:  q6
+ +----> 54.   sli.4s	v28, v6, #8                       ## REGISTER dependency:  q6
+ |      55.   ushr.4s	v27, v27, #16
+ |      56.   and.16b	v27, v22, v27
+ |      57.   scvtf.4s	v27, v27
+ |      58.   fmul.4s	v7, v23, v27
+ |      59.   fmul.4s	v6, v7, v24
+ |      60.   fmla.4s	v6, v17, v4
+ |      61.   fmla.4s	v6, v17, v7
+ |      62.   fmls.4s	v6, v23, v27
+ |      63.   fmul.4s	v6, v30, v6
+ |      64.   fmla.4s	v6, v23, v27
+ |      65.   mov.16b	v27, v26
+ |      66.   fmla.4s	v27, v6, v25
+ |      67.   fcvtzs.4s	v27, v27
+ |      68.   and.16b	v27, v22, v27
+ |      69.   sli.4s	v28, v27, #16
+ |      70.   fmul.4s	v6, v23, v31
+ |      71.   fmul.4s	v27, v6, v24
+ |      72.   fmla.4s	v27, v18, v4
+ +----> 73.   fmla.4s	v27, v18, v6                      ## RESOURCE interference:  CyUnitV [ probability: 47% ]
+ +----> 74.   fmls.4s	v27, v23, v31                     ## REGISTER dependency:  q27
+ +----> 75.   fmul.4s	v30, v30, v27                     ## REGISTER dependency:  q27
+ +----> 76.   fmla.4s	v30, v23, v31                     ## REGISTER dependency:  q30
+ |      77.   mov.16b	v31, v26
+ +----> 78.   fmla.4s	v31, v30, v25                     ## REGISTER dependency:  q30
+ +----> 79.   fcvtzs.4s	v31, v31                          ## REGISTER dependency:  q31
+ +----> 80.   sli.4s	v28, v31, #24                     ## REGISTER dependency:  q31
+ +----> 81.   str	q28, [x8, x12]                    ## REGISTER dependency:  q28
+ |      82.   ldr	q4, [x15]
+ |      83.   ldr	q5, [x15, #16]
+ |      84.   ldr	q7, [x15, #48]
+ |      85.   ldr	q6, [x15, #32]
+ |
+ |    < loop carried > 
+ |
+ +----> 26.   str	q5, [x15, #16]                    ## RESOURCE interference:  CyUnitLS [ probability: 98% ]
+
+
+Instruction Info:
+[1]: #uOps
+[2]: Latency
+[3]: RThroughput
+[4]: MayLoad
+[5]: MayStore
+[6]: HasSideEffects (U)
+
+[1]    [2]    [3]    [4]    [5]    [6]    Instructions:
+ 1      4     0.50    *                   ldr	x8, [x1]
+ 2      5     0.50    *                   ldr	q27, [x8, x12]
+ 1      2     0.33                        and.16b	v28, v27, v22
+ 1      2     0.33                        scvtf.4s	v28, v28
+ 2      7     0.50                        dup.4s	v29, w9
+ 1      2     0.33                        movi.4s	v30, #0
+ 1      1     0.25                        mov	w10, #1
+ 2      7     0.50                        mov.s	v30[1], w10
+ 1      1     0.25                        mov	w10, #2
+ 2      7     0.50                        mov.s	v30[2], w10
+ 1      1     0.25                        mov	w10, #3
+ 2      7     0.50                        mov.s	v30[3], w10
+ 1      2     0.33                        add.4s	v29, v29, v30
+ 1      2     0.33                        add.4s	v29, v29, v5
+ 1      2     0.33                        scvtf.4s	v29, v29
+ 1      2     0.33                        fcmge.4s	v30, v29, v19
+ 1      3     0.33                        fcmgt.4s	v29, v21, v29
+ 1      2     0.33                        and.16b	v30, v30, v29
+ 1      2     0.33                        and.16b	v30, v30, v20
+ 1      2     0.33                        bsl.16b	v30, v6, v4
+ 1      2     0.33                        fmul.4s	v29, v23, v28
+ 1      2     0.33                        ushr.4s	v31, v27, #24
+ 1      2     0.33                        scvtf.4s	v31, v31
+ 1      4     0.50           *            str	q4, [x15]
+ 1      2     0.33                        mov.16b	v4, v6
+ 1      2     0.33                        fmls.4s	v4, v23, v31
+ 1      4     0.50           *            str	q5, [x15, #16]
+ 1      4     0.50    *                   ldr	q5, [x15]
+ 1      4     0.50           *            str	q6, [x15, #32]
+ 1      2     0.33                        fmul.4s	v6, v29, v24
+ 1      8     0.50                        fmla.4s	v6, v7, v4
+ 1      8     0.50                        fmla.4s	v6, v7, v29
+ 1      2     0.33                        fmls.4s	v6, v23, v28
+ 1      2     0.33                        fmul.4s	v6, v30, v6
+ 1      8     0.50                        fmla.4s	v6, v23, v28
+ 1      2     0.33                        mov.16b	v28, v26
+ 1      8     0.50                        fmla.4s	v28, v6, v25
+ 1      2     0.33                        fcvtzs.4s	v28, v28
+ 1      2     0.33                        and.16b	v28, v22, v28
+ 1      2     0.33                        ushr.4s	v6, v27, #8
+ 1      2     0.33                        and.16b	v6, v22, v6
+ 1      2     0.33                        scvtf.4s	v6, v6
+ 1      2     0.33                        fmul.4s	v29, v23, v6
+ 1      4     0.50           *            str	q7, [x15, #48]
+ 1      2     0.33                        fmul.4s	v7, v29, v24
+ 1      8     0.50                        fmla.4s	v7, v16, v4
+ 1      8     0.50                        fmla.4s	v7, v16, v29
+ 1      2     0.33                        fmls.4s	v7, v23, v6
+ 1      2     0.33                        fmul.4s	v7, v30, v7
+ 1      8     0.50                        fmla.4s	v7, v23, v6
+ 1      2     0.33                        mov.16b	v6, v26
+ 1      8     0.50                        fmla.4s	v6, v7, v25
+ 1      2     0.33                        fcvtzs.4s	v6, v6
+ 1      2     0.33                        and.16b	v6, v22, v6
+ 1      2     0.33                        sli.4s	v28, v6, #8
+ 1      2     0.33                        ushr.4s	v27, v27, #16
+ 1      2     0.33                        and.16b	v27, v22, v27
+ 1      2     0.33                        scvtf.4s	v27, v27
+ 1      2     0.33                        fmul.4s	v7, v23, v27
+ 1      2     0.33                        fmul.4s	v6, v7, v24
+ 1      8     0.50                        fmla.4s	v6, v17, v4
+ 1      8     0.50                        fmla.4s	v6, v17, v7
+ 1      2     0.33                        fmls.4s	v6, v23, v27
+ 1      2     0.33                        fmul.4s	v6, v30, v6
+ 1      8     0.50                        fmla.4s	v6, v23, v27
+ 1      2     0.33                        mov.16b	v27, v26
+ 1      8     0.50                        fmla.4s	v27, v6, v25
+ 1      2     0.33                        fcvtzs.4s	v27, v27
+ 1      2     0.33                        and.16b	v27, v22, v27
+ 1      2     0.33                        sli.4s	v28, v27, #16
+ 1      2     0.33                        fmul.4s	v6, v23, v31
+ 1      2     0.33                        fmul.4s	v27, v6, v24
+ 1      8     0.50                        fmla.4s	v27, v18, v4
+ 1      8     0.50                        fmla.4s	v27, v18, v6
+ 1      2     0.33                        fmls.4s	v27, v23, v31
+ 1      2     0.33                        fmul.4s	v30, v30, v27
+ 1      8     0.50                        fmla.4s	v30, v23, v31
+ 1      2     0.33                        mov.16b	v31, v26
+ 1      8     0.50                        fmla.4s	v31, v30, v25
+ 1      2     0.33                        fcvtzs.4s	v31, v31
+ 1      2     0.33                        sli.4s	v28, v31, #24
+ 2      5     0.50           *            str	q28, [x8, x12]
+ 1      4     0.50    *                   ldr	q4, [x15]
+ 1      4     0.50    *                   ldr	q5, [x15, #16]
+ 1      4     0.50    *                   ldr	q7, [x15, #48]
+ 1      4     0.50    *                   ldr	q6, [x15, #32]
+
+
+Resources:
+[0.0] - CyUnitB
+[0.1] - CyUnitB
+[1]   - CyUnitBR
+[2.0] - CyUnitFloatDiv
+[2.1] - CyUnitFloatDiv
+[3.0] - CyUnitI
+[3.1] - CyUnitI
+[3.2] - CyUnitI
+[3.3] - CyUnitI
+[4]   - CyUnitID
+[5]   - CyUnitIM
+[6.0] - CyUnitIS
+[6.1] - CyUnitIS
+[7]   - CyUnitIntDiv
+[8.0] - CyUnitLS
+[8.1] - CyUnitLS
+[9.0] - CyUnitV
+[9.1] - CyUnitV
+[9.2] - CyUnitV
+[10]  - CyUnitVC
+[11]  - CyUnitVD
+[12.0] - CyUnitVM
+[12.1] - CyUnitVM
+
+
+Resource pressure per iteration:
+[0.0]  [0.1]  [1]    [2.0]  [2.1]  [3.0]  [3.1]  [3.2]  [3.3]  [4]    [5]    [6.0]  [6.1]  [7]    [8.0]  [8.1]  [9.0]  [9.1]  [9.2]  [10]   [11]   [12.0] [12.1] 
+ -      -      -      -      -     1.25   1.25   1.25   1.25    -      -     1.00   1.00    -     8.00   8.00   23.66  23.67  23.67   -      -     8.00   8.00   
+
+Resource pressure by instruction:
+[0.0]  [0.1]  [1]    [2.0]  [2.1]  [3.0]  [3.1]  [3.2]  [3.3]  [4]    [5]    [6.0]  [6.1]  [7]    [8.0]  [8.1]  [9.0]  [9.1]  [9.2]  [10]   [11]   [12.0] [12.1] Instructions:
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -     ldr	x8, [x1]
+ -      -      -      -      -     0.27   0.24   0.24   0.25    -      -     0.01   0.99    -     0.48   0.52    -      -      -      -      -      -      -     ldr	q27, [x8, x12]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.33   0.35    -      -      -      -     and.16b	v28, v27, v22
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.33   0.35    -      -      -      -     scvtf.4s	v28, v28
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.53   0.47   0.32   0.35   0.33    -      -      -      -     dup.4s	v29, w9
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.31   0.37   0.32    -      -      -      -     movi.4s	v30, #0
+ -      -      -      -      -     0.24   0.24   0.25   0.27    -      -      -      -      -      -      -      -      -      -      -      -      -      -     mov	w10, #1
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.06   0.94   0.33   0.33   0.34    -      -      -      -     mov.s	v30[1], w10
+ -      -      -      -      -     0.24   0.25   0.27   0.24    -      -      -      -      -      -      -      -      -      -      -      -      -      -     mov	w10, #2
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.06   0.94   0.33   0.37   0.30    -      -      -      -     mov.s	v30[2], w10
+ -      -      -      -      -     0.25   0.27   0.24   0.24    -      -      -      -      -      -      -      -      -      -      -      -      -      -     mov	w10, #3
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -     0.32   0.36   0.32    -      -      -      -     mov.s	v30[3], w10
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.30   0.35    -      -      -      -     add.4s	v29, v29, v30
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.37   0.30   0.33    -      -      -      -     add.4s	v29, v29, v5
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.33   0.32    -      -      -      -     scvtf.4s	v29, v29
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.32   0.35    -      -      -      -     fcmge.4s	v30, v29, v19
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.31   0.34   0.35    -      -      -      -     fcmgt.4s	v29, v21, v29
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.34   0.31    -      -      -      -     and.16b	v30, v30, v29
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.32   0.35    -      -      -      -     and.16b	v30, v30, v20
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.31   0.35    -      -      -      -     bsl.16b	v30, v6, v4
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.34   0.33    -      -      -      -     fmul.4s	v29, v23, v28
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.35   0.33    -      -      -      -     ushr.4s	v31, v27, #24
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.36   0.31    -      -      -      -     scvtf.4s	v31, v31
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.05   0.95    -      -      -      -      -      -      -     str	q4, [x15]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.33   0.35    -      -      -      -     mov.16b	v4, v6
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.34   0.33    -      -      -      -     fmls.4s	v4, v23, v31
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.95   0.05    -      -      -      -      -      -      -     str	q5, [x15, #16]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.92   0.08    -      -      -      -      -      -      -     ldr	q5, [x15]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.06   0.94    -      -      -      -      -      -      -     str	q6, [x15, #32]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.33   0.35    -      -      -      -     fmul.4s	v6, v29, v24
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.35   0.32    -      -     0.03   0.97   fmla.4s	v6, v7, v4
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.33   0.35    -      -     0.98   0.02   fmla.4s	v6, v7, v29
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.33   0.33    -      -      -      -     fmls.4s	v6, v23, v28
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.33   0.32    -      -      -      -     fmul.4s	v6, v30, v6
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.36   0.32   0.32    -      -     0.01   0.99   fmla.4s	v6, v23, v28
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.35   0.31    -      -      -      -     mov.16b	v28, v26
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.30   0.35    -      -     0.05   0.95   fmla.4s	v28, v6, v25
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.32   0.34    -      -      -      -     fcvtzs.4s	v28, v28
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.37   0.31   0.32    -      -      -      -     and.16b	v28, v22, v28
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.33   0.32    -      -      -      -     ushr.4s	v6, v27, #8
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.36   0.31    -      -      -      -     and.16b	v6, v22, v6
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.33   0.35    -      -      -      -     scvtf.4s	v6, v6
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.32   0.34    -      -      -      -     fmul.4s	v29, v23, v6
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.94   0.06    -      -      -      -      -      -      -     str	q7, [x15, #48]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.36   0.33   0.31    -      -      -      -     fmul.4s	v7, v29, v24
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.34   0.32    -      -     0.50   0.50   fmla.4s	v7, v16, v4
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.31   0.38   0.31    -      -     0.52   0.48   fmla.4s	v7, v16, v29
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.32   0.36    -      -      -      -     fmls.4s	v7, v23, v6
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.32   0.34    -      -      -      -     fmul.4s	v7, v30, v7
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.32   0.35    -      -     0.99   0.01   fmla.4s	v7, v23, v6
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.32   0.33    -      -      -      -     mov.16b	v6, v26
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.30   0.34   0.36    -      -     0.95   0.05   fmla.4s	v6, v7, v25
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.33   0.34    -      -      -      -     fcvtzs.4s	v6, v6
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.32   0.36    -      -      -      -     and.16b	v6, v22, v6
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.37   0.32   0.31    -      -      -      -     sli.4s	v28, v6, #8
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.34   0.32    -      -      -      -     ushr.4s	v27, v27, #16
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.35   0.33    -      -      -      -     and.16b	v27, v22, v27
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.31   0.36   0.33    -      -      -      -     scvtf.4s	v27, v27
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.32   0.34    -      -      -      -     fmul.4s	v7, v23, v27
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.32   0.34    -      -      -      -     fmul.4s	v6, v7, v24
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.31   0.33   0.36    -      -     0.97   0.03   fmla.4s	v6, v17, v4
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.35   0.33    -      -     0.03   0.97   fmla.4s	v6, v17, v7
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.33   0.34    -      -      -      -     fmls.4s	v6, v23, v27
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.33   0.33    -      -      -      -     fmul.4s	v6, v30, v6
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.32   0.35    -      -      -     1.00   fmla.4s	v6, v23, v27
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.36   0.34   0.30    -      -      -      -     mov.16b	v27, v26
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.36   0.31   0.33    -      -     0.04   0.96   fmla.4s	v27, v6, v25
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.34   0.33    -      -      -      -     fcvtzs.4s	v27, v27
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.33   0.34    -      -      -      -     and.16b	v27, v22, v27
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.31   0.35    -      -      -      -     sli.4s	v28, v27, #16
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.35   0.31    -      -      -      -     fmul.4s	v6, v23, v31
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.34   0.33    -      -      -      -     fmul.4s	v27, v6, v24
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.35   0.32    -      -     0.49   0.51   fmla.4s	v27, v18, v4
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.33   0.34    -      -     0.98   0.02   fmla.4s	v27, v18, v6
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.31   0.35    -      -      -      -     fmls.4s	v27, v23, v31
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.31   0.33   0.36    -      -      -      -     fmul.4s	v30, v30, v27
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.32   0.34    -      -     0.97   0.03   fmla.4s	v30, v23, v31
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.31   0.38   0.31    -      -      -      -     mov.16b	v31, v26
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.30   0.34   0.36    -      -     0.49   0.51   fmla.4s	v31, v30, v25
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.34   0.32    -      -      -      -     fcvtzs.4s	v31, v31
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.33   0.32    -      -      -      -     sli.4s	v28, v31, #24
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.99   0.01    -     0.95   0.05    -      -      -      -      -      -      -     str	q28, [x8, x12]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -     ldr	q4, [x15]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -     ldr	q5, [x15, #16]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -     ldr	q7, [x15, #48]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -     ldr	q6, [x15, #32]

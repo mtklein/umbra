@@ -1,97 +1,199 @@
-:63:40: error: unknown token in expression
-                je      0x166 <__text+0x166>
-                                            ^
-:68:40: error: unknown token in expression
-                je      0x183 <__text+0x183>
-                                            ^
-:74:40: error: unknown token in expression
-                je      0x19d <__text+0x19d>
-                                            ^
-:79:40: error: unknown token in expression
-                je      0x1ba <__text+0x1ba>
-                                            ^
-:85:40: error: unknown token in expression
-                je      0x1d2 <__text+0x1d2>
-                                            ^
-:90:40: error: unknown token in expression
-                je      0x1ef <__text+0x1ef>
-                                            ^
-:96:40: error: unknown token in expression
-                je      0x209 <__text+0x209>
-                                            ^
-:101:40: error: unknown token in expression
-                je      0x226 <__text+0x226>
-                                            ^
-:124:40: error: unknown token in expression
-                je      0x291 <__text+0x291>
-                                            ^
-:129:40: error: unknown token in expression
-                je      0x2ae <__text+0x2ae>
-                                            ^
-:135:40: error: unknown token in expression
-                je      0x2c8 <__text+0x2c8>
-                                            ^
-:140:40: error: unknown token in expression
-                je      0x2e5 <__text+0x2e5>
-                                            ^
-:146:40: error: unknown token in expression
-                je      0x2fd <__text+0x2fd>
-                                            ^
-:151:40: error: unknown token in expression
-                je      0x31a <__text+0x31a>
-                                            ^
-:157:40: error: unknown token in expression
-                je      0x334 <__text+0x334>
-                                            ^
-:162:40: error: unknown token in expression
-                je      0x351 <__text+0x351>
-                                            ^
-:185:40: error: unknown token in expression
-                je      0x3bc <__text+0x3bc>
-                                            ^
-:190:40: error: unknown token in expression
-                je      0x3d9 <__text+0x3d9>
-                                            ^
-:196:40: error: unknown token in expression
-                je      0x3f3 <__text+0x3f3>
-                                            ^
-:201:40: error: unknown token in expression
-                je      0x410 <__text+0x410>
-                                            ^
-:207:40: error: unknown token in expression
-                je      0x428 <__text+0x428>
-                                            ^
-:212:40: error: unknown token in expression
-                je      0x445 <__text+0x445>
-                                            ^
-:218:40: error: unknown token in expression
-                je      0x45f <__text+0x45f>
-                                            ^
-:223:40: error: unknown token in expression
-                je      0x47c <__text+0x47c>
-                                            ^
-:243:40: error: unknown token in expression
-                je      0x4d7 <__text+0x4d7>
-                                            ^
-:248:40: error: unknown token in expression
-                je      0x4f4 <__text+0x4f4>
-                                            ^
-:254:40: error: unknown token in expression
-                je      0x50e <__text+0x50e>
-                                            ^
-:259:40: error: unknown token in expression
-                je      0x52b <__text+0x52b>
-                                            ^
-:265:40: error: unknown token in expression
-                je      0x543 <__text+0x543>
-                                            ^
-:270:40: error: unknown token in expression
-                je      0x560 <__text+0x560>
-                                            ^
-:276:40: error: unknown token in expression
-                je      0x57a <__text+0x57a>
-                                            ^
-:281:40: error: unknown token in expression
-                je      0x597 <__text+0x597>
-                                            ^
-error: Assembly input parsing had errors, use -skip-unsupported-instructions=parse-failure to drop failing lines from the input.
+Iterations:        100
+Instructions:      4200
+Total Cycles:      1082
+Total uOps:        5000
+
+Dispatch Width:    6
+uOps Per Cycle:    4.62
+IPC:               3.88
+Block RThroughput: 10.0
+
+
+Cycles with backend pressure increase [ 69.50% ]
+Throughput Bottlenecks: 
+  Resource Pressure       [ 54.53% ]
+  - Zn4FP0  [ 4.99% ]
+  - Zn4FP1  [ 32.35% ]
+  - Zn4FP2  [ 54.53% ]
+  - Zn4FP3  [ 53.88% ]
+  - Zn4FP45  [ 4.44% ]
+  - Zn4FPSt  [ 4.44% ]
+  - Zn4LSU  [ 0.09% ]
+  Data Dependencies:      [ 65.16% ]
+  - Register Dependencies [ 65.16% ]
+  - Memory Dependencies   [ 0.00% ]
+
+Critical sequence based on the simulation:
+
+              Instruction                                 Dependency Information
+ +----< 0.    movq	(%rsi), %r11
+ +----> 1.    vmovdqu	(%r11,%r10,4), %ymm4              ## REGISTER dependency:  %r11
+ +----> 2.    vpand	%ymm1, %ymm4, %ymm5               ## REGISTER dependency:  %ymm4
+ +----> 3.    vcvtdq2ps	%ymm5, %ymm5                      ## REGISTER dependency:  %ymm5
+ |      4.    movq	16(%rsi), %r11
+ |      5.    vmovdqu	(%r11,%r10,2), %xmm6
+ +----> 6.    vcvtph2ps	%xmm6, %ymm6                      ## RESOURCE interference:  Zn4FP3 [ probability: 49% ]
+ |      7.    vpsrld	$24, %ymm4, %ymm7
+ +----> 8.    vcvtdq2ps	%ymm7, %ymm7                      ## RESOURCE interference:  Zn4FP2 [ probability: 52% ]
+ |      9.    vmovaps	%ymm3, %ymm8
+ |      10.   vfnmadd231ps	%ymm7, %ymm2, %ymm8
+ |      11.   vmulps	%ymm6, %ymm8, %ymm6
+ |      12.   vfmadd231ps	%ymm5, %ymm2, %ymm6
+ |      13.   vcvtps2ph	$4, %ymm6, %xmm6
+ |      14.   vmovdqu	%xmm6, (%r11,%r10,2)
+ +----> 15.   vpsrld	$8, %ymm4, %ymm6                  ## RESOURCE interference:  Zn4FP2 [ probability: 47% ]
+ +----> 16.   vpand	%ymm6, %ymm1, %ymm6               ## REGISTER dependency:  %ymm6
+ +----> 17.   vcvtdq2ps	%ymm6, %ymm6                      ## REGISTER dependency:  %ymm6
+ |      18.   movq	32(%rsi), %r11
+ |      19.   vmovdqu	(%r11,%r10,2), %xmm5
+ |      20.   vcvtph2ps	%xmm5, %ymm5
+ |      21.   vmulps	%ymm5, %ymm8, %ymm5
+ +----> 22.   vfmadd231ps	%ymm6, %ymm2, %ymm5       ## REGISTER dependency:  %ymm6
+ +----> 23.   vcvtps2ph	$4, %ymm5, %xmm5                  ## REGISTER dependency:  %ymm5
+ |      24.   vmovdqu	%xmm5, (%r11,%r10,2)
+ |      25.   vpsrld	$16, %ymm4, %ymm4
+ |      26.   vpand	%ymm4, %ymm1, %ymm4
+ +----> 27.   vcvtdq2ps	%ymm4, %ymm4                      ## RESOURCE interference:  Zn4FP3 [ probability: 46% ]
+ |      28.   movq	48(%rsi), %r11
+ |      29.   vmovdqu	(%r11,%r10,2), %xmm5
+ |      30.   vcvtph2ps	%xmm5, %ymm5
+ |      31.   vmulps	%ymm5, %ymm8, %ymm5
+ +----> 32.   vfmadd231ps	%ymm4, %ymm2, %ymm5       ## REGISTER dependency:  %ymm4
+ +----> 33.   vcvtps2ph	$4, %ymm5, %xmm5                  ## REGISTER dependency:  %ymm5
+ +----> 34.   vmovdqu	%xmm5, (%r11,%r10,2)              ## REGISTER dependency:  %xmm5
+        35.   movq	64(%rsi), %r11
+        36.   vmovdqu	(%r11,%r10,2), %xmm5
+        37.   vcvtph2ps	%xmm5, %ymm5
+        38.   vmulps	%ymm5, %ymm8, %ymm5
+        39.   vfmadd231ps	%ymm7, %ymm2, %ymm5
+        40.   vcvtps2ph	$4, %ymm5, %xmm5
+        41.   vmovdqu	%xmm5, (%r11,%r10,2)
+
+
+Instruction Info:
+[1]: #uOps
+[2]: Latency
+[3]: RThroughput
+[4]: MayLoad
+[5]: MayStore
+[6]: HasSideEffects (U)
+
+[1]    [2]    [3]    [4]    [5]    [6]    Instructions:
+ 1      5     0.33    *                   movq	(%rsi), %r11
+ 1      8     0.50    *                   vmovdqu	(%r11,%r10,4), %ymm4
+ 1      1     0.25                        vpand	%ymm1, %ymm4, %ymm5
+ 1      3     0.50                        vcvtdq2ps	%ymm5, %ymm5
+ 1      5     0.33    *                   movq	16(%rsi), %r11
+ 1      8     0.50    *                   vmovdqu	(%r11,%r10,2), %xmm6
+ 2      4     1.00                        vcvtph2ps	%xmm6, %ymm6
+ 1      1     0.50                        vpsrld	$24, %ymm4, %ymm7
+ 1      3     0.50                        vcvtdq2ps	%ymm7, %ymm7
+ 1      0     0.17                        vmovaps	%ymm3, %ymm8
+ 1      4     0.50                        vfnmadd231ps	%ymm7, %ymm2, %ymm8
+ 1      3     0.50                        vmulps	%ymm6, %ymm8, %ymm6
+ 1      4     0.50                        vfmadd231ps	%ymm5, %ymm2, %ymm6
+ 2      6     1.00                        vcvtps2ph	$4, %ymm6, %xmm6
+ 1      1     1.00           *            vmovdqu	%xmm6, (%r11,%r10,2)
+ 1      1     0.50                        vpsrld	$8, %ymm4, %ymm6
+ 1      1     0.25                        vpand	%ymm6, %ymm1, %ymm6
+ 1      3     0.50                        vcvtdq2ps	%ymm6, %ymm6
+ 1      5     0.33    *                   movq	32(%rsi), %r11
+ 1      8     0.50    *                   vmovdqu	(%r11,%r10,2), %xmm5
+ 2      4     1.00                        vcvtph2ps	%xmm5, %ymm5
+ 1      3     0.50                        vmulps	%ymm5, %ymm8, %ymm5
+ 1      4     0.50                        vfmadd231ps	%ymm6, %ymm2, %ymm5
+ 2      6     1.00                        vcvtps2ph	$4, %ymm5, %xmm5
+ 1      1     1.00           *            vmovdqu	%xmm5, (%r11,%r10,2)
+ 1      1     0.50                        vpsrld	$16, %ymm4, %ymm4
+ 1      1     0.25                        vpand	%ymm4, %ymm1, %ymm4
+ 1      3     0.50                        vcvtdq2ps	%ymm4, %ymm4
+ 1      5     0.33    *                   movq	48(%rsi), %r11
+ 1      8     0.50    *                   vmovdqu	(%r11,%r10,2), %xmm5
+ 2      4     1.00                        vcvtph2ps	%xmm5, %ymm5
+ 1      3     0.50                        vmulps	%ymm5, %ymm8, %ymm5
+ 1      4     0.50                        vfmadd231ps	%ymm4, %ymm2, %ymm5
+ 2      6     1.00                        vcvtps2ph	$4, %ymm5, %xmm5
+ 1      1     1.00           *            vmovdqu	%xmm5, (%r11,%r10,2)
+ 1      5     0.33    *                   movq	64(%rsi), %r11
+ 1      8     0.50    *                   vmovdqu	(%r11,%r10,2), %xmm5
+ 2      4     1.00                        vcvtph2ps	%xmm5, %ymm5
+ 1      3     0.50                        vmulps	%ymm5, %ymm8, %ymm5
+ 1      4     0.50                        vfmadd231ps	%ymm7, %ymm2, %ymm5
+ 2      6     1.00                        vcvtps2ph	$4, %ymm5, %xmm5
+ 1      1     1.00           *            vmovdqu	%xmm5, (%r11,%r10,2)
+
+
+Resources:
+[0]   - Zn4AGU0
+[1]   - Zn4AGU1
+[2]   - Zn4AGU2
+[3]   - Zn4ALU0
+[4]   - Zn4ALU1
+[5]   - Zn4ALU2
+[6]   - Zn4ALU3
+[7]   - Zn4BRU1
+[8]   - Zn4FP0
+[9]   - Zn4FP1
+[10]  - Zn4FP2
+[11]  - Zn4FP3
+[12.0] - Zn4FP45
+[12.1] - Zn4FP45
+[13]  - Zn4FPSt
+[14.0] - Zn4LSU
+[14.1] - Zn4LSU
+[14.2] - Zn4LSU
+[15.0] - Zn4Load
+[15.1] - Zn4Load
+[15.2] - Zn4Load
+[16.0] - Zn4Store
+[16.1] - Zn4Store
+
+
+Resource pressure per iteration:
+[0]    [1]    [2]    [3]    [4]    [5]    [6]    [7]    [8]    [9]    [10]   [11]   [12.0] [12.1] [13]   [14.0] [14.1] [14.2] [15.0] [15.1] [15.2] [16.0] [16.1] 
+1.66   1.67   1.67    -      -      -      -      -     6.48   7.50   10.52  10.50  4.50   4.50   4.00   4.66   4.67   4.67   3.33   3.33   3.34   2.00   2.00   
+
+Resource pressure by instruction:
+[0]    [1]    [2]    [3]    [4]    [5]    [6]    [7]    [8]    [9]    [10]   [11]   [12.0] [12.1] [13]   [14.0] [14.1] [14.2] [15.0] [15.1] [15.2] [16.0] [16.1] Instructions:
+0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.33   0.35   0.33   0.33   0.34    -      -     movq	(%rsi), %r11
+ -      -      -      -      -      -      -      -      -      -      -      -     0.96   0.04    -     0.34   0.33   0.33   0.34   0.32   0.34    -      -     vmovdqu	(%r11,%r10,4), %ymm4
+ -      -      -      -      -      -      -      -     0.49   0.50    -     0.01    -      -      -      -      -      -      -      -      -      -      -     vpand	%ymm1, %ymm4, %ymm5
+ -      -      -      -      -      -      -      -      -      -     0.49   0.51    -      -      -      -      -      -      -      -      -      -      -     vcvtdq2ps	%ymm5, %ymm5
+0.33   0.34   0.33    -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.35   0.33   0.33   0.34   0.33    -      -     movq	16(%rsi), %r11
+ -      -      -      -      -      -      -      -      -      -      -      -     0.52   0.48    -     0.32   0.36   0.32   0.33   0.34   0.33    -      -     vmovdqu	(%r11,%r10,2), %xmm6
+ -      -      -      -      -      -      -      -      -      -     1.04   0.96    -      -      -      -      -      -      -      -      -      -      -     vcvtph2ps	%xmm6, %ymm6
+ -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	$24, %ymm4, %ymm7
+ -      -      -      -      -      -      -      -      -      -     0.48   0.52    -      -      -      -      -      -      -      -      -      -      -     vcvtdq2ps	%ymm7, %ymm7
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vmovaps	%ymm3, %ymm8
+ -      -      -      -      -      -      -      -     0.52   0.48    -      -      -      -      -      -      -      -      -      -      -      -      -     vfnmadd231ps	%ymm7, %ymm2, %ymm8
+ -      -      -      -      -      -      -      -     0.53   0.47    -      -      -      -      -      -      -      -      -      -      -      -      -     vmulps	%ymm6, %ymm8, %ymm6
+ -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm5, %ymm2, %ymm6
+ -      -      -      -      -      -      -      -      -      -     1.92   0.08    -      -      -      -      -      -      -      -      -      -      -     vcvtps2ph	$4, %ymm6, %xmm6
+ -      -      -      -      -      -      -      -      -      -      -      -     0.47   0.53   1.00   0.34   0.33   0.33    -      -      -      -     1.00   vmovdqu	%xmm6, (%r11,%r10,2)
+ -      -      -      -      -      -      -      -      -     0.98   0.02    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	$8, %ymm4, %ymm6
+ -      -      -      -      -      -      -      -     0.04   0.48    -     0.48    -      -      -      -      -      -      -      -      -      -      -     vpand	%ymm6, %ymm1, %ymm6
+ -      -      -      -      -      -      -      -      -      -     0.03   0.97    -      -      -      -      -      -      -      -      -      -      -     vcvtdq2ps	%ymm6, %ymm6
+0.34   0.33   0.33    -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.32   0.34   0.33   0.34   0.33    -      -     movq	32(%rsi), %r11
+ -      -      -      -      -      -      -      -      -      -      -      -     0.95   0.05    -     0.34   0.34   0.32   0.34   0.33   0.33    -      -     vmovdqu	(%r11,%r10,2), %xmm5
+ -      -      -      -      -      -      -      -      -      -     1.94   0.06    -      -      -      -      -      -      -      -      -      -      -     vcvtph2ps	%xmm5, %ymm5
+ -      -      -      -      -      -      -      -     0.47   0.53    -      -      -      -      -      -      -      -      -      -      -      -      -     vmulps	%ymm5, %ymm8, %ymm5
+ -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm6, %ymm2, %ymm5
+ -      -      -      -      -      -      -      -      -      -     0.08   1.92    -      -      -      -      -      -      -      -      -      -      -     vcvtps2ph	$4, %ymm5, %xmm5
+ -      -      -      -      -      -      -      -      -      -      -      -     0.05   0.95   1.00   0.33   0.34   0.33    -      -      -     1.00    -     vmovdqu	%xmm5, (%r11,%r10,2)
+ -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	$16, %ymm4, %ymm4
+ -      -      -      -      -      -      -      -     0.47   0.03   0.03   0.47    -      -      -      -      -      -      -      -      -      -      -     vpand	%ymm4, %ymm1, %ymm4
+ -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -      -     vcvtdq2ps	%ymm4, %ymm4
+0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.33   0.33   0.34   0.33   0.33    -      -     movq	48(%rsi), %r11
+ -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -     0.33   0.33   0.34   0.34   0.33   0.33    -      -     vmovdqu	(%r11,%r10,2), %xmm5
+ -      -      -      -      -      -      -      -      -      -     0.06   1.94    -      -      -      -      -      -      -      -      -      -      -     vcvtph2ps	%xmm5, %ymm5
+ -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -      -      -     vmulps	%ymm5, %ymm8, %ymm5
+ -      -      -      -      -      -      -      -     0.53   0.47    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm4, %ymm2, %ymm5
+ -      -      -      -      -      -      -      -      -      -     1.02   0.98    -      -      -      -      -      -      -      -      -      -      -     vcvtps2ph	$4, %ymm5, %xmm5
+ -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50   1.00   0.33   0.33   0.34    -      -      -      -     1.00   vmovdqu	%xmm5, (%r11,%r10,2)
+0.33   0.34   0.33    -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.32   0.36   0.32   0.34   0.34    -      -     movq	64(%rsi), %r11
+ -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -     0.33   0.34   0.33   0.33   0.33   0.34    -      -     vmovdqu	(%r11,%r10,2), %xmm5
+ -      -      -      -      -      -      -      -      -      -     0.98   1.02    -      -      -      -      -      -      -      -      -      -      -     vcvtph2ps	%xmm5, %ymm5
+ -      -      -      -      -      -      -      -     0.96   0.04    -      -      -      -      -      -      -      -      -      -      -      -      -     vmulps	%ymm5, %ymm8, %ymm5
+ -      -      -      -      -      -      -      -     0.48   0.52    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm7, %ymm2, %ymm5
+ -      -      -      -      -      -      -      -      -      -     1.92   0.08    -      -      -      -      -      -      -      -      -      -      -     vcvtps2ph	$4, %ymm5, %xmm5
+ -      -      -      -      -      -      -      -      -      -      -      -     0.05   0.95   1.00   0.36   0.32   0.32    -      -      -     1.00    -     vmovdqu	%xmm5, (%r11,%r10,2)

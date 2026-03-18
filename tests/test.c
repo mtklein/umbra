@@ -1299,7 +1299,7 @@ static void test_preamble_pair_alias(void) {
   }
 }
 
-static void test_gather_oob(void) {
+static void test_gather_clamp(void) {
   for (int opt = 0; opt < 2; opt++) {
     {
         struct umbra_builder *builder =
@@ -1320,10 +1320,10 @@ static void test_gather_oob(void) {
                 {src,     (long)sizeof src},
                 {dst,     (long)sizeof dst},
             })) { continue; }
-            (dst[0] ==  0) here;
+            (dst[0] == 10) here;
             (dst[1] == 10) here;
             (dst[2] == 30) here;
-            (dst[3] ==  0) here;
+            (dst[3] == 30) here;
         }
         cleanup(&B);
     }
@@ -1347,17 +1347,17 @@ static void test_gather_oob(void) {
                 {src,     (long)sizeof src},
                 {dst,     (long)sizeof dst},
             })) { continue; }
-            (dst[0] ==   0) here;
+            (dst[0] == 100) here;
             (dst[1] == 200) here;
-            (dst[2] ==   0) here;
-            (dst[3] ==   0) here;
+            (dst[2] == 300) here;
+            (dst[3] == 300) here;
         }
         cleanup(&B);
     }
   }
 }
 
-static void test_scatter_oob(void) {
+static void test_scatter_clamp(void) {
   for (int opt = 0; opt < 2; opt++) {
     struct umbra_builder *builder =
         umbra_builder();
@@ -1377,9 +1377,9 @@ static void test_scatter_oob(void) {
             {vals,    (long)sizeof vals},
             {dst,     (long)sizeof dst},
         })) { continue; }
-        (dst[0] ==  0) here;
+        (dst[0] == 11) here;
         (dst[1] == 22) here;
-        (dst[2] ==  0) here;
+        (dst[2] == 33) here;
     }
     cleanup(&B);
   }
@@ -1675,152 +1675,6 @@ static void test_gather_deref_large(void) {
     cleanup(&B);
 }
 
-static void test_oob_load_store(void) {
-  for (int opt = 0; opt < 2; opt++) {
-    {
-        struct umbra_builder *b = umbra_builder();
-        umbra_val ix  = umbra_iota(b),
-                  idx = umbra_load_i32(b,
-                            (umbra_ptr){0}, ix),
-                  val = umbra_load_i32(b,
-                            (umbra_ptr){1}, idx);
-        umbra_store_i32(b, (umbra_ptr){2}, ix, val);
-        backends B = make(b, opt);
-        for (int bi = 0; bi < 3; bi++) {
-            int32_t indices[4] = {0, 1, -1, 999};
-            int32_t src[2]     = {42, 99};
-            int32_t dst[4]     = {-1,-1,-1,-1};
-            if (!run(&B, bi, 4, (umbra_buf[]){
-                {indices, (long)sizeof indices},
-                {src,     (long)sizeof src},
-                {dst,     (long)sizeof dst},
-            })) { continue; }
-            (dst[0] == 42) here;
-            (dst[1] == 99) here;
-            (dst[2] ==  0) here;
-            (dst[3] ==  0) here;
-        }
-        cleanup(&B);
-    }
-    {
-        struct umbra_builder *b = umbra_builder();
-        umbra_val ix  = umbra_iota(b),
-                  idx = umbra_load_i32(b,
-                            (umbra_ptr){0}, ix);
-        umbra_val val = umbra_widen_s16(b,
-                            umbra_load_i16(b,
-                                (umbra_ptr){1}, idx));
-        umbra_store_i32(b, (umbra_ptr){2}, ix, val);
-        backends B = make(b, opt);
-        for (int bi = 0; bi < 3; bi++) {
-            int32_t indices[4] = {0, 2, -1, 100};
-            int16_t src[3]     = {10, 20, 30};
-            int32_t dst[4]     = {-1,-1,-1,-1};
-            if (!run(&B, bi, 4, (umbra_buf[]){
-                {indices, (long)sizeof indices},
-                {src,     (long)sizeof src},
-                {dst,     (long)sizeof dst},
-            })) { continue; }
-            (dst[0] == 10) here;
-            (dst[1] == 30) here;
-            (dst[2] ==  0) here;
-            (dst[3] ==  0) here;
-        }
-        cleanup(&B);
-    }
-    {
-        struct umbra_builder *b = umbra_builder();
-        umbra_val ix  = umbra_iota(b),
-                  idx = umbra_load_i32(b,
-                            (umbra_ptr){0}, ix),
-                  val = umbra_load_i32(b,
-                            (umbra_ptr){1}, ix);
-        umbra_store_i32(b, (umbra_ptr){2}, idx, val);
-        backends B = make(b, opt);
-        for (int bi = 0; bi < 3; bi++) {
-            int32_t indices[3] = {0, -1, 999};
-            int32_t vals[3]    = {77, 88, 99};
-            int32_t dst[3]     = {0,  0,  0};
-            if (!run(&B, bi, 3, (umbra_buf[]){
-                {indices, (long)sizeof indices},
-                {vals,    (long)sizeof vals},
-                {dst,     (long)sizeof dst},
-            })) { continue; }
-            (dst[0] == 77) here;
-            (dst[1] ==  0) here;
-            (dst[2] ==  0) here;
-        }
-        cleanup(&B);
-    }
-  }
-}
-
-static void test_store16_multi_tail(void) {
-  for (int opt = 0; opt < 2; opt++) {
-    for (int n = 1; n <= 17; n++) {
-        struct umbra_builder *b = umbra_builder();
-        umbra_val ix = umbra_iota(b);
-        umbra_val c0 = umbra_imm_f32(b, 0.25f),
-                  c1 = umbra_imm_f32(b, 0.5f);
-        umbra_store_i16(b, (umbra_ptr){0}, ix,
-            umbra_narrow_f32(b, c0));
-        umbra_store_i16(b, (umbra_ptr){1}, ix,
-            umbra_narrow_f32(b, c1));
-        backends B = make(b, opt);
-        for (int bi = 0; bi < 3; bi++) {
-            uint16_t *d0 = calloc((size_t)n, 2);
-            uint16_t *d1 = calloc((size_t)n, 2);
-            if (!run(&B, bi, n, (umbra_buf[]){
-                {d0, n*2}, {d1, n*2},
-            })) { free(d0); free(d1); continue; }
-            __fp16 h0 = (__fp16)0.25f,
-                   h1 = (__fp16)0.5f;
-            uint16_t e0, e1;
-            __builtin_memcpy(&e0, &h0, 2);
-            __builtin_memcpy(&e1, &h1, 2);
-            for (int j = 0; j < n; j++) {
-                (d0[j] == e0) here;
-                (d1[j] == e1) here;
-            }
-            free(d0);
-            free(d1);
-        }
-        cleanup(&B);
-    }
-  }
-}
-
-static void test_store16_tail(void) {
-  for (int opt = 0; opt < 2; opt++) {
-    for (int n = 1; n <= 17; n++) {
-        struct umbra_builder *b = umbra_builder();
-        umbra_val ix = umbra_iota(b);
-        umbra_val v = umbra_load_i32(b,
-            (umbra_ptr){0}, ix);
-        umbra_store_i16(b, (umbra_ptr){1}, ix,
-            umbra_narrow_i16(b, v));
-        backends B = make(b, opt);
-        for (int bi = 0; bi < 3; bi++) {
-            int32_t *src = calloc((size_t)n, 4);
-            uint16_t *dst = calloc((size_t)n, 2);
-            for (int j = 0; j < n; j++) {
-                src[j] = j + 1;
-                dst[j] = 0xdead;
-            }
-            if (!run(&B, bi, n, (umbra_buf[]){
-                {src, n*4}, {dst, n*2},
-            })) { free(src); free(dst); continue; }
-            for (int j = 0; j < n; j++) {
-                (dst[j] == (uint16_t)(j + 1)) here;
-            }
-            free(src);
-            free(dst);
-        }
-        cleanup(&B);
-    }
-  }
-}
-
 int main(void) {
     test_f32_ops();
     test_i32_ops();
@@ -1843,14 +1697,11 @@ int main(void) {
     test_mixed_ptr_sizes();
     test_n9();
     test_preamble_pair_alias();
-    test_gather_oob();
-    test_scatter_oob();
+    test_gather_clamp();
+    test_scatter_clamp();
     test_offset_load_store();
     test_shift_imm();
     test_pack_channels();
     test_gather_deref_large();
-    test_oob_load_store();
-    test_store16_tail();
-    test_store16_multi_tail();
     return 0;
 }

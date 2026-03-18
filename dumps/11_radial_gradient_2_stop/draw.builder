@@ -88,8 +88,4 @@
   v87  = or_32           v84 v86
   v88  = pack            v84 v65 24
   v89  = join            v87 v88
-  v90  = buf_n           p0 >>2
-  v91  = lane_mask      
-  v92  = lt_u32          v1 v90
-  v93  = and_32          v91 v92
-      store_32        p0 v89 mask v93
+      store_32        p0 v89

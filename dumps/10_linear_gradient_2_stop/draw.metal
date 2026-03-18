@@ -1,6 +1,12 @@
 #include <metal_stdlib>
 using namespace metal;
 
+static inline int clamp_ix(int ix, uint bytes, int elem) {
+    int hi = (int)(bytes / (uint)elem) - 1;
+    if (hi < 0) hi = 0;
+    return clamp(ix, 0, hi);
+}
+
 kernel void umbra_entry(
     constant uint &n [[buffer(0)]],
     device uchar *p0 [[buffer(1)]],
@@ -33,37 +39,33 @@ kernel void umbra_entry(
     uint v21 = 1132396544u;
     uint v22 = 1056964608u;
     uint v23 = 255u;
-    uint v24 = buf_szs[0] >> 2u;
-    uint v25 = i;
-    uint v26 = v25 + v1;
-    uint v27 = as_type<uint>((float)(int)v26);
-    uint v28 = as_type<uint>(fma(as_type<float>(v27), as_type<float>(v4), as_type<float>(v7)));
-    uint v29 = as_type<uint>(as_type<float>(v6) + as_type<float>(v28));
-    uint v30 = as_type<uint>(max(as_type<float>(v0), as_type<float>(v29)));
-    uint v31 = as_type<uint>(min(as_type<float>(v30), as_type<float>(v8)));
-    uint v32 = as_type<uint>(fma(as_type<float>(v31), as_type<float>(v17), as_type<float>(v9)));
-    uint v33 = as_type<uint>(fma(as_type<float>(v32), as_type<float>(v21), as_type<float>(v22)));
-    uint v34 = (uint)(int)as_type<float>(v33);
-    uint v35 = v34 & v23;
-    uint v36 = as_type<uint>(fma(as_type<float>(v31), as_type<float>(v18), as_type<float>(v10)));
-    uint v37 = as_type<uint>(fma(as_type<float>(v36), as_type<float>(v21), as_type<float>(v22)));
-    uint v38 = (uint)(int)as_type<float>(v37);
-    uint v39 = v38 & v23;
-    uint v40 = v39 << 8u;
-    uint v41 = v35 | v40;
-    uint v42 = as_type<uint>(fma(as_type<float>(v31), as_type<float>(v19), as_type<float>(v11)));
-    uint v43 = as_type<uint>(fma(as_type<float>(v42), as_type<float>(v21), as_type<float>(v22)));
-    uint v44 = (uint)(int)as_type<float>(v43);
-    uint v45 = v44 & v23;
-    uint v46 = v45 << 16u;
-    uint v47 = v41 | v46;
-    uint v48 = as_type<uint>(fma(as_type<float>(v31), as_type<float>(v20), as_type<float>(v12)));
-    uint v49 = as_type<uint>(fma(as_type<float>(v48), as_type<float>(v21), as_type<float>(v22)));
-    uint v50 = (uint)(int)as_type<float>(v49);
-    uint v51 = v50 << 24u;
-    uint v52 = v47 | v51;
-    uint v53 = 0xffffffffu;
-    uint v54 = v25 <  v24 ? 0xffffffffu : 0u;
-    uint v55 = v53 & v54;
-    ((device uint*)p0)[i] = v52;
+    uint v24 = i;
+    uint v25 = v24 + v1;
+    uint v26 = as_type<uint>((float)(int)v25);
+    uint v27 = as_type<uint>(fma(as_type<float>(v26), as_type<float>(v4), as_type<float>(v7)));
+    uint v28 = as_type<uint>(as_type<float>(v6) + as_type<float>(v27));
+    uint v29 = as_type<uint>(max(as_type<float>(v0), as_type<float>(v28)));
+    uint v30 = as_type<uint>(min(as_type<float>(v29), as_type<float>(v8)));
+    uint v31 = as_type<uint>(fma(as_type<float>(v30), as_type<float>(v17), as_type<float>(v9)));
+    uint v32 = as_type<uint>(fma(as_type<float>(v31), as_type<float>(v21), as_type<float>(v22)));
+    uint v33 = (uint)(int)as_type<float>(v32);
+    uint v34 = v33 & v23;
+    uint v35 = as_type<uint>(fma(as_type<float>(v30), as_type<float>(v18), as_type<float>(v10)));
+    uint v36 = as_type<uint>(fma(as_type<float>(v35), as_type<float>(v21), as_type<float>(v22)));
+    uint v37 = (uint)(int)as_type<float>(v36);
+    uint v38 = v37 & v23;
+    uint v39 = v38 << 8u;
+    uint v40 = v34 | v39;
+    uint v41 = as_type<uint>(fma(as_type<float>(v30), as_type<float>(v19), as_type<float>(v11)));
+    uint v42 = as_type<uint>(fma(as_type<float>(v41), as_type<float>(v21), as_type<float>(v22)));
+    uint v43 = (uint)(int)as_type<float>(v42);
+    uint v44 = v43 & v23;
+    uint v45 = v44 << 16u;
+    uint v46 = v40 | v45;
+    uint v47 = as_type<uint>(fma(as_type<float>(v30), as_type<float>(v20), as_type<float>(v12)));
+    uint v48 = as_type<uint>(fma(as_type<float>(v47), as_type<float>(v21), as_type<float>(v22)));
+    uint v49 = (uint)(int)as_type<float>(v48);
+    uint v50 = v49 << 24u;
+    uint v51 = v46 | v50;
+    ((device uint*)p0)[i] = v51;
 }
