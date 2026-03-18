@@ -837,6 +837,7 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
 }
 
 void umbra_basic_block_free(struct umbra_basic_block *bb) {
+    if (!bb) { return; }
     free(bb->inst);
     free(bb);
 }

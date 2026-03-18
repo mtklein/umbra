@@ -1,13 +1,17 @@
 #include "backend.h"
 #include <stdlib.h>
 
+typedef struct umbra_backend*
+    (*build_fn)(struct umbra_basic_block const*);
+
 struct umbra_backend {
-    void  *ctx;
-    void (*run)        (void*, int, umbra_buf[]);
-    void (*begin_batch)(void*);
-    void (*flush)      (void*);
-    void (*dump)       (void const*, FILE*);
-    void (*free_fn)    (void*);
+    void    *ctx;
+    void   (*run)        (void*, int, umbra_buf[]);
+    void   (*begin_batch)(void*);
+    void   (*flush)      (void*);
+    void   (*dump)       (void const*, FILE*);
+    void   (*free_fn)    (void*);
+    build_fn build;
 };
 
 static void run_interp(void *ctx, int n,
@@ -28,6 +32,7 @@ struct umbra_backend* umbra_backend_interp(
         .ctx     = p,
         .run     = run_interp,
         .free_fn = free_interp,
+        .build   = umbra_backend_interp,
     };
     return b;
 }
@@ -53,6 +58,7 @@ struct umbra_backend* umbra_backend_jit(
         .run     = run_jit,
         .dump    = dump_jit,
         .free_fn = free_jit,
+        .build   = umbra_backend_jit,
     };
     return b;
 }
@@ -86,6 +92,7 @@ struct umbra_backend* umbra_backend_metal(
         .flush       = flush_metal,
         .dump        = dump_metal,
         .free_fn     = free_metal,
+        .build       = umbra_backend_metal,
     };
     return b;
 }
@@ -109,6 +116,15 @@ void umbra_backend_flush(struct umbra_backend *b) {
 void umbra_backend_dump(struct umbra_backend *b,
                         FILE *f) {
     if (b && b->dump) { b->dump(b->ctx, f); }
+}
+
+typedef struct umbra_backend*
+    (*umbra_backend_ctor_fn)(
+        struct umbra_basic_block const*);
+
+umbra_backend_ctor_fn umbra_backend_ctor(
+        struct umbra_backend const *b) {
+    return b->build;
 }
 
 void umbra_backend_free(struct umbra_backend *b) {

@@ -7,8 +7,10 @@ typedef struct {
     slug_curves  *slug;
     int           w, h;
     float        *wind_buf;
-    slug_acc_layout          acc_lay;
-    struct umbra_backend    *acc;
+    slug_acc_layout                acc_lay;
+    struct umbra_basic_block      *acc_bb;
+    struct umbra_backend          *acc;
+    umbra_backend_ctor_fn          acc_ctor;
 } slug_state;
 
 static void slug_init(slide *s, int w, int h) {
@@ -23,9 +25,7 @@ static void slug_init(slide *s, int w, int h) {
     struct umbra_basic_block *bb =
         umbra_basic_block(b);
     umbra_builder_free(b);
-    struct umbra_backend *jit = umbra_backend_jit(bb);
-    st->acc = jit ? jit : umbra_backend_interp(bb);
-    umbra_basic_block_free(bb);
+    st->acc_bb = bb;
 
     slide_perspective_matrix(st->mat, 0.0f,
         w, h, (int)st->slug->w, (int)st->slug->h);
@@ -51,6 +51,15 @@ static void slug_render_row(
         int ps, int32_t stride,
         struct umbra_backend *backend) {
     slug_state *st = s->state;
+    {
+        umbra_backend_ctor_fn ctor =
+            umbra_backend_ctor(backend);
+        if (ctor != st->acc_ctor) {
+            umbra_backend_free(st->acc);
+            st->acc = ctor(st->acc_bb);
+            st->acc_ctor = ctor;
+        }
+    }
     __builtin_memset(st->wind_buf, 0,
         (size_t)w * sizeof(float));
 
@@ -104,6 +113,7 @@ static void slug_cleanup(slide *s) {
     slug_state *st = s->state;
     free(st->wind_buf);
     umbra_backend_free(st->acc);
+    umbra_basic_block_free(st->acc_bb);
     free(st);
     s->state = NULL;
 }

@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include "../slides/slide.h"
+#include "../slides/slug.h"
 #include "../src/backend.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -115,6 +116,87 @@ int main(int argc, char *argv[]) {
         umbra_backend_free(jit);
         umbra_backend_free(mtl);
         free(row);
+    }
+
+    {
+        slug_curves sc =
+            slug_extract("Slug", (float)H * 0.3125f);
+        slug_acc_layout al;
+        struct umbra_builder *bld =
+            slug_build_acc(&al);
+        struct umbra_basic_block *bb =
+            umbra_basic_block(bld);
+        umbra_builder_free(bld);
+
+        struct umbra_backend *interp =
+            umbra_backend_interp(bb);
+        struct umbra_backend *jit =
+            umbra_backend_jit(bb);
+        struct umbra_backend *mtl =
+            umbra_backend_metal(bb);
+        umbra_basic_block_free(bb);
+
+        float *wind = calloc((size_t)W, 4);
+        float mat[11] = {0};
+        slide_perspective_matrix(mat, 0.0f,
+            W, H, (int)sc.w, (int)sc.h);
+        mat[9]  = sc.w;
+        mat[10] = sc.h;
+        long long au_[12] = {0};
+        char *au = (char*)au_;
+        slide_uni_i32(au, al.x0, 0);
+        slide_uni_i32(au, al.y,  H/2);
+        slide_uni_f32(au, al.mat, mat, 11);
+        slide_uni_ptr(au, al.curves_off,
+            sc.data,
+            (long)(sc.count * 6 * 4));
+        int32_t j0 = 0;
+        __builtin_memcpy(au + al.loop_off, &j0, 4);
+        umbra_buf abuf[] = {
+            { wind, (long)(W * 4) },
+            { au,  -(long)al.uni_len },
+        };
+
+        printf("\n%-40s %12s %12s %12s\n",
+               "slug accumulator (1 curve)",
+               "interp", "jit", "metal");
+        printf("%-40s", "");
+
+        struct umbra_backend *bes[] =
+            {interp, jit, mtl};
+        for (int bi = 0; bi < 3; bi++) {
+            if (!bes[bi]) {
+                printf(" %12s", "-");
+                continue;
+            }
+            umbra_backend_run(bes[bi], W, abuf);
+            int iters = 1;
+            for (;;) {
+                double const start = now();
+                for (int it = 0; it < iters; it++) {
+                    umbra_backend_run(
+                        bes[bi], W, abuf);
+                }
+                double const elapsed = now()-start;
+                if (elapsed >= 0.1) {
+                    char tmp[32];
+                    sprintf(tmp, "%5.2f ns/px",
+                        elapsed
+                        / ((double)iters*(double)W)
+                        * 1e9);
+                    printf(" %12s", tmp);
+                    break;
+                }
+                iters *= 2;
+            }
+        }
+        printf("\n");
+
+        umbra_backend_free(interp);
+        umbra_backend_free(jit);
+        umbra_backend_free(mtl);
+        free(wind);
+        slug_free(&sc);
     }
 
     slides_cleanup();
