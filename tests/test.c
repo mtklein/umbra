@@ -1677,7 +1677,7 @@ static void test_step(void) {
 
         int pos = 0;
         while (pos < N) {
-            float scratch[UMBRA_MAX_K];
+            float scratch[UMBRA_MAX_STEP];
             __builtin_memset(scratch, 0,
                 sizeof scratch);
             int k = 0;
