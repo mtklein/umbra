@@ -629,6 +629,102 @@ static void test_slug_rect(void) {
     umbra_interpreter_free(interp);
 }
 
+static void test_perspective_text(
+        text_cov *bitmap_cov) {
+    enum { BW = 16, BH = 8 };
+    uint16_t bmp[BW * BH];
+    __builtin_memset(bmp, 0, sizeof bmp);
+    bmp[4 * BW + 8] = 255;
+
+    umbra_draw_layout lay;
+    builder *bld = umbra_draw_build(
+        umbra_shader_solid,
+        umbra_coverage_bitmap_matrix,
+        umbra_blend_srcover, umbra_load_8888,
+        umbra_store_8888, &lay);
+    struct umbra_basic_block *bb =
+        umbra_basic_block(bld);
+    umbra_builder_free(bld);
+    struct umbra_interpreter *interp =
+        umbra_interpreter(bb);
+    umbra_basic_block_free(bb);
+
+    uint32_t pixels[BW];
+    for (int i = 0; i < BW; i++) {
+        pixels[i] = 0xff000000;
+    }
+
+    float mat[11] = {
+        1,0,0, 0,1,0, 0,0,1,
+        (float)BW, (float)BH,
+    };
+    float color[4] = {1,1,1,1};
+
+    long long uni_[12] = {0};
+    char *uni = (char*)uni_;
+    uni_i32(uni, lay.x0, 0);
+    uni_i32(uni, lay.y, 4);
+    uni_f32(uni, lay.shader, color, 4);
+    uni_f32(uni, lay.coverage, mat, 11);
+    uni_ptr(uni,
+        (lay.coverage + 11*4 + 7) & ~7,
+        bmp, (long)sizeof bmp);
+    umbra_buf buf[] = {
+        { pixels, (long)sizeof pixels },
+        { uni, -(long)lay.uni_len },
+    };
+    umbra_interpreter_run(interp, BW, buf);
+
+    (pixels[8] == 0xffffffff) here;
+    (pixels[0] == 0xff000000) here;
+
+    umbra_interpreter_free(interp);
+
+    umbra_draw_layout lay2;
+    bld = umbra_draw_build(
+        umbra_shader_solid,
+        umbra_coverage_bitmap_matrix,
+        umbra_blend_srcover, umbra_load_8888,
+        umbra_store_8888, &lay2);
+    bb = umbra_basic_block(bld);
+    umbra_builder_free(bld);
+    interp = umbra_interpreter(bb);
+    umbra_basic_block_free(bb);
+
+    uint32_t px2[W * H];
+    for (int i = 0; i < W * H; i++) {
+        px2[i] = 0xff0a0a1e;
+    }
+    float mat2[11];
+    build_perspective_matrix(mat2, 1.0f,
+        W, H, bitmap_cov->w, bitmap_cov->h);
+    float hc2[4] = {1,0.8f,0.2f,1};
+    for (int y = 0; y < H; y++) {
+        long long u2_[12] = {0};
+        char *u2 = (char*)u2_;
+        uni_i32(u2, lay2.x0, 0);
+        uni_i32(u2, lay2.y, y);
+        uni_f32(u2, lay2.shader, hc2, 4);
+        uni_f32(u2, lay2.coverage, mat2, 11);
+        uni_ptr(u2,
+            (lay2.coverage + 11*4 + 7) & ~7,
+            bitmap_cov->data,
+            (long)(W * H * 2));
+        umbra_buf b2[] = {
+            { px2 + y * W, (long)(W * 4) },
+            { u2, -(long)lay2.uni_len },
+        };
+        umbra_interpreter_run(interp, W, b2);
+    }
+    int changed = 0;
+    for (int i = 0; i < W * H; i++) {
+        if (px2[i] != 0xff0a0a1e) { changed++; }
+    }
+    (changed > 0) here;
+
+    umbra_interpreter_free(interp);
+}
+
 int main(void) {
     text_cov bitmap_cov =
         text_rasterize(W, H, 24.0f, 0);
@@ -647,6 +743,7 @@ int main(void) {
         umbra_basic_block_free(abb);
     }
 
+    test_perspective_text(&bitmap_cov);
     test_slug_rect();
 
     for (int fi = 0; fi < NUM_FMTS; fi++) {
