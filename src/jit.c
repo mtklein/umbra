@@ -304,10 +304,9 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
 
     int loop_top = c.len;
 
-    put(&c, 0xcb090000u|(uint32_t)XT);
-    put(&c, SUBS_xi(31,XT,4));
-    int br_tail = c.len;
-    put(&c, Bcond(0xb,0));
+    put(&c, 0xeb09001fu);
+    int br_epi = c.len;
+    put(&c, Bcond(0xd,0));
     put(&c, LSL_xi(XH, XI, 1));
     put(&c, LSL_xi(XW, XI, 2));
 
@@ -320,22 +319,6 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
 
     put(&c, ADD_xi(XI,XI,4));
     put(&c, B(loop_top - c.len));
-
-    int tail_top = c.len;
-    c.buf[br_tail] = Bcond(0xb, tail_top - br_tail);
-
-    put(&c, 0xeb09001fu);
-    int br_epi = c.len;
-    put(&c, Bcond(0xd,0));
-
-    for (int i = 0; i < bb->insts; i++) { ra_free_reg(ra, i); }
-    for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
-
-    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr);
-    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 1, deref_gpr);
-
-    put(&c, ADD_xi(XI,XI,1));
-    put(&c, B(tail_top - c.len));
 
     int epi = c.len;
     c.buf[br_epi] = Bcond(0xd, epi - br_epi);
@@ -475,40 +458,65 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
                 put(c, LSL_xi(XT, XT, 2));
                 put(c, ADD_xr(XT, XP, XT));
-                if (scalar) { put(c, LDR_sx(s.rd, XT, XI)); }
-                else         { put(c, LDR_q(s.rd, XT, XW)); }
+                put(c, ADD_xr(XT, XT, XW));
                 last_ptr = -999;
             } else {
-                if (scalar) { put(c, LDR_sx(s.rd, XP, XI)); }
-                else         { put(c, LDR_q(s.rd, XP, XW)); }
+                put(c, ADD_xr(XT, XP, XW));
             }
-            put(c, AND_16b(s.rd, s.rd, rz));
+            put(c, MOVI_4s(s.rd, 0, 0));
+            for (int k = 0; k < 4; k++) {
+                put(c, UMOV_ws_lane(XH, rz, k));
+                int skip = c->len;
+                put(c, 0x34000000u | (uint32_t)XH);
+                put(c, 0xb9400000u
+                    | ((uint32_t)k << 10)
+                    | ((uint32_t)XT << 5)
+                    | (uint32_t)XH);
+                put(c, INS_s(s.rd, k, XH));
+                {
+                    int off = c->len - skip;
+                    c->buf[skip] = 0x34000000u
+                        | ((uint32_t)(off & 0x7ffff) << 5)
+                        | (uint32_t)XH;
+                }
+            }
             if (lu(inst->z) <= i) { ra_free_reg(ra, inst->z); }
         } break;
 
         case op_load_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            int8_t rz = ra_ensure(ra, sl, ns, inst->z);
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
-            int base16 = XP;
+            put(c, LSL_xi(XT, XI, 1));
             if (inst->x) {
                 int8_t ro = ra_ensure(ra, sl, ns, inst->x);
-                put(c, UMOV_ws(XT, ro));
+                put(c, UMOV_ws(XH, ro));
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
-                put(c, LSL_xi(XT, XT, 1));
-                put(c, ADD_xr(XT, XP, XT));
+                put(c, LSL_xi(XH, XH, 1));
+                put(c, ADD_xr(XT, XT, XH));
                 last_ptr = -999;
-                base16 = XT;
             }
-            if (scalar) {
-                put(c, 0x78607800u
-                    | ((uint32_t)XI << 16)
-                    | ((uint32_t)base16 << 5)
-                    | (uint32_t)XT);
-                put(c, DUP_4s_w(s.rd, XT));
-            } else {
-                put(c, LDR_d(s.rd, base16, XH));
+            put(c, ADD_xr(XT, XP, XT));
+            put(c, MOVI_4s(s.rd, 0, 0));
+            for (int k = 0; k < 4; k++) {
+                put(c, UMOV_ws_lane(XH, rz, k));
+                int skip = c->len;
+                put(c, 0x34000000u | (uint32_t)XH);
+                put(c, 0x79400000u
+                    | ((uint32_t)k << 10)
+                    | ((uint32_t)XT << 5)
+                    | (uint32_t)XH);
+                put(c, INS_s(s.rd, k, XH));
+                {
+                    int off = c->len - skip;
+                    c->buf[skip] = 0x34000000u
+                        | ((uint32_t)(off & 0x7ffff) << 5)
+                        | (uint32_t)XH;
+                }
             }
+            put(c, XTN_4h(s.rd, s.rd));
+            if (lu(inst->z) <= i) { ra_free_reg(ra, inst->z); }
         } break;
 
         case op_uni_32: {
@@ -604,6 +612,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         case op_store_32: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
+            int8_t rz = ra_ensure(ra, sl, ns, inst->z);
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
             if (inst->x) {
@@ -612,35 +621,81 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
                 put(c, LSL_xi(XT, XT, 2));
                 put(c, ADD_xr(XT, XP, XT));
-                if (scalar) { put(c, STR_sx(ry, XT, XI)); }
-                else         { put(c, STR_q(ry, XT, XW)); }
+                put(c, ADD_xr(XT, XT, XW));
                 last_ptr = -999;
             } else {
-                if (scalar) { put(c, STR_sx(ry, XP, XI)); }
-                else         { put(c, STR_q(ry, XP, XW)); }
+                put(c, ADD_xr(XT, XP, XW));
             }
+            for (int k = 0; k < 4; k++) {
+                put(c, UMOV_ws_lane(XH, rz, k));
+                int skip = c->len;
+                put(c, 0x34000000u | (uint32_t)XH);
+                put(c, 0x0e003c00u
+                    | (((uint32_t)(k << 3) | 4) << 16)
+                    | ((uint32_t)ry << 5)
+                    | (uint32_t)XH);
+                put(c, 0xb9000000u
+                    | ((uint32_t)k << 10)
+                    | ((uint32_t)XT << 5)
+                    | (uint32_t)XH);
+                {
+                    int off = c->len - skip;
+                    c->buf[skip] = 0x34000000u
+                        | ((uint32_t)(off & 0x7ffff) << 5)
+                        | (uint32_t)XH;
+                }
+            }
+            if (lu(inst->z) <= i) { ra_free_reg(ra, inst->z); }
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
         } break;
 
         case op_store_16: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
+            int8_t rz = ra_ensure(ra, sl, ns, inst->z);
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
-            int sbase = XP;
+            put(c, LSL_xi(XT, XI, 1));
             if (inst->x) {
                 int8_t ro = ra_ensure(ra, sl, ns, inst->x);
-                put(c, UMOV_ws(XT, ro));
+                put(c, UMOV_ws(XH, ro));
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
-                put(c, LSL_xi(XT, XT, 1));
-                put(c, ADD_xr(XT, XP, XT));
+                put(c, LSL_xi(XH, XH, 1));
+                put(c, ADD_xr(XT, XT, XH));
                 last_ptr = -999;
-                sbase = XT;
             }
-            if (scalar) {
-                put(c, STR_hx(ry, sbase, XI));
-            } else {
-                put(c, STR_d(ry, sbase, XH));
+            put(c, ADD_xr(XT, XP, XT));
+            {
+                int8_t wide =
+                    ra_alloc(ra, sl, ns);
+                put(c, 0x2f10a400u
+                    | ((uint32_t)ry << 5)
+                    | (uint32_t)wide);
+                for (int k = 0; k < 4; k++) {
+                    put(c, UMOV_ws_lane(XH, rz, k));
+                    int skip = c->len;
+                    put(c, 0x34000000u
+                        | (uint32_t)XH);
+                    uint32_t imm5 =
+                        (uint32_t)(k << 3) | 4;
+                    put(c, 0x0e003c00u
+                        | (imm5 << 16)
+                        | ((uint32_t)wide << 5)
+                        | (uint32_t)XH);
+                    put(c, 0x79000000u
+                        | ((uint32_t)k << 10)
+                        | ((uint32_t)XT << 5)
+                        | (uint32_t)XH);
+                    {
+                        int off = c->len - skip;
+                        c->buf[skip] = 0x34000000u
+                            | ((uint32_t)
+                                (off & 0x7ffff) << 5)
+                            | (uint32_t)XH;
+                    }
+                }
+                ra_return_reg(ra, wide);
             }
+            if (lu(inst->z) <= i) { ra_free_reg(ra, inst->z); }
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
         } break;
 
