@@ -1625,88 +1625,6 @@ static void test_pack_channels(void) {
   }
 }
 
-static int step_(backends *B, int b,
-                 int n, umbra_buf buf[]) {
-    switch (b) {
-    case 0:
-        return umbra_interpreter_step(
-            B->interp, n, buf);
-    case 1:
-        if (B->cg) {
-            return umbra_codegen_step(
-                B->cg, n, buf);
-        }
-        return 0;
-    case 2:
-        if (B->jit) {
-            return umbra_jit_step(
-                B->jit, n, buf);
-        }
-        return 0;
-    case 3:
-        if (B->mtl) {
-            return umbra_metal_step(
-                B->mtl, n, buf);
-        }
-        return 0;
-    }
-    return 0;
-}
-
-static void test_step(void) {
-    struct umbra_builder *b = umbra_builder();
-    umbra_val ln = umbra_lane(b);
-    int ji = umbra_reserve(b, 1);
-    umbra_val j = umbra_load_i32(b, (umbra_ptr){1},
-                      umbra_imm_i32(b, ji));
-    umbra_val jf = umbra_cvt_f32_i32(b, j);
-    umbra_val acc = umbra_load_i32(b,
-                        (umbra_ptr){0}, ln);
-    umbra_val sum = umbra_add_f32(b, acc, jf);
-    umbra_store_i32(b, (umbra_ptr){0}, ln, sum);
-    int loop_off = ji * 4;
-
-    backends B = make_full(b, 0);
-
-    enum { N = 17, M = 4 };
-
-    for (int bi = 0; bi < 4; bi++) {
-        float result[N];
-        __builtin_memset(result, 0, sizeof result);
-        int32_t uni[4] = {0};
-
-        int pos = 0;
-        while (pos < N) {
-            float scratch[UMBRA_MAX_STEP];
-            __builtin_memset(scratch, 0,
-                sizeof scratch);
-            int k = 0;
-            for (int j_ = 0; j_ < M; j_++) {
-                int32_t j32 = j_;
-                __builtin_memcpy(
-                    (char*)uni + loop_off,
-                    &j32, 4);
-                umbra_buf buf[] = {
-                    { scratch,
-                      (long)sizeof scratch },
-                    { uni, -(long)sizeof uni },
-                };
-                k = step_(&B, bi, N - pos, buf);
-                if (!k) { goto next_backend; }
-            }
-            __builtin_memcpy(result + pos,
-                scratch, (size_t)k * 4);
-            pos += k;
-        }
-        for (int i = 0; i < N; i++) {
-            (equiv(result[i], 6.0f)) here;
-        }
-        next_backend:;
-    }
-
-    cleanup(&B);
-}
-
 static void test_gather_deref_large(void) {
     struct umbra_builder *b = umbra_builder();
     umbra_val ix = umbra_iota(b);
@@ -1783,7 +1701,6 @@ int main(void) {
     test_offset_load_store();
     test_shift_imm();
     test_pack_channels();
-    test_step();
     test_gather_deref_large();
     return 0;
 }

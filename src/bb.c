@@ -102,9 +102,6 @@ void umbra_builder_free(builder *b) {
 val umbra_iota(builder *b) {
     return push(b, op_iota);
 }
-val umbra_lane(builder *b) {
-    return push(b, op_lane);
-}
 
 val umbra_imm_i32(builder *b, int bits) {
     return push(b, op_imm_32, .imm=bits);
@@ -806,7 +803,6 @@ static void dump_insts(struct bb_inst const *inst,
                         ip->ptr, ip->imm);
                 break;
             case op_iota: break;
-            case op_lane: break;
 
             case op_store_16:
             case op_store_32:

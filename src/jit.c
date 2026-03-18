@@ -10,10 +10,6 @@ struct umbra_jit* umbra_jit(
 void umbra_jit_run (struct umbra_jit *j, int n, umbra_buf buf[]) {
     (void)j; (void)n; (void)buf;
 }
-int umbra_jit_step(struct umbra_jit *j, int n, umbra_buf buf[]) {
-    (void)j; (void)n; (void)buf;
-    return 0;
-}
 void umbra_jit_free(struct umbra_jit *j) { (void)j; }
 void umbra_dump_jit(
     struct umbra_jit const *j, FILE *f
@@ -220,7 +216,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
         return 1;
 
     case op_and_imm:
-    case op_iota: case op_lane:
+    case op_iota:
     case op_deref_ptr:
     case op_uni_32:   case op_load_32:
     case op_gather_32: case op_store_32:
@@ -415,18 +411,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 put(c, MOVZ_w(XT,3)); put(c, INS_s(tmp,3,XT));
                 put(c, ADD_4s(s.rd, s.rd, tmp));
                 ra_return_reg(ra, tmp);
-            }
-        } break;
-
-        case op_lane: {
-            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            if (scalar) {
-                put(c, MOVI_4s(s.rd, 0, 0));
-            } else {
-                put(c, MOVI_4s(s.rd, 0, 0));
-                put(c, MOVZ_w(XT,1)); put(c, INS_s(s.rd,1,XT));
-                put(c, MOVZ_w(XT,2)); put(c, INS_s(s.rd,2,XT));
-                put(c, MOVZ_w(XT,3)); put(c, INS_s(s.rd,3,XT));
             }
         } break;
 
@@ -724,8 +708,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 CZ(op_lt_s32,  CMLT_4s_z,  CMGT_4s_z)
                 CZ(op_le_f32,  FCMLE_4s_z, FCMGE_4s_z)
                 CZ(op_le_s32,  CMLE_4s_z,  CMGE_4s_z)
-                case op_iota: case op_lane:
-                case op_deref_ptr:
+                case op_iota: case op_deref_ptr:
                 case op_imm_32:
                 case op_uni_32: case op_load_32:
                 case op_gather_32: case op_store_32:
@@ -828,13 +811,6 @@ void umbra_jit_run(struct umbra_jit *j, int n, umbra_buf buf[]) {
     if (!j) { return; }
     j->entry(n, buf);
 }
-int umbra_jit_step(struct umbra_jit *j, int n, umbra_buf buf[]) {
-    if (!j || n <= 0) { return 0; }
-    int k = n >= 4 ? 4 : 1;
-    j->entry(k, buf);
-    return k;
-}
-
 void umbra_jit_free(struct umbra_jit *j) {
     if (!j) { return; }
     munmap(j->code, j->code_size);
@@ -1144,7 +1120,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
     case op_and_imm:
         return 0;
 
-    case op_iota: case op_lane:
+    case op_iota:
     case op_deref_ptr:
     case op_uni_32:   case op_load_32:
     case op_gather_32: case op_store_32:
@@ -1345,28 +1321,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 vpaddd(c, s.rd, s.rd, tmp);
                 add_ri(c, RSP, 32);
                 ra_return_reg(ra, tmp);
-            }
-        } break;
-
-        case op_lane: {
-            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            if (scalar) {
-                vpxor(c, 1, s.rd, s.rd, s.rd);
-            } else {
-                sub_ri(c, RSP, 32);
-                for (int k = 0; k < 8; k++) {
-                    emit1(c, 0xc7);
-                    if (k == 0) {
-                        emit1(c, 0x04); emit1(c, 0x24);
-                    } else {
-                        emit1(c, 0x44);
-                        emit1(c, 0x24);
-                        emit1(c, (uint8_t)(k*4));
-                    }
-                    emit4(c, (uint32_t)k);
-                }
-                vfill(c, s.rd, 0);
-                add_ri(c, RSP, 32);
             }
         } break;
 
@@ -1794,12 +1748,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 void umbra_jit_run(struct umbra_jit *j, int n, umbra_buf buf[]) {
     if (!j) { return; }
     j->entry(n, buf);
-}
-int umbra_jit_step(struct umbra_jit *j, int n, umbra_buf buf[]) {
-    if (!j || n <= 0) { return 0; }
-    int k = n >= 8 ? 8 : 1;
-    j->entry(k, buf);
-    return k;
 }
 
 void umbra_jit_free(struct umbra_jit *j) {

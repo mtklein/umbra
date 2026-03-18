@@ -12,12 +12,6 @@ void umbra_metal_run(
 ) {
     (void)m; (void)n; (void)buf;
 }
-int umbra_metal_step(
-    struct umbra_metal *m, int n, umbra_buf buf[]
-) {
-    (void)m; (void)n; (void)buf;
-    return 0;
-}
 void umbra_metal_begin_batch(struct umbra_metal *m) {
     (void)m;
 }
@@ -113,10 +107,6 @@ static void emit_ops(Buf *b, BB const *bb,
         switch (inst->op) {
             case op_iota:
                 emit(b, "%suint v%d = i;\n",
-                     pad, i);
-                break;
-            case op_lane:
-                emit(b, "%suint v%d = 0u;\n",
                      pad, i);
                 break;
 
@@ -1046,14 +1036,6 @@ void umbra_metal_run(
                 (size_t)dsz);
         }
     }
-}
-
-int umbra_metal_step(
-    struct umbra_metal *m, int n, umbra_buf buf[]
-) {
-    if (!m || n <= 0) { return 0; }
-    umbra_metal_run(m, 1, buf);
-    return 1;
 }
 
 void umbra_metal_begin_batch(

@@ -13,10 +13,7 @@ umbra_ptr umbra_deref_ptr  (struct umbra_builder*, umbra_ptr buf, int byte_off);
 int   umbra_uni_len    (struct umbra_builder const*);
 void  umbra_set_uni_len(struct umbra_builder*, int);
 
-enum { UMBRA_MAX_STEP = 8 };
-
 umbra_val umbra_iota(struct umbra_builder*);
-umbra_val umbra_lane(struct umbra_builder*);
 umbra_val umbra_imm_i32(struct umbra_builder*, int bits);
 static inline umbra_val umbra_imm_f32(struct umbra_builder *b, float v) {
     union { float f; int i; } u = {.f=v};
@@ -87,22 +84,18 @@ typedef struct { void *ptr; long sz; } umbra_buf;
 
 struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const*);
 void   umbra_interpreter_run (struct umbra_interpreter*, int n, umbra_buf[]);
-int    umbra_interpreter_step(struct umbra_interpreter*, int n, umbra_buf[]);
 void   umbra_interpreter_free(struct umbra_interpreter*);
 
 struct umbra_codegen* umbra_codegen(struct umbra_basic_block const*);
 void   umbra_codegen_run (struct umbra_codegen*, int n, umbra_buf[]);
-int    umbra_codegen_step(struct umbra_codegen*, int n, umbra_buf[]);
 void   umbra_codegen_free(struct umbra_codegen*);
 
 struct umbra_jit* umbra_jit(struct umbra_basic_block const*);
 void   umbra_jit_run (struct umbra_jit*, int n, umbra_buf[]);
-int    umbra_jit_step(struct umbra_jit*, int n, umbra_buf[]);
 void   umbra_jit_free(struct umbra_jit*);
 
 struct umbra_metal* umbra_metal(struct umbra_basic_block const*);
 void   umbra_metal_run        (struct umbra_metal*, int n, umbra_buf[]);
-int    umbra_metal_step       (struct umbra_metal*, int n, umbra_buf[]);
 void   umbra_metal_begin_batch(struct umbra_metal*);
 void   umbra_metal_flush      (struct umbra_metal*);
 void   umbra_metal_free       (struct umbra_metal*);
