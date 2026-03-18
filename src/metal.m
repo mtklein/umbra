@@ -34,6 +34,12 @@ void umbra_dump_metal(
 
 typedef struct umbra_basic_block BB;
 
+struct batch_shared {
+    void *mtl;
+    char *host;
+    long  copy_sz;
+};
+
 struct copyback {
     void *host;
     void *mtlbuf;
@@ -58,12 +64,13 @@ struct umbra_metal {
     int    n_deref;
     struct deref_info *deref;
 
-    void           *batch_cmdbuf;
-    void           *batch_enc;
-    void          **batch_bufs;
-    int             batch_nbufs, batch_bufs_cap;
-    struct copyback *batch_copy;
-    int             batch_ncopy, batch_copy_cap;
+    void                *batch_cmdbuf;
+    void                *batch_enc;
+    void               **batch_bufs;
+    int                  batch_nbufs, batch_bufs_cap;
+    struct batch_shared *batch_data;
+    struct copyback     *batch_copy;
+    int                  batch_ncopy, batch_copy_cap;
 };
 
 typedef struct {
@@ -755,20 +762,6 @@ struct umbra_metal* umbra_metal(BB const *bb) {
     }
 }
 
-static void batch_retain_buf(
-    struct umbra_metal *m, void *retained
-) {
-    if (m->batch_nbufs >= m->batch_bufs_cap) {
-        m->batch_bufs_cap = m->batch_bufs_cap
-            ? 2 * m->batch_bufs_cap : 64;
-        m->batch_bufs = realloc(
-            m->batch_bufs,
-            (size_t)m->batch_bufs_cap
-                * sizeof(void*));
-    }
-    m->batch_bufs[m->batch_nbufs++] = retained;
-}
-
 static void batch_add_copy(
     struct umbra_metal *m,
     void *host, void *raw_ptr, long bytes
@@ -784,6 +777,21 @@ static void batch_add_copy(
     m->batch_copy[m->batch_ncopy++] =
         (struct copyback){host, raw_ptr, bytes};
 }
+
+static void batch_retain_buf(
+    struct umbra_metal *m, void *retained
+) {
+    if (m->batch_nbufs >= m->batch_bufs_cap) {
+        m->batch_bufs_cap = m->batch_bufs_cap
+            ? 2 * m->batch_bufs_cap : 64;
+        m->batch_bufs = realloc(
+            m->batch_bufs,
+            (size_t)m->batch_bufs_cap
+                * sizeof(void*));
+    }
+    m->batch_bufs[m->batch_nbufs++] = retained;
+}
+
 
 static void encode_dispatch(
     struct umbra_metal *m, int n, umbra_buf buf[],
@@ -823,27 +831,48 @@ static void encode_dispatch(
         *(uint32_t*)per_n.contents = (uint32_t)n;
     }
 
+    long offsets[32] = {0};
     for (int i = 0; i <= m->max_ptr; i++) {
         if (!buf[i].ptr || !buf[i].sz) { continue; }
         long bytes = buf[i].sz < 0
             ? -buf[i].sz : buf[i].sz;
         if (batching) {
-            id<MTLBuffer> tmp =
-                [device
-                 newBufferWithLength:(NSUInteger)bytes
-                 options:
-                     MTLResourceStorageModeShared];
-            __builtin_memcpy(
-                tmp.contents,
-                buf[i].ptr, (size_t)bytes);
-            void *retained =
-                (__bridge_retained void*)tmp;
-            batch_retain_buf(m, retained);
-            m->per_bufs[i] = retained;
-            if (buf[i].sz > 0) {
-                batch_add_copy(
-                    m, buf[i].ptr,
-                    retained, buf[i].sz);
+            struct batch_shared *sh =
+                &m->batch_data[i];
+            char *ptr = buf[i].ptr;
+            _Bool overlap = sh->mtl
+                && ptr >= sh->host
+                && ptr <  sh->host + sh->copy_sz;
+            if (overlap) {
+                offsets[i] = ptr - sh->host;
+                m->per_bufs[i] = sh->mtl;
+            } else {
+                id<MTLBuffer> tmp =
+                    [device
+                     newBufferWithLength:
+                         (NSUInteger)bytes
+                     options:
+                         MTLResourceStorageModeShared];
+                __builtin_memcpy(
+                    tmp.contents,
+                    ptr, (size_t)bytes);
+                void *retained =
+                    (__bridge_retained void*)tmp;
+                if (!sh->mtl) {
+                    sh->mtl     = retained;
+                    sh->host    = ptr;
+                    sh->copy_sz = buf[i].sz > 0
+                        ? bytes : 0;
+                } else {
+                    batch_retain_buf(m, retained);
+                    if (buf[i].sz > 0) {
+                        batch_add_copy(
+                            m, ptr,
+                            retained, bytes);
+                    }
+                }
+                offsets[i] = 0;
+                m->per_bufs[i] = retained;
             }
         } else {
             if (bytes > m->buf_cap[i]) {
@@ -884,21 +913,42 @@ static void encode_dispatch(
         long bytes = dsz < 0 ? -dsz : dsz;
         int bi = m->deref[d].buf_idx;
         if (batching) {
-            id<MTLBuffer> tmp =
-                [device
-                 newBufferWithLength:(NSUInteger)bytes
-                 options:
-                     MTLResourceStorageModeShared];
-            __builtin_memcpy(
-                tmp.contents,
-                derived, (size_t)bytes);
-            void *retained =
-                (__bridge_retained void*)tmp;
-            m->per_bufs[bi] = retained;
-            batch_retain_buf(m, retained);
-            if (dsz > 0) {
-                batch_add_copy(
-                    m, derived, retained, dsz);
+            struct batch_shared *sh =
+                &m->batch_data[bi];
+            char *dptr = derived;
+            _Bool overlap = sh->mtl
+                && dptr >= sh->host
+                && dptr <  sh->host + sh->copy_sz;
+            if (overlap) {
+                offsets[bi] = dptr - sh->host;
+                m->per_bufs[bi] = sh->mtl;
+            } else {
+                id<MTLBuffer> tmp =
+                    [device
+                     newBufferWithLength:
+                         (NSUInteger)bytes
+                     options:
+                         MTLResourceStorageModeShared];
+                __builtin_memcpy(
+                    tmp.contents,
+                    dptr, (size_t)bytes);
+                void *retained =
+                    (__bridge_retained void*)tmp;
+                if (!sh->mtl) {
+                    sh->mtl     = retained;
+                    sh->host    = dptr;
+                    sh->copy_sz = dsz > 0
+                        ? bytes : 0;
+                } else {
+                    batch_retain_buf(m, retained);
+                    if (dsz > 0) {
+                        batch_add_copy(
+                            m, dptr,
+                            retained, bytes);
+                    }
+                }
+                offsets[bi] = 0;
+                m->per_bufs[bi] = retained;
             }
         } else {
             if (bytes > m->buf_cap[bi]) {
@@ -951,8 +1001,8 @@ static void encode_dispatch(
             [enc setBuffer:
                 (__bridge id<MTLBuffer>)
                     m->per_bufs[i]
-                    offset:0
-                   atIndex:(NSUInteger)(i + 1)];
+                offset:(NSUInteger)offsets[i]
+               atIndex:(NSUInteger)(i + 1)];
         }
     }
     [enc setBuffer:per_sz
@@ -1064,6 +1114,17 @@ void umbra_metal_begin_batch(
             (__bridge_retained void*)cmdbuf;
         m->batch_enc =
             (__bridge_retained void*)enc;
+
+        if (!m->batch_data) {
+            m->batch_data = calloc(
+                (size_t)m->total_bufs,
+                sizeof *m->batch_data);
+        } else {
+            __builtin_memset(
+                m->batch_data, 0,
+                (size_t)m->total_bufs
+                    * sizeof *m->batch_data);
+        }
     }
 }
 
@@ -1083,6 +1144,22 @@ void umbra_metal_flush(struct umbra_metal *m) {
         [enc endEncoding];
         [cmdbuf commit];
         [cmdbuf waitUntilCompleted];
+
+        for (int i = 0; i < m->total_bufs; i++) {
+            struct batch_shared *sh =
+                &m->batch_data[i];
+            if (sh->mtl && sh->copy_sz > 0) {
+                __builtin_memcpy(
+                    sh->host,
+                    ((__bridge id<MTLBuffer>)
+                        sh->mtl).contents,
+                    (size_t)sh->copy_sz);
+            }
+            if (sh->mtl) {
+                (void)(__bridge_transfer id)
+                    sh->mtl;
+            }
+        }
 
         for (int i = 0; i < m->batch_ncopy; i++) {
             struct copyback *c =
@@ -1136,6 +1213,7 @@ void umbra_metal_free(struct umbra_metal *m) {
     free(m->per_bufs);
     free(m->deref);
     free(m->batch_bufs);
+    free(m->batch_data);
     free(m->batch_copy);
     free(m->src);
     free(m);

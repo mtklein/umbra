@@ -263,13 +263,13 @@ static void test_slide_golden(
 
     for (int bi = 1; bi < NUM_BACKENDS; bi++) {
         if (!backs[bi]) { continue; }
-        if (bi == 2 && mtl && !planar) {
+        if (bi == 2 && mtl) {
             umbra_metal_begin_batch(mtl);
         }
         render_slide(slide_idx, fmt,
                      backs[bi], run_fns[bi],
                      pbuf_tst, &lay);
-        if (bi == 2 && mtl && !planar) {
+        if (bi == 2 && mtl) {
             umbra_metal_flush(mtl);
         }
         readback_to_8888(fmt, pbuf_tst, tst);
