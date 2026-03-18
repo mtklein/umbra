@@ -49,7 +49,7 @@ static umbra_store_fn fmt_store[] = {
     umbra_store_1010102,
 };
 static int fmt_bpp[] = {4, 2, 8, 2, 4};
-static int fmt_tol[] = {0, 0, 0, 0, 1};
+static int fmt_tol[] = {0, 0, 0, 0, 0};
 
 typedef struct {
     struct umbra_interpreter *interp;
@@ -245,13 +245,14 @@ static void test_slide_golden(
         interp, jit, mtl,
     };
 
-    size_t pixbuf_sz =
-        (fmt == FMT_FP16P)
-            ? (size_t)(W * H * 4) * 2
-            : (size_t)(W * H)
-              * (size_t)fmt_bpp[fmt];
-    void *pbuf_ref = malloc(pixbuf_sz);
-    void *pbuf_tst = malloc(pixbuf_sz);
+    _Bool planar = (fmt == FMT_FP16P);
+    size_t pixbuf_sz = planar
+        ? (size_t)(W * H * 4) * 2
+        : (size_t)(W * H) * (size_t)fmt_bpp[fmt];
+    size_t pad = planar
+        ? (size_t)((H - 1) * W) * 2 : 0;
+    void *pbuf_ref = calloc(1, pixbuf_sz + pad);
+    void *pbuf_tst = calloc(1, pixbuf_sz + pad);
     uint32_t *ref = malloc((size_t)(W * H) * 4);
     uint32_t *tst = malloc((size_t)(W * H) * 4);
 
@@ -262,10 +263,15 @@ static void test_slide_golden(
 
     for (int bi = 1; bi < NUM_BACKENDS; bi++) {
         if (!backs[bi]) { continue; }
-        if (bi == 2) { continue; }
+        if (bi == 2 && mtl && !planar) {
+            umbra_metal_begin_batch(mtl);
+        }
         render_slide(slide_idx, fmt,
                      backs[bi], run_fns[bi],
                      pbuf_tst, &lay);
+        if (bi == 2 && mtl && !planar) {
+            umbra_metal_flush(mtl);
+        }
         readback_to_8888(fmt, pbuf_tst, tst);
 
         int mismatches = 0;

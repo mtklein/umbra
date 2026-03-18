@@ -545,9 +545,15 @@ umbra_color umbra_load_1010102(builder *builder, umbra_ptr ptr, umbra_val ix) {
 }
 
 void umbra_store_1010102(builder *builder, umbra_ptr ptr, umbra_val ix, umbra_color c) {
+    umbra_val zero  = umbra_imm_f32(builder, 0.0f);
+    umbra_val one   = umbra_imm_f32(builder, 1.0f);
     umbra_val s1023 = umbra_imm_f32(builder,1023.0f);
     umbra_val s3    = umbra_imm_f32(builder,3.0f);
     umbra_val half_ = umbra_imm_f32(builder,0.5f);
+    c.r = umbra_min_f32(builder, umbra_max_f32(builder, c.r, zero), one);
+    c.g = umbra_min_f32(builder, umbra_max_f32(builder, c.g, zero), one);
+    c.b = umbra_min_f32(builder, umbra_max_f32(builder, c.b, zero), one);
+    c.a = umbra_min_f32(builder, umbra_max_f32(builder, c.a, zero), one);
     umbra_val r = umbra_cvt_i32_f32(builder,
         umbra_add_f32(builder, umbra_mul_f32(builder, c.r, s1023), half_));
     umbra_val g = umbra_cvt_i32_f32(builder,

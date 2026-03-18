@@ -811,10 +811,10 @@ static void encode_dispatch(
     if (batching) {
         uint32_t n32 = (uint32_t)n;
         per_n =
-            [device newBufferWithBytes:&n32
-                    length:sizeof n32
+            [device newBufferWithLength:sizeof n32
                     options:
                         MTLResourceStorageModeShared];
+        *(uint32_t*)per_n.contents = n32;
         batch_retain_buf(
             m, (__bridge_retained void*)per_n);
     } else {
@@ -830,10 +830,12 @@ static void encode_dispatch(
         if (batching) {
             id<MTLBuffer> tmp =
                 [device
-                 newBufferWithBytes:buf[i].ptr
-                 length:(NSUInteger)bytes
+                 newBufferWithLength:(NSUInteger)bytes
                  options:
                      MTLResourceStorageModeShared];
+            __builtin_memcpy(
+                tmp.contents,
+                buf[i].ptr, (size_t)bytes);
             void *retained =
                 (__bridge_retained void*)tmp;
             batch_retain_buf(m, retained);
@@ -884,10 +886,12 @@ static void encode_dispatch(
         if (batching) {
             id<MTLBuffer> tmp =
                 [device
-                 newBufferWithBytes:derived
-                 length:(NSUInteger)bytes
+                 newBufferWithLength:(NSUInteger)bytes
                  options:
                      MTLResourceStorageModeShared];
+            __builtin_memcpy(
+                tmp.contents,
+                derived, (size_t)bytes);
             void *retained =
                 (__bridge_retained void*)tmp;
             m->per_bufs[bi] = retained;
@@ -926,10 +930,11 @@ static void encode_dispatch(
     id<MTLBuffer> per_sz;
     if (batching) {
         per_sz =
-            [device newBufferWithBytes:szs_data
-                    length:sz_bytes
+            [device newBufferWithLength:sz_bytes
                     options:
                         MTLResourceStorageModeShared];
+        __builtin_memcpy(
+            per_sz.contents, szs_data, sz_bytes);
         batch_retain_buf(
             m, (__bridge_retained void*)per_sz);
     } else {
