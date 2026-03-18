@@ -1874,8 +1874,16 @@ void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
              cleanpath);
     FILE *p = popen(cmd, "r");
     if (p) {
+        int cplen = (int)__builtin_strlen(cleanpath);
         char line[256];
-        while (fgets(line, (int)sizeof line, p)) { fputs(line, f); }
+        while (fgets(line, (int)sizeof line, p)) {
+            char *s = line;
+            if (__builtin_strncmp(s, cleanpath,
+                                  (size_t)cplen) == 0) {
+                s += cplen;
+            }
+            fputs(s, f);
+        }
         pclose(p);
     }
     remove(cleanpath);
