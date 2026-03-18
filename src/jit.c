@@ -429,7 +429,25 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         } break;
         case op_lane_mask: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            put(c, MVNI_4s(s.rd, 0, 0));
+            if (scalar) {
+                put(c, MVNI_4s(s.rd, 0, 0));
+            } else {
+                put(c, 0xcb000000u
+                    | ((uint32_t)XI << 16)
+                    | (0u << 5)
+                    | (uint32_t)XT);
+                put(c, DUP_4s_w(s.rd, XT));
+                int8_t tmp = ra_alloc(ra, sl, ns);
+                put(c, MOVI_4s(tmp, 0, 0));
+                put(c, MOVZ_w(XT,1));
+                put(c, INS_s(tmp,1,XT));
+                put(c, MOVZ_w(XT,2));
+                put(c, INS_s(tmp,2,XT));
+                put(c, MOVZ_w(XT,3));
+                put(c, INS_s(tmp,3,XT));
+                put(c, CMHI_4s(s.rd, s.rd, tmp));
+                ra_return_reg(ra, tmp);
+            }
         } break;
 
         case op_iota: {
@@ -448,6 +466,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         case op_load_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            int8_t rz = ra_ensure(ra, sl, ns, inst->z);
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
             if (inst->x) {
@@ -463,6 +482,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 if (scalar) { put(c, LDR_sx(s.rd, XP, XI)); }
                 else         { put(c, LDR_q(s.rd, XP, XW)); }
             }
+            put(c, AND_16b(s.rd, s.rd, rz));
+            if (lu(inst->z) <= i) { ra_free_reg(ra, inst->z); }
         } break;
 
         case op_load_16: {
