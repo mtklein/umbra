@@ -453,24 +453,6 @@ op(pack_fn) {
     next;
 }
 
-op(buf_n_fn) {
-    long bytes = sz[ip->x];
-    if (bytes < 0) { bytes = -bytes; }
-    v->i32 = (I32){0} + (int)(bytes >> ip->y);
-    next;
-}
-op(lane_mask_fn) {
-    I32 const seq = {0,1,2,3,4,5,6,7};
-    if (end & (K-1)) {
-        v->i32 = (I32){0};
-        v->i32[0] = -1;
-    } else {
-        (void)seq;
-        v->i32 = (I32){0} - 1;
-    }
-    next;
-}
-
 op(done) {
     (void)ip; (void)v; (void)end;
     (void)ptr; (void)sz;
@@ -538,8 +520,6 @@ static Fn const fn[] = {
     [op_le_u32] = le_u32,
 
     [op_deref_ptr]  = deref_ptr_handler,
-    [op_buf_n]      = buf_n_fn,
-    [op_lane_mask]  = lane_mask_fn,
     [op_join]       = join_fn,
 
     [op_shl_imm]     = shl_imm_fn,
@@ -680,15 +660,6 @@ struct umbra_interpreter* umbra_interpreter(
                                  .x=RESOLVE_PTR(inst),
                                  .y=inst->imm);
                         }
-                        break;
-
-                    case op_buf_n:
-                        emit(.fn=buf_n_fn,
-                             .x=RESOLVE_PTR(inst),
-                             .y=inst->imm);
-                        break;
-                    case op_lane_mask:
-                        emit(.fn=lane_mask_fn);
                         break;
 
                     case op_load_16:

@@ -21,7 +21,6 @@
     X(gather_16) X(scatter_16)                           \
     X(widen_s16) X(widen_u16) X(narrow_16)                \
     X(widen_f16) X(narrow_f32)                       \
-    X(buf_n) X(lane_mask)                            \
     X(join)                                          \
     X(shl_imm) X(shr_u32_imm) X(shr_s32_imm)       \
     X(and_imm)                                      \
@@ -62,14 +61,12 @@ static inline _Bool is_store(enum op op) {
 
 static inline _Bool has_ptr(enum op op) {
     return op == op_deref_ptr
-        || op == op_buf_n
         || (op >= op_uni_32 && op <= op_scatter_32)
         || (op >= op_uni_16 && op <= op_scatter_16);
 }
 
 static inline _Bool is_varying(enum op op) {
     return op == op_iota
-        || op == op_lane_mask
         || op == op_load_16
         || op == op_load_32
         || op == op_store_16
