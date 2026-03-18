@@ -1,22 +1,22 @@
 Iterations:        100
-Instructions:      32800
+Instructions:      32600
 Total Cycles:      13361
-Total uOps:        39500
+Total uOps:        39300
 
 Dispatch Width:    6
-uOps Per Cycle:    2.96
-IPC:               2.45
+uOps Per Cycle:    2.94
+IPC:               2.44
 Block RThroughput: 80.5
 
 
-Cycles with backend pressure increase [ 65.23% ]
+Cycles with backend pressure increase [ 65.98% ]
 Throughput Bottlenecks: 
-  Resource Pressure       [ 31.42% ]
-  - CyUnitI  [ 19.46% ]
-  - CyUnitIS  [ 21.70% ]
-  - CyUnitLS  [ 5.98% ]
-  Data Dependencies:      [ 59.24% ]
-  - Register Dependencies [ 59.24% ]
+  Resource Pressure       [ 32.92% ]
+  - CyUnitI  [ 18.71% ]
+  - CyUnitIS  [ 23.94% ]
+  - CyUnitLS  [ 5.23% ]
+  Data Dependencies:      [ 59.99% ]
+  - Register Dependencies [ 59.99% ]
   - Memory Dependencies   [ 0.00% ]
 
 Critical sequence based on the simulation:
@@ -118,238 +118,236 @@ Critical sequence based on the simulation:
  |      93.   fcvtzs.4s	v31, v31
  |      94.   and.16b	v31, v31, v26
  |      95.   add.4s	v29, v6, v27
- |      96.   str	q4, [x15]
- +----> 97.   mov	x13, #2147418112                  ## RESOURCE interference:  CyUnitI [ probability: 100% ]
- +----> 98.   mov.s	w10, v29[0]                       ## RESOURCE interference:  CyUnitI [ probability: 100% ]
- |      99.   cmp	w10, #0
- |      100.  csel	w10, wzr, w10, lt
- |      101.  cmp	w10, w13
- |      102.  csel	w10, w13, w10, ge
- |      103.  lsl	x10, x10, #2
- |      104.  add	x10, x8, x10
- |      105.  ld1.s	{ v4 }[0], [x10]
- +----> 106.  mov.s	w10, v29[1]                       ## RESOURCE interference:  CyUnitI [ probability: 100% ]
- |      107.  cmp	w10, #0
- |      108.  csel	w10, wzr, w10, lt
- |      109.  cmp	w10, w13
- |      110.  csel	w10, w13, w10, ge
- |      111.  lsl	x10, x10, #2
- |      112.  add	x10, x8, x10
- |      113.  ld1.s	{ v4 }[1], [x10]
- +----> 114.  mov.s	w10, v29[2]                       ## RESOURCE interference:  CyUnitI [ probability: 100% ]
- +----> 115.  cmp	w10, #0                           ## REGISTER dependency:  w10
- |      116.  csel	w10, wzr, w10, lt
- |      117.  cmp	w10, w13
- |      118.  csel	w10, w13, w10, ge
- |      119.  lsl	x10, x10, #2
- |      120.  add	x10, x8, x10
- |      121.  ld1.s	{ v4 }[2], [x10]
- |      122.  mov.s	w10, v29[3]
- +----> 123.  cmp	w10, #0                           ## RESOURCE interference:  CyUnitI [ probability: 100% ]
- +----> 124.  csel	w10, wzr, w10, lt                 ## REGISTER dependency:  nzcv
- +----> 125.  cmp	w10, w13                          ## REGISTER dependency:  w10
- +----> 126.  csel	w10, w13, w10, ge                 ## REGISTER dependency:  nzcv
- +----> 127.  lsl	x10, x10, #2                      ## REGISTER dependency:  w10
- +----> 128.  add	x10, x8, x10                      ## REGISTER dependency:  x10
- |      129.  ld1.s	{ v4 }[3], [x10]
- |      130.  ldr	q29, [x15]
- |      131.  str	q5, [x15, #16]
- |      132.  add.4s	v5, v6, v30
- |      133.  str	q6, [x15, #32]
- |      134.  mov	x13, #2147418112
- |      135.  mov.s	w10, v5[0]
- |      136.  cmp	w10, #0
- |      137.  csel	w10, wzr, w10, lt
- |      138.  cmp	w10, w13
- |      139.  csel	w10, w13, w10, ge
- |      140.  lsl	x10, x10, #2
- |      141.  add	x10, x8, x10
- |      142.  ld1.s	{ v6 }[0], [x10]
- |      143.  mov.s	w10, v5[1]
- |      144.  cmp	w10, #0
- |      145.  csel	w10, wzr, w10, lt
- |      146.  cmp	w10, w13
- |      147.  csel	w10, w13, w10, ge
- |      148.  lsl	x10, x10, #2
- |      149.  add	x10, x8, x10
- |      150.  ld1.s	{ v6 }[1], [x10]
- |      151.  mov.s	w10, v5[2]
- |      152.  cmp	w10, #0
- |      153.  csel	w10, wzr, w10, lt
- |      154.  cmp	w10, w13
- |      155.  csel	w10, w13, w10, ge
- |      156.  lsl	x10, x10, #2
- |      157.  add	x10, x8, x10
- |      158.  ld1.s	{ v6 }[2], [x10]
- |      159.  mov.s	w10, v5[3]
- |      160.  cmp	w10, #0
- |      161.  csel	w10, wzr, w10, lt
- |      162.  cmp	w10, w13
- |      163.  csel	w10, w13, w10, ge
- |      164.  lsl	x10, x10, #2
- |      165.  add	x10, x8, x10
- |      166.  ld1.s	{ v6 }[3], [x10]
- |      167.  fsub.4s	v6, v6, v4
- |      168.  fmla.4s	v4, v28, v6
- |      169.  mov.16b	v6, v25
- |      170.  fmla.4s	v6, v4, v23
- |      171.  fcvtzs.4s	v6, v6
- |      172.  and.16b	v6, v6, v26
- |      173.  sli.4s	v31, v6, #8
- |      174.  add.4s	v4, v16, v27
- |      175.  mov	x13, #2147418112
- +----> 176.  mov.s	w10, v4[0]                        ## RESOURCE interference:  CyUnitI [ probability: 100% ]
- |      177.  cmp	w10, #0
- |      178.  csel	w10, wzr, w10, lt
- |      179.  cmp	w10, w13
- |      180.  csel	w10, w13, w10, ge
- |      181.  lsl	x10, x10, #2
- |      182.  add	x10, x8, x10
- |      183.  ld1.s	{ v6 }[0], [x10]
- +----> 184.  mov.s	w10, v4[1]                        ## RESOURCE interference:  CyUnitI [ probability: 100% ]
- |      185.  cmp	w10, #0
- |      186.  csel	w10, wzr, w10, lt
- |      187.  cmp	w10, w13
- |      188.  csel	w10, w13, w10, ge
- |      189.  lsl	x10, x10, #2
- |      190.  add	x10, x8, x10
- |      191.  ld1.s	{ v6 }[1], [x10]
- +----> 192.  mov.s	w10, v4[2]                        ## RESOURCE interference:  CyUnitI [ probability: 100% ]
- +----> 193.  cmp	w10, #0                           ## REGISTER dependency:  w10
- +----> 194.  csel	w10, wzr, w10, lt                 ## REGISTER dependency:  nzcv
- +----> 195.  cmp	w10, w13                          ## REGISTER dependency:  w10
- |      196.  csel	w10, w13, w10, ge
- |      197.  lsl	x10, x10, #2
- |      198.  add	x10, x8, x10
- |      199.  ld1.s	{ v6 }[2], [x10]
- |      200.  mov.s	w10, v4[3]
- |      201.  cmp	w10, #0
- |      202.  csel	w10, wzr, w10, lt
- +----> 203.  cmp	w10, w13                          ## RESOURCE interference:  CyUnitIS [ probability: 100% ]
- +----> 204.  csel	w10, w13, w10, ge                 ## REGISTER dependency:  nzcv
- +----> 205.  lsl	x10, x10, #2                      ## REGISTER dependency:  w10
- +----> 206.  add	x10, x8, x10                      ## REGISTER dependency:  x10
- +----> 207.  ld1.s	{ v6 }[3], [x10]                  ## REGISTER dependency:  x10
- |      208.  add.4s	v4, v16, v30
- |      209.  mov	x13, #2147418112
- |      210.  mov.s	w10, v4[0]
- |      211.  cmp	w10, #0
- |      212.  csel	w10, wzr, w10, lt
- |      213.  cmp	w10, w13
- |      214.  csel	w10, w13, w10, ge
- |      215.  lsl	x10, x10, #2
- |      216.  add	x10, x8, x10
- |      217.  ld1.s	{ v5 }[0], [x10]
- |      218.  mov.s	w10, v4[1]
- |      219.  cmp	w10, #0
- |      220.  csel	w10, wzr, w10, lt
- |      221.  cmp	w10, w13
- |      222.  csel	w10, w13, w10, ge
- |      223.  lsl	x10, x10, #2
- |      224.  add	x10, x8, x10
- |      225.  ld1.s	{ v5 }[1], [x10]
- |      226.  mov.s	w10, v4[2]
- |      227.  cmp	w10, #0
- |      228.  csel	w10, wzr, w10, lt
- |      229.  cmp	w10, w13
- |      230.  csel	w10, w13, w10, ge
- |      231.  lsl	x10, x10, #2
- |      232.  add	x10, x8, x10
- |      233.  ld1.s	{ v5 }[2], [x10]
- |      234.  mov.s	w10, v4[3]
- |      235.  cmp	w10, #0
- |      236.  csel	w10, wzr, w10, lt
- |      237.  cmp	w10, w13
- |      238.  csel	w10, w13, w10, ge
- |      239.  lsl	x10, x10, #2
- |      240.  add	x10, x8, x10
- |      241.  ld1.s	{ v5 }[3], [x10]
- +----> 242.  fsub.4s	v5, v5, v6                        ## REGISTER dependency:  q6
- +----> 243.  fmla.4s	v6, v28, v5                       ## REGISTER dependency:  q5
- |      244.  mov.16b	v5, v25
- +----> 245.  fmla.4s	v5, v6, v23                       ## REGISTER dependency:  q6
- +----> 246.  fcvtzs.4s	v5, v5                            ## REGISTER dependency:  q5
- +----> 247.  and.16b	v5, v5, v26                       ## REGISTER dependency:  q5
- +----> 248.  sli.4s	v31, v5, #16                      ## REGISTER dependency:  q5
-        249.  add.4s	v27, v18, v27
-        250.  mov	x13, #2147418112
-        251.  mov.s	w10, v27[0]
-        252.  cmp	w10, #0
-        253.  csel	w10, wzr, w10, lt
-        254.  cmp	w10, w13
-        255.  csel	w10, w13, w10, ge
-        256.  lsl	x10, x10, #2
-        257.  add	x10, x8, x10
-        258.  ld1.s	{ v6 }[0], [x10]
-        259.  mov.s	w10, v27[1]
-        260.  cmp	w10, #0
-        261.  csel	w10, wzr, w10, lt
-        262.  cmp	w10, w13
-        263.  csel	w10, w13, w10, ge
-        264.  lsl	x10, x10, #2
-        265.  add	x10, x8, x10
-        266.  ld1.s	{ v6 }[1], [x10]
-        267.  mov.s	w10, v27[2]
-        268.  cmp	w10, #0
-        269.  csel	w10, wzr, w10, lt
-        270.  cmp	w10, w13
-        271.  csel	w10, w13, w10, ge
-        272.  lsl	x10, x10, #2
-        273.  add	x10, x8, x10
-        274.  ld1.s	{ v6 }[2], [x10]
-        275.  mov.s	w10, v27[3]
-        276.  cmp	w10, #0
-        277.  csel	w10, wzr, w10, lt
-        278.  cmp	w10, w13
-        279.  csel	w10, w13, w10, ge
-        280.  lsl	x10, x10, #2
-        281.  add	x10, x8, x10
-        282.  ld1.s	{ v6 }[3], [x10]
-        283.  add.4s	v30, v18, v30
-        284.  mov	x13, #2147418112
-        285.  mov.s	w10, v30[0]
-        286.  cmp	w10, #0
-        287.  csel	w10, wzr, w10, lt
-        288.  cmp	w10, w13
-        289.  csel	w10, w13, w10, ge
-        290.  lsl	x10, x10, #2
-        291.  add	x10, x8, x10
-        292.  ld1.s	{ v27 }[0], [x10]
-        293.  mov.s	w10, v30[1]
-        294.  cmp	w10, #0
-        295.  csel	w10, wzr, w10, lt
-        296.  cmp	w10, w13
-        297.  csel	w10, w13, w10, ge
-        298.  lsl	x10, x10, #2
-        299.  add	x10, x8, x10
-        300.  ld1.s	{ v27 }[1], [x10]
-        301.  mov.s	w10, v30[2]
-        302.  cmp	w10, #0
-        303.  csel	w10, wzr, w10, lt
-        304.  cmp	w10, w13
-        305.  csel	w10, w13, w10, ge
-        306.  lsl	x10, x10, #2
-        307.  add	x10, x8, x10
-        308.  ld1.s	{ v27 }[2], [x10]
-        309.  mov.s	w10, v30[3]
-        310.  cmp	w10, #0
-        311.  csel	w10, wzr, w10, lt
-        312.  cmp	w10, w13
-        313.  csel	w10, w13, w10, ge
-        314.  lsl	x10, x10, #2
-        315.  add	x10, x8, x10
-        316.  ld1.s	{ v27 }[3], [x10]
-        317.  fsub.4s	v27, v27, v6
-        318.  fmla.4s	v6, v28, v27
-        319.  mov.16b	v27, v25
-        320.  fmla.4s	v27, v6, v23
-        321.  fcvtzs.4s	v27, v27
-        322.  sli.4s	v31, v27, #24
-        323.  ldr	x8, [x1]
-        324.  str	q31, [x8, x12]
-        325.  ldr	q4, [x15]
-        326.  ldr	q5, [x15, #16]
-        327.  ldr	q6, [x15, #32]
+ +----> 96.   mov	x13, #2147418112                  ## RESOURCE interference:  CyUnitI [ probability: 100% ]
+ +----> 97.   mov.s	w10, v29[0]                       ## RESOURCE interference:  CyUnitI [ probability: 100% ]
+ |      98.   cmp	w10, #0
+ |      99.   csel	w10, wzr, w10, lt
+ |      100.  cmp	w10, w13
+ |      101.  csel	w10, w13, w10, ge
+ |      102.  lsl	x10, x10, #2
+ |      103.  add	x10, x8, x10
+ |      104.  ld1.s	{ v4 }[0], [x10]
+ +----> 105.  mov.s	w10, v29[1]                       ## RESOURCE interference:  CyUnitI [ probability: 100% ]
+ |      106.  cmp	w10, #0
+ |      107.  csel	w10, wzr, w10, lt
+ |      108.  cmp	w10, w13
+ |      109.  csel	w10, w13, w10, ge
+ |      110.  lsl	x10, x10, #2
+ |      111.  add	x10, x8, x10
+ |      112.  ld1.s	{ v4 }[1], [x10]
+ +----> 113.  mov.s	w10, v29[2]                       ## RESOURCE interference:  CyUnitI [ probability: 100% ]
+ +----> 114.  cmp	w10, #0                           ## REGISTER dependency:  w10
+ |      115.  csel	w10, wzr, w10, lt
+ |      116.  cmp	w10, w13
+ |      117.  csel	w10, w13, w10, ge
+ |      118.  lsl	x10, x10, #2
+ |      119.  add	x10, x8, x10
+ |      120.  ld1.s	{ v4 }[2], [x10]
+ |      121.  mov.s	w10, v29[3]
+ +----> 122.  cmp	w10, #0                           ## RESOURCE interference:  CyUnitI [ probability: 100% ]
+ +----> 123.  csel	w10, wzr, w10, lt                 ## REGISTER dependency:  nzcv
+ +----> 124.  cmp	w10, w13                          ## REGISTER dependency:  w10
+ +----> 125.  csel	w10, w13, w10, ge                 ## REGISTER dependency:  nzcv
+ +----> 126.  lsl	x10, x10, #2                      ## REGISTER dependency:  w10
+ +----> 127.  add	x10, x8, x10                      ## REGISTER dependency:  x10
+ |      128.  ld1.s	{ v4 }[3], [x10]
+ |      129.  movi.4s	v29, #0
+ |      130.  str	q5, [x15]
+ |      131.  add.4s	v5, v6, v30
+ |      132.  mov	x13, #2147418112
+ |      133.  mov.s	w10, v5[0]
+ |      134.  cmp	w10, #0
+ |      135.  csel	w10, wzr, w10, lt
+ |      136.  cmp	w10, w13
+ |      137.  csel	w10, w13, w10, ge
+ |      138.  lsl	x10, x10, #2
+ |      139.  add	x10, x8, x10
+ |      140.  ld1.s	{ v6 }[0], [x10]
+ |      141.  mov.s	w10, v5[1]
+ |      142.  cmp	w10, #0
+ |      143.  csel	w10, wzr, w10, lt
+ |      144.  cmp	w10, w13
+ |      145.  csel	w10, w13, w10, ge
+ |      146.  lsl	x10, x10, #2
+ |      147.  add	x10, x8, x10
+ |      148.  ld1.s	{ v6 }[1], [x10]
+ |      149.  mov.s	w10, v5[2]
+ |      150.  cmp	w10, #0
+ |      151.  csel	w10, wzr, w10, lt
+ |      152.  cmp	w10, w13
+ |      153.  csel	w10, w13, w10, ge
+ |      154.  lsl	x10, x10, #2
+ |      155.  add	x10, x8, x10
+ |      156.  ld1.s	{ v6 }[2], [x10]
+ |      157.  mov.s	w10, v5[3]
+ |      158.  cmp	w10, #0
+ |      159.  csel	w10, wzr, w10, lt
+ |      160.  cmp	w10, w13
+ |      161.  csel	w10, w13, w10, ge
+ |      162.  lsl	x10, x10, #2
+ |      163.  add	x10, x8, x10
+ |      164.  ld1.s	{ v6 }[3], [x10]
+ |      165.  fsub.4s	v6, v6, v4
+ |      166.  fmla.4s	v4, v28, v6
+ |      167.  mov.16b	v6, v25
+ |      168.  fmla.4s	v6, v4, v23
+ |      169.  fcvtzs.4s	v6, v6
+ |      170.  and.16b	v6, v6, v26
+ |      171.  sli.4s	v31, v6, #8
+ |      172.  add.4s	v4, v16, v27
+ |      173.  mov	x13, #2147418112
+ +----> 174.  mov.s	w10, v4[0]                        ## RESOURCE interference:  CyUnitI [ probability: 100% ]
+ |      175.  cmp	w10, #0
+ |      176.  csel	w10, wzr, w10, lt
+ |      177.  cmp	w10, w13
+ |      178.  csel	w10, w13, w10, ge
+ |      179.  lsl	x10, x10, #2
+ |      180.  add	x10, x8, x10
+ |      181.  ld1.s	{ v6 }[0], [x10]
+ +----> 182.  mov.s	w10, v4[1]                        ## RESOURCE interference:  CyUnitI [ probability: 100% ]
+ |      183.  cmp	w10, #0
+ |      184.  csel	w10, wzr, w10, lt
+ |      185.  cmp	w10, w13
+ |      186.  csel	w10, w13, w10, ge
+ |      187.  lsl	x10, x10, #2
+ |      188.  add	x10, x8, x10
+ |      189.  ld1.s	{ v6 }[1], [x10]
+ +----> 190.  mov.s	w10, v4[2]                        ## RESOURCE interference:  CyUnitI [ probability: 100% ]
+ +----> 191.  cmp	w10, #0                           ## REGISTER dependency:  w10
+ +----> 192.  csel	w10, wzr, w10, lt                 ## REGISTER dependency:  nzcv
+ +----> 193.  cmp	w10, w13                          ## REGISTER dependency:  w10
+ |      194.  csel	w10, w13, w10, ge
+ |      195.  lsl	x10, x10, #2
+ |      196.  add	x10, x8, x10
+ |      197.  ld1.s	{ v6 }[2], [x10]
+ |      198.  mov.s	w10, v4[3]
+ |      199.  cmp	w10, #0
+ |      200.  csel	w10, wzr, w10, lt
+ +----> 201.  cmp	w10, w13                          ## RESOURCE interference:  CyUnitIS [ probability: 100% ]
+ +----> 202.  csel	w10, w13, w10, ge                 ## REGISTER dependency:  nzcv
+ +----> 203.  lsl	x10, x10, #2                      ## REGISTER dependency:  w10
+ +----> 204.  add	x10, x8, x10                      ## REGISTER dependency:  x10
+ |      205.  ld1.s	{ v6 }[3], [x10]
+ |      206.  add.4s	v4, v16, v30
+ |      207.  mov	x13, #2147418112
+ |      208.  mov.s	w10, v4[0]
+ |      209.  cmp	w10, #0
+ |      210.  csel	w10, wzr, w10, lt
+ |      211.  cmp	w10, w13
+ |      212.  csel	w10, w13, w10, ge
+ |      213.  lsl	x10, x10, #2
+ |      214.  add	x10, x8, x10
+ |      215.  ld1.s	{ v5 }[0], [x10]
+ |      216.  mov.s	w10, v4[1]
+ |      217.  cmp	w10, #0
+ |      218.  csel	w10, wzr, w10, lt
+ |      219.  cmp	w10, w13
+ |      220.  csel	w10, w13, w10, ge
+ |      221.  lsl	x10, x10, #2
+ |      222.  add	x10, x8, x10
+ |      223.  ld1.s	{ v5 }[1], [x10]
+ |      224.  mov.s	w10, v4[2]
+ |      225.  cmp	w10, #0
+ |      226.  csel	w10, wzr, w10, lt
+ |      227.  cmp	w10, w13
+ |      228.  csel	w10, w13, w10, ge
+ |      229.  lsl	x10, x10, #2
+ |      230.  add	x10, x8, x10
+ |      231.  ld1.s	{ v5 }[2], [x10]
+ |      232.  mov.s	w10, v4[3]
+ |      233.  cmp	w10, #0
+ |      234.  csel	w10, wzr, w10, lt
+ |      235.  cmp	w10, w13
+ |      236.  csel	w10, w13, w10, ge
+ |      237.  lsl	x10, x10, #2
+ |      238.  add	x10, x8, x10
+ |      239.  ld1.s	{ v5 }[3], [x10]
+ |      240.  fsub.4s	v5, v5, v6
+ |      241.  fmla.4s	v6, v28, v5
+ |      242.  mov.16b	v5, v25
+ |      243.  fmla.4s	v5, v6, v23
+ |      244.  fcvtzs.4s	v5, v5
+ |      245.  and.16b	v5, v5, v26
+ |      246.  sli.4s	v31, v5, #16
+ |      247.  add.4s	v27, v18, v27
+ |      248.  mov	x13, #2147418112
+ +----> 249.  mov.s	w10, v27[0]                       ## RESOURCE interference:  CyUnitI [ probability: 100% ]
+ +----> 250.  cmp	w10, #0                           ## REGISTER dependency:  w10
+ +----> 251.  csel	w10, wzr, w10, lt                 ## REGISTER dependency:  nzcv
+ +----> 252.  cmp	w10, w13                          ## REGISTER dependency:  w10
+ +----> 253.  csel	w10, w13, w10, ge                 ## REGISTER dependency:  nzcv
+ +----> 254.  lsl	x10, x10, #2                      ## REGISTER dependency:  w10
+ +----> 255.  add	x10, x8, x10                      ## REGISTER dependency:  x10
+ |      256.  ld1.s	{ v6 }[0], [x10]
+ |      257.  mov.s	w10, v27[1]
+ |      258.  cmp	w10, #0
+ |      259.  csel	w10, wzr, w10, lt
+ |      260.  cmp	w10, w13
+ |      261.  csel	w10, w13, w10, ge
+ |      262.  lsl	x10, x10, #2
+ |      263.  add	x10, x8, x10
+ |      264.  ld1.s	{ v6 }[1], [x10]
+ |      265.  mov.s	w10, v27[2]
+ |      266.  cmp	w10, #0
+ |      267.  csel	w10, wzr, w10, lt
+ |      268.  cmp	w10, w13
+ |      269.  csel	w10, w13, w10, ge
+ |      270.  lsl	x10, x10, #2
+ |      271.  add	x10, x8, x10
+ |      272.  ld1.s	{ v6 }[2], [x10]
+ |      273.  mov.s	w10, v27[3]
+ |      274.  cmp	w10, #0
+ |      275.  csel	w10, wzr, w10, lt
+ |      276.  cmp	w10, w13
+ |      277.  csel	w10, w13, w10, ge
+ |      278.  lsl	x10, x10, #2
+ |      279.  add	x10, x8, x10
+ |      280.  ld1.s	{ v6 }[3], [x10]
+ |      281.  add.4s	v30, v18, v30
+ |      282.  mov	x13, #2147418112
+ |      283.  mov.s	w10, v30[0]
+ |      284.  cmp	w10, #0
+ |      285.  csel	w10, wzr, w10, lt
+ |      286.  cmp	w10, w13
+ |      287.  csel	w10, w13, w10, ge
+ |      288.  lsl	x10, x10, #2
+ |      289.  add	x10, x8, x10
+ |      290.  ld1.s	{ v27 }[0], [x10]
+ +----> 291.  mov.s	w10, v30[1]                       ## RESOURCE interference:  CyUnitI [ probability: 100% ]
+ +----> 292.  cmp	w10, #0                           ## REGISTER dependency:  w10
+ +----> 293.  csel	w10, wzr, w10, lt                 ## REGISTER dependency:  nzcv
+ +----> 294.  cmp	w10, w13                          ## REGISTER dependency:  w10
+ +----> 295.  csel	w10, w13, w10, ge                 ## REGISTER dependency:  nzcv
+ +----> 296.  lsl	x10, x10, #2                      ## REGISTER dependency:  w10
+ +----> 297.  add	x10, x8, x10                      ## REGISTER dependency:  x10
+ |      298.  ld1.s	{ v27 }[1], [x10]
+ |      299.  mov.s	w10, v30[2]
+ |      300.  cmp	w10, #0
+ |      301.  csel	w10, wzr, w10, lt
+ |      302.  cmp	w10, w13
+ |      303.  csel	w10, w13, w10, ge
+ +----> 304.  lsl	x10, x10, #2                      ## RESOURCE interference:  CyUnitIS [ probability: 99% ]
+ +----> 305.  add	x10, x8, x10                      ## REGISTER dependency:  x10
+ |      306.  ld1.s	{ v27 }[2], [x10]
+ |      307.  mov.s	w10, v30[3]
+ |      308.  cmp	w10, #0
+ |      309.  csel	w10, wzr, w10, lt
+ +----> 310.  cmp	w10, w13                          ## RESOURCE interference:  CyUnitIS [ probability: 99% ]
+ +----> 311.  csel	w10, w13, w10, ge                 ## REGISTER dependency:  nzcv
+ +----> 312.  lsl	x10, x10, #2                      ## REGISTER dependency:  w10
+ +----> 313.  add	x10, x8, x10                      ## REGISTER dependency:  x10
+ +----> 314.  ld1.s	{ v27 }[3], [x10]                 ## REGISTER dependency:  x10
+        315.  fsub.4s	v27, v27, v6
+        316.  fmla.4s	v6, v28, v27
+        317.  mov.16b	v27, v25
+        318.  fmla.4s	v27, v6, v23
+        319.  fcvtzs.4s	v27, v27
+        320.  sli.4s	v31, v27, #24
+        321.  ldr	x8, [x1]
+        322.  str	q31, [x8, x12]
+        323.  movi.4s	v4, #0
+        324.  ldr	q5, [x15]
+        325.  movi.4s	v6, #1
 
 
 Instruction Info:
@@ -457,7 +455,6 @@ Instruction Info:
  1      2     0.33                        fcvtzs.4s	v31, v31
  1      2     0.33                        and.16b	v31, v31, v26
  1      2     0.33                        add.4s	v29, v6, v27
- 1      4     0.50           *            str	q4, [x15]
  1      1     0.25                        mov	x13, #2147418112
  2      5     0.50                        mov.s	w10, v29[0]
  1      1     0.25                        cmp	w10, #0
@@ -491,10 +488,9 @@ Instruction Info:
  1      1     0.50                        lsl	x10, x10, #2
  1      2     1.00                        add	x10, x8, x10
  2      7     0.50    *                   ld1.s	{ v4 }[3], [x10]
- 1      4     0.50    *                   ldr	q29, [x15]
- 1      4     0.50           *            str	q5, [x15, #16]
+ 1      2     0.33                        movi.4s	v29, #0
+ 1      4     0.50           *            str	q5, [x15]
  1      2     0.33                        add.4s	v5, v6, v30
- 1      4     0.50           *            str	q6, [x15, #32]
  1      1     0.25                        mov	x13, #2147418112
  2      5     0.50                        mov.s	w10, v5[0]
  1      1     0.25                        cmp	w10, #0
@@ -686,9 +682,9 @@ Instruction Info:
  1      2     0.33                        sli.4s	v31, v27, #24
  1      4     0.50    *                   ldr	x8, [x1]
  2      5     0.50           *            str	q31, [x8, x12]
- 1      4     0.50    *                   ldr	q4, [x15]
- 1      4     0.50    *                   ldr	q5, [x15, #16]
- 1      4     0.50    *                   ldr	q6, [x15, #32]
+ 1      2     0.33                        movi.4s	v4, #0
+ 1      4     0.50    *                   ldr	q5, [x15]
+ 1      2     0.33                        movi.4s	v6, #1
 
 
 Resources:
@@ -719,14 +715,14 @@ Resources:
 
 Resource pressure per iteration:
 [0.0]  [0.1]  [1]    [2.0]  [2.1]  [3.0]  [3.1]  [3.2]  [3.3]  [4]    [5]    [6.0]  [6.1]  [7]    [8.0]  [8.1]  [9.0]  [9.1]  [9.2]  [10]   [11]   [12.0] [12.1] 
- -      -      -      -      -     74.99  75.01  75.00  75.00   -      -     80.50  80.50   -     37.50  37.50  28.00  28.00  28.00   -      -     4.50   4.50   
+ -      -      -      -      -     74.99  74.99  75.00  75.02   -      -     80.50  80.50   -     35.00  35.00  29.00  29.00  29.00   -      -     4.50   4.50   
 
 Resource pressure by instruction:
 [0.0]  [0.1]  [1]    [2.0]  [2.1]  [3.0]  [3.1]  [3.2]  [3.3]  [4]    [5]    [6.0]  [6.1]  [7]    [8.0]  [8.1]  [9.0]  [9.1]  [9.2]  [10]   [11]   [12.0] [12.1] Instructions:
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -     0.99   0.01    -      -      -      -     dup.4s	v27, w9
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -     0.99   0.01    -      -      -      -     dup.4s	v27, w9
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     mov	w10, #256
  -      -      -      -      -     0.25   0.24   0.26   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     movk	w10, #770, lsl #16
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.51   0.49   0.01    -     0.99    -      -      -      -     dup.4s	v28, w10
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.01   0.99   0.01    -     0.99    -      -      -      -     dup.4s	v28, w10
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -     ushll.8h	v28, v28, #0
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -     ushll.4s	v28, v28, #0
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -     add.4s	v27, v27, v28
@@ -746,308 +742,306 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -     shl.4s	v27, v27, #2
  -      -      -      -      -     0.24   0.26   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     add	x8, x2, #0
  -      -      -      -      -     0.26   0.25   0.25   0.24    -      -      -      -      -      -      -      -      -      -      -      -      -      -     mov	x13, #2147418112
- -      -      -      -      -     0.25   0.25   0.26   0.24    -      -      -      -      -     0.49   0.51    -      -      -      -      -      -      -     mov.s	w10, v27[0]
+ -      -      -      -      -     0.25   0.25   0.26   0.24    -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -     mov.s	w10, v27[0]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -     1.00    -      -      -      -      -     ld1.s	{ v29 }[0], [x10]
- -      -      -      -      -     0.25   0.26   0.24   0.25    -      -      -      -      -     0.51   0.49    -      -      -      -      -      -      -     mov.s	w10, v27[1]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -     1.00    -      -      -      -      -     ld1.s	{ v29 }[0], [x10]
+ -      -      -      -      -     0.25   0.26   0.24   0.25    -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -     mov.s	w10, v27[1]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50   1.00    -      -      -      -      -      -     ld1.s	{ v29 }[1], [x10]
- -      -      -      -      -     0.26   0.24   0.25   0.25    -      -      -      -      -     0.49   0.51    -      -      -      -      -      -      -     mov.s	w10, v27[2]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00   1.00    -      -      -      -      -      -     ld1.s	{ v29 }[1], [x10]
+ -      -      -      -      -     0.26   0.24   0.25   0.25    -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -     mov.s	w10, v27[2]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -     1.00    -      -      -      -      -     ld1.s	{ v29 }[2], [x10]
- -      -      -      -      -     0.24   0.25   0.25   0.26    -      -      -      -      -     0.51   0.49    -      -      -      -      -      -      -     mov.s	w10, v27[3]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00   1.00    -      -      -      -      -      -     ld1.s	{ v29 }[2], [x10]
+ -      -      -      -      -     0.24   0.25   0.25   0.26    -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -     mov.s	w10, v27[3]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50   1.00    -      -      -      -      -      -     ld1.s	{ v29 }[3], [x10]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -     1.00    -      -      -      -     ld1.s	{ v29 }[3], [x10]
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -     add.4s	v30, v20, v27
  -      -      -      -      -     0.24   0.25   0.25   0.26    -      -      -      -      -      -      -      -      -      -      -      -      -      -     mov	x13, #2147418112
- -      -      -      -      -     0.25   0.25   0.26   0.24    -      -      -      -      -     0.49   0.51    -      -      -      -      -      -      -     mov.s	w10, v30[0]
+ -      -      -      -      -     0.25   0.25   0.26   0.24    -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -     mov.s	w10, v30[0]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -     1.00    -      -      -      -     ld1.s	{ v31 }[0], [x10]
- -      -      -      -      -     0.25   0.26   0.24   0.25    -      -      -      -      -     0.51   0.49    -      -      -      -      -      -      -     mov.s	w10, v30[1]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -     1.00    -      -      -      -      -     ld1.s	{ v31 }[0], [x10]
+ -      -      -      -      -     0.25   0.26   0.24   0.25    -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -     mov.s	w10, v30[1]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -     1.00    -      -      -      -      -     ld1.s	{ v31 }[1], [x10]
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v30[2]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -     1.00    -      -      -      -      -      -     ld1.s	{ v31 }[1], [x10]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -     1.00    -      -      -      -      -      -      -     mov.s	w10, v30[2]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -     1.00    -      -      -      -     ld1.s	{ v31 }[2], [x10]
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v30[3]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -     1.00    -      -      -      -      -     ld1.s	{ v31 }[2], [x10]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     1.00    -      -      -      -      -      -      -      -     mov.s	w10, v30[3]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50   1.00    -      -      -      -      -      -     ld1.s	{ v31 }[3], [x10]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -     fsub.4s	v31, v31, v29
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -     0.50   0.50   fmla.4s	v29, v28, v31
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -     1.00    -      -      -      -     ld1.s	{ v31 }[3], [x10]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -     fsub.4s	v31, v31, v29
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -     0.50   0.50   fmla.4s	v29, v28, v31
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -     mov.16b	v31, v25
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -     0.50   0.50   fmla.4s	v31, v29, v23
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -     fcvtzs.4s	v31, v31
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -     and.16b	v31, v31, v26
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -     0.50   0.50   fmla.4s	v31, v29, v23
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -     fcvtzs.4s	v31, v31
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -     and.16b	v31, v31, v26
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -     add.4s	v29, v6, v27
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     str	q4, [x15]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     mov	x13, #2147418112
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v29[0]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     1.00    -      -      -      -      -      -      -      -     mov.s	w10, v29[0]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -     1.00    -      -      -      -     ld1.s	{ v4 }[0], [x10]
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v29[1]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -     1.00    -      -      -      -      -     ld1.s	{ v4 }[0], [x10]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -     1.00    -      -      -      -      -      -      -     mov.s	w10, v29[1]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -     1.00    -      -      -      -      -     ld1.s	{ v4 }[1], [x10]
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v29[2]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -     1.00    -      -      -      -      -      -     ld1.s	{ v4 }[1], [x10]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     1.00    -      -      -      -      -      -      -      -     mov.s	w10, v29[2]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -     1.00    -      -      -      -      -     ld1.s	{ v4 }[2], [x10]
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v29[3]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00   1.00    -      -      -      -      -      -     ld1.s	{ v4 }[2], [x10]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     1.00    -      -      -      -      -      -      -      -     mov.s	w10, v29[3]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50   1.00    -      -      -      -      -      -     ld1.s	{ v4 }[3], [x10]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldr	q29, [x15]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     str	q5, [x15, #16]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -     add.4s	v5, v6, v30
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     str	q6, [x15, #32]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -     1.00    -      -      -      -     ld1.s	{ v4 }[3], [x10]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -     movi.4s	v29, #0
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -     str	q5, [x15]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -     add.4s	v5, v6, v30
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     mov	x13, #2147418112
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v5[0]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     1.00    -      -      -      -      -      -      -      -     mov.s	w10, v5[0]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -     1.00    -      -      -      -      -     ld1.s	{ v6 }[0], [x10]
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v5[1]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -     1.00    -      -      -      -      -      -     ld1.s	{ v6 }[0], [x10]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -     1.00    -      -      -      -      -      -      -     mov.s	w10, v5[1]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50   1.00    -      -      -      -      -      -     ld1.s	{ v6 }[1], [x10]
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v5[2]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -     1.00    -      -      -      -     ld1.s	{ v6 }[1], [x10]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -     1.00    -      -      -      -      -      -      -     mov.s	w10, v5[2]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -     1.00    -      -      -      -      -     ld1.s	{ v6 }[2], [x10]
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v5[3]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -     1.00    -      -      -      -      -      -     ld1.s	{ v6 }[2], [x10]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     1.00    -      -      -      -      -      -      -      -     mov.s	w10, v5[3]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -     1.00    -      -      -      -      -     ld1.s	{ v6 }[3], [x10]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -     fsub.4s	v6, v6, v4
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -     0.50   0.50   fmla.4s	v4, v28, v6
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -     mov.16b	v6, v25
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -     0.50   0.50   fmla.4s	v6, v4, v23
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -     fcvtzs.4s	v6, v6
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00   1.00    -      -      -      -      -      -     ld1.s	{ v6 }[3], [x10]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -     fsub.4s	v6, v6, v4
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -     0.50   0.50   fmla.4s	v4, v28, v6
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -     mov.16b	v6, v25
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -     0.50   0.50   fmla.4s	v6, v4, v23
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -     fcvtzs.4s	v6, v6
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -     and.16b	v6, v6, v26
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -     sli.4s	v31, v6, #8
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -     add.4s	v4, v16, v27
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -     add.4s	v4, v16, v27
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     mov	x13, #2147418112
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v4[0]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     1.00    -      -      -      -      -      -      -      -     mov.s	w10, v4[0]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -     1.00    -      -      -      -     ld1.s	{ v6 }[0], [x10]
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v4[1]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -     1.00    -      -      -      -     ld1.s	{ v6 }[0], [x10]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -     1.00    -      -      -      -      -      -      -     mov.s	w10, v4[1]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.49   0.51   0.01    -     0.99    -      -      -      -     ld1.s	{ v6 }[1], [x10]
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v4[2]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.99   0.01   0.01    -     0.99    -      -      -      -     ld1.s	{ v6 }[1], [x10]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -     1.00    -      -      -      -      -      -      -     mov.s	w10, v4[2]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.51   0.49    -     0.99   0.01    -      -      -      -     ld1.s	{ v6 }[2], [x10]
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v4[3]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.01   0.99    -     0.99   0.01    -      -      -      -     ld1.s	{ v6 }[2], [x10]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     1.00    -      -      -      -      -      -      -      -     mov.s	w10, v4[3]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.49   0.51   0.99   0.01    -      -      -      -      -     ld1.s	{ v6 }[3], [x10]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -     add.4s	v4, v16, v30
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.99   0.01   0.99   0.01    -      -      -      -      -     ld1.s	{ v6 }[3], [x10]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -     add.4s	v4, v16, v30
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     mov	x13, #2147418112
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v4[0]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -     1.00    -      -      -      -      -      -      -     mov.s	w10, v4[0]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -     1.00    -      -      -      -     ld1.s	{ v5 }[0], [x10]
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v4[1]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -     1.00    -      -      -      -      -     ld1.s	{ v5 }[0], [x10]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     1.00    -      -      -      -      -      -      -      -     mov.s	w10, v4[1]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -     1.00    -      -      -      -      -     ld1.s	{ v5 }[1], [x10]
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v4[2]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -     1.00    -      -      -      -      -      -     ld1.s	{ v5 }[1], [x10]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     1.00    -      -      -      -      -      -      -      -     mov.s	w10, v4[2]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50   1.00    -      -      -      -      -      -     ld1.s	{ v5 }[2], [x10]
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v4[3]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -     1.00    -      -      -      -     ld1.s	{ v5 }[2], [x10]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -     1.00    -      -      -      -      -      -      -     mov.s	w10, v4[3]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50   1.00    -      -      -      -      -      -     ld1.s	{ v5 }[3], [x10]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -     1.00    -      -      -      -     ld1.s	{ v5 }[3], [x10]
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -     fsub.4s	v5, v5, v6
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.01   0.99    -      -     0.50   0.50   fmla.4s	v6, v28, v5
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -     mov.16b	v5, v25
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -     mov.16b	v5, v25
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -     0.51   0.49   fmla.4s	v5, v6, v23
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -     fcvtzs.4s	v5, v5
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -     and.16b	v5, v5, v26
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -     sli.4s	v31, v5, #16
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -     add.4s	v27, v18, v27
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -     add.4s	v27, v18, v27
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     mov	x13, #2147418112
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v27[0]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     1.00    -      -      -      -      -      -      -      -     mov.s	w10, v27[0]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50   0.01    -     0.99    -      -      -      -     ld1.s	{ v6 }[0], [x10]
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v27[1]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -     0.01    -     0.99    -      -      -      -     ld1.s	{ v6 }[0], [x10]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     1.00    -      -      -      -      -      -      -      -     mov.s	w10, v27[1]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50   0.99    -     0.01    -      -      -      -     ld1.s	{ v6 }[1], [x10]
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v27[2]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00   0.99    -     0.01    -      -      -      -     ld1.s	{ v6 }[1], [x10]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -     1.00    -      -      -      -      -      -      -     mov.s	w10, v27[2]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -     1.00    -      -      -      -      -     ld1.s	{ v6 }[2], [x10]
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v27[3]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -     1.00    -      -      -      -      -     ld1.s	{ v6 }[2], [x10]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -     1.00    -      -      -      -      -      -      -     mov.s	w10, v27[3]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -     1.00    -      -      -      -     ld1.s	{ v6 }[3], [x10]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -     add.4s	v30, v18, v30
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -     1.00    -      -      -      -     ld1.s	{ v6 }[3], [x10]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -     add.4s	v30, v18, v30
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     mov	x13, #2147418112
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v30[0]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     1.00    -      -      -      -      -      -      -      -     mov.s	w10, v30[0]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
- -      -      -      -      -     0.25   0.24   0.25   0.26    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
- -      -      -      -      -     0.26   0.25   0.25   0.24    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
- -      -      -      -      -     0.48   0.50   0.52   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50   0.01   0.99    -      -      -      -      -     ld1.s	{ v27 }[0], [x10]
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v30[1]
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
- -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
- -      -      -      -      -     0.25   0.25   0.24   0.26    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
- -      -      -      -      -     0.25   0.26   0.25   0.24    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
- -      -      -      -      -     0.50   0.48   0.50   0.52    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -     1.00    -      -      -      -     ld1.s	{ v27 }[1], [x10]
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v30[2]
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
- -      -      -      -      -     0.48   0.52   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
  -      -      -      -      -     0.26   0.25   0.24   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
- -      -      -      -      -     0.24   0.25   0.26   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
- -      -      -      -      -     0.50   0.52   0.50   0.48    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -     1.00    -      -      -      -      -     ld1.s	{ v27 }[2], [x10]
- -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     mov.s	w10, v30[3]
+ -      -      -      -      -     0.25   0.25   0.26   0.24    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
+ -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -     0.01   0.99    -      -      -      -      -     ld1.s	{ v27 }[0], [x10]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -     1.00    -      -      -      -      -      -      -     mov.s	w10, v30[1]
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
- -      -      -      -      -     0.52   0.50   0.48   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
- -      -      -      -      -     0.25   0.24   0.25   0.26    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
+ -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
+ -      -      -      -      -     0.25   0.26   0.24   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
  -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
  -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -     0.99   0.01    -      -      -      -     ld1.s	{ v27 }[3], [x10]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -     1.00    -      -      -      -     ld1.s	{ v27 }[1], [x10]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -     1.00    -      -      -      -      -      -      -      -     mov.s	w10, v30[2]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
+ -      -      -      -      -     0.48   0.50   0.50   0.52    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
+ -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -     1.00    -      -      -      -      -     ld1.s	{ v27 }[2], [x10]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -     1.00    -      -      -      -      -      -      -     mov.s	w10, v30[3]
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmp	w10, #0
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, wzr, w10, lt
+ -      -      -      -      -     0.50   0.50   0.50   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     cmp	w10, w13
+ -      -      -      -      -     0.25   0.25   0.25   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -      -     csel	w10, w13, w10, ge
+ -      -      -      -      -     0.26   0.25   0.24   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #2
+ -      -      -      -      -     0.50   0.48   0.50   0.52    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -     0.99   0.01    -      -      -      -     ld1.s	{ v27 }[3], [x10]
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.01    -     0.99    -      -      -      -     fsub.4s	v27, v27, v6
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -     0.49   0.51   fmla.4s	v6, v28, v27
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -     mov.16b	v27, v25
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -     mov.16b	v27, v25
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.99    -     0.01    -      -     0.51   0.49   fmla.4s	v27, v6, v23
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -     fcvtzs.4s	v27, v27
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -     sli.4s	v31, v27, #24
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldr	x8, [x1]
- -      -      -      -      -     0.26   0.24   0.25   0.25    -      -     0.50   0.50    -     0.50   0.50    -      -      -      -      -      -      -     str	q31, [x8, x12]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldr	q4, [x15]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldr	q5, [x15, #16]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldr	q6, [x15, #32]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -     ldr	x8, [x1]
+ -      -      -      -      -     0.25   0.24   0.26   0.25    -      -     0.50   0.50    -     1.00    -      -      -      -      -      -      -      -     str	q31, [x8, x12]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -     movi.4s	v4, #0
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -     ldr	q5, [x15]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -     movi.4s	v6, #1

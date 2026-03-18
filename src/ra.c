@@ -8,6 +8,7 @@ struct ra {
     int    *owner;
     int8_t *free_stack;
     int8_t *loop_reg;
+    struct bb_inst const *inst;
     struct ra_config cfg;
     int     nfree;
     int     preamble;
@@ -70,6 +71,7 @@ struct ra* ra_create(struct umbra_basic_block const *bb,
         }
     }
 
+    ra->inst     = bb->inst;
     ra->preamble = bb->preamble;
     ra->loop_reg = malloc((size_t)bb->preamble
                           * sizeof *ra->loop_reg);
@@ -99,13 +101,21 @@ void ra_begin_loop(struct ra *ra) {
     }
 }
 
+static _Bool can_remat(struct ra const *ra, int val) {
+    return ra->cfg.remat
+        && ra->inst[val].op == op_imm_32;
+}
+
 void ra_end_loop(struct ra *ra, int *sl) {
     for (int i = 0; i < ra->preamble; i++) {
         int8_t target = ra->loop_reg[i];
         if (target < 0)            { continue; }
         if (ra->reg[i] == target)  { continue; }
-        if (sl[i] < 0)            { continue; }
-        ra->cfg.fill(target, sl[i], ra->cfg.ctx);
+        if (sl[i] >= 0) {
+            ra->cfg.fill(target, sl[i], ra->cfg.ctx);
+        } else if (can_remat(ra, i)) {
+            ra->cfg.remat(target, i, ra->cfg.ctx);
+        }
     }
 }
 
@@ -122,7 +132,6 @@ int8_t ra_alloc(struct ra *ra, int *sl, int *ns) {
         return ra->free_stack[--ra->nfree];
     }
 
-    // Evict: farthest last_use (Belady-like).
     int best_r = -1, best_lu = -1;
     for (int r = 0; r < ra->cfg.max_reg; r++) {
         if (ra->owner[r] < 0) { continue; }
@@ -144,11 +153,15 @@ int8_t ra_alloc(struct ra *ra, int *sl, int *ns) {
         }
     }
     int evicted = ra->owner[best_r];
-    if (sl[evicted] < 0) {
-        sl[evicted] = (*ns)++;
+    if (can_remat(ra, evicted)) {
+        sl[evicted] = -1;
+    } else {
+        if (sl[evicted] < 0) {
+            sl[evicted] = (*ns)++;
+        }
+        ra->cfg.spill(ra->reg[evicted], sl[evicted],
+                      ra->cfg.ctx);
     }
-    ra->cfg.spill(ra->reg[evicted], sl[evicted],
-                  ra->cfg.ctx);
     ra->owner[(int)ra->reg[evicted]] = -1;
     int8_t r = ra->reg[evicted];
     ra->reg[evicted] = -1;
@@ -161,6 +174,8 @@ int8_t ra_ensure(struct ra *ra, int *sl, int *ns,
     int8_t r = ra_alloc(ra, sl, ns);
     if (sl[val] >= 0) {
         ra->cfg.fill(r, sl[val], ra->cfg.ctx);
+    } else if (can_remat(ra, val)) {
+        ra->cfg.remat(r, val, ra->cfg.ctx);
     }
     ra->reg[val] = r;
     ra->owner[(int)r] = val;

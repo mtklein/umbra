@@ -4,11 +4,13 @@
 
 typedef void (*ra_spill_fn)(int reg, int slot, void *ctx);
 typedef void (*ra_fill_fn) (int reg, int slot, void *ctx);
+typedef void (*ra_remat_fn)(int reg, int val,  void *ctx);
 
 struct ra_config {
     int8_t const *pool;
     ra_spill_fn   spill;
     ra_fill_fn    fill;
+    ra_remat_fn   remat;
     void         *ctx;
     int           nregs, max_reg;
 };

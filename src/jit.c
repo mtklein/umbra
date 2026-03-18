@@ -237,23 +237,39 @@ static int8_t const ra_pool[] = {
     22,23,24,25,26,27,28,29,30,31,
 };
 
+struct jit_ctx {
+    Buf *c;
+    struct umbra_basic_block const *bb;
+};
+
 static void arm64_spill(int reg, int slot,
                         void *ctx) {
-    vst((Buf*)ctx, reg, slot);
+    vst(((struct jit_ctx*)ctx)->c, reg, slot);
 }
 static void arm64_fill(int reg, int slot,
                        void *ctx) {
-    vld((Buf*)ctx, reg, slot);
+    vld(((struct jit_ctx*)ctx)->c, reg, slot);
+}
+static void arm64_remat(int reg, int val,
+                        void *ctx) {
+    struct jit_ctx *j = ctx;
+    emit_alu_reg(j->c, op_imm_32,
+                 reg, 0, 0, 0,
+                 j->bb->inst[val].imm, -1);
 }
 
-static struct ra* ra_create_arm64(struct umbra_basic_block const *bb, Buf *c) {
+static struct ra* ra_create_arm64(
+    struct umbra_basic_block const *bb,
+    struct jit_ctx *jc)
+{
     struct ra_config cfg = {
         .pool     = ra_pool,
         .nregs    = 20,
         .max_reg  = 32,
         .spill    = arm64_spill,
         .fill     = arm64_fill,
-        .ctx      = c,
+        .remat    = arm64_remat,
+        .ctx      = jc,
     };
     return ra_create(bb, &cfg);
 }
@@ -287,7 +303,8 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     int *deref_gpr = calloc((size_t)bb->insts, sizeof(int));
 
     Buf c={0};
-    struct ra *ra = ra_create_arm64(bb, &c);
+    struct jit_ctx jc = {.c=&c, .bb=bb};
+    struct ra *ra = ra_create_arm64(bb, &jc);
 
     put(&c, STP_pre(29,30,31,-2));
     put(&c, ADD_xi(29,31,0));
@@ -1036,23 +1053,43 @@ static int load_ptr_x86(Buf *c, int p, int *last_ptr) {
 
 static int8_t const ra_pool_x86[] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
 
+struct jit_ctx {
+    Buf *c;
+    struct umbra_basic_block const *bb;
+};
+
 static void x86_spill(int reg, int slot,
                       void *ctx) {
-    vspill((Buf*)ctx, reg, slot);
+    vspill(((struct jit_ctx*)ctx)->c, reg, slot);
 }
 static void x86_fill(int reg, int slot,
                      void *ctx) {
-    vfill((Buf*)ctx, reg, slot);
+    vfill(((struct jit_ctx*)ctx)->c, reg, slot);
+}
+static _Bool emit_alu_reg(Buf *c, enum op op,
+                          int d, int x, int y,
+                          int z, int imm,
+                          int scratch, int scratch2);
+static void x86_remat(int reg, int val,
+                      void *ctx) {
+    struct jit_ctx *j = ctx;
+    emit_alu_reg(j->c, op_imm_32,
+                 reg, 0, 0, 0,
+                 j->bb->inst[val].imm, -1, -1);
 }
 
-static struct ra* ra_create_x86(struct umbra_basic_block const *bb, Buf *c) {
+static struct ra* ra_create_x86(
+    struct umbra_basic_block const *bb,
+    struct jit_ctx *jc)
+{
     struct ra_config cfg = {
         .pool     = ra_pool_x86,
         .nregs    = 16,
         .max_reg  = 16,
         .spill    = x86_spill,
         .fill     = x86_fill,
-        .ctx      = c,
+        .remat    = x86_remat,
+        .ctx      = jc,
     };
     return ra_create(bb, &cfg);
 }
@@ -1183,7 +1220,8 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     int *deref_gpr = calloc((size_t)bb->insts, sizeof(int));
 
     Buf c = {0};
-    struct ra *ra = ra_create_x86(bb, &c);
+    struct jit_ctx jc = {.c=&c, .bb=bb};
+    struct ra *ra = ra_create_x86(bb, &jc);
 
     push_r(&c, XM);
 
