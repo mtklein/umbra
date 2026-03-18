@@ -1293,13 +1293,8 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
 
     int loop_top = c.len;
 
-    mov_rr(&c, R11, RDI);
-    rex_w(&c, XI, R11);
-    emit1(&c, 0x29);
-    emit1(&c, (uint8_t)(0xc0 | ((XI&7)<<3) | (R11&7)));
-
-    cmp_ri(&c, R11, 8);
-    int br_tail = jcc(&c, 0x0c);
+    cmp_rr(&c, XI, RDI);
+    int br_epi = jcc(&c, 0x0d);
 
     int loop_body_start = c.len;
     emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0, deref_gpr);
@@ -1309,31 +1304,9 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     int loop_body_end = c.len;
 
     add_ri(&c, XI, 8);
-    int jmp_top = jmp(&c);
-    {
-        int32_t rel = (int32_t)(loop_top - (jmp_top + 4));
-        __builtin_memcpy(c.buf + jmp_top, &rel, 4);
-    }
-
-    int tail_top = c.len;
-    {
-        int32_t rel = (int32_t)(tail_top - (br_tail + 4));
-        __builtin_memcpy(c.buf + br_tail, &rel, 4);
-    }
-
-    cmp_rr(&c, XI, RDI);
-    int br_epi = jcc(&c, 0x0d);
-
-    for (int i = 0; i < bb->insts; i++) { ra_free_reg(ra, i); }
-    for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
-
-    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr);
-    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 1, deref_gpr);
-
-    add_ri(&c, XI, 1);
     {
         int j = jmp(&c);
-        int32_t rel = (int32_t)(tail_top - (j + 4));
+        int32_t rel = (int32_t)(loop_top - (j + 4));
         __builtin_memcpy(c.buf + j, &rel, 4);
     }
 
@@ -1503,12 +1476,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 last_ptr = -1;
                 base = R11;
             }
-            if (scalar) {
-                vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, XI, 4, 0);
-                vpand(c, 0, s.rd, s.rd, rz);
-            } else {
-                vpmaskmov_load(c, 1, s.rd, rz, base, XI, 4, 0);
-            }
+            vpmaskmov_load(c, 1, s.rd, rz, base, XI, 4, 0);
             if (lu(inst->z) <= i) { ra_free_reg(ra, inst->z); }
         } break;
 
@@ -1524,22 +1492,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 last_ptr = -1;
                 base = R11;
             }
-            if (scalar) {
-                // MOVZX eax, word [base + R10*2]
-                {
-                    uint8_t rex = 0x40;
-                    if (XI >= 8) { rex |= 0x02; }
-                    if (base >= 8) { rex |= 0x01; }
-                    if (rex != 0x40) { emit1(c, rex); }
-                    emit1(c, 0x0f); emit1(c, 0xb7);
-                    emit1(c, (uint8_t)(((RAX&7)<<3) | 4));
-                    emit1(c, (uint8_t)((1<<6) | ((XI&7)<<3) | (base&7)));
-                }
-                vex(c, 1, 1, 0, 0, s.rd, 0, RAX, 0x6e);
-            } else {
-                // Load 128-bit (8 x u16)
-                vmov_load(c, 0, s.rd, base, XI, 2, 0);
-            }
+            vmov_load(c, 0, s.rd, base, XI, 2, 0);
         } break;
 
         case op_store_32: {
@@ -1555,21 +1508,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 last_ptr = -1;
                 base = R11;
             }
-            if (scalar) {
-                vex(c, 1, 1, 0, 0, rz, 0, RAX, 0x7e);
-                test_rr(c, RAX, RAX);
-                int skip = jcc(c, 0x04);
-                vex_mem(c, 1, 1, 0, 0, ry, 0, 0x7e, base, XI, 4, 0);
-                patch_jcc(c, skip);
-            } else {
-                vpmaskmov_store(c, 1, rz, ry, base, XI, 4, 0);
-            }
+            vpmaskmov_store(c, 1, rz, ry, base, XI, 4, 0);
             if (lu(inst->z) <= i) { ra_free_reg(ra, inst->z); }
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
         } break;
 
         case op_store_16: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
+            int8_t rz = ra_ensure(ra, sl, ns, inst->z);
             int p = inst->ptr;
             int base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
             if (inst->x) {
@@ -1580,23 +1526,54 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 last_ptr = -1;
                 base = R11;
             }
-            if (scalar) {
-                // VMOVD eax, xmm
-                vex(c, 1, 1, 0, 0, ry, 0, RAX, 0x7e);
-                // MOV word [base + R10*2], ax
-                {
-                    emit1(c, 0x66);
-                    uint8_t rex = 0x40;
-                    if (XI >= 8) { rex |= 0x02; }
-                    if (base >= 8) { rex |= 0x01; }
-                    if (rex != 0x40) { emit1(c, rex); }
-                    emit1(c, 0x89);
-                    emit1(c, (uint8_t)(((RAX&7)<<3) | 4));
-                    emit1(c, (uint8_t)((1<<6) | ((XI&7)<<3) | (base&7)));
-                }
-            } else {
-                vmov_store(c, 0, ry, base, XI, 2, 0);
+            if (base != R11) {
+                mov_rr(c, R11, base);
             }
+            rex_w(c, XI, R11);
+            emit1(c, 0x01);
+            emit1(c, (uint8_t)(0xc0
+                | ((XI&7)<<3) | (R11&7)));
+            rex_w(c, XI, R11);
+            emit1(c, 0x01);
+            emit1(c, (uint8_t)(0xc0
+                | ((XI&7)<<3) | (R11&7)));
+            {
+                int8_t rz_hi =
+                    ra_alloc(ra, sl, ns);
+                vextracti128(c, rz_hi, rz, 1);
+                for (int k = 0; k < 8; k++) {
+                    int msrc =
+                        k < 4 ? rz : rz_hi;
+                    int lane = k & 3;
+                    if (lane == 0) {
+                        vex(c, 1, 1, 0, 0,
+                            msrc, 0, RAX,
+                            0x7e);
+                    } else {
+                        vpextrd(c, RAX, msrc,
+                            (uint8_t)lane);
+                    }
+                    test_rr(c, RAX, RAX);
+                    int skip = jcc(c, 0x04);
+                    vpextrd(c, RAX, ry,
+                        (uint8_t)(k >> 1));
+                    if (k & 1) {
+                        emit1(c, 0xc1);
+                        emit1(c, 0xe8);
+                        emit1(c, 16);
+                    }
+                    emit1(c, 0x66);
+                    emit1(c, 0x41);
+                    emit1(c, 0x89);
+                    emit1(c, 0x43);
+                    emit1(c,
+                        (uint8_t)(k * 2));
+                    patch_jcc(c, skip);
+                }
+                ra_return_reg(ra, rz_hi);
+            }
+            last_ptr = -1;
+            if (lu(inst->z) <= i) { ra_free_reg(ra, inst->z); }
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
         } break;
 
@@ -1893,6 +1870,47 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 last_ptr = -1;
                 patch_jcc(c, skip);
             } else {
+                int p = inst->ptr;
+                int base = resolve_ptr_x86(c, p,
+                    &last_ptr, deref_gpr);
+                sub_ri(c, RSP, 80);
+                vmov_store(c,0,ry,RSP,RSP,0,0);
+                vmov_store(c,1,rx,RSP,RSP,0,16);
+                vmov_store(c,1,rz,RSP,RSP,0,48);
+                if (lu(inst->x) <= i) {
+                    ra_free_reg(ra, inst->x);
+                }
+                if (base != R11) {
+                    mov_rr(c, R11, base);
+                    last_ptr = -1;
+                }
+                for (int k = 0; k < 8; k++) {
+                    emit1(c, 0x8b);
+                    emit1(c, 0x44);
+                    emit1(c, 0x24);
+                    emit1(c,(uint8_t)(48+k*4));
+                    test_rr(c, RAX, RAX);
+                    int skip = jcc(c, 0x04);
+                    emit1(c, 0x8b);
+                    emit1(c, 0x44);
+                    emit1(c, 0x24);
+                    emit1(c,(uint8_t)(16+k*4));
+                    emit1(c, 0x48);
+                    emit1(c, 0x63);
+                    emit1(c, 0xc0);
+                    emit1(c, 0x0f);
+                    emit1(c, 0xb7);
+                    emit1(c, 0x54);
+                    emit1(c, 0x24);
+                    emit1(c, (uint8_t)(k*2));
+                    emit1(c, 0x66);
+                    emit1(c, 0x41);
+                    emit1(c, 0x89);
+                    emit1(c, 0x14);
+                    emit1(c, 0x43);
+                    patch_jcc(c, skip);
+                }
+                add_ri(c, RSP, 80);
             }
             if (lu(inst->z) <= i) { ra_free_reg(ra, inst->z); }
             if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
