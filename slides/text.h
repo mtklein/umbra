@@ -14,7 +14,7 @@ typedef struct {
     int       w, h;
 } text_cov;
 
-static unsigned char* text_load_font(const char *path) {
+static inline unsigned char* text_load_font(const char *path) {
     FILE *f = fopen(path, "rb");
     if (!f) { return NULL; }
     fseek(f, 0, SEEK_END);
@@ -30,7 +30,7 @@ static unsigned char* text_load_font(const char *path) {
     return buf;
 }
 
-static text_cov text_rasterize(int W, int H, float font_size, _Bool sdf) {
+static inline text_cov text_rasterize(int W, int H, float font_size, _Bool sdf) {
     text_cov tc = { .data = calloc((size_t)(W * H), sizeof(uint16_t)), .w = W, .h = H };
 
     unsigned char *font_data = text_load_font("/System/Library/Fonts/Supplemental/Arial.ttf");
@@ -104,7 +104,7 @@ static text_cov text_rasterize(int W, int H, float font_size, _Bool sdf) {
     return tc;
 }
 
-static void text_cov_free(text_cov *tc) {
+static inline void text_cov_free(text_cov *tc) {
     free(tc->data);
     tc->data = NULL;
 }

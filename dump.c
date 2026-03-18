@@ -1,5 +1,6 @@
 #include "srcover.h"
 #include "umbra_draw.h"
+#include "slides/slug.h"
 #include <stdio.h>
 
 #if defined(__aarch64__)
@@ -8,15 +9,8 @@
   #define JIT_EXT "avx2"
 #endif
 
-static void dump(char const *name,
-                 umbra_shader_fn   shader,
-                 umbra_coverage_fn coverage,
-                 umbra_blend_fn    blend,
-                 umbra_load_fn     load,
-                 umbra_store_fn    store) {
-    struct umbra_builder *builder =
-        umbra_draw_build(shader, coverage,
-                         blend, load, store, NULL);
+static void dump_builder(char const *name,
+                         struct umbra_builder *builder) {
     { char p[64];
       snprintf(p, sizeof p, "dumps/%s.builder", name);
       FILE *f = fopen(p, "w");
@@ -74,6 +68,17 @@ static void dump(char const *name,
     if (mtl) { umbra_metal_free(mtl); }
 }
 
+static void dump(char const *name,
+                 umbra_shader_fn   shader,
+                 umbra_coverage_fn coverage,
+                 umbra_blend_fn    blend,
+                 umbra_load_fn     load,
+                 umbra_store_fn    store) {
+    dump_builder(name,
+        umbra_draw_build(shader, coverage,
+                         blend, load, store, NULL));
+}
+
 int main(void) {
     struct umbra_builder *builder = build_srcover();
     { FILE *f = fopen("dumps/srcover.builder", "w");
@@ -125,6 +130,13 @@ int main(void) {
          umbra_load_8888, umbra_store_8888);
     dump("solid_srcover_8888",
          umbra_shader_solid, NULL,
+         umbra_blend_srcover,
+         umbra_load_8888, umbra_store_8888);
+
+    dump_builder("slug_acc",
+        slug_build_acc(NULL));
+    dump("slug_render",
+         umbra_shader_solid, umbra_coverage_wind,
          umbra_blend_srcover,
          umbra_load_8888, umbra_store_8888);
 

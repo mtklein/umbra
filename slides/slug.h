@@ -15,7 +15,7 @@ typedef struct {
     float  w, h;
 } slug_curves;
 
-static slug_curves slug_extract(
+static inline slug_curves slug_extract(
         char const *text, float font_size) {
     slug_curves sc = {0};
 
@@ -142,7 +142,7 @@ static slug_curves slug_extract(
     return sc;
 }
 
-static void slug_free(slug_curves *sc) {
+static inline void slug_free(slug_curves *sc) {
     free(sc->data);
     *sc = (slug_curves){0};
 }
@@ -151,7 +151,7 @@ typedef struct {
     int x0, y, mat, curves_off, loop_off, uni_len;
 } slug_acc_layout;
 
-static struct umbra_builder *slug_build_acc(
+static inline struct umbra_builder *slug_build_acc(
         slug_acc_layout *lay) {
     struct umbra_builder *b = umbra_builder();
     umbra_val ix = umbra_iota(b);
