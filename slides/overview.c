@@ -12,9 +12,10 @@ static uint8_t const font3x5[10][5] = {
 
 typedef struct {
     int       w, h, cw, ch;
-    int       n_real;
-    int       pad_;
-    uint32_t *fb;
+    int       n_real, frame;
+    uint32_t *fb, *tmp;
+    struct umbra_interpreter *interps[ROWS * COLS];
+    umbra_draw_layout         lays[ROWS * COLS];
 } overview_state;
 
 static void run_interp_(void *ctx, int n,
@@ -66,17 +67,8 @@ static void draw_xbox(uint32_t *fb, int stride,
     }
 }
 
-static void overview_init(slide *s, int w, int h) {
-    overview_state *st = s->state;
-    st->w  = w;
-    st->h  = h;
-    st->cw = w / COLS;
-    st->ch = h / ROWS;
-    st->fb = calloc((size_t)(w * h), 4);
-    st->n_real = slide_count() - 1;
-
-    uint32_t *tmp = calloc((size_t)(w * h), 4);
-
+static void render_thumbnails(overview_state *st) {
+    int w = st->w, h = st->h;
     for (int idx = 0; idx < ROWS * COLS; idx++) {
         int col = idx % COLS;
         int row = idx / COLS;
@@ -97,38 +89,24 @@ static void overview_init(slide *s, int w, int h) {
         }
 
         slide *sub = slide_get(idx);
-
-        umbra_draw_layout lay;
-        struct umbra_builder *b = umbra_draw_build(
-            sub->shader, sub->coverage,
-            sub->blend, sub->load, sub->store,
-            &lay);
-        struct umbra_basic_block *bb =
-            umbra_basic_block(b);
-        umbra_builder_free(b);
-        struct umbra_interpreter *interp =
-            umbra_interpreter(bb);
-        umbra_basic_block_free(bb);
-
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) {
-                tmp[y * w + x] = sub->bg;
+                st->tmp[y * w + x] = sub->bg;
             }
         }
         for (int y = 0; y < h; y++) {
             sub->render_row(sub, y, w,
-                tmp + y * w, (long)(w * 4),
-                &lay, 0, 0,
-                interp, run_interp_);
+                st->tmp + y * w, (long)(w * 4),
+                &st->lays[idx], 0, 0,
+                st->interps[idx], run_interp_);
         }
-        umbra_interpreter_free(interp);
 
         for (int cy = 0; cy < st->ch; cy++) {
             for (int cx = 0; cx < st->cw; cx++) {
                 int sx = cx * w / st->cw;
                 int sy = cy * h / st->ch;
                 st->fb[(y0+cy)*w + x0+cx] =
-                    tmp[sy * w + sx];
+                    st->tmp[sy * w + sx];
             }
         }
 
@@ -139,8 +117,45 @@ static void overview_init(slide *s, int w, int h) {
             x0 + 2, y0 + 2,
             idx + 1, 0xffffffff);
     }
+}
 
-    free(tmp);
+static void overview_init(slide *s, int w, int h) {
+    overview_state *st = s->state;
+    st->w  = w;
+    st->h  = h;
+    st->cw = w / COLS;
+    st->ch = h / ROWS;
+    st->fb  = calloc((size_t)(w * h), 4);
+    st->tmp = calloc((size_t)(w * h), 4);
+    st->n_real = slide_count() - 1;
+    st->frame  = 0;
+
+    for (int idx = 0; idx < st->n_real; idx++) {
+        slide *sub = slide_get(idx);
+        struct umbra_builder *b = umbra_draw_build(
+            sub->shader, sub->coverage,
+            sub->blend, sub->load, sub->store,
+            &st->lays[idx]);
+        struct umbra_basic_block *bb =
+            umbra_basic_block(b);
+        umbra_builder_free(b);
+        st->interps[idx] = umbra_interpreter(bb);
+        umbra_basic_block_free(bb);
+    }
+
+    render_thumbnails(st);
+}
+
+static void overview_animate(slide *s, float dt) {
+    overview_state *st = s->state;
+    for (int i = 0; i < st->n_real; i++) {
+        slide *sub = slide_get(i);
+        if (sub->animate) { sub->animate(sub, dt); }
+    }
+    st->frame++;
+    if (st->frame % 120 == 0) {
+        render_thumbnails(st);
+    }
 }
 
 static void overview_render_row(
@@ -158,7 +173,13 @@ static void overview_render_row(
 
 static void overview_cleanup(slide *s) {
     overview_state *st = s->state;
+    for (int i = 0; i < st->n_real; i++) {
+        if (st->interps[i]) {
+            umbra_interpreter_free(st->interps[i]);
+        }
+    }
     free(st->fb);
+    free(st->tmp);
     free(st);
     s->state = NULL;
 }
@@ -173,6 +194,7 @@ slide slide_overview(void) {
         .store=umbra_store_8888,
         .bg=0xff101010,
         .init=overview_init,
+        .animate=overview_animate,
         .render_row=overview_render_row,
         .cleanup=overview_cleanup,
         .state=st,

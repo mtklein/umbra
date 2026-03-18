@@ -30,10 +30,6 @@ static void run_interp(void *ctx, int n,
                        umbra_buf buf[]) {
     umbra_interpreter_run(ctx, n, buf);
 }
-static void run_cg(void *ctx, int n,
-                   umbra_buf buf[]) {
-    umbra_codegen_run(ctx, n, buf);
-}
 static void run_jit(void *ctx, int n,
                     umbra_buf buf[]) {
     umbra_jit_run(ctx, n, buf);
@@ -138,12 +134,6 @@ static void build_interp(
     umbra_basic_block_free(bb);
     umbra_interpreter_free(p);
 }
-static void build_codegen(
-        struct umbra_basic_block *bb) {
-    struct umbra_codegen *cg = umbra_codegen(bb);
-    umbra_basic_block_free(bb);
-    if (cg) { umbra_codegen_free(cg); }
-}
 static void build_jit(
         struct umbra_basic_block *bb) {
     struct umbra_jit *j = umbra_jit(bb);
@@ -192,9 +182,8 @@ int main(int argc, char *argv[]) {
 
     struct umbra_interpreter *p =
         umbra_interpreter(bb);
-    struct umbra_codegen *cg = umbra_codegen(bb);
-    struct umbra_jit     *jit = umbra_jit(bb);
-    struct umbra_metal   *mtl = umbra_metal(bb);
+    struct umbra_jit   *jit = umbra_jit(bb);
+    struct umbra_metal *mtl = umbra_metal(bb);
     umbra_basic_block_free(bb);
 
 #if !defined(__wasm__)
@@ -260,16 +249,6 @@ int main(int argc, char *argv[]) {
         printf("  interp  %s  %s\n",
                build_buf, run_buf);
 
-        if (cg) {
-            fmt_ns(build_buf, bench_build(
-                build_srcover, build_codegen));
-            sprintf(run_buf, "%5.2f ns/px",
-                bench_run(run_cg, cg,
-                          pixel_n, buf));
-            printf("  codegen %s  %s\n",
-                   build_buf, run_buf);
-        }
-
         if (jit) {
             fmt_ns(build_buf, bench_build(
                 build_srcover, build_jit));
@@ -317,19 +296,6 @@ int main(int argc, char *argv[]) {
                "    %5.2f  ns/px\n",
                s[0], s[samples/2], s[samples-1]);
 
-        if (cg) {
-            for (int i = 0; i < samples; i++) {
-                s[i] = bench_run(run_cg, cg,
-                                 pixel_n, buf);
-            }
-            qsort(s, (size_t)samples,
-                  sizeof *s, cmp_double);
-            printf("  codegen   %5.2f     %5.2f"
-                   "    %5.2f  ns/px\n",
-                   s[0], s[samples/2],
-                   s[samples-1]);
-        }
-
         if (jit) {
             for (int i = 0; i < samples; i++) {
                 s[i] = bench_run(run_jit, jit,
@@ -376,7 +342,6 @@ int main(int argc, char *argv[]) {
     }
 
     umbra_interpreter_free(p);
-    if (cg)  { umbra_codegen_free(cg); }
     if (jit) { umbra_jit_free(jit); }
     if (mtl) { umbra_metal_free(mtl); }
     free(src);
@@ -428,8 +393,6 @@ int main(int argc, char *argv[]) {
 
         struct umbra_interpreter *dp =
             umbra_interpreter(dbb);
-        struct umbra_codegen *dcg =
-            umbra_codegen(dbb);
         struct umbra_jit *djit = umbra_jit(dbb);
         struct umbra_metal *dmtl =
             umbra_metal(dbb);
@@ -478,12 +441,6 @@ int main(int argc, char *argv[]) {
                       pixel_n, dbuf));
         printf("  interp    %s\n", rbuf);
 
-        if (dcg) {
-            sprintf(rbuf, "%5.2f ns/px",
-                bench_run(run_cg, dcg,
-                          pixel_n, dbuf));
-            printf("  codegen   %s\n", rbuf);
-        }
         if (djit) {
             sprintf(rbuf, "%5.2f ns/px",
                 bench_run(run_jit, djit,
@@ -507,7 +464,6 @@ int main(int argc, char *argv[]) {
         }
 
         umbra_interpreter_free(dp);
-        if (dcg)  { umbra_codegen_free(dcg); }
         if (djit) { umbra_jit_free(djit); }
         if (dmtl) { umbra_metal_free(dmtl); }
         free(dst_px);

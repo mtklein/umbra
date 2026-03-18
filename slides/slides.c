@@ -59,13 +59,7 @@ static void build_luts(void) {
                             4, radial_stops);
 }
 
-void slides_init(int w, int h) {
-    float font = (float)h * 0.15f;
-    bitmap_cov = text_rasterize(w, h, font, 0);
-    sdf_cov    = text_rasterize(w, h, font, 1);
-    slug = slug_extract("Slug", (float)h * 0.3125f);
-    build_luts();
-
+static void register_slides(void) {
     count = 0;
     all[count++] = slide_solid(
         "1. Solid Fill (src)", 0xff202020,
@@ -97,11 +91,9 @@ void slides_init(int w, int h) {
         (float[]){0.9f, 0.4f, 0.1f, 1.0f},
         umbra_coverage_rect, NULL,
         NULL, umbra_store_8888);
-
     all[count++] = slide_text_bitmap(&bitmap_cov);
     all[count++] = slide_text_sdf(&sdf_cov);
     all[count++] = slide_persp(&bitmap_cov);
-
     all[count++] = slide_gradient_2stop(
         "10. Linear Gradient (2-stop)", 0xff000000,
         umbra_shader_linear_2, umbra_store_8888,
@@ -129,8 +121,17 @@ void slides_init(int w, int h) {
         (float[]){320.0f, 240.0f,
                   1.0f/280.0f, 64.0f},
         radial_lut, LUT_N);
-
     all[count++] = slide_slug_wind(&slug);
+}
+
+void slides_init(int w, int h) {
+    float font = (float)h * 0.15f;
+    bitmap_cov = text_rasterize(w, h, font, 0);
+    sdf_cov    = text_rasterize(w, h, font, 1);
+    slug = slug_extract("Slug", (float)h * 0.3125f);
+    build_luts();
+
+    register_slides();
 
     for (int i = 0; i < count; i++) {
         if (all[i].init) {
@@ -140,6 +141,10 @@ void slides_init(int w, int h) {
 
     all[count++] = slide_overview();
     all[count - 1].init(&all[count - 1], w, h);
+}
+
+void slides_init_for_dump(void) {
+    register_slides();
 }
 
 void slides_cleanup(void) {

@@ -3,11 +3,9 @@
 #include <stdint.h>
 
 typedef struct {
-    struct umbra_interpreter *interp;
-    struct umbra_jit          *jit;
-    struct umbra_metal        *mtl;
-    umbra_draw_layout          lay;
-    int                        pad_;
+    test_backends  tb;
+    umbra_draw_layout lay;
+    int               pad_;
 } draw_backends;
 
 static void uni_i32(char *u, int off, int32_t v) {
@@ -26,49 +24,21 @@ static void uni_ptr(char *u, int off,
 static draw_backends make_draw(
         struct umbra_builder *builder,
         umbra_draw_layout lay) {
-    struct umbra_basic_block *bb = umbra_basic_block(builder);
+    struct umbra_basic_block *bb =
+        umbra_basic_block(builder);
     umbra_builder_free(builder);
     draw_backends B = {
-        umbra_interpreter(bb),
-        umbra_jit(bb),
-        umbra_metal(bb),
-        lay, 0,
+        test_backends_make(bb), lay, 0,
     };
     umbra_basic_block_free(bb);
-    (B.interp != 0) here;
-#if defined(__aarch64__) || defined(__AVX2__)
-    (B.jit != 0) here;
-#endif
-#if defined(__APPLE__) && !defined(__wasm__)
-    (B.mtl != 0) here;
-#endif
     return B;
 }
 static _Bool run_draw(draw_backends *B, int b,
                       int n, umbra_buf buf[]) {
-    switch (b) {
-    case 0:
-        umbra_interpreter_run(B->interp, n, buf);
-        return 1;
-    case 1:
-        if (B->jit) {
-            umbra_jit_run(B->jit, n, buf);
-            return 1;
-        }
-        return 0;
-    case 2:
-        if (B->mtl) {
-            umbra_metal_run(B->mtl, n, buf);
-            return 1;
-        }
-        return 0;
-    }
-    return 0;
+    return test_backends_run(&B->tb, b, n, buf);
 }
 static void cleanup_draw(draw_backends *B) {
-    umbra_interpreter_free(B->interp);
-    if (B->jit) { umbra_jit_free(B->jit); }
-    if (B->mtl) { umbra_metal_free(B->mtl); }
+    test_backends_free(&B->tb);
 }
 
 static void test_solid_src(void) {

@@ -20,9 +20,9 @@ int main(void) { return 0; }
 
 typedef struct umbra_builder builder;
 
-enum { NUM_BACKENDS = 4 };
+enum { NUM_BACKENDS = 3 };
 static char const *backend_name[NUM_BACKENDS] = {
-    "interp", "jit", "codegen", "metal",
+    "interp", "jit", "metal",
 };
 
 static void run_interp(void *ctx, int n,
@@ -33,22 +33,17 @@ static void run_jit(void *ctx, int n,
                     umbra_buf buf[]) {
     umbra_jit_run(ctx, n, buf);
 }
-static void run_codegen(void *ctx, int n,
-                        umbra_buf buf[]) {
-    umbra_codegen_run(ctx, n, buf);
-}
 static void run_metal(void *ctx, int n,
                       umbra_buf buf[]) {
     umbra_metal_run(ctx, n, buf);
 }
 
 static slide_run_fn const run_fns[NUM_BACKENDS] = {
-    run_interp, run_jit, run_codegen, run_metal,
+    run_interp, run_jit, run_metal,
 };
 
 static struct umbra_interpreter *interp;
 static struct umbra_jit         *jit;
-static struct umbra_codegen     *codegen;
 static struct umbra_metal       *mtl;
 
 static void             *backends[NUM_BACKENDS];
@@ -62,10 +57,6 @@ static void free_backends(void) {
     if (jit) {
         umbra_jit_free(jit);
         jit = NULL;
-    }
-    if (codegen) {
-        umbra_codegen_free(codegen);
-        codegen = NULL;
     }
     if (mtl) {
         umbra_metal_free(mtl);
@@ -204,16 +195,14 @@ static void build_slide_fmt(slide *s, int fmt) {
         umbra_basic_block(builder);
     umbra_builder_free(builder);
 
-    interp  = umbra_interpreter(bb);
-    jit     = umbra_jit(bb);
-    codegen = umbra_codegen(bb);
-    mtl     = umbra_metal(bb);
+    interp = umbra_interpreter(bb);
+    jit    = umbra_jit(bb);
+    mtl    = umbra_metal(bb);
     umbra_basic_block_free(bb);
 
     backends[0] = interp;
     backends[1] = jit;
-    backends[2] = codegen;
-    backends[3] = mtl;
+    backends[2] = mtl;
 
     build_pipes(fmt);
 }
@@ -432,7 +421,7 @@ int main(void) {
 
         if (s->animate) { s->animate(s, 0.016f); }
 
-        if (cur_backend == 3 && mtl) {
+        if (cur_backend == 2 && mtl) {
             umbra_metal_begin_batch(mtl);
         }
 
@@ -443,7 +432,7 @@ int main(void) {
                 ctx, run);
         }
 
-        if (cur_backend == 3 && mtl) {
+        if (cur_backend == 2 && mtl) {
             umbra_metal_flush(mtl);
         }
         #undef ROW

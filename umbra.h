@@ -86,10 +86,6 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const*);
 void   umbra_interpreter_run (struct umbra_interpreter*, int n, umbra_buf[]);
 void   umbra_interpreter_free(struct umbra_interpreter*);
 
-struct umbra_codegen* umbra_codegen(struct umbra_basic_block const*);
-void   umbra_codegen_run (struct umbra_codegen*, int n, umbra_buf[]);
-void   umbra_codegen_free(struct umbra_codegen*);
-
 struct umbra_jit* umbra_jit(struct umbra_basic_block const*);
 void   umbra_jit_run (struct umbra_jit*, int n, umbra_buf[]);
 void   umbra_jit_free(struct umbra_jit*);
@@ -103,7 +99,6 @@ void   umbra_metal_free       (struct umbra_metal*);
 #include <stdio.h>
 void umbra_dump_builder    (struct umbra_builder const*, FILE*);
 void umbra_dump_basic_block(struct umbra_basic_block const*, FILE*);
-void umbra_dump_codegen    (struct umbra_codegen const*, FILE*);
 void umbra_dump_jit        (struct umbra_jit const*, FILE*);
 void umbra_dump_jit_bin    (struct umbra_jit const*, FILE*);
 void umbra_dump_jit_mca    (struct umbra_jit const*, FILE*);

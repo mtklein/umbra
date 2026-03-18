@@ -123,8 +123,8 @@ static void slug_render_row(
 static void slug_cleanup(slide *s) {
     slug_state *st = s->state;
     free(st->wind_buf);
-    if (st->acc_jit) { umbra_jit_free(st->acc_jit); }
-    umbra_interpreter_free(st->acc_interp);
+    if (st->acc_jit)    { umbra_jit_free(st->acc_jit); }
+    if (st->acc_interp) { umbra_interpreter_free(st->acc_interp); }
     free(st);
     s->state = NULL;
 }

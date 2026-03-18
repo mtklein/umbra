@@ -30,10 +30,11 @@ struct slide {
     void              *state;
 };
 
-int    slide_count  (void);
-slide *slide_get    (int i);
-void   slides_init  (int w, int h);
-void   slides_cleanup(void);
+int    slide_count        (void);
+slide *slide_get          (int i);
+void   slides_init        (int w, int h);
+void   slides_init_for_dump(void);
+void   slides_cleanup     (void);
 
 static inline void slide_uni_i32(char *u, int off,
                                  int32_t v) {

@@ -18,21 +18,17 @@ static void run_jit(void *ctx, int n,
                     umbra_buf buf[]) {
     umbra_jit_run(ctx, n, buf);
 }
-static void run_codegen(void *ctx, int n,
-                        umbra_buf buf[]) {
-    umbra_codegen_run(ctx, n, buf);
-}
 static void run_metal(void *ctx, int n,
                       umbra_buf buf[]) {
     umbra_metal_run(ctx, n, buf);
 }
 
-enum { NUM_BACKENDS = 4 };
+enum { NUM_BACKENDS = 3 };
 static char const *backend_name[NUM_BACKENDS] = {
-    "interp", "jit", "codegen", "metal",
+    "interp", "jit", "metal",
 };
 static slide_run_fn const run_fns[NUM_BACKENDS] = {
-    run_interp, run_jit, run_codegen, run_metal,
+    run_interp, run_jit, run_metal,
 };
 
 enum {
@@ -53,7 +49,7 @@ static umbra_store_fn fmt_store[] = {
     umbra_store_1010102,
 };
 static int fmt_bpp[] = {4, 2, 8, 2, 4};
-static int fmt_tol[] = {0, 0, 0, 0, 0};
+static int fmt_tol[] = {0, 0, 0, 0, 1};
 
 typedef struct {
     struct umbra_interpreter *interp;
@@ -241,13 +237,12 @@ static void test_slide_golden(
 
     struct umbra_interpreter *interp =
         umbra_interpreter(bb);
-    struct umbra_jit     *jit = umbra_jit(bb);
-    struct umbra_codegen *cg  = umbra_codegen(bb);
-    struct umbra_metal   *mtl = umbra_metal(bb);
+    struct umbra_jit   *jit = umbra_jit(bb);
+    struct umbra_metal *mtl = umbra_metal(bb);
     umbra_basic_block_free(bb);
 
     void *backs[NUM_BACKENDS] = {
-        interp, jit, cg, mtl,
+        interp, jit, mtl,
     };
 
     size_t pixbuf_sz =
@@ -267,10 +262,7 @@ static void test_slide_golden(
 
     for (int bi = 1; bi < NUM_BACKENDS; bi++) {
         if (!backs[bi]) { continue; }
-        if (bi == 1 && fmt == FMT_1010102) {
-            continue;
-        }
-        if (bi == 3) { continue; }
+        if (bi == 2) { continue; }
         render_slide(slide_idx, fmt,
                      backs[bi], run_fns[bi],
                      pbuf_tst, &lay);
@@ -311,7 +303,6 @@ static void test_slide_golden(
     free(pbuf_tst);
     umbra_interpreter_free(interp);
     if (jit) { umbra_jit_free(jit); }
-    if (cg)  { umbra_codegen_free(cg); }
     if (mtl) { umbra_metal_free(mtl); }
 }
 

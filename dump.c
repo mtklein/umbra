@@ -31,18 +31,10 @@ static void dump_builder(char const *dir,
       umbra_dump_basic_block(bb, f);
       fclose(f); }
 
-    struct umbra_codegen *cg  = umbra_codegen(bb);
-    struct umbra_jit     *jit = umbra_jit(bb);
-    struct umbra_metal   *mtl = umbra_metal(bb);
+    struct umbra_jit   *jit = umbra_jit(bb);
+    struct umbra_metal *mtl = umbra_metal(bb);
     umbra_basic_block_free(bb);
 
-    if (cg) {
-        snprintf(p, sizeof p,
-                 "%s/%s.c", dir, name);
-        FILE *f = fopen(p, "w");
-        umbra_dump_codegen(cg, f);
-        fclose(f);
-    }
 #ifdef JIT_EXT
     if (jit) {
         snprintf(p, sizeof p,
@@ -67,7 +59,6 @@ static void dump_builder(char const *dir,
         fclose(f);
     }
 
-    if (cg)  { umbra_codegen_free(cg); }
     if (jit) { umbra_jit_free(jit); }
     if (mtl) { umbra_metal_free(mtl); }
 }
@@ -94,9 +85,9 @@ int main(void) {
     dump_builder("dumps", "srcover",
         build_srcover());
 
-    slides_init(640, 480);
+    slides_init_for_dump();
 
-    for (int i = 0; i < slide_count() - 1; i++) {
+    for (int i = 0; i < slide_count(); i++) {
         slide *s = slide_get(i);
         char dir[128];
         slugify(s->title, dir, sizeof dir);
