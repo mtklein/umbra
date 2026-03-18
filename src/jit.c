@@ -10,6 +10,9 @@ struct umbra_jit* umbra_jit(
 void umbra_jit_run (struct umbra_jit *j, int n, umbra_buf buf[]) {
     (void)j; (void)n; (void)buf;
 }
+void umbra_jit_run_m(struct umbra_jit *j, int n, int m, int loop_off, umbra_buf buf[]) {
+    (void)j; (void)n; (void)m; (void)loop_off; (void)buf;
+}
 void umbra_jit_free(struct umbra_jit *j) { (void)j; }
 void umbra_dump_jit(
     struct umbra_jit const *j, FILE *f
@@ -808,6 +811,15 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 void umbra_jit_run(struct umbra_jit *j, int n, umbra_buf buf[]) {
     if (!j) { return; }
     j->entry(n, buf);
+}
+void umbra_jit_run_m(struct umbra_jit *j, int n, int m, int loop_off, umbra_buf buf[]) {
+    for (int ji = 0; ji < m; ji++) {
+        int32_t j32 = ji;
+        __builtin_memcpy(
+            (char*)buf[1].ptr + loop_off,
+            &j32, 4);
+        umbra_jit_run(j, n, buf);
+    }
 }
 
 void umbra_jit_free(struct umbra_jit *j) {
@@ -1721,6 +1733,15 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 void umbra_jit_run(struct umbra_jit *j, int n, umbra_buf buf[]) {
     if (!j) { return; }
     j->entry(n, buf);
+}
+void umbra_jit_run_m(struct umbra_jit *j, int n, int m, int loop_off, umbra_buf buf[]) {
+    for (int ji = 0; ji < m; ji++) {
+        int32_t j32 = ji;
+        __builtin_memcpy(
+            (char*)buf[1].ptr + loop_off,
+            &j32, 4);
+        umbra_jit_run(j, n, buf);
+    }
 }
 
 void umbra_jit_free(struct umbra_jit *j) {

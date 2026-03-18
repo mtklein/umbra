@@ -12,6 +12,13 @@ void umbra_metal_run(
 ) {
     (void)m; (void)n; (void)buf;
 }
+void umbra_metal_run_m(
+    struct umbra_metal *m, int n, int mm,
+    int loop_off, umbra_buf buf[]
+) {
+    (void)m; (void)n; (void)mm;
+    (void)loop_off; (void)buf;
+}
 void umbra_metal_begin_batch(struct umbra_metal *m) {
     (void)m;
 }
@@ -1013,6 +1020,19 @@ void umbra_metal_run(
                     m->bufs[bi]).contents,
                 (size_t)dsz);
         }
+    }
+}
+
+void umbra_metal_run_m(
+    struct umbra_metal *m, int n, int mm,
+    int loop_off, umbra_buf buf[]
+) {
+    for (int j = 0; j < mm; j++) {
+        int32_t j32 = j;
+        __builtin_memcpy(
+            (char*)buf[1].ptr + loop_off,
+            &j32, 4);
+        umbra_metal_run(m, n, buf);
     }
 }
 

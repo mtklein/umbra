@@ -1624,6 +1624,75 @@ static void test_pack_channels(void) {
   }
 }
 
+static _Bool run_m_(backends *B, int b,
+                    int n, int m, int loop_off,
+                    umbra_buf buf[]) {
+    switch (b) {
+    case 0:
+        umbra_interpreter_run_m(
+            B->interp, n, m, loop_off, buf);
+        return 1;
+    case 1:
+        if (B->cg) {
+            umbra_codegen_run_m(
+                B->cg, n, m, loop_off, buf);
+            return 1;
+        }
+        return 0;
+    case 2:
+        if (B->jit) {
+            umbra_jit_run_m(
+                B->jit, n, m, loop_off, buf);
+            return 1;
+        }
+        return 0;
+    case 3:
+        if (B->mtl) {
+            umbra_metal_run_m(
+                B->mtl, n, m, loop_off, buf);
+            return 1;
+        }
+        return 0;
+    }
+    return 0;
+}
+
+static void test_run_m(void) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_val ix = umbra_lane(b);
+    int ji = umbra_reserve(b, 1);
+    umbra_val j = umbra_load_i32(b, (umbra_ptr){1},
+                      umbra_imm_i32(b, ji));
+    umbra_val jf = umbra_cvt_f32_i32(b, j);
+    umbra_val acc = umbra_load_i32(b,
+                        (umbra_ptr){0}, ix);
+    umbra_val sum = umbra_add_f32(b, acc, jf);
+    umbra_store_i32(b, (umbra_ptr){0}, ix, sum);
+    int loop_off = ji * 4;
+
+    backends B = make_full(b, 0);
+
+    enum { N = 17, M = 4 };
+
+    for (int bi = 0; bi < 4; bi++) {
+        float buf0[N];
+        __builtin_memset(buf0, 0, sizeof buf0);
+        int32_t uni[4] = {0};
+        umbra_buf buf[] = {
+            { buf0, (long)sizeof buf0 },
+            { uni, -(long)sizeof uni },
+        };
+        if (!run_m_(&B, bi, N, M, loop_off, buf)) {
+            continue;
+        }
+        for (int i = 0; i < N; i++) {
+            (equiv(buf0[i], 6.0f)) here;
+        }
+    }
+
+    cleanup(&B);
+}
+
 int main(void) {
     test_f32_ops();
     test_i32_ops();
@@ -1651,5 +1720,6 @@ int main(void) {
     test_offset_load_store();
     test_shift_imm();
     test_pack_channels();
+    test_run_m();
     return 0;
 }

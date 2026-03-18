@@ -15,6 +15,13 @@ void umbra_codegen_run(
 {
     (void)cg; (void)n; (void)buf;
 }
+void umbra_codegen_run_m(
+    struct umbra_codegen *cg,
+    int n, int m, int loop_off, umbra_buf buf[])
+{
+    (void)cg; (void)n; (void)m;
+    (void)loop_off; (void)buf;
+}
 void umbra_codegen_free(struct umbra_codegen *cg) {
     (void)cg;
 }
@@ -756,6 +763,19 @@ void umbra_codegen_run(
                  ? -buf[i].sz : buf[i].sz;
     }
     cg->entry(n, ptrs, szs);
+}
+
+void umbra_codegen_run_m(
+    struct umbra_codegen *cg,
+    int n, int m, int loop_off, umbra_buf buf[])
+{
+    for (int j = 0; j < m; j++) {
+        int32_t j32 = j;
+        __builtin_memcpy(
+            (char*)buf[1].ptr + loop_off,
+            &j32, 4);
+        umbra_codegen_run(cg, n, buf);
+    }
 }
 
 void umbra_codegen_free(struct umbra_codegen *cg) {

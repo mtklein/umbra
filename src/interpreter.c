@@ -771,6 +771,19 @@ void umbra_interpreter_run(
     }
 }
 
+void umbra_interpreter_run_m(
+    struct umbra_interpreter *p,
+    int n, int m, int loop_off, umbra_buf buf[])
+{
+    for (int j = 0; j < m; j++) {
+        int32_t j32 = j;
+        __builtin_memcpy(
+            (char*)buf[1].ptr + loop_off,
+            &j32, 4);
+        umbra_interpreter_run(p, n, buf);
+    }
+}
+
 void umbra_interpreter_free(
     struct umbra_interpreter *p)
 {

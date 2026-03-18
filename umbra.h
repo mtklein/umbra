@@ -83,19 +83,23 @@ void   umbra_basic_block_free(struct umbra_basic_block*);
 typedef struct { void *ptr; long sz; } umbra_buf;
 
 struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const*);
-void   umbra_interpreter_run (struct umbra_interpreter*, int n, umbra_buf[]);
-void   umbra_interpreter_free(struct umbra_interpreter*);
+void   umbra_interpreter_run  (struct umbra_interpreter*, int n, umbra_buf[]);
+void   umbra_interpreter_run_m(struct umbra_interpreter*, int n, int m, int loop_off, umbra_buf[]);
+void   umbra_interpreter_free (struct umbra_interpreter*);
 
 struct umbra_codegen* umbra_codegen(struct umbra_basic_block const*);
-void   umbra_codegen_run (struct umbra_codegen*, int n, umbra_buf[]);
-void   umbra_codegen_free(struct umbra_codegen*);
+void   umbra_codegen_run  (struct umbra_codegen*, int n, umbra_buf[]);
+void   umbra_codegen_run_m(struct umbra_codegen*, int n, int m, int loop_off, umbra_buf[]);
+void   umbra_codegen_free (struct umbra_codegen*);
 
 struct umbra_jit* umbra_jit(struct umbra_basic_block const*);
-void   umbra_jit_run (struct umbra_jit*, int n, umbra_buf[]);
-void   umbra_jit_free(struct umbra_jit*);
+void   umbra_jit_run  (struct umbra_jit*, int n, umbra_buf[]);
+void   umbra_jit_run_m(struct umbra_jit*, int n, int m, int loop_off, umbra_buf[]);
+void   umbra_jit_free (struct umbra_jit*);
 
 struct umbra_metal* umbra_metal(struct umbra_basic_block const*);
 void   umbra_metal_run        (struct umbra_metal*, int n, umbra_buf[]);
+void   umbra_metal_run_m      (struct umbra_metal*, int n, int m, int loop_off, umbra_buf[]);
 void   umbra_metal_begin_batch(struct umbra_metal*);
 void   umbra_metal_flush      (struct umbra_metal*);
 void   umbra_metal_free       (struct umbra_metal*);
