@@ -1299,7 +1299,7 @@ static void test_preamble_pair_alias(void) {
   }
 }
 
-static void test_gather_clamp(void) {
+static void test_gather_oob(void) {
   for (int opt = 0; opt < 2; opt++) {
     {
         struct umbra_builder *builder =
@@ -1357,7 +1357,7 @@ static void test_gather_clamp(void) {
   }
 }
 
-static void test_scatter_clamp(void) {
+static void test_scatter_oob(void) {
   for (int opt = 0; opt < 2; opt++) {
     struct umbra_builder *builder =
         umbra_builder();
@@ -1777,8 +1777,8 @@ int main(void) {
     test_mixed_ptr_sizes();
     test_n9();
     test_preamble_pair_alias();
-    test_gather_clamp();
-    test_scatter_clamp();
+    test_gather_oob();
+    test_scatter_oob();
     test_offset_load_store();
     test_shift_imm();
     test_pack_channels();
