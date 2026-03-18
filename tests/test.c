@@ -1693,6 +1693,55 @@ static void test_run_m(void) {
     cleanup(&B);
 }
 
+static void test_gather_deref_large(void) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_val ix = umbra_lane(b);
+    umbra_val idx = umbra_load_i32(b,
+                        (umbra_ptr){0}, ix);
+    int off = umbra_reserve_ptr(b);
+    umbra_ptr src = umbra_deref_ptr(b,
+                        (umbra_ptr){1}, off);
+    umbra_val val = umbra_widen_s16(b,
+                        umbra_load_i16(b, src, idx));
+    umbra_store_i32(b, (umbra_ptr){2}, ix, val);
+    backends B = make_full(b, 0);
+
+    enum { N = 33000 };
+    static int16_t data[N];
+    __builtin_memset(data, 0, sizeof data);
+    data[0]     = 10;
+    data[100]   = 20;
+    data[32800] = 30;
+    data[N-1]   = 42;
+
+    int32_t indices[4] = {0, 100, 32800, N-1};
+    int32_t dst[4]     = {0};
+
+    long long uni_[2] = {0};
+    char *uni = (char*)uni_;
+    {
+        void *p = data;
+        long sz = (long)(N * 2);
+        __builtin_memcpy(uni + off,     &p,  8);
+        __builtin_memcpy(uni + off + 8, &sz, 8);
+    }
+
+    for (int bi = 0; bi < 4; bi++) {
+        __builtin_memset(dst, 0, sizeof dst);
+        if (!run(&B, bi, 4, (umbra_buf[]){
+            {indices, (long)sizeof indices},
+            {uni,     -(long)sizeof uni_},
+            {dst,     (long)sizeof dst},
+        })) { continue; }
+        (dst[0] == 10) here;
+        (dst[1] == 20) here;
+        (dst[2] == 30) here;
+        (dst[3] == 42) here;
+    }
+
+    cleanup(&B);
+}
+
 int main(void) {
     test_f32_ops();
     test_i32_ops();
@@ -1721,5 +1770,6 @@ int main(void) {
     test_shift_imm();
     test_pack_channels();
     test_run_m();
+    test_gather_deref_large();
     return 0;
 }

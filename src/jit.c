@@ -60,7 +60,9 @@ static void resolve_ptr(Buf *c, int p, int *last_ptr, int const *deref_gpr) {
 static void load_max_ix(Buf *c, int p, int elem_shift, int const *deref_gpr) {
     if (p < 0) {
         (void)deref_gpr;
-        put(c, MOVZ_x(XM, 0x7fff));
+        put(c, 0xd2a00000u
+            | (0x7fffu << 5)
+            | (uint32_t)XM);
         return;
     }
     int disp = p * 16 + 8;
