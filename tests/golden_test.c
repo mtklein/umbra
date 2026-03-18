@@ -522,6 +522,69 @@ static void test_slide_golden(
     if (mtl) { umbra_metal_free(mtl); }
 }
 
+static void test_slug_rect(void) {
+    int saved_n = slug_n_curves;
+
+    static float rect[] = {
+         5, 5,  5,20,  5,35,
+         5,35, 30,35, 55,35,
+        55,35, 55,20, 55, 5,
+        55, 5, 30, 5,  5, 5,
+    };
+    slug_n_curves = 4;
+
+    umbra_draw_layout lay;
+    builder *bld = umbra_draw_build(
+        umbra_shader_solid, umbra_coverage_slug,
+        umbra_blend_srcover, umbra_load_8888,
+        umbra_store_8888, &lay);
+    struct umbra_basic_block *bb =
+        umbra_basic_block(bld);
+    umbra_builder_free(bld);
+    struct umbra_interpreter *interp =
+        umbra_interpreter(bb);
+    umbra_basic_block_free(bb);
+
+    uint32_t pixels[W * H];
+    for (int i = 0; i < W * H; i++) {
+        pixels[i] = 0xff000000;
+    }
+
+    float mat[11] = {
+        1,0,0, 0,1,0, 0,0,1, 60,40,
+    };
+    float color[4] = {1,1,1,1};
+
+    for (int y = 0; y < H; y++) {
+        long long uni_[12] = {0};
+        char *uni = (char*)uni_;
+        uni_i32(uni, lay.x0, 0);
+        uni_i32(uni, lay.y, y);
+        uni_f32(uni, lay.shader, color, 4);
+        uni_f32(uni, lay.coverage, mat, 11);
+        uni_ptr(uni,
+            (lay.coverage + 11*4 + 7) & ~7,
+            rect, (long)sizeof rect);
+        umbra_buf buf[] = {
+            { pixels + y * W, (long)(W * 4) },
+            { uni, -(long)lay.uni_len },
+        };
+        umbra_interpreter_run(interp, W, buf);
+    }
+
+    uint32_t bg = 0xff000000;
+    uint32_t fg = 0xffffffff;
+    (pixels[20*W + 30] == fg) here;
+    (pixels[20*W +  2] == bg) here;
+    (pixels[20*W + 58] == bg) here;
+    (pixels[ 2*W + 30] == bg) here;
+    (pixels[38*W + 30] == bg) here;
+    (pixels[20*W + 70] == bg) here;
+
+    umbra_interpreter_free(interp);
+    slug_n_curves = saved_n;
+}
+
 int main(void) {
     text_cov bitmap_cov =
         text_rasterize(W, H, 24.0f, 0);
@@ -531,6 +594,8 @@ int main(void) {
     slug_n_curves = gt_slug.count;
     build_luts();
     build_pipes();
+
+    test_slug_rect();
 
     for (int fi = 0; fi < NUM_FMTS; fi++) {
         for (int si = 0; si < SLIDE_COUNT; si++) {
