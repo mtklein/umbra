@@ -77,6 +77,7 @@ static void slug_render_row(
           (long)((int)sizeof(float) * w) },
         { au, -(long)st->acc_lay.uni_len },
     };
+    umbra_backend_begin_batch(st->acc);
     for (int j = 0; j < st->slug->count; j++) {
         int32_t j32 = j;
         __builtin_memcpy(
@@ -84,6 +85,7 @@ static void slug_render_row(
             &j32, 4);
         umbra_backend_run(st->acc, w, abuf);
     }
+    umbra_backend_flush(st->acc);
 
     float hc[4];
     for (int i = 0; i < 4; i++) {
