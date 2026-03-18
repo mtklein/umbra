@@ -218,6 +218,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
     case op_and_imm:
     case op_iota:
     case op_deref_ptr:
+    case op_buf_n: case op_lane_mask:
     case op_uni_32:   case op_load_32:
     case op_gather_32: case op_store_32:
     case op_scatter_32:
@@ -399,6 +400,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 put(c, 0xf9400000u | ((uint32_t)XT << 5) | (uint32_t)gpr);
             }
         } break;
+
+        case op_buf_n: break;
+        case op_lane_mask: break;
 
         case op_iota: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
@@ -722,6 +726,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 CZ(op_le_f32,  FCMLE_4s_z, FCMGE_4s_z)
                 CZ(op_le_s32,  CMLE_4s_z,  CMGE_4s_z)
                 case op_iota: case op_deref_ptr:
+                case op_buf_n: case op_lane_mask:
                 case op_imm_32:
                 case op_uni_32: case op_load_32:
                 case op_gather_32: case op_store_32:
@@ -1135,6 +1140,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
 
     case op_iota:
     case op_deref_ptr:
+    case op_buf_n: case op_lane_mask:
     case op_uni_32:   case op_load_32:
     case op_gather_32: case op_store_32:
     case op_scatter_32:
@@ -1309,6 +1315,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             mov_load(c, gpr, base, inst->imm);
             deref_gpr[i] = gpr;
         } break;
+
+        case op_buf_n: break;
+        case op_lane_mask: break;
 
         case op_iota: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);

@@ -123,6 +123,8 @@ static void emit_ops(Buf *b, BB const *bb,
                 break;
 
             case op_deref_ptr: break;
+            case op_buf_n: break;
+            case op_lane_mask: break;
 
             case op_uni_32: {
                 int p = inst->ptr < 0

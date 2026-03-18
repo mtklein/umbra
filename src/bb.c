@@ -33,7 +33,8 @@ static val push_(builder *b, struct bb_inst inst) {
     {
         enum op op = inst.op;
         if (op == op_imm_32 || op == op_uni_32
-         || op == op_uni_16 || op == op_deref_ptr) {
+         || op == op_uni_16 || op == op_deref_ptr
+         || op == op_buf_n) {
             inst.uniform = 1;
         } else if (is_varying(op) || op == op_iota
                 || op == op_gather_32
@@ -834,7 +835,12 @@ static void dump_insts(struct bb_inst const *inst,
                 fprintf(f, " p%d byte%d",
                         ip->ptr, ip->imm);
                 break;
+            case op_buf_n:
+                fprintf(f, " p%d >>%d",
+                        ip->ptr, ip->imm);
+                break;
             case op_iota: break;
+            case op_lane_mask: break;
 
             case op_store_16:
             case op_store_32:
