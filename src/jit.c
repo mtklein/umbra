@@ -462,7 +462,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
-            load_imm_w(c, XT, (uint32_t)inst->imm);
+            if (inst->x) {
+                int8_t rx = ra_ensure(ra, sl, ns, inst->x);
+                if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
+                put(c, UMOV_ws(XT, rx));
+            } else {
+                load_imm_w(c, XT, (uint32_t)inst->imm);
+            }
             put(c, LDR_sx(s.rd, XP, XT));
             put(c, 0x4e040400u | ((uint32_t)s.rd<<5) | (uint32_t)s.rd);
         } break;
@@ -471,7 +477,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
-            load_imm_w(c, XT, (uint32_t)(inst->imm * 2));
+            if (inst->x) {
+                int8_t rx = ra_ensure(ra, sl, ns, inst->x);
+                if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
+                put(c, UMOV_ws(XT, rx));
+                put(c, LSL_xi(XT, XT, 1));
+            } else {
+                load_imm_w(c, XT, (uint32_t)(inst->imm * 2));
+            }
             put(c, 0x78606800u
                 | ((uint32_t)XT << 16)
                 | ((uint32_t)XP << 5)
@@ -1429,47 +1442,72 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int p = inst->ptr;
             int base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
-            int disp = inst->imm * 4;
-            {
-                uint8_t R = (uint8_t)(~s.rd >> 3) & 1;
-                uint8_t B = (uint8_t)(~base >> 3) & 1;
-                emit1(c, 0xc4);
-                emit1(c, (uint8_t)((R<<7) | (1<<6) | (B<<5) | 0x02));
-                emit1(c, (uint8_t)(0x7d));
-                emit1(c, 0x18);
-                if (disp == 0 && (base & 7) != RBP) {
-                    emit1(c, (uint8_t)(((s.rd & 7) << 3) | (base & 7)));
-                    if ((base & 7) == RSP) { emit1(c, 0x24); }
-                } else if (disp >= -128 && disp <= 127) {
-                    emit1(c, (uint8_t)(0x40 | ((s.rd & 7) << 3) | (base & 7)));
-                    if ((base & 7) == RSP) { emit1(c, 0x24); }
-                    emit1(c, (uint8_t)disp);
-                } else {
-                    emit1(c, (uint8_t)(0x80 | ((s.rd & 7) << 3) | (base & 7)));
-                    if ((base & 7) == RSP) { emit1(c, 0x24); }
-                    emit4(c, (uint32_t)disp);
+            if (inst->x) {
+                int8_t rx = ra_ensure(ra, sl, ns, inst->x);
+                if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
+                vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
+                vex_mem(c, 1, 1, 0, 0, s.rd, 0,
+                        0x6e, base, RAX, 4, 0);
+            } else {
+                int disp = inst->imm * 4;
+                {
+                    uint8_t R = (uint8_t)(~s.rd >> 3) & 1;
+                    uint8_t B = (uint8_t)(~base >> 3) & 1;
+                    emit1(c, 0xc4);
+                    emit1(c, (uint8_t)((R<<7) | (1<<6) | (B<<5) | 0x02));
+                    emit1(c, (uint8_t)(0x7d));
+                    emit1(c, 0x18);
+                    if (disp == 0 && (base & 7) != RBP) {
+                        emit1(c, (uint8_t)(((s.rd & 7) << 3) | (base & 7)));
+                        if ((base & 7) == RSP) { emit1(c, 0x24); }
+                    } else if (disp >= -128 && disp <= 127) {
+                        emit1(c, (uint8_t)(0x40 | ((s.rd & 7) << 3) | (base & 7)));
+                        if ((base & 7) == RSP) { emit1(c, 0x24); }
+                        emit1(c, (uint8_t)disp);
+                    } else {
+                        emit1(c, (uint8_t)(0x80 | ((s.rd & 7) << 3) | (base & 7)));
+                        if ((base & 7) == RSP) { emit1(c, 0x24); }
+                        emit4(c, (uint32_t)disp);
+                    }
                 }
             }
+            vbroadcastss(c, s.rd, s.rd);
         } break;
 
         case op_uni_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int p = inst->ptr;
             int base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
-            // MOVZX eax, word [base + imm*2]
-            {
-                uint8_t rex = 0x40;
-                if (base >= 8) { rex |= 0x01; }
-                if (rex != 0x40) { emit1(c, rex); }
-                emit1(c, 0x0f); emit1(c, 0xb7);
-                int disp = inst->imm * 2;
-                if (disp == 0 && (base & 7) != RBP) {
-                    emit1(c, (uint8_t)(((RAX & 7) << 3) | (base & 7)));
-                    if ((base & 7) == RSP) { emit1(c, 0x24); }
-                } else {
+            if (inst->x) {
+                int8_t rx = ra_ensure(ra, sl, ns, inst->x);
+                if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
+                vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
+                // MOVZX eax, word [base + rax*2]
+                {
+                    uint8_t rex = 0x48;
+                    if (base >= 8) { rex |= 0x01; }
+                    emit1(c, rex);
+                    emit1(c, 0x0f); emit1(c, 0xb7);
+                    emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
                     emit1(c, (uint8_t)(0x40 | ((RAX & 7) << 3) | (base & 7)));
-                    if ((base & 7) == RSP) { emit1(c, 0x24); }
-                    emit1(c, (uint8_t)disp);
+                    emit1(c, 0);
+                }
+            } else {
+                // MOVZX eax, word [base + imm*2]
+                {
+                    uint8_t rex = 0x40;
+                    if (base >= 8) { rex |= 0x01; }
+                    if (rex != 0x40) { emit1(c, rex); }
+                    emit1(c, 0x0f); emit1(c, 0xb7);
+                    int disp = inst->imm * 2;
+                    if (disp == 0 && (base & 7) != RBP) {
+                        emit1(c, (uint8_t)(((RAX & 7) << 3) | (base & 7)));
+                        if ((base & 7) == RSP) { emit1(c, 0x24); }
+                    } else {
+                        emit1(c, (uint8_t)(0x40 | ((RAX & 7) << 3) | (base & 7)));
+                        if ((base & 7) == RSP) { emit1(c, 0x24); }
+                        emit1(c, (uint8_t)disp);
+                    }
                 }
             }
             // VMOVD + VPBROADCASTD

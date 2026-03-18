@@ -128,11 +128,22 @@ static void emit_ops(Buf *b, BB const *bb,
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed
-                    ? "%suint v%d = p%d_32[%d];\n"
-                    : "%suint v%d = "
-                      "((device const uint*)p%d)[%d];\n",
-                     pad, i, p, inst->imm);
+                if (inst->x) {
+                    emit(b, mixed
+                        ? "%suint v%d = "
+                          "p%d_32[v%d];\n"
+                        : "%suint v%d = "
+                          "((device const uint*)"
+                          "p%d)[v%d];\n",
+                         pad, i, p, inst->x);
+                } else {
+                    emit(b, mixed
+                        ? "%suint v%d = p%d_32[%d];\n"
+                        : "%suint v%d = "
+                          "((device const uint*)"
+                          "p%d)[%d];\n",
+                         pad, i, p, inst->imm);
+                }
             } break;
             case op_load_32: {
                 int p = inst->ptr < 0
@@ -205,13 +216,25 @@ static void emit_ops(Buf *b, BB const *bb,
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed
-                    ? "%suint v%d = "
-                      "(uint)(ushort)p%d_16[%d];\n"
-                    : "%suint v%d = (uint)"
-                      "((device const ushort*)"
-                      "p%d)[%d];\n",
-                     pad, i, p, inst->imm);
+                if (inst->x) {
+                    emit(b, mixed
+                        ? "%suint v%d = "
+                          "(uint)(ushort)"
+                          "p%d_16[v%d];\n"
+                        : "%suint v%d = (uint)"
+                          "((device const ushort*)"
+                          "p%d)[v%d];\n",
+                         pad, i, p, inst->x);
+                } else {
+                    emit(b, mixed
+                        ? "%suint v%d = "
+                          "(uint)(ushort)"
+                          "p%d_16[%d];\n"
+                        : "%suint v%d = (uint)"
+                          "((device const ushort*)"
+                          "p%d)[%d];\n",
+                         pad, i, p, inst->imm);
+                }
             } break;
             case op_load_16: {
                 int p = inst->ptr < 0

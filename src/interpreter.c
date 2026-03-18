@@ -101,10 +101,28 @@ op(uni_16) {
     v->u32 = (U32){0} + (uint32_t)uni;
     next;
 }
+op(uni_16_dyn) {
+    int ix = v[ip->y].i32[0];
+    uint16_t uni;
+    __builtin_memcpy(&uni,
+                     (uint16_t const*)ptr[ip->x] + ix,
+                     sizeof uni);
+    v->u32 = (U32){0} + (uint32_t)uni;
+    next;
+}
 op(uni_32) {
     int32_t uni;
     __builtin_memcpy(&uni,
                      (int32_t const*)ptr[ip->x] + ip->y,
+                     sizeof uni);
+    v->i32 = (I32){0} + uni;
+    next;
+}
+op(uni_32_dyn) {
+    int ix = v[ip->y].i32[0];
+    int32_t uni;
+    __builtin_memcpy(&uni,
+                     (int32_t const*)ptr[ip->x] + ix,
                      sizeof uni);
     v->i32 = (I32){0} + uni;
     next;
@@ -622,14 +640,26 @@ struct umbra_interpreter* umbra_interpreter(
                             ? deref_slot[~(inst)->ptr] \
                             : (inst)->ptr)
                     case op_uni_16:
-                        emit(.fn=uni_16,
-                             .x=RESOLVE_PTR(inst),
-                             .y=inst->imm);
+                        if (inst->x) {
+                            emit(.fn=uni_16_dyn,
+                                 .x=RESOLVE_PTR(inst),
+                                 .y=X);
+                        } else {
+                            emit(.fn=uni_16,
+                                 .x=RESOLVE_PTR(inst),
+                                 .y=inst->imm);
+                        }
                         break;
                     case op_uni_32:
-                        emit(.fn=uni_32,
-                             .x=RESOLVE_PTR(inst),
-                             .y=inst->imm);
+                        if (inst->x) {
+                            emit(.fn=uni_32_dyn,
+                                 .x=RESOLVE_PTR(inst),
+                                 .y=X);
+                        } else {
+                            emit(.fn=uni_32,
+                                 .x=RESOLVE_PTR(inst),
+                                 .y=inst->imm);
+                        }
                         break;
 
                     case op_load_16:

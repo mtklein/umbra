@@ -132,6 +132,24 @@ void umbra_set_uni_len(builder *b, int len) {
     b->uni_len = len;
 }
 
+static _Bool is_uniform(builder *b, int ix) {
+    enum op op = b->inst[ix].op;
+    if (op == op_imm_32 || op == op_uni_32
+     || op == op_uni_16 || op == op_deref_ptr) {
+        return 1;
+    }
+    if (is_varying(op) || op == op_iota
+     || op == op_gather_32 || op == op_gather_16
+     || op == op_scatter_32 || op == op_scatter_16) {
+        return 0;
+    }
+    struct bb_inst const *inst = &b->inst[ix];
+    if (inst->x && !is_uniform(b, inst->x)) { return 0; }
+    if (inst->y && !is_uniform(b, inst->y)) { return 0; }
+    if (inst->z && !is_uniform(b, inst->z)) { return 0; }
+    return 1;
+}
+
 static int iota_plus_off(builder *b, int ix) {
     if (b->inst[ix].op != op_add_i32) { return -1; }
     int p = b->inst[ix].x, q = b->inst[ix].y;
@@ -157,6 +175,10 @@ val umbra_load_i16(builder *b, umbra_ptr src, val ix) {
                              .x=off, .ptr=src.ix);
         }
     }
+    if (is_uniform(b, ix.id)) {
+        return push(b, op_uni_16,
+                         .x=ix.id, .ptr=src.ix);
+    }
     return push(b, op_gather_16,
                       .x=ix.id, .ptr=src.ix);
 }
@@ -176,6 +198,10 @@ val umbra_load_i32(builder *b, umbra_ptr src, val ix) {
             return push(b, op_load_32,
                              .x=off, .ptr=src.ix);
         }
+    }
+    if (is_uniform(b, ix.id)) {
+        return push(b, op_uni_32,
+                         .x=ix.id, .ptr=src.ix);
     }
     return push(b, op_gather_32,
                       .x=ix.id, .ptr=src.ix);
@@ -783,8 +809,13 @@ static void dump_insts(struct bb_inst const *inst,
                 break;
             case op_uni_32:
             case op_uni_16:
-                fprintf(f, " p%d[%d]",
-                        ip->ptr, ip->imm);
+                if (ip->x) {
+                    fprintf(f, " p%d[v%d]",
+                            ip->ptr, ip->x);
+                } else {
+                    fprintf(f, " p%d[%d]",
+                            ip->ptr, ip->imm);
+                }
                 break;
             case op_gather_32:
             case op_gather_16:
