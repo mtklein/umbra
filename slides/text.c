@@ -11,7 +11,7 @@ static void text_render_row(
         void *row, long row_sz,
         umbra_draw_layout const *lay,
         int ps, int32_t stride,
-        void *ctx, slide_run_fn run) {
+        struct umbra_backend *backend) {
     text_state *st = s->state;
     float hc[4];
     for (int i = 0; i < 4; i++) {
@@ -34,7 +34,7 @@ static void text_render_row(
         { row,  row_sz },
         { uni, -(long)uni_len },
     };
-    run(ctx, w, buf);
+    umbra_backend_run(backend, w, buf);
 }
 
 static void text_cleanup(slide *s) {

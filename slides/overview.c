@@ -14,14 +14,9 @@ typedef struct {
     int       w, h, cw, ch;
     int       n_real, frame;
     uint32_t *fb, *tmp;
-    struct umbra_interpreter *interps[ROWS * COLS];
-    umbra_draw_layout         lays[ROWS * COLS];
+    struct umbra_backend *backs[ROWS * COLS];
+    umbra_draw_layout     lays[ROWS * COLS];
 } overview_state;
-
-static void run_interp_(void *ctx, int n,
-                        umbra_buf buf[]) {
-    umbra_interpreter_run(ctx, n, buf);
-}
 
 static void draw_digit(uint32_t *fb, int stride,
                        int ox, int oy,
@@ -98,7 +93,7 @@ static void render_thumbnails(overview_state *st) {
             sub->render_row(sub, y, w,
                 st->tmp + y * w, (long)(w * 4),
                 &st->lays[idx], 0, 0,
-                st->interps[idx], run_interp_);
+                st->backs[idx]);
         }
 
         for (int cy = 0; cy < st->ch; cy++) {
@@ -139,7 +134,7 @@ static void overview_init(slide *s, int w, int h) {
         struct umbra_basic_block *bb =
             umbra_basic_block(b);
         umbra_builder_free(b);
-        st->interps[idx] = umbra_interpreter(bb);
+        st->backs[idx] = umbra_backend_interp(bb);
         umbra_basic_block_free(bb);
     }
 
@@ -163,10 +158,10 @@ static void overview_render_row(
         void *row, long row_sz,
         umbra_draw_layout const *lay,
         int ps, int32_t stride,
-        void *ctx, slide_run_fn run) {
+        struct umbra_backend *backend) {
     overview_state *st = s->state;
     (void)w; (void)row_sz; (void)lay;
-    (void)ps; (void)stride; (void)ctx; (void)run;
+    (void)ps; (void)stride; (void)backend;
     __builtin_memcpy(row, st->fb + y * st->w,
         (size_t)st->w * 4);
 }
@@ -174,9 +169,7 @@ static void overview_render_row(
 static void overview_cleanup(slide *s) {
     overview_state *st = s->state;
     for (int i = 0; i < st->n_real; i++) {
-        if (st->interps[i]) {
-            umbra_interpreter_free(st->interps[i]);
-        }
+        umbra_backend_free(st->backs[i]);
     }
     free(st->fb);
     free(st->tmp);

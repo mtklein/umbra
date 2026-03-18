@@ -5,8 +5,6 @@
 
 typedef struct slide slide;
 
-typedef void (*slide_run_fn)(void*, int, umbra_buf[]);
-
 struct slide {
     char const        *title;
     umbra_shader_fn    shader;
@@ -25,7 +23,7 @@ struct slide {
                        void *row, long row_sz,
                        umbra_draw_layout const*,
                        int ps, int32_t stride,
-                       void *ctx, slide_run_fn);
+                       struct umbra_backend*);
     void (*cleanup)   (slide*);
     void              *state;
 };

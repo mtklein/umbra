@@ -7,21 +7,9 @@ typedef struct {
     slug_curves  *slug;
     int           w, h;
     float        *wind_buf;
-    slug_acc_layout      acc_lay;
-    struct umbra_interpreter *acc_interp;
-    struct umbra_jit         *acc_jit;
-    void                     *acc_ctx;
-    void (*acc_run)(void*, int, umbra_buf[]);
+    slug_acc_layout          acc_lay;
+    struct umbra_backend    *acc;
 } slug_state;
-
-static void acc_run_interp(void *ctx, int n,
-                           umbra_buf buf[]) {
-    umbra_interpreter_run(ctx, n, buf);
-}
-static void acc_run_jit(void *ctx, int n,
-                        umbra_buf buf[]) {
-    umbra_jit_run(ctx, n, buf);
-}
 
 static void slug_init(slide *s, int w, int h) {
     slug_state *st = s->state;
@@ -35,17 +23,9 @@ static void slug_init(slide *s, int w, int h) {
     struct umbra_basic_block *bb =
         umbra_basic_block(b);
     umbra_builder_free(b);
-    st->acc_interp = umbra_interpreter(bb);
-    st->acc_jit    = umbra_jit(bb);
+    struct umbra_backend *jit = umbra_backend_jit(bb);
+    st->acc = jit ? jit : umbra_backend_interp(bb);
     umbra_basic_block_free(bb);
-
-    if (st->acc_jit) {
-        st->acc_ctx = st->acc_jit;
-        st->acc_run = acc_run_jit;
-    } else {
-        st->acc_ctx = st->acc_interp;
-        st->acc_run = acc_run_interp;
-    }
 
     slide_perspective_matrix(st->mat, 0.0f,
         w, h, (int)st->slug->w, (int)st->slug->h);
@@ -69,7 +49,7 @@ static void slug_render_row(
         void *row, long row_sz,
         umbra_draw_layout const *lay,
         int ps, int32_t stride,
-        void *ctx, slide_run_fn run) {
+        struct umbra_backend *backend) {
     slug_state *st = s->state;
     __builtin_memset(st->wind_buf, 0,
         (size_t)w * sizeof(float));
@@ -93,7 +73,7 @@ static void slug_render_row(
         __builtin_memcpy(
             au + st->acc_lay.loop_off,
             &j32, 4);
-        st->acc_run(st->acc_ctx, w, abuf);
+        umbra_backend_run(st->acc, w, abuf);
     }
 
     float hc[4];
@@ -117,14 +97,13 @@ static void slug_render_row(
         { row,  row_sz },
         { uni, -(long)uni_len },
     };
-    run(ctx, w, buf);
+    umbra_backend_run(backend, w, buf);
 }
 
 static void slug_cleanup(slide *s) {
     slug_state *st = s->state;
     free(st->wind_buf);
-    if (st->acc_jit)    { umbra_jit_free(st->acc_jit); }
-    if (st->acc_interp) { umbra_interpreter_free(st->acc_interp); }
+    umbra_backend_free(st->acc);
     free(st);
     s->state = NULL;
 }

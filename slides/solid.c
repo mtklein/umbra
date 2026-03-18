@@ -48,7 +48,7 @@ static void solid_render_row(
         void *row, long row_sz,
         umbra_draw_layout const *lay,
         int ps, int32_t stride,
-        void *ctx, slide_run_fn run) {
+        struct umbra_backend *backend) {
     solid_state *st = s->state;
     float rect[4] = {
         st->rx, st->ry,
@@ -76,7 +76,7 @@ static void solid_render_row(
         { row,  row_sz },
         { uni, -(long)uni_len },
     };
-    run(ctx, w, buf);
+    umbra_backend_run(backend, w, buf);
 }
 
 static void solid_cleanup(slide *s) {

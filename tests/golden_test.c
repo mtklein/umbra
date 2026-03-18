@@ -10,25 +10,9 @@ typedef struct umbra_builder builder;
 
 enum { W = 128, H = 96 };
 
-static void run_interp(void *ctx, int n,
-                       umbra_buf buf[]) {
-    umbra_interpreter_run(ctx, n, buf);
-}
-static void run_jit(void *ctx, int n,
-                    umbra_buf buf[]) {
-    umbra_jit_run(ctx, n, buf);
-}
-static void run_metal(void *ctx, int n,
-                      umbra_buf buf[]) {
-    umbra_metal_run(ctx, n, buf);
-}
-
 enum { N_BACKS = 3 };
 static char const *backend_name[N_BACKS] = {
     "interp", "jit", "metal",
-};
-static slide_run_fn const run_fns[N_BACKS] = {
-    run_interp, run_jit, run_metal,
 };
 
 enum {
@@ -166,7 +150,7 @@ static void readback_row(int fmt, uint32_t *dst,
 
 static void render_slide(
         int slide_idx, int fmt,
-        void *ctx, slide_run_fn run,
+        struct umbra_backend *backend,
         void *pixbuf,
         umbra_draw_layout const *lay) {
     slide *s = slide_get(slide_idx);
@@ -193,7 +177,7 @@ static void render_slide(
         s->render_row(s, y, W,
             ROW(y), row_sz,
             lay, ps, planar_stride,
-            ctx, run);
+            backend);
     }
     #undef ROW
 }
@@ -235,15 +219,12 @@ static void test_slide_golden(
         umbra_basic_block(bld);
     umbra_builder_free(bld);
 
-    struct umbra_interpreter *interp =
-        umbra_interpreter(bb);
-    struct umbra_jit   *jit = umbra_jit(bb);
-    struct umbra_metal *mtl = umbra_metal(bb);
-    umbra_basic_block_free(bb);
-
-    void *backs[N_BACKS] = {
-        interp, jit, mtl,
+    struct umbra_backend *backs[N_BACKS] = {
+        umbra_backend_interp(bb),
+        umbra_backend_jit(bb),
+        umbra_backend_metal(bb),
     };
+    umbra_basic_block_free(bb);
 
     _Bool planar = (fmt == FMT_FP16P);
     size_t pixbuf_sz = planar
@@ -257,21 +238,15 @@ static void test_slide_golden(
     uint32_t *tst = malloc((size_t)(W * H) * 4);
 
     render_slide(slide_idx, fmt,
-                 interp, run_interp,
-                 pbuf_ref, &lay);
+                 backs[0], pbuf_ref, &lay);
     readback_to_8888(fmt, pbuf_ref, ref);
 
     for (int bi = 1; bi < N_BACKS; bi++) {
         if (!backs[bi]) { continue; }
-        if (bi == 2 && mtl) {
-            umbra_metal_begin_batch(mtl);
-        }
+        umbra_backend_begin_batch(backs[bi]);
         render_slide(slide_idx, fmt,
-                     backs[bi], run_fns[bi],
-                     pbuf_tst, &lay);
-        if (bi == 2 && mtl) {
-            umbra_metal_flush(mtl);
-        }
+                     backs[bi], pbuf_tst, &lay);
+        umbra_backend_flush(backs[bi]);
         readback_to_8888(fmt, pbuf_tst, tst);
 
         int mismatches = 0;
@@ -307,9 +282,9 @@ static void test_slide_golden(
     free(tst);
     free(pbuf_ref);
     free(pbuf_tst);
-    umbra_interpreter_free(interp);
-    if (jit) { umbra_jit_free(jit); }
-    if (mtl) { umbra_metal_free(mtl); }
+    for (int bi = 0; bi < N_BACKS; bi++) {
+        umbra_backend_free(backs[bi]);
+    }
 }
 
 static void test_slug_rect(void) {

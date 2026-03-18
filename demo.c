@@ -25,44 +25,12 @@ static char const *backend_name[NUM_BACKENDS] = {
     "interp", "jit", "metal",
 };
 
-static void run_interp(void *ctx, int n,
-                       umbra_buf buf[]) {
-    umbra_interpreter_run(ctx, n, buf);
-}
-static void run_jit(void *ctx, int n,
-                    umbra_buf buf[]) {
-    umbra_jit_run(ctx, n, buf);
-}
-static void run_metal(void *ctx, int n,
-                      umbra_buf buf[]) {
-    umbra_metal_run(ctx, n, buf);
-}
-
-static slide_run_fn const run_fns[NUM_BACKENDS] = {
-    run_interp, run_jit, run_metal,
-};
-
-static struct umbra_interpreter *interp;
-static struct umbra_jit         *jit;
-static struct umbra_metal       *mtl;
-
-static void             *backends[NUM_BACKENDS];
-static umbra_draw_layout draw_layout;
+static struct umbra_backend *backends[NUM_BACKENDS];
+static umbra_draw_layout     draw_layout;
 
 static void free_backends(void) {
-    if (interp) {
-        umbra_interpreter_free(interp);
-        interp = NULL;
-    }
-    if (jit) {
-        umbra_jit_free(jit);
-        jit = NULL;
-    }
-    if (mtl) {
-        umbra_metal_free(mtl);
-        mtl = NULL;
-    }
     for (int i = 0; i < NUM_BACKENDS; i++) {
+        umbra_backend_free(backends[i]);
         backends[i] = NULL;
     }
 }
@@ -87,21 +55,14 @@ static umbra_store_fn fmt_store[] = {
 static int fmt_bpp[] = {4, 2, 8, 2, 4};
 
 typedef struct {
-    struct umbra_interpreter *interp;
-    struct umbra_jit         *jit;
-    void                     *ctx;
-    slide_run_fn              run;
-    int                       uni_len;
-    int                       pad_;
+    struct umbra_backend *backend;
+    int                   uni_len, pad_;
 } pipe;
 
 static pipe fill_pipe, readback_pipe, hdr_pipe;
 
 static void free_pipe(pipe *p) {
-    if (p->interp) {
-        umbra_interpreter_free(p->interp);
-    }
-    if (p->jit) { umbra_jit_free(p->jit); }
+    umbra_backend_free(p->backend);
     *p = (pipe){0};
 }
 
@@ -110,11 +71,10 @@ static void finish_pipe(pipe *p, builder *builder) {
     struct umbra_basic_block *bb =
         umbra_basic_block(builder);
     umbra_builder_free(builder);
-    p->interp  = umbra_interpreter(bb);
-    p->jit     = umbra_jit(bb);
-    p->ctx = p->jit
-        ? (void*)p->jit : (void*)p->interp;
-    p->run = p->jit ? run_jit : run_interp;
+    struct umbra_backend *jit =
+        umbra_backend_jit(bb);
+    p->backend = jit
+        ? jit : umbra_backend_interp(bb);
     umbra_basic_block_free(bb);
 }
 
@@ -195,14 +155,10 @@ static void build_slide_fmt(slide *s, int fmt) {
         umbra_basic_block(builder);
     umbra_builder_free(builder);
 
-    interp = umbra_interpreter(bb);
-    jit    = umbra_jit(bb);
-    mtl    = umbra_metal(bb);
+    backends[0] = umbra_backend_interp(bb);
+    backends[1] = umbra_backend_jit(bb);
+    backends[2] = umbra_backend_metal(bb);
     umbra_basic_block_free(bb);
-
-    backends[0] = interp;
-    backends[1] = jit;
-    backends[2] = mtl;
 
     build_pipes(fmt);
 }
@@ -255,7 +211,7 @@ static void fill_bg_row(void *dst, int n,
         { dst,  row_sz },
         { uni, -(long)fill_pipe.uni_len },
     };
-    fill_pipe.run(fill_pipe.ctx, n, buf);
+    umbra_backend_run(fill_pipe.backend, n, buf);
 }
 
 static void readback_row(uint32_t *dst,
@@ -272,7 +228,7 @@ static void readback_row(uint32_t *dst,
         { uni,  -(long)readback_pipe.uni_len },
         { dst,  (long)(n * 4) },
     };
-    readback_pipe.run(readback_pipe.ctx, n, buf);
+    umbra_backend_run(readback_pipe.backend, n, buf);
 }
 
 static void to_hdr_row(float *dst, void *src,
@@ -288,7 +244,7 @@ static void to_hdr_row(float *dst, void *src,
         { uni,  -(long)hdr_pipe.uni_len },
         { dst,  (long)(n * 16) },
     };
-    hdr_pipe.run(hdr_pipe.ctx, n, buf);
+    umbra_backend_run(hdr_pipe.backend, n, buf);
 }
 
 int main(void) {
@@ -396,8 +352,8 @@ int main(void) {
         if (!running) { break; }
 
         slide *s = slide_get(cur_slide);
-        slide_run_fn run = run_fns[cur_backend];
-        void  *ctx = backends[cur_backend];
+        struct umbra_backend *b =
+            backends[cur_backend];
 
         int bpp = fmt_bpp[cur_fmt];
         _Bool planar = (cur_fmt == FMT_FP16P);
@@ -421,20 +377,16 @@ int main(void) {
 
         if (s->animate) { s->animate(s, 0.016f); }
 
-        if (cur_backend == 2 && mtl) {
-            umbra_metal_begin_batch(mtl);
-        }
+        umbra_backend_begin_batch(b);
 
         for (int y = 0; y < H; y++) {
             s->render_row(s, y, W,
                 ROW(y), row_sz,
                 &draw_layout, ps, planar_stride,
-                ctx, run);
+                b);
         }
 
-        if (cur_backend == 2 && mtl) {
-            umbra_metal_flush(mtl);
-        }
+        umbra_backend_flush(b);
         #undef ROW
 
         void *tex_pixels;
