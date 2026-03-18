@@ -100,7 +100,7 @@ static void dump_bb(char const *dir,
     };
     char const *exts[] = {
 #ifdef JIT_EXT
-        JIT_EXT ".mca",
+        JIT_EXT,
 #endif
         "metal",
     };
