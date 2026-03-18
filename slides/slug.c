@@ -10,7 +10,6 @@ typedef struct {
     slug_acc_layout                acc_lay;
     struct umbra_basic_block      *acc_bb;
     struct umbra_backend          *acc;
-    umbra_backend_ctor_fn          acc_ctor;
 } slug_state;
 
 static void slug_init(slide *s, int w, int h) {
@@ -51,14 +50,11 @@ static void slug_render_row(
         int ps, int32_t stride,
         struct umbra_backend *backend) {
     slug_state *st = s->state;
-    {
-        umbra_backend_ctor_fn ctor =
-            umbra_backend_ctor(backend);
-        if (ctor != st->acc_ctor) {
-            umbra_backend_free(st->acc);
-            st->acc = ctor(st->acc_bb);
-            st->acc_ctor = ctor;
-        }
+    if (!st->acc) {
+        struct umbra_backend *jit =
+            umbra_backend_jit(st->acc_bb);
+        st->acc = jit ? jit
+            : umbra_backend_interp(st->acc_bb);
     }
     __builtin_memset(st->wind_buf, 0,
         (size_t)w * sizeof(float));
