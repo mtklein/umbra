@@ -380,6 +380,13 @@ static void emit_ops(Buf *b, BB const *bb,
             case op_add_f32_imm: case op_sub_f32_imm:
             case op_mul_f32_imm: case op_div_f32_imm:
             case op_min_f32_imm: case op_max_f32_imm:
+            case op_add_i32_imm: case op_sub_i32_imm:
+            case op_mul_i32_imm:
+            case op_or_32_imm:  case op_xor_32_imm:
+            case op_eq_f32_imm: case op_lt_f32_imm:
+            case op_le_f32_imm:
+            case op_eq_i32_imm: case op_lt_s32_imm:
+            case op_le_s32_imm:
                 break;
             case op_add_f32:
                 emit(b, "%suint v%d = as_type<uint>"

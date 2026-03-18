@@ -257,6 +257,13 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
     case op_add_f32_imm: case op_sub_f32_imm:
     case op_mul_f32_imm: case op_div_f32_imm:
     case op_min_f32_imm: case op_max_f32_imm:
+    case op_add_i32_imm: case op_sub_i32_imm:
+    case op_mul_i32_imm:
+    case op_or_32_imm:  case op_xor_32_imm:
+    case op_eq_f32_imm: case op_lt_f32_imm:
+    case op_le_f32_imm:
+    case op_eq_i32_imm: case op_lt_s32_imm:
+    case op_le_s32_imm:
     case op_iota:
     case op_deref_ptr:
     case op_uni_32:   case op_load_32:
@@ -883,6 +890,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 case op_add_f32_imm: case op_sub_f32_imm:
                 case op_mul_f32_imm: case op_div_f32_imm:
                 case op_min_f32_imm: case op_max_f32_imm:
+                case op_add_i32_imm: case op_sub_i32_imm:
+                case op_mul_i32_imm:
+                case op_or_32_imm:  case op_xor_32_imm:
+                case op_eq_f32_imm: case op_lt_f32_imm:
+                case op_le_f32_imm:
+                case op_eq_i32_imm: case op_lt_s32_imm:
+                case op_le_s32_imm:
                     break;
                 }
                 #undef CZ
@@ -957,6 +971,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_add_f32_imm: case op_sub_f32_imm:
         case op_mul_f32_imm: case op_div_f32_imm:
         case op_min_f32_imm: case op_max_f32_imm:
+        case op_add_i32_imm: case op_sub_i32_imm:
+        case op_mul_i32_imm:
+        case op_or_32_imm:  case op_xor_32_imm:
+        case op_eq_f32_imm: case op_lt_f32_imm:
+        case op_le_f32_imm:
+        case op_eq_i32_imm: case op_lt_s32_imm:
+        case op_le_s32_imm:
             break;
         }
     }
@@ -1357,6 +1378,13 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
     case op_add_f32_imm: case op_sub_f32_imm:
     case op_mul_f32_imm: case op_div_f32_imm:
     case op_min_f32_imm: case op_max_f32_imm:
+    case op_add_i32_imm: case op_sub_i32_imm:
+    case op_mul_i32_imm:
+    case op_or_32_imm:  case op_xor_32_imm:
+    case op_eq_f32_imm: case op_lt_f32_imm:
+    case op_le_f32_imm:
+    case op_eq_i32_imm: case op_lt_s32_imm:
+    case op_le_s32_imm:
         return 0;
 
     case op_iota:
@@ -1398,8 +1426,10 @@ struct umbra_jit {
 static _Bool x86_chooser(struct bb_inst const *insts,
                          int join_id) {
     enum op y_op = insts[insts[join_id].y].op;
-    return y_op >= op_add_f32_imm
-        && y_op <= op_max_f32_imm;
+    return (y_op >= op_add_f32_imm
+         && y_op <= op_le_s32_imm)
+        && y_op != op_lt_s32_imm
+        && y_op != op_le_s32_imm;
 }
 
 struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
@@ -2004,12 +2034,16 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 s.rd, (uint32_t)inst->imm);
         } break;
 
-        case op_add_f32_imm:
-        case op_sub_f32_imm:
-        case op_mul_f32_imm:
-        case op_div_f32_imm:
-        case op_min_f32_imm:
-        case op_max_f32_imm: {
+        case op_add_f32_imm: case op_sub_f32_imm:
+        case op_mul_f32_imm: case op_div_f32_imm:
+        case op_min_f32_imm: case op_max_f32_imm:
+        case op_add_i32_imm: case op_sub_i32_imm:
+        case op_mul_i32_imm:
+        case op_or_32_imm:  case op_xor_32_imm:
+        case op_eq_f32_imm: case op_lt_f32_imm:
+        case op_le_f32_imm:
+        case op_eq_i32_imm: case op_lt_s32_imm:
+        case op_le_s32_imm: {
             struct ra_step s = ra_step_unary(
                 ra, sl, ns, inst, i, scalar);
             uint32_t v = (uint32_t)inst->imm;
@@ -2017,16 +2051,36 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             int off = pool_add(&jc->pool,
                                bcast, 32);
             enum op o = inst->op;
-            uint8_t vop
-                = o==op_add_f32_imm ? 0x58
-                : o==op_sub_f32_imm ? 0x5c
-                : o==op_mul_f32_imm ? 0x59
-                : o==op_div_f32_imm ? 0x5e
-                : o==op_min_f32_imm ? 0x5d
-                :                     0x5f;
-            int pos = vex_rip(c, 0, 1, 0, 1,
-                s.rd, s.rx, vop);
-            pool_ref_at(&jc->pool, off, pos);
+            int pp = 0, mm = 1;
+            uint8_t vop = 0;
+            if      (o==op_add_f32_imm) { vop=0x58; }
+            else if (o==op_sub_f32_imm) { vop=0x5c; }
+            else if (o==op_mul_f32_imm) { vop=0x59; }
+            else if (o==op_div_f32_imm) { vop=0x5e; }
+            else if (o==op_min_f32_imm) { vop=0x5d; }
+            else if (o==op_max_f32_imm) { vop=0x5f; }
+            else if (o==op_add_i32_imm) { pp=1; vop=0xfe; }
+            else if (o==op_sub_i32_imm) { pp=1; vop=0xfa; }
+            else if (o==op_mul_i32_imm) { pp=1; mm=2; vop=0x40; }
+            else if (o==op_or_32_imm)   { pp=1; vop=0xeb; }
+            else if (o==op_xor_32_imm)  { pp=1; vop=0xef; }
+            else if (o==op_eq_i32_imm)  { pp=1; vop=0x76; }
+            else                        { vop=0xc2; }
+            if (o == op_eq_f32_imm
+             || o == op_lt_f32_imm
+             || o == op_le_f32_imm) {
+                uint8_t pred = o==op_eq_f32_imm ? 0
+                             : o==op_lt_f32_imm ? 1
+                             :                     2;
+                int pos = vex_rip(c, pp, mm, 0, 1,
+                    s.rd, s.rx, vop);
+                emit1(c, pred);
+                pool_ref_at(&jc->pool, off, pos);
+            } else {
+                int pos = vex_rip(c, pp, mm, 0, 1,
+                    s.rd, s.rx, vop);
+                pool_ref_at(&jc->pool, off, pos);
+            }
         } break;
 
         case op_add_f32: case op_sub_f32:

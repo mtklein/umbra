@@ -477,6 +477,67 @@ op(max_f32_imm_fn) {
         v[ip->x].f32, imm);
     next;
 }
+op(add_i32_imm_fn) {
+    I32 imm = (I32){0} + ip->y;
+    v->i32 = v[ip->x].i32 + imm;
+    next;
+}
+op(sub_i32_imm_fn) {
+    I32 imm = (I32){0} + ip->y;
+    v->i32 = v[ip->x].i32 - imm;
+    next;
+}
+op(mul_i32_imm_fn) {
+    I32 imm = (I32){0} + ip->y;
+    v->i32 = v[ip->x].i32 * imm;
+    next;
+}
+op(or_32_imm_fn) {
+    U32 imm = (U32){0} + (uint32_t)ip->y;
+    v->u32 = v[ip->x].u32 | imm;
+    next;
+}
+op(xor_32_imm_fn) {
+    U32 imm = (U32){0} + (uint32_t)ip->y;
+    v->u32 = v[ip->x].u32 ^ imm;
+    next;
+}
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wfloat-equal"
+op(eq_f32_imm_fn) {
+    union { int i; float f; } u = {.i=ip->y};
+    F32 imm = (F32){0} + u.f;
+    v->i32 = (I32)(v[ip->x].f32 == imm);
+    next;
+}
+#pragma clang diagnostic pop
+op(lt_f32_imm_fn) {
+    union { int i; float f; } u = {.i=ip->y};
+    F32 imm = (F32){0} + u.f;
+    v->i32 = (I32)(v[ip->x].f32 < imm);
+    next;
+}
+op(le_f32_imm_fn) {
+    union { int i; float f; } u = {.i=ip->y};
+    F32 imm = (F32){0} + u.f;
+    v->i32 = (I32)(v[ip->x].f32 <= imm);
+    next;
+}
+op(eq_i32_imm_fn) {
+    I32 imm = (I32){0} + ip->y;
+    v->i32 = (I32)(v[ip->x].i32 == imm);
+    next;
+}
+op(lt_s32_imm_fn) {
+    I32 imm = (I32){0} + ip->y;
+    v->i32 = (I32)(v[ip->x].i32 < imm);
+    next;
+}
+op(le_s32_imm_fn) {
+    I32 imm = (I32){0} + ip->y;
+    v->i32 = (I32)(v[ip->x].i32 <= imm);
+    next;
+}
 op(pack_fn) {
     I32 sh = (I32){0} + ip->z;
     v->u32 = v[ip->x].u32 | (U32)(v[ip->y].i32 << sh);
@@ -563,6 +624,17 @@ static Fn const fn[] = {
     [op_div_f32_imm] = div_f32_imm_fn,
     [op_min_f32_imm] = min_f32_imm_fn,
     [op_max_f32_imm] = max_f32_imm_fn,
+    [op_add_i32_imm] = add_i32_imm_fn,
+    [op_sub_i32_imm] = sub_i32_imm_fn,
+    [op_mul_i32_imm] = mul_i32_imm_fn,
+    [op_or_32_imm]   = or_32_imm_fn,
+    [op_xor_32_imm]  = xor_32_imm_fn,
+    [op_eq_f32_imm]  = eq_f32_imm_fn,
+    [op_lt_f32_imm]  = lt_f32_imm_fn,
+    [op_le_f32_imm]  = le_f32_imm_fn,
+    [op_eq_i32_imm]  = eq_i32_imm_fn,
+    [op_lt_s32_imm]  = lt_s32_imm_fn,
+    [op_le_s32_imm]  = le_s32_imm_fn,
 };
 
 int umbra_const_eval(enum op op, int xb,
@@ -591,7 +663,7 @@ static _Bool interp_chooser(struct bb_inst const *insts,
     return y_op == op_pack
         || y_op == op_and_imm
         || (y_op >= op_add_f32_imm
-         && y_op <= op_max_f32_imm);
+         && y_op <= op_le_s32_imm);
 }
 
 struct umbra_interpreter* umbra_interpreter(
@@ -800,6 +872,17 @@ struct umbra_interpreter* umbra_interpreter(
                     case op_div_f32_imm:
                     case op_min_f32_imm:
                     case op_max_f32_imm:
+                    case op_add_i32_imm:
+                    case op_sub_i32_imm:
+                    case op_mul_i32_imm:
+                    case op_or_32_imm:
+                    case op_xor_32_imm:
+                    case op_eq_f32_imm:
+                    case op_lt_f32_imm:
+                    case op_le_f32_imm:
+                    case op_eq_i32_imm:
+                    case op_lt_s32_imm:
+                    case op_le_s32_imm:
                         emit(.fn=fn[inst->op],
                              .x=X, .y=inst->imm);
                         break;
