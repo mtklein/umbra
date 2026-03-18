@@ -309,7 +309,22 @@ static _Bool arm64_movi(Buf *c, int d, uint32_t v) {
     } else if ((~v) == ((~v) & 0xff000000u)) {
         put(c, MVNI_4s(d,(uint8_t)(~v>>24),24));
     } else {
-        return 0;
+        uint32_t s = v >> 31,
+                 e = (v >> 23) & 0xffu,
+                 f = v & 0x7fffffu;
+        if (!(f & 0x7ffffu) && e >= 124 && e <= 131) {
+            uint32_t E = e - 124;
+            uint32_t imm8 = (s << 7)
+                | (((~E >> 2) & 1) << 6)
+                | ((E & 3) << 4)
+                | ((f >> 19) & 0xf);
+            put(c, 0x4f00f400u
+                | ((imm8 >> 5) << 16)
+                | ((imm8 & 0x1fu) << 5)
+                | (uint32_t)d);
+        } else {
+            return 0;
+        }
     }
     return 1;
 }
