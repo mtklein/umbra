@@ -1322,21 +1322,15 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 vex(c, 1, 1, 0, 0, s.rd, 0, XI, 0x6e);
                 vbroadcastss(c, s.rd, s.rd);
                 int8_t tmp = ra_alloc(ra, sl, ns);
-                sub_ri(c, RSP, 32);
-                for (int k = 0; k < 8; k++) {
-                    emit1(c, 0xc7);
-                    if (k == 0) {
-                        emit1(c, 0x04); emit1(c, 0x24);
-                    } else {
-                        emit1(c, 0x44);
-                        emit1(c, 0x24);
-                        emit1(c, (uint8_t)(k*4));
-                    }
-                    emit4(c, (uint32_t)k);
-                }
-                vfill(c, tmp, 0);
+                emit1(c, 0x48);
+                emit1(c, 0xb8);
+                emit4(c, 0x03020100u);
+                emit4(c, 0x07060504u);
+                vex(c, 1, 1, 1, 0,
+                    tmp, 0, RAX, 0x6e);
+                vex_rr(c, 1, 2, 1, 0x31,
+                       tmp, tmp);
                 vpaddd(c, s.rd, s.rd, tmp);
-                add_ri(c, RSP, 32);
                 ra_return_reg(ra, tmp);
             }
         } break;
