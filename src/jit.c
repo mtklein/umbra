@@ -32,38 +32,41 @@ void umbra_dump_jit_mca(
 #include <unistd.h>
 #include <libkern/OSCacheControl.h>
 
-struct pool_ref { int entry, code_pos; };
+struct pool_ref { int data_off, code_pos; };
 struct pool {
-    uint32_t       *vals;
+    uint8_t        *data;
     struct pool_ref *refs;
-    int nvals, nrefs, cap_vals, cap_refs;
+    int nbytes, nrefs, cap_data, cap_refs;
 };
-static int pool_intern(struct pool *p, uint32_t v) {
-    for (int i = 0; i < p->nvals; i++) {
-        if (p->vals[i] == v) { return i; }
+static int pool_add(struct pool *p,
+                    void const *src, int n) {
+    for (int i = 0; i + n <= p->nbytes; i += n) {
+        if (!__builtin_memcmp(p->data + i, src, (size_t)n)) {
+            return i;
+        }
     }
-    if (p->nvals == p->cap_vals) {
-        p->cap_vals = p->cap_vals ? 2*p->cap_vals : 16;
-        p->vals = realloc(p->vals,
-            (size_t)p->cap_vals * sizeof *p->vals);
+    if (p->nbytes + n > p->cap_data) {
+        p->cap_data = p->cap_data ? 2*p->cap_data : 256;
+        p->data = realloc(p->data,
+                          (size_t)p->cap_data);
     }
-    int idx = p->nvals++;
-    p->vals[idx] = v;
-    return idx;
+    int off = p->nbytes;
+    __builtin_memcpy(p->data + off, src, (size_t)n);
+    p->nbytes += n;
+    return off;
 }
-static void pool_ref(struct pool *p,
-                     uint32_t v, int code_pos) {
-    int entry = pool_intern(p, v);
+static void pool_ref_at(struct pool *p,
+                        int data_off, int code_pos) {
     if (p->nrefs == p->cap_refs) {
         p->cap_refs = p->cap_refs ? 2*p->cap_refs : 32;
         p->refs = realloc(p->refs,
             (size_t)p->cap_refs * sizeof *p->refs);
     }
     p->refs[p->nrefs++] =
-        (struct pool_ref){entry, code_pos};
+        (struct pool_ref){data_off, code_pos};
 }
 static void pool_free(struct pool *p) {
-    free(p->vals);
+    free(p->data);
     free(p->refs);
 }
 
@@ -313,7 +316,15 @@ static _Bool arm64_movi(Buf *c, int d, uint32_t v) {
 static void arm64_pool_load(Buf *c, struct pool *p,
                             int d, uint32_t v) {
     if (arm64_movi(c, d, v)) { return; }
-    pool_ref(p, v, c->len);
+    uint32_t bcast[4] = {v, v, v, v};
+    int off = pool_add(p, bcast, 16);
+    pool_ref_at(p, off, c->len);
+    put(c, 0x9c000000u | (uint32_t)d);
+}
+static void arm64_pool_load_wide(Buf *c, struct pool *p,
+                                 int d, void const *data) {
+    int off = pool_add(p, data, 16);
+    pool_ref_at(p, off, c->len);
     put(c, 0x9c000000u | (uint32_t)d);
 }
 static void arm64_remat(int reg, int val,
@@ -433,14 +444,15 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     }
     while (c.len & 3) { put(&c, 0xd503201fu); }
     int pool_start = c.len;
-    for (int pi = 0; pi < jc.pool.nvals; pi++) {
-        uint32_t v = jc.pool.vals[pi];
-        put(&c, v); put(&c, v); put(&c, v); put(&c, v);
+    for (int pi = 0; pi < jc.pool.nbytes; pi += 4) {
+        uint32_t w;
+        __builtin_memcpy(&w, jc.pool.data + pi, 4);
+        put(&c, w);
     }
     for (int pi = 0; pi < jc.pool.nrefs; pi++) {
         struct pool_ref *r = &jc.pool.refs[pi];
-        int entry = pool_start + r->entry * 4;
-        int imm19 = entry - r->code_pos;
+        int word_off = pool_start + r->data_off / 4;
+        int imm19 = word_off - r->code_pos;
         c.buf[r->code_pos] = 0x9c000000u
             | ((uint32_t)(imm19 & 0x7ffff) << 5)
             | (c.buf[r->code_pos] & 0x1fu);
@@ -506,14 +518,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             put(c, DUP_4s_w(s.rd, XI));
             if (!scalar) {
                 int8_t tmp = ra_alloc(ra, sl, ns);
-                load_imm_w(c, XT, 0x03020100u);
-                put(c, DUP_4s_w(tmp, XT));
-                put(c, 0x2f08a400u
-                    | ((uint32_t)tmp << 5)
-                    | (uint32_t)tmp);
-                put(c, 0x2f10a400u
-                    | ((uint32_t)tmp << 5)
-                    | (uint32_t)tmp);
+                uint32_t iota4[4] = {0,1,2,3};
+                arm64_pool_load_wide(c, &jc->pool,
+                                     tmp, iota4);
                 put(c, ADD_4s(s.rd, s.rd, tmp));
                 ra_return_reg(ra, tmp);
             }
@@ -1087,38 +1094,41 @@ void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
 #include <sys/mman.h>
 #include <unistd.h>
 
-struct pool_ref { int entry, code_pos; };
+struct pool_ref { int data_off, code_pos; };
 struct pool {
-    uint32_t       *vals;
+    uint8_t        *data;
     struct pool_ref *refs;
-    int nvals, nrefs, cap_vals, cap_refs;
+    int nbytes, nrefs, cap_data, cap_refs;
 };
-static int pool_intern(struct pool *p, uint32_t v) {
-    for (int i = 0; i < p->nvals; i++) {
-        if (p->vals[i] == v) { return i; }
+static int pool_add(struct pool *p,
+                    void const *src, int n) {
+    for (int i = 0; i + n <= p->nbytes; i += n) {
+        if (!__builtin_memcmp(p->data + i, src, (size_t)n)) {
+            return i;
+        }
     }
-    if (p->nvals == p->cap_vals) {
-        p->cap_vals = p->cap_vals ? 2*p->cap_vals : 16;
-        p->vals = realloc(p->vals,
-            (size_t)p->cap_vals * sizeof *p->vals);
+    if (p->nbytes + n > p->cap_data) {
+        p->cap_data = p->cap_data ? 2*p->cap_data : 256;
+        p->data = realloc(p->data,
+                          (size_t)p->cap_data);
     }
-    int idx = p->nvals++;
-    p->vals[idx] = v;
-    return idx;
+    int off = p->nbytes;
+    __builtin_memcpy(p->data + off, src, (size_t)n);
+    p->nbytes += n;
+    return off;
 }
-static void pool_ref(struct pool *p,
-                     uint32_t v, int code_pos) {
-    int entry = pool_intern(p, v);
+static void pool_ref_at(struct pool *p,
+                        int data_off, int code_pos) {
     if (p->nrefs == p->cap_refs) {
         p->cap_refs = p->cap_refs ? 2*p->cap_refs : 32;
         p->refs = realloc(p->refs,
             (size_t)p->cap_refs * sizeof *p->refs);
     }
     p->refs[p->nrefs++] =
-        (struct pool_ref){entry, code_pos};
+        (struct pool_ref){data_off, code_pos};
 }
 static void pool_free(struct pool *p) {
-    free(p->vals);
+    free(p->data);
     free(p->refs);
 }
 
@@ -1210,9 +1220,10 @@ static void pool_broadcast(Buf *c, struct pool *p,
         vpslld_i(c,d,d,(uint8_t)shl);
     }
     else {
+        int off = pool_add(p, &v, 4);
         int pos = vex_rip(c, 1, 2, 0, 1,
                           d, 0, 0x18);
-        pool_ref(p, v, pos);
+        pool_ref_at(p, off, pos);
     }
 }
 
@@ -1450,12 +1461,12 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     }
 
     int pool_start = c.len;
-    for (int i = 0; i < jc.pool.nvals; i++) {
-        emit4(&c, jc.pool.vals[i]);
+    for (int i = 0; i < jc.pool.nbytes; i++) {
+        emit1(&c, jc.pool.data[i]);
     }
     for (int i = 0; i < jc.pool.nrefs; i++) {
         struct pool_ref *r = &jc.pool.refs[i];
-        int entry_off = pool_start + r->entry * 4;
+        int entry_off = pool_start + r->data_off;
         int32_t rel = (int32_t)(entry_off
             - (r->code_pos + 4));
         __builtin_memcpy(c.buf + r->code_pos,
@@ -1521,17 +1532,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             } else {
                 vex(c, 1, 1, 0, 0, s.rd, 0, XI, 0x6e);
                 vbroadcastss(c, s.rd, s.rd);
-                int8_t tmp = ra_alloc(ra, sl, ns);
-                emit1(c, 0x48);
-                emit1(c, 0xb8);
-                emit4(c, 0x03020100u);
-                emit4(c, 0x07060504u);
-                vex(c, 1, 1, 1, 0,
-                    tmp, 0, RAX, 0x6e);
-                vex_rr(c, 1, 2, 1, 0x31,
-                       tmp, tmp);
-                vpaddd(c, s.rd, s.rd, tmp);
-                ra_return_reg(ra, tmp);
+                uint32_t iota8[8] =
+                    {0,1,2,3,4,5,6,7};
+                int off = pool_add(&jc->pool,
+                                   iota8, 32);
+                int pos = vex_rip(c, 1, 1, 0, 1,
+                    s.rd, s.rd, 0xfe);
+                pool_ref_at(&jc->pool, off, pos);
             }
         } break;
 
