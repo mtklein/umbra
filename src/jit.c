@@ -1050,6 +1050,8 @@ void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
             continue;
         }
         if (line[0] == '\n' || line[0] == '<') { continue; }
+        char *comment = __builtin_strstr(line, " <");
+        if (comment) { comment[0] = '\n'; comment[1] = '\0'; }
         fputs(line, afp);
     }
     pclose(p);
