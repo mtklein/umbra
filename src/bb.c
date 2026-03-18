@@ -654,30 +654,108 @@ static char const* op_name(enum op op) {
     return "?";
 }
 
-static void schedule(int id,
-                     struct bb_inst const *in,
+static void schedule(struct bb_inst const *in, int n,
+                     _Bool const *body,
                      struct bb_inst *out,
-                     int *old_to_new, int *j) {
-    if (old_to_new[id] >= 0) { return; }
+                     int *old_to_new,
+                     int preamble, int total) {
+    int *last_use = calloc((size_t)n, sizeof *last_use);
+    int *n_deps   = calloc((size_t)n, sizeof *n_deps);
+    int *n_users  = calloc((size_t)n, sizeof *n_users);
 
-    int inputs[] = {
-        in[id].x, in[id].y, in[id].z,
-    };
-    for (int a = 0; a < 2; a++) {
-        for (int b = a+1; b < 3; b++) {
-            if (inputs[a] > inputs[b]) {
-                int t = inputs[a];
-                inputs[a] = inputs[b];
-                inputs[b] = t;
+    for (int i = 0; i < n; i++) {
+        last_use[i] = -1;
+    }
+    for (int i = 0; i < n; i++) {
+        if (!body[i]) { continue; }
+        int deps[] = {in[i].x, in[i].y, in[i].z};
+        for (int k = 0; k < 3; k++) {
+            last_use[deps[k]] = i;
+        }
+    }
+    for (int i = 0; i < n; i++) {
+        if (!body[i]) { continue; }
+        int deps[] = {in[i].x, in[i].y, in[i].z};
+        for (int k = 0; k < 3; k++) {
+            if (body[deps[k]]) {
+                n_deps[i]++;
+                n_users[deps[k]]++;
             }
         }
     }
-    for (int k = 0; k < 3; k++) {
-        schedule(inputs[k], in, out, old_to_new, j);
+
+    int *user_off = calloc((size_t)(n+1),
+                           sizeof *user_off);
+    for (int i = 0; i < n; i++) {
+        user_off[i+1] = user_off[i] + n_users[i];
+        n_users[i] = 0;
+    }
+    int *users = calloc((size_t)user_off[n],
+                        sizeof *users);
+    for (int i = 0; i < n; i++) {
+        if (!body[i]) { continue; }
+        n_users[i] = 0;
+    }
+    for (int i = 0; i < n; i++) {
+        if (!body[i]) { continue; }
+        int deps[] = {in[i].x, in[i].y, in[i].z};
+        for (int k = 0; k < 3; k++) {
+            if (body[deps[k]]) {
+                users[user_off[deps[k]]
+                    + n_users[deps[k]]++] = i;
+            }
+        }
     }
 
-    old_to_new[id] = *j;
-    out[(*j)++] = in[id];
+    int *ready = calloc((size_t)n, sizeof *ready);
+    int nready = 0;
+    for (int i = 0; i < n; i++) {
+        if (body[i] && n_deps[i] == 0) {
+            ready[nready++] = i;
+        }
+    }
+
+    int j = preamble;
+    while (nready > 0) {
+        int best = 0, best_score = -9999;
+        for (int r = 0; r < nready; r++) {
+            int id = ready[r];
+            int kills = 0;
+            int deps[] = {in[id].x, in[id].y,
+                          in[id].z};
+            for (int k = 0; k < 3; k++) {
+                if (last_use[deps[k]] == id) {
+                    kills++;
+                }
+            }
+            int score = kills * 1000
+                - (last_use[id] < 0
+                    ? total : last_use[id]);
+            if (score > best_score) {
+                best_score = score;
+                best = r;
+            }
+        }
+        int id = ready[best];
+        ready[best] = ready[--nready];
+
+        old_to_new[id] = j;
+        out[j++] = in[id];
+
+        for (int u = user_off[id];
+             u < user_off[id] + n_users[id]; u++) {
+            if (--n_deps[users[u]] == 0) {
+                ready[nready++] = users[u];
+            }
+        }
+    }
+
+    free(last_use);
+    free(n_deps);
+    free(users);
+    free(user_off);
+    free(n_users);
+    free(ready);
 }
 
 struct umbra_basic_block* umbra_basic_block(builder *b) {
@@ -726,12 +804,13 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
     }
     int const preamble = j;
 
+    _Bool *body = calloc((size_t)n, 1);
     for (int i = 0; i < n; i++) {
-        if (live[i] && is_store(b->inst[i].op)) {
-            schedule(i, b->inst, out,
-                     old_to_new, &j);
-        }
+        body[i] = live[i] && varying[i];
     }
+    schedule(b->inst, n, body, out, old_to_new,
+             preamble, total);
+    free(body);
 
     for (int i = 0; i < total; i++) {
         out[i].x = old_to_new[out[i].x];
