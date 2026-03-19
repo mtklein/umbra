@@ -5,13 +5,14 @@ struct umbra_backend {
     struct umbra_program* (*compile)(
         struct umbra_backend*,
         struct umbra_basic_block const*);
+    void (*flush)  (struct umbra_backend*);
     void (*free_fn)(struct umbra_backend*);
+    void *ctx;
 };
 
 struct umbra_program {
     void    *ctx;
     void   (*queue)   (void*, int, umbra_buf[]);
-    void   (*flush)   (void*);
     void   (*dump)    (void const*, FILE*);
     void   (*free_fn) (void*);
     struct umbra_backend *backend;
@@ -92,9 +93,6 @@ static void run_metal(void *ctx, int n,
                       umbra_buf buf[]) {
     umbra_metal_run(ctx, n, buf);
 }
-static void flush_metal(void *ctx) {
-    umbra_metal_flush(ctx);
-}
 static void dump_metal(void const *ctx, FILE *f) {
     umbra_dump_metal(ctx, f);
 }
@@ -104,27 +102,35 @@ static void free_metal(void *ctx) {
 static struct umbra_program* compile_metal(
         struct umbra_backend *be,
         struct umbra_basic_block const *bb) {
-    struct umbra_metal *m = umbra_metal(bb);
+    struct umbra_metal *m = umbra_metal(be->ctx, bb);
     if (!m) { return NULL; }
     struct umbra_program *prog = malloc(sizeof *prog);
     *prog = (struct umbra_program){
         .ctx     = m,
         .queue   = run_metal,
-        .flush   = flush_metal,
         .dump    = dump_metal,
         .free_fn = free_metal,
         .backend = be,
     };
     return prog;
 }
+static void flush_be_metal(struct umbra_backend *be) {
+    umbra_metal_flush(be->ctx);
+}
 static void free_be_metal(struct umbra_backend *be) {
+    umbra_metal_flush(be->ctx);
+    umbra_metal_backend_free(be->ctx);
     free(be);
 }
 struct umbra_backend* umbra_backend_metal(void) {
+    void *ctx = umbra_metal_backend_create();
+    if (!ctx) { return NULL; }
     struct umbra_backend *be = malloc(sizeof *be);
     *be = (struct umbra_backend){
         .compile = compile_metal,
+        .flush   = flush_be_metal,
         .free_fn = free_be_metal,
+        .ctx     = ctx,
     };
     return be;
 }
@@ -146,7 +152,9 @@ void umbra_program_queue(struct umbra_program *p,
 }
 
 void umbra_program_flush(struct umbra_program *p) {
-    if (p && p->flush) { p->flush(p->ctx); }
+    if (p && p->backend && p->backend->flush) {
+        p->backend->flush(p->backend);
+    }
 }
 
 void umbra_program_dump(struct umbra_program *p,

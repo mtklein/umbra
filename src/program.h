@@ -13,12 +13,16 @@ void   umbra_jit_run (struct umbra_jit*,
                       int n, umbra_buf[]);
 void   umbra_jit_free(struct umbra_jit*);
 
+void*  umbra_metal_backend_create(void);
+void   umbra_metal_backend_free  (void*);
+
 struct umbra_metal* umbra_metal(
+        void *backend_ctx,
         struct umbra_basic_block const*);
 void   umbra_metal_run        (struct umbra_metal*,
                                int n, umbra_buf[]);
-void   umbra_metal_begin_batch(struct umbra_metal*);
-void   umbra_metal_flush      (struct umbra_metal*);
+void   umbra_metal_begin_batch(void*);
+void   umbra_metal_flush      (void*);
 void   umbra_metal_free       (struct umbra_metal*);
 
 #include <stdio.h>
