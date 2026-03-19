@@ -29,7 +29,7 @@ static struct umbra_backend *bes[NUM_BACKENDS];
 static struct umbra_program *programs[NUM_BACKENDS];
 static umbra_draw_layout     draw_layout;
 
-static void free_backends(void) {
+static void free_programs(void) {
     for (int i = 0; i < NUM_BACKENDS; i++) {
         umbra_program_free(programs[i]);
         programs[i] = NULL;
@@ -56,14 +56,14 @@ static umbra_store_fn fmt_store[] = {
 static int fmt_bpp[] = {4, 2, 8, 2, 4};
 
 typedef struct {
-    struct umbra_program *backend;
+    struct umbra_program *program;
     int                   uni_len, pad_;
 } pipe;
 
 static pipe fill_pipe, readback_pipe, hdr_pipe;
 
 static void free_pipe(pipe *p) {
-    umbra_program_free(p->backend);
+    umbra_program_free(p->program);
     *p = (pipe){0};
 }
 
@@ -74,7 +74,7 @@ static void finish_pipe(pipe *p, builder *builder) {
     struct umbra_basic_block *bb =
         umbra_basic_block(builder);
     umbra_builder_free(builder);
-    p->backend = umbra_backend_compile(pipe_be, bb);
+    p->program = umbra_backend_compile(pipe_be, bb);
     umbra_basic_block_free(bb);
 }
 
@@ -143,7 +143,7 @@ static void free_pipes(void) {
 }
 
 static void build_slide_fmt(slide *s, int fmt) {
-    free_backends();
+    free_programs();
     umbra_load_fn  load =
         s->load ? fmt_load[fmt] : NULL;
     umbra_store_fn store = fmt_store[fmt];
@@ -213,7 +213,7 @@ static void fill_bg_row(void *dst, int n,
         { dst,  row_sz },
         { uni, -(long)fill_pipe.uni_len },
     };
-    umbra_program_queue(fill_pipe.backend, n, buf);
+    umbra_program_queue(fill_pipe.program, n, buf);
 }
 
 static void readback_row(uint32_t *dst,
@@ -230,7 +230,7 @@ static void readback_row(uint32_t *dst,
         { uni,  -(long)readback_pipe.uni_len },
         { dst,  (long)(n * 4) },
     };
-    umbra_program_queue(readback_pipe.backend, n, buf);
+    umbra_program_queue(readback_pipe.program, n, buf);
 }
 
 static void to_hdr_row(float *dst, void *src,
@@ -246,7 +246,7 @@ static void to_hdr_row(float *dst, void *src,
         { uni,  -(long)hdr_pipe.uni_len },
         { dst,  (long)(n * 16) },
     };
-    umbra_program_queue(hdr_pipe.backend, n, buf);
+    umbra_program_queue(hdr_pipe.program, n, buf);
 }
 
 int main(void) {
@@ -462,7 +462,7 @@ int main(void) {
     }
 
     free(pixbuf);
-    free_backends();
+    free_programs();
     free_pipes();
     for (int i = 0; i < NUM_BACKENDS; i++) {
         umbra_backend_free(bes[i]);
