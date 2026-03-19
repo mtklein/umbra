@@ -14,7 +14,7 @@ typedef struct {
     int       w, h, cw, ch;
     int       n_real, frame;
     uint32_t *fb, *tmp;
-    struct umbra_backend *backs[ROWS * COLS];
+    struct umbra_program *backs[ROWS * COLS];
     umbra_draw_layout     lays[ROWS * COLS];
 } overview_state;
 
@@ -134,7 +134,7 @@ static void overview_init(slide *s, int w, int h) {
         struct umbra_basic_block *bb =
             umbra_basic_block(b);
         umbra_builder_free(b);
-        st->backs[idx] = umbra_backend_interp(bb);
+        st->backs[idx] = umbra_program_interp(bb);
         umbra_basic_block_free(bb);
     }
 
@@ -158,7 +158,7 @@ static void overview_render_row(
         void *row, long row_sz,
         umbra_draw_layout const *lay,
         int ps, int32_t stride,
-        struct umbra_backend *backend) {
+        struct umbra_program *backend) {
     overview_state *st = s->state;
     (void)w; (void)row_sz; (void)lay;
     (void)ps; (void)stride; (void)backend;
@@ -169,7 +169,7 @@ static void overview_render_row(
 static void overview_cleanup(slide *s) {
     overview_state *st = s->state;
     for (int i = 0; i < st->n_real; i++) {
-        umbra_backend_free(st->backs[i]);
+        umbra_program_free(st->backs[i]);
     }
     free(st->fb);
     free(st->tmp);

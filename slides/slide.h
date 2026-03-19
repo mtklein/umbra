@@ -23,7 +23,7 @@ struct slide {
                        void *row, long row_sz,
                        umbra_draw_layout const*,
                        int ps, int32_t stride,
-                       struct umbra_backend*);
+                       struct umbra_program*);
     void (*cleanup)   (slide*);
     void              *state;
 };

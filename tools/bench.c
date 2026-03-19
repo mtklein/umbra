@@ -1,7 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "../slides/slide.h"
 #include "../slides/slug.h"
-#include "../src/backend.h"
+#include "../src/program.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,10 +18,10 @@ static double bench(slide *s, int w, int h,
                     umbra_draw_layout const *lay,
                     int ps, int32_t stride,
                     void *row, long row_sz,
-                    struct umbra_backend *be) {
+                    struct umbra_program *be) {
     s->render_row(s, h/2, w, row, row_sz,
                   lay, ps, stride, be);
-    umbra_backend_flush(be);
+    umbra_program_flush(be);
     int iters = 1;
     for (;;) {
         double const start = now();
@@ -29,7 +29,7 @@ static double bench(slide *s, int w, int h,
             s->render_row(s, h/2, w, row, row_sz,
                           lay, ps, stride, be);
         }
-        umbra_backend_flush(be);
+        umbra_program_flush(be);
         double const elapsed = now() - start;
         if (elapsed >= 0.1) {
             return elapsed
@@ -66,12 +66,12 @@ int main(int argc, char *argv[]) {
             umbra_basic_block(bld);
         umbra_builder_free(bld);
 
-        struct umbra_backend *interp =
-            umbra_backend_interp(bb);
-        struct umbra_backend *jit =
-            umbra_backend_jit(bb);
-        struct umbra_backend *mtl =
-            umbra_backend_metal(bb);
+        struct umbra_program *interp =
+            umbra_program_interp(bb);
+        struct umbra_program *jit =
+            umbra_program_jit(bb);
+        struct umbra_program *mtl =
+            umbra_program_metal(bb);
         umbra_basic_block_free(bb);
 
         _Bool planar =
@@ -110,9 +110,9 @@ int main(int argc, char *argv[]) {
 
         printf("\n");
 
-        umbra_backend_free(interp);
-        umbra_backend_free(jit);
-        umbra_backend_free(mtl);
+        umbra_program_free(interp);
+        umbra_program_free(jit);
+        umbra_program_free(mtl);
         free(row);
     }
 
@@ -126,12 +126,12 @@ int main(int argc, char *argv[]) {
             umbra_basic_block(bld);
         umbra_builder_free(bld);
 
-        struct umbra_backend *interp =
-            umbra_backend_interp(bb);
-        struct umbra_backend *jit =
-            umbra_backend_jit(bb);
-        struct umbra_backend *mtl =
-            umbra_backend_metal(bb);
+        struct umbra_program *interp =
+            umbra_program_interp(bb);
+        struct umbra_program *jit =
+            umbra_program_jit(bb);
+        struct umbra_program *mtl =
+            umbra_program_metal(bb);
         umbra_basic_block_free(bb);
 
         float *wind = calloc((size_t)W, 4);
@@ -160,19 +160,19 @@ int main(int argc, char *argv[]) {
                "interp", "jit", "metal");
         printf("%-40s", "");
 
-        struct umbra_backend *bes[] =
+        struct umbra_program *bes[] =
             {interp, jit, mtl};
         for (int bi = 0; bi < 3; bi++) {
             if (!bes[bi]) {
                 printf(" %12s", "-");
                 continue;
             }
-            umbra_backend_queue(bes[bi], W, abuf);
+            umbra_program_queue(bes[bi], W, abuf);
             int iters = 1;
             for (;;) {
                 double const start = now();
                 for (int it = 0; it < iters; it++) {
-                    umbra_backend_queue(
+                    umbra_program_queue(
                         bes[bi], W, abuf);
                 }
                 double const elapsed = now()-start;
@@ -190,9 +190,9 @@ int main(int argc, char *argv[]) {
         }
         printf("\n");
 
-        umbra_backend_free(interp);
-        umbra_backend_free(jit);
-        umbra_backend_free(mtl);
+        umbra_program_free(interp);
+        umbra_program_free(jit);
+        umbra_program_free(mtl);
         free(wind);
         slug_free(&sc);
     }

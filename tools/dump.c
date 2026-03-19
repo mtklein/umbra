@@ -92,11 +92,11 @@ static void dump_bb(char const *dir,
       umbra_dump_basic_block(bb, f);
       fclose(f); }
 
-    struct umbra_backend *backs[] = {
+    struct umbra_program *backs[] = {
 #ifdef JIT_EXT
-        umbra_backend_jit(bb),
+        umbra_program_jit(bb),
 #endif
-        umbra_backend_metal(bb),
+        umbra_program_metal(bb),
     };
     char const *exts[] = {
 #ifdef JIT_EXT
@@ -112,9 +112,9 @@ static void dump_bb(char const *dir,
         snprintf(p, sizeof p,
                  "%s/%s.%s", dir, name, exts[i]);
         FILE *f = fopen(p, "w");
-        umbra_backend_dump(backs[i], f);
+        umbra_program_dump(backs[i], f);
         fclose(f);
-        umbra_backend_free(backs[i]);
+        umbra_program_free(backs[i]);
     }
 }
 

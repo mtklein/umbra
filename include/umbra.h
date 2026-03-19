@@ -96,19 +96,19 @@ void   umbra_metal_begin_batch(struct umbra_metal*);
 void   umbra_metal_flush      (struct umbra_metal*);
 void   umbra_metal_free       (struct umbra_metal*);
 
-struct umbra_backend* umbra_backend_interp(struct umbra_basic_block const*);
-struct umbra_backend* umbra_backend_jit   (struct umbra_basic_block const*);
-struct umbra_backend* umbra_backend_metal (struct umbra_basic_block const*);
+struct umbra_program* umbra_program_interp(struct umbra_basic_block const*);
+struct umbra_program* umbra_program_jit   (struct umbra_basic_block const*);
+struct umbra_program* umbra_program_metal (struct umbra_basic_block const*);
 
-typedef struct umbra_backend*
-    (*umbra_backend_ctor_fn)(struct umbra_basic_block const*);
-umbra_backend_ctor_fn umbra_backend_ctor(struct umbra_backend const*);
-void umbra_backend_queue(struct umbra_backend*, int n, umbra_buf[]);
-void umbra_backend_flush(struct umbra_backend*);
-void umbra_backend_free       (struct umbra_backend*);
+typedef struct umbra_program*
+    (*umbra_program_ctor_fn)(struct umbra_basic_block const*);
+umbra_program_ctor_fn umbra_program_ctor(struct umbra_program const*);
+void umbra_program_queue(struct umbra_program*, int n, umbra_buf[]);
+void umbra_program_flush(struct umbra_program*);
+void umbra_program_free       (struct umbra_program*);
 
 #include <stdio.h>
-void umbra_backend_dump       (struct umbra_backend*, FILE*);
+void umbra_program_dump       (struct umbra_program*, FILE*);
 void umbra_dump_builder    (struct umbra_builder const*, FILE*);
 void umbra_dump_basic_block(struct umbra_basic_block const*, FILE*);
 void umbra_dump_jit        (struct umbra_jit const*, FILE*);

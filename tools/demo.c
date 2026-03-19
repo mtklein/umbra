@@ -25,12 +25,12 @@ static char const *backend_name[NUM_BACKENDS] = {
     "interp", "jit", "metal",
 };
 
-static struct umbra_backend *backends[NUM_BACKENDS];
+static struct umbra_program *backends[NUM_BACKENDS];
 static umbra_draw_layout     draw_layout;
 
 static void free_backends(void) {
     for (int i = 0; i < NUM_BACKENDS; i++) {
-        umbra_backend_free(backends[i]);
+        umbra_program_free(backends[i]);
         backends[i] = NULL;
     }
 }
@@ -55,14 +55,14 @@ static umbra_store_fn fmt_store[] = {
 static int fmt_bpp[] = {4, 2, 8, 2, 4};
 
 typedef struct {
-    struct umbra_backend *backend;
+    struct umbra_program *backend;
     int                   uni_len, pad_;
 } pipe;
 
 static pipe fill_pipe, readback_pipe, hdr_pipe;
 
 static void free_pipe(pipe *p) {
-    umbra_backend_free(p->backend);
+    umbra_program_free(p->backend);
     *p = (pipe){0};
 }
 
@@ -71,10 +71,10 @@ static void finish_pipe(pipe *p, builder *builder) {
     struct umbra_basic_block *bb =
         umbra_basic_block(builder);
     umbra_builder_free(builder);
-    struct umbra_backend *jit =
-        umbra_backend_jit(bb);
+    struct umbra_program *jit =
+        umbra_program_jit(bb);
     p->backend = jit
-        ? jit : umbra_backend_interp(bb);
+        ? jit : umbra_program_interp(bb);
     umbra_basic_block_free(bb);
 }
 
@@ -155,9 +155,9 @@ static void build_slide_fmt(slide *s, int fmt) {
         umbra_basic_block(builder);
     umbra_builder_free(builder);
 
-    backends[0] = umbra_backend_interp(bb);
-    backends[1] = umbra_backend_jit(bb);
-    backends[2] = umbra_backend_metal(bb);
+    backends[0] = umbra_program_interp(bb);
+    backends[1] = umbra_program_jit(bb);
+    backends[2] = umbra_program_metal(bb);
     umbra_basic_block_free(bb);
 
     build_pipes(fmt);
@@ -211,7 +211,7 @@ static void fill_bg_row(void *dst, int n,
         { dst,  row_sz },
         { uni, -(long)fill_pipe.uni_len },
     };
-    umbra_backend_queue(fill_pipe.backend, n, buf);
+    umbra_program_queue(fill_pipe.backend, n, buf);
 }
 
 static void readback_row(uint32_t *dst,
@@ -228,7 +228,7 @@ static void readback_row(uint32_t *dst,
         { uni,  -(long)readback_pipe.uni_len },
         { dst,  (long)(n * 4) },
     };
-    umbra_backend_queue(readback_pipe.backend, n, buf);
+    umbra_program_queue(readback_pipe.backend, n, buf);
 }
 
 static void to_hdr_row(float *dst, void *src,
@@ -244,7 +244,7 @@ static void to_hdr_row(float *dst, void *src,
         { uni,  -(long)hdr_pipe.uni_len },
         { dst,  (long)(n * 16) },
     };
-    umbra_backend_queue(hdr_pipe.backend, n, buf);
+    umbra_program_queue(hdr_pipe.backend, n, buf);
 }
 
 int main(void) {
@@ -352,7 +352,7 @@ int main(void) {
         if (!running) { break; }
 
         slide *s = slide_get(cur_slide);
-        struct umbra_backend *b =
+        struct umbra_program *b =
             backends[cur_backend];
 
         int bpp = fmt_bpp[cur_fmt];
@@ -385,7 +385,7 @@ int main(void) {
                 b);
         }
 
-        umbra_backend_flush(b);
+        umbra_program_flush(b);
         #undef ROW
 
         void *tex_pixels;

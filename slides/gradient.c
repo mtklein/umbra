@@ -12,7 +12,7 @@ static void grad_2stop_render_row(
         void *row, long row_sz,
         umbra_draw_layout const *lay,
         int ps, int32_t stride,
-        struct umbra_backend *backend) {
+        struct umbra_program *backend) {
     int uni_len = lay->uni_len;
     long long uni_[8] = {0};
     char *uni = (char*)uni_;
@@ -29,7 +29,7 @@ static void grad_2stop_render_row(
         { row,  row_sz },
         { uni, -(long)uni_len },
     };
-    umbra_backend_queue(backend, w, buf);
+    umbra_program_queue(backend, w, buf);
 }
 
 static void grad_lut_render_row(
@@ -37,7 +37,7 @@ static void grad_lut_render_row(
         void *row, long row_sz,
         umbra_draw_layout const *lay,
         int ps, int32_t stride,
-        struct umbra_backend *backend) {
+        struct umbra_program *backend) {
     grad_lut_state *st = s->state;
     int uni_len = lay->uni_len;
     long long uni_[8] = {0};
@@ -56,7 +56,7 @@ static void grad_lut_render_row(
         { row,  row_sz },
         { uni, -(long)uni_len },
     };
-    umbra_backend_queue(backend, w, buf);
+    umbra_program_queue(backend, w, buf);
 }
 
 static void grad_lut_cleanup(slide *s) {

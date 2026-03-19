@@ -9,7 +9,7 @@ typedef struct {
     float        *wind_buf;
     slug_acc_layout                acc_lay;
     struct umbra_basic_block      *acc_bb;
-    struct umbra_backend          *acc;
+    struct umbra_program          *acc;
 } slug_state;
 
 static void slug_init(slide *s, int w, int h) {
@@ -48,13 +48,13 @@ static void slug_render_row(
         void *row, long row_sz,
         umbra_draw_layout const *lay,
         int ps, int32_t stride,
-        struct umbra_backend *backend) {
+        struct umbra_program *backend) {
     slug_state *st = s->state;
     if (!st->acc) {
-        struct umbra_backend *jit =
-            umbra_backend_jit(st->acc_bb);
+        struct umbra_program *jit =
+            umbra_program_jit(st->acc_bb);
         st->acc = jit ? jit
-            : umbra_backend_interp(st->acc_bb);
+            : umbra_program_interp(st->acc_bb);
     }
     __builtin_memset(st->wind_buf, 0,
         (size_t)w * sizeof(float));
@@ -78,9 +78,9 @@ static void slug_render_row(
         __builtin_memcpy(
             au + st->acc_lay.loop_off,
             &j32, 4);
-        umbra_backend_queue(st->acc, w, abuf);
+        umbra_program_queue(st->acc, w, abuf);
     }
-    umbra_backend_flush(st->acc);
+    umbra_program_flush(st->acc);
 
     float hc[4];
     for (int i = 0; i < 4; i++) {
@@ -103,13 +103,13 @@ static void slug_render_row(
         { row,  row_sz },
         { uni, -(long)uni_len },
     };
-    umbra_backend_queue(backend, w, buf);
+    umbra_program_queue(backend, w, buf);
 }
 
 static void slug_cleanup(slide *s) {
     slug_state *st = s->state;
     free(st->wind_buf);
-    umbra_backend_free(st->acc);
+    umbra_program_free(st->acc);
     umbra_basic_block_free(st->acc_bb);
     free(st);
     s->state = NULL;
