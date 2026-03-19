@@ -63,6 +63,7 @@ struct metal_backend {
     int                  batch_nbufs, batch_bufs_cap;
     struct copyback     *batch_copy;
     int                  batch_ncopy, batch_copy_cap;
+    int                  batch_gen, :32;
 };
 
 struct umbra_metal {
@@ -80,6 +81,7 @@ struct umbra_metal {
     int    n_deref;
     struct deref_info    *deref;
     struct batch_shared  *batch_data;
+    int                  batch_gen, :32;
 };
 
 typedef struct {
@@ -1110,6 +1112,13 @@ void umbra_metal_run(
                 (size_t)m->total_bufs,
                 sizeof *m->batch_data);
         }
+        if (m->batch_gen != be->batch_gen) {
+            m->batch_gen = be->batch_gen;
+            __builtin_memset(
+                m->batch_data, 0,
+                (size_t)m->total_bufs
+                    * sizeof *m->batch_data);
+        }
         encode_dispatch(m, n, buf, enc, 1);
     }
 }
@@ -1117,6 +1126,7 @@ void umbra_metal_run(
 void umbra_metal_begin_batch(void *ctx) {
     struct metal_backend *be = ctx;
     if (!be || be->batch_cmdbuf) { return; }
+    be->batch_gen++;
     @autoreleasepool {
         id<MTLCommandQueue> queue =
             (__bridge id<MTLCommandQueue>)
