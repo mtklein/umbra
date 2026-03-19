@@ -1,8 +1,12 @@
 #include "program.h"
 #include <stdlib.h>
 
-typedef struct umbra_program*
-    (*build_fn)(struct umbra_basic_block const*);
+struct umbra_backend {
+    struct umbra_program* (*compile)(
+        struct umbra_backend*,
+        struct umbra_basic_block const*);
+    void (*free_fn)(struct umbra_backend*);
+};
 
 struct umbra_program {
     void    *ctx;
@@ -10,7 +14,7 @@ struct umbra_program {
     void   (*flush)   (void*);
     void   (*dump)    (void const*, FILE*);
     void   (*free_fn) (void*);
-    build_fn build;
+    struct umbra_backend *backend;
 };
 
 static void run_interp(void *ctx, int n,
@@ -20,20 +24,31 @@ static void run_interp(void *ctx, int n,
 static void free_interp(void *ctx) {
     umbra_interpreter_free(ctx);
 }
-
-struct umbra_program* umbra_program_interp(
+static struct umbra_program* compile_interp(
+        struct umbra_backend *be,
         struct umbra_basic_block const *bb) {
     struct umbra_interpreter *p =
         umbra_interpreter(bb);
     if (!p) { return NULL; }
-    struct umbra_program *b = malloc(sizeof *b);
-    *b = (struct umbra_program){
+    struct umbra_program *prog = malloc(sizeof *prog);
+    *prog = (struct umbra_program){
         .ctx     = p,
         .queue   = run_interp,
         .free_fn = free_interp,
-        .build   = umbra_program_interp,
+        .backend = be,
     };
-    return b;
+    return prog;
+}
+static void free_be_interp(struct umbra_backend *be) {
+    free(be);
+}
+struct umbra_backend* umbra_backend_interp(void) {
+    struct umbra_backend *be = malloc(sizeof *be);
+    *be = (struct umbra_backend){
+        .compile = compile_interp,
+        .free_fn = free_be_interp,
+    };
+    return be;
 }
 
 static void run_jit(void *ctx, int n,
@@ -46,20 +61,31 @@ static void dump_jit(void const *ctx, FILE *f) {
 static void free_jit(void *ctx) {
     umbra_jit_free(ctx);
 }
-
-struct umbra_program* umbra_program_jit(
+static struct umbra_program* compile_jit(
+        struct umbra_backend *be,
         struct umbra_basic_block const *bb) {
     struct umbra_jit *j = umbra_jit(bb);
     if (!j) { return NULL; }
-    struct umbra_program *b = malloc(sizeof *b);
-    *b = (struct umbra_program){
+    struct umbra_program *prog = malloc(sizeof *prog);
+    *prog = (struct umbra_program){
         .ctx     = j,
         .queue   = run_jit,
         .dump    = dump_jit,
         .free_fn = free_jit,
-        .build   = umbra_program_jit,
+        .backend = be,
     };
-    return b;
+    return prog;
+}
+static void free_be_jit(struct umbra_backend *be) {
+    free(be);
+}
+struct umbra_backend* umbra_backend_jit(void) {
+    struct umbra_backend *be = malloc(sizeof *be);
+    *be = (struct umbra_backend){
+        .compile = compile_jit,
+        .free_fn = free_be_jit,
+    };
+    return be;
 }
 
 static void run_metal(void *ctx, int n,
@@ -75,48 +101,61 @@ static void dump_metal(void const *ctx, FILE *f) {
 static void free_metal(void *ctx) {
     umbra_metal_free(ctx);
 }
-
-struct umbra_program* umbra_program_metal(
+static struct umbra_program* compile_metal(
+        struct umbra_backend *be,
         struct umbra_basic_block const *bb) {
     struct umbra_metal *m = umbra_metal(bb);
     if (!m) { return NULL; }
-    struct umbra_program *b = malloc(sizeof *b);
-    *b = (struct umbra_program){
+    struct umbra_program *prog = malloc(sizeof *prog);
+    *prog = (struct umbra_program){
         .ctx     = m,
         .queue   = run_metal,
         .flush   = flush_metal,
         .dump    = dump_metal,
         .free_fn = free_metal,
-        .build   = umbra_program_metal,
+        .backend = be,
     };
-    return b;
+    return prog;
+}
+static void free_be_metal(struct umbra_backend *be) {
+    free(be);
+}
+struct umbra_backend* umbra_backend_metal(void) {
+    struct umbra_backend *be = malloc(sizeof *be);
+    *be = (struct umbra_backend){
+        .compile = compile_metal,
+        .free_fn = free_be_metal,
+    };
+    return be;
 }
 
-void umbra_program_queue(struct umbra_program *b,
-                        int n, umbra_buf buf[]) {
-    b->queue(b->ctx, n, buf);
+struct umbra_program* umbra_backend_compile(
+        struct umbra_backend *be,
+        struct umbra_basic_block const *bb) {
+    return be->compile(be, bb);
 }
 
-void umbra_program_flush(struct umbra_program *b) {
-    if (b && b->flush) { b->flush(b->ctx); }
+void umbra_backend_free(struct umbra_backend *be) {
+    if (!be) { return; }
+    if (be->free_fn) { be->free_fn(be); }
 }
 
-void umbra_program_dump(struct umbra_program *b,
+void umbra_program_queue(struct umbra_program *p,
+                         int n, umbra_buf buf[]) {
+    p->queue(p->ctx, n, buf);
+}
+
+void umbra_program_flush(struct umbra_program *p) {
+    if (p && p->flush) { p->flush(p->ctx); }
+}
+
+void umbra_program_dump(struct umbra_program *p,
                         FILE *f) {
-    if (b && b->dump) { b->dump(b->ctx, f); }
+    if (p && p->dump) { p->dump(p->ctx, f); }
 }
 
-typedef struct umbra_program*
-    (*umbra_program_ctor_fn)(
-        struct umbra_basic_block const*);
-
-umbra_program_ctor_fn umbra_program_ctor(
-        struct umbra_program const *b) {
-    return b->build;
-}
-
-void umbra_program_free(struct umbra_program *b) {
-    if (!b) { return; }
-    if (b->free_fn) { b->free_fn(b->ctx); }
-    free(b);
+void umbra_program_free(struct umbra_program *p) {
+    if (!p) { return; }
+    if (p->free_fn) { p->free_fn(p->ctx); }
+    free(p);
 }

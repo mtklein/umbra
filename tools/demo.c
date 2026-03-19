@@ -25,13 +25,14 @@ static char const *backend_name[NUM_BACKENDS] = {
     "interp", "jit", "metal",
 };
 
-static struct umbra_program *backends[NUM_BACKENDS];
+static struct umbra_backend *bes[NUM_BACKENDS];
+static struct umbra_program *programs[NUM_BACKENDS];
 static umbra_draw_layout     draw_layout;
 
 static void free_backends(void) {
     for (int i = 0; i < NUM_BACKENDS; i++) {
-        umbra_program_free(backends[i]);
-        backends[i] = NULL;
+        umbra_program_free(programs[i]);
+        programs[i] = NULL;
     }
 }
 
@@ -66,15 +67,14 @@ static void free_pipe(pipe *p) {
     *p = (pipe){0};
 }
 
+static struct umbra_backend *pipe_be;
+
 static void finish_pipe(pipe *p, builder *builder) {
     p->uni_len = umbra_uni_len(builder);
     struct umbra_basic_block *bb =
         umbra_basic_block(builder);
     umbra_builder_free(builder);
-    struct umbra_program *jit =
-        umbra_program_jit(bb);
-    p->backend = jit
-        ? jit : umbra_program_interp(bb);
+    p->backend = umbra_backend_compile(pipe_be, bb);
     umbra_basic_block_free(bb);
 }
 
@@ -155,26 +155,28 @@ static void build_slide_fmt(slide *s, int fmt) {
         umbra_basic_block(builder);
     umbra_builder_free(builder);
 
-    backends[0] = umbra_program_interp(bb);
-    backends[1] = umbra_program_jit(bb);
-    backends[2] = umbra_program_metal(bb);
+    for (int i = 0; i < NUM_BACKENDS; i++) {
+        programs[i] = bes[i]
+            ? umbra_backend_compile(bes[i], bb)
+            : NULL;
+    }
     umbra_basic_block_free(bb);
 
     build_pipes(fmt);
 }
 
 static int pick_backend(int cur) {
-    if (backends[cur]) { return cur; }
+    if (programs[cur]) { return cur; }
     for (int i = 1; i < NUM_BACKENDS; i++) {
         int b = (cur + i) % NUM_BACKENDS;
-        if (backends[b]) { return b; }
+        if (programs[b]) { return b; }
     }
     return 0;
 }
 static int next_backend(int cur) {
     for (int i = 1; i <= NUM_BACKENDS; i++) {
         int b = (cur + i) % NUM_BACKENDS;
-        if (backends[b]) { return b; }
+        if (programs[b]) { return b; }
     }
     return cur;
 }
@@ -283,6 +285,12 @@ int main(void) {
 
     slides_init(W, H);
 
+    bes[0] = umbra_backend_interp();
+    bes[1] = umbra_backend_jit();
+    bes[2] = umbra_backend_metal();
+    pipe_be = umbra_backend_jit();
+    if (!pipe_be) { pipe_be = umbra_backend_interp(); }
+
     void *pixbuf = malloc(W * H * 8);
     int32_t planar_stride = W * H;
 
@@ -353,7 +361,7 @@ int main(void) {
 
         slide *s = slide_get(cur_slide);
         struct umbra_program *b =
-            backends[cur_backend];
+            programs[cur_backend];
 
         int bpp = fmt_bpp[cur_fmt];
         _Bool planar = (cur_fmt == FMT_FP16P);
@@ -456,6 +464,10 @@ int main(void) {
     free(pixbuf);
     free_backends();
     free_pipes();
+    for (int i = 0; i < NUM_BACKENDS; i++) {
+        umbra_backend_free(bes[i]);
+    }
+    umbra_backend_free(pipe_be);
     slides_cleanup();
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);

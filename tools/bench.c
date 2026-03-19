@@ -66,12 +66,20 @@ int main(int argc, char *argv[]) {
             umbra_basic_block(bld);
         umbra_builder_free(bld);
 
+        struct umbra_backend *be_i =
+            umbra_backend_interp();
+        struct umbra_backend *be_j =
+            umbra_backend_jit();
+        struct umbra_backend *be_m =
+            umbra_backend_metal();
         struct umbra_program *interp =
-            umbra_program_interp(bb);
-        struct umbra_program *jit =
-            umbra_program_jit(bb);
-        struct umbra_program *mtl =
-            umbra_program_metal(bb);
+            umbra_backend_compile(be_i, bb);
+        struct umbra_program *jit = be_j
+            ? umbra_backend_compile(be_j, bb)
+            : NULL;
+        struct umbra_program *mtl = be_m
+            ? umbra_backend_compile(be_m, bb)
+            : NULL;
         umbra_basic_block_free(bb);
 
         _Bool planar =
@@ -113,6 +121,9 @@ int main(int argc, char *argv[]) {
         umbra_program_free(interp);
         umbra_program_free(jit);
         umbra_program_free(mtl);
+        umbra_backend_free(be_i);
+        umbra_backend_free(be_j);
+        umbra_backend_free(be_m);
         free(row);
     }
 
@@ -126,12 +137,20 @@ int main(int argc, char *argv[]) {
             umbra_basic_block(bld);
         umbra_builder_free(bld);
 
+        struct umbra_backend *be_i =
+            umbra_backend_interp();
+        struct umbra_backend *be_j =
+            umbra_backend_jit();
+        struct umbra_backend *be_m =
+            umbra_backend_metal();
         struct umbra_program *interp =
-            umbra_program_interp(bb);
-        struct umbra_program *jit =
-            umbra_program_jit(bb);
-        struct umbra_program *mtl =
-            umbra_program_metal(bb);
+            umbra_backend_compile(be_i, bb);
+        struct umbra_program *jit = be_j
+            ? umbra_backend_compile(be_j, bb)
+            : NULL;
+        struct umbra_program *mtl = be_m
+            ? umbra_backend_compile(be_m, bb)
+            : NULL;
         umbra_basic_block_free(bb);
 
         float *wind = calloc((size_t)W, 4);
@@ -193,6 +212,9 @@ int main(int argc, char *argv[]) {
         umbra_program_free(interp);
         umbra_program_free(jit);
         umbra_program_free(mtl);
+        umbra_backend_free(be_i);
+        umbra_backend_free(be_j);
+        umbra_backend_free(be_m);
         free(wind);
         slug_free(&sc);
     }

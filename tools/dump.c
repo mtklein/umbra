@@ -92,11 +92,18 @@ static void dump_bb(char const *dir,
       umbra_dump_basic_block(bb, f);
       fclose(f); }
 
-    struct umbra_program *backs[] = {
+    struct umbra_backend *bes[] = {
 #ifdef JIT_EXT
-        umbra_program_jit(bb),
+        umbra_backend_jit(),
 #endif
-        umbra_program_metal(bb),
+        umbra_backend_metal(),
+    };
+    struct umbra_program *progs[] = {
+#ifdef JIT_EXT
+        umbra_backend_compile(bes[0], bb),
+#endif
+        umbra_backend_compile(
+            bes[sizeof bes / sizeof bes[0] - 1], bb),
     };
     char const *exts[] = {
 #ifdef JIT_EXT
@@ -106,15 +113,20 @@ static void dump_bb(char const *dir,
     };
     umbra_basic_block_free(bb);
 
-    int nb = (int)(sizeof backs / sizeof backs[0]);
+    int nb = (int)(sizeof progs / sizeof progs[0]);
     for (int i = 0; i < nb; i++) {
-        if (!backs[i]) { continue; }
+        if (!progs[i]) { continue; }
         snprintf(p, sizeof p,
                  "%s/%s.%s", dir, name, exts[i]);
         FILE *f = fopen(p, "w");
-        umbra_program_dump(backs[i], f);
+        umbra_program_dump(progs[i], f);
         fclose(f);
-        umbra_program_free(backs[i]);
+        umbra_program_free(progs[i]);
+    }
+    for (int i = 0;
+         i < (int)(sizeof bes / sizeof bes[0]);
+         i++) {
+        umbra_backend_free(bes[i]);
     }
 }
 

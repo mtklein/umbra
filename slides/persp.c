@@ -32,7 +32,7 @@ static void persp_render_row(
         void *row, long row_sz,
         umbra_draw_layout const *lay,
         int ps, int32_t stride,
-        struct umbra_program *backend) {
+        struct umbra_program *program) {
     persp_state *st = s->state;
     float hc[4];
     for (int i = 0; i < 4; i++) {
@@ -58,7 +58,7 @@ static void persp_render_row(
         { row,  row_sz },
         { uni, -(long)uni_len },
     };
-    umbra_program_queue(backend, w, buf);
+    umbra_program_queue(program, w, buf);
 }
 
 static void persp_cleanup(slide *s) {

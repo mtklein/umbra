@@ -12,16 +12,21 @@ static inline _Bool equiv(float x, float y) {
 enum { NUM_BACKENDS = 3 };
 
 typedef struct {
+    struct umbra_backend *be[NUM_BACKENDS];
     struct umbra_program *b[NUM_BACKENDS];
 } test_backends;
 
 static inline test_backends test_backends_make(
         struct umbra_basic_block const *bb) {
-    test_backends B = {{
-        umbra_program_interp(bb),
-        umbra_program_jit(bb),
-        umbra_program_metal(bb),
-    }};
+    test_backends B;
+    B.be[0] = umbra_backend_interp();
+    B.be[1] = umbra_backend_jit();
+    B.be[2] = umbra_backend_metal();
+    for (int i = 0; i < NUM_BACKENDS; i++) {
+        B.b[i] = B.be[i]
+            ? umbra_backend_compile(B.be[i], bb)
+            : NULL;
+    }
     (B.b[0] != 0) here;
 #if defined(__aarch64__) || defined(__AVX2__)
     (B.b[1] != 0) here;
@@ -45,5 +50,6 @@ static inline void test_backends_free(
         test_backends *B) {
     for (int i = 0; i < NUM_BACKENDS; i++) {
         umbra_program_free(B->b[i]);
+        umbra_backend_free(B->be[i]);
     }
 }
