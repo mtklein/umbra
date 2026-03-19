@@ -393,7 +393,7 @@ int main(void) {
                 b);
         }
 
-        umbra_program_flush(b);
+        umbra_backend_flush(bes[cur_backend]);
         #undef ROW
 
         void *tex_pixels;

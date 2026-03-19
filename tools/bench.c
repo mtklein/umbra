@@ -18,18 +18,19 @@ static double bench(slide *s, int w, int h,
                     umbra_draw_layout const *lay,
                     int ps, int32_t stride,
                     void *row, long row_sz,
-                    struct umbra_program *be) {
+                    struct umbra_backend *be,
+                    struct umbra_program *prog) {
     s->render_row(s, h/2, w, row, row_sz,
-                  lay, ps, stride, be);
-    umbra_program_flush(be);
+                  lay, ps, stride, prog);
+    umbra_backend_flush(be);
     int iters = 1;
     for (;;) {
         double const start = now();
         for (int it = 0; it < iters; it++) {
             s->render_row(s, h/2, w, row, row_sz,
-                          lay, ps, stride, be);
+                          lay, ps, stride, prog);
         }
-        umbra_program_flush(be);
+        umbra_backend_flush(be);
         double const elapsed = now() - start;
         if (elapsed >= 0.1) {
             return elapsed
@@ -95,13 +96,13 @@ int main(int argc, char *argv[]) {
 
         sprintf(tmp, "%5.2f ns/px",
                 bench(s, W, H, &lay, ps, stride,
-                      row, row_sz, interp));
+                      row, row_sz, be_i, interp));
         printf(" %12s", tmp);
 
         if (jit) {
             sprintf(tmp, "%5.2f ns/px",
                     bench(s, W, H, &lay, ps, stride,
-                          row, row_sz, jit));
+                          row, row_sz, be_j, jit));
             printf(" %12s", tmp);
         } else {
             printf(" %12s", "-");
@@ -110,7 +111,7 @@ int main(int argc, char *argv[]) {
         if (mtl) {
             sprintf(tmp, "%5.2f ns/px",
                     bench(s, W, H, &lay, ps, stride,
-                          row, row_sz, mtl));
+                          row, row_sz, be_m, mtl));
             printf(" %12s", tmp);
         } else {
             printf(" %12s", "-");
@@ -179,21 +180,25 @@ int main(int argc, char *argv[]) {
                "interp", "jit", "metal");
         printf("%-40s", "");
 
-        struct umbra_program *bes[] =
+        struct umbra_backend *backs[] =
+            {be_i, be_j, be_m};
+        struct umbra_program *progs[] =
             {interp, jit, mtl};
         for (int bi = 0; bi < 3; bi++) {
-            if (!bes[bi]) {
+            if (!progs[bi]) {
                 printf(" %12s", "-");
                 continue;
             }
-            umbra_program_queue(bes[bi], W, abuf);
+            umbra_program_queue(progs[bi], W, abuf);
+            umbra_backend_flush(backs[bi]);
             int iters = 1;
             for (;;) {
                 double const start = now();
                 for (int it = 0; it < iters; it++) {
                     umbra_program_queue(
-                        bes[bi], W, abuf);
+                        progs[bi], W, abuf);
                 }
+                umbra_backend_flush(backs[bi]);
                 double const elapsed = now()-start;
                 if (elapsed >= 0.1) {
                     char tmp[32];

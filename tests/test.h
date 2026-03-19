@@ -42,7 +42,7 @@ static inline _Bool test_backends_run(
         int n, umbra_buf buf[]) {
     if (!B->b[bi]) { return 0; }
     umbra_program_queue(B->b[bi], n, buf);
-    umbra_program_flush(B->b[bi]);
+    umbra_backend_flush(B->be[bi]);
     return 1;
 }
 

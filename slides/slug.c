@@ -79,7 +79,7 @@ static void slug_render_row(
             &j32, 4);
         umbra_program_queue(st->acc, w, abuf);
     }
-    umbra_program_flush(st->acc);
+    umbra_backend_flush(st->acc_be);
 
     float hc[4];
     for (int i = 0; i < 4; i++) {

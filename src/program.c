@@ -141,6 +141,10 @@ struct umbra_program* umbra_backend_compile(
     return be->compile(be, bb);
 }
 
+void umbra_backend_flush(struct umbra_backend *be) {
+    if (be && be->flush) { be->flush(be); }
+}
+
 void umbra_backend_free(struct umbra_backend *be) {
     if (!be) { return; }
     if (be->free_fn) { be->free_fn(be); }
@@ -149,12 +153,6 @@ void umbra_backend_free(struct umbra_backend *be) {
 void umbra_program_queue(struct umbra_program *p,
                          int n, umbra_buf buf[]) {
     p->queue(p->ctx, n, buf);
-}
-
-void umbra_program_flush(struct umbra_program *p) {
-    if (p && p->backend && p->backend->flush) {
-        p->backend->flush(p->backend);
-    }
 }
 
 void umbra_program_dump(struct umbra_program *p,
