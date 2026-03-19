@@ -186,20 +186,18 @@ static inline struct umbra_builder *slug_build_acc(
         umbra_add_f32(b,
             umbra_mul_f32(b, m[6], xf),
             umbra_mul_f32(b, m[7], yf)), m[8]);
-    umbra_val ipw = umbra_div_f32(b,
-        umbra_imm_f32(b, 1.0f), pw);
-    umbra_val gx = umbra_mul_f32(b,
+    umbra_val gx = umbra_div_f32(b,
         umbra_add_f32(b,
             umbra_add_f32(b,
                 umbra_mul_f32(b, m[0], xf),
                 umbra_mul_f32(b, m[1], yf)),
-            m[2]), ipw);
-    umbra_val gy = umbra_mul_f32(b,
+            m[2]), pw);
+    umbra_val gy = umbra_div_f32(b,
         umbra_add_f32(b,
             umbra_add_f32(b,
                 umbra_mul_f32(b, m[3], xf),
                 umbra_mul_f32(b, m[4], yf)),
-            m[5]), ipw);
+            m[5]), pw);
 
     umbra_val z  = umbra_imm_f32(b, 0.0f);
     umbra_val o  = umbra_imm_f32(b, 1.0f);
