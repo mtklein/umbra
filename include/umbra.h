@@ -90,6 +90,7 @@ struct umbra_program* umbra_backend_compile(struct umbra_backend*,
 void umbra_backend_flush(struct umbra_backend*);
 void umbra_backend_free (struct umbra_backend*);
 
+struct umbra_backend* umbra_program_backend(struct umbra_program*);
 void umbra_program_queue(struct umbra_program*, int n, umbra_buf[]);
 void umbra_program_free (struct umbra_program*);
 
