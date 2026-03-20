@@ -1,5 +1,6 @@
 brew "lld"
 brew "llvm"
+brew "mlx-c"
 brew "ninja"
 brew "sdl3"
 brew "wasi-libc"

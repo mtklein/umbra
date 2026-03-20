@@ -3,16 +3,16 @@ san = address,integer,undefined
 out     = $builddir/xsan
 cc      = $clang -fsanitize=$san -fno-sanitize-recover=address
 exec    = env UBSAN_OPTIONS=print_stacktrace=1
-ldflags = -framework Metal -framework Foundation
+ldflags = -framework Metal -framework Foundation -L/opt/homebrew/lib -lmlxc -lmlx -lc++
 include build/project.ninja
 
 build $out/tests/golden_test.o: compile tests/golden_test.c
     cflags = -Wno-cast-align
-build $out/golden_test:   link $out/tests/golden_test.o $out/src/bb.o $out/src/ra.o $out/src/program.o $out/src/interpreter.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/umbra_draw.o $out/stb_truetype.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/overview.o
-    ldflags = -framework Metal -framework Foundation -lm
+build $out/golden_test:   link $out/tests/golden_test.o $out/src/bb.o $out/src/ra.o $out/src/program.o $out/src/interpreter.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/mlx.o $out/src/umbra_draw.o $out/stb_truetype.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/overview.o
+    ldflags = -framework Metal -framework Foundation -L/opt/homebrew/lib -lmlxc -lmlx -lc++ -lm
 build $out/golden_test.log: run $out/golden_test
 
 build $out/tools/demo.o: compile tools/demo.c
     cflags = -I/opt/homebrew/include -Wno-cast-align
-build $out/demo:   link $out/tools/demo.o $out/src/bb.o $out/src/ra.o $out/src/program.o $out/src/interpreter.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/umbra_draw.o $out/stb_truetype.o $out/stb_image_write.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/overview.o
-    ldflags = -framework Metal -framework Foundation -L/opt/homebrew/lib -lSDL3
+build $out/demo:   link $out/tools/demo.o $out/src/bb.o $out/src/ra.o $out/src/program.o $out/src/interpreter.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/mlx.o $out/src/umbra_draw.o $out/stb_truetype.o $out/stb_image_write.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/overview.o
+    ldflags = -framework Metal -framework Foundation -L/opt/homebrew/lib -lmlxc -lmlx -lc++ -lSDL3

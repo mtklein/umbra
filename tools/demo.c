@@ -20,9 +20,9 @@ int main(void) { return 0; }
 
 typedef struct umbra_builder builder;
 
-enum { NUM_BACKENDS = 3 };
+enum { NUM_BACKENDS = 4 };
 static char const *backend_name[NUM_BACKENDS] = {
-    "interp", "jit", "metal",
+    "interp", "jit", "metal", "mlx",
 };
 
 static struct umbra_backend *bes[NUM_BACKENDS];
@@ -288,6 +288,7 @@ int main(void) {
     bes[0] = umbra_backend_interp();
     bes[1] = umbra_backend_jit();
     bes[2] = umbra_backend_metal();
+    bes[3] = umbra_backend_mlx();
     pipe_be = umbra_backend_jit();
     if (!pipe_be) { pipe_be = umbra_backend_interp(); }
 
