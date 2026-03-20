@@ -135,39 +135,6 @@ struct umbra_backend* umbra_backend_metal(void) {
     return be;
 }
 
-static void run_mlx(void *ctx, int n,
-                     umbra_buf buf[]) {
-    umbra_mlx_run(ctx, n, buf);
-}
-static void free_mlx(void *ctx) {
-    umbra_mlx_free(ctx);
-}
-static struct umbra_program* compile_mlx(
-        struct umbra_backend *be,
-        struct umbra_basic_block const *bb) {
-    struct umbra_mlx *m = umbra_mlx(bb);
-    if (!m) { return NULL; }
-    struct umbra_program *prog = malloc(sizeof *prog);
-    *prog = (struct umbra_program){
-        .ctx     = m,
-        .queue   = run_mlx,
-        .free_fn = free_mlx,
-        .backend = be,
-    };
-    return prog;
-}
-static void free_be_mlx(struct umbra_backend *be) {
-    free(be);
-}
-struct umbra_backend* umbra_backend_mlx(void) {
-    struct umbra_backend *be = malloc(sizeof *be);
-    *be = (struct umbra_backend){
-        .compile = compile_mlx,
-        .free_fn = free_be_mlx,
-    };
-    return be;
-}
-
 struct umbra_program* umbra_backend_compile(
         struct umbra_backend *be,
         struct umbra_basic_block const *bb) {

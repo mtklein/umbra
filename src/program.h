@@ -34,9 +34,3 @@ void umbra_dump_jit_mca(struct umbra_jit const*,
                         FILE*);
 void umbra_dump_metal  (struct umbra_metal const*,
                         FILE*);
-
-struct umbra_mlx* umbra_mlx(
-        struct umbra_basic_block const*);
-void   umbra_mlx_run (struct umbra_mlx*,
-                       int n, umbra_buf[]);
-void   umbra_mlx_free(struct umbra_mlx*);

@@ -50,8 +50,8 @@ int main(int argc, char *argv[]) {
     slides_init(W, H);
 
     int ns = slide_count() - 1;
-    printf("%-40s %12s %12s %12s %12s\n",
-           "", "interp", "jit", "metal", "mlx");
+    printf("%-40s %12s %12s %12s\n",
+           "", "interp", "jit", "metal");
 
     for (int si = 0; si < ns; si++) {
         slide *s = slide_get(si);
@@ -73,8 +73,6 @@ int main(int argc, char *argv[]) {
             umbra_backend_jit();
         struct umbra_backend *be_m =
             umbra_backend_metal();
-        struct umbra_backend *be_x =
-            umbra_backend_mlx();
         struct umbra_program *interp =
             umbra_backend_compile(be_i, bb);
         struct umbra_program *jit = be_j
@@ -82,9 +80,6 @@ int main(int argc, char *argv[]) {
             : NULL;
         struct umbra_program *mtl = be_m
             ? umbra_backend_compile(be_m, bb)
-            : NULL;
-        struct umbra_program *mlx = be_x
-            ? umbra_backend_compile(be_x, bb)
             : NULL;
         umbra_basic_block_free(bb);
 
@@ -122,25 +117,14 @@ int main(int argc, char *argv[]) {
             printf(" %12s", "-");
         }
 
-        if (mlx) {
-            sprintf(tmp, "%5.2f ns/px",
-                    bench(s, W, H, &lay, ps, stride,
-                          row, row_sz, be_x, mlx));
-            printf(" %12s", tmp);
-        } else {
-            printf(" %12s", "-");
-        }
-
         printf("\n");
 
         umbra_program_free(interp);
         umbra_program_free(jit);
         umbra_program_free(mtl);
-        umbra_program_free(mlx);
         umbra_backend_free(be_i);
         umbra_backend_free(be_j);
         umbra_backend_free(be_m);
-        umbra_backend_free(be_x);
         free(row);
     }
 
@@ -160,8 +144,6 @@ int main(int argc, char *argv[]) {
             umbra_backend_jit();
         struct umbra_backend *be_m =
             umbra_backend_metal();
-        struct umbra_backend *be_x =
-            umbra_backend_mlx();
         struct umbra_program *interp =
             umbra_backend_compile(be_i, bb);
         struct umbra_program *jit = be_j
@@ -169,9 +151,6 @@ int main(int argc, char *argv[]) {
             : NULL;
         struct umbra_program *mtl = be_m
             ? umbra_backend_compile(be_m, bb)
-            : NULL;
-        struct umbra_program *mlx = be_x
-            ? umbra_backend_compile(be_x, bb)
             : NULL;
         umbra_basic_block_free(bb);
 
@@ -196,16 +175,16 @@ int main(int argc, char *argv[]) {
             { au,  -(long)al.uni_len },
         };
 
-        printf("\n%-40s %12s %12s %12s %12s\n",
+        printf("\n%-40s %12s %12s %12s\n",
                "slug accumulator (1 curve)",
-               "interp", "jit", "metal", "mlx");
+               "interp", "jit", "metal");
         printf("%-40s", "");
 
         struct umbra_backend *backs[] =
-            {be_i, be_j, be_m, be_x};
+            {be_i, be_j, be_m};
         struct umbra_program *progs[] =
-            {interp, jit, mtl, mlx};
-        for (int bi = 0; bi < 4; bi++) {
+            {interp, jit, mtl};
+        for (int bi = 0; bi < 3; bi++) {
             if (!progs[bi]) {
                 printf(" %12s", "-");
                 continue;
@@ -238,11 +217,9 @@ int main(int argc, char *argv[]) {
         umbra_program_free(interp);
         umbra_program_free(jit);
         umbra_program_free(mtl);
-        umbra_program_free(mlx);
         umbra_backend_free(be_i);
         umbra_backend_free(be_j);
         umbra_backend_free(be_m);
-        umbra_backend_free(be_x);
         free(wind);
         slug_free(&sc);
     }

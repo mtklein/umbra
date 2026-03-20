@@ -85,7 +85,6 @@ typedef struct { void *ptr; long sz; } umbra_buf;
 struct umbra_backend* umbra_backend_interp(void);
 struct umbra_backend* umbra_backend_jit   (void);
 struct umbra_backend* umbra_backend_metal (void);
-struct umbra_backend* umbra_backend_mlx   (void);
 struct umbra_program* umbra_backend_compile(struct umbra_backend*,
                                             struct umbra_basic_block const*);
 void umbra_backend_flush(struct umbra_backend*);
