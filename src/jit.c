@@ -1140,7 +1140,7 @@ void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
 #include <sys/mman.h>
 #include <unistd.h>
 
-struct pool_ref { int data_off, code_pos; };
+struct pool_ref { int data_off, code_pos, extra; };
 struct pool {
     uint8_t        *data;
     struct pool_ref *refs;
@@ -1164,14 +1164,15 @@ static int pool_add(struct pool *p,
     return off;
 }
 static void pool_ref_at(struct pool *p,
-                        int data_off, int code_pos) {
+                        int data_off, int code_pos,
+                        int extra) {
     if (p->nrefs == p->cap_refs) {
         p->cap_refs = p->cap_refs ? 2*p->cap_refs : 32;
         p->refs = realloc(p->refs,
             (size_t)p->cap_refs * sizeof *p->refs);
     }
     p->refs[p->nrefs++] =
-        (struct pool_ref){data_off, code_pos};
+        (struct pool_ref){data_off, code_pos, extra};
 }
 static void pool_free(struct pool *p) {
     free(p->data);
@@ -1269,7 +1270,7 @@ static void pool_broadcast(Buf *c, struct pool *p,
         int off = pool_add(p, &v, 4);
         int pos = vex_rip(c, 1, 2, 0, 1,
                           d, 0, 0x18);
-        pool_ref_at(p, off, pos);
+        pool_ref_at(p, off, pos, 0);
     }
 }
 
@@ -1533,7 +1534,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
         struct pool_ref *r = &jc.pool.refs[i];
         int entry_off = pool_start + r->data_off;
         int32_t rel = (int32_t)(entry_off
-            - (r->code_pos + 4));
+            - (r->code_pos + 4 + r->extra));
         __builtin_memcpy(c.buf + r->code_pos,
                          &rel, 4);
     }
@@ -1603,7 +1604,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                                    iota8, 32);
                 int pos = vex_rip(c, 1, 1, 0, 1,
                     s.rd, s.rd, 0xfe);
-                pool_ref_at(&jc->pool, off, pos);
+                pool_ref_at(&jc->pool, off, pos, 0);
             }
         } break;
 
@@ -2075,11 +2076,11 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 int pos = vex_rip(c, pp, mm, 0, 1,
                     s.rd, s.rx, vop);
                 emit1(c, pred);
-                pool_ref_at(&jc->pool, off, pos);
+                pool_ref_at(&jc->pool, off, pos, 1);
             } else {
                 int pos = vex_rip(c, pp, mm, 0, 1,
                     s.rd, s.rx, vop);
-                pool_ref_at(&jc->pool, off, pos);
+                pool_ref_at(&jc->pool, off, pos, 0);
             }
         } break;
 
