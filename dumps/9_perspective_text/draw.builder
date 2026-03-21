@@ -73,9 +73,9 @@
   v72  = sub_f32_imm     v38 0x3f800000
   v73  = join            v71 v72
   v74  = min_f32         v70 v73
-  v75  = i32_from_f32    v67
-  v76  = i32_from_f32    v74
-  v77  = i32_from_f32    v36
+  v75  = floor_i32       v67
+  v76  = floor_i32       v74
+  v77  = floor_i32       v36
   v78  = mul_i32         v76 v77
   v79  = add_i32         v75 v78
   v80  = gather_16       p-17 v79

@@ -393,9 +393,9 @@ umbra_val umbra_coverage_bitmap_matrix(builder *builder, umbra_val x, umbra_val 
                                       umbra_sub_f32(builder, bw, one_f));
     umbra_val yc = umbra_min_f32(builder, umbra_max_f32(builder, yp, zero_f),
                                       umbra_sub_f32(builder, bh, one_f));
-    umbra_val xi = umbra_cvt_i32_f32(builder, xc);
-    umbra_val yi = umbra_cvt_i32_f32(builder, yc);
-    umbra_val bwi = umbra_cvt_i32_f32(builder, bw);
+    umbra_val xi = umbra_floor_i32(builder, xc);
+    umbra_val yi = umbra_floor_i32(builder, yc);
+    umbra_val bwi = umbra_floor_i32(builder, bw);
     umbra_val idx = umbra_add_i32(builder, umbra_mul_i32(builder, yi, bwi), xi);
 
     umbra_val val = umbra_widen_s16(builder,

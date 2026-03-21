@@ -28,7 +28,7 @@
   v27  = sub_f32         v19 v23
   v28  = sub_f32_imm     v19 0x3f800000
   v29  = join            v27 v28
-  v30  = i32_from_f32    v18
+  v30  = floor_i32       v18
   v31  = imm_32          0x3b808081
   v32  = imm_32          0xff
   v33  = sub_f32         v23 v7
@@ -56,11 +56,11 @@
   v55  = max_f32         v0 v46
   v56  = join            v55 v48
   v57  = min_f32         v56 v26
-  v58  = i32_from_f32    v57
+  v58  = floor_i32       v57
   v59  = max_f32         v0 v44
   v60  = join            v59 v49
   v61  = min_f32         v60 v29
-  v62  = i32_from_f32    v61
+  v62  = floor_i32       v61
   v63  = mul_i32         v62 v30
   v64  = add_i32         v58 v63
   v65  = gather_16       p-9 v64

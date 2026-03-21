@@ -41,7 +41,7 @@ kernel void umbra_entry(
     uint v23 = 1065353216u;
     uint v24 = as_type<uint>(as_type<float>(v18) - as_type<float>(v23));
     uint v25 = as_type<uint>(as_type<float>(v19) - as_type<float>(v23));
-    uint v26 = (uint)(int)as_type<float>(v18);
+    uint v26 = as_type<uint>((int)floor(as_type<float>(v18)));
     uint v27 = 998277249u;
     uint v28 = 255u;
     uint v29 = as_type<uint>(as_type<float>(v23) - as_type<float>(v7));
@@ -66,10 +66,10 @@ kernel void umbra_entry(
     uint v48 = v45 & v47;
     uint v49 = as_type<uint>(max(as_type<float>(v0), as_type<float>(v42)));
     uint v50 = as_type<uint>(min(as_type<float>(v49), as_type<float>(v24)));
-    uint v51 = (uint)(int)as_type<float>(v50);
+    uint v51 = as_type<uint>((int)floor(as_type<float>(v50)));
     uint v52 = as_type<uint>(max(as_type<float>(v0), as_type<float>(v40)));
     uint v53 = as_type<uint>(min(as_type<float>(v52), as_type<float>(v25)));
-    uint v54 = (uint)(int)as_type<float>(v53);
+    uint v54 = as_type<uint>((int)floor(as_type<float>(v53)));
     uint v55 = v54 * v26;
     uint v56 = v51 + v55;
     uint v57 = (uint)((device ushort*)p2)[clamp_ix((int)v56,buf_szs[2],2)];
