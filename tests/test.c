@@ -1929,6 +1929,29 @@ static void test_movi_patterns(void) {
     }
 }
 
+static void test_mixed_ptr(void) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_val ix = umbra_iota(b);
+    umbra_val v32 = umbra_load_i32(b, (umbra_ptr){0}, ix);
+    umbra_val v16 = umbra_widen_u16(b,
+                        umbra_load_i16(b, (umbra_ptr){0}, ix));
+    umbra_val r = umbra_add_i32(b, v32, v16);
+    umbra_store_i32(b, (umbra_ptr){1}, ix, r);
+    backends B = make(b, 0);
+    for (int bi = 0; bi < 3; bi++) {
+        uint32_t src[] = {0x00010002, 0x00030004,
+                          0x00050006};
+        int dst[3] = {0};
+        if (!run(&B, bi, 3, (umbra_buf[]){
+            {src,(long)sizeof src},{dst,3*4},
+        })) { continue; }
+        (dst[0] == (int)(0x00010002 + 0x0002)) here;
+        (dst[1] == (int)(0x00030004 + 0x0001)) here;
+        (dst[2] == (int)(0x00050006 + 0x0004)) here;
+    }
+    cleanup(&B);
+}
+
 static void test_uni_16(void) {
     {
         struct umbra_builder *b = umbra_builder();
@@ -2024,6 +2047,7 @@ int main(void) {
     test_cmp_zero();
     test_fms();
     test_movi_patterns();
+    test_mixed_ptr();
     test_uni_16();
     test_dump();
     return 0;

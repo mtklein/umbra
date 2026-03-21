@@ -158,16 +158,6 @@ void test_rr(Buf *b, int a, int c) {
     emit1(b, 0x85);
     emit1(b, (uint8_t)(0xc0 | ((c&7)<<3) | (a&7)));
 }
-void cmovl_rr(Buf *b, int d, int s) {
-    rex_w(b, d, s);
-    emit1(b, 0x0f); emit1(b, 0x4c);
-    emit1(b, (uint8_t)(0xc0 | ((d&7)<<3) | (s&7)));
-}
-void cmovg_rr(Buf *b, int d, int s) {
-    rex_w(b, d, s);
-    emit1(b, 0x0f); emit1(b, 0x4f);
-    emit1(b, (uint8_t)(0xc0 | ((d&7)<<3) | (s&7)));
-}
 void neg_r(Buf *b, int r) {
     rex_w(b, 0, r);
     emit1(b, 0xf7);
@@ -309,17 +299,6 @@ void broadcast_imm16(Buf *b, int d, uint16_t v) {
     }
 }
 
-void broadcast_half_imm(Buf *b, int d, uint16_t bits) {
-    if (bits == 0) {
-        vpxor(b, 1, d, d, d);
-    } else {
-        emit1(b, 0xb8); emit4(b, (uint32_t)bits);     // MOV eax, bits
-        vex(b, 1, 1, 0, 0, d, 0, RAX, 0x6e);          // VMOVD xmm_d, eax
-        vex_rr(b, 1, 2, 0, 0x13, d, d);                // VCVTPH2PS ymm_d, xmm_d
-        vbroadcastss(b, d, d);                          // VBROADCASTSS ymm_d, xmm_d
-    }
-}
-
 // ---- F32 arithmetic (YMM, L=1) ----
 void vaddps(Buf *b, int d, int v, int s) { vex_rrr(b,0,1,1,0x58,d,v,s); }
 void vsubps(Buf *b, int d, int v, int s) { vex_rrr(b,0,1,1,0x5c,d,v,s); }
@@ -373,20 +352,14 @@ void vpmaxsd(Buf *b, int d, int v, int s)  { vex_rrr(b,1,2,1,0x3d,d,v,s); }
 // ---- I16 arithmetic (XMM, L=0) ----
 void vpaddw(Buf *b, int d, int v, int s)  { vex_rrr(b,1,1,0,0xfd,d,v,s); }
 void vpsubw(Buf *b, int d, int v, int s)  { vex_rrr(b,1,1,0,0xf9,d,v,s); }
-void vpmullw(Buf *b, int d, int v, int s) { vex_rrr(b,1,1,0,0xd5,d,v,s); }
 void vpsllw_i(Buf *b, int d, int s, uint8_t imm) { vex_shift(b,1,1,0,0x71,6,d,s,imm); }
 void vpsrlw_i(Buf *b, int d, int s, uint8_t imm) { vex_shift(b,1,1,0,0x71,2,d,s,imm); }
-void vpsraw_i(Buf *b, int d, int s, uint8_t imm) { vex_shift(b,1,1,0,0x71,4,d,s,imm); }
 
 // ---- I16 compare (XMM) ----
 void vpcmpeqw(Buf *b, int d, int v, int s) { vex_rrr(b,1,1,0,0x75,d,v,s); }
-void vpcmpgtw(Buf *b, int d, int v, int s) { vex_rrr(b,1,1,0,0x65,d,v,s); }
-
 // ---- Widening/narrowing ----
 void vpmovsxwd(Buf *b, int d, int s) { vex_rr(b,1,2,1,0x23,d,s); }
 void vpmovzxwd(Buf *b, int d, int s) { vex_rr(b,1,2,1,0x33,d,s); }
-void vpackuswb(Buf *b, int d, int v, int s) { vex_rrr(b,1,1,0,0x67,d,v,s); }
-void vpunpcklbw(Buf *b, int d, int v, int s) { vex_rrr(b,1,1,0,0x60,d,v,s); }
 
 void vpgatherdd(Buf *b, int dst, int base, int idx, int scale, int mask) {
     vex_mem(b, 1, 2, 0, 1, dst, mask, 0x90, base, idx, scale, 0);
@@ -394,10 +367,6 @@ void vpgatherdd(Buf *b, int dst, int base, int idx, int scale, int mask) {
 void vpextrd(Buf *b, int gpr, int xmm, uint8_t imm) {
     vex(b, 1, 3, 0, 0, xmm, 0, gpr, 0x16); emit1(b, imm);
 }
-void vpinsrw(Buf *b, int d, int v, int gpr, uint8_t imm) {
-    vex(b, 1, 1, 0, 0, d, v, gpr, 0xc4); emit1(b, imm);
-}
-
 void vextracti128(Buf *b, int d, int s, uint8_t imm) {
     vex_rrr(b,1,3,1,0x39,s,0,d); emit1(b, imm);
 }

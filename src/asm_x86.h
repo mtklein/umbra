@@ -28,8 +28,6 @@ void sub_ri(Buf *b, int d, int32_t imm);
 void cmp_rr(Buf *b, int a, int c);
 void cmp_ri(Buf *b, int a, int32_t imm);
 void test_rr(Buf *b, int a, int c);
-void cmovl_rr(Buf *b, int d, int s);
-void cmovg_rr(Buf *b, int d, int s);
 void neg_r(Buf *b, int r);
 void shr_ri(Buf *b, int r, uint8_t imm);
 void mov_ri(Buf *b, int d, int32_t imm);
@@ -54,7 +52,6 @@ void vbroadcastss(Buf *b, int d, int s);
 
 void broadcast_imm32(Buf *b, int d, uint32_t v);
 void broadcast_imm16(Buf *b, int d, uint16_t v);
-void broadcast_half_imm(Buf *b, int d, uint16_t bits);
 
 void vaddps(Buf *b, int d, int v, int s);
 void vsubps(Buf *b, int d, int v, int s);
@@ -98,21 +95,15 @@ void vpmaxsd(Buf *b, int d, int v, int s);
 
 void vpaddw(Buf *b, int d, int v, int s);
 void vpsubw(Buf *b, int d, int v, int s);
-void vpmullw(Buf *b, int d, int v, int s);
 void vpsllw_i(Buf *b, int d, int s, uint8_t imm);
 void vpsrlw_i(Buf *b, int d, int s, uint8_t imm);
-void vpsraw_i(Buf *b, int d, int s, uint8_t imm);
 
 void vpcmpeqw(Buf *b, int d, int v, int s);
-void vpcmpgtw(Buf *b, int d, int v, int s);
 
 void vpmovsxwd(Buf *b, int d, int s);
 void vpmovzxwd(Buf *b, int d, int s);
-void vpackuswb(Buf *b, int d, int v, int s);
-void vpunpcklbw(Buf *b, int d, int v, int s);
 
 void vpgatherdd(Buf *b, int dst, int base, int idx, int scale, int mask);
 void vpextrd(Buf *b, int gpr, int xmm, uint8_t imm);
-void vpinsrw(Buf *b, int d, int v, int gpr, uint8_t imm);
 void vextracti128(Buf *b, int d, int s, uint8_t imm);
 void vinserti128(Buf *b, int d, int v, int s, uint8_t imm);
