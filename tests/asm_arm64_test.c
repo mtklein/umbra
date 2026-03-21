@@ -77,33 +77,14 @@ static void test_neon_bitwise(void) {
     (BIF_16b(3, 4, 5)    == 0x6EE51C83) here;
 }
 
-static void test_neon_i16(void) {
-    (ADD_4h(7, 8, 9)  == 0x0E698507) here;
-    (SUB_4h(0, 1, 2)  == 0x2E628420) here;
-    (MUL_4h(3, 4, 5)  == 0x0E659C83) here;
-    (USHL_4h(6, 7, 8) == 0x2E6844E6) here;
-    (NEG_4h(0, 1)     == 0x2E60B820) here;
-    (CMEQ_4h(2, 3, 4) == 0x2E648C62) here;
-}
-
-static void test_neon_f16(void) {
-    (FADD_4h(0, 1, 2) == 0x0E421420) here;
-    (FSUB_4h(3, 4, 5) == 0x0EC51483) here;
-    (FMUL_4h(6, 7, 8) == 0x2E481CE6) here;
-    (FDIV_4h(0, 1, 2) == 0x2E423C20) here;
-}
-
 static void test_conversions(void) {
     (FCVTN_4h(2, 3) == 0x0E216862) here;
     (FCVTL_4s(4, 5) == 0x0E2178A4) here;
     (XTN_4h(6, 7)   == 0x0E6128E6) here;
     (SXTL_4s(8, 9)  == 0x0F10A528) here;
-    (UXTL_8h(0, 1)  == 0x2F08A420) here;
 }
 
 static void test_W_promotion(void) {
-    (W(FADD_4h(0, 1, 2)) == 0x4E421420) here;  // fadd.8h
-    (W(ADD_4h(7, 8, 9))  == 0x4E698507) here;   // add.8h
     (W(FCVTN_4h(2, 3))   == 0x4E216862) here;   // fcvtn2
     (W(XTN_4h(6, 7))     == 0x4E6128E6) here;   // xtn2
     (W(SXTL_4s(8, 9))    == 0x4F10A528) here;   // sxtl2
@@ -113,10 +94,6 @@ static void test_shift_imm(void) {
     (SHL_4s_imm(2, 3, 4)  == 0x4F245462) here;
     (USHR_4s_imm(2, 3, 4) == 0x6F3C0462) here;
     (SSHR_4s_imm(2, 3, 4) == 0x4F3C0462) here;
-    (SHRN_4h(2, 3, 4)     == 0x0F1C8462) here;
-    (SHL_4h_imm(0, 1, 3)  == 0x0F135420) here;
-    (USHR_4h_imm(0, 1, 3) == 0x2F1D0420) here;
-    (SSHR_4h_imm(0, 1, 3) == 0x0F1D0420) here;
 }
 
 static void test_movi(void) {
@@ -127,7 +104,6 @@ static void test_movi(void) {
 
 static void test_dup_ins(void) {
     (DUP_4s_w(7, 8)  == 0x4E040D07) here;
-    (DUP_4h_w(0, 1)  == 0x0E020C20) here;
     (UMOV_ws(0, 1)    == 0x0E043C20) here;
 }
 
@@ -135,8 +111,6 @@ static void test_compare_zero(void) {
     (CMEQ_4s_z(0, 1)  == 0x4EA09820) here;
     (CMGT_4s_z(2, 3)  == 0x4EA08862) here;
     (FCMEQ_4s_z(4, 5) == 0x4EA0D8A4) here;
-    (CMEQ_4h_z(6, 7)  == 0x0E6098E6) here;
-    (FCMGE_4h_z(0, 1) == 0x2EF8C820) here;
 }
 
 static void test_load_imm_w(void) {
@@ -175,8 +149,6 @@ int main(void) {
     test_neon_f32();
     test_neon_i32();
     test_neon_bitwise();
-    test_neon_i16();
-    test_neon_f16();
     test_conversions();
     test_W_promotion();
     test_shift_imm();

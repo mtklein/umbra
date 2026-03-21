@@ -42,18 +42,9 @@ V3(ADD_4s) V3(SUB_4s) V3(MUL_4s)
 V3(USHL_4s) V3(SSHL_4s) V2(NEG_4s)
 V3(CMEQ_4s) V3(CMGT_4s) V3(CMGE_4s) V3(CMHI_4s) V3(CMHS_4s)
 V3(AND_16b) V3(ORR_16b) V3(EOR_16b) V3(BSL_16b) V3(BIT_16b) V3(BIF_16b)
-V3(FADD_4h)  V3(FSUB_4h)  V3(FMUL_4h) V3(FDIV_4h)  V3(FMLA_4h) V3(FMLS_4h)
-V3(FMINNM_4h) V3(FMAXNM_4h) V2(FSQRT_4h)
-V3(FCMEQ_4h) V3(FCMGT_4h) V3(FCMGE_4h)
-V3(ADD_4h) V3(SUB_4h) V3(MUL_4h)
-V3(USHL_4h) V3(SSHL_4h) V2(NEG_4h)
-V3(CMEQ_4h) V3(CMGT_4h) V3(CMGE_4h) V3(CMHI_4h) V3(CMHS_4h)
 V2(CMEQ_4s_z) V2(CMGT_4s_z) V2(CMGE_4s_z) V2(CMLE_4s_z) V2(CMLT_4s_z)
 V2(FCMEQ_4s_z) V2(FCMGT_4s_z) V2(FCMGE_4s_z) V2(FCMLE_4s_z) V2(FCMLT_4s_z)
-V2(CMEQ_4h_z) V2(CMGT_4h_z) V2(CMGE_4h_z) V2(CMLE_4h_z) V2(CMLT_4h_z)
-V2(FCMEQ_4h_z) V2(FCMGT_4h_z) V2(FCMGE_4h_z) V2(FCMLE_4h_z) V2(FCMLT_4h_z)
-V2(FCVTN_4h) V2(FCVTL_4s)
-V2(SCVTF_4h) V2(FCVTZS_4h) V2(XTN_4h) V2(SXTL_4s) V2(UXTL_8h)
+V2(FCVTN_4h) V2(FCVTL_4s) V2(XTN_4h) V2(SXTL_4s)
 uint32_t SLI_4s_imm(int d, int n, int shift);
 #undef V3
 #undef V2
@@ -61,21 +52,11 @@ uint32_t SLI_4s_imm(int d, int n, int shift);
 uint32_t SHL_4s_imm(int d, int n, int sh);
 uint32_t USHR_4s_imm(int d, int n, int sh);
 uint32_t SSHR_4s_imm(int d, int n, int sh);
-uint32_t SHRN_4h(int d, int n, int sh);
-uint32_t SHL_4h_imm(int d, int n, int sh);
-uint32_t USHR_4h_imm(int d, int n, int sh);
-uint32_t SSHR_4h_imm(int d, int n, int sh);
 uint32_t UMOV_ws(int d, int n);
 uint32_t UMOV_ws_lane(int d, int n, int lane);
-uint32_t LD1_h(int t, int idx, int n);
 uint32_t LD1_s(int t, int idx, int n);
-uint32_t ST1_b(int t, int idx, int n);
-uint32_t XTN_8b(int d, int n);
 uint32_t MOVI_4s(int d, uint8_t imm8, int shift);
 uint32_t MVNI_4s(int d, uint8_t imm8, int shift);
-uint32_t MOVI_8h(int d, uint8_t imm8, int shift);
-uint32_t MVNI_8h(int d, uint8_t imm8, int shift);
 uint32_t DUP_4s_w(int d, int n);
-uint32_t DUP_4h_w(int d, int n);
 uint32_t INS_s(int d, int idx, int n);
 void     load_imm_w(Buf *c, int rd, uint32_t v);

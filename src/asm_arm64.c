@@ -131,35 +131,15 @@ enum {
     AND_16b_=0x4e201c00u, ORR_16b_=0x4ea01c00u, EOR_16b_=0x6e201c00u,
     BSL_16b_=0x6e601c00u, BIT_16b_=0x6ea01c00u, BIF_16b_=0x6ee01c00u,
 
-    // float 4H (FEAT_FP16)
-    FADD_4h_  =0x0e401400u, FSUB_4h_  =0x0ec01400u, FMUL_4h_  =0x2e401c00u,
-    FDIV_4h_  =0x2e403c00u, FMLA_4h_  =0x0e400c00u, FMLS_4h_  =0x0ec00c00u,
-    FMINNM_4h_=0x0ec00400u, FMAXNM_4h_=0x0e400400u,
-    FSQRT_4h_ =0x2ef9f800u,
-    FCMEQ_4h_ =0x0e402400u, FCMGT_4h_ =0x2ec02400u, FCMGE_4h_ =0x2e402400u,
-
-    // int 4H
-    ADD_4h_ =0x0e608400u, SUB_4h_ =0x2e608400u, MUL_4h_ =0x0e609c00u,
-    USHL_4h_=0x2e604400u, SSHL_4h_=0x0e604400u, NEG_4h_ =0x2e60b800u,
-    CMEQ_4h_=0x2e608c00u, CMGT_4h_=0x0e603400u, CMGE_4h_=0x0e603c00u,
-    CMHI_4h_=0x2e603400u, CMHS_4h_=0x2e603c00u,
-
     // compare against zero (2-operand)
     CMEQ_4s_z_=0x4ea09800u, CMGT_4s_z_=0x4ea08800u, CMGE_4s_z_=0x6ea08800u,
     CMLE_4s_z_=0x6ea09800u, CMLT_4s_z_=0x4ea0a800u,
     FCMEQ_4s_z_=0x4ea0d800u, FCMGT_4s_z_=0x4ea0c800u, FCMGE_4s_z_=0x6ea0c800u,
     FCMLE_4s_z_=0x6ea0d800u, FCMLT_4s_z_=0x4ea0e800u,
 
-    CMEQ_4h_z_=0x0e609800u, CMGT_4h_z_=0x0e608800u, CMGE_4h_z_=0x2e608800u,
-    CMLE_4h_z_=0x2e609800u, CMLT_4h_z_=0x0e60a800u,
-    FCMEQ_4h_z_=0x0ef8d800u, FCMGT_4h_z_=0x0ef8c800u, FCMGE_4h_z_=0x2ef8c800u,
-    FCMLE_4h_z_=0x2ef8d800u, FCMLT_4h_z_=0x0ef8e800u,
-
     // conversions
     FCVTN_4h_=0x0e216800u, FCVTL_4s_=0x0e217800u,
-    SCVTF_4h_=0x0e79d800u, FCVTZS_4h_=0x0ef9b800u,
     XTN_4h_  =0x0e612800u, SXTL_4s_  =0x0f10a400u,
-    UXTL_8h_ =0x2f08a400u,
 };
 
 #define V3(enc) uint32_t enc(int d,int n,int m){\
@@ -175,18 +155,9 @@ V3(ADD_4s) V3(SUB_4s) V3(MUL_4s)
 V3(USHL_4s) V3(SSHL_4s) V2(NEG_4s)
 V3(CMEQ_4s) V3(CMGT_4s) V3(CMGE_4s) V3(CMHI_4s) V3(CMHS_4s)
 V3(AND_16b) V3(ORR_16b) V3(EOR_16b) V3(BSL_16b) V3(BIT_16b) V3(BIF_16b)
-V3(FADD_4h)  V3(FSUB_4h)  V3(FMUL_4h) V3(FDIV_4h)  V3(FMLA_4h) V3(FMLS_4h)
-V3(FMINNM_4h) V3(FMAXNM_4h) V2(FSQRT_4h)
-V3(FCMEQ_4h) V3(FCMGT_4h) V3(FCMGE_4h)
-V3(ADD_4h) V3(SUB_4h) V3(MUL_4h)
-V3(USHL_4h) V3(SSHL_4h) V2(NEG_4h)
-V3(CMEQ_4h) V3(CMGT_4h) V3(CMGE_4h) V3(CMHI_4h) V3(CMHS_4h)
 V2(CMEQ_4s_z) V2(CMGT_4s_z) V2(CMGE_4s_z) V2(CMLE_4s_z) V2(CMLT_4s_z)
 V2(FCMEQ_4s_z) V2(FCMGT_4s_z) V2(FCMGE_4s_z) V2(FCMLE_4s_z) V2(FCMLT_4s_z)
-V2(CMEQ_4h_z) V2(CMGT_4h_z) V2(CMGE_4h_z) V2(CMLE_4h_z) V2(CMLT_4h_z)
-V2(FCMEQ_4h_z) V2(FCMGT_4h_z) V2(FCMGE_4h_z) V2(FCMLE_4h_z) V2(FCMLT_4h_z)
-V2(FCVTN_4h) V2(FCVTL_4s)
-V2(SCVTF_4h) V2(FCVTZS_4h) V2(XTN_4h) V2(SXTL_4s) V2(UXTL_8h)
+V2(FCVTN_4h) V2(FCVTL_4s) V2(XTN_4h) V2(SXTL_4s)
 
 #undef V3
 #undef V2
@@ -204,23 +175,6 @@ uint32_t SSHR_4s_imm(int d, int n, int sh) {
     return 0x4f000400u | ((uint32_t)(64-sh)<<16)
          | ((uint32_t)n<<5) | (uint32_t)d;
 }
-uint32_t SHRN_4h    (int d, int n, int sh) {
-    return 0x0f008400u | ((uint32_t)(32-sh)<<16)
-         | ((uint32_t)n<<5) | (uint32_t)d;
-}
-uint32_t SHL_4h_imm (int d, int n, int sh) {
-    return 0x0f005400u | ((uint32_t)(sh+16)<<16)
-         | ((uint32_t)n<<5) | (uint32_t)d;
-}
-uint32_t USHR_4h_imm(int d, int n, int sh) {
-    return 0x2f000400u | ((uint32_t)(32-sh)<<16)
-         | ((uint32_t)n<<5) | (uint32_t)d;
-}
-uint32_t SSHR_4h_imm(int d, int n, int sh) {
-    return 0x0f000400u | ((uint32_t)(32-sh)<<16)
-         | ((uint32_t)n<<5) | (uint32_t)d;
-}
-
 uint32_t UMOV_ws(int d, int n) {
     return 0x0e043c00u | ((uint32_t)n<<5) | (uint32_t)d;
 }
@@ -228,26 +182,11 @@ uint32_t UMOV_ws_lane(int d, int n, int lane) {
     uint32_t imm5 = (uint32_t)((lane << 3) | 4);
     return 0x0e003c00u | (imm5<<16) | ((uint32_t)n<<5) | (uint32_t)d;
 }
-uint32_t LD1_h(int t, int idx, int n) {
-    uint32_t Q  = ((uint32_t)idx >> 2) & 1;
-    uint32_t S  = ((uint32_t)idx >> 1) & 1;
-    uint32_t sz = (uint32_t)idx & 1;
-    return 0x0d404000u | (Q<<30) | (S<<12) | (sz<<11) | ((uint32_t)n<<5) | (uint32_t)t;
-}
 uint32_t LD1_s(int t, int idx, int n) {
     uint32_t Q = ((uint32_t)idx >> 1) & 1;
     uint32_t S = (uint32_t)idx & 1;
     return 0x0d408000u | (Q<<30) | (S<<12) | ((uint32_t)n<<5) | (uint32_t)t;
 }
-
-uint32_t ST1_b(int t, int idx, int n) {
-    uint32_t Q = ((uint32_t)idx >> 3) & 1;
-    uint32_t S = ((uint32_t)idx >> 2) & 1;
-    uint32_t sz = (uint32_t)idx & 3;
-    return 0x0d000000u | (Q<<30) | (S<<12) | (sz<<10) | ((uint32_t)n<<5) | (uint32_t)t;
-}
-
-uint32_t XTN_8b(int d, int n) { return 0x0e212800u | ((uint32_t)n<<5) | (uint32_t)d; }
 
 uint32_t MOVI_4s(int d, uint8_t imm8, int shift) {
     int cmode = (shift/8) * 2;
@@ -257,16 +196,7 @@ uint32_t MOVI_4s(int d, uint8_t imm8, int shift) {
 uint32_t MVNI_4s(int d, uint8_t imm8, int shift) {
     return MOVI_4s(d, imm8, shift) | (1u<<29);
 }
-uint32_t MOVI_8h(int d, uint8_t imm8, int shift) {
-    int cmode = 8 + (shift/8) * 2;
-    uint32_t abc = (imm8 >> 5) & 7, defgh = imm8 & 0x1f;
-    return 0x4f000400u | (abc<<16) | ((uint32_t)cmode<<12) | (defgh<<5) | (uint32_t)d;
-}
-uint32_t MVNI_8h(int d, uint8_t imm8, int shift) {
-    return MOVI_8h(d, imm8, shift) | (1u<<29);
-}
 uint32_t DUP_4s_w(int d, int n) { return 0x4e040c00u|((uint32_t)n<<5)|(uint32_t)d; }
-uint32_t DUP_4h_w(int d, int n) { return 0x0e020c00u|((uint32_t)n<<5)|(uint32_t)d; }
 
 uint32_t INS_s(int d, int idx, int n) {
     uint32_t imm5 = (uint32_t)(idx<<3)|4;
