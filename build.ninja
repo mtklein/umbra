@@ -26,6 +26,17 @@ rule link
 rule run
     command = $exec ./$in $args > $out
 
+llvm = /opt/homebrew/opt/llvm/bin
+
+rule profmerge
+    command = $llvm/llvm-profdata merge -sparse $dir/*.profraw -o $out
+
+rule cov_report
+    command = $llvm/llvm-cov report --show-branch-summary --instr-profile=$in $objects src/ include/ > $out
+
+rule cov_show
+    command = rm -rf $dir && $llvm/llvm-cov show --show-branches=count --instr-profile=$in $objects --format=html --output-dir=$dir src/ include/ && echo "Coverage report: file://$$(pwd)/$dir/index.html" > $out
+
 subninja build/host.ninja
 subninja build/lto.ninja
 subninja build/xsan.ninja
