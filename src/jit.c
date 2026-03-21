@@ -11,12 +11,6 @@ void umbra_jit_run (struct umbra_jit *j, int n, umbra_buf buf[]) {
     (void)j; (void)n; (void)buf;
 }
 void umbra_jit_free(struct umbra_jit *j) { (void)j; }
-void umbra_dump_jit(
-    struct umbra_jit const *j, FILE *f
-) { (void)j; (void)f; }
-void umbra_dump_jit_bin(
-    struct umbra_jit const *j, FILE *f
-) { (void)j; (void)f; }
 void umbra_dump_jit_mca(
     struct umbra_jit const *j, FILE *f
 ) { (void)j; (void)f; }
@@ -135,32 +129,6 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
                           int z, int imm,
                           int scratch) {
     switch (op) {
-    case op_imm_32: {
-        uint32_t v=(uint32_t)imm;
-        if (v == 0) {
-            put(c, MOVI_4s(d, 0, 0));
-        } else if (v == (v & 0x000000ffu)) {
-            put(c, MOVI_4s(d, (uint8_t)v, 0));
-        } else if (v == (v & 0x0000ff00u)) {
-            put(c, MOVI_4s(d, (uint8_t)(v>>8), 8));
-        } else if (v == (v & 0x00ff0000u)) {
-            put(c, MOVI_4s(d,(uint8_t)(v>>16),16));
-        } else if (v == (v & 0xff000000u)) {
-            put(c, MOVI_4s(d,(uint8_t)(v>>24),24));
-        } else if ((~v) == ((~v) & 0x000000ffu)) {
-            put(c, MVNI_4s(d, (uint8_t)~v, 0));
-        } else if ((~v) == ((~v) & 0x0000ff00u)) {
-            put(c, MVNI_4s(d,(uint8_t)(~v>>8), 8));
-        } else if ((~v) == ((~v) & 0x00ff0000u)) {
-            put(c, MVNI_4s(d,(uint8_t)(~v>>16),16));
-        } else if ((~v) == ((~v) & 0xff000000u)) {
-            put(c, MVNI_4s(d,(uint8_t)(~v>>24),24));
-        } else {
-            load_imm_w(c,XT,v);
-            put(c, DUP_4s_w(d,XT));
-        }
-    } return 1;
-
     case op_add_f32: put(c, FADD_4s(d,x,y)); return 1;
     case op_sub_f32: put(c, FSUB_4s(d,x,y)); return 1;
     case op_mul_f32: put(c, FMUL_4s(d,x,y)); return 1;
@@ -253,6 +221,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
         }
         return 1;
 
+    case op_imm_32:
     case op_and_imm:
     case op_add_f32_imm: case op_sub_f32_imm:
     case op_mul_f32_imm: case op_div_f32_imm:
@@ -264,19 +233,16 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
     case op_le_f32_imm:
     case op_eq_i32_imm: case op_lt_s32_imm:
     case op_le_s32_imm:
-    case op_iota:
-    case op_deref_ptr:
-    case op_uni_32:   case op_load_32:
-    case op_gather_32: case op_store_32:
+    case op_iota:       case op_deref_ptr:
+    case op_uni_32:     case op_load_32:
+    case op_gather_32:  case op_store_32:
     case op_scatter_32:
-    case op_uni_16:   case op_load_16:
-    case op_gather_16: case op_store_16:
+    case op_uni_16:     case op_load_16:
+    case op_gather_16:  case op_store_16:
     case op_scatter_16:
-    case op_widen_f16:
-    case op_narrow_f32:
-    case op_widen_s16: case op_widen_u16:
-    case op_narrow_16:
-        return 0;
+    case op_widen_f16:  case op_narrow_f32:
+    case op_widen_s16:  case op_widen_u16:
+    case op_narrow_16:  return 0;
     }
 }
 
@@ -992,68 +958,6 @@ void umbra_jit_free(struct umbra_jit *j) {
     if (!j) { return; }
     munmap(j->code, j->code_size);
     free(j);
-}
-
-void umbra_dump_jit(struct umbra_jit const *j, FILE *f) {
-    if (!j) { return; }
-    size_t code_bytes = j->code_size;
-    uint32_t const *words = (uint32_t const *)j->code;
-    size_t nwords = code_bytes / 4;
-
-    char tmp[] = "/tmp/umbra_jit_XXXXXX.s";
-    int fd = mkstemps(tmp, 2);
-    if (fd >= 0) {
-        FILE *fp = fdopen(fd, "w");
-        if (fp) {
-            for (size_t i = 0; i < nwords; i++) {
-                fprintf(fp, ".inst 0x%08x\n", words[i]);
-            }
-            fclose(fp);
-
-            char opath[sizeof tmp + 2];
-            snprintf(opath, sizeof opath, "%.*s.o", (int)(sizeof tmp - 3), tmp);
-
-            char cmd[1024];
-            snprintf(cmd, sizeof cmd,
-                     "as -o %s %s 2>/dev/null && "
-                     "/opt/homebrew/opt/llvm/bin/"
-                     "llvm-objdump -d"
-                     " --no-show-raw-insn"
-                     " --no-leading-addr"
-                     " %s 2>/dev/null",
-                     opath, tmp, opath);
-            FILE *p = popen(cmd, "r");
-            if (p) {
-                char line[256];
-                _Bool ok = 0;
-                while (fgets(line, (int)sizeof line, p)) {
-                    if (!ok && __builtin_strstr(
-                            line, "file format")) {
-                        ok = 1; continue;
-                    }
-                    fputs(line, f);
-                }
-                int rc = pclose(p);
-                remove(tmp);
-                remove(opath);
-                if (ok && rc == 0) { return; }
-            }
-            remove(tmp);
-            remove(opath);
-        } else {
-            close(fd);
-            remove(tmp);
-        }
-    }
-
-    for (size_t i = 0; i < nwords; i++) {
-        fprintf(f, "  %04zx: %08x\n", i * 4, words[i]);
-    }
-}
-
-void umbra_dump_jit_bin(struct umbra_jit const *j, FILE *f) {
-    if (!j) { return; }
-    fwrite(j->code, 1, j->code_size, f);
 }
 
 void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
@@ -2168,37 +2072,6 @@ static _Bool x86_disasm(uint8_t const *code, size_t n,
         if (f) { fputs(line, f); }
     }
     return pclose(p) == 0 && ok;
-}
-
-void umbra_dump_jit(struct umbra_jit const *j, FILE *f) {
-    if (!j) { return; }
-    uint8_t const *code = (uint8_t const *)j->code;
-    size_t n = j->code_len;
-
-    char spath[] = "/tmp/umbra_jit_XXXXXX.s";
-    int fd = mkstemps(spath, 2);
-    if (fd < 0) { goto fallback; }
-    close(fd);
-
-    char opath[sizeof spath + 2];
-    snprintf(opath, sizeof opath, "%.*s.o", (int)(sizeof spath - 3), spath);
-
-    if (x86_disasm(code, n, spath, opath, f)) {
-        remove(spath); remove(opath);
-        return;
-    }
-    remove(spath); remove(opath);
-
-fallback:
-    for (size_t i = 0; i < n; i++) {
-        fprintf(f, "%02x ", code[i]);
-        if ((i & 15) == 15 || i == n-1) { fputc('\n', f); }
-    }
-}
-
-void umbra_dump_jit_bin(struct umbra_jit const *j, FILE *f) {
-    if (!j) { return; }
-    fwrite(j->code, 1, j->code_len, f);
 }
 
 void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {

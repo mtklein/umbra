@@ -26,10 +26,6 @@ void   umbra_metal_flush      (void*);
 void   umbra_metal_free       (struct umbra_metal*);
 
 #include <stdio.h>
-void umbra_dump_jit    (struct umbra_jit const*,
-                        FILE*);
-void umbra_dump_jit_bin(struct umbra_jit const*,
-                        FILE*);
 void umbra_dump_jit_mca(struct umbra_jit const*,
                         FILE*);
 void umbra_dump_metal  (struct umbra_metal const*,
