@@ -389,9 +389,13 @@ val umbra_sqrt_f32(builder *b, val x) {
 val umbra_abs_f32(builder *b, val x) {
     return math(b, op_abs_f32, .x=x.id);
 }
-val umbra_neg_f32(builder *b, val x) {
-    return math(b, op_neg_f32, .x=x.id);
-}
+val umbra_neg_f32  (builder *b, val x) { return math(b, op_neg_f32,   .x=x.id); }
+val umbra_round_f32(builder *b, val x) { return math(b, op_round_f32, .x=x.id); }
+val umbra_floor_f32(builder *b, val x) { return math(b, op_floor_f32, .x=x.id); }
+val umbra_ceil_f32 (builder *b, val x) { return math(b, op_ceil_f32,  .x=x.id); }
+val umbra_round_i32(builder *b, val x) { return math(b, op_round_i32, .x=x.id); }
+val umbra_floor_i32(builder *b, val x) { return math(b, op_floor_i32, .x=x.id); }
+val umbra_ceil_i32 (builder *b, val x) { return math(b, op_ceil_i32,  .x=x.id); }
 val umbra_sign_f32(builder *b, val x) {
     val z = umbra_imm_f32(b, 0.0f);
     return umbra_or_i32(b,
@@ -1014,8 +1018,11 @@ static void dump_insts(struct bb_inst const *inst,
                 break;
 
             case op_sqrt_f32:
-            case op_abs_f32:
-            case op_neg_f32:
+            case op_abs_f32:   case op_neg_f32:
+            case op_round_f32: case op_floor_f32:
+            case op_ceil_f32:
+            case op_round_i32: case op_floor_i32:
+            case op_ceil_i32:
             case op_f32_from_i32:
             case op_i32_from_f32:
             case op_widen_s16:

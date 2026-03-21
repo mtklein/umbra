@@ -761,6 +761,53 @@ static void test_abs_sign_f32(void) {
   }
 }
 
+static void test_round_floor_ceil(void) {
+    float src[] = {1.3f, 1.5f, -1.5f, -2.7f};
+
+    #define RFC(op, e0, e1, e2, e3, as_int) do {     \
+        struct umbra_builder *b_ = umbra_builder();   \
+        umbra_val ix_ = umbra_iota(b_);               \
+        umbra_val x_ = umbra_load_i32(b_,             \
+                           (umbra_ptr){0}, ix_);      \
+        umbra_val r_ = op(b_, x_);                    \
+        umbra_store_i32(b_, (umbra_ptr){1}, ix_, r_); \
+        backends B_ = make(b_, 0);                    \
+        for (int bi_ = 0; bi_ < 3; bi_++) {           \
+            float s_[4];                              \
+            __builtin_memcpy(s_, src, 16);            \
+            int d_[4] = {0};                          \
+            if (!run(&B_, bi_, 4, (umbra_buf[]){      \
+                {s_,16},{d_,16},                      \
+            })) { continue; }                         \
+            if (as_int) {                             \
+                (d_[0]==(int)(e0)) here;              \
+                (d_[1]==(int)(e1)) here;              \
+                (d_[2]==(int)(e2)) here;              \
+                (d_[3]==(int)(e3)) here;              \
+            } else {                                  \
+                float g0,g1,g2,g3;                    \
+                __builtin_memcpy(&g0, d_+0, 4);      \
+                __builtin_memcpy(&g1, d_+1, 4);      \
+                __builtin_memcpy(&g2, d_+2, 4);      \
+                __builtin_memcpy(&g3, d_+3, 4);      \
+                equiv(g0,(float)(e0)) here;           \
+                equiv(g1,(float)(e1)) here;           \
+                equiv(g2,(float)(e2)) here;           \
+                equiv(g3,(float)(e3)) here;           \
+            }                                         \
+        }                                             \
+        cleanup(&B_);                                 \
+    } while(0)
+
+    RFC(umbra_round_f32, 1, 2,-2,-3, 0);
+    RFC(umbra_floor_f32, 1, 1,-2,-3, 0);
+    RFC(umbra_ceil_f32,  2, 2,-1,-2, 0);
+    RFC(umbra_round_i32, 1, 2,-2,-3, 1);
+    RFC(umbra_floor_i32, 1, 1,-2,-3, 1);
+    RFC(umbra_ceil_i32,  2, 2,-1,-2, 1);
+    #undef RFC
+}
+
 static void test_large_n(void) {
   for (int opt = 0; opt < 2; opt++) {
     backends B; BINOP_F32(umbra_add_f32, B, opt);
@@ -2046,6 +2093,7 @@ int main(void) {
     test_fma_f32();
     test_min_max_sqrt_f32();
     test_abs_sign_f32();
+    test_round_floor_ceil();
     test_large_n();
     test_convert();
     test_dedup();

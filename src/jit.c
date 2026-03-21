@@ -136,8 +136,14 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
     case op_min_f32: put(c, FMINNM_4s(d,x,y)); return 1;
     case op_max_f32: put(c, FMAXNM_4s(d,x,y)); return 1;
     case op_sqrt_f32: put(c, FSQRT_4s(d,x)); return 1;
-    case op_abs_f32:  put(c, FABS_4s(d,x));  return 1;
-    case op_neg_f32:  put(c, FNEG_4s(d,x));  return 1;
+    case op_abs_f32:    put(c, FABS_4s(d,x));    return 1;
+    case op_neg_f32:    put(c, FNEG_4s(d,x));    return 1;
+    case op_round_f32:  put(c, FRINTN_4s(d,x));  return 1;
+    case op_floor_f32:  put(c, FRINTM_4s(d,x));  return 1;
+    case op_ceil_f32:   put(c, FRINTP_4s(d,x));  return 1;
+    case op_round_i32:  put(c, FCVTNS_4s(d,x));  return 1;
+    case op_floor_i32:  put(c, FCVTMS_4s(d,x));  return 1;
+    case op_ceil_i32:   put(c, FCVTPS_4s(d,x));  return 1;
     case op_fma_f32:
         if (d==z) {
             put(c, FMLA_4s(d,x,y));
@@ -835,7 +841,11 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 case op_mul_f32: case op_div_f32:
                 case op_min_f32: case op_max_f32:
                 case op_sqrt_f32:
-                case op_abs_f32: case op_neg_f32:
+                case op_abs_f32:   case op_neg_f32:
+                case op_round_f32: case op_floor_f32:
+                case op_ceil_f32:
+                case op_round_i32: case op_floor_i32:
+                case op_ceil_i32:
                 case op_fma_f32: case op_fms_f32:
                 case op_add_i32: case op_sub_i32:
                 case op_mul_i32:
@@ -888,7 +898,11 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_mul_f32: case op_div_f32:
         case op_min_f32: case op_max_f32:
         case op_sqrt_f32:
-        case op_abs_f32: case op_neg_f32:
+        case op_abs_f32:   case op_neg_f32:
+        case op_round_f32: case op_floor_f32:
+        case op_ceil_f32:
+        case op_round_i32: case op_floor_i32:
+        case op_ceil_i32:
         case op_fma_f32: case op_fms_f32:
         case op_add_i32: case op_sub_i32:
         case op_mul_i32:
@@ -1219,7 +1233,19 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
     case op_div_f32:  vdivps(c,d,x,y); return 1;
     case op_min_f32:  vminps(c,d,x,y); return 1;
     case op_max_f32:  vmaxps(c,d,x,y); return 1;
-    case op_sqrt_f32: vsqrtps(c,d,x);  return 1;
+    case op_sqrt_f32:  vsqrtps(c,d,x);      return 1;
+    case op_round_f32: vroundps(c,d,x, 0); return 1;
+    case op_floor_f32: vroundps(c,d,x, 1); return 1;
+    case op_ceil_f32:  vroundps(c,d,x, 2); return 1;
+    case op_round_i32: vcvtps2dq(c,d,x);   return 1;
+    case op_floor_i32:
+        vroundps(c,d,x, 1);
+        vcvttps2dq(c,d,d);
+        return 1;
+    case op_ceil_i32:
+        vroundps(c,d,x, 2);
+        vcvttps2dq(c,d,d);
+        return 1;
     case op_fma_f32:
         if      (d == x) { vfmadd132ps(c,d,z,y); }
         else if (d == y) { vfmadd213ps(c,d,x,z); }
@@ -2022,6 +2048,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_mul_f32: case op_div_f32:
         case op_min_f32: case op_max_f32:
         case op_sqrt_f32:
+        case op_round_f32: case op_floor_f32:
+        case op_ceil_f32:
+        case op_round_i32: case op_floor_i32:
+        case op_ceil_i32:
         case op_fma_f32: case op_fms_f32:
         case op_add_i32: case op_sub_i32:
         case op_mul_i32:

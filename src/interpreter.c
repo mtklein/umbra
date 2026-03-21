@@ -338,6 +338,24 @@ op(sqrt_f32) {
 }
 op(abs_f32) { v->f32 = __builtin_elementwise_abs(v[ip->x].f32); next; }
 op(neg_f32) { v->f32 = -v[ip->x].f32; next; }
+op(round_f32) { v->f32 = __builtin_elementwise_roundeven(v[ip->x].f32); next; }
+op(floor_f32) { v->f32 = __builtin_elementwise_floor(v[ip->x].f32); next; }
+op(ceil_f32)  { v->f32 = __builtin_elementwise_ceil(v[ip->x].f32); next; }
+op(round_i32) {
+    v->i32 = __builtin_convertvector(
+        __builtin_elementwise_roundeven(v[ip->x].f32), I32);
+    next;
+}
+op(floor_i32) {
+    v->i32 = __builtin_convertvector(
+        __builtin_elementwise_floor(v[ip->x].f32), I32);
+    next;
+}
+op(ceil_i32) {
+    v->i32 = __builtin_convertvector(
+        __builtin_elementwise_ceil(v[ip->x].f32), I32);
+    next;
+}
 op( min_f32) {
     v->f32 = __builtin_elementwise_min(
         v[ip->x].f32, v[ip->y].f32);
@@ -578,9 +596,15 @@ static Fn const fn[] = {
     [op_min_f32]  = min_f32,
     [op_max_f32]  = max_f32,
     [op_sqrt_f32] = sqrt_f32,
-    [op_abs_f32]  = abs_f32,
-    [op_neg_f32]  = neg_f32,
-    [op_fma_f32]  = fma_f32,
+    [op_abs_f32]    = abs_f32,
+    [op_neg_f32]    = neg_f32,
+    [op_round_f32]  = round_f32,
+    [op_floor_f32]  = floor_f32,
+    [op_ceil_f32]   = ceil_f32,
+    [op_round_i32]  = round_i32,
+    [op_floor_i32]  = floor_i32,
+    [op_ceil_i32]   = ceil_i32,
+    [op_fma_f32]    = fma_f32,
     [op_fms_f32]  = fms_f32,
 
     [op_add_i32] = add_i32,
@@ -829,8 +853,11 @@ struct umbra_interpreter* umbra_interpreter(
                     case op_min_f32:
                     case op_max_f32:
                     case op_sqrt_f32:
-                    case op_abs_f32:
-                    case op_neg_f32:
+                    case op_abs_f32:   case op_neg_f32:
+                    case op_round_f32: case op_floor_f32:
+                    case op_ceil_f32:
+                    case op_round_i32: case op_floor_i32:
+                    case op_ceil_i32:
                     case op_fma_f32:
                     case op_fms_f32:
 

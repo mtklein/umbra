@@ -452,6 +452,42 @@ static void emit_ops(Buf *b, BB const *bb,
                         "(-as_type<float>(v%d));\n",
                      pad, i, inst->x);
                 break;
+            case op_round_f32:
+                emit(b, "%suint v%d = as_type<uint>"
+                        "(rint("
+                        "as_type<float>(v%d)));\n",
+                     pad, i, inst->x);
+                break;
+            case op_floor_f32:
+                emit(b, "%suint v%d = as_type<uint>"
+                        "(floor("
+                        "as_type<float>(v%d)));\n",
+                     pad, i, inst->x);
+                break;
+            case op_ceil_f32:
+                emit(b, "%suint v%d = as_type<uint>"
+                        "(ceil("
+                        "as_type<float>(v%d)));\n",
+                     pad, i, inst->x);
+                break;
+            case op_round_i32:
+                emit(b, "%suint v%d = as_type<uint>"
+                        "((int)rint("
+                        "as_type<float>(v%d)));\n",
+                     pad, i, inst->x);
+                break;
+            case op_floor_i32:
+                emit(b, "%suint v%d = as_type<uint>"
+                        "((int)floor("
+                        "as_type<float>(v%d)));\n",
+                     pad, i, inst->x);
+                break;
+            case op_ceil_i32:
+                emit(b, "%suint v%d = as_type<uint>"
+                        "((int)ceil("
+                        "as_type<float>(v%d)));\n",
+                     pad, i, inst->x);
+                break;
             case op_fma_f32:
                 emit(b, "%suint v%d = as_type<uint>"
                         "(fma(as_type<float>(v%d),"

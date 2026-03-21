@@ -293,8 +293,12 @@ void vfmadd231ps(Buf *b, int d, int v, int s) { vex(b,1,2,0,1,d,v,s,0xb8); }
 void vfnmadd132ps(Buf *b, int d, int v, int s) { vex(b,1,2,0,1,d,v,s,0x9c); }
 void vfnmadd213ps(Buf *b, int d, int v, int s) { vex(b,1,2,0,1,d,v,s,0xac); }
 void vfnmadd231ps(Buf *b, int d, int v, int s) { vex(b,1,2,0,1,d,v,s,0xbc); }
-void vcvtdq2ps(Buf *b, int d, int s) { vex_rr(b,0,1,1,0x5b,d,s); }
+void vcvtdq2ps (Buf *b, int d, int s) { vex_rr(b,0,1,1,0x5b,d,s); }
 void vcvttps2dq(Buf *b, int d, int s) { vex_rr(b,2,1,1,0x5b,d,s); }
+void vcvtps2dq (Buf *b, int d, int s) { vex_rr(b,1,1,1,0x5b,d,s); }
+void vroundps(Buf *b, int d, int s, uint8_t imm) {
+    vex_rrr(b,1,3,1,0x08,d,0,s); emit1(b, imm);
+}
 void vcmpps(Buf *b, int d, int v, int s, uint8_t pred) {
     vex_rrr(b,0,1,1,0xc2,d,v,s); emit1(b, pred);
 }
