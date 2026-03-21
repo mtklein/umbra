@@ -231,6 +231,21 @@ static void test_broadcast_imm32(void) {
     // All ones => vpcmpeqd ymm4,ymm4,ymm4 => c5 dd 76 e4
     broadcast_imm32(&b, 4, 0xFFFFFFFF);
     (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xDD, 0x76, 0xE4})) here;
+    reset(&b);
+
+    // Shift-right pattern: 0x7FFFFFFF => vpcmpeqd + vpsrld $1
+    broadcast_imm32(&b, 5, 0x7FFFFFFF);
+    (b.len == 9) here;
+    reset(&b);
+
+    // Shift-left pattern: 0xFFFF0000 => vpcmpeqd + vpslld $16
+    broadcast_imm32(&b, 6, 0xFFFF0000);
+    (b.len == 9) here;
+    reset(&b);
+
+    // General fallback: 0xDEADBEEF => mov eax + vmovd + vbroadcastss
+    broadcast_imm32(&b, 7, 0xDEADBEEF);
+    (b.buf[0] == 0xB8) here;
     free(b.buf);
 }
 

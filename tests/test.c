@@ -1180,6 +1180,27 @@ static void test_hash_quality(void) {
     umbra_builder_free(builder);
 }
 
+static void test_narrow_16(void) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_val ix = umbra_iota(b);
+    umbra_val v = umbra_load_i32(b, (umbra_ptr){0}, ix);
+    umbra_store_i16(b, (umbra_ptr){1}, ix,
+                    umbra_narrow_i16(b, v));
+    backends B = make(b, 0);
+    for (int bi = 0; bi < 3; bi++) {
+        int src[] = {0x00010002, 0x00030004,
+                     0x00050006};
+        uint16_t dst[3] = {0};
+        if (!run(&B, bi, 3, (umbra_buf[]){
+            {src,3*4},{dst,3*2},
+        })) { continue; }
+        (dst[0] == 0x0002) here;
+        (dst[1] == 0x0004) here;
+        (dst[2] == 0x0006) here;
+    }
+    cleanup(&B);
+}
+
 static void test_mixed_ptr_sizes(void) {
   for (int opt = 0; opt < 2; opt++) {
     {
@@ -2104,6 +2125,7 @@ int main(void) {
     test_store_8x4();
     test_srcover();
     test_hash_quality();
+    test_narrow_16();
     test_mixed_ptr_sizes();
     test_n9();
     test_preamble_pair_alias();
