@@ -438,7 +438,6 @@ op(le_u32) {
     next;
 }
 
-op(join_fn) { v->i32 = v[ip->x].i32; next; }
 op(shl_imm_fn) {
     I32 sh = (I32){0} + ip->y;
     v->i32 = v[ip->x].i32 << sh;
@@ -639,7 +638,6 @@ static Fn const fn[] = {
     [op_le_u32] = le_u32,
 
     [op_deref_ptr]  = deref_ptr_handler,
-    [op_join]       = join_fn,
 
     [op_shl_imm]     = shl_imm_fn,
     [op_shr_u32_imm] = shr_u32_imm_fn,
