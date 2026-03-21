@@ -29,7 +29,7 @@ rule run
 llvm = /opt/homebrew/opt/llvm/bin
 
 rule profmerge
-    command = $llvm/llvm-profdata merge -sparse $dir/*.profraw -o $out
+    command = $llvm/llvm-profdata merge -sparse $$(for d in $dir; do echo $$d/*.profraw; done) -o $out
 
 rule cov_report
     command = $llvm/llvm-cov report --show-branch-summary --instr-profile=$in $objects src/ include/ > $out
@@ -43,3 +43,4 @@ subninja build/xsan.ninja
 subninja build/wasm.ninja
 subninja build/x86_64.ninja
 subninja build/x86_64h.ninja
+subninja build/x86_64h_xsan.ninja

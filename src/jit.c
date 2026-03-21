@@ -1262,7 +1262,7 @@ static void pool_broadcast(Buf *c, struct pool *p,
         vpcmpeqd(c,d,d,d);
         vpsrld_i(c,d,d,(uint8_t)shr);
     }
-    else if (v == 0xffffffffu << shl) {
+    else if (v == (uint32_t)(UINT64_C(0xffffffff) << shl)) {
         vpcmpeqd(c,d,d,d);
         vpslld_i(c,d,d,(uint8_t)shl);
     }
@@ -1775,7 +1775,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     emit1(c, rex);
                     emit1(c, 0x0f); emit1(c, 0xb7);
                     emit1(c, (uint8_t)(
-                        ((RAX & 7) << 3) | 4));
+                        0x40 | ((RAX & 7) << 3) | 4));
                     emit1(c, (uint8_t)(
                         0x40
                         | ((RAX & 7) << 3)

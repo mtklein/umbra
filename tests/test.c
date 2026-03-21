@@ -1813,6 +1813,50 @@ static void test_imm_fused(void) {
     }
 }
 
+static void test_uni_16(void) {
+    {
+        struct umbra_builder *b = umbra_builder();
+        umbra_val ix = umbra_iota(b);
+        umbra_val v = umbra_load_i16(b, (umbra_ptr){0},
+                         umbra_imm_i32(b, 2));
+        umbra_store_i32(b, (umbra_ptr){1}, ix, v);
+        backends B = make(b, 0);
+        for (int bi = 0; bi < 3; bi++) {
+            uint16_t src[] = {100,200,300,400};
+            int dst[3] = {0};
+            if (!run(&B, bi, 3, (umbra_buf[]){
+                {src,8},{dst,3*4},
+            })) { continue; }
+            (dst[0] == 300) here;
+            (dst[1] == 300) here;
+            (dst[2] == 300) here;
+        }
+        cleanup(&B);
+    }
+    {
+        struct umbra_builder *b = umbra_builder();
+        umbra_val ix = umbra_iota(b);
+        umbra_val idx = umbra_load_i32(b, (umbra_ptr){0},
+                            umbra_imm_i32(b, 0));
+        umbra_val v = umbra_load_i16(b, (umbra_ptr){1},
+                         idx);
+        umbra_store_i32(b, (umbra_ptr){2}, ix, v);
+        backends B = make(b, 0);
+        for (int bi = 0; bi < 3; bi++) {
+            int idx_val[] = {1};
+            uint16_t src[] = {100,200,300,400};
+            int dst[3] = {0};
+            if (!run(&B, bi, 3, (umbra_buf[]){
+                {idx_val,4},{src,8},{dst,3*4},
+            })) { continue; }
+            (dst[0] == 200) here;
+            (dst[1] == 200) here;
+            (dst[2] == 200) here;
+        }
+        cleanup(&B);
+    }
+}
+
 static void test_dump(void) {
     FILE *f = fopen("/dev/null", "w");
     if (!f) { return; }
@@ -1861,6 +1905,7 @@ int main(void) {
     test_pack_channels();
     test_gather_deref_large();
     test_imm_fused();
+    test_uni_16();
     test_dump();
     return 0;
 }
