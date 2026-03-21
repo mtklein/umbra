@@ -18,6 +18,8 @@ build $out/tools/demo.o: compile tools/demo.c
 build $out/demo:   link $out/tools/demo.o $out/src/bb.o $out/src/ra.o $out/src/program.o $out/src/interpreter.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/umbra_draw.o $out/stb_truetype.o $out/stb_image_write.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/overview.o
     ldflags = -framework Metal -framework Foundation -L/opt/homebrew/lib -lSDL3
 
+build $out/dump.log: run $out/dump
+
 x86 = $builddir/x86_64h_xsan
 
 build $out/coverage.profdata: profmerge | $
@@ -27,6 +29,7 @@ build $out/coverage.profdata: profmerge | $
       $out/asm_arm64_test.log $
       $out/asm_x86_test.log $
       $out/golden_test.log $
+      $out/dump.log $
       $x86/test.log $
       $x86/ra_test.log $
       $x86/draw_test.log $
@@ -41,6 +44,7 @@ build $out/coverage.txt: cov_report $out/coverage.profdata | $
       $out/asm_arm64_test $
       $out/asm_x86_test $
       $out/golden_test $
+      $out/dump $
       $x86/test $
       $x86/ra_test $
       $x86/draw_test $
@@ -52,6 +56,7 @@ build $out/coverage.txt: cov_report $out/coverage.profdata | $
               -object=$out/asm_arm64_test $
               -object=$out/asm_x86_test $
               -object=$out/golden_test $
+              -object=$out/dump $
               -object=$x86/test $
               -object=$x86/ra_test $
               -object=$x86/draw_test $
@@ -65,6 +70,7 @@ build $out/report.txt: cov_show $out/coverage.profdata | $
       $out/asm_arm64_test $
       $out/asm_x86_test $
       $out/golden_test $
+      $out/dump $
       $x86/test $
       $x86/ra_test $
       $x86/draw_test $
@@ -76,6 +82,7 @@ build $out/report.txt: cov_show $out/coverage.profdata | $
               -object=$out/asm_arm64_test $
               -object=$out/asm_x86_test $
               -object=$out/golden_test $
+              -object=$out/dump $
               -object=$x86/test $
               -object=$x86/ra_test $
               -object=$x86/draw_test $
