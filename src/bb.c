@@ -329,6 +329,7 @@ val umbra_add_f32(builder *b, val x, val y) {
 
 val umbra_sub_f32(builder *b, val x, val y) {
     if (is_imm32(b, y.id, 0)) { return x; }
+    if (is_imm32(b, x.id, 0)) { return umbra_neg_f32(b, y); }
     if (b->inst[y.id].op == op_mul_f32) {
         return math(b, op_fms_f32,
             .x=b->inst[y.id].x,
@@ -377,6 +378,14 @@ val umbra_min_f32(builder *b, val x, val y) {
 }
 
 val umbra_max_f32(builder *b, val x, val y) {
+    if (b->inst[x.id].op == op_neg_f32
+     && b->inst[x.id].x == y.id) {
+        return umbra_abs_f32(b, y);
+    }
+    if (b->inst[y.id].op == op_neg_f32
+     && b->inst[y.id].x == x.id) {
+        return umbra_abs_f32(b, x);
+    }
     sort(&x.id, &y.id);
     return try_imm(b,
         math(b, op_max_f32, .x=x.id, .y=y.id),

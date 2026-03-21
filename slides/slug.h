@@ -245,8 +245,7 @@ static inline struct umbra_builder *slug_build_acc(
     umbra_val sd = umbra_sqrt_f32(b,
         umbra_max_f32(b, disc, z));
 
-    umbra_val abs_a = umbra_max_f32(b, a,
-        umbra_sub_f32(b, z, a));
+    umbra_val abs_a = umbra_abs_f32(b, a);
     umbra_val is_quad = umbra_gt_f32(b, abs_a, ep);
 
     umbra_val ia = umbra_div_f32(b, o,
@@ -257,8 +256,7 @@ static inline struct umbra_builder *slug_build_acc(
     umbra_val qt2 = umbra_mul_f32(b,
         umbra_add_f32(b, bv, sd), ia);
 
-    umbra_val abs_bv = umbra_max_f32(b, bv,
-        umbra_sub_f32(b, z, bv));
+    umbra_val abs_bv = umbra_abs_f32(b, bv);
     umbra_val lt = umbra_div_f32(b, q0y,
         umbra_sel_i32(b,
             umbra_gt_f32(b, abs_bv, ep),
