@@ -97,6 +97,30 @@ static void test_avx_f32(void) {
     free(b.buf);
 }
 
+static void test_avx_fma(void) {
+    Buf b = {0};
+
+    // vfmadd132ps %ymm4, %ymm3, %ymm2 => c4 e2 65 98 d4
+    vfmadd132ps(&b, 2, 3, 4);
+    (bytes_eq(&b, 5, (uint8_t[]){0xC4,0xE2,0x65,0x98,0xD4})) here;
+    reset(&b);
+
+    // vfmadd213ps %ymm4, %ymm3, %ymm2 => c4 e2 65 a8 d4
+    vfmadd213ps(&b, 2, 3, 4);
+    (bytes_eq(&b, 5, (uint8_t[]){0xC4,0xE2,0x65,0xA8,0xD4})) here;
+    reset(&b);
+
+    // vfnmadd132ps %ymm7, %ymm6, %ymm5 => c4 e2 4d 9c fd
+    vfnmadd132ps(&b, 7, 6, 5);
+    (bytes_eq(&b, 5, (uint8_t[]){0xC4,0xE2,0x4D,0x9C,0xFD})) here;
+    reset(&b);
+
+    // vfnmadd213ps %ymm7, %ymm6, %ymm5 => c4 e2 4d ac fd
+    vfnmadd213ps(&b, 7, 6, 5);
+    (bytes_eq(&b, 5, (uint8_t[]){0xC4,0xE2,0x4D,0xAC,0xFD})) here;
+    free(b.buf);
+}
+
 static void test_avx_i32(void) {
     Buf b = {0};
 
@@ -234,6 +258,7 @@ int main(void) {
     test_ret_vzeroupper_nop();
     test_gpr();
     test_avx_f32();
+    test_avx_fma();
     test_avx_i32();
     test_avx_bitwise();
     test_avx_cmp();
