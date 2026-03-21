@@ -46,12 +46,10 @@ void vspill(Buf *b, int reg, int slot);
 void vfill(Buf *b, int reg, int slot);
 
 void vmovaps(Buf *b, int d, int s);
-void vmovaps_x(Buf *b, int d, int s);
 void vpxor(Buf *b, int L, int d, int v, int s);
 void vbroadcastss(Buf *b, int d, int s);
 
 void broadcast_imm32(Buf *b, int d, uint32_t v);
-void broadcast_imm16(Buf *b, int d, uint16_t v);
 
 void vaddps(Buf *b, int d, int v, int s);
 void vsubps(Buf *b, int d, int v, int s);
@@ -92,13 +90,6 @@ void vpcmpeqd(Buf *b, int d, int v, int s);
 void vpcmpgtd(Buf *b, int d, int v, int s);
 void vpminsd(Buf *b, int d, int v, int s);
 void vpmaxsd(Buf *b, int d, int v, int s);
-
-void vpaddw(Buf *b, int d, int v, int s);
-void vpsubw(Buf *b, int d, int v, int s);
-void vpsllw_i(Buf *b, int d, int s, uint8_t imm);
-void vpsrlw_i(Buf *b, int d, int s, uint8_t imm);
-
-void vpcmpeqw(Buf *b, int d, int v, int s);
 
 void vpmovsxwd(Buf *b, int d, int s);
 void vpmovzxwd(Buf *b, int d, int s);

@@ -261,7 +261,6 @@ void vfill(Buf *b, int reg, int slot) {
 // ---- AVX2 instruction helpers ----
 
 void vmovaps(Buf *b, int d, int s) { vex_rr(b,0,1,1,0x28,d,s); }
-void vmovaps_x(Buf *b, int d, int s) { vex_rr(b,0,1,0,0x28,d,s); }
 void vpxor(Buf *b, int L, int d, int v, int s) { vex_rrr(b,1,1,L,0xef,d,v,s); }
 void vbroadcastss(Buf *b, int d, int s) { vex_rrr(b,1,2,1,0x18,d,0,s); }
 
@@ -277,25 +276,6 @@ void broadcast_imm32(Buf *b, int d, uint32_t v) {
         emit1(b, 0xb8); emit4(b, v);           // MOV eax, v
         vex(b, 1, 1, 0, 0, d, 0, RAX, 0x6e);  // VMOVD xmm_d, eax
         vbroadcastss(b, d, d);                  // VBROADCASTSS ymm_d, xmm_d
-    }
-}
-
-void broadcast_imm16(Buf *b, int d, uint16_t v) {
-    int shr = v ? __builtin_clz(v) - 16 : 0;
-    int shl = v ? __builtin_ctz(v) : 0;
-
-    if      (v == 0)      { vpxor(b,0,d,d,d); }
-    else if (v == 0xffffu) { vpcmpeqw(b,d,d,d); }
-    else if (v == (uint16_t)(0xffffu >> shr)) {
-        vpcmpeqw(b,d,d,d); vpsrlw_i(b,d,d,(uint8_t)shr);
-    }
-    else if (v == (uint16_t)(0xffffu << shl)) {
-        vpcmpeqw(b,d,d,d); vpsllw_i(b,d,d,(uint8_t)shl);
-    }
-    else {
-        emit1(b, 0xb8); emit4(b, (uint32_t)v);        // MOV eax, v
-        vex(b, 1, 1, 0, 0, d, 0, RAX, 0x6e);          // VMOVD xmm_d, eax
-        vex_rr(b, 1, 2, 0, 0x79, d, d);                // VPBROADCASTW xmm_d, xmm_d
     }
 }
 
@@ -350,13 +330,6 @@ void vpminsd(Buf *b, int d, int v, int s)  { vex_rrr(b,1,2,1,0x39,d,v,s); }
 void vpmaxsd(Buf *b, int d, int v, int s)  { vex_rrr(b,1,2,1,0x3d,d,v,s); }
 
 // ---- I16 arithmetic (XMM, L=0) ----
-void vpaddw(Buf *b, int d, int v, int s)  { vex_rrr(b,1,1,0,0xfd,d,v,s); }
-void vpsubw(Buf *b, int d, int v, int s)  { vex_rrr(b,1,1,0,0xf9,d,v,s); }
-void vpsllw_i(Buf *b, int d, int s, uint8_t imm) { vex_shift(b,1,1,0,0x71,6,d,s,imm); }
-void vpsrlw_i(Buf *b, int d, int s, uint8_t imm) { vex_shift(b,1,1,0,0x71,2,d,s,imm); }
-
-// ---- I16 compare (XMM) ----
-void vpcmpeqw(Buf *b, int d, int v, int s) { vex_rrr(b,1,1,0,0x75,d,v,s); }
 // ---- Widening/narrowing ----
 void vpmovsxwd(Buf *b, int d, int s) { vex_rr(b,1,2,1,0x23,d,s); }
 void vpmovzxwd(Buf *b, int d, int s) { vex_rr(b,1,2,1,0x33,d,s); }

@@ -124,20 +124,6 @@ static void test_avx_cmp(void) {
     free(b.buf);
 }
 
-static void test_avx_i16(void) {
-    Buf b = {0};
-
-    // vpaddw %xmm5, %xmm6, %xmm7 => c5 c9 fd fd
-    vpaddw(&b, 7, 6, 5);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xC9, 0xFD, 0xFD})) here;
-    reset(&b);
-
-    // vpsubw %xmm8, %xmm9, %xmm10 => c4 41 31 f9 d0
-    vpsubw(&b, 10, 9, 8);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC4, 0x41, 0x31, 0xF9, 0xD0})) here;
-    free(b.buf);
-}
-
 static void test_avx_shift(void) {
     Buf b = {0};
 
@@ -198,9 +184,6 @@ static void test_avx_mov(void) {
     (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xFC, 0x28, 0xE3})) here;
     reset(&b);
 
-    // vmovaps %xmm5, %xmm6 => c5 f8 28 f5
-    vmovaps_x(&b, 6, 5);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xF8, 0x28, 0xF5})) here;
     free(b.buf);
 }
 
@@ -224,20 +207,6 @@ static void test_broadcast_imm32(void) {
     // All ones => vpcmpeqd ymm4,ymm4,ymm4 => c5 dd 76 e4
     broadcast_imm32(&b, 4, 0xFFFFFFFF);
     (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xDD, 0x76, 0xE4})) here;
-    free(b.buf);
-}
-
-static void test_broadcast_imm16(void) {
-    Buf b = {0};
-
-    // Zero => vpxor xmm3,xmm3,xmm3 => c5 e1 ef db
-    broadcast_imm16(&b, 3, 0);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE1, 0xEF, 0xDB})) here;
-    reset(&b);
-
-    // All ones => vpcmpeqw xmm4,xmm4,xmm4 => c5 d9 75 e4
-    broadcast_imm16(&b, 4, 0xFFFF);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xD9, 0x75, 0xE4})) here;
     free(b.buf);
 }
 
@@ -268,14 +237,12 @@ int main(void) {
     test_avx_i32();
     test_avx_bitwise();
     test_avx_cmp();
-    test_avx_i16();
     test_avx_shift();
     test_avx_convert();
     test_avx_extract_insert();
     test_avx_mov();
     test_avx_broadcast();
     test_broadcast_imm32();
-    test_broadcast_imm16();
     test_vex_2byte_vs_3byte();
     return 0;
 }
