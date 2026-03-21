@@ -417,7 +417,6 @@ val umbra_sign_f32(builder *b, val x) {
 val umbra_add_i32(builder *b, val x, val y) {
     sort(&x.id, &y.id);
     if (is_imm32(b, x.id, 0)) { return y; }
-    if (is_imm32(b, y.id, 0)) { return x; }
     return try_imm(b,
         math(b, op_add_i32, .x=x.id, .y=y.id),
         op_add_i32_imm, x.id, y.id);
@@ -443,7 +442,6 @@ val umbra_mul_i32(builder *b, val x, val y) {
     if (is_imm32(b, x.id, 1)) { return y; }
     if (is_imm32(b, y.id, 1)) { return x; }
     if (is_imm32(b, x.id, 0)) { return x; }
-    if (is_imm32(b, y.id, 0)) { return y; }
     if (b->inst[x.id].op == op_imm_32
      && is_pow2(b->inst[x.id].imm)) {
         int const shift =
@@ -500,7 +498,6 @@ val umbra_and_i32(builder *b, val x, val y) {
     if (is_imm32(b, x.id, -1))    { return y; }
     if (is_imm32(b, y.id, -1))    { return x; }
     if (is_imm32(b, x.id,  0))    { return x; }
-    if (is_imm32(b, y.id,  0))    { return y; }
     if (is_imm32(b, x.id, 0x7fffffff)) {
         return umbra_abs_f32(b, y);
     }
@@ -524,11 +521,10 @@ val umbra_and_i32(builder *b, val x, val y) {
 }
 val umbra_or_i32(builder *b, val x, val y) {
     sort(&x.id, &y.id);
-    if (x.id == y.id)              { return x; }
-    if (is_imm32(b, x.id,  0))    { return y; }
-    if (is_imm32(b, y.id,  0))    { return x; }
-    if (is_imm32(b, x.id, -1))    { return x; }
-    if (is_imm32(b, y.id, -1))    { return y; }
+    if (x.id == y.id)           { return x; }
+    if (is_imm32(b, x.id,  0)) { return y; }
+    if (is_imm32(b, x.id, -1)) { return x; }
+    if (is_imm32(b, y.id, -1)) { return y; }
     return try_imm(b,
         math(b, op_or_32, .x=x.id, .y=y.id),
         op_or_32_imm, x.id, y.id);
@@ -545,9 +541,8 @@ val umbra_pack(builder *b, val base,
 }
 val umbra_xor_i32(builder *b, val x, val y) {
     sort(&x.id, &y.id);
-    if (is_imm32(b, x.id, 0))    { return y; }
-    if (is_imm32(b, y.id, 0))    { return x; }
     if (x.id == y.id) { return umbra_imm_i32(b, 0); }
+    if (is_imm32(b, x.id, 0)) { return y; }
     return try_imm(b,
         math(b, op_xor_32, .x=x.id, .y=y.id),
         op_xor_32_imm, x.id, y.id);

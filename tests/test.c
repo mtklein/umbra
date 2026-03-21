@@ -1031,6 +1031,28 @@ static void test_zero_imm(void) {
 }
 
 
+static void test_late_imm_identity(void) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_val ix = umbra_iota(b);
+    umbra_val x = umbra_load_i32(b, (umbra_ptr){0}, ix);
+    umbra_val z1 = umbra_imm_i32(b, 1);
+    umbra_val zm = umbra_imm_i32(b, -1);
+    (z1.id > x.id) here;
+    (zm.id > x.id) here;
+
+    (umbra_mul_i32(b, x, z1).id == x.id) here;
+    (umbra_and_i32(b, x, zm).id == x.id) here;
+    (umbra_or_i32 (b, x, zm).id == zm.id) here;
+    (umbra_sel_i32(b, zm, x, z1).id == x.id) here;
+    (umbra_eq_i32(b, x, x).id
+        == umbra_imm_i32(b, -1).id) here;
+    (umbra_div_f32(b, x,
+        umbra_imm_f32(b, 1.0f)).id == x.id) here;
+    (umbra_sub_f32(b, x,
+        umbra_imm_f32(b, 0.0f)).id == x.id) here;
+    umbra_builder_free(b);
+}
+
 static void test_load_8x4(void) {
   for (int opt = 0; opt < 2; opt++) {
     struct umbra_builder *builder =
@@ -2121,6 +2143,7 @@ int main(void) {
     test_constprop();
     test_strength_reduction();
     test_zero_imm();
+    test_late_imm_identity();
     test_load_8x4();
     test_store_8x4();
     test_srcover();
