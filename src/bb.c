@@ -387,8 +387,10 @@ val umbra_sqrt_f32(builder *b, val x) {
     return math(b, op_sqrt_f32, .x=x.id);
 }
 val umbra_abs_f32(builder *b, val x) {
-    return umbra_and_i32(b, x,
-        umbra_imm_i32(b, 0x7fffffff));
+    return math(b, op_abs_f32, .x=x.id);
+}
+val umbra_neg_f32(builder *b, val x) {
+    return math(b, op_neg_f32, .x=x.id);
 }
 val umbra_sign_f32(builder *b, val x) {
     val z = umbra_imm_f32(b, 0.0f);
@@ -486,6 +488,12 @@ val umbra_and_i32(builder *b, val x, val y) {
     if (is_imm32(b, y.id, -1))    { return x; }
     if (is_imm32(b, x.id,  0))    { return x; }
     if (is_imm32(b, y.id,  0))    { return y; }
+    if (is_imm32(b, x.id, 0x7fffffff)) {
+        return umbra_abs_f32(b, y);
+    }
+    if (is_imm32(b, y.id, 0x7fffffff)) {
+        return umbra_abs_f32(b, x);
+    }
     val d = math(b, op_and_32, .x=x.id, .y=y.id);
     if (is_imm(b, x.id)) {
         val f = push(b, op_and_imm,
@@ -1006,6 +1014,8 @@ static void dump_insts(struct bb_inst const *inst,
                 break;
 
             case op_sqrt_f32:
+            case op_abs_f32:
+            case op_neg_f32:
             case op_f32_from_i32:
             case op_i32_from_f32:
             case op_widen_s16:

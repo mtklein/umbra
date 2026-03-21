@@ -336,6 +336,8 @@ op(sqrt_f32) {
     v->f32 = __builtin_elementwise_sqrt(v[ip->x].f32);
     next;
 }
+op(abs_f32) { v->f32 = __builtin_elementwise_abs(v[ip->x].f32); next; }
+op(neg_f32) { v->f32 = -v[ip->x].f32; next; }
 op( min_f32) {
     v->f32 = __builtin_elementwise_min(
         v[ip->x].f32, v[ip->y].f32);
@@ -576,6 +578,8 @@ static Fn const fn[] = {
     [op_min_f32]  = min_f32,
     [op_max_f32]  = max_f32,
     [op_sqrt_f32] = sqrt_f32,
+    [op_abs_f32]  = abs_f32,
+    [op_neg_f32]  = neg_f32,
     [op_fma_f32]  = fma_f32,
     [op_fms_f32]  = fms_f32,
 
@@ -825,6 +829,8 @@ struct umbra_interpreter* umbra_interpreter(
                     case op_min_f32:
                     case op_max_f32:
                     case op_sqrt_f32:
+                    case op_abs_f32:
+                    case op_neg_f32:
                     case op_fma_f32:
                     case op_fms_f32:
 

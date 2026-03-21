@@ -136,6 +136,8 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
     case op_min_f32: put(c, FMINNM_4s(d,x,y)); return 1;
     case op_max_f32: put(c, FMAXNM_4s(d,x,y)); return 1;
     case op_sqrt_f32: put(c, FSQRT_4s(d,x)); return 1;
+    case op_abs_f32:  put(c, FABS_4s(d,x));  return 1;
+    case op_neg_f32:  put(c, FNEG_4s(d,x));  return 1;
     case op_fma_f32:
         if (d==z) {
             put(c, FMLA_4s(d,x,y));
@@ -833,6 +835,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 case op_mul_f32: case op_div_f32:
                 case op_min_f32: case op_max_f32:
                 case op_sqrt_f32:
+                case op_abs_f32: case op_neg_f32:
                 case op_fma_f32: case op_fms_f32:
                 case op_add_i32: case op_sub_i32:
                 case op_mul_i32:
@@ -885,6 +888,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_mul_f32: case op_div_f32:
         case op_min_f32: case op_max_f32:
         case op_sqrt_f32:
+        case op_abs_f32: case op_neg_f32:
         case op_fma_f32: case op_fms_f32:
         case op_add_i32: case op_sub_i32:
         case op_mul_i32:
@@ -1292,6 +1296,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
     case op_le_s32_imm:
         return 0;
 
+    case op_abs_f32: case op_neg_f32:
     case op_iota:
     case op_deref_ptr:
     case op_uni_32:   case op_load_32:
@@ -1986,6 +1991,31 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     s.rd, s.rx, vop);
                 pool_ref_at(&jc->pool, off, pos, 0);
             }
+        } break;
+
+        case op_abs_f32: {
+            struct ra_step s = ra_step_unary(
+                ra, sl, ns, inst, i, scalar);
+            uint32_t mask[8] = {0x7fffffffu,0x7fffffffu,
+                                0x7fffffffu,0x7fffffffu,
+                                0x7fffffffu,0x7fffffffu,
+                                0x7fffffffu,0x7fffffffu};
+            int off = pool_add(&jc->pool, mask, 32);
+            int pos = vex_rip(c, 0, 1, 0, 1,
+                s.rd, s.rx, 0x54);
+            pool_ref_at(&jc->pool, off, pos, 0);
+        } break;
+        case op_neg_f32: {
+            struct ra_step s = ra_step_unary(
+                ra, sl, ns, inst, i, scalar);
+            uint32_t mask[8] = {0x80000000u,0x80000000u,
+                                0x80000000u,0x80000000u,
+                                0x80000000u,0x80000000u,
+                                0x80000000u,0x80000000u};
+            int off = pool_add(&jc->pool, mask, 32);
+            int pos = vex_rip(c, 0, 1, 0, 1,
+                s.rd, s.rx, 0x57);
+            pool_ref_at(&jc->pool, off, pos, 0);
         } break;
 
         case op_add_f32: case op_sub_f32:

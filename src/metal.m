@@ -441,6 +441,17 @@ static void emit_ops(Buf *b, BB const *bb,
                         "as_type<float>(v%d)));\n",
                      pad, i, inst->x);
                 break;
+            case op_abs_f32:
+                emit(b, "%suint v%d = as_type<uint>"
+                        "(fabs("
+                        "as_type<float>(v%d)));\n",
+                     pad, i, inst->x);
+                break;
+            case op_neg_f32:
+                emit(b, "%suint v%d = as_type<uint>"
+                        "(-as_type<float>(v%d));\n",
+                     pad, i, inst->x);
+                break;
             case op_fma_f32:
                 emit(b, "%suint v%d = as_type<uint>"
                         "(fma(as_type<float>(v%d),"

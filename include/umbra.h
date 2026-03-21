@@ -41,6 +41,7 @@ umbra_val umbra_max_f32(struct umbra_builder*, umbra_val, umbra_val);
 
 umbra_val umbra_sqrt_f32(struct umbra_builder*, umbra_val);
 umbra_val umbra_abs_f32 (struct umbra_builder*, umbra_val);
+umbra_val umbra_neg_f32 (struct umbra_builder*, umbra_val);
 umbra_val umbra_sign_f32(struct umbra_builder*, umbra_val);
 
 umbra_val umbra_add_i32(struct umbra_builder*, umbra_val, umbra_val);

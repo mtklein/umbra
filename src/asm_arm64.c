@@ -118,6 +118,7 @@ enum {
     FDIV_4s_  =0x6e20fc00u, FMLA_4s_  =0x4e20cc00u, FMLS_4s_  =0x4ea0cc00u,
     FMINNM_4s_=0x4ea0c400u, FMAXNM_4s_=0x4e20c400u,
     FSQRT_4s_ =0x6ea1f800u,
+    FABS_4s_  =0x4ea0f800u, FNEG_4s_  =0x6ea0f800u,
     SCVTF_4s_ =0x4e21d800u, FCVTZS_4s_=0x4ea1b800u,
     FCMEQ_4s_ =0x4e20e400u, FCMGT_4s_ =0x6ea0e400u, FCMGE_4s_ =0x6e20e400u,
 
@@ -149,7 +150,8 @@ enum {
 #define V2(enc) uint32_t enc(int d,int n){return enc##_ | ((uint32_t)n<<5)|(uint32_t)d;}
 
 V3(FADD_4s)  V3(FSUB_4s)  V3(FMUL_4s) V3(FDIV_4s)  V3(FMLA_4s) V3(FMLS_4s)
-V3(FMINNM_4s) V3(FMAXNM_4s) V2(FSQRT_4s) V2(SCVTF_4s) V2(FCVTZS_4s)
+V3(FMINNM_4s) V3(FMAXNM_4s) V2(FSQRT_4s) V2(FABS_4s) V2(FNEG_4s)
+V2(SCVTF_4s) V2(FCVTZS_4s)
 V3(FCMEQ_4s) V3(FCMGT_4s) V3(FCMGE_4s)
 V3(ADD_4s) V3(SUB_4s) V3(MUL_4s)
 V3(USHL_4s) V3(SSHL_4s) V2(NEG_4s)

@@ -36,7 +36,8 @@ uint32_t W(uint32_t insn);
 #define V3(name) uint32_t name(int d, int n, int m);
 #define V2(name) uint32_t name(int d, int n);
 V3(FADD_4s)  V3(FSUB_4s)  V3(FMUL_4s) V3(FDIV_4s)  V3(FMLA_4s) V3(FMLS_4s)
-V3(FMINNM_4s) V3(FMAXNM_4s) V2(FSQRT_4s) V2(SCVTF_4s) V2(FCVTZS_4s)
+V3(FMINNM_4s) V3(FMAXNM_4s) V2(FSQRT_4s) V2(FABS_4s) V2(FNEG_4s)
+V2(SCVTF_4s) V2(FCVTZS_4s)
 V3(FCMEQ_4s) V3(FCMGT_4s) V3(FCMGE_4s)
 V3(ADD_4s) V3(SUB_4s) V3(MUL_4s)
 V3(USHL_4s) V3(SSHL_4s) V2(NEG_4s)

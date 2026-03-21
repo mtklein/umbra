@@ -736,6 +736,28 @@ static void test_abs_sign_f32(void) {
         }
         cleanup(&B);
     }
+    {
+        struct umbra_builder *builder =
+            umbra_builder();
+        umbra_val ix = umbra_iota(builder);
+        umbra_val x = umbra_load_i32(builder,
+                          (umbra_ptr){0}, ix),
+                  r = umbra_neg_f32(builder, x);
+        umbra_store_i32(builder,
+            (umbra_ptr){1}, ix, r);
+        backends B = make(builder, opt);
+        for (int bi = 0; bi < 3; bi++) {
+            float a[] = {-1.5f, 2.5f, 0.0f};
+            float z[3] = {0};
+            if (!run(&B, bi, 3, (umbra_buf[]){
+                {a,3*4},{z,3*4},
+            })) { continue; }
+            equiv(z[0],  1.5f) here;
+            equiv(z[1], -2.5f) here;
+            equiv(z[2],  0.0f) here;
+        }
+        cleanup(&B);
+    }
   }
 }
 

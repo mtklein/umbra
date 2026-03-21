@@ -8,6 +8,7 @@
     X(deref_ptr)                                         \
     X(add_f32) X(sub_f32) X(mul_f32) X(div_f32)         \
     X(min_f32) X(max_f32) X(sqrt_f32)                   \
+    X(abs_f32) X(neg_f32)                               \
     X(fma_f32) X(fms_f32)                               \
     X(add_i32) X(sub_i32) X(mul_i32)                    \
     X(shl_i32) X(shr_u32) X(shr_s32)                    \
