@@ -283,6 +283,12 @@ struct ra_step ra_step_alu(struct ra *ra,
     } else if (op == op_sel_32 && x_dead) {
         s.rd = ra_claim(ra, inst->x, i);
         x_dead = 0;
+    } else if (op == op_sel_32 && y_dead) {
+        s.rd = ra_claim(ra, inst->y, i);
+        y_dead = 0;
+    } else if (op == op_sel_32 && z_dead) {
+        s.rd = ra_claim(ra, inst->z, i);
+        z_dead = 0;
     }
 
     if (!destructive) {
