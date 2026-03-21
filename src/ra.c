@@ -270,6 +270,12 @@ struct ra_step ra_step_alu(struct ra *ra,
     if (fma && z_dead) {
         s.rd = ra_claim(ra, inst->z, i);
         z_dead = 0;
+    } else if (fma && x_dead) {
+        s.rd = ra_claim(ra, inst->x, i);
+        x_dead = 0;
+    } else if (fma && y_dead) {
+        s.rd = ra_claim(ra, inst->y, i);
+        y_dead = 0;
     } else if (fma && !z_dead) {
         s.rd = ra_alloc(ra, sl, ns);
         ra->reg[i] = s.rd;
