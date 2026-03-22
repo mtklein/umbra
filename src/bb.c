@@ -61,10 +61,9 @@ static val push_(builder *b, struct bb_inst inst) {
                 || op == op_scatter_16) {
             inst.uniform = 0;
         } else {
-            inst.uniform =
-                (!inst.x || b->inst[inst.x].uniform)
-             && (!inst.y || b->inst[inst.y].uniform)
-             && (!inst.z || b->inst[inst.z].uniform);
+            inst.uniform = (!inst.x || b->inst[inst.x].uniform)
+                && (!inst.y || b->inst[inst.y].uniform)
+                && (!inst.z || b->inst[inst.z].uniform);
         }
     }
 
