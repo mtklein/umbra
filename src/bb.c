@@ -28,15 +28,18 @@ _Bool is_varying(enum op op) {
 static _Bool is_pow2(int x) { return __builtin_popcount((unsigned)x) == 1; }
 static _Bool is_pow2_or_zero(int x) { return __builtin_popcount((unsigned)x) <= 1; }
 
+static uint32_t mul_overflow(uint32_t x, uint32_t y) {
+    __builtin_mul_overflow(x,y,&x);
+    return x;
+}
+
 static uint32_t bb_inst_hash(struct bb_inst const *inst) {
     uint32_t h = (uint32_t)inst->op;
-    // clang-format off
-    __builtin_mul_overflow(h ^ (uint32_t)inst->x  , 0x9e3779b9u, &h);
-    __builtin_mul_overflow(h ^ (uint32_t)inst->y  , 0x9e3779b9u, &h);
-    __builtin_mul_overflow(h ^ (uint32_t)inst->z  , 0x9e3779b9u, &h);
-    __builtin_mul_overflow(h ^ (uint32_t)inst->ptr, 0x9e3779b9u, &h);
-    __builtin_mul_overflow(h ^ (uint32_t)inst->imm, 0x9e3779b9u, &h);
-    // clang-format on
+    h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->x);
+    h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->y);
+    h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->z);
+    h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->ptr);
+    h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->imm);
     h ^= h >> 16;
     return h ? h : 1;
 }
