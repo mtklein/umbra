@@ -183,27 +183,72 @@ enum {
     SXTL_4s_ = 0x0f10a400u,
 };
 
-#define V3(enc)                                                                 \
-    uint32_t enc(int d, int n, int m) {                                         \
-        return enc##_ | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d; \
-    }
-#define V2(enc) \
-    uint32_t enc(int d, int n) { return enc##_ | ((uint32_t)n << 5) | (uint32_t)d; }
+static uint32_t v3(uint32_t enc, int d, int n, int m) {
+    return enc | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d;
+}
+static uint32_t v2(uint32_t enc, int d, int n) {
+    return enc | ((uint32_t)n << 5) | (uint32_t)d;
+}
 
-V3(FADD_4s)
-V3(FSUB_4s)
-V3(FMUL_4s) V3(FDIV_4s) V3(FMLA_4s) V3(FMLS_4s) V3(FMINNM_4s) V3(FMAXNM_4s) V2(FSQRT_4s)
-    V2(FABS_4s) V2(FNEG_4s) V2(FRINTN_4s) V2(FRINTM_4s) V2(FRINTP_4s) V2(SCVTF_4s)
-        V2(FCVTZS_4s) V2(FCVTNS_4s) V2(FCVTMS_4s) V2(FCVTPS_4s) V3(FCMEQ_4s) V3(FCMGT_4s)
-            V3(FCMGE_4s) V3(ADD_4s) V3(SUB_4s) V3(MUL_4s) V3(USHL_4s) V3(SSHL_4s)
-                V2(NEG_4s) V3(CMEQ_4s) V3(CMGT_4s) V3(CMGE_4s) V3(CMHI_4s) V3(CMHS_4s)
-                    V3(AND_16b) V3(ORR_16b) V3(EOR_16b) V3(BSL_16b) V3(BIT_16b)
-                        V3(BIF_16b) V2(CMEQ_4s_z) V2(CMGT_4s_z) V2(CMGE_4s_z)
-                            V2(CMLE_4s_z) V2(CMLT_4s_z) V2(FCMEQ_4s_z) V2(FCMGT_4s_z)
-                                V2(FCMGE_4s_z) V2(FCMLE_4s_z) V2(FCMLT_4s_z) V2(FCVTN_4h)
-                                    V2(FCVTL_4s) V2(XTN_4h) V2(SXTL_4s)
-#undef V3
-#undef V2
+// clang-format off
+uint32_t FADD_4s   (int d, int n, int m) { return v3(FADD_4s_,    d, n, m); }
+uint32_t FSUB_4s   (int d, int n, int m) { return v3(FSUB_4s_,    d, n, m); }
+uint32_t FMUL_4s   (int d, int n, int m) { return v3(FMUL_4s_,    d, n, m); }
+uint32_t FDIV_4s   (int d, int n, int m) { return v3(FDIV_4s_,    d, n, m); }
+uint32_t FMLA_4s   (int d, int n, int m) { return v3(FMLA_4s_,    d, n, m); }
+uint32_t FMLS_4s   (int d, int n, int m) { return v3(FMLS_4s_,    d, n, m); }
+uint32_t FMINNM_4s (int d, int n, int m) { return v3(FMINNM_4s_,  d, n, m); }
+uint32_t FMAXNM_4s (int d, int n, int m) { return v3(FMAXNM_4s_,  d, n, m); }
+uint32_t FSQRT_4s  (int d, int n)        { return v2(FSQRT_4s_,   d, n); }
+uint32_t FABS_4s   (int d, int n)        { return v2(FABS_4s_,    d, n); }
+uint32_t FNEG_4s   (int d, int n)        { return v2(FNEG_4s_,    d, n); }
+uint32_t FRINTN_4s (int d, int n)        { return v2(FRINTN_4s_,  d, n); }
+uint32_t FRINTM_4s (int d, int n)        { return v2(FRINTM_4s_,  d, n); }
+uint32_t FRINTP_4s (int d, int n)        { return v2(FRINTP_4s_,  d, n); }
+uint32_t SCVTF_4s  (int d, int n)        { return v2(SCVTF_4s_,   d, n); }
+uint32_t FCVTZS_4s (int d, int n)        { return v2(FCVTZS_4s_,  d, n); }
+uint32_t FCVTNS_4s (int d, int n)        { return v2(FCVTNS_4s_,  d, n); }
+uint32_t FCVTMS_4s (int d, int n)        { return v2(FCVTMS_4s_,  d, n); }
+uint32_t FCVTPS_4s (int d, int n)        { return v2(FCVTPS_4s_,  d, n); }
+uint32_t FCMEQ_4s  (int d, int n, int m) { return v3(FCMEQ_4s_,   d, n, m); }
+uint32_t FCMGT_4s  (int d, int n, int m) { return v3(FCMGT_4s_,   d, n, m); }
+uint32_t FCMGE_4s  (int d, int n, int m) { return v3(FCMGE_4s_,   d, n, m); }
+
+uint32_t ADD_4s    (int d, int n, int m) { return v3(ADD_4s_,     d, n, m); }
+uint32_t SUB_4s    (int d, int n, int m) { return v3(SUB_4s_,     d, n, m); }
+uint32_t MUL_4s    (int d, int n, int m) { return v3(MUL_4s_,     d, n, m); }
+uint32_t USHL_4s   (int d, int n, int m) { return v3(USHL_4s_,    d, n, m); }
+uint32_t SSHL_4s   (int d, int n, int m) { return v3(SSHL_4s_,    d, n, m); }
+uint32_t NEG_4s    (int d, int n)        { return v2(NEG_4s_,     d, n); }
+uint32_t CMEQ_4s   (int d, int n, int m) { return v3(CMEQ_4s_,    d, n, m); }
+uint32_t CMGT_4s   (int d, int n, int m) { return v3(CMGT_4s_,    d, n, m); }
+uint32_t CMGE_4s   (int d, int n, int m) { return v3(CMGE_4s_,    d, n, m); }
+uint32_t CMHI_4s   (int d, int n, int m) { return v3(CMHI_4s_,    d, n, m); }
+uint32_t CMHS_4s   (int d, int n, int m) { return v3(CMHS_4s_,    d, n, m); }
+
+uint32_t AND_16b   (int d, int n, int m) { return v3(AND_16b_,    d, n, m); }
+uint32_t ORR_16b   (int d, int n, int m) { return v3(ORR_16b_,    d, n, m); }
+uint32_t EOR_16b   (int d, int n, int m) { return v3(EOR_16b_,    d, n, m); }
+uint32_t BSL_16b   (int d, int n, int m) { return v3(BSL_16b_,    d, n, m); }
+uint32_t BIT_16b   (int d, int n, int m) { return v3(BIT_16b_,    d, n, m); }
+uint32_t BIF_16b   (int d, int n, int m) { return v3(BIF_16b_,    d, n, m); }
+
+uint32_t CMEQ_4s_z (int d, int n)        { return v2(CMEQ_4s_z_,  d, n); }
+uint32_t CMGT_4s_z (int d, int n)        { return v2(CMGT_4s_z_,  d, n); }
+uint32_t CMGE_4s_z (int d, int n)        { return v2(CMGE_4s_z_,  d, n); }
+uint32_t CMLE_4s_z (int d, int n)        { return v2(CMLE_4s_z_,  d, n); }
+uint32_t CMLT_4s_z (int d, int n)        { return v2(CMLT_4s_z_,  d, n); }
+uint32_t FCMEQ_4s_z(int d, int n)        { return v2(FCMEQ_4s_z_, d, n); }
+uint32_t FCMGT_4s_z(int d, int n)        { return v2(FCMGT_4s_z_, d, n); }
+uint32_t FCMGE_4s_z(int d, int n)        { return v2(FCMGE_4s_z_, d, n); }
+uint32_t FCMLE_4s_z(int d, int n)        { return v2(FCMLE_4s_z_, d, n); }
+uint32_t FCMLT_4s_z(int d, int n)        { return v2(FCMLT_4s_z_, d, n); }
+
+uint32_t FCVTN_4h  (int d, int n)        { return v2(FCVTN_4h_,   d, n); }
+uint32_t FCVTL_4s  (int d, int n)        { return v2(FCVTL_4s_,   d, n); }
+uint32_t XTN_4h    (int d, int n)        { return v2(XTN_4h_,     d, n); }
+uint32_t SXTL_4s   (int d, int n)        { return v2(SXTL_4s_,    d, n); }
+// clang-format on
 
     // Shift-by-immediate: immh:immb at bits 22:16
     uint32_t SHL_4s_imm(int d, int n, int sh) {
