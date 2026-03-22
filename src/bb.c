@@ -30,11 +30,13 @@ static _Bool is_pow2_or_zero(int x) { return __builtin_popcount((unsigned)x) <= 
 
 static uint32_t bb_inst_hash(struct bb_inst const *inst) {
     uint32_t h = (uint32_t)inst->op;
-    __builtin_mul_overflow(h ^ (uint32_t)inst->x, 0x9e3779b9u, &h);
-    __builtin_mul_overflow(h ^ (uint32_t)inst->y, 0x9e3779b9u, &h);
-    __builtin_mul_overflow(h ^ (uint32_t)inst->z, 0x9e3779b9u, &h);
+    // clang-format off
+    __builtin_mul_overflow(h ^ (uint32_t)inst->x  , 0x9e3779b9u, &h);
+    __builtin_mul_overflow(h ^ (uint32_t)inst->y  , 0x9e3779b9u, &h);
+    __builtin_mul_overflow(h ^ (uint32_t)inst->z  , 0x9e3779b9u, &h);
     __builtin_mul_overflow(h ^ (uint32_t)inst->ptr, 0x9e3779b9u, &h);
     __builtin_mul_overflow(h ^ (uint32_t)inst->imm, 0x9e3779b9u, &h);
+    // clang-format on
     h ^= h >> 16;
     return h ? h : 1;
 }
