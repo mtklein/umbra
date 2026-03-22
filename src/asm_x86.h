@@ -1,7 +1,10 @@
 #pragma once
 #include <stdint.h>
 
-typedef struct { uint8_t *buf; int len,cap; } Buf;
+typedef struct {
+    uint8_t *buf;
+    int      len, cap;
+} Buf;
 
 void emit1(Buf *b, uint8_t v);
 void emit4(Buf *b, uint32_t v);
@@ -9,11 +12,10 @@ void emit4(Buf *b, uint32_t v);
 void vex(Buf *b, int pp, int mm, int W, int L, int d, int v, int s, uint8_t op);
 void vex_rrr(Buf *b, int pp, int mm, int L, uint8_t op, int d, int v, int s);
 void vex_rr(Buf *b, int pp, int mm, int L, uint8_t op, int d, int s);
-void vex_shift(Buf *b, int pp, int mm, int L,
-               uint8_t op, int ext, int d, int s,
+void vex_shift(Buf *b, int pp, int mm, int L, uint8_t op, int ext, int d, int s,
                uint8_t imm);
-void vex_mem(Buf *b, int pp, int mm, int W, int L, int reg, int v, uint8_t op,
-             int base, int index, int scale, int disp);
+void vex_mem(Buf *b, int pp, int mm, int W, int L, int reg, int v, uint8_t op, int base,
+             int index, int scale, int disp);
 
 int  vex_rip(Buf *b, int pp, int mm, int W, int L, int reg, int v, uint8_t op);
 void vmov_load(Buf *b, int L, int reg, int base, int index, int scale, int disp);
@@ -39,8 +41,24 @@ void ret(Buf *b);
 void vzeroupper(Buf *b);
 void nop(Buf *b);
 
-enum { RAX=0,RCX=1,RDX=2,RBX=3,RSP=4,RBP=5,RSI=6,RDI=7,
-       R8=8,R9=9,R10=10,R11=11,R12=12,R13=13,R14=14,R15=15 };
+enum {
+    RAX = 0,
+    RCX = 1,
+    RDX = 2,
+    RBX = 3,
+    RSP = 4,
+    RBP = 5,
+    RSI = 6,
+    RDI = 7,
+    R8 = 8,
+    R9 = 9,
+    R10 = 10,
+    R11 = 11,
+    R12 = 12,
+    R13 = 13,
+    R14 = 14,
+    R15 = 15
+};
 
 void vspill(Buf *b, int reg, int slot);
 void vfill(Buf *b, int reg, int slot);
@@ -64,9 +82,9 @@ void vfmadd231ps(Buf *b, int d, int v, int s);
 void vfnmadd132ps(Buf *b, int d, int v, int s);
 void vfnmadd213ps(Buf *b, int d, int v, int s);
 void vfnmadd231ps(Buf *b, int d, int v, int s);
-void vcvtdq2ps (Buf *b, int d, int s);
+void vcvtdq2ps(Buf *b, int d, int s);
 void vcvttps2dq(Buf *b, int d, int s);
-void vcvtps2dq (Buf *b, int d, int s);
+void vcvtps2dq(Buf *b, int d, int s);
 void vroundps(Buf *b, int d, int s, uint8_t imm);
 void vcmpps(Buf *b, int d, int v, int s, uint8_t pred);
 

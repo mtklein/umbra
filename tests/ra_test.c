@@ -3,9 +3,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct spill_record { int reg, slot; };
+struct spill_record {
+    int reg, slot;
+};
 static struct spill_record spills[256], fills[256];
-static int nspills, nfills;
+static int                 nspills, nfills;
 
 static void test_spill(int reg, int slot, void *ctx) {
     (void)ctx;
@@ -18,7 +20,7 @@ static void test_fill(int reg, int slot, void *ctx) {
 
 static void reset_records(void) { nspills = nfills = 0; }
 
-static struct umbra_basic_block* make_bb(int n, int pre) {
+static struct umbra_basic_block *make_bb(int n, int pre) {
     struct umbra_basic_block *bb = malloc(sizeof *bb);
     bb->inst = calloc((size_t)n, sizeof *bb->inst);
     bb->insts = n;
@@ -29,7 +31,7 @@ static struct umbra_basic_block* make_bb(int n, int pre) {
 
     for (int i = 1; i < n; i++) {
         bb->inst[i].op = op_add_i32;
-        bb->inst[i].x = i-1;
+        bb->inst[i].x = i - 1;
         bb->inst[i].y = 0;
     }
     return bb;
@@ -41,17 +43,20 @@ static void free_bb(struct umbra_basic_block *bb) {
 }
 
 static void test_basic_alloc_free(void) {
-    static const int8_t pool[] = {10, 11, 12, 13};
-    struct ra_config cfg = {
-        .pool = pool, .nregs = 4, .max_reg = 16,
+    static int8_t const pool[] = {10, 11, 12, 13};
+    struct ra_config    cfg = {
+        .pool = pool,
+        .nregs = 4,
+        .max_reg = 16,
 
         .spill = test_spill,
-        .fill = test_fill, .ctx = 0,
+        .fill = test_fill,
+        .ctx = 0,
     };
     struct umbra_basic_block *bb = make_bb(3, 0);
-    struct ra *ra = ra_create(bb, &cfg);
-    int sl[3] = {-1,-1,-1};
-    int ns = 0;
+    struct ra                *ra = ra_create(bb, &cfg);
+    int                       sl[3] = {-1, -1, -1};
+    int                       ns = 0;
     reset_records();
 
     // pool[0] popped first (LIFO)
@@ -75,17 +80,20 @@ static void test_basic_alloc_free(void) {
 }
 
 static void test_eviction_belady(void) {
-    static const int8_t pool[] = {5, 6};
-    struct ra_config cfg = {
-        .pool = pool, .nregs = 2, .max_reg = 8,
+    static int8_t const pool[] = {5, 6};
+    struct ra_config    cfg = {
+        .pool = pool,
+        .nregs = 2,
+        .max_reg = 8,
 
         .spill = test_spill,
-        .fill = test_fill, .ctx = 0,
+        .fill = test_fill,
+        .ctx = 0,
     };
     struct umbra_basic_block *bb = make_bb(5, 0);
-    struct ra *ra = ra_create(bb, &cfg);
-    int sl[5] = {-1,-1,-1,-1,-1};
-    int ns = 0;
+    struct ra                *ra = ra_create(bb, &cfg);
+    int                       sl[5] = {-1, -1, -1, -1, -1};
+    int                       ns = 0;
     reset_records();
 
     ra_set_last_use(ra, 0, 4);
@@ -110,17 +118,20 @@ static void test_eviction_belady(void) {
 
 static void test_dead_value_evicted_first(void) {
     // dead values (last_use=-1) evicted first
-    static const int8_t pool[] = {5, 6};
-    struct ra_config cfg = {
-        .pool = pool, .nregs = 2, .max_reg = 8,
+    static int8_t const pool[] = {5, 6};
+    struct ra_config    cfg = {
+        .pool = pool,
+        .nregs = 2,
+        .max_reg = 8,
 
         .spill = test_spill,
-        .fill = test_fill, .ctx = 0,
+        .fill = test_fill,
+        .ctx = 0,
     };
     struct umbra_basic_block *bb = make_bb(5, 0);
-    struct ra *ra = ra_create(bb, &cfg);
-    int sl[5] = {-1,-1,-1,-1,-1};
-    int ns = 0;
+    struct ra                *ra = ra_create(bb, &cfg);
+    int                       sl[5] = {-1, -1, -1, -1, -1};
+    int                       ns = 0;
     reset_records();
 
     ra_set_last_use(ra, 0, -1);
@@ -142,17 +153,20 @@ static void test_dead_value_evicted_first(void) {
 }
 
 static void test_ensure_and_fill(void) {
-    static const int8_t pool[] = {5, 6};
-    struct ra_config cfg = {
-        .pool = pool, .nregs = 2, .max_reg = 8,
+    static int8_t const pool[] = {5, 6};
+    struct ra_config    cfg = {
+        .pool = pool,
+        .nregs = 2,
+        .max_reg = 8,
 
         .spill = test_spill,
-        .fill = test_fill, .ctx = 0,
+        .fill = test_fill,
+        .ctx = 0,
     };
     struct umbra_basic_block *bb = make_bb(5, 0);
-    struct ra *ra = ra_create(bb, &cfg);
-    int sl[5] = {-1,-1,-1,-1,-1};
-    int ns = 0;
+    struct ra                *ra = ra_create(bb, &cfg);
+    int                       sl[5] = {-1, -1, -1, -1, -1};
+    int                       ns = 0;
     reset_records();
 
     ra_set_last_use(ra, 0, 4);
@@ -183,17 +197,20 @@ static void test_ensure_and_fill(void) {
 }
 
 static void test_claim(void) {
-    static const int8_t pool[] = {5, 6, 7};
-    struct ra_config cfg = {
-        .pool = pool, .nregs = 3, .max_reg = 8,
+    static int8_t const pool[] = {5, 6, 7};
+    struct ra_config    cfg = {
+        .pool = pool,
+        .nregs = 3,
+        .max_reg = 8,
 
         .spill = test_spill,
-        .fill = test_fill, .ctx = 0,
+        .fill = test_fill,
+        .ctx = 0,
     };
     struct umbra_basic_block *bb = make_bb(4, 0);
-    struct ra *ra = ra_create(bb, &cfg);
-    int sl[4] = {-1,-1,-1,-1};
-    int ns = 0;
+    struct ra                *ra = ra_create(bb, &cfg);
+    int                       sl[4] = {-1, -1, -1, -1};
+    int                       ns = 0;
     reset_records();
 
     int8_t r0 = ra_alloc(ra, sl, &ns);
@@ -211,15 +228,18 @@ static void test_claim(void) {
 
 static void test_last_use_preamble(void) {
     // preamble used in varying: last_use = n
-    static const int8_t pool[] = {5, 6, 7};
-    struct ra_config cfg = {
-        .pool = pool, .nregs = 3, .max_reg = 8,
+    static int8_t const pool[] = {5, 6, 7};
+    struct ra_config    cfg = {
+        .pool = pool,
+        .nregs = 3,
+        .max_reg = 8,
 
         .spill = test_spill,
-        .fill = test_fill, .ctx = 0,
+        .fill = test_fill,
+        .ctx = 0,
     };
     struct umbra_basic_block *bb = make_bb(4, 2);
-    struct ra *ra = ra_create(bb, &cfg);
+    struct ra                *ra = ra_create(bb, &cfg);
 
     (ra_last_use(ra, 0) == 4) here;
     (ra_last_use(ra, 1) == 4) here;
@@ -230,17 +250,20 @@ static void test_last_use_preamble(void) {
 
 static void test_many_values_stress(void) {
     // many values, few registers, lots of spills
-    static const int8_t pool[] = {0, 1, 2};
-    struct ra_config cfg = {
-        .pool = pool, .nregs = 3, .max_reg = 4,
+    static int8_t const pool[] = {0, 1, 2};
+    struct ra_config    cfg = {
+        .pool = pool,
+        .nregs = 3,
+        .max_reg = 4,
 
         .spill = test_spill,
-        .fill = test_fill, .ctx = 0,
+        .fill = test_fill,
+        .ctx = 0,
     };
-    int n = 20;
+    int                       n = 20;
     struct umbra_basic_block *bb = make_bb(n, 0);
-    struct ra *ra = ra_create(bb, &cfg);
-    int *sl = calloc((size_t)n, sizeof *sl);
+    struct ra                *ra = ra_create(bb, &cfg);
+    int                      *sl = calloc((size_t)n, sizeof *sl);
     for (int i = 0; i < n; i++) { sl[i] = -1; }
     int ns = 0;
     reset_records();
@@ -261,9 +284,7 @@ static void test_many_values_stress(void) {
 
     // ensure all: 17 spilled trigger fills
     reset_records();
-    for (int i = 0; i < n; i++) {
-        ra_ensure(ra, sl, &ns, i);
-    }
+    for (int i = 0; i < n; i++) { ra_ensure(ra, sl, &ns, i); }
     (nfills > 0) here;
 
     ra_destroy(ra);
@@ -272,17 +293,20 @@ static void test_many_values_stress(void) {
 }
 
 static void test_step_alloc(void) {
-    static const int8_t pool[] = {5, 6, 7, 8};
-    struct ra_config cfg = {
-        .pool = pool, .nregs = 4, .max_reg = 10,
+    static int8_t const pool[] = {5, 6, 7, 8};
+    struct ra_config    cfg = {
+        .pool = pool,
+        .nregs = 4,
+        .max_reg = 10,
 
         .spill = test_spill,
-        .fill = test_fill, .ctx = 0,
+        .fill = test_fill,
+        .ctx = 0,
     };
     struct umbra_basic_block *bb = make_bb(3, 0);
-    struct ra *ra = ra_create(bb, &cfg);
-    int sl[3] = {-1,-1,-1};
-    int ns = 0;
+    struct ra                *ra = ra_create(bb, &cfg);
+    int                       sl[3] = {-1, -1, -1};
+    int                       ns = 0;
     reset_records();
 
     struct ra_step s0 = ra_step_alloc(ra, sl, &ns, 0);
@@ -300,16 +324,20 @@ static void test_step_alloc(void) {
 }
 
 static void test_step_unary(void) {
-    static const int8_t pool[] = {5, 6, 7, 8};
-    struct ra_config cfg = {
-        .pool = pool, .nregs = 4, .max_reg = 10,
+    static int8_t const pool[] = {5, 6, 7, 8};
+    struct ra_config    cfg = {
+        .pool = pool,
+        .nregs = 4,
+        .max_reg = 10,
 
         .spill = test_spill,
-        .fill = test_fill, .ctx = 0,
+        .fill = test_fill,
+        .ctx = 0,
     };
     struct umbra_basic_block *bb = malloc(sizeof *bb);
     bb->inst = calloc(2, sizeof *bb->inst);
-    bb->insts = 2; bb->preamble = 0;
+    bb->insts = 2;
+    bb->preamble = 0;
 
     bb->inst[0].op = op_imm_32;
     bb->inst[0].imm = 42;
@@ -317,8 +345,8 @@ static void test_step_unary(void) {
     bb->inst[1].x = 0;
 
     struct ra *ra = ra_create(bb, &cfg);
-    int sl[2] = {-1,-1};
-    int ns = 0;
+    int        sl[2] = {-1, -1};
+    int        ns = 0;
     reset_records();
 
     int8_t r0 = ra_alloc(ra, sl, &ns);
@@ -326,9 +354,7 @@ static void test_step_unary(void) {
 
     // x dead at inst 1: claim x's register
     ra_set_last_use(ra, 0, 1);
-    struct ra_step s =
-        ra_step_unary(ra, sl, &ns,
-                      &bb->inst[1], 1, 0);
+    struct ra_step s = ra_step_unary(ra, sl, &ns, &bb->inst[1], 1, 0);
     (s.rx == r0) here;
     (s.rd == r0) here;
     (ra_reg(ra, 1) == s.rd) here;
@@ -336,31 +362,37 @@ static void test_step_unary(void) {
     (nspills == 0) here;
 
     ra_destroy(ra);
-    free(bb->inst); free(bb);
+    free(bb->inst);
+    free(bb);
 }
 
 static void test_step_unary_alive(void) {
-    static const int8_t pool[] = {5, 6, 7, 8};
-    struct ra_config cfg = {
-        .pool = pool, .nregs = 4, .max_reg = 10,
+    static int8_t const pool[] = {5, 6, 7, 8};
+    struct ra_config    cfg = {
+        .pool = pool,
+        .nregs = 4,
+        .max_reg = 10,
 
         .spill = test_spill,
-        .fill = test_fill, .ctx = 0,
+        .fill = test_fill,
+        .ctx = 0,
     };
     struct umbra_basic_block *bb = malloc(sizeof *bb);
     bb->inst = calloc(3, sizeof *bb->inst);
-    bb->insts = 3; bb->preamble = 0;
+    bb->insts = 3;
+    bb->preamble = 0;
 
     bb->inst[0].op = op_imm_32;
     bb->inst[0].imm = 42;
     bb->inst[1].op = op_f32_from_i32;
     bb->inst[1].x = 0;
     bb->inst[2].op = op_add_i32;
-    bb->inst[2].x = 0; bb->inst[2].y = 0;
+    bb->inst[2].x = 0;
+    bb->inst[2].y = 0;
 
     struct ra *ra = ra_create(bb, &cfg);
-    int sl[3] = {-1,-1,-1};
-    int ns = 0;
+    int        sl[3] = {-1, -1, -1};
+    int        ns = 0;
     reset_records();
 
     int8_t r0 = ra_alloc(ra, sl, &ns);
@@ -368,40 +400,44 @@ static void test_step_unary_alive(void) {
 
     // x still alive: rd must differ
     ra_set_last_use(ra, 0, 2);
-    struct ra_step s =
-        ra_step_unary(ra, sl, &ns,
-                      &bb->inst[1], 1, 0);
+    struct ra_step s = ra_step_unary(ra, sl, &ns, &bb->inst[1], 1, 0);
     (s.rx == r0) here;
     (s.rd != r0) here;
     (ra_reg(ra, 0) == r0) here;
     (ra_reg(ra, 1) == s.rd) here;
 
     ra_destroy(ra);
-    free(bb->inst); free(bb);
+    free(bb->inst);
+    free(bb);
 }
 
 static void test_step_alu(void) {
-    static const int8_t pool[] = {5, 6, 7, 8};
-    struct ra_config cfg = {
-        .pool = pool, .nregs = 4, .max_reg = 10,
+    static int8_t const pool[] = {5, 6, 7, 8};
+    struct ra_config    cfg = {
+        .pool = pool,
+        .nregs = 4,
+        .max_reg = 10,
 
         .spill = test_spill,
-        .fill = test_fill, .ctx = 0,
+        .fill = test_fill,
+        .ctx = 0,
     };
     struct umbra_basic_block *bb = malloc(sizeof *bb);
     bb->inst = calloc(3, sizeof *bb->inst);
-    bb->insts = 3; bb->preamble = 0;
+    bb->insts = 3;
+    bb->preamble = 0;
 
     bb->inst[0].op = op_imm_32;
     bb->inst[0].imm = 1;
     bb->inst[1].op = op_imm_32;
     bb->inst[1].imm = 2;
     bb->inst[2].op = op_add_i32;
-    bb->inst[2].x = 0; bb->inst[2].y = 1;
+    bb->inst[2].x = 0;
+    bb->inst[2].y = 1;
 
     struct ra *ra = ra_create(bb, &cfg);
-    int sl[3] = {-1,-1,-1};
-    int ns = 0;
+    int        sl[3] = {-1, -1, -1};
+    int        ns = 0;
     reset_records();
 
     int8_t r0 = ra_alloc(ra, sl, &ns);
@@ -412,9 +448,7 @@ static void test_step_alu(void) {
     // both dead: rd claims one
     ra_set_last_use(ra, 0, 2);
     ra_set_last_use(ra, 1, 2);
-    struct ra_step s =
-        ra_step_alu(ra, sl, &ns,
-                    &bb->inst[2], 2, 0, 0);
+    struct ra_step s = ra_step_alu(ra, sl, &ns, &bb->inst[2], 2, 0, 0);
     (s.rx == r0) here;
     (s.ry == r1) here;
     (s.rd >= 0) here;
@@ -422,31 +456,37 @@ static void test_step_alu(void) {
     (s.scratch < 0) here;
 
     ra_destroy(ra);
-    free(bb->inst); free(bb);
+    free(bb->inst);
+    free(bb);
 }
 
 static void test_step_alu_scratch(void) {
-    static const int8_t pool[] = {5, 6, 7, 8};
-    struct ra_config cfg = {
-        .pool = pool, .nregs = 4, .max_reg = 10,
+    static int8_t const pool[] = {5, 6, 7, 8};
+    struct ra_config    cfg = {
+        .pool = pool,
+        .nregs = 4,
+        .max_reg = 10,
 
         .spill = test_spill,
-        .fill = test_fill, .ctx = 0,
+        .fill = test_fill,
+        .ctx = 0,
     };
     struct umbra_basic_block *bb = malloc(sizeof *bb);
     bb->inst = calloc(3, sizeof *bb->inst);
-    bb->insts = 3; bb->preamble = 0;
+    bb->insts = 3;
+    bb->preamble = 0;
 
     bb->inst[0].op = op_imm_32;
     bb->inst[0].imm = 1;
     bb->inst[1].op = op_imm_32;
     bb->inst[1].imm = 2;
     bb->inst[2].op = op_add_i32;
-    bb->inst[2].x = 0; bb->inst[2].y = 1;
+    bb->inst[2].x = 0;
+    bb->inst[2].y = 1;
 
     struct ra *ra = ra_create(bb, &cfg);
-    int sl[3] = {-1,-1,-1};
-    int ns = 0;
+    int        sl[3] = {-1, -1, -1};
+    int        ns = 0;
     reset_records();
 
     int8_t r0 = ra_alloc(ra, sl, &ns);
@@ -456,9 +496,7 @@ static void test_step_alu_scratch(void) {
 
     ra_set_last_use(ra, 0, 2);
     ra_set_last_use(ra, 1, 2);
-    struct ra_step s =
-        ra_step_alu(ra, sl, &ns,
-                    &bb->inst[2], 2, 0, 1);
+    struct ra_step s = ra_step_alu(ra, sl, &ns, &bb->inst[2], 2, 0, 1);
     (s.rd >= 0) here;
     (s.scratch >= 0) here;
     (s.scratch != s.rd) here;
@@ -466,7 +504,8 @@ static void test_step_alu_scratch(void) {
     (s.scratch != s.ry) here;
 
     ra_destroy(ra);
-    free(bb->inst); free(bb);
+    free(bb->inst);
+    free(bb);
 }
 
 int main(void) {

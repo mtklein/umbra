@@ -29,7 +29,7 @@ static _Bool is_pow2(int x) { return __builtin_popcount((unsigned)x) == 1; }
 static _Bool is_pow2_or_zero(int x) { return __builtin_popcount((unsigned)x) <= 1; }
 
 static uint32_t mul_overflow(uint32_t x, uint32_t y) {
-    __builtin_mul_overflow(x,y,&x);
+    __builtin_mul_overflow(x, y, &x);
     return x;
 }
 

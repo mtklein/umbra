@@ -1,76 +1,63 @@
 #pragma once
 #include <stdint.h>
 
-#define OP_LIST(X)                                       \
-    X(iota)                                              \
-    X(imm_32) X(uni_32) X(load_32)                      \
-    X(gather_32) X(store_32) X(scatter_32)               \
-    X(deref_ptr)                                         \
-    X(add_f32) X(sub_f32) X(mul_f32) X(div_f32)         \
-    X(min_f32) X(max_f32) X(sqrt_f32)                   \
-    X(abs_f32) X(neg_f32)                               \
-    X(round_f32) X(floor_f32) X(ceil_f32)              \
-    X(round_i32) X(floor_i32) X(ceil_i32)              \
-    X(fma_f32) X(fms_f32)                               \
-    X(add_i32) X(sub_i32) X(mul_i32)                    \
-    X(shl_i32) X(shr_u32) X(shr_s32)                    \
-    X(and_32) X(or_32) X(xor_32) X(sel_32)              \
-    X(f32_from_i32) X(i32_from_f32)                     \
-    X(eq_f32) X(lt_f32) X(le_f32)                       \
-    X(eq_i32)                                            \
-    X(lt_s32) X(le_s32)                                  \
-    X(lt_u32) X(le_u32)                                  \
-    X(uni_16) X(load_16) X(store_16)                     \
-    X(gather_16) X(scatter_16)                           \
-    X(widen_s16) X(widen_u16) X(narrow_16)                \
-    X(widen_f16) X(narrow_f32)                       \
-    X(join)                                          \
-    X(shl_imm) X(shr_u32_imm) X(shr_s32_imm)       \
-    X(and_imm)                                      \
-    X(pack)                                         \
-    X(add_f32_imm) X(sub_f32_imm)                  \
-    X(mul_f32_imm) X(div_f32_imm)                  \
-    X(min_f32_imm) X(max_f32_imm)                  \
-    X(add_i32_imm) X(sub_i32_imm) X(mul_i32_imm)  \
-    X(or_32_imm) X(xor_32_imm)                     \
-    X(eq_f32_imm) X(lt_f32_imm) X(le_f32_imm)     \
-    X(eq_i32_imm) X(lt_s32_imm) X(le_s32_imm)
+#define OP_LIST(X)                                                                        \
+    X(iota)                                                                               \
+    X(imm_32)                                                                             \
+    X(uni_32)                                                                             \
+    X(load_32) X(gather_32) X(store_32) X(scatter_32) X(deref_ptr) X(add_f32) X(sub_f32)  \
+        X(mul_f32) X(div_f32) X(min_f32) X(max_f32) X(sqrt_f32) X(abs_f32) X(neg_f32) X(  \
+            round_f32) X(floor_f32) X(ceil_f32) X(round_i32) X(floor_i32) X(ceil_i32)     \
+            X(fma_f32) X(fms_f32) X(add_i32) X(sub_i32) X(mul_i32) X(shl_i32) X(shr_u32)  \
+                X(shr_s32) X(and_32) X(or_32) X(xor_32) X(sel_32) X(f32_from_i32)         \
+                    X(i32_from_f32) X(eq_f32) X(lt_f32) X(le_f32) X(eq_i32) X(lt_s32) X(  \
+                        le_s32) X(lt_u32) X(le_u32) X(uni_16) X(load_16) X(store_16)      \
+                        X(gather_16) X(scatter_16) X(widen_s16) X(widen_u16) X(narrow_16) \
+                            X(widen_f16) X(narrow_f32) X(join) X(shl_imm) X(shr_u32_imm)  \
+                                X(shr_s32_imm) X(and_imm) X(pack) X(add_f32_imm)          \
+                                    X(sub_f32_imm) X(mul_f32_imm) X(div_f32_imm)          \
+                                        X(min_f32_imm) X(max_f32_imm) X(add_i32_imm)      \
+                                            X(sub_i32_imm) X(mul_i32_imm) X(or_32_imm)    \
+                                                X(xor_32_imm) X(eq_f32_imm) X(lt_f32_imm) \
+                                                    X(le_f32_imm) X(eq_i32_imm)           \
+                                                        X(lt_s32_imm) X(le_s32_imm)
 
 enum op {
-    #define OP_ENUM(name) op_##name,
+#define OP_ENUM(name) op_##name,
     OP_LIST(OP_ENUM)
-    #undef OP_ENUM
+#undef OP_ENUM
 };
 
 struct bb_inst {
     enum op op;
     _Bool   uniform, pad_[3];
-    int     x,y,z;
+    int     x, y, z;
     int     ptr, imm;
 };
 
-struct hash_slot { uint32_t hash; int ix; };
+struct hash_slot {
+    uint32_t hash;
+    int      ix;
+};
 
 struct umbra_builder {
     struct bb_inst   *inst;
     struct hash_slot *ht;
-    int               insts, ht_mask, uni_len, :32;
+    int               insts, ht_mask, uni_len, : 32;
 };
 
 struct umbra_basic_block {
     struct bb_inst *inst;
-    int             insts, preamble, uni_len, :32;
+    int             insts, preamble, uni_len, : 32;
 };
 
-_Bool is_store  (enum op);
-_Bool has_ptr   (enum op);
+_Bool is_store(enum op);
+_Bool has_ptr(enum op);
 _Bool is_varying(enum op);
 
 int umbra_const_eval(enum op, int, int, int);
 
-typedef _Bool (*join_chooser)(
-    struct bb_inst const *insts, int join_id);
+typedef _Bool (*join_chooser)(struct bb_inst const *insts, int join_id);
 
-struct umbra_basic_block* umbra_resolve_joins(
-    struct umbra_basic_block const *bb,
-    join_chooser choose_y);
+struct umbra_basic_block *umbra_resolve_joins(struct umbra_basic_block const *bb,
+                                              join_chooser                    choose_y);

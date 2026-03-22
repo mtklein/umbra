@@ -3,17 +3,23 @@
 
 #if !defined(__aarch64__) && !defined(__AVX2__)
 
-struct umbra_jit { int dummy; };
-struct umbra_jit* umbra_jit(
-    struct umbra_basic_block const *bb
-) { (void)bb; return 0; }
-void umbra_jit_run (struct umbra_jit *j, int n, umbra_buf buf[]) {
-    (void)j; (void)n; (void)buf;
+struct umbra_jit {
+    int dummy;
+};
+struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
+    (void)bb;
+    return 0;
+}
+void umbra_jit_run(struct umbra_jit *j, int n, umbra_buf buf[]) {
+    (void)j;
+    (void)n;
+    (void)buf;
 }
 void umbra_jit_free(struct umbra_jit *j) { (void)j; }
-void umbra_dump_jit_mca(
-    struct umbra_jit const *j, FILE *f
-) { (void)j; (void)f; }
+void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
+    (void)j;
+    (void)f;
+}
 
 #elif defined(__aarch64__)
 
@@ -26,38 +32,33 @@ void umbra_dump_jit_mca(
 #include <unistd.h>
 #include <libkern/OSCacheControl.h>
 
-struct pool_ref { int data_off, code_pos; };
-struct pool {
-    uint8_t        *data;
-    struct pool_ref *refs;
-    int nbytes, nrefs, cap_data, cap_refs;
+struct pool_ref {
+    int data_off, code_pos;
 };
-static int pool_add(struct pool *p,
-                    void const *src, int n) {
+struct pool {
+    uint8_t         *data;
+    struct pool_ref *refs;
+    int              nbytes, nrefs, cap_data, cap_refs;
+};
+static int pool_add(struct pool *p, void const *src, int n) {
     for (int i = 0; i + n <= p->nbytes; i += n) {
-        if (!__builtin_memcmp(p->data + i, src, (size_t)n)) {
-            return i;
-        }
+        if (!__builtin_memcmp(p->data + i, src, (size_t)n)) { return i; }
     }
     if (p->nbytes + n > p->cap_data) {
-        p->cap_data = p->cap_data ? 2*p->cap_data : 256;
-        p->data = realloc(p->data,
-                          (size_t)p->cap_data);
+        p->cap_data = p->cap_data ? 2 * p->cap_data : 256;
+        p->data = realloc(p->data, (size_t)p->cap_data);
     }
     int off = p->nbytes;
     __builtin_memcpy(p->data + off, src, (size_t)n);
     p->nbytes += n;
     return off;
 }
-static void pool_ref_at(struct pool *p,
-                        int data_off, int code_pos) {
+static void pool_ref_at(struct pool *p, int data_off, int code_pos) {
     if (p->nrefs == p->cap_refs) {
-        p->cap_refs = p->cap_refs ? 2*p->cap_refs : 32;
-        p->refs = realloc(p->refs,
-            (size_t)p->cap_refs * sizeof *p->refs);
+        p->cap_refs = p->cap_refs ? 2 * p->cap_refs : 32;
+        p->refs = realloc(p->refs, (size_t)p->cap_refs * sizeof *p->refs);
     }
-    p->refs[p->nrefs++] =
-        (struct pool_ref){data_off, code_pos};
+    p->refs[p->nrefs++] = (struct pool_ref){data_off, code_pos};
 }
 static void pool_free(struct pool *p) {
     free(p->data);
@@ -66,13 +67,13 @@ static void pool_free(struct pool *p) {
 
 #include "asm_arm64.h"
 
-enum { XP=8, XI=9, XT=10, XH=11, XW=12, XM=13, XS=15 };
+enum { XP = 8, XI = 9, XT = 10, XH = 11, XW = 12, XM = 13, XS = 15 };
 
 static void load_ptr(Buf *c, int p, int *last_ptr) {
     if (*last_ptr == p) { return; }
     *last_ptr = p;
     int disp = p * 16;
-    put(c, 0xf9400020u | ((uint32_t)(disp/8)<<10) | (1u<<5) | (uint32_t)XP);
+    put(c, 0xf9400020u | ((uint32_t)(disp / 8) << 10) | (1u << 5) | (uint32_t)XP);
 }
 
 static void resolve_ptr(Buf *c, int p, int *last_ptr, int const *deref_gpr) {
@@ -89,190 +90,192 @@ static void resolve_ptr(Buf *c, int p, int *last_ptr, int const *deref_gpr) {
 static void load_max_ix(Buf *c, int p, int elem_shift, int const *deref_gpr) {
     if (p < 0) {
         (void)deref_gpr;
-        put(c, 0xd2a00000u
-            | (0x7fffu << 5)
-            | (uint32_t)XM);
+        put(c, 0xd2a00000u | (0x7fffu << 5) | (uint32_t)XM);
         return;
     }
     int disp = p * 16 + 8;
-    put(c, 0xf9400020u | ((uint32_t)(disp / 8) << 10)
-                       | (1u << 5) | (uint32_t)XM);
+    put(c, 0xf9400020u | ((uint32_t)(disp / 8) << 10) | (1u << 5) | (uint32_t)XM);
     put(c, 0xf10001bfu);
     put(c, 0xda8da1adu);
-    put(c, 0x53000000u | ((uint32_t)elem_shift << 16) | (31u << 10)
-                       | ((uint32_t)XM << 5) | (uint32_t)XM);
+    put(c,
+        0x53000000u
+            | ((uint32_t)elem_shift << 16)
+            | (31u << 10)
+            | ((uint32_t)XM << 5)
+            | (uint32_t)XM);
     put(c, 0x71000000u | (1u << 10) | ((uint32_t)XM << 5) | (uint32_t)XM);
-    put(c, 0x1a800000u | ((uint32_t)XM << 16)
-                       | (0x4u << 12)
-                       | (31u << 5)
-                       | (uint32_t)XM);
+    put(c, 0x1a800000u | ((uint32_t)XM << 16) | (0x4u << 12) | (31u << 5) | (uint32_t)XM);
 }
 
 static void clamp_wt(Buf *c) {
     put(c, 0x7100001fu | ((uint32_t)XT << 5));
-    put(c, 0x1a800000u | ((uint32_t)XT << 16)
-                       | (0xbu << 12)
-                       | (31u << 5)
-                       | (uint32_t)XT);
+    put(c, 0x1a800000u | ((uint32_t)XT << 16) | (0xbu << 12) | (31u << 5) | (uint32_t)XT);
     put(c, 0x6b00001fu | ((uint32_t)XM << 16) | ((uint32_t)XT << 5));
-    put(c, 0x1a800000u | ((uint32_t)XT << 16)
-                       | (0xau << 12)
-                       | ((uint32_t)XM << 5)
-                       | (uint32_t)XT);
+    put(c,
+        0x1a800000u | ((uint32_t)XT << 16) | (0xau << 12) | ((uint32_t)XM << 5) | (uint32_t)XT);
 }
 
 static void vld(Buf *c, int vd, int s) { put(c, LDR_qi(vd, XS, s)); }
 static void vst(Buf *c, int vd, int s) { put(c, STR_qi(vd, XS, s)); }
 
-static _Bool emit_alu_reg(Buf *c, enum op op,
-                          int d, int x, int y,
-                          int z, int imm,
+static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm,
                           int scratch) {
     switch (op) {
-    case op_add_f32: put(c, FADD_4s(d,x,y)); return 1;
-    case op_sub_f32: put(c, FSUB_4s(d,x,y)); return 1;
-    case op_mul_f32: put(c, FMUL_4s(d,x,y)); return 1;
-    case op_div_f32: put(c, FDIV_4s(d,x,y)); return 1;
-    case op_min_f32: put(c, FMINNM_4s(d,x,y)); return 1;
-    case op_max_f32: put(c, FMAXNM_4s(d,x,y)); return 1;
-    case op_sqrt_f32: put(c, FSQRT_4s(d,x)); return 1;
-    case op_abs_f32:    put(c, FABS_4s(d,x));    return 1;
-    case op_neg_f32:    put(c, FNEG_4s(d,x));    return 1;
-    case op_round_f32:  put(c, FRINTN_4s(d,x));  return 1;
-    case op_floor_f32:  put(c, FRINTM_4s(d,x));  return 1;
-    case op_ceil_f32:   put(c, FRINTP_4s(d,x));  return 1;
-    case op_round_i32:  put(c, FCVTNS_4s(d,x));  return 1;
-    case op_floor_i32:  put(c, FCVTMS_4s(d,x));  return 1;
-    case op_ceil_i32:   put(c, FCVTPS_4s(d,x));  return 1;
+    case op_add_f32: put(c, FADD_4s(d, x, y)); return 1;
+    case op_sub_f32: put(c, FSUB_4s(d, x, y)); return 1;
+    case op_mul_f32: put(c, FMUL_4s(d, x, y)); return 1;
+    case op_div_f32: put(c, FDIV_4s(d, x, y)); return 1;
+    case op_min_f32: put(c, FMINNM_4s(d, x, y)); return 1;
+    case op_max_f32: put(c, FMAXNM_4s(d, x, y)); return 1;
+    case op_sqrt_f32: put(c, FSQRT_4s(d, x)); return 1;
+    case op_abs_f32: put(c, FABS_4s(d, x)); return 1;
+    case op_neg_f32: put(c, FNEG_4s(d, x)); return 1;
+    case op_round_f32: put(c, FRINTN_4s(d, x)); return 1;
+    case op_floor_f32: put(c, FRINTM_4s(d, x)); return 1;
+    case op_ceil_f32: put(c, FRINTP_4s(d, x)); return 1;
+    case op_round_i32: put(c, FCVTNS_4s(d, x)); return 1;
+    case op_floor_i32: put(c, FCVTMS_4s(d, x)); return 1;
+    case op_ceil_i32: put(c, FCVTPS_4s(d, x)); return 1;
     case op_fma_f32:
-        if (d==z) {
-            put(c, FMLA_4s(d,x,y));
-        } else if (d!=x && d!=y) {
-            put(c, ORR_16b(d,z,z));
-            put(c, FMLA_4s(d,x,y));
+        if (d == z) {
+            put(c, FMLA_4s(d, x, y));
+        } else if (d != x && d != y) {
+            put(c, ORR_16b(d, z, z));
+            put(c, FMLA_4s(d, x, y));
         } else {
-            put(c, ORR_16b(scratch,z,z));
-            put(c, FMLA_4s(scratch,x,y));
-            put(c, ORR_16b(d,scratch,scratch));
+            put(c, ORR_16b(scratch, z, z));
+            put(c, FMLA_4s(scratch, x, y));
+            put(c, ORR_16b(d, scratch, scratch));
         }
         return 1;
     case op_fms_f32:
-        if (d==z) {
-            put(c, FMLS_4s(d,x,y));
-        } else if (d!=x && d!=y) {
-            put(c, ORR_16b(d,z,z));
-            put(c, FMLS_4s(d,x,y));
+        if (d == z) {
+            put(c, FMLS_4s(d, x, y));
+        } else if (d != x && d != y) {
+            put(c, ORR_16b(d, z, z));
+            put(c, FMLS_4s(d, x, y));
         } else {
-            put(c, ORR_16b(scratch,z,z));
-            put(c, FMLS_4s(scratch,x,y));
-            put(c, ORR_16b(d,scratch,scratch));
+            put(c, ORR_16b(scratch, z, z));
+            put(c, FMLS_4s(scratch, x, y));
+            put(c, ORR_16b(d, scratch, scratch));
         }
         return 1;
 
-    case op_add_i32: put(c, ADD_4s(d,x,y)); return 1;
-    case op_sub_i32: put(c, SUB_4s(d,x,y)); return 1;
-    case op_mul_i32: put(c, MUL_4s(d,x,y)); return 1;
-    case op_shl_i32: put(c, USHL_4s(d,x,y)); return 1;
+    case op_add_i32: put(c, ADD_4s(d, x, y)); return 1;
+    case op_sub_i32: put(c, SUB_4s(d, x, y)); return 1;
+    case op_mul_i32: put(c, MUL_4s(d, x, y)); return 1;
+    case op_shl_i32: put(c, USHL_4s(d, x, y)); return 1;
     case op_shr_u32:
-        put(c, NEG_4s(scratch,y));
-        put(c, USHL_4s(d,x,scratch));
+        put(c, NEG_4s(scratch, y));
+        put(c, USHL_4s(d, x, scratch));
         return 1;
     case op_shr_s32:
-        put(c, NEG_4s(scratch,y));
-        put(c, SSHL_4s(d,x,scratch));
+        put(c, NEG_4s(scratch, y));
+        put(c, SSHL_4s(d, x, scratch));
         return 1;
 
-    case op_f32_from_i32: put(c, SCVTF_4s(d,x)); return 1;
-    case op_i32_from_f32: put(c, FCVTZS_4s(d,x)); return 1;
+    case op_f32_from_i32: put(c, SCVTF_4s(d, x)); return 1;
+    case op_i32_from_f32: put(c, FCVTZS_4s(d, x)); return 1;
 
-    case op_eq_f32: put(c, FCMEQ_4s(d,x,y)); return 1;
-    case op_lt_f32: put(c, FCMGT_4s(d,y,x)); return 1;
-    case op_le_f32: put(c, FCMGE_4s(d,y,x)); return 1;
+    case op_eq_f32: put(c, FCMEQ_4s(d, x, y)); return 1;
+    case op_lt_f32: put(c, FCMGT_4s(d, y, x)); return 1;
+    case op_le_f32: put(c, FCMGE_4s(d, y, x)); return 1;
 
-    case op_eq_i32: put(c, CMEQ_4s(d,x,y)); return 1;
-    case op_lt_s32: put(c, CMGT_4s(d,y,x)); return 1;
-    case op_le_s32: put(c, CMGE_4s(d,y,x)); return 1;
-    case op_lt_u32: put(c, CMHI_4s(d,y,x)); return 1;
-    case op_le_u32: put(c, CMHS_4s(d,y,x)); return 1;
+    case op_eq_i32: put(c, CMEQ_4s(d, x, y)); return 1;
+    case op_lt_s32: put(c, CMGT_4s(d, y, x)); return 1;
+    case op_le_s32: put(c, CMGE_4s(d, y, x)); return 1;
+    case op_lt_u32: put(c, CMHI_4s(d, y, x)); return 1;
+    case op_le_u32: put(c, CMHS_4s(d, y, x)); return 1;
 
-    case op_and_32: put(c, AND_16b(d,x,y)); return 1;
-    case op_or_32:  put(c, ORR_16b(d,x,y)); return 1;
-    case op_xor_32: put(c, EOR_16b(d,x,y)); return 1;
+    case op_and_32: put(c, AND_16b(d, x, y)); return 1;
+    case op_or_32: put(c, ORR_16b(d, x, y)); return 1;
+    case op_xor_32: put(c, EOR_16b(d, x, y)); return 1;
     case op_sel_32:
-        if (d==x) { put(c, BSL_16b(d,y,z)); }
-        else if (d==y) { put(c, BIF_16b(d,z,x)); }
-        else if (d==z) { put(c, BIT_16b(d,y,x)); }
-        else { put(c, ORR_16b(d,z,z)); put(c, BIT_16b(d,y,x)); }
+        if (d == x) {
+            put(c, BSL_16b(d, y, z));
+        } else if (d == y) {
+            put(c, BIF_16b(d, z, x));
+        } else if (d == z) {
+            put(c, BIT_16b(d, y, x));
+        } else {
+            put(c, ORR_16b(d, z, z));
+            put(c, BIT_16b(d, y, x));
+        }
         return 1;
     case op_join:
-        if (d != x) { put(c, ORR_16b(d,x,x)); }
+        if (d != x) { put(c, ORR_16b(d, x, x)); }
         return 1;
-    case op_shl_imm:
-        put(c, SHL_4s_imm(d,x,imm));
-        return 1;
-    case op_shr_u32_imm:
-        put(c, USHR_4s_imm(d,x,imm));
-        return 1;
-    case op_shr_s32_imm:
-        put(c, SSHR_4s_imm(d,x,imm));
-        return 1;
+    case op_shl_imm: put(c, SHL_4s_imm(d, x, imm)); return 1;
+    case op_shr_u32_imm: put(c, USHR_4s_imm(d, x, imm)); return 1;
+    case op_shr_s32_imm: put(c, SSHR_4s_imm(d, x, imm)); return 1;
     case op_pack:
         if (d == x) {
-            put(c, SLI_4s_imm(d,y,imm));
+            put(c, SLI_4s_imm(d, y, imm));
         } else if (d != y) {
-            put(c, ORR_16b(d,x,x));
-            put(c, SLI_4s_imm(d,y,imm));
+            put(c, ORR_16b(d, x, x));
+            put(c, SLI_4s_imm(d, y, imm));
         } else {
-            put(c, ORR_16b(scratch,x,x));
-            put(c, SLI_4s_imm(scratch,y,imm));
-            put(c, ORR_16b(d,scratch,scratch));
+            put(c, ORR_16b(scratch, x, x));
+            put(c, SLI_4s_imm(scratch, y, imm));
+            put(c, ORR_16b(d, scratch, scratch));
         }
         return 1;
 
     case op_imm_32:
     case op_and_imm:
-    case op_add_f32_imm: case op_sub_f32_imm:
-    case op_mul_f32_imm: case op_div_f32_imm:
-    case op_min_f32_imm: case op_max_f32_imm:
-    case op_add_i32_imm: case op_sub_i32_imm:
+    case op_add_f32_imm:
+    case op_sub_f32_imm:
+    case op_mul_f32_imm:
+    case op_div_f32_imm:
+    case op_min_f32_imm:
+    case op_max_f32_imm:
+    case op_add_i32_imm:
+    case op_sub_i32_imm:
     case op_mul_i32_imm:
-    case op_or_32_imm:  case op_xor_32_imm:
-    case op_eq_f32_imm: case op_lt_f32_imm:
+    case op_or_32_imm:
+    case op_xor_32_imm:
+    case op_eq_f32_imm:
+    case op_lt_f32_imm:
     case op_le_f32_imm:
-    case op_eq_i32_imm: case op_lt_s32_imm:
+    case op_eq_i32_imm:
+    case op_lt_s32_imm:
     case op_le_s32_imm:
-    case op_iota:       case op_deref_ptr:
-    case op_uni_32:     case op_load_32:
-    case op_gather_32:  case op_store_32:
+    case op_iota:
+    case op_deref_ptr:
+    case op_uni_32:
+    case op_load_32:
+    case op_gather_32:
+    case op_store_32:
     case op_scatter_32:
-    case op_uni_16:     case op_load_16:
-    case op_gather_16:  case op_store_16:
+    case op_uni_16:
+    case op_load_16:
+    case op_gather_16:
+    case op_store_16:
     case op_scatter_16:
-    case op_widen_f16:  case op_narrow_f32:
-    case op_widen_s16:  case op_widen_u16:
-    case op_narrow_16:  return 0;
+    case op_widen_f16:
+    case op_narrow_f32:
+    case op_widen_s16:
+    case op_widen_u16:
+    case op_narrow_16: return 0;
     }
     return 0;
 }
 
 static int8_t const ra_pool[] = {
-    4,5,6,7,16,17,18,19,20,21,
-    22,23,24,25,26,27,28,29,30,31,
+    4, 5, 6, 7, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
 };
 
 struct jit_ctx {
-    Buf *c;
+    Buf                            *c;
     struct umbra_basic_block const *bb;
-    struct pool pool;
+    struct pool                     pool;
 };
 
-static void arm64_spill(int reg, int slot,
-                        void *ctx) {
-    vst(((struct jit_ctx*)ctx)->c, reg, slot);
+static void arm64_spill(int reg, int slot, void *ctx) {
+    vst(((struct jit_ctx *)ctx)->c, reg, slot);
 }
-static void arm64_fill(int reg, int slot,
-                       void *ctx) {
-    vld(((struct jit_ctx*)ctx)->c, reg, slot);
+static void arm64_fill(int reg, int slot, void *ctx) {
+    vld(((struct jit_ctx *)ctx)->c, reg, slot);
 }
 static _Bool arm64_movi(Buf *c, int d, uint32_t v) {
     if (v == 0) {
@@ -280,112 +283,92 @@ static _Bool arm64_movi(Buf *c, int d, uint32_t v) {
     } else if (v == (v & 0x000000ffu)) {
         put(c, MOVI_4s(d, (uint8_t)v, 0));
     } else if (v == (v & 0x0000ff00u)) {
-        put(c, MOVI_4s(d, (uint8_t)(v>>8), 8));
+        put(c, MOVI_4s(d, (uint8_t)(v >> 8), 8));
     } else if (v == (v & 0x00ff0000u)) {
-        put(c, MOVI_4s(d,(uint8_t)(v>>16),16));
+        put(c, MOVI_4s(d, (uint8_t)(v >> 16), 16));
     } else if (v == (v & 0xff000000u)) {
-        put(c, MOVI_4s(d,(uint8_t)(v>>24),24));
+        put(c, MOVI_4s(d, (uint8_t)(v >> 24), 24));
     } else if ((~v) == ((~v) & 0x000000ffu)) {
         put(c, MVNI_4s(d, (uint8_t)~v, 0));
     } else if ((~v) == ((~v) & 0x0000ff00u)) {
-        put(c, MVNI_4s(d,(uint8_t)(~v>>8), 8));
+        put(c, MVNI_4s(d, (uint8_t)(~v >> 8), 8));
     } else if ((~v) == ((~v) & 0x00ff0000u)) {
-        put(c, MVNI_4s(d,(uint8_t)(~v>>16),16));
+        put(c, MVNI_4s(d, (uint8_t)(~v >> 16), 16));
     } else if ((~v) == ((~v) & 0xff000000u)) {
-        put(c, MVNI_4s(d,(uint8_t)(~v>>24),24));
+        put(c, MVNI_4s(d, (uint8_t)(~v >> 24), 24));
     } else {
-        uint32_t s = v >> 31,
-                 e = (v >> 23) & 0xffu,
-                 f = v & 0x7fffffu;
+        uint32_t s = v >> 31, e = (v >> 23) & 0xffu, f = v & 0x7fffffu;
         if (!(f & 0x7ffffu) && e >= 124 && e <= 131) {
             uint32_t E = e - 124;
-            uint32_t imm8 = (s << 7)
-                | (((~E >> 2) & 1) << 6)
-                | ((E & 3) << 4)
-                | ((f >> 19) & 0xf);
-            put(c, 0x4f00f400u
-                | ((imm8 >> 5) << 16)
-                | ((imm8 & 0x1fu) << 5)
-                | (uint32_t)d);
+            uint32_t imm8 =
+                (s << 7) | (((~E >> 2) & 1) << 6) | ((E & 3) << 4) | ((f >> 19) & 0xf);
+            put(c, 0x4f00f400u | ((imm8 >> 5) << 16) | ((imm8 & 0x1fu) << 5) | (uint32_t)d);
         } else {
             return 0;
         }
     }
     return 1;
 }
-static void arm64_pool_load(Buf *c, struct pool *p,
-                            int d, uint32_t v) {
+static void arm64_pool_load(Buf *c, struct pool *p, int d, uint32_t v) {
     if (arm64_movi(c, d, v)) { return; }
     uint32_t bcast[4] = {v, v, v, v};
-    int off = pool_add(p, bcast, 16);
+    int      off = pool_add(p, bcast, 16);
     pool_ref_at(p, off, c->len);
     put(c, 0x9c000000u | (uint32_t)d);
 }
-static void arm64_pool_load_wide(Buf *c, struct pool *p,
-                                 int d, void const *data) {
+static void arm64_pool_load_wide(Buf *c, struct pool *p, int d, void const *data) {
     int off = pool_add(p, data, 16);
     pool_ref_at(p, off, c->len);
     put(c, 0x9c000000u | (uint32_t)d);
 }
-static void arm64_remat(int reg, int val,
-                        void *ctx) {
+static void arm64_remat(int reg, int val, void *ctx) {
     struct jit_ctx *j = ctx;
-    arm64_pool_load(j->c, &j->pool,
-                    reg,
-                    (uint32_t)j->bb->inst[val].imm);
+    arm64_pool_load(j->c, &j->pool, reg, (uint32_t)j->bb->inst[val].imm);
 }
 
-static struct ra* ra_create_arm64(
-    struct umbra_basic_block const *bb,
-    struct jit_ctx *jc)
-{
+static struct ra *ra_create_arm64(struct umbra_basic_block const *bb, struct jit_ctx *jc) {
     struct ra_config cfg = {
-        .pool     = ra_pool,
-        .nregs    = 20,
-        .max_reg  = 32,
-        .spill    = arm64_spill,
-        .fill     = arm64_fill,
-        .remat    = arm64_remat,
-        .ctx      = jc,
+        .pool = ra_pool,
+        .nregs = 20,
+        .max_reg = 32,
+        .spill = arm64_spill,
+        .fill = arm64_fill,
+        .remat = arm64_remat,
+        .ctx = jc,
     };
     return ra_create(bb, &cfg);
 }
 
-
-static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
-                     int from, int to,
-                     int *sl, int *ns, struct ra *ra, _Bool scalar,
-                     int *deref_gpr,
+static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int to,
+                     int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
                      struct jit_ctx *jc);
 
 struct umbra_jit {
     void  *code;
     size_t code_size;
-    void (*entry)(int, umbra_buf*);
-    int    loop_start, loop_end;
+    void (*entry)(int, umbra_buf *);
+    int loop_start, loop_end;
 };
 
-static _Bool arm64_chooser(struct bb_inst const *insts,
-                           int join_id) {
+static _Bool arm64_chooser(struct bb_inst const *insts, int join_id) {
     return insts[insts[join_id].y].op == op_pack;
 }
 
-struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
-    struct umbra_basic_block *resolved =
-        umbra_resolve_joins(bb, arm64_chooser);
+struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
+    struct umbra_basic_block *resolved = umbra_resolve_joins(bb, arm64_chooser);
     bb = resolved;
 
     int *sl = malloc((size_t)bb->insts * sizeof(int));
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
-    int ns = 0;
+    int  ns = 0;
     int *deref_gpr = calloc((size_t)bb->insts, sizeof(int));
 
-    Buf c={0};
-    struct jit_ctx jc = {.c=&c, .bb=bb, .pool={0}};
-    struct ra *ra = ra_create_arm64(bb, &jc);
+    Buf            c = {0};
+    struct jit_ctx jc = {.c = &c, .bb = bb, .pool = {0}};
+    struct ra     *ra = ra_create_arm64(bb, &jc);
 
-    put(&c, STP_pre(29,30,31,-2));
-    put(&c, ADD_xi(29,31,0));
+    put(&c, STP_pre(29, 30, 31, -2));
+    put(&c, ADD_xi(29, 31, 0));
     int stack_patch = c.len;
     put(&c, 0xd503201fu);
     put(&c, 0xd503201fu);
@@ -394,14 +377,14 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
 
     ra_begin_loop(ra);
 
-    put(&c, MOVZ_x(XI,0));
+    put(&c, MOVZ_x(XI, 0));
 
     int loop_top = c.len;
 
-    put(&c, 0xcb090000u|(uint32_t)XT);
-    put(&c, SUBS_xi(31,XT,4));
+    put(&c, 0xcb090000u | (uint32_t)XT);
+    put(&c, SUBS_xi(31, XT, 4));
     int br_tail = c.len;
-    put(&c, Bcond(0xb,0));
+    put(&c, Bcond(0xb, 0));
     put(&c, LSL_xi(XH, XI, 1));
     put(&c, LSL_xi(XW, XI, 2));
 
@@ -412,7 +395,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
 
     int loop_body_end = c.len;
 
-    put(&c, ADD_xi(XI,XI,4));
+    put(&c, ADD_xi(XI, XI, 4));
     put(&c, B(loop_top - c.len));
 
     int tail_top = c.len;
@@ -420,7 +403,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
 
     put(&c, 0xeb09001fu);
     int br_epi = c.len;
-    put(&c, Bcond(0xd,0));
+    put(&c, Bcond(0xd, 0));
 
     for (int i = 0; i < bb->insts; i++) { ra_free_reg(ra, i); }
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
@@ -428,19 +411,19 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, &jc);
     emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 1, deref_gpr, &jc);
 
-    put(&c, ADD_xi(XI,XI,1));
+    put(&c, ADD_xi(XI, XI, 1));
     put(&c, B(tail_top - c.len));
 
     int epi = c.len;
     c.buf[br_epi] = Bcond(0xd, epi - br_epi);
 
-    put(&c, ADD_xi(31,29,0));
-    put(&c, LDP_post(29,30,31,2));
+    put(&c, ADD_xi(31, 29, 0));
+    put(&c, LDP_post(29, 30, 31, 2));
     put(&c, RET());
 
     if (ns > 0) {
-        c.buf[stack_patch  ] = SUB_xi(31,31,ns*16);
-        c.buf[stack_patch+1] = ADD_xi(XS,31,0);
+        c.buf[stack_patch] = SUB_xi(31, 31, ns * 16);
+        c.buf[stack_patch + 1] = ADD_xi(XS, 31, 0);
     }
     while (c.len & 3) { put(&c, 0xd503201fu); }
     int pool_start = c.len;
@@ -451,24 +434,29 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     }
     for (int pi = 0; pi < jc.pool.nrefs; pi++) {
         struct pool_ref *r = &jc.pool.refs[pi];
-        int word_off = pool_start + r->data_off / 4;
-        int imm19 = word_off - r->code_pos;
+        int              word_off = pool_start + r->data_off / 4;
+        int              imm19 = word_off - r->code_pos;
         c.buf[r->code_pos] = 0x9c000000u
             | ((uint32_t)(imm19 & 0x7ffff) << 5)
             | (c.buf[r->code_pos] & 0x1fu);
     }
     pool_free(&jc.pool);
 
-    ra_destroy(ra); free(sl); free(deref_gpr);
+    ra_destroy(ra);
+    free(sl);
+    free(deref_gpr);
     umbra_basic_block_free(resolved);
 
     size_t code_sz = (size_t)c.len * 4;
     size_t pg = 16384;
-    size_t alloc = (code_sz + pg-1) & ~(pg-1);
+    size_t alloc = (code_sz + pg - 1) & ~(pg - 1);
 
-    void *mem = mmap(NULL, alloc, PROT_READ|PROT_WRITE|PROT_EXEC,
-                     MAP_PRIVATE|MAP_ANON|MAP_JIT, -1, 0);
-    if (mem==MAP_FAILED) { free(c.buf); return 0; }
+    void *mem = mmap(NULL, alloc, PROT_READ | PROT_WRITE | PROT_EXEC,
+                     MAP_PRIVATE | MAP_ANON | MAP_JIT, -1, 0);
+    if (mem == MAP_FAILED) {
+        free(c.buf);
+        return 0;
+    }
 
     pthread_jit_write_protect_np(0);
     __builtin_memcpy(mem, c.buf, code_sz);
@@ -480,24 +468,25 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     j->code = mem;
     j->code_size = alloc;
     j->loop_start = loop_body_start;
-    j->loop_end   = loop_body_end;
-    { union { void *p; void (*fn)(int,umbra_buf*); } u = {.p=mem};
-      j->entry = u.fn; }
+    j->loop_end = loop_body_end;
+    {
+        union {
+            void *p;
+            void (*fn)(int, umbra_buf *);
+        } u = {.p = mem};
+        j->entry = u.fn;
+    }
     return j;
 }
 
-static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
-                     int from, int to,
-                     int *sl, int *ns,
-                     struct ra *ra, _Bool scalar,
-                     int *deref_gpr,
-                     struct jit_ctx *jc)
-{
-    #define lu(v) ra_last_use(ra, (v))
+static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int to,
+                     int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
+                     struct jit_ctx *jc) {
+#define lu(v) ra_last_use(ra, (v))
     int last_ptr = -1;
     int dc = 0;
 
-    for (int i=from; i<to; i++) {
+    for (int i = from; i < to; i++) {
         struct bb_inst const *inst = &bb->inst[i];
 
         switch (inst->op) {
@@ -518,10 +507,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             put(c, DUP_4s_w(s.rd, XI));
             if (!scalar) {
-                int8_t tmp = ra_alloc(ra, sl, ns);
-                uint32_t iota4[4] = {0,1,2,3};
-                arm64_pool_load_wide(c, &jc->pool,
-                                     tmp, iota4);
+                int8_t   tmp = ra_alloc(ra, sl, ns);
+                uint32_t iota4[4] = {0, 1, 2, 3};
+                arm64_pool_load_wide(c, &jc->pool, tmp, iota4);
                 put(c, ADD_4s(s.rd, s.rd, tmp));
                 ra_return_reg(ra, tmp);
             }
@@ -529,7 +517,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         case op_load_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int p = inst->ptr;
+            int            p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
             if (inst->x) {
                 int8_t ro = ra_ensure(ra, sl, ns, inst->x);
@@ -537,18 +525,24 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
                 put(c, LSL_xi(XT, XT, 2));
                 put(c, ADD_xr(XT, XP, XT));
-                if (scalar) { put(c, LDR_sx(s.rd, XT, XI)); }
-                else         { put(c, LDR_q(s.rd, XT, XW)); }
+                if (scalar) {
+                    put(c, LDR_sx(s.rd, XT, XI));
+                } else {
+                    put(c, LDR_q(s.rd, XT, XW));
+                }
                 last_ptr = -999;
             } else {
-                if (scalar) { put(c, LDR_sx(s.rd, XP, XI)); }
-                else         { put(c, LDR_q(s.rd, XP, XW)); }
+                if (scalar) {
+                    put(c, LDR_sx(s.rd, XP, XI));
+                } else {
+                    put(c, LDR_q(s.rd, XP, XW));
+                }
             }
         } break;
 
         case op_load_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int p = inst->ptr;
+            int            p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
             int base16 = XP;
             if (inst->x) {
@@ -561,10 +555,11 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 base16 = XT;
             }
             if (scalar) {
-                put(c, 0x78607800u
-                    | ((uint32_t)XI << 16)
-                    | ((uint32_t)base16 << 5)
-                    | (uint32_t)XT);
+                put(c,
+                    0x78607800u
+                        | ((uint32_t)XI << 16)
+                        | ((uint32_t)base16 << 5)
+                        | (uint32_t)XT);
                 put(c, DUP_4s_w(s.rd, XT));
             } else {
                 put(c, LDR_d(s.rd, base16, XH));
@@ -573,7 +568,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         case op_uni_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int p = inst->ptr;
+            int            p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
             if (inst->x) {
                 int8_t rx = ra_ensure(ra, sl, ns, inst->x);
@@ -583,12 +578,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 load_imm_w(c, XT, (uint32_t)inst->imm);
             }
             put(c, LDR_sx(s.rd, XP, XT));
-            put(c, 0x4e040400u | ((uint32_t)s.rd<<5) | (uint32_t)s.rd);
+            put(c, 0x4e040400u | ((uint32_t)s.rd << 5) | (uint32_t)s.rd);
         } break;
 
         case op_uni_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int p = inst->ptr;
+            int            p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
             if (inst->x) {
                 int8_t rx = ra_ensure(ra, sl, ns, inst->x);
@@ -598,16 +593,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             } else {
                 load_imm_w(c, XT, (uint32_t)(inst->imm * 2));
             }
-            put(c, 0x78606800u
-                | ((uint32_t)XT << 16)
-                | ((uint32_t)XP << 5)
-                | (uint32_t)XT);
+            put(c, 0x78606800u | ((uint32_t)XT << 16) | ((uint32_t)XP << 5) | (uint32_t)XT);
             put(c, DUP_4s_w(s.rd, XT));
         } break;
 
         case op_gather_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
+            int8_t         rx = ra_ensure(ra, sl, ns, inst->x);
             if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
@@ -629,7 +621,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         case op_gather_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
+            int8_t         rx = ra_ensure(ra, sl, ns, inst->x);
             if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
@@ -656,7 +648,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         case op_store_32: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
-            int p = inst->ptr;
+            int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
             if (inst->x) {
                 int8_t ro = ra_ensure(ra, sl, ns, inst->x);
@@ -664,19 +656,25 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
                 put(c, LSL_xi(XT, XT, 2));
                 put(c, ADD_xr(XT, XP, XT));
-                if (scalar) { put(c, STR_sx(ry, XT, XI)); }
-                else         { put(c, STR_q(ry, XT, XW)); }
+                if (scalar) {
+                    put(c, STR_sx(ry, XT, XI));
+                } else {
+                    put(c, STR_q(ry, XT, XW));
+                }
                 last_ptr = -999;
             } else {
-                if (scalar) { put(c, STR_sx(ry, XP, XI)); }
-                else         { put(c, STR_q(ry, XP, XW)); }
+                if (scalar) {
+                    put(c, STR_sx(ry, XP, XI));
+                } else {
+                    put(c, STR_q(ry, XP, XW));
+                }
             }
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
         } break;
 
         case op_store_16: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
-            int p = inst->ptr;
+            int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
             int sbase = XP;
             if (inst->x) {
@@ -699,7 +697,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_scatter_32: {
             int8_t rx = ra_ensure(ra, sl, ns, inst->x);
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
-            int p = inst->ptr;
+            int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
             load_max_ix(c, p, 2, deref_gpr);
             if (scalar) {
@@ -709,17 +707,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             } else {
                 for (int k = 0; k < 4; k++) {
                     uint32_t imm5 = (uint32_t)(k << 3) | 4;
-                    put(c, 0x0e003c00u | (imm5 << 16)
-                        | ((uint32_t)rx << 5)
-                        | (uint32_t)XT);
+                    put(c, 0x0e003c00u | (imm5 << 16) | ((uint32_t)rx << 5) | (uint32_t)XT);
                     clamp_wt(c);
-                    put(c, 0x0e003c00u | (imm5 << 16)
-                        | ((uint32_t)ry << 5)
-                        | (uint32_t)XH);
-                    put(c, 0xb8207800u
-                        | ((uint32_t)XT << 16)
-                        | ((uint32_t)XP << 5)
-                        | (uint32_t)XH);
+                    put(c, 0x0e003c00u | (imm5 << 16) | ((uint32_t)ry << 5) | (uint32_t)XH);
+                    put(c,
+                        0xb8207800u
+                            | ((uint32_t)XT << 16)
+                            | ((uint32_t)XP << 5)
+                            | (uint32_t)XH);
                 }
             }
             if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
@@ -729,38 +724,29 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_scatter_16: {
             int8_t rx = ra_ensure(ra, sl, ns, inst->x);
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
-            int p = inst->ptr;
+            int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
             load_max_ix(c, p, 1, deref_gpr);
             if (scalar) {
                 put(c, UMOV_ws(XT, rx));
                 clamp_wt(c);
-                put(c, 0x0e003c00u | (4u << 16)
-                    | ((uint32_t)ry << 5)
-                    | (uint32_t)XH);
-                put(c, 0x78207800u
-                    | ((uint32_t)XT << 16)
-                    | ((uint32_t)XP << 5)
-                    | (uint32_t)XH);
+                put(c, 0x0e003c00u | (4u << 16) | ((uint32_t)ry << 5) | (uint32_t)XH);
+                put(c,
+                    0x78207800u | ((uint32_t)XT << 16) | ((uint32_t)XP << 5) | (uint32_t)XH);
             } else {
-                int8_t wide =
-                    ra_alloc(ra, sl, ns);
-                put(c, 0x2f10a400u
-                    | ((uint32_t)ry << 5)
-                    | (uint32_t)wide);
+                int8_t wide = ra_alloc(ra, sl, ns);
+                put(c, 0x2f10a400u | ((uint32_t)ry << 5) | (uint32_t)wide);
                 for (int k = 0; k < 4; k++) {
                     uint32_t imm5 = (uint32_t)(k << 3) | 4;
-                    put(c, 0x0e003c00u | (imm5 << 16)
-                        | ((uint32_t)rx << 5)
-                        | (uint32_t)XT);
+                    put(c, 0x0e003c00u | (imm5 << 16) | ((uint32_t)rx << 5) | (uint32_t)XT);
                     clamp_wt(c);
-                    put(c, 0x0e003c00u | (imm5 << 16)
-                        | ((uint32_t)wide << 5)
-                        | (uint32_t)XH);
-                    put(c, 0x78207800u
-                        | ((uint32_t)XT << 16)
-                        | ((uint32_t)XP << 5)
-                        | (uint32_t)XH);
+                    put(c,
+                        0x0e003c00u | (imm5 << 16) | ((uint32_t)wide << 5) | (uint32_t)XH);
+                    put(c,
+                        0x78207800u
+                            | ((uint32_t)XT << 16)
+                            | ((uint32_t)XP << 5)
+                            | (uint32_t)XH);
                 }
                 ra_return_reg(ra, wide);
             }
@@ -769,48 +755,43 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         } break;
 
         case op_widen_f16: {
-            struct ra_step s = ra_step_unary(
-                ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
             put(c, FCVTL_4s(s.rd, s.rx));
         } break;
 
         case op_narrow_f32: {
-            struct ra_step s = ra_step_unary(
-                ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
             put(c, FCVTN_4h(s.rd, s.rx));
         } break;
 
         case op_widen_s16: {
-            struct ra_step s = ra_step_unary(
-                ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
             put(c, SXTL_4s(s.rd, s.rx));
         } break;
 
         case op_widen_u16: {
-            struct ra_step s = ra_step_unary(
-                ra, sl, ns, inst, i, scalar);
-            put(c, 0x2f10a400u
-                | ((uint32_t)s.rx << 5)
-                | (uint32_t)s.rd);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            put(c, 0x2f10a400u | ((uint32_t)s.rx << 5) | (uint32_t)s.rd);
         } break;
 
         case op_narrow_16: {
-            struct ra_step s = ra_step_unary(
-                ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
             put(c, XTN_4h(s.rd, s.rx));
         } break;
 
-        case op_eq_f32: case op_lt_f32: case op_le_f32:
-        case op_eq_i32: case op_lt_s32: case op_le_s32: {
-            _Bool x_is_0 = bb->inst[inst->x].op == op_imm_32
-                        && bb->inst[inst->x].imm == 0;
-            _Bool y_is_0 = bb->inst[inst->y].op == op_imm_32
-                        && bb->inst[inst->y].imm == 0;
+        case op_eq_f32:
+        case op_lt_f32:
+        case op_le_f32:
+        case op_eq_i32:
+        case op_lt_s32:
+        case op_le_s32: {
+            _Bool x_is_0 = bb->inst[inst->x].op == op_imm_32 && bb->inst[inst->x].imm == 0;
+            _Bool y_is_0 = bb->inst[inst->y].op == op_imm_32 && bb->inst[inst->y].imm == 0;
 
             if (x_is_0 || y_is_0) {
-                int val = x_is_0 ? inst->y : inst->x;
+                int    val = x_is_0 ? inst->y : inst->x;
                 int8_t rv = ra_ensure(ra, sl, ns, val);
-                _Bool v_dead = lu(val) <= i;
+                _Bool  v_dead = lu(val) <= i;
 
                 int8_t rd;
                 if (v_dead) {
@@ -820,67 +801,90 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     ra_assign(ra, i, rd);
                 }
 
-                #define CZ(op_name, zr, zl) \
-                    case op_name:       \
-                        put(c, y_is_0   \
-                            ? zr(rd,rv) \
-                            : zl(rd,rv)); \
-                        break;
+#define CZ(op_name, zr, zl) \
+    case op_name: put(c, y_is_0 ? zr(rd, rv) : zl(rd, rv)); break;
 
                 switch (inst->op) {
-                CZ(op_eq_f32,  FCMEQ_4s_z, FCMEQ_4s_z)
-                CZ(op_eq_i32,  CMEQ_4s_z,  CMEQ_4s_z)
-                CZ(op_lt_f32,  FCMLT_4s_z, FCMGT_4s_z)
-                CZ(op_lt_s32,  CMLT_4s_z,  CMGT_4s_z)
-                CZ(op_le_f32,  FCMLE_4s_z, FCMGE_4s_z)
-                CZ(op_le_s32,  CMLE_4s_z,  CMGE_4s_z)
-                case op_iota: case op_deref_ptr:
+                    CZ(op_eq_f32, FCMEQ_4s_z, FCMEQ_4s_z)
+                    CZ(op_eq_i32, CMEQ_4s_z, CMEQ_4s_z)
+                    CZ(op_lt_f32, FCMLT_4s_z, FCMGT_4s_z)
+                    CZ(op_lt_s32, CMLT_4s_z, CMGT_4s_z)
+                    CZ(op_le_f32, FCMLE_4s_z, FCMGE_4s_z)
+                    CZ(op_le_s32, CMLE_4s_z, CMGE_4s_z)
+                case op_iota:
+                case op_deref_ptr:
                 case op_imm_32:
-                case op_uni_32: case op_load_32:
-                case op_gather_32: case op_store_32:
+                case op_uni_32:
+                case op_load_32:
+                case op_gather_32:
+                case op_store_32:
                 case op_scatter_32:
-                case op_add_f32: case op_sub_f32:
-                case op_mul_f32: case op_div_f32:
-                case op_min_f32: case op_max_f32:
+                case op_add_f32:
+                case op_sub_f32:
+                case op_mul_f32:
+                case op_div_f32:
+                case op_min_f32:
+                case op_max_f32:
                 case op_sqrt_f32:
-                case op_abs_f32:   case op_neg_f32:
-                case op_round_f32: case op_floor_f32:
+                case op_abs_f32:
+                case op_neg_f32:
+                case op_round_f32:
+                case op_floor_f32:
                 case op_ceil_f32:
-                case op_round_i32: case op_floor_i32:
+                case op_round_i32:
+                case op_floor_i32:
                 case op_ceil_i32:
-                case op_fma_f32: case op_fms_f32:
-                case op_add_i32: case op_sub_i32:
+                case op_fma_f32:
+                case op_fms_f32:
+                case op_add_i32:
+                case op_sub_i32:
                 case op_mul_i32:
-                case op_shl_i32: case op_shr_u32:
+                case op_shl_i32:
+                case op_shr_u32:
                 case op_shr_s32:
-                case op_and_32: case op_or_32:
-                case op_xor_32: case op_sel_32:
+                case op_and_32:
+                case op_or_32:
+                case op_xor_32:
+                case op_sel_32:
                 case op_f32_from_i32:
                 case op_i32_from_f32:
-                case op_lt_u32: case op_le_u32:
-                case op_uni_16: case op_load_16:
-                case op_gather_16: case op_store_16:
+                case op_lt_u32:
+                case op_le_u32:
+                case op_uni_16:
+                case op_load_16:
+                case op_gather_16:
+                case op_store_16:
                 case op_scatter_16:
-                case op_widen_f16: case op_narrow_f32:
-                case op_widen_s16: case op_widen_u16:
+                case op_widen_f16:
+                case op_narrow_f32:
+                case op_widen_s16:
+                case op_widen_u16:
                 case op_narrow_16:
                 case op_join:
-                case op_shl_imm: case op_shr_u32_imm:
-                case op_shr_s32_imm: case op_pack:
+                case op_shl_imm:
+                case op_shr_u32_imm:
+                case op_shr_s32_imm:
+                case op_pack:
                 case op_and_imm:
-                case op_add_f32_imm: case op_sub_f32_imm:
-                case op_mul_f32_imm: case op_div_f32_imm:
-                case op_min_f32_imm: case op_max_f32_imm:
-                case op_add_i32_imm: case op_sub_i32_imm:
+                case op_add_f32_imm:
+                case op_sub_f32_imm:
+                case op_mul_f32_imm:
+                case op_div_f32_imm:
+                case op_min_f32_imm:
+                case op_max_f32_imm:
+                case op_add_i32_imm:
+                case op_sub_i32_imm:
                 case op_mul_i32_imm:
-                case op_or_32_imm:  case op_xor_32_imm:
-                case op_eq_f32_imm: case op_lt_f32_imm:
+                case op_or_32_imm:
+                case op_xor_32_imm:
+                case op_eq_f32_imm:
+                case op_lt_f32_imm:
                 case op_le_f32_imm:
-                case op_eq_i32_imm: case op_lt_s32_imm:
-                case op_le_s32_imm:
-                    break;
+                case op_eq_i32_imm:
+                case op_lt_s32_imm:
+                case op_le_s32_imm: break;
                 }
-                #undef CZ
+#undef CZ
 
                 int zero_val = x_is_0 ? inst->x : inst->y;
                 if (lu(zero_val) <= i) { ra_free_reg(ra, zero_val); }
@@ -890,84 +894,82 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         }
 
         case op_imm_32: {
-            struct ra_step s = ra_step_alloc(
-                ra, sl, ns, i);
-            arm64_pool_load(c, &jc->pool,
-                s.rd, (uint32_t)inst->imm);
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            arm64_pool_load(c, &jc->pool, s.rd, (uint32_t)inst->imm);
         } break;
 
-        case op_add_f32: case op_sub_f32:
-        case op_mul_f32: case op_div_f32:
-        case op_min_f32: case op_max_f32:
+        case op_add_f32:
+        case op_sub_f32:
+        case op_mul_f32:
+        case op_div_f32:
+        case op_min_f32:
+        case op_max_f32:
         case op_sqrt_f32:
-        case op_abs_f32:   case op_neg_f32:
-        case op_round_f32: case op_floor_f32:
+        case op_abs_f32:
+        case op_neg_f32:
+        case op_round_f32:
+        case op_floor_f32:
         case op_ceil_f32:
-        case op_round_i32: case op_floor_i32:
+        case op_round_i32:
+        case op_floor_i32:
         case op_ceil_i32:
-        case op_fma_f32: case op_fms_f32:
-        case op_add_i32: case op_sub_i32:
+        case op_fma_f32:
+        case op_fms_f32:
+        case op_add_i32:
+        case op_sub_i32:
         case op_mul_i32:
-        case op_shl_i32: case op_shr_u32:
+        case op_shl_i32:
+        case op_shr_u32:
         case op_shr_s32:
-        case op_and_32: case op_or_32:
-        case op_xor_32: case op_sel_32:
+        case op_and_32:
+        case op_or_32:
+        case op_xor_32:
+        case op_sel_32:
         case op_f32_from_i32:
         case op_i32_from_f32:
-        case op_lt_u32: case op_le_u32:
+        case op_lt_u32:
+        case op_le_u32:
         case op_join:
         case op_and_imm:
         default_alu: {
-            int nscratch =
-                (inst->op==op_shr_u32
-              || inst->op==op_shr_s32)
-                ? 1 : 0;
-            struct ra_step s = ra_step_alu(
-                ra, sl, ns, inst, i,
-                scalar, nscratch);
-            emit_alu_reg(c, inst->op,
-                s.rd, s.rx, s.ry, s.rz,
-                inst->imm, s.scratch);
-            if (s.scratch >= 0) {
-                ra_return_reg(ra, s.scratch);
-            }
+            int nscratch = (inst->op == op_shr_u32 || inst->op == op_shr_s32) ? 1 : 0;
+            struct ra_step s = ra_step_alu(ra, sl, ns, inst, i, scalar, nscratch);
+            emit_alu_reg(c, inst->op, s.rd, s.rx, s.ry, s.rz, inst->imm, s.scratch);
+            if (s.scratch >= 0) { ra_return_reg(ra, s.scratch); }
         } break;
 
         case op_shl_imm:
         case op_shr_u32_imm:
         case op_shr_s32_imm: {
-            struct ra_step s = ra_step_unary(
-                ra, sl, ns, inst, i, scalar);
-            emit_alu_reg(c, inst->op,
-                s.rd, s.rx, 0, 0,
-                inst->imm, -1);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            emit_alu_reg(c, inst->op, s.rd, s.rx, 0, 0, inst->imm, -1);
         } break;
 
         case op_pack: {
-            struct ra_step s = ra_step_alu(
-                ra, sl, ns, inst, i,
-                scalar, 1);
-            emit_alu_reg(c, inst->op,
-                s.rd, s.rx, s.ry, 0,
-                inst->imm, s.scratch);
-            if (s.scratch >= 0) {
-                ra_return_reg(ra, s.scratch);
-            }
+            struct ra_step s = ra_step_alu(ra, sl, ns, inst, i, scalar, 1);
+            emit_alu_reg(c, inst->op, s.rd, s.rx, s.ry, 0, inst->imm, s.scratch);
+            if (s.scratch >= 0) { ra_return_reg(ra, s.scratch); }
         } break;
-        case op_add_f32_imm: case op_sub_f32_imm:
-        case op_mul_f32_imm: case op_div_f32_imm:
-        case op_min_f32_imm: case op_max_f32_imm:
-        case op_add_i32_imm: case op_sub_i32_imm:
+        case op_add_f32_imm:
+        case op_sub_f32_imm:
+        case op_mul_f32_imm:
+        case op_div_f32_imm:
+        case op_min_f32_imm:
+        case op_max_f32_imm:
+        case op_add_i32_imm:
+        case op_sub_i32_imm:
         case op_mul_i32_imm:
-        case op_or_32_imm:  case op_xor_32_imm:
-        case op_eq_f32_imm: case op_lt_f32_imm:
+        case op_or_32_imm:
+        case op_xor_32_imm:
+        case op_eq_f32_imm:
+        case op_lt_f32_imm:
         case op_le_f32_imm:
-        case op_eq_i32_imm: case op_lt_s32_imm:
-        case op_le_s32_imm:
-            break;
+        case op_eq_i32_imm:
+        case op_lt_s32_imm:
+        case op_le_s32_imm: break;
         }
     }
-    #undef lu
+#undef lu
 }
 
 void umbra_jit_run(struct umbra_jit *j, int n, umbra_buf buf[]) {
@@ -985,10 +987,14 @@ void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
     uint32_t const *words = (uint32_t const *)j->code;
 
     char tmp[] = "/tmp/umbra_mca_XXXXXX.s";
-    int fd = mkstemps(tmp, 2);
+    int  fd = mkstemps(tmp, 2);
     if (fd < 0) { return; }
     FILE *fp = fdopen(fd, "w");
-    if (!fp) { close(fd); remove(tmp); return; }
+    if (!fp) {
+        close(fd);
+        remove(tmp);
+        return;
+    }
     for (int i = j->loop_start; i < j->loop_end; i++) {
         fprintf(fp, ".inst 0x%08x\n", words[i]);
     }
@@ -998,8 +1004,11 @@ void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
     snprintf(opath, sizeof opath, "%.*s.o", (int)(sizeof tmp - 3), tmp);
 
     char asm_path[] = "/tmp/umbra_mca_loop_XXXXXX.s";
-    int afd = mkstemps(asm_path, 2);
-    if (afd < 0) { remove(tmp); return; }
+    int  afd = mkstemps(asm_path, 2);
+    if (afd < 0) {
+        remove(tmp);
+        return;
+    }
 
     char cmd[1024];
     snprintf(cmd, sizeof cmd,
@@ -1013,13 +1022,14 @@ void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
     FILE *p = popen(cmd, "r");
     if (!p) {
         close(afd);
-        remove(tmp); remove(opath);
+        remove(tmp);
+        remove(opath);
         remove(asm_path);
         return;
     }
 
     FILE *afp = fdopen(afd, "w");
-    char line[256];
+    char  line[256];
     _Bool past_header = 0;
     while (fgets(line, (int)sizeof line, p)) {
         if (!past_header) {
@@ -1028,7 +1038,10 @@ void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
         }
         if (line[0] == '\n' || line[0] == '<') { continue; }
         char *comment = __builtin_strstr(line, " <");
-        if (comment) { comment[0] = '\n'; comment[1] = '\0'; }
+        if (comment) {
+            comment[0] = '\n';
+            comment[1] = '\0';
+        }
         fputs(line, afp);
     }
     pclose(p);
@@ -1045,9 +1058,7 @@ void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
              asm_path);
     p = popen(cmd, "r");
     if (p) {
-        while (fgets(line, (int)sizeof line, p)) {
-            fputs(line, f);
-        }
+        while (fgets(line, (int)sizeof line, p)) { fputs(line, f); }
         pclose(p);
     }
     remove(asm_path);
@@ -1064,46 +1075,40 @@ void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
 #include <sys/mman.h>
 #include <unistd.h>
 
-struct pool_ref { int data_off, code_pos, extra; };
-struct pool {
-    uint8_t        *data;
-    struct pool_ref *refs;
-    int nbytes, nrefs, cap_data, cap_refs;
+struct pool_ref {
+    int data_off, code_pos, extra;
 };
-static int pool_add(struct pool *p,
-                    void const *src, int n) {
+struct pool {
+    uint8_t         *data;
+    struct pool_ref *refs;
+    int              nbytes, nrefs, cap_data, cap_refs;
+};
+static int pool_add(struct pool *p, void const *src, int n) {
     for (int i = 0; i + n <= p->nbytes; i += n) {
-        if (!__builtin_memcmp(p->data + i, src, (size_t)n)) {
-            return i;
-        }
+        if (!__builtin_memcmp(p->data + i, src, (size_t)n)) { return i; }
     }
     if (p->nbytes + n > p->cap_data) {
-        p->cap_data = p->cap_data ? 2*p->cap_data : 256;
-        p->data = realloc(p->data,
-                          (size_t)p->cap_data);
+        p->cap_data = p->cap_data ? 2 * p->cap_data : 256;
+        p->data = realloc(p->data, (size_t)p->cap_data);
     }
     int off = p->nbytes;
     __builtin_memcpy(p->data + off, src, (size_t)n);
     p->nbytes += n;
     return off;
 }
-static void pool_ref_at(struct pool *p,
-                        int data_off, int code_pos,
-                        int extra) {
+static void pool_ref_at(struct pool *p, int data_off, int code_pos, int extra) {
     if (p->nrefs == p->cap_refs) {
-        p->cap_refs = p->cap_refs ? 2*p->cap_refs : 32;
-        p->refs = realloc(p->refs,
-            (size_t)p->cap_refs * sizeof *p->refs);
+        p->cap_refs = p->cap_refs ? 2 * p->cap_refs : 32;
+        p->refs = realloc(p->refs, (size_t)p->cap_refs * sizeof *p->refs);
     }
-    p->refs[p->nrefs++] =
-        (struct pool_ref){data_off, code_pos, extra};
+    p->refs[p->nrefs++] = (struct pool_ref){data_off, code_pos, extra};
 }
 static void pool_free(struct pool *p) {
     free(p->data);
     free(p->refs);
 }
 
-enum { XI=R10, XM=R13 };
+enum { XI = R10, XM = R13 };
 
 static void patch_jcc(Buf *c, int fixup) {
     int32_t rel = (int32_t)(c->len - (fixup + 4));
@@ -1129,7 +1134,9 @@ static void load_max_ix_x86(Buf *c, int p, int elem_shift) {
 }
 
 static void clamp_eax_x86(Buf *c) {
-    emit1(c, 0x48); emit1(c, 0x63); emit1(c, 0xc0);
+    emit1(c, 0x48);
+    emit1(c, 0x63);
+    emit1(c, 0xc0);
     test_rr(c, RAX, RAX);
     int skip_lo = jcc(c, 0x09);
     xor_rr(c, RAX, RAX);
@@ -1142,13 +1149,18 @@ static void clamp_eax_x86(Buf *c) {
 
 static void apply_offset_x86(Buf *c, int8_t off_reg, int elem_shift) {
     vex(c, 1, 1, 0, 0, off_reg, 0, RAX, 0x7e);
-    emit1(c, 0x48); emit1(c, 0x63); emit1(c, 0xc0);
+    emit1(c, 0x48);
+    emit1(c, 0x63);
+    emit1(c, 0xc0);
     if (elem_shift) {
-        emit1(c, 0x48); emit1(c, 0xc1);
+        emit1(c, 0x48);
+        emit1(c, 0xc1);
         emit1(c, 0xe0);
         emit1(c, (uint8_t)elem_shift);
     }
-    emit1(c, 0x49); emit1(c, 0x01); emit1(c, 0xc3);
+    emit1(c, 0x49);
+    emit1(c, 0x01);
+    emit1(c, 0xc3);
 }
 
 static int load_ptr_x86(Buf *c, int p, int *last_ptr) {
@@ -1159,195 +1171,196 @@ static int load_ptr_x86(Buf *c, int p, int *last_ptr) {
     return R11;
 }
 
-static int8_t const ra_pool_x86[] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
+static int8_t const ra_pool_x86[] = {0, 1, 2,  3,  4,  5,  6,  7,
+                                     8, 9, 10, 11, 12, 13, 14, 15};
 
 struct jit_ctx {
-    Buf *c;
+    Buf                            *c;
     struct umbra_basic_block const *bb;
-    struct pool pool;
+    struct pool                     pool;
 };
 
-static void x86_spill(int reg, int slot,
-                      void *ctx) {
-    vspill(((struct jit_ctx*)ctx)->c, reg, slot);
+static void x86_spill(int reg, int slot, void *ctx) {
+    vspill(((struct jit_ctx *)ctx)->c, reg, slot);
 }
-static void x86_fill(int reg, int slot,
-                     void *ctx) {
-    vfill(((struct jit_ctx*)ctx)->c, reg, slot);
+static void x86_fill(int reg, int slot, void *ctx) {
+    vfill(((struct jit_ctx *)ctx)->c, reg, slot);
 }
 
-static void pool_broadcast(Buf *c, struct pool *p,
-                           int d, uint32_t v) {
+static void pool_broadcast(Buf *c, struct pool *p, int d, uint32_t v) {
     int shr = v ? __builtin_clz(v) : 0;
     int shl = v ? __builtin_ctz(v) : 0;
-    if      (v == 0)           { vpxor(c,1,d,d,d); }
-    else if (v == 0xffffffffu) { vpcmpeqd(c,d,d,d); }
-    else if (v == 0xffffffffu >> shr) {
-        vpcmpeqd(c,d,d,d);
-        vpsrld_i(c,d,d,(uint8_t)shr);
-    }
-    else if (v == (uint32_t)(UINT64_C(0xffffffff) << shl)) {
-        vpcmpeqd(c,d,d,d);
-        vpslld_i(c,d,d,(uint8_t)shl);
-    }
-    else {
+    if (v == 0) {
+        vpxor(c, 1, d, d, d);
+    } else if (v == 0xffffffffu) {
+        vpcmpeqd(c, d, d, d);
+    } else if (v == 0xffffffffu >> shr) {
+        vpcmpeqd(c, d, d, d);
+        vpsrld_i(c, d, d, (uint8_t)shr);
+    } else if (v == (uint32_t)(UINT64_C(0xffffffff) << shl)) {
+        vpcmpeqd(c, d, d, d);
+        vpslld_i(c, d, d, (uint8_t)shl);
+    } else {
         int off = pool_add(p, &v, 4);
-        int pos = vex_rip(c, 1, 2, 0, 1,
-                          d, 0, 0x18);
+        int pos = vex_rip(c, 1, 2, 0, 1, d, 0, 0x18);
         pool_ref_at(p, off, pos, 0);
     }
 }
 
-static void x86_remat(int reg, int val,
-                      void *ctx) {
+static void x86_remat(int reg, int val, void *ctx) {
     struct jit_ctx *j = ctx;
-    pool_broadcast(j->c, &j->pool,
-                   reg,
-                   (uint32_t)j->bb->inst[val].imm);
+    pool_broadcast(j->c, &j->pool, reg, (uint32_t)j->bb->inst[val].imm);
 }
 
-static struct ra* ra_create_x86(
-    struct umbra_basic_block const *bb,
-    struct jit_ctx *jc)
-{
+static struct ra *ra_create_x86(struct umbra_basic_block const *bb, struct jit_ctx *jc) {
     struct ra_config cfg = {
-        .pool     = ra_pool_x86,
-        .nregs    = 16,
-        .max_reg  = 16,
-        .spill    = x86_spill,
-        .fill     = x86_fill,
-        .remat    = x86_remat,
-        .ctx      = jc,
+        .pool = ra_pool_x86,
+        .nregs = 16,
+        .max_reg = 16,
+        .spill = x86_spill,
+        .fill = x86_fill,
+        .remat = x86_remat,
+        .ctx = jc,
     };
     return ra_create(bb, &cfg);
 }
 
-static _Bool emit_alu_reg(Buf *c, enum op op,
-                          int d, int x, int y,
-                          int z, int imm,
+static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm,
                           int scratch, int scratch2) {
     switch (op) {
     case op_imm_32: broadcast_imm32(c, d, (uint32_t)imm); return 1;
 
-    case op_add_f32:  vaddps(c,d,x,y); return 1;
-    case op_sub_f32:  vsubps(c,d,x,y); return 1;
-    case op_mul_f32:  vmulps(c,d,x,y); return 1;
-    case op_div_f32:  vdivps(c,d,x,y); return 1;
-    case op_min_f32:  vminps(c,d,x,y); return 1;
-    case op_max_f32:  vmaxps(c,d,x,y); return 1;
-    case op_sqrt_f32:  vsqrtps(c,d,x);      return 1;
-    case op_round_f32: vroundps(c,d,x, 0); return 1;
-    case op_floor_f32: vroundps(c,d,x, 1); return 1;
-    case op_ceil_f32:  vroundps(c,d,x, 2); return 1;
-    case op_round_i32: vcvtps2dq(c,d,x);   return 1;
+    case op_add_f32: vaddps(c, d, x, y); return 1;
+    case op_sub_f32: vsubps(c, d, x, y); return 1;
+    case op_mul_f32: vmulps(c, d, x, y); return 1;
+    case op_div_f32: vdivps(c, d, x, y); return 1;
+    case op_min_f32: vminps(c, d, x, y); return 1;
+    case op_max_f32: vmaxps(c, d, x, y); return 1;
+    case op_sqrt_f32: vsqrtps(c, d, x); return 1;
+    case op_round_f32: vroundps(c, d, x, 0); return 1;
+    case op_floor_f32: vroundps(c, d, x, 1); return 1;
+    case op_ceil_f32: vroundps(c, d, x, 2); return 1;
+    case op_round_i32: vcvtps2dq(c, d, x); return 1;
     case op_floor_i32:
-        vroundps(c,d,x, 1);
-        vcvttps2dq(c,d,d);
+        vroundps(c, d, x, 1);
+        vcvttps2dq(c, d, d);
         return 1;
     case op_ceil_i32:
-        vroundps(c,d,x, 2);
-        vcvttps2dq(c,d,d);
+        vroundps(c, d, x, 2);
+        vcvttps2dq(c, d, d);
         return 1;
     case op_fma_f32:
-        if      (d == x) { vfmadd132ps(c,d,z,y); }
-        else if (d == y) { vfmadd213ps(c,d,x,z); }
-        else if (d == z) { vfmadd231ps(c,d,x,y); }
-        else             { vmovaps(c,d,z); vfmadd231ps(c,d,x,y); }
+        if (d == x) {
+            vfmadd132ps(c, d, z, y);
+        } else if (d == y) {
+            vfmadd213ps(c, d, x, z);
+        } else if (d == z) {
+            vfmadd231ps(c, d, x, y);
+        } else {
+            vmovaps(c, d, z);
+            vfmadd231ps(c, d, x, y);
+        }
         return 1;
     case op_fms_f32:
-        if      (d == x) { vfnmadd132ps(c,d,z,y); }
-        else if (d == y) { vfnmadd213ps(c,d,x,z); }
-        else if (d == z) { vfnmadd231ps(c,d,x,y); }
-        else             { vmovaps(c,d,z); vfnmadd231ps(c,d,x,y); }
+        if (d == x) {
+            vfnmadd132ps(c, d, z, y);
+        } else if (d == y) {
+            vfnmadd213ps(c, d, x, z);
+        } else if (d == z) {
+            vfnmadd231ps(c, d, x, y);
+        } else {
+            vmovaps(c, d, z);
+            vfnmadd231ps(c, d, x, y);
+        }
         return 1;
 
-    case op_add_i32: vpaddd(c,d,x,y); return 1;
-    case op_sub_i32: vpsubd(c,d,x,y); return 1;
-    case op_mul_i32: vpmulld(c,d,x,y); return 1;
-    case op_shl_i32: vpsllvd(c,d,x,y); return 1;
-    case op_shr_u32: vpsrlvd(c,d,x,y); return 1;
-    case op_shr_s32: vpsravd(c,d,x,y);
-        return 1;
+    case op_add_i32: vpaddd(c, d, x, y); return 1;
+    case op_sub_i32: vpsubd(c, d, x, y); return 1;
+    case op_mul_i32: vpmulld(c, d, x, y); return 1;
+    case op_shl_i32: vpsllvd(c, d, x, y); return 1;
+    case op_shr_u32: vpsrlvd(c, d, x, y); return 1;
+    case op_shr_s32: vpsravd(c, d, x, y); return 1;
 
-    case op_and_32: vpand(c,1,d,x,y); return 1;
-    case op_or_32:  vpor(c,1,d,x,y);  return 1;
-    case op_xor_32: vpxor_3(c,1,d,x,y); return 1;
-    case op_sel_32: vpblendvb(c,1,d,z,y,x); return 1;
+    case op_and_32: vpand(c, 1, d, x, y); return 1;
+    case op_or_32: vpor(c, 1, d, x, y); return 1;
+    case op_xor_32: vpxor_3(c, 1, d, x, y); return 1;
+    case op_sel_32: vpblendvb(c, 1, d, z, y, x); return 1;
 
-    case op_f32_from_i32: vcvtdq2ps(c,d,x); return 1;
-    case op_i32_from_f32: vcvttps2dq(c,d,x); return 1;
+    case op_f32_from_i32: vcvtdq2ps(c, d, x); return 1;
+    case op_i32_from_f32: vcvttps2dq(c, d, x); return 1;
 
-    case op_eq_f32: vcmpps(c,d,x,y,0);  return 1;
-    case op_lt_f32: vcmpps(c,d,x,y,1);  return 1;
-    case op_le_f32: vcmpps(c,d,x,y,2);  return 1;
+    case op_eq_f32: vcmpps(c, d, x, y, 0); return 1;
+    case op_lt_f32: vcmpps(c, d, x, y, 1); return 1;
+    case op_le_f32: vcmpps(c, d, x, y, 2); return 1;
 
-    case op_eq_i32: vpcmpeqd(c,d,x,y); return 1;
-    case op_lt_s32: vpcmpgtd(c,d,y,x); return 1;
+    case op_eq_i32: vpcmpeqd(c, d, x, y); return 1;
+    case op_lt_s32: vpcmpgtd(c, d, y, x); return 1;
     case op_le_s32:
-        vpcmpgtd(c,d,x,y);
-        vpcmpeqd(c,scratch,scratch,scratch);
-        vpxor_3(c,1,d,d,scratch);
+        vpcmpgtd(c, d, x, y);
+        vpcmpeqd(c, scratch, scratch, scratch);
+        vpxor_3(c, 1, d, d, scratch);
         return 1;
     case op_lt_u32:
-        vex_rrr(c,1,2,1,0x3b,scratch2,x,y);
-        vpcmpeqd(c,d,y,scratch2);
-        vpcmpeqd(c,scratch,scratch,scratch);
-        vpxor_3(c,1,d,d,scratch);
+        vex_rrr(c, 1, 2, 1, 0x3b, scratch2, x, y);
+        vpcmpeqd(c, d, y, scratch2);
+        vpcmpeqd(c, scratch, scratch, scratch);
+        vpxor_3(c, 1, d, d, scratch);
         return 1;
     case op_le_u32:
-        vex_rrr(c,1,2,1,0x3f,scratch,x,y);
-        vpcmpeqd(c,d,y,scratch);
+        vex_rrr(c, 1, 2, 1, 0x3f, scratch, x, y);
+        vpcmpeqd(c, d, y, scratch);
         return 1;
     case op_join:
-        if (d != x) { vmovaps(c,d,x); }
+        if (d != x) { vmovaps(c, d, x); }
         return 1;
-    case op_shl_imm:
-        vpslld_i(c,d,x,(uint8_t)imm);
-        return 1;
-    case op_shr_u32_imm:
-        vpsrld_i(c,d,x,(uint8_t)imm);
-        return 1;
-    case op_shr_s32_imm:
-        vpsrad_i(c,d,x,(uint8_t)imm);
-        return 1;
+    case op_shl_imm: vpslld_i(c, d, x, (uint8_t)imm); return 1;
+    case op_shr_u32_imm: vpsrld_i(c, d, x, (uint8_t)imm); return 1;
+    case op_shr_s32_imm: vpsrad_i(c, d, x, (uint8_t)imm); return 1;
     case op_pack:
     case op_and_imm:
-    case op_add_f32_imm: case op_sub_f32_imm:
-    case op_mul_f32_imm: case op_div_f32_imm:
-    case op_min_f32_imm: case op_max_f32_imm:
-    case op_add_i32_imm: case op_sub_i32_imm:
+    case op_add_f32_imm:
+    case op_sub_f32_imm:
+    case op_mul_f32_imm:
+    case op_div_f32_imm:
+    case op_min_f32_imm:
+    case op_max_f32_imm:
+    case op_add_i32_imm:
+    case op_sub_i32_imm:
     case op_mul_i32_imm:
-    case op_or_32_imm:  case op_xor_32_imm:
-    case op_eq_f32_imm: case op_lt_f32_imm:
+    case op_or_32_imm:
+    case op_xor_32_imm:
+    case op_eq_f32_imm:
+    case op_lt_f32_imm:
     case op_le_f32_imm:
-    case op_eq_i32_imm: case op_lt_s32_imm:
-    case op_le_s32_imm:
-        return 0;
+    case op_eq_i32_imm:
+    case op_lt_s32_imm:
+    case op_le_s32_imm: return 0;
 
-    case op_abs_f32: case op_neg_f32:
+    case op_abs_f32:
+    case op_neg_f32:
     case op_iota:
     case op_deref_ptr:
-    case op_uni_32:   case op_load_32:
-    case op_gather_32: case op_store_32:
+    case op_uni_32:
+    case op_load_32:
+    case op_gather_32:
+    case op_store_32:
     case op_scatter_32:
-    case op_uni_16:   case op_load_16:
-    case op_gather_16: case op_store_16:
+    case op_uni_16:
+    case op_load_16:
+    case op_gather_16:
+    case op_store_16:
     case op_scatter_16:
-    case op_widen_f16: case op_narrow_f32:
-    case op_widen_s16: case op_widen_u16:
-    case op_narrow_16:
-        return 0;
+    case op_widen_f16:
+    case op_narrow_f32:
+    case op_widen_s16:
+    case op_widen_u16:
+    case op_narrow_16: return 0;
     }
 }
 
-static void emit_ops(
-    Buf *c,
-    struct umbra_basic_block const *bb,
-    int from, int to,
-    int *sl, int *ns,
-    struct ra *ra, _Bool scalar,
-    int *deref_gpr,
-    struct jit_ctx *jc);
+static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int to,
+                     int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
+                     struct jit_ctx *jc);
 
 static int resolve_ptr_x86(Buf *c, int p, int *last_ptr, int const *deref_gpr) {
     if (p < 0) { return deref_gpr[~p]; }
@@ -1357,32 +1370,29 @@ static int resolve_ptr_x86(Buf *c, int p, int *last_ptr, int const *deref_gpr) {
 struct umbra_jit {
     void  *code;
     size_t code_size, code_len;
-    void (*entry)(int, umbra_buf*);
-    int    loop_start, loop_end;
+    void (*entry)(int, umbra_buf *);
+    int loop_start, loop_end;
 };
 
-static _Bool x86_chooser(struct bb_inst const *insts,
-                         int join_id) {
+static _Bool x86_chooser(struct bb_inst const *insts, int join_id) {
     enum op y_op = insts[insts[join_id].y].op;
-    return (y_op >= op_add_f32_imm
-         && y_op <= op_le_s32_imm)
+    return (y_op >= op_add_f32_imm && y_op <= op_le_s32_imm)
         && y_op != op_lt_s32_imm
         && y_op != op_le_s32_imm;
 }
 
-struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
-    struct umbra_basic_block *resolved =
-        umbra_resolve_joins(bb, x86_chooser);
+struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
+    struct umbra_basic_block *resolved = umbra_resolve_joins(bb, x86_chooser);
     bb = resolved;
 
     int *sl = malloc((size_t)bb->insts * sizeof(int));
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
-    int ns = 0;
+    int  ns = 0;
     int *deref_gpr = calloc((size_t)bb->insts, sizeof(int));
 
-    Buf c = {0};
-    struct jit_ctx jc = {.c=&c, .bb=bb, .pool={0}};
-    struct ra *ra = ra_create_x86(bb, &jc);
+    Buf            c = {0};
+    struct jit_ctx jc = {.c = &c, .bb = bb, .pool = {0}};
+    struct ra     *ra = ra_create_x86(bb, &jc);
 
     push_r(&c, XM);
 
@@ -1400,7 +1410,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     mov_rr(&c, R11, RDI);
     rex_w(&c, XI, R11);
     emit1(&c, 0x29);
-    emit1(&c, (uint8_t)(0xc0 | ((XI&7)<<3) | (R11&7)));
+    emit1(&c, (uint8_t)(0xc0 | ((XI & 7) << 3) | (R11 & 7)));
 
     cmp_ri(&c, R11, 8);
     int br_tail = jcc(&c, 0x0c);
@@ -1436,7 +1446,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
 
     add_ri(&c, XI, 1);
     {
-        int j = jmp(&c);
+        int     j = jmp(&c);
         int32_t rel = (int32_t)(tail_top - (j + 4));
         __builtin_memcpy(c.buf + j, &rel, 4);
     }
@@ -1447,9 +1457,7 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
         __builtin_memcpy(c.buf + br_epi, &rel, 4);
     }
 
-    if (ns > 0) {
-        add_ri(&c, RSP, ns * 32);
-    }
+    if (ns > 0) { add_ri(&c, RSP, ns * 32); }
     pop_r(&c, XM);
     vzeroupper(&c);
     ret(&c);
@@ -1458,39 +1466,37 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
         int pos = stack_patch;
         c.buf[pos++] = 0x48;
         c.buf[pos++] = 0x81;
-        c.buf[pos++] = (uint8_t)(0xc0 | (5<<3) | (RSP&7));
+        c.buf[pos++] = (uint8_t)(0xc0 | (5 << 3) | (RSP & 7));
         int32_t sz = ns * 32;
         __builtin_memcpy(c.buf + pos, &sz, 4);
     }
 
     int pool_start = c.len;
-    for (int i = 0; i < jc.pool.nbytes; i++) {
-        emit1(&c, jc.pool.data[i]);
-    }
+    for (int i = 0; i < jc.pool.nbytes; i++) { emit1(&c, jc.pool.data[i]); }
     for (int i = 0; i < jc.pool.nrefs; i++) {
         struct pool_ref *r = &jc.pool.refs[i];
-        int entry_off = pool_start + r->data_off;
-        int32_t rel = (int32_t)(entry_off
-            - (r->code_pos + 4 + r->extra));
-        __builtin_memcpy(c.buf + r->code_pos,
-                         &rel, 4);
+        int              entry_off = pool_start + r->data_off;
+        int32_t          rel = (int32_t)(entry_off - (r->code_pos + 4 + r->extra));
+        __builtin_memcpy(c.buf + r->code_pos, &rel, 4);
     }
     pool_free(&jc.pool);
 
-    ra_destroy(ra); free(sl); free(deref_gpr);
+    ra_destroy(ra);
+    free(sl);
+    free(deref_gpr);
     umbra_basic_block_free(resolved);
 
     size_t code_sz = (size_t)c.len;
     size_t pg = (size_t)sysconf(_SC_PAGESIZE);
-    size_t alloc = (code_sz + pg-1) & ~(pg-1);
+    size_t alloc = (code_sz + pg - 1) & ~(pg - 1);
 
-    void *mem = mmap(NULL, alloc,
-                     PROT_READ|PROT_WRITE,
-                     MAP_PRIVATE|MAP_ANON,
-                     -1, 0);
-    if (mem == MAP_FAILED) { free(c.buf); return 0; }
+    void *mem = mmap(NULL, alloc, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+    if (mem == MAP_FAILED) {
+        free(c.buf);
+        return 0;
+    }
     __builtin_memcpy(mem, c.buf, code_sz);
-    if (mprotect(mem, alloc, PROT_READ|PROT_EXEC) != 0) {
+    if (mprotect(mem, alloc, PROT_READ | PROT_EXEC) != 0) {
         munmap(mem, alloc);
         free(c.buf);
         return 0;
@@ -1499,24 +1505,26 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
 
     struct umbra_jit *j = malloc(sizeof *j);
     j->code = mem;
-    j->code_size = alloc; j->code_len = code_sz;
+    j->code_size = alloc;
+    j->code_len = code_sz;
     j->loop_start = loop_body_start;
-    j->loop_end   = loop_body_end;
-    { union { void *p; void (*fn)(int,umbra_buf*); } u = {.p=mem};
-      j->entry = u.fn; }
+    j->loop_end = loop_body_end;
+    {
+        union {
+            void *p;
+            void (*fn)(int, umbra_buf *);
+        } u = {.p = mem};
+        j->entry = u.fn;
+    }
     return j;
 }
 
-static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
-                     int from, int to,
-                     int *sl, int *ns,
-                     struct ra *ra, _Bool scalar,
-                     int *deref_gpr,
-                     struct jit_ctx *jc)
-{
-    #define lu(v) ra_last_use(ra, (v))
-    int last_ptr = -1;
-    int dc = 0;
+static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int to,
+                     int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
+                     struct jit_ctx *jc) {
+#define lu(v) ra_last_use(ra, (v))
+    int       last_ptr = -1;
+    int       dc = 0;
     int const deref_gprs[] = {RDX, RCX, R8, R9};
 
     for (int i = from; i < to; i++) {
@@ -1536,22 +1544,22 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
             } else {
                 vex(c, 1, 1, 0, 0, s.rd, 0, XI, 0x6e);
                 vbroadcastss(c, s.rd, s.rd);
-                uint32_t iota8[8] =
-                    {0,1,2,3,4,5,6,7};
-                int off = pool_add(&jc->pool,
-                                   iota8, 32);
-                int pos = vex_rip(c, 1, 1, 0, 1,
-                    s.rd, s.rd, 0xfe);
+                uint32_t iota8[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+                int      off = pool_add(&jc->pool, iota8, 32);
+                int      pos = vex_rip(c, 1, 1, 0, 1, s.rd, s.rd, 0xfe);
                 pool_ref_at(&jc->pool, off, pos, 0);
             }
         } break;
 
         case op_load_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int p = inst->ptr;
-            int base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
+            int            p = inst->ptr;
+            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
             if (inst->x) {
-                if (base != R11) { mov_rr(c, R11, base); last_ptr = -1; }
+                if (base != R11) {
+                    mov_rr(c, R11, base);
+                    last_ptr = -1;
+                }
                 int8_t ro = ra_ensure(ra, sl, ns, inst->x);
                 apply_offset_x86(c, ro, 2);
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
@@ -1567,10 +1575,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         case op_load_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int p = inst->ptr;
-            int base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
+            int            p = inst->ptr;
+            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
             if (inst->x) {
-                if (base != R11) { mov_rr(c, R11, base); last_ptr = -1; }
+                if (base != R11) {
+                    mov_rr(c, R11, base);
+                    last_ptr = -1;
+                }
                 int8_t ro = ra_ensure(ra, sl, ns, inst->x);
                 apply_offset_x86(c, ro, 1);
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
@@ -1584,9 +1595,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     if (XI >= 8) { rex |= 0x02; }
                     if (base >= 8) { rex |= 0x01; }
                     if (rex != 0x40) { emit1(c, rex); }
-                    emit1(c, 0x0f); emit1(c, 0xb7);
-                    emit1(c, (uint8_t)(((RAX&7)<<3) | 4));
-                    emit1(c, (uint8_t)((1<<6) | ((XI&7)<<3) | (base&7)));
+                    emit1(c, 0x0f);
+                    emit1(c, 0xb7);
+                    emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
+                    emit1(c, (uint8_t)((1 << 6) | ((XI & 7) << 3) | (base & 7)));
                 }
                 vex(c, 1, 1, 0, 0, s.rd, 0, RAX, 0x6e);
             } else {
@@ -1597,10 +1609,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         case op_store_32: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
-            int p = inst->ptr;
-            int base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
+            int    p = inst->ptr;
+            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
             if (inst->x) {
-                if (base != R11) { mov_rr(c, R11, base); last_ptr = -1; }
+                if (base != R11) {
+                    mov_rr(c, R11, base);
+                    last_ptr = -1;
+                }
                 int8_t ro = ra_ensure(ra, sl, ns, inst->x);
                 apply_offset_x86(c, ro, 2);
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
@@ -1617,10 +1632,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         case op_store_16: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
-            int p = inst->ptr;
-            int base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
+            int    p = inst->ptr;
+            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
             if (inst->x) {
-                if (base != R11) { mov_rr(c, R11, base); last_ptr = -1; }
+                if (base != R11) {
+                    mov_rr(c, R11, base);
+                    last_ptr = -1;
+                }
                 int8_t ro = ra_ensure(ra, sl, ns, inst->x);
                 apply_offset_x86(c, ro, 1);
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
@@ -1638,8 +1656,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     if (base >= 8) { rex |= 0x01; }
                     if (rex != 0x40) { emit1(c, rex); }
                     emit1(c, 0x89);
-                    emit1(c, (uint8_t)(((RAX&7)<<3) | 4));
-                    emit1(c, (uint8_t)((1<<6) | ((XI&7)<<3) | (base&7)));
+                    emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
+                    emit1(c, (uint8_t)((1 << 6) | ((XI & 7) << 3) | (base & 7)));
                 }
             } else {
                 vmov_store(c, 0, ry, base, XI, 2, 0);
@@ -1649,51 +1667,32 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         case op_uni_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int p = inst->ptr;
-            int base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
+            int            p = inst->ptr;
+            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
             if (inst->x) {
                 int8_t rx = ra_ensure(ra, sl, ns, inst->x);
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
                 vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
-                vex_mem(c, 1, 1, 0, 0, s.rd, 0,
-                        0x6e, base, RAX, 4, 0);
+                vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, RAX, 4, 0);
                 vbroadcastss(c, s.rd, s.rd);
             } else {
-                int disp = inst->imm * 4;
+                int     disp = inst->imm * 4;
                 uint8_t R = (uint8_t)(~s.rd >> 3) & 1;
                 uint8_t B = (uint8_t)(~base >> 3) & 1;
                 emit1(c, 0xc4);
-                emit1(c, (uint8_t)(
-                    (R<<7) | (1<<6)
-                    | (B<<5) | 0x02));
+                emit1(c, (uint8_t)((R << 7) | (1 << 6) | (B << 5) | 0x02));
                 emit1(c, 0x7d);
                 emit1(c, 0x18);
-                if (disp == 0
-                        && (base & 7) != RBP) {
-                    emit1(c, (uint8_t)(
-                        ((s.rd & 7) << 3)
-                        | (base & 7)));
-                    if ((base & 7) == RSP) {
-                        emit1(c, 0x24);
-                    }
-                } else if (disp >= -128
-                        && disp <= 127) {
-                    emit1(c, (uint8_t)(
-                        0x40
-                        | ((s.rd & 7) << 3)
-                        | (base & 7)));
-                    if ((base & 7) == RSP) {
-                        emit1(c, 0x24);
-                    }
+                if (disp == 0 && (base & 7) != RBP) {
+                    emit1(c, (uint8_t)(((s.rd & 7) << 3) | (base & 7)));
+                    if ((base & 7) == RSP) { emit1(c, 0x24); }
+                } else if (disp >= -128 && disp <= 127) {
+                    emit1(c, (uint8_t)(0x40 | ((s.rd & 7) << 3) | (base & 7)));
+                    if ((base & 7) == RSP) { emit1(c, 0x24); }
                     emit1(c, (uint8_t)disp);
                 } else {
-                    emit1(c, (uint8_t)(
-                        0x80
-                        | ((s.rd & 7) << 3)
-                        | (base & 7)));
-                    if ((base & 7) == RSP) {
-                        emit1(c, 0x24);
-                    }
+                    emit1(c, (uint8_t)(0x80 | ((s.rd & 7) << 3) | (base & 7)));
+                    if ((base & 7) == RSP) { emit1(c, 0x24); }
                     emit4(c, (uint32_t)disp);
                 }
             }
@@ -1701,8 +1700,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         case op_uni_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int p = inst->ptr;
-            int base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
+            int            p = inst->ptr;
+            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
             if (inst->x) {
                 int8_t rx = ra_ensure(ra, sl, ns, inst->x);
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
@@ -1711,37 +1710,25 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     uint8_t rex = 0x48;
                     if (base >= 8) { rex |= 0x01; }
                     emit1(c, rex);
-                    emit1(c, 0x0f); emit1(c, 0xb7);
-                    emit1(c, (uint8_t)(
-                        0x40 | ((RAX & 7) << 3) | 4));
-                    emit1(c, (uint8_t)(
-                        0x40
-                        | ((RAX & 7) << 3)
-                        | (base & 7)));
+                    emit1(c, 0x0f);
+                    emit1(c, 0xb7);
+                    emit1(c, (uint8_t)(0x40 | ((RAX & 7) << 3) | 4));
+                    emit1(c, (uint8_t)(0x40 | ((RAX & 7) << 3) | (base & 7)));
                     emit1(c, 0);
                 }
             } else {
                 uint8_t rex = 0x40;
                 if (base >= 8) { rex |= 0x01; }
                 if (rex != 0x40) { emit1(c, rex); }
-                emit1(c, 0x0f); emit1(c, 0xb7);
+                emit1(c, 0x0f);
+                emit1(c, 0xb7);
                 int disp = inst->imm * 2;
-                if (disp == 0
-                        && (base & 7) != RBP) {
-                    emit1(c, (uint8_t)(
-                        ((RAX & 7) << 3)
-                        | (base & 7)));
-                    if ((base & 7) == RSP) {
-                        emit1(c, 0x24);
-                    }
+                if (disp == 0 && (base & 7) != RBP) {
+                    emit1(c, (uint8_t)(((RAX & 7) << 3) | (base & 7)));
+                    if ((base & 7) == RSP) { emit1(c, 0x24); }
                 } else {
-                    emit1(c, (uint8_t)(
-                        0x40
-                        | ((RAX & 7) << 3)
-                        | (base & 7)));
-                    if ((base & 7) == RSP) {
-                        emit1(c, 0x24);
-                    }
+                    emit1(c, (uint8_t)(0x40 | ((RAX & 7) << 3) | (base & 7)));
+                    if ((base & 7) == RSP) { emit1(c, 0x24); }
                     emit1(c, (uint8_t)disp);
                 }
             }
@@ -1751,9 +1738,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         case op_gather_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-            int p = inst->ptr;
-            int base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
+            int8_t         rx = ra_ensure(ra, sl, ns, inst->x);
+            int            p = inst->ptr;
+            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
             if (scalar) {
                 vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
@@ -1779,9 +1766,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
 
         case op_gather_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-            int p = inst->ptr;
-            int base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
+            int8_t         rx = ra_ensure(ra, sl, ns, inst->x);
+            int            p = inst->ptr;
+            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
             load_max_ix_x86(c, p, 1);
             if (scalar) {
                 vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
@@ -1794,8 +1781,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     if (rex != 0x40) { emit1(c, rex); }
                     emit1(c, 0x0f);
                     emit1(c, 0xb7u);
-                    emit1(c, (uint8_t)(((RAX&7)<<3) | 4));
-                    emit1(c, (uint8_t)((1<<6) | ((RAX&7)<<3) | (base&7)));
+                    emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
+                    emit1(c, (uint8_t)((1 << 6) | ((RAX & 7) << 3) | (base & 7)));
                 }
                 vex(c, 1, 1, 0, 0, s.rd, 0, RAX, 0x6e);
             } else {
@@ -1820,21 +1807,18 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                             if (rex2 != 0x40) { emit1(c, rex2); }
                             emit1(c, 0x0f);
                             emit1(c, 0xb7);
-                            emit1(c, (uint8_t)(
-                                ((RAX&7)<<3) | 4));
-                            emit1(c, (uint8_t)(
-                                (1<<6)
-                                | ((RAX&7)<<3)
-                                | (base&7)));
+                            emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
+                            emit1(c, (uint8_t)((1 << 6) | ((RAX & 7) << 3) | (base & 7)));
                         }
                         // MOV [RSP + k*4], eax
                         emit1(c, 0x89);
                         if (k == 0) {
-                            emit1(c, 0x04); emit1(c, 0x24);
+                            emit1(c, 0x04);
+                            emit1(c, 0x24);
                         } else {
                             emit1(c, 0x44);
-                        emit1(c, 0x24);
-                        emit1(c, (uint8_t)(k*4));
+                            emit1(c, 0x24);
+                            emit1(c, (uint8_t)(k * 4));
                         }
                     }
                     // Load 8xu32 from stack into YMM
@@ -1844,8 +1828,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     // VEXTRACTI128 hi, rd, 1
                     // VPACKUSDW rd, rd, hi (128-bit)
                     vextracti128(c, hi_idx, s.rd, 1);
-                    vex_rrr(c, 1, 2, 0, 0x2b,
-                            s.rd, s.rd, hi_idx);
+                    vex_rrr(c, 1, 2, 0, 0x2b, s.rd, s.rd, hi_idx);
                 }
                 ra_return_reg(ra, hi_idx);
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
@@ -1855,22 +1838,23 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_scatter_32: {
             int8_t rx = ra_ensure(ra, sl, ns, inst->x);
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
-            int p = inst->ptr;
-            int base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
+            int    p = inst->ptr;
+            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
             load_max_ix_x86(c, p, 2);
             if (scalar) {
                 vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
                 clamp_eax_x86(c);
-                if (base != R11) { mov_rr(c, R11, base); last_ptr = -1; }
+                if (base != R11) {
+                    mov_rr(c, R11, base);
+                    last_ptr = -1;
+                }
                 vex_mem(c, 1, 1, 0, 0, ry, 0, 0x7e, R11, RAX, 4, 0);
             } else {
                 sub_ri(c, RSP, 64);
-                vmov_store(c,1,ry,RSP,RSP,0,0);
-                vmov_store(c,1,rx,RSP,RSP,0,32);
-                if (lu(inst->x) <= i) {
-                    ra_free_reg(ra, inst->x);
-                }
+                vmov_store(c, 1, ry, RSP, RSP, 0, 0);
+                vmov_store(c, 1, rx, RSP, RSP, 0, 32);
+                if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
                 if (base != R11) {
                     mov_rr(c, R11, base);
                     last_ptr = -1;
@@ -1879,13 +1863,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                     emit1(c, 0x8b);
                     emit1(c, 0x44);
                     emit1(c, 0x24);
-                    emit1(c,(uint8_t)(32+k*4));
+                    emit1(c, (uint8_t)(32 + k * 4));
                     clamp_eax_x86(c);
                     emit1(c, 0x44);
                     emit1(c, 0x8b);
                     emit1(c, 0x54);
                     emit1(c, 0x24);
-                    emit1(c, (uint8_t)(k*4));
+                    emit1(c, (uint8_t)(k * 4));
                     emit1(c, 0x45);
                     emit1(c, 0x89);
                     emit1(c, 0x14);
@@ -1906,15 +1890,17 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
                 int base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
                 load_max_ix_x86(c, p, 1);
                 clamp_eax_x86(c);
-                if (base != R11) { mov_rr(c, R11, base); last_ptr = -1; }
+                if (base != R11) {
+                    mov_rr(c, R11, base);
+                    last_ptr = -1;
+                }
                 // LEA R11, [R11 + RAX*2]
                 emit1(c, 0x4d);
                 emit1(c, 0x8d);
                 emit1(c, 0x1c);
                 emit1(c, 0x43);
                 // VMOVD eax, xmm_ry
-                vex(c, 1, 1, 0, 0,
-                    ry, 0, RAX, 0x7e);
+                vex(c, 1, 1, 0, 0, ry, 0, RAX, 0x7e);
                 // MOV word [R11], ax
                 emit1(c, 0x66);
                 emit1(c, 0x41);
@@ -1928,159 +1914,171 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         } break;
 
         case op_widen_f16: {
-            struct ra_step s = ra_step_unary(
-                ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
             vcvtph2ps(c, s.rd, s.rx);
         } break;
 
         case op_narrow_f32: {
-            struct ra_step s = ra_step_unary(
-                ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
             vcvtps2ph(c, s.rd, s.rx, 4);
         } break;
 
         case op_widen_s16: {
-            struct ra_step s = ra_step_unary(
-                ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
             vpmovsxwd(c, s.rd, s.rx);
         } break;
 
         case op_widen_u16: {
-            struct ra_step s = ra_step_unary(
-                ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
             vpmovzxwd(c, s.rd, s.rx);
         } break;
 
         case op_narrow_16: {
-            struct ra_step s = ra_step_unary(
-                ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
             if (scalar) {
                 vmovaps(c, s.rd, s.rx);
             } else {
-                int8_t tmp =
-                    ra_alloc(ra, sl, ns);
+                int8_t tmp = ra_alloc(ra, sl, ns);
                 vextracti128(c, tmp, s.rx, 1);
-                vex_rrr(c, 1, 2, 0, 0x2b,
-                    s.rd, s.rx, tmp);
+                vex_rrr(c, 1, 2, 0, 0x2b, s.rd, s.rx, tmp);
                 ra_return_reg(ra, tmp);
             }
         } break;
 
         case op_imm_32: {
-            struct ra_step s = ra_step_alloc(
-                ra, sl, ns, i);
-            pool_broadcast(c, &jc->pool,
-                s.rd, (uint32_t)inst->imm);
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            pool_broadcast(c, &jc->pool, s.rd, (uint32_t)inst->imm);
         } break;
 
-        case op_add_f32_imm: case op_sub_f32_imm:
-        case op_mul_f32_imm: case op_div_f32_imm:
-        case op_min_f32_imm: case op_max_f32_imm:
-        case op_add_i32_imm: case op_sub_i32_imm:
+        case op_add_f32_imm:
+        case op_sub_f32_imm:
+        case op_mul_f32_imm:
+        case op_div_f32_imm:
+        case op_min_f32_imm:
+        case op_max_f32_imm:
+        case op_add_i32_imm:
+        case op_sub_i32_imm:
         case op_mul_i32_imm:
-        case op_or_32_imm:  case op_xor_32_imm:
-        case op_eq_f32_imm: case op_lt_f32_imm:
+        case op_or_32_imm:
+        case op_xor_32_imm:
+        case op_eq_f32_imm:
+        case op_lt_f32_imm:
         case op_le_f32_imm:
-        case op_eq_i32_imm: case op_lt_s32_imm:
+        case op_eq_i32_imm:
+        case op_lt_s32_imm:
         case op_le_s32_imm: {
-            struct ra_step s = ra_step_unary(
-                ra, sl, ns, inst, i, scalar);
-            uint32_t v = (uint32_t)inst->imm;
-            uint32_t bcast[8] = {v,v,v,v,v,v,v,v};
-            int off = pool_add(&jc->pool,
-                               bcast, 32);
-            enum op o = inst->op;
-            int pp = 0, mm = 1;
-            uint8_t vop = 0;
-            if      (o==op_add_f32_imm) { vop=0x58; }
-            else if (o==op_sub_f32_imm) { vop=0x5c; }
-            else if (o==op_mul_f32_imm) { vop=0x59; }
-            else if (o==op_div_f32_imm) { vop=0x5e; }
-            else if (o==op_min_f32_imm) { vop=0x5d; }
-            else if (o==op_max_f32_imm) { vop=0x5f; }
-            else if (o==op_add_i32_imm) { pp=1; vop=0xfe; }
-            else if (o==op_sub_i32_imm) { pp=1; vop=0xfa; }
-            else if (o==op_mul_i32_imm) { pp=1; mm=2; vop=0x40; }
-            else if (o==op_or_32_imm)   { pp=1; vop=0xeb; }
-            else if (o==op_xor_32_imm)  { pp=1; vop=0xef; }
-            else if (o==op_eq_i32_imm)  { pp=1; vop=0x76; }
-            else                        { vop=0xc2; }
-            if (o == op_eq_f32_imm
-             || o == op_lt_f32_imm
-             || o == op_le_f32_imm) {
-                uint8_t pred = o==op_eq_f32_imm ? 0
-                             : o==op_lt_f32_imm ? 1
-                             :                     2;
-                int pos = vex_rip(c, pp, mm, 0, 1,
-                    s.rd, s.rx, vop);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            uint32_t       v = (uint32_t)inst->imm;
+            uint32_t       bcast[8] = {v, v, v, v, v, v, v, v};
+            int            off = pool_add(&jc->pool, bcast, 32);
+            enum op        o = inst->op;
+            int            pp = 0, mm = 1;
+            uint8_t        vop = 0;
+            if (o == op_add_f32_imm) {
+                vop = 0x58;
+            } else if (o == op_sub_f32_imm) {
+                vop = 0x5c;
+            } else if (o == op_mul_f32_imm) {
+                vop = 0x59;
+            } else if (o == op_div_f32_imm) {
+                vop = 0x5e;
+            } else if (o == op_min_f32_imm) {
+                vop = 0x5d;
+            } else if (o == op_max_f32_imm) {
+                vop = 0x5f;
+            } else if (o == op_add_i32_imm) {
+                pp = 1;
+                vop = 0xfe;
+            } else if (o == op_sub_i32_imm) {
+                pp = 1;
+                vop = 0xfa;
+            } else if (o == op_mul_i32_imm) {
+                pp = 1;
+                mm = 2;
+                vop = 0x40;
+            } else if (o == op_or_32_imm) {
+                pp = 1;
+                vop = 0xeb;
+            } else if (o == op_xor_32_imm) {
+                pp = 1;
+                vop = 0xef;
+            } else if (o == op_eq_i32_imm) {
+                pp = 1;
+                vop = 0x76;
+            } else {
+                vop = 0xc2;
+            }
+            if (o == op_eq_f32_imm || o == op_lt_f32_imm || o == op_le_f32_imm) {
+                uint8_t pred = o == op_eq_f32_imm ? 0 : o == op_lt_f32_imm ? 1 : 2;
+                int     pos = vex_rip(c, pp, mm, 0, 1, s.rd, s.rx, vop);
                 emit1(c, pred);
                 pool_ref_at(&jc->pool, off, pos, 1);
             } else {
-                int pos = vex_rip(c, pp, mm, 0, 1,
-                    s.rd, s.rx, vop);
+                int pos = vex_rip(c, pp, mm, 0, 1, s.rd, s.rx, vop);
                 pool_ref_at(&jc->pool, off, pos, 0);
             }
         } break;
 
         case op_abs_f32: {
-            struct ra_step s = ra_step_unary(
-                ra, sl, ns, inst, i, scalar);
-            uint32_t mask[8] = {0x7fffffffu,0x7fffffffu,
-                                0x7fffffffu,0x7fffffffu,
-                                0x7fffffffu,0x7fffffffu,
-                                0x7fffffffu,0x7fffffffu};
-            int off = pool_add(&jc->pool, mask, 32);
-            int pos = vex_rip(c, 0, 1, 0, 1,
-                s.rd, s.rx, 0x54);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            uint32_t       mask[8] = {0x7fffffffu, 0x7fffffffu, 0x7fffffffu, 0x7fffffffu,
+                                      0x7fffffffu, 0x7fffffffu, 0x7fffffffu, 0x7fffffffu};
+            int            off = pool_add(&jc->pool, mask, 32);
+            int            pos = vex_rip(c, 0, 1, 0, 1, s.rd, s.rx, 0x54);
             pool_ref_at(&jc->pool, off, pos, 0);
         } break;
         case op_neg_f32: {
-            struct ra_step s = ra_step_unary(
-                ra, sl, ns, inst, i, scalar);
-            uint32_t mask[8] = {0x80000000u,0x80000000u,
-                                0x80000000u,0x80000000u,
-                                0x80000000u,0x80000000u,
-                                0x80000000u,0x80000000u};
-            int off = pool_add(&jc->pool, mask, 32);
-            int pos = vex_rip(c, 0, 1, 0, 1,
-                s.rd, s.rx, 0x57);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            uint32_t       mask[8] = {0x80000000u, 0x80000000u, 0x80000000u, 0x80000000u,
+                                      0x80000000u, 0x80000000u, 0x80000000u, 0x80000000u};
+            int            off = pool_add(&jc->pool, mask, 32);
+            int            pos = vex_rip(c, 0, 1, 0, 1, s.rd, s.rx, 0x57);
             pool_ref_at(&jc->pool, off, pos, 0);
         } break;
 
-        case op_add_f32: case op_sub_f32:
-        case op_mul_f32: case op_div_f32:
-        case op_min_f32: case op_max_f32:
+        case op_add_f32:
+        case op_sub_f32:
+        case op_mul_f32:
+        case op_div_f32:
+        case op_min_f32:
+        case op_max_f32:
         case op_sqrt_f32:
-        case op_round_f32: case op_floor_f32:
+        case op_round_f32:
+        case op_floor_f32:
         case op_ceil_f32:
-        case op_round_i32: case op_floor_i32:
+        case op_round_i32:
+        case op_floor_i32:
         case op_ceil_i32:
-        case op_fma_f32: case op_fms_f32:
-        case op_add_i32: case op_sub_i32:
+        case op_fma_f32:
+        case op_fms_f32:
+        case op_add_i32:
+        case op_sub_i32:
         case op_mul_i32:
-        case op_shl_i32: case op_shr_u32:
+        case op_shl_i32:
+        case op_shr_u32:
         case op_shr_s32:
-        case op_and_32: case op_or_32:
-        case op_xor_32: case op_sel_32:
+        case op_and_32:
+        case op_or_32:
+        case op_xor_32:
+        case op_sel_32:
         case op_f32_from_i32:
         case op_i32_from_f32:
-        case op_eq_f32: case op_lt_f32:
+        case op_eq_f32:
+        case op_lt_f32:
         case op_le_f32:
-        case op_eq_i32: case op_lt_s32:
+        case op_eq_i32:
+        case op_lt_s32:
         case op_le_s32:
-        case op_lt_u32: case op_le_u32:
+        case op_lt_u32:
+        case op_le_u32:
         case op_join:
         case op_and_imm: {
-            int nscratch = (inst->op==op_lt_u32) ? 2
-                : (inst->op==op_le_s32
-                    || inst->op==op_le_u32)
-                ? 1 : 0;
-            struct ra_step s = ra_step_alu(
-                ra, sl, ns, inst,
-                i, scalar, nscratch);
-            emit_alu_reg(c, inst->op, s.rd, s.rx,
-                s.ry, s.rz, inst->imm,
-                s.scratch, s.scratch2);
+            int            nscratch = (inst->op == op_lt_u32)                 ? 2
+                           : (inst->op == op_le_s32 || inst->op == op_le_u32) ? 1
+                                                                              : 0;
+            struct ra_step s = ra_step_alu(ra, sl, ns, inst, i, scalar, nscratch);
+            emit_alu_reg(c, inst->op, s.rd, s.rx, s.ry, s.rz, inst->imm, s.scratch,
+                         s.scratch2);
             if (s.scratch >= 0) { ra_return_reg(ra, s.scratch); }
             if (s.scratch2 >= 0) { ra_return_reg(ra, s.scratch2); }
         } break;
@@ -2088,17 +2086,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb,
         case op_shl_imm:
         case op_shr_u32_imm:
         case op_shr_s32_imm: {
-            struct ra_step s = ra_step_unary(
-                ra, sl, ns, inst, i, scalar);
-            emit_alu_reg(c, inst->op,
-                s.rd, s.rx, 0, 0,
-                inst->imm, -1, -1);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            emit_alu_reg(c, inst->op, s.rd, s.rx, 0, 0, inst->imm, -1, -1);
         } break;
 
         case op_pack: break;
         }
     }
-    #undef lu
+#undef lu
 }
 
 void umbra_jit_run(struct umbra_jit *j, int n, umbra_buf buf[]) {
@@ -2112,8 +2107,8 @@ void umbra_jit_free(struct umbra_jit *j) {
     free(j);
 }
 
-static _Bool x86_disasm(uint8_t const *code, size_t n,
-                        char const *spath, char const *opath, FILE *f) {
+static _Bool x86_disasm(uint8_t const *code, size_t n, char const *spath,
+                        char const *opath, FILE *f) {
     FILE *fp = fopen(spath, "w");
     if (!fp) { return 0; }
     for (size_t i = 0; i < n; i++) { fprintf(fp, ".byte 0x%02x\n", code[i]); }
@@ -2128,10 +2123,13 @@ static _Bool x86_disasm(uint8_t const *code, size_t n,
              spath, opath, opath);
     FILE *p = popen(cmd, "r");
     if (!p) { return 0; }
-    char line[256];
+    char  line[256];
     _Bool ok = 0;
     while (fgets(line, (int)sizeof line, p)) {
-        if (!ok && __builtin_strstr(line, "file format")) { ok = 1; continue; }
+        if (!ok && __builtin_strstr(line, "file format")) {
+            ok = 1;
+            continue;
+        }
         if (f) { fputs(line, f); }
     }
     return pclose(p) == 0 && ok;
@@ -2140,10 +2138,10 @@ static _Bool x86_disasm(uint8_t const *code, size_t n,
 void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
     if (!j || j->loop_start >= j->loop_end) { return; }
     uint8_t const *code = (uint8_t const *)j->code;
-    size_t n = (size_t)(j->loop_end - j->loop_start);
+    size_t         n = (size_t)(j->loop_end - j->loop_start);
 
     char spath[] = "/tmp/umbra_mca_XXXXXX.s";
-    int fd = mkstemps(spath, 2);
+    int  fd = mkstemps(spath, 2);
     if (fd < 0) { return; }
     close(fd);
 
@@ -2151,29 +2149,47 @@ void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
     snprintf(opath, sizeof opath, "%.*s.o", (int)(sizeof spath - 3), spath);
 
     char asmpath[] = "/tmp/umbra_mca_asm_XXXXXX.s";
-    int afd = mkstemps(asmpath, 2);
-    if (afd < 0) { remove(spath); return; }
+    int  afd = mkstemps(asmpath, 2);
+    if (afd < 0) {
+        remove(spath);
+        return;
+    }
     close(afd);
     FILE *afp = fopen(asmpath, "w");
-    if (!afp) { remove(spath); remove(asmpath); return; }
+    if (!afp) {
+        remove(spath);
+        remove(asmpath);
+        return;
+    }
 
     if (!x86_disasm(code + j->loop_start, n, spath, opath, afp)) {
         fclose(afp);
-        remove(spath); remove(opath); remove(asmpath);
+        remove(spath);
+        remove(opath);
+        remove(asmpath);
         return;
     }
     fclose(afp);
-    remove(spath); remove(opath);
+    remove(spath);
+    remove(opath);
 
     char cleanpath[] = "/tmp/umbra_mca_clean_XXXXXX.s";
-    int cfd = mkstemps(cleanpath, 2);
-    if (cfd < 0) { remove(asmpath); return; }
+    int  cfd = mkstemps(cleanpath, 2);
+    if (cfd < 0) {
+        remove(asmpath);
+        return;
+    }
     FILE *cfp = fdopen(cfd, "w");
-    if (!cfp) { close(cfd); remove(asmpath); remove(cleanpath); return; }
+    if (!cfp) {
+        close(cfd);
+        remove(asmpath);
+        remove(cleanpath);
+        return;
+    }
 
     afp = fopen(asmpath, "r");
     if (afp) {
-        char line[256];
+        char  line[256];
         _Bool past_header = 0;
         while (fgets(line, (int)sizeof line, afp)) {
             if (!past_header) {
@@ -2199,14 +2215,11 @@ void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
              cleanpath);
     FILE *p = popen(cmd, "r");
     if (p) {
-        int cplen = (int)__builtin_strlen(cleanpath);
+        int  cplen = (int)__builtin_strlen(cleanpath);
         char line[256];
         while (fgets(line, (int)sizeof line, p)) {
             char *s = line;
-            if (__builtin_strncmp(s, cleanpath,
-                                  (size_t)cplen) == 0) {
-                s += cplen;
-            }
+            if (__builtin_strncmp(s, cleanpath, (size_t)cplen) == 0) { s += cplen; }
             fputs(s, f);
         }
         pclose(p);

@@ -5,7 +5,7 @@
 
 // All encodings verified against clang -target x86_64 + llvm-objdump.
 
-static _Bool bytes_eq(Buf *b, int n, const uint8_t exp[]) {
+static _Bool bytes_eq(Buf *b, int n, uint8_t const exp[]) {
     return b->len == n && memcmp(b->buf, exp, (size_t)n) == 0;
 }
 
@@ -15,12 +15,12 @@ static void test_emit(void) {
     Buf b = {0};
     emit1(&b, 0xAB);
     emit4(&b, 0xDEADBEEF);
-    (b.len == 5)         here;
-    (b.buf[0] == 0xAB)  here;
-    (b.buf[1] == 0xEF)  here;
-    (b.buf[2] == 0xBE)  here;
-    (b.buf[3] == 0xAD)  here;
-    (b.buf[4] == 0xDE)  here;
+    (b.len == 5) here;
+    (b.buf[0] == 0xAB) here;
+    (b.buf[1] == 0xEF) here;
+    (b.buf[2] == 0xBE) here;
+    (b.buf[3] == 0xAD) here;
+    (b.buf[4] == 0xDE) here;
     free(b.buf);
 }
 
@@ -84,20 +84,17 @@ static void test_gpr(void) {
 
     // subq $256, %rax => 48 81 e8 00 01 00 00
     sub_ri(&b, RAX, 256);
-    (bytes_eq(&b, 7, (uint8_t[]){0x48, 0x81, 0xE8,
-                                  0x00, 0x01, 0x00, 0x00})) here;
+    (bytes_eq(&b, 7, (uint8_t[]){0x48, 0x81, 0xE8, 0x00, 0x01, 0x00, 0x00})) here;
     reset(&b);
 
     // cmpq $256, %rax => 48 81 f8 00 01 00 00
     cmp_ri(&b, RAX, 256);
-    (bytes_eq(&b, 7, (uint8_t[]){0x48, 0x81, 0xF8,
-                                  0x00, 0x01, 0x00, 0x00})) here;
+    (bytes_eq(&b, 7, (uint8_t[]){0x48, 0x81, 0xF8, 0x00, 0x01, 0x00, 0x00})) here;
     reset(&b);
 
     // movq 256(%rdi), %rax => 48 8b 87 00 01 00 00
     mov_load(&b, RAX, RDI, 256);
-    (bytes_eq(&b, 7, (uint8_t[]){0x48, 0x8B, 0x87,
-                                  0x00, 0x01, 0x00, 0x00})) here;
+    (bytes_eq(&b, 7, (uint8_t[]){0x48, 0x8B, 0x87, 0x00, 0x01, 0x00, 0x00})) here;
     free(b.buf);
 }
 
@@ -120,22 +117,22 @@ static void test_avx_fma(void) {
 
     // vfmadd132ps %ymm4, %ymm3, %ymm2 => c4 e2 65 98 d4
     vfmadd132ps(&b, 2, 3, 4);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC4,0xE2,0x65,0x98,0xD4})) here;
+    (bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0x98, 0xD4})) here;
     reset(&b);
 
     // vfmadd213ps %ymm4, %ymm3, %ymm2 => c4 e2 65 a8 d4
     vfmadd213ps(&b, 2, 3, 4);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC4,0xE2,0x65,0xA8,0xD4})) here;
+    (bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0xA8, 0xD4})) here;
     reset(&b);
 
     // vfnmadd132ps %ymm7, %ymm6, %ymm5 => c4 e2 4d 9c fd
     vfnmadd132ps(&b, 7, 6, 5);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC4,0xE2,0x4D,0x9C,0xFD})) here;
+    (bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x4D, 0x9C, 0xFD})) here;
     reset(&b);
 
     // vfnmadd213ps %ymm7, %ymm6, %ymm5 => c4 e2 4d ac fd
     vfnmadd213ps(&b, 7, 6, 5);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC4,0xE2,0x4D,0xAC,0xFD})) here;
+    (bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x4D, 0xAC, 0xFD})) here;
     free(b.buf);
 }
 
