@@ -111,10 +111,6 @@ void   umbra_jit_free(struct umbra_jit*);
 Same in enums (see bb.h) and struct fields.
 Align return types within a group when it helps readability.
 
-## Designated initializer spacing
-
-No spaces around `=`: `.x=val`, `.imm=0`, `.ptr=src.ix`.
-
 ## Switch style
 
 - Blank line between logical groups of cases.
