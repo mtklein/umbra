@@ -1,5 +1,6 @@
 #include "program.h"
 #include "bb.h"
+#include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -10,6 +11,24 @@ typedef  int32_t I32 __attribute__((vector_size(K*4)));
 typedef uint32_t U32 __attribute__((vector_size(K*4)));
 typedef    float F32 __attribute__((vector_size(K*4)));
 typedef uint16_t U16 __attribute__((vector_size(K*2)));
+
+#ifdef __clang__
+    #define vec_sqrt(v)    __builtin_elementwise_sqrt(v)
+    #define vec_abs(v)     __builtin_elementwise_abs(v)
+    #define vec_round(v)   __builtin_elementwise_roundeven(v)
+    #define vec_floor(v)   __builtin_elementwise_floor(v)
+    #define vec_ceil(v)    __builtin_elementwise_ceil(v)
+    #define vec_min(a,b)   __builtin_elementwise_min(a,b)
+    #define vec_max(a,b)   __builtin_elementwise_max(a,b)
+#else
+    static F32 vec_sqrt(F32 v)  { F32 r; for (int i=0;i<K;i++) { r[i]=sqrtf(v[i]); } return r; }
+    static F32 vec_abs(F32 v)   { F32 r; for (int i=0;i<K;i++) { r[i]=fabsf(v[i]); } return r; }
+    static F32 vec_round(F32 v) { F32 r; for (int i=0;i<K;i++) { r[i]=rintf(v[i]); } return r; }
+    static F32 vec_floor(F32 v) { F32 r; for (int i=0;i<K;i++) { r[i]=floorf(v[i]); } return r; }
+    static F32 vec_ceil(F32 v)  { F32 r; for (int i=0;i<K;i++) { r[i]=ceilf(v[i]); } return r; }
+    static F32 vec_min(F32 a, F32 b) { F32 r; for (int i=0;i<K;i++) { r[i]=fminf(a[i],b[i]); } return r; }
+    static F32 vec_max(F32 a, F32 b) { F32 r; for (int i=0;i<K;i++) { r[i]=fmaxf(a[i],b[i]); } return r; }
+#endif
 
 #if !defined(__wasm__)
     typedef __fp16 F16 __attribute__((vector_size(K*2)));
@@ -333,36 +352,36 @@ op( div_f32) {
     }
 #endif
 op(sqrt_f32) {
-    v->f32 = __builtin_elementwise_sqrt(v[ip->x].f32);
+    v->f32 = vec_sqrt(v[ip->x].f32);
     next;
 }
-op(abs_f32) { v->f32 = __builtin_elementwise_abs(v[ip->x].f32); next; }
+op(abs_f32) { v->f32 = vec_abs(v[ip->x].f32); next; }
 op(neg_f32) { v->f32 = -v[ip->x].f32; next; }
-op(round_f32) { v->f32 = __builtin_elementwise_roundeven(v[ip->x].f32); next; }
-op(floor_f32) { v->f32 = __builtin_elementwise_floor(v[ip->x].f32); next; }
-op(ceil_f32)  { v->f32 = __builtin_elementwise_ceil(v[ip->x].f32); next; }
+op(round_f32) { v->f32 = vec_round(v[ip->x].f32); next; }
+op(floor_f32) { v->f32 = vec_floor(v[ip->x].f32); next; }
+op(ceil_f32)  { v->f32 = vec_ceil(v[ip->x].f32); next; }
 op(round_i32) {
     v->i32 = __builtin_convertvector(
-        __builtin_elementwise_roundeven(v[ip->x].f32), I32);
+        vec_round(v[ip->x].f32), I32);
     next;
 }
 op(floor_i32) {
     v->i32 = __builtin_convertvector(
-        __builtin_elementwise_floor(v[ip->x].f32), I32);
+        vec_floor(v[ip->x].f32), I32);
     next;
 }
 op(ceil_i32) {
     v->i32 = __builtin_convertvector(
-        __builtin_elementwise_ceil(v[ip->x].f32), I32);
+        vec_ceil(v[ip->x].f32), I32);
     next;
 }
 op( min_f32) {
-    v->f32 = __builtin_elementwise_min(
+    v->f32 = vec_min(
         v[ip->x].f32, v[ip->y].f32);
     next;
 }
 op( max_f32) {
-    v->f32 = __builtin_elementwise_max(
+    v->f32 = vec_max(
         v[ip->x].f32, v[ip->y].f32);
     next;
 }
@@ -485,14 +504,14 @@ op(div_f32_imm_fn) {
 op(min_f32_imm_fn) {
     union { int i; float f; } u = {.i=ip->y};
     F32 imm = (F32){0} + u.f;
-    v->f32 = __builtin_elementwise_min(
+    v->f32 = vec_min(
         v[ip->x].f32, imm);
     next;
 }
 op(max_f32_imm_fn) {
     union { int i; float f; } u = {.i=ip->y};
     F32 imm = (F32){0} + u.f;
-    v->f32 = __builtin_elementwise_max(
+    v->f32 = vec_max(
         v[ip->x].f32, imm);
     next;
 }

@@ -2,7 +2,7 @@
 #include "../include/umbra.h"
 
 int dprintf(int, char const[], ...);
-#define here || (dprintf(1, "%s:%d failed\n",__FILE__,__LINE__),__builtin_debugtrap(),0)
+#define here || (dprintf(1, "%s:%d failed\n",__FILE__,__LINE__),__builtin_trap(),0)
 
 static inline _Bool equiv(float x, float y) {
     return (x <= y && y <= x)
@@ -32,7 +32,7 @@ static inline test_backends test_backends_make(
     (B.p[1] != 0) here;
 #endif
 #if defined(__APPLE__) && !defined(__wasm__)
-    (B.p[2] != 0) here;
+    if (B.be[2]) { (B.p[2] != 0) here; }
 #endif
     return B;
 }

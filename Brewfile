@@ -1,3 +1,4 @@
+brew "gcc"
 brew "lld"
 brew "llvm"
 brew "ninja"

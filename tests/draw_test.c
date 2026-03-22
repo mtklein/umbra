@@ -1047,7 +1047,7 @@ static void test_radial_2(void) {
 }
 
 static void test_linear_grad(void) {
-    float stop_colors[][4] = {
+    float const stop_colors[][4] = {
         {1,0,0,1}, {0,1,0,1}, {0,0,1,1},
     };
     float lut[256*4];
@@ -1084,7 +1084,7 @@ static void test_linear_grad(void) {
 }
 
 static void test_radial_grad(void) {
-    float stop_colors[][4] = {
+    float const stop_colors[][4] = {
         {1,0,0,1}, {1,1,0,1},
         {0,1,0,1}, {0,0,1,1},
     };
@@ -1121,7 +1121,7 @@ static void test_radial_grad(void) {
 }
 
 static void test_gradient_lut_nonuniform(void) {
-    float stop_colors[][4] = {
+    float const stop_colors[][4] = {
         {1,0,0,1}, {0,1,0,1}, {0,0,1,1},
     };
     float positions[] = {0, 0.2f, 1.0f};

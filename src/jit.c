@@ -252,6 +252,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op,
     case op_widen_s16:  case op_widen_u16:
     case op_narrow_16:  return 0;
     }
+    return 0;
 }
 
 static int8_t const ra_pool[] = {
@@ -480,7 +481,8 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     j->code_size = alloc;
     j->loop_start = loop_body_start;
     j->loop_end   = loop_body_end;
-    j->entry = (void(*)(int,umbra_buf*))mem;
+    { union { void *p; void (*fn)(int,umbra_buf*); } u = {.p=mem};
+      j->entry = u.fn; }
     return j;
 }
 
@@ -1500,7 +1502,8 @@ struct umbra_jit* umbra_jit(struct umbra_basic_block const *bb) {
     j->code_size = alloc; j->code_len = code_sz;
     j->loop_start = loop_body_start;
     j->loop_end   = loop_body_end;
-    j->entry = (void(*)(int,umbra_buf*))mem;
+    { union { void *p; void (*fn)(int,umbra_buf*); } u = {.p=mem};
+      j->entry = u.fn; }
     return j;
 }
 
