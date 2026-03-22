@@ -271,7 +271,7 @@ void broadcast_imm32(Buf *b, int d, uint32_t v) {
     if      (v == 0)           { vpxor(b,1,d,d,d); }
     else if (v == 0xffffffffu) { vpcmpeqd(b,d,d,d); }
     else if (v == 0xffffffffu >> shr) { vpcmpeqd(b,d,d,d); vpsrld_i(b,d,d,(uint8_t)shr); }
-    else if (v == 0xffffffffu << shl) { vpcmpeqd(b,d,d,d); vpslld_i(b,d,d,(uint8_t)shl); }
+    else if (v == (uint32_t)(UINT64_C(0xffffffff) << shl)) { vpcmpeqd(b,d,d,d); vpslld_i(b,d,d,(uint8_t)shl); }
     else {
         emit1(b, 0xb8); emit4(b, v);           // MOV eax, v
         vex(b, 1, 1, 0, 0, d, 0, RAX, 0x6e);  // VMOVD xmm_d, eax
