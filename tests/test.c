@@ -2113,22 +2113,19 @@ static void test_codegen_regalloc(void) {
         umbra_val y = umbra_load_i32(b, (umbra_ptr){1}, ix);
         umbra_val z = umbra_load_i32(b, (umbra_ptr){2}, ix);
         umbra_val r = umbra_sel_i32(b, x, y, z);
-        umbra_val s = umbra_add_i32(b, x, y);
-        umbra_store_i32(b, (umbra_ptr){3}, ix, r);
-        umbra_store_i32(b, (umbra_ptr){4}, ix, s);
+        umbra_val s = umbra_add_i32(b, r, x);
+        umbra_val u = umbra_add_i32(b, s, y);
+        umbra_store_i32(b, (umbra_ptr){3}, ix, u);
         backends B = make(b, 0);
         for (int bi = 0; bi < 3; bi++) {
             int m[] = {-1,0}, t[] = {10,20},
                 f[] = {30,40};
-            int dst[2]={0}, dst2[2]={0};
+            int dst[2]={0};
             if (!run(&B, bi, 2, (umbra_buf[]){
-                {m,2*4},{t,2*4},{f,2*4},
-                {dst,2*4},{dst2,2*4},
+                {m,2*4},{t,2*4},{f,2*4},{dst,2*4},
             })) { continue; }
-            (dst[0] == 10) here;
-            (dst[1] == 40) here;
-            (dst2[0] == -1+10) here;
-            (dst2[1] == 0+20) here;
+            (dst[0] == 10+(-1)+10) here;
+            (dst[1] == 40+0+20) here;
         }
         cleanup(&B);
     }
