@@ -6,6 +6,25 @@
 typedef struct umbra_builder builder;
 typedef umbra_val val;
 
+_Bool is_store(enum op op) {
+    return op == op_store_16
+        || op == op_store_32
+        || op == op_scatter_16
+        || op == op_scatter_32;
+}
+_Bool has_ptr(enum op op) {
+    return op == op_deref_ptr
+        || (op >= op_uni_32 && op <= op_scatter_32)
+        || (op >= op_uni_16 && op <= op_scatter_16);
+}
+_Bool is_varying(enum op op) {
+    return op == op_iota
+        || op == op_load_16
+        || op == op_load_32
+        || op == op_store_16
+        || op == op_store_32;
+}
+
 static _Bool is_pow2(int x) {
     return __builtin_popcount((unsigned)x) == 1;
 }
@@ -124,6 +143,10 @@ val umbra_iota(builder *b) {
 
 val umbra_imm_i32(builder *b, int bits) {
     return push(b, op_imm_32, .imm=bits);
+}
+val umbra_imm_f32(builder *b, float v) {
+    union { float f; int i; } u = {.f=v};
+    return umbra_imm_i32(b, u.i);
 }
 
 int umbra_reserve(builder *b, int n) {

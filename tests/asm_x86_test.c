@@ -80,6 +80,24 @@ static void test_gpr(void) {
     // movq %rsp, %r12 => 49 89 e4
     mov_rr(&b, R12, RSP);
     (bytes_eq(&b, 3, (uint8_t[]){0x49, 0x89, 0xE4})) here;
+    reset(&b);
+
+    // subq $256, %rax => 48 81 e8 00 01 00 00
+    sub_ri(&b, RAX, 256);
+    (bytes_eq(&b, 7, (uint8_t[]){0x48, 0x81, 0xE8,
+                                  0x00, 0x01, 0x00, 0x00})) here;
+    reset(&b);
+
+    // cmpq $256, %rax => 48 81 f8 00 01 00 00
+    cmp_ri(&b, RAX, 256);
+    (bytes_eq(&b, 7, (uint8_t[]){0x48, 0x81, 0xF8,
+                                  0x00, 0x01, 0x00, 0x00})) here;
+    reset(&b);
+
+    // movq 256(%rdi), %rax => 48 8b 87 00 01 00 00
+    mov_load(&b, RAX, RDI, 256);
+    (bytes_eq(&b, 7, (uint8_t[]){0x48, 0x8B, 0x87,
+                                  0x00, 0x01, 0x00, 0x00})) here;
     free(b.buf);
 }
 
@@ -249,6 +267,16 @@ static void test_broadcast_imm32(void) {
     free(b.buf);
 }
 
+static void test_large_disp(void) {
+    Buf b = {0};
+
+    // vmovdqu 256(%rdi,%r10,4), %ymm0
+    vmov_load(&b, 1, 0, RDI, R10, 4, 256);
+    (b.buf[0] == 0xC4) here;
+    (b.len == 10) here;
+    free(b.buf);
+}
+
 static void test_vex_2byte_vs_3byte(void) {
     Buf b = {0};
 
@@ -283,6 +311,7 @@ int main(void) {
     test_avx_mov();
     test_avx_broadcast();
     test_broadcast_imm32();
+    test_large_disp();
     test_vex_2byte_vs_3byte();
     return 0;
 }

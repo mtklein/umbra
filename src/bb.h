@@ -62,26 +62,9 @@ struct umbra_basic_block {
     int             insts, preamble, uni_len, :32;
 };
 
-static inline _Bool is_store(enum op op) {
-    return op == op_store_16
-        || op == op_store_32
-        || op == op_scatter_16
-        || op == op_scatter_32;
-}
-
-static inline _Bool has_ptr(enum op op) {
-    return op == op_deref_ptr
-        || (op >= op_uni_32 && op <= op_scatter_32)
-        || (op >= op_uni_16 && op <= op_scatter_16);
-}
-
-static inline _Bool is_varying(enum op op) {
-    return op == op_iota
-        || op == op_load_16
-        || op == op_load_32
-        || op == op_store_16
-        || op == op_store_32;
-}
+_Bool is_store  (enum op);
+_Bool has_ptr   (enum op);
+_Bool is_varying(enum op);
 
 int umbra_const_eval(enum op, int, int, int);
 
