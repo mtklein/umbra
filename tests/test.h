@@ -31,8 +31,8 @@ static inline test_backends test_backends_make(
 #if defined(__aarch64__) || defined(__AVX2__)
     (B.p[1] != 0) here;
 #endif
-#if defined(__APPLE__) && !defined(__wasm__)
-    if (B.be[2]) { (B.p[2] != 0) here; }
+#if (defined(__APPLE__) && defined(__clang__)) && !defined(__wasm__)
+    B.p[2] != 0 here;
 #endif
     return B;
 }
