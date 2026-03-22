@@ -469,6 +469,50 @@ static void test_step_alu_scratch(void) {
     free(bb->inst); free(bb);
 }
 
+static void test_step_alu_z_claim(void) {
+    static const int8_t pool[] = {5, 6, 7, 8};
+    struct ra_config cfg = {
+        .pool = pool, .nregs = 4, .max_reg = 10,
+        .spill = test_spill,
+        .fill = test_fill, .ctx = 0,
+    };
+    struct umbra_basic_block *bb = malloc(sizeof *bb);
+    bb->inst = calloc(5, sizeof *bb->inst);
+    bb->insts = 5; bb->preamble = 0;
+
+    bb->inst[0].op = op_imm_32; bb->inst[0].imm = 1;
+    bb->inst[1].op = op_imm_32; bb->inst[1].imm = 2;
+    bb->inst[2].op = op_imm_32; bb->inst[2].imm = 3;
+    bb->inst[3].op = op_add_i32;
+    bb->inst[3].x = 0; bb->inst[3].y = 1; bb->inst[3].z = 2;
+    bb->inst[4].op = op_add_i32;
+    bb->inst[4].x = 0; bb->inst[4].y = 1;
+
+    struct ra *ra = ra_create(bb, &cfg);
+    int sl[5] = {-1,-1,-1,-1,-1};
+    int ns = 0;
+    reset_records();
+
+    int8_t r0 = ra_alloc(ra, sl, &ns); ra_assign(ra, 0, r0);
+    int8_t r1 = ra_alloc(ra, sl, &ns); ra_assign(ra, 1, r1);
+    int8_t r2 = ra_alloc(ra, sl, &ns); ra_assign(ra, 2, r2);
+
+    ra_set_last_use(ra, 0, 4);
+    ra_set_last_use(ra, 1, 4);
+    ra_set_last_use(ra, 2, 3);
+
+    struct ra_step s =
+        ra_step_alu(ra, sl, &ns,
+                    &bb->inst[3], 3, 0, 0);
+    (s.rx == r0) here;
+    (s.ry == r1) here;
+    (s.rz == r2) here;
+    (s.rd == r2) here;
+
+    ra_destroy(ra);
+    free(bb->inst); free(bb);
+}
+
 int main(void) {
     test_basic_alloc_free();
     test_eviction_belady();
@@ -482,5 +526,6 @@ int main(void) {
     test_step_unary_alive();
     test_step_alu();
     test_step_alu_scratch();
+    test_step_alu_z_claim();
     return 0;
 }
