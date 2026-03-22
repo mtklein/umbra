@@ -300,10 +300,6 @@ struct ra_step ra_step_alu(struct ra *ra,
             s.rd = ra_claim(ra, inst->y, i);
             y_dead = 0;
         }
-        if (s.rd < 0 && z_dead) {
-            s.rd = ra_claim(ra, inst->z, i);
-            z_dead = 0;
-        }
     }
 
     if (s.rd < 0) {
