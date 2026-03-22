@@ -899,9 +899,7 @@ struct umbra_basic_block* umbra_resolve_joins(
         }
     }
     for (int i = 0; i < n; i++) {
-        while (remap[i] != remap[remap[i]]) {
-            remap[i] = remap[remap[i]];
-        }
+        if (remap[i] != remap[remap[i]]) { __builtin_trap(); }
     }
 
     _Bool *live = calloc((size_t)n, 1);
