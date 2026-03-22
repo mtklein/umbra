@@ -1053,6 +1053,40 @@ static void test_late_imm_identity(void) {
     umbra_builder_free(b);
 }
 
+static void test_abs_peepholes(void) {
+    {
+        struct umbra_builder *b = umbra_builder();
+        umbra_val ix = umbra_iota(b);
+        umbra_val x = umbra_load_i32(b,
+                          (umbra_ptr){0}, ix);
+        umbra_val direct = umbra_abs_f32(b, x);
+        umbra_val neg_x = umbra_neg_f32(b, x);
+        umbra_val mask = umbra_imm_i32(b, 0x7fffffff);
+
+        (umbra_max_f32(b, x, neg_x).id
+            == direct.id) here;
+        (umbra_max_f32(b, neg_x, x).id
+            == direct.id) here;
+        (umbra_and_i32(b, x, mask).id
+            == direct.id) here;
+        (umbra_and_i32(b, mask, x).id
+            == direct.id) here;
+        umbra_builder_free(b);
+    }
+    {
+        struct umbra_builder *b = umbra_builder();
+        umbra_val mask = umbra_imm_i32(b, 0x7fffffff);
+        umbra_val ix = umbra_iota(b);
+        umbra_val x = umbra_load_i32(b,
+                          (umbra_ptr){0}, ix);
+        (mask.id < x.id) here;
+        umbra_val direct = umbra_abs_f32(b, x);
+        (umbra_and_i32(b, x, mask).id
+            == direct.id) here;
+        umbra_builder_free(b);
+    }
+}
+
 static void test_load_8x4(void) {
   for (int opt = 0; opt < 2; opt++) {
     struct umbra_builder *builder =
@@ -2286,18 +2320,42 @@ static void test_dump(void) {
     FILE *f = fopen("/dev/null", "w");
     if (!f) { return; }
 
-    struct umbra_builder *b = umbra_builder();
-    umbra_val ix = umbra_iota(b);
-    umbra_val x = umbra_load_i32(b, (umbra_ptr){0}, ix);
-    umbra_val r = umbra_add_f32(b, x,
-                     umbra_imm_f32(b, 1.0f));
-    umbra_store_i32(b, (umbra_ptr){1}, ix, r);
-    umbra_dump_builder(b, f);
+    {
+        struct umbra_builder *b = umbra_builder();
+        umbra_val ix = umbra_iota(b);
+        umbra_val x = umbra_load_i32(b, (umbra_ptr){0}, ix);
+        umbra_val r = umbra_add_f32(b, x,
+                         umbra_imm_f32(b, 1.0f));
+        umbra_store_i32(b, (umbra_ptr){1}, ix, r);
+        umbra_dump_builder(b, f);
 
-    struct umbra_basic_block *bb = umbra_basic_block(b);
-    umbra_builder_free(b);
-    umbra_dump_basic_block(bb, f);
-    umbra_basic_block_free(bb);
+        struct umbra_basic_block *bb =
+            umbra_basic_block(b);
+        umbra_builder_free(b);
+        umbra_dump_basic_block(bb, f);
+        umbra_basic_block_free(bb);
+    }
+    {
+        struct umbra_builder *b = umbra_builder();
+        umbra_val ix = umbra_iota(b);
+        umbra_val off = umbra_load_i32(b, (umbra_ptr){0},
+                            umbra_imm_i32(b, 0));
+        umbra_val idx = umbra_add_i32(b, ix, off);
+        umbra_val v = umbra_load_i32(b, (umbra_ptr){1},
+                         idx);
+        umbra_store_i32(b, (umbra_ptr){2}, idx, v);
+        umbra_store_i16(b, (umbra_ptr){3}, idx,
+                        umbra_narrow_i16(b, v));
+        umbra_val gi = umbra_load_i32(b,
+                           (umbra_ptr){4}, ix);
+        umbra_store_i32(b, (umbra_ptr){5}, gi, v);
+
+        struct umbra_basic_block *bb =
+            umbra_basic_block(b);
+        umbra_builder_free(b);
+        umbra_dump_basic_block(bb, f);
+        umbra_basic_block_free(bb);
+    }
     fclose(f);
 }
 
@@ -2318,6 +2376,7 @@ int main(void) {
     test_strength_reduction();
     test_zero_imm();
     test_late_imm_identity();
+    test_abs_peepholes();
     test_load_8x4();
     test_store_8x4();
     test_srcover();
