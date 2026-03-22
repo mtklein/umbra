@@ -1,8 +1,7 @@
-san = address,integer,undefined
 cov = -fprofile-instr-generate -fcoverage-mapping
 
 out     = $builddir/xsan
-cc      = $clang -fsanitize=$san -fno-sanitize-recover=all $cov
+cc      = $clang -fsanitize=address,integer,undefined -fno-sanitize-recover=all $cov
 exec    = env UBSAN_OPTIONS=print_stacktrace=1 LLVM_PROFILE_FILE=$builddir/xsan/%p.profraw
 ldflags = -framework Metal -framework Foundation $cov
 include build/project.ninja
