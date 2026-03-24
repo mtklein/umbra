@@ -48,8 +48,8 @@ static backends make_full(struct umbra_builder *builder, _Bool opt) {
 static backends make(struct umbra_builder *builder, _Bool opt) {
     return make_full(builder, opt);
 }
-static _Bool run(backends *B, int b, int n, umbra_buf buf[]) {
-    return test_backends_run(B, b, n, buf);
+static _Bool run(backends *B, int b, int w, int h, umbra_buf buf[]) {
+    return test_backends_run(B, b, w, h, buf);
 }
 static void cleanup(backends *B) { test_backends_free(B); }
 
@@ -91,7 +91,7 @@ static void test_f32_ops(void) {
             for (int bi = 0; bi < 3; bi++) {
                 float x[] = {1, 2, 3, 4, 5};
                 float y[] = {6, 7, 8, 9, 0}, z[5] = {0};
-                if (!run(&B, bi, 5,
+                if (!run(&B, bi, 5, 1,
                          (umbra_buf[]){
                              {x, 5 * 4},
                              {y, 5 * 4},
@@ -113,7 +113,7 @@ static void test_f32_ops(void) {
             for (int bi = 0; bi < 3; bi++) {
                 float x[] = {1, 2, 3};
                 float y[] = {10, 20, 30}, z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -133,7 +133,7 @@ static void test_f32_ops(void) {
             for (int bi = 0; bi < 3; bi++) {
                 float x[] = {10, 20, 30};
                 float y[] = {1, 2, 3}, z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -153,7 +153,7 @@ static void test_f32_ops(void) {
             for (int bi = 0; bi < 3; bi++) {
                 float x[] = {10, 20, 30};
                 float y[] = {2, 4, 5}, z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -178,7 +178,7 @@ static void test_i32_ops(void) {
             for (int bi = 0; bi < 3; bi++) {
                 int x[] = {1, 2, 3};
                 int y[] = {10, 20, 30}, z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -198,7 +198,7 @@ static void test_i32_ops(void) {
             for (int bi = 0; bi < 3; bi++) {
                 int x[] = {10, 20, 30};
                 int y[] = {1, 2, 3}, z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -218,7 +218,7 @@ static void test_i32_ops(void) {
             for (int bi = 0; bi < 3; bi++) {
                 int x[] = {2, 3, 4};
                 int y[] = {5, 6, 7}, z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -238,7 +238,7 @@ static void test_i32_ops(void) {
             for (int bi = 0; bi < 3; bi++) {
                 int x[] = {1, 3, 7};
                 int y[] = {1, 2, 3}, z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -258,7 +258,7 @@ static void test_i32_ops(void) {
             for (int bi = 0; bi < 3; bi++) {
                 int x[] = {-1, 8, 64};
                 int y[] = {1, 1, 3}, z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -278,7 +278,7 @@ static void test_i32_ops(void) {
             for (int bi = 0; bi < 3; bi++) {
                 int x[] = {-8, 8, 64};
                 int y[] = {1, 1, 3}, z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -298,7 +298,7 @@ static void test_i32_ops(void) {
             for (int bi = 0; bi < 3; bi++) {
                 int x[] = {0xff, 0x0f};
                 int y[] = {0x0f, 0xff}, z[2] = {0};
-                if (!run(&B, bi, 2,
+                if (!run(&B, bi, 2, 1,
                          (umbra_buf[]){
                              {x, 2 * 4},
                              {y, 2 * 4},
@@ -317,7 +317,7 @@ static void test_i32_ops(void) {
             for (int bi = 0; bi < 3; bi++) {
                 int x[] = {0xf0, 0x0f};
                 int y[] = {0x0f, 0xf0}, z[2] = {0};
-                if (!run(&B, bi, 2,
+                if (!run(&B, bi, 2, 1,
                          (umbra_buf[]){
                              {x, 2 * 4},
                              {y, 2 * 4},
@@ -336,7 +336,7 @@ static void test_i32_ops(void) {
             for (int bi = 0; bi < 3; bi++) {
                 int x[] = {0xff, 0xff};
                 int y[] = {0x0f, 0xff}, z[2] = {0};
-                if (!run(&B, bi, 2,
+                if (!run(&B, bi, 2, 1,
                          (umbra_buf[]){
                              {x, 2 * 4},
                              {y, 2 * 4},
@@ -363,7 +363,7 @@ static void test_i32_ops(void) {
                 int va[] = {10, 20, 30};
                 int vb[] = {40, 50, 60};
                 int z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {cond, 3 * 4},
                              {va, 3 * 4},
@@ -389,7 +389,7 @@ static void test_cmp_i32(void) {
             for (int bi = 0; bi < 3; bi++) {
                 int x[] = {1, 2, 3};
                 int y[] = {1, 9, 3}, z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -409,7 +409,7 @@ static void test_cmp_i32(void) {
             for (int bi = 0; bi < 3; bi++) {
                 int x[] = {1, 2};
                 int y[] = {1, 9}, z[2] = {0};
-                if (!run(&B, bi, 2,
+                if (!run(&B, bi, 2, 1,
                          (umbra_buf[]){
                              {x, 2 * 4},
                              {y, 2 * 4},
@@ -428,7 +428,7 @@ static void test_cmp_i32(void) {
             for (int bi = 0; bi < 3; bi++) {
                 int x[] = {1, 5, 3};
                 int y[] = {2, 5, 1}, z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -448,7 +448,7 @@ static void test_cmp_i32(void) {
             for (int bi = 0; bi < 3; bi++) {
                 int x[] = {1, 5, 3};
                 int y[] = {2, 5, 1}, z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -468,7 +468,7 @@ static void test_cmp_i32(void) {
             for (int bi = 0; bi < 3; bi++) {
                 int x[] = {3, 5, 1};
                 int y[] = {2, 5, 3}, z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -488,7 +488,7 @@ static void test_cmp_i32(void) {
             for (int bi = 0; bi < 3; bi++) {
                 int x[] = {3, 5, 1};
                 int y[] = {2, 5, 3}, z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -508,7 +508,7 @@ static void test_cmp_i32(void) {
             for (int bi = 0; bi < 3; bi++) {
                 int x[] = {1, -1};
                 int y[] = {2, 1}, z[2] = {0};
-                if (!run(&B, bi, 2,
+                if (!run(&B, bi, 2, 1,
                          (umbra_buf[]){
                              {x, 2 * 4},
                              {y, 2 * 4},
@@ -527,7 +527,7 @@ static void test_cmp_i32(void) {
             for (int bi = 0; bi < 3; bi++) {
                 int x[] = {1, 2, -1};
                 int y[] = {2, 2, 1}, z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -547,7 +547,7 @@ static void test_cmp_i32(void) {
             for (int bi = 0; bi < 3; bi++) {
                 int x[] = {2, -1, 1};
                 int y[] = {1, 1, 2}, z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -567,7 +567,7 @@ static void test_cmp_i32(void) {
             for (int bi = 0; bi < 3; bi++) {
                 int x[] = {2, 2, 1};
                 int y[] = {1, 2, -1}, z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -593,7 +593,7 @@ static void test_cmp_f32(void) {
                 float x[] = {1, 2, 3};
                 float y[] = {1, 9, 3};
                 int   z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -614,7 +614,7 @@ static void test_cmp_f32(void) {
                 float x[] = {1, 2};
                 float y[] = {1, 9};
                 int   z[2] = {0};
-                if (!run(&B, bi, 2,
+                if (!run(&B, bi, 2, 1,
                          (umbra_buf[]){
                              {x, 2 * 4},
                              {y, 2 * 4},
@@ -634,7 +634,7 @@ static void test_cmp_f32(void) {
                 float x[] = {1, 5, 3};
                 float y[] = {2, 5, 1};
                 int   z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -655,7 +655,7 @@ static void test_cmp_f32(void) {
                 float x[] = {1, 5, 3};
                 float y[] = {2, 5, 1};
                 int   z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -676,7 +676,7 @@ static void test_cmp_f32(void) {
                 float x[] = {3, 5, 1};
                 float y[] = {2, 5, 3};
                 int   z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -697,7 +697,7 @@ static void test_cmp_f32(void) {
                 float x[] = {3, 5, 1};
                 float y[] = {2, 5, 3};
                 int   z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -723,7 +723,7 @@ static void test_imm(void) {
             backends B = make(builder, opt);
             for (int bi = 0; bi < 3; bi++) {
                 int z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {z, 3 * 4},
                          })) {
@@ -751,7 +751,7 @@ static void test_fma_f32(void) {
         for (int bi = 0; bi < 3; bi++) {
             float a[] = {2, 3}, c[] = {4, 5};
             float d[] = {10, 20}, z[2] = {0};
-            if (!run(&B, bi, 2,
+            if (!run(&B, bi, 2, 1,
                      (umbra_buf[]){
                          {a, 2 * 4},
                          {c, 2 * 4},
@@ -775,7 +775,7 @@ static void test_min_max_sqrt_f32(void) {
             for (int bi = 0; bi < 3; bi++) {
                 float x[] = {5, 1, 3};
                 float y[] = {2, 4, 3}, z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -795,7 +795,7 @@ static void test_min_max_sqrt_f32(void) {
             for (int bi = 0; bi < 3; bi++) {
                 float x[] = {5, 1, 3};
                 float y[] = {2, 4, 3}, z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -818,7 +818,7 @@ static void test_min_max_sqrt_f32(void) {
             backends B = make(builder, opt);
             for (int bi = 0; bi < 3; bi++) {
                 float a[] = {4, 9, 16}, z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {a, 3 * 4},
                              {z, 3 * 4},
@@ -846,7 +846,7 @@ static void test_abs_sign_f32(void) {
             for (int bi = 0; bi < 3; bi++) {
                 float a[] = {-1.5f, 2.5f, -0.0f};
                 float z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {a, 3 * 4},
                              {z, 3 * 4},
@@ -869,7 +869,7 @@ static void test_abs_sign_f32(void) {
             for (int bi = 0; bi < 3; bi++) {
                 float a[] = {-3.0f, 7.0f, 0.0f};
                 float z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {a, 3 * 4},
                              {z, 3 * 4},
@@ -892,7 +892,7 @@ static void test_abs_sign_f32(void) {
             for (int bi = 0; bi < 3; bi++) {
                 float a[] = {-1.5f, 2.5f, 0.0f};
                 float z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {a, 3 * 4},
                              {z, 3 * 4},
@@ -923,7 +923,7 @@ static void test_round_floor_ceil(void) {
             float s_[4];                                                    \
             __builtin_memcpy(s_, src, 16);                                  \
             int d_[4] = {0};                                                \
-            if (!run(&B_, bi_, 4,                                           \
+            if (!run(&B_, bi_, 4, 1,                                        \
                      (umbra_buf[]){                                         \
                          {s_, 16},                                          \
                          {d_, 16},                                          \
@@ -969,7 +969,7 @@ static void test_large_n(void) {
                 x[i] = (float)i;
                 y[i] = (float)(100 - i);
             }
-            if (!run(&B, bi, 100,
+            if (!run(&B, bi, 100, 1,
                      (umbra_buf[]){
                          {x, 100 * 4},
                          {y, 100 * 4},
@@ -995,7 +995,7 @@ static void test_convert(void) {
             for (int bi = 0; bi < 3; bi++) {
                 int   a[] = {1, 255, -3};
                 float z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {a, 3 * 4},
                              {z, 3 * 4},
@@ -1018,7 +1018,7 @@ static void test_convert(void) {
             for (int bi = 0; bi < 3; bi++) {
                 float a[] = {1.9f, 255.0f, -3.7f};
                 int   z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {a, 3 * 4},
                              {z, 3 * 4},
@@ -1056,7 +1056,7 @@ static void test_constprop(void) {
             backends B = make(builder, opt);
             for (int bi = 0; bi < 3; bi++) {
                 int z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {z, 3 * 4},
                          })) {
@@ -1077,7 +1077,7 @@ static void test_constprop(void) {
             backends B = make(builder, opt);
             for (int bi = 0; bi < 3; bi++) {
                 float z[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {z, 3 * 4},
                          })) {
@@ -1120,7 +1120,7 @@ static void test_strength_reduction(void) {
             backends B = make(builder, opt);
             for (int bi = 0; bi < 3; bi++) {
                 int32_t a[] = {1, 2, 3, 4, 5}, c[5] = {0};
-                if (!run(&B, bi, 5,
+                if (!run(&B, bi, 5, 1,
                          (umbra_buf[]){
                              {a, 5 * 4},
                              {c, 5 * 4},
@@ -1140,7 +1140,7 @@ static void test_strength_reduction(void) {
             backends B = make(builder, opt);
             for (int bi = 0; bi < 3; bi++) {
                 int32_t a[] = {1, 2, 3}, c[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {a, 3 * 4},
                              {c, 3 * 4},
@@ -1166,7 +1166,7 @@ static void test_zero_imm(void) {
         backends B = make(builder, opt);
         for (int bi = 0; bi < 3; bi++) {
             int a[] = {0, 1, 0}, z[3] = {0};
-            if (!run(&B, bi, 3,
+            if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
                          {a, 3 * 4},
                          {z, 3 * 4},
@@ -1254,7 +1254,7 @@ static void test_load_8x4(void) {
             };
             int32_t rr[3] = {0}, gg[3] = {0};
             int32_t b_[3] = {0}, aa[3] = {0};
-            if (!run(&B, bi, 3,
+            if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
                          {src, 3 * 4},
                          {rr, 3 * 4},
@@ -1307,7 +1307,7 @@ static void test_store_8x4(void) {
             int32_t  b_[] = {0xBB, 0x22, 0x00};
             int32_t  aa[] = {0xAA, 0x11, 0xFF};
             uint32_t dst[3] = {0};
-            if (!run(&B, bi, 3,
+            if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
                          {rr, 3 * 4},
                          {gg, 3 * 4},
@@ -1338,7 +1338,7 @@ static void test_srcover(void) {
             };
             __fp16 dst_r[] = {0.5, 0.5, 0.5}, dst_g[] = {0.5, 0.5, 0.5},
                    dst_b[] = {0.5, 0.5, 0.5}, dst_a[] = {0.5, 0.5, 0.5};
-            if (!run(&B, bi, 3,
+            if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
                          {src_px, 3 * 4},
                          {dst_r, 3 * 2},
@@ -1380,7 +1380,7 @@ static void test_narrow_16(void) {
     for (int bi = 0; bi < 3; bi++) {
         int      src[] = {0x00010002, 0x00030004, 0x00050006};
         uint16_t dst[3] = {0};
-        if (!run(&B, bi, 3,
+        if (!run(&B, bi, 3, 1,
                  (umbra_buf[]){
                      {src, 3 * 4},
                      {dst, 3 * 2},
@@ -1406,7 +1406,7 @@ static void test_mixed_ptr_sizes(void) {
             for (int bi = 0; bi < 3; bi++) {
                 uint32_t x[] = {10, 20, 30};
                 uint32_t y[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 4},
                              {y, 3 * 4},
@@ -1429,7 +1429,7 @@ static void test_mixed_ptr_sizes(void) {
             backends B = make(builder, opt);
             for (int bi = 0; bi < 3; bi++) {
                 __fp16 x[] = {1, 2, 3}, y[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {x, 3 * 2},
                              {y, 3 * 2},
@@ -1456,7 +1456,7 @@ static void test_n9(void) {
                     x[i] = (float)(i + 1);
                     y[i] = (float)(10 * (i + 1));
                 }
-                if (!run(&B, bi, 9,
+                if (!run(&B, bi, 9, 1,
                          (umbra_buf[]){
                              {x, 9 * 4},
                              {y, 9 * 4},
@@ -1477,7 +1477,7 @@ static void test_n9(void) {
                     x[i] = i + 1;
                     y[i] = i + 2;
                 }
-                if (!run(&B, bi, 9,
+                if (!run(&B, bi, 9, 1,
                          (umbra_buf[]){
                              {x, 9 * 4},
                              {y, 9 * 4},
@@ -1516,7 +1516,7 @@ static void test_n9(void) {
             for (int bi = 0; bi < 3; bi++) {
                 uint32_t src[9], dst[9] = {0};
                 for (int i = 0; i < 9; i++) { src[i] = 0xAABBCC00u + (uint32_t)i; }
-                if (!run(&B, bi, 9,
+                if (!run(&B, bi, 9, 1,
                          (umbra_buf[]){
                              {src, 9 * 4},
                              {dst, 9 * 4},
@@ -1560,7 +1560,7 @@ static void test_preamble_pair_alias(void) {
         for (int bi = 0; bi < 3; bi++) {
             float in[16], out[16] = {0};
             for (int i = 0; i < 16; i++) { in[i] = (float)(i + 1); }
-            if (!run(&B, bi, 16,
+            if (!run(&B, bi, 16, 1,
                      (umbra_buf[]){
                          {in, 16 * 4},
                          {out, 16 * 4},
@@ -1568,7 +1568,7 @@ static void test_preamble_pair_alias(void) {
                 continue;
             }
             float ref[16];
-            umbra_program_queue(B.p[0], 16,
+            umbra_program_queue(B.p[0], 16, 1,
                                 (umbra_buf[]){
                                     {in, 16 * 4},
                                     {ref, 16 * 4},
@@ -1592,7 +1592,7 @@ static void test_gather_clamp(void) {
                 int32_t indices[4] = {-5, 0, 2, 100};
                 int32_t src[3] = {10, 20, 30};
                 int32_t dst[4] = {0};
-                if (!run(&B, bi, 4,
+                if (!run(&B, bi, 4, 1,
                          (umbra_buf[]){
                              {indices, (long)sizeof indices},
                              {src, (long)sizeof src},
@@ -1619,7 +1619,7 @@ static void test_gather_clamp(void) {
                 int32_t indices[4] = {-1, 1, 3, 999};
                 int16_t src[3] = {100, 200, 300};
                 int32_t dst[4] = {0};
-                if (!run(&B, bi, 4,
+                if (!run(&B, bi, 4, 1,
                          (umbra_buf[]){
                              {indices, (long)sizeof indices},
                              {src, (long)sizeof src},
@@ -1649,7 +1649,7 @@ static void test_scatter_clamp(void) {
             int32_t indices[3] = {-10, 1, 500};
             int32_t vals[3] = {11, 22, 33};
             int32_t dst[3] = {0};
-            if (!run(&B, bi, 3,
+            if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
                          {indices, (long)sizeof indices},
                          {vals, (long)sizeof vals},
@@ -1683,7 +1683,7 @@ static void test_offset_load_store(void) {
                 };
                 int32_t uni[1] = {4};
                 int32_t dst[8] = {0};
-                if (!run(&B, bi, 8,
+                if (!run(&B, bi, 8, 1,
                          (umbra_buf[]){
                              {src, (long)sizeof src},
                              {uni, -(long)sizeof uni},
@@ -1711,7 +1711,7 @@ static void test_offset_load_store(void) {
                 };
                 int32_t uni[1] = {3};
                 int32_t dst[8] = {0};
-                if (!run(&B, bi, 8,
+                if (!run(&B, bi, 8, 1,
                          (umbra_buf[]){
                              {src, (long)sizeof src},
                              {uni, -(long)sizeof uni},
@@ -1738,7 +1738,7 @@ static void test_offset_load_store(void) {
                 };
                 int32_t uni[1] = {2};
                 int32_t dst[16] = {0};
-                if (!run(&B, bi, 8,
+                if (!run(&B, bi, 8, 1,
                          (umbra_buf[]){
                              {src, (long)sizeof src},
                              {uni, -(long)sizeof uni},
@@ -1768,7 +1768,7 @@ static void test_offset_load_store(void) {
                 }
                 int32_t  uni[1] = {5};
                 uint16_t dst[8] = {0};
-                if (!run(&B, bi, 8,
+                if (!run(&B, bi, 8, 1,
                          (umbra_buf[]){
                              {src, (long)sizeof src},
                              {uni, -(long)sizeof uni},
@@ -1799,7 +1799,7 @@ static void test_shift_imm(void) {
             for (int bi = 0; bi < 3; bi++) {
                 uint32_t src[] = {1, 2, 3, 0xff};
                 uint32_t dst[4] = {0};
-                if (!run(&B, bi, 4,
+                if (!run(&B, bi, 4, 1,
                          (umbra_buf[]){
                              {src, 4 * 4},
                              {dst, 4 * 4},
@@ -1823,7 +1823,7 @@ static void test_shift_imm(void) {
             for (int bi = 0; bi < 3; bi++) {
                 uint32_t src[] = {0x100, 0x200, 0xff00};
                 uint32_t dst[3] = {0};
-                if (!run(&B, bi, 3,
+                if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
                              {src, 3 * 4},
                              {dst, 3 * 4},
@@ -1846,7 +1846,7 @@ static void test_shift_imm(void) {
             for (int bi = 0; bi < 3; bi++) {
                 uint32_t src[] = {0x80, 0xfffffff0u};
                 uint32_t dst[2] = {0};
-                if (!run(&B, bi, 2,
+                if (!run(&B, bi, 2, 1,
                          (umbra_buf[]){
                              {src, 2 * 4},
                              {dst, 2 * 4},
@@ -1882,7 +1882,7 @@ static void test_pack_channels(void) {
             uint32_t bb_[] = {0xCC, 0x33, 0xFF};
             uint32_t aa[] = {0xDD, 0x44, 0x00};
             uint32_t dst[3] = {0};
-            if (!run(&B, bi, 3,
+            if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
                          {rr, 3 * 4},
                          {gg, 3 * 4},
@@ -1931,7 +1931,7 @@ static void test_gather_deref_large(void) {
 
     for (int bi = 0; bi < 3; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
-        if (!run(&B, bi, 4,
+        if (!run(&B, bi, 4, 1,
                  (umbra_buf[]){
                      {indices, (long)sizeof indices},
                      {uni, -(long)sizeof uni_},
@@ -1959,7 +1959,7 @@ static void test_imm_fused(void) {
         backends B = make(b, 0);
         for (int bi = 0; bi < 3; bi++) {
             float src[] = {10, 20, 30}, dst[3] = {0};
-            if (!run(&B, bi, 3,
+            if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
                          {src, 3 * 4},
                          {dst, 3 * 4},
@@ -1981,7 +1981,7 @@ static void test_imm_fused(void) {
         backends B = make(b, 0);
         for (int bi = 0; bi < 3; bi++) {
             int src[] = {10, 20, 30}, dst[3] = {0};
-            if (!run(&B, bi, 3,
+            if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
                          {src, 3 * 4},
                          {dst, 3 * 4},
@@ -2003,7 +2003,7 @@ static void test_imm_fused(void) {
         backends B = make(b, 0);
         for (int bi = 0; bi < 3; bi++) {
             int src[] = {0x0f, 0x00, 0xff}, dst[3] = {0};
-            if (!run(&B, bi, 3,
+            if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
                          {src, 3 * 4},
                          {dst, 3 * 4},
@@ -2026,7 +2026,7 @@ static void test_imm_fused(void) {
         for (int bi = 0; bi < 3; bi++) {
             float src[] = {1, 2, 3};
             int   dst[3] = {0};
-            if (!run(&B, bi, 3,
+            if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
                          {src, 3 * 4},
                          {dst, 3 * 4},
@@ -2049,7 +2049,7 @@ static void test_imm_fused(void) {
         for (int bi = 0; bi < 3; bi++) {
             float src[] = {1, 2, 3};
             int   dst[3] = {0};
-            if (!run(&B, bi, 3,
+            if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
                          {src, 3 * 4},
                          {dst, 3 * 4},
@@ -2071,7 +2071,7 @@ static void test_imm_fused(void) {
         backends B = make(b, 0);
         for (int bi = 0; bi < 3; bi++) {
             int src[] = {3, 5, 7}, dst[3] = {0};
-            if (!run(&B, bi, 3,
+            if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
                          {src, 3 * 4},
                          {dst, 3 * 4},
@@ -2093,7 +2093,7 @@ static void test_imm_fused(void) {
         backends B = make(b, 0);
         for (int bi = 0; bi < 3; bi++) {
             int src[] = {3, 5, 7}, dst[3] = {0};
-            if (!run(&B, bi, 3,
+            if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
                          {src, 3 * 4},
                          {dst, 3 * 4},
@@ -2118,7 +2118,7 @@ static void test_cmp_zero(void) {
         backends B = make(b, 0);
         for (int bi = 0; bi < 3; bi++) {
             int src[] = {-1, 0, 1}, dst[3] = {0};
-            if (!run(&B, bi, 3,
+            if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
                          {src, 3 * 4},
                          {dst, 3 * 4},
@@ -2141,7 +2141,7 @@ static void test_cmp_zero(void) {
         for (int bi = 0; bi < 3; bi++) {
             float src[] = {-1, 0, 1};
             int   dst[3] = {0};
-            if (!run(&B, bi, 3,
+            if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
                          {src, 3 * 4},
                          {dst, 3 * 4},
@@ -2164,7 +2164,7 @@ static void test_cmp_zero(void) {
         for (int bi = 0; bi < 3; bi++) {
             float src[] = {-1, 0, 1};
             int   dst[3] = {0};
-            if (!run(&B, bi, 3,
+            if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
                          {src, 3 * 4},
                          {dst, 3 * 4},
@@ -2186,7 +2186,7 @@ static void test_cmp_zero(void) {
         backends B = make(b, 0);
         for (int bi = 0; bi < 3; bi++) {
             int src[] = {-1, 0, 1}, dst[3] = {0};
-            if (!run(&B, bi, 3,
+            if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
                          {src, 3 * 4},
                          {dst, 3 * 4},
@@ -2213,7 +2213,7 @@ static void test_store_16_offset(void) {
         int      off_val[] = {2};
         int      src[] = {0xA, 0xB, 0xC};
         uint16_t dst[6] = {0};
-        if (!run(&B, bi, 3,
+        if (!run(&B, bi, 3, 1,
                  (umbra_buf[]){
                      {off_val, 4},
                      {src, 3 * 4},
@@ -2243,7 +2243,7 @@ static void test_imm_broadcast(void) {
         backends B = make(b, 0);
         for (int bi = 0; bi < 3; bi++) {
             int dst[3] = {0};
-            if (!run(&B, bi, 3,
+            if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
                          {dst, 3 * 4},
                      })) {
@@ -2272,7 +2272,7 @@ static void test_codegen_regalloc(void) {
         for (int bi = 0; bi < 3; bi++) {
             float a[] = {2, 3}, c[] = {5, 6}, d[] = {100, 200};
             float dst[4] = {0};
-            if (!run(&B, bi, 2,
+            if (!run(&B, bi, 2, 1,
                      (umbra_buf[]){
                          {a, 2 * 4},
                          {c, 2 * 4},
@@ -2301,7 +2301,7 @@ static void test_codegen_regalloc(void) {
         for (int bi = 0; bi < 3; bi++) {
             float a[] = {2, 3}, c[] = {5, 6}, d[] = {100, 200};
             float dst[4] = {0};
-            if (!run(&B, bi, 2,
+            if (!run(&B, bi, 2, 1,
                      (umbra_buf[]){
                          {a, 2 * 4},
                          {c, 2 * 4},
@@ -2329,7 +2329,7 @@ static void test_codegen_regalloc(void) {
         for (int bi = 0; bi < 3; bi++) {
             int m[] = {-1, 0}, t[] = {10, 20}, f[] = {30, 40};
             int dst[2] = {0};
-            if (!run(&B, bi, 2,
+            if (!run(&B, bi, 2, 1,
                      (umbra_buf[]){
                          {m, 2 * 4},
                          {t, 2 * 4},
@@ -2357,7 +2357,7 @@ static void test_codegen_regalloc(void) {
             int ba[] = {0x0F, 0xFF};
             int vl[] = {0x0A, 0x0B};
             int dst[2] = {0}, dst2[2] = {0};
-            if (!run(&B, bi, 2,
+            if (!run(&B, bi, 2, 1,
                      (umbra_buf[]){
                          {ba, 2 * 4},
                          {vl, 2 * 4},
@@ -2386,7 +2386,7 @@ static void test_fms(void) {
     backends B = make(b, 0);
     for (int bi = 0; bi < 3; bi++) {
         float a[] = {2, 3, 4}, c[] = {5, 6, 7}, d[] = {100, 200, 300}, dst[3] = {0};
-        if (!run(&B, bi, 3,
+        if (!run(&B, bi, 3, 1,
                  (umbra_buf[]){
                      {a, 3 * 4},
                      {c, 3 * 4},
@@ -2416,7 +2416,7 @@ static void test_movi_patterns(void) {
         backends B = make(b, 0);
         for (int bi = 0; bi < 3; bi++) {
             int src[] = {0, 0, 0}, dst[3] = {0};
-            if (!run(&B, bi, 3,
+            if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
                          {src, 3 * 4},
                          {dst, 3 * 4},
@@ -2442,7 +2442,7 @@ static void test_mixed_ptr(void) {
     for (int bi = 0; bi < 3; bi++) {
         uint32_t src[] = {0x00010002, 0x00030004, 0x00050006};
         int      dst[3] = {0};
-        if (!run(&B, bi, 3,
+        if (!run(&B, bi, 3, 1,
                  (umbra_buf[]){
                      {src, (long)sizeof src},
                      {dst, 3 * 4},
@@ -2466,7 +2466,7 @@ static void test_uni_16(void) {
         for (int bi = 0; bi < 3; bi++) {
             uint16_t src[] = {100, 200, 300, 400};
             int      dst[3] = {0};
-            if (!run(&B, bi, 3,
+            if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
                          {src, 8},
                          {dst, 3 * 4},
@@ -2490,7 +2490,7 @@ static void test_uni_16(void) {
             int      idx_val[] = {1};
             uint16_t src[] = {100, 200, 300, 400};
             int      dst[3] = {0};
-            if (!run(&B, bi, 3,
+            if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
                          {idx_val, 4},
                          {src, 8},
@@ -2556,11 +2556,11 @@ static void test_xy(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(xbuf, 0, sizeof xbuf);
         __builtin_memset(ybuf, 0, sizeof ybuf);
-        if (!test_backends_run_2d(&B, bi, W, H,
-                                  (umbra_buf[]){
-                                      {xbuf, (long)sizeof xbuf},
-                                      {ybuf, (long)sizeof ybuf},
-                                  })) {
+        if (!run(&B, bi, W, H,
+                 (umbra_buf[]){
+                     {xbuf, (long)sizeof xbuf},
+                     {ybuf, (long)sizeof ybuf},
+                 })) {
             continue;
         }
         for (int j = 0; j < N; j++) {

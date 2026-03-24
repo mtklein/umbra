@@ -190,7 +190,7 @@ static void fill_bg_row(void *dst, int n, uint32_t bg, long row_sz, int32_t stri
         {dst, row_sz},
         {uni, -(long)fill_pipe.uni_len},
     };
-    umbra_program_queue(fill_pipe.program, n, buf);
+    umbra_program_queue(fill_pipe.program, n, 1, buf);
 }
 
 static void readback_row(uint32_t *dst, void *src, int n, long src_sz, int32_t stride) {
@@ -202,7 +202,7 @@ static void readback_row(uint32_t *dst, void *src, int n, long src_sz, int32_t s
         {uni, -(long)readback_pipe.uni_len},
         {dst, (long)(n * 4)},
     };
-    umbra_program_queue(readback_pipe.program, n, buf);
+    umbra_program_queue(readback_pipe.program, n, 1, buf);
 }
 
 static void to_hdr_row(float *dst, void *src, int n, long src_sz, int32_t stride) {
@@ -214,7 +214,7 @@ static void to_hdr_row(float *dst, void *src, int n, long src_sz, int32_t stride
         {uni, -(long)hdr_pipe.uni_len},
         {dst, (long)(n * 16)},
     };
-    umbra_program_queue(hdr_pipe.program, n, buf);
+    umbra_program_queue(hdr_pipe.program, n, 1, buf);
 }
 
 int main(void) {

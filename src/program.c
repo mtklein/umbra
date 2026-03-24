@@ -129,11 +129,7 @@ struct umbra_backend *umbra_program_backend(struct umbra_program *p) {
     return p->backend;
 }
 
-void umbra_program_queue(struct umbra_program *p, int n, umbra_buf buf[]) {
-    p->queue(p->ctx, n, n, buf);
-}
-
-void umbra_program_queue_2d(struct umbra_program *p, int w, int h, umbra_buf buf[]) {
+void umbra_program_queue(struct umbra_program *p, int w, int h, umbra_buf buf[]) {
     p->queue(p->ctx, w * h, w, buf);
 }
 

@@ -22,7 +22,7 @@ static void grad_2stop_render_row(slide *s, int y, int w, void *row, long row_sz
         {row, row_sz},
         {uni, -(long)uni_len},
     };
-    umbra_program_queue(program, w, buf);
+    umbra_program_queue(program, w, 1, buf);
 }
 
 static void grad_lut_render_row(slide *s, int y, int w, void *row, long row_sz,
@@ -41,7 +41,7 @@ static void grad_lut_render_row(slide *s, int y, int w, void *row, long row_sz,
         {row, row_sz},
         {uni, -(long)uni_len},
     };
-    umbra_program_queue(program, w, buf);
+    umbra_program_queue(program, w, 1, buf);
 }
 
 static void grad_lut_cleanup(slide *s) {

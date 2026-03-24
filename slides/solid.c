@@ -67,7 +67,7 @@ static void solid_render_row(slide *s, int y, int w, void *row, long row_sz,
         {row, row_sz},
         {uni, -(long)uni_len},
     };
-    umbra_program_queue(program, w, buf);
+    umbra_program_queue(program, w, 1, buf);
 }
 
 static void solid_cleanup(slide *s) {

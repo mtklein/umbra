@@ -24,7 +24,7 @@ static void text_render_row(slide *s, int y, int w, void *row, long row_sz,
         {row, row_sz},
         {uni, -(long)uni_len},
     };
-    umbra_program_queue(program, w, buf);
+    umbra_program_queue(program, w, 1, buf);
 }
 
 static void text_cleanup(slide *s) {

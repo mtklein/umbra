@@ -124,7 +124,7 @@ static void fill_bg_row(int fmt, void *dst,
         { uni, -(long)fill_pipes[fmt].uni_len },
     };
     umbra_program_queue(
-        fill_pipes[fmt].prog, n, buf);
+        fill_pipes[fmt].prog, n, 1, buf);
 }
 
 static void readback_row(int fmt, uint32_t *dst,
@@ -142,7 +142,7 @@ static void readback_row(int fmt, uint32_t *dst,
         { dst,  (long)(n * 4) },
     };
     umbra_program_queue(
-        readback_pipes[fmt].prog, n, buf);
+        readback_pipes[fmt].prog, n, 1, buf);
 }
 
 static void render_slide(
@@ -352,7 +352,7 @@ static void test_slug_rect(void) {
             __builtin_memcpy(
                 au + alay.loop_off,
                 &j32, 4);
-            umbra_program_queue(acc, W, abuf);
+            umbra_program_queue(acc, W, 1, abuf);
         }
         umbra_backend_flush(be);
 
@@ -367,7 +367,7 @@ static void test_slug_rect(void) {
             { pixels + y * W, (long)(W * 4) },
             { uni, -(long)lay.uni_len },
         };
-        umbra_program_queue(interp, W, buf);
+        umbra_program_queue(interp, W, 1, buf);
         umbra_backend_flush(be);
     }
 
@@ -431,7 +431,7 @@ static void test_perspective_text(void) {
         { pixels, (long)sizeof pixels },
         { uni, -(long)lay.uni_len },
     };
-    umbra_program_queue(interp, BW, buf);
+    umbra_program_queue(interp, BW, 1, buf);
     umbra_backend_flush(be);
 
     (pixels[8] == 0xffffffff) here;
@@ -475,7 +475,7 @@ static void test_perspective_text(void) {
             { px2 + y * W, (long)(W * 4) },
             { u2, -(long)lay2.uni_len },
         };
-        umbra_program_queue(interp, W, b2);
+        umbra_program_queue(interp, W, 1, b2);
         umbra_backend_flush(be);
     }
     int changed = 0;
