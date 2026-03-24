@@ -17,7 +17,7 @@ typedef void (*umbra_store_fn)(struct umbra_builder *, umbra_ptr ptr, umbra_val 
 typedef struct {
     int rs;
     int shader, coverage;
-    int uni_len;
+    int uni_len, ps;
 } umbra_draw_layout;
 
 struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn coverage,

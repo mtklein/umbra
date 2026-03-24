@@ -76,4 +76,4 @@
   v75  = or_32           v72 v74
   v76  = pack            v72 v53 24
   v77  = join            v75 v76
-      scatter_32      p0 v5 v77
+      store_32        p0 v77

@@ -163,8 +163,25 @@ static int iota_plus_off(builder *b, int ix) {
     return -1;
 }
 
+// Recognize add(mul(op_y, uniform), op_x) as contiguous.
+// Within a SIMD vector, y is constant and x advances by 1, so memory is contiguous.
+// The backends' linear loop counter already includes the row offset, so no extra offset needed.
+static _Bool is_x_plus_y_stride(builder *b, int ix) {
+    if (b->inst[ix].op != op_add_i32) { return 0; }
+    int p = b->inst[ix].x, q = b->inst[ix].y;
+    int mul = -1;
+    if (b->inst[p].op == op_x) { mul = q; }
+    if (b->inst[q].op == op_x) { mul = p; }
+    if (mul < 0 || b->inst[mul].op != op_mul_i32) { return 0; }
+    int a = b->inst[mul].x, c = b->inst[mul].y;
+    return (b->inst[a].op == op_y && b->inst[c].uniform)
+        || (b->inst[c].op == op_y && b->inst[a].uniform);
+}
+
 val umbra_load_i16(builder *b, umbra_ptr src, val ix) {
-    if (b->inst[ix.id].op == op_iota) { return push(b, op_load_16, .ptr = src.ix); }
+    if (b->inst[ix.id].op == op_iota || is_x_plus_y_stride(b, ix.id)) {
+        return push(b, op_load_16, .ptr = src.ix);
+    }
     if (b->inst[ix.id].op == op_imm_32) {
         return push(b, op_uni_16, .imm = b->inst[ix.id].imm, .ptr = src.ix);
     }
@@ -176,7 +193,9 @@ val umbra_load_i16(builder *b, umbra_ptr src, val ix) {
     return push(b, op_gather_16, .x = ix.id, .ptr = src.ix);
 }
 val umbra_load_i32(builder *b, umbra_ptr src, val ix) {
-    if (b->inst[ix.id].op == op_iota) { return push(b, op_load_32, .ptr = src.ix); }
+    if (b->inst[ix.id].op == op_iota || is_x_plus_y_stride(b, ix.id)) {
+        return push(b, op_load_32, .ptr = src.ix);
+    }
     if (b->inst[ix.id].op == op_imm_32) {
         return push(b, op_uni_32, .imm = b->inst[ix.id].imm, .ptr = src.ix);
     }
@@ -188,7 +207,7 @@ val umbra_load_i32(builder *b, umbra_ptr src, val ix) {
     return push(b, op_gather_32, .x = ix.id, .ptr = src.ix);
 }
 void umbra_store_i16(builder *b, umbra_ptr dst, val ix, val v) {
-    if (b->inst[ix.id].op == op_iota) {
+    if (b->inst[ix.id].op == op_iota || is_x_plus_y_stride(b, ix.id)) {
         push(b, op_store_16, .y = v.id, .ptr = dst.ix);
         return;
     }
@@ -202,7 +221,7 @@ void umbra_store_i16(builder *b, umbra_ptr dst, val ix, val v) {
     push(b, op_scatter_16, .x = ix.id, .y = v.id, .ptr = dst.ix);
 }
 void umbra_store_i32(builder *b, umbra_ptr dst, val ix, val v) {
-    if (b->inst[ix.id].op == op_iota) {
+    if (b->inst[ix.id].op == op_iota || is_x_plus_y_stride(b, ix.id)) {
         push(b, op_store_32, .y = v.id, .ptr = dst.ix);
         return;
     }

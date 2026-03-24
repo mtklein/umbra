@@ -34,6 +34,13 @@ static void persp_render(slide *s, int w, int h, void *buf, long buf_sz, int row
     char     *uni = (char *)uni_;
     (void)row_bytes;
     slide_uni_i32(uni, lay->rs, w);
+    {
+        int ps = lay->ps;
+        int32_t planar_stride = (int32_t)(w * h);
+        for (int i = 0; i < ps; i++) {
+            slide_uni_i32(uni, lay->uni_len - (ps - i) * 4, planar_stride);
+        }
+    }
     slide_uni_f32(uni, lay->shader, hc, 4);
     slide_uni_f32(uni, lay->coverage, st->mat, 11);
     slide_uni_ptr(uni, (lay->coverage + 11 * 4 + 7) & ~7, st->bitmap->data,

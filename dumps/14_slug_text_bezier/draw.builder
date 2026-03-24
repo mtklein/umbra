@@ -15,13 +15,13 @@
   v14  = imm_32          0x5
   v15  = uni_32          p1[5]
   v16  = deref_ptr       p1 byte24
-  v17  = gather_32       p-17 v5
+  v17  = load_32         p-17
   v18  = abs_f32         v17
   v19  = imm_32          0x3f800000
   v20  = min_f32         v18 v19
   v21  = min_f32_imm     v18 0x3f800000
   v22  = join            v20 v21
-  v23  = gather_32       p0 v5
+  v23  = load_32         p0
   v24  = imm_32          0xff
   v25  = and_32          v23 v24
   v26  = and_imm         v23 0xff
@@ -114,4 +114,4 @@
   v113 = or_32           v111 v112
   v114 = pack            v111 v94 24
   v115 = join            v113 v114
-      scatter_32      p0 v5 v115
+      store_32        p0 v115

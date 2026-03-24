@@ -5,6 +5,7 @@
 typedef struct {
     test_backends     tb;
     umbra_draw_layout lay;
+    int               pad_;
 } draw_backends;
 
 static void uni_i32(char *u, int off, int32_t v) { __builtin_memcpy(u + off, &v, 4); }
@@ -22,6 +23,7 @@ static draw_backends make_draw(struct umbra_builder *builder, umbra_draw_layout 
     draw_backends B = {
         test_backends_make(bb),
         lay,
+        0,
     };
     umbra_basic_block_free(bb);
     return B;

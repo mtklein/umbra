@@ -38,7 +38,9 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
         umbra_imm_f32(builder, 0.0f),
         umbra_imm_f32(builder, 0.0f),
     };
+    int before_load = umbra_uni_len(builder);
     if (load) { dst = load(builder, (umbra_ptr){0}, ix); }
+    int load_strides = (umbra_uni_len(builder) - before_load) / 4;
 
     umbra_color out;
     if (blend) {
@@ -62,13 +64,16 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
                                             cov));
     }
 
+    int before_store = umbra_uni_len(builder);
     if (store) { store(builder, (umbra_ptr){0}, ix, out); }
+    int store_strides = (umbra_uni_len(builder) - before_store) / 4;
 
     if (layout) {
         layout->rs = rs_ix * 4;
         layout->shader = shader_off;
         layout->coverage = coverage_off;
         layout->uni_len = umbra_uni_len(builder);
+        layout->ps = load_strides + store_strides;
     }
 
     return builder;

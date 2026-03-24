@@ -60,6 +60,13 @@ static void solid_render(slide *s, int w, int h, void *buf, long buf_sz, int row
     slide_uni_i32(uni, lay->rs, w);
     slide_uni_f32(uni, lay->shader, hc, 4);
     if (s->coverage) { slide_uni_f32(uni, lay->coverage, rect, 4); }
+    {
+        int ps = lay->ps;
+        int32_t planar_stride = (int32_t)(w * h);
+        for (int i = 0; i < ps; i++) {
+            slide_uni_i32(uni, lay->uni_len - (ps - i) * 4, planar_stride);
+        }
+    }
     umbra_buf ubuf[] = {
         {buf, buf_sz},
         {uni, -(long)lay->uni_len},

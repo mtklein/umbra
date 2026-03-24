@@ -31,7 +31,7 @@
   v30  = and_32          v26 v29
   v31  = imm_32          0x3f800000
   v32  = sel_32          v30 v31 v0
-  v33  = gather_32       p0 v5
+  v33  = load_32         p0
   v34  = imm_32          0xff
   v35  = and_32          v33 v34
   v36  = and_imm         v33 0xff
@@ -123,4 +123,4 @@
   v122 = or_32           v120 v121
   v123 = pack            v120 v103 24
   v124 = join            v122 v123
-      scatter_32      p0 v5 v124
+      store_32        p0 v124

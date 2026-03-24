@@ -16,8 +16,7 @@ static void grad_2stop_render(slide *s, int w, int h, void *buf, long buf_sz, in
     slide_uni_i32(uni, lay->rs, w);
     slide_uni_f32(uni, lay->shader, s->grad, 3);
     slide_uni_f32(uni, lay->shader + 12, s->color, 8);
-    int ps = (s->store == umbra_store_fp16_planar ? 1 : 0)
-           + (s->load == umbra_load_fp16_planar ? 1 : 0);
+        int ps = lay->ps;
     int32_t planar_stride = (int32_t)(w * h);
     for (int i = 0; i < ps; i++) { slide_uni_i32(uni, uni_len - (ps - i) * 4, planar_stride); }
     umbra_buf ubuf[] = {
@@ -37,8 +36,7 @@ static void grad_lut_render(slide *s, int w, int h, void *buf, long buf_sz, int 
     slide_uni_i32(uni, lay->rs, w);
     slide_uni_f32(uni, lay->shader, s->grad, 4);
     slide_uni_ptr(uni, (lay->shader + 16 + 7) & ~7, st->lut, (long)(st->lut_n * 4 * 4));
-    int ps = (s->store == umbra_store_fp16_planar ? 1 : 0)
-           + (s->load == umbra_load_fp16_planar ? 1 : 0);
+        int ps = lay->ps;
     int32_t planar_stride = (int32_t)(w * h);
     for (int i = 0; i < ps; i++) { slide_uni_i32(uni, uni_len - (ps - i) * 4, planar_stride); }
     umbra_buf ubuf[] = {
