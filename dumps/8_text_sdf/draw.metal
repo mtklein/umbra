@@ -35,7 +35,7 @@ kernel void umbra_entry(
     uint v15 = v14 * v1;
     uint v16 = pos.x;
     uint v17 = v16 + v15;
-    uint v18 = (uint)((device ushort*)p2)[i];
+    uint v18 = (uint)((device ushort*)p2)[clamp_ix((int)v17,buf_szs[2],2)];
     uint v19 = (uint)(int)(short)(ushort)v18;
     uint v20 = as_type<uint>((float)(int)v19);
     uint v21 = as_type<uint>(as_type<float>(v7) * as_type<float>(v20));

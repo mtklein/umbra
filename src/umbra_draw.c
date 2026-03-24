@@ -30,7 +30,7 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
 
     int       coverage_off = umbra_uni_len(builder);
     umbra_val cov = {0};
-    if (coverage) { cov = coverage(builder, xf, yf); }
+    if (coverage) { cov = coverage(builder, xf, yf, ix); }
 
     umbra_color dst = {
         umbra_imm_f32(builder, 0.0f),
@@ -272,7 +272,8 @@ umbra_color umbra_blend_multiply(builder *builder, umbra_color src, umbra_color 
     return (umbra_color){r, g, b, a};
 }
 
-umbra_val umbra_coverage_rect(builder *builder, umbra_val x, umbra_val y) {
+umbra_val umbra_coverage_rect(builder *builder, umbra_val x, umbra_val y, umbra_val ix) {
+    (void)ix;
     int       fi = umbra_reserve(builder, 4);
     umbra_val l = umbra_load_i32(builder, (umbra_ptr){1}, umbra_imm_i32(builder, fi));
     umbra_val t = umbra_load_i32(builder, (umbra_ptr){1}, umbra_imm_i32(builder, fi + 1));
@@ -288,23 +289,21 @@ umbra_val umbra_coverage_rect(builder *builder, umbra_val x, umbra_val y) {
     return umbra_sel_i32(builder, inside, one_f, zero_f);
 }
 
-umbra_val umbra_coverage_bitmap(builder *builder, umbra_val x, umbra_val y) {
+umbra_val umbra_coverage_bitmap(builder *builder, umbra_val x, umbra_val y, umbra_val ix) {
     (void)x;
     (void)y;
     int       bmp_off = umbra_reserve_ptr(builder);
     umbra_ptr bmp = umbra_deref_ptr(builder, (umbra_ptr){1}, bmp_off);
-    umbra_val ix = umbra_iota(builder);
     umbra_val val = umbra_widen_s16(builder, umbra_load_i16(builder, bmp, ix));
     umbra_val inv255 = umbra_imm_f32(builder, 1.0f / 255.0f);
     return umbra_mul_f32(builder, umbra_cvt_f32_i32(builder, val), inv255);
 }
 
-umbra_val umbra_coverage_sdf(builder *builder, umbra_val x, umbra_val y) {
+umbra_val umbra_coverage_sdf(builder *builder, umbra_val x, umbra_val y, umbra_val ix) {
     (void)x;
     (void)y;
     int       bmp_off = umbra_reserve_ptr(builder);
     umbra_ptr bmp = umbra_deref_ptr(builder, (umbra_ptr){1}, bmp_off);
-    umbra_val ix = umbra_iota(builder);
     umbra_val raw = umbra_widen_s16(builder, umbra_load_i16(builder, bmp, ix));
     umbra_val inv255 = umbra_imm_f32(builder, 1.0f / 255.0f);
     umbra_val dist = umbra_mul_f32(builder, umbra_cvt_f32_i32(builder, raw), inv255);
@@ -317,18 +316,19 @@ umbra_val umbra_coverage_sdf(builder *builder, umbra_val x, umbra_val y) {
     return umbra_min_f32(builder, umbra_max_f32(builder, scaled, zero), one);
 }
 
-umbra_val umbra_coverage_wind(builder *builder, umbra_val x, umbra_val y) {
+umbra_val umbra_coverage_wind(builder *builder, umbra_val x, umbra_val y, umbra_val ix) {
     (void)x;
     (void)y;
     int       off = umbra_reserve_ptr(builder);
     umbra_ptr w = umbra_deref_ptr(builder, (umbra_ptr){1}, off);
-    umbra_val ix = umbra_iota(builder);
     umbra_val raw = umbra_load_i32(builder, w, ix);
     return umbra_min_f32(builder, umbra_abs_f32(builder, raw),
                          umbra_imm_f32(builder, 1.0f));
 }
 
-umbra_val umbra_coverage_bitmap_matrix(builder *builder, umbra_val x, umbra_val y) {
+umbra_val umbra_coverage_bitmap_matrix(builder *builder, umbra_val x, umbra_val y,
+                                      umbra_val ix) {
+    (void)ix;
     int       fi = umbra_reserve(builder, 11);
     int       bmp_off = umbra_reserve_ptr(builder);
     umbra_ptr bmp = umbra_deref_ptr(builder, (umbra_ptr){1}, bmp_off);

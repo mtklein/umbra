@@ -16,7 +16,7 @@
   v15  = mul_i32         v14 v1
   v16  = x              
   v17  = add_i32         v16 v15
-  v18  = load_16         p-7
+  v18  = gather_16       p-7 v17
   v19  = widen_s16       v18
   v20  = f32_from_i32    v19
   v21  = mul_f32_imm     v20 0x3b808081

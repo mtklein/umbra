@@ -351,7 +351,7 @@ static void test_slug_rect(void) {
 
         long long uni_[12] = {0};
         char *uni = (char*)uni_;
-        slide_uni_i32(uni, lay.rs, 0);
+        slide_uni_i32(uni, lay.rs, W);
         slide_uni_f32(uni, lay.shader, color, 4);
         slide_uni_ptr(uni, lay.coverage,
             wind_buf, -(long)sizeof wind_buf);

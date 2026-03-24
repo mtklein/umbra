@@ -14,7 +14,7 @@
   v13  = mul_i32         v12 v1
   v14  = x              
   v15  = add_i32         v14 v13
-  v16  = load_32         p-7
+  v16  = gather_32       p-7 v15
   v17  = abs_f32         v16
   v18  = min_f32         v17 v7
   v19  = min_f32_imm     v17 0x3f800000

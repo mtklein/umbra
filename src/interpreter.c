@@ -664,7 +664,7 @@ op(deref_ptr_handler) {
     __builtin_memcpy(&derived, (char *)base + ip->y, sizeof derived);
     __builtin_memcpy(&dsz, (char *)base + ip->y + 8, sizeof dsz);
     ptr[ip->z] = derived;
-    sz[ip->z] = dsz;
+    sz[ip->z] = dsz < 0 ? -dsz : dsz;
     next;
 }
 
