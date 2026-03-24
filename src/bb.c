@@ -155,17 +155,8 @@ umbra_ptr umbra_deref_ptr(builder *b, umbra_ptr buf, int byte_off) {
 int  umbra_uni_len(builder const *b) { return b->uni_len; }
 void umbra_set_uni_len(builder *b, int len) { b->uni_len = len; }
 
-static int iota_plus_off(builder *b, int ix) {
-    if (b->inst[ix].op != op_add_i32) { return -1; }
-    int p = b->inst[ix].x, q = b->inst[ix].y;
-    if (b->inst[p].op == op_iota) { return q; }
-    if (b->inst[q].op == op_iota) { return p; }
-    return -1;
-}
-
 // Recognize add(mul(op_y, uniform), op_x) as contiguous.
 // Within a SIMD vector, y is constant and x advances by 1, so memory is contiguous.
-// The backends' linear loop counter already includes the row offset, so no extra offset needed.
 static _Bool is_x_plus_y_stride(builder *b, int ix) {
     if (b->inst[ix].op != op_add_i32) { return 0; }
     int p = b->inst[ix].x, q = b->inst[ix].y;
@@ -178,6 +169,17 @@ static _Bool is_x_plus_y_stride(builder *b, int ix) {
         || (b->inst[c].op == op_y && b->inst[a].uniform);
 }
 
+// Recognize iota+offset or (y*stride+x)+offset as contiguous with offset.
+static int contiguous_plus_off(builder *b, int ix) {
+    if (b->inst[ix].op != op_add_i32) { return -1; }
+    int p = b->inst[ix].x, q = b->inst[ix].y;
+    if (b->inst[p].op == op_iota) { return q; }
+    if (b->inst[q].op == op_iota) { return p; }
+    if (is_x_plus_y_stride(b, p)) { return q; }
+    if (is_x_plus_y_stride(b, q)) { return p; }
+    return -1;
+}
+
 val umbra_load_i16(builder *b, umbra_ptr src, val ix) {
     if (b->inst[ix.id].op == op_iota || is_x_plus_y_stride(b, ix.id)) {
         return push(b, op_load_16, .ptr = src.ix);
@@ -186,7 +188,7 @@ val umbra_load_i16(builder *b, umbra_ptr src, val ix) {
         return push(b, op_uni_16, .imm = b->inst[ix.id].imm, .ptr = src.ix);
     }
     {
-        int off = iota_plus_off(b, ix.id);
+        int off = contiguous_plus_off(b, ix.id);
         if (off >= 0) { return push(b, op_load_16, .x = off, .ptr = src.ix); }
     }
     if (b->inst[ix.id].uniform) { return push(b, op_uni_16, .x = ix.id, .ptr = src.ix); }
@@ -200,7 +202,7 @@ val umbra_load_i32(builder *b, umbra_ptr src, val ix) {
         return push(b, op_uni_32, .imm = b->inst[ix.id].imm, .ptr = src.ix);
     }
     {
-        int off = iota_plus_off(b, ix.id);
+        int off = contiguous_plus_off(b, ix.id);
         if (off >= 0) { return push(b, op_load_32, .x = off, .ptr = src.ix); }
     }
     if (b->inst[ix.id].uniform) { return push(b, op_uni_32, .x = ix.id, .ptr = src.ix); }
@@ -212,7 +214,7 @@ void umbra_store_i16(builder *b, umbra_ptr dst, val ix, val v) {
         return;
     }
     {
-        int off = iota_plus_off(b, ix.id);
+        int off = contiguous_plus_off(b, ix.id);
         if (off >= 0) {
             push(b, op_store_16, .x = off, .y = v.id, .ptr = dst.ix);
             return;
@@ -226,7 +228,7 @@ void umbra_store_i32(builder *b, umbra_ptr dst, val ix, val v) {
         return;
     }
     {
-        int off = iota_plus_off(b, ix.id);
+        int off = contiguous_plus_off(b, ix.id);
         if (off >= 0) {
             push(b, op_store_32, .x = off, .y = v.id, .ptr = dst.ix);
             return;
