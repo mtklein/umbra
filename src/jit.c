@@ -69,7 +69,19 @@ static void pool_free(struct pool *p) {
 #include "asm_arm64.h"
 
 // X0=n, X1=w, X2=buf.
-enum { XWIDTH = 1, XBUF = 2, XP = 8, XI = 9, XT = 10, XH = 11, XW = 12, XM = 13, XS = 15 };
+// X0=n (then h=n/w), X1=w, X2=buf, X14=y.
+enum {
+    XWIDTH = 1,
+    XBUF = 2,
+    XP = 8,
+    XI = 9,
+    XT = 10,
+    XH = 11,
+    XW = 12,
+    XM = 13,
+    XY = 14,
+    XS = 15,
+};
 
 static void load_ptr(Buf *c, int p, int *last_ptr) {
     if (*last_ptr == p) { return; }
@@ -383,11 +395,18 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
 
     ra_begin_loop(ra);
 
+    // 2D loop: XI = linear index, XY = row, X0 = row_end.
+    // op_x = XI - XY*w (column), op_y = XY (row), op_iota = XI (linear).
     put(&c, MOVZ_x(XI, 0));
+    put(&c, MOVZ_x(XY, 0));
+    // STP X0,XZR to save n on stack (will need it to check outer loop exit)
+    put(&c, STP_pre(0, 15, 31, -2));  // push X0 (n) and dummy
+    put(&c, ADD_xi(0, XWIDTH, 0));    // X0 = row_end = w
 
     int loop_top = c.len;
 
-    put(&c, 0xcb090000u | (uint32_t)XT);
+    // remaining = row_end - XI
+    put(&c, 0xcb090000u | (uint32_t)XT);  // SUB XT, X0, XI
     put(&c, SUBS_xi(31, XT, 4));
     int br_tail = c.len;
     put(&c, Bcond(0xb, 0));
@@ -407,9 +426,10 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     int tail_top = c.len;
     c.buf[br_tail] = Bcond(0xb, tail_top - br_tail);
 
-    put(&c, 0xeb09001fu);
-    int br_epi = c.len;
-    put(&c, Bcond(0xd, 0));
+    // CMP XI, X0 (row_end): xi >= row_end means row is done
+    put(&c, 0xeb00001fu | ((uint32_t)XI << 5));  // CMP XI, X0
+    int br_row_done = c.len;
+    put(&c, Bcond(0xa, 0));  // B.GE row_done
 
     for (int i = 0; i < bb->insts; i++) { ra_free_reg(ra, i); }
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
@@ -420,8 +440,23 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, ADD_xi(XI, XI, 1));
     put(&c, B(tail_top - c.len));
 
-    int epi = c.len;
-    c.buf[br_epi] = Bcond(0xd, epi - br_epi);
+    int row_done = c.len;
+    c.buf[br_row_done] = Bcond(0xa, row_done - br_row_done);
+
+    put(&c, ADD_xi(XY, XY, 1));
+    put(&c, ADD_xr(0, 0, XWIDTH));       // row_end += w
+    // LDR XT, [SP] — load saved n
+    put(&c, 0xf9400000u | (31u << 5) | (uint32_t)XT);  // LDR XT, [SP]
+    // CMP X0, XT — row_end > n means done
+    put(&c, 0xeb000000u | ((uint32_t)XT << 16) | (0u << 5) | 0x1fu);  // CMP X0, XT
+    int br_more_rows = c.len;
+    put(&c, Bcond(0xd, 0));  // B.LE → more rows (row_end <= n)
+
+    // Restore stack (saved n)
+    put(&c, LDP_post(0, 15, 31, 2));
+
+    // Patch: B.LE → loop_top
+    c.buf[br_more_rows] = Bcond(0xd, loop_top - br_more_rows);
 
     put(&c, ADD_xi(31, 29, 0));
     put(&c, LDP_post(29, 30, 31, 2));
@@ -521,11 +556,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
-        case op_x:
-        case op_y: {
-            // Build iota = {XI, XI+1, ...} then compute x=iota%w, y=iota/w via float trick.
+        case op_x: {
+            // x = column = XI - XY * XWIDTH.
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            put(c, DUP_4s_w(s.rd, XI));
+            // MSUB XT, XY, XWIDTH, XI → XT = XI - XY*w = column
+            put(c, 0x1b008000u | ((uint32_t)XWIDTH << 16) | ((uint32_t)XI << 10)
+                                | ((uint32_t)XY << 5) | (uint32_t)XT);
+            put(c, DUP_4s_w(s.rd, XT));
             if (!scalar) {
                 int8_t   tmp = ra_alloc(ra, sl, ns);
                 uint32_t iota4[4] = {0, 1, 2, 3};
@@ -533,28 +570,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, ADD_4s(s.rd, s.rd, tmp));
                 ra_return_reg(ra, tmp);
             }
-            // s.rd = iota vector (or scalar XI)
-            // XWIDTH holds w as a GP register
-            int8_t tw = ra_alloc(ra, sl, ns);  // broadcast w
-            put(c, DUP_4s_w(tw, XWIDTH));
-            int8_t fi = ra_alloc(ra, sl, ns);  // float iota
-            put(c, SCVTF_4s(fi, s.rd));
-            int8_t fw = ra_alloc(ra, sl, ns);  // float w
-            put(c, SCVTF_4s(fw, tw));
-            put(c, FDIV_4s(fi, fi, fw));       // fi = iota/w as float
-            ra_return_reg(ra, fw);
-            put(c, FCVTZS_4s(fi, fi));         // fi = floor(iota/w) = y
-            if (inst->op == op_y) {
-                // result is y = fi
-                // MOV s.rd = fi
-                put(c, ORR_16b(s.rd, fi, fi));
-            } else {
-                // x = iota - y*w
-                put(c, MUL_4s(fi, fi, tw));    // fi = y*w
-                put(c, SUB_4s(s.rd, s.rd, fi));// s.rd = iota - y*w = x
-            }
-            ra_return_reg(ra, tw);
-            ra_return_reg(ra, fi);
+        } break;
+
+        case op_y: {
+            // y = row counter XY, broadcast.
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            put(c, DUP_4s_w(s.rd, XY));
         } break;
 
         case op_load_32: {
@@ -1152,8 +1173,8 @@ static void pool_free(struct pool *p) {
     free(p->refs);
 }
 
-// RDI=n, RSI=w, RDX=buf.
-enum { XWIDTH = RSI, XBUF = RDX, XI = R10, XM = R13 };
+// RDI=n (then row_end), RSI=w, RDX=buf, R14=y, R12=h.
+enum { XWIDTH = RSI, XBUF = RDX, XI = R10, XH_X86 = R12, XM = R13, XY = R14 };
 
 static void patch_jcc(Buf *c, int fixup) {
     int32_t rel = (int32_t)(c->len - (fixup + 4));
@@ -1443,6 +1464,8 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     struct ra     *ra = ra_create_x86(bb, &jc);
 
     push_r(&c, XM);
+    push_r(&c, XY);
+    push_r(&c, XH_X86);
 
     int stack_patch = c.len;
     for (int i = 0; i < 7; i++) { nop(&c); }
@@ -1451,10 +1474,23 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
 
     ra_begin_loop(ra);
 
+    // 2D loop: XI = linear index, XY = row, RDI = row_end, R12 = h.
+    // Compute h = n / w.  Save XBUF around DIV.
+    push_r(&c, XBUF);
+    mov_rr(&c, RAX, RDI);
+    xor_rr(&c, RDX, RDX);
+    emit1(&c, 0xf7);
+    emit1(&c, (uint8_t)(0xf0 | (XWIDTH & 7)));  // DIV XWIDTH → EAX=h
+    mov_rr(&c, XH_X86, RAX);            // R12 = h
+    pop_r(&c, XBUF);
+
     xor_rr(&c, XI, XI);
+    xor_rr(&c, XY, XY);
+    mov_rr(&c, RDI, XWIDTH);             // row_end = w
 
     int loop_top = c.len;
 
+    // remaining = row_end (RDI) - XI
     mov_rr(&c, R11, RDI);
     rex_w(&c, XI, R11);
     emit1(&c, 0x29);
@@ -1471,20 +1507,17 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     int loop_body_end = c.len;
 
     add_ri(&c, XI, 8);
-    int jmp_top = jmp(&c);
     {
-        int32_t rel = (int32_t)(loop_top - (jmp_top + 4));
-        __builtin_memcpy(c.buf + jmp_top, &rel, 4);
+        int     j = jmp(&c);
+        int32_t rel = (int32_t)(loop_top - (j + 4));
+        __builtin_memcpy(c.buf + j, &rel, 4);
     }
 
     int tail_top = c.len;
-    {
-        int32_t rel = (int32_t)(tail_top - (br_tail + 4));
-        __builtin_memcpy(c.buf + br_tail, &rel, 4);
-    }
+    patch_jcc(&c, br_tail);
 
-    cmp_rr(&c, XI, RDI);
-    int br_epi = jcc(&c, 0x0d);
+    cmp_rr(&c, XI, RDI);                 // xi >= row_end?
+    int br_row_done = jcc(&c, 0x0d);     // JGE row_done
 
     for (int i = 0; i < bb->insts; i++) { ra_free_reg(ra, i); }
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
@@ -1499,13 +1532,25 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
         __builtin_memcpy(c.buf + j, &rel, 4);
     }
 
-    int epi = c.len;
+    // row_done:
+    patch_jcc(&c, br_row_done);
+
+    add_ri(&c, XY, 1);
+    // row_end += w
+    rex_w(&c, XWIDTH, RDI);
+    emit1(&c, 0x01);
+    emit1(&c, (uint8_t)(0xc0 | ((XWIDTH & 7) << 3) | (RDI & 7)));
+    // CMP XY, R12 (y < h → more rows)
+    cmp_rr(&c, XY, XH_X86);
+    int br_more_rows = jcc(&c, 0x0c);    // JL → more rows
     {
-        int32_t rel = (int32_t)(epi - (br_epi + 4));
-        __builtin_memcpy(c.buf + br_epi, &rel, 4);
+        int32_t rel = (int32_t)(loop_top - (br_more_rows + 4));
+        __builtin_memcpy(c.buf + br_more_rows, &rel, 4);
     }
 
     if (ns > 0) { add_ri(&c, RSP, ns * 32); }
+    pop_r(&c, XH_X86);
+    pop_r(&c, XY);
     pop_r(&c, XM);
     vzeroupper(&c);
     ret(&c);
@@ -1599,41 +1644,34 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
-        case op_x:
-        case op_y: {
-            // Build iota, then compute x=iota%w, y=iota/w via float trick.
+        case op_x: {
+            // x = column = XI - XY * XWIDTH.
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            if (scalar) {
-                vex(c, 1, 1, 0, 0, s.rd, 0, XI, 0x6e);  // VMOVD xmm, XI
-            } else {
-                vex(c, 1, 1, 0, 0, s.rd, 0, XI, 0x6e);   // VMOVD xmm, XI
+            mov_rr(c, RAX, XY);
+            // IMUL EAX, XWIDTH
+            emit1(c, 0x0f);
+            emit1(c, 0xaf);
+            emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (XWIDTH & 7)));
+            // R11 = XI - RAX (= XI - XY*w)
+            mov_rr(c, R11, XI);
+            rex_w(c, RAX, R11);
+            emit1(c, 0x29);
+            emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (R11 & 7)));
+            vex(c, 1, 1, 0, 0, s.rd, 0, R11, 0x6e);  // VMOVD xmm, R11d
+            if (!scalar) {
                 vbroadcastss(c, s.rd, s.rd);
                 uint32_t iota8[8] = {0, 1, 2, 3, 4, 5, 6, 7};
                 int      off = pool_add(&jc->pool, iota8, 32);
-                int      pos = vex_rip(c, 1, 1, 0, 1, s.rd, s.rd, 0xfe);  // VPADDD
+                int      pos = vex_rip(c, 1, 1, 0, 1, s.rd, s.rd, 0xfe);
                 pool_ref_at(&jc->pool, off, pos, 0);
             }
-            // s.rd = iota (int32 vector)
-            int8_t tw = ra_alloc(ra, sl, ns);  // broadcast w
-            vex(c, 1, 1, 0, 0, tw, 0, XWIDTH, 0x6e);  // VMOVD xmm, XWIDTH
-            vbroadcastss(c, tw, tw);
-            int8_t fi = ra_alloc(ra, sl, ns);  // float iota
-            vcvtdq2ps(c, fi, s.rd);
-            int8_t fw = ra_alloc(ra, sl, ns);  // float w
-            vcvtdq2ps(c, fw, tw);
-            vdivps(c, fi, fi, fw);             // fi = iota/w as float
-            ra_return_reg(ra, fw);
-            // Truncate to int32 = floor for positive values
-            vcvttps2dq(c, fi, fi);             // fi = y = floor(iota/w)
-            if (inst->op == op_y) {
-                vmovaps(c, s.rd, fi);
-            } else {
-                // x = iota - y*w
-                vpmulld(c, fi, fi, tw);        // fi = y*w
-                vpsubd(c, s.rd, s.rd, fi);     // s.rd = iota - y*w = x
-            }
-            ra_return_reg(ra, tw);
-            ra_return_reg(ra, fi);
+        } break;
+
+        case op_y: {
+            // y = row counter XY, broadcast.
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            vex(c, 1, 1, 0, 0, s.rd, 0, XY, 0x6e);  // VMOVD xmm, XY
+            if (!scalar) { vbroadcastss(c, s.rd, s.rd); }
         } break;
 
         case op_load_32: {
