@@ -40,6 +40,14 @@ static inline _Bool test_backends_run(test_backends *B, int bi, int n, umbra_buf
     return 1;
 }
 
+static inline _Bool test_backends_run_2d(test_backends *B, int bi, int w, int h,
+                                         umbra_buf buf[]) {
+    if (!B->p[bi]) { return 0; }
+    umbra_program_queue_2d(B->p[bi], w, h, buf);
+    umbra_backend_flush(B->be[bi]);
+    return 1;
+}
+
 static inline void test_backends_free(test_backends *B) {
     for (int i = 0; i < NUM_BACKENDS; i++) {
         umbra_program_free(B->p[i]);

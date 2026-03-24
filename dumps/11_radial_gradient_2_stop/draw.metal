@@ -9,11 +9,13 @@ static inline int clamp_ix(int ix, uint bytes, int elem) {
 
 kernel void umbra_entry(
     constant uint &n [[buffer(0)]],
+    constant uint &w [[buffer(4)]],
     device uchar *p0 [[buffer(1)]],
     device uchar *p1 [[buffer(2)]],
     constant uint *buf_szs [[buffer(3)]],
-    uint i [[thread_position_in_grid]]
+    uint2 pos [[thread_position_in_grid]]
 ) {
+    uint i = pos.y * w + pos.x;
     if (i >= n) return;
     uint v0 = 0u;
     uint v1 = ((device const uint*)p1)[0];

@@ -11,14 +11,14 @@ struct umbra_backend {
 
 struct umbra_program {
     void *ctx;
-    void (*queue)(void *, int, umbra_buf[]);
+    void (*queue)(void *, int, int, umbra_buf[]);
     void (*dump)(void const *, FILE *);
     void (*free_fn)(void *);
     struct umbra_backend *backend;
 };
 
-static void run_interp(void *ctx, int n, umbra_buf buf[]) {
-    umbra_interpreter_run(ctx, n, buf);
+static void run_interp(void *ctx, int n, int w, umbra_buf buf[]) {
+    umbra_interpreter_run(ctx, n, w, buf);
 }
 static void                  free_interp(void *ctx) { umbra_interpreter_free(ctx); }
 static struct umbra_program *compile_interp(struct umbra_backend           *be,
@@ -44,7 +44,9 @@ struct umbra_backend *umbra_backend_interp(void) {
     return be;
 }
 
-static void run_jit(void *ctx, int n, umbra_buf buf[]) { umbra_jit_run(ctx, n, buf); }
+static void run_jit(void *ctx, int n, int w, umbra_buf buf[]) {
+    umbra_jit_run(ctx, n, w, buf);
+}
 static void dump_jit(void const *ctx, FILE *f) { umbra_dump_jit_mca(ctx, f); }
 static void free_jit(void *ctx) { umbra_jit_free(ctx); }
 static struct umbra_program *compile_jit(struct umbra_backend           *be,
@@ -71,7 +73,9 @@ struct umbra_backend *umbra_backend_jit(void) {
     return be;
 }
 
-static void run_metal(void *ctx, int n, umbra_buf buf[]) { umbra_metal_run(ctx, n, buf); }
+static void run_metal(void *ctx, int n, int w, umbra_buf buf[]) {
+    umbra_metal_run(ctx, n, w, buf);
+}
 static void dump_metal(void const *ctx, FILE *f) { umbra_dump_metal(ctx, f); }
 static void free_metal(void *ctx) { umbra_metal_free(ctx); }
 static struct umbra_program *compile_metal(struct umbra_backend           *be,
@@ -126,7 +130,11 @@ struct umbra_backend *umbra_program_backend(struct umbra_program *p) {
 }
 
 void umbra_program_queue(struct umbra_program *p, int n, umbra_buf buf[]) {
-    p->queue(p->ctx, n, buf);
+    p->queue(p->ctx, n, n, buf);
+}
+
+void umbra_program_queue_2d(struct umbra_program *p, int w, int h, umbra_buf buf[]) {
+    p->queue(p->ctx, w * h, w, buf);
 }
 
 void umbra_program_dump(struct umbra_program *p, FILE *f) {

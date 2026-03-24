@@ -19,6 +19,8 @@ _Bool has_ptr(enum op op) {
 }
 _Bool is_varying(enum op op) {
     return op == op_iota
+        || op == op_x
+        || op == op_y
         || op == op_load_16
         || op == op_load_32
         || op == op_store_16
@@ -122,6 +124,8 @@ void umbra_builder_free(builder *b) {
 }
 
 val umbra_iota(builder *b) { return push(b, op_iota); }
+val umbra_x(builder *b) { return push(b, op_x); }
+val umbra_y(builder *b) { return push(b, op_y); }
 
 val umbra_imm_i32(builder *b, int bits) { return push(b, op_imm_32, .imm = bits); }
 val umbra_imm_f32(builder *b, float v) {
@@ -781,7 +785,9 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
             if (ip->x) { fprintf(f, " +v%d", ip->x); }
             break;
         case op_deref_ptr: fprintf(f, " p%d byte%d", ip->ptr, ip->imm); break;
-        case op_iota: break;
+        case op_iota:
+        case op_x:
+        case op_y: break;
 
         case op_store_16:
         case op_store_32:

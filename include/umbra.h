@@ -18,6 +18,8 @@ int  umbra_uni_len(struct umbra_builder const *);
 void umbra_set_uni_len(struct umbra_builder *, int);
 
 umbra_val umbra_iota(struct umbra_builder *);
+umbra_val umbra_x(struct umbra_builder *);
+umbra_val umbra_y(struct umbra_builder *);
 umbra_val umbra_imm_i32(struct umbra_builder *, int bits);
 umbra_val umbra_imm_f32(struct umbra_builder *, float);
 
@@ -103,6 +105,7 @@ void                  umbra_backend_free(struct umbra_backend *);
 
 struct umbra_backend *umbra_program_backend(struct umbra_program *);
 void                  umbra_program_queue(struct umbra_program *, int n, umbra_buf[]);
+void                  umbra_program_queue_2d(struct umbra_program *, int w, int h, umbra_buf[]);
 void                  umbra_program_free(struct umbra_program *);
 
 #include <stdio.h>

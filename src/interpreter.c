@@ -98,8 +98,8 @@ typedef union {
 } val;
 
 struct interp_inst;
-typedef int (*Fn)(struct interp_inst const *ip, val *v, int end, int n, void *ptr[],
-                  long sz[]);
+typedef int (*Fn)(struct interp_inst const *ip, val *v, int end, int n, int w,
+                  void *ptr[], long sz[]);
 struct interp_inst {
     Fn  fn;
     int x, y, z, : 32;
@@ -114,9 +114,9 @@ struct umbra_interpreter {
 };
 
 #define op(name)                                                                       \
-    static int name(struct interp_inst const *ip, val *v, int end, int n, void *ptr[], \
-                    long sz[])
-#define next return ip[1].fn(ip + 1, v + 1, end, n, ptr, sz)
+    static int name(struct interp_inst const *ip, val *v, int end, int n, int w,       \
+                    void *ptr[], long sz[])
+#define next return ip[1].fn(ip + 1, v + 1, end, n, w, ptr, sz)
 
 static I32 clamp_ix(I32 ix, long bytes, int elem) {
     I32 zero = {0};
@@ -136,6 +136,20 @@ op(imm_32) {
 op(iota_fn) {
     I32 const seq = {0, 1, 2, 3, 4, 5, 6, 7};
     v->i32 = seq + (end - K);
+    next;
+}
+op(x_fn) {
+    I32 const seq = {0, 1, 2, 3, 4, 5, 6, 7};
+    U32 iota = (U32)(seq + (end - K));
+    U32 wv = (U32)((I32){0} + w);
+    v->u32 = iota - iota / wv * wv;
+    next;
+}
+op(y_fn) {
+    I32 const seq = {0, 1, 2, 3, 4, 5, 6, 7};
+    U32 iota = (U32)(seq + (end - K));
+    U32 wv = (U32)((I32){0} + w);
+    v->u32 = iota / wv;
     next;
 }
 
@@ -637,6 +651,7 @@ op(done) {
     (void)v;
     (void)end;
     (void)n;
+    (void)w;
     (void)ptr;
     (void)sz;
     return 0;
@@ -743,7 +758,7 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     __builtin_memcpy(&v[1], &yb, 4);
     __builtin_memcpy(&v[2], &zb, 4);
 
-    inst[0].fn(inst, v + 3, K, K, (void *[]){0}, (long[]){0});
+    inst[0].fn(inst, v + 3, K, K, 0, (void *[]){0}, (long[]){0});
 
     int r;
     __builtin_memcpy(&r, &v[3], 4);
@@ -802,6 +817,8 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
                 int const X = id[inst->x] - n, Y = id[inst->y] - n, Z = id[inst->z] - n;
                 switch (inst->op) {
                 case op_iota: emit(.fn = iota_fn); break;
+                case op_x: emit(.fn = x_fn); break;
+                case op_y: emit(.fn = y_fn); break;
                 case op_imm_32: emit(.fn = imm_32, .x = inst->imm); break;
 
                 case op_deref_ptr:
@@ -951,7 +968,7 @@ static void load_bufs(struct umbra_interpreter *p, umbra_buf buf[]) {
     }
 }
 
-void umbra_interpreter_run(struct umbra_interpreter *p, int n, umbra_buf buf[]) {
+void umbra_interpreter_run(struct umbra_interpreter *p, int n, int w, umbra_buf buf[]) {
     load_bufs(p, buf);
     struct interp_inst const *start = p->inst;
     val                      *v = p->v;
@@ -959,7 +976,7 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int n, umbra_buf buf[]) 
 
     int i = 0;
     while (i < n) {
-        start->fn(start, v, i + K, n, p->ptr, p->sz);
+        start->fn(start, v, i + K, n, w, p->ptr, p->sz);
         i += K;
         start = p->inst + P;
         v = p->v + P;

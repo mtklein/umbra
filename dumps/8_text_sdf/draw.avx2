@@ -26,7 +26,7 @@ Throughput Bottlenecks:
 Critical sequence based on the simulation:
 
               Instruction                                 Dependency Information
-        0.    vmovdqu	(%rdx,%r10,2), %xmm7
+        0.    vmovdqu	(%rcx,%r10,2), %xmm7
         1.    vpmovsxwd	%xmm7, %ymm7
         2.    vcvtdq2ps	%ymm7, %ymm7
  +----< 3.    vmulps	761(%rip), %ymm7, %ymm7
@@ -34,7 +34,7 @@ Critical sequence based on the simulation:
  +----> 5.    vmulps	807(%rip), %ymm7, %ymm7           ## REGISTER dependency:  %ymm7
  +----> 6.    vmaxps	830(%rip), %ymm7, %ymm7           ## REGISTER dependency:  %ymm7
  |      7.    vminps	853(%rip), %ymm7, %ymm7
- |      8.    movq	(%rsi), %r11
+ |      8.    movq	(%rdx), %r11
  |      9.    vmovdqu	(%r11,%r10,4), %ymm8
  |      10.   vpsrld	$24, %ymm8, %ymm9
  |      11.   vcvtdq2ps	%ymm9, %ymm9
@@ -99,7 +99,7 @@ Instruction Info:
 [6]: HasSideEffects (U)
 
 [1]    [2]    [3]    [4]    [5]    [6]    Instructions:
- 1      8     0.50    *                   vmovdqu	(%rdx,%r10,2), %xmm7
+ 1      8     0.50    *                   vmovdqu	(%rcx,%r10,2), %xmm7
  1      2     0.50                        vpmovsxwd	%xmm7, %ymm7
  1      3     0.50                        vcvtdq2ps	%ymm7, %ymm7
  1      10    0.50    *                   vmulps	761(%rip), %ymm7, %ymm7
@@ -107,7 +107,7 @@ Instruction Info:
  1      10    0.50    *                   vmulps	807(%rip), %ymm7, %ymm7
  1      9     0.50    *                   vmaxps	830(%rip), %ymm7, %ymm7
  1      9     0.50    *                   vminps	853(%rip), %ymm7, %ymm7
- 1      5     0.33    *                   movq	(%rsi), %r11
+ 1      5     0.33    *                   movq	(%rdx), %r11
  1      8     0.50    *                   vmovdqu	(%r11,%r10,4), %ymm8
  1      1     0.50                        vpsrld	$24, %ymm8, %ymm9
  1      3     0.50                        vcvtdq2ps	%ymm9, %ymm9
@@ -191,7 +191,7 @@ Resource pressure per iteration:
 
 Resource pressure by instruction:
 [0]    [1]    [2]    [3]    [4]    [5]    [6]    [7]    [8]    [9]    [10]   [11]   [12.0] [12.1] [13]   [14.0] [14.1] [14.2] [15.0] [15.1] [15.2] [16.0] [16.1] Instructions:
- -      -      -      -      -      -      -      -      -      -      -      -     0.77   0.23    -     0.22   0.53   0.25   0.51   0.12   0.37    -      -     vmovdqu	(%rdx,%r10,2), %xmm7
+ -      -      -      -      -      -      -      -      -      -      -      -     0.77   0.23    -     0.22   0.53   0.25   0.51   0.12   0.37    -      -     vmovdqu	(%rcx,%r10,2), %xmm7
  -      -      -      -      -      -      -      -      -     0.15   0.85    -      -      -      -      -      -      -      -      -      -      -      -     vpmovsxwd	%xmm7, %ymm7
  -      -      -      -      -      -      -      -      -      -     0.54   0.46    -      -      -      -      -      -      -      -      -      -      -     vcvtdq2ps	%ymm7, %ymm7
  -      -      -      -      -      -      -      -     0.65   0.35    -      -     0.11   0.89    -     0.38   0.34   0.28   0.29   0.39   0.32    -      -     vmulps	761(%rip), %ymm7, %ymm7
@@ -199,7 +199,7 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -     0.72   0.28    -      -     0.30   0.70    -     0.44   0.31   0.25   0.28   0.20   0.52    -      -     vmulps	807(%rip), %ymm7, %ymm7
  -      -      -      -      -      -      -      -     0.67   0.33    -      -     0.43   0.57    -     0.16   0.59   0.25   0.31   0.26   0.43    -      -     vmaxps	830(%rip), %ymm7, %ymm7
  -      -      -      -      -      -      -      -     0.66   0.34    -      -     0.41   0.59    -     0.41   0.28   0.31   0.32   0.32   0.36    -      -     vminps	853(%rip), %ymm7, %ymm7
-0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.39   0.19   0.42   0.08   0.69   0.23    -      -     movq	(%rsi), %r11
+0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.39   0.19   0.42   0.08   0.69   0.23    -      -     movq	(%rdx), %r11
  -      -      -      -      -      -      -      -      -      -      -      -     0.82   0.18    -     0.31   0.33   0.36   0.40   0.29   0.31    -      -     vmovdqu	(%r11,%r10,4), %ymm8
  -      -      -      -      -      -      -      -      -     0.35   0.65    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	$24, %ymm8, %ymm9
  -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -      -     vcvtdq2ps	%ymm9, %ymm9

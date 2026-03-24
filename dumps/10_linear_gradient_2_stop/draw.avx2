@@ -66,7 +66,7 @@ Critical sequence based on the simulation:
  +----> 33.   vpor	%ymm0, %ymm14, %ymm0              ## REGISTER dependency:  %ymm0
  |      34.   vpslld	$24, %ymm15, %ymm15
  +----> 35.   vpor	%ymm0, %ymm15, %ymm0              ## REGISTER dependency:  %ymm0
- |      36.   movq	(%rsi), %r11
+ |      36.   movq	(%rdx), %r11
  +----> 37.   vmovdqu	%ymm0, (%r11,%r10,4)              ## REGISTER dependency:  %ymm0
  |      38.   vpxor	%ymm0, %ymm0, %ymm0
  |      39.   vmovdqu	(%rsp), %ymm1
@@ -122,7 +122,7 @@ Instruction Info:
  1      1     0.25                        vpor	%ymm0, %ymm14, %ymm0
  1      1     0.50                        vpslld	$24, %ymm15, %ymm15
  1      1     0.25                        vpor	%ymm0, %ymm15, %ymm0
- 1      5     0.33    *                   movq	(%rsi), %r11
+ 1      5     0.33    *                   movq	(%rdx), %r11
  1      1     1.00           *            vmovdqu	%ymm0, (%r11,%r10,4)
  1      0     0.17                        vpxor	%ymm0, %ymm0, %ymm0
  1      8     0.50    *                   vmovdqu	(%rsp), %ymm1
@@ -197,7 +197,7 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -     0.04    -      -     0.96    -      -      -      -      -      -      -      -      -      -      -     vpor	%ymm0, %ymm14, %ymm0
  -      -      -      -      -      -      -      -      -     0.74   0.26    -      -      -      -      -      -      -      -      -      -      -      -     vpslld	$24, %ymm15, %ymm15
  -      -      -      -      -      -      -      -     0.25    -     0.15   0.60    -      -      -      -      -      -      -      -      -      -      -     vpor	%ymm0, %ymm15, %ymm0
-0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.33   0.33   0.33   0.34   0.33    -      -     movq	(%rsi), %r11
+0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.33   0.33   0.33   0.34   0.33    -      -     movq	(%rdx), %r11
  -      -      -      -      -      -      -      -      -      -      -      -     0.51   0.49   1.00   0.32   0.36   0.32    -      -      -     0.50   0.50   vmovdqu	%ymm0, (%r11,%r10,4)
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vpxor	%ymm0, %ymm0, %ymm0
  -      -      -      -      -      -      -      -      -      -      -      -     0.48   0.52    -     0.33   0.32   0.35   0.34   0.34   0.32    -      -     vmovdqu	(%rsp), %ymm1

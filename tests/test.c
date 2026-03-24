@@ -2542,6 +2542,35 @@ static void test_dump(void) {
     fclose(f);
 }
 
+static void test_xy(void) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_val             ix = umbra_iota(b);
+    umbra_val             x = umbra_x(b);
+    umbra_val             y = umbra_y(b);
+    umbra_store_i32(b, (umbra_ptr){0}, ix, x);
+    umbra_store_i32(b, (umbra_ptr){1}, ix, y);
+    backends B = make(b, 0);
+
+    enum { W = 5, H = 3, N = W * H };
+    int32_t xbuf[N], ybuf[N];
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        __builtin_memset(xbuf, 0, sizeof xbuf);
+        __builtin_memset(ybuf, 0, sizeof ybuf);
+        if (!test_backends_run_2d(&B, bi, W, H,
+                                  (umbra_buf[]){
+                                      {xbuf, (long)sizeof xbuf},
+                                      {ybuf, (long)sizeof ybuf},
+                                  })) {
+            continue;
+        }
+        for (int j = 0; j < N; j++) {
+            (xbuf[j] == j % W) here;
+            (ybuf[j] == j / W) here;
+        }
+    }
+    cleanup(&B);
+}
+
 int main(void) {
     test_f32_ops();
     test_i32_ops();
@@ -2584,5 +2613,6 @@ int main(void) {
     test_mixed_ptr();
     test_uni_16();
     test_dump();
+    test_xy();
     return 0;
 }
