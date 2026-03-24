@@ -39,7 +39,7 @@ static void slug_animate(slide *s, float dt) {
     st->mat[10] = st->slug->h;
 }
 
-static void slug_render(slide *s, int w, int h, void *buf, long buf_sz, int rs,
+static void slug_render(slide *s, int w, int h, void *buf, long buf_sz, int row_bytes,
                          umbra_draw_layout const *lay, struct umbra_program *program) {
     (void)buf_sz;
     slug_state           *st = s->state;
@@ -51,7 +51,7 @@ static void slug_render(slide *s, int w, int h, void *buf, long buf_sz, int rs,
     }
 
     for (int y = 0; y < h; y++) {
-        void *row = (char *)buf + y * rs * 4;
+        void *row = (char *)buf + y * row_bytes;
         __builtin_memset(st->wind_buf, 0, (size_t)w * sizeof(float));
 
         long long au_[12] = {0};
@@ -76,11 +76,11 @@ static void slug_render(slide *s, int w, int h, void *buf, long buf_sz, int rs,
         for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
         long long uni_[12] = {0};
         char     *uni = (char *)uni_;
-        slide_uni_i32(uni, lay->rs, rs);
+        slide_uni_i32(uni, lay->rs, w);
         slide_uni_f32(uni, lay->shader, hc, 4);
         slide_uni_ptr(uni, lay->coverage, st->wind_buf, -(long)((int)sizeof(float) * w));
         umbra_buf rbuf[] = {
-            {row, (long)(w * 4)},
+            {row, (long)row_bytes},
             {uni, -(long)lay->uni_len},
         };
         umbra_program_queue(program, w, 1, rbuf);

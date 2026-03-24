@@ -307,17 +307,17 @@ int main(void) {
         int   bpp = fmt_bpp[cur_fmt];
         _Bool planar = (cur_fmt == FMT_FP16P);
         long buf_sz = planar ? (long)(W * H * 4) * 2 : (long)(W * H * bpp);
-        int  rs = W;
+        int  row_bytes = planar ? W * 2 : W * bpp;
 
         for (int y = 0; y < H; y++) {
             void *row = planar ? (void *)((__fp16 *)pixbuf + y * W)
-                               : (void *)((uint8_t *)pixbuf + y * W * bpp);
+                               : (void *)((uint8_t *)pixbuf + y * row_bytes);
             fill_bg_row(row, W, s->bg, buf_sz, planar_stride);
         }
 
         if (s->animate) { s->animate(s, 0.016f); }
 
-        s->render(s, W, H, pixbuf, buf_sz, rs, &draw_layout, b);
+        s->render(s, W, H, pixbuf, buf_sz, row_bytes, &draw_layout, b);
 
         umbra_backend_flush(bes[cur_backend]);
 

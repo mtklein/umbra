@@ -7,12 +7,13 @@ typedef struct {
     int    pad_;
 } grad_lut_state;
 
-static void grad_2stop_render(slide *s, int w, int h, void *buf, long buf_sz, int rs,
+static void grad_2stop_render(slide *s, int w, int h, void *buf, long buf_sz, int row_bytes,
                                umbra_draw_layout const *lay, struct umbra_program *program) {
     int       uni_len = lay->uni_len;
     long long uni_[8] = {0};
     char     *uni = (char *)uni_;
-    slide_uni_i32(uni, lay->rs, rs);
+    (void)row_bytes;
+    slide_uni_i32(uni, lay->rs, w);
     slide_uni_f32(uni, lay->shader, s->grad, 3);
     slide_uni_f32(uni, lay->shader + 12, s->color, 8);
     int ps = (s->store == umbra_store_fp16_planar ? 1 : 0)
@@ -26,13 +27,14 @@ static void grad_2stop_render(slide *s, int w, int h, void *buf, long buf_sz, in
     umbra_program_queue(program, w, h, ubuf);
 }
 
-static void grad_lut_render(slide *s, int w, int h, void *buf, long buf_sz, int rs,
+static void grad_lut_render(slide *s, int w, int h, void *buf, long buf_sz, int row_bytes,
                              umbra_draw_layout const *lay, struct umbra_program *program) {
     grad_lut_state *st = s->state;
     int             uni_len = lay->uni_len;
     long long       uni_[8] = {0};
     char           *uni = (char *)uni_;
-    slide_uni_i32(uni, lay->rs, rs);
+    (void)row_bytes;
+    slide_uni_i32(uni, lay->rs, w);
     slide_uni_f32(uni, lay->shader, s->grad, 4);
     slide_uni_ptr(uni, (lay->shader + 16 + 7) & ~7, st->lut, (long)(st->lut_n * 4 * 4));
     int ps = (s->store == umbra_store_fp16_planar ? 1 : 0)

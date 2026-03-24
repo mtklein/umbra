@@ -25,14 +25,15 @@ static void persp_animate(slide *s, float dt) {
                              st->bitmap->h);
 }
 
-static void persp_render(slide *s, int w, int h, void *buf, long buf_sz, int rs,
+static void persp_render(slide *s, int w, int h, void *buf, long buf_sz, int row_bytes,
                           umbra_draw_layout const *lay, struct umbra_program *program) {
     persp_state *st = s->state;
     float        hc[4];
     for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
     long long uni_[12] = {0};
     char     *uni = (char *)uni_;
-    slide_uni_i32(uni, lay->rs, rs);
+    (void)row_bytes;
+    slide_uni_i32(uni, lay->rs, w);
     slide_uni_f32(uni, lay->shader, hc, 4);
     slide_uni_f32(uni, lay->coverage, st->mat, 11);
     slide_uni_ptr(uni, (lay->coverage + 11 * 4 + 7) & ~7, st->bitmap->data,

@@ -158,18 +158,18 @@ static void render_slide(
     long buf_sz = planar
         ? (long)(W * H * 4) * 2
         : (long)(W * H * bpp);
-    int rs = W;
+    int row_bytes = planar ? W * 2 : W * bpp;
 
     for (int y = 0; y < H; y++) {
         void *row = planar
             ? (void*)((__fp16*)pixbuf + y * W)
-            : (void*)((uint8_t*)pixbuf + y * W * bpp);
+            : (void*)((uint8_t*)pixbuf + y * row_bytes);
         fill_bg_row(fmt, row, W,
                     s->bg, buf_sz,
                     planar_stride);
     }
     s->render(s, W, H, pixbuf, buf_sz,
-              rs, lay, program);
+              row_bytes, lay, program);
 }
 
 static void readback_to_8888(int fmt,

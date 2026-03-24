@@ -20,7 +20,7 @@ struct slide {
     void (*init)   (slide*, int w, int h);
     void (*animate)(slide*, float dt);
     void (*render) (slide*, int w, int h,
-                    void *buf, long buf_sz, int rs,
+                    void *buf, long buf_sz, int row_bytes,
                     umbra_draw_layout const*,
                     struct umbra_program*);
     void (*cleanup)(slide*);
