@@ -98,7 +98,7 @@ typedef union {
 } val;
 
 struct interp_inst;
-typedef int (*Fn)(struct interp_inst const *ip, val *v, int end, int n, int w,
+typedef int (*Fn)(struct interp_inst const *ip, val *v, int end, int n, int w, int row,
                   void *ptr[], long sz[]);
 struct interp_inst {
     Fn  fn;
@@ -115,8 +115,8 @@ struct umbra_interpreter {
 
 #define op(name)                                                                       \
     static int name(struct interp_inst const *ip, val *v, int end, int n, int w,       \
-                    void *ptr[], long sz[])
-#define next return ip[1].fn(ip + 1, v + 1, end, n, w, ptr, sz)
+                    int row, void *ptr[], long sz[])
+#define next return ip[1].fn(ip + 1, v + 1, end, n, w, row, ptr, sz)
 
 static I32 clamp_ix(I32 ix, long bytes, int elem) {
     I32 zero = {0};
@@ -140,16 +140,11 @@ op(iota_fn) {
 }
 op(x_fn) {
     I32 const seq = {0, 1, 2, 3, 4, 5, 6, 7};
-    U32 iota = (U32)(seq + (end - K));
-    U32 wv = (U32)((I32){0} + w);
-    v->u32 = iota - iota / wv * wv;
+    v->i32 = seq + (end - K - row * w);
     next;
 }
 op(y_fn) {
-    I32 const seq = {0, 1, 2, 3, 4, 5, 6, 7};
-    U32 iota = (U32)(seq + (end - K));
-    U32 wv = (U32)((I32){0} + w);
-    v->u32 = iota / wv;
+    v->i32 = (I32){0} + row;
     next;
 }
 
@@ -652,6 +647,7 @@ op(done) {
     (void)end;
     (void)n;
     (void)w;
+    (void)row;
     (void)ptr;
     (void)sz;
     return 0;
@@ -758,7 +754,7 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     __builtin_memcpy(&v[1], &yb, 4);
     __builtin_memcpy(&v[2], &zb, 4);
 
-    inst[0].fn(inst, v + 3, K, K, 0, (void *[]){0}, (long[]){0});
+    inst[0].fn(inst, v + 3, K, K, 0, 0, (void *[]){0}, (long[]){0});
 
     int r;
     __builtin_memcpy(&r, &v[3], 4);
@@ -970,16 +966,21 @@ static void load_bufs(struct umbra_interpreter *p, umbra_buf buf[]) {
 
 void umbra_interpreter_run(struct umbra_interpreter *p, int n, int w, umbra_buf buf[]) {
     load_bufs(p, buf);
+    int const                 P = p->preamble;
+    int const                 h = n / w;
     struct interp_inst const *start = p->inst;
     val                      *v = p->v;
-    int const                 P = p->preamble;
 
-    int i = 0;
-    while (i < n) {
-        start->fn(start, v, i + K, n, w, p->ptr, p->sz);
-        i += K;
-        start = p->inst + P;
-        v = p->v + P;
+    // 2D loop: rows then columns.  op_x = column, op_y = row, op_iota = y*w+x.
+    // end = row*w + x + K gives contiguous ops the correct linear offset.
+    // First call runs preamble + body; subsequent calls run body only.
+    for (int row = 0; row < h; row++) {
+        int row_end = (row + 1) * w;
+        for (int x = 0; x < w; x += K) {
+            start->fn(start, v, row * w + x + K, row_end, w, row, p->ptr, p->sz);
+            start = p->inst + P;
+            v = p->v + P;
+        }
     }
 }
 
