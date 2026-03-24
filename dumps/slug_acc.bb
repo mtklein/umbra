@@ -52,7 +52,7 @@
   v51  = join            v49 v50
   v52  = uni_32          p-2[v51]
   v53  = imm_32          0xbf800000
-  v54  = iota           
+  v54  = x              
   v55  = add_i32         v54 v2
   v56  = f32_from_i32    v55
   v57  = fma_f32         v56 v13 v24

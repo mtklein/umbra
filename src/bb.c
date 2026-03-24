@@ -123,7 +123,6 @@ void umbra_builder_free(builder *b) {
     free(b);
 }
 
-val umbra_iota(builder *b) { return push(b, op_iota); }
 val umbra_x(builder *b) { return push(b, op_x); }
 val umbra_y(builder *b) { return push(b, op_y); }
 
@@ -169,19 +168,22 @@ static _Bool is_x_plus_y_stride(builder *b, int ix) {
         || (b->inst[c].op == op_y && b->inst[a].uniform);
 }
 
-// Recognize iota+offset or (y*stride+x)+offset as contiguous with offset.
+static _Bool is_contiguous(builder *b, int ix) {
+    enum op op = b->inst[ix].op;
+    return op == op_iota || op == op_x || is_x_plus_y_stride(b, ix);
+}
+
+// Recognize contiguous+offset as contiguous with offset.
 static int contiguous_plus_off(builder *b, int ix) {
     if (b->inst[ix].op != op_add_i32) { return -1; }
     int p = b->inst[ix].x, q = b->inst[ix].y;
-    if (b->inst[p].op == op_iota) { return q; }
-    if (b->inst[q].op == op_iota) { return p; }
-    if (is_x_plus_y_stride(b, p)) { return q; }
-    if (is_x_plus_y_stride(b, q)) { return p; }
+    if (is_contiguous(b, p)) { return q; }
+    if (is_contiguous(b, q)) { return p; }
     return -1;
 }
 
 val umbra_load_i16(builder *b, umbra_ptr src, val ix) {
-    if (b->inst[ix.id].op == op_iota || is_x_plus_y_stride(b, ix.id)) {
+    if (is_contiguous(b, ix.id)) {
         return push(b, op_load_16, .ptr = src.ix);
     }
     if (b->inst[ix.id].op == op_imm_32) {
@@ -195,7 +197,7 @@ val umbra_load_i16(builder *b, umbra_ptr src, val ix) {
     return push(b, op_gather_16, .x = ix.id, .ptr = src.ix);
 }
 val umbra_load_i32(builder *b, umbra_ptr src, val ix) {
-    if (b->inst[ix.id].op == op_iota || is_x_plus_y_stride(b, ix.id)) {
+    if (is_contiguous(b, ix.id)) {
         return push(b, op_load_32, .ptr = src.ix);
     }
     if (b->inst[ix.id].op == op_imm_32) {
@@ -209,7 +211,7 @@ val umbra_load_i32(builder *b, umbra_ptr src, val ix) {
     return push(b, op_gather_32, .x = ix.id, .ptr = src.ix);
 }
 void umbra_store_i16(builder *b, umbra_ptr dst, val ix, val v) {
-    if (b->inst[ix.id].op == op_iota || is_x_plus_y_stride(b, ix.id)) {
+    if (is_contiguous(b, ix.id)) {
         push(b, op_store_16, .y = v.id, .ptr = dst.ix);
         return;
     }
@@ -223,7 +225,7 @@ void umbra_store_i16(builder *b, umbra_ptr dst, val ix, val v) {
     push(b, op_scatter_16, .x = ix.id, .y = v.id, .ptr = dst.ix);
 }
 void umbra_store_i32(builder *b, umbra_ptr dst, val ix, val v) {
-    if (b->inst[ix.id].op == op_iota || is_x_plus_y_stride(b, ix.id)) {
+    if (is_contiguous(b, ix.id)) {
         push(b, op_store_32, .y = v.id, .ptr = dst.ix);
         return;
     }

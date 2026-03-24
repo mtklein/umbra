@@ -59,7 +59,7 @@ kernel void umbra_entry(
     uint v39 = v12 + v29;
     uint v40 = ((device const uint*)p2)[v39];
     uint v41 = 3212836864u;
-    uint v42 = i;
+    uint v42 = pos.x;
     uint v43 = v42 + v2;
     uint v44 = as_type<uint>((float)(int)v43);
     uint v45 = as_type<uint>(fma(as_type<float>(v44), as_type<float>(v13), as_type<float>(v24)));

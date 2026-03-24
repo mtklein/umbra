@@ -154,7 +154,7 @@ typedef struct {
 static inline struct umbra_builder *slug_build_acc(
         slug_acc_layout *lay) {
     struct umbra_builder *b = umbra_builder();
-    umbra_val ix = umbra_iota(b);
+    umbra_val ix = umbra_x(b);
 
     int x0i = umbra_reserve(b, 1);
     int yi  = umbra_reserve(b, 1);

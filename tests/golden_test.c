@@ -47,7 +47,7 @@ static struct umbra_backend *interp_be;
 
 static void build_fill(int fmt) {
     builder *builder = umbra_builder();
-    umbra_val ix = umbra_iota(builder);
+    umbra_val ix = umbra_x(builder);
     int fi = umbra_reserve(builder, 4);
     umbra_color c = {
         umbra_load_i32(builder, (umbra_ptr){1},
@@ -72,7 +72,7 @@ static void build_fill(int fmt) {
 
 static void build_readback(int fmt) {
     builder *builder = umbra_builder();
-    umbra_val ix = umbra_iota(builder);
+    umbra_val ix = umbra_x(builder);
     umbra_color c =
         fmt_load[fmt](builder, (umbra_ptr){0}, ix);
     umbra_store_8888(builder,

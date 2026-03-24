@@ -1,0 +1,48 @@
+Known bugs and fragile areas.
+
+
+CONTIGUOUS PATTERN ASSUMES rs == w
+
+The builder recognizes add(mul(op_y, rs_uniform), op_x) as contiguous and
+emits op_load/op_store.  These contiguous ops use the backend's linear loop
+counter (row * w + column) for addressing.  But the program computed
+ix = y * rs + x, and rs is a runtime uniform that COULD differ from w.
+
+If rs != w (e.g. padded rows, sub-rectangle rendering), the contiguous op
+accesses the wrong memory.  All current callers set rs = w, so this hasn't
+manifested, but the optimization is unsound in the general case.
+
+Options: remove rs (always use w), or teach contiguous ops about row stride.
+
+
+NO VALIDATION THAT w > 0
+
+queue(p, 0, h, buf) causes division by zero in Metal dispatch (h = n/w),
+interpreter (h = n/w), and the ARM64 JIT (UDIV by zero = 0, silent but
+wrong).  Should guard at the dispatch entry point.
+
+
+JIT op_x CLOBBERS SCRATCH REGISTERS
+
+ARM64: MSUB writes XT (X10).  XT is designated scratch so this is fine in
+practice, but if the RA ever spilled a value into XT between the MSUB and
+its use, there'd be a conflict.  The RA doesn't use GP registers for values
+so this is currently safe.
+
+x86-64: op_x uses RAX and R11 as temps.  Same argument — safe because the
+RA only manages YMM registers, not GPRs.
+
+
+SLUG ACCUMULATOR STILL USES OLD 1D API INTERNALLY
+
+slug_build_acc uses umbra_iota, x0/y uniforms, and per-row 1D dispatch.
+It works but doesn't benefit from 2D dispatch.  Converting it would require
+rethinking the per-curve-per-row accumulation strategy.
+
+
+METAL THREADGROUP SELECTION IS GREEDY
+
+The 2D threadgroup picker iterates factorizations of tg_size and picks the
+last one where both dimensions fit the grid.  This tends toward wide shapes
+(large x, small y).  A smarter heuristic (prefer squarish, or match grid
+aspect ratio) might improve occupancy for non-square grids.

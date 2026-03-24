@@ -1,5 +1,5 @@
   v0   = imm_32          0x0
-  v1   = iota           
+  v1   = x              
   v2   = deref_ptr       p1 byte56
   v3   = uni_32          p1[0]
   v4   = imm_32          0x1
