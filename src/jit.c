@@ -1945,19 +1945,21 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     last_ptr = -1;
                 }
                 for (int k = 0; k < 8; k++) {
+                    // MOV EAX, [RSP + 32 + k*4]  (load index)
                     emit1(c, 0x8b);
                     emit1(c, 0x44);
                     emit1(c, 0x24);
                     emit1(c, (uint8_t)(32 + k * 4));
                     clamp_eax_x86(c);
-                    emit1(c, 0x44);
+                    // MOV ECX, [RSP + k*4]  (load value into ECX, not R10=XI)
                     emit1(c, 0x8b);
-                    emit1(c, 0x54);
+                    emit1(c, 0x4c);
                     emit1(c, 0x24);
                     emit1(c, (uint8_t)(k * 4));
-                    emit1(c, 0x45);
+                    // MOV [R11 + RAX*4], ECX
+                    emit1(c, 0x41);
                     emit1(c, 0x89);
-                    emit1(c, 0x14);
+                    emit1(c, 0x0c);
                     emit1(c, 0x83);
                 }
                 add_ri(c, RSP, 64);

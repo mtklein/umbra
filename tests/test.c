@@ -2571,6 +2571,26 @@ static void test_xy(void) {
     cleanup(&B);
 }
 
+static void test_scatter_multi_iter(void) {
+    // Regression: scatter_32 vector path must not clobber the loop counter.
+    // Uses computed ix (not iota) to force scatter instead of contiguous store.
+    struct umbra_builder *b = umbra_builder();
+    umbra_val             x = umbra_x(b);
+    umbra_val             y = umbra_y(b);
+    umbra_val             rs = umbra_imm_i32(b, 16);
+    umbra_val             ix = umbra_add_i32(b, umbra_mul_i32(b, y, rs), x);
+    umbra_store_i32(b, (umbra_ptr){0}, ix, umbra_imm_i32(b, 42));
+    backends B = make(b, 0);
+
+    int32_t buf[16];
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        __builtin_memset(buf, 0, sizeof buf);
+        if (!run(&B, bi, 16, 1, (umbra_buf[]){{buf, (long)sizeof buf}})) { continue; }
+        for (int i = 0; i < 16; i++) { (buf[i] == 42) here; }
+    }
+    cleanup(&B);
+}
+
 int main(void) {
     test_f32_ops();
     test_i32_ops();
@@ -2614,5 +2634,6 @@ int main(void) {
     test_uni_16();
     test_dump();
     test_xy();
+    test_scatter_multi_iter();
     return 0;
 }
