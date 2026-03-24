@@ -43,9 +43,8 @@ static void solid_animate(slide *s, float dt) {
     }
 }
 
-static void solid_render_row(slide *s, int y, int w, void *row, long row_sz,
-                             umbra_draw_layout const *lay, int ps, int32_t stride,
-                             struct umbra_program *program) {
+static void solid_render(slide *s, int w, int h, void *buf, long buf_sz, int rs,
+                          umbra_draw_layout const *lay, struct umbra_program *program) {
     solid_state *st = s->state;
     float        rect[4] = {
         st->rx,
@@ -55,19 +54,16 @@ static void solid_render_row(slide *s, int y, int w, void *row, long row_sz,
     };
     float hc[4];
     for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
-    int       uni_len = lay->uni_len;
     long long uni_[6] = {0};
     char     *uni = (char *)uni_;
-    slide_uni_i32(uni, lay->x0, 0);
-    slide_uni_i32(uni, lay->y, y);
+    slide_uni_i32(uni, lay->rs, rs);
     slide_uni_f32(uni, lay->shader, hc, 4);
     if (s->coverage) { slide_uni_f32(uni, lay->coverage, rect, 4); }
-    for (int i = 0; i < ps; i++) { slide_uni_i32(uni, uni_len - (ps - i) * 4, stride); }
-    umbra_buf buf[] = {
-        {row, row_sz},
-        {uni, -(long)uni_len},
+    umbra_buf ubuf[] = {
+        {buf, buf_sz},
+        {uni, -(long)lay->uni_len},
     };
-    umbra_program_queue(program, w, 1, buf);
+    umbra_program_queue(program, w, h, ubuf);
 }
 
 static void solid_cleanup(slide *s) {
@@ -92,7 +88,7 @@ slide slide_solid(char const *title, uint32_t bg, float const color[4],
         .color = {color[0], color[1], color[2], color[3]},
         .init = solid_init,
         .animate = solid_animate,
-        .render_row = solid_render_row,
+        .render = solid_render,
         .cleanup = solid_cleanup,
     };
 }

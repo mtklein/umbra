@@ -1,11 +1,11 @@
   v0   = imm_32          0x0
-  v1   = iota           
-  v2   = uni_32          p1[0]
-  v3   = imm_32          0x1
-  v4   = uni_32          p1[1]
-  v5   = add_i32         v1 v2
-  v6   = f32_from_i32    v5
-  v7   = f32_from_i32    v4
+  v1   = x              
+  v2   = y              
+  v3   = uni_32          p1[0]
+  v4   = mul_i32         v2 v3
+  v5   = add_i32         v1 v4
+  v6   = f32_from_i32    v1
+  v7   = f32_from_i32    v2
   v8   = imm_32          0x2
   v9   = uni_32          p1[2]
   v10  = imm_32          0x3
@@ -86,7 +86,7 @@
   v85  = mul_f32_imm     v83 0x3b808081
   v86  = join            v84 v85
   v87  = sel_32          v59 v86 v0
-  v88  = load_32         p0
+  v88  = gather_32       p0 v5
   v89  = imm_32          0xff
   v90  = and_32          v88 v89
   v91  = and_imm         v88 0xff
@@ -176,4 +176,4 @@
   v175 = or_32           v173 v174
   v176 = pack            v173 v156 24
   v177 = join            v175 v176
-      store_32        p0 v177
+      scatter_32      p0 v5 v177

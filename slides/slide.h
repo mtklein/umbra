@@ -17,15 +17,14 @@ struct slide {
     uint32_t           bg;
     uint32_t           pad_;
 
-    void (*init)      (slide*, int w, int h);
-    void (*animate)   (slide*, float dt);
-    void (*render_row)(slide*, int y, int w,
-                       void *row, long row_sz,
-                       umbra_draw_layout const*,
-                       int ps, int32_t stride,
-                       struct umbra_program*);
-    void (*cleanup)   (slide*);
-    void              *state;
+    void (*init)   (slide*, int w, int h);
+    void (*animate)(slide*, float dt);
+    void (*render) (slide*, int w, int h,
+                    void *buf, long buf_sz, int rs,
+                    umbra_draw_layout const*,
+                    struct umbra_program*);
+    void (*cleanup)(slide*);
+    void           *state;
 };
 
 int    slide_count        (void);

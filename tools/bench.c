@@ -13,20 +13,20 @@ static double now(void) {
     return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
 }
 
-static double bench(slide *s, int w, int h, umbra_draw_layout const *lay, int ps,
-                    int32_t stride, void *row, long row_sz, struct umbra_backend *be,
+static double bench(slide *s, int w, int h, umbra_draw_layout const *lay,
+                    void *buf, long buf_sz, int rs, struct umbra_backend *be,
                     struct umbra_program *prog) {
-    s->render_row(s, h / 2, w, row, row_sz, lay, ps, stride, prog);
+    s->render(s, w, h, buf, buf_sz, rs, lay, prog);
     umbra_backend_flush(be);
     int iters = 1;
     for (;;) {
         double const start = now();
         for (int it = 0; it < iters; it++) {
-            s->render_row(s, h / 2, w, row, row_sz, lay, ps, stride, prog);
+            s->render(s, w, h, buf, buf_sz, rs, lay, prog);
         }
         umbra_backend_flush(be);
         double const elapsed = now() - start;
-        if (elapsed >= 0.1) { return elapsed / ((double)iters * (double)w) * 1e9; }
+        if (elapsed >= 0.1) { return elapsed / ((double)iters * (double)w * (double)h) * 1e9; }
         iters *= 2;
     }
 }
@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
 
     for (int si = 0; si < ns; si++) {
         slide *s = slide_get(si);
-        if (!s->render_row) { continue; }
+        if (!s->render) { continue; }
 
         umbra_draw_layout         lay;
         struct umbra_builder     *bld = umbra_draw_build(s->shader, s->coverage, s->blend,
@@ -58,23 +58,22 @@ int main(int argc, char *argv[]) {
         struct umbra_program *mtl = be_m ? umbra_backend_compile(be_m, bb) : NULL;
         umbra_basic_block_free(bb);
 
-        _Bool   planar = s->store == umbra_store_fp16_planar;
-        int     px = planar ? 2 : 4;
-        int     ps = planar ? (s->load ? 2 : 1) : 0;
-        void   *row = calloc((size_t)W, (size_t)px);
-        long    row_sz = W * px;
-        int32_t stride = (int32_t)W;
+        _Bool planar = s->store == umbra_store_fp16_planar;
+        int   bpp = planar ? 2 : 4;
+        int   rs = W;
+        long  buf_sz = (long)W * H * bpp;
+        void *buf = calloc((size_t)(W * H), (size_t)bpp);
 
         char tmp[32];
         printf("%-40s", s->title);
 
         sprintf(tmp, "%5.2f ns/px",
-                bench(s, W, H, &lay, ps, stride, row, row_sz, be_i, interp));
+                bench(s, W, H, &lay, buf, buf_sz, rs, be_i, interp));
         printf(" %12s", tmp);
 
         if (jit) {
             sprintf(tmp, "%5.2f ns/px",
-                    bench(s, W, H, &lay, ps, stride, row, row_sz, be_j, jit));
+                    bench(s, W, H, &lay, buf, buf_sz, rs, be_j, jit));
             printf(" %12s", tmp);
         } else {
             printf(" %12s", "-");
@@ -82,7 +81,7 @@ int main(int argc, char *argv[]) {
 
         if (mtl) {
             sprintf(tmp, "%5.2f ns/px",
-                    bench(s, W, H, &lay, ps, stride, row, row_sz, be_m, mtl));
+                    bench(s, W, H, &lay, buf, buf_sz, rs, be_m, mtl));
             printf(" %12s", tmp);
         } else {
             printf(" %12s", "-");
@@ -96,7 +95,7 @@ int main(int argc, char *argv[]) {
         umbra_backend_free(be_i);
         umbra_backend_free(be_j);
         umbra_backend_free(be_m);
-        free(row);
+        free(buf);
     }
 
     {

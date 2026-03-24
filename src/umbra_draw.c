@@ -8,15 +8,15 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
                                        umbra_blend_fn blend, umbra_load_fn load,
                                        umbra_store_fn store, umbra_draw_layout *layout) {
     builder  *builder = umbra_builder();
-    umbra_val ix = umbra_iota(builder);
+    umbra_val x = umbra_x(builder);
+    umbra_val y = umbra_y(builder);
 
-    int x0_ix = umbra_reserve(builder, 1);
-    int y_ix = umbra_reserve(builder, 1);
+    int rs_ix = umbra_reserve(builder, 2);
 
-    umbra_val x0 = umbra_load_i32(builder, (umbra_ptr){1}, umbra_imm_i32(builder, x0_ix));
-    umbra_val y = umbra_load_i32(builder, (umbra_ptr){1}, umbra_imm_i32(builder, y_ix));
+    umbra_val rs = umbra_load_i32(builder, (umbra_ptr){1}, umbra_imm_i32(builder, rs_ix));
+    umbra_val ix = umbra_add_i32(builder, umbra_mul_i32(builder, y, rs), x);
 
-    umbra_val xf = umbra_cvt_f32_i32(builder, umbra_add_i32(builder, x0, ix));
+    umbra_val xf = umbra_cvt_f32_i32(builder, x);
     umbra_val yf = umbra_cvt_f32_i32(builder, y);
 
     int         shader_off = umbra_uni_len(builder);
@@ -65,8 +65,7 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
     if (store) { store(builder, (umbra_ptr){0}, ix, out); }
 
     if (layout) {
-        layout->x0 = x0_ix * 4;
-        layout->y = y_ix * 4;
+        layout->rs = rs_ix * 4;
         layout->shader = shader_off;
         layout->coverage = coverage_off;
         layout->uni_len = umbra_uni_len(builder);

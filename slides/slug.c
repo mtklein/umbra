@@ -39,9 +39,9 @@ static void slug_animate(slide *s, float dt) {
     st->mat[10] = st->slug->h;
 }
 
-static void slug_render_row(slide *s, int y, int w, void *row, long row_sz,
-                            umbra_draw_layout const *lay, int ps, int32_t stride,
-                            struct umbra_program *program) {
+static void slug_render(slide *s, int w, int h, void *buf, long buf_sz, int rs,
+                         umbra_draw_layout const *lay, struct umbra_program *program) {
+    (void)buf_sz;
     slug_state           *st = s->state;
     struct umbra_backend *be = umbra_program_backend(program);
     if (be != st->acc_be) {
@@ -49,41 +49,42 @@ static void slug_render_row(slide *s, int y, int w, void *row, long row_sz,
         st->acc = umbra_backend_compile(be, st->acc_bb);
         st->acc_be = be;
     }
-    __builtin_memset(st->wind_buf, 0, (size_t)w * sizeof(float));
 
-    long long au_[12] = {0};
-    char     *au = (char *)au_;
-    slide_uni_i32(au, st->acc_lay.x0, 0);
-    slide_uni_i32(au, st->acc_lay.y, y);
-    slide_uni_f32(au, st->acc_lay.mat, st->mat, 11);
-    slide_uni_ptr(au, st->acc_lay.curves_off, st->slug->data,
-                  (long)(st->slug->count * 6 * 4));
-    umbra_buf abuf[] = {
-        {st->wind_buf, (long)((int)sizeof(float) * w)},
-        {au, -(long)st->acc_lay.uni_len},
-    };
-    for (int j = 0; j < st->slug->count; j++) {
-        int32_t j32 = j;
-        __builtin_memcpy(au + st->acc_lay.loop_off, &j32, 4);
-        umbra_program_queue(st->acc, w, 1, abuf);
+    for (int y = 0; y < h; y++) {
+        void *row = (char *)buf + y * rs * 4;
+        __builtin_memset(st->wind_buf, 0, (size_t)w * sizeof(float));
+
+        long long au_[12] = {0};
+        char     *au = (char *)au_;
+        slide_uni_i32(au, st->acc_lay.x0, 0);
+        slide_uni_i32(au, st->acc_lay.y, y);
+        slide_uni_f32(au, st->acc_lay.mat, st->mat, 11);
+        slide_uni_ptr(au, st->acc_lay.curves_off, st->slug->data,
+                      (long)(st->slug->count * 6 * 4));
+        umbra_buf abuf[] = {
+            {st->wind_buf, (long)((int)sizeof(float) * w)},
+            {au, -(long)st->acc_lay.uni_len},
+        };
+        for (int j = 0; j < st->slug->count; j++) {
+            int32_t j32 = j;
+            __builtin_memcpy(au + st->acc_lay.loop_off, &j32, 4);
+            umbra_program_queue(st->acc, w, 1, abuf);
+        }
+        umbra_backend_flush(st->acc_be);
+
+        float hc[4];
+        for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
+        long long uni_[12] = {0};
+        char     *uni = (char *)uni_;
+        slide_uni_i32(uni, lay->rs, rs);
+        slide_uni_f32(uni, lay->shader, hc, 4);
+        slide_uni_ptr(uni, lay->coverage, st->wind_buf, -(long)((int)sizeof(float) * w));
+        umbra_buf rbuf[] = {
+            {row, (long)(w * 4)},
+            {uni, -(long)lay->uni_len},
+        };
+        umbra_program_queue(program, w, 1, rbuf);
     }
-    umbra_backend_flush(st->acc_be);
-
-    float hc[4];
-    for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
-    int       uni_len = lay->uni_len;
-    long long uni_[12] = {0};
-    char     *uni = (char *)uni_;
-    slide_uni_i32(uni, lay->x0, 0);
-    slide_uni_i32(uni, lay->y, y);
-    slide_uni_f32(uni, lay->shader, hc, 4);
-    slide_uni_ptr(uni, lay->coverage, st->wind_buf, -(long)((int)sizeof(float) * w));
-    for (int i = 0; i < ps; i++) { slide_uni_i32(uni, uni_len - (ps - i) * 4, stride); }
-    umbra_buf buf[] = {
-        {row, row_sz},
-        {uni, -(long)uni_len},
-    };
-    umbra_program_queue(program, w, 1, buf);
 }
 
 static void slug_cleanup(slide *s) {
@@ -111,7 +112,7 @@ slide slide_slug_wind(slug_curves *sc) {
         .bg = 0xff0a0a1e,
         .init = slug_init,
         .animate = slug_animate,
-        .render_row = slug_render_row,
+        .render = slug_render,
         .cleanup = slug_cleanup,
         .state = st,
     };

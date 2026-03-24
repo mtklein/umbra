@@ -71,10 +71,8 @@ static void render_thumbnails(overview_state *st) {
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) { st->tmp[y * w + x] = sub->bg; }
         }
-        for (int y = 0; y < h; y++) {
-            sub->render_row(sub, y, w, st->tmp + y * w, (long)(w * 4), &st->lays[idx], 0,
-                            0, st->progs[idx]);
-        }
+        sub->render(sub, w, h, st->tmp, (long)(w * h * 4), w, &st->lays[idx],
+                    st->progs[idx]);
 
         for (int cy = 0; cy < st->ch; cy++) {
             for (int cx = 0; cx < st->cw; cx++) {
@@ -124,17 +122,16 @@ static void overview_animate(slide *s, float dt) {
     if (st->frame % 120 == 0) { render_thumbnails(st); }
 }
 
-static void overview_render_row(slide *s, int y, int w, void *row, long row_sz,
-                                umbra_draw_layout const *lay, int ps, int32_t stride,
-                                struct umbra_program *program) {
+static void overview_render(slide *s, int w, int h, void *buf, long buf_sz, int rs,
+                             umbra_draw_layout const *lay, struct umbra_program *program) {
     overview_state *st = s->state;
     (void)w;
-    (void)row_sz;
+    (void)h;
+    (void)buf_sz;
+    (void)rs;
     (void)lay;
-    (void)ps;
-    (void)stride;
     (void)program;
-    __builtin_memcpy(row, st->fb + y * st->w, (size_t)st->w * 4);
+    __builtin_memcpy(buf, st->fb, (size_t)(st->w * st->h) * 4);
 }
 
 static void overview_cleanup(slide *s) {
@@ -158,7 +155,7 @@ slide slide_overview(void) {
         .bg = 0xff101010,
         .init = overview_init,
         .animate = overview_animate,
-        .render_row = overview_render_row,
+        .render = overview_render,
         .cleanup = overview_cleanup,
         .state = st,
     };

@@ -155,28 +155,21 @@ static void render_slide(
     int bpp = fmt_bpp[fmt];
     _Bool planar = (fmt == FMT_FP16P);
     int32_t planar_stride = W * H;
-    long row_sz = planar
+    long buf_sz = planar
         ? (long)(W * H * 4) * 2
-        : (long)(W * bpp);
-    int ps = planar ? (s->load ? 2 : 1) : 0;
-
-    #define ROW(y) (planar \
-        ? (void*)((__fp16*)pixbuf + (y) * W) \
-        : (void*)((uint8_t*)pixbuf             \
-                  + (y) * W * bpp))
+        : (long)(W * H * bpp);
+    int rs = W;
 
     for (int y = 0; y < H; y++) {
-        fill_bg_row(fmt, ROW(y), W,
-                    s->bg, row_sz,
+        void *row = planar
+            ? (void*)((__fp16*)pixbuf + y * W)
+            : (void*)((uint8_t*)pixbuf + y * W * bpp);
+        fill_bg_row(fmt, row, W,
+                    s->bg, buf_sz,
                     planar_stride);
     }
-    for (int y = 0; y < H; y++) {
-        s->render_row(s, y, W,
-            ROW(y), row_sz,
-            lay, ps, planar_stride,
-            program);
-    }
-    #undef ROW
+    s->render(s, W, H, pixbuf, buf_sz,
+              rs, lay, program);
 }
 
 static void readback_to_8888(int fmt,
@@ -358,8 +351,7 @@ static void test_slug_rect(void) {
 
         long long uni_[12] = {0};
         char *uni = (char*)uni_;
-        slide_uni_i32(uni, lay.x0, 0);
-        slide_uni_i32(uni, lay.y, y);
+        slide_uni_i32(uni, lay.rs, 0);
         slide_uni_f32(uni, lay.shader, color, 4);
         slide_uni_ptr(uni, lay.coverage,
             wind_buf, -(long)sizeof wind_buf);
@@ -389,7 +381,7 @@ static void test_perspective_text(void) {
     enum { BW = 16, BH = 8 };
     uint16_t bmp[BW * BH];
     __builtin_memset(bmp, 0, sizeof bmp);
-    bmp[4 * BW + 8] = 255;
+    bmp[0 * BW + 8] = 255;
 
     struct umbra_backend *be =
         umbra_backend_interp();
@@ -420,8 +412,7 @@ static void test_perspective_text(void) {
 
     long long uni_[12] = {0};
     char *uni = (char*)uni_;
-    slide_uni_i32(uni, lay.x0, 0);
-    slide_uni_i32(uni, lay.y, 4);
+    slide_uni_i32(uni, lay.rs, 0);
     slide_uni_f32(uni, lay.shader, color, 4);
     slide_uni_f32(uni, lay.coverage, mat, 11);
     slide_uni_ptr(uni,
@@ -460,11 +451,10 @@ static void test_perspective_text(void) {
     slide_perspective_matrix(mat2, 1.0f,
         W, H, tc.w, tc.h);
     float hc2[4] = {1,0.8f,0.2f,1};
-    for (int y = 0; y < H; y++) {
+    {
         long long u2_[12] = {0};
         char *u2 = (char*)u2_;
-        slide_uni_i32(u2, lay2.x0, 0);
-        slide_uni_i32(u2, lay2.y, y);
+        slide_uni_i32(u2, lay2.rs, W);
         slide_uni_f32(u2, lay2.shader, hc2, 4);
         slide_uni_f32(u2, lay2.coverage, mat2, 11);
         slide_uni_ptr(u2,
@@ -472,10 +462,10 @@ static void test_perspective_text(void) {
             tc.data,
             (long)(W * H * 2));
         umbra_buf b2[] = {
-            { px2 + y * W, (long)(W * 4) },
+            { px2, (long)(W * H * 4) },
             { u2, -(long)lay2.uni_len },
         };
-        umbra_program_queue(interp, W, 1, b2);
+        umbra_program_queue(interp, W, H, b2);
         umbra_backend_flush(be);
     }
     int changed = 0;

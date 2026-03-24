@@ -306,26 +306,20 @@ int main(void) {
 
         int   bpp = fmt_bpp[cur_fmt];
         _Bool planar = (cur_fmt == FMT_FP16P);
-
-#define ROW(y)                                     \
-    (planar ? (void *)((__fp16 *)pixbuf + (y) * W) \
-            : (void *)((uint8_t *)pixbuf + (y) * W * bpp))
-        long  row_sz = planar ? (long)(W * H * 4) * 2 : (long)(W * bpp);
+        long buf_sz = planar ? (long)(W * H * 4) * 2 : (long)(W * H * bpp);
+        int  rs = W;
 
         for (int y = 0; y < H; y++) {
-            fill_bg_row(ROW(y), W, s->bg, row_sz, planar_stride);
+            void *row = planar ? (void *)((__fp16 *)pixbuf + y * W)
+                               : (void *)((uint8_t *)pixbuf + y * W * bpp);
+            fill_bg_row(row, W, s->bg, buf_sz, planar_stride);
         }
-
-        int ps = planar ? (s->load ? 2 : 1) : 0;
 
         if (s->animate) { s->animate(s, 0.016f); }
 
-        for (int y = 0; y < H; y++) {
-            s->render_row(s, y, W, ROW(y), row_sz, &draw_layout, ps, planar_stride, b);
-        }
+        s->render(s, W, H, pixbuf, buf_sz, rs, &draw_layout, b);
 
         umbra_backend_flush(bes[cur_backend]);
-#undef ROW
 
         void *tex_pixels;
         int   tex_pitch;
@@ -338,7 +332,7 @@ int main(void) {
         for (int y = 0; y < H; y++) {
             void *src = planar ? (void *)((__fp16 *)pixbuf + y * W)
                                : (void *)((uint8_t *)pixbuf + y * W * bpp);
-            readback_row((uint32_t *)(rows + y * tex_pitch), src, W, row_sz, planar_stride);
+            readback_row((uint32_t *)(rows + y * tex_pitch), src, W, buf_sz, planar_stride);
         }
 
         if (want_dump) {
@@ -346,7 +340,7 @@ int main(void) {
             for (int y = 0; y < H; y++) {
                 void *src = planar ? (void *)((__fp16 *)pixbuf + y * W)
                                    : (void *)((uint8_t *)pixbuf + y * W * bpp);
-                to_hdr_row(fdata + y * W * 4, src, W, row_sz, planar_stride);
+                to_hdr_row(fdata + y * W * 4, src, W, buf_sz, planar_stride);
             }
             stbi_write_hdr("dump.hdr", W, H, 4, fdata);
             SDL_Log("saved dump.hdr (%s)", fmt_name[cur_fmt]);

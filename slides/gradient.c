@@ -7,41 +7,43 @@ typedef struct {
     int    pad_;
 } grad_lut_state;
 
-static void grad_2stop_render_row(slide *s, int y, int w, void *row, long row_sz,
-                                  umbra_draw_layout const *lay, int ps, int32_t stride,
-                                  struct umbra_program *program) {
+static void grad_2stop_render(slide *s, int w, int h, void *buf, long buf_sz, int rs,
+                               umbra_draw_layout const *lay, struct umbra_program *program) {
     int       uni_len = lay->uni_len;
     long long uni_[8] = {0};
     char     *uni = (char *)uni_;
-    slide_uni_i32(uni, lay->x0, 0);
-    slide_uni_i32(uni, lay->y, y);
+    slide_uni_i32(uni, lay->rs, rs);
     slide_uni_f32(uni, lay->shader, s->grad, 3);
     slide_uni_f32(uni, lay->shader + 12, s->color, 8);
-    for (int i = 0; i < ps; i++) { slide_uni_i32(uni, uni_len - (ps - i) * 4, stride); }
-    umbra_buf buf[] = {
-        {row, row_sz},
+    int ps = (s->store == umbra_store_fp16_planar ? 1 : 0)
+           + (s->load == umbra_load_fp16_planar ? 1 : 0);
+    int32_t planar_stride = (int32_t)(w * h);
+    for (int i = 0; i < ps; i++) { slide_uni_i32(uni, uni_len - (ps - i) * 4, planar_stride); }
+    umbra_buf ubuf[] = {
+        {buf, buf_sz},
         {uni, -(long)uni_len},
     };
-    umbra_program_queue(program, w, 1, buf);
+    umbra_program_queue(program, w, h, ubuf);
 }
 
-static void grad_lut_render_row(slide *s, int y, int w, void *row, long row_sz,
-                                umbra_draw_layout const *lay, int ps, int32_t stride,
-                                struct umbra_program *program) {
+static void grad_lut_render(slide *s, int w, int h, void *buf, long buf_sz, int rs,
+                             umbra_draw_layout const *lay, struct umbra_program *program) {
     grad_lut_state *st = s->state;
     int             uni_len = lay->uni_len;
     long long       uni_[8] = {0};
     char           *uni = (char *)uni_;
-    slide_uni_i32(uni, lay->x0, 0);
-    slide_uni_i32(uni, lay->y, y);
+    slide_uni_i32(uni, lay->rs, rs);
     slide_uni_f32(uni, lay->shader, s->grad, 4);
     slide_uni_ptr(uni, (lay->shader + 16 + 7) & ~7, st->lut, (long)(st->lut_n * 4 * 4));
-    for (int i = 0; i < ps; i++) { slide_uni_i32(uni, uni_len - (ps - i) * 4, stride); }
-    umbra_buf buf[] = {
-        {row, row_sz},
+    int ps = (s->store == umbra_store_fp16_planar ? 1 : 0)
+           + (s->load == umbra_load_fp16_planar ? 1 : 0);
+    int32_t planar_stride = (int32_t)(w * h);
+    for (int i = 0; i < ps; i++) { slide_uni_i32(uni, uni_len - (ps - i) * 4, planar_stride); }
+    umbra_buf ubuf[] = {
+        {buf, buf_sz},
         {uni, -(long)uni_len},
     };
-    umbra_program_queue(program, w, 1, buf);
+    umbra_program_queue(program, w, h, ubuf);
 }
 
 static void grad_lut_cleanup(slide *s) {
@@ -64,7 +66,7 @@ slide slide_gradient_2stop(char const *title, uint32_t bg, umbra_shader_fn shade
         .color = {color[0], color[1], color[2], color[3], color[4], color[5], color[6],
                   color[7]},
         .grad = {grad[0], grad[1], grad[2], grad[3]},
-        .render_row = grad_2stop_render_row,
+        .render = grad_2stop_render,
     };
 }
 
@@ -80,7 +82,7 @@ slide slide_gradient_lut(char const *title, uint32_t bg, umbra_shader_fn shader,
         .shader = shader,
         .store = store,
         .grad = {grad[0], grad[1], grad[2], grad[3]},
-        .render_row = grad_lut_render_row,
+        .render = grad_lut_render,
         .cleanup = grad_lut_cleanup,
         .state = st,
     };

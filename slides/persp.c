@@ -25,27 +25,23 @@ static void persp_animate(slide *s, float dt) {
                              st->bitmap->h);
 }
 
-static void persp_render_row(slide *s, int y, int w, void *row, long row_sz,
-                             umbra_draw_layout const *lay, int ps, int32_t stride,
-                             struct umbra_program *program) {
+static void persp_render(slide *s, int w, int h, void *buf, long buf_sz, int rs,
+                          umbra_draw_layout const *lay, struct umbra_program *program) {
     persp_state *st = s->state;
     float        hc[4];
     for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
-    int       uni_len = lay->uni_len;
     long long uni_[12] = {0};
     char     *uni = (char *)uni_;
-    slide_uni_i32(uni, lay->x0, 0);
-    slide_uni_i32(uni, lay->y, y);
+    slide_uni_i32(uni, lay->rs, rs);
     slide_uni_f32(uni, lay->shader, hc, 4);
     slide_uni_f32(uni, lay->coverage, st->mat, 11);
     slide_uni_ptr(uni, (lay->coverage + 11 * 4 + 7) & ~7, st->bitmap->data,
-                  (long)(st->w * st->h * 2));
-    for (int i = 0; i < ps; i++) { slide_uni_i32(uni, uni_len - (ps - i) * 4, stride); }
-    umbra_buf buf[] = {
-        {row, row_sz},
-        {uni, -(long)uni_len},
+                  (long)(st->bitmap->w * st->bitmap->h * 2));
+    umbra_buf ubuf[] = {
+        {buf, buf_sz},
+        {uni, -(long)lay->uni_len},
     };
-    umbra_program_queue(program, w, 1, buf);
+    umbra_program_queue(program, w, h, ubuf);
 }
 
 static void persp_cleanup(slide *s) {
@@ -69,7 +65,7 @@ slide slide_persp(text_cov *bitmap) {
         .bg = 0xff0a0a1e,
         .init = persp_init,
         .animate = persp_animate,
-        .render_row = persp_render_row,
+        .render = persp_render,
         .cleanup = persp_cleanup,
         .state = st,
     };
