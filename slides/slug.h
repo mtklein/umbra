@@ -325,10 +325,9 @@ static inline struct umbra_builder *slug_build_acc(
     umbra_val dw = umbra_sel_i32(b, in,
         umbra_add_f32(b, w1, w2), z);
 
-    umbra_val acc = umbra_load_i32(b,
-                        (umbra_ptr){0}, ix);
+    umbra_val acc = umbra_load_next_i32(b, (umbra_ptr){0});
     acc = umbra_add_f32(b, acc, dw);
-    umbra_store_i32(b, (umbra_ptr){0}, ix, acc);
+    umbra_store_next_i32(b, (umbra_ptr){0}, acc);
 
     if (lay) {
         lay->x0         = x0i * 4;

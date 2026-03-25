@@ -155,6 +155,6 @@
   v154 = sel_32          v138 v153 v0
   v155 = add_f32         v148 v154
   v156 = sel_32          v82 v155 v0
-  v157 = load_32         p0
+  v157 = load_next_32    p0
   v158 = add_f32         v156 v157
-      store_32        p0 v158
+      store_next_32   p0 v158

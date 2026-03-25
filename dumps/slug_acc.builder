@@ -170,6 +170,6 @@
   v169 = sel_32          v168 v163 v0
   v170 = add_f32         v166 v169
   v171 = sel_32          v54 v170 v0
-  v172 = load_32         p0
+  v172 = load_next_32    p0
   v173 = add_f32         v171 v172
-      store_32        p0 v173
+      store_next_32   p0 v173
