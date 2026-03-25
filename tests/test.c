@@ -2609,8 +2609,7 @@ static void test_scatter_16(void) {
 static void test_load_next_32(void) {
     struct umbra_builder *b = umbra_builder();
     umbra_val             v = umbra_load_next_i32(b, (umbra_ptr){0});
-    umbra_val             x = umbra_x(b);
-    umbra_store_i32(b, (umbra_ptr){1}, x, v);
+    umbra_store_next_i32(b, (umbra_ptr){1}, v);
     backends B = make(b, 0);
 
     int32_t src[16], dst[16];

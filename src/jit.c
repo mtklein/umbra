@@ -265,6 +265,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_load_next_32:
     case op_gather_32:
     case op_store_32:
+    case op_store_next_32:
     case op_scatter_32:
     case op_uni_16:
     case op_load_16:
@@ -711,6 +712,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
+        case op_store_next_32:
         case op_store_32: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
             int    p = inst->ptr;
@@ -886,6 +888,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 case op_load_next_32:
                 case op_gather_32:
                 case op_store_32:
+                case op_store_next_32:
                 case op_scatter_32:
                 case op_add_f32:
                 case op_sub_f32:
@@ -1416,6 +1419,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_load_next_32:
     case op_gather_32:
     case op_store_32:
+    case op_store_next_32:
     case op_scatter_32:
     case op_uni_16:
     case op_load_16:
@@ -1735,6 +1739,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
+        case op_store_next_32:
         case op_store_32: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
             int    p = inst->ptr;

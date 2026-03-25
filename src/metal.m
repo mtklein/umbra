@@ -209,6 +209,16 @@ static void emit_ops(Buf *b, BB const *bb,
                       "buf_szs[%d],4)];\n",
                      pad, i, p, inst->x, p);
             } break;
+            case op_store_next_32: {
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
+                _Bool mixed = ptr_32[p] && ptr_16[p];
+                emit(b, mixed
+                    ? "%sp%d_32[i] = v%d;\n"
+                    : "%s((device uint*)p%d)"
+                      "[i] = v%d;\n",
+                     pad, p, inst->y);
+            } break;
             case op_store_32: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;

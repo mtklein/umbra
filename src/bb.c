@@ -9,6 +9,7 @@ typedef umbra_val            val;
 _Bool is_store(enum op op) {
     return op == op_store_16
         || op == op_store_32
+        || op == op_store_next_32
         || op == op_scatter_16
         || op == op_scatter_32;
 }
@@ -25,7 +26,8 @@ _Bool is_varying(enum op op) {
         || op == op_load_32
         || op == op_load_next_32
         || op == op_store_16
-        || op == op_store_32;
+        || op == op_store_32
+        || op == op_store_next_32;
 }
 
 static _Bool is_pow2(int x) { return __builtin_popcount((unsigned)x) == 1; }
@@ -227,6 +229,9 @@ void umbra_store_i16(builder *b, umbra_ptr dst, val ix, val v) {
         }
     }
     push(b, op_scatter_16, .x = ix.id, .y = v.id, .ptr = dst.ix);
+}
+void umbra_store_next_i32(builder *b, umbra_ptr dst, val v) {
+    push(b, op_store_next_32, .y = v.id, .ptr = dst.ix);
 }
 void umbra_store_i32(builder *b, umbra_ptr dst, val ix, val v) {
     if (is_contiguous(b, ix.id)) {
@@ -819,6 +824,7 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
 
         case op_store_16:
         case op_store_32:
+        case op_store_next_32:
         case op_scatter_16:
         case op_scatter_32: break;
 
