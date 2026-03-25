@@ -1,16 +1,19 @@
 Known bugs and fragile areas.
 
 
-CONTIGUOUS PATTERN ASSUMES rs == w
+CONTIGUOUS LOAD PATTERN ASSUMES rs == w
 
 The builder recognizes add(mul(op_y, rs_uniform), op_x) as contiguous and
-emits op_load/op_store.  These contiguous ops use the backend's linear loop
-counter (row * w + column) for addressing.  But the program computed
+emits op_load_32/op_load_16.  These contiguous ops use the backend's linear
+loop counter (row * w + column) for addressing.  But the program computed
 ix = y * rs + x, and rs is a runtime uniform that COULD differ from w.
 
 If rs != w (e.g. padded rows, sub-rectangle rendering), the contiguous op
 accesses the wrong memory.  All current callers set rs = w, so this hasn't
 manifested, but the optimization is unsound in the general case.
+
+This only affects indexed loads (umbra_load_i32/i16 with a contiguous
+index).  Streaming ops (load_next/store_next) don't go through this path.
 
 Options: remove rs (always use w), or teach contiguous ops about row stride.
 
@@ -33,11 +36,11 @@ x86-64: op_x uses RAX and R11 as temps.  Same argument — safe because the
 RA only manages YMM registers, not GPRs.
 
 
-SLUG ACCUMULATOR STILL USES OLD 1D API INTERNALLY
+SLUG ACCUMULATOR STILL USES PER-ROW 1D DISPATCH
 
-slug_build_acc uses umbra_iota, x0/y uniforms, and per-row 1D dispatch.
-It works but doesn't benefit from 2D dispatch.  Converting it would require
-rethinking the per-curve-per-row accumulation strategy.
+slug_build_acc uses umbra_x, per-row uniforms (x0, y), and per-row 1D
+dispatch.  It now uses streaming load/store for the accumulator buffer,
+but the per-curve-per-row dispatch loop prevents full 2D dispatch.
 
 
 METAL THREADGROUP SELECTION IS GREEDY
@@ -46,3 +49,11 @@ The 2D threadgroup picker iterates factorizations of tg_size and picks the
 last one where both dimensions fit the grid.  This tends toward wide shapes
 (large x, small y).  A smarter heuristic (prefer squarish, or match grid
 aspect ratio) might improve occupancy for non-square grids.
+
+
+64-BIT STREAMING OPS INVALIDATE POINTER CACHE UNNECESSARILY
+
+The ARM64 and x86 64-bit load/store ops set last_ptr = -999 unconditionally,
+including on scalar (tail) paths where the base pointer register (XP / R11)
+is not modified.  This forces the next load/store to re-resolve the pointer
+even when the cache is still valid.
