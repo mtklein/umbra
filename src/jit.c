@@ -2006,14 +2006,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         } break;
 
         case op_scatter_16: {
+            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
+            int8_t ry = ra_ensure(ra, sl, ns, inst->y);
+            int    p = inst->ptr;
+            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
+            load_max_ix_x86(c, p, 1);
             if (scalar) {
-                int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-                int8_t ry = ra_ensure(ra, sl, ns, inst->y);
                 vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
-                int p = inst->ptr;
-                int base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
-                load_max_ix_x86(c, p, 1);
                 clamp_eax_x86(c);
                 if (base != R11) {
                     mov_rr(c, R11, base);
@@ -2033,7 +2033,35 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 emit1(c, 0x03);
                 last_ptr = -1;
             } else {
+                sub_ri(c, RSP, 64);
+                vmov_store(c, 1, ry, RSP, RSP, 0, 0);
+                vmov_store(c, 1, rx, RSP, RSP, 0, 32);
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
+                if (base != R11) {
+                    mov_rr(c, R11, base);
+                    last_ptr = -1;
+                }
+                for (int k = 0; k < 8; k++) {
+                    // MOV EAX, [RSP + 32 + k*4]
+                    emit1(c, 0x8b);
+                    emit1(c, 0x44);
+                    emit1(c, 0x24);
+                    emit1(c, (uint8_t)(32 + k * 4));
+                    clamp_eax_x86(c);
+                    // MOVZX ECX, word [RSP + k*2]
+                    emit1(c, 0x0f);
+                    emit1(c, 0xb7);
+                    emit1(c, 0x4c);
+                    emit1(c, 0x24);
+                    emit1(c, (uint8_t)(k * 2));
+                    // MOV word [R11 + RAX*2], CX
+                    emit1(c, 0x66);
+                    emit1(c, 0x41);
+                    emit1(c, 0x89);
+                    emit1(c, 0x0c);
+                    emit1(c, 0x43);
+                }
+                add_ri(c, RSP, 64);
             }
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
         } break;
