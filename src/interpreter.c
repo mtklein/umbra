@@ -194,6 +194,25 @@ op(load_16) {
     }
     next;
 }
+op(load_next_16) {
+    uint16_t const *src = (uint16_t const *)ptr[ip->x];
+    int             i = end - K;
+    int             rem = n - i;
+    if (rem >= K) {
+        U16 tmp;
+        __builtin_memcpy(&tmp, src + i, 2 * K);
+        v->u32 = (U32){0};
+        __builtin_memcpy(v, &tmp, sizeof tmp);
+    } else {
+        v->u32 = (U32){0};
+        for (int l = 0; l < rem; l++) {
+            uint16_t s;
+            __builtin_memcpy(&s, src + i + l, 2);
+            __builtin_memcpy((char *)v + 2 * l, &s, 2);
+        }
+    }
+    next;
+}
 op(load_next_32) {
     int32_t const *src = (int32_t const *)ptr[ip->x];
     int            i = end - K;
@@ -229,6 +248,21 @@ op(load_32) {
 
 op(store_16) {
     uint16_t *dst = (uint16_t *)ptr[ip->x] + v[ip->z].i32[0];
+    int       i = end - K;
+    int       rem = n - i;
+    if (rem >= K) {
+        __builtin_memcpy(dst + i, &v[ip->y], 2 * K);
+    } else {
+        for (int l = 0; l < rem; l++) {
+            uint16_t s;
+            __builtin_memcpy(&s, (char *)&v[ip->y] + 2 * l, 2);
+            __builtin_memcpy(dst + i + l, &s, 2);
+        }
+    }
+    next;
+}
+op(store_next_16) {
+    uint16_t *dst = (uint16_t *)ptr[ip->x];
     int       i = end - K;
     int       rem = n - i;
     if (rem >= K) {
@@ -872,6 +906,9 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
                 case op_load_16:
                     emit(.fn = load_16, .x = RESOLVE_PTR(inst), .y = X);
                     break;
+                case op_load_next_16:
+                    emit(.fn = load_next_16, .x = RESOLVE_PTR(inst));
+                    break;
                 case op_load_next_32:
                     emit(.fn = load_next_32, .x = RESOLVE_PTR(inst));
                     break;
@@ -888,6 +925,9 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
 
                 case op_store_16:
                     emit(.fn = store_16, .x = RESOLVE_PTR(inst), .y = Y, .z = X);
+                    break;
+                case op_store_next_16:
+                    emit(.fn = store_next_16, .x = RESOLVE_PTR(inst), .y = Y);
                     break;
                 case op_store_next_32:
                     emit(.fn = store_next_32, .x = RESOLVE_PTR(inst), .y = Y);

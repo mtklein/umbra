@@ -276,6 +276,17 @@ static void emit_ops(Buf *b, BB const *bb,
                          pad, i, p, inst->imm);
                 }
             } break;
+            case op_load_next_16: {
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
+                _Bool mixed = ptr_32[p] && ptr_16[p];
+                emit(b, mixed
+                    ? "%suint v%d = (uint)(ushort)"
+                      "p%d_16[i];\n"
+                    : "%suint v%d = (uint)"
+                      "((device ushort*)p%d)[i];\n",
+                     pad, i, p);
+            } break;
             case op_load_16: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
@@ -312,6 +323,17 @@ static void emit_ops(Buf *b, BB const *bb,
                       "[clamp_ix((int)v%d,"
                       "buf_szs[%d],2)];\n",
                      pad, i, p, inst->x, p);
+            } break;
+            case op_store_next_16: {
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
+                _Bool mixed = ptr_32[p] && ptr_16[p];
+                emit(b, mixed
+                    ? "%sp%d_16[i]"
+                      " = (ushort)v%d;\n"
+                    : "%s((device ushort*)p%d)"
+                      "[i] = (ushort)v%d;\n",
+                     pad, p, inst->y);
             } break;
             case op_store_16: {
                 int p = inst->ptr < 0

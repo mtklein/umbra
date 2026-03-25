@@ -269,8 +269,10 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_scatter_32:
     case op_uni_16:
     case op_load_16:
+    case op_load_next_16:
     case op_gather_16:
     case op_store_16:
+    case op_store_next_16:
     case op_scatter_16:
     case op_widen_f16:
     case op_narrow_f32:
@@ -606,6 +608,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
+        case op_load_next_16:
         case op_load_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int            p = inst->ptr;
@@ -739,6 +742,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
         } break;
 
+        case op_store_next_16:
         case op_store_16: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
             int    p = inst->ptr;
@@ -923,8 +927,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 case op_le_u32:
                 case op_uni_16:
                 case op_load_16:
+                case op_load_next_16:
                 case op_gather_16:
                 case op_store_16:
+                case op_store_next_16:
                 case op_scatter_16:
                 case op_widen_f16:
                 case op_narrow_f32:
@@ -1423,8 +1429,10 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_scatter_32:
     case op_uni_16:
     case op_load_16:
+    case op_load_next_16:
     case op_gather_16:
     case op_store_16:
+    case op_store_next_16:
     case op_scatter_16:
     case op_widen_f16:
     case op_narrow_f32:
@@ -1705,6 +1713,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
+        case op_load_next_16:
         case op_load_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int            p = inst->ptr;
@@ -1763,6 +1772,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
         } break;
 
+        case op_store_next_16:
         case op_store_16: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
             int    p = inst->ptr;
