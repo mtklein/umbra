@@ -161,12 +161,12 @@ static inline struct umbra_builder *slug_build_acc(
     int fi  = umbra_reserve(b, 11);
     int co  = umbra_reserve_ptr(b);
     umbra_ptr curves = umbra_deref_ptr(b,
-        (umbra_ptr){1}, co);
+        (umbra_ptr){0}, co);
     int ji = umbra_reserve(b, 1);
 
-    umbra_val x0 = umbra_load_i32(b, (umbra_ptr){1},
+    umbra_val x0 = umbra_load_i32(b, (umbra_ptr){0},
                        umbra_imm_i32(b, x0i));
-    umbra_val y  = umbra_load_i32(b, (umbra_ptr){1},
+    umbra_val y  = umbra_load_i32(b, (umbra_ptr){0},
                        umbra_imm_i32(b, yi));
     umbra_val xf = umbra_cvt_f32_i32(b,
                        umbra_add_i32(b, x0, ix));
@@ -174,12 +174,12 @@ static inline struct umbra_builder *slug_build_acc(
 
     umbra_val m[9];
     for (int i = 0; i < 9; i++) {
-        m[i] = umbra_load_i32(b, (umbra_ptr){1},
+        m[i] = umbra_load_i32(b, (umbra_ptr){0},
                    umbra_imm_i32(b, fi+i));
     }
-    umbra_val bw = umbra_load_i32(b, (umbra_ptr){1},
+    umbra_val bw = umbra_load_i32(b, (umbra_ptr){0},
                        umbra_imm_i32(b, fi+9));
-    umbra_val bh = umbra_load_i32(b, (umbra_ptr){1},
+    umbra_val bh = umbra_load_i32(b, (umbra_ptr){0},
                        umbra_imm_i32(b, fi+10));
 
     umbra_val pw = umbra_add_f32(b,
@@ -212,7 +212,7 @@ static inline struct umbra_builder *slug_build_acc(
             umbra_ge_f32(b, gy, z),
             umbra_lt_f32(b, gy, bh)));
 
-    umbra_val j = umbra_load_i32(b, (umbra_ptr){1},
+    umbra_val j = umbra_load_i32(b, (umbra_ptr){0},
                       umbra_imm_i32(b, ji));
     umbra_val k = umbra_mul_i32(b, j,
                       umbra_imm_i32(b, 6));
@@ -325,9 +325,9 @@ static inline struct umbra_builder *slug_build_acc(
     umbra_val dw = umbra_sel_i32(b, in,
         umbra_add_f32(b, w1, w2), z);
 
-    umbra_val acc = umbra_load_next_i32(b, (umbra_ptr){0});
+    umbra_val acc = umbra_load_next_i32(b, (umbra_ptr){1});
     acc = umbra_add_f32(b, acc, dw);
-    umbra_store_next_i32(b, (umbra_ptr){0}, acc);
+    umbra_store_next_i32(b, (umbra_ptr){1}, acc);
 
     if (lay) {
         lay->x0         = x0i * 4;

@@ -46,8 +46,8 @@ static void persp_render(slide *s, int w, int h, void *buf, long buf_sz, int row
     slide_uni_ptr(uni, (lay->coverage + 11 * 4 + 7) & ~7, st->bitmap->data,
                   (long)(st->bitmap->w * st->bitmap->h * 2));
     umbra_buf ubuf[] = {
-        {buf, buf_sz},
         {uni, -(long)lay->uni_len},
+        {buf, buf_sz},
     };
     umbra_program_queue(program, w, h, ubuf);
 }

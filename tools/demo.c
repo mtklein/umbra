@@ -86,19 +86,19 @@ static void build_fill(int fmt) {
     builder    *builder = umbra_builder();
     int         fi = umbra_reserve(builder, 4);
     umbra_color c = {
-        umbra_load_i32(builder, (umbra_ptr){1}, umbra_imm_i32(builder, fi)),
-        umbra_load_i32(builder, (umbra_ptr){1}, umbra_imm_i32(builder, fi + 1)),
-        umbra_load_i32(builder, (umbra_ptr){1}, umbra_imm_i32(builder, fi + 2)),
-        umbra_load_i32(builder, (umbra_ptr){1}, umbra_imm_i32(builder, fi + 3)),
+        umbra_load_i32(builder, (umbra_ptr){0}, umbra_imm_i32(builder, fi)),
+        umbra_load_i32(builder, (umbra_ptr){0}, umbra_imm_i32(builder, fi + 1)),
+        umbra_load_i32(builder, (umbra_ptr){0}, umbra_imm_i32(builder, fi + 2)),
+        umbra_load_i32(builder, (umbra_ptr){0}, umbra_imm_i32(builder, fi + 3)),
     };
-    fmt_store[fmt](builder, (umbra_ptr){0}, c);
+    fmt_store[fmt](builder, (umbra_ptr){1}, c);
     finish_pipe(&fill_pipe, builder);
 }
 
 static void build_readback(int fmt) {
     free_pipe(&readback_pipe);
     builder    *builder = umbra_builder();
-    umbra_color c = fmt_load[fmt](builder, (umbra_ptr){0});
+    umbra_color c = fmt_load[fmt](builder, (umbra_ptr){1});
     umbra_store_8888(builder, (umbra_ptr){2}, c);
     finish_pipe(&readback_pipe, builder);
 }
@@ -106,7 +106,7 @@ static void build_readback(int fmt) {
 static void build_hdr(int fmt) {
     free_pipe(&hdr_pipe);
     builder    *builder = umbra_builder();
-    umbra_color c = fmt_load[fmt](builder, (umbra_ptr){0});
+    umbra_color c = fmt_load[fmt](builder, (umbra_ptr){1});
     umbra_val   ix = umbra_x(builder);
     umbra_val   ix4 = umbra_shl_i32(builder, ix, umbra_imm_i32(builder, 2));
     umbra_store_i32(builder, (umbra_ptr){2},
@@ -185,8 +185,8 @@ static void fill_bg_row(void *dst, int n, uint32_t bg, long row_sz, int32_t stri
     slide_uni_f32(uni, 0, hc, 4);
     if (fill_pipe.uni_len > 16) { slide_uni_i32(uni, 16, stride); }
     umbra_buf buf[] = {
-        {dst, row_sz},
         {uni, -(long)fill_pipe.uni_len},
+        {dst, row_sz},
     };
     umbra_program_queue(fill_pipe.program, n, 1, buf);
 }
@@ -196,8 +196,8 @@ static void readback_row(uint32_t *dst, void *src, int n, long src_sz, int32_t s
     char     *uni = (char *)uni_;
     if (readback_pipe.uni_len > 0) { slide_uni_i32(uni, 0, stride); }
     umbra_buf buf[] = {
-        {src, -src_sz},
         {uni, -(long)readback_pipe.uni_len},
+        {src, -src_sz},
         {dst, (long)(n * 4)},
     };
     umbra_program_queue(readback_pipe.program, n, 1, buf);
@@ -208,8 +208,8 @@ static void to_hdr_row(float *dst, void *src, int n, long src_sz, int32_t stride
     char     *uni = (char *)uni_;
     if (hdr_pipe.uni_len > 0) { slide_uni_i32(uni, 0, stride); }
     umbra_buf buf[] = {
-        {src, -src_sz},
         {uni, -(long)hdr_pipe.uni_len},
+        {src, -src_sz},
         {dst, (long)(n * 16)},
     };
     umbra_program_queue(hdr_pipe.program, n, 1, buf);

@@ -1,17 +1,17 @@
   v0   = imm_32          0x0
   v1   = x              
   v2   = y              
-  v3   = uni_32          p1[0]
+  v3   = uni_32          p0[0]
   v4   = mul_i32         v2 v3
   v5   = add_i32         v1 v4
   v6   = f32_from_i32    v1
   v7   = f32_from_i32    v2
   v8   = imm_32          0x2
-  v9   = uni_32          p1[2]
+  v9   = uni_32          p0[2]
   v10  = imm_32          0x3
-  v11  = uni_32          p1[3]
+  v11  = uni_32          p0[3]
   v12  = imm_32          0x4
-  v13  = uni_32          p1[4]
+  v13  = uni_32          p0[4]
   v14  = sub_f32         v6 v9
   v15  = sub_f32         v7 v11
   v16  = mul_f32         v14 v14
@@ -27,21 +27,21 @@
   v26  = min_f32_imm     v23 0x3f800000
   v27  = join            v25 v26
   v28  = imm_32          0x5
-  v29  = uni_32          p1[5]
+  v29  = uni_32          p0[5]
   v30  = imm_32          0x6
-  v31  = uni_32          p1[6]
+  v31  = uni_32          p0[6]
   v32  = imm_32          0x7
-  v33  = uni_32          p1[7]
+  v33  = uni_32          p0[7]
   v34  = imm_32          0x8
-  v35  = uni_32          p1[8]
+  v35  = uni_32          p0[8]
   v36  = imm_32          0x9
-  v37  = uni_32          p1[9]
+  v37  = uni_32          p0[9]
   v38  = imm_32          0xa
-  v39  = uni_32          p1[10]
+  v39  = uni_32          p0[10]
   v40  = imm_32          0xb
-  v41  = uni_32          p1[11]
+  v41  = uni_32          p0[11]
   v42  = imm_32          0xc
-  v43  = uni_32          p1[12]
+  v43  = uni_32          p0[12]
   v44  = sub_f32         v37 v29
   v45  = mul_f32         v27 v44
   v46  = fma_f32         v27 v44 v29
@@ -95,4 +95,4 @@
   v94  = or_32           v91 v93
   v95  = pack            v91 v72 24
   v96  = join            v94 v95
-      store_next_32   p0 v96
+      store_next_32   p1 v96

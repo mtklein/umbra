@@ -18,16 +18,16 @@ kernel void umbra_entry(
     uint i = pos.y * w + pos.x;
     if (i >= n) return;
     uint v0 = 0u;
-    uint v1 = ((device const uint*)p1)[2];
-    uint v2 = ((device const uint*)p1)[3];
-    uint v3 = ((device const uint*)p1)[4];
-    uint v4 = ((device const uint*)p1)[5];
+    uint v1 = ((device const uint*)p0)[2];
+    uint v2 = ((device const uint*)p0)[3];
+    uint v3 = ((device const uint*)p0)[4];
+    uint v4 = ((device const uint*)p0)[5];
     uint v5 = 255u;
     uint v6 = 998277249u;
     uint v7 = 1065353216u;
     uint v8 = as_type<uint>(as_type<float>(v7) - as_type<float>(v4));
     uint v9 = 1132396544u;
-    uint v10 = ((device uint*)p0)[i];
+    uint v10 = ((device uint*)p1)[i];
     uint v11 = v10 >> 24u;
     uint v12 = as_type<uint>((float)(int)v11);
     uint v13 = as_type<uint>(as_type<float>(v6) * as_type<float>(v12));
@@ -63,5 +63,5 @@ kernel void umbra_entry(
     uint v43 = v41 | v42;
     uint v44 = v16 << 24u;
     uint v45 = v43 | v44;
-    ((device uint*)p0)[i] = v45;
+    ((device uint*)p1)[i] = v45;
 }

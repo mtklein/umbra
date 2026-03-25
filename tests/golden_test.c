@@ -49,16 +49,16 @@ static void build_fill(int fmt) {
     builder *builder = umbra_builder();
     int fi = umbra_reserve(builder, 4);
     umbra_color c = {
-        umbra_load_i32(builder, (umbra_ptr){1},
+        umbra_load_i32(builder, (umbra_ptr){0},
                      umbra_imm_i32(builder, fi)),
-        umbra_load_i32(builder, (umbra_ptr){1},
+        umbra_load_i32(builder, (umbra_ptr){0},
                      umbra_imm_i32(builder, fi+1)),
-        umbra_load_i32(builder, (umbra_ptr){1},
+        umbra_load_i32(builder, (umbra_ptr){0},
                      umbra_imm_i32(builder, fi+2)),
-        umbra_load_i32(builder, (umbra_ptr){1},
+        umbra_load_i32(builder, (umbra_ptr){0},
                      umbra_imm_i32(builder, fi+3)),
     };
-    fmt_store[fmt](builder, (umbra_ptr){0}, c);
+    fmt_store[fmt](builder, (umbra_ptr){1}, c);
     fill_pipes[fmt].uni_len =
         umbra_uni_len(builder);
     struct umbra_basic_block *opt =
@@ -72,7 +72,7 @@ static void build_fill(int fmt) {
 static void build_readback(int fmt) {
     builder *builder = umbra_builder();
     umbra_color c =
-        fmt_load[fmt](builder, (umbra_ptr){0});
+        fmt_load[fmt](builder, (umbra_ptr){1});
     umbra_store_8888(builder, (umbra_ptr){2}, c);
     readback_pipes[fmt].uni_len =
         umbra_uni_len(builder);
@@ -117,8 +117,8 @@ static void fill_bg_row(int fmt, void *dst,
         slide_uni_i32(uni, 16, stride);
     }
     umbra_buf buf[] = {
-        { dst,  row_sz },
         { uni, -(long)fill_pipes[fmt].uni_len },
+        { dst,  row_sz },
     };
     umbra_program_queue(
         fill_pipes[fmt].prog, n, 1, buf);
@@ -134,8 +134,8 @@ static void readback_row(int fmt, uint32_t *dst,
         __builtin_memcpy(uni, &stride, 4);
     }
     umbra_buf buf[] = {
-        { src,  -src_sz },
         { uni,  -(long)readback_pipes[fmt].uni_len },
+        { src,  -src_sz },
         { dst,  (long)(n * 4) },
     };
     umbra_program_queue(
@@ -333,9 +333,9 @@ static void test_slug_rect(void) {
         slide_uni_ptr(au, alay.curves_off,
             rect, (long)sizeof rect);
         umbra_buf abuf[] = {
+            { au, -(long)alay.uni_len },
             { wind_buf,
               (long)sizeof wind_buf },
-            { au, -(long)alay.uni_len },
         };
         for (int j = 0; j < 4; j++) {
             int32_t j32 = j;
@@ -353,8 +353,8 @@ static void test_slug_rect(void) {
         slide_uni_ptr(uni, lay.coverage,
             wind_buf, -(long)sizeof wind_buf);
         umbra_buf buf[] = {
-            { pixels + y * W, (long)(W * 4) },
             { uni, -(long)lay.uni_len },
+            { pixels + y * W, (long)(W * 4) },
         };
         umbra_program_queue(interp, W, 1, buf);
         umbra_backend_flush(be);
@@ -416,8 +416,8 @@ static void test_perspective_text(void) {
         (lay.coverage + 11*4 + 7) & ~7,
         bmp, (long)sizeof bmp);
     umbra_buf buf[] = {
-        { pixels, (long)sizeof pixels },
         { uni, -(long)lay.uni_len },
+        { pixels, (long)sizeof pixels },
     };
     umbra_program_queue(interp, BW, 1, buf);
     umbra_backend_flush(be);
@@ -459,8 +459,8 @@ static void test_perspective_text(void) {
             tc.data,
             (long)(W * H * 2));
         umbra_buf b2[] = {
-            { px2, (long)(W * H * 4) },
             { u2, -(long)lay2.uni_len },
+            { px2, (long)(W * H * 4) },
         };
         umbra_program_queue(interp, W, H, b2);
         umbra_backend_flush(be);

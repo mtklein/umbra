@@ -62,8 +62,8 @@ static void slug_render(slide *s, int w, int h, void *buf, long buf_sz, int row_
         slide_uni_ptr(au, st->acc_lay.curves_off, st->slug->data,
                       (long)(st->slug->count * 6 * 4));
         umbra_buf abuf[] = {
-            {st->wind_buf, (long)((int)sizeof(float) * w)},
             {au, -(long)st->acc_lay.uni_len},
+            {st->wind_buf, (long)((int)sizeof(float) * w)},
         };
         for (int j = 0; j < st->slug->count; j++) {
             int32_t j32 = j;
@@ -80,8 +80,8 @@ static void slug_render(slide *s, int w, int h, void *buf, long buf_sz, int row_
         slide_uni_f32(uni, lay->shader, hc, 4);
         slide_uni_ptr(uni, lay->coverage, st->wind_buf, -(long)((int)sizeof(float) * w));
         umbra_buf rbuf[] = {
-            {row, (long)row_bytes},
             {uni, -(long)lay->uni_len},
+            {row, (long)row_bytes},
         };
         umbra_program_queue(program, w, 1, rbuf);
     }

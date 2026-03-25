@@ -68,8 +68,8 @@ static void solid_render(slide *s, int w, int h, void *buf, long buf_sz, int row
         }
     }
     umbra_buf ubuf[] = {
-        {buf, buf_sz},
         {uni, -(long)lay->uni_len},
+        {buf, buf_sz},
     };
     umbra_program_queue(program, w, h, ubuf);
 }

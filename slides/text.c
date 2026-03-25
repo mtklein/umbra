@@ -25,8 +25,8 @@ static void text_render(slide *s, int w, int h, void *buf, long buf_sz, int row_
     slide_uni_f32(uni, lay->shader, hc, 4);
     slide_uni_ptr(uni, lay->coverage, st->tc->data, (long)(w * h * 2));
     umbra_buf ubuf[] = {
-        {buf, buf_sz},
         {uni, -(long)lay->uni_len},
+        {buf, buf_sz},
     };
     umbra_program_queue(program, w, h, ubuf);
 }

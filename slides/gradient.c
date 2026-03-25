@@ -20,8 +20,8 @@ static void grad_2stop_render(slide *s, int w, int h, void *buf, long buf_sz, in
     int32_t planar_stride = (int32_t)(w * h);
     for (int i = 0; i < ps; i++) { slide_uni_i32(uni, uni_len - (ps - i) * 4, planar_stride); }
     umbra_buf ubuf[] = {
-        {buf, buf_sz},
         {uni, -(long)uni_len},
+        {buf, buf_sz},
     };
     umbra_program_queue(program, w, h, ubuf);
 }
@@ -40,8 +40,8 @@ static void grad_lut_render(slide *s, int w, int h, void *buf, long buf_sz, int 
     int32_t planar_stride = (int32_t)(w * h);
     for (int i = 0; i < ps; i++) { slide_uni_i32(uni, uni_len - (ps - i) * 4, planar_stride); }
     umbra_buf ubuf[] = {
-        {buf, buf_sz},
         {uni, -(long)uni_len},
+        {buf, buf_sz},
     };
     umbra_program_queue(program, w, h, ubuf);
 }

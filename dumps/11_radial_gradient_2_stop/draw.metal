@@ -18,18 +18,18 @@ kernel void umbra_entry(
     uint i = pos.y * w + pos.x;
     if (i >= n) return;
     uint v0 = 0u;
-    uint v1 = ((device const uint*)p1)[2];
-    uint v2 = ((device const uint*)p1)[3];
-    uint v3 = ((device const uint*)p1)[4];
+    uint v1 = ((device const uint*)p0)[2];
+    uint v2 = ((device const uint*)p0)[3];
+    uint v3 = ((device const uint*)p0)[4];
     uint v4 = 1065353216u;
-    uint v5 = ((device const uint*)p1)[5];
-    uint v6 = ((device const uint*)p1)[6];
-    uint v7 = ((device const uint*)p1)[7];
-    uint v8 = ((device const uint*)p1)[8];
-    uint v9 = ((device const uint*)p1)[9];
-    uint v10 = ((device const uint*)p1)[10];
-    uint v11 = ((device const uint*)p1)[11];
-    uint v12 = ((device const uint*)p1)[12];
+    uint v5 = ((device const uint*)p0)[5];
+    uint v6 = ((device const uint*)p0)[6];
+    uint v7 = ((device const uint*)p0)[7];
+    uint v8 = ((device const uint*)p0)[8];
+    uint v9 = ((device const uint*)p0)[9];
+    uint v10 = ((device const uint*)p0)[10];
+    uint v11 = ((device const uint*)p0)[11];
+    uint v12 = ((device const uint*)p0)[12];
     uint v13 = as_type<uint>(as_type<float>(v9) - as_type<float>(v5));
     uint v14 = as_type<uint>(as_type<float>(v10) - as_type<float>(v6));
     uint v15 = as_type<uint>(as_type<float>(v11) - as_type<float>(v7));
@@ -69,5 +69,5 @@ kernel void umbra_entry(
     uint v49 = v47 | v48;
     uint v50 = v36 << 24u;
     uint v51 = v49 | v50;
-    ((device uint*)p0)[i] = v51;
+    ((device uint*)p1)[i] = v51;
 }

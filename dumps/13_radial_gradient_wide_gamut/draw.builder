@@ -1,18 +1,18 @@
   v0   = imm_32          0x0
   v1   = x              
   v2   = y              
-  v3   = uni_32          p1[0]
+  v3   = uni_32          p0[0]
   v4   = mul_i32         v2 v3
   v5   = add_i32         v1 v4
   v6   = f32_from_i32    v1
   v7   = f32_from_i32    v2
-  v8   = deref_ptr       p1 byte24
+  v8   = deref_ptr       p0 byte24
   v9   = imm_32          0x2
-  v10  = uni_32          p1[2]
+  v10  = uni_32          p0[2]
   v11  = imm_32          0x3
-  v12  = uni_32          p1[3]
+  v12  = uni_32          p0[3]
   v13  = imm_32          0x4
-  v14  = uni_32          p1[4]
+  v14  = uni_32          p0[4]
   v15  = sub_f32         v6 v10
   v16  = sub_f32         v7 v12
   v17  = mul_f32         v15 v15
@@ -28,7 +28,7 @@
   v27  = min_f32_imm     v24 0x3f800000
   v28  = join            v26 v27
   v29  = imm_32          0x5
-  v30  = uni_32          p1[5]
+  v30  = uni_32          p0[5]
   v31  = imm_32          0x40000000
   v32  = sub_f32         v30 v25
   v33  = sub_f32_imm     v30 0x3f800000
@@ -126,4 +126,4 @@
   v125 = or_32           v122 v124
   v126 = pack            v122 v102 24
   v127 = join            v125 v126
-      store_next_32   p0 v127
+      store_next_32   p1 v127
