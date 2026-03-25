@@ -1,8 +1,8 @@
   v0   = imm_32          0x0
-  v1   = uni_32          p0[2]
-  v2   = uni_32          p0[3]
-  v3   = uni_32          p0[4]
-  v4   = uni_32          p0[5]
+  v1   = uni_32          p0[0]
+  v2   = uni_32          p0[1]
+  v3   = uni_32          p0[2]
+  v4   = uni_32          p0[3]
   v5   = imm_32          0xff
   v6   = imm_32          0x3b808081
   v7   = imm_32          0x3f800000

@@ -76,7 +76,6 @@ static void slug_render(slide *s, int w, int h, void *buf, long buf_sz, int row_
         for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
         long long uni_[12] = {0};
         char     *uni = (char *)uni_;
-        slide_uni_i32(uni, lay->rs, w);
         slide_uni_f32(uni, lay->shader, hc, 4);
         slide_uni_ptr(uni, lay->coverage, st->wind_buf, -(long)((int)sizeof(float) * w));
         int       ps = lay->ps;

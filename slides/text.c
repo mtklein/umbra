@@ -14,7 +14,6 @@ static void text_render(slide *s, int w, int h, void *buf, long buf_sz, int row_
     long long uni_[6] = {0};
     char     *uni = (char *)uni_;
     (void)row_bytes;
-    slide_uni_i32(uni, lay->rs, w);
     slide_uni_f32(uni, lay->shader, hc, 4);
     slide_uni_ptr(uni, lay->coverage, st->tc->data, (long)(w * h * 2));
     int       ps = lay->ps;

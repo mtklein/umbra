@@ -350,7 +350,6 @@ static void test_slug_rect(void) {
 
         long long uni_[12] = {0};
         char *uni = (char*)uni_;
-        slide_uni_i32(uni, lay.rs, W);
         slide_uni_f32(uni, lay.shader, color, 4);
         slide_uni_ptr(uni, lay.coverage,
             wind_buf, -(long)sizeof wind_buf);
@@ -411,7 +410,6 @@ static void test_perspective_text(void) {
 
     long long uni_[12] = {0};
     char *uni = (char*)uni_;
-    slide_uni_i32(uni, lay.rs, 0);
     slide_uni_f32(uni, lay.shader, color, 4);
     slide_uni_f32(uni, lay.coverage, mat, 11);
     slide_uni_ptr(uni,
@@ -453,7 +451,6 @@ static void test_perspective_text(void) {
     {
         long long u2_[12] = {0};
         char *u2 = (char*)u2_;
-        slide_uni_i32(u2, lay2.rs, W);
         slide_uni_f32(u2, lay2.shader, hc2, 4);
         slide_uni_f32(u2, lay2.coverage, mat2, 11);
         slide_uni_ptr(u2,
