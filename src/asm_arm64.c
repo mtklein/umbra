@@ -86,6 +86,12 @@ uint32_t LSL_xi(int d, int n, int shift) {
         | (uint32_t)d;
 }
 
+uint32_t LDR_si(int d, int n, int imm) {
+    return 0xbd400000u | ((uint32_t)imm << 10) | ((uint32_t)n << 5) | (uint32_t)d;
+}
+uint32_t STR_si(int d, int n, int imm) {
+    return 0xbd000000u | ((uint32_t)imm << 10) | ((uint32_t)n << 5) | (uint32_t)d;
+}
 uint32_t LDR_qi(int d, int n, int imm) {
     return 0x3dc00000u | ((uint32_t)imm << 10) | ((uint32_t)n << 5) | (uint32_t)d;
 }
@@ -263,6 +269,19 @@ uint32_t UMOV_ws_lane(int d, int n, int lane) {
     uint32_t imm5 = (uint32_t)((lane << 3) | 4);
     return 0x0e003c00u | (imm5 << 16) | ((uint32_t)n << 5) | (uint32_t)d;
 }
+uint32_t UZP1_4s(int d, int n, int m) {
+    return 0x4e801800u | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d;
+}
+uint32_t UZP2_4s(int d, int n, int m) {
+    return 0x4e805800u | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d;
+}
+uint32_t ZIP1_4s(int d, int n, int m) {
+    return 0x4e803800u | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d;
+}
+uint32_t ZIP2_4s(int d, int n, int m) {
+    return 0x4e807800u | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d;
+}
+
 uint32_t LD1_s(int t, int idx, int n) {
     uint32_t Q = ((uint32_t)idx >> 1) & 1;
     uint32_t S = (uint32_t)idx & 1;

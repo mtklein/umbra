@@ -32,6 +32,8 @@ uint32_t LDR_qi(int d, int n, int imm);
 uint32_t STR_qi(int d, int n, int imm);
 uint32_t LDP_qi(int t1, int t2, int n, int imm);
 uint32_t STP_qi(int t1, int t2, int n, int imm);
+uint32_t LDR_si(int d, int n, int imm);
+uint32_t STR_si(int d, int n, int imm);
 uint32_t LD4_8b(int t, int n);
 uint32_t ST4_8b(int t, int n);
 uint32_t W(uint32_t insn);
@@ -98,6 +100,11 @@ uint32_t FCVTN_4h(int d, int n);
 uint32_t FCVTL_4s(int d, int n);
 uint32_t XTN_4h(int d, int n);
 uint32_t SXTL_4s(int d, int n);
+
+uint32_t UZP1_4s(int d, int n, int m);
+uint32_t UZP2_4s(int d, int n, int m);
+uint32_t ZIP1_4s(int d, int n, int m);
+uint32_t ZIP2_4s(int d, int n, int m);
 
 uint32_t SLI_4s_imm(int d, int n, int shift);
 

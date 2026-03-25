@@ -619,22 +619,16 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             put(c, LSL_xi(XT, XI, 3));
             put(c, ADD_xr(XT, XP, XT));
             if (scalar) {
-                int off = inst->op == op_load_next_64_hi ? 4 : 0;
-                // LDR S Vd, [XT, #off]
-                put(c, 0xbd400000u | ((uint32_t)(off / 4) << 10)
-                                   | ((uint32_t)XT << 5) | (uint32_t)s.rd);
+                int off = inst->op == op_load_next_64_hi ? 1 : 0;
+                put(c, LDR_si(s.rd, XT, off));
             } else {
                 int8_t t0 = ra_alloc(ra, sl, ns);
                 int8_t t1 = ra_alloc(ra, sl, ns);
                 put(c, LDR_qi(t0, XT, 0));
                 put(c, LDR_qi(t1, XT, 1));
-                if (inst->op == op_load_next_64_lo) {
-                    put(c, 0x4e801800u | ((uint32_t)t1 << 16)
-                                       | ((uint32_t)t0 << 5) | (uint32_t)s.rd);
-                } else {
-                    put(c, 0x4e805800u | ((uint32_t)t1 << 16)
-                                       | ((uint32_t)t0 << 5) | (uint32_t)s.rd);
-                }
+                put(c, inst->op == op_load_next_64_lo
+                    ? UZP1_4s(s.rd, t0, t1)
+                    : UZP2_4s(s.rd, t0, t1));
                 ra_return_reg(ra, t1);
                 ra_return_reg(ra, t0);
             }
@@ -783,19 +777,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             put(c, LSL_xi(XT, XI, 3));
             put(c, ADD_xr(XT, XP, XT));
             if (scalar) {
-                // STR S Vx, [XT, #0]
-                put(c, 0xbd000000u | ((uint32_t)XT << 5) | (uint32_t)rx);
-                // STR S Vy, [XT, #4]
-                put(c, 0xbd000400u | ((uint32_t)XT << 5) | (uint32_t)ry);
+                put(c, STR_si(rx, XT, 0));
+                put(c, STR_si(ry, XT, 1));
             } else {
                 int8_t t0 = ra_alloc(ra, sl, ns);
                 int8_t t1 = ra_alloc(ra, sl, ns);
-                // ZIP1.4S t0, rx, ry → [lo0,hi0,lo1,hi1]
-                put(c, 0x4e803800u | ((uint32_t)ry << 16)
-                                   | ((uint32_t)rx << 5) | (uint32_t)t0);
-                // ZIP2.4S t1, rx, ry → [lo2,hi2,lo3,hi3]
-                put(c, 0x4e807800u | ((uint32_t)ry << 16)
-                                   | ((uint32_t)rx << 5) | (uint32_t)t1);
+                put(c, ZIP1_4s(t0, rx, ry));
+                put(c, ZIP2_4s(t1, rx, ry));
                 put(c, STR_qi(t0, XT, 0));
                 put(c, STR_qi(t1, XT, 1));
                 ra_return_reg(ra, t1);
@@ -1792,30 +1780,17 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             if (scalar) {
                 vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, XI, 8, off);
             } else {
-                if (base != R11) {
-                    mov_rr(c, R11, base);
-                    last_ptr = -1;
-                }
-                sub_ri(c, RSP, 64);
-                mov_rr(c, RAX, XI);
-                // SHL RAX, 3
-                emit1(c, 0x48); emit1(c, 0xc1);
-                emit1(c, 0xe0); emit1(c, 0x03);
-                // ADD R11, RAX
-                emit1(c, 0x49); emit1(c, 0x01);
-                emit1(c, 0xc3);
-                for (int k = 0; k < 8; k++) {
-                    // MOV EAX, [R11 + k*8 + off]
-                    emit1(c, 0x41); emit1(c, 0x8b);
-                    emit1(c, 0x43); emit1(c, (uint8_t)(k * 8 + off));
-                    // MOV [RSP + k*4], EAX
-                    emit1(c, 0x89); emit1(c, 0x44);
-                    emit1(c, 0x24); emit1(c, (uint8_t)(k * 4));
-                }
-                vmov_load(c, 1, s.rd, RSP, RSP, 0, 0);
-                add_ri(c, RSP, 64);
+                int8_t t0 = ra_alloc(ra, sl, ns);
+                vmov_load(c, 1, t0, base, XI, 8, 0);
+                vmov_load(c, 1, s.rd, base, XI, 8, 32);
+                // VSHUFPS s.rd, t0, s.rd, imm8
+                vex_rrr(c, 0, 1, 1, 0xc6, s.rd, t0, s.rd);
+                emit1(c, off ? 0xddu : 0x88u);
+                // VPERMPD s.rd, s.rd, 0xd8 (fix lane crossing)
+                vex(c, 1, 3, 1, 1, s.rd, 0, s.rd, 0x01);
+                emit1(c, 0xd8);
+                ra_return_reg(ra, t0);
             }
-            last_ptr = -999;
         } break;
 
         case op_load_next_16:
@@ -1886,35 +1861,24 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 vex_mem(c, 1, 1, 0, 0, rx, 0, 0x7e, base, XI, 8, 0);
                 vex_mem(c, 1, 1, 0, 0, ry, 0, 0x7e, base, XI, 8, 4);
             } else {
-                sub_ri(c, RSP, 64);
-                vmov_store(c, 1, rx, RSP, RSP, 0, 0);
-                vmov_store(c, 1, ry, RSP, RSP, 0, 32);
-                if (base != R11) {
-                    mov_rr(c, R11, base);
-                    last_ptr = -1;
-                }
-                mov_rr(c, RAX, XI);
-                // SHL RAX, 3
-                emit1(c, 0x48); emit1(c, 0xc1);
-                emit1(c, 0xe0); emit1(c, 0x03);
-                // ADD R11, RAX
-                emit1(c, 0x49); emit1(c, 0x01);
-                emit1(c, 0xc3);
-                for (int k = 0; k < 8; k++) {
-                    // MOV EAX, [RSP + k*4]
-                    emit1(c, 0x8b); emit1(c, 0x44);
-                    emit1(c, 0x24); emit1(c, (uint8_t)(k * 4));
-                    // MOV ECX, [RSP + 32 + k*4]
-                    emit1(c, 0x8b); emit1(c, 0x4c);
-                    emit1(c, 0x24); emit1(c, (uint8_t)(32 + k * 4));
-                    // MOV [R11 + k*8], EAX
-                    emit1(c, 0x41); emit1(c, 0x89);
-                    emit1(c, 0x43); emit1(c, (uint8_t)(k * 8));
-                    // MOV [R11 + k*8 + 4], ECX
-                    emit1(c, 0x41); emit1(c, 0x89);
-                    emit1(c, 0x4b); emit1(c, (uint8_t)(k * 8 + 4));
-                }
-                add_ri(c, RSP, 64);
+                int8_t t0 = ra_alloc(ra, sl, ns);
+                int8_t t1 = ra_alloc(ra, sl, ns);
+                int8_t t2 = ra_alloc(ra, sl, ns);
+                // VUNPCKLPS t0, rx, ry
+                vex_rrr(c, 0, 1, 1, 0x14, t0, rx, ry);
+                // VUNPCKHPS t1, rx, ry
+                vex_rrr(c, 0, 1, 1, 0x15, t1, rx, ry);
+                // VPERM2I128 t2, t0, t1, 0x20
+                vex(c, 1, 3, 0, 1, t2, t0, t1, 0x46);
+                emit1(c, 0x20);
+                // VPERM2I128 t0, t0, t1, 0x31
+                vex(c, 1, 3, 0, 1, t0, t0, t1, 0x46);
+                emit1(c, 0x31);
+                vmov_store(c, 1, t2, base, XI, 8, 0);
+                vmov_store(c, 1, t0, base, XI, 8, 32);
+                ra_return_reg(ra, t2);
+                ra_return_reg(ra, t1);
+                ra_return_reg(ra, t0);
             }
             if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }

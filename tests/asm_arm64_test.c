@@ -150,6 +150,24 @@ static void test_lsl(void) {
     (LSL_xi(0, 1, 4) == (0xD3400000u | (60u << 16) | (59u << 10) | (1u << 5) | 0)) here;
 }
 
+static void test_ldr_str_si(void) {
+    // LDR S V3, [X4, #0] = 0xBD400083
+    (LDR_si(3, 4, 0) == 0xBD400083) here;
+    // LDR S V3, [X4, #4] → imm=1 → 0xBD400483
+    (LDR_si(3, 4, 1) == 0xBD400483) here;
+    // STR S V5, [X6, #0] = 0xBD0000C5
+    (STR_si(5, 6, 0) == 0xBD0000C5) here;
+    // STR S V5, [X6, #4] → imm=1 → 0xBD0004C5
+    (STR_si(5, 6, 1) == 0xBD0004C5) here;
+}
+
+static void test_uzp_zip(void) {
+    (UZP1_4s(0, 1, 2) == (0x4E801800u | (2u << 16) | (1u << 5) | 0u)) here;
+    (UZP2_4s(3, 4, 5) == (0x4E805800u | (5u << 16) | (4u << 5) | 3u)) here;
+    (ZIP1_4s(6, 7, 8) == (0x4E803800u | (8u << 16) | (7u << 5) | 6u)) here;
+    (ZIP2_4s(0, 1, 2) == (0x4E807800u | (2u << 16) | (1u << 5) | 0u)) here;
+}
+
 int main(void) {
     test_buf();
     test_gpr();
@@ -167,5 +185,7 @@ int main(void) {
     test_load_imm_w();
     test_stp_ldp();
     test_lsl();
+    test_ldr_str_si();
+    test_uzp_zip();
     return 0;
 }
