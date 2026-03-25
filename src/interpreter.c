@@ -194,6 +194,22 @@ op(load_16) {
     }
     next;
 }
+op(load_next_32) {
+    int32_t const *src = (int32_t const *)ptr[ip->x];
+    int            i = end - K;
+    int            rem = n - i;
+    if (rem >= K) {
+        __builtin_memcpy(v, src + i, 4 * K);
+    } else {
+        v->i32 = (I32){0};
+        for (int l = 0; l < rem; l++) {
+            int32_t tmp;
+            __builtin_memcpy(&tmp, src + i + l, 4);
+            v->i32[l] = tmp;
+        }
+    }
+    next;
+}
 op(load_32) {
     int32_t const *src = (int32_t const *)ptr[ip->x] + v[ip->y].i32[0];
     int            i = end - K;
@@ -840,6 +856,9 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
 
                 case op_load_16:
                     emit(.fn = load_16, .x = RESOLVE_PTR(inst), .y = X);
+                    break;
+                case op_load_next_32:
+                    emit(.fn = load_next_32, .x = RESOLVE_PTR(inst));
                     break;
                 case op_load_32:
                     emit(.fn = load_32, .x = RESOLVE_PTR(inst), .y = X);

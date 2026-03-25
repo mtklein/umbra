@@ -262,6 +262,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_deref_ptr:
     case op_uni_32:
     case op_load_32:
+    case op_load_next_32:
     case op_gather_32:
     case op_store_32:
     case op_scatter_32:
@@ -578,6 +579,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             put(c, DUP_4s_w(s.rd, XY));
         } break;
 
+        case op_load_next_32:
         case op_load_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int            p = inst->ptr;
@@ -881,6 +883,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 case op_imm_32:
                 case op_uni_32:
                 case op_load_32:
+                case op_load_next_32:
                 case op_gather_32:
                 case op_store_32:
                 case op_scatter_32:
@@ -1410,6 +1413,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_deref_ptr:
     case op_uni_32:
     case op_load_32:
+    case op_load_next_32:
     case op_gather_32:
     case op_store_32:
     case op_scatter_32:
@@ -1674,6 +1678,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             if (!scalar) { vbroadcastss(c, s.rd, s.rd); }
         } break;
 
+        case op_load_next_32:
         case op_load_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int            p = inst->ptr;
