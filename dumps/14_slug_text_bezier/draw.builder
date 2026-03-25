@@ -15,7 +15,7 @@
   v14  = imm_32          0x5
   v15  = uni_32          p0[5]
   v16  = deref_ptr       p0 byte24
-  v17  = load_32         p-17
+  v17  = gather_32       p-17 v5
   v18  = abs_f32         v17
   v19  = imm_32          0x3f800000
   v20  = min_f32         v18 v19

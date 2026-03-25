@@ -163,31 +163,17 @@ int umbra_max_ptr(builder const *b) {
     return m;
 }
 
-// Recognize add(mul(op_y, uniform), op_x) as contiguous.
-// Within a SIMD vector, y is constant and x advances by 1, so memory is contiguous.
-static _Bool is_x_plus_y_stride(builder *b, int ix) {
-    if (b->inst[ix].op != op_add_i32) { return 0; }
-    int p = b->inst[ix].x, q = b->inst[ix].y;
-    int mul = -1;
-    if (b->inst[p].op == op_x) { mul = q; }
-    if (b->inst[q].op == op_x) { mul = p; }
-    if (mul < 0 || b->inst[mul].op != op_mul_i32) { return 0; }
-    int a = b->inst[mul].x, c = b->inst[mul].y;
-    return (b->inst[a].op == op_y && b->inst[c].uniform)
-        || (b->inst[c].op == op_y && b->inst[a].uniform);
-}
-
 static _Bool is_contiguous(builder *b, int ix) {
     enum op op = b->inst[ix].op;
-    return op == op_iota || op == op_x || is_x_plus_y_stride(b, ix);
+    return op == op_iota || op == op_x;
 }
 
 // Recognize contiguous+offset as contiguous with offset.
 static int contiguous_plus_off(builder *b, int ix) {
     if (b->inst[ix].op != op_add_i32) { return -1; }
     int p = b->inst[ix].x, q = b->inst[ix].y;
-    if (is_contiguous(b, p)) { return q; }
-    if (is_contiguous(b, q)) { return p; }
+    if (is_contiguous(b, p) && b->inst[q].uniform) { return q; }
+    if (is_contiguous(b, q) && b->inst[p].uniform) { return p; }
     return -1;
 }
 

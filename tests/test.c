@@ -2554,6 +2554,45 @@ static void test_load_store_next_64(void) {
     cleanup(&B);
 }
 
+static void test_load_stride_neq_w(void) {
+    // Regression: add(mul(y, rs_uniform), x) was optimized to a contiguous
+    // load using the linear loop counter.  When rs != w, this is wrong.
+    struct umbra_builder *b = umbra_builder();
+    int       ri = umbra_reserve(b, 1);
+    umbra_val x = umbra_x(b);
+    umbra_val y = umbra_y(b);
+    umbra_val rs = umbra_load_i32(b, (umbra_ptr){0}, umbra_imm_i32(b, ri));
+    umbra_val ix = umbra_add_i32(b, umbra_mul_i32(b, y, rs), x);
+    umbra_val v = umbra_load_i32(b, (umbra_ptr){1}, ix);
+    umbra_store_next_i32(b, (umbra_ptr){2}, v);
+    backends B = make(b, 0);
+
+    // w=4, h=2, rs=8 (padded rows).
+    // Row 0 at src[0..3], row 1 at src[8..11].
+    int32_t src[16] = {0};
+    src[0] = 10; src[1] = 11; src[2] = 12; src[3] = 13;
+    src[8] = 20; src[9] = 21; src[10] = 22; src[11] = 23;
+
+    int32_t expected[8] = {10, 11, 12, 13, 20, 21, 22, 23};
+    int32_t dst[8];
+
+    long long uni_[2] = {0};
+    char     *uni = (char *)uni_;
+    int32_t   rs_val = 8;
+    __builtin_memcpy(uni + ri * 4, &rs_val, 4);
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        __builtin_memset(dst, 0, sizeof dst);
+        if (!run(&B, bi, 4, 2, (umbra_buf[]){
+            {uni, -(long)(ri * 4 + 4)},
+            {src, (long)sizeof src},
+            {dst, (long)sizeof dst},
+        })) { continue; }
+        for (int i = 0; i < 8; i++) { (dst[i] == expected[i]) here; }
+    }
+    cleanup(&B);
+}
+
 int main(void) {
     test_f32_ops();
     test_i32_ops();
@@ -2598,5 +2637,7 @@ int main(void) {
     test_load_next_32();
     test_load_next_16();
     test_load_store_next_64();
+    test_load_stride_neq_w();
     return 0;
 }
+
