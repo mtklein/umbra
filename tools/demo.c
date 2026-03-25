@@ -111,16 +111,13 @@ static void build_hdr(int fmt) {
     umbra_color c = fmt_load[fmt](builder, (umbra_ptr){1});
     int         op = umbra_max_ptr(builder) + 1;
     hdr_pipe.out_ptr = op;
-    umbra_val   ix = umbra_x(builder);
-    umbra_val   ix4 = umbra_shl_i32(builder, ix, umbra_imm_i32(builder, 2));
-    umbra_store_i32(builder, (umbra_ptr){op},
-                    umbra_add_i32(builder, ix4, umbra_imm_i32(builder, 0)), c.r);
-    umbra_store_i32(builder, (umbra_ptr){op},
-                    umbra_add_i32(builder, ix4, umbra_imm_i32(builder, 1)), c.g);
-    umbra_store_i32(builder, (umbra_ptr){op},
-                    umbra_add_i32(builder, ix4, umbra_imm_i32(builder, 2)), c.b);
-    umbra_store_i32(builder, (umbra_ptr){op},
-                    umbra_add_i32(builder, ix4, umbra_imm_i32(builder, 3)), c.a);
+    umbra_val lo = umbra_pack(builder,
+                              umbra_widen_u16(builder, umbra_narrow_f32(builder, c.r)),
+                              umbra_widen_u16(builder, umbra_narrow_f32(builder, c.g)), 16);
+    umbra_val hi = umbra_pack(builder,
+                              umbra_widen_u16(builder, umbra_narrow_f32(builder, c.b)),
+                              umbra_widen_u16(builder, umbra_narrow_f32(builder, c.a)), 16);
+    umbra_store_next_i64(builder, (umbra_ptr){op}, lo, hi);
     finish_pipe(&hdr_pipe, builder);
 }
 
@@ -212,7 +209,7 @@ static void readback_row(uint32_t *dst, void *src, int n, long src_sz, long plan
     umbra_program_queue(readback_pipe.program, n, 1, buf);
 }
 
-static void to_hdr_row(float *dst, void *src, int n, long src_sz, long plane_gap) {
+static void to_hdr_row(__fp16 *dst, void *src, int n, long src_sz, long plane_gap) {
     long long uni_[2] = {0};
     char     *uni = (char *)uni_;
     int       ps = plane_gap ? 3 : 0;
@@ -223,7 +220,7 @@ static void to_hdr_row(float *dst, void *src, int n, long src_sz, long plane_gap
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (umbra_buf){(char *)src + (i + 1) * plane_gap, src_sz};
     }
-    buf[op] = (umbra_buf){dst, (long)(n * 16)};
+    buf[op] = (umbra_buf){dst, (long)(n * 8)};
     umbra_program_queue(hdr_pipe.program, n, 1, buf);
 }
 
@@ -347,12 +344,15 @@ int main(void) {
         }
 
         if (want_dump) {
-            float *fdata = malloc((size_t)(W * H) * 4 * sizeof(float));
+            __fp16 *hdata = malloc((size_t)(W * H) * 4 * sizeof(__fp16));
             for (int y = 0; y < H; y++) {
                 void *src = planar ? (void *)((__fp16 *)pixbuf + y * W)
                                    : (void *)((uint8_t *)pixbuf + y * W * bpp);
-                to_hdr_row(fdata + y * W * 4, src, W, row_sz, plane_gap);
+                to_hdr_row(hdata + y * W * 4, src, W, row_sz, plane_gap);
             }
+            float *fdata = malloc((size_t)(W * H) * 4 * sizeof(float));
+            for (int i = 0; i < W * H * 4; i++) { fdata[i] = (float)hdata[i]; }
+            free(hdata);
             stbi_write_hdr("dump.hdr", W, H, 4, fdata);
             SDL_Log("saved dump.hdr (%s)", fmt_name[cur_fmt]);
             free(fdata);
