@@ -31,10 +31,10 @@ static struct umbra_builder *build_srcover(void) {
               gout = umbra_add_f32(b, sg, umbra_mul_f32(b, dg, inv_a)),
               bout = umbra_add_f32(b, sb, umbra_mul_f32(b, db, inv_a)),
               aout = umbra_add_f32(b, sa, umbra_mul_f32(b, da, inv_a));
-    umbra_store_i16(b, (umbra_ptr){1}, ix, umbra_narrow_f32(b, rout));
-    umbra_store_i16(b, (umbra_ptr){2}, ix, umbra_narrow_f32(b, gout));
-    umbra_store_i16(b, (umbra_ptr){3}, ix, umbra_narrow_f32(b, bout));
-    umbra_store_i16(b, (umbra_ptr){4}, ix, umbra_narrow_f32(b, aout));
+    umbra_store_next_i16(b, (umbra_ptr){1}, umbra_narrow_f32(b, rout));
+    umbra_store_next_i16(b, (umbra_ptr){2}, umbra_narrow_f32(b, gout));
+    umbra_store_next_i16(b, (umbra_ptr){3}, umbra_narrow_f32(b, bout));
+    umbra_store_next_i16(b, (umbra_ptr){4}, umbra_narrow_f32(b, aout));
     return b;
 }
 

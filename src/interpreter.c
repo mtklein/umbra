@@ -270,21 +270,6 @@ op(load_32) {
     next;
 }
 
-op(store_16) {
-    uint16_t *dst = (uint16_t *)ptr[ip->x] + v[ip->z].i32[0];
-    int       i = end - K;
-    int       rem = n - i;
-    if (rem >= K) {
-        __builtin_memcpy(dst + i, &v[ip->y], 2 * K);
-    } else {
-        for (int l = 0; l < rem; l++) {
-            uint16_t s;
-            __builtin_memcpy(&s, (char *)&v[ip->y] + 2 * l, 2);
-            __builtin_memcpy(dst + i + l, &s, 2);
-        }
-    }
-    next;
-}
 op(store_next_16) {
     uint16_t *dst = (uint16_t *)ptr[ip->x];
     int       i = end - K;
@@ -328,21 +313,6 @@ op(store_next_64) {
     }
     next;
 }
-op(store_32) {
-    int32_t *dst = (int32_t *)ptr[ip->x] + v[ip->z].i32[0];
-    int      i = end - K;
-    int      rem = n - i;
-    if (rem >= K) {
-        __builtin_memcpy(dst + i, v + ip->y, 4 * K);
-    } else {
-        for (int l = 0; l < rem; l++) {
-            int32_t tmp;
-            __builtin_memcpy(&tmp, (char *)&v[ip->y].i32 + 4 * l, 4);
-            __builtin_memcpy(dst + i + l, &tmp, 4);
-        }
-    }
-    next;
-}
 
 op(gather_16) {
     I32 ix = clamp_ix(v[ip->y].i32, sz[ip->x], 2);
@@ -360,25 +330,6 @@ op(gather_32) {
     int rem = n - (end - K);
     for (int l = 0; l < (rem < K ? rem : K); l++) {
         __builtin_memcpy((char *)&v->i32 + 4 * l, (char const *)ptr[ip->x] + 4 * ix[l], 4);
-    }
-    next;
-}
-
-op(scatter_16) {
-    I32 ix = clamp_ix(v[ip->z].i32, sz[ip->x], 2);
-    int rem = n - (end - K);
-    for (int l = 0; l < (rem < K ? rem : K); l++) {
-        uint16_t s;
-        __builtin_memcpy(&s, (char *)&v[ip->y] + 2 * l, 2);
-        __builtin_memcpy((char *)ptr[ip->x] + 2 * ix[l], &s, 2);
-    }
-    next;
-}
-op(scatter_32) {
-    I32 ix = clamp_ix(v[ip->z].i32, sz[ip->x], 4);
-    int rem = n - (end - K);
-    for (int l = 0; l < (rem < K ? rem : K); l++) {
-        __builtin_memcpy((char *)ptr[ip->x] + 4 * ix[l], (char *)&v[ip->y].i32 + 4 * l, 4);
     }
     next;
 }
@@ -966,9 +917,6 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
                     emit(.fn = gather_32, .x = RESOLVE_PTR(inst), .y = X);
                     break;
 
-                case op_store_16:
-                    emit(.fn = store_16, .x = RESOLVE_PTR(inst), .y = Y, .z = X);
-                    break;
                 case op_store_next_16:
                     emit(.fn = store_next_16, .x = RESOLVE_PTR(inst), .y = Y);
                     break;
@@ -977,16 +925,6 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
                     break;
                 case op_store_next_64:
                     emit(.fn = store_next_64, .x = RESOLVE_PTR(inst), .y = X, .z = Y);
-                    break;
-                case op_store_32:
-                    emit(.fn = store_32, .x = RESOLVE_PTR(inst), .y = Y, .z = X);
-                    break;
-
-                case op_scatter_16:
-                    emit(.fn = scatter_16, .x = RESOLVE_PTR(inst), .y = Y, .z = X);
-                    break;
-                case op_scatter_32:
-                    emit(.fn = scatter_32, .x = RESOLVE_PTR(inst), .y = Y, .z = X);
                     break;
 
 #undef RESOLVE_PTR

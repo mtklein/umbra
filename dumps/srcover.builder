@@ -53,10 +53,10 @@
   v52  = mul_f32         v43 v45
   v53  = fma_f32         v43 v45 v35
   v54  = narrow_f32      v47
-      store_16        p1 v54
+      store_next_16   p1 v54
   v56  = narrow_f32      v49
-      store_16        p2 v56
+      store_next_16   p2 v56
   v58  = narrow_f32      v51
-      store_16        p3 v58
+      store_next_16   p3 v58
   v60  = narrow_f32      v53
-      store_16        p4 v60
+      store_next_16   p4 v60

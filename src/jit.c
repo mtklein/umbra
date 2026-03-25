@@ -266,17 +266,13 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_load_next_64_lo:
     case op_load_next_64_hi:
     case op_gather_32:
-    case op_store_32:
     case op_store_next_32:
     case op_store_next_64:
-    case op_scatter_32:
     case op_uni_16:
     case op_load_16:
     case op_load_next_16:
     case op_gather_16:
-    case op_store_16:
     case op_store_next_16:
-    case op_scatter_16:
     case op_widen_f16:
     case op_narrow_f32:
     case op_widen_s16:
@@ -742,29 +738,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
-        case op_store_next_32:
-        case op_store_32: {
+        case op_store_next_32: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
             int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
-            if (inst->x) {
-                int8_t ro = ra_ensure(ra, sl, ns, inst->x);
-                put(c, UMOV_ws(XT, ro));
-                if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
-                put(c, LSL_xi(XT, XT, 2));
-                put(c, ADD_xr(XT, XP, XT));
-                if (scalar) {
-                    put(c, STR_sx(ry, XT, XI));
-                } else {
-                    put(c, STR_q(ry, XT, XW));
-                }
-                last_ptr = -999;
+            if (scalar) {
+                put(c, STR_sx(ry, XP, XI));
             } else {
-                if (scalar) {
-                    put(c, STR_sx(ry, XP, XI));
-                } else {
-                    put(c, STR_q(ry, XP, XW));
-                }
+                put(c, STR_q(ry, XP, XW));
             }
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
         } break;
@@ -794,86 +775,15 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             last_ptr = -999;
         } break;
 
-        case op_store_next_16:
-        case op_store_16: {
+        case op_store_next_16: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
             int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
-            int sbase = XP;
-            if (inst->x) {
-                int8_t ro = ra_ensure(ra, sl, ns, inst->x);
-                put(c, UMOV_ws(XT, ro));
-                if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
-                put(c, LSL_xi(XT, XT, 1));
-                put(c, ADD_xr(XT, XP, XT));
-                last_ptr = -999;
-                sbase = XT;
-            }
             if (scalar) {
-                put(c, STR_hx(ry, sbase, XI));
+                put(c, STR_hx(ry, XP, XI));
             } else {
-                put(c, STR_d(ry, sbase, XH));
+                put(c, STR_d(ry, XP, XH));
             }
-            if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
-        } break;
-
-        case op_scatter_32: {
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-            int8_t ry = ra_ensure(ra, sl, ns, inst->y);
-            int    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr);
-            load_max_ix(c, p, 2, deref_gpr);
-            if (scalar) {
-                put(c, UMOV_ws(XT, rx));
-                clamp_wt(c);
-                put(c, STR_sx(ry, XP, XT));
-            } else {
-                for (int k = 0; k < 4; k++) {
-                    uint32_t imm5 = (uint32_t)(k << 3) | 4;
-                    put(c, 0x0e003c00u | (imm5 << 16) | ((uint32_t)rx << 5) | (uint32_t)XT);
-                    clamp_wt(c);
-                    put(c, 0x0e003c00u | (imm5 << 16) | ((uint32_t)ry << 5) | (uint32_t)XH);
-                    put(c,
-                        0xb8207800u
-                            | ((uint32_t)XT << 16)
-                            | ((uint32_t)XP << 5)
-                            | (uint32_t)XH);
-                }
-            }
-            if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
-            if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
-        } break;
-
-        case op_scatter_16: {
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-            int8_t ry = ra_ensure(ra, sl, ns, inst->y);
-            int    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr);
-            load_max_ix(c, p, 1, deref_gpr);
-            if (scalar) {
-                put(c, UMOV_ws(XT, rx));
-                clamp_wt(c);
-                put(c, 0x0e003c00u | (4u << 16) | ((uint32_t)ry << 5) | (uint32_t)XH);
-                put(c,
-                    0x78207800u | ((uint32_t)XT << 16) | ((uint32_t)XP << 5) | (uint32_t)XH);
-            } else {
-                int8_t wide = ra_alloc(ra, sl, ns);
-                put(c, 0x2f10a400u | ((uint32_t)ry << 5) | (uint32_t)wide);
-                for (int k = 0; k < 4; k++) {
-                    uint32_t imm5 = (uint32_t)(k << 3) | 4;
-                    put(c, 0x0e003c00u | (imm5 << 16) | ((uint32_t)rx << 5) | (uint32_t)XT);
-                    clamp_wt(c);
-                    put(c,
-                        0x0e003c00u | (imm5 << 16) | ((uint32_t)wide << 5) | (uint32_t)XH);
-                    put(c,
-                        0x78207800u
-                            | ((uint32_t)XT << 16)
-                            | ((uint32_t)XP << 5)
-                            | (uint32_t)XH);
-                }
-                ra_return_reg(ra, wide);
-            }
-            if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
         } break;
 
@@ -945,10 +855,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 case op_load_next_64_lo:
                 case op_load_next_64_hi:
                 case op_gather_32:
-                case op_store_32:
                 case op_store_next_32:
                 case op_store_next_64:
-                case op_scatter_32:
                 case op_add_f32:
                 case op_sub_f32:
                 case op_mul_f32:
@@ -984,9 +892,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 case op_load_16:
                 case op_load_next_16:
                 case op_gather_16:
-                case op_store_16:
                 case op_store_next_16:
-                case op_scatter_16:
                 case op_widen_f16:
                 case op_narrow_f32:
                 case op_widen_s16:
@@ -1481,17 +1387,13 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_load_next_64_lo:
     case op_load_next_64_hi:
     case op_gather_32:
-    case op_store_32:
     case op_store_next_32:
     case op_store_next_64:
-    case op_scatter_32:
     case op_uni_16:
     case op_load_16:
     case op_load_next_16:
     case op_gather_16:
-    case op_store_16:
     case op_store_next_16:
-    case op_scatter_16:
     case op_widen_f16:
     case op_narrow_f32:
     case op_widen_s16:
@@ -1828,22 +1730,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
-        case op_store_next_32:
-        case op_store_32: {
+        case op_store_next_32: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
             int    p = inst->ptr;
             int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
-            if (inst->x) {
-                if (base != R11) {
-                    mov_rr(c, R11, base);
-                    last_ptr = -1;
-                }
-                int8_t ro = ra_ensure(ra, sl, ns, inst->x);
-                apply_offset_x86(c, ro, 2);
-                if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
-                last_ptr = -1;
-                base = R11;
-            }
             if (scalar) {
                 vex_mem(c, 1, 1, 0, 0, ry, 0, 0x7e, base, XI, 4, 0);
             } else {
@@ -1885,22 +1775,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             last_ptr = -999;
         } break;
 
-        case op_store_next_16:
-        case op_store_16: {
+        case op_store_next_16: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
             int    p = inst->ptr;
             int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
-            if (inst->x) {
-                if (base != R11) {
-                    mov_rr(c, R11, base);
-                    last_ptr = -1;
-                }
-                int8_t ro = ra_ensure(ra, sl, ns, inst->x);
-                apply_offset_x86(c, ro, 1);
-                if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
-                last_ptr = -1;
-                base = R11;
-            }
             if (scalar) {
                 // VMOVD eax, xmm
                 vex(c, 1, 1, 0, 0, ry, 0, RAX, 0x7e);
@@ -2091,113 +1969,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
-        case op_scatter_32: {
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-            int8_t ry = ra_ensure(ra, sl, ns, inst->y);
-            int    p = inst->ptr;
-            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
-            load_max_ix_x86(c, p, 2);
-            if (scalar) {
-                vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
-                if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
-                clamp_eax_x86(c);
-                if (base != R11) {
-                    mov_rr(c, R11, base);
-                    last_ptr = -1;
-                }
-                vex_mem(c, 1, 1, 0, 0, ry, 0, 0x7e, R11, RAX, 4, 0);
-            } else {
-                sub_ri(c, RSP, 64);
-                vmov_store(c, 1, ry, RSP, RSP, 0, 0);
-                vmov_store(c, 1, rx, RSP, RSP, 0, 32);
-                if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
-                if (base != R11) {
-                    mov_rr(c, R11, base);
-                    last_ptr = -1;
-                }
-                for (int k = 0; k < 8; k++) {
-                    // MOV EAX, [RSP + 32 + k*4]  (load index)
-                    emit1(c, 0x8b);
-                    emit1(c, 0x44);
-                    emit1(c, 0x24);
-                    emit1(c, (uint8_t)(32 + k * 4));
-                    clamp_eax_x86(c);
-                    // MOV ECX, [RSP + k*4]  (load value into ECX, not R10=XI)
-                    emit1(c, 0x8b);
-                    emit1(c, 0x4c);
-                    emit1(c, 0x24);
-                    emit1(c, (uint8_t)(k * 4));
-                    // MOV [R11 + RAX*4], ECX
-                    emit1(c, 0x41);
-                    emit1(c, 0x89);
-                    emit1(c, 0x0c);
-                    emit1(c, 0x83);
-                }
-                add_ri(c, RSP, 64);
-            }
-            if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
-        } break;
-
-        case op_scatter_16: {
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-            int8_t ry = ra_ensure(ra, sl, ns, inst->y);
-            int    p = inst->ptr;
-            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
-            load_max_ix_x86(c, p, 1);
-            if (scalar) {
-                vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
-                if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
-                clamp_eax_x86(c);
-                if (base != R11) {
-                    mov_rr(c, R11, base);
-                    last_ptr = -1;
-                }
-                // LEA R11, [R11 + RAX*2]
-                emit1(c, 0x4d);
-                emit1(c, 0x8d);
-                emit1(c, 0x1c);
-                emit1(c, 0x43);
-                // VMOVD eax, xmm_ry
-                vex(c, 1, 1, 0, 0, ry, 0, RAX, 0x7e);
-                // MOV word [R11], ax
-                emit1(c, 0x66);
-                emit1(c, 0x41);
-                emit1(c, 0x89);
-                emit1(c, 0x03);
-                last_ptr = -1;
-            } else {
-                sub_ri(c, RSP, 64);
-                vmov_store(c, 1, ry, RSP, RSP, 0, 0);
-                vmov_store(c, 1, rx, RSP, RSP, 0, 32);
-                if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
-                if (base != R11) {
-                    mov_rr(c, R11, base);
-                    last_ptr = -1;
-                }
-                for (int k = 0; k < 8; k++) {
-                    // MOV EAX, [RSP + 32 + k*4]
-                    emit1(c, 0x8b);
-                    emit1(c, 0x44);
-                    emit1(c, 0x24);
-                    emit1(c, (uint8_t)(32 + k * 4));
-                    clamp_eax_x86(c);
-                    // MOVZX ECX, word [RSP + k*2]
-                    emit1(c, 0x0f);
-                    emit1(c, 0xb7);
-                    emit1(c, 0x4c);
-                    emit1(c, 0x24);
-                    emit1(c, (uint8_t)(k * 2));
-                    // MOV word [R11 + RAX*2], CX
-                    emit1(c, 0x66);
-                    emit1(c, 0x41);
-                    emit1(c, 0x89);
-                    emit1(c, 0x0c);
-                    emit1(c, 0x43);
-                }
-                add_ri(c, RSP, 64);
-            }
-            if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
-        } break;
 
         case op_widen_f16: {
             struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);

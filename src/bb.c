@@ -7,18 +7,13 @@ typedef struct umbra_builder builder;
 typedef umbra_val            val;
 
 _Bool is_store(enum op op) {
-    return op == op_store_16
-        || op == op_store_next_16
-        || op == op_store_32
+    return op == op_store_next_16
         || op == op_store_next_32
-        || op == op_store_next_64
-        || op == op_scatter_16
-        || op == op_scatter_32;
+        || op == op_store_next_64;
 }
 _Bool has_ptr(enum op op) {
-    return op == op_deref_ptr
-        || (op >= op_uni_32 && op <= op_scatter_32)
-        || (op >= op_uni_16 && op <= op_scatter_16);
+    return (op >= op_uni_32 && op <= op_deref_ptr)
+        || (op >= op_uni_16 && op <= op_gather_16);
 }
 _Bool is_varying(enum op op) {
     return op == op_iota
@@ -30,9 +25,7 @@ _Bool is_varying(enum op op) {
         || op == op_load_next_32
         || op == op_load_next_64_lo
         || op == op_load_next_64_hi
-        || op == op_store_16
         || op == op_store_next_16
-        || op == op_store_32
         || op == op_store_next_32
         || op == op_store_next_64;
 }
@@ -64,9 +57,7 @@ static val push_(builder *b, struct bb_inst inst) {
         } else if (is_varying(op)
                    || op == op_iota
                    || op == op_gather_32
-                   || op == op_gather_16
-                   || op == op_scatter_32
-                   || op == op_scatter_16) {
+                   || op == op_gather_16) {
             inst.uniform = 0;
         } else {
             inst.uniform = (!inst.x || b->inst[inst.x].uniform)
@@ -240,20 +231,6 @@ val umbra_load_i32(builder *b, umbra_ptr src, val ix) {
     if (b->inst[ix.id].uniform) { return push(b, op_uni_32, .x = ix.id, .ptr = src.ix); }
     return push(b, op_gather_32, .x = ix.id, .ptr = src.ix);
 }
-void umbra_store_i16(builder *b, umbra_ptr dst, val ix, val v) {
-    if (is_contiguous(b, ix.id)) {
-        push(b, op_store_16, .y = v.id, .ptr = dst.ix);
-        return;
-    }
-    {
-        int off = contiguous_plus_off(b, ix.id);
-        if (off >= 0) {
-            push(b, op_store_16, .x = off, .y = v.id, .ptr = dst.ix);
-            return;
-        }
-    }
-    push(b, op_scatter_16, .x = ix.id, .y = v.id, .ptr = dst.ix);
-}
 void umbra_store_next_i32(builder *b, umbra_ptr dst, val v) {
     push(b, op_store_next_32, .y = v.id, .ptr = dst.ix);
 }
@@ -262,20 +239,6 @@ void umbra_store_next_i64(builder *b, umbra_ptr dst, val lo, val hi) {
 }
 void umbra_store_next_i16(builder *b, umbra_ptr dst, val v) {
     push(b, op_store_next_16, .y = v.id, .ptr = dst.ix);
-}
-void umbra_store_i32(builder *b, umbra_ptr dst, val ix, val v) {
-    if (is_contiguous(b, ix.id)) {
-        push(b, op_store_32, .y = v.id, .ptr = dst.ix);
-        return;
-    }
-    {
-        int off = contiguous_plus_off(b, ix.id);
-        if (off >= 0) {
-            push(b, op_store_32, .x = off, .y = v.id, .ptr = dst.ix);
-            return;
-        }
-    }
-    push(b, op_scatter_32, .x = ix.id, .y = v.id, .ptr = dst.ix);
 }
 val umbra_widen_s16(builder *b, val x) { return push(b, op_widen_s16, .x = x.id); }
 val umbra_widen_u16(builder *b, val x) { return push(b, op_widen_u16, .x = x.id); }
@@ -817,12 +780,8 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         if (is_store(op)) {
             {
                 fprintf(f, "      %-15s p%d", op_name(op), ip->ptr);
-                if (op == op_scatter_16 || op == op_scatter_32) {
-                    fprintf(f, " v%d", ip->x);
-                } else if (op == op_store_next_64) {
+                if (op == op_store_next_64) {
                     fprintf(f, " v%d v%d", ip->x, ip->y);
-                } else if (ip->x && (op == op_store_16 || op == op_store_32)) {
-                    fprintf(f, " +v%d", ip->x);
                 }
                 if (op != op_store_next_64) { fprintf(f, " v%d", ip->y); }
                 fprintf(f, "\n");
@@ -858,13 +817,9 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_x:
         case op_y: break;
 
-        case op_store_16:
         case op_store_next_16:
-        case op_store_32:
         case op_store_next_32:
-        case op_store_next_64:
-        case op_scatter_16:
-        case op_scatter_32: break;
+        case op_store_next_64: break;
 
         case op_sqrt_f32:
         case op_abs_f32:

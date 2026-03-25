@@ -36,19 +36,19 @@
   v35  = widen_f16       v34
   v36  = fma_f32         v35 v10 v29
   v37  = narrow_f32      v36
-      store_16        p1 v37
+      store_next_16   p1 v37
   v39  = load_16         p2
   v40  = widen_f16       v39
   v41  = fma_f32         v40 v10 v31
   v42  = narrow_f32      v41
-      store_16        p2 v42
+      store_next_16   p2 v42
   v44  = load_16         p3
   v45  = widen_f16       v44
   v46  = fma_f32         v45 v10 v33
   v47  = narrow_f32      v46
-      store_16        p3 v47
+      store_next_16   p3 v47
   v49  = load_16         p4
   v50  = widen_f16       v49
   v51  = fma_f32         v50 v10 v9
   v52  = narrow_f32      v51
-      store_16        p4 v52
+      store_next_16   p4 v52

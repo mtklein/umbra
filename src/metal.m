@@ -109,10 +109,10 @@ static void emit(Buf *b, char const *fmt, ...) {
 }
 
 static _Bool is_16(enum op op) {
-    return op >= op_uni_16 && op <= op_scatter_16;
+    return op >= op_uni_16 && op <= op_gather_16;
 }
 static _Bool is_32(enum op op) {
-    return op >= op_uni_32 && op <= op_scatter_32;
+    return op >= op_uni_32 && op <= op_deref_ptr;
 }
 
 static void emit_ops(Buf *b, BB const *bb,
@@ -239,38 +239,6 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, p, inst->x,
                      pad, p, inst->y);
             } break;
-            case op_store_32: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
-                _Bool mixed = ptr_32[p] && ptr_16[p];
-                if (inst->x) {
-                    emit(b, mixed
-                        ? "%sp%d_32[i+(int)v%d]"
-                          " = v%d;\n"
-                        : "%s((device uint*)p%d)"
-                          "[i+(int)v%d] = v%d;\n",
-                         pad, p, inst->x, inst->y);
-                } else {
-                    emit(b, mixed
-                        ? "%sp%d_32[i] = v%d;\n"
-                        : "%s((device uint*)p%d)"
-                          "[i] = v%d;\n",
-                         pad, p, inst->y);
-                }
-            } break;
-            case op_scatter_32: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
-                _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed
-                    ? "%sp%d_32"
-                      "[clamp_ix((int)v%d,"
-                      "buf_szs[%d],4)] = v%d;\n"
-                    : "%s((device uint*)p%d)"
-                      "[clamp_ix((int)v%d,"
-                      "buf_szs[%d],4)] = v%d;\n",
-                     pad, p, inst->x, p, inst->y);
-            } break;
 
             case op_uni_16: {
                 int p = inst->ptr < 0
@@ -354,41 +322,6 @@ static void emit_ops(Buf *b, BB const *bb,
                     : "%s((device ushort*)p%d)"
                       "[i] = (ushort)v%d;\n",
                      pad, p, inst->y);
-            } break;
-            case op_store_16: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
-                _Bool mixed = ptr_32[p] && ptr_16[p];
-                if (inst->x) {
-                    emit(b, mixed
-                        ? "%sp%d_16[i+(int)v%d]"
-                          " = (ushort)v%d;\n"
-                        : "%s((device ushort*)p%d)"
-                          "[i+(int)v%d]"
-                          " = (ushort)v%d;\n",
-                         pad, p, inst->x, inst->y);
-                } else {
-                    emit(b, mixed
-                        ? "%sp%d_16[i]"
-                          " = (ushort)v%d;\n"
-                        : "%s((device ushort*)p%d)"
-                          "[i] = (ushort)v%d;\n",
-                         pad, p, inst->y);
-                }
-            } break;
-            case op_scatter_16: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
-                _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed
-                    ? "%sp%d_16[clamp_ix((int)v%d,"
-                      "buf_szs[%d],2)]"
-                      " = (ushort)v%d;\n"
-                    : "%s((device ushort*)p%d)"
-                      "[clamp_ix((int)v%d,"
-                      "buf_szs[%d],2)]"
-                      " = (ushort)v%d;\n",
-                     pad, p, inst->x, p, inst->y);
             } break;
 
             case op_widen_f16:
