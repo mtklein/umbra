@@ -175,6 +175,16 @@ static void emit_ops(Buf *b, BB const *bb,
                       "((device uint*)p%d)[i];\n",
                      pad, i, p);
             } break;
+            case op_load_next_64_lo:
+            case op_load_next_64_hi: {
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
+                emit(b, "%suint v%d = "
+                        "((device uint*)p%d)"
+                        "[i*2+%d];\n",
+                     pad, i, p,
+                     inst->op == op_load_next_64_hi);
+            } break;
             case op_load_32: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
@@ -217,6 +227,16 @@ static void emit_ops(Buf *b, BB const *bb,
                     ? "%sp%d_32[i] = v%d;\n"
                     : "%s((device uint*)p%d)"
                       "[i] = v%d;\n",
+                     pad, p, inst->y);
+            } break;
+            case op_store_next_64: {
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
+                emit(b, "%s((device uint*)p%d)"
+                        "[i*2] = v%d;\n"
+                        "%s((device uint*)p%d)"
+                        "[i*2+1] = v%d;\n",
+                     pad, p, inst->x,
                      pad, p, inst->y);
             } break;
             case op_store_32: {

@@ -2664,6 +2664,36 @@ static void test_load_next_16(void) {
     cleanup(&B);
 }
 
+static void test_load_store_next_64(void) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_val             lo = umbra_load_next_i64_lo(b, (umbra_ptr){0});
+    umbra_val             hi = umbra_load_next_i64_hi(b, (umbra_ptr){0});
+    umbra_store_next_i64(b, (umbra_ptr){1}, lo, hi);
+    backends B = make(b, 0);
+
+    int32_t src[32], dst[32];
+    for (int i = 0; i < 32; i++) { src[i] = i * 7 + 3; }
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        __builtin_memset(dst, 0, sizeof dst);
+        if (!run(&B, bi, 16, 1, (umbra_buf[]){
+            {src, (long)sizeof src},
+            {dst, (long)sizeof dst},
+        })) { continue; }
+        for (int i = 0; i < 32; i++) { (dst[i] == src[i]) here; }
+    }
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        __builtin_memset(dst, 0, sizeof dst);
+        if (!run(&B, bi, 4, 4, (umbra_buf[]){
+            {src, (long)sizeof src},
+            {dst, (long)sizeof dst},
+        })) { continue; }
+        for (int i = 0; i < 32; i++) { (dst[i] == src[i]) here; }
+    }
+    cleanup(&B);
+}
+
 int main(void) {
     test_f32_ops();
     test_i32_ops();
@@ -2711,5 +2741,6 @@ int main(void) {
     test_scatter_16();
     test_load_next_32();
     test_load_next_16();
+    test_load_store_next_64();
     return 0;
 }

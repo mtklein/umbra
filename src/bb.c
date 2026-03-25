@@ -11,6 +11,7 @@ _Bool is_store(enum op op) {
         || op == op_store_next_16
         || op == op_store_32
         || op == op_store_next_32
+        || op == op_store_next_64
         || op == op_scatter_16
         || op == op_scatter_32;
 }
@@ -27,10 +28,13 @@ _Bool is_varying(enum op op) {
         || op == op_load_next_16
         || op == op_load_32
         || op == op_load_next_32
+        || op == op_load_next_64_lo
+        || op == op_load_next_64_hi
         || op == op_store_16
         || op == op_store_next_16
         || op == op_store_32
-        || op == op_store_next_32;
+        || op == op_store_next_32
+        || op == op_store_next_64;
 }
 
 static _Bool is_pow2(int x) { return __builtin_popcount((unsigned)x) == 1; }
@@ -205,6 +209,12 @@ val umbra_load_i16(builder *b, umbra_ptr src, val ix) {
 val umbra_load_next_i32(builder *b, umbra_ptr src) {
     return push(b, op_load_next_32, .ptr = src.ix);
 }
+val umbra_load_next_i64_lo(builder *b, umbra_ptr src) {
+    return push(b, op_load_next_64_lo, .ptr = src.ix);
+}
+val umbra_load_next_i64_hi(builder *b, umbra_ptr src) {
+    return push(b, op_load_next_64_hi, .ptr = src.ix);
+}
 val umbra_load_next_i16(builder *b, umbra_ptr src) {
     return push(b, op_load_next_16, .ptr = src.ix);
 }
@@ -238,6 +248,9 @@ void umbra_store_i16(builder *b, umbra_ptr dst, val ix, val v) {
 }
 void umbra_store_next_i32(builder *b, umbra_ptr dst, val v) {
     push(b, op_store_next_32, .y = v.id, .ptr = dst.ix);
+}
+void umbra_store_next_i64(builder *b, umbra_ptr dst, val lo, val hi) {
+    push(b, op_store_next_64, .x = lo.id, .y = hi.id, .ptr = dst.ix);
 }
 void umbra_store_next_i16(builder *b, umbra_ptr dst, val v) {
     push(b, op_store_next_16, .y = v.id, .ptr = dst.ix);
@@ -798,10 +811,13 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
                 fprintf(f, "      %-15s p%d", op_name(op), ip->ptr);
                 if (op == op_scatter_16 || op == op_scatter_32) {
                     fprintf(f, " v%d", ip->x);
+                } else if (op == op_store_next_64) {
+                    fprintf(f, " v%d v%d", ip->x, ip->y);
                 } else if (ip->x && (op == op_store_16 || op == op_store_32)) {
                     fprintf(f, " +v%d", ip->x);
                 }
-                fprintf(f, " v%d\n", ip->y);
+                if (op != op_store_next_64) { fprintf(f, " v%d", ip->y); }
+                fprintf(f, "\n");
             }
             continue;
         }
@@ -821,7 +837,9 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_gather_32:
         case op_gather_16: fprintf(f, " p%d v%d", ip->ptr, ip->x); break;
         case op_load_next_16:
-        case op_load_next_32: fprintf(f, " p%d", ip->ptr); break;
+        case op_load_next_32:
+        case op_load_next_64_lo:
+        case op_load_next_64_hi: fprintf(f, " p%d", ip->ptr); break;
         case op_load_32:
         case op_load_16:
             fprintf(f, " p%d", ip->ptr);
@@ -836,6 +854,7 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_store_next_16:
         case op_store_32:
         case op_store_next_32:
+        case op_store_next_64:
         case op_scatter_16:
         case op_scatter_32: break;
 

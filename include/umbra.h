@@ -23,10 +23,13 @@ umbra_val umbra_imm_i32(struct umbra_builder *, int bits);
 umbra_val umbra_imm_f32(struct umbra_builder *, float);
 
 umbra_val umbra_load_next_i32(struct umbra_builder *, umbra_ptr);
+umbra_val umbra_load_next_i64_lo(struct umbra_builder *, umbra_ptr);
+umbra_val umbra_load_next_i64_hi(struct umbra_builder *, umbra_ptr);
 umbra_val umbra_load_next_i16(struct umbra_builder *, umbra_ptr);
 umbra_val umbra_load_i32(struct umbra_builder *, umbra_ptr, umbra_val ix);
 umbra_val umbra_load_i16(struct umbra_builder *, umbra_ptr, umbra_val ix);
 void      umbra_store_next_i32(struct umbra_builder *, umbra_ptr, umbra_val);
+void      umbra_store_next_i64(struct umbra_builder *, umbra_ptr, umbra_val lo, umbra_val hi);
 void      umbra_store_next_i16(struct umbra_builder *, umbra_ptr, umbra_val);
 void      umbra_store_i32(struct umbra_builder *, umbra_ptr, umbra_val ix, umbra_val);
 void      umbra_store_i16(struct umbra_builder *, umbra_ptr, umbra_val ix, umbra_val);
