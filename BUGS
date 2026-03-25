@@ -1,22 +1,6 @@
 Known bugs and fragile areas.
 
 
-CONTIGUOUS LOAD PATTERN ASSUMES rs == w
-
-The builder recognizes add(mul(op_y, rs_uniform), op_x) as contiguous and
-emits op_load_32/op_load_16.  These contiguous ops use the backend's linear
-loop counter (row * w + column) for addressing.  But the program computed
-ix = y * rs + x, and rs is a runtime uniform that COULD differ from w.
-
-If rs != w (e.g. padded rows, sub-rectangle rendering), the contiguous op
-accesses the wrong memory.  All current callers set rs = w, so this hasn't
-manifested, but the optimization is unsound in the general case.
-
-This only affects indexed loads (umbra_load_i32/i16 with a contiguous
-index).  Streaming ops (load_next/store_next) don't go through this path.
-
-Options: remove rs (always use w), or teach contiguous ops about row stride.
-
 
 NO VALIDATION THAT w > 0
 
