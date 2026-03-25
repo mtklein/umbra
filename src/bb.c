@@ -164,6 +164,14 @@ umbra_ptr umbra_deref_ptr(builder *b, umbra_ptr buf, int byte_off) {
 int  umbra_uni_len(builder const *b) { return b->uni_len; }
 void umbra_set_uni_len(builder *b, int len) { b->uni_len = len; }
 
+int umbra_max_ptr(builder const *b) {
+    int m = 0;
+    for (int i = 0; i < b->insts; i++) {
+        if (has_ptr(b->inst[i].op) && b->inst[i].ptr > m) { m = b->inst[i].ptr; }
+    }
+    return m;
+}
+
 // Recognize add(mul(op_y, uniform), op_x) as contiguous.
 // Within a SIMD vector, y is constant and x advances by 1, so memory is contiguous.
 static _Bool is_x_plus_y_stride(builder *b, int ix) {

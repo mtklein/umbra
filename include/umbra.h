@@ -16,6 +16,7 @@ umbra_ptr umbra_deref_ptr(struct umbra_builder *, umbra_ptr buf, int byte_off);
 
 int  umbra_uni_len(struct umbra_builder const *);
 void umbra_set_uni_len(struct umbra_builder *, int);
+int  umbra_max_ptr(struct umbra_builder const *);
 
 umbra_val umbra_x(struct umbra_builder *);
 umbra_val umbra_y(struct umbra_builder *);

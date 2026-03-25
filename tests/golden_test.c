@@ -38,7 +38,7 @@ static int fmt_tol[] = {0, 0, 0, 0, 0};
 typedef struct {
     struct umbra_program *prog;
     int                   uni_len;
-    int                   pad_;
+    int                   out_ptr;
 } pipe;
 
 static pipe fill_pipes[NUM_FMTS];
@@ -73,7 +73,9 @@ static void build_readback(int fmt) {
     builder *builder = umbra_builder();
     umbra_color c =
         fmt_load[fmt](builder, (umbra_ptr){1});
-    umbra_store_8888(builder, (umbra_ptr){2}, c);
+    int op = umbra_max_ptr(builder) + 1;
+    umbra_store_8888(builder, (umbra_ptr){op}, c);
+    readback_pipes[fmt].out_ptr = op;
     readback_pipes[fmt].uni_len =
         umbra_uni_len(builder);
     struct umbra_basic_block *opt =
@@ -103,7 +105,7 @@ static void free_pipes(void) {
 static void fill_bg_row(int fmt, void *dst,
                         int n, uint32_t bg,
                         long row_sz,
-                        int32_t stride) {
+                        long plane_gap) {
     float hc[4] = {
         (float)( bg        & 0xffu) / 255.0f,
         (float)((bg >>  8) & 0xffu) / 255.0f,
@@ -113,13 +115,13 @@ static void fill_bg_row(int fmt, void *dst,
     long long uni_[4] = {0};
     char *uni = (char*)uni_;
     slide_uni_f32(uni, 0, hc, 4);
-    if (fill_pipes[fmt].uni_len > 16) {
-        slide_uni_i32(uni, 16, stride);
+    int ps = plane_gap ? 3 : 0;
+    umbra_buf buf[5];
+    buf[0] = (umbra_buf){ uni, -(long)fill_pipes[fmt].uni_len };
+    buf[1] = (umbra_buf){ dst, row_sz };
+    for (int i = 0; i < ps; i++) {
+        buf[2 + i] = (umbra_buf){(char *)dst + (i + 1) * plane_gap, row_sz};
     }
-    umbra_buf buf[] = {
-        { uni, -(long)fill_pipes[fmt].uni_len },
-        { dst,  row_sz },
-    };
     umbra_program_queue(
         fill_pipes[fmt].prog, n, 1, buf);
 }
@@ -127,17 +129,18 @@ static void fill_bg_row(int fmt, void *dst,
 static void readback_row(int fmt, uint32_t *dst,
                          void *src, int n,
                          long src_sz,
-                         int32_t stride) {
+                         long plane_gap) {
     long long uni_[2] = {0};
     char *uni = (char*)uni_;
-    if (readback_pipes[fmt].uni_len > 0) {
-        __builtin_memcpy(uni, &stride, 4);
+    int ps = plane_gap ? 3 : 0;
+    int op = readback_pipes[fmt].out_ptr;
+    umbra_buf buf[6];
+    buf[0] = (umbra_buf){ uni, -(long)readback_pipes[fmt].uni_len };
+    buf[1] = (umbra_buf){ src, -src_sz };
+    for (int i = 0; i < ps; i++) {
+        buf[2 + i] = (umbra_buf){(char *)src + (i + 1) * plane_gap, src_sz};
     }
-    umbra_buf buf[] = {
-        { uni,  -(long)readback_pipes[fmt].uni_len },
-        { src,  -src_sz },
-        { dst,  (long)(n * 4) },
-    };
+    buf[op] = (umbra_buf){ dst, (long)(n * 4) };
     umbra_program_queue(
         readback_pipes[fmt].prog, n, 1, buf);
 }
@@ -149,21 +152,22 @@ static void render_slide(
         umbra_draw_layout const *lay) {
     slide *s = slide_get(slide_idx);
 
-    int bpp = fmt_bpp[fmt];
+    int   bpp = fmt_bpp[fmt];
     _Bool planar = (fmt == FMT_FP16P);
-    int32_t planar_stride = W * H;
-    long buf_sz = planar
+    long  buf_sz = planar
         ? (long)(W * H * 4) * 2
         : (long)(W * H * bpp);
-    int row_bytes = planar ? W * 2 : W * bpp;
+    int   row_bytes = planar ? W * 2 : W * bpp;
+    long  plane_gap = planar ? (long)W * H * 2 : 0;
+    long  row_sz = planar ? (long)W * 2 : (long)W * bpp;
 
     for (int y = 0; y < H; y++) {
         void *row = planar
             ? (void*)((__fp16*)pixbuf + y * W)
             : (void*)((uint8_t*)pixbuf + y * row_bytes);
         fill_bg_row(fmt, row, W,
-                    s->bg, buf_sz,
-                    planar_stride);
+                    s->bg, row_sz,
+                    plane_gap);
     }
     s->render(s, W, H, pixbuf, buf_sz,
               row_bytes, lay, program);
@@ -173,11 +177,9 @@ static void readback_to_8888(int fmt,
                              void *pixbuf,
                              uint32_t *out) {
     _Bool planar = (fmt == FMT_FP16P);
-    int bpp = fmt_bpp[fmt];
-    int32_t planar_stride = W * H;
-    long row_sz = planar
-        ? (long)(W * H * 4) * 2
-        : (long)(W * bpp);
+    int   bpp = fmt_bpp[fmt];
+    long  plane_gap = planar ? (long)W * H * 2 : 0;
+    long  row_sz = planar ? (long)W * 2 : (long)W * bpp;
 
     for (int y = 0; y < H; y++) {
         void *src = planar
@@ -185,7 +187,7 @@ static void readback_to_8888(int fmt,
             : (void*)((uint8_t*)pixbuf
                       + y * W * bpp);
         readback_row(fmt, out + y * W, src,
-                     W, row_sz, planar_stride);
+                     W, row_sz, plane_gap);
     }
 }
 

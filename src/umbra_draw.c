@@ -38,9 +38,7 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
         umbra_imm_f32(builder, 0.0f),
         umbra_imm_f32(builder, 0.0f),
     };
-    int before_load = umbra_uni_len(builder);
     if (load) { dst = load(builder, (umbra_ptr){1}); }
-    int load_strides = (umbra_uni_len(builder) - before_load) / 4;
 
     umbra_color out;
     if (blend) {
@@ -64,16 +62,14 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
                                             cov));
     }
 
-    int before_store = umbra_uni_len(builder);
     if (store) { store(builder, (umbra_ptr){1}, out); }
-    int store_strides = (umbra_uni_len(builder) - before_store) / 4;
 
     if (layout) {
         layout->rs = rs_ix * 4;
         layout->shader = shader_off;
         layout->coverage = coverage_off;
         layout->uni_len = umbra_uni_len(builder);
-        layout->ps = load_strides + store_strides;
+        layout->ps = umbra_max_ptr(builder) - 1;
     }
 
     return builder;
@@ -512,35 +508,19 @@ void umbra_store_fp16(builder *builder, umbra_ptr ptr, umbra_color c) {
 }
 
 umbra_color umbra_load_fp16_planar(builder *builder, umbra_ptr ptr) {
-    int       si = umbra_reserve(builder, 1);
-    umbra_val stride = umbra_load_i32(builder, (umbra_ptr){0}, umbra_imm_i32(builder, si));
-    umbra_val s2 = umbra_mul_i32(builder, stride, umbra_imm_i32(builder, 2));
-    umbra_val s3 = umbra_mul_i32(builder, stride, umbra_imm_i32(builder, 3));
-    umbra_val ix = umbra_x(builder);
     return (umbra_color){
         umbra_widen_f16(builder, umbra_load_next_i16(builder, ptr)),
-        umbra_widen_f16(builder,
-                        umbra_load_i16(builder, ptr, umbra_add_i32(builder, ix, stride))),
-        umbra_widen_f16(builder,
-                        umbra_load_i16(builder, ptr, umbra_add_i32(builder, ix, s2))),
-        umbra_widen_f16(builder,
-                        umbra_load_i16(builder, ptr, umbra_add_i32(builder, ix, s3))),
+        umbra_widen_f16(builder, umbra_load_next_i16(builder, (umbra_ptr){ptr.ix + 1})),
+        umbra_widen_f16(builder, umbra_load_next_i16(builder, (umbra_ptr){ptr.ix + 2})),
+        umbra_widen_f16(builder, umbra_load_next_i16(builder, (umbra_ptr){ptr.ix + 3})),
     };
 }
 
 void umbra_store_fp16_planar(builder *builder, umbra_ptr ptr, umbra_color c) {
-    int       si = umbra_reserve(builder, 1);
-    umbra_val stride = umbra_load_i32(builder, (umbra_ptr){0}, umbra_imm_i32(builder, si));
-    umbra_val s2 = umbra_mul_i32(builder, stride, umbra_imm_i32(builder, 2));
-    umbra_val s3 = umbra_mul_i32(builder, stride, umbra_imm_i32(builder, 3));
-    umbra_val ix = umbra_x(builder);
     umbra_store_next_i16(builder, ptr, umbra_narrow_f32(builder, c.r));
-    umbra_store_i16(builder, ptr, umbra_add_i32(builder, ix, stride),
-                    umbra_narrow_f32(builder, c.g));
-    umbra_store_i16(builder, ptr, umbra_add_i32(builder, ix, s2),
-                    umbra_narrow_f32(builder, c.b));
-    umbra_store_i16(builder, ptr, umbra_add_i32(builder, ix, s3),
-                    umbra_narrow_f32(builder, c.a));
+    umbra_store_next_i16(builder, (umbra_ptr){ptr.ix + 1}, umbra_narrow_f32(builder, c.g));
+    umbra_store_next_i16(builder, (umbra_ptr){ptr.ix + 2}, umbra_narrow_f32(builder, c.b));
+    umbra_store_next_i16(builder, (umbra_ptr){ptr.ix + 3}, umbra_narrow_f32(builder, c.a));
 }
 
 void umbra_gradient_lut_even(float *out, int lut_n, int n_stops, float const colors[][4]) {

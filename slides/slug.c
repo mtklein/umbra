@@ -79,10 +79,14 @@ static void slug_render(slide *s, int w, int h, void *buf, long buf_sz, int row_
         slide_uni_i32(uni, lay->rs, w);
         slide_uni_f32(uni, lay->shader, hc, 4);
         slide_uni_ptr(uni, lay->coverage, st->wind_buf, -(long)((int)sizeof(float) * w));
-        umbra_buf rbuf[] = {
-            {uni, -(long)lay->uni_len},
-            {row, (long)row_bytes},
-        };
+        int       ps = lay->ps;
+        long      plane_gap = ps ? (long)w * h * 2 : 0;
+        umbra_buf rbuf[5];
+        rbuf[0] = (umbra_buf){uni, -(long)lay->uni_len};
+        rbuf[1] = (umbra_buf){row, (long)row_bytes};
+        for (int i = 0; i < ps; i++) {
+            rbuf[2 + i] = (umbra_buf){(char *)row + (i + 1) * plane_gap, row_bytes};
+        }
         umbra_program_queue(program, w, 1, rbuf);
     }
 }
