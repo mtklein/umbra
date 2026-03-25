@@ -123,4 +123,4 @@
   v122 = or_32           v119 v121
   v123 = pack            v119 v99 24
   v124 = join            v122 v123
-      store_32        p0 v124
+      store_next_32   p0 v124

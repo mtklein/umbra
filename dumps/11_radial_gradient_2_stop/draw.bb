@@ -74,4 +74,4 @@
   v73  = shl_imm         v45 24
   v74  = or_32           v71 v73
   v75  = join            v74 v72
-      store_32        p0 v75
+      store_next_32   p0 v75

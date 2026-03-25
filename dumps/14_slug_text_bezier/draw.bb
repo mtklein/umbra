@@ -14,7 +14,7 @@
   v13  = min_f32         v12 v6
   v14  = min_f32_imm     v12 0x3f800000
   v15  = join            v13 v14
-  v16  = load_32         p0
+  v16  = load_next_32    p0
   v17  = shr_u32_imm     v16 24
   v18  = f32_from_i32    v17
   v19  = mul_f32         v8 v18
@@ -92,4 +92,4 @@
   v91  = shl_imm         v28 24
   v92  = or_32           v89 v91
   v93  = join            v92 v90
-      store_32        p0 v93
+      store_next_32   p0 v93

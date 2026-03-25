@@ -23,7 +23,7 @@
   v22  = and_32          v21 v20
   v23  = and_32          v17 v22
   v24  = sel_32          v23 v9 v0
-  v25  = load_32         p0
+  v25  = load_next_32    p0
   v26  = shr_u32_imm     v25 24
   v27  = f32_from_i32    v26
   v28  = mul_f32         v11 v27
@@ -102,4 +102,4 @@
   v101 = shl_imm         v38 24
   v102 = or_32           v99 v101
   v103 = join            v102 v100
-      store_32        p0 v103
+      store_next_32   p0 v103

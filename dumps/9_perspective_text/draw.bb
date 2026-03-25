@@ -68,7 +68,7 @@
   v67  = mul_f32         v25 v65
   v68  = join            v67 v66
   v69  = sel_32          v52 v68 v0
-  v70  = load_32         p0
+  v70  = load_next_32    p0
   v71  = shr_u32_imm     v70 24
   v72  = f32_from_i32    v71
   v73  = mul_f32         v25 v72
@@ -146,4 +146,4 @@
   v145 = shl_imm         v82 24
   v146 = or_32           v143 v145
   v147 = join            v146 v144
-      store_32        p0 v147
+      store_next_32   p0 v147

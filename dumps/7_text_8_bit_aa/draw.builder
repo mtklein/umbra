@@ -22,7 +22,7 @@
   v21  = mul_f32         v19 v20
   v22  = mul_f32_imm     v20 0x3b808081
   v23  = join            v21 v22
-  v24  = load_32         p0
+  v24  = load_next_32    p0
   v25  = imm_32          0xff
   v26  = and_32          v24 v25
   v27  = and_imm         v24 0xff
@@ -115,4 +115,4 @@
   v114 = or_32           v112 v113
   v115 = pack            v112 v95 24
   v116 = join            v114 v115
-      store_32        p0 v116
+      store_next_32   p0 v116

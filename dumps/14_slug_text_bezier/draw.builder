@@ -21,7 +21,7 @@
   v20  = min_f32         v18 v19
   v21  = min_f32_imm     v18 0x3f800000
   v22  = join            v20 v21
-  v23  = load_32         p0
+  v23  = load_next_32    p0
   v24  = imm_32          0xff
   v25  = and_32          v23 v24
   v26  = and_imm         v23 0xff
@@ -114,4 +114,4 @@
   v113 = or_32           v111 v112
   v114 = pack            v111 v94 24
   v115 = join            v113 v114
-      store_32        p0 v115
+      store_next_32   p0 v115

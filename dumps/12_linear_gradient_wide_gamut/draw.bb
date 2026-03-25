@@ -111,4 +111,4 @@
   v110 = shl_imm         v65 24
   v111 = or_32           v108 v110
   v112 = join            v111 v109
-      store_32        p0 v112
+      store_next_32   p0 v112

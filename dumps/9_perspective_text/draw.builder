@@ -86,7 +86,7 @@
   v85  = mul_f32_imm     v83 0x3b808081
   v86  = join            v84 v85
   v87  = sel_32          v59 v86 v0
-  v88  = load_32         p0
+  v88  = load_next_32    p0
   v89  = imm_32          0xff
   v90  = and_32          v88 v89
   v91  = and_imm         v88 0xff
@@ -176,4 +176,4 @@
   v175 = or_32           v173 v174
   v176 = pack            v173 v156 24
   v177 = join            v175 v176
-      store_32        p0 v177
+      store_next_32   p0 v177

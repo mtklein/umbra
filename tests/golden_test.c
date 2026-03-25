@@ -47,7 +47,6 @@ static struct umbra_backend *interp_be;
 
 static void build_fill(int fmt) {
     builder *builder = umbra_builder();
-    umbra_val ix = umbra_x(builder);
     int fi = umbra_reserve(builder, 4);
     umbra_color c = {
         umbra_load_i32(builder, (umbra_ptr){1},
@@ -59,7 +58,7 @@ static void build_fill(int fmt) {
         umbra_load_i32(builder, (umbra_ptr){1},
                      umbra_imm_i32(builder, fi+3)),
     };
-    fmt_store[fmt](builder, (umbra_ptr){0}, ix, c);
+    fmt_store[fmt](builder, (umbra_ptr){0}, c);
     fill_pipes[fmt].uni_len =
         umbra_uni_len(builder);
     struct umbra_basic_block *opt =
@@ -72,11 +71,9 @@ static void build_fill(int fmt) {
 
 static void build_readback(int fmt) {
     builder *builder = umbra_builder();
-    umbra_val ix = umbra_x(builder);
     umbra_color c =
-        fmt_load[fmt](builder, (umbra_ptr){0}, ix);
-    umbra_store_8888(builder,
-        (umbra_ptr){2}, ix, c);
+        fmt_load[fmt](builder, (umbra_ptr){0});
+    umbra_store_8888(builder, (umbra_ptr){2}, c);
     readback_pipes[fmt].uni_len =
         umbra_uni_len(builder);
     struct umbra_basic_block *opt =

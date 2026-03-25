@@ -63,4 +63,4 @@
   v62  = shl_imm         v34 24
   v63  = or_32           v60 v62
   v64  = join            v63 v61
-      store_32        p0 v64
+      store_next_32   p0 v64

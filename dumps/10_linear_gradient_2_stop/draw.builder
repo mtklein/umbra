@@ -92,4 +92,4 @@
   v91  = or_32           v88 v90
   v92  = pack            v88 v69 24
   v93  = join            v91 v92
-      store_32        p0 v93
+      store_next_32   p0 v93

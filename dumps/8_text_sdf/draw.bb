@@ -29,7 +29,7 @@
   v28  = min_f32         v9 v27
   v29  = min_f32_imm     v27 0x3f800000
   v30  = join            v28 v29
-  v31  = load_32         p0
+  v31  = load_next_32    p0
   v32  = shr_u32_imm     v31 24
   v33  = f32_from_i32    v32
   v34  = mul_f32         v6 v33
@@ -107,4 +107,4 @@
   v106 = shl_imm         v43 24
   v107 = or_32           v104 v106
   v108 = join            v107 v105
-      store_32        p0 v108
+      store_next_32   p0 v108

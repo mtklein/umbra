@@ -14,7 +14,7 @@
   v13  = uni_32          p1[4]
   v14  = imm_32          0x5
   v15  = uni_32          p1[5]
-  v16  = load_32         p0
+  v16  = load_next_32    p0
   v17  = imm_32          0xff
   v18  = and_32          v16 v17
   v19  = and_imm         v16 0xff
@@ -96,4 +96,4 @@
   v95  = or_32           v93 v94
   v96  = pack            v93 v76 24
   v97  = join            v95 v96
-      store_32        p0 v97
+      store_next_32   p0 v97

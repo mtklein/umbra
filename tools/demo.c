@@ -84,7 +84,6 @@ static void finish_pipe(pipe *p, builder *builder) {
 static void build_fill(int fmt) {
     free_pipe(&fill_pipe);
     builder    *builder = umbra_builder();
-    umbra_val   ix = umbra_x(builder);
     int         fi = umbra_reserve(builder, 4);
     umbra_color c = {
         umbra_load_i32(builder, (umbra_ptr){1}, umbra_imm_i32(builder, fi)),
@@ -92,24 +91,23 @@ static void build_fill(int fmt) {
         umbra_load_i32(builder, (umbra_ptr){1}, umbra_imm_i32(builder, fi + 2)),
         umbra_load_i32(builder, (umbra_ptr){1}, umbra_imm_i32(builder, fi + 3)),
     };
-    fmt_store[fmt](builder, (umbra_ptr){0}, ix, c);
+    fmt_store[fmt](builder, (umbra_ptr){0}, c);
     finish_pipe(&fill_pipe, builder);
 }
 
 static void build_readback(int fmt) {
     free_pipe(&readback_pipe);
     builder    *builder = umbra_builder();
-    umbra_val   ix = umbra_x(builder);
-    umbra_color c = fmt_load[fmt](builder, (umbra_ptr){0}, ix);
-    umbra_store_8888(builder, (umbra_ptr){2}, ix, c);
+    umbra_color c = fmt_load[fmt](builder, (umbra_ptr){0});
+    umbra_store_8888(builder, (umbra_ptr){2}, c);
     finish_pipe(&readback_pipe, builder);
 }
 
 static void build_hdr(int fmt) {
     free_pipe(&hdr_pipe);
     builder    *builder = umbra_builder();
+    umbra_color c = fmt_load[fmt](builder, (umbra_ptr){0});
     umbra_val   ix = umbra_x(builder);
-    umbra_color c = fmt_load[fmt](builder, (umbra_ptr){0}, ix);
     umbra_val   ix4 = umbra_shl_i32(builder, ix, umbra_imm_i32(builder, 2));
     umbra_store_i32(builder, (umbra_ptr){2},
                     umbra_add_i32(builder, ix4, umbra_imm_i32(builder, 0)), c.r);
