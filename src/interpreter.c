@@ -133,11 +133,6 @@ op(imm_32) {
     next;
 }
 
-op(iota_fn) {
-    I32 const seq = {0, 1, 2, 3, 4, 5, 6, 7};
-    v->i32 = seq + (end - K);
-    next;
-}
 op(x_fn) {
     I32 const seq = {0, 1, 2, 3, 4, 5, 6, 7};
     v->i32 = seq + (end - K - row * w);
@@ -815,7 +810,6 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
                 struct bb_inst const *inst = &bb->inst[i];
                 int const X = id[inst->x] - n, Y = id[inst->y] - n, Z = id[inst->z] - n;
                 switch (inst->op) {
-                case op_iota: emit(.fn = iota_fn); break;
                 case op_x: emit(.fn = x_fn); break;
                 case op_y: emit(.fn = y_fn); break;
                 case op_imm_32: emit(.fn = imm_32, .x = inst->imm); break;
@@ -968,7 +962,7 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int n, int w, umbra_buf 
     struct interp_inst const *start = p->inst;
     val                      *v = p->v;
 
-    // 2D loop: rows then columns.  op_x = column, op_y = row, op_iota = y*w+x.
+    // 2D loop: rows then columns.  op_x = column, op_y = row.
     // end = row*w + x + K gives contiguous ops the correct linear offset.
     // First call runs preamble + body; subsequent calls run body only.
     for (int row = 0; row < h; row++) {

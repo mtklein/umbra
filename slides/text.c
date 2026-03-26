@@ -6,14 +6,13 @@ typedef struct {
     text_cov *tc;
 } text_state;
 
-static void text_render(slide *s, int w, int h, void *buf, long buf_sz, int row_bytes,
+static void text_render(slide *s, int w, int h, void *buf, long buf_sz,
                          umbra_draw_layout const *lay, struct umbra_program *program) {
     text_state *st = s->state;
     float       hc[4];
     for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
     long long uni_[6] = {0};
     char     *uni = (char *)uni_;
-    (void)row_bytes;
     slide_uni_f32(uni, lay->shader, hc, 4);
     slide_uni_ptr(uni, lay->coverage, st->tc->data, (long)(w * h * 2));
     int       ps = lay->ps;

@@ -39,10 +39,9 @@ static void slug_animate(slide *s, float dt) {
     st->mat[10] = st->slug->h;
 }
 
-static void slug_render(slide *s, int w, int h, void *buf, long buf_sz, int row_bytes,
+static void slug_render(slide *s, int w, int h, void *buf, long buf_sz,
                          umbra_draw_layout const *lay, struct umbra_program *program) {
     (void)buf_sz;
-    (void)row_bytes;
     slug_state           *st = s->state;
     struct umbra_backend *be = umbra_program_backend(program);
     if (be != st->acc_be) {

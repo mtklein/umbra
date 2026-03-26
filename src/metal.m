@@ -124,10 +124,6 @@ static void emit_ops(Buf *b, BB const *bb,
         struct bb_inst const *inst = &bb->inst[i];
 
         switch (inst->op) {
-            case op_iota:
-                emit(b, "%suint v%d = i;\n",
-                     pad, i);
-                break;
             case op_x:
                 emit(b, "%suint v%d = pos.x;\n",
                      pad, i);

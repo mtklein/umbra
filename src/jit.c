@@ -256,7 +256,6 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_eq_i32_imm:
     case op_lt_s32_imm:
     case op_le_s32_imm:
-    case op_iota:
     case op_x:
     case op_y:
     case op_deref_ptr:
@@ -397,7 +396,7 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     ra_begin_loop(ra);
 
     // 2D loop: XI = linear index, XY = row, X0 = row_end.
-    // op_x = XI - XY*w (column), op_y = XY (row), op_iota = XI (linear).
+    // op_x = XI - XY*w (column), op_y = XY (row).
     put(&c, MOVZ_x(XI, 0));
     put(&c, MOVZ_x(XY, 0));
     // STP X0,XZR to save n on stack (will need it to check outer loop exit)
@@ -542,18 +541,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 load_imm_w(c, XT, (uint32_t)inst->imm);
                 put(c, ADD_xr(XT, XP, XT));
                 put(c, 0xf9400000u | ((uint32_t)XT << 5) | (uint32_t)gpr);
-            }
-        } break;
-
-        case op_iota: {
-            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            put(c, DUP_4s_w(s.rd, XI));
-            if (!scalar) {
-                int8_t   tmp = ra_alloc(ra, sl, ns);
-                uint32_t iota4[4] = {0, 1, 2, 3};
-                arm64_pool_load_wide(c, &jc->pool, tmp, iota4);
-                put(c, ADD_4s(s.rd, s.rd, tmp));
-                ra_return_reg(ra, tmp);
             }
         } break;
 
@@ -801,7 +788,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     CZ(op_lt_s32, CMLT_4s_z, CMGT_4s_z)
                     CZ(op_le_f32, FCMLE_4s_z, FCMGE_4s_z)
                     CZ(op_le_s32, CMLE_4s_z, CMGE_4s_z)
-                case op_iota:
                 case op_x:
                 case op_y:
                 case op_deref_ptr:
@@ -1317,7 +1303,6 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
 
     case op_abs_f32:
     case op_neg_f32:
-    case op_iota:
     case op_x:
     case op_y:
     case op_deref_ptr:
@@ -1542,20 +1527,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int gpr = deref_gprs[dc++];
             mov_load(c, gpr, base, inst->imm);
             deref_gpr[i] = gpr;
-        } break;
-
-        case op_iota: {
-            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            if (scalar) {
-                vex(c, 1, 1, 0, 0, s.rd, 0, XI, 0x6e);
-            } else {
-                vex(c, 1, 1, 0, 0, s.rd, 0, XI, 0x6e);
-                vbroadcastss(c, s.rd, s.rd);
-                uint32_t iota8[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-                int      off = pool_add(&jc->pool, iota8, 32);
-                int      pos = vex_rip(c, 1, 1, 0, 1, s.rd, s.rd, 0xfe);
-                pool_ref_at(&jc->pool, off, pos, 0);
-            }
         } break;
 
         case op_x: {

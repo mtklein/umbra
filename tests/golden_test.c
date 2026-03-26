@@ -166,7 +166,7 @@ static void render_slide(
                     plane_gap);
     }
     s->render(s, W, H, pixbuf, buf_sz,
-              row_bytes, lay, program);
+              lay, program);
 }
 
 static void readback_to_8888(int fmt,

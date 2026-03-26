@@ -16,8 +16,7 @@ _Bool has_ptr(enum op op) {
         || (op >= op_uni_16 && op <= op_gather_16);
 }
 _Bool is_varying(enum op op) {
-    return op == op_iota
-        || op == op_x
+    return op == op_x
         || op == op_y
         || op == op_load_next_16
         || op == op_load_next_32
@@ -53,7 +52,6 @@ static val push_(builder *b, struct bb_inst inst) {
         if (op == op_imm_32 || op == op_uni_32 || op == op_uni_16 || op == op_deref_ptr) {
             inst.uniform = 1;
         } else if (is_varying(op)
-                   || op == op_iota
                    || op == op_gather_32
                    || op == op_gather_16) {
             inst.uniform = 0;
@@ -758,7 +756,6 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_load_next_64_lo:
         case op_load_next_64_hi: fprintf(f, " p%d", ip->ptr); break;
         case op_deref_ptr: fprintf(f, " p%d byte%d", ip->ptr, ip->imm); break;
-        case op_iota:
         case op_x:
         case op_y: break;
 

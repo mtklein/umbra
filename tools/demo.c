@@ -325,7 +325,7 @@ int main(void) {
 
         if (s->animate) { s->animate(s, 0.016f); }
 
-        s->render(s, W, H, pixbuf, buf_sz, row_bytes, &draw_layout, b);
+        s->render(s, W, H, pixbuf, buf_sz, &draw_layout, b);
 
         umbra_backend_flush(bes[cur_backend]);
 

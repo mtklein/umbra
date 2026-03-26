@@ -2,7 +2,7 @@
 #include <stdint.h>
 
 #define OP_LIST(X)                                                                        \
-    X(iota) X(x) X(y)                                                                    \
+    X(x) X(y)                                                                             \
     X(imm_32)                                                                             \
     X(uni_32)                                                                             \
     X(load_next_32) X(load_next_64_lo) X(load_next_64_hi) X(gather_32)                   \
