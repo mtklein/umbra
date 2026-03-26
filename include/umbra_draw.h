@@ -63,7 +63,6 @@ typedef struct {
 } umbra_transfer;
 
 extern umbra_transfer const umbra_transfer_srgb;
-extern umbra_transfer const umbra_transfer_gamma22;
 
 umbra_color umbra_transfer_apply(struct umbra_builder *, umbra_color,
                                  umbra_transfer const *);

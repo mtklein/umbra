@@ -565,15 +565,7 @@ umbra_transfer const umbra_transfer_srgb = {
     .f = 0,
     .g = 2.4f,
 };
-umbra_transfer const umbra_transfer_gamma22 = {
-    .a = 1,
-    .b = 0,
-    .c = 0,
-    .d = 0,
-    .e = 0,
-    .f = 0,
-    .g = 2.2f,
-};
+
 
 static float tf_invert_scalar(umbra_transfer const *tf, float x) {
     if (x >= tf->d) { return powf(tf->a * x + tf->b, tf->g) + tf->e; }
