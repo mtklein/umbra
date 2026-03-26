@@ -1,13 +1,1 @@
 Known bugs and fragile areas.
-
-
-RARE XSAN CRASH IN JIT DISPATCH (UNRESOLVED)
-
-Under ASan, the ARM64 JIT very rarely (~1 in 1000+ runs) SEGVs on a
-data read near a page boundary during test_fma_f32.  Audit of the JIT
-codegen shows all vector-width loads are guarded by the remaining >= K
-branch, and scalar tail loads are single-element.  Guard pages have been
-added after JIT code allocations to catch code overruns.
-
-The crash may be an ASan redzone/quarantine artifact rather than a real
-overread.  Cannot reproduce reliably.

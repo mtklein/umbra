@@ -462,10 +462,8 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, LDP_post(29, 30, 31, 2));
     put(&c, RET());
 
-    if (ns > 0) {
-        c.buf[stack_patch] = SUB_xi(31, 31, ns * 16);
-        c.buf[stack_patch + 1] = ADD_xi(XS, 31, 0);
-    }
+    if (ns > 0) { c.buf[stack_patch] = SUB_xi(31, 31, ns * 16); }
+    c.buf[stack_patch + 1] = ADD_xi(XS, 31, 0);
     while (c.len & 3) { put(&c, 0xd503201fu); }
     int pool_start = c.len;
     for (int pi = 0; pi < jc.pool.nbytes; pi += 4) {

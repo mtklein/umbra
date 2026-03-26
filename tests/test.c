@@ -2537,6 +2537,34 @@ static void test_load_stride_neq_w(void) {
     cleanup(&B);
 }
 
+static void test_jit_xs_init(void) {
+    // Regression: ARM64 JIT only initialized XS (spill stack pointer) when
+    // ns > 0.  For tiny programs with no spills, XS was caller garbage.
+    // Use enough preamble values to force eviction+fill at the back-edge.
+    struct umbra_builder *b = umbra_builder();
+    enum { N = 25 };
+    umbra_val pre[N];
+    for (int i = 0; i < N; i++) { pre[i] = umbra_imm_i32(b, i + 1); }
+    umbra_val v = umbra_load_32(b, (umbra_ptr){0});
+    for (int i = 0; i < N; i++) { v = umbra_add_i32(b, v, pre[i]); }
+    umbra_store_32(b, (umbra_ptr){1}, v);
+    backends B = make(b, 0);
+    int32_t sum_pre = N * (N + 1) / 2;
+    int32_t src[4] = {100, 200, 300, 400}, dst[4] = {0};
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        __builtin_memset(dst, 0, sizeof dst);
+#if defined(__aarch64__)
+        __asm__ volatile("mov x15, #0xdead" ::: "x15");
+#endif
+        if (!run(&B, bi, 4, 1, (umbra_buf[]){
+            {src, (long)sizeof src},
+            {dst, (long)sizeof dst},
+        })) { continue; }
+        for (int i = 0; i < 4; i++) { (dst[i] == src[i] + sum_pre) here; }
+    }
+    cleanup(&B);
+}
+
 int main(void) {
     test_f32_ops();
     test_i32_ops();
@@ -2582,6 +2610,8 @@ int main(void) {
     test_load_next_16();
     test_load_store_next_64();
     test_load_stride_neq_w();
+    test_jit_xs_init();
     return 0;
 }
+
 
