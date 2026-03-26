@@ -69,11 +69,6 @@ struct metal_backend {
 struct umbra_metal {
     struct metal_backend *be;
     void *pipeline;
-    void *n_buf;
-    void *w_buf;
-    void *sz_buf;
-    void **bufs;
-    long  *buf_cap;
     void **per_bufs;
     char  *src;
     int    max_ptr;
@@ -782,41 +777,16 @@ struct umbra_metal* umbra_metal(
             free(deref_buf); free(src); return 0;
         }
 
-        id<MTLBuffer> n_buf =
-            [device
-             newBufferWithLength:sizeof(uint32_t)
-             options:MTLResourceStorageModeShared];
-        id<MTLBuffer> w_buf =
-            [device
-             newBufferWithLength:sizeof(uint32_t)
-             options:MTLResourceStorageModeShared];
-        id<MTLBuffer> sz_buf =
-            [device
-             newBufferWithLength:
-                 (NSUInteger)(total_bufs + 1)
-                 * sizeof(uint32_t)
-             options:MTLResourceStorageModeShared];
-
         struct umbra_metal *m =
             calloc(1, sizeof *m);
         m->be = be;
         m->pipeline =
             (__bridge_retained void*)pipeline;
-        m->n_buf    =
-            (__bridge_retained void*)n_buf;
-        m->w_buf    =
-            (__bridge_retained void*)w_buf;
-        m->sz_buf   =
-            (__bridge_retained void*)sz_buf;
         m->src        = src;
         m->max_ptr    = max_ptr;
         m->total_bufs = total_bufs;
         m->tg_size    =
             (int)pipeline.maxTotalThreadsPerThreadgroup;
-        m->bufs     = calloc((size_t)total_bufs,
-                             sizeof *m->bufs);
-        m->buf_cap  = calloc((size_t)total_bufs,
-                             sizeof *m->buf_cap);
         m->per_bufs = calloc((size_t)total_bufs,
                              sizeof *m->per_bufs);
         m->deref   = di;
@@ -860,8 +830,7 @@ static void batch_retain_buf(
 
 static void encode_dispatch(
     struct umbra_metal *m, int n, int w, umbra_buf buf[],
-    id<MTLComputeCommandEncoder> enc,
-    _Bool batching
+    id<MTLComputeCommandEncoder> enc
 ) {
     struct metal_backend *be = m->be;
     id<MTLDevice> device =
@@ -878,107 +847,73 @@ static void encode_dispatch(
         }
     }
 
-    id<MTLBuffer> per_n = nil;
-    id<MTLBuffer> per_w = nil;
     __builtin_memset(m->per_bufs, 0,
                      (size_t)tb * sizeof(void*));
 
-    if (batching) {
-        uint32_t n32 = (uint32_t)n;
-        per_n =
-            [device newBufferWithLength:sizeof n32
-                    options:
-                        MTLResourceStorageModeShared];
-        *(uint32_t*)per_n.contents = n32;
-        batch_retain_buf(
-            be, (__bridge_retained void*)per_n);
-        uint32_t w32 = (uint32_t)w;
-        per_w =
-            [device newBufferWithLength:sizeof w32
-                    options:
-                        MTLResourceStorageModeShared];
-        *(uint32_t*)per_w.contents = w32;
-        batch_retain_buf(
-            be, (__bridge_retained void*)per_w);
-    } else {
-        per_n =
-            (__bridge id<MTLBuffer>)m->n_buf;
-        *(uint32_t*)per_n.contents = (uint32_t)n;
-        per_w =
-            (__bridge id<MTLBuffer>)m->w_buf;
-        *(uint32_t*)per_w.contents = (uint32_t)w;
-    }
+    uint32_t n32 = (uint32_t)n;
+    id<MTLBuffer> per_n =
+        [device newBufferWithLength:sizeof n32
+                options:
+                    MTLResourceStorageModeShared];
+    *(uint32_t*)per_n.contents = n32;
+    batch_retain_buf(
+        be, (__bridge_retained void*)per_n);
+    uint32_t w32 = (uint32_t)w;
+    id<MTLBuffer> per_w =
+        [device newBufferWithLength:sizeof w32
+                options:
+                    MTLResourceStorageModeShared];
+    *(uint32_t*)per_w.contents = w32;
+    batch_retain_buf(
+        be, (__bridge_retained void*)per_w);
 
     long offsets[32] = {0};
     for (int i = 0; i <= m->max_ptr; i++) {
         if (!buf[i].ptr || !buf[i].sz) { continue; }
         long bytes = buf[i].sz < 0
             ? -buf[i].sz : buf[i].sz;
-        if (batching) {
-            struct batch_shared *sh =
-                &m->batch_data[i];
-            char *ptr = buf[i].ptr;
-            _Bool overlap = sh->mtl
-                && ptr >= sh->host
-                && ptr <  sh->host + sh->copy_sz;
-            if (overlap) {
-                offsets[i] = ptr - sh->host;
-                m->per_bufs[i] = sh->mtl;
-            } else {
-                size_t pg = (size_t)sysconf(_SC_PAGESIZE);
-                size_t aligned_sz = ((size_t)bytes + pg - 1) & ~(pg - 1);
-                _Bool can_nocopy = ((uintptr_t)ptr & (pg - 1)) == 0;
-                id<MTLBuffer> tmp;
-                if (can_nocopy) {
-                    tmp = [device
-                        newBufferWithBytesNoCopy:ptr
-                                         length:(NSUInteger)aligned_sz
-                                        options:MTLResourceStorageModeShared
-                                    deallocator:nil];
-                } else {
-                    tmp = [device
-                        newBufferWithLength:(NSUInteger)bytes
-                                    options:MTLResourceStorageModeShared];
-                    __builtin_memcpy(tmp.contents, ptr, (size_t)bytes);
-                }
-                void *retained =
-                    (__bridge_retained void*)tmp;
-                if (!sh->mtl) {
-                    sh->mtl     = retained;
-                    sh->host    = ptr;
-                    sh->copy_sz = buf[i].sz > 0
-                        ? bytes : 0;
-                }
-                batch_retain_buf(be, retained);
-                if (buf[i].sz > 0 && !can_nocopy) {
-                    batch_add_copy(
-                        be, ptr,
-                        retained, bytes);
-                }
-                offsets[i] = 0;
-                m->per_bufs[i] = retained;
-            }
+        struct batch_shared *sh =
+            &m->batch_data[i];
+        char *ptr = buf[i].ptr;
+        _Bool overlap = sh->mtl
+            && ptr >= sh->host
+            && ptr <  sh->host + sh->copy_sz;
+        if (overlap) {
+            offsets[i] = ptr - sh->host;
+            m->per_bufs[i] = sh->mtl;
         } else {
-            if (bytes > m->buf_cap[i]) {
-                if (m->bufs[i]) {
-                    (void)(__bridge_transfer id)
-                        m->bufs[i];
-                }
-                m->buf_cap[i] = bytes;
-                id<MTLBuffer> b =
-                    [device
-                     newBufferWithLength:
-                         (NSUInteger)bytes
-                     options:
-                         MTLResourceStorageModeShared];
-                m->bufs[i] =
-                    (__bridge_retained void*)b;
+            size_t pg = (size_t)sysconf(_SC_PAGESIZE);
+            size_t aligned_sz = ((size_t)bytes + pg - 1) & ~(pg - 1);
+            _Bool can_nocopy = ((uintptr_t)ptr & (pg - 1)) == 0;
+            id<MTLBuffer> tmp;
+            if (can_nocopy) {
+                tmp = [device
+                    newBufferWithBytesNoCopy:ptr
+                                     length:(NSUInteger)aligned_sz
+                                    options:MTLResourceStorageModeShared
+                                deallocator:nil];
+            } else {
+                tmp = [device
+                    newBufferWithLength:(NSUInteger)bytes
+                                options:MTLResourceStorageModeShared];
+                __builtin_memcpy(tmp.contents, ptr, (size_t)bytes);
             }
-            __builtin_memcpy(
-                ((__bridge id<MTLBuffer>)
-                    m->bufs[i]).contents,
-                buf[i].ptr, (size_t)bytes);
-            m->per_bufs[i] = m->bufs[i];
+            void *retained =
+                (__bridge_retained void*)tmp;
+            if (!sh->mtl) {
+                sh->mtl     = retained;
+                sh->host    = ptr;
+                sh->copy_sz = buf[i].sz > 0
+                    ? bytes : 0;
+            }
+            batch_retain_buf(be, retained);
+            if (buf[i].sz > 0 && !can_nocopy) {
+                batch_add_copy(
+                    be, ptr,
+                    retained, bytes);
+            }
+            offsets[i] = 0;
+            m->per_bufs[i] = retained;
         }
     }
 
@@ -996,94 +931,62 @@ static void encode_dispatch(
             sizeof dsz);
         long bytes = dsz < 0 ? -dsz : dsz;
         int bi = m->deref[d].buf_idx;
-        if (batching) {
-            struct batch_shared *sh =
-                &m->batch_data[bi];
-            char *dptr = derived;
-            _Bool overlap = sh->mtl
-                && dptr >= sh->host
-                && dptr <  sh->host + sh->copy_sz;
-            if (overlap) {
-                offsets[bi] = dptr - sh->host;
-                m->per_bufs[bi] = sh->mtl;
-            } else {
-                size_t pg = (size_t)sysconf(_SC_PAGESIZE);
-                size_t aligned_sz = ((size_t)bytes + pg - 1) & ~(pg - 1);
-                _Bool can_nocopy = ((uintptr_t)dptr & (pg - 1)) == 0;
-                id<MTLBuffer> tmp;
-                if (can_nocopy) {
-                    tmp = [device
-                        newBufferWithBytesNoCopy:dptr
-                                         length:(NSUInteger)aligned_sz
-                                        options:MTLResourceStorageModeShared
-                                    deallocator:nil];
-                } else {
-                    tmp = [device
-                        newBufferWithLength:(NSUInteger)bytes
-                                    options:MTLResourceStorageModeShared];
-                    __builtin_memcpy(tmp.contents, dptr, (size_t)bytes);
-                }
-                void *retained =
-                    (__bridge_retained void*)tmp;
-                if (!sh->mtl) {
-                    sh->mtl     = retained;
-                    sh->host    = dptr;
-                    sh->copy_sz = dsz > 0
-                        ? bytes : 0;
-                }
-                batch_retain_buf(be, retained);
-                if (dsz > 0 && !can_nocopy) {
-                    batch_add_copy(
-                        be, dptr,
-                        retained, bytes);
-                }
-                offsets[bi] = 0;
-                m->per_bufs[bi] = retained;
-            }
+        struct batch_shared *sh =
+            &m->batch_data[bi];
+        char *dptr = derived;
+        _Bool overlap = sh->mtl
+            && dptr >= sh->host
+            && dptr <  sh->host + sh->copy_sz;
+        if (overlap) {
+            offsets[bi] = dptr - sh->host;
+            m->per_bufs[bi] = sh->mtl;
         } else {
-            if (bytes > m->buf_cap[bi]) {
-                if (m->bufs[bi]) {
-                    (void)(__bridge_transfer id)
-                        m->bufs[bi];
-                }
-                m->buf_cap[bi] = bytes;
-                id<MTLBuffer> b =
-                    [device
-                     newBufferWithLength:
-                         (NSUInteger)bytes
-                     options:
-                         MTLResourceStorageModeShared];
-                m->bufs[bi] =
-                    (__bridge_retained void*)b;
+            size_t pg = (size_t)sysconf(_SC_PAGESIZE);
+            size_t aligned_sz = ((size_t)bytes + pg - 1) & ~(pg - 1);
+            _Bool can_nocopy = ((uintptr_t)dptr & (pg - 1)) == 0;
+            id<MTLBuffer> tmp;
+            if (can_nocopy) {
+                tmp = [device
+                    newBufferWithBytesNoCopy:dptr
+                                     length:(NSUInteger)aligned_sz
+                                    options:MTLResourceStorageModeShared
+                                deallocator:nil];
+            } else {
+                tmp = [device
+                    newBufferWithLength:(NSUInteger)bytes
+                                options:MTLResourceStorageModeShared];
+                __builtin_memcpy(tmp.contents, dptr, (size_t)bytes);
             }
-            __builtin_memcpy(
-                ((__bridge id<MTLBuffer>)
-                    m->bufs[bi]).contents,
-                derived, (size_t)bytes);
-            m->per_bufs[bi] = m->bufs[bi];
+            void *retained =
+                (__bridge_retained void*)tmp;
+            if (!sh->mtl) {
+                sh->mtl     = retained;
+                sh->host    = dptr;
+                sh->copy_sz = dsz > 0
+                    ? bytes : 0;
+            }
+            batch_retain_buf(be, retained);
+            if (dsz > 0 && !can_nocopy) {
+                batch_add_copy(
+                    be, dptr,
+                    retained, bytes);
+            }
+            offsets[bi] = 0;
+            m->per_bufs[bi] = retained;
         }
         szs_data[bi] = (uint32_t)bytes;
     }
 
     size_t sz_bytes = (size_t)(tb + 1)
                     * sizeof(uint32_t);
-    id<MTLBuffer> per_sz;
-    if (batching) {
-        per_sz =
-            [device newBufferWithLength:sz_bytes
-                    options:
-                        MTLResourceStorageModeShared];
-        __builtin_memcpy(
-            per_sz.contents, szs_data, sz_bytes);
-        batch_retain_buf(
-            be, (__bridge_retained void*)per_sz);
-    } else {
-        per_sz =
-            (__bridge id<MTLBuffer>)m->sz_buf;
-        __builtin_memcpy(
-            per_sz.contents,
-            szs_data, sz_bytes);
-    }
+    id<MTLBuffer> per_sz =
+        [device newBufferWithLength:sz_bytes
+                options:
+                    MTLResourceStorageModeShared];
+    __builtin_memcpy(
+        per_sz.contents, szs_data, sz_bytes);
+    batch_retain_buf(
+        be, (__bridge_retained void*)per_sz);
 
     [enc setBuffer:per_n offset:0 atIndex:0];
     for (int i = 0; i < m->total_bufs; i++) {
@@ -1150,7 +1053,7 @@ void umbra_metal_run(
                 (size_t)m->total_bufs
                     * sizeof *m->batch_data);
         }
-        encode_dispatch(m, n, w, buf, enc, 1);
+        encode_dispatch(m, n, w, buf, enc);
     }
 }
 
@@ -1219,24 +1122,7 @@ void umbra_metal_free(struct umbra_metal *m) {
             (void)(__bridge_transfer id)
                 m->pipeline;
         }
-        if (m->n_buf) {
-            (void)(__bridge_transfer id)m->n_buf;
-        }
-        if (m->w_buf) {
-            (void)(__bridge_transfer id)m->w_buf;
-        }
-        if (m->sz_buf) {
-            (void)(__bridge_transfer id)m->sz_buf;
-        }
-        for (int p = 0; p < m->total_bufs; p++) {
-            if (m->bufs[p]) {
-                (void)(__bridge_transfer id)
-                    m->bufs[p];
-            }
-        }
     }
-    free(m->bufs);
-    free(m->buf_cap);
     free(m->per_bufs);
     free(m->deref);
     free(m->batch_data);
