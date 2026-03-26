@@ -2470,8 +2470,8 @@ static void test_load_next_16(void) {
 
 static void test_load_store_next_64(void) {
     struct umbra_builder *b = umbra_builder();
-    umbra_val             lo = umbra_load_64_lo(b, (umbra_ptr){0});
-    umbra_val             hi = umbra_load_64_hi(b, (umbra_ptr){0});
+    umbra_val             lo, hi;
+    umbra_load_64(b, (umbra_ptr){0}, &lo, &hi);
     umbra_store_64(b, (umbra_ptr){1}, lo, hi);
     backends B = make(b, 0);
 

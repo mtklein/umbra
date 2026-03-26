@@ -20,19 +20,19 @@ int  umbra_max_ptr(struct umbra_builder const *);
 
 umbra_val umbra_x(struct umbra_builder *);
 umbra_val umbra_y(struct umbra_builder *);
+
 umbra_val umbra_imm_i32(struct umbra_builder *, int bits);
 umbra_val umbra_imm_f32(struct umbra_builder *, float);
-
-umbra_val umbra_load_16   (struct umbra_builder *, umbra_ptr);
-umbra_val umbra_load_32   (struct umbra_builder *, umbra_ptr);
-umbra_val umbra_load_64_lo(struct umbra_builder *, umbra_ptr);
-umbra_val umbra_load_64_hi(struct umbra_builder *, umbra_ptr);
 
 umbra_val umbra_uniform_16(struct umbra_builder *, umbra_ptr, int slot);
 umbra_val umbra_uniform_32(struct umbra_builder *, umbra_ptr, int slot);
 
 umbra_val umbra_gather_16(struct umbra_builder *, umbra_ptr, umbra_val ix);
 umbra_val umbra_gather_32(struct umbra_builder *, umbra_ptr, umbra_val ix);
+
+umbra_val umbra_load_16(struct umbra_builder *, umbra_ptr);
+umbra_val umbra_load_32(struct umbra_builder *, umbra_ptr);
+void      umbra_load_64(struct umbra_builder *, umbra_ptr, umbra_val *lo, umbra_val *hi);
 
 void      umbra_store_16(struct umbra_builder *, umbra_ptr, umbra_val);
 void      umbra_store_32(struct umbra_builder *, umbra_ptr, umbra_val);

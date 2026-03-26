@@ -477,8 +477,8 @@ void umbra_store_1010102(builder *builder, umbra_ptr ptr, umbra_color c) {
 }
 
 umbra_color umbra_load_fp16(builder *builder, umbra_ptr ptr) {
-    umbra_val lo = umbra_load_64_lo(builder, ptr);
-    umbra_val hi = umbra_load_64_hi(builder, ptr);
+    umbra_val lo, hi;
+    umbra_load_64(builder, ptr, &lo, &hi);
     umbra_val s16 = umbra_imm_i32(builder, 16);
     return (umbra_color){
         umbra_f32_from_f16(builder, umbra_i16_from_i32(builder, lo)),

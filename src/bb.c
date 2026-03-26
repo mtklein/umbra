@@ -168,11 +168,9 @@ val umbra_gather_16(builder *b, umbra_ptr src, val ix) {
 val umbra_load_32(builder *b, umbra_ptr src) {
     return push(b, op_load_next_32, .ptr = src.ix);
 }
-val umbra_load_64_lo(builder *b, umbra_ptr src) {
-    return push(b, op_load_next_64_lo, .ptr = src.ix);
-}
-val umbra_load_64_hi(builder *b, umbra_ptr src) {
-    return push(b, op_load_next_64_hi, .ptr = src.ix);
+void umbra_load_64(builder *b, umbra_ptr src, val *lo, val *hi) {
+    *lo = push(b, op_load_next_64_lo, .ptr = src.ix);
+    *hi = push(b, op_load_next_64_hi, .ptr = src.ix);
 }
 val umbra_load_16(builder *b, umbra_ptr src) {
     return push(b, op_load_next_16, .ptr = src.ix);
