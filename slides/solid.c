@@ -43,7 +43,7 @@ static void solid_animate(slide *s, float dt) {
     }
 }
 
-static void solid_render(slide *s, int w, int h, void *buf,
+static void solid_render(slide *s, int w, int h, int y0, int y1, void *buf,
                           umbra_draw_layout const *lay, struct umbra_program *program) {
     solid_state *st = s->state;
     float        rect[4] = {
@@ -66,7 +66,7 @@ static void solid_render(slide *s, int w, int h, void *buf,
     for (int i = 0; i < ps; i++) {
         ubuf[2 + i] = (umbra_buf){(char *)buf + plane_sz * (size_t)(i + 1), plane_sz, 0};
     }
-    umbra_program_queue(program, 0, 0, w, h, ubuf);
+    umbra_program_queue(program, 0, y0, w, y1, ubuf);
 }
 
 static void solid_cleanup(slide *s) {

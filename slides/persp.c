@@ -25,7 +25,7 @@ static void persp_animate(slide *s, float dt) {
                              st->bitmap->h);
 }
 
-static void persp_render(slide *s, int w, int h, void *buf,
+static void persp_render(slide *s, int w, int h, int y0, int y1, void *buf,
                           umbra_draw_layout const *lay, struct umbra_program *program) {
     persp_state *st = s->state;
     float        hc[4];
@@ -44,7 +44,7 @@ static void persp_render(slide *s, int w, int h, void *buf,
     for (int i = 0; i < ps; i++) {
         ubuf[2 + i] = (umbra_buf){(char *)buf + plane_sz * (size_t)(i + 1), plane_sz, 0};
     }
-    umbra_program_queue(program, 0, 0, w, h, ubuf);
+    umbra_program_queue(program, 0, y0, w, y1, ubuf);
 }
 
 static void persp_cleanup(slide *s) {

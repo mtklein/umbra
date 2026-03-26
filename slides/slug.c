@@ -9,8 +9,6 @@ typedef struct {
     float                    *wind_buf;
     slug_acc_layout           acc_lay;
     struct umbra_basic_block *acc_bb;
-    struct umbra_program     *acc;
-    struct umbra_backend     *acc_be;
 } slug_state;
 
 static void slug_init(slide *s, int w, int h) {
@@ -39,18 +37,18 @@ static void slug_animate(slide *s, float dt) {
     st->mat[10] = st->slug->h;
 }
 
-static void slug_render(slide *s, int w, int h, void *buf,
+static void slug_render(slide *s, int w, int h, int y0, int y1, void *buf,
                          umbra_draw_layout const *lay, struct umbra_program *program) {
     slug_state           *st = s->state;
     struct umbra_backend *be = umbra_program_backend(program);
-    if (be != st->acc_be) {
-        umbra_program_free(st->acc);
-        st->acc = umbra_backend_compile(be, st->acc_bb);
-        st->acc_be = be;
-    }
 
-    long wind_sz = (long)w * h * (int)sizeof(float);
-    __builtin_memset(st->wind_buf, 0, (size_t)wind_sz);
+    // Compile a fresh acc program each call so tiled renders don't share
+    // mutable interpreter state.  Compile is cheap (~100 IR ops).
+    struct umbra_program *acc = umbra_backend_compile(be, st->acc_bb);
+
+    long wind_sz    = (long)w * h * (int)sizeof(float);
+    long wind_row   = (long)w * (int)sizeof(float);
+    __builtin_memset((char *)st->wind_buf + y0 * wind_row, 0, (size_t)(y1 - y0) * (size_t)wind_row);
 
     long long au_[12] = {0};
     char     *au = (char *)au_;
@@ -64,9 +62,10 @@ static void slug_render(slide *s, int w, int h, void *buf,
     for (int j = 0; j < st->slug->count; j++) {
         int32_t j32 = j;
         __builtin_memcpy(au + st->acc_lay.loop_off, &j32, 4);
-        umbra_program_queue(st->acc, 0, 0, w, h, abuf);
+        umbra_program_queue(acc, 0, y0, w, y1, abuf);
     }
-    umbra_backend_flush(st->acc_be);
+    umbra_backend_flush(be);
+    umbra_program_free(acc);
 
     float hc[4];
     for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
@@ -82,13 +81,12 @@ static void slug_render(slide *s, int w, int h, void *buf,
     for (int i = 0; i < ps; i++) {
         rbuf[2 + i] = (umbra_buf){(char *)buf + plane_sz * (size_t)(i + 1), plane_sz, 0};
     }
-    umbra_program_queue(program, 0, 0, w, h, rbuf);
+    umbra_program_queue(program, 0, y0, w, y1, rbuf);
 }
 
 static void slug_cleanup(slide *s) {
     slug_state *st = s->state;
     free(st->wind_buf);
-    umbra_program_free(st->acc);
     umbra_basic_block_free(st->acc_bb);
     free(st);
     s->state = NULL;

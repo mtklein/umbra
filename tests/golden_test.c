@@ -155,7 +155,7 @@ static void render_slide(
                     s->bg, row_sz,
                     plane_gap);
     }
-    s->render(s, W, H, pixbuf,
+    s->render(s, W, H, 0, H, pixbuf,
               lay, program);
 }
 

@@ -71,7 +71,7 @@ static void render_thumbnails(overview_state *st) {
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) { st->tmp[y * w + x] = sub->bg; }
         }
-        sub->render(sub, w, h, st->tmp, &st->lays[idx],
+        sub->render(sub, w, h, 0, h, st->tmp, &st->lays[idx],
                     st->progs[idx]);
 
         for (int cy = 0; cy < st->ch; cy++) {
@@ -122,14 +122,16 @@ static void overview_animate(slide *s, float dt) {
     if (st->frame % 120 == 0) { render_thumbnails(st); }
 }
 
-static void overview_render(slide *s, int w, int h, void *buf,
+static void overview_render(slide *s, int w, int h, int y0, int y1, void *buf,
                              umbra_draw_layout const *lay, struct umbra_program *program) {
     overview_state *st = s->state;
     (void)w;
     (void)h;
     (void)lay;
     (void)program;
-    __builtin_memcpy(buf, st->fb, (size_t)(st->w * st->h) * 4);
+    size_t off = (size_t)y0 * (size_t)st->w * 4;
+    size_t len = (size_t)(y1 - y0) * (size_t)st->w * 4;
+    __builtin_memcpy((char*)buf + off, (char*)st->fb + off, len);
 }
 
 static void overview_cleanup(slide *s) {

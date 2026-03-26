@@ -7,7 +7,7 @@ typedef struct {
     int    pad_;
 } grad_lut_state;
 
-static void grad_2stop_render(slide *s, int w, int h, void *buf,
+static void grad_2stop_render(slide *s, int w, int h, int y0, int y1, void *buf,
                                umbra_draw_layout const *lay, struct umbra_program *program) {
     int       uni_len = lay->uni_len;
     long long uni_[8] = {0};
@@ -22,10 +22,10 @@ static void grad_2stop_render(slide *s, int w, int h, void *buf,
     for (int i = 0; i < ps; i++) {
         ubuf[2 + i] = (umbra_buf){(char *)buf + plane_sz * (size_t)(i + 1), plane_sz, 0};
     }
-    umbra_program_queue(program, 0, 0, w, h, ubuf);
+    umbra_program_queue(program, 0, y0, w, y1, ubuf);
 }
 
-static void grad_lut_render(slide *s, int w, int h, void *buf,
+static void grad_lut_render(slide *s, int w, int h, int y0, int y1, void *buf,
                              umbra_draw_layout const *lay, struct umbra_program *program) {
     grad_lut_state *st = s->state;
     int             uni_len = lay->uni_len;
@@ -41,7 +41,7 @@ static void grad_lut_render(slide *s, int w, int h, void *buf,
     for (int i = 0; i < ps; i++) {
         ubuf[2 + i] = (umbra_buf){(char *)buf + plane_sz * (size_t)(i + 1), plane_sz, 0};
     }
-    umbra_program_queue(program, 0, 0, w, h, ubuf);
+    umbra_program_queue(program, 0, y0, w, y1, ubuf);
 }
 
 static void grad_lut_cleanup(slide *s) {

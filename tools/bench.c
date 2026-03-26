@@ -16,13 +16,13 @@ static double now(void) {
 static double bench(slide *s, int w, int h, umbra_draw_layout const *lay,
                     void *buf, struct umbra_backend *be,
                     struct umbra_program *prog) {
-    s->render(s, w, h, buf, lay, prog);
+    s->render(s, w, h, 0, h, buf, lay, prog);
     umbra_backend_flush(be);
     int iters = 1;
     for (;;) {
         double const start = now();
         for (int it = 0; it < iters; it++) {
-            s->render(s, w, h, buf, lay, prog);
+            s->render(s, w, h, 0, h, buf, lay, prog);
         }
         umbra_backend_flush(be);
         double const elapsed = now() - start;

@@ -3,6 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if !defined(__wasm__)
+#include <pthread.h>
+#endif
+
 #if defined(__wasm__)
 
 int main(void) { return 0; }
@@ -129,6 +133,35 @@ static void free_pipes(void) {
     free_pipe(&hdr_pipe);
 }
 
+static int                    max_threads;
+static int                    n_threads = 1;
+static struct umbra_program **xtra_progs;   // [1..n_threads-1], compiled from shared backend
+static struct umbra_basic_block *saved_bb;
+
+static void free_xtra(void) {
+    for (int t = 1; t < max_threads; t++) {
+        umbra_program_free(xtra_progs[t]);
+        xtra_progs[t] = NULL;
+    }
+}
+
+static void rebuild_xtra(int backend) {
+    free_xtra();
+    if (!saved_bb || n_threads <= 1 || !bes[backend]) { return; }
+    for (int t = 1; t < n_threads; t++) {
+        xtra_progs[t] = umbra_backend_compile(bes[backend], saved_bb);
+    }
+}
+
+static void tile_factor(int n, int *cols, int *rows) {
+    int c = 1;
+    for (int d = 2; d * d <= n; d++) {
+        if (n % d == 0) { c = d; }
+    }
+    *cols = c;
+    *rows = n / c;
+}
+
 static void build_slide_fmt(slide *s, int fmt) {
     free_programs();
     umbra_format format = *fmt_formats[fmt];
@@ -142,7 +175,8 @@ static void build_slide_fmt(slide *s, int fmt) {
     for (int i = 0; i < NUM_BACKENDS; i++) {
         programs[i] = bes[i] ? umbra_backend_compile(bes[i], bb) : NULL;
     }
-    umbra_basic_block_free(bb);
+    umbra_basic_block_free(saved_bb);
+    saved_bb = bb;
 
     build_pipes(fmt);
 }
@@ -163,10 +197,15 @@ static int next_backend(int cur) {
     return cur;
 }
 
-static void update_title(SDL_Window *w, slide *s, int bi, int fi, double fps) {
+static void update_title(SDL_Window *w, slide *s, int bi, int fi, double fps, int nt) {
     char title[256];
-    SDL_snprintf(title, sizeof title, "%s  [%s/%s]  %.0f fps", s->title, backend_name[bi],
-                 fmt_name[fi], fps);
+    int n = SDL_snprintf(title, sizeof title, "%s  [%s/%s]  %.0f fps", s->title,
+                         backend_name[bi], fmt_name[fi], fps);
+    if (nt > 1) {
+        int tc, tr;
+        tile_factor(nt, &tc, &tr);
+        SDL_snprintf(title + n, sizeof title - (size_t)n, "  %dx%d", tc, tr);
+    }
     SDL_SetWindowTitle(w, title);
 }
 
@@ -220,6 +259,20 @@ static void to_hdr_row(__fp16 *dst, void *src, int n, long src_sz, long plane_ga
     umbra_program_queue(hdr_pipe.program, 0, 0, n, 1, buf);
 }
 
+typedef struct {
+    slide *s;
+    int    W, H, y0, y1;
+    void  *buf;
+    umbra_draw_layout const *lay;
+    struct umbra_program    *prog;
+} tile_work;
+
+static void *tile_fn(void *arg) {
+    tile_work *tw = arg;
+    tw->s->render(tw->s, tw->W, tw->H, tw->y0, tw->y1, tw->buf, tw->lay, tw->prog);
+    return NULL;
+}
+
 int main(void) {
     enum { W = 640, H = 480 };
 
@@ -249,6 +302,10 @@ int main(void) {
 
     slides_init(W, H);
 
+    max_threads = SDL_GetNumLogicalCPUCores();
+    if (max_threads < 1) { max_threads = 1; }
+    xtra_progs = calloc((size_t)max_threads, sizeof *xtra_progs);
+
     bes[0] = umbra_backend_interp();
     bes[1] = umbra_backend_jit();
     bes[2] = umbra_backend_metal();
@@ -268,7 +325,7 @@ int main(void) {
 
     _Bool want_dump = 0;
 
-    update_title(window, slide_get(cur_slide), cur_backend, cur_fmt, fps);
+    update_title(window, slide_get(cur_slide), cur_backend, cur_fmt, fps, n_threads);
 
     _Bool running = 1;
     while (running) {
@@ -284,10 +341,16 @@ int main(void) {
                     next = (cur_slide + slide_count() - 1) % slide_count();
                 } else if (ev.key.key == SDLK_B) {
                     cur_backend = next_backend(cur_backend);
+                    rebuild_xtra(cur_backend);
                 } else if (ev.key.key == SDLK_C) {
                     cur_fmt = (cur_fmt + 1) % NUM_FMTS;
                     build_slide_fmt(slide_get(cur_slide), cur_fmt);
                     cur_backend = pick_backend(cur_backend);
+                    rebuild_xtra(cur_backend);
+                } else if (ev.key.key == SDLK_COMMA) {
+                    if (n_threads > 1) { n_threads--; rebuild_xtra(cur_backend); }
+                } else if (ev.key.key == SDLK_PERIOD) {
+                    if (n_threads < max_threads) { n_threads++; rebuild_xtra(cur_backend); }
                 } else if (ev.key.key == SDLK_S) {
                     want_dump = 1;
                 } else if (ev.key.key == SDLK_ESCAPE) {
@@ -297,8 +360,10 @@ int main(void) {
                     cur_slide = next;
                     build_slide_fmt(slide_get(cur_slide), cur_fmt);
                     cur_backend = pick_backend(cur_backend);
+                    rebuild_xtra(cur_backend);
                 }
-                update_title(window, slide_get(cur_slide), cur_backend, cur_fmt, fps);
+                update_title(window, slide_get(cur_slide), cur_backend, cur_fmt, fps,
+                             n_threads);
             }
         }
         if (!running) { break; }
@@ -320,7 +385,35 @@ int main(void) {
 
         if (s->animate) { s->animate(s, 0.016f); }
 
-        s->render(s, W, H, pixbuf, &draw_layout, b);
+        if (n_threads <= 1) {
+            s->render(s, W, H, 0, H, pixbuf, &draw_layout, b);
+        } else {
+            int nt = n_threads;
+            int sh = (H + nt - 1) / nt;
+
+            if (cur_backend == 2) {
+                // Metal: same backend+program, sequential (batched)
+                for (int t = 0; t < nt; t++) {
+                    int y0 = t * sh;
+                    int y1 = y0 + sh > H ? H : y0 + sh;
+                    s->render(s, W, H, y0, y1, pixbuf, &draw_layout, b);
+                }
+            } else {
+                // CPU: shared backend, separate programs, parallel
+                pthread_t *tids = malloc((size_t)nt * sizeof *tids);
+                tile_work *work = malloc((size_t)nt * sizeof *work);
+                for (int t = 0; t < nt; t++) {
+                    int y0 = t * sh;
+                    int y1 = y0 + sh > H ? H : y0 + sh;
+                    struct umbra_program *tp = t == 0 ? b : xtra_progs[t];
+                    work[t] = (tile_work){s, W, H, y0, y1, pixbuf, &draw_layout, tp};
+                    pthread_create(&tids[t], NULL, tile_fn, &work[t]);
+                }
+                for (int t = 0; t < nt; t++) { pthread_join(tids[t], NULL); }
+                free(tids);
+                free(work);
+            }
+        }
 
         umbra_backend_flush(bes[cur_backend]);
 
@@ -366,11 +459,15 @@ int main(void) {
             fps = (double)fps_frames / elapsed;
             fps_frames = 0;
             fps_start = now;
-            update_title(window, slide_get(cur_slide), cur_backend, cur_fmt, fps);
+            update_title(window, slide_get(cur_slide), cur_backend, cur_fmt, fps,
+                         n_threads);
         }
     }
 
     free(pixbuf);
+    free_xtra();
+    free(xtra_progs);
+    umbra_basic_block_free(saved_bb);
     free_programs();
     free_pipes();
     for (int i = 0; i < NUM_BACKENDS; i++) { umbra_backend_free(bes[i]); }
