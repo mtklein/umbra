@@ -32,7 +32,6 @@ void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
 #include <sys/mman.h>
 #include <pthread.h>
 #include <unistd.h>
-#include <libkern/OSCacheControl.h>
 
 struct pool_ref {
     int data_off, code_pos;
@@ -487,7 +486,7 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     pthread_jit_write_protect_np(0);
     __builtin_memcpy(mem, c.buf, code_sz);
     pthread_jit_write_protect_np(1);
-    sys_icache_invalidate(mem, code_sz);
+    __builtin___clear_cache(mem, (char *)mem + alloc);
     free(c.buf);
 
     struct umbra_jit *j = malloc(sizeof *j);
