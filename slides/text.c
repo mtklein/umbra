@@ -16,12 +16,12 @@ static void text_render(slide *s, int w, int h, void *buf,
     slide_uni_f32(uni, lay->shader, hc, 4);
     slide_uni_ptr(uni, lay->coverage, st->tc->data, (long)(w * h * 2));
     int       ps = lay->ps;
-    long      plane_sz = (long)w * h * lay->pixel_bytes;
+    size_t plane_sz = (size_t)w * (size_t)h * lay->pixel_bytes;
     umbra_buf ubuf[5];
     ubuf[0] = (umbra_buf){uni, (size_t)lay->uni_len, 1};
-    ubuf[1] = (umbra_buf){buf, (size_t)plane_sz, 0};
+    ubuf[1] = (umbra_buf){buf, plane_sz, 0};
     for (int i = 0; i < ps; i++) {
-        ubuf[2 + i] = (umbra_buf){(char *)buf + plane_sz * (i + 1), (size_t)plane_sz, 0};
+        ubuf[2 + i] = (umbra_buf){(char *)buf + plane_sz * (size_t)(i + 1), plane_sz, 0};
     }
     umbra_program_queue(program, w, h, ubuf);
 }
