@@ -41,10 +41,10 @@ static inline void slide_uni_i32(char *u, int off,
 static inline void slide_uni_f32(char *u, int off,
                                  float const *v,
                                  int n) {
-    __builtin_memcpy(u+off, v, (unsigned long)n*4);
+    __builtin_memcpy(u+off, v, (size_t)n*4);
 }
 static inline void slide_uni_ptr(char *u, int off,
-                                 void *p, long sz) {
+                                 void *p, ptrdiff_t sz) {
     __builtin_memcpy(u+off,   &p,  8);
     __builtin_memcpy(u+off+8, &sz, 8);
 }

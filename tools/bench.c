@@ -118,10 +118,10 @@ int main(int argc, char *argv[]) {
         slide_perspective_matrix(mat, 0.0f, W, H, (int)sc.w, (int)sc.h);
         mat[9] = sc.w;
         mat[10] = sc.h;
-        long long au_[12] = {0};
+        uint64_t au_[12] = {0};
         char     *au = (char *)au_;
         slide_uni_f32(au, al.mat, mat, 11);
-        slide_uni_ptr(au, al.curves_off, sc.data, (long)(sc.count * 6 * 4));
+        slide_uni_ptr(au, al.curves_off, sc.data, (ptrdiff_t)(sc.count * 6 * 4));
         int32_t j0 = 0;
         __builtin_memcpy(au + al.loop_off, &j0, 4);
         umbra_buf abuf[] = {

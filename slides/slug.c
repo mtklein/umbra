@@ -43,19 +43,19 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     struct umbra_backend *be = umbra_program_backend(program);
     struct umbra_program *acc = umbra_backend_compile(be, st->acc_bb);
 
-    long wind_sz  = (long)w * h * (int)sizeof(float);
-    long wind_row = (long)w * (int)sizeof(float);
-    __builtin_memset((char *)st->wind_buf + y0 * wind_row, 0,
-                     (size_t)(y1 - y0) * (size_t)wind_row);
+    size_t wind_sz  = (size_t)w * (size_t)h * sizeof(float);
+    size_t wind_row = (size_t)w * sizeof(float);
+    __builtin_memset((char *)st->wind_buf + (size_t)y0 * wind_row, 0,
+                     (size_t)(y1 - y0) * wind_row);
 
-    long long au_[12] = {0};
+    uint64_t au_[12] = {0};
     char     *au = (char *)au_;
     slide_uni_f32(au, st->acc_lay.mat, st->mat, 11);
     slide_uni_ptr(au, st->acc_lay.curves_off, st->slug->data,
-                  (long)(st->slug->count * 6 * 4));
+                  (ptrdiff_t)(st->slug->count * 6 * 4));
     umbra_buf abuf[] = {
         {au, (size_t)st->acc_lay.uni_len, 1},
-        {st->wind_buf, (size_t)wind_sz, 0},
+        {st->wind_buf, wind_sz, 0},
     };
     for (int j = 0; j < st->slug->count; j++) {
         int32_t j32 = j;
@@ -67,10 +67,10 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
 
     float hc[4];
     for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
-    long long uni_[12] = {0};
+    uint64_t uni_[12] = {0};
     char     *uni = (char *)uni_;
     slide_uni_f32(uni, lay->shader, hc, 4);
-    slide_uni_ptr(uni, lay->coverage, st->wind_buf, -(long)wind_sz);
+    slide_uni_ptr(uni, lay->coverage, st->wind_buf, -(ptrdiff_t)wind_sz);
     int       ps = lay->ps;
     size_t plane_sz = (size_t)w * (size_t)h * lay->pixel_bytes;
     umbra_buf rbuf[5];

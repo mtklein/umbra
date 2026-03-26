@@ -11,10 +11,10 @@ static void text_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     text_state *st = s->state;
     float       hc[4];
     for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
-    long long uni_[6] = {0};
+    uint64_t uni_[6] = {0};
     char     *uni = (char *)uni_;
     slide_uni_f32(uni, lay->shader, hc, 4);
-    slide_uni_ptr(uni, lay->coverage, st->tc->data, (long)(w * h * 2));
+    slide_uni_ptr(uni, lay->coverage, st->tc->data, (ptrdiff_t)(w * h * 2));
     int       ps = lay->ps;
     size_t plane_sz = (size_t)w * (size_t)h * lay->pixel_bytes;
     umbra_buf ubuf[5];

@@ -1861,11 +1861,11 @@ static void test_gather_deref_large(void) {
     int32_t indices[4] = {0, 100, 32800, N - 1};
     int32_t dst[4] = {0};
 
-    long long uni_[2] = {0};
-    char     *uni = (char *)uni_;
+    uint64_t uni_[2] = {0};
+    char    *uni = (char *)uni_;
     {
-        void *p = data;
-        long  sz = (long)(N * 2);
+        void   *p = data;
+        size_t sz = (size_t)N * 2;
         __builtin_memcpy(uni + off, &p, 8);
         __builtin_memcpy(uni + off + 8, &sz, 8);
     }
@@ -2554,9 +2554,9 @@ static void test_load_stride_neq_w(void) {
     int32_t expected[8] = {10, 11, 12, 13, 20, 21, 22, 23};
     int32_t dst[8];
 
-    long long uni_[2] = {0};
-    char     *uni = (char *)uni_;
-    int32_t   rs_val = 8;
+    uint64_t uni_[2] = {0};
+    char    *uni = (char *)uni_;
+    int32_t  rs_val = 8;
     __builtin_memcpy(uni + ri * 4, &rs_val, 4);
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {

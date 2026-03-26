@@ -93,23 +93,23 @@ static void free_pipes(void) {
 
 static void fill_bg_row(int fmt, void *dst,
                         int n, uint32_t bg,
-                        long row_sz,
-                        long plane_gap) {
+                        size_t row_sz,
+                        size_t plane_gap) {
     float hc[4] = {
         (float)( bg        & 0xffu) / 255.0f,
         (float)((bg >>  8) & 0xffu) / 255.0f,
         (float)((bg >> 16) & 0xffu) / 255.0f,
         (float)((bg >> 24) & 0xffu) / 255.0f,
     };
-    long long uni_[4] = {0};
+    uint64_t uni_[4] = {0};
     char *uni = (char*)uni_;
     slide_uni_f32(uni, 0, hc, 4);
     int ps = plane_gap ? 3 : 0;
     umbra_buf buf[5];
     buf[0] = (umbra_buf){ uni, (size_t)fill_pipes[fmt].uni_len, 1 };
-    buf[1] = (umbra_buf){ dst, (size_t)row_sz , 0};
+    buf[1] = (umbra_buf){ dst, row_sz, 0};
     for (int i = 0; i < ps; i++) {
-        buf[2 + i] = (umbra_buf){(char *)dst + (i + 1) * plane_gap, (size_t)row_sz, 0};
+        buf[2 + i] = (umbra_buf){(char *)dst + (size_t)(i + 1) * plane_gap, row_sz, 0};
     }
     umbra_program_queue(
         fill_pipes[fmt].prog, 0, 0, n, 1, buf);
@@ -117,17 +117,17 @@ static void fill_bg_row(int fmt, void *dst,
 
 static void readback_row(int fmt, uint32_t *dst,
                          void *src, int n,
-                         long src_sz,
-                         long plane_gap) {
-    long long uni_[2] = {0};
+                         size_t src_sz,
+                         size_t plane_gap) {
+    uint64_t uni_[2] = {0};
     char *uni = (char*)uni_;
     int ps = plane_gap ? 3 : 0;
     int op = readback_pipes[fmt].out_ptr;
     umbra_buf buf[6];
     buf[0] = (umbra_buf){ uni, (size_t)readback_pipes[fmt].uni_len, 1 };
-    buf[1] = (umbra_buf){ src, (size_t)src_sz, 1 };
+    buf[1] = (umbra_buf){ src, src_sz, 1 };
     for (int i = 0; i < ps; i++) {
-        buf[2 + i] = (umbra_buf){(char *)src + (i + 1) * plane_gap, (size_t)src_sz, 0};
+        buf[2 + i] = (umbra_buf){(char *)src + (size_t)(i + 1) * plane_gap, src_sz, 0};
     }
     buf[op] = (umbra_buf){ dst, (size_t)(n * 4) , 0};
     umbra_program_queue(
@@ -145,8 +145,8 @@ static void render_slide(
     int   bpp = (int)formats[fmt]->pixel_bytes;
     _Bool planar = (fmt == FMT_FP16P);
     int   row_bytes = planar ? W * 2 : W * bpp;
-    long  plane_gap = planar ? (long)W * H * 2 : 0;
-    long  row_sz = planar ? (long)W * 2 : (long)W * bpp;
+    size_t plane_gap = planar ? (size_t)W * H * 2 : 0;
+    size_t row_sz = planar ? (size_t)W * 2 : (size_t)W * (size_t)bpp;
 
     for (int y = 0; y < H; y++) {
         void *row = planar
@@ -166,8 +166,8 @@ static void readback_to_8888(int fmt,
                              uint32_t *out) {
     _Bool planar = (fmt == FMT_FP16P);
     int   bpp = (int)formats[fmt]->pixel_bytes;
-    long  plane_gap = planar ? (long)W * H * 2 : 0;
-    long  row_sz = planar ? (long)W * 2 : (long)W * bpp;
+    size_t plane_gap = planar ? (size_t)W * H * 2 : 0;
+    size_t row_sz = planar ? (size_t)W * 2 : (size_t)W * (size_t)bpp;
 
     for (int y = 0; y < H; y++) {
         void *src = planar
@@ -310,11 +310,11 @@ static void test_slug_rect(void) {
 
     float wind_buf[W * H];
     __builtin_memset(wind_buf, 0, sizeof wind_buf);
-    long long au_[12] = {0};
+    uint64_t au_[12] = {0};
     char *au = (char*)au_;
     slide_uni_f32(au, alay.mat, mat, 11);
     slide_uni_ptr(au, alay.curves_off,
-        rect, (long)sizeof rect);
+        rect, (ptrdiff_t)sizeof rect);
     umbra_buf abuf[] = {
         { au, (size_t)alay.uni_len, 1 },
         { wind_buf, sizeof wind_buf , 0},
@@ -327,11 +327,11 @@ static void test_slug_rect(void) {
     }
     umbra_backend_flush(be);
 
-    long long uni_[12] = {0};
+    uint64_t uni_[12] = {0};
     char *uni = (char*)uni_;
     slide_uni_f32(uni, lay.shader, color, 4);
     slide_uni_ptr(uni, lay.coverage,
-        wind_buf, -(long)sizeof wind_buf);
+        wind_buf, -(ptrdiff_t)sizeof wind_buf);
     umbra_buf buf[] = {
         { uni, (size_t)lay.uni_len, 1 },
         { pixels, sizeof pixels , 0},
@@ -386,13 +386,13 @@ static void test_perspective_text(void) {
     };
     float color[4] = {1,1,1,1};
 
-    long long uni_[12] = {0};
+    uint64_t uni_[12] = {0};
     char *uni = (char*)uni_;
     slide_uni_f32(uni, lay.shader, color, 4);
     slide_uni_f32(uni, lay.coverage, mat, 11);
     slide_uni_ptr(uni,
         (lay.coverage + 11*4 + 7) & ~7,
-        bmp, (long)sizeof bmp);
+        bmp, (ptrdiff_t)sizeof bmp);
     umbra_buf buf[] = {
         { uni, (size_t)lay.uni_len, 1 },
         { pixels, sizeof pixels , 0},
@@ -427,14 +427,14 @@ static void test_perspective_text(void) {
         W, H, tc.w, tc.h);
     float hc2[4] = {1,0.8f,0.2f,1};
     {
-        long long u2_[12] = {0};
+        uint64_t u2_[12] = {0};
         char *u2 = (char*)u2_;
         slide_uni_f32(u2, lay2.shader, hc2, 4);
         slide_uni_f32(u2, lay2.coverage, mat2, 11);
         slide_uni_ptr(u2,
             (lay2.coverage + 11*4 + 7) & ~7,
             tc.data,
-            (long)(W * H * 2));
+            (ptrdiff_t)(W * H * 2));
         umbra_buf b2[] = {
             { u2, (size_t)lay2.uni_len, 1 },
             { px2, (size_t)(W * H * 4), 0 },

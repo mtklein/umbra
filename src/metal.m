@@ -35,6 +35,7 @@ void umbra_dump_metal(
 
 #import <Metal/Metal.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -43,13 +44,13 @@ typedef struct umbra_basic_block BB;
 struct batch_shared {
     void *mtl;
     char *host;
-    long  copy_sz;
+    size_t copy_sz;
 };
 
 struct copyback {
     void *host;
     void *mtlbuf;
-    long  bytes;
+    size_t bytes;
 };
 
 struct deref_info { int buf_idx, src_buf, byte_off; };
@@ -938,7 +939,7 @@ struct umbra_metal* umbra_metal(
 
 static void batch_add_copy(
     struct metal_backend *be,
-    void *host, void *raw_ptr, long bytes
+    void *host, void *raw_ptr, size_t bytes
 ) {
     if (be->batch_ncopy >= be->batch_copy_cap) {
         be->batch_copy_cap = be->batch_copy_cap
@@ -1004,10 +1005,10 @@ static void encode_dispatch(
     batch_retain_buf(
         be, (__bridge_retained void*)per_w);
 
-    long offsets[32] = {0};
+    size_t offsets[32] = {0};
     for (int i = 0; i <= m->max_ptr; i++) {
         if (!buf[i].ptr || !buf[i].sz) { continue; }
-        long bytes = (long)buf[i].sz;
+        size_t bytes = buf[i].sz;
         struct batch_shared *sh =
             &m->batch_data[i];
         char *ptr = buf[i].ptr;
@@ -1015,11 +1016,11 @@ static void encode_dispatch(
             && ptr >= sh->host
             && ptr <  sh->host + sh->copy_sz;
         if (overlap) {
-            offsets[i] = ptr - sh->host;
+            offsets[i] = (size_t)(ptr - sh->host);
             m->per_bufs[i] = sh->mtl;
         } else {
             size_t pg = (size_t)sysconf(_SC_PAGESIZE);
-            size_t aligned_sz = ((size_t)bytes + pg - 1) & ~(pg - 1);
+            size_t aligned_sz = (bytes + pg - 1) & ~(pg - 1);
             _Bool can_nocopy = ((uintptr_t)ptr & (pg - 1)) == 0;
             id<MTLBuffer> tmp;
             if (can_nocopy) {
@@ -1032,7 +1033,7 @@ static void encode_dispatch(
                 tmp = [device
                     newBufferWithLength:(NSUInteger)bytes
                                 options:MTLResourceStorageModeShared];
-                __builtin_memcpy(tmp.contents, ptr, (size_t)bytes);
+                __builtin_memcpy(tmp.contents, ptr, bytes);
             }
             void *retained =
                 (__bridge_retained void*)tmp;
@@ -1056,7 +1057,7 @@ static void encode_dispatch(
     for (int d = 0; d < m->n_deref; d++) {
         void *base = buf[m->deref[d].src_buf].ptr;
         void *derived;
-        long  dsz;
+        ptrdiff_t dsz;
         __builtin_memcpy(
             &derived,
             (char*)base + m->deref[d].byte_off,
@@ -1065,7 +1066,7 @@ static void encode_dispatch(
             &dsz,
             (char*)base + m->deref[d].byte_off + 8,
             sizeof dsz);
-        long bytes = dsz < 0 ? -dsz : dsz;
+        size_t bytes = dsz < 0 ? (size_t)-dsz : (size_t)dsz;
         _Bool deref_read_only = dsz < 0;
         int bi = m->deref[d].buf_idx;
         struct batch_shared *sh =
@@ -1075,11 +1076,11 @@ static void encode_dispatch(
             && dptr >= sh->host
             && dptr <  sh->host + sh->copy_sz;
         if (overlap) {
-            offsets[bi] = dptr - sh->host;
+            offsets[bi] = (size_t)(dptr - sh->host);
             m->per_bufs[bi] = sh->mtl;
         } else {
             size_t pg = (size_t)sysconf(_SC_PAGESIZE);
-            size_t aligned_sz = ((size_t)bytes + pg - 1) & ~(pg - 1);
+            size_t aligned_sz = (bytes + pg - 1) & ~(pg - 1);
             _Bool can_nocopy = ((uintptr_t)dptr & (pg - 1)) == 0;
             id<MTLBuffer> tmp;
             if (can_nocopy) {
@@ -1092,7 +1093,7 @@ static void encode_dispatch(
                 tmp = [device
                     newBufferWithLength:(NSUInteger)bytes
                                 options:MTLResourceStorageModeShared];
-                __builtin_memcpy(tmp.contents, dptr, (size_t)bytes);
+                __builtin_memcpy(tmp.contents, dptr, bytes);
             }
             void *retained =
                 (__bridge_retained void*)tmp;

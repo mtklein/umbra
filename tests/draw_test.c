@@ -8,9 +8,9 @@ typedef struct {
 } draw_backends;
 
 static void uni_f32(char *u, int off, float const *v, int n) {
-    __builtin_memcpy(u + off, v, (unsigned long)n * 4);
+    __builtin_memcpy(u + off, v, (size_t)n * 4);
 }
-static void uni_ptr(char *u, int off, void *p, long sz) {
+static void uni_ptr(char *u, int off, void *p, ptrdiff_t sz) {
     __builtin_memcpy(u + off, &p, 8);
     __builtin_memcpy(u + off + 8, &sz, 8);
 }
@@ -44,7 +44,7 @@ static void test_solid_src(void) {
             0xFFFFFFFF,
         };
         float     color[4] = {1, 0, 0, 1};
-        long long uni_[3] = {0};
+        uint64_t uni_[3] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 4, 1,
@@ -73,7 +73,7 @@ static void test_solid_src_n1(void) {
     for (int bi = 0; bi < 3; bi++) {
         uint32_t  dst[1] = {0xFFFFFFFF};
         float     color[4] = {0, 0, 1, 1};
-        long long uni_[3] = {0};
+        uint64_t uni_[3] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 1, 1,
@@ -101,7 +101,7 @@ static void test_solid_src_n9(void) {
         uint32_t dst[9];
         __builtin_memset(dst, 0xFF, sizeof dst);
         float     color[4] = {0, 1, 0, 1};
-        long long uni_[3] = {0};
+        uint64_t uni_[3] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 9, 1,
@@ -129,7 +129,7 @@ static void test_solid_src_n16(void) {
         uint32_t dst[16];
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {1, 1, 1, 1};
-        long long uni_[3] = {0};
+        uint64_t uni_[3] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 16, 1,
@@ -154,7 +154,7 @@ static void test_srcover_8888(void) {
     for (int bi = 0; bi < 3; bi++) {
         uint32_t  dst[2] = {0xFFFFFFFF, 0xFFFFFFFF};
         float     color[4] = {0, 0.5f, 0, 0.5f};
-        long long uni_[3] = {0};
+        uint64_t uni_[3] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 2, 1,
@@ -188,7 +188,7 @@ static void test_dstover_8888(void) {
     for (int bi = 0; bi < 3; bi++) {
         uint32_t  dst[2] = {0xFFFFFFFF, 0xFFFFFFFF};
         float     color[4] = {1, 0, 0, 1};
-        long long uni_[3] = {0};
+        uint64_t uni_[3] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 2, 1,
@@ -213,7 +213,7 @@ static void test_dstover_transparent(void) {
     for (int bi = 0; bi < 3; bi++) {
         uint32_t  dst[2] = {0, 0};
         float     color[4] = {1, 0, 0, 1};
-        long long uni_[3] = {0};
+        uint64_t uni_[3] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 2, 1,
@@ -241,7 +241,7 @@ static void test_multiply_8888(void) {
     for (int bi = 0; bi < 3; bi++) {
         uint32_t  dst[2] = {0xFF804020, 0xFF804020};
         float     color[4] = {1, 1, 1, 1};
-        long long uni_[3] = {0};
+        uint64_t uni_[3] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 2, 1,
@@ -275,7 +275,7 @@ static void test_solid_src_fp16(void) {
         __fp16 dst[4 * 3];
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {0.25f, 0.5f, 0.75f, 1};
-        long long uni_[3] = {0};
+        uint64_t uni_[3] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 3, 1,
@@ -311,7 +311,7 @@ static void test_srcover_fp16(void) {
             dst[i * 4 + 3] = 1;
         }
         float     color[4] = {0, 0.5f, 0, 0.5f};
-        long long uni_[3] = {0};
+        uint64_t uni_[3] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 2, 1,
@@ -347,7 +347,7 @@ static void test_coverage_rect(void) {
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {1, 0, 0, 1};
         float     rect[4] = {2.0f, 0.0f, 5.0f, 1.0f};
-        long long uni_[5] = {0};
+        uint64_t uni_[5] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         uni_f32(uni, B.lay.coverage, rect, 4);
@@ -382,7 +382,7 @@ static void test_coverage_rect_scalar(void) {
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {1, 0, 0, 1};
         float     rect[4] = {1.0f, 0.0f, 3.0f, 1.0f};
-        long long uni_[5] = {0};
+        uint64_t uni_[5] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         uni_f32(uni, B.lay.coverage, rect, 4);
@@ -415,7 +415,7 @@ static void test_coverage_rect_n9(void) {
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {0, 1, 0, 1};
         float     rect[4] = {3.0f, 0.0f, 7.0f, 1.0f};
-        long long uni_[5] = {0};
+        uint64_t uni_[5] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         uni_f32(uni, B.lay.coverage, rect, 4);
@@ -449,7 +449,7 @@ static void test_coverage_rect_offset(void) {
         __builtin_memset(dst, 0, sizeof dst);
         float color[4] = {0, 1, 0, 1};
         float rect[4] = {1.0f, 0.0f, 3.0f, 10.0f};
-        long long uni_[5] = {0};
+        uint64_t uni_[5] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         uni_f32(uni, B.lay.coverage, rect, 4);
@@ -484,7 +484,7 @@ static void test_coverage_rect_outside_y(void) {
         };
         float     color[4] = {1, 1, 1, 1};
         float     rect[4] = {0.0f, 5.0f, 10.0f, 10.0f};
-        long long uni_[5] = {0};
+        uint64_t uni_[5] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         uni_f32(uni, B.lay.coverage, rect, 4);
@@ -513,7 +513,7 @@ static void test_no_shader(void) {
             0xFFFFFFFF,
             0xFFFFFFFF,
         };
-        long long uni_[1] = {0};
+        uint64_t uni_[1] = {0};
         char     *uni = (char *)uni_;
         if (!run_draw(&B, bi, 4, 1,
                       (umbra_buf[]){
@@ -536,7 +536,7 @@ static void test_no_blend(void) {
     for (int bi = 0; bi < 3; bi++) {
         uint32_t  dst[2] = {0, 0};
         float     color[4] = {1, 0, 1, 1};
-        long long uni_[3] = {0};
+        uint64_t uni_[3] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 2, 1,
@@ -575,7 +575,7 @@ static void test_gradient_shader(void) {
     for (int bi = 0; bi < 3; bi++) {
         uint32_t  dst[4] = {0, 0, 0, 0};
         float     params[2] = {4.0f, 1.0f};
-        long long uni_[2] = {0};
+        uint64_t uni_[2] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, params, 2);
         if (!run_draw(&B, bi, 4, 1,
@@ -604,7 +604,7 @@ static void test_multiply_half_alpha(void) {
     for (int bi = 0; bi < 3; bi++) {
         uint32_t  dst[2] = {0x80FF0000, 0x80FF0000};
         float     color[4] = {1, 0, 0, 0.5f};
-        long long uni_[3] = {0};
+        uint64_t uni_[3] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 2, 1,
@@ -639,7 +639,7 @@ static void test_srcover_8888_n9(void) {
         uint32_t dst[9];
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {1, 0, 0, 0.5f};
-        long long uni_[3] = {0};
+        uint64_t uni_[3] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 9, 1,
@@ -671,7 +671,7 @@ static void test_full_pipeline(void) {
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {1, 0, 0, 1};
         float     rect[4] = {2.0f, 0.0f, 7.0f, 1.0f};
-        long long uni_[5] = {0};
+        uint64_t uni_[5] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         uni_f32(uni, B.lay.coverage, rect, 4);
@@ -711,7 +711,7 @@ static void test_solid_src_fp16_n9(void) {
         __fp16 dst[4 * 9];
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {0.125f, 0.25f, 0.5f, 1};
-        long long uni_[3] = {0};
+        uint64_t uni_[3] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 9, 1,
@@ -761,7 +761,7 @@ static void test_coverage_rect_white_dst(void) {
                 rc.x1,
                 1.0f,
             };
-            long long uni_[5] = {0};
+            uint64_t uni_[5] = {0};
             char     *uni = (char *)uni_;
             uni_f32(uni, B.lay.shader, color, 4);
             uni_f32(uni, B.lay.coverage, rect, 4);
@@ -797,10 +797,10 @@ static void test_coverage_bitmap(void) {
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {1, 1, 1, 1};
         uint16_t  cov[8] = {0, 128, 255, 0, 0, 0, 0, 0};
-        long long uni_[5] = {0};
+        uint64_t uni_[5] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
-        uni_ptr(uni, B.lay.coverage, cov, (long)sizeof cov);
+        uni_ptr(uni, B.lay.coverage, cov, (ptrdiff_t)sizeof cov);
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           {uni, (size_t)B.lay.uni_len, 1},
@@ -828,10 +828,10 @@ static void test_coverage_sdf(void) {
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {1, 1, 1, 1};
         uint16_t  cov[8] = {0, 100, 128, 200, 255, 0, 0, 0};
-        long long uni_[5] = {0};
+        uint64_t uni_[5] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
-        uni_ptr(uni, B.lay.coverage, cov, (long)sizeof cov);
+        uni_ptr(uni, B.lay.coverage, cov, (ptrdiff_t)sizeof cov);
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           {uni, (size_t)B.lay.uni_len, 1},
@@ -862,11 +862,11 @@ static void test_coverage_bitmap_matrix(void) {
         float    mat[11] = {
             1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1,
         };
-        long long uni_[11] = {0};
+        uint64_t uni_[11] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         uni_f32(uni, B.lay.coverage, mat, 11);
-        uni_ptr(uni, ptr_off, bmp, (long)sizeof bmp);
+        uni_ptr(uni, ptr_off, bmp, (ptrdiff_t)sizeof bmp);
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           {uni, (size_t)B.lay.uni_len, 1},
@@ -898,11 +898,11 @@ static void test_coverage_bitmap_matrix_oob(void) {
         float    mat[11] = {
             1, 0, 0, 0, 1, 0, 0.001f, 0, 1, 2, 2,
         };
-        long long uni_[11] = {0};
+        uint64_t uni_[11] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         uni_f32(uni, B.lay.coverage, mat, 11);
-        uni_ptr(uni, ptr_off, bmp, (long)sizeof bmp);
+        uni_ptr(uni, ptr_off, bmp, (ptrdiff_t)sizeof bmp);
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           {uni, (size_t)B.lay.uni_len, 1},
@@ -926,7 +926,7 @@ static void test_linear_2(void) {
         uint32_t  dst[4] = {0};
         float     colors[8] = {1, 0, 0, 1, 0, 0, 1, 1};
         float     params[3] = {0.25f, 0, 0};
-        long long uni_[7] = {0};
+        uint64_t uni_[7] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, params, 3);
         uni_f32(uni, B.lay.shader + 12, colors, 8);
@@ -957,7 +957,7 @@ static void test_radial_2(void) {
         uint32_t  dst[1] = {0};
         float     colors[8] = {1, 1, 1, 1, 0, 0, 0, 1};
         float     params[3] = {0, 0, 0.1f};
-        long long uni_[7] = {0};
+        uint64_t uni_[7] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, params, 3);
         uni_f32(uni, B.lay.shader + 12, colors, 8);
@@ -993,10 +993,10 @@ static void test_linear_grad(void) {
     for (int bi = 0; bi < 3; bi++) {
         uint32_t  dst[8] = {0};
         float     params[4] = {0.125f, 0, 0, 256};
-        long long uni_[5] = {0};
+        uint64_t uni_[5] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, params, 4);
-        uni_ptr(uni, lut_off, lut, (long)sizeof lut);
+        uni_ptr(uni, lut_off, lut, (ptrdiff_t)sizeof lut);
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           {uni, (size_t)B.lay.uni_len, 1},
@@ -1031,10 +1031,10 @@ static void test_radial_grad(void) {
     for (int bi = 0; bi < 3; bi++) {
         uint32_t  dst[1] = {0};
         float     params[4] = {0, 0, 0.1f, 64};
-        long long uni_[5] = {0};
+        uint64_t uni_[5] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, params, 4);
-        uni_ptr(uni, lut_off, lut, (long)sizeof lut);
+        uni_ptr(uni, lut_off, lut, (ptrdiff_t)sizeof lut);
         if (!run_draw(&B, bi, 1, 1,
                       (umbra_buf[]){
                           {uni, (size_t)B.lay.uni_len, 1},
@@ -1068,10 +1068,10 @@ static void test_gradient_lut_nonuniform(void) {
     for (int bi = 0; bi < 3; bi++) {
         uint32_t  dst[8] = {0};
         float     params[4] = {0.125f, 0, 0, 64};
-        long long uni_[5] = {0};
+        uint64_t uni_[5] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, params, 4);
-        uni_ptr(uni, lut_off, lut, (long)sizeof lut);
+        uni_ptr(uni, lut_off, lut, (ptrdiff_t)sizeof lut);
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           {uni, (size_t)B.lay.uni_len, 1},
@@ -1127,7 +1127,7 @@ static void test_transfer_invert(void) {
         __fp16 dst[4 * 2];
         __builtin_memset(dst, 0, sizeof dst);
         float     color0[4] = {0.5f, 0.5f, 0.5f, 1};
-        long long uni_[3] = {0};
+        uint64_t uni_[3] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color0, 4);
         if (!run_draw(&B, bi, 2, 1,
@@ -1170,7 +1170,7 @@ static void test_transfer_apply(void) {
         __fp16 dst[4 * 2];
         __builtin_memset(dst, 0, sizeof dst);
         float     color0[4] = {0.5f, 0.5f, 0.5f, 1};
-        long long uni_[3] = {0};
+        uint64_t uni_[3] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color0, 4);
         if (!run_draw(&B, bi, 2, 1,
@@ -1216,7 +1216,7 @@ static void test_transfer_roundtrip(void) {
         __fp16 dst[4 * 4];
         __builtin_memset(dst, 0, sizeof dst);
         float     color0[4] = {0.25f, 0.5f, 0.75f, 1};
-        long long uni_[3] = {0};
+        uint64_t uni_[3] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color0, 4);
         if (!run_draw(&B, bi, 4, 1,
@@ -1256,7 +1256,7 @@ static void test_supersample(void) {
 
     for (int bi = 0; bi < 3; bi++) {
         uint32_t  dst[4] = {0};
-        long long uni_[3] = {0};
+        uint64_t uni_[3] = {0};
         char     *uni = (char *)uni_;
         float     color[4] = {1, 0, 0, 1};
         uni_f32(uni, B.lay.shader, color, 4);
@@ -1301,7 +1301,7 @@ static void test_page_aligned_buffer(void) {
 #pragma clang diagnostic pop
 
     float     color[4] = {0, 1, 0, 1};
-    long long uni_[3] = {0};
+    uint64_t uni_[3] = {0};
     char     *uni = (char *)uni_;
     uni_f32(uni, B.lay.shader, color, 4);
 

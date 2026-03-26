@@ -30,12 +30,12 @@ static void persp_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     persp_state *st = s->state;
     float        hc[4];
     for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
-    long long uni_[12] = {0};
+    uint64_t uni_[12] = {0};
     char     *uni = (char *)uni_;
     slide_uni_f32(uni, lay->shader, hc, 4);
     slide_uni_f32(uni, lay->coverage, st->mat, 11);
     slide_uni_ptr(uni, (lay->coverage + 11 * 4 + 7) & ~7, st->bitmap->data,
-                  (long)(st->bitmap->w * st->bitmap->h * 2));
+                  (ptrdiff_t)(st->bitmap->w * st->bitmap->h * 2));
     int       ps = lay->ps;
     size_t plane_sz = (size_t)w * (size_t)h * lay->pixel_bytes;
     umbra_buf ubuf[5];

@@ -54,7 +54,7 @@ static void solid_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     };
     float hc[4];
     for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
-    long long uni_[6] = {0};
+    uint64_t uni_[6] = {0};
     char     *uni = (char *)uni_;
     slide_uni_f32(uni, lay->shader, hc, 4);
     if (s->coverage) { slide_uni_f32(uni, lay->coverage, rect, 4); }
