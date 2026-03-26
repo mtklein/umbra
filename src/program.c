@@ -7,9 +7,10 @@ static void nop_dump(void const *ctx, FILE *f) { (void)ctx; (void)f; }
 struct umbra_backend {
     struct umbra_program *(*compile)(struct umbra_backend *,
                                      struct umbra_basic_block const *);
-    void (*flush)(struct umbra_backend *);
-    void (*free_fn)(struct umbra_backend *);
-    void *ctx;
+    void  (*flush)(struct umbra_backend *);
+    void  (*free_fn)(struct umbra_backend *);
+    void  *ctx;
+    int     threadsafe, :32;
 };
 
 struct umbra_program {
@@ -45,6 +46,7 @@ struct umbra_backend *umbra_backend_interp(void) {
         .compile = compile_interp,
         .flush = nop_flush,
         .free_fn = free_be_interp,
+        .threadsafe = 1,
     };
     return be;
 }
@@ -75,6 +77,7 @@ struct umbra_backend *umbra_backend_jit(void) {
         .compile = compile_jit,
         .flush = nop_flush,
         .free_fn = free_be_jit,
+        .threadsafe = 1,
     };
     return be;
 }
@@ -124,6 +127,10 @@ struct umbra_program *umbra_backend_compile(struct umbra_backend           *be,
 
 void umbra_backend_flush(struct umbra_backend *be) {
     if (be) { be->flush(be); }
+}
+
+_Bool umbra_backend_threadsafe(struct umbra_backend *be) {
+    return be && be->threadsafe;
 }
 
 void umbra_backend_free(struct umbra_backend *be) {

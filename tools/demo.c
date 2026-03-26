@@ -387,11 +387,11 @@ int main(void) {
                 int y0 = t * sh;
                 int y1 = y0 + sh > H ? H : y0 + sh;
                 struct umbra_program *tp;
-                if (cur_backend == 2) { tp = b; }
-                else                  { tp = t == 0 ? b : xtra_progs[t]; }
+                if (!umbra_backend_threadsafe(bes[cur_backend])) { tp = b; }
+                else { tp = t == 0 ? b : xtra_progs[t]; }
                 work[t] = (tile_work){s, W, H, y0, y1, pixbuf, &draw_layout, tp};
             }
-            if (cur_backend == 2) {
+            if (!umbra_backend_threadsafe(bes[cur_backend])) {
                 for (int t = 0; t < nt; t++) { tile_fn(&work[t]); }
             } else {
                 work_group wg = {.pool = pool};
