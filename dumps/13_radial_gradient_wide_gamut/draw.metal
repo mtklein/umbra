@@ -1,10 +1,13 @@
 #include <metal_stdlib>
 using namespace metal;
 
-static inline int clamp_ix(int ix, uint bytes, int elem) {
-    int hi = (int)(bytes / (uint)elem) - 1;
-    if (hi < 0) hi = 0;
-    return clamp(ix, 0, hi);
+static inline int safe_ix(int ix, uint bytes, int elem) {
+    int count = (int)(bytes / (uint)elem);
+    return clamp(ix, 0, max(count-1, 0));
+}
+static inline uint oob_mask(int ix, uint bytes, int elem) {
+    int count = (int)(bytes / (uint)elem);
+    return (ix >= 0 && ix < count) ? ~0u : 0u;
 }
 
 kernel void umbra_entry(
@@ -55,25 +58,25 @@ kernel void umbra_entry(
     uint v35 = v33 + v12;
     uint v36 = v10 + v33;
     uint v37 = v33 + v13;
-    uint v38 = ((device uint*)p2)[clamp_ix((int)v37,buf_szs[2],4)];
+    uint v38 = ((device uint*)p2)[safe_ix((int)v37,buf_szs[2],4)] & oob_mask((int)v37,buf_szs[2],4);
     uint v39 = v32 + v12;
-    uint v40 = ((device uint*)p2)[clamp_ix((int)v39,buf_szs[2],4)];
+    uint v40 = ((device uint*)p2)[safe_ix((int)v39,buf_szs[2],4)] & oob_mask((int)v39,buf_szs[2],4);
     uint v41 = v10 + v32;
-    uint v42 = ((device uint*)p2)[clamp_ix((int)v41,buf_szs[2],4)];
+    uint v42 = ((device uint*)p2)[safe_ix((int)v41,buf_szs[2],4)] & oob_mask((int)v41,buf_szs[2],4);
     uint v43 = v32 + v13;
-    uint v44 = ((device uint*)p2)[clamp_ix((int)v43,buf_szs[2],4)];
+    uint v44 = ((device uint*)p2)[safe_ix((int)v43,buf_szs[2],4)] & oob_mask((int)v43,buf_szs[2],4);
     uint v45 = as_type<uint>(as_type<float>(v38) - as_type<float>(v44));
     uint v46 = as_type<uint>(fma(as_type<float>(v34), as_type<float>(v45), as_type<float>(v44)));
     uint v47 = as_type<uint>(as_type<float>(v46) * as_type<float>(v14));
     uint v48 = as_type<uint>((int)rint(as_type<float>(v47)));
-    uint v49 = ((device uint*)p2)[clamp_ix((int)v35,buf_szs[2],4)];
+    uint v49 = ((device uint*)p2)[safe_ix((int)v35,buf_szs[2],4)] & oob_mask((int)v35,buf_szs[2],4);
     uint v50 = as_type<uint>(as_type<float>(v49) - as_type<float>(v40));
     uint v51 = as_type<uint>(fma(as_type<float>(v34), as_type<float>(v50), as_type<float>(v40)));
-    uint v52 = ((device uint*)p2)[clamp_ix((int)v36,buf_szs[2],4)];
+    uint v52 = ((device uint*)p2)[safe_ix((int)v36,buf_szs[2],4)] & oob_mask((int)v36,buf_szs[2],4);
     uint v53 = as_type<uint>(as_type<float>(v52) - as_type<float>(v42));
     uint v54 = as_type<uint>(fma(as_type<float>(v34), as_type<float>(v53), as_type<float>(v42)));
-    uint v55 = ((device uint*)p2)[clamp_ix((int)v33,buf_szs[2],4)];
-    uint v56 = ((device uint*)p2)[clamp_ix((int)v32,buf_szs[2],4)];
+    uint v55 = ((device uint*)p2)[safe_ix((int)v33,buf_szs[2],4)] & oob_mask((int)v33,buf_szs[2],4);
+    uint v56 = ((device uint*)p2)[safe_ix((int)v32,buf_szs[2],4)] & oob_mask((int)v32,buf_szs[2],4);
     uint v57 = as_type<uint>(as_type<float>(v55) - as_type<float>(v56));
     uint v58 = as_type<uint>(fma(as_type<float>(v34), as_type<float>(v57), as_type<float>(v56)));
     uint v59 = as_type<uint>(as_type<float>(v58) * as_type<float>(v14));

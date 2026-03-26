@@ -1,10 +1,13 @@
 #include <metal_stdlib>
 using namespace metal;
 
-static inline int clamp_ix(int ix, uint bytes, int elem) {
-    int hi = (int)(bytes / (uint)elem) - 1;
-    if (hi < 0) hi = 0;
-    return clamp(ix, 0, hi);
+static inline int safe_ix(int ix, uint bytes, int elem) {
+    int count = (int)(bytes / (uint)elem);
+    return clamp(ix, 0, max(count-1, 0));
+}
+static inline uint oob_mask(int ix, uint bytes, int elem) {
+    int count = (int)(bytes / (uint)elem);
+    return (ix >= 0 && ix < count) ? ~0u : 0u;
 }
 
 kernel void umbra_entry(

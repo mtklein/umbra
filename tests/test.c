@@ -1571,10 +1571,10 @@ static void test_gather_clamp(void) {
                          })) {
                     continue;
                 }
-                (dst[0] == 10) here;
+                (dst[0] == 0) here;
                 (dst[1] == 10) here;
                 (dst[2] == 30) here;
-                (dst[3] == 30) here;
+                (dst[3] == 0) here;
             }
             cleanup(&B);
         }
@@ -1597,10 +1597,10 @@ static void test_gather_clamp(void) {
                          })) {
                     continue;
                 }
-                (dst[0] == 100) here;
+                (dst[0] == 0) here;
                 (dst[1] == 200) here;
-                (dst[2] == 300) here;
-                (dst[3] == 300) here;
+                (dst[2] == 0) here;
+                (dst[3] == 0) here;
             }
             cleanup(&B);
         }
@@ -1623,10 +1623,10 @@ static void test_gather_clamp_zero_sz(void) {
             {src, sizeof src, 0},
             {dst, 4, 0},
         })) { continue; }
-        (dst[0] == 100) here;
+        (dst[0] == 0) here;
     }
 
-    // gather_uniform with over-range index → clamped to last.
+    // gather_uniform with over-range index → OOB returns 0.
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         int32_t big_idx[] = {999};
         int32_t src[3] = {100, 200, 300};
@@ -1636,7 +1636,7 @@ static void test_gather_clamp_zero_sz(void) {
             {src, sizeof src, 0},
             {dst, 4, 0},
         })) { continue; }
-        (dst[0] == 300) here;
+        (dst[0] == 0) here;
     }
     cleanup(&B);
 }

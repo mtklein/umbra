@@ -1,10 +1,13 @@
 #include <metal_stdlib>
 using namespace metal;
 
-static inline int clamp_ix(int ix, uint bytes, int elem) {
-    int hi = (int)(bytes / (uint)elem) - 1;
-    if (hi < 0) hi = 0;
-    return clamp(ix, 0, hi);
+static inline int safe_ix(int ix, uint bytes, int elem) {
+    int count = (int)(bytes / (uint)elem);
+    return clamp(ix, 0, max(count-1, 0));
+}
+static inline uint oob_mask(int ix, uint bytes, int elem) {
+    int count = (int)(bytes / (uint)elem);
+    return (ix >= 0 && ix < count) ? ~0u : 0u;
 }
 
 kernel void umbra_entry(
@@ -36,22 +39,22 @@ kernel void umbra_entry(
     uint v16 = ((device const uint*)p0)[16];
     uint v17 = 6u;
     uint v18 = v16 * v17;
-    uint v19 = ((device uint*)p2)[clamp_ix((int)v18,buf_szs[2],4)];
+    uint v19 = ((device uint*)p2)[safe_ix((int)v18,buf_szs[2],4)] & oob_mask((int)v18,buf_szs[2],4);
     uint v20 = 1u;
     uint v21 = v18 + v20;
-    uint v22 = ((device uint*)p2)[clamp_ix((int)v21,buf_szs[2],4)];
+    uint v22 = ((device uint*)p2)[safe_ix((int)v21,buf_szs[2],4)] & oob_mask((int)v21,buf_szs[2],4);
     uint v23 = 2u;
     uint v24 = v18 + v23;
-    uint v25 = ((device uint*)p2)[clamp_ix((int)v24,buf_szs[2],4)];
+    uint v25 = ((device uint*)p2)[safe_ix((int)v24,buf_szs[2],4)] & oob_mask((int)v24,buf_szs[2],4);
     uint v26 = 3u;
     uint v27 = v18 + v26;
-    uint v28 = ((device uint*)p2)[clamp_ix((int)v27,buf_szs[2],4)];
+    uint v28 = ((device uint*)p2)[safe_ix((int)v27,buf_szs[2],4)] & oob_mask((int)v27,buf_szs[2],4);
     uint v29 = 4u;
     uint v30 = v18 + v29;
-    uint v31 = ((device uint*)p2)[clamp_ix((int)v30,buf_szs[2],4)];
+    uint v31 = ((device uint*)p2)[safe_ix((int)v30,buf_szs[2],4)] & oob_mask((int)v30,buf_szs[2],4);
     uint v32 = 5u;
     uint v33 = v18 + v32;
-    uint v34 = ((device uint*)p2)[clamp_ix((int)v33,buf_szs[2],4)];
+    uint v34 = ((device uint*)p2)[safe_ix((int)v33,buf_szs[2],4)] & oob_mask((int)v33,buf_szs[2],4);
     uint v35 = 3212836864u;
     uint v36 = pos.x;
     uint v37 = as_type<uint>((float)(int)v36);

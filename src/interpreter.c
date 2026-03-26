@@ -118,14 +118,11 @@ struct umbra_interpreter {
                     int row, void *ptr[], long sz[])
 #define next return ip[1].fn(ip + 1, v + 1, end, n, w, row, ptr, sz)
 
-static I32 clamp_ix(I32 ix, long bytes, int elem) {
+static I32 oob_mask(I32 ix, long bytes, int elem) {
     I32 zero = {0};
-    int hi = (int)(bytes / elem) - 1;
-    if (hi < 0) { hi = 0; }
-    I32 max_ix = zero + hi;
-    ix = (I32)((ix > zero) & ix) | (I32)((ix <= zero) & zero);
-    ix = (I32)((ix < max_ix) & ix) | (I32)((ix >= max_ix) & max_ix);
-    return ix;
+    int count = (int)(bytes / elem);
+    I32 cnt = zero + count;
+    return (I32)(ix >= zero) & (I32)(ix < cnt);
 }
 
 op(imm_32) {
@@ -276,10 +273,8 @@ op(store_64) {
 
 op(gather_uniform_16) {
     int ix = v[ip->y].i32[0];
-    int hi = (int)(sz[ip->x] / 2) - 1;
-    if (hi < 0) { hi = 0; }
-    if (ix < 0) { ix = 0; }
-    if (ix > hi) { ix = hi; }
+    int count = (int)(sz[ip->x] / 2);
+    if (ix < 0 || ix >= count) { v->u32 = (U32){0}; next; }
     uint16_t s;
     __builtin_memcpy(&s, (char const *)ptr[ip->x] + 2 * ix, 2);
     U16 packed = (U16){0} + s;
@@ -289,10 +284,8 @@ op(gather_uniform_16) {
 }
 op(gather_uniform_32) {
     int ix = v[ip->y].i32[0];
-    int hi = (int)(sz[ip->x] / 4) - 1;
-    if (hi < 0) { hi = 0; }
-    if (ix < 0) { ix = 0; }
-    if (ix > hi) { ix = hi; }
+    int count = (int)(sz[ip->x] / 4);
+    if (ix < 0 || ix >= count) { v->i32 = (I32){0}; next; }
     int32_t val;
     __builtin_memcpy(&val, (char const *)ptr[ip->x] + 4 * ix, 4);
     v->i32 = (I32){0} + val;
@@ -300,21 +293,29 @@ op(gather_uniform_32) {
 }
 
 op(gather_16) {
-    I32 ix = clamp_ix(v[ip->y].i32, sz[ip->x], 2);
+    I32 ix = v[ip->y].i32;
+    I32 mask = oob_mask(ix, sz[ip->x], 2);
+    I32 safe = ix & mask;
     int rem = n - (end - K);
     v->u32 = (U32){0};
     for (int l = 0; l < (rem < K ? rem : K); l++) {
         uint16_t s;
-        __builtin_memcpy(&s, (char const *)ptr[ip->x] + 2 * ix[l], 2);
+        __builtin_memcpy(&s, (char const *)ptr[ip->x] + 2 * safe[l], 2);
+        s = (uint16_t)(s & (uint16_t)mask[l]);
         __builtin_memcpy((char *)v + 2 * l, &s, 2);
     }
     next;
 }
 op(gather_32) {
-    I32 ix = clamp_ix(v[ip->y].i32, sz[ip->x], 4);
+    I32 ix = v[ip->y].i32;
+    I32 mask = oob_mask(ix, sz[ip->x], 4);
+    I32 safe = ix & mask;
     int rem = n - (end - K);
+    v->i32 = (I32){0};
     for (int l = 0; l < (rem < K ? rem : K); l++) {
-        __builtin_memcpy((char *)&v->i32 + 4 * l, (char const *)ptr[ip->x] + 4 * ix[l], 4);
+        int32_t tmp;
+        __builtin_memcpy(&tmp, (char const *)ptr[ip->x] + 4 * safe[l], 4);
+        v->i32[l] = tmp & mask[l];
     }
     next;
 }

@@ -102,31 +102,22 @@ static void resolve_ptr(Buf *c, int p, int *last_ptr, int const *deref_gpr) {
     }
 }
 
-static void load_max_ix(Buf *c, int p, int elem_shift, int const *deref_gpr) {
+static void load_count(Buf *c, int p, int elem_shift, int const *deref_gpr) {
     if (p < 0) {
         (void)deref_gpr;
         put(c, 0xd2a00000u | (0x7fffu << 5) | (uint32_t)XM);
         return;
     }
     int disp = p * (int)sizeof(umbra_buf) + 8;
-    // LDR XM, [XBUF, #disp]  (sz is size_t, always non-negative)
     put(c, 0xf9400000u | ((uint32_t)(disp / 8) << 10) | ((uint32_t)XBUF << 5) | (uint32_t)XM);
-    put(c,
-        0x53000000u
-            | ((uint32_t)elem_shift << 16)
-            | (31u << 10)
-            | ((uint32_t)XM << 5)
-            | (uint32_t)XM);
-    put(c, 0x71000000u | (1u << 10) | ((uint32_t)XM << 5) | (uint32_t)XM);
-    put(c, 0x1a800000u | ((uint32_t)XM << 16) | (0x4u << 12) | (31u << 5) | (uint32_t)XM);
-}
-
-static void clamp_wt(Buf *c) {
-    put(c, 0x7100001fu | ((uint32_t)XT << 5));
-    put(c, 0x1a800000u | ((uint32_t)XT << 16) | (0xbu << 12) | (31u << 5) | (uint32_t)XT);
-    put(c, 0x6b00001fu | ((uint32_t)XM << 16) | ((uint32_t)XT << 5));
-    put(c,
-        0x1a800000u | ((uint32_t)XT << 16) | (0xau << 12) | ((uint32_t)XM << 5) | (uint32_t)XT);
+    if (elem_shift) {
+        put(c,
+            0x53000000u
+                | ((uint32_t)elem_shift << 16)
+                | (31u << 10)
+                | ((uint32_t)XM << 5)
+                | (uint32_t)XM);
+    }
 }
 
 static void vld(Buf *c, int vd, int s) { put(c, LDR_qi(vd, XS, s)); }
@@ -666,10 +657,11 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
-            load_max_ix(c, p, 2, deref_gpr);
+            load_count(c, p, 2, deref_gpr);
             put(c, UMOV_ws(XT, rx));
-            clamp_wt(c);
-            // LDR W XT, [XP, XT, LSL #2]
+            put(c, MOVI_4s(s.rd, 0, 0));
+            put(c, 0x6b00001fu | ((uint32_t)XM << 16) | ((uint32_t)XT << 5));
+            put(c, Bcond(0x2, 3));
             put(c, 0xb8607800u | ((uint32_t)XT << 16)
                                | ((uint32_t)XP << 5) | (uint32_t)XT);
             put(c, DUP_4s_w(s.rd, XT));
@@ -681,15 +673,19 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
-            load_max_ix(c, p, 2, deref_gpr);
+            load_count(c, p, 2, deref_gpr);
             if (scalar) {
+                put(c, MOVI_4s(s.rd, 0, 0));
                 put(c, UMOV_ws(XT, rx));
-                clamp_wt(c);
+                put(c, 0x6b00001fu | ((uint32_t)XM << 16) | ((uint32_t)XT << 5));
+                put(c, Bcond(0x2, 2));
                 put(c, LDR_sx(s.rd, XP, XT));
             } else {
+                put(c, MOVI_4s(s.rd, 0, 0));
                 for (int k = 0; k < 4; k++) {
                     put(c, UMOV_ws_lane(XT, rx, k));
-                    clamp_wt(c);
+                    put(c, 0x6b00001fu | ((uint32_t)XM << 16) | ((uint32_t)XT << 5));
+                    put(c, Bcond(0x2, 4));
                     put(c, LSL_xi(XT, XT, 2));
                     put(c, ADD_xr(XT, XP, XT));
                     put(c, LD1_s(s.rd, k, XT));
@@ -703,13 +699,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
-            load_max_ix(c, p, 1, deref_gpr);
+            load_count(c, p, 1, deref_gpr);
             put(c, UMOV_ws(XT, rx));
-            clamp_wt(c);
-            // LDRH W XT, [XP, XT, LSL #1]
+            put(c, MOVI_4s(s.rd, 0, 0));
+            put(c, 0x6b00001fu | ((uint32_t)XM << 16) | ((uint32_t)XT << 5));
+            put(c, Bcond(0x2, 3));
             put(c, 0x78607800u | ((uint32_t)XT << 16)
                                | ((uint32_t)XP << 5) | (uint32_t)XT);
-            // DUP Vd.4H, Wn — broadcast to packed 16-bit lanes
             put(c, 0x0e020c00u | ((uint32_t)XT << 5) | (uint32_t)s.rd);
         } break;
 
@@ -719,18 +715,22 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr);
-            load_max_ix(c, p, 1, deref_gpr);
+            load_count(c, p, 1, deref_gpr);
             if (scalar) {
+                put(c, MOVI_4s(s.rd, 0, 0));
                 put(c, UMOV_ws(XT, rx));
-                clamp_wt(c);
+                put(c, 0x6b00001fu | ((uint32_t)XM << 16) | ((uint32_t)XT << 5));
+                put(c, Bcond(0x2, 5));
                 put(c, LSL_xi(XT, XT, 1));
                 put(c, ADD_xr(XT, XP, XT));
                 put(c, 0x79400000u | ((uint32_t)XT << 5) | (uint32_t)XT);
                 put(c, DUP_4s_w(s.rd, XT));
             } else {
+                put(c, MOVI_4s(s.rd, 0, 0));
                 for (int k = 0; k < 4; k++) {
                     put(c, UMOV_ws_lane(XT, rx, k));
-                    clamp_wt(c);
+                    put(c, 0x6b00001fu | ((uint32_t)XM << 16) | ((uint32_t)XT << 5));
+                    put(c, Bcond(0x2, 5));
                     put(c, LSL_xi(XT, XT, 1));
                     put(c, ADD_xr(XT, XP, XT));
                     put(c, 0x79400000u | ((uint32_t)XT << 5) | (uint32_t)XT);
@@ -1154,32 +1154,13 @@ static void patch_jcc(Buf *c, int fixup) {
     __builtin_memcpy(c->buf + fixup, &rel, 4);
 }
 
-static void load_max_ix_x86(Buf *c, int p, int elem_shift) {
+static void load_count_x86(Buf *c, int p, int elem_shift) {
     if (p < 0) {
         mov_ri(c, XM, 0x7fffffff);
         return;
     }
     mov_load(c, XM, XBUF, p * (int)sizeof(umbra_buf) + 8);
     if (elem_shift) { shr_ri(c, XM, (uint8_t)elem_shift); }
-    sub_ri(c, XM, 1);
-    test_rr(c, XM, XM);
-    int skip_zero = jcc(c, 0x09);
-    xor_rr(c, XM, XM);
-    patch_jcc(c, skip_zero);
-}
-
-static void clamp_eax_x86(Buf *c) {
-    emit1(c, 0x48);
-    emit1(c, 0x63);
-    emit1(c, 0xc0);
-    test_rr(c, RAX, RAX);
-    int skip_lo = jcc(c, 0x09);
-    xor_rr(c, RAX, RAX);
-    patch_jcc(c, skip_lo);
-    cmp_rr(c, RAX, XM);
-    int skip_hi = jcc(c, 0x0e);
-    mov_rr(c, RAX, XM);
-    patch_jcc(c, skip_hi);
 }
 
 
@@ -1832,10 +1813,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
             vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
             if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
-            load_max_ix_x86(c, p, 2);
-            clamp_eax_x86(c);
+            load_count_x86(c, p, 2);
+            vpxor(c, scalar ? 0 : 1, s.rd, s.rd, s.rd);
+            cmp_rr(c, RAX, XM);
+            int skip = jcc(c, 0x03);
             vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, RAX, 4, 0);
             if (!scalar) { vbroadcastss(c, s.rd, s.rd); }
+            patch_jcc(c, skip);
         } break;
 
         case op_gather_32: {
@@ -1846,20 +1830,36 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             if (scalar) {
                 vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
-                load_max_ix_x86(c, p, 2);
-                clamp_eax_x86(c);
+                load_count_x86(c, p, 2);
+                vpxor(c, 0, s.rd, s.rd, s.rd);
+                cmp_rr(c, RAX, XM);
+                int skip = jcc(c, 0x03);
                 vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, RAX, 4, 0);
+                patch_jcc(c, skip);
             } else {
                 int8_t mask = ra_alloc(ra, sl, ns);
                 int8_t clamped = ra_alloc(ra, sl, ns);
-                load_max_ix_x86(c, p, 2);
+                load_count_x86(c, p, 2);
                 vpxor(c, 1, mask, mask, mask);
                 vpmaxsd(c, clamped, rx, mask);
+                sub_ri(c, XM, 1);
+                test_rr(c, XM, XM);
+                int fix = jcc(c, 0x09);
+                xor_rr(c, XM, XM);
+                patch_jcc(c, fix);
                 vex(c, 1, 1, 0, 0, mask, 0, XM, 0x6e);
                 vbroadcastss(c, mask, mask);
                 vpminsd(c, clamped, clamped, mask);
                 vpcmpeqd(c, mask, mask, mask);
                 vpgatherdd(c, s.rd, base, clamped, 4, mask);
+                load_count_x86(c, p, 2);
+                vex(c, 1, 1, 0, 0, mask, 0, XM, 0x6e);
+                vbroadcastss(c, mask, mask);
+                vpcmpgtd(c, mask, mask, rx);
+                vpxor(c, 1, clamped, clamped, clamped);
+                vpcmpgtd(c, clamped, clamped, rx);
+                vex_rrr(c, 1, 1, 1, 0xDF, mask, clamped, mask);
+                vpand(c, 1, s.rd, s.rd, mask);
                 ra_return_reg(ra, clamped);
                 ra_return_reg(ra, mask);
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
@@ -1871,10 +1871,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x);
             int            p = inst->ptr;
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
-            load_max_ix_x86(c, p, 1);
+            load_count_x86(c, p, 1);
             vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
             if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
-            clamp_eax_x86(c);
+            vpxor(c, scalar ? 0 : 1, s.rd, s.rd, s.rd);
+            cmp_rr(c, RAX, XM);
+            int skip = jcc(c, 0x03);
             {
                 uint8_t rex = 0x40;
                 if (base >= 8) { rex |= 0x01; }
@@ -1885,8 +1887,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 emit1(c, (uint8_t)((1 << 6) | ((RAX & 7) << 3) | (base & 7)));
             }
             vex(c, 1, 1, 0, 0, s.rd, 0, RAX, 0x6e);
-            // VPBROADCASTW ymm, xmm — broadcast 16-bit to packed lanes
             if (!scalar) { vex_rr(c, 1, 2, 1, 0x79, s.rd, s.rd); }
+            patch_jcc(c, skip);
         } break;
 
         case op_gather_16: {
@@ -1894,12 +1896,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x);
             int            p = inst->ptr;
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
-            load_max_ix_x86(c, p, 1);
+            load_count_x86(c, p, 1);
             if (scalar) {
                 vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
-                clamp_eax_x86(c);
-                // MOVZX eax, word [base + rax*2]
+                vpxor(c, 0, s.rd, s.rd, s.rd);
+                cmp_rr(c, RAX, XM);
+                int skip = jcc(c, 0x03);
                 {
                     uint8_t rex = 0x40;
                     if (base >= 8) { rex |= 0x01; }
@@ -1910,11 +1913,11 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     emit1(c, (uint8_t)((1 << 6) | ((RAX & 7) << 3) | (base & 7)));
                 }
                 vex(c, 1, 1, 0, 0, s.rd, 0, RAX, 0x6e);
+                patch_jcc(c, skip);
             } else {
                 int8_t hi_idx = ra_alloc(ra, sl, ns);
                 vextracti128(c, hi_idx, rx, 1);
                 {
-                    // Gather 8 x u16, zero-extend to u32, build YMM
                     sub_ri(c, RSP, 32);
                     for (int k = 0; k < 8; k++) {
                         int src = (k < 4) ? rx : hi_idx;
@@ -1924,8 +1927,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                         } else {
                             vpextrd(c, RAX, src, (uint8_t)lane);
                         }
-                        clamp_eax_x86(c);
-                        // MOVZX eax, word [base + rax*2]
+                        cmp_rr(c, RAX, XM);
+                        int oob = jcc(c, 0x03);
                         {
                             uint8_t rex2 = 0x40;
                             if (base >= 8) { rex2 |= 0x01; }
@@ -1935,7 +1938,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                             emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
                             emit1(c, (uint8_t)((1 << 6) | ((RAX & 7) << 3) | (base & 7)));
                         }
-                        // MOV [RSP + k*4], eax
+                        int done = jmp(c);
+                        patch_jcc(c, oob);
+                        xor_rr(c, RAX, RAX);
+                        patch_jcc(c, done);
                         emit1(c, 0x89);
                         if (k == 0) {
                             emit1(c, 0x04);
@@ -1946,12 +1952,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                             emit1(c, (uint8_t)(k * 4));
                         }
                     }
-                    // Load 8xu32 from stack into YMM
                     vfill(c, s.rd, 0);
                     add_ri(c, RSP, 32);
-                    // Pack 8xu32 -> 8xu16:
-                    // VEXTRACTI128 hi, rd, 1
-                    // VPACKUSDW rd, rd, hi (128-bit)
                     vextracti128(c, hi_idx, s.rd, 1);
                     vex_rrr(c, 1, 2, 0, 0x2b, s.rd, s.rd, hi_idx);
                 }

@@ -190,13 +190,18 @@ static void emit_ops(Buf *b, BB const *bb,
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 emit(b, mixed
                     ? "%suint v%d = p%d_32"
-                      "[clamp_ix((int)v%d,"
-                      "buf_szs[%d],4)];\n"
+                      "[safe_ix((int)v%d,"
+                      "buf_szs[%d],4)]"
+                      " & oob_mask((int)v%d,"
+                      "buf_szs[%d],4);\n"
                     : "%suint v%d = "
                       "((device uint*)p%d)"
-                      "[clamp_ix((int)v%d,"
-                      "buf_szs[%d],4)];\n",
-                     pad, i, p, inst->x, p);
+                      "[safe_ix((int)v%d,"
+                      "buf_szs[%d],4)]"
+                      " & oob_mask((int)v%d,"
+                      "buf_szs[%d],4);\n",
+                     pad, i, p, inst->x, p,
+                     inst->x, p);
             } break;
             case op_store_32: {
                 int p = inst->ptr < 0
@@ -250,13 +255,18 @@ static void emit_ops(Buf *b, BB const *bb,
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 emit(b, mixed
                     ? "%suint v%d = (uint)(ushort)"
-                      "p%d_16[clamp_ix((int)v%d,"
-                      "buf_szs[%d],2)];\n"
+                      "p%d_16[safe_ix((int)v%d,"
+                      "buf_szs[%d],2)]"
+                      " & oob_mask((int)v%d,"
+                      "buf_szs[%d],2);\n"
                     : "%suint v%d = (uint)"
                       "((device ushort*)p%d)"
-                      "[clamp_ix((int)v%d,"
-                      "buf_szs[%d],2)];\n",
-                     pad, i, p, inst->x, p);
+                      "[safe_ix((int)v%d,"
+                      "buf_szs[%d],2)]"
+                      " & oob_mask((int)v%d,"
+                      "buf_szs[%d],2);\n",
+                     pad, i, p, inst->x, p,
+                     inst->x, p);
             } break;
             case op_store_16: {
                 int p = inst->ptr < 0
@@ -621,14 +631,23 @@ static char* build_source(BB const *bb,
          "using namespace metal;\n\n");
 
     emit(&b,
-         "static inline int clamp_ix"
+         "static inline int safe_ix"
          "(int ix, uint bytes, int elem) {\n");
     emit(&b,
-         "    int hi = (int)"
-         "(bytes / (uint)elem) - 1;\n");
-    emit(&b, "    if (hi < 0) hi = 0;\n");
+         "    int count = (int)"
+         "(bytes / (uint)elem);\n");
     emit(&b,
-         "    return clamp(ix, 0, hi);\n}\n\n");
+         "    return clamp(ix, 0,"
+         " max(count-1, 0));\n}\n");
+    emit(&b,
+         "static inline uint oob_mask"
+         "(int ix, uint bytes, int elem) {\n");
+    emit(&b,
+         "    int count = (int)"
+         "(bytes / (uint)elem);\n");
+    emit(&b,
+         "    return (ix >= 0 && ix < count)"
+         " ? ~0u : 0u;\n}\n\n");
 
     emit(&b, "kernel void umbra_entry(\n");
     emit(&b,

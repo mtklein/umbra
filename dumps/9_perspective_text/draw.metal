@@ -1,10 +1,13 @@
 #include <metal_stdlib>
 using namespace metal;
 
-static inline int clamp_ix(int ix, uint bytes, int elem) {
-    int hi = (int)(bytes / (uint)elem) - 1;
-    if (hi < 0) hi = 0;
-    return clamp(ix, 0, hi);
+static inline int safe_ix(int ix, uint bytes, int elem) {
+    int count = (int)(bytes / (uint)elem);
+    return clamp(ix, 0, max(count-1, 0));
+}
+static inline uint oob_mask(int ix, uint bytes, int elem) {
+    int count = (int)(bytes / (uint)elem);
+    return (ix >= 0 && ix < count) ? ~0u : 0u;
 }
 
 kernel void umbra_entry(
@@ -72,7 +75,7 @@ kernel void umbra_entry(
     uint v52 = as_type<uint>((int)floor(as_type<float>(v51)));
     uint v53 = v52 * v20;
     uint v54 = v49 + v53;
-    uint v55 = (uint)((device ushort*)p2)[clamp_ix((int)v54,buf_szs[2],2)];
+    uint v55 = (uint)((device ushort*)p2)[safe_ix((int)v54,buf_szs[2],2)] & oob_mask((int)v54,buf_szs[2],2);
     uint v56 = (uint)(int)(short)(ushort)v55;
     uint v57 = as_type<uint>((float)(int)v56);
     uint v58 = as_type<uint>(as_type<float>(v21) * as_type<float>(v57));
