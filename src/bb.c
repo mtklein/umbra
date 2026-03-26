@@ -768,8 +768,8 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_shl_i32_imm:
         case op_shr_u32_imm:
         case op_shr_s32_imm: fprintf(f, " v%d %d", ip->x, ip->imm); break;
-        case op_and_32_imm: fprintf(f, " v%d 0x%x", ip->x, (uint32_t)ip->imm); break;
         case op_pack: fprintf(f, " v%d v%d %d", ip->x, ip->y, ip->imm); break;
+        case op_and_32_imm:
         case op_add_f32_imm:
         case op_sub_f32_imm:
         case op_mul_f32_imm:
@@ -786,7 +786,10 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_le_f32_imm:
         case op_eq_i32_imm:
         case op_lt_s32_imm:
-        case op_le_s32_imm: fprintf(f, " v%d 0x%x", ip->x, (uint32_t)ip->imm); break;
+        case op_le_s32_imm:
+            fprintf(f, " v%d 0x%x", ip->x, (uint32_t)ip->imm);
+            if (ip->y) { fprintf(f, " (a.k.a. v%d)", ip->y); }
+            break;
         }
         fprintf(f, "\n");
     }
