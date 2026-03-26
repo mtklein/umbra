@@ -253,7 +253,7 @@ static val try_imm(builder *b, val d, enum op fused, int x, int y) {
     int imm_id = is_imm(b, x) ? x : is_imm(b, y) ? y : -1;
     if (imm_id >= 0) {
         int other = imm_id == x ? y : x;
-        return push(b, fused, .x = other, .imm = b->inst[imm_id].imm);
+        return push(b, fused, .x = other, .y = imm_id, .imm = b->inst[imm_id].imm);
     }
     return (val){d.id};
 }
@@ -287,7 +287,7 @@ val umbra_sub_f32(builder *b, val x, val y) {
     }
     val d = math(b, op_sub_f32, .x = x.id, .y = y.id);
     if (is_imm(b, y.id)) {
-        return push(b, op_sub_f32_imm, .x = x.id, .imm = b->inst[y.id].imm);
+        return push(b, op_sub_f32_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
     return (val){d.id};
 }
@@ -304,7 +304,7 @@ val umbra_div_f32(builder *b, val x, val y) {
     if (is_imm32(b, y.id, 0x3f800000)) { return x; }
     val d = math(b, op_div_f32, .x = x.id, .y = y.id);
     if (is_imm(b, y.id)) {
-        return push(b, op_div_f32_imm, .x = x.id, .imm = b->inst[y.id].imm);
+        return push(b, op_div_f32_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
     return (val){d.id};
 }
@@ -357,7 +357,7 @@ val umbra_sub_i32(builder *b, val x, val y) {
     if (x.id == y.id) { return umbra_imm_i32(b, 0); }
     val d = math(b, op_sub_i32, .x = x.id, .y = y.id);
     if (is_imm(b, y.id)) {
-        return push(b, op_sub_i32_imm, .x = x.id, .imm = b->inst[y.id].imm);
+        return push(b, op_sub_i32_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
     return (val){d.id};
 }
@@ -411,10 +411,10 @@ val umbra_and_i32(builder *b, val x, val y) {
     if (is_imm32(b, y.id, 0x7fffffff)) { return umbra_abs_f32(b, x); }
     val d = math(b, op_and_32, .x = x.id, .y = y.id);
     if (is_imm(b, x.id)) {
-        return push(b, op_and_imm, .x = y.id, .imm = b->inst[x.id].imm);
+        return push(b, op_and_imm, .x = y.id, .y = x.id, .imm = b->inst[x.id].imm);
     }
     if (is_imm(b, y.id)) {
-        return push(b, op_and_imm, .x = x.id, .imm = b->inst[y.id].imm);
+        return push(b, op_and_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
     return (val){d.id};
 }
@@ -455,14 +455,14 @@ val umbra_ne_f32(builder *b, val x, val y) {
 val umbra_lt_f32(builder *b, val x, val y) {
     val d = math(b, op_lt_f32, .x = x.id, .y = y.id);
     if (is_imm(b, y.id)) {
-        return push(b, op_lt_f32_imm, .x = x.id, .imm = b->inst[y.id].imm);
+        return push(b, op_lt_f32_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
     return (val){d.id};
 }
 val umbra_le_f32(builder *b, val x, val y) {
     val d = math(b, op_le_f32, .x = x.id, .y = y.id);
     if (is_imm(b, y.id)) {
-        return push(b, op_le_f32_imm, .x = x.id, .imm = b->inst[y.id].imm);
+        return push(b, op_le_f32_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
     return (val){d.id};
 }
@@ -481,14 +481,14 @@ val umbra_ne_i32(builder *b, val x, val y) {
 val umbra_lt_s32(builder *b, val x, val y) {
     val d = math(b, op_lt_s32, .x = x.id, .y = y.id);
     if (is_imm(b, y.id)) {
-        return push(b, op_lt_s32_imm, .x = x.id, .imm = b->inst[y.id].imm);
+        return push(b, op_lt_s32_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
     return (val){d.id};
 }
 val umbra_le_s32(builder *b, val x, val y) {
     val d = math(b, op_le_s32, .x = x.id, .y = y.id);
     if (is_imm(b, y.id)) {
-        return push(b, op_le_s32_imm, .x = x.id, .imm = b->inst[y.id].imm);
+        return push(b, op_le_s32_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
     return (val){d.id};
 }

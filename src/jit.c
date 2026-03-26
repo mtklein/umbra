@@ -327,51 +327,6 @@ static void arm64_pool_load_wide(Buf *c, struct pool *p, int d, void const *data
     pool_ref_at(p, off, c->len);
     put(c, 0x9c000000u | (uint32_t)d);
 }
-struct imm_entry { uint32_t val; int8_t reg, pad_[3]; };
-enum { IMM_CACHE_CAP = 8 };
-
-struct imm_cache {
-    struct imm_entry entries[IMM_CACHE_CAP];
-    int              len;
-};
-
-static void imm_cache_invalidate_reg(struct imm_cache *ic, int8_t reg) {
-    for (int i = 0; i < ic->len; i++) {
-        if (ic->entries[i].reg == reg) {
-            ic->entries[i] = ic->entries[--ic->len];
-            return;
-        }
-    }
-}
-
-static void imm_cache_flush(struct imm_cache *ic, struct ra *ra) {
-    for (int i = 0; i < ic->len; i++) { ra_return_reg(ra, ic->entries[i].reg); }
-    ic->len = 0;
-}
-
-static int8_t imm_cache_ensure(struct imm_cache *ic, Buf *c, struct pool *pool,
-                                struct ra *ra, int *sl, int *ns, uint32_t val) {
-    for (int i = 0; i < ic->len; i++) {
-        if (ic->entries[i].val == val) { return ic->entries[i].reg; }
-    }
-    int8_t reg = ra_alloc(ra, sl, ns);
-    arm64_pool_load(c, pool, reg, val);
-    if (ic->len >= IMM_CACHE_CAP) {
-        ra_return_reg(ra, ic->entries[0].reg);
-        for (int i = 0; i < IMM_CACHE_CAP - 1; i++) { ic->entries[i] = ic->entries[i + 1]; }
-        ic->len--;
-    }
-    ic->entries[ic->len++] = (struct imm_entry){val, reg, {0}};
-    return reg;
-}
-
-static struct imm_cache *active_imm_cache;
-
-static void arm64_spill_with_cache(int reg, int slot, void *ctx) {
-    arm64_spill(reg, slot, ctx);
-    if (active_imm_cache) { imm_cache_invalidate_reg(active_imm_cache, (int8_t)reg); }
-}
-
 static void arm64_remat(int reg, int val, void *ctx) {
     struct jit_ctx *j = ctx;
     arm64_pool_load(j->c, &j->pool, reg, (uint32_t)j->bb->inst[val].imm);
@@ -382,7 +337,7 @@ static struct ra *ra_create_arm64(struct umbra_basic_block const *bb, struct jit
         .pool = ra_pool,
         .nregs = 20,
         .max_reg = 32,
-        .spill = arm64_spill_with_cache,
+        .spill = arm64_spill,
         .fill = arm64_fill,
         .remat = arm64_remat,
         .ctx = jc,
@@ -551,14 +506,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 #define lu(v) ra_last_use(ra, (v))
     int last_ptr = -1;
     int dc = 0;
-    struct imm_cache ic = {.len = 0};
-    active_imm_cache = &ic;
 
     for (int i = from; i < to; i++) {
         struct bb_inst const *inst = &bb->inst[i];
-        if (!is_fused_imm(inst->op) && inst->op != op_and_imm) {
-            imm_cache_flush(&ic, ra);
-        }
 
         switch (inst->op) {
         case op_deref_ptr: {
@@ -1044,7 +994,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_lt_s32_imm:
         case op_le_s32_imm: {
             struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
-            int8_t ir = imm_cache_ensure(&ic, c, &jc->pool, ra, sl, ns, (uint32_t)inst->imm);
+            int8_t ir = ra_ensure(ra, sl, ns, inst->y);
+            if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
             enum op o = inst->op;
             uint32_t w =
                 o == op_add_f32_imm ? FADD_4s(s.rd, s.rx, ir)  :
@@ -1069,8 +1020,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         } break;
         }
     }
-    imm_cache_flush(&ic, ra);
-    active_imm_cache = 0;
 #undef lu
 }
 
