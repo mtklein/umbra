@@ -1,5 +1,5 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Weverything"
-#define STB_TRUETYPE_IMPLEMENTATION
-#include "stb/stb_truetype.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "../third_party/stb/stb_image_write.h"
 #pragma clang diagnostic pop

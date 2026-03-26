@@ -15,7 +15,7 @@ int main(void) { return 0; }
 #pragma clang diagnostic pop
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Weverything"
-#include "../stb/stb_image_write.h"
+#include "../third_party/stb/stb_image_write.h"
 #pragma clang diagnostic pop
 
 typedef struct umbra_builder builder;

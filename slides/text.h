@@ -6,7 +6,7 @@
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Weverything"
-#include "../stb/stb_truetype.h"
+#include "../third_party/stb/stb_truetype.h"
 #pragma clang diagnostic pop
 
 typedef struct {
