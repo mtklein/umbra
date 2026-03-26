@@ -59,7 +59,5 @@ _Bool is_varying(enum op);
 
 _Bool is_fused_imm(enum op);
 
-struct umbra_basic_block *umbra_strip_imm_refs(struct umbra_basic_block const *);
-
 int umbra_const_eval(enum op, int, int, int);
 

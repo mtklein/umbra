@@ -796,9 +796,6 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
 }
 
 struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) {
-    struct umbra_basic_block *stripped = umbra_strip_imm_refs(bb);
-    bb = stripped;
-
     int *id = calloc((size_t)bb->insts, sizeof *id);
 
     struct umbra_interpreter *p = malloc(sizeof *p);
@@ -988,7 +985,6 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
 
     free(deref_slot);
     free(id);
-    umbra_basic_block_free(stripped);
     return p;
 }
 

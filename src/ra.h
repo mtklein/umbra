@@ -11,8 +11,8 @@ struct ra_config {
     ra_spill_fn   spill;
     ra_fill_fn    fill;
     ra_remat_fn   remat;
+    int           nregs, max_reg, uses_imm_y, :32;
     void         *ctx;
-    int           nregs, max_reg;
 };
 
 // Opaque register allocator.
