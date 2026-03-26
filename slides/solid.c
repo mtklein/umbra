@@ -75,19 +75,17 @@ static void solid_cleanup(slide *s) {
 }
 
 slide slide_solid(char const *, uint32_t, float const[4], umbra_coverage_fn,
-                  umbra_blend_fn, umbra_load_fn, umbra_store_fn);
+                  umbra_blend_fn, umbra_format);
 
 slide slide_solid(char const *title, uint32_t bg, float const color[4],
-                  umbra_coverage_fn coverage, umbra_blend_fn blend, umbra_load_fn load,
-                  umbra_store_fn store) {
+                  umbra_coverage_fn coverage, umbra_blend_fn blend, umbra_format format) {
     return (slide){
         .title = title,
         .bg = bg,
         .shader = umbra_shader_solid,
         .coverage = coverage,
         .blend = blend,
-        .load = load,
-        .store = store,
+        .format = format,
         .color = {color[0], color[1], color[2], color[3]},
         .init = solid_init,
         .animate = solid_animate,

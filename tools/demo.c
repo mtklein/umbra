@@ -49,13 +49,9 @@ enum {
 static char const *fmt_name[] = {
     "8888", "565", "fp16", "fp16p", "1010102",
 };
-static umbra_load_fn fmt_load[] = {
-    umbra_load_8888,        umbra_load_565,     umbra_load_fp16,
-    umbra_load_fp16_planar, umbra_load_1010102,
-};
-static umbra_store_fn fmt_store[] = {
-    umbra_store_8888,        umbra_store_565,     umbra_store_fp16,
-    umbra_store_fp16_planar, umbra_store_1010102,
+static umbra_format const *fmt_formats[] = {
+    &umbra_format_8888, &umbra_format_565,     &umbra_format_fp16,
+    &umbra_format_fp16_planar, &umbra_format_1010102,
 };
 static int fmt_bpp[] = {4, 2, 8, 2, 4};
 
@@ -91,16 +87,16 @@ static void build_fill(int fmt) {
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 2),
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 3),
     };
-    fmt_store[fmt](builder, (umbra_ptr){1, 0}, c);
+    fmt_formats[fmt]->store(builder, (umbra_ptr){1, 0}, c);
     finish_pipe(&fill_pipe, builder);
 }
 
 static void build_readback(int fmt) {
     free_pipe(&readback_pipe);
     builder    *builder = umbra_builder();
-    umbra_color c = fmt_load[fmt](builder, (umbra_ptr){1, 0});
+    umbra_color c = fmt_formats[fmt]->load(builder, (umbra_ptr){1, 0});
     int         op = umbra_max_ptr(builder) + 1;
-    umbra_store_8888(builder, (umbra_ptr){op, 0}, c);
+    umbra_format_8888.store(builder, (umbra_ptr){op, 0}, c);
     readback_pipe.out_ptr = op;
     finish_pipe(&readback_pipe, builder);
 }
@@ -108,7 +104,7 @@ static void build_readback(int fmt) {
 static void build_hdr(int fmt) {
     free_pipe(&hdr_pipe);
     builder    *builder = umbra_builder();
-    umbra_color c = fmt_load[fmt](builder, (umbra_ptr){1, 0});
+    umbra_color c = fmt_formats[fmt]->load(builder, (umbra_ptr){1, 0});
     int         op = umbra_max_ptr(builder) + 1;
     hdr_pipe.out_ptr = op;
     umbra_val lo = umbra_pack(builder,
@@ -135,10 +131,10 @@ static void free_pipes(void) {
 
 static void build_slide_fmt(slide *s, int fmt) {
     free_programs();
-    umbra_load_fn  load = s->load ? fmt_load[fmt] : NULL;
-    umbra_store_fn store = fmt_store[fmt];
+    umbra_format format = *fmt_formats[fmt];
+    if (!s->format.load) { format.load = NULL; }
 
-    builder *builder = umbra_draw_build(s->shader, s->coverage, s->blend, load, store,
+    builder *builder = umbra_draw_build(s->shader, s->coverage, s->blend, format,
                                         &draw_layout);
     struct umbra_basic_block *bb = umbra_basic_block(builder);
     umbra_builder_free(builder);

@@ -3,13 +3,13 @@
 #include "slug.h"
 
 extern slide slide_solid(char const *, uint32_t, float const[4], umbra_coverage_fn,
-                         umbra_blend_fn, umbra_load_fn, umbra_store_fn);
+                         umbra_blend_fn, umbra_format);
 extern slide slide_text_bitmap(text_cov *);
 extern slide slide_text_sdf(text_cov *);
 extern slide slide_persp(text_cov *);
-extern slide slide_gradient_2stop(char const *, uint32_t, umbra_shader_fn, umbra_store_fn,
+extern slide slide_gradient_2stop(char const *, uint32_t, umbra_shader_fn, umbra_format,
                                   float const[8], float const[4]);
-extern slide slide_gradient_lut(char const *, uint32_t, umbra_shader_fn, umbra_store_fn,
+extern slide slide_gradient_lut(char const *, uint32_t, umbra_shader_fn, umbra_format,
                                 float const[4], float *, int);
 extern slide slide_slug_wind(slug_curves *);
 extern slide slide_overview(void);
@@ -47,41 +47,41 @@ static void register_slides(void) {
     count = 0;
     all[count++] = slide_solid("1. Solid Fill (src)", 0xff202020,
                                (float[]){0.0f, 0.6f, 1.0f, 1.0f}, umbra_coverage_rect,
-                               umbra_blend_src, umbra_load_8888, umbra_store_8888);
+                               umbra_blend_src, umbra_format_8888);
     all[count++] = slide_solid("2. Source Over (srcover)", 0xff00ff00,
                                (float[]){0.45f, 0.0f, 0.0f, 0.5f}, umbra_coverage_rect,
-                               umbra_blend_srcover, umbra_load_8888, umbra_store_8888);
+                               umbra_blend_srcover, umbra_format_8888);
     all[count++] = slide_solid("3. Destination Over (dstover)", 0xc0008000,
                                (float[]){0.0f, 0.0f, 0.9f, 0.9f}, umbra_coverage_rect,
-                               umbra_blend_dstover, umbra_load_8888, umbra_store_8888);
+                               umbra_blend_dstover, umbra_format_8888);
     all[count++] = slide_solid("4. Multiply Blend", 0xff804020,
                                (float[]){1.0f, 0.5f, 0.0f, 1.0f}, umbra_coverage_rect,
-                               umbra_blend_multiply, umbra_load_8888, umbra_store_8888);
+                               umbra_blend_multiply, umbra_format_8888);
     all[count++] = slide_solid("5. Full Coverage (no rect clip)", 0xffffffff,
                                (float[]){0.15f, 0.0f, 0.3f, 0.3f}, NULL,
-                               umbra_blend_srcover, umbra_load_8888, umbra_store_8888);
+                               umbra_blend_srcover, umbra_format_8888);
     all[count++] = slide_solid("6. No Blend (direct paint)", 0xff000000,
                                (float[]){0.9f, 0.4f, 0.1f, 1.0f}, umbra_coverage_rect,
-                               NULL, NULL, umbra_store_8888);
+                               NULL, umbra_format_8888);
     all[count++] = slide_text_bitmap(&bitmap_cov);
     all[count++] = slide_text_sdf(&sdf_cov);
     all[count++] = slide_persp(&bitmap_cov);
     all[count++] =
         slide_gradient_2stop("10. Linear Gradient (2-stop)", 0xff000000,
-                             umbra_shader_linear_2, umbra_store_8888,
+                             umbra_shader_linear_2, umbra_format_8888,
                              (float[]){1.0f, 0.4f, 0.0f, 1.0f, 0.0f, 0.3f, 1.0f, 1.0f},
                              (float[]){1.0f / 640.0f, 0.0f, 0.0f, 0.0f});
     all[count++] =
         slide_gradient_2stop("11. Radial Gradient (2-stop)", 0xff000000,
-                             umbra_shader_radial_2, umbra_store_8888,
+                             umbra_shader_radial_2, umbra_format_8888,
                              (float[]){1.0f, 1.0f, 0.9f, 1.0f, 0.05f, 0.0f, 0.15f, 1.0f},
                              (float[]){320.0f, 240.0f, 1.0f / 300.0f, 0.0f});
     all[count++] = slide_gradient_lut("12. Linear Gradient (wide gamut)", 0xff000000,
-                                      umbra_shader_linear_grad, umbra_store_8888,
+                                      umbra_shader_linear_grad, umbra_format_8888,
                                       (float[]){1.0f / 640.0f, 0.0f, 0.0f, 64.0f},
                                       linear_lut, LUT_N);
     all[count++] = slide_gradient_lut("13. Radial Gradient (wide gamut)", 0xff000000,
-                                      umbra_shader_radial_grad, umbra_store_8888,
+                                      umbra_shader_radial_grad, umbra_format_8888,
                                       (float[]){320.0f, 240.0f, 1.0f / 280.0f, 64.0f},
                                       radial_lut, LUT_N);
     all[count++] = slide_slug_wind(&slug);

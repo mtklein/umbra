@@ -13,13 +13,19 @@ typedef umbra_color (*umbra_load_fn)(struct umbra_builder *, umbra_ptr ptr);
 typedef void (*umbra_store_fn)(struct umbra_builder *, umbra_ptr ptr, umbra_color);
 
 typedef struct {
+    size_t         pixel_bytes;
+    umbra_load_fn  load;
+    umbra_store_fn store;
+} umbra_format;
+
+typedef struct {
     int shader, coverage;
     int uni_len, ps, pixel_bytes;
 } umbra_draw_layout;
 
 struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn coverage,
-                                       umbra_blend_fn blend, umbra_load_fn load,
-                                       umbra_store_fn store, umbra_draw_layout *layout);
+                                       umbra_blend_fn blend, umbra_format format,
+                                       umbra_draw_layout *layout);
 
 umbra_color umbra_shader_solid(struct umbra_builder *, umbra_val x, umbra_val y);
 umbra_color umbra_shader_linear_2(struct umbra_builder *, umbra_val x, umbra_val y);
@@ -45,16 +51,11 @@ umbra_color umbra_blend_srcover(struct umbra_builder *, umbra_color src, umbra_c
 umbra_color umbra_blend_dstover(struct umbra_builder *, umbra_color src, umbra_color dst);
 umbra_color umbra_blend_multiply(struct umbra_builder *, umbra_color src, umbra_color dst);
 
-umbra_color umbra_load_8888(struct umbra_builder *, umbra_ptr ptr);
-void        umbra_store_8888(struct umbra_builder *, umbra_ptr ptr, umbra_color);
-umbra_color umbra_load_565(struct umbra_builder *, umbra_ptr ptr);
-void        umbra_store_565(struct umbra_builder *, umbra_ptr ptr, umbra_color);
-umbra_color umbra_load_1010102(struct umbra_builder *, umbra_ptr ptr);
-void        umbra_store_1010102(struct umbra_builder *, umbra_ptr ptr, umbra_color);
-umbra_color umbra_load_fp16(struct umbra_builder *, umbra_ptr ptr);
-void        umbra_store_fp16(struct umbra_builder *, umbra_ptr ptr, umbra_color);
-umbra_color umbra_load_fp16_planar(struct umbra_builder *, umbra_ptr ptr);
-void        umbra_store_fp16_planar(struct umbra_builder *, umbra_ptr ptr, umbra_color);
+extern umbra_format const umbra_format_8888;
+extern umbra_format const umbra_format_565;
+extern umbra_format const umbra_format_1010102;
+extern umbra_format const umbra_format_fp16;
+extern umbra_format const umbra_format_fp16_planar;
 
 typedef struct {
     float a, b, c, d, e, f, g;
