@@ -99,7 +99,7 @@ typedef union {
 
 struct interp_inst;
 typedef int (*Fn)(struct interp_inst const *ip, val *v, int end, int n, int w, int row,
-                  void *ptr[], ptrdiff_t sz[]);
+                  void *ptr[], size_t sz[]);
 struct interp_inst {
     Fn  fn;
     int x, y, z, : 32;
@@ -109,13 +109,13 @@ struct umbra_interpreter {
     struct interp_inst *inst;
     val                *v;
     void              **ptr;
-    ptrdiff_t            *sz;
+    size_t            *sz;
     int                 preamble, nptr, n_deref, pad_;
 };
 
 #define op(name)                                                                       \
     static int name(struct interp_inst const *ip, val *v, int end, int n, int w,       \
-                    int row, void *ptr[], ptrdiff_t sz[])
+                    int row, void *ptr[], size_t sz[])
 #define next return ip[1].fn(ip + 1, v + 1, end, n, w, row, ptr, sz)
 
 
@@ -690,11 +690,11 @@ op(done) {
 op(deref_ptr_handler) {
     void *base = ptr[ip->x];
     void *derived;
-    ptrdiff_t dsz;
-    __builtin_memcpy(&derived, (char *)base + ip->y, sizeof derived);
-    __builtin_memcpy(&dsz, (char *)base + ip->y + 8, sizeof dsz);
+    ptrdiff_t ssz;
+    __builtin_memcpy(&derived, (char *)base + ip->y,     sizeof derived);
+    __builtin_memcpy(&ssz,    (char *)base + ip->y + 8, sizeof ssz);
     ptr[ip->z] = derived;
-    sz[ip->z] = dsz < 0 ? -dsz : dsz;
+    sz[ip->z] = ssz < 0 ? (size_t)-ssz : (size_t)ssz;
     next;
 }
 
@@ -788,7 +788,7 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     __builtin_memcpy(&v[1], &yb, 4);
     __builtin_memcpy(&v[2], &zb, 4);
 
-    inst[0].fn(inst, v + 3, K, K, 0, 0, (void *[]){0}, (ptrdiff_t[]){0});
+    inst[0].fn(inst, v + 3, K, K, 0, 0, (void *[]){0}, (size_t[]){0});
 
     int r;
     __builtin_memcpy(&r, &v[3], 4);
@@ -991,7 +991,7 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
 static void load_bufs(struct umbra_interpreter *p, umbra_buf buf[]) {
     for (int i = 0; i < p->nptr; i++) {
         p->ptr[i] = buf[i].ptr;
-        p->sz[i] = (ptrdiff_t)buf[i].sz;
+        p->sz[i] = buf[i].sz;
     }
 }
 

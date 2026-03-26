@@ -52,7 +52,7 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     char     *au = (char *)au_;
     slide_uni_f32(au, st->acc_lay.mat, st->mat, 11);
     slide_uni_ptr(au, st->acc_lay.curves_off, st->slug->data,
-                  (ptrdiff_t)(st->slug->count * 6 * 4));
+                  (size_t)(st->slug->count * 6 * 4), 0);
     umbra_buf abuf[] = {
         {au, (size_t)st->acc_lay.uni_len, 1},
         {st->wind_buf, wind_sz, 0},
@@ -70,7 +70,7 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     uint64_t uni_[12] = {0};
     char     *uni = (char *)uni_;
     slide_uni_f32(uni, lay->shader, hc, 4);
-    slide_uni_ptr(uni, lay->coverage, st->wind_buf, -(ptrdiff_t)wind_sz);
+    slide_uni_ptr(uni, lay->coverage, st->wind_buf, wind_sz, 1);
     int       ps = lay->ps;
     size_t plane_sz = (size_t)w * (size_t)h * lay->pixel_bytes;
     umbra_buf rbuf[5];

@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
         uint64_t au_[12] = {0};
         char     *au = (char *)au_;
         slide_uni_f32(au, al.mat, mat, 11);
-        slide_uni_ptr(au, al.curves_off, sc.data, (ptrdiff_t)(sc.count * 6 * 4));
+        slide_uni_ptr(au, al.curves_off, sc.data, (size_t)(sc.count * 6 * 4), 0);
         int32_t j0 = 0;
         __builtin_memcpy(au + al.loop_off, &j0, 4);
         umbra_buf abuf[] = {

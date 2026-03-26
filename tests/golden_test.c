@@ -314,7 +314,7 @@ static void test_slug_rect(void) {
     char *au = (char*)au_;
     slide_uni_f32(au, alay.mat, mat, 11);
     slide_uni_ptr(au, alay.curves_off,
-        rect, (ptrdiff_t)sizeof rect);
+        rect, sizeof rect, 0);
     umbra_buf abuf[] = {
         { au, (size_t)alay.uni_len, 1 },
         { wind_buf, sizeof wind_buf , 0},
@@ -331,7 +331,7 @@ static void test_slug_rect(void) {
     char *uni = (char*)uni_;
     slide_uni_f32(uni, lay.shader, color, 4);
     slide_uni_ptr(uni, lay.coverage,
-        wind_buf, -(ptrdiff_t)sizeof wind_buf);
+        wind_buf, sizeof wind_buf, 1);
     umbra_buf buf[] = {
         { uni, (size_t)lay.uni_len, 1 },
         { pixels, sizeof pixels , 0},
@@ -392,7 +392,7 @@ static void test_perspective_text(void) {
     slide_uni_f32(uni, lay.coverage, mat, 11);
     slide_uni_ptr(uni,
         (lay.coverage + 11*4 + 7) & ~7,
-        bmp, (ptrdiff_t)sizeof bmp);
+        bmp, sizeof bmp, 0);
     umbra_buf buf[] = {
         { uni, (size_t)lay.uni_len, 1 },
         { pixels, sizeof pixels , 0},
@@ -434,7 +434,7 @@ static void test_perspective_text(void) {
         slide_uni_ptr(u2,
             (lay2.coverage + 11*4 + 7) & ~7,
             tc.data,
-            (ptrdiff_t)(W * H * 2));
+            (size_t)(W * H * 2), 0);
         umbra_buf b2[] = {
             { u2, (size_t)lay2.uni_len, 1 },
             { px2, (size_t)(W * H * 4), 0 },

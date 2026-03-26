@@ -14,7 +14,7 @@ static void text_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     uint64_t uni_[6] = {0};
     char     *uni = (char *)uni_;
     slide_uni_f32(uni, lay->shader, hc, 4);
-    slide_uni_ptr(uni, lay->coverage, st->tc->data, (ptrdiff_t)(w * h * 2));
+    slide_uni_ptr(uni, lay->coverage, st->tc->data, (size_t)(w * h * 2), 0);
     int       ps = lay->ps;
     size_t plane_sz = (size_t)w * (size_t)h * lay->pixel_bytes;
     umbra_buf ubuf[5];

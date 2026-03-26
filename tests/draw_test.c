@@ -10,9 +10,10 @@ typedef struct {
 static void uni_f32(char *u, int off, float const *v, int n) {
     __builtin_memcpy(u + off, v, (size_t)n * 4);
 }
-static void uni_ptr(char *u, int off, void *p, ptrdiff_t sz) {
+static void uni_ptr(char *u, int off, void *p, size_t sz, _Bool read_only) {
+    ptrdiff_t ssz = read_only ? -(ptrdiff_t)sz : (ptrdiff_t)sz;
     __builtin_memcpy(u + off, &p, 8);
-    __builtin_memcpy(u + off + 8, &sz, 8);
+    __builtin_memcpy(u + off + 8, &ssz, 8);
 }
 
 static draw_backends make_draw(struct umbra_builder *builder, umbra_draw_layout lay) {
@@ -800,7 +801,7 @@ static void test_coverage_bitmap(void) {
         uint64_t uni_[5] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
-        uni_ptr(uni, B.lay.coverage, cov, (ptrdiff_t)sizeof cov);
+        uni_ptr(uni, B.lay.coverage, cov, sizeof cov, 0);
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           {uni, (size_t)B.lay.uni_len, 1},
@@ -831,7 +832,7 @@ static void test_coverage_sdf(void) {
         uint64_t uni_[5] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
-        uni_ptr(uni, B.lay.coverage, cov, (ptrdiff_t)sizeof cov);
+        uni_ptr(uni, B.lay.coverage, cov, sizeof cov, 0);
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           {uni, (size_t)B.lay.uni_len, 1},
@@ -866,7 +867,7 @@ static void test_coverage_bitmap_matrix(void) {
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         uni_f32(uni, B.lay.coverage, mat, 11);
-        uni_ptr(uni, ptr_off, bmp, (ptrdiff_t)sizeof bmp);
+        uni_ptr(uni, ptr_off, bmp, sizeof bmp, 0);
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           {uni, (size_t)B.lay.uni_len, 1},
@@ -902,7 +903,7 @@ static void test_coverage_bitmap_matrix_oob(void) {
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, color, 4);
         uni_f32(uni, B.lay.coverage, mat, 11);
-        uni_ptr(uni, ptr_off, bmp, (ptrdiff_t)sizeof bmp);
+        uni_ptr(uni, ptr_off, bmp, sizeof bmp, 0);
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           {uni, (size_t)B.lay.uni_len, 1},
@@ -996,7 +997,7 @@ static void test_linear_grad(void) {
         uint64_t uni_[5] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, params, 4);
-        uni_ptr(uni, lut_off, lut, (ptrdiff_t)sizeof lut);
+        uni_ptr(uni, lut_off, lut, sizeof lut, 0);
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           {uni, (size_t)B.lay.uni_len, 1},
@@ -1034,7 +1035,7 @@ static void test_radial_grad(void) {
         uint64_t uni_[5] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, params, 4);
-        uni_ptr(uni, lut_off, lut, (ptrdiff_t)sizeof lut);
+        uni_ptr(uni, lut_off, lut, sizeof lut, 0);
         if (!run_draw(&B, bi, 1, 1,
                       (umbra_buf[]){
                           {uni, (size_t)B.lay.uni_len, 1},
@@ -1071,7 +1072,7 @@ static void test_gradient_lut_nonuniform(void) {
         uint64_t uni_[5] = {0};
         char     *uni = (char *)uni_;
         uni_f32(uni, B.lay.shader, params, 4);
-        uni_ptr(uni, lut_off, lut, (ptrdiff_t)sizeof lut);
+        uni_ptr(uni, lut_off, lut, sizeof lut, 0);
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           {uni, (size_t)B.lay.uni_len, 1},
