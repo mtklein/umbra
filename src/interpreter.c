@@ -282,8 +282,7 @@ op(gather_uniform_16) {
     if (ix > hi) { ix = hi; }
     uint16_t s;
     __builtin_memcpy(&s, (char const *)ptr[ip->x] + 2 * ix, 2);
-    U16 packed = {0};
-    for (int l = 0; l < K; l++) { packed[l] = s; }
+    U16 packed = (U16){0} + s;
     v->u32 = (U32){0};
     __builtin_memcpy(v, &packed, sizeof packed);
     next;
