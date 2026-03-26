@@ -274,6 +274,32 @@ op(store_64) {
     next;
 }
 
+op(gather_uniform_16) {
+    int ix = v[ip->y].i32[0];
+    int hi = (int)(sz[ip->x] / 2) - 1;
+    if (hi < 0) { hi = 0; }
+    if (ix < 0) { ix = 0; }
+    if (ix > hi) { ix = hi; }
+    uint16_t s;
+    __builtin_memcpy(&s, (char const *)ptr[ip->x] + 2 * ix, 2);
+    U16 packed = {0};
+    for (int l = 0; l < K; l++) { packed[l] = s; }
+    v->u32 = (U32){0};
+    __builtin_memcpy(v, &packed, sizeof packed);
+    next;
+}
+op(gather_uniform_32) {
+    int ix = v[ip->y].i32[0];
+    int hi = (int)(sz[ip->x] / 4) - 1;
+    if (hi < 0) { hi = 0; }
+    if (ix < 0) { ix = 0; }
+    if (ix > hi) { ix = hi; }
+    int32_t val;
+    __builtin_memcpy(&val, (char const *)ptr[ip->x] + 4 * ix, 4);
+    v->i32 = (I32){0} + val;
+    next;
+}
+
 op(gather_16) {
     I32 ix = clamp_ix(v[ip->y].i32, sz[ip->x], 2);
     int rem = n - (end - K);
@@ -865,8 +891,14 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
                     emit(.fn = load_64_hi, .x = RESOLVE_PTR(inst));
                     break;
 
+                case op_gather_uniform_16:
+                    emit(.fn = gather_uniform_16, .x = RESOLVE_PTR(inst), .y = X);
+                    break;
                 case op_gather_16:
                     emit(.fn = gather_16, .x = RESOLVE_PTR(inst), .y = X);
+                    break;
+                case op_gather_uniform_32:
+                    emit(.fn = gather_uniform_32, .x = RESOLVE_PTR(inst), .y = X);
                     break;
                 case op_gather_32:
                     emit(.fn = gather_32, .x = RESOLVE_PTR(inst), .y = X);

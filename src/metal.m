@@ -107,6 +107,7 @@ static _Bool is_16(enum op op) {
     return op == op_uniform_16
         || op == op_load_16
         || op == op_store_16
+        || op == op_gather_uniform_16
         || op == op_gather_16
         || op == op_i32_from_s16
         || op == op_i32_from_u16
@@ -119,6 +120,7 @@ static _Bool is_32(enum op op) {
         || op == op_load_32
         || op == op_load_64_lo
         || op == op_load_64_hi
+        || op == op_gather_uniform_32
         || op == op_gather_32
         || op == op_store_32
         || op == op_store_64
@@ -181,6 +183,7 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i, p,
                      inst->op == op_load_64_hi);
             } break;
+            case op_gather_uniform_32:
             case op_gather_32: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
@@ -240,6 +243,7 @@ static void emit_ops(Buf *b, BB const *bb,
                       "((device ushort*)p%d)[i];\n",
                      pad, i, p);
             } break;
+            case op_gather_uniform_16:
             case op_gather_16: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;

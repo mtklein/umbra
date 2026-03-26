@@ -18,6 +18,7 @@ _Bool has_ptr(enum op op) {
         || op == op_load_32
         || op == op_load_64_lo
         || op == op_load_64_hi
+        || op == op_gather_uniform_32
         || op == op_gather_32
         || op == op_store_32
         || op == op_store_64
@@ -25,6 +26,7 @@ _Bool has_ptr(enum op op) {
         || op == op_uniform_16
         || op == op_load_16
         || op == op_store_16
+        || op == op_gather_uniform_16
         || op == op_gather_16;
 }
 _Bool is_varying(enum op op) {
@@ -175,7 +177,8 @@ val umbra_uniform_16(builder *b, umbra_ptr src, int slot) {
     return push(b, op_uniform_16, .imm = slot, .ptr = ptr_ix(src));
 }
 val umbra_gather_16(builder *b, umbra_ptr src, val ix) {
-    return push(b, op_gather_16, .x = ix.id, .ptr = ptr_ix(src));
+    enum op op = b->inst[ix.id].uniform ? op_gather_uniform_16 : op_gather_16;
+    return push(b, op, .x = ix.id, .ptr = ptr_ix(src));
 }
 val umbra_load_32(builder *b, umbra_ptr src) {
     return push(b, op_load_32, .ptr = ptr_ix(src));
@@ -191,7 +194,8 @@ val umbra_uniform_32(builder *b, umbra_ptr src, int slot) {
     return push(b, op_uniform_32, .imm = slot, .ptr = ptr_ix(src));
 }
 val umbra_gather_32(builder *b, umbra_ptr src, val ix) {
-    return push(b, op_gather_32, .x = ix.id, .ptr = ptr_ix(src));
+    enum op op = b->inst[ix.id].uniform ? op_gather_uniform_32 : op_gather_32;
+    return push(b, op, .x = ix.id, .ptr = ptr_ix(src));
 }
 void umbra_store_32(builder *b, umbra_ptr dst, val v) {
     push(b, op_store_32, .y = v.id, .ptr = ptr_ix(dst));
@@ -759,6 +763,8 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_uniform_16:
             fprintf(f, " p%d[%d]", ip->ptr, ip->imm);
             break;
+        case op_gather_uniform_32:
+        case op_gather_uniform_16:
         case op_gather_32:
         case op_gather_16: fprintf(f, " p%d v%d", ip->ptr, ip->x); break;
         case op_load_16:

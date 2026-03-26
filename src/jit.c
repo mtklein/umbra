@@ -261,11 +261,13 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_load_32:
     case op_load_64_lo:
     case op_load_64_hi:
+    case op_gather_uniform_32:
     case op_gather_32:
     case op_store_32:
     case op_store_64:
     case op_uniform_16:
     case op_load_16:
+    case op_gather_uniform_16:
     case op_gather_16:
     case op_store_16:
     case op_f32_from_f16:
@@ -658,6 +660,21 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             put(c, DUP_4s_w(s.rd, XT));
         } break;
 
+        case op_gather_uniform_32: {
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            int8_t         rx = ra_ensure(ra, sl, ns, inst->x);
+            if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
+            int p = inst->ptr;
+            resolve_ptr(c, p, &last_ptr, deref_gpr);
+            load_max_ix(c, p, 2, deref_gpr);
+            put(c, UMOV_ws(XT, rx));
+            clamp_wt(c);
+            // LDR W XT, [XP, XT, LSL #2]
+            put(c, 0xb8607800u | ((uint32_t)XT << 16)
+                               | ((uint32_t)XP << 5) | (uint32_t)XT);
+            put(c, DUP_4s_w(s.rd, XT));
+        } break;
+
         case op_gather_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x);
@@ -678,6 +695,22 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     put(c, LD1_s(s.rd, k, XT));
                 }
             }
+        } break;
+
+        case op_gather_uniform_16: {
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            int8_t         rx = ra_ensure(ra, sl, ns, inst->x);
+            if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
+            int p = inst->ptr;
+            resolve_ptr(c, p, &last_ptr, deref_gpr);
+            load_max_ix(c, p, 1, deref_gpr);
+            put(c, UMOV_ws(XT, rx));
+            clamp_wt(c);
+            // LDRH W XT, [XP, XT, LSL #1]
+            put(c, 0x78607800u | ((uint32_t)XT << 16)
+                               | ((uint32_t)XP << 5) | (uint32_t)XT);
+            // DUP Vd.4H, Wn — broadcast to packed 16-bit lanes
+            put(c, 0x0e020c00u | ((uint32_t)XT << 5) | (uint32_t)s.rd);
         } break;
 
         case op_gather_16: {
@@ -820,6 +853,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 case op_load_32:
                 case op_load_64_lo:
                 case op_load_64_hi:
+                case op_gather_uniform_32:
                 case op_gather_32:
                 case op_store_32:
                 case op_store_64:
@@ -856,6 +890,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 case op_le_u32:
                 case op_uniform_16:
                 case op_load_16:
+                case op_gather_uniform_16:
                 case op_gather_16:
                 case op_store_16:
                 case op_f32_from_f16:
@@ -1330,11 +1365,13 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_load_32:
     case op_load_64_lo:
     case op_load_64_hi:
+    case op_gather_uniform_32:
     case op_gather_32:
     case op_store_32:
     case op_store_64:
     case op_uniform_16:
     case op_load_16:
+    case op_gather_uniform_16:
     case op_gather_16:
     case op_store_16:
     case op_f32_from_f16:
@@ -1788,6 +1825,19 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             vbroadcastss(c, s.rd, s.rd);
         } break;
 
+        case op_gather_uniform_32: {
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            int8_t         rx = ra_ensure(ra, sl, ns, inst->x);
+            int            p = inst->ptr;
+            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
+            vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
+            if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
+            load_max_ix_x86(c, p, 2);
+            clamp_eax_x86(c);
+            vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, RAX, 4, 0);
+            if (!scalar) { vbroadcastss(c, s.rd, s.rd); }
+        } break;
+
         case op_gather_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x);
@@ -1814,6 +1864,29 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 ra_return_reg(ra, mask);
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
             }
+        } break;
+
+        case op_gather_uniform_16: {
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            int8_t         rx = ra_ensure(ra, sl, ns, inst->x);
+            int            p = inst->ptr;
+            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr);
+            load_max_ix_x86(c, p, 1);
+            vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
+            if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
+            clamp_eax_x86(c);
+            {
+                uint8_t rex = 0x40;
+                if (base >= 8) { rex |= 0x01; }
+                if (rex != 0x40) { emit1(c, rex); }
+                emit1(c, 0x0f);
+                emit1(c, 0xb7);
+                emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
+                emit1(c, (uint8_t)((1 << 6) | ((RAX & 7) << 3) | (base & 7)));
+            }
+            vex(c, 1, 1, 0, 0, s.rd, 0, RAX, 0x6e);
+            // VPBROADCASTW ymm, xmm — broadcast 16-bit to packed lanes
+            if (!scalar) { vex_rr(c, 1, 2, 1, 0x79, s.rd, s.rd); }
         } break;
 
         case op_gather_16: {
