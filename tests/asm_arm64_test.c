@@ -35,6 +35,8 @@ static void test_mem(void) {
     (LDR_sx(0, 1, 2) == 0xBC627820) here;
     (STR_sx(3, 4, 5) == 0xBC257883) here;
     (STR_hx(3, 4, 5) == 0x7C257883) here;
+    (LDR_d(0, 1, 2) == 0xFC626820) here;
+    (STR_d(3, 4, 5) == 0xFC256883) here;
     (LDR_q(0, 1, 2) == 0x3CE26820) here;
     (STR_q(3, 4, 5) == 0x3CA56883) here;
     (LDR_qi(6, 7, 1) == 0x3DC004E6) here;
@@ -46,9 +48,21 @@ static void test_neon_f32(void) {
     (FSUB_4s(0, 1, 2) == 0x4EA2D420) here;
     (FMUL_4s(7, 8, 9) == 0x6E29DD07) here;
     (FDIV_4s(0, 1, 2) == 0x6E22FC20) here;
+    (FMLA_4s(0, 1, 2) == 0x4E22CC20) here;
+    (FMLS_4s(3, 4, 5) == 0x4EA5CC83) here;
+    (FMINNM_4s(0, 1, 2) == 0x4EA2C420) here;
+    (FMAXNM_4s(3, 4, 5) == 0x4E25C483) here;
     (FSQRT_4s(3, 4) == 0x6EA1F883) here;
+    (FABS_4s(0, 1) == 0x4EA0F820) here;
+    (FNEG_4s(2, 3) == 0x6EA0F862) here;
+    (FRINTN_4s(4, 5) == 0x4E2188A4) here;
+    (FRINTM_4s(6, 7) == 0x4E2198E6) here;
+    (FRINTP_4s(0, 1) == 0x4EA18820) here;
     (SCVTF_4s(5, 6) == 0x4E21D8C5) here;
     (FCVTZS_4s(7, 8) == 0x4EA1B907) here;
+    (FCVTNS_4s(2, 3) == 0x4E21A862) here;
+    (FCVTMS_4s(4, 5) == 0x4E21B8A4) here;
+    (FCVTPS_4s(6, 7) == 0x4EA1A8E6) here;
     (FCMEQ_4s(0, 1, 2) == 0x4E22E420) here;
     (FCMGT_4s(3, 4, 5) == 0x6EA5E483) here;
     (FCMGE_4s(6, 7, 8) == 0x6E28E4E6) here;
@@ -59,10 +73,13 @@ static void test_neon_i32(void) {
     (SUB_4s(3, 4, 5) == 0x6EA58483) here;
     (MUL_4s(6, 7, 8) == 0x4EA89CE6) here;
     (USHL_4s(0, 1, 2) == 0x6EA24420) here;
+    (SSHL_4s(0, 1, 2) == 0x4EA24420) here;
     (NEG_4s(3, 4) == 0x6EA0B883) here;
     (CMEQ_4s(5, 6, 7) == 0x6EA78CC5) here;
     (CMGT_4s(0, 1, 2) == 0x4EA23420) here;
+    (CMGE_4s(0, 1, 2) == 0x4EA23C20) here;
     (CMHI_4s(3, 4, 5) == 0x6EA53483) here;
+    (CMHS_4s(3, 4, 5) == 0x6EA53C83) here;
 }
 
 static void test_neon_bitwise(void) {
@@ -91,6 +108,7 @@ static void test_shift_imm(void) {
     (SHL_4s_imm(2, 3, 4) == 0x4F245462) here;
     (USHR_4s_imm(2, 3, 4) == 0x6F3C0462) here;
     (SSHR_4s_imm(2, 3, 4) == 0x4F3C0462) here;
+    (SLI_4s_imm(0, 1, 8) == 0x6F285420) here;
 }
 
 static void test_movi(void) {
@@ -107,12 +125,26 @@ static void test_movi(void) {
 static void test_dup_ins(void) {
     (DUP_4s_w(7, 8) == 0x4E040D07) here;
     (UMOV_ws(0, 1) == 0x0E043C20) here;
+    (UMOV_ws_lane(0, 1, 0) == 0x0E043C20) here;
+    (UMOV_ws_lane(0, 1, 2) == 0x0E143C20) here;
+    (LD1_s(0, 0, 1) == 0x0D408020) here;
+    (LD1_s(2, 1, 3) == 0x0D409062) here;
+    (LD1_s(4, 2, 5) == 0x4D4080A4) here;
+    (INS_s(0, 1, 2) == 0x4E0C1C40) here;
+    (INS_s(3, 0, 4) == 0x4E041C83) here;
 }
 
 static void test_compare_zero(void) {
     (CMEQ_4s_z(0, 1) == 0x4EA09820) here;
     (CMGT_4s_z(2, 3) == 0x4EA08862) here;
+    (CMGE_4s_z(6, 7) == 0x6EA088E6) here;
+    (CMLE_4s_z(0, 1) == 0x6EA09820) here;
+    (CMLT_4s_z(2, 3) == 0x4EA0A862) here;
     (FCMEQ_4s_z(4, 5) == 0x4EA0D8A4) here;
+    (FCMGT_4s_z(4, 5) == 0x4EA0C8A4) here;
+    (FCMGE_4s_z(6, 7) == 0x6EA0C8E6) here;
+    (FCMLE_4s_z(0, 1) == 0x6EA0D820) here;
+    (FCMLT_4s_z(2, 3) == 0x4EA0E862) here;
 }
 
 static void test_load_imm_w(void) {
