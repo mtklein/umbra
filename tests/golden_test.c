@@ -27,7 +27,7 @@ static umbra_format const *formats[] = {
     &umbra_format_fp16,  &umbra_format_fp16_planar,
     &umbra_format_1010102, &umbra_format_srgb_8888,
 };
-static int fmt_tol[] = {0, 0, 0, 0, 0, 2};
+static int fmt_tol[] = {0, 0, 0, 0, 0, 2};  // sRGB: polynomial rounding differs on Metal GPU
 
 typedef struct {
     struct umbra_program *prog;
