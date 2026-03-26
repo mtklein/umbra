@@ -492,12 +492,13 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     size_t pg = 16384;
     size_t alloc = (code_sz + pg - 1) & ~(pg - 1);
 
-    void *mem = mmap(NULL, alloc, PROT_READ | PROT_WRITE | PROT_EXEC,
+    void *mem = mmap(NULL, alloc + pg, PROT_READ | PROT_WRITE | PROT_EXEC,
                      MAP_PRIVATE | MAP_ANON | MAP_JIT, -1, 0);
     if (mem == MAP_FAILED) {
         free(c.buf);
         return 0;
     }
+    mprotect((char *)mem + alloc, pg, PROT_NONE);
 
     pthread_jit_write_protect_np(0);
     __builtin_memcpy(mem, c.buf, code_sz);
@@ -507,7 +508,7 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
 
     struct umbra_jit *j = malloc(sizeof *j);
     j->code = mem;
-    j->code_size = alloc;
+    j->code_size = alloc + pg;
     j->loop_start = loop_body_start;
     j->loop_end = loop_body_end;
     {
@@ -1509,11 +1510,12 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     size_t pg = (size_t)sysconf(_SC_PAGESIZE);
     size_t alloc = (code_sz + pg - 1) & ~(pg - 1);
 
-    void *mem = mmap(NULL, alloc, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+    void *mem = mmap(NULL, alloc + pg, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
     if (mem == MAP_FAILED) {
         free(c.buf);
         return 0;
     }
+    mprotect((char *)mem + alloc, pg, PROT_NONE);
     __builtin_memcpy(mem, c.buf, code_sz);
     if (mprotect(mem, alloc, PROT_READ | PROT_EXEC) != 0) {
         munmap(mem, alloc);
@@ -1524,7 +1526,7 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
 
     struct umbra_jit *j = malloc(sizeof *j);
     j->code = mem;
-    j->code_size = alloc;
+    j->code_size = alloc + pg;
     j->code_len = code_sz;
     j->loop_start = loop_body_start;
     j->loop_end = loop_body_end;
