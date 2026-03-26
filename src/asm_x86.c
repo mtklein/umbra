@@ -45,8 +45,8 @@ void vex_rr(Buf *b, int pp, int mm, int L, uint8_t op, int d, int s) {
     vex(b, pp, mm, 0, L, d, 0, s, op);
 }
 // shift-by-immediate: ModRM.reg=ext, VEX.vvvv=d(dest), ModRM.rm=s(src), +imm8
-void vex_shift(Buf *b, int pp, int mm, int L, uint8_t op, int ext, int d, int s,
-               uint8_t imm) {
+static void vex_shift(Buf *b, int pp, int mm, int L, uint8_t op, int ext, int d, int s,
+                      uint8_t imm) {
     vex(b, pp, mm, 0, L, ext, d, s, op);
     emit1(b, imm);
 }
@@ -162,11 +162,6 @@ void test_rr(Buf *b, int a, int c) {
     rex_w(b, c, a);
     emit1(b, 0x85);
     emit1(b, (uint8_t)(0xc0 | ((c & 7) << 3) | (a & 7)));
-}
-void neg_r(Buf *b, int r) {
-    rex_w(b, 0, r);
-    emit1(b, 0xf7);
-    emit1(b, (uint8_t)(0xc0 | (3 << 3) | (r & 7)));
 }
 void shr_ri(Buf *b, int r, uint8_t imm) {
     rex_w(b, 0, r);
@@ -373,9 +368,5 @@ void vpextrd(Buf *b, int gpr, int xmm, uint8_t imm) {
 }
 void vextracti128(Buf *b, int d, int s, uint8_t imm) {
     vex_rrr(b, 1, 3, 1, 0x39, s, 0, d);
-    emit1(b, imm);
-}
-void vinserti128(Buf *b, int d, int v, int s, uint8_t imm) {
-    vex_rrr(b, 1, 3, 1, 0x38, d, v, s);
     emit1(b, imm);
 }

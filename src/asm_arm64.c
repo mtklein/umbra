@@ -57,9 +57,6 @@ uint32_t LDR_sx(int d, int n, int m) {
 uint32_t STR_sx(int d, int n, int m) {
     return 0xbc207800u | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d;
 }
-uint32_t LDR_hx(int d, int n, int m) {
-    return 0x7c607800u | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d;
-}
 uint32_t STR_hx(int d, int n, int m) {
     return 0x7c207800u | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d;
 }
@@ -98,24 +95,6 @@ uint32_t LDR_qi(int d, int n, int imm) {
 uint32_t STR_qi(int d, int n, int imm) {
     return 0x3d800000u | ((uint32_t)imm << 10) | ((uint32_t)n << 5) | (uint32_t)d;
 }
-
-uint32_t LDP_qi(int t1, int t2, int n, int imm) {
-    return 0xad400000u
-        | ((uint32_t)(imm & 0x7f) << 15)
-        | ((uint32_t)t2 << 10)
-        | ((uint32_t)n << 5)
-        | (uint32_t)t1;
-}
-uint32_t STP_qi(int t1, int t2, int n, int imm) {
-    return 0xad000000u
-        | ((uint32_t)(imm & 0x7f) << 15)
-        | ((uint32_t)t2 << 10)
-        | ((uint32_t)n << 5)
-        | (uint32_t)t1;
-}
-
-uint32_t LD4_8b(int t, int n) { return 0x0c400000u | ((uint32_t)n << 5) | (uint32_t)t; }
-uint32_t ST4_8b(int t, int n) { return 0x0c000000u | ((uint32_t)n << 5) | (uint32_t)t; }
 
 uint32_t SLI_4s_imm(int d, int n, int shift) {
     return 0x6f005400u | ((uint32_t)(shift + 32) << 16) | ((uint32_t)n << 5) | (uint32_t)d;

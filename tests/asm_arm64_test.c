@@ -34,14 +34,11 @@ static void test_branch(void) {
 static void test_mem(void) {
     (LDR_sx(0, 1, 2) == 0xBC627820) here;
     (STR_sx(3, 4, 5) == 0xBC257883) here;
-    (LDR_hx(0, 1, 2) == 0x7C627820) here;
     (STR_hx(3, 4, 5) == 0x7C257883) here;
     (LDR_q(0, 1, 2) == 0x3CE26820) here;
     (STR_q(3, 4, 5) == 0x3CA56883) here;
     (LDR_qi(6, 7, 1) == 0x3DC004E6) here;
     (STR_qi(8, 9, 2) == 0x3D800928) here;
-    (LD4_8b(0, 4) == 0x0C400080) here;
-    (ST4_8b(0, 4) == 0x0C000080) here;
 }
 
 static void test_neon_f32(void) {
@@ -140,10 +137,6 @@ static void test_stp_ldp(void) {
      == (0xA9800000u | ((uint32_t)(-2 & 0x7f) << 15) | (20u << 10) | (31u << 5) | 19)) here;
     (LDP_post(19, 20, 31, 2) == (0xA8C00000u | (2u << 15) | (20u << 10) | (31u << 5) | 19))
         here;
-    (LDP_qi(0, 1, 2, 3)
-     == (0xAD400000u | ((3u & 0x7f) << 15) | (1u << 10) | (2u << 5) | 0)) here;
-    (STP_qi(4, 5, 6, 2)
-     == (0xAD000000u | ((2u & 0x7f) << 15) | (5u << 10) | (6u << 5) | 4)) here;
 }
 
 static void test_lsl(void) {

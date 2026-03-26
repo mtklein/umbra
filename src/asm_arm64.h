@@ -21,7 +21,6 @@ uint32_t B(int off26);
 uint32_t Bcond(int cond, int off19);
 uint32_t LDR_sx(int d, int n, int m);
 uint32_t STR_sx(int d, int n, int m);
-uint32_t LDR_hx(int d, int n, int m);
 uint32_t STR_hx(int d, int n, int m);
 uint32_t LDR_d(int d, int n, int m);
 uint32_t STR_d(int d, int n, int m);
@@ -30,12 +29,8 @@ uint32_t STR_q(int d, int n, int m);
 uint32_t LSL_xi(int d, int n, int shift);
 uint32_t LDR_qi(int d, int n, int imm);
 uint32_t STR_qi(int d, int n, int imm);
-uint32_t LDP_qi(int t1, int t2, int n, int imm);
-uint32_t STP_qi(int t1, int t2, int n, int imm);
 uint32_t LDR_si(int d, int n, int imm);
 uint32_t STR_si(int d, int n, int imm);
-uint32_t LD4_8b(int t, int n);
-uint32_t ST4_8b(int t, int n);
 uint32_t W(uint32_t insn);
 
 // float 4S

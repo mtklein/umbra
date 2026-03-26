@@ -201,17 +201,12 @@ static void test_avx_convert(void) {
     free(b.buf);
 }
 
-static void test_avx_extract_insert(void) {
+static void test_avx_extract(void) {
     Buf b = {0};
 
     // vextracti128 $1, %ymm7, %xmm6 => c4 e3 7d 39 fe 01
     vextracti128(&b, 6, 7, 1);
     (bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE3, 0x7D, 0x39, 0xFE, 0x01})) here;
-    reset(&b);
-
-    // vinserti128 $1, %xmm8, %ymm9, %ymm10 => c4 43 35 38 d0 01
-    vinserti128(&b, 10, 9, 8, 1);
-    (bytes_eq(&b, 6, (uint8_t[]){0xC4, 0x43, 0x35, 0x38, 0xD0, 0x01})) here;
     free(b.buf);
 }
 
@@ -304,7 +299,7 @@ int main(void) {
     test_avx_cmp();
     test_avx_shift();
     test_avx_convert();
-    test_avx_extract_insert();
+    test_avx_extract();
     test_avx_mov();
     test_avx_broadcast();
     test_broadcast_imm32();

@@ -12,8 +12,6 @@ void emit4(Buf *b, uint32_t v);
 void vex(Buf *b, int pp, int mm, int W, int L, int d, int v, int s, uint8_t op);
 void vex_rrr(Buf *b, int pp, int mm, int L, uint8_t op, int d, int v, int s);
 void vex_rr(Buf *b, int pp, int mm, int L, uint8_t op, int d, int s);
-void vex_shift(Buf *b, int pp, int mm, int L, uint8_t op, int ext, int d, int s,
-               uint8_t imm);
 void vex_mem(Buf *b, int pp, int mm, int W, int L, int reg, int v, uint8_t op, int base,
              int index, int scale, int disp);
 
@@ -30,7 +28,6 @@ void sub_ri(Buf *b, int d, int32_t imm);
 void cmp_rr(Buf *b, int a, int c);
 void cmp_ri(Buf *b, int a, int32_t imm);
 void test_rr(Buf *b, int a, int c);
-void neg_r(Buf *b, int r);
 void shr_ri(Buf *b, int r, uint8_t imm);
 void mov_ri(Buf *b, int d, int32_t imm);
 void mov_rr(Buf *b, int d, int s);
@@ -117,4 +114,3 @@ void vpmovzxwd(Buf *b, int d, int s);
 void vpgatherdd(Buf *b, int dst, int base, int idx, int scale, int mask);
 void vpextrd(Buf *b, int gpr, int xmm, uint8_t imm);
 void vextracti128(Buf *b, int d, int s, uint8_t imm);
-void vinserti128(Buf *b, int d, int v, int s, uint8_t imm);
