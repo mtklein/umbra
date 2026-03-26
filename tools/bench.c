@@ -16,13 +16,15 @@ static double now(void) {
 static double bench(slide *s, int w, int h, umbra_draw_layout const *lay,
                     void *buf, struct umbra_backend *be,
                     struct umbra_program *prog) {
-    s->render(s, w, h, 0, h, buf, lay, prog);
+    if (s->prepare) { s->prepare(s, w, h, be); }
+    s->draw(s, w, h, 0, h, buf, lay, prog);
     umbra_backend_flush(be);
     int iters = 1;
     for (;;) {
+        if (s->prepare) { s->prepare(s, w, h, be); }
         double const start = now();
         for (int it = 0; it < iters; it++) {
-            s->render(s, w, h, 0, h, buf, lay, prog);
+            s->draw(s, w, h, 0, h, buf, lay, prog);
         }
         umbra_backend_flush(be);
         double const elapsed = now() - start;
@@ -42,7 +44,7 @@ int main(int argc, char *argv[]) {
 
     for (int si = 0; si < ns; si++) {
         slide *s = slide_get(si);
-        if (!s->render) { continue; }
+        if (!s->draw) { continue; }
 
         umbra_draw_layout         lay;
         struct umbra_builder     *bld = umbra_draw_build(s->shader, s->coverage, s->blend,

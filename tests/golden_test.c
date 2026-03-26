@@ -136,6 +136,7 @@ static void readback_row(int fmt, uint32_t *dst,
 
 static void render_slide(
         int slide_idx, int fmt,
+        struct umbra_backend *be,
         struct umbra_program *program,
         void *pixbuf,
         umbra_draw_layout const *lay) {
@@ -155,8 +156,9 @@ static void render_slide(
                     s->bg, row_sz,
                     plane_gap);
     }
-    s->render(s, W, H, 0, H, pixbuf,
-              lay, program);
+    if (s->prepare) { s->prepare(s, W, H, be); }
+    s->draw(s, W, H, 0, H, pixbuf,
+            lay, program);
 }
 
 static void readback_to_8888(int fmt,
@@ -218,13 +220,13 @@ static void test_slide_golden(
     uint32_t *tst = malloc((size_t)(W * H) * 4);
 
     render_slide(slide_idx, fmt,
-                 progs[0], pbuf_ref, &lay);
+                 bes[0], progs[0], pbuf_ref, &lay);
     readback_to_8888(fmt, pbuf_ref, ref);
 
     for (int bi = 1; bi < N_BACKS; bi++) {
         if (!progs[bi]) { continue; }
         render_slide(slide_idx, fmt,
-                     progs[bi], pbuf_tst, &lay);
+                     bes[bi], progs[bi], pbuf_tst, &lay);
         umbra_backend_flush(bes[bi]);
         readback_to_8888(fmt, pbuf_tst, tst);
 

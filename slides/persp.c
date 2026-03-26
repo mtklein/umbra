@@ -25,7 +25,7 @@ static void persp_animate(slide *s, float dt) {
                              st->bitmap->h);
 }
 
-static void persp_render(slide *s, int w, int h, int y0, int y1, void *buf,
+static void persp_draw(slide *s, int w, int h, int y0, int y1, void *buf,
                           umbra_draw_layout const *lay, struct umbra_program *program) {
     persp_state *st = s->state;
     float        hc[4];
@@ -67,7 +67,7 @@ slide slide_persp(text_cov *bitmap) {
         .bg = 0xff0a0a1e,
         .init = persp_init,
         .animate = persp_animate,
-        .render = persp_render,
+        .draw = persp_draw,
         .cleanup = persp_cleanup,
         .state = st,
     };

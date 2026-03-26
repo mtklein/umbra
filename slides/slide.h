@@ -18,7 +18,9 @@ struct slide {
 
     void (*init)   (slide*, int w, int h);
     void (*animate)(slide*, float dt);
-    void (*render) (slide*, int w, int h,
+    void (*prepare)(slide*, int w, int h,
+                    struct umbra_backend*);
+    void (*draw)   (slide*, int w, int h,
                     int y0, int y1, void *buf,
                     umbra_draw_layout const*,
                     struct umbra_program*);

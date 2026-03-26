@@ -7,7 +7,7 @@ typedef struct {
     int    pad_;
 } grad_lut_state;
 
-static void grad_2stop_render(slide *s, int w, int h, int y0, int y1, void *buf,
+static void grad_2stop_draw(slide *s, int w, int h, int y0, int y1, void *buf,
                                umbra_draw_layout const *lay, struct umbra_program *program) {
     int       uni_len = lay->uni_len;
     long long uni_[8] = {0};
@@ -25,7 +25,7 @@ static void grad_2stop_render(slide *s, int w, int h, int y0, int y1, void *buf,
     umbra_program_queue(program, 0, y0, w, y1, ubuf);
 }
 
-static void grad_lut_render(slide *s, int w, int h, int y0, int y1, void *buf,
+static void grad_lut_draw(slide *s, int w, int h, int y0, int y1, void *buf,
                              umbra_draw_layout const *lay, struct umbra_program *program) {
     grad_lut_state *st = s->state;
     int             uni_len = lay->uni_len;
@@ -64,7 +64,7 @@ slide slide_gradient_2stop(char const *title, uint32_t bg, umbra_shader_fn shade
         .color = {color[0], color[1], color[2], color[3], color[4], color[5], color[6],
                   color[7]},
         .grad = {grad[0], grad[1], grad[2], grad[3]},
-        .render = grad_2stop_render,
+        .draw = grad_2stop_draw,
     };
 }
 
@@ -80,7 +80,7 @@ slide slide_gradient_lut(char const *title, uint32_t bg, umbra_shader_fn shader,
         .shader = shader,
         .format = format,
         .grad = {grad[0], grad[1], grad[2], grad[3]},
-        .render = grad_lut_render,
+        .draw = grad_lut_draw,
         .cleanup = grad_lut_cleanup,
         .state = st,
     };

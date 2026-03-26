@@ -269,7 +269,7 @@ typedef struct {
 
 static void *tile_fn(void *arg) {
     tile_work *tw = arg;
-    tw->s->render(tw->s, tw->W, tw->H, tw->y0, tw->y1, tw->buf, tw->lay, tw->prog);
+    tw->s->draw(tw->s, tw->W, tw->H, tw->y0, tw->y1, tw->buf, tw->lay, tw->prog);
     return NULL;
 }
 
@@ -385,8 +385,10 @@ int main(void) {
 
         if (s->animate) { s->animate(s, 0.016f); }
 
+        if (s->prepare) { s->prepare(s, W, H, bes[cur_backend]); }
+
         if (n_threads <= 1) {
-            s->render(s, W, H, 0, H, pixbuf, &draw_layout, b);
+            s->draw(s, W, H, 0, H, pixbuf, &draw_layout, b);
         } else {
             int nt = n_threads;
             int sh = (H + nt - 1) / nt;
@@ -396,7 +398,7 @@ int main(void) {
                 for (int t = 0; t < nt; t++) {
                     int y0 = t * sh;
                     int y1 = y0 + sh > H ? H : y0 + sh;
-                    s->render(s, W, H, y0, y1, pixbuf, &draw_layout, b);
+                    s->draw(s, W, H, y0, y1, pixbuf, &draw_layout, b);
                 }
             } else {
                 // CPU: shared backend, separate programs, parallel

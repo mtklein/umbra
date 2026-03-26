@@ -43,7 +43,7 @@ static void solid_animate(slide *s, float dt) {
     }
 }
 
-static void solid_render(slide *s, int w, int h, int y0, int y1, void *buf,
+static void solid_draw(slide *s, int w, int h, int y0, int y1, void *buf,
                           umbra_draw_layout const *lay, struct umbra_program *program) {
     solid_state *st = s->state;
     float        rect[4] = {
@@ -89,7 +89,7 @@ slide slide_solid(char const *title, uint32_t bg, float const color[4],
         .color = {color[0], color[1], color[2], color[3]},
         .init = solid_init,
         .animate = solid_animate,
-        .render = solid_render,
+        .draw = solid_draw,
         .cleanup = solid_cleanup,
     };
 }

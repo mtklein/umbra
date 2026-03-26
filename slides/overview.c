@@ -9,12 +9,13 @@ static uint8_t const font3x5[10][5] = {
 };
 
 typedef struct {
-    int                   w, h, cw, ch;
-    int                   n_real, frame;
-    uint32_t             *fb, *tmp;
-    struct umbra_backend *be;
-    struct umbra_program *progs[ROWS * COLS];
-    umbra_draw_layout     lays[ROWS * COLS];
+    int                       w, h, cw, ch;
+    int                       n_real, pad_;
+    uint32_t                 *fb, *tmp;
+    struct umbra_backend     *be;
+    struct umbra_program     *progs[ROWS * COLS];
+    struct umbra_basic_block *bbs[ROWS * COLS];
+    umbra_draw_layout         lays[ROWS * COLS];
 } overview_state;
 
 static void draw_digit(uint32_t *fb, int stride, int ox, int oy, int digit, uint32_t color) {
@@ -71,8 +72,9 @@ static void render_thumbnails(overview_state *st) {
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) { st->tmp[y * w + x] = sub->bg; }
         }
-        sub->render(sub, w, h, 0, h, st->tmp, &st->lays[idx],
-                    st->progs[idx]);
+        if (sub->prepare) { sub->prepare(sub, w, h, st->be); }
+        sub->draw(sub, w, h, 0, h, st->tmp, &st->lays[idx],
+                  st->progs[idx]);
 
         for (int cy = 0; cy < st->ch; cy++) {
             for (int cx = 0; cx < st->cw; cx++) {
@@ -87,6 +89,15 @@ static void render_thumbnails(overview_state *st) {
     }
 }
 
+static void recompile(overview_state *st, struct umbra_backend *be) {
+    if (be == st->be) { return; }
+    for (int i = 0; i < st->n_real; i++) { umbra_program_free(st->progs[i]); }
+    st->be = be;
+    for (int i = 0; i < st->n_real; i++) {
+        st->progs[i] = umbra_backend_compile(be, st->bbs[i]);
+    }
+}
+
 static void overview_init(slide *s, int w, int h) {
     overview_state *st = s->state;
     st->w = w;
@@ -96,20 +107,14 @@ static void overview_init(slide *s, int w, int h) {
     st->fb = calloc((size_t)(w * h), 4);
     st->tmp = calloc((size_t)(w * h), 4);
     st->n_real = slide_count() - 1;
-    st->frame = 0;
-    st->be = umbra_backend_interp();
 
     for (int idx = 0; idx < st->n_real; idx++) {
         slide                *sub = slide_get(idx);
         struct umbra_builder *b = umbra_draw_build(sub->shader, sub->coverage, sub->blend,
                                                    sub->format, &st->lays[idx]);
-        struct umbra_basic_block *bb = umbra_basic_block(b);
+        st->bbs[idx] = umbra_basic_block(b);
         umbra_builder_free(b);
-        st->progs[idx] = umbra_backend_compile(st->be, bb);
-        umbra_basic_block_free(bb);
     }
-
-    render_thumbnails(st);
 }
 
 static void overview_animate(slide *s, float dt) {
@@ -118,11 +123,17 @@ static void overview_animate(slide *s, float dt) {
         slide *sub = slide_get(i);
         if (sub->animate) { sub->animate(sub, dt); }
     }
-    st->frame++;
-    if (st->frame % 120 == 0) { render_thumbnails(st); }
 }
 
-static void overview_render(slide *s, int w, int h, int y0, int y1, void *buf,
+static void overview_prepare(slide *s, int w, int h, struct umbra_backend *be) {
+    (void)w;
+    (void)h;
+    overview_state *st = s->state;
+    recompile(st, be);
+    render_thumbnails(st);
+}
+
+static void overview_draw(slide *s, int w, int h, int y0, int y1, void *buf,
                              umbra_draw_layout const *lay, struct umbra_program *program) {
     overview_state *st = s->state;
     (void)w;
@@ -137,7 +148,7 @@ static void overview_render(slide *s, int w, int h, int y0, int y1, void *buf,
 static void overview_cleanup(slide *s) {
     overview_state *st = s->state;
     for (int i = 0; i < st->n_real; i++) { umbra_program_free(st->progs[i]); }
-    umbra_backend_free(st->be);
+    for (int i = 0; i < st->n_real; i++) { umbra_basic_block_free(st->bbs[i]); }
     free(st->fb);
     free(st->tmp);
     free(st);
@@ -155,7 +166,8 @@ slide slide_overview(void) {
         .bg = 0xff101010,
         .init = overview_init,
         .animate = overview_animate,
-        .render = overview_render,
+        .prepare = overview_prepare,
+        .draw = overview_draw,
         .cleanup = overview_cleanup,
         .state = st,
     };

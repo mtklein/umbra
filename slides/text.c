@@ -6,7 +6,7 @@ typedef struct {
     text_cov *tc;
 } text_state;
 
-static void text_render(slide *s, int w, int h, int y0, int y1, void *buf,
+static void text_draw(slide *s, int w, int h, int y0, int y1, void *buf,
                          umbra_draw_layout const *lay, struct umbra_program *program) {
     text_state *st = s->state;
     float       hc[4];
@@ -45,7 +45,7 @@ slide slide_text_bitmap(text_cov *tc) {
         .format = umbra_format_8888,
         .color = {1.0f, 1.0f, 1.0f, 1.0f},
         .bg = 0xff1a1a2e,
-        .render = text_render,
+        .draw = text_draw,
         .cleanup = text_cleanup,
         .state = st,
     };
@@ -62,7 +62,7 @@ slide slide_text_sdf(text_cov *tc) {
         .format = umbra_format_8888,
         .color = {0.2f, 0.8f, 1.0f, 1.0f},
         .bg = 0xff1a1a2e,
-        .render = text_render,
+        .draw = text_draw,
         .cleanup = text_cleanup,
         .state = st,
     };
