@@ -215,6 +215,21 @@ op(load_64_hi) {
     }
     next;
 }
+op(load_64_fused) {
+    char const *src = (char const *)ptr[ip->x];
+    int         i = end - K;
+    int         rem = n - i;
+    v[0].i32 = (I32){0};
+    v[1].i32 = (I32){0};
+    for (int l = 0; l < (rem < K ? rem : K); l++) {
+        int32_t lo, hi;
+        __builtin_memcpy(&lo, src + (i + l) * 8, 4);
+        __builtin_memcpy(&hi, src + (i + l) * 8 + 4, 4);
+        v[0].i32[l] = lo;
+        v[1].i32[l] = hi;
+    }
+    return ip[1].fn(ip + 1, v + 2, end, n, w, row, ptr, sz);
+}
 op(store_16) {
     uint16_t *dst = (uint16_t *)ptr[ip->x];
     int       i = end - K;
@@ -834,6 +849,16 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
                     emit(.fn = load_32, .x = RESOLVE_PTR(inst));
                     break;
                 case op_load_64_lo:
+                    if (i + 1 < hi
+                        && bb->inst[i + 1].op == op_load_64_hi
+                        && bb->inst[i + 1].ptr == inst->ptr) {
+                        emit(.fn = load_64_fused, .x = RESOLVE_PTR(inst));
+                        id[i] = n - 1;
+                        id[i + 1] = n;
+                        i++;
+                        n++;
+                        continue;
+                    }
                     emit(.fn = load_64_lo, .x = RESOLVE_PTR(inst));
                     break;
                 case op_load_64_hi:
