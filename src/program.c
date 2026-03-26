@@ -1,6 +1,9 @@
 #include "program.h"
 #include <stdlib.h>
 
+static void nop_flush(struct umbra_backend *be) { (void)be; }
+static void nop_dump(void const *ctx, FILE *f) { (void)ctx; (void)f; }
+
 struct umbra_backend {
     struct umbra_program *(*compile)(struct umbra_backend *,
                                      struct umbra_basic_block const *);
@@ -29,6 +32,7 @@ static struct umbra_program *compile_interp(struct umbra_backend           *be,
     *prog = (struct umbra_program){
         .ctx = p,
         .queue = run_interp,
+        .dump = nop_dump,
         .free_fn = free_interp,
         .backend = be,
     };
@@ -39,6 +43,7 @@ struct umbra_backend *umbra_backend_interp(void) {
     struct umbra_backend *be = malloc(sizeof *be);
     *be = (struct umbra_backend){
         .compile = compile_interp,
+        .flush = nop_flush,
         .free_fn = free_be_interp,
     };
     return be;
@@ -68,6 +73,7 @@ struct umbra_backend *umbra_backend_jit(void) {
     struct umbra_backend *be = malloc(sizeof *be);
     *be = (struct umbra_backend){
         .compile = compile_jit,
+        .flush = nop_flush,
         .free_fn = free_be_jit,
     };
     return be;
@@ -117,12 +123,12 @@ struct umbra_program *umbra_backend_compile(struct umbra_backend           *be,
 }
 
 void umbra_backend_flush(struct umbra_backend *be) {
-    if (be && be->flush) { be->flush(be); }
+    if (be) { be->flush(be); }
 }
 
 void umbra_backend_free(struct umbra_backend *be) {
     if (!be) { return; }
-    if (be->free_fn) { be->free_fn(be); }
+    be->free_fn(be);
 }
 
 struct umbra_backend *umbra_program_backend(struct umbra_program *p) {
@@ -135,11 +141,11 @@ void umbra_program_queue(struct umbra_program *p, int w, int h, umbra_buf buf[])
 }
 
 void umbra_program_dump(struct umbra_program *p, FILE *f) {
-    if (p && p->dump) { p->dump(p->ctx, f); }
+    if (p) { p->dump(p->ctx, f); }
 }
 
 void umbra_program_free(struct umbra_program *p) {
     if (!p) { return; }
-    if (p->free_fn) { p->free_fn(p->ctx); }
+    p->free_fn(p->ctx);
     free(p);
 }
