@@ -1,91 +1,93 @@
 Iterations:        100
-Instructions:      5400
-Total Cycles:      2103
-Total uOps:        5400
+Instructions:      6200
+Total Cycles:      2349
+Total uOps:        6200
 
 Dispatch Width:    6
-uOps Per Cycle:    2.57
-IPC:               2.57
-Block RThroughput: 9.0
+uOps Per Cycle:    2.64
+IPC:               2.64
+Block RThroughput: 13.0
 
 
-Cycles with backend pressure increase [ 95.96% ]
+Cycles with backend pressure increase [ 84.12% ]
 Throughput Bottlenecks: 
-  Resource Pressure       [ 42.08% ]
-  - Zn4FP0  [ 37.09% ]
-  - Zn4FP1  [ 40.42% ]
-  - Zn4FP2  [ 15.79% ]
-  - Zn4FP3  [ 12.41% ]
-  - Zn4FP45  [ 13.84% ]
-  Data Dependencies:      [ 81.93% ]
-  - Register Dependencies [ 81.93% ]
+  Resource Pressure       [ 32.99% ]
+  - Zn4FP0  [ 20.14% ]
+  - Zn4FP1  [ 24.69% ]
+  - Zn4FP2  [ 13.11% ]
+  - Zn4FP3  [ 8.51% ]
+  - Zn4FP45  [ 11.11% ]
+  - Zn4LSU  [ 2.13% ]
+  - Zn4Load  [ 0.13% ]
+  Data Dependencies:      [ 73.18% ]
+  - Register Dependencies [ 73.18% ]
   - Memory Dependencies   [ 0.00% ]
 
 Critical sequence based on the simulation:
 
               Instruction                                 Dependency Information
- +----< 30.   vfmadd231ps	%ymm7, %ymm13, %ymm14
- |
- |    < loop carried > 
- |
- |      0.    vmovdqu	(%rcx,%r10,2), %xmm9
- |      1.    vpmovsxwd	%xmm9, %ymm9
- |      2.    vcvtdq2ps	%ymm9, %ymm9
- |      3.    vmulps	786(%rip), %ymm9, %ymm9
- |      4.    movq	24(%rdx), %r11
- |      5.    vmovdqu	(%r11,%r10,4), %ymm10
- |      6.    vpsrld	$24, %ymm10, %ymm11
- |      7.    vcvtdq2ps	%ymm11, %ymm11
- +----> 8.    vmulps	788(%rip), %ymm11, %ymm11         ## RESOURCE interference:  Zn4FP0 [ probability: 32% ]
+        0.    vmovdqu	(%rcx,%r10,2), %xmm9
+        1.    vpmovsxwd	%xmm9, %ymm9
+        2.    vcvtdq2ps	%ymm9, %ymm9
+        3.    vmulps	930(%rip), %ymm9, %ymm9
+        4.    movq	24(%rdx), %r11
+        5.    vmovdqu	(%r11,%r10,4), %ymm10
+        6.    vpsrld	$24, %ymm10, %ymm11
+        7.    vcvtdq2ps	%ymm11, %ymm11
+ +----< 8.    vmulps	932(%rip), %ymm11, %ymm11
  |      9.    vmovaps	%ymm4, %ymm12
  +----> 10.   vfmadd231ps	%ymm7, %ymm11, %ymm12     ## REGISTER dependency:  %ymm11
  |      11.   vsubps	%ymm11, %ymm12, %ymm12
  |      12.   vfmadd231ps	%ymm12, %ymm9, %ymm11
- |      13.   vmulps	792(%rip), %ymm11, %ymm11
- |      14.   vpsrld	$8, %ymm10, %ymm12
- |      15.   vpand	809(%rip), %ymm12, %ymm12
- |      16.   vcvtdq2ps	%ymm12, %ymm12
- +----> 17.   vmulps	719(%rip), %ymm12, %ymm12         ## RESOURCE interference:  Zn4FP0 [ probability: 32% ]
- |      18.   vmovaps	%ymm2, %ymm13
- |      19.   vfmadd231ps	%ymm7, %ymm12, %ymm13
- |      20.   vsubps	%ymm12, %ymm13, %ymm13
- |      21.   vfmadd231ps	%ymm13, %ymm9, %ymm12
- |      22.   vmulps	799(%rip), %ymm12, %ymm12
- |      23.   vcvtps2dq	%ymm12, %ymm12
- |      24.   vpand	817(%rip), %ymm12, %ymm12
- |      25.   vpsrld	$16, %ymm10, %ymm13
- |      26.   vpand	834(%rip), %ymm13, %ymm13
- |      27.   vcvtdq2ps	%ymm13, %ymm13
- +----> 28.   vmulps	648(%rip), %ymm13, %ymm13         ## RESOURCE interference:  Zn4FP1 [ probability: 96% ]
- |      29.   vmovaps	%ymm3, %ymm14
- |      30.   vfmadd231ps	%ymm7, %ymm13, %ymm14
- |      31.   vsubps	%ymm13, %ymm14, %ymm14
- |      32.   vfmadd231ps	%ymm14, %ymm9, %ymm13
- |      33.   vmulps	824(%rip), %ymm13, %ymm13
- |      34.   vcvtps2dq	%ymm13, %ymm13
- |      35.   vpand	766(%rip), %ymm13, %ymm13
- |      36.   vcvtps2dq	%ymm11, %ymm11
- |      37.   vpand	752(%rip), %ymm10, %ymm10
- |      38.   vcvtdq2ps	%ymm10, %ymm10
- +----> 39.   vmulps	578(%rip), %ymm10, %ymm10         ## RESOURCE interference:  Zn4FP45 [ probability: 96% ]
- |      40.   vmovaps	%ymm1, %ymm14
- |      41.   vfmadd231ps	%ymm7, %ymm10, %ymm14
- +----> 42.   vsubps	%ymm10, %ymm14, %ymm14            ## REGISTER dependency:  %ymm10
- +----> 43.   vfmadd231ps	%ymm14, %ymm9, %ymm10     ## REGISTER dependency:  %ymm14
- +----> 44.   vmulps	786(%rip), %ymm10, %ymm10         ## RESOURCE interference:  Zn4FP1 [ probability: 66% ]
- +----> 45.   vcvtps2dq	%ymm10, %ymm10                    ## REGISTER dependency:  %ymm10
- |      46.   vpand	696(%rip), %ymm10, %ymm10
- |      47.   vpslld	$8, %ymm12, %ymm14
- |      48.   vpor	%ymm10, %ymm14, %ymm10
- |      49.   vpslld	$16, %ymm13, %ymm14
- |      50.   vpor	%ymm10, %ymm14, %ymm10
- |      51.   vpslld	$24, %ymm11, %ymm14
- |      52.   vpor	%ymm10, %ymm14, %ymm10
- |      53.   vmovdqu	%ymm10, (%r11,%r10,4)
- |
- |    < loop carried > 
- |
- +----> 7.    vcvtdq2ps	%ymm11, %ymm11                    ## RESOURCE interference:  Zn4FP2 [ probability: 32% ]
+ |      13.   vmaxps	936(%rip), %ymm11, %ymm11
+ |      14.   vminps	959(%rip), %ymm11, %ymm11
+ |      15.   vmulps	982(%rip), %ymm11, %ymm11
+ |      16.   vpsrld	$8, %ymm10, %ymm12
+ |      17.   vpand	999(%rip), %ymm12, %ymm12
+ |      18.   vcvtdq2ps	%ymm12, %ymm12
+ |      19.   vmulps	845(%rip), %ymm12, %ymm12
+ |      20.   vmovaps	%ymm2, %ymm13
+ |      21.   vfmadd231ps	%ymm7, %ymm12, %ymm13
+ |      22.   vsubps	%ymm12, %ymm13, %ymm13
+ |      23.   vfmadd231ps	%ymm13, %ymm9, %ymm12
+ |      24.   vmaxps	989(%rip), %ymm12, %ymm12
+ |      25.   vminps	1012(%rip), %ymm12, %ymm12
+ |      26.   vmulps	1035(%rip), %ymm12, %ymm12
+ |      27.   vpsrld	$16, %ymm10, %ymm13
+ |      28.   vpand	1052(%rip), %ymm13, %ymm13
+ |      29.   vcvtdq2ps	%ymm13, %ymm13
+ |      30.   vmulps	770(%rip), %ymm13, %ymm13
+ |      31.   vmovaps	%ymm3, %ymm14
+ |      32.   vfmadd231ps	%ymm7, %ymm13, %ymm14
+ |      33.   vsubps	%ymm13, %ymm14, %ymm14
+ |      34.   vfmadd231ps	%ymm14, %ymm9, %ymm13
+ |      35.   vmaxps	1042(%rip), %ymm13, %ymm13
+ |      36.   vminps	1065(%rip), %ymm13, %ymm13
+ |      37.   vmulps	1088(%rip), %ymm13, %ymm13
+ |      38.   vpand	1111(%rip), %ymm10, %ymm10
+ |      39.   vcvtdq2ps	%ymm10, %ymm10
+ +----> 40.   vmulps	701(%rip), %ymm10, %ymm10         ## RESOURCE interference:  Zn4FP1 [ probability: 1% ]
+ |      41.   vmovaps	%ymm1, %ymm14
+ |      42.   vfmadd231ps	%ymm7, %ymm10, %ymm14
+ +----> 43.   vsubps	%ymm10, %ymm14, %ymm14            ## REGISTER dependency:  %ymm10
+ +----> 44.   vfmadd231ps	%ymm14, %ymm9, %ymm10     ## REGISTER dependency:  %ymm14
+ +----> 45.   vmaxps	1101(%rip), %ymm10, %ymm10        ## RESOURCE interference:  Zn4FP1 [ probability: 51% ]
+ +----> 46.   vminps	1124(%rip), %ymm10, %ymm10        ## REGISTER dependency:  %ymm10
+ +----> 47.   vmulps	1147(%rip), %ymm10, %ymm10        ## REGISTER dependency:  %ymm10
+ +----> 48.   vcvtps2dq	%ymm10, %ymm10                    ## REGISTER dependency:  %ymm10
+        49.   vcvtps2dq	%ymm12, %ymm12
+        50.   vpand	1160(%rip), %ymm10, %ymm10
+        51.   vpand	1183(%rip), %ymm12, %ymm12
+        52.   vpslld	$8, %ymm12, %ymm14
+        53.   vpor	%ymm10, %ymm14, %ymm10
+        54.   vcvtps2dq	%ymm13, %ymm13
+        55.   vpand	1146(%rip), %ymm13, %ymm13
+        56.   vpslld	$16, %ymm13, %ymm14
+        57.   vpor	%ymm10, %ymm14, %ymm10
+        58.   vcvtps2dq	%ymm11, %ymm11
+        59.   vpslld	$24, %ymm11, %ymm14
+        60.   vpor	%ymm10, %ymm14, %ymm10
+        61.   vmovdqu	%ymm10, (%r11,%r10,4)
 
 
 Instruction Info:
@@ -100,54 +102,62 @@ Instruction Info:
  1      8     0.50    *                   vmovdqu	(%rcx,%r10,2), %xmm9
  1      2     0.50                        vpmovsxwd	%xmm9, %ymm9
  1      3     0.50                        vcvtdq2ps	%ymm9, %ymm9
- 1      10    0.50    *                   vmulps	786(%rip), %ymm9, %ymm9
+ 1      10    0.50    *                   vmulps	930(%rip), %ymm9, %ymm9
  1      5     0.33    *                   movq	24(%rdx), %r11
  1      8     0.50    *                   vmovdqu	(%r11,%r10,4), %ymm10
  1      1     0.50                        vpsrld	$24, %ymm10, %ymm11
  1      3     0.50                        vcvtdq2ps	%ymm11, %ymm11
- 1      10    0.50    *                   vmulps	788(%rip), %ymm11, %ymm11
+ 1      10    0.50    *                   vmulps	932(%rip), %ymm11, %ymm11
  1      0     0.17                        vmovaps	%ymm4, %ymm12
  1      4     0.50                        vfmadd231ps	%ymm7, %ymm11, %ymm12
  1      3     0.50                        vsubps	%ymm11, %ymm12, %ymm12
  1      4     0.50                        vfmadd231ps	%ymm12, %ymm9, %ymm11
- 1      10    0.50    *                   vmulps	792(%rip), %ymm11, %ymm11
+ 1      9     0.50    *                   vmaxps	936(%rip), %ymm11, %ymm11
+ 1      9     0.50    *                   vminps	959(%rip), %ymm11, %ymm11
+ 1      10    0.50    *                   vmulps	982(%rip), %ymm11, %ymm11
  1      1     0.50                        vpsrld	$8, %ymm10, %ymm12
- 1      8     0.50    *                   vpand	809(%rip), %ymm12, %ymm12
+ 1      8     0.50    *                   vpand	999(%rip), %ymm12, %ymm12
  1      3     0.50                        vcvtdq2ps	%ymm12, %ymm12
- 1      10    0.50    *                   vmulps	719(%rip), %ymm12, %ymm12
+ 1      10    0.50    *                   vmulps	845(%rip), %ymm12, %ymm12
  1      0     0.17                        vmovaps	%ymm2, %ymm13
  1      4     0.50                        vfmadd231ps	%ymm7, %ymm12, %ymm13
  1      3     0.50                        vsubps	%ymm12, %ymm13, %ymm13
  1      4     0.50                        vfmadd231ps	%ymm13, %ymm9, %ymm12
- 1      10    0.50    *                   vmulps	799(%rip), %ymm12, %ymm12
- 1      4     0.50                        vcvtps2dq	%ymm12, %ymm12
- 1      8     0.50    *                   vpand	817(%rip), %ymm12, %ymm12
+ 1      9     0.50    *                   vmaxps	989(%rip), %ymm12, %ymm12
+ 1      9     0.50    *                   vminps	1012(%rip), %ymm12, %ymm12
+ 1      10    0.50    *                   vmulps	1035(%rip), %ymm12, %ymm12
  1      1     0.50                        vpsrld	$16, %ymm10, %ymm13
- 1      8     0.50    *                   vpand	834(%rip), %ymm13, %ymm13
+ 1      8     0.50    *                   vpand	1052(%rip), %ymm13, %ymm13
  1      3     0.50                        vcvtdq2ps	%ymm13, %ymm13
- 1      10    0.50    *                   vmulps	648(%rip), %ymm13, %ymm13
+ 1      10    0.50    *                   vmulps	770(%rip), %ymm13, %ymm13
  1      0     0.17                        vmovaps	%ymm3, %ymm14
  1      4     0.50                        vfmadd231ps	%ymm7, %ymm13, %ymm14
  1      3     0.50                        vsubps	%ymm13, %ymm14, %ymm14
  1      4     0.50                        vfmadd231ps	%ymm14, %ymm9, %ymm13
- 1      10    0.50    *                   vmulps	824(%rip), %ymm13, %ymm13
- 1      4     0.50                        vcvtps2dq	%ymm13, %ymm13
- 1      8     0.50    *                   vpand	766(%rip), %ymm13, %ymm13
- 1      4     0.50                        vcvtps2dq	%ymm11, %ymm11
- 1      8     0.50    *                   vpand	752(%rip), %ymm10, %ymm10
+ 1      9     0.50    *                   vmaxps	1042(%rip), %ymm13, %ymm13
+ 1      9     0.50    *                   vminps	1065(%rip), %ymm13, %ymm13
+ 1      10    0.50    *                   vmulps	1088(%rip), %ymm13, %ymm13
+ 1      8     0.50    *                   vpand	1111(%rip), %ymm10, %ymm10
  1      3     0.50                        vcvtdq2ps	%ymm10, %ymm10
- 1      10    0.50    *                   vmulps	578(%rip), %ymm10, %ymm10
+ 1      10    0.50    *                   vmulps	701(%rip), %ymm10, %ymm10
  1      0     0.17                        vmovaps	%ymm1, %ymm14
  1      4     0.50                        vfmadd231ps	%ymm7, %ymm10, %ymm14
  1      3     0.50                        vsubps	%ymm10, %ymm14, %ymm14
  1      4     0.50                        vfmadd231ps	%ymm14, %ymm9, %ymm10
- 1      10    0.50    *                   vmulps	786(%rip), %ymm10, %ymm10
+ 1      9     0.50    *                   vmaxps	1101(%rip), %ymm10, %ymm10
+ 1      9     0.50    *                   vminps	1124(%rip), %ymm10, %ymm10
+ 1      10    0.50    *                   vmulps	1147(%rip), %ymm10, %ymm10
  1      4     0.50                        vcvtps2dq	%ymm10, %ymm10
- 1      8     0.50    *                   vpand	696(%rip), %ymm10, %ymm10
+ 1      4     0.50                        vcvtps2dq	%ymm12, %ymm12
+ 1      8     0.50    *                   vpand	1160(%rip), %ymm10, %ymm10
+ 1      8     0.50    *                   vpand	1183(%rip), %ymm12, %ymm12
  1      1     0.50                        vpslld	$8, %ymm12, %ymm14
  1      1     0.25                        vpor	%ymm10, %ymm14, %ymm10
+ 1      4     0.50                        vcvtps2dq	%ymm13, %ymm13
+ 1      8     0.50    *                   vpand	1146(%rip), %ymm13, %ymm13
  1      1     0.50                        vpslld	$16, %ymm13, %ymm14
  1      1     0.25                        vpor	%ymm10, %ymm14, %ymm10
+ 1      4     0.50                        vcvtps2dq	%ymm11, %ymm11
  1      1     0.50                        vpslld	$24, %ymm11, %ymm14
  1      1     0.25                        vpor	%ymm10, %ymm14, %ymm10
  1      1     1.00           *            vmovdqu	%ymm10, (%r11,%r10,4)
@@ -181,61 +191,69 @@ Resources:
 
 Resource pressure per iteration:
 [0]    [1]    [2]    [3]    [4]    [5]    [6]    [7]    [8]    [9]    [10]   [11]   [12.0] [12.1] [13]   [14.0] [14.1] [14.2] [15.0] [15.1] [15.2] [16.0] [16.1] 
-0.33   0.33   0.34    -      -      -      -      -     11.35  12.33  11.64  10.68  9.00   9.00   1.00   6.33   6.33   6.34   6.00   6.00   6.00   0.50   0.50   
+0.33   0.33   0.34    -      -      -      -      -     15.01  15.49  11.99  11.51  13.00  13.00  1.00   9.00   9.00   9.00   8.66   8.67   8.67   0.50   0.50   
 
 Resource pressure by instruction:
 [0]    [1]    [2]    [3]    [4]    [5]    [6]    [7]    [8]    [9]    [10]   [11]   [12.0] [12.1] [13]   [14.0] [14.1] [14.2] [15.0] [15.1] [15.2] [16.0] [16.1] Instructions:
- -      -      -      -      -      -      -      -      -      -      -      -     0.97   0.03    -     0.33   0.33   0.34   0.97   0.01   0.02    -      -     vmovdqu	(%rcx,%r10,2), %xmm9
- -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -      -      -      -      -      -     vpmovsxwd	%xmm9, %ymm9
- -      -      -      -      -      -      -      -      -      -     0.33   0.67    -      -      -      -      -      -      -      -      -      -      -     vcvtdq2ps	%ymm9, %ymm9
- -      -      -      -      -      -      -      -     0.33   0.67    -      -     0.01   0.99    -     0.32   0.32   0.36   0.96    -     0.04    -      -     vmulps	786(%rip), %ymm9, %ymm9
-0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.33   0.33   0.02   0.01   0.97    -      -     movq	24(%rdx), %r11
- -      -      -      -      -      -      -      -      -      -      -      -     0.68   0.32    -     0.68   0.32    -     0.04   0.64   0.32    -      -     vmovdqu	(%r11,%r10,4), %ymm10
- -      -      -      -      -      -      -      -      -     0.65   0.35    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	$24, %ymm10, %ymm11
- -      -      -      -      -      -      -      -      -      -     0.34   0.66    -      -      -      -      -      -      -      -      -      -      -     vcvtdq2ps	%ymm11, %ymm11
- -      -      -      -      -      -      -      -     0.66   0.34    -      -     0.99   0.01    -     0.03   0.65   0.32   0.03   0.64   0.33    -      -     vmulps	788(%rip), %ymm11, %ymm11
+ -      -      -      -      -      -      -      -      -      -      -      -     0.47   0.53    -     0.48   0.02   0.50   0.35   0.31   0.34    -      -     vmovdqu	(%rcx,%r10,2), %xmm9
+ -      -      -      -      -      -      -      -      -     0.48   0.52    -      -      -      -      -      -      -      -      -      -      -      -     vpmovsxwd	%xmm9, %ymm9
+ -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -      -     vcvtdq2ps	%ymm9, %ymm9
+ -      -      -      -      -      -      -      -     0.50   0.50    -      -     0.93   0.07    -     0.02   0.52   0.46   0.32   0.33   0.35    -      -     vmulps	930(%rip), %ymm9, %ymm9
+0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.93   0.04   0.03   0.32   0.36   0.32    -      -     movq	24(%rdx), %r11
+ -      -      -      -      -      -      -      -      -      -      -      -     0.98   0.02    -     0.02   0.02   0.96   0.34   0.33   0.33    -      -     vmovdqu	(%r11,%r10,4), %ymm10
+ -      -      -      -      -      -      -      -      -     0.02   0.98    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	$24, %ymm10, %ymm11
+ -      -      -      -      -      -      -      -      -      -     0.94   0.06    -      -      -      -      -      -      -      -      -      -      -     vcvtdq2ps	%ymm11, %ymm11
+ -      -      -      -      -      -      -      -     0.96   0.04    -      -     0.95   0.05    -     0.50   0.48   0.02   0.32   0.32   0.36    -      -     vmulps	932(%rip), %ymm11, %ymm11
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vmovaps	%ymm4, %ymm12
- -      -      -      -      -      -      -      -     0.97   0.03    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm7, %ymm11, %ymm12
- -      -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -      -      -      -      -     vsubps	%ymm11, %ymm12, %ymm12
- -      -      -      -      -      -      -      -     0.65   0.35    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm12, %ymm9, %ymm11
- -      -      -      -      -      -      -      -     0.68   0.32    -      -     0.67   0.33    -     0.34   0.03   0.63   0.66   0.32   0.02    -      -     vmulps	792(%rip), %ymm11, %ymm11
- -      -      -      -      -      -      -      -      -     0.35   0.65    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	$8, %ymm10, %ymm12
- -      -      -      -      -      -      -      -     0.02    -      -     0.98   0.01   0.99    -     0.33   0.34   0.33   0.98   0.02    -      -      -     vpand	809(%rip), %ymm12, %ymm12
- -      -      -      -      -      -      -      -      -      -     0.66   0.34    -      -      -      -      -      -      -      -      -      -      -     vcvtdq2ps	%ymm12, %ymm12
- -      -      -      -      -      -      -      -     0.02   0.98    -      -     0.34   0.66    -     0.34   0.01   0.65   0.03   0.96   0.01    -      -     vmulps	719(%rip), %ymm12, %ymm12
+ -      -      -      -      -      -      -      -     0.47   0.53    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm7, %ymm11, %ymm12
+ -      -      -      -      -      -      -      -      -      -     0.02   0.98    -      -      -      -      -      -      -      -      -      -      -     vsubps	%ymm11, %ymm12, %ymm12
+ -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm12, %ymm9, %ymm11
+ -      -      -      -      -      -      -      -     0.03   0.97    -      -     0.49   0.51    -     0.50   0.05   0.45   0.34   0.34   0.32    -      -     vmaxps	936(%rip), %ymm11, %ymm11
+ -      -      -      -      -      -      -      -     0.97   0.03    -      -     0.07   0.93    -     0.94   0.04   0.02   0.34   0.34   0.32    -      -     vminps	959(%rip), %ymm11, %ymm11
+ -      -      -      -      -      -      -      -     0.05   0.95    -      -     0.06   0.94    -     0.03   0.91   0.06   0.35   0.33   0.32    -      -     vmulps	982(%rip), %ymm11, %ymm11
+ -      -      -      -      -      -      -      -      -     0.96   0.04    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	$8, %ymm10, %ymm12
+ -      -      -      -      -      -      -      -     0.03   0.01   0.01   0.95   0.95   0.05    -     0.48   0.46   0.06   0.34   0.34   0.32    -      -     vpand	999(%rip), %ymm12, %ymm12
+ -      -      -      -      -      -      -      -      -      -     0.52   0.48    -      -      -      -      -      -      -      -      -      -      -     vcvtdq2ps	%ymm12, %ymm12
+ -      -      -      -      -      -      -      -     0.05   0.95    -      -     0.93   0.07    -     0.04   0.48   0.48   0.35   0.34   0.31    -      -     vmulps	845(%rip), %ymm12, %ymm12
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vmovaps	%ymm2, %ymm13
- -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm7, %ymm12, %ymm13
- -      -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -     vsubps	%ymm12, %ymm13, %ymm13
- -      -      -      -      -      -      -      -     0.66   0.34    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm13, %ymm9, %ymm12
- -      -      -      -      -      -      -      -     0.34   0.66    -      -     0.02   0.98    -     0.33   0.33   0.34   0.01   0.97   0.02    -      -     vmulps	799(%rip), %ymm12, %ymm12
- -      -      -      -      -      -      -      -      -      -     0.64   0.36    -      -      -      -      -      -      -      -      -      -      -     vcvtps2dq	%ymm12, %ymm12
- -      -      -      -      -      -      -      -     0.34   0.65   0.01    -     0.96   0.04    -     0.33   0.34   0.33   0.01   0.02   0.97    -      -     vpand	817(%rip), %ymm12, %ymm12
- -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	$16, %ymm10, %ymm13
- -      -      -      -      -      -      -      -     0.32   0.01    -     0.67   0.66   0.34    -     0.65    -     0.35    -     0.33   0.67    -      -     vpand	834(%rip), %ymm13, %ymm13
- -      -      -      -      -      -      -      -      -      -     0.66   0.34    -      -      -      -      -      -      -      -      -      -      -     vcvtdq2ps	%ymm13, %ymm13
- -      -      -      -      -      -      -      -     0.33   0.67    -      -     0.98   0.02    -     0.33   0.33   0.34   0.96   0.01   0.03    -      -     vmulps	648(%rip), %ymm13, %ymm13
+ -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm7, %ymm12, %ymm13
+ -      -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -      -      -      -      -     vsubps	%ymm12, %ymm13, %ymm13
+ -      -      -      -      -      -      -      -     0.98   0.02    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm13, %ymm9, %ymm12
+ -      -      -      -      -      -      -      -     0.02   0.98    -      -     0.52   0.48    -     0.02   0.01   0.97   0.34   0.33   0.33    -      -     vmaxps	989(%rip), %ymm12, %ymm12
+ -      -      -      -      -      -      -      -     0.96   0.04    -      -     0.49   0.51    -     0.49   0.48   0.03   0.33   0.33   0.34    -      -     vminps	1012(%rip), %ymm12, %ymm12
+ -      -      -      -      -      -      -      -     0.52   0.48    -      -     0.06   0.94    -     0.45   0.03   0.52   0.32   0.34   0.34    -      -     vmulps	1035(%rip), %ymm12, %ymm12
+ -      -      -      -      -      -      -      -      -     0.49   0.51    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	$16, %ymm10, %ymm13
+ -      -      -      -      -      -      -      -     0.48   0.49   0.02   0.01   0.07   0.93    -     0.46   0.05   0.49   0.35   0.32   0.33    -      -     vpand	1052(%rip), %ymm13, %ymm13
+ -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -      -     vcvtdq2ps	%ymm13, %ymm13
+ -      -      -      -      -      -      -      -     0.50   0.50    -      -     0.50   0.50    -     0.03   0.49   0.48   0.33   0.34   0.33    -      -     vmulps	770(%rip), %ymm13, %ymm13
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vmovaps	%ymm3, %ymm14
- -      -      -      -      -      -      -      -     0.67   0.33    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm7, %ymm13, %ymm14
- -      -      -      -      -      -      -      -      -      -     0.02   0.98    -      -      -      -      -      -      -      -      -      -      -     vsubps	%ymm13, %ymm14, %ymm14
- -      -      -      -      -      -      -      -     0.34   0.66    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm14, %ymm9, %ymm13
- -      -      -      -      -      -      -      -     0.66   0.34    -      -     0.67   0.33    -     0.33   0.65   0.02   0.96   0.02   0.02    -      -     vmulps	824(%rip), %ymm13, %ymm13
- -      -      -      -      -      -      -      -      -      -     0.34   0.66    -      -      -      -      -      -      -      -      -      -      -     vcvtps2dq	%ymm13, %ymm13
- -      -      -      -      -      -      -      -      -     0.03   0.65   0.32   0.34   0.66    -     0.33   0.64   0.03   0.33   0.67    -      -      -     vpand	766(%rip), %ymm13, %ymm13
- -      -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -     vcvtps2dq	%ymm11, %ymm11
- -      -      -      -      -      -      -      -     0.01   0.64    -     0.35   0.34   0.66    -     0.33   0.33   0.34    -     0.98   0.02    -      -     vpand	752(%rip), %ymm10, %ymm10
- -      -      -      -      -      -      -      -      -      -     0.33   0.67    -      -      -      -      -      -      -      -      -      -      -     vcvtdq2ps	%ymm10, %ymm10
- -      -      -      -      -      -      -      -     0.68   0.32    -      -     0.35   0.65    -      -     0.35   0.65    -     0.36   0.64    -      -     vmulps	578(%rip), %ymm10, %ymm10
+ -      -      -      -      -      -      -      -     0.98   0.02    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm7, %ymm13, %ymm14
+ -      -      -      -      -      -      -      -      -      -     0.04   0.96    -      -      -      -      -      -      -      -      -      -      -     vsubps	%ymm13, %ymm14, %ymm14
+ -      -      -      -      -      -      -      -     0.51   0.49    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm14, %ymm9, %ymm13
+ -      -      -      -      -      -      -      -     0.49   0.51    -      -     0.50   0.50    -     0.49   0.50   0.01   0.32   0.35   0.33    -      -     vmaxps	1042(%rip), %ymm13, %ymm13
+ -      -      -      -      -      -      -      -     0.50   0.50    -      -     0.49   0.51    -     0.06   0.48   0.46   0.32   0.32   0.36    -      -     vminps	1065(%rip), %ymm13, %ymm13
+ -      -      -      -      -      -      -      -     0.51   0.49    -      -     0.51   0.49    -     0.46   0.47   0.07   0.33   0.32   0.35    -      -     vmulps	1088(%rip), %ymm13, %ymm13
+ -      -      -      -      -      -      -      -     0.47   0.47   0.03   0.03   0.48   0.52    -     0.50   0.02   0.48   0.33   0.32   0.35    -      -     vpand	1111(%rip), %ymm10, %ymm10
+ -      -      -      -      -      -      -      -      -      -     0.49   0.51    -      -      -      -      -      -      -      -      -      -      -     vcvtdq2ps	%ymm10, %ymm10
+ -      -      -      -      -      -      -      -     0.51   0.49    -      -     0.49   0.51    -     0.50   0.48   0.02   0.34   0.35   0.31    -      -     vmulps	701(%rip), %ymm10, %ymm10
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vmovaps	%ymm1, %ymm14
- -      -      -      -      -      -      -      -     0.34   0.66    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm7, %ymm10, %ymm14
- -      -      -      -      -      -      -      -      -      -     0.97   0.03    -      -      -      -      -      -      -      -      -      -      -     vsubps	%ymm10, %ymm14, %ymm14
- -      -      -      -      -      -      -      -     0.33   0.67    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm14, %ymm9, %ymm10
- -      -      -      -      -      -      -      -     0.67   0.33    -      -     0.33   0.67    -     0.65   0.02   0.33   0.02   0.02   0.96    -      -     vmulps	786(%rip), %ymm10, %ymm10
- -      -      -      -      -      -      -      -      -      -     0.33   0.67    -      -      -      -      -      -      -      -      -      -      -     vcvtps2dq	%ymm10, %ymm10
- -      -      -      -      -      -      -      -     0.01   0.33   0.33   0.33   0.01   0.99    -     0.33   0.35   0.32   0.02   0.02   0.96    -      -     vpand	696(%rip), %ymm10, %ymm10
- -      -      -      -      -      -      -      -      -     0.98   0.02    -      -      -      -      -      -      -      -      -      -      -      -     vpslld	$8, %ymm12, %ymm14
- -      -      -      -      -      -      -      -     0.67    -     0.01   0.32    -      -      -      -      -      -      -      -      -      -      -     vpor	%ymm10, %ymm14, %ymm10
- -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -      -     vpslld	$16, %ymm13, %ymm14
- -      -      -      -      -      -      -      -     0.34    -     0.01   0.65    -      -      -      -      -      -      -      -      -      -      -     vpor	%ymm10, %ymm14, %ymm10
- -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpslld	$24, %ymm11, %ymm14
- -      -      -      -      -      -      -      -     0.32    -     0.01   0.67    -      -      -      -      -      -      -      -      -      -      -     vpor	%ymm10, %ymm14, %ymm10
- -      -      -      -      -      -      -      -      -      -      -      -     0.67   0.33   1.00   0.01   0.66   0.33    -      -      -     0.50   0.50   vmovdqu	%ymm10, (%r11,%r10,4)
+ -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm7, %ymm10, %ymm14
+ -      -      -      -      -      -      -      -      -      -     0.02   0.98    -      -      -      -      -      -      -      -      -      -      -     vsubps	%ymm10, %ymm14, %ymm14
+ -      -      -      -      -      -      -      -     0.49   0.51    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm14, %ymm9, %ymm10
+ -      -      -      -      -      -      -      -     0.50   0.50    -      -     0.50   0.50    -     0.47   0.49   0.04   0.34   0.34   0.32    -      -     vmaxps	1101(%rip), %ymm10, %ymm10
+ -      -      -      -      -      -      -      -     0.50   0.50    -      -     0.49   0.51    -     0.47   0.07   0.46   0.33   0.32   0.35    -      -     vminps	1124(%rip), %ymm10, %ymm10
+ -      -      -      -      -      -      -      -     0.50   0.50    -      -     0.52   0.48    -     0.06   0.49   0.45   0.32   0.34   0.34    -      -     vmulps	1147(%rip), %ymm10, %ymm10
+ -      -      -      -      -      -      -      -      -      -     0.02   0.98    -      -      -      -      -      -      -      -      -      -      -     vcvtps2dq	%ymm10, %ymm10
+ -      -      -      -      -      -      -      -      -      -     0.47   0.53    -      -      -      -      -      -      -      -      -      -      -     vcvtps2dq	%ymm12, %ymm12
+ -      -      -      -      -      -      -      -     0.02   0.46   0.51   0.01   0.93   0.07    -     0.04   0.48   0.48   0.33   0.35   0.32    -      -     vpand	1160(%rip), %ymm10, %ymm10
+ -      -      -      -      -      -      -      -     0.01   0.47   0.51   0.01   0.04   0.96    -     0.04   0.95   0.01   0.32   0.33   0.35    -      -     vpand	1183(%rip), %ymm12, %ymm12
+ -      -      -      -      -      -      -      -      -     0.02   0.98    -      -      -      -      -      -      -      -      -      -      -      -     vpslld	$8, %ymm12, %ymm14
+ -      -      -      -      -      -      -      -     0.02    -     0.01   0.97    -      -      -      -      -      -      -      -      -      -      -     vpor	%ymm10, %ymm14, %ymm10
+ -      -      -      -      -      -      -      -      -      -     0.47   0.53    -      -      -      -      -      -      -      -      -      -      -     vcvtps2dq	%ymm13, %ymm13
+ -      -      -      -      -      -      -      -     0.47   0.04   0.48   0.01   0.50   0.50    -     0.48   0.02   0.50   0.34   0.33   0.33    -      -     vpand	1146(%rip), %ymm13, %ymm13
+ -      -      -      -      -      -      -      -      -     0.05   0.95    -      -      -      -      -      -      -      -      -      -      -      -     vpslld	$16, %ymm13, %ymm14
+ -      -      -      -      -      -      -      -     0.02    -     0.46   0.52    -      -      -      -      -      -      -      -      -      -      -     vpor	%ymm10, %ymm14, %ymm10
+ -      -      -      -      -      -      -      -      -      -     0.04   0.96    -      -      -      -      -      -      -      -      -      -      -     vcvtps2dq	%ymm11, %ymm11
+ -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -      -      -      -      -      -     vpslld	$24, %ymm11, %ymm14
+ -      -      -      -      -      -      -      -      -     0.01   0.95   0.04    -      -      -      -      -      -      -      -      -      -      -     vpor	%ymm10, %ymm14, %ymm10
+ -      -      -      -      -      -      -      -      -      -      -      -     0.08   0.92   1.00   0.04   0.47   0.49    -      -      -     0.50   0.50   vmovdqu	%ymm10, (%r11,%r10,4)
