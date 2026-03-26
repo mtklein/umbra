@@ -17,18 +17,17 @@ static char const *backend_name[N_BACKS] = {
 
 enum {
     FMT_8888, FMT_565, FMT_FP16,
-    FMT_FP16P, FMT_1010102, NUM_FMTS,
+    FMT_FP16P, FMT_1010102, FMT_SRGB, NUM_FMTS,
 };
 static char const *fmt_name[] = {
-    "8888", "565", "fp16", "fp16p", "1010102",
+    "8888", "565", "fp16", "fp16p", "1010102", "sRGB",
 };
 static umbra_format const *formats[] = {
     &umbra_format_8888,  &umbra_format_565,
     &umbra_format_fp16,  &umbra_format_fp16_planar,
-    &umbra_format_1010102,
+    &umbra_format_1010102, &umbra_format_srgb_8888,
 };
-static int fmt_bpp[] = {4, 2, 8, 2, 4};
-static int fmt_tol[] = {0, 0, 0, 0, 0};
+static int fmt_tol[] = {0, 0, 0, 0, 0, 2};
 
 typedef struct {
     struct umbra_program *prog;
@@ -143,7 +142,7 @@ static void render_slide(
         umbra_draw_layout const *lay) {
     slide *s = slide_get(slide_idx);
 
-    int   bpp = fmt_bpp[fmt];
+    int   bpp = (int)formats[fmt]->pixel_bytes;
     _Bool planar = (fmt == FMT_FP16P);
     int   row_bytes = planar ? W * 2 : W * bpp;
     long  plane_gap = planar ? (long)W * H * 2 : 0;
@@ -165,7 +164,7 @@ static void readback_to_8888(int fmt,
                              void *pixbuf,
                              uint32_t *out) {
     _Bool planar = (fmt == FMT_FP16P);
-    int   bpp = fmt_bpp[fmt];
+    int   bpp = (int)formats[fmt]->pixel_bytes;
     long  plane_gap = planar ? (long)W * H * 2 : 0;
     long  row_sz = planar ? (long)W * 2 : (long)W * bpp;
 
@@ -211,7 +210,7 @@ static void test_slide_golden(
     _Bool planar = (fmt == FMT_FP16P);
     size_t pixbuf_sz = planar
         ? (size_t)(W * H * 4) * 2
-        : (size_t)(W * H) * (size_t)fmt_bpp[fmt];
+        : (size_t)(W * H) * (size_t)(int)formats[fmt]->pixel_bytes;
     size_t pad = planar
         ? (size_t)((H - 1) * W) * 2 : 0;
     void *pbuf_ref = calloc(1, pixbuf_sz + pad);

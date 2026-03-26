@@ -57,6 +57,7 @@ extern umbra_format const umbra_format_565;
 extern umbra_format const umbra_format_1010102;
 extern umbra_format const umbra_format_fp16;
 extern umbra_format const umbra_format_fp16_planar;
+extern umbra_format const umbra_format_srgb_8888;
 
 typedef struct {
     float a, b, c, d, e, f, g;

@@ -44,16 +44,16 @@ enum {
     FMT_FP16,
     FMT_FP16P,
     FMT_1010102,
+    FMT_SRGB,
     NUM_FMTS,
 };
 static char const *fmt_name[] = {
-    "8888", "565", "fp16", "fp16p", "1010102",
+    "8888", "565", "fp16", "fp16p", "1010102", "sRGB",
 };
 static umbra_format const *fmt_formats[] = {
-    &umbra_format_8888, &umbra_format_565,     &umbra_format_fp16,
-    &umbra_format_fp16_planar, &umbra_format_1010102,
+    &umbra_format_8888,   &umbra_format_565,       &umbra_format_fp16,
+    &umbra_format_fp16_planar, &umbra_format_1010102, &umbra_format_srgb_8888,
 };
-static int fmt_bpp[] = {4, 2, 8, 2, 4};
 
 typedef struct {
     struct umbra_program *program;
@@ -306,7 +306,7 @@ int main(void) {
         slide                *s = slide_get(cur_slide);
         struct umbra_program *b = programs[cur_backend];
 
-        int   bpp = fmt_bpp[cur_fmt];
+        int   bpp = (int)fmt_formats[cur_fmt]->pixel_bytes;
         _Bool planar = (cur_fmt == FMT_FP16P);
         int   row_bytes = planar ? W * 2 : W * bpp;
         long  plane_gap = planar ? (long)W * H * 2 : 0;
