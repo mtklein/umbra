@@ -57,6 +57,26 @@ _Bool is_store(enum op);
 _Bool has_ptr(enum op);
 _Bool is_varying(enum op);
 
+static inline _Bool is_fused_imm(enum op op) {
+    return op == op_add_f32_imm
+        || op == op_sub_f32_imm
+        || op == op_mul_f32_imm
+        || op == op_div_f32_imm
+        || op == op_min_f32_imm
+        || op == op_max_f32_imm
+        || op == op_add_i32_imm
+        || op == op_sub_i32_imm
+        || op == op_mul_i32_imm
+        || op == op_or_32_imm
+        || op == op_xor_32_imm
+        || op == op_eq_f32_imm
+        || op == op_lt_f32_imm
+        || op == op_le_f32_imm
+        || op == op_eq_i32_imm
+        || op == op_lt_s32_imm
+        || op == op_le_s32_imm;
+}
+
 int umbra_const_eval(enum op, int, int, int);
 
 typedef _Bool (*join_chooser)(struct bb_inst const *insts, int join_id);

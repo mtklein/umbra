@@ -104,10 +104,25 @@ static void emit(Buf *b, char const *fmt, ...) {
 }
 
 static _Bool is_16(enum op op) {
-    return op >= op_uniform_16 && op <= op_gather_16;
+    return op == op_uniform_16
+        || op == op_load_16
+        || op == op_store_16
+        || op == op_gather_16
+        || op == op_i32_from_s16
+        || op == op_i32_from_u16
+        || op == op_i16_from_i32
+        || op == op_f32_from_f16
+        || op == op_f16_from_f32;
 }
 static _Bool is_32(enum op op) {
-    return op >= op_uniform_32 && op <= op_deref_ptr;
+    return op == op_uniform_32
+        || op == op_load_32
+        || op == op_load_64_lo
+        || op == op_load_64_hi
+        || op == op_gather_32
+        || op == op_store_32
+        || op == op_store_64
+        || op == op_deref_ptr;
 }
 
 static void emit_ops(Buf *b, BB const *bb,
@@ -841,9 +856,7 @@ static void encode_dispatch(
                                 sizeof *szs_data);
     for (int i = 0; i <= m->max_ptr; i++) {
         if (buf[i].ptr && buf[i].sz) {
-            long bytes = buf[i].sz < 0
-                ? -buf[i].sz : buf[i].sz;
-            szs_data[i] = (uint32_t)bytes;
+            szs_data[i] = (uint32_t)buf[i].sz;
         }
     }
 
@@ -870,8 +883,7 @@ static void encode_dispatch(
     long offsets[32] = {0};
     for (int i = 0; i <= m->max_ptr; i++) {
         if (!buf[i].ptr || !buf[i].sz) { continue; }
-        long bytes = buf[i].sz < 0
-            ? -buf[i].sz : buf[i].sz;
+        long bytes = (long)buf[i].sz;
         struct batch_shared *sh =
             &m->batch_data[i];
         char *ptr = buf[i].ptr;
@@ -903,11 +915,11 @@ static void encode_dispatch(
             if (!sh->mtl) {
                 sh->mtl     = retained;
                 sh->host    = ptr;
-                sh->copy_sz = buf[i].sz > 0
+                sh->copy_sz = !buf[i].read_only
                     ? bytes : 0;
             }
             batch_retain_buf(be, retained);
-            if (buf[i].sz > 0 && !can_nocopy) {
+            if (!buf[i].read_only && !can_nocopy) {
                 batch_add_copy(
                     be, ptr,
                     retained, bytes);
@@ -930,6 +942,7 @@ static void encode_dispatch(
             (char*)base + m->deref[d].byte_off + 8,
             sizeof dsz);
         long bytes = dsz < 0 ? -dsz : dsz;
+        _Bool deref_read_only = dsz < 0;
         int bi = m->deref[d].buf_idx;
         struct batch_shared *sh =
             &m->batch_data[bi];
@@ -962,11 +975,11 @@ static void encode_dispatch(
             if (!sh->mtl) {
                 sh->mtl     = retained;
                 sh->host    = dptr;
-                sh->copy_sz = dsz > 0
+                sh->copy_sz = !deref_read_only
                     ? bytes : 0;
             }
             batch_retain_buf(be, retained);
-            if (dsz > 0 && !can_nocopy) {
+            if (!deref_read_only && !can_nocopy) {
                 batch_add_copy(
                     be, dptr,
                     retained, bytes);

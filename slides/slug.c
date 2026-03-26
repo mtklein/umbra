@@ -59,8 +59,8 @@ static void slug_render(slide *s, int w, int h, void *buf, long buf_sz,
     slide_uni_ptr(au, st->acc_lay.curves_off, st->slug->data,
                   (long)(st->slug->count * 6 * 4));
     umbra_buf abuf[] = {
-        {au, -(long)st->acc_lay.uni_len},
-        {st->wind_buf, wind_sz},
+        {au, (size_t)st->acc_lay.uni_len, 1},
+        {st->wind_buf, (size_t)wind_sz, 0},
     };
     for (int j = 0; j < st->slug->count; j++) {
         int32_t j32 = j;
@@ -78,10 +78,10 @@ static void slug_render(slide *s, int w, int h, void *buf, long buf_sz,
     int       ps = lay->ps;
     long      plane_sz = ps ? (long)w * h * 2 : buf_sz;
     umbra_buf rbuf[5];
-    rbuf[0] = (umbra_buf){uni, -(long)lay->uni_len};
-    rbuf[1] = (umbra_buf){buf, plane_sz};
+    rbuf[0] = (umbra_buf){uni, (size_t)lay->uni_len, 1};
+    rbuf[1] = (umbra_buf){buf, (size_t)plane_sz, 0};
     for (int i = 0; i < ps; i++) {
-        rbuf[2 + i] = (umbra_buf){(char *)buf + plane_sz * (i + 1), plane_sz};
+        rbuf[2 + i] = (umbra_buf){(char *)buf + plane_sz * (i + 1), (size_t)plane_sz, 0};
     }
     umbra_program_queue(program, w, h, rbuf);
 }

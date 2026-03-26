@@ -778,7 +778,7 @@ static _Bool interp_chooser(struct bb_inst const *insts, int join_id) {
     enum op y_op = insts[insts[join_id].y].op;
     return y_op == op_pack
         || y_op == op_and_imm
-        || (y_op >= op_add_f32_imm && y_op <= op_le_s32_imm);
+        || is_fused_imm(y_op);
 }
 
 struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) {
@@ -976,7 +976,7 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
 static void load_bufs(struct umbra_interpreter *p, umbra_buf buf[]) {
     for (int i = 0; i < p->nptr; i++) {
         p->ptr[i] = buf[i].ptr;
-        p->sz[i] = buf[i].sz < 0 ? -buf[i].sz : buf[i].sz;
+        p->sz[i] = (long)buf[i].sz;
     }
 }
 

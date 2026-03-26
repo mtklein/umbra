@@ -6,14 +6,26 @@
 typedef struct umbra_builder builder;
 typedef umbra_val            val;
 
+static int ptr_ix(umbra_ptr p) { return p.deref ? ~p.ix : p.ix; }
+
 _Bool is_store(enum op op) {
     return op == op_store_16
         || op == op_store_32
         || op == op_store_64;
 }
 _Bool has_ptr(enum op op) {
-    return (op >= op_uniform_32 && op <= op_deref_ptr)
-        || (op >= op_uniform_16 && op <= op_gather_16);
+    return op == op_uniform_32
+        || op == op_load_32
+        || op == op_load_64_lo
+        || op == op_load_64_hi
+        || op == op_gather_32
+        || op == op_store_32
+        || op == op_store_64
+        || op == op_deref_ptr
+        || op == op_uniform_16
+        || op == op_load_16
+        || op == op_store_16
+        || op == op_gather_16;
 }
 _Bool is_varying(enum op op) {
     return op == op_x
@@ -145,8 +157,8 @@ int umbra_reserve_ptr(builder *b) {
     return off;
 }
 umbra_ptr umbra_deref_ptr(builder *b, umbra_ptr buf, int byte_off) {
-    val v = push(b, op_deref_ptr, .ptr = buf.ix, .imm = byte_off);
-    return (umbra_ptr){~v.id};
+    val v = push(b, op_deref_ptr, .ptr = ptr_ix(buf), .imm = byte_off);
+    return (umbra_ptr){.ix = v.id, .deref = 1};
 }
 int  umbra_uni_len(builder const *b) { return b->uni_len; }
 void umbra_set_uni_len(builder *b, int len) { b->uni_len = len; }
@@ -160,35 +172,35 @@ int umbra_max_ptr(builder const *b) {
 }
 
 val umbra_uniform_16(builder *b, umbra_ptr src, int slot) {
-    return push(b, op_uniform_16, .imm = slot, .ptr = src.ix);
+    return push(b, op_uniform_16, .imm = slot, .ptr = ptr_ix(src));
 }
 val umbra_gather_16(builder *b, umbra_ptr src, val ix) {
-    return push(b, op_gather_16, .x = ix.id, .ptr = src.ix);
+    return push(b, op_gather_16, .x = ix.id, .ptr = ptr_ix(src));
 }
 val umbra_load_32(builder *b, umbra_ptr src) {
-    return push(b, op_load_32, .ptr = src.ix);
+    return push(b, op_load_32, .ptr = ptr_ix(src));
 }
 void umbra_load_64(builder *b, umbra_ptr src, val *lo, val *hi) {
-    *lo = push(b, op_load_64_lo, .ptr = src.ix);
-    *hi = push(b, op_load_64_hi, .ptr = src.ix);
+    *lo = push(b, op_load_64_lo, .ptr = ptr_ix(src));
+    *hi = push(b, op_load_64_hi, .ptr = ptr_ix(src));
 }
 val umbra_load_16(builder *b, umbra_ptr src) {
-    return push(b, op_load_16, .ptr = src.ix);
+    return push(b, op_load_16, .ptr = ptr_ix(src));
 }
 val umbra_uniform_32(builder *b, umbra_ptr src, int slot) {
-    return push(b, op_uniform_32, .imm = slot, .ptr = src.ix);
+    return push(b, op_uniform_32, .imm = slot, .ptr = ptr_ix(src));
 }
 val umbra_gather_32(builder *b, umbra_ptr src, val ix) {
-    return push(b, op_gather_32, .x = ix.id, .ptr = src.ix);
+    return push(b, op_gather_32, .x = ix.id, .ptr = ptr_ix(src));
 }
 void umbra_store_32(builder *b, umbra_ptr dst, val v) {
-    push(b, op_store_32, .y = v.id, .ptr = dst.ix);
+    push(b, op_store_32, .y = v.id, .ptr = ptr_ix(dst));
 }
 void umbra_store_64(builder *b, umbra_ptr dst, val lo, val hi) {
-    push(b, op_store_64, .x = lo.id, .y = hi.id, .ptr = dst.ix);
+    push(b, op_store_64, .x = lo.id, .y = hi.id, .ptr = ptr_ix(dst));
 }
 void umbra_store_16(builder *b, umbra_ptr dst, val v) {
-    push(b, op_store_16, .y = v.id, .ptr = dst.ix);
+    push(b, op_store_16, .y = v.id, .ptr = ptr_ix(dst));
 }
 val umbra_i32_from_s16(builder *b, val x) { return push(b, op_i32_from_s16, .x = x.id); }
 val umbra_i32_from_u16(builder *b, val x) { return push(b, op_i32_from_u16, .x = x.id); }

@@ -64,7 +64,7 @@ Critical sequence based on the simulation:
  |      37.   vpor	%ymm11, %ymm13, %ymm13
  +----> 38.   vpslld	$24, %ymm12, %ymm12               ## REGISTER dependency:  %ymm12
  +----> 39.   vpor	%ymm12, %ymm13, %ymm13            ## REGISTER dependency:  %ymm12
- |      40.   movq	16(%rdx), %r11
+ |      40.   movq	24(%rdx), %r11
  +----> 41.   vmovdqu	%ymm13, (%r11,%r10,4)             ## REGISTER dependency:  %ymm13
 
 
@@ -117,7 +117,7 @@ Instruction Info:
  1      1     0.25                        vpor	%ymm11, %ymm13, %ymm13
  1      1     0.50                        vpslld	$24, %ymm12, %ymm12
  1      1     0.25                        vpor	%ymm12, %ymm13, %ymm13
- 1      5     0.33    *                   movq	16(%rdx), %r11
+ 1      5     0.33    *                   movq	24(%rdx), %r11
  1      1     1.00           *            vmovdqu	%ymm13, (%r11,%r10,4)
 
 
@@ -193,5 +193,5 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -     0.03    -     0.01   0.96    -      -      -      -      -      -      -      -      -      -      -     vpor	%ymm11, %ymm13, %ymm13
  -      -      -      -      -      -      -      -      -     0.98   0.02    -      -      -      -      -      -      -      -      -      -      -      -     vpslld	$24, %ymm12, %ymm12
  -      -      -      -      -      -      -      -     0.33   0.01   0.02   0.64    -      -      -      -      -      -      -      -      -      -      -     vpor	%ymm12, %ymm13, %ymm13
-0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.64   0.01   0.35   0.01   0.33   0.66    -      -     movq	16(%rdx), %r11
+0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.64   0.01   0.35   0.01   0.33   0.66    -      -     movq	24(%rdx), %r11
  -      -      -      -      -      -      -      -      -      -      -      -     0.03   0.97   1.00   0.33   0.33   0.34    -      -      -     0.50   0.50   vmovdqu	%ymm13, (%r11,%r10,4)

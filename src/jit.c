@@ -86,7 +86,7 @@ enum {
 static void load_ptr(Buf *c, int p, int *last_ptr) {
     if (*last_ptr == p) { return; }
     *last_ptr = p;
-    int disp = p * 16;
+    int disp = p * (int)sizeof(umbra_buf);
     // LDR XP, [XBUF, #disp]
     put(c, 0xf9400000u | ((uint32_t)(disp / 8) << 10) | ((uint32_t)XBUF << 5) | (uint32_t)XP);
 }
@@ -108,11 +108,9 @@ static void load_max_ix(Buf *c, int p, int elem_shift, int const *deref_gpr) {
         put(c, 0xd2a00000u | (0x7fffu << 5) | (uint32_t)XM);
         return;
     }
-    int disp = p * 16 + 8;
-    // LDR XM, [XBUF, #disp]
+    int disp = p * (int)sizeof(umbra_buf) + 8;
+    // LDR XM, [XBUF, #disp]  (sz is size_t, always non-negative)
     put(c, 0xf9400000u | ((uint32_t)(disp / 8) << 10) | ((uint32_t)XBUF << 5) | (uint32_t)XM);
-    put(c, 0xf10001bfu);
-    put(c, 0xda8da1adu);
     put(c,
         0x53000000u
             | ((uint32_t)elem_shift << 16)
@@ -1126,11 +1124,7 @@ static void load_max_ix_x86(Buf *c, int p, int elem_shift) {
         mov_ri(c, XM, 0x7fffffff);
         return;
     }
-    mov_load(c, XM, XBUF, p * 16 + 8);
-    test_rr(c, XM, XM);
-    int skip_neg = jcc(c, 0x09);
-    neg_r(c, XM);
-    patch_jcc(c, skip_neg);
+    mov_load(c, XM, XBUF, p * (int)sizeof(umbra_buf) + 8);
     if (elem_shift) { shr_ri(c, XM, (uint8_t)elem_shift); }
     sub_ri(c, XM, 1);
     test_rr(c, XM, XM);
@@ -1157,7 +1151,7 @@ static void clamp_eax_x86(Buf *c) {
 static int load_ptr_x86(Buf *c, int p, int *last_ptr) {
     if (*last_ptr != p) {
         *last_ptr = p;
-        mov_load(c, R11, XBUF, p * 16);
+        mov_load(c, R11, XBUF, p * (int)sizeof(umbra_buf));
     }
     return R11;
 }
@@ -1370,7 +1364,7 @@ struct umbra_jit {
 
 static _Bool x86_chooser(struct bb_inst const *insts, int join_id) {
     enum op y_op = insts[insts[join_id].y].op;
-    return (y_op >= op_add_f32_imm && y_op <= op_le_s32_imm)
+    return is_fused_imm(y_op)
         && y_op != op_lt_s32_imm
         && y_op != op_le_s32_imm;
 }

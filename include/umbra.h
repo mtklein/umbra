@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stddef.h>
+
 struct umbra_builder *umbra_builder(void);
 void                  umbra_builder_free(struct umbra_builder *);
 
@@ -7,7 +9,7 @@ typedef struct {
     int id;
 } umbra_val;
 typedef struct {
-    int ix;
+    int ix, deref;
 } umbra_ptr;
 
 int       umbra_reserve(struct umbra_builder *, int n);
@@ -103,8 +105,9 @@ struct umbra_basic_block *umbra_basic_block(struct umbra_builder *);
 void                      umbra_basic_block_free(struct umbra_basic_block *);
 
 typedef struct {
-    void *ptr;
-    long  sz;
+    void  *ptr;
+    size_t sz;
+    int    read_only, :32;
 } umbra_buf;
 
 struct umbra_backend *umbra_backend_interp(void);
