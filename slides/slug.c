@@ -8,6 +8,7 @@ typedef struct {
     int                       w, h;
     float                    *wind_buf;
     slug_acc_layout           acc_lay;
+    struct umbra_basic_block *acc_bb;
 } slug_state;
 
 static void slug_init(slide *s, int w, int h) {
@@ -18,6 +19,7 @@ static void slug_init(slide *s, int w, int h) {
     st->wind_buf = malloc((size_t)w * (size_t)h * sizeof(float));
 
     struct umbra_builder *b = slug_build_acc(&st->acc_lay);
+    st->acc_bb = umbra_basic_block(b);
     umbra_builder_free(b);
 
     slide_perspective_matrix(st->mat, 0.0f, w, h, (int)st->slug->w, (int)st->slug->h);
@@ -35,17 +37,16 @@ static void slug_animate(slide *s, float dt) {
     st->mat[10] = st->slug->h;
 }
 
-static void slug_prepare(slide *s, int w, int h, struct umbra_backend *be) {
-    slug_state *st = s->state;
-
-    struct umbra_builder *b = slug_build_acc(&st->acc_lay);
-    struct umbra_basic_block *acc_bb = umbra_basic_block(b);
-    umbra_builder_free(b);
-    struct umbra_program *acc = umbra_backend_compile(be, acc_bb);
-    umbra_basic_block_free(acc_bb);
+static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
+                       umbra_draw_layout const *lay, struct umbra_program *program) {
+    slug_state           *st = s->state;
+    struct umbra_backend *be = umbra_program_backend(program);
+    struct umbra_program *acc = umbra_backend_compile(be, st->acc_bb);
 
     long wind_sz  = (long)w * h * (int)sizeof(float);
-    __builtin_memset(st->wind_buf, 0, (size_t)wind_sz);
+    long wind_row = (long)w * (int)sizeof(float);
+    __builtin_memset((char *)st->wind_buf + y0 * wind_row, 0,
+                     (size_t)(y1 - y0) * (size_t)wind_row);
 
     long long au_[12] = {0};
     char     *au = (char *)au_;
@@ -59,17 +60,11 @@ static void slug_prepare(slide *s, int w, int h, struct umbra_backend *be) {
     for (int j = 0; j < st->slug->count; j++) {
         int32_t j32 = j;
         __builtin_memcpy(au + st->acc_lay.loop_off, &j32, 4);
-        umbra_program_queue(acc, 0, 0, w, h, abuf);
+        umbra_program_queue(acc, 0, y0, w, y1, abuf);
     }
     umbra_backend_flush(be);
     umbra_program_free(acc);
-}
 
-static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
-                       umbra_draw_layout const *lay, struct umbra_program *program) {
-    slug_state *st = s->state;
-
-    long wind_sz = (long)w * h * (int)sizeof(float);
     float hc[4];
     for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
     long long uni_[12] = {0};
@@ -90,6 +85,7 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
 static void slug_cleanup(slide *s) {
     slug_state *st = s->state;
     free(st->wind_buf);
+    umbra_basic_block_free(st->acc_bb);
     free(st);
     s->state = NULL;
 }
@@ -109,7 +105,6 @@ slide slide_slug_wind(slug_curves *sc) {
         .bg = 0xff0a0a1e,
         .init = slug_init,
         .animate = slug_animate,
-        .prepare = slug_prepare,
         .draw = slug_draw,
         .cleanup = slug_cleanup,
         .state = st,

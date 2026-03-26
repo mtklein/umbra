@@ -75,6 +75,7 @@ static void render_thumbnails(overview_state *st) {
         if (sub->prepare) { sub->prepare(sub, w, h, st->be); }
         sub->draw(sub, w, h, 0, h, st->tmp, &st->lays[idx],
                   st->progs[idx]);
+        umbra_backend_flush(st->be);
 
         for (int cy = 0; cy < st->ch; cy++) {
             for (int cx = 0; cx < st->cw; cx++) {
