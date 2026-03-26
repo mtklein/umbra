@@ -19,9 +19,7 @@ _Bool is_varying(enum op op) {
     return op == op_iota
         || op == op_x
         || op == op_y
-        || op == op_load_16
         || op == op_load_next_16
-        || op == op_load_32
         || op == op_load_next_32
         || op == op_load_next_64_lo
         || op == op_load_next_64_hi
@@ -163,32 +161,10 @@ int umbra_max_ptr(builder const *b) {
     return m;
 }
 
-static _Bool is_contiguous(builder *b, int ix) {
-    enum op op = b->inst[ix].op;
-    return op == op_iota || op == op_x;
+val umbra_uniform_i16(builder *b, umbra_ptr src, int slot) {
+    return push(b, op_uni_16, .imm = slot, .ptr = src.ix);
 }
-
-// Recognize contiguous+offset as contiguous with offset.
-static int contiguous_plus_off(builder *b, int ix) {
-    if (b->inst[ix].op != op_add_i32) { return -1; }
-    int p = b->inst[ix].x, q = b->inst[ix].y;
-    if (is_contiguous(b, p) && b->inst[q].uniform) { return q; }
-    if (is_contiguous(b, q) && b->inst[p].uniform) { return p; }
-    return -1;
-}
-
-val umbra_load_i16(builder *b, umbra_ptr src, val ix) {
-    if (is_contiguous(b, ix.id)) {
-        return push(b, op_load_16, .ptr = src.ix);
-    }
-    if (b->inst[ix.id].op == op_imm_32) {
-        return push(b, op_uni_16, .imm = b->inst[ix.id].imm, .ptr = src.ix);
-    }
-    {
-        int off = contiguous_plus_off(b, ix.id);
-        if (off >= 0) { return push(b, op_load_16, .x = off, .ptr = src.ix); }
-    }
-    if (b->inst[ix.id].uniform) { return push(b, op_uni_16, .x = ix.id, .ptr = src.ix); }
+val umbra_gather_i16(builder *b, umbra_ptr src, val ix) {
     return push(b, op_gather_16, .x = ix.id, .ptr = src.ix);
 }
 val umbra_load_next_i32(builder *b, umbra_ptr src) {
@@ -203,18 +179,10 @@ val umbra_load_next_i64_hi(builder *b, umbra_ptr src) {
 val umbra_load_next_i16(builder *b, umbra_ptr src) {
     return push(b, op_load_next_16, .ptr = src.ix);
 }
-val umbra_load_i32(builder *b, umbra_ptr src, val ix) {
-    if (is_contiguous(b, ix.id)) {
-        return push(b, op_load_32, .ptr = src.ix);
-    }
-    if (b->inst[ix.id].op == op_imm_32) {
-        return push(b, op_uni_32, .imm = b->inst[ix.id].imm, .ptr = src.ix);
-    }
-    {
-        int off = contiguous_plus_off(b, ix.id);
-        if (off >= 0) { return push(b, op_load_32, .x = off, .ptr = src.ix); }
-    }
-    if (b->inst[ix.id].uniform) { return push(b, op_uni_32, .x = ix.id, .ptr = src.ix); }
+val umbra_uniform_i32(builder *b, umbra_ptr src, int slot) {
+    return push(b, op_uni_32, .imm = slot, .ptr = src.ix);
+}
+val umbra_gather_i32(builder *b, umbra_ptr src, val ix) {
     return push(b, op_gather_32, .x = ix.id, .ptr = src.ix);
 }
 void umbra_store_next_i32(builder *b, umbra_ptr dst, val v) {
@@ -781,11 +749,7 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_imm_32: fprintf(f, " 0x%x", (uint32_t)ip->imm); break;
         case op_uni_32:
         case op_uni_16:
-            if (ip->x) {
-                fprintf(f, " p%d[v%d]", ip->ptr, ip->x);
-            } else {
-                fprintf(f, " p%d[%d]", ip->ptr, ip->imm);
-            }
+            fprintf(f, " p%d[%d]", ip->ptr, ip->imm);
             break;
         case op_gather_32:
         case op_gather_16: fprintf(f, " p%d v%d", ip->ptr, ip->x); break;
@@ -793,11 +757,6 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_load_next_32:
         case op_load_next_64_lo:
         case op_load_next_64_hi: fprintf(f, " p%d", ip->ptr); break;
-        case op_load_32:
-        case op_load_16:
-            fprintf(f, " p%d", ip->ptr);
-            if (ip->x) { fprintf(f, " +v%d", ip->x); }
-            break;
         case op_deref_ptr: fprintf(f, " p%d byte%d", ip->ptr, ip->imm); break;
         case op_iota:
         case op_x:

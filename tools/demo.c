@@ -86,10 +86,10 @@ static void build_fill(int fmt) {
     builder    *builder = umbra_builder();
     int         fi = umbra_reserve(builder, 4);
     umbra_color c = {
-        umbra_load_i32(builder, (umbra_ptr){0}, umbra_imm_i32(builder, fi)),
-        umbra_load_i32(builder, (umbra_ptr){0}, umbra_imm_i32(builder, fi + 1)),
-        umbra_load_i32(builder, (umbra_ptr){0}, umbra_imm_i32(builder, fi + 2)),
-        umbra_load_i32(builder, (umbra_ptr){0}, umbra_imm_i32(builder, fi + 3)),
+        umbra_uniform_i32(builder, (umbra_ptr){0}, fi),
+        umbra_uniform_i32(builder, (umbra_ptr){0}, fi + 1),
+        umbra_uniform_i32(builder, (umbra_ptr){0}, fi + 2),
+        umbra_uniform_i32(builder, (umbra_ptr){0}, fi + 3),
     };
     fmt_store[fmt](builder, (umbra_ptr){1}, c);
     finish_pipe(&fill_pipe, builder);

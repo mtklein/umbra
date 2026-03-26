@@ -154,46 +154,13 @@ op(uni_16) {
     v->u32 = (U32){0} + (uint32_t)uni;
     next;
 }
-op(uni_16_dyn) {
-    int      ix = v[ip->y].i32[0];
-    uint16_t uni;
-    __builtin_memcpy(&uni, (uint16_t const *)ptr[ip->x] + ix, sizeof uni);
-    v->u32 = (U32){0} + (uint32_t)uni;
-    next;
-}
 op(uni_32) {
     int32_t uni;
     __builtin_memcpy(&uni, (int32_t const *)ptr[ip->x] + ip->y, sizeof uni);
     v->i32 = (I32){0} + uni;
     next;
 }
-op(uni_32_dyn) {
-    int     ix = v[ip->y].i32[0];
-    int32_t uni;
-    __builtin_memcpy(&uni, (int32_t const *)ptr[ip->x] + ix, sizeof uni);
-    v->i32 = (I32){0} + uni;
-    next;
-}
 
-op(load_16) {
-    uint16_t const *src = (uint16_t const *)ptr[ip->x] + v[ip->y].i32[0];
-    int             i = end - K;
-    int             rem = n - i;
-    if (rem >= K) {
-        U16 tmp;
-        __builtin_memcpy(&tmp, src + i, 2 * K);
-        v->u32 = (U32){0};
-        __builtin_memcpy(v, &tmp, sizeof tmp);
-    } else {
-        v->u32 = (U32){0};
-        for (int l = 0; l < rem; l++) {
-            uint16_t s;
-            __builtin_memcpy(&s, src + i + l, 2);
-            __builtin_memcpy((char *)v + 2 * l, &s, 2);
-        }
-    }
-    next;
-}
 op(load_next_16) {
     uint16_t const *src = (uint16_t const *)ptr[ip->x];
     int             i = end - K;
@@ -253,23 +220,6 @@ op(load_next_64_hi) {
     }
     next;
 }
-op(load_32) {
-    int32_t const *src = (int32_t const *)ptr[ip->x] + v[ip->y].i32[0];
-    int            i = end - K;
-    int            rem = n - i;
-    if (rem >= K) {
-        __builtin_memcpy(v, src + i, 4 * K);
-    } else {
-        v->i32 = (I32){0};
-        for (int l = 0; l < rem; l++) {
-            int32_t tmp;
-            __builtin_memcpy(&tmp, src + i + l, 4);
-            v->i32[l] = tmp;
-        }
-    }
-    next;
-}
-
 op(store_next_16) {
     uint16_t *dst = (uint16_t *)ptr[ip->x];
     int       i = end - K;
@@ -877,23 +827,12 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
 
 #define RESOLVE_PTR(inst) ((inst)->ptr < 0 ? deref_slot[~(inst)->ptr] : (inst)->ptr)
                 case op_uni_16:
-                    if (inst->x) {
-                        emit(.fn = uni_16_dyn, .x = RESOLVE_PTR(inst), .y = X);
-                    } else {
-                        emit(.fn = uni_16, .x = RESOLVE_PTR(inst), .y = inst->imm);
-                    }
+                    emit(.fn = uni_16, .x = RESOLVE_PTR(inst), .y = inst->imm);
                     break;
                 case op_uni_32:
-                    if (inst->x) {
-                        emit(.fn = uni_32_dyn, .x = RESOLVE_PTR(inst), .y = X);
-                    } else {
-                        emit(.fn = uni_32, .x = RESOLVE_PTR(inst), .y = inst->imm);
-                    }
+                    emit(.fn = uni_32, .x = RESOLVE_PTR(inst), .y = inst->imm);
                     break;
 
-                case op_load_16:
-                    emit(.fn = load_16, .x = RESOLVE_PTR(inst), .y = X);
-                    break;
                 case op_load_next_16:
                     emit(.fn = load_next_16, .x = RESOLVE_PTR(inst));
                     break;
@@ -905,9 +844,6 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
                     break;
                 case op_load_next_64_hi:
                     emit(.fn = load_next_64_hi, .x = RESOLVE_PTR(inst));
-                    break;
-                case op_load_32:
-                    emit(.fn = load_32, .x = RESOLVE_PTR(inst), .y = X);
                     break;
 
                 case op_gather_16:
