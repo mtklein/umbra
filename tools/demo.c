@@ -187,7 +187,7 @@ static void fill_bg_row(void *dst, int n, uint32_t bg, long row_sz, long plane_g
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (umbra_buf){(char *)dst + (i + 1) * plane_gap, (size_t)row_sz, 0};
     }
-    umbra_program_queue(fill_pipe.program, n, 1, buf);
+    umbra_program_queue(fill_pipe.program, 0, 0, n, 1, buf);
 }
 
 static void readback_row(uint32_t *dst, void *src, int n, long src_sz, long plane_gap) {
@@ -202,7 +202,7 @@ static void readback_row(uint32_t *dst, void *src, int n, long src_sz, long plan
         buf[2 + i] = (umbra_buf){(char *)src + (i + 1) * plane_gap, (size_t)src_sz, 0};
     }
     buf[op] = (umbra_buf){dst, (size_t)(n * 4), 0};
-    umbra_program_queue(readback_pipe.program, n, 1, buf);
+    umbra_program_queue(readback_pipe.program, 0, 0, n, 1, buf);
 }
 
 static void to_hdr_row(__fp16 *dst, void *src, int n, long src_sz, long plane_gap) {
@@ -217,7 +217,7 @@ static void to_hdr_row(__fp16 *dst, void *src, int n, long src_sz, long plane_ga
         buf[2 + i] = (umbra_buf){(char *)src + (i + 1) * plane_gap, (size_t)src_sz, 0};
     }
     buf[op] = (umbra_buf){dst, (size_t)(n * 8), 0};
-    umbra_program_queue(hdr_pipe.program, n, 1, buf);
+    umbra_program_queue(hdr_pipe.program, 0, 0, n, 1, buf);
 }
 
 int main(void) {

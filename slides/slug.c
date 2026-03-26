@@ -64,7 +64,7 @@ static void slug_render(slide *s, int w, int h, void *buf,
     for (int j = 0; j < st->slug->count; j++) {
         int32_t j32 = j;
         __builtin_memcpy(au + st->acc_lay.loop_off, &j32, 4);
-        umbra_program_queue(st->acc, w, h, abuf);
+        umbra_program_queue(st->acc, 0, 0, w, h, abuf);
     }
     umbra_backend_flush(st->acc_be);
 
@@ -82,7 +82,7 @@ static void slug_render(slide *s, int w, int h, void *buf,
     for (int i = 0; i < ps; i++) {
         rbuf[2 + i] = (umbra_buf){(char *)buf + plane_sz * (size_t)(i + 1), plane_sz, 0};
     }
-    umbra_program_queue(program, w, h, rbuf);
+    umbra_program_queue(program, 0, 0, w, h, rbuf);
 }
 
 static void slug_cleanup(slide *s) {

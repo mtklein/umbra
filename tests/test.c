@@ -1540,7 +1540,7 @@ static void test_preamble_pair_alias(void) {
                 continue;
             }
             float ref[16];
-            umbra_program_queue(B.p[0], 16, 1,
+            umbra_program_queue(B.p[0], 0, 0, 16, 1,
                                 (umbra_buf[]){
                                     {in, 16 * 4, 0},
                                     {ref, 16 * 4, 0},
@@ -2621,8 +2621,8 @@ static void test_program_null_guards(void) {
 
     // queue with w=0 and h=0
     int32_t buf[1] = {0};
-    umbra_program_queue(p, 0, 1, (umbra_buf[]){{buf, 4, 0}});
-    umbra_program_queue(p, 1, 0, (umbra_buf[]){{buf, 4, 0}});
+    umbra_program_queue(p, 0, 0, 0, 1, (umbra_buf[]){{buf, 4, 0}});
+    umbra_program_queue(p, 0, 0, 1, 0, (umbra_buf[]){{buf, 4, 0}});
 
     umbra_program_free(p);
     umbra_backend_free(be);

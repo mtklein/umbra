@@ -14,9 +14,9 @@ struct umbra_metal* umbra_metal(
     struct umbra_basic_block const *bb
 ) { (void)backend_ctx; (void)bb; return 0; }
 void umbra_metal_run(
-    struct umbra_metal *m, int n, int w, umbra_buf buf[]
+    struct umbra_metal *m, int n, int w, int y0, umbra_buf buf[]
 ) {
-    (void)m; (void)n; (void)w; (void)buf;
+    (void)m; (void)n; (void)w; (void)y0; (void)buf;
 }
 void umbra_metal_begin_batch(void *ctx) {
     (void)ctx;
@@ -1162,8 +1162,9 @@ static void encode_dispatch(
 }
 
 void umbra_metal_run(
-    struct umbra_metal *m, int n, int w, umbra_buf buf[]
+    struct umbra_metal *m, int n, int w, int y0, umbra_buf buf[]
 ) {
+    (void)y0;
     if (!m || n <= 0) { return; }
     struct metal_backend *be = m->be;
     if (!be->batch_cmdbuf) {

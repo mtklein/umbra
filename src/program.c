@@ -14,14 +14,14 @@ struct umbra_backend {
 
 struct umbra_program {
     void *ctx;
-    void (*queue)(void *, int, int, umbra_buf[]);
+    void (*queue)(void *, int, int, int, umbra_buf[]);
     void (*dump)(void const *, FILE *);
     void (*free_fn)(void *);
     struct umbra_backend *backend;
 };
 
-static void run_interp(void *ctx, int n, int w, umbra_buf buf[]) {
-    umbra_interpreter_run(ctx, n, w, buf);
+static void run_interp(void *ctx, int n, int w, int y0, umbra_buf buf[]) {
+    umbra_interpreter_run(ctx, n, w, y0, buf);
 }
 static void                  free_interp(void *ctx) { umbra_interpreter_free(ctx); }
 static struct umbra_program *compile_interp(struct umbra_backend           *be,
@@ -49,8 +49,8 @@ struct umbra_backend *umbra_backend_interp(void) {
     return be;
 }
 
-static void run_jit(void *ctx, int n, int w, umbra_buf buf[]) {
-    umbra_jit_run(ctx, n, w, buf);
+static void run_jit(void *ctx, int n, int w, int y0, umbra_buf buf[]) {
+    umbra_jit_run(ctx, n, w, y0, buf);
 }
 static void dump_jit(void const *ctx, FILE *f) { umbra_dump_jit_mca(ctx, f); }
 static void free_jit(void *ctx) { umbra_jit_free(ctx); }
@@ -79,8 +79,8 @@ struct umbra_backend *umbra_backend_jit(void) {
     return be;
 }
 
-static void run_metal(void *ctx, int n, int w, umbra_buf buf[]) {
-    umbra_metal_run(ctx, n, w, buf);
+static void run_metal(void *ctx, int n, int w, int y0, umbra_buf buf[]) {
+    umbra_metal_run(ctx, n, w, y0, buf);
 }
 static void dump_metal(void const *ctx, FILE *f) { umbra_dump_metal(ctx, f); }
 static void free_metal(void *ctx) { umbra_metal_free(ctx); }
@@ -135,9 +135,11 @@ struct umbra_backend *umbra_program_backend(struct umbra_program *p) {
     return p->backend;
 }
 
-void umbra_program_queue(struct umbra_program *p, int w, int h, umbra_buf buf[]) {
-    if (w <= 0 || h <= 0) { return; }
-    p->queue(p->ctx, w * h, w, buf);
+void umbra_program_queue(struct umbra_program *p,
+                         int l, int t, int r, int b, umbra_buf buf[]) {
+    int w = r - l;
+    if (w <= 0 || b <= t) { return; }
+    p->queue(p->ctx, w * b, w, t, buf);
 }
 
 void umbra_program_dump(struct umbra_program *p, FILE *f) {

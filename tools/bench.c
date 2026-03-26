@@ -138,13 +138,13 @@ int main(int argc, char *argv[]) {
                 printf(" %12s", "-");
                 continue;
             }
-            umbra_program_queue(progs[bi], W, H, abuf);
+            umbra_program_queue(progs[bi], 0, 0, W, H, abuf);
             umbra_backend_flush(backs[bi]);
             int iters = 1;
             for (;;) {
                 double const start = now();
                 for (int it = 0; it < iters; it++) {
-                    umbra_program_queue(progs[bi], W, H, abuf);
+                    umbra_program_queue(progs[bi], 0, 0, W, H, abuf);
                 }
                 umbra_backend_flush(backs[bi]);
                 double const elapsed = now() - start;

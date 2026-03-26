@@ -112,7 +112,7 @@ static void fill_bg_row(int fmt, void *dst,
         buf[2 + i] = (umbra_buf){(char *)dst + (i + 1) * plane_gap, (size_t)row_sz, 0};
     }
     umbra_program_queue(
-        fill_pipes[fmt].prog, n, 1, buf);
+        fill_pipes[fmt].prog, 0, 0, n, 1, buf);
 }
 
 static void readback_row(int fmt, uint32_t *dst,
@@ -131,7 +131,7 @@ static void readback_row(int fmt, uint32_t *dst,
     }
     buf[op] = (umbra_buf){ dst, (size_t)(n * 4) , 0};
     umbra_program_queue(
-        readback_pipes[fmt].prog, n, 1, buf);
+        readback_pipes[fmt].prog, 0, 0, n, 1, buf);
 }
 
 static void render_slide(
@@ -321,7 +321,7 @@ static void test_slug_rect(void) {
         int32_t j32 = j;
         __builtin_memcpy(
             au + alay.loop_off, &j32, 4);
-        umbra_program_queue(acc, W, H, abuf);
+        umbra_program_queue(acc, 0, 0, W, H, abuf);
     }
     umbra_backend_flush(be);
 
@@ -334,7 +334,7 @@ static void test_slug_rect(void) {
         { uni, (size_t)lay.uni_len, 1 },
         { pixels, sizeof pixels , 0},
     };
-    umbra_program_queue(interp, W, H, buf);
+    umbra_program_queue(interp, 0, 0, W, H, buf);
     umbra_backend_flush(be);
 
     uint32_t bg = 0xff000000;
@@ -395,7 +395,7 @@ static void test_perspective_text(void) {
         { uni, (size_t)lay.uni_len, 1 },
         { pixels, sizeof pixels , 0},
     };
-    umbra_program_queue(interp, BW, 1, buf);
+    umbra_program_queue(interp, 0, 0, BW, 1, buf);
     umbra_backend_flush(be);
 
     (pixels[8] == 0xffffffff) here;
@@ -437,7 +437,7 @@ static void test_perspective_text(void) {
             { u2, (size_t)lay2.uni_len, 1 },
             { px2, (size_t)(W * H * 4), 0 },
         };
-        umbra_program_queue(interp, W, H, b2);
+        umbra_program_queue(interp, 0, 0, W, H, b2);
         umbra_backend_flush(be);
     }
     int changed = 0;

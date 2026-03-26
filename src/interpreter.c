@@ -995,7 +995,7 @@ static void load_bufs(struct umbra_interpreter *p, umbra_buf buf[]) {
     }
 }
 
-void umbra_interpreter_run(struct umbra_interpreter *p, int n, int w, umbra_buf buf[]) {
+void umbra_interpreter_run(struct umbra_interpreter *p, int n, int w, int y0, umbra_buf buf[]) {
     load_bufs(p, buf);
     int const                 P = p->preamble;
     int const                 h = n / w;
@@ -1005,7 +1005,7 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int n, int w, umbra_buf 
     // 2D loop: rows then columns.  op_x = column, op_y = row.
     // end = row*w + x + K gives contiguous ops the correct linear offset.
     // First call runs preamble + body; subsequent calls run body only.
-    for (int row = 0; row < h; row++) {
+    for (int row = y0; row < h; row++) {
         int row_end = (row + 1) * w;
         for (int x = 0; x < w; x += K) {
             start->fn(start, v, row * w + x + K, row_end, w, row, p->ptr, p->sz);

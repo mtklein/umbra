@@ -66,7 +66,7 @@ static void solid_render(slide *s, int w, int h, void *buf,
     for (int i = 0; i < ps; i++) {
         ubuf[2 + i] = (umbra_buf){(char *)buf + plane_sz * (size_t)(i + 1), plane_sz, 0};
     }
-    umbra_program_queue(program, w, h, ubuf);
+    umbra_program_queue(program, 0, 0, w, h, ubuf);
 }
 
 static void solid_cleanup(slide *s) {
