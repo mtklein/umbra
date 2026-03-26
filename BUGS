@@ -1,14 +1,6 @@
 Known bugs and fragile areas.
 
 
-
-NO VALIDATION THAT w > 0
-
-queue(p, 0, h, buf) causes division by zero in Metal dispatch (h = n/w),
-interpreter (h = n/w), and the ARM64 JIT (UDIV by zero = 0, silent but
-wrong).  Should guard at the dispatch entry point.
-
-
 JIT op_x CLOBBERS SCRATCH REGISTERS
 
 ARM64: MSUB writes XT (X10).  XT is designated scratch so this is fine in
@@ -25,19 +17,3 @@ SLUG ACCUMULATOR STILL USES PER-ROW 1D DISPATCH
 slug_build_acc uses umbra_x, per-row uniforms (x0, y), and per-row 1D
 dispatch.  It now uses streaming load/store for the accumulator buffer,
 but the per-curve-per-row dispatch loop prevents full 2D dispatch.
-
-
-METAL THREADGROUP SELECTION IS GREEDY
-
-The 2D threadgroup picker iterates factorizations of tg_size and picks the
-last one where both dimensions fit the grid.  This tends toward wide shapes
-(large x, small y).  A smarter heuristic (prefer squarish, or match grid
-aspect ratio) might improve occupancy for non-square grids.
-
-
-64-BIT STREAMING OPS INVALIDATE POINTER CACHE UNNECESSARILY
-
-The ARM64 and x86 64-bit load/store ops set last_ptr = -999 unconditionally,
-including on scalar (tail) paths where the base pointer register (XP / R11)
-is not modified.  This forces the next load/store to re-resolve the pointer
-even when the cache is still valid.

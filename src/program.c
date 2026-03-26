@@ -130,6 +130,7 @@ struct umbra_backend *umbra_program_backend(struct umbra_program *p) {
 }
 
 void umbra_program_queue(struct umbra_program *p, int w, int h, umbra_buf buf[]) {
+    if (w <= 0 || h <= 0) { return; }
     p->queue(p->ctx, w * h, w, buf);
 }
 

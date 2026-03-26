@@ -1095,12 +1095,13 @@ static void encode_dispatch(
     int h = (n + w - 1) / w;
     MTLSize grid =
         MTLSizeMake((NSUInteger)w, (NSUInteger)h, 1);
-    // Pick a 2D threadgroup size that fits within tg_size.
-    int gx = 1, gy = m->tg_size;
+    // Pick the squarest 2D threadgroup that fits within tg_size and the grid.
+    int gx = 1, gy = 1;
     for (int x = 1; x * x <= m->tg_size; x++) {
         if (m->tg_size % x != 0) { continue; }
         int y = m->tg_size / x;
         if (x <= w && y <= h) { gx = x; gy = y; }
+        if (y <= w && x <= h) { gx = y; gy = x; }
     }
     MTLSize group =
         MTLSizeMake((NSUInteger)gx,

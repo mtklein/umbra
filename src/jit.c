@@ -611,7 +611,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 ra_return_reg(ra, t1);
                 ra_return_reg(ra, t0);
             }
-            last_ptr = -999;
         } break;
 
         case op_load_next_16: {
@@ -731,7 +730,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
             if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
-            last_ptr = -999;
         } break;
 
         case op_store_next_16: {
@@ -1688,7 +1686,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
             if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
-            last_ptr = -999;
         } break;
 
         case op_store_next_16: {
