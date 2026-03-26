@@ -315,11 +315,6 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i, inst->x);
                 break;
 
-            case op_join:
-                emit(b, "%suint v%d = v%d;\n",
-                     pad, i, inst->x);
-                break;
-
             case op_shl_imm:
                 emit(b, "%suint v%d = v%d << %du;\n",
                      pad, i, inst->x, inst->imm);
@@ -348,16 +343,117 @@ static void emit_ops(Buf *b, BB const *bb,
                     inst->y, inst->imm);
                 break;
 
-            case op_add_f32_imm: case op_sub_f32_imm:
-            case op_mul_f32_imm: case op_div_f32_imm:
-            case op_min_f32_imm: case op_max_f32_imm:
-            case op_add_i32_imm: case op_sub_i32_imm:
+            case op_add_f32_imm:
+                emit(b, "%suint v%d = as_type<uint>"
+                        "(as_type<float>(v%d)"
+                        " + as_type<float>(%uu));\n",
+                     pad, i, inst->x,
+                     (uint32_t)inst->imm);
+                break;
+            case op_sub_f32_imm:
+                emit(b, "%suint v%d = as_type<uint>"
+                        "(as_type<float>(v%d)"
+                        " - as_type<float>(%uu));\n",
+                     pad, i, inst->x,
+                     (uint32_t)inst->imm);
+                break;
+            case op_mul_f32_imm:
+                emit(b, "%suint v%d = as_type<uint>"
+                        "(as_type<float>(v%d)"
+                        " * as_type<float>(%uu));\n",
+                     pad, i, inst->x,
+                     (uint32_t)inst->imm);
+                break;
+            case op_div_f32_imm:
+                emit(b, "%suint v%d = as_type<uint>"
+                        "(as_type<float>(v%d)"
+                        " / as_type<float>(%uu));\n",
+                     pad, i, inst->x,
+                     (uint32_t)inst->imm);
+                break;
+            case op_min_f32_imm:
+                emit(b, "%suint v%d = as_type<uint>"
+                        "(min(as_type<float>(v%d),"
+                        " as_type<float>(%uu)));\n",
+                     pad, i, inst->x,
+                     (uint32_t)inst->imm);
+                break;
+            case op_max_f32_imm:
+                emit(b, "%suint v%d = as_type<uint>"
+                        "(max(as_type<float>(v%d),"
+                        " as_type<float>(%uu)));\n",
+                     pad, i, inst->x,
+                     (uint32_t)inst->imm);
+                break;
+            case op_add_i32_imm:
+                emit(b, "%suint v%d = v%d + %uu;\n",
+                     pad, i, inst->x,
+                     (uint32_t)inst->imm);
+                break;
+            case op_sub_i32_imm:
+                emit(b, "%suint v%d = v%d - %uu;\n",
+                     pad, i, inst->x,
+                     (uint32_t)inst->imm);
+                break;
             case op_mul_i32_imm:
-            case op_or_32_imm:  case op_xor_32_imm:
-            case op_eq_f32_imm: case op_lt_f32_imm:
+                emit(b, "%suint v%d = v%d * %uu;\n",
+                     pad, i, inst->x,
+                     (uint32_t)inst->imm);
+                break;
+            case op_or_32_imm:
+                emit(b, "%suint v%d = v%d | %uu;\n",
+                     pad, i, inst->x,
+                     (uint32_t)inst->imm);
+                break;
+            case op_xor_32_imm:
+                emit(b, "%suint v%d = v%d ^ %uu;\n",
+                     pad, i, inst->x,
+                     (uint32_t)inst->imm);
+                break;
+            case op_eq_f32_imm:
+                emit(b, "%suint v%d = "
+                        "as_type<float>(v%d) == "
+                        "as_type<float>(%uu)"
+                        " ? 0xffffffffu : 0u;\n",
+                     pad, i, inst->x,
+                     (uint32_t)inst->imm);
+                break;
+            case op_lt_f32_imm:
+                emit(b, "%suint v%d = "
+                        "as_type<float>(v%d) <  "
+                        "as_type<float>(%uu)"
+                        " ? 0xffffffffu : 0u;\n",
+                     pad, i, inst->x,
+                     (uint32_t)inst->imm);
+                break;
             case op_le_f32_imm:
-            case op_eq_i32_imm: case op_lt_s32_imm:
+                emit(b, "%suint v%d = "
+                        "as_type<float>(v%d) <= "
+                        "as_type<float>(%uu)"
+                        " ? 0xffffffffu : 0u;\n",
+                     pad, i, inst->x,
+                     (uint32_t)inst->imm);
+                break;
+            case op_eq_i32_imm:
+                emit(b, "%suint v%d = "
+                        "(int)v%d == (int)%uu"
+                        " ? 0xffffffffu : 0u;\n",
+                     pad, i, inst->x,
+                     (uint32_t)inst->imm);
+                break;
+            case op_lt_s32_imm:
+                emit(b, "%suint v%d = "
+                        "(int)v%d <  (int)%uu"
+                        " ? 0xffffffffu : 0u;\n",
+                     pad, i, inst->x,
+                     (uint32_t)inst->imm);
+                break;
             case op_le_s32_imm:
+                emit(b, "%suint v%d = "
+                        "(int)v%d <= (int)%uu"
+                        " ? 0xffffffffu : 0u;\n",
+                     pad, i, inst->x,
+                     (uint32_t)inst->imm);
                 break;
             case op_add_f32:
                 emit(b, "%suint v%d = as_type<uint>"
@@ -749,20 +845,17 @@ struct umbra_metal* umbra_metal(
         id<MTLDevice> device =
             (__bridge id<MTLDevice>)be->device;
 
-        BB *resolved =
-            umbra_resolve_joins(bb, NULL);
-
         int *deref_buf = calloc(
-            (size_t)resolved->insts,
+            (size_t)bb->insts,
             sizeof *deref_buf);
         int max_ptr = -1, total_bufs = 0;
         char *src = build_source(
-            resolved, &max_ptr, &total_bufs,
+            bb, &max_ptr, &total_bufs,
             deref_buf);
 
         int n_deref = 0;
-        for (int i = 0; i < resolved->insts; i++) {
-            if (resolved->inst[i].op == op_deref_ptr) {
+        for (int i = 0; i < bb->insts; i++) {
+            if (bb->inst[i].op == op_deref_ptr) {
                 n_deref++;
             }
         }
@@ -772,19 +865,18 @@ struct umbra_metal* umbra_metal(
         {
             int d = 0;
             for (int i = 0;
-                 i < resolved->insts; i++) {
-                if (resolved->inst[i].op
+                 i < bb->insts; i++) {
+                if (bb->inst[i].op
                         == op_deref_ptr) {
                     di[d].buf_idx = deref_buf[i];
                     di[d].src_buf =
-                        resolved->inst[i].ptr;
+                        bb->inst[i].ptr;
                     di[d].byte_off =
-                        resolved->inst[i].imm;
+                        bb->inst[i].imm;
                     d++;
                 }
             }
         }
-        umbra_basic_block_free(resolved);
 
         NSString *source =
             [NSString stringWithUTF8String:src];

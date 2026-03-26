@@ -795,16 +795,7 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     return r;
 }
 
-static _Bool interp_chooser(struct bb_inst const *insts, int join_id) {
-    enum op y_op = insts[insts[join_id].y].op;
-    return y_op == op_pack
-        || y_op == op_and_imm
-        || is_fused_imm(y_op);
-}
-
 struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) {
-    struct umbra_basic_block *resolved = umbra_resolve_joins(bb, interp_chooser);
-    bb = resolved;
 
     int *id = calloc((size_t)bb->insts, sizeof *id);
 
@@ -957,8 +948,7 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
                 case op_lt_s32:
                 case op_le_s32:
                 case op_lt_u32:
-                case op_le_u32:
-                case op_join: emit(.fn = fn[inst->op], .x = X, .y = Y, .z = Z); break;
+                case op_le_u32: emit(.fn = fn[inst->op], .x = X, .y = Y, .z = Z); break;
 
                 case op_shl_imm:
                 case op_shr_u32_imm:
@@ -996,7 +986,6 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
 
     free(deref_slot);
     free(id);
-    umbra_basic_block_free(resolved);
     return p;
 }
 

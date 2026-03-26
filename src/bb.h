@@ -14,7 +14,7 @@
                     X(i32_from_f32) X(eq_f32) X(lt_f32) X(le_f32) X(eq_i32) X(lt_s32) X( \
                         le_s32) X(lt_u32) X(le_u32) X(uniform_16) X(load_16)              \
                         X(store_16) X(gather_uniform_16) X(gather_16) X(i32_from_s16) X(i32_from_u16)          \
-                            X(i16_from_i32) X(f32_from_f16) X(f16_from_f32) X(join)       \
+                            X(i16_from_i32) X(f32_from_f16) X(f16_from_f32)              \
                                 X(shl_imm) X(shr_u32_imm) X(shr_s32_imm) X(and_imm)      \
                                     X(pack) X(add_f32_imm) X(sub_f32_imm) X(mul_f32_imm)  \
                                         X(div_f32_imm) X(min_f32_imm) X(max_f32_imm)      \
@@ -61,7 +61,3 @@ _Bool is_fused_imm(enum op);
 
 int umbra_const_eval(enum op, int, int, int);
 
-typedef _Bool (*join_chooser)(struct bb_inst const *insts, int join_id);
-
-struct umbra_basic_block *umbra_resolve_joins(struct umbra_basic_block const *bb,
-                                              join_chooser                    choose_y);
