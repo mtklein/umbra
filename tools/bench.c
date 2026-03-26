@@ -14,15 +14,15 @@ static double now(void) {
 }
 
 static double bench(slide *s, int w, int h, umbra_draw_layout const *lay,
-                    void *buf, long buf_sz, struct umbra_backend *be,
+                    void *buf, struct umbra_backend *be,
                     struct umbra_program *prog) {
-    s->render(s, w, h, buf, buf_sz, lay, prog);
+    s->render(s, w, h, buf, lay, prog);
     umbra_backend_flush(be);
     int iters = 1;
     for (;;) {
         double const start = now();
         for (int it = 0; it < iters; it++) {
-            s->render(s, w, h, buf, buf_sz, lay, prog);
+            s->render(s, w, h, buf, lay, prog);
         }
         umbra_backend_flush(be);
         double const elapsed = now() - start;
@@ -60,19 +60,18 @@ int main(int argc, char *argv[]) {
 
         _Bool planar = s->store == umbra_store_fp16_planar;
         int   bpp = planar ? 2 : 4;
-        long  buf_sz = (long)W * H * bpp;
         void *buf = calloc((size_t)(W * H), (size_t)bpp);
 
         char tmp[32];
         printf("%-40s", s->title);
 
         sprintf(tmp, "%5.2f ns/px",
-                bench(s, W, H, &lay, buf, buf_sz, be_i, interp));
+                bench(s, W, H, &lay, buf, be_i, interp));
         printf(" %12s", tmp);
 
         if (jit) {
             sprintf(tmp, "%5.2f ns/px",
-                    bench(s, W, H, &lay, buf, buf_sz, be_j, jit));
+                    bench(s, W, H, &lay, buf, be_j, jit));
             printf(" %12s", tmp);
         } else {
             printf(" %12s", "-");
@@ -80,7 +79,7 @@ int main(int argc, char *argv[]) {
 
         if (mtl) {
             sprintf(tmp, "%5.2f ns/px",
-                    bench(s, W, H, &lay, buf, buf_sz, be_m, mtl));
+                    bench(s, W, H, &lay, buf, be_m, mtl));
             printf(" %12s", tmp);
         } else {
             printf(" %12s", "-");

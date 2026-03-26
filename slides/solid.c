@@ -43,7 +43,7 @@ static void solid_animate(slide *s, float dt) {
     }
 }
 
-static void solid_render(slide *s, int w, int h, void *buf, long buf_sz,
+static void solid_render(slide *s, int w, int h, void *buf,
                           umbra_draw_layout const *lay, struct umbra_program *program) {
     solid_state *st = s->state;
     float        rect[4] = {
@@ -59,7 +59,7 @@ static void solid_render(slide *s, int w, int h, void *buf, long buf_sz,
     slide_uni_f32(uni, lay->shader, hc, 4);
     if (s->coverage) { slide_uni_f32(uni, lay->coverage, rect, 4); }
     int       ps = lay->ps;
-    long      plane_sz = ps ? (long)w * h * 2 : buf_sz;
+    long      plane_sz = (long)w * h * lay->pixel_bytes;
     umbra_buf ubuf[5];
     ubuf[0] = (umbra_buf){uni, (size_t)lay->uni_len, 1};
     ubuf[1] = (umbra_buf){buf, (size_t)plane_sz, 0};

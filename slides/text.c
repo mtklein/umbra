@@ -6,7 +6,7 @@ typedef struct {
     text_cov *tc;
 } text_state;
 
-static void text_render(slide *s, int w, int h, void *buf, long buf_sz,
+static void text_render(slide *s, int w, int h, void *buf,
                          umbra_draw_layout const *lay, struct umbra_program *program) {
     text_state *st = s->state;
     float       hc[4];
@@ -16,7 +16,7 @@ static void text_render(slide *s, int w, int h, void *buf, long buf_sz,
     slide_uni_f32(uni, lay->shader, hc, 4);
     slide_uni_ptr(uni, lay->coverage, st->tc->data, (long)(w * h * 2));
     int       ps = lay->ps;
-    long      plane_sz = ps ? (long)w * h * 2 : buf_sz;
+    long      plane_sz = (long)w * h * lay->pixel_bytes;
     umbra_buf ubuf[5];
     ubuf[0] = (umbra_buf){uni, (size_t)lay->uni_len, 1};
     ubuf[1] = (umbra_buf){buf, (size_t)plane_sz, 0};

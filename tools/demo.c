@@ -312,7 +312,6 @@ int main(void) {
 
         int   bpp = fmt_bpp[cur_fmt];
         _Bool planar = (cur_fmt == FMT_FP16P);
-        long  buf_sz = planar ? (long)(W * H * 4) * 2 : (long)(W * H * bpp);
         int   row_bytes = planar ? W * 2 : W * bpp;
         long  plane_gap = planar ? (long)W * H * 2 : 0;
         long  row_sz = planar ? (long)W * 2 : (long)W * bpp;
@@ -325,7 +324,7 @@ int main(void) {
 
         if (s->animate) { s->animate(s, 0.016f); }
 
-        s->render(s, W, H, pixbuf, buf_sz, &draw_layout, b);
+        s->render(s, W, H, pixbuf, &draw_layout, b);
 
         umbra_backend_flush(bes[cur_backend]);
 

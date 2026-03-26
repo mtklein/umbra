@@ -150,9 +150,6 @@ static void render_slide(
 
     int   bpp = fmt_bpp[fmt];
     _Bool planar = (fmt == FMT_FP16P);
-    long  buf_sz = planar
-        ? (long)(W * H * 4) * 2
-        : (long)(W * H * bpp);
     int   row_bytes = planar ? W * 2 : W * bpp;
     long  plane_gap = planar ? (long)W * H * 2 : 0;
     long  row_sz = planar ? (long)W * 2 : (long)W * bpp;
@@ -165,7 +162,7 @@ static void render_slide(
                     s->bg, row_sz,
                     plane_gap);
     }
-    s->render(s, W, H, pixbuf, buf_sz,
+    s->render(s, W, H, pixbuf,
               lay, program);
 }
 
