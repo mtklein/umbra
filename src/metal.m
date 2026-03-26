@@ -925,15 +925,22 @@ static void encode_dispatch(
                 offsets[i] = ptr - sh->host;
                 m->per_bufs[i] = sh->mtl;
             } else {
-                id<MTLBuffer> tmp =
-                    [device
-                     newBufferWithLength:
-                         (NSUInteger)bytes
-                     options:
-                         MTLResourceStorageModeShared];
-                __builtin_memcpy(
-                    tmp.contents,
-                    ptr, (size_t)bytes);
+                size_t pg = (size_t)sysconf(_SC_PAGESIZE);
+                size_t aligned_sz = ((size_t)bytes + pg - 1) & ~(pg - 1);
+                _Bool can_nocopy = ((uintptr_t)ptr & (pg - 1)) == 0;
+                id<MTLBuffer> tmp;
+                if (can_nocopy) {
+                    tmp = [device
+                        newBufferWithBytesNoCopy:ptr
+                                         length:(NSUInteger)aligned_sz
+                                        options:MTLResourceStorageModeShared
+                                    deallocator:nil];
+                } else {
+                    tmp = [device
+                        newBufferWithLength:(NSUInteger)bytes
+                                    options:MTLResourceStorageModeShared];
+                    __builtin_memcpy(tmp.contents, ptr, (size_t)bytes);
+                }
                 void *retained =
                     (__bridge_retained void*)tmp;
                 if (!sh->mtl) {
@@ -943,7 +950,7 @@ static void encode_dispatch(
                         ? bytes : 0;
                 }
                 batch_retain_buf(be, retained);
-                if (buf[i].sz > 0) {
+                if (buf[i].sz > 0 && !can_nocopy) {
                     batch_add_copy(
                         be, ptr,
                         retained, bytes);
@@ -1000,15 +1007,22 @@ static void encode_dispatch(
                 offsets[bi] = dptr - sh->host;
                 m->per_bufs[bi] = sh->mtl;
             } else {
-                id<MTLBuffer> tmp =
-                    [device
-                     newBufferWithLength:
-                         (NSUInteger)bytes
-                     options:
-                         MTLResourceStorageModeShared];
-                __builtin_memcpy(
-                    tmp.contents,
-                    dptr, (size_t)bytes);
+                size_t pg = (size_t)sysconf(_SC_PAGESIZE);
+                size_t aligned_sz = ((size_t)bytes + pg - 1) & ~(pg - 1);
+                _Bool can_nocopy = ((uintptr_t)dptr & (pg - 1)) == 0;
+                id<MTLBuffer> tmp;
+                if (can_nocopy) {
+                    tmp = [device
+                        newBufferWithBytesNoCopy:dptr
+                                         length:(NSUInteger)aligned_sz
+                                        options:MTLResourceStorageModeShared
+                                    deallocator:nil];
+                } else {
+                    tmp = [device
+                        newBufferWithLength:(NSUInteger)bytes
+                                    options:MTLResourceStorageModeShared];
+                    __builtin_memcpy(tmp.contents, dptr, (size_t)bytes);
+                }
                 void *retained =
                     (__bridge_retained void*)tmp;
                 if (!sh->mtl) {
@@ -1018,7 +1032,7 @@ static void encode_dispatch(
                         ? bytes : 0;
                 }
                 batch_retain_buf(be, retained);
-                if (dsz > 0) {
+                if (dsz > 0 && !can_nocopy) {
                     batch_add_copy(
                         be, dptr,
                         retained, bytes);
