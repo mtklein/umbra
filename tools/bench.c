@@ -113,22 +113,20 @@ int main(int argc, char *argv[]) {
         struct umbra_program *mtl = be_m ? umbra_backend_compile(be_m, bb) : NULL;
         umbra_basic_block_free(bb);
 
-        float *wind = calloc((size_t)W, 4);
+        float *wind = calloc((size_t)(W * H), 4);
         float  mat[11] = {0};
         slide_perspective_matrix(mat, 0.0f, W, H, (int)sc.w, (int)sc.h);
         mat[9] = sc.w;
         mat[10] = sc.h;
         long long au_[12] = {0};
         char     *au = (char *)au_;
-        slide_uni_i32(au, al.x0, 0);
-        slide_uni_i32(au, al.y, H / 2);
         slide_uni_f32(au, al.mat, mat, 11);
         slide_uni_ptr(au, al.curves_off, sc.data, (long)(sc.count * 6 * 4));
         int32_t j0 = 0;
         __builtin_memcpy(au + al.loop_off, &j0, 4);
         umbra_buf abuf[] = {
             {au, -(long)al.uni_len},
-            {wind, (long)(W * 4)},
+            {wind, (long)(W * H * 4)},
         };
 
         printf("\n%-40s %12s %12s %12s\n", "slug accumulator (1 curve)", "interp", "jit",
@@ -142,20 +140,20 @@ int main(int argc, char *argv[]) {
                 printf(" %12s", "-");
                 continue;
             }
-            umbra_program_queue(progs[bi], W, 1, abuf);
+            umbra_program_queue(progs[bi], W, H, abuf);
             umbra_backend_flush(backs[bi]);
             int iters = 1;
             for (;;) {
                 double const start = now();
                 for (int it = 0; it < iters; it++) {
-                    umbra_program_queue(progs[bi], W, 1, abuf);
+                    umbra_program_queue(progs[bi], W, H, abuf);
                 }
                 umbra_backend_flush(backs[bi]);
                 double const elapsed = now() - start;
                 if (elapsed >= 0.1) {
                     char tmp[32];
                     sprintf(tmp, "%5.2f ns/px",
-                            elapsed / ((double)iters * (double)W) * 1e9);
+                            elapsed / ((double)iters * (double)(W * H)) * 1e9);
                     printf(" %12s", tmp);
                     break;
                 }

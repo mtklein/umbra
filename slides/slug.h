@@ -148,27 +148,21 @@ static inline void slug_free(slug_curves *sc) {
 }
 
 typedef struct {
-    int x0, y, mat, curves_off, loop_off, uni_len;
+    int mat, curves_off, loop_off, uni_len;
 } slug_acc_layout;
 
 static inline struct umbra_builder *slug_build_acc(
         slug_acc_layout *lay) {
     struct umbra_builder *b = umbra_builder();
-    umbra_val ix = umbra_x(b);
 
-    int x0i = umbra_reserve(b, 1);
-    int yi  = umbra_reserve(b, 1);
     int fi  = umbra_reserve(b, 11);
     int co  = umbra_reserve_ptr(b);
     umbra_ptr curves = umbra_deref_ptr(b,
         (umbra_ptr){0}, co);
     int ji = umbra_reserve(b, 1);
 
-    umbra_val x0 = umbra_uniform_i32(b, (umbra_ptr){0}, x0i);
-    umbra_val y  = umbra_uniform_i32(b, (umbra_ptr){0}, yi);
-    umbra_val xf = umbra_cvt_f32_i32(b,
-                       umbra_add_i32(b, x0, ix));
-    umbra_val yf = umbra_cvt_f32_i32(b, y);
+    umbra_val xf = umbra_cvt_f32_i32(b, umbra_x(b));
+    umbra_val yf = umbra_cvt_f32_i32(b, umbra_y(b));
 
     umbra_val m[9];
     for (int i = 0; i < 9; i++) {
@@ -324,8 +318,6 @@ static inline struct umbra_builder *slug_build_acc(
     umbra_store_next_i32(b, (umbra_ptr){1}, acc);
 
     if (lay) {
-        lay->x0         = x0i * 4;
-        lay->y          = yi  * 4;
         lay->mat        = fi  * 4;
         lay->curves_off = co;
         lay->loop_off   = ji  * 4;

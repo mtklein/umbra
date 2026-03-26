@@ -319,43 +319,36 @@ static void test_slug_rect(void) {
     };
     float color[4] = {1,1,1,1};
 
-    float wind_buf[W];
-    for (int y = 0; y < H; y++) {
-        __builtin_memset(wind_buf, 0,
-            sizeof wind_buf);
-        long long au_[12] = {0};
-        char *au = (char*)au_;
-        slide_uni_i32(au, alay.x0, 0);
-        slide_uni_i32(au, alay.y, y);
-        slide_uni_f32(au, alay.mat, mat, 11);
-        slide_uni_ptr(au, alay.curves_off,
-            rect, (long)sizeof rect);
-        umbra_buf abuf[] = {
-            { au, -(long)alay.uni_len },
-            { wind_buf,
-              (long)sizeof wind_buf },
-        };
-        for (int j = 0; j < 4; j++) {
-            int32_t j32 = j;
-            __builtin_memcpy(
-                au + alay.loop_off,
-                &j32, 4);
-            umbra_program_queue(acc, W, 1, abuf);
-        }
-        umbra_backend_flush(be);
-
-        long long uni_[12] = {0};
-        char *uni = (char*)uni_;
-        slide_uni_f32(uni, lay.shader, color, 4);
-        slide_uni_ptr(uni, lay.coverage,
-            wind_buf, -(long)sizeof wind_buf);
-        umbra_buf buf[] = {
-            { uni, -(long)lay.uni_len },
-            { pixels + y * W, (long)(W * 4) },
-        };
-        umbra_program_queue(interp, W, 1, buf);
-        umbra_backend_flush(be);
+    float wind_buf[W * H];
+    __builtin_memset(wind_buf, 0, sizeof wind_buf);
+    long long au_[12] = {0};
+    char *au = (char*)au_;
+    slide_uni_f32(au, alay.mat, mat, 11);
+    slide_uni_ptr(au, alay.curves_off,
+        rect, (long)sizeof rect);
+    umbra_buf abuf[] = {
+        { au, -(long)alay.uni_len },
+        { wind_buf, (long)sizeof wind_buf },
+    };
+    for (int j = 0; j < 4; j++) {
+        int32_t j32 = j;
+        __builtin_memcpy(
+            au + alay.loop_off, &j32, 4);
+        umbra_program_queue(acc, W, H, abuf);
     }
+    umbra_backend_flush(be);
+
+    long long uni_[12] = {0};
+    char *uni = (char*)uni_;
+    slide_uni_f32(uni, lay.shader, color, 4);
+    slide_uni_ptr(uni, lay.coverage,
+        wind_buf, -(long)sizeof wind_buf);
+    umbra_buf buf[] = {
+        { uni, -(long)lay.uni_len },
+        { pixels, (long)sizeof pixels },
+    };
+    umbra_program_queue(interp, W, H, buf);
+    umbra_backend_flush(be);
 
     uint32_t bg = 0xff000000;
     uint32_t fg = 0xffffffff;
