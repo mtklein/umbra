@@ -315,7 +315,7 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i, inst->x);
                 break;
 
-            case op_shl_imm:
+            case op_shl_i32_imm:
                 emit(b, "%suint v%d = v%d << %du;\n",
                      pad, i, inst->x, inst->imm);
                 break;
@@ -329,7 +329,7 @@ static void emit_ops(Buf *b, BB const *bb,
                     " (uint)((int)v%d >> %d);\n",
                     pad, i, inst->x, inst->imm);
                 break;
-            case op_and_imm:
+            case op_and_32_imm:
                 emit(b, "%suint v%d = v%d & %uu;\n",
                      pad, i, inst->x,
                      (uint32_t)inst->imm);

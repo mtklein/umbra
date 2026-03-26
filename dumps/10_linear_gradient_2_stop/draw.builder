@@ -38,15 +38,15 @@
   v37  = load_32         p1
   v38  = imm_32          0xff
   v39  = and_32          v37 v38
-  v40  = and_imm         v37 0xff
+  v40  = and_32_imm      v37 0xff
   v41  = imm_32          0x8
   v42  = shr_u32_imm     v37 8
   v43  = and_32          v38 v42
-  v44  = and_imm         v42 0xff
+  v44  = and_32_imm      v42 0xff
   v45  = imm_32          0x10
   v46  = shr_u32_imm     v37 16
   v47  = and_32          v38 v46
-  v48  = and_imm         v46 0xff
+  v48  = and_32_imm      v46 0xff
   v49  = imm_32          0x18
   v50  = shr_u32_imm     v37 24
   v51  = imm_32          0x3b808081
@@ -76,12 +76,12 @@
   v75  = mul_f32_imm     v36 0x437f0000
   v76  = round_i32       v75
   v77  = and_32          v38 v67
-  v78  = and_imm         v67 0xff
+  v78  = and_32_imm      v67 0xff
   v79  = and_32          v38 v70
-  v80  = and_imm         v70 0xff
+  v80  = and_32_imm      v70 0xff
   v81  = pack            v78 v80 8
   v82  = and_32          v38 v73
-  v83  = and_imm         v73 0xff
+  v83  = and_32_imm      v73 0xff
   v84  = pack            v81 v83 16
   v85  = pack            v84 v76 24
       store_32        p1 v85

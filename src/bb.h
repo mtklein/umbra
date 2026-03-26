@@ -15,7 +15,7 @@
                         le_s32) X(lt_u32) X(le_u32) X(uniform_16) X(load_16)              \
                         X(store_16) X(gather_uniform_16) X(gather_16) X(i32_from_s16) X(i32_from_u16)          \
                             X(i16_from_i32) X(f32_from_f16) X(f16_from_f32)              \
-                                X(shl_imm) X(shr_u32_imm) X(shr_s32_imm) X(and_imm)      \
+                                X(shl_i32_imm) X(shr_u32_imm) X(shr_s32_imm) X(and_32_imm)      \
                                     X(pack) X(add_f32_imm) X(sub_f32_imm) X(mul_f32_imm)  \
                                         X(div_f32_imm) X(min_f32_imm) X(max_f32_imm)      \
                                             X(add_i32_imm) X(sub_i32_imm) X(mul_i32_imm)  \

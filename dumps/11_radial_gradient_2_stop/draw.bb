@@ -39,11 +39,11 @@
   v38  = mul_f32_imm     v34 0x437f0000
   v39  = round_i32       v36
   v40  = round_i32       v37
-  v41  = and_imm         v39 0xff
-  v42  = and_imm         v40 0xff
+  v41  = and_32_imm      v39 0xff
+  v42  = and_32_imm      v40 0xff
   v43  = pack            v41 v42 8
   v44  = round_i32       v38
-  v45  = and_imm         v44 0xff
+  v45  = and_32_imm      v44 0xff
   v46  = pack            v43 v45 16
   v47  = round_i32       v35
   v48  = pack            v46 v47 24

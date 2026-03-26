@@ -37,14 +37,14 @@
   v36  = mul_f32_imm     v35 0x437f0000
   v37  = round_i32       v36
   v38  = shr_u32_imm     v26 8
-  v39  = and_imm         v38 0xff
+  v39  = and_32_imm      v38 0xff
   v40  = f32_from_i32    v39
   v41  = mul_f32_imm     v40 0x3b808081
   v42  = shr_u32_imm     v26 16
-  v43  = and_imm         v42 0xff
+  v43  = and_32_imm      v42 0xff
   v44  = f32_from_i32    v43
   v45  = mul_f32_imm     v44 0x3b808081
-  v46  = and_imm         v26 0xff
+  v46  = and_32_imm      v26 0xff
   v47  = f32_from_i32    v46
   v48  = mul_f32_imm     v47 0x3b808081
   v49  = mul_f32         v48 v12
@@ -54,7 +54,7 @@
   v53  = fma_f32         v25 v52 v48
   v54  = mul_f32_imm     v53 0x437f0000
   v55  = round_i32       v54
-  v56  = and_imm         v55 0xff
+  v56  = and_32_imm      v55 0xff
   v57  = mul_f32         v41 v12
   v58  = fma_f32         v2 v30 v57
   v59  = fma_f32         v2 v41 v58
@@ -62,7 +62,7 @@
   v61  = fma_f32         v25 v60 v41
   v62  = mul_f32_imm     v61 0x437f0000
   v63  = round_i32       v62
-  v64  = and_imm         v63 0xff
+  v64  = and_32_imm      v63 0xff
   v65  = pack            v56 v64 8
   v66  = mul_f32         v45 v12
   v67  = fma_f32         v3 v30 v66
@@ -71,7 +71,7 @@
   v70  = fma_f32         v25 v69 v45
   v71  = mul_f32_imm     v70 0x437f0000
   v72  = round_i32       v71
-  v73  = and_imm         v72 0xff
+  v73  = and_32_imm      v72 0xff
   v74  = pack            v65 v73 16
   v75  = pack            v74 v37 24
       store_32        p1 v75

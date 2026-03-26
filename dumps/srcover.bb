@@ -8,14 +8,14 @@
   v7   = mul_f32_imm     v6 0x3b808081
   v8   = sub_f32         v3 v7
   v9   = shr_u32_imm     v4 8
-  v10  = and_imm         v9 0xff
+  v10  = and_32_imm      v9 0xff
   v11  = f32_from_i32    v10
   v12  = mul_f32_imm     v11 0x3b808081
   v13  = shr_u32_imm     v4 16
-  v14  = and_imm         v13 0xff
+  v14  = and_32_imm      v13 0xff
   v15  = f32_from_i32    v14
   v16  = mul_f32_imm     v15 0x3b808081
-  v17  = and_imm         v4 0xff
+  v17  = and_32_imm      v4 0xff
   v18  = f32_from_i32    v17
   v19  = mul_f32_imm     v18 0x3b808081
   v20  = load_16         p1

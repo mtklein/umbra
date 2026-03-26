@@ -207,7 +207,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
             put(c, BIT_16b(d, y, x));
         }
         return 1;
-    case op_shl_imm: put(c, SHL_4s_imm(d, x, imm)); return 1;
+    case op_shl_i32_imm: put(c, SHL_4s_imm(d, x, imm)); return 1;
     case op_shr_u32_imm: put(c, USHR_4s_imm(d, x, imm)); return 1;
     case op_shr_s32_imm: put(c, SSHR_4s_imm(d, x, imm)); return 1;
     case op_pack:
@@ -224,7 +224,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
         return 1;
 
     case op_imm_32:
-    case op_and_imm:
+    case op_and_32_imm:
     case op_add_f32_imm:
     case op_sub_f32_imm:
     case op_mul_f32_imm:
@@ -888,11 +888,11 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 case op_i32_from_s16:
                 case op_i32_from_u16:
                 case op_i16_from_i32:
-                case op_shl_imm:
+                case op_shl_i32_imm:
                 case op_shr_u32_imm:
                 case op_shr_s32_imm:
                 case op_pack:
-                case op_and_imm:
+                case op_and_32_imm:
                 case op_add_f32_imm:
                 case op_sub_f32_imm:
                 case op_mul_f32_imm:
@@ -963,7 +963,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             if (s.scratch >= 0) { ra_return_reg(ra, s.scratch); }
         } break;
 
-        case op_shl_imm:
+        case op_shl_i32_imm:
         case op_shr_u32_imm:
         case op_shr_s32_imm: {
             struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
@@ -975,7 +975,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             emit_alu_reg(c, inst->op, s.rd, s.rx, s.ry, 0, inst->imm, s.scratch);
             if (s.scratch >= 0) { ra_return_reg(ra, s.scratch); }
         } break;
-        case op_and_imm:
+        case op_and_32_imm:
         case op_add_f32_imm:
         case op_sub_f32_imm:
         case op_mul_f32_imm:
@@ -1007,7 +1007,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 o == op_add_i32_imm ? ADD_4s(s.rd, s.rx, ir)   :
                 o == op_sub_i32_imm ? SUB_4s(s.rd, s.rx, ir)   :
                 o == op_mul_i32_imm ? MUL_4s(s.rd, s.rx, ir)   :
-                o == op_and_imm     ? AND_16b(s.rd, s.rx, ir)  :
+                o == op_and_32_imm     ? AND_16b(s.rd, s.rx, ir)  :
                 o == op_or_32_imm   ? ORR_16b(s.rd, s.rx, ir)  :
                 o == op_xor_32_imm  ? EOR_16b(s.rd, s.rx, ir)  :
                 o == op_eq_f32_imm  ? FCMEQ_4s(s.rd, ir, s.rx) :
@@ -1324,11 +1324,11 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
         vex_rrr(c, 1, 2, 1, 0x3f, scratch, x, y);
         vpcmpeqd(c, d, y, scratch);
         return 1;
-    case op_shl_imm: vpslld_i(c, d, x, (uint8_t)imm); return 1;
+    case op_shl_i32_imm: vpslld_i(c, d, x, (uint8_t)imm); return 1;
     case op_shr_u32_imm: vpsrld_i(c, d, x, (uint8_t)imm); return 1;
     case op_shr_s32_imm: vpsrad_i(c, d, x, (uint8_t)imm); return 1;
     case op_pack:
-    case op_and_imm:
+    case op_and_32_imm:
     case op_add_f32_imm:
     case op_sub_f32_imm:
     case op_mul_f32_imm:
@@ -2007,7 +2007,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             vpxor_3(c, 1, s.rd, s.rd, tmp);
             ra_return_reg(ra, tmp);
         } break;
-        case op_and_imm:
+        case op_and_32_imm:
         case op_add_f32_imm:
         case op_sub_f32_imm:
         case op_mul_f32_imm:
@@ -2030,7 +2030,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             enum op        o = inst->op;
             int            pp = 0, mm = 1;
             uint8_t        vop = 0;
-            if (o == op_and_imm) {
+            if (o == op_and_32_imm) {
                 pp = 1;
                 vop = 0xdb;
             } else if (o == op_add_f32_imm) {
@@ -2140,7 +2140,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             if (s.scratch2 >= 0) { ra_return_reg(ra, s.scratch2); }
         } break;
 
-        case op_shl_imm:
+        case op_shl_i32_imm:
         case op_shr_u32_imm:
         case op_shr_s32_imm: {
             struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);

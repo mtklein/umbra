@@ -27,7 +27,7 @@
   v26  = floor_f32       v25
   v27  = min_f32         v9 v26
   v28  = i32_from_f32    v27
-  v29  = shl_imm         v28 2
+  v29  = shl_i32_imm     v28 2
   v30  = add_i32_imm     v29 0x3
   v31  = add_i32_imm     v29 0x4
   v32  = add_i32_imm     v31 0x3
@@ -52,9 +52,9 @@
   v51  = fma_f32         v38 v50 v49
   v52  = mul_f32_imm     v51 0x437f0000
   v53  = round_i32       v47
-  v54  = and_imm         v53 0xff
+  v54  = and_32_imm      v53 0xff
   v55  = round_i32       v52
-  v56  = and_imm         v55 0xff
+  v56  = and_32_imm      v55 0xff
   v57  = round_i32       v42
   v58  = gather_32       p-2 v31
   v59  = gather_32       p-2 v29
@@ -62,7 +62,7 @@
   v61  = fma_f32         v38 v60 v59
   v62  = mul_f32_imm     v61 0x437f0000
   v63  = round_i32       v62
-  v64  = and_imm         v63 0xff
+  v64  = and_32_imm      v63 0xff
   v65  = pack            v64 v54 8
   v66  = pack            v65 v56 16
   v67  = pack            v66 v57 24

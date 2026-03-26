@@ -753,11 +753,11 @@ static Fn const fn[] = {
 
     [op_deref_ptr] = deref_ptr_handler,
 
-    [op_shl_imm] = shl_imm_fn,
+    [op_shl_i32_imm] = shl_imm_fn,
     [op_shr_u32_imm] = shr_u32_imm_fn,
     [op_shr_s32_imm] = shr_s32_imm_fn,
     [op_pack] = pack_fn,
-    [op_and_imm] = and_imm_fn,
+    [op_and_32_imm] = and_imm_fn,
     [op_add_f32_imm] = add_f32_imm_fn,
     [op_sub_f32_imm] = sub_f32_imm_fn,
     [op_mul_f32_imm] = mul_f32_imm_fn,
@@ -950,10 +950,10 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
                 case op_lt_u32:
                 case op_le_u32: emit(.fn = fn[inst->op], .x = X, .y = Y, .z = Z); break;
 
-                case op_shl_imm:
+                case op_shl_i32_imm:
                 case op_shr_u32_imm:
                 case op_shr_s32_imm:
-                case op_and_imm:
+                case op_and_32_imm:
                 case op_add_f32_imm:
                 case op_sub_f32_imm:
                 case op_mul_f32_imm:

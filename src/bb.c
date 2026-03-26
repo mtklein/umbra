@@ -382,7 +382,7 @@ val umbra_mul_i32(builder *b, val x, val y) {
 val umbra_shl_i32(builder *b, val x, val y) {
     if (is_imm32(b, y.id, 0)) { return x; }
     if (is_imm(b, y.id)) {
-        return push(b, op_shl_imm, .x = x.id, .imm = b->inst[y.id].imm);
+        return push(b, op_shl_i32_imm, .x = x.id, .imm = b->inst[y.id].imm);
     }
     return math(b, op_shl_i32, .x = x.id, .y = y.id);
 }
@@ -411,10 +411,10 @@ val umbra_and_i32(builder *b, val x, val y) {
     if (is_imm32(b, y.id, 0x7fffffff)) { return umbra_abs_f32(b, x); }
     val d = math(b, op_and_32, .x = x.id, .y = y.id);
     if (is_imm(b, x.id)) {
-        return push(b, op_and_imm, .x = y.id, .y = x.id, .imm = b->inst[x.id].imm);
+        return push(b, op_and_32_imm, .x = y.id, .y = x.id, .imm = b->inst[x.id].imm);
     }
     if (is_imm(b, y.id)) {
-        return push(b, op_and_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
+        return push(b, op_and_32_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
     return (val){d.id};
 }
@@ -752,10 +752,10 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_fms_f32:
         case op_sel_32: fprintf(f, " v%d v%d v%d", ip->x, ip->y, ip->z); break;
 
-        case op_shl_imm:
+        case op_shl_i32_imm:
         case op_shr_u32_imm:
         case op_shr_s32_imm: fprintf(f, " v%d %d", ip->x, ip->imm); break;
-        case op_and_imm: fprintf(f, " v%d 0x%x", ip->x, (uint32_t)ip->imm); break;
+        case op_and_32_imm: fprintf(f, " v%d 0x%x", ip->x, (uint32_t)ip->imm); break;
         case op_pack: fprintf(f, " v%d v%d %d", ip->x, ip->y, ip->imm); break;
         case op_add_f32_imm:
         case op_sub_f32_imm:

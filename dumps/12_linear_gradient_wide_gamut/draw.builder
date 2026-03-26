@@ -28,7 +28,7 @@
   v27  = sub_f32         v24 v26
   v28  = i32_from_f32    v26
   v29  = imm_32          0x2
-  v30  = shl_imm         v28 2
+  v30  = shl_i32_imm     v28 2
   v31  = imm_32          0x4
   v32  = add_i32         v30 v31
   v33  = add_i32_imm     v30 0x4
@@ -69,15 +69,15 @@
   v68  = load_32         p1
   v69  = imm_32          0xff
   v70  = and_32          v68 v69
-  v71  = and_imm         v68 0xff
+  v71  = and_32_imm      v68 0xff
   v72  = imm_32          0x8
   v73  = shr_u32_imm     v68 8
   v74  = and_32          v69 v73
-  v75  = and_imm         v73 0xff
+  v75  = and_32_imm      v73 0xff
   v76  = imm_32          0x10
   v77  = shr_u32_imm     v68 16
   v78  = and_32          v69 v77
-  v79  = and_imm         v77 0xff
+  v79  = and_32_imm      v77 0xff
   v80  = imm_32          0x18
   v81  = shr_u32_imm     v68 24
   v82  = imm_32          0x3b808081
@@ -107,12 +107,12 @@
   v106 = mul_f32_imm     v67 0x437f0000
   v107 = round_i32       v106
   v108 = and_32          v69 v98
-  v109 = and_imm         v98 0xff
+  v109 = and_32_imm      v98 0xff
   v110 = and_32          v69 v101
-  v111 = and_imm         v101 0xff
+  v111 = and_32_imm      v101 0xff
   v112 = pack            v109 v111 8
   v113 = and_32          v69 v104
-  v114 = and_imm         v104 0xff
+  v114 = and_32_imm      v104 0xff
   v115 = pack            v112 v114 16
   v116 = pack            v115 v107 24
       store_32        p1 v116
