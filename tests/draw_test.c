@@ -1275,6 +1275,56 @@ static void test_supersample(void) {
     cleanup_draw(&B);
 }
 
+#if !defined(__wasm__)
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
+
+static void test_page_aligned_buffer(void) {
+#if defined(__wasm__)
+    return;
+#else
+    // Test Metal zero-copy path (page-aligned) and copy path (offset by 4).
+    umbra_draw_layout lay;
+    draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
+                                                 umbra_load_8888, umbra_store_8888, &lay),
+                                lay);
+    enum { N = 64 };
+    long      pgsz = sysconf(_SC_PAGESIZE);
+    size_t    alloc = (N * 4 + (size_t)pgsz - 1) & ~((size_t)pgsz - 1);
+    void     *page = mmap(NULL, alloc + (size_t)pgsz, PROT_READ | PROT_WRITE,
+                          MAP_PRIVATE | MAP_ANON, -1, 0);
+    uint32_t *aligned = page;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-align"
+    uint32_t *offset = (uint32_t *)((char *)page + 4);
+#pragma clang diagnostic pop
+
+    float     color[4] = {0, 1, 0, 1};
+    long long uni_[3] = {0};
+    char     *uni = (char *)uni_;
+    uni_f32(uni, B.lay.shader, color, 4);
+
+    for (int bi = 0; bi < 3; bi++) {
+        __builtin_memset(aligned, 0, N * 4);
+        if (!run_draw(&B, bi, N, 1, (umbra_buf[]){
+            {uni, -(long)B.lay.uni_len},
+            {aligned, N * 4},
+        })) { continue; }
+        for (int i = 0; i < N; i++) { (aligned[i] == 0xFF00FF00u) here; }
+
+        __builtin_memset(offset, 0, N * 4);
+        if (!run_draw(&B, bi, N, 1, (umbra_buf[]){
+            {uni, -(long)B.lay.uni_len},
+            {offset, N * 4},
+        })) { continue; }
+        for (int i = 0; i < N; i++) { (offset[i] == 0xFF00FF00u) here; }
+    }
+    munmap(page, alloc + (size_t)pgsz);
+    cleanup_draw(&B);
+#endif
+}
+
 int main(void) {
     test_solid_src();
     test_solid_src_n1();
@@ -1313,5 +1363,7 @@ int main(void) {
     test_transfer_invert();
     test_transfer_apply();
     test_transfer_roundtrip();
+    test_page_aligned_buffer();
+
     return 0;
 }
