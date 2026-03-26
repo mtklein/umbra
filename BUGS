@@ -1,14 +1,13 @@
 Known bugs and fragile areas.
 
 
-JIT VECTOR PATH MAY READ PAST BUFFER BOUNDS
+RARE XSAN CRASH IN JIT DISPATCH (UNRESOLVED)
 
-The JIT's vector loop processes K elements at a time (K=4 ARM64, K=8 x86).
-The branch to the scalar tail correctly checks remaining >= K, but the
-preamble also runs vector-width ops on uniform values loaded from buffers.
-When a buffer is smaller than K * element_size bytes, vector loads (LDR Q,
-VMOVDQU) read past the allocation.
+Under ASan, the ARM64 JIT very rarely (~1 in 1000+ runs) SEGVs on a
+data read near a page boundary during test_fma_f32.  Audit of the JIT
+codegen shows all vector-width loads are guarded by the remaining >= K
+branch, and scalar tail loads are single-element.  Guard pages have been
+added after JIT code allocations to catch code overruns.
 
-This is usually harmless (excess lanes are unused), but ASan redzones or
-page-boundary allocations can cause intermittent SEGV.  Guard pages after
-JIT code allocations help detect code overruns but don't fix data overreads.
+The crash may be an ASan redzone/quarantine artifact rather than a real
+overread.  Cannot reproduce reliably.
