@@ -44,7 +44,7 @@ struct ra *ra_create(struct umbra_basic_block const *bb, struct ra_config const 
     for (int i = 0; i < n; i++) {
         struct bb_inst const *inst = &bb->inst[i];
         ra->last_use[inst->x] = i;
-        if (!cfg->uses_imm_y || !is_fused_imm(inst->op)) { ra->last_use[inst->y] = i; }
+        if (!cfg->ignore_imm_y || !is_fused_imm(inst->op)) { ra->last_use[inst->y] = i; }
         ra->last_use[inst->z] = i;
     }
     for (int i = 0; i < bb->preamble; i++) {
