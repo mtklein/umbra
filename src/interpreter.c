@@ -118,12 +118,6 @@ struct umbra_interpreter {
                     int row, void *ptr[], long sz[])
 #define next return ip[1].fn(ip + 1, v + 1, end, n, w, row, ptr, sz)
 
-static I32 oob_mask(I32 ix, long bytes, int elem) {
-    I32 zero = {0};
-    int count = (int)(bytes / elem);
-    I32 cnt = zero + count;
-    return (I32)(ix >= zero) & (I32)(ix < cnt);
-}
 
 op(imm_32) {
     v->i32 = (I32){0} + ip->x;
@@ -294,28 +288,29 @@ op(gather_uniform_32) {
 
 op(gather_16) {
     I32 ix = v[ip->y].i32;
-    I32 mask = oob_mask(ix, sz[ip->x], 2);
-    I32 safe = ix & mask;
+    int count = (int)(sz[ip->x] / 2);
     int rem = n - (end - K);
     v->u32 = (U32){0};
     for (int l = 0; l < (rem < K ? rem : K); l++) {
-        uint16_t s;
-        __builtin_memcpy(&s, (char const *)ptr[ip->x] + 2 * safe[l], 2);
-        s = (uint16_t)(s & (uint16_t)mask[l]);
-        __builtin_memcpy((char *)v + 2 * l, &s, 2);
+        if (ix[l] >= 0 && ix[l] < count) {
+            uint16_t s;
+            __builtin_memcpy(&s, (char const *)ptr[ip->x] + 2 * ix[l], 2);
+            __builtin_memcpy((char *)v + 2 * l, &s, 2);
+        }
     }
     next;
 }
 op(gather_32) {
     I32 ix = v[ip->y].i32;
-    I32 mask = oob_mask(ix, sz[ip->x], 4);
-    I32 safe = ix & mask;
+    int count = (int)(sz[ip->x] / 4);
     int rem = n - (end - K);
     v->i32 = (I32){0};
     for (int l = 0; l < (rem < K ? rem : K); l++) {
-        int32_t tmp;
-        __builtin_memcpy(&tmp, (char const *)ptr[ip->x] + 4 * safe[l], 4);
-        v->i32[l] = tmp & mask[l];
+        if (ix[l] >= 0 && ix[l] < count) {
+            int32_t tmp;
+            __builtin_memcpy(&tmp, (char const *)ptr[ip->x] + 4 * ix[l], 4);
+            v->i32[l] = tmp;
+        }
     }
     next;
 }

@@ -1838,29 +1838,20 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 patch_jcc(c, skip);
             } else {
                 int8_t mask = ra_alloc(ra, sl, ns);
-                int8_t clamped = ra_alloc(ra, sl, ns);
+                int8_t cnt = ra_alloc(ra, sl, ns);
                 load_count_x86(c, p, 2);
+                // Build in-bounds mask: (ix >= 0) AND (ix < count)
                 vpxor(c, 1, mask, mask, mask);
-                vpmaxsd(c, clamped, rx, mask);
-                sub_ri(c, XM, 1);
-                test_rr(c, XM, XM);
-                int fix = jcc(c, 0x09);
-                xor_rr(c, XM, XM);
-                patch_jcc(c, fix);
-                vex(c, 1, 1, 0, 0, mask, 0, XM, 0x6e);
-                vbroadcastss(c, mask, mask);
-                vpminsd(c, clamped, clamped, mask);
-                vpcmpeqd(c, mask, mask, mask);
-                vpgatherdd(c, s.rd, base, clamped, 4, mask);
-                load_count_x86(c, p, 2);
-                vex(c, 1, 1, 0, 0, mask, 0, XM, 0x6e);
-                vbroadcastss(c, mask, mask);
-                vpcmpgtd(c, mask, mask, rx);
-                vpxor(c, 1, clamped, clamped, clamped);
-                vpcmpgtd(c, clamped, clamped, rx);
-                vex_rrr(c, 1, 1, 1, 0xDF, mask, clamped, mask);
-                vpand(c, 1, s.rd, s.rd, mask);
-                ra_return_reg(ra, clamped);
+                vpcmpgtd(c, mask, mask, rx);          // mask = (0 > ix) = neg lanes
+                vex(c, 1, 1, 0, 0, cnt, 0, XM, 0x6e);
+                vbroadcastss(c, cnt, cnt);             // cnt = broadcast(count)
+                vpcmpgtd(c, cnt, cnt, rx);             // cnt = (count > ix)
+                // in_bounds = NOT(neg) AND (count > ix) = VPANDN(neg, count>ix)
+                vex_rrr(c, 1, 1, 1, 0xDF, mask, mask, cnt); // mask = NOT(mask) AND cnt
+                // Pre-zero dst, gather only in-bounds lanes
+                vpxor(c, 1, s.rd, s.rd, s.rd);
+                vpgatherdd(c, s.rd, base, rx, 4, mask);
+                ra_return_reg(ra, cnt);
                 ra_return_reg(ra, mask);
                 if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
             }
