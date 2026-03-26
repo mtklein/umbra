@@ -4,17 +4,17 @@
   v3   = f32_from_i32    v2
   v4   = y              
   v5   = f32_from_i32    v4
-  v6   = uni_32          p0[0]
-  v7   = uni_32          p0[1]
-  v8   = uni_32          p0[2]
-  v9   = uni_32          p0[3]
-  v10  = uni_32          p0[4]
-  v11  = uni_32          p0[5]
-  v12  = uni_32          p0[6]
-  v13  = uni_32          p0[7]
-  v14  = uni_32          p0[8]
-  v15  = uni_32          p0[9]
-  v16  = uni_32          p0[10]
+  v6   = uniform_32      p0[0]
+  v7   = uniform_32      p0[1]
+  v8   = uniform_32      p0[2]
+  v9   = uniform_32      p0[3]
+  v10  = uniform_32      p0[4]
+  v11  = uniform_32      p0[5]
+  v12  = uniform_32      p0[6]
+  v13  = uniform_32      p0[7]
+  v14  = uniform_32      p0[8]
+  v15  = uniform_32      p0[9]
+  v16  = uniform_32      p0[10]
   v17  = mul_f32         v3 v12
   v18  = mul_f32         v5 v13
   v19  = fma_f32         v3 v12 v18
@@ -39,7 +39,7 @@
   v38  = lt_f32          v30 v16
   v39  = and_32          v37 v38
   v40  = and_32          v36 v39
-  v41  = uni_32          p0[16]
+  v41  = uniform_32      p0[16]
   v42  = imm_32          0x6
   v43  = mul_i32         v41 v42
   v44  = mul_i32_imm     v41 0x6
@@ -161,6 +161,6 @@
   v160 = sel_32          v159 v154 v0
   v161 = add_f32         v157 v160
   v162 = sel_32          v40 v161 v0
-  v163 = load_next_32    p1
+  v163 = load_32         p1
   v164 = add_f32         v162 v163
-      store_next_32   p1 v164
+      store_32        p1 v164

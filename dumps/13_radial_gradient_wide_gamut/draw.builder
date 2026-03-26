@@ -4,9 +4,9 @@
   v3   = f32_from_i32    v1
   v4   = f32_from_i32    v2
   v5   = deref_ptr       p0 byte16
-  v6   = uni_32          p0[0]
-  v7   = uni_32          p0[1]
-  v8   = uni_32          p0[2]
+  v6   = uniform_32      p0[0]
+  v7   = uniform_32      p0[1]
+  v8   = uniform_32      p0[2]
   v9   = sub_f32         v3 v6
   v10  = sub_f32         v4 v7
   v11  = mul_f32         v9 v9
@@ -21,7 +21,7 @@
   v20  = min_f32         v18 v19
   v21  = min_f32_imm     v18 0x3f800000
   v22  = join            v20 v21
-  v23  = uni_32          p0[3]
+  v23  = uniform_32      p0[3]
   v24  = imm_32          0x40000000
   v25  = sub_f32         v23 v19
   v26  = sub_f32_imm     v23 0x3f800000
@@ -122,4 +122,4 @@
   v121 = or_32           v118 v120
   v122 = pack            v118 v98 24
   v123 = join            v121 v122
-      store_next_32   p1 v123
+      store_32        p1 v123

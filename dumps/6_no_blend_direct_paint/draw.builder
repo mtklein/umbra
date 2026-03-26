@@ -3,14 +3,14 @@
   v2   = y              
   v3   = f32_from_i32    v1
   v4   = f32_from_i32    v2
-  v5   = uni_32          p0[0]
-  v6   = uni_32          p0[1]
-  v7   = uni_32          p0[2]
-  v8   = uni_32          p0[3]
-  v9   = uni_32          p0[4]
-  v10  = uni_32          p0[5]
-  v11  = uni_32          p0[6]
-  v12  = uni_32          p0[7]
+  v5   = uniform_32      p0[0]
+  v6   = uniform_32      p0[1]
+  v7   = uniform_32      p0[2]
+  v8   = uniform_32      p0[3]
+  v9   = uniform_32      p0[4]
+  v10  = uniform_32      p0[5]
+  v11  = uniform_32      p0[6]
+  v12  = uniform_32      p0[7]
   v13  = le_f32          v9 v3
   v14  = lt_f32          v3 v11
   v15  = and_32          v13 v14
@@ -66,4 +66,4 @@
   v65  = or_32           v62 v64
   v66  = pack            v62 v42 24
   v67  = join            v65 v66
-      store_next_32   p1 v67
+      store_32        p1 v67

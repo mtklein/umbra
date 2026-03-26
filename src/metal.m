@@ -109,10 +109,10 @@ static void emit(Buf *b, char const *fmt, ...) {
 }
 
 static _Bool is_16(enum op op) {
-    return op >= op_uni_16 && op <= op_gather_16;
+    return op >= op_uniform_16 && op <= op_gather_16;
 }
 static _Bool is_32(enum op op) {
-    return op >= op_uni_32 && op <= op_deref_ptr;
+    return op >= op_uniform_32 && op <= op_deref_ptr;
 }
 
 static void emit_ops(Buf *b, BB const *bb,
@@ -140,7 +140,7 @@ static void emit_ops(Buf *b, BB const *bb,
 
             case op_deref_ptr: break;
 
-            case op_uni_32: {
+            case op_uniform_32: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
@@ -151,7 +151,7 @@ static void emit_ops(Buf *b, BB const *bb,
                       "p%d)[%d];\n",
                      pad, i, p, inst->imm);
             } break;
-            case op_load_next_32: {
+            case op_load_32: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
@@ -161,15 +161,15 @@ static void emit_ops(Buf *b, BB const *bb,
                       "((device uint*)p%d)[i];\n",
                      pad, i, p);
             } break;
-            case op_load_next_64_lo:
-            case op_load_next_64_hi: {
+            case op_load_64_lo:
+            case op_load_64_hi: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 emit(b, "%suint v%d = "
                         "((device uint*)p%d)"
                         "[i*2+%d];\n",
                      pad, i, p,
-                     inst->op == op_load_next_64_hi);
+                     inst->op == op_load_64_hi);
             } break;
             case op_gather_32: {
                 int p = inst->ptr < 0
@@ -185,7 +185,7 @@ static void emit_ops(Buf *b, BB const *bb,
                       "buf_szs[%d],4)];\n",
                      pad, i, p, inst->x, p);
             } break;
-            case op_store_next_32: {
+            case op_store_32: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
@@ -195,7 +195,7 @@ static void emit_ops(Buf *b, BB const *bb,
                       "[i] = v%d;\n",
                      pad, p, inst->y);
             } break;
-            case op_store_next_64: {
+            case op_store_64: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 emit(b, "%s((device uint*)p%d)"
@@ -206,7 +206,7 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, p, inst->y);
             } break;
 
-            case op_uni_16: {
+            case op_uniform_16: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
@@ -219,7 +219,7 @@ static void emit_ops(Buf *b, BB const *bb,
                       "p%d)[%d];\n",
                      pad, i, p, inst->imm);
             } break;
-            case op_load_next_16: {
+            case op_load_16: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
@@ -244,7 +244,7 @@ static void emit_ops(Buf *b, BB const *bb,
                       "buf_szs[%d],2)];\n",
                      pad, i, p, inst->x, p);
             } break;
-            case op_store_next_16: {
+            case op_store_16: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
@@ -256,14 +256,14 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, p, inst->y);
             } break;
 
-            case op_widen_f16:
+            case op_f32_from_f16:
                 emit(b,
                     "%suint v%d = as_type<uint>"
                     "((float)as_type<half>"
                     "((ushort)v%d));\n",
                      pad, i, inst->x);
                 break;
-            case op_narrow_f32:
+            case op_f16_from_f32:
                 emit(b,
                     "%suint v%d = (uint)"
                     "as_type<ushort>"
@@ -272,19 +272,19 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i, inst->x);
                 break;
 
-            case op_widen_s16:
+            case op_i32_from_s16:
                 emit(b,
                     "%suint v%d = (uint)(int)"
                     "(short)(ushort)v%d;\n",
                      pad, i, inst->x);
                 break;
-            case op_widen_u16:
+            case op_i32_from_u16:
                 emit(b,
                     "%suint v%d = (uint)"
                     "(ushort)v%d;\n",
                      pad, i, inst->x);
                 break;
-            case op_narrow_16:
+            case op_i16_from_i32:
                 emit(b,
                     "%suint v%d = (uint)"
                     "(ushort)v%d;\n",

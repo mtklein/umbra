@@ -4,24 +4,25 @@
 #define OP_LIST(X)                                                                        \
     X(x) X(y)                                                                             \
     X(imm_32)                                                                             \
-    X(uni_32)                                                                             \
-    X(load_next_32) X(load_next_64_lo) X(load_next_64_hi) X(gather_32)                   \
-    X(store_next_32) X(store_next_64) X(deref_ptr) X(add_f32) X(sub_f32)                 \
+    X(uniform_32)                                                                         \
+    X(load_32) X(load_64_lo) X(load_64_hi) X(gather_32)                                  \
+    X(store_32) X(store_64) X(deref_ptr) X(add_f32) X(sub_f32)                           \
         X(mul_f32) X(div_f32) X(min_f32) X(max_f32) X(sqrt_f32) X(abs_f32) X(neg_f32) X(\
             round_f32) X(floor_f32) X(ceil_f32) X(round_i32) X(floor_i32) X(ceil_i32)    \
             X(fma_f32) X(fms_f32) X(add_i32) X(sub_i32) X(mul_i32) X(shl_i32) X(shr_u32)\
                 X(shr_s32) X(and_32) X(or_32) X(xor_32) X(sel_32) X(f32_from_i32)        \
                     X(i32_from_f32) X(eq_f32) X(lt_f32) X(le_f32) X(eq_i32) X(lt_s32) X( \
-                        le_s32) X(lt_u32) X(le_u32) X(uni_16) X(load_next_16)             \
-                        X(store_next_16) X(gather_16) X(widen_s16) X(widen_u16) X(narrow_16) \
-                            X(widen_f16) X(narrow_f32) X(join) X(shl_imm) X(shr_u32_imm)  \
-                                X(shr_s32_imm) X(and_imm) X(pack) X(add_f32_imm)          \
-                                    X(sub_f32_imm) X(mul_f32_imm) X(div_f32_imm)          \
-                                        X(min_f32_imm) X(max_f32_imm) X(add_i32_imm)      \
-                                            X(sub_i32_imm) X(mul_i32_imm) X(or_32_imm)    \
-                                                X(xor_32_imm) X(eq_f32_imm) X(lt_f32_imm) \
-                                                    X(le_f32_imm) X(eq_i32_imm)            \
-                                                        X(lt_s32_imm) X(le_s32_imm)
+                        le_s32) X(lt_u32) X(le_u32) X(uniform_16) X(load_16)              \
+                        X(store_16) X(gather_16) X(i32_from_s16) X(i32_from_u16)          \
+                            X(i16_from_i32) X(f32_from_f16) X(f16_from_f32) X(join)       \
+                                X(shl_imm) X(shr_u32_imm) X(shr_s32_imm) X(and_imm)      \
+                                    X(pack) X(add_f32_imm) X(sub_f32_imm) X(mul_f32_imm)  \
+                                        X(div_f32_imm) X(min_f32_imm) X(max_f32_imm)      \
+                                            X(add_i32_imm) X(sub_i32_imm) X(mul_i32_imm)  \
+                                                X(or_32_imm) X(xor_32_imm) X(eq_f32_imm)  \
+                                                    X(lt_f32_imm) X(le_f32_imm)            \
+                                                        X(eq_i32_imm) X(lt_s32_imm)       \
+                                                            X(le_s32_imm)
 
 enum op {
 #define OP_ENUM(name) op_##name,

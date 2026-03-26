@@ -3,11 +3,11 @@
   v2   = y              
   v3   = f32_from_i32    v1
   v4   = f32_from_i32    v2
-  v5   = uni_32          p0[0]
-  v6   = uni_32          p0[1]
-  v7   = uni_32          p0[2]
-  v8   = uni_32          p0[3]
-  v9   = load_next_32    p1
+  v5   = uniform_32      p0[0]
+  v6   = uniform_32      p0[1]
+  v7   = uniform_32      p0[2]
+  v8   = uniform_32      p0[3]
+  v9   = load_32         p1
   v10  = imm_32          0xff
   v11  = and_32          v9 v10
   v12  = and_imm         v9 0xff
@@ -89,4 +89,4 @@
   v88  = or_32           v86 v87
   v89  = pack            v86 v69 24
   v90  = join            v88 v89
-      store_next_32   p1 v90
+      store_32        p1 v90

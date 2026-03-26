@@ -1,20 +1,20 @@
   v0   = imm_32          0x0
   v1   = deref_ptr       p0 byte48
-  v2   = uni_32          p0[0]
-  v3   = uni_32          p0[1]
-  v4   = uni_32          p0[2]
-  v5   = uni_32          p0[3]
-  v6   = uni_32          p0[4]
-  v7   = uni_32          p0[5]
-  v8   = uni_32          p0[6]
-  v9   = uni_32          p0[7]
-  v10  = uni_32          p0[8]
-  v11  = uni_32          p0[9]
-  v12  = uni_32          p0[10]
+  v2   = uniform_32      p0[0]
+  v3   = uniform_32      p0[1]
+  v4   = uniform_32      p0[2]
+  v5   = uniform_32      p0[3]
+  v6   = uniform_32      p0[4]
+  v7   = uniform_32      p0[5]
+  v8   = uniform_32      p0[6]
+  v9   = uniform_32      p0[7]
+  v10  = uniform_32      p0[8]
+  v11  = uniform_32      p0[9]
+  v12  = uniform_32      p0[10]
   v13  = imm_32          0x3f800000
   v14  = imm_32          0x40000000
   v15  = imm_32          0x37800000
-  v16  = uni_32          p0[16]
+  v16  = uniform_32      p0[16]
   v17  = imm_32          0x6
   v18  = mul_i32         v16 v17
   v19  = mul_i32_imm     v16 0x6
@@ -153,6 +153,6 @@
   v152 = sel_32          v136 v151 v0
   v153 = add_f32         v146 v152
   v154 = sel_32          v80 v153 v0
-  v155 = load_next_32    p1
+  v155 = load_32         p1
   v156 = add_f32         v154 v155
-      store_next_32   p1 v156
+      store_32        p1 v156

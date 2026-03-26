@@ -143,20 +143,20 @@ op(y_fn) {
     next;
 }
 
-op(uni_16) {
+op(uniform_16) {
     uint16_t uni;
     __builtin_memcpy(&uni, (uint16_t const *)ptr[ip->x] + ip->y, sizeof uni);
     v->u32 = (U32){0} + (uint32_t)uni;
     next;
 }
-op(uni_32) {
+op(uniform_32) {
     int32_t uni;
     __builtin_memcpy(&uni, (int32_t const *)ptr[ip->x] + ip->y, sizeof uni);
     v->i32 = (I32){0} + uni;
     next;
 }
 
-op(load_next_16) {
+op(load_16) {
     uint16_t const *src = (uint16_t const *)ptr[ip->x];
     int             i = end - K;
     int             rem = n - i;
@@ -175,7 +175,7 @@ op(load_next_16) {
     }
     next;
 }
-op(load_next_32) {
+op(load_32) {
     int32_t const *src = (int32_t const *)ptr[ip->x];
     int            i = end - K;
     int            rem = n - i;
@@ -191,7 +191,7 @@ op(load_next_32) {
     }
     next;
 }
-op(load_next_64_lo) {
+op(load_64_lo) {
     char const *src = (char const *)ptr[ip->x];
     int         i = end - K;
     int         rem = n - i;
@@ -203,7 +203,7 @@ op(load_next_64_lo) {
     }
     next;
 }
-op(load_next_64_hi) {
+op(load_64_hi) {
     char const *src = (char const *)ptr[ip->x];
     int         i = end - K;
     int         rem = n - i;
@@ -215,7 +215,7 @@ op(load_next_64_hi) {
     }
     next;
 }
-op(store_next_16) {
+op(store_16) {
     uint16_t *dst = (uint16_t *)ptr[ip->x];
     int       i = end - K;
     int       rem = n - i;
@@ -230,7 +230,7 @@ op(store_next_16) {
     }
     next;
 }
-op(store_next_32) {
+op(store_32) {
     int32_t *dst = (int32_t *)ptr[ip->x];
     int      i = end - K;
     int      rem = n - i;
@@ -245,7 +245,7 @@ op(store_next_32) {
     }
     next;
 }
-op(store_next_64) {
+op(store_64) {
     char *dst = (char *)ptr[ip->x];
     int   i = end - K;
     int   rem = n - i;
@@ -279,21 +279,21 @@ op(gather_32) {
     next;
 }
 
-op(widen_f16_fn) {
+op(f32_from_f16_fn) {
     U16 h;
     __builtin_memcpy(&h, &v[ip->x], sizeof h);
     v->f32 = f16_to_f32(h);
     next;
 }
 
-op(narrow_f32_fn) {
+op(f16_from_f32_fn) {
     U16 h = f32_to_f16(v[ip->x].f32);
     v->u32 = (U32){0};
     __builtin_memcpy(v, &h, sizeof h);
     next;
 }
 
-op(widen_s16) {
+op(i32_from_s16) {
     U16 tmp;
     __builtin_memcpy(&tmp, &v[ip->x], sizeof tmp);
     typedef int16_t S16 __attribute__((vector_size(K * 2)));
@@ -302,13 +302,13 @@ op(widen_s16) {
     v->i32 = cast(I32, stmp);
     next;
 }
-op(widen_u16) {
+op(i32_from_u16) {
     U16 tmp;
     __builtin_memcpy(&tmp, &v[ip->x], sizeof tmp);
     v->u32 = cast(U32, tmp);
     next;
 }
-op(narrow_16) {
+op(i16_from_i32) {
     U16 tmp;
     for (int l = 0; l < K; l++) { tmp[l] = (uint16_t)v[ip->x].u32[l]; }
     v->u32 = (U32){0};
@@ -698,12 +698,12 @@ static Fn const fn[] = {
     [op_f32_from_i32] = f32_from_i32,
     [op_i32_from_f32] = i32_from_f32,
 
-    [op_widen_f16] = widen_f16_fn,
-    [op_narrow_f32] = narrow_f32_fn,
+    [op_f32_from_f16] = f32_from_f16_fn,
+    [op_f16_from_f32] = f16_from_f32_fn,
 
-    [op_widen_s16] = widen_s16,
-    [op_widen_u16] = widen_u16,
-    [op_narrow_16] = narrow_16,
+    [op_i32_from_s16] = i32_from_s16,
+    [op_i32_from_u16] = i32_from_u16,
+    [op_i16_from_i32] = i16_from_i32,
 
     [op_eq_f32] = eq_f32,
     [op_lt_f32] = lt_f32,
@@ -820,24 +820,24 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
                     break;
 
 #define RESOLVE_PTR(inst) ((inst)->ptr < 0 ? deref_slot[~(inst)->ptr] : (inst)->ptr)
-                case op_uni_16:
-                    emit(.fn = uni_16, .x = RESOLVE_PTR(inst), .y = inst->imm);
+                case op_uniform_16:
+                    emit(.fn = uniform_16, .x = RESOLVE_PTR(inst), .y = inst->imm);
                     break;
-                case op_uni_32:
-                    emit(.fn = uni_32, .x = RESOLVE_PTR(inst), .y = inst->imm);
+                case op_uniform_32:
+                    emit(.fn = uniform_32, .x = RESOLVE_PTR(inst), .y = inst->imm);
                     break;
 
-                case op_load_next_16:
-                    emit(.fn = load_next_16, .x = RESOLVE_PTR(inst));
+                case op_load_16:
+                    emit(.fn = load_16, .x = RESOLVE_PTR(inst));
                     break;
-                case op_load_next_32:
-                    emit(.fn = load_next_32, .x = RESOLVE_PTR(inst));
+                case op_load_32:
+                    emit(.fn = load_32, .x = RESOLVE_PTR(inst));
                     break;
-                case op_load_next_64_lo:
-                    emit(.fn = load_next_64_lo, .x = RESOLVE_PTR(inst));
+                case op_load_64_lo:
+                    emit(.fn = load_64_lo, .x = RESOLVE_PTR(inst));
                     break;
-                case op_load_next_64_hi:
-                    emit(.fn = load_next_64_hi, .x = RESOLVE_PTR(inst));
+                case op_load_64_hi:
+                    emit(.fn = load_64_hi, .x = RESOLVE_PTR(inst));
                     break;
 
                 case op_gather_16:
@@ -847,14 +847,14 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
                     emit(.fn = gather_32, .x = RESOLVE_PTR(inst), .y = X);
                     break;
 
-                case op_store_next_16:
-                    emit(.fn = store_next_16, .x = RESOLVE_PTR(inst), .y = Y);
+                case op_store_16:
+                    emit(.fn = store_16, .x = RESOLVE_PTR(inst), .y = Y);
                     break;
-                case op_store_next_32:
-                    emit(.fn = store_next_32, .x = RESOLVE_PTR(inst), .y = Y);
+                case op_store_32:
+                    emit(.fn = store_32, .x = RESOLVE_PTR(inst), .y = Y);
                     break;
-                case op_store_next_64:
-                    emit(.fn = store_next_64, .x = RESOLVE_PTR(inst), .y = X, .z = Y);
+                case op_store_64:
+                    emit(.fn = store_64, .x = RESOLVE_PTR(inst), .y = X, .z = Y);
                     break;
 
 #undef RESOLVE_PTR
@@ -891,12 +891,12 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
                 case op_f32_from_i32:
                 case op_i32_from_f32:
 
-                case op_widen_f16:
-                case op_narrow_f32:
+                case op_f32_from_f16:
+                case op_f16_from_f32:
 
-                case op_widen_s16:
-                case op_widen_u16:
-                case op_narrow_16:
+                case op_i32_from_s16:
+                case op_i32_from_u16:
+                case op_i16_from_i32:
 
                 case op_eq_f32:
                 case op_lt_f32:

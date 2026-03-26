@@ -1,14 +1,14 @@
   v0   = imm_32          0x0
-  v1   = uni_32          p0[0]
-  v2   = uni_32          p0[1]
-  v3   = uni_32          p0[2]
-  v4   = uni_32          p0[3]
+  v1   = uniform_32      p0[0]
+  v2   = uniform_32      p0[1]
+  v3   = uniform_32      p0[2]
+  v4   = uniform_32      p0[3]
   v5   = imm_32          0xff
   v6   = imm_32          0x3b808081
   v7   = imm_32          0x3f800000
   v8   = sub_f32         v7 v4
   v9   = imm_32          0x437f0000
-  v10  = load_next_32    p1
+  v10  = load_32         p1
   v11  = shr_u32_imm     v10 24
   v12  = f32_from_i32    v11
   v13  = mul_f32         v6 v12
@@ -78,4 +78,4 @@
   v77  = shl_imm         v20 24
   v78  = or_32           v75 v77
   v79  = join            v78 v76
-      store_next_32   p1 v79
+      store_32        p1 v79
