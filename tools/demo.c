@@ -1,17 +1,8 @@
 #include "../slides/slide.h"
+#include "work_group.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-
-#if !defined(__wasm__)
-#include "work_group.h"
-#endif
-
-#if defined(__wasm__)
-
-int main(void) { return 0; }
-
-#else
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Weverything"
@@ -475,5 +466,3 @@ int main(void) {
     SDL_Quit();
     return 0;
 }
-
-#endif
