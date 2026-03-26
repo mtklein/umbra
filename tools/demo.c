@@ -4,7 +4,7 @@
 #include <string.h>
 
 #if !defined(__wasm__)
-#include <pthread.h>
+#include "work_group.h"
 #endif
 
 #if defined(__wasm__)
@@ -267,10 +267,9 @@ typedef struct {
     struct umbra_program    *prog;
 } tile_work;
 
-static void *tile_fn(void *arg) {
+static void tile_fn(void *arg) {
     tile_work *tw = arg;
     tw->s->draw(tw->s, tw->W, tw->H, tw->y0, tw->y1, tw->buf, tw->lay, tw->prog);
-    return NULL;
 }
 
 int main(void) {
@@ -304,6 +303,7 @@ int main(void) {
 
     max_threads = SDL_GetNumLogicalCPUCores();
     if (max_threads < 1) { max_threads = 1; }
+    thread_pool *pool = pool_create(max_threads);
     xtra_progs = calloc((size_t)max_threads, sizeof *xtra_progs);
 
     bes[0] = umbra_backend_interp();
@@ -387,34 +387,27 @@ int main(void) {
 
         if (s->prepare) { s->prepare(s, W, H, bes[cur_backend]); }
 
-        if (n_threads <= 1) {
-            s->draw(s, W, H, 0, H, pixbuf, &draw_layout, b);
-        } else {
+        {
             int nt = n_threads;
             int sh = (H + nt - 1) / nt;
 
-            if (cur_backend == 2) {
-                // Metal: same backend+program, sequential (batched)
-                for (int t = 0; t < nt; t++) {
-                    int y0 = t * sh;
-                    int y1 = y0 + sh > H ? H : y0 + sh;
-                    s->draw(s, W, H, y0, y1, pixbuf, &draw_layout, b);
-                }
-            } else {
-                // CPU: shared backend, separate programs, parallel
-                pthread_t *tids = malloc((size_t)nt * sizeof *tids);
-                tile_work *work = malloc((size_t)nt * sizeof *work);
-                for (int t = 0; t < nt; t++) {
-                    int y0 = t * sh;
-                    int y1 = y0 + sh > H ? H : y0 + sh;
-                    struct umbra_program *tp = t == 0 ? b : xtra_progs[t];
-                    work[t] = (tile_work){s, W, H, y0, y1, pixbuf, &draw_layout, tp};
-                    pthread_create(&tids[t], NULL, tile_fn, &work[t]);
-                }
-                for (int t = 0; t < nt; t++) { pthread_join(tids[t], NULL); }
-                free(tids);
-                free(work);
+            tile_work *work = malloc((size_t)nt * sizeof *work);
+            for (int t = 0; t < nt; t++) {
+                int y0 = t * sh;
+                int y1 = y0 + sh > H ? H : y0 + sh;
+                struct umbra_program *tp;
+                if (cur_backend == 2) { tp = b; }
+                else                  { tp = t == 0 ? b : xtra_progs[t]; }
+                work[t] = (tile_work){s, W, H, y0, y1, pixbuf, &draw_layout, tp};
             }
+            if (cur_backend == 2) {
+                for (int t = 0; t < nt; t++) { tile_fn(&work[t]); }
+            } else {
+                work_group wg = {.pool = pool};
+                for (int t = 0; t < nt; t++) { work_group_add(&wg, tile_fn, &work[t]); }
+                work_group_wait(&wg);
+            }
+            free(work);
         }
 
         umbra_backend_flush(bes[cur_backend]);
@@ -467,6 +460,7 @@ int main(void) {
     }
 
     free(pixbuf);
+    pool_destroy(pool);
     free_xtra();
     free(xtra_progs);
     umbra_basic_block_free(saved_bb);
