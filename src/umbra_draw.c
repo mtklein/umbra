@@ -522,17 +522,10 @@ umbra_format const umbra_format_fp16        = {8, umbra_load_fp16,        umbra_
 umbra_format const umbra_format_fp16_planar = {2, umbra_load_fp16_planar, umbra_store_fp16_planar};
 
 static umbra_color load_srgb_8888(builder *builder, umbra_ptr ptr) {
-    umbra_color c = umbra_load_8888(builder, ptr);
-    umbra_val   a = c.a;
-    c = umbra_transfer_invert(builder, c, &umbra_transfer_srgb);
-    c.a = a;
-    return c;
+    return umbra_transfer_invert(builder, umbra_load_8888(builder, ptr), &umbra_transfer_srgb);
 }
 static void store_srgb_8888(builder *builder, umbra_ptr ptr, umbra_color c) {
-    umbra_val a = c.a;
-    c = umbra_transfer_apply(builder, c, &umbra_transfer_srgb);
-    c.a = a;
-    umbra_store_8888(builder, ptr, c);
+    umbra_store_8888(builder, ptr, umbra_transfer_apply(builder, c, &umbra_transfer_srgb));
 }
 umbra_format const umbra_format_srgb_8888 = {4, load_srgb_8888, store_srgb_8888};
 
