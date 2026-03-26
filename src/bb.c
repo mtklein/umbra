@@ -39,6 +39,7 @@ _Bool is_fused_imm(enum op op) {
         || op == op_add_i32_imm
         || op == op_sub_i32_imm
         || op == op_mul_i32_imm
+        || op == op_and_32_imm
         || op == op_or_32_imm
         || op == op_xor_32_imm
         || op == op_eq_f32_imm
@@ -47,6 +48,18 @@ _Bool is_fused_imm(enum op op) {
         || op == op_eq_i32_imm
         || op == op_lt_s32_imm
         || op == op_le_s32_imm;
+}
+struct umbra_basic_block *umbra_strip_imm_refs(struct umbra_basic_block const *bb) {
+    struct umbra_basic_block *copy = malloc(sizeof *copy);
+    *copy = *bb;
+    copy->inst = malloc((size_t)bb->insts * sizeof *copy->inst);
+    __builtin_memcpy(copy->inst, bb->inst, (size_t)bb->insts * sizeof *copy->inst);
+    for (int i = 0; i < copy->insts; i++) {
+        if (is_fused_imm(copy->inst[i].op)) {
+            copy->inst[i].y = 0;
+        }
+    }
+    return copy;
 }
 _Bool is_varying(enum op op) {
     return op == op_x

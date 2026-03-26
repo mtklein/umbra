@@ -1391,6 +1391,8 @@ struct umbra_jit {
 };
 
 struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
+    struct umbra_basic_block *stripped = umbra_strip_imm_refs(bb);
+    bb = stripped;
 
     int *sl = malloc((size_t)bb->insts * sizeof(int));
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
@@ -1530,9 +1532,11 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     if (mprotect(mem, alloc, PROT_READ | PROT_EXEC) != 0) {
         munmap(mem, alloc);
         free(c.buf);
+        umbra_basic_block_free(stripped);
         return 0;
     }
     free(c.buf);
+    umbra_basic_block_free(stripped);
 
     struct umbra_jit *j = malloc(sizeof *j);
     j->code = mem;
