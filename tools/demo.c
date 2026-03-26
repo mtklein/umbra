@@ -303,7 +303,7 @@ int main(void) {
 
     max_threads = SDL_GetNumLogicalCPUCores();
     if (max_threads < 1) { max_threads = 1; }
-    thread_pool *pool = pool_create(max_threads);
+    struct thread_pool *pool = thread_pool(max_threads);
     xtra_progs = calloc((size_t)max_threads, sizeof *xtra_progs);
 
     bes[0] = umbra_backend_interp();
@@ -460,7 +460,7 @@ int main(void) {
     }
 
     free(pixbuf);
-    pool_destroy(pool);
+    thread_pool_free(pool);
     free_xtra();
     free(xtra_progs);
     umbra_basic_block_free(saved_bb);

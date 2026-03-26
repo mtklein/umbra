@@ -12,14 +12,13 @@ typedef struct {
 struct thread_pool {
     pthread_mutex_t mu;
     pthread_cond_t  cv;
+    pthread_t      *threads;
     work_item      *stack;
     int             top, cap;
-    int             n_threads, :32;
-    pthread_t      *threads;
-    int             quit, :32;
+    int             n_threads, quit;
 };
 
-static _Bool pop(thread_pool *p, work_item *out) {
+static _Bool pop(struct thread_pool *p, work_item *out) {
     pthread_mutex_lock(&p->mu);
     while (p->top == 0 && !p->quit) {
         pthread_cond_wait(&p->cv, &p->mu);
@@ -30,7 +29,7 @@ static _Bool pop(thread_pool *p, work_item *out) {
     return got;
 }
 
-static _Bool try_pop(thread_pool *p, work_item *out) {
+static _Bool try_pop(struct thread_pool *p, work_item *out) {
     _Bool got = 0;
     pthread_mutex_lock(&p->mu);
     if (p->top > 0) { *out = p->stack[--p->top]; got = 1; }
@@ -39,7 +38,7 @@ static _Bool try_pop(thread_pool *p, work_item *out) {
 }
 
 static void *worker(void *arg) {
-    thread_pool *p = arg;
+    struct thread_pool *p = arg;
     for (;;) {
         work_item w;
         if (!pop(p, &w)) { break; }
@@ -49,8 +48,8 @@ static void *worker(void *arg) {
     return NULL;
 }
 
-thread_pool *pool_create(int n) {
-    thread_pool *p = calloc(1, sizeof *p);
+struct thread_pool* thread_pool(int n) {
+    struct thread_pool *p = calloc(1, sizeof *p);
     pthread_mutex_init(&p->mu, NULL);
     pthread_cond_init(&p->cv, NULL);
     p->cap = 64;
@@ -63,7 +62,7 @@ thread_pool *pool_create(int n) {
     return p;
 }
 
-void pool_destroy(thread_pool *p) {
+void thread_pool_free(struct thread_pool *p) {
     pthread_mutex_lock(&p->mu);
     p->quit = 1;
     pthread_cond_broadcast(&p->cv);
@@ -80,7 +79,7 @@ void pool_destroy(thread_pool *p) {
 
 void work_group_add(work_group *wg, void (*fn)(void *), void *ctx) {
     __atomic_fetch_add(&wg->pending, 1, __ATOMIC_RELAXED);
-    thread_pool *p = wg->pool;
+    struct thread_pool *p = wg->pool;
     pthread_mutex_lock(&p->mu);
     if (p->top == p->cap) {
         p->cap *= 2;
