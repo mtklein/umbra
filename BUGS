@@ -1,17 +1,6 @@
 Known bugs and fragile areas.
 
 
-JIT op_x CLOBBERS SCRATCH REGISTERS
-
-ARM64: MSUB writes XT (X10).  XT is designated scratch so this is fine in
-practice, but if the RA ever spilled a value into XT between the MSUB and
-its use, there'd be a conflict.  The RA doesn't use GP registers for values
-so this is currently safe.
-
-x86-64: op_x uses RAX and R11 as temps.  Same argument — safe because the
-RA only manages YMM registers, not GPRs.
-
-
 SLUG ACCUMULATOR STILL USES PER-ROW 1D DISPATCH
 
 slug_build_acc uses umbra_x, per-row uniforms (x0, y), and per-row 1D
