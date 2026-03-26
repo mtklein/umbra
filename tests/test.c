@@ -1607,6 +1607,40 @@ static void test_gather_clamp(void) {
     }
 }
 
+static void test_gather_clamp_zero_sz(void) {
+    // gather_uniform with negative index → clamped to 0.
+    struct umbra_builder *b = umbra_builder();
+    umbra_val             ix = umbra_uniform_32(b, (umbra_ptr){0, 0}, 0);
+    umbra_val             v = umbra_gather_32(b, (umbra_ptr){1, 0}, ix);
+    umbra_store_32(b, (umbra_ptr){2, 0}, v);
+    backends B = make(b, 0);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        int32_t neg_idx[] = {-10};
+        int32_t src[3] = {100, 200, 300};
+        int32_t dst[1] = {0};
+        if (!run(&B, bi, 1, 1, (umbra_buf[]){
+            {neg_idx, 4, 0},
+            {src, sizeof src, 0},
+            {dst, 4, 0},
+        })) { continue; }
+        (dst[0] == 100) here;
+    }
+
+    // gather_uniform with over-range index → clamped to last.
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        int32_t big_idx[] = {999};
+        int32_t src[3] = {100, 200, 300};
+        int32_t dst[1] = {0};
+        if (!run(&B, bi, 1, 1, (umbra_buf[]){
+            {big_idx, 4, 0},
+            {src, sizeof src, 0},
+            {dst, 4, 0},
+        })) { continue; }
+        (dst[0] == 300) here;
+    }
+    cleanup(&B);
+}
+
 static void test_offset_load_store(void) {
     for (int opt = 0; opt < 2; opt++) {
         {
@@ -2622,6 +2656,7 @@ int main(void) {
     test_n9();
     test_preamble_pair_alias();
     test_gather_clamp();
+    test_gather_clamp_zero_sz();
     test_offset_load_store();
     test_shift_imm();
     test_pack_channels();
