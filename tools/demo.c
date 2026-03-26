@@ -86,10 +86,10 @@ static void build_fill(int fmt) {
     builder    *builder = umbra_builder();
     int         fi = umbra_reserve(builder, 4);
     umbra_color c = {
-        umbra_uniform_i32(builder, (umbra_ptr){0}, fi),
-        umbra_uniform_i32(builder, (umbra_ptr){0}, fi + 1),
-        umbra_uniform_i32(builder, (umbra_ptr){0}, fi + 2),
-        umbra_uniform_i32(builder, (umbra_ptr){0}, fi + 3),
+        umbra_uniform_32(builder, (umbra_ptr){0}, fi),
+        umbra_uniform_32(builder, (umbra_ptr){0}, fi + 1),
+        umbra_uniform_32(builder, (umbra_ptr){0}, fi + 2),
+        umbra_uniform_32(builder, (umbra_ptr){0}, fi + 3),
     };
     fmt_store[fmt](builder, (umbra_ptr){1}, c);
     finish_pipe(&fill_pipe, builder);
@@ -112,12 +112,12 @@ static void build_hdr(int fmt) {
     int         op = umbra_max_ptr(builder) + 1;
     hdr_pipe.out_ptr = op;
     umbra_val lo = umbra_pack(builder,
-                              umbra_widen_u16(builder, umbra_narrow_f32(builder, c.r)),
-                              umbra_widen_u16(builder, umbra_narrow_f32(builder, c.g)), 16);
+                              umbra_i32_from_u16(builder, umbra_f16_from_f32(builder, c.r)),
+                              umbra_i32_from_u16(builder, umbra_f16_from_f32(builder, c.g)), 16);
     umbra_val hi = umbra_pack(builder,
-                              umbra_widen_u16(builder, umbra_narrow_f32(builder, c.b)),
-                              umbra_widen_u16(builder, umbra_narrow_f32(builder, c.a)), 16);
-    umbra_store_next_i64(builder, (umbra_ptr){op}, lo, hi);
+                              umbra_i32_from_u16(builder, umbra_f16_from_f32(builder, c.b)),
+                              umbra_i32_from_u16(builder, umbra_f16_from_f32(builder, c.a)), 16);
+    umbra_store_64(builder, (umbra_ptr){op}, lo, hi);
     finish_pipe(&hdr_pipe, builder);
 }
 

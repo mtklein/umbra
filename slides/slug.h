@@ -161,15 +161,15 @@ static inline struct umbra_builder *slug_build_acc(
         (umbra_ptr){0}, co);
     int ji = umbra_reserve(b, 1);
 
-    umbra_val xf = umbra_cvt_f32_i32(b, umbra_x(b));
-    umbra_val yf = umbra_cvt_f32_i32(b, umbra_y(b));
+    umbra_val xf = umbra_f32_from_i32(b, umbra_x(b));
+    umbra_val yf = umbra_f32_from_i32(b, umbra_y(b));
 
     umbra_val m[9];
     for (int i = 0; i < 9; i++) {
-        m[i] = umbra_uniform_i32(b, (umbra_ptr){0}, fi+i);
+        m[i] = umbra_uniform_32(b, (umbra_ptr){0}, fi+i);
     }
-    umbra_val bw = umbra_uniform_i32(b, (umbra_ptr){0}, fi+9);
-    umbra_val bh = umbra_uniform_i32(b, (umbra_ptr){0}, fi+10);
+    umbra_val bw = umbra_uniform_32(b, (umbra_ptr){0}, fi+9);
+    umbra_val bh = umbra_uniform_32(b, (umbra_ptr){0}, fi+10);
 
     umbra_val pw = umbra_add_f32(b,
         umbra_add_f32(b,
@@ -201,20 +201,20 @@ static inline struct umbra_builder *slug_build_acc(
             umbra_ge_f32(b, gy, z),
             umbra_lt_f32(b, gy, bh)));
 
-    umbra_val j = umbra_uniform_i32(b, (umbra_ptr){0}, ji);
+    umbra_val j = umbra_uniform_32(b, (umbra_ptr){0}, ji);
     umbra_val k = umbra_mul_i32(b, j,
                       umbra_imm_i32(b, 6));
 
-    umbra_val p0x = umbra_gather_i32(b, curves, k);
-    umbra_val p0y = umbra_gather_i32(b, curves,
+    umbra_val p0x = umbra_gather_32(b, curves, k);
+    umbra_val p0y = umbra_gather_32(b, curves,
         umbra_add_i32(b, k, umbra_imm_i32(b, 1)));
-    umbra_val p1x = umbra_gather_i32(b, curves,
+    umbra_val p1x = umbra_gather_32(b, curves,
         umbra_add_i32(b, k, umbra_imm_i32(b, 2)));
-    umbra_val p1y = umbra_gather_i32(b, curves,
+    umbra_val p1y = umbra_gather_32(b, curves,
         umbra_add_i32(b, k, umbra_imm_i32(b, 3)));
-    umbra_val p2x = umbra_gather_i32(b, curves,
+    umbra_val p2x = umbra_gather_32(b, curves,
         umbra_add_i32(b, k, umbra_imm_i32(b, 4)));
-    umbra_val p2y = umbra_gather_i32(b, curves,
+    umbra_val p2y = umbra_gather_32(b, curves,
         umbra_add_i32(b, k, umbra_imm_i32(b, 5)));
 
     umbra_val q0y = umbra_sub_f32(b, p0y, gy);
@@ -313,9 +313,9 @@ static inline struct umbra_builder *slug_build_acc(
     umbra_val dw = umbra_sel_i32(b, in,
         umbra_add_f32(b, w1, w2), z);
 
-    umbra_val acc = umbra_load_next_i32(b, (umbra_ptr){1});
+    umbra_val acc = umbra_load_32(b, (umbra_ptr){1});
     acc = umbra_add_f32(b, acc, dw);
-    umbra_store_next_i32(b, (umbra_ptr){1}, acc);
+    umbra_store_32(b, (umbra_ptr){1}, acc);
 
     if (lay) {
         lay->mat        = fi  * 4;
