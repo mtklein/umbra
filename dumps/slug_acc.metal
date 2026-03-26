@@ -91,7 +91,7 @@ kernel void umbra_entry(
     uint v68 = as_type<uint>(as_type<float>(v53) - as_type<float>(v67));
     uint v69 = as_type<uint>(as_type<float>(v47) + as_type<float>(v68));
     uint v70 = as_type<uint>(as_type<float>(v61) * as_type<float>(v61));
-    uint v71 = as_type<uint>(as_type<float>(v70) - as_type<float>(v53) * as_type<float>(v69));
+    uint v71 = as_type<uint>(fma(-as_type<float>(v53), as_type<float>(v69), as_type<float>(v70)));
     uint v72 = as_type<uint>(max(as_type<float>(v71), as_type<float>(0u)));
     uint v73 = as_type<uint>(sqrt(as_type<float>(v72)));
     uint v74 = as_type<uint>(as_type<float>(v61) + as_type<float>(v73));

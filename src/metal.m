@@ -554,11 +554,11 @@ static void emit_ops(Buf *b, BB const *bb,
                 break;
             case op_fms_f32:
                 emit(b, "%suint v%d = as_type<uint>"
-                        "(as_type<float>(v%d)"
-                        " - as_type<float>(v%d)"
-                        " * as_type<float>(v%d));\n",
+                        "(fma(-as_type<float>(v%d),"
+                        " as_type<float>(v%d),"
+                        " as_type<float>(v%d)));\n",
                      pad, i,
-                     inst->z, inst->x, inst->y);
+                     inst->x, inst->y, inst->z);
                 break;
 
             case op_add_i32:
@@ -881,9 +881,18 @@ struct umbra_metal* umbra_metal(
         NSString *source =
             [NSString stringWithUTF8String:src];
         NSError *error = nil;
+        MTLCompileOptions *opts = [MTLCompileOptions new];
+        if (@available(macOS 15.0, *)) {
+            opts.mathMode = MTLMathModeSafe;
+        } else {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+            opts.fastMathEnabled = NO;
+#pragma clang diagnostic pop
+        }
         id<MTLLibrary> library =
             [device newLibraryWithSource:source
-                                 options:nil
+                                 options:opts
                                    error:&error];
         if (!library) {
             NSLog(@"Metal compile error: %@", error);
