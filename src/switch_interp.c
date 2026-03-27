@@ -517,8 +517,8 @@ void umbra_switch_interp_run(struct umbra_switch_interp *p, int l, int t, int r,
 #pragma clang diagnostic ignored "-Wfloat-equal"
                 case op_eq_f32_imm:  { F32_IMM; v->i32 = (I32)(v[ip->x].f32 == imm); } break;
 #pragma clang diagnostic pop
-                case op_lt_f32_imm:  { F32_IMM; v->f32 = (F32)(v[ip->x].f32 <  imm); } break;
-                case op_le_f32_imm:  { F32_IMM; v->f32 = (F32)(v[ip->x].f32 <= imm); } break;
+                case op_lt_f32_imm:  { F32_IMM; v->i32 = (I32)(v[ip->x].f32 <  imm); } break;
+                case op_le_f32_imm:  { F32_IMM; v->i32 = (I32)(v[ip->x].f32 <= imm); } break;
 #undef F32_IMM
 
 #define I32_IMM I32 const imm = (I32){0} + ip->y
