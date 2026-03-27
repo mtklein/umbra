@@ -117,17 +117,17 @@ struct sw_inst {
 #pragma GCC diagnostic ignored "-Wpedantic"
 #endif
 
-struct umbra_switch_interp {
+struct umbra_interpreter {
     struct sw_inst *inst;
     val            *v;
     umbra_buf      *buf;
     int             preamble, nptr, n_deref, pad_;
 };
 
-struct umbra_switch_interp* umbra_switch_interp(struct umbra_basic_block const *bb) {
+struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) {
     int *id = calloc((size_t)bb->insts, sizeof *id);
 
-    struct umbra_switch_interp *p = malloc(sizeof *p);
+    struct umbra_interpreter *p = malloc(sizeof *p);
     int const num_insts = bb->insts + 1;
     p->inst = malloc((size_t)num_insts * sizeof *p->inst);
     p->v = malloc((size_t)num_insts * sizeof *p->v);
@@ -287,7 +287,7 @@ struct umbra_switch_interp* umbra_switch_interp(struct umbra_basic_block const *
     return p;
 }
 
-void umbra_switch_interp_run(struct umbra_switch_interp *p, int l, int t, int r, int b,
+void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int b,
                              umbra_buf caller_buf[]) {
     int const nall = p->nptr + p->n_deref;
     for (int i = 0; i < p->nptr; i++) { p->buf[i] = caller_buf[i]; }
@@ -686,7 +686,7 @@ void umbra_switch_interp_run(struct umbra_switch_interp *p, int l, int t, int r,
     }
 }
 
-void umbra_switch_interp_free(struct umbra_switch_interp *p) {
+void umbra_interpreter_free(struct umbra_interpreter *p) {
     if (p) {
         free(p->buf);
         free(p->inst);

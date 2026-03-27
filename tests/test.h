@@ -8,7 +8,7 @@ static inline _Bool equiv(float x, float y) {
     return (x <= y && y <= x) || (x != x && y != y);
 }
 
-enum { NUM_BACKENDS = 4 };
+enum { NUM_BACKENDS = 3 };
 
 typedef struct {
     struct umbra_backend *be[NUM_BACKENDS];
@@ -18,19 +18,17 @@ typedef struct {
 static inline test_backends test_backends_make(struct umbra_basic_block const *bb) {
     test_backends B;
     B.be[0] = umbra_backend_interp();
-    B.be[1] = umbra_backend_switch();
-    B.be[2] = umbra_backend_jit();
-    B.be[3] = umbra_backend_metal();
+    B.be[1] = umbra_backend_jit();
+    B.be[2] = umbra_backend_metal();
     for (int i = 0; i < NUM_BACKENDS; i++) {
         B.p[i] = B.be[i] ? umbra_program(B.be[i], bb) : NULL;
     }
     B.p[0] != 0 here;
-    B.p[1] != 0 here;
 #if defined(__aarch64__) || defined(__AVX2__)
-    B.p[2] != 0 here;
+    B.p[1] != 0 here;
 #endif
 #if (defined(__APPLE__) && defined(__clang__)) && !defined(__wasm__)
-    B.p[3] != 0 here;
+    B.p[2] != 0 here;
 #endif
     return B;
 }

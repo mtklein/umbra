@@ -5,10 +5,6 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const*);
 void umbra_interpreter_run(struct umbra_interpreter*, int l, int t, int r, int b, umbra_buf[]);
 void umbra_interpreter_free(struct umbra_interpreter*);
 
-struct umbra_switch_interp *umbra_switch_interp(struct umbra_basic_block const*);
-void umbra_switch_interp_run(struct umbra_switch_interp*, int l, int t, int r, int b, umbra_buf[]);
-void umbra_switch_interp_free(struct umbra_switch_interp*);
-
 struct umbra_jit *umbra_jit(struct umbra_basic_block const*);
 void              umbra_jit_run(struct umbra_jit*, int l, int t, int r, int b, umbra_buf[]);
 void              umbra_jit_free(struct umbra_jit*);

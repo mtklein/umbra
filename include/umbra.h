@@ -9,7 +9,6 @@ struct umbra_basic_block* umbra_basic_block(struct umbra_builder*);
 void   umbra_basic_block_free(struct umbra_basic_block*);
 
 struct umbra_backend* umbra_backend_interp(void);
-struct umbra_backend* umbra_backend_switch(void);
 struct umbra_backend* umbra_backend_jit   (void);
 struct umbra_backend* umbra_backend_metal (void);
 
