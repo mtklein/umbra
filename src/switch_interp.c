@@ -246,7 +246,9 @@ void umbra_switch_interp_run(struct umbra_switch_interp *p, int l, int t, int r,
 #if defined(__GNUC__) && !defined(__wasm__)
     #define DISPATCH    goto *labels[ip->tag]
     #define CASE(label) L_##label:
-    #define NEXT        do { ip++; v++; DISPATCH; } while (0)
+    // The asm volatile prevents the compiler from tail-merging dispatch sites.
+    // Each NEXT must be its own indirect branch for branch predictor accuracy.
+    #define NEXT        do { ip++; v++; __asm__ volatile(""); DISPATCH; } while (0)
     #define DONE        goto next_tile
             static void *const labels[SW_NUM_OPS] = {
                 [op_x] = &&L_op_x, [op_y] = &&L_op_y, [op_imm_32] = &&L_op_imm_32,
