@@ -76,6 +76,8 @@ struct umbra_metal {
     int    total_bufs;
     int    tg_size;
     int    n_deref;
+    int    store_buf;
+    int    store_shift;
     struct deref_info    *deref;
     struct batch_shared  *batch_data;
     int                  batch_gen, :32;
@@ -138,11 +140,11 @@ static void emit_ops(Buf *b, BB const *bb,
 
         switch (inst->op) {
             case op_x:
-                emit(b, "%suint v%d = pos.x;\n",
+                emit(b, "%suint v%d = x0 + pos.x;\n",
                      pad, i);
                 break;
             case op_y:
-                emit(b, "%suint v%d = pos.y;\n",
+                emit(b, "%suint v%d = y0 + pos.y;\n",
                      pad, i);
                 break;
 
@@ -749,8 +751,14 @@ static char* build_source(BB const *bb,
     emit(&b, "kernel void umbra_entry(\n");
     emit(&b,
          "    constant uint &n [[buffer(0)]]"
-         ",\n    constant uint &w [[buffer(%d)]]",
-         total_bufs + 2);
+         ",\n    constant uint &w [[buffer(%d)]]"
+         ",\n    constant uint &stride [[buffer(%d)]]"
+         ",\n    constant uint &x0 [[buffer(%d)]]"
+         ",\n    constant uint &y0 [[buffer(%d)]]",
+         total_bufs + 2,
+         total_bufs + 3,
+         total_bufs + 4,
+         total_bufs + 5);
     for (int p = 0; p <= max_ptr; p++) {
         emit(&b,
              ",\n    device uchar *p%d"
@@ -773,7 +781,9 @@ static char* build_source(BB const *bb,
     emit(&b,
          ",\n    uint2 pos"
          " [[thread_position_in_grid]]\n) {\n");
-    emit(&b, "    uint i = pos.y * w + pos.x;\n");
+    emit(&b,
+         "    uint i = (y0 + pos.y) * stride"
+         " + x0 + pos.x;\n");
     emit(&b, "    if (i >= n) return;\n");
 
     for (int p = 0; p < total_bufs; p++) {
@@ -931,6 +941,27 @@ struct umbra_metal* umbra_metal(
                              sizeof *m->per_bufs);
         m->deref   = di;
         m->n_deref = n_deref;
+        m->store_buf   = -1;
+        m->store_shift = 0;
+        for (int i = 0; i < bb->insts; i++) {
+            enum op op = bb->inst[i].op;
+            if (op == op_store_16
+                    || op == op_store_32
+                    || op == op_store_64) {
+                int p = bb->inst[i].ptr;
+                if (p >= 0) {
+                    m->store_buf = p;
+                } else {
+                    m->store_buf =
+                        deref_buf[~p];
+                }
+                m->store_shift =
+                    op == op_store_16 ? 1
+                  : op == op_store_64 ? 3
+                  :                     2;
+                break;
+            }
+        }
 
         free(deref_buf);
         return m;
@@ -969,9 +1000,12 @@ static void batch_retain_buf(
 
 
 static void encode_dispatch(
-    struct umbra_metal *m, int n, int w, umbra_buf buf[],
+    struct umbra_metal *m,
+    int w, int h, int stride, int x0, int y0,
+    umbra_buf buf[],
     id<MTLComputeCommandEncoder> enc
 ) {
+    int n = stride * (y0 + h);
     struct metal_backend *be = m->be;
     id<MTLDevice> device =
         (__bridge id<MTLDevice>)be->device;
@@ -1004,6 +1038,30 @@ static void encode_dispatch(
     *(uint32_t*)per_w.contents = w32;
     batch_retain_buf(
         be, (__bridge_retained void*)per_w);
+    uint32_t stride32 = (uint32_t)stride;
+    id<MTLBuffer> per_stride =
+        [device newBufferWithLength:sizeof stride32
+                options:
+                    MTLResourceStorageModeShared];
+    *(uint32_t*)per_stride.contents = stride32;
+    batch_retain_buf(
+        be, (__bridge_retained void*)per_stride);
+    uint32_t x032 = (uint32_t)x0;
+    id<MTLBuffer> per_x0 =
+        [device newBufferWithLength:sizeof x032
+                options:
+                    MTLResourceStorageModeShared];
+    *(uint32_t*)per_x0.contents = x032;
+    batch_retain_buf(
+        be, (__bridge_retained void*)per_x0);
+    uint32_t y032 = (uint32_t)y0;
+    id<MTLBuffer> per_y0 =
+        [device newBufferWithLength:sizeof y032
+                options:
+                    MTLResourceStorageModeShared];
+    *(uint32_t*)per_y0.contents = y032;
+    batch_retain_buf(
+        be, (__bridge_retained void*)per_y0);
 
     size_t offsets[32] = {0};
     for (int i = 0; i <= m->max_ptr; i++) {
@@ -1142,8 +1200,16 @@ static void encode_dispatch(
     [enc setBuffer:per_w
             offset:0
            atIndex:(NSUInteger)(m->total_bufs + 2)];
+    [enc setBuffer:per_stride
+            offset:0
+           atIndex:(NSUInteger)(m->total_bufs + 3)];
+    [enc setBuffer:per_x0
+            offset:0
+           atIndex:(NSUInteger)(m->total_bufs + 4)];
+    [enc setBuffer:per_y0
+            offset:0
+           atIndex:(NSUInteger)(m->total_bufs + 5)];
 
-    int h = (n + w - 1) / w;
     MTLSize grid =
         MTLSizeMake((NSUInteger)w, (NSUInteger)h, 1);
     // Pick the squarest 2D threadgroup that fits within tg_size and the grid.
@@ -1165,11 +1231,13 @@ static void encode_dispatch(
 void umbra_metal_run(
     struct umbra_metal *m, int w, int h, int x0, int y0, umbra_buf buf[]
 ) {
-    // TODO: pass x0, y0 through to kernel once Metal codegen is updated
-    (void)x0;
-    (void)y0;
-    int n = w * h;
-    if (!m || n <= 0) { return; }
+    if (!m || w <= 0 || h <= 0) { return; }
+    int stride = w;
+    if (m->store_buf >= 0
+            && buf[m->store_buf].row_bytes) {
+        stride = (int)(buf[m->store_buf].row_bytes
+                       >> m->store_shift);
+    }
     struct metal_backend *be = m->be;
     if (!be->batch_cmdbuf) {
         umbra_metal_begin_batch(be);
@@ -1195,7 +1263,8 @@ void umbra_metal_run(
                 (size_t)m->total_bufs
                     * sizeof *m->batch_data);
         }
-        encode_dispatch(m, n, w, buf, enc);
+        encode_dispatch(
+            m, w, h, stride, x0, y0, buf, enc);
     }
 }
 

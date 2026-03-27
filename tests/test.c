@@ -2676,6 +2676,76 @@ int main(void) {
     test_load_store_next_64();
     test_load_stride_neq_w();
     test_jit_xs_init();
+
+    // Regression test: arbitrary (l,t,r,b) tile dispatch on a strided buffer.
+    {
+        struct umbra_builder *b = umbra_builder();
+        umbra_val x   = umbra_x(b);
+        umbra_val y   = umbra_y(b);
+        umbra_val k   = umbra_imm_i32(b, 1000);
+        umbra_val val = umbra_add_i32(b, x, umbra_mul_i32(b, y, k));
+        umbra_store_32(b, (umbra_ptr){0, 0}, val);
+        backends B = make(b, 0);
+
+        enum { S = 32, TH = 16, L = 5, T = 3, R = 21, BT = 11 };
+        int32_t buf[S * TH];
+
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            __builtin_memset(buf, 0xff, sizeof buf);
+            if (!B.p[bi]) { continue; }
+            umbra_program_queue(B.p[bi], L, T, R, BT,
+                                (umbra_buf[]){{buf, sizeof buf, 0, S * 4}});
+            umbra_backend_flush(B.be[bi]);
+            for (int row = T; row < BT; row++) {
+                for (int col = L; col < R; col++) {
+                    (buf[row * S + col] == col + row * 1000) here;
+                }
+            }
+            for (int row = 0; row < TH; row++) {
+                for (int col = 0; col < S; col++) {
+                    if (row >= T && row < BT && col >= L && col < R) { continue; }
+                    (buf[row * S + col] == (int32_t)0xffffffff) here;
+                }
+            }
+        }
+        cleanup(&B);
+    }
+
+    // Regression test: load from strided buffer with arbitrary tile.
+    {
+        struct umbra_builder *b = umbra_builder();
+        umbra_val v   = umbra_load_32(b, (umbra_ptr){0, 0});
+        umbra_val one = umbra_imm_i32(b, 1);
+        umbra_store_32(b, (umbra_ptr){1, 0}, umbra_add_i32(b, v, one));
+        backends B = make(b, 0);
+
+        enum { S = 20, TH = 10, L = 3, T = 2, R = 15, BT = 7 };
+        int32_t src[S * TH], dst[S * TH];
+        for (int i = 0; i < S * TH; i++) { src[i] = i; }
+
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            __builtin_memset(dst, 0, sizeof dst);
+            if (!B.p[bi]) { continue; }
+            umbra_program_queue(B.p[bi], L, T, R, BT,
+                                (umbra_buf[]){{src, sizeof src, 1, S * 4},
+                                              {dst, sizeof dst, 0, S * 4}});
+            umbra_backend_flush(B.be[bi]);
+            for (int row = T; row < BT; row++) {
+                for (int col = L; col < R; col++) {
+                    int idx = row * S + col;
+                    (dst[idx] == src[idx] + 1) here;
+                }
+            }
+            for (int row = 0; row < TH; row++) {
+                for (int col = 0; col < S; col++) {
+                    if (row >= T && row < BT && col >= L && col < R) { continue; }
+                    (dst[row * S + col] == 0) here;
+                }
+            }
+        }
+        cleanup(&B);
+    }
+
     return 0;
 }
 

@@ -13,12 +13,15 @@ static inline uint oob_mask(int ix, uint bytes, int elem) {
 kernel void umbra_entry(
     constant uint &n [[buffer(0)]],
     constant uint &w [[buffer(4)]],
+    constant uint &stride [[buffer(5)]],
+    constant uint &x0 [[buffer(6)]],
+    constant uint &y0 [[buffer(7)]],
     device uchar *p0 [[buffer(1)]],
     device uchar *p1 [[buffer(2)]],
     constant uint *buf_szs [[buffer(3)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
-    uint i = pos.y * w + pos.x;
+    uint i = (y0 + pos.y) * stride + x0 + pos.x;
     if (i >= n) return;
     uint v0 = 0u;
     uint v1 = ((device const uint*)p0)[0];
@@ -34,12 +37,12 @@ kernel void umbra_entry(
     uint v11 = 998277249u;
     uint v12 = as_type<uint>(as_type<float>(v9) - as_type<float>(v4));
     uint v13 = 1132396544u;
-    uint v14 = pos.x;
+    uint v14 = x0 + pos.x;
     uint v15 = as_type<uint>((float)(int)v14);
     uint v16 = as_type<float>(v15) <  as_type<float>(v7) ? 0xffffffffu : 0u;
     uint v17 = as_type<float>(v5) <= as_type<float>(v15) ? 0xffffffffu : 0u;
     uint v18 = v17 & v16;
-    uint v19 = pos.y;
+    uint v19 = y0 + pos.y;
     uint v20 = as_type<uint>((float)(int)v19);
     uint v21 = as_type<float>(v20) <  as_type<float>(v8) ? 0xffffffffu : 0u;
     uint v22 = as_type<float>(v6) <= as_type<float>(v20) ? 0xffffffffu : 0u;

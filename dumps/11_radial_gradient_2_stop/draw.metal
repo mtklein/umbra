@@ -13,12 +13,15 @@ static inline uint oob_mask(int ix, uint bytes, int elem) {
 kernel void umbra_entry(
     constant uint &n [[buffer(0)]],
     constant uint &w [[buffer(4)]],
+    constant uint &stride [[buffer(5)]],
+    constant uint &x0 [[buffer(6)]],
+    constant uint &y0 [[buffer(7)]],
     device uchar *p0 [[buffer(1)]],
     device uchar *p1 [[buffer(2)]],
     constant uint *buf_szs [[buffer(3)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
-    uint i = pos.y * w + pos.x;
+    uint i = (y0 + pos.y) * stride + x0 + pos.x;
     if (i >= n) return;
     uint v0 = 0u;
     uint v1 = ((device const uint*)p0)[0];
@@ -39,10 +42,10 @@ kernel void umbra_entry(
     uint v16 = as_type<uint>(as_type<float>(v12) - as_type<float>(v8));
     uint v17 = 255u;
     uint v18 = 1132396544u;
-    uint v19 = pos.x;
+    uint v19 = x0 + pos.x;
     uint v20 = as_type<uint>((float)(int)v19);
     uint v21 = as_type<uint>(as_type<float>(v20) - as_type<float>(v1));
-    uint v22 = pos.y;
+    uint v22 = y0 + pos.y;
     uint v23 = as_type<uint>((float)(int)v22);
     uint v24 = as_type<uint>(as_type<float>(v23) - as_type<float>(v2));
     uint v25 = as_type<uint>(as_type<float>(v24) * as_type<float>(v24));
