@@ -2,7 +2,7 @@
 #include "../include/umbra.h"
 
 int dprintf(int, char const[], ...);
-#define here || (dprintf(1, "%s:%d failed\n", __FILE__, __LINE__), __builtin_trap(), 0)
+#define here ? (void)0 : (dprintf(1, "%s:%d failed\n", __FILE__, __LINE__), __builtin_trap())
 
 static inline _Bool equiv(float x, float y) {
     return (x <= y && y <= x) || (x != x && y != y);
@@ -23,9 +23,9 @@ static inline test_backends test_backends_make(struct umbra_basic_block const *b
     for (int i = 0; i < NUM_BACKENDS; i++) {
         B.p[i] = B.be[i] ? umbra_program(B.be[i], bb) : NULL;
     }
-    (B.p[0] != 0) here;
+    B.p[0] != 0 here;
 #if defined(__aarch64__) || defined(__AVX2__)
-    (B.p[1] != 0) here;
+    B.p[1] != 0 here;
 #endif
 #if (defined(__APPLE__) && defined(__clang__)) && !defined(__wasm__)
     B.p[2] != 0 here;

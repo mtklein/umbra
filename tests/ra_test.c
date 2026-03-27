@@ -64,16 +64,16 @@ static void test_basic_alloc_free(void) {
     int8_t r1 = ra_alloc(ra, sl, &ns);
     int8_t r2 = ra_alloc(ra, sl, &ns);
 
-    (r0 == 10) here;
-    (r1 == 11) here;
-    (r2 == 12) here;
-    (nspills == 0) here;
+    r0 == 10 here;
+    r1 == 11 here;
+    r2 == 12 here;
+    nspills == 0 here;
 
     ra_assign(ra, 1, r1);
     ra_free_reg(ra, 1);
     int8_t r3 = ra_alloc(ra, sl, &ns);
-    (r3 == r1) here;
-    (nspills == 0) here;
+    r3 == r1 here;
+    nspills == 0 here;
 
     ra_destroy(ra);
     free_bb(bb);
@@ -106,11 +106,11 @@ static void test_eviction_belady(void) {
 
     // evicts value 0 (farthest last_use=4)
     int8_t r2 = ra_alloc(ra, sl, &ns);
-    (nspills == 1) here;
-    (spills[0].reg == r0) here;
-    (r2 == r0) here;
-    (ra_reg(ra, 0) == -1) here;
-    (sl[0] >= 0) here;
+    nspills == 1 here;
+    spills[0].reg == r0 here;
+    r2 == r0 here;
+    ra_reg(ra, 0) == -1 here;
+    sl[0] >= 0 here;
 
     ra_destroy(ra);
     free_bb(bb);
@@ -143,10 +143,10 @@ static void test_dead_value_evicted_first(void) {
     ra_assign(ra, 1, r1);
 
     int8_t r2 = ra_alloc(ra, sl, &ns);
-    (nspills == 1) here;
-    (spills[0].reg == r0) here;
-    (r2 == r0) here;
-    (ra_reg(ra, 1) == r1) here;
+    nspills == 1 here;
+    spills[0].reg == r0 here;
+    r2 == r0 here;
+    ra_reg(ra, 1) == r1 here;
 
     ra_destroy(ra);
     free_bb(bb);
@@ -180,17 +180,17 @@ static void test_ensure_and_fill(void) {
 
     int8_t r2 = ra_alloc(ra, sl, &ns);
     ra_assign(ra, 2, r2);
-    (nspills == 1) here;
+    nspills == 1 here;
 
     int8_t r0b = ra_ensure(ra, sl, &ns, 0);
-    (nfills == 1) here;
-    (fills[0].slot == sl[0]) here;
-    (r0b >= 0) here;
-    (ra_reg(ra, 0) == r0b) here;
+    nfills == 1 here;
+    fills[0].slot == sl[0] here;
+    r0b >= 0 here;
+    ra_reg(ra, 0) == r0b here;
 
     int8_t r0c = ra_ensure(ra, sl, &ns, 0);
-    (r0c == r0b) here;
-    (nfills == 1) here;
+    r0c == r0b here;
+    nfills == 1 here;
 
     ra_destroy(ra);
     free_bb(bb);
@@ -217,10 +217,10 @@ static void test_claim(void) {
     ra_assign(ra, 0, r0);
 
     int8_t r1 = ra_claim(ra, 0, 1);
-    (r1 == r0) here;
-    (ra_reg(ra, 0) == -1) here;
-    (ra_reg(ra, 1) == r0) here;
-    (nspills == 0) here;
+    r1 == r0 here;
+    ra_reg(ra, 0) == -1 here;
+    ra_reg(ra, 1) == r0 here;
+    nspills == 0 here;
 
     ra_destroy(ra);
     free_bb(bb);
@@ -241,8 +241,8 @@ static void test_last_use_preamble(void) {
     struct umbra_basic_block *bb = make_bb(4, 2);
     struct ra                *ra = ra_create(bb, &cfg);
 
-    (ra_last_use(ra, 0) == 4) here;
-    (ra_last_use(ra, 1) == 4) here;
+    ra_last_use(ra, 0) == 4 here;
+    ra_last_use(ra, 1) == 4 here;
 
     ra_destroy(ra);
     free_bb(bb);
@@ -270,22 +270,22 @@ static void test_many_values_stress(void) {
 
     for (int i = 0; i < n; i++) {
         int8_t r = ra_alloc(ra, sl, &ns);
-        (r >= 0 && r < 4) here;
+        r >= 0 && r < 4 here;
         ra_assign(ra, i, r);
     }
 
-    (nspills == 17) here;
+    nspills == 17 here;
 
     int in_reg = 0;
     for (int i = 0; i < n; i++) {
         if (ra_reg(ra, i) >= 0) { in_reg++; }
     }
-    (in_reg == 3) here;
+    in_reg == 3 here;
 
     // ensure all: 17 spilled trigger fills
     reset_records();
     for (int i = 0; i < n; i++) { ra_ensure(ra, sl, &ns, i); }
-    (nfills > 0) here;
+    nfills > 0 here;
 
     ra_destroy(ra);
     free(sl);
@@ -310,14 +310,14 @@ static void test_step_alloc(void) {
     reset_records();
 
     struct ra_step s0 = ra_step_alloc(ra, sl, &ns, 0);
-    (s0.rd >= 0) here;
-    (ra_reg(ra, 0) == s0.rd) here;
+    s0.rd >= 0 here;
+    ra_reg(ra, 0) == s0.rd here;
 
     struct ra_step s1 = ra_step_alloc(ra, sl, &ns, 1);
-    (s1.rd >= 0) here;
-    (s1.rd != s0.rd) here;
-    (ra_reg(ra, 1) == s1.rd) here;
-    (nspills == 0) here;
+    s1.rd >= 0 here;
+    s1.rd != s0.rd here;
+    ra_reg(ra, 1) == s1.rd here;
+    nspills == 0 here;
 
     ra_destroy(ra);
     free_bb(bb);
@@ -355,11 +355,11 @@ static void test_step_unary(void) {
     // x dead at inst 1: claim x's register
     ra_set_last_use(ra, 0, 1);
     struct ra_step s = ra_step_unary(ra, sl, &ns, &bb->inst[1], 1, 0);
-    (s.rx == r0) here;
-    (s.rd == r0) here;
-    (ra_reg(ra, 1) == s.rd) here;
-    (ra_reg(ra, 0) == -1) here;
-    (nspills == 0) here;
+    s.rx == r0 here;
+    s.rd == r0 here;
+    ra_reg(ra, 1) == s.rd here;
+    ra_reg(ra, 0) == -1 here;
+    nspills == 0 here;
 
     ra_destroy(ra);
     free(bb->inst);
@@ -401,10 +401,10 @@ static void test_step_unary_alive(void) {
     // x still alive: rd must differ
     ra_set_last_use(ra, 0, 2);
     struct ra_step s = ra_step_unary(ra, sl, &ns, &bb->inst[1], 1, 0);
-    (s.rx == r0) here;
-    (s.rd != r0) here;
-    (ra_reg(ra, 0) == r0) here;
-    (ra_reg(ra, 1) == s.rd) here;
+    s.rx == r0 here;
+    s.rd != r0 here;
+    ra_reg(ra, 0) == r0 here;
+    ra_reg(ra, 1) == s.rd here;
 
     ra_destroy(ra);
     free(bb->inst);
@@ -449,11 +449,11 @@ static void test_step_alu(void) {
     ra_set_last_use(ra, 0, 2);
     ra_set_last_use(ra, 1, 2);
     struct ra_step s = ra_step_alu(ra, sl, &ns, &bb->inst[2], 2, 0, 0);
-    (s.rx == r0) here;
-    (s.ry == r1) here;
-    (s.rd >= 0) here;
-    (s.rd == r0 || s.rd == r1) here;
-    (s.scratch < 0) here;
+    s.rx == r0 here;
+    s.ry == r1 here;
+    s.rd >= 0 here;
+    s.rd == r0 || s.rd == r1 here;
+    s.scratch < 0 here;
 
     ra_destroy(ra);
     free(bb->inst);
@@ -497,11 +497,11 @@ static void test_step_alu_scratch(void) {
     ra_set_last_use(ra, 0, 2);
     ra_set_last_use(ra, 1, 2);
     struct ra_step s = ra_step_alu(ra, sl, &ns, &bb->inst[2], 2, 0, 1);
-    (s.rd >= 0) here;
-    (s.scratch >= 0) here;
-    (s.scratch != s.rd) here;
-    (s.scratch != s.rx) here;
-    (s.scratch != s.ry) here;
+    s.rd >= 0 here;
+    s.scratch >= 0 here;
+    s.scratch != s.rd here;
+    s.scratch != s.rx here;
+    s.scratch != s.ry here;
 
     ra_destroy(ra);
     free(bb->inst);

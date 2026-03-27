@@ -15,27 +15,27 @@ static void test_emit(void) {
     Buf b = {0};
     emit1(&b, 0xAB);
     emit4(&b, 0xDEADBEEF);
-    (b.len == 5) here;
-    (b.buf[0] == 0xAB) here;
-    (b.buf[1] == 0xEF) here;
-    (b.buf[2] == 0xBE) here;
-    (b.buf[3] == 0xAD) here;
-    (b.buf[4] == 0xDE) here;
+    b.len == 5 here;
+    b.buf[0] == 0xAB here;
+    b.buf[1] == 0xEF here;
+    b.buf[2] == 0xBE here;
+    b.buf[3] == 0xAD here;
+    b.buf[4] == 0xDE here;
     free(b.buf);
 }
 
 static void test_ret_vzeroupper_nop(void) {
     Buf b = {0};
     ret(&b);
-    (bytes_eq(&b, 1, (uint8_t[]){0xC3})) here;
+    bytes_eq(&b, 1, (uint8_t[]){0xC3}) here;
     reset(&b);
 
     vzeroupper(&b);
-    (bytes_eq(&b, 3, (uint8_t[]){0xC5, 0xF8, 0x77})) here;
+    bytes_eq(&b, 3, (uint8_t[]){0xC5, 0xF8, 0x77}) here;
     reset(&b);
 
     nop(&b);
-    (bytes_eq(&b, 1, (uint8_t[]){0x90})) here;
+    bytes_eq(&b, 1, (uint8_t[]){0x90}) here;
     free(b.buf);
 }
 
@@ -44,107 +44,107 @@ static void test_gpr(void) {
 
     // xorl %eax, %eax => 31 c0
     xor_rr(&b, RAX, RAX);
-    (bytes_eq(&b, 2, (uint8_t[]){0x31, 0xC0})) here;
+    bytes_eq(&b, 2, (uint8_t[]){0x31, 0xC0}) here;
     reset(&b);
 
     // xorl %r10d, %r10d => 45 31 d2
     xor_rr(&b, R10, R10);
-    (bytes_eq(&b, 3, (uint8_t[]){0x45, 0x31, 0xD2})) here;
+    bytes_eq(&b, 3, (uint8_t[]){0x45, 0x31, 0xD2}) here;
     reset(&b);
 
     // addq $8, %rdi => 48 83 c7 08
     add_ri(&b, RDI, 8);
-    (bytes_eq(&b, 4, (uint8_t[]){0x48, 0x83, 0xC7, 0x08})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0x48, 0x83, 0xC7, 0x08}) here;
     reset(&b);
 
     // addq $256, %rsi => 48 81 c6 00 01 00 00
     add_ri(&b, RSI, 256);
-    (bytes_eq(&b, 7, (uint8_t[]){0x48, 0x81, 0xC6, 0x00, 0x01, 0x00, 0x00})) here;
+    bytes_eq(&b, 7, (uint8_t[]){0x48, 0x81, 0xC6, 0x00, 0x01, 0x00, 0x00}) here;
     reset(&b);
 
     // subq $32, %r10 => 49 83 ea 20
     sub_ri(&b, R10, 32);
-    (bytes_eq(&b, 4, (uint8_t[]){0x49, 0x83, 0xEA, 0x20})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0x49, 0x83, 0xEA, 0x20}) here;
     reset(&b);
 
     // cmpq %rcx, %rdx => 48 39 ca
     cmp_rr(&b, RDX, RCX);
-    (bytes_eq(&b, 3, (uint8_t[]){0x48, 0x39, 0xCA})) here;
+    bytes_eq(&b, 3, (uint8_t[]){0x48, 0x39, 0xCA}) here;
     reset(&b);
 
     // cmpq $127, %r11 => 49 83 fb 7f
     cmp_ri(&b, R11, 127);
-    (bytes_eq(&b, 4, (uint8_t[]){0x49, 0x83, 0xFB, 0x7F})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0x49, 0x83, 0xFB, 0x7F}) here;
     reset(&b);
 
     // movq %rsp, %r12 => 49 89 e4
     mov_rr(&b, R12, RSP);
-    (bytes_eq(&b, 3, (uint8_t[]){0x49, 0x89, 0xE4})) here;
+    bytes_eq(&b, 3, (uint8_t[]){0x49, 0x89, 0xE4}) here;
     reset(&b);
 
     // subq $256, %rax => 48 81 e8 00 01 00 00
     sub_ri(&b, RAX, 256);
-    (bytes_eq(&b, 7, (uint8_t[]){0x48, 0x81, 0xE8, 0x00, 0x01, 0x00, 0x00})) here;
+    bytes_eq(&b, 7, (uint8_t[]){0x48, 0x81, 0xE8, 0x00, 0x01, 0x00, 0x00}) here;
     reset(&b);
 
     // cmpq $256, %rax => 48 81 f8 00 01 00 00
     cmp_ri(&b, RAX, 256);
-    (bytes_eq(&b, 7, (uint8_t[]){0x48, 0x81, 0xF8, 0x00, 0x01, 0x00, 0x00})) here;
+    bytes_eq(&b, 7, (uint8_t[]){0x48, 0x81, 0xF8, 0x00, 0x01, 0x00, 0x00}) here;
     reset(&b);
 
     // movq 256(%rdi), %rax => 48 8b 87 00 01 00 00
     mov_load(&b, RAX, RDI, 256);
-    (bytes_eq(&b, 7, (uint8_t[]){0x48, 0x8B, 0x87, 0x00, 0x01, 0x00, 0x00})) here;
+    bytes_eq(&b, 7, (uint8_t[]){0x48, 0x8B, 0x87, 0x00, 0x01, 0x00, 0x00}) here;
     reset(&b);
 
     // movq $42, %rax => 48 c7 c0 2a 00 00 00
     mov_ri(&b, RAX, 42);
-    (bytes_eq(&b, 7, (uint8_t[]){0x48, 0xC7, 0xC0, 0x2A, 0x00, 0x00, 0x00})) here;
+    bytes_eq(&b, 7, (uint8_t[]){0x48, 0xC7, 0xC0, 0x2A, 0x00, 0x00, 0x00}) here;
     reset(&b);
 
     // push %rax => 50
     push_r(&b, RAX);
-    (bytes_eq(&b, 1, (uint8_t[]){0x50})) here;
+    bytes_eq(&b, 1, (uint8_t[]){0x50}) here;
     reset(&b);
 
     // push %r12 => 41 54
     push_r(&b, R12);
-    (bytes_eq(&b, 2, (uint8_t[]){0x41, 0x54})) here;
+    bytes_eq(&b, 2, (uint8_t[]){0x41, 0x54}) here;
     reset(&b);
 
     // pop %rax => 58
     pop_r(&b, RAX);
-    (bytes_eq(&b, 1, (uint8_t[]){0x58})) here;
+    bytes_eq(&b, 1, (uint8_t[]){0x58}) here;
     reset(&b);
 
     // pop %r12 => 41 5c
     pop_r(&b, R12);
-    (bytes_eq(&b, 2, (uint8_t[]){0x41, 0x5C})) here;
+    bytes_eq(&b, 2, (uint8_t[]){0x41, 0x5C}) here;
     reset(&b);
 
     // rex.w prefix for rax,rdi => 48
     rex_w(&b, RAX, RDI);
-    (bytes_eq(&b, 1, (uint8_t[]){0x48})) here;
+    bytes_eq(&b, 1, (uint8_t[]){0x48}) here;
     reset(&b);
 
     // rex.w prefix for r10,r11 => 4d
     rex_w(&b, R10, R11);
-    (bytes_eq(&b, 1, (uint8_t[]){0x4D})) here;
+    bytes_eq(&b, 1, (uint8_t[]){0x4D}) here;
     reset(&b);
 
     // shrq $4, %rax => 48 c1 e8 04
     shr_ri(&b, RAX, 4);
-    (bytes_eq(&b, 4, (uint8_t[]){0x48, 0xC1, 0xE8, 0x04})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0x48, 0xC1, 0xE8, 0x04}) here;
     reset(&b);
 
     // shrq $1, %rax => 48 d1 e8
     shr_ri(&b, RAX, 1);
-    (bytes_eq(&b, 3, (uint8_t[]){0x48, 0xD1, 0xE8})) here;
+    bytes_eq(&b, 3, (uint8_t[]){0x48, 0xD1, 0xE8}) here;
     reset(&b);
 
     // testq %rcx, %rax => 48 85 c8
     test_rr(&b, RAX, RCX);
-    (bytes_eq(&b, 3, (uint8_t[]){0x48, 0x85, 0xC8})) here;
+    bytes_eq(&b, 3, (uint8_t[]){0x48, 0x85, 0xC8}) here;
     free(b.buf);
 }
 
@@ -153,62 +153,62 @@ static void test_avx_f32(void) {
 
     // vaddps %ymm4, %ymm3, %ymm2 => c5 e4 58 d4
     vaddps(&b, 2, 3, 4);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE4, 0x58, 0xD4})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE4, 0x58, 0xD4}) here;
     reset(&b);
 
     // vsubps %ymm5, %ymm6, %ymm7 => c5 cc 5c fd
     vsubps(&b, 7, 6, 5);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xCC, 0x5C, 0xFD})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xCC, 0x5C, 0xFD}) here;
     reset(&b);
 
     // vmulps %ymm4, %ymm3, %ymm2 => c5 e4 59 d4
     vmulps(&b, 2, 3, 4);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE4, 0x59, 0xD4})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE4, 0x59, 0xD4}) here;
     reset(&b);
 
     // vdivps %ymm4, %ymm3, %ymm2 => c5 e4 5e d4
     vdivps(&b, 2, 3, 4);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE4, 0x5E, 0xD4})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE4, 0x5E, 0xD4}) here;
     reset(&b);
 
     // vminps %ymm4, %ymm3, %ymm2 => c5 e4 5d d4
     vminps(&b, 2, 3, 4);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE4, 0x5D, 0xD4})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE4, 0x5D, 0xD4}) here;
     reset(&b);
 
     // vmaxps %ymm4, %ymm3, %ymm2 => c5 e4 5f d4
     vmaxps(&b, 2, 3, 4);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE4, 0x5F, 0xD4})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE4, 0x5F, 0xD4}) here;
     reset(&b);
 
     // vsqrtps %ymm3, %ymm2 => c5 fc 51 d3
     vsqrtps(&b, 2, 3);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xFC, 0x51, 0xD3})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xFC, 0x51, 0xD3}) here;
     reset(&b);
 
     // vcmpps %ymm4, %ymm3, %ymm2, $0 => c5 e4 c2 d4 00
     vcmpps(&b, 2, 3, 4, 0);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC5, 0xE4, 0xC2, 0xD4, 0x00})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC5, 0xE4, 0xC2, 0xD4, 0x00}) here;
     reset(&b);
 
     // vcvtdq2ps %ymm3, %ymm2 => c5 fc 5b d3
     vcvtdq2ps(&b, 2, 3);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xFC, 0x5B, 0xD3})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xFC, 0x5B, 0xD3}) here;
     reset(&b);
 
     // vcvtps2dq %ymm3, %ymm2 => c5 fd 5b d3
     vcvtps2dq(&b, 2, 3);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xFD, 0x5B, 0xD3})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xFD, 0x5B, 0xD3}) here;
     reset(&b);
 
     // vcvttps2dq %ymm3, %ymm2 => c5 fe 5b d3
     vcvttps2dq(&b, 2, 3);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xFE, 0x5B, 0xD3})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xFE, 0x5B, 0xD3}) here;
     reset(&b);
 
     // vroundps %ymm3, %ymm2, $8 => c4 e3 7d 08 d3 08
     vroundps(&b, 2, 3, 8);
-    (bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE3, 0x7D, 0x08, 0xD3, 0x08})) here;
+    bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE3, 0x7D, 0x08, 0xD3, 0x08}) here;
     free(b.buf);
 }
 
@@ -217,32 +217,32 @@ static void test_avx_fma(void) {
 
     // vfmadd132ps %ymm4, %ymm3, %ymm2 => c4 e2 65 98 d4
     vfmadd132ps(&b, 2, 3, 4);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0x98, 0xD4})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0x98, 0xD4}) here;
     reset(&b);
 
     // vfmadd213ps %ymm4, %ymm3, %ymm2 => c4 e2 65 a8 d4
     vfmadd213ps(&b, 2, 3, 4);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0xA8, 0xD4})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0xA8, 0xD4}) here;
     reset(&b);
 
     // vfmadd231ps %ymm4, %ymm3, %ymm2 => c4 e2 65 b8 d4
     vfmadd231ps(&b, 2, 3, 4);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0xB8, 0xD4})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0xB8, 0xD4}) here;
     reset(&b);
 
     // vfnmadd132ps %ymm7, %ymm6, %ymm5 => c4 e2 4d 9c fd
     vfnmadd132ps(&b, 7, 6, 5);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x4D, 0x9C, 0xFD})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x4D, 0x9C, 0xFD}) here;
     reset(&b);
 
     // vfnmadd213ps %ymm7, %ymm6, %ymm5 => c4 e2 4d ac fd
     vfnmadd213ps(&b, 7, 6, 5);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x4D, 0xAC, 0xFD})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x4D, 0xAC, 0xFD}) here;
     reset(&b);
 
     // vfnmadd231ps %ymm4, %ymm3, %ymm2 => c4 e2 65 bc d4
     vfnmadd231ps(&b, 2, 3, 4);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0xBC, 0xD4})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0xBC, 0xD4}) here;
     free(b.buf);
 }
 
@@ -251,47 +251,47 @@ static void test_avx_i32(void) {
 
     // vpaddd %ymm8, %ymm9, %ymm10 => c4 41 35 fe d0
     vpaddd(&b, 10, 9, 8);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC4, 0x41, 0x35, 0xFE, 0xD0})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0x41, 0x35, 0xFE, 0xD0}) here;
     reset(&b);
 
     // vpsubd %ymm4, %ymm3, %ymm2 => c5 e5 fa d4
     vpsubd(&b, 2, 3, 4);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE5, 0xFA, 0xD4})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE5, 0xFA, 0xD4}) here;
     reset(&b);
 
     // vpmulld %ymm4, %ymm3, %ymm2 => c4 e2 65 40 d4
     vpmulld(&b, 2, 3, 4);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0x40, 0xD4})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0x40, 0xD4}) here;
     reset(&b);
 
     // vpsllvd %ymm4, %ymm3, %ymm2 => c4 e2 65 47 d4
     vpsllvd(&b, 2, 3, 4);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0x47, 0xD4})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0x47, 0xD4}) here;
     reset(&b);
 
     // vpsrlvd %ymm4, %ymm3, %ymm2 => c4 e2 65 45 d4
     vpsrlvd(&b, 2, 3, 4);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0x45, 0xD4})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0x45, 0xD4}) here;
     reset(&b);
 
     // vpsravd %ymm4, %ymm3, %ymm2 => c4 e2 65 46 d4
     vpsravd(&b, 2, 3, 4);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0x46, 0xD4})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0x46, 0xD4}) here;
     reset(&b);
 
     // vpsrad $4, %ymm3, %ymm2 => c5 ed 72 e3 04
     vpsrad_i(&b, 2, 3, 4);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC5, 0xED, 0x72, 0xE3, 0x04})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC5, 0xED, 0x72, 0xE3, 0x04}) here;
     reset(&b);
 
     // vpminsd %ymm4, %ymm3, %ymm2 => c4 e2 65 39 d4
     vpminsd(&b, 2, 3, 4);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0x39, 0xD4})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0x39, 0xD4}) here;
     reset(&b);
 
     // vpmaxsd %ymm4, %ymm3, %ymm2 => c4 e2 65 3d d4
     vpmaxsd(&b, 2, 3, 4);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0x3D, 0xD4})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0x3D, 0xD4}) here;
     free(b.buf);
 }
 
@@ -300,27 +300,27 @@ static void test_avx_bitwise(void) {
 
     // vpxor %ymm3, %ymm3, %ymm3 => c5 e5 ef db
     vpxor(&b, 1, 3, 3, 3);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE5, 0xEF, 0xDB})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE5, 0xEF, 0xDB}) here;
     reset(&b);
 
     // vpand %ymm4, %ymm3, %ymm2 => c5 e5 db d4
     vpand(&b, 1, 2, 3, 4);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE5, 0xDB, 0xD4})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE5, 0xDB, 0xD4}) here;
     reset(&b);
 
     // vpor %ymm4, %ymm3, %ymm2 => c5 e5 eb d4
     vpor(&b, 1, 2, 3, 4);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE5, 0xEB, 0xD4})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE5, 0xEB, 0xD4}) here;
     reset(&b);
 
     // vpxor_3 %ymm4, %ymm3, %ymm2 => c5 e5 ef d4
     vpxor_3(&b, 1, 2, 3, 4);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE5, 0xEF, 0xD4})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE5, 0xEF, 0xD4}) here;
     reset(&b);
 
     // vpblendvb %ymm5, %ymm4, %ymm3, %ymm2 => c4 e3 65 4c d4 50
     vpblendvb(&b, 1, 2, 3, 4, 5);
-    (bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE3, 0x65, 0x4C, 0xD4, 0x50})) here;
+    bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE3, 0x65, 0x4C, 0xD4, 0x50}) here;
     free(b.buf);
 }
 
@@ -329,12 +329,12 @@ static void test_avx_cmp(void) {
 
     // vpcmpeqd %ymm4, %ymm4, %ymm4 => c5 dd 76 e4
     vpcmpeqd(&b, 4, 4, 4);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xDD, 0x76, 0xE4})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xDD, 0x76, 0xE4}) here;
     reset(&b);
 
     // vpcmpgtd %ymm4, %ymm3, %ymm2 => c5 e5 66 d4
     vpcmpgtd(&b, 2, 3, 4);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE5, 0x66, 0xD4})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE5, 0x66, 0xD4}) here;
     free(b.buf);
 }
 
@@ -343,12 +343,12 @@ static void test_avx_shift(void) {
 
     // vpsrld $4, %ymm3, %ymm2 => c5 ed 72 d3 04
     vpsrld_i(&b, 2, 3, 4);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC5, 0xED, 0x72, 0xD3, 0x04})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC5, 0xED, 0x72, 0xD3, 0x04}) here;
     reset(&b);
 
     // vpslld $8, %ymm5, %ymm4 => c5 dd 72 f5 08
     vpslld_i(&b, 4, 5, 8);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC5, 0xDD, 0x72, 0xF5, 0x08})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC5, 0xDD, 0x72, 0xF5, 0x08}) here;
     free(b.buf);
 }
 
@@ -357,22 +357,22 @@ static void test_avx_convert(void) {
 
     // vcvtph2ps %xmm3, %ymm2 => c4 e2 7d 13 d3
     vcvtph2ps(&b, 2, 3);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x7D, 0x13, 0xD3})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x7D, 0x13, 0xD3}) here;
     reset(&b);
 
     // vcvtps2ph $4, %ymm5, %xmm4 => c4 e3 7d 1d ec 04
     vcvtps2ph(&b, 4, 5, 4);
-    (bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE3, 0x7D, 0x1D, 0xEC, 0x04})) here;
+    bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE3, 0x7D, 0x1D, 0xEC, 0x04}) here;
     reset(&b);
 
     // vpmovzxwd %xmm6, %ymm7 => c4 e2 7d 33 fe
     vpmovzxwd(&b, 7, 6);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x7D, 0x33, 0xFE})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x7D, 0x33, 0xFE}) here;
     reset(&b);
 
     // vpmovsxwd %xmm8, %ymm9 => c4 42 7d 23 c8
     vpmovsxwd(&b, 9, 8);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC4, 0x42, 0x7D, 0x23, 0xC8})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0x42, 0x7D, 0x23, 0xC8}) here;
     free(b.buf);
 }
 
@@ -381,12 +381,12 @@ static void test_avx_extract(void) {
 
     // vextracti128 $1, %ymm7, %xmm6 => c4 e3 7d 39 fe 01
     vextracti128(&b, 6, 7, 1);
-    (bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE3, 0x7D, 0x39, 0xFE, 0x01})) here;
+    bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE3, 0x7D, 0x39, 0xFE, 0x01}) here;
     reset(&b);
 
     // vpextrd $1, %xmm3, %eax => c4 e3 79 16 d8 01
     vpextrd(&b, RAX, 3, 1);
-    (bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE3, 0x79, 0x16, 0xD8, 0x01})) here;
+    bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE3, 0x79, 0x16, 0xD8, 0x01}) here;
     free(b.buf);
 }
 
@@ -395,12 +395,12 @@ static void test_avx_mov(void) {
 
     // vmovaps %ymm3, %ymm4 => c5 fc 28 e3
     vmovaps(&b, 4, 3);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xFC, 0x28, 0xE3})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xFC, 0x28, 0xE3}) here;
     reset(&b);
 
     // vmov_store ymm3, [rdi+rcx*4+0] => c4 e1 7e 7f 1c 8f
     vmov_store(&b, 1, 3, RDI, RCX, 4, 0);
-    (bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE1, 0x7E, 0x7F, 0x1C, 0x8F})) here;
+    bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE1, 0x7E, 0x7F, 0x1C, 0x8F}) here;
     reset(&b);
 
     free(b.buf);
@@ -411,7 +411,7 @@ static void test_avx_broadcast(void) {
 
     // vbroadcastss %xmm0, %ymm2 => c4 e2 7d 18 d0
     vbroadcastss(&b, 2, 0);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x7D, 0x18, 0xD0})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x7D, 0x18, 0xD0}) here;
     free(b.buf);
 }
 
@@ -420,27 +420,27 @@ static void test_broadcast_imm32(void) {
 
     // Zero => vpxor ymm3,ymm3,ymm3 => c5 e5 ef db
     broadcast_imm32(&b, 3, 0);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE5, 0xEF, 0xDB})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE5, 0xEF, 0xDB}) here;
     reset(&b);
 
     // All ones => vpcmpeqd ymm4,ymm4,ymm4 => c5 dd 76 e4
     broadcast_imm32(&b, 4, 0xFFFFFFFF);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xDD, 0x76, 0xE4})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xDD, 0x76, 0xE4}) here;
     reset(&b);
 
     // Shift-right pattern: 0x7FFFFFFF => vpcmpeqd + vpsrld $1
     broadcast_imm32(&b, 5, 0x7FFFFFFF);
-    (b.len == 9) here;
+    b.len == 9 here;
     reset(&b);
 
     // Shift-left pattern: 0xFFFF0000 => vpcmpeqd + vpslld $16
     broadcast_imm32(&b, 6, 0xFFFF0000);
-    (b.len == 9) here;
+    b.len == 9 here;
     reset(&b);
 
     // General fallback: 0xDEADBEEF => mov eax + vmovd + vbroadcastss
     broadcast_imm32(&b, 7, 0xDEADBEEF);
-    (b.buf[0] == 0xB8) here;
+    b.buf[0] == 0xB8 here;
     free(b.buf);
 }
 
@@ -449,22 +449,22 @@ static void test_spill_fill(void) {
 
     // vspill ymm3 to slot 0: vmovdqu [rsp], ymm3 => c5 fe 7f 1c 24
     vspill(&b, 3, 0);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC5, 0xFE, 0x7F, 0x1C, 0x24})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC5, 0xFE, 0x7F, 0x1C, 0x24}) here;
     reset(&b);
 
     // vspill ymm3 to slot 1 (disp=32): c5 fe 7f 5c 24 20
     vspill(&b, 3, 1);
-    (bytes_eq(&b, 6, (uint8_t[]){0xC5, 0xFE, 0x7F, 0x5C, 0x24, 0x20})) here;
+    bytes_eq(&b, 6, (uint8_t[]){0xC5, 0xFE, 0x7F, 0x5C, 0x24, 0x20}) here;
     reset(&b);
 
     // vfill ymm3 from slot 0: vmovdqu ymm3, [rsp] => c5 fe 6f 1c 24
     vfill(&b, 3, 0);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC5, 0xFE, 0x6F, 0x1C, 0x24})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC5, 0xFE, 0x6F, 0x1C, 0x24}) here;
     reset(&b);
 
     // vfill ymm3 from slot 1 (disp=32): c5 fe 6f 5c 24 20
     vfill(&b, 3, 1);
-    (bytes_eq(&b, 6, (uint8_t[]){0xC5, 0xFE, 0x6F, 0x5C, 0x24, 0x20})) here;
+    bytes_eq(&b, 6, (uint8_t[]){0xC5, 0xFE, 0x6F, 0x5C, 0x24, 0x20}) here;
     free(b.buf);
 }
 
@@ -473,7 +473,7 @@ static void test_gather(void) {
 
     // vpgatherdd ymm2, [rdi+rcx*4], ymm5 => c4 e2 55 90 14 8f
     vpgatherdd(&b, 2, RDI, RCX, 4, 5);
-    (bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE2, 0x55, 0x90, 0x14, 0x8F})) here;
+    bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE2, 0x55, 0x90, 0x14, 0x8F}) here;
     free(b.buf);
 }
 
@@ -482,28 +482,28 @@ static void test_vex_helpers(void) {
 
     // vex 2-byte: pp=0,mm=1,W=0,L=1,d=2,v=3,s=4,op=0x58 (same as vaddps 2,3,4)
     vex(&b, 0, 1, 0, 1, 2, 3, 4, 0x58);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE4, 0x58, 0xD4})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE4, 0x58, 0xD4}) here;
     reset(&b);
 
     // vex 3-byte: pp=1,mm=2,W=0,L=1,d=2,v=3,s=4,op=0x98 (same as vfmadd132ps 2,3,4)
     vex(&b, 1, 2, 0, 1, 2, 3, 4, 0x98);
-    (bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0x98, 0xD4})) here;
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0x98, 0xD4}) here;
     reset(&b);
 
     // vex_rrr: pp=0,mm=1,L=1,op=0x58,d=2,v=3,s=4 => same as vaddps
     vex_rrr(&b, 0, 1, 1, 0x58, 2, 3, 4);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE4, 0x58, 0xD4})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE4, 0x58, 0xD4}) here;
     reset(&b);
 
     // vex_rr: pp=0,mm=1,L=1,op=0x51,d=2,s=3 => same as vsqrtps 2,3
     vex_rr(&b, 0, 1, 1, 0x51, 2, 3);
-    (bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xFC, 0x51, 0xD3})) here;
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xFC, 0x51, 0xD3}) here;
     reset(&b);
 
     // vex_mem: pp=2,mm=1,W=0,L=1,reg=3,v=0,op=0x6f,base=RDI,index=RCX,scale=4,disp=0
     // (same as vmov_load L=1,3,RDI,RCX,4,0)
     vex_mem(&b, 2, 1, 0, 1, 3, 0, 0x6f, RDI, RCX, 4, 0);
-    (bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE1, 0x7E, 0x6F, 0x1C, 0x8F})) here;
+    bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE1, 0x7E, 0x6F, 0x1C, 0x8F}) here;
     free(b.buf);
 }
 
@@ -512,8 +512,8 @@ static void test_large_disp(void) {
 
     // vmovdqu 256(%rdi,%r10,4), %ymm0
     vmov_load(&b, 1, 0, RDI, R10, 4, 256);
-    (b.buf[0] == 0xC4) here;
-    (b.len == 10) here;
+    b.buf[0] == 0xC4 here;
+    b.len == 10 here;
     free(b.buf);
 }
 
@@ -522,17 +522,17 @@ static void test_vex_2byte_vs_3byte(void) {
 
     // Low regs => 2-byte VEX (C5)
     vaddps(&b, 4, 3, 2);
-    (b.buf[0] == 0xC5) here;
+    b.buf[0] == 0xC5 here;
     reset(&b);
 
     // High reg in rm => 3-byte VEX (C4)
     vpaddd(&b, 10, 9, 8);
-    (b.buf[0] == 0xC4) here;
+    b.buf[0] == 0xC4 here;
     reset(&b);
 
     // mm==2 (0F38) always needs 3-byte VEX
     vcvtph2ps(&b, 2, 3);
-    (b.buf[0] == 0xC4) here;
+    b.buf[0] == 0xC4 here;
     free(b.buf);
 }
 

@@ -183,9 +183,9 @@ static void test_i32_ops(void) {
                          })) {
                     continue;
                 }
-                (z[0] == 11) here;
-                (z[1] == 22) here;
-                (z[2] == 33) here;
+                z[0] == 11 here;
+                z[1] == 22 here;
+                z[2] == 33 here;
             }
             cleanup(&B);
         }
@@ -203,9 +203,9 @@ static void test_i32_ops(void) {
                          })) {
                     continue;
                 }
-                (z[0] == 9) here;
-                (z[1] == 18) here;
-                (z[2] == 27) here;
+                z[0] == 9 here;
+                z[1] == 18 here;
+                z[2] == 27 here;
             }
             cleanup(&B);
         }
@@ -223,9 +223,9 @@ static void test_i32_ops(void) {
                          })) {
                     continue;
                 }
-                (z[0] == 10) here;
-                (z[1] == 18) here;
-                (z[2] == 28) here;
+                z[0] == 10 here;
+                z[1] == 18 here;
+                z[2] == 28 here;
             }
             cleanup(&B);
         }
@@ -243,9 +243,9 @@ static void test_i32_ops(void) {
                          })) {
                     continue;
                 }
-                (z[0] == 2) here;
-                (z[1] == 12) here;
-                (z[2] == 56) here;
+                z[0] == 2 here;
+                z[1] == 12 here;
+                z[2] == 56 here;
             }
             cleanup(&B);
         }
@@ -263,9 +263,9 @@ static void test_i32_ops(void) {
                          })) {
                     continue;
                 }
-                (z[0] == (int)(0xffffffffu >> 1)) here;
-                (z[1] == 4) here;
-                (z[2] == 8) here;
+                z[0] == (int)(0xffffffffu >> 1) here;
+                z[1] == 4 here;
+                z[2] == 8 here;
             }
             cleanup(&B);
         }
@@ -283,9 +283,9 @@ static void test_i32_ops(void) {
                          })) {
                     continue;
                 }
-                (z[0] == -4) here;
-                (z[1] == 4) here;
-                (z[2] == 8) here;
+                z[0] == -4 here;
+                z[1] == 4 here;
+                z[2] == 8 here;
             }
             cleanup(&B);
         }
@@ -303,8 +303,8 @@ static void test_i32_ops(void) {
                          })) {
                     continue;
                 }
-                (z[0] == 0x0f) here;
-                (z[1] == 0x0f) here;
+                z[0] == 0x0f here;
+                z[1] == 0x0f here;
             }
             cleanup(&B);
         }
@@ -322,8 +322,8 @@ static void test_i32_ops(void) {
                          })) {
                     continue;
                 }
-                (z[0] == 0xff) here;
-                (z[1] == 0xff) here;
+                z[0] == 0xff here;
+                z[1] == 0xff here;
             }
             cleanup(&B);
         }
@@ -341,8 +341,8 @@ static void test_i32_ops(void) {
                          })) {
                     continue;
                 }
-                (z[0] == 0xf0) here;
-                (z[1] == 0x00) here;
+                z[0] == 0xf0 here;
+                z[1] == 0x00 here;
             }
             cleanup(&B);
         }
@@ -368,9 +368,9 @@ static void test_i32_ops(void) {
                          })) {
                     continue;
                 }
-                (z[0] == 10) here;
-                (z[1] == 50) here;
-                (z[2] == 30) here;
+                z[0] == 10 here;
+                z[1] == 50 here;
+                z[2] == 30 here;
             }
             cleanup(&B);
         }
@@ -393,9 +393,9 @@ static void test_cmp_i32(void) {
                          })) {
                     continue;
                 }
-                (z[0] == -1) here;
-                (z[1] == 0) here;
-                (z[2] == -1) here;
+                z[0] == -1 here;
+                z[1] == 0 here;
+                z[2] == -1 here;
             }
             cleanup(&B);
         }
@@ -413,8 +413,8 @@ static void test_cmp_i32(void) {
                          })) {
                     continue;
                 }
-                (z[0] == 0) here;
-                (z[1] == -1) here;
+                z[0] == 0 here;
+                z[1] == -1 here;
             }
             cleanup(&B);
         }
@@ -432,9 +432,9 @@ static void test_cmp_i32(void) {
                          })) {
                     continue;
                 }
-                (z[0] == -1) here;
-                (z[1] == 0) here;
-                (z[2] == 0) here;
+                z[0] == -1 here;
+                z[1] == 0 here;
+                z[2] == 0 here;
             }
             cleanup(&B);
         }
@@ -452,9 +452,9 @@ static void test_cmp_i32(void) {
                          })) {
                     continue;
                 }
-                (z[0] == -1) here;
-                (z[1] == -1) here;
-                (z[2] == 0) here;
+                z[0] == -1 here;
+                z[1] == -1 here;
+                z[2] == 0 here;
             }
             cleanup(&B);
         }
@@ -472,9 +472,9 @@ static void test_cmp_i32(void) {
                          })) {
                     continue;
                 }
-                (z[0] == -1) here;
-                (z[1] == 0) here;
-                (z[2] == 0) here;
+                z[0] == -1 here;
+                z[1] == 0 here;
+                z[2] == 0 here;
             }
             cleanup(&B);
         }
@@ -492,9 +492,9 @@ static void test_cmp_i32(void) {
                          })) {
                     continue;
                 }
-                (z[0] == -1) here;
-                (z[1] == -1) here;
-                (z[2] == 0) here;
+                z[0] == -1 here;
+                z[1] == -1 here;
+                z[2] == 0 here;
             }
             cleanup(&B);
         }
@@ -512,8 +512,8 @@ static void test_cmp_i32(void) {
                          })) {
                     continue;
                 }
-                (z[0] == -1) here;
-                (z[1] == 0) here;
+                z[0] == -1 here;
+                z[1] == 0 here;
             }
             cleanup(&B);
         }
@@ -531,9 +531,9 @@ static void test_cmp_i32(void) {
                          })) {
                     continue;
                 }
-                (z[0] == -1) here;
-                (z[1] == -1) here;
-                (z[2] == 0) here;
+                z[0] == -1 here;
+                z[1] == -1 here;
+                z[2] == 0 here;
             }
             cleanup(&B);
         }
@@ -551,9 +551,9 @@ static void test_cmp_i32(void) {
                          })) {
                     continue;
                 }
-                (z[0] == -1) here;
-                (z[1] == -1) here;
-                (z[2] == 0) here;
+                z[0] == -1 here;
+                z[1] == -1 here;
+                z[2] == 0 here;
             }
             cleanup(&B);
         }
@@ -571,9 +571,9 @@ static void test_cmp_i32(void) {
                          })) {
                     continue;
                 }
-                (z[0] == -1) here;
-                (z[1] == -1) here;
-                (z[2] == 0) here;
+                z[0] == -1 here;
+                z[1] == -1 here;
+                z[2] == 0 here;
             }
             cleanup(&B);
         }
@@ -597,9 +597,9 @@ static void test_cmp_f32(void) {
                          })) {
                     continue;
                 }
-                (z[0] == -1) here;
-                (z[1] == 0) here;
-                (z[2] == -1) here;
+                z[0] == -1 here;
+                z[1] == 0 here;
+                z[2] == -1 here;
             }
             cleanup(&B);
         }
@@ -618,8 +618,8 @@ static void test_cmp_f32(void) {
                          })) {
                     continue;
                 }
-                (z[0] == 0) here;
-                (z[1] == -1) here;
+                z[0] == 0 here;
+                z[1] == -1 here;
             }
             cleanup(&B);
         }
@@ -638,9 +638,9 @@ static void test_cmp_f32(void) {
                          })) {
                     continue;
                 }
-                (z[0] == -1) here;
-                (z[1] == 0) here;
-                (z[2] == 0) here;
+                z[0] == -1 here;
+                z[1] == 0 here;
+                z[2] == 0 here;
             }
             cleanup(&B);
         }
@@ -659,9 +659,9 @@ static void test_cmp_f32(void) {
                          })) {
                     continue;
                 }
-                (z[0] == -1) here;
-                (z[1] == -1) here;
-                (z[2] == 0) here;
+                z[0] == -1 here;
+                z[1] == -1 here;
+                z[2] == 0 here;
             }
             cleanup(&B);
         }
@@ -680,9 +680,9 @@ static void test_cmp_f32(void) {
                          })) {
                     continue;
                 }
-                (z[0] == -1) here;
-                (z[1] == 0) here;
-                (z[2] == 0) here;
+                z[0] == -1 here;
+                z[1] == 0 here;
+                z[2] == 0 here;
             }
             cleanup(&B);
         }
@@ -701,9 +701,9 @@ static void test_cmp_f32(void) {
                          })) {
                     continue;
                 }
-                (z[0] == -1) here;
-                (z[1] == -1) here;
-                (z[2] == 0) here;
+                z[0] == -1 here;
+                z[1] == -1 here;
+                z[2] == 0 here;
             }
             cleanup(&B);
         }
@@ -725,9 +725,9 @@ static void test_imm(void) {
                          })) {
                     continue;
                 }
-                (z[0] == 42) here;
-                (z[1] == 42) here;
-                (z[2] == 42) here;
+                z[0] == 42 here;
+                z[1] == 42 here;
+                z[2] == 42 here;
             }
             cleanup(&B);
         }
@@ -921,10 +921,10 @@ static void test_round_floor_ceil(void) {
                 continue;                                                   \
             }                                                               \
             if (as_int) {                                                   \
-                (d_[0] == (int)(e0)) here;                                  \
-                (d_[1] == (int)(e1)) here;                                  \
-                (d_[2] == (int)(e2)) here;                                  \
-                (d_[3] == (int)(e3)) here;                                  \
+                d_[0] == (int)(e0) here;                                  \
+                d_[1] == (int)(e1) here;                                  \
+                d_[2] == (int)(e2) here;                                  \
+                d_[3] == (int)(e3) here;                                  \
             } else {                                                        \
                 float g0, g1, g2, g3;                                       \
                 __builtin_memcpy(&g0, d_ + 0, 4);                           \
@@ -1013,9 +1013,9 @@ static void test_convert(void) {
                          })) {
                     continue;
                 }
-                (z[0] == 1) here;
-                (z[1] == 255) here;
-                (z[2] == -3) here;
+                z[0] == 1 here;
+                z[1] == 255 here;
+                z[2] == -3 here;
             }
             cleanup(&B);
         }
@@ -1025,12 +1025,12 @@ static void test_convert(void) {
 static void test_dedup(void) {
     struct umbra_builder *builder = umbra_builder();
     umbra_val v1 = umbra_imm_i32(builder, 42), v2 = umbra_imm_i32(builder, 42);
-    (v1.id == v2.id) here;
+    v1.id == v2.id here;
     umbra_val c = umbra_imm_i32(builder, 99);
-    (v1.id != c.id) here;
+    v1.id != c.id here;
     umbra_val x = umbra_load_32(builder, (umbra_ptr){0, 0}),
               s1 = umbra_add_i32(builder, x, v1), s2 = umbra_add_i32(builder, x, v1);
-    (s1.id == s2.id) here;
+    s1.id == s2.id here;
     umbra_builder_free(builder);
 }
 
@@ -1050,9 +1050,9 @@ static void test_constprop(void) {
                          })) {
                     continue;
                 }
-                (z[0] == 8) here;
-                (z[1] == 8) here;
-                (z[2] == 8) here;
+                z[0] == 8 here;
+                z[1] == 8 here;
+                z[2] == 8 here;
             }
             cleanup(&B);
         }
@@ -1084,14 +1084,14 @@ static void test_strength_reduction(void) {
         struct umbra_builder *builder = umbra_builder();
         umbra_val             x = umbra_load_32(builder, (umbra_ptr){0, 0}),
                   z = umbra_imm_i32(builder, 0), s = umbra_add_i32(builder, x, z);
-        (s.id == x.id) here;
+        s.id == x.id here;
         umbra_builder_free(builder);
     }
     {
         struct umbra_builder *builder = umbra_builder();
         umbra_val             x = umbra_load_32(builder, (umbra_ptr){0, 0}),
                   one = umbra_imm_i32(builder, 1), s = umbra_mul_i32(builder, x, one);
-        (s.id == x.id) here;
+        s.id == x.id here;
         umbra_builder_free(builder);
     }
     for (int opt = 0; opt < 2; opt++) {
@@ -1141,7 +1141,7 @@ static void test_zero_imm(void) {
     for (int opt = 0; opt < 2; opt++) {
         struct umbra_builder *builder = umbra_builder();
         umbra_val             zero = umbra_imm_i32(builder, 0);
-        (zero.id == 0) here;
+        zero.id == 0 here;
         umbra_val             x = umbra_load_32(builder, (umbra_ptr){0, 0}),
                   r = umbra_eq_i32(builder, x, zero);
         umbra_store_32(builder, (umbra_ptr){1, 0}, r);
@@ -1155,9 +1155,9 @@ static void test_zero_imm(void) {
                      })) {
                 continue;
             }
-            (z[0] == -1) here;
-            (z[1] == 0) here;
-            (z[2] == -1) here;
+            z[0] == -1 here;
+            z[1] == 0 here;
+            z[2] == -1 here;
         }
         cleanup(&B);
     }
@@ -1168,16 +1168,16 @@ static void test_late_imm_identity(void) {
     umbra_val             x = umbra_load_32(b, (umbra_ptr){0, 0});
     umbra_val             z1 = umbra_imm_i32(b, 1);
     umbra_val             zm = umbra_imm_i32(b, -1);
-    (z1.id > x.id) here;
-    (zm.id > x.id) here;
+    z1.id > x.id here;
+    zm.id > x.id here;
 
-    (umbra_mul_i32(b, x, z1).id == x.id) here;
-    (umbra_and_i32(b, x, zm).id == x.id) here;
-    (umbra_or_i32(b, x, zm).id == zm.id) here;
-    (umbra_sel_i32(b, zm, x, z1).id == x.id) here;
-    (umbra_eq_i32(b, x, x).id == umbra_imm_i32(b, -1).id) here;
-    (umbra_div_f32(b, x, umbra_imm_f32(b, 1.0f)).id == x.id) here;
-    (umbra_sub_f32(b, x, umbra_imm_f32(b, 0.0f)).id == x.id) here;
+    umbra_mul_i32(b, x, z1).id == x.id here;
+    umbra_and_i32(b, x, zm).id == x.id here;
+    umbra_or_i32(b, x, zm).id == zm.id here;
+    umbra_sel_i32(b, zm, x, z1).id == x.id here;
+    umbra_eq_i32(b, x, x).id == umbra_imm_i32(b, -1).id here;
+    umbra_div_f32(b, x, umbra_imm_f32(b, 1.0f)).id == x.id here;
+    umbra_sub_f32(b, x, umbra_imm_f32(b, 0.0f)).id == x.id here;
     umbra_builder_free(b);
 }
 
@@ -1189,19 +1189,19 @@ static void test_abs_peepholes(void) {
         umbra_val             neg_x = umbra_neg_f32(b, x);
         umbra_val             mask = umbra_imm_i32(b, 0x7fffffff);
 
-        (umbra_max_f32(b, x, neg_x).id == direct.id) here;
-        (umbra_max_f32(b, neg_x, x).id == direct.id) here;
-        (umbra_and_i32(b, x, mask).id == direct.id) here;
-        (umbra_and_i32(b, mask, x).id == direct.id) here;
+        umbra_max_f32(b, x, neg_x).id == direct.id here;
+        umbra_max_f32(b, neg_x, x).id == direct.id here;
+        umbra_and_i32(b, x, mask).id == direct.id here;
+        umbra_and_i32(b, mask, x).id == direct.id here;
         umbra_builder_free(b);
     }
     {
         struct umbra_builder *b = umbra_builder();
         umbra_val             mask = umbra_imm_i32(b, 0x7fffffff);
         umbra_val             x = umbra_load_32(b, (umbra_ptr){0, 0});
-        (mask.id < x.id) here;
+        mask.id < x.id here;
         umbra_val direct = umbra_abs_f32(b, x);
-        (umbra_and_i32(b, x, mask).id == direct.id) here;
+        umbra_and_i32(b, x, mask).id == direct.id here;
         umbra_builder_free(b);
     }
 }
@@ -1242,18 +1242,18 @@ static void test_load_8x4(void) {
                      })) {
                 continue;
             }
-            (rr[0] == 0xDD) here;
-            (gg[0] == 0xCC) here;
-            (b_[0] == 0xBB) here;
-            (aa[0] == 0xAA) here;
-            (rr[1] == 0x44) here;
-            (gg[1] == 0x33) here;
-            (b_[1] == 0x22) here;
-            (aa[1] == 0x11) here;
-            (rr[2] == 0x00) here;
-            (gg[2] == 0xFF) here;
-            (b_[2] == 0x00) here;
-            (aa[2] == 0xFF) here;
+            rr[0] == 0xDD here;
+            gg[0] == 0xCC here;
+            b_[0] == 0xBB here;
+            aa[0] == 0xAA here;
+            rr[1] == 0x44 here;
+            gg[1] == 0x33 here;
+            b_[1] == 0x22 here;
+            aa[1] == 0x11 here;
+            rr[2] == 0x00 here;
+            gg[2] == 0xFF here;
+            b_[2] == 0x00 here;
+            aa[2] == 0xFF here;
         }
         cleanup(&B);
     }
@@ -1294,9 +1294,9 @@ static void test_store_8x4(void) {
                      })) {
                 continue;
             }
-            (dst[0] == 0xAABBCCDDu) here;
-            (dst[1] == 0x11223344u) here;
-            (dst[2] == 0xFF00FF00u) here;
+            dst[0] == 0xAABBCCDDu here;
+            dst[1] == 0x11223344u here;
+            dst[2] == 0xFF00FF00u here;
         }
         cleanup(&B);
     }
@@ -1325,7 +1325,7 @@ static void test_srcover(void) {
                      })) {
                 continue;
             }
-            ((float)dst_r[0] > 0.28f - tol && (float)dst_r[0] < 0.34f + tol) here;
+            (float)dst_r[0] > 0.28f - tol && (float)dst_r[0] < 0.34f + tol here;
         }
         cleanup(&B);
     }
@@ -1343,7 +1343,7 @@ static void test_hash_quality(void) {
         umbra_val c = umbra_imm_i32(builder, i);
         umbra_val sum = umbra_add_i32(builder, x, c);
         umbra_val sum2 = umbra_add_i32(builder, x, c);
-        (sum.id == sum2.id) here;
+        sum.id == sum2.id here;
     }
     umbra_builder_free(builder);
 }
@@ -1363,9 +1363,9 @@ static void test_narrow_16(void) {
                  })) {
             continue;
         }
-        (dst[0] == 0x0002) here;
-        (dst[1] == 0x0004) here;
-        (dst[2] == 0x0006) here;
+        dst[0] == 0x0002 here;
+        dst[1] == 0x0004 here;
+        dst[2] == 0x0006 here;
     }
     cleanup(&B);
 }
@@ -1388,9 +1388,9 @@ static void test_mixed_ptr_sizes(void) {
                          })) {
                     continue;
                 }
-                (y[0] == 11) here;
-                (y[1] == 21) here;
-                (y[2] == 31) here;
+                y[0] == 11 here;
+                y[1] == 21 here;
+                y[2] == 31 here;
             }
             cleanup(&B);
         }
@@ -1571,10 +1571,10 @@ static void test_gather_clamp(void) {
                          })) {
                     continue;
                 }
-                (dst[0] == 0) here;
-                (dst[1] == 10) here;
-                (dst[2] == 30) here;
-                (dst[3] == 0) here;
+                dst[0] == 0 here;
+                dst[1] == 10 here;
+                dst[2] == 30 here;
+                dst[3] == 0 here;
             }
             cleanup(&B);
         }
@@ -1597,10 +1597,10 @@ static void test_gather_clamp(void) {
                          })) {
                     continue;
                 }
-                (dst[0] == 0) here;
-                (dst[1] == 200) here;
-                (dst[2] == 0) here;
-                (dst[3] == 0) here;
+                dst[0] == 0 here;
+                dst[1] == 200 here;
+                dst[2] == 0 here;
+                dst[3] == 0 here;
             }
             cleanup(&B);
         }
@@ -1623,7 +1623,7 @@ static void test_gather_clamp_zero_sz(void) {
             {src, sizeof src, 0, 0},
             {dst, 4, 0, 0},
         })) { continue; }
-        (dst[0] == 0) here;
+        dst[0] == 0 here;
     }
 
     // gather_uniform with over-range index → OOB returns 0.
@@ -1636,7 +1636,7 @@ static void test_gather_clamp_zero_sz(void) {
             {src, sizeof src, 0, 0},
             {dst, 4, 0, 0},
         })) { continue; }
-        (dst[0] == 0) here;
+        dst[0] == 0 here;
     }
     cleanup(&B);
 }
@@ -1751,10 +1751,10 @@ static void test_shift_imm(void) {
                          })) {
                     continue;
                 }
-                (dst[0] == 0x100u) here;
-                (dst[1] == 0x200u) here;
-                (dst[2] == 0x300u) here;
-                (dst[3] == 0xff00u) here;
+                dst[0] == 0x100u here;
+                dst[1] == 0x200u here;
+                dst[2] == 0x300u here;
+                dst[3] == 0xff00u here;
             }
             cleanup(&B);
         }
@@ -1774,9 +1774,9 @@ static void test_shift_imm(void) {
                          })) {
                     continue;
                 }
-                (dst[0] == 1) here;
-                (dst[1] == 2) here;
-                (dst[2] == 0xff) here;
+                dst[0] == 1 here;
+                dst[1] == 2 here;
+                dst[2] == 0xff here;
             }
             cleanup(&B);
         }
@@ -1796,8 +1796,8 @@ static void test_shift_imm(void) {
                          })) {
                     continue;
                 }
-                (dst[0] == 8) here;
-                (dst[1] == 0xffffffffu) here;
+                dst[0] == 8 here;
+                dst[1] == 0xffffffffu here;
             }
             cleanup(&B);
         }
@@ -1834,9 +1834,9 @@ static void test_pack_channels(void) {
                      })) {
                 continue;
             }
-            (dst[0] == 0xDDCCBBAAu) here;
-            (dst[1] == 0x44332211u) here;
-            (dst[2] == 0x00FF00FFu) here;
+            dst[0] == 0xDDCCBBAAu here;
+            dst[1] == 0x44332211u here;
+            dst[2] == 0x00FF00FFu here;
         }
         cleanup(&B);
     }
@@ -1880,10 +1880,10 @@ static void test_gather_deref_large(void) {
                  })) {
             continue;
         }
-        (dst[0] == 10) here;
-        (dst[1] == 20) here;
-        (dst[2] == 30) here;
-        (dst[3] == 42) here;
+        dst[0] == 10 here;
+        dst[1] == 20 here;
+        dst[2] == 30 here;
+        dst[3] == 42 here;
     }
 
     free(data);
@@ -1927,9 +1927,9 @@ static void test_imm_fused(void) {
                      })) {
                 continue;
             }
-            (dst[0] == 5) here;
-            (dst[1] == 15) here;
-            (dst[2] == 25) here;
+            dst[0] == 5 here;
+            dst[1] == 15 here;
+            dst[2] == 25 here;
         }
         cleanup(&B);
     }
@@ -1948,9 +1948,9 @@ static void test_imm_fused(void) {
                      })) {
                 continue;
             }
-            (dst[0] == 0xff) here;
-            (dst[1] == 0xf0) here;
-            (dst[2] == 0xff) here;
+            dst[0] == 0xff here;
+            dst[1] == 0xf0 here;
+            dst[2] == 0xff here;
         }
         cleanup(&B);
     }
@@ -1970,9 +1970,9 @@ static void test_imm_fused(void) {
                      })) {
                 continue;
             }
-            (dst[0] == 0) here;
-            (dst[1] == -1) here;
-            (dst[2] == 0) here;
+            dst[0] == 0 here;
+            dst[1] == -1 here;
+            dst[2] == 0 here;
         }
         cleanup(&B);
     }
@@ -1992,9 +1992,9 @@ static void test_imm_fused(void) {
                      })) {
                 continue;
             }
-            (dst[0] == -1) here;
-            (dst[1] == -1) here;
-            (dst[2] == 0) here;
+            dst[0] == -1 here;
+            dst[1] == -1 here;
+            dst[2] == 0 here;
         }
         cleanup(&B);
     }
@@ -2013,9 +2013,9 @@ static void test_imm_fused(void) {
                      })) {
                 continue;
             }
-            (dst[0] == -1) here;
-            (dst[1] == 0) here;
-            (dst[2] == 0) here;
+            dst[0] == -1 here;
+            dst[1] == 0 here;
+            dst[2] == 0 here;
         }
         cleanup(&B);
     }
@@ -2034,9 +2034,9 @@ static void test_imm_fused(void) {
                      })) {
                 continue;
             }
-            (dst[0] == -1) here;
-            (dst[1] == -1) here;
-            (dst[2] == 0) here;
+            dst[0] == -1 here;
+            dst[1] == -1 here;
+            dst[2] == 0 here;
         }
         cleanup(&B);
     }
@@ -2058,9 +2058,9 @@ static void test_cmp_zero(void) {
                      })) {
                 continue;
             }
-            (dst[0] == -1) here;
-            (dst[1] == 0) here;
-            (dst[2] == 0) here;
+            dst[0] == -1 here;
+            dst[1] == 0 here;
+            dst[2] == 0 here;
         }
         cleanup(&B);
     }
@@ -2080,9 +2080,9 @@ static void test_cmp_zero(void) {
                      })) {
                 continue;
             }
-            (dst[0] == -1) here;
-            (dst[1] == -1) here;
-            (dst[2] == 0) here;
+            dst[0] == -1 here;
+            dst[1] == -1 here;
+            dst[2] == 0 here;
         }
         cleanup(&B);
     }
@@ -2102,9 +2102,9 @@ static void test_cmp_zero(void) {
                      })) {
                 continue;
             }
-            (dst[0] == 0) here;
-            (dst[1] == -1) here;
-            (dst[2] == 0) here;
+            dst[0] == 0 here;
+            dst[1] == -1 here;
+            dst[2] == 0 here;
         }
         cleanup(&B);
     }
@@ -2123,9 +2123,9 @@ static void test_cmp_zero(void) {
                      })) {
                 continue;
             }
-            (dst[0] == -1) here;
-            (dst[1] == -1) here;
-            (dst[2] == 0) here;
+            dst[0] == -1 here;
+            dst[1] == -1 here;
+            dst[2] == 0 here;
         }
         cleanup(&B);
     }
@@ -2149,9 +2149,9 @@ static void test_imm_broadcast(void) {
                      })) {
                 continue;
             }
-            (dst[0] == patterns[pi]) here;
-            (dst[1] == patterns[pi]) here;
-            (dst[2] == patterns[pi]) here;
+            dst[0] == patterns[pi] here;
+            dst[1] == patterns[pi] here;
+            dst[2] == patterns[pi] here;
         }
         cleanup(&B);
     }
@@ -2235,8 +2235,8 @@ static void test_codegen_regalloc(void) {
                      })) {
                 continue;
             }
-            (dst[0] == 10 + (-1) + 10) here;
-            (dst[1] == 40 + 0 + 20) here;
+            dst[0] == 10 + (-1) + 10 here;
+            dst[1] == 40 + 0 + 20 here;
         }
         cleanup(&B);
     }
@@ -2262,10 +2262,10 @@ static void test_codegen_regalloc(void) {
                      })) {
                 continue;
             }
-            (dst[0] == (0x0F | (0x0A << 8))) here;
-            (dst[1] == (0xFF | (0x0B << 8))) here;
-            (dst2[0] == 0x10) here;
-            (dst2[1] == 0x100) here;
+            dst[0] == (0x0F | (0x0A << 8)) here;
+            dst[1] == (0xFF | (0x0B << 8)) here;
+            dst2[0] == 0x10 here;
+            dst2[1] == 0x100 here;
         }
         cleanup(&B);
     }
@@ -2317,9 +2317,9 @@ static void test_movi_patterns(void) {
                      })) {
                 continue;
             }
-            (dst[0] == patterns[pi]) here;
-            (dst[1] == patterns[pi]) here;
-            (dst[2] == patterns[pi]) here;
+            dst[0] == patterns[pi] here;
+            dst[1] == patterns[pi] here;
+            dst[2] == patterns[pi] here;
         }
         cleanup(&B);
     }
@@ -2342,9 +2342,9 @@ static void test_mixed_ptr(void) {
                  })) {
             continue;
         }
-        (dst[0] == (int)(0x00010002 + 0x0002)) here;
-        (dst[1] == (int)(0x00030004 + 0x0001)) here;
-        (dst[2] == (int)(0x00050006 + 0x0004)) here;
+        dst[0] == (int)(0x00010002 + 0x0002) here;
+        dst[1] == (int)(0x00030004 + 0x0001) here;
+        dst[2] == (int)(0x00050006 + 0x0004) here;
     }
     cleanup(&B);
 }
@@ -2365,9 +2365,9 @@ static void test_uni_16(void) {
                      })) {
                 continue;
             }
-            (dst[0] == 300) here;
-            (dst[1] == 300) here;
-            (dst[2] == 300) here;
+            dst[0] == 300 here;
+            dst[1] == 300 here;
+            dst[2] == 300 here;
         }
         cleanup(&B);
     }
@@ -2389,9 +2389,9 @@ static void test_uni_16(void) {
                      })) {
                 continue;
             }
-            (dst[0] == 200) here;
-            (dst[1] == 200) here;
-            (dst[2] == 200) here;
+            dst[0] == 200 here;
+            dst[1] == 200 here;
+            dst[2] == 200 here;
         }
         cleanup(&B);
     }
@@ -2437,8 +2437,8 @@ static void test_xy(void) {
             continue;
         }
         for (int j = 0; j < N; j++) {
-            (xbuf[j] == j % W) here;
-            (ybuf[j] == j / W) here;
+            xbuf[j] == j % W here;
+            ybuf[j] == j / W here;
         }
     }
     cleanup(&B);
@@ -2601,20 +2601,20 @@ static void test_jit_xs_init(void) {
 
 static void test_backend_threadsafe(void) {
     struct umbra_backend *interp = umbra_backend_interp();
-    (umbra_backend_threadsafe(interp) == 1) here;
+    umbra_backend_threadsafe(interp) == 1 here;
     umbra_backend_free(interp);
 
     struct umbra_backend *jit = umbra_backend_jit();
-    (umbra_backend_threadsafe(jit) == 1) here;
+    umbra_backend_threadsafe(jit) == 1 here;
     umbra_backend_free(jit);
 
     struct umbra_backend *metal = umbra_backend_metal();
     if (metal) {
-        (umbra_backend_threadsafe(metal) == 0) here;
+        umbra_backend_threadsafe(metal) == 0 here;
         umbra_backend_free(metal);
     }
 
-    (umbra_backend_threadsafe(NULL) == 0) here;
+    umbra_backend_threadsafe(NULL) == 0 here;
 }
 
 static void test_program_null_guards(void) {
@@ -2717,13 +2717,13 @@ int main(void) {
             umbra_backend_flush(B.be[bi]);
             for (int row = T; row < BT; row++) {
                 for (int col = L; col < R; col++) {
-                    (buf[row * S + col] == col + row * 1000) here;
+                    buf[row * S + col] == col + row * 1000 here;
                 }
             }
             for (int row = 0; row < TH; row++) {
                 for (int col = 0; col < S; col++) {
                     if (row >= T && row < BT && col >= L && col < R) { continue; }
-                    (buf[row * S + col] == (int32_t)0xffffffff) here;
+                    buf[row * S + col] == (int32_t)0xffffffff here;
                 }
             }
         }
@@ -2752,13 +2752,13 @@ int main(void) {
             for (int row = T; row < BT; row++) {
                 for (int col = L; col < R; col++) {
                     int idx = row * S + col;
-                    (dst[idx] == src[idx] + 1) here;
+                    dst[idx] == src[idx] + 1 here;
                 }
             }
             for (int row = 0; row < TH; row++) {
                 for (int col = 0; col < S; col++) {
                     if (row >= T && row < BT && col >= L && col < R) { continue; }
-                    (dst[row * S + col] == 0) here;
+                    dst[row * S + col] == 0 here;
                 }
             }
         }
@@ -2789,7 +2789,7 @@ int main(void) {
                 for (int col = L; col < R; col++) {
                     int si = row * SW + col;
                     int di = row * DW + col;
-                    (dst[di] == src[si] + 1) here;
+                    dst[di] == src[si] + 1 here;
                 }
             }
         }
@@ -2833,13 +2833,13 @@ int main(void) {
             for (int row = T; row < BT; row++) {
                 for (int col = L; col < R; col++) {
                     int idx = row * S + col;
-                    (dst_px[idx] == src_px[idx] + 1) here;
+                    dst_px[idx] == src_px[idx] + 1 here;
                 }
             }
             for (int row = 0; row < TH; row++) {
                 for (int col = 0; col < S; col++) {
                     if (row >= T && row < BT && col >= L && col < R) { continue; }
-                    (dst_px[row * S + col] == 0) here;
+                    dst_px[row * S + col] == 0 here;
                 }
             }
         }
