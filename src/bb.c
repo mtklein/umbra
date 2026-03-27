@@ -795,10 +795,6 @@ void umbra_dump_basic_block(struct umbra_basic_block const *bb, FILE *f) {
     dump_insts(bb->inst, bb->insts, f);
 }
 
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wswitch-enum"
-#endif
 int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     typedef union { float f; int32_t i; uint32_t u; } s32;
     s32 x, y, z, r = {.i = 0};
@@ -847,13 +843,55 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     case op_le_s32: r.i = x.i <= y.i ? -1 : 0; break;
     case op_lt_u32: r.i = x.u <  y.u ? -1 : 0; break;
     case op_le_u32: r.i = x.u <= y.u ? -1 : 0; break;
-    default: break;
+
+    case op_x:
+    case op_y:
+    case op_imm_32:
+    case op_uniform_32:
+    case op_uniform_16:
+    case op_load_32:
+    case op_load_16:
+    case op_load_64_lo:
+    case op_load_64_hi:
+    case op_store_32:
+    case op_store_16:
+    case op_store_64:
+    case op_gather_uniform_32:
+    case op_gather_uniform_16:
+    case op_gather_32:
+    case op_gather_16:
+    case op_deref_ptr:
+    case op_f32_from_f16:
+    case op_f16_from_f32:
+    case op_i32_from_s16:
+    case op_i32_from_u16:
+    case op_i16_from_i32:
+    case op_shl_i32_imm:
+    case op_shr_u32_imm:
+    case op_shr_s32_imm:
+    case op_and_32_imm:
+    case op_or_32_imm:
+    case op_xor_32_imm:
+    case op_pack:
+    case op_add_f32_imm:
+    case op_sub_f32_imm:
+    case op_mul_f32_imm:
+    case op_div_f32_imm:
+    case op_min_f32_imm:
+    case op_max_f32_imm:
+    case op_add_i32_imm:
+    case op_sub_i32_imm:
+    case op_mul_i32_imm:
+    case op_eq_f32_imm:
+    case op_lt_f32_imm:
+    case op_le_f32_imm:
+    case op_eq_i32_imm:
+    case op_lt_s32_imm:
+    case op_le_s32_imm:
+        break;
     }
 
     int result;
     __builtin_memcpy(&result, &r, 4);
     return result;
 }
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif

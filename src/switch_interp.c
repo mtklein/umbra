@@ -111,7 +111,6 @@ struct sw_inst {
     int x, y, z;
 };
 #pragma clang diagnostic ignored "-Wsign-conversion"
-#pragma clang diagnostic ignored "-Wswitch-enum"
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wgnu-label-as-value"
 #else
@@ -207,12 +206,73 @@ struct umbra_switch_interp* umbra_switch_interp(struct umbra_basic_block const *
 
             case op_pack: emit(.tag = op_pack, .x = X, .y = Y, .z = inst->imm); break;
 
-            default:
-                if (inst->op >= op_shl_i32_imm && inst->op <= op_le_s32_imm) {
-                    emit(.tag = inst->op, .x = X, .y = inst->imm);
-                } else {
-                    emit(.tag = inst->op, .x = X, .y = Y, .z = Z);
-                }
+            case op_shl_i32_imm:
+            case op_shr_u32_imm:
+            case op_shr_s32_imm:
+            case op_and_32_imm:
+            case op_or_32_imm:
+            case op_xor_32_imm:
+            case op_add_f32_imm:
+            case op_sub_f32_imm:
+            case op_mul_f32_imm:
+            case op_div_f32_imm:
+            case op_min_f32_imm:
+            case op_max_f32_imm:
+            case op_add_i32_imm:
+            case op_sub_i32_imm:
+            case op_mul_i32_imm:
+            case op_eq_f32_imm:
+            case op_lt_f32_imm:
+            case op_le_f32_imm:
+            case op_eq_i32_imm:
+            case op_lt_s32_imm:
+            case op_le_s32_imm:
+                emit(.tag = inst->op, .x = X, .y = inst->imm);
+                break;
+
+            case op_add_f32:
+            case op_sub_f32:
+            case op_mul_f32:
+            case op_div_f32:
+            case op_min_f32:
+            case op_max_f32:
+            case op_sqrt_f32:
+            case op_abs_f32:
+            case op_neg_f32:
+            case op_round_f32:
+            case op_floor_f32:
+            case op_ceil_f32:
+            case op_round_i32:
+            case op_floor_i32:
+            case op_ceil_i32:
+            case op_fma_f32:
+            case op_fms_f32:
+            case op_add_i32:
+            case op_sub_i32:
+            case op_mul_i32:
+            case op_shl_i32:
+            case op_shr_u32:
+            case op_shr_s32:
+            case op_and_32:
+            case op_or_32:
+            case op_xor_32:
+            case op_sel_32:
+            case op_f32_from_i32:
+            case op_i32_from_f32:
+            case op_f32_from_f16:
+            case op_f16_from_f32:
+            case op_i32_from_s16:
+            case op_i32_from_u16:
+            case op_i16_from_i32:
+            case op_eq_f32:
+            case op_lt_f32:
+            case op_le_f32:
+            case op_eq_i32:
+            case op_lt_s32:
+            case op_le_s32:
+            case op_lt_u32:
+            case op_le_u32:
+                emit(.tag = inst->op, .x = X, .y = Y, .z = Z);
                 break;
             }
             id[i] = n++;
