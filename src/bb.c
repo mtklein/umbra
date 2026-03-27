@@ -176,7 +176,7 @@ int umbra_reserve(builder *b, int n) {
 int umbra_reserve_ptr(builder *b) {
     b->uni_len = (b->uni_len + 7) & ~7;
     int off = b->uni_len;
-    b->uni_len += 16;
+    b->uni_len += 24;
     return off;
 }
 umbra_ptr umbra_deref_ptr(builder *b, umbra_ptr buf, int byte_off) {

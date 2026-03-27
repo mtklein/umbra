@@ -36,7 +36,7 @@ kernel void umbra_entry(
     uint v13 = 1065353216u;
     uint v14 = 1073741824u;
     uint v15 = 931135488u;
-    uint v16 = ((device const uint*)p0)[16];
+    uint v16 = ((device const uint*)p0)[18];
     uint v17 = 6u;
     uint v18 = v16 * 6u;
     uint v19 = ((device uint*)p2)[safe_ix((int)v18,buf_szs[2],4)] & oob_mask((int)v18,buf_szs[2],4);

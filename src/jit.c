@@ -10,10 +10,11 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     (void)bb;
     return 0;
 }
-void umbra_jit_run(struct umbra_jit *j, int n, int w, int y0, umbra_buf buf[]) {
+void umbra_jit_run(struct umbra_jit *j, int w, int h, int x0, int y0, umbra_buf buf[]) {
     (void)j;
-    (void)n;
     (void)w;
+    (void)h;
+    (void)x0;
     (void)y0;
     (void)buf;
 }
@@ -1030,9 +1031,11 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 #if __clang__
 __attribute__((no_sanitize("function")))
 #endif
-void umbra_jit_run(struct umbra_jit *j, int n, int w, int y0, umbra_buf buf[]) {
+void umbra_jit_run(struct umbra_jit *j, int w, int h, int x0, int y0, umbra_buf buf[]) {
     if (!j) { return; }
-    j->entry(n, w, buf, y0);
+    // TODO: pass (w, h, buf, y0, x0) once JIT codegen is updated
+    j->entry(w * h, w, buf, y0);
+    (void)x0;
 }
 void umbra_jit_free(struct umbra_jit *j) {
     if (!j) { return; }
@@ -2176,9 +2179,11 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 #if __clang__
 __attribute__((no_sanitize("function")))
 #endif
-void umbra_jit_run(struct umbra_jit *j, int n, int w, int y0, umbra_buf buf[]) {
+void umbra_jit_run(struct umbra_jit *j, int w, int h, int x0, int y0, umbra_buf buf[]) {
     if (!j) { return; }
-    j->entry(n, w, buf, y0);
+    // TODO: pass (w, h, buf, y0, x0) once JIT codegen is updated
+    j->entry(w * h, w, buf, y0);
+    (void)x0;
 }
 
 void umbra_jit_free(struct umbra_jit *j) {

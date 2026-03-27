@@ -45,11 +45,12 @@ static inline void slide_uni_f32(char *u, int off,
 }
 static inline void slide_uni_ptr(char *u, int off,
                                  void *p, size_t sz,
-                                 _Bool read_only) {
+                                 _Bool read_only, size_t row_bytes) {
     ptrdiff_t ssz = read_only ? -(ptrdiff_t)sz : (ptrdiff_t)sz;
-    __builtin_memset(u+off, 0, 16);
-    __builtin_memcpy(u+off,   &p,   sizeof p);
-    __builtin_memcpy(u+off+8, &ssz, sizeof ssz);
+    __builtin_memset(u+off, 0, 24);
+    __builtin_memcpy(u+off,    &p,         sizeof p);
+    __builtin_memcpy(u+off+8,  &ssz,       sizeof ssz);
+    __builtin_memcpy(u+off+16, &row_bytes, sizeof row_bytes);
 }
 
 static inline void slide_perspective_matrix(

@@ -212,10 +212,10 @@ static void fill_bg_row(void *dst, int n, uint32_t bg, size_t row_sz, size_t pla
     slide_uni_f32(uni, 0, hc, 4);
     int      ps = plane_gap ? 3 : 0;
     umbra_buf buf[5];
-    buf[0] = (umbra_buf){uni, (size_t)fill_pipe.uni_len, 1};
-    buf[1] = (umbra_buf){dst, row_sz, 0};
+    buf[0] = (umbra_buf){uni, (size_t)fill_pipe.uni_len, 1, 0};
+    buf[1] = (umbra_buf){dst, row_sz, 0, 0};
     for (int i = 0; i < ps; i++) {
-        buf[2 + i] = (umbra_buf){(char *)dst + (size_t)(i + 1) * plane_gap, row_sz, 0};
+        buf[2 + i] = (umbra_buf){(char *)dst + (size_t)(i + 1) * plane_gap, row_sz, 0, 0};
     }
     umbra_program_queue(fill_pipe.program, 0, 0, n, 1, buf);
 }
@@ -226,12 +226,12 @@ static void readback_row(uint32_t *dst, void *src, int n, size_t src_sz, size_t 
     int      ps = plane_gap ? 3 : 0;
     int      op = readback_pipe.out_ptr;
     umbra_buf buf[6];
-    buf[0] = (umbra_buf){uni, (size_t)readback_pipe.uni_len, 1};
-    buf[1] = (umbra_buf){src, src_sz, 1};
+    buf[0] = (umbra_buf){uni, (size_t)readback_pipe.uni_len, 1, 0};
+    buf[1] = (umbra_buf){src, src_sz, 1, 0};
     for (int i = 0; i < ps; i++) {
-        buf[2 + i] = (umbra_buf){(char *)src + (size_t)(i + 1) * plane_gap, src_sz, 0};
+        buf[2 + i] = (umbra_buf){(char *)src + (size_t)(i + 1) * plane_gap, src_sz, 0, 0};
     }
-    buf[op] = (umbra_buf){dst, (size_t)(n * 4), 0};
+    buf[op] = (umbra_buf){dst, (size_t)(n * 4), 0, 0};
     umbra_program_queue(readback_pipe.program, 0, 0, n, 1, buf);
 }
 
@@ -241,12 +241,12 @@ static void to_hdr_row(__fp16 *dst, void *src, int n, size_t src_sz, size_t plan
     int      ps = plane_gap ? 3 : 0;
     int      op = hdr_pipe.out_ptr;
     umbra_buf buf[6];
-    buf[0] = (umbra_buf){uni, (size_t)hdr_pipe.uni_len, 1};
-    buf[1] = (umbra_buf){src, src_sz, 1};
+    buf[0] = (umbra_buf){uni, (size_t)hdr_pipe.uni_len, 1, 0};
+    buf[1] = (umbra_buf){src, src_sz, 1, 0};
     for (int i = 0; i < ps; i++) {
-        buf[2 + i] = (umbra_buf){(char *)src + (size_t)(i + 1) * plane_gap, src_sz, 0};
+        buf[2 + i] = (umbra_buf){(char *)src + (size_t)(i + 1) * plane_gap, src_sz, 0, 0};
     }
-    buf[op] = (umbra_buf){dst, (size_t)(n * 8), 0};
+    buf[op] = (umbra_buf){dst, (size_t)(n * 8), 0, 0};
     umbra_program_queue(hdr_pipe.program, 0, 0, n, 1, buf);
 }
 

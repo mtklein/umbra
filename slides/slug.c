@@ -52,10 +52,10 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     char     *au = (char *)au_;
     slide_uni_f32(au, st->acc_lay.mat, st->mat, 11);
     slide_uni_ptr(au, st->acc_lay.curves_off, st->slug->data,
-                  (size_t)(st->slug->count * 6 * 4), 0);
+                  (size_t)(st->slug->count * 6 * 4), 0, 0);
     umbra_buf abuf[] = {
-        {au, (size_t)st->acc_lay.uni_len, 1},
-        {st->wind_buf, wind_sz, 0},
+        {au, (size_t)st->acc_lay.uni_len, 1, 0},
+        {st->wind_buf, wind_sz, 0, wind_row},
     };
     for (int j = 0; j < st->slug->count; j++) {
         int32_t j32 = j;
@@ -70,14 +70,15 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     uint64_t uni_[12] = {0};
     char     *uni = (char *)uni_;
     slide_uni_f32(uni, lay->shader, hc, 4);
-    slide_uni_ptr(uni, lay->coverage, st->wind_buf, wind_sz, 1);
+    slide_uni_ptr(uni, lay->coverage, st->wind_buf, wind_sz, 1, (size_t)w * sizeof(float));
     int       ps = lay->ps;
     size_t plane_sz = (size_t)w * (size_t)h * lay->pixel_bytes;
     umbra_buf rbuf[5];
-    rbuf[0] = (umbra_buf){uni, (size_t)lay->uni_len, 1};
-    rbuf[1] = (umbra_buf){buf, plane_sz, 0};
+    size_t rb = (size_t)w * lay->pixel_bytes;
+    rbuf[0] = (umbra_buf){uni, (size_t)lay->uni_len, 1, 0};
+    rbuf[1] = (umbra_buf){buf, plane_sz, 0, rb};
     for (int i = 0; i < ps; i++) {
-        rbuf[2 + i] = (umbra_buf){(char *)buf + plane_sz * (size_t)(i + 1), plane_sz, 0};
+        rbuf[2 + i] = (umbra_buf){(char *)buf + plane_sz * (size_t)(i + 1), plane_sz, 0, rb};
     }
     umbra_program_queue(program, 0, y0, w, y1, rbuf);
 }

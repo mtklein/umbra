@@ -80,7 +80,7 @@ Critical sequence based on the simulation:
  +----> 47.   vcvtps2dq	%ymm15, %ymm15                    ## RESOURCE interference:  Zn4FP2 [ probability: 47% ]
  +----> 48.   vpslld	$24, %ymm15, %ymm1                ## REGISTER dependency:  %ymm15
  +----> 49.   vpor	%ymm1, %ymm13, %ymm13             ## REGISTER dependency:  %ymm1
- |      50.   movq	24(%rdx), %r11
+ |      50.   movq	32(%rdx), %r11
  +----> 51.   vmovdqu	%ymm13, (%r11,%r10,4)             ## REGISTER dependency:  %ymm13
         52.   vmovdqu	(%rsp), %ymm1
         53.   vbroadcastss	492(%rip), %ymm4
@@ -148,7 +148,7 @@ Instruction Info:
  1      4     0.50                        vcvtps2dq	%ymm15, %ymm15
  1      1     0.50                        vpslld	$24, %ymm15, %ymm1
  1      1     0.25                        vpor	%ymm1, %ymm13, %ymm13
- 1      5     0.33    *                   movq	24(%rdx), %r11
+ 1      5     0.33    *                   movq	32(%rdx), %r11
  1      1     1.00           *            vmovdqu	%ymm13, (%r11,%r10,4)
  1      8     0.50    *                   vmovdqu	(%rsp), %ymm1
  1      8     0.50    *                   vbroadcastss	492(%rip), %ymm4
@@ -239,7 +239,7 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -      -     0.95   0.05    -      -      -      -      -      -      -      -      -      -      -     vcvtps2dq	%ymm15, %ymm15
  -      -      -      -      -      -      -      -      -     0.49   0.51    -      -      -      -      -      -      -      -      -      -      -      -     vpslld	$24, %ymm15, %ymm1
  -      -      -      -      -      -      -      -     0.01    -      -     0.99    -      -      -      -      -      -      -      -      -      -      -     vpor	%ymm1, %ymm13, %ymm13
-0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.49   0.01   0.34   0.34   0.32    -      -     movq	24(%rdx), %r11
+0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.49   0.01   0.34   0.34   0.32    -      -     movq	32(%rdx), %r11
  -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50   1.00   0.98   0.01   0.01    -      -      -     1.00    -     vmovdqu	%ymm13, (%r11,%r10,4)
  -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -     0.98   0.02    -     0.33   0.34   0.33    -      -     vmovdqu	(%rsp), %ymm1
  -      -      -      -      -      -      -      -      -      -     1.00    -     0.50   0.50    -     0.02    -     0.98   0.34   0.33   0.33    -      -     vbroadcastss	492(%rip), %ymm4

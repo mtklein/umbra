@@ -121,12 +121,12 @@ int main(int argc, char *argv[]) {
         uint64_t au_[12] = {0};
         char     *au = (char *)au_;
         slide_uni_f32(au, al.mat, mat, 11);
-        slide_uni_ptr(au, al.curves_off, sc.data, (size_t)(sc.count * 6 * 4), 0);
+        slide_uni_ptr(au, al.curves_off, sc.data, (size_t)(sc.count * 6 * 4), 0, 0);
         int32_t j0 = 0;
         __builtin_memcpy(au + al.loop_off, &j0, 4);
         umbra_buf abuf[] = {
-            {au, (size_t)al.uni_len, 1},
-            {wind, (size_t)(W * H * 4), 0},
+            {au, (size_t)al.uni_len, 1, 0},
+            {wind, (size_t)(W * H * 4), 0, 0},
         };
 
         printf("\n%-40s %12s %12s %12s\n", "slug accumulator (1 curve)", "interp", "jit",

@@ -17,10 +17,11 @@ static void grad_2stop_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     int       ps = lay->ps;
     size_t plane_sz = (size_t)w * (size_t)h * lay->pixel_bytes;
     umbra_buf ubuf[5];
-    ubuf[0] = (umbra_buf){uni, (size_t)uni_len, 1};
-    ubuf[1] = (umbra_buf){buf, plane_sz, 0};
+    size_t rb = (size_t)w * lay->pixel_bytes;
+    ubuf[0] = (umbra_buf){uni, (size_t)uni_len, 1, 0};
+    ubuf[1] = (umbra_buf){buf, plane_sz, 0, rb};
     for (int i = 0; i < ps; i++) {
-        ubuf[2 + i] = (umbra_buf){(char *)buf + plane_sz * (size_t)(i + 1), plane_sz, 0};
+        ubuf[2 + i] = (umbra_buf){(char *)buf + plane_sz * (size_t)(i + 1), plane_sz, 0, rb};
     }
     umbra_program_queue(program, 0, y0, w, y1, ubuf);
 }
@@ -32,14 +33,15 @@ static void grad_lut_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     uint64_t        uni_[8] = {0};
     char           *uni = (char *)uni_;
     slide_uni_f32(uni, lay->shader, s->grad, 4);
-    slide_uni_ptr(uni, (lay->shader + 16 + 7) & ~7, st->lut, (size_t)(st->lut_n * 4 * 4), 0);
+    slide_uni_ptr(uni, (lay->shader + 16 + 7) & ~7, st->lut, (size_t)(st->lut_n * 4 * 4), 0, 0);
     int       ps = lay->ps;
     size_t plane_sz = (size_t)w * (size_t)h * lay->pixel_bytes;
     umbra_buf ubuf[5];
-    ubuf[0] = (umbra_buf){uni, (size_t)uni_len, 1};
-    ubuf[1] = (umbra_buf){buf, plane_sz, 0};
+    size_t rb = (size_t)w * lay->pixel_bytes;
+    ubuf[0] = (umbra_buf){uni, (size_t)uni_len, 1, 0};
+    ubuf[1] = (umbra_buf){buf, plane_sz, 0, rb};
     for (int i = 0; i < ps; i++) {
-        ubuf[2 + i] = (umbra_buf){(char *)buf + plane_sz * (size_t)(i + 1), plane_sz, 0};
+        ubuf[2 + i] = (umbra_buf){(char *)buf + plane_sz * (size_t)(i + 1), plane_sz, 0, rb};
     }
     umbra_program_queue(program, 0, y0, w, y1, ubuf);
 }

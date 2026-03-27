@@ -14,7 +14,7 @@
   v13  = imm_32          0x3f800000
   v14  = imm_32          0x40000000
   v15  = imm_32          0x37800000
-  v16  = uniform_32      p0[16]
+  v16  = uniform_32      p0[18]
   v17  = imm_32          0x6
   v18  = mul_i32_imm     v16 0x6 (a.k.a. v17)
   v19  = gather_uniform_32 p-2 v18

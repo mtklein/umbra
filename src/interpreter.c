@@ -99,7 +99,7 @@ typedef union {
 
 struct interp_inst;
 typedef int (*Fn)(struct interp_inst const *ip, val *v, int end, int n, int w, int row,
-                  void *ptr[], size_t sz[]);
+                  void *ptr[], size_t sz[], size_t rb[]);
 struct interp_inst {
     Fn  fn;
     int x, y, z, : 32;
@@ -109,14 +109,16 @@ struct umbra_interpreter {
     struct interp_inst *inst;
     val                *v;
     void              **ptr;
-    size_t            *sz;
+    void              **row_ptr;
+    size_t             *sz;
+    size_t             *row_bytes;
     int                 preamble, nptr, n_deref, pad_;
 };
 
 #define op(name)                                                                       \
     static int name(struct interp_inst const *ip, val *v, int end, int n, int w,       \
-                    int row, void *ptr[], size_t sz[])
-#define next return ip[1].fn(ip + 1, v + 1, end, n, w, row, ptr, sz)
+                    int row, void *ptr[], size_t sz[], size_t rb[])
+#define next return ip[1].fn(ip + 1, v + 1, end, n, w, row, ptr, sz, rb)
 
 
 op(imm_32) {
@@ -126,7 +128,7 @@ op(imm_32) {
 
 op(x_fn) {
     I32 const seq = {0, 1, 2, 3, 4, 5, 6, 7};
-    v->i32 = seq + (end - K - row * w);
+    v->i32 = seq + (end - K);
     next;
 }
 op(y_fn) {
@@ -219,7 +221,7 @@ op(load_64_fused) {
         v[0].i32[l] = lo;
         v[1].i32[l] = hi;
     }
-    return ip[1].fn(ip + 1, v + 2, end, n, w, row, ptr, sz);
+    return ip[1].fn(ip + 1, v + 2, end, n, w, row, ptr, sz, rb);
 }
 op(store_16) {
     uint16_t *dst = (uint16_t *)ptr[ip->x];
@@ -684,6 +686,7 @@ op(done) {
     (void)row;
     (void)ptr;
     (void)sz;
+    (void)rb;
     return 0;
 }
 
@@ -691,10 +694,13 @@ op(deref_ptr_handler) {
     void *base = ptr[ip->x];
     void *derived;
     ptrdiff_t ssz;
-    __builtin_memcpy(&derived, (char *)base + ip->y,     sizeof derived);
-    __builtin_memcpy(&ssz,    (char *)base + ip->y + 8, sizeof ssz);
-    ptr[ip->z] = derived;
-    sz[ip->z] = ssz < 0 ? (size_t)-ssz : (size_t)ssz;
+    size_t drb;
+    __builtin_memcpy(&derived, (char *)base + ip->y,      sizeof derived);
+    __builtin_memcpy(&ssz,     (char *)base + ip->y + 8,  sizeof ssz);
+    __builtin_memcpy(&drb,     (char *)base + ip->y + 16, sizeof drb);
+    ptr[ip->z] = (char *)derived + (size_t)row * drb;
+    sz[ip->z]  = ssz < 0 ? (size_t)-ssz : (size_t)ssz;
+    rb[ip->z]  = drb;
     next;
 }
 
@@ -788,7 +794,7 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     __builtin_memcpy(&v[1], &yb, 4);
     __builtin_memcpy(&v[2], &zb, 4);
 
-    inst[0].fn(inst, v + 3, K, K, 0, 0, (void *[]){0}, (size_t[]){0});
+    inst[0].fn(inst, v + 3, K, K, 0, 0, (void *[]){0}, (size_t[]){0}, (size_t[]){0});
 
     int r;
     __builtin_memcpy(&r, &v[3], 4);
@@ -814,8 +820,10 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
     p->nptr = max_ptr + 1;
     p->n_deref = n_deref;
     int total_ptrs = p->nptr + n_deref;
-    p->ptr = calloc((size_t)total_ptrs, sizeof *p->ptr);
-    p->sz = calloc((size_t)total_ptrs, sizeof *p->sz);
+    p->ptr       = calloc((size_t)total_ptrs, sizeof *p->ptr);
+    p->row_ptr   = calloc((size_t)total_ptrs, sizeof *p->row_ptr);
+    p->sz        = calloc((size_t)total_ptrs, sizeof *p->sz);
+    p->row_bytes = calloc((size_t)total_ptrs, sizeof *p->row_bytes);
 
     int *deref_slot = calloc((size_t)bb->insts, sizeof *deref_slot);
     {
@@ -990,26 +998,27 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
 
 static void load_bufs(struct umbra_interpreter *p, umbra_buf buf[]) {
     for (int i = 0; i < p->nptr; i++) {
-        p->ptr[i] = buf[i].ptr;
-        p->sz[i] = buf[i].sz;
+        p->ptr[i]       = buf[i].ptr;
+        p->sz[i]        = buf[i].sz;
+        p->row_bytes[i] = buf[i].row_bytes;
     }
 }
 
-void umbra_interpreter_run(struct umbra_interpreter *p, int n, int w, int y0, umbra_buf buf[]) {
+void umbra_interpreter_run(struct umbra_interpreter *p, int w, int h, int x0, int y0,
+                           umbra_buf buf[]) {
     load_bufs(p, buf);
-    int const                 P = p->preamble;
-    int const                 h = n / w;
-    struct interp_inst const *start = p->inst;
-    val                      *v = p->v;
+    int const P  = p->preamble;
+    int const ce = x0 + w;
 
-    // 2D loop: rows then columns.  op_x = column, op_y = row.
-    // end = row*w + x + K gives contiguous ops the correct linear offset.
-    // First call runs preamble + body; subsequent calls run body only.
-    for (int row = y0; row < h; row++) {
-        int row_end = (row + 1) * w;
-        for (int x = 0; x < w; x += K) {
-            start->fn(start, v, row * w + x + K, row_end, w, row, p->ptr, p->sz);
-            start = p->inst + P;
+    for (int row = y0; row < y0 + h; row++) {
+        for (int i = 0; i < p->nptr; i++) {
+            p->row_ptr[i] = (char *)p->ptr[i] + (size_t)row * p->row_bytes[i];
+        }
+        struct interp_inst const *s = p->inst;
+        val                      *v = p->v;
+        for (int col = x0; col < ce; col += K) {
+            s->fn(s, v, col + K, ce, 0, row, p->row_ptr, p->sz, p->row_bytes);
+            s = p->inst + P;
             v = p->v + P;
         }
     }
@@ -1017,7 +1026,9 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int n, int w, int y0, um
 
 void umbra_interpreter_free(struct umbra_interpreter *p) {
     free(p->ptr);
+    free(p->row_ptr);
     free(p->sz);
+    free(p->row_bytes);
     free(p->inst);
     free(p->v);
     free(p);

@@ -49,7 +49,7 @@ Critical sequence based on the simulation:
  +----> 16.   vpand	%ymm10, %ymm15, %ymm15            ## REGISTER dependency:  %ymm10
  +----> 17.   vpand	%ymm15, %ymm14, %ymm14            ## REGISTER dependency:  %ymm15
  +----> 18.   vpblendvb	%ymm14, %ymm9, %ymm0, %ymm14      ## REGISTER dependency:  %ymm14
- |      19.   movq	24(%rdx), %r11
+ |      19.   movq	32(%rdx), %r11
  |      20.   vmovdqu	(%r11,%r10,4), %ymm15
  |      21.   vpsrld	$24, %ymm15, %ymm10
  |      22.   vcvtdq2ps	%ymm10, %ymm10
@@ -151,7 +151,7 @@ Instruction Info:
  1      1     0.25                        vpand	%ymm10, %ymm15, %ymm15
  1      1     0.25                        vpand	%ymm15, %ymm14, %ymm14
  1      1     0.50                        vpblendvb	%ymm14, %ymm9, %ymm0, %ymm14
- 1      5     0.33    *                   movq	24(%rdx), %r11
+ 1      5     0.33    *                   movq	32(%rdx), %r11
  1      8     0.50    *                   vmovdqu	(%r11,%r10,4), %ymm15
  1      1     0.50                        vpsrld	$24, %ymm15, %ymm10
  1      3     0.50                        vcvtdq2ps	%ymm10, %ymm10
@@ -272,7 +272,7 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -     0.01   0.14   0.32   0.53    -      -      -      -      -      -      -      -      -      -      -     vpand	%ymm10, %ymm15, %ymm15
  -      -      -      -      -      -      -      -     0.21    -     0.33   0.46    -      -      -      -      -      -      -      -      -      -      -     vpand	%ymm15, %ymm14, %ymm14
  -      -      -      -      -      -      -      -     0.38    -      -     0.62    -      -      -      -      -      -      -      -      -      -      -     vpblendvb	%ymm14, %ymm9, %ymm0, %ymm14
-0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.43   0.21   0.36   0.02   0.36   0.62    -      -     movq	24(%rdx), %r11
+0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.43   0.21   0.36   0.02   0.36   0.62    -      -     movq	32(%rdx), %r11
  -      -      -      -      -      -      -      -      -      -      -      -     0.52   0.48    -     0.52   0.35   0.13   0.37   0.13   0.50    -      -     vmovdqu	(%r11,%r10,4), %ymm15
  -      -      -      -      -      -      -      -      -     0.02   0.98    -      -      -      -      -      -      -      -      -      -      -      -     vpsrld	$24, %ymm15, %ymm10
  -      -      -      -      -      -      -      -      -      -     0.49   0.51    -      -      -      -      -      -      -      -      -      -      -     vcvtdq2ps	%ymm10, %ymm10

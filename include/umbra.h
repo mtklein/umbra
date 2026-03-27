@@ -20,6 +20,7 @@ typedef struct {
     void  *ptr;
     size_t sz, : 8*sizeof(size_t)-8;
     _Bool  read_only;
+    size_t row_bytes;
 } umbra_buf;
 
 

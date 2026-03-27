@@ -61,10 +61,11 @@ static void solid_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     int       ps = lay->ps;
     size_t plane_sz = (size_t)w * (size_t)h * lay->pixel_bytes;
     umbra_buf ubuf[5];
-    ubuf[0] = (umbra_buf){uni, (size_t)lay->uni_len, 1};
-    ubuf[1] = (umbra_buf){buf, plane_sz, 0};
+    size_t rb = (size_t)w * lay->pixel_bytes;
+    ubuf[0] = (umbra_buf){uni, (size_t)lay->uni_len, 1, 0};
+    ubuf[1] = (umbra_buf){buf, plane_sz, 0, rb};
     for (int i = 0; i < ps; i++) {
-        ubuf[2 + i] = (umbra_buf){(char *)buf + plane_sz * (size_t)(i + 1), plane_sz, 0};
+        ubuf[2 + i] = (umbra_buf){(char *)buf + plane_sz * (size_t)(i + 1), plane_sz, 0, rb};
     }
     umbra_program_queue(program, 0, y0, w, y1, ubuf);
 }
