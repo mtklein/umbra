@@ -351,11 +351,13 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
         _Bool prev_r = 0;  // did the previous instruction output to register?
         for (int i = 0; i < n; i++) {
             struct sw_inst *s = &p->inst[i];
+            if (i == p->preamble) { prev_r = 0; }
             _Bool x_r = prev_r && s->x == -1;
             _Bool y_r = prev_r && s->y == -1;
-            // Output to register only if the sole consumer is an upgradable ALU op.
+            // Output to register only if the sole consumer is an upgradable ALU op
+            // and doesn't cross the preamble/body boundary.
             _Bool out_r = 0;
-            if (lu[i] == i + 1) {
+            if (lu[i] == i + 1 && i + 1 != p->preamble) {
                 int const next_tag = p->inst[i + 1].tag;
 #define CHECK_BINARY(name, rt, pt) || next_tag == op_##name
 #define CHECK_UNARY(name, rt, pt)  || next_tag == op_##name
