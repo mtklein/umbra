@@ -2646,7 +2646,38 @@ static void test_program_null_guards(void) {
     umbra_backend_free(be);
 }
 
+// Regression test: register variant chains must not cross the preamble/body boundary.
+// The preamble runs only on the first tile; subsequent tiles start at the body.
+// If a preamble output is kept in the register and the body reads from it,
+// tile 2+ would read the previous tile's last value instead.
+static void test_preamble_register_boundary(void) {
+    struct umbra_builder *b = umbra_builder();
+    // uniform is preamble (loop-invariant), add is body (uses x which varies).
+    // The uniform feeds directly into the add at offset -1 if scheduled adjacently.
+    umbra_val u = umbra_uniform_32(b, (umbra_ptr){0, 0}, 0);
+    umbra_val x = umbra_add_i32(b, umbra_x(b), u);
+    umbra_store_32(b, (umbra_ptr){1, 0}, x);
+    backends B = make(b, 0);
+
+    // Width 32 > K=16, so there are at least 2 tiles.
+    // The uniform value is 1000, so result should be col + 1000.
+    int32_t uni = 1000;
+    int32_t dst[32];
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        __builtin_memset(dst, 0, sizeof dst);
+        if (!run(&B, bi, 32, 1,
+                 (umbra_buf[]){{&uni, 4, 1, 0}, {dst, sizeof dst, 0, 0}})) {
+            continue;
+        }
+        for (int col = 0; col < 32; col++) {
+            dst[col] == col + 1000 here;
+        }
+    }
+    cleanup(&B);
+}
+
 int main(void) {
+    test_preamble_register_boundary();
     test_backend_threadsafe();
     test_program_null_guards();
     test_f32_ops();
