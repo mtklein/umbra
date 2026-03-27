@@ -786,23 +786,7 @@ static Fn const fn[] = {
     [op_le_s32_imm] = le_s32_imm_fn,
 };
 
-int umbra_const_eval(enum op op, int xb, int yb, int zb) {
-    val                v[4] = {0};
-    struct interp_inst const inst[2] = {
-        {.fn = fn[op], .x = -3, .y = -2, .z = -1},
-        {.fn = done},
-    };
 
-    __builtin_memcpy(&v[0], &xb, 4);
-    __builtin_memcpy(&v[1], &yb, 4);
-    __builtin_memcpy(&v[2], &zb, 4);
-
-    inst[0].fn(inst, v + 3, K, K, 0, (umbra_buf[]){{0}});
-
-    int r;
-    __builtin_memcpy(&r, &v[3], 4);
-    return r;
-}
 
 struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) {
     int *id = calloc((size_t)bb->insts, sizeof *id);

@@ -626,6 +626,63 @@ void umbra_switch_interp_run(struct umbra_switch_interp *p, int l, int t, int r,
     }
 }
 
+int umbra_const_eval(enum op op, int xb, int yb, int zb) {
+    val v[4] = {0};
+    __builtin_memcpy(&v[0], &xb, 4);
+    __builtin_memcpy(&v[1], &yb, 4);
+    __builtin_memcpy(&v[2], &zb, 4);
+
+    val *r = &v[3];
+    val *s = v;  // x=-3, y=-2, z=-1 relative to r
+    switch (op) {
+    case op_add_f32: r->f32 = s[0].f32 + s[1].f32; break;
+    case op_sub_f32: r->f32 = s[0].f32 - s[1].f32; break;
+    case op_mul_f32: r->f32 = s[0].f32 * s[1].f32; break;
+    case op_div_f32: r->f32 = s[0].f32 / s[1].f32; break;
+    case op_min_f32: r->f32 = vec_min(s[0].f32, s[1].f32); break;
+    case op_max_f32: r->f32 = vec_max(s[0].f32, s[1].f32); break;
+    case op_sqrt_f32:  r->f32 = vec_sqrt(s[0].f32); break;
+    case op_abs_f32:   r->f32 = vec_abs(s[0].f32); break;
+    case op_neg_f32:   r->f32 = -s[0].f32; break;
+    case op_round_f32: r->f32 = vec_round(s[0].f32); break;
+    case op_floor_f32: r->f32 = vec_floor(s[0].f32); break;
+    case op_ceil_f32:  r->f32 = vec_ceil(s[0].f32); break;
+    case op_round_i32: r->i32 = cast(I32, vec_round(s[0].f32)); break;
+    case op_floor_i32: r->i32 = cast(I32, vec_floor(s[0].f32)); break;
+    case op_ceil_i32:  r->i32 = cast(I32, vec_ceil(s[0].f32)); break;
+    case op_fma_f32:   r->f32 = s[2].f32 + s[0].f32 * s[1].f32; break;
+    case op_fms_f32:   r->f32 = s[2].f32 - s[0].f32 * s[1].f32; break;
+    case op_add_i32: r->i32 = s[0].i32 + s[1].i32; break;
+    case op_sub_i32: r->i32 = s[0].i32 - s[1].i32; break;
+    case op_mul_i32: r->i32 = s[0].i32 * s[1].i32; break;
+    case op_shl_i32: r->i32 = s[0].i32 << s[1].i32; break;
+    case op_shr_u32: r->u32 = s[0].u32 >> s[1].u32; break;
+    case op_shr_s32: r->i32 = s[0].i32 >> s[1].i32; break;
+    case op_and_32:  r->i32 = s[0].i32 & s[1].i32; break;
+    case op_or_32:   r->i32 = s[0].i32 | s[1].i32; break;
+    case op_xor_32:  r->i32 = s[0].i32 ^ s[1].i32; break;
+    case op_sel_32:  r->i32 = (s[0].i32 & s[1].i32) | (~s[0].i32 & s[2].i32); break;
+    case op_f32_from_i32: r->f32 = cast(F32, s[0].i32); break;
+    case op_i32_from_f32: r->i32 = cast(I32, s[0].f32); break;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wfloat-equal"
+    case op_eq_f32: r->i32 = (I32)(s[0].f32 == s[1].f32); break;
+#pragma clang diagnostic pop
+    case op_lt_f32: r->i32 = (I32)(s[0].f32 <  s[1].f32); break;
+    case op_le_f32: r->i32 = (I32)(s[0].f32 <= s[1].f32); break;
+    case op_eq_i32: r->i32 = (I32)(s[0].i32 == s[1].i32); break;
+    case op_lt_s32: r->i32 = (I32)(s[0].i32 <  s[1].i32); break;
+    case op_le_s32: r->i32 = (I32)(s[0].i32 <= s[1].i32); break;
+    case op_lt_u32: r->i32 = (I32)(s[0].u32 <  s[1].u32); break;
+    case op_le_u32: r->i32 = (I32)(s[0].u32 <= s[1].u32); break;
+    default: break;
+    }
+
+    int result;
+    __builtin_memcpy(&result, r, 4);
+    return result;
+}
+
 void umbra_switch_interp_free(struct umbra_switch_interp *p) {
     if (p) {
         free(p->buf);
