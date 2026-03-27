@@ -2359,6 +2359,11 @@ void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
         while (fgets(line, (int)sizeof line, afp)) {
             if (past_header) {
                 if (line[0] != '\n' && line[0] != '<') {
+                    char *angle = __builtin_strchr(line, '<');
+                    if (angle) {
+                        *angle = '\n';
+                        angle[1] = '\0';
+                    }
                     fputs(line, cfp);
                 }
             } else if (__builtin_strstr(line, "<")) {
