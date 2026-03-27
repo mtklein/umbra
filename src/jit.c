@@ -69,34 +69,44 @@ static void pool_free(struct pool *p) {
 
 #include "asm_arm64.h"
 
-// X0=n, X1=w, X2=buf, X3=y0.
-// X0=n (then row_end), X1=w, X2=buf, X14=y.
+// X0=w, X1=h, X2=buf, X3=y0, X4=x0.
+// X0=col_end, X1=x0_col, X2=buf, X9=col, X14=row.
 enum {
-    XWIDTH = 1,
-    XBUF = 2,
-    XP = 8,
-    XI = 9,
-    XT = 10,
-    XH = 11,
-    XW = 12,
-    XM = 13,
-    XY = 14,
-    XS = 15,
+    XWIDTH = 1,   // x0_col (reset XCOL at row boundary)
+    XBUF   = 2,
+    XP     = 8,
+    XCOL   = 9,   // column counter (was XI)
+    XT     = 10,
+    XH     = 11,
+    XW     = 12,
+    XM     = 13,
+    XY     = 14,
+    XS     = 15,
 };
+#define XI XCOL
 
 static void load_ptr(Buf *c, int p, int *last_ptr) {
     if (*last_ptr == p) { return; }
     *last_ptr = p;
-    int disp = p * (int)sizeof(umbra_buf);
-    // LDR XP, [XBUF, #disp]
-    put(c, 0xf9400000u | ((uint32_t)(disp / 8) << 10) | ((uint32_t)XBUF << 5) | (uint32_t)XP);
+    int disp_ptr = p * (int)sizeof(umbra_buf);
+    int disp_rb  = p * (int)sizeof(umbra_buf) + 24;
+    put(c, 0xf9400000u | ((uint32_t)(disp_ptr / 8) << 10) | ((uint32_t)XBUF << 5) | (uint32_t)XP);
+    put(c, 0xf9400000u | ((uint32_t)(disp_rb  / 8) << 10) | ((uint32_t)XBUF << 5) | (uint32_t)XT);
+    put(c, 0x9b000000u | ((uint32_t)XT << 16) | ((uint32_t)XP << 10)
+                        | ((uint32_t)XY << 5)  | (uint32_t)XP);
 }
 
-static void resolve_ptr(Buf *c, int p, int *last_ptr, int const *deref_gpr) {
+static void resolve_ptr(Buf *c, int p, int *last_ptr, int const *deref_gpr,
+                        int const *deref_rb_gpr) {
     if (p < 0) {
-        if (*last_ptr != p) {
-            *last_ptr = p;
-            put(c, ADD_xi(XP, deref_gpr[~p], 0));
+        *last_ptr = -1;
+        int gpr = deref_gpr[~p];
+        int rbg = deref_rb_gpr[~p];
+        if (rbg > 0) {
+            put(c, 0x9b000000u | ((uint32_t)rbg << 16) | ((uint32_t)gpr << 10)
+                                | ((uint32_t)XY  << 5)  | (uint32_t)XP);
+        } else {
+            put(c, ADD_xi(XP, gpr, 0));
         }
     } else {
         load_ptr(c, p, last_ptr);
@@ -348,12 +358,12 @@ static struct ra *ra_create_arm64(struct umbra_basic_block const *bb, struct jit
 
 static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
-                     struct jit_ctx *jc);
+                     int *deref_rb_gpr, struct jit_ctx *jc);
 
 struct umbra_jit {
     void  *code;
     size_t code_size;
-    void (*entry)(int, int, umbra_buf *, int);
+    void (*entry)(int, int, umbra_buf *, int, int);
     int loop_start, loop_end;
 };
 
@@ -362,7 +372,8 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     int *sl = malloc((size_t)bb->insts * sizeof(int));
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
     int  ns = 0;
-    int *deref_gpr = calloc((size_t)bb->insts, sizeof(int));
+    int *deref_gpr    = calloc((size_t)bb->insts, sizeof(int));
+    int *deref_rb_gpr = calloc((size_t)bb->insts, sizeof(int));
 
     Buf            c = {0};
     struct jit_ctx jc = {.c = &c, .bb = bb, .pool = {0}};
@@ -374,76 +385,79 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, 0xd503201fu);
     put(&c, 0xd503201fu);
 
-    put(&c, ADD_xi(XI, 3, 0));  // save y0 (x3) to XI before preamble clobbers it
+    // Entry: x0=w, x1=h, x2=buf, x3=y0, x4=x0_col.
+    // Save before preamble clobbers x3, x4 (and XM via load_count).
+    put(&c, ADD_xi(XCOL, 3, 0));       // XCOL = y0 (temp)
+    put(&c, ADD_xr(XW, 0, 4));        // XW = w + x0_col = col_end
+    put(&c, ADD_xi(XH, 4, 0));        // XH = x0_col
 
-    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, &jc);
+    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
 
     ra_begin_loop(ra);
 
-    // 2D loop: XI = linear index, XY = row, X0 = row_end.
-    // op_x = XI - XY*w (column), op_y = XY (row).
-    // MOV XY, XI  →  XY = y0 (saved in XI)
-    put(&c, 0xaa0003e0u | ((uint32_t)XI << 16) | (uint32_t)XY);
-    // MUL XI, XI, XWIDTH  →  XI = y0 * w
-    put(&c, 0x9b007c00u | ((uint32_t)XWIDTH << 16) | ((uint32_t)XI << 5) | (uint32_t)XI);
-    // STP X0,XZR to save n on stack (will need it to check outer loop exit)
-    put(&c, STP_pre(0, 15, 31, -2));  // push X0 (n) and dummy
-    put(&c, ADD_xr(0, XI, XWIDTH));   // X0 = row_end = (y0+1)*w
+    // 2D loop: XCOL = column, XY = row, X0 = col_end.
+    // Compute end_row here (after preamble) since preamble may clobber XM.
+    put(&c, ADD_xr(XM, 1, XCOL));     // XM = h + y0 = end_row (x1 survives preamble)
+    put(&c, ADD_xi(0, XW, 0));        // x0 = col_end
+    put(&c, ADD_xi(XWIDTH, XH, 0));   // XWIDTH = x0_col
+    put(&c, ADD_xi(XY, XCOL, 0));     // XY = y0
+    put(&c, ADD_xi(XCOL, XH, 0));     // XCOL = x0_col
+    put(&c, STP_pre(XM, 15, 31, -2)); // push end_row
 
     int loop_top = c.len;
 
-    // remaining = row_end - XI
-    put(&c, 0xcb090000u | (uint32_t)XT);  // SUB XT, X0, XI
+    // remaining = col_end - XCOL
+    put(&c, 0xcb000000u | ((uint32_t)XCOL << 16) | (0u << 5) | (uint32_t)XT); // SUB XT,X0,XCOL
     put(&c, SUBS_xi(31, XT, 4));
     int br_tail = c.len;
     put(&c, Bcond(0xb, 0));
-    put(&c, LSL_xi(XH, XI, 1));
-    put(&c, LSL_xi(XW, XI, 2));
+    put(&c, LSL_xi(XH, XCOL, 1));
+    put(&c, LSL_xi(XW, XCOL, 2));
 
     int loop_body_start = c.len;
-    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0, deref_gpr, &jc);
+    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
 
     ra_end_loop(ra, sl);
 
     int loop_body_end = c.len;
 
-    put(&c, ADD_xi(XI, XI, 4));
+    put(&c, ADD_xi(XCOL, XCOL, 4));
     put(&c, B(loop_top - c.len));
 
     int tail_top = c.len;
     c.buf[br_tail] = Bcond(0xb, tail_top - br_tail);
 
-    // CMP XI, X0 (row_end): xi >= row_end means row is done
-    put(&c, 0xeb00001fu | ((uint32_t)XI << 5));  // CMP XI, X0
+    // CMP XCOL, X0 (col_end): xcol >= col_end means row is done
+    put(&c, 0xeb00001fu | ((uint32_t)XCOL << 5));
     int br_row_done = c.len;
     put(&c, Bcond(0xa, 0));  // B.GE row_done
 
     for (int i = 0; i < bb->insts; i++) { ra_free_reg(ra, i); }
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
 
-    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, &jc);
-    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 1, deref_gpr, &jc);
+    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
+    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 1, deref_gpr, deref_rb_gpr, &jc);
 
-    put(&c, ADD_xi(XI, XI, 1));
+    put(&c, ADD_xi(XCOL, XCOL, 1));
     put(&c, B(tail_top - c.len));
 
     int row_done = c.len;
     c.buf[br_row_done] = Bcond(0xa, row_done - br_row_done);
 
     put(&c, ADD_xi(XY, XY, 1));
-    put(&c, ADD_xr(0, 0, XWIDTH));       // row_end += w
-    // LDR XT, [SP] — load saved n
-    put(&c, 0xf9400000u | (31u << 5) | (uint32_t)XT);  // LDR XT, [SP]
-    // CMP X0, XT — row_end > n means done
-    put(&c, 0xeb000000u | ((uint32_t)XT << 16) | (0u << 5) | 0x1fu);  // CMP X0, XT
+    put(&c, ADD_xi(XCOL, XWIDTH, 0));    // XCOL = x0_col
+    // LDR XT, [SP] — load saved end_row
+    put(&c, 0xf9400000u | (31u << 5) | (uint32_t)XT);
+    // CMP XY, XT — XY >= end_row means done
+    put(&c, 0xeb000000u | ((uint32_t)XT << 16) | ((uint32_t)XY << 5) | 0x1fu);
     int br_more_rows = c.len;
-    put(&c, Bcond(0xd, 0));  // B.LE → more rows (row_end <= n)
+    put(&c, Bcond(0xb, 0));  // B.LT → more rows
 
-    // Restore stack (saved n)
+    // Restore stack (saved end_row)
     put(&c, LDP_post(0, 15, 31, 2));
 
-    // Patch: B.LE → loop_top
-    c.buf[br_more_rows] = Bcond(0xd, loop_top - br_more_rows);
+    // Patch: B.LT → loop_top
+    c.buf[br_more_rows] = Bcond(0xb, loop_top - br_more_rows);
 
     put(&c, ADD_xi(31, 29, 0));
     put(&c, LDP_post(29, 30, 31, 2));
@@ -471,6 +485,7 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     ra_destroy(ra);
     free(sl);
     free(deref_gpr);
+    free(deref_rb_gpr);
 
     size_t code_sz = (size_t)c.len * 4;
     size_t pg = 16384;
@@ -498,7 +513,7 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     {
         union {
             void *p;
-            void (*fn)(int, int, umbra_buf *, int);
+            void (*fn)(int, int, umbra_buf *, int, int);
         } u = {.p = mem};
         j->entry = u.fn;
     }
@@ -507,7 +522,7 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
 
 static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
-                     struct jit_ctx *jc) {
+                     int *deref_rb_gpr, struct jit_ctx *jc) {
 #define lu(v) ra_last_use(ra, (v))
     int last_ptr = -1;
     int dc = 0;
@@ -518,24 +533,28 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         switch (inst->op) {
         case op_deref_ptr: {
             load_ptr(c, inst->ptr, &last_ptr);
-            int gpr = 3 + dc++;
-            deref_gpr[i] = gpr;
-            if (inst->imm == 0) {
-                put(c, 0xf9400000u | ((uint32_t)XP << 5) | (uint32_t)gpr);
-            } else {
+            int gpr    = 3 + dc;
+            int rb_gpr = dc < 2 ? 6 + dc : 0;
+            dc++;
+            deref_gpr[i]    = gpr;
+            deref_rb_gpr[i] = rb_gpr;
+            int base = XP;
+            if (inst->imm != 0) {
                 load_imm_w(c, XT, (uint32_t)inst->imm);
                 put(c, ADD_xr(XT, XP, XT));
-                put(c, 0xf9400000u | ((uint32_t)XT << 5) | (uint32_t)gpr);
+                base = XT;
+            }
+            // LDR gpr, [base] — deref pointer
+            put(c, 0xf9400000u | ((uint32_t)base << 5) | (uint32_t)gpr);
+            // LDR rb_gpr, [base, #16] — deref row_bytes
+            if (rb_gpr) {
+                put(c, 0xf9400000u | (2u << 10) | ((uint32_t)base << 5) | (uint32_t)rb_gpr);
             }
         } break;
 
         case op_x: {
-            // x = column = XI - XY * XWIDTH.
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            // MSUB XT, XY, XWIDTH, XI → XT = XI - XY*w = column
-            put(c, 0x1b008000u | ((uint32_t)XWIDTH << 16) | ((uint32_t)XI << 10)
-                                | ((uint32_t)XY << 5) | (uint32_t)XT);
-            put(c, DUP_4s_w(s.rd, XT));
+            put(c, DUP_4s_w(s.rd, XCOL));
             if (!scalar) {
                 int8_t   tmp = ra_alloc(ra, sl, ns);
                 uint32_t iota4[4] = {0, 1, 2, 3};
@@ -554,7 +573,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_load_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int            p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {
                 put(c, LDR_sx(s.rd, XP, XI));
             } else {
@@ -568,7 +587,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                        && bb->inst[i + 1].ptr == inst->ptr;
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int            p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             put(c, LSL_xi(XT, XI, 3));
             put(c, ADD_xr(XT, XP, XT));
             if (scalar) {
@@ -596,7 +615,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_load_64_hi: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int            p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             put(c, LSL_xi(XT, XI, 3));
             put(c, ADD_xr(XT, XP, XT));
             if (scalar) {
@@ -615,7 +634,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_load_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int            p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {
                 put(c,
                     0x78607800u
@@ -631,7 +650,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_uniform_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int            p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_imm_w(c, XT, (uint32_t)inst->imm);
             put(c, LDR_sx(s.rd, XP, XT));
             put(c, 0x4e040400u | ((uint32_t)s.rd << 5) | (uint32_t)s.rd);
@@ -640,7 +659,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_uniform_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int            p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_imm_w(c, XT, (uint32_t)(inst->imm * 2));
             put(c, 0x78606800u | ((uint32_t)XT << 16) | ((uint32_t)XP << 5) | (uint32_t)XT);
             put(c, DUP_4s_w(s.rd, XT));
@@ -651,7 +670,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x);
             if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
             int p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_count(c, p, 2, deref_gpr);
             put(c, UMOV_ws(XT, rx));
             put(c, MOVI_4s(s.rd, 0, 0));
@@ -667,7 +686,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x);
             if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
             int p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_count(c, p, 2, deref_gpr);
             if (scalar) {
                 put(c, MOVI_4s(s.rd, 0, 0));
@@ -693,7 +712,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x);
             if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
             int p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_count(c, p, 1, deref_gpr);
             put(c, UMOV_ws(XT, rx));
             put(c, MOVI_4s(s.rd, 0, 0));
@@ -709,7 +728,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x);
             if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
             int p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_count(c, p, 1, deref_gpr);
             if (scalar) {
                 put(c, MOVI_4s(s.rd, 0, 0));
@@ -738,7 +757,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_store_32: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
             int    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {
                 put(c, STR_sx(ry, XP, XI));
             } else {
@@ -751,7 +770,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t rx = ra_ensure(ra, sl, ns, inst->x);
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
             int    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             put(c, LSL_xi(XT, XI, 3));
             put(c, ADD_xr(XT, XP, XT));
             if (scalar) {
@@ -774,7 +793,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_store_16: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
             int    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {
                 put(c, STR_hx(ry, XP, XI));
             } else {
@@ -1033,9 +1052,7 @@ __attribute__((no_sanitize("function")))
 #endif
 void umbra_jit_run(struct umbra_jit *j, int w, int h, int x0, int y0, umbra_buf buf[]) {
     if (!j) { return; }
-    // TODO: pass (w, h, buf, y0, x0) once JIT codegen is updated
-    j->entry(w * h, w, buf, y0);
-    (void)x0;
+    j->entry(w, h, buf, y0, x0);
 }
 void umbra_jit_free(struct umbra_jit *j) {
     if (!j) { return; }
@@ -1387,7 +1404,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
 
 static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
-                     struct jit_ctx *jc);
+                     int *deref_rb_gpr, struct jit_ctx *jc);
 
 static int resolve_ptr_x86(Buf *c, int p, int *last_ptr, int const *deref_gpr) {
     if (p < 0) { return deref_gpr[~p]; }
@@ -1397,7 +1414,7 @@ static int resolve_ptr_x86(Buf *c, int p, int *last_ptr, int const *deref_gpr) {
 struct umbra_jit {
     void  *code;
     size_t code_size, code_len;
-    void (*entry)(int, int, umbra_buf *, int);
+    void (*entry)(int, int, umbra_buf *, int, int);
     int loop_start, loop_end;
 };
 
@@ -1405,7 +1422,8 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     int *sl = malloc((size_t)bb->insts * sizeof(int));
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
     int  ns = 0;
-    int *deref_gpr = calloc((size_t)bb->insts, sizeof(int));
+    int *deref_gpr    = calloc((size_t)bb->insts, sizeof(int));
+    int *deref_rb_gpr = calloc((size_t)bb->insts, sizeof(int));
 
     Buf            c = {0};
     struct jit_ctx jc = {.c = &c, .bb = bb, .pool = {0}};
@@ -1420,7 +1438,14 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
 
     mov_rr(&c, XI, RCX);  // save y0 (RCX) to XI before preamble clobbers it
 
-    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, &jc);
+    // Shim new ABI (RDI=w, RSI=h) → old ABI (RDI=n, RSI=w).
+    mov_rr(&c, R11, RDI);      // R11 = w (save)
+    rex_w(&c, RDI, RSI);       // IMUL RDI, RSI → RDI = w*h = n
+    emit1(&c, 0x0f); emit1(&c, 0xaf);
+    emit1(&c, (uint8_t)(0xc0 | ((RDI & 7) << 3) | (RSI & 7)));
+    mov_rr(&c, RSI, R11);      // RSI = w = XWIDTH
+
+    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
 
     ra_begin_loop(ra);
 
@@ -1456,7 +1481,7 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     int br_tail = jcc(&c, 0x0c);
 
     int loop_body_start = c.len;
-    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0, deref_gpr, &jc);
+    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
 
     ra_end_loop(ra, sl);
 
@@ -1478,8 +1503,8 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     for (int i = 0; i < bb->insts; i++) { ra_free_reg(ra, i); }
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
 
-    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, &jc);
-    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 1, deref_gpr, &jc);
+    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
+    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 1, deref_gpr, deref_rb_gpr, &jc);
 
     add_ri(&c, XI, 1);
     {
@@ -1533,6 +1558,7 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     ra_destroy(ra);
     free(sl);
     free(deref_gpr);
+    free(deref_rb_gpr);
 
     size_t code_sz = (size_t)c.len;
     size_t pg = (size_t)sysconf(_SC_PAGESIZE);
@@ -1561,7 +1587,7 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     {
         union {
             void *p;
-            void (*fn)(int, int, umbra_buf *, int);
+            void (*fn)(int, int, umbra_buf *, int, int);
         } u = {.p = mem};
         j->entry = u.fn;
     }
@@ -1570,7 +1596,8 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
 
 static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
-                     struct jit_ctx *jc) {
+                     int *deref_rb_gpr, struct jit_ctx *jc) {
+    (void)deref_rb_gpr;
 #define lu(v) ra_last_use(ra, (v))
     int       last_ptr = -1;
     int       dc = 0;
@@ -2181,9 +2208,7 @@ __attribute__((no_sanitize("function")))
 #endif
 void umbra_jit_run(struct umbra_jit *j, int w, int h, int x0, int y0, umbra_buf buf[]) {
     if (!j) { return; }
-    // TODO: pass (w, h, buf, y0, x0) once JIT codegen is updated
-    j->entry(w * h, w, buf, y0);
-    (void)x0;
+    j->entry(w, h, buf, y0, x0);
 }
 
 void umbra_jit_free(struct umbra_jit *j) {
