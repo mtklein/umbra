@@ -77,7 +77,7 @@ static F32 f16_to_f32(U16 h) {
     F32 r = {0};
     for (int i = 0; i < K; i++) {
         __fp16 tmp;
-        __builtin_memcpy(&tmp, (char *)&h + 2 * i, 2);
+        __builtin_memcpy(&tmp, (char*)&h + 2 * i, 2);
         r[i] = (float)tmp;
     }
     return r;
@@ -86,7 +86,7 @@ static U16 f32_to_f16(F32 f) {
     U16 r = {0};
     for (int i = 0; i < K; i++) {
         __fp16 tmp = (__fp16)f[i];
-        __builtin_memcpy((char *)&r + 2 * i, &tmp, 2);
+        __builtin_memcpy((char*)&r + 2 * i, &tmp, 2);
     }
     return r;
 }
@@ -137,23 +137,23 @@ op(y_fn) {
 op(uniform_16) {
     assert(buf[ip->x].row_bytes == 0);
     uint16_t uni;
-    __builtin_memcpy(&uni, (uint16_t const *)buf[ip->x].ptr + ip->y, sizeof uni);
+    __builtin_memcpy(&uni, (uint16_t const*)buf[ip->x].ptr + ip->y, sizeof uni);
     v->u32 = (U32){0} + (uint32_t)uni;
     next;
 }
 op(uniform_32) {
     assert(buf[ip->x].row_bytes == 0);
     int32_t uni;
-    __builtin_memcpy(&uni, (int32_t const *)buf[ip->x].ptr + ip->y, sizeof uni);
+    __builtin_memcpy(&uni, (int32_t const*)buf[ip->x].ptr + ip->y, sizeof uni);
     v->i32 = (I32){0} + uni;
     next;
 }
 
 op(load_16) {
-    void const     *base = (char *)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
-    uint16_t const *src = (uint16_t const *)base;
-    int             i = end - K;
-    int             rem = n - i;
+    void const     *base = (char*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
+    uint16_t const *src = (uint16_t const*)base;
+    int const       i = end - K;
+    int const       rem = n - i;
     if (rem >= K) {
         U16 tmp;
         __builtin_memcpy(&tmp, src + i, 2 * K);
@@ -164,16 +164,16 @@ op(load_16) {
         for (int l = 0; l < rem; l++) {
             uint16_t s;
             __builtin_memcpy(&s, src + i + l, 2);
-            __builtin_memcpy((char *)v + 2 * l, &s, 2);
+            __builtin_memcpy((char*)v + 2 * l, &s, 2);
         }
     }
     next;
 }
 op(load_32) {
-    void const    *base = (char *)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
-    int32_t const *src = (int32_t const *)base;
-    int            i = end - K;
-    int            rem = n - i;
+    void const    *base = (char*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
+    int32_t const *src = (int32_t const*)base;
+    int const      i = end - K;
+    int const      rem = n - i;
     if (rem >= K) {
         __builtin_memcpy(v, src + i, 4 * K);
     } else {
@@ -187,9 +187,9 @@ op(load_32) {
     next;
 }
 op(load_64_lo) {
-    char const *src = (char const *)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
-    int         i = end - K;
-    int         rem = n - i;
+    char const *src = (char const*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
+    int const   i = end - K;
+    int const   rem = n - i;
     v->i32 = (I32){0};
     for (int l = 0; l < (rem < K ? rem : K); l++) {
         int32_t tmp;
@@ -199,9 +199,9 @@ op(load_64_lo) {
     next;
 }
 op(load_64_hi) {
-    char const *src = (char const *)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
-    int         i = end - K;
-    int         rem = n - i;
+    char const *src = (char const*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
+    int const   i = end - K;
+    int const   rem = n - i;
     v->i32 = (I32){0};
     for (int l = 0; l < (rem < K ? rem : K); l++) {
         int32_t tmp;
@@ -211,9 +211,9 @@ op(load_64_hi) {
     next;
 }
 op(load_64_fused) {
-    char const *src = (char const *)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
-    int         i = end - K;
-    int         rem = n - i;
+    char const *src = (char const*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
+    int const   i = end - K;
+    int const   rem = n - i;
     v[0].i32 = (I32){0};
     v[1].i32 = (I32){0};
     for (int l = 0; l < (rem < K ? rem : K); l++) {
@@ -226,45 +226,45 @@ op(load_64_fused) {
     return ip[1].fn(ip + 1, v + 2, end, n, row, buf);
 }
 op(store_16) {
-    void     *base = (char *)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
-    uint16_t *dst = (uint16_t *)base;
-    int       i = end - K;
-    int       rem = n - i;
+    void     *base = (char*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
+    uint16_t *dst = (uint16_t*)base;
+    int const i = end - K;
+    int const rem = n - i;
     if (rem >= K) {
         __builtin_memcpy(dst + i, &v[ip->y], 2 * K);
     } else {
         for (int l = 0; l < rem; l++) {
             uint16_t s;
-            __builtin_memcpy(&s, (char *)&v[ip->y] + 2 * l, 2);
+            __builtin_memcpy(&s, (char*)&v[ip->y] + 2 * l, 2);
             __builtin_memcpy(dst + i + l, &s, 2);
         }
     }
     next;
 }
 op(store_32) {
-    void    *base = (char *)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
-    int32_t *dst = (int32_t *)base;
-    int      i = end - K;
-    int      rem = n - i;
+    void    *base = (char*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
+    int32_t *dst = (int32_t*)base;
+    int const i = end - K;
+    int const rem = n - i;
     if (rem >= K) {
         __builtin_memcpy(dst + i, v + ip->y, 4 * K);
     } else {
         for (int l = 0; l < rem; l++) {
             int32_t tmp;
-            __builtin_memcpy(&tmp, (char *)&v[ip->y].i32 + 4 * l, 4);
+            __builtin_memcpy(&tmp, (char*)&v[ip->y].i32 + 4 * l, 4);
             __builtin_memcpy(dst + i + l, &tmp, 4);
         }
     }
     next;
 }
 op(store_64) {
-    char *dst = (char *)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
-    int   i = end - K;
-    int   rem = n - i;
+    char *dst = (char*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
+    int const i = end - K;
+    int const rem = n - i;
     for (int l = 0; l < (rem < K ? rem : K); l++) {
         int32_t lo, hi;
-        __builtin_memcpy(&lo, (char *)&v[ip->y].i32 + 4 * l, 4);
-        __builtin_memcpy(&hi, (char *)&v[ip->z].i32 + 4 * l, 4);
+        __builtin_memcpy(&lo, (char*)&v[ip->y].i32 + 4 * l, 4);
+        __builtin_memcpy(&hi, (char*)&v[ip->z].i32 + 4 * l, 4);
         __builtin_memcpy(dst + (i + l) * 8, &lo, 4);
         __builtin_memcpy(dst + (i + l) * 8 + 4, &hi, 4);
     }
@@ -272,49 +272,49 @@ op(store_64) {
 }
 
 op(gather_uniform_16) {
-    int ix = v[ip->y].i32[0];
-    int count = (int)(buf[ip->x].sz / 2);
+    int const ix = v[ip->y].i32[0];
+    int const count = (int)(buf[ip->x].sz / 2);
     if (ix < 0 || ix >= count) { v->u32 = (U32){0}; next; }
     uint16_t s;
-    __builtin_memcpy(&s, (char const *)buf[ip->x].ptr + 2 * ix, 2);
-    U16 packed = (U16){0} + s;
+    __builtin_memcpy(&s, (char const*)buf[ip->x].ptr + 2 * ix, 2);
+    U16 const packed = (U16){0} + s;
     v->u32 = (U32){0};
     __builtin_memcpy(v, &packed, sizeof packed);
     next;
 }
 op(gather_uniform_32) {
-    int ix = v[ip->y].i32[0];
-    int count = (int)(buf[ip->x].sz / 4);
+    int const ix = v[ip->y].i32[0];
+    int const count = (int)(buf[ip->x].sz / 4);
     if (ix < 0 || ix >= count) { v->i32 = (I32){0}; next; }
     int32_t val;
-    __builtin_memcpy(&val, (char const *)buf[ip->x].ptr + 4 * ix, 4);
+    __builtin_memcpy(&val, (char const*)buf[ip->x].ptr + 4 * ix, 4);
     v->i32 = (I32){0} + val;
     next;
 }
 
 op(gather_16) {
-    I32 ix = v[ip->y].i32;
-    int count = (int)(buf[ip->x].sz / 2);
-    int rem = n - (end - K);
+    I32 const ix = v[ip->y].i32;
+    int const count = (int)(buf[ip->x].sz / 2);
+    int const rem = n - (end - K);
     v->u32 = (U32){0};
     for (int l = 0; l < (rem < K ? rem : K); l++) {
         if (ix[l] >= 0 && ix[l] < count) {
             uint16_t s;
-            __builtin_memcpy(&s, (char const *)buf[ip->x].ptr + 2 * ix[l], 2);
-            __builtin_memcpy((char *)v + 2 * l, &s, 2);
+            __builtin_memcpy(&s, (char const*)buf[ip->x].ptr + 2 * ix[l], 2);
+            __builtin_memcpy((char*)v + 2 * l, &s, 2);
         }
     }
     next;
 }
 op(gather_32) {
-    I32 ix = v[ip->y].i32;
-    int count = (int)(buf[ip->x].sz / 4);
-    int rem = n - (end - K);
+    I32 const ix = v[ip->y].i32;
+    int const count = (int)(buf[ip->x].sz / 4);
+    int const rem = n - (end - K);
     v->i32 = (I32){0};
     for (int l = 0; l < (rem < K ? rem : K); l++) {
         if (ix[l] >= 0 && ix[l] < count) {
             int32_t tmp;
-            __builtin_memcpy(&tmp, (char const *)buf[ip->x].ptr + 4 * ix[l], 4);
+            __builtin_memcpy(&tmp, (char const*)buf[ip->x].ptr + 4 * ix[l], 4);
             v->i32[l] = tmp;
         }
     }
@@ -329,7 +329,7 @@ op(f32_from_f16_fn) {
 }
 
 op(f16_from_f32_fn) {
-    U16 h = f32_to_f16(v[ip->x].f32);
+    U16 const h = f32_to_f16(v[ip->x].f32);
     v->u32 = (U32){0};
     __builtin_memcpy(v, &h, sizeof h);
     next;
@@ -395,14 +395,14 @@ op(fms_f32) {
 #else
 typedef double F64 __attribute__((vector_size(K * 8)));
 op(fma_f32) {
-    F64 x = cast(F64, v[ip->x].f32), y = cast(F64, v[ip->y].f32),
-        z = cast(F64, v[ip->z].f32);
+    F64 const x = cast(F64, v[ip->x].f32), y = cast(F64, v[ip->y].f32),
+              z = cast(F64, v[ip->z].f32);
     v->f32 = cast(F32, x * y + z);
     next;
 }
 op(fms_f32) {
-    F64 x = cast(F64, v[ip->x].f32), y = cast(F64, v[ip->y].f32),
-        z = cast(F64, v[ip->z].f32);
+    F64 const x = cast(F64, v[ip->x].f32), y = cast(F64, v[ip->y].f32),
+              z = cast(F64, v[ip->z].f32);
     v->f32 = cast(F32, z - x * y);
     next;
 }
@@ -532,22 +532,22 @@ op(le_u32) {
 }
 
 op(shl_imm_fn) {
-    I32 sh = (I32){0} + ip->y;
+    I32 const sh = (I32){0} + ip->y;
     v->i32 = v[ip->x].i32 << sh;
     next;
 }
 op(shr_u32_imm_fn) {
-    U32 sh = (U32){0} + (uint32_t)ip->y;
+    U32 const sh = (U32){0} + (uint32_t)ip->y;
     v->u32 = v[ip->x].u32 >> sh;
     next;
 }
 op(shr_s32_imm_fn) {
-    I32 sh = (I32){0} + ip->y;
+    I32 const sh = (I32){0} + ip->y;
     v->i32 = v[ip->x].i32 >> sh;
     next;
 }
 op(and_imm_fn) {
-    U32 m = (U32){0} + (uint32_t)ip->y;
+    U32 const m = (U32){0} + (uint32_t)ip->y;
     v->u32 = v[ip->x].u32 & m;
     next;
 }
@@ -555,8 +555,8 @@ op(add_f32_imm_fn) {
     union {
         int   i;
         float f;
-    } u = {.i = ip->y};
-    F32 imm = (F32){0} + u.f;
+    } const u = {.i = ip->y};
+    F32 const imm = (F32){0} + u.f;
     v->f32 = v[ip->x].f32 + imm;
     next;
 }
@@ -564,8 +564,8 @@ op(sub_f32_imm_fn) {
     union {
         int   i;
         float f;
-    } u = {.i = ip->y};
-    F32 imm = (F32){0} + u.f;
+    } const u = {.i = ip->y};
+    F32 const imm = (F32){0} + u.f;
     v->f32 = v[ip->x].f32 - imm;
     next;
 }
@@ -573,8 +573,8 @@ op(mul_f32_imm_fn) {
     union {
         int   i;
         float f;
-    } u = {.i = ip->y};
-    F32 imm = (F32){0} + u.f;
+    } const u = {.i = ip->y};
+    F32 const imm = (F32){0} + u.f;
     v->f32 = v[ip->x].f32 * imm;
     next;
 }
@@ -582,8 +582,8 @@ op(div_f32_imm_fn) {
     union {
         int   i;
         float f;
-    } u = {.i = ip->y};
-    F32 imm = (F32){0} + u.f;
+    } const u = {.i = ip->y};
+    F32 const imm = (F32){0} + u.f;
     v->f32 = v[ip->x].f32 / imm;
     next;
 }
@@ -591,8 +591,8 @@ op(min_f32_imm_fn) {
     union {
         int   i;
         float f;
-    } u = {.i = ip->y};
-    F32 imm = (F32){0} + u.f;
+    } const u = {.i = ip->y};
+    F32 const imm = (F32){0} + u.f;
     v->f32 = vec_min(v[ip->x].f32, imm);
     next;
 }
@@ -600,33 +600,33 @@ op(max_f32_imm_fn) {
     union {
         int   i;
         float f;
-    } u = {.i = ip->y};
-    F32 imm = (F32){0} + u.f;
+    } const u = {.i = ip->y};
+    F32 const imm = (F32){0} + u.f;
     v->f32 = vec_max(v[ip->x].f32, imm);
     next;
 }
 op(add_i32_imm_fn) {
-    I32 imm = (I32){0} + ip->y;
+    I32 const imm = (I32){0} + ip->y;
     v->i32 = v[ip->x].i32 + imm;
     next;
 }
 op(sub_i32_imm_fn) {
-    I32 imm = (I32){0} + ip->y;
+    I32 const imm = (I32){0} + ip->y;
     v->i32 = v[ip->x].i32 - imm;
     next;
 }
 op(mul_i32_imm_fn) {
-    I32 imm = (I32){0} + ip->y;
+    I32 const imm = (I32){0} + ip->y;
     v->i32 = v[ip->x].i32 * imm;
     next;
 }
 op(or_32_imm_fn) {
-    U32 imm = (U32){0} + (uint32_t)ip->y;
+    U32 const imm = (U32){0} + (uint32_t)ip->y;
     v->u32 = v[ip->x].u32 | imm;
     next;
 }
 op(xor_32_imm_fn) {
-    U32 imm = (U32){0} + (uint32_t)ip->y;
+    U32 const imm = (U32){0} + (uint32_t)ip->y;
     v->u32 = v[ip->x].u32 ^ imm;
     next;
 }
@@ -636,8 +636,8 @@ op(eq_f32_imm_fn) {
     union {
         int   i;
         float f;
-    } u = {.i = ip->y};
-    F32 imm = (F32){0} + u.f;
+    } const u = {.i = ip->y};
+    F32 const imm = (F32){0} + u.f;
     v->i32 = (I32)(v[ip->x].f32 == imm);
     next;
 }
@@ -646,8 +646,8 @@ op(lt_f32_imm_fn) {
     union {
         int   i;
         float f;
-    } u = {.i = ip->y};
-    F32 imm = (F32){0} + u.f;
+    } const u = {.i = ip->y};
+    F32 const imm = (F32){0} + u.f;
     v->i32 = (I32)(v[ip->x].f32 < imm);
     next;
 }
@@ -655,28 +655,28 @@ op(le_f32_imm_fn) {
     union {
         int   i;
         float f;
-    } u = {.i = ip->y};
-    F32 imm = (F32){0} + u.f;
+    } const u = {.i = ip->y};
+    F32 const imm = (F32){0} + u.f;
     v->i32 = (I32)(v[ip->x].f32 <= imm);
     next;
 }
 op(eq_i32_imm_fn) {
-    I32 imm = (I32){0} + ip->y;
+    I32 const imm = (I32){0} + ip->y;
     v->i32 = (I32)(v[ip->x].i32 == imm);
     next;
 }
 op(lt_s32_imm_fn) {
-    I32 imm = (I32){0} + ip->y;
+    I32 const imm = (I32){0} + ip->y;
     v->i32 = (I32)(v[ip->x].i32 < imm);
     next;
 }
 op(le_s32_imm_fn) {
-    I32 imm = (I32){0} + ip->y;
+    I32 const imm = (I32){0} + ip->y;
     v->i32 = (I32)(v[ip->x].i32 <= imm);
     next;
 }
 op(pack_fn) {
-    I32 sh = (I32){0} + ip->z;
+    I32 const sh = (I32){0} + ip->z;
     v->u32 = v[ip->x].u32 | (U32)(v[ip->y].i32 << sh);
     next;
 }
@@ -692,7 +692,7 @@ op(done) {
 }
 
 op(deref_ptr_handler) {
-    char *base = (char *)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
+    char *base = (char*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
     void *derived;
     ptrdiff_t ssz;
     size_t drb;
@@ -786,7 +786,7 @@ static Fn const fn[] = {
 
 int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     val                v[4] = {0};
-    struct interp_inst inst[2] = {
+    struct interp_inst const inst[2] = {
         {.fn = fn[op], .x = -3, .y = -2, .z = -1},
         {.fn = done},
     };
@@ -802,18 +802,18 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     return r;
 }
 
-struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) {
+struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) {
     int *id = calloc((size_t)bb->insts, sizeof *id);
 
     struct umbra_interpreter *p = malloc(sizeof *p);
-    int                       num_insts = bb->insts + 1;
+    int const                 num_insts = bb->insts + 1;
     p->inst = malloc((size_t)num_insts * sizeof *p->inst);
     p->v = malloc((size_t)num_insts * sizeof *p->v);
 
     int max_ptr = -1;
     int n_deref = 0;
     for (int i = 0; i < bb->insts; i++) {
-        if (has_ptr(bb->inst[i].op) && bb->inst[i].ptr >= 0 && bb->inst[i].ptr > max_ptr) {
+        if (has_ptr(bb->inst[i].op) && bb->inst[i].ptr >= 0 && max_ptr < bb->inst[i].ptr) {
             max_ptr = bb->inst[i].ptr;
         }
         if (bb->inst[i].op == op_deref_ptr) {
@@ -822,7 +822,7 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
     }
     p->nptr = max_ptr + 1;
     p->n_deref = n_deref;
-    int total_ptrs = p->nptr + n_deref;
+    int const total_ptrs = p->nptr + n_deref;
     p->buf = calloc((size_t)total_ptrs, sizeof *p->buf);
 
     int *deref_slot = calloc((size_t)bb->insts, sizeof *deref_slot);
@@ -1000,7 +1000,7 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
 
 void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int b,
                            umbra_buf caller_buf[]) {
-    int nall = p->nptr + p->n_deref;
+    int const nall = p->nptr + p->n_deref;
     for (int i = 0; i < p->nptr; i++) { p->buf[i] = caller_buf[i]; }
     for (int i = p->nptr; i < nall; i++) { p->buf[i] = (umbra_buf){0}; }
 

@@ -29,7 +29,7 @@ static void solid_animate(slide *s, float dt) {
         st->rx = 0.0f;
         st->vx = -st->vx;
     }
-    if (st->rx + st->rect_w > (float)st->w) {
+    if ((float)st->w < st->rx + st->rect_w) {
         st->rx = (float)st->w - st->rect_w;
         st->vx = -st->vx;
     }
@@ -37,7 +37,7 @@ static void solid_animate(slide *s, float dt) {
         st->ry = 0.0f;
         st->vy = -st->vy;
     }
-    if (st->ry + st->rect_h > (float)st->h) {
+    if ((float)st->h < st->ry + st->rect_h) {
         st->ry = (float)st->h - st->rect_h;
         st->vy = -st->vy;
     }

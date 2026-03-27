@@ -18,7 +18,7 @@ struct ra_config {
 // Opaque register allocator.
 struct ra;
 
-struct ra *ra_create(struct umbra_basic_block const *bb, struct ra_config const *cfg);
+struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const *cfg);
 void       ra_destroy(struct ra *ra);
 
 // Core operations.

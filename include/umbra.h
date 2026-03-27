@@ -38,9 +38,9 @@ typedef struct { int ix, :24; _Bool deref; } umbra_ptr;
 int       umbra_reserve    (struct umbra_builder*, int n);
 int       umbra_reserve_ptr(struct umbra_builder*);
 umbra_ptr umbra_deref_ptr  (struct umbra_builder*, umbra_ptr buf, int byte_off);
-int       umbra_uni_len    (struct umbra_builder const *);
+int       umbra_uni_len    (struct umbra_builder const*);
 void      umbra_set_uni_len(struct umbra_builder*, int);
-int       umbra_max_ptr    (struct umbra_builder const *);
+int       umbra_max_ptr    (struct umbra_builder const*);
 
 umbra_val umbra_x(struct umbra_builder*);
 umbra_val umbra_y(struct umbra_builder*);
@@ -127,6 +127,6 @@ umbra_val umbra_ge_u32(struct umbra_builder*, umbra_val, umbra_val);
 
 
 #include <stdio.h>
-void umbra_program_dump(struct umbra_program *, FILE *);
-void umbra_dump_builder(struct umbra_builder const *, FILE *);
-void umbra_dump_basic_block(struct umbra_basic_block const *, FILE *);
+void umbra_program_dump(struct umbra_program*, FILE*);
+void umbra_dump_builder(struct umbra_builder const*, FILE*);
+void umbra_dump_basic_block(struct umbra_basic_block const*, FILE*);

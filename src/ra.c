@@ -28,8 +28,8 @@ void ra_assign(struct ra *ra, int val, int8_t r) {
     ra->owner[(int)r] = val;
 }
 
-struct ra *ra_create(struct umbra_basic_block const *bb, struct ra_config const *cfg) {
-    int        n = bb->insts;
+struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const *cfg) {
+    int const  n = bb->insts;
     struct ra *ra = malloc(sizeof *ra);
     ra->cfg = *cfg;
     ra->reg = malloc((size_t)n * sizeof *ra->reg);
@@ -87,7 +87,7 @@ static _Bool can_remat(struct ra const *ra, int val) {
 
 void ra_end_loop(struct ra *ra, int *sl) {
     for (int i = 0; i < ra->preamble; i++) {
-        int8_t target = ra->loop_reg[i];
+        int8_t const target = ra->loop_reg[i];
         if (target < 0) { continue; }
         if (ra->reg[i] == target) { continue; }
         if (sl[i] >= 0) {
@@ -99,7 +99,7 @@ void ra_end_loop(struct ra *ra, int *sl) {
 }
 
 void ra_free_reg(struct ra *ra, int val) {
-    int8_t r = ra->reg[val];
+    int8_t const r = ra->reg[val];
     if (r >= 0) {
         ra->free_stack[ra->nfree++] = r;
         ra->owner[(int)r] = -1;
@@ -115,7 +115,7 @@ int8_t ra_alloc(struct ra *ra, int *sl, int *ns) {
     int best_r = -1, best_lu = -1;
     for (int r = 0; r < ra->cfg.max_reg; r++) {
         if (ra->owner[r] < 0) { continue; }
-        int   val = ra->owner[r];
+        int const val = ra->owner[r];
         _Bool skip = 0;
         for (int p = 0; p < ra->npinned; p++) {
             if (ra->pinned[p] == val) {
@@ -124,13 +124,13 @@ int8_t ra_alloc(struct ra *ra, int *sl, int *ns) {
             }
         }
         if (skip) { continue; }
-        int lu = ra->last_use[val] < 0 ? INT_MAX : ra->last_use[val];
-        if (lu > best_lu) {
+        int const lu = ra->last_use[val] < 0 ? INT_MAX : ra->last_use[val];
+        if (best_lu < lu) {
             best_lu = lu;
             best_r = r;
         }
     }
-    int evicted = ra->owner[best_r];
+    int const evicted = ra->owner[best_r];
     if (can_remat(ra, evicted)) {
         sl[evicted] = -1;
     } else {
@@ -140,14 +140,14 @@ int8_t ra_alloc(struct ra *ra, int *sl, int *ns) {
         ra->cfg.spill(ra->reg[evicted], sl[evicted], ra->cfg.ctx);
     }
     ra->owner[(int)ra->reg[evicted]] = -1;
-    int8_t r = ra->reg[evicted];
+    int8_t const r = ra->reg[evicted];
     ra->reg[evicted] = -1;
     return r;
 }
 
 int8_t ra_ensure(struct ra *ra, int *sl, int *ns, int val) {
     if (ra->reg[val] < 0) {
-        int8_t r = ra_alloc(ra, sl, ns);
+        int8_t const r = ra_alloc(ra, sl, ns);
         if (sl[val] >= 0) {
             ra->cfg.fill(r, sl[val], ra->cfg.ctx);
         } else if (can_remat(ra, val)) {
@@ -160,7 +160,7 @@ int8_t ra_ensure(struct ra *ra, int *sl, int *ns, int val) {
 }
 
 int8_t ra_claim(struct ra *ra, int old_val, int new_val) {
-    int8_t r = ra->reg[old_val];
+    int8_t const r = ra->reg[old_val];
     ra->reg[old_val] = -1;
     ra->reg[new_val] = r;
     ra->owner[(int)r] = new_val;
@@ -191,7 +191,7 @@ struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct bb_inst con
     (void)scalar;
     struct ra_step s = step0();
     s.rx = ra_ensure(ra, sl, ns, inst->x);
-    _Bool x_dead = ra->last_use[inst->x] <= i;
+    _Bool const x_dead = ra->last_use[inst->x] <= i;
     if (x_dead) {
         s.rd = ra_claim(ra, inst->x, i);
     } else {
@@ -231,9 +231,9 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const
     if (inst->z == inst->x) { z_dead = 0; }
     if (inst->z == inst->y) { z_dead = 0; }
 
-    enum op op = inst->op;
-    _Bool   fma = op == op_fma_f32 || op == op_fms_f32;
-    _Bool   destructive = fma || op == op_sel_32;
+    enum op const op = inst->op;
+    _Bool const   fma = op == op_fma_f32 || op == op_fms_f32;
+    _Bool const   destructive = fma || op == op_sel_32;
 
     if (fma && z_dead) {
         s.rd = ra_claim(ra, inst->z, i);
@@ -276,7 +276,7 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const
         ra->owner[(int)s.rd] = i;
     }
 
-    _Bool fma_scratch = fma && s.rd != s.rz && (s.rd == s.rx || s.rd == s.ry);
+    _Bool const fma_scratch = fma && s.rd != s.rz && (s.rd == s.rx || s.rd == s.ry);
     if (nscratch >= 1 || fma_scratch) { s.scratch = ra_alloc(ra, sl, ns); }
     if (nscratch >= 2) { s.scratch2 = ra_alloc(ra, sl, ns); }
 

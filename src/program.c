@@ -5,19 +5,19 @@ static void nop_flush(struct umbra_backend *be) { (void)be; }
 static void nop_dump(void const *ctx, FILE *f) { (void)ctx; (void)f; }
 
 struct umbra_backend {
-    struct umbra_program *(*compile)(struct umbra_backend *,
-                                     struct umbra_basic_block const *);
-    void  (*flush)(struct umbra_backend *);
-    void  (*free_fn)(struct umbra_backend *);
+    struct umbra_program* (*compile)(struct umbra_backend*,
+                                     struct umbra_basic_block const*);
+    void  (*flush)(struct umbra_backend*);
+    void  (*free_fn)(struct umbra_backend*);
     void  *ctx;
     int     threadsafe, :32;
 };
 
 struct umbra_program {
     void *ctx;
-    void (*queue)(void *, int, int, int, int, umbra_buf[]);
-    void (*dump)(void const *, FILE *);
-    void (*free_fn)(void *);
+    void (*queue)(void*, int, int, int, int, umbra_buf[]);
+    void (*dump)(void const*, FILE*);
+    void (*free_fn)(void*);
     struct umbra_backend *backend;
 };
 
@@ -27,9 +27,9 @@ static void run_interp(void *ctx, int l, int t, int r, int b, umbra_buf buf[]) {
 static void                  free_interp(void *ctx) { umbra_interpreter_free(ctx); }
 static struct umbra_program *compile_interp(struct umbra_backend           *be,
                                             struct umbra_basic_block const *bb) {
-    struct umbra_interpreter *p = umbra_interpreter(bb);
+    struct umbra_interpreter *const p = umbra_interpreter(bb);
     if (p) {
-        struct umbra_program *prog = malloc(sizeof *prog);
+        struct umbra_program *const prog = malloc(sizeof *prog);
         *prog = (struct umbra_program){
             .ctx = p,
             .queue = run_interp,
@@ -43,7 +43,7 @@ static struct umbra_program *compile_interp(struct umbra_backend           *be,
 }
 static void           free_be_interp(struct umbra_backend *be) { free(be); }
 struct umbra_backend *umbra_backend_interp(void) {
-    struct umbra_backend *be = malloc(sizeof *be);
+    struct umbra_backend *const be = malloc(sizeof *be);
     *be = (struct umbra_backend){
         .compile = compile_interp,
         .flush = nop_flush,
@@ -60,9 +60,9 @@ static void dump_jit(void const *ctx, FILE *f) { umbra_dump_jit_mca(ctx, f); }
 static void free_jit(void *ctx) { umbra_jit_free(ctx); }
 static struct umbra_program *compile_jit(struct umbra_backend           *be,
                                          struct umbra_basic_block const *bb) {
-    struct umbra_jit *j = umbra_jit(bb);
+    struct umbra_jit *const j = umbra_jit(bb);
     if (j) {
-        struct umbra_program *prog = malloc(sizeof *prog);
+        struct umbra_program *const prog = malloc(sizeof *prog);
         *prog = (struct umbra_program){
             .ctx = j,
             .queue = run_jit,
@@ -76,7 +76,7 @@ static struct umbra_program *compile_jit(struct umbra_backend           *be,
 }
 static void           free_be_jit(struct umbra_backend *be) { free(be); }
 struct umbra_backend *umbra_backend_jit(void) {
-    struct umbra_backend *be = malloc(sizeof *be);
+    struct umbra_backend *const be = malloc(sizeof *be);
     *be = (struct umbra_backend){
         .compile = compile_jit,
         .flush = nop_flush,
@@ -93,9 +93,9 @@ static void dump_metal(void const *ctx, FILE *f) { umbra_dump_metal(ctx, f); }
 static void free_metal(void *ctx) { umbra_metal_free(ctx); }
 static struct umbra_program *compile_metal(struct umbra_backend           *be,
                                            struct umbra_basic_block const *bb) {
-    struct umbra_metal *m = umbra_metal(be->ctx, bb);
+    struct umbra_metal *const m = umbra_metal(be->ctx, bb);
     if (m) {
-        struct umbra_program *prog = malloc(sizeof *prog);
+        struct umbra_program *const prog = malloc(sizeof *prog);
         *prog = (struct umbra_program){
             .ctx = m,
             .queue = run_metal,
@@ -114,9 +114,9 @@ static void free_be_metal(struct umbra_backend *be) {
     free(be);
 }
 struct umbra_backend *umbra_backend_metal(void) {
-    void *ctx = umbra_metal_backend_create();
+    void *const ctx = umbra_metal_backend_create();
     if (ctx) {
-        struct umbra_backend *be = malloc(sizeof *be);
+        struct umbra_backend *const be = malloc(sizeof *be);
         *be = (struct umbra_backend){
             .compile = compile_metal,
             .flush = flush_be_metal,

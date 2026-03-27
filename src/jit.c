@@ -48,7 +48,7 @@ static int pool_add(struct pool *p, void const *src, int n) {
             return i;
         }
     }
-    if (p->nbytes + n > p->cap_data) {
+    if (p->cap_data < p->nbytes + n) {
         p->cap_data = p->cap_data ? 2 * p->cap_data : 256;
         p->data = realloc(p->data, (size_t)p->cap_data);
     }
@@ -1189,7 +1189,7 @@ static int pool_add(struct pool *p, void const *src, int n) {
             return i;
         }
     }
-    if (p->nbytes + n > p->cap_data) {
+    if (p->cap_data < p->nbytes + n) {
         p->cap_data = p->cap_data ? 2 * p->cap_data : 256;
         p->data = realloc(p->data, (size_t)p->cap_data);
     }

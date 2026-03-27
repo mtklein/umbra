@@ -83,7 +83,7 @@ static uint32_t bb_inst_hash(struct bb_inst const *inst) {
 
 static val push_(builder *b, struct bb_inst inst) {
     {
-        enum op op = inst.op;
+        enum op const op = inst.op;
         if (op == op_imm_32 || op == op_uniform_32 || op == op_uniform_16 || op == op_deref_ptr) {
             inst.uniform = 1;
         } else if (is_varying(op)
@@ -142,7 +142,7 @@ static val push_(builder *b, struct bb_inst inst) {
 }
 #define push(b, ...) push_(b, (struct bb_inst){.op = __VA_ARGS__})
 
-builder *umbra_builder(void) {
+builder* umbra_builder(void) {
     builder *b = calloc(1, sizeof *b);
     // Simplifies liveness analysis to know id 0 is imm=0.
     push(b, op_imm_32, .imm = 0);
@@ -163,24 +163,24 @@ val umbra_imm_f32(builder *b, float v) {
     union {
         float f;
         int   i;
-    } u = {.f = v};
+    } const u = {.f = v};
     return umbra_imm_i32(b, u.i);
 }
 
 int umbra_reserve(builder *b, int n) {
     b->uni_len = (b->uni_len + 3) & ~3;
-    int ix = b->uni_len / 4;
+    int const ix = b->uni_len / 4;
     b->uni_len += n * 4;
     return ix;
 }
 int umbra_reserve_ptr(builder *b) {
     b->uni_len = (b->uni_len + 7) & ~7;
-    int off = b->uni_len;
+    int const off = b->uni_len;
     b->uni_len += 24;
     return off;
 }
 umbra_ptr umbra_deref_ptr(builder *b, umbra_ptr buf, int byte_off) {
-    val v = push(b, op_deref_ptr, .ptr = ptr_ix(buf), .imm = byte_off);
+    val const v = push(b, op_deref_ptr, .ptr = ptr_ix(buf), .imm = byte_off);
     return (umbra_ptr){.ix = v.id, .deref = 1};
 }
 int  umbra_uni_len(builder const *b) { return b->uni_len; }
@@ -190,7 +190,7 @@ void umbra_set_uni_len(builder *b, int len) { b->uni_len = len; }
 int umbra_max_ptr(builder const *b) {
     int m = 0;
     for (int i = 0; i < b->insts; i++) {
-        if (has_ptr(b->inst[i].op) && b->inst[i].ptr > m) { m = b->inst[i].ptr; }
+        if (has_ptr(b->inst[i].op) && m < b->inst[i].ptr) { m = b->inst[i].ptr; }
     }
     return m;
 }
@@ -199,7 +199,7 @@ val umbra_uniform_16(builder *b, umbra_ptr src, int slot) {
     return push(b, op_uniform_16, .imm = slot, .ptr = ptr_ix(src));
 }
 val umbra_gather_16(builder *b, umbra_ptr src, val ix) {
-    enum op op = b->inst[ix.id].uniform ? op_gather_uniform_16 : op_gather_16;
+    enum op const op = b->inst[ix.id].uniform ? op_gather_uniform_16 : op_gather_16;
     return push(b, op, .x = ix.id, .ptr = ptr_ix(src));
 }
 val umbra_load_32(builder *b, umbra_ptr src) {
@@ -216,7 +216,7 @@ val umbra_uniform_32(builder *b, umbra_ptr src, int slot) {
     return push(b, op_uniform_32, .imm = slot, .ptr = ptr_ix(src));
 }
 val umbra_gather_32(builder *b, umbra_ptr src, val ix) {
-    enum op op = b->inst[ix.id].uniform ? op_gather_uniform_32 : op_gather_32;
+    enum op const op = b->inst[ix.id].uniform ? op_gather_uniform_32 : op_gather_32;
     return push(b, op, .x = ix.id, .ptr = ptr_ix(src));
 }
 void umbra_store_32(builder *b, umbra_ptr dst, val v) {
@@ -252,16 +252,16 @@ static val math_(builder *b, struct bb_inst inst) {
 #define math(b, ...) math_(b, (struct bb_inst){.op = __VA_ARGS__})
 
 static val try_imm(builder *b, val d, enum op fused, int x, int y) {
-    int imm_id = is_imm(b, x) ? x : is_imm(b, y) ? y : -1;
+    int const imm_id = is_imm(b, x) ? x : is_imm(b, y) ? y : -1;
     if (imm_id >= 0) {
-        int other = imm_id == x ? y : x;
+        int const other = imm_id == x ? y : x;
         return push(b, fused, .x = other, .y = imm_id, .imm = b->inst[imm_id].imm);
     }
     return (val){d.id};
 }
 
 static void sort(int *a, int *b) {
-    if (*a > *b) {
+    if (*b < *a) {
         int const t = *a;
         *a = *b;
         *b = t;
@@ -287,7 +287,7 @@ val umbra_sub_f32(builder *b, val x, val y) {
     if (b->inst[y.id].op == op_mul_f32) {
         return math(b, op_fms_f32, .x = b->inst[y.id].x, .y = b->inst[y.id].y, .z = x.id);
     }
-    val d = math(b, op_sub_f32, .x = x.id, .y = y.id);
+    val const d = math(b, op_sub_f32, .x = x.id, .y = y.id);
     if (is_imm(b, y.id)) {
         return push(b, op_sub_f32_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
@@ -304,7 +304,7 @@ val umbra_mul_f32(builder *b, val x, val y) {
 
 val umbra_div_f32(builder *b, val x, val y) {
     if (is_imm32(b, y.id, 0x3f800000)) { return x; }
-    val d = math(b, op_div_f32, .x = x.id, .y = y.id);
+    val const d = math(b, op_div_f32, .x = x.id, .y = y.id);
     if (is_imm(b, y.id)) {
         return push(b, op_div_f32_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
@@ -339,7 +339,7 @@ val umbra_round_i32(builder *b, val x) { return math(b, op_round_i32, .x = x.id)
 val umbra_floor_i32(builder *b, val x) { return math(b, op_floor_i32, .x = x.id); }
 val umbra_ceil_i32(builder *b, val x) { return math(b, op_ceil_i32, .x = x.id); }
 val umbra_sign_f32(builder *b, val x) {
-    val z = umbra_imm_f32(b, 0.0f);
+    val const z = umbra_imm_f32(b, 0.0f);
     return umbra_or_i32(b,
                         umbra_and_i32(b, umbra_gt_f32(b, x, z),
                                       umbra_imm_i32(b, 0x3f800000)),
@@ -357,7 +357,7 @@ val umbra_add_i32(builder *b, val x, val y) {
 val umbra_sub_i32(builder *b, val x, val y) {
     if (is_imm32(b, y.id, 0)) { return x; }
     if (x.id == y.id) { return umbra_imm_i32(b, 0); }
-    val d = math(b, op_sub_i32, .x = x.id, .y = y.id);
+    val const d = math(b, op_sub_i32, .x = x.id, .y = y.id);
     if (is_imm(b, y.id)) {
         return push(b, op_sub_i32_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
@@ -411,7 +411,7 @@ val umbra_and_i32(builder *b, val x, val y) {
     if (is_imm32(b, x.id, 0)) { return x; }
     if (is_imm32(b, x.id, 0x7fffffff)) { return umbra_abs_f32(b, y); }
     if (is_imm32(b, y.id, 0x7fffffff)) { return umbra_abs_f32(b, x); }
-    val d = math(b, op_and_32, .x = x.id, .y = y.id);
+    val const d = math(b, op_and_32, .x = x.id, .y = y.id);
     if (is_imm(b, x.id)) {
         return push(b, op_and_32_imm, .x = y.id, .y = x.id, .imm = b->inst[x.id].imm);
     }
@@ -455,14 +455,14 @@ val umbra_ne_f32(builder *b, val x, val y) {
     return umbra_xor_i32(b, umbra_eq_f32(b, x, y), umbra_imm_i32(b, -1));
 }
 val umbra_lt_f32(builder *b, val x, val y) {
-    val d = math(b, op_lt_f32, .x = x.id, .y = y.id);
+    val const d = math(b, op_lt_f32, .x = x.id, .y = y.id);
     if (is_imm(b, y.id)) {
         return push(b, op_lt_f32_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
     return (val){d.id};
 }
 val umbra_le_f32(builder *b, val x, val y) {
-    val d = math(b, op_le_f32, .x = x.id, .y = y.id);
+    val const d = math(b, op_le_f32, .x = x.id, .y = y.id);
     if (is_imm(b, y.id)) {
         return push(b, op_le_f32_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
@@ -481,14 +481,14 @@ val umbra_ne_i32(builder *b, val x, val y) {
 }
 
 val umbra_lt_s32(builder *b, val x, val y) {
-    val d = math(b, op_lt_s32, .x = x.id, .y = y.id);
+    val const d = math(b, op_lt_s32, .x = x.id, .y = y.id);
     if (is_imm(b, y.id)) {
         return push(b, op_lt_s32_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
     return (val){d.id};
 }
 val umbra_le_s32(builder *b, val x, val y) {
-    val d = math(b, op_le_s32, .x = x.id, .y = y.id);
+    val const d = math(b, op_le_s32, .x = x.id, .y = y.id);
     if (is_imm(b, y.id)) {
         return push(b, op_le_s32_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
@@ -506,7 +506,7 @@ val umbra_le_u32(builder *b, val x, val y) {
 val umbra_gt_u32(builder *b, val x, val y) { return umbra_lt_u32(b, y, x); }
 val umbra_ge_u32(builder *b, val x, val y) { return umbra_le_u32(b, y, x); }
 
-static char const *op_name(enum op op) {
+static char const* op_name(enum op op) {
     static char const *names[] = {
 #define OP_NAME(name) [op_##name] = #name,
         OP_LIST(OP_NAME)
@@ -525,12 +525,12 @@ static void schedule(struct bb_inst const *in, int n, _Bool const *body,
     for (int i = 0; i < n; i++) { last_use[i] = -1; }
     for (int i = 0; i < n; i++) {
         if (!body[i]) { continue; }
-        int deps[] = {in[i].x, in[i].y, in[i].z};
+        int const deps[] = {in[i].x, in[i].y, in[i].z};
         for (int k = 0; k < 3; k++) { last_use[deps[k]] = i; }
     }
     for (int i = 0; i < n; i++) {
         if (!body[i]) { continue; }
-        int deps[] = {in[i].x, in[i].y, in[i].z};
+        int const deps[] = {in[i].x, in[i].y, in[i].z};
         for (int k = 0; k < 3; k++) {
             if (body[deps[k]]) {
                 n_deps[i]++;
@@ -551,7 +551,7 @@ static void schedule(struct bb_inst const *in, int n, _Bool const *body,
     }
     for (int i = 0; i < n; i++) {
         if (!body[i]) { continue; }
-        int deps[] = {in[i].x, in[i].y, in[i].z};
+        int const deps[] = {in[i].x, in[i].y, in[i].z};
         for (int k = 0; k < 3; k++) {
             if (body[deps[k]]) { users[user_off[deps[k]] + n_users[deps[k]]++] = i; }
         }
@@ -567,22 +567,22 @@ static void schedule(struct bb_inst const *in, int n, _Bool const *body,
     while (nready > 0) {
         int best = 0, best_score = -9999;
         for (int r = 0; r < nready; r++) {
-            int id = ready[r];
-            int kills = 0;
-            int deps[] = {in[id].x, in[id].y, in[id].z};
+            int const id = ready[r];
+            int       kills = 0;
+            int const deps[] = {in[id].x, in[id].y, in[id].z};
             for (int k = 0; k < 3; k++) {
                 if (last_use[deps[k]] == id) { kills++; }
             }
-            int defines = is_store(in[id].op) ? 0 : 1;
-            int net = kills - defines;
-            int lu = last_use[id] < 0 ? total : last_use[id];
-            int score = net * total - lu;
-            if (score > best_score) {
+            int const defines = is_store(in[id].op) ? 0 : 1;
+            int const net = kills - defines;
+            int const lu = last_use[id] < 0 ? total : last_use[id];
+            int const score = net * total - lu;
+            if (best_score < score) {
                 best_score = score;
                 best = r;
             }
         }
-        int id = ready[best];
+        int const id = ready[best];
         ready[best] = ready[--nready];
 
         old_to_new[id] = j;
@@ -601,7 +601,7 @@ static void schedule(struct bb_inst const *in, int n, _Bool const *body,
     free(ready);
 }
 
-struct umbra_basic_block *umbra_basic_block(builder *b) {
+struct umbra_basic_block* umbra_basic_block(builder *b) {
     int const n = b->insts;
 
     _Bool *live = calloc((size_t)n, 1);
@@ -672,7 +672,7 @@ void umbra_basic_block_free(struct umbra_basic_block *bb) {
 static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
     for (int i = 0; i < insts; i++) {
         struct bb_inst const *ip = &inst[i];
-        enum op               op = ip->op;
+        enum op const         op = ip->op;
 
         if (is_store(op)) {
             {
