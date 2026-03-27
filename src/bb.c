@@ -568,6 +568,7 @@ static void schedule(struct bb_inst const *in, int n, _Bool const *body,
     }
 
     int j = preamble;
+    int prev_scheduled = -1;
     while (nready > 0) {
         int best = 0, best_score = -9999;
         for (int r = 0; r < nready; r++) {
@@ -580,7 +581,13 @@ static void schedule(struct bb_inst const *in, int n, _Bool const *body,
             int const defines = is_store(in[id].op) ? 0 : 1;
             int const net = kills - defines;
             int const lu = last_use[id] < 0 ? total : last_use[id];
-            int const score = net * total - lu;
+            // Bonus for chaining: if this op consumes the previous output,
+            // the interpreter can keep the value in a register.
+            int chain = 0;
+            for (int k = 0; k < 3; k++) {
+                if (deps[k] == prev_scheduled) { chain = 1; }
+            }
+            int const score = net * total - lu + chain * total * 2;
             if (best_score < score) {
                 best_score = score;
                 best = r;
@@ -591,6 +598,7 @@ static void schedule(struct bb_inst const *in, int n, _Bool const *body,
 
         old_to_new[id] = j;
         out[j++] = in[id];
+        prev_scheduled = id;
 
         for (int u = user_off[id]; u < user_off[id] + n_users[id]; u++) {
             if (--n_deps[users[u]] == 0) { ready[nready++] = users[u]; }
