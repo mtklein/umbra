@@ -1075,93 +1075,83 @@ void umbra_jit_free(struct umbra_jit *j) {
 
 void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
     assert(j);
-    if (j->loop_start < j->loop_end) {
-        uint32_t const *words = (uint32_t const *)j->code;
+    if (j->loop_start >= j->loop_end) { return; }
 
-        char tmp[] = "/tmp/umbra_mca_XXXXXX.s";
-        int  fd = mkstemps(tmp, 2);
-        if (fd < 0) {
-            return;
-        }
-        FILE *fp = fdopen(fd, "w");
-        if (fp) {
-            for (int i = j->loop_start; i < j->loop_end; i++) {
-                fprintf(fp, ".inst 0x%08x\n", words[i]);
-            }
-            fclose(fp);
-        } else {
-            close(fd);
-            remove(tmp);
-            return;
-        }
+    uint32_t const *words = (uint32_t const*)j->code;
 
-        char opath[sizeof tmp + 2];
-        snprintf(opath, sizeof opath, "%.*s.o", (int)(sizeof tmp - 3), tmp);
+    char tmp[]      = "/tmp/umbra_mca_XXXXXX.s";
+    char asm_path[] = "/tmp/umbra_mca_loop_XXXXXX.s";
+    char opath[sizeof tmp + 2];
+    _Bool have_tmp = 0, have_asm = 0;
 
-        char asm_path[] = "/tmp/umbra_mca_loop_XXXXXX.s";
-        int  afd = mkstemps(asm_path, 2);
-        if (afd < 0) {
-            remove(tmp);
-            return;
-        }
+    int   fd, afd;
+    FILE *fp, *afp;
 
+    fd = mkstemps(tmp, 2);
+    if (fd < 0) { goto done; }
+    have_tmp = 1;
+    fp = fdopen(fd, "w");
+    if (!fp) { close(fd); goto done; }
+    for (int i = j->loop_start; i < j->loop_end; i++) {
+        fprintf(fp, ".inst 0x%08x\n", words[i]);
+    }
+    fclose(fp);
+    snprintf(opath, sizeof opath, "%.*s.o", (int)(sizeof tmp - 3), tmp);
+
+    afd = mkstemps(asm_path, 2);
+    if (afd < 0) { goto done; }
+    have_asm = 1;
+
+    {
         char cmd[1024];
         snprintf(cmd, sizeof cmd,
-                 "as -o %s %s 2>/dev/null && "
-                 "/opt/homebrew/opt/llvm/bin/"
-                 "llvm-objdump -d"
-                 " --no-show-raw-insn"
-                 " --no-leading-addr"
-                 " %s 2>/dev/null",
+                 "as -o %s %s 2>/dev/null &&"
+                 " /opt/homebrew/opt/llvm/bin/llvm-objdump -d"
+                 " --no-show-raw-insn --no-leading-addr %s 2>/dev/null",
                  opath, tmp, opath);
         FILE *p = popen(cmd, "r");
-        if (p) {
-            FILE *afp = fdopen(afd, "w");
-            char  line[256];
-            _Bool past_header = 0;
-            while (fgets(line, (int)sizeof line, p)) {
-                if (past_header) {
-                    if (line[0] == '\n' || line[0] == '<') {
-                        continue;
-                    }
-                    char *comment = __builtin_strstr(line, " <");
-                    if (comment) {
-                        comment[0] = '\n';
-                        comment[1] = '\0';
+        if (!p) { close(afd); goto done; }
+        afp = fdopen(afd, "w");
+        char  line[256];
+        _Bool past_header = 0;
+        while (fgets(line, (int)sizeof line, p)) {
+            if (past_header) {
+                if (line[0] != '\n' && line[0] != '<') {
+                    char *angle = __builtin_strchr(line, '<');
+                    if (angle) {
+                        *angle = '\n';
+                        angle[1] = '\0';
                     }
                     fputs(line, afp);
-                } else {
-                    if (__builtin_strstr(line, "<")) {
-                        past_header = 1;
-                    }
                 }
+            } else if (__builtin_strstr(line, "<")) {
+                past_header = 1;
+            }
+        }
+        pclose(p);
+        fclose(afp);
+    }
+
+    {
+        char cmd[1024];
+        snprintf(cmd, sizeof cmd,
+                 "/opt/homebrew/opt/llvm/bin/llvm-mca"
+                 " -mcpu=apple-m4 -iterations=100 -bottleneck-analysis"
+                 " %s 2>&1",
+                 asm_path);
+        FILE *p = popen(cmd, "r");
+        if (p) {
+            char line[256];
+            while (fgets(line, (int)sizeof line, p)) {
+                fputs(line, f);
             }
             pclose(p);
-            fclose(afp);
-            remove(tmp);
-            remove(opath);
-
-            snprintf(cmd, sizeof cmd,
-                     "/opt/homebrew/opt/llvm/bin/llvm-mca"
-                     " -mcpu=apple-m4"
-                     " -iterations=100"
-                     " -bottleneck-analysis"
-                     " %s 2>&1",
-                     asm_path);
-            p = popen(cmd, "r");
-            if (p) {
-                while (fgets(line, (int)sizeof line, p)) {
-                    fputs(line, f);
-                }
-                pclose(p);
-            }
-        } else {
-            close(afd);
-            remove(tmp);
-            remove(opath);
         }
-        remove(asm_path);
     }
+
+done:
+    if (have_tmp) { remove(tmp); remove(opath); }
+    if (have_asm) { remove(asm_path); }
 }
 
 #elif defined(__AVX2__)
