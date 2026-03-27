@@ -7,7 +7,7 @@
 
 #define cast(T, v) __builtin_convertvector(v, T)
 
-#define K 8
+#define K 16
 typedef int32_t  I32 __attribute__((vector_size(K * 4)));
 typedef uint32_t U32 __attribute__((vector_size(K * 4)));
 typedef float    F32 __attribute__((vector_size(K * 4)));
@@ -309,7 +309,10 @@ void umbra_switch_interp_run(struct umbra_switch_interp *p, int l, int t, int r,
             for (;;) { switch (ip->tag) {
 #endif
                 CASE(op_imm_32) v->i32 = (I32){0} + ip->x; NEXT;
-                CASE(op_x) { I32 const seq = {0,1,2,3,4,5,6,7}; v->i32 = seq + (end - K); } NEXT;
+                CASE(op_x) {
+                    I32 const seq = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
+                    v->i32 = seq + (end - K);
+                } NEXT;
                 CASE(op_y) v->i32 = (I32){0} + row; NEXT;
 
                 CASE(op_uniform_16) {
