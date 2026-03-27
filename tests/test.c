@@ -2599,6 +2599,24 @@ static void test_jit_xs_init(void) {
     cleanup(&B);
 }
 
+static void test_backend_threadsafe(void) {
+    struct umbra_backend *interp = umbra_backend_interp();
+    (umbra_backend_threadsafe(interp) == 1) here;
+    umbra_backend_free(interp);
+
+    struct umbra_backend *jit = umbra_backend_jit();
+    (umbra_backend_threadsafe(jit) == 1) here;
+    umbra_backend_free(jit);
+
+    struct umbra_backend *metal = umbra_backend_metal();
+    if (metal) {
+        (umbra_backend_threadsafe(metal) == 0) here;
+        umbra_backend_free(metal);
+    }
+
+    (umbra_backend_threadsafe(NULL) == 0) here;
+}
+
 static void test_program_null_guards(void) {
     umbra_backend_flush(NULL);
     umbra_backend_free(NULL);
@@ -2629,6 +2647,7 @@ static void test_program_null_guards(void) {
 }
 
 int main(void) {
+    test_backend_threadsafe();
     test_program_null_guards();
     test_f32_ops();
     test_i32_ops();
