@@ -10,9 +10,9 @@ typedef struct umbra_builder builder;
 
 enum { W = 128, H = 96 };
 
-enum { N_BACKS = 3 };
+enum { N_BACKS = 4 };
 static char const *backend_name[N_BACKS] = {
-    "interp", "jit", "metal",
+    "interp", "switch", "jit", "metal",
 };
 
 enum {
@@ -197,6 +197,7 @@ static void test_slide_golden(
 
     struct umbra_backend *bes[N_BACKS] = {
         umbra_backend_interp(),
+        umbra_backend_switch(),
         umbra_backend_jit(),
         umbra_backend_metal(),
     };
