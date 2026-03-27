@@ -2,5 +2,10 @@
   (read_only=1, row_bytes>0) and single-row writable outputs (read_only=0,
   row_bytes=0) are both legitimate.
 - thread one umbra_buf[] through interp rather than three-pointer SoA we have now
+  Done: single umbra_buf[] passed to ops, 9→6 params, no per-row precomputation.
 - would interpreter / JIT be simpler if the inner core loop were 1D and driven
   from the outside with normal C in e.g. umbra_jit_run() to make it 2D?
+  Trade-off: removes ~15 instructions of row bookkeeping from JIT, but adds
+  ~10 cycles per row of call overhead and forces preamble re-execution per row
+  (bad for heavy preambles like slug's 6 gather_uniform ops).  Current 2D-in-JIT
+  is already clean after column-based refactor.  Cute but not fundamental.
