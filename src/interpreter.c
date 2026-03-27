@@ -98,8 +98,8 @@ typedef union {
 } val;
 
 struct interp_inst;
-typedef int (*Fn)(struct interp_inst const *ip, val *v, int end, int n, int w, int row,
-                  void *ptr[], size_t sz[], size_t rb[]);
+typedef int (*Fn)(struct interp_inst const *ip, val *v, int end, int n, int row,
+                  umbra_buf buf[]);
 struct interp_inst {
     Fn  fn;
     int x, y, z, : 32;
@@ -108,17 +108,14 @@ struct interp_inst {
 struct umbra_interpreter {
     struct interp_inst *inst;
     val                *v;
-    void              **ptr;
-    void              **row_ptr;
-    size_t             *sz;
-    size_t             *row_bytes;
+    umbra_buf          *buf;
     int                 preamble, nptr, n_deref, pad_;
 };
 
 #define op(name)                                                                       \
-    static int name(struct interp_inst const *ip, val *v, int end, int n, int w,       \
-                    int row, void *ptr[], size_t sz[], size_t rb[])
-#define next return ip[1].fn(ip + 1, v + 1, end, n, w, row, ptr, sz, rb)
+    static int name(struct interp_inst const *ip, val *v, int end, int n,              \
+                    int row, umbra_buf buf[])
+#define next return ip[1].fn(ip + 1, v + 1, end, n, row, buf)
 
 
 op(imm_32) {
@@ -137,20 +134,23 @@ op(y_fn) {
 }
 
 op(uniform_16) {
-    uint16_t uni;
-    __builtin_memcpy(&uni, (uint16_t const *)ptr[ip->x] + ip->y, sizeof uni);
+    void const *base = (char const *)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
+    uint16_t    uni;
+    __builtin_memcpy(&uni, (uint16_t const *)base + ip->y, sizeof uni);
     v->u32 = (U32){0} + (uint32_t)uni;
     next;
 }
 op(uniform_32) {
-    int32_t uni;
-    __builtin_memcpy(&uni, (int32_t const *)ptr[ip->x] + ip->y, sizeof uni);
+    void const *base = (char const *)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
+    int32_t     uni;
+    __builtin_memcpy(&uni, (int32_t const *)base + ip->y, sizeof uni);
     v->i32 = (I32){0} + uni;
     next;
 }
 
 op(load_16) {
-    uint16_t const *src = (uint16_t const *)ptr[ip->x];
+    void const     *base = (char *)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
+    uint16_t const *src = (uint16_t const *)base;
     int             i = end - K;
     int             rem = n - i;
     if (rem >= K) {
@@ -169,7 +169,8 @@ op(load_16) {
     next;
 }
 op(load_32) {
-    int32_t const *src = (int32_t const *)ptr[ip->x];
+    void const    *base = (char *)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
+    int32_t const *src = (int32_t const *)base;
     int            i = end - K;
     int            rem = n - i;
     if (rem >= K) {
@@ -185,7 +186,7 @@ op(load_32) {
     next;
 }
 op(load_64_lo) {
-    char const *src = (char const *)ptr[ip->x];
+    char const *src = (char const *)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
     int         i = end - K;
     int         rem = n - i;
     v->i32 = (I32){0};
@@ -197,7 +198,7 @@ op(load_64_lo) {
     next;
 }
 op(load_64_hi) {
-    char const *src = (char const *)ptr[ip->x];
+    char const *src = (char const *)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
     int         i = end - K;
     int         rem = n - i;
     v->i32 = (I32){0};
@@ -209,7 +210,7 @@ op(load_64_hi) {
     next;
 }
 op(load_64_fused) {
-    char const *src = (char const *)ptr[ip->x];
+    char const *src = (char const *)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
     int         i = end - K;
     int         rem = n - i;
     v[0].i32 = (I32){0};
@@ -221,10 +222,11 @@ op(load_64_fused) {
         v[0].i32[l] = lo;
         v[1].i32[l] = hi;
     }
-    return ip[1].fn(ip + 1, v + 2, end, n, w, row, ptr, sz, rb);
+    return ip[1].fn(ip + 1, v + 2, end, n, row, buf);
 }
 op(store_16) {
-    uint16_t *dst = (uint16_t *)ptr[ip->x];
+    void     *base = (char *)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
+    uint16_t *dst = (uint16_t *)base;
     int       i = end - K;
     int       rem = n - i;
     if (rem >= K) {
@@ -239,7 +241,8 @@ op(store_16) {
     next;
 }
 op(store_32) {
-    int32_t *dst = (int32_t *)ptr[ip->x];
+    void    *base = (char *)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
+    int32_t *dst = (int32_t *)base;
     int      i = end - K;
     int      rem = n - i;
     if (rem >= K) {
@@ -254,7 +257,7 @@ op(store_32) {
     next;
 }
 op(store_64) {
-    char *dst = (char *)ptr[ip->x];
+    char *dst = (char *)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
     int   i = end - K;
     int   rem = n - i;
     for (int l = 0; l < (rem < K ? rem : K); l++) {
@@ -269,10 +272,10 @@ op(store_64) {
 
 op(gather_uniform_16) {
     int ix = v[ip->y].i32[0];
-    int count = (int)(sz[ip->x] / 2);
+    int count = (int)(buf[ip->x].sz / 2);
     if (ix < 0 || ix >= count) { v->u32 = (U32){0}; next; }
     uint16_t s;
-    __builtin_memcpy(&s, (char const *)ptr[ip->x] + 2 * ix, 2);
+    __builtin_memcpy(&s, (char const *)buf[ip->x].ptr + 2 * ix, 2);
     U16 packed = (U16){0} + s;
     v->u32 = (U32){0};
     __builtin_memcpy(v, &packed, sizeof packed);
@@ -280,23 +283,23 @@ op(gather_uniform_16) {
 }
 op(gather_uniform_32) {
     int ix = v[ip->y].i32[0];
-    int count = (int)(sz[ip->x] / 4);
+    int count = (int)(buf[ip->x].sz / 4);
     if (ix < 0 || ix >= count) { v->i32 = (I32){0}; next; }
     int32_t val;
-    __builtin_memcpy(&val, (char const *)ptr[ip->x] + 4 * ix, 4);
+    __builtin_memcpy(&val, (char const *)buf[ip->x].ptr + 4 * ix, 4);
     v->i32 = (I32){0} + val;
     next;
 }
 
 op(gather_16) {
     I32 ix = v[ip->y].i32;
-    int count = (int)(sz[ip->x] / 2);
+    int count = (int)(buf[ip->x].sz / 2);
     int rem = n - (end - K);
     v->u32 = (U32){0};
     for (int l = 0; l < (rem < K ? rem : K); l++) {
         if (ix[l] >= 0 && ix[l] < count) {
             uint16_t s;
-            __builtin_memcpy(&s, (char const *)ptr[ip->x] + 2 * ix[l], 2);
+            __builtin_memcpy(&s, (char const *)buf[ip->x].ptr + 2 * ix[l], 2);
             __builtin_memcpy((char *)v + 2 * l, &s, 2);
         }
     }
@@ -304,13 +307,13 @@ op(gather_16) {
 }
 op(gather_32) {
     I32 ix = v[ip->y].i32;
-    int count = (int)(sz[ip->x] / 4);
+    int count = (int)(buf[ip->x].sz / 4);
     int rem = n - (end - K);
     v->i32 = (I32){0};
     for (int l = 0; l < (rem < K ? rem : K); l++) {
         if (ix[l] >= 0 && ix[l] < count) {
             int32_t tmp;
-            __builtin_memcpy(&tmp, (char const *)ptr[ip->x] + 4 * ix[l], 4);
+            __builtin_memcpy(&tmp, (char const *)buf[ip->x].ptr + 4 * ix[l], 4);
             v->i32[l] = tmp;
         }
     }
@@ -682,25 +685,22 @@ op(done) {
     (void)v;
     (void)end;
     (void)n;
-    (void)w;
     (void)row;
-    (void)ptr;
-    (void)sz;
-    (void)rb;
+    (void)buf;
     return 0;
 }
 
 op(deref_ptr_handler) {
-    void *base = ptr[ip->x];
+    char *base = (char *)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
     void *derived;
     ptrdiff_t ssz;
     size_t drb;
-    __builtin_memcpy(&derived, (char *)base + ip->y,      sizeof derived);
-    __builtin_memcpy(&ssz,     (char *)base + ip->y + 8,  sizeof ssz);
-    __builtin_memcpy(&drb,     (char *)base + ip->y + 16, sizeof drb);
-    ptr[ip->z] = (char *)derived + (size_t)row * drb;
-    sz[ip->z]  = ssz < 0 ? (size_t)-ssz : (size_t)ssz;
-    rb[ip->z]  = drb;
+    __builtin_memcpy(&derived, base + ip->y,      sizeof derived);
+    __builtin_memcpy(&ssz,     base + ip->y + 8,  sizeof ssz);
+    __builtin_memcpy(&drb,     base + ip->y + 16, sizeof drb);
+    buf[ip->z].ptr       = derived;
+    buf[ip->z].sz        = ssz < 0 ? (size_t)-ssz : (size_t)ssz;
+    buf[ip->z].row_bytes = drb;
     next;
 }
 
@@ -794,7 +794,7 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     __builtin_memcpy(&v[1], &yb, 4);
     __builtin_memcpy(&v[2], &zb, 4);
 
-    inst[0].fn(inst, v + 3, K, K, 0, 0, (void *[]){0}, (size_t[]){0}, (size_t[]){0});
+    inst[0].fn(inst, v + 3, K, K, 0, (umbra_buf[]){{0}});
 
     int r;
     __builtin_memcpy(&r, &v[3], 4);
@@ -820,10 +820,7 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
     p->nptr = max_ptr + 1;
     p->n_deref = n_deref;
     int total_ptrs = p->nptr + n_deref;
-    p->ptr       = calloc((size_t)total_ptrs, sizeof *p->ptr);
-    p->row_ptr   = calloc((size_t)total_ptrs, sizeof *p->row_ptr);
-    p->sz        = calloc((size_t)total_ptrs, sizeof *p->sz);
-    p->row_bytes = calloc((size_t)total_ptrs, sizeof *p->row_bytes);
+    p->buf = calloc((size_t)total_ptrs, sizeof *p->buf);
 
     int *deref_slot = calloc((size_t)bb->insts, sizeof *deref_slot);
     {
@@ -996,28 +993,20 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
     return p;
 }
 
-static void load_bufs(struct umbra_interpreter *p, umbra_buf buf[]) {
-    for (int i = 0; i < p->nptr; i++) {
-        p->ptr[i]       = buf[i].ptr;
-        p->sz[i]        = buf[i].sz;
-        p->row_bytes[i] = buf[i].row_bytes;
-    }
-}
-
 void umbra_interpreter_run(struct umbra_interpreter *p, int w, int h, int x0, int y0,
-                           umbra_buf buf[]) {
-    load_bufs(p, buf);
+                           umbra_buf caller_buf[]) {
+    int nall = p->nptr + p->n_deref;
+    for (int i = 0; i < p->nptr; i++) { p->buf[i] = caller_buf[i]; }
+    for (int i = p->nptr; i < nall; i++) { p->buf[i] = (umbra_buf){0}; }
+
     int const P  = p->preamble;
     int const ce = x0 + w;
 
+    struct interp_inst const *s = p->inst;
+    val                      *v = p->v;
     for (int row = y0; row < y0 + h; row++) {
-        for (int i = 0; i < p->nptr; i++) {
-            p->row_ptr[i] = (char *)p->ptr[i] + (size_t)row * p->row_bytes[i];
-        }
-        struct interp_inst const *s = p->inst;
-        val                      *v = p->v;
         for (int col = x0; col < ce; col += K) {
-            s->fn(s, v, col + K, ce, 0, row, p->row_ptr, p->sz, p->row_bytes);
+            s->fn(s, v, col + K, ce, row, p->buf);
             s = p->inst + P;
             v = p->v + P;
         }
@@ -1025,10 +1014,7 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int w, int h, int x0, in
 }
 
 void umbra_interpreter_free(struct umbra_interpreter *p) {
-    free(p->ptr);
-    free(p->row_ptr);
-    free(p->sz);
-    free(p->row_bytes);
+    free(p->buf);
     free(p->inst);
     free(p->v);
     free(p);
