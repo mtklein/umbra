@@ -626,62 +626,6 @@ void umbra_switch_interp_run(struct umbra_switch_interp *p, int l, int t, int r,
     }
 }
 
-int umbra_const_eval(enum op op, int xb, int yb, int zb) {
-    typedef union { float f; int32_t i; uint32_t u; } s32;
-    s32 x, y, z, r = {.i = 0};
-    __builtin_memcpy(&x, &xb, 4);
-    __builtin_memcpy(&y, &yb, 4);
-    __builtin_memcpy(&z, &zb, 4);
-
-    switch (op) {
-    case op_add_f32: r.f = x.f + y.f; break;
-    case op_sub_f32: r.f = x.f - y.f; break;
-    case op_mul_f32: r.f = x.f * y.f; break;
-    case op_div_f32: r.f = x.f / y.f; break;
-    case op_min_f32: r.f = x.f < y.f ? x.f : y.f; break;
-    case op_max_f32: r.f = x.f > y.f ? x.f : y.f; break;
-    case op_sqrt_f32:  r.f = sqrtf(x.f); break;
-    case op_abs_f32:   r.f = fabsf(x.f); break;
-    case op_neg_f32:   r.f = -x.f; break;
-    case op_round_f32: r.f = rintf(x.f); break;
-    case op_floor_f32: r.f = floorf(x.f); break;
-    case op_ceil_f32:  r.f = ceilf(x.f); break;
-    case op_round_i32: { float t = rintf(x.f);  r.i = (int32_t)t; } break;
-    case op_floor_i32: { float t = floorf(x.f); r.i = (int32_t)t; } break;
-    case op_ceil_i32:  { float t = ceilf(x.f);  r.i = (int32_t)t; } break;
-    case op_fma_f32:   r.f = z.f + x.f * y.f; break;
-    case op_fms_f32:   r.f = z.f - x.f * y.f; break;
-    case op_add_i32: r.i = x.i + y.i; break;
-    case op_sub_i32: r.i = x.i - y.i; break;
-    case op_mul_i32: r.i = x.i * y.i; break;
-    case op_shl_i32: r.i = x.i << y.i; break;
-    case op_shr_u32: r.u = x.u >> y.u; break;
-    case op_shr_s32: r.i = x.i >> y.i; break;
-    case op_and_32:  r.i = x.i & y.i; break;
-    case op_or_32:   r.i = x.i | y.i; break;
-    case op_xor_32:  r.i = x.i ^ y.i; break;
-    case op_sel_32:  r.i = (x.i & y.i) | (~x.i & z.i); break;
-    case op_f32_from_i32: r.f = (float)x.i; break;
-    case op_i32_from_f32: r.i = (int32_t)x.f; break;
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wfloat-equal"
-    case op_eq_f32: r.i = x.f == y.f ? -1 : 0; break;
-#pragma clang diagnostic pop
-    case op_lt_f32: r.i = x.f <  y.f ? -1 : 0; break;
-    case op_le_f32: r.i = x.f <= y.f ? -1 : 0; break;
-    case op_eq_i32: r.i = x.i == y.i ? -1 : 0; break;
-    case op_lt_s32: r.i = x.i <  y.i ? -1 : 0; break;
-    case op_le_s32: r.i = x.i <= y.i ? -1 : 0; break;
-    case op_lt_u32: r.i = x.u <  y.u ? -1 : 0; break;
-    case op_le_u32: r.i = x.u <= y.u ? -1 : 0; break;
-    default: break;
-    }
-
-    int result;
-    __builtin_memcpy(&result, &r, 4);
-    return result;
-}
-
 void umbra_switch_interp_free(struct umbra_switch_interp *p) {
     if (p) {
         free(p->buf);
