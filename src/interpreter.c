@@ -99,10 +99,63 @@ typedef union {
     F32 f32;
 } val;
 
-// Tag values: all enum op values (0..op_le_s32_imm), plus two interpreter-only ops.
+// Tag values: all enum op values (0..op_le_s32_imm), plus interpreter-only ops.
+//
+// Register variants: op_<ret>_<name>_<params> where r=register, m=memory.
+// The existing op_<name> is the all-memory variant (mm->m for binary, m->m for unary).
+// Example: op_r_mul_f32_rm = "result to register, x from register, y from memory"
+
+// Ops that get register variants.
+#define BINARY_OPS(X)                                                                      \
+    X(add_f32, f32, f32) X(sub_f32, f32, f32) X(mul_f32, f32, f32) X(div_f32, f32, f32)   \
+    X(min_f32, f32, f32) X(max_f32, f32, f32)                                             \
+    X(add_i32, i32, i32) X(sub_i32, i32, i32) X(mul_i32, i32, i32)                        \
+    X(shl_i32, i32, i32) X(shr_u32, u32, u32) X(shr_s32, i32, i32)                        \
+    X(and_32,  i32, i32) X(or_32,   i32, i32) X(xor_32,  i32, i32)                        \
+    X(eq_f32,  i32, f32) X(lt_f32,  i32, f32) X(le_f32,  i32, f32)                        \
+    X(eq_i32,  i32, i32) X(lt_s32,  i32, i32) X(le_s32,  i32, i32)                        \
+    X(lt_u32,  i32, u32) X(le_u32,  i32, u32)
+
+#define UNARY_OPS(X)                                                                       \
+    X(sqrt_f32,    f32, f32) X(abs_f32,     f32, f32) X(neg_f32,     f32, f32)             \
+    X(round_f32,   f32, f32) X(floor_f32,   f32, f32) X(ceil_f32,    f32, f32)             \
+    X(round_i32,   i32, f32) X(floor_i32,   i32, f32) X(ceil_i32,    i32, f32)             \
+    X(f32_from_i32,f32, i32) X(i32_from_f32,i32, f32)
+
+// _imm ops: x is the only variable input, y is the immediate.
+#define IMM_OPS(X)                                                                         \
+    X(shl_i32_imm, i32, i32) X(shr_u32_imm, u32, u32) X(shr_s32_imm, i32, i32)           \
+    X(and_32_imm,  u32, u32) X(or_32_imm,   u32, u32) X(xor_32_imm,  u32, u32)           \
+    X(add_f32_imm, f32, f32) X(sub_f32_imm, f32, f32) X(mul_f32_imm, f32, f32)            \
+    X(div_f32_imm, f32, f32) X(min_f32_imm, f32, f32) X(max_f32_imm, f32, f32)            \
+    X(add_i32_imm, i32, i32) X(sub_i32_imm, i32, i32) X(mul_i32_imm, i32, i32)            \
+    X(eq_f32_imm,  i32, f32) X(lt_f32_imm,  i32, f32) X(le_f32_imm,  i32, f32)           \
+    X(eq_i32_imm,  i32, i32) X(lt_s32_imm,  i32, i32) X(le_s32_imm,  i32, i32)
+
 enum {
     SW_LOAD_64_FUSED = op_le_s32_imm + 1,
     SW_DONE,
+
+    // Binary op variants: 7 new per op (existing op_X is the mm->m variant)
+#define BINARY_VARIANTS(name, rt, pt) \
+    op_r_##name##_mm, op_r_##name##_rm, op_m_##name##_rm, \
+    op_r_##name##_mr, op_m_##name##_mr, \
+    op_r_##name##_rr, op_m_##name##_rr,
+    BINARY_OPS(BINARY_VARIANTS)
+#undef BINARY_VARIANTS
+
+    // Unary op variants: 3 new per op (existing op_X is the m->m variant)
+#define UNARY_VARIANTS(name, rt, pt) \
+    op_r_##name##_m, op_r_##name##_r, op_m_##name##_r,
+    UNARY_OPS(UNARY_VARIANTS)
+#undef UNARY_VARIANTS
+
+    // Imm op variants: 3 new per op (existing op_X is the m->m variant, y is always imm)
+#define IMM_VARIANTS(name, rt, pt) \
+    op_r_##name##_m, op_r_##name##_r, op_m_##name##_r,
+    IMM_OPS(IMM_VARIANTS)
+#undef IMM_VARIANTS
+
     SW_NUM_OPS,
 };
 
@@ -282,6 +335,82 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
 #undef RESOLVE_PTR
     p->inst[n] = (struct sw_inst){.tag = SW_DONE};
 
+    // Register variant upgrade: find values that die immediately (last_use == i+1)
+    // and upgrade their op tags to register variants.
+    {
+        // Compute last_use[i] = last instruction that reads value i.
+        int *lu = calloc((size_t)n, sizeof *lu);
+        for (int i = 0; i < n; i++) {
+            struct sw_inst const *s = &p->inst[i];
+            if (s->x < 0) { int src = i + s->x; if (src >= 0) { lu[src] = i; } }
+            if (s->y < 0) { int src = i + s->y; if (src >= 0) { lu[src] = i; } }
+            if (s->z < 0) { int src = i + s->z; if (src >= 0) { lu[src] = i; } }
+        }
+
+        // Walk forward, upgrading tags.
+        _Bool prev_r = 0;  // did the previous instruction output to register?
+        for (int i = 0; i < n; i++) {
+            struct sw_inst *s = &p->inst[i];
+            _Bool x_r = prev_r && s->x == -1;
+            _Bool y_r = prev_r && s->y == -1;
+            // Output to register only if the sole consumer is an upgradable ALU op.
+            _Bool out_r = 0;
+            if (lu[i] == i + 1) {
+                int const next_tag = p->inst[i + 1].tag;
+#define CHECK_BINARY(name, rt, pt) || next_tag == op_##name
+#define CHECK_UNARY(name, rt, pt)  || next_tag == op_##name
+#define CHECK_IMM(name, rt, pt)    || next_tag == op_##name
+                out_r = 0 BINARY_OPS(CHECK_BINARY) UNARY_OPS(CHECK_UNARY) IMM_OPS(CHECK_IMM);
+#undef CHECK_BINARY
+#undef CHECK_UNARY
+#undef CHECK_IMM
+            }
+
+            // Only upgrade ALU ops — loads/stores/gathers/deref stay as-is.
+            int const tag = s->tag;
+
+            // Try binary ops.
+#define TRY_BINARY(name, rt, pt) \
+            if (tag == op_##name) { \
+                if      ( out_r &&  x_r &&  y_r) { s->tag = op_r_##name##_rr; } \
+                else if ( out_r &&  x_r && !y_r) { s->tag = op_r_##name##_rm; } \
+                else if (!out_r &&  x_r && !y_r) { s->tag = op_m_##name##_rm; } \
+                else if ( out_r && !x_r &&  y_r) { s->tag = op_r_##name##_mr; } \
+                else if (!out_r && !x_r &&  y_r) { s->tag = op_m_##name##_mr; } \
+                else if ( out_r &&  x_r &&  y_r) { s->tag = op_r_##name##_rr; } \
+                else if (!out_r &&  x_r &&  y_r) { s->tag = op_m_##name##_rr; } \
+                else if ( out_r && !x_r && !y_r) { s->tag = op_r_##name##_mm; } \
+                /* else: !out_r && !x_r && !y_r → keep original tag (mm→m) */ \
+            } else
+            BINARY_OPS(TRY_BINARY)
+#undef TRY_BINARY
+
+            // Try unary ops (only x input, ignore y_r).
+#define TRY_UNARY(name, rt, pt) \
+            if (tag == op_##name) { \
+                if      ( out_r &&  x_r) { s->tag = op_r_##name##_r; } \
+                else if (!out_r &&  x_r) { s->tag = op_m_##name##_r; } \
+                else if ( out_r && !x_r) { s->tag = op_r_##name##_m; } \
+            } else
+            UNARY_OPS(TRY_UNARY)
+#undef TRY_UNARY
+
+            // Try _imm ops (only x is variable input).
+#define TRY_IMM(name, rt, pt) \
+            if (tag == op_##name) { \
+                if      ( out_r &&  x_r) { s->tag = op_r_##name##_r; } \
+                else if (!out_r &&  x_r) { s->tag = op_m_##name##_r; } \
+                else if ( out_r && !x_r) { s->tag = op_r_##name##_m; } \
+            } else
+            IMM_OPS(TRY_IMM)
+#undef TRY_IMM
+            { /* not an upgradable op */ }
+
+            prev_r = (s->tag != tag) ? out_r : 0;
+        }
+        free(lu);
+    }
+
     free(deref_slot);
     free(id);
     return p;
@@ -303,6 +432,8 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
             struct sw_inst const  *ip  = p->inst + (col == l ? 0 : P);
             val                   *v   = p->v    + (col == l ? 0 : P);
 
+            val acc = {0};
+#define F32_IMM union { int i; float f; } const u = {.i = ip->y}; F32 const imm = (F32){0} + u.f
             // Computed goto on native, switch on WASM.
 #if defined(__GNUC__) && !defined(__wasm__)
     #define DISPATCH    goto *labels[ip->tag]
@@ -361,6 +492,30 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                 [op_le_s32_imm] = &&L_op_le_s32_imm,
                 [op_pack] = &&L_op_pack,
                 [SW_DONE] = &&L_SW_DONE,
+
+                // Register variant labels.
+#define BINARY_LABELS(name, rt, pt) \
+                [op_r_##name##_mm] = &&L_op_r_##name##_mm, \
+                [op_r_##name##_rm] = &&L_op_r_##name##_rm, \
+                [op_m_##name##_rm] = &&L_op_m_##name##_rm, \
+                [op_r_##name##_mr] = &&L_op_r_##name##_mr, \
+                [op_m_##name##_mr] = &&L_op_m_##name##_mr, \
+                [op_r_##name##_rr] = &&L_op_r_##name##_rr, \
+                [op_m_##name##_rr] = &&L_op_m_##name##_rr,
+                BINARY_OPS(BINARY_LABELS)
+#undef BINARY_LABELS
+#define UNARY_LABELS(name, rt, pt) \
+                [op_r_##name##_m] = &&L_op_r_##name##_m, \
+                [op_r_##name##_r] = &&L_op_r_##name##_r, \
+                [op_m_##name##_r] = &&L_op_m_##name##_r,
+                UNARY_OPS(UNARY_LABELS)
+#undef UNARY_LABELS
+#define IMM_LABELS(name, rt, pt) \
+                [op_r_##name##_m] = &&L_op_r_##name##_m, \
+                [op_r_##name##_r] = &&L_op_r_##name##_r, \
+                [op_m_##name##_r] = &&L_op_m_##name##_r,
+                IMM_OPS(IMM_LABELS)
+#undef IMM_LABELS
             };
             DISPATCH;
 #else
@@ -645,7 +800,6 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                 CASE(op_or_32_imm)   { U32 const m = (U32){0} + (uint32_t)ip->y; v->u32 = v[ip->x].u32 | m; } NEXT;
                 CASE(op_xor_32_imm)  { U32 const m = (U32){0} + (uint32_t)ip->y; v->u32 = v[ip->x].u32 ^ m; } NEXT;
 
-#define F32_IMM union { int i; float f; } const u = {.i = ip->y}; F32 const imm = (F32){0} + u.f
                 CASE(op_add_f32_imm) { F32_IMM; v->f32 = v[ip->x].f32 + imm; } NEXT;
                 CASE(op_sub_f32_imm) { F32_IMM; v->f32 = v[ip->x].f32 - imm; } NEXT;
                 CASE(op_mul_f32_imm) { F32_IMM; v->f32 = v[ip->x].f32 * imm; } NEXT;
@@ -658,7 +812,6 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
 #pragma clang diagnostic pop
                 CASE(op_lt_f32_imm)  { F32_IMM; v->i32 = (I32)(v[ip->x].f32 <  imm); } NEXT;
                 CASE(op_le_f32_imm)  { F32_IMM; v->i32 = (I32)(v[ip->x].f32 <= imm); } NEXT;
-#undef F32_IMM
 
 #define I32_IMM I32 const imm = (I32){0} + ip->y
                 CASE(op_add_i32_imm) { I32_IMM; v->i32 = v[ip->x].i32 + imm; } NEXT;
@@ -673,6 +826,162 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                     I32 const sh = (I32){0} + ip->z;
                     v->u32 = v[ip->x].u32 | (U32)(v[ip->y].i32 << sh);
                 } NEXT;
+
+                // Register variant dispatch.
+                // Binary: 7 variants per op (the existing case is the mm→m fallback).
+#define BINARY_DISPATCH(name, rt, pt) \
+                CASE(op_r_##name##_mm) acc.rt = v[ip->x].pt OP_##name v[ip->y].pt; NEXT; \
+                CASE(op_r_##name##_rm) acc.rt = acc.pt       OP_##name v[ip->y].pt; NEXT; \
+                CASE(op_m_##name##_rm) v->rt  = acc.pt       OP_##name v[ip->y].pt; NEXT; \
+                CASE(op_r_##name##_mr) acc.rt = v[ip->x].pt OP_##name acc.pt;       NEXT; \
+                CASE(op_m_##name##_mr) v->rt  = v[ip->x].pt OP_##name acc.pt;       NEXT; \
+                CASE(op_r_##name##_rr) acc.rt = acc.pt       OP_##name acc.pt;       NEXT; \
+                CASE(op_m_##name##_rr) v->rt  = acc.pt       OP_##name acc.pt;       NEXT;
+
+                // Define the binary operator for each op.
+#define OP_add_f32 +
+#define OP_sub_f32 -
+#define OP_mul_f32 *
+#define OP_div_f32 /
+#define OP_add_i32 +
+#define OP_sub_i32 -
+#define OP_mul_i32 *
+#define OP_shl_i32 <<
+#define OP_shr_u32 >>
+#define OP_shr_s32 >>
+#define OP_and_32  &
+#define OP_or_32   |
+#define OP_xor_32  ^
+                // Arithmetic binary ops.
+                BINARY_DISPATCH(add_f32, f32, f32)
+                BINARY_DISPATCH(sub_f32, f32, f32)
+                BINARY_DISPATCH(mul_f32, f32, f32)
+                BINARY_DISPATCH(div_f32, f32, f32)
+                BINARY_DISPATCH(add_i32, i32, i32)
+                BINARY_DISPATCH(sub_i32, i32, i32)
+                BINARY_DISPATCH(mul_i32, i32, i32)
+                BINARY_DISPATCH(shl_i32, i32, i32)
+                BINARY_DISPATCH(shr_u32, u32, u32)
+                BINARY_DISPATCH(shr_s32, i32, i32)
+                BINARY_DISPATCH(and_32,  i32, i32)
+                BINARY_DISPATCH(or_32,   i32, i32)
+                BINARY_DISPATCH(xor_32,  i32, i32)
+#undef BINARY_DISPATCH
+
+                // min/max/cmp need custom expansion (not simple operators).
+#define MINMAX_DISPATCH(name, fn, rt, pt) \
+                CASE(op_r_##name##_mm) acc.rt = fn(v[ip->x].pt, v[ip->y].pt); NEXT; \
+                CASE(op_r_##name##_rm) acc.rt = fn(acc.pt,       v[ip->y].pt); NEXT; \
+                CASE(op_m_##name##_rm) v->rt  = fn(acc.pt,       v[ip->y].pt); NEXT; \
+                CASE(op_r_##name##_mr) acc.rt = fn(v[ip->x].pt, acc.pt);       NEXT; \
+                CASE(op_m_##name##_mr) v->rt  = fn(v[ip->x].pt, acc.pt);       NEXT; \
+                CASE(op_r_##name##_rr) acc.rt = fn(acc.pt,       acc.pt);       NEXT; \
+                CASE(op_m_##name##_rr) v->rt  = fn(acc.pt,       acc.pt);       NEXT;
+                MINMAX_DISPATCH(min_f32, vec_min, f32, f32)
+                MINMAX_DISPATCH(max_f32, vec_max, f32, f32)
+#undef MINMAX_DISPATCH
+
+                // Comparison variants: result type (i32) differs from param type.
+#define CMP_DISPATCH(name, op, rt, pt) \
+                CASE(op_r_##name##_mm) acc.rt = (I32)(v[ip->x].pt op v[ip->y].pt); NEXT; \
+                CASE(op_r_##name##_rm) acc.rt = (I32)(acc.pt       op v[ip->y].pt); NEXT; \
+                CASE(op_m_##name##_rm) v->rt  = (I32)(acc.pt       op v[ip->y].pt); NEXT; \
+                CASE(op_r_##name##_mr) acc.rt = (I32)(v[ip->x].pt op acc.pt);       NEXT; \
+                CASE(op_m_##name##_mr) v->rt  = (I32)(v[ip->x].pt op acc.pt);       NEXT; \
+                CASE(op_r_##name##_rr) acc.rt = (I32)(acc.pt       op acc.pt);       NEXT; \
+                CASE(op_m_##name##_rr) v->rt  = (I32)(acc.pt       op acc.pt);       NEXT;
+                CMP_DISPATCH(lt_f32, <,  i32, f32)
+                CMP_DISPATCH(le_f32, <=, i32, f32)
+                CMP_DISPATCH(eq_i32, ==, i32, i32)
+                CMP_DISPATCH(lt_s32, <,  i32, i32)
+                CMP_DISPATCH(le_s32, <=, i32, i32)
+                CMP_DISPATCH(lt_u32, <,  i32, u32)
+                CMP_DISPATCH(le_u32, <=, i32, u32)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wfloat-equal"
+                CMP_DISPATCH(eq_f32, ==, i32, f32)
+#pragma clang diagnostic pop
+#undef CMP_DISPATCH
+
+                // Unary op variants: 3 per op.
+#define UNARY_DISPATCH(name, fn, rt, pt) \
+                CASE(op_r_##name##_m) acc.rt = fn(v[ip->x].pt); NEXT; \
+                CASE(op_r_##name##_r) acc.rt = fn(acc.pt);       NEXT; \
+                CASE(op_m_##name##_r) v->rt  = fn(acc.pt);       NEXT;
+                UNARY_DISPATCH(sqrt_f32,     vec_sqrt,  f32, f32)
+                UNARY_DISPATCH(abs_f32,      vec_abs,   f32, f32)
+                UNARY_DISPATCH(round_f32,    vec_round, f32, f32)
+                UNARY_DISPATCH(floor_f32,    vec_floor, f32, f32)
+                UNARY_DISPATCH(ceil_f32,     vec_ceil,  f32, f32)
+#undef UNARY_DISPATCH
+                // neg, convert, round_i32 etc need custom expansion.
+#define UNARY3(name, expr_m, expr_r) \
+                CASE(op_r_##name##_m) acc expr_m; NEXT; \
+                CASE(op_r_##name##_r) acc expr_r; NEXT; \
+                CASE(op_m_##name##_r) v[0] expr_r; NEXT;
+                UNARY3(neg_f32,     .f32 = -v[ip->x].f32, .f32 = -acc.f32)
+                UNARY3(round_i32,   .i32 = cast(I32, vec_round(v[ip->x].f32)), .i32 = cast(I32, vec_round(acc.f32)))
+                UNARY3(floor_i32,   .i32 = cast(I32, vec_floor(v[ip->x].f32)), .i32 = cast(I32, vec_floor(acc.f32)))
+                UNARY3(ceil_i32,    .i32 = cast(I32, vec_ceil(v[ip->x].f32)),  .i32 = cast(I32, vec_ceil(acc.f32)))
+                UNARY3(f32_from_i32,.f32 = cast(F32, v[ip->x].i32),           .f32 = cast(F32, acc.i32))
+                UNARY3(i32_from_f32,.i32 = cast(I32, v[ip->x].f32),           .i32 = cast(I32, acc.f32))
+#undef UNARY3
+
+                // _imm op variants: 3 per op, y is always the immediate.
+#define IMM_DISPATCH_F(name, op) \
+                CASE(op_r_##name##_m) { F32_IMM; acc.f32 = v[ip->x].f32 op imm; } NEXT; \
+                CASE(op_r_##name##_r) { F32_IMM; acc.f32 = acc.f32       op imm; } NEXT; \
+                CASE(op_m_##name##_r) { F32_IMM; v->f32  = acc.f32       op imm; } NEXT;
+#define IMM_DISPATCH_I(name, op, rt, pt) \
+                CASE(op_r_##name##_m) { I32 const imm = (I32){0} + ip->y; acc.rt = v[ip->x].pt op imm; } NEXT; \
+                CASE(op_r_##name##_r) { I32 const imm = (I32){0} + ip->y; acc.rt = acc.pt       op imm; } NEXT; \
+                CASE(op_m_##name##_r) { I32 const imm = (I32){0} + ip->y; v->rt  = acc.pt       op imm; } NEXT;
+#define IMM_DISPATCH_U(name, op) \
+                CASE(op_r_##name##_m) { U32 const imm = (U32){0} + (uint32_t)ip->y; acc.u32 = v[ip->x].u32 op imm; } NEXT; \
+                CASE(op_r_##name##_r) { U32 const imm = (U32){0} + (uint32_t)ip->y; acc.u32 = acc.u32       op imm; } NEXT; \
+                CASE(op_m_##name##_r) { U32 const imm = (U32){0} + (uint32_t)ip->y; v->u32  = acc.u32       op imm; } NEXT;
+                IMM_DISPATCH_I(shl_i32_imm, <<, i32, i32)
+                IMM_DISPATCH_I(shr_s32_imm, >>, i32, i32)
+                IMM_DISPATCH_U(shr_u32_imm, >>)
+                IMM_DISPATCH_U(and_32_imm,  &)
+                IMM_DISPATCH_U(or_32_imm,   |)
+                IMM_DISPATCH_U(xor_32_imm,  ^)
+                IMM_DISPATCH_F(add_f32_imm, +)
+                IMM_DISPATCH_F(sub_f32_imm, -)
+                IMM_DISPATCH_F(mul_f32_imm, *)
+                IMM_DISPATCH_F(div_f32_imm, /)
+#define IMM_DISPATCH_FMIN(name, fn) \
+                CASE(op_r_##name##_m) { F32_IMM; acc.f32 = fn(v[ip->x].f32, imm); } NEXT; \
+                CASE(op_r_##name##_r) { F32_IMM; acc.f32 = fn(acc.f32,       imm); } NEXT; \
+                CASE(op_m_##name##_r) { F32_IMM; v->f32  = fn(acc.f32,       imm); } NEXT;
+                IMM_DISPATCH_FMIN(min_f32_imm, vec_min)
+                IMM_DISPATCH_FMIN(max_f32_imm, vec_max)
+#undef IMM_DISPATCH_FMIN
+#define IMM_CMP_F(name, op) \
+                CASE(op_r_##name##_m) { F32_IMM; acc.i32 = (I32)(v[ip->x].f32 op imm); } NEXT; \
+                CASE(op_r_##name##_r) { F32_IMM; acc.i32 = (I32)(acc.f32       op imm); } NEXT; \
+                CASE(op_m_##name##_r) { F32_IMM; v->i32  = (I32)(acc.f32       op imm); } NEXT;
+#define IMM_CMP_I(name, op) \
+                CASE(op_r_##name##_m) { I32 const imm = (I32){0} + ip->y; acc.i32 = (I32)(v[ip->x].i32 op imm); } NEXT; \
+                CASE(op_r_##name##_r) { I32 const imm = (I32){0} + ip->y; acc.i32 = (I32)(acc.i32       op imm); } NEXT; \
+                CASE(op_m_##name##_r) { I32 const imm = (I32){0} + ip->y; v->i32  = (I32)(acc.i32       op imm); } NEXT;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wfloat-equal"
+                IMM_CMP_F(eq_f32_imm, ==)
+#pragma clang diagnostic pop
+                IMM_CMP_F(lt_f32_imm, <)
+                IMM_CMP_F(le_f32_imm, <=)
+                IMM_CMP_I(eq_i32_imm, ==)
+                IMM_CMP_I(lt_s32_imm, <)
+                IMM_CMP_I(le_s32_imm, <=)
+                IMM_DISPATCH_I(add_i32_imm, +, i32, i32)
+                IMM_DISPATCH_I(sub_i32_imm, -, i32, i32)
+                IMM_DISPATCH_I(mul_i32_imm, *, i32, i32)
+#undef IMM_DISPATCH_F
+#undef IMM_DISPATCH_I
+#undef IMM_DISPATCH_U
+#undef IMM_CMP_F
+#undef IMM_CMP_I
 
                 CASE(SW_DONE) DONE;
 #if !defined(__GNUC__) || defined(__wasm__)
