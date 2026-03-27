@@ -2,16 +2,38 @@
 
 #include <stddef.h>
 
-struct umbra_builder *umbra_builder(void);
-void                  umbra_builder_free(struct umbra_builder *);
+struct umbra_builder* umbra_builder(void);
+void   umbra_builder_free(struct umbra_builder*);
+
+struct umbra_basic_block* umbra_basic_block(struct umbra_builder*);
+void   umbra_basic_block_free(struct umbra_basic_block*);
+
+struct umbra_backend* umbra_backend_interp(void);
+struct umbra_backend* umbra_backend_jit   (void);
+struct umbra_backend* umbra_backend_metal (void);
+
+void   umbra_backend_free      (struct umbra_backend*);
+void   umbra_backend_flush     (struct umbra_backend*);
+_Bool  umbra_backend_threadsafe(struct umbra_backend const*);
 
 typedef struct {
-    int id;
-} umbra_val;
-typedef struct {
-    int ix, deref;
-} umbra_ptr;
+    void  *ptr;
+    size_t sz, : 8*sizeof(size_t)-8;
+    _Bool  read_only;
+} umbra_buf;
 
+
+struct umbra_program* umbra_program(struct umbra_backend*,
+                                    struct umbra_basic_block const*);
+void   umbra_program_free (struct umbra_program*);
+void   umbra_program_queue(struct umbra_program*,
+                           int l, int t, int r, int b, umbra_buf[]);
+struct umbra_backend* umbra_program_backend(struct umbra_program const*);
+
+typedef struct { int id; } umbra_val;
+typedef struct { int ix, :24; _Bool deref; } umbra_ptr;
+
+// TODO: I don't like any of these first six methods.
 int       umbra_reserve(struct umbra_builder *, int n);
 int       umbra_reserve_ptr(struct umbra_builder *);
 umbra_ptr umbra_deref_ptr(struct umbra_builder *, umbra_ptr buf, int byte_off);
@@ -101,28 +123,6 @@ umbra_val umbra_le_u32(struct umbra_builder *, umbra_val, umbra_val);
 umbra_val umbra_gt_u32(struct umbra_builder *, umbra_val, umbra_val);
 umbra_val umbra_ge_u32(struct umbra_builder *, umbra_val, umbra_val);
 
-struct umbra_basic_block *umbra_basic_block(struct umbra_builder *);
-void                      umbra_basic_block_free(struct umbra_basic_block *);
-
-typedef struct {
-    void  *ptr;
-    size_t sz;
-    int    read_only, :32;
-} umbra_buf;
-
-struct umbra_backend *umbra_backend_interp(void);
-struct umbra_backend *umbra_backend_jit(void);
-struct umbra_backend *umbra_backend_metal(void);
-struct umbra_program *umbra_backend_compile(struct umbra_backend *,
-                                            struct umbra_basic_block const *);
-void                  umbra_backend_flush(struct umbra_backend *);
-_Bool                 umbra_backend_threadsafe(struct umbra_backend *);
-void                  umbra_backend_free(struct umbra_backend *);
-
-struct umbra_backend *umbra_program_backend(struct umbra_program *);
-void                  umbra_program_queue(struct umbra_program *,
-                                          int l, int t, int r, int b, umbra_buf[]);
-void                  umbra_program_free(struct umbra_program *);
 
 #include <stdio.h>
 void umbra_program_dump(struct umbra_program *, FILE *);

@@ -2613,7 +2613,7 @@ static void test_program_null_guards(void) {
     umbra_store_32(b, (umbra_ptr){0, 0}, umbra_load_32(b, (umbra_ptr){0, 0}));
     struct umbra_basic_block *bb = umbra_basic_block(b);
     umbra_builder_free(b);
-    struct umbra_program *p = umbra_backend_compile(be, bb);
+    struct umbra_program *p = umbra_program(be, bb);
     umbra_basic_block_free(bb);
 
     // dump on interpreter (no dump fn)

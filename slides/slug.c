@@ -41,7 +41,7 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
                        umbra_draw_layout const *lay, struct umbra_program *program) {
     slug_state           *st = s->state;
     struct umbra_backend *be = umbra_program_backend(program);
-    struct umbra_program *acc = umbra_backend_compile(be, st->acc_bb);
+    struct umbra_program *acc = umbra_program(be, st->acc_bb);
 
     size_t wind_sz  = (size_t)w * (size_t)h * sizeof(float);
     size_t wind_row = (size_t)w * sizeof(float);

@@ -95,7 +95,7 @@ static void recompile(overview_state *st, struct umbra_backend *be) {
     for (int i = 0; i < st->n_real; i++) { umbra_program_free(st->progs[i]); }
     st->be = be;
     for (int i = 0; i < st->n_real; i++) {
-        st->progs[i] = umbra_backend_compile(be, st->bbs[i]);
+        st->progs[i] = umbra_program(be, st->bbs[i]);
     }
 }
 

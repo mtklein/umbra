@@ -55,9 +55,9 @@ int main(int argc, char *argv[]) {
         struct umbra_backend *be_i = umbra_backend_interp();
         struct umbra_backend *be_j = umbra_backend_jit();
         struct umbra_backend *be_m = umbra_backend_metal();
-        struct umbra_program *interp = umbra_backend_compile(be_i, bb);
-        struct umbra_program *jit = be_j ? umbra_backend_compile(be_j, bb) : NULL;
-        struct umbra_program *mtl = be_m ? umbra_backend_compile(be_m, bb) : NULL;
+        struct umbra_program *interp = umbra_program(be_i, bb);
+        struct umbra_program *jit = be_j ? umbra_program(be_j, bb) : NULL;
+        struct umbra_program *mtl = be_m ? umbra_program(be_m, bb) : NULL;
         umbra_basic_block_free(bb);
 
         _Bool planar = s->format.store == umbra_format_fp16_planar.store;
@@ -108,9 +108,9 @@ int main(int argc, char *argv[]) {
         struct umbra_backend *be_i = umbra_backend_interp();
         struct umbra_backend *be_j = umbra_backend_jit();
         struct umbra_backend *be_m = umbra_backend_metal();
-        struct umbra_program *interp = umbra_backend_compile(be_i, bb);
-        struct umbra_program *jit = be_j ? umbra_backend_compile(be_j, bb) : NULL;
-        struct umbra_program *mtl = be_m ? umbra_backend_compile(be_m, bb) : NULL;
+        struct umbra_program *interp = umbra_program(be_i, bb);
+        struct umbra_program *jit = be_j ? umbra_program(be_j, bb) : NULL;
+        struct umbra_program *mtl = be_m ? umbra_program(be_m, bb) : NULL;
         umbra_basic_block_free(bb);
 
         float *wind = calloc((size_t)(W * H), 4);

@@ -21,7 +21,7 @@ static inline test_backends test_backends_make(struct umbra_basic_block const *b
     B.be[1] = umbra_backend_jit();
     B.be[2] = umbra_backend_metal();
     for (int i = 0; i < NUM_BACKENDS; i++) {
-        B.p[i] = B.be[i] ? umbra_backend_compile(B.be[i], bb) : NULL;
+        B.p[i] = B.be[i] ? umbra_program(B.be[i], bb) : NULL;
     }
     (B.p[0] != 0) here;
 #if defined(__aarch64__) || defined(__AVX2__)

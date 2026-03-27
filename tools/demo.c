@@ -68,7 +68,7 @@ static void finish_pipe(pipe *p, builder *builder) {
     p->uni_len = umbra_uni_len(builder);
     struct umbra_basic_block *bb = umbra_basic_block(builder);
     umbra_builder_free(builder);
-    p->program = umbra_backend_compile(pipe_be, bb);
+    p->program = umbra_program(pipe_be, bb);
     umbra_basic_block_free(bb);
 }
 
@@ -140,7 +140,7 @@ static void rebuild_xtra(int backend) {
     free_xtra();
     if (!saved_bb || n_threads <= 1 || !bes[backend]) { return; }
     for (int t = 1; t < n_threads; t++) {
-        xtra_progs[t] = umbra_backend_compile(bes[backend], saved_bb);
+        xtra_progs[t] = umbra_program(bes[backend], saved_bb);
     }
 }
 
@@ -164,7 +164,7 @@ static void build_slide_fmt(slide *s, int fmt) {
     umbra_builder_free(builder);
 
     for (int i = 0; i < NUM_BACKENDS; i++) {
-        programs[i] = bes[i] ? umbra_backend_compile(bes[i], bb) : NULL;
+        programs[i] = bes[i] ? umbra_program(bes[i], bb) : NULL;
     }
     umbra_basic_block_free(saved_bb);
     saved_bb = bb;

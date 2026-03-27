@@ -120,7 +120,7 @@ struct umbra_backend *umbra_backend_metal(void) {
     return be;
 }
 
-struct umbra_program *umbra_backend_compile(struct umbra_backend           *be,
+struct umbra_program *umbra_program(struct umbra_backend           *be,
                                             struct umbra_basic_block const *bb) {
     return be->compile(be, bb);
 }
@@ -129,7 +129,7 @@ void umbra_backend_flush(struct umbra_backend *be) {
     if (be) { be->flush(be); }
 }
 
-_Bool umbra_backend_threadsafe(struct umbra_backend *be) {
+_Bool umbra_backend_threadsafe(struct umbra_backend const *be) {
     return be && be->threadsafe;
 }
 
@@ -138,7 +138,7 @@ void umbra_backend_free(struct umbra_backend *be) {
     be->free_fn(be);
 }
 
-struct umbra_backend *umbra_program_backend(struct umbra_program *p) {
+struct umbra_backend* umbra_program_backend(struct umbra_program const *p) {
     return p->backend;
 }
 

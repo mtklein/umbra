@@ -69,9 +69,9 @@ static void dump_bb(char const *dir, char const *name, struct umbra_builder *b) 
     };
     struct umbra_program *progs[] = {
 #ifdef JIT_EXT
-        umbra_backend_compile(bes[0], bb),
+        umbra_program(bes[0], bb),
 #endif
-        umbra_backend_compile(bes[sizeof bes / sizeof bes[0] - 1], bb),
+        umbra_program(bes[sizeof bes / sizeof bes[0] - 1], bb),
     };
     char const *exts[] = {
 #ifdef JIT_EXT
