@@ -2325,18 +2325,20 @@ void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
     char asmpath[]   = "/tmp/umbra_mca_asm_XXXXXX.s";
     char cleanpath[] = "/tmp/umbra_mca_clean_XXXXXX.s";
     char opath[sizeof spath + 2];
-    spath[0] = asmpath[0] = cleanpath[0] = '\0';
+    _Bool have_s = 0, have_asm = 0, have_clean = 0;
 
     int   fd, afd, cfd;
     FILE *afp, *cfp;
 
     fd = mkstemps(spath, 2);
     if (fd < 0) { goto done; }
+    have_s = 1;
     close(fd);
     snprintf(opath, sizeof opath, "%.*s.o", (int)(sizeof spath - 3), spath);
 
     afd = mkstemps(asmpath, 2);
     if (afd < 0) { goto done; }
+    have_asm = 1;
     close(afd);
 
     afp = fopen(asmpath, "w");
@@ -2346,6 +2348,7 @@ void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
 
     cfd = mkstemps(cleanpath, 2);
     if (cfd < 0) { goto done; }
+    have_clean = 1;
     cfp = fdopen(cfd, "w");
     if (!cfp) { close(cfd); goto done; }
 
@@ -2389,13 +2392,9 @@ void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
     }
 
 done:
-    if (spath[0])     { remove(spath); }
-    if (asmpath[0])   { remove(asmpath); }
-    if (cleanpath[0]) { remove(cleanpath); }
-    if (spath[0]) {
-        snprintf(opath, sizeof opath, "%.*s.o", (int)(sizeof spath - 3), spath);
-        remove(opath);
-    }
+    if (have_s)     { remove(spath); remove(opath); }
+    if (have_asm)   { remove(asmpath); }
+    if (have_clean) { remove(cleanpath); }
 }
 
 #endif
