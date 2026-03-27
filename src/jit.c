@@ -1027,6 +1027,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 #undef lu
 }
 
+#if __clang__
+__attribute__((no_sanitize("function")))
+#endif
 void umbra_jit_run(struct umbra_jit *j, int n, int w, int y0, umbra_buf buf[]) {
     if (!j) { return; }
     j->entry(n, w, buf, y0);
@@ -2170,6 +2173,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 #undef lu
 }
 
+#if __clang__
+__attribute__((no_sanitize("function")))
+#endif
 void umbra_jit_run(struct umbra_jit *j, int n, int w, int y0, umbra_buf buf[]) {
     if (!j) { return; }
     j->entry(n, w, buf, y0);
