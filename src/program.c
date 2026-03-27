@@ -60,6 +60,9 @@ static void free_jit(void *ctx) { umbra_jit_free(ctx); }
 static struct umbra_program *compile_jit(struct umbra_backend           *be,
                                          struct umbra_basic_block const *bb) {
     struct umbra_jit *const j = umbra_jit(bb);
+#if defined(__aarch64__) || defined(__AVX2__)
+    assert(j);
+#endif
     if (j) {
         struct umbra_program *const prog = malloc(sizeof *prog);
         *prog = (struct umbra_program){
@@ -93,6 +96,9 @@ static void free_metal(void *ctx) { umbra_metal_free(ctx); }
 static struct umbra_program *compile_metal(struct umbra_backend           *be,
                                            struct umbra_basic_block const *bb) {
     struct umbra_metal *const m = umbra_metal(be->ctx, bb);
+#if defined(__APPLE__) && !defined(__wasm__)
+    assert(m);
+#endif
     if (m) {
         struct umbra_program *const prog = malloc(sizeof *prog);
         *prog = (struct umbra_program){
