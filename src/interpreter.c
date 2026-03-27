@@ -156,6 +156,9 @@ enum {
     IMM_OPS(IMM_VARIANTS)
 #undef IMM_VARIANTS
 
+    // Output-only variants: no register inputs, just output to register.
+    op_r_imm_32, op_r_x, op_r_y, op_r_uniform_32, op_r_uniform_16,
+
     SW_NUM_OPS,
 };
 
@@ -406,6 +409,15 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
             } else
             IMM_OPS(TRY_IMM)
 #undef TRY_IMM
+            // Output-only ops: no register inputs, just output to register.
+            if (out_r && (tag == op_imm_32 || tag == op_x || tag == op_y
+                       || tag == op_uniform_32 || tag == op_uniform_16)) {
+                     if (tag == op_imm_32)      { s->tag = op_r_imm_32; }
+                else if (tag == op_x)           { s->tag = op_r_x; }
+                else if (tag == op_y)           { s->tag = op_r_y; }
+                else if (tag == op_uniform_32)  { s->tag = op_r_uniform_32; }
+                else if (tag == op_uniform_16)  { s->tag = op_r_uniform_16; }
+            } else
             { /* not an upgradable op */ }
 
             prev_r = (s->tag != tag) ? out_r : 0;
@@ -518,6 +530,11 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                 [op_m_##name##_r] = &&L_op_m_##name##_r,
                 IMM_OPS(IMM_LABELS)
 #undef IMM_LABELS
+                [op_r_imm_32] = &&L_op_r_imm_32,
+                [op_r_x] = &&L_op_r_x,
+                [op_r_y] = &&L_op_r_y,
+                [op_r_uniform_32] = &&L_op_r_uniform_32,
+                [op_r_uniform_16] = &&L_op_r_uniform_16,
             };
             DISPATCH;
 #else
@@ -984,6 +1001,27 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
 #undef IMM_DISPATCH_U
 #undef IMM_CMP_F
 #undef IMM_CMP_I
+
+                // Output-only register variants.
+                CASE(op_r_imm_32) acc.i32 = (I32){0} + ip->x; NEXT;
+                CASE(op_r_x) {
+                    I32 seq;
+                    __builtin_memcpy(&seq, iota, sizeof seq);
+                    acc.i32 = seq + (end - K);
+                } NEXT;
+                CASE(op_r_y) acc.i32 = (I32){0} + row; NEXT;
+                CASE(op_r_uniform_32) {
+                    assert(buf[ip->x].row_bytes == 0);
+                    int32_t uni;
+                    __builtin_memcpy(&uni, (int32_t const*)buf[ip->x].ptr + ip->y, sizeof uni);
+                    acc.i32 = (I32){0} + uni;
+                } NEXT;
+                CASE(op_r_uniform_16) {
+                    assert(buf[ip->x].row_bytes == 0);
+                    uint16_t uni;
+                    __builtin_memcpy(&uni, (uint16_t const*)buf[ip->x].ptr + ip->y, sizeof uni);
+                    acc.u32 = (U32){0} + (uint32_t)uni;
+                } NEXT;
 
                 CASE(SW_DONE) DONE;
 #if !defined(__GNUC__) || defined(__wasm__)
