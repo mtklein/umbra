@@ -1,4 +1,5 @@
 #include "program.h"
+#include <assert.h>
 #include <stdlib.h>
 
 static void nop_flush(struct umbra_backend *be) { (void)be; }
@@ -28,18 +29,16 @@ static void                  free_interp(void *ctx) { umbra_interpreter_free(ctx
 static struct umbra_program *compile_interp(struct umbra_backend           *be,
                                             struct umbra_basic_block const *bb) {
     struct umbra_interpreter *const p = umbra_interpreter(bb);
-    if (p) {
-        struct umbra_program *const prog = malloc(sizeof *prog);
-        *prog = (struct umbra_program){
-            .ctx = p,
-            .queue = run_interp,
-            .dump = nop_dump,
-            .free_fn = free_interp,
-            .backend = be,
-        };
-        return prog;
-    }
-    return NULL;
+    assert(p);
+    struct umbra_program *const prog = malloc(sizeof *prog);
+    *prog = (struct umbra_program){
+        .ctx = p,
+        .queue = run_interp,
+        .dump = nop_dump,
+        .free_fn = free_interp,
+        .backend = be,
+    };
+    return prog;
 }
 static void           free_be_interp(struct umbra_backend *be) { free(be); }
 struct umbra_backend *umbra_backend_interp(void) {

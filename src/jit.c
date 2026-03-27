@@ -1,5 +1,6 @@
 #include "program.h"
 #include "bb.h"
+#include <assert.h>
 
 #if !defined(__aarch64__) && !defined(__AVX2__)
 
@@ -1063,19 +1064,18 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 __attribute__((no_sanitize("function")))
 #endif
 void umbra_jit_run(struct umbra_jit *j, int l, int t, int r, int b, umbra_buf buf[]) {
-    if (j) {
-        j->entry(l, t, r, b, buf);
-    }
+    assert(j);
+    j->entry(l, t, r, b, buf);
 }
 void umbra_jit_free(struct umbra_jit *j) {
-    if (j) {
-        munmap(j->code, j->code_size);
-        free(j);
-    }
+    assert(j);
+    munmap(j->code, j->code_size);
+    free(j);
 }
 
 void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
-    if (j && j->loop_start < j->loop_end) {
+    assert(j);
+    if (j->loop_start < j->loop_end) {
         uint32_t const *words = (uint32_t const *)j->code;
 
         char tmp[] = "/tmp/umbra_mca_XXXXXX.s";
@@ -2268,16 +2268,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 __attribute__((no_sanitize("function")))
 #endif
 void umbra_jit_run(struct umbra_jit *j, int l, int t, int r, int b, umbra_buf buf[]) {
-    if (j) {
-        j->entry(l, t, r, b, buf);
-    }
+    assert(j);
+    j->entry(l, t, r, b, buf);
 }
 
 void umbra_jit_free(struct umbra_jit *j) {
-    if (j) {
-        munmap(j->code, j->code_size);
-        free(j);
-    }
+    assert(j);
+    munmap(j->code, j->code_size);
+    free(j);
 }
 
 static _Bool x86_disasm(uint8_t const *code, size_t n, char const *spath,
@@ -2317,7 +2315,8 @@ static _Bool x86_disasm(uint8_t const *code, size_t n, char const *spath,
 }
 
 void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
-    if (j && j->loop_start < j->loop_end) {
+    assert(j);
+    if (j->loop_start < j->loop_end) {
         uint8_t const *code = (uint8_t const *)j->code;
         size_t         n = (size_t)(j->loop_end - j->loop_start);
 

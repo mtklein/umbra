@@ -1,5 +1,6 @@
 #include "program.h"
 #include "bb.h"
+#include <assert.h>
 
 #if !defined(__APPLE__) || defined(__wasm__)
 
@@ -1208,7 +1209,8 @@ void umbra_metal_run(
     struct umbra_metal *m, int l, int t, int r, int b, umbra_buf buf[]
 ) {
     int w = r - l, h = b - t;
-    if (m && w > 0 && h > 0) {
+    assert(m);
+    if (w > 0 && h > 0) {
         struct metal_backend *be = m->be;
         if (!be->batch_cmdbuf) {
             umbra_metal_begin_batch(be);
@@ -1301,25 +1303,25 @@ void umbra_metal_flush(void *ctx) {
 }
 
 void umbra_metal_free(struct umbra_metal *m) {
-    if (m) {
-        @autoreleasepool {
-            if (m->pipeline) {
-                (void)(__bridge_transfer id)
-                    m->pipeline;
-            }
+    assert(m);
+    @autoreleasepool {
+        if (m->pipeline) {
+            (void)(__bridge_transfer id)
+                m->pipeline;
         }
-        free(m->per_bufs);
-        free(m->deref);
-        free(m->batch_data);
-        free(m->src);
-        free(m);
     }
+    free(m->per_bufs);
+    free(m->deref);
+    free(m->batch_data);
+    free(m->src);
+    free(m);
 }
 
 void umbra_dump_metal(
     struct umbra_metal const *m, FILE *f
 ) {
-    if (m && m->src) {
+    assert(m);
+    if (m->src) {
         fputs(m->src, f);
     }
 }
