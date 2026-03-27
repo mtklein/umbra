@@ -7,7 +7,7 @@
 
 #define cast(T, v) __builtin_convertvector(v, T)
 
-#define K 8
+#define K 16
 typedef int32_t  I32 __attribute__((vector_size(K * 4)));
 typedef uint32_t U32 __attribute__((vector_size(K * 4)));
 typedef float    F32 __attribute__((vector_size(K * 4)));
@@ -124,8 +124,10 @@ op(imm_32) {
     next;
 }
 
+static const int iota[K] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
 op(x_fn) {
-    I32 const seq = {0, 1, 2, 3, 4, 5, 6, 7};
+    I32 seq;
+    __builtin_memcpy(&seq, iota, sizeof seq);
     v->i32 = seq + (end - K);
     next;
 }
