@@ -12,7 +12,9 @@ static const int iota[K] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
 typedef int32_t  I32 __attribute__((vector_size(K * 4)));
 typedef uint32_t U32 __attribute__((vector_size(K * 4)));
 typedef float    F32 __attribute__((vector_size(K * 4)));
+typedef double   F64 __attribute__((vector_size(K * 8)));
 typedef uint16_t U16 __attribute__((vector_size(K * 2)));
+typedef int16_t  S16 __attribute__((vector_size(K * 2)));
 
 #ifdef __clang__
 #define vec_sqrt(v) __builtin_elementwise_sqrt(v)
@@ -160,6 +162,9 @@ enum {
     op_r_imm_32, op_r_x, op_r_y, op_r_uniform_32, op_r_uniform_16,
     op_r_pack_mm, op_r_pack_rm, op_m_pack_rm,
     op_r_pack_mr, op_m_pack_mr, op_r_pack_rr, op_m_pack_rr,
+    // fma/fms: z is most commonly the register operand (accumulator chains)
+    op_r_fma_f32_mmm, op_r_fma_f32_mmr, op_m_fma_f32_mmr,
+    op_r_fms_f32_mmm, op_r_fms_f32_mmr, op_m_fms_f32_mmr,
 
     SW_NUM_OPS,
 };
@@ -359,6 +364,7 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
             if (i == p->preamble) { prev_r = 0; }
             _Bool x_r = prev_r && s->x == -1;
             _Bool y_r = prev_r && s->y == -1;
+            _Bool z_r = prev_r && s->z == -1; (void)z_r;
             // Output to register only if the sole consumer is an upgradable ALU op
             // and doesn't cross the preamble/body boundary.
             _Bool out_r = 0;
@@ -368,7 +374,12 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
 #define CHECK_UNARY(name, rt, pt)  || next_tag == op_##name
 #define CHECK_IMM(name, rt, pt)    || next_tag == op_##name
                 out_r = 0 BINARY_OPS(CHECK_BINARY) UNARY_OPS(CHECK_UNARY) IMM_OPS(CHECK_IMM)
-                        || next_tag == op_pack;
+                        || next_tag == op_pack
+#if defined(__ARM_FEATURE_FMA) || defined(__FMA__)
+                        || ((next_tag == op_fma_f32 || next_tag == op_fms_f32)
+                            && p->inst[i + 1].z == -1)
+#endif
+                        ;
 #undef CHECK_BINARY
 #undef CHECK_UNARY
 #undef CHECK_IMM
@@ -412,6 +423,22 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
             } else
             IMM_OPS(TRY_IMM)
 #undef TRY_IMM
+            // fma/fms: z is most commonly from register (accumulator chains).
+            // Only on FMA platforms — the F64 fallback path has precision
+            // differences between register and memory accumulation.
+#if defined(__ARM_FEATURE_FMA) || defined(__FMA__)
+            if (tag == op_fma_f32) {
+                if      ( out_r &&  z_r) { s->tag = op_r_fma_f32_mmr; }
+                else if (!out_r &&  z_r) { s->tag = op_m_fma_f32_mmr; }
+                else if ( out_r && !z_r) { s->tag = op_r_fma_f32_mmm; }
+            } else
+            if (tag == op_fms_f32) {
+                if      ( out_r &&  z_r) { s->tag = op_r_fms_f32_mmr; }
+                else if (!out_r &&  z_r) { s->tag = op_m_fms_f32_mmr; }
+                else if ( out_r && !z_r) { s->tag = op_r_fms_f32_mmm; }
+            } else
+#endif
+
             // pack: binary pattern (x,y inputs, z is immediate shift).
             if (tag == op_pack) {
                 if      ( out_r &&  x_r &&  y_r) { s->tag = op_r_pack_rr; }
@@ -553,6 +580,12 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                 [op_m_pack_rm] = &&L_op_m_pack_rm, [op_r_pack_mr] = &&L_op_r_pack_mr,
                 [op_m_pack_mr] = &&L_op_m_pack_mr, [op_r_pack_rr] = &&L_op_r_pack_rr,
                 [op_m_pack_rr] = &&L_op_m_pack_rr,
+                [op_r_fma_f32_mmm] = &&L_op_r_fma_f32_mmm,
+                [op_r_fma_f32_mmr] = &&L_op_r_fma_f32_mmr,
+                [op_m_fma_f32_mmr] = &&L_op_m_fma_f32_mmr,
+                [op_r_fms_f32_mmm] = &&L_op_r_fms_f32_mmm,
+                [op_r_fms_f32_mmr] = &&L_op_r_fms_f32_mmr,
+                [op_m_fms_f32_mmr] = &&L_op_m_fms_f32_mmr,
             };
             DISPATCH;
 #else
@@ -760,7 +793,6 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                 CASE(op_f16_from_f32) { U16 const h = f32_to_f16(v[ip->x].f32); v->u32 = (U32){0}; __builtin_memcpy(v, &h, sizeof h); } NEXT;
                 CASE(op_i32_from_s16) {
                     U16 tmp; __builtin_memcpy(&tmp, &v[ip->x], sizeof tmp);
-                    typedef int16_t S16 __attribute__((vector_size(K * 2)));
                     S16 stmp; __builtin_memcpy(&stmp, &tmp, sizeof tmp);
                     v->i32 = cast(I32, stmp);
                 } NEXT;
@@ -796,12 +828,10 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                 CASE(op_fms_f32) v->f32 = v[ip->z].f32 - v[ip->x].f32 * v[ip->y].f32; NEXT;
 #else
                 CASE(op_fma_f32) {
-                    typedef double F64 __attribute__((vector_size(K * 8)));
                     F64 const x = cast(F64, v[ip->x].f32), y = cast(F64, v[ip->y].f32), z = cast(F64, v[ip->z].f32);
                     v->f32 = cast(F32, x * y + z);
                 } NEXT;
                 CASE(op_fms_f32) {
-                    typedef double F64 __attribute__((vector_size(K * 8)));
                     F64 const x = cast(F64, v[ip->x].f32), y = cast(F64, v[ip->y].f32), z = cast(F64, v[ip->z].f32);
                     v->f32 = cast(F32, z - x * y);
                 } NEXT;
@@ -1019,6 +1049,25 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
 #undef IMM_DISPATCH_U
 #undef IMM_CMP_F
 #undef IMM_CMP_I
+
+                // fma/fms register variants.
+#if defined(__ARM_FEATURE_FMA) || defined(__FMA__)
+#define FMA_OP(xv,yv,zv) ((zv) + (xv) * (yv))
+#define FMS_OP(xv,yv,zv) ((zv) - (xv) * (yv))
+#else
+                // F64 intermediate for precision on non-FMA platforms.
+                // (uses the existing F64 typedef from the non-variant fma cases)
+#define FMA_OP(xv,yv,zv) cast(F32, cast(F64,(xv)) * cast(F64,(yv)) + cast(F64,(zv)))
+#define FMS_OP(xv,yv,zv) cast(F32, cast(F64,(zv)) - cast(F64,(xv)) * cast(F64,(yv)))
+#endif
+                CASE(op_r_fma_f32_mmm) acc.f32 = FMA_OP(v[ip->x].f32, v[ip->y].f32, v[ip->z].f32); NEXT;
+                CASE(op_r_fma_f32_mmr) acc.f32 = FMA_OP(v[ip->x].f32, v[ip->y].f32, acc.f32);       NEXT;
+                CASE(op_m_fma_f32_mmr) v->f32  = FMA_OP(v[ip->x].f32, v[ip->y].f32, acc.f32);       NEXT;
+                CASE(op_r_fms_f32_mmm) acc.f32 = FMS_OP(v[ip->x].f32, v[ip->y].f32, v[ip->z].f32); NEXT;
+                CASE(op_r_fms_f32_mmr) acc.f32 = FMS_OP(v[ip->x].f32, v[ip->y].f32, acc.f32);       NEXT;
+                CASE(op_m_fms_f32_mmr) v->f32  = FMS_OP(v[ip->x].f32, v[ip->y].f32, acc.f32);       NEXT;
+#undef FMA_OP
+#undef FMS_OP
 
                 // pack register variants.
 #define PACK_SH I32 const sh = (I32){0} + ip->z
