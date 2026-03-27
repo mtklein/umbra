@@ -98,13 +98,24 @@ typedef union {
     F32 f32;
 } val;
 
+// Tag values: all enum op values (0..op_le_s32_imm), plus two interpreter-only ops.
+enum {
+    SW_LOAD_64_FUSED = op_le_s32_imm + 1,
+    SW_DONE,
+    SW_NUM_OPS,
+};
+
 struct sw_inst {
-    int tag;   // enum op value, or SW_DONE / SW_LOAD_64_FUSED
+    int tag;
     int x, y, z;
 };
 #pragma clang diagnostic ignored "-Wsign-conversion"
 #pragma clang diagnostic ignored "-Wswitch-enum"
-enum { SW_DONE = -1, SW_LOAD_64_FUSED = -2 };
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wgnu-label-as-value"
+#else
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
 
 struct umbra_switch_interp {
     struct sw_inst *inst;
@@ -231,27 +242,88 @@ void umbra_switch_interp_run(struct umbra_switch_interp *p, int l, int t, int r,
             struct sw_inst const  *ip  = p->inst + (col == l ? 0 : P);
             val                   *v   = p->v    + (col == l ? 0 : P);
 
-            for (;;) {
-                switch (ip->tag) {
+            // Computed goto on native, switch on WASM.
+#if defined(__GNUC__) && !defined(__wasm__)
+    #define DISPATCH    goto *labels[ip->tag]
+    #define CASE(label) L_##label:
+    #define NEXT        do { ip++; v++; DISPATCH; } while (0)
+    #define DONE        goto next_tile
+            static void *const labels[SW_NUM_OPS] = {
+                [op_x] = &&L_op_x, [op_y] = &&L_op_y, [op_imm_32] = &&L_op_imm_32,
+                [op_uniform_16] = &&L_op_uniform_16, [op_uniform_32] = &&L_op_uniform_32,
+                [op_load_16] = &&L_op_load_16, [op_load_32] = &&L_op_load_32,
+                [op_load_64_lo] = &&L_op_load_64_lo, [op_load_64_hi] = &&L_op_load_64_hi,
+                [SW_LOAD_64_FUSED] = &&L_SW_LOAD_64_FUSED,
+                [op_store_16] = &&L_op_store_16, [op_store_32] = &&L_op_store_32,
+                [op_store_64] = &&L_op_store_64,
+                [op_gather_uniform_16] = &&L_op_gather_uniform_16,
+                [op_gather_uniform_32] = &&L_op_gather_uniform_32,
+                [op_gather_16] = &&L_op_gather_16, [op_gather_32] = &&L_op_gather_32,
+                [op_deref_ptr] = &&L_op_deref_ptr,
+                [op_f32_from_f16] = &&L_op_f32_from_f16, [op_f16_from_f32] = &&L_op_f16_from_f32,
+                [op_i32_from_s16] = &&L_op_i32_from_s16, [op_i32_from_u16] = &&L_op_i32_from_u16,
+                [op_i16_from_i32] = &&L_op_i16_from_i32,
+                [op_f32_from_i32] = &&L_op_f32_from_i32, [op_i32_from_f32] = &&L_op_i32_from_f32,
+                [op_add_f32] = &&L_op_add_f32, [op_sub_f32] = &&L_op_sub_f32,
+                [op_mul_f32] = &&L_op_mul_f32, [op_div_f32] = &&L_op_div_f32,
+                [op_min_f32] = &&L_op_min_f32, [op_max_f32] = &&L_op_max_f32,
+                [op_sqrt_f32] = &&L_op_sqrt_f32, [op_abs_f32] = &&L_op_abs_f32,
+                [op_neg_f32] = &&L_op_neg_f32,
+                [op_round_f32] = &&L_op_round_f32, [op_floor_f32] = &&L_op_floor_f32,
+                [op_ceil_f32] = &&L_op_ceil_f32,
+                [op_round_i32] = &&L_op_round_i32, [op_floor_i32] = &&L_op_floor_i32,
+                [op_ceil_i32] = &&L_op_ceil_i32,
+                [op_fma_f32] = &&L_op_fma_f32, [op_fms_f32] = &&L_op_fms_f32,
+                [op_add_i32] = &&L_op_add_i32, [op_sub_i32] = &&L_op_sub_i32,
+                [op_mul_i32] = &&L_op_mul_i32,
+                [op_shl_i32] = &&L_op_shl_i32, [op_shr_u32] = &&L_op_shr_u32,
+                [op_shr_s32] = &&L_op_shr_s32,
+                [op_and_32] = &&L_op_and_32, [op_or_32] = &&L_op_or_32, [op_xor_32] = &&L_op_xor_32,
+                [op_sel_32] = &&L_op_sel_32,
+                [op_eq_f32] = &&L_op_eq_f32, [op_lt_f32] = &&L_op_lt_f32, [op_le_f32] = &&L_op_le_f32,
+                [op_eq_i32] = &&L_op_eq_i32, [op_lt_s32] = &&L_op_lt_s32, [op_le_s32] = &&L_op_le_s32,
+                [op_lt_u32] = &&L_op_lt_u32, [op_le_u32] = &&L_op_le_u32,
+                [op_shl_i32_imm] = &&L_op_shl_i32_imm, [op_shr_u32_imm] = &&L_op_shr_u32_imm,
+                [op_shr_s32_imm] = &&L_op_shr_s32_imm,
+                [op_and_32_imm] = &&L_op_and_32_imm, [op_or_32_imm] = &&L_op_or_32_imm,
+                [op_xor_32_imm] = &&L_op_xor_32_imm,
+                [op_add_f32_imm] = &&L_op_add_f32_imm, [op_sub_f32_imm] = &&L_op_sub_f32_imm,
+                [op_mul_f32_imm] = &&L_op_mul_f32_imm, [op_div_f32_imm] = &&L_op_div_f32_imm,
+                [op_min_f32_imm] = &&L_op_min_f32_imm, [op_max_f32_imm] = &&L_op_max_f32_imm,
+                [op_eq_f32_imm] = &&L_op_eq_f32_imm, [op_lt_f32_imm] = &&L_op_lt_f32_imm,
+                [op_le_f32_imm] = &&L_op_le_f32_imm,
+                [op_add_i32_imm] = &&L_op_add_i32_imm, [op_sub_i32_imm] = &&L_op_sub_i32_imm,
+                [op_mul_i32_imm] = &&L_op_mul_i32_imm,
+                [op_eq_i32_imm] = &&L_op_eq_i32_imm, [op_lt_s32_imm] = &&L_op_lt_s32_imm,
+                [op_le_s32_imm] = &&L_op_le_s32_imm,
+                [op_pack] = &&L_op_pack,
+                [SW_DONE] = &&L_SW_DONE,
+            };
+            DISPATCH;
+#else
+    #define CASE(label) case label:
+    #define NEXT        break
+    #define DONE        goto next_tile
+            for (;;) { switch (ip->tag) {
+#endif
+                CASE(op_imm_32) v->i32 = (I32){0} + ip->x; NEXT;
+                CASE(op_x) { I32 const seq = {0,1,2,3,4,5,6,7}; v->i32 = seq + (end - K); } NEXT;
+                CASE(op_y) v->i32 = (I32){0} + row; NEXT;
 
-                case op_imm_32: v->i32 = (I32){0} + ip->x; break;
-                case op_x: { I32 const seq = {0,1,2,3,4,5,6,7}; v->i32 = seq + (end - K); } break;
-                case op_y: v->i32 = (I32){0} + row; break;
-
-                case op_uniform_16: {
+                CASE(op_uniform_16) {
                     assert(buf[ip->x].row_bytes == 0);
                     uint16_t uni;
                     __builtin_memcpy(&uni, (uint16_t const*)buf[ip->x].ptr + ip->y, sizeof uni);
                     v->u32 = (U32){0} + (uint32_t)uni;
-                } break;
-                case op_uniform_32: {
+                } NEXT;
+                CASE(op_uniform_32) {
                     assert(buf[ip->x].row_bytes == 0);
                     int32_t uni;
                     __builtin_memcpy(&uni, (int32_t const*)buf[ip->x].ptr + ip->y, sizeof uni);
                     v->i32 = (I32){0} + uni;
-                } break;
+                } NEXT;
 
-                case op_load_16: {
+                CASE(op_load_16) {
                     void const     *base = (char*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
                     uint16_t const *src = (uint16_t const*)base;
                     int const       i = end - K;
@@ -269,8 +341,8 @@ void umbra_switch_interp_run(struct umbra_switch_interp *p, int l, int t, int r,
                             __builtin_memcpy((char*)v + 2 * ll, &s, 2);
                         }
                     }
-                } break;
-                case op_load_32: {
+                } NEXT;
+                CASE(op_load_32) {
                     void const    *base = (char*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
                     int32_t const *src = (int32_t const*)base;
                     int const      i = end - K;
@@ -285,8 +357,8 @@ void umbra_switch_interp_run(struct umbra_switch_interp *p, int l, int t, int r,
                             v->i32[ll] = tmp;
                         }
                     }
-                } break;
-                case op_load_64_lo: {
+                } NEXT;
+                CASE(op_load_64_lo) {
                     char const *src = (char const*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
                     int const   i = end - K;
                     int const   rem = n - i;
@@ -296,8 +368,8 @@ void umbra_switch_interp_run(struct umbra_switch_interp *p, int l, int t, int r,
                         __builtin_memcpy(&tmp, src + (i + ll) * 8, 4);
                         v->i32[ll] = tmp;
                     }
-                } break;
-                case op_load_64_hi: {
+                } NEXT;
+                CASE(op_load_64_hi) {
                     char const *src = (char const*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
                     int const   i = end - K;
                     int const   rem = n - i;
@@ -307,8 +379,8 @@ void umbra_switch_interp_run(struct umbra_switch_interp *p, int l, int t, int r,
                         __builtin_memcpy(&tmp, src + (i + ll) * 8 + 4, 4);
                         v->i32[ll] = tmp;
                     }
-                } break;
-                case SW_LOAD_64_FUSED: {
+                } NEXT;
+                CASE(SW_LOAD_64_FUSED) {
                     char const *src = (char const*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
                     int const   i = end - K;
                     int const   rem = n - i;
@@ -322,9 +394,9 @@ void umbra_switch_interp_run(struct umbra_switch_interp *p, int l, int t, int r,
                         v[1].i32[ll] = hi;
                     }
                     v++;
-                } break;
+                } NEXT;
 
-                case op_store_16: {
+                CASE(op_store_16) {
                     void     *base = (char*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
                     uint16_t *dst = (uint16_t*)base;
                     int const i = end - K;
@@ -338,8 +410,8 @@ void umbra_switch_interp_run(struct umbra_switch_interp *p, int l, int t, int r,
                             __builtin_memcpy(dst + i + ll, &s, 2);
                         }
                     }
-                } break;
-                case op_store_32: {
+                } NEXT;
+                CASE(op_store_32) {
                     void    *base = (char*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
                     int32_t *dst = (int32_t*)base;
                     int const i = end - K;
@@ -353,8 +425,8 @@ void umbra_switch_interp_run(struct umbra_switch_interp *p, int l, int t, int r,
                             __builtin_memcpy(dst + i + ll, &tmp, 4);
                         }
                     }
-                } break;
-                case op_store_64: {
+                } NEXT;
+                CASE(op_store_64) {
                     char *dst = (char*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
                     int const i = end - K;
                     int const rem = n - i;
@@ -365,9 +437,9 @@ void umbra_switch_interp_run(struct umbra_switch_interp *p, int l, int t, int r,
                         __builtin_memcpy(dst + (i + ll) * 8,     &lo, 4);
                         __builtin_memcpy(dst + (i + ll) * 8 + 4, &hi, 4);
                     }
-                } break;
+                } NEXT;
 
-                case op_gather_uniform_16: {
+                CASE(op_gather_uniform_16) {
                     int const ix = v[ip->y].i32[0];
                     int const count = (int)(buf[ip->x].sz / 2);
                     if (ix < 0 || ix >= count) { v->u32 = (U32){0}; break; }
@@ -376,16 +448,16 @@ void umbra_switch_interp_run(struct umbra_switch_interp *p, int l, int t, int r,
                     U16 const packed = (U16){0} + s;
                     v->u32 = (U32){0};
                     __builtin_memcpy(v, &packed, sizeof packed);
-                } break;
-                case op_gather_uniform_32: {
+                } NEXT;
+                CASE(op_gather_uniform_32) {
                     int const ix = v[ip->y].i32[0];
                     int const count = (int)(buf[ip->x].sz / 4);
                     if (ix < 0 || ix >= count) { v->i32 = (I32){0}; break; }
                     int32_t gval;
                     __builtin_memcpy(&gval, (char const*)buf[ip->x].ptr + 4 * ix, 4);
                     v->i32 = (I32){0} + gval;
-                } break;
-                case op_gather_16: {
+                } NEXT;
+                CASE(op_gather_16) {
                     I32 const ix = v[ip->y].i32;
                     int const count = (int)(buf[ip->x].sz / 2);
                     int const rem = n - (end - K);
@@ -397,8 +469,8 @@ void umbra_switch_interp_run(struct umbra_switch_interp *p, int l, int t, int r,
                             __builtin_memcpy((char*)v + 2 * ll, &s, 2);
                         }
                     }
-                } break;
-                case op_gather_32: {
+                } NEXT;
+                CASE(op_gather_32) {
                     I32 const ix = v[ip->y].i32;
                     int const count = (int)(buf[ip->x].sz / 4);
                     int const rem = n - (end - K);
@@ -410,9 +482,9 @@ void umbra_switch_interp_run(struct umbra_switch_interp *p, int l, int t, int r,
                             v->i32[ll] = tmp;
                         }
                     }
-                } break;
+                } NEXT;
 
-                case op_deref_ptr: {
+                CASE(op_deref_ptr) {
                     char *base = (char*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
                     void *derived;
                     ptrdiff_t ssz;
@@ -423,123 +495,125 @@ void umbra_switch_interp_run(struct umbra_switch_interp *p, int l, int t, int r,
                     buf[ip->z].ptr       = derived;
                     buf[ip->z].sz        = ssz < 0 ? (size_t)-ssz : (size_t)ssz;
                     buf[ip->z].row_bytes = drb;
-                } break;
+                } NEXT;
 
-                case op_f32_from_f16: { U16 h; __builtin_memcpy(&h, &v[ip->x], sizeof h); v->f32 = f16_to_f32(h); } break;
-                case op_f16_from_f32: { U16 const h = f32_to_f16(v[ip->x].f32); v->u32 = (U32){0}; __builtin_memcpy(v, &h, sizeof h); } break;
-                case op_i32_from_s16: {
+                CASE(op_f32_from_f16) { U16 h; __builtin_memcpy(&h, &v[ip->x], sizeof h); v->f32 = f16_to_f32(h); } NEXT;
+                CASE(op_f16_from_f32) { U16 const h = f32_to_f16(v[ip->x].f32); v->u32 = (U32){0}; __builtin_memcpy(v, &h, sizeof h); } NEXT;
+                CASE(op_i32_from_s16) {
                     U16 tmp; __builtin_memcpy(&tmp, &v[ip->x], sizeof tmp);
                     typedef int16_t S16 __attribute__((vector_size(K * 2)));
                     S16 stmp; __builtin_memcpy(&stmp, &tmp, sizeof tmp);
                     v->i32 = cast(I32, stmp);
-                } break;
-                case op_i32_from_u16: { U16 tmp; __builtin_memcpy(&tmp, &v[ip->x], sizeof tmp); v->u32 = cast(U32, tmp); } break;
-                case op_i16_from_i32: {
+                } NEXT;
+                CASE(op_i32_from_u16) { U16 tmp; __builtin_memcpy(&tmp, &v[ip->x], sizeof tmp); v->u32 = cast(U32, tmp); } NEXT;
+                CASE(op_i16_from_i32) {
                     U16 tmp;
                     for (int ll = 0; ll < K; ll++) { tmp[ll] = (uint16_t)v[ip->x].u32[ll]; }
                     v->u32 = (U32){0};
                     __builtin_memcpy(v, &tmp, sizeof tmp);
-                } break;
+                } NEXT;
 
-                case op_f32_from_i32: v->f32 = cast(F32, v[ip->x].i32); break;
-                case op_i32_from_f32: v->i32 = cast(I32, v[ip->x].f32); break;
+                CASE(op_f32_from_i32) v->f32 = cast(F32, v[ip->x].i32); NEXT;
+                CASE(op_i32_from_f32) v->i32 = cast(I32, v[ip->x].f32); NEXT;
 
-                case op_add_f32: v->f32 = v[ip->x].f32 + v[ip->y].f32; break;
-                case op_sub_f32: v->f32 = v[ip->x].f32 - v[ip->y].f32; break;
-                case op_mul_f32: v->f32 = v[ip->x].f32 * v[ip->y].f32; break;
-                case op_div_f32: v->f32 = v[ip->x].f32 / v[ip->y].f32; break;
-                case op_min_f32: v->f32 = vec_min(v[ip->x].f32, v[ip->y].f32); break;
-                case op_max_f32: v->f32 = vec_max(v[ip->x].f32, v[ip->y].f32); break;
-                case op_sqrt_f32: v->f32 = vec_sqrt(v[ip->x].f32); break;
-                case op_abs_f32: v->f32 = vec_abs(v[ip->x].f32); break;
-                case op_neg_f32: v->f32 = -v[ip->x].f32; break;
-                case op_round_f32: v->f32 = vec_round(v[ip->x].f32); break;
-                case op_floor_f32: v->f32 = vec_floor(v[ip->x].f32); break;
-                case op_ceil_f32:  v->f32 = vec_ceil(v[ip->x].f32);  break;
-                case op_round_i32: v->i32 = cast(I32, vec_round(v[ip->x].f32)); break;
-                case op_floor_i32: v->i32 = cast(I32, vec_floor(v[ip->x].f32)); break;
-                case op_ceil_i32:  v->i32 = cast(I32, vec_ceil(v[ip->x].f32));  break;
+                CASE(op_add_f32) v->f32 = v[ip->x].f32 + v[ip->y].f32; NEXT;
+                CASE(op_sub_f32) v->f32 = v[ip->x].f32 - v[ip->y].f32; NEXT;
+                CASE(op_mul_f32) v->f32 = v[ip->x].f32 * v[ip->y].f32; NEXT;
+                CASE(op_div_f32) v->f32 = v[ip->x].f32 / v[ip->y].f32; NEXT;
+                CASE(op_min_f32) v->f32 = vec_min(v[ip->x].f32, v[ip->y].f32); NEXT;
+                CASE(op_max_f32) v->f32 = vec_max(v[ip->x].f32, v[ip->y].f32); NEXT;
+                CASE(op_sqrt_f32) v->f32 = vec_sqrt(v[ip->x].f32); NEXT;
+                CASE(op_abs_f32) v->f32 = vec_abs(v[ip->x].f32); NEXT;
+                CASE(op_neg_f32) v->f32 = -v[ip->x].f32; NEXT;
+                CASE(op_round_f32) v->f32 = vec_round(v[ip->x].f32); NEXT;
+                CASE(op_floor_f32) v->f32 = vec_floor(v[ip->x].f32); NEXT;
+                CASE(op_ceil_f32)  v->f32 = vec_ceil(v[ip->x].f32);  NEXT;
+                CASE(op_round_i32) v->i32 = cast(I32, vec_round(v[ip->x].f32)); NEXT;
+                CASE(op_floor_i32) v->i32 = cast(I32, vec_floor(v[ip->x].f32)); NEXT;
+                CASE(op_ceil_i32)  v->i32 = cast(I32, vec_ceil(v[ip->x].f32));  NEXT;
 
 #if defined(__ARM_FEATURE_FMA) || defined(__FMA__)
-                case op_fma_f32: v->f32 = v[ip->z].f32 + v[ip->x].f32 * v[ip->y].f32; break;
-                case op_fms_f32: v->f32 = v[ip->z].f32 - v[ip->x].f32 * v[ip->y].f32; break;
+                CASE(op_fma_f32) v->f32 = v[ip->z].f32 + v[ip->x].f32 * v[ip->y].f32; NEXT;
+                CASE(op_fms_f32) v->f32 = v[ip->z].f32 - v[ip->x].f32 * v[ip->y].f32; NEXT;
 #else
-                case op_fma_f32: {
+                CASE(op_fma_f32) {
                     typedef double F64 __attribute__((vector_size(K * 8)));
                     F64 const x = cast(F64, v[ip->x].f32), y = cast(F64, v[ip->y].f32), z = cast(F64, v[ip->z].f32);
                     v->f32 = cast(F32, x * y + z);
-                } break;
-                case op_fms_f32: {
+                } NEXT;
+                CASE(op_fms_f32) {
                     typedef double F64 __attribute__((vector_size(K * 8)));
                     F64 const x = cast(F64, v[ip->x].f32), y = cast(F64, v[ip->y].f32), z = cast(F64, v[ip->z].f32);
                     v->f32 = cast(F32, z - x * y);
-                } break;
+                } NEXT;
 #endif
 
-                case op_add_i32: v->i32 = v[ip->x].i32 + v[ip->y].i32; break;
-                case op_sub_i32: v->i32 = v[ip->x].i32 - v[ip->y].i32; break;
-                case op_mul_i32: v->i32 = v[ip->x].i32 * v[ip->y].i32; break;
-                case op_shl_i32: v->i32 = v[ip->x].i32 << v[ip->y].i32; break;
-                case op_shr_u32: v->u32 = v[ip->x].u32 >> v[ip->y].u32; break;
-                case op_shr_s32: v->i32 = v[ip->x].i32 >> v[ip->y].i32; break;
-                case op_and_32:  v->i32 = v[ip->x].i32 & v[ip->y].i32;  break;
-                case op_or_32:   v->i32 = v[ip->x].i32 | v[ip->y].i32;  break;
-                case op_xor_32:  v->i32 = v[ip->x].i32 ^ v[ip->y].i32;  break;
-                case op_sel_32:  v->i32 = (v[ip->x].i32 & v[ip->y].i32) | (~v[ip->x].i32 & v[ip->z].i32); break;
+                CASE(op_add_i32) v->i32 = v[ip->x].i32 + v[ip->y].i32; NEXT;
+                CASE(op_sub_i32) v->i32 = v[ip->x].i32 - v[ip->y].i32; NEXT;
+                CASE(op_mul_i32) v->i32 = v[ip->x].i32 * v[ip->y].i32; NEXT;
+                CASE(op_shl_i32) v->i32 = v[ip->x].i32 << v[ip->y].i32; NEXT;
+                CASE(op_shr_u32) v->u32 = v[ip->x].u32 >> v[ip->y].u32; NEXT;
+                CASE(op_shr_s32) v->i32 = v[ip->x].i32 >> v[ip->y].i32; NEXT;
+                CASE(op_and_32)  v->i32 = v[ip->x].i32 & v[ip->y].i32;  NEXT;
+                CASE(op_or_32)   v->i32 = v[ip->x].i32 | v[ip->y].i32;  NEXT;
+                CASE(op_xor_32)  v->i32 = v[ip->x].i32 ^ v[ip->y].i32;  NEXT;
+                CASE(op_sel_32)  v->i32 = (v[ip->x].i32 & v[ip->y].i32) | (~v[ip->x].i32 & v[ip->z].i32); NEXT;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-equal"
-                case op_eq_f32: v->i32 = (I32)(v[ip->x].f32 == v[ip->y].f32); break;
+                CASE(op_eq_f32) v->i32 = (I32)(v[ip->x].f32 == v[ip->y].f32); NEXT;
 #pragma clang diagnostic pop
-                case op_lt_f32: v->i32 = (I32)(v[ip->x].f32 <  v[ip->y].f32); break;
-                case op_le_f32: v->i32 = (I32)(v[ip->x].f32 <= v[ip->y].f32); break;
-                case op_eq_i32: v->i32 = (I32)(v[ip->x].i32 == v[ip->y].i32); break;
-                case op_lt_s32: v->i32 = (I32)(v[ip->x].i32 <  v[ip->y].i32); break;
-                case op_le_s32: v->i32 = (I32)(v[ip->x].i32 <= v[ip->y].i32); break;
-                case op_lt_u32: v->i32 = (I32)(v[ip->x].u32 <  v[ip->y].u32); break;
-                case op_le_u32: v->i32 = (I32)(v[ip->x].u32 <= v[ip->y].u32); break;
+                CASE(op_lt_f32) v->i32 = (I32)(v[ip->x].f32 <  v[ip->y].f32); NEXT;
+                CASE(op_le_f32) v->i32 = (I32)(v[ip->x].f32 <= v[ip->y].f32); NEXT;
+                CASE(op_eq_i32) v->i32 = (I32)(v[ip->x].i32 == v[ip->y].i32); NEXT;
+                CASE(op_lt_s32) v->i32 = (I32)(v[ip->x].i32 <  v[ip->y].i32); NEXT;
+                CASE(op_le_s32) v->i32 = (I32)(v[ip->x].i32 <= v[ip->y].i32); NEXT;
+                CASE(op_lt_u32) v->i32 = (I32)(v[ip->x].u32 <  v[ip->y].u32); NEXT;
+                CASE(op_le_u32) v->i32 = (I32)(v[ip->x].u32 <= v[ip->y].u32); NEXT;
 
-                case op_shl_i32_imm: { I32 const sh = (I32){0} + ip->y; v->i32 = v[ip->x].i32 << sh; } break;
-                case op_shr_u32_imm: { U32 const sh = (U32){0} + (uint32_t)ip->y; v->u32 = v[ip->x].u32 >> sh; } break;
-                case op_shr_s32_imm: { I32 const sh = (I32){0} + ip->y; v->i32 = v[ip->x].i32 >> sh; } break;
-                case op_and_32_imm:  { U32 const m = (U32){0} + (uint32_t)ip->y; v->u32 = v[ip->x].u32 & m; } break;
-                case op_or_32_imm:   { U32 const m = (U32){0} + (uint32_t)ip->y; v->u32 = v[ip->x].u32 | m; } break;
-                case op_xor_32_imm:  { U32 const m = (U32){0} + (uint32_t)ip->y; v->u32 = v[ip->x].u32 ^ m; } break;
+                CASE(op_shl_i32_imm) { I32 const sh = (I32){0} + ip->y; v->i32 = v[ip->x].i32 << sh; } NEXT;
+                CASE(op_shr_u32_imm) { U32 const sh = (U32){0} + (uint32_t)ip->y; v->u32 = v[ip->x].u32 >> sh; } NEXT;
+                CASE(op_shr_s32_imm) { I32 const sh = (I32){0} + ip->y; v->i32 = v[ip->x].i32 >> sh; } NEXT;
+                CASE(op_and_32_imm)  { U32 const m = (U32){0} + (uint32_t)ip->y; v->u32 = v[ip->x].u32 & m; } NEXT;
+                CASE(op_or_32_imm)   { U32 const m = (U32){0} + (uint32_t)ip->y; v->u32 = v[ip->x].u32 | m; } NEXT;
+                CASE(op_xor_32_imm)  { U32 const m = (U32){0} + (uint32_t)ip->y; v->u32 = v[ip->x].u32 ^ m; } NEXT;
 
 #define F32_IMM union { int i; float f; } const u = {.i = ip->y}; F32 const imm = (F32){0} + u.f
-                case op_add_f32_imm: { F32_IMM; v->f32 = v[ip->x].f32 + imm; } break;
-                case op_sub_f32_imm: { F32_IMM; v->f32 = v[ip->x].f32 - imm; } break;
-                case op_mul_f32_imm: { F32_IMM; v->f32 = v[ip->x].f32 * imm; } break;
-                case op_div_f32_imm: { F32_IMM; v->f32 = v[ip->x].f32 / imm; } break;
-                case op_min_f32_imm: { F32_IMM; v->f32 = vec_min(v[ip->x].f32, imm); } break;
-                case op_max_f32_imm: { F32_IMM; v->f32 = vec_max(v[ip->x].f32, imm); } break;
+                CASE(op_add_f32_imm) { F32_IMM; v->f32 = v[ip->x].f32 + imm; } NEXT;
+                CASE(op_sub_f32_imm) { F32_IMM; v->f32 = v[ip->x].f32 - imm; } NEXT;
+                CASE(op_mul_f32_imm) { F32_IMM; v->f32 = v[ip->x].f32 * imm; } NEXT;
+                CASE(op_div_f32_imm) { F32_IMM; v->f32 = v[ip->x].f32 / imm; } NEXT;
+                CASE(op_min_f32_imm) { F32_IMM; v->f32 = vec_min(v[ip->x].f32, imm); } NEXT;
+                CASE(op_max_f32_imm) { F32_IMM; v->f32 = vec_max(v[ip->x].f32, imm); } NEXT;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-equal"
-                case op_eq_f32_imm:  { F32_IMM; v->i32 = (I32)(v[ip->x].f32 == imm); } break;
+                CASE(op_eq_f32_imm)  { F32_IMM; v->i32 = (I32)(v[ip->x].f32 == imm); } NEXT;
 #pragma clang diagnostic pop
-                case op_lt_f32_imm:  { F32_IMM; v->i32 = (I32)(v[ip->x].f32 <  imm); } break;
-                case op_le_f32_imm:  { F32_IMM; v->i32 = (I32)(v[ip->x].f32 <= imm); } break;
+                CASE(op_lt_f32_imm)  { F32_IMM; v->i32 = (I32)(v[ip->x].f32 <  imm); } NEXT;
+                CASE(op_le_f32_imm)  { F32_IMM; v->i32 = (I32)(v[ip->x].f32 <= imm); } NEXT;
 #undef F32_IMM
 
 #define I32_IMM I32 const imm = (I32){0} + ip->y
-                case op_add_i32_imm: { I32_IMM; v->i32 = v[ip->x].i32 + imm; } break;
-                case op_sub_i32_imm: { I32_IMM; v->i32 = v[ip->x].i32 - imm; } break;
-                case op_mul_i32_imm: { I32_IMM; v->i32 = v[ip->x].i32 * imm; } break;
-                case op_eq_i32_imm:  { I32_IMM; v->i32 = (I32)(v[ip->x].i32 == imm); } break;
-                case op_lt_s32_imm:  { I32_IMM; v->i32 = (I32)(v[ip->x].i32 <  imm); } break;
-                case op_le_s32_imm:  { I32_IMM; v->i32 = (I32)(v[ip->x].i32 <= imm); } break;
+                CASE(op_add_i32_imm) { I32_IMM; v->i32 = v[ip->x].i32 + imm; } NEXT;
+                CASE(op_sub_i32_imm) { I32_IMM; v->i32 = v[ip->x].i32 - imm; } NEXT;
+                CASE(op_mul_i32_imm) { I32_IMM; v->i32 = v[ip->x].i32 * imm; } NEXT;
+                CASE(op_eq_i32_imm)  { I32_IMM; v->i32 = (I32)(v[ip->x].i32 == imm); } NEXT;
+                CASE(op_lt_s32_imm)  { I32_IMM; v->i32 = (I32)(v[ip->x].i32 <  imm); } NEXT;
+                CASE(op_le_s32_imm)  { I32_IMM; v->i32 = (I32)(v[ip->x].i32 <= imm); } NEXT;
 #undef I32_IMM
 
-                case op_pack: {
+                CASE(op_pack) {
                     I32 const sh = (I32){0} + ip->z;
                     v->u32 = v[ip->x].u32 | (U32)(v[ip->y].i32 << sh);
-                } break;
+                } NEXT;
 
-                case SW_DONE: goto next_tile;
+                CASE(SW_DONE) DONE;
+#if !defined(__GNUC__) || defined(__wasm__)
                 }
                 ip++;
                 v++;
             }
+#endif
             next_tile:;
         }
     }
