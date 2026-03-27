@@ -2000,45 +2000,29 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             } else {
                 int8_t hi_idx = ra_alloc(ra, sl, ns);
                 vextracti128(c, hi_idx, rx, 1);
-                {
-                    sub_ri(c, RSP, 32);
-                    for (int k = 0; k < 8; k++) {
-                        int src = (k < 4) ? rx : hi_idx;
-                        int lane = k & 3;
-                        if (lane == 0) {
-                            vex(c, 1, 1, 0, 0, src, 0, RAX, 0x7e);
-                        } else {
-                            vpextrd(c, RAX, src, (uint8_t)lane);
-                        }
-                        cmp_rr(c, RAX, XM);
-                        int oob = jcc(c, 0x03);
-                        {
-                            uint8_t rex2 = 0x40;
-                            if (base >= 8) { rex2 |= 0x01; }
-                            if (rex2 != 0x40) { emit1(c, rex2); }
-                            emit1(c, 0x0f);
-                            emit1(c, 0xb7);
-                            emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
-                            emit1(c, (uint8_t)((1 << 6) | ((RAX & 7) << 3) | (base & 7)));
-                        }
-                        int done = jmp(c);
-                        patch_jcc(c, oob);
-                        xor_rr(c, RAX, RAX);
-                        patch_jcc(c, done);
-                        emit1(c, 0x89);
-                        if (k == 0) {
-                            emit1(c, 0x04);
-                            emit1(c, 0x24);
-                        } else {
-                            emit1(c, 0x44);
-                            emit1(c, 0x24);
-                            emit1(c, (uint8_t)(k * 4));
-                        }
+                vpxor(c, 0, s.rd, s.rd, s.rd);
+                for (int k = 0; k < 8; k++) {
+                    int src = (k < 4) ? rx : hi_idx;
+                    int lane = k & 3;
+                    if (lane == 0) {
+                        vex(c, 1, 1, 0, 0, src, 0, RAX, 0x7e);
+                    } else {
+                        vpextrd(c, RAX, src, (uint8_t)lane);
                     }
-                    vfill(c, s.rd, 0);
-                    add_ri(c, RSP, 32);
-                    vextracti128(c, hi_idx, s.rd, 1);
-                    vex_rrr(c, 1, 2, 0, 0x2b, s.rd, s.rd, hi_idx);
+                    cmp_rr(c, RAX, XM);
+                    int skip = jcc(c, 0x03);
+                    {
+                        uint8_t rex2 = 0x40;
+                        if (base >= 8) { rex2 |= 0x01; }
+                        if (rex2 != 0x40) { emit1(c, rex2); }
+                        emit1(c, 0x0f);
+                        emit1(c, 0xb7);
+                        emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
+                        emit1(c, (uint8_t)((1 << 6) | ((RAX & 7) << 3) | (base & 7)));
+                    }
+                    vex(c, 1, 1, 0, 0, s.rd, s.rd, RAX, 0xC4);
+                    emit1(c, (uint8_t)k);
+                    patch_jcc(c, skip);
                 }
                 ra_return_reg(ra, hi_idx);
                 if (lu(inst->x) <= i) {
