@@ -151,9 +151,11 @@ builder* umbra_builder(void) {
 }
 
 void umbra_builder_free(builder *b) {
-    free(b->inst);
-    free(b->ht);
-    free(b);
+    if (b) {
+        free(b->inst);
+        free(b->ht);
+        free(b);
+    }
 }
 
 val umbra_x(builder *b) { return push(b, op_x); }
