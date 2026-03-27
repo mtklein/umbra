@@ -845,103 +845,83 @@ struct umbra_metal* umbra_metal(
     void *backend_ctx, BB const *bb
 ) {
     struct metal_backend *be = backend_ctx;
-    if (be) {
-        @autoreleasepool {
-            id<MTLDevice> device =
-                (__bridge id<MTLDevice>)be->device;
+    if (!be) { return 0; }
 
-            int *deref_buf = calloc(
-                (size_t)bb->insts,
-                sizeof *deref_buf);
-            int max_ptr = -1, total_bufs = 0;
-            char *src = build_source(
-                bb, &max_ptr, &total_bufs,
-                deref_buf);
+    struct umbra_metal *result = 0;
+    @autoreleasepool {
+        id<MTLDevice> device = (__bridge id<MTLDevice>)be->device;
 
-            int n_deref = 0;
+        int *deref_buf = calloc((size_t)bb->insts, sizeof *deref_buf);
+        int  max_ptr = -1, total_bufs = 0;
+        char *src = build_source(bb, &max_ptr, &total_bufs, deref_buf);
+
+        int n_deref = 0;
+        for (int i = 0; i < bb->insts; i++) {
+            if (bb->inst[i].op == op_deref_ptr) {
+                n_deref++;
+            }
+        }
+        struct deref_info *di = calloc((size_t)(n_deref ? n_deref : 1), sizeof *di);
+        {
+            int d = 0;
             for (int i = 0; i < bb->insts; i++) {
                 if (bb->inst[i].op == op_deref_ptr) {
-                    n_deref++;
+                    di[d].buf_idx  = deref_buf[i];
+                    di[d].src_buf  = bb->inst[i].ptr;
+                    di[d].byte_off = bb->inst[i].imm;
+                    d++;
                 }
             }
-            struct deref_info *di = calloc(
-                (size_t)(n_deref ? n_deref : 1),
-                sizeof *di);
-            {
-                int d = 0;
-                for (int i = 0;
-                     i < bb->insts; i++) {
-                    if (bb->inst[i].op
-                            == op_deref_ptr) {
-                        di[d].buf_idx = deref_buf[i];
-                        di[d].src_buf =
-                            bb->inst[i].ptr;
-                        di[d].byte_off =
-                            bb->inst[i].imm;
-                        d++;
-                    }
-                }
-            }
+        }
 
-            NSString *source =
-                [NSString stringWithUTF8String:src];
-            NSError *error = nil;
-            MTLCompileOptions *opts =
-                [MTLCompileOptions new];
-            if (@available(macOS 15.0, *)) {
-                opts.mathMode = MTLMathModeSafe;
-            } else {
+        NSString *source = [NSString stringWithUTF8String:src];
+        NSError *error = nil;
+        MTLCompileOptions *opts = [MTLCompileOptions new];
+        if (@available(macOS 15.0, *)) {
+            opts.mathMode = MTLMathModeSafe;
+        } else {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-                opts.fastMathEnabled = NO;
+            opts.fastMathEnabled = NO;
 #pragma clang diagnostic pop
-            }
-            id<MTLLibrary> library =
-                [device newLibraryWithSource:source
-                                     options:opts
-                                       error:&error];
-            if (library) {
-                id<MTLFunction> func =
-                    [library
-                     newFunctionWithName:
-                         @"umbra_entry"];
-                if (func) {
-                    id<MTLComputePipelineState>
-                        pipeline = [device
-                     newComputePipelineStateWithFunction:func
-                                                   error:&error];
-                    if (pipeline) {
-                        struct umbra_metal *m =
-                            calloc(1, sizeof *m);
-                        m->be = be;
-                        m->pipeline =
-                            (__bridge_retained void*)
-                                pipeline;
-                        m->src        = src;
-                        m->max_ptr    = max_ptr;
-                        m->total_bufs = total_bufs;
-                        m->tg_size    = (int)pipeline
-                            .maxTotalThreadsPerThreadgroup;
-                        m->per_bufs = calloc(
-                            (size_t)total_bufs,
-                            sizeof *m->per_bufs);
-                        m->deref   = di;
-                        m->n_deref = n_deref;
-
-                        free(deref_buf);
-                        return m;
-                    }
-                }
-            } else {
-                NSLog(@"Metal compile error: %@",
-                      error);
-            }
-            free(deref_buf);
-            free(src);
-            return 0;
         }
+
+        id<MTLLibrary>              library;
+        id<MTLFunction>             func;
+        id<MTLComputePipelineState> pipeline;
+        struct umbra_metal         *m;
+
+        library = [device newLibraryWithSource:source options:opts error:&error];
+        if (!library) {
+            NSLog(@"Metal compile error: %@", error);
+            goto fail;
+        }
+        func = [library newFunctionWithName:@"umbra_entry"];
+        if (!func) { goto fail; }
+        pipeline = [device newComputePipelineStateWithFunction:func error:&error];
+        if (!pipeline) { goto fail; }
+
+        m = calloc(1, sizeof *m);
+        m->be        = be;
+        m->pipeline  = (__bridge_retained void*)pipeline;
+        m->src       = src;
+        m->max_ptr   = max_ptr;
+        m->total_bufs = total_bufs;
+        m->tg_size   = (int)pipeline.maxTotalThreadsPerThreadgroup;
+        m->per_bufs  = calloc((size_t)total_bufs, sizeof *m->per_bufs);
+        m->deref     = di;
+        m->n_deref   = n_deref;
+        free(deref_buf);
+        result = m;
+        goto out;
+
+    fail:
+        free(deref_buf);
+        free(di);
+        free(src);
+    out:;
     }
-    return 0;
+    return result;
 }
 
 static void batch_add_copy(
