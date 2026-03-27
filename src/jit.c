@@ -69,7 +69,7 @@ static void pool_free(struct pool *p) {
 
 #include "asm_arm64.h"
 
-// X0=r, X1=b, X2=buf, X3=t, X4=l.
+// X0=l, X1=t, X2=r, X3=b, X4=buf.
 // X0=col_end, X1=l, X2=buf, X9=col, X14=row.
 enum {
     XWIDTH = 1,   // x0_col (reset XCOL at row boundary)
@@ -363,7 +363,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 struct umbra_jit {
     void  *code;
     size_t code_size;
-    void (*entry)(int, int, umbra_buf *, int, int);
+    void (*entry)(int, int, int, int, umbra_buf *);
     int loop_start, loop_end;
 };
 
@@ -385,18 +385,20 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, 0xd503201fu);
     put(&c, 0xd503201fu);
 
-    // Entry: x0=r, x1=b, x2=buf, x3=t, x4=l.
-    // Save before preamble clobbers x3, x4 (and XM via load_count).
-    put(&c, ADD_xi(XCOL, 3, 0));       // XCOL = t (temp)
-    put(&c, ADD_xi(XW, 0, 0));        // XW = r = col_end
-    put(&c, ADD_xi(XH, 4, 0));        // XH = l
+    // Entry: x0=l, x1=t, x2=r, x3=b, x4=buf.
+    // Save before preamble clobbers args (and XM via load_count).
+    put(&c, ADD_xi(XH, 0, 0));        // XH = l
+    put(&c, ADD_xi(XCOL, 1, 0));      // XCOL = t (temp)
+    put(&c, ADD_xi(XW, 2, 0));        // XW = r = col_end
+    put(&c, ADD_xi(XY, 3, 0));        // XY = b (temp)
+    put(&c, ADD_xi(XBUF, 4, 0));      // XBUF = buf
 
     emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
 
     ra_begin_loop(ra);
 
     // 2D loop: XCOL = column, XY = row, X0 = col_end.
-    put(&c, ADD_xi(XM, 1, 0));        // XM = b = end_row (x1 survives preamble)
+    put(&c, ADD_xi(XM, XY, 0));       // XM = b = end_row (XY saved pre-preamble)
     put(&c, ADD_xi(0, XW, 0));        // x0 = col_end = r
     put(&c, ADD_xi(XWIDTH, XH, 0));   // XWIDTH = l
     put(&c, ADD_xi(XY, XCOL, 0));     // XY = t
@@ -512,7 +514,7 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     {
         union {
             void *p;
-            void (*fn)(int, int, umbra_buf *, int, int);
+            void (*fn)(int, int, int, int, umbra_buf *);
         } u = {.p = mem};
         j->entry = u.fn;
     }
@@ -1051,7 +1053,7 @@ __attribute__((no_sanitize("function")))
 #endif
 void umbra_jit_run(struct umbra_jit *j, int l, int t, int r, int b, umbra_buf buf[]) {
     if (!j) { return; }
-    j->entry(r, b, buf, t, l);
+    j->entry(l, t, r, b, buf);
 }
 void umbra_jit_free(struct umbra_jit *j) {
     if (!j) { return; }
@@ -1437,7 +1439,7 @@ static int resolve_ptr_x86(Buf *c, int p, int *last_ptr, int const *deref_gpr,
 struct umbra_jit {
     void  *code;
     size_t code_size, code_len;
-    void (*entry)(int, int, umbra_buf *, int, int);
+    void (*entry)(int, int, int, int, umbra_buf *);
     int loop_start, loop_end;
 };
 
@@ -1461,21 +1463,20 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     int stack_patch = c.len;
     for (int i = 0; i < 7; i++) { nop(&c); }
 
-    mov_rr(&c, XI, RCX);
-    mov_rr(&c, XH_X86, R8);
+    // Entry: RDI=l, RSI=t, RDX=r, RCX=b, R8=buf.
+    mov_rr(&c, XI, RDX);             // XI = r (save before XBUF overwrite)
+    mov_rr(&c, XH_X86, RCX);         // XH_X86 = b
+    mov_rr(&c, XBUF, R8);            // XBUF(RDX) = buf
 
     emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
 
     ra_begin_loop(ra);
 
-    // Entry: RDI=r, RSI=b, RDX=buf, RCX=t, R8=l.
-    // XI=t, XH_X86=l saved pre-preamble.
-    mov_rr(&c, R11, XH_X86);         // R11 = l
-    mov_rr(&c, XH_X86, RSI);         // XH_X86 = b = end_row
-    mov_rr(&c, XY, XI);              // XY = t
-    mov_rr(&c, XI, R11);             // XI = l
-    // RDI = r = col_end already.
-    mov_rr(&c, RSI, R11);            // XWIDTH = l
+    // RDI=l, RSI=t survive preamble; XI=r, XH_X86=b saved above.
+    mov_rr(&c, XY, RSI);             // XY = t
+    mov_rr(&c, RSI, RDI);            // XWIDTH = l
+    mov_rr(&c, RDI, XI);             // RDI = r = col_end
+    mov_rr(&c, XI, RSI);             // XI = l
 
     int loop_top = c.len;
 
@@ -1593,7 +1594,7 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     {
         union {
             void *p;
-            void (*fn)(int, int, umbra_buf *, int, int);
+            void (*fn)(int, int, int, int, umbra_buf *);
         } u = {.p = mem};
         j->entry = u.fn;
     }
@@ -2209,7 +2210,7 @@ __attribute__((no_sanitize("function")))
 #endif
 void umbra_jit_run(struct umbra_jit *j, int l, int t, int r, int b, umbra_buf buf[]) {
     if (!j) { return; }
-    j->entry(r, b, buf, t, l);
+    j->entry(l, t, r, b, buf);
 }
 
 void umbra_jit_free(struct umbra_jit *j) {
