@@ -12,12 +12,12 @@ struct umbra_metal *umbra_metal(void *ctx, struct umbra_basic_block const *bb) {
     (void)bb;
     return 0;
 }
-void umbra_metal_run(struct umbra_metal *m, int w, int h, int x0, int y0, umbra_buf buf[]) {
+void umbra_metal_run(struct umbra_metal *m, int l, int t, int r, int b, umbra_buf buf[]) {
     (void)m;
-    (void)w;
-    (void)h;
-    (void)x0;
-    (void)y0;
+    (void)l;
+    (void)t;
+    (void)r;
+    (void)b;
     (void)buf;
 }
 void umbra_metal_begin_batch(void *ctx) { (void)ctx; }

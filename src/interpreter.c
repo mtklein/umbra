@@ -994,20 +994,19 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
     return p;
 }
 
-void umbra_interpreter_run(struct umbra_interpreter *p, int w, int h, int x0, int y0,
+void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int b,
                            umbra_buf caller_buf[]) {
     int nall = p->nptr + p->n_deref;
     for (int i = 0; i < p->nptr; i++) { p->buf[i] = caller_buf[i]; }
     for (int i = p->nptr; i < nall; i++) { p->buf[i] = (umbra_buf){0}; }
 
-    int const P  = p->preamble;
-    int const ce = x0 + w;
+    int const P = p->preamble;
 
     struct interp_inst const *s = p->inst;
     val                      *v = p->v;
-    for (int row = y0; row < y0 + h; row++) {
-        for (int col = x0; col < ce; col += K) {
-            s->fn(s, v, col + K, ce, row, p->buf);
+    for (int row = t; row < b; row++) {
+        for (int col = l; col < r; col += K) {
+            s->fn(s, v, col + K, r, row, p->buf);
             s = p->inst + P;
             v = p->v + P;
         }

@@ -971,10 +971,11 @@ static void batch_retain_buf(
 
 static void encode_dispatch(
     struct umbra_metal *m,
-    int w, int h, int x0, int y0,
+    int l, int t, int r, int b,
     umbra_buf buf[],
     id<MTLComputeCommandEncoder> enc
 ) {
+    int w = r - l, h = b - t, x0 = l, y0 = t;
     struct metal_backend *be = m->be;
     id<MTLDevice> device =
         (__bridge id<MTLDevice>)be->device;
@@ -1199,8 +1200,9 @@ static void encode_dispatch(
 }
 
 void umbra_metal_run(
-    struct umbra_metal *m, int w, int h, int x0, int y0, umbra_buf buf[]
+    struct umbra_metal *m, int l, int t, int r, int b, umbra_buf buf[]
 ) {
+    int w = r - l, h = b - t;
     if (!m || w <= 0 || h <= 0) { return; }
     struct metal_backend *be = m->be;
     if (!be->batch_cmdbuf) {
@@ -1228,7 +1230,7 @@ void umbra_metal_run(
                     * sizeof *m->batch_data);
         }
         encode_dispatch(
-            m, w, h, x0, y0, buf, enc);
+            m, l, t, r, b, buf, enc);
     }
 }
 
