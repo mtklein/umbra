@@ -1,13 +1,2 @@
 Known bugs and fragile areas.
 
-- Metal uses a single shared stride for all buffers, derived from one store
-  buffer's row_bytes.  If two pixel buffers had different pixel strides,
-  Metal would address one of them incorrectly.  The interpreter and JITs
-  handle per-buffer row_bytes independently.
-
-- x86 JIT still shims the new (w, h) entry into the old (n, w) convention
-  internally (IMUL+DIV).  Works but wastes a division per call.
-
-- No test coverage for l>0 with deref'd buffers that have row_bytes>0.
-  The regression tests only exercise direct (non-deref) pixel buffers.
-

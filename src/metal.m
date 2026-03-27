@@ -76,8 +76,6 @@ struct umbra_metal {
     int    total_bufs;
     int    tg_size;
     int    n_deref;
-    int    store_buf;
-    int    store_shift;
     struct deref_info    *deref;
     struct batch_shared  *batch_data;
     int                  batch_gen, :32;
@@ -169,21 +167,20 @@ static void emit_ops(Buf *b, BB const *bb,
             case op_load_32: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
-                _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed
-                    ? "%suint v%d = p%d_32[i];\n"
-                    : "%suint v%d = "
-                      "((device uint*)p%d)[i];\n",
-                     pad, i, p);
+                emit(b,
+                     "%suint v%d = ((device uint*)"
+                     "(p%d + y * buf_rbs[%d]))[x];\n",
+                     pad, i, p, p);
             } break;
             case op_load_64_lo:
             case op_load_64_hi: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 emit(b, "%suint v%d = "
-                        "((device uint*)p%d)"
-                        "[i*2+%d];\n",
-                     pad, i, p,
+                        "((device uint*)"
+                        "(p%d + y * buf_rbs[%d]))"
+                        "[x*2+%d];\n",
+                     pad, i, p, p,
                      inst->op == op_load_64_hi);
             } break;
             case op_gather_uniform_32:
@@ -209,22 +206,23 @@ static void emit_ops(Buf *b, BB const *bb,
             case op_store_32: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
-                _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed
-                    ? "%sp%d_32[i] = v%d;\n"
-                    : "%s((device uint*)p%d)"
-                      "[i] = v%d;\n",
-                     pad, p, inst->y);
+                emit(b,
+                     "%s((device uint*)"
+                     "(p%d + y * buf_rbs[%d]))"
+                     "[x] = v%d;\n",
+                     pad, p, p, inst->y);
             } break;
             case op_store_64: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
-                emit(b, "%s((device uint*)p%d)"
-                        "[i*2] = v%d;\n"
-                        "%s((device uint*)p%d)"
-                        "[i*2+1] = v%d;\n",
-                     pad, p, inst->x,
-                     pad, p, inst->y);
+                emit(b, "%s((device uint*)"
+                        "(p%d + y * buf_rbs[%d]))"
+                        "[x*2] = v%d;\n"
+                        "%s((device uint*)"
+                        "(p%d + y * buf_rbs[%d]))"
+                        "[x*2+1] = v%d;\n",
+                     pad, p, p, inst->x,
+                     pad, p, p, inst->y);
             } break;
 
             case op_uniform_16: {
@@ -243,13 +241,11 @@ static void emit_ops(Buf *b, BB const *bb,
             case op_load_16: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
-                _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed
-                    ? "%suint v%d = (uint)(ushort)"
-                      "p%d_16[i];\n"
-                    : "%suint v%d = (uint)"
-                      "((device ushort*)p%d)[i];\n",
-                     pad, i, p);
+                emit(b,
+                     "%suint v%d = (uint)"
+                     "((device ushort*)"
+                     "(p%d + y * buf_rbs[%d]))[x];\n",
+                     pad, i, p, p);
             } break;
             case op_gather_uniform_16:
             case op_gather_16: {
@@ -274,13 +270,11 @@ static void emit_ops(Buf *b, BB const *bb,
             case op_store_16: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
-                _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed
-                    ? "%sp%d_16[i]"
-                      " = (ushort)v%d;\n"
-                    : "%s((device ushort*)p%d)"
-                      "[i] = (ushort)v%d;\n",
-                     pad, p, inst->y);
+                emit(b,
+                     "%s((device ushort*)"
+                     "(p%d + y * buf_rbs[%d]))"
+                     "[x] = (ushort)v%d;\n",
+                     pad, p, p, inst->y);
             } break;
 
             case op_f32_from_f16:
@@ -750,20 +744,21 @@ static char* build_source(BB const *bb,
 
     emit(&b, "kernel void umbra_entry(\n");
     emit(&b,
-         "    constant uint &n [[buffer(0)]]"
-         ",\n    constant uint &w [[buffer(%d)]]"
-         ",\n    constant uint &stride [[buffer(%d)]]"
+         "    constant uint &w [[buffer(%d)]]"
+         ",\n    constant uint *buf_szs [[buffer(%d)]]"
+         ",\n    constant uint *buf_rbs [[buffer(%d)]]"
          ",\n    constant uint &x0 [[buffer(%d)]]"
          ",\n    constant uint &y0 [[buffer(%d)]]",
+         total_bufs + 0,
+         total_bufs + 1,
          total_bufs + 2,
          total_bufs + 3,
-         total_bufs + 4,
-         total_bufs + 5);
+         total_bufs + 4);
     for (int p = 0; p <= max_ptr; p++) {
         emit(&b,
              ",\n    device uchar *p%d"
              " [[buffer(%d)]]",
-             p, p + 1);
+             p, p);
     }
     for (int i = 0; i < bb->insts; i++) {
         if (bb->inst[i].op == op_deref_ptr) {
@@ -771,20 +766,16 @@ static char* build_source(BB const *bb,
                  ",\n    device uchar *p%d"
                  " [[buffer(%d)]]",
                  deref_buf[i],
-                 deref_buf[i] + 1);
+                 deref_buf[i]);
         }
     }
-    emit(&b,
-         ",\n    constant uint *buf_szs"
-         " [[buffer(%d)]]",
-         total_bufs + 1);
     emit(&b,
          ",\n    uint2 pos"
          " [[thread_position_in_grid]]\n) {\n");
     emit(&b,
-         "    uint i = (y0 + pos.y) * stride"
-         " + x0 + pos.x;\n");
-    emit(&b, "    if (i >= n) return;\n");
+         "    if (pos.x >= w) return;\n"
+         "    uint x = x0 + pos.x;\n"
+         "    uint y = y0 + pos.y;\n");
 
     for (int p = 0; p < total_bufs; p++) {
         if (ptr_32[p] && ptr_16[p]) {
@@ -941,27 +932,6 @@ struct umbra_metal* umbra_metal(
                              sizeof *m->per_bufs);
         m->deref   = di;
         m->n_deref = n_deref;
-        m->store_buf   = -1;
-        m->store_shift = 0;
-        for (int i = 0; i < bb->insts; i++) {
-            enum op op = bb->inst[i].op;
-            if (op == op_store_16
-                    || op == op_store_32
-                    || op == op_store_64) {
-                int p = bb->inst[i].ptr;
-                if (p >= 0) {
-                    m->store_buf = p;
-                } else {
-                    m->store_buf =
-                        deref_buf[~p];
-                }
-                m->store_shift =
-                    op == op_store_16 ? 1
-                  : op == op_store_64 ? 3
-                  :                     2;
-                break;
-            }
-        }
 
         free(deref_buf);
         return m;
@@ -1001,11 +971,10 @@ static void batch_retain_buf(
 
 static void encode_dispatch(
     struct umbra_metal *m,
-    int w, int h, int stride, int x0, int y0,
+    int w, int h, int x0, int y0,
     umbra_buf buf[],
     id<MTLComputeCommandEncoder> enc
 ) {
-    int n = stride * (y0 + h);
     struct metal_backend *be = m->be;
     id<MTLDevice> device =
         (__bridge id<MTLDevice>)be->device;
@@ -1013,23 +982,18 @@ static void encode_dispatch(
     int tb = m->total_bufs;
     uint32_t *szs_data = calloc((size_t)(tb + 1),
                                 sizeof *szs_data);
+    uint32_t *rbs_data = calloc((size_t)(tb + 1),
+                                sizeof *rbs_data);
     for (int i = 0; i <= m->max_ptr; i++) {
         if (buf[i].ptr && buf[i].sz) {
             szs_data[i] = (uint32_t)buf[i].sz;
         }
+        rbs_data[i] = (uint32_t)buf[i].row_bytes;
     }
 
     __builtin_memset(m->per_bufs, 0,
                      (size_t)tb * sizeof(void*));
 
-    uint32_t n32 = (uint32_t)n;
-    id<MTLBuffer> per_n =
-        [device newBufferWithLength:sizeof n32
-                options:
-                    MTLResourceStorageModeShared];
-    *(uint32_t*)per_n.contents = n32;
-    batch_retain_buf(
-        be, (__bridge_retained void*)per_n);
     uint32_t w32 = (uint32_t)w;
     id<MTLBuffer> per_w =
         [device newBufferWithLength:sizeof w32
@@ -1038,14 +1002,6 @@ static void encode_dispatch(
     *(uint32_t*)per_w.contents = w32;
     batch_retain_buf(
         be, (__bridge_retained void*)per_w);
-    uint32_t stride32 = (uint32_t)stride;
-    id<MTLBuffer> per_stride =
-        [device newBufferWithLength:sizeof stride32
-                options:
-                    MTLResourceStorageModeShared];
-    *(uint32_t*)per_stride.contents = stride32;
-    batch_retain_buf(
-        be, (__bridge_retained void*)per_stride);
     uint32_t x032 = (uint32_t)x0;
     id<MTLBuffer> per_x0 =
         [device newBufferWithLength:sizeof x032
@@ -1116,6 +1072,7 @@ static void encode_dispatch(
         void *base = buf[m->deref[d].src_buf].ptr;
         void *derived;
         ptrdiff_t dsz;
+        size_t drb;
         __builtin_memcpy(
             &derived,
             (char*)base + m->deref[d].byte_off,
@@ -1124,6 +1081,10 @@ static void encode_dispatch(
             &dsz,
             (char*)base + m->deref[d].byte_off + 8,
             sizeof dsz);
+        __builtin_memcpy(
+            &drb,
+            (char*)base + m->deref[d].byte_off + 16,
+            sizeof drb);
         size_t bytes = dsz < 0 ? (size_t)-dsz : (size_t)dsz;
         _Bool deref_read_only = dsz < 0;
         int bi = m->deref[d].buf_idx;
@@ -1171,6 +1132,7 @@ static void encode_dispatch(
             m->per_bufs[bi] = retained;
         }
         szs_data[bi] = (uint32_t)bytes;
+        rbs_data[bi] = (uint32_t)drb;
     }
 
     size_t sz_bytes = (size_t)(tb + 1)
@@ -1183,32 +1145,39 @@ static void encode_dispatch(
         per_sz.contents, szs_data, sz_bytes);
     batch_retain_buf(
         be, (__bridge_retained void*)per_sz);
+    id<MTLBuffer> per_rbs =
+        [device newBufferWithLength:sz_bytes
+                options:
+                    MTLResourceStorageModeShared];
+    __builtin_memcpy(
+        per_rbs.contents, rbs_data, sz_bytes);
+    batch_retain_buf(
+        be, (__bridge_retained void*)per_rbs);
 
-    [enc setBuffer:per_n offset:0 atIndex:0];
     for (int i = 0; i < m->total_bufs; i++) {
         if (m->per_bufs[i]) {
             [enc setBuffer:
                 (__bridge id<MTLBuffer>)
                     m->per_bufs[i]
                 offset:(NSUInteger)offsets[i]
-               atIndex:(NSUInteger)(i + 1)];
+               atIndex:(NSUInteger)i];
         }
     }
+    [enc setBuffer:per_w
+            offset:0
+           atIndex:(NSUInteger)(m->total_bufs + 0)];
     [enc setBuffer:per_sz
             offset:0
            atIndex:(NSUInteger)(m->total_bufs + 1)];
-    [enc setBuffer:per_w
+    [enc setBuffer:per_rbs
             offset:0
            atIndex:(NSUInteger)(m->total_bufs + 2)];
-    [enc setBuffer:per_stride
-            offset:0
-           atIndex:(NSUInteger)(m->total_bufs + 3)];
     [enc setBuffer:per_x0
             offset:0
-           atIndex:(NSUInteger)(m->total_bufs + 4)];
+           atIndex:(NSUInteger)(m->total_bufs + 3)];
     [enc setBuffer:per_y0
             offset:0
-           atIndex:(NSUInteger)(m->total_bufs + 5)];
+           atIndex:(NSUInteger)(m->total_bufs + 4)];
 
     MTLSize grid =
         MTLSizeMake((NSUInteger)w, (NSUInteger)h, 1);
@@ -1226,18 +1195,13 @@ static void encode_dispatch(
     [enc dispatchThreads:grid
        threadsPerThreadgroup:group];
     free(szs_data);
+    free(rbs_data);
 }
 
 void umbra_metal_run(
     struct umbra_metal *m, int w, int h, int x0, int y0, umbra_buf buf[]
 ) {
     if (!m || w <= 0 || h <= 0) { return; }
-    int stride = w;
-    if (m->store_buf >= 0
-            && buf[m->store_buf].row_bytes) {
-        stride = (int)(buf[m->store_buf].row_bytes
-                       >> m->store_shift);
-    }
     struct metal_backend *be = m->be;
     if (!be->batch_cmdbuf) {
         umbra_metal_begin_batch(be);
@@ -1264,7 +1228,7 @@ void umbra_metal_run(
                     * sizeof *m->batch_data);
         }
         encode_dispatch(
-            m, w, h, stride, x0, y0, buf, enc);
+            m, w, h, x0, y0, buf, enc);
     }
 }
 

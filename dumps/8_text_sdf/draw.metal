@@ -11,19 +11,19 @@ static inline uint oob_mask(int ix, uint bytes, int elem) {
 }
 
 kernel void umbra_entry(
-    constant uint &n [[buffer(0)]],
-    constant uint &w [[buffer(5)]],
-    constant uint &stride [[buffer(6)]],
-    constant uint &x0 [[buffer(7)]],
-    constant uint &y0 [[buffer(8)]],
-    device uchar *p0 [[buffer(1)]],
-    device uchar *p1 [[buffer(2)]],
-    device uchar *p2 [[buffer(3)]],
+    constant uint &w [[buffer(3)]],
     constant uint *buf_szs [[buffer(4)]],
+    constant uint *buf_rbs [[buffer(5)]],
+    constant uint &x0 [[buffer(6)]],
+    constant uint &y0 [[buffer(7)]],
+    device uchar *p0 [[buffer(0)]],
+    device uchar *p1 [[buffer(1)]],
+    device uchar *p2 [[buffer(2)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
-    uint i = (y0 + pos.y) * stride + x0 + pos.x;
-    if (i >= n) return;
+    if (pos.x >= w) return;
+    uint x = x0 + pos.x;
+    uint y = y0 + pos.y;
     uint v0 = 0u;
     uint v1 = ((device const uint*)p0)[0];
     uint v2 = ((device const uint*)p0)[1];
@@ -36,7 +36,7 @@ kernel void umbra_entry(
     uint v10 = 255u;
     uint v11 = as_type<uint>(as_type<float>(v9) - as_type<float>(v4));
     uint v12 = 1132396544u;
-    uint v13 = (uint)((device ushort*)p2)[i];
+    uint v13 = (uint)((device ushort*)(p2 + y * buf_rbs[2]))[x];
     uint v14 = (uint)(int)(short)(ushort)v13;
     uint v15 = as_type<uint>((float)(int)v14);
     uint v16 = as_type<uint>(as_type<float>(v15) * as_type<float>(998277249u));
@@ -44,7 +44,7 @@ kernel void umbra_entry(
     uint v18 = as_type<uint>(as_type<float>(v17) * as_type<float>(1090519040u));
     uint v19 = as_type<uint>(max(as_type<float>(v18), as_type<float>(0u)));
     uint v20 = as_type<uint>(min(as_type<float>(v19), as_type<float>(1065353216u)));
-    uint v21 = ((device uint*)p1)[i];
+    uint v21 = ((device uint*)(p1 + y * buf_rbs[1]))[x];
     uint v22 = v21 >> 24u;
     uint v23 = as_type<uint>((float)(int)v22);
     uint v24 = as_type<uint>(as_type<float>(v23) * as_type<float>(998277249u));
@@ -93,5 +93,5 @@ kernel void umbra_entry(
     uint v67 = v66 | (v42 << 8u);
     uint v68 = v67 | (v54 << 16u);
     uint v69 = v68 | (v55 << 24u);
-    ((device uint*)p1)[i] = v69;
+    ((device uint*)(p1 + y * buf_rbs[1]))[x] = v69;
 }

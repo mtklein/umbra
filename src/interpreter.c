@@ -2,6 +2,7 @@
 #include "bb.h"
 #include <math.h>
 #include <stdint.h>
+#include <assert.h>
 #include <stdlib.h>
 
 #define cast(T, v) __builtin_convertvector(v, T)
@@ -134,16 +135,16 @@ op(y_fn) {
 }
 
 op(uniform_16) {
-    void const *base = (char const *)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
-    uint16_t    uni;
-    __builtin_memcpy(&uni, (uint16_t const *)base + ip->y, sizeof uni);
+    assert(buf[ip->x].row_bytes == 0);
+    uint16_t uni;
+    __builtin_memcpy(&uni, (uint16_t const *)buf[ip->x].ptr + ip->y, sizeof uni);
     v->u32 = (U32){0} + (uint32_t)uni;
     next;
 }
 op(uniform_32) {
-    void const *base = (char const *)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
-    int32_t     uni;
-    __builtin_memcpy(&uni, (int32_t const *)base + ip->y, sizeof uni);
+    assert(buf[ip->x].row_bytes == 0);
+    int32_t uni;
+    __builtin_memcpy(&uni, (int32_t const *)buf[ip->x].ptr + ip->y, sizeof uni);
     v->i32 = (I32){0} + uni;
     next;
 }

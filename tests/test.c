@@ -2746,6 +2746,135 @@ int main(void) {
         cleanup(&B);
     }
 
+    // Regression test: two direct buffers with different row_bytes (strides).
+    // Metal bug: uses a single shared stride from one store buffer.
+    {
+        struct umbra_builder *b = umbra_builder();
+        umbra_val             v   = umbra_load_32(b, (umbra_ptr){0, 0});
+        umbra_val             one = umbra_imm_i32(b, 1);
+        umbra_store_32(b, (umbra_ptr){1, 0}, umbra_add_i32(b, v, one));
+        backends B = make(b, 0);
+
+        enum { SW = 32, DW = 20, H = 5, L = 3, T = 1, R = 15, BT = 4 };
+        int32_t src[SW * H], dst[DW * H];
+        for (int i = 0; i < SW * H; i++) { src[i] = i * 10; }
+
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            __builtin_memset(dst, 0, sizeof dst);
+            if (!B.p[bi]) { continue; }
+            umbra_program_queue(B.p[bi], L, T, R, BT,
+                                (umbra_buf[]){{src, sizeof src, 1, SW * 4},
+                                              {dst, sizeof dst, 0, DW * 4}});
+            umbra_backend_flush(B.be[bi]);
+            for (int row = T; row < BT; row++) {
+                for (int col = L; col < R; col++) {
+                    int si = row * SW + col;
+                    int di = row * DW + col;
+                    (dst[di] == src[si] + 1) here;
+                }
+            }
+        }
+        cleanup(&B);
+    }
+
+    // Regression test: l>0 with deref'd buffer that has row_bytes>0.
+    {
+        struct umbra_builder *b = umbra_builder();
+        int                   off = umbra_reserve_ptr(b);
+        umbra_ptr             src = umbra_deref_ptr(b, (umbra_ptr){1, 0}, off);
+        umbra_val             v   = umbra_load_32(b, src);
+        umbra_val             one = umbra_imm_i32(b, 1);
+        umbra_store_32(b, (umbra_ptr){2, 0}, umbra_add_i32(b, v, one));
+        backends B = make(b, 0);
+
+        enum { S = 20, TH = 6, L = 3, T = 1, R = 15, BT = 5 };
+        int32_t src_px[S * TH];
+        for (int i = 0; i < S * TH; i++) { src_px[i] = i; }
+        int32_t dst_px[S * TH];
+
+        uint64_t uni_[4] = {0};
+        char    *uni = (char *)uni_;
+        {
+            void   *p = src_px;
+            size_t  sz = sizeof src_px;
+            size_t  rb = S * 4;
+            __builtin_memcpy(uni + off,      &p,  8);
+            __builtin_memcpy(uni + off + 8,  &sz, 8);
+            __builtin_memcpy(uni + off + 16, &rb, 8);
+        }
+
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            __builtin_memset(dst_px, 0, sizeof dst_px);
+            if (!B.p[bi]) { continue; }
+            umbra_program_queue(B.p[bi], L, T, R, BT,
+                                (umbra_buf[]){{0, 0, 0, 0},
+                                              {uni, sizeof uni_, 1, 0},
+                                              {dst_px, sizeof dst_px, 0, S * 4}});
+            umbra_backend_flush(B.be[bi]);
+            for (int row = T; row < BT; row++) {
+                for (int col = L; col < R; col++) {
+                    int idx = row * S + col;
+                    (dst_px[idx] == src_px[idx] + 1) here;
+                }
+            }
+            for (int row = 0; row < TH; row++) {
+                for (int col = 0; col < S; col++) {
+                    if (row >= T && row < BT && col >= L && col < R) { continue; }
+                    (dst_px[row * S + col] == 0) here;
+                }
+            }
+        }
+        cleanup(&B);
+    }
+
+    // Regression test: l>0 with deref'd 16-bit buffer, row_bytes>0.
+    {
+        struct umbra_builder *b = umbra_builder();
+        int                   off = umbra_reserve_ptr(b);
+        umbra_ptr             src = umbra_deref_ptr(b, (umbra_ptr){1, 0}, off);
+        umbra_val             v   = umbra_f32_from_f16(b, umbra_load_16(b, src));
+        umbra_val             one = umbra_imm_f32(b, 1.0f);
+        umbra_store_32(b, (umbra_ptr){2, 0}, umbra_add_f32(b, v, one));
+        backends B = make(b, 0);
+
+        enum { S = 16, TH = 4, L = 2, T = 1, R = 10, BT = 3 };
+        uint16_t src_px[S * TH];
+        for (int i = 0; i < S * TH; i++) {
+            float f = (float)i;
+            __fp16 h = (__fp16)f;
+            __builtin_memcpy(&src_px[i], &h, 2);
+        }
+        float dst_px[S * TH];
+
+        uint64_t uni_[4] = {0};
+        char    *uni = (char *)uni_;
+        {
+            void   *p = src_px;
+            size_t  sz = sizeof src_px;
+            size_t  rb = S * 2;
+            __builtin_memcpy(uni + off,      &p,  8);
+            __builtin_memcpy(uni + off + 8,  &sz, 8);
+            __builtin_memcpy(uni + off + 16, &rb, 8);
+        }
+
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            __builtin_memset(dst_px, 0, sizeof dst_px);
+            if (!B.p[bi]) { continue; }
+            umbra_program_queue(B.p[bi], L, T, R, BT,
+                                (umbra_buf[]){{0, 0, 0, 0},
+                                              {uni, sizeof uni_, 1, 0},
+                                              {dst_px, sizeof dst_px, 0, S * 4}});
+            umbra_backend_flush(B.be[bi]);
+            for (int row = T; row < BT; row++) {
+                for (int col = L; col < R; col++) {
+                    int idx = row * S + col;
+                    equiv(dst_px[idx], (float)(row * S + col) + 1.0f) here;
+                }
+            }
+        }
+        cleanup(&B);
+    }
+
     return 0;
 }
 
