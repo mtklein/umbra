@@ -44,7 +44,9 @@ struct pool {
 };
 static int pool_add(struct pool *p, void const *src, int n) {
     for (int i = 0; i + n <= p->nbytes; i += n) {
-        if (!__builtin_memcmp(p->data + i, src, (size_t)n)) { return i; }
+        if (__builtin_memcmp(p->data + i, src, (size_t)n) == 0) {
+            return i;
+        }
     }
     if (p->nbytes + n > p->cap_data) {
         p->cap_data = p->cap_data ? 2 * p->cap_data : 256;
@@ -86,14 +88,15 @@ enum {
 #define XI XCOL
 
 static void load_ptr(Buf *c, int p, int *last_ptr) {
-    if (*last_ptr == p) { return; }
-    *last_ptr = p;
-    int disp_ptr = p * (int)sizeof(umbra_buf);
-    int disp_rb  = p * (int)sizeof(umbra_buf) + 24;
-    put(c, 0xf9400000u | ((uint32_t)(disp_ptr / 8) << 10) | ((uint32_t)XBUF << 5) | (uint32_t)XP);
-    put(c, 0xf9400000u | ((uint32_t)(disp_rb  / 8) << 10) | ((uint32_t)XBUF << 5) | (uint32_t)XT);
-    put(c, 0x9b000000u | ((uint32_t)XT << 16) | ((uint32_t)XP << 10)
-                        | ((uint32_t)XY << 5)  | (uint32_t)XP);
+    if (*last_ptr != p) {
+        *last_ptr = p;
+        int disp_ptr = p * (int)sizeof(umbra_buf);
+        int disp_rb  = p * (int)sizeof(umbra_buf) + 24;
+        put(c, 0xf9400000u | ((uint32_t)(disp_ptr / 8) << 10) | ((uint32_t)XBUF << 5) | (uint32_t)XP);
+        put(c, 0xf9400000u | ((uint32_t)(disp_rb  / 8) << 10) | ((uint32_t)XBUF << 5) | (uint32_t)XT);
+        put(c, 0x9b000000u | ((uint32_t)XT << 16) | ((uint32_t)XP << 10)
+                            | ((uint32_t)XY << 5)  | (uint32_t)XP);
+    }
 }
 
 static void resolve_ptr(Buf *c, int p, int *last_ptr, int const *deref_gpr,
@@ -117,17 +120,17 @@ static void load_count(Buf *c, int p, int elem_shift, int const *deref_gpr) {
     if (p < 0) {
         (void)deref_gpr;
         put(c, 0xd2a00000u | (0x7fffu << 5) | (uint32_t)XM);
-        return;
-    }
-    int disp = p * (int)sizeof(umbra_buf) + 8;
-    put(c, 0xf9400000u | ((uint32_t)(disp / 8) << 10) | ((uint32_t)XBUF << 5) | (uint32_t)XM);
-    if (elem_shift) {
-        put(c,
-            0x53000000u
-                | ((uint32_t)elem_shift << 16)
-                | (31u << 10)
-                | ((uint32_t)XM << 5)
-                | (uint32_t)XM);
+    } else {
+        int disp = p * (int)sizeof(umbra_buf) + 8;
+        put(c, 0xf9400000u | ((uint32_t)(disp / 8) << 10) | ((uint32_t)XBUF << 5) | (uint32_t)XM);
+        if (elem_shift) {
+            put(c,
+                0x53000000u
+                    | ((uint32_t)elem_shift << 16)
+                    | (31u << 10)
+                    | ((uint32_t)XM << 5)
+                    | (uint32_t)XM);
+        }
     }
 }
 
@@ -315,7 +318,7 @@ static _Bool arm64_movi(Buf *c, int d, uint32_t v) {
         put(c, MVNI_4s(d, (uint8_t)(~v >> 24), 24));
     } else {
         uint32_t s = v >> 31, e = (v >> 23) & 0xffu, f = v & 0x7fffffu;
-        if (!(f & 0x7ffffu) && e >= 124 && e <= 131) {
+        if ((f & 0x7ffffu) == 0 && e >= 124 && e <= 131) {
             uint32_t E = e - 124;
             uint32_t imm8 =
                 (s << 7) | (((~E >> 2) & 1) << 6) | ((E & 3) << 4) | ((f >> 19) & 0xf);
@@ -327,7 +330,9 @@ static _Bool arm64_movi(Buf *c, int d, uint32_t v) {
     return 1;
 }
 static void arm64_pool_load(Buf *c, struct pool *p, int d, uint32_t v) {
-    if (arm64_movi(c, d, v)) { return; }
+    if (arm64_movi(c, d, v)) {
+        return;
+    }
     uint32_t bcast[4] = {v, v, v, v};
     int      off = pool_add(p, bcast, 16);
     pool_ref_at(p, off, c->len);
@@ -464,9 +469,13 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, LDP_post(29, 30, 31, 2));
     put(&c, RET());
 
-    if (ns > 0) { c.buf[stack_patch] = SUB_xi(31, 31, ns * 16); }
+    if (ns > 0) {
+        c.buf[stack_patch] = SUB_xi(31, 31, ns * 16);
+    }
     c.buf[stack_patch + 1] = ADD_xi(XS, 31, 0);
-    while (c.len & 3) { put(&c, 0xd503201fu); }
+    while (c.len & 3) {
+        put(&c, 0xd503201fu);
+    }
     int pool_start = c.len;
     for (int pi = 0; pi < jc.pool.nbytes; pi += 4) {
         uint32_t w;
@@ -610,7 +619,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 ra_return_reg(ra, t1);
                 ra_return_reg(ra, t0);
             }
-            if (fused) { i++; }
+            if (fused) {
+                i++;
+            }
         } break;
 
         case op_load_64_hi: {
@@ -1052,95 +1063,105 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 __attribute__((no_sanitize("function")))
 #endif
 void umbra_jit_run(struct umbra_jit *j, int l, int t, int r, int b, umbra_buf buf[]) {
-    if (!j) { return; }
-    j->entry(l, t, r, b, buf);
+    if (j) {
+        j->entry(l, t, r, b, buf);
+    }
 }
 void umbra_jit_free(struct umbra_jit *j) {
-    if (!j) { return; }
-    munmap(j->code, j->code_size);
-    free(j);
+    if (j) {
+        munmap(j->code, j->code_size);
+        free(j);
+    }
 }
 
 void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
-    if (!j || j->loop_start >= j->loop_end) { return; }
-    uint32_t const *words = (uint32_t const *)j->code;
+    if (j && j->loop_start < j->loop_end) {
+        uint32_t const *words = (uint32_t const *)j->code;
 
-    char tmp[] = "/tmp/umbra_mca_XXXXXX.s";
-    int  fd = mkstemps(tmp, 2);
-    if (fd < 0) { return; }
-    FILE *fp = fdopen(fd, "w");
-    if (!fp) {
-        close(fd);
-        remove(tmp);
-        return;
-    }
-    for (int i = j->loop_start; i < j->loop_end; i++) {
-        fprintf(fp, ".inst 0x%08x\n", words[i]);
-    }
-    fclose(fp);
+        char tmp[] = "/tmp/umbra_mca_XXXXXX.s";
+        int  fd = mkstemps(tmp, 2);
+        if (fd < 0) {
+            return;
+        }
+        FILE *fp = fdopen(fd, "w");
+        if (fp) {
+            for (int i = j->loop_start; i < j->loop_end; i++) {
+                fprintf(fp, ".inst 0x%08x\n", words[i]);
+            }
+            fclose(fp);
+        } else {
+            close(fd);
+            remove(tmp);
+            return;
+        }
 
-    char opath[sizeof tmp + 2];
-    snprintf(opath, sizeof opath, "%.*s.o", (int)(sizeof tmp - 3), tmp);
+        char opath[sizeof tmp + 2];
+        snprintf(opath, sizeof opath, "%.*s.o", (int)(sizeof tmp - 3), tmp);
 
-    char asm_path[] = "/tmp/umbra_mca_loop_XXXXXX.s";
-    int  afd = mkstemps(asm_path, 2);
-    if (afd < 0) {
-        remove(tmp);
-        return;
-    }
+        char asm_path[] = "/tmp/umbra_mca_loop_XXXXXX.s";
+        int  afd = mkstemps(asm_path, 2);
+        if (afd < 0) {
+            remove(tmp);
+            return;
+        }
 
-    char cmd[1024];
-    snprintf(cmd, sizeof cmd,
-             "as -o %s %s 2>/dev/null && "
-             "/opt/homebrew/opt/llvm/bin/"
-             "llvm-objdump -d"
-             " --no-show-raw-insn"
-             " --no-leading-addr"
-             " %s 2>/dev/null",
-             opath, tmp, opath);
-    FILE *p = popen(cmd, "r");
-    if (!p) {
-        close(afd);
-        remove(tmp);
-        remove(opath);
+        char cmd[1024];
+        snprintf(cmd, sizeof cmd,
+                 "as -o %s %s 2>/dev/null && "
+                 "/opt/homebrew/opt/llvm/bin/"
+                 "llvm-objdump -d"
+                 " --no-show-raw-insn"
+                 " --no-leading-addr"
+                 " %s 2>/dev/null",
+                 opath, tmp, opath);
+        FILE *p = popen(cmd, "r");
+        if (p) {
+            FILE *afp = fdopen(afd, "w");
+            char  line[256];
+            _Bool past_header = 0;
+            while (fgets(line, (int)sizeof line, p)) {
+                if (past_header) {
+                    if (line[0] == '\n' || line[0] == '<') {
+                        continue;
+                    }
+                    char *comment = __builtin_strstr(line, " <");
+                    if (comment) {
+                        comment[0] = '\n';
+                        comment[1] = '\0';
+                    }
+                    fputs(line, afp);
+                } else {
+                    if (__builtin_strstr(line, "<")) {
+                        past_header = 1;
+                    }
+                }
+            }
+            pclose(p);
+            fclose(afp);
+            remove(tmp);
+            remove(opath);
+
+            snprintf(cmd, sizeof cmd,
+                     "/opt/homebrew/opt/llvm/bin/llvm-mca"
+                     " -mcpu=apple-m4"
+                     " -iterations=100"
+                     " -bottleneck-analysis"
+                     " %s 2>&1",
+                     asm_path);
+            p = popen(cmd, "r");
+            if (p) {
+                while (fgets(line, (int)sizeof line, p)) {
+                    fputs(line, f);
+                }
+                pclose(p);
+            }
+        } else {
+            close(afd);
+            remove(tmp);
+            remove(opath);
+        }
         remove(asm_path);
-        return;
     }
-
-    FILE *afp = fdopen(afd, "w");
-    char  line[256];
-    _Bool past_header = 0;
-    while (fgets(line, (int)sizeof line, p)) {
-        if (!past_header) {
-            if (__builtin_strstr(line, "<")) { past_header = 1; }
-            continue;
-        }
-        if (line[0] == '\n' || line[0] == '<') { continue; }
-        char *comment = __builtin_strstr(line, " <");
-        if (comment) {
-            comment[0] = '\n';
-            comment[1] = '\0';
-        }
-        fputs(line, afp);
-    }
-    pclose(p);
-    fclose(afp);
-    remove(tmp);
-    remove(opath);
-
-    snprintf(cmd, sizeof cmd,
-             "/opt/homebrew/opt/llvm/bin/llvm-mca"
-             " -mcpu=apple-m4"
-             " -iterations=100"
-             " -bottleneck-analysis"
-             " %s 2>&1",
-             asm_path);
-    p = popen(cmd, "r");
-    if (p) {
-        while (fgets(line, (int)sizeof line, p)) { fputs(line, f); }
-        pclose(p);
-    }
-    remove(asm_path);
 }
 
 #elif defined(__AVX2__)
@@ -1164,7 +1185,9 @@ struct pool {
 };
 static int pool_add(struct pool *p, void const *src, int n) {
     for (int i = 0; i + n <= p->nbytes; i += n) {
-        if (!__builtin_memcmp(p->data + i, src, (size_t)n)) { return i; }
+        if (__builtin_memcmp(p->data + i, src, (size_t)n) == 0) {
+            return i;
+        }
     }
     if (p->nbytes + n > p->cap_data) {
         p->cap_data = p->cap_data ? 2 * p->cap_data : 256;
@@ -1199,10 +1222,12 @@ static void patch_jcc(Buf *c, int fixup) {
 static void load_count_x86(Buf *c, int p, int elem_shift) {
     if (p < 0) {
         mov_ri(c, XM, 0x7fffffff);
-        return;
+    } else {
+        mov_load(c, XM, XBUF, p * (int)sizeof(umbra_buf) + 8);
+        if (elem_shift) {
+            shr_ri(c, XM, (uint8_t)elem_shift);
+        }
     }
-    mov_load(c, XM, XBUF, p * (int)sizeof(umbra_buf) + 8);
-    if (elem_shift) { shr_ri(c, XM, (uint8_t)elem_shift); }
 }
 
 
@@ -1445,7 +1470,9 @@ struct umbra_jit {
 
 struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     int *sl = malloc((size_t)bb->insts * sizeof(int));
-    for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
+    for (int i = 0; i < bb->insts; i++) {
+        sl[i] = -1;
+    }
     int  ns = 0;
     int *deref_gpr    = calloc((size_t)bb->insts, sizeof(int));
     int *deref_rb_gpr = calloc((size_t)bb->insts, sizeof(int));
@@ -1461,7 +1488,9 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     push_r(&c, RBX);
 
     int stack_patch = c.len;
-    for (int i = 0; i < 7; i++) { nop(&c); }
+    for (int i = 0; i < 7; i++) {
+        nop(&c);
+    }
 
     // Entry: RDI=l, RSI=t, RDX=r, RCX=b, R8=buf.
     mov_rr(&c, XI, RDX);             // XI = r (save before XBUF overwrite)
@@ -1534,7 +1563,9 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
         __builtin_memcpy(c.buf + br_more_rows, &rel, 4);
     }
 
-    if (ns > 0) { add_ri(&c, RSP, ns * 32); }
+    if (ns > 0) {
+        add_ri(&c, RSP, ns * 32);
+    }
     pop_r(&c, RBX);
     pop_r(&c, R15);
     pop_r(&c, XH_X86);
@@ -1553,7 +1584,9 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     }
 
     int pool_start = c.len;
-    for (int i = 0; i < jc.pool.nbytes; i++) { emit1(&c, jc.pool.data[i]); }
+    for (int i = 0; i < jc.pool.nbytes; i++) {
+        emit1(&c, jc.pool.data[i]);
+    }
     for (int i = 0; i < jc.pool.nrefs; i++) {
         struct pool_ref *r = &jc.pool.refs[i];
         int              entry_off = pool_start + r->data_off;
@@ -1642,7 +1675,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             // y = row counter XY, broadcast.
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             vex(c, 1, 1, 0, 0, s.rd, 0, XY, 0x6e);  // VMOVD xmm, XY
-            if (!scalar) { vbroadcastss(c, s.rd, s.rd); }
+            if (!scalar) {
+                vbroadcastss(c, s.rd, s.rd);
+            }
         } break;
 
         case op_load_32: {
@@ -1688,7 +1723,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 ra_return_reg(ra, t1);
                 ra_return_reg(ra, t0);
             }
-            if (fused) { i++; }
+            if (fused) {
+                i++;
+            }
         } break;
 
         case op_load_64_hi: {
@@ -1743,7 +1780,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             } else {
                 vmov_store(c, 1, ry, base, XI, 4, 0);
             }
-            if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
+            if (lu(inst->y) <= i) {
+                ra_free_reg(ra, inst->y);
+            }
         } break;
 
         case op_store_64: {
@@ -1799,7 +1838,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             } else {
                 vmov_store(c, 0, ry, base, XI, 2, 0);
             }
-            if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
+            if (lu(inst->y) <= i) {
+                ra_free_reg(ra, inst->y);
+            }
         } break;
 
         case op_uniform_32: {
@@ -1859,13 +1900,17 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int            p = inst->ptr;
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
-            if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
+            if (lu(inst->x) <= i) {
+                ra_free_reg(ra, inst->x);
+            }
             load_count_x86(c, p, 2);
             vpxor(c, scalar ? 0 : 1, s.rd, s.rd, s.rd);
             cmp_rr(c, RAX, XM);
             int skip = jcc(c, 0x03);
             vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, RAX, 4, 0);
-            if (!scalar) { vbroadcastss(c, s.rd, s.rd); }
+            if (!scalar) {
+                vbroadcastss(c, s.rd, s.rd);
+            }
             patch_jcc(c, skip);
         } break;
 
@@ -1876,7 +1921,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {
                 vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
-                if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
+                if (lu(inst->x) <= i) {
+                    ra_free_reg(ra, inst->x);
+                }
                 load_count_x86(c, p, 2);
                 vpxor(c, 0, s.rd, s.rd, s.rd);
                 cmp_rr(c, RAX, XM);
@@ -1900,7 +1947,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 vpgatherdd(c, s.rd, base, rx, 4, mask);
                 ra_return_reg(ra, cnt);
                 ra_return_reg(ra, mask);
-                if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
+                if (lu(inst->x) <= i) {
+                    ra_free_reg(ra, inst->x);
+                }
             }
         } break;
 
@@ -1911,7 +1960,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_count_x86(c, p, 1);
             vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
-            if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
+            if (lu(inst->x) <= i) {
+                ra_free_reg(ra, inst->x);
+            }
             vpxor(c, scalar ? 0 : 1, s.rd, s.rd, s.rd);
             cmp_rr(c, RAX, XM);
             int skip = jcc(c, 0x03);
@@ -1925,7 +1976,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 emit1(c, (uint8_t)((1 << 6) | ((RAX & 7) << 3) | (base & 7)));
             }
             vex(c, 1, 1, 0, 0, s.rd, 0, RAX, 0x6e);
-            if (!scalar) { vex_rr(c, 1, 2, 1, 0x79, s.rd, s.rd); }
+            if (!scalar) {
+                vex_rr(c, 1, 2, 1, 0x79, s.rd, s.rd);
+            }
             patch_jcc(c, skip);
         } break;
 
@@ -1937,7 +1990,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             load_count_x86(c, p, 1);
             if (scalar) {
                 vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
-                if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
+                if (lu(inst->x) <= i) {
+                    ra_free_reg(ra, inst->x);
+                }
                 vpxor(c, 0, s.rd, s.rd, s.rd);
                 cmp_rr(c, RAX, XM);
                 int skip = jcc(c, 0x03);
@@ -1996,7 +2051,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     vex_rrr(c, 1, 2, 0, 0x2b, s.rd, s.rd, hi_idx);
                 }
                 ra_return_reg(ra, hi_idx);
-                if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
+                if (lu(inst->x) <= i) {
+                    ra_free_reg(ra, inst->x);
+                }
             }
         } break;
 
@@ -2198,7 +2255,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             struct ra_step s = ra_step_alu(ra, sl, ns, inst, i, scalar, 1);
             vpslld_i(c, s.scratch, s.ry, (uint8_t)inst->imm);
             vpor(c, 1, s.rd, s.scratch, s.rx);
-            if (s.scratch >= 0) { ra_return_reg(ra, s.scratch); }
+            if (s.scratch >= 0) {
+                ra_return_reg(ra, s.scratch);
+            }
         } break;
         }
     }
@@ -2209,134 +2268,149 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 __attribute__((no_sanitize("function")))
 #endif
 void umbra_jit_run(struct umbra_jit *j, int l, int t, int r, int b, umbra_buf buf[]) {
-    if (!j) { return; }
-    j->entry(l, t, r, b, buf);
+    if (j) {
+        j->entry(l, t, r, b, buf);
+    }
 }
 
 void umbra_jit_free(struct umbra_jit *j) {
-    if (!j) { return; }
-    munmap(j->code, j->code_size);
-    free(j);
+    if (j) {
+        munmap(j->code, j->code_size);
+        free(j);
+    }
 }
 
 static _Bool x86_disasm(uint8_t const *code, size_t n, char const *spath,
                         char const *opath, FILE *f) {
+    _Bool result = 0;
     FILE *fp = fopen(spath, "w");
-    if (!fp) { return 0; }
-    for (size_t i = 0; i < n; i++) { fprintf(fp, ".byte 0x%02x\n", code[i]); }
-    fclose(fp);
-
-    char cmd[1024];
-    snprintf(cmd, sizeof cmd,
-             "/opt/homebrew/opt/llvm/bin/clang"
-             " -target x86_64-apple-macos13 -c %s -o %s 2>/dev/null &&"
-             " /opt/homebrew/opt/llvm/bin/llvm-objdump"
-             " -d --no-show-raw-insn --no-leading-addr %s 2>/dev/null",
-             spath, opath, opath);
-    FILE *p = popen(cmd, "r");
-    if (!p) { return 0; }
-    char  line[256];
-    _Bool ok = 0;
-    while (fgets(line, (int)sizeof line, p)) {
-        if (!ok && __builtin_strstr(line, "file format")) {
-            ok = 1;
-            continue;
+    if (fp) {
+        for (size_t i = 0; i < n; i++) {
+            fprintf(fp, ".byte 0x%02x\n", code[i]);
         }
-        if (f) { fputs(line, f); }
+        fclose(fp);
+
+        char cmd[1024];
+        snprintf(cmd, sizeof cmd,
+                 "/opt/homebrew/opt/llvm/bin/clang"
+                 " -target x86_64-apple-macos13 -c %s -o %s 2>/dev/null &&"
+                 " /opt/homebrew/opt/llvm/bin/llvm-objdump"
+                 " -d --no-show-raw-insn --no-leading-addr %s 2>/dev/null",
+                 spath, opath, opath);
+        FILE *p = popen(cmd, "r");
+        if (p) {
+            char  line[256];
+            _Bool ok = 0;
+            while (fgets(line, (int)sizeof line, p)) {
+                if (!ok && __builtin_strstr(line, "file format")) {
+                    ok = 1;
+                    continue;
+                }
+                if (f) {
+                    fputs(line, f);
+                }
+            }
+            result = pclose(p) == 0 && ok;
+        }
     }
-    return pclose(p) == 0 && ok;
+    return result;
 }
 
 void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
-    if (!j || j->loop_start >= j->loop_end) { return; }
-    uint8_t const *code = (uint8_t const *)j->code;
-    size_t         n = (size_t)(j->loop_end - j->loop_start);
+    if (j && j->loop_start < j->loop_end) {
+        uint8_t const *code = (uint8_t const *)j->code;
+        size_t         n = (size_t)(j->loop_end - j->loop_start);
 
-    char spath[] = "/tmp/umbra_mca_XXXXXX.s";
-    int  fd = mkstemps(spath, 2);
-    if (fd < 0) { return; }
-    close(fd);
+        char spath[] = "/tmp/umbra_mca_XXXXXX.s";
+        int  fd = mkstemps(spath, 2);
+        if (fd >= 0) {
+            close(fd);
 
-    char opath[sizeof spath + 2];
-    snprintf(opath, sizeof opath, "%.*s.o", (int)(sizeof spath - 3), spath);
+            char opath[sizeof spath + 2];
+            snprintf(opath, sizeof opath, "%.*s.o", (int)(sizeof spath - 3), spath);
 
-    char asmpath[] = "/tmp/umbra_mca_asm_XXXXXX.s";
-    int  afd = mkstemps(asmpath, 2);
-    if (afd < 0) {
-        remove(spath);
-        return;
-    }
-    close(afd);
-    FILE *afp = fopen(asmpath, "w");
-    if (!afp) {
-        remove(spath);
-        remove(asmpath);
-        return;
-    }
+            char asmpath[] = "/tmp/umbra_mca_asm_XXXXXX.s";
+            int  afd = mkstemps(asmpath, 2);
+            if (afd >= 0) {
+                close(afd);
+                FILE *afp = fopen(asmpath, "w");
+                if (afp) {
+                    if (x86_disasm(code + j->loop_start, n, spath, opath, afp)) {
+                        fclose(afp);
+                        remove(spath);
+                        remove(opath);
 
-    if (!x86_disasm(code + j->loop_start, n, spath, opath, afp)) {
-        fclose(afp);
-        remove(spath);
-        remove(opath);
-        remove(asmpath);
-        return;
-    }
-    fclose(afp);
-    remove(spath);
-    remove(opath);
+                        char cleanpath[] = "/tmp/umbra_mca_clean_XXXXXX.s";
+                        int  cfd = mkstemps(cleanpath, 2);
+                        if (cfd >= 0) {
+                            FILE *cfp = fdopen(cfd, "w");
+                            if (cfp) {
+                                afp = fopen(asmpath, "r");
+                                if (afp) {
+                                    char  line[256];
+                                    _Bool past_header = 0;
+                                    while (fgets(line, (int)sizeof line, afp)) {
+                                        if (past_header) {
+                                            if (line[0] != '\n' && line[0] != '<') {
+                                                fputs(line, cfp);
+                                            }
+                                        } else {
+                                            if (__builtin_strstr(line, "<")) {
+                                                past_header = 1;
+                                            }
+                                        }
+                                    }
+                                    fclose(afp);
+                                }
+                                fclose(cfp);
+                                remove(asmpath);
 
-    char cleanpath[] = "/tmp/umbra_mca_clean_XXXXXX.s";
-    int  cfd = mkstemps(cleanpath, 2);
-    if (cfd < 0) {
-        remove(asmpath);
-        return;
-    }
-    FILE *cfp = fdopen(cfd, "w");
-    if (!cfp) {
-        close(cfd);
-        remove(asmpath);
-        remove(cleanpath);
-        return;
-    }
-
-    afp = fopen(asmpath, "r");
-    if (afp) {
-        char  line[256];
-        _Bool past_header = 0;
-        while (fgets(line, (int)sizeof line, afp)) {
-            if (!past_header) {
-                if (__builtin_strstr(line, "<")) { past_header = 1; }
-                continue;
+                                char cmd[1024];
+                                snprintf(cmd, sizeof cmd,
+                                         "/opt/homebrew/opt/llvm/bin/llvm-mca"
+                                         " -mcpu=znver4"
+                                         " -iterations=100"
+                                         " -bottleneck-analysis"
+                                         " -mtriple=x86_64"
+                                         " %s 2>&1",
+                                         cleanpath);
+                                FILE *p = popen(cmd, "r");
+                                if (p) {
+                                    int  cplen = (int)__builtin_strlen(cleanpath);
+                                    char line[256];
+                                    while (fgets(line, (int)sizeof line, p)) {
+                                        char *s = line;
+                                        if (__builtin_strncmp(s, cleanpath, (size_t)cplen) == 0) {
+                                            s += cplen;
+                                        }
+                                        fputs(s, f);
+                                    }
+                                    pclose(p);
+                                }
+                                remove(cleanpath);
+                            } else {
+                                close(cfd);
+                                remove(asmpath);
+                                remove(cleanpath);
+                            }
+                        } else {
+                            remove(asmpath);
+                        }
+                    } else {
+                        fclose(afp);
+                        remove(spath);
+                        remove(opath);
+                        remove(asmpath);
+                    }
+                } else {
+                    remove(spath);
+                    remove(asmpath);
+                }
+            } else {
+                remove(spath);
             }
-            if (line[0] == '\n' || line[0] == '<') { continue; }
-            fputs(line, cfp);
         }
-        fclose(afp);
     }
-    fclose(cfp);
-    remove(asmpath);
-
-    char cmd[1024];
-    snprintf(cmd, sizeof cmd,
-             "/opt/homebrew/opt/llvm/bin/llvm-mca"
-             " -mcpu=znver4"
-             " -iterations=100"
-             " -bottleneck-analysis"
-             " -mtriple=x86_64"
-             " %s 2>&1",
-             cleanpath);
-    FILE *p = popen(cmd, "r");
-    if (p) {
-        int  cplen = (int)__builtin_strlen(cleanpath);
-        char line[256];
-        while (fgets(line, (int)sizeof line, p)) {
-            char *s = line;
-            if (__builtin_strncmp(s, cleanpath, (size_t)cplen) == 0) { s += cplen; }
-            fputs(s, f);
-        }
-        pclose(p);
-    }
-    remove(cleanpath);
 }
 
 #endif

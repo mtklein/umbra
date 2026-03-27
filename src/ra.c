@@ -48,7 +48,9 @@ struct ra *ra_create(struct umbra_basic_block const *bb, struct ra_config const 
         ra->last_use[inst->z] = i;
     }
     for (int i = 0; i < bb->preamble; i++) {
-        if (ra->last_use[i] >= bb->preamble) { ra->last_use[i] = n; }
+        if (ra->last_use[i] >= bb->preamble) {
+            ra->last_use[i] = n;
+        }
     }
 
     ra->inst = bb->inst;
@@ -74,7 +76,9 @@ void ra_destroy(struct ra *ra) {
 }
 
 void ra_begin_loop(struct ra *ra) {
-    for (int i = 0; i < ra->preamble; i++) { ra->loop_reg[i] = ra->reg[i]; }
+    for (int i = 0; i < ra->preamble; i++) {
+        ra->loop_reg[i] = ra->reg[i];
+    }
 }
 
 static _Bool can_remat(struct ra const *ra, int val) {
@@ -96,14 +100,17 @@ void ra_end_loop(struct ra *ra, int *sl) {
 
 void ra_free_reg(struct ra *ra, int val) {
     int8_t r = ra->reg[val];
-    if (r < 0) { return; }
-    ra->free_stack[ra->nfree++] = r;
-    ra->owner[(int)r] = -1;
-    ra->reg[val] = -1;
+    if (r >= 0) {
+        ra->free_stack[ra->nfree++] = r;
+        ra->owner[(int)r] = -1;
+        ra->reg[val] = -1;
+    }
 }
 
 int8_t ra_alloc(struct ra *ra, int *sl, int *ns) {
-    if (ra->nfree > 0) { return ra->free_stack[--ra->nfree]; }
+    if (ra->nfree > 0) {
+        return ra->free_stack[--ra->nfree];
+    }
 
     int best_r = -1, best_lu = -1;
     for (int r = 0; r < ra->cfg.max_reg; r++) {
@@ -127,7 +134,9 @@ int8_t ra_alloc(struct ra *ra, int *sl, int *ns) {
     if (can_remat(ra, evicted)) {
         sl[evicted] = -1;
     } else {
-        if (sl[evicted] < 0) { sl[evicted] = (*ns)++; }
+        if (sl[evicted] < 0) {
+            sl[evicted] = (*ns)++;
+        }
         ra->cfg.spill(ra->reg[evicted], sl[evicted], ra->cfg.ctx);
     }
     ra->owner[(int)ra->reg[evicted]] = -1;
@@ -137,16 +146,17 @@ int8_t ra_alloc(struct ra *ra, int *sl, int *ns) {
 }
 
 int8_t ra_ensure(struct ra *ra, int *sl, int *ns, int val) {
-    if (ra->reg[val] >= 0) { return ra->reg[val]; }
-    int8_t r = ra_alloc(ra, sl, ns);
-    if (sl[val] >= 0) {
-        ra->cfg.fill(r, sl[val], ra->cfg.ctx);
-    } else if (can_remat(ra, val)) {
-        ra->cfg.remat(r, val, ra->cfg.ctx);
+    if (ra->reg[val] < 0) {
+        int8_t r = ra_alloc(ra, sl, ns);
+        if (sl[val] >= 0) {
+            ra->cfg.fill(r, sl[val], ra->cfg.ctx);
+        } else if (can_remat(ra, val)) {
+            ra->cfg.remat(r, val, ra->cfg.ctx);
+        }
+        ra->reg[val] = r;
+        ra->owner[(int)r] = val;
     }
-    ra->reg[val] = r;
-    ra->owner[(int)r] = val;
-    return r;
+    return ra->reg[val];
 }
 
 int8_t ra_claim(struct ra *ra, int old_val, int new_val) {

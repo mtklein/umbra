@@ -816,7 +816,9 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
         if (has_ptr(bb->inst[i].op) && bb->inst[i].ptr >= 0 && bb->inst[i].ptr > max_ptr) {
             max_ptr = bb->inst[i].ptr;
         }
-        if (bb->inst[i].op == op_deref_ptr) { n_deref++; }
+        if (bb->inst[i].op == op_deref_ptr) {
+            n_deref++;
+        }
     }
     p->nptr = max_ptr + 1;
     p->n_deref = n_deref;
@@ -827,7 +829,9 @@ struct umbra_interpreter *umbra_interpreter(struct umbra_basic_block const *bb) 
     {
         int di = 0;
         for (int i = 0; i < bb->insts; i++) {
-            if (bb->inst[i].op == op_deref_ptr) { deref_slot[i] = p->nptr + di++; }
+            if (bb->inst[i].op == op_deref_ptr) {
+                deref_slot[i] = p->nptr + di++;
+            }
         }
     }
 

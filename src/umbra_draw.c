@@ -22,11 +22,15 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
         umbra_imm_f32(builder, 0.0f),
         umbra_imm_f32(builder, 0.0f),
     };
-    if (shader) { src = shader(builder, xf, yf); }
+    if (shader) {
+        src = shader(builder, xf, yf);
+    }
 
     int       coverage_off = umbra_uni_len(builder);
     umbra_val cov = {0};
-    if (coverage) { cov = coverage(builder, xf, yf); }
+    if (coverage) {
+        cov = coverage(builder, xf, yf);
+    }
 
     umbra_color dst = {
         umbra_imm_f32(builder, 0.0f),
@@ -34,7 +38,9 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
         umbra_imm_f32(builder, 0.0f),
         umbra_imm_f32(builder, 0.0f),
     };
-    if (load) { dst = load(builder, (umbra_ptr){1, 0}); }
+    if (load) {
+        dst = load(builder, (umbra_ptr){1, 0});
+    }
 
     umbra_color out;
     if (blend) {
@@ -58,7 +64,9 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
                                             cov));
     }
 
-    if (store) { store(builder, (umbra_ptr){1, 0}, out); }
+    if (store) {
+        store(builder, (umbra_ptr){1, 0}, out);
+    }
 
     if (layout) {
         layout->shader = shader_off;
@@ -537,7 +545,9 @@ void umbra_gradient_lut_even(float *out, int lut_n, int n_stops, float const col
         float t = (float)i / (float)(lut_n - 1);
         float seg = t * (float)(n_stops - 1);
         int   idx = (int)seg;
-        if (idx >= n_stops - 1) { idx = n_stops - 2; }
+        if (idx >= n_stops - 1) {
+            idx = n_stops - 2;
+        }
         float f = seg - (float)idx;
         for (int ch = 0; ch < 4; ch++) {
             out[i * 4 + ch] = colors[idx][ch] * (1 - f) + colors[idx + 1][ch] * f;
@@ -551,9 +561,13 @@ void umbra_gradient_lut(float *out, int lut_n, int n_stops, float const position
         float t = (float)i / (float)(lut_n - 1);
         int   seg = 0;
         for (int j = 1; j < n_stops; j++) {
-            if (t >= positions[j]) { seg = j; }
+            if (t >= positions[j]) {
+                seg = j;
+            }
         }
-        if (seg >= n_stops - 1) { seg = n_stops - 2; }
+        if (seg >= n_stops - 1) {
+            seg = n_stops - 2;
+        }
         float span = positions[seg + 1] - positions[seg];
         float f = 0;
         if (span > 0) {
@@ -579,18 +593,24 @@ umbra_transfer const umbra_transfer_srgb = {
 
 
 static float tf_invert_scalar(umbra_transfer const *tf, float x) {
-    if (x >= tf->d) { return powf(tf->a * x + tf->b, tf->g) + tf->e; }
+    if (x >= tf->d) {
+        return powf(tf->a * x + tf->b, tf->g) + tf->e;
+    }
     return tf->c * x + tf->f;
 }
 
 static float tf_apply_scalar(umbra_transfer const *tf, float y) {
     float lin_thresh = tf->c * tf->d + tf->f;
     if (y >= lin_thresh) {
-        if (tf->a <= 0) { return 0; }
-        return (powf(y - tf->e, 1.0f / tf->g) - tf->b) / tf->a;
+        if (tf->a > 0) {
+            return (powf(y - tf->e, 1.0f / tf->g) - tf->b) / tf->a;
+        }
+        return 0;
     }
-    if (tf->c <= 0) { return 0; }
-    return (y - tf->f) / tf->c;
+    if (tf->c > 0) {
+        return (y - tf->f) / tf->c;
+    }
+    return 0;
 }
 
 void umbra_transfer_lut_invert(float out[256], umbra_transfer const *tf) {
@@ -624,7 +644,9 @@ static void fit_poly(double gamma, int n, double coeffs[]) {
     for (int k = 0; k < n; k++) {
         int mx = k;
         for (int r = k + 1; r < n; r++) {
-            if (fabs(ata[r][k]) > fabs(ata[mx][k])) { mx = r; }
+            if (fabs(ata[r][k]) > fabs(ata[mx][k])) {
+                mx = r;
+            }
         }
         for (int c = 0; c < n; c++) {
             double t = ata[k][c];
@@ -638,13 +660,17 @@ static void fit_poly(double gamma, int n, double coeffs[]) {
         }
         for (int r = k + 1; r < n; r++) {
             double f = ata[r][k] / ata[k][k];
-            for (int c = k; c < n; c++) { ata[r][c] -= f * ata[k][c]; }
+            for (int c = k; c < n; c++) {
+                ata[r][c] -= f * ata[k][c];
+            }
             atb[r] -= f * atb[k];
         }
     }
     for (int k = n - 1; k >= 0; k--) {
         double s = atb[k];
-        for (int c = k + 1; c < n; c++) { s -= ata[k][c] * coeffs[c]; }
+        for (int c = k + 1; c < n; c++) {
+            s -= ata[k][c] * coeffs[c];
+        }
         coeffs[k] = s / ata[k][k];
     }
 }

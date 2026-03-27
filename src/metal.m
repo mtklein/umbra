@@ -808,134 +808,139 @@ void* umbra_metal_backend_create(void) {
     @autoreleasepool {
         id<MTLDevice> device =
             MTLCreateSystemDefaultDevice();
-        if (!device) { return 0; }
-        id<MTLCommandQueue> queue =
-            [device newCommandQueue];
-        if (!queue) { return 0; }
-        struct metal_backend *be =
-            calloc(1, sizeof *be);
-        be->device =
-            (__bridge_retained void*)device;
-        be->queue =
-            (__bridge_retained void*)queue;
-        return be;
+        id<MTLCommandQueue> queue = device
+            ? [device newCommandQueue] : nil;
+        if (device && queue) {
+            struct metal_backend *be =
+                calloc(1, sizeof *be);
+            be->device =
+                (__bridge_retained void*)device;
+            be->queue =
+                (__bridge_retained void*)queue;
+            return be;
+        }
+        return 0;
     }
 }
 
 void umbra_metal_backend_free(void *ctx) {
     struct metal_backend *be = ctx;
-    if (!be) { return; }
-    @autoreleasepool {
-        if (be->device) {
-            (void)(__bridge_transfer id)be->device;
+    if (be) {
+        @autoreleasepool {
+            if (be->device) {
+                (void)(__bridge_transfer id)be->device;
+            }
+            if (be->queue) {
+                (void)(__bridge_transfer id)be->queue;
+            }
         }
-        if (be->queue) {
-            (void)(__bridge_transfer id)be->queue;
-        }
+        free(be->batch_bufs);
+        free(be->batch_copy);
+        free(be);
     }
-    free(be->batch_bufs);
-    free(be->batch_copy);
-    free(be);
 }
 
 struct umbra_metal* umbra_metal(
     void *backend_ctx, BB const *bb
 ) {
     struct metal_backend *be = backend_ctx;
-    if (!be) { return 0; }
-    @autoreleasepool {
-        id<MTLDevice> device =
-            (__bridge id<MTLDevice>)be->device;
+    if (be) {
+        @autoreleasepool {
+            id<MTLDevice> device =
+                (__bridge id<MTLDevice>)be->device;
 
-        int *deref_buf = calloc(
-            (size_t)bb->insts,
-            sizeof *deref_buf);
-        int max_ptr = -1, total_bufs = 0;
-        char *src = build_source(
-            bb, &max_ptr, &total_bufs,
-            deref_buf);
+            int *deref_buf = calloc(
+                (size_t)bb->insts,
+                sizeof *deref_buf);
+            int max_ptr = -1, total_bufs = 0;
+            char *src = build_source(
+                bb, &max_ptr, &total_bufs,
+                deref_buf);
 
-        int n_deref = 0;
-        for (int i = 0; i < bb->insts; i++) {
-            if (bb->inst[i].op == op_deref_ptr) {
-                n_deref++;
-            }
-        }
-        struct deref_info *di = calloc(
-            (size_t)(n_deref ? n_deref : 1),
-            sizeof *di);
-        {
-            int d = 0;
-            for (int i = 0;
-                 i < bb->insts; i++) {
-                if (bb->inst[i].op
-                        == op_deref_ptr) {
-                    di[d].buf_idx = deref_buf[i];
-                    di[d].src_buf =
-                        bb->inst[i].ptr;
-                    di[d].byte_off =
-                        bb->inst[i].imm;
-                    d++;
+            int n_deref = 0;
+            for (int i = 0; i < bb->insts; i++) {
+                if (bb->inst[i].op == op_deref_ptr) {
+                    n_deref++;
                 }
             }
-        }
+            struct deref_info *di = calloc(
+                (size_t)(n_deref ? n_deref : 1),
+                sizeof *di);
+            {
+                int d = 0;
+                for (int i = 0;
+                     i < bb->insts; i++) {
+                    if (bb->inst[i].op
+                            == op_deref_ptr) {
+                        di[d].buf_idx = deref_buf[i];
+                        di[d].src_buf =
+                            bb->inst[i].ptr;
+                        di[d].byte_off =
+                            bb->inst[i].imm;
+                        d++;
+                    }
+                }
+            }
 
-        NSString *source =
-            [NSString stringWithUTF8String:src];
-        NSError *error = nil;
-        MTLCompileOptions *opts = [MTLCompileOptions new];
-        if (@available(macOS 15.0, *)) {
-            opts.mathMode = MTLMathModeSafe;
-        } else {
+            NSString *source =
+                [NSString stringWithUTF8String:src];
+            NSError *error = nil;
+            MTLCompileOptions *opts =
+                [MTLCompileOptions new];
+            if (@available(macOS 15.0, *)) {
+                opts.mathMode = MTLMathModeSafe;
+            } else {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-            opts.fastMathEnabled = NO;
+                opts.fastMathEnabled = NO;
 #pragma clang diagnostic pop
-        }
-        id<MTLLibrary> library =
-            [device newLibraryWithSource:source
-                                 options:opts
-                                   error:&error];
-        if (!library) {
-            NSLog(@"Metal compile error: %@", error);
+            }
+            id<MTLLibrary> library =
+                [device newLibraryWithSource:source
+                                     options:opts
+                                       error:&error];
+            if (library) {
+                id<MTLFunction> func =
+                    [library
+                     newFunctionWithName:
+                         @"umbra_entry"];
+                if (func) {
+                    id<MTLComputePipelineState>
+                        pipeline = [device
+                     newComputePipelineStateWithFunction:func
+                                                   error:&error];
+                    if (pipeline) {
+                        struct umbra_metal *m =
+                            calloc(1, sizeof *m);
+                        m->be = be;
+                        m->pipeline =
+                            (__bridge_retained void*)
+                                pipeline;
+                        m->src        = src;
+                        m->max_ptr    = max_ptr;
+                        m->total_bufs = total_bufs;
+                        m->tg_size    = (int)pipeline
+                            .maxTotalThreadsPerThreadgroup;
+                        m->per_bufs = calloc(
+                            (size_t)total_bufs,
+                            sizeof *m->per_bufs);
+                        m->deref   = di;
+                        m->n_deref = n_deref;
+
+                        free(deref_buf);
+                        return m;
+                    }
+                }
+            } else {
+                NSLog(@"Metal compile error: %@",
+                      error);
+            }
             free(deref_buf);
             free(src);
             return 0;
         }
-
-        id<MTLFunction> func =
-            [library
-             newFunctionWithName:@"umbra_entry"];
-        if (!func) {
-            free(deref_buf); free(src); return 0;
-        }
-
-        id<MTLComputePipelineState> pipeline =
-            [device
-             newComputePipelineStateWithFunction:func
-                                           error:&error];
-        if (!pipeline) {
-            free(deref_buf); free(src); return 0;
-        }
-
-        struct umbra_metal *m =
-            calloc(1, sizeof *m);
-        m->be = be;
-        m->pipeline =
-            (__bridge_retained void*)pipeline;
-        m->src        = src;
-        m->max_ptr    = max_ptr;
-        m->total_bufs = total_bufs;
-        m->tg_size    =
-            (int)pipeline.maxTotalThreadsPerThreadgroup;
-        m->per_bufs = calloc((size_t)total_bufs,
-                             sizeof *m->per_bufs);
-        m->deref   = di;
-        m->n_deref = n_deref;
-
-        free(deref_buf);
-        return m;
     }
+    return 0;
 }
 
 static void batch_add_copy(
@@ -1203,114 +1208,120 @@ void umbra_metal_run(
     struct umbra_metal *m, int l, int t, int r, int b, umbra_buf buf[]
 ) {
     int w = r - l, h = b - t;
-    if (!m || w <= 0 || h <= 0) { return; }
-    struct metal_backend *be = m->be;
-    if (!be->batch_cmdbuf) {
-        umbra_metal_begin_batch(be);
-    }
-    @autoreleasepool {
-        id<MTLComputeCommandEncoder> enc =
-            (__bridge
-             id<MTLComputeCommandEncoder>)
-                be->batch_enc;
-        [enc setComputePipelineState:
-            (__bridge
-             id<MTLComputePipelineState>)
-                m->pipeline];
-        if (!m->batch_data) {
-            m->batch_data = calloc(
-                (size_t)m->total_bufs,
-                sizeof *m->batch_data);
+    if (m && w > 0 && h > 0) {
+        struct metal_backend *be = m->be;
+        if (!be->batch_cmdbuf) {
+            umbra_metal_begin_batch(be);
         }
-        if (m->batch_gen != be->batch_gen) {
-            m->batch_gen = be->batch_gen;
-            __builtin_memset(
-                m->batch_data, 0,
-                (size_t)m->total_bufs
-                    * sizeof *m->batch_data);
+        @autoreleasepool {
+            id<MTLComputeCommandEncoder> enc =
+                (__bridge
+                 id<MTLComputeCommandEncoder>)
+                    be->batch_enc;
+            [enc setComputePipelineState:
+                (__bridge
+                 id<MTLComputePipelineState>)
+                    m->pipeline];
+            if (!m->batch_data) {
+                m->batch_data = calloc(
+                    (size_t)m->total_bufs,
+                    sizeof *m->batch_data);
+            }
+            if (m->batch_gen != be->batch_gen) {
+                m->batch_gen = be->batch_gen;
+                __builtin_memset(
+                    m->batch_data, 0,
+                    (size_t)m->total_bufs
+                        * sizeof *m->batch_data);
+            }
+            encode_dispatch(
+                m, l, t, r, b, buf, enc);
         }
-        encode_dispatch(
-            m, l, t, r, b, buf, enc);
     }
 }
 
 void umbra_metal_begin_batch(void *ctx) {
     struct metal_backend *be = ctx;
-    if (!be || be->batch_cmdbuf) { return; }
-    be->batch_gen++;
-    @autoreleasepool {
-        id<MTLCommandQueue> queue =
-            (__bridge id<MTLCommandQueue>)
-                be->queue;
-        id<MTLCommandBuffer> cmdbuf =
-            [queue
-             commandBufferWithUnretainedReferences];
-        id<MTLComputeCommandEncoder> enc =
-            [cmdbuf computeCommandEncoder];
-        be->batch_cmdbuf =
-            (__bridge_retained void*)cmdbuf;
-        be->batch_enc =
-            (__bridge_retained void*)enc;
+    if (be && !be->batch_cmdbuf) {
+        be->batch_gen++;
+        @autoreleasepool {
+            id<MTLCommandQueue> queue =
+                (__bridge id<MTLCommandQueue>)
+                    be->queue;
+            id<MTLCommandBuffer> cmdbuf =
+                [queue
+                 commandBufferWithUnretainedReferences];
+            id<MTLComputeCommandEncoder> enc =
+                [cmdbuf computeCommandEncoder];
+            be->batch_cmdbuf =
+                (__bridge_retained void*)cmdbuf;
+            be->batch_enc =
+                (__bridge_retained void*)enc;
+        }
     }
 }
 
 void umbra_metal_flush(void *ctx) {
     struct metal_backend *be = ctx;
-    if (!be || !be->batch_cmdbuf) { return; }
-    @autoreleasepool {
-        id<MTLComputeCommandEncoder> enc =
-            (__bridge_transfer
-             id<MTLComputeCommandEncoder>)
-                be->batch_enc;
-        id<MTLCommandBuffer> cmdbuf =
-            (__bridge_transfer id<MTLCommandBuffer>)
-                be->batch_cmdbuf;
-        be->batch_enc    = NULL;
-        be->batch_cmdbuf = NULL;
+    if (be && be->batch_cmdbuf) {
+        @autoreleasepool {
+            id<MTLComputeCommandEncoder> enc =
+                (__bridge_transfer
+                 id<MTLComputeCommandEncoder>)
+                    be->batch_enc;
+            id<MTLCommandBuffer> cmdbuf =
+                (__bridge_transfer id<MTLCommandBuffer>)
+                    be->batch_cmdbuf;
+            be->batch_enc    = NULL;
+            be->batch_cmdbuf = NULL;
 
-        [enc endEncoding];
-        [cmdbuf commit];
-        [cmdbuf waitUntilCompleted];
+            [enc endEncoding];
+            [cmdbuf commit];
+            [cmdbuf waitUntilCompleted];
 
-        for (int i = 0; i < be->batch_ncopy; i++) {
-            struct copyback *c =
-                &be->batch_copy[i];
-            id<MTLBuffer> mtlbuf =
-                (__bridge id<MTLBuffer>)c->mtlbuf;
-            __builtin_memcpy(
-                c->host,
-                mtlbuf.contents,
-                (size_t)c->bytes);
+            for (int i = 0; i < be->batch_ncopy; i++) {
+                struct copyback *c =
+                    &be->batch_copy[i];
+                id<MTLBuffer> mtlbuf =
+                    (__bridge id<MTLBuffer>)c->mtlbuf;
+                __builtin_memcpy(
+                    c->host,
+                    mtlbuf.contents,
+                    (size_t)c->bytes);
+            }
+            be->batch_ncopy = 0;
+
+            for (int i = 0; i < be->batch_nbufs; i++) {
+                (void)(__bridge_transfer id)
+                    be->batch_bufs[i];
+            }
+            be->batch_nbufs = 0;
         }
-        be->batch_ncopy = 0;
-
-        for (int i = 0; i < be->batch_nbufs; i++) {
-            (void)(__bridge_transfer id)
-                be->batch_bufs[i];
-        }
-        be->batch_nbufs = 0;
     }
 }
 
 void umbra_metal_free(struct umbra_metal *m) {
-    if (!m) { return; }
-    @autoreleasepool {
-        if (m->pipeline) {
-            (void)(__bridge_transfer id)
-                m->pipeline;
+    if (m) {
+        @autoreleasepool {
+            if (m->pipeline) {
+                (void)(__bridge_transfer id)
+                    m->pipeline;
+            }
         }
+        free(m->per_bufs);
+        free(m->deref);
+        free(m->batch_data);
+        free(m->src);
+        free(m);
     }
-    free(m->per_bufs);
-    free(m->deref);
-    free(m->batch_data);
-    free(m->src);
-    free(m);
 }
 
 void umbra_dump_metal(
     struct umbra_metal const *m, FILE *f
 ) {
-    if (m && m->src) { fputs(m->src, f); }
+    if (m && m->src) {
+        fputs(m->src, f);
+    }
 }
 
 #endif
