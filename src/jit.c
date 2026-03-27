@@ -2316,99 +2316,85 @@ static _Bool x86_disasm(uint8_t const *code, size_t n, char const *spath,
 
 void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
     assert(j);
-    if (j->loop_start < j->loop_end) {
-        uint8_t const *code = (uint8_t const *)j->code;
-        size_t         n = (size_t)(j->loop_end - j->loop_start);
+    if (j->loop_start >= j->loop_end) { return; }
 
-        char spath[] = "/tmp/umbra_mca_XXXXXX.s";
-        int  fd = mkstemps(spath, 2);
-        if (fd >= 0) {
-            close(fd);
+    uint8_t const *code = (uint8_t const*)j->code;
+    size_t const   n    = (size_t)(j->loop_end - j->loop_start);
 
-            char opath[sizeof spath + 2];
-            snprintf(opath, sizeof opath, "%.*s.o", (int)(sizeof spath - 3), spath);
+    char spath[]     = "/tmp/umbra_mca_XXXXXX.s";
+    char asmpath[]   = "/tmp/umbra_mca_asm_XXXXXX.s";
+    char cleanpath[] = "/tmp/umbra_mca_clean_XXXXXX.s";
+    char opath[sizeof spath + 2];
+    spath[0] = asmpath[0] = cleanpath[0] = '\0';
 
-            char asmpath[] = "/tmp/umbra_mca_asm_XXXXXX.s";
-            int  afd = mkstemps(asmpath, 2);
-            if (afd >= 0) {
-                close(afd);
-                FILE *afp = fopen(asmpath, "w");
-                if (afp) {
-                    if (x86_disasm(code + j->loop_start, n, spath, opath, afp)) {
-                        fclose(afp);
-                        remove(spath);
-                        remove(opath);
+    int   fd, afd, cfd;
+    FILE *afp, *cfp;
 
-                        char cleanpath[] = "/tmp/umbra_mca_clean_XXXXXX.s";
-                        int  cfd = mkstemps(cleanpath, 2);
-                        if (cfd >= 0) {
-                            FILE *cfp = fdopen(cfd, "w");
-                            if (cfp) {
-                                afp = fopen(asmpath, "r");
-                                if (afp) {
-                                    char  line[256];
-                                    _Bool past_header = 0;
-                                    while (fgets(line, (int)sizeof line, afp)) {
-                                        if (past_header) {
-                                            if (line[0] != '\n' && line[0] != '<') {
-                                                fputs(line, cfp);
-                                            }
-                                        } else {
-                                            if (__builtin_strstr(line, "<")) {
-                                                past_header = 1;
-                                            }
-                                        }
-                                    }
-                                    fclose(afp);
-                                }
-                                fclose(cfp);
-                                remove(asmpath);
+    fd = mkstemps(spath, 2);
+    if (fd < 0) { goto done; }
+    close(fd);
+    snprintf(opath, sizeof opath, "%.*s.o", (int)(sizeof spath - 3), spath);
 
-                                char cmd[1024];
-                                snprintf(cmd, sizeof cmd,
-                                         "/opt/homebrew/opt/llvm/bin/llvm-mca"
-                                         " -mcpu=znver4"
-                                         " -iterations=100"
-                                         " -bottleneck-analysis"
-                                         " -mtriple=x86_64"
-                                         " %s 2>&1",
-                                         cleanpath);
-                                FILE *p = popen(cmd, "r");
-                                if (p) {
-                                    int  cplen = (int)__builtin_strlen(cleanpath);
-                                    char line[256];
-                                    while (fgets(line, (int)sizeof line, p)) {
-                                        char *s = line;
-                                        if (__builtin_strncmp(s, cleanpath, (size_t)cplen) == 0) {
-                                            s += cplen;
-                                        }
-                                        fputs(s, f);
-                                    }
-                                    pclose(p);
-                                }
-                                remove(cleanpath);
-                            } else {
-                                close(cfd);
-                                remove(asmpath);
-                                remove(cleanpath);
-                            }
-                        } else {
-                            remove(asmpath);
-                        }
-                    } else {
-                        fclose(afp);
-                        remove(spath);
-                        remove(opath);
-                        remove(asmpath);
-                    }
-                } else {
-                    remove(spath);
-                    remove(asmpath);
+    afd = mkstemps(asmpath, 2);
+    if (afd < 0) { goto done; }
+    close(afd);
+
+    afp = fopen(asmpath, "w");
+    if (!afp)                                                    { goto done; }
+    if (!x86_disasm(code + j->loop_start, n, spath, opath, afp)) { fclose(afp); goto done; }
+    fclose(afp);
+
+    cfd = mkstemps(cleanpath, 2);
+    if (cfd < 0) { goto done; }
+    cfp = fdopen(cfd, "w");
+    if (!cfp) { close(cfd); goto done; }
+
+    afp = fopen(asmpath, "r");
+    if (afp) {
+        char  line[256];
+        _Bool past_header = 0;
+        while (fgets(line, (int)sizeof line, afp)) {
+            if (past_header) {
+                if (line[0] != '\n' && line[0] != '<') {
+                    fputs(line, cfp);
                 }
-            } else {
-                remove(spath);
+            } else if (__builtin_strstr(line, "<")) {
+                past_header = 1;
             }
         }
+        fclose(afp);
+    }
+    fclose(cfp);
+
+    {
+        char cmd[1024];
+        snprintf(cmd, sizeof cmd,
+                 "/opt/homebrew/opt/llvm/bin/llvm-mca"
+                 " -mcpu=znver4 -iterations=100 -bottleneck-analysis"
+                 " -mtriple=x86_64 %s 2>&1",
+                 cleanpath);
+        FILE *p = popen(cmd, "r");
+        if (p) {
+            int const cplen = (int)__builtin_strlen(cleanpath);
+            char      line[256];
+            while (fgets(line, (int)sizeof line, p)) {
+                char *s = line;
+                if (__builtin_strncmp(s, cleanpath, (size_t)cplen) == 0) {
+                    s += cplen;
+                }
+                fputs(s, f);
+            }
+            pclose(p);
+        }
+    }
+
+done:
+    if (spath[0])     { remove(spath); }
+    if (asmpath[0])   { remove(asmpath); }
+    if (cleanpath[0]) { remove(cleanpath); }
+    if (spath[0]) {
+        snprintf(opath, sizeof opath, "%.*s.o", (int)(sizeof spath - 3), spath);
+        remove(opath);
     }
 }
 
