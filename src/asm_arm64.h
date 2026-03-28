@@ -101,6 +101,9 @@ uint32_t UZP2_4s(int d, int n, int m);
 uint32_t ZIP1_4s(int d, int n, int m);
 uint32_t ZIP2_4s(int d, int n, int m);
 
+uint32_t LD2_4s(int t, int n);  // LD2 {Vt.4S, V(t+1).4S}, [Xn]
+uint32_t ST2_4s(int t, int n);  // ST2 {Vt.4S, V(t+1).4S}, [Xn]
+
 uint32_t SLI_4s_imm(int d, int n, int shift);
 
 uint32_t SHL_4s_imm(int d, int n, int sh);

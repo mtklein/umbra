@@ -260,6 +260,14 @@ uint32_t ZIP1_4s(int d, int n, int m) {
 uint32_t ZIP2_4s(int d, int n, int m) {
     return 0x4e807800u | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d;
 }
+// LD2 {Vt.4S, V(t+1).4S}, [Xn]  — Q=1, L=1, opcode=1000, size=10
+uint32_t LD2_4s(int t, int n) {
+    return 0x4c408800u | ((uint32_t)n << 5) | (uint32_t)t;
+}
+// ST2 {Vt.4S, V(t+1).4S}, [Xn]  — Q=1, L=0, opcode=1000, size=10
+uint32_t ST2_4s(int t, int n) {
+    return 0x4c008800u | ((uint32_t)n << 5) | (uint32_t)t;
+}
 
 uint32_t LD1_s(int t, int idx, int n) {
     uint32_t Q = ((uint32_t)idx >> 1) & 1;

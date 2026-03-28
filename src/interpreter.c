@@ -137,6 +137,8 @@ typedef union {
 enum {
     SW_DONE = op_le_s32_imm + 1,
     SW_CHAN_8X4,
+    SW_CHAN_32X2_FUSED,
+    SW_CHAN_8X4_FUSED,
 
     // Binary op variants: 7 new per op (existing op_X is the mm->m variant)
 #define BINARY_VARIANTS(name, rt, pt) \
@@ -244,12 +246,37 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
 
             case op_load_16: emit(.tag = op_load_16, .x = RESOLVE_PTR(inst)); break;
             case op_load_32: emit(.tag = op_load_32, .x = RESOLVE_PTR(inst)); break;
-            case op_load_32x2:   emit(.tag = op_load_32x2);   break;
-            case op_load_8x4: emit(.tag = op_load_8x4); break;
+            case op_load_32x2: emit(.tag = op_load_32x2); break;
+            case op_load_8x4:  emit(.tag = op_load_8x4);  break;
             case op_chan: {
                 struct bb_inst const *parent = &bb->inst[inst->x];
+                int const ptr = RESOLVE_PTR(parent);
+                if (parent->op == op_load_8x4 && inst->imm == 0
+                    && i + 3 < hi
+                    && bb->inst[i+1].op == op_chan && bb->inst[i+1].x == inst->x && bb->inst[i+1].imm == 1
+                    && bb->inst[i+2].op == op_chan && bb->inst[i+2].x == inst->x && bb->inst[i+2].imm == 2
+                    && bb->inst[i+3].op == op_chan && bb->inst[i+3].x == inst->x && bb->inst[i+3].imm == 3) {
+                    emit(.tag = SW_CHAN_8X4_FUSED, .x = ptr);
+                    id[i] = n++;
+                    for (int k = 1; k <= 3; k++) {
+                        p->inst[n] = (struct sw_inst){.tag = op_load_8x4};
+                        id[i + k] = n++;
+                    }
+                    i += 3;
+                    continue;
+                }
+                if (parent->op == op_load_32x2 && inst->imm == 0
+                    && i + 1 < hi
+                    && bb->inst[i+1].op == op_chan && bb->inst[i+1].x == inst->x && bb->inst[i+1].imm == 1) {
+                    emit(.tag = SW_CHAN_32X2_FUSED, .x = ptr);
+                    id[i] = n++;
+                    p->inst[n] = (struct sw_inst){.tag = op_load_32x2};
+                    id[i + 1] = n++;
+                    i++;
+                    continue;
+                }
                 int tag = parent->op == op_load_8x4 ? (int)SW_CHAN_8X4 : (int)op_chan;
-                emit(.tag = tag, .x = RESOLVE_PTR(parent), .y = inst->imm);
+                emit(.tag = tag, .x = ptr, .y = inst->imm);
             } break;
 
             case op_gather_uniform_16: emit(.tag = op_gather_uniform_16, .x = RESOLVE_PTR(inst), .y = X); break;
@@ -509,6 +536,8 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                 [op_load_16] = &&L_op_load_16, [op_load_32] = &&L_op_load_32,
                 [op_load_32x2] = &&L_op_load_32x2, [op_load_8x4] = &&L_op_load_8x4,
                 [op_chan] = &&L_op_chan, [SW_CHAN_8X4] = &&L_SW_CHAN_8X4,
+                [SW_CHAN_32X2_FUSED] = &&L_SW_CHAN_32X2_FUSED,
+                [SW_CHAN_8X4_FUSED] = &&L_SW_CHAN_8X4_FUSED,
                 [op_store_16] = &&L_op_store_16, [op_store_32] = &&L_op_store_32,
                 [op_store_32x2] = &&L_op_store_32x2, [op_store_8x4] = &&L_op_store_8x4,
                 [op_gather_uniform_16] = &&L_op_gather_uniform_16,
@@ -683,6 +712,36 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                         __builtin_memcpy(&px, src + (i + ll) * 4, 4);
                         v->u32[ll] = (px >> shift) & 0xFFu;
                     }
+                } NEXT;
+                CASE(SW_CHAN_32X2_FUSED) {
+                    char const *src = (char const*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
+                    int const   i = end - K;
+                    int const   rem = n - i;
+                    v[0].i32 = (I32){0};
+                    v[1].i32 = (I32){0};
+                    for (int ll = 0; ll < (rem < K ? rem : K); ll++) {
+                        int32_t lo, hi;
+                        __builtin_memcpy(&lo, src + (i + ll) * 8,     4);
+                        __builtin_memcpy(&hi, src + (i + ll) * 8 + 4, 4);
+                        v[0].i32[ll] = lo;
+                        v[1].i32[ll] = hi;
+                    }
+                    ip++; v++;
+                } NEXT;
+                CASE(SW_CHAN_8X4_FUSED) {
+                    char const *src = (char const*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
+                    int const   i = end - K;
+                    int const   rem = n - i;
+                    v[0].u32 = v[1].u32 = v[2].u32 = v[3].u32 = (U32){0};
+                    for (int ll = 0; ll < (rem < K ? rem : K); ll++) {
+                        uint32_t px;
+                        __builtin_memcpy(&px, src + (i + ll) * 4, 4);
+                        v[0].u32[ll] = (px      ) & 0xFFu;
+                        v[1].u32[ll] = (px >>  8) & 0xFFu;
+                        v[2].u32[ll] = (px >> 16) & 0xFFu;
+                        v[3].u32[ll] = (px >> 24);
+                    }
+                    ip += 3; v += 3;
                 } NEXT;
 
                 CASE(op_store_16) {

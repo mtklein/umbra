@@ -594,34 +594,61 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
-        case op_load_32x2:   break;
-        case op_load_8x4: break;
+        case op_load_32x2: break;
+        case op_load_8x4:  break;
         case op_chan: {
             struct bb_inst const *parent = &bb->inst[inst->x];
-            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int            p = parent->ptr;
+            int                   p = parent->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+
             if (parent->op == op_load_8x4) {
-                // Load u32 pixel(s), extract channel by shift+mask.
-                if (scalar) {
-                    put(c, LDR_sx(s.rd, XP, XI));
+                // Check for 4-way fusion: all 4 channels adjacent in order.
+                _Bool fused4 = inst->imm == 0
+                            && i + 3 < to
+                            && bb->inst[i+1].op == op_chan && bb->inst[i+1].x == inst->x && bb->inst[i+1].imm == 1
+                            && bb->inst[i+2].op == op_chan && bb->inst[i+2].x == inst->x && bb->inst[i+2].imm == 2
+                            && bb->inst[i+3].op == op_chan && bb->inst[i+3].x == inst->x && bb->inst[i+3].imm == 3;
+                if (fused4 && !scalar) {
+                    struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
+                    struct ra_step s1 = ra_step_alloc(ra, sl, ns, i+1);
+                    struct ra_step s2 = ra_step_alloc(ra, sl, ns, i+2);
+                    struct ra_step s3 = ra_step_alloc(ra, sl, ns, i+3);
+                    int8_t px   = ra_alloc(ra, sl, ns);
+                    int8_t mask = ra_alloc(ra, sl, ns);
+                    put(c, LDR_q(px, XP, XW));
+                    arm64_pool_load(c, &jc->pool, mask, 0xFF);
+                    put(c, AND_16b(s0.rd, px, mask));
+                    put(c, USHR_4s_imm(s1.rd, px,  8));
+                    put(c, AND_16b(s1.rd, s1.rd, mask));
+                    put(c, USHR_4s_imm(s2.rd, px, 16));
+                    put(c, AND_16b(s2.rd, s2.rd, mask));
+                    put(c, USHR_4s_imm(s3.rd, px, 24));
+                    ra_return_reg(ra, mask);
+                    ra_return_reg(ra, px);
+                    i += 3;
                 } else {
-                    put(c, LDR_q(s.rd, XP, XW));
+                    struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+                    if (scalar) {
+                        put(c, LDR_sx(s.rd, XP, XI));
+                    } else {
+                        put(c, LDR_q(s.rd, XP, XW));
+                    }
+                    if (inst->imm) {
+                        put(c, USHR_4s_imm(s.rd, s.rd, 8 * inst->imm));
+                    }
+                    int8_t mask = ra_alloc(ra, sl, ns);
+                    arm64_pool_load(c, &jc->pool, mask, 0xFF);
+                    put(c, AND_16b(s.rd, s.rd, mask));
+                    ra_return_reg(ra, mask);
                 }
-                if (inst->imm) {
-                    put(c, USHR_4s_imm(s.rd, s.rd, 8 * inst->imm));
-                }
-                int8_t mask = ra_alloc(ra, sl, ns);
-                arm64_pool_load(c, &jc->pool, mask, 0xFF);
-                put(c, AND_16b(s.rd, s.rd, mask));
-                ra_return_reg(ra, mask);
             } else {
-                // load_64 channel extraction.
+                // load_32x2: check for 2-way fusion.
                 _Bool fused = inst->imm == 0
                            && i + 1 < to
                            && bb->inst[i + 1].op == op_chan
                            && bb->inst[i + 1].x == inst->x
                            && bb->inst[i + 1].imm == 1;
+                struct ra_step s = ra_step_alloc(ra, sl, ns, i);
                 put(c, LSL_xi(XT, XI, 3));
                 put(c, ADD_xr(XT, XP, XT));
                 if (scalar) {
@@ -630,6 +657,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                         struct ra_step s2 = ra_step_alloc(ra, sl, ns, i + 1);
                         put(c, LDR_si(s2.rd, XT, 1));
                     }
+                } else if (fused) {
+                    // LD2 deinterleaves two u32 streams in one instruction.
+                    // LD2 requires consecutive register numbers; use v0,v1 as temps.
+                    put(c, LD2_4s(0, XT));
+                    struct ra_step s2 = ra_step_alloc(ra, sl, ns, i + 1);
+                    put(c, ORR_16b(s.rd,  0, 0));
+                    put(c, ORR_16b(s2.rd, 1, 1));
                 } else {
                     int8_t t0 = ra_alloc(ra, sl, ns);
                     int8_t t1 = ra_alloc(ra, sl, ns);
@@ -639,10 +673,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                         put(c, UZP1_4s(s.rd, t0, t1));
                     } else {
                         put(c, UZP2_4s(s.rd, t0, t1));
-                    }
-                    if (fused) {
-                        struct ra_step s2 = ra_step_alloc(ra, sl, ns, i + 1);
-                        put(c, UZP2_4s(s2.rd, t0, t1));
                     }
                     ra_return_reg(ra, t1);
                     ra_return_reg(ra, t0);
@@ -799,14 +829,11 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, STR_si(rx, XT, 0));
                 put(c, STR_si(ry, XT, 1));
             } else {
-                int8_t t0 = ra_alloc(ra, sl, ns);
-                int8_t t1 = ra_alloc(ra, sl, ns);
-                put(c, ZIP1_4s(t0, rx, ry));
-                put(c, ZIP2_4s(t1, rx, ry));
-                put(c, STR_qi(t0, XT, 0));
-                put(c, STR_qi(t1, XT, 1));
-                ra_return_reg(ra, t1);
-                ra_return_reg(ra, t0);
+                // ST2 interleaves two u32 streams in one instruction.
+                // ST2 requires consecutive registers; use v0,v1 as temps.
+                put(c, ORR_16b(0, rx, rx));
+                put(c, ORR_16b(1, ry, ry));
+                put(c, ST2_4s(0, XT));
             }
             if (lu(inst->x) <= i) { ra_free_reg(ra, inst->x); }
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
@@ -1718,34 +1745,60 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
-        case op_load_32x2:   break;
-        case op_load_8x4: break;
+        case op_load_32x2: break;
+        case op_load_8x4:  break;
         case op_chan: {
             struct bb_inst const *parent = &bb->inst[inst->x];
-            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int            p = parent->ptr;
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (parent->op == op_load_8x4) {
-                // Load u32 pixel(s), extract channel by shift+mask.
-                if (scalar) {
-                    vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, XI, 4, 0);
+                // Check for 4-way fusion.
+                _Bool fused4 = inst->imm == 0
+                            && i + 3 < to
+                            && bb->inst[i+1].op == op_chan && bb->inst[i+1].x == inst->x && bb->inst[i+1].imm == 1
+                            && bb->inst[i+2].op == op_chan && bb->inst[i+2].x == inst->x && bb->inst[i+2].imm == 2
+                            && bb->inst[i+3].op == op_chan && bb->inst[i+3].x == inst->x && bb->inst[i+3].imm == 3;
+                if (fused4 && !scalar) {
+                    struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
+                    struct ra_step s1 = ra_step_alloc(ra, sl, ns, i+1);
+                    struct ra_step s2 = ra_step_alloc(ra, sl, ns, i+2);
+                    struct ra_step s3 = ra_step_alloc(ra, sl, ns, i+3);
+                    int8_t px   = ra_alloc(ra, sl, ns);
+                    int8_t mask = ra_alloc(ra, sl, ns);
+                    vmov_load(c, 1, px, base, XI, 4, 0);
+                    pool_broadcast(c, &jc->pool, mask, 0xFF);
+                    vpand(c, 1, s0.rd, px, mask);
+                    vpsrld_i(c, s1.rd, px,  8);
+                    vpand(c, 1, s1.rd, s1.rd, mask);
+                    vpsrld_i(c, s2.rd, px, 16);
+                    vpand(c, 1, s2.rd, s2.rd, mask);
+                    vpsrld_i(c, s3.rd, px, 24);
+                    ra_return_reg(ra, mask);
+                    ra_return_reg(ra, px);
+                    i += 3;
                 } else {
-                    vmov_load(c, 1, s.rd, base, XI, 4, 0);
+                    struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+                    if (scalar) {
+                        vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, XI, 4, 0);
+                    } else {
+                        vmov_load(c, 1, s.rd, base, XI, 4, 0);
+                    }
+                    if (inst->imm) {
+                        vpsrld_i(c, s.rd, s.rd, (uint8_t)(8 * inst->imm));
+                    }
+                    int8_t mask = ra_alloc(ra, sl, ns);
+                    pool_broadcast(c, &jc->pool, mask, 0xFF);
+                    vpand(c, 1, s.rd, s.rd, mask);
+                    ra_return_reg(ra, mask);
                 }
-                if (inst->imm) {
-                    vpsrld_i(c, s.rd, s.rd, (uint8_t)(8 * inst->imm));
-                }
-                int8_t mask = ra_alloc(ra, sl, ns);
-                pool_broadcast(c, &jc->pool, mask, 0xFF);
-                vpand(c, 1, s.rd, s.rd, mask);
-                ra_return_reg(ra, mask);
             } else {
-                // load_64 channel extraction.
+                // load_32x2 channel extraction.
                 _Bool fused = inst->imm == 0
                            && i + 1 < to
                            && bb->inst[i + 1].op == op_chan
                            && bb->inst[i + 1].x == inst->x
                            && bb->inst[i + 1].imm == 1;
+                struct ra_step s = ra_step_alloc(ra, sl, ns, i);
                 if (scalar) {
                     vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, XI, 8, 4 * inst->imm);
                     if (fused) {
