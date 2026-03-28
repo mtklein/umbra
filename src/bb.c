@@ -13,16 +13,19 @@ static int ptr_ix(umbra_ptr p) { return p.deref ? ~p.ix : p.ix; }
 _Bool is_store(enum op op) {
     return op == op_store_16
         || op == op_store_32
-        || op == op_store_64;
+        || op == op_store_64
+        || op == op_store_u8x4;
 }
 _Bool has_ptr(enum op op) {
     return op == op_uniform_32
         || op == op_load_32
         || op == op_load_64
+        || op == op_load_u8x4
         || op == op_gather_uniform_32
         || op == op_gather_32
         || op == op_store_32
         || op == op_store_64
+        || op == op_store_u8x4
         || op == op_deref_ptr
         || op == op_uniform_16
         || op == op_load_16
@@ -57,9 +60,11 @@ _Bool is_varying(enum op op) {
         || op == op_load_16
         || op == op_load_32
         || op == op_load_64
+        || op == op_load_u8x4
         || op == op_store_16
         || op == op_store_32
-        || op == op_store_64;
+        || op == op_store_64
+        || op == op_store_u8x4;
 }
 
 static _Bool is_pow2(int x) { return __builtin_popcount((unsigned)x) == 1; }
@@ -75,6 +80,7 @@ static uint32_t bb_inst_hash(struct bb_inst const *inst) {
     h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->x);
     h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->y);
     h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->z);
+    h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->w);
     h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->ptr);
     h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->imm);
     h ^= h >> 16;
@@ -93,7 +99,8 @@ static val push_(builder *b, struct bb_inst inst) {
         } else {
             inst.uniform = (!inst.x || b->inst[inst.x].uniform)
                 && (!inst.y || b->inst[inst.y].uniform)
-                && (!inst.z || b->inst[inst.z].uniform);
+                && (!inst.z || b->inst[inst.z].uniform)
+                && (!inst.w || b->inst[inst.w].uniform);
         }
     }
 
@@ -227,6 +234,16 @@ void umbra_store_32(builder *b, umbra_ptr dst, val v) {
 }
 void umbra_store_64(builder *b, umbra_ptr dst, val lo, val hi) {
     push(b, op_store_64, .x = lo.id, .y = hi.id, .ptr = ptr_ix(dst));
+}
+void umbra_load_u8x4(builder *b, umbra_ptr src, val out[4]) {
+    val px = push(b, op_load_u8x4, .ptr = ptr_ix(src));
+    for (int i = 0; i < 4; i++) {
+        out[i] = push(b, op_chan, .x = px.id, .imm = i);
+    }
+}
+void umbra_store_u8x4(builder *b, umbra_ptr dst, val const in[4]) {
+    push(b, op_store_u8x4, .x = in[0].id, .y = in[1].id, .z = in[2].id, .w = in[3].id,
+         .ptr = ptr_ix(dst));
 }
 void umbra_store_16(builder *b, umbra_ptr dst, val v) {
     push(b, op_store_16, .y = v.id, .ptr = ptr_ix(dst));
@@ -528,13 +545,13 @@ static void schedule(struct bb_inst const *in, int n, _Bool const *body,
     for (int i = 0; i < n; i++) { last_use[i] = -1; }
     for (int i = 0; i < n; i++) {
         if (!body[i]) { continue; }
-        int const deps[] = {in[i].x, in[i].y, in[i].z};
-        for (int k = 0; k < 3; k++) { last_use[deps[k]] = i; }
+        int const deps[] = {in[i].x, in[i].y, in[i].z, in[i].w};
+        for (int k = 0; k < 4; k++) { last_use[deps[k]] = i; }
     }
     for (int i = 0; i < n; i++) {
         if (!body[i]) { continue; }
-        int const deps[] = {in[i].x, in[i].y, in[i].z};
-        for (int k = 0; k < 3; k++) {
+        int const deps[] = {in[i].x, in[i].y, in[i].z, in[i].w};
+        for (int k = 0; k < 4; k++) {
             if (body[deps[k]]) {
                 n_deps[i]++;
                 n_users[deps[k]]++;
@@ -554,8 +571,8 @@ static void schedule(struct bb_inst const *in, int n, _Bool const *body,
     }
     for (int i = 0; i < n; i++) {
         if (!body[i]) { continue; }
-        int const deps[] = {in[i].x, in[i].y, in[i].z};
-        for (int k = 0; k < 3; k++) {
+        int const deps[] = {in[i].x, in[i].y, in[i].z, in[i].w};
+        for (int k = 0; k < 4; k++) {
             if (body[deps[k]]) { users[user_off[deps[k]] + n_users[deps[k]]++] = i; }
         }
     }
@@ -573,8 +590,8 @@ static void schedule(struct bb_inst const *in, int n, _Bool const *body,
         for (int r = 0; r < nready; r++) {
             int const id = ready[r];
             int       kills = 0;
-            int const deps[] = {in[id].x, in[id].y, in[id].z};
-            for (int k = 0; k < 3; k++) {
+            int const deps[] = {in[id].x, in[id].y, in[id].z, in[id].w};
+            for (int k = 0; k < 4; k++) {
                 if (last_use[deps[k]] == id) { kills++; }
             }
             int const defines = is_store(in[id].op) ? 0 : 1;
@@ -624,6 +641,7 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
             live[b->inst[i].x] = 1;
             live[b->inst[i].y] = 1;
             live[b->inst[i].z] = 1;
+            live[b->inst[i].w] = 1;
             if (b->inst[i].ptr < 0) { live[~b->inst[i].ptr] = 1; }
         }
     }
@@ -631,7 +649,8 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
         varying[i] = is_varying(b->inst[i].op)
             | varying[b->inst[i].x]
             | varying[b->inst[i].y]
-            | varying[b->inst[i].z];
+            | varying[b->inst[i].z]
+            | varying[b->inst[i].w];
     }
 
     int total = 0;
@@ -658,6 +677,7 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
         out[i].x = old_to_new[out[i].x];
         out[i].y = old_to_new[out[i].y];
         out[i].z = old_to_new[out[i].z];
+        out[i].w = old_to_new[out[i].w];
         if (out[i].ptr < 0) { out[i].ptr = ~old_to_new[~out[i].ptr]; }
     }
 
@@ -711,7 +731,8 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_gather_16: fprintf(f, " p%d v%d", ip->ptr, ip->x); break;
         case op_load_16:
         case op_load_32:
-        case op_load_64: fprintf(f, " p%d", ip->ptr); break;
+        case op_load_64:
+        case op_load_u8x4: fprintf(f, " p%d", ip->ptr); break;
         case op_chan: fprintf(f, " v%d[%d]", ip->x, ip->imm); break;
         case op_deref_ptr: fprintf(f, " p%d byte%d", ip->ptr, ip->imm); break;
         case op_x:
@@ -719,7 +740,8 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
 
         case op_store_16:
         case op_store_32:
-        case op_store_64: break;
+        case op_store_64:
+        case op_store_u8x4: break;
 
         case op_sqrt_f32:
         case op_abs_f32:
@@ -859,8 +881,10 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     case op_load_32:
     case op_load_16:
     case op_load_64:
+    case op_load_u8x4:
     case op_chan:
     case op_store_32:
+    case op_store_u8x4:
     case op_store_16:
     case op_store_64:
     case op_gather_uniform_32:

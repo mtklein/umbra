@@ -136,6 +136,7 @@ typedef union {
 
 enum {
     SW_DONE = op_le_s32_imm + 1,
+    SW_CHAN_U8X4,
 
     // Binary op variants: 7 new per op (existing op_X is the mm->m variant)
 #define BINARY_VARIANTS(name, rt, pt) \
@@ -171,7 +172,7 @@ enum {
 
 struct sw_inst {
     int tag;
-    int x, y, z;
+    int x, y, z, w;
 };
 #pragma clang diagnostic ignored "-Wsign-conversion"
 #ifdef __clang__
@@ -228,7 +229,7 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
         if (pass) { p->preamble = n; }
         for (int i = lo; i < hi; i++) {
             struct bb_inst const *inst = &bb->inst[i];
-            int const X = id[inst->x] - n, Y = id[inst->y] - n, Z = id[inst->z] - n;
+            int const X = id[inst->x] - n, Y = id[inst->y] - n, Z = id[inst->z] - n, W = id[inst->w] - n;
             switch (inst->op) {
             case op_x:      emit(.tag = op_x);      break;
             case op_y:      emit(.tag = op_y);      break;
@@ -243,10 +244,12 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
 
             case op_load_16: emit(.tag = op_load_16, .x = RESOLVE_PTR(inst)); break;
             case op_load_32: emit(.tag = op_load_32, .x = RESOLVE_PTR(inst)); break;
-            case op_load_64: emit(.tag = op_load_64); break;
+            case op_load_64:   emit(.tag = op_load_64);   break;
+            case op_load_u8x4: emit(.tag = op_load_u8x4); break;
             case op_chan: {
                 struct bb_inst const *parent = &bb->inst[inst->x];
-                emit(.tag = op_chan, .x = RESOLVE_PTR(parent), .y = inst->imm);
+                int tag = parent->op == op_load_u8x4 ? (int)SW_CHAN_U8X4 : (int)op_chan;
+                emit(.tag = tag, .x = RESOLVE_PTR(parent), .y = inst->imm);
             } break;
 
             case op_gather_uniform_16: emit(.tag = op_gather_uniform_16, .x = RESOLVE_PTR(inst), .y = X); break;
@@ -257,6 +260,10 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
             case op_store_16: emit(.tag = op_store_16, .x = RESOLVE_PTR(inst), .y = Y); break;
             case op_store_32: emit(.tag = op_store_32, .x = RESOLVE_PTR(inst), .y = Y); break;
             case op_store_64: emit(.tag = op_store_64, .x = RESOLVE_PTR(inst), .y = X, .z = Y); break;
+            case op_store_u8x4:
+                emit(.tag = op_store_u8x4, .x = RESOLVE_PTR(inst),
+                     .y = X, .z = Y, .w = (int)(((unsigned)Z << 16) | ((unsigned)W & 0xFFFFu)));
+                break;
 
             case op_pack: emit(.tag = op_pack, .x = X, .y = Y, .z = inst->imm); break;
 
@@ -500,9 +507,10 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                 [op_x] = &&L_op_x, [op_y] = &&L_op_y, [op_imm_32] = &&L_op_imm_32,
                 [op_uniform_16] = &&L_op_uniform_16, [op_uniform_32] = &&L_op_uniform_32,
                 [op_load_16] = &&L_op_load_16, [op_load_32] = &&L_op_load_32,
-                [op_load_64] = &&L_op_load_64, [op_chan] = &&L_op_chan,
+                [op_load_64] = &&L_op_load_64, [op_load_u8x4] = &&L_op_load_u8x4,
+                [op_chan] = &&L_op_chan, [SW_CHAN_U8X4] = &&L_SW_CHAN_U8X4,
                 [op_store_16] = &&L_op_store_16, [op_store_32] = &&L_op_store_32,
-                [op_store_64] = &&L_op_store_64,
+                [op_store_64] = &&L_op_store_64, [op_store_u8x4] = &&L_op_store_u8x4,
                 [op_gather_uniform_16] = &&L_op_gather_uniform_16,
                 [op_gather_uniform_32] = &&L_op_gather_uniform_32,
                 [op_gather_16] = &&L_op_gather_16, [op_gather_32] = &&L_op_gather_32,
@@ -652,6 +660,7 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                     }
                 } NEXT;
                 CASE(op_load_64) NEXT;
+                CASE(op_load_u8x4) NEXT;
                 CASE(op_chan) {
                     char const *src = (char const*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
                     int const   i = end - K;
@@ -661,6 +670,18 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                         int32_t tmp;
                         __builtin_memcpy(&tmp, src + (i + ll) * 8 + 4 * ip->y, 4);
                         v->i32[ll] = tmp;
+                    }
+                } NEXT;
+                CASE(SW_CHAN_U8X4) {
+                    char const *src = (char const*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
+                    int const   i = end - K;
+                    int const   rem = n - i;
+                    int const   shift = 8 * ip->y;
+                    v->u32 = (U32){0};
+                    for (int ll = 0; ll < (rem < K ? rem : K); ll++) {
+                        uint32_t px;
+                        __builtin_memcpy(&px, src + (i + ll) * 4, 4);
+                        v->u32[ll] = (px >> shift) & 0xFFu;
                     }
                 } NEXT;
 
@@ -704,6 +725,19 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                         __builtin_memcpy(&hi, (char*)&v[ip->z].i32 + 4 * ll, 4);
                         __builtin_memcpy(dst + (i + ll) * 8,     &lo, 4);
                         __builtin_memcpy(dst + (i + ll) * 8 + 4, &hi, 4);
+                    }
+                } NEXT;
+                CASE(op_store_u8x4) {
+                    char *dst = (char*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
+                    int const i = end - K;
+                    int const rem = n - i;
+                    int const b_off = ip->w >> 16, a_off = (int)(int16_t)(ip->w & 0xFFFF);
+                    for (int ll = 0; ll < (rem < K ? rem : K); ll++) {
+                        uint32_t px = (v[ip->y].u32[ll] & 0xFFu)
+                                    | (v[ip->z].u32[ll] & 0xFFu) <<  8
+                                    | (v[b_off].u32[ll] & 0xFFu) << 16
+                                    | (v[a_off].u32[ll])          << 24;
+                        __builtin_memcpy(dst + (i + ll) * 4, &px, 4);
                     }
                 } NEXT;
 

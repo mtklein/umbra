@@ -397,7 +397,7 @@ umbra_val umbra_coverage_bitmap_matrix(builder *builder, umbra_val x, umbra_val 
 
 static umbra_color umbra_load_8888(builder *builder, umbra_ptr ptr) {
     umbra_val const px = umbra_load_32(builder, ptr), mask = umbra_imm_i32(builder, 0xFF);
-    umbra_val const ch[4] = {
+    umbra_val ch[4] = {
         umbra_and_i32(builder, px, mask),
         umbra_and_i32(builder, umbra_shr_u32(builder, px, umbra_imm_i32(builder, 8)), mask),
         umbra_and_i32(builder, umbra_shr_u32(builder, px, umbra_imm_i32(builder, 16)), mask),

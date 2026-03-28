@@ -121,11 +121,13 @@ static _Bool is_32(enum op op) {
     return op == op_uniform_32
         || op == op_load_32
         || op == op_load_64
+        || op == op_load_u8x4
         || op == op_chan
         || op == op_gather_uniform_32
         || op == op_gather_32
         || op == op_store_32
         || op == op_store_64
+        || op == op_store_u8x4
         || op == op_deref_ptr;
 }
 
@@ -173,17 +175,27 @@ static void emit_ops(Buf *b, BB const *bb,
                      "(p%d + y * buf_rbs[%d]))[x];\n",
                      pad, i, p, p);
             } break;
-            case op_load_64: break;
+            case op_load_64:   break;
+            case op_load_u8x4: break;
             case op_chan: {
                 struct bb_inst const *parent = &bb->inst[inst->x];
                 int p = parent->ptr < 0
                     ? deref_buf[~parent->ptr] : parent->ptr;
-                emit(b, "%suint v%d = "
-                        "((device uint*)"
-                        "(p%d + y * buf_rbs[%d]))"
-                        "[x*2+%d];\n",
-                     pad, i, p, p,
-                     inst->imm);
+                if (parent->op == op_load_u8x4) {
+                    emit(b, "%suint v%d = "
+                            "(((device uint*)"
+                            "(p%d + y * buf_rbs[%d]))"
+                            "[x] >> %d) & 0xFFu;\n",
+                         pad, i, p, p,
+                         8 * inst->imm);
+                } else {
+                    emit(b, "%suint v%d = "
+                            "((device uint*)"
+                            "(p%d + y * buf_rbs[%d]))"
+                            "[x*2+%d];\n",
+                         pad, i, p, p,
+                         inst->imm);
+                }
             } break;
             case op_gather_uniform_32:
             case op_gather_32: {
@@ -225,6 +237,18 @@ static void emit_ops(Buf *b, BB const *bb,
                         "[x*2+1] = v%d;\n",
                      pad, p, p, inst->x,
                      pad, p, p, inst->y);
+            } break;
+            case op_store_u8x4: {
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
+                emit(b, "%s((device uint*)"
+                        "(p%d + y * buf_rbs[%d]))"
+                        "[x] = (v%d & 0xFFu)"
+                        " | ((v%d & 0xFFu) << 8)"
+                        " | ((v%d & 0xFFu) << 16)"
+                        " | (v%d << 24);\n",
+                     pad, p, p,
+                     inst->x, inst->y, inst->z, inst->w);
             } break;
 
             case op_uniform_16: {
