@@ -191,9 +191,15 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
 
     struct umbra_interpreter *p = malloc(sizeof *p);
     // 4x to leave room for multi-result ops (load_32x2 uses 2, load_8x4 uses 4).
-    int const num_insts = 4 * bb->insts + 1;
-    p->inst = malloc((size_t)num_insts * sizeof *p->inst);
-    p->v = malloc((size_t)num_insts * sizeof *p->v);
+    int num_slots = 1; // +1 for SW_DONE sentinel
+    for (int i = 0; i < bb->insts; i++) {
+        enum op const op = bb->inst[i].op;
+        if (op == op_load_8x4)  { num_slots += 4; }
+        else if (op == op_load_32x2) { num_slots += 2; }
+        else                    { num_slots += 1; }
+    }
+    p->inst = malloc((size_t)num_slots * sizeof *p->inst);
+    p->v = malloc((size_t)num_slots * sizeof *p->v);
 
     int max_ptr = -1;
     int n_deref = 0;
