@@ -2564,6 +2564,28 @@ static void test_load_store_8x4_roundtrip(void) {
     cleanup(&B);
 }
 
+static void test_load_store_color_8888(void) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_val ch[4];
+    umbra_load_color(b, (umbra_ptr){0, 0}, ch);
+    umbra_store_color(b, (umbra_ptr){1, 0}, ch);
+    backends B = make(b, 0);
+
+    uint32_t src[8], dst[8];
+    for (int i = 0; i < 8; i++) { src[i] = 0xFF804020u + (unsigned)i; }
+
+    // Only test interpreter for now; JIT and Metal stubs not yet implemented.
+    for (int bi = 0; bi < 1; bi++) {
+        __builtin_memset(dst, 0, sizeof dst);
+        if (!run(&B, bi, 8, 1, (umbra_buf[]){
+            {.ptr=src, .sz=sizeof src, .fmt=umbra_fmt_8888},
+            {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_8888},
+        })) { continue; }
+        for (int i = 0; i < 8; i++) { (dst[i] == src[i]) here; }
+    }
+    cleanup(&B);
+}
+
 static void test_load_stride_neq_w(void) {
     // Regression: add(mul(y, rs_uniform), x) was optimized to a contiguous
     // load using the linear loop counter.  When rs != w, this is wrong.
@@ -2758,6 +2780,7 @@ int main(void) {
     test_load_store_next_64();
     test_load_8x4_channel_vals();
     test_load_store_8x4_roundtrip();
+    test_load_store_color_8888();
     test_load_stride_neq_w();
     test_jit_xs_init();
 
