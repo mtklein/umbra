@@ -2,10 +2,17 @@
 #include <stdint.h>
 #include "../include/umbra.h"
 
-// umbra_val packing: low 2 bits = channel, upper 30 bits = instruction index.
-static inline int       val_id  (umbra_val v) { return v.bits >> 2; }
-static inline int       val_chan(umbra_val v) { return v.bits & 3; }
-static inline umbra_val val_make(int id, int chan) { return (umbra_val){.bits = (id << 2) | (chan & 3)}; }
+// Internally, umbra_val is a union giving named access to the packed fields.
+// Low 2 bits = channel, upper 30 bits = instruction index.
+// The public header sees only { int bits; }.
+typedef union {
+    int      bits;
+    struct { unsigned chan : 2, id : 30; };
+} val_;
+
+static inline int       val_id  (umbra_val v) { return ((val_){.bits = v.bits}).id; }
+static inline int       val_chan (umbra_val v) { return ((val_){.bits = v.bits}).chan; }
+static inline umbra_val val_make(int id, int chan) { return (umbra_val){.bits = ((val_){.id=(unsigned)id, .chan=(unsigned)chan}).bits}; }
 
 #define OP_LIST(X)                                                                        \
     X(x) X(y)                                                                             \
@@ -38,10 +45,9 @@ enum op {
 
 struct bb_inst {
     enum op op;
-    _Bool   uniform, pad_[3];
-    int     x, y, z, w;
-    int     cx, cy, cz, cw;
-    int     ptr, imm;
+    _Bool       uniform, pad_[3];
+    umbra_val   x, y, z, w;
+    int         ptr, imm;
 };
 
 struct hash_slot {

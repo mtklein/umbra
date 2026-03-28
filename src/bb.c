@@ -77,14 +77,10 @@ static uint32_t mul_overflow(uint32_t x, uint32_t y) {
 
 static uint32_t bb_inst_hash(struct bb_inst const *inst) {
     uint32_t h = (uint32_t)inst->op;
-    h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->x);
-    h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->y);
-    h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->z);
-    h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->w);
-    h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->cx);
-    h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->cy);
-    h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->cz);
-    h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->cw);
+    h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->x.bits);
+    h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->y.bits);
+    h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->z.bits);
+    h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->w.bits);
     h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->ptr);
     h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->imm);
     h ^= h >> 16;
@@ -101,10 +97,10 @@ static val push_(builder *b, struct bb_inst inst) {
                    || op == op_gather_16) {
             inst.uniform = 0;
         } else {
-            inst.uniform = (!inst.x || b->inst[inst.x].uniform)
-                && (!inst.y || b->inst[inst.y].uniform)
-                && (!inst.z || b->inst[inst.z].uniform)
-                && (!inst.w || b->inst[inst.w].uniform);
+            inst.uniform = (!inst.x.bits || b->inst[val_id(inst.x)].uniform)
+                && (!inst.y.bits || b->inst[val_id(inst.y)].uniform)
+                && (!inst.z.bits || b->inst[val_id(inst.z)].uniform)
+                && (!inst.w.bits || b->inst[val_id(inst.w)].uniform);
         }
     }
 
@@ -152,11 +148,10 @@ static val push_(builder *b, struct bb_inst inst) {
     return val_make(id, 0);
 }
 #define push(b, ...) push_(b, (struct bb_inst){.op = __VA_ARGS__})
-// push with channel-aware vals: use .x=val_id(v),.cx=v.chan etc.
-#define VX(v) .x = val_id(v), .cx = val_chan(v)
-#define VY(v) .y = val_id(v), .cy = val_chan(v)
-#define VZ(v) .z = val_id(v), .cz = val_chan(v)
-#define VW(v) .w = val_id(v), .cw = val_chan(v)
+#define VX(v) .x = (v)
+#define VY(v) .y = (v)
+#define VZ(v) .z = (v)
+#define VW(v) .w = (v)
 
 builder* umbra_builder(void) {
     builder *b = calloc(1, sizeof *b);
@@ -271,9 +266,9 @@ static _Bool is_imm32(builder *b, int id, int v) {
 static _Bool is_imm(builder *b, int id) { return b->inst[id].op == op_imm_32; }
 
 static val math_(builder *b, struct bb_inst inst) {
-    if (is_imm(b, inst.x) && is_imm(b, inst.y) && is_imm(b, inst.z)) {
-        int const result = umbra_const_eval(inst.op, b->inst[inst.x].imm,
-                                            b->inst[inst.y].imm, b->inst[inst.z].imm);
+    if (is_imm(b, val_id(inst.x)) && is_imm(b, val_id(inst.y)) && is_imm(b, val_id(inst.z))) {
+        int const result = umbra_const_eval(inst.op, b->inst[val_id(inst.x)].imm,
+                                            b->inst[val_id(inst.y)].imm, b->inst[val_id(inst.z)].imm);
         return umbra_imm_i32(b, result);
     }
     return push_(b, inst);
@@ -284,7 +279,7 @@ static val try_imm(builder *b, val d, enum op fused, val x, val y) {
     int const imm_id = is_imm(b, val_id(x)) ? val_id(x) : is_imm(b, val_id(y)) ? val_id(y) : -1;
     if (imm_id >= 0) {
         val const other = imm_id == val_id(x) ? y : x;
-        return push(b, fused, VX(other), .y = imm_id, .imm = b->inst[imm_id].imm);
+        return push(b, fused, VX(other), VY(val_make(imm_id, 0)), .imm = b->inst[imm_id].imm);
     }
     return (val){.bits = d.bits};
 }
@@ -347,10 +342,10 @@ val umbra_min_f32(builder *b, val x, val y) {
 }
 
 val umbra_max_f32(builder *b, val x, val y) {
-    if (b->inst[val_id(x)].op == op_neg_f32 && b->inst[val_id(x)].x == val_id(y)) {
+    if (b->inst[val_id(x)].op == op_neg_f32 && val_id(b->inst[val_id(x)].x) == val_id(y)) {
         return umbra_abs_f32(b, y);
     }
-    if (b->inst[val_id(y)].op == op_neg_f32 && b->inst[val_id(y)].x == val_id(x)) {
+    if (b->inst[val_id(y)].op == op_neg_f32 && val_id(b->inst[val_id(y)].x) == val_id(x)) {
         return umbra_abs_f32(b, x);
     }
     sort(&x, &y);
@@ -554,12 +549,12 @@ static void schedule(struct bb_inst const *in, int n, _Bool const *body,
     for (int i = 0; i < n; i++) { last_use[i] = -1; }
     for (int i = 0; i < n; i++) {
         if (!body[i]) { continue; }
-        int const deps[] = {in[i].x, in[i].y, in[i].z, in[i].w};
+        int const deps[] = {val_id(in[i].x), val_id(in[i].y), val_id(in[i].z), val_id(in[i].w)};
         for (int k = 0; k < 4; k++) { last_use[deps[k]] = i; }
     }
     for (int i = 0; i < n; i++) {
         if (!body[i]) { continue; }
-        int const deps[] = {in[i].x, in[i].y, in[i].z, in[i].w};
+        int const deps[] = {val_id(in[i].x), val_id(in[i].y), val_id(in[i].z), val_id(in[i].w)};
         for (int k = 0; k < 4; k++) {
             if (body[deps[k]]) {
                 n_deps[i]++;
@@ -580,7 +575,7 @@ static void schedule(struct bb_inst const *in, int n, _Bool const *body,
     }
     for (int i = 0; i < n; i++) {
         if (!body[i]) { continue; }
-        int const deps[] = {in[i].x, in[i].y, in[i].z, in[i].w};
+        int const deps[] = {val_id(in[i].x), val_id(in[i].y), val_id(in[i].z), val_id(in[i].w)};
         for (int k = 0; k < 4; k++) {
             if (body[deps[k]]) { users[user_off[deps[k]] + n_users[deps[k]]++] = i; }
         }
@@ -599,7 +594,7 @@ static void schedule(struct bb_inst const *in, int n, _Bool const *body,
         for (int r = 0; r < nready; r++) {
             int const id = ready[r];
             int       kills = 0;
-            int const deps[] = {in[id].x, in[id].y, in[id].z, in[id].w};
+            int const deps[] = {val_id(in[id].x), val_id(in[id].y), val_id(in[id].z), val_id(in[id].w)};
             for (int k = 0; k < 4; k++) {
                 if (last_use[deps[k]] == id) { kills++; }
             }
@@ -647,19 +642,19 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
     for (int i = n; i-- > 0;) {
         if (is_store(b->inst[i].op)) { live[i] = 1; }
         if (live[i]) {
-            live[b->inst[i].x] = 1;
-            live[b->inst[i].y] = 1;
-            live[b->inst[i].z] = 1;
-            live[b->inst[i].w] = 1;
+            live[val_id(b->inst[i].x)] = 1;
+            live[val_id(b->inst[i].y)] = 1;
+            live[val_id(b->inst[i].z)] = 1;
+            live[val_id(b->inst[i].w)] = 1;
             if (b->inst[i].ptr < 0) { live[~b->inst[i].ptr] = 1; }
         }
     }
     for (int i = 0; i < n; i++) {
         varying[i] = is_varying(b->inst[i].op)
-            | varying[b->inst[i].x]
-            | varying[b->inst[i].y]
-            | varying[b->inst[i].z]
-            | varying[b->inst[i].w];
+            || varying[val_id(b->inst[i].x)]
+            || varying[val_id(b->inst[i].y)]
+            || varying[val_id(b->inst[i].z)]
+            || varying[val_id(b->inst[i].w)];
     }
 
     int total = 0;
@@ -683,10 +678,10 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
     free(body);
 
     for (int i = 0; i < total; i++) {
-        out[i].x = old_to_new[out[i].x];
-        out[i].y = old_to_new[out[i].y];
-        out[i].z = old_to_new[out[i].z];
-        out[i].w = old_to_new[out[i].w];
+        out[i].x = val_make(old_to_new[val_id(out[i].x)], val_chan(out[i].x));
+        out[i].y = val_make(old_to_new[val_id(out[i].y)], val_chan(out[i].y));
+        out[i].z = val_make(old_to_new[val_id(out[i].z)], val_chan(out[i].z));
+        out[i].w = val_make(old_to_new[val_id(out[i].w)], val_chan(out[i].w));
         if (out[i].ptr < 0) { out[i].ptr = ~old_to_new[~out[i].ptr]; }
     }
 
@@ -718,9 +713,9 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
             {
                 fprintf(f, "      %-15s p%d", op_name(op), ip->ptr);
                 if (op == op_store_32x2) {
-                    fprintf(f, " v%d v%d", ip->x, ip->y);
+                    fprintf(f, " v%d v%d", val_id(ip->x), val_id(ip->y));
                 }
-                if (op != op_store_32x2) { fprintf(f, " v%d", ip->y); }
+                if (op != op_store_32x2) { fprintf(f, " v%d", val_id(ip->y)); }
                 fprintf(f, "\n");
             }
             continue;
@@ -737,7 +732,7 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_gather_uniform_32:
         case op_gather_uniform_16:
         case op_gather_32:
-        case op_gather_16: fprintf(f, " p%d v%d", ip->ptr, ip->x); break;
+        case op_gather_16: fprintf(f, " p%d v%d", ip->ptr, val_id(ip->x)); break;
         case op_load_16:
         case op_load_32:
         case op_load_32x2:
@@ -766,7 +761,7 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_i32_from_u16:
         case op_i16_from_i32:
         case op_f32_from_f16:
-        case op_f16_from_f32: fprintf(f, " v%d", ip->x); break;
+        case op_f16_from_f32: fprintf(f, " v%d", val_id(ip->x)); break;
 
         case op_add_f32:
         case op_sub_f32:
@@ -790,16 +785,16 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_lt_s32:
         case op_le_s32:
         case op_lt_u32:
-        case op_le_u32: fprintf(f, " v%d v%d", ip->x, ip->y); break;
+        case op_le_u32: fprintf(f, " v%d v%d", val_id(ip->x), val_id(ip->y)); break;
 
         case op_fma_f32:
         case op_fms_f32:
-        case op_sel_32: fprintf(f, " v%d v%d v%d", ip->x, ip->y, ip->z); break;
+        case op_sel_32: fprintf(f, " v%d v%d v%d", val_id(ip->x), val_id(ip->y), val_id(ip->z)); break;
 
         case op_shl_i32_imm:
         case op_shr_u32_imm:
-        case op_shr_s32_imm: fprintf(f, " v%d %d", ip->x, ip->imm); break;
-        case op_pack: fprintf(f, " v%d v%d %d", ip->x, ip->y, ip->imm); break;
+        case op_shr_s32_imm: fprintf(f, " v%d %d", val_id(ip->x), ip->imm); break;
+        case op_pack: fprintf(f, " v%d v%d %d", val_id(ip->x), val_id(ip->y), ip->imm); break;
         case op_and_32_imm:
         case op_add_f32_imm:
         case op_sub_f32_imm:
@@ -818,8 +813,8 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_eq_i32_imm:
         case op_lt_s32_imm:
         case op_le_s32_imm:
-            fprintf(f, " v%d 0x%x", ip->x, (uint32_t)ip->imm);
-            if (ip->y) { fprintf(f, " (a.k.a. v%d)", ip->y); }
+            fprintf(f, " v%d 0x%x", val_id(ip->x), (uint32_t)ip->imm);
+            if (ip->y.bits) { fprintf(f, " (a.k.a. v%d)", val_id(ip->y)); }
             break;
         }
         fprintf(f, "\n");

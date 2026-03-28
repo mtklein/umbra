@@ -52,10 +52,10 @@ struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const 
     for (int i = 0; i < n; i++) { ra->last_use[i] = -1; }
     for (int i = 0; i < n; i++) {
         struct bb_inst const *inst = &bb->inst[i];
-        ra->last_use[inst->x] = i;
-        if (!cfg->ignore_imm_y || !is_fused_imm(inst->op)) { ra->last_use[inst->y] = i; }
-        ra->last_use[inst->z] = i;
-        ra->last_use[inst->w] = i;
+        ra->last_use[val_id(inst->x)] = i;
+        if (!cfg->ignore_imm_y || !is_fused_imm(inst->op)) { ra->last_use[val_id(inst->y)] = i; }
+        ra->last_use[val_id(inst->z)] = i;
+        ra->last_use[val_id(inst->w)] = i;
     }
     for (int i = 0; i < bb->preamble; i++) {
         if (ra->last_use[i] >= bb->preamble) {
@@ -205,10 +205,10 @@ struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct bb_inst con
                              int i, _Bool scalar) {
     (void)scalar;
     struct ra_step s = step0();
-    s.rx = ra_ensure_chan(ra, sl, ns, inst->x, inst->cx);
-    _Bool const x_dead = ra->last_use[inst->x] <= i;
+    s.rx = ra_ensure_chan(ra, sl, ns, val_id(inst->x), val_chan(inst->x));
+    _Bool const x_dead = ra->last_use[val_id(inst->x)] <= i;
     if (x_dead) {
-        s.rd = ra_claim(ra, inst->x, i);
+        s.rd = ra_claim(ra, val_id(inst->x), i);
     } else {
         s.rd = ra_alloc(ra, sl, ns);
         ra->reg[i] = s.rd;
@@ -224,64 +224,64 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const
     struct ra_step s = step0();
 
     ra->npinned = 0;
-    if (inst->x < i) {
-        s.rx = ra_ensure_chan(ra, sl, ns, inst->x, inst->cx);
-        ra->pinned[ra->npinned++] = inst->x;
+    if (val_id(inst->x) < i) {
+        s.rx = ra_ensure_chan(ra, sl, ns, val_id(inst->x), val_chan(inst->x));
+        ra->pinned[ra->npinned++] = val_id(inst->x);
     }
-    if (inst->y < i) {
-        s.ry = ra_ensure_chan(ra, sl, ns, inst->y, inst->cy);
-        if (inst->y != inst->x || inst->cy != inst->cx) { ra->pinned[ra->npinned++] = inst->y; }
+    if (val_id(inst->y) < i) {
+        s.ry = ra_ensure_chan(ra, sl, ns, val_id(inst->y), val_chan(inst->y));
+        if (inst->y.bits != inst->x.bits) { ra->pinned[ra->npinned++] = val_id(inst->y); }
     }
-    if (inst->z < i) {
-        s.rz = ra_ensure_chan(ra, sl, ns, inst->z, inst->cz);
-        if ((inst->z != inst->x || inst->cz != inst->cx) &&
-            (inst->z != inst->y || inst->cz != inst->cy)) {
-            ra->pinned[ra->npinned++] = inst->z;
+    if (val_id(inst->z) < i) {
+        s.rz = ra_ensure_chan(ra, sl, ns, val_id(inst->z), val_chan(inst->z));
+        if (inst->z.bits != inst->x.bits &&
+            inst->z.bits != inst->y.bits) {
+            ra->pinned[ra->npinned++] = val_id(inst->z);
         }
     }
 
-    _Bool x_dead = inst->x < i && lu[inst->x] <= i;
-    _Bool y_dead = inst->y < i && lu[inst->y] <= i;
-    _Bool z_dead = inst->z < i && lu[inst->z] <= i;
-    if (inst->y == inst->x) { y_dead = 0; }
-    if (inst->z == inst->x) { z_dead = 0; }
-    if (inst->z == inst->y) { z_dead = 0; }
+    _Bool x_dead = val_id(inst->x) < i && lu[val_id(inst->x)] <= i;
+    _Bool y_dead = val_id(inst->y) < i && lu[val_id(inst->y)] <= i;
+    _Bool z_dead = val_id(inst->z) < i && lu[val_id(inst->z)] <= i;
+    if (inst->y.bits == inst->x.bits) { y_dead = 0; }
+    if (inst->z.bits == inst->x.bits) { z_dead = 0; }
+    if (inst->z.bits == inst->y.bits) { z_dead = 0; }
 
     enum op const op = inst->op;
     _Bool const   fma = op == op_fma_f32 || op == op_fms_f32;
     _Bool const   destructive = fma || op == op_sel_32;
 
     if (fma && z_dead) {
-        s.rd = ra_claim(ra, inst->z, i);
+        s.rd = ra_claim(ra, val_id(inst->z), i);
         z_dead = 0;
     } else if (fma && x_dead) {
-        s.rd = ra_claim(ra, inst->x, i);
+        s.rd = ra_claim(ra, val_id(inst->x), i);
         x_dead = 0;
     } else if (fma && y_dead) {
-        s.rd = ra_claim(ra, inst->y, i);
+        s.rd = ra_claim(ra, val_id(inst->y), i);
         y_dead = 0;
     } else if (fma && !z_dead) {
         s.rd = ra_alloc(ra, sl, ns);
         ra->reg[i] = s.rd;
         ra->owner[(int)s.rd] = i;
     } else if (op == op_sel_32 && x_dead) {
-        s.rd = ra_claim(ra, inst->x, i);
+        s.rd = ra_claim(ra, val_id(inst->x), i);
         x_dead = 0;
     } else if (op == op_sel_32 && y_dead) {
-        s.rd = ra_claim(ra, inst->y, i);
+        s.rd = ra_claim(ra, val_id(inst->y), i);
         y_dead = 0;
     } else if (op == op_sel_32 && z_dead) {
-        s.rd = ra_claim(ra, inst->z, i);
+        s.rd = ra_claim(ra, val_id(inst->z), i);
         z_dead = 0;
     }
 
     if (!destructive) {
         if (s.rd < 0 && x_dead) {
-            s.rd = ra_claim(ra, inst->x, i);
+            s.rd = ra_claim(ra, val_id(inst->x), i);
             x_dead = 0;
         }
         if (s.rd < 0 && y_dead) {
-            s.rd = ra_claim(ra, inst->y, i);
+            s.rd = ra_claim(ra, val_id(inst->y), i);
             y_dead = 0;
         }
     }
@@ -297,9 +297,9 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const
     if (nscratch >= 2) { s.scratch2 = ra_alloc(ra, sl, ns); }
 
     ra->npinned = 0;
-    if (x_dead) { ra_free_reg(ra, inst->x); }
-    if (y_dead) { ra_free_reg(ra, inst->y); }
-    if (z_dead) { ra_free_reg(ra, inst->z); }
+    if (x_dead) { ra_free_reg(ra, val_id(inst->x)); }
+    if (y_dead) { ra_free_reg(ra, val_id(inst->y)); }
+    if (z_dead) { ra_free_reg(ra, val_id(inst->z)); }
 
     return s;
 }

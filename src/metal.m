@@ -136,16 +136,16 @@ static void emit_ops(Buf *b, BB const *bb,
                      int lo, int hi,
                      char const *pad) {
     char vx[16], vy[16], vz[16], vw[16];
-#define VNAME(buf, val_id, chan) \
-    ((chan) ? (void)snprintf(buf, sizeof buf, "v%d_%d", (val_id), (chan)) \
-            : (void)snprintf(buf, sizeof buf, "v%d", (val_id)), buf)
+#define VNAME(buf, vid, ch) \
+    ((ch) ? (void)snprintf(buf, sizeof buf, "v%d_%d", (vid), (ch)) \
+           : (void)snprintf(buf, sizeof buf, "v%d", (vid)), buf)
 
     for (int i = lo; i < hi; i++) {
         struct bb_inst const *inst = &bb->inst[i];
-        VNAME(vx, inst->x, inst->cx);
-        VNAME(vy, inst->y, inst->cy);
-        VNAME(vz, inst->z, inst->cz);
-        VNAME(vw, inst->w, inst->cw);
+        VNAME(vx, val_id(inst->x), val_chan(inst->x));
+        VNAME(vy, val_id(inst->y), val_chan(inst->y));
+        VNAME(vz, val_id(inst->z), val_chan(inst->z));
+        VNAME(vw, val_id(inst->w), val_chan(inst->w));
 
         switch (inst->op) {
             case op_x:
