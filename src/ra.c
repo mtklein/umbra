@@ -4,22 +4,24 @@
 
 struct ra {
     int                  *last_use;
+    int                 (*chan_last_use)[4];
     int8_t               *reg;
     int                  *owner;
     int8_t               *free_stack;
     int8_t               *loop_reg;
-    int8_t              (*chan_reg)[4]; // per-channel registers for multi-result ops
+    int8_t              (*chan_reg)[4];
     struct bb_inst const *inst;
     struct ra_config      cfg;
     int                   nfree;
     int                   preamble;
+    int                   npinned;
     int                   pinned[3];
-    int                   npinned, : 32, : 32;
 };
 
 int8_t ra_reg(struct ra const *ra, int val) { return ra->reg[val]; }
 int8_t ra_chan_reg(struct ra const *ra, int val, int chan) { return ra->chan_reg[val][chan]; }
 int    ra_last_use(struct ra const *ra, int val) { return ra->last_use[val]; }
+int    ra_chan_last_use(struct ra const *ra, int val, int chan) { return ra->chan_last_use[val][chan]; }
 
 void ra_set_last_use(struct ra *ra, int val, int lu) { ra->last_use[val] = lu; }
 
@@ -43,9 +45,10 @@ struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const 
     ra->free_stack = malloc((size_t)cfg->max_reg * sizeof *ra->free_stack);
 
     ra->chan_reg = malloc((size_t)n * sizeof *ra->chan_reg);
+    ra->chan_last_use = malloc((size_t)n * sizeof *ra->chan_last_use);
     for (int i = 0; i < n; i++) { ra->reg[i] = -1; }
     for (int i = 0; i < n; i++) {
-        for (int c = 0; c < 4; c++) { ra->chan_reg[i][c] = -1; }
+        for (int c = 0; c < 4; c++) { ra->chan_reg[i][c] = -1; ra->chan_last_use[i][c] = -1; }
     }
     for (int i = 0; i < cfg->max_reg; i++) { ra->owner[i] = -1; }
 
@@ -53,9 +56,15 @@ struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const 
     for (int i = 0; i < n; i++) {
         struct bb_inst const *inst = &bb->inst[i];
         ra->last_use[(int)inst->x.id] = i;
-        if (!cfg->ignore_imm_y || !is_fused_imm(inst->op)) { ra->last_use[(int)inst->y.id] = i; }
+        ra->chan_last_use[(int)inst->x.id][(int)inst->x.chan] = i;
+        if (!cfg->ignore_imm_y || !is_fused_imm(inst->op)) {
+            ra->last_use[(int)inst->y.id] = i;
+            ra->chan_last_use[(int)inst->y.id][(int)inst->y.chan] = i;
+        }
         ra->last_use[(int)inst->z.id] = i;
+        ra->chan_last_use[(int)inst->z.id][(int)inst->z.chan] = i;
         ra->last_use[(int)inst->w.id] = i;
+        ra->chan_last_use[(int)inst->w.id][(int)inst->w.chan] = i;
     }
     for (int i = 0; i < bb->preamble; i++) {
         if (ra->last_use[i] >= bb->preamble) {
@@ -79,6 +88,7 @@ struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const 
 void ra_destroy(struct ra *ra) {
     free(ra->reg);
     free(ra->chan_reg);
+    free(ra->chan_last_use);
     free(ra->last_use);
     free(ra->owner);
     free(ra->free_stack);
@@ -206,13 +216,19 @@ struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct bb_inst con
     (void)scalar;
     struct ra_step s = step0();
     s.rx = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
-    _Bool const x_dead = ra->last_use[(int)inst->x.id] <= i;
-    if (x_dead) {
+    _Bool const x_dead = inst->x.chan
+        ? ra->chan_last_use[(int)inst->x.id][(int)inst->x.chan] <= i
+        : ra->last_use[(int)inst->x.id] <= i;
+    if (x_dead && !inst->x.chan) {
         s.rd = ra_claim(ra, (int)inst->x.id, i);
     } else {
         s.rd = ra_alloc(ra, sl, ns);
         ra->reg[i] = s.rd;
         ra->owner[(int)s.rd] = i;
+    }
+    if (x_dead && inst->x.chan) {
+        int8_t r = ra->chan_reg[(int)inst->x.id][(int)inst->x.chan];
+        if (r >= 0) { ra_return_reg(ra, r); ra->chan_reg[(int)inst->x.id][(int)inst->x.chan] = -1; }
     }
     return s;
 }
@@ -240,9 +256,13 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const
         }
     }
 
-    _Bool x_dead = (int)inst->x.id < i && lu[(int)inst->x.id] <= i;
-    _Bool y_dead = (int)inst->y.id < i && lu[(int)inst->y.id] <= i;
-    _Bool z_dead = (int)inst->z.id < i && lu[(int)inst->z.id] <= i;
+    // Dead analysis: a scalar operand is dead when last_use <= i.
+    // Channel operands can't be claimed (claim uses reg[id], not chan_reg),
+    // so only mark scalar operands as dead for the claim logic.
+    // Channel registers are freed separately below.
+    _Bool x_dead = !inst->x.chan && (int)inst->x.id < i && lu[(int)inst->x.id] <= i;
+    _Bool y_dead = !inst->y.chan && (int)inst->y.id < i && lu[(int)inst->y.id] <= i;
+    _Bool z_dead = !inst->z.chan && (int)inst->z.id < i && lu[(int)inst->z.id] <= i;
     if (inst->y.bits == inst->x.bits) { y_dead = 0; }
     if (inst->z.bits == inst->x.bits) { z_dead = 0; }
     if (inst->z.bits == inst->y.bits) { z_dead = 0; }
@@ -300,6 +320,19 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const
     if (x_dead) { ra_free_reg(ra, (int)inst->x.id); }
     if (y_dead) { ra_free_reg(ra, (int)inst->y.id); }
     if (z_dead) { ra_free_reg(ra, (int)inst->z.id); }
+
+    // Free channel registers whose per-channel last use has expired.
+#define FREE_CHAN_RA(op) do {                                                           \
+    if ((op).chan && (int)(op).id < i &&                                                \
+        ra->chan_last_use[(int)(op).id][(int)(op).chan] <= i) {                         \
+        int8_t r_ = ra->chan_reg[(int)(op).id][(int)(op).chan];                         \
+        if (r_ >= 0) { ra_return_reg(ra, r_); ra->chan_reg[(int)(op).id][(int)(op).chan] = -1; } \
+    }                                                                                   \
+} while(0)
+    FREE_CHAN_RA(inst->x);
+    FREE_CHAN_RA(inst->y);
+    FREE_CHAN_RA(inst->z);
+#undef FREE_CHAN_RA
 
     return s;
 }

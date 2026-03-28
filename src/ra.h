@@ -34,6 +34,7 @@ void   ra_end_loop(struct ra *ra, int *sl);
 int8_t ra_reg(struct ra const *ra, int val);
 int8_t ra_chan_reg(struct ra const *ra, int val, int chan);
 int    ra_last_use(struct ra const *ra, int val);
+int    ra_chan_last_use(struct ra const *ra, int val, int chan);
 
 // Mutation helpers.
 void ra_set_last_use(struct ra *ra, int val, int lu);
