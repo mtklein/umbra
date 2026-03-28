@@ -742,7 +742,6 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_load_32:
         case op_load_32x2:
         case op_load_8x4: fprintf(f, " p%d", ip->ptr); break;
-        case op_chan: fprintf(f, " v%d[%d]", ip->x, ip->imm); break;
         case op_deref_ptr: fprintf(f, " p%d byte%d", ip->ptr, ip->imm); break;
         case op_x:
         case op_y: break;
@@ -891,7 +890,6 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     case op_load_16:
     case op_load_32x2:
     case op_load_8x4:
-    case op_chan:
     case op_store_32:
     case op_store_8x4:
     case op_store_16:

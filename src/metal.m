@@ -122,7 +122,6 @@ static _Bool is_32(enum op op) {
         || op == op_load_32
         || op == op_load_32x2
         || op == op_load_8x4
-        || op == op_chan
         || op == op_gather_uniform_32
         || op == op_gather_32
         || op == op_store_32
@@ -213,26 +212,6 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i, i,
                      pad, i, i,
                      pad, i, i);
-            } break;
-            case op_chan: {
-                struct bb_inst const *parent = &bb->inst[inst->x];
-                int p = parent->ptr < 0
-                    ? deref_buf[~parent->ptr] : parent->ptr;
-                if (parent->op == op_load_8x4) {
-                    emit(b, "%suint v%d = "
-                            "(((device uint*)"
-                            "(p%d + y * buf_rbs[%d]))"
-                            "[x] >> %d) & 0xFFu;\n",
-                         pad, i, p, p,
-                         8 * inst->imm);
-                } else {
-                    emit(b, "%suint v%d = "
-                            "((device uint*)"
-                            "(p%d + y * buf_rbs[%d]))"
-                            "[x*2+%d];\n",
-                         pad, i, p, p,
-                         inst->imm);
-                }
             } break;
             case op_gather_uniform_32:
             case op_gather_32: {
