@@ -191,7 +191,7 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
     int *id = calloc((size_t)bb->insts, sizeof *id);
 
     struct umbra_interpreter *p = malloc(sizeof *p);
-    // 4x to leave room for multi-result ops (load_32x2 uses 2, load_8x4 uses 4).
+    // Count slots, leaving room for multi-result ops (load_32x2 uses 2, load_8x4 uses 4).
     int num_slots = 1; // +1 for SW_DONE sentinel
     for (int i = 0; i < bb->insts; i++) {
         enum op const op = bb->inst[i].op;
