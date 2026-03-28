@@ -106,10 +106,8 @@ static void emit(Buf *b, char const *fmt, ...) {
 }
 
 static _Bool is_16(enum op op) {
-    return op == op_uniform_16
-        || op == op_load_16
+    return op == op_load_16
         || op == op_store_16
-        || op == op_gather_uniform_16
         || op == op_gather_16
         || op == op_i32_from_s16
         || op == op_i32_from_u16
@@ -267,19 +265,6 @@ static void emit_ops(Buf *b, BB const *bb,
                      vx, vy, vz, vw);
             } break;
 
-            case op_uniform_16: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
-                _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed
-                    ? "%suint v%d = "
-                      "(uint)(ushort)"
-                      "p%d_16[%d];\n"
-                    : "%suint v%d = (uint)"
-                      "((device const ushort*)"
-                      "p%d)[%d];\n",
-                     pad, i, p, inst->imm);
-            } break;
             case op_load_16: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
@@ -289,7 +274,6 @@ static void emit_ops(Buf *b, BB const *bb,
                      "(p%d + y * buf_rbs[%d]))[x];\n",
                      pad, i, p, p);
             } break;
-            case op_gather_uniform_16:
             case op_gather_16: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;

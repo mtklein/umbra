@@ -2352,27 +2352,6 @@ static void test_mixed_ptr(void) {
 static void test_uni_16(void) {
     {
         struct umbra_builder *b = umbra_builder();
-        umbra_val             v = umbra_uniform_16(b, (umbra_ptr){0, 0}, 2);
-        umbra_store_32(b, (umbra_ptr){1, 0}, v);
-        backends B = make(b, 0);
-        for (int bi = 0; bi < 3; bi++) {
-            uint16_t src[] = {100, 200, 300, 400};
-            int      dst[3] = {0};
-            if (!run(&B, bi, 3, 1,
-                     (umbra_buf[]){
-                         {src, 8, 0, 0},
-                         {dst, 3 * 4, 0, 0},
-                     })) {
-                continue;
-            }
-            dst[0] == 300 here;
-            dst[1] == 300 here;
-            dst[2] == 300 here;
-        }
-        cleanup(&B);
-    }
-    {
-        struct umbra_builder *b = umbra_builder();
         umbra_val idx = umbra_uniform_32(b, (umbra_ptr){0, 0}, 0);
         umbra_val v = umbra_i32_from_u16(b, umbra_gather_16(b, (umbra_ptr){1, 0}, idx));
         umbra_store_32(b, (umbra_ptr){2, 0}, v);

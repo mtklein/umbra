@@ -157,7 +157,7 @@ enum {
 #undef IMM_VARIANTS
 
     // Output-only variants: no register inputs, just output to register.
-    op_r_imm_32, op_r_x, op_r_y, op_r_uniform_32, op_r_uniform_16,
+    op_r_imm_32, op_r_x, op_r_y, op_r_uniform_32,
     op_r_pack_mm, op_r_pack_rm, op_m_pack_rm,
     op_r_pack_mr, op_m_pack_mr, op_r_pack_rr, op_m_pack_rr,
     // fma/fms: z is most commonly the register operand (accumulator chains)
@@ -248,7 +248,6 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                 emit(.tag = op_deref_ptr, .ptr = inst->ptr, .x = inst->imm, .y = deref_slot[i]);
                 break;
 
-            case op_uniform_16: emit(.tag = op_uniform_16, .ptr = RESOLVE_PTR(inst), .x = inst->imm); break;
             case op_uniform_32: emit(.tag = op_uniform_32, .ptr = RESOLVE_PTR(inst), .x = inst->imm); break;
 
             case op_load_16: emit(.tag = op_load_16, .ptr = RESOLVE_PTR(inst)); break;
@@ -267,7 +266,6 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                 p->inst[n++] = (struct sw_inst){.tag = op_load_8x4};
                 p->inst[n++] = (struct sw_inst){.tag = op_load_8x4};
                 continue;
-            case op_gather_uniform_16: emit(.tag = op_gather_uniform_16, .ptr = RESOLVE_PTR(inst), .x = X); break;
             case op_gather_16:         emit(.tag = op_gather_16,         .ptr = RESOLVE_PTR(inst), .x = X); break;
             case op_gather_uniform_32: emit(.tag = op_gather_uniform_32, .ptr = RESOLVE_PTR(inst), .x = X); break;
             case op_gather_32:         emit(.tag = op_gather_32,         .ptr = RESOLVE_PTR(inst), .x = X); break;
@@ -474,12 +472,11 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
 
             // Output-only ops: no register inputs, just output to register.
             if (out_r && (tag == op_imm_32 || tag == op_x || tag == op_y
-                       || tag == op_uniform_32 || tag == op_uniform_16)) {
+                       || tag == op_uniform_32)) {
                      if (tag == op_imm_32)      { s->tag = op_r_imm_32; }
                 else if (tag == op_x)           { s->tag = op_r_x; }
                 else if (tag == op_y)           { s->tag = op_r_y; }
                 else if (tag == op_uniform_32)  { s->tag = op_r_uniform_32; }
-                else if (tag == op_uniform_16)  { s->tag = op_r_uniform_16; }
             } else
             { /* not an upgradable op */ }
 
@@ -521,12 +518,11 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
     #define DONE        goto next_tile
             static void *const labels[SW_NUM_OPS] = {
                 [op_x] = &&L_op_x, [op_y] = &&L_op_y, [op_imm_32] = &&L_op_imm_32,
-                [op_uniform_16] = &&L_op_uniform_16, [op_uniform_32] = &&L_op_uniform_32,
+                [op_uniform_32] = &&L_op_uniform_32,
                 [op_load_16] = &&L_op_load_16, [op_load_32] = &&L_op_load_32,
                 [op_load_32x2] = &&L_op_load_32x2, [op_load_8x4] = &&L_op_load_8x4,
                 [op_store_16] = &&L_op_store_16, [op_store_32] = &&L_op_store_32,
                 [op_store_32x2] = &&L_op_store_32x2, [op_store_8x4] = &&L_op_store_8x4,
-                [op_gather_uniform_16] = &&L_op_gather_uniform_16,
                 [op_gather_uniform_32] = &&L_op_gather_uniform_32,
                 [op_gather_16] = &&L_op_gather_16, [op_gather_32] = &&L_op_gather_32,
                 [op_deref_ptr] = &&L_op_deref_ptr,
@@ -596,7 +592,6 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                 [op_r_x] = &&L_op_r_x,
                 [op_r_y] = &&L_op_r_y,
                 [op_r_uniform_32] = &&L_op_r_uniform_32,
-                [op_r_uniform_16] = &&L_op_r_uniform_16,
                 [op_r_pack_mm] = &&L_op_r_pack_mm, [op_r_pack_rm] = &&L_op_r_pack_rm,
                 [op_m_pack_rm] = &&L_op_m_pack_rm, [op_r_pack_mr] = &&L_op_r_pack_mr,
                 [op_m_pack_mr] = &&L_op_m_pack_mr, [op_r_pack_rr] = &&L_op_r_pack_rr,
@@ -626,12 +621,6 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                 } NEXT;
                 CASE(op_y) v->i32 = (I32){0} + row; NEXT;
 
-                CASE(op_uniform_16) {
-                    assert(buf[ip->ptr].row_bytes == 0);
-                    uint16_t uni;
-                    __builtin_memcpy(&uni, (uint16_t const*)buf[ip->ptr].ptr + ip->x, sizeof uni);
-                    v->u32 = (U32){0} + (uint32_t)uni;
-                } NEXT;
                 CASE(op_uniform_32) {
                     assert(buf[ip->ptr].row_bytes == 0);
                     int32_t uni;
@@ -772,16 +761,6 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                     }
                 } NEXT;
 
-                CASE(op_gather_uniform_16) {
-                    int const ix = v[ip->x].i32[0];
-                    int const count = (int)(buf[ip->ptr].sz / 2);
-                    if (ix < 0 || ix >= count) { v->u32 = (U32){0}; break; }
-                    uint16_t s;
-                    __builtin_memcpy(&s, (char const*)buf[ip->ptr].ptr + 2 * ix, 2);
-                    U16 const packed = (U16){0} + s;
-                    v->u32 = (U32){0};
-                    __builtin_memcpy(v, &packed, sizeof packed);
-                } NEXT;
                 CASE(op_gather_uniform_32) {
                     int const ix = v[ip->x].i32[0];
                     int const count = (int)(buf[ip->ptr].sz / 4);
@@ -1144,13 +1123,6 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                     __builtin_memcpy(&uni, (int32_t const*)buf[ip->x].ptr + ip->y, sizeof uni);
                     acc.i32 = (I32){0} + uni;
                 } NEXT;
-                CASE(op_r_uniform_16) {
-                    assert(buf[ip->x].row_bytes == 0);
-                    uint16_t uni;
-                    __builtin_memcpy(&uni, (uint16_t const*)buf[ip->x].ptr + ip->y, sizeof uni);
-                    acc.u32 = (U32){0} + (uint32_t)uni;
-                } NEXT;
-
                 CASE(SW_DONE) DONE;
 #if !defined(__GNUC__) || defined(__wasm__)
                 }

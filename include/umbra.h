@@ -48,7 +48,6 @@ umbra_val umbra_y(struct umbra_builder*);
 umbra_val umbra_imm_i32(struct umbra_builder*, int);
 umbra_val umbra_imm_f32(struct umbra_builder*, float);
 
-umbra_val umbra_uniform_16(struct umbra_builder*, umbra_ptr, int slot);
 umbra_val umbra_uniform_32(struct umbra_builder*, umbra_ptr, int slot);
 
 umbra_val umbra_gather_16(struct umbra_builder*, umbra_ptr, umbra_val ix);

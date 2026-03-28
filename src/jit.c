@@ -269,9 +269,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_store_32:
     case op_store_32x2:
     case op_store_8x4:
-    case op_uniform_16:
     case op_load_16:
-    case op_gather_uniform_16:
     case op_gather_16:
     case op_store_16:
     case op_f32_from_f16:
@@ -681,15 +679,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             put(c, 0x4e040400u | ((uint32_t)s.rd << 5) | (uint32_t)s.rd);
         } break;
 
-        case op_uniform_16: {
-            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int            p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            load_imm_w(c, XT, (uint32_t)(inst->imm * 2));
-            put(c, 0x78606800u | ((uint32_t)XT << 16) | ((uint32_t)XP << 5) | (uint32_t)XT);
-            put(c, DUP_4s_w(s.rd, XT));
-        } break;
-
         case op_gather_uniform_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int8_t         rx = ra_ensure(ra, sl, ns, (int)inst->x.id);
@@ -730,22 +719,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     put(c, LD1_s(s.rd, k, XT));
                 }
             }
-        } break;
-
-        case op_gather_uniform_16: {
-            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int8_t         rx = ra_ensure(ra, sl, ns, (int)inst->x.id);
-            FREE_CHAN(inst->x, i);
-            int p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            load_count(c, p, 1, deref_gpr);
-            put(c, UMOV_ws(XT, rx));
-            put(c, MOVI_4s(s.rd, 0, 0));
-            put(c, 0x6b00001fu | ((uint32_t)XM << 16) | ((uint32_t)XT << 5));
-            put(c, Bcond(0x2, 3));
-            put(c, 0x78607800u | ((uint32_t)XT << 16)
-                               | ((uint32_t)XP << 5) | (uint32_t)XT);
-            put(c, 0x0e020c00u | ((uint32_t)XT << 5) | (uint32_t)s.rd);
         } break;
 
         case op_gather_16: {
@@ -949,9 +922,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 case op_i32_from_f32:
                 case op_lt_u32:
                 case op_le_u32:
-                case op_uniform_16:
                 case op_load_16:
-                case op_gather_uniform_16:
                 case op_gather_16:
                 case op_store_16:
                 case op_f32_from_f16:
@@ -1447,9 +1418,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_store_32:
     case op_store_32x2:
     case op_store_8x4:
-    case op_uniform_16:
     case op_load_16:
-    case op_gather_uniform_16:
     case op_gather_16:
     case op_store_16:
     case op_f32_from_f16:
@@ -1927,30 +1896,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
-        case op_uniform_16: {
-            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int            p = inst->ptr;
-            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            {
-                uint8_t rex = 0x40;
-                if (base >= 8) { rex |= 0x01; }
-                if (rex != 0x40) { emit1(c, rex); }
-                emit1(c, 0x0f);
-                emit1(c, 0xb7);
-                int disp = inst->imm * 2;
-                if (disp == 0 && (base & 7) != RBP) {
-                    emit1(c, (uint8_t)(((RAX & 7) << 3) | (base & 7)));
-                    if ((base & 7) == RSP) { emit1(c, 0x24); }
-                } else {
-                    emit1(c, (uint8_t)(0x40 | ((RAX & 7) << 3) | (base & 7)));
-                    if ((base & 7) == RSP) { emit1(c, 0x24); }
-                    emit1(c, (uint8_t)disp);
-                }
-            }
-            vex(c, 1, 1, 0, 0, s.rd, 0, RAX, 0x6e);
-            vbroadcastss(c, s.rd, s.rd);
-        } break;
-
         case op_gather_uniform_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int8_t         rx = ra_ensure(ra, sl, ns, (int)inst->x.id);
@@ -2002,33 +1947,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 ra_return_reg(ra, mask);
                 FREE_CHAN(inst->x, i);
             }
-        } break;
-
-        case op_gather_uniform_16: {
-            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int8_t         rx = ra_ensure(ra, sl, ns, (int)inst->x.id);
-            int            p = inst->ptr;
-            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            load_count_x86(c, p, 1);
-            vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
-            FREE_CHAN(inst->x, i);
-            vpxor(c, scalar ? 0 : 1, s.rd, s.rd, s.rd);
-            cmp_rr(c, RAX, XM);
-            int skip = jcc(c, 0x03);
-            {
-                uint8_t rex = 0x40;
-                if (base >= 8) { rex |= 0x01; }
-                if (rex != 0x40) { emit1(c, rex); }
-                emit1(c, 0x0f);
-                emit1(c, 0xb7);
-                emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
-                emit1(c, (uint8_t)((1 << 6) | ((RAX & 7) << 3) | (base & 7)));
-            }
-            vex(c, 1, 1, 0, 0, s.rd, 0, RAX, 0x6e);
-            if (!scalar) {
-                vex_rr(c, 1, 2, 1, 0x79, s.rd, s.rd);
-            }
-            patch_jcc(c, skip);
         } break;
 
         case op_gather_16: {

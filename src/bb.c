@@ -27,10 +27,8 @@ _Bool has_ptr(enum op op) {
         || op == op_store_32x2
         || op == op_store_8x4
         || op == op_deref_ptr
-        || op == op_uniform_16
         || op == op_load_16
         || op == op_store_16
-        || op == op_gather_uniform_16
         || op == op_gather_16;
 }
 _Bool is_fused_imm(enum op op) {
@@ -90,7 +88,7 @@ static uint32_t bb_inst_hash(struct bb_inst const *inst) {
 static val push_(builder *b, struct bb_inst inst) {
     {
         enum op const op = inst.op;
-        if (op == op_imm_32 || op == op_uniform_32 || op == op_uniform_16 || op == op_deref_ptr) {
+        if (op == op_imm_32 || op == op_uniform_32 || op == op_deref_ptr) {
             inst.uniform = 1;
         } else if (is_varying(op)
                    || op == op_gather_32
@@ -208,12 +206,8 @@ int umbra_max_ptr(builder const *b) {
     return m;
 }
 
-val umbra_uniform_16(builder *b, umbra_ptr src, int slot) {
-    return push(b, op_uniform_16, .imm = slot, .ptr = ptr_ix(src));
-}
 val umbra_gather_16(builder *b, umbra_ptr src, val ix) {
-    enum op const op = b->inst[val_id(ix)].uniform ? op_gather_uniform_16 : op_gather_16;
-    return push(b, op, VX(ix), .ptr = ptr_ix(src));
+    return push(b, op_gather_16, VX(ix), .ptr = ptr_ix(src));
 }
 val umbra_load_32(builder *b, umbra_ptr src) {
     return push(b, op_load_32, .ptr = ptr_ix(src));
@@ -726,11 +720,9 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         switch (op) {
         case op_imm_32: fprintf(f, " 0x%x", (uint32_t)ip->imm); break;
         case op_uniform_32:
-        case op_uniform_16:
             fprintf(f, " p%d[%d]", ip->ptr, ip->imm);
             break;
         case op_gather_uniform_32:
-        case op_gather_uniform_16:
         case op_gather_32:
         case op_gather_16: fprintf(f, " p%d v%d", ip->ptr, (int)ip->x.id); break;
         case op_load_16:
@@ -880,7 +872,6 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     case op_y:
     case op_imm_32:
     case op_uniform_32:
-    case op_uniform_16:
     case op_load_32:
     case op_load_16:
     case op_load_32x2:
@@ -890,7 +881,6 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     case op_store_16:
     case op_store_32x2:
     case op_gather_uniform_32:
-    case op_gather_uniform_16:
     case op_gather_32:
     case op_gather_16:
     case op_deref_ptr:
