@@ -683,8 +683,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 
         case op_gather_uniform_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int8_t         rx = ra_ensure(ra, sl, ns, val_id(inst->x));
-            if (lu(val_id(inst->x)) <= i) { ra_free_reg(ra, val_id(inst->x)); }
+            int8_t         rx = ra_ensure(ra, sl, ns, (int)inst->x.id);
+            if (lu((int)inst->x.id) <= i) { ra_free_reg(ra, (int)inst->x.id); }
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_count(c, p, 2, deref_gpr);
@@ -699,8 +699,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 
         case op_gather_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int8_t         rx = ra_ensure(ra, sl, ns, val_id(inst->x));
-            if (lu(val_id(inst->x)) <= i) { ra_free_reg(ra, val_id(inst->x)); }
+            int8_t         rx = ra_ensure(ra, sl, ns, (int)inst->x.id);
+            if (lu((int)inst->x.id) <= i) { ra_free_reg(ra, (int)inst->x.id); }
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_count(c, p, 2, deref_gpr);
@@ -725,8 +725,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 
         case op_gather_uniform_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int8_t         rx = ra_ensure(ra, sl, ns, val_id(inst->x));
-            if (lu(val_id(inst->x)) <= i) { ra_free_reg(ra, val_id(inst->x)); }
+            int8_t         rx = ra_ensure(ra, sl, ns, (int)inst->x.id);
+            if (lu((int)inst->x.id) <= i) { ra_free_reg(ra, (int)inst->x.id); }
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_count(c, p, 1, deref_gpr);
@@ -741,8 +741,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 
         case op_gather_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int8_t         rx = ra_ensure(ra, sl, ns, val_id(inst->x));
-            if (lu(val_id(inst->x)) <= i) { ra_free_reg(ra, val_id(inst->x)); }
+            int8_t         rx = ra_ensure(ra, sl, ns, (int)inst->x.id);
+            if (lu((int)inst->x.id) <= i) { ra_free_reg(ra, (int)inst->x.id); }
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_count(c, p, 1, deref_gpr);
@@ -771,7 +771,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         } break;
 
         case op_store_32: {
-            int8_t ry = ra_ensure(ra, sl, ns, val_id(inst->y));
+            int8_t ry = ra_ensure(ra, sl, ns, (int)inst->y.id);
             int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {
@@ -779,12 +779,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             } else {
                 put(c, STR_q(ry, XP, XW));
             }
-            if (lu(val_id(inst->y)) <= i) { ra_free_reg(ra, val_id(inst->y)); }
+            if (lu((int)inst->y.id) <= i) { ra_free_reg(ra, (int)inst->y.id); }
         } break;
 
         case op_store_32x2: {
-            int8_t rx = ra_ensure_chan(ra, sl, ns, val_id(inst->x), val_chan(inst->x));
-            int8_t ry = ra_ensure_chan(ra, sl, ns, val_id(inst->y), val_chan(inst->y));
+            int8_t rx = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
+            int8_t ry = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
             int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             put(c, LSL_xi(XT, XI, 3));
@@ -799,15 +799,15 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, ORR_16b(1, ry, ry));
                 put(c, ST2_4s(0, XT));
             }
-            if (lu(val_id(inst->x)) <= i) { ra_free_reg(ra, val_id(inst->x)); }
-            if (lu(val_id(inst->y)) <= i) { ra_free_reg(ra, val_id(inst->y)); }
+            if (lu((int)inst->x.id) <= i) { ra_free_reg(ra, (int)inst->x.id); }
+            if (lu((int)inst->y.id) <= i) { ra_free_reg(ra, (int)inst->y.id); }
         } break;
 
         case op_store_8x4: {
-            int8_t rr   = ra_ensure_chan(ra, sl, ns, val_id(inst->x), val_chan(inst->x));
-            int8_t rg   = ra_ensure_chan(ra, sl, ns, val_id(inst->y), val_chan(inst->y));
-            int8_t rb   = ra_ensure_chan(ra, sl, ns, val_id(inst->z), val_chan(inst->z));
-            int8_t ra_v = ra_ensure_chan(ra, sl, ns, val_id(inst->w), val_chan(inst->w));
+            int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
+            int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
+            int8_t rb   = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
+            int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
             int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             int8_t px = ra_alloc(ra, sl, ns);
@@ -821,14 +821,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, STR_q(px, XP, XW));
             }
             ra_return_reg(ra, px);
-            if (lu(val_id(inst->x)) <= i) { ra_free_reg(ra, val_id(inst->x)); }
-            if (lu(val_id(inst->y)) <= i) { ra_free_reg(ra, val_id(inst->y)); }
-            if (lu(val_id(inst->z)) <= i) { ra_free_reg(ra, val_id(inst->z)); }
-            if (lu(val_id(inst->w)) <= i) { ra_free_reg(ra, val_id(inst->w)); }
+            if (lu((int)inst->x.id) <= i) { ra_free_reg(ra, (int)inst->x.id); }
+            if (lu((int)inst->y.id) <= i) { ra_free_reg(ra, (int)inst->y.id); }
+            if (lu((int)inst->z.id) <= i) { ra_free_reg(ra, (int)inst->z.id); }
+            if (lu((int)inst->w.id) <= i) { ra_free_reg(ra, (int)inst->w.id); }
         } break;
 
         case op_store_16: {
-            int8_t ry = ra_ensure(ra, sl, ns, val_id(inst->y));
+            int8_t ry = ra_ensure(ra, sl, ns, (int)inst->y.id);
             int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {
@@ -836,7 +836,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             } else {
                 put(c, STR_d(ry, XP, XH));
             }
-            if (lu(val_id(inst->y)) <= i) { ra_free_reg(ra, val_id(inst->y)); }
+            if (lu((int)inst->y.id) <= i) { ra_free_reg(ra, (int)inst->y.id); }
         } break;
 
         case op_f32_from_f16: {
@@ -870,11 +870,11 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_eq_i32:
         case op_lt_s32:
         case op_le_s32: {
-            _Bool x_is_0 = bb->inst[val_id(inst->x)].op == op_imm_32 && bb->inst[val_id(inst->x)].imm == 0;
-            _Bool y_is_0 = bb->inst[val_id(inst->y)].op == op_imm_32 && bb->inst[val_id(inst->y)].imm == 0;
+            _Bool x_is_0 = bb->inst[(int)inst->x.id].op == op_imm_32 && bb->inst[(int)inst->x.id].imm == 0;
+            _Bool y_is_0 = bb->inst[(int)inst->y.id].op == op_imm_32 && bb->inst[(int)inst->y.id].imm == 0;
 
             if (x_is_0 || y_is_0) {
-                int    val = x_is_0 ? val_id(inst->y) : val_id(inst->x);
+                int    val = x_is_0 ? (int)inst->y.id : (int)inst->x.id;
                 int8_t rv = ra_ensure(ra, sl, ns, val);
                 _Bool  v_dead = lu(val) <= i;
 
@@ -975,7 +975,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 }
 #undef CZ
 
-                int zero_val = x_is_0 ? val_id(inst->x) : val_id(inst->y);
+                int zero_val = x_is_0 ? (int)inst->x.id : (int)inst->y.id;
                 if (lu(zero_val) <= i) { ra_free_reg(ra, zero_val); }
                 break;
             }
@@ -1056,8 +1056,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_lt_s32_imm:
         case op_le_s32_imm: {
             struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
-            int8_t ir = ra_ensure(ra, sl, ns, val_id(inst->y));
-            if (lu(val_id(inst->y)) <= i) { ra_free_reg(ra, val_id(inst->y)); }
+            int8_t ir = ra_ensure(ra, sl, ns, (int)inst->y.id);
+            if (lu((int)inst->y.id) <= i) { ra_free_reg(ra, (int)inst->y.id); }
             enum op o = inst->op;
             uint32_t w =
                 o == op_add_f32_imm ? FADD_4s(s.rd, s.rx, ir)  :
@@ -1787,7 +1787,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         } break;
 
         case op_store_32: {
-            int8_t ry = ra_ensure(ra, sl, ns, val_id(inst->y));
+            int8_t ry = ra_ensure(ra, sl, ns, (int)inst->y.id);
             int    p = inst->ptr;
             int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {
@@ -1795,14 +1795,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             } else {
                 vmov_store(c, 1, ry, base, XI, 4, 0);
             }
-            if (lu(val_id(inst->y)) <= i) {
-                ra_free_reg(ra, val_id(inst->y));
+            if (lu((int)inst->y.id) <= i) {
+                ra_free_reg(ra, (int)inst->y.id);
             }
         } break;
 
         case op_store_32x2: {
-            int8_t rx = ra_ensure_chan(ra, sl, ns, val_id(inst->x), val_chan(inst->x));
-            int8_t ry = ra_ensure_chan(ra, sl, ns, val_id(inst->y), val_chan(inst->y));
+            int8_t rx = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
+            int8_t ry = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
             int    p = inst->ptr;
             int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {
@@ -1828,15 +1828,15 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 ra_return_reg(ra, t1);
                 ra_return_reg(ra, t0);
             }
-            if (lu(val_id(inst->x)) <= i) { ra_free_reg(ra, val_id(inst->x)); }
-            if (lu(val_id(inst->y)) <= i) { ra_free_reg(ra, val_id(inst->y)); }
+            if (lu((int)inst->x.id) <= i) { ra_free_reg(ra, (int)inst->x.id); }
+            if (lu((int)inst->y.id) <= i) { ra_free_reg(ra, (int)inst->y.id); }
         } break;
 
         case op_store_8x4: {
-            int8_t rr   = ra_ensure_chan(ra, sl, ns, val_id(inst->x), val_chan(inst->x));
-            int8_t rg   = ra_ensure_chan(ra, sl, ns, val_id(inst->y), val_chan(inst->y));
-            int8_t rb_v = ra_ensure_chan(ra, sl, ns, val_id(inst->z), val_chan(inst->z));
-            int8_t ra_v = ra_ensure_chan(ra, sl, ns, val_id(inst->w), val_chan(inst->w));
+            int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
+            int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
+            int8_t rb_v = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
+            int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
             int    p = inst->ptr;
             int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             // Pack: px = r | (g << 8) | (b << 16) | (a << 24)
@@ -1855,14 +1855,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 vmov_store(c, 1, px, base, XI, 4, 0);
             }
             ra_return_reg(ra, px);
-            if (lu(val_id(inst->x)) <= i) { ra_free_reg(ra, val_id(inst->x)); }
-            if (lu(val_id(inst->y)) <= i) { ra_free_reg(ra, val_id(inst->y)); }
-            if (lu(val_id(inst->z)) <= i) { ra_free_reg(ra, val_id(inst->z)); }
-            if (lu(val_id(inst->w)) <= i) { ra_free_reg(ra, val_id(inst->w)); }
+            if (lu((int)inst->x.id) <= i) { ra_free_reg(ra, (int)inst->x.id); }
+            if (lu((int)inst->y.id) <= i) { ra_free_reg(ra, (int)inst->y.id); }
+            if (lu((int)inst->z.id) <= i) { ra_free_reg(ra, (int)inst->z.id); }
+            if (lu((int)inst->w.id) <= i) { ra_free_reg(ra, (int)inst->w.id); }
         } break;
 
         case op_store_16: {
-            int8_t ry = ra_ensure(ra, sl, ns, val_id(inst->y));
+            int8_t ry = ra_ensure(ra, sl, ns, (int)inst->y.id);
             int    p = inst->ptr;
             int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {
@@ -1882,8 +1882,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             } else {
                 vmov_store(c, 0, ry, base, XI, 2, 0);
             }
-            if (lu(val_id(inst->y)) <= i) {
-                ra_free_reg(ra, val_id(inst->y));
+            if (lu((int)inst->y.id) <= i) {
+                ra_free_reg(ra, (int)inst->y.id);
             }
         } break;
 
@@ -1940,12 +1940,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 
         case op_gather_uniform_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int8_t         rx = ra_ensure(ra, sl, ns, val_id(inst->x));
+            int8_t         rx = ra_ensure(ra, sl, ns, (int)inst->x.id);
             int            p = inst->ptr;
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
-            if (lu(val_id(inst->x)) <= i) {
-                ra_free_reg(ra, val_id(inst->x));
+            if (lu((int)inst->x.id) <= i) {
+                ra_free_reg(ra, (int)inst->x.id);
             }
             load_count_x86(c, p, 2);
             vpxor(c, scalar ? 0 : 1, s.rd, s.rd, s.rd);
@@ -1960,13 +1960,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 
         case op_gather_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int8_t         rx = ra_ensure(ra, sl, ns, val_id(inst->x));
+            int8_t         rx = ra_ensure(ra, sl, ns, (int)inst->x.id);
             int            p = inst->ptr;
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {
                 vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
-                if (lu(val_id(inst->x)) <= i) {
-                    ra_free_reg(ra, val_id(inst->x));
+                if (lu((int)inst->x.id) <= i) {
+                    ra_free_reg(ra, (int)inst->x.id);
                 }
                 load_count_x86(c, p, 2);
                 vpxor(c, 0, s.rd, s.rd, s.rd);
@@ -1991,21 +1991,21 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 vpgatherdd(c, s.rd, base, rx, 4, mask);
                 ra_return_reg(ra, cnt);
                 ra_return_reg(ra, mask);
-                if (lu(val_id(inst->x)) <= i) {
-                    ra_free_reg(ra, val_id(inst->x));
+                if (lu((int)inst->x.id) <= i) {
+                    ra_free_reg(ra, (int)inst->x.id);
                 }
             }
         } break;
 
         case op_gather_uniform_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int8_t         rx = ra_ensure(ra, sl, ns, val_id(inst->x));
+            int8_t         rx = ra_ensure(ra, sl, ns, (int)inst->x.id);
             int            p = inst->ptr;
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_count_x86(c, p, 1);
             vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
-            if (lu(val_id(inst->x)) <= i) {
-                ra_free_reg(ra, val_id(inst->x));
+            if (lu((int)inst->x.id) <= i) {
+                ra_free_reg(ra, (int)inst->x.id);
             }
             vpxor(c, scalar ? 0 : 1, s.rd, s.rd, s.rd);
             cmp_rr(c, RAX, XM);
@@ -2028,14 +2028,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 
         case op_gather_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int8_t         rx = ra_ensure(ra, sl, ns, val_id(inst->x));
+            int8_t         rx = ra_ensure(ra, sl, ns, (int)inst->x.id);
             int            p = inst->ptr;
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_count_x86(c, p, 1);
             if (scalar) {
                 vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
-                if (lu(val_id(inst->x)) <= i) {
-                    ra_free_reg(ra, val_id(inst->x));
+                if (lu((int)inst->x.id) <= i) {
+                    ra_free_reg(ra, (int)inst->x.id);
                 }
                 vpxor(c, 0, s.rd, s.rd, s.rd);
                 cmp_rr(c, RAX, XM);
@@ -2079,8 +2079,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     patch_jcc(c, skip);
                 }
                 ra_return_reg(ra, hi_idx);
-                if (lu(val_id(inst->x)) <= i) {
-                    ra_free_reg(ra, val_id(inst->x));
+                if (lu((int)inst->x.id) <= i) {
+                    ra_free_reg(ra, (int)inst->x.id);
                 }
             }
         } break;

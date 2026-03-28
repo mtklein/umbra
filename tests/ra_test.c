@@ -32,8 +32,8 @@ static struct umbra_basic_block *make_bb(int n, int pre) {
 
     for (int i = 1; i < n; i++) {
         bb->inst[i].op = op_add_i32;
-        bb->inst[i].x = val_make(i - 1, 0);
-        bb->inst[i].y = val_make(0, 0);
+        bb->inst[i].x = (val_){.id = (unsigned)(i - 1)};
+        bb->inst[i].y = (val_){0};
     }
     return bb;
 }
@@ -343,7 +343,7 @@ static void test_step_unary(void) {
     bb->inst[0].op = op_imm_32;
     bb->inst[0].imm = 42;
     bb->inst[1].op = op_f32_from_i32;
-    bb->inst[1].x = val_make(0, 0);
+    bb->inst[1].x = (val_){0};
 
     struct ra *ra = ra_create(bb, &cfg);
     int        sl[2] = {-1, -1};
@@ -386,10 +386,10 @@ static void test_step_unary_alive(void) {
     bb->inst[0].op = op_imm_32;
     bb->inst[0].imm = 42;
     bb->inst[1].op = op_f32_from_i32;
-    bb->inst[1].x = val_make(0, 0);
+    bb->inst[1].x = (val_){0};
     bb->inst[2].op = op_add_i32;
-    bb->inst[2].x = val_make(0, 0);
-    bb->inst[2].y = val_make(0, 0);
+    bb->inst[2].x = (val_){0};
+    bb->inst[2].y = (val_){0};
 
     struct ra *ra = ra_create(bb, &cfg);
     int        sl[3] = {-1, -1, -1};
@@ -433,8 +433,8 @@ static void test_step_alu(void) {
     bb->inst[1].op = op_imm_32;
     bb->inst[1].imm = 2;
     bb->inst[2].op = op_add_i32;
-    bb->inst[2].x = val_make(0, 0);
-    bb->inst[2].y = val_make(1, 0);
+    bb->inst[2].x = (val_){0};
+    bb->inst[2].y = (val_){.id = 1};
 
     struct ra *ra = ra_create(bb, &cfg);
     int        sl[3] = {-1, -1, -1};
@@ -482,8 +482,8 @@ static void test_step_alu_scratch(void) {
     bb->inst[1].op = op_imm_32;
     bb->inst[1].imm = 2;
     bb->inst[2].op = op_add_i32;
-    bb->inst[2].x = val_make(0, 0);
-    bb->inst[2].y = val_make(1, 0);
+    bb->inst[2].x = (val_){0};
+    bb->inst[2].y = (val_){.id = 1};
 
     struct ra *ra = ra_create(bb, &cfg);
     int        sl[3] = {-1, -1, -1};

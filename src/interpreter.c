@@ -234,10 +234,10 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
         if (pass) { p->preamble = n; }
         for (int i = lo; i < hi; i++) {
             struct bb_inst const *inst = &bb->inst[i];
-            int const X = id[val_id(inst->x)] + val_chan(inst->x) - n;
-            int const Y = id[val_id(inst->y)] + val_chan(inst->y) - n;
-            int const Z = id[val_id(inst->z)] + val_chan(inst->z) - n;
-            int const W = id[val_id(inst->w)] + val_chan(inst->w) - n;
+            int const X = id[inst->x.id] + (int)inst->x.chan - n;
+            int const Y = id[inst->y.id] + (int)inst->y.chan - n;
+            int const Z = id[inst->z.id] + (int)inst->z.chan - n;
+            int const W = id[inst->w.id] + (int)inst->w.chan - n;
             switch (inst->op) {
             case op_x:      emit(.tag = op_x);      break;
             case op_y:      emit(.tag = op_y);      break;

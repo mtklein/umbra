@@ -142,10 +142,10 @@ static void emit_ops(Buf *b, BB const *bb,
 
     for (int i = lo; i < hi; i++) {
         struct bb_inst const *inst = &bb->inst[i];
-        VNAME(vx, val_id(inst->x), val_chan(inst->x));
-        VNAME(vy, val_id(inst->y), val_chan(inst->y));
-        VNAME(vz, val_id(inst->z), val_chan(inst->z));
-        VNAME(vw, val_id(inst->w), val_chan(inst->w));
+        VNAME(vx, (int)inst->x.id, (int)inst->x.chan);
+        VNAME(vy, (int)inst->y.id, (int)inst->y.chan);
+        VNAME(vz, (int)inst->z.id, (int)inst->z.chan);
+        VNAME(vw, (int)inst->w.id, (int)inst->w.chan);
 
         switch (inst->op) {
             case op_x:

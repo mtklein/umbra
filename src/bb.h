@@ -46,7 +46,7 @@ enum op {
 struct bb_inst {
     enum op op;
     _Bool       uniform, pad_[3];
-    umbra_val   x, y, z, w;
+    val_        x, y, z, w;
     int         ptr, imm;
 };
 
