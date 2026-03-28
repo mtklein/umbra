@@ -25,18 +25,21 @@ void       ra_destroy(struct ra *ra);
 void   ra_free_reg(struct ra *ra, int val);
 int8_t ra_alloc(struct ra *ra, int *sl, int *ns);
 int8_t ra_ensure(struct ra *ra, int *sl, int *ns, int val);
+int8_t ra_ensure_chan(struct ra *ra, int *sl, int *ns, int val, int chan);
 int8_t ra_claim(struct ra *ra, int old_val, int new_val);
 void   ra_begin_loop(struct ra *ra);
 void   ra_end_loop(struct ra *ra, int *sl);
 
 // Accessors.
 int8_t ra_reg(struct ra const *ra, int val);
+int8_t ra_chan_reg(struct ra const *ra, int val, int chan);
 int    ra_last_use(struct ra const *ra, int val);
 
 // Mutation helpers.
 void ra_set_last_use(struct ra *ra, int val, int lu);
 void ra_return_reg(struct ra *ra, int8_t r);
 void ra_assign(struct ra *ra, int val, int8_t r);
+void ra_set_chan_reg(struct ra *ra, int val, int chan, int8_t r);
 
 struct ra_step {
     int8_t rd;

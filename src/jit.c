@@ -594,7 +594,24 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
-        case op_load_32x2: break;
+        case op_load_32x2: {
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            int8_t         hi_reg = ra_alloc(ra, sl, ns);
+            int            p = inst->ptr;
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            put(c, LSL_xi(XT, XI, 3));
+            put(c, ADD_xr(XT, XP, XT));
+            if (scalar) {
+                put(c, LDR_si(s.rd, XT, 0));
+                put(c, LDR_si(hi_reg, XT, 1));
+            } else {
+                put(c, LD2_4s(0, XT));
+                put(c, ORR_16b(s.rd, 0, 0));
+                put(c, ORR_16b(hi_reg, 1, 1));
+            }
+            ra_set_chan_reg(ra, i, 0, s.rd);
+            ra_set_chan_reg(ra, i, 1, hi_reg);
+        } break;
         case op_load_8x4:  break;
         case op_chan: {
             struct bb_inst const *parent = &bb->inst[inst->x];
@@ -819,8 +836,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         } break;
 
         case op_store_32x2: {
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-            int8_t ry = ra_ensure(ra, sl, ns, inst->y);
+            int8_t rx = ra_ensure_chan(ra, sl, ns, inst->x, inst->cx);
+            int8_t ry = ra_ensure_chan(ra, sl, ns, inst->y, inst->cy);
             int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             put(c, LSL_xi(XT, XI, 3));
@@ -1745,7 +1762,33 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
-        case op_load_32x2: break;
+        case op_load_32x2: {
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            int8_t         hi_reg = ra_alloc(ra, sl, ns);
+            int            p = inst->ptr;
+            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            if (scalar) {
+                vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, XI, 8, 0);
+                vex_mem(c, 1, 1, 0, 0, hi_reg, 0, 0x6e, base, XI, 8, 4);
+            } else {
+                int8_t t0 = ra_alloc(ra, sl, ns);
+                int8_t t1 = ra_alloc(ra, sl, ns);
+                vmov_load(c, 1, t0, base, XI, 8, 0);
+                vmov_load(c, 1, t1, base, XI, 8, 32);
+                vex_rrr(c, 0, 1, 1, 0xc6, s.rd, t0, t1);
+                emit1(c, 0x88u);
+                vex(c, 1, 3, 1, 1, s.rd, 0, s.rd, 0x01);
+                emit1(c, 0xd8);
+                vex_rrr(c, 0, 1, 1, 0xc6, hi_reg, t0, t1);
+                emit1(c, 0xddu);
+                vex(c, 1, 3, 1, 1, hi_reg, 0, hi_reg, 0x01);
+                emit1(c, 0xd8);
+                ra_return_reg(ra, t1);
+                ra_return_reg(ra, t0);
+            }
+            ra_set_chan_reg(ra, i, 0, s.rd);
+            ra_set_chan_reg(ra, i, 1, hi_reg);
+        } break;
         case op_load_8x4:  break;
         case op_chan: {
             struct bb_inst const *parent = &bb->inst[inst->x];
@@ -1873,8 +1916,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         } break;
 
         case op_store_32x2: {
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x);
-            int8_t ry = ra_ensure(ra, sl, ns, inst->y);
+            int8_t rx = ra_ensure_chan(ra, sl, ns, inst->x, inst->cx);
+            int8_t ry = ra_ensure_chan(ra, sl, ns, inst->y, inst->cy);
             int    p = inst->ptr;
             int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {

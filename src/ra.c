@@ -8,6 +8,7 @@ struct ra {
     int                  *owner;
     int8_t               *free_stack;
     int8_t               *loop_reg;
+    int8_t              (*chan_reg)[4]; // per-channel registers for multi-result ops
     struct bb_inst const *inst;
     struct ra_config      cfg;
     int                   nfree;
@@ -17,6 +18,7 @@ struct ra {
 };
 
 int8_t ra_reg(struct ra const *ra, int val) { return ra->reg[val]; }
+int8_t ra_chan_reg(struct ra const *ra, int val, int chan) { return ra->chan_reg[val][chan]; }
 int    ra_last_use(struct ra const *ra, int val) { return ra->last_use[val]; }
 
 void ra_set_last_use(struct ra *ra, int val, int lu) { ra->last_use[val] = lu; }
@@ -26,6 +28,9 @@ void ra_return_reg(struct ra *ra, int8_t r) { ra->free_stack[ra->nfree++] = r; }
 void ra_assign(struct ra *ra, int val, int8_t r) {
     ra->reg[val] = r;
     ra->owner[(int)r] = val;
+}
+void ra_set_chan_reg(struct ra *ra, int val, int chan, int8_t r) {
+    ra->chan_reg[val][chan] = r;
 }
 
 struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const *cfg) {
@@ -37,7 +42,11 @@ struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const 
     ra->owner = malloc((size_t)cfg->max_reg * sizeof *ra->owner);
     ra->free_stack = malloc((size_t)cfg->max_reg * sizeof *ra->free_stack);
 
+    ra->chan_reg = malloc((size_t)n * sizeof *ra->chan_reg);
     for (int i = 0; i < n; i++) { ra->reg[i] = -1; }
+    for (int i = 0; i < n; i++) {
+        for (int c = 0; c < 4; c++) { ra->chan_reg[i][c] = -1; }
+    }
     for (int i = 0; i < cfg->max_reg; i++) { ra->owner[i] = -1; }
 
     for (int i = 0; i < n; i++) { ra->last_use[i] = -1; }
@@ -69,6 +78,7 @@ struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const 
 
 void ra_destroy(struct ra *ra) {
     free(ra->reg);
+    free(ra->chan_reg);
     free(ra->last_use);
     free(ra->owner);
     free(ra->free_stack);
@@ -146,6 +156,10 @@ int8_t ra_alloc(struct ra *ra, int *sl, int *ns) {
     return r;
 }
 
+int8_t ra_ensure_chan(struct ra *ra, int *sl, int *ns, int val, int chan) {
+    if (chan != 0) { return ra->chan_reg[val][chan]; }
+    return ra_ensure(ra, sl, ns, val);
+}
 int8_t ra_ensure(struct ra *ra, int *sl, int *ns, int val) {
     if (ra->reg[val] < 0) {
         int8_t const r = ra_alloc(ra, sl, ns);
@@ -191,7 +205,7 @@ struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct bb_inst con
                              int i, _Bool scalar) {
     (void)scalar;
     struct ra_step s = step0();
-    s.rx = ra_ensure(ra, sl, ns, inst->x);
+    s.rx = ra_ensure_chan(ra, sl, ns, inst->x, inst->cx);
     _Bool const x_dead = ra->last_use[inst->x] <= i;
     if (x_dead) {
         s.rd = ra_claim(ra, inst->x, i);
@@ -211,16 +225,17 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const
 
     ra->npinned = 0;
     if (inst->x < i) {
-        s.rx = ra_ensure(ra, sl, ns, inst->x);
+        s.rx = ra_ensure_chan(ra, sl, ns, inst->x, inst->cx);
         ra->pinned[ra->npinned++] = inst->x;
     }
     if (inst->y < i) {
-        s.ry = ra_ensure(ra, sl, ns, inst->y);
-        if (inst->y != inst->x) { ra->pinned[ra->npinned++] = inst->y; }
+        s.ry = ra_ensure_chan(ra, sl, ns, inst->y, inst->cy);
+        if (inst->y != inst->x || inst->cy != inst->cx) { ra->pinned[ra->npinned++] = inst->y; }
     }
     if (inst->z < i) {
-        s.rz = ra_ensure(ra, sl, ns, inst->z);
-        if (inst->z != inst->x && inst->z != inst->y) {
+        s.rz = ra_ensure_chan(ra, sl, ns, inst->z, inst->cz);
+        if ((inst->z != inst->x || inst->cz != inst->cx) &&
+            (inst->z != inst->y || inst->cz != inst->cy)) {
             ra->pinned[ra->npinned++] = inst->z;
         }
     }

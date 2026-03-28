@@ -194,7 +194,8 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
     int *id = calloc((size_t)bb->insts, sizeof *id);
 
     struct umbra_interpreter *p = malloc(sizeof *p);
-    int const num_insts = bb->insts + 1;
+    // 4x to leave room for multi-result ops (load_32x2 uses 2, load_8x4 uses 4).
+    int const num_insts = 4 * bb->insts + 1;
     p->inst = malloc((size_t)num_insts * sizeof *p->inst);
     p->v = malloc((size_t)num_insts * sizeof *p->v);
 
@@ -231,7 +232,10 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
         if (pass) { p->preamble = n; }
         for (int i = lo; i < hi; i++) {
             struct bb_inst const *inst = &bb->inst[i];
-            int const X = id[inst->x] - n, Y = id[inst->y] - n, Z = id[inst->z] - n, W = id[inst->w] - n;
+            int const X = id[inst->x] + inst->cx - n;
+            int const Y = id[inst->y] + inst->cy - n;
+            int const Z = id[inst->z] + inst->cz - n;
+            int const W = id[inst->w] + inst->cw - n;
             switch (inst->op) {
             case op_x:      emit(.tag = op_x);      break;
             case op_y:      emit(.tag = op_y);      break;
@@ -246,7 +250,11 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
 
             case op_load_16: emit(.tag = op_load_16, .x = RESOLVE_PTR(inst)); break;
             case op_load_32: emit(.tag = op_load_32, .x = RESOLVE_PTR(inst)); break;
-            case op_load_32x2: emit(.tag = op_load_32x2); break;
+            case op_load_32x2:
+                emit(.tag = op_load_32x2, .x = RESOLVE_PTR(inst));
+                id[i] = n;
+                n += 2;
+                continue;
             case op_load_8x4:  emit(.tag = op_load_8x4);  break;
             case op_chan: {
                 struct bb_inst const *parent = &bb->inst[inst->x];
@@ -688,7 +696,21 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                         }
                     }
                 } NEXT;
-                CASE(op_load_32x2) NEXT;
+                CASE(op_load_32x2) {
+                    char const *src = (char const*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
+                    int const   i = end - K;
+                    int const   rem = n - i;
+                    v[0].i32 = (I32){0};
+                    v[1].i32 = (I32){0};
+                    for (int ll = 0; ll < (rem < K ? rem : K); ll++) {
+                        int32_t lo, hi;
+                        __builtin_memcpy(&lo, src + (i + ll) * 8,     4);
+                        __builtin_memcpy(&hi, src + (i + ll) * 8 + 4, 4);
+                        v[0].i32[ll] = lo;
+                        v[1].i32[ll] = hi;
+                    }
+                    ip++; v++;
+                } NEXT;
                 CASE(op_load_8x4) NEXT;
                 CASE(op_chan) {
                     char const *src = (char const*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
