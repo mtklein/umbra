@@ -81,6 +81,10 @@ static uint32_t bb_inst_hash(struct bb_inst const *inst) {
     h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->y);
     h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->z);
     h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->w);
+    h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->cx);
+    h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->cy);
+    h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->cz);
+    h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->cw);
     h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->ptr);
     h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->imm);
     h ^= h >> 16;
@@ -112,7 +116,7 @@ static val push_(builder *b, struct bb_inst inst) {
             && 0
                 == __builtin_memcmp(&inst, &b->inst[b->ht[slot & b->ht_mask].ix],
                                     sizeof inst)) {
-            return (val){b->ht[slot & b->ht_mask].ix};
+            return (val){b->ht[slot & b->ht_mask].ix, 0};
         }
     }
 
@@ -145,7 +149,7 @@ static val push_(builder *b, struct bb_inst inst) {
             }
         }
     }
-    return (val){id};
+    return (val){id, 0};
 }
 #define push(b, ...) push_(b, (struct bb_inst){.op = __VA_ARGS__})
 
@@ -277,7 +281,7 @@ static val try_imm(builder *b, val d, enum op fused, int x, int y) {
         int const other = imm_id == x ? y : x;
         return push(b, fused, .x = other, .y = imm_id, .imm = b->inst[imm_id].imm);
     }
-    return (val){d.id};
+    return (val){d.id, d.chan};
 }
 
 static void sort(int *a, int *b) {
@@ -311,7 +315,7 @@ val umbra_sub_f32(builder *b, val x, val y) {
     if (is_imm(b, y.id)) {
         return push(b, op_sub_f32_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
-    return (val){d.id};
+    return (val){d.id, d.chan};
 }
 
 val umbra_mul_f32(builder *b, val x, val y) {
@@ -328,7 +332,7 @@ val umbra_div_f32(builder *b, val x, val y) {
     if (is_imm(b, y.id)) {
         return push(b, op_div_f32_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
-    return (val){d.id};
+    return (val){d.id, d.chan};
 }
 
 val umbra_min_f32(builder *b, val x, val y) {
@@ -381,7 +385,7 @@ val umbra_sub_i32(builder *b, val x, val y) {
     if (is_imm(b, y.id)) {
         return push(b, op_sub_i32_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
-    return (val){d.id};
+    return (val){d.id, d.chan};
 }
 
 val umbra_mul_i32(builder *b, val x, val y) {
@@ -438,7 +442,7 @@ val umbra_and_i32(builder *b, val x, val y) {
     if (is_imm(b, y.id)) {
         return push(b, op_and_32_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
-    return (val){d.id};
+    return (val){d.id, d.chan};
 }
 val umbra_or_i32(builder *b, val x, val y) {
     sort(&x.id, &y.id);
@@ -479,14 +483,14 @@ val umbra_lt_f32(builder *b, val x, val y) {
     if (is_imm(b, y.id)) {
         return push(b, op_lt_f32_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
-    return (val){d.id};
+    return (val){d.id, d.chan};
 }
 val umbra_le_f32(builder *b, val x, val y) {
     val const d = math(b, op_le_f32, .x = x.id, .y = y.id);
     if (is_imm(b, y.id)) {
         return push(b, op_le_f32_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
-    return (val){d.id};
+    return (val){d.id, d.chan};
 }
 val umbra_gt_f32(builder *b, val x, val y) { return umbra_lt_f32(b, y, x); }
 val umbra_ge_f32(builder *b, val x, val y) { return umbra_le_f32(b, y, x); }
@@ -505,14 +509,14 @@ val umbra_lt_s32(builder *b, val x, val y) {
     if (is_imm(b, y.id)) {
         return push(b, op_lt_s32_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
-    return (val){d.id};
+    return (val){d.id, d.chan};
 }
 val umbra_le_s32(builder *b, val x, val y) {
     val const d = math(b, op_le_s32, .x = x.id, .y = y.id);
     if (is_imm(b, y.id)) {
         return push(b, op_le_s32_imm, .x = x.id, .y = y.id, .imm = b->inst[y.id].imm);
     }
-    return (val){d.id};
+    return (val){d.id, d.chan};
 }
 val umbra_gt_s32(builder *b, val x, val y) { return umbra_lt_s32(b, y, x); }
 val umbra_ge_s32(builder *b, val x, val y) { return umbra_le_s32(b, y, x); }
