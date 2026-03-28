@@ -165,6 +165,7 @@ enum {
     // fma/fms: z is most commonly the register operand (accumulator chains)
     op_r_fma_f32_mmm, op_r_fma_f32_mmr, op_m_fma_f32_mmr,
     op_r_fms_f32_mmm, op_r_fms_f32_mmr, op_m_fms_f32_mmr,
+    op_r_sel_32_mm, op_r_sel_32_rm, op_m_sel_32_rm,
 
     SW_NUM_OPS,
 };
@@ -375,6 +376,7 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
 #define CHECK_IMM(name, rt, pt)    || next_tag == op_##name
                 out_r = 0 BINARY_OPS(CHECK_BINARY) UNARY_OPS(CHECK_UNARY) IMM_OPS(CHECK_IMM)
                         || next_tag == op_pack
+                        || (next_tag == op_sel_32 && p->inst[i + 1].x == -1)
 #if defined(__ARM_FEATURE_FMA) || defined(__FMA__)
                         || ((next_tag == op_fma_f32 || next_tag == op_fms_f32)
                             && p->inst[i + 1].z == -1)
@@ -438,6 +440,13 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                 else if ( out_r && !z_r) { s->tag = op_r_fms_f32_mmm; }
             } else
 #endif
+
+            // sel_32: x (mask) from register.
+            if (tag == op_sel_32) {
+                if      ( out_r &&  x_r) { s->tag = op_r_sel_32_rm; }
+                else if (!out_r &&  x_r) { s->tag = op_m_sel_32_rm; }
+                else if ( out_r && !x_r) { s->tag = op_r_sel_32_mm; }
+            } else
 
             // pack: binary pattern (x,y inputs, z is immediate shift).
             if (tag == op_pack) {
@@ -580,6 +589,9 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                 [op_m_pack_rm] = &&L_op_m_pack_rm, [op_r_pack_mr] = &&L_op_r_pack_mr,
                 [op_m_pack_mr] = &&L_op_m_pack_mr, [op_r_pack_rr] = &&L_op_r_pack_rr,
                 [op_m_pack_rr] = &&L_op_m_pack_rr,
+                [op_r_sel_32_mm] = &&L_op_r_sel_32_mm,
+                [op_r_sel_32_rm] = &&L_op_r_sel_32_rm,
+                [op_m_sel_32_rm] = &&L_op_m_sel_32_rm,
                 [op_r_fma_f32_mmm] = &&L_op_r_fma_f32_mmm,
                 [op_r_fma_f32_mmr] = &&L_op_r_fma_f32_mmr,
                 [op_m_fma_f32_mmr] = &&L_op_m_fma_f32_mmr,
@@ -1049,6 +1061,13 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
 #undef IMM_DISPATCH_U
 #undef IMM_CMP_F
 #undef IMM_CMP_I
+
+                // sel_32 register variants.
+#define SEL(xv,yv,zv) (((xv).i32 & (yv).i32) | (~(xv).i32 & (zv).i32))
+                CASE(op_r_sel_32_mm) acc.i32 = SEL(v[ip->x], v[ip->y], v[ip->z]); NEXT;
+                CASE(op_r_sel_32_rm) acc.i32 = SEL(acc,       v[ip->y], v[ip->z]); NEXT;
+                CASE(op_m_sel_32_rm) v->i32  = SEL(acc,       v[ip->y], v[ip->z]); NEXT;
+#undef SEL
 
                 // fma/fms register variants.
 #if defined(__ARM_FEATURE_FMA) || defined(__FMA__)
