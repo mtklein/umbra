@@ -31,7 +31,7 @@ void   umbra_program_queue(struct umbra_program*,
                            int l, int t, int r, int b, umbra_buf[]);
 struct umbra_backend* umbra_program_backend(struct umbra_program const*);
 
-typedef struct { int id, chan; } umbra_val;
+typedef struct { int bits; } umbra_val;
 typedef struct { int ix, :24; _Bool deref; } umbra_ptr;
 
 // TODO: I don't like any of these first six methods.

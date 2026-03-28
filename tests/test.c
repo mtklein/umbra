@@ -1025,12 +1025,12 @@ static void test_convert(void) {
 static void test_dedup(void) {
     struct umbra_builder *builder = umbra_builder();
     umbra_val v1 = umbra_imm_i32(builder, 42), v2 = umbra_imm_i32(builder, 42);
-    v1.id == v2.id here;
+    (v1).bits == (v2).bits here;
     umbra_val c = umbra_imm_i32(builder, 99);
-    v1.id != c.id here;
+    (v1).bits != (c).bits here;
     umbra_val x = umbra_load_32(builder, (umbra_ptr){0, 0}),
               s1 = umbra_add_i32(builder, x, v1), s2 = umbra_add_i32(builder, x, v1);
-    s1.id == s2.id here;
+    (s1).bits == (s2).bits here;
     umbra_builder_free(builder);
 }
 
@@ -1084,14 +1084,14 @@ static void test_strength_reduction(void) {
         struct umbra_builder *builder = umbra_builder();
         umbra_val             x = umbra_load_32(builder, (umbra_ptr){0, 0}),
                   z = umbra_imm_i32(builder, 0), s = umbra_add_i32(builder, x, z);
-        s.id == x.id here;
+        (s).bits == (x).bits here;
         umbra_builder_free(builder);
     }
     {
         struct umbra_builder *builder = umbra_builder();
         umbra_val             x = umbra_load_32(builder, (umbra_ptr){0, 0}),
                   one = umbra_imm_i32(builder, 1), s = umbra_mul_i32(builder, x, one);
-        s.id == x.id here;
+        (s).bits == (x).bits here;
         umbra_builder_free(builder);
     }
     for (int opt = 0; opt < 2; opt++) {
@@ -1141,7 +1141,7 @@ static void test_zero_imm(void) {
     for (int opt = 0; opt < 2; opt++) {
         struct umbra_builder *builder = umbra_builder();
         umbra_val             zero = umbra_imm_i32(builder, 0);
-        zero.id == 0 here;
+        (zero).bits == 0 here;
         umbra_val             x = umbra_load_32(builder, (umbra_ptr){0, 0}),
                   r = umbra_eq_i32(builder, x, zero);
         umbra_store_32(builder, (umbra_ptr){1, 0}, r);
@@ -1168,16 +1168,16 @@ static void test_late_imm_identity(void) {
     umbra_val             x = umbra_load_32(b, (umbra_ptr){0, 0});
     umbra_val             z1 = umbra_imm_i32(b, 1);
     umbra_val             zm = umbra_imm_i32(b, -1);
-    z1.id > x.id here;
-    zm.id > x.id here;
+    (z1).bits > (x).bits here;
+    (zm).bits > (x).bits here;
 
-    umbra_mul_i32(b, x, z1).id == x.id here;
-    umbra_and_i32(b, x, zm).id == x.id here;
-    umbra_or_i32(b, x, zm).id == zm.id here;
-    umbra_sel_i32(b, zm, x, z1).id == x.id here;
-    umbra_eq_i32(b, x, x).id == umbra_imm_i32(b, -1).id here;
-    umbra_div_f32(b, x, umbra_imm_f32(b, 1.0f)).id == x.id here;
-    umbra_sub_f32(b, x, umbra_imm_f32(b, 0.0f)).id == x.id here;
+    umbra_mul_i32(b, x, z1).bits == (x).bits here;
+    umbra_and_i32(b, x, zm).bits == (x).bits here;
+    umbra_or_i32(b, x, zm).bits == (zm).bits here;
+    umbra_sel_i32(b, zm, x, z1).bits == (x).bits here;
+    umbra_eq_i32(b, x, x).bits == umbra_imm_i32(b, -1).bits here;
+    umbra_div_f32(b, x, umbra_imm_f32(b, 1.0f)).bits == (x).bits here;
+    umbra_sub_f32(b, x, umbra_imm_f32(b, 0.0f)).bits == (x).bits here;
     umbra_builder_free(b);
 }
 
@@ -1189,19 +1189,19 @@ static void test_abs_peepholes(void) {
         umbra_val             neg_x = umbra_neg_f32(b, x);
         umbra_val             mask = umbra_imm_i32(b, 0x7fffffff);
 
-        umbra_max_f32(b, x, neg_x).id == direct.id here;
-        umbra_max_f32(b, neg_x, x).id == direct.id here;
-        umbra_and_i32(b, x, mask).id == direct.id here;
-        umbra_and_i32(b, mask, x).id == direct.id here;
+        umbra_max_f32(b, x, neg_x).bits == (direct).bits here;
+        umbra_max_f32(b, neg_x, x).bits == (direct).bits here;
+        umbra_and_i32(b, x, mask).bits == (direct).bits here;
+        umbra_and_i32(b, mask, x).bits == (direct).bits here;
         umbra_builder_free(b);
     }
     {
         struct umbra_builder *b = umbra_builder();
         umbra_val             mask = umbra_imm_i32(b, 0x7fffffff);
         umbra_val             x = umbra_load_32(b, (umbra_ptr){0, 0});
-        mask.id < x.id here;
+        (mask).bits < (x).bits here;
         umbra_val direct = umbra_abs_f32(b, x);
-        umbra_and_i32(b, x, mask).id == direct.id here;
+        umbra_and_i32(b, x, mask).bits == (direct).bits here;
         umbra_builder_free(b);
     }
 }
@@ -1335,15 +1335,15 @@ static void test_hash_quality(void) {
     struct umbra_builder *builder = umbra_builder();
     enum { N = 1000 };
     int ids[N];
-    for (int i = 0; i < N; i++) { ids[i] = umbra_imm_i32(builder, i).id; }
-    for (int i = 0; i < N; i++) { (umbra_imm_i32(builder, i).id == ids[i]) here; }
+    for (int i = 0; i < N; i++) { ids[i] = umbra_imm_i32(builder, i).bits; }
+    for (int i = 0; i < N; i++) { (umbra_imm_i32(builder, i).bits == ids[i]) here; }
     for (int i = 1; i < N; i++) { (ids[i] != ids[i - 1]) here; }
     umbra_val x = umbra_load_32(builder, (umbra_ptr){0, 0});
     for (int i = 0; i < N; i++) {
         umbra_val c = umbra_imm_i32(builder, i);
         umbra_val sum = umbra_add_i32(builder, x, c);
         umbra_val sum2 = umbra_add_i32(builder, x, c);
-        sum.id == sum2.id here;
+        (sum).bits == (sum2).bits here;
     }
     umbra_builder_free(builder);
 }

@@ -1,5 +1,11 @@
 #pragma once
 #include <stdint.h>
+#include "../include/umbra.h"
+
+// umbra_val packing: low 2 bits = channel, upper 30 bits = instruction index.
+static inline int       val_id  (umbra_val v) { return v.bits >> 2; }
+static inline int       val_chan(umbra_val v) { return v.bits & 3; }
+static inline umbra_val val_make(int id, int chan) { return (umbra_val){.bits = (id << 2) | (chan & 3)}; }
 
 #define OP_LIST(X)                                                                        \
     X(x) X(y)                                                                             \
