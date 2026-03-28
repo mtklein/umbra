@@ -90,9 +90,9 @@ static void test_f32_ops(void) {
                 float y[] = {6, 7, 8, 9, 0}, z[5] = {0};
                 if (!run(&B, bi, 5, 1,
                          (umbra_buf[]){
-                             {x, 5 * 4, 0, 0},
-                             {y, 5 * 4, 0, 0},
-                             {z, 5 * 4, 0, 0},
+                             {.ptr=x, .sz=5 * 4},
+                             {.ptr=y, .sz=5 * 4},
+                             {.ptr=z, .sz=5 * 4},
                          })) {
                     continue;
                 }
@@ -112,9 +112,9 @@ static void test_f32_ops(void) {
                 float y[] = {10, 20, 30}, z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -132,9 +132,9 @@ static void test_f32_ops(void) {
                 float y[] = {1, 2, 3}, z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -152,9 +152,9 @@ static void test_f32_ops(void) {
                 float y[] = {2, 4, 5}, z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -177,9 +177,9 @@ static void test_i32_ops(void) {
                 int y[] = {10, 20, 30}, z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -197,9 +197,9 @@ static void test_i32_ops(void) {
                 int y[] = {1, 2, 3}, z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -217,9 +217,9 @@ static void test_i32_ops(void) {
                 int y[] = {5, 6, 7}, z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -237,9 +237,9 @@ static void test_i32_ops(void) {
                 int y[] = {1, 2, 3}, z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -257,9 +257,9 @@ static void test_i32_ops(void) {
                 int y[] = {1, 1, 3}, z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -277,9 +277,9 @@ static void test_i32_ops(void) {
                 int y[] = {1, 1, 3}, z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -297,9 +297,9 @@ static void test_i32_ops(void) {
                 int y[] = {0x0f, 0xff}, z[2] = {0};
                 if (!run(&B, bi, 2, 1,
                          (umbra_buf[]){
-                             {x, 2 * 4, 0, 0},
-                             {y, 2 * 4, 0, 0},
-                             {z, 2 * 4, 0, 0},
+                             {.ptr=x, .sz=2 * 4},
+                             {.ptr=y, .sz=2 * 4},
+                             {.ptr=z, .sz=2 * 4},
                          })) {
                     continue;
                 }
@@ -316,9 +316,9 @@ static void test_i32_ops(void) {
                 int y[] = {0x0f, 0xf0}, z[2] = {0};
                 if (!run(&B, bi, 2, 1,
                          (umbra_buf[]){
-                             {x, 2 * 4, 0, 0},
-                             {y, 2 * 4, 0, 0},
-                             {z, 2 * 4, 0, 0},
+                             {.ptr=x, .sz=2 * 4},
+                             {.ptr=y, .sz=2 * 4},
+                             {.ptr=z, .sz=2 * 4},
                          })) {
                     continue;
                 }
@@ -335,9 +335,9 @@ static void test_i32_ops(void) {
                 int y[] = {0x0f, 0xff}, z[2] = {0};
                 if (!run(&B, bi, 2, 1,
                          (umbra_buf[]){
-                             {x, 2 * 4, 0, 0},
-                             {y, 2 * 4, 0, 0},
-                             {z, 2 * 4, 0, 0},
+                             {.ptr=x, .sz=2 * 4},
+                             {.ptr=y, .sz=2 * 4},
+                             {.ptr=z, .sz=2 * 4},
                          })) {
                     continue;
                 }
@@ -361,10 +361,10 @@ static void test_i32_ops(void) {
                 int z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {cond, 3 * 4, 0, 0},
-                             {va, 3 * 4, 0, 0},
-                             {vb, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=cond, .sz=3 * 4},
+                             {.ptr=va, .sz=3 * 4},
+                             {.ptr=vb, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -387,9 +387,9 @@ static void test_cmp_i32(void) {
                 int y[] = {1, 9, 3}, z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -407,9 +407,9 @@ static void test_cmp_i32(void) {
                 int y[] = {1, 9}, z[2] = {0};
                 if (!run(&B, bi, 2, 1,
                          (umbra_buf[]){
-                             {x, 2 * 4, 0, 0},
-                             {y, 2 * 4, 0, 0},
-                             {z, 2 * 4, 0, 0},
+                             {.ptr=x, .sz=2 * 4},
+                             {.ptr=y, .sz=2 * 4},
+                             {.ptr=z, .sz=2 * 4},
                          })) {
                     continue;
                 }
@@ -426,9 +426,9 @@ static void test_cmp_i32(void) {
                 int y[] = {2, 5, 1}, z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -446,9 +446,9 @@ static void test_cmp_i32(void) {
                 int y[] = {2, 5, 1}, z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -466,9 +466,9 @@ static void test_cmp_i32(void) {
                 int y[] = {2, 5, 3}, z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -486,9 +486,9 @@ static void test_cmp_i32(void) {
                 int y[] = {2, 5, 3}, z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -506,9 +506,9 @@ static void test_cmp_i32(void) {
                 int y[] = {2, 1}, z[2] = {0};
                 if (!run(&B, bi, 2, 1,
                          (umbra_buf[]){
-                             {x, 2 * 4, 0, 0},
-                             {y, 2 * 4, 0, 0},
-                             {z, 2 * 4, 0, 0},
+                             {.ptr=x, .sz=2 * 4},
+                             {.ptr=y, .sz=2 * 4},
+                             {.ptr=z, .sz=2 * 4},
                          })) {
                     continue;
                 }
@@ -525,9 +525,9 @@ static void test_cmp_i32(void) {
                 int y[] = {2, 2, 1}, z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -545,9 +545,9 @@ static void test_cmp_i32(void) {
                 int y[] = {1, 1, 2}, z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -565,9 +565,9 @@ static void test_cmp_i32(void) {
                 int y[] = {1, 2, -1}, z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -591,9 +591,9 @@ static void test_cmp_f32(void) {
                 int   z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -612,9 +612,9 @@ static void test_cmp_f32(void) {
                 int   z[2] = {0};
                 if (!run(&B, bi, 2, 1,
                          (umbra_buf[]){
-                             {x, 2 * 4, 0, 0},
-                             {y, 2 * 4, 0, 0},
-                             {z, 2 * 4, 0, 0},
+                             {.ptr=x, .sz=2 * 4},
+                             {.ptr=y, .sz=2 * 4},
+                             {.ptr=z, .sz=2 * 4},
                          })) {
                     continue;
                 }
@@ -632,9 +632,9 @@ static void test_cmp_f32(void) {
                 int   z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -653,9 +653,9 @@ static void test_cmp_f32(void) {
                 int   z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -674,9 +674,9 @@ static void test_cmp_f32(void) {
                 int   z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -695,9 +695,9 @@ static void test_cmp_f32(void) {
                 int   z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -721,7 +721,7 @@ static void test_imm(void) {
                 int z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -748,10 +748,10 @@ static void test_fma_f32(void) {
             float d[] = {10, 20}, z[2] = {0};
             if (!run(&B, bi, 2, 1,
                      (umbra_buf[]){
-                         {a, 2 * 4, 0, 0},
-                         {c, 2 * 4, 0, 0},
-                         {d, 2 * 4, 0, 0},
-                         {z, 2 * 4, 0, 0},
+                         {.ptr=a, .sz=2 * 4},
+                         {.ptr=c, .sz=2 * 4},
+                         {.ptr=d, .sz=2 * 4},
+                         {.ptr=z, .sz=2 * 4},
                      })) {
                 continue;
             }
@@ -772,9 +772,9 @@ static void test_min_max_sqrt_f32(void) {
                 float y[] = {2, 4, 3}, z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -792,9 +792,9 @@ static void test_min_max_sqrt_f32(void) {
                 float y[] = {2, 4, 3}, z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -814,8 +814,8 @@ static void test_min_max_sqrt_f32(void) {
                 float a[] = {4, 9, 16}, z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {a, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=a, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -841,8 +841,8 @@ static void test_abs_sign_f32(void) {
                 float z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {a, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=a, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -863,8 +863,8 @@ static void test_abs_sign_f32(void) {
                 float z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {a, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=a, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -885,8 +885,8 @@ static void test_abs_sign_f32(void) {
                 float z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {a, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=a, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -915,8 +915,8 @@ static void test_round_floor_ceil(void) {
             int d_[4] = {0};                                                \
             if (!run(&B_, bi_, 4, 1,                                        \
                      (umbra_buf[]){                                         \
-                         {s_, 16, 0, 0},                                          \
-                         {d_, 16, 0, 0},                                          \
+                         {.ptr=s_, .sz=16},                                          \
+                         {.ptr=d_, .sz=16},                                          \
                      })) {                                                  \
                 continue;                                                   \
             }                                                               \
@@ -961,9 +961,9 @@ static void test_large_n(void) {
             }
             if (!run(&B, bi, 100, 1,
                      (umbra_buf[]){
-                         {x, 100 * 4, 0, 0},
-                         {y, 100 * 4, 0, 0},
-                         {z, 100 * 4, 0, 0},
+                         {.ptr=x, .sz=100 * 4},
+                         {.ptr=y, .sz=100 * 4},
+                         {.ptr=z, .sz=100 * 4},
                      })) {
                 continue;
             }
@@ -986,8 +986,8 @@ static void test_convert(void) {
                 float z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {a, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=a, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -1008,8 +1008,8 @@ static void test_convert(void) {
                 int   z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {a, 3 * 4, 0, 0},
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=a, .sz=3 * 4},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -1046,7 +1046,7 @@ static void test_constprop(void) {
                 int z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -1066,7 +1066,7 @@ static void test_constprop(void) {
                 float z[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {z, 3 * 4, 0, 0},
+                             {.ptr=z, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -1106,8 +1106,8 @@ static void test_strength_reduction(void) {
                 int32_t a[] = {1, 2, 3, 4, 5}, c[5] = {0};
                 if (!run(&B, bi, 5, 1,
                          (umbra_buf[]){
-                             {a, 5 * 4, 0, 0},
-                             {c, 5 * 4, 0, 0},
+                             {.ptr=a, .sz=5 * 4},
+                             {.ptr=c, .sz=5 * 4},
                          })) {
                     continue;
                 }
@@ -1125,8 +1125,8 @@ static void test_strength_reduction(void) {
                 int32_t a[] = {1, 2, 3}, c[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {a, 3 * 4, 0, 0},
-                             {c, 3 * 4, 0, 0},
+                             {.ptr=a, .sz=3 * 4},
+                             {.ptr=c, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -1150,8 +1150,8 @@ static void test_zero_imm(void) {
             int a[] = {0, 1, 0}, z[3] = {0};
             if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
-                         {a, 3 * 4, 0, 0},
-                         {z, 3 * 4, 0, 0},
+                         {.ptr=a, .sz=3 * 4},
+                         {.ptr=z, .sz=3 * 4},
                      })) {
                 continue;
             }
@@ -1234,11 +1234,11 @@ static void test_load_8x4(void) {
             int32_t b_[3] = {0}, aa[3] = {0};
             if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
-                         {src, 3 * 4, 0, 0},
-                         {rr, 3 * 4, 0, 0},
-                         {gg, 3 * 4, 0, 0},
-                         {b_, 3 * 4, 0, 0},
-                         {aa, 3 * 4, 0, 0},
+                         {.ptr=src, .sz=3 * 4},
+                         {.ptr=rr, .sz=3 * 4},
+                         {.ptr=gg, .sz=3 * 4},
+                         {.ptr=b_, .sz=3 * 4},
+                         {.ptr=aa, .sz=3 * 4},
                      })) {
                 continue;
             }
@@ -1286,11 +1286,11 @@ static void test_store_8x4(void) {
             uint32_t dst[3] = {0};
             if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
-                         {rr, 3 * 4, 0, 0},
-                         {gg, 3 * 4, 0, 0},
-                         {b_, 3 * 4, 0, 0},
-                         {aa, 3 * 4, 0, 0},
-                         {dst, 3 * 4, 0, 0},
+                         {.ptr=rr, .sz=3 * 4},
+                         {.ptr=gg, .sz=3 * 4},
+                         {.ptr=b_, .sz=3 * 4},
+                         {.ptr=aa, .sz=3 * 4},
+                         {.ptr=dst, .sz=3 * 4},
                      })) {
                 continue;
             }
@@ -1317,11 +1317,11 @@ static void test_srcover(void) {
                    dst_b[] = {0.5, 0.5, 0.5}, dst_a[] = {0.5, 0.5, 0.5};
             if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
-                         {src_px, 3 * 4, 0, 0},
-                         {dst_r, 3 * 2, 0, 0},
-                         {dst_g, 3 * 2, 0, 0},
-                         {dst_b, 3 * 2, 0, 0},
-                         {dst_a, 3 * 2, 0, 0},
+                         {.ptr=src_px, .sz=3 * 4},
+                         {.ptr=dst_r, .sz=3 * 2},
+                         {.ptr=dst_g, .sz=3 * 2},
+                         {.ptr=dst_b, .sz=3 * 2},
+                         {.ptr=dst_a, .sz=3 * 2},
                      })) {
                 continue;
             }
@@ -1358,8 +1358,8 @@ static void test_narrow_16(void) {
         uint16_t dst[3] = {0};
         if (!run(&B, bi, 3, 1,
                  (umbra_buf[]){
-                     {src, 3 * 4, 0, 0},
-                     {dst, 3 * 2, 0, 0},
+                     {.ptr=src, .sz=3 * 4},
+                     {.ptr=dst, .sz=3 * 2},
                  })) {
             continue;
         }
@@ -1383,8 +1383,8 @@ static void test_mixed_ptr_sizes(void) {
                 uint32_t y[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 4, 0, 0},
-                             {y, 3 * 4, 0, 0},
+                             {.ptr=x, .sz=3 * 4},
+                             {.ptr=y, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -1405,8 +1405,8 @@ static void test_mixed_ptr_sizes(void) {
                 __fp16 x[] = {1, 2, 3}, y[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {x, 3 * 2, 0, 0},
-                             {y, 3 * 2, 0, 0},
+                             {.ptr=x, .sz=3 * 2},
+                             {.ptr=y, .sz=3 * 2},
                          })) {
                     continue;
                 }
@@ -1432,9 +1432,9 @@ static void test_n9(void) {
                 }
                 if (!run(&B, bi, 9, 1,
                          (umbra_buf[]){
-                             {x, 9 * 4, 0, 0},
-                             {y, 9 * 4, 0, 0},
-                             {z, 9 * 4, 0, 0},
+                             {.ptr=x, .sz=9 * 4},
+                             {.ptr=y, .sz=9 * 4},
+                             {.ptr=z, .sz=9 * 4},
                          })) {
                     continue;
                 }
@@ -1453,9 +1453,9 @@ static void test_n9(void) {
                 }
                 if (!run(&B, bi, 9, 1,
                          (umbra_buf[]){
-                             {x, 9 * 4, 0, 0},
-                             {y, 9 * 4, 0, 0},
-                             {z, 9 * 4, 0, 0},
+                             {.ptr=x, .sz=9 * 4},
+                             {.ptr=y, .sz=9 * 4},
+                             {.ptr=z, .sz=9 * 4},
                          })) {
                     continue;
                 }
@@ -1491,8 +1491,8 @@ static void test_n9(void) {
                 for (int i = 0; i < 9; i++) { src[i] = 0xAABBCC00u + (uint32_t)i; }
                 if (!run(&B, bi, 9, 1,
                          (umbra_buf[]){
-                             {src, 9 * 4, 0, 0},
-                             {dst, 9 * 4, 0, 0},
+                             {.ptr=src, .sz=9 * 4},
+                             {.ptr=dst, .sz=9 * 4},
                          })) {
                     continue;
                 }
@@ -1534,16 +1534,16 @@ static void test_preamble_pair_alias(void) {
             for (int i = 0; i < 16; i++) { in[i] = (float)(i + 1); }
             if (!run(&B, bi, 16, 1,
                      (umbra_buf[]){
-                         {in, 16 * 4, 0, 0},
-                         {out, 16 * 4, 0, 0},
+                         {.ptr=in, .sz=16 * 4},
+                         {.ptr=out, .sz=16 * 4},
                      })) {
                 continue;
             }
             float ref[16];
             umbra_program_queue(B.p[0], 0, 0, 16, 1,
                                 (umbra_buf[]){
-                                    {in, 16 * 4, 0, 0},
-                                    {ref, 16 * 4, 0, 0},
+                                    {.ptr=in, .sz=16 * 4},
+                                    {.ptr=ref, .sz=16 * 4},
                                 });
             for (int i = 0; i < 16; i++) { equiv(out[i], ref[i]) here; }
         }
@@ -1565,9 +1565,9 @@ static void test_gather_clamp(void) {
                 int32_t dst[4] = {0};
                 if (!run(&B, bi, 4, 1,
                          (umbra_buf[]){
-                             {indices, sizeof indices, 0, 0},
-                             {src, sizeof src, 0, 0},
-                             {dst, sizeof dst, 0, 0},
+                             {.ptr=indices, .sz=sizeof indices},
+                             {.ptr=src, .sz=sizeof src},
+                             {.ptr=dst, .sz=sizeof dst},
                          })) {
                     continue;
                 }
@@ -1591,9 +1591,9 @@ static void test_gather_clamp(void) {
                 int32_t dst[4] = {0};
                 if (!run(&B, bi, 4, 1,
                          (umbra_buf[]){
-                             {indices, sizeof indices, 0, 0},
-                             {src, sizeof src, 0, 0},
-                             {dst, sizeof dst, 0, 0},
+                             {.ptr=indices, .sz=sizeof indices},
+                             {.ptr=src, .sz=sizeof src},
+                             {.ptr=dst, .sz=sizeof dst},
                          })) {
                     continue;
                 }
@@ -1619,9 +1619,9 @@ static void test_gather_clamp_zero_sz(void) {
         int32_t src[3] = {100, 200, 300};
         int32_t dst[1] = {0};
         if (!run(&B, bi, 1, 1, (umbra_buf[]){
-            {neg_idx, 4, 0, 0},
-            {src, sizeof src, 0, 0},
-            {dst, 4, 0, 0},
+            {.ptr=neg_idx, .sz=4},
+            {.ptr=src, .sz=sizeof src},
+            {.ptr=dst, .sz=4},
         })) { continue; }
         dst[0] == 0 here;
     }
@@ -1632,9 +1632,9 @@ static void test_gather_clamp_zero_sz(void) {
         int32_t src[3] = {100, 200, 300};
         int32_t dst[1] = {0};
         if (!run(&B, bi, 1, 1, (umbra_buf[]){
-            {big_idx, 4, 0, 0},
-            {src, sizeof src, 0, 0},
-            {dst, 4, 0, 0},
+            {.ptr=big_idx, .sz=4},
+            {.ptr=src, .sz=sizeof src},
+            {.ptr=dst, .sz=4},
         })) { continue; }
         dst[0] == 0 here;
     }
@@ -1660,9 +1660,9 @@ static void test_offset_load_store(void) {
                 int32_t dst[8] = {0};
                 if (!run(&B, bi, 8, 1,
                          (umbra_buf[]){
-                             {src, sizeof src, 0, 0},
-                             {uni, sizeof uni, 1, 0},
-                             {dst, sizeof dst, 0, 0},
+                             {.ptr=src, .sz=sizeof src},
+                             {.ptr=uni, .sz=sizeof uni, .read_only=1},
+                             {.ptr=dst, .sz=sizeof dst},
                          })) {
                     continue;
                 }
@@ -1687,9 +1687,9 @@ static void test_offset_load_store(void) {
                 int32_t dst[8] = {0};
                 if (!run(&B, bi, 8, 1,
                          (umbra_buf[]){
-                             {src, sizeof src, 0, 0},
-                             {uni, sizeof uni, 1, 0},
-                             {dst, sizeof dst, 0, 0},
+                             {.ptr=src, .sz=sizeof src},
+                             {.ptr=uni, .sz=sizeof uni, .read_only=1},
+                             {.ptr=dst, .sz=sizeof dst},
                          })) {
                     continue;
                 }
@@ -1716,9 +1716,9 @@ static void test_offset_load_store(void) {
                 uint16_t dst[8] = {0};
                 if (!run(&B, bi, 8, 1,
                          (umbra_buf[]){
-                             {src, sizeof src, 0, 0},
-                             {uni, sizeof uni, 1, 0},
-                             {dst, sizeof dst, 0, 0},
+                             {.ptr=src, .sz=sizeof src},
+                             {.ptr=uni, .sz=sizeof uni, .read_only=1},
+                             {.ptr=dst, .sz=sizeof dst},
                          })) {
                     continue;
                 }
@@ -1746,8 +1746,8 @@ static void test_shift_imm(void) {
                 uint32_t dst[4] = {0};
                 if (!run(&B, bi, 4, 1,
                          (umbra_buf[]){
-                             {src, 4 * 4, 0, 0},
-                             {dst, 4 * 4, 0, 0},
+                             {.ptr=src, .sz=4 * 4},
+                             {.ptr=dst, .sz=4 * 4},
                          })) {
                     continue;
                 }
@@ -1769,8 +1769,8 @@ static void test_shift_imm(void) {
                 uint32_t dst[3] = {0};
                 if (!run(&B, bi, 3, 1,
                          (umbra_buf[]){
-                             {src, 3 * 4, 0, 0},
-                             {dst, 3 * 4, 0, 0},
+                             {.ptr=src, .sz=3 * 4},
+                             {.ptr=dst, .sz=3 * 4},
                          })) {
                     continue;
                 }
@@ -1791,8 +1791,8 @@ static void test_shift_imm(void) {
                 uint32_t dst[2] = {0};
                 if (!run(&B, bi, 2, 1,
                          (umbra_buf[]){
-                             {src, 2 * 4, 0, 0},
-                             {dst, 2 * 4, 0, 0},
+                             {.ptr=src, .sz=2 * 4},
+                             {.ptr=dst, .sz=2 * 4},
                          })) {
                     continue;
                 }
@@ -1826,11 +1826,11 @@ static void test_pack_channels(void) {
             uint32_t dst[3] = {0};
             if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
-                         {rr, 3 * 4, 0, 0},
-                         {gg, 3 * 4, 0, 0},
-                         {bb_, 3 * 4, 0, 0},
-                         {aa, 3 * 4, 0, 0},
-                         {dst, 3 * 4, 0, 0},
+                         {.ptr=rr, .sz=3 * 4},
+                         {.ptr=gg, .sz=3 * 4},
+                         {.ptr=bb_, .sz=3 * 4},
+                         {.ptr=aa, .sz=3 * 4},
+                         {.ptr=dst, .sz=3 * 4},
                      })) {
                 continue;
             }
@@ -1874,9 +1874,9 @@ static void test_gather_deref_large(void) {
         __builtin_memset(dst, 0, sizeof dst);
         if (!run(&B, bi, 4, 1,
                  (umbra_buf[]){
-                     {indices, sizeof indices, 0, 0},
-                     {uni, sizeof uni_, 1, 0},
-                     {dst, sizeof dst, 0, 0},
+                     {.ptr=indices, .sz=sizeof indices},
+                     {.ptr=uni, .sz=sizeof uni_, .read_only=1},
+                     {.ptr=dst, .sz=sizeof dst},
                  })) {
             continue;
         }
@@ -1901,8 +1901,8 @@ static void test_imm_fused(void) {
             float src[] = {10, 20, 30}, dst[3] = {0};
             if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
-                         {src, 3 * 4, 0, 0},
-                         {dst, 3 * 4, 0, 0},
+                         {.ptr=src, .sz=3 * 4},
+                         {.ptr=dst, .sz=3 * 4},
                      })) {
                 continue;
             }
@@ -1922,8 +1922,8 @@ static void test_imm_fused(void) {
             int src[] = {10, 20, 30}, dst[3] = {0};
             if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
-                         {src, 3 * 4, 0, 0},
-                         {dst, 3 * 4, 0, 0},
+                         {.ptr=src, .sz=3 * 4},
+                         {.ptr=dst, .sz=3 * 4},
                      })) {
                 continue;
             }
@@ -1943,8 +1943,8 @@ static void test_imm_fused(void) {
             int src[] = {0x0f, 0x00, 0xff}, dst[3] = {0};
             if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
-                         {src, 3 * 4, 0, 0},
-                         {dst, 3 * 4, 0, 0},
+                         {.ptr=src, .sz=3 * 4},
+                         {.ptr=dst, .sz=3 * 4},
                      })) {
                 continue;
             }
@@ -1965,8 +1965,8 @@ static void test_imm_fused(void) {
             int   dst[3] = {0};
             if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
-                         {src, 3 * 4, 0, 0},
-                         {dst, 3 * 4, 0, 0},
+                         {.ptr=src, .sz=3 * 4},
+                         {.ptr=dst, .sz=3 * 4},
                      })) {
                 continue;
             }
@@ -1987,8 +1987,8 @@ static void test_imm_fused(void) {
             int   dst[3] = {0};
             if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
-                         {src, 3 * 4, 0, 0},
-                         {dst, 3 * 4, 0, 0},
+                         {.ptr=src, .sz=3 * 4},
+                         {.ptr=dst, .sz=3 * 4},
                      })) {
                 continue;
             }
@@ -2008,8 +2008,8 @@ static void test_imm_fused(void) {
             int src[] = {3, 5, 7}, dst[3] = {0};
             if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
-                         {src, 3 * 4, 0, 0},
-                         {dst, 3 * 4, 0, 0},
+                         {.ptr=src, .sz=3 * 4},
+                         {.ptr=dst, .sz=3 * 4},
                      })) {
                 continue;
             }
@@ -2029,8 +2029,8 @@ static void test_imm_fused(void) {
             int src[] = {3, 5, 7}, dst[3] = {0};
             if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
-                         {src, 3 * 4, 0, 0},
-                         {dst, 3 * 4, 0, 0},
+                         {.ptr=src, .sz=3 * 4},
+                         {.ptr=dst, .sz=3 * 4},
                      })) {
                 continue;
             }
@@ -2053,8 +2053,8 @@ static void test_cmp_zero(void) {
             int src[] = {-1, 0, 1}, dst[3] = {0};
             if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
-                         {src, 3 * 4, 0, 0},
-                         {dst, 3 * 4, 0, 0},
+                         {.ptr=src, .sz=3 * 4},
+                         {.ptr=dst, .sz=3 * 4},
                      })) {
                 continue;
             }
@@ -2075,8 +2075,8 @@ static void test_cmp_zero(void) {
             int   dst[3] = {0};
             if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
-                         {src, 3 * 4, 0, 0},
-                         {dst, 3 * 4, 0, 0},
+                         {.ptr=src, .sz=3 * 4},
+                         {.ptr=dst, .sz=3 * 4},
                      })) {
                 continue;
             }
@@ -2097,8 +2097,8 @@ static void test_cmp_zero(void) {
             int   dst[3] = {0};
             if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
-                         {src, 3 * 4, 0, 0},
-                         {dst, 3 * 4, 0, 0},
+                         {.ptr=src, .sz=3 * 4},
+                         {.ptr=dst, .sz=3 * 4},
                      })) {
                 continue;
             }
@@ -2118,8 +2118,8 @@ static void test_cmp_zero(void) {
             int src[] = {-1, 0, 1}, dst[3] = {0};
             if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
-                         {src, 3 * 4, 0, 0},
-                         {dst, 3 * 4, 0, 0},
+                         {.ptr=src, .sz=3 * 4},
+                         {.ptr=dst, .sz=3 * 4},
                      })) {
                 continue;
             }
@@ -2145,7 +2145,7 @@ static void test_imm_broadcast(void) {
             int dst[3] = {0};
             if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
-                         {dst, 3 * 4, 0, 0},
+                         {.ptr=dst, .sz=3 * 4},
                      })) {
                 continue;
             }
@@ -2173,10 +2173,10 @@ static void test_codegen_regalloc(void) {
             float dst[4] = {0};
             if (!run(&B, bi, 2, 1,
                      (umbra_buf[]){
-                         {a, 2 * 4, 0, 0},
-                         {c, 2 * 4, 0, 0},
-                         {d, 2 * 4, 0, 0},
-                         {dst, 2 * 4, 0, 0},
+                         {.ptr=a, .sz=2 * 4},
+                         {.ptr=c, .sz=2 * 4},
+                         {.ptr=d, .sz=2 * 4},
+                         {.ptr=dst, .sz=2 * 4},
                      })) {
                 continue;
             }
@@ -2201,10 +2201,10 @@ static void test_codegen_regalloc(void) {
             float dst[4] = {0};
             if (!run(&B, bi, 2, 1,
                      (umbra_buf[]){
-                         {a, 2 * 4, 0, 0},
-                         {c, 2 * 4, 0, 0},
-                         {d, 2 * 4, 0, 0},
-                         {dst, 2 * 4, 0, 0},
+                         {.ptr=a, .sz=2 * 4},
+                         {.ptr=c, .sz=2 * 4},
+                         {.ptr=d, .sz=2 * 4},
+                         {.ptr=dst, .sz=2 * 4},
                      })) {
                 continue;
             }
@@ -2228,10 +2228,10 @@ static void test_codegen_regalloc(void) {
             int dst[2] = {0};
             if (!run(&B, bi, 2, 1,
                      (umbra_buf[]){
-                         {m, 2 * 4, 0, 0},
-                         {t, 2 * 4, 0, 0},
-                         {f, 2 * 4, 0, 0},
-                         {dst, 2 * 4, 0, 0},
+                         {.ptr=m, .sz=2 * 4},
+                         {.ptr=t, .sz=2 * 4},
+                         {.ptr=f, .sz=2 * 4},
+                         {.ptr=dst, .sz=2 * 4},
                      })) {
                 continue;
             }
@@ -2255,10 +2255,10 @@ static void test_codegen_regalloc(void) {
             int dst[2] = {0}, dst2[2] = {0};
             if (!run(&B, bi, 2, 1,
                      (umbra_buf[]){
-                         {ba, 2 * 4, 0, 0},
-                         {vl, 2 * 4, 0, 0},
-                         {dst, 2 * 4, 0, 0},
-                         {dst2, 2 * 4, 0, 0},
+                         {.ptr=ba, .sz=2 * 4},
+                         {.ptr=vl, .sz=2 * 4},
+                         {.ptr=dst, .sz=2 * 4},
+                         {.ptr=dst2, .sz=2 * 4},
                      })) {
                 continue;
             }
@@ -2283,10 +2283,10 @@ static void test_fms(void) {
         float a[] = {2, 3, 4}, c[] = {5, 6, 7}, d[] = {100, 200, 300}, dst[3] = {0};
         if (!run(&B, bi, 3, 1,
                  (umbra_buf[]){
-                     {a, 3 * 4, 0, 0},
-                     {c, 3 * 4, 0, 0},
-                     {d, 3 * 4, 0, 0},
-                     {dst, 3 * 4, 0, 0},
+                     {.ptr=a, .sz=3 * 4},
+                     {.ptr=c, .sz=3 * 4},
+                     {.ptr=d, .sz=3 * 4},
+                     {.ptr=dst, .sz=3 * 4},
                  })) {
             continue;
         }
@@ -2312,8 +2312,8 @@ static void test_movi_patterns(void) {
             int src[] = {0, 0, 0}, dst[3] = {0};
             if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
-                         {src, 3 * 4, 0, 0},
-                         {dst, 3 * 4, 0, 0},
+                         {.ptr=src, .sz=3 * 4},
+                         {.ptr=dst, .sz=3 * 4},
                      })) {
                 continue;
             }
@@ -2337,8 +2337,8 @@ static void test_mixed_ptr(void) {
         int      dst[3] = {0};
         if (!run(&B, bi, 3, 1,
                  (umbra_buf[]){
-                     {src, sizeof src, 0, 0},
-                     {dst, 3 * 4, 0, 0},
+                     {.ptr=src, .sz=sizeof src},
+                     {.ptr=dst, .sz=3 * 4},
                  })) {
             continue;
         }
@@ -2362,9 +2362,9 @@ static void test_uni_16(void) {
             int      dst[3] = {0};
             if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
-                         {idx_val, 4, 0, 0},
-                         {src, 8, 0, 0},
-                         {dst, 3 * 4, 0, 0},
+                         {.ptr=idx_val, .sz=4},
+                         {.ptr=src, .sz=8},
+                         {.ptr=dst, .sz=3 * 4},
                      })) {
                 continue;
             }
@@ -2410,8 +2410,8 @@ static void test_xy(void) {
         __builtin_memset(ybuf, 0, sizeof ybuf);
         if (!run(&B, bi, W, H,
                  (umbra_buf[]){
-                     {xbuf, sizeof xbuf, 0, W * 4},
-                     {ybuf, sizeof ybuf, 0, W * 4},
+                     {.ptr=xbuf, .sz=sizeof xbuf, .row_bytes=W * 4},
+                     {.ptr=ybuf, .sz=sizeof ybuf, .row_bytes=W * 4},
                  })) {
             continue;
         }
@@ -2435,8 +2435,8 @@ static void test_load_next_32(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
         if (!run(&B, bi, 16, 1, (umbra_buf[]){
-            {src, sizeof src, 0, 0},
-            {dst, sizeof dst, 0, 0},
+            {.ptr=src, .sz=sizeof src},
+            {.ptr=dst, .sz=sizeof dst},
         })) { continue; }
         for (int i = 0; i < 16; i++) { (dst[i] == src[i]) here; }
     }
@@ -2444,8 +2444,8 @@ static void test_load_next_32(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
         if (!run(&B, bi, 4, 4, (umbra_buf[]){
-            {src, sizeof src, 0, 4*4},
-            {dst, sizeof dst, 0, 4*4},
+            {.ptr=src, .sz=sizeof src, .row_bytes=4*4},
+            {.ptr=dst, .sz=sizeof dst, .row_bytes=4*4},
         })) { continue; }
         for (int i = 0; i < 16; i++) { (dst[i] == src[i]) here; }
     }
@@ -2464,8 +2464,8 @@ static void test_load_next_16(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
         if (!run(&B, bi, 16, 1, (umbra_buf[]){
-            {src, sizeof src, 0, 0},
-            {dst, sizeof dst, 0, 0},
+            {.ptr=src, .sz=sizeof src},
+            {.ptr=dst, .sz=sizeof dst},
         })) { continue; }
         for (int i = 0; i < 16; i++) { (dst[i] == src[i]) here; }
     }
@@ -2473,8 +2473,8 @@ static void test_load_next_16(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
         if (!run(&B, bi, 4, 4, (umbra_buf[]){
-            {src, sizeof src, 0, 4*2},
-            {dst, sizeof dst, 0, 4*2},
+            {.ptr=src, .sz=sizeof src, .row_bytes=4*2},
+            {.ptr=dst, .sz=sizeof dst, .row_bytes=4*2},
         })) { continue; }
         for (int i = 0; i < 16; i++) { (dst[i] == src[i]) here; }
     }
@@ -2494,8 +2494,8 @@ static void test_load_store_next_64(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
         if (!run(&B, bi, 16, 1, (umbra_buf[]){
-            {src, sizeof src, 0, 0},
-            {dst, sizeof dst, 0, 0},
+            {.ptr=src, .sz=sizeof src},
+            {.ptr=dst, .sz=sizeof dst},
         })) { continue; }
         for (int i = 0; i < 32; i++) { (dst[i] == src[i]) here; }
     }
@@ -2503,8 +2503,8 @@ static void test_load_store_next_64(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
         if (!run(&B, bi, 4, 4, (umbra_buf[]){
-            {src, sizeof src, 0, 4*8},
-            {dst, sizeof dst, 0, 4*8},
+            {.ptr=src, .sz=sizeof src, .row_bytes=4*8},
+            {.ptr=dst, .sz=sizeof dst, .row_bytes=4*8},
         })) { continue; }
         for (int i = 0; i < 32; i++) { (dst[i] == src[i]) here; }
     }
@@ -2529,8 +2529,8 @@ static void test_load_8x4_channel_vals(void) {
         uint32_t d[4][8];
         __builtin_memset(d, 0, sizeof d);
         if (!run(&B, bi, 8, 1, (umbra_buf[]){
-            {src, sizeof src, 0, 0},
-            {d[0], 32, 0, 0}, {d[1], 32, 0, 0}, {d[2], 32, 0, 0}, {d[3], 32, 0, 0},
+            {.ptr=src, .sz=sizeof src},
+            {.ptr=d[0], .sz=32}, {.ptr=d[1], .sz=32}, {.ptr=d[2], .sz=32}, {.ptr=d[3], .sz=32},
         })) { continue; }
         union { uint32_t u; float f; } u;
         for (int j = 0; j < 8; j++) {
@@ -2556,8 +2556,8 @@ static void test_load_store_8x4_roundtrip(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
         if (!run(&B, bi, 16, 1, (umbra_buf[]){
-            {src, sizeof src, 0, 0},
-            {dst, sizeof dst, 0, 0},
+            {.ptr=src, .sz=sizeof src},
+            {.ptr=dst, .sz=sizeof dst},
         })) { continue; }
         for (int i = 0; i < 16; i++) { (dst[i] == src[i]) here; }
     }
@@ -2594,9 +2594,9 @@ static void test_load_stride_neq_w(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
         if (!run(&B, bi, 4, 2, (umbra_buf[]){
-            {uni, (size_t)(ri * 4 + 4), 1, 0},
-            {src, sizeof src, 0, 0},
-            {dst, sizeof dst, 0, 4*4},
+            {.ptr=uni, .sz=(size_t)(ri * 4 + 4), .read_only=1},
+            {.ptr=src, .sz=sizeof src},
+            {.ptr=dst, .sz=sizeof dst, .row_bytes=4*4},
         })) { continue; }
         for (int i = 0; i < 8; i++) { (dst[i] == expected[i]) here; }
     }
@@ -2623,8 +2623,8 @@ static void test_jit_xs_init(void) {
         __asm__ volatile("mov x15, #0xdead" ::: "x15");
 #endif
         if (!run(&B, bi, 4, 1, (umbra_buf[]){
-            {src, sizeof src, 0, 0},
-            {dst, sizeof dst, 0, 0},
+            {.ptr=src, .sz=sizeof src},
+            {.ptr=dst, .sz=sizeof dst},
         })) { continue; }
         for (int i = 0; i < 4; i++) { (dst[i] == src[i] + sum_pre) here; }
     }
@@ -2671,8 +2671,8 @@ static void test_program_null_guards(void) {
 
     // queue with w=0 and h=0
     int32_t buf[1] = {0};
-    umbra_program_queue(p, 0, 0, 0, 1, (umbra_buf[]){{buf, 4, 0, 0}});
-    umbra_program_queue(p, 0, 0, 1, 0, (umbra_buf[]){{buf, 4, 0, 0}});
+    umbra_program_queue(p, 0, 0, 0, 1, (umbra_buf[]){{.ptr=buf, .sz=4}});
+    umbra_program_queue(p, 0, 0, 1, 0, (umbra_buf[]){{.ptr=buf, .sz=4}});
 
     umbra_program_free(p);
     umbra_backend_free(be);
@@ -2698,7 +2698,7 @@ static void test_preamble_register_boundary(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
         if (!run(&B, bi, 32, 1,
-                 (umbra_buf[]){{&uni, 4, 1, 0}, {dst, sizeof dst, 0, 0}})) {
+                 (umbra_buf[]){{.ptr=&uni, .sz=4, .read_only=1}, {.ptr=dst, .sz=sizeof dst}})) {
             continue;
         }
         for (int col = 0; col < 32; col++) {
@@ -2778,7 +2778,7 @@ int main(void) {
             __builtin_memset(buf, 0xff, sizeof buf);
             if (!B.p[bi]) { continue; }
             umbra_program_queue(B.p[bi], L, T, R, BT,
-                                (umbra_buf[]){{buf, sizeof buf, 0, S * 4}});
+                                (umbra_buf[]){{.ptr=buf, .sz=sizeof buf, .row_bytes=S * 4}});
             umbra_backend_flush(B.be[bi]);
             for (int row = T; row < BT; row++) {
                 for (int col = L; col < R; col++) {
@@ -2811,8 +2811,8 @@ int main(void) {
             __builtin_memset(dst, 0, sizeof dst);
             if (!B.p[bi]) { continue; }
             umbra_program_queue(B.p[bi], L, T, R, BT,
-                                (umbra_buf[]){{src, sizeof src, 1, S * 4},
-                                              {dst, sizeof dst, 0, S * 4}});
+                                (umbra_buf[]){{.ptr=src, .sz=sizeof src, .row_bytes=S * 4, .read_only=1},
+                                              {.ptr=dst, .sz=sizeof dst, .row_bytes=S * 4}});
             umbra_backend_flush(B.be[bi]);
             for (int row = T; row < BT; row++) {
                 for (int col = L; col < R; col++) {
@@ -2847,8 +2847,8 @@ int main(void) {
             __builtin_memset(dst, 0, sizeof dst);
             if (!B.p[bi]) { continue; }
             umbra_program_queue(B.p[bi], L, T, R, BT,
-                                (umbra_buf[]){{src, sizeof src, 1, SW * 4},
-                                              {dst, sizeof dst, 0, DW * 4}});
+                                (umbra_buf[]){{.ptr=src, .sz=sizeof src, .row_bytes=SW * 4, .read_only=1},
+                                              {.ptr=dst, .sz=sizeof dst, .row_bytes=DW * 4}});
             umbra_backend_flush(B.be[bi]);
             for (int row = T; row < BT; row++) {
                 for (int col = L; col < R; col++) {
@@ -2891,9 +2891,9 @@ int main(void) {
             __builtin_memset(dst_px, 0, sizeof dst_px);
             if (!B.p[bi]) { continue; }
             umbra_program_queue(B.p[bi], L, T, R, BT,
-                                (umbra_buf[]){{0, 0, 0, 0},
-                                              {uni, sizeof uni_, 1, 0},
-                                              {dst_px, sizeof dst_px, 0, S * 4}});
+                                (umbra_buf[]){{0},
+                                              {.ptr=uni, .sz=sizeof uni_, .read_only=1},
+                                              {.ptr=dst_px, .sz=sizeof dst_px, .row_bytes=S * 4}});
             umbra_backend_flush(B.be[bi]);
             for (int row = T; row < BT; row++) {
                 for (int col = L; col < R; col++) {
@@ -2945,9 +2945,9 @@ int main(void) {
             __builtin_memset(dst_px, 0, sizeof dst_px);
             if (!B.p[bi]) { continue; }
             umbra_program_queue(B.p[bi], L, T, R, BT,
-                                (umbra_buf[]){{0, 0, 0, 0},
-                                              {uni, sizeof uni_, 1, 0},
-                                              {dst_px, sizeof dst_px, 0, S * 4}});
+                                (umbra_buf[]){{0},
+                                              {.ptr=uni, .sz=sizeof uni_, .read_only=1},
+                                              {.ptr=dst_px, .sz=sizeof dst_px, .row_bytes=S * 4}});
             umbra_backend_flush(B.be[bi]);
             for (int row = T; row < BT; row++) {
                 for (int col = L; col < R; col++) {

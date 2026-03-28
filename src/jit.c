@@ -92,7 +92,7 @@ static void load_ptr(Buf *c, int p, int *last_ptr) {
     if (*last_ptr != p) {
         *last_ptr = p;
         int disp_ptr = p * (int)sizeof(umbra_buf);
-        int disp_rb  = p * (int)sizeof(umbra_buf) + 24;
+        int disp_rb  = p * (int)sizeof(umbra_buf) + (int)__builtin_offsetof(umbra_buf, row_bytes);
         put(c, 0xf9400000u | ((uint32_t)(disp_ptr / 8) << 10) | ((uint32_t)XBUF << 5) | (uint32_t)XP);
         put(c, 0xf9400000u | ((uint32_t)(disp_rb  / 8) << 10) | ((uint32_t)XBUF << 5) | (uint32_t)XT);
         put(c, 0x9b000000u | ((uint32_t)XT << 16) | ((uint32_t)XP << 10)
@@ -122,7 +122,7 @@ static void load_count(Buf *c, int p, int elem_shift, int const *deref_gpr) {
         (void)deref_gpr;
         put(c, 0xd2a00000u | (0x7fffu << 5) | (uint32_t)XM);
     } else {
-        int disp = p * (int)sizeof(umbra_buf) + 8;
+        int disp = p * (int)sizeof(umbra_buf) + (int)__builtin_offsetof(umbra_buf, sz);
         put(c, 0xf9400000u | ((uint32_t)(disp / 8) << 10) | ((uint32_t)XBUF << 5) | (uint32_t)XM);
         if (elem_shift) {
             put(c,
@@ -1218,7 +1218,7 @@ static void load_count_x86(Buf *c, int p, int elem_shift) {
     if (p < 0) {
         mov_ri(c, XM, 0x7fffffff);
     } else {
-        mov_load(c, XM, XBUF, p * (int)sizeof(umbra_buf) + 8);
+        mov_load(c, XM, XBUF, p * (int)sizeof(umbra_buf) + (int)__builtin_offsetof(umbra_buf, sz));
         if (elem_shift) {
             shr_ri(c, XM, (uint8_t)elem_shift);
         }
@@ -1230,7 +1230,7 @@ static int load_ptr_x86(Buf *c, int p, int *last_ptr) {
     if (*last_ptr != p) {
         *last_ptr = p;
         mov_load(c, R11, XBUF, p * (int)sizeof(umbra_buf));
-        mov_load(c, RAX, XBUF, p * (int)sizeof(umbra_buf) + 24);
+        mov_load(c, RAX, XBUF, p * (int)sizeof(umbra_buf) + (int)__builtin_offsetof(umbra_buf, row_bytes));
         rex_w(c, RAX, XY);
         emit1(c, 0x0f); emit1(c, 0xaf);
         emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (XY & 7)));

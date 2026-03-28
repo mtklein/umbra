@@ -125,8 +125,8 @@ int main(int argc, char *argv[]) {
         int32_t j0 = 0;
         __builtin_memcpy(au + al.loop_off, &j0, 4);
         umbra_buf abuf[] = {
-            {au, (size_t)al.uni_len, 1, 0},
-            {wind, (size_t)(W * H * 4), 0, 0},
+            {.ptr=au, .sz=(size_t)al.uni_len, .read_only=1},
+            {.ptr=wind, .sz=(size_t)(W * H * 4)},
         };
 
         printf("\n%-40s %12s %12s %12s\n", "slug accumulator (1 curve)", "interp",

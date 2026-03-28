@@ -16,11 +16,40 @@ void   umbra_backend_free      (struct umbra_backend*);
 void   umbra_backend_flush     (struct umbra_backend*);
 _Bool  umbra_backend_threadsafe(struct umbra_backend const*);
 
+typedef enum {
+    umbra_fmt_none = 0,
+    umbra_fmt_8888,
+    umbra_fmt_565,
+    umbra_fmt_1010102,
+    umbra_fmt_fp16,
+    umbra_fmt_f16,
+    umbra_fmt_f32,
+} umbra_fmt;
+
+static inline int umbra_pixel_bytes(umbra_fmt fmt) {
+    switch (fmt) {
+    case umbra_fmt_none:     return 0;
+    case umbra_fmt_8888:     return 4;
+    case umbra_fmt_565:      return 2;
+    case umbra_fmt_1010102:  return 4;
+    case umbra_fmt_fp16:     return 8;
+    case umbra_fmt_f16:      return 2;
+    case umbra_fmt_f32:      return 4;
+    }
+    return 0;
+}
+
+typedef void (*umbra_transfer_fn)(float dst[4], float const src[4]);
+
 typedef struct {
-    void  *ptr;
-    size_t sz, : 8*sizeof(size_t)-8;
-    _Bool  read_only;
-    size_t row_bytes;
+    void              *ptr;
+    size_t             sz;
+    size_t             row_bytes;
+    umbra_transfer_fn  transfer_to_linear;
+    umbra_transfer_fn  transfer_from_linear;
+    umbra_fmt          fmt;
+    _Bool              read_only;
+    char               pad_[3];
 } umbra_buf;
 
 
