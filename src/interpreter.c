@@ -166,53 +166,9 @@ enum {
     op_r_fma_f32_mmm, op_r_fma_f32_mmr, op_m_fma_f32_mmr,
     op_r_fms_f32_mmm, op_r_fms_f32_mmr, op_m_fms_f32_mmr,
     op_r_sel_32_mm, op_r_sel_32_rm, op_m_sel_32_rm,
-    op_r_load_32, op_r_load_16,
 
     SW_NUM_OPS,
 };
-
-// Out-of-line load helpers to keep the dispatch function small.
-__attribute__((noinline))
-static val load_32_impl(umbra_buf const *b, int row, int end, int n) {
-    val r;
-    void const    *base = (char*)b->ptr + (size_t)row * b->row_bytes;
-    int32_t const *src = (int32_t const*)base;
-    int const      i = end - K;
-    int const      rem = n - i;
-    if (rem >= K) {
-        __builtin_memcpy(&r, src + i, 4 * K);
-    } else {
-        r.i32 = (I32){0};
-        for (int ll = 0; ll < rem; ll++) {
-            int32_t tmp;
-            __builtin_memcpy(&tmp, src + i + ll, 4);
-            r.i32[ll] = tmp;
-        }
-    }
-    return r;
-}
-
-__attribute__((noinline))
-static val load_16_impl(umbra_buf const *b, int row, int end, int n) {
-    val r;
-    void const     *base = (char*)b->ptr + (size_t)row * b->row_bytes;
-    uint16_t const *src = (uint16_t const*)base;
-    int const       i = end - K;
-    int const       rem = n - i;
-    r.u32 = (U32){0};
-    if (rem >= K) {
-        U16 tmp;
-        __builtin_memcpy(&tmp, src + i, 2 * K);
-        __builtin_memcpy(&r, &tmp, sizeof tmp);
-    } else {
-        for (int ll = 0; ll < rem; ll++) {
-            uint16_t s;
-            __builtin_memcpy(&s, src + i + ll, 2);
-            __builtin_memcpy((char*)&r + 2 * ll, &s, 2);
-        }
-    }
-    return r;
-}
 
 struct sw_inst {
     int tag;
@@ -505,15 +461,12 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
 
             // Output-only ops: no register inputs, just output to register.
             if (out_r && (tag == op_imm_32 || tag == op_x || tag == op_y
-                       || tag == op_uniform_32 || tag == op_uniform_16
-                       || tag == op_load_32 || tag == op_load_16)) {
+                       || tag == op_uniform_32 || tag == op_uniform_16)) {
                      if (tag == op_imm_32)      { s->tag = op_r_imm_32; }
                 else if (tag == op_x)           { s->tag = op_r_x; }
                 else if (tag == op_y)           { s->tag = op_r_y; }
                 else if (tag == op_uniform_32)  { s->tag = op_r_uniform_32; }
                 else if (tag == op_uniform_16)  { s->tag = op_r_uniform_16; }
-                else if (tag == op_load_32)     { s->tag = op_r_load_32; }
-                else if (tag == op_load_16)     { s->tag = op_r_load_16; }
             } else
             { /* not an upgradable op */ }
 
@@ -632,8 +585,6 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                 [op_r_y] = &&L_op_r_y,
                 [op_r_uniform_32] = &&L_op_r_uniform_32,
                 [op_r_uniform_16] = &&L_op_r_uniform_16,
-                [op_r_load_32] = &&L_op_r_load_32,
-                [op_r_load_16] = &&L_op_r_load_16,
                 [op_r_pack_mm] = &&L_op_r_pack_mm, [op_r_pack_rm] = &&L_op_r_pack_rm,
                 [op_m_pack_rm] = &&L_op_m_pack_rm, [op_r_pack_mr] = &&L_op_r_pack_mr,
                 [op_m_pack_mr] = &&L_op_m_pack_mr, [op_r_pack_rr] = &&L_op_r_pack_rr,
@@ -1170,10 +1121,6 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                     __builtin_memcpy(&uni, (uint16_t const*)buf[ip->x].ptr + ip->y, sizeof uni);
                     acc.u32 = (U32){0} + (uint32_t)uni;
                 } NEXT;
-
-                // Load register variants — call out-of-line to keep dispatch small.
-                CASE(op_r_load_32) acc = load_32_impl(&buf[ip->x], row, end, n); NEXT;
-                CASE(op_r_load_16) acc = load_16_impl(&buf[ip->x], row, end, n); NEXT;
 
                 CASE(SW_DONE) DONE;
 #if !defined(__GNUC__) || defined(__wasm__)
