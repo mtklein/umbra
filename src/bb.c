@@ -14,18 +14,21 @@ _Bool is_store(enum op op) {
     return op == op_store_16
         || op == op_store_32
         || op == op_store_32x2
-        || op == op_store_8x4;
+        || op == op_store_8x4
+        || op == op_store_color;
 }
 _Bool has_ptr(enum op op) {
     return op == op_uniform_32
         || op == op_load_32
         || op == op_load_32x2
         || op == op_load_8x4
+        || op == op_load_color
         || op == op_gather_uniform_32
         || op == op_gather_32
         || op == op_store_32
         || op == op_store_32x2
         || op == op_store_8x4
+        || op == op_store_color
         || op == op_deref_ptr
         || op == op_load_16
         || op == op_store_16
@@ -59,10 +62,12 @@ _Bool is_varying(enum op op) {
         || op == op_load_32
         || op == op_load_32x2
         || op == op_load_8x4
+        || op == op_load_color
         || op == op_store_16
         || op == op_store_32
         || op == op_store_32x2
-        || op == op_store_8x4;
+        || op == op_store_8x4
+        || op == op_store_color;
 }
 
 static _Bool is_pow2(int x) { return __builtin_popcount((unsigned)x) == 1; }
@@ -245,6 +250,16 @@ void umbra_store_8x4(builder *b, umbra_ptr dst, val const in[4]) {
 }
 void umbra_store_16(builder *b, umbra_ptr dst, val v) {
     push(b, op_store_16, VY(v), .ptr = ptr_ix(dst));
+}
+void umbra_load_color(builder *b, umbra_ptr src, val out[4]) {
+    val px = push(b, op_load_color, .ptr = ptr_ix(src));
+    for (int i = 0; i < 4; i++) {
+        out[i] = val_make(val_id((umbra_val){.bits = px.bits}), i);
+    }
+}
+void umbra_store_color(builder *b, umbra_ptr dst, val const in[4]) {
+    push(b, op_store_color, VX(in[0]), VY(in[1]), VZ(in[2]), VW(in[3]),
+         .ptr = ptr_ix(dst));
 }
 val umbra_i32_from_s16(builder *b, val x) { return push(b, op_i32_from_s16, VX(x)); }
 val umbra_i32_from_u16(builder *b, val x) { return push(b, op_i32_from_u16, VX(x)); }
@@ -728,7 +743,8 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_load_16:
         case op_load_32:
         case op_load_32x2:
-        case op_load_8x4: fprintf(f, " p%d", ip->ptr); break;
+        case op_load_8x4:
+        case op_load_color: fprintf(f, " p%d", ip->ptr); break;
         case op_deref_ptr: fprintf(f, " p%d byte%d", ip->ptr, ip->imm); break;
         case op_x:
         case op_y: break;
@@ -736,7 +752,8 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_store_16:
         case op_store_32:
         case op_store_32x2:
-        case op_store_8x4: break;
+        case op_store_8x4:
+        case op_store_color: break;
 
         case op_sqrt_f32:
         case op_abs_f32:
@@ -876,8 +893,10 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     case op_load_16:
     case op_load_32x2:
     case op_load_8x4:
+    case op_load_color:
     case op_store_32:
     case op_store_8x4:
+    case op_store_color:
     case op_store_16:
     case op_store_32x2:
     case op_gather_uniform_32:

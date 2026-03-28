@@ -278,6 +278,9 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
                      .x = X, .y = Y, .z = Z, .w = W);
                 break;
 
+            case op_load_color: break;
+            case op_store_color: break;
+
             case op_pack: emit(.tag = op_pack, .x = X, .y = Y, .z = inst->imm); break;
 
             case op_shl_i32_imm:

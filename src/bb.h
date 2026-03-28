@@ -18,8 +18,8 @@ static inline umbra_val val_make(int id, int chan) { return (umbra_val){.bits = 
     X(x) X(y)                                                                             \
     X(imm_32)                                                                             \
     X(uniform_32)                                                                         \
-    X(load_32) X(load_32x2) X(load_8x4) X(gather_uniform_32) X(gather_32)              \
-    X(store_32) X(store_32x2) X(store_8x4) X(deref_ptr) X(add_f32) X(sub_f32)                           \
+    X(load_32) X(load_32x2) X(load_8x4) X(load_color) X(gather_uniform_32) X(gather_32) \
+    X(store_32) X(store_32x2) X(store_8x4) X(store_color) X(deref_ptr) X(add_f32) X(sub_f32)                           \
         X(mul_f32) X(div_f32) X(min_f32) X(max_f32) X(sqrt_f32) X(abs_f32) X(neg_f32) X(\
             round_f32) X(floor_f32) X(ceil_f32) X(round_i32) X(floor_i32) X(ceil_i32)    \
             X(fma_f32) X(fms_f32) X(add_i32) X(sub_i32) X(mul_i32) X(shl_i32) X(shr_u32)\

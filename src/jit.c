@@ -264,11 +264,13 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_load_32:
     case op_load_32x2:
     case op_load_8x4:
+    case op_load_color:
     case op_gather_uniform_32:
     case op_gather_32:
     case op_store_32:
     case op_store_32x2:
     case op_store_8x4:
+    case op_store_color:
     case op_load_16:
     case op_gather_16:
     case op_store_16:
@@ -809,6 +811,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             FREE_CHAN(inst->w, i);
         } break;
 
+        case op_load_color: break;
+        case op_store_color: break;
+
         case op_store_16: {
             int8_t ry = ra_ensure(ra, sl, ns, (int)inst->y.id);
             int    p = inst->ptr;
@@ -886,11 +891,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 case op_load_32:
                 case op_load_32x2:
                 case op_load_8x4:
+                case op_load_color:
                 case op_gather_uniform_32:
                 case op_gather_32:
                 case op_store_32:
                 case op_store_32x2:
                 case op_store_8x4:
+                case op_store_color:
                 case op_add_f32:
                 case op_sub_f32:
                 case op_mul_f32:
@@ -1413,11 +1420,13 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_load_32:
     case op_load_32x2:
     case op_load_8x4:
+    case op_load_color:
     case op_gather_uniform_32:
     case op_gather_32:
     case op_store_32:
     case op_store_32x2:
     case op_store_8x4:
+    case op_store_color:
     case op_load_16:
     case op_gather_16:
     case op_store_16:
@@ -1844,6 +1853,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             FREE_CHAN(inst->z, i);
             FREE_CHAN(inst->w, i);
         } break;
+
+        case op_load_color: break;
+        case op_store_color: break;
 
         case op_store_16: {
             int8_t ry = ra_ensure(ra, sl, ns, (int)inst->y.id);

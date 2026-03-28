@@ -93,6 +93,9 @@ void      umbra_store_32x2(struct umbra_builder*, umbra_ptr, umbra_val lo, umbra
 void      umbra_load_8x4 (struct umbra_builder*, umbra_ptr, umbra_val out[4]);
 void      umbra_store_8x4(struct umbra_builder*, umbra_ptr, umbra_val const in[4]);
 
+void      umbra_load_color (struct umbra_builder*, umbra_ptr, umbra_val out[4]);
+void      umbra_store_color(struct umbra_builder*, umbra_ptr, umbra_val const in[4]);
+
 umbra_val umbra_i32_from_s16(struct umbra_builder*, umbra_val);
 umbra_val umbra_i32_from_u16(struct umbra_builder*, umbra_val);
 umbra_val umbra_i16_from_i32(struct umbra_builder*, umbra_val);

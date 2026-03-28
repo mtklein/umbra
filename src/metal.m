@@ -120,11 +120,13 @@ static _Bool is_32(enum op op) {
         || op == op_load_32
         || op == op_load_32x2
         || op == op_load_8x4
+        || op == op_load_color
         || op == op_gather_uniform_32
         || op == op_gather_32
         || op == op_store_32
         || op == op_store_32x2
         || op == op_store_8x4
+        || op == op_store_color
         || op == op_deref_ptr;
 }
 
@@ -264,6 +266,9 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, p, p,
                      vx, vy, vz, vw);
             } break;
+
+            case op_load_color: break;
+            case op_store_color: break;
 
             case op_load_16: {
                 int p = inst->ptr < 0
