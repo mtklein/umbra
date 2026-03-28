@@ -198,7 +198,22 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i, p, p,
                      pad, i, p, p);
             } break;
-            case op_load_8x4: break;
+            case op_load_8x4: {
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
+                emit(b, "%suint v%d_px = "
+                        "((device uint*)"
+                        "(p%d + y * buf_rbs[%d]))[x];\n"
+                        "%suint v%d = v%d_px & 0xFFu;\n"
+                        "%suint v%d_1 = (v%d_px >> 8) & 0xFFu;\n"
+                        "%suint v%d_2 = (v%d_px >> 16) & 0xFFu;\n"
+                        "%suint v%d_3 = v%d_px >> 24;\n",
+                     pad, i, p, p,
+                     pad, i, i,
+                     pad, i, i,
+                     pad, i, i,
+                     pad, i, i);
+            } break;
             case op_chan: {
                 struct bb_inst const *parent = &bb->inst[inst->x];
                 int p = parent->ptr < 0

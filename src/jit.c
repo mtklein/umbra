@@ -612,91 +612,80 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             ra_set_chan_reg(ra, i, 0, s.rd);
             ra_set_chan_reg(ra, i, 1, hi_reg);
         } break;
-        case op_load_8x4:  break;
+        case op_load_8x4: {
+            struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
+            int8_t r1 = ra_alloc(ra, sl, ns);
+            int8_t r2 = ra_alloc(ra, sl, ns);
+            int8_t r3 = ra_alloc(ra, sl, ns);
+            int    p = inst->ptr;
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            if (scalar) {
+                int8_t px = ra_alloc(ra, sl, ns);
+                int8_t mask = ra_alloc(ra, sl, ns);
+                put(c, LDR_sx(px, XP, XI));
+                arm64_pool_load(c, &jc->pool, mask, 0xFF);
+                put(c, AND_16b(s0.rd, px, mask));
+                put(c, USHR_4s_imm(r1, px,  8)); put(c, AND_16b(r1, r1, mask));
+                put(c, USHR_4s_imm(r2, px, 16)); put(c, AND_16b(r2, r2, mask));
+                put(c, USHR_4s_imm(r3, px, 24));
+                ra_return_reg(ra, mask);
+                ra_return_reg(ra, px);
+            } else {
+                int8_t px   = ra_alloc(ra, sl, ns);
+                int8_t mask = ra_alloc(ra, sl, ns);
+                put(c, LDR_q(px, XP, XW));
+                arm64_pool_load(c, &jc->pool, mask, 0xFF);
+                put(c, AND_16b(s0.rd, px, mask));
+                put(c, USHR_4s_imm(r1, px,  8)); put(c, AND_16b(r1, r1, mask));
+                put(c, USHR_4s_imm(r2, px, 16)); put(c, AND_16b(r2, r2, mask));
+                put(c, USHR_4s_imm(r3, px, 24));
+                ra_return_reg(ra, mask);
+                ra_return_reg(ra, px);
+            }
+            ra_set_chan_reg(ra, i, 0, s0.rd);
+            ra_set_chan_reg(ra, i, 1, r1);
+            ra_set_chan_reg(ra, i, 2, r2);
+            ra_set_chan_reg(ra, i, 3, r3);
+        } break;
         case op_chan: {
+            // Only load_32x2 parents still use op_chan (load_8x4 is handled above).
             struct bb_inst const *parent = &bb->inst[inst->x];
             int                   p = parent->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-
-            if (parent->op == op_load_8x4) {
-                // Check for 4-way fusion: all 4 channels adjacent in order.
-                _Bool fused4 = inst->imm == 0
-                            && i + 3 < to
-                            && bb->inst[i+1].op == op_chan && bb->inst[i+1].x == inst->x && bb->inst[i+1].imm == 1
-                            && bb->inst[i+2].op == op_chan && bb->inst[i+2].x == inst->x && bb->inst[i+2].imm == 2
-                            && bb->inst[i+3].op == op_chan && bb->inst[i+3].x == inst->x && bb->inst[i+3].imm == 3;
-                if (fused4 && !scalar) {
-                    struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
-                    struct ra_step s1 = ra_step_alloc(ra, sl, ns, i+1);
-                    struct ra_step s2 = ra_step_alloc(ra, sl, ns, i+2);
-                    struct ra_step s3 = ra_step_alloc(ra, sl, ns, i+3);
-                    int8_t px   = ra_alloc(ra, sl, ns);
-                    int8_t mask = ra_alloc(ra, sl, ns);
-                    put(c, LDR_q(px, XP, XW));
-                    arm64_pool_load(c, &jc->pool, mask, 0xFF);
-                    put(c, AND_16b(s0.rd, px, mask));
-                    put(c, USHR_4s_imm(s1.rd, px,  8));
-                    put(c, AND_16b(s1.rd, s1.rd, mask));
-                    put(c, USHR_4s_imm(s2.rd, px, 16));
-                    put(c, AND_16b(s2.rd, s2.rd, mask));
-                    put(c, USHR_4s_imm(s3.rd, px, 24));
-                    ra_return_reg(ra, mask);
-                    ra_return_reg(ra, px);
-                    i += 3;
-                } else {
-                    struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-                    if (scalar) {
-                        put(c, LDR_sx(s.rd, XP, XI));
-                    } else {
-                        put(c, LDR_q(s.rd, XP, XW));
-                    }
-                    if (inst->imm) {
-                        put(c, USHR_4s_imm(s.rd, s.rd, 8 * inst->imm));
-                    }
-                    int8_t mask = ra_alloc(ra, sl, ns);
-                    arm64_pool_load(c, &jc->pool, mask, 0xFF);
-                    put(c, AND_16b(s.rd, s.rd, mask));
-                    ra_return_reg(ra, mask);
-                }
-            } else {
-                // load_32x2: check for 2-way fusion.
-                _Bool fused = inst->imm == 0
-                           && i + 1 < to
-                           && bb->inst[i + 1].op == op_chan
-                           && bb->inst[i + 1].x == inst->x
-                           && bb->inst[i + 1].imm == 1;
-                struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-                put(c, LSL_xi(XT, XI, 3));
-                put(c, ADD_xr(XT, XP, XT));
-                if (scalar) {
-                    put(c, LDR_si(s.rd, XT, inst->imm));
-                    if (fused) {
-                        struct ra_step s2 = ra_step_alloc(ra, sl, ns, i + 1);
-                        put(c, LDR_si(s2.rd, XT, 1));
-                    }
-                } else if (fused) {
-                    // LD2 deinterleaves two u32 streams in one instruction.
-                    // LD2 requires consecutive register numbers; use v0,v1 as temps.
-                    put(c, LD2_4s(0, XT));
-                    struct ra_step s2 = ra_step_alloc(ra, sl, ns, i + 1);
-                    put(c, ORR_16b(s.rd,  0, 0));
-                    put(c, ORR_16b(s2.rd, 1, 1));
-                } else {
-                    int8_t t0 = ra_alloc(ra, sl, ns);
-                    int8_t t1 = ra_alloc(ra, sl, ns);
-                    put(c, LDR_qi(t0, XT, 0));
-                    put(c, LDR_qi(t1, XT, 1));
-                    if (inst->imm == 0) {
-                        put(c, UZP1_4s(s.rd, t0, t1));
-                    } else {
-                        put(c, UZP2_4s(s.rd, t0, t1));
-                    }
-                    ra_return_reg(ra, t1);
-                    ra_return_reg(ra, t0);
-                }
+            _Bool fused = inst->imm == 0
+                       && i + 1 < to
+                       && bb->inst[i + 1].op == op_chan
+                       && bb->inst[i + 1].x == inst->x
+                       && bb->inst[i + 1].imm == 1;
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            put(c, LSL_xi(XT, XI, 3));
+            put(c, ADD_xr(XT, XP, XT));
+            if (scalar) {
+                put(c, LDR_si(s.rd, XT, inst->imm));
                 if (fused) {
-                    i++;
+                    struct ra_step s2 = ra_step_alloc(ra, sl, ns, i + 1);
+                    put(c, LDR_si(s2.rd, XT, 1));
                 }
+            } else if (fused) {
+                put(c, LD2_4s(0, XT));
+                struct ra_step s2 = ra_step_alloc(ra, sl, ns, i + 1);
+                put(c, ORR_16b(s.rd,  0, 0));
+                put(c, ORR_16b(s2.rd, 1, 1));
+            } else {
+                int8_t t0 = ra_alloc(ra, sl, ns);
+                int8_t t1 = ra_alloc(ra, sl, ns);
+                put(c, LDR_qi(t0, XT, 0));
+                put(c, LDR_qi(t1, XT, 1));
+                if (inst->imm == 0) {
+                    put(c, UZP1_4s(s.rd, t0, t1));
+                } else {
+                    put(c, UZP2_4s(s.rd, t0, t1));
+                }
+                ra_return_reg(ra, t1);
+                ra_return_reg(ra, t0);
+            }
+            if (fused) {
+                i++;
             }
         } break;
 
@@ -857,10 +846,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         } break;
 
         case op_store_8x4: {
-            int8_t rr = ra_ensure(ra, sl, ns, inst->x);
-            int8_t rg = ra_ensure(ra, sl, ns, inst->y);
-            int8_t rb = ra_ensure(ra, sl, ns, inst->z);
-            int8_t ra_v = ra_ensure(ra, sl, ns, inst->w);
+            int8_t rr   = ra_ensure_chan(ra, sl, ns, inst->x, inst->cx);
+            int8_t rg   = ra_ensure_chan(ra, sl, ns, inst->y, inst->cy);
+            int8_t rb   = ra_ensure_chan(ra, sl, ns, inst->z, inst->cz);
+            int8_t ra_v = ra_ensure_chan(ra, sl, ns, inst->w, inst->cw);
             int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             int8_t px = ra_alloc(ra, sl, ns);
@@ -1789,92 +1778,77 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             ra_set_chan_reg(ra, i, 0, s.rd);
             ra_set_chan_reg(ra, i, 1, hi_reg);
         } break;
-        case op_load_8x4:  break;
+        case op_load_8x4: {
+            struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
+            int8_t r1 = ra_alloc(ra, sl, ns);
+            int8_t r2 = ra_alloc(ra, sl, ns);
+            int8_t r3 = ra_alloc(ra, sl, ns);
+            int    p = inst->ptr;
+            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            {
+                int8_t px   = ra_alloc(ra, sl, ns);
+                int8_t mask = ra_alloc(ra, sl, ns);
+                if (scalar) {
+                    vex_mem(c, 1, 1, 0, 0, px, 0, 0x6e, base, XI, 4, 0);
+                } else {
+                    vmov_load(c, 1, px, base, XI, 4, 0);
+                }
+                pool_broadcast(c, &jc->pool, mask, 0xFF);
+                vpand(c, 1, s0.rd, px, mask);
+                vpsrld_i(c, r1, px,  8); vpand(c, 1, r1, r1, mask);
+                vpsrld_i(c, r2, px, 16); vpand(c, 1, r2, r2, mask);
+                vpsrld_i(c, r3, px, 24);
+                ra_return_reg(ra, mask);
+                ra_return_reg(ra, px);
+            }
+            ra_set_chan_reg(ra, i, 0, s0.rd);
+            ra_set_chan_reg(ra, i, 1, r1);
+            ra_set_chan_reg(ra, i, 2, r2);
+            ra_set_chan_reg(ra, i, 3, r3);
+        } break;
         case op_chan: {
+            // Only load_32x2 parents still use op_chan.
             struct bb_inst const *parent = &bb->inst[inst->x];
             int            p = parent->ptr;
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            if (parent->op == op_load_8x4) {
-                // Check for 4-way fusion.
-                _Bool fused4 = inst->imm == 0
-                            && i + 3 < to
-                            && bb->inst[i+1].op == op_chan && bb->inst[i+1].x == inst->x && bb->inst[i+1].imm == 1
-                            && bb->inst[i+2].op == op_chan && bb->inst[i+2].x == inst->x && bb->inst[i+2].imm == 2
-                            && bb->inst[i+3].op == op_chan && bb->inst[i+3].x == inst->x && bb->inst[i+3].imm == 3;
-                if (fused4 && !scalar) {
-                    struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
-                    struct ra_step s1 = ra_step_alloc(ra, sl, ns, i+1);
-                    struct ra_step s2 = ra_step_alloc(ra, sl, ns, i+2);
-                    struct ra_step s3 = ra_step_alloc(ra, sl, ns, i+3);
-                    int8_t px   = ra_alloc(ra, sl, ns);
-                    int8_t mask = ra_alloc(ra, sl, ns);
-                    vmov_load(c, 1, px, base, XI, 4, 0);
-                    pool_broadcast(c, &jc->pool, mask, 0xFF);
-                    vpand(c, 1, s0.rd, px, mask);
-                    vpsrld_i(c, s1.rd, px,  8);
-                    vpand(c, 1, s1.rd, s1.rd, mask);
-                    vpsrld_i(c, s2.rd, px, 16);
-                    vpand(c, 1, s2.rd, s2.rd, mask);
-                    vpsrld_i(c, s3.rd, px, 24);
-                    ra_return_reg(ra, mask);
-                    ra_return_reg(ra, px);
-                    i += 3;
-                } else {
-                    struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-                    if (scalar) {
-                        vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, XI, 4, 0);
-                    } else {
-                        vmov_load(c, 1, s.rd, base, XI, 4, 0);
-                    }
-                    if (inst->imm) {
-                        vpsrld_i(c, s.rd, s.rd, (uint8_t)(8 * inst->imm));
-                    }
-                    int8_t mask = ra_alloc(ra, sl, ns);
-                    pool_broadcast(c, &jc->pool, mask, 0xFF);
-                    vpand(c, 1, s.rd, s.rd, mask);
-                    ra_return_reg(ra, mask);
+            _Bool fused = inst->imm == 0
+                       && i + 1 < to
+                       && bb->inst[i + 1].op == op_chan
+                       && bb->inst[i + 1].x == inst->x
+                       && bb->inst[i + 1].imm == 1;
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            if (scalar) {
+                vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, XI, 8, 4 * inst->imm);
+                if (fused) {
+                    struct ra_step s2 = ra_step_alloc(ra, sl, ns, i + 1);
+                    vex_mem(c, 1, 1, 0, 0, s2.rd, 0, 0x6e, base, XI, 8, 4);
                 }
             } else {
-                // load_32x2 channel extraction.
-                _Bool fused = inst->imm == 0
-                           && i + 1 < to
-                           && bb->inst[i + 1].op == op_chan
-                           && bb->inst[i + 1].x == inst->x
-                           && bb->inst[i + 1].imm == 1;
-                struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-                if (scalar) {
-                    vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, XI, 8, 4 * inst->imm);
-                    if (fused) {
-                        struct ra_step s2 = ra_step_alloc(ra, sl, ns, i + 1);
-                        vex_mem(c, 1, 1, 0, 0, s2.rd, 0, 0x6e, base, XI, 8, 4);
-                    }
+                int8_t t0 = ra_alloc(ra, sl, ns);
+                int8_t t1 = ra_alloc(ra, sl, ns);
+                vmov_load(c, 1, t0, base, XI, 8, 0);
+                vmov_load(c, 1, t1, base, XI, 8, 32);
+                if (inst->imm == 0) {
+                    vex_rrr(c, 0, 1, 1, 0xc6, s.rd, t0, t1);
+                    emit1(c, 0x88u);
                 } else {
-                    int8_t t0 = ra_alloc(ra, sl, ns);
-                    int8_t t1 = ra_alloc(ra, sl, ns);
-                    vmov_load(c, 1, t0, base, XI, 8, 0);
-                    vmov_load(c, 1, t1, base, XI, 8, 32);
-                    if (inst->imm == 0) {
-                        vex_rrr(c, 0, 1, 1, 0xc6, s.rd, t0, t1);
-                        emit1(c, 0x88u);
-                    } else {
-                        vex_rrr(c, 0, 1, 1, 0xc6, s.rd, t0, t1);
-                        emit1(c, 0xddu);
-                    }
-                    vex(c, 1, 3, 1, 1, s.rd, 0, s.rd, 0x01);
-                    emit1(c, 0xd8);
-                    if (fused) {
-                        struct ra_step s2 = ra_step_alloc(ra, sl, ns, i + 1);
-                        vex_rrr(c, 0, 1, 1, 0xc6, s2.rd, t0, t1);
-                        emit1(c, 0xddu);
-                        vex(c, 1, 3, 1, 1, s2.rd, 0, s2.rd, 0x01);
-                        emit1(c, 0xd8);
-                    }
-                    ra_return_reg(ra, t1);
-                    ra_return_reg(ra, t0);
+                    vex_rrr(c, 0, 1, 1, 0xc6, s.rd, t0, t1);
+                    emit1(c, 0xddu);
                 }
+                vex(c, 1, 3, 1, 1, s.rd, 0, s.rd, 0x01);
+                emit1(c, 0xd8);
                 if (fused) {
-                    i++;
+                    struct ra_step s2 = ra_step_alloc(ra, sl, ns, i + 1);
+                    vex_rrr(c, 0, 1, 1, 0xc6, s2.rd, t0, t1);
+                    emit1(c, 0xddu);
+                    vex(c, 1, 3, 1, 1, s2.rd, 0, s2.rd, 0x01);
+                    emit1(c, 0xd8);
                 }
+                ra_return_reg(ra, t1);
+                ra_return_reg(ra, t0);
+            }
+            if (fused) {
+                i++;
             }
         } break;
 
@@ -1948,10 +1922,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         } break;
 
         case op_store_8x4: {
-            int8_t rr   = ra_ensure(ra, sl, ns, inst->x);
-            int8_t rg   = ra_ensure(ra, sl, ns, inst->y);
-            int8_t rb_v = ra_ensure(ra, sl, ns, inst->z);
-            int8_t ra_v = ra_ensure(ra, sl, ns, inst->w);
+            int8_t rr   = ra_ensure_chan(ra, sl, ns, inst->x, inst->cx);
+            int8_t rg   = ra_ensure_chan(ra, sl, ns, inst->y, inst->cy);
+            int8_t rb_v = ra_ensure_chan(ra, sl, ns, inst->z, inst->cz);
+            int8_t ra_v = ra_ensure_chan(ra, sl, ns, inst->w, inst->cw);
             int    p = inst->ptr;
             int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             // Pack: px = r | (g << 8) | (b << 16) | (a << 24)

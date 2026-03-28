@@ -253,9 +253,17 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
             case op_load_32x2:
                 emit(.tag = op_load_32x2, .x = RESOLVE_PTR(inst));
                 id[i] = n;
-                n += 2;
+                n++;
+                p->inst[n++] = (struct sw_inst){.tag = op_load_32x2};
                 continue;
-            case op_load_8x4:  emit(.tag = op_load_8x4);  break;
+            case op_load_8x4:
+                emit(.tag = op_load_8x4, .x = RESOLVE_PTR(inst));
+                id[i] = n;
+                n++;
+                p->inst[n++] = (struct sw_inst){.tag = op_load_8x4};
+                p->inst[n++] = (struct sw_inst){.tag = op_load_8x4};
+                p->inst[n++] = (struct sw_inst){.tag = op_load_8x4};
+                continue;
             case op_chan: {
                 struct bb_inst const *parent = &bb->inst[inst->x];
                 int const ptr = RESOLVE_PTR(parent);
@@ -711,7 +719,21 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                     }
                     ip++; v++;
                 } NEXT;
-                CASE(op_load_8x4) NEXT;
+                CASE(op_load_8x4) {
+                    char const *src = (char const*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
+                    int const   i = end - K;
+                    int const   rem = n - i;
+                    v[0].u32 = v[1].u32 = v[2].u32 = v[3].u32 = (U32){0};
+                    for (int ll = 0; ll < (rem < K ? rem : K); ll++) {
+                        uint32_t px;
+                        __builtin_memcpy(&px, src + (i + ll) * 4, 4);
+                        v[0].u32[ll] = (px      ) & 0xFFu;
+                        v[1].u32[ll] = (px >>  8) & 0xFFu;
+                        v[2].u32[ll] = (px >> 16) & 0xFFu;
+                        v[3].u32[ll] = (px >> 24);
+                    }
+                    ip += 3; v += 3;
+                } NEXT;
                 CASE(op_chan) {
                     char const *src = (char const*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
                     int const   i = end - K;
