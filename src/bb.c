@@ -18,8 +18,7 @@ _Bool is_store(enum op op) {
 _Bool has_ptr(enum op op) {
     return op == op_uniform_32
         || op == op_load_32
-        || op == op_load_64_lo
-        || op == op_load_64_hi
+        || op == op_load_64
         || op == op_gather_uniform_32
         || op == op_gather_32
         || op == op_store_32
@@ -57,8 +56,7 @@ _Bool is_varying(enum op op) {
         || op == op_y
         || op == op_load_16
         || op == op_load_32
-        || op == op_load_64_lo
-        || op == op_load_64_hi
+        || op == op_load_64
         || op == op_store_16
         || op == op_store_32
         || op == op_store_64;
@@ -210,8 +208,9 @@ val umbra_load_32(builder *b, umbra_ptr src) {
     return push(b, op_load_32, .ptr = ptr_ix(src));
 }
 void umbra_load_64(builder *b, umbra_ptr src, val *lo, val *hi) {
-    *lo = push(b, op_load_64_lo, .ptr = ptr_ix(src));
-    *hi = push(b, op_load_64_hi, .ptr = ptr_ix(src));
+    val hilo = push(b, op_load_64, .ptr = ptr_ix(src));
+    *lo = push(b, op_chan, .x = hilo.id, .imm = 0);
+    *hi = push(b, op_chan, .x = hilo.id, .imm = 1);
 }
 val umbra_load_16(builder *b, umbra_ptr src) {
     return push(b, op_load_16, .ptr = ptr_ix(src));
@@ -712,8 +711,8 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_gather_16: fprintf(f, " p%d v%d", ip->ptr, ip->x); break;
         case op_load_16:
         case op_load_32:
-        case op_load_64_lo:
-        case op_load_64_hi: fprintf(f, " p%d", ip->ptr); break;
+        case op_load_64: fprintf(f, " p%d", ip->ptr); break;
+        case op_chan: fprintf(f, " v%d[%d]", ip->x, ip->imm); break;
         case op_deref_ptr: fprintf(f, " p%d byte%d", ip->ptr, ip->imm); break;
         case op_x:
         case op_y: break;
@@ -859,8 +858,8 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     case op_uniform_16:
     case op_load_32:
     case op_load_16:
-    case op_load_64_lo:
-    case op_load_64_hi:
+    case op_load_64:
+    case op_chan:
     case op_store_32:
     case op_store_16:
     case op_store_64:

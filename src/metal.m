@@ -120,8 +120,8 @@ static _Bool is_16(enum op op) {
 static _Bool is_32(enum op op) {
     return op == op_uniform_32
         || op == op_load_32
-        || op == op_load_64_lo
-        || op == op_load_64_hi
+        || op == op_load_64
+        || op == op_chan
         || op == op_gather_uniform_32
         || op == op_gather_32
         || op == op_store_32
@@ -173,16 +173,17 @@ static void emit_ops(Buf *b, BB const *bb,
                      "(p%d + y * buf_rbs[%d]))[x];\n",
                      pad, i, p, p);
             } break;
-            case op_load_64_lo:
-            case op_load_64_hi: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
+            case op_load_64: break;
+            case op_chan: {
+                struct bb_inst const *parent = &bb->inst[inst->x];
+                int p = parent->ptr < 0
+                    ? deref_buf[~parent->ptr] : parent->ptr;
                 emit(b, "%suint v%d = "
                         "((device uint*)"
                         "(p%d + y * buf_rbs[%d]))"
                         "[x*2+%d];\n",
                      pad, i, p, p,
-                     inst->op == op_load_64_hi);
+                     inst->imm);
             } break;
             case op_gather_uniform_32:
             case op_gather_32: {

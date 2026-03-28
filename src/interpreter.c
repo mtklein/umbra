@@ -135,8 +135,7 @@ typedef union {
     X(eq_i32_imm,  i32, i32) X(lt_s32_imm,  i32, i32) X(le_s32_imm,  i32, i32)
 
 enum {
-    SW_LOAD_64_FUSED = op_le_s32_imm + 1,
-    SW_DONE,
+    SW_DONE = op_le_s32_imm + 1,
 
     // Binary op variants: 7 new per op (existing op_X is the mm->m variant)
 #define BINARY_VARIANTS(name, rt, pt) \
@@ -244,20 +243,11 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
 
             case op_load_16: emit(.tag = op_load_16, .x = RESOLVE_PTR(inst)); break;
             case op_load_32: emit(.tag = op_load_32, .x = RESOLVE_PTR(inst)); break;
-            case op_load_64_lo:
-                if (i + 1 < hi
-                    && bb->inst[i + 1].op == op_load_64_hi
-                    && bb->inst[i + 1].ptr == inst->ptr) {
-                    emit(.tag = SW_LOAD_64_FUSED, .x = RESOLVE_PTR(inst));
-                    id[i] = n - 1;
-                    id[i + 1] = n;
-                    i++;
-                    n++;
-                    continue;
-                }
-                emit(.tag = op_load_64_lo, .x = RESOLVE_PTR(inst));
-                break;
-            case op_load_64_hi: emit(.tag = op_load_64_hi, .x = RESOLVE_PTR(inst)); break;
+            case op_load_64: emit(.tag = op_load_64); break;
+            case op_chan: {
+                struct bb_inst const *parent = &bb->inst[inst->x];
+                emit(.tag = op_chan, .x = RESOLVE_PTR(parent), .y = inst->imm);
+            } break;
 
             case op_gather_uniform_16: emit(.tag = op_gather_uniform_16, .x = RESOLVE_PTR(inst), .y = X); break;
             case op_gather_16:         emit(.tag = op_gather_16,         .x = RESOLVE_PTR(inst), .y = X); break;
@@ -510,8 +500,7 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                 [op_x] = &&L_op_x, [op_y] = &&L_op_y, [op_imm_32] = &&L_op_imm_32,
                 [op_uniform_16] = &&L_op_uniform_16, [op_uniform_32] = &&L_op_uniform_32,
                 [op_load_16] = &&L_op_load_16, [op_load_32] = &&L_op_load_32,
-                [op_load_64_lo] = &&L_op_load_64_lo, [op_load_64_hi] = &&L_op_load_64_hi,
-                [SW_LOAD_64_FUSED] = &&L_SW_LOAD_64_FUSED,
+                [op_load_64] = &&L_op_load_64, [op_chan] = &&L_op_chan,
                 [op_store_16] = &&L_op_store_16, [op_store_32] = &&L_op_store_32,
                 [op_store_64] = &&L_op_store_64,
                 [op_gather_uniform_16] = &&L_op_gather_uniform_16,
@@ -662,42 +651,17 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                         }
                     }
                 } NEXT;
-                CASE(op_load_64_lo) {
+                CASE(op_load_64) NEXT;
+                CASE(op_chan) {
                     char const *src = (char const*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
                     int const   i = end - K;
                     int const   rem = n - i;
                     v->i32 = (I32){0};
                     for (int ll = 0; ll < (rem < K ? rem : K); ll++) {
                         int32_t tmp;
-                        __builtin_memcpy(&tmp, src + (i + ll) * 8, 4);
+                        __builtin_memcpy(&tmp, src + (i + ll) * 8 + 4 * ip->y, 4);
                         v->i32[ll] = tmp;
                     }
-                } NEXT;
-                CASE(op_load_64_hi) {
-                    char const *src = (char const*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
-                    int const   i = end - K;
-                    int const   rem = n - i;
-                    v->i32 = (I32){0};
-                    for (int ll = 0; ll < (rem < K ? rem : K); ll++) {
-                        int32_t tmp;
-                        __builtin_memcpy(&tmp, src + (i + ll) * 8 + 4, 4);
-                        v->i32[ll] = tmp;
-                    }
-                } NEXT;
-                CASE(SW_LOAD_64_FUSED) {
-                    char const *src = (char const*)buf[ip->x].ptr + (size_t)row * buf[ip->x].row_bytes;
-                    int const   i = end - K;
-                    int const   rem = n - i;
-                    v[0].i32 = (I32){0};
-                    v[1].i32 = (I32){0};
-                    for (int ll = 0; ll < (rem < K ? rem : K); ll++) {
-                        int32_t lo, hi;
-                        __builtin_memcpy(&lo, src + (i + ll) * 8,     4);
-                        __builtin_memcpy(&hi, src + (i + ll) * 8 + 4, 4);
-                        v[0].i32[ll] = lo;
-                        v[1].i32[ll] = hi;
-                    }
-                    v++;
                 } NEXT;
 
                 CASE(op_store_16) {

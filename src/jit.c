@@ -262,8 +262,8 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_deref_ptr:
     case op_uniform_32:
     case op_load_32:
-    case op_load_64_lo:
-    case op_load_64_hi:
+    case op_load_64:
+    case op_chan:
     case op_gather_uniform_32:
     case op_gather_32:
     case op_store_32:
@@ -592,17 +592,21 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
-        case op_load_64_lo: {
-            _Bool fused = i + 1 < to
-                       && bb->inst[i + 1].op == op_load_64_hi
-                       && bb->inst[i + 1].ptr == inst->ptr;
+        case op_load_64: break;
+        case op_chan: {
+            struct bb_inst const *parent = &bb->inst[inst->x];
+            _Bool fused = inst->imm == 0
+                       && i + 1 < to
+                       && bb->inst[i + 1].op == op_chan
+                       && bb->inst[i + 1].x == inst->x
+                       && bb->inst[i + 1].imm == 1;
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int            p = inst->ptr;
+            int            p = parent->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             put(c, LSL_xi(XT, XI, 3));
             put(c, ADD_xr(XT, XP, XT));
             if (scalar) {
-                put(c, LDR_si(s.rd, XT, 0));
+                put(c, LDR_si(s.rd, XT, inst->imm));
                 if (fused) {
                     struct ra_step s2 = ra_step_alloc(ra, sl, ns, i + 1);
                     put(c, LDR_si(s2.rd, XT, 1));
@@ -612,7 +616,11 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 int8_t t1 = ra_alloc(ra, sl, ns);
                 put(c, LDR_qi(t0, XT, 0));
                 put(c, LDR_qi(t1, XT, 1));
-                put(c, UZP1_4s(s.rd, t0, t1));
+                if (inst->imm == 0) {
+                    put(c, UZP1_4s(s.rd, t0, t1));
+                } else {
+                    put(c, UZP2_4s(s.rd, t0, t1));
+                }
                 if (fused) {
                     struct ra_step s2 = ra_step_alloc(ra, sl, ns, i + 1);
                     put(c, UZP2_4s(s2.rd, t0, t1));
@@ -622,25 +630,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
             if (fused) {
                 i++;
-            }
-        } break;
-
-        case op_load_64_hi: {
-            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int            p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            put(c, LSL_xi(XT, XI, 3));
-            put(c, ADD_xr(XT, XP, XT));
-            if (scalar) {
-                put(c, LDR_si(s.rd, XT, 1));
-            } else {
-                int8_t t0 = ra_alloc(ra, sl, ns);
-                int8_t t1 = ra_alloc(ra, sl, ns);
-                put(c, LDR_qi(t0, XT, 0));
-                put(c, LDR_qi(t1, XT, 1));
-                put(c, UZP2_4s(s.rd, t0, t1));
-                ra_return_reg(ra, t1);
-                ra_return_reg(ra, t0);
             }
         } break;
 
@@ -878,8 +867,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 case op_imm_32:
                 case op_uniform_32:
                 case op_load_32:
-                case op_load_64_lo:
-                case op_load_64_hi:
+                case op_load_64:
+                case op_chan:
                 case op_gather_uniform_32:
                 case op_gather_32:
                 case op_store_32:
@@ -1406,8 +1395,8 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_deref_ptr:
     case op_uniform_32:
     case op_load_32:
-    case op_load_64_lo:
-    case op_load_64_hi:
+    case op_load_64:
+    case op_chan:
     case op_gather_uniform_32:
     case op_gather_32:
     case op_store_32:
@@ -1681,15 +1670,19 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
-        case op_load_64_lo: {
-            _Bool fused = i + 1 < to
-                       && bb->inst[i + 1].op == op_load_64_hi
-                       && bb->inst[i + 1].ptr == inst->ptr;
+        case op_load_64: break;
+        case op_chan: {
+            struct bb_inst const *parent = &bb->inst[inst->x];
+            _Bool fused = inst->imm == 0
+                       && i + 1 < to
+                       && bb->inst[i + 1].op == op_chan
+                       && bb->inst[i + 1].x == inst->x
+                       && bb->inst[i + 1].imm == 1;
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int            p = inst->ptr;
+            int            p = parent->ptr;
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {
-                vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, XI, 8, 0);
+                vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, XI, 8, 4 * inst->imm);
                 if (fused) {
                     struct ra_step s2 = ra_step_alloc(ra, sl, ns, i + 1);
                     vex_mem(c, 1, 1, 0, 0, s2.rd, 0, 0x6e, base, XI, 8, 4);
@@ -1699,8 +1692,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 int8_t t1 = ra_alloc(ra, sl, ns);
                 vmov_load(c, 1, t0, base, XI, 8, 0);
                 vmov_load(c, 1, t1, base, XI, 8, 32);
-                vex_rrr(c, 0, 1, 1, 0xc6, s.rd, t0, t1);
-                emit1(c, 0x88u);
+                if (inst->imm == 0) {
+                    vex_rrr(c, 0, 1, 1, 0xc6, s.rd, t0, t1);
+                    emit1(c, 0x88u);
+                } else {
+                    vex_rrr(c, 0, 1, 1, 0xc6, s.rd, t0, t1);
+                    emit1(c, 0xddu);
+                }
                 vex(c, 1, 3, 1, 1, s.rd, 0, s.rd, 0x01);
                 emit1(c, 0xd8);
                 if (fused) {
@@ -1715,26 +1713,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
             if (fused) {
                 i++;
-            }
-        } break;
-
-        case op_load_64_hi: {
-            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int            p = inst->ptr;
-            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            if (scalar) {
-                vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, XI, 8, 4);
-            } else {
-                int8_t t0 = ra_alloc(ra, sl, ns);
-                int8_t t1 = ra_alloc(ra, sl, ns);
-                vmov_load(c, 1, t0, base, XI, 8, 0);
-                vmov_load(c, 1, t1, base, XI, 8, 32);
-                vex_rrr(c, 0, 1, 1, 0xc6, s.rd, t0, t1);
-                emit1(c, 0xddu);
-                vex(c, 1, 3, 1, 1, s.rd, 0, s.rd, 0x01);
-                emit1(c, 0xd8);
-                ra_return_reg(ra, t1);
-                ra_return_reg(ra, t0);
             }
         } break;
 
