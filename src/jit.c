@@ -262,14 +262,14 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_deref_ptr:
     case op_uniform_32:
     case op_load_32:
-    case op_load_64:
-    case op_load_u8x4:
+    case op_load_32x2:
+    case op_load_8x4:
     case op_chan:
     case op_gather_uniform_32:
     case op_gather_32:
     case op_store_32:
-    case op_store_64:
-    case op_store_u8x4:
+    case op_store_32x2:
+    case op_store_8x4:
     case op_uniform_16:
     case op_load_16:
     case op_gather_uniform_16:
@@ -594,17 +594,17 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
-        case op_load_64:   break;
-        case op_load_u8x4: break;
+        case op_load_32x2:   break;
+        case op_load_8x4: break;
         case op_chan: {
             struct bb_inst const *parent = &bb->inst[inst->x];
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int            p = parent->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            if (parent->op == op_load_u8x4) {
+            if (parent->op == op_load_8x4) {
                 // Load u32 pixel(s), extract channel by shift+mask.
                 if (scalar) {
-                    put(c, LDR_sx(s.rd, XP, XW));
+                    put(c, LDR_sx(s.rd, XP, XI));
                 } else {
                     put(c, LDR_q(s.rd, XP, XW));
                 }
@@ -788,7 +788,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
         } break;
 
-        case op_store_64: {
+        case op_store_32x2: {
             int8_t rx = ra_ensure(ra, sl, ns, inst->x);
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
             int    p = inst->ptr;
@@ -812,7 +812,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
         } break;
 
-        case op_store_u8x4: {
+        case op_store_8x4: {
             int8_t rr = ra_ensure(ra, sl, ns, inst->x);
             int8_t rg = ra_ensure(ra, sl, ns, inst->y);
             int8_t rb = ra_ensure(ra, sl, ns, inst->z);
@@ -911,14 +911,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 case op_imm_32:
                 case op_uniform_32:
                 case op_load_32:
-                case op_load_64:
-                case op_load_u8x4:
+                case op_load_32x2:
+                case op_load_8x4:
                 case op_chan:
                 case op_gather_uniform_32:
                 case op_gather_32:
                 case op_store_32:
-                case op_store_64:
-                case op_store_u8x4:
+                case op_store_32x2:
+                case op_store_8x4:
                 case op_add_f32:
                 case op_sub_f32:
                 case op_mul_f32:
@@ -1441,14 +1441,14 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_deref_ptr:
     case op_uniform_32:
     case op_load_32:
-    case op_load_64:
-    case op_load_u8x4:
+    case op_load_32x2:
+    case op_load_8x4:
     case op_chan:
     case op_gather_uniform_32:
     case op_gather_32:
     case op_store_32:
-    case op_store_64:
-    case op_store_u8x4:
+    case op_store_32x2:
+    case op_store_8x4:
     case op_uniform_16:
     case op_load_16:
     case op_gather_uniform_16:
@@ -1718,14 +1718,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
-        case op_load_64:   break;
-        case op_load_u8x4: break;
+        case op_load_32x2:   break;
+        case op_load_8x4: break;
         case op_chan: {
             struct bb_inst const *parent = &bb->inst[inst->x];
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int            p = parent->ptr;
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            if (parent->op == op_load_u8x4) {
+            if (parent->op == op_load_8x4) {
                 // Load u32 pixel(s), extract channel by shift+mask.
                 if (scalar) {
                     vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, XI, 4, 0);
@@ -1819,7 +1819,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
-        case op_store_64: {
+        case op_store_32x2: {
             int8_t rx = ra_ensure(ra, sl, ns, inst->x);
             int8_t ry = ra_ensure(ra, sl, ns, inst->y);
             int    p = inst->ptr;
@@ -1851,7 +1851,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             if (lu(inst->y) <= i) { ra_free_reg(ra, inst->y); }
         } break;
 
-        case op_store_u8x4: {
+        case op_store_8x4: {
             int8_t rr   = ra_ensure(ra, sl, ns, inst->x);
             int8_t rg   = ra_ensure(ra, sl, ns, inst->y);
             int8_t rb_v = ra_ensure(ra, sl, ns, inst->z);

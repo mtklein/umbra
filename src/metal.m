@@ -120,14 +120,14 @@ static _Bool is_16(enum op op) {
 static _Bool is_32(enum op op) {
     return op == op_uniform_32
         || op == op_load_32
-        || op == op_load_64
-        || op == op_load_u8x4
+        || op == op_load_32x2
+        || op == op_load_8x4
         || op == op_chan
         || op == op_gather_uniform_32
         || op == op_gather_32
         || op == op_store_32
-        || op == op_store_64
-        || op == op_store_u8x4
+        || op == op_store_32x2
+        || op == op_store_8x4
         || op == op_deref_ptr;
 }
 
@@ -175,13 +175,13 @@ static void emit_ops(Buf *b, BB const *bb,
                      "(p%d + y * buf_rbs[%d]))[x];\n",
                      pad, i, p, p);
             } break;
-            case op_load_64:   break;
-            case op_load_u8x4: break;
+            case op_load_32x2:   break;
+            case op_load_8x4: break;
             case op_chan: {
                 struct bb_inst const *parent = &bb->inst[inst->x];
                 int p = parent->ptr < 0
                     ? deref_buf[~parent->ptr] : parent->ptr;
-                if (parent->op == op_load_u8x4) {
+                if (parent->op == op_load_8x4) {
                     emit(b, "%suint v%d = "
                             "(((device uint*)"
                             "(p%d + y * buf_rbs[%d]))"
@@ -226,7 +226,7 @@ static void emit_ops(Buf *b, BB const *bb,
                      "[x] = v%d;\n",
                      pad, p, p, inst->y);
             } break;
-            case op_store_64: {
+            case op_store_32x2: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 emit(b, "%s((device uint*)"
@@ -238,7 +238,7 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, p, p, inst->x,
                      pad, p, p, inst->y);
             } break;
-            case op_store_u8x4: {
+            case op_store_8x4: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 emit(b, "%s((device uint*)"

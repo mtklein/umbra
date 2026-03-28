@@ -396,13 +396,8 @@ umbra_val umbra_coverage_bitmap_matrix(builder *builder, umbra_val x, umbra_val 
 }
 
 static umbra_color umbra_load_8888(builder *builder, umbra_ptr ptr) {
-    umbra_val const px = umbra_load_32(builder, ptr), mask = umbra_imm_i32(builder, 0xFF);
-    umbra_val ch[4] = {
-        umbra_and_i32(builder, px, mask),
-        umbra_and_i32(builder, umbra_shr_u32(builder, px, umbra_imm_i32(builder, 8)), mask),
-        umbra_and_i32(builder, umbra_shr_u32(builder, px, umbra_imm_i32(builder, 16)), mask),
-        umbra_shr_u32(builder, px, umbra_imm_i32(builder, 24)),
-    };
+    umbra_val ch[4];
+    umbra_load_8x4(builder, ptr, ch);
     umbra_val const inv255 = umbra_imm_f32(builder, 1.0f / 255.0f);
     return (umbra_color){
         umbra_mul_f32(builder, umbra_f32_from_i32(builder, ch[0]), inv255),
@@ -421,12 +416,7 @@ static void umbra_store_8888(builder *builder, umbra_ptr ptr, umbra_color c) {
         umbra_round_i32(builder, umbra_mul_f32(builder, c.b, scale)),
         umbra_round_i32(builder, umbra_mul_f32(builder, c.a, scale)),
     };
-    umbra_val const mask = umbra_imm_i32(builder, 0xFF);
-    umbra_val px = umbra_and_i32(builder, ch[0], mask);
-    px = umbra_pack(builder, px, umbra_and_i32(builder, ch[1], mask), 8);
-    px = umbra_pack(builder, px, umbra_and_i32(builder, ch[2], mask), 16);
-    px = umbra_pack(builder, px, ch[3], 24);
-    umbra_store_32(builder, ptr, px);
+    umbra_store_8x4(builder, ptr, ch);
 }
 
 static umbra_color umbra_load_565(builder *builder, umbra_ptr ptr) {
@@ -492,7 +482,7 @@ static void umbra_store_1010102(builder *builder, umbra_ptr ptr, umbra_color c) 
 
 static umbra_color umbra_load_fp16(builder *builder, umbra_ptr ptr) {
     umbra_val lo, hi;
-    umbra_load_64(builder, ptr, &lo, &hi);
+    umbra_load_32x2(builder, ptr, &lo, &hi);
     umbra_val const s16 = umbra_imm_i32(builder, 16);
     return (umbra_color){
         umbra_f32_from_f16(builder, umbra_i16_from_i32(builder, lo)),
@@ -507,7 +497,7 @@ static void umbra_store_fp16(builder *builder, umbra_ptr ptr, umbra_color c) {
                                     umbra_i32_from_u16(builder, umbra_f16_from_f32(builder, c.g)), 16);
     umbra_val const hi = umbra_pack(builder, umbra_i32_from_u16(builder, umbra_f16_from_f32(builder, c.b)),
                                     umbra_i32_from_u16(builder, umbra_f16_from_f32(builder, c.a)), 16);
-    umbra_store_64(builder, ptr, lo, hi);
+    umbra_store_32x2(builder, ptr, lo, hi);
 }
 
 static umbra_color umbra_load_fp16_planar(builder *builder, umbra_ptr ptr) {

@@ -13,19 +13,19 @@ static int ptr_ix(umbra_ptr p) { return p.deref ? ~p.ix : p.ix; }
 _Bool is_store(enum op op) {
     return op == op_store_16
         || op == op_store_32
-        || op == op_store_64
-        || op == op_store_u8x4;
+        || op == op_store_32x2
+        || op == op_store_8x4;
 }
 _Bool has_ptr(enum op op) {
     return op == op_uniform_32
         || op == op_load_32
-        || op == op_load_64
-        || op == op_load_u8x4
+        || op == op_load_32x2
+        || op == op_load_8x4
         || op == op_gather_uniform_32
         || op == op_gather_32
         || op == op_store_32
-        || op == op_store_64
-        || op == op_store_u8x4
+        || op == op_store_32x2
+        || op == op_store_8x4
         || op == op_deref_ptr
         || op == op_uniform_16
         || op == op_load_16
@@ -59,12 +59,12 @@ _Bool is_varying(enum op op) {
         || op == op_y
         || op == op_load_16
         || op == op_load_32
-        || op == op_load_64
-        || op == op_load_u8x4
+        || op == op_load_32x2
+        || op == op_load_8x4
         || op == op_store_16
         || op == op_store_32
-        || op == op_store_64
-        || op == op_store_u8x4;
+        || op == op_store_32x2
+        || op == op_store_8x4;
 }
 
 static _Bool is_pow2(int x) { return __builtin_popcount((unsigned)x) == 1; }
@@ -214,8 +214,8 @@ val umbra_gather_16(builder *b, umbra_ptr src, val ix) {
 val umbra_load_32(builder *b, umbra_ptr src) {
     return push(b, op_load_32, .ptr = ptr_ix(src));
 }
-void umbra_load_64(builder *b, umbra_ptr src, val *lo, val *hi) {
-    val hilo = push(b, op_load_64, .ptr = ptr_ix(src));
+void umbra_load_32x2(builder *b, umbra_ptr src, val *lo, val *hi) {
+    val hilo = push(b, op_load_32x2, .ptr = ptr_ix(src));
     *lo = push(b, op_chan, .x = hilo.id, .imm = 0);
     *hi = push(b, op_chan, .x = hilo.id, .imm = 1);
 }
@@ -232,17 +232,17 @@ val umbra_gather_32(builder *b, umbra_ptr src, val ix) {
 void umbra_store_32(builder *b, umbra_ptr dst, val v) {
     push(b, op_store_32, .y = v.id, .ptr = ptr_ix(dst));
 }
-void umbra_store_64(builder *b, umbra_ptr dst, val lo, val hi) {
-    push(b, op_store_64, .x = lo.id, .y = hi.id, .ptr = ptr_ix(dst));
+void umbra_store_32x2(builder *b, umbra_ptr dst, val lo, val hi) {
+    push(b, op_store_32x2, .x = lo.id, .y = hi.id, .ptr = ptr_ix(dst));
 }
-void umbra_load_u8x4(builder *b, umbra_ptr src, val out[4]) {
-    val px = push(b, op_load_u8x4, .ptr = ptr_ix(src));
+void umbra_load_8x4(builder *b, umbra_ptr src, val out[4]) {
+    val px = push(b, op_load_8x4, .ptr = ptr_ix(src));
     for (int i = 0; i < 4; i++) {
         out[i] = push(b, op_chan, .x = px.id, .imm = i);
     }
 }
-void umbra_store_u8x4(builder *b, umbra_ptr dst, val const in[4]) {
-    push(b, op_store_u8x4, .x = in[0].id, .y = in[1].id, .z = in[2].id, .w = in[3].id,
+void umbra_store_8x4(builder *b, umbra_ptr dst, val const in[4]) {
+    push(b, op_store_8x4, .x = in[0].id, .y = in[1].id, .z = in[2].id, .w = in[3].id,
          .ptr = ptr_ix(dst));
 }
 void umbra_store_16(builder *b, umbra_ptr dst, val v) {
@@ -708,10 +708,10 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         if (is_store(op)) {
             {
                 fprintf(f, "      %-15s p%d", op_name(op), ip->ptr);
-                if (op == op_store_64) {
+                if (op == op_store_32x2) {
                     fprintf(f, " v%d v%d", ip->x, ip->y);
                 }
-                if (op != op_store_64) { fprintf(f, " v%d", ip->y); }
+                if (op != op_store_32x2) { fprintf(f, " v%d", ip->y); }
                 fprintf(f, "\n");
             }
             continue;
@@ -731,8 +731,8 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_gather_16: fprintf(f, " p%d v%d", ip->ptr, ip->x); break;
         case op_load_16:
         case op_load_32:
-        case op_load_64:
-        case op_load_u8x4: fprintf(f, " p%d", ip->ptr); break;
+        case op_load_32x2:
+        case op_load_8x4: fprintf(f, " p%d", ip->ptr); break;
         case op_chan: fprintf(f, " v%d[%d]", ip->x, ip->imm); break;
         case op_deref_ptr: fprintf(f, " p%d byte%d", ip->ptr, ip->imm); break;
         case op_x:
@@ -740,8 +740,8 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
 
         case op_store_16:
         case op_store_32:
-        case op_store_64:
-        case op_store_u8x4: break;
+        case op_store_32x2:
+        case op_store_8x4: break;
 
         case op_sqrt_f32:
         case op_abs_f32:
@@ -880,13 +880,13 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     case op_uniform_16:
     case op_load_32:
     case op_load_16:
-    case op_load_64:
-    case op_load_u8x4:
+    case op_load_32x2:
+    case op_load_8x4:
     case op_chan:
     case op_store_32:
-    case op_store_u8x4:
+    case op_store_8x4:
     case op_store_16:
-    case op_store_64:
+    case op_store_32x2:
     case op_gather_uniform_32:
     case op_gather_uniform_16:
     case op_gather_32:

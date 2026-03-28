@@ -108,7 +108,7 @@ static void build_hdr(int fmt) {
     umbra_val hi = umbra_pack(builder,
                               umbra_i32_from_u16(builder, umbra_f16_from_f32(builder, c.b)),
                               umbra_i32_from_u16(builder, umbra_f16_from_f32(builder, c.a)), 16);
-    umbra_store_64(builder, (umbra_ptr){op, 0}, lo, hi);
+    umbra_store_32x2(builder, (umbra_ptr){op, 0}, lo, hi);
     finish_pipe(&hdr_pipe, builder);
 }
 
