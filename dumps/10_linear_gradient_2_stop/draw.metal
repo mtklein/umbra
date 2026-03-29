@@ -20,6 +20,12 @@ kernel void umbra_entry(
     constant float *buf_transfers [[buffer(8)]],
     device uchar *p0 [[buffer(0)]],
     device uchar *p1 [[buffer(1)]],
+    device uchar *p0_g [[buffer(9)]],
+    device uchar *p0_b [[buffer(10)]],
+    device uchar *p0_a [[buffer(11)]],
+    device uchar *p1_g [[buffer(12)]],
+    device uchar *p1_b [[buffer(13)]],
+    device uchar *p1_a [[buffer(14)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
     if (pos.x >= w) return;
@@ -80,6 +86,7 @@ kernel void umbra_entry(
                 hp[0]=half(sc30.x); hp[1]=half(sc30.y); hp[2]=half(sc30.z); hp[3]=half(sc30.w); break; }
       case 5u: ((device half*)(p1 + y * buf_rbs[1]))[x] = half(sc30.x); break;
       case 6u: ((device float*)(p1 + y * buf_rbs[1]))[x] = sc30.x; break;
+      case 7u: { ((device half*)(p1 + y * buf_rbs[1]))[x] = half(sc30.x); ((device half*)(p1_g + y * buf_rbs[1]))[x] = half(sc30.y); ((device half*)(p1_b + y * buf_rbs[1]))[x] = half(sc30.z); ((device half*)(p1_a + y * buf_rbs[1]))[x] = half(sc30.w); break; }
       default: break;
     }
 }

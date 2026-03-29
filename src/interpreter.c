@@ -884,6 +884,32 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                         v[2].f32 = (F32){0};
                         v[3].f32 = (F32){0} + 1.f;
                     } break;
+                    case umbra_fmt_f16_planar: {
+                        size_t const rb = buf[ip->ptr].row_bytes;
+                        char const *src_r = (char const*)buf[ip->ptr].ptr  + (size_t)row * rb;
+                        char const *src_g = (char const*)buf[ip->ptr].ptr2 + (size_t)row * rb;
+                        char const *src_b = (char const*)buf[ip->ptr].ptr3 + (size_t)row * rb;
+                        char const *src_a = (char const*)buf[ip->ptr].ptr4 + (size_t)row * rb;
+                        U16 hr = {0}, hg = {0}, hb = {0}, ha = {0};
+                        if (rem >= K) {
+                            __builtin_memcpy(&hr, src_r + i * 2, sizeof hr);
+                            __builtin_memcpy(&hg, src_g + i * 2, sizeof hg);
+                            __builtin_memcpy(&hb, src_b + i * 2, sizeof hb);
+                            __builtin_memcpy(&ha, src_a + i * 2, sizeof ha);
+                        } else {
+                            for (int ll = 0; ll < rem; ll++) {
+                                uint16_t tmp;
+                                __builtin_memcpy(&tmp, src_r + (i + ll) * 2, 2); hr[ll] = tmp;
+                                __builtin_memcpy(&tmp, src_g + (i + ll) * 2, 2); hg[ll] = tmp;
+                                __builtin_memcpy(&tmp, src_b + (i + ll) * 2, 2); hb[ll] = tmp;
+                                __builtin_memcpy(&tmp, src_a + (i + ll) * 2, 2); ha[ll] = tmp;
+                            }
+                        }
+                        v[0].f32 = f16_to_f32(hr);
+                        v[1].f32 = f16_to_f32(hg);
+                        v[2].f32 = f16_to_f32(hb);
+                        v[3].f32 = f16_to_f32(ha);
+                    } break;
                     case umbra_fmt_none: break;
                     }
                     {
@@ -1010,6 +1036,31 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                             for (int ll = 0; ll < rem; ll++) {
                                 float tmp = cr[ll];
                                 __builtin_memcpy(dst + (i + ll) * 4, &tmp, 4);
+                            }
+                        }
+                    } break;
+                    case umbra_fmt_f16_planar: {
+                        size_t const rb = buf[ip->ptr].row_bytes;
+                        char *dst_r = (char*)buf[ip->ptr].ptr  + (size_t)row * rb;
+                        char *dst_g = (char*)buf[ip->ptr].ptr2 + (size_t)row * rb;
+                        char *dst_b = (char*)buf[ip->ptr].ptr3 + (size_t)row * rb;
+                        char *dst_a = (char*)buf[ip->ptr].ptr4 + (size_t)row * rb;
+                        U16 hr = f32_to_f16(cr);
+                        U16 hg = f32_to_f16(cg);
+                        U16 hb = f32_to_f16(cb);
+                        U16 ha = f32_to_f16(ca);
+                        if (rem >= K) {
+                            __builtin_memcpy(dst_r + i * 2, &hr, sizeof hr);
+                            __builtin_memcpy(dst_g + i * 2, &hg, sizeof hg);
+                            __builtin_memcpy(dst_b + i * 2, &hb, sizeof hb);
+                            __builtin_memcpy(dst_a + i * 2, &ha, sizeof ha);
+                        } else {
+                            for (int ll = 0; ll < rem; ll++) {
+                                uint16_t tmp;
+                                tmp = hr[ll]; __builtin_memcpy(dst_r + (i + ll) * 2, &tmp, 2);
+                                tmp = hg[ll]; __builtin_memcpy(dst_g + (i + ll) * 2, &tmp, 2);
+                                tmp = hb[ll]; __builtin_memcpy(dst_b + (i + ll) * 2, &tmp, 2);
+                                tmp = ha[ll]; __builtin_memcpy(dst_a + (i + ll) * 2, &tmp, 2);
                             }
                         }
                     } break;

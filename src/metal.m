@@ -285,6 +285,11 @@ static void emit_ops(Buf *b, BB const *bb,
                      "%s            v%d_c = float4(float(h), 0, 0, 1); break; }\n"
                      "%s  case 6u: { float f = ((device float*)(p%d + y * buf_rbs[%d]))[x];\n"
                      "%s            v%d_c = float4(f, 0, 0, 1); break; }\n"
+                     "%s  case 7u: { v%d_c = float4("
+                     "float(((device half*)(p%d + y * buf_rbs[%d]))[x]),"
+                     "float(((device half*)(p%d_g + y * buf_rbs[%d]))[x]),"
+                     "float(((device half*)(p%d_b + y * buf_rbs[%d]))[x]),"
+                     "float(((device half*)(p%d_a + y * buf_rbs[%d]))[x])); break; }\n"
                      "%s  default: v%d_c = float4(0); break;\n"
                      "%s}\n"
                      "%s{ float tf_a = buf_transfers[%d*7+0];\n"
@@ -320,6 +325,7 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i,
                      pad, p, p,
                      pad, i,
+                     pad, i, p, p, p, p, p, p, p, p,
                      pad, i,
                      pad,
                      pad, p,
@@ -379,6 +385,11 @@ static void emit_ops(Buf *b, BB const *bb,
                      " hp[2]=half(sc%d.z); hp[3]=half(sc%d.w); break; }\n"
                      "%s  case 5u: ((device half*)(p%d + y * buf_rbs[%d]))[x] = half(sc%d.x); break;\n"
                      "%s  case 6u: ((device float*)(p%d + y * buf_rbs[%d]))[x] = sc%d.x; break;\n"
+                     "%s  case 7u: {"
+                     " ((device half*)(p%d + y * buf_rbs[%d]))[x] = half(sc%d.x);"
+                     " ((device half*)(p%d_g + y * buf_rbs[%d]))[x] = half(sc%d.y);"
+                     " ((device half*)(p%d_b + y * buf_rbs[%d]))[x] = half(sc%d.z);"
+                     " ((device half*)(p%d_a + y * buf_rbs[%d]))[x] = half(sc%d.w); break; }\n"
                      "%s  default: break;\n"
                      "%s}\n",
                      pad, i, vx, vy, vz, vw,
@@ -409,6 +420,7 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i, i, i, i,
                      pad, p, p, i,
                      pad, p, p, i,
+                     pad, p, p, i, p, p, i, p, p, i, p, p, i,
                      pad,
                      pad);
             } break;
@@ -947,6 +959,15 @@ static char* build_source(BB const *bb,
                  deref_buf[i]);
         }
     }
+    for (int p = 0; p <= max_ptr; p++) {
+        emit(&b,
+             ",\n    device uchar *p%d_g [[buffer(%d)]]"
+             ",\n    device uchar *p%d_b [[buffer(%d)]]"
+             ",\n    device uchar *p%d_a [[buffer(%d)]]",
+             p, total_bufs + 7 + p*3 + 0,
+             p, total_bufs + 7 + p*3 + 1,
+             p, total_bufs + 7 + p*3 + 2);
+    }
     emit(&b,
          ",\n    uint2 pos"
          " [[thread_position_in_grid]]\n) {\n");
@@ -1376,6 +1397,45 @@ static void encode_dispatch(
     [enc setBuffer:per_transfers
             offset:0
            atIndex:(NSUInteger)(m->total_bufs + 6)];
+
+    // Bind f16_planar plane pointers (ptr2, ptr3, ptr4) for each buffer.
+    for (int pp = 0; pp <= m->max_ptr; pp++) {
+        void *ptrs[3] = {buf[pp].ptr2, buf[pp].ptr3, buf[pp].ptr4};
+        for (int k = 0; k < 3; k++) {
+            int slot = m->total_bufs + 7 + pp*3 + k;
+            if (ptrs[k]) {
+                size_t pg = (size_t)sysconf(_SC_PAGESIZE);
+                size_t plane_sz = buf[pp].row_bytes
+                    ? buf[pp].row_bytes * (size_t)(b - t)
+                    : buf[pp].sz;
+                if (!plane_sz) { plane_sz = 1; }
+                _Bool can_nocopy = ((uintptr_t)ptrs[k] & (pg - 1)) == 0;
+                id<MTLBuffer> tmp;
+                if (can_nocopy) {
+                    size_t aligned_sz = (plane_sz + pg - 1) & ~(pg - 1);
+                    tmp = [device
+                        newBufferWithBytesNoCopy:ptrs[k]
+                                         length:(NSUInteger)aligned_sz
+                                        options:MTLResourceStorageModeShared
+                                    deallocator:nil];
+                } else {
+                    tmp = [device
+                        newBufferWithLength:(NSUInteger)plane_sz
+                                    options:MTLResourceStorageModeShared];
+                    __builtin_memcpy(tmp.contents, ptrs[k], plane_sz);
+                }
+                batch_retain_buf(be, (__bridge_retained void*)tmp);
+                if (!buf[pp].read_only && !can_nocopy) {
+                    batch_add_copy(be, ptrs[k],
+                                   (__bridge_retained void*)tmp,
+                                   plane_sz);
+                }
+                [enc setBuffer:tmp
+                        offset:0
+                       atIndex:(NSUInteger)slot];
+            }
+        }
+    }
 
     MTLSize grid =
         MTLSizeMake((NSUInteger)w, (NSUInteger)h, 1);

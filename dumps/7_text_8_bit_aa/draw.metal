@@ -21,6 +21,12 @@ kernel void umbra_entry(
     device uchar *p0 [[buffer(0)]],
     device uchar *p1 [[buffer(1)]],
     device uchar *p2 [[buffer(2)]],
+    device uchar *p0_g [[buffer(10)]],
+    device uchar *p0_b [[buffer(11)]],
+    device uchar *p0_a [[buffer(12)]],
+    device uchar *p1_g [[buffer(13)]],
+    device uchar *p1_b [[buffer(14)]],
+    device uchar *p1_a [[buffer(15)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
     if (pos.x >= w) return;
@@ -52,6 +58,7 @@ kernel void umbra_entry(
                 v13_c = float4(float(h), 0, 0, 1); break; }
       case 6u: { float f = ((device float*)(p1 + y * buf_rbs[1]))[x];
                 v13_c = float4(f, 0, 0, 1); break; }
+      case 7u: { v13_c = float4(float(((device half*)(p1 + y * buf_rbs[1]))[x]),float(((device half*)(p1_g + y * buf_rbs[1]))[x]),float(((device half*)(p1_b + y * buf_rbs[1]))[x]),float(((device half*)(p1_a + y * buf_rbs[1]))[x])); break; }
       default: v13_c = float4(0); break;
     }
     { float tf_a = buf_transfers[1*7+0];
@@ -108,6 +115,7 @@ kernel void umbra_entry(
                 hp[0]=half(sc26.x); hp[1]=half(sc26.y); hp[2]=half(sc26.z); hp[3]=half(sc26.w); break; }
       case 5u: ((device half*)(p1 + y * buf_rbs[1]))[x] = half(sc26.x); break;
       case 6u: ((device float*)(p1 + y * buf_rbs[1]))[x] = sc26.x; break;
+      case 7u: { ((device half*)(p1 + y * buf_rbs[1]))[x] = half(sc26.x); ((device half*)(p1_g + y * buf_rbs[1]))[x] = half(sc26.y); ((device half*)(p1_b + y * buf_rbs[1]))[x] = half(sc26.z); ((device half*)(p1_a + y * buf_rbs[1]))[x] = half(sc26.w); break; }
       default: break;
     }
 }
