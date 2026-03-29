@@ -91,9 +91,9 @@ int main(int argc, char *argv[]) {
         interp->free(interp->ctx); free(interp);
         if (jit) { jit->free(jit->ctx); free(jit); }
         if (mtl) { mtl->free(mtl->ctx); free(mtl); }
-        umbra_backend_free(be_i);
-        umbra_backend_free(be_j);
-        umbra_backend_free(be_m);
+        be_i->free(be_i);
+        if (be_j) { be_j->free(be_j); }
+        if (be_m) { be_m->free(be_m); }
         free(buf);
     }
 
@@ -164,9 +164,9 @@ int main(int argc, char *argv[]) {
         interp->free(interp->ctx); free(interp);
         if (jit) { jit->free(jit->ctx); free(jit); }
         if (mtl) { mtl->free(mtl->ctx); free(mtl); }
-        umbra_backend_free(be_i);
-        umbra_backend_free(be_j);
-        umbra_backend_free(be_m);
+        be_i->free(be_i);
+        if (be_j) { be_j->free(be_j); }
+        if (be_m) { be_m->free(be_m); }
         free(wind);
         slug_free(&sc);
     }

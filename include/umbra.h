@@ -2,7 +2,6 @@
 
 #include <stddef.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 struct umbra_builder* umbra_builder(void);
 void   umbra_builder_free(struct umbra_builder*);
@@ -55,11 +54,6 @@ static inline void umbra_program_queue(struct umbra_program *p,
                                        int l, int t, int r, int b, umbra_buf buf[]) {
     if (r > l && b > t) {
         p->queue(p->ctx, l, t, r, b, buf);
-    }
-}
-static inline void umbra_backend_free(struct umbra_backend *be) {
-    if (be) {
-        be->free(be);
     }
 }
 

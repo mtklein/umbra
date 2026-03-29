@@ -450,8 +450,8 @@ int main(void) {
     umbra_basic_block_free(saved_bb);
     free_programs();
     free_pipes();
-    for (int i = 0; i < NUM_BACKENDS; i++) { umbra_backend_free(bes[i]); }
-    umbra_backend_free(pipe_be);
+    for (int i = 0; i < NUM_BACKENDS; i++) { if (bes[i]) { bes[i]->free(bes[i]); } }
+    pipe_be->free(pipe_be);
     slides_cleanup();
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);

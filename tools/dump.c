@@ -91,7 +91,7 @@ static void dump_bb(char const *dir, char const *name, struct umbra_builder *b) 
         progs[i]->free(progs[i]->ctx); free(progs[i]);
     }
     for (int i = 0; i < (int)(sizeof bes / sizeof bes[0]); i++) {
-        umbra_backend_free(bes[i]);
+        if (bes[i]) { bes[i]->free(bes[i]); }
     }
 }
 

@@ -2538,24 +2538,23 @@ static void test_jit_xs_init(void) {
 static void test_backend_threadsafe(void) {
     struct umbra_backend *interp = umbra_backend_interp();
     interp->threadsafe == 1 here;
-    umbra_backend_free(interp);
+    interp->free(interp);
 
     struct umbra_backend *jit = umbra_backend_jit();
     if (jit) {
         jit->threadsafe == 1 here;
-        umbra_backend_free(jit);
+        jit->free(jit);
     }
 
     struct umbra_backend *metal = umbra_backend_metal();
     if (metal) {
         metal->threadsafe == 0 here;
-        umbra_backend_free(metal);
+        metal->free(metal);
     }
 
 }
 
 static void test_program_null_guards(void) {
-    umbra_backend_free(NULL);
 
     struct umbra_backend *be = umbra_backend_interp();
     be->flush(be);
@@ -2576,7 +2575,7 @@ static void test_program_null_guards(void) {
     umbra_program_queue(p, 0, 0, 1, 0, (umbra_buf[]){{.ptr=buf, .sz=4}});
 
     p->free(p->ctx); free(p);
-    umbra_backend_free(be);
+    be->free(be);
 }
 
 // Regression test: register variant chains must not cross the preamble/body boundary.

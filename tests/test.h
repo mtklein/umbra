@@ -1,5 +1,6 @@
 #pragma once
 #include "../include/umbra.h"
+#include <stdlib.h>
 
 int dprintf(int, char const[], ...);
 #define here ? (void)0 : (dprintf(1, "%s:%d failed\n", __FILE__, __LINE__), __builtin_trap())
@@ -44,6 +45,6 @@ static inline _Bool test_backends_run(test_backends *B, int bi, int r, int b,
 static inline void test_backends_free(test_backends *B) {
     for (int i = 0; i < NUM_BACKENDS; i++) {
         if (B->p[i]) { B->p[i]->free(B->p[i]->ctx); free(B->p[i]); }
-        umbra_backend_free(B->be[i]);
+        if (B->be[i]) { B->be[i]->free(B->be[i]); }
     }
 }
