@@ -3433,7 +3433,37 @@ static void test_sel_r_rm(void) {
     cleanup(&B);
 }
 
+// Exercise RA channel-register return: ra_step_unary consuming a non-zero
+// channel of load_color where that channel dies at the unary op.
+// Must use ops that go through ra_step_unary (abs, neg, imm shifts, etc.)
+// not ra_step_alu (which is used by i32_from_f32, add, etc.)
+static void test_ra_chan_unary(void) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_color c = umbra_load_color(b, (umbra_ptr){0, 0});
+    // abs_f32 and neg_f32 use ra_step_unary.
+    // Use c.g (chan 1) only via abs → dies at abs → triggers chan return.
+    umbra_store_32(b, (umbra_ptr){1, 0}, umbra_i32_from_f32(b, umbra_abs_f32(b, c.g)));
+    // Use c.b (chan 2) only via neg.
+    umbra_store_32(b, (umbra_ptr){2, 0}, umbra_i32_from_f32(b, umbra_neg_f32(b, c.b)));
+    // Use c.a (chan 3) only via abs.
+    umbra_store_32(b, (umbra_ptr){3, 0}, umbra_i32_from_f32(b, umbra_abs_f32(b, c.a)));
+    // c.r (chan 0) unused.
+    backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint32_t src[] = {0x80402010u, 0x80402010u, 0x80402010u, 0x80402010u};
+        int32_t dg[4]={0}, db[4]={0}, da[4]={0};
+        if (!run(&B, bi, 4, 1, (umbra_buf[]){
+            {.ptr=src, .sz=sizeof src, .fmt=umbra_fmt_8888},
+            {.ptr=dg, .sz=16}, {.ptr=db, .sz=16}, {.ptr=da, .sz=16},
+        })) { continue; }
+        // g = 0x40/255 ≈ 0.251, abs(0.251) ≈ 0.251, i32 truncates to 0
+        (dg[0] == 0) here;
+    }
+    cleanup(&B);
+}
+
 int main(void) {
+    test_ra_chan_unary();
     test_binary_m_rr();
     test_binary_r_mm();
     test_minmax_m_rm();
