@@ -24,7 +24,7 @@ static char const *fmt_name[] = {
 };
 static umbra_fmt const fmt_enums[] = {
     umbra_fmt_8888, umbra_fmt_565, umbra_fmt_fp16,
-    umbra_fmt_none, umbra_fmt_1010102, umbra_fmt_8888,
+    umbra_fmt_f16_planar, umbra_fmt_1010102, umbra_fmt_8888,
 };
 
 typedef struct {
@@ -91,10 +91,13 @@ static void free_pipes(void) {
     umbra_backend_free(interp_be);
 }
 
-static void fill_bg_row(int fmt, void *dst,
-                        int n, uint32_t bg,
-                        size_t row_sz,
-                        size_t plane_gap) {
+static size_t pixbuf_size(int fmt) {
+    int   bpp = umbra_pixel_bytes(fmt_enums[fmt]);
+    int   planes = (fmt_enums[fmt] == umbra_fmt_f16_planar) ? 4 : 1;
+    return (size_t)(W * H * bpp * planes);
+}
+
+static void fill_bg(int fmt, void *dst, uint32_t bg) {
     float hc[4] = {
         (float)( bg        & 0xffu) / 255.0f,
         (float)((bg >>  8) & 0xffu) / 255.0f,
@@ -104,36 +107,31 @@ static void fill_bg_row(int fmt, void *dst,
     uint64_t uni_[4] = {0};
     char *uni = (char*)uni_;
     slide_uni_f32(uni, 0, hc, 4);
-    int ps = plane_gap ? 3 : 0;
-    umbra_buf buf[5];
+    int   bpp = umbra_pixel_bytes(fmt_enums[fmt]);
     umbra_transfer tf = (fmt == FMT_SRGB) ? umbra_transfer_srgb : (umbra_transfer){0};
-    buf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)fill_pipes[fmt].uni_len, .read_only=1};
-    buf[1] = (umbra_buf){.ptr=dst, .sz=row_sz, .fmt=fmt_enums[fmt], .transfer=tf};
-    for (int i = 0; i < ps; i++) {
-        buf[2 + i] = (umbra_buf){.ptr=(char *)dst + (size_t)(i + 1) * plane_gap, .sz=row_sz};
-    }
-    umbra_program_queue(
-        fill_pipes[fmt].prog, 0, 0, n, 1, buf);
+    umbra_buf buf[2] = {
+        {.ptr=uni, .sz=(size_t)fill_pipes[fmt].uni_len, .read_only=1},
+        {.ptr=dst, .sz=pixbuf_size(fmt), .row_bytes=(size_t)(W * bpp),
+         .fmt=fmt_enums[fmt], .transfer=tf},
+    };
+    umbra_program_queue(fill_pipes[fmt].prog, 0, 0, W, H, buf);
 }
 
-static void readback_row(int fmt, uint32_t *dst,
-                         void *src, int n,
-                         size_t src_sz,
-                         size_t plane_gap) {
+static void readback_to_8888(int fmt,
+                             void *pixbuf,
+                             uint32_t *out) {
     uint64_t uni_[2] = {0};
     char *uni = (char*)uni_;
-    int ps = plane_gap ? 3 : 0;
-    int op = readback_pipes[fmt].out_ptr;
-    umbra_buf buf[6];
+    int   bpp = umbra_pixel_bytes(fmt_enums[fmt]);
+    int   op = readback_pipes[fmt].out_ptr;
     umbra_transfer tf = (fmt == FMT_SRGB) ? umbra_transfer_srgb : (umbra_transfer){0};
+    umbra_buf buf[3];
     buf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)readback_pipes[fmt].uni_len, .read_only=1};
-    buf[1] = (umbra_buf){.ptr=src, .sz=src_sz, .read_only=1, .fmt=fmt_enums[fmt], .transfer=tf};
-    for (int i = 0; i < ps; i++) {
-        buf[2 + i] = (umbra_buf){.ptr=(char *)src + (size_t)(i + 1) * plane_gap, .sz=src_sz};
-    }
-    buf[op] = (umbra_buf){.ptr=dst, .sz=(size_t)(n * 4), .fmt=umbra_fmt_8888};
-    umbra_program_queue(
-        readback_pipes[fmt].prog, 0, 0, n, 1, buf);
+    buf[1] = (umbra_buf){.ptr=pixbuf, .sz=pixbuf_size(fmt), .row_bytes=(size_t)(W * bpp),
+                         .read_only=1, .fmt=fmt_enums[fmt], .transfer=tf};
+    buf[op] = (umbra_buf){.ptr=out, .sz=(size_t)(W * H * 4), .row_bytes=(size_t)(W * 4),
+                          .fmt=umbra_fmt_8888};
+    umbra_program_queue(readback_pipes[fmt].prog, 0, 0, W, H, buf);
 }
 
 static void render_slide(
@@ -144,33 +142,10 @@ static void render_slide(
         umbra_draw_layout const *lay) {
     slide *s = slide_get(slide_idx);
 
-    int   bpp = umbra_pixel_bytes(fmt_enums[fmt]);
-    int   row_bytes = W * bpp;
-    size_t row_sz = (size_t)W * (size_t)bpp;
-
-    for (int y = 0; y < H; y++) {
-        void *row = (void*)((uint8_t*)pixbuf + y * row_bytes);
-        fill_bg_row(fmt, row, W,
-                    s->bg, row_sz,
-                    0);
-    }
+    fill_bg(fmt, pixbuf, s->bg);
     if (s->prepare) { s->prepare(s, W, H, be); }
     s->draw(s, W, H, 0, H, pixbuf,
             lay, program);
-}
-
-static void readback_to_8888(int fmt,
-                             void *pixbuf,
-                             uint32_t *out) {
-    int   bpp = umbra_pixel_bytes(fmt_enums[fmt]);
-    size_t row_sz = (size_t)W * (size_t)bpp;
-
-    for (int y = 0; y < H; y++) {
-        void *src = (void*)((uint8_t*)pixbuf
-                      + y * W * bpp);
-        readback_row(fmt, out + y * W, src,
-                     W, row_sz, 0);
-    }
 }
 
 static void test_slide_golden(
@@ -206,7 +181,7 @@ static void test_slide_golden(
     }
     umbra_basic_block_free(bb);
 
-    size_t pixbuf_sz = (size_t)(W * H) * (size_t)umbra_pixel_bytes(fmt_enums[fmt]);
+    size_t pixbuf_sz = pixbuf_size(fmt);
     void *pbuf_ref = calloc(1, pixbuf_sz);
     void *pbuf_tst = calloc(1, pixbuf_sz);
     uint32_t *ref = malloc((size_t)(W * H) * 4);
@@ -218,7 +193,6 @@ static void test_slide_golden(
 
     for (int bi = 1; bi < N_BACKS; bi++) {
         if (!progs[bi]) { continue; }
-        if (bi == 1 && fmt_enums[fmt] == umbra_fmt_none) { continue; }
         render_slide(slide_idx, fmt,
                      bes[bi], progs[bi], pbuf_tst, &lay);
         umbra_backend_flush(bes[bi]);
