@@ -13,6 +13,7 @@ typedef int32_t  I32 __attribute__((vector_size(K * 4)));
 typedef uint32_t U32 __attribute__((vector_size(K * 4)));
 typedef float    F32 __attribute__((vector_size(K * 4)));
 typedef double   F64 __attribute__((vector_size(K * 8)));
+typedef uint64_t U64 __attribute__((vector_size(K * 8)));
 typedef uint16_t U16 __attribute__((vector_size(K * 2)));
 typedef int16_t  S16 __attribute__((vector_size(K * 2)));
 
@@ -104,7 +105,6 @@ typedef union {
 __attribute__((noinline))
 static void interp_load_color(val v[4], umbra_buf const *b,
                                char const *src, int i, int rem) {
-    int const clamp = rem < K ? rem : K;
     switch (b->fmt) {
     case umbra_fmt_8888: {
         U32 px;
@@ -164,11 +164,22 @@ static void interp_load_color(val v[4], umbra_buf const *b,
         v[3].f32 = cast(F32, cast(I32, px >> 30))            * ((F32){0} + (1.f/3));
     } break;
     case umbra_fmt_fp16: {
-        U16 hr = {0}, hg = {0}, hb = {0}, ha = {0};
-        for (int ll = 0; ll < clamp; ll++) {
-            uint16_t h[4];
-            __builtin_memcpy(h, src + (i + ll) * 8, 8);
-            hr[ll] = h[0]; hg[ll] = h[1]; hb[ll] = h[2]; ha[ll] = h[3];
+        U16 hr, hg, hb, ha;
+        if (rem >= K) {
+            U64 px;
+            __builtin_memcpy(&px, src + i * 8, sizeof px);
+            U64 const mask16 = (U64){0} + 0xFFFFULL;
+            hr = cast(U16,  px        & mask16);
+            hg = cast(U16, (px >> 16) & mask16);
+            hb = cast(U16, (px >> 32) & mask16);
+            ha = cast(U16,  px >> 48);
+        } else {
+            hr = (U16){0}; hg = (U16){0}; hb = (U16){0}; ha = (U16){0};
+            for (int ll = 0; ll < rem; ll++) {
+                uint16_t h[4];
+                __builtin_memcpy(h, src + (i + ll) * 8, 8);
+                hr[ll] = h[0]; hg[ll] = h[1]; hb[ll] = h[2]; ha[ll] = h[3];
+            }
         }
         v[0].f32 = f16_to_f32(hr);
         v[1].f32 = f16_to_f32(hg);
@@ -196,13 +207,13 @@ static void interp_load_color(val v[4], umbra_buf const *b,
         // sRGB→linear: polynomial approximation (no powf).
         for (int ch = 0; ch < 3; ch++) {
             F32 s = v[ch].f32;
-            for (int ll = 0; ll < clamp; ll++) {
-                float x = s[ll];
-                s[ll] = x < 0.055f
-                    ? x * (1.0f/12.92f)
-                    : x*x * (0.3f*x + 0.6975f) + 0.0025f;
-            }
-            v[ch].f32 = s;
+            F32 const lo = s * ((F32){0} + (1.0f/12.92f));
+            F32 const hi = s*s * (s * ((F32){0} + 0.3f) + ((F32){0} + 0.6975f))
+                         + ((F32){0} + 0.0025f);
+            I32 const sel = (I32)(s < ((F32){0} + 0.055f));
+            union { F32 f; I32 i; } lo_u = {.f=lo}, hi_u = {.f=hi}, r;
+            r.i = (sel & lo_u.i) | (~sel & hi_u.i);
+            v[ch].f32 = r.f;
         }
     } break;
     case umbra_fmt_f16:
@@ -237,7 +248,6 @@ static void interp_load_color(val v[4], umbra_buf const *b,
 __attribute__((noinline))
 static void interp_store_color(val const v[], umbra_buf const *b,
                                 char *dst, int i, int rem) {
-    int const clamp = rem < K ? rem : K;
     F32 cr = v[0].f32, cg = v[1].f32, cb = v[2].f32, ca = v[3].f32;
     switch (b->fmt) {
     case umbra_fmt_8888: {
@@ -301,32 +311,36 @@ static void interp_store_color(val const v[], umbra_buf const *b,
         U16 hg = f32_to_f16(cg);
         U16 hb = f32_to_f16(cb);
         U16 ha = f32_to_f16(ca);
-        for (int ll = 0; ll < clamp; ll++) {
-            uint16_t h[4] = {hr[ll], hg[ll], hb[ll], ha[ll]};
-            __builtin_memcpy(dst + (i + ll) * 8, h, 8);
+        if (rem >= K) {
+            U64 const px = cast(U64, hr)
+                         | cast(U64, hg) << 16
+                         | cast(U64, hb) << 32
+                         | cast(U64, ha) << 48;
+            __builtin_memcpy(dst + i * 8, &px, sizeof px);
+        } else {
+            for (int ll = 0; ll < rem; ll++) {
+                uint16_t h[4] = {hr[ll], hg[ll], hb[ll], ha[ll]};
+                __builtin_memcpy(dst + (i + ll) * 8, h, 8);
+            }
         }
     } break;
     case umbra_fmt_srgb: {
         // linear→sRGB: rsqrt/rcp rational approximation (no powf).
-        // Interpreter uses exact 1/sqrt and 1/x.
         {
-            float const c_ = 1.12999999523f;
-            float const d_ = 0.14137776196f;
-            float const k1 = 0.01383202704f;
-            float const k2 = -0.00245423456f;
+            F32 const vc  = (F32){0} + 1.12999999523f;
+            F32 const vd  = (F32){0} + 0.14137776196f;
+            F32 const vk1 = (F32){0} + 0.01383202704f;
+            F32 const vk2 = (F32){0} + -0.00245423456f;
             F32 *chs[3] = {&cr, &cg, &cb};
             for (int ci = 0; ci < 3; ci++) {
                 F32 l = vec_max(*chs[ci], (F32){0});
-                for (int ll = 0; ll < clamp; ll++) {
-                    float x = l[ll];
-                    if (x < 0.00465985f) {
-                        l[ll] = x * 12.92f;
-                    } else {
-                        float t = 1.0f / sqrtf(x);
-                        l[ll] = (c_ + t * (k1 + t * k2)) / (d_ + t);
-                    }
-                }
-                *chs[ci] = l;
+                F32 const lo = l * ((F32){0} + 12.92f);
+                F32 const t  = ((F32){0} + 1.f) / vec_sqrt(vec_max(l, (F32){0} + 1e-30f));
+                F32 const hi = (vc + t * (vk1 + t * vk2)) / (vd + t);
+                I32 const mask = (I32)(l < ((F32){0} + 0.00465985f));
+                union { F32 f; I32 i; } lo_u = {.f=lo}, hi_u = {.f=hi}, r;
+                r.i = (mask & lo_u.i) | (~mask & hi_u.i);
+                *chs[ci] = r.f;
             }
         }
         F32 const zero = {0}, one = (F32){0} + 1.f, scale = (F32){0} + 255.f;
@@ -954,14 +968,21 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                     char const *src = (char const*)buf[ip->ptr].ptr + (size_t)row * buf[ip->ptr].row_bytes;
                     int const   i = end - K;
                     int const   rem = n - i;
-                    v[0].i32 = (I32){0};
-                    v[1].i32 = (I32){0};
-                    for (int ll = 0; ll < (rem < K ? rem : K); ll++) {
-                        int32_t lo, hi;
-                        __builtin_memcpy(&lo, src + (i + ll) * 8,     4);
-                        __builtin_memcpy(&hi, src + (i + ll) * 8 + 4, 4);
-                        v[0].i32[ll] = lo;
-                        v[1].i32[ll] = hi;
+                    if (rem >= K) {
+                        U64 pairs;
+                        __builtin_memcpy(&pairs, src + i * 8, sizeof pairs);
+                        v[0].u32 = cast(U32, pairs & ((U64){0} + 0xFFFFFFFFULL));
+                        v[1].u32 = cast(U32, pairs >> 32);
+                    } else {
+                        v[0].i32 = (I32){0};
+                        v[1].i32 = (I32){0};
+                        for (int ll = 0; ll < rem; ll++) {
+                            int32_t lo, hi;
+                            __builtin_memcpy(&lo, src + (i + ll) * 8,     4);
+                            __builtin_memcpy(&hi, src + (i + ll) * 8 + 4, 4);
+                            v[0].i32[ll] = lo;
+                            v[1].i32[ll] = hi;
+                        }
                     }
                     ip++; v++;
                 } NEXT;
@@ -1021,12 +1042,18 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                     char *dst = (char*)buf[ip->ptr].ptr + (size_t)row * buf[ip->ptr].row_bytes;
                     int const i = end - K;
                     int const rem = n - i;
-                    for (int ll = 0; ll < (rem < K ? rem : K); ll++) {
-                        int32_t lo, hi;
-                        __builtin_memcpy(&lo, (char*)&v[ip->x].i32 + 4 * ll, 4);
-                        __builtin_memcpy(&hi, (char*)&v[ip->y].i32 + 4 * ll, 4);
-                        __builtin_memcpy(dst + (i + ll) * 8,     &lo, 4);
-                        __builtin_memcpy(dst + (i + ll) * 8 + 4, &hi, 4);
+                    if (rem >= K) {
+                        U64 const pairs = cast(U64, v[ip->x].u32)
+                                        | cast(U64, v[ip->y].u32) << 32;
+                        __builtin_memcpy(dst + i * 8, &pairs, sizeof pairs);
+                    } else {
+                        for (int ll = 0; ll < rem; ll++) {
+                            int32_t lo, hi;
+                            __builtin_memcpy(&lo, (char*)&v[ip->x].i32 + 4 * ll, 4);
+                            __builtin_memcpy(&hi, (char*)&v[ip->y].i32 + 4 * ll, 4);
+                            __builtin_memcpy(dst + (i + ll) * 8,     &lo, 4);
+                            __builtin_memcpy(dst + (i + ll) * 8 + 4, &hi, 4);
+                        }
                     }
                 } NEXT;
                 CASE(op_store_8x4) {
@@ -1116,8 +1143,7 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                 } NEXT;
                 CASE(op_i32_from_u16) { U16 tmp; __builtin_memcpy(&tmp, &v[ip->x], sizeof tmp); v->u32 = cast(U32, tmp); } NEXT;
                 CASE(op_i16_from_i32) {
-                    U16 tmp;
-                    for (int ll = 0; ll < K; ll++) { tmp[ll] = (uint16_t)v[ip->x].u32[ll]; }
+                    U16 tmp = cast(U16, v[ip->x].u32);
                     v->u32 = (U32){0};
                     __builtin_memcpy(v, &tmp, sizeof tmp);
                 } NEXT;
