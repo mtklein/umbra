@@ -44,10 +44,6 @@ enum {
 static char const *fmt_name[] = {
     "8888", "565", "fp16", "1010102", "sRGB",
 };
-static umbra_format const *fmt_formats[] = {
-    &umbra_format_8888,   &umbra_format_565,       &umbra_format_fp16,
-    &umbra_format_1010102, &umbra_format_srgb_8888,
-};
 static umbra_fmt const fmt_enums[] = {
     umbra_fmt_8888, umbra_fmt_565, umbra_fmt_fp16,
     umbra_fmt_1010102, umbra_fmt_8888,
@@ -66,6 +62,8 @@ static void free_pipe(pipe *p) {
 }
 
 static struct umbra_backend *pipe_be;
+static umbra_fmt      cur_pipe_fmt;
+static umbra_transfer cur_pipe_tf;
 
 static void finish_pipe(pipe *p, builder *builder) {
     p->uni_len = umbra_uni_len(builder);
@@ -76,6 +74,7 @@ static void finish_pipe(pipe *p, builder *builder) {
 }
 
 static void build_fill(int fmt) {
+    (void)fmt;
     free_pipe(&fill_pipe);
     builder    *builder = umbra_builder();
     int         fi = umbra_reserve(builder, 4);
@@ -85,37 +84,35 @@ static void build_fill(int fmt) {
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 2),
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 3),
     };
-    fmt_formats[fmt]->store(builder, (umbra_ptr){1, 0}, c);
+    umbra_store_color(builder, (umbra_ptr){1, 0}, c);
     finish_pipe(&fill_pipe, builder);
 }
 
 static void build_readback(int fmt) {
+    (void)fmt;
     free_pipe(&readback_pipe);
     builder    *builder = umbra_builder();
-    umbra_color c = fmt_formats[fmt]->load(builder, (umbra_ptr){1, 0});
+    umbra_color c = umbra_load_color(builder, (umbra_ptr){1, 0});
     int         op = umbra_max_ptr(builder) + 1;
-    umbra_format_8888.store(builder, (umbra_ptr){op, 0}, c);
+    umbra_store_color(builder, (umbra_ptr){op, 0}, c);
     readback_pipe.out_ptr = op;
     finish_pipe(&readback_pipe, builder);
 }
 
 static void build_hdr(int fmt) {
+    (void)fmt;
     free_pipe(&hdr_pipe);
     builder    *builder = umbra_builder();
-    umbra_color c = fmt_formats[fmt]->load(builder, (umbra_ptr){1, 0});
+    umbra_color c = umbra_load_color(builder, (umbra_ptr){1, 0});
     int         op = umbra_max_ptr(builder) + 1;
     hdr_pipe.out_ptr = op;
-    umbra_val lo = umbra_pack(builder,
-                              umbra_i32_from_u16(builder, umbra_f16_from_f32(builder, c.r)),
-                              umbra_i32_from_u16(builder, umbra_f16_from_f32(builder, c.g)), 16);
-    umbra_val hi = umbra_pack(builder,
-                              umbra_i32_from_u16(builder, umbra_f16_from_f32(builder, c.b)),
-                              umbra_i32_from_u16(builder, umbra_f16_from_f32(builder, c.a)), 16);
-    umbra_store_32x2(builder, (umbra_ptr){op, 0}, lo, hi);
+    umbra_store_color(builder, (umbra_ptr){op, 0}, c);
     finish_pipe(&hdr_pipe, builder);
 }
 
 static void build_pipes(int fmt) {
+    cur_pipe_fmt = fmt_enums[fmt];
+    cur_pipe_tf = (fmt == 4) ? umbra_transfer_srgb : (umbra_transfer){0};  // fmt 4 = sRGB
     build_fill(fmt);
     build_readback(fmt);
     build_hdr(fmt);
@@ -215,7 +212,7 @@ static void fill_bg_row(void *dst, int n, uint32_t bg, size_t row_sz, size_t pla
     int      ps = plane_gap ? 3 : 0;
     umbra_buf buf[5];
     buf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)fill_pipe.uni_len, .read_only=1};
-    buf[1] = (umbra_buf){.ptr=dst, .sz=row_sz};
+    buf[1] = (umbra_buf){.ptr=dst, .sz=row_sz, .fmt=cur_pipe_fmt, .transfer=cur_pipe_tf};
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (umbra_buf){.ptr=(char *)dst + (size_t)(i + 1) * plane_gap, .sz=row_sz};
     }
@@ -229,11 +226,11 @@ static void readback_row(uint32_t *dst, void *src, int n, size_t src_sz, size_t 
     int      op = readback_pipe.out_ptr;
     umbra_buf buf[6];
     buf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)readback_pipe.uni_len, .read_only=1};
-    buf[1] = (umbra_buf){.ptr=src, .sz=src_sz, .read_only=1};
+    buf[1] = (umbra_buf){.ptr=src, .sz=src_sz, .read_only=1, .fmt=cur_pipe_fmt, .transfer=cur_pipe_tf};
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (umbra_buf){.ptr=(char *)src + (size_t)(i + 1) * plane_gap, .sz=src_sz};
     }
-    buf[op] = (umbra_buf){.ptr=dst, .sz=(size_t)(n * 4)};
+    buf[op] = (umbra_buf){.ptr=dst, .sz=(size_t)(n * 4), .fmt=umbra_fmt_8888};
     umbra_program_queue(readback_pipe.program, 0, 0, n, 1, buf);
 }
 
@@ -244,11 +241,11 @@ static void to_hdr_row(__fp16 *dst, void *src, int n, size_t src_sz, size_t plan
     int      op = hdr_pipe.out_ptr;
     umbra_buf buf[6];
     buf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)hdr_pipe.uni_len, .read_only=1};
-    buf[1] = (umbra_buf){.ptr=src, .sz=src_sz, .read_only=1};
+    buf[1] = (umbra_buf){.ptr=src, .sz=src_sz, .read_only=1, .fmt=cur_pipe_fmt, .transfer=cur_pipe_tf};
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (umbra_buf){.ptr=(char *)src + (size_t)(i + 1) * plane_gap, .sz=src_sz};
     }
-    buf[op] = (umbra_buf){.ptr=dst, .sz=(size_t)(n * 8)};
+    buf[op] = (umbra_buf){.ptr=dst, .sz=(size_t)(n * 8), .fmt=umbra_fmt_fp16};
     umbra_program_queue(hdr_pipe.program, 0, 0, n, 1, buf);
 }
 
