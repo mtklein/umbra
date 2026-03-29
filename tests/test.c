@@ -2802,6 +2802,7 @@ static void test_neg_round_i32(void) {
 }
 
 static void test_cmp_unsigned_signed(void) {
+    // Base ops (non-chain, result to store → m_*_mm).
     struct umbra_builder *b = umbra_builder();
     umbra_val a = umbra_load_32(b, (umbra_ptr){0, 0});
     umbra_val c = umbra_load_32(b, (umbra_ptr){1, 0});
@@ -2825,6 +2826,34 @@ static void test_cmp_unsigned_signed(void) {
         (d3[0] == 0) here; (d3[1] == -1) here; (d3[2] == -1) here; (d3[3] == 0) here;
     }
     cleanup(&B);
+
+    // Chained: cmp → sel exercises r_*_mm (result to acc) and
+    // the base ops with register variant upgrade.
+    b = umbra_builder();
+    a = umbra_load_32(b, (umbra_ptr){0, 0});
+    c = umbra_load_32(b, (umbra_ptr){1, 0});
+    umbra_val one = umbra_imm_i32(b, 1), zero = umbra_imm_i32(b, 0);
+    // le_s32 → sel: le result → acc, sel reads it
+    umbra_val r1 = umbra_sel_i32(b, umbra_le_s32(b, a, c), one, zero);
+    umbra_val r2 = umbra_sel_i32(b, umbra_lt_u32(b, a, c), one, zero);
+    umbra_val r3 = umbra_sel_i32(b, umbra_le_u32(b, a, c), one, zero);
+    umbra_store_32(b, (umbra_ptr){2, 0}, r1);
+    umbra_store_32(b, (umbra_ptr){3, 0}, r2);
+    umbra_store_32(b, (umbra_ptr){4, 0}, r3);
+    B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        int32_t sa2[] = {-1, 0, 5, 10};
+        int32_t sc2[] = { 0, 0, 5,  5};
+        int32_t d12[4]={0}, d22[4]={0}, d32[4]={0};
+        if (!run(&B, bi, 4, 1, (umbra_buf[]){
+            {.ptr=sa2, .sz=sizeof sa2}, {.ptr=sc2, .sz=sizeof sc2},
+            {.ptr=d12, .sz=sizeof d12}, {.ptr=d22, .sz=sizeof d22}, {.ptr=d32, .sz=sizeof d32},
+        })) { continue; }
+        (d12[0] == 1) here; (d12[1] == 1) here; (d12[2] == 1) here; (d12[3] == 0) here;
+        (d22[0] == 0) here; (d22[1] == 0) here; (d22[2] == 0) here; (d22[3] == 0) here;
+        (d32[0] == 0) here; (d32[1] == 1) here; (d32[2] == 1) here; (d32[3] == 0) here;
+    }
+    cleanup(&B);
 }
 
 static void test_max_f32_imm(void) {
@@ -2845,6 +2874,7 @@ static void test_max_f32_imm(void) {
 }
 
 static void test_imm_cmp_i32(void) {
+    // Base imm ops (result to store).
     struct umbra_builder *b = umbra_builder();
     umbra_val a = umbra_load_32(b, (umbra_ptr){0, 0});
     umbra_val m1 = umbra_eq_i32(b, a, umbra_imm_i32(b, 5));
@@ -2973,6 +3003,88 @@ static void test_pack_register_variants(void) {
     cleanup(&B);
 }
 
+static void test_regvar_m_patterns(void) {
+    // Targets: m_cmp_rm, m_cmp_rr, r_minmax_mm, base max_f32_imm,
+    // m_float_cmp_imm_r, r/m_int_cmp_imm_r, r_pack_rm, m_pack_rr.
+    struct umbra_builder *b = umbra_builder();
+    umbra_val a = umbra_load_32(b, (umbra_ptr){0, 0});
+    umbra_val c = umbra_load_32(b, (umbra_ptr){1, 0});
+    umbra_val fa = umbra_f32_from_i32(b, a);
+    umbra_val fc = umbra_f32_from_i32(b, c);
+
+    // m_cmp_rm: add→acc, then lt_f32(acc, mem) → store (out_r=false → m_)
+    umbra_val sum = umbra_add_f32(b, fa, umbra_imm_f32(b, 0.5f));
+    umbra_store_32(b, (umbra_ptr){2, 0}, umbra_lt_f32(b, sum, fc));
+
+    // m_cmp_rr: lt_f32(x, x) where x is from acc, result to store
+    umbra_val neg = umbra_neg_f32(b, fa);
+    umbra_store_32(b, (umbra_ptr){3, 0}, umbra_lt_f32(b, neg, neg));
+
+    // r_min_mm: both from memory, result feeds next ALU
+    umbra_val dummy = umbra_add_f32(b, fa, fc);
+    umbra_store_32(b, (umbra_ptr){4, 0}, umbra_i32_from_f32(b, dummy));
+    umbra_val mn = umbra_min_f32(b, fa, fc);
+    umbra_store_32(b, (umbra_ptr){5, 0}, umbra_i32_from_f32(b, mn));
+
+    // base max_f32_imm: result direct to store (no chain → base op)
+    umbra_val mx = umbra_max_f32(b, fc, umbra_imm_f32(b, 5.f));
+    umbra_store_32(b, (umbra_ptr){6, 0}, mx);
+
+    // m_float_cmp_imm_r: chain→lt_f32_imm→store (x from acc, result to memory)
+    umbra_val fn_ = umbra_neg_f32(b, fc);
+    umbra_store_32(b, (umbra_ptr){7, 0}, umbra_lt_f32(b, fn_, umbra_imm_f32(b, 0.f)));
+
+    // m_int_cmp_imm_r: chain→cmp_imm→store (x from acc, result to memory)
+    umbra_val ai = umbra_add_i32(b, a, umbra_imm_i32(b, 1));
+    umbra_store_32(b, (umbra_ptr){8, 0}, umbra_eq_i32(b, ai, umbra_imm_i32(b, 6)));
+    umbra_val ai2 = umbra_add_i32(b, a, umbra_imm_i32(b, 2));
+    umbra_store_32(b, (umbra_ptr){9, 0}, umbra_lt_s32(b, ai2, umbra_imm_i32(b, 6)));
+    umbra_val ai3 = umbra_add_i32(b, a, umbra_imm_i32(b, 3));
+    umbra_store_32(b, (umbra_ptr){10, 0}, umbra_le_s32(b, ai3, umbra_imm_i32(b, 6)));
+    // r_int_cmp_imm_r: chain→cmp_imm→and (result to acc, feeds ALU)
+    umbra_val ai4 = umbra_add_i32(b, a, umbra_imm_i32(b, 100));
+    umbra_val eq_mask = umbra_eq_i32(b, ai4, umbra_imm_i32(b, 105));
+    umbra_store_32(b, (umbra_ptr){13, 0}, umbra_and_i32(b, eq_mask, a));
+
+    // r_pack_rm: and→acc, pack(acc, mem)→acc, add→store (pack result feeds ALU)
+    umbra_val lo2 = umbra_and_i32(b, a, umbra_imm_i32(b, 0xFF));
+    umbra_val pk = umbra_pack(b, lo2, c, 8);
+    umbra_store_32(b, (umbra_ptr){11, 0}, umbra_add_i32(b, pk, umbra_imm_i32(b, 1)));
+
+    // m_pack_rr: pack(x, x) where x from acc, result to store
+    umbra_val lo3 = umbra_and_i32(b, a, umbra_imm_i32(b, 0xF));
+    umbra_store_32(b, (umbra_ptr){12, 0}, umbra_pack(b, lo3, lo3, 4));
+
+    backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        int32_t sa[] = {5, 0, -1, 10};
+        int32_t sc[] = {3, 3, 3, 3};
+        int32_t d[14][4];
+        __builtin_memset(d, 0, sizeof d);
+        if (!run(&B, bi, 4, 1, (umbra_buf[]){
+            {.ptr=sa, .sz=sizeof sa}, {.ptr=sc, .sz=sizeof sc},
+            {.ptr=d[2], .sz=16}, {.ptr=d[3], .sz=16},
+            {.ptr=d[4], .sz=16}, {.ptr=d[5], .sz=16},
+            {.ptr=d[6], .sz=16}, {.ptr=d[7], .sz=16},
+            {.ptr=d[8], .sz=16}, {.ptr=d[9], .sz=16},
+            {.ptr=d[10], .sz=16}, {.ptr=d[11], .sz=16},
+            {.ptr=d[12], .sz=16}, {.ptr=d[13], .sz=16},
+        })) { continue; }
+        // lt(5.5,3)=0, lt(0.5,3)=-1, lt(-0.5,3)=-1, lt(10.5,3)=0
+        (d[2][0] == 0) here; (d[2][1] == -1) here; (d[2][2] == -1) here; (d[2][3] == 0) here;
+        // lt(x,x) always 0
+        for (int i = 0; i < 4; i++) { (d[3][i] == 0) here; }
+        // min(5.0,3.0)=3 min(0.0,3.0)=0 min(-1.0,3.0)=-1 min(10.0,3.0)=3
+        (d[5][0] == 3) here; (d[5][1] == 0) here; (d[5][2] == -1) here; (d[5][3] == 3) here;
+        // max(3.0,5.0)=5.0 for all (fc=3, imm=5), stored as float bits
+        union { float f; int32_t i; } five = {.f=5.f};
+        for (int i = 0; i < 4; i++) { (d[6][i] == five.i) here; }
+        // eq(5+1,6)=-1, eq(0+1,6)=0, eq(-1+1,6)=0, eq(10+1,6)=0
+        (d[8][0] == -1) here; (d[8][1] == 0) here; (d[8][2] == 0) here; (d[8][3] == 0) here;
+    }
+    cleanup(&B);
+}
+
 int main(void) {
     test_shr_ops();
     test_neg_round_i32();
@@ -2983,6 +3095,7 @@ int main(void) {
     test_minmax_register_variants();
     test_cmp_register_variants();
     test_pack_register_variants();
+    test_regvar_m_patterns();
     test_preamble_register_boundary();
     test_backend_threadsafe();
     test_program_null_guards();
