@@ -2529,6 +2529,97 @@ static void test_load_store_color_f16_planar(void) {
     cleanup(&B);
 }
 
+static void test_load_store_color_565(void) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_color c = umbra_load_color(b, (umbra_ptr){0, 0});
+    umbra_store_color(b, (umbra_ptr){1, 0}, c);
+    backends B = make(b, 0);
+
+    uint16_t src[7], dst[7];
+    for (int i = 0; i < 7; i++) { src[i] = (uint16_t)(0x1234u + (unsigned)i * 0x1111u); }
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        __builtin_memset(dst, 0, sizeof dst);
+        if (!run(&B, bi, 7, 1, (umbra_buf[]){
+            {.ptr=src, .sz=sizeof src, .fmt=umbra_fmt_565},
+            {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_565},
+        })) { continue; }
+        for (int i = 0; i < 7; i++) { (dst[i] == src[i]) here; }
+    }
+    cleanup(&B);
+}
+
+static void test_load_store_color_1010102(void) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_color c = umbra_load_color(b, (umbra_ptr){0, 0});
+    umbra_store_color(b, (umbra_ptr){1, 0}, c);
+    backends B = make(b, 0);
+
+    uint32_t src[7], dst[7];
+    for (int i = 0; i < 7; i++) {
+        src[i] = ((unsigned)i * 73u) | ((unsigned)i * 37u << 10)
+               | ((unsigned)i * 19u << 20) | (2u << 30);
+    }
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        __builtin_memset(dst, 0, sizeof dst);
+        if (!run(&B, bi, 7, 1, (umbra_buf[]){
+            {.ptr=src, .sz=sizeof src, .fmt=umbra_fmt_1010102},
+            {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_1010102},
+        })) { continue; }
+        for (int i = 0; i < 7; i++) { (dst[i] == src[i]) here; }
+    }
+    cleanup(&B);
+}
+
+static void test_load_store_color_fp16(void) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_color c = umbra_load_color(b, (umbra_ptr){0, 0});
+    umbra_store_color(b, (umbra_ptr){1, 0}, c);
+    backends B = make(b, 0);
+
+    __fp16 src[7 * 4], dst[7 * 4];
+    for (int i = 0; i < 7; i++) {
+        src[i * 4 + 0] = (__fp16)(0.1f * (float)(i + 1));
+        src[i * 4 + 1] = (__fp16)(0.2f * (float)(i + 1));
+        src[i * 4 + 2] = (__fp16)(0.3f * (float)(i + 1));
+        src[i * 4 + 3] = (__fp16)(0.9f + 0.001f * (float)i);
+    }
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        __builtin_memset(dst, 0, sizeof dst);
+        if (!run(&B, bi, 7, 1, (umbra_buf[]){
+            {.ptr=src, .sz=sizeof src, .fmt=umbra_fmt_fp16},
+            {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_fp16},
+        })) { continue; }
+        (0 == __builtin_memcmp(dst, src, sizeof src)) here;
+    }
+    cleanup(&B);
+}
+
+static void test_load_store_color_srgb(void) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_color c = umbra_load_color(b, (umbra_ptr){0, 0});
+    umbra_store_color(b, (umbra_ptr){1, 0}, c);
+    backends B = make(b, 0);
+
+    uint32_t src[7], dst[7];
+    for (int i = 0; i < 7; i++) {
+        unsigned v = (unsigned)i * 37u;
+        src[i] = v | (v << 8) | (v << 16) | (0xFFu << 24);
+    }
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        __builtin_memset(dst, 0, sizeof dst);
+        if (!run(&B, bi, 7, 1, (umbra_buf[]){
+            {.ptr=src, .sz=sizeof src, .fmt=umbra_fmt_srgb},
+            {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_srgb},
+        })) { continue; }
+        for (int i = 0; i < 7; i++) { (dst[i] == src[i]) here; }
+    }
+    cleanup(&B);
+}
+
 static void test_srgb_roundtrip_256(void) {
     // sRGB byte → load_color (sRGB→linear) → store_color (linear→sRGB) → compare.
     struct umbra_builder *b = umbra_builder();
@@ -2760,6 +2851,10 @@ int main(void) {
     test_load_next_32();
     test_load_next_16();
     test_load_store_color_8888();
+    test_load_store_color_565();
+    test_load_store_color_1010102();
+    test_load_store_color_fp16();
+    test_load_store_color_srgb();
     test_load_store_color_f16_planar();
     test_srgb_roundtrip_256();
     test_load_stride_neq_w();
