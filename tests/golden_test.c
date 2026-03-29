@@ -215,7 +215,7 @@ static void test_slide_golden(
                 backend_name[bi], fmt_name[fmt],
                 mismatches, W * H, worst);
         }
-        worst == 0 here;
+        (worst <= 1) here;  // texture hardware float->unorm8 may differ by ±1
     }
 
     free(ref);

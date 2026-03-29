@@ -1031,8 +1031,27 @@ static void umbra_metal_backend_free(struct metal_backend *be) {
     }
 }
 
+static MTLPixelFormat fmt_to_mtl(umbra_fmt fmt) {
+    switch (fmt) {
+    case umbra_fmt_8888:        return MTLPixelFormatRGBA8Unorm;
+    case umbra_fmt_565:         return MTLPixelFormatR16Uint;
+    case umbra_fmt_1010102:     return MTLPixelFormatRGB10A2Unorm;
+    case umbra_fmt_fp16:        return MTLPixelFormatRGBA16Float;
+    case umbra_fmt_fp16_planar: return MTLPixelFormatR16Float;
+    case umbra_fmt_srgb:        return MTLPixelFormatRGBA8Unorm_sRGB;
+    }
+    return MTLPixelFormatRGBA8Unorm;
+}
+
 static int fmt_to_planes(umbra_fmt fmt) {
-    (void)fmt;
+    switch (fmt) {
+    case umbra_fmt_8888:        return 1;
+    case umbra_fmt_1010102:     return 1;
+    case umbra_fmt_fp16:        return 0;
+    case umbra_fmt_fp16_planar: return 0;
+    case umbra_fmt_srgb:        return 0;
+    case umbra_fmt_565:         return 0;
+    }
     return 0;
 }
 
@@ -1075,6 +1094,17 @@ static id<MTLComputePipelineState> get_pipeline(
         int bi = m->color_bufs[c].buf_idx;
         int pl = (bi <= m->max_ptr) ? fmt_to_planes(buf[bi].fmt) : 0;
         uint32_t fm = (bi <= m->max_ptr) ? (uint32_t)buf[bi].fmt : 0;
+        if (pl > 0 && bi <= m->max_ptr) {
+            if (buf[bi].row_bytes == 0) { pl = 0; }
+            else {
+                NSUInteger min_align = [device
+                    minimumLinearTextureAlignmentForPixelFormat:
+                        fmt_to_mtl(buf[bi].fmt)];
+                if (min_align > 0 && (buf[bi].row_bytes % min_align) != 0) {
+                    pl = 0;
+                }
+            }
+        }
         planes[c] = (uint32_t)pl;
         fmts[c]   = fm;
         key = key * 131 + (uint64_t)pl * 7 + fm;
@@ -1446,6 +1476,64 @@ static void encode_dispatch(
     [enc setBuffer:per_y0
             offset:0
            atIndex:(NSUInteger)(m->total_bufs + 4)];
+
+    for (int c = 0; c < m->n_color_bufs; c++) {
+        int bi = m->color_bufs[c].buf_idx;
+        if (bi > m->max_ptr || !m->per_bufs[bi]) { continue; }
+        int planes = fmt_to_planes(buf[bi].fmt);
+        if (planes <= 0) { continue; }
+        if (buf[bi].row_bytes == 0) { continue; }
+        NSUInteger min_align = [device
+            minimumLinearTextureAlignmentForPixelFormat:
+                fmt_to_mtl(buf[bi].fmt)];
+        if (min_align > 0 && (buf[bi].row_bytes % min_align) != 0) { continue; }
+
+        id<MTLBuffer> mtlBuf =
+            (__bridge id<MTLBuffer>)m->per_bufs[bi];
+        size_t pb = (size_t)umbra_pixel_bytes(buf[bi].fmt);
+        int tex_base = m->color_bufs[c].tex_base;
+
+        if (planes == 1) {
+            NSUInteger tw = (NSUInteger)(buf[bi].row_bytes / pb);
+            NSUInteger th = (NSUInteger)(buf[bi].sz / buf[bi].row_bytes);
+            MTLTextureDescriptor *desc = [MTLTextureDescriptor
+                texture2DDescriptorWithPixelFormat:fmt_to_mtl(buf[bi].fmt)
+                                             width:tw
+                                            height:th
+                                         mipmapped:NO];
+            desc.usage = (MTLTextureUsage)(MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite);
+            desc.storageMode = MTLStorageModeShared;
+            id<MTLTexture> tex = [mtlBuf
+                newTextureWithDescriptor:desc
+                                  offset:(NSUInteger)offsets[bi]
+                             bytesPerRow:(NSUInteger)buf[bi].row_bytes];
+            if (tex) {
+                [enc setTexture:tex atIndex:(NSUInteger)tex_base];
+                batch_retain_buf(be, (__bridge_retained void*)tex);
+            }
+        } else if (planes == 4) {
+            size_t plane_stride = buf[bi].sz / 4;
+            NSUInteger tw = (NSUInteger)(buf[bi].row_bytes / 2);
+            NSUInteger th = (NSUInteger)(plane_stride / buf[bi].row_bytes);
+            for (int p = 0; p < 4; p++) {
+                MTLTextureDescriptor *desc = [MTLTextureDescriptor
+                    texture2DDescriptorWithPixelFormat:MTLPixelFormatR16Float
+                                                 width:tw
+                                                height:th
+                                             mipmapped:NO];
+                desc.usage = (MTLTextureUsage)(MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite);
+                desc.storageMode = MTLStorageModeShared;
+                id<MTLTexture> tex = [mtlBuf
+                    newTextureWithDescriptor:desc
+                                      offset:(NSUInteger)(offsets[bi] + (size_t)p * plane_stride)
+                                 bytesPerRow:(NSUInteger)buf[bi].row_bytes];
+                if (tex) {
+                    [enc setTexture:tex atIndex:(NSUInteger)(tex_base + p)];
+                    batch_retain_buf(be, (__bridge_retained void*)tex);
+                }
+            }
+        }
+    }
 
     MTLSize grid =
         MTLSizeMake((NSUInteger)w, (NSUInteger)h, 1);
