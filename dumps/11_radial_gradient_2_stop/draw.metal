@@ -16,6 +16,7 @@ kernel void umbra_entry(
     constant uint *buf_rbs [[buffer(4)]],
     constant uint &x0 [[buffer(5)]],
     constant uint &y0 [[buffer(6)]],
+    constant uint *buf_fmts [[buffer(7)]],
     device uchar *p0 [[buffer(0)]],
     device uchar *p1 [[buffer(1)]],
     uint2 pos [[thread_position_in_grid]]

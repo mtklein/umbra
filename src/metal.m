@@ -267,8 +267,95 @@ static void emit_ops(Buf *b, BB const *bb,
                      vx, vy, vz, vw);
             } break;
 
-            case op_load_color: break;
-            case op_store_color: break;
+            case op_load_color: {
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
+                emit(b,
+                     "%sfloat4 v%d_c;\n"
+                     "%sswitch (buf_fmts[%d]) {\n"
+                     "%s  case 1u: { uint px = ((device uint*)(p%d + y * buf_rbs[%d]))[x];\n"
+                     "%s            v%d_c = float4(px & 0xFFu, (px>>8)&0xFFu, (px>>16)&0xFFu, px>>24) / 255.0; break; }\n"
+                     "%s  case 2u: { ushort px = ((device ushort*)(p%d + y * buf_rbs[%d]))[x];\n"
+                     "%s            v%d_c = float4(float(px>>11)/31.0, float((px>>5)&0x3Fu)/63.0, float(px&0x1Fu)/31.0, 1.0); break; }\n"
+                     "%s  case 3u: { uint px = ((device uint*)(p%d + y * buf_rbs[%d]))[x];\n"
+                     "%s            v%d_c = float4(float(px&0x3FFu)/1023.0, float((px>>10)&0x3FFu)/1023.0, float((px>>20)&0x3FFu)/1023.0, float(px>>30)/3.0); break; }\n"
+                     "%s  case 4u: { device half *hp = (device half*)(p%d + y * buf_rbs[%d]) + x*4;\n"
+                     "%s            v%d_c = float4(hp[0], hp[1], hp[2], hp[3]); break; }\n"
+                     "%s  case 5u: { half h = ((device half*)(p%d + y * buf_rbs[%d]))[x];\n"
+                     "%s            v%d_c = float4(float(h), 0, 0, 1); break; }\n"
+                     "%s  case 6u: { float f = ((device float*)(p%d + y * buf_rbs[%d]))[x];\n"
+                     "%s            v%d_c = float4(f, 0, 0, 1); break; }\n"
+                     "%s  default: v%d_c = float4(0); break;\n"
+                     "%s}\n"
+                     "%suint v%d = as_type<uint>(v%d_c.x);\n"
+                     "%suint v%d_1 = as_type<uint>(v%d_c.y);\n"
+                     "%suint v%d_2 = as_type<uint>(v%d_c.z);\n"
+                     "%suint v%d_3 = as_type<uint>(v%d_c.w);\n",
+                     pad, i,
+                     pad, p,
+                     pad, p, p,
+                     pad, i,
+                     pad, p, p,
+                     pad, i,
+                     pad, p, p,
+                     pad, i,
+                     pad, p, p,
+                     pad, i,
+                     pad, p, p,
+                     pad, i,
+                     pad, p, p,
+                     pad, i,
+                     pad, i,
+                     pad,
+                     pad, i, i,
+                     pad, i, i,
+                     pad, i, i,
+                     pad, i, i);
+            } break;
+            case op_store_color: {
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
+                emit(b,
+                     "%sfloat4 sc%d = float4(as_type<float>(%s), as_type<float>(%s),"
+                     " as_type<float>(%s), as_type<float>(%s));\n"
+                     "%sswitch (buf_fmts[%d]) {\n"
+                     "%s  case 1u: { sc%d = clamp(sc%d, 0.0, 1.0);\n"
+                     "%s            ((device uint*)(p%d + y * buf_rbs[%d]))[x] ="
+                     " uint(sc%d.x*255.0+0.5) | (uint(sc%d.y*255.0+0.5)<<8)"
+                     " | (uint(sc%d.z*255.0+0.5)<<16) | (uint(sc%d.w*255.0+0.5)<<24); break; }\n"
+                     "%s  case 2u: { sc%d = clamp(sc%d, 0.0, 1.0);\n"
+                     "%s            ((device ushort*)(p%d + y * buf_rbs[%d]))[x] ="
+                     " ushort((uint(sc%d.x*31.0+0.5)<<11) | (uint(sc%d.y*63.0+0.5)<<5)"
+                     " | uint(sc%d.z*31.0+0.5)); break; }\n"
+                     "%s  case 3u: { sc%d = clamp(sc%d, 0.0, 1.0);\n"
+                     "%s            ((device uint*)(p%d + y * buf_rbs[%d]))[x] ="
+                     " uint(sc%d.x*1023.0+0.5) | (uint(sc%d.y*1023.0+0.5)<<10)"
+                     " | (uint(sc%d.z*1023.0+0.5)<<20) | (uint(sc%d.w*3.0+0.5)<<30); break; }\n"
+                     "%s  case 4u: { device half *hp = (device half*)(p%d + y * buf_rbs[%d]) + x*4;\n"
+                     "%s            hp[0]=half(sc%d.x); hp[1]=half(sc%d.y);"
+                     " hp[2]=half(sc%d.z); hp[3]=half(sc%d.w); break; }\n"
+                     "%s  case 5u: ((device half*)(p%d + y * buf_rbs[%d]))[x] = half(sc%d.x); break;\n"
+                     "%s  case 6u: ((device float*)(p%d + y * buf_rbs[%d]))[x] = sc%d.x; break;\n"
+                     "%s  default: break;\n"
+                     "%s}\n",
+                     pad, i, vx, vy, vz, vw,
+                     pad, p,
+                     pad, i, i,
+                     pad, p, p,
+                     i, i, i, i,
+                     pad, i, i,
+                     pad, p, p,
+                     i, i, i,
+                     pad, i, i,
+                     pad, p, p,
+                     i, i, i, i,
+                     pad, p, p,
+                     pad, i, i, i, i,
+                     pad, p, p, i,
+                     pad, p, p, i,
+                     pad,
+                     pad);
+            } break;
 
             case op_load_16: {
                 int p = inst->ptr < 0
@@ -779,12 +866,14 @@ static char* build_source(BB const *bb,
          ",\n    constant uint *buf_szs [[buffer(%d)]]"
          ",\n    constant uint *buf_rbs [[buffer(%d)]]"
          ",\n    constant uint &x0 [[buffer(%d)]]"
-         ",\n    constant uint &y0 [[buffer(%d)]]",
+         ",\n    constant uint &y0 [[buffer(%d)]]"
+         ",\n    constant uint *buf_fmts [[buffer(%d)]]",
          total_bufs + 0,
          total_bufs + 1,
          total_bufs + 2,
          total_bufs + 3,
-         total_bufs + 4);
+         total_bufs + 4,
+         total_bufs + 5);
     for (int p = 0; p <= max_ptr; p++) {
         emit(&b,
              ",\n    device uchar *p%d"
@@ -997,15 +1086,15 @@ static void encode_dispatch(
         (__bridge id<MTLDevice>)be->device;
 
     int tb = m->total_bufs;
-    uint32_t *szs_data = calloc((size_t)(tb + 1),
-                                sizeof *szs_data);
-    uint32_t *rbs_data = calloc((size_t)(tb + 1),
-                                sizeof *rbs_data);
+    uint32_t *szs_data  = calloc((size_t)(tb + 1), sizeof *szs_data);
+    uint32_t *rbs_data  = calloc((size_t)(tb + 1), sizeof *rbs_data);
+    uint32_t *fmts_data = calloc((size_t)(tb + 1), sizeof *fmts_data);
     for (int i = 0; i <= m->max_ptr; i++) {
         if (buf[i].ptr && buf[i].sz) {
             szs_data[i] = (uint32_t)buf[i].sz;
         }
-        rbs_data[i] = (uint32_t)buf[i].row_bytes;
+        rbs_data[i]  = (uint32_t)buf[i].row_bytes;
+        fmts_data[i] = (uint32_t)buf[i].fmt;
     }
 
     __builtin_memset(m->per_bufs, 0,
@@ -1170,6 +1259,14 @@ static void encode_dispatch(
         per_rbs.contents, rbs_data, sz_bytes);
     batch_retain_buf(
         be, (__bridge_retained void*)per_rbs);
+    id<MTLBuffer> per_fmts =
+        [device newBufferWithLength:sz_bytes
+                options:
+                    MTLResourceStorageModeShared];
+    __builtin_memcpy(
+        per_fmts.contents, fmts_data, sz_bytes);
+    batch_retain_buf(
+        be, (__bridge_retained void*)per_fmts);
 
     for (int i = 0; i < m->total_bufs; i++) {
         if (m->per_bufs[i]) {
@@ -1195,6 +1292,9 @@ static void encode_dispatch(
     [enc setBuffer:per_y0
             offset:0
            atIndex:(NSUInteger)(m->total_bufs + 4)];
+    [enc setBuffer:per_fmts
+            offset:0
+           atIndex:(NSUInteger)(m->total_bufs + 5)];
 
     MTLSize grid =
         MTLSizeMake((NSUInteger)w, (NSUInteger)h, 1);
@@ -1213,6 +1313,7 @@ static void encode_dispatch(
        threadsPerThreadgroup:group];
     free(szs_data);
     free(rbs_data);
+    free(fmts_data);
 }
 
 void umbra_metal_run(
