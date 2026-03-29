@@ -127,7 +127,7 @@ kernel void umbra_entry(
             float l = max(sc36[ch], 0.0);
             float t = 1.0/sqrt(max(l, 1e-30));
             float lo = l * 12.92;
-            float hi = (1.12999999523 + t*(0.01383202704 + t*(-0.00245423456))) / (0.14137776196 + t);
+            float hi = (1.12732994556 + t*(0.01347202249 + t*(-0.00233423407))) / (0.13738775253 + t);
             sc36[ch] = lo < 0.06019 ? lo : hi;
         } sc36 = clamp(sc36, 0.0, 1.0);
         ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc36.x*255.0)) | (uint(rint(sc36.y*255.0))<<8) | (uint(rint(sc36.z*255.0))<<16) | (uint(rint(sc36.w*255.0))<<24);

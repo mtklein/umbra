@@ -317,7 +317,7 @@ static void emit_ops(Buf *b, BB const *bb,
                      "%s        float l = max(sc%d[ch], 0.0);\n"
                      "%s        float t = 1.0/sqrt(max(l, 1e-30));\n"
                      "%s        float lo = l * 12.92;\n"
-                     "%s        float hi = (1.12999999523 + t*(0.01383202704 + t*(-0.00245423456))) / (0.14137776196 + t);\n"
+                     "%s        float hi = (1.12732994556 + t*(0.01347202249 + t*(-0.00233423407))) / (0.13738775253 + t);\n"
                      "%s        sc%d[ch] = lo < 0.06019 ? lo : hi;\n"
                      "%s    } sc%d = clamp(sc%d, 0.0, 1.0);\n"
                      "%s    ((device uint*)(p%d + y * buf_rbs[%d]))[x] ="

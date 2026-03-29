@@ -323,10 +323,10 @@ static void interp_store_color(val const v[], umbra_buf const *b,
     case umbra_fmt_srgb: {
         // linear→sRGB: rsqrt/rcp rational approximation (no powf).
         {
-            F32 const vc  = (F32){0} + 1.12999999523f;
-            F32 const vd  = (F32){0} + 0.14137776196f;
-            F32 const vk1 = (F32){0} + 0.01383202704f;
-            F32 const vk2 = (F32){0} + -0.00245423456f;
+            F32 const vc  = (F32){0} + 1.12732994556f;
+            F32 const vd  = (F32){0} + 0.13738775253f;
+            F32 const vk1 = (F32){0} + 0.01347202249f;
+            F32 const vk2 = (F32){0} + -0.00233423407f;
             F32 *chs[3] = {&cr, &cg, &cb};
             for (int ci = 0; ci < 3; ci++) {
                 F32 l = vec_max(*chs[ci], (F32){0});
