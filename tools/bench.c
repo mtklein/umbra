@@ -18,7 +18,7 @@ static double bench(slide *s, int w, int h, umbra_draw_layout const *lay,
                     struct umbra_program *prog) {
     if (s->prepare) { s->prepare(s, w, h, be); }
     s->draw(s, w, h, 0, h, buf, lay, prog);
-    umbra_backend_flush(be);
+    be->flush(be);
     int iters = 1;
     for (;;) {
         if (s->prepare) { s->prepare(s, w, h, be); }
@@ -26,7 +26,7 @@ static double bench(slide *s, int w, int h, umbra_draw_layout const *lay,
         for (int it = 0; it < iters; it++) {
             s->draw(s, w, h, 0, h, buf, lay, prog);
         }
-        umbra_backend_flush(be);
+        be->flush(be);
         double const elapsed = now() - start;
         if (elapsed >= 0.1) { return elapsed / ((double)iters * (double)w * (double)h) * 1e9; }
         iters *= 2;
@@ -140,14 +140,14 @@ int main(int argc, char *argv[]) {
                 continue;
             }
             umbra_program_queue(progs[bi], 0, 0, W, H, abuf);
-            umbra_backend_flush(backs[bi]);
+            backs[bi]->flush(backs[bi]);
             int iters = 1;
             for (;;) {
                 double const start = now();
                 for (int it = 0; it < iters; it++) {
                     umbra_program_queue(progs[bi], 0, 0, W, H, abuf);
                 }
-                umbra_backend_flush(backs[bi]);
+                backs[bi]->flush(backs[bi]);
                 double const elapsed = now() - start;
                 if (elapsed >= 0.1) {
                     char tmp[32];

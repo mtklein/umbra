@@ -188,7 +188,7 @@ static void test_slide_golden(
         if (!progs[bi]) { continue; }
         render_slide(slide_idx, fmt,
                      bes[bi], progs[bi], pbuf_tst, &lay);
-        umbra_backend_flush(bes[bi]);
+        bes[bi]->flush(bes[bi]);
         readback_to_8888(fmt, pbuf_tst, tst);
 
         int mismatches = 0;
@@ -287,7 +287,7 @@ static void test_slug_rect(void) {
             au + alay.loop_off, &j32, 4);
         umbra_program_queue(acc, 0, 0, W, H, abuf);
     }
-    umbra_backend_flush(be);
+    be->flush(be);
 
     uint64_t uni_[12] = {0};
     char *uni = (char*)uni_;
@@ -299,7 +299,7 @@ static void test_slug_rect(void) {
         {.ptr=pixels, .sz=sizeof pixels, .row_bytes=W * 4, .fmt=umbra_fmt_8888},
     };
     umbra_program_queue(interp, 0, 0, W, H, buf);
-    umbra_backend_flush(be);
+    be->flush(be);
 
     uint32_t bg = 0xff000000;
     uint32_t fg = 0xffffffff;
@@ -360,7 +360,7 @@ static void test_perspective_text(void) {
         {.ptr=pixels, .sz=sizeof pixels, .fmt=umbra_fmt_8888},
     };
     umbra_program_queue(interp, 0, 0, BW, 1, buf);
-    umbra_backend_flush(be);
+    be->flush(be);
 
     pixels[8] == 0xffffffff here;
     pixels[0] == 0xff000000 here;
@@ -402,7 +402,7 @@ static void test_perspective_text(void) {
             {.ptr=px2, .sz=(size_t)(W * H * 4), .row_bytes=W * 4, .fmt=umbra_fmt_8888},
         };
         umbra_program_queue(interp, 0, 0, W, H, b2);
-        umbra_backend_flush(be);
+        be->flush(be);
     }
     int changed = 0;
     for (int i = 0; i < W * H; i++) {

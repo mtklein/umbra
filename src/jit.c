@@ -1698,12 +1698,13 @@ static struct umbra_program *compile_jit(struct umbra_backend           *be,
     };
     return prog;
 }
+static void flush_be_noop(struct umbra_backend *be) { (void)be; }
 static void free_be_jit(struct umbra_backend *be) { free(be); }
 struct umbra_backend *umbra_backend_jit(void) {
     struct umbra_backend *const be = malloc(sizeof *be);
     *be = (struct umbra_backend){
         .compile    = compile_jit,
-        .flush      = 0,
+        .flush      = flush_be_noop,
         .free    = free_be_jit,
         .threadsafe = 1,
     };
@@ -3697,12 +3698,13 @@ static struct umbra_program *compile_jit(struct umbra_backend           *be,
     };
     return prog;
 }
+static void flush_be_noop(struct umbra_backend *be) { (void)be; }
 static void free_be_jit(struct umbra_backend *be) { free(be); }
 struct umbra_backend *umbra_backend_jit(void) {
     struct umbra_backend *const be = malloc(sizeof *be);
     *be = (struct umbra_backend){
         .compile    = compile_jit,
-        .flush      = 0,
+        .flush      = flush_be_noop,
         .free    = free_be_jit,
         .threadsafe = 1,
     };

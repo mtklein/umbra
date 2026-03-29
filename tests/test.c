@@ -2555,12 +2555,10 @@ static void test_backend_threadsafe(void) {
 }
 
 static void test_program_null_guards(void) {
-    umbra_backend_flush(NULL);
     umbra_backend_free(NULL);
 
-    // flush/dump on backends that don't have those fns
     struct umbra_backend *be = umbra_backend_interp();
-    umbra_backend_flush(be);
+    be->flush(be);
 
     struct umbra_builder *b = umbra_builder();
     umbra_store_32(b, (umbra_ptr){0, 0}, umbra_load_32(b, (umbra_ptr){0, 0}));
@@ -3665,7 +3663,7 @@ int main(void) {
             if (!B.p[bi]) { continue; }
             umbra_program_queue(B.p[bi], L, T, R, BT,
                                 (umbra_buf[]){{.ptr=buf, .sz=sizeof buf, .row_bytes=S * 4}});
-            umbra_backend_flush(B.be[bi]);
+            B.be[bi]->flush(B.be[bi]);
             for (int row = T; row < BT; row++) {
                 for (int col = L; col < R; col++) {
                     buf[row * S + col] == col + row * 1000 here;
@@ -3699,7 +3697,7 @@ int main(void) {
             umbra_program_queue(B.p[bi], L, T, R, BT,
                                 (umbra_buf[]){{.ptr=src, .sz=sizeof src, .row_bytes=S * 4, .read_only=1},
                                               {.ptr=dst, .sz=sizeof dst, .row_bytes=S * 4}});
-            umbra_backend_flush(B.be[bi]);
+            B.be[bi]->flush(B.be[bi]);
             for (int row = T; row < BT; row++) {
                 for (int col = L; col < R; col++) {
                     int idx = row * S + col;
@@ -3735,7 +3733,7 @@ int main(void) {
             umbra_program_queue(B.p[bi], L, T, R, BT,
                                 (umbra_buf[]){{.ptr=src, .sz=sizeof src, .row_bytes=SW * 4, .read_only=1},
                                               {.ptr=dst, .sz=sizeof dst, .row_bytes=DW * 4}});
-            umbra_backend_flush(B.be[bi]);
+            B.be[bi]->flush(B.be[bi]);
             for (int row = T; row < BT; row++) {
                 for (int col = L; col < R; col++) {
                     int si = row * SW + col;
@@ -3780,7 +3778,7 @@ int main(void) {
                                 (umbra_buf[]){{0},
                                               {.ptr=uni, .sz=sizeof uni_, .read_only=1},
                                               {.ptr=dst_px, .sz=sizeof dst_px, .row_bytes=S * 4}});
-            umbra_backend_flush(B.be[bi]);
+            B.be[bi]->flush(B.be[bi]);
             for (int row = T; row < BT; row++) {
                 for (int col = L; col < R; col++) {
                     int idx = row * S + col;
@@ -3834,7 +3832,7 @@ int main(void) {
                                 (umbra_buf[]){{0},
                                               {.ptr=uni, .sz=sizeof uni_, .read_only=1},
                                               {.ptr=dst_px, .sz=sizeof dst_px, .row_bytes=S * 4}});
-            umbra_backend_flush(B.be[bi]);
+            B.be[bi]->flush(B.be[bi]);
             for (int row = T; row < BT; row++) {
                 for (int col = L; col < R; col++) {
                     int idx = row * S + col;

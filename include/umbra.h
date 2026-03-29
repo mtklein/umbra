@@ -57,11 +57,6 @@ static inline void umbra_program_queue(struct umbra_program *p,
         p->queue(p->ctx, l, t, r, b, buf);
     }
 }
-static inline void umbra_backend_flush(struct umbra_backend *be) {
-    if (be && be->flush) {
-        be->flush(be);
-    }
-}
 static inline void umbra_backend_free(struct umbra_backend *be) {
     if (be) {
         be->free(be);

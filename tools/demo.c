@@ -396,7 +396,7 @@ int main(void) {
             free(work);
         }
 
-        umbra_backend_flush(bes[cur_backend]);
+        bes[cur_backend]->flush(bes[cur_backend]);
 
         void *tex_pixels;
         int   tex_pitch;
