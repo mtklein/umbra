@@ -18,7 +18,6 @@ kernel void umbra_entry(
     constant uint &y0 [[buffer(9)]],
     constant uint *buf_fmts [[buffer(10)]],
     constant float *buf_transfers [[buffer(11)]],
-    constant uint *buf_plane_strides [[buffer(12)]],
     device uchar *p0 [[buffer(0)]],
     device uchar *p1 [[buffer(1)]],
     device uchar *p2 [[buffer(2)]],

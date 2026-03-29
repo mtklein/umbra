@@ -2591,7 +2591,6 @@ static void test_load_store_color_f16_planar(void) {
     backends B = make(b, 0);
 
     enum { W = 8, H = 4 };
-    size_t const plane = W * H * sizeof(__fp16);
     __fp16 src[W * H * 4], dst[W * H * 4];
     for (int i = 0; i < W * H; i++) {
         src[i + W*H*0] = (__fp16)(0.1f * (float)(i + 1));
@@ -2604,9 +2603,9 @@ static void test_load_store_color_f16_planar(void) {
         __builtin_memset(dst, 0, sizeof dst);
         if (!run(&B, bi, W, H, (umbra_buf[]){
             {.ptr=src, .sz=sizeof src, .row_bytes=W*2,
-             .plane_stride=plane, .fmt=umbra_fmt_f16_planar},
+             .fmt=umbra_fmt_f16_planar},
             {.ptr=dst, .sz=sizeof dst, .row_bytes=W*2,
-             .plane_stride=plane, .fmt=umbra_fmt_f16_planar},
+             .fmt=umbra_fmt_f16_planar},
         })) { continue; }
         (0 == __builtin_memcmp(dst, src, sizeof src)) here;
     }

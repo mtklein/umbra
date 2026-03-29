@@ -1204,11 +1204,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int br_skip_f16_planar = c->len;
             put(c, Bcond(0x1, 0));
             {
-                // Load plane_stride into XT.  XP already has plane 0 row addr.
-                int const ps_off = p * (int)sizeof(umbra_buf)
-                                 + (int)__builtin_offsetof(umbra_buf, plane_stride);
-                put(c, 0xf9400000u | ((uint32_t)(ps_off/8) << 10)
+                // XT = buf[p].sz / 4 (plane stride).  XP already has plane 0 row addr.
+                int const sz_off = p * (int)sizeof(umbra_buf)
+                                 + (int)__builtin_offsetof(umbra_buf, sz);
+                put(c, 0xf9400000u | ((uint32_t)(sz_off/8) << 10)
                                    | ((uint32_t)XBUF << 5) | (uint32_t)XT);
+                put(c, 0xd342fc00u | ((uint32_t)XT << 5) | (uint32_t)XT);
                 if (scalar) {
                     // Plane 0 (R)
                     put(c, 0x7c607800u | ((uint32_t)XI << 16)
@@ -1466,10 +1467,11 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int br_skip_f16_planar_s = c->len;
             put(c, Bcond(0x1, 0));
             {
-                int const ps_off = p * (int)sizeof(umbra_buf)
-                                 + (int)__builtin_offsetof(umbra_buf, plane_stride);
-                put(c, 0xf9400000u | ((uint32_t)(ps_off/8) << 10)
+                int const sz_off = p * (int)sizeof(umbra_buf)
+                                 + (int)__builtin_offsetof(umbra_buf, sz);
+                put(c, 0xf9400000u | ((uint32_t)(sz_off/8) << 10)
                                    | ((uint32_t)XBUF << 5) | (uint32_t)XT);
+                put(c, 0xd342fc00u | ((uint32_t)XT << 5) | (uint32_t)XT);
                 if (scalar) {
                     put(c, FCVTN_4h(px, rr));  put(c, STR_hx(px, XP, XI));
                     put(c, ADD_xr(XP, XP, XT));
@@ -3047,10 +3049,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             cmp_ri(c, RAX, 7);
             int br_skip_f16_planar = jcc(c, 0x05);
             {
-                int const ps_off = p * (int)sizeof(umbra_buf)
-                                 + (int)__builtin_offsetof(umbra_buf, plane_stride);
+                int const sz_off = p * (int)sizeof(umbra_buf)
+                                 + (int)__builtin_offsetof(umbra_buf, sz);
                 mov_rr(c, R11, base);
-                mov_load(c, RBX, XBUF, ps_off);
+                mov_load(c, RBX, XBUF, sz_off);
+                // SHR RBX, 2
+                rex_w(c, 0, RBX);
+                emit1(c, 0xc1); emit1(c, (uint8_t)(0xe8 | (RBX & 7))); emit1(c, 2);
                 if (scalar) {
                     // Plane 0 (R): MOVZX eax, word [R11 + XI*2]
                     {
@@ -3374,10 +3379,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             cmp_ri(c, RAX, 7);
             int br_skip_f16_planar_s = jcc(c, 0x05);
             {
-                int const ps_off = p * (int)sizeof(umbra_buf)
-                                 + (int)__builtin_offsetof(umbra_buf, plane_stride);
+                int const sz_off = p * (int)sizeof(umbra_buf)
+                                 + (int)__builtin_offsetof(umbra_buf, sz);
                 mov_rr(c, R11, base);
-                mov_load(c, RBX, XBUF, ps_off);
+                mov_load(c, RBX, XBUF, sz_off);
+                // SHR RBX, 2
+                rex_w(c, 0, RBX);
+                emit1(c, 0xc1); emit1(c, (uint8_t)(0xe8 | (RBX & 7))); emit1(c, 2);
                 if (scalar) {
                     // Plane 0 (R): VCVTPS2PH, store 16-bit
                     vcvtps2ph(c, px, rr, 4);

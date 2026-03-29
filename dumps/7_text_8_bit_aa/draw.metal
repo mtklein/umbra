@@ -18,7 +18,6 @@ kernel void umbra_entry(
     constant uint &y0 [[buffer(7)]],
     constant uint *buf_fmts [[buffer(8)]],
     constant float *buf_transfers [[buffer(9)]],
-    constant uint *buf_plane_strides [[buffer(10)]],
     device uchar *p0 [[buffer(0)]],
     device uchar *p1 [[buffer(1)]],
     device uchar *p2 [[buffer(2)]],
@@ -49,7 +48,7 @@ kernel void umbra_entry(
                 v13_c = float4(float(px&0x3FFu)/1023.0, float((px>>10)&0x3FFu)/1023.0, float((px>>20)&0x3FFu)/1023.0, float(px>>30)/3.0); break; }
       case 4u: { device half *hp = (device half*)(p1 + y * buf_rbs[1]) + x*4;
                 v13_c = float4(hp[0], hp[1], hp[2], hp[3]); break; }
-      case 7u: { device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_plane_strides[1];
+      case 7u: { device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_szs[1]/4;
                 v13_c = float4(float(((device half*)row)[x]),float(((device half*)(row+ps))[x]),float(((device half*)(row+2*ps))[x]),float(((device half*)(row+3*ps))[x])); break; }
       default: v13_c = float4(0); break;
     }
@@ -105,7 +104,7 @@ kernel void umbra_entry(
                 ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc26.x*1023.0)) | (uint(rint(sc26.y*1023.0))<<10) | (uint(rint(sc26.z*1023.0))<<20) | (uint(rint(sc26.w*3.0))<<30); break; }
       case 4u: { device half *hp = (device half*)(p1 + y * buf_rbs[1]) + x*4;
                 hp[0]=half(sc26.x); hp[1]=half(sc26.y); hp[2]=half(sc26.z); hp[3]=half(sc26.w); break; }
-      case 7u: { device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_plane_strides[1];
+      case 7u: { device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_szs[1]/4;
                 ((device half*)row)[x] = half(sc26.x); ((device half*)(row+ps))[x] = half(sc26.y); ((device half*)(row+2*ps))[x] = half(sc26.z); ((device half*)(row+3*ps))[x] = half(sc26.w); break; }
       default: break;
     }

@@ -281,7 +281,7 @@ static void emit_ops(Buf *b, BB const *bb,
                      "%s            v%d_c = float4(float(px&0x3FFu)/1023.0, float((px>>10)&0x3FFu)/1023.0, float((px>>20)&0x3FFu)/1023.0, float(px>>30)/3.0); break; }\n"
                      "%s  case 4u: { device half *hp = (device half*)(p%d + y * buf_rbs[%d]) + x*4;\n"
                      "%s            v%d_c = float4(hp[0], hp[1], hp[2], hp[3]); break; }\n"
-                     "%s  case 7u: { device uchar *row = p%d + y * buf_rbs[%d]; uint ps = buf_plane_strides[%d];\n"
+                     "%s  case 7u: { device uchar *row = p%d + y * buf_rbs[%d]; uint ps = buf_szs[%d]/4;\n"
                      "%s            v%d_c = float4("
                      "float(((device half*)row)[x]),"
                      "float(((device half*)(row+ps))[x]),"
@@ -377,7 +377,7 @@ static void emit_ops(Buf *b, BB const *bb,
                      "%s  case 4u: { device half *hp = (device half*)(p%d + y * buf_rbs[%d]) + x*4;\n"
                      "%s            hp[0]=half(sc%d.x); hp[1]=half(sc%d.y);"
                      " hp[2]=half(sc%d.z); hp[3]=half(sc%d.w); break; }\n"
-                     "%s  case 7u: { device uchar *row = p%d + y * buf_rbs[%d]; uint ps = buf_plane_strides[%d];\n"
+                     "%s  case 7u: { device uchar *row = p%d + y * buf_rbs[%d]; uint ps = buf_szs[%d]/4;\n"
                      "%s            ((device half*)row)[x] = half(sc%d.x);"
                      " ((device half*)(row+ps))[x] = half(sc%d.y);"
                      " ((device half*)(row+2*ps))[x] = half(sc%d.z);"
@@ -927,16 +927,14 @@ static char* build_source(BB const *bb,
          ",\n    constant uint &x0 [[buffer(%d)]]"
          ",\n    constant uint &y0 [[buffer(%d)]]"
          ",\n    constant uint *buf_fmts [[buffer(%d)]]"
-         ",\n    constant float *buf_transfers [[buffer(%d)]]"
-         ",\n    constant uint *buf_plane_strides [[buffer(%d)]]",
+         ",\n    constant float *buf_transfers [[buffer(%d)]]",
          total_bufs + 0,
          total_bufs + 1,
          total_bufs + 2,
          total_bufs + 3,
          total_bufs + 4,
          total_bufs + 5,
-         total_bufs + 6,
-         total_bufs + 7);
+         total_bufs + 6);
     for (int p = 0; p <= max_ptr; p++) {
         emit(&b,
              ",\n    device uchar *p%d"
@@ -1152,7 +1150,6 @@ static void encode_dispatch(
     uint32_t *szs_data  = calloc((size_t)(tb + 1), sizeof *szs_data);
     uint32_t *rbs_data  = calloc((size_t)(tb + 1), sizeof *rbs_data);
     uint32_t *fmts_data = calloc((size_t)(tb + 1), sizeof *fmts_data);
-    uint32_t *ps_data   = calloc((size_t)(tb + 1), sizeof *ps_data);
     float *transfers_data = calloc((size_t)(tb + 1) * 7, sizeof *transfers_data);
     for (int i = 0; i <= m->max_ptr; i++) {
         if (buf[i].ptr && buf[i].sz) {
@@ -1160,7 +1157,6 @@ static void encode_dispatch(
         }
         rbs_data[i]  = (uint32_t)buf[i].row_bytes;
         fmts_data[i] = (uint32_t)buf[i].fmt;
-        ps_data[i]   = (uint32_t)buf[i].plane_stride;
         transfers_data[i * 7 + 0] = buf[i].transfer.a;
         transfers_data[i * 7 + 1] = buf[i].transfer.b;
         transfers_data[i * 7 + 2] = buf[i].transfer.c;
@@ -1352,15 +1348,6 @@ static void encode_dispatch(
     batch_retain_buf(
         be,
         (__bridge_retained void*)per_transfers);
-    id<MTLBuffer> per_ps =
-        [device newBufferWithLength:sz_bytes
-                options:
-                    MTLResourceStorageModeShared];
-    __builtin_memcpy(
-        per_ps.contents, ps_data, sz_bytes);
-    batch_retain_buf(
-        be, (__bridge_retained void*)per_ps);
-
     for (int i = 0; i < m->total_bufs; i++) {
         if (m->per_bufs[i]) {
             [enc setBuffer:
@@ -1392,9 +1379,6 @@ static void encode_dispatch(
             offset:0
            atIndex:(NSUInteger)(m->total_bufs + 6)];
 
-    [enc setBuffer:per_ps
-            offset:0
-           atIndex:(NSUInteger)(m->total_bufs + 7)];
 
     MTLSize grid =
         MTLSizeMake((NSUInteger)w, (NSUInteger)h, 1);
@@ -1414,7 +1398,6 @@ static void encode_dispatch(
     free(szs_data);
     free(rbs_data);
     free(fmts_data);
-    free(ps_data);
     free(transfers_data);
 }
 

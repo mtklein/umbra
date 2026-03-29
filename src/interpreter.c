@@ -854,7 +854,7 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                     case umbra_fmt_f32:
                     case umbra_fmt_none: break;
                     case umbra_fmt_f16_planar: {
-                        size_t const ps = buf[ip->ptr].plane_stride;
+                        size_t const ps = buf[ip->ptr].sz / 4;
                         char const *p0 = src;
                         U16 hr = {0}, hg = {0}, hb = {0}, ha = {0};
                         if (rem >= K) {
@@ -987,7 +987,7 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                     case umbra_fmt_f32:
                     case umbra_fmt_none: break;
                     case umbra_fmt_f16_planar: {
-                        size_t const ps = buf[ip->ptr].plane_stride;
+                        size_t const ps = buf[ip->ptr].sz / 4;
                         U16 hr = f32_to_f16(cr);
                         U16 hg = f32_to_f16(cg);
                         U16 hb = f32_to_f16(cb);
