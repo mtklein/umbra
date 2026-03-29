@@ -52,8 +52,8 @@ kernel void umbra_entry(
       case 8u: { uint px = ((device uint*)(p1 + y * buf_rbs[1]))[x];
                 v13_c = float4(px & 0xFFu, (px>>8)&0xFFu, (px>>16)&0xFFu, px>>24) / 255.0;
                 for (int ch = 0; ch < 3; ch++) {
-                  float xv = v13_c[ch];
-                  v13_c[ch] = xv >= 0.04045 ? pow((xv+0.055)/1.055, 2.4) : xv/12.92;
+                  float s = v13_c[ch];
+                  v13_c[ch] = s < 0.055 ? s/12.92 : s*s*(0.3*s+0.6975)+0.0025;
                 } break; }
       default: v13_c = float4(0); break;
     }
@@ -86,8 +86,11 @@ kernel void umbra_entry(
       case 7u: { device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_szs[1]/4;
                 ((device half*)row)[x] = half(sc26.x); ((device half*)(row+ps))[x] = half(sc26.y); ((device half*)(row+2*ps))[x] = half(sc26.z); ((device half*)(row+3*ps))[x] = half(sc26.w); break; }
       case 8u: { for (int ch = 0; ch < 3; ch++) {
-                  float xv = sc26[ch];
-                  sc26[ch] = xv >= 0.0031308 ? 1.055*pow(xv,1.0/2.4)-0.055 : 12.92*xv;
+                  float l = max(sc26[ch], 0.0);
+                  float t = 1.0/sqrt(max(l, 1e-30));
+                  float lo = l * 12.92;
+                  float hi = (1.12999999523 + t*(0.01383202704 + t*(-0.00245423456))) / (0.14137776196 + t);
+                  sc26[ch] = lo < 0.06019 ? lo : hi;
                 } sc26 = clamp(sc26, 0.0, 1.0);
                 ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc26.x*255.0)) | (uint(rint(sc26.y*255.0))<<8) | (uint(rint(sc26.z*255.0))<<16) | (uint(rint(sc26.w*255.0))<<24); break; }
       default: break;

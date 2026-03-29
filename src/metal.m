@@ -290,8 +290,8 @@ static void emit_ops(Buf *b, BB const *bb,
                      "%s  case 8u: { uint px = ((device uint*)(p%d + y * buf_rbs[%d]))[x];\n"
                      "%s            v%d_c = float4(px & 0xFFu, (px>>8)&0xFFu, (px>>16)&0xFFu, px>>24) / 255.0;\n"
                      "%s            for (int ch = 0; ch < 3; ch++) {\n"
-                     "%s              float xv = v%d_c[ch];\n"
-                     "%s              v%d_c[ch] = xv >= 0.04045 ? pow((xv+0.055)/1.055, 2.4) : xv/12.92;\n"
+                     "%s              float s = v%d_c[ch];\n"
+                     "%s              v%d_c[ch] = s < 0.055 ? s/12.92 : s*s*(0.3*s+0.6975)+0.0025;\n"
                      "%s            } break; }\n"
                      "%s  default: v%d_c = float4(0); break;\n"
                      "%s}\n"
@@ -352,8 +352,11 @@ static void emit_ops(Buf *b, BB const *bb,
                      " ((device half*)(row+2*ps))[x] = half(sc%d.z);"
                      " ((device half*)(row+3*ps))[x] = half(sc%d.w); break; }\n"
                      "%s  case 8u: { for (int ch = 0; ch < 3; ch++) {\n"
-                     "%s              float xv = sc%d[ch];\n"
-                     "%s              sc%d[ch] = xv >= 0.0031308 ? 1.055*pow(xv,1.0/2.4)-0.055 : 12.92*xv;\n"
+                     "%s              float l = max(sc%d[ch], 0.0);\n"
+                     "%s              float t = 1.0/sqrt(max(l, 1e-30));\n"
+                     "%s              float lo = l * 12.92;\n"
+                     "%s              float hi = (1.12999999523 + t*(0.01383202704 + t*(-0.00245423456))) / (0.14137776196 + t);\n"
+                     "%s              sc%d[ch] = lo < 0.06019 ? lo : hi;\n"
                      "%s            } sc%d = clamp(sc%d, 0.0, 1.0);\n"
                      "%s            ((device uint*)(p%d + y * buf_rbs[%d]))[x] ="
                      " uint(rint(sc%d.x*255.0)) | (uint(rint(sc%d.y*255.0))<<8)"
@@ -377,6 +380,9 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i, i, i, i,
                      pad,
                      pad, i,
+                     pad,
+                     pad,
+                     pad,
                      pad, i,
                      pad, i, i,
                      pad, p, p,
