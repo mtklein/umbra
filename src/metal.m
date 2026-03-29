@@ -1412,13 +1412,12 @@ static void encode_dispatch(
                                     options:MTLResourceStorageModeShared];
                     __builtin_memcpy(tmp.contents, ptrs[k], plane_sz);
                 }
-                batch_retain_buf(be, (__bridge_retained void*)tmp);
+                void *retained = (__bridge_retained void*)tmp;
+                batch_retain_buf(be, retained);
                 if (!buf[pp].read_only && !can_nocopy) {
-                    batch_add_copy(be, ptrs[k],
-                                   (__bridge_retained void*)tmp,
-                                   plane_sz);
+                    batch_add_copy(be, ptrs[k], retained, plane_sz);
                 }
-                [enc setBuffer:tmp
+                [enc setBuffer:(__bridge id<MTLBuffer>)retained
                         offset:0
                        atIndex:(NSUInteger)slot];
             }
