@@ -251,14 +251,17 @@ void umbra_store_8x4(builder *b, umbra_ptr dst, val const in[4]) {
 void umbra_store_16(builder *b, umbra_ptr dst, val v) {
     push(b, op_store_16, VY(v), .ptr = ptr_ix(dst));
 }
-void umbra_load_color(builder *b, umbra_ptr src, val out[4]) {
+umbra_color umbra_load_color(builder *b, umbra_ptr src) {
     val px = push(b, op_load_color, .ptr = ptr_ix(src));
-    for (int i = 0; i < 4; i++) {
-        out[i] = val_make(val_id((umbra_val){.bits = px.bits}), i);
-    }
+    return (umbra_color){
+        val_make(val_id((umbra_val){.bits = px.bits}), 0),
+        val_make(val_id((umbra_val){.bits = px.bits}), 1),
+        val_make(val_id((umbra_val){.bits = px.bits}), 2),
+        val_make(val_id((umbra_val){.bits = px.bits}), 3),
+    };
 }
-void umbra_store_color(builder *b, umbra_ptr dst, val const in[4]) {
-    push(b, op_store_color, VX(in[0]), VY(in[1]), VZ(in[2]), VW(in[3]),
+void umbra_store_color(builder *b, umbra_ptr dst, umbra_color c) {
+    push(b, op_store_color, VX(c.r), VY(c.g), VZ(c.b), VW(c.a),
          .ptr = ptr_ix(dst));
 }
 val umbra_i32_from_s16(builder *b, val x) { return push(b, op_i32_from_s16, VX(x)); }

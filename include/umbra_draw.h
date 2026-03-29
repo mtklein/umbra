@@ -1,10 +1,6 @@
 #pragma once
 #include "umbra.h"
 
-typedef struct {
-    umbra_val r, g, b, a;
-} umbra_color;
-
 typedef umbra_color (*umbra_shader_fn)(struct umbra_builder *, umbra_val x, umbra_val y);
 typedef umbra_val (*umbra_coverage_fn)(struct umbra_builder *, umbra_val x, umbra_val y);
 typedef umbra_color (*umbra_blend_fn)(struct umbra_builder *, umbra_color src,

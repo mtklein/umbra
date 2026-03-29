@@ -37,9 +37,7 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
         umbra_imm_f32(builder, 0.0f),
     };
     if (blend || coverage) {
-        umbra_val ch[4];
-        umbra_load_color(builder, (umbra_ptr){1, 0}, ch);
-        dst = (umbra_color){ch[0], ch[1], ch[2], ch[3]};
+        dst = umbra_load_color(builder, (umbra_ptr){1, 0});
     }
 
     umbra_color out;
@@ -64,10 +62,7 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
                                             cov));
     }
 
-    {
-        umbra_val ch[4] = {out.r, out.g, out.b, out.a};
-        umbra_store_color(builder, (umbra_ptr){1, 0}, ch);
-    }
+    umbra_store_color(builder, (umbra_ptr){1, 0}, out);
 
     if (layout) {
         layout->shader = shader_off;

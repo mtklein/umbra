@@ -61,6 +61,7 @@ void   umbra_program_queue(struct umbra_program*,
 struct umbra_backend* umbra_program_backend(struct umbra_program const*);
 
 typedef struct { int bits; } umbra_val;
+typedef struct { umbra_val r, g, b, a; } umbra_color;
 typedef struct { int ix, :24; _Bool deref; } umbra_ptr;
 
 // TODO: I don't like any of these first six methods.
@@ -93,8 +94,8 @@ void      umbra_store_32x2(struct umbra_builder*, umbra_ptr, umbra_val lo, umbra
 void      umbra_load_8x4 (struct umbra_builder*, umbra_ptr, umbra_val out[4]);
 void      umbra_store_8x4(struct umbra_builder*, umbra_ptr, umbra_val const in[4]);
 
-void      umbra_load_color (struct umbra_builder*, umbra_ptr, umbra_val out[4]);
-void      umbra_store_color(struct umbra_builder*, umbra_ptr, umbra_val const in[4]);
+umbra_color umbra_load_color (struct umbra_builder*, umbra_ptr);
+void        umbra_store_color(struct umbra_builder*, umbra_ptr, umbra_color);
 
 umbra_val umbra_i32_from_s16(struct umbra_builder*, umbra_val);
 umbra_val umbra_i32_from_u16(struct umbra_builder*, umbra_val);

@@ -2566,9 +2566,8 @@ static void test_load_store_8x4_roundtrip(void) {
 
 static void test_load_store_color_8888(void) {
     struct umbra_builder *b = umbra_builder();
-    umbra_val ch[4];
-    umbra_load_color(b, (umbra_ptr){0, 0}, ch);
-    umbra_store_color(b, (umbra_ptr){1, 0}, ch);
+    umbra_color c = umbra_load_color(b, (umbra_ptr){0, 0});
+    umbra_store_color(b, (umbra_ptr){1, 0}, c);
     backends B = make(b, 0);
 
     uint32_t src[8], dst[8];
