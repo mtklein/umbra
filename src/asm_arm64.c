@@ -228,6 +228,18 @@ uint32_t FMLS_4s(int d, int n, int m) { return v3(FMLS_4s_, d, n, m); }
 uint32_t FMINNM_4s(int d, int n, int m) { return v3(FMINNM_4s_, d, n, m); }
 uint32_t FMAXNM_4s(int d, int n, int m) { return v3(FMAXNM_4s_, d, n, m); }
 uint32_t FSQRT_4s(int d, int n) { return v2(FSQRT_4s_, d, n); }
+uint32_t FRSQRTE_4s(int d, int n) {
+    return 0x6ea1d800u | ((uint32_t)n << 5) | (uint32_t)d;
+}
+uint32_t FRSQRTS_4s(int d, int n, int m) {
+    return 0x4ea0fc00u | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d;
+}
+uint32_t FRECPE_4s(int d, int n) {
+    return 0x4ea1d800u | ((uint32_t)n << 5) | (uint32_t)d;
+}
+uint32_t FRECPS_4s(int d, int n, int m) {
+    return 0x4e20fc00u | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d;
+}
 uint32_t FABS_4s(int d, int n) { return v2(FABS_4s_, d, n); }
 uint32_t FNEG_4s(int d, int n) { return v2(FNEG_4s_, d, n); }
 uint32_t FRINTN_4s(int d, int n) { return v2(FRINTN_4s_, d, n); }

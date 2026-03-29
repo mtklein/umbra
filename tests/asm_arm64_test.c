@@ -54,6 +54,10 @@ static void test_neon_f32(void) {
     FMINNM_4s(0, 1, 2) == 0x4EA2C420 here;
     FMAXNM_4s(3, 4, 5) == 0x4E25C483 here;
     FSQRT_4s(3, 4) == 0x6EA1F883 here;
+    FRSQRTE_4s(0, 1) == 0x6EA1D820 here;
+    FRSQRTS_4s(0, 1, 2) == 0x4EA2FC20 here;
+    FRECPE_4s(0, 1) == 0x4EA1D820 here;
+    FRECPS_4s(0, 1, 2) == 0x4E22FC20 here;
     FABS_4s(0, 1) == 0x4EA0F820 here;
     FNEG_4s(2, 3) == 0x6EA0F862 here;
     FRINTN_4s(4, 5) == 0x4E2188A4 here;

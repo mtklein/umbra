@@ -186,6 +186,16 @@ static void test_avx_f32(void) {
     bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xFC, 0x51, 0xD3}) here;
     reset(&b);
 
+    // vrsqrtps %ymm3, %ymm2 => c5 fc 52 d3
+    vrsqrtps(&b, 2, 3);
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xFC, 0x52, 0xD3}) here;
+    reset(&b);
+
+    // vrcpps %ymm3, %ymm2 => c5 fc 53 d3
+    vrcpps(&b, 2, 3);
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xFC, 0x53, 0xD3}) here;
+    reset(&b);
+
     // vcmpps %ymm4, %ymm3, %ymm2, $0 => c5 e4 c2 d4 00
     vcmpps(&b, 2, 3, 4, 0);
     bytes_eq(&b, 5, (uint8_t[]){0xC5, 0xE4, 0xC2, 0xD4, 0x00}) here;

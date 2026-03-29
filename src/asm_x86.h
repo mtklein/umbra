@@ -79,6 +79,8 @@ void vfmadd231ps(Buf *b, int d, int v, int s);
 void vfnmadd132ps(Buf *b, int d, int v, int s);
 void vfnmadd213ps(Buf *b, int d, int v, int s);
 void vfnmadd231ps(Buf *b, int d, int v, int s);
+void vrsqrtps(Buf *b, int d, int s);
+void vrcpps(Buf *b, int d, int s);
 void vcvtdq2ps(Buf *b, int d, int s);
 void vcvttps2dq(Buf *b, int d, int s);
 void vcvtps2dq(Buf *b, int d, int s);
