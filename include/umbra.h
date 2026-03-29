@@ -39,17 +39,19 @@ static inline int umbra_pixel_bytes(umbra_fmt fmt) {
     return 0;
 }
 
-typedef void (*umbra_transfer_fn)(float dst[4], float const src[4]);
+typedef struct {
+    float a, b, c, d, e, f, g;
+} umbra_transfer;
 
 typedef struct {
-    void              *ptr;
-    size_t             sz;
-    size_t             row_bytes;
-    umbra_transfer_fn  transfer_to_linear;
-    umbra_transfer_fn  transfer_from_linear;
-    umbra_fmt          fmt;
-    _Bool              read_only;
-    char               pad_[3];
+    void           *ptr;
+    size_t          sz;
+    size_t          row_bytes;
+    umbra_fmt       fmt;
+    _Bool           read_only;
+    char            pad_[3];
+    umbra_transfer  transfer;
+    char            pad2_[4];
 } umbra_buf;
 
 

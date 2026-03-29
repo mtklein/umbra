@@ -17,6 +17,7 @@ kernel void umbra_entry(
     constant uint &x0 [[buffer(6)]],
     constant uint &y0 [[buffer(7)]],
     constant uint *buf_fmts [[buffer(8)]],
+    constant float *buf_transfers [[buffer(9)]],
     device uchar *p0 [[buffer(0)]],
     device uchar *p1 [[buffer(1)]],
     device uchar *p2 [[buffer(2)]],
@@ -51,6 +52,19 @@ kernel void umbra_entry(
                 v11_c = float4(f, 0, 0, 1); break; }
       default: v11_c = float4(0); break;
     }
+    { float tf_a = buf_transfers[1*7+0];
+      if (tf_a != 0.0) {
+        float tf_b = buf_transfers[1*7+1];
+        float tf_c = buf_transfers[1*7+2];
+        float tf_e = buf_transfers[1*7+4];
+        float tf_f = buf_transfers[1*7+5];
+        float tf_g = buf_transfers[1*7+6];
+        for (int ch = 0; ch < 3; ch++) {
+          float xv = v11_c[ch];
+          v11_c[ch] = xv >= tf_e ? pow((xv - tf_b) / tf_a, tf_g) : (xv - tf_f) / tf_c;
+        }
+      }
+    }
     uint v11 = as_type<uint>(v11_c.x);
     uint v11_1 = as_type<uint>(v11_c.y);
     uint v11_2 = as_type<uint>(v11_c.z);
@@ -68,6 +82,19 @@ kernel void umbra_entry(
     uint v22 = as_type<uint>(as_type<float>(v21) - as_type<float>(v11_2));
     uint v23 = as_type<uint>(fma(as_type<float>(v10), as_type<float>(v22), as_type<float>(v11_2)));
     float4 sc24 = float4(as_type<float>(v17), as_type<float>(v20), as_type<float>(v23), as_type<float>(v14));
+    { float tf_a = buf_transfers[1*7+0];
+      if (tf_a != 0.0) {
+        float tf_b = buf_transfers[1*7+1];
+        float tf_c = buf_transfers[1*7+2];
+        float tf_d = buf_transfers[1*7+3];
+        float tf_f = buf_transfers[1*7+5];
+        float tf_g = buf_transfers[1*7+6];
+        for (int ch = 0; ch < 3; ch++) {
+          float xv = sc24[ch];
+          sc24[ch] = xv >= tf_d ? tf_a * pow(xv, 1.0 / tf_g) + tf_b : tf_c * xv + tf_f;
+        }
+      }
+    }
     switch (buf_fmts[1]) {
       case 1u: { sc24 = clamp(sc24, 0.0, 1.0);
                 ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc24.x*255.0)) | (uint(rint(sc24.y*255.0))<<8) | (uint(rint(sc24.z*255.0))<<16) | (uint(rint(sc24.w*255.0))<<24); break; }

@@ -17,6 +17,7 @@ kernel void umbra_entry(
     constant uint &x0 [[buffer(5)]],
     constant uint &y0 [[buffer(6)]],
     constant uint *buf_fmts [[buffer(7)]],
+    constant float *buf_transfers [[buffer(8)]],
     device uchar *p0 [[buffer(0)]],
     device uchar *p1 [[buffer(1)]],
     uint2 pos [[thread_position_in_grid]]
@@ -47,6 +48,19 @@ kernel void umbra_entry(
                 v7_c = float4(f, 0, 0, 1); break; }
       default: v7_c = float4(0); break;
     }
+    { float tf_a = buf_transfers[1*7+0];
+      if (tf_a != 0.0) {
+        float tf_b = buf_transfers[1*7+1];
+        float tf_c = buf_transfers[1*7+2];
+        float tf_e = buf_transfers[1*7+4];
+        float tf_f = buf_transfers[1*7+5];
+        float tf_g = buf_transfers[1*7+6];
+        for (int ch = 0; ch < 3; ch++) {
+          float xv = v7_c[ch];
+          v7_c[ch] = xv >= tf_e ? pow((xv - tf_b) / tf_a, tf_g) : (xv - tf_f) / tf_c;
+        }
+      }
+    }
     uint v7 = as_type<uint>(v7_c.x);
     uint v7_1 = as_type<uint>(v7_c.y);
     uint v7_2 = as_type<uint>(v7_c.z);
@@ -56,6 +70,19 @@ kernel void umbra_entry(
     uint v10 = as_type<uint>(fma(as_type<float>(v7_2), as_type<float>(v6), as_type<float>(v3)));
     uint v11 = as_type<uint>(fma(as_type<float>(v7_1), as_type<float>(v6), as_type<float>(v2)));
     float4 sc12 = float4(as_type<float>(v9), as_type<float>(v11), as_type<float>(v10), as_type<float>(v8));
+    { float tf_a = buf_transfers[1*7+0];
+      if (tf_a != 0.0) {
+        float tf_b = buf_transfers[1*7+1];
+        float tf_c = buf_transfers[1*7+2];
+        float tf_d = buf_transfers[1*7+3];
+        float tf_f = buf_transfers[1*7+5];
+        float tf_g = buf_transfers[1*7+6];
+        for (int ch = 0; ch < 3; ch++) {
+          float xv = sc12[ch];
+          sc12[ch] = xv >= tf_d ? tf_a * pow(xv, 1.0 / tf_g) + tf_b : tf_c * xv + tf_f;
+        }
+      }
+    }
     switch (buf_fmts[1]) {
       case 1u: { sc12 = clamp(sc12, 0.0, 1.0);
                 ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc12.x*255.0)) | (uint(rint(sc12.y*255.0))<<8) | (uint(rint(sc12.z*255.0))<<16) | (uint(rint(sc12.w*255.0))<<24); break; }

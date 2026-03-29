@@ -2,6 +2,37 @@
 #include "bb.h"
 #include <assert.h>
 
+#if defined(__aarch64__) || defined(__AVX2__)
+#include <math.h>
+
+// Transfer function helpers called from JIT code.
+// data layout: [r0..rK-1, g0..gK-1, b0..bK-1]
+static void jit_tf_invert(float *data, umbra_transfer const *tf, int K) {
+    for (int ch = 0; ch < 3; ch++) {
+        for (int i = 0; i < K; i++) {
+            float x = data[ch * K + i];
+            if (x >= tf->e) {
+                data[ch * K + i] = powf((x - tf->b) / tf->a, tf->g);
+            } else {
+                data[ch * K + i] = (x - tf->f) / tf->c;
+            }
+        }
+    }
+}
+static void jit_tf_apply(float *data, umbra_transfer const *tf, int K) {
+    for (int ch = 0; ch < 3; ch++) {
+        for (int i = 0; i < K; i++) {
+            float x = data[ch * K + i];
+            if (x >= tf->d) {
+                data[ch * K + i] = tf->a * powf(x, 1.0f / tf->g) + tf->b;
+            } else {
+                data[ch * K + i] = tf->c * x + tf->f;
+            }
+        }
+    }
+}
+#endif
+
 #if !defined(__aarch64__) && !defined(__AVX2__)
 
 struct umbra_jit {
@@ -361,6 +392,120 @@ static struct ra *ra_create_arm64(struct umbra_basic_block const *bb, struct jit
         .ctx = jc,
     };
     return ra_create(bb, &cfg);
+}
+
+// Emit ARM64 code to call a transfer helper (jit_tf_invert or jit_tf_apply).
+// r_ch[3] are the SIMD registers holding R, G, B channels.
+// p is the buffer index. fn is the C function pointer.
+// This saves/restores all JIT state around the call.
+static void emit_transfer_call_arm64(Buf *c, int p, _Bool scalar,
+                                     int r_ch0, int r_ch1, int r_ch2,
+                                     void (*fn)(float*, umbra_transfer const*, int)) {
+    // Check buf[p].transfer.a — if 0, skip.
+    {
+        int const a_off = p * (int)sizeof(umbra_buf)
+                        + (int)__builtin_offsetof(umbra_buf, transfer)
+                        + (int)__builtin_offsetof(umbra_transfer, a);
+        // LDR w_XT, [XBUF, #a_off]  (32-bit load)
+        put(c, 0xb9400000u
+            | ((uint32_t)(a_off / 4) << 10)
+            | ((uint32_t)XBUF << 5)
+            | (uint32_t)XT);
+    }
+    // CBZ w_XT, skip
+    int br_skip = c->len;
+    put(c, 0x34000000u | (uint32_t)XT);  // CBZ Wt, +0 (patch later)
+
+    // Save frame: we need space for:
+    //   - 3 channel Q regs: 48 bytes (for data to pass to helper)
+    //   - GPR saves: 12 regs (x0-x2, x8-x15, x30) → 7 STP pairs = 112 bytes
+    //   - SIMD saves: 20 regs (v4-v7, v16-v31) → 10 STP pairs = 320 bytes
+    // Total = 480, round up to 496 for 16-byte alignment.
+    enum { FRAME = 496 };
+    // SUB SP, SP, #FRAME
+    put(c, SUB_xi(31, 31, FRAME));
+
+    // Save GPRs using STR with unsigned offset.
+    // STR x_reg, [SP, #off]
+#define SAVE_X(reg, off) put(c, 0xf9000000u | ((uint32_t)((off)/8) << 10) | (31u << 5) | ((uint32_t)(reg) & 0x1f))
+#define LOAD_X(reg, off) put(c, 0xf9400000u | ((uint32_t)((off)/8) << 10) | (31u << 5) | ((uint32_t)(reg) & 0x1f))
+    SAVE_X( 0, 48); SAVE_X( 1, 56); SAVE_X( 2, 64); SAVE_X( 8, 72);
+    SAVE_X( 9, 80); SAVE_X(10, 88); SAVE_X(11, 96); SAVE_X(12, 104);
+    SAVE_X(13, 112); SAVE_X(14, 120); SAVE_X(15, 128); SAVE_X(30, 136);
+
+    // Save SIMD regs: v4-v7 at 144, v16-v31 at 208
+    // STR Q_reg, [SP, #off]
+#define SAVE_Q(reg, off) put(c, 0x3d800000u | ((uint32_t)((off)/16) << 10) | (31u << 5) | ((uint32_t)(reg) & 0x1f))
+#define LOAD_Q(reg, off) put(c, 0x3dc00000u | ((uint32_t)((off)/16) << 10) | (31u << 5) | ((uint32_t)(reg) & 0x1f))
+    SAVE_Q( 4, 144); SAVE_Q( 5, 160); SAVE_Q( 6, 176); SAVE_Q( 7, 192);
+    SAVE_Q(16, 208); SAVE_Q(17, 224); SAVE_Q(18, 240); SAVE_Q(19, 256);
+    SAVE_Q(20, 272); SAVE_Q(21, 288); SAVE_Q(22, 304); SAVE_Q(23, 320);
+    SAVE_Q(24, 336); SAVE_Q(25, 352); SAVE_Q(26, 368); SAVE_Q(27, 384);
+    SAVE_Q(28, 400); SAVE_Q(29, 416); SAVE_Q(30, 432); SAVE_Q(31, 448);
+
+    // Store R,G,B channel data to [SP+0], [SP+16], [SP+32]
+    put(c, 0x3d800000u | (0u << 10) | (31u << 5) | ((uint32_t)r_ch0 & 0x1f));  // STR Q r_ch0, [SP, #0]
+    put(c, 0x3d800000u | (1u << 10) | (31u << 5) | ((uint32_t)r_ch1 & 0x1f));  // STR Q r_ch1, [SP, #16]
+    put(c, 0x3d800000u | (2u << 10) | (31u << 5) | ((uint32_t)r_ch2 & 0x1f));  // STR Q r_ch2, [SP, #32]
+
+    // Set up args: x0 = SP (data ptr), x1 = &buf[p].transfer, x2 = K
+    put(c, ADD_xi(0, 31, 0));  // x0 = SP
+    {
+        int const tf_off = p * (int)sizeof(umbra_buf)
+                         + (int)__builtin_offsetof(umbra_buf, transfer);
+        put(c, ADD_xi(1, XBUF, tf_off));  // x1 = XBUF + tf_off
+    }
+    if (scalar) {
+        put(c, MOVZ_w(2, 1));  // x2 = 1
+    } else {
+        put(c, MOVZ_w(2, 4));  // x2 = 4
+    }
+
+    // Load function address into x3 and BLR.
+    {
+        uint64_t addr = (uint64_t)(uintptr_t)fn;
+        // MOVZ x3, addr[15:0]
+        put(c, 0xd2800003u | ((uint32_t)(addr & 0xffff) << 5));
+        // MOVK x3, addr[31:16], LSL #16
+        put(c, 0xf2a00003u | ((uint32_t)((addr >> 16) & 0xffff) << 5));
+        // MOVK x3, addr[47:32], LSL #32
+        put(c, 0xf2c00003u | ((uint32_t)((addr >> 32) & 0xffff) << 5));
+        // MOVK x3, addr[63:48], LSL #48
+        put(c, 0xf2e00003u | ((uint32_t)((addr >> 48) & 0xffff) << 5));
+        // BLR x3
+        put(c, 0xd63f0060u);
+    }
+
+    // Reload R,G,B channel data from [SP+0], [SP+16], [SP+32]
+    put(c, 0x3dc00000u | (0u << 10) | (31u << 5) | ((uint32_t)r_ch0 & 0x1f));
+    put(c, 0x3dc00000u | (1u << 10) | (31u << 5) | ((uint32_t)r_ch1 & 0x1f));
+    put(c, 0x3dc00000u | (2u << 10) | (31u << 5) | ((uint32_t)r_ch2 & 0x1f));
+
+    // Restore SIMD regs
+    LOAD_Q( 4, 144); LOAD_Q( 5, 160); LOAD_Q( 6, 176); LOAD_Q( 7, 192);
+    LOAD_Q(16, 208); LOAD_Q(17, 224); LOAD_Q(18, 240); LOAD_Q(19, 256);
+    LOAD_Q(20, 272); LOAD_Q(21, 288); LOAD_Q(22, 304); LOAD_Q(23, 320);
+    LOAD_Q(24, 336); LOAD_Q(25, 352); LOAD_Q(26, 368); LOAD_Q(27, 384);
+    LOAD_Q(28, 400); LOAD_Q(29, 416); LOAD_Q(30, 432); LOAD_Q(31, 448);
+
+    // Restore GPRs
+    LOAD_X( 0, 48); LOAD_X( 1, 56); LOAD_X( 2, 64); LOAD_X( 8, 72);
+    LOAD_X( 9, 80); LOAD_X(10, 88); LOAD_X(11, 96); LOAD_X(12, 104);
+    LOAD_X(13, 112); LOAD_X(14, 120); LOAD_X(15, 128); LOAD_X(30, 136);
+
+    // Restore SP
+    put(c, ADD_xi(31, 31, FRAME));
+
+#undef SAVE_X
+#undef LOAD_X
+#undef SAVE_Q
+#undef LOAD_Q
+
+    // Patch CBZ
+    {
+        int off19 = c->len - br_skip;
+        c->buf[br_skip] = 0x34000000u | ((uint32_t)(off19 & 0x7ffff) << 5) | (uint32_t)XT;
+    }
 }
 
 static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int to,
@@ -1008,6 +1153,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 c->buf[br_done[j]] = B(c->len - br_done[j]);
             }
 
+            // Apply transfer function (invert: encoded -> linear).
+            emit_transfer_call_arm64(c, p, scalar, s0.rd, r1, r2, jit_tf_invert);
+
             ra_return_reg(ra, t1);
             ra_return_reg(ra, t0);
             ra_return_reg(ra, px);
@@ -1023,6 +1171,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
             int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+
+            // Apply transfer function (apply: linear -> encoded).
+            emit_transfer_call_arm64(c, p, scalar, rr, rg, rb_, jit_tf_apply);
 
             int8_t scale = ra_alloc(ra, sl, ns);
             int8_t z     = ra_alloc(ra, sl, ns);
@@ -1837,6 +1988,114 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     return 0;
 }
 
+// Emit x86-64 code to call a transfer helper (jit_tf_invert or jit_tf_apply).
+// r_ch[3] are the YMM registers holding R, G, B channels.
+// p is the buffer index. fn is the C function pointer.
+static void emit_transfer_call_x86(Buf *c, int p, _Bool scalar,
+                                   int r_ch0, int r_ch1, int r_ch2,
+                                   void (*fn)(float*, umbra_transfer const*, int)) {
+    // Check buf[p].transfer.a — load 32-bit float, compare to zero.
+    {
+        int const a_off = p * (int)sizeof(umbra_buf)
+                        + (int)__builtin_offsetof(umbra_buf, transfer)
+                        + (int)__builtin_offsetof(umbra_transfer, a);
+        // MOV eax, [XBUF + a_off]
+        emit1(c, 0x8b);
+        emit1(c, (uint8_t)(0x80 | (XBUF & 7)));
+        emit4(c, (uint32_t)a_off);
+        // TEST eax, eax
+        emit1(c, 0x85); emit1(c, 0xc0);
+    }
+    int br_skip = jcc(c, 0x04);  // JE skip
+
+    // Save state. Layout on stack (after SUB RSP):
+    //   slots 0-2: 3 channel YMM regs (96 bytes) = data for helper
+    //   slot  3: GPR save area (5 GPRs, 40 bytes, fits in 64 bytes)
+    //   slots 5-20: 16 YMM saves (512 bytes)
+    // Total: 21 slots * 32 = 672 bytes.
+    enum { FRAME = 672 };
+    add_ri(c, RSP, -FRAME);
+
+    // Save channel data: slots 0, 1, 2
+    vspill(c, r_ch0, 0);
+    vspill(c, r_ch1, 1);
+    vspill(c, r_ch2, 2);
+
+    // Save GPRs at byte offset 96 (slot 3 area).
+#define SGPR(reg, off) do { \
+    uint8_t rex_ = 0x48; if ((reg) >= 8) { rex_ |= 0x04; } \
+    emit1(c, rex_); emit1(c, 0x89); \
+    emit1(c, (uint8_t)(0x84 | (((reg) & 7) << 3))); \
+    emit1(c, 0x24); emit4(c, (uint32_t)(off)); \
+} while (0)
+#define LGPR(reg, off) do { \
+    uint8_t rex_ = 0x48; if ((reg) >= 8) { rex_ |= 0x04; } \
+    emit1(c, rex_); emit1(c, 0x8b); \
+    emit1(c, (uint8_t)(0x84 | (((reg) & 7) << 3))); \
+    emit1(c, 0x24); emit4(c, (uint32_t)(off)); \
+} while (0)
+    SGPR(RDI, 96);
+    SGPR(RSI, 104);
+    SGPR(RDX, 112);
+    SGPR(R10, 120);
+    SGPR(R11, 128);
+
+    // Save all 16 YMM regs: slots 5-20
+    for (int r = 0; r < 16; r++) {
+        vspill(c, r, 5 + r);
+    }
+
+    // Set up args: RDI = RSP (data ptr), RSI = &buf[p].transfer, RDX = K
+    mov_rr(c, RDI, RSP);
+    {
+        int const tf_off = p * (int)sizeof(umbra_buf)
+                         + (int)__builtin_offsetof(umbra_buf, transfer);
+        // LEA RSI, [XBUF + tf_off]
+        // XBUF=RDX(2), RSI(6): both < 8, so REX.W=0x48 only
+        emit1(c, 0x48);
+        emit1(c, 0x8d);
+        emit1(c, (uint8_t)(0x80 | ((RSI & 7) << 3) | (XBUF & 7)));
+        emit4(c, (uint32_t)tf_off);
+    }
+    mov_ri(c, RDX, scalar ? 1 : 8);
+
+    // Load function address into RAX and CALL.
+    {
+        uint64_t addr = (uint64_t)(uintptr_t)fn;
+        emit1(c, 0x48); emit1(c, 0xb8);
+        for (int b_ = 0; b_ < 8; b_++) {
+            emit1(c, (uint8_t)(addr >> (b_ * 8)));
+        }
+        emit1(c, 0xff); emit1(c, 0xd0);
+    }
+
+    // Restore YMM regs
+    for (int r = 0; r < 16; r++) {
+        vfill(c, r, 5 + r);
+    }
+
+    // Restore channel data (overwriting the YMM reg values just restored)
+    vfill(c, r_ch0, 0);
+    vfill(c, r_ch1, 1);
+    vfill(c, r_ch2, 2);
+
+    // Restore GPRs
+    LGPR(RDI, 96);
+    LGPR(RSI, 104);
+    LGPR(RDX, 112);
+    LGPR(R10, 120);
+    LGPR(R11, 128);
+
+#undef SGPR
+#undef LGPR
+
+    // Restore RSP
+    add_ri(c, RSP, FRAME);
+
+    // Patch JE
+    patch_jcc(c, br_skip);
+}
+
 static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
                      int *deref_rb_gpr, struct jit_ctx *jc);
@@ -2568,6 +2827,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 __builtin_memcpy(c->buf + br_done[j], &rel, 4);
             }
 
+            // Apply transfer function (invert: encoded -> linear).
+            emit_transfer_call_x86(c, p, scalar, s0.rd, r1, r2, jit_tf_invert);
+
             ra_return_reg(ra, t1);
             ra_return_reg(ra, t0);
             ra_return_reg(ra, px);
@@ -2583,6 +2845,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
             int    p = inst->ptr;
             int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+
+            // Apply transfer function (apply: linear -> encoded).
+            emit_transfer_call_x86(c, p, scalar, rr, rg, rb_, jit_tf_apply);
 
             int8_t scale = ra_alloc(ra, sl, ns);
             int8_t px    = ra_alloc(ra, sl, ns);

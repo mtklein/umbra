@@ -54,10 +54,6 @@ extern umbra_format const umbra_format_fp16;
 extern umbra_format const umbra_format_fp16_planar;
 extern umbra_format const umbra_format_srgb_8888;
 
-typedef struct {
-    float a, b, c, d, e, f, g;
-} umbra_transfer;
-
 extern umbra_transfer const umbra_transfer_srgb;
 
 umbra_color umbra_transfer_apply(struct umbra_builder *, umbra_color,

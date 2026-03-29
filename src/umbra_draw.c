@@ -567,35 +567,32 @@ void umbra_gradient_lut(float *out, int lut_n, int n_stops, float const position
 }
 
 umbra_transfer const umbra_transfer_srgb = {
-    .a = 1.0f / 1.055f,
-    .b = 0.055f / 1.055f,
-    .c = 1.0f / 12.92f,
-    .d = 0.04045f,
-    .e = 0,
+    .a = 1.055f,
+    .b = -0.055f,
+    .c = 12.92f,
+    .d = 0.0031308f,
+    .e = 0.04045f,
     .f = 0,
     .g = 2.4f,
 };
 
 
+// Invert: encoded -> linear.
+// x >= e ? pow((x - b) / a, g) : (x - f) / c
 static float tf_invert_scalar(umbra_transfer const *tf, float x) {
-    if (x >= tf->d) {
-        return powf(tf->a * x + tf->b, tf->g) + tf->e;
+    if (x >= tf->e) {
+        return powf((x - tf->b) / tf->a, tf->g);
     }
-    return tf->c * x + tf->f;
+    return (x - tf->f) / tf->c;
 }
 
-static float tf_apply_scalar(umbra_transfer const *tf, float y) {
-    float const lin_thresh = tf->c * tf->d + tf->f;
-    if (y >= lin_thresh) {
-        if (tf->a > 0) {
-            return (powf(y - tf->e, 1.0f / tf->g) - tf->b) / tf->a;
-        }
-        return 0;
+// Apply: linear -> encoded.
+// x >= d ? a * pow(x, 1/g) + b : c * x + f
+static float tf_apply_scalar(umbra_transfer const *tf, float x) {
+    if (x >= tf->d) {
+        return tf->a * powf(x, 1.0f / tf->g) + tf->b;
     }
-    if (tf->c > 0) {
-        return (y - tf->f) / tf->c;
-    }
-    return 0;
+    return tf->c * x + tf->f;
 }
 
 void umbra_transfer_lut_invert(float out[256], umbra_transfer const *tf) {
@@ -669,60 +666,68 @@ static umbra_val eval_poly_ir(builder *builder, umbra_val x, int n, double const
     return r;
 }
 
+// IR for invert: encoded -> linear.
+// x >= e ? pow((x - b) / a, g) : (x - f) / c
 umbra_color umbra_transfer_invert(builder *builder, umbra_color c,
                                   umbra_transfer const *tf) {
     double poly[POLY_N];
     int    const deg = 7;
     fit_poly((double)tf->g, deg, poly);
 
+    float const inv_c = tf->c > 0 ? 1.0f / tf->c : 0;
+
     for (int ch = 0; ch < 3; ch++) {
         umbra_val *h = ch == 0 ? &c.r : ch == 1 ? &c.g : &c.b;
         umbra_val  const x = clamp01(builder, *h);
 
+        // Linear segment: (x - f) / c
         umbra_val const lin =
-            umbra_add_f32(builder, umbra_mul_f32(builder, x, umbra_imm_f32(builder, tf->c)),
-                          umbra_imm_f32(builder, tf->f));
+            umbra_mul_f32(builder,
+                          umbra_sub_f32(builder, x, umbra_imm_f32(builder, tf->f)),
+                          umbra_imm_f32(builder, inv_c));
 
-        umbra_val t =
-            umbra_add_f32(builder, umbra_mul_f32(builder, x, umbra_imm_f32(builder, tf->a)),
-                          umbra_imm_f32(builder, tf->b));
+        // Curved segment: pow((x - b) / a, g)
+        // t = (x - b) / a, then poly approx of pow(t, g)
+        umbra_val t = umbra_mul_f32(builder,
+                                    umbra_sub_f32(builder, x, umbra_imm_f32(builder, tf->b)),
+                                    umbra_imm_f32(builder, 1.0f / tf->a));
         t = umbra_max_f32(builder, t, umbra_imm_f32(builder, 0.0f));
-        umbra_val const cur = umbra_add_f32(builder, eval_poly_ir(builder, t, deg, poly),
-                                            umbra_imm_f32(builder, tf->e));
+        umbra_val const cur = eval_poly_ir(builder, t, deg, poly);
 
-        umbra_val const mask = umbra_ge_f32(builder, x, umbra_imm_f32(builder, tf->d));
+        umbra_val const mask = umbra_ge_f32(builder, x, umbra_imm_f32(builder, tf->e));
         *h = umbra_sel_i32(builder, mask, cur, lin);
     }
     return c;
 }
 
+// IR for apply: linear -> encoded.
+// x >= d ? a * pow(x, 1/g) + b : c * x + f
 umbra_color umbra_transfer_apply(builder *builder, umbra_color c, umbra_transfer const *tf) {
     double poly[POLY_N];
     int    const deg = 10;
     fit_poly(2.0 / (double)tf->g, deg, poly);
 
-    float const lin_thresh = tf->c * tf->d + tf->f;
-    float const inv_c = tf->c > 0 ? 1.0f / tf->c : 0;
-    float const inv_a = tf->a > 0 ? 1.0f / tf->a : 0;
-
     for (int ch = 0; ch < 3; ch++) {
         umbra_val *h = ch == 0 ? &c.r : ch == 1 ? &c.g : &c.b;
-        umbra_val  const y = clamp01(builder, *h);
+        umbra_val  const x = clamp01(builder, *h);
 
+        // Linear segment: c * x + f
         umbra_val const lin =
-            umbra_mul_f32(builder, umbra_sub_f32(builder, y, umbra_imm_f32(builder, tf->f)),
-                          umbra_imm_f32(builder, inv_c));
+            umbra_add_f32(builder,
+                          umbra_mul_f32(builder, x, umbra_imm_f32(builder, tf->c)),
+                          umbra_imm_f32(builder, tf->f));
 
-        umbra_val t = umbra_sub_f32(builder, y, umbra_imm_f32(builder, tf->e));
-        t = umbra_max_f32(builder, t, umbra_imm_f32(builder, 0.0f));
+        // Curved segment: a * pow(x, 1/g) + b
+        // poly approx of pow(x, 1/g) via sqrt: sqrt(x)^(2/g)
+        umbra_val t = umbra_max_f32(builder, x, umbra_imm_f32(builder, 0.0f));
         umbra_val const s = umbra_sqrt_f32(builder, t);
         umbra_val const cur =
-            umbra_mul_f32(builder,
-                          umbra_sub_f32(builder, eval_poly_ir(builder, s, deg, poly),
-                                        umbra_imm_f32(builder, tf->b)),
-                          umbra_imm_f32(builder, inv_a));
+            umbra_add_f32(builder,
+                          umbra_mul_f32(builder, eval_poly_ir(builder, s, deg, poly),
+                                        umbra_imm_f32(builder, tf->a)),
+                          umbra_imm_f32(builder, tf->b));
 
-        umbra_val const mask = umbra_ge_f32(builder, y, umbra_imm_f32(builder, lin_thresh));
+        umbra_val const mask = umbra_ge_f32(builder, x, umbra_imm_f32(builder, tf->d));
         *h = umbra_sel_i32(builder, mask, cur, lin);
     }
     return c;

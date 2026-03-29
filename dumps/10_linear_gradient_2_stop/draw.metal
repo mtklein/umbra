@@ -17,6 +17,7 @@ kernel void umbra_entry(
     constant uint &x0 [[buffer(5)]],
     constant uint &y0 [[buffer(6)]],
     constant uint *buf_fmts [[buffer(7)]],
+    constant float *buf_transfers [[buffer(8)]],
     device uchar *p0 [[buffer(0)]],
     device uchar *p1 [[buffer(1)]],
     uint2 pos [[thread_position_in_grid]]
@@ -55,6 +56,19 @@ kernel void umbra_entry(
     uint v28 = as_type<uint>(fma(as_type<float>(v25), as_type<float>(v15), as_type<float>(v7)));
     uint v29 = as_type<uint>(fma(as_type<float>(v25), as_type<float>(v14), as_type<float>(v6)));
     float4 sc30 = float4(as_type<float>(v27), as_type<float>(v29), as_type<float>(v28), as_type<float>(v26));
+    { float tf_a = buf_transfers[1*7+0];
+      if (tf_a != 0.0) {
+        float tf_b = buf_transfers[1*7+1];
+        float tf_c = buf_transfers[1*7+2];
+        float tf_d = buf_transfers[1*7+3];
+        float tf_f = buf_transfers[1*7+5];
+        float tf_g = buf_transfers[1*7+6];
+        for (int ch = 0; ch < 3; ch++) {
+          float xv = sc30[ch];
+          sc30[ch] = xv >= tf_d ? tf_a * pow(xv, 1.0 / tf_g) + tf_b : tf_c * xv + tf_f;
+        }
+      }
+    }
     switch (buf_fmts[1]) {
       case 1u: { sc30 = clamp(sc30, 0.0, 1.0);
                 ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc30.x*255.0)) | (uint(rint(sc30.y*255.0))<<8) | (uint(rint(sc30.z*255.0))<<16) | (uint(rint(sc30.w*255.0))<<24); break; }

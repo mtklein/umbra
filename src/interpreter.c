@@ -886,12 +886,21 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                     } break;
                     case umbra_fmt_none: break;
                     }
-                    if (buf[ip->ptr].transfer_to_linear) {
-                        for (int ll = 0; ll < clamp; ll++) {
-                            float c[4] = {v[0].f32[ll], v[1].f32[ll], v[2].f32[ll], v[3].f32[ll]};
-                            buf[ip->ptr].transfer_to_linear(c, c);
-                            v[0].f32[ll] = c[0]; v[1].f32[ll] = c[1];
-                            v[2].f32[ll] = c[2]; v[3].f32[ll] = c[3];
+                    {
+                        umbra_transfer const *tf = &buf[ip->ptr].transfer;
+                        uint32_t tf_a_bits;
+                        __builtin_memcpy(&tf_a_bits, &tf->a, 4);
+                        if (tf_a_bits) {
+                            for (int ll = 0; ll < clamp; ll++) {
+                                for (int ch = 0; ch < 3; ch++) {
+                                    float x = v[ch].f32[ll];
+                                    if (x >= tf->e) {
+                                        v[ch].f32[ll] = powf((x - tf->b) / tf->a, tf->g);
+                                    } else {
+                                        v[ch].f32[ll] = (x - tf->f) / tf->c;
+                                    }
+                                }
+                            }
                         }
                     }
                     ip += 3; v += 3;
@@ -902,11 +911,18 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                     int const rem = n - i;
                     int const clamp = rem < K ? rem : K;
                     F32 cr = v[ip->x].f32, cg = v[ip->y].f32, cb = v[ip->z].f32, ca = v[ip->w].f32;
-                    if (buf[ip->ptr].transfer_from_linear) {
-                        for (int ll = 0; ll < clamp; ll++) {
-                            float c[4] = {cr[ll], cg[ll], cb[ll], ca[ll]};
-                            buf[ip->ptr].transfer_from_linear(c, c);
-                            cr[ll] = c[0]; cg[ll] = c[1]; cb[ll] = c[2]; ca[ll] = c[3];
+                    {
+                        umbra_transfer const *tf = &buf[ip->ptr].transfer;
+                        uint32_t tf_a_bits;
+                        __builtin_memcpy(&tf_a_bits, &tf->a, 4);
+                        if (tf_a_bits) {
+                            float const inv_g = 1.0f / tf->g;
+                            for (int ll = 0; ll < clamp; ll++) {
+                                float xr = cr[ll], xg = cg[ll], xb = cb[ll];
+                                cr[ll] = xr >= tf->d ? tf->a * powf(xr, inv_g) + tf->b : tf->c * xr + tf->f;
+                                cg[ll] = xg >= tf->d ? tf->a * powf(xg, inv_g) + tf->b : tf->c * xg + tf->f;
+                                cb[ll] = xb >= tf->d ? tf->a * powf(xb, inv_g) + tf->b : tf->c * xb + tf->f;
+                            }
                         }
                     }
                     switch (buf[ip->ptr].fmt) {
