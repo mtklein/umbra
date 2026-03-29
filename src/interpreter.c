@@ -101,6 +101,239 @@ typedef union {
     F32 f32;
 } val;
 
+__attribute__((noinline))
+static void interp_load_color(val v[4], umbra_buf const *b,
+                               char const *src, int i, int rem) {
+    int const clamp = rem < K ? rem : K;
+    switch (b->fmt) {
+    case umbra_fmt_8888: {
+        U32 px;
+        if (rem >= K) {
+            __builtin_memcpy(&px, src + i * 4, sizeof px);
+        } else {
+            px = (U32){0};
+            for (int ll = 0; ll < rem; ll++) {
+                uint32_t tmp;
+                __builtin_memcpy(&tmp, src + (i + ll) * 4, 4);
+                px[ll] = tmp;
+            }
+        }
+        U32 const mask = (U32){0} + 0xFFu;
+        F32 const inv  = (F32){0} + (1.f/255);
+        v[0].f32 = cast(F32, (I32)(px & mask))         * inv;
+        v[1].f32 = cast(F32, (I32)((px >>  8) & mask)) * inv;
+        v[2].f32 = cast(F32, (I32)((px >> 16) & mask)) * inv;
+        v[3].f32 = cast(F32, (I32)(px >> 24))          * inv;
+    } break;
+    case umbra_fmt_565: {
+        U16 px;
+        if (rem >= K) {
+            __builtin_memcpy(&px, src + i * 2, sizeof px);
+        } else {
+            px = (U16){0};
+            for (int ll = 0; ll < rem; ll++) {
+                uint16_t tmp;
+                __builtin_memcpy(&tmp, src + (i + ll) * 2, 2);
+                px[ll] = tmp;
+            }
+        }
+        U16 const r5 = px >> 11;
+        U16 const g6 = (px >> 5) & (U16)((U16){0} + 0x3F);
+        U16 const b5 = px & (U16)((U16){0} + 0x1F);
+        v[0].f32 = cast(F32, cast(I32, cast(U32, r5))) * ((F32){0} + (1.f/31));
+        v[1].f32 = cast(F32, cast(I32, cast(U32, g6))) * ((F32){0} + (1.f/63));
+        v[2].f32 = cast(F32, cast(I32, cast(U32, b5))) * ((F32){0} + (1.f/31));
+        v[3].f32 = (F32){0} + 1.f;
+    } break;
+    case umbra_fmt_1010102: {
+        U32 px;
+        if (rem >= K) {
+            __builtin_memcpy(&px, src + i * 4, sizeof px);
+        } else {
+            px = (U32){0};
+            for (int ll = 0; ll < rem; ll++) {
+                uint32_t tmp;
+                __builtin_memcpy(&tmp, src + (i + ll) * 4, 4);
+                px[ll] = tmp;
+            }
+        }
+        U32 const mask10 = (U32){0} + 0x3FFu;
+        v[0].f32 = cast(F32, cast(I32, px & mask10))         * ((F32){0} + (1.f/1023));
+        v[1].f32 = cast(F32, cast(I32, (px >> 10) & mask10)) * ((F32){0} + (1.f/1023));
+        v[2].f32 = cast(F32, cast(I32, (px >> 20) & mask10)) * ((F32){0} + (1.f/1023));
+        v[3].f32 = cast(F32, cast(I32, px >> 30))            * ((F32){0} + (1.f/3));
+    } break;
+    case umbra_fmt_fp16: {
+        U16 hr = {0}, hg = {0}, hb = {0}, ha = {0};
+        for (int ll = 0; ll < clamp; ll++) {
+            uint16_t h[4];
+            __builtin_memcpy(h, src + (i + ll) * 8, 8);
+            hr[ll] = h[0]; hg[ll] = h[1]; hb[ll] = h[2]; ha[ll] = h[3];
+        }
+        v[0].f32 = f16_to_f32(hr);
+        v[1].f32 = f16_to_f32(hg);
+        v[2].f32 = f16_to_f32(hb);
+        v[3].f32 = f16_to_f32(ha);
+    } break;
+    case umbra_fmt_f16:
+    case umbra_fmt_f32:
+    case umbra_fmt_none: break;
+    case umbra_fmt_f16_planar: {
+        size_t const ps = b->sz / 4;
+        char const *p0 = src;
+        U16 hr = {0}, hg = {0}, hb = {0}, ha = {0};
+        if (rem >= K) {
+            __builtin_memcpy(&hr, p0           + i * 2, sizeof hr);
+            __builtin_memcpy(&hg, p0 + ps      + i * 2, sizeof hg);
+            __builtin_memcpy(&hb, p0 + ps * 2  + i * 2, sizeof hb);
+            __builtin_memcpy(&ha, p0 + ps * 3  + i * 2, sizeof ha);
+        } else {
+            for (int ll = 0; ll < rem; ll++) {
+                uint16_t tmp;
+                __builtin_memcpy(&tmp, p0           + (i + ll) * 2, 2); hr[ll] = tmp;
+                __builtin_memcpy(&tmp, p0 + ps      + (i + ll) * 2, 2); hg[ll] = tmp;
+                __builtin_memcpy(&tmp, p0 + ps * 2  + (i + ll) * 2, 2); hb[ll] = tmp;
+                __builtin_memcpy(&tmp, p0 + ps * 3  + (i + ll) * 2, 2); ha[ll] = tmp;
+            }
+        }
+        v[0].f32 = f16_to_f32(hr);
+        v[1].f32 = f16_to_f32(hg);
+        v[2].f32 = f16_to_f32(hb);
+        v[3].f32 = f16_to_f32(ha);
+    } break;
+    }
+    {
+        umbra_transfer const *tf = &b->transfer;
+        uint32_t tf_a_bits;
+        __builtin_memcpy(&tf_a_bits, &tf->a, 4);
+        if (tf_a_bits) {
+            for (int ll = 0; ll < clamp; ll++) {
+                for (int ch = 0; ch < 3; ch++) {
+                    float x = v[ch].f32[ll];
+                    if (x >= tf->e) {
+                        v[ch].f32[ll] = powf((x - tf->b) / tf->a, tf->g);
+                    } else {
+                        v[ch].f32[ll] = (x - tf->f) / tf->c;
+                    }
+                }
+            }
+        }
+    }
+}
+
+__attribute__((noinline))
+static void interp_store_color(val const v[], umbra_buf const *b,
+                                char *dst, int i, int rem) {
+    int const clamp = rem < K ? rem : K;
+    F32 cr = v[0].f32, cg = v[1].f32, cb = v[2].f32, ca = v[3].f32;
+    {
+        umbra_transfer const *tf = &b->transfer;
+        uint32_t tf_a_bits;
+        __builtin_memcpy(&tf_a_bits, &tf->a, 4);
+        if (tf_a_bits) {
+            float const inv_g = 1.0f / tf->g;
+            for (int ll = 0; ll < clamp; ll++) {
+                float xr = cr[ll], xg = cg[ll], xb = cb[ll];
+                cr[ll] = xr >= tf->d ? tf->a * powf(xr, inv_g) + tf->b : tf->c * xr + tf->f;
+                cg[ll] = xg >= tf->d ? tf->a * powf(xg, inv_g) + tf->b : tf->c * xg + tf->f;
+                cb[ll] = xb >= tf->d ? tf->a * powf(xb, inv_g) + tf->b : tf->c * xb + tf->f;
+            }
+        }
+    }
+    switch (b->fmt) {
+    case umbra_fmt_8888: {
+        F32 const zero = {0}, one = (F32){0} + 1.f, scale = (F32){0} + 255.f;
+        F32 const rc = vec_round(vec_min(vec_max(cr, zero), one) * scale);
+        F32 const gc = vec_round(vec_min(vec_max(cg, zero), one) * scale);
+        F32 const bc = vec_round(vec_min(vec_max(cb, zero), one) * scale);
+        F32 const ac = vec_round(vec_min(vec_max(ca, zero), one) * scale);
+        U32 const px = cast(U32, cast(I32, rc))
+                     | cast(U32, cast(I32, gc)) <<  8
+                     | cast(U32, cast(I32, bc)) << 16
+                     | cast(U32, cast(I32, ac)) << 24;
+        if (rem >= K) {
+            __builtin_memcpy(dst + i * 4, &px, sizeof px);
+        } else {
+            for (int ll = 0; ll < rem; ll++) {
+                uint32_t tmp = px[ll];
+                __builtin_memcpy(dst + (i + ll) * 4, &tmp, 4);
+            }
+        }
+    } break;
+    case umbra_fmt_565: {
+        F32 const zero = {0}, one = (F32){0} + 1.f;
+        F32 const rc = vec_round(vec_min(vec_max(cr, zero), one) * ((F32){0} + 31.f));
+        F32 const gc = vec_round(vec_min(vec_max(cg, zero), one) * ((F32){0} + 63.f));
+        F32 const bc = vec_round(vec_min(vec_max(cb, zero), one) * ((F32){0} + 31.f));
+        U32 const px32 = cast(U32, cast(I32, rc)) << 11
+                       | cast(U32, cast(I32, gc)) <<  5
+                       | cast(U32, cast(I32, bc));
+        U16 const px = cast(U16, cast(S16, cast(I32, px32)));
+        if (rem >= K) {
+            __builtin_memcpy(dst + i * 2, &px, sizeof px);
+        } else {
+            for (int ll = 0; ll < rem; ll++) {
+                uint16_t tmp = px[ll];
+                __builtin_memcpy(dst + (i + ll) * 2, &tmp, 2);
+            }
+        }
+    } break;
+    case umbra_fmt_1010102: {
+        F32 const zero = {0}, one = (F32){0} + 1.f;
+        F32 const rc = vec_round(vec_min(vec_max(cr, zero), one) * ((F32){0} + 1023.f));
+        F32 const gc = vec_round(vec_min(vec_max(cg, zero), one) * ((F32){0} + 1023.f));
+        F32 const bc = vec_round(vec_min(vec_max(cb, zero), one) * ((F32){0} + 1023.f));
+        F32 const ac = vec_round(vec_min(vec_max(ca, zero), one) * ((F32){0} + 3.f));
+        U32 const px = cast(U32, cast(I32, rc))
+                     | cast(U32, cast(I32, gc)) << 10
+                     | cast(U32, cast(I32, bc)) << 20
+                     | cast(U32, cast(I32, ac)) << 30;
+        if (rem >= K) {
+            __builtin_memcpy(dst + i * 4, &px, sizeof px);
+        } else {
+            for (int ll = 0; ll < rem; ll++) {
+                uint32_t tmp = px[ll];
+                __builtin_memcpy(dst + (i + ll) * 4, &tmp, 4);
+            }
+        }
+    } break;
+    case umbra_fmt_fp16: {
+        U16 hr = f32_to_f16(cr);
+        U16 hg = f32_to_f16(cg);
+        U16 hb = f32_to_f16(cb);
+        U16 ha = f32_to_f16(ca);
+        for (int ll = 0; ll < clamp; ll++) {
+            uint16_t h[4] = {hr[ll], hg[ll], hb[ll], ha[ll]};
+            __builtin_memcpy(dst + (i + ll) * 8, h, 8);
+        }
+    } break;
+    case umbra_fmt_f16:
+    case umbra_fmt_f32:
+    case umbra_fmt_none: break;
+    case umbra_fmt_f16_planar: {
+        size_t const ps = b->sz / 4;
+        U16 hr = f32_to_f16(cr);
+        U16 hg = f32_to_f16(cg);
+        U16 hb = f32_to_f16(cb);
+        U16 ha = f32_to_f16(ca);
+        if (rem >= K) {
+            __builtin_memcpy(dst           + i * 2, &hr, sizeof hr);
+            __builtin_memcpy(dst + ps      + i * 2, &hg, sizeof hg);
+            __builtin_memcpy(dst + ps * 2  + i * 2, &hb, sizeof hb);
+            __builtin_memcpy(dst + ps * 3  + i * 2, &ha, sizeof ha);
+        } else {
+            for (int ll = 0; ll < rem; ll++) {
+                uint16_t tmp;
+                tmp = hr[ll]; __builtin_memcpy(dst           + (i + ll) * 2, &tmp, 2);
+                tmp = hg[ll]; __builtin_memcpy(dst + ps      + (i + ll) * 2, &tmp, 2);
+                tmp = hb[ll]; __builtin_memcpy(dst + ps * 2  + (i + ll) * 2, &tmp, 2);
+                tmp = ha[ll]; __builtin_memcpy(dst + ps * 3  + (i + ll) * 2, &tmp, 2);
+            }
+        }
+    } break;
+    }
+}
+
 // Tag values: all enum op values (0..op_le_s32_imm), plus interpreter-only ops.
 //
 // Register variants: op_<ret>_<name>_<params> where r=register, m=memory.
@@ -777,237 +1010,13 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
 
                 CASE(op_load_color) {
                     char const *src = (char const*)buf[ip->ptr].ptr + (size_t)row * buf[ip->ptr].row_bytes;
-                    int const   i = end - K;
-                    int const   rem = n - i;
-                    int const   clamp = rem < K ? rem : K;
-                    switch (buf[ip->ptr].fmt) {
-                    case umbra_fmt_8888: {
-                        U32 px;
-                        if (rem >= K) {
-                            __builtin_memcpy(&px, src + i * 4, sizeof px);
-                        } else {
-                            px = (U32){0};
-                            for (int ll = 0; ll < rem; ll++) {
-                                uint32_t tmp;
-                                __builtin_memcpy(&tmp, src + (i + ll) * 4, 4);
-                                px[ll] = tmp;
-                            }
-                        }
-                        U32 const mask = (U32){0} + 0xFFu;
-                        F32 const inv  = (F32){0} + (1.f/255);
-                        v[0].f32 = cast(F32, (I32)(px & mask))         * inv;
-                        v[1].f32 = cast(F32, (I32)((px >>  8) & mask)) * inv;
-                        v[2].f32 = cast(F32, (I32)((px >> 16) & mask)) * inv;
-                        v[3].f32 = cast(F32, (I32)(px >> 24))          * inv;
-                    } break;
-                    case umbra_fmt_565: {
-                        U16 px;
-                        if (rem >= K) {
-                            __builtin_memcpy(&px, src + i * 2, sizeof px);
-                        } else {
-                            px = (U16){0};
-                            for (int ll = 0; ll < rem; ll++) {
-                                uint16_t tmp;
-                                __builtin_memcpy(&tmp, src + (i + ll) * 2, 2);
-                                px[ll] = tmp;
-                            }
-                        }
-                        U16 const r5 = px >> 11;
-                        U16 const g6 = (px >> 5) & (U16)((U16){0} + 0x3F);
-                        U16 const b5 = px & (U16)((U16){0} + 0x1F);
-                        v[0].f32 = cast(F32, cast(I32, cast(U32, r5))) * ((F32){0} + (1.f/31));
-                        v[1].f32 = cast(F32, cast(I32, cast(U32, g6))) * ((F32){0} + (1.f/63));
-                        v[2].f32 = cast(F32, cast(I32, cast(U32, b5))) * ((F32){0} + (1.f/31));
-                        v[3].f32 = (F32){0} + 1.f;
-                    } break;
-                    case umbra_fmt_1010102: {
-                        U32 px;
-                        if (rem >= K) {
-                            __builtin_memcpy(&px, src + i * 4, sizeof px);
-                        } else {
-                            px = (U32){0};
-                            for (int ll = 0; ll < rem; ll++) {
-                                uint32_t tmp;
-                                __builtin_memcpy(&tmp, src + (i + ll) * 4, 4);
-                                px[ll] = tmp;
-                            }
-                        }
-                        U32 const mask10 = (U32){0} + 0x3FFu;
-                        v[0].f32 = cast(F32, cast(I32, px & mask10))         * ((F32){0} + (1.f/1023));
-                        v[1].f32 = cast(F32, cast(I32, (px >> 10) & mask10)) * ((F32){0} + (1.f/1023));
-                        v[2].f32 = cast(F32, cast(I32, (px >> 20) & mask10)) * ((F32){0} + (1.f/1023));
-                        v[3].f32 = cast(F32, cast(I32, px >> 30))            * ((F32){0} + (1.f/3));
-                    } break;
-                    case umbra_fmt_fp16: {
-                        U16 hr = {0}, hg = {0}, hb = {0}, ha = {0};
-                        for (int ll = 0; ll < clamp; ll++) {
-                            uint16_t h[4];
-                            __builtin_memcpy(h, src + (i + ll) * 8, 8);
-                            hr[ll] = h[0]; hg[ll] = h[1]; hb[ll] = h[2]; ha[ll] = h[3];
-                        }
-                        v[0].f32 = f16_to_f32(hr);
-                        v[1].f32 = f16_to_f32(hg);
-                        v[2].f32 = f16_to_f32(hb);
-                        v[3].f32 = f16_to_f32(ha);
-                    } break;
-                    case umbra_fmt_f16:
-                    case umbra_fmt_f32:
-                    case umbra_fmt_none: break;
-                    case umbra_fmt_f16_planar: {
-                        size_t const ps = buf[ip->ptr].sz / 4;
-                        char const *p0 = src;
-                        U16 hr = {0}, hg = {0}, hb = {0}, ha = {0};
-                        if (rem >= K) {
-                            __builtin_memcpy(&hr, p0           + i * 2, sizeof hr);
-                            __builtin_memcpy(&hg, p0 + ps      + i * 2, sizeof hg);
-                            __builtin_memcpy(&hb, p0 + ps * 2  + i * 2, sizeof hb);
-                            __builtin_memcpy(&ha, p0 + ps * 3  + i * 2, sizeof ha);
-                        } else {
-                            for (int ll = 0; ll < rem; ll++) {
-                                uint16_t tmp;
-                                __builtin_memcpy(&tmp, p0           + (i + ll) * 2, 2); hr[ll] = tmp;
-                                __builtin_memcpy(&tmp, p0 + ps      + (i + ll) * 2, 2); hg[ll] = tmp;
-                                __builtin_memcpy(&tmp, p0 + ps * 2  + (i + ll) * 2, 2); hb[ll] = tmp;
-                                __builtin_memcpy(&tmp, p0 + ps * 3  + (i + ll) * 2, 2); ha[ll] = tmp;
-                            }
-                        }
-                        v[0].f32 = f16_to_f32(hr);
-                        v[1].f32 = f16_to_f32(hg);
-                        v[2].f32 = f16_to_f32(hb);
-                        v[3].f32 = f16_to_f32(ha);
-                    } break;
-                    }
-                    {
-                        umbra_transfer const *tf = &buf[ip->ptr].transfer;
-                        uint32_t tf_a_bits;
-                        __builtin_memcpy(&tf_a_bits, &tf->a, 4);
-                        if (tf_a_bits) {
-                            for (int ll = 0; ll < clamp; ll++) {
-                                for (int ch = 0; ch < 3; ch++) {
-                                    float x = v[ch].f32[ll];
-                                    if (x >= tf->e) {
-                                        v[ch].f32[ll] = powf((x - tf->b) / tf->a, tf->g);
-                                    } else {
-                                        v[ch].f32[ll] = (x - tf->f) / tf->c;
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    interp_load_color(v, &buf[ip->ptr], src, end - K, n - (end - K));
                     ip += 3; v += 3;
                 } NEXT;
                 CASE(op_store_color) {
                     char *dst = (char*)buf[ip->ptr].ptr + (size_t)row * buf[ip->ptr].row_bytes;
-                    int const i = end - K;
-                    int const rem = n - i;
-                    int const clamp = rem < K ? rem : K;
-                    F32 cr = v[ip->x].f32, cg = v[ip->y].f32, cb = v[ip->z].f32, ca = v[ip->w].f32;
-                    {
-                        umbra_transfer const *tf = &buf[ip->ptr].transfer;
-                        uint32_t tf_a_bits;
-                        __builtin_memcpy(&tf_a_bits, &tf->a, 4);
-                        if (tf_a_bits) {
-                            float const inv_g = 1.0f / tf->g;
-                            for (int ll = 0; ll < clamp; ll++) {
-                                float xr = cr[ll], xg = cg[ll], xb = cb[ll];
-                                cr[ll] = xr >= tf->d ? tf->a * powf(xr, inv_g) + tf->b : tf->c * xr + tf->f;
-                                cg[ll] = xg >= tf->d ? tf->a * powf(xg, inv_g) + tf->b : tf->c * xg + tf->f;
-                                cb[ll] = xb >= tf->d ? tf->a * powf(xb, inv_g) + tf->b : tf->c * xb + tf->f;
-                            }
-                        }
-                    }
-                    switch (buf[ip->ptr].fmt) {
-                    case umbra_fmt_8888: {
-                        F32 const zero = {0}, one = (F32){0} + 1.f, scale = (F32){0} + 255.f;
-                        F32 const rc = vec_round(vec_min(vec_max(cr, zero), one) * scale);
-                        F32 const gc = vec_round(vec_min(vec_max(cg, zero), one) * scale);
-                        F32 const bc = vec_round(vec_min(vec_max(cb, zero), one) * scale);
-                        F32 const ac = vec_round(vec_min(vec_max(ca, zero), one) * scale);
-                        U32 const px = cast(U32, cast(I32, rc))
-                                     | cast(U32, cast(I32, gc)) <<  8
-                                     | cast(U32, cast(I32, bc)) << 16
-                                     | cast(U32, cast(I32, ac)) << 24;
-                        if (rem >= K) {
-                            __builtin_memcpy(dst + i * 4, &px, sizeof px);
-                        } else {
-                            for (int ll = 0; ll < rem; ll++) {
-                                uint32_t tmp = px[ll];
-                                __builtin_memcpy(dst + (i + ll) * 4, &tmp, 4);
-                            }
-                        }
-                    } break;
-                    case umbra_fmt_565: {
-                        F32 const zero = {0}, one = (F32){0} + 1.f;
-                        F32 const rc = vec_round(vec_min(vec_max(cr, zero), one) * ((F32){0} + 31.f));
-                        F32 const gc = vec_round(vec_min(vec_max(cg, zero), one) * ((F32){0} + 63.f));
-                        F32 const bc = vec_round(vec_min(vec_max(cb, zero), one) * ((F32){0} + 31.f));
-                        U32 const px32 = cast(U32, cast(I32, rc)) << 11
-                                       | cast(U32, cast(I32, gc)) <<  5
-                                       | cast(U32, cast(I32, bc));
-                        U16 const px = cast(U16, cast(S16, cast(I32, px32)));
-                        if (rem >= K) {
-                            __builtin_memcpy(dst + i * 2, &px, sizeof px);
-                        } else {
-                            for (int ll = 0; ll < rem; ll++) {
-                                uint16_t tmp = px[ll];
-                                __builtin_memcpy(dst + (i + ll) * 2, &tmp, 2);
-                            }
-                        }
-                    } break;
-                    case umbra_fmt_1010102: {
-                        F32 const zero = {0}, one = (F32){0} + 1.f;
-                        F32 const rc = vec_round(vec_min(vec_max(cr, zero), one) * ((F32){0} + 1023.f));
-                        F32 const gc = vec_round(vec_min(vec_max(cg, zero), one) * ((F32){0} + 1023.f));
-                        F32 const bc = vec_round(vec_min(vec_max(cb, zero), one) * ((F32){0} + 1023.f));
-                        F32 const ac = vec_round(vec_min(vec_max(ca, zero), one) * ((F32){0} + 3.f));
-                        U32 const px = cast(U32, cast(I32, rc))
-                                     | cast(U32, cast(I32, gc)) << 10
-                                     | cast(U32, cast(I32, bc)) << 20
-                                     | cast(U32, cast(I32, ac)) << 30;
-                        if (rem >= K) {
-                            __builtin_memcpy(dst + i * 4, &px, sizeof px);
-                        } else {
-                            for (int ll = 0; ll < rem; ll++) {
-                                uint32_t tmp = px[ll];
-                                __builtin_memcpy(dst + (i + ll) * 4, &tmp, 4);
-                            }
-                        }
-                    } break;
-                    case umbra_fmt_fp16: {
-                        U16 hr = f32_to_f16(cr);
-                        U16 hg = f32_to_f16(cg);
-                        U16 hb = f32_to_f16(cb);
-                        U16 ha = f32_to_f16(ca);
-                        for (int ll = 0; ll < clamp; ll++) {
-                            uint16_t h[4] = {hr[ll], hg[ll], hb[ll], ha[ll]};
-                            __builtin_memcpy(dst + (i + ll) * 8, h, 8);
-                        }
-                    } break;
-                    case umbra_fmt_f16:
-                    case umbra_fmt_f32:
-                    case umbra_fmt_none: break;
-                    case umbra_fmt_f16_planar: {
-                        size_t const ps = buf[ip->ptr].sz / 4;
-                        U16 hr = f32_to_f16(cr);
-                        U16 hg = f32_to_f16(cg);
-                        U16 hb = f32_to_f16(cb);
-                        U16 ha = f32_to_f16(ca);
-                        if (rem >= K) {
-                            __builtin_memcpy(dst           + i * 2, &hr, sizeof hr);
-                            __builtin_memcpy(dst + ps      + i * 2, &hg, sizeof hg);
-                            __builtin_memcpy(dst + ps * 2  + i * 2, &hb, sizeof hb);
-                            __builtin_memcpy(dst + ps * 3  + i * 2, &ha, sizeof ha);
-                        } else {
-                            for (int ll = 0; ll < rem; ll++) {
-                                uint16_t tmp;
-                                tmp = hr[ll]; __builtin_memcpy(dst           + (i + ll) * 2, &tmp, 2);
-                                tmp = hg[ll]; __builtin_memcpy(dst + ps      + (i + ll) * 2, &tmp, 2);
-                                tmp = hb[ll]; __builtin_memcpy(dst + ps * 2  + (i + ll) * 2, &tmp, 2);
-                                tmp = ha[ll]; __builtin_memcpy(dst + ps * 3  + (i + ll) * 2, &tmp, 2);
-                            }
-                        }
-                    } break;
-                    }
+                    val cv[4] = { v[ip->x], v[ip->y], v[ip->z], v[ip->w] };
+                    interp_store_color(cv, &buf[ip->ptr], dst, end - K, n - (end - K));
                 } NEXT;
 
                 CASE(op_gather_uniform_32) {
