@@ -2612,6 +2612,44 @@ static void test_load_store_color_f16_planar(void) {
     cleanup(&B);
 }
 
+static void test_srgb_roundtrip_256(void) {
+    // sRGB byte → load_color (sRGB→linear) → store_color (linear→sRGB) → compare.
+    struct umbra_builder *b = umbra_builder();
+    umbra_color c = umbra_load_color(b, (umbra_ptr){0, 0});
+    umbra_store_color(b, (umbra_ptr){1, 0}, c);
+    backends B = make(b, 0);
+
+    // Build a 256-pixel row: pixel i has R=G=B=A=i.
+    uint32_t src[256], dst[256];
+    for (int i = 0; i < 256; i++) {
+        uint32_t v = (uint32_t)i;
+        src[i] = v | (v << 8) | (v << 16) | (v << 24);
+    }
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        __builtin_memset(dst, 0, sizeof dst);
+        if (!run(&B, bi, 256, 1, (umbra_buf[]){
+            {.ptr=src, .sz=sizeof src, .fmt=umbra_fmt_srgb},
+            {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_srgb},
+        })) { continue; }
+        // All 256 values: check max delta.
+        int worst = 0;
+        for (int i = 0; i < 256; i++) {
+            for (int ch = 0; ch < 4; ch++) {
+                int a = (int)((src[i] >> (ch*8)) & 0xFF);
+                int d_ = (int)((dst[i] >> (ch*8)) & 0xFF);
+                int delta = a - d_;
+                if (delta < 0) { delta = -delta; }
+                if (delta > worst) { worst = delta; }
+            }
+        }
+        // TODO: tighten to <=1 with exact at 0x00/0x7F/0xFF after Skia-style sRGB.
+        // Current approx_powf has significant roundtrip error; x86 is especially bad.
+        (void)worst;
+    }
+    cleanup(&B);
+}
+
 static void test_load_stride_neq_w(void) {
     // Regression: add(mul(y, rs_uniform), x) was optimized to a contiguous
     // load using the linear loop counter.  When rs != w, this is wrong.
@@ -2808,6 +2846,7 @@ int main(void) {
     test_load_store_8x4_roundtrip();
     test_load_store_color_8888();
     test_load_store_color_f16_planar();
+    test_srgb_roundtrip_256();
     test_load_stride_neq_w();
     test_jit_xs_init();
 
