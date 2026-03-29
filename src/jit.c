@@ -448,14 +448,13 @@ static void emit_approx_powf_arm64(Buf *c, struct pool *pool,
 
 // Emit inline NEON transfer function for ARM64 (no function call).
 // Invert: x >= e ? pow((x-b)/a, g) : (x-f)/c
-// Apply:  x >= d ? a*pow(x, 1/g)+b : c*x+f
-static void emit_transfer_inline_arm64(Buf *c, struct pool *pool,
-                                       struct ra *ra, int *sl, int *ns,
-                                       int p,
-                                       int r_ch0, int r_ch1, int r_ch2,
-                                       _Bool invert) {
-    // Allocate temp SIMD registers BEFORE the CBZ so that any spills happen
-    // unconditionally (outside the conditional block).
+// sRGB inline conversion for 3 channels (R, G, B).
+// invert=1: sRGB→linear  (x >= 0.04045 ? pow((x+0.055)/1.055, 2.4) : x/12.92)
+// invert=0: linear→sRGB  (x >= 0.0031308 ? 1.055*pow(x, 1/2.4)-0.055 : 12.92*x)
+static void emit_srgb_arm64(Buf *c, struct pool *pool,
+                             struct ra *ra, int *sl, int *ns,
+                             int r_ch0, int r_ch1, int r_ch2,
+                             _Bool invert) {
     int8_t t0    = ra_alloc(ra, sl, ns);
     int8_t t1    = ra_alloc(ra, sl, ns);
     int8_t t2    = ra_alloc(ra, sl, ns);
@@ -466,90 +465,44 @@ static void emit_transfer_inline_arm64(Buf *c, struct pool *pool,
     int8_t exp_v = ra_alloc(ra, sl, ns);
     int8_t zero  = ra_alloc(ra, sl, ns);
 
-    // Check buf[p].transfer.a — if 0, skip the transfer block.
-    {
-        int const a_off = p * (int)sizeof(umbra_buf)
-                        + (int)__builtin_offsetof(umbra_buf, transfer)
-                        + (int)__builtin_offsetof(umbra_transfer, a);
-        put(c, LDR_wi(XT, XBUF, a_off / 4));
-    }
-    int br_skip = c->len;
-    put(c, CBZ_w(XT, 0));  // CBZ Wt, +0 (patch later)
+    put(c, MOVI_4s(zero, 0, 0));
+    arm64_pool_load(c, pool, exp_v, invert ? f2u(2.4f) : f2u(1.0f/2.4f));
 
-    // Load constants that are reused across all 3 channels.
-    put(c, MOVI_4s(zero, 0, 0));                         // zero = 0
-
-    // Helper macro: load scalar from transfer struct, broadcast to 4 lanes.
-    int const tf_off = p * (int)sizeof(umbra_buf)
-                     + (int)__builtin_offsetof(umbra_buf, transfer);
-#define LOAD_TF(reg, field) do {                                              \
-    int const off_ = tf_off + (int)__builtin_offsetof(umbra_transfer, field); \
-    put(c, LDR_si(reg, XBUF, off_ / 4));                                     \
-    put(c, DUP_4s_lane(reg, reg, 0));                                        \
-} while (0)
-
-    // Load the exponent for powf.
-    LOAD_TF(exp_v, g);
-    if (!invert) {
-        // exp_v = 1.0 / g — use t0 as temporary for 1.0
-        arm64_pool_load(c, pool, t0, f2u(1.0f));
-        put(c, FDIV_4s(exp_v, t0, exp_v));
-    }
-
-    // Process each of the 3 channels (R, G, B).
-    // Transfer parameters are loaded into t0/t1 on-demand per channel.
     int const channels[3] = { r_ch0, r_ch1, r_ch2 };
     for (int ch_i = 0; ch_i < 3; ch_i++) {
         int const ch = channels[ch_i];
 
-        // Compute comparison mask: ch >= threshold (e for invert, d for apply).
         if (invert) {
-            LOAD_TF(t0, e);
+            arm64_pool_load(c, pool, t0, f2u(0.04045f));
+            put(c, FCMGE_4s(tmask, ch, t0));
+
+            arm64_pool_load(c, pool, t0, f2u(0.055f));
+            put(c, FADD_4s(t4, ch, t0));
+            arm64_pool_load(c, pool, t0, f2u(1.0f/1.055f));
+            put(c, FMUL_4s(t4, t4, t0));
+            emit_approx_powf_arm64(c, pool, t4, t0, t1, t2, t3, exp_v, zero);
+
+            arm64_pool_load(c, pool, t0, f2u(1.0f/12.92f));
+            put(c, FMUL_4s(lin, ch, t0));
         } else {
-            LOAD_TF(t0, d);
-        }
-        put(c, FCMGE_4s(tmask, ch, t0));                // tmask = ch >= thresh
+            arm64_pool_load(c, pool, t0, f2u(0.0031308f));
+            put(c, FCMGE_4s(tmask, ch, t0));
 
-        if (invert) {
-            // Curved: pow((ch - b) / a, g)
-            LOAD_TF(t0, b);
-            put(c, FSUB_4s(t4, ch, t0));                // t4 = ch - b
-            LOAD_TF(t0, a);
-            put(c, FDIV_4s(t4, t4, t0));                // t4 = (ch - b) / a
-            emit_approx_powf_arm64(c, pool, t4, t0, t1, t2, t3,
-                                   exp_v, zero);
+            put(c, ORR_16b(t4, ch, ch));
+            emit_approx_powf_arm64(c, pool, t4, t0, t1, t2, t3, exp_v, zero);
+            arm64_pool_load(c, pool, t0, f2u(1.055f));
+            put(c, FMUL_4s(t4, t0, t4));
+            arm64_pool_load(c, pool, t0, f2u(0.055f));
+            put(c, FSUB_4s(t4, t4, t0));
 
-            // Linear: (ch - f) / c
-            LOAD_TF(t0, f);
-            put(c, FSUB_4s(lin, ch, t0));                // lin = ch - f
-            LOAD_TF(t0, c);
-            put(c, FDIV_4s(lin, lin, t0));               // lin = (ch - f) / c
-        } else {
-            // Curved: a * pow(ch, 1/g) + b
-            put(c, ORR_16b(t4, ch, ch));                 // t4 = copy of ch
-            emit_approx_powf_arm64(c, pool, t4, t0, t1, t2, t3,
-                                   exp_v, zero);
-            LOAD_TF(t0, a);
-            put(c, FMUL_4s(t4, t0, t4));                // t4 = a * pow(ch, 1/g)
-            LOAD_TF(t0, b);
-            put(c, FADD_4s(t4, t4, t0));                // t4 += b
-
-            // Linear: c * ch + f
-            LOAD_TF(t0, c);
-            put(c, FMUL_4s(lin, t0, ch));               // lin = c * ch
-            LOAD_TF(t0, f);
-            put(c, FADD_4s(lin, lin, t0));               // lin += f
+            arm64_pool_load(c, pool, t0, f2u(12.92f));
+            put(c, FMUL_4s(lin, t0, ch));
         }
 
-        // Select: ch = tmask ? curved(t4) : linear(lin)
-        // BIT Vd, Vn, Vm: Vd = (Vm & Vn) | (~Vm & Vd)
-        // ch = lin; BIT ch, t4, tmask → ch = tmask ? t4 : lin
-        put(c, ORR_16b(ch, lin, lin));                   // ch = lin
-        put(c, BIT_16b(ch, t4, tmask));                  // ch = tmask ? t4 : lin
+        put(c, ORR_16b(ch, lin, lin));
+        put(c, BIT_16b(ch, t4, tmask));
     }
-#undef LOAD_TF
 
-    // Free all temp registers.
     ra_return_reg(ra, zero);
     ra_return_reg(ra, exp_v);
     ra_return_reg(ra, lin);
@@ -559,12 +512,6 @@ static void emit_transfer_inline_arm64(Buf *c, struct pool *pool,
     ra_return_reg(ra, t2);
     ra_return_reg(ra, t1);
     ra_return_reg(ra, t0);
-
-    // Patch CBZ
-    {
-        int off19 = c->len - br_skip;
-        c->buf[br_skip] = CBZ_w(XT, off19);
-    }
 }
 
 static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int to,
@@ -1243,6 +1190,37 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             put(c, B(0));
             c->buf[br_skip_f16_planar] = Bcond(0x1, c->len - br_skip_f16_planar);
 
+            // --- umbra_fmt_srgb (=8) ---
+            put(c, CMP_wi(XT, 8));
+            int br_skip_srgb = c->len;
+            put(c, Bcond(0x1, 0));
+            {
+                // Same as 8888 decode.
+                if (scalar) { put(c, LDR_sx(px, XP, XI)); }
+                else        { put(c, LDR_q(px, XP, XW)); }
+                arm64_pool_load(c, &jc->pool, t0, 0xFF);
+                put(c, AND_16b(s0.rd, px, t0));
+                put(c, USHR_4s_imm(r1, px,  8)); put(c, AND_16b(r1, r1, t0));
+                put(c, USHR_4s_imm(r2, px, 16)); put(c, AND_16b(r2, r2, t0));
+                put(c, USHR_4s_imm(r3, px, 24));
+                put(c, SCVTF_4s(s0.rd, s0.rd));
+                put(c, SCVTF_4s(r1, r1));
+                put(c, SCVTF_4s(r2, r2));
+                put(c, SCVTF_4s(r3, r3));
+                union { float f; uint32_t u; } inv255 = {.f = 1.0f/255.0f};
+                arm64_pool_load(c, &jc->pool, t0, inv255.u);
+                put(c, FMUL_4s(s0.rd, s0.rd, t0));
+                put(c, FMUL_4s(r1, r1, t0));
+                put(c, FMUL_4s(r2, r2, t0));
+                put(c, FMUL_4s(r3, r3, t0));
+                // sRGB→linear on RGB only.
+                emit_srgb_arm64(c, &jc->pool, ra, sl, ns,
+                                s0.rd, r1, r2, /*invert=*/1);
+            }
+            br_done[n_done] = c->len; n_done++;
+            put(c, B(0));
+            c->buf[br_skip_srgb] = Bcond(0x1, c->len - br_skip_srgb);
+
             // Default: zero all outputs.
             put(c, MOVI_4s(s0.rd, 0, 0));
             put(c, MOVI_4s(r1, 0, 0));
@@ -1253,10 +1231,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             for (int j = 0; j < n_done; j++) {
                 c->buf[br_done[j]] = B(c->len - br_done[j]);
             }
-
-            // Apply transfer function (invert: encoded -> linear).
-            emit_transfer_inline_arm64(c, &jc->pool, ra, sl, ns,
-                                       p, s0.rd, r1, r2, /*invert=*/1);
 
             ra_return_reg(ra, t1);
             ra_return_reg(ra, t0);
@@ -1273,10 +1247,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
             int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-
-            // Apply transfer function (apply: linear -> encoded).
-            emit_transfer_inline_arm64(c, &jc->pool, ra, sl, ns,
-                                       p, rr, rg, rb_, /*invert=*/0);
 
             int8_t scale = ra_alloc(ra, sl, ns);
             int8_t z     = ra_alloc(ra, sl, ns);
@@ -1474,6 +1444,38 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             br_done[n_done] = c->len; n_done++;
             put(c, B(0));
             c->buf[br_skip_f16_planar_s] = Bcond(0x1, c->len - br_skip_f16_planar_s);
+
+            // --- umbra_fmt_srgb (=8) ---
+            put(c, CMP_wi(XT, 8));
+            int br_skip_srgb_s = c->len;
+            put(c, Bcond(0x1, 0));
+            {
+                // linear→sRGB on RGB only.
+                emit_srgb_arm64(c, &jc->pool, ra, sl, ns,
+                                rr, rg, rb_, /*invert=*/0);
+                // Same as 8888 encode.
+                union { float f; uint32_t u; } s255 = {.f = 255.0f};
+                union { float f; uint32_t u; } f1   = {.f = 1.0f};
+                arm64_pool_load(c, &jc->pool, scale, s255.u);
+                arm64_pool_load(c, &jc->pool, one, f1.u);
+                put(c, MOVI_4s(z, 0, 0));
+                put(c, FMAXNM_4s(px, rr, z)); put(c, FMINNM_4s(px, px, one));
+                put(c, FMUL_4s(px, px, scale)); put(c, FCVTNS_4s(px, px));
+                put(c, FMAXNM_4s(t, rg, z)); put(c, FMINNM_4s(t, t, one));
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
+                put(c, SLI_4s_imm(px, t, 8));
+                put(c, FMAXNM_4s(t, rb_, z)); put(c, FMINNM_4s(t, t, one));
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
+                put(c, SLI_4s_imm(px, t, 16));
+                put(c, FMAXNM_4s(t, ra_v, z)); put(c, FMINNM_4s(t, t, one));
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
+                put(c, SLI_4s_imm(px, t, 24));
+                if (scalar) { put(c, STR_sx(px, XP, XI)); }
+                else        { put(c, STR_q(px, XP, XW)); }
+            }
+            br_done[n_done] = c->len; n_done++;
+            put(c, B(0));
+            c->buf[br_skip_srgb_s] = Bcond(0x1, c->len - br_skip_srgb_s);
 
             // Default: no-op for unknown formats.
 
@@ -2126,12 +2128,6 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
 }
 
 // Load a transfer function parameter from [XBUF + disp] and broadcast to all YMM lanes.
-static void x86_load_tf_param(Buf *c, int reg, int disp) {
-    mov_load(c, RAX, XBUF, disp);
-    vex(c, 1, 1, 0, 0, reg, 0, RAX, 0x6e);  // VMOVD xmm_reg, eax
-    vbroadcastss(c, reg, reg);                 // VBROADCASTSS ymm, xmm
-}
-
 // Emit inline AVX2 approx_powf for one channel register.
 // ch = the YMM register to transform in-place.
 // t0..t3 = scratch YMM registers.
@@ -2200,16 +2196,11 @@ static void emit_approx_powf_x86(Buf *c, struct pool *pool,
     vcvtps2dq(c, ch, t1);                               // ch = round to nearest int
 }
 
-// Emit inline AVX2 transfer function for x86-64 (no function call).
-// Invert: x >= e ? pow((x-b)/a, g) : (x-f)/c
-// Apply:  x >= d ? a*pow(x, 1/g)+b : c*x+f
-static void emit_transfer_inline_x86(Buf *c, struct pool *pool,
-                                     struct ra *ra, int *sl, int *ns,
-                                     int p,
-                                     int r_ch0, int r_ch1, int r_ch2,
-                                     _Bool invert) {
-    // Allocate temp SIMD registers BEFORE the JE so that any spills happen
-    // unconditionally (outside the conditional block).
+// sRGB inline conversion for 3 channels (R, G, B) using AVX2.
+static void emit_srgb_x86(Buf *c, struct pool *pool,
+                           struct ra *ra, int *sl, int *ns,
+                           int r_ch0, int r_ch1, int r_ch2,
+                           _Bool invert) {
     int8_t t0    = ra_alloc(ra, sl, ns);
     int8_t t1    = ra_alloc(ra, sl, ns);
     int8_t t2    = ra_alloc(ra, sl, ns);
@@ -2219,87 +2210,43 @@ static void emit_transfer_inline_x86(Buf *c, struct pool *pool,
     int8_t exp_v = ra_alloc(ra, sl, ns);
     int8_t tzero = ra_alloc(ra, sl, ns);
 
-    // Check buf[p].transfer.a — load 32-bit float, compare to zero.
-    {
-        int const a_off = p * (int)sizeof(umbra_buf)
-                        + (int)__builtin_offsetof(umbra_buf, transfer)
-                        + (int)__builtin_offsetof(umbra_transfer, a);
-        // MOV eax, [XBUF + a_off]
-        emit1(c, 0x8b);
-        emit1(c, (uint8_t)(0x80 | (XBUF & 7)));
-        emit4(c, (uint32_t)a_off);
-        // TEST eax, eax
-        emit1(c, 0x85); emit1(c, 0xc0);
-    }
-    int br_skip = jcc(c, 0x04);  // JE skip
+    vpxor(c, 1, tzero, tzero, tzero);
+    pool_broadcast(c, pool, exp_v, invert ? f2u(2.4f) : f2u(1.0f/2.4f));
 
-    // Load constants reused across all 3 channels.
-    vpxor(c, 1, tzero, tzero, tzero);                    // zero
-
-    // Load the exponent for powf.
-    int const tf_off = p * (int)sizeof(umbra_buf)
-                     + (int)__builtin_offsetof(umbra_buf, transfer);
-    {
-        int const g_off = tf_off + (int)__builtin_offsetof(umbra_transfer, g);
-        x86_load_tf_param(c, exp_v, g_off);
-        if (!invert) {
-            // exp_v = 1.0 / g — use t0 as temporary for 1.0
-            pool_broadcast(c, pool, t0, f2u(1.0f));
-            vdivps(c, exp_v, t0, exp_v);
-        }
-    }
-
-    // Process each of the 3 channels (R, G, B).
-    // Transfer parameters are loaded into t0 on-demand per channel.
     int const channels[3] = { r_ch0, r_ch1, r_ch2 };
     for (int ch_i = 0; ch_i < 3; ch_i++) {
         int const ch = channels[ch_i];
 
-        // Compute comparison mask: ch >= threshold (e for invert, d for apply).
         if (invert) {
-            x86_load_tf_param(c, t0, tf_off + (int)__builtin_offsetof(umbra_transfer, e));
+            pool_broadcast(c, pool, t0, f2u(0.04045f));
+            vcmpps(c, tmask, ch, t0, 5);
+
+            pool_broadcast(c, pool, t0, f2u(0.055f));
+            vaddps(c, tcurv, ch, t0);
+            pool_broadcast(c, pool, t0, f2u(1.0f/1.055f));
+            vmulps(c, tcurv, tcurv, t0);
+            emit_approx_powf_x86(c, pool, tcurv, t0, t1, t2, exp_v, tzero);
+
+            pool_broadcast(c, pool, t0, f2u(1.0f/12.92f));
+            vmulps(c, tlin, ch, t0);
         } else {
-            x86_load_tf_param(c, t0, tf_off + (int)__builtin_offsetof(umbra_transfer, d));
-        }
-        vcmpps(c, tmask, ch, t0, 5);                    // tmask = ch >= thresh
+            pool_broadcast(c, pool, t0, f2u(0.0031308f));
+            vcmpps(c, tmask, ch, t0, 5);
 
-        if (invert) {
-            // Curved: pow((ch - b) / a, g)
-            x86_load_tf_param(c, t0, tf_off + (int)__builtin_offsetof(umbra_transfer, b));
-            vsubps(c, tcurv, ch, t0);                    // tcurv = ch - b
-            x86_load_tf_param(c, t0, tf_off + (int)__builtin_offsetof(umbra_transfer, a));
-            vdivps(c, tcurv, tcurv, t0);                 // tcurv = (ch - b) / a
-            emit_approx_powf_x86(c, pool, tcurv, t0, t1, t2,
-                                 exp_v, tzero);
+            vmovaps(c, tcurv, ch);
+            emit_approx_powf_x86(c, pool, tcurv, t0, t1, t2, exp_v, tzero);
+            pool_broadcast(c, pool, t0, f2u(1.055f));
+            vmulps(c, tcurv, t0, tcurv);
+            pool_broadcast(c, pool, t0, f2u(0.055f));
+            vsubps(c, tcurv, tcurv, t0);
 
-            // Linear: (ch - f) / c
-            x86_load_tf_param(c, t0, tf_off + (int)__builtin_offsetof(umbra_transfer, f));
-            vsubps(c, tlin, ch, t0);                     // tlin = ch - f
-            x86_load_tf_param(c, t0, tf_off + (int)__builtin_offsetof(umbra_transfer, c));
-            vdivps(c, tlin, tlin, t0);                   // tlin = (ch - f) / c
-        } else {
-            // Curved: a * pow(ch, 1/g) + b
-            vmovaps(c, tcurv, ch);                       // tcurv = copy of ch
-            emit_approx_powf_x86(c, pool, tcurv, t0, t1, t2,
-                                 exp_v, tzero);
-            x86_load_tf_param(c, t0, tf_off + (int)__builtin_offsetof(umbra_transfer, a));
-            vmulps(c, tcurv, t0, tcurv);                 // tcurv = a * pow(ch, 1/g)
-            x86_load_tf_param(c, t0, tf_off + (int)__builtin_offsetof(umbra_transfer, b));
-            vaddps(c, tcurv, tcurv, t0);                 // tcurv += b
-
-            // Linear: c * ch + f
-            x86_load_tf_param(c, t0, tf_off + (int)__builtin_offsetof(umbra_transfer, c));
-            vmulps(c, tlin, t0, ch);                     // tlin = c * ch
-            x86_load_tf_param(c, t0, tf_off + (int)__builtin_offsetof(umbra_transfer, f));
-            vaddps(c, tlin, tlin, t0);                   // tlin += f
+            pool_broadcast(c, pool, t0, f2u(12.92f));
+            vmulps(c, tlin, t0, ch);
         }
 
-        // Select: ch = tmask ? curved(tcurv) : linear(tlin)
-        // vpblendvb(c, L, d, z, y, x): d = x[msb] ? y : z
         vpblendvb(c, 1, ch, tlin, tcurv, tmask);
     }
 
-    // Free all temp registers.
     ra_return_reg(ra, tzero);
     ra_return_reg(ra, exp_v);
     ra_return_reg(ra, tlin);
@@ -2308,9 +2255,6 @@ static void emit_transfer_inline_x86(Buf *c, struct pool *pool,
     ra_return_reg(ra, t2);
     ra_return_reg(ra, t1);
     ra_return_reg(ra, t0);
-
-    // Patch JE
-    patch_jcc(c, br_skip);
 }
 
 static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int to,
@@ -3143,15 +3087,44 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             vpxor(c, 1, r2, r2, r2);
             vpxor(c, 1, r3, r3, r3);
 
+            // --- umbra_fmt_srgb (=8) ---
+            cmp_ri(c, RAX, 8);
+            int br_skip_srgb = jcc(c, 0x05);
+            {
+                if (scalar) { vex_mem(c, 1, 1, 0, 0, px, 0, 0x6e, base, XI, 4, 0); }
+                else        { vmov_load(c, 1, px, base, XI, 4, 0); }
+                pool_broadcast(c, &jc->pool, t0, 0xFF);
+                vpand(c, 1, s0.rd, px, t0);
+                vpsrld_i(c, r1, px,  8); vpand(c, 1, r1, r1, t0);
+                vpsrld_i(c, r2, px, 16); vpand(c, 1, r2, r2, t0);
+                vpsrld_i(c, r3, px, 24);
+                vcvtdq2ps(c, s0.rd, s0.rd);
+                vcvtdq2ps(c, r1, r1);
+                vcvtdq2ps(c, r2, r2);
+                vcvtdq2ps(c, r3, r3);
+                union { float f; uint32_t u; } inv255 = {.f = 1.0f/255.0f};
+                pool_broadcast(c, &jc->pool, t0, inv255.u);
+                vmulps(c, s0.rd, s0.rd, t0);
+                vmulps(c, r1, r1, t0);
+                vmulps(c, r2, r2, t0);
+                vmulps(c, r3, r3, t0);
+                emit_srgb_x86(c, &jc->pool, ra, sl, ns,
+                              s0.rd, r1, r2, /*invert=*/1);
+            }
+            br_done[n_done] = jmp(c); n_done++;
+            patch_jcc(c, br_skip_srgb);
+
+            // Default: zero all outputs.
+            vpxor(c, 1, s0.rd, s0.rd, s0.rd);
+            vpxor(c, 1, r1, r1, r1);
+            vpxor(c, 1, r2, r2, r2);
+            vpxor(c, 1, r3, r3, r3);
+
             // Patch all JMP-to-done.
             for (int j = 0; j < n_done; j++) {
                 int32_t rel = (int32_t)(c->len - (br_done[j] + 4));
                 __builtin_memcpy(c->buf + br_done[j], &rel, 4);
             }
-
-            // Apply transfer function (invert: encoded -> linear).
-            emit_transfer_inline_x86(c, &jc->pool, ra, sl, ns,
-                                     p, s0.rd, r1, r2, /*invert=*/1);
 
             ra_return_reg(ra, t1);
             ra_return_reg(ra, t0);
@@ -3168,10 +3141,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
             int    p = inst->ptr;
             int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-
-            // Apply transfer function (apply: linear -> encoded).
-            emit_transfer_inline_x86(c, &jc->pool, ra, sl, ns,
-                                     p, rr, rg, rb_, /*invert=*/0);
 
             int8_t scale = ra_alloc(ra, sl, ns);
             int8_t px    = ra_alloc(ra, sl, ns);
@@ -3466,6 +3435,34 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
             br_done[n_done] = jmp(c); n_done++;
             patch_jcc(c, br_skip_f16_planar_s);
+
+            // --- umbra_fmt_srgb (=8) ---
+            cmp_ri(c, RAX, 8);
+            int br_skip_srgb_s = jcc(c, 0x05);
+            {
+                emit_srgb_x86(c, &jc->pool, ra, sl, ns,
+                              rr, rg, rb_, /*invert=*/0);
+                union { float f; uint32_t u; } s255 = {.f = 255.0f};
+                union { float f; uint32_t u; } f1   = {.f = 1.0f};
+                pool_broadcast(c, &jc->pool, scale, s255.u);
+                pool_broadcast(c, &jc->pool, one, f1.u);
+                vex_rrr(c, 0, 1, 1, 0x57, z, z, z);
+                vmaxps(c, px, rr, z); vminps(c, px, px, one);
+                vmulps(c, px, px, scale); vcvtps2dq(c, px, px);
+                vmaxps(c, t, rg, z); vminps(c, t, t, one);
+                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
+                vpslld_i(c, t, t, 8); vpor(c, 1, px, px, t);
+                vmaxps(c, t, rb_, z); vminps(c, t, t, one);
+                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
+                vpslld_i(c, t, t, 16); vpor(c, 1, px, px, t);
+                vmaxps(c, t, ra_v, z); vminps(c, t, t, one);
+                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
+                vpslld_i(c, t, t, 24); vpor(c, 1, px, px, t);
+                if (scalar) { vex_mem(c, 1, 1, 0, 0, px, 0, 0x7e, base, XI, 4, 0); }
+                else        { vmov_store(c, 1, px, base, XI, 4, 0); }
+            }
+            br_done[n_done] = jmp(c); n_done++;
+            patch_jcc(c, br_skip_srgb_s);
 
             // Default: no-op for unknown formats.
 
