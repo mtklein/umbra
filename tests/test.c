@@ -3229,7 +3229,7 @@ static void test_imm_regvar(void) {
 #define IMM_CHAIN_I(op, k) { \
         umbra_val src = umbra_add_i32(b, a, umbra_imm_i32(b, (k))); \
         umbra_val r = op(b, src, umbra_imm_i32(b, 3)); \
-        umbra_store_32(b, (umbra_ptr){p++, 0}, umbra_add_i32(b, r, umbra_imm_i32(b, 0))); \
+        umbra_store_32(b, (umbra_ptr){p++, 0}, umbra_add_i32(b, r, umbra_imm_i32(b, 1))); \
     }
     IMM_CHAIN_F(umbra_mul_f32, 1)
     IMM_CHAIN_F(umbra_div_f32, 2)
@@ -3293,29 +3293,29 @@ static void test_binary_r_mm(void) {
     int p = 2;
 
     // Break the chain by storing a dummy, then use fa/fc as both-from-memory.
-#define RMM_F32(op) { \
-        umbra_val dummy = umbra_add_f32(b, fa, fc); \
+#define RMM_F32(op, dummy_k) { \
+        umbra_val dummy = umbra_add_f32(b, fa, umbra_imm_f32(b, (float)(dummy_k))); \
         umbra_store_32(b, (umbra_ptr){p++, 0}, umbra_i32_from_f32(b, dummy)); \
         umbra_store_32(b, (umbra_ptr){p++, 0}, \
             umbra_i32_from_f32(b, op(b, fa, fc))); \
     }
-#define RMM_I32(op) { \
-        umbra_val dummy = umbra_add_i32(b, a, c); \
+#define RMM_I32(op, dummy_k) { \
+        umbra_val dummy = umbra_add_i32(b, a, umbra_imm_i32(b, (dummy_k))); \
         umbra_store_32(b, (umbra_ptr){p++, 0}, dummy); \
         umbra_store_32(b, (umbra_ptr){p++, 0}, \
-            umbra_add_i32(b, op(b, a, c), umbra_imm_i32(b, 0))); \
+            umbra_add_i32(b, op(b, a, c), umbra_imm_i32(b, 1))); \
     }
-    RMM_F32(umbra_sub_f32)
-    RMM_F32(umbra_mul_f32)
-    RMM_F32(umbra_div_f32)
-    RMM_I32(umbra_sub_i32)
-    RMM_I32(umbra_mul_i32)
-    RMM_I32(umbra_or_i32)
-    RMM_I32(umbra_xor_i32)
-    RMM_I32(umbra_and_i32)
-    RMM_I32(umbra_shl_i32)
-    RMM_I32(umbra_shr_u32)
-    RMM_I32(umbra_shr_s32)
+    RMM_F32(umbra_sub_f32, 100)
+    RMM_F32(umbra_mul_f32, 200)
+    RMM_F32(umbra_div_f32, 300)
+    RMM_I32(umbra_sub_i32, 10)
+    RMM_I32(umbra_mul_i32, 20)
+    RMM_I32(umbra_or_i32,  30)
+    RMM_I32(umbra_xor_i32, 40)
+    RMM_I32(umbra_and_i32, 50)
+    RMM_I32(umbra_shl_i32, 60)
+    RMM_I32(umbra_shr_u32, 70)
+    RMM_I32(umbra_shr_s32, 80)
 #undef RMM_F32
 #undef RMM_I32
     backends B = make(b);
@@ -3328,10 +3328,10 @@ static void test_binary_r_mm(void) {
         bufs[1] = (umbra_buf){.ptr=sc, .sz=16};
         for (int i = 2; i < p; i++) { bufs[i] = (umbra_buf){.ptr=d[i], .sz=16}; }
         if (!run(&B, bi, 4, 1, bufs)) { continue; }
-        // sub(6,2)=4
+        // sub(6,2)=4 stored as i32_from_f32
         (d[3][0] == 4) here;
-        // xor(6,2)=4
-        (d[15][0] == (6^2)) here;
+        // xor(6,2)+1=5
+        (d[15][0] == (6^2)+1) here;
     }
     cleanup(&B);
 }
