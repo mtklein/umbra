@@ -2457,13 +2457,37 @@ static void test_srgb_roundtrip_256(void) {
                 int d_ = (int)((dst[i] >> (ch*8)) & 0xFF);
                 int delta = a - d_;
                 if (delta < 0) { delta = -delta; }
-                if (delta > worst) { worst = delta; }
+                if (delta > worst) {
+                    worst = delta;
+                    dprintf(1, "bi=%d i=%d ch=%d src=%d dst=%d d=%d\n", bi, i, ch, a, d_, delta);
+                }
             }
         }
         (dst[0x00] == src[0x00]) here;
         (dst[0x7F] == src[0x7F]) here;
         (dst[0xFF] == src[0xFF]) here;
         worst == 0 here;
+    }
+    cleanup(&B);
+}
+
+static void test_srgb_cross_roundtrip(void) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_color c = umbra_load_color(b, (umbra_ptr){0, 0});
+    umbra_store_color(b, (umbra_ptr){1, 0}, c);
+    backends B = make(b);
+
+    uint32_t src[256], dst[256];
+    for (int i = 0; i < 256; i++) {
+        src[i] = (uint32_t)i | ((uint32_t)i << 8) | ((uint32_t)i << 16) | (0xFFu << 24);
+    }
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        __builtin_memset(dst, 0, sizeof dst);
+        if (!run(&B, bi, 256, 1, (umbra_buf[]){
+            {.ptr=src, .sz=sizeof src, .fmt=umbra_fmt_srgb},
+            {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_srgb},
+        })) { continue; }
+        for (int i = 0; i < 256; i++) { (dst[i] == src[i]) here; }
     }
     cleanup(&B);
 }
@@ -3641,6 +3665,7 @@ int main(void) {
     test_load_store_color_srgb();
     test_load_store_color_f16_planar();
     test_srgb_roundtrip_256();
+    test_srgb_cross_roundtrip();
     test_load_stride_neq_w();
     test_jit_xs_init();
 

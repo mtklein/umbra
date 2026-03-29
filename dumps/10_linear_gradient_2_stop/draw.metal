@@ -90,8 +90,8 @@ kernel void umbra_entry(
             float l = max(sc30[ch], 0.0);
             float t = 1.0/sqrt(max(l, 1e-30));
             float lo = l * 12.92;
-            float hi = (1.09732234 + t*(0.02995744 + t*(-0.00546762 + t*0.00012954))) / (0.12201570 + t);
-            sc30[ch] = lo < 0.116027 ? lo : hi;
+            float hi = (1.063381076 + t*(0.0503838025 + t*(-0.009712861851 + t*(0.0005095639499 + t*-1.013387191e-05)))) / (0.104337059 + t);
+            sc30[ch] = lo < 0.04838767 ? lo : hi;
         } sc30 = clamp(sc30, 0.0, 1.0);
         ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc30.x*255.0)) | (uint(rint(sc30.y*255.0))<<8) | (uint(rint(sc30.z*255.0))<<16) | (uint(rint(sc30.w*255.0))<<24);
     }

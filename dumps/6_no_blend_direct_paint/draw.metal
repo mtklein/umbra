@@ -79,7 +79,9 @@ kernel void umbra_entry(
         v22_c = float4(px & 0xFFu, (px>>8)&0xFFu, (px>>16)&0xFFu, px>>24) / 255.0;
         for (int ch = 0; ch < 3; ch++) {
             float s = v22_c[ch];
-            v22_c[ch] = s < 0.09870274 ? s/12.92 : s*s*(-0.03423264*s*s*s+0.02881829*s*s+0.31312484*s+0.68812025)+0.00333771;
+            float s2 = s*s; float inner = 0.2456940264*s2 + -0.7771521211*s + 0.8481360674;
+            float mid = inner*s2 + -0.07268945128*s + 0.7527475953;
+            v22_c[ch] = s < 0.05796349049 ? s/12.92 : mid*s2 + 0.002375858836;
         }
     }
     uint v22 = as_type<uint>(v22_c.x);
@@ -122,8 +124,8 @@ kernel void umbra_entry(
             float l = max(sc31[ch], 0.0);
             float t = 1.0/sqrt(max(l, 1e-30));
             float lo = l * 12.92;
-            float hi = (1.09732234 + t*(0.02995744 + t*(-0.00546762 + t*0.00012954))) / (0.12201570 + t);
-            sc31[ch] = lo < 0.116027 ? lo : hi;
+            float hi = (1.063381076 + t*(0.0503838025 + t*(-0.009712861851 + t*(0.0005095639499 + t*-1.013387191e-05)))) / (0.104337059 + t);
+            sc31[ch] = lo < 0.04838767 ? lo : hi;
         } sc31 = clamp(sc31, 0.0, 1.0);
         ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc31.x*255.0)) | (uint(rint(sc31.y*255.0))<<8) | (uint(rint(sc31.z*255.0))<<16) | (uint(rint(sc31.w*255.0))<<24);
     }

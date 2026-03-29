@@ -234,7 +234,9 @@ static void emit_ops(Buf *b, BB const *bb,
                      "%s    v%d_c = float4(px & 0xFFu, (px>>8)&0xFFu, (px>>16)&0xFFu, px>>24) / 255.0;\n"
                      "%s    for (int ch = 0; ch < 3; ch++) {\n"
                      "%s        float s = v%d_c[ch];\n"
-                     "%s        v%d_c[ch] = s < 0.09870274 ? s/12.92 : s*s*(-0.03423264*s*s*s+0.02881829*s*s+0.31312484*s+0.68812025)+0.00333771;\n"
+                     "%s        float s2 = s*s; float inner = 0.2456940264*s2 + -0.7771521211*s + 0.8481360674;\n"
+                     "%s        float mid = inner*s2 + -0.07268945128*s + 0.7527475953;\n"
+                     "%s        v%d_c[ch] = s < 0.05796349049 ? s/12.92 : mid*s2 + 0.002375858836;\n"
                      "%s    }\n"
                      "%s}\n"
                      "%suint v%d = as_type<uint>(v%d_c.x);\n"
@@ -266,6 +268,8 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i,
                      pad,
                      pad, i,
+                     pad,
+                     pad,
                      pad, i,
                      pad,
                      pad,
@@ -317,8 +321,8 @@ static void emit_ops(Buf *b, BB const *bb,
                      "%s        float l = max(sc%d[ch], 0.0);\n"
                      "%s        float t = 1.0/sqrt(max(l, 1e-30));\n"
                      "%s        float lo = l * 12.92;\n"
-                     "%s        float hi = (1.09732234 + t*(0.02995744 + t*(-0.00546762 + t*0.00012954))) / (0.12201570 + t);\n"
-                     "%s        sc%d[ch] = lo < 0.116027 ? lo : hi;\n"
+                     "%s        float hi = (1.063381076 + t*(0.0503838025 + t*(-0.009712861851 + t*(0.0005095639499 + t*-1.013387191e-05)))) / (0.104337059 + t);\n"
+                     "%s        sc%d[ch] = lo < 0.04838767 ? lo : hi;\n"
                      "%s    } sc%d = clamp(sc%d, 0.0, 1.0);\n"
                      "%s    ((device uint*)(p%d + y * buf_rbs[%d]))[x] ="
                      " uint(rint(sc%d.x*255.0)) | (uint(rint(sc%d.y*255.0))<<8)"
