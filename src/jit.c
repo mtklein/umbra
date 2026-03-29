@@ -36,12 +36,20 @@ void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
 #elif defined(__aarch64__)
 
 #include "ra.h"
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <pthread.h>
 #include <unistd.h>
+
+_Static_assert(sizeof(umbra_buf) == 64, "");
+_Static_assert(offsetof(umbra_buf, ptr)       ==  0, "");
+_Static_assert(offsetof(umbra_buf, sz)        ==  8, "");
+_Static_assert(offsetof(umbra_buf, row_bytes) == 16, "");
+_Static_assert(offsetof(umbra_buf, fmt)       == 24, "");
+_Static_assert(offsetof(umbra_buf, transfer)  == 32, "");
 
 struct pool_ref {
     int data_off, code_pos;
@@ -1865,12 +1873,20 @@ done:
 
 #include "ra.h"
 #include "asm_x86.h"
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
+
+_Static_assert(sizeof(umbra_buf) == 64, "");
+_Static_assert(offsetof(umbra_buf, ptr)       ==  0, "");
+_Static_assert(offsetof(umbra_buf, sz)        ==  8, "");
+_Static_assert(offsetof(umbra_buf, row_bytes) == 16, "");
+_Static_assert(offsetof(umbra_buf, fmt)       == 24, "");
+_Static_assert(offsetof(umbra_buf, transfer)  == 32, "");
 
 struct pool_ref {
     int data_off, code_pos, extra;
@@ -3049,9 +3065,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                                  + (int)__builtin_offsetof(umbra_buf, sz);
                 mov_rr(c, R11, base);
                 mov_load(c, RBX, XBUF, sz_off);
-                // SHR RBX, 2
-                rex_w(c, 0, RBX);
-                emit1(c, 0xc1); emit1(c, (uint8_t)(0xe8 | (RBX & 7))); emit1(c, 2);
+                shr_ri(c, RBX, 2);
                 if (scalar) {
                     // Plane 0 (R): MOVZX eax, word [R11 + XI*2]
                     {
@@ -3379,9 +3393,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                                  + (int)__builtin_offsetof(umbra_buf, sz);
                 mov_rr(c, R11, base);
                 mov_load(c, RBX, XBUF, sz_off);
-                // SHR RBX, 2
-                rex_w(c, 0, RBX);
-                emit1(c, 0xc1); emit1(c, (uint8_t)(0xe8 | (RBX & 7))); emit1(c, 2);
+                shr_ri(c, RBX, 2);
                 if (scalar) {
                     // Plane 0 (R): VCVTPS2PH, store 16-bit
                     vcvtps2ph(c, px, rr, 4);
