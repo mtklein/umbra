@@ -36,12 +36,11 @@ typedef struct {
 } umbra_buf;
 
 struct umbra_backend {
-    struct umbra_program* (*compile)(struct umbra_backend*,
-                                     struct umbra_basic_block const*);
-    void  (*flush)(struct umbra_backend*);
-    void  (*free_fn)(struct umbra_backend*);
-    void  *ctx;
-    int     threadsafe, :32;
+    struct umbra_program* (*compile)(struct umbra_backend*, struct umbra_basic_block const*);
+    void                  (*flush)(struct umbra_backend*);
+    void                  (*free_fn)(struct umbra_backend*);
+    void                   *ctx;
+    int                     threadsafe, :32;
 };
 
 struct umbra_program {
