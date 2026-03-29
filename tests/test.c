@@ -2574,10 +2574,7 @@ static void test_load_store_color_8888(void) {
     uint32_t src[8], dst[8];
     for (int i = 0; i < 8; i++) { src[i] = 0xFF804020u + (unsigned)i; }
 
-    // Interpreter (0) and Metal (2) implemented; JIT (1) stub not yet.
-    int const test_backends[] = {0, 2};
-    for (int ti = 0; ti < 2; ti++) {
-        int bi = test_backends[ti];
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
         if (!run(&B, bi, 8, 1, (umbra_buf[]){
             {.ptr=src, .sz=sizeof src, .fmt=umbra_fmt_8888},

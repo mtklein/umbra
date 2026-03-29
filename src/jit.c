@@ -811,8 +811,85 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             FREE_CHAN(inst->w, i);
         } break;
 
-        case op_load_color: break;
-        case op_store_color: break;
+        case op_load_color: {
+            struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
+            int8_t r1 = ra_alloc(ra, sl, ns);
+            int8_t r2 = ra_alloc(ra, sl, ns);
+            int8_t r3 = ra_alloc(ra, sl, ns);
+            int    p = inst->ptr;
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            {
+                int8_t px   = ra_alloc(ra, sl, ns);
+                int8_t mask = ra_alloc(ra, sl, ns);
+                int8_t inv  = ra_alloc(ra, sl, ns);
+                if (scalar) { put(c, LDR_sx(px, XP, XI)); }
+                else        { put(c, LDR_q(px, XP, XW)); }
+                arm64_pool_load(c, &jc->pool, mask, 0xFF);
+                put(c, AND_16b(s0.rd, px, mask));
+                put(c, USHR_4s_imm(r1, px,  8)); put(c, AND_16b(r1, r1, mask));
+                put(c, USHR_4s_imm(r2, px, 16)); put(c, AND_16b(r2, r2, mask));
+                put(c, USHR_4s_imm(r3, px, 24));
+                put(c, SCVTF_4s(s0.rd, s0.rd));
+                put(c, SCVTF_4s(r1, r1));
+                put(c, SCVTF_4s(r2, r2));
+                put(c, SCVTF_4s(r3, r3));
+                union { float f; uint32_t u; } inv255 = {.f = 1.0f/255.0f};
+                arm64_pool_load(c, &jc->pool, inv, inv255.u);
+                put(c, FMUL_4s(s0.rd, s0.rd, inv));
+                put(c, FMUL_4s(r1, r1, inv));
+                put(c, FMUL_4s(r2, r2, inv));
+                put(c, FMUL_4s(r3, r3, inv));
+                ra_return_reg(ra, inv);
+                ra_return_reg(ra, mask);
+                ra_return_reg(ra, px);
+            }
+            ra_set_chan_reg(ra, i, 0, s0.rd);
+            ra_set_chan_reg(ra, i, 1, r1);
+            ra_set_chan_reg(ra, i, 2, r2);
+            ra_set_chan_reg(ra, i, 3, r3);
+        } break;
+        case op_store_color: {
+            int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
+            int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
+            int8_t rb_  = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
+            int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
+            int    p = inst->ptr;
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            {
+                int8_t scale = ra_alloc(ra, sl, ns);
+                int8_t z     = ra_alloc(ra, sl, ns);
+                int8_t one   = ra_alloc(ra, sl, ns);
+                int8_t px    = ra_alloc(ra, sl, ns);
+                int8_t t     = ra_alloc(ra, sl, ns);
+                union { float f; uint32_t u; } s255 = {.f = 255.0f};
+                union { float f; uint32_t u; } f1   = {.f = 1.0f};
+                arm64_pool_load(c, &jc->pool, scale, s255.u);
+                arm64_pool_load(c, &jc->pool, one, f1.u);
+                put(c, MOVI_4s(z, 0, 0));
+                put(c, FMAXNM_4s(px, rr, z)); put(c, FMINNM_4s(px, px, one));
+                put(c, FMUL_4s(px, px, scale)); put(c, FCVTNS_4s(px, px));
+                put(c, FMAXNM_4s(t, rg, z)); put(c, FMINNM_4s(t, t, one));
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
+                put(c, SLI_4s_imm(px, t, 8));
+                put(c, FMAXNM_4s(t, rb_, z)); put(c, FMINNM_4s(t, t, one));
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
+                put(c, SLI_4s_imm(px, t, 16));
+                put(c, FMAXNM_4s(t, ra_v, z)); put(c, FMINNM_4s(t, t, one));
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
+                put(c, SLI_4s_imm(px, t, 24));
+                ra_return_reg(ra, t);
+                if (scalar) { put(c, STR_sx(px, XP, XI)); }
+                else        { put(c, STR_q(px, XP, XW)); }
+                ra_return_reg(ra, px);
+                ra_return_reg(ra, one);
+                ra_return_reg(ra, z);
+                ra_return_reg(ra, scale);
+            }
+            FREE_CHAN(inst->x, i);
+            FREE_CHAN(inst->y, i);
+            FREE_CHAN(inst->z, i);
+            FREE_CHAN(inst->w, i);
+        } break;
 
         case op_store_16: {
             int8_t ry = ra_ensure(ra, sl, ns, (int)inst->y.id);
@@ -1854,8 +1931,103 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             FREE_CHAN(inst->w, i);
         } break;
 
-        case op_load_color: break;
-        case op_store_color: break;
+        case op_load_color: {
+            struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
+            int8_t r1 = ra_alloc(ra, sl, ns);
+            int8_t r2 = ra_alloc(ra, sl, ns);
+            int8_t r3 = ra_alloc(ra, sl, ns);
+            int    p = inst->ptr;
+            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            {
+                int8_t px   = ra_alloc(ra, sl, ns);
+                int8_t mask = ra_alloc(ra, sl, ns);
+                int8_t inv  = ra_alloc(ra, sl, ns);
+                if (scalar) { vex_mem(c, 1, 1, 0, 0, px, 0, 0x6e, base, XI, 4, 0); }
+                else        { vmov_load(c, 1, px, base, XI, 4, 0); }
+                pool_broadcast(c, &jc->pool, mask, 0xFF);
+                vpand(c, 1, s0.rd, px, mask);
+                vpsrld_i(c, r1, px,  8); vpand(c, 1, r1, r1, mask);
+                vpsrld_i(c, r2, px, 16); vpand(c, 1, r2, r2, mask);
+                vpsrld_i(c, r3, px, 24);
+                // VCVTDQ2PS: int32 -> float32
+                vex_rrr(c, 0, 1, 1, 0x5b, s0.rd, 0, s0.rd);
+                vex_rrr(c, 0, 1, 1, 0x5b, r1, 0, r1);
+                vex_rrr(c, 0, 1, 1, 0x5b, r2, 0, r2);
+                vex_rrr(c, 0, 1, 1, 0x5b, r3, 0, r3);
+                // VMULPS * 1/255
+                union { float f; uint32_t u; } inv255 = {.f = 1.0f/255.0f};
+                pool_broadcast(c, &jc->pool, inv, inv255.u);
+                vex_rrr(c, 0, 1, 1, 0x59, s0.rd, s0.rd, inv);
+                vex_rrr(c, 0, 1, 1, 0x59, r1, r1, inv);
+                vex_rrr(c, 0, 1, 1, 0x59, r2, r2, inv);
+                vex_rrr(c, 0, 1, 1, 0x59, r3, r3, inv);
+                ra_return_reg(ra, inv);
+                ra_return_reg(ra, mask);
+                ra_return_reg(ra, px);
+            }
+            ra_set_chan_reg(ra, i, 0, s0.rd);
+            ra_set_chan_reg(ra, i, 1, r1);
+            ra_set_chan_reg(ra, i, 2, r2);
+            ra_set_chan_reg(ra, i, 3, r3);
+        } break;
+        case op_store_color: {
+            int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
+            int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
+            int8_t rb_  = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
+            int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
+            int    p = inst->ptr;
+            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            {
+                int8_t scale = ra_alloc(ra, sl, ns);
+                int8_t px    = ra_alloc(ra, sl, ns);
+                int8_t t     = ra_alloc(ra, sl, ns);
+                int8_t z     = ra_alloc(ra, sl, ns);
+                int8_t one   = ra_alloc(ra, sl, ns);
+                union { float f; uint32_t u; } s255 = {.f = 255.0f};
+                union { float f; uint32_t u; } f1   = {.f = 1.0f};
+                pool_broadcast(c, &jc->pool, scale, s255.u);
+                pool_broadcast(c, &jc->pool, one, f1.u);
+                // VXORPS z, z, z (zero)
+                vex_rrr(c, 0, 1, 1, 0x57, z, z, z);
+                // R: clamp, scale, round to int
+                vex_rrr(c, 0, 1, 1, 0x5f, px, rr, z);    // VMAXPS px, rr, zero
+                vex_rrr(c, 0, 1, 1, 0x5d, px, px, one);   // VMINPS px, px, one
+                vex_rrr(c, 0, 1, 1, 0x59, px, px, scale); // VMULPS
+                vex_rrr(c, 1, 1, 1, 0x5b, px, 0, px);     // VCVTPS2DQ (round to int)
+                // G
+                vex_rrr(c, 0, 1, 1, 0x5f, t, rg, z);
+                vex_rrr(c, 0, 1, 1, 0x5d, t, t, one);
+                vex_rrr(c, 0, 1, 1, 0x59, t, t, scale);
+                vex_rrr(c, 1, 1, 1, 0x5b, t, 0, t);
+                vpslld_i(c, t, t, 8);
+                vpor(c, 1, px, px, t);
+                // B
+                vex_rrr(c, 0, 1, 1, 0x5f, t, rb_, z);
+                vex_rrr(c, 0, 1, 1, 0x5d, t, t, one);
+                vex_rrr(c, 0, 1, 1, 0x59, t, t, scale);
+                vex_rrr(c, 1, 1, 1, 0x5b, t, 0, t);
+                vpslld_i(c, t, t, 16);
+                vpor(c, 1, px, px, t);
+                // A
+                vex_rrr(c, 0, 1, 1, 0x5f, t, ra_v, z);
+                vex_rrr(c, 0, 1, 1, 0x5d, t, t, one);
+                vex_rrr(c, 0, 1, 1, 0x59, t, t, scale);
+                vex_rrr(c, 1, 1, 1, 0x5b, t, 0, t);
+                vpslld_i(c, t, t, 24);
+                vpor(c, 1, px, px, t);
+                ra_return_reg(ra, t);
+                ra_return_reg(ra, one);
+                ra_return_reg(ra, z);
+                if (scalar) { vex_mem(c, 1, 1, 0, 0, px, 0, 0x7e, base, XI, 4, 0); }
+                else        { vmov_store(c, 1, px, base, XI, 4, 0); }
+                ra_return_reg(ra, px);
+                ra_return_reg(ra, scale);
+            }
+            FREE_CHAN(inst->x, i);
+            FREE_CHAN(inst->y, i);
+            FREE_CHAN(inst->z, i);
+            FREE_CHAN(inst->w, i);
+        } break;
 
         case op_store_16: {
             int8_t ry = ra_ensure(ra, sl, ns, (int)inst->y.id);
