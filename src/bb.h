@@ -10,9 +10,8 @@ typedef union {
     struct { unsigned chan : 2, id : 30; };
 } val_;
 
-static inline int       val_id  (umbra_val v) { return ((val_){.bits = v.bits}).id; }
-static inline int       val_chan (umbra_val v) { return ((val_){.bits = v.bits}).chan; }
-static inline umbra_val val_make(int id, int chan) { return (umbra_val){.bits = ((val_){.id=(unsigned)id, .chan=(unsigned)chan}).bits}; }
+int       val_id  (umbra_val);
+umbra_val val_make(int id, int chan);
 
 #define OP_LIST(X)                                                                        \
     X(x) X(y)                                                                             \

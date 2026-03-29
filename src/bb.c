@@ -5,6 +5,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+int       val_id  (umbra_val v)          { return ((val_){.bits = v.bits}).id; }
+umbra_val val_make(int id, int chan)    { return (umbra_val){.bits = ((val_){.id=(unsigned)id, .chan=(unsigned)chan}).bits}; }
+
 typedef struct umbra_builder builder;
 typedef umbra_val            val;
 
