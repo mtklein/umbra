@@ -11,8 +11,6 @@ struct slide {
     umbra_coverage_fn  coverage;
     umbra_blend_fn     blend;
     umbra_fmt          fmt;
-    umbra_transfer     transfer;
-    char               pad_slide_[4];
     float              color[8];
     float              grad[4];
     uint32_t           bg;

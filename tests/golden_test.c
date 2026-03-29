@@ -24,7 +24,7 @@ static char const *fmt_name[] = {
 };
 static umbra_fmt const fmt_enums[] = {
     umbra_fmt_8888, umbra_fmt_565, umbra_fmt_fp16,
-    umbra_fmt_f16_planar, umbra_fmt_1010102, umbra_fmt_8888,
+    umbra_fmt_f16_planar, umbra_fmt_1010102, umbra_fmt_srgb,
 };
 
 typedef struct {
@@ -108,11 +108,10 @@ static void fill_bg(int fmt, void *dst, uint32_t bg) {
     char *uni = (char*)uni_;
     slide_uni_f32(uni, 0, hc, 4);
     int   bpp = umbra_pixel_bytes(fmt_enums[fmt]);
-    umbra_transfer tf = (fmt == FMT_SRGB) ? umbra_transfer_srgb : (umbra_transfer){0};
     umbra_buf buf[2] = {
         {.ptr=uni, .sz=(size_t)fill_pipes[fmt].uni_len, .read_only=1},
         {.ptr=dst, .sz=pixbuf_size(fmt), .row_bytes=(size_t)(W * bpp),
-         .fmt=fmt_enums[fmt], .transfer=tf},
+         .fmt=fmt_enums[fmt]},
     };
     umbra_program_queue(fill_pipes[fmt].prog, 0, 0, W, H, buf);
 }
@@ -124,11 +123,10 @@ static void readback_to_8888(int fmt,
     char *uni = (char*)uni_;
     int   bpp = umbra_pixel_bytes(fmt_enums[fmt]);
     int   op = readback_pipes[fmt].out_ptr;
-    umbra_transfer tf = (fmt == FMT_SRGB) ? umbra_transfer_srgb : (umbra_transfer){0};
     umbra_buf buf[3];
     buf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)readback_pipes[fmt].uni_len, .read_only=1};
     buf[1] = (umbra_buf){.ptr=pixbuf, .sz=pixbuf_size(fmt), .row_bytes=(size_t)(W * bpp),
-                         .read_only=1, .fmt=fmt_enums[fmt], .transfer=tf};
+                         .read_only=1, .fmt=fmt_enums[fmt]};
     buf[op] = (umbra_buf){.ptr=out, .sz=(size_t)(W * H * 4), .row_bytes=(size_t)(W * 4),
                           .fmt=umbra_fmt_8888};
     umbra_program_queue(readback_pipes[fmt].prog, 0, 0, W, H, buf);
@@ -155,9 +153,7 @@ static void test_slide_golden(
     if (fmt_enums[fmt] == umbra_fmt_none) { return; }
 
     umbra_fmt saved_fmt = s->fmt;
-    umbra_transfer saved_tf = s->transfer;
     s->fmt = fmt_enums[fmt];
-    s->transfer = (fmt == FMT_SRGB) ? umbra_transfer_srgb : (umbra_transfer){0};
 
     umbra_draw_layout lay;
     struct umbra_builder *bld =
@@ -236,7 +232,6 @@ static void test_slide_golden(
         umbra_backend_free(bes[bi]);
     }
     s->fmt = saved_fmt;
-    s->transfer = saved_tf;
 }
 
 static void test_slug_rect(void) {

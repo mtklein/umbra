@@ -37,13 +37,3 @@ umbra_color umbra_blend_src(struct umbra_builder *, umbra_color src, umbra_color
 umbra_color umbra_blend_srcover(struct umbra_builder *, umbra_color src, umbra_color dst);
 umbra_color umbra_blend_dstover(struct umbra_builder *, umbra_color src, umbra_color dst);
 umbra_color umbra_blend_multiply(struct umbra_builder *, umbra_color src, umbra_color dst);
-
-extern umbra_transfer const umbra_transfer_srgb;
-
-umbra_color umbra_transfer_apply(struct umbra_builder *, umbra_color,
-                                 umbra_transfer const *);
-umbra_color umbra_transfer_invert(struct umbra_builder *, umbra_color,
-                                  umbra_transfer const *);
-
-void umbra_transfer_lut_invert(float out[256], umbra_transfer const *);
-void umbra_transfer_lut_apply(float out[256], umbra_transfer const *);

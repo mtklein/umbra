@@ -17,7 +17,6 @@ kernel void umbra_entry(
     constant uint &x0 [[buffer(5)]],
     constant uint &y0 [[buffer(6)]],
     constant uint *buf_fmts [[buffer(7)]],
-    constant float *buf_transfers [[buffer(8)]],
     device uchar *p0 [[buffer(0)]],
     device uchar *p1 [[buffer(1)]],
     uint2 pos [[thread_position_in_grid]]
@@ -60,20 +59,13 @@ kernel void umbra_entry(
                 v23_c = float4(hp[0], hp[1], hp[2], hp[3]); break; }
       case 7u: { device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_szs[1]/4;
                 v23_c = float4(float(((device half*)row)[x]),float(((device half*)(row+ps))[x]),float(((device half*)(row+2*ps))[x]),float(((device half*)(row+3*ps))[x])); break; }
+      case 8u: { uint px = ((device uint*)(p1 + y * buf_rbs[1]))[x];
+                v23_c = float4(px & 0xFFu, (px>>8)&0xFFu, (px>>16)&0xFFu, px>>24) / 255.0;
+                for (int ch = 0; ch < 3; ch++) {
+                  float xv = v23_c[ch];
+                  v23_c[ch] = xv >= 0.04045 ? pow((xv+0.055)/1.055, 2.4) : xv/12.92;
+                } break; }
       default: v23_c = float4(0); break;
-    }
-    { float tf_a = buf_transfers[1*7+0];
-      if (tf_a != 0.0) {
-        float tf_b = buf_transfers[1*7+1];
-        float tf_c = buf_transfers[1*7+2];
-        float tf_e = buf_transfers[1*7+4];
-        float tf_f = buf_transfers[1*7+5];
-        float tf_g = buf_transfers[1*7+6];
-        for (int ch = 0; ch < 3; ch++) {
-          float xv = v23_c[ch];
-          v23_c[ch] = xv >= tf_e ? pow((xv - tf_b) / tf_a, tf_g) : (xv - tf_f) / tf_c;
-        }
-      }
     }
     uint v23 = as_type<uint>(v23_c.x);
     uint v23_1 = as_type<uint>(v23_c.y);
@@ -101,19 +93,6 @@ kernel void umbra_entry(
     uint v43 = as_type<uint>(as_type<float>(v42) - as_type<float>(v23_2));
     uint v44 = as_type<uint>(fma(as_type<float>(v22), as_type<float>(v43), as_type<float>(v23_2)));
     float4 sc45 = float4(as_type<float>(v34), as_type<float>(v39), as_type<float>(v44), as_type<float>(v29));
-    { float tf_a = buf_transfers[1*7+0];
-      if (tf_a != 0.0) {
-        float tf_b = buf_transfers[1*7+1];
-        float tf_c = buf_transfers[1*7+2];
-        float tf_d = buf_transfers[1*7+3];
-        float tf_f = buf_transfers[1*7+5];
-        float tf_g = buf_transfers[1*7+6];
-        for (int ch = 0; ch < 3; ch++) {
-          float xv = sc45[ch];
-          sc45[ch] = xv >= tf_d ? tf_a * pow(xv, 1.0 / tf_g) + tf_b : tf_c * xv + tf_f;
-        }
-      }
-    }
     switch (buf_fmts[1]) {
       case 1u: { sc45 = clamp(sc45, 0.0, 1.0);
                 ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc45.x*255.0)) | (uint(rint(sc45.y*255.0))<<8) | (uint(rint(sc45.z*255.0))<<16) | (uint(rint(sc45.w*255.0))<<24); break; }
@@ -125,6 +104,11 @@ kernel void umbra_entry(
                 hp[0]=half(sc45.x); hp[1]=half(sc45.y); hp[2]=half(sc45.z); hp[3]=half(sc45.w); break; }
       case 7u: { device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_szs[1]/4;
                 ((device half*)row)[x] = half(sc45.x); ((device half*)(row+ps))[x] = half(sc45.y); ((device half*)(row+2*ps))[x] = half(sc45.z); ((device half*)(row+3*ps))[x] = half(sc45.w); break; }
+      case 8u: { for (int ch = 0; ch < 3; ch++) {
+                  float xv = sc45[ch];
+                  sc45[ch] = xv >= 0.0031308 ? 1.055*pow(xv,1.0/2.4)-0.055 : 12.92*xv;
+                } sc45 = clamp(sc45, 0.0, 1.0);
+                ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc45.x*255.0)) | (uint(rint(sc45.y*255.0))<<8) | (uint(rint(sc45.z*255.0))<<16) | (uint(rint(sc45.w*255.0))<<24); break; }
       default: break;
     }
 }

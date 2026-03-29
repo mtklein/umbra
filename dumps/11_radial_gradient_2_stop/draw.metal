@@ -17,7 +17,6 @@ kernel void umbra_entry(
     constant uint &x0 [[buffer(5)]],
     constant uint &y0 [[buffer(6)]],
     constant uint *buf_fmts [[buffer(7)]],
-    constant float *buf_transfers [[buffer(8)]],
     device uchar *p0 [[buffer(0)]],
     device uchar *p1 [[buffer(1)]],
     uint2 pos [[thread_position_in_grid]]
@@ -59,19 +58,6 @@ kernel void umbra_entry(
     uint v31 = as_type<uint>(fma(as_type<float>(v28), as_type<float>(v15), as_type<float>(v7)));
     uint v32 = as_type<uint>(fma(as_type<float>(v28), as_type<float>(v14), as_type<float>(v6)));
     float4 sc33 = float4(as_type<float>(v30), as_type<float>(v32), as_type<float>(v31), as_type<float>(v29));
-    { float tf_a = buf_transfers[1*7+0];
-      if (tf_a != 0.0) {
-        float tf_b = buf_transfers[1*7+1];
-        float tf_c = buf_transfers[1*7+2];
-        float tf_d = buf_transfers[1*7+3];
-        float tf_f = buf_transfers[1*7+5];
-        float tf_g = buf_transfers[1*7+6];
-        for (int ch = 0; ch < 3; ch++) {
-          float xv = sc33[ch];
-          sc33[ch] = xv >= tf_d ? tf_a * pow(xv, 1.0 / tf_g) + tf_b : tf_c * xv + tf_f;
-        }
-      }
-    }
     switch (buf_fmts[1]) {
       case 1u: { sc33 = clamp(sc33, 0.0, 1.0);
                 ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc33.x*255.0)) | (uint(rint(sc33.y*255.0))<<8) | (uint(rint(sc33.z*255.0))<<16) | (uint(rint(sc33.w*255.0))<<24); break; }
@@ -83,6 +69,11 @@ kernel void umbra_entry(
                 hp[0]=half(sc33.x); hp[1]=half(sc33.y); hp[2]=half(sc33.z); hp[3]=half(sc33.w); break; }
       case 7u: { device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_szs[1]/4;
                 ((device half*)row)[x] = half(sc33.x); ((device half*)(row+ps))[x] = half(sc33.y); ((device half*)(row+2*ps))[x] = half(sc33.z); ((device half*)(row+3*ps))[x] = half(sc33.w); break; }
+      case 8u: { for (int ch = 0; ch < 3; ch++) {
+                  float xv = sc33[ch];
+                  sc33[ch] = xv >= 0.0031308 ? 1.055*pow(xv,1.0/2.4)-0.055 : 12.92*xv;
+                } sc33 = clamp(sc33, 0.0, 1.0);
+                ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc33.x*255.0)) | (uint(rint(sc33.y*255.0))<<8) | (uint(rint(sc33.z*255.0))<<16) | (uint(rint(sc33.w*255.0))<<24); break; }
       default: break;
     }
 }
