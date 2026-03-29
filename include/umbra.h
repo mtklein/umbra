@@ -28,20 +28,7 @@ typedef enum {
     umbra_fmt_srgb,
 } umbra_fmt;
 
-static inline int umbra_pixel_bytes(umbra_fmt fmt) {
-    switch (fmt) {
-    case umbra_fmt_none:       return 0;
-    case umbra_fmt_8888:       return 4;
-    case umbra_fmt_565:        return 2;
-    case umbra_fmt_1010102:    return 4;
-    case umbra_fmt_fp16:       return 8;
-    case umbra_fmt_f16:        return 2;
-    case umbra_fmt_f32:        return 4;
-    case umbra_fmt_f16_planar: return 2;
-    case umbra_fmt_srgb:       return 4;
-    }
-    return 0;
-}
+int umbra_pixel_bytes(umbra_fmt);
 
 typedef struct {
     void           *ptr;

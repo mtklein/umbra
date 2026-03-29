@@ -8,6 +8,21 @@
 typedef struct umbra_builder builder;
 typedef umbra_val            val;
 
+int umbra_pixel_bytes(umbra_fmt fmt) {
+    switch (fmt) {
+    case umbra_fmt_none:       return 0;
+    case umbra_fmt_8888:       return 4;
+    case umbra_fmt_565:        return 2;
+    case umbra_fmt_1010102:    return 4;
+    case umbra_fmt_fp16:       return 8;
+    case umbra_fmt_f16:        return 2;
+    case umbra_fmt_f32:        return 4;
+    case umbra_fmt_f16_planar: return 2;
+    case umbra_fmt_srgb:       return 4;
+    }
+    return 0;
+}
+
 static int ptr_ix(umbra_ptr p) { return p.deref ? ~p.ix : p.ix; }
 
 _Bool is_store(enum op op) {
