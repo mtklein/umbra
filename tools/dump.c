@@ -88,7 +88,7 @@ static void dump_bb(char const *dir, char const *name, struct umbra_builder *b) 
         FILE *f = fopen(p, "w");
         if (progs[i]->dump) { progs[i]->dump(progs[i]->ctx, f); }
         fclose(f);
-        progs[i]->free_fn(progs[i]->ctx); free(progs[i]);
+        progs[i]->free(progs[i]->ctx); free(progs[i]);
     }
     for (int i = 0; i < (int)(sizeof bes / sizeof bes[0]); i++) {
         umbra_backend_free(bes[i]);

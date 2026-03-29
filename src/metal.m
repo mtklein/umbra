@@ -1401,7 +1401,7 @@ static struct umbra_program *compile_metal(struct umbra_backend           *be,
         .ctx     = m,
         .queue   = run_metal,
         .dump    = dump_metal,
-        .free_fn = free_metal,
+        .free = free_metal,
         .backend = be,
     };
     return prog;
@@ -1419,7 +1419,7 @@ struct umbra_backend *umbra_backend_metal(void) {
         *be = (struct umbra_backend){
             .compile = compile_metal,
             .flush   = flush_be_metal,
-            .free_fn = free_be_metal,
+            .free = free_be_metal,
             .ctx     = ctx,
         };
         return be;

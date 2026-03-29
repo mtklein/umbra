@@ -2577,7 +2577,7 @@ static void test_program_null_guards(void) {
     umbra_program_queue(p, 0, 0, 0, 1, (umbra_buf[]){{.ptr=buf, .sz=4}});
     umbra_program_queue(p, 0, 0, 1, 0, (umbra_buf[]){{.ptr=buf, .sz=4}});
 
-    p->free_fn(p->ctx); free(p);
+    p->free(p->ctx); free(p);
     umbra_backend_free(be);
 }
 

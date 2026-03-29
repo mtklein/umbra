@@ -63,7 +63,7 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
         umbra_program_queue(acc, 0, y0, w, y1, abuf);
     }
     umbra_backend_flush(be);
-    acc->free_fn(acc->ctx); free(acc);
+    acc->free(acc->ctx); free(acc);
 
     float hc[4];
     for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }

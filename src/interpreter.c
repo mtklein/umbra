@@ -1732,7 +1732,7 @@ static struct umbra_program *compile_interp(struct umbra_backend           *be,
         .ctx     = p,
         .queue   = run_interp,
         .dump    = 0,
-        .free_fn = free_interp,
+        .free = free_interp,
         .backend = be,
     };
     return prog;
@@ -1743,7 +1743,7 @@ struct umbra_backend *umbra_backend_interp(void) {
     *be = (struct umbra_backend){
         .compile    = compile_interp,
         .flush      = 0,
-        .free_fn    = free_be_interp,
+        .free    = free_be_interp,
         .threadsafe = 1,
     };
     return be;

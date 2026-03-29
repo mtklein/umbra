@@ -1693,7 +1693,7 @@ static struct umbra_program *compile_jit(struct umbra_backend           *be,
         .ctx     = j,
         .queue   = run_jit,
         .dump    = dump_jit,
-        .free_fn = free_jit,
+        .free = free_jit,
         .backend = be,
     };
     return prog;
@@ -1704,7 +1704,7 @@ struct umbra_backend *umbra_backend_jit(void) {
     *be = (struct umbra_backend){
         .compile    = compile_jit,
         .flush      = 0,
-        .free_fn    = free_be_jit,
+        .free    = free_be_jit,
         .threadsafe = 1,
     };
     return be;
@@ -3692,7 +3692,7 @@ static struct umbra_program *compile_jit(struct umbra_backend           *be,
         .ctx     = j,
         .queue   = run_jit,
         .dump    = dump_jit,
-        .free_fn = free_jit,
+        .free = free_jit,
         .backend = be,
     };
     return prog;
@@ -3703,7 +3703,7 @@ struct umbra_backend *umbra_backend_jit(void) {
     *be = (struct umbra_backend){
         .compile    = compile_jit,
         .flush      = 0,
-        .free_fn    = free_be_jit,
+        .free    = free_be_jit,
         .threadsafe = 1,
     };
     return be;

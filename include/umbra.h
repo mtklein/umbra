@@ -38,7 +38,7 @@ typedef struct {
 struct umbra_backend {
     struct umbra_program* (*compile)(struct umbra_backend*, struct umbra_basic_block const*);
     void                  (*flush)(struct umbra_backend*);
-    void                  (*free_fn)(struct umbra_backend*);
+    void                  (*free)(struct umbra_backend*);
     void                   *ctx;
     int                     threadsafe, :32;
 };
@@ -47,7 +47,7 @@ struct umbra_program {
     void *ctx;
     void (*queue)(void*, int, int, int, int, umbra_buf[]);
     void (*dump)(void const*, FILE*);
-    void (*free_fn)(void*);
+    void (*free)(void*);
     struct umbra_backend *backend;
 };
 
@@ -64,7 +64,7 @@ static inline void umbra_backend_flush(struct umbra_backend *be) {
 }
 static inline void umbra_backend_free(struct umbra_backend *be) {
     if (be) {
-        be->free_fn(be);
+        be->free(be);
     }
 }
 

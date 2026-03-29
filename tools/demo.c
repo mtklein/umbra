@@ -28,7 +28,7 @@ static umbra_draw_layout     draw_layout;
 
 static void free_programs(void) {
     for (int i = 0; i < NUM_BACKENDS; i++) {
-        if (programs[i]) { programs[i]->free_fn(programs[i]->ctx); free(programs[i]); }
+        if (programs[i]) { programs[i]->free(programs[i]->ctx); free(programs[i]); }
         programs[i] = NULL;
     }
 }
@@ -57,7 +57,7 @@ typedef struct {
 static pipe fill_pipe, readback_pipe, hdr_pipe;
 
 static void free_pipe(pipe *p) {
-    if (p->program) { p->program->free_fn(p->program->ctx); free(p->program); }
+    if (p->program) { p->program->free(p->program->ctx); free(p->program); }
     *p = (pipe){0};
 }
 
@@ -129,7 +129,7 @@ static struct umbra_basic_block *saved_bb;
 
 static void free_xtra(void) {
     for (int t = 1; t < max_threads; t++) {
-        if (xtra_progs[t]) { xtra_progs[t]->free_fn(xtra_progs[t]->ctx); free(xtra_progs[t]); }
+        if (xtra_progs[t]) { xtra_progs[t]->free(xtra_progs[t]->ctx); free(xtra_progs[t]); }
         xtra_progs[t] = NULL;
     }
 }

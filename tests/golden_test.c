@@ -83,8 +83,8 @@ static void build_pipes(void) {
 
 static void free_pipes(void) {
     for (int f = 0; f < NUM_FMTS; f++) {
-        fill_pipes[f].prog->free_fn(fill_pipes[f].prog->ctx); free(fill_pipes[f].prog);
-        readback_pipes[f].prog->free_fn(readback_pipes[f].prog->ctx); free(readback_pipes[f].prog);
+        fill_pipes[f].prog->free(fill_pipes[f].prog->ctx); free(fill_pipes[f].prog);
+        readback_pipes[f].prog->free(readback_pipes[f].prog->ctx); free(readback_pipes[f].prog);
     }
     umbra_backend_free(interp_be);
 }
@@ -223,7 +223,7 @@ static void test_slide_golden(
     free(pbuf_ref);
     free(pbuf_tst);
     for (int bi = 0; bi < N_BACKS; bi++) {
-        if (progs[bi]) { progs[bi]->free_fn(progs[bi]->ctx); free(progs[bi]); }
+        if (progs[bi]) { progs[bi]->free(progs[bi]->ctx); free(progs[bi]); }
         umbra_backend_free(bes[bi]);
     }
     s->fmt = saved_fmt;
@@ -310,8 +310,8 @@ static void test_slug_rect(void) {
     pixels[38*W + 30] == bg here;
     pixels[20*W + 70] == bg here;
 
-    acc->free_fn(acc->ctx); free(acc);
-    interp->free_fn(interp->ctx); free(interp);
+    acc->free(acc->ctx); free(acc);
+    interp->free(interp->ctx); free(interp);
     umbra_backend_free(be);
 }
 
@@ -365,7 +365,7 @@ static void test_perspective_text(void) {
     pixels[8] == 0xffffffff here;
     pixels[0] == 0xff000000 here;
 
-    interp->free_fn(interp->ctx); free(interp);
+    interp->free(interp->ctx); free(interp);
 
     text_cov tc = text_rasterize(W, H, 24.0f, 0);
 
@@ -410,7 +410,7 @@ static void test_perspective_text(void) {
     }
     changed > 0 here;
 
-    interp->free_fn(interp->ctx); free(interp);
+    interp->free(interp->ctx); free(interp);
     umbra_backend_free(be);
     text_cov_free(&tc);
 }
