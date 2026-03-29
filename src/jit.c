@@ -109,10 +109,9 @@ static void load_ptr(Buf *c, int p, int *last_ptr) {
         *last_ptr = p;
         int disp_ptr = p * (int)sizeof(umbra_buf);
         int disp_rb  = p * (int)sizeof(umbra_buf) + (int)__builtin_offsetof(umbra_buf, row_bytes);
-        put(c, 0xf9400000u | ((uint32_t)(disp_ptr / 8) << 10) | ((uint32_t)XBUF << 5) | (uint32_t)XP);
-        put(c, 0xf9400000u | ((uint32_t)(disp_rb  / 8) << 10) | ((uint32_t)XBUF << 5) | (uint32_t)XT);
-        put(c, 0x9b000000u | ((uint32_t)XT << 16) | ((uint32_t)XP << 10)
-                            | ((uint32_t)XY << 5)  | (uint32_t)XP);
+        put(c, LDR_xi(XP, XBUF, disp_ptr / 8));
+        put(c, LDR_xi(XT, XBUF, disp_rb  / 8));
+        put(c, MADD_x(XP, XY, XT, XP));
     }
 }
 
@@ -123,8 +122,7 @@ static void resolve_ptr(Buf *c, int p, int *last_ptr, int const *deref_gpr,
         int gpr = deref_gpr[~p];
         int rbg = deref_rb_gpr[~p];
         if (rbg > 0) {
-            put(c, 0x9b000000u | ((uint32_t)rbg << 16) | ((uint32_t)gpr << 10)
-                                | ((uint32_t)XY  << 5)  | (uint32_t)XP);
+            put(c, MADD_x(XP, XY, rbg, gpr));
         } else {
             put(c, ADD_xi(XP, gpr, 0));
         }
@@ -139,7 +137,7 @@ static void load_count(Buf *c, int p, int elem_shift, int const *deref_gpr) {
         put(c, 0xd2a00000u | (0x7fffu << 5) | (uint32_t)XM);
     } else {
         int disp = p * (int)sizeof(umbra_buf) + (int)__builtin_offsetof(umbra_buf, sz);
-        put(c, 0xf9400000u | ((uint32_t)(disp / 8) << 10) | ((uint32_t)XBUF << 5) | (uint32_t)XM);
+        put(c, LDR_xi(XM, XBUF, disp / 8));
         if (elem_shift) {
             put(c,
                 0x53000000u
@@ -474,13 +472,10 @@ static void emit_transfer_inline_arm64(Buf *c, struct pool *pool,
         int const a_off = p * (int)sizeof(umbra_buf)
                         + (int)__builtin_offsetof(umbra_buf, transfer)
                         + (int)__builtin_offsetof(umbra_transfer, a);
-        put(c, 0xb9400000u
-            | ((uint32_t)(a_off / 4) << 10)
-            | ((uint32_t)XBUF << 5)
-            | (uint32_t)XT);
+        put(c, LDR_wi(XT, XBUF, a_off / 4));
     }
     int br_skip = c->len;
-    put(c, 0x34000000u | (uint32_t)XT);  // CBZ Wt, +0 (patch later)
+    put(c, CBZ_w(XT, 0));  // CBZ Wt, +0 (patch later)
 
     // Load constants that are reused across all 3 channels.
     put(c, MOVI_4s(zero, 0, 0));                         // zero = 0
@@ -569,7 +564,7 @@ static void emit_transfer_inline_arm64(Buf *c, struct pool *pool,
     // Patch CBZ
     {
         int off19 = c->len - br_skip;
-        c->buf[br_skip] = 0x34000000u | ((uint32_t)(off19 & 0x7ffff) << 5) | (uint32_t)XT;
+        c->buf[br_skip] = CBZ_w(XT, off19);
     }
 }
 
@@ -665,7 +660,7 @@ struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, ADD_xi(XY, XY, 1));
     put(&c, ADD_xi(XCOL, XWIDTH, 0));    // XCOL = x0_col
     // LDR XT, [SP] — load saved end_row
-    put(&c, 0xf9400000u | (31u << 5) | (uint32_t)XT);
+    put(&c, LDR_xi(XT, 31, 0));
     // CMP XY, XT — XY >= end_row means done
     put(&c, 0xeb000000u | ((uint32_t)XT << 16) | ((uint32_t)XY << 5) | 0x1fu);
     int br_more_rows = c.len;
@@ -776,10 +771,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 base = XT;
             }
             // LDR gpr, [base] — deref pointer
-            put(c, 0xf9400000u | ((uint32_t)base << 5) | (uint32_t)gpr);
+            put(c, LDR_xi(gpr, base, 0));
             // LDR rb_gpr, [base, #16] — deref row_bytes
             if (rb_gpr) {
-                put(c, 0xf9400000u | (2u << 10) | ((uint32_t)base << 5) | (uint32_t)rb_gpr);
+                put(c, LDR_xi(rb_gpr, base, 2));
             }
         } break;
 
@@ -871,11 +866,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int            p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {
-                put(c,
-                    0x78607800u
-                        | ((uint32_t)XI << 16)
-                        | ((uint32_t)XP << 5)
-                        | (uint32_t)XT);
+                put(c, LDRH_wr(XT, XP, XI));
                 put(c, DUP_4s_w(s.rd, XT));
             } else {
                 put(c, LDR_d(s.rd, XP, XH));
@@ -900,10 +891,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             load_count(c, p, 2, deref_gpr);
             put(c, UMOV_ws(XT, rx));
             put(c, MOVI_4s(s.rd, 0, 0));
-            put(c, 0x6b00001fu | ((uint32_t)XM << 16) | ((uint32_t)XT << 5));
+            put(c, CMP_wr(XT, XM));
             put(c, Bcond(0x2, 3));
-            put(c, 0xb8607800u | ((uint32_t)XT << 16)
-                               | ((uint32_t)XP << 5) | (uint32_t)XT);
+            put(c, LDR_wr(XT, XP, XT));
             put(c, DUP_4s_w(s.rd, XT));
         } break;
 
@@ -917,14 +907,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             if (scalar) {
                 put(c, MOVI_4s(s.rd, 0, 0));
                 put(c, UMOV_ws(XT, rx));
-                put(c, 0x6b00001fu | ((uint32_t)XM << 16) | ((uint32_t)XT << 5));
+                put(c, CMP_wr(XT, XM));
                 put(c, Bcond(0x2, 2));
                 put(c, LDR_sx(s.rd, XP, XT));
             } else {
                 put(c, MOVI_4s(s.rd, 0, 0));
                 for (int k = 0; k < 4; k++) {
                     put(c, UMOV_ws_lane(XT, rx, k));
-                    put(c, 0x6b00001fu | ((uint32_t)XM << 16) | ((uint32_t)XT << 5));
+                    put(c, CMP_wr(XT, XM));
                     put(c, Bcond(0x2, 4));
                     put(c, LSL_xi(XT, XT, 2));
                     put(c, ADD_xr(XT, XP, XT));
@@ -943,21 +933,21 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             if (scalar) {
                 put(c, MOVI_4s(s.rd, 0, 0));
                 put(c, UMOV_ws(XT, rx));
-                put(c, 0x6b00001fu | ((uint32_t)XM << 16) | ((uint32_t)XT << 5));
+                put(c, CMP_wr(XT, XM));
                 put(c, Bcond(0x2, 5));
                 put(c, LSL_xi(XT, XT, 1));
                 put(c, ADD_xr(XT, XP, XT));
-                put(c, 0x79400000u | ((uint32_t)XT << 5) | (uint32_t)XT);
+                put(c, LDRH_wi(XT, XT, 0));
                 put(c, DUP_4s_w(s.rd, XT));
             } else {
                 put(c, MOVI_4s(s.rd, 0, 0));
                 for (int k = 0; k < 4; k++) {
                     put(c, UMOV_ws_lane(XT, rx, k));
-                    put(c, 0x6b00001fu | ((uint32_t)XM << 16) | ((uint32_t)XT << 5));
+                    put(c, CMP_wr(XT, XM));
                     put(c, Bcond(0x2, 5));
                     put(c, LSL_xi(XT, XT, 1));
                     put(c, ADD_xr(XT, XP, XT));
-                    put(c, 0x79400000u | ((uint32_t)XT << 5) | (uint32_t)XT);
+                    put(c, LDRH_wi(XT, XT, 0));
                     put(c, INS_s(s.rd, k, XT));
                 }
                 put(c, XTN_4h(s.rd, s.rd));
@@ -1037,10 +1027,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             {
                 int const fmt_off = p * (int)sizeof(umbra_buf)
                                   + (int)__builtin_offsetof(umbra_buf, fmt);
-                put(c, 0xb9400000u
-                    | ((uint32_t)(fmt_off / 4) << 10)
-                    | ((uint32_t)XBUF << 5)
-                    | (uint32_t)XT);
+                put(c, LDR_wi(XT, XBUF, fmt_off / 4));
             }
 
             int br_done[8];
@@ -1048,7 +1035,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 
             // --- umbra_fmt_8888 (=1) ---
             // CMP w_XT, #1
-            put(c, 0x7100001fu | (1u << 10) | ((uint32_t)XT << 5));
+            put(c, CMP_wi(XT, 1));
             int br_skip_8888 = c->len;
             put(c, Bcond(0x1, 0));  // B.NE
             {
@@ -1075,22 +1062,19 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             c->buf[br_skip_8888] = Bcond(0x1, c->len - br_skip_8888);
 
             // --- umbra_fmt_565 (=2) ---
-            put(c, 0x7100001fu | (2u << 10) | ((uint32_t)XT << 5));
+            put(c, CMP_wi(XT, 2));
             int br_skip_565 = c->len;
             put(c, Bcond(0x1, 0));
             {
                 // Load 16-bit pixels, widen to 32-bit.
                 if (scalar) {
                     // LDRH w_XT2, [XP, XI, LSL #1]
-                    put(c, 0x78607800u
-                        | ((uint32_t)XI  << 16)
-                        | ((uint32_t)XP  << 5)
-                        | (uint32_t)XT);
+                    put(c, LDRH_wr(XT, XP, XI));
                     put(c, DUP_4s_w(px, XT));
                 } else {
                     put(c, LDR_d(px, XP, XH));
                     // UXTL.4S (zero-extend 4H->4S)
-                    put(c, 0x2f10a400u | ((uint32_t)px << 5) | (uint32_t)px);
+                    put(c, UXTL_4s(px, px));
                 }
                 // r5 = px >> 11
                 put(c, USHR_4s_imm(s0.rd, px, 11));
@@ -1121,7 +1105,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             c->buf[br_skip_565] = Bcond(0x1, c->len - br_skip_565);
 
             // --- umbra_fmt_1010102 (=3) ---
-            put(c, 0x7100001fu | (3u << 10) | ((uint32_t)XT << 5));
+            put(c, CMP_wi(XT, 3));
             int br_skip_1010102 = c->len;
             put(c, Bcond(0x1, 0));
             {
@@ -1150,7 +1134,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             c->buf[br_skip_1010102] = Bcond(0x1, c->len - br_skip_1010102);
 
             // --- umbra_fmt_fp16 (=4) ---
-            put(c, 0x7100001fu | (4u << 10) | ((uint32_t)XT << 5));
+            put(c, CMP_wi(XT, 4));
             int br_skip_fp16 = c->len;
             put(c, Bcond(0x1, 0));
             {
@@ -1159,7 +1143,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     put(c, LSL_xi(XT, XI, 3));
                     put(c, ADD_xr(XT, XP, XT));
                     // LDR Dpx, [XT, #0] (64-bit SIMD load, unsigned offset)
-                    put(c, 0xfd400000u | ((uint32_t)XT << 5) | (uint32_t)px);
+                    put(c, LDR_di(px, XT, 0));
                     // FCVTL: convert lower 4 x fp16 -> 4 x fp32
                     put(c, FCVTL_4s(px, px));
                     // px now has {R, G, B, A} as fp32 in lanes 0-3.
@@ -1184,22 +1168,22 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     // Round 1: separate even/odd 16-bit lanes.
                     // t1 = UZP1.8H(px, t0) = [R0,B0,R1,B1, R2,B2,R3,B3]
                     // px = UZP2.8H(px, t0) = [G0,A0,G1,A1, G2,A2,G3,A3]
-                    put(c, 0x4e401800u | ((uint32_t)t0 << 16) | ((uint32_t)px << 5) | (uint32_t)t1);
-                    put(c, 0x4e405800u | ((uint32_t)t0 << 16) | ((uint32_t)px << 5) | (uint32_t)px);
+                    put(c, UZP1_8h(t1, px, t0));
+                    put(c, UZP2_8h(px, px, t0));
                     // Round 2: separate R/B and G/A.
                     // t0 = UZP1.8H(t1, px) = [R0,R1,R2,R3, G0,G1,G2,G3]
                     // t1 = UZP2.8H(t1, px) = [B0,B1,B2,B3, A0,A1,A2,A3]
-                    put(c, 0x4e401800u | ((uint32_t)px << 16) | ((uint32_t)t1 << 5) | (uint32_t)t0);
-                    put(c, 0x4e405800u | ((uint32_t)px << 16) | ((uint32_t)t1 << 5) | (uint32_t)t1);
+                    put(c, UZP1_8h(t0, t1, px));
+                    put(c, UZP2_8h(t1, t1, px));
                     // FCVTL on lower halves (4 x fp16 -> 4 x fp32).
                     put(c, FCVTL_4s(s0.rd, t0));  // R
                     put(c, FCVTL_4s(r2, t1));      // B
                     // For upper halves, use EXT #8 then FCVTL.
                     // EXT.16B Vd, Vn, Vm, #8: 0x6e004000 | (imm<<11) | (Vm<<16) | (Vn<<5) | Vd
                     // where imm = 8 bytes
-                    put(c, 0x6e004000u | (8u << 11) | ((uint32_t)t0 << 16) | ((uint32_t)t0 << 5) | (uint32_t)t0);
+                    put(c, EXT_16b(t0, t0, t0, 8));
                     put(c, FCVTL_4s(r1, t0));      // G
-                    put(c, 0x6e004000u | (8u << 11) | ((uint32_t)t1 << 16) | ((uint32_t)t1 << 5) | (uint32_t)t1);
+                    put(c, EXT_16b(t1, t1, t1, 8));
                     put(c, FCVTL_4s(r3, t1));      // A
                 }
             }
@@ -1208,15 +1192,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             c->buf[br_skip_fp16] = Bcond(0x1, c->len - br_skip_fp16);
 
             // --- umbra_fmt_f16_planar (=7) ---
-            put(c, 0x7100001fu | (7u << 10) | ((uint32_t)XT << 5));
+            put(c, CMP_wi(XT, 7));
             int br_skip_f16_planar = c->len;
             put(c, Bcond(0x1, 0));
             {
                 // XT = buf[p].sz / 4 (plane stride).  XP already has plane 0 row addr.
                 int const sz_off = p * (int)sizeof(umbra_buf)
                                  + (int)__builtin_offsetof(umbra_buf, sz);
-                put(c, 0xf9400000u | ((uint32_t)(sz_off/8) << 10)
-                                   | ((uint32_t)XBUF << 5) | (uint32_t)XT);
+                put(c, LDR_xi(XT, XBUF, sz_off / 8));
                 put(c, LSR_xi(XT, XT, 2));
                 if (scalar) {
                     // Plane 0 (R)
@@ -1306,17 +1289,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             {
                 int const fmt_off = p * (int)sizeof(umbra_buf)
                                   + (int)__builtin_offsetof(umbra_buf, fmt);
-                put(c, 0xb9400000u
-                    | ((uint32_t)(fmt_off / 4) << 10)
-                    | ((uint32_t)XBUF << 5)
-                    | (uint32_t)XT);
+                put(c, LDR_wi(XT, XBUF, fmt_off / 4));
             }
 
             int br_done[8];
             int n_done = 0;
 
             // --- umbra_fmt_8888 (=1) ---
-            put(c, 0x7100001fu | (1u << 10) | ((uint32_t)XT << 5));
+            put(c, CMP_wi(XT, 1));
             int br_skip_8888 = c->len;
             put(c, Bcond(0x1, 0));
             {
@@ -1344,7 +1324,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             c->buf[br_skip_8888] = Bcond(0x1, c->len - br_skip_8888);
 
             // --- umbra_fmt_565 (=2) ---
-            put(c, 0x7100001fu | (2u << 10) | ((uint32_t)XT << 5));
+            put(c, CMP_wi(XT, 2));
             int br_skip_565 = c->len;
             put(c, Bcond(0x1, 0));
             {
@@ -1383,7 +1363,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             c->buf[br_skip_565] = Bcond(0x1, c->len - br_skip_565);
 
             // --- umbra_fmt_1010102 (=3) ---
-            put(c, 0x7100001fu | (3u << 10) | ((uint32_t)XT << 5));
+            put(c, CMP_wi(XT, 3));
             int br_skip_1010102 = c->len;
             put(c, Bcond(0x1, 0));
             {
@@ -1417,7 +1397,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             c->buf[br_skip_1010102] = Bcond(0x1, c->len - br_skip_1010102);
 
             // --- umbra_fmt_fp16 (=4) ---
-            put(c, 0x7100001fu | (4u << 10) | ((uint32_t)XT << 5));
+            put(c, CMP_wi(XT, 4));
             int br_skip_fp16 = c->len;
             put(c, Bcond(0x1, 0));
             {
@@ -1429,15 +1409,15 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     // Simpler: pack all 4 into a temp Q as fp32 [R,G,B,A], then FCVTN.
                     // INS Vd.S[idx], Vn.S[0] = 0x6e040400 | (idx<<19) | (Vn<<5) | Vd
                     put(c, ORR_16b(t, rr, rr));  // t = rr
-                    put(c, 0x6e0c0400u | ((uint32_t)rg  << 5) | (uint32_t)t);  // INS t.S[1], rg.S[0]
-                    put(c, 0x6e140400u | ((uint32_t)rb_ << 5) | (uint32_t)t);  // INS t.S[2], rb_.S[0]
-                    put(c, 0x6e1c0400u | ((uint32_t)ra_v<< 5) | (uint32_t)t);  // INS t.S[3], ra_v.S[0]
+                    put(c, INS_elem_s(t, 1, rg,  0));  // INS t.S[1], rg.S[0]
+                    put(c, INS_elem_s(t, 2, rb_, 0));  // INS t.S[2], rb_.S[0]
+                    put(c, INS_elem_s(t, 3, ra_v, 0)); // INS t.S[3], ra_v.S[0]
                     put(c, FCVTN_4h(px, t));
                     // STR Dpx, [XP + XI*8]
                     put(c, LSL_xi(XT, XI, 3));
                     put(c, ADD_xr(XT, XP, XT));
                     // STR Dpx, [XT, #0] (64-bit SIMD store, unsigned offset)
-                    put(c, 0xfd000000u | ((uint32_t)XT << 5) | (uint32_t)px);
+                    put(c, STR_di(px, XT, 0));
                 } else {
                     // Convert each channel from fp32 to fp16.
                     put(c, FCVTN_4h(px, rr));     // px low = R0..R3 as fp16
@@ -1446,10 +1426,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     put(c, FCVTN_4h(one, ra_v));  // one low = A0..A3 as fp16
                     // Interleave: need [R0,G0,B0,A0, R1,G1,B1,A1, ...].
                     // ZIP1.8H(a, px, t) = [R0,G0,R1,G1, R2,G2,R3,G3]
-                    // ZIP1.8H: 0x4e403800 | (Vm<<16) | (Vn<<5) | Vd
-                    // ZIP2.8H: 0x4e407800 | (Vm<<16) | (Vn<<5) | Vd
-                    put(c, 0x4e403800u | ((uint32_t)t   << 16) | ((uint32_t)px  << 5) | (uint32_t)scale);  // scale = ZIP1.8H(px, t) = [R0,G0,R1,G1,R2,G2,R3,G3]
-                    put(c, 0x4e403800u | ((uint32_t)one << 16) | ((uint32_t)z   << 5) | (uint32_t)px);     // px = ZIP1.8H(z, one) = [B0,A0,B1,A1,B2,A2,B3,A3]
+                    put(c, ZIP1_8h(scale, px, t));   // scale = ZIP1.8H(px, t) = [R0,G0,R1,G1,R2,G2,R3,G3]
+                    put(c, ZIP1_8h(px, z, one));    // px = ZIP1.8H(z, one) = [B0,A0,B1,A1,B2,A2,B3,A3]
                     // Now interleave at 32-bit granularity.
                     // ZIP1.4S(q0, scale, px) = [R0G0,B0A0, R1G1,B1A1]
                     // ZIP2.4S(q1, scale, px) = [R2G2,B2A2, R3G3,B3A3]
@@ -1467,14 +1445,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             c->buf[br_skip_fp16] = Bcond(0x1, c->len - br_skip_fp16);
 
             // --- umbra_fmt_f16_planar (=7) ---
-            put(c, 0x7100001fu | (7u << 10) | ((uint32_t)XT << 5));
+            put(c, CMP_wi(XT, 7));
             int br_skip_f16_planar_s = c->len;
             put(c, Bcond(0x1, 0));
             {
                 int const sz_off = p * (int)sizeof(umbra_buf)
                                  + (int)__builtin_offsetof(umbra_buf, sz);
-                put(c, 0xf9400000u | ((uint32_t)(sz_off/8) << 10)
-                                   | ((uint32_t)XBUF << 5) | (uint32_t)XT);
+                put(c, LDR_xi(XT, XBUF, sz_off / 8));
                 put(c, LSR_xi(XT, XT, 2));
                 if (scalar) {
                     put(c, FCVTN_4h(px, rr));  put(c, STR_hx(px, XP, XI));
@@ -1546,7 +1523,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 
         case op_i32_from_u16: {
             struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
-            put(c, 0x2f10a400u | ((uint32_t)s.rx << 5) | (uint32_t)s.rd);
+            put(c, UXTL_4s(s.rd, s.rx));
         } break;
 
         case op_i16_from_i32: {

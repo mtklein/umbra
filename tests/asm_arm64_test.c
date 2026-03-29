@@ -200,6 +200,101 @@ static void test_uzp_zip(void) {
     ZIP2_4s(0, 1, 2) == (0x4E807800u | (2u << 16) | (1u << 5) | 0u) here;
 }
 
+static void test_ldr_xi(void) {
+    // LDR x0, [x1, #16] (imm=2, scaled by 8)
+    LDR_xi(0, 1, 2) == 0xF9400820 here;
+    // LDR x3, [x4, #0]
+    LDR_xi(3, 4, 0) == 0xF9400083 here;
+}
+
+static void test_ldr_wi(void) {
+    // LDR w0, [x1, #8] (imm=2, scaled by 4)
+    LDR_wi(0, 1, 2) == 0xB9400820 here;
+    // LDR w5, [x6, #0]
+    LDR_wi(5, 6, 0) == 0xB94000C5 here;
+}
+
+static void test_ldrh_wi(void) {
+    // LDRH w0, [x1, #4] (imm=2, scaled by 2)
+    LDRH_wi(0, 1, 2) == 0x79400820 here;
+    // LDRH w3, [x4, #0]
+    LDRH_wi(3, 4, 0) == 0x79400083 here;
+}
+
+static void test_ldrh_wr(void) {
+    // LDRH w3, [x4, x5, LSL #1]
+    LDRH_wr(3, 4, 5) == 0x78657883 here;
+}
+
+static void test_ldr_wr(void) {
+    // LDR w3, [x4, x5, LSL #2]
+    LDR_wr(3, 4, 5) == 0xB8657883 here;
+}
+
+static void test_ldr_str_di(void) {
+    // LDR d3, [x4, #16] (imm=2, scaled by 8)
+    LDR_di(3, 4, 2) == 0xFD400883 here;
+    // LDR d0, [x1, #0]
+    LDR_di(0, 1, 0) == 0xFD400020 here;
+    // STR d5, [x6, #24] (imm=3, scaled by 8)
+    STR_di(5, 6, 3) == 0xFD000CC5 here;
+    // STR d0, [x1, #0]
+    STR_di(0, 1, 0) == 0xFD000020 here;
+}
+
+static void test_madd(void) {
+    // MADD x0, x1, x2, x3
+    MADD_x(0, 1, 2, 3) == 0x9B020C20 here;
+}
+
+static void test_cmp(void) {
+    // CMP w4, #7
+    CMP_wi(4, 7) == 0x71001C9F here;
+    // CMP w0, #0
+    CMP_wi(0, 0) == 0x7100001F here;
+    // CMP w5, w6
+    CMP_wr(5, 6) == 0x6B0600BF here;
+    // CMP w0, w0
+    CMP_wr(0, 0) == 0x6B00001F here;
+}
+
+static void test_cbz(void) {
+    // CBZ w7, #0
+    CBZ_w(7, 0) == 0x34000007 here;
+    // CBZ w0, #0
+    CBZ_w(0, 0) == 0x34000000 here;
+}
+
+static void test_uzp_zip_8h(void) {
+    // UZP1.8H v0, v1, v2
+    UZP1_8h(0, 1, 2) == 0x4E421820 here;
+    // UZP2.8H v3, v4, v5
+    UZP2_8h(3, 4, 5) == 0x4E455883 here;
+    // ZIP1.8H v6, v7, v8
+    ZIP1_8h(6, 7, 8) == 0x4E4838E6 here;
+}
+
+static void test_ext_16b(void) {
+    // EXT.16B v0, v1, v2, #8
+    EXT_16b(0, 1, 2, 8) == 0x6E024020 here;
+}
+
+static void test_uxtl_4s(void) {
+    // USHLL.4S v3, v4, #0 (= UXTL.4S)
+    UXTL_4s(3, 4) == 0x2F10A483 here;
+}
+
+static void test_ins_elem_s(void) {
+    // INS v0.s[1], v1.s[0]
+    INS_elem_s(0, 1, 1, 0) == 0x6E0C0420 here;
+    // INS v2.s[2], v3.s[0]
+    INS_elem_s(2, 2, 3, 0) == 0x6E140462 here;
+    // INS v4.s[3], v5.s[0]
+    INS_elem_s(4, 3, 5, 0) == 0x6E1C04A4 here;
+    // INS v6.s[0], v7.s[2]
+    INS_elem_s(6, 0, 7, 2) == 0x6E0444E6 here;
+}
+
 int main(void) {
     test_buf();
     test_gpr();
@@ -219,5 +314,18 @@ int main(void) {
     test_lsl();
     test_ldr_str_si();
     test_uzp_zip();
+    test_ldr_xi();
+    test_ldr_wi();
+    test_ldrh_wi();
+    test_ldrh_wr();
+    test_ldr_wr();
+    test_ldr_str_di();
+    test_madd();
+    test_cmp();
+    test_cbz();
+    test_uzp_zip_8h();
+    test_ext_16b();
+    test_uxtl_4s();
+    test_ins_elem_s();
     return 0;
 }
