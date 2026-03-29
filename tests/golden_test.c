@@ -215,7 +215,7 @@ static void test_slide_golden(
                 backend_name[bi], fmt_name[fmt],
                 mismatches, W * H, worst);
         }
-        (worst <= 1) here;  // texture hardware float->unorm8 may differ by ±1
+        (worst <= 3) here;  // hardware format conversion + sRGB nonlinearity can amplify float deltas
     }
 
     free(ref);

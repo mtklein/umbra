@@ -1049,7 +1049,7 @@ static int fmt_to_planes(umbra_fmt fmt) {
     case umbra_fmt_1010102:     return 1;
     case umbra_fmt_fp16:        return 1;
     case umbra_fmt_fp16_planar: return 4;
-    case umbra_fmt_srgb:        return 0;
+    case umbra_fmt_srgb:        return 1;
     case umbra_fmt_565:         return 0;
     }
     return 0;
