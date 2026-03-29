@@ -275,14 +275,10 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_deref_ptr:
     case op_uniform_32:
     case op_load_32:
-    case op_load_32x2:
-    case op_load_8x4:
     case op_load_color:
     case op_gather_uniform_32:
     case op_gather_32:
     case op_store_32:
-    case op_store_32x2:
-    case op_store_8x4:
     case op_store_color:
     case op_load_16:
     case op_gather_16:
@@ -699,60 +695,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
-        case op_load_32x2: {
-            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int8_t         hi_reg = ra_alloc(ra, sl, ns);
-            int            p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            put(c, LSL_xi(XT, XI, 3));
-            put(c, ADD_xr(XT, XP, XT));
-            if (scalar) {
-                put(c, LDR_si(s.rd, XT, 0));
-                put(c, LDR_si(hi_reg, XT, 1));
-            } else {
-                put(c, LD2_4s(0, XT));
-                put(c, ORR_16b(s.rd, 0, 0));
-                put(c, ORR_16b(hi_reg, 1, 1));
-            }
-            ra_set_chan_reg(ra, i, 0, s.rd);
-            ra_set_chan_reg(ra, i, 1, hi_reg);
-        } break;
-        case op_load_8x4: {
-            struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
-            int8_t r1 = ra_alloc(ra, sl, ns);
-            int8_t r2 = ra_alloc(ra, sl, ns);
-            int8_t r3 = ra_alloc(ra, sl, ns);
-            int    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            if (scalar) {
-                int8_t px = ra_alloc(ra, sl, ns);
-                int8_t mask = ra_alloc(ra, sl, ns);
-                put(c, LDR_sx(px, XP, XI));
-                arm64_pool_load(c, &jc->pool, mask, 0xFF);
-                put(c, AND_16b(s0.rd, px, mask));
-                put(c, USHR_4s_imm(r1, px,  8)); put(c, AND_16b(r1, r1, mask));
-                put(c, USHR_4s_imm(r2, px, 16)); put(c, AND_16b(r2, r2, mask));
-                put(c, USHR_4s_imm(r3, px, 24));
-                ra_return_reg(ra, mask);
-                ra_return_reg(ra, px);
-            } else {
-                int8_t px   = ra_alloc(ra, sl, ns);
-                int8_t mask = ra_alloc(ra, sl, ns);
-                put(c, LDR_q(px, XP, XW));
-                arm64_pool_load(c, &jc->pool, mask, 0xFF);
-                put(c, AND_16b(s0.rd, px, mask));
-                put(c, USHR_4s_imm(r1, px,  8)); put(c, AND_16b(r1, r1, mask));
-                put(c, USHR_4s_imm(r2, px, 16)); put(c, AND_16b(r2, r2, mask));
-                put(c, USHR_4s_imm(r3, px, 24));
-                ra_return_reg(ra, mask);
-                ra_return_reg(ra, px);
-            }
-            ra_set_chan_reg(ra, i, 0, s0.rd);
-            ra_set_chan_reg(ra, i, 1, r1);
-            ra_set_chan_reg(ra, i, 2, r2);
-            ra_set_chan_reg(ra, i, 3, r3);
-        } break;
-
         case op_load_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int            p = inst->ptr;
@@ -856,51 +798,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, STR_q(ry, XP, XW));
             }
             FREE_CHAN(inst->y, i);
-        } break;
-
-        case op_store_32x2: {
-            int8_t rx = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
-            int8_t ry = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
-            int    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            put(c, LSL_xi(XT, XI, 3));
-            put(c, ADD_xr(XT, XP, XT));
-            if (scalar) {
-                put(c, STR_si(rx, XT, 0));
-                put(c, STR_si(ry, XT, 1));
-            } else {
-                // ST2 interleaves two u32 streams in one instruction.
-                // ST2 requires consecutive registers; use v0,v1 as temps.
-                put(c, ORR_16b(0, rx, rx));
-                put(c, ORR_16b(1, ry, ry));
-                put(c, ST2_4s(0, XT));
-            }
-            FREE_CHAN(inst->x, i);
-            FREE_CHAN(inst->y, i);
-        } break;
-
-        case op_store_8x4: {
-            int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
-            int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
-            int8_t rb   = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
-            int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
-            int    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            int8_t px = ra_alloc(ra, sl, ns);
-            put(c, ORR_16b(px, rr, rr));
-            put(c, SLI_4s_imm(px, rg, 8));
-            put(c, SLI_4s_imm(px, rb, 16));
-            put(c, SLI_4s_imm(px, ra_v, 24));
-            if (scalar) {
-                put(c, STR_sx(px, XP, XI));
-            } else {
-                put(c, STR_q(px, XP, XW));
-            }
-            ra_return_reg(ra, px);
-            FREE_CHAN(inst->x, i);
-            FREE_CHAN(inst->y, i);
-            FREE_CHAN(inst->z, i);
-            FREE_CHAN(inst->w, i);
         } break;
 
         case op_load_color: {
@@ -1529,14 +1426,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 case op_imm_32:
                 case op_uniform_32:
                 case op_load_32:
-                case op_load_32x2:
-                case op_load_8x4:
                 case op_load_color:
                 case op_gather_uniform_32:
                 case op_gather_32:
                 case op_store_32:
-                case op_store_32x2:
-                case op_store_8x4:
                 case op_store_color:
                 case op_add_f32:
                 case op_sub_f32:
@@ -2065,14 +1958,10 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_deref_ptr:
     case op_uniform_32:
     case op_load_32:
-    case op_load_32x2:
-    case op_load_8x4:
     case op_load_color:
     case op_gather_uniform_32:
     case op_gather_32:
     case op_store_32:
-    case op_store_32x2:
-    case op_store_8x4:
     case op_store_color:
     case op_load_16:
     case op_gather_16:
@@ -2418,62 +2307,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
-        case op_load_32x2: {
-            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int8_t         hi_reg = ra_alloc(ra, sl, ns);
-            int            p = inst->ptr;
-            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            if (scalar) {
-                vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, XI, 8, 0);
-                vex_mem(c, 1, 1, 0, 0, hi_reg, 0, 0x6e, base, XI, 8, 4);
-            } else {
-                int8_t t0 = ra_alloc(ra, sl, ns);
-                int8_t t1 = ra_alloc(ra, sl, ns);
-                vmov_load(c, 1, t0, base, XI, 8, 0);
-                vmov_load(c, 1, t1, base, XI, 8, 32);
-                vex_rrr(c, 0, 1, 1, 0xc6, s.rd, t0, t1);
-                emit1(c, 0x88u);
-                vex(c, 1, 3, 1, 1, s.rd, 0, s.rd, 0x01);
-                emit1(c, 0xd8);
-                vex_rrr(c, 0, 1, 1, 0xc6, hi_reg, t0, t1);
-                emit1(c, 0xddu);
-                vex(c, 1, 3, 1, 1, hi_reg, 0, hi_reg, 0x01);
-                emit1(c, 0xd8);
-                ra_return_reg(ra, t1);
-                ra_return_reg(ra, t0);
-            }
-            ra_set_chan_reg(ra, i, 0, s.rd);
-            ra_set_chan_reg(ra, i, 1, hi_reg);
-        } break;
-        case op_load_8x4: {
-            struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
-            int8_t r1 = ra_alloc(ra, sl, ns);
-            int8_t r2 = ra_alloc(ra, sl, ns);
-            int8_t r3 = ra_alloc(ra, sl, ns);
-            int    p = inst->ptr;
-            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            {
-                int8_t px   = ra_alloc(ra, sl, ns);
-                int8_t mask = ra_alloc(ra, sl, ns);
-                if (scalar) {
-                    vex_mem(c, 1, 1, 0, 0, px, 0, 0x6e, base, XI, 4, 0);
-                } else {
-                    vmov_load(c, 1, px, base, XI, 4, 0);
-                }
-                pool_broadcast(c, &jc->pool, mask, 0xFF);
-                vpand(c, 1, s0.rd, px, mask);
-                vpsrld_i(c, r1, px,  8); vpand(c, 1, r1, r1, mask);
-                vpsrld_i(c, r2, px, 16); vpand(c, 1, r2, r2, mask);
-                vpsrld_i(c, r3, px, 24);
-                ra_return_reg(ra, mask);
-                ra_return_reg(ra, px);
-            }
-            ra_set_chan_reg(ra, i, 0, s0.rd);
-            ra_set_chan_reg(ra, i, 1, r1);
-            ra_set_chan_reg(ra, i, 2, r2);
-            ra_set_chan_reg(ra, i, 3, r3);
-        } break;
-
         case op_load_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int            p = inst->ptr;
@@ -2507,67 +2340,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 vmov_store(c, 1, ry, base, XI, 4, 0);
             }
             FREE_CHAN(inst->y, i);
-        } break;
-
-        case op_store_32x2: {
-            int8_t rx = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
-            int8_t ry = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
-            int    p = inst->ptr;
-            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            if (scalar) {
-                vex_mem(c, 1, 1, 0, 0, rx, 0, 0x7e, base, XI, 8, 0);
-                vex_mem(c, 1, 1, 0, 0, ry, 0, 0x7e, base, XI, 8, 4);
-            } else {
-                int8_t t0 = ra_alloc(ra, sl, ns);
-                int8_t t1 = ra_alloc(ra, sl, ns);
-                int8_t t2 = ra_alloc(ra, sl, ns);
-                // VUNPCKLPS t0, rx, ry
-                vex_rrr(c, 0, 1, 1, 0x14, t0, rx, ry);
-                // VUNPCKHPS t1, rx, ry
-                vex_rrr(c, 0, 1, 1, 0x15, t1, rx, ry);
-                // VPERM2I128 t2, t0, t1, 0x20
-                vex(c, 1, 3, 0, 1, t2, t0, t1, 0x46);
-                emit1(c, 0x20);
-                // VPERM2I128 t0, t0, t1, 0x31
-                vex(c, 1, 3, 0, 1, t0, t0, t1, 0x46);
-                emit1(c, 0x31);
-                vmov_store(c, 1, t2, base, XI, 8, 0);
-                vmov_store(c, 1, t0, base, XI, 8, 32);
-                ra_return_reg(ra, t2);
-                ra_return_reg(ra, t1);
-                ra_return_reg(ra, t0);
-            }
-            FREE_CHAN(inst->x, i);
-            FREE_CHAN(inst->y, i);
-        } break;
-
-        case op_store_8x4: {
-            int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
-            int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
-            int8_t rb_v = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
-            int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
-            int    p = inst->ptr;
-            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            // Pack: px = r | (g << 8) | (b << 16) | (a << 24)
-            int8_t px = ra_alloc(ra, sl, ns);
-            int8_t t  = ra_alloc(ra, sl, ns);
-            vpslld_i(c, t, rg, 8);
-            vpor(c, 1, px, rr, t);
-            vpslld_i(c, t, rb_v, 16);
-            vpor(c, 1, px, px, t);
-            vpslld_i(c, t, ra_v, 24);
-            vpor(c, 1, px, px, t);
-            ra_return_reg(ra, t);
-            if (scalar) {
-                vex_mem(c, 1, 1, 0, 0, px, 0, 0x7e, base, XI, 4, 0);
-            } else {
-                vmov_store(c, 1, px, base, XI, 4, 0);
-            }
-            ra_return_reg(ra, px);
-            FREE_CHAN(inst->x, i);
-            FREE_CHAN(inst->y, i);
-            FREE_CHAN(inst->z, i);
-            FREE_CHAN(inst->w, i);
         } break;
 
         case op_load_color: {

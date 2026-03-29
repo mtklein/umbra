@@ -2481,89 +2481,6 @@ static void test_load_next_16(void) {
     cleanup(&B);
 }
 
-static void test_load_store_next_64(void) {
-    struct umbra_builder *b = umbra_builder();
-    umbra_val             lo, hi;
-    umbra_load_32x2(b, (umbra_ptr){0, 0}, &lo, &hi);
-    umbra_store_32x2(b, (umbra_ptr){1, 0}, lo, hi);
-    backends B = make(b, 0);
-
-    int32_t src[32], dst[32];
-    for (int i = 0; i < 32; i++) { src[i] = i * 7 + 3; }
-
-    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-        __builtin_memset(dst, 0, sizeof dst);
-        if (!run(&B, bi, 16, 1, (umbra_buf[]){
-            {.ptr=src, .sz=sizeof src},
-            {.ptr=dst, .sz=sizeof dst},
-        })) { continue; }
-        for (int i = 0; i < 32; i++) { (dst[i] == src[i]) here; }
-    }
-
-    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-        __builtin_memset(dst, 0, sizeof dst);
-        if (!run(&B, bi, 4, 4, (umbra_buf[]){
-            {.ptr=src, .sz=sizeof src, .row_bytes=4*8},
-            {.ptr=dst, .sz=sizeof dst, .row_bytes=4*8},
-        })) { continue; }
-        for (int i = 0; i < 32; i++) { (dst[i] == src[i]) here; }
-    }
-    cleanup(&B);
-}
-
-static void test_load_8x4_channel_vals(void) {
-    // Regression: multi-result op_load_8x4 reserves extra interpreter slots.
-    // Those slots must be initialized (not garbage) or the register-variant
-    // upgrade pass may corrupt the next real instruction.
-    struct umbra_builder *b = umbra_builder();
-    umbra_val ch[4];
-    umbra_load_8x4(b, (umbra_ptr){0, 0}, ch);
-    umbra_val f[4];
-    for (int i = 0; i < 4; i++) { f[i] = umbra_f32_from_i32(b, ch[i]); }
-    for (int i = 0; i < 4; i++) { umbra_store_32(b, (umbra_ptr){1 + i, 0}, f[i]); }
-    backends B = make(b, 0);
-
-    uint32_t src[] = {0xFF804020, 0xFF804020, 0xFF804020, 0xFF804020,
-                      0xFF804020, 0xFF804020, 0xFF804020, 0xFF804020};
-    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-        uint32_t d[4][8];
-        __builtin_memset(d, 0, sizeof d);
-        if (!run(&B, bi, 8, 1, (umbra_buf[]){
-            {.ptr=src, .sz=sizeof src},
-            {.ptr=d[0], .sz=32}, {.ptr=d[1], .sz=32}, {.ptr=d[2], .sz=32}, {.ptr=d[3], .sz=32},
-        })) { continue; }
-        union { uint32_t u; float f; } u;
-        for (int j = 0; j < 8; j++) {
-            u.u = d[0][j]; equiv(u.f, 32.0f) here;
-            u.u = d[1][j]; equiv(u.f, 64.0f) here;
-            u.u = d[2][j]; equiv(u.f, 128.0f) here;
-            u.u = d[3][j]; equiv(u.f, 255.0f) here;
-        }
-    }
-    cleanup(&B);
-}
-
-static void test_load_store_8x4_roundtrip(void) {
-    // Simple roundtrip: load_8x4 → store_8x4 should be identity.
-    struct umbra_builder *b = umbra_builder();
-    umbra_val ch[4];
-    umbra_load_8x4(b, (umbra_ptr){0, 0}, ch);
-    umbra_store_8x4(b, (umbra_ptr){1, 0}, ch);
-    backends B = make(b, 0);
-
-    uint32_t src[16], dst[16];
-    for (int i = 0; i < 16; i++) { src[i] = (uint32_t)(0xAABBCC00u + (unsigned)i); }
-    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-        __builtin_memset(dst, 0, sizeof dst);
-        if (!run(&B, bi, 16, 1, (umbra_buf[]){
-            {.ptr=src, .sz=sizeof src},
-            {.ptr=dst, .sz=sizeof dst},
-        })) { continue; }
-        for (int i = 0; i < 16; i++) { (dst[i] == src[i]) here; }
-    }
-    cleanup(&B);
-}
-
 static void test_load_store_color_8888(void) {
     struct umbra_builder *b = umbra_builder();
     umbra_color c = umbra_load_color(b, (umbra_ptr){0, 0});
@@ -2842,9 +2759,6 @@ int main(void) {
     test_xy();
     test_load_next_32();
     test_load_next_16();
-    test_load_store_next_64();
-    test_load_8x4_channel_vals();
-    test_load_store_8x4_roundtrip();
     test_load_store_color_8888();
     test_load_store_color_f16_planar();
     test_srgb_roundtrip_256();

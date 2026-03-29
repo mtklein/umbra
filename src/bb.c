@@ -13,21 +13,15 @@ static int ptr_ix(umbra_ptr p) { return p.deref ? ~p.ix : p.ix; }
 _Bool is_store(enum op op) {
     return op == op_store_16
         || op == op_store_32
-        || op == op_store_32x2
-        || op == op_store_8x4
         || op == op_store_color;
 }
 _Bool has_ptr(enum op op) {
     return op == op_uniform_32
         || op == op_load_32
-        || op == op_load_32x2
-        || op == op_load_8x4
         || op == op_load_color
         || op == op_gather_uniform_32
         || op == op_gather_32
         || op == op_store_32
-        || op == op_store_32x2
-        || op == op_store_8x4
         || op == op_store_color
         || op == op_deref_ptr
         || op == op_load_16
@@ -60,13 +54,9 @@ _Bool is_varying(enum op op) {
         || op == op_y
         || op == op_load_16
         || op == op_load_32
-        || op == op_load_32x2
-        || op == op_load_8x4
         || op == op_load_color
         || op == op_store_16
         || op == op_store_32
-        || op == op_store_32x2
-        || op == op_store_8x4
         || op == op_store_color;
 }
 
@@ -217,11 +207,6 @@ val umbra_gather_16(builder *b, umbra_ptr src, val ix) {
 val umbra_load_32(builder *b, umbra_ptr src) {
     return push(b, op_load_32, .ptr = ptr_ix(src));
 }
-void umbra_load_32x2(builder *b, umbra_ptr src, val *lo, val *hi) {
-    val hilo = push(b, op_load_32x2, .ptr = ptr_ix(src));
-    *lo = val_make(val_id(hilo), 0);
-    *hi = val_make(val_id(hilo), 1);
-}
 val umbra_load_16(builder *b, umbra_ptr src) {
     return push(b, op_load_16, .ptr = ptr_ix(src));
 }
@@ -234,19 +219,6 @@ val umbra_gather_32(builder *b, umbra_ptr src, val ix) {
 }
 void umbra_store_32(builder *b, umbra_ptr dst, val v) {
     push(b, op_store_32, VY(v), .ptr = ptr_ix(dst));
-}
-void umbra_store_32x2(builder *b, umbra_ptr dst, val lo, val hi) {
-    push(b, op_store_32x2, VX(lo), VY(hi), .ptr = ptr_ix(dst));
-}
-void umbra_load_8x4(builder *b, umbra_ptr src, val out[4]) {
-    val px = push(b, op_load_8x4, .ptr = ptr_ix(src));
-    for (int i = 0; i < 4; i++) {
-        out[i] = val_make(val_id(px), i);
-    }
-}
-void umbra_store_8x4(builder *b, umbra_ptr dst, val const in[4]) {
-    push(b, op_store_8x4, VX(in[0]), VY(in[1]), VZ(in[2]), VW(in[3]),
-         .ptr = ptr_ix(dst));
 }
 void umbra_store_16(builder *b, umbra_ptr dst, val v) {
     push(b, op_store_16, VY(v), .ptr = ptr_ix(dst));
@@ -722,14 +694,7 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         enum op const         op = ip->op;
 
         if (is_store(op)) {
-            {
-                fprintf(f, "      %-15s p%d", op_name(op), ip->ptr);
-                if (op == op_store_32x2) {
-                    fprintf(f, " v%d v%d", (int)ip->x.id, (int)ip->y.id);
-                }
-                if (op != op_store_32x2) { fprintf(f, " v%d", (int)ip->y.id); }
-                fprintf(f, "\n");
-            }
+            fprintf(f, "      %-15s p%d v%d\n", op_name(op), ip->ptr, (int)ip->y.id);
             continue;
         }
 
@@ -745,8 +710,6 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_gather_16: fprintf(f, " p%d v%d", ip->ptr, (int)ip->x.id); break;
         case op_load_16:
         case op_load_32:
-        case op_load_32x2:
-        case op_load_8x4:
         case op_load_color: fprintf(f, " p%d", ip->ptr); break;
         case op_deref_ptr: fprintf(f, " p%d byte%d", ip->ptr, ip->imm); break;
         case op_x:
@@ -754,8 +717,6 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
 
         case op_store_16:
         case op_store_32:
-        case op_store_32x2:
-        case op_store_8x4:
         case op_store_color: break;
 
         case op_sqrt_f32:
@@ -894,14 +855,10 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     case op_uniform_32:
     case op_load_32:
     case op_load_16:
-    case op_load_32x2:
-    case op_load_8x4:
     case op_load_color:
     case op_store_32:
-    case op_store_8x4:
     case op_store_color:
     case op_store_16:
-    case op_store_32x2:
     case op_gather_uniform_32:
     case op_gather_32:
     case op_gather_16:

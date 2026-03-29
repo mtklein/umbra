@@ -85,14 +85,9 @@ umbra_val umbra_gather_32(struct umbra_builder*, umbra_ptr, umbra_val ix);
 
 umbra_val umbra_load_16(struct umbra_builder*, umbra_ptr);
 umbra_val umbra_load_32(struct umbra_builder*, umbra_ptr);
-void      umbra_load_32x2(struct umbra_builder*, umbra_ptr, umbra_val *lo, umbra_val *hi);
 
 void      umbra_store_16(struct umbra_builder*, umbra_ptr, umbra_val);
 void      umbra_store_32(struct umbra_builder*, umbra_ptr, umbra_val);
-void      umbra_store_32x2(struct umbra_builder*, umbra_ptr, umbra_val lo, umbra_val hi);
-
-void      umbra_load_8x4 (struct umbra_builder*, umbra_ptr, umbra_val out[4]);
-void      umbra_store_8x4(struct umbra_builder*, umbra_ptr, umbra_val const in[4]);
 
 umbra_color umbra_load_color (struct umbra_builder*, umbra_ptr);
 void        umbra_store_color(struct umbra_builder*, umbra_ptr, umbra_color);

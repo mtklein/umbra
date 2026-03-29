@@ -118,14 +118,10 @@ static _Bool is_16(enum op op) {
 static _Bool is_32(enum op op) {
     return op == op_uniform_32
         || op == op_load_32
-        || op == op_load_32x2
-        || op == op_load_8x4
         || op == op_load_color
         || op == op_gather_uniform_32
         || op == op_gather_32
         || op == op_store_32
-        || op == op_store_32x2
-        || op == op_store_8x4
         || op == op_store_color
         || op == op_deref_ptr;
 }
@@ -183,36 +179,6 @@ static void emit_ops(Buf *b, BB const *bb,
                      "(p%d + y * buf_rbs[%d]))[x];\n",
                      pad, i, p, p);
             } break;
-            case op_load_32x2: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
-                emit(b, "%suint v%d = "
-                        "((device uint*)"
-                        "(p%d + y * buf_rbs[%d]))"
-                        "[x*2];\n"
-                        "%suint v%d_1 = "
-                        "((device uint*)"
-                        "(p%d + y * buf_rbs[%d]))"
-                        "[x*2+1];\n",
-                     pad, i, p, p,
-                     pad, i, p, p);
-            } break;
-            case op_load_8x4: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
-                emit(b, "%suint v%d_px = "
-                        "((device uint*)"
-                        "(p%d + y * buf_rbs[%d]))[x];\n"
-                        "%suint v%d = v%d_px & 0xFFu;\n"
-                        "%suint v%d_1 = (v%d_px >> 8) & 0xFFu;\n"
-                        "%suint v%d_2 = (v%d_px >> 16) & 0xFFu;\n"
-                        "%suint v%d_3 = v%d_px >> 24;\n",
-                     pad, i, p, p,
-                     pad, i, i,
-                     pad, i, i,
-                     pad, i, i,
-                     pad, i, i);
-            } break;
             case op_gather_uniform_32:
             case op_gather_32: {
                 int p = inst->ptr < 0
@@ -242,31 +208,6 @@ static void emit_ops(Buf *b, BB const *bb,
                      "[x] = %s;\n",
                      pad, p, p, vy);
             } break;
-            case op_store_32x2: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
-                emit(b, "%s((device uint*)"
-                        "(p%d + y * buf_rbs[%d]))"
-                        "[x*2] = %s;\n"
-                        "%s((device uint*)"
-                        "(p%d + y * buf_rbs[%d]))"
-                        "[x*2+1] = %s;\n",
-                     pad, p, p, vx,
-                     pad, p, p, vy);
-            } break;
-            case op_store_8x4: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
-                emit(b, "%s((device uint*)"
-                        "(p%d + y * buf_rbs[%d]))"
-                        "[x] = (%s & 0xFFu)"
-                        " | ((%s & 0xFFu) << 8)"
-                        " | ((%s & 0xFFu) << 16)"
-                        " | (%s << 24);\n",
-                     pad, p, p,
-                     vx, vy, vz, vw);
-            } break;
-
             case op_load_color: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
