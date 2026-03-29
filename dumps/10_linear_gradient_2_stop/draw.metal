@@ -84,8 +84,6 @@ kernel void umbra_entry(
                 ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc30.x*1023.0)) | (uint(rint(sc30.y*1023.0))<<10) | (uint(rint(sc30.z*1023.0))<<20) | (uint(rint(sc30.w*3.0))<<30); break; }
       case 4u: { device half *hp = (device half*)(p1 + y * buf_rbs[1]) + x*4;
                 hp[0]=half(sc30.x); hp[1]=half(sc30.y); hp[2]=half(sc30.z); hp[3]=half(sc30.w); break; }
-      case 5u: ((device half*)(p1 + y * buf_rbs[1]))[x] = half(sc30.x); break;
-      case 6u: ((device float*)(p1 + y * buf_rbs[1]))[x] = sc30.x; break;
       case 7u: { ((device half*)(p1 + y * buf_rbs[1]))[x] = half(sc30.x); ((device half*)(p1_g + y * buf_rbs[1]))[x] = half(sc30.y); ((device half*)(p1_b + y * buf_rbs[1]))[x] = half(sc30.z); ((device half*)(p1_a + y * buf_rbs[1]))[x] = half(sc30.w); break; }
       default: break;
     }

@@ -281,10 +281,6 @@ static void emit_ops(Buf *b, BB const *bb,
                      "%s            v%d_c = float4(float(px&0x3FFu)/1023.0, float((px>>10)&0x3FFu)/1023.0, float((px>>20)&0x3FFu)/1023.0, float(px>>30)/3.0); break; }\n"
                      "%s  case 4u: { device half *hp = (device half*)(p%d + y * buf_rbs[%d]) + x*4;\n"
                      "%s            v%d_c = float4(hp[0], hp[1], hp[2], hp[3]); break; }\n"
-                     "%s  case 5u: { half h = ((device half*)(p%d + y * buf_rbs[%d]))[x];\n"
-                     "%s            v%d_c = float4(float(h), 0, 0, 1); break; }\n"
-                     "%s  case 6u: { float f = ((device float*)(p%d + y * buf_rbs[%d]))[x];\n"
-                     "%s            v%d_c = float4(f, 0, 0, 1); break; }\n"
                      "%s  case 7u: { v%d_c = float4("
                      "float(((device half*)(p%d + y * buf_rbs[%d]))[x]),"
                      "float(((device half*)(p%d_g + y * buf_rbs[%d]))[x]),"
@@ -313,10 +309,6 @@ static void emit_ops(Buf *b, BB const *bb,
                      "%suint v%d_3 = as_type<uint>(v%d_c.w);\n",
                      pad, i,
                      pad, p,
-                     pad, p, p,
-                     pad, i,
-                     pad, p, p,
-                     pad, i,
                      pad, p, p,
                      pad, i,
                      pad, p, p,
@@ -383,8 +375,6 @@ static void emit_ops(Buf *b, BB const *bb,
                      "%s  case 4u: { device half *hp = (device half*)(p%d + y * buf_rbs[%d]) + x*4;\n"
                      "%s            hp[0]=half(sc%d.x); hp[1]=half(sc%d.y);"
                      " hp[2]=half(sc%d.z); hp[3]=half(sc%d.w); break; }\n"
-                     "%s  case 5u: ((device half*)(p%d + y * buf_rbs[%d]))[x] = half(sc%d.x); break;\n"
-                     "%s  case 6u: ((device float*)(p%d + y * buf_rbs[%d]))[x] = sc%d.x; break;\n"
                      "%s  case 7u: {"
                      " ((device half*)(p%d + y * buf_rbs[%d]))[x] = half(sc%d.x);"
                      " ((device half*)(p%d_g + y * buf_rbs[%d]))[x] = half(sc%d.y);"
@@ -418,8 +408,6 @@ static void emit_ops(Buf *b, BB const *bb,
                      i, i, i, i,
                      pad, p, p,
                      pad, i, i, i, i,
-                     pad, p, p, i,
-                     pad, p, p, i,
                      pad, p, p, i, p, p, i, p, p, i, p, p, i,
                      pad,
                      pad);

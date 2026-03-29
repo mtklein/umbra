@@ -850,40 +850,9 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                         v[2].f32 = f16_to_f32(hb);
                         v[3].f32 = f16_to_f32(ha);
                     } break;
-                    case umbra_fmt_f16: {
-                        U16 px;
-                        if (rem >= K) {
-                            __builtin_memcpy(&px, src + i * 2, sizeof px);
-                        } else {
-                            px = (U16){0};
-                            for (int ll = 0; ll < rem; ll++) {
-                                uint16_t tmp;
-                                __builtin_memcpy(&tmp, src + (i + ll) * 2, 2);
-                                px[ll] = tmp;
-                            }
-                        }
-                        v[0].f32 = f16_to_f32(px);
-                        v[1].f32 = (F32){0};
-                        v[2].f32 = (F32){0};
-                        v[3].f32 = (F32){0} + 1.f;
-                    } break;
-                    case umbra_fmt_f32: {
-                        F32 px;
-                        if (rem >= K) {
-                            __builtin_memcpy(&px, src + i * 4, sizeof px);
-                        } else {
-                            px = (F32){0};
-                            for (int ll = 0; ll < rem; ll++) {
-                                float tmp;
-                                __builtin_memcpy(&tmp, src + (i + ll) * 4, 4);
-                                px[ll] = tmp;
-                            }
-                        }
-                        v[0].f32 = px;
-                        v[1].f32 = (F32){0};
-                        v[2].f32 = (F32){0};
-                        v[3].f32 = (F32){0} + 1.f;
-                    } break;
+                    case umbra_fmt_f16:
+                    case umbra_fmt_f32:
+                    case umbra_fmt_none: break;
                     case umbra_fmt_f16_planar: {
                         size_t const rb = buf[ip->ptr].row_bytes;
                         char const *src_r = (char const*)buf[ip->ptr].ptr  + (size_t)row * rb;
@@ -910,7 +879,6 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                         v[2].f32 = f16_to_f32(hb);
                         v[3].f32 = f16_to_f32(ha);
                     } break;
-                    case umbra_fmt_none: break;
                     }
                     {
                         umbra_transfer const *tf = &buf[ip->ptr].transfer;
@@ -1018,27 +986,9 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                             __builtin_memcpy(dst + (i + ll) * 8, h, 8);
                         }
                     } break;
-                    case umbra_fmt_f16: {
-                        U16 const px = f32_to_f16(cr);
-                        if (rem >= K) {
-                            __builtin_memcpy(dst + i * 2, &px, sizeof px);
-                        } else {
-                            for (int ll = 0; ll < rem; ll++) {
-                                uint16_t tmp = px[ll];
-                                __builtin_memcpy(dst + (i + ll) * 2, &tmp, 2);
-                            }
-                        }
-                    } break;
-                    case umbra_fmt_f32: {
-                        if (rem >= K) {
-                            __builtin_memcpy(dst + i * 4, &cr, sizeof cr);
-                        } else {
-                            for (int ll = 0; ll < rem; ll++) {
-                                float tmp = cr[ll];
-                                __builtin_memcpy(dst + (i + ll) * 4, &tmp, 4);
-                            }
-                        }
-                    } break;
+                    case umbra_fmt_f16:
+                    case umbra_fmt_f32:
+                    case umbra_fmt_none: break;
                     case umbra_fmt_f16_planar: {
                         size_t const rb = buf[ip->ptr].row_bytes;
                         char *dst_r = (char*)buf[ip->ptr].ptr  + (size_t)row * rb;
@@ -1064,7 +1014,6 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                             }
                         }
                     } break;
-                    case umbra_fmt_none: break;
                     }
                 } NEXT;
 
