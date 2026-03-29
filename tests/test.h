@@ -21,7 +21,7 @@ static inline test_backends test_backends_make(struct umbra_basic_block const *b
     B.be[1] = umbra_backend_jit();
     B.be[2] = umbra_backend_metal();
     for (int i = 0; i < NUM_BACKENDS; i++) {
-        B.p[i] = B.be[i] ? umbra_program(B.be[i], bb) : NULL;
+        B.p[i] = B.be[i] ? B.be[i]->compile(B.be[i], bb) : NULL;
     }
     B.p[0] != 0 here;
 #if defined(__aarch64__) || defined(__AVX2__)
@@ -43,7 +43,7 @@ static inline _Bool test_backends_run(test_backends *B, int bi, int r, int b,
 
 static inline void test_backends_free(test_backends *B) {
     for (int i = 0; i < NUM_BACKENDS; i++) {
-        umbra_program_free(B->p[i]);
+        if (B->p[i]) { B->p[i]->free_fn(B->p[i]->ctx); free(B->p[i]); }
         umbra_backend_free(B->be[i]);
     }
 }

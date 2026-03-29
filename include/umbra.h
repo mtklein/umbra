@@ -51,37 +51,16 @@ struct umbra_program {
     struct umbra_backend *backend;
 };
 
-static inline struct umbra_program *umbra_program(struct umbra_backend           *be,
-                                                  struct umbra_basic_block const *bb) {
-    return be->compile(be, bb);
-}
-static inline void umbra_program_free(struct umbra_program *p) {
-    if (p) {
-        p->free_fn(p->ctx);
-        free(p);
-    }
-}
 static inline void umbra_program_queue(struct umbra_program *p,
                                        int l, int t, int r, int b, umbra_buf buf[]) {
     if (r > l && b > t) {
         p->queue(p->ctx, l, t, r, b, buf);
     }
 }
-static inline struct umbra_backend *umbra_program_backend(struct umbra_program const *p) {
-    return p->backend;
-}
-static inline void umbra_program_dump(struct umbra_program *p, FILE *f) {
-    if (p && p->dump) {
-        p->dump(p->ctx, f);
-    }
-}
 static inline void umbra_backend_flush(struct umbra_backend *be) {
     if (be && be->flush) {
         be->flush(be);
     }
-}
-static inline _Bool umbra_backend_threadsafe(struct umbra_backend const *be) {
-    return be && be->threadsafe;
 }
 static inline void umbra_backend_free(struct umbra_backend *be) {
     if (be) {

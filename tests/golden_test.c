@@ -53,7 +53,7 @@ static void build_fill(int fmt) {
         umbra_basic_block(builder);
     umbra_builder_free(builder);
     fill_pipes[fmt].prog =
-        umbra_program(interp_be, opt);
+        interp_be->compile(interp_be, opt);
     umbra_basic_block_free(opt);
 }
 
@@ -69,7 +69,7 @@ static void build_readback(int fmt) {
         umbra_basic_block(builder);
     umbra_builder_free(builder);
     readback_pipes[fmt].prog =
-        umbra_program(interp_be, opt);
+        interp_be->compile(interp_be, opt);
     umbra_basic_block_free(opt);
 }
 
@@ -83,8 +83,8 @@ static void build_pipes(void) {
 
 static void free_pipes(void) {
     for (int f = 0; f < NUM_FMTS; f++) {
-        umbra_program_free(fill_pipes[f].prog);
-        umbra_program_free(readback_pipes[f].prog);
+        fill_pipes[f].prog->free_fn(fill_pipes[f].prog->ctx); free(fill_pipes[f].prog);
+        readback_pipes[f].prog->free_fn(readback_pipes[f].prog->ctx); free(readback_pipes[f].prog);
     }
     umbra_backend_free(interp_be);
 }
@@ -169,7 +169,7 @@ static void test_slide_golden(
     struct umbra_program *progs[N_BACKS];
     for (int bi = 0; bi < N_BACKS; bi++) {
         progs[bi] = bes[bi]
-            ? umbra_program(bes[bi], bb)
+            ? bes[bi]->compile(bes[bi], bb)
             : NULL;
     }
     umbra_basic_block_free(bb);
@@ -223,7 +223,7 @@ static void test_slide_golden(
     free(pbuf_ref);
     free(pbuf_tst);
     for (int bi = 0; bi < N_BACKS; bi++) {
-        umbra_program_free(progs[bi]);
+        if (progs[bi]) { progs[bi]->free_fn(progs[bi]->ctx); free(progs[bi]); }
         umbra_backend_free(bes[bi]);
     }
     s->fmt = saved_fmt;
@@ -245,7 +245,7 @@ static void test_slug_rect(void) {
     struct umbra_backend *be =
         umbra_backend_interp();
     struct umbra_program *acc =
-        umbra_program(be, abb);
+        be->compile(be, abb);
     umbra_basic_block_free(abb);
 
     umbra_draw_layout lay;
@@ -257,7 +257,7 @@ static void test_slug_rect(void) {
         umbra_basic_block(bld);
     umbra_builder_free(bld);
     struct umbra_program *interp =
-        umbra_program(be, bb);
+        be->compile(be, bb);
     umbra_basic_block_free(bb);
 
     uint32_t pixels[W * H];
@@ -310,8 +310,8 @@ static void test_slug_rect(void) {
     pixels[38*W + 30] == bg here;
     pixels[20*W + 70] == bg here;
 
-    umbra_program_free(acc);
-    umbra_program_free(interp);
+    acc->free_fn(acc->ctx); free(acc);
+    interp->free_fn(interp->ctx); free(interp);
     umbra_backend_free(be);
 }
 
@@ -334,7 +334,7 @@ static void test_perspective_text(void) {
         umbra_basic_block(bld);
     umbra_builder_free(bld);
     struct umbra_program *interp =
-        umbra_program(be, bb);
+        be->compile(be, bb);
     umbra_basic_block_free(bb);
 
     uint32_t pixels[BW];
@@ -365,7 +365,7 @@ static void test_perspective_text(void) {
     pixels[8] == 0xffffffff here;
     pixels[0] == 0xff000000 here;
 
-    umbra_program_free(interp);
+    interp->free_fn(interp->ctx); free(interp);
 
     text_cov tc = text_rasterize(W, H, 24.0f, 0);
 
@@ -377,7 +377,7 @@ static void test_perspective_text(void) {
         &lay2);
     bb = umbra_basic_block(bld);
     umbra_builder_free(bld);
-    interp = umbra_program(be, bb);
+    interp = be->compile(be, bb);
     umbra_basic_block_free(bb);
 
     uint32_t px2[W * H];
@@ -410,7 +410,7 @@ static void test_perspective_text(void) {
     }
     changed > 0 here;
 
-    umbra_program_free(interp);
+    interp->free_fn(interp->ctx); free(interp);
     umbra_backend_free(be);
     text_cov_free(&tc);
 }

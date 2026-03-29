@@ -28,7 +28,7 @@ static umbra_draw_layout     draw_layout;
 
 static void free_programs(void) {
     for (int i = 0; i < NUM_BACKENDS; i++) {
-        umbra_program_free(programs[i]);
+        if (programs[i]) { programs[i]->free_fn(programs[i]->ctx); free(programs[i]); }
         programs[i] = NULL;
     }
 }
@@ -57,7 +57,7 @@ typedef struct {
 static pipe fill_pipe, readback_pipe, hdr_pipe;
 
 static void free_pipe(pipe *p) {
-    umbra_program_free(p->program);
+    if (p->program) { p->program->free_fn(p->program->ctx); free(p->program); }
     *p = (pipe){0};
 }
 
@@ -68,7 +68,7 @@ static void finish_pipe(pipe *p, builder *builder) {
     p->uni_len = umbra_uni_len(builder);
     struct umbra_basic_block *bb = umbra_basic_block(builder);
     umbra_builder_free(builder);
-    p->program = umbra_program(pipe_be, bb);
+    p->program = pipe_be->compile(pipe_be, bb);
     umbra_basic_block_free(bb);
 }
 
@@ -129,7 +129,7 @@ static struct umbra_basic_block *saved_bb;
 
 static void free_xtra(void) {
     for (int t = 1; t < max_threads; t++) {
-        umbra_program_free(xtra_progs[t]);
+        if (xtra_progs[t]) { xtra_progs[t]->free_fn(xtra_progs[t]->ctx); free(xtra_progs[t]); }
         xtra_progs[t] = NULL;
     }
 }
@@ -138,7 +138,7 @@ static void rebuild_xtra(int backend) {
     free_xtra();
     if (!saved_bb || n_threads <= 1 || !bes[backend]) { return; }
     for (int t = 1; t < n_threads; t++) {
-        xtra_progs[t] = umbra_program(bes[backend], saved_bb);
+        xtra_progs[t] = bes[backend]->compile(bes[backend], saved_bb);
     }
 }
 
@@ -161,7 +161,7 @@ static void build_slide_fmt(slide *s, int fmt) {
     umbra_builder_free(builder);
 
     for (int i = 0; i < NUM_BACKENDS; i++) {
-        programs[i] = bes[i] ? umbra_program(bes[i], bb) : NULL;
+        programs[i] = bes[i] ? bes[i]->compile(bes[i], bb) : NULL;
     }
     umbra_basic_block_free(saved_bb);
     saved_bb = bb;
@@ -382,11 +382,11 @@ int main(void) {
                 int y0 = t * sh;
                 int y1 = y0 + sh > H ? H : y0 + sh;
                 struct umbra_program *tp;
-                if (!umbra_backend_threadsafe(bes[cur_backend])) { tp = b; }
+                if (!bes[cur_backend]->threadsafe) { tp = b; }
                 else { tp = t == 0 ? b : xtra_progs[t]; }
                 work[t] = (tile_work){s, W, H, y0, y1, pixbuf, &draw_layout, tp};
             }
-            if (!umbra_backend_threadsafe(bes[cur_backend])) {
+            if (!bes[cur_backend]->threadsafe) {
                 for (int t = 0; t < nt; t++) { tile_fn(&work[t]); }
             } else {
                 work_group wg = {.pool = pool};

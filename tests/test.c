@@ -2537,29 +2537,26 @@ static void test_jit_xs_init(void) {
 
 static void test_backend_threadsafe(void) {
     struct umbra_backend *interp = umbra_backend_interp();
-    umbra_backend_threadsafe(interp) == 1 here;
+    interp->threadsafe == 1 here;
     umbra_backend_free(interp);
 
     struct umbra_backend *jit = umbra_backend_jit();
     if (jit) {
-        umbra_backend_threadsafe(jit) == 1 here;
+        jit->threadsafe == 1 here;
         umbra_backend_free(jit);
     }
 
     struct umbra_backend *metal = umbra_backend_metal();
     if (metal) {
-        umbra_backend_threadsafe(metal) == 0 here;
+        metal->threadsafe == 0 here;
         umbra_backend_free(metal);
     }
 
-    umbra_backend_threadsafe(NULL) == 0 here;
 }
 
 static void test_program_null_guards(void) {
     umbra_backend_flush(NULL);
     umbra_backend_free(NULL);
-    umbra_program_free(NULL);
-    umbra_program_dump(NULL, NULL);
 
     // flush/dump on backends that don't have those fns
     struct umbra_backend *be = umbra_backend_interp();
@@ -2569,18 +2566,18 @@ static void test_program_null_guards(void) {
     umbra_store_32(b, (umbra_ptr){0, 0}, umbra_load_32(b, (umbra_ptr){0, 0}));
     struct umbra_basic_block *bb = umbra_basic_block(b);
     umbra_builder_free(b);
-    struct umbra_program *p = umbra_program(be, bb);
+    struct umbra_program *p = be->compile(be, bb);
     umbra_basic_block_free(bb);
 
     // dump on interpreter (no dump fn)
-    umbra_program_dump(p, stdout);
+    if (p->dump) { p->dump(p->ctx, stdout); }
 
     // queue with w=0 and h=0
     int32_t buf[1] = {0};
     umbra_program_queue(p, 0, 0, 0, 1, (umbra_buf[]){{.ptr=buf, .sz=4}});
     umbra_program_queue(p, 0, 0, 1, 0, (umbra_buf[]){{.ptr=buf, .sz=4}});
 
-    umbra_program_free(p);
+    p->free_fn(p->ctx); free(p);
     umbra_backend_free(be);
 }
 

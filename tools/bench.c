@@ -55,9 +55,9 @@ int main(int argc, char *argv[]) {
         struct umbra_backend *be_i = umbra_backend_interp();
         struct umbra_backend *be_j = umbra_backend_jit();
         struct umbra_backend *be_m = umbra_backend_metal();
-        struct umbra_program *interp = umbra_program(be_i, bb);
-        struct umbra_program *jit = be_j ? umbra_program(be_j, bb) : NULL;
-        struct umbra_program *mtl = be_m ? umbra_program(be_m, bb) : NULL;
+        struct umbra_program *interp = be_i->compile(be_i, bb);
+        struct umbra_program *jit = be_j ? be_j->compile(be_j, bb) : NULL;
+        struct umbra_program *mtl = be_m ? be_m->compile(be_m, bb) : NULL;
         umbra_basic_block_free(bb);
 
         int   bpp = umbra_pixel_bytes(s->fmt);
@@ -88,9 +88,9 @@ int main(int argc, char *argv[]) {
 
         printf("\n");
 
-        umbra_program_free(interp);
-        umbra_program_free(jit);
-        umbra_program_free(mtl);
+        interp->free_fn(interp->ctx); free(interp);
+        if (jit) { jit->free_fn(jit->ctx); free(jit); }
+        if (mtl) { mtl->free_fn(mtl->ctx); free(mtl); }
         umbra_backend_free(be_i);
         umbra_backend_free(be_j);
         umbra_backend_free(be_m);
@@ -107,9 +107,9 @@ int main(int argc, char *argv[]) {
         struct umbra_backend *be_i = umbra_backend_interp();
         struct umbra_backend *be_j = umbra_backend_jit();
         struct umbra_backend *be_m = umbra_backend_metal();
-        struct umbra_program *interp = umbra_program(be_i, bb);
-        struct umbra_program *jit = be_j ? umbra_program(be_j, bb) : NULL;
-        struct umbra_program *mtl = be_m ? umbra_program(be_m, bb) : NULL;
+        struct umbra_program *interp = be_i->compile(be_i, bb);
+        struct umbra_program *jit = be_j ? be_j->compile(be_j, bb) : NULL;
+        struct umbra_program *mtl = be_m ? be_m->compile(be_m, bb) : NULL;
         umbra_basic_block_free(bb);
 
         float *wind = calloc((size_t)(W * H), 4);
@@ -161,9 +161,9 @@ int main(int argc, char *argv[]) {
         }
         printf("\n");
 
-        umbra_program_free(interp);
-        umbra_program_free(jit);
-        umbra_program_free(mtl);
+        interp->free_fn(interp->ctx); free(interp);
+        if (jit) { jit->free_fn(jit->ctx); free(jit); }
+        if (mtl) { mtl->free_fn(mtl->ctx); free(mtl); }
         umbra_backend_free(be_i);
         umbra_backend_free(be_j);
         umbra_backend_free(be_m);
