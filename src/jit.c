@@ -377,122 +377,86 @@ static struct ra *ra_create_arm64(struct umbra_basic_block const *bb, struct jit
 }
 
 // Emit inline NEON approx_powf for one channel register.
-// ch = the SIMD register to transform in-place.
-// t0..t4 = scratch SIMD registers.
-// exp_v = SIMD register holding the exponent (g or 1/g), broadcast.
-// zero = SIMD register of all zeros.
-// one = SIMD register of all 1.0f.
-static void emit_approx_powf_arm64(Buf *c, struct pool *pool,
-                                   int ch, int t0, int t1, int t2, int t3,
-                                   int exp_v, int zero) {
-    // x = max(ch, 0)
-    put(c, FMAXNM_4s(ch, ch, zero));
-
-    // --- approx_log2(x) ---
-    // xi = reinterpret_as_int(x) — already in ch, use integer ops
-    // e = to_float(xi) * (1.0f / (1<<23))
-    put(c, SCVTF_4s(t0, ch));                           // t0 = to_float(xi)
-    arm64_pool_load(c, pool, t1, f2u(1.0f / 8388608.0f));  // t1 = 1/(1<<23)
-    put(c, FMUL_4s(t0, t0, t1));                        // t0 = e
-
-    // m = reinterpret_as_float((xi & 0x007fffff) | 0x3f000000)
-    arm64_pool_load(c, pool, t1, 0x007fffff);            // t1 = mantissa mask
-    put(c, AND_16b(t2, ch, t1));                         // t2 = xi & mask
-    arm64_pool_load(c, pool, t1, 0x3f000000);            // t1 = 0.5f exponent
-    put(c, ORR_16b(t2, t2, t1));                         // t2 = m (as float)
-
-    // result = e - 124.225515 - 1.498030*m - 1.725880/(0.352089 + m)
-    arm64_pool_load(c, pool, t1, f2u(0.3520887068f));
-    put(c, FADD_4s(t3, t2, t1));                         // t3 = 0.352089 + m
-    arm64_pool_load(c, pool, t1, f2u(1.7258800268f));
-    put(c, FDIV_4s(t3, t1, t3));                         // t3 = 1.725880 / (0.352089+m)
-    arm64_pool_load(c, pool, t1, f2u(124.2255153f));
-    put(c, FSUB_4s(t0, t0, t1));                         // t0 = e - 124.225515
-    arm64_pool_load(c, pool, t1, f2u(1.4980303049f));
-    put(c, FMLS_4s(t0, t2, t1));                         // t0 -= 1.498030 * m
-    put(c, FSUB_4s(t0, t0, t3));                         // t0 = log2(x)
-
-    // --- scaled = log2(x) * exponent ---
-    put(c, FMUL_4s(t0, t0, exp_v));                     // t0 = log2(x) * exp
-
-    // --- approx_pow2(t0) ---
-    // f = t0 - floor(t0)
-    put(c, FRINTM_4s(t1, t0));                          // t1 = floor(t0)
-    put(c, FSUB_4s(t2, t0, t1));                         // t2 = f
-
-    // approx = t0 + 121.274058 - 1.490129*f + 27.728023/(4.842526 - f)
-    arm64_pool_load(c, pool, t1, f2u(4.8425264359f));
-    put(c, FSUB_4s(t3, t1, t2));                         // t3 = 4.842526 - f
-    arm64_pool_load(c, pool, t1, f2u(27.7280235f));
-    put(c, FDIV_4s(t3, t1, t3));                         // t3 = 27.728023/(4.842526-f)
-    arm64_pool_load(c, pool, t1, f2u(121.2740575f));
-    put(c, FADD_4s(t0, t0, t1));                         // t0 = x + 121.274058
-    arm64_pool_load(c, pool, t1, f2u(1.4901290827f));
-    put(c, FMLS_4s(t0, t2, t1));                         // t0 -= 1.490129 * f
-    put(c, FADD_4s(t0, t0, t3));                         // t0 = approx
-
-    // clamp: approx = clamp(approx * (1<<23), 0, 0x7f800000)
-    arm64_pool_load(c, pool, t1, f2u(8388608.0f));       // t1 = 1<<23
-    put(c, FMUL_4s(t0, t0, t1));                         // t0 *= (1<<23)
-    put(c, FMAXNM_4s(t0, t0, zero));                    // clamp low
-    arm64_pool_load(c, pool, t1, 0x4f000000);            // t1 = (float)0x7f800000
-    put(c, FMINNM_4s(t0, t0, t1));                      // clamp high
-    put(c, FCVTNS_4s(t0, t0));                           // round to nearest int
-    // t0 now holds the result (reinterpreted as float)
-
-    // Copy result to ch. We also need to handle x==0: if original x was 0,
-    // the log2 path produces garbage but clamp to 0 handles it.
-    // For x==1 the approximation is close enough.
-    put(c, ORR_16b(ch, t0, t0));                         // ch = result
-}
-
-// Emit inline NEON transfer function for ARM64 (no function call).
-// Invert: x >= e ? pow((x-b)/a, g) : (x-f)/c
-// sRGB inline conversion for 3 channels (R, G, B).
-// invert=1: sRGB→linear  (x >= 0.04045 ? pow((x+0.055)/1.055, 2.4) : x/12.92)
-// invert=0: linear→sRGB  (x >= 0.0031308 ? 1.055*pow(x, 1/2.4)-0.055 : 12.92*x)
+// Skia-style sRGB conversion for 3 channels using polynomial (from) and
+// rsqrt/rcp rational (to) approximations.  t0/t1/t2 are scratch registers.
 static void emit_srgb_arm64(Buf *c, struct pool *pool,
                              int r_ch0, int r_ch1, int r_ch2,
-                             int t0, int t1, int t2, int t3, int t4,
-                             int tmask, int lin, int exp_v, int zero,
+                             int t0, int t1, int t2,
                              _Bool invert) {
-
-    put(c, MOVI_4s(zero, 0, 0));
-    arm64_pool_load(c, pool, exp_v, invert ? f2u(2.4f) : f2u(1.0f/2.4f));
+    // from_srgb (invert=1): lo = s/12.92; hi = s²*(0.3s+0.6975)+0.0025
+    // to_srgb   (invert=0): lo = l*12.92; hi = (c+t*(k1+t*k2))*rcp(d+t)
+    //                        where t = rsqrt(l) with one NR step
 
     int const channels[3] = { r_ch0, r_ch1, r_ch2 };
     for (int ch_i = 0; ch_i < 3; ch_i++) {
         int const ch = channels[ch_i];
 
         if (invert) {
-            arm64_pool_load(c, pool, t0, f2u(0.04045f));
-            put(c, FCMGE_4s(tmask, ch, t0));
-
-            arm64_pool_load(c, pool, t0, f2u(0.055f));
-            put(c, FADD_4s(t4, ch, t0));
-            arm64_pool_load(c, pool, t0, f2u(1.0f/1.055f));
-            put(c, FMUL_4s(t4, t4, t0));
-            emit_approx_powf_arm64(c, pool, t4, t0, t1, t2, t3, exp_v, zero);
-
+            // lo = s * (1/12.92)
             arm64_pool_load(c, pool, t0, f2u(1.0f/12.92f));
-            put(c, FMUL_4s(lin, ch, t0));
+            put(c, FMUL_4s(t0, ch, t0));                 // t0 = lo
+
+            // hi = s*s * (0.3*s + 0.6975) + 0.0025
+            arm64_pool_load(c, pool, t1, f2u(0.6975f));
+            arm64_pool_load(c, pool, t2, f2u(0.3f));
+            put(c, FMLA_4s(t1, ch, t2));                 // t1 = 0.6975 + 0.3*s
+            put(c, FMUL_4s(t2, ch, ch));                  // t2 = s*s
+            put(c, FMUL_4s(t1, t2, t1));                  // t1 = s*s*(0.3*s+0.6975)
+            arm64_pool_load(c, pool, t2, f2u(0.0025f));
+            put(c, FADD_4s(t1, t1, t2));                  // t1 = hi
+
+            // sel = s < 0.055 ? lo : hi
+            arm64_pool_load(c, pool, t2, f2u(0.055f));
+            put(c, FCMGE_4s(t2, ch, t2));                 // t2 = s >= 0.055
+            put(c, ORR_16b(ch, t0, t0));                   // ch = lo
+            put(c, BIT_16b(ch, t1, t2));                   // ch = t2 ? hi : lo
         } else {
-            arm64_pool_load(c, pool, t0, f2u(0.0031308f));
-            put(c, FCMGE_4s(tmask, ch, t0));
+            // t0 = rsqrt(ch) with one NR step
+            put(c, MOVI_4s(t1, 0, 0));
+            put(c, FMAXNM_4s(ch, ch, t1));               // clamp >= 0
+            put(c, FRSQRTE_4s(t0, ch));                   // t0 = estimate
+            put(c, FMUL_4s(t1, t0, t0));                  // t1 = e*e
+            put(c, FRSQRTS_4s(t1, ch, t1));               // t1 = (3-ch*e²)/2
+            put(c, FMUL_4s(t0, t0, t1));                  // t0 = refined rsqrt = t
 
-            put(c, ORR_16b(t4, ch, ch));
-            emit_approx_powf_arm64(c, pool, t4, t0, t1, t2, t3, exp_v, zero);
-            arm64_pool_load(c, pool, t0, f2u(1.055f));
-            put(c, FMUL_4s(t4, t0, t4));
-            arm64_pool_load(c, pool, t0, f2u(0.055f));
-            put(c, FSUB_4s(t4, t4, t0));
+            // lo = ch * 12.92
+            arm64_pool_load(c, pool, t1, f2u(12.92f));
+            put(c, FMUL_4s(t1, ch, t1));                  // t1 = lo
 
-            arm64_pool_load(c, pool, t0, f2u(12.92f));
-            put(c, FMUL_4s(lin, t0, ch));
+            // numerator = c + t*(k1 + t*k2)
+            arm64_pool_load(c, pool, t2, f2u(-0.00245423456f));
+            put(c, FMUL_4s(t2, t0, t2));                  // t2 = t*k2
+            arm64_pool_load(c, pool, ch, f2u(0.01383202704f));
+            put(c, FADD_4s(t2, t2, ch));                   // t2 = k1 + t*k2
+            put(c, FMUL_4s(t2, t0, t2));                   // t2 = t*(k1+t*k2)
+            arm64_pool_load(c, pool, ch, f2u(1.12999999523f));
+            put(c, FADD_4s(t2, t2, ch));                   // t2 = numerator
+
+            // denominator = rcp(d + t) with one NR step
+            arm64_pool_load(c, pool, ch, f2u(0.14138144254f));
+            put(c, FADD_4s(ch, ch, t0));                   // ch = d + t
+            put(c, FRECPE_4s(t0, ch));                     // t0 = rcp estimate
+            put(c, FRECPS_4s(ch, ch, t0));                 // ch = 2 - (d+t)*est
+            put(c, FMUL_4s(t0, t0, ch));                   // t0 = refined rcp
+
+            // hi = numerator * rcp(denominator)
+            put(c, FMUL_4s(t2, t2, t0));                   // t2 = hi
+
+            // sel = l < 0.00465985 ? lo : hi
+            arm64_pool_load(c, pool, t0, f2u(0.00465985f));
+            put(c, FCMGE_4s(t0, ch, t0));
+            // Wait, ch was clobbered. We need original l for the comparison.
+            // Problem: ch was overwritten during numerator/denominator computation.
+            // We need to keep l around. Use t1 (lo) as the fallback base.
+            // Actually the comparison is on the original linear value, but we
+            // clobbered ch. Let me restructure to save lo and compare against it.
+            // The comparison l < 0.00465985 and lo = l*12.92. If l < thresh then
+            // lo < thresh*12.92 = 0.06019. We can compare lo < 0.06019 instead.
+            arm64_pool_load(c, pool, t0, f2u(0.00465985f * 12.92f));
+            put(c, FCMGE_4s(t0, t1, t0));                 // t0 = lo >= (thresh*12.92)
+            put(c, ORR_16b(ch, t1, t1));                   // ch = lo
+            put(c, BIT_16b(ch, t2, t0));                   // ch = t0 ? hi : lo
         }
-
-        put(c, ORR_16b(ch, lin, lin));
-        put(c, BIT_16b(ch, t4, tmask));
     }
 }
 
@@ -950,14 +914,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t px   = ra_alloc(ra, sl, ns);
             int8_t t0   = ra_alloc(ra, sl, ns);
             int8_t t1   = ra_alloc(ra, sl, ns);
-            // Extra temps for sRGB (allocated unconditionally for RA consistency).
-            int8_t st2    = ra_alloc(ra, sl, ns);
-            int8_t st3    = ra_alloc(ra, sl, ns);
-            int8_t st4    = ra_alloc(ra, sl, ns);
-            int8_t stmask = ra_alloc(ra, sl, ns);
-            int8_t slin   = ra_alloc(ra, sl, ns);
-            int8_t sexp   = ra_alloc(ra, sl, ns);
-            int8_t szero  = ra_alloc(ra, sl, ns);
+            int8_t st2  = ra_alloc(ra, sl, ns);  // extra temp for sRGB
 
             // Load fmt: LDR w_XT, [XBUF, #(p*sizeof(umbra_buf)+offsetof(fmt))]
             {
@@ -1206,8 +1163,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 // sRGB→linear on RGB only.
                 emit_srgb_arm64(c, &jc->pool,
                                 s0.rd, r1, r2,
-                                t0, t1, st2, st3, st4,
-                                stmask, slin, sexp, szero,
+                                t0, t1, st2,
                                 /*invert=*/1);
             }
             br_done[n_done] = c->len; n_done++;
@@ -1225,12 +1181,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 c->buf[br_done[j]] = B(c->len - br_done[j]);
             }
 
-            ra_return_reg(ra, szero);
-            ra_return_reg(ra, sexp);
-            ra_return_reg(ra, slin);
-            ra_return_reg(ra, stmask);
-            ra_return_reg(ra, st4);
-            ra_return_reg(ra, st3);
             ra_return_reg(ra, st2);
             ra_return_reg(ra, t1);
             ra_return_reg(ra, t0);
@@ -1254,15 +1204,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t px    = ra_alloc(ra, sl, ns);
             int8_t t     = ra_alloc(ra, sl, ns);
             // Extra temps for sRGB.
-            int8_t st0    = ra_alloc(ra, sl, ns);
-            int8_t st1    = ra_alloc(ra, sl, ns);
-            int8_t st2    = ra_alloc(ra, sl, ns);
-            int8_t st3    = ra_alloc(ra, sl, ns);
-            int8_t st4    = ra_alloc(ra, sl, ns);
-            int8_t stmask = ra_alloc(ra, sl, ns);
-            int8_t slin   = ra_alloc(ra, sl, ns);
-            int8_t sexp   = ra_alloc(ra, sl, ns);
-            int8_t szero  = ra_alloc(ra, sl, ns);
+            int8_t st0 = ra_alloc(ra, sl, ns);
+            int8_t st1 = ra_alloc(ra, sl, ns);
+            int8_t st2 = ra_alloc(ra, sl, ns);
 
             // Load fmt.
             {
@@ -1463,8 +1407,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 // linear→sRGB on RGB only.
                 emit_srgb_arm64(c, &jc->pool,
                                 rr, rg, rb_,
-                                st0, st1, st2, st3, st4,
-                                stmask, slin, sexp, szero,
+                                st0, st1, st2,
                                 /*invert=*/0);
                 // Same as 8888 encode.
                 union { float f; uint32_t u; } s255 = {.f = 255.0f};
@@ -1497,12 +1440,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 c->buf[br_done[j]] = B(c->len - br_done[j]);
             }
 
-            ra_return_reg(ra, szero);
-            ra_return_reg(ra, sexp);
-            ra_return_reg(ra, slin);
-            ra_return_reg(ra, stmask);
-            ra_return_reg(ra, st4);
-            ra_return_reg(ra, st3);
             ra_return_reg(ra, st2);
             ra_return_reg(ra, st1);
             ra_return_reg(ra, st0);
