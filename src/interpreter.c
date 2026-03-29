@@ -193,13 +193,14 @@ static void interp_load_color(val v[4], umbra_buf const *b,
         v[1].f32 = cast(F32, (I32)((px >>  8) & mask)) * inv;
         v[2].f32 = cast(F32, (I32)((px >> 16) & mask)) * inv;
         v[3].f32 = cast(F32, (I32)(px >> 24))          * inv;
-        for (int ll = 0; ll < clamp; ll++) {
-            for (int ch = 0; ch < 3; ch++) {
-                float x = v[ch].f32[ll];
-                v[ch].f32[ll] = x >= 0.04045f
-                    ? powf((x + 0.055f) / 1.055f, 2.4f)
-                    : x / 12.92f;
-            }
+        // sRGB→linear: polynomial approximation (no powf).
+        for (int ch = 0; ch < 3; ch++) {
+            F32 s = v[ch].f32;
+            F32 lo = s * ((F32){0} + (1.0f/12.92f));
+            F32 hi = s*s * (s * ((F32){0} + 0.3000f) + ((F32){0} + 0.6975f))
+                   + ((F32){0} + 0.0025f);
+            I32 sel = cast(I32, s < ((F32){0} + 0.055f));
+            v[ch].i32 = (sel & cast(I32, lo)) | (~sel & cast(I32, hi));
         }
     } break;
     case umbra_fmt_f16:
@@ -304,11 +305,29 @@ static void interp_store_color(val const v[], umbra_buf const *b,
         }
     } break;
     case umbra_fmt_srgb: {
-        for (int ll = 0; ll < clamp; ll++) {
-            float xr = cr[ll], xg = cg[ll], xb = cb[ll];
-            cr[ll] = xr >= 0.0031308f ? 1.055f * powf(xr, 1.0f/2.4f) - 0.055f : 12.92f * xr;
-            cg[ll] = xg >= 0.0031308f ? 1.055f * powf(xg, 1.0f/2.4f) - 0.055f : 12.92f * xg;
-            cb[ll] = xb >= 0.0031308f ? 1.055f * powf(xb, 1.0f/2.4f) - 0.055f : 12.92f * xb;
+        // linear→sRGB: rsqrt/rcp rational approximation (no powf).
+        // Interpreter uses exact 1/sqrt and 1/x.
+        {
+            F32 const thresh = (F32){0} + 0.00465985f;
+            F32 const s12_92 = (F32){0} + 12.92f;
+            F32 const c_ = (F32){0} + 1.12999999523f;
+            F32 const d_ = (F32){0} + 0.14137776196f;
+            F32 const k1 = (F32){0} + 0.01383202704f;
+            F32 const k2 = (F32){0} + (-0.00245423456f);
+            F32 *chs[3] = {&cr, &cg, &cb};
+            for (int ci = 0; ci < 3; ci++) {
+                F32 l = vec_max(*chs[ci], (F32){0});
+                F32 t = (F32){0};
+                for (int ll = 0; ll < K; ll++) {
+                    t[ll] = l[ll] > 0.0f ? 1.0f / sqrtf(l[ll]) : 0.0f;
+                }
+                F32 lo = l * s12_92;
+                F32 hi_num = t * (t * k2 + k1) + c_;
+                F32 hi_den = d_ + t;
+                F32 hi = hi_num / hi_den;
+                I32 sel = cast(I32, l < thresh);
+                *chs[ci] = cast(F32, (sel & cast(I32, lo)) | (~sel & cast(I32, hi)));
+            }
         }
         F32 const zero = {0}, one = (F32){0} + 1.f, scale = (F32){0} + 255.f;
         F32 const rc = vec_round(vec_min(vec_max(cr, zero), one) * scale);
