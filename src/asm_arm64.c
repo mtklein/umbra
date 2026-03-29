@@ -337,15 +337,6 @@ uint32_t INS_elem_s(int d, int dst_lane, int n, int src_lane) {
     uint32_t imm4 = (uint32_t)(src_lane << 2);
     return 0x6e000400u | (imm5 << 16) | (imm4 << 11) | ((uint32_t)n << 5) | (uint32_t)d;
 }
-// LD2 {Vt.4S, V(t+1).4S}, [Xn]  — Q=1, L=1, opcode=1000, size=10
-uint32_t LD2_4s(int t, int n) {
-    return 0x4c408800u | ((uint32_t)n << 5) | (uint32_t)t;
-}
-// ST2 {Vt.4S, V(t+1).4S}, [Xn]  — Q=1, L=0, opcode=1000, size=10
-uint32_t ST2_4s(int t, int n) {
-    return 0x4c008800u | ((uint32_t)n << 5) | (uint32_t)t;
-}
-
 uint32_t LD1_s(int t, int idx, int n) {
     uint32_t Q = ((uint32_t)idx >> 1) & 1;
     uint32_t S = (uint32_t)idx & 1;
