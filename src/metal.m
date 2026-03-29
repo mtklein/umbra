@@ -287,22 +287,13 @@ static void emit_ops(Buf *b, BB const *bb,
                      "float(((device half*)(row+ps))[x]),"
                      "float(((device half*)(row+2*ps))[x]),"
                      "float(((device half*)(row+3*ps))[x])); break; }\n"
+                     "%s  case 8u: { uint px = ((device uint*)(p%d + y * buf_rbs[%d]))[x];\n"
+                     "%s            v%d_c = float4(px & 0xFFu, (px>>8)&0xFFu, (px>>16)&0xFFu, px>>24) / 255.0;\n"
+                     "%s            for (int ch = 0; ch < 3; ch++) {\n"
+                     "%s              float xv = v%d_c[ch];\n"
+                     "%s              v%d_c[ch] = xv >= 0.04045 ? pow((xv+0.055)/1.055, 2.4) : xv/12.92;\n"
+                     "%s            } break; }\n"
                      "%s  default: v%d_c = float4(0); break;\n"
-                     "%s}\n"
-                     "%s{ float tf_a = buf_transfers[%d*7+0];\n"
-                     "%s  if (tf_a != 0.0) {\n"
-                     "%s    float tf_b = buf_transfers[%d*7+1];\n"
-                     "%s    float tf_c = buf_transfers[%d*7+2];\n"
-                     "%s    float tf_e = buf_transfers[%d*7+4];\n"
-                     "%s    float tf_f = buf_transfers[%d*7+5];\n"
-                     "%s    float tf_g = buf_transfers[%d*7+6];\n"
-                     "%s    for (int ch = 0; ch < 3; ch++) {\n"
-                     "%s      float xv = v%d_c[ch];\n"
-                     "%s      v%d_c[ch] = xv >= tf_e"
-                     " ? pow((xv - tf_b) / tf_a, tf_g)"
-                     " : (xv - tf_f) / tf_c;\n"
-                     "%s    }\n"
-                     "%s  }\n"
                      "%s}\n"
                      "%suint v%d = as_type<uint>(v%d_c.x);\n"
                      "%suint v%d_1 = as_type<uint>(v%d_c.y);\n"
@@ -320,20 +311,13 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i,
                      pad, p, p, p,
                      pad, i,
+                     pad, p, p,
                      pad, i,
-                     pad,
-                     pad, p,
-                     pad,
-                     pad, p,
-                     pad, p,
-                     pad, p,
-                     pad, p,
-                     pad, p,
                      pad,
                      pad, i,
                      pad, i,
                      pad,
-                     pad,
+                     pad, i,
                      pad,
                      pad, i, i,
                      pad, i, i,
@@ -346,21 +330,6 @@ static void emit_ops(Buf *b, BB const *bb,
                 emit(b,
                      "%sfloat4 sc%d = float4(as_type<float>(%s), as_type<float>(%s),"
                      " as_type<float>(%s), as_type<float>(%s));\n"
-                     "%s{ float tf_a = buf_transfers[%d*7+0];\n"
-                     "%s  if (tf_a != 0.0) {\n"
-                     "%s    float tf_b = buf_transfers[%d*7+1];\n"
-                     "%s    float tf_c = buf_transfers[%d*7+2];\n"
-                     "%s    float tf_d = buf_transfers[%d*7+3];\n"
-                     "%s    float tf_f = buf_transfers[%d*7+5];\n"
-                     "%s    float tf_g = buf_transfers[%d*7+6];\n"
-                     "%s    for (int ch = 0; ch < 3; ch++) {\n"
-                     "%s      float xv = sc%d[ch];\n"
-                     "%s      sc%d[ch] = xv >= tf_d"
-                     " ? tf_a * pow(xv, 1.0 / tf_g) + tf_b"
-                     " : tf_c * xv + tf_f;\n"
-                     "%s    }\n"
-                     "%s  }\n"
-                     "%s}\n"
                      "%sswitch (buf_fmts[%d]) {\n"
                      "%s  case 1u: { sc%d = clamp(sc%d, 0.0, 1.0);\n"
                      "%s            ((device uint*)(p%d + y * buf_rbs[%d]))[x] ="
@@ -382,22 +351,16 @@ static void emit_ops(Buf *b, BB const *bb,
                      " ((device half*)(row+ps))[x] = half(sc%d.y);"
                      " ((device half*)(row+2*ps))[x] = half(sc%d.z);"
                      " ((device half*)(row+3*ps))[x] = half(sc%d.w); break; }\n"
+                     "%s  case 8u: { for (int ch = 0; ch < 3; ch++) {\n"
+                     "%s              float xv = sc%d[ch];\n"
+                     "%s              sc%d[ch] = xv >= 0.0031308 ? 1.055*pow(xv,1.0/2.4)-0.055 : 12.92*xv;\n"
+                     "%s            } sc%d = clamp(sc%d, 0.0, 1.0);\n"
+                     "%s            ((device uint*)(p%d + y * buf_rbs[%d]))[x] ="
+                     " uint(rint(sc%d.x*255.0)) | (uint(rint(sc%d.y*255.0))<<8)"
+                     " | (uint(rint(sc%d.z*255.0))<<16) | (uint(rint(sc%d.w*255.0))<<24); break; }\n"
                      "%s  default: break;\n"
                      "%s}\n",
                      pad, i, vx, vy, vz, vw,
-                     pad, p,
-                     pad,
-                     pad, p,
-                     pad, p,
-                     pad, p,
-                     pad, p,
-                     pad, p,
-                     pad,
-                     pad, i,
-                     pad, i,
-                     pad,
-                     pad,
-                     pad,
                      pad, p,
                      pad, i, i,
                      pad, p, p,
@@ -412,6 +375,12 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i, i, i, i,
                      pad, p, p, p,
                      pad, i, i, i, i,
+                     pad,
+                     pad, i,
+                     pad, i,
+                     pad, i, i,
+                     pad, p, p,
+                     i, i, i, i,
                      pad,
                      pad);
             } break;
@@ -926,15 +895,13 @@ static char* build_source(BB const *bb,
          ",\n    constant uint *buf_rbs [[buffer(%d)]]"
          ",\n    constant uint &x0 [[buffer(%d)]]"
          ",\n    constant uint &y0 [[buffer(%d)]]"
-         ",\n    constant uint *buf_fmts [[buffer(%d)]]"
-         ",\n    constant float *buf_transfers [[buffer(%d)]]",
+         ",\n    constant uint *buf_fmts [[buffer(%d)]]",
          total_bufs + 0,
          total_bufs + 1,
          total_bufs + 2,
          total_bufs + 3,
          total_bufs + 4,
-         total_bufs + 5,
-         total_bufs + 6);
+         total_bufs + 5);
     for (int p = 0; p <= max_ptr; p++) {
         emit(&b,
              ",\n    device uchar *p%d"
@@ -1150,20 +1117,12 @@ static void encode_dispatch(
     uint32_t *szs_data  = calloc((size_t)(tb + 1), sizeof *szs_data);
     uint32_t *rbs_data  = calloc((size_t)(tb + 1), sizeof *rbs_data);
     uint32_t *fmts_data = calloc((size_t)(tb + 1), sizeof *fmts_data);
-    float *transfers_data = calloc((size_t)(tb + 1) * 7, sizeof *transfers_data);
     for (int i = 0; i <= m->max_ptr; i++) {
         if (buf[i].ptr && buf[i].sz) {
             szs_data[i] = (uint32_t)buf[i].sz;
         }
         rbs_data[i]  = (uint32_t)buf[i].row_bytes;
         fmts_data[i] = (uint32_t)buf[i].fmt;
-        transfers_data[i * 7 + 0] = buf[i].transfer.a;
-        transfers_data[i * 7 + 1] = buf[i].transfer.b;
-        transfers_data[i * 7 + 2] = buf[i].transfer.c;
-        transfers_data[i * 7 + 3] = buf[i].transfer.d;
-        transfers_data[i * 7 + 4] = buf[i].transfer.e;
-        transfers_data[i * 7 + 5] = buf[i].transfer.f;
-        transfers_data[i * 7 + 6] = buf[i].transfer.g;
     }
 
     __builtin_memset(m->per_bufs, 0,
@@ -1336,18 +1295,6 @@ static void encode_dispatch(
         per_fmts.contents, fmts_data, sz_bytes);
     batch_retain_buf(
         be, (__bridge_retained void*)per_fmts);
-    size_t tf_bytes = (size_t)(tb + 1) * 7
-                    * sizeof(float);
-    id<MTLBuffer> per_transfers =
-        [device newBufferWithLength:tf_bytes
-                options:
-                    MTLResourceStorageModeShared];
-    __builtin_memcpy(
-        per_transfers.contents,
-        transfers_data, tf_bytes);
-    batch_retain_buf(
-        be,
-        (__bridge_retained void*)per_transfers);
     for (int i = 0; i < m->total_bufs; i++) {
         if (m->per_bufs[i]) {
             [enc setBuffer:
@@ -1375,9 +1322,6 @@ static void encode_dispatch(
     [enc setBuffer:per_fmts
             offset:0
            atIndex:(NSUInteger)(m->total_bufs + 5)];
-    [enc setBuffer:per_transfers
-            offset:0
-           atIndex:(NSUInteger)(m->total_bufs + 6)];
 
 
     MTLSize grid =
@@ -1398,7 +1342,6 @@ static void encode_dispatch(
     free(szs_data);
     free(rbs_data);
     free(fmts_data);
-    free(transfers_data);
 }
 
 void umbra_metal_run(
