@@ -53,9 +53,9 @@ kernel void umbra_entry(
                 v19_c = float4(float(px&0x3FFu)/1023.0, float((px>>10)&0x3FFu)/1023.0, float((px>>20)&0x3FFu)/1023.0, float(px>>30)/3.0); break; }
       case 4u: { device half *hp = (device half*)(p1 + y * buf_rbs[1]) + x*4;
                 v19_c = float4(hp[0], hp[1], hp[2], hp[3]); break; }
-      case 7u: { device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_szs[1]/4;
+      case 5u: { device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_szs[1]/4;
                 v19_c = float4(float(((device half*)row)[x]),float(((device half*)(row+ps))[x]),float(((device half*)(row+2*ps))[x]),float(((device half*)(row+3*ps))[x])); break; }
-      case 8u: { uint px = ((device uint*)(p1 + y * buf_rbs[1]))[x];
+      case 6u: { uint px = ((device uint*)(p1 + y * buf_rbs[1]))[x];
                 v19_c = float4(px & 0xFFu, (px>>8)&0xFFu, (px>>16)&0xFFu, px>>24) / 255.0;
                 for (int ch = 0; ch < 3; ch++) {
                   float s = v19_c[ch];
@@ -89,9 +89,9 @@ kernel void umbra_entry(
                 ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc32.x*1023.0)) | (uint(rint(sc32.y*1023.0))<<10) | (uint(rint(sc32.z*1023.0))<<20) | (uint(rint(sc32.w*3.0))<<30); break; }
       case 4u: { device half *hp = (device half*)(p1 + y * buf_rbs[1]) + x*4;
                 hp[0]=half(sc32.x); hp[1]=half(sc32.y); hp[2]=half(sc32.z); hp[3]=half(sc32.w); break; }
-      case 7u: { device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_szs[1]/4;
+      case 5u: { device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_szs[1]/4;
                 ((device half*)row)[x] = half(sc32.x); ((device half*)(row+ps))[x] = half(sc32.y); ((device half*)(row+2*ps))[x] = half(sc32.z); ((device half*)(row+3*ps))[x] = half(sc32.w); break; }
-      case 8u: { for (int ch = 0; ch < 3; ch++) {
+      case 6u: { for (int ch = 0; ch < 3; ch++) {
                   float l = max(sc32[ch], 0.0);
                   float t = 1.0/sqrt(max(l, 1e-30));
                   float lo = l * 12.92;

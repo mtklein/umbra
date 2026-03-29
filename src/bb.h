@@ -10,9 +10,6 @@ typedef union {
     struct { unsigned chan : 2, id : 30; };
 } val_;
 
-int       val_id  (umbra_val);
-umbra_val val_make(int id, int chan);
-
 #define OP_LIST(X)                                                                        \
     X(x) X(y)                                                                             \
     X(imm_32)                                                                             \

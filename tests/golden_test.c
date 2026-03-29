@@ -24,7 +24,7 @@ static char const *fmt_name[] = {
 };
 static umbra_fmt const fmt_enums[] = {
     umbra_fmt_8888, umbra_fmt_565, umbra_fmt_fp16,
-    umbra_fmt_f16_planar, umbra_fmt_1010102, umbra_fmt_srgb,
+    umbra_fmt_fp16_planar, umbra_fmt_1010102, umbra_fmt_srgb,
 };
 
 typedef struct {
@@ -93,7 +93,7 @@ static void free_pipes(void) {
 
 static size_t pixbuf_size(int fmt) {
     int   bpp = umbra_pixel_bytes(fmt_enums[fmt]);
-    int   planes = (fmt_enums[fmt] == umbra_fmt_f16_planar) ? 4 : 1;
+    int   planes = (fmt_enums[fmt] == umbra_fmt_fp16_planar) ? 4 : 1;
     return (size_t)(W * H * bpp * planes);
 }
 

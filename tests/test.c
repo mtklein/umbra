@@ -2520,9 +2520,9 @@ static void test_load_store_color_f16_planar(void) {
         __builtin_memset(dst, 0, sizeof dst);
         if (!run(&B, bi, W, H, (umbra_buf[]){
             {.ptr=src, .sz=sizeof src, .row_bytes=W*2,
-             .fmt=umbra_fmt_f16_planar},
+             .fmt=umbra_fmt_fp16_planar},
             {.ptr=dst, .sz=sizeof dst, .row_bytes=W*2,
-             .fmt=umbra_fmt_f16_planar},
+             .fmt=umbra_fmt_fp16_planar},
         })) { continue; }
         (0 == __builtin_memcmp(dst, src, sizeof src)) here;
     }

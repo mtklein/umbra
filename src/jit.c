@@ -981,8 +981,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             put(c, B(0));
             c->buf[br_skip_fp16] = Bcond(0x1, c->len - br_skip_fp16);
 
-            // --- umbra_fmt_f16_planar (=7) ---
-            put(c, CMP_wi(XT, 7));
+            // --- umbra_fmt_fp16_planar (=5) ---
+            put(c, CMP_wi(XT, 5));
             int br_skip_f16_planar = c->len;
             put(c, Bcond(0x1, 0));
             {
@@ -1034,8 +1034,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             put(c, B(0));
             c->buf[br_skip_f16_planar] = Bcond(0x1, c->len - br_skip_f16_planar);
 
-            // --- umbra_fmt_srgb (=8) ---
-            put(c, CMP_wi(XT, 8));
+            // --- umbra_fmt_srgb (=6) ---
+            put(c, CMP_wi(XT, 6));
             int br_skip_srgb = c->len;
             put(c, Bcond(0x1, 0));
             {
@@ -1264,8 +1264,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             put(c, B(0));
             c->buf[br_skip_fp16] = Bcond(0x1, c->len - br_skip_fp16);
 
-            // --- umbra_fmt_f16_planar (=7) ---
-            put(c, CMP_wi(XT, 7));
+            // --- umbra_fmt_fp16_planar (=5) ---
+            put(c, CMP_wi(XT, 5));
             int br_skip_f16_planar_s = c->len;
             put(c, Bcond(0x1, 0));
             {
@@ -1296,8 +1296,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             put(c, B(0));
             c->buf[br_skip_f16_planar_s] = Bcond(0x1, c->len - br_skip_f16_planar_s);
 
-            // --- umbra_fmt_srgb (=8) ---
-            put(c, CMP_wi(XT, 8));
+            // --- umbra_fmt_srgb (=6) ---
+            put(c, CMP_wi(XT, 6));
             int br_skip_srgb_s = c->len;
             put(c, Bcond(0x1, 0));
             {
@@ -2648,8 +2648,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             br_done[n_done] = jmp(c); n_done++;
             patch_jcc(c, br_skip_fp16);
 
-            // --- umbra_fmt_f16_planar (=7) ---
-            cmp_ri(c, RAX, 7);
+            // --- umbra_fmt_fp16_planar (=5) ---
+            cmp_ri(c, RAX, 5);
             int br_skip_f16_planar = jcc(c, 0x05);
             {
                 int const sz_off = p * (int)sizeof(umbra_buf)
@@ -2759,8 +2759,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             vpxor(c, 1, r2, r2, r2);
             vpxor(c, 1, r3, r3, r3);
 
-            // --- umbra_fmt_srgb (=8) ---
-            cmp_ri(c, RAX, 8);
+            // --- umbra_fmt_srgb (=6) ---
+            cmp_ri(c, RAX, 6);
             int br_skip_srgb = jcc(c, 0x05);
             {
                 if (scalar) { vex_mem(c, 1, 1, 0, 0, px, 0, 0x6e, base, XI, 4, 0); }
@@ -3008,8 +3008,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             br_done[n_done] = jmp(c); n_done++;
             patch_jcc(c, br_skip_fp16);
 
-            // --- umbra_fmt_f16_planar (=7) ---
-            cmp_ri(c, RAX, 7);
+            // --- umbra_fmt_fp16_planar (=5) ---
+            cmp_ri(c, RAX, 5);
             int br_skip_f16_planar_s = jcc(c, 0x05);
             {
                 int const sz_off = p * (int)sizeof(umbra_buf)
@@ -3115,8 +3115,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             br_done[n_done] = jmp(c); n_done++;
             patch_jcc(c, br_skip_f16_planar_s);
 
-            // --- umbra_fmt_srgb (=8) ---
-            cmp_ri(c, RAX, 8);
+            // --- umbra_fmt_srgb (=6) ---
+            cmp_ri(c, RAX, 6);
             int br_skip_srgb_s = jcc(c, 0x05);
             {
                 emit_srgb_x86(c, &jc->pool,

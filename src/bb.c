@@ -5,8 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int       val_id  (umbra_val v)          { return ((val_){.bits = v.bits}).id; }
-umbra_val val_make(int id, int chan)    { return (umbra_val){.bits = ((val_){.id=(unsigned)id, .chan=(unsigned)chan}).bits}; }
+static int       val_id  (umbra_val v)       { return ((val_){.bits = v.bits}).id; }
+static umbra_val val_make(int id, int chan)  { return (umbra_val){.bits = ((val_){.id=(unsigned)id, .chan=(unsigned)chan}).bits}; }
 
 typedef struct umbra_builder builder;
 typedef umbra_val            val;
@@ -18,9 +18,7 @@ int umbra_pixel_bytes(umbra_fmt fmt) {
     case umbra_fmt_565:        return 2;
     case umbra_fmt_1010102:    return 4;
     case umbra_fmt_fp16:       return 8;
-    case umbra_fmt_f16:        return 2;
-    case umbra_fmt_f32:        return 4;
-    case umbra_fmt_f16_planar: return 2;
+    case umbra_fmt_fp16_planar: return 2;
     case umbra_fmt_srgb:       return 4;
     }
     return 0;
