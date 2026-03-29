@@ -3462,8 +3462,111 @@ static void test_ra_chan_unary(void) {
     cleanup(&B);
 }
 
+// Exercise mul-by-power-of-2 peephole where imm has lower val ID than operand.
+static void test_mul_pow2_peephole(void) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_val four = umbra_imm_i32(b, 4);  // low ID
+    umbra_val a = umbra_load_32(b, (umbra_ptr){0, 0});  // higher ID
+    umbra_val r = umbra_mul_i32(b, a, four);  // sort puts four as x → pow2 x-path
+    umbra_store_32(b, (umbra_ptr){1, 0}, r);
+    backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        int32_t src[] = {3,7,10,0};
+        int32_t dst[4] = {0};
+        if (!run(&B, bi, 4, 1, (umbra_buf[]){
+            {.ptr=src, .sz=sizeof src}, {.ptr=dst, .sz=sizeof dst},
+        })) { continue; }
+        (dst[0] == 12) here; (dst[1] == 28) here; (dst[2] == 40) here; (dst[3] == 0) here;
+    }
+    cleanup(&B);
+}
+
+// Exercise umbra_const_eval: op(imm, imm) constant folding.
+// All results are compile-time constants stored to a single output buffer.
+static void test_const_eval(void) {
+    // Split into two programs to stay under Metal's 31-buffer limit.
+    // Part 1: float ops
+    {
+        struct umbra_builder *b = umbra_builder();
+        umbra_val fa = umbra_imm_f32(b, 10.f);
+        umbra_val fc = umbra_imm_f32(b, 3.f);
+        umbra_store_32(b, (umbra_ptr){0, 0}, umbra_add_f32(b, fa, fc));
+        umbra_store_32(b, (umbra_ptr){1, 0}, umbra_sub_f32(b, fa, fc));
+        umbra_store_32(b, (umbra_ptr){2, 0}, umbra_mul_f32(b, fa, fc));
+        umbra_store_32(b, (umbra_ptr){3, 0}, umbra_div_f32(b, fa, fc));
+        umbra_store_32(b, (umbra_ptr){4, 0}, umbra_min_f32(b, fa, fc));
+        umbra_store_32(b, (umbra_ptr){5, 0}, umbra_max_f32(b, fa, fc));
+        umbra_store_32(b, (umbra_ptr){6, 0}, umbra_sqrt_f32(b, fc));
+        umbra_store_32(b, (umbra_ptr){7, 0}, umbra_abs_f32(b, umbra_imm_f32(b, -5.f)));
+        umbra_store_32(b, (umbra_ptr){8, 0}, umbra_neg_f32(b, fc));
+        umbra_store_32(b, (umbra_ptr){9, 0}, umbra_round_f32(b, umbra_imm_f32(b, 3.7f)));
+        umbra_store_32(b, (umbra_ptr){10, 0}, umbra_floor_f32(b, umbra_imm_f32(b, 3.7f)));
+        umbra_store_32(b, (umbra_ptr){11, 0}, umbra_ceil_f32(b, umbra_imm_f32(b, 3.2f)));
+        umbra_store_32(b, (umbra_ptr){12, 0}, umbra_round_i32(b, umbra_imm_f32(b, 3.7f)));
+        umbra_store_32(b, (umbra_ptr){13, 0}, umbra_floor_i32(b, umbra_imm_f32(b, 3.7f)));
+        umbra_store_32(b, (umbra_ptr){14, 0}, umbra_ceil_i32(b, umbra_imm_f32(b, 3.2f)));
+        umbra_store_32(b, (umbra_ptr){15, 0}, umbra_f32_from_i32(b, umbra_imm_i32(b, 10)));
+        umbra_store_32(b, (umbra_ptr){16, 0}, umbra_i32_from_f32(b, fa));
+        umbra_store_32(b, (umbra_ptr){17, 0}, umbra_eq_f32(b, fa, fc));
+        umbra_store_32(b, (umbra_ptr){18, 0}, umbra_lt_f32(b, fa, fc));
+        umbra_store_32(b, (umbra_ptr){19, 0}, umbra_le_f32(b, fa, fc));
+        backends B = make(b);
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            int32_t d[20][4];
+            __builtin_memset(d, 0, sizeof d);
+            umbra_buf bufs[20];
+            for (int i = 0; i < 20; i++) { bufs[i] = (umbra_buf){.ptr=d[i], .sz=16}; }
+            if (!run(&B, bi, 4, 1, bufs)) { continue; }
+            union { float f; int32_t i; } u;
+            u.f = 13.f; (d[0][0] == u.i) here;
+            u.f = 7.f;  (d[1][0] == u.i) here;
+            (d[12][0] == 4) here;
+            (d[13][0] == 3) here;
+            (d[14][0] == 4) here;
+            (d[16][0] == 10) here;
+        }
+        cleanup(&B);
+    }
+    // Part 2: integer ops
+    {
+        struct umbra_builder *b = umbra_builder();
+        umbra_val a = umbra_imm_i32(b, 10);
+        umbra_val c = umbra_imm_i32(b, 3);
+        umbra_store_32(b, (umbra_ptr){0, 0}, umbra_sub_i32(b, a, c));
+        umbra_store_32(b, (umbra_ptr){1, 0}, umbra_mul_i32(b, a, c));
+        umbra_store_32(b, (umbra_ptr){2, 0}, umbra_shl_i32(b, a, c));
+        umbra_store_32(b, (umbra_ptr){3, 0}, umbra_shr_u32(b, a, c));
+        umbra_store_32(b, (umbra_ptr){4, 0}, umbra_shr_s32(b, a, c));
+        umbra_store_32(b, (umbra_ptr){5, 0}, umbra_and_i32(b, a, c));
+        umbra_store_32(b, (umbra_ptr){6, 0}, umbra_or_i32(b, a, c));
+        umbra_store_32(b, (umbra_ptr){7, 0}, umbra_xor_i32(b, a, c));
+        umbra_store_32(b, (umbra_ptr){8, 0}, umbra_sel_i32(b, umbra_imm_i32(b, -1), a, c));
+        umbra_store_32(b, (umbra_ptr){9, 0}, umbra_eq_i32(b, a, c));
+        umbra_store_32(b, (umbra_ptr){10, 0}, umbra_lt_s32(b, a, c));
+        umbra_store_32(b, (umbra_ptr){11, 0}, umbra_le_s32(b, a, c));
+        umbra_store_32(b, (umbra_ptr){12, 0}, umbra_lt_u32(b, a, c));
+        umbra_store_32(b, (umbra_ptr){13, 0}, umbra_le_u32(b, a, c));
+        backends B = make(b);
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            int32_t d[14][4];
+            __builtin_memset(d, 0, sizeof d);
+            umbra_buf bufs[14];
+            for (int i = 0; i < 14; i++) { bufs[i] = (umbra_buf){.ptr=d[i], .sz=16}; }
+            if (!run(&B, bi, 4, 1, bufs)) { continue; }
+            (d[0][0] == 7)  here;   // 10-3
+            (d[1][0] == 30) here;   // 10*3
+            (d[7][0] == 9)  here;   // 10^3
+            (d[8][0] == 10) here;   // sel(-1, 10, 3) = 10
+            (d[9][0] == 0)  here;   // eq(10,3)=0
+        }
+        cleanup(&B);
+    }
+}
+
 int main(void) {
     test_ra_chan_unary();
+    test_mul_pow2_peephole();
+    test_const_eval();
     test_binary_m_rr();
     test_binary_r_mm();
     test_minmax_m_rm();
