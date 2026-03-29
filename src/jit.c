@@ -441,6 +441,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                      int *deref_rb_gpr, struct jit_ctx *jc);
 
 struct umbra_jit {
+    struct umbra_program base;
     void  *code;
     size_t code_size;
     void (*entry)(int, int, int, int, umbra_buf *);
@@ -1679,24 +1680,22 @@ done:
     if (have_asm) { remove(asm_path); }
 }
 
-static void run_jit(void *ctx, int l, int t, int r, int b, umbra_buf buf[]) {
-    umbra_jit_run(ctx, l, t, r, b, buf);
+static void run_jit(struct umbra_program *prog, int l, int t, int r, int b, umbra_buf buf[]) {
+    umbra_jit_run((struct umbra_jit*)prog, l, t, r, b, buf);
 }
-static void dump_jit(void const *ctx, FILE *f) { umbra_dump_jit_mca(ctx, f); }
-static void free_jit(void *ctx) { umbra_jit_free(ctx); }
+static void dump_jit(struct umbra_program const *prog, FILE *f) { umbra_dump_jit_mca((struct umbra_jit const*)prog, f); }
+static void free_jit(struct umbra_program *prog) { umbra_jit_free((struct umbra_jit*)prog); }
 static struct umbra_program *compile_jit(struct umbra_backend           *be,
                                          struct umbra_basic_block const *bb) {
     struct umbra_jit *const j = umbra_jit(bb);
     assert(j);
-    struct umbra_program *const prog = malloc(sizeof *prog);
-    *prog = (struct umbra_program){
-        .ctx     = j,
+    j->base = (struct umbra_program){
         .queue   = run_jit,
         .dump    = dump_jit,
-        .free = free_jit,
+        .free    = free_jit,
         .backend = be,
     };
-    return prog;
+    return &j->base;
 }
 static void flush_be_noop(struct umbra_backend *be) { (void)be; }
 static void free_be_jit(struct umbra_backend *be) { free(be); }
@@ -2080,6 +2079,7 @@ static int resolve_ptr_x86(Buf *c, int p, int *last_ptr, int const *deref_gpr,
 }
 
 struct umbra_jit {
+    struct umbra_program base;
     void  *code;
     size_t code_size, code_len;
     void (*entry)(int, int, int, int, umbra_buf *);
@@ -3679,24 +3679,22 @@ done:
     if (have_clean) { remove(cleanpath); }
 }
 
-static void run_jit(void *ctx, int l, int t, int r, int b, umbra_buf buf[]) {
-    umbra_jit_run(ctx, l, t, r, b, buf);
+static void run_jit(struct umbra_program *prog, int l, int t, int r, int b, umbra_buf buf[]) {
+    umbra_jit_run((struct umbra_jit*)prog, l, t, r, b, buf);
 }
-static void dump_jit(void const *ctx, FILE *f) { umbra_dump_jit_mca(ctx, f); }
-static void free_jit(void *ctx) { umbra_jit_free(ctx); }
+static void dump_jit(struct umbra_program const *prog, FILE *f) { umbra_dump_jit_mca((struct umbra_jit const*)prog, f); }
+static void free_jit(struct umbra_program *prog) { umbra_jit_free((struct umbra_jit*)prog); }
 static struct umbra_program *compile_jit(struct umbra_backend           *be,
                                          struct umbra_basic_block const *bb) {
     struct umbra_jit *const j = umbra_jit(bb);
     assert(j);
-    struct umbra_program *const prog = malloc(sizeof *prog);
-    *prog = (struct umbra_program){
-        .ctx     = j,
+    j->base = (struct umbra_program){
         .queue   = run_jit,
         .dump    = dump_jit,
-        .free = free_jit,
+        .free    = free_jit,
         .backend = be,
     };
-    return prog;
+    return &j->base;
 }
 static void flush_be_noop(struct umbra_backend *be) { (void)be; }
 static void free_be_jit(struct umbra_backend *be) { free(be); }

@@ -86,9 +86,9 @@ static void dump_bb(char const *dir, char const *name, struct umbra_builder *b) 
         if (!progs[i]) { continue; }
         snprintf(p, sizeof p, "%s/%s.%s", dir, name, exts[i]);
         FILE *f = fopen(p, "w");
-        if (progs[i]->dump) { progs[i]->dump(progs[i]->ctx, f); }
+        if (progs[i]->dump) { progs[i]->dump(progs[i], f); }
         fclose(f);
-        progs[i]->free(progs[i]->ctx); free(progs[i]);
+        progs[i]->free(progs[i]);
     }
     for (int i = 0; i < (int)(sizeof bes / sizeof bes[0]); i++) {
         if (bes[i]) { bes[i]->free(bes[i]); }

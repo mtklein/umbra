@@ -92,7 +92,7 @@ static void render_thumbnails(overview_state *st) {
 
 static void recompile(overview_state *st, struct umbra_backend *be) {
     if (be == st->be) { return; }
-    for (int i = 0; i < st->n_real; i++) { if (st->progs[i]) { st->progs[i]->free(st->progs[i]->ctx); free(st->progs[i]); } }
+    for (int i = 0; i < st->n_real; i++) { if (st->progs[i]) { st->progs[i]->free(st->progs[i]); } }
     st->be = be;
     for (int i = 0; i < st->n_real; i++) {
         st->progs[i] = be->compile(be, st->bbs[i]);
@@ -148,7 +148,7 @@ static void overview_draw(slide *s, int w, int h, int y0, int y1, void *buf,
 
 static void overview_cleanup(slide *s) {
     overview_state *st = s->state;
-    for (int i = 0; i < st->n_real; i++) { if (st->progs[i]) { st->progs[i]->free(st->progs[i]->ctx); free(st->progs[i]); } }
+    for (int i = 0; i < st->n_real; i++) { if (st->progs[i]) { st->progs[i]->free(st->progs[i]); } }
     for (int i = 0; i < st->n_real; i++) { umbra_basic_block_free(st->bbs[i]); }
     free(st->fb);
     free(st->tmp);

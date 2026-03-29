@@ -38,22 +38,20 @@ struct umbra_backend {
     struct umbra_program* (*compile)(struct umbra_backend*, struct umbra_basic_block const*);
     void                  (*flush)(struct umbra_backend*);
     void                  (*free)(struct umbra_backend*);
-    void                   *ctx;
     int                     threadsafe, :32;
 };
 
 struct umbra_program {
-    void *ctx;
-    void (*queue)(void*, int, int, int, int, umbra_buf[]);
-    void (*dump)(void const*, FILE*);
-    void (*free)(void*);
+    void (*queue)(struct umbra_program*, int l, int t, int r, int b, umbra_buf[]);
+    void (*dump)(struct umbra_program const*, FILE*);
+    void (*free)(struct umbra_program*);
     struct umbra_backend *backend;
 };
 
 static inline void umbra_program_queue(struct umbra_program *p,
                                        int l, int t, int r, int b, umbra_buf buf[]) {
     if (r > l && b > t) {
-        p->queue(p->ctx, l, t, r, b, buf);
+        p->queue(p, l, t, r, b, buf);
     }
 }
 

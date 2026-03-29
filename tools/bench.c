@@ -88,9 +88,9 @@ int main(int argc, char *argv[]) {
 
         printf("\n");
 
-        interp->free(interp->ctx); free(interp);
-        if (jit) { jit->free(jit->ctx); free(jit); }
-        if (mtl) { mtl->free(mtl->ctx); free(mtl); }
+        interp->free(interp);
+        if (jit) { jit->free(jit); }
+        if (mtl) { mtl->free(mtl); }
         be_i->free(be_i);
         if (be_j) { be_j->free(be_j); }
         if (be_m) { be_m->free(be_m); }
@@ -161,9 +161,9 @@ int main(int argc, char *argv[]) {
         }
         printf("\n");
 
-        interp->free(interp->ctx); free(interp);
-        if (jit) { jit->free(jit->ctx); free(jit); }
-        if (mtl) { mtl->free(mtl->ctx); free(mtl); }
+        interp->free(interp);
+        if (jit) { jit->free(jit); }
+        if (mtl) { mtl->free(mtl); }
         be_i->free(be_i);
         if (be_j) { be_j->free(be_j); }
         if (be_m) { be_m->free(be_m); }

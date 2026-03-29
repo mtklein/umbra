@@ -2567,14 +2567,14 @@ static void test_program_null_guards(void) {
     umbra_basic_block_free(bb);
 
     // dump on interpreter (no dump fn)
-    if (p->dump) { p->dump(p->ctx, stdout); }
+    if (p->dump) { p->dump(p, stdout); }
 
     // queue with w=0 and h=0
     int32_t buf[1] = {0};
     umbra_program_queue(p, 0, 0, 0, 1, (umbra_buf[]){{.ptr=buf, .sz=4}});
     umbra_program_queue(p, 0, 0, 1, 0, (umbra_buf[]){{.ptr=buf, .sz=4}});
 
-    p->free(p->ctx); free(p);
+    p->free(p);
     be->free(be);
 }
 

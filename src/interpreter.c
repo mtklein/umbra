@@ -526,6 +526,7 @@ struct sw_inst {
 #endif
 
 struct umbra_interpreter {
+    struct umbra_program base;
     struct sw_inst *inst;
     val            *v;
     umbra_buf      *buf;
@@ -1719,23 +1720,21 @@ static void umbra_interpreter_free(struct umbra_interpreter *p) {
     }
 }
 
-static void run_interp(void *ctx, int l, int t, int r, int b, umbra_buf buf[]) {
-    umbra_interpreter_run(ctx, l, t, r, b, buf);
+static void run_interp(struct umbra_program *prog, int l, int t, int r, int b, umbra_buf buf[]) {
+    umbra_interpreter_run((struct umbra_interpreter*)prog, l, t, r, b, buf);
 }
-static void free_interp(void *ctx) { umbra_interpreter_free(ctx); }
+static void free_interp(struct umbra_program *prog) { umbra_interpreter_free((struct umbra_interpreter*)prog); }
 static struct umbra_program *compile_interp(struct umbra_backend           *be,
                                             struct umbra_basic_block const *bb) {
     struct umbra_interpreter *const p = umbra_interpreter(bb);
     assert(p);
-    struct umbra_program *const prog = malloc(sizeof *prog);
-    *prog = (struct umbra_program){
-        .ctx     = p,
+    p->base = (struct umbra_program){
         .queue   = run_interp,
         .dump    = 0,
-        .free = free_interp,
+        .free    = free_interp,
         .backend = be,
     };
-    return prog;
+    return &p->base;
 }
 static void flush_be_noop(struct umbra_backend *be) { (void)be; }
 static void free_be_interp(struct umbra_backend *be) { free(be); }
