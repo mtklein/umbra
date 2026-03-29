@@ -2643,9 +2643,10 @@ static void test_srgb_roundtrip_256(void) {
                 if (delta > worst) { worst = delta; }
             }
         }
-        (dst[0x00] == src[0x00]) here;  // 0 must be exact
-        (dst[0xFF] == src[0xFF]) here;  // 1 must be exact
-        worst <= 1 here;
+        (dst[0x00] == src[0x00]) here;
+        (dst[0x7F] == src[0x7F]) here;
+        (dst[0xFF] == src[0xFF]) here;
+        worst == 0 here;
     }
     cleanup(&B);
 }
