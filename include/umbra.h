@@ -48,13 +48,6 @@ struct umbra_program {
     struct umbra_backend *backend;
 };
 
-static inline void umbra_program_queue(struct umbra_program *p,
-                                       int l, int t, int r, int b, umbra_buf buf[]) {
-    if (r > l && b > t) {
-        p->queue(p, l, t, r, b, buf);
-    }
-}
-
 typedef struct { int bits; } umbra_val;
 typedef struct { umbra_val r, g, b, a; } umbra_color;
 typedef struct { int ix, :24; _Bool deref; } umbra_ptr;

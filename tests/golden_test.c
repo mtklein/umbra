@@ -111,7 +111,7 @@ static void fill_bg(int fmt, void *dst, uint32_t bg) {
         {.ptr=dst, .sz=pixbuf_size(fmt), .row_bytes=(size_t)(W * bpp),
          .fmt=fmt_enums[fmt]},
     };
-    umbra_program_queue(fill_pipes[fmt].prog, 0, 0, W, H, buf);
+    fill_pipes[fmt].prog->queue(fill_pipes[fmt].prog, 0, 0, W, H, buf);
 }
 
 static void readback_to_8888(int fmt,
@@ -127,7 +127,7 @@ static void readback_to_8888(int fmt,
                          .read_only=1, .fmt=fmt_enums[fmt]};
     buf[op] = (umbra_buf){.ptr=out, .sz=(size_t)(W * H * 4), .row_bytes=(size_t)(W * 4),
                           .fmt=umbra_fmt_8888};
-    umbra_program_queue(readback_pipes[fmt].prog, 0, 0, W, H, buf);
+    readback_pipes[fmt].prog->queue(readback_pipes[fmt].prog, 0, 0, W, H, buf);
 }
 
 static void render_slide(
@@ -285,7 +285,7 @@ static void test_slug_rect(void) {
         int32_t j32 = j;
         __builtin_memcpy(
             au + alay.loop_off, &j32, 4);
-        umbra_program_queue(acc, 0, 0, W, H, abuf);
+        acc->queue(acc, 0, 0, W, H, abuf);
     }
     be->flush(be);
 
@@ -298,7 +298,7 @@ static void test_slug_rect(void) {
         {.ptr=uni, .sz=(size_t)lay.uni_len, .read_only=1},
         {.ptr=pixels, .sz=sizeof pixels, .row_bytes=W * 4, .fmt=umbra_fmt_8888},
     };
-    umbra_program_queue(interp, 0, 0, W, H, buf);
+    interp->queue(interp, 0, 0, W, H, buf);
     be->flush(be);
 
     uint32_t bg = 0xff000000;
@@ -359,7 +359,7 @@ static void test_perspective_text(void) {
         {.ptr=uni, .sz=(size_t)lay.uni_len, .read_only=1},
         {.ptr=pixels, .sz=sizeof pixels, .fmt=umbra_fmt_8888},
     };
-    umbra_program_queue(interp, 0, 0, BW, 1, buf);
+    interp->queue(interp, 0, 0, BW, 1, buf);
     be->flush(be);
 
     pixels[8] == 0xffffffff here;
@@ -401,7 +401,7 @@ static void test_perspective_text(void) {
             {.ptr=u2, .sz=(size_t)lay2.uni_len, .read_only=1},
             {.ptr=px2, .sz=(size_t)(W * H * 4), .row_bytes=W * 4, .fmt=umbra_fmt_8888},
         };
-        umbra_program_queue(interp, 0, 0, W, H, b2);
+        interp->queue(interp, 0, 0, W, H, b2);
         be->flush(be);
     }
     int changed = 0;

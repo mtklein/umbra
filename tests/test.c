@@ -1358,7 +1358,7 @@ static void test_preamble_pair_alias(void) {
             continue;
         }
         float ref[16];
-        umbra_program_queue(B.p[0], 0, 0, 16, 1,
+        B.p[0]->queue(B.p[0], 0, 0, 16, 1,
                             (umbra_buf[]){
                                 {.ptr=in, .sz=16 * 4},
                                 {.ptr=ref, .sz=16 * 4},
@@ -2571,8 +2571,8 @@ static void test_program_null_guards(void) {
 
     // queue with w=0 and h=0
     int32_t buf[1] = {0};
-    umbra_program_queue(p, 0, 0, 0, 1, (umbra_buf[]){{.ptr=buf, .sz=4}});
-    umbra_program_queue(p, 0, 0, 1, 0, (umbra_buf[]){{.ptr=buf, .sz=4}});
+    p->queue(p, 0, 0, 0, 1, (umbra_buf[]){{.ptr=buf, .sz=4}});
+    p->queue(p, 0, 0, 1, 0, (umbra_buf[]){{.ptr=buf, .sz=4}});
 
     p->free(p);
     be->free(be);
@@ -3660,7 +3660,7 @@ int main(void) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             __builtin_memset(buf, 0xff, sizeof buf);
             if (!B.p[bi]) { continue; }
-            umbra_program_queue(B.p[bi], L, T, R, BT,
+            B.p[bi]->queue(B.p[bi], L, T, R, BT,
                                 (umbra_buf[]){{.ptr=buf, .sz=sizeof buf, .row_bytes=S * 4}});
             B.be[bi]->flush(B.be[bi]);
             for (int row = T; row < BT; row++) {
@@ -3693,7 +3693,7 @@ int main(void) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             __builtin_memset(dst, 0, sizeof dst);
             if (!B.p[bi]) { continue; }
-            umbra_program_queue(B.p[bi], L, T, R, BT,
+            B.p[bi]->queue(B.p[bi], L, T, R, BT,
                                 (umbra_buf[]){{.ptr=src, .sz=sizeof src, .row_bytes=S * 4, .read_only=1},
                                               {.ptr=dst, .sz=sizeof dst, .row_bytes=S * 4}});
             B.be[bi]->flush(B.be[bi]);
@@ -3729,7 +3729,7 @@ int main(void) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             __builtin_memset(dst, 0, sizeof dst);
             if (!B.p[bi]) { continue; }
-            umbra_program_queue(B.p[bi], L, T, R, BT,
+            B.p[bi]->queue(B.p[bi], L, T, R, BT,
                                 (umbra_buf[]){{.ptr=src, .sz=sizeof src, .row_bytes=SW * 4, .read_only=1},
                                               {.ptr=dst, .sz=sizeof dst, .row_bytes=DW * 4}});
             B.be[bi]->flush(B.be[bi]);
@@ -3773,7 +3773,7 @@ int main(void) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             __builtin_memset(dst_px, 0, sizeof dst_px);
             if (!B.p[bi]) { continue; }
-            umbra_program_queue(B.p[bi], L, T, R, BT,
+            B.p[bi]->queue(B.p[bi], L, T, R, BT,
                                 (umbra_buf[]){{0},
                                               {.ptr=uni, .sz=sizeof uni_, .read_only=1},
                                               {.ptr=dst_px, .sz=sizeof dst_px, .row_bytes=S * 4}});
@@ -3827,7 +3827,7 @@ int main(void) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             __builtin_memset(dst_px, 0, sizeof dst_px);
             if (!B.p[bi]) { continue; }
-            umbra_program_queue(B.p[bi], L, T, R, BT,
+            B.p[bi]->queue(B.p[bi], L, T, R, BT,
                                 (umbra_buf[]){{0},
                                               {.ptr=uni, .sz=sizeof uni_, .read_only=1},
                                               {.ptr=dst_px, .sz=sizeof dst_px, .row_bytes=S * 4}});

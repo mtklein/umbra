@@ -214,7 +214,7 @@ static void fill_bg_row(void *dst, int n, uint32_t bg, size_t row_sz, size_t pla
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (umbra_buf){.ptr=(char *)dst + (size_t)(i + 1) * plane_gap, .sz=row_sz};
     }
-    umbra_program_queue(fill_pipe.program, 0, 0, n, 1, buf);
+    fill_pipe.program->queue(fill_pipe.program, 0, 0, n, 1, buf);
 }
 
 static void readback_row(uint32_t *dst, void *src, int n, size_t src_sz, size_t plane_gap) {
@@ -229,7 +229,7 @@ static void readback_row(uint32_t *dst, void *src, int n, size_t src_sz, size_t 
         buf[2 + i] = (umbra_buf){.ptr=(char *)src + (size_t)(i + 1) * plane_gap, .sz=src_sz};
     }
     buf[op] = (umbra_buf){.ptr=dst, .sz=(size_t)(n * 4), .fmt=umbra_fmt_8888};
-    umbra_program_queue(readback_pipe.program, 0, 0, n, 1, buf);
+    readback_pipe.program->queue(readback_pipe.program, 0, 0, n, 1, buf);
 }
 
 static void to_hdr_row(__fp16 *dst, void *src, int n, size_t src_sz, size_t plane_gap) {
@@ -244,7 +244,7 @@ static void to_hdr_row(__fp16 *dst, void *src, int n, size_t src_sz, size_t plan
         buf[2 + i] = (umbra_buf){.ptr=(char *)src + (size_t)(i + 1) * plane_gap, .sz=src_sz};
     }
     buf[op] = (umbra_buf){.ptr=dst, .sz=(size_t)(n * 8), .fmt=umbra_fmt_fp16};
-    umbra_program_queue(hdr_pipe.program, 0, 0, n, 1, buf);
+    hdr_pipe.program->queue(hdr_pipe.program, 0, 0, n, 1, buf);
 }
 
 typedef struct {
