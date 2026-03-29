@@ -80,7 +80,7 @@ kernel void umbra_entry(
         v23_c = float4(px & 0xFFu, (px>>8)&0xFFu, (px>>16)&0xFFu, px>>24) / 255.0;
         for (int ch = 0; ch < 3; ch++) {
             float s = v23_c[ch];
-            v23_c[ch] = s < 0.055 ? s/12.92 : s*s*(0.3*s+0.6975)+0.0025;
+            v23_c[ch] = s < 0.09870274 ? s/12.92 : s*s*(-0.03423264*s*s*s+0.02881829*s*s+0.31312484*s+0.68812025)+0.00333771;
         }
     }
     uint v23 = as_type<uint>(v23_c.x);
@@ -136,8 +136,8 @@ kernel void umbra_entry(
             float l = max(sc45[ch], 0.0);
             float t = 1.0/sqrt(max(l, 1e-30));
             float lo = l * 12.92;
-            float hi = (1.12732994556 + t*(0.01347202249 + t*(-0.00233423407))) / (0.13738775253 + t);
-            sc45[ch] = lo < 0.06019 ? lo : hi;
+            float hi = (1.09732234 + t*(0.02995744 + t*(-0.00546762 + t*0.00012954))) / (0.12201570 + t);
+            sc45[ch] = lo < 0.116027 ? lo : hi;
         } sc45 = clamp(sc45, 0.0, 1.0);
         ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc45.x*255.0)) | (uint(rint(sc45.y*255.0))<<8) | (uint(rint(sc45.z*255.0))<<16) | (uint(rint(sc45.w*255.0))<<24);
     }
