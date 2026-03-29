@@ -218,9 +218,7 @@ static void test_slide_golden(
                 backend_name[bi], fmt_name[fmt],
                 mismatches, W * H, worst);
         }
-        // sRGB uses an approximate powf in the JIT, allowing up to 3 delta.
-        int const tolerance = (fmt == FMT_SRGB) ? 3 : 0;
-        worst <= tolerance here;
+        worst == 0 here;
     }
 
     free(ref);

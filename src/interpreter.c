@@ -196,11 +196,13 @@ static void interp_load_color(val v[4], umbra_buf const *b,
         // sRGB→linear: polynomial approximation (no powf).
         for (int ch = 0; ch < 3; ch++) {
             F32 s = v[ch].f32;
-            F32 lo = s * ((F32){0} + (1.0f/12.92f));
-            F32 hi = s*s * (s * ((F32){0} + 0.3000f) + ((F32){0} + 0.6975f))
-                   + ((F32){0} + 0.0025f);
-            I32 sel = cast(I32, s < ((F32){0} + 0.055f));
-            v[ch].i32 = (sel & cast(I32, lo)) | (~sel & cast(I32, hi));
+            for (int ll = 0; ll < clamp; ll++) {
+                float x = s[ll];
+                s[ll] = x < 0.055f
+                    ? x * (1.0f/12.92f)
+                    : x*x * (0.3f*x + 0.6975f) + 0.0025f;
+            }
+            v[ch].f32 = s;
         }
     } break;
     case umbra_fmt_f16:
@@ -308,25 +310,23 @@ static void interp_store_color(val const v[], umbra_buf const *b,
         // linear→sRGB: rsqrt/rcp rational approximation (no powf).
         // Interpreter uses exact 1/sqrt and 1/x.
         {
-            F32 const thresh = (F32){0} + 0.00465985f;
-            F32 const s12_92 = (F32){0} + 12.92f;
-            F32 const c_ = (F32){0} + 1.12999999523f;
-            F32 const d_ = (F32){0} + 0.14137776196f;
-            F32 const k1 = (F32){0} + 0.01383202704f;
-            F32 const k2 = (F32){0} + (-0.00245423456f);
+            float const c_ = 1.12999999523f;
+            float const d_ = 0.14137776196f;
+            float const k1 = 0.01383202704f;
+            float const k2 = -0.00245423456f;
             F32 *chs[3] = {&cr, &cg, &cb};
             for (int ci = 0; ci < 3; ci++) {
                 F32 l = vec_max(*chs[ci], (F32){0});
-                F32 t = (F32){0};
-                for (int ll = 0; ll < K; ll++) {
-                    t[ll] = l[ll] > 0.0f ? 1.0f / sqrtf(l[ll]) : 0.0f;
+                for (int ll = 0; ll < clamp; ll++) {
+                    float x = l[ll];
+                    if (x < 0.00465985f) {
+                        l[ll] = x * 12.92f;
+                    } else {
+                        float t = 1.0f / sqrtf(x);
+                        l[ll] = (c_ + t * (k1 + t * k2)) / (d_ + t);
+                    }
                 }
-                F32 lo = l * s12_92;
-                F32 hi_num = t * (t * k2 + k1) + c_;
-                F32 hi_den = d_ + t;
-                F32 hi = hi_num / hi_den;
-                I32 sel = cast(I32, l < thresh);
-                *chs[ci] = cast(F32, (sel & cast(I32, lo)) | (~sel & cast(I32, hi)));
+                *chs[ci] = l;
             }
         }
         F32 const zero = {0}, one = (F32){0} + 1.f, scale = (F32){0} + 255.f;

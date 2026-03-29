@@ -2643,9 +2643,9 @@ static void test_srgb_roundtrip_256(void) {
                 if (delta > worst) { worst = delta; }
             }
         }
-        // TODO: tighten to <=1 with exact at 0x00/0x7F/0xFF after Skia-style sRGB.
-        // Current approx_powf has significant roundtrip error; x86 is especially bad.
-        (void)worst;
+        (dst[0x00] == src[0x00]) here;  // 0 must be exact
+        (dst[0xFF] == src[0xFF]) here;  // 1 must be exact
+        worst <= 1 here;
     }
     cleanup(&B);
 }
