@@ -3282,10 +3282,177 @@ static void test_imm_regvar(void) {
     cleanup(&B);
 }
 
+// Exercise r_*_mm for binary ops: both from memory, result→acc→chain.
+// Need an intervening op between the loads and the target so prev_r is false.
+static void test_binary_r_mm(void) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_val a = umbra_load_32(b, (umbra_ptr){0, 0});
+    umbra_val c = umbra_load_32(b, (umbra_ptr){1, 0});
+    umbra_val fa = umbra_f32_from_i32(b, a);
+    umbra_val fc = umbra_f32_from_i32(b, c);
+    int p = 2;
+
+    // Break the chain by storing a dummy, then use fa/fc as both-from-memory.
+#define RMM_F32(op) { \
+        umbra_val dummy = umbra_add_f32(b, fa, fc); \
+        umbra_store_32(b, (umbra_ptr){p++, 0}, umbra_i32_from_f32(b, dummy)); \
+        umbra_store_32(b, (umbra_ptr){p++, 0}, \
+            umbra_i32_from_f32(b, op(b, fa, fc))); \
+    }
+#define RMM_I32(op) { \
+        umbra_val dummy = umbra_add_i32(b, a, c); \
+        umbra_store_32(b, (umbra_ptr){p++, 0}, dummy); \
+        umbra_store_32(b, (umbra_ptr){p++, 0}, \
+            umbra_add_i32(b, op(b, a, c), umbra_imm_i32(b, 0))); \
+    }
+    RMM_F32(umbra_sub_f32)
+    RMM_F32(umbra_mul_f32)
+    RMM_F32(umbra_div_f32)
+    RMM_I32(umbra_sub_i32)
+    RMM_I32(umbra_mul_i32)
+    RMM_I32(umbra_or_i32)
+    RMM_I32(umbra_xor_i32)
+    RMM_I32(umbra_and_i32)
+    RMM_I32(umbra_shl_i32)
+    RMM_I32(umbra_shr_u32)
+    RMM_I32(umbra_shr_s32)
+#undef RMM_F32
+#undef RMM_I32
+    backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        int32_t sa[] = {6,6,6,6}, sc[] = {2,2,2,2};
+        int32_t d[24][4];
+        __builtin_memset(d, 0, sizeof d);
+        umbra_buf bufs[24];
+        bufs[0] = (umbra_buf){.ptr=sa, .sz=16};
+        bufs[1] = (umbra_buf){.ptr=sc, .sz=16};
+        for (int i = 2; i < p; i++) { bufs[i] = (umbra_buf){.ptr=d[i], .sz=16}; }
+        if (!run(&B, bi, 4, 1, bufs)) { continue; }
+        // sub(6,2)=4
+        (d[3][0] == 4) here;
+        // xor(6,2)=4
+        (d[15][0] == (6^2)) here;
+    }
+    cleanup(&B);
+}
+
+// Exercise missing per-op UNARY and IMM variants more thoroughly.
+// m_unary_r: chain→unary(acc)→store (no further chain).
+static void test_unary_m_r(void) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_val a = umbra_load_32(b, (umbra_ptr){0, 0});
+    umbra_val fa = umbra_f32_from_i32(b, a);
+    int p = 1;
+    // Each: chain→unary→store
+#define MR(unary, chain_val) { \
+        umbra_store_32(b, (umbra_ptr){p++, 0}, unary(b, chain_val)); \
+    }
+    umbra_val fa2 = umbra_add_f32(b, fa, umbra_imm_f32(b, 1.f));
+    MR(umbra_sqrt_f32, fa2)
+    umbra_val fa3 = umbra_add_f32(b, fa, umbra_imm_f32(b, 2.f));
+    MR(umbra_round_f32, fa3)
+    umbra_val fa4 = umbra_add_f32(b, fa, umbra_imm_f32(b, 3.f));
+    MR(umbra_floor_f32, fa4)
+    umbra_val fa5 = umbra_add_f32(b, fa, umbra_imm_f32(b, 4.f));
+    MR(umbra_ceil_f32, fa5)
+    umbra_val fa6 = umbra_add_f32(b, fa, umbra_imm_f32(b, 5.f));
+    MR(umbra_neg_f32, fa6)
+    umbra_val fa7 = umbra_add_f32(b, fa, umbra_imm_f32(b, 6.f));
+    MR(umbra_round_i32, fa7)
+    umbra_val fa8 = umbra_add_f32(b, fa, umbra_imm_f32(b, 7.f));
+    MR(umbra_ceil_i32, fa8)
+    umbra_val ia = umbra_add_i32(b, a, umbra_imm_i32(b, 100));
+    MR(umbra_f32_from_i32, ia)
+#undef MR
+    backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        int32_t src[] = {4,4,4,4};
+        int32_t d[9][4];
+        __builtin_memset(d, 0, sizeof d);
+        umbra_buf bufs[9];
+        bufs[0] = (umbra_buf){.ptr=src, .sz=16};
+        for (int i = 1; i < p; i++) { bufs[i] = (umbra_buf){.ptr=d[i], .sz=16}; }
+        if (!run(&B, bi, 4, 1, bufs)) { continue; }
+        // sqrt(5)≈2.236
+        union { float f; int32_t i; } u;
+        u.f = -9.f; (d[5][0] == u.i) here;   // neg(4+5) = -9
+        (d[6][0] == 10) here;                  // round(4+6) = 10
+    }
+    cleanup(&B);
+}
+
+// Exercise base IMM ops: op(mem, imm)→store with no chain.
+// Covers shr_s32_imm, shr_u32_imm, or_32_imm, mul_f32_imm, etc.
+static void test_base_imm_more(void) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_val a = umbra_load_32(b, (umbra_ptr){0, 0});
+    umbra_val c = umbra_load_32(b, (umbra_ptr){1, 0});
+    umbra_val fc = umbra_f32_from_i32(b, c);
+    int p = 2;
+    // Each: op(mem, imm)→store, no chain on either side.
+    // Use multiple loads so dedup doesn't merge chains.
+    umbra_store_32(b, (umbra_ptr){p++, 0}, umbra_shr_s32(b, a, umbra_imm_i32(b, 1)));
+    umbra_store_32(b, (umbra_ptr){p++, 0}, umbra_shr_u32(b, a, umbra_imm_i32(b, 2)));
+    umbra_store_32(b, (umbra_ptr){p++, 0}, umbra_or_i32(b, a, umbra_imm_i32(b, 0xF0)));
+    umbra_store_32(b, (umbra_ptr){p++, 0}, umbra_mul_f32(b, fc, umbra_imm_f32(b, 3.f)));
+    umbra_store_32(b, (umbra_ptr){p++, 0}, umbra_mul_i32(b, a, umbra_imm_i32(b, 7)));
+    umbra_store_32(b, (umbra_ptr){p++, 0}, umbra_sub_i32(b, a, umbra_imm_i32(b, 1)));
+    backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        int32_t sa[] = {16,16,16,16}, sc[] = {5,5,5,5};
+        int32_t d[8][4];
+        __builtin_memset(d, 0, sizeof d);
+        umbra_buf bufs[8];
+        bufs[0] = (umbra_buf){.ptr=sa, .sz=16};
+        bufs[1] = (umbra_buf){.ptr=sc, .sz=16};
+        for (int i = 2; i < p; i++) { bufs[i] = (umbra_buf){.ptr=d[i], .sz=16}; }
+        if (!run(&B, bi, 4, 1, bufs)) { continue; }
+        (d[2][0] == 8) here;   // 16 >> 1
+        (d[3][0] == 4) here;   // 16 >>> 2
+        (d[4][0] == (16 | 0xF0)) here;
+        (d[7][0] == 15) here;  // 16 - 1
+    }
+    cleanup(&B);
+}
+
+// r_sel_32_rm: sel with mask from acc, result→acc.
+// Need: chain→sel(acc_mask, y, z)→ALU→store
+static void test_sel_r_rm(void) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_val a = umbra_load_32(b, (umbra_ptr){0, 0});
+    umbra_val c = umbra_load_32(b, (umbra_ptr){1, 0});
+    umbra_val fa = umbra_f32_from_i32(b, a);
+    umbra_val fc = umbra_f32_from_i32(b, c);
+    // lt→acc, sel(acc, a, c)→acc, add→store
+    umbra_val mask = umbra_lt_f32(b, fa, fc);
+    umbra_val s = umbra_sel_i32(b, mask, a, c);
+    umbra_val out = umbra_add_i32(b, s, umbra_imm_i32(b, 1));
+    umbra_store_32(b, (umbra_ptr){2, 0}, out);
+    backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        int32_t sa[] = {2,8,2,8}, sc[] = {5,5,5,5};
+        int32_t d[4] = {0};
+        if (!run(&B, bi, 4, 1, (umbra_buf[]){
+            {.ptr=sa, .sz=16}, {.ptr=sc, .sz=16}, {.ptr=d, .sz=16},
+        })) { continue; }
+        // 2<5→sel a=2, 8<5=false→sel c=5; +1
+        (d[0] == 3) here; (d[1] == 6) here;
+    }
+    cleanup(&B);
+}
+
 int main(void) {
     test_binary_m_rr();
+    test_binary_r_mm();
     test_minmax_m_rm();
     test_cmp_r_rm_rr();
+    test_unary_r_m();
+    test_unary_m_r();
+    test_base_imm_ops();
+    test_base_imm_more();
+    test_sel_fms_pack_variants();
+    test_sel_r_rm();
+    test_imm_regvar();
     test_unary_r_m();
     test_base_imm_ops();
     test_sel_fms_pack_variants();
