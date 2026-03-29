@@ -22,11 +22,6 @@ enum {
 static char const *fmt_name[] = {
     "8888", "565", "fp16", "fp16p", "1010102", "sRGB",
 };
-static umbra_format const *formats[] = {
-    &umbra_format_8888,  &umbra_format_565,
-    &umbra_format_fp16,  &umbra_format_fp16_planar,
-    &umbra_format_1010102, &umbra_format_srgb_8888,
-};
 static umbra_fmt const fmt_enums[] = {
     umbra_fmt_8888, umbra_fmt_565, umbra_fmt_fp16,
     umbra_fmt_none, umbra_fmt_1010102, umbra_fmt_8888,
@@ -43,6 +38,7 @@ static pipe readback_pipes[NUM_FMTS];
 static struct umbra_backend *interp_be;
 
 static void build_fill(int fmt) {
+    if (fmt_enums[fmt] == umbra_fmt_none) { return; }
     builder *builder = umbra_builder();
     int fi = umbra_reserve(builder, 4);
     umbra_color c = {
@@ -51,7 +47,7 @@ static void build_fill(int fmt) {
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi+2),
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi+3),
     };
-    formats[fmt]->store(builder, (umbra_ptr){1, 0}, c);
+    umbra_store_color(builder, (umbra_ptr){1, 0}, c);
     fill_pipes[fmt].uni_len =
         umbra_uni_len(builder);
     struct umbra_basic_block *opt =
@@ -63,12 +59,12 @@ static void build_fill(int fmt) {
 }
 
 static void build_readback(int fmt) {
+    if (fmt_enums[fmt] == umbra_fmt_none) { return; }
     builder *builder = umbra_builder();
     umbra_color c =
-        formats[fmt]->load(builder, (umbra_ptr){1, 0});
-    int op = umbra_max_ptr(builder) + 1;
-    umbra_format_8888.store(builder, (umbra_ptr){op, 0}, c);
-    readback_pipes[fmt].out_ptr = op;
+        umbra_load_color(builder, (umbra_ptr){1, 0});
+    umbra_store_color(builder, (umbra_ptr){2, 0}, c);
+    readback_pipes[fmt].out_ptr = 2;
     readback_pipes[fmt].uni_len =
         umbra_uni_len(builder);
     struct umbra_basic_block *opt =
@@ -110,8 +106,9 @@ static void fill_bg_row(int fmt, void *dst,
     slide_uni_f32(uni, 0, hc, 4);
     int ps = plane_gap ? 3 : 0;
     umbra_buf buf[5];
+    umbra_transfer tf = (fmt == FMT_SRGB) ? umbra_transfer_srgb : (umbra_transfer){0};
     buf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)fill_pipes[fmt].uni_len, .read_only=1};
-    buf[1] = (umbra_buf){.ptr=dst, .sz=row_sz};
+    buf[1] = (umbra_buf){.ptr=dst, .sz=row_sz, .fmt=fmt_enums[fmt], .transfer=tf};
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (umbra_buf){.ptr=(char *)dst + (size_t)(i + 1) * plane_gap, .sz=row_sz};
     }
@@ -128,12 +125,13 @@ static void readback_row(int fmt, uint32_t *dst,
     int ps = plane_gap ? 3 : 0;
     int op = readback_pipes[fmt].out_ptr;
     umbra_buf buf[6];
+    umbra_transfer tf = (fmt == FMT_SRGB) ? umbra_transfer_srgb : (umbra_transfer){0};
     buf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)readback_pipes[fmt].uni_len, .read_only=1};
-    buf[1] = (umbra_buf){.ptr=src, .sz=src_sz, .read_only=1};
+    buf[1] = (umbra_buf){.ptr=src, .sz=src_sz, .read_only=1, .fmt=fmt_enums[fmt], .transfer=tf};
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (umbra_buf){.ptr=(char *)src + (size_t)(i + 1) * plane_gap, .sz=src_sz};
     }
-    buf[op] = (umbra_buf){.ptr=dst, .sz=(size_t)(n * 4) };
+    buf[op] = (umbra_buf){.ptr=dst, .sz=(size_t)(n * 4), .fmt=umbra_fmt_8888};
     umbra_program_queue(
         readback_pipes[fmt].prog, 0, 0, n, 1, buf);
 }
@@ -182,7 +180,9 @@ static void test_slide_golden(
     if (fmt_enums[fmt] == umbra_fmt_none) { return; }
 
     umbra_fmt saved_fmt = s->fmt;
+    umbra_transfer saved_tf = s->transfer;
     s->fmt = fmt_enums[fmt];
+    s->transfer = (fmt == FMT_SRGB) ? umbra_transfer_srgb : (umbra_transfer){0};
 
     umbra_draw_layout lay;
     struct umbra_builder *bld =
@@ -260,6 +260,7 @@ static void test_slide_golden(
         umbra_backend_free(bes[bi]);
     }
     s->fmt = saved_fmt;
+    s->transfer = saved_tf;
 }
 
 static void test_slug_rect(void) {

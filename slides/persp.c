@@ -42,7 +42,7 @@ static void persp_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     umbra_buf ubuf[5];
     size_t rb = (size_t)w * (size_t)pb;
     ubuf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)lay->uni_len, .read_only=1};
-    ubuf[1] = (umbra_buf){.ptr=buf, .sz=plane_sz, .row_bytes=rb, .fmt=s->fmt};
+    ubuf[1] = (umbra_buf){.ptr=buf, .sz=plane_sz, .row_bytes=rb, .fmt=s->fmt, .transfer=s->transfer};
     for (int i = 0; i < ps; i++) {
         ubuf[2 + i] = (umbra_buf){.ptr=(char *)buf + plane_sz * (size_t)(i + 1), .sz=plane_sz, .row_bytes=rb};
     }

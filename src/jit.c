@@ -476,17 +476,17 @@ static void emit_transfer_call_arm64(Buf *c, int p, _Bool scalar,
         put(c, 0xd63f0060u);
     }
 
-    // Reload R,G,B channel data from [SP+0], [SP+16], [SP+32]
-    put(c, 0x3dc00000u | (0u << 10) | (31u << 5) | ((uint32_t)r_ch0 & 0x1f));
-    put(c, 0x3dc00000u | (1u << 10) | (31u << 5) | ((uint32_t)r_ch1 & 0x1f));
-    put(c, 0x3dc00000u | (2u << 10) | (31u << 5) | ((uint32_t)r_ch2 & 0x1f));
-
-    // Restore SIMD regs
+    // Restore SIMD regs (saved state from before the call)
     LOAD_Q( 4, 144); LOAD_Q( 5, 160); LOAD_Q( 6, 176); LOAD_Q( 7, 192);
     LOAD_Q(16, 208); LOAD_Q(17, 224); LOAD_Q(18, 240); LOAD_Q(19, 256);
     LOAD_Q(20, 272); LOAD_Q(21, 288); LOAD_Q(22, 304); LOAD_Q(23, 320);
     LOAD_Q(24, 336); LOAD_Q(25, 352); LOAD_Q(26, 368); LOAD_Q(27, 384);
     LOAD_Q(28, 400); LOAD_Q(29, 416); LOAD_Q(30, 432); LOAD_Q(31, 448);
+
+    // Reload R,G,B channel data AFTER restoring saved regs (the helper modified these)
+    put(c, 0x3dc00000u | (0u << 10) | (31u << 5) | ((uint32_t)r_ch0 & 0x1f));
+    put(c, 0x3dc00000u | (1u << 10) | (31u << 5) | ((uint32_t)r_ch1 & 0x1f));
+    put(c, 0x3dc00000u | (2u << 10) | (31u << 5) | ((uint32_t)r_ch2 & 0x1f));
 
     // Restore GPRs
     LOAD_X( 0, 48); LOAD_X( 1, 56); LOAD_X( 2, 64); LOAD_X( 8, 72);

@@ -77,7 +77,7 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     umbra_buf rbuf[5];
     size_t rb = (size_t)w * (size_t)pb;
     rbuf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)lay->uni_len, .read_only=1};
-    rbuf[1] = (umbra_buf){.ptr=buf, .sz=plane_sz, .row_bytes=rb, .fmt=s->fmt};
+    rbuf[1] = (umbra_buf){.ptr=buf, .sz=plane_sz, .row_bytes=rb, .fmt=s->fmt, .transfer=s->transfer};
     for (int i = 0; i < ps; i++) {
         rbuf[2 + i] = (umbra_buf){.ptr=(char *)buf + plane_sz * (size_t)(i + 1), .sz=plane_sz, .row_bytes=rb};
     }
