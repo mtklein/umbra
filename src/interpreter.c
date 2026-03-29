@@ -417,25 +417,90 @@ static void interp_store_color(val const v[], umbra_buf const *b,
 
 enum {
     SW_DONE = op_le_s32_imm + 1,
-    // Binary op variants: 7 new per op (existing op_X is the mm->m variant)
-#define BINARY_VARIANTS(name, rt, pt) \
-    op_r_##name##_mm, op_r_##name##_rm, op_m_##name##_rm, \
-    op_r_##name##_mr, op_m_##name##_mr, \
-    op_r_##name##_rr, op_m_##name##_rr,
-    BINARY_OPS(BINARY_VARIANTS)
-#undef BINARY_VARIANTS
-
-    // Unary op variants: 3 new per op (existing op_X is the m->m variant)
-#define UNARY_VARIANTS(name, rt, pt) \
-    op_r_##name##_m, op_r_##name##_r, op_m_##name##_r,
-    UNARY_OPS(UNARY_VARIANTS)
-#undef UNARY_VARIANTS
-
-    // Imm op variants: 3 new per op (existing op_X is the m->m variant, y is always imm)
-#define IMM_VARIANTS(name, rt, pt) \
-    op_r_##name##_m, op_r_##name##_r, op_m_##name##_r,
-    IMM_OPS(IMM_VARIANTS)
-#undef IMM_VARIANTS
+    // Binary op register variants (only live variants).
+    // add_f32
+    op_r_add_f32_mm, op_r_add_f32_rm, op_m_add_f32_rm,
+    op_r_add_f32_mr, op_m_add_f32_mr, op_r_add_f32_rr,
+    // sub_f32
+    op_r_sub_f32_rm, op_m_sub_f32_rm, op_r_sub_f32_mr, op_m_sub_f32_rr,
+    // mul_f32
+    op_r_mul_f32_mm, op_r_mul_f32_rm, op_m_mul_f32_rm,
+    op_r_mul_f32_mr, op_m_mul_f32_mr, op_r_mul_f32_rr, op_m_mul_f32_rr,
+    // div_f32
+    op_r_div_f32_mm, op_r_div_f32_rm, op_m_div_f32_rm,
+    op_r_div_f32_mr, op_m_div_f32_mr, op_r_div_f32_rr, op_m_div_f32_rr,
+    // min_f32
+    op_r_min_f32_rm, op_r_min_f32_mr, op_m_min_f32_mr, op_r_min_f32_rr,
+    // max_f32
+    op_m_max_f32_mr, op_r_max_f32_rr,
+    // add_i32
+    op_r_add_i32_mm, op_m_add_i32_rm,
+    op_r_add_i32_mr, op_m_add_i32_mr, op_r_add_i32_rr, op_m_add_i32_rr,
+    // sub_i32
+    op_r_sub_i32_mm, op_r_sub_i32_rm,
+    // mul_i32
+    op_r_mul_i32_rm, op_m_mul_i32_rm, op_r_mul_i32_mr, op_m_mul_i32_rr,
+    // shl_i32
+    op_r_shl_i32_mm, op_r_shl_i32_rm, op_m_shl_i32_rr,
+    // shr_u32
+    op_r_shr_u32_mm, op_r_shr_u32_rm, op_m_shr_u32_rr,
+    // shr_s32
+    op_r_shr_s32_mm, op_r_shr_s32_rm, op_m_shr_s32_rm, op_r_shr_s32_mr, op_m_shr_s32_rr,
+    // and_32
+    op_r_and_32_mm, op_r_and_32_rm, op_m_and_32_rm,
+    op_r_and_32_mr, op_m_and_32_mr, op_r_and_32_rr,
+    // or_32
+    op_r_or_32_rm, op_m_or_32_rm, op_r_or_32_mr, op_m_or_32_mr, op_r_or_32_rr,
+    // lt_f32
+    op_r_lt_f32_mm,
+    op_r_lt_f32_rm, op_m_lt_f32_rm, op_r_lt_f32_mr, op_m_lt_f32_mr,
+    op_r_lt_f32_rr, op_m_lt_f32_rr,
+    // le_f32
+    op_r_le_f32_mm, op_r_le_f32_rm,
+    // Unary op register variants (only live variants).
+    // sqrt_f32
+    op_r_sqrt_f32_r, op_m_sqrt_f32_r,
+    // abs_f32
+    op_r_abs_f32_m, op_r_abs_f32_r,
+    // neg_f32
+    op_r_neg_f32_m, op_r_neg_f32_r, op_m_neg_f32_r,
+    // round_f32
+    op_m_round_f32_r,
+    // floor_f32
+    op_r_floor_f32_m, op_r_floor_f32_r, op_m_floor_f32_r,
+    // ceil_f32
+    op_r_ceil_f32_m, op_r_ceil_f32_r, op_m_ceil_f32_r,
+    // round_i32
+    op_r_round_i32_m, op_m_round_i32_r,
+    // floor_i32
+    op_r_floor_i32_m, op_r_floor_i32_r, op_m_floor_i32_r,
+    // ceil_i32
+    op_r_ceil_i32_m, op_m_ceil_i32_r,
+    // f32_from_i32
+    op_r_f32_from_i32_m, op_r_f32_from_i32_r, op_m_f32_from_i32_r,
+    // i32_from_f32
+    op_r_i32_from_f32_m, op_r_i32_from_f32_r, op_m_i32_from_f32_r,
+    // Imm op register variants (only live variants).
+    op_r_shl_i32_imm_m, op_r_shl_i32_imm_r, op_m_shl_i32_imm_r,
+    op_r_shr_u32_imm_r, op_m_shr_u32_imm_r,
+    op_r_and_32_imm_m, op_r_and_32_imm_r, op_m_and_32_imm_r,
+    op_r_or_32_imm_m,
+    op_r_xor_32_imm_r, op_m_xor_32_imm_r,
+    op_r_add_f32_imm_m, op_r_add_f32_imm_r, op_m_add_f32_imm_r,
+    op_r_sub_f32_imm_m, op_r_sub_f32_imm_r, op_m_sub_f32_imm_r,
+    op_r_mul_f32_imm_r, op_m_mul_f32_imm_r,
+    op_r_div_f32_imm_m, op_r_div_f32_imm_r, op_m_div_f32_imm_r,
+    op_r_min_f32_imm_r, op_m_min_f32_imm_r,
+    op_r_max_f32_imm_m, op_r_max_f32_imm_r, op_m_max_f32_imm_r,
+    op_r_add_i32_imm_m, op_r_add_i32_imm_r, op_m_add_i32_imm_r,
+    op_r_sub_i32_imm_m, op_r_sub_i32_imm_r, op_m_sub_i32_imm_r,
+    op_r_mul_i32_imm_r, op_m_mul_i32_imm_r,
+    op_r_eq_f32_imm_r, op_m_eq_f32_imm_r,
+    op_r_lt_f32_imm_r, op_m_lt_f32_imm_r,
+    op_r_le_f32_imm_m, op_r_le_f32_imm_r, op_m_le_f32_imm_r,
+    op_r_eq_i32_imm_r, op_m_eq_i32_imm_r,
+    op_r_lt_s32_imm_m, op_m_lt_s32_imm_r,
+    op_r_le_s32_imm_m, op_m_le_s32_imm_r,
 
     // Output-only variants: no register inputs, just output to register.
     op_r_imm_32, op_r_x, op_r_y,
@@ -675,41 +740,211 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
             // Only upgrade ALU ops — loads/stores/gathers/deref stay as-is.
             int const tag = s->tag;
 
-            // Try binary ops.
-#define TRY_BINARY(name, rt, pt) \
+            // Binary ops.
+#define TRY_BINARY(name) \
             if (tag == op_##name) { \
                 if      ( out_r &&  x_r &&  y_r) { s->tag = op_r_##name##_rr; } \
                 else if ( out_r &&  x_r && !y_r) { s->tag = op_r_##name##_rm; } \
                 else if (!out_r &&  x_r && !y_r) { s->tag = op_m_##name##_rm; } \
                 else if ( out_r && !x_r &&  y_r) { s->tag = op_r_##name##_mr; } \
                 else if (!out_r && !x_r &&  y_r) { s->tag = op_m_##name##_mr; } \
-                else if ( out_r &&  x_r &&  y_r) { s->tag = op_r_##name##_rr; } \
                 else if (!out_r &&  x_r &&  y_r) { s->tag = op_m_##name##_rr; } \
                 else if ( out_r && !x_r && !y_r) { s->tag = op_r_##name##_mm; } \
-                /* else: !out_r && !x_r && !y_r → keep original tag (mm→m) */ \
             } else
-            BINARY_OPS(TRY_BINARY)
+            TRY_BINARY(mul_f32)
+            TRY_BINARY(div_f32)
 #undef TRY_BINARY
+            // add_f32: no m_rr
+            if (tag == op_add_f32) {
+                if      ( out_r &&  x_r &&  y_r) { s->tag = op_r_add_f32_rr; }
+                else if ( out_r &&  x_r && !y_r) { s->tag = op_r_add_f32_rm; }
+                else if (!out_r &&  x_r && !y_r) { s->tag = op_m_add_f32_rm; }
+                else if ( out_r && !x_r &&  y_r) { s->tag = op_r_add_f32_mr; }
+                else if (!out_r && !x_r &&  y_r) { s->tag = op_m_add_f32_mr; }
+                else if ( out_r && !x_r && !y_r) { s->tag = op_r_add_f32_mm; }
+            } else
+            // sub_f32: no m_mr, no r_rr
+            if (tag == op_sub_f32) {
+                if      ( out_r &&  x_r && !y_r) { s->tag = op_r_sub_f32_rm; }
+                else if (!out_r &&  x_r && !y_r) { s->tag = op_m_sub_f32_rm; }
+                else if ( out_r && !x_r &&  y_r) { s->tag = op_r_sub_f32_mr; }
+                else if (!out_r &&  x_r &&  y_r) { s->tag = op_m_sub_f32_rr; }
+            } else
+            // add_i32: no r_rm
+            if (tag == op_add_i32) {
+                if      ( out_r &&  x_r &&  y_r) { s->tag = op_r_add_i32_rr; }
+                else if (!out_r &&  x_r && !y_r) { s->tag = op_m_add_i32_rm; }
+                else if ( out_r && !x_r &&  y_r) { s->tag = op_r_add_i32_mr; }
+                else if (!out_r && !x_r &&  y_r) { s->tag = op_m_add_i32_mr; }
+                else if (!out_r &&  x_r &&  y_r) { s->tag = op_m_add_i32_rr; }
+                else if ( out_r && !x_r && !y_r) { s->tag = op_r_add_i32_mm; }
+            } else
+            // sub_i32: only r_mm, r_rm
+            if (tag == op_sub_i32) {
+                if      ( out_r &&  x_r && !y_r) { s->tag = op_r_sub_i32_rm; }
+                else if ( out_r && !x_r && !y_r) { s->tag = op_r_sub_i32_mm; }
+            } else
+            // mul_i32: no m_mr, no r_rr
+            if (tag == op_mul_i32) {
+                if      ( out_r &&  x_r && !y_r) { s->tag = op_r_mul_i32_rm; }
+                else if (!out_r &&  x_r && !y_r) { s->tag = op_m_mul_i32_rm; }
+                else if ( out_r && !x_r &&  y_r) { s->tag = op_r_mul_i32_mr; }
+                else if (!out_r &&  x_r &&  y_r) { s->tag = op_m_mul_i32_rr; }
+            } else
+            // shl_i32: only r_mm, r_rm, m_rr
+            if (tag == op_shl_i32) {
+                if      ( out_r &&  x_r && !y_r) { s->tag = op_r_shl_i32_rm; }
+                else if (!out_r &&  x_r &&  y_r) { s->tag = op_m_shl_i32_rr; }
+                else if ( out_r && !x_r && !y_r) { s->tag = op_r_shl_i32_mm; }
+            } else
+            // shr_u32: only r_mm, r_rm, m_rr
+            if (tag == op_shr_u32) {
+                if      ( out_r &&  x_r && !y_r) { s->tag = op_r_shr_u32_rm; }
+                else if (!out_r &&  x_r &&  y_r) { s->tag = op_m_shr_u32_rr; }
+                else if ( out_r && !x_r && !y_r) { s->tag = op_r_shr_u32_mm; }
+            } else
+            // shr_s32: no m_mr, no r_rr
+            if (tag == op_shr_s32) {
+                if      ( out_r &&  x_r && !y_r) { s->tag = op_r_shr_s32_rm; }
+                else if (!out_r &&  x_r && !y_r) { s->tag = op_m_shr_s32_rm; }
+                else if ( out_r && !x_r &&  y_r) { s->tag = op_r_shr_s32_mr; }
+                else if (!out_r &&  x_r &&  y_r) { s->tag = op_m_shr_s32_rr; }
+                else if ( out_r && !x_r && !y_r) { s->tag = op_r_shr_s32_mm; }
+            } else
+            // and_32: no m_rr
+            if (tag == op_and_32) {
+                if      ( out_r &&  x_r &&  y_r) { s->tag = op_r_and_32_rr; }
+                else if ( out_r &&  x_r && !y_r) { s->tag = op_r_and_32_rm; }
+                else if (!out_r &&  x_r && !y_r) { s->tag = op_m_and_32_rm; }
+                else if ( out_r && !x_r &&  y_r) { s->tag = op_r_and_32_mr; }
+                else if (!out_r && !x_r &&  y_r) { s->tag = op_m_and_32_mr; }
+                else if ( out_r && !x_r && !y_r) { s->tag = op_r_and_32_mm; }
+            } else
+            // or_32: no m_rr
+            if (tag == op_or_32) {
+                if      ( out_r &&  x_r && !y_r) { s->tag = op_r_or_32_rm; }
+                else if (!out_r &&  x_r && !y_r) { s->tag = op_m_or_32_rm; }
+                else if ( out_r && !x_r &&  y_r) { s->tag = op_r_or_32_mr; }
+                else if (!out_r && !x_r &&  y_r) { s->tag = op_m_or_32_mr; }
+                else if ( out_r &&  x_r &&  y_r) { s->tag = op_r_or_32_rr; }
+            } else
 
-            // Try unary ops (only x input, ignore y_r).
-#define TRY_UNARY(name, rt, pt) \
+            // min_f32
+            if (tag == op_min_f32) {
+                if      ( out_r &&  x_r && !y_r) { s->tag = op_r_min_f32_rm; }
+                else if ( out_r && !x_r &&  y_r) { s->tag = op_r_min_f32_mr; }
+                else if (!out_r && !x_r &&  y_r) { s->tag = op_m_min_f32_mr; }
+                else if ( out_r &&  x_r &&  y_r) { s->tag = op_r_min_f32_rr; }
+            } else
+            // max_f32: only m_mr, r_rr
+            if (tag == op_max_f32) {
+                if      (!out_r && !x_r &&  y_r) { s->tag = op_m_max_f32_mr; }
+                else if ( out_r &&  x_r &&  y_r) { s->tag = op_r_max_f32_rr; }
+            } else
+
+            // lt_f32 (all 7)
+            if (tag == op_lt_f32) {
+                if      ( out_r &&  x_r &&  y_r) { s->tag = op_r_lt_f32_rr; }
+                else if ( out_r &&  x_r && !y_r) { s->tag = op_r_lt_f32_rm; }
+                else if (!out_r &&  x_r && !y_r) { s->tag = op_m_lt_f32_rm; }
+                else if ( out_r && !x_r &&  y_r) { s->tag = op_r_lt_f32_mr; }
+                else if (!out_r && !x_r &&  y_r) { s->tag = op_m_lt_f32_mr; }
+                else if (!out_r &&  x_r &&  y_r) { s->tag = op_m_lt_f32_rr; }
+                else if ( out_r && !x_r && !y_r) { s->tag = op_r_lt_f32_mm; }
+            } else
+            // le_f32: only r_mm, r_rm
+            if (tag == op_le_f32) {
+                if      ( out_r &&  x_r && !y_r) { s->tag = op_r_le_f32_rm; }
+                else if ( out_r && !x_r && !y_r) { s->tag = op_r_le_f32_mm; }
+            } else
+
+            // Unary ops (only x input).
+#define TRY_UNARY(name) \
             if (tag == op_##name) { \
                 if      ( out_r &&  x_r) { s->tag = op_r_##name##_r; } \
                 else if (!out_r &&  x_r) { s->tag = op_m_##name##_r; } \
                 else if ( out_r && !x_r) { s->tag = op_r_##name##_m; } \
             } else
-            UNARY_OPS(TRY_UNARY)
+#define TRY_UNARY_NO_M(name) \
+            if (tag == op_##name) { \
+                if      ( out_r &&  x_r) { s->tag = op_r_##name##_r; } \
+                else if (!out_r &&  x_r) { s->tag = op_m_##name##_r; } \
+            } else
+#define TRY_UNARY_NO_R(name) \
+            if (tag == op_##name) { \
+                if      (!out_r &&  x_r) { s->tag = op_m_##name##_r; } \
+                else if ( out_r && !x_r) { s->tag = op_r_##name##_m; } \
+            } else
+            TRY_UNARY_NO_M(sqrt_f32)
+            // abs_f32: no m_r
+            if (tag == op_abs_f32) {
+                if      ( out_r &&  x_r) { s->tag = op_r_abs_f32_r; }
+                else if ( out_r && !x_r) { s->tag = op_r_abs_f32_m; }
+            } else
+            TRY_UNARY(neg_f32)
+            // round_f32: only m_r
+            if (tag == op_round_f32) {
+                if      (!out_r &&  x_r) { s->tag = op_m_round_f32_r; }
+            } else
+            TRY_UNARY(floor_f32)
+            TRY_UNARY(ceil_f32)
+            TRY_UNARY_NO_R(round_i32)
+            TRY_UNARY(floor_i32)
+            TRY_UNARY_NO_R(ceil_i32)
+            TRY_UNARY(f32_from_i32)
+            TRY_UNARY(i32_from_f32)
 #undef TRY_UNARY
+#undef TRY_UNARY_NO_M
+#undef TRY_UNARY_NO_R
 
-            // Try _imm ops (only x is variable input).
-#define TRY_IMM(name, rt, pt) \
+            // _imm ops (only x is variable input).
+#define TRY_IMM(name) \
             if (tag == op_##name) { \
                 if      ( out_r &&  x_r) { s->tag = op_r_##name##_r; } \
                 else if (!out_r &&  x_r) { s->tag = op_m_##name##_r; } \
                 else if ( out_r && !x_r) { s->tag = op_r_##name##_m; } \
             } else
-            IMM_OPS(TRY_IMM)
+#define TRY_IMM_NO_M(name) \
+            if (tag == op_##name) { \
+                if      ( out_r &&  x_r) { s->tag = op_r_##name##_r; } \
+                else if (!out_r &&  x_r) { s->tag = op_m_##name##_r; } \
+            } else
+#define TRY_IMM_M_ONLY(name) \
+            if (tag == op_##name) { \
+                if      ( out_r && !x_r) { s->tag = op_r_##name##_m; } \
+            } else
+            TRY_IMM(shl_i32_imm)
+            TRY_IMM_NO_M(shr_u32_imm)
+            TRY_IMM(and_32_imm)
+            TRY_IMM_M_ONLY(or_32_imm)
+            TRY_IMM_NO_M(xor_32_imm)
+            TRY_IMM(add_f32_imm)
+            TRY_IMM(sub_f32_imm)
+            TRY_IMM_NO_M(mul_f32_imm)
+            TRY_IMM(div_f32_imm)
+            TRY_IMM_NO_M(min_f32_imm)
+            TRY_IMM(max_f32_imm)
+            TRY_IMM(add_i32_imm)
+            TRY_IMM(sub_i32_imm)
+            // mul_i32_imm: no r_m
+            TRY_IMM_NO_M(mul_i32_imm)
+            TRY_IMM_NO_M(eq_f32_imm)
+            TRY_IMM_NO_M(lt_f32_imm)
+            TRY_IMM(le_f32_imm)
+            TRY_IMM_NO_M(eq_i32_imm)
+            // lt_s32_imm: no r_r
+            if (tag == op_lt_s32_imm) {
+                if      (!out_r &&  x_r) { s->tag = op_m_lt_s32_imm_r; }
+                else if ( out_r && !x_r) { s->tag = op_r_lt_s32_imm_m; }
+            } else
+            // le_s32_imm: no r_r
+            if (tag == op_le_s32_imm) {
+                if      (!out_r &&  x_r) { s->tag = op_m_le_s32_imm_r; }
+                else if ( out_r && !x_r) { s->tag = op_r_le_s32_imm_m; }
+            } else
 #undef TRY_IMM
+#undef TRY_IMM_NO_M
+#undef TRY_IMM_M_ONLY
             // fma/fms: z is most commonly from register (accumulator chains).
             // Only on FMA platforms — the F64 fallback path has precision
             // differences between register and memory accumulation.
@@ -836,29 +1071,113 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                 [op_pack] = &&L_op_pack,
                 [SW_DONE] = &&L_SW_DONE,
 
-                // Register variant labels.
-#define BINARY_LABELS(name, rt, pt) \
-                [op_r_##name##_mm] = &&L_op_r_##name##_mm, \
-                [op_r_##name##_rm] = &&L_op_r_##name##_rm, \
-                [op_m_##name##_rm] = &&L_op_m_##name##_rm, \
-                [op_r_##name##_mr] = &&L_op_r_##name##_mr, \
-                [op_m_##name##_mr] = &&L_op_m_##name##_mr, \
-                [op_r_##name##_rr] = &&L_op_r_##name##_rr, \
-                [op_m_##name##_rr] = &&L_op_m_##name##_rr,
-                BINARY_OPS(BINARY_LABELS)
-#undef BINARY_LABELS
-#define UNARY_LABELS(name, rt, pt) \
-                [op_r_##name##_m] = &&L_op_r_##name##_m, \
-                [op_r_##name##_r] = &&L_op_r_##name##_r, \
-                [op_m_##name##_r] = &&L_op_m_##name##_r,
-                UNARY_OPS(UNARY_LABELS)
-#undef UNARY_LABELS
-#define IMM_LABELS(name, rt, pt) \
-                [op_r_##name##_m] = &&L_op_r_##name##_m, \
-                [op_r_##name##_r] = &&L_op_r_##name##_r, \
-                [op_m_##name##_r] = &&L_op_m_##name##_r,
-                IMM_OPS(IMM_LABELS)
-#undef IMM_LABELS
+                // Binary op register variant labels.
+                [op_r_add_f32_mm] = &&L_op_r_add_f32_mm,
+                [op_r_add_f32_rm] = &&L_op_r_add_f32_rm, [op_m_add_f32_rm] = &&L_op_m_add_f32_rm,
+                [op_r_add_f32_mr] = &&L_op_r_add_f32_mr, [op_m_add_f32_mr] = &&L_op_m_add_f32_mr,
+                [op_r_add_f32_rr] = &&L_op_r_add_f32_rr,
+                [op_r_sub_f32_rm] = &&L_op_r_sub_f32_rm, [op_m_sub_f32_rm] = &&L_op_m_sub_f32_rm,
+                [op_r_sub_f32_mr] = &&L_op_r_sub_f32_mr,
+                [op_m_sub_f32_rr] = &&L_op_m_sub_f32_rr,
+                [op_r_mul_f32_mm] = &&L_op_r_mul_f32_mm,
+                [op_r_mul_f32_rm] = &&L_op_r_mul_f32_rm, [op_m_mul_f32_rm] = &&L_op_m_mul_f32_rm,
+                [op_r_mul_f32_mr] = &&L_op_r_mul_f32_mr, [op_m_mul_f32_mr] = &&L_op_m_mul_f32_mr,
+                [op_r_mul_f32_rr] = &&L_op_r_mul_f32_rr, [op_m_mul_f32_rr] = &&L_op_m_mul_f32_rr,
+                [op_r_div_f32_mm] = &&L_op_r_div_f32_mm,
+                [op_r_div_f32_rm] = &&L_op_r_div_f32_rm, [op_m_div_f32_rm] = &&L_op_m_div_f32_rm,
+                [op_r_div_f32_mr] = &&L_op_r_div_f32_mr, [op_m_div_f32_mr] = &&L_op_m_div_f32_mr,
+                [op_r_div_f32_rr] = &&L_op_r_div_f32_rr, [op_m_div_f32_rr] = &&L_op_m_div_f32_rr,
+                [op_r_min_f32_rm] = &&L_op_r_min_f32_rm,
+                [op_r_min_f32_mr] = &&L_op_r_min_f32_mr, [op_m_min_f32_mr] = &&L_op_m_min_f32_mr,
+                [op_r_min_f32_rr] = &&L_op_r_min_f32_rr,
+                [op_m_max_f32_mr] = &&L_op_m_max_f32_mr,
+                [op_r_max_f32_rr] = &&L_op_r_max_f32_rr,
+                [op_r_add_i32_mm] = &&L_op_r_add_i32_mm,
+                [op_m_add_i32_rm] = &&L_op_m_add_i32_rm,
+                [op_r_add_i32_mr] = &&L_op_r_add_i32_mr, [op_m_add_i32_mr] = &&L_op_m_add_i32_mr,
+                [op_r_add_i32_rr] = &&L_op_r_add_i32_rr, [op_m_add_i32_rr] = &&L_op_m_add_i32_rr,
+                [op_r_sub_i32_mm] = &&L_op_r_sub_i32_mm,
+                [op_r_sub_i32_rm] = &&L_op_r_sub_i32_rm,
+                [op_r_mul_i32_rm] = &&L_op_r_mul_i32_rm, [op_m_mul_i32_rm] = &&L_op_m_mul_i32_rm,
+                [op_r_mul_i32_mr] = &&L_op_r_mul_i32_mr,
+                [op_m_mul_i32_rr] = &&L_op_m_mul_i32_rr,
+                [op_r_shl_i32_mm] = &&L_op_r_shl_i32_mm,
+                [op_r_shl_i32_rm] = &&L_op_r_shl_i32_rm,
+                [op_m_shl_i32_rr] = &&L_op_m_shl_i32_rr,
+                [op_r_shr_u32_mm] = &&L_op_r_shr_u32_mm,
+                [op_r_shr_u32_rm] = &&L_op_r_shr_u32_rm,
+                [op_m_shr_u32_rr] = &&L_op_m_shr_u32_rr,
+                [op_r_shr_s32_mm] = &&L_op_r_shr_s32_mm,
+                [op_r_shr_s32_rm] = &&L_op_r_shr_s32_rm, [op_m_shr_s32_rm] = &&L_op_m_shr_s32_rm,
+                [op_r_shr_s32_mr] = &&L_op_r_shr_s32_mr,
+                [op_m_shr_s32_rr] = &&L_op_m_shr_s32_rr,
+                [op_r_and_32_mm] = &&L_op_r_and_32_mm,
+                [op_r_and_32_rm] = &&L_op_r_and_32_rm, [op_m_and_32_rm] = &&L_op_m_and_32_rm,
+                [op_r_and_32_mr] = &&L_op_r_and_32_mr, [op_m_and_32_mr] = &&L_op_m_and_32_mr,
+                [op_r_and_32_rr] = &&L_op_r_and_32_rr,
+                [op_r_or_32_rm] = &&L_op_r_or_32_rm, [op_m_or_32_rm] = &&L_op_m_or_32_rm,
+                [op_r_or_32_mr] = &&L_op_r_or_32_mr, [op_m_or_32_mr] = &&L_op_m_or_32_mr,
+                [op_r_or_32_rr] = &&L_op_r_or_32_rr,
+                // Comparison register variant labels.
+                [op_r_lt_f32_mm] = &&L_op_r_lt_f32_mm,
+                [op_r_lt_f32_rm] = &&L_op_r_lt_f32_rm, [op_m_lt_f32_rm] = &&L_op_m_lt_f32_rm,
+                [op_r_lt_f32_mr] = &&L_op_r_lt_f32_mr, [op_m_lt_f32_mr] = &&L_op_m_lt_f32_mr,
+                [op_r_lt_f32_rr] = &&L_op_r_lt_f32_rr, [op_m_lt_f32_rr] = &&L_op_m_lt_f32_rr,
+                [op_r_le_f32_mm] = &&L_op_r_le_f32_mm,
+                [op_r_le_f32_rm] = &&L_op_r_le_f32_rm,
+                // Unary op register variant labels.
+                [op_r_sqrt_f32_r] = &&L_op_r_sqrt_f32_r, [op_m_sqrt_f32_r] = &&L_op_m_sqrt_f32_r,
+                [op_r_abs_f32_m] = &&L_op_r_abs_f32_m,
+                [op_r_abs_f32_r] = &&L_op_r_abs_f32_r,
+                [op_r_neg_f32_m] = &&L_op_r_neg_f32_m,
+                [op_r_neg_f32_r] = &&L_op_r_neg_f32_r, [op_m_neg_f32_r] = &&L_op_m_neg_f32_r,
+                [op_m_round_f32_r] = &&L_op_m_round_f32_r,
+                [op_r_floor_f32_m] = &&L_op_r_floor_f32_m,
+                [op_r_floor_f32_r] = &&L_op_r_floor_f32_r, [op_m_floor_f32_r] = &&L_op_m_floor_f32_r,
+                [op_r_ceil_f32_m] = &&L_op_r_ceil_f32_m,
+                [op_r_ceil_f32_r] = &&L_op_r_ceil_f32_r, [op_m_ceil_f32_r] = &&L_op_m_ceil_f32_r,
+                [op_r_round_i32_m] = &&L_op_r_round_i32_m,
+                [op_m_round_i32_r] = &&L_op_m_round_i32_r,
+                [op_r_floor_i32_m] = &&L_op_r_floor_i32_m,
+                [op_r_floor_i32_r] = &&L_op_r_floor_i32_r, [op_m_floor_i32_r] = &&L_op_m_floor_i32_r,
+                [op_r_ceil_i32_m] = &&L_op_r_ceil_i32_m,
+                [op_m_ceil_i32_r] = &&L_op_m_ceil_i32_r,
+                [op_r_f32_from_i32_m] = &&L_op_r_f32_from_i32_m,
+                [op_r_f32_from_i32_r] = &&L_op_r_f32_from_i32_r, [op_m_f32_from_i32_r] = &&L_op_m_f32_from_i32_r,
+                [op_r_i32_from_f32_m] = &&L_op_r_i32_from_f32_m,
+                [op_r_i32_from_f32_r] = &&L_op_r_i32_from_f32_r, [op_m_i32_from_f32_r] = &&L_op_m_i32_from_f32_r,
+                // Imm op register variant labels.
+                [op_r_shl_i32_imm_m] = &&L_op_r_shl_i32_imm_m,
+                [op_r_shl_i32_imm_r] = &&L_op_r_shl_i32_imm_r, [op_m_shl_i32_imm_r] = &&L_op_m_shl_i32_imm_r,
+                [op_r_shr_u32_imm_r] = &&L_op_r_shr_u32_imm_r, [op_m_shr_u32_imm_r] = &&L_op_m_shr_u32_imm_r,
+                [op_r_and_32_imm_m] = &&L_op_r_and_32_imm_m,
+                [op_r_and_32_imm_r] = &&L_op_r_and_32_imm_r, [op_m_and_32_imm_r] = &&L_op_m_and_32_imm_r,
+                [op_r_or_32_imm_m] = &&L_op_r_or_32_imm_m,
+                [op_r_xor_32_imm_r] = &&L_op_r_xor_32_imm_r, [op_m_xor_32_imm_r] = &&L_op_m_xor_32_imm_r,
+                [op_r_add_f32_imm_m] = &&L_op_r_add_f32_imm_m,
+                [op_r_add_f32_imm_r] = &&L_op_r_add_f32_imm_r, [op_m_add_f32_imm_r] = &&L_op_m_add_f32_imm_r,
+                [op_r_sub_f32_imm_m] = &&L_op_r_sub_f32_imm_m,
+                [op_r_sub_f32_imm_r] = &&L_op_r_sub_f32_imm_r, [op_m_sub_f32_imm_r] = &&L_op_m_sub_f32_imm_r,
+                [op_r_mul_f32_imm_r] = &&L_op_r_mul_f32_imm_r, [op_m_mul_f32_imm_r] = &&L_op_m_mul_f32_imm_r,
+                [op_r_div_f32_imm_m] = &&L_op_r_div_f32_imm_m,
+                [op_r_div_f32_imm_r] = &&L_op_r_div_f32_imm_r, [op_m_div_f32_imm_r] = &&L_op_m_div_f32_imm_r,
+                [op_r_min_f32_imm_r] = &&L_op_r_min_f32_imm_r, [op_m_min_f32_imm_r] = &&L_op_m_min_f32_imm_r,
+                [op_r_max_f32_imm_m] = &&L_op_r_max_f32_imm_m,
+                [op_r_max_f32_imm_r] = &&L_op_r_max_f32_imm_r, [op_m_max_f32_imm_r] = &&L_op_m_max_f32_imm_r,
+                [op_r_add_i32_imm_m] = &&L_op_r_add_i32_imm_m,
+                [op_r_add_i32_imm_r] = &&L_op_r_add_i32_imm_r, [op_m_add_i32_imm_r] = &&L_op_m_add_i32_imm_r,
+                [op_r_sub_i32_imm_m] = &&L_op_r_sub_i32_imm_m,
+                [op_r_sub_i32_imm_r] = &&L_op_r_sub_i32_imm_r, [op_m_sub_i32_imm_r] = &&L_op_m_sub_i32_imm_r,
+                [op_r_mul_i32_imm_r] = &&L_op_r_mul_i32_imm_r, [op_m_mul_i32_imm_r] = &&L_op_m_mul_i32_imm_r,
+                [op_r_eq_f32_imm_r] = &&L_op_r_eq_f32_imm_r, [op_m_eq_f32_imm_r] = &&L_op_m_eq_f32_imm_r,
+                [op_r_lt_f32_imm_r] = &&L_op_r_lt_f32_imm_r, [op_m_lt_f32_imm_r] = &&L_op_m_lt_f32_imm_r,
+                [op_r_le_f32_imm_m] = &&L_op_r_le_f32_imm_m,
+                [op_r_le_f32_imm_r] = &&L_op_r_le_f32_imm_r, [op_m_le_f32_imm_r] = &&L_op_m_le_f32_imm_r,
+                [op_r_eq_i32_imm_r] = &&L_op_r_eq_i32_imm_r, [op_m_eq_i32_imm_r] = &&L_op_m_eq_i32_imm_r,
+                [op_r_lt_s32_imm_m] = &&L_op_r_lt_s32_imm_m,
+                [op_m_lt_s32_imm_r] = &&L_op_m_lt_s32_imm_r,
+                [op_r_le_s32_imm_m] = &&L_op_r_le_s32_imm_m,
+                [op_m_le_s32_imm_r] = &&L_op_m_le_s32_imm_r,
                 [op_r_imm_32] = &&L_op_r_imm_32,
                 [op_r_x] = &&L_op_r_x,
                 [op_r_y] = &&L_op_r_y,
@@ -1127,161 +1446,211 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                     v->u32 = v[ip->x].u32 | (U32)(v[ip->y].i32 << sh);
                 } NEXT;
 
-                // Register variant dispatch.
-                // Binary: 7 variants per op (the existing case is the mm→m fallback).
-#define BINARY_DISPATCH(name, rt, pt) \
-                CASE(op_r_##name##_mm) acc.rt = v[ip->x].pt OP_##name v[ip->y].pt; NEXT; \
-                CASE(op_r_##name##_rm) acc.rt = acc.pt       OP_##name v[ip->y].pt; NEXT; \
-                CASE(op_m_##name##_rm) v->rt  = acc.pt       OP_##name v[ip->y].pt; NEXT; \
-                CASE(op_r_##name##_mr) acc.rt = v[ip->x].pt OP_##name acc.pt;       NEXT; \
-                CASE(op_m_##name##_mr) v->rt  = v[ip->x].pt OP_##name acc.pt;       NEXT; \
-                CASE(op_r_##name##_rr) acc.rt = acc.pt       OP_##name acc.pt;       NEXT; \
-                CASE(op_m_##name##_rr) v->rt  = acc.pt       OP_##name acc.pt;       NEXT;
+                // Register variant dispatch — binary ops.
+                // add_f32
+                CASE(op_r_add_f32_mm) acc.f32 = v[ip->x].f32 + v[ip->y].f32; NEXT;
+                CASE(op_r_add_f32_rm) acc.f32 = acc.f32       + v[ip->y].f32; NEXT;
+                CASE(op_m_add_f32_rm) v->f32  = acc.f32       + v[ip->y].f32; NEXT;
+                CASE(op_r_add_f32_mr) acc.f32 = v[ip->x].f32 + acc.f32;       NEXT;
+                CASE(op_m_add_f32_mr) v->f32  = v[ip->x].f32 + acc.f32;       NEXT;
+                CASE(op_r_add_f32_rr) acc.f32 = acc.f32       + acc.f32;       NEXT;
+                // sub_f32
+                CASE(op_r_sub_f32_rm) acc.f32 = acc.f32       - v[ip->y].f32; NEXT;
+                CASE(op_m_sub_f32_rm) v->f32  = acc.f32       - v[ip->y].f32; NEXT;
+                CASE(op_r_sub_f32_mr) acc.f32 = v[ip->x].f32 - acc.f32;       NEXT;
+                CASE(op_m_sub_f32_rr) v->f32  = acc.f32       - acc.f32;       NEXT;
+                // mul_f32
+                CASE(op_r_mul_f32_mm) acc.f32 = v[ip->x].f32 * v[ip->y].f32; NEXT;
+                CASE(op_r_mul_f32_rm) acc.f32 = acc.f32       * v[ip->y].f32; NEXT;
+                CASE(op_m_mul_f32_rm) v->f32  = acc.f32       * v[ip->y].f32; NEXT;
+                CASE(op_r_mul_f32_mr) acc.f32 = v[ip->x].f32 * acc.f32;       NEXT;
+                CASE(op_m_mul_f32_mr) v->f32  = v[ip->x].f32 * acc.f32;       NEXT;
+                CASE(op_r_mul_f32_rr) acc.f32 = acc.f32       * acc.f32;       NEXT;
+                CASE(op_m_mul_f32_rr) v->f32  = acc.f32       * acc.f32;       NEXT;
+                // div_f32
+                CASE(op_r_div_f32_mm) acc.f32 = v[ip->x].f32 / v[ip->y].f32; NEXT;
+                CASE(op_r_div_f32_rm) acc.f32 = acc.f32       / v[ip->y].f32; NEXT;
+                CASE(op_m_div_f32_rm) v->f32  = acc.f32       / v[ip->y].f32; NEXT;
+                CASE(op_r_div_f32_mr) acc.f32 = v[ip->x].f32 / acc.f32;       NEXT;
+                CASE(op_m_div_f32_mr) v->f32  = v[ip->x].f32 / acc.f32;       NEXT;
+                CASE(op_r_div_f32_rr) acc.f32 = acc.f32       / acc.f32;       NEXT;
+                CASE(op_m_div_f32_rr) v->f32  = acc.f32       / acc.f32;       NEXT;
+                // add_i32
+                CASE(op_r_add_i32_mm) acc.i32 = v[ip->x].i32 + v[ip->y].i32; NEXT;
+                CASE(op_m_add_i32_rm) v->i32  = acc.i32       + v[ip->y].i32; NEXT;
+                CASE(op_r_add_i32_mr) acc.i32 = v[ip->x].i32 + acc.i32;       NEXT;
+                CASE(op_m_add_i32_mr) v->i32  = v[ip->x].i32 + acc.i32;       NEXT;
+                CASE(op_r_add_i32_rr) acc.i32 = acc.i32       + acc.i32;       NEXT;
+                CASE(op_m_add_i32_rr) v->i32  = acc.i32       + acc.i32;       NEXT;
+                // sub_i32
+                CASE(op_r_sub_i32_mm) acc.i32 = v[ip->x].i32 - v[ip->y].i32; NEXT;
+                CASE(op_r_sub_i32_rm) acc.i32 = acc.i32       - v[ip->y].i32; NEXT;
+                // mul_i32
+                CASE(op_r_mul_i32_rm) acc.i32 = acc.i32       * v[ip->y].i32; NEXT;
+                CASE(op_m_mul_i32_rm) v->i32  = acc.i32       * v[ip->y].i32; NEXT;
+                CASE(op_r_mul_i32_mr) acc.i32 = v[ip->x].i32 * acc.i32;       NEXT;
+                CASE(op_m_mul_i32_rr) v->i32  = acc.i32       * acc.i32;       NEXT;
+                // shl_i32
+                CASE(op_r_shl_i32_mm) acc.i32 = v[ip->x].i32 << v[ip->y].i32; NEXT;
+                CASE(op_r_shl_i32_rm) acc.i32 = acc.i32       << v[ip->y].i32; NEXT;
+                CASE(op_m_shl_i32_rr) v->i32  = acc.i32       << acc.i32;       NEXT;
+                // shr_u32
+                CASE(op_r_shr_u32_mm) acc.u32 = v[ip->x].u32 >> v[ip->y].u32; NEXT;
+                CASE(op_r_shr_u32_rm) acc.u32 = acc.u32       >> v[ip->y].u32; NEXT;
+                CASE(op_m_shr_u32_rr) v->u32  = acc.u32       >> acc.u32;       NEXT;
+                // shr_s32
+                CASE(op_r_shr_s32_mm) acc.i32 = v[ip->x].i32 >> v[ip->y].i32; NEXT;
+                CASE(op_r_shr_s32_rm) acc.i32 = acc.i32       >> v[ip->y].i32; NEXT;
+                CASE(op_m_shr_s32_rm) v->i32  = acc.i32       >> v[ip->y].i32; NEXT;
+                CASE(op_r_shr_s32_mr) acc.i32 = v[ip->x].i32 >> acc.i32;       NEXT;
+                CASE(op_m_shr_s32_rr) v->i32  = acc.i32       >> acc.i32;       NEXT;
+                // and_32
+                CASE(op_r_and_32_mm) acc.i32 = v[ip->x].i32 & v[ip->y].i32; NEXT;
+                CASE(op_r_and_32_rm) acc.i32 = acc.i32       & v[ip->y].i32; NEXT;
+                CASE(op_m_and_32_rm) v->i32  = acc.i32       & v[ip->y].i32; NEXT;
+                CASE(op_r_and_32_mr) acc.i32 = v[ip->x].i32 & acc.i32;       NEXT;
+                CASE(op_m_and_32_mr) v->i32  = v[ip->x].i32 & acc.i32;       NEXT;
+                CASE(op_r_and_32_rr) acc.i32 = acc.i32       & acc.i32;       NEXT;
+                // or_32
+                CASE(op_r_or_32_rm) acc.i32 = acc.i32       | v[ip->y].i32; NEXT;
+                CASE(op_m_or_32_rm) v->i32  = acc.i32       | v[ip->y].i32; NEXT;
+                CASE(op_r_or_32_mr) acc.i32 = v[ip->x].i32 | acc.i32;       NEXT;
+                CASE(op_m_or_32_mr) v->i32  = v[ip->x].i32 | acc.i32;       NEXT;
+                CASE(op_r_or_32_rr) acc.i32 = acc.i32       | acc.i32;       NEXT;
 
-                // Define the binary operator for each op.
-#define OP_add_f32 +
-#define OP_sub_f32 -
-#define OP_mul_f32 *
-#define OP_div_f32 /
-#define OP_add_i32 +
-#define OP_sub_i32 -
-#define OP_mul_i32 *
-#define OP_shl_i32 <<
-#define OP_shr_u32 >>
-#define OP_shr_s32 >>
-#define OP_and_32  &
-#define OP_or_32   |
-#define OP_xor_32  ^
-                // Arithmetic binary ops.
-                BINARY_DISPATCH(add_f32, f32, f32)
-                BINARY_DISPATCH(sub_f32, f32, f32)
-                BINARY_DISPATCH(mul_f32, f32, f32)
-                BINARY_DISPATCH(div_f32, f32, f32)
-                BINARY_DISPATCH(add_i32, i32, i32)
-                BINARY_DISPATCH(sub_i32, i32, i32)
-                BINARY_DISPATCH(mul_i32, i32, i32)
-                BINARY_DISPATCH(shl_i32, i32, i32)
-                BINARY_DISPATCH(shr_u32, u32, u32)
-                BINARY_DISPATCH(shr_s32, i32, i32)
-                BINARY_DISPATCH(and_32,  i32, i32)
-                BINARY_DISPATCH(or_32,   i32, i32)
-                BINARY_DISPATCH(xor_32,  i32, i32)
-#undef BINARY_DISPATCH
+                // min_f32
+                CASE(op_r_min_f32_rm) acc.f32 = vec_min(acc.f32,       v[ip->y].f32); NEXT;
+                CASE(op_r_min_f32_mr) acc.f32 = vec_min(v[ip->x].f32, acc.f32);       NEXT;
+                CASE(op_m_min_f32_mr) v->f32  = vec_min(v[ip->x].f32, acc.f32);       NEXT;
+                CASE(op_r_min_f32_rr) acc.f32 = vec_min(acc.f32,       acc.f32);       NEXT;
+                // max_f32
+                CASE(op_m_max_f32_mr) v->f32  = vec_max(v[ip->x].f32, acc.f32);       NEXT;
+                CASE(op_r_max_f32_rr) acc.f32 = vec_max(acc.f32,       acc.f32);       NEXT;
 
-                // min/max/cmp need custom expansion (not simple operators).
-#define MINMAX_DISPATCH(name, fn, rt, pt) \
-                CASE(op_r_##name##_mm) acc.rt = fn(v[ip->x].pt, v[ip->y].pt); NEXT; \
-                CASE(op_r_##name##_rm) acc.rt = fn(acc.pt,       v[ip->y].pt); NEXT; \
-                CASE(op_m_##name##_rm) v->rt  = fn(acc.pt,       v[ip->y].pt); NEXT; \
-                CASE(op_r_##name##_mr) acc.rt = fn(v[ip->x].pt, acc.pt);       NEXT; \
-                CASE(op_m_##name##_mr) v->rt  = fn(v[ip->x].pt, acc.pt);       NEXT; \
-                CASE(op_r_##name##_rr) acc.rt = fn(acc.pt,       acc.pt);       NEXT; \
-                CASE(op_m_##name##_rr) v->rt  = fn(acc.pt,       acc.pt);       NEXT;
-                MINMAX_DISPATCH(min_f32, vec_min, f32, f32)
-                MINMAX_DISPATCH(max_f32, vec_max, f32, f32)
-#undef MINMAX_DISPATCH
+                // lt_f32 (all 7)
+                CASE(op_r_lt_f32_mm) acc.i32 = (I32)(v[ip->x].f32 <  v[ip->y].f32); NEXT;
+                CASE(op_r_lt_f32_rm) acc.i32 = (I32)(acc.f32       <  v[ip->y].f32); NEXT;
+                CASE(op_m_lt_f32_rm) v->i32  = (I32)(acc.f32       <  v[ip->y].f32); NEXT;
+                CASE(op_r_lt_f32_mr) acc.i32 = (I32)(v[ip->x].f32 <  acc.f32);       NEXT;
+                CASE(op_m_lt_f32_mr) v->i32  = (I32)(v[ip->x].f32 <  acc.f32);       NEXT;
+                CASE(op_r_lt_f32_rr) acc.i32 = (I32)(acc.f32       <  acc.f32);       NEXT;
+                CASE(op_m_lt_f32_rr) v->i32  = (I32)(acc.f32       <  acc.f32);       NEXT;
+                // le_f32
+                CASE(op_r_le_f32_mm) acc.i32 = (I32)(v[ip->x].f32 <= v[ip->y].f32); NEXT;
+                CASE(op_r_le_f32_rm) acc.i32 = (I32)(acc.f32       <= v[ip->y].f32); NEXT;
 
-                // Comparison variants: result type (i32) differs from param type.
-#define CMP_DISPATCH(name, op, rt, pt) \
-                CASE(op_r_##name##_mm) acc.rt = (I32)(v[ip->x].pt op v[ip->y].pt); NEXT; \
-                CASE(op_r_##name##_rm) acc.rt = (I32)(acc.pt       op v[ip->y].pt); NEXT; \
-                CASE(op_m_##name##_rm) v->rt  = (I32)(acc.pt       op v[ip->y].pt); NEXT; \
-                CASE(op_r_##name##_mr) acc.rt = (I32)(v[ip->x].pt op acc.pt);       NEXT; \
-                CASE(op_m_##name##_mr) v->rt  = (I32)(v[ip->x].pt op acc.pt);       NEXT; \
-                CASE(op_r_##name##_rr) acc.rt = (I32)(acc.pt       op acc.pt);       NEXT; \
-                CASE(op_m_##name##_rr) v->rt  = (I32)(acc.pt       op acc.pt);       NEXT;
-                CMP_DISPATCH(lt_f32, <,  i32, f32)
-                CMP_DISPATCH(le_f32, <=, i32, f32)
-                CMP_DISPATCH(eq_i32, ==, i32, i32)
-                CMP_DISPATCH(lt_s32, <,  i32, i32)
-                CMP_DISPATCH(le_s32, <=, i32, i32)
-                CMP_DISPATCH(lt_u32, <,  i32, u32)
-                CMP_DISPATCH(le_u32, <=, i32, u32)
+                // Unary op variants.
+                // sqrt_f32 (no _m)
+                CASE(op_r_sqrt_f32_r) acc.f32 = vec_sqrt(acc.f32);       NEXT;
+                CASE(op_m_sqrt_f32_r) v->f32  = vec_sqrt(acc.f32);       NEXT;
+                // abs_f32
+                CASE(op_r_abs_f32_m) acc.f32 = vec_abs(v[ip->x].f32); NEXT;
+                CASE(op_r_abs_f32_r) acc.f32 = vec_abs(acc.f32);       NEXT;
+                // round_f32
+                CASE(op_m_round_f32_r) v->f32  = vec_round(acc.f32);       NEXT;
+                // floor_f32
+                CASE(op_r_floor_f32_m) acc.f32 = vec_floor(v[ip->x].f32); NEXT;
+                CASE(op_r_floor_f32_r) acc.f32 = vec_floor(acc.f32);       NEXT;
+                CASE(op_m_floor_f32_r) v->f32  = vec_floor(acc.f32);       NEXT;
+                // ceil_f32
+                CASE(op_r_ceil_f32_m) acc.f32 = vec_ceil(v[ip->x].f32);  NEXT;
+                CASE(op_r_ceil_f32_r) acc.f32 = vec_ceil(acc.f32);        NEXT;
+                CASE(op_m_ceil_f32_r) v->f32  = vec_ceil(acc.f32);        NEXT;
+                // neg_f32
+                CASE(op_r_neg_f32_m) acc.f32 = -v[ip->x].f32; NEXT;
+                CASE(op_r_neg_f32_r) acc.f32 = -acc.f32;       NEXT;
+                CASE(op_m_neg_f32_r) v->f32  = -acc.f32;       NEXT;
+                // round_i32
+                CASE(op_r_round_i32_m) acc.i32 = cast(I32, vec_round(v[ip->x].f32)); NEXT;
+                CASE(op_m_round_i32_r) v->i32  = cast(I32, vec_round(acc.f32));       NEXT;
+                // floor_i32
+                CASE(op_r_floor_i32_m) acc.i32 = cast(I32, vec_floor(v[ip->x].f32)); NEXT;
+                CASE(op_r_floor_i32_r) acc.i32 = cast(I32, vec_floor(acc.f32));       NEXT;
+                CASE(op_m_floor_i32_r) v->i32  = cast(I32, vec_floor(acc.f32));       NEXT;
+                // ceil_i32
+                CASE(op_r_ceil_i32_m) acc.i32 = cast(I32, vec_ceil(v[ip->x].f32));  NEXT;
+                CASE(op_m_ceil_i32_r) v->i32  = cast(I32, vec_ceil(acc.f32));        NEXT;
+                // f32_from_i32
+                CASE(op_r_f32_from_i32_m) acc.f32 = cast(F32, v[ip->x].i32); NEXT;
+                CASE(op_r_f32_from_i32_r) acc.f32 = cast(F32, acc.i32);       NEXT;
+                CASE(op_m_f32_from_i32_r) v->f32  = cast(F32, acc.i32);       NEXT;
+                // i32_from_f32
+                CASE(op_r_i32_from_f32_m) acc.i32 = cast(I32, v[ip->x].f32); NEXT;
+                CASE(op_r_i32_from_f32_r) acc.i32 = cast(I32, acc.f32);       NEXT;
+                CASE(op_m_i32_from_f32_r) v->i32  = cast(I32, acc.f32);       NEXT;
+
+                // _imm op variants.
+                // shl_i32_imm
+                CASE(op_r_shl_i32_imm_m) { I32 const imm = (I32){0} + ip->y; acc.i32 = v[ip->x].i32 << imm; } NEXT;
+                CASE(op_r_shl_i32_imm_r) { I32 const imm = (I32){0} + ip->y; acc.i32 = acc.i32       << imm; } NEXT;
+                CASE(op_m_shl_i32_imm_r) { I32 const imm = (I32){0} + ip->y; v->i32  = acc.i32       << imm; } NEXT;
+                // shr_u32_imm (no _m)
+                CASE(op_r_shr_u32_imm_r) { U32 const imm = (U32){0} + (uint32_t)ip->y; acc.u32 = acc.u32 >> imm; } NEXT;
+                CASE(op_m_shr_u32_imm_r) { U32 const imm = (U32){0} + (uint32_t)ip->y; v->u32  = acc.u32 >> imm; } NEXT;
+                // and_32_imm
+                CASE(op_r_and_32_imm_m) { U32 const imm = (U32){0} + (uint32_t)ip->y; acc.u32 = v[ip->x].u32 & imm; } NEXT;
+                CASE(op_r_and_32_imm_r) { U32 const imm = (U32){0} + (uint32_t)ip->y; acc.u32 = acc.u32       & imm; } NEXT;
+                CASE(op_m_and_32_imm_r) { U32 const imm = (U32){0} + (uint32_t)ip->y; v->u32  = acc.u32       & imm; } NEXT;
+                // or_32_imm (_m only)
+                CASE(op_r_or_32_imm_m) { U32 const imm = (U32){0} + (uint32_t)ip->y; acc.u32 = v[ip->x].u32 | imm; } NEXT;
+                // xor_32_imm (no _m)
+                CASE(op_r_xor_32_imm_r) { U32 const imm = (U32){0} + (uint32_t)ip->y; acc.u32 = acc.u32 ^ imm; } NEXT;
+                CASE(op_m_xor_32_imm_r) { U32 const imm = (U32){0} + (uint32_t)ip->y; v->u32  = acc.u32 ^ imm; } NEXT;
+                // add_f32_imm
+                CASE(op_r_add_f32_imm_m) { F32_IMM; acc.f32 = v[ip->x].f32 + imm; } NEXT;
+                CASE(op_r_add_f32_imm_r) { F32_IMM; acc.f32 = acc.f32       + imm; } NEXT;
+                CASE(op_m_add_f32_imm_r) { F32_IMM; v->f32  = acc.f32       + imm; } NEXT;
+                // sub_f32_imm
+                CASE(op_r_sub_f32_imm_m) { F32_IMM; acc.f32 = v[ip->x].f32 - imm; } NEXT;
+                CASE(op_r_sub_f32_imm_r) { F32_IMM; acc.f32 = acc.f32       - imm; } NEXT;
+                CASE(op_m_sub_f32_imm_r) { F32_IMM; v->f32  = acc.f32       - imm; } NEXT;
+                // mul_f32_imm (no _m)
+                CASE(op_r_mul_f32_imm_r) { F32_IMM; acc.f32 = acc.f32 * imm; } NEXT;
+                CASE(op_m_mul_f32_imm_r) { F32_IMM; v->f32  = acc.f32 * imm; } NEXT;
+                // div_f32_imm
+                CASE(op_r_div_f32_imm_m) { F32_IMM; acc.f32 = v[ip->x].f32 / imm; } NEXT;
+                CASE(op_r_div_f32_imm_r) { F32_IMM; acc.f32 = acc.f32       / imm; } NEXT;
+                CASE(op_m_div_f32_imm_r) { F32_IMM; v->f32  = acc.f32       / imm; } NEXT;
+                // min_f32_imm (no _m)
+                CASE(op_r_min_f32_imm_r) { F32_IMM; acc.f32 = vec_min(acc.f32, imm); } NEXT;
+                CASE(op_m_min_f32_imm_r) { F32_IMM; v->f32  = vec_min(acc.f32, imm); } NEXT;
+                // max_f32_imm
+                CASE(op_r_max_f32_imm_m) { F32_IMM; acc.f32 = vec_max(v[ip->x].f32, imm); } NEXT;
+                CASE(op_r_max_f32_imm_r) { F32_IMM; acc.f32 = vec_max(acc.f32,       imm); } NEXT;
+                CASE(op_m_max_f32_imm_r) { F32_IMM; v->f32  = vec_max(acc.f32,       imm); } NEXT;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-equal"
-                CMP_DISPATCH(eq_f32, ==, i32, f32)
+                // eq_f32_imm (no _m)
+                CASE(op_r_eq_f32_imm_r) { F32_IMM; acc.i32 = (I32)(acc.f32 == imm); } NEXT;
+                CASE(op_m_eq_f32_imm_r) { F32_IMM; v->i32  = (I32)(acc.f32 == imm); } NEXT;
 #pragma clang diagnostic pop
-#undef CMP_DISPATCH
-
-                // Unary op variants: 3 per op.
-#define UNARY_DISPATCH(name, fn, rt, pt) \
-                CASE(op_r_##name##_m) acc.rt = fn(v[ip->x].pt); NEXT; \
-                CASE(op_r_##name##_r) acc.rt = fn(acc.pt);       NEXT; \
-                CASE(op_m_##name##_r) v->rt  = fn(acc.pt);       NEXT;
-                UNARY_DISPATCH(sqrt_f32,     vec_sqrt,  f32, f32)
-                UNARY_DISPATCH(abs_f32,      vec_abs,   f32, f32)
-                UNARY_DISPATCH(round_f32,    vec_round, f32, f32)
-                UNARY_DISPATCH(floor_f32,    vec_floor, f32, f32)
-                UNARY_DISPATCH(ceil_f32,     vec_ceil,  f32, f32)
-#undef UNARY_DISPATCH
-                // neg, convert, round_i32 etc need custom expansion.
-#define UNARY3(name, expr_m, expr_r) \
-                CASE(op_r_##name##_m) acc expr_m; NEXT; \
-                CASE(op_r_##name##_r) acc expr_r; NEXT; \
-                CASE(op_m_##name##_r) v[0] expr_r; NEXT;
-                UNARY3(neg_f32,     .f32 = -v[ip->x].f32, .f32 = -acc.f32)
-                UNARY3(round_i32,   .i32 = cast(I32, vec_round(v[ip->x].f32)), .i32 = cast(I32, vec_round(acc.f32)))
-                UNARY3(floor_i32,   .i32 = cast(I32, vec_floor(v[ip->x].f32)), .i32 = cast(I32, vec_floor(acc.f32)))
-                UNARY3(ceil_i32,    .i32 = cast(I32, vec_ceil(v[ip->x].f32)),  .i32 = cast(I32, vec_ceil(acc.f32)))
-                UNARY3(f32_from_i32,.f32 = cast(F32, v[ip->x].i32),           .f32 = cast(F32, acc.i32))
-                UNARY3(i32_from_f32,.i32 = cast(I32, v[ip->x].f32),           .i32 = cast(I32, acc.f32))
-#undef UNARY3
-
-                // _imm op variants: 3 per op, y is always the immediate.
-#define IMM_DISPATCH_F(name, op) \
-                CASE(op_r_##name##_m) { F32_IMM; acc.f32 = v[ip->x].f32 op imm; } NEXT; \
-                CASE(op_r_##name##_r) { F32_IMM; acc.f32 = acc.f32       op imm; } NEXT; \
-                CASE(op_m_##name##_r) { F32_IMM; v->f32  = acc.f32       op imm; } NEXT;
-#define IMM_DISPATCH_I(name, op, rt, pt) \
-                CASE(op_r_##name##_m) { I32 const imm = (I32){0} + ip->y; acc.rt = v[ip->x].pt op imm; } NEXT; \
-                CASE(op_r_##name##_r) { I32 const imm = (I32){0} + ip->y; acc.rt = acc.pt       op imm; } NEXT; \
-                CASE(op_m_##name##_r) { I32 const imm = (I32){0} + ip->y; v->rt  = acc.pt       op imm; } NEXT;
-#define IMM_DISPATCH_U(name, op) \
-                CASE(op_r_##name##_m) { U32 const imm = (U32){0} + (uint32_t)ip->y; acc.u32 = v[ip->x].u32 op imm; } NEXT; \
-                CASE(op_r_##name##_r) { U32 const imm = (U32){0} + (uint32_t)ip->y; acc.u32 = acc.u32       op imm; } NEXT; \
-                CASE(op_m_##name##_r) { U32 const imm = (U32){0} + (uint32_t)ip->y; v->u32  = acc.u32       op imm; } NEXT;
-                IMM_DISPATCH_I(shl_i32_imm, <<, i32, i32)
-                IMM_DISPATCH_I(shr_s32_imm, >>, i32, i32)
-                IMM_DISPATCH_U(shr_u32_imm, >>)
-                IMM_DISPATCH_U(and_32_imm,  &)
-                IMM_DISPATCH_U(or_32_imm,   |)
-                IMM_DISPATCH_U(xor_32_imm,  ^)
-                IMM_DISPATCH_F(add_f32_imm, +)
-                IMM_DISPATCH_F(sub_f32_imm, -)
-                IMM_DISPATCH_F(mul_f32_imm, *)
-                IMM_DISPATCH_F(div_f32_imm, /)
-#define IMM_DISPATCH_FMIN(name, fn) \
-                CASE(op_r_##name##_m) { F32_IMM; acc.f32 = fn(v[ip->x].f32, imm); } NEXT; \
-                CASE(op_r_##name##_r) { F32_IMM; acc.f32 = fn(acc.f32,       imm); } NEXT; \
-                CASE(op_m_##name##_r) { F32_IMM; v->f32  = fn(acc.f32,       imm); } NEXT;
-                IMM_DISPATCH_FMIN(min_f32_imm, vec_min)
-                IMM_DISPATCH_FMIN(max_f32_imm, vec_max)
-#undef IMM_DISPATCH_FMIN
-#define IMM_CMP_F(name, op) \
-                CASE(op_r_##name##_m) { F32_IMM; acc.i32 = (I32)(v[ip->x].f32 op imm); } NEXT; \
-                CASE(op_r_##name##_r) { F32_IMM; acc.i32 = (I32)(acc.f32       op imm); } NEXT; \
-                CASE(op_m_##name##_r) { F32_IMM; v->i32  = (I32)(acc.f32       op imm); } NEXT;
-#define IMM_CMP_I(name, op) \
-                CASE(op_r_##name##_m) { I32 const imm = (I32){0} + ip->y; acc.i32 = (I32)(v[ip->x].i32 op imm); } NEXT; \
-                CASE(op_r_##name##_r) { I32 const imm = (I32){0} + ip->y; acc.i32 = (I32)(acc.i32       op imm); } NEXT; \
-                CASE(op_m_##name##_r) { I32 const imm = (I32){0} + ip->y; v->i32  = (I32)(acc.i32       op imm); } NEXT;
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wfloat-equal"
-                IMM_CMP_F(eq_f32_imm, ==)
-#pragma clang diagnostic pop
-                IMM_CMP_F(lt_f32_imm, <)
-                IMM_CMP_F(le_f32_imm, <=)
-                IMM_CMP_I(eq_i32_imm, ==)
-                IMM_CMP_I(lt_s32_imm, <)
-                IMM_CMP_I(le_s32_imm, <=)
-                IMM_DISPATCH_I(add_i32_imm, +, i32, i32)
-                IMM_DISPATCH_I(sub_i32_imm, -, i32, i32)
-                IMM_DISPATCH_I(mul_i32_imm, *, i32, i32)
-#undef IMM_DISPATCH_F
-#undef IMM_DISPATCH_I
-#undef IMM_DISPATCH_U
-#undef IMM_CMP_F
-#undef IMM_CMP_I
+                // lt_f32_imm (no _m)
+                CASE(op_r_lt_f32_imm_r) { F32_IMM; acc.i32 = (I32)(acc.f32 <  imm); } NEXT;
+                CASE(op_m_lt_f32_imm_r) { F32_IMM; v->i32  = (I32)(acc.f32 <  imm); } NEXT;
+                // le_f32_imm
+                CASE(op_r_le_f32_imm_m) { F32_IMM; acc.i32 = (I32)(v[ip->x].f32 <= imm); } NEXT;
+                CASE(op_r_le_f32_imm_r) { F32_IMM; acc.i32 = (I32)(acc.f32       <= imm); } NEXT;
+                CASE(op_m_le_f32_imm_r) { F32_IMM; v->i32  = (I32)(acc.f32       <= imm); } NEXT;
+                // eq_i32_imm (no _m)
+                CASE(op_r_eq_i32_imm_r) { I32 const imm = (I32){0} + ip->y; acc.i32 = (I32)(acc.i32 == imm); } NEXT;
+                CASE(op_m_eq_i32_imm_r) { I32 const imm = (I32){0} + ip->y; v->i32  = (I32)(acc.i32 == imm); } NEXT;
+                // lt_s32_imm
+                CASE(op_r_lt_s32_imm_m) { I32 const imm = (I32){0} + ip->y; acc.i32 = (I32)(v[ip->x].i32 <  imm); } NEXT;
+                CASE(op_m_lt_s32_imm_r) { I32 const imm = (I32){0} + ip->y; v->i32  = (I32)(acc.i32       <  imm); } NEXT;
+                // le_s32_imm
+                CASE(op_r_le_s32_imm_m) { I32 const imm = (I32){0} + ip->y; acc.i32 = (I32)(v[ip->x].i32 <= imm); } NEXT;
+                CASE(op_m_le_s32_imm_r) { I32 const imm = (I32){0} + ip->y; v->i32  = (I32)(acc.i32       <= imm); } NEXT;
+                // add_i32_imm
+                CASE(op_r_add_i32_imm_m) { I32 const imm = (I32){0} + ip->y; acc.i32 = v[ip->x].i32 + imm; } NEXT;
+                CASE(op_r_add_i32_imm_r) { I32 const imm = (I32){0} + ip->y; acc.i32 = acc.i32       + imm; } NEXT;
+                CASE(op_m_add_i32_imm_r) { I32 const imm = (I32){0} + ip->y; v->i32  = acc.i32       + imm; } NEXT;
+                // sub_i32_imm
+                CASE(op_r_sub_i32_imm_m) { I32 const imm = (I32){0} + ip->y; acc.i32 = v[ip->x].i32 - imm; } NEXT;
+                CASE(op_r_sub_i32_imm_r) { I32 const imm = (I32){0} + ip->y; acc.i32 = acc.i32       - imm; } NEXT;
+                CASE(op_m_sub_i32_imm_r) { I32 const imm = (I32){0} + ip->y; v->i32  = acc.i32       - imm; } NEXT;
+                // mul_i32_imm
+                CASE(op_r_mul_i32_imm_r) { I32 const imm = (I32){0} + ip->y; acc.i32 = acc.i32       * imm; } NEXT;
+                CASE(op_m_mul_i32_imm_r) { I32 const imm = (I32){0} + ip->y; v->i32  = acc.i32       * imm; } NEXT;
 
                 // sel_32 register variants.
 #define SEL(xv,yv,zv) (((xv).i32 & (yv).i32) | (~(xv).i32 & (zv).i32))
