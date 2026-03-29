@@ -25,6 +25,7 @@ typedef enum {
     umbra_fmt_f16,
     umbra_fmt_f32,
     umbra_fmt_f16_planar,
+    umbra_fmt_srgb,
 } umbra_fmt;
 
 static inline int umbra_pixel_bytes(umbra_fmt fmt) {
@@ -37,13 +38,10 @@ static inline int umbra_pixel_bytes(umbra_fmt fmt) {
     case umbra_fmt_f16:        return 2;
     case umbra_fmt_f32:        return 4;
     case umbra_fmt_f16_planar: return 2;
+    case umbra_fmt_srgb:       return 4;
     }
     return 0;
 }
-
-typedef struct {
-    float a, b, c, d, e, f, g;
-} umbra_transfer;
 
 typedef struct {
     void           *ptr;
@@ -52,8 +50,6 @@ typedef struct {
     umbra_fmt       fmt;
     _Bool           read_only;
     char            pad_[3];
-    umbra_transfer  transfer;
-    char            pad2_[4];
 } umbra_buf;
 
 

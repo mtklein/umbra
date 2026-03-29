@@ -44,12 +44,11 @@ void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
 #include <pthread.h>
 #include <unistd.h>
 
-_Static_assert(sizeof(umbra_buf) == 64, "");
+_Static_assert(sizeof(umbra_buf) == 32, "");
 _Static_assert(offsetof(umbra_buf, ptr)       ==  0, "");
 _Static_assert(offsetof(umbra_buf, sz)        ==  8, "");
 _Static_assert(offsetof(umbra_buf, row_bytes) == 16, "");
 _Static_assert(offsetof(umbra_buf, fmt)       == 24, "");
-_Static_assert(offsetof(umbra_buf, transfer)  == 32, "");
 
 struct pool_ref {
     int data_off, code_pos;
@@ -1858,12 +1857,11 @@ done:
 #include <sys/mman.h>
 #include <unistd.h>
 
-_Static_assert(sizeof(umbra_buf) == 64, "");
+_Static_assert(sizeof(umbra_buf) == 32, "");
 _Static_assert(offsetof(umbra_buf, ptr)       ==  0, "");
 _Static_assert(offsetof(umbra_buf, sz)        ==  8, "");
 _Static_assert(offsetof(umbra_buf, row_bytes) == 16, "");
 _Static_assert(offsetof(umbra_buf, fmt)       == 24, "");
-_Static_assert(offsetof(umbra_buf, transfer)  == 32, "");
 
 struct pool_ref {
     int data_off, code_pos, extra;

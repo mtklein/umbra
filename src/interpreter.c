@@ -175,6 +175,33 @@ static void interp_load_color(val v[4], umbra_buf const *b,
         v[2].f32 = f16_to_f32(hb);
         v[3].f32 = f16_to_f32(ha);
     } break;
+    case umbra_fmt_srgb: {
+        U32 px;
+        if (rem >= K) {
+            __builtin_memcpy(&px, src + i * 4, sizeof px);
+        } else {
+            px = (U32){0};
+            for (int ll = 0; ll < rem; ll++) {
+                uint32_t tmp;
+                __builtin_memcpy(&tmp, src + (i + ll) * 4, 4);
+                px[ll] = tmp;
+            }
+        }
+        U32 const mask = (U32){0} + 0xFFu;
+        F32 const inv  = (F32){0} + (1.f/255);
+        v[0].f32 = cast(F32, (I32)(px & mask))         * inv;
+        v[1].f32 = cast(F32, (I32)((px >>  8) & mask)) * inv;
+        v[2].f32 = cast(F32, (I32)((px >> 16) & mask)) * inv;
+        v[3].f32 = cast(F32, (I32)(px >> 24))          * inv;
+        for (int ll = 0; ll < clamp; ll++) {
+            for (int ch = 0; ch < 3; ch++) {
+                float x = v[ch].f32[ll];
+                v[ch].f32[ll] = x >= 0.04045f
+                    ? powf((x + 0.055f) / 1.055f, 2.4f)
+                    : x / 12.92f;
+            }
+        }
+    } break;
     case umbra_fmt_f16:
     case umbra_fmt_f32:
     case umbra_fmt_none: break;
@@ -202,23 +229,6 @@ static void interp_load_color(val v[4], umbra_buf const *b,
         v[3].f32 = f16_to_f32(ha);
     } break;
     }
-    {
-        umbra_transfer const *tf = &b->transfer;
-        uint32_t tf_a_bits;
-        __builtin_memcpy(&tf_a_bits, &tf->a, 4);
-        if (tf_a_bits) {
-            for (int ll = 0; ll < clamp; ll++) {
-                for (int ch = 0; ch < 3; ch++) {
-                    float x = v[ch].f32[ll];
-                    if (x >= tf->e) {
-                        v[ch].f32[ll] = powf((x - tf->b) / tf->a, tf->g);
-                    } else {
-                        v[ch].f32[ll] = (x - tf->f) / tf->c;
-                    }
-                }
-            }
-        }
-    }
 }
 
 __attribute__((noinline))
@@ -226,20 +236,6 @@ static void interp_store_color(val const v[], umbra_buf const *b,
                                 char *dst, int i, int rem) {
     int const clamp = rem < K ? rem : K;
     F32 cr = v[0].f32, cg = v[1].f32, cb = v[2].f32, ca = v[3].f32;
-    {
-        umbra_transfer const *tf = &b->transfer;
-        uint32_t tf_a_bits;
-        __builtin_memcpy(&tf_a_bits, &tf->a, 4);
-        if (tf_a_bits) {
-            float const inv_g = 1.0f / tf->g;
-            for (int ll = 0; ll < clamp; ll++) {
-                float xr = cr[ll], xg = cg[ll], xb = cb[ll];
-                cr[ll] = xr >= tf->d ? tf->a * powf(xr, inv_g) + tf->b : tf->c * xr + tf->f;
-                cg[ll] = xg >= tf->d ? tf->a * powf(xg, inv_g) + tf->b : tf->c * xg + tf->f;
-                cb[ll] = xb >= tf->d ? tf->a * powf(xb, inv_g) + tf->b : tf->c * xb + tf->f;
-            }
-        }
-    }
     switch (b->fmt) {
     case umbra_fmt_8888: {
         F32 const zero = {0}, one = (F32){0} + 1.f, scale = (F32){0} + 255.f;
@@ -305,6 +301,31 @@ static void interp_store_color(val const v[], umbra_buf const *b,
         for (int ll = 0; ll < clamp; ll++) {
             uint16_t h[4] = {hr[ll], hg[ll], hb[ll], ha[ll]};
             __builtin_memcpy(dst + (i + ll) * 8, h, 8);
+        }
+    } break;
+    case umbra_fmt_srgb: {
+        for (int ll = 0; ll < clamp; ll++) {
+            float xr = cr[ll], xg = cg[ll], xb = cb[ll];
+            cr[ll] = xr >= 0.0031308f ? 1.055f * powf(xr, 1.0f/2.4f) - 0.055f : 12.92f * xr;
+            cg[ll] = xg >= 0.0031308f ? 1.055f * powf(xg, 1.0f/2.4f) - 0.055f : 12.92f * xg;
+            cb[ll] = xb >= 0.0031308f ? 1.055f * powf(xb, 1.0f/2.4f) - 0.055f : 12.92f * xb;
+        }
+        F32 const zero = {0}, one = (F32){0} + 1.f, scale = (F32){0} + 255.f;
+        F32 const rc = vec_round(vec_min(vec_max(cr, zero), one) * scale);
+        F32 const gc = vec_round(vec_min(vec_max(cg, zero), one) * scale);
+        F32 const bc = vec_round(vec_min(vec_max(cb, zero), one) * scale);
+        F32 const ac = vec_round(vec_min(vec_max(ca, zero), one) * scale);
+        U32 const px = cast(U32, cast(I32, rc))
+                     | cast(U32, cast(I32, gc)) <<  8
+                     | cast(U32, cast(I32, bc)) << 16
+                     | cast(U32, cast(I32, ac)) << 24;
+        if (rem >= K) {
+            __builtin_memcpy(dst + i * 4, &px, sizeof px);
+        } else {
+            for (int ll = 0; ll < rem; ll++) {
+                uint32_t tmp = px[ll];
+                __builtin_memcpy(dst + (i + ll) * 4, &tmp, 4);
+            }
         }
     } break;
     case umbra_fmt_f16:
