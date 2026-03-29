@@ -1081,10 +1081,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t one   = ra_alloc(ra, sl, ns);
             int8_t px    = ra_alloc(ra, sl, ns);
             int8_t t     = ra_alloc(ra, sl, ns);
-            // Extra temps for sRGB.
+            // Extra temps for sRGB: 3 for channel copies, 3 for scratch.
             int8_t st0 = ra_alloc(ra, sl, ns);
             int8_t st1 = ra_alloc(ra, sl, ns);
             int8_t st2 = ra_alloc(ra, sl, ns);
+            int8_t st3 = ra_alloc(ra, sl, ns);
+            int8_t st4 = ra_alloc(ra, sl, ns);
+            int8_t st5 = ra_alloc(ra, sl, ns);
 
             // Load fmt.
             {
@@ -1282,11 +1285,17 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int br_skip_srgb_s = c->len;
             put(c, Bcond(0x1, 0));
             {
-                // linear→sRGB on RGB only.
+                // linear→sRGB on RGB only — copy inputs first since
+                // emit_srgb_arm64 modifies channels in-place, and the
+                // originals may be preamble values reused across tiles.
+                put(c, ORR_16b(st0, rr, rr));
+                put(c, ORR_16b(st1, rg, rg));
+                put(c, ORR_16b(st2, rb_, rb_));
                 emit_srgb_arm64(c, &jc->pool,
-                                rr, rg, rb_,
                                 st0, st1, st2,
+                                st3, st4, st5,
                                 /*invert=*/0);
+                rr = st0; rg = st1; rb_ = st2;
                 // Same as 8888 encode.
                 union { float f; uint32_t u; } s255 = {.f = 255.0f};
                 union { float f; uint32_t u; } f1   = {.f = 1.0f};
@@ -1318,6 +1327,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 c->buf[br_done[j]] = B(c->len - br_done[j]);
             }
 
+            ra_return_reg(ra, st5);
+            ra_return_reg(ra, st4);
+            ra_return_reg(ra, st3);
             ra_return_reg(ra, st2);
             ra_return_reg(ra, st1);
             ra_return_reg(ra, st0);
@@ -2832,10 +2844,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t t     = ra_alloc(ra, sl, ns);
             int8_t z     = ra_alloc(ra, sl, ns);
             int8_t one   = ra_alloc(ra, sl, ns);
-            // Extra temps for sRGB.
+            // Extra temps for sRGB: 3 for channel copies, 3 for scratch.
             int8_t st0 = ra_alloc(ra, sl, ns);
             int8_t st1 = ra_alloc(ra, sl, ns);
             int8_t st2 = ra_alloc(ra, sl, ns);
+            int8_t st3 = ra_alloc(ra, sl, ns);
+            int8_t st4 = ra_alloc(ra, sl, ns);
+            int8_t st5 = ra_alloc(ra, sl, ns);
 
             // Load fmt into EAX (32-bit).
             {
@@ -3129,10 +3144,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             cmp_ri(c, RAX, umbra_fmt_srgb);
             int br_skip_srgb_s = jcc(c, 0x05);
             {
+                vmovaps(c, st0, rr);
+                vmovaps(c, st1, rg);
+                vmovaps(c, st2, rb_);
                 emit_srgb_x86(c, &jc->pool,
-                              rr, rg, rb_,
                               st0, st1, st2,
+                              st3, st4, st5,
                               /*invert=*/0);
+                rr = st0; rg = st1; rb_ = st2;
                 union { float f; uint32_t u; } s255 = {.f = 255.0f};
                 union { float f; uint32_t u; } f1   = {.f = 1.0f};
                 pool_broadcast(c, &jc->pool, scale, s255.u);
@@ -3163,6 +3182,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 __builtin_memcpy(c->buf + br_done[j], &rel, 4);
             }
 
+            ra_return_reg(ra, st5);
+            ra_return_reg(ra, st4);
+            ra_return_reg(ra, st3);
             ra_return_reg(ra, st2);
             ra_return_reg(ra, st1);
             ra_return_reg(ra, st0);
