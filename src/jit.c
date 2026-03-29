@@ -2090,115 +2090,69 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
 // Emit inline AVX2 approx_powf for one channel register.
 // ch = the YMM register to transform in-place.
 // t0..t3 = scratch YMM registers.
-// exp_v = YMM register holding the exponent (g or 1/g), broadcast.
-// zero = YMM register of all zeros.
-// one = YMM register of all 1.0f.
-// ch, t0, t1, t2 are scratch YMM registers; ch is both input and output.
-// After the call, ch holds approx_powf(x, exp_v).
-// ch is reused as scratch after the initial integer extraction.
-static void emit_approx_powf_x86(Buf *c, struct pool *pool,
-                                  int ch, int t0, int t1, int t2,
-                                  int exp_v, int zero) {
-    // x = max(ch, 0)
-    vmaxps(c, ch, ch, zero);
-
-    // --- approx_log2(x) ---
-    // Extract m first, then e, then ch is free for reuse as scratch.
-    // m = reinterpret_as_float((xi & 0x007fffff) | 0x3f000000)
-    pool_broadcast(c, pool, t1, 0x007fffff);
-    vpand(c, 1, t0, ch, t1);                            // t0 = xi & mask
-    pool_broadcast(c, pool, t1, 0x3f000000);
-    vpor(c, 1, t0, t0, t1);                             // t0 = m
-
-    // e = to_float(xi) * (1.0f / (1<<23))
-    vcvtdq2ps(c, t1, ch);                               // t1 = to_float(xi)
-    pool_broadcast(c, pool, t2, f2u(1.0f / 8388608.0f));
-    vmulps(c, t1, t1, t2);                              // t1 = e
-
-    // ch is now free for reuse as 4th scratch register.
-    // result = e - 124.225515 - 1.498030*m - 1.725880/(0.352089 + m)
-    pool_broadcast(c, pool, t2, f2u(0.3520887068f));
-    vaddps(c, t2, t0, t2);                              // t2 = 0.352089 + m
-    pool_broadcast(c, pool, ch, f2u(1.7258800268f));
-    vdivps(c, ch, ch, t2);                              // ch = 1.725880 / (0.352089+m)
-    pool_broadcast(c, pool, t2, f2u(124.2255153f));
-    vsubps(c, t1, t1, t2);                              // t1 = e - 124.225515
-    pool_broadcast(c, pool, t2, f2u(1.4980303049f));
-    vfnmadd231ps(c, t1, t0, t2);                        // t1 -= 1.498030 * m
-    vsubps(c, t1, t1, ch);                              // t1 = log2(x)
-
-    // --- scaled = log2(x) * exponent ---
-    vmulps(c, t1, t1, exp_v);                           // t1 = log2(x) * exp
-
-    // --- approx_pow2(t1) ---
-    // f = t1 - floor(t1)
-    vroundps(c, t0, t1, 1);                             // t0 = floor(t1)
-    vsubps(c, t2, t1, t0);                              // t2 = f
-
-    // approx = t1 + 121.274058 - 1.490129*f + 27.728023/(4.842526 - f)
-    pool_broadcast(c, pool, ch, f2u(4.8425264359f));
-    vsubps(c, ch, ch, t2);                              // ch = 4.842526 - f
-    pool_broadcast(c, pool, t0, f2u(27.7280235f));
-    vdivps(c, t0, t0, ch);                              // t0 = 27.728023/(4.842526-f)
-    pool_broadcast(c, pool, ch, f2u(121.2740575f));
-    vaddps(c, t1, t1, ch);                              // t1 = x + 121.274058
-    pool_broadcast(c, pool, ch, f2u(1.4901290827f));
-    vfnmadd231ps(c, t1, t2, ch);                        // t1 -= 1.490129 * f
-    vaddps(c, t1, t1, t0);                              // t1 = approx
-
-    // clamp: approx = clamp(approx * (1<<23), 0, 0x7f800000)
-    pool_broadcast(c, pool, ch, f2u(8388608.0f));
-    vmulps(c, t1, t1, ch);                              // t1 *= (1<<23)
-    vmaxps(c, t1, t1, zero);                            // clamp low
-    pool_broadcast(c, pool, ch, 0x4f000000);             // (float)0x7f800000
-    vminps(c, t1, t1, ch);                              // clamp high
-    vcvtps2dq(c, ch, t1);                               // ch = round to nearest int
-}
-
-// sRGB inline conversion for 3 channels (R, G, B) using AVX2.
+// Skia-style sRGB conversion for 3 channels using polynomial (from) and
+// rsqrt/rcp rational (to) approximations.  t0/t1/t2 are scratch registers.
 static void emit_srgb_x86(Buf *c, struct pool *pool,
                            int r_ch0, int r_ch1, int r_ch2,
-                           int t0, int t1, int t2, int tcurv,
-                           int tmask, int tlin, int exp_v, int tzero,
+                           int t0, int t1, int t2,
                            _Bool invert) {
-
-    vpxor(c, 1, tzero, tzero, tzero);
-    pool_broadcast(c, pool, exp_v, invert ? f2u(2.4f) : f2u(1.0f/2.4f));
-
     int const channels[3] = { r_ch0, r_ch1, r_ch2 };
     for (int ch_i = 0; ch_i < 3; ch_i++) {
         int const ch = channels[ch_i];
 
         if (invert) {
-            pool_broadcast(c, pool, t0, f2u(0.04045f));
-            vcmpps(c, tmask, ch, t0, 5);
-
-            pool_broadcast(c, pool, t0, f2u(0.055f));
-            vaddps(c, tcurv, ch, t0);
-            pool_broadcast(c, pool, t0, f2u(1.0f/1.055f));
-            vmulps(c, tcurv, tcurv, t0);
-            emit_approx_powf_x86(c, pool, tcurv, t0, t1, t2, exp_v, tzero);
-
+            // lo = s * (1/12.92)
             pool_broadcast(c, pool, t0, f2u(1.0f/12.92f));
-            vmulps(c, tlin, ch, t0);
+            vmulps(c, t0, ch, t0);                       // t0 = lo
+
+            // hi = s*s * (0.3*s + 0.6975) + 0.0025
+            pool_broadcast(c, pool, t1, f2u(0.6975f));
+            pool_broadcast(c, pool, t2, f2u(0.3f));
+            vfmadd231ps(c, t1, ch, t2);                  // t1 = 0.6975 + 0.3*s
+            vmulps(c, t2, ch, ch);                        // t2 = s*s
+            vmulps(c, t1, t2, t1);                        // t1 = s*s*(0.3*s+0.6975)
+            pool_broadcast(c, pool, t2, f2u(0.0025f));
+            vaddps(c, t1, t1, t2);                        // t1 = hi
+
+            // sel = s >= 0.055 ? hi : lo
+            pool_broadcast(c, pool, t2, f2u(0.055f));
+            vcmpps(c, t2, ch, t2, 5);                    // t2 = s >= 0.055
+            vpblendvb(c, 1, ch, t0, t1, t2);             // ch = t2 ? hi : lo
         } else {
-            pool_broadcast(c, pool, t0, f2u(0.0031308f));
-            vcmpps(c, tmask, ch, t0, 5);
+            // Clamp >= 0
+            vpxor(c, 1, t0, t0, t0);
+            vmaxps(c, ch, ch, t0);
 
-            vmovaps(c, tcurv, ch);
-            emit_approx_powf_x86(c, pool, tcurv, t0, t1, t2, exp_v, tzero);
-            pool_broadcast(c, pool, t0, f2u(1.055f));
-            vmulps(c, tcurv, t0, tcurv);
-            pool_broadcast(c, pool, t0, f2u(0.055f));
-            vsubps(c, tcurv, tcurv, t0);
+            // t0 = rsqrt(ch)  (VRSQRTPS, ~12-bit, no NR needed)
+            vrsqrtps(c, t0, ch);                          // t0 = t = rsqrt(l)
 
-            pool_broadcast(c, pool, t0, f2u(12.92f));
-            vmulps(c, tlin, t0, ch);
+            // lo = ch * 12.92
+            pool_broadcast(c, pool, t1, f2u(12.92f));
+            vmulps(c, t1, ch, t1);                        // t1 = lo
+
+            // numerator = c + t*(k1 + t*k2)
+            pool_broadcast(c, pool, t2, f2u(-0.00245423456f));
+            vmulps(c, t2, t0, t2);                        // t2 = t*k2
+            pool_broadcast(c, pool, ch, f2u(0.01383202704f));
+            vaddps(c, t2, t2, ch);                        // t2 = k1 + t*k2
+            vmulps(c, t2, t0, t2);                        // t2 = t*(k1+t*k2)
+            pool_broadcast(c, pool, ch, f2u(1.13004839420f));  // c (x86 tuned)
+            vaddps(c, t2, t2, ch);                        // t2 = numerator
+
+            // denominator = rcp(d + t)  (VRCPPS, ~12-bit, no NR needed)
+            pool_broadcast(c, pool, ch, f2u(0.14135736227f));  // d (x86 tuned)
+            vaddps(c, ch, ch, t0);                        // ch = d + t
+            vrcpps(c, ch, ch);                            // ch = rcp(d + t)
+
+            // hi = numerator * rcp(denominator)
+            vmulps(c, t2, t2, ch);                        // t2 = hi
+
+            // sel = lo < (thresh*12.92) ? lo : hi
+            pool_broadcast(c, pool, t0, f2u(0.00465985f * 12.92f));
+            vcmpps(c, t0, t1, t0, 5);                    // t0 = lo >= threshold
+            vpblendvb(c, 1, ch, t1, t2, t0);             // ch = t0 ? hi : lo
         }
-
-        vpblendvb(c, 1, ch, tlin, tcurv, tmask);
     }
-
 }
 
 static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int to,
@@ -2628,12 +2582,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t t0 = ra_alloc(ra, sl, ns);
             int8_t t1 = ra_alloc(ra, sl, ns);
             // Extra temps for sRGB.
-            int8_t st2    = ra_alloc(ra, sl, ns);
-            int8_t stcurv = ra_alloc(ra, sl, ns);
-            int8_t stmask = ra_alloc(ra, sl, ns);
-            int8_t stlin  = ra_alloc(ra, sl, ns);
-            int8_t stexp  = ra_alloc(ra, sl, ns);
-            int8_t stzero = ra_alloc(ra, sl, ns);
+            int8_t st2 = ra_alloc(ra, sl, ns);  // extra temp for sRGB
 
             // Load fmt into EAX (32-bit load, zero-extends).
             {
@@ -3061,8 +3010,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 vmulps(c, r3, r3, t0);
                 emit_srgb_x86(c, &jc->pool,
                               s0.rd, r1, r2,
-                              t0, t1, st2, stcurv,
-                              stmask, stlin, stexp, stzero,
+                              t0, t1, st2,
                               /*invert=*/1);
             }
             br_done[n_done] = jmp(c); n_done++;
@@ -3080,11 +3028,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 __builtin_memcpy(c->buf + br_done[j], &rel, 4);
             }
 
-            ra_return_reg(ra, stzero);
-            ra_return_reg(ra, stexp);
-            ra_return_reg(ra, stlin);
-            ra_return_reg(ra, stmask);
-            ra_return_reg(ra, stcurv);
             ra_return_reg(ra, st2);
             ra_return_reg(ra, t1);
             ra_return_reg(ra, t0);
@@ -3108,14 +3051,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t z     = ra_alloc(ra, sl, ns);
             int8_t one   = ra_alloc(ra, sl, ns);
             // Extra temps for sRGB.
-            int8_t st0    = ra_alloc(ra, sl, ns);
-            int8_t st1    = ra_alloc(ra, sl, ns);
-            int8_t st2    = ra_alloc(ra, sl, ns);
-            int8_t stcurv = ra_alloc(ra, sl, ns);
-            int8_t stmask = ra_alloc(ra, sl, ns);
-            int8_t stlin  = ra_alloc(ra, sl, ns);
-            int8_t stexp  = ra_alloc(ra, sl, ns);
-            int8_t stzero = ra_alloc(ra, sl, ns);
+            int8_t st0 = ra_alloc(ra, sl, ns);
+            int8_t st1 = ra_alloc(ra, sl, ns);
+            int8_t st2 = ra_alloc(ra, sl, ns);
 
             // Load fmt into EAX (32-bit).
             {
@@ -3411,8 +3349,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             {
                 emit_srgb_x86(c, &jc->pool,
                               rr, rg, rb_,
-                              st0, st1, st2, stcurv,
-                              stmask, stlin, stexp, stzero,
+                              st0, st1, st2,
                               /*invert=*/0);
                 union { float f; uint32_t u; } s255 = {.f = 255.0f};
                 union { float f; uint32_t u; } f1   = {.f = 1.0f};
@@ -3444,11 +3381,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 __builtin_memcpy(c->buf + br_done[j], &rel, 4);
             }
 
-            ra_return_reg(ra, stzero);
-            ra_return_reg(ra, stexp);
-            ra_return_reg(ra, stlin);
-            ra_return_reg(ra, stmask);
-            ra_return_reg(ra, stcurv);
             ra_return_reg(ra, st2);
             ra_return_reg(ra, st1);
             ra_return_reg(ra, st0);
