@@ -440,7 +440,7 @@ enum {
 #undef IMM_VARIANTS
 
     // Output-only variants: no register inputs, just output to register.
-    op_r_imm_32, op_r_x, op_r_y, op_r_uniform_32,
+    op_r_imm_32, op_r_x, op_r_y,
     op_r_pack_mm, op_r_pack_rm, op_m_pack_rm,
     op_r_pack_mr, op_m_pack_mr, op_r_pack_rr, op_m_pack_rr,
     // fma/fms: z is most commonly the register operand (accumulator chains)
@@ -747,12 +747,10 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
             } else
 
             // Output-only ops: no register inputs, just output to register.
-            if (out_r && (tag == op_imm_32 || tag == op_x || tag == op_y
-                       || tag == op_uniform_32)) {
+            if (out_r && (tag == op_imm_32 || tag == op_x || tag == op_y)) {
                      if (tag == op_imm_32)      { s->tag = op_r_imm_32; }
                 else if (tag == op_x)           { s->tag = op_r_x; }
                 else if (tag == op_y)           { s->tag = op_r_y; }
-                else if (tag == op_uniform_32)  { s->tag = op_r_uniform_32; }
             } else
             { /* not an upgradable op */ }
 
@@ -866,7 +864,6 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                 [op_r_imm_32] = &&L_op_r_imm_32,
                 [op_r_x] = &&L_op_r_x,
                 [op_r_y] = &&L_op_r_y,
-                [op_r_uniform_32] = &&L_op_r_uniform_32,
                 [op_r_pack_mm] = &&L_op_r_pack_mm, [op_r_pack_rm] = &&L_op_r_pack_rm,
                 [op_m_pack_rm] = &&L_op_m_pack_rm, [op_r_pack_mr] = &&L_op_r_pack_mr,
                 [op_m_pack_mr] = &&L_op_m_pack_mr, [op_r_pack_rr] = &&L_op_r_pack_rr,
@@ -1335,12 +1332,6 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
                     acc.i32 = seq + (end - K);
                 } NEXT;
                 CASE(op_r_y) acc.i32 = (I32){0} + row; NEXT;
-                CASE(op_r_uniform_32) {
-                    assert(buf[ip->x].row_bytes == 0);
-                    int32_t uni;
-                    __builtin_memcpy(&uni, (int32_t const*)buf[ip->x].ptr + ip->y, sizeof uni);
-                    acc.i32 = (I32){0} + uni;
-                } NEXT;
                 CASE(SW_DONE) DONE;
 #if !defined(__GNUC__) || defined(__wasm__)
                 }
