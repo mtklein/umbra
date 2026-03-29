@@ -2590,31 +2590,25 @@ static void test_load_store_color_f16_planar(void) {
     umbra_store_color(b, (umbra_ptr){1, 0}, c);
     backends B = make(b, 0);
 
-    enum { N = 8 };
-    __fp16 src_r[N], src_g[N], src_b[N], src_a[N];
-    __fp16 dst_r[N], dst_g[N], dst_b[N], dst_a[N];
-    for (int i = 0; i < N; i++) {
-        src_r[i] = (__fp16)(0.1f * (float)(i + 1));
-        src_g[i] = (__fp16)(0.2f * (float)(i + 1));
-        src_b[i] = (__fp16)(0.3f * (float)(i + 1));
-        src_a[i] = (__fp16)(0.9f + 0.01f * (float)i);
+    enum { W = 8, H = 4 };
+    size_t const plane = W * H * sizeof(__fp16);
+    __fp16 src[W * H * 4], dst[W * H * 4];
+    for (int i = 0; i < W * H; i++) {
+        src[i + W*H*0] = (__fp16)(0.1f * (float)(i + 1));
+        src[i + W*H*1] = (__fp16)(0.2f * (float)(i + 1));
+        src[i + W*H*2] = (__fp16)(0.3f * (float)(i + 1));
+        src[i + W*H*3] = (__fp16)(0.9f + 0.001f * (float)i);
     }
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-        __builtin_memset(dst_r, 0, sizeof dst_r);
-        __builtin_memset(dst_g, 0, sizeof dst_g);
-        __builtin_memset(dst_b, 0, sizeof dst_b);
-        __builtin_memset(dst_a, 0, sizeof dst_a);
-        if (!run(&B, bi, N, 1, (umbra_buf[]){
-            {.ptr=src_r, .ptr2=src_g, .ptr3=src_b, .ptr4=src_a,
-             .sz=sizeof src_r, .fmt=umbra_fmt_f16_planar},
-            {.ptr=dst_r, .ptr2=dst_g, .ptr3=dst_b, .ptr4=dst_a,
-             .sz=sizeof dst_r, .fmt=umbra_fmt_f16_planar},
+        __builtin_memset(dst, 0, sizeof dst);
+        if (!run(&B, bi, W, H, (umbra_buf[]){
+            {.ptr=src, .sz=sizeof src, .row_bytes=W*2,
+             .plane_stride=plane, .fmt=umbra_fmt_f16_planar},
+            {.ptr=dst, .sz=sizeof dst, .row_bytes=W*2,
+             .plane_stride=plane, .fmt=umbra_fmt_f16_planar},
         })) { continue; }
-        (0 == __builtin_memcmp(dst_r, src_r, sizeof src_r)) here;
-        (0 == __builtin_memcmp(dst_g, src_g, sizeof src_g)) here;
-        (0 == __builtin_memcmp(dst_b, src_b, sizeof src_b)) here;
-        (0 == __builtin_memcmp(dst_a, src_a, sizeof src_a)) here;
+        (0 == __builtin_memcmp(dst, src, sizeof src)) here;
     }
     cleanup(&B);
 }

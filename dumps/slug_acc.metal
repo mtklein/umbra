@@ -18,15 +18,10 @@ kernel void umbra_entry(
     constant uint &y0 [[buffer(7)]],
     constant uint *buf_fmts [[buffer(8)]],
     constant float *buf_transfers [[buffer(9)]],
+    constant uint *buf_plane_strides [[buffer(10)]],
     device uchar *p0 [[buffer(0)]],
     device uchar *p1 [[buffer(1)]],
     device uchar *p2 [[buffer(2)]],
-    device uchar *p0_g [[buffer(10)]],
-    device uchar *p0_b [[buffer(11)]],
-    device uchar *p0_a [[buffer(12)]],
-    device uchar *p1_g [[buffer(13)]],
-    device uchar *p1_b [[buffer(14)]],
-    device uchar *p1_a [[buffer(15)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
     if (pos.x >= w) return;

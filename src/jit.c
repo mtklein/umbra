@@ -1204,92 +1204,49 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int br_skip_f16_planar = c->len;
             put(c, Bcond(0x1, 0));
             {
-                int const rb_off   = p * (int)sizeof(umbra_buf)
-                                   + (int)__builtin_offsetof(umbra_buf, row_bytes);
-                int const ptr2_off = p * (int)sizeof(umbra_buf)
-                                   + (int)__builtin_offsetof(umbra_buf, ptr2);
-                int const ptr3_off = p * (int)sizeof(umbra_buf)
-                                   + (int)__builtin_offsetof(umbra_buf, ptr3);
-                int const ptr4_off = p * (int)sizeof(umbra_buf)
-                                   + (int)__builtin_offsetof(umbra_buf, ptr4);
+                // Load plane_stride into XT.  XP already has plane 0 row addr.
+                int const ps_off = p * (int)sizeof(umbra_buf)
+                                 + (int)__builtin_offsetof(umbra_buf, plane_stride);
+                put(c, 0xf9400000u | ((uint32_t)(ps_off/8) << 10)
+                                   | ((uint32_t)XBUF << 5) | (uint32_t)XT);
                 if (scalar) {
-                    // Plane 0 (R): LDR Hpx, [XP, XI, LSL #1] → FCVTL → DUP
+                    // Plane 0 (R)
                     put(c, 0x7c607800u | ((uint32_t)XI << 16)
                                        | ((uint32_t)XP << 5) | (uint32_t)px);
                     put(c, FCVTL_4s(s0.rd, px));
-                    put(c, 0x4e040400u | (0u << 19)
-                                       | ((uint32_t)s0.rd << 5) | (uint32_t)s0.rd);
-
-                    // Plane 1 (G): load ptr2, compute row addr, load f16
-                    put(c, 0xf9400000u | ((uint32_t)(ptr2_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XP);
-                    put(c, 0xf9400000u | ((uint32_t)(rb_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XT);
-                    put(c, 0x9b000000u | ((uint32_t)XT << 16) | ((uint32_t)XP << 10)
-                                       | ((uint32_t)XY << 5)  | (uint32_t)XP);
+                    put(c, 0x4e040400u | ((uint32_t)s0.rd << 5) | (uint32_t)s0.rd);
+                    // Plane 1 (G)
+                    put(c, ADD_xr(XP, XP, XT));
                     put(c, 0x7c607800u | ((uint32_t)XI << 16)
                                        | ((uint32_t)XP << 5) | (uint32_t)px);
                     put(c, FCVTL_4s(r1, px));
-                    put(c, 0x4e040400u | (0u << 19)
-                                       | ((uint32_t)r1 << 5) | (uint32_t)r1);
-
+                    put(c, 0x4e040400u | ((uint32_t)r1 << 5) | (uint32_t)r1);
                     // Plane 2 (B)
-                    put(c, 0xf9400000u | ((uint32_t)(ptr3_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XP);
-                    put(c, 0xf9400000u | ((uint32_t)(rb_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XT);
-                    put(c, 0x9b000000u | ((uint32_t)XT << 16) | ((uint32_t)XP << 10)
-                                       | ((uint32_t)XY << 5)  | (uint32_t)XP);
+                    put(c, ADD_xr(XP, XP, XT));
                     put(c, 0x7c607800u | ((uint32_t)XI << 16)
                                        | ((uint32_t)XP << 5) | (uint32_t)px);
                     put(c, FCVTL_4s(r2, px));
-                    put(c, 0x4e040400u | (0u << 19)
-                                       | ((uint32_t)r2 << 5) | (uint32_t)r2);
-
+                    put(c, 0x4e040400u | ((uint32_t)r2 << 5) | (uint32_t)r2);
                     // Plane 3 (A)
-                    put(c, 0xf9400000u | ((uint32_t)(ptr4_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XP);
-                    put(c, 0xf9400000u | ((uint32_t)(rb_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XT);
-                    put(c, 0x9b000000u | ((uint32_t)XT << 16) | ((uint32_t)XP << 10)
-                                       | ((uint32_t)XY << 5)  | (uint32_t)XP);
+                    put(c, ADD_xr(XP, XP, XT));
                     put(c, 0x7c607800u | ((uint32_t)XI << 16)
                                        | ((uint32_t)XP << 5) | (uint32_t)px);
                     put(c, FCVTL_4s(r3, px));
-                    put(c, 0x4e040400u | (0u << 19)
-                                       | ((uint32_t)r3 << 5) | (uint32_t)r3);
+                    put(c, 0x4e040400u | ((uint32_t)r3 << 5) | (uint32_t)r3);
                 } else {
-                    // Plane 0 (R): LDR D, [XP, XH] → FCVTL
+                    // Plane 0 (R)
                     put(c, LDR_d(s0.rd, XP, XH));
                     put(c, FCVTL_4s(s0.rd, s0.rd));
-
                     // Plane 1 (G)
-                    put(c, 0xf9400000u | ((uint32_t)(ptr2_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XP);
-                    put(c, 0xf9400000u | ((uint32_t)(rb_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XT);
-                    put(c, 0x9b000000u | ((uint32_t)XT << 16) | ((uint32_t)XP << 10)
-                                       | ((uint32_t)XY << 5)  | (uint32_t)XP);
+                    put(c, ADD_xr(XP, XP, XT));
                     put(c, LDR_d(r1, XP, XH));
                     put(c, FCVTL_4s(r1, r1));
-
                     // Plane 2 (B)
-                    put(c, 0xf9400000u | ((uint32_t)(ptr3_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XP);
-                    put(c, 0xf9400000u | ((uint32_t)(rb_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XT);
-                    put(c, 0x9b000000u | ((uint32_t)XT << 16) | ((uint32_t)XP << 10)
-                                       | ((uint32_t)XY << 5)  | (uint32_t)XP);
+                    put(c, ADD_xr(XP, XP, XT));
                     put(c, LDR_d(r2, XP, XH));
                     put(c, FCVTL_4s(r2, r2));
-
                     // Plane 3 (A)
-                    put(c, 0xf9400000u | ((uint32_t)(ptr4_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XP);
-                    put(c, 0xf9400000u | ((uint32_t)(rb_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XT);
-                    put(c, 0x9b000000u | ((uint32_t)XT << 16) | ((uint32_t)XP << 10)
-                                       | ((uint32_t)XY << 5)  | (uint32_t)XP);
+                    put(c, ADD_xr(XP, XP, XT));
                     put(c, LDR_d(r3, XP, XH));
                     put(c, FCVTL_4s(r3, r3));
                 }
@@ -1509,82 +1466,26 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int br_skip_f16_planar_s = c->len;
             put(c, Bcond(0x1, 0));
             {
-                int const rb_off   = p * (int)sizeof(umbra_buf)
-                                   + (int)__builtin_offsetof(umbra_buf, row_bytes);
-                int const ptr2_off = p * (int)sizeof(umbra_buf)
-                                   + (int)__builtin_offsetof(umbra_buf, ptr2);
-                int const ptr3_off = p * (int)sizeof(umbra_buf)
-                                   + (int)__builtin_offsetof(umbra_buf, ptr3);
-                int const ptr4_off = p * (int)sizeof(umbra_buf)
-                                   + (int)__builtin_offsetof(umbra_buf, ptr4);
+                int const ps_off = p * (int)sizeof(umbra_buf)
+                                 + (int)__builtin_offsetof(umbra_buf, plane_stride);
+                put(c, 0xf9400000u | ((uint32_t)(ps_off/8) << 10)
+                                   | ((uint32_t)XBUF << 5) | (uint32_t)XT);
                 if (scalar) {
-                    // Plane 0 (R): FCVTN → STR H
-                    put(c, FCVTN_4h(px, rr));
-                    put(c, STR_hx(px, XP, XI));
-
-                    // Plane 1 (G)
-                    put(c, 0xf9400000u | ((uint32_t)(ptr2_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XP);
-                    put(c, 0xf9400000u | ((uint32_t)(rb_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XT);
-                    put(c, 0x9b000000u | ((uint32_t)XT << 16) | ((uint32_t)XP << 10)
-                                       | ((uint32_t)XY << 5)  | (uint32_t)XP);
-                    put(c, FCVTN_4h(px, rg));
-                    put(c, STR_hx(px, XP, XI));
-
-                    // Plane 2 (B)
-                    put(c, 0xf9400000u | ((uint32_t)(ptr3_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XP);
-                    put(c, 0xf9400000u | ((uint32_t)(rb_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XT);
-                    put(c, 0x9b000000u | ((uint32_t)XT << 16) | ((uint32_t)XP << 10)
-                                       | ((uint32_t)XY << 5)  | (uint32_t)XP);
-                    put(c, FCVTN_4h(px, rb_));
-                    put(c, STR_hx(px, XP, XI));
-
-                    // Plane 3 (A)
-                    put(c, 0xf9400000u | ((uint32_t)(ptr4_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XP);
-                    put(c, 0xf9400000u | ((uint32_t)(rb_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XT);
-                    put(c, 0x9b000000u | ((uint32_t)XT << 16) | ((uint32_t)XP << 10)
-                                       | ((uint32_t)XY << 5)  | (uint32_t)XP);
-                    put(c, FCVTN_4h(px, ra_v));
-                    put(c, STR_hx(px, XP, XI));
+                    put(c, FCVTN_4h(px, rr));  put(c, STR_hx(px, XP, XI));
+                    put(c, ADD_xr(XP, XP, XT));
+                    put(c, FCVTN_4h(px, rg));  put(c, STR_hx(px, XP, XI));
+                    put(c, ADD_xr(XP, XP, XT));
+                    put(c, FCVTN_4h(px, rb_)); put(c, STR_hx(px, XP, XI));
+                    put(c, ADD_xr(XP, XP, XT));
+                    put(c, FCVTN_4h(px, ra_v)); put(c, STR_hx(px, XP, XI));
                 } else {
-                    // Plane 0 (R): FCVTN → STR D
-                    put(c, FCVTN_4h(px, rr));
-                    put(c, STR_d(px, XP, XH));
-
-                    // Plane 1 (G)
-                    put(c, 0xf9400000u | ((uint32_t)(ptr2_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XP);
-                    put(c, 0xf9400000u | ((uint32_t)(rb_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XT);
-                    put(c, 0x9b000000u | ((uint32_t)XT << 16) | ((uint32_t)XP << 10)
-                                       | ((uint32_t)XY << 5)  | (uint32_t)XP);
-                    put(c, FCVTN_4h(px, rg));
-                    put(c, STR_d(px, XP, XH));
-
-                    // Plane 2 (B)
-                    put(c, 0xf9400000u | ((uint32_t)(ptr3_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XP);
-                    put(c, 0xf9400000u | ((uint32_t)(rb_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XT);
-                    put(c, 0x9b000000u | ((uint32_t)XT << 16) | ((uint32_t)XP << 10)
-                                       | ((uint32_t)XY << 5)  | (uint32_t)XP);
-                    put(c, FCVTN_4h(px, rb_));
-                    put(c, STR_d(px, XP, XH));
-
-                    // Plane 3 (A)
-                    put(c, 0xf9400000u | ((uint32_t)(ptr4_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XP);
-                    put(c, 0xf9400000u | ((uint32_t)(rb_off/8) << 10)
-                                       | ((uint32_t)XBUF << 5) | (uint32_t)XT);
-                    put(c, 0x9b000000u | ((uint32_t)XT << 16) | ((uint32_t)XP << 10)
-                                       | ((uint32_t)XY << 5)  | (uint32_t)XP);
-                    put(c, FCVTN_4h(px, ra_v));
-                    put(c, STR_d(px, XP, XH));
+                    put(c, FCVTN_4h(px, rr));  put(c, STR_d(px, XP, XH));
+                    put(c, ADD_xr(XP, XP, XT));
+                    put(c, FCVTN_4h(px, rg));  put(c, STR_d(px, XP, XH));
+                    put(c, ADD_xr(XP, XP, XT));
+                    put(c, FCVTN_4h(px, rb_)); put(c, STR_d(px, XP, XH));
+                    put(c, ADD_xr(XP, XP, XT));
+                    put(c, FCVTN_4h(px, ra_v)); put(c, STR_d(px, XP, XH));
                 }
                 last_ptr = -1;
             }
@@ -3146,38 +3047,29 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             cmp_ri(c, RAX, 7);
             int br_skip_f16_planar = jcc(c, 0x05);
             {
-                int const rb_off   = p * (int)sizeof(umbra_buf)
-                                   + (int)__builtin_offsetof(umbra_buf, row_bytes);
-                int const ptr2_off = p * (int)sizeof(umbra_buf)
-                                   + (int)__builtin_offsetof(umbra_buf, ptr2);
-                int const ptr3_off = p * (int)sizeof(umbra_buf)
-                                   + (int)__builtin_offsetof(umbra_buf, ptr3);
-                int const ptr4_off = p * (int)sizeof(umbra_buf)
-                                   + (int)__builtin_offsetof(umbra_buf, ptr4);
+                int const ps_off = p * (int)sizeof(umbra_buf)
+                                 + (int)__builtin_offsetof(umbra_buf, plane_stride);
+                mov_rr(c, R11, base);
+                mov_load(c, RBX, XBUF, ps_off);
                 if (scalar) {
-                    // Plane 0 (R): MOVZX eax, word [base + XI*2]
+                    // Plane 0 (R): MOVZX eax, word [R11 + XI*2]
                     {
                         uint8_t rex = 0x40;
                         if (XI >= 8)   { rex |= 0x02; }
-                        if (base >= 8) { rex |= 0x01; }
+                        if (R11 >= 8)  { rex |= 0x01; }
                         if (rex != 0x40) { emit1(c, rex); }
                         emit1(c, 0x0f); emit1(c, 0xb7);
                         emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
-                        emit1(c, (uint8_t)((1 << 6) | ((XI & 7) << 3) | (base & 7)));
+                        emit1(c, (uint8_t)((1 << 6) | ((XI & 7) << 3) | (R11 & 7)));
                     }
                     vex(c, 1, 1, 0, 0, px, 0, RAX, 0x6e);
                     vcvtph2ps(c, s0.rd, px);
                     vbroadcastss(c, s0.rd, s0.rd);
 
-                    // Plane 1 (G)
-                    mov_load(c, R11, XBUF, ptr2_off);
-                    mov_load(c, RAX, XBUF, rb_off);
-                    rex_w(c, RAX, XY);
-                    emit1(c, 0x0f); emit1(c, 0xaf);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (XY & 7)));
-                    rex_w(c, RAX, R11);
+                    // Plane 1 (G): advance R11 by plane_stride
+                    rex_w(c, RBX, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
                     {
                         uint8_t rex = 0x40;
                         if (XI >= 8)   { rex |= 0x02; }
@@ -3191,15 +3083,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     vcvtph2ps(c, r1, px);
                     vbroadcastss(c, r1, r1);
 
-                    // Plane 2 (B)
-                    mov_load(c, R11, XBUF, ptr3_off);
-                    mov_load(c, RAX, XBUF, rb_off);
-                    rex_w(c, RAX, XY);
-                    emit1(c, 0x0f); emit1(c, 0xaf);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (XY & 7)));
-                    rex_w(c, RAX, R11);
+                    // Plane 2 (B): advance R11 by plane_stride
+                    rex_w(c, RBX, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
                     {
                         uint8_t rex = 0x40;
                         if (XI >= 8)   { rex |= 0x02; }
@@ -3213,15 +3100,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     vcvtph2ps(c, r2, px);
                     vbroadcastss(c, r2, r2);
 
-                    // Plane 3 (A)
-                    mov_load(c, R11, XBUF, ptr4_off);
-                    mov_load(c, RAX, XBUF, rb_off);
-                    rex_w(c, RAX, XY);
-                    emit1(c, 0x0f); emit1(c, 0xaf);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (XY & 7)));
-                    rex_w(c, RAX, R11);
+                    // Plane 3 (A): advance R11 by plane_stride
+                    rex_w(c, RBX, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
                     {
                         uint8_t rex = 0x40;
                         if (XI >= 8)   { rex |= 0x02; }
@@ -3236,42 +3118,27 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     vbroadcastss(c, r3, r3);
                 } else {
                     // Plane 0 (R): load 8 x f16 (16 bytes), convert to 8 x f32
-                    vmov_load(c, 0, px, base, XI, 2, 0);
+                    vmov_load(c, 0, px, R11, XI, 2, 0);
                     vcvtph2ps(c, s0.rd, px);
 
-                    // Plane 1 (G)
-                    mov_load(c, R11, XBUF, ptr2_off);
-                    mov_load(c, RAX, XBUF, rb_off);
-                    rex_w(c, RAX, XY);
-                    emit1(c, 0x0f); emit1(c, 0xaf);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (XY & 7)));
-                    rex_w(c, RAX, R11);
+                    // Plane 1 (G): advance R11 by plane_stride
+                    rex_w(c, RBX, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
                     vmov_load(c, 0, px, R11, XI, 2, 0);
                     vcvtph2ps(c, r1, px);
 
-                    // Plane 2 (B)
-                    mov_load(c, R11, XBUF, ptr3_off);
-                    mov_load(c, RAX, XBUF, rb_off);
-                    rex_w(c, RAX, XY);
-                    emit1(c, 0x0f); emit1(c, 0xaf);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (XY & 7)));
-                    rex_w(c, RAX, R11);
+                    // Plane 2 (B): advance R11 by plane_stride
+                    rex_w(c, RBX, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
                     vmov_load(c, 0, px, R11, XI, 2, 0);
                     vcvtph2ps(c, r2, px);
 
-                    // Plane 3 (A)
-                    mov_load(c, R11, XBUF, ptr4_off);
-                    mov_load(c, RAX, XBUF, rb_off);
-                    rex_w(c, RAX, XY);
-                    emit1(c, 0x0f); emit1(c, 0xaf);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (XY & 7)));
-                    rex_w(c, RAX, R11);
+                    // Plane 3 (A): advance R11 by plane_stride
+                    rex_w(c, RBX, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
                     vmov_load(c, 0, px, R11, XI, 2, 0);
                     vcvtph2ps(c, r3, px);
                 }
@@ -3507,40 +3374,31 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             cmp_ri(c, RAX, 7);
             int br_skip_f16_planar_s = jcc(c, 0x05);
             {
-                int const rb_off   = p * (int)sizeof(umbra_buf)
-                                   + (int)__builtin_offsetof(umbra_buf, row_bytes);
-                int const ptr2_off = p * (int)sizeof(umbra_buf)
-                                   + (int)__builtin_offsetof(umbra_buf, ptr2);
-                int const ptr3_off = p * (int)sizeof(umbra_buf)
-                                   + (int)__builtin_offsetof(umbra_buf, ptr3);
-                int const ptr4_off = p * (int)sizeof(umbra_buf)
-                                   + (int)__builtin_offsetof(umbra_buf, ptr4);
+                int const ps_off = p * (int)sizeof(umbra_buf)
+                                 + (int)__builtin_offsetof(umbra_buf, plane_stride);
+                mov_rr(c, R11, base);
+                mov_load(c, RBX, XBUF, ps_off);
                 if (scalar) {
                     // Plane 0 (R): VCVTPS2PH, store 16-bit
                     vcvtps2ph(c, px, rr, 4);
                     // VMOVD eax, px
                     vex(c, 1, 1, 0, 0, px, 0, RAX, 0x7e);
-                    // MOV word [base + XI*2], ax
+                    // MOV word [R11 + XI*2], ax
                     {
                         emit1(c, 0x66);
                         uint8_t rex = 0x40;
                         if (XI >= 8)   { rex |= 0x02; }
-                        if (base >= 8) { rex |= 0x01; }
+                        if (R11 >= 8)  { rex |= 0x01; }
                         if (rex != 0x40) { emit1(c, rex); }
                         emit1(c, 0x89);
                         emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
-                        emit1(c, (uint8_t)((1 << 6) | ((XI & 7) << 3) | (base & 7)));
+                        emit1(c, (uint8_t)((1 << 6) | ((XI & 7) << 3) | (R11 & 7)));
                     }
 
-                    // Plane 1 (G)
-                    mov_load(c, R11, XBUF, ptr2_off);
-                    mov_load(c, RAX, XBUF, rb_off);
-                    rex_w(c, RAX, XY);
-                    emit1(c, 0x0f); emit1(c, 0xaf);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (XY & 7)));
-                    rex_w(c, RAX, R11);
+                    // Plane 1 (G): advance R11 by plane_stride
+                    rex_w(c, RBX, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
                     vcvtps2ph(c, px, rg, 4);
                     vex(c, 1, 1, 0, 0, px, 0, RAX, 0x7e);
                     {
@@ -3554,15 +3412,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                         emit1(c, (uint8_t)((1 << 6) | ((XI & 7) << 3) | (R11 & 7)));
                     }
 
-                    // Plane 2 (B)
-                    mov_load(c, R11, XBUF, ptr3_off);
-                    mov_load(c, RAX, XBUF, rb_off);
-                    rex_w(c, RAX, XY);
-                    emit1(c, 0x0f); emit1(c, 0xaf);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (XY & 7)));
-                    rex_w(c, RAX, R11);
+                    // Plane 2 (B): advance R11 by plane_stride
+                    rex_w(c, RBX, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
                     vcvtps2ph(c, px, rb_, 4);
                     vex(c, 1, 1, 0, 0, px, 0, RAX, 0x7e);
                     {
@@ -3576,15 +3429,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                         emit1(c, (uint8_t)((1 << 6) | ((XI & 7) << 3) | (R11 & 7)));
                     }
 
-                    // Plane 3 (A)
-                    mov_load(c, R11, XBUF, ptr4_off);
-                    mov_load(c, RAX, XBUF, rb_off);
-                    rex_w(c, RAX, XY);
-                    emit1(c, 0x0f); emit1(c, 0xaf);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (XY & 7)));
-                    rex_w(c, RAX, R11);
+                    // Plane 3 (A): advance R11 by plane_stride
+                    rex_w(c, RBX, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
                     vcvtps2ph(c, px, ra_v, 4);
                     vex(c, 1, 1, 0, 0, px, 0, RAX, 0x7e);
                     {
@@ -3600,41 +3448,26 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 } else {
                     // Plane 0 (R): VCVTPS2PH, store 128-bit (8 x f16)
                     vcvtps2ph(c, px, rr, 4);
-                    vmov_store(c, 0, px, base, XI, 2, 0);
+                    vmov_store(c, 0, px, R11, XI, 2, 0);
 
-                    // Plane 1 (G)
-                    mov_load(c, R11, XBUF, ptr2_off);
-                    mov_load(c, RAX, XBUF, rb_off);
-                    rex_w(c, RAX, XY);
-                    emit1(c, 0x0f); emit1(c, 0xaf);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (XY & 7)));
-                    rex_w(c, RAX, R11);
+                    // Plane 1 (G): advance R11 by plane_stride
+                    rex_w(c, RBX, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
                     vcvtps2ph(c, px, rg, 4);
                     vmov_store(c, 0, px, R11, XI, 2, 0);
 
-                    // Plane 2 (B)
-                    mov_load(c, R11, XBUF, ptr3_off);
-                    mov_load(c, RAX, XBUF, rb_off);
-                    rex_w(c, RAX, XY);
-                    emit1(c, 0x0f); emit1(c, 0xaf);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (XY & 7)));
-                    rex_w(c, RAX, R11);
+                    // Plane 2 (B): advance R11 by plane_stride
+                    rex_w(c, RBX, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
                     vcvtps2ph(c, px, rb_, 4);
                     vmov_store(c, 0, px, R11, XI, 2, 0);
 
-                    // Plane 3 (A)
-                    mov_load(c, R11, XBUF, ptr4_off);
-                    mov_load(c, RAX, XBUF, rb_off);
-                    rex_w(c, RAX, XY);
-                    emit1(c, 0x0f); emit1(c, 0xaf);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (XY & 7)));
-                    rex_w(c, RAX, R11);
+                    // Plane 3 (A): advance R11 by plane_stride
+                    rex_w(c, RBX, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
                     vcvtps2ph(c, px, ra_v, 4);
                     vmov_store(c, 0, px, R11, XI, 2, 0);
                 }

@@ -47,9 +47,9 @@ typedef struct {
 
 typedef struct {
     void           *ptr;
-    void           *ptr2, *ptr3, *ptr4;
     size_t          sz;
     size_t          row_bytes;
+    size_t          plane_stride;
     umbra_fmt       fmt;
     _Bool           read_only;
     char            pad_[3];
