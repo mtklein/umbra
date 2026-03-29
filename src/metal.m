@@ -29,6 +29,18 @@ struct copyback {
 
 struct deref_info { int buf_idx, src_buf, byte_off; };
 
+struct color_buf_info {
+    int buf_idx;
+    int tex_base;
+    _Bool read, write, pad_[2];
+};
+
+struct pipeline_entry {
+    uint64_t key;
+    void    *pipeline;
+    int      tg_size, :32;
+};
+
 struct metal_backend {
     struct umbra_backend base;
     void *device;
@@ -44,7 +56,11 @@ struct metal_backend {
 
 struct umbra_metal {
     struct umbra_program base;
-    void *pipeline;
+    void *library;
+    struct pipeline_entry *pipelines;
+    int    n_pipelines, pipelines_cap;
+    struct color_buf_info *color_bufs;
+    int    n_color_bufs, n_textures;
     void **per_bufs;
     char  *src;
     int    max_ptr;
@@ -187,28 +203,39 @@ static void emit_ops(Buf *b, BB const *bb,
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 emit(b,
                      "%sfloat4 v%d_c;\n"
-                     "%sswitch (buf_fmts[%d]) {\n"
-                     "%s  case %du: { uint px = ((device uint*)(p%d + y * buf_rbs[%d]))[x];\n"
-                     "%s            v%d_c = float4(px & 0xFFu, (px>>8)&0xFFu, (px>>16)&0xFFu, px>>24) / 255.0; break; }\n"
-                     "%s  case %du: { ushort px = ((device ushort*)(p%d + y * buf_rbs[%d]))[x];\n"
-                     "%s            v%d_c = float4(float(px>>11)/31.0, float((px>>5)&0x3Fu)/63.0, float(px&0x1Fu)/31.0, 1.0); break; }\n"
-                     "%s  case %du: { uint px = ((device uint*)(p%d + y * buf_rbs[%d]))[x];\n"
-                     "%s            v%d_c = float4(float(px&0x3FFu)/1023.0, float((px>>10)&0x3FFu)/1023.0, float((px>>20)&0x3FFu)/1023.0, float(px>>30)/3.0); break; }\n"
-                     "%s  case %du: { device half *hp = (device half*)(p%d + y * buf_rbs[%d]) + x*4;\n"
-                     "%s            v%d_c = float4(hp[0], hp[1], hp[2], hp[3]); break; }\n"
-                     "%s  case %du: { device uchar *row = p%d + y * buf_rbs[%d]; uint ps = buf_szs[%d]/4;\n"
-                     "%s            v%d_c = float4("
+                     "%sif (planes_p%d == 1) {\n"
+                     "%s    v%d_c = tex_p%d_0.read(uint2(x,y));\n"
+                     "%s} else if (planes_p%d == 4) {\n"
+                     "%s    v%d_c = float4(tex_p%d_0.read(uint2(x,y)).r,"
+                     " tex_p%d_1.read(uint2(x,y)).r,"
+                     " tex_p%d_2.read(uint2(x,y)).r,"
+                     " tex_p%d_3.read(uint2(x,y)).r);\n"
+                     "%s} else if (fmt_p%d == %du) {\n"
+                     "%s    uint px = ((device uint*)(p%d + y * buf_rbs[%d]))[x];\n"
+                     "%s    v%d_c = float4(px & 0xFFu, (px>>8)&0xFFu, (px>>16)&0xFFu, px>>24) / 255.0;\n"
+                     "%s} else if (fmt_p%d == %du) {\n"
+                     "%s    ushort px = ((device ushort*)(p%d + y * buf_rbs[%d]))[x];\n"
+                     "%s    v%d_c = float4(float(px>>11)/31.0, float((px>>5)&0x3Fu)/63.0, float(px&0x1Fu)/31.0, 1.0);\n"
+                     "%s} else if (fmt_p%d == %du) {\n"
+                     "%s    uint px = ((device uint*)(p%d + y * buf_rbs[%d]))[x];\n"
+                     "%s    v%d_c = float4(float(px&0x3FFu)/1023.0, float((px>>10)&0x3FFu)/1023.0, float((px>>20)&0x3FFu)/1023.0, float(px>>30)/3.0);\n"
+                     "%s} else if (fmt_p%d == %du) {\n"
+                     "%s    device half *hp = (device half*)(p%d + y * buf_rbs[%d]) + x*4;\n"
+                     "%s    v%d_c = float4(hp[0], hp[1], hp[2], hp[3]);\n"
+                     "%s} else if (fmt_p%d == %du) {\n"
+                     "%s    device uchar *row = p%d + y * buf_rbs[%d]; uint ps = buf_szs[%d]/4;\n"
+                     "%s    v%d_c = float4("
                      "float(((device half*)row)[x]),"
                      "float(((device half*)(row+ps))[x]),"
                      "float(((device half*)(row+2*ps))[x]),"
-                     "float(((device half*)(row+3*ps))[x])); break; }\n"
-                     "%s  case %du: { uint px = ((device uint*)(p%d + y * buf_rbs[%d]))[x];\n"
-                     "%s            v%d_c = float4(px & 0xFFu, (px>>8)&0xFFu, (px>>16)&0xFFu, px>>24) / 255.0;\n"
-                     "%s            for (int ch = 0; ch < 3; ch++) {\n"
-                     "%s              float s = v%d_c[ch];\n"
-                     "%s              v%d_c[ch] = s < 0.055 ? s/12.92 : s*s*(0.3*s+0.6975)+0.0025;\n"
-                     "%s            } break; }\n"
-                     "%s  default: v%d_c = float4(0); break;\n"
+                     "float(((device half*)(row+3*ps))[x]));\n"
+                     "%s} else {\n"
+                     "%s    uint px = ((device uint*)(p%d + y * buf_rbs[%d]))[x];\n"
+                     "%s    v%d_c = float4(px & 0xFFu, (px>>8)&0xFFu, (px>>16)&0xFFu, px>>24) / 255.0;\n"
+                     "%s    for (int ch = 0; ch < 3; ch++) {\n"
+                     "%s        float s = v%d_c[ch];\n"
+                     "%s        v%d_c[ch] = s < 0.055 ? s/12.92 : s*s*(0.3*s+0.6975)+0.0025;\n"
+                     "%s    }\n"
                      "%s}\n"
                      "%suint v%d = as_type<uint>(v%d_c.x);\n"
                      "%suint v%d_1 = as_type<uint>(v%d_c.y);\n"
@@ -216,23 +243,31 @@ static void emit_ops(Buf *b, BB const *bb,
                      "%suint v%d_3 = as_type<uint>(v%d_c.w);\n",
                      pad, i,
                      pad, p,
-                     pad, umbra_fmt_8888, p, p,
+                     pad, i, p,
+                     pad, p,
+                     pad, i, p, p, p, p,
+                     pad, p, umbra_fmt_8888,
+                     pad, p, p,
                      pad, i,
-                     pad, umbra_fmt_565, p, p,
+                     pad, p, umbra_fmt_565,
+                     pad, p, p,
                      pad, i,
-                     pad, umbra_fmt_1010102, p, p,
+                     pad, p, umbra_fmt_1010102,
+                     pad, p, p,
                      pad, i,
-                     pad, umbra_fmt_fp16, p, p,
+                     pad, p, umbra_fmt_fp16,
+                     pad, p, p,
                      pad, i,
-                     pad, umbra_fmt_fp16_planar, p, p, p,
+                     pad, p, umbra_fmt_fp16_planar,
+                     pad, p, p, p,
                      pad, i,
-                     pad, umbra_fmt_srgb, p, p,
+                     pad,
+                     pad, p, p,
                      pad, i,
                      pad,
                      pad, i,
                      pad, i,
                      pad,
-                     pad, i,
                      pad,
                      pad, i, i,
                      pad, i, i,
@@ -245,55 +280,78 @@ static void emit_ops(Buf *b, BB const *bb,
                 emit(b,
                      "%sfloat4 sc%d = float4(as_type<float>(%s), as_type<float>(%s),"
                      " as_type<float>(%s), as_type<float>(%s));\n"
-                     "%sswitch (buf_fmts[%d]) {\n"
-                     "%s  case %du: { sc%d = clamp(sc%d, 0.0, 1.0);\n"
-                     "%s            ((device uint*)(p%d + y * buf_rbs[%d]))[x] ="
+                     "%sif (planes_p%d == 1) {\n"
+                     "%s    tex_p%d_0.write(sc%d, uint2(x,y));\n"
+                     "%s} else if (planes_p%d == 4) {\n"
+                     "%s    tex_p%d_0.write(float4(sc%d.x,0,0,0), uint2(x,y));\n"
+                     "%s    tex_p%d_1.write(float4(sc%d.y,0,0,0), uint2(x,y));\n"
+                     "%s    tex_p%d_2.write(float4(sc%d.z,0,0,0), uint2(x,y));\n"
+                     "%s    tex_p%d_3.write(float4(sc%d.w,0,0,0), uint2(x,y));\n"
+                     "%s} else if (fmt_p%d == %du) {\n"
+                     "%s    sc%d = clamp(sc%d, 0.0, 1.0);\n"
+                     "%s    ((device uint*)(p%d + y * buf_rbs[%d]))[x] ="
                      " uint(rint(sc%d.x*255.0)) | (uint(rint(sc%d.y*255.0))<<8)"
-                     " | (uint(rint(sc%d.z*255.0))<<16) | (uint(rint(sc%d.w*255.0))<<24); break; }\n"
-                     "%s  case %du: { sc%d = clamp(sc%d, 0.0, 1.0);\n"
-                     "%s            ((device ushort*)(p%d + y * buf_rbs[%d]))[x] ="
+                     " | (uint(rint(sc%d.z*255.0))<<16) | (uint(rint(sc%d.w*255.0))<<24);\n"
+                     "%s} else if (fmt_p%d == %du) {\n"
+                     "%s    sc%d = clamp(sc%d, 0.0, 1.0);\n"
+                     "%s    ((device ushort*)(p%d + y * buf_rbs[%d]))[x] ="
                      " ushort((uint(rint(sc%d.x*31.0))<<11) | (uint(rint(sc%d.y*63.0))<<5)"
-                     " | uint(rint(sc%d.z*31.0))); break; }\n"
-                     "%s  case %du: { sc%d = clamp(sc%d, 0.0, 1.0);\n"
-                     "%s            ((device uint*)(p%d + y * buf_rbs[%d]))[x] ="
+                     " | uint(rint(sc%d.z*31.0)));\n"
+                     "%s} else if (fmt_p%d == %du) {\n"
+                     "%s    sc%d = clamp(sc%d, 0.0, 1.0);\n"
+                     "%s    ((device uint*)(p%d + y * buf_rbs[%d]))[x] ="
                      " uint(rint(sc%d.x*1023.0)) | (uint(rint(sc%d.y*1023.0))<<10)"
-                     " | (uint(rint(sc%d.z*1023.0))<<20) | (uint(rint(sc%d.w*3.0))<<30); break; }\n"
-                     "%s  case %du: { device half *hp = (device half*)(p%d + y * buf_rbs[%d]) + x*4;\n"
-                     "%s            hp[0]=half(sc%d.x); hp[1]=half(sc%d.y);"
-                     " hp[2]=half(sc%d.z); hp[3]=half(sc%d.w); break; }\n"
-                     "%s  case %du: { device uchar *row = p%d + y * buf_rbs[%d]; uint ps = buf_szs[%d]/4;\n"
-                     "%s            ((device half*)row)[x] = half(sc%d.x);"
+                     " | (uint(rint(sc%d.z*1023.0))<<20) | (uint(rint(sc%d.w*3.0))<<30);\n"
+                     "%s} else if (fmt_p%d == %du) {\n"
+                     "%s    device half *hp = (device half*)(p%d + y * buf_rbs[%d]) + x*4;\n"
+                     "%s    hp[0]=half(sc%d.x); hp[1]=half(sc%d.y);"
+                     " hp[2]=half(sc%d.z); hp[3]=half(sc%d.w);\n"
+                     "%s} else if (fmt_p%d == %du) {\n"
+                     "%s    device uchar *row = p%d + y * buf_rbs[%d]; uint ps = buf_szs[%d]/4;\n"
+                     "%s    ((device half*)row)[x] = half(sc%d.x);"
                      " ((device half*)(row+ps))[x] = half(sc%d.y);"
                      " ((device half*)(row+2*ps))[x] = half(sc%d.z);"
-                     " ((device half*)(row+3*ps))[x] = half(sc%d.w); break; }\n"
-                     "%s  case %du: { for (int ch = 0; ch < 3; ch++) {\n"
-                     "%s              float l = max(sc%d[ch], 0.0);\n"
-                     "%s              float t = 1.0/sqrt(max(l, 1e-30));\n"
-                     "%s              float lo = l * 12.92;\n"
-                     "%s              float hi = (1.12999999523 + t*(0.01383202704 + t*(-0.00245423456))) / (0.14137776196 + t);\n"
-                     "%s              sc%d[ch] = lo < 0.06019 ? lo : hi;\n"
-                     "%s            } sc%d = clamp(sc%d, 0.0, 1.0);\n"
-                     "%s            ((device uint*)(p%d + y * buf_rbs[%d]))[x] ="
+                     " ((device half*)(row+3*ps))[x] = half(sc%d.w);\n"
+                     "%s} else {\n"
+                     "%s    for (int ch = 0; ch < 3; ch++) {\n"
+                     "%s        float l = max(sc%d[ch], 0.0);\n"
+                     "%s        float t = 1.0/sqrt(max(l, 1e-30));\n"
+                     "%s        float lo = l * 12.92;\n"
+                     "%s        float hi = (1.12999999523 + t*(0.01383202704 + t*(-0.00245423456))) / (0.14137776196 + t);\n"
+                     "%s        sc%d[ch] = lo < 0.06019 ? lo : hi;\n"
+                     "%s    } sc%d = clamp(sc%d, 0.0, 1.0);\n"
+                     "%s    ((device uint*)(p%d + y * buf_rbs[%d]))[x] ="
                      " uint(rint(sc%d.x*255.0)) | (uint(rint(sc%d.y*255.0))<<8)"
-                     " | (uint(rint(sc%d.z*255.0))<<16) | (uint(rint(sc%d.w*255.0))<<24); break; }\n"
-                     "%s  default: break;\n"
+                     " | (uint(rint(sc%d.z*255.0))<<16) | (uint(rint(sc%d.w*255.0))<<24);\n"
                      "%s}\n",
                      pad, i, vx, vy, vz, vw,
                      pad, p,
-                     pad, umbra_fmt_8888, i, i,
+                     pad, p, i,
+                     pad, p,
+                     pad, p, i,
+                     pad, p, i,
+                     pad, p, i,
+                     pad, p, i,
+                     pad, p, umbra_fmt_8888,
+                     pad, i, i,
                      pad, p, p,
                      i, i, i, i,
-                     pad, umbra_fmt_565, i, i,
+                     pad, p, umbra_fmt_565,
+                     pad, i, i,
                      pad, p, p,
                      i, i, i,
-                     pad, umbra_fmt_1010102, i, i,
+                     pad, p, umbra_fmt_1010102,
+                     pad, i, i,
                      pad, p, p,
                      i, i, i, i,
-                     pad, umbra_fmt_fp16, p, p,
+                     pad, p, umbra_fmt_fp16,
+                     pad, p, p,
                      pad, i, i, i, i,
-                     pad, umbra_fmt_fp16_planar, p, p, p,
+                     pad, p, umbra_fmt_fp16_planar,
+                     pad, p, p, p,
                      pad, i, i, i, i,
-                     pad, umbra_fmt_srgb,
+                     pad,
+                     pad,
                      pad, i,
                      pad,
                      pad,
@@ -302,7 +360,6 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i, i,
                      pad, p, p,
                      i, i, i, i,
-                     pad,
                      pad);
             } break;
 
@@ -749,7 +806,10 @@ static void emit_ops(Buf *b, BB const *bb,
 static char* build_source(BB const *bb,
                            int *out_max_ptr,
                            int *out_total_bufs,
-                           int *out_deref_buf) {
+                           int *out_deref_buf,
+                           struct color_buf_info **out_color_bufs,
+                           int *out_n_color_bufs,
+                           int *out_n_textures) {
     int max_ptr = -1;
     for (int i = 0; i < bb->insts; i++) {
         if (has_ptr(bb->inst[i].op)
@@ -784,11 +844,62 @@ static char* build_source(BB const *bb,
         }
     }
 
+    int n_color_bufs = 0;
+    struct color_buf_info *color_bufs = calloc((size_t)(total_bufs + 1), sizeof *color_bufs);
+    for (int i = 0; i < bb->insts; i++) {
+        enum op op = bb->inst[i].op;
+        if (op != op_load_color && op != op_store_color) { continue; }
+        int p = bb->inst[i].ptr < 0
+            ? deref_buf[~bb->inst[i].ptr]
+            : bb->inst[i].ptr;
+        int found = -1;
+        for (int c = 0; c < n_color_bufs; c++) {
+            if (color_bufs[c].buf_idx == p) { found = c; break; }
+        }
+        if (found < 0) {
+            found = n_color_bufs++;
+            color_bufs[found].buf_idx = p;
+        }
+        if (op == op_load_color)  { color_bufs[found].read  = 1; }
+        if (op == op_store_color) { color_bufs[found].write = 1; }
+    }
+    int n_textures = 0;
+    for (int c = 0; c < n_color_bufs; c++) {
+        color_bufs[c].tex_base = n_textures;
+        n_textures += 4;
+    }
+    *out_color_bufs  = color_bufs;
+    *out_n_color_bufs = n_color_bufs;
+    *out_n_textures  = n_textures;
+
     Buf b = {0};
 
     emit(&b,
          "#include <metal_stdlib>\n"
          "using namespace metal;\n\n");
+
+    int fc = 0;
+    for (int c = 0; c < n_color_bufs; c++) {
+        int p = color_bufs[c].buf_idx;
+        emit(&b,
+             "constant uint planes_p%d"
+             " [[function_constant(%d)]];\n",
+             p, fc++);
+        emit(&b,
+             "constant uint fmt_p%d"
+             " [[function_constant(%d)]];\n",
+             p, fc++);
+    }
+    if (n_color_bufs) {
+        emit(&b, "\n");
+        emit(&b,
+             "enum { FMT_8888=%d, FMT_565=%d,"
+             " FMT_1010102=%d, FMT_FP16=%d,"
+             " FMT_FP16_PLANAR=%d, FMT_SRGB=%d };\n\n",
+             umbra_fmt_8888, umbra_fmt_565,
+             umbra_fmt_1010102, umbra_fmt_fp16,
+             umbra_fmt_fp16_planar, umbra_fmt_srgb);
+    }
 
     emit(&b,
          "static inline int safe_ix"
@@ -815,14 +926,12 @@ static char* build_source(BB const *bb,
          ",\n    constant uint *buf_szs [[buffer(%d)]]"
          ",\n    constant uint *buf_rbs [[buffer(%d)]]"
          ",\n    constant uint &x0 [[buffer(%d)]]"
-         ",\n    constant uint &y0 [[buffer(%d)]]"
-         ",\n    constant uint *buf_fmts [[buffer(%d)]]",
+         ",\n    constant uint &y0 [[buffer(%d)]]",
          total_bufs + 0,
          total_bufs + 1,
          total_bufs + 2,
          total_bufs + 3,
-         total_bufs + 4,
-         total_bufs + 5);
+         total_bufs + 4);
     for (int p = 0; p <= max_ptr; p++) {
         emit(&b,
              ",\n    device uchar *p%d"
@@ -836,6 +945,19 @@ static char* build_source(BB const *bb,
                  " [[buffer(%d)]]",
                  deref_buf[i],
                  deref_buf[i]);
+        }
+    }
+    for (int c = 0; c < n_color_bufs; c++) {
+        int p = color_bufs[c].buf_idx;
+        int tb = color_bufs[c].tex_base;
+        char const *acc = (color_bufs[c].read && color_bufs[c].write)
+            ? "read_write"
+            : color_bufs[c].write ? "write" : "read";
+        for (int t = 0; t < 4; t++) {
+            emit(&b,
+                 ",\n    texture2d<float, access::%s>"
+                 " tex_p%d_%d [[texture(%d)]]",
+                 acc, p, t, tb + t);
         }
     }
     emit(&b,
@@ -860,7 +982,8 @@ static char* build_source(BB const *bb,
     }
 
     emit_ops(&b, bb, ptr_16, ptr_32,
-             deref_buf, 0, bb->insts, "    ");
+             deref_buf,
+             0, bb->insts, "    ");
     emit(&b, "}\n");
 
     free(ptr_16);
@@ -908,6 +1031,75 @@ static void umbra_metal_backend_free(struct metal_backend *be) {
     }
 }
 
+static int fmt_to_planes(umbra_fmt fmt) {
+    (void)fmt;
+    return 0;
+}
+
+static id<MTLComputePipelineState> make_pipeline(
+    struct umbra_metal *m,
+    id<MTLDevice> device,
+    uint32_t const *planes,
+    uint32_t const *fmts,
+    int *out_tg_size
+) {
+    id<MTLLibrary> lib = (__bridge id<MTLLibrary>)m->library;
+    MTLFunctionConstantValues *cv = [MTLFunctionConstantValues new];
+    int fc = 0;
+    for (int c = 0; c < m->n_color_bufs; c++) {
+        [cv setConstantValue:&planes[c] type:MTLDataTypeUInt atIndex:(NSUInteger)fc++];
+        [cv setConstantValue:&fmts[c]   type:MTLDataTypeUInt atIndex:(NSUInteger)fc++];
+    }
+    NSError *error = nil;
+    id<MTLFunction> func = [lib newFunctionWithName:@"umbra_entry"
+                                     constantValues:cv
+                                              error:&error];
+    if (!func) { return nil; }
+    id<MTLComputePipelineState> pso =
+        [device newComputePipelineStateWithFunction:func error:&error];
+    if (pso && out_tg_size) {
+        *out_tg_size = (int)pso.maxTotalThreadsPerThreadgroup;
+    }
+    return pso;
+}
+
+static id<MTLComputePipelineState> get_pipeline(
+    struct umbra_metal *m,
+    umbra_buf buf[],
+    id<MTLDevice> device,
+    int *out_tg_size
+) {
+    uint32_t planes[64], fmts[64];
+    uint64_t key = 0;
+    for (int c = 0; c < m->n_color_bufs; c++) {
+        int bi = m->color_bufs[c].buf_idx;
+        int pl = (bi <= m->max_ptr) ? fmt_to_planes(buf[bi].fmt) : 0;
+        uint32_t fm = (bi <= m->max_ptr) ? (uint32_t)buf[bi].fmt : 0;
+        planes[c] = (uint32_t)pl;
+        fmts[c]   = fm;
+        key = key * 131 + (uint64_t)pl * 7 + fm;
+    }
+    for (int i = 0; i < m->n_pipelines; i++) {
+        if (m->pipelines[i].key == key) {
+            *out_tg_size = m->pipelines[i].tg_size;
+            return (__bridge id<MTLComputePipelineState>)m->pipelines[i].pipeline;
+        }
+    }
+    int tg = 0;
+    id<MTLComputePipelineState> pso = make_pipeline(m, device, planes, fmts, &tg);
+    if (!pso) { return nil; }
+    if (m->n_pipelines >= m->pipelines_cap) {
+        m->pipelines_cap = m->pipelines_cap ? 2 * m->pipelines_cap : 8;
+        m->pipelines = realloc(m->pipelines,
+                               (size_t)m->pipelines_cap * sizeof *m->pipelines);
+    }
+    m->pipelines[m->n_pipelines++] = (struct pipeline_entry){
+        .key=key, .pipeline=(__bridge_retained void*)pso, .tg_size=tg,
+    };
+    *out_tg_size = tg;
+    return pso;
+}
+
 static struct umbra_metal* umbra_metal(
     struct metal_backend *be, BB const *bb
 ) {
@@ -919,7 +1111,10 @@ static struct umbra_metal* umbra_metal(
 
         int *deref_buf = calloc((size_t)bb->insts, sizeof *deref_buf);
         int  max_ptr = -1, total_bufs = 0;
-        char *src = build_source(bb, &max_ptr, &total_bufs, deref_buf);
+        struct color_buf_info *color_bufs = 0;
+        int n_color_bufs = 0, n_textures = 0;
+        char *src = build_source(bb, &max_ptr, &total_bufs, deref_buf,
+                                 &color_bufs, &n_color_bufs, &n_textures);
 
         int n_deref = 0;
         for (int i = 0; i < bb->insts; i++) {
@@ -952,37 +1147,56 @@ static struct umbra_metal* umbra_metal(
 #pragma clang diagnostic pop
         }
 
-        id<MTLLibrary>              library;
-        id<MTLFunction>             func;
-        id<MTLComputePipelineState> pipeline;
-        struct umbra_metal         *m;
+        id<MTLLibrary> library;
+        struct umbra_metal *m;
 
         library = [device newLibraryWithSource:source options:opts error:&error];
         if (!library) {
             NSLog(@"Metal compile error: %@", error);
             goto fail;
         }
-        func = [library newFunctionWithName:@"umbra_entry"];
-        if (!func) { goto fail; }
-        pipeline = [device newComputePipelineStateWithFunction:func error:&error];
-        if (!pipeline) { goto fail; }
 
         m = calloc(1, sizeof *m);
-        m->pipeline  = (__bridge_retained void*)pipeline;
-        m->src       = src;
-        m->max_ptr   = max_ptr;
-        m->total_bufs = total_bufs;
-        m->tg_size   = (int)pipeline.maxTotalThreadsPerThreadgroup;
-        m->per_bufs  = calloc((size_t)total_bufs, sizeof *m->per_bufs);
-        m->deref     = di;
-        m->n_deref   = n_deref;
+        m->library       = (__bridge_retained void*)library;
+        m->color_bufs    = color_bufs;
+        m->n_color_bufs  = n_color_bufs;
+        m->n_textures    = n_textures;
+        m->src           = src;
+        m->max_ptr       = max_ptr;
+        m->total_bufs    = total_bufs;
+        m->per_bufs      = calloc((size_t)total_bufs, sizeof *m->per_bufs);
+        m->deref         = di;
+        m->n_deref       = n_deref;
+
+        {
+            uint32_t *def_planes = calloc((size_t)(n_color_bufs + 1), sizeof *def_planes);
+            uint32_t *def_fmts   = calloc((size_t)(n_color_bufs + 1), sizeof *def_fmts);
+            int tg = 0;
+            id<MTLComputePipelineState> pso = make_pipeline(m, device, def_planes, def_fmts, &tg);
+            free(def_planes);
+            free(def_fmts);
+            if (!pso) { goto fail2; }
+            m->tg_size = tg;
+            m->pipelines_cap = 8;
+            m->pipelines = calloc((size_t)m->pipelines_cap, sizeof *m->pipelines);
+            m->pipelines[0] = (struct pipeline_entry){
+                .key=0, .pipeline=(__bridge_retained void*)pso, .tg_size=tg,
+            };
+            m->n_pipelines = 1;
+        }
+
         free(deref_buf);
         result = m;
         goto out;
 
+    fail2:
+        (void)(__bridge_transfer id)m->library;
+        free(m->per_bufs);
+        free(m);
     fail:
         free(deref_buf);
         free(di);
+        free(color_bufs);
         free(src);
     out:;
     }
@@ -1031,16 +1245,19 @@ static void encode_dispatch(
     id<MTLDevice> device =
         (__bridge id<MTLDevice>)be->device;
 
+    int tg_size = 0;
+    id<MTLComputePipelineState> pso = get_pipeline(m, buf, device, &tg_size);
+    assert(pso);
+    [enc setComputePipelineState:pso];
+
     int tb = m->total_bufs;
     uint32_t *szs_data  = calloc((size_t)(tb + 1), sizeof *szs_data);
     uint32_t *rbs_data  = calloc((size_t)(tb + 1), sizeof *rbs_data);
-    uint32_t *fmts_data = calloc((size_t)(tb + 1), sizeof *fmts_data);
     for (int i = 0; i <= m->max_ptr; i++) {
         if (buf[i].ptr && buf[i].sz) {
             szs_data[i] = (uint32_t)buf[i].sz;
         }
         rbs_data[i]  = (uint32_t)buf[i].row_bytes;
-        fmts_data[i] = (uint32_t)buf[i].fmt;
     }
 
     __builtin_memset(m->per_bufs, 0,
@@ -1205,14 +1422,6 @@ static void encode_dispatch(
         per_rbs.contents, rbs_data, sz_bytes);
     batch_retain_buf(
         be, (__bridge_retained void*)per_rbs);
-    id<MTLBuffer> per_fmts =
-        [device newBufferWithLength:sz_bytes
-                options:
-                    MTLResourceStorageModeShared];
-    __builtin_memcpy(
-        per_fmts.contents, fmts_data, sz_bytes);
-    batch_retain_buf(
-        be, (__bridge_retained void*)per_fmts);
     for (int i = 0; i < m->total_bufs; i++) {
         if (m->per_bufs[i]) {
             [enc setBuffer:
@@ -1237,18 +1446,13 @@ static void encode_dispatch(
     [enc setBuffer:per_y0
             offset:0
            atIndex:(NSUInteger)(m->total_bufs + 4)];
-    [enc setBuffer:per_fmts
-            offset:0
-           atIndex:(NSUInteger)(m->total_bufs + 5)];
-
 
     MTLSize grid =
         MTLSizeMake((NSUInteger)w, (NSUInteger)h, 1);
-    // Pick the squarest 2D threadgroup that fits within tg_size and the grid.
     int gx = 1, gy = 1;
-    for (int x = 1; x * x <= m->tg_size; x++) {
-        if (m->tg_size % x != 0) { continue; }
-        int y = m->tg_size / x;
+    for (int x = 1; x * x <= tg_size; x++) {
+        if (tg_size % x != 0) { continue; }
+        int y = tg_size / x;
         if (x <= w && y <= h) { gx = x; gy = y; }
         if (y <= w && x <= h) { gx = y; gy = x; }
     }
@@ -1259,7 +1463,6 @@ static void encode_dispatch(
        threadsPerThreadgroup:group];
     free(szs_data);
     free(rbs_data);
-    free(fmts_data);
 }
 
 static void umbra_metal_begin_batch(struct metal_backend *be);
@@ -1279,10 +1482,6 @@ static void umbra_metal_run(
                 (__bridge
                  id<MTLComputeCommandEncoder>)
                     be->batch_enc;
-            [enc setComputePipelineState:
-                (__bridge
-                 id<MTLComputePipelineState>)
-                    m->pipeline];
             if (!m->batch_data) {
                 m->batch_data = calloc(
                     (size_t)m->total_bufs,
@@ -1362,11 +1561,17 @@ static void umbra_metal_flush(struct metal_backend *be) {
 static void umbra_metal_free(struct umbra_metal *m) {
     assert(m);
     @autoreleasepool {
-        if (m->pipeline) {
-            (void)(__bridge_transfer id)
-                m->pipeline;
+        if (m->library) {
+            (void)(__bridge_transfer id)m->library;
+        }
+        for (int i = 0; i < m->n_pipelines; i++) {
+            if (m->pipelines[i].pipeline) {
+                (void)(__bridge_transfer id)m->pipelines[i].pipeline;
+            }
         }
     }
+    free(m->pipelines);
+    free(m->color_bufs);
     free(m->per_bufs);
     free(m->deref);
     free(m->batch_data);
