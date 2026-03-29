@@ -276,7 +276,6 @@ static void test_solid_src_fp16(void) {
                                 lay);
 
     for (int bi = 0; bi < 3; bi++) {
-        if (bi == 1) { continue; }
         __fp16 dst[4 * 3];
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {0.25f, 0.5f, 0.75f, 1};
@@ -308,7 +307,6 @@ static void test_srcover_fp16(void) {
                   lay);
 
     for (int bi = 0; bi < 3; bi++) {
-        if (bi == 1) { continue; }
         __fp16 dst[4 * 2];
         for (int i = 0; i < 2; i++) {
             dst[i * 4 + 0] = 1;
@@ -713,7 +711,6 @@ static void test_solid_src_fp16_n9(void) {
                                 lay);
 
     for (int bi = 0; bi < 3; bi++) {
-        if (bi == 1) { continue; }
         __fp16 dst[4 * 9];
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {0.125f, 0.25f, 0.5f, 1};
@@ -1128,7 +1125,6 @@ static void test_transfer_invert(void) {
                                 lay);
 
     for (int bi = 0; bi < 3; bi++) {
-        if (bi == 1) { continue; }
         __fp16 dst[4 * 2];
         __builtin_memset(dst, 0, sizeof dst);
         float     color0[4] = {0.5f, 0.5f, 0.5f, 1};
@@ -1172,7 +1168,6 @@ static void test_transfer_apply(void) {
                                 lay);
 
     for (int bi = 0; bi < 3; bi++) {
-        if (bi == 1) { continue; }
         __fp16 dst[4 * 2];
         __builtin_memset(dst, 0, sizeof dst);
         float     color0[4] = {0.5f, 0.5f, 0.5f, 1};
@@ -1219,7 +1214,6 @@ static void test_transfer_roundtrip(void) {
                   lay);
 
     for (int bi = 0; bi < 3; bi++) {
-        if (bi == 1) { continue; }
         __fp16 dst[4 * 4];
         __builtin_memset(dst, 0, sizeof dst);
         float     color0[4] = {0.25f, 0.5f, 0.75f, 1};

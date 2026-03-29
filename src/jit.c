@@ -818,31 +818,199 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t r3 = ra_alloc(ra, sl, ns);
             int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+
+            int8_t px   = ra_alloc(ra, sl, ns);
+            int8_t t0   = ra_alloc(ra, sl, ns);
+            int8_t t1   = ra_alloc(ra, sl, ns);
+
+            // Load fmt: LDR w_XT, [XBUF, #(p*sizeof(umbra_buf)+offsetof(fmt))]
             {
-                int8_t px   = ra_alloc(ra, sl, ns);
-                int8_t mask = ra_alloc(ra, sl, ns);
-                int8_t inv  = ra_alloc(ra, sl, ns);
+                int const fmt_off = p * (int)sizeof(umbra_buf)
+                                  + (int)__builtin_offsetof(umbra_buf, fmt);
+                put(c, 0xb9400000u
+                    | ((uint32_t)(fmt_off / 4) << 10)
+                    | ((uint32_t)XBUF << 5)
+                    | (uint32_t)XT);
+            }
+
+            int br_done[4];
+            int n_done = 0;
+
+            // --- umbra_fmt_8888 (=1) ---
+            // CMP w_XT, #1
+            put(c, 0x7100001fu | (1u << 10) | ((uint32_t)XT << 5));
+            int br_skip_8888 = c->len;
+            put(c, Bcond(0x1, 0));  // B.NE
+            {
                 if (scalar) { put(c, LDR_sx(px, XP, XI)); }
                 else        { put(c, LDR_q(px, XP, XW)); }
-                arm64_pool_load(c, &jc->pool, mask, 0xFF);
-                put(c, AND_16b(s0.rd, px, mask));
-                put(c, USHR_4s_imm(r1, px,  8)); put(c, AND_16b(r1, r1, mask));
-                put(c, USHR_4s_imm(r2, px, 16)); put(c, AND_16b(r2, r2, mask));
+                arm64_pool_load(c, &jc->pool, t0, 0xFF);
+                put(c, AND_16b(s0.rd, px, t0));
+                put(c, USHR_4s_imm(r1, px,  8)); put(c, AND_16b(r1, r1, t0));
+                put(c, USHR_4s_imm(r2, px, 16)); put(c, AND_16b(r2, r2, t0));
                 put(c, USHR_4s_imm(r3, px, 24));
                 put(c, SCVTF_4s(s0.rd, s0.rd));
                 put(c, SCVTF_4s(r1, r1));
                 put(c, SCVTF_4s(r2, r2));
                 put(c, SCVTF_4s(r3, r3));
                 union { float f; uint32_t u; } inv255 = {.f = 1.0f/255.0f};
-                arm64_pool_load(c, &jc->pool, inv, inv255.u);
-                put(c, FMUL_4s(s0.rd, s0.rd, inv));
-                put(c, FMUL_4s(r1, r1, inv));
-                put(c, FMUL_4s(r2, r2, inv));
-                put(c, FMUL_4s(r3, r3, inv));
-                ra_return_reg(ra, inv);
-                ra_return_reg(ra, mask);
-                ra_return_reg(ra, px);
+                arm64_pool_load(c, &jc->pool, t0, inv255.u);
+                put(c, FMUL_4s(s0.rd, s0.rd, t0));
+                put(c, FMUL_4s(r1, r1, t0));
+                put(c, FMUL_4s(r2, r2, t0));
+                put(c, FMUL_4s(r3, r3, t0));
             }
+            br_done[n_done] = c->len; n_done++;
+            put(c, B(0));
+            c->buf[br_skip_8888] = Bcond(0x1, c->len - br_skip_8888);
+
+            // --- umbra_fmt_565 (=2) ---
+            put(c, 0x7100001fu | (2u << 10) | ((uint32_t)XT << 5));
+            int br_skip_565 = c->len;
+            put(c, Bcond(0x1, 0));
+            {
+                // Load 16-bit pixels, widen to 32-bit.
+                if (scalar) {
+                    // LDRH w_XT2, [XP, XI, LSL #1]
+                    put(c, 0x78607800u
+                        | ((uint32_t)XI  << 16)
+                        | ((uint32_t)XP  << 5)
+                        | (uint32_t)XT);
+                    put(c, DUP_4s_w(px, XT));
+                } else {
+                    put(c, LDR_d(px, XP, XH));
+                    // UXTL.4S (zero-extend 4H->4S)
+                    put(c, 0x2f10a400u | ((uint32_t)px << 5) | (uint32_t)px);
+                }
+                // r5 = px >> 11
+                put(c, USHR_4s_imm(s0.rd, px, 11));
+                // g6 = (px >> 5) & 0x3F
+                put(c, USHR_4s_imm(r1, px, 5));
+                arm64_pool_load(c, &jc->pool, t0, 0x3F);
+                put(c, AND_16b(r1, r1, t0));
+                // b5 = px & 0x1F
+                arm64_pool_load(c, &jc->pool, t0, 0x1F);
+                put(c, AND_16b(r2, px, t0));
+                // Convert to float and scale.
+                put(c, SCVTF_4s(s0.rd, s0.rd));
+                put(c, SCVTF_4s(r1, r1));
+                put(c, SCVTF_4s(r2, r2));
+                union { float f; uint32_t u; } inv31 = {.f = 1.0f/31.0f};
+                union { float f; uint32_t u; } inv63 = {.f = 1.0f/63.0f};
+                arm64_pool_load(c, &jc->pool, t0, inv31.u);
+                put(c, FMUL_4s(s0.rd, s0.rd, t0));
+                put(c, FMUL_4s(r2, r2, t0));
+                arm64_pool_load(c, &jc->pool, t0, inv63.u);
+                put(c, FMUL_4s(r1, r1, t0));
+                // a = 1.0
+                union { float f; uint32_t u; } f1 = {.f = 1.0f};
+                arm64_pool_load(c, &jc->pool, r3, f1.u);
+            }
+            br_done[n_done] = c->len; n_done++;
+            put(c, B(0));
+            c->buf[br_skip_565] = Bcond(0x1, c->len - br_skip_565);
+
+            // --- umbra_fmt_1010102 (=3) ---
+            put(c, 0x7100001fu | (3u << 10) | ((uint32_t)XT << 5));
+            int br_skip_1010102 = c->len;
+            put(c, Bcond(0x1, 0));
+            {
+                if (scalar) { put(c, LDR_sx(px, XP, XI)); }
+                else        { put(c, LDR_q(px, XP, XW)); }
+                arm64_pool_load(c, &jc->pool, t0, 0x3FF);
+                put(c, AND_16b(s0.rd, px, t0));
+                put(c, USHR_4s_imm(r1, px, 10)); put(c, AND_16b(r1, r1, t0));
+                put(c, USHR_4s_imm(r2, px, 20)); put(c, AND_16b(r2, r2, t0));
+                put(c, USHR_4s_imm(r3, px, 30));
+                put(c, SCVTF_4s(s0.rd, s0.rd));
+                put(c, SCVTF_4s(r1, r1));
+                put(c, SCVTF_4s(r2, r2));
+                put(c, SCVTF_4s(r3, r3));
+                union { float f; uint32_t u; } inv1023 = {.f = 1.0f/1023.0f};
+                union { float f; uint32_t u; } inv3    = {.f = 1.0f/3.0f};
+                arm64_pool_load(c, &jc->pool, t0, inv1023.u);
+                put(c, FMUL_4s(s0.rd, s0.rd, t0));
+                put(c, FMUL_4s(r1, r1, t0));
+                put(c, FMUL_4s(r2, r2, t0));
+                arm64_pool_load(c, &jc->pool, t0, inv3.u);
+                put(c, FMUL_4s(r3, r3, t0));
+            }
+            br_done[n_done] = c->len; n_done++;
+            put(c, B(0));
+            c->buf[br_skip_1010102] = Bcond(0x1, c->len - br_skip_1010102);
+
+            // --- umbra_fmt_fp16 (=4) ---
+            put(c, 0x7100001fu | (4u << 10) | ((uint32_t)XT << 5));
+            int br_skip_fp16 = c->len;
+            put(c, Bcond(0x1, 0));
+            {
+                if (scalar) {
+                    // Load 8 bytes (1 pixel, 4xfp16).
+                    put(c, LSL_xi(XT, XI, 3));
+                    put(c, ADD_xr(XT, XP, XT));
+                    // LDR Dpx, [XT, #0] (64-bit SIMD load, unsigned offset)
+                    put(c, 0xfd400000u | ((uint32_t)XT << 5) | (uint32_t)px);
+                    // FCVTL: convert lower 4 x fp16 -> 4 x fp32
+                    put(c, FCVTL_4s(px, px));
+                    // px now has {R, G, B, A} as fp32 in lanes 0-3.
+                    // DUP each lane.
+                    put(c, 0x4e040400u | (0u << 19) | ((uint32_t)px << 5) | (uint32_t)s0.rd);
+                    put(c, 0x4e040400u | (1u << 19) | ((uint32_t)px << 5) | (uint32_t)r1);
+                    put(c, 0x4e040400u | (2u << 19) | ((uint32_t)px << 5) | (uint32_t)r2);
+                    put(c, 0x4e040400u | (3u << 19) | ((uint32_t)px << 5) | (uint32_t)r3);
+                } else {
+                    // Load 32 bytes (4 pixels, each 4xfp16).
+                    // Compute addr = XP + XCOL*8 in XT.
+                    put(c, LSL_xi(XT, XI, 3));
+                    put(c, ADD_xr(XT, XP, XT));
+                    // LDR Q, [XT, #0] and LDR Q, [XT, #16]
+                    put(c, LDR_qi(px, XT, 0));
+                    put(c, LDR_qi(t0, XT, 1));
+                    // px  = [R0,G0,B0,A0, R1,G1,B1,A1] (8 x fp16)
+                    // t0  = [R2,G2,B2,A2, R3,G3,B3,A3] (8 x fp16)
+                    // De-interleave with UZP at 16-bit granularity.
+                    // UZP1.8H: 0x4e401800 | (Vm<<16) | (Vn<<5) | Vd
+                    // UZP2.8H: 0x4e405800 | (Vm<<16) | (Vn<<5) | Vd
+                    // Round 1: separate even/odd 16-bit lanes.
+                    // t1 = UZP1.8H(px, t0) = [R0,B0,R1,B1, R2,B2,R3,B3]
+                    // px = UZP2.8H(px, t0) = [G0,A0,G1,A1, G2,A2,G3,A3]
+                    put(c, 0x4e401800u | ((uint32_t)t0 << 16) | ((uint32_t)px << 5) | (uint32_t)t1);
+                    put(c, 0x4e405800u | ((uint32_t)t0 << 16) | ((uint32_t)px << 5) | (uint32_t)px);
+                    // Round 2: separate R/B and G/A.
+                    // t0 = UZP1.8H(t1, px) = [R0,R1,R2,R3, G0,G1,G2,G3]
+                    // t1 = UZP2.8H(t1, px) = [B0,B1,B2,B3, A0,A1,A2,A3]
+                    put(c, 0x4e401800u | ((uint32_t)px << 16) | ((uint32_t)t1 << 5) | (uint32_t)t0);
+                    put(c, 0x4e405800u | ((uint32_t)px << 16) | ((uint32_t)t1 << 5) | (uint32_t)t1);
+                    // FCVTL on lower halves (4 x fp16 -> 4 x fp32).
+                    put(c, FCVTL_4s(s0.rd, t0));  // R
+                    put(c, FCVTL_4s(r2, t1));      // B
+                    // For upper halves, use EXT #8 then FCVTL.
+                    // EXT.16B Vd, Vn, Vm, #8: 0x6e004000 | (imm<<11) | (Vm<<16) | (Vn<<5) | Vd
+                    // where imm = 8 bytes
+                    put(c, 0x6e004000u | (8u << 11) | ((uint32_t)t0 << 16) | ((uint32_t)t0 << 5) | (uint32_t)t0);
+                    put(c, FCVTL_4s(r1, t0));      // G
+                    put(c, 0x6e004000u | (8u << 11) | ((uint32_t)t1 << 16) | ((uint32_t)t1 << 5) | (uint32_t)t1);
+                    put(c, FCVTL_4s(r3, t1));      // A
+                }
+            }
+            br_done[n_done] = c->len; n_done++;
+            put(c, B(0));
+            c->buf[br_skip_fp16] = Bcond(0x1, c->len - br_skip_fp16);
+
+            // Default: zero all outputs.
+            put(c, MOVI_4s(s0.rd, 0, 0));
+            put(c, MOVI_4s(r1, 0, 0));
+            put(c, MOVI_4s(r2, 0, 0));
+            put(c, MOVI_4s(r3, 0, 0));
+
+            // Patch all B-to-done branches.
+            for (int j = 0; j < n_done; j++) {
+                c->buf[br_done[j]] = B(c->len - br_done[j]);
+            }
+
+            ra_return_reg(ra, t1);
+            ra_return_reg(ra, t0);
+            ra_return_reg(ra, px);
             ra_set_chan_reg(ra, i, 0, s0.rd);
             ra_set_chan_reg(ra, i, 1, r1);
             ra_set_chan_reg(ra, i, 2, r2);
@@ -855,12 +1023,31 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
             int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+
+            int8_t scale = ra_alloc(ra, sl, ns);
+            int8_t z     = ra_alloc(ra, sl, ns);
+            int8_t one   = ra_alloc(ra, sl, ns);
+            int8_t px    = ra_alloc(ra, sl, ns);
+            int8_t t     = ra_alloc(ra, sl, ns);
+
+            // Load fmt.
             {
-                int8_t scale = ra_alloc(ra, sl, ns);
-                int8_t z     = ra_alloc(ra, sl, ns);
-                int8_t one   = ra_alloc(ra, sl, ns);
-                int8_t px    = ra_alloc(ra, sl, ns);
-                int8_t t     = ra_alloc(ra, sl, ns);
+                int const fmt_off = p * (int)sizeof(umbra_buf)
+                                  + (int)__builtin_offsetof(umbra_buf, fmt);
+                put(c, 0xb9400000u
+                    | ((uint32_t)(fmt_off / 4) << 10)
+                    | ((uint32_t)XBUF << 5)
+                    | (uint32_t)XT);
+            }
+
+            int br_done[4];
+            int n_done = 0;
+
+            // --- umbra_fmt_8888 (=1) ---
+            put(c, 0x7100001fu | (1u << 10) | ((uint32_t)XT << 5));
+            int br_skip_8888 = c->len;
+            put(c, Bcond(0x1, 0));
+            {
                 union { float f; uint32_t u; } s255 = {.f = 255.0f};
                 union { float f; uint32_t u; } f1   = {.f = 1.0f};
                 arm64_pool_load(c, &jc->pool, scale, s255.u);
@@ -877,14 +1064,148 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, FMAXNM_4s(t, ra_v, z)); put(c, FMINNM_4s(t, t, one));
                 put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
                 put(c, SLI_4s_imm(px, t, 24));
-                ra_return_reg(ra, t);
                 if (scalar) { put(c, STR_sx(px, XP, XI)); }
                 else        { put(c, STR_q(px, XP, XW)); }
-                ra_return_reg(ra, px);
-                ra_return_reg(ra, one);
-                ra_return_reg(ra, z);
-                ra_return_reg(ra, scale);
             }
+            br_done[n_done] = c->len; n_done++;
+            put(c, B(0));
+            c->buf[br_skip_8888] = Bcond(0x1, c->len - br_skip_8888);
+
+            // --- umbra_fmt_565 (=2) ---
+            put(c, 0x7100001fu | (2u << 10) | ((uint32_t)XT << 5));
+            int br_skip_565 = c->len;
+            put(c, Bcond(0x1, 0));
+            {
+                union { float f; uint32_t u; } s31 = {.f = 31.0f};
+                union { float f; uint32_t u; } s63 = {.f = 63.0f};
+                union { float f; uint32_t u; } f1  = {.f = 1.0f};
+                arm64_pool_load(c, &jc->pool, one, f1.u);
+                put(c, MOVI_4s(z, 0, 0));
+                // B: clamp, scale by 31, round. (start with B in bits 0-4)
+                arm64_pool_load(c, &jc->pool, scale, s31.u);
+                put(c, FMAXNM_4s(px, rb_, z)); put(c, FMINNM_4s(px, px, one));
+                put(c, FMUL_4s(px, px, scale)); put(c, FCVTNS_4s(px, px));
+                // G: clamp, scale by 63, round, shift left 5, OR.
+                arm64_pool_load(c, &jc->pool, scale, s63.u);
+                put(c, FMAXNM_4s(t, rg, z)); put(c, FMINNM_4s(t, t, one));
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
+                put(c, SHL_4s_imm(t, t, 5));
+                put(c, ORR_16b(px, px, t));
+                // R: clamp, scale by 31, round, shift left 11, OR.
+                arm64_pool_load(c, &jc->pool, scale, s31.u);
+                put(c, FMAXNM_4s(t, rr, z)); put(c, FMINNM_4s(t, t, one));
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
+                put(c, SHL_4s_imm(t, t, 11));
+                put(c, ORR_16b(px, px, t));
+                // Narrow 4S -> 4H and store.
+                put(c, XTN_4h(px, px));
+                if (scalar) {
+                    // STR Hpx, [XP, XI, LSL #1]
+                    put(c, STR_hx(px, XP, XI));
+                } else {
+                    put(c, STR_d(px, XP, XH));
+                }
+            }
+            br_done[n_done] = c->len; n_done++;
+            put(c, B(0));
+            c->buf[br_skip_565] = Bcond(0x1, c->len - br_skip_565);
+
+            // --- umbra_fmt_1010102 (=3) ---
+            put(c, 0x7100001fu | (3u << 10) | ((uint32_t)XT << 5));
+            int br_skip_1010102 = c->len;
+            put(c, Bcond(0x1, 0));
+            {
+                union { float f; uint32_t u; } s1023 = {.f = 1023.0f};
+                union { float f; uint32_t u; } s3    = {.f = 3.0f};
+                union { float f; uint32_t u; } f1    = {.f = 1.0f};
+                arm64_pool_load(c, &jc->pool, one, f1.u);
+                put(c, MOVI_4s(z, 0, 0));
+                // R: clamp, scale by 1023, round.
+                arm64_pool_load(c, &jc->pool, scale, s1023.u);
+                put(c, FMAXNM_4s(px, rr, z)); put(c, FMINNM_4s(px, px, one));
+                put(c, FMUL_4s(px, px, scale)); put(c, FCVTNS_4s(px, px));
+                // G: clamp, scale by 1023, round.
+                put(c, FMAXNM_4s(t, rg, z)); put(c, FMINNM_4s(t, t, one));
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
+                put(c, SLI_4s_imm(px, t, 10));
+                // B: clamp, scale by 1023, round.
+                put(c, FMAXNM_4s(t, rb_, z)); put(c, FMINNM_4s(t, t, one));
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
+                put(c, SLI_4s_imm(px, t, 20));
+                // A: clamp, scale by 3, round.
+                arm64_pool_load(c, &jc->pool, scale, s3.u);
+                put(c, FMAXNM_4s(t, ra_v, z)); put(c, FMINNM_4s(t, t, one));
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
+                put(c, SLI_4s_imm(px, t, 30));
+                if (scalar) { put(c, STR_sx(px, XP, XI)); }
+                else        { put(c, STR_q(px, XP, XW)); }
+            }
+            br_done[n_done] = c->len; n_done++;
+            put(c, B(0));
+            c->buf[br_skip_1010102] = Bcond(0x1, c->len - br_skip_1010102);
+
+            // --- umbra_fmt_fp16 (=4) ---
+            put(c, 0x7100001fu | (4u << 10) | ((uint32_t)XT << 5));
+            int br_skip_fp16 = c->len;
+            put(c, Bcond(0x1, 0));
+            {
+                if (scalar) {
+                    // Convert each f32 channel to f16, pack into one D register.
+                    put(c, FCVTN_4h(px, rr));
+                    // px now has rr[0] as fp16 in lane 0.
+                    // INS Vpx.H[1], Vrg.H[0] etc. — but FCVTN gives us the low 4 lanes.
+                    // Simpler: pack all 4 into a temp Q as fp32 [R,G,B,A], then FCVTN.
+                    // INS Vd.S[idx], Vn.S[0] = 0x6e040400 | (idx<<19) | (Vn<<5) | Vd
+                    put(c, ORR_16b(t, rr, rr));  // t = rr
+                    put(c, 0x6e0c0400u | ((uint32_t)rg  << 5) | (uint32_t)t);  // INS t.S[1], rg.S[0]
+                    put(c, 0x6e140400u | ((uint32_t)rb_ << 5) | (uint32_t)t);  // INS t.S[2], rb_.S[0]
+                    put(c, 0x6e1c0400u | ((uint32_t)ra_v<< 5) | (uint32_t)t);  // INS t.S[3], ra_v.S[0]
+                    put(c, FCVTN_4h(px, t));
+                    // STR Dpx, [XP + XI*8]
+                    put(c, LSL_xi(XT, XI, 3));
+                    put(c, ADD_xr(XT, XP, XT));
+                    // STR Dpx, [XT, #0] (64-bit SIMD store, unsigned offset)
+                    put(c, 0xfd000000u | ((uint32_t)XT << 5) | (uint32_t)px);
+                } else {
+                    // Convert each channel from fp32 to fp16.
+                    put(c, FCVTN_4h(px, rr));     // px low = R0..R3 as fp16
+                    put(c, FCVTN_4h(t, rg));      // t  low = G0..G3 as fp16
+                    put(c, FCVTN_4h(z, rb_));     // z  low = B0..B3 as fp16
+                    put(c, FCVTN_4h(one, ra_v));  // one low = A0..A3 as fp16
+                    // Interleave: need [R0,G0,B0,A0, R1,G1,B1,A1, ...].
+                    // ZIP1.8H(a, px, t) = [R0,G0,R1,G1, R2,G2,R3,G3]
+                    // ZIP1.8H: 0x4e403800 | (Vm<<16) | (Vn<<5) | Vd
+                    // ZIP2.8H: 0x4e407800 | (Vm<<16) | (Vn<<5) | Vd
+                    put(c, 0x4e403800u | ((uint32_t)t   << 16) | ((uint32_t)px  << 5) | (uint32_t)scale);  // scale = ZIP1.8H(px, t) = [R0,G0,R1,G1,R2,G2,R3,G3]
+                    put(c, 0x4e403800u | ((uint32_t)one << 16) | ((uint32_t)z   << 5) | (uint32_t)px);     // px = ZIP1.8H(z, one) = [B0,A0,B1,A1,B2,A2,B3,A3]
+                    // Now interleave at 32-bit granularity.
+                    // ZIP1.4S(q0, scale, px) = [R0G0,B0A0, R1G1,B1A1]
+                    // ZIP2.4S(q1, scale, px) = [R2G2,B2A2, R3G3,B3A3]
+                    put(c, ZIP1_4s(t, scale, px));    // t = first 2 pixels
+                    put(c, ZIP2_4s(z, scale, px));    // z = last 2 pixels
+                    // Store 32 bytes.
+                    put(c, LSL_xi(XT, XI, 3));
+                    put(c, ADD_xr(XT, XP, XT));
+                    put(c, STR_qi(t, XT, 0));
+                    put(c, STR_qi(z, XT, 1));
+                }
+            }
+            br_done[n_done] = c->len; n_done++;
+            put(c, B(0));
+            c->buf[br_skip_fp16] = Bcond(0x1, c->len - br_skip_fp16);
+
+            // Default: no-op for unknown formats.
+
+            // Patch all B-to-done branches.
+            for (int j = 0; j < n_done; j++) {
+                c->buf[br_done[j]] = B(c->len - br_done[j]);
+            }
+
+            ra_return_reg(ra, t);
+            ra_return_reg(ra, px);
+            ra_return_reg(ra, one);
+            ra_return_reg(ra, z);
+            ra_return_reg(ra, scale);
             FREE_CHAN(inst->x, i);
             FREE_CHAN(inst->y, i);
             FREE_CHAN(inst->z, i);
@@ -1938,33 +2259,318 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t r3 = ra_alloc(ra, sl, ns);
             int    p = inst->ptr;
             int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+
+            int8_t px = ra_alloc(ra, sl, ns);
+            int8_t t0 = ra_alloc(ra, sl, ns);
+            int8_t t1 = ra_alloc(ra, sl, ns);
+
+            // Load fmt into EAX (32-bit load, zero-extends).
             {
-                int8_t px   = ra_alloc(ra, sl, ns);
-                int8_t mask = ra_alloc(ra, sl, ns);
-                int8_t inv  = ra_alloc(ra, sl, ns);
+                int const fmt_off = p * (int)sizeof(umbra_buf)
+                                  + (int)__builtin_offsetof(umbra_buf, fmt);
+                emit1(c, 0x8b);
+                if (fmt_off >= -128 && fmt_off <= 127) {
+                    emit1(c, (uint8_t)(0x40 | (XBUF & 7)));
+                    emit1(c, (uint8_t)(int8_t)fmt_off);
+                } else {
+                    emit1(c, (uint8_t)(0x80 | (XBUF & 7)));
+                    emit4(c, (uint32_t)fmt_off);
+                }
+            }
+
+            int br_done[4];
+            int n_done = 0;
+
+            // --- umbra_fmt_8888 (=1) ---
+            cmp_ri(c, RAX, 1);
+            int br_skip_8888 = jcc(c, 0x05);  // JNE
+            {
                 if (scalar) { vex_mem(c, 1, 1, 0, 0, px, 0, 0x6e, base, XI, 4, 0); }
                 else        { vmov_load(c, 1, px, base, XI, 4, 0); }
-                pool_broadcast(c, &jc->pool, mask, 0xFF);
-                vpand(c, 1, s0.rd, px, mask);
-                vpsrld_i(c, r1, px,  8); vpand(c, 1, r1, r1, mask);
-                vpsrld_i(c, r2, px, 16); vpand(c, 1, r2, r2, mask);
+                pool_broadcast(c, &jc->pool, t0, 0xFF);
+                vpand(c, 1, s0.rd, px, t0);
+                vpsrld_i(c, r1, px,  8); vpand(c, 1, r1, r1, t0);
+                vpsrld_i(c, r2, px, 16); vpand(c, 1, r2, r2, t0);
                 vpsrld_i(c, r3, px, 24);
-                // VCVTDQ2PS: int32 -> float32
-                vex_rrr(c, 0, 1, 1, 0x5b, s0.rd, 0, s0.rd);
-                vex_rrr(c, 0, 1, 1, 0x5b, r1, 0, r1);
-                vex_rrr(c, 0, 1, 1, 0x5b, r2, 0, r2);
-                vex_rrr(c, 0, 1, 1, 0x5b, r3, 0, r3);
-                // VMULPS * 1/255
+                vcvtdq2ps(c, s0.rd, s0.rd);
+                vcvtdq2ps(c, r1, r1);
+                vcvtdq2ps(c, r2, r2);
+                vcvtdq2ps(c, r3, r3);
                 union { float f; uint32_t u; } inv255 = {.f = 1.0f/255.0f};
-                pool_broadcast(c, &jc->pool, inv, inv255.u);
-                vex_rrr(c, 0, 1, 1, 0x59, s0.rd, s0.rd, inv);
-                vex_rrr(c, 0, 1, 1, 0x59, r1, r1, inv);
-                vex_rrr(c, 0, 1, 1, 0x59, r2, r2, inv);
-                vex_rrr(c, 0, 1, 1, 0x59, r3, r3, inv);
-                ra_return_reg(ra, inv);
-                ra_return_reg(ra, mask);
-                ra_return_reg(ra, px);
+                pool_broadcast(c, &jc->pool, t0, inv255.u);
+                vmulps(c, s0.rd, s0.rd, t0);
+                vmulps(c, r1, r1, t0);
+                vmulps(c, r2, r2, t0);
+                vmulps(c, r3, r3, t0);
             }
+            br_done[n_done] = jmp(c); n_done++;
+            patch_jcc(c, br_skip_8888);
+
+            // --- umbra_fmt_565 (=2) ---
+            cmp_ri(c, RAX, 2);
+            int br_skip_565 = jcc(c, 0x05);
+            {
+                if (scalar) {
+                    // MOVZX eax, word [base + XI*2]
+                    {
+                        uint8_t rex = 0x40;
+                        if (XI >= 8)   { rex |= 0x02; }
+                        if (base >= 8) { rex |= 0x01; }
+                        if (rex != 0x40) { emit1(c, rex); }
+                        emit1(c, 0x0f); emit1(c, 0xb7);
+                        emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
+                        emit1(c, (uint8_t)((1 << 6) | ((XI & 7) << 3) | (base & 7)));
+                    }
+                    // VMOVD px, eax
+                    vex(c, 1, 1, 0, 0, px, 0, RAX, 0x6e);
+                    // VPBROADCASTD px, px
+                    vbroadcastss(c, px, px);
+                } else {
+                    // Load 128-bit (8 x u16).
+                    vmov_load(c, 0, px, base, XI, 2, 0);
+                    // VPMOVZXWD: zero-extend 8 x u16 -> 8 x u32
+                    vpmovzxwd(c, px, px);
+                }
+                // r5 = px >> 11
+                vpsrld_i(c, s0.rd, px, 11);
+                // g6 = (px >> 5) & 0x3F
+                vpsrld_i(c, r1, px, 5);
+                pool_broadcast(c, &jc->pool, t0, 0x3F);
+                vpand(c, 1, r1, r1, t0);
+                // b5 = px & 0x1F
+                pool_broadcast(c, &jc->pool, t0, 0x1F);
+                vpand(c, 1, r2, px, t0);
+                // Convert to float and scale.
+                vcvtdq2ps(c, s0.rd, s0.rd);
+                vcvtdq2ps(c, r1, r1);
+                vcvtdq2ps(c, r2, r2);
+                union { float f; uint32_t u; } inv31 = {.f = 1.0f/31.0f};
+                union { float f; uint32_t u; } inv63 = {.f = 1.0f/63.0f};
+                pool_broadcast(c, &jc->pool, t0, inv31.u);
+                vmulps(c, s0.rd, s0.rd, t0);
+                vmulps(c, r2, r2, t0);
+                pool_broadcast(c, &jc->pool, t0, inv63.u);
+                vmulps(c, r1, r1, t0);
+                // a = 1.0
+                union { float f; uint32_t u; } f1 = {.f = 1.0f};
+                pool_broadcast(c, &jc->pool, r3, f1.u);
+            }
+            br_done[n_done] = jmp(c); n_done++;
+            patch_jcc(c, br_skip_565);
+
+            // --- umbra_fmt_1010102 (=3) ---
+            cmp_ri(c, RAX, 3);
+            int br_skip_1010102 = jcc(c, 0x05);
+            {
+                if (scalar) { vex_mem(c, 1, 1, 0, 0, px, 0, 0x6e, base, XI, 4, 0); }
+                else        { vmov_load(c, 1, px, base, XI, 4, 0); }
+                pool_broadcast(c, &jc->pool, t0, 0x3FF);
+                vpand(c, 1, s0.rd, px, t0);
+                vpsrld_i(c, r1, px, 10); vpand(c, 1, r1, r1, t0);
+                vpsrld_i(c, r2, px, 20); vpand(c, 1, r2, r2, t0);
+                vpsrld_i(c, r3, px, 30);
+                vcvtdq2ps(c, s0.rd, s0.rd);
+                vcvtdq2ps(c, r1, r1);
+                vcvtdq2ps(c, r2, r2);
+                vcvtdq2ps(c, r3, r3);
+                union { float f; uint32_t u; } inv1023 = {.f = 1.0f/1023.0f};
+                union { float f; uint32_t u; } inv3    = {.f = 1.0f/3.0f};
+                pool_broadcast(c, &jc->pool, t0, inv1023.u);
+                vmulps(c, s0.rd, s0.rd, t0);
+                vmulps(c, r1, r1, t0);
+                vmulps(c, r2, r2, t0);
+                pool_broadcast(c, &jc->pool, t0, inv3.u);
+                vmulps(c, r3, r3, t0);
+            }
+            br_done[n_done] = jmp(c); n_done++;
+            patch_jcc(c, br_skip_1010102);
+
+            // --- umbra_fmt_fp16 (=4) ---
+            cmp_ri(c, RAX, 4);
+            int br_skip_fp16 = jcc(c, 0x05);
+            {
+                if (scalar) {
+                    // Load 8 bytes (1 pixel, 4xfp16) via VMOVQ.
+                    // VMOVQ xmm, m64: VEX.128 F3.0F 7E /r
+                    vex_mem(c, 2, 1, 0, 0, px, 0, 0x7e, base, XI, 8, 0);
+                    // VCVTPH2PS: convert 4 x fp16 -> 4 x fp32
+                    vcvtph2ps(c, px, px);
+                    // Broadcast each lane.
+                    vex_rrr(c, 1, 1, 1, 0x70, s0.rd, 0, px); emit1(c, 0x00);
+                    vex_rrr(c, 1, 1, 1, 0x70, r1,    0, px); emit1(c, 0x55);
+                    vex_rrr(c, 1, 1, 1, 0x70, r2,    0, px); emit1(c, 0xAA);
+                    vex_rrr(c, 1, 1, 1, 0x70, r3,    0, px); emit1(c, 0xFF);
+                } else {
+                    // 8 pixels * 8 bytes = 64 bytes. Load in two 32-byte halves.
+                    // Low 4 pixels (32 bytes):
+                    vmov_load(c, 1, t0, base, XI, 8, 0);
+                    // High 4 pixels (32 bytes, offset +32):
+                    vmov_load(c, 1, t1, base, XI, 8, 32);
+                    // Each 256-bit block has 4 interleaved fp16 pixels.
+                    // Extract low 128 from each = pixels 0-1 and 4-5.
+                    // Extract high 128 from each = pixels 2-3 and 6-7.
+                    // VCVTPH2PS on each 128-bit chunk → 8 fp32 per chunk.
+                    // t0 low 128 = [R0,G0,B0,A0,R1,G1,B1,A1] as fp16
+                    // t0 high 128 = [R2,G2,B2,A2,R3,G3,B3,A3] as fp16
+                    // t1 low 128 = [R4,G4,B4,A4,R5,G5,B5,A5] as fp16
+                    // t1 high 128 = [R6,G6,B6,A6,R7,G7,B7,A7] as fp16
+                    // VCVTPH2PS on t0 (128-bit input → 256-bit output):
+                    //   produces [R0,G0,B0,A0,R1,G1,B1,A1] as 8 fp32.
+                    // Then extract R0,R1 from lanes 0,4 and similarly for other channels.
+                    // This is complex. Simpler: VEXTRACTI128 to split each 256-bit block,
+                    // VCVTPH2PS on each 128-bit half, then shuffle.
+
+                    // Even simpler: convert all to fp32, then de-interleave.
+                    // After VCVTPH2PS(256) on t0: 8 x fp32 = [R0,G0,B0,A0,R1,G1,B1,A1]
+                    vcvtph2ps(c, px, t0);     // px = pixels 0-1 as fp32 (256-bit)
+                    vextracti128(c, t0, t1, 1);
+                    vcvtph2ps(c, t0, t0);     // t0 = pixels 2-3 as fp32 from t1 high half
+                    vcvtph2ps(c, t1, t1);     // t1 = pixels 4-5 as fp32 from t1 low half
+                    // Wait, this clobbers t1 before we extracted. Let me reorder.
+
+                    // Restart: load both halves, then process.
+                    vmov_load(c, 1, t0, base, XI, 8, 0);   // pixels 0-3
+                    vmov_load(c, 1, t1, base, XI, 8, 32);  // pixels 4-7
+
+                    // Split each into two 128-bit halves, convert to fp32.
+                    vextracti128(c, px, t0, 1);   // px = t0 high = pixels 2-3 as fp16
+                    vcvtph2ps(c, t0, t0);          // t0 = pixels 0-1 as 8 x fp32
+                    vcvtph2ps(c, px, px);          // px = pixels 2-3 as 8 x fp32
+                    // t0 = [R0,G0,B0,A0 | R1,G1,B1,A1] (each 128-bit lane has 1 pixel)
+                    // px = [R2,G2,B2,A2 | R3,G3,B3,A3]
+                    // Extract R0,R1,R2,R3 from lane 0 of each pixel:
+                    // VSHUFPS(d, t0, px, 0x88) per lane:
+                    //   lo: [t0[0],t0[2],px[0],px[2]] = [R0,B0,R2,B2]
+                    //   hi: [t0[4],t0[6],px[4],px[6]] = [R1,B1,R3,B3]
+                    // After VPERM2F128 to rearrange, then VSHUFPS again...
+                    // This is still complex. Let me use a completely different approach.
+
+                    // Actually, the simplest approach: for each channel, use VSHUFPS to
+                    // extract the channel from each pixel, then combine.
+                    // But with 8 pixels across 4 256-bit registers, this needs lots of shuffles.
+
+                    // The most practical approach for correctness: just use
+                    // VPSHUFB on each 256-bit half to extract channels, then merge.
+
+                    // Re-load raw data.
+                    vmov_load(c, 1, t0, base, XI, 8, 0);   // pixels 0-3 raw
+                    // VPSHUFB mask: in each 128-bit lane, extract one channel.
+                    uint8_t shuf_r[32], shuf_g[32], shuf_b[32], shuf_a[32];
+                    for (int j = 0; j < 32; j++) {
+                        shuf_r[j] = 0x80; shuf_g[j] = 0x80;
+                        shuf_b[j] = 0x80; shuf_a[j] = 0x80;
+                    }
+                    shuf_r[0]=0; shuf_r[1]=1; shuf_r[2]=8;  shuf_r[3]=9;
+                    shuf_g[0]=2; shuf_g[1]=3; shuf_g[2]=10; shuf_g[3]=11;
+                    shuf_b[0]=4; shuf_b[1]=5; shuf_b[2]=12; shuf_b[3]=13;
+                    shuf_a[0]=6; shuf_a[1]=7; shuf_a[2]=14; shuf_a[3]=15;
+                    shuf_r[16]=0; shuf_r[17]=1; shuf_r[18]=8;  shuf_r[19]=9;
+                    shuf_g[16]=2; shuf_g[17]=3; shuf_g[18]=10; shuf_g[19]=11;
+                    shuf_b[16]=4; shuf_b[17]=5; shuf_b[18]=12; shuf_b[19]=13;
+                    shuf_a[16]=6; shuf_a[17]=7; shuf_a[18]=14; shuf_a[19]=15;
+
+                    // Process R channel: VPSHUFB on low half, VPERMQ, VCVTPH2PS
+                    // gives 4 fp32 values in the low 128 bits. Then repeat for
+                    // the high half and combine.
+
+                    // Low half (pixels 0-3):
+                    int off_r = pool_add(&jc->pool, shuf_r, 32);
+                    {
+                        int ref = vex_rip(c, 1, 2, 0, 1, s0.rd, t0, 0x00);
+                        pool_ref_at(&jc->pool, off_r, ref, 0);
+                    }
+                    // VPERMQ to pack: s0 has [R0,R1,0...0 | R2,R3,0...0]
+                    // VPERMQ imm=0x08: [q0,q2,q0,q0] = [R0R1, R2R3, ...]
+                    vex(c, 1, 3, 1, 1, s0.rd, 0, s0.rd, 0x00); emit1(c, 0x08);
+                    // s0 low 64 bits = [R0,R1,R2,R3] as 4 fp16
+
+                    // High half (pixels 4-7):
+                    vmov_load(c, 1, t1, base, XI, 8, 32);
+                    {
+                        int ref = vex_rip(c, 1, 2, 0, 1, t0, t1, 0x00);
+                        pool_ref_at(&jc->pool, off_r, ref, 0);
+                    }
+                    vex(c, 1, 3, 1, 1, t0, 0, t0, 0x00); emit1(c, 0x08);
+                    // t0 low 64 bits = [R4,R5,R6,R7] as 4 fp16
+
+                    // Combine: VPUNPCKLQDQ to merge low 64 bits.
+                    // VPUNPCKLQDQ(128) = VEX.128 66.0F 6C: [s0_lo64, t0_lo64]
+                    vex_rrr(c, 1, 1, 0, 0x6c, s0.rd, s0.rd, t0);
+                    // s0 = [R0,R1,R2,R3,R4,R5,R6,R7] as 8 fp16 in XMM
+                    vcvtph2ps(c, s0.rd, s0.rd);
+
+                    // Repeat for G, B, A. Reload low half for each.
+                    int off_g = pool_add(&jc->pool, shuf_g, 32);
+                    int off_b = pool_add(&jc->pool, shuf_b, 32);
+                    int off_a = pool_add(&jc->pool, shuf_a, 32);
+
+                    // G: low half
+                    vmov_load(c, 1, t0, base, XI, 8, 0);
+                    {
+                        int ref = vex_rip(c, 1, 2, 0, 1, r1, t0, 0x00);
+                        pool_ref_at(&jc->pool, off_g, ref, 0);
+                    }
+                    vex(c, 1, 3, 1, 1, r1, 0, r1, 0x00); emit1(c, 0x08);
+                    // G: high half
+                    {
+                        int ref = vex_rip(c, 1, 2, 0, 1, t0, t1, 0x00);
+                        pool_ref_at(&jc->pool, off_g, ref, 0);
+                    }
+                    vex(c, 1, 3, 1, 1, t0, 0, t0, 0x00); emit1(c, 0x08);
+                    vex_rrr(c, 1, 1, 0, 0x6c, r1, r1, t0);
+                    vcvtph2ps(c, r1, r1);
+
+                    // B: low half
+                    vmov_load(c, 1, t0, base, XI, 8, 0);
+                    {
+                        int ref = vex_rip(c, 1, 2, 0, 1, r2, t0, 0x00);
+                        pool_ref_at(&jc->pool, off_b, ref, 0);
+                    }
+                    vex(c, 1, 3, 1, 1, r2, 0, r2, 0x00); emit1(c, 0x08);
+                    // B: high half
+                    {
+                        int ref = vex_rip(c, 1, 2, 0, 1, t0, t1, 0x00);
+                        pool_ref_at(&jc->pool, off_b, ref, 0);
+                    }
+                    vex(c, 1, 3, 1, 1, t0, 0, t0, 0x00); emit1(c, 0x08);
+                    vex_rrr(c, 1, 1, 0, 0x6c, r2, r2, t0);
+                    vcvtph2ps(c, r2, r2);
+
+                    // A: low half
+                    vmov_load(c, 1, t0, base, XI, 8, 0);
+                    {
+                        int ref = vex_rip(c, 1, 2, 0, 1, r3, t0, 0x00);
+                        pool_ref_at(&jc->pool, off_a, ref, 0);
+                    }
+                    vex(c, 1, 3, 1, 1, r3, 0, r3, 0x00); emit1(c, 0x08);
+                    // A: high half
+                    {
+                        int ref = vex_rip(c, 1, 2, 0, 1, t0, t1, 0x00);
+                        pool_ref_at(&jc->pool, off_a, ref, 0);
+                    }
+                    vex(c, 1, 3, 1, 1, t0, 0, t0, 0x00); emit1(c, 0x08);
+                    vex_rrr(c, 1, 1, 0, 0x6c, r3, r3, t0);
+                    vcvtph2ps(c, r3, r3);
+                }
+            }
+            br_done[n_done] = jmp(c); n_done++;
+            patch_jcc(c, br_skip_fp16);
+
+            // Default: zero all outputs.
+            vpxor(c, 1, s0.rd, s0.rd, s0.rd);
+            vpxor(c, 1, r1, r1, r1);
+            vpxor(c, 1, r2, r2, r2);
+            vpxor(c, 1, r3, r3, r3);
+
+            // Patch all JMP-to-done.
+            for (int j = 0; j < n_done; j++) {
+                int32_t rel = (int32_t)(c->len - (br_done[j] + 4));
+                __builtin_memcpy(c->buf + br_done[j], &rel, 4);
+            }
+
+            ra_return_reg(ra, t1);
+            ra_return_reg(ra, t0);
+            ra_return_reg(ra, px);
             ra_set_chan_reg(ra, i, 0, s0.rd);
             ra_set_chan_reg(ra, i, 1, r1);
             ra_set_chan_reg(ra, i, 2, r2);
@@ -1977,52 +2583,207 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
             int    p = inst->ptr;
             int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+
+            int8_t scale = ra_alloc(ra, sl, ns);
+            int8_t px    = ra_alloc(ra, sl, ns);
+            int8_t t     = ra_alloc(ra, sl, ns);
+            int8_t z     = ra_alloc(ra, sl, ns);
+            int8_t one   = ra_alloc(ra, sl, ns);
+
+            // Load fmt into EAX (32-bit).
             {
-                int8_t scale = ra_alloc(ra, sl, ns);
-                int8_t px    = ra_alloc(ra, sl, ns);
-                int8_t t     = ra_alloc(ra, sl, ns);
-                int8_t z     = ra_alloc(ra, sl, ns);
-                int8_t one   = ra_alloc(ra, sl, ns);
+                int const fmt_off = p * (int)sizeof(umbra_buf)
+                                  + (int)__builtin_offsetof(umbra_buf, fmt);
+                emit1(c, 0x8b);
+                if (fmt_off >= -128 && fmt_off <= 127) {
+                    emit1(c, (uint8_t)(0x40 | (XBUF & 7)));
+                    emit1(c, (uint8_t)(int8_t)fmt_off);
+                } else {
+                    emit1(c, (uint8_t)(0x80 | (XBUF & 7)));
+                    emit4(c, (uint32_t)fmt_off);
+                }
+            }
+
+            int br_done[4];
+            int n_done = 0;
+
+            // --- umbra_fmt_8888 (=1) ---
+            cmp_ri(c, RAX, 1);
+            int br_skip_8888 = jcc(c, 0x05);
+            {
                 union { float f; uint32_t u; } s255 = {.f = 255.0f};
                 union { float f; uint32_t u; } f1   = {.f = 1.0f};
                 pool_broadcast(c, &jc->pool, scale, s255.u);
                 pool_broadcast(c, &jc->pool, one, f1.u);
-                // VXORPS z, z, z (zero)
                 vex_rrr(c, 0, 1, 1, 0x57, z, z, z);
-                // R: clamp, scale, round to int
-                vex_rrr(c, 0, 1, 1, 0x5f, px, rr, z);    // VMAXPS px, rr, zero
-                vex_rrr(c, 0, 1, 1, 0x5d, px, px, one);   // VMINPS px, px, one
-                vex_rrr(c, 0, 1, 1, 0x59, px, px, scale); // VMULPS
-                vex_rrr(c, 1, 1, 1, 0x5b, px, 0, px);     // VCVTPS2DQ (round to int)
-                // G
-                vex_rrr(c, 0, 1, 1, 0x5f, t, rg, z);
-                vex_rrr(c, 0, 1, 1, 0x5d, t, t, one);
-                vex_rrr(c, 0, 1, 1, 0x59, t, t, scale);
-                vex_rrr(c, 1, 1, 1, 0x5b, t, 0, t);
-                vpslld_i(c, t, t, 8);
-                vpor(c, 1, px, px, t);
-                // B
-                vex_rrr(c, 0, 1, 1, 0x5f, t, rb_, z);
-                vex_rrr(c, 0, 1, 1, 0x5d, t, t, one);
-                vex_rrr(c, 0, 1, 1, 0x59, t, t, scale);
-                vex_rrr(c, 1, 1, 1, 0x5b, t, 0, t);
-                vpslld_i(c, t, t, 16);
-                vpor(c, 1, px, px, t);
-                // A
-                vex_rrr(c, 0, 1, 1, 0x5f, t, ra_v, z);
-                vex_rrr(c, 0, 1, 1, 0x5d, t, t, one);
-                vex_rrr(c, 0, 1, 1, 0x59, t, t, scale);
-                vex_rrr(c, 1, 1, 1, 0x5b, t, 0, t);
-                vpslld_i(c, t, t, 24);
-                vpor(c, 1, px, px, t);
-                ra_return_reg(ra, t);
-                ra_return_reg(ra, one);
-                ra_return_reg(ra, z);
+                vmaxps(c, px, rr, z); vminps(c, px, px, one);
+                vmulps(c, px, px, scale); vcvtps2dq(c, px, px);
+                vmaxps(c, t, rg, z); vminps(c, t, t, one);
+                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
+                vpslld_i(c, t, t, 8); vpor(c, 1, px, px, t);
+                vmaxps(c, t, rb_, z); vminps(c, t, t, one);
+                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
+                vpslld_i(c, t, t, 16); vpor(c, 1, px, px, t);
+                vmaxps(c, t, ra_v, z); vminps(c, t, t, one);
+                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
+                vpslld_i(c, t, t, 24); vpor(c, 1, px, px, t);
                 if (scalar) { vex_mem(c, 1, 1, 0, 0, px, 0, 0x7e, base, XI, 4, 0); }
                 else        { vmov_store(c, 1, px, base, XI, 4, 0); }
-                ra_return_reg(ra, px);
-                ra_return_reg(ra, scale);
             }
+            br_done[n_done] = jmp(c); n_done++;
+            patch_jcc(c, br_skip_8888);
+
+            // --- umbra_fmt_565 (=2) ---
+            cmp_ri(c, RAX, 2);
+            int br_skip_565 = jcc(c, 0x05);
+            {
+                union { float f; uint32_t u; } s31 = {.f = 31.0f};
+                union { float f; uint32_t u; } s63 = {.f = 63.0f};
+                union { float f; uint32_t u; } f1  = {.f = 1.0f};
+                pool_broadcast(c, &jc->pool, one, f1.u);
+                vex_rrr(c, 0, 1, 1, 0x57, z, z, z);
+                // R: clamp, scale by 31, round, shift left 11.
+                pool_broadcast(c, &jc->pool, scale, s31.u);
+                vmaxps(c, px, rr, z); vminps(c, px, px, one);
+                vmulps(c, px, px, scale); vcvtps2dq(c, px, px);
+                vpslld_i(c, px, px, 11);
+                // G: clamp, scale by 63, round, shift left 5, OR.
+                pool_broadcast(c, &jc->pool, scale, s63.u);
+                vmaxps(c, t, rg, z); vminps(c, t, t, one);
+                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
+                vpslld_i(c, t, t, 5); vpor(c, 1, px, px, t);
+                // B: clamp, scale by 31, round, OR.
+                pool_broadcast(c, &jc->pool, scale, s31.u);
+                vmaxps(c, t, rb_, z); vminps(c, t, t, one);
+                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
+                vpor(c, 1, px, px, t);
+                // Narrow 32->16 and store.
+                // VPACKSSDW (signed saturation) works if values are in range [0, 2047].
+                // But our values are in [0, 63<<5|31] max. Use VPACKUSDW for unsigned.
+                // VPACKUSDW: VEX.256 66.0F38 2B /r
+                vex_rrr(c, 0, 1, 1, 0x57, t, t, t);  // VXORPS t = zero
+                vex_rrr(c, 1, 2, 1, 0x2b, px, px, t); // VPACKUSDW px, px, zero
+                // After VPACKUSDW(256): result has the packed words in lo64 of each lane.
+                // VPERMQ to pack: lane0_lo64 + lane1_lo64 adjacent.
+                vex(c, 1, 3, 1, 1, px, 0, px, 0x00); emit1(c, 0x08);
+                if (scalar) {
+                    // VMOVD eax, xmm
+                    vex(c, 1, 1, 0, 0, px, 0, RAX, 0x7e);
+                    // MOV word [base + XI*2], ax
+                    emit1(c, 0x66);
+                    {
+                        uint8_t rex = 0x40;
+                        if (XI >= 8)   { rex |= 0x02; }
+                        if (base >= 8) { rex |= 0x01; }
+                        if (rex != 0x40) { emit1(c, rex); }
+                        emit1(c, 0x89);
+                        emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
+                        emit1(c, (uint8_t)((1 << 6) | ((XI & 7) << 3) | (base & 7)));
+                    }
+                } else {
+                    vmov_store(c, 0, px, base, XI, 2, 0);
+                }
+            }
+            br_done[n_done] = jmp(c); n_done++;
+            patch_jcc(c, br_skip_565);
+
+            // --- umbra_fmt_1010102 (=3) ---
+            cmp_ri(c, RAX, 3);
+            int br_skip_1010102 = jcc(c, 0x05);
+            {
+                union { float f; uint32_t u; } s1023 = {.f = 1023.0f};
+                union { float f; uint32_t u; } s3    = {.f = 3.0f};
+                union { float f; uint32_t u; } f1    = {.f = 1.0f};
+                pool_broadcast(c, &jc->pool, one, f1.u);
+                vex_rrr(c, 0, 1, 1, 0x57, z, z, z);
+                // R: clamp, scale by 1023, round.
+                pool_broadcast(c, &jc->pool, scale, s1023.u);
+                vmaxps(c, px, rr, z); vminps(c, px, px, one);
+                vmulps(c, px, px, scale); vcvtps2dq(c, px, px);
+                // G
+                vmaxps(c, t, rg, z); vminps(c, t, t, one);
+                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
+                vpslld_i(c, t, t, 10); vpor(c, 1, px, px, t);
+                // B
+                vmaxps(c, t, rb_, z); vminps(c, t, t, one);
+                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
+                vpslld_i(c, t, t, 20); vpor(c, 1, px, px, t);
+                // A: scale by 3
+                pool_broadcast(c, &jc->pool, scale, s3.u);
+                vmaxps(c, t, ra_v, z); vminps(c, t, t, one);
+                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
+                vpslld_i(c, t, t, 30); vpor(c, 1, px, px, t);
+                if (scalar) { vex_mem(c, 1, 1, 0, 0, px, 0, 0x7e, base, XI, 4, 0); }
+                else        { vmov_store(c, 1, px, base, XI, 4, 0); }
+            }
+            br_done[n_done] = jmp(c); n_done++;
+            patch_jcc(c, br_skip_1010102);
+
+            // --- umbra_fmt_fp16 (=4) ---
+            cmp_ri(c, RAX, 4);
+            int br_skip_fp16 = jcc(c, 0x05);
+            {
+                if (scalar) {
+                    // Pack 4 fp32 channels into one xmm, then VCVTPS2PH.
+                    // VINSERTPS px, rr, rr, 0x00 — copy rr[0] to px[0]
+                    vmovaps(c, px, rr);
+                    // VINSERTPS px, px, rg, 0x10 — rg[0] -> px[1]
+                    vex(c, 1, 3, 0, 0, px, px, rg, 0x21); emit1(c, 0x10);
+                    // VINSERTPS px, px, rb_, 0x20 — rb_[0] -> px[2]
+                    vex(c, 1, 3, 0, 0, px, px, rb_, 0x21); emit1(c, 0x20);
+                    // VINSERTPS px, px, ra_v, 0x30 — ra_v[0] -> px[3]
+                    vex(c, 1, 3, 0, 0, px, px, ra_v, 0x21); emit1(c, 0x30);
+                    // VCVTPS2PH px, px, 4 (round to nearest)
+                    vcvtps2ph(c, px, px, 4);
+                    // VMOVQ [base + XI*8], px (store 8 bytes)
+                    vex_mem(c, 1, 1, 0, 0, px, 0, 0xd6, base, XI, 8, 0);
+                } else {
+                    // Convert each channel from fp32 (8 x YMM) to fp16 (8 x XMM).
+                    vcvtps2ph(c, px, rr, 4);     // px  = [R0..R7] as fp16 in XMM
+                    vcvtps2ph(c, t, rg, 4);      // t   = [G0..G7] as fp16
+                    vcvtps2ph(c, z, rb_, 4);     // z   = [B0..B7] as fp16
+                    vcvtps2ph(c, one, ra_v, 4);  // one = [A0..A7] as fp16
+                    // Interleave to pixel order. Process low 4 then high 4 pixels.
+                    // Low 4 (VPUNPCKLWD takes low 4 words from each XMM):
+                    vex_rrr(c, 1, 1, 0, 0x61, scale, px, t);  // scale=[R0,G0,R1,G1,R2,G2,R3,G3]
+                    vex_rrr(c, 1, 1, 0, 0x61, px, z, one);    // px=[B0,A0,B1,A1,B2,A2,B3,A3]
+                    // Interleave at 32-bit to form pixel pairs:
+                    vex_rrr(c, 1, 1, 0, 0x62, t, scale, px);  // t=[R0G0,B0A0,R1G1,B1A1] (pixels 0,1)
+                    vex_rrr(c, 1, 1, 0, 0x6a, z, scale, px);  // z=[R2G2,B2A2,R3G3,B3A3] (pixels 2,3)
+                    vex(c, 1, 3, 0, 1, t, t, z, 0x38); emit1(c, 1);
+                    // t = [pixels 0-1 | pixels 2-3] (256 bits = 32 bytes)
+                    vmov_store(c, 1, t, base, XI, 8, 0);
+                    // High 4 (VPUNPCKHWD takes high 4 words):
+                    // Re-convert all channels (registers were clobbered above).
+                    vcvtps2ph(c, px, rr, 4);
+                    vcvtps2ph(c, t, rg, 4);
+                    vcvtps2ph(c, z, rb_, 4);
+                    vcvtps2ph(c, one, ra_v, 4);
+                    vex_rrr(c, 1, 1, 0, 0x69, scale, px, t);  // VPUNPCKHWD scale=[R4,G4,R5,G5,R6,G6,R7,G7]
+                    vex_rrr(c, 1, 1, 0, 0x69, px, z, one);    // VPUNPCKHWD px=[B4,A4,B5,A5,B6,A6,B7,A7]
+                    vex_rrr(c, 1, 1, 0, 0x62, t, scale, px);  // VPUNPCKLDQ t=[R4G4,B4A4,R5G5,B5A5]
+                    vex_rrr(c, 1, 1, 0, 0x6a, z, scale, px);  // VPUNPCKHDQ z=[R6G6,B6A6,R7G7,B7A7]
+                    vex(c, 1, 3, 0, 1, t, t, z, 0x38); emit1(c, 1);
+                    // t = [pixels 4-5 | pixels 6-7] (256 bits)
+                    vmov_store(c, 1, t, base, XI, 8, 32);
+                }
+            }
+            br_done[n_done] = jmp(c); n_done++;
+            patch_jcc(c, br_skip_fp16);
+
+            // Default: no-op for unknown formats.
+
+            // Patch all JMP-to-done.
+            for (int j = 0; j < n_done; j++) {
+                int32_t rel = (int32_t)(c->len - (br_done[j] + 4));
+                __builtin_memcpy(c->buf + br_done[j], &rel, 4);
+            }
+
+            ra_return_reg(ra, t);
+            ra_return_reg(ra, one);
+            ra_return_reg(ra, z);
+            ra_return_reg(ra, px);
+            ra_return_reg(ra, scale);
             FREE_CHAN(inst->x, i);
             FREE_CHAN(inst->y, i);
             FREE_CHAN(inst->z, i);
