@@ -3283,55 +3283,47 @@ static void test_imm_regvar(void) {
 }
 
 // Exercise r_*_mm for binary ops: both from memory, result→acc→chain.
-// Need an intervening op between the loads and the target so prev_r is false.
+// The BB optimizer schedules loads near consumers. To get _mm we need both
+// operands pinned early (via a use/store) then a barrier store between them
+// and the target op so prev_r is false.
 static void test_binary_r_mm(void) {
     struct umbra_builder *b = umbra_builder();
     umbra_val a = umbra_load_32(b, (umbra_ptr){0, 0});
     umbra_val c = umbra_load_32(b, (umbra_ptr){1, 0});
     umbra_val fa = umbra_f32_from_i32(b, a);
     umbra_val fc = umbra_f32_from_i32(b, c);
-    int p = 2;
-
-    // Break the chain by storing a dummy, then use fa/fc as both-from-memory.
-#define RMM_F32(op, dummy_k) { \
-        umbra_val dummy = umbra_add_f32(b, fa, umbra_imm_f32(b, (float)(dummy_k))); \
-        umbra_store_32(b, (umbra_ptr){p++, 0}, umbra_i32_from_f32(b, dummy)); \
-        umbra_store_32(b, (umbra_ptr){p++, 0}, \
-            umbra_i32_from_f32(b, op(b, fa, fc))); \
-    }
-#define RMM_I32(op, dummy_k) { \
-        umbra_val dummy = umbra_add_i32(b, a, umbra_imm_i32(b, (dummy_k))); \
-        umbra_store_32(b, (umbra_ptr){p++, 0}, dummy); \
-        umbra_store_32(b, (umbra_ptr){p++, 0}, \
-            umbra_add_i32(b, op(b, a, c), umbra_imm_i32(b, 1))); \
-    }
-    RMM_F32(umbra_sub_f32, 100)
-    RMM_F32(umbra_mul_f32, 200)
-    RMM_F32(umbra_div_f32, 300)
-    RMM_I32(umbra_sub_i32, 10)
-    RMM_I32(umbra_mul_i32, 20)
-    RMM_I32(umbra_or_i32,  30)
-    RMM_I32(umbra_xor_i32, 40)
-    RMM_I32(umbra_and_i32, 50)
-    RMM_I32(umbra_shl_i32, 60)
-    RMM_I32(umbra_shr_u32, 70)
-    RMM_I32(umbra_shr_s32, 80)
-#undef RMM_F32
-#undef RMM_I32
+    // Pin fa and fc: use both in an add, store result, then barrier store.
+    umbra_store_32(b, (umbra_ptr){2, 0}, umbra_i32_from_f32(b, umbra_add_f32(b, fa, fc)));
+    // After the store, prev_r=false. op(fa,fc) gets both from memory → r_*_mm.
+    // Use i32_from_f32 as the chain consumer (out_r=true for op).
+    umbra_store_32(b, (umbra_ptr){3, 0}, umbra_i32_from_f32(b, umbra_sub_f32(b, fa, fc)));
+    umbra_store_32(b, (umbra_ptr){4, 0}, umbra_i32_from_f32(b, umbra_mul_f32(b, fa, fc)));
+    umbra_store_32(b, (umbra_ptr){5, 0}, umbra_i32_from_f32(b, umbra_div_f32(b, fa, fc)));
+    // Integer: pin a and c, then barrier, then ops.
+    umbra_store_32(b, (umbra_ptr){6, 0}, umbra_add_i32(b, a, c));
+    umbra_store_32(b, (umbra_ptr){7, 0}, umbra_add_i32(b, umbra_sub_i32(b, a, c), umbra_imm_i32(b, 1)));
+    umbra_store_32(b, (umbra_ptr){8, 0}, umbra_add_i32(b, umbra_mul_i32(b, a, c), umbra_imm_i32(b, 1)));
+    umbra_store_32(b, (umbra_ptr){9, 0}, umbra_add_i32(b, umbra_or_i32(b, a, c), umbra_imm_i32(b, 1)));
+    umbra_store_32(b, (umbra_ptr){10, 0}, umbra_add_i32(b, umbra_xor_i32(b, a, c), umbra_imm_i32(b, 1)));
+    umbra_store_32(b, (umbra_ptr){11, 0}, umbra_add_i32(b, umbra_and_i32(b, a, c), umbra_imm_i32(b, 1)));
+    umbra_store_32(b, (umbra_ptr){12, 0}, umbra_add_i32(b, umbra_shl_i32(b, a, c), umbra_imm_i32(b, 1)));
+    umbra_store_32(b, (umbra_ptr){13, 0}, umbra_add_i32(b, umbra_shr_u32(b, a, c), umbra_imm_i32(b, 1)));
+    umbra_store_32(b, (umbra_ptr){14, 0}, umbra_add_i32(b, umbra_shr_s32(b, a, c), umbra_imm_i32(b, 1)));
     backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         int32_t sa[] = {6,6,6,6}, sc[] = {2,2,2,2};
-        int32_t d[24][4];
+        int32_t d[15][4];
         __builtin_memset(d, 0, sizeof d);
-        umbra_buf bufs[24];
+        umbra_buf bufs[15];
         bufs[0] = (umbra_buf){.ptr=sa, .sz=16};
         bufs[1] = (umbra_buf){.ptr=sc, .sz=16};
-        for (int i = 2; i < p; i++) { bufs[i] = (umbra_buf){.ptr=d[i], .sz=16}; }
+        for (int i = 2; i < 15; i++) { bufs[i] = (umbra_buf){.ptr=d[i], .sz=16}; }
         if (!run(&B, bi, 4, 1, bufs)) { continue; }
-        // sub(6,2)=4 stored as i32_from_f32
-        (d[3][0] == 4) here;
-        // xor(6,2)+1=5
-        (d[15][0] == (6^2)+1) here;
+        (d[3][0] == 4)  here;  // sub(6,2)=4
+        (d[4][0] == 12) here;  // mul(6,2)=12
+        (d[5][0] == 3)  here;  // div(6,2)=3
+        (d[7][0] == 5)  here;  // sub(6,2)+1=5
+        (d[10][0] == (6^2)+1) here;
     }
     cleanup(&B);
 }
