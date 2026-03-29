@@ -17,7 +17,6 @@ void   umbra_backend_flush     (struct umbra_backend*);
 _Bool  umbra_backend_threadsafe(struct umbra_backend const*);
 
 typedef enum {
-    umbra_fmt_none = 0,
     umbra_fmt_8888,
     umbra_fmt_565,
     umbra_fmt_1010102,

@@ -38,7 +38,6 @@ static pipe readback_pipes[NUM_FMTS];
 static struct umbra_backend *interp_be;
 
 static void build_fill(int fmt) {
-    if (fmt_enums[fmt] == umbra_fmt_none) { return; }
     builder *builder = umbra_builder();
     int fi = umbra_reserve(builder, 4);
     umbra_color c = {
@@ -59,7 +58,6 @@ static void build_fill(int fmt) {
 }
 
 static void build_readback(int fmt) {
-    if (fmt_enums[fmt] == umbra_fmt_none) { return; }
     builder *builder = umbra_builder();
     umbra_color c =
         umbra_load_color(builder, (umbra_ptr){1, 0});
@@ -150,7 +148,6 @@ static void test_slide_golden(
         int slide_idx, int fmt) {
     slide *s = slide_get(slide_idx);
 
-    if (fmt_enums[fmt] == umbra_fmt_none) { return; }
 
     umbra_fmt saved_fmt = s->fmt;
     s->fmt = fmt_enums[fmt];

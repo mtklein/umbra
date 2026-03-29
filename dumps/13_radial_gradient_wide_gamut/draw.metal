@@ -81,17 +81,17 @@ kernel void umbra_entry(
     uint v54 = as_type<uint>(fma(as_type<float>(v41), as_type<float>(v53), as_type<float>(v52)));
     float4 sc55 = float4(as_type<float>(v54), as_type<float>(v46), as_type<float>(v50), as_type<float>(v42));
     switch (buf_fmts[1]) {
-      case 1u: { sc55 = clamp(sc55, 0.0, 1.0);
+      case 0u: { sc55 = clamp(sc55, 0.0, 1.0);
                 ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc55.x*255.0)) | (uint(rint(sc55.y*255.0))<<8) | (uint(rint(sc55.z*255.0))<<16) | (uint(rint(sc55.w*255.0))<<24); break; }
-      case 2u: { sc55 = clamp(sc55, 0.0, 1.0);
+      case 1u: { sc55 = clamp(sc55, 0.0, 1.0);
                 ((device ushort*)(p1 + y * buf_rbs[1]))[x] = ushort((uint(rint(sc55.x*31.0))<<11) | (uint(rint(sc55.y*63.0))<<5) | uint(rint(sc55.z*31.0))); break; }
-      case 3u: { sc55 = clamp(sc55, 0.0, 1.0);
+      case 2u: { sc55 = clamp(sc55, 0.0, 1.0);
                 ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc55.x*1023.0)) | (uint(rint(sc55.y*1023.0))<<10) | (uint(rint(sc55.z*1023.0))<<20) | (uint(rint(sc55.w*3.0))<<30); break; }
-      case 4u: { device half *hp = (device half*)(p1 + y * buf_rbs[1]) + x*4;
+      case 3u: { device half *hp = (device half*)(p1 + y * buf_rbs[1]) + x*4;
                 hp[0]=half(sc55.x); hp[1]=half(sc55.y); hp[2]=half(sc55.z); hp[3]=half(sc55.w); break; }
-      case 5u: { device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_szs[1]/4;
+      case 4u: { device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_szs[1]/4;
                 ((device half*)row)[x] = half(sc55.x); ((device half*)(row+ps))[x] = half(sc55.y); ((device half*)(row+2*ps))[x] = half(sc55.z); ((device half*)(row+3*ps))[x] = half(sc55.w); break; }
-      case 6u: { for (int ch = 0; ch < 3; ch++) {
+      case 5u: { for (int ch = 0; ch < 3; ch++) {
                   float l = max(sc55[ch], 0.0);
                   float t = 1.0/sqrt(max(l, 1e-30));
                   float lo = l * 12.92;

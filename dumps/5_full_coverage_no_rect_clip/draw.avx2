@@ -32,7 +32,7 @@ Critical sequence based on the simulation:
  +----> 2.    imulq	%r14, %rax                        ## REGISTER dependency:  %rax
  +----> 3.    addq	%rax, %r11                        ## REGISTER dependency:  %rax
  |      4.    movl	56(%rdx), %eax
- |      5.    cmpq	$1, %rax
+ |      5.    cmpq	$0, %rax
  |      6.    jne	130
  +----> 7.    vmovdqu	(%r11,%r10,4), %ymm10             ## REGISTER dependency:  %r11
  |      8.    vpcmpeqd	%ymm11, %ymm11, %ymm11
@@ -53,7 +53,7 @@ Critical sequence based on the simulation:
  +----> 23.   vmulps	%ymm11, %ymm8, %ymm8              ## RESOURCE interference:  Zn4FP1 [ probability: 48% ]
  +----> 24.   vmulps	%ymm11, %ymm9, %ymm9              ## RESOURCE interference:  Zn4FP0 [ probability: 48% ]
  |      25.   jmp	1116
- |      26.   cmpq	$2, %rax
+ |      26.   cmpq	$1, %rax
  |      27.   jne	255
  |      28.   vmovdqu	(%r11,%r10,2), %xmm10
  |      29.   vpmovzxwd	%xmm10, %ymm10
@@ -75,7 +75,7 @@ Critical sequence based on the simulation:
  |      45.   vmulps	%ymm7, %ymm11, %ymm7
  |      46.   vbroadcastss	4309(%rip), %ymm9
  |      47.   jmp	1116
- |      48.   cmpq	$3, %rax
+ |      48.   cmpq	$2, %rax
  |      49.   jne	376
  |      50.   vmovdqu	(%r11,%r10,4), %ymm10
  |      51.   vpcmpeqd	%ymm11, %ymm11, %ymm11
@@ -97,7 +97,7 @@ Critical sequence based on the simulation:
  |      67.   vbroadcastss	4213(%rip), %ymm11
  |      68.   vmulps	%ymm11, %ymm9, %ymm9
  |      69.   jmp	1116
- |      70.   cmpq	$4, %rax
+ |      70.   cmpq	$3, %rax
  |      71.   jne	645
  |      72.   vmovdqu	(%r11,%r10,8), %ymm11
  |      73.   vmovdqu	32(%r11,%r10,8), %ymm12
@@ -140,7 +140,7 @@ Critical sequence based on the simulation:
  |      110.  vpunpcklqdq	%xmm11, %xmm9, %xmm9
  |      111.  vcvtph2ps	%xmm9, %ymm9
  |      112.  jmp	1116
- |      113.  cmpq	$5, %rax
+ |      113.  cmpq	$4, %rax
  |      114.  jne	724
  |      115.  movq	%r11, %r11
  |      116.  movq	40(%rdx), %rbx
@@ -161,7 +161,7 @@ Critical sequence based on the simulation:
  |      131.  vpxor	%ymm7, %ymm7, %ymm7
  |      132.  vpxor	%ymm8, %ymm8, %ymm8
  |      133.  vpxor	%ymm9, %ymm9, %ymm9
- |      134.  cmpq	$6, %rax
+ |      134.  cmpq	$5, %rax
  |      135.  jne	1098
  +----> 136.  vmovdqu	(%r11,%r10,4), %ymm10             ## RESOURCE interference:  Zn4FP45 [ probability: 100% ]
  |      137.  vpcmpeqd	%ymm11, %ymm11, %ymm11
@@ -237,7 +237,7 @@ Critical sequence based on the simulation:
  +----> 207.  vmovdqu	%ymm1, (%rsp)                     ## RESOURCE interference:  Zn4FP45 [ probability: 48% ]
  |      208.  vmovdqu	%ymm2, 32(%rsp)
  |      209.  movl	56(%rdx), %eax
- |      210.  cmpq	$1, %rax
+ |      210.  cmpq	$0, %rax
  |      211.  jne	1334
  +----> 212.  vbroadcastss	3531(%rip), %ymm7         ## RESOURCE interference:  Zn4FP45 [ probability: 48% ]
  +----> 213.  vbroadcastss	3350(%rip), %ymm15        ## RESOURCE interference:  Zn4FP2 [ probability: 100% ]
@@ -266,7 +266,7 @@ Critical sequence based on the simulation:
  |      236.  vpor	%ymm13, %ymm12, %ymm12
  |      237.  vmovdqu	%ymm12, (%r11,%r10,4)
  |      238.  jmp	2359
- |      239.  cmpq	$2, %rax
+ |      239.  cmpq	$1, %rax
  |      240.  jne	1491
  +----> 241.  vbroadcastss	3206(%rip), %ymm15        ## RESOURCE interference:  Zn4FP2 [ probability: 100% ]
  |      242.  vxorps	%ymm14, %ymm14, %ymm14
@@ -294,7 +294,7 @@ Critical sequence based on the simulation:
  |      264.  vpermq	$8, %ymm12, %ymm12
  |      265.  vmovdqu	%xmm12, (%r11,%r10,2)
  |      266.  jmp	2359
- |      267.  cmpq	$3, %rax
+ |      267.  cmpq	$2, %rax
  |      268.  jne	1653
  +----> 269.  vbroadcastss	3049(%rip), %ymm15        ## RESOURCE interference:  Zn4FP2 [ probability: 99% ]
  |      270.  vxorps	%ymm14, %ymm14, %ymm14
@@ -324,7 +324,7 @@ Critical sequence based on the simulation:
  +----> 294.  vpor	%ymm13, %ymm12, %ymm12            ## REGISTER dependency:  %ymm13
  |      295.  vmovdqu	%ymm12, (%r11,%r10,4)
  |      296.  jmp	2359
- |      297.  cmpq	$4, %rax
+ |      297.  cmpq	$3, %rax
  |      298.  jne	1781
  |      299.  vcvtps2ph	$4, %ymm9, %xmm12
  |      300.  vcvtps2ph	$4, %ymm8, %xmm13
@@ -347,7 +347,7 @@ Critical sequence based on the simulation:
  |      317.  vinserti128	$1, %xmm14, %ymm13, %ymm13
  |      318.  vmovdqu	%ymm13, 32(%r11,%r10,8)
  |      319.  jmp	2359
- |      320.  cmpq	$5, %rax
+ |      320.  cmpq	$4, %rax
  |      321.  jne	1864
  |      322.  movq	%r11, %r11
  |      323.  movq	40(%rdx), %rbx
@@ -364,7 +364,7 @@ Critical sequence based on the simulation:
  +----> 334.  vcvtps2ph	$4, %ymm10, %xmm12                ## RESOURCE interference:  Zn4FP3 [ probability: 50% ]
  |      335.  vmovdqu	%xmm12, (%r11,%r10,2)
  |      336.  jmp	2359
- |      337.  cmpq	$6, %rax
+ |      337.  cmpq	$5, %rax
  |      338.  jne	2359
  |      339.  vpxor	%ymm0, %ymm0, %ymm0
  |      340.  vmaxps	%ymm0, %ymm9, %ymm9
@@ -473,7 +473,7 @@ Instruction Info:
  1      3     1.00                        imulq	%r14, %rax
  1      1     0.25                        addq	%rax, %r11
  1      5     0.33    *                   movl	56(%rdx), %eax
- 1      1     0.25                        cmpq	$1, %rax
+ 1      1     0.25                        cmpq	$0, %rax
  1      1     0.50                        jne	130
  1      8     0.50    *                   vmovdqu	(%r11,%r10,4), %ymm10
  1      1     0.25                        vpcmpeqd	%ymm11, %ymm11, %ymm11
@@ -494,7 +494,7 @@ Instruction Info:
  1      3     0.50                        vmulps	%ymm11, %ymm8, %ymm8
  1      3     0.50                        vmulps	%ymm11, %ymm9, %ymm9
  1      1     0.50                        jmp	1116
- 1      1     0.25                        cmpq	$2, %rax
+ 1      1     0.25                        cmpq	$1, %rax
  1      1     0.50                        jne	255
  1      8     0.50    *                   vmovdqu	(%r11,%r10,2), %xmm10
  1      2     0.50                        vpmovzxwd	%xmm10, %ymm10
@@ -516,7 +516,7 @@ Instruction Info:
  1      3     0.50                        vmulps	%ymm7, %ymm11, %ymm7
  1      8     0.50    *                   vbroadcastss	4309(%rip), %ymm9
  1      1     0.50                        jmp	1116
- 1      1     0.25                        cmpq	$3, %rax
+ 1      1     0.25                        cmpq	$2, %rax
  1      1     0.50                        jne	376
  1      8     0.50    *                   vmovdqu	(%r11,%r10,4), %ymm10
  1      1     0.25                        vpcmpeqd	%ymm11, %ymm11, %ymm11
@@ -538,7 +538,7 @@ Instruction Info:
  1      8     0.50    *                   vbroadcastss	4213(%rip), %ymm11
  1      3     0.50                        vmulps	%ymm11, %ymm9, %ymm9
  1      1     0.50                        jmp	1116
- 1      1     0.25                        cmpq	$4, %rax
+ 1      1     0.25                        cmpq	$3, %rax
  1      1     0.50                        jne	645
  1      8     0.50    *                   vmovdqu	(%r11,%r10,8), %ymm11
  1      8     0.50    *                   vmovdqu	32(%r11,%r10,8), %ymm12
@@ -581,7 +581,7 @@ Instruction Info:
  1      1     0.50                        vpunpcklqdq	%xmm11, %xmm9, %xmm9
  2      4     1.00                        vcvtph2ps	%xmm9, %ymm9
  1      1     0.50                        jmp	1116
- 1      1     0.25                        cmpq	$5, %rax
+ 1      1     0.25                        cmpq	$4, %rax
  1      1     0.50                        jne	724
  1      0     0.17                        movq	%r11, %r11
  1      5     0.33    *                   movq	40(%rdx), %rbx
@@ -602,7 +602,7 @@ Instruction Info:
  1      0     0.17                        vpxor	%ymm7, %ymm7, %ymm7
  1      0     0.17                        vpxor	%ymm8, %ymm8, %ymm8
  1      0     0.17                        vpxor	%ymm9, %ymm9, %ymm9
- 1      1     0.25                        cmpq	$6, %rax
+ 1      1     0.25                        cmpq	$5, %rax
  1      1     0.50                        jne	1098
  1      8     0.50    *                   vmovdqu	(%r11,%r10,4), %ymm10
  1      1     0.25                        vpcmpeqd	%ymm11, %ymm11, %ymm11
@@ -678,7 +678,7 @@ Instruction Info:
  1      1     1.00           *            vmovdqu	%ymm1, (%rsp)
  1      1     1.00           *            vmovdqu	%ymm2, 32(%rsp)
  1      5     0.33    *                   movl	56(%rdx), %eax
- 1      1     0.25                        cmpq	$1, %rax
+ 1      1     0.25                        cmpq	$0, %rax
  1      1     0.50                        jne	1334
  1      8     0.50    *                   vbroadcastss	3531(%rip), %ymm7
  1      8     0.50    *                   vbroadcastss	3350(%rip), %ymm15
@@ -707,7 +707,7 @@ Instruction Info:
  1      1     0.25                        vpor	%ymm13, %ymm12, %ymm12
  1      1     1.00           *            vmovdqu	%ymm12, (%r11,%r10,4)
  1      1     0.50                        jmp	2359
- 1      1     0.25                        cmpq	$2, %rax
+ 1      1     0.25                        cmpq	$1, %rax
  1      1     0.50                        jne	1491
  1      8     0.50    *                   vbroadcastss	3206(%rip), %ymm15
  1      0     0.17                        vxorps	%ymm14, %ymm14, %ymm14
@@ -735,7 +735,7 @@ Instruction Info:
  1      4     1.00                        vpermq	$8, %ymm12, %ymm12
  1      1     1.00           *            vmovdqu	%xmm12, (%r11,%r10,2)
  1      1     0.50                        jmp	2359
- 1      1     0.25                        cmpq	$3, %rax
+ 1      1     0.25                        cmpq	$2, %rax
  1      1     0.50                        jne	1653
  1      8     0.50    *                   vbroadcastss	3049(%rip), %ymm15
  1      0     0.17                        vxorps	%ymm14, %ymm14, %ymm14
@@ -765,7 +765,7 @@ Instruction Info:
  1      1     0.25                        vpor	%ymm13, %ymm12, %ymm12
  1      1     1.00           *            vmovdqu	%ymm12, (%r11,%r10,4)
  1      1     0.50                        jmp	2359
- 1      1     0.25                        cmpq	$4, %rax
+ 1      1     0.25                        cmpq	$3, %rax
  1      1     0.50                        jne	1781
  2      6     1.00                        vcvtps2ph	$4, %ymm9, %xmm12
  2      6     1.00                        vcvtps2ph	$4, %ymm8, %xmm13
@@ -788,7 +788,7 @@ Instruction Info:
  1      1     1.00                        vinserti128	$1, %xmm14, %ymm13, %ymm13
  1      1     1.00           *            vmovdqu	%ymm13, 32(%r11,%r10,8)
  1      1     0.50                        jmp	2359
- 1      1     0.25                        cmpq	$5, %rax
+ 1      1     0.25                        cmpq	$4, %rax
  1      1     0.50                        jne	1864
  1      0     0.17                        movq	%r11, %r11
  1      5     0.33    *                   movq	40(%rdx), %rbx
@@ -805,7 +805,7 @@ Instruction Info:
  2      6     1.00                        vcvtps2ph	$4, %ymm10, %xmm12
  1      1     1.00           *            vmovdqu	%xmm12, (%r11,%r10,2)
  1      1     0.50                        jmp	2359
- 1      1     0.25                        cmpq	$6, %rax
+ 1      1     0.25                        cmpq	$5, %rax
  1      1     0.50                        jne	2359
  1      0     0.17                        vpxor	%ymm0, %ymm0, %ymm0
  1      2     0.50                        vmaxps	%ymm0, %ymm9, %ymm9
@@ -933,7 +933,7 @@ Resource pressure by instruction:
  -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     imulq	%r14, %rax
  -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     addq	%rax, %r11
 0.34   0.33   0.33    -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.34   0.32   0.35   0.32   0.33    -      -     movl	56(%rdx), %eax
- -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$1, %rax
+ -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$0, %rax
  -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     jne	130
  -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -     0.33   0.34   0.33   0.33   0.34   0.33    -      -     vmovdqu	(%r11,%r10,4), %ymm10
  -      -      -      -      -      -      -      -     0.50    -      -     0.50    -      -      -      -      -      -      -      -      -      -      -     vpcmpeqd	%ymm11, %ymm11, %ymm11
@@ -954,7 +954,7 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -     0.51   0.49    -      -      -      -      -      -      -      -      -      -      -      -      -     vmulps	%ymm11, %ymm8, %ymm8
  -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -     vmulps	%ymm11, %ymm9, %ymm9
  -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     jmp	1116
- -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$2, %rax
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$1, %rax
  -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     jne	255
  -      -      -      -      -      -      -      -      -      -      -      -     1.00    -      -     0.34   0.33   0.33   0.34   0.33   0.33    -      -     vmovdqu	(%r11,%r10,2), %xmm10
  -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -     vpmovzxwd	%xmm10, %ymm10
@@ -976,7 +976,7 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -     0.02   0.98    -      -      -      -      -      -      -      -      -      -      -      -      -     vmulps	%ymm7, %ymm11, %ymm7
  -      -      -      -      -      -      -      -      -     0.47   0.53    -     0.52   0.48    -     0.31   0.34   0.35   0.34   0.34   0.32    -      -     vbroadcastss	4309(%rip), %ymm9
  -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     jmp	1116
- -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$3, %rax
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$2, %rax
  -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     jne	376
  -      -      -      -      -      -      -      -      -      -      -      -     0.48   0.52    -     0.35   0.32   0.33   0.32   0.32   0.36    -      -     vmovdqu	(%r11,%r10,4), %ymm10
  -      -      -      -      -      -      -      -     0.50   0.47   0.01   0.02    -      -      -      -      -      -      -      -      -      -      -     vpcmpeqd	%ymm11, %ymm11, %ymm11
@@ -998,7 +998,7 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -     0.03   0.97    -     0.99   0.01    -     0.34   0.33   0.33   0.34   0.33   0.33    -      -     vbroadcastss	4213(%rip), %ymm11
  -      -      -      -      -      -      -      -     0.98   0.02    -      -      -      -      -      -      -      -      -      -      -      -      -     vmulps	%ymm11, %ymm9, %ymm9
  -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     jmp	1116
- -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$4, %rax
+ -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$3, %rax
  -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     jne	645
  -      -      -      -      -      -      -      -      -      -      -      -     0.01   0.99    -     0.33   0.33   0.34   0.33   0.33   0.34    -      -     vmovdqu	(%r11,%r10,8), %ymm11
  -      -      -      -      -      -      -      -      -      -      -      -     0.99   0.01    -     0.33   0.34   0.33   0.33   0.34   0.33    -      -     vmovdqu	32(%r11,%r10,8), %ymm12
@@ -1041,7 +1041,7 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpunpcklqdq	%xmm11, %xmm9, %xmm9
  -      -      -      -      -      -      -      -      -      -      -     2.00    -      -      -      -      -      -      -      -      -      -      -     vcvtph2ps	%xmm9, %ymm9
  -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     jmp	1116
- -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$5, %rax
+ -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$4, %rax
  -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     jne	724
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     movq	%r11, %r11
 0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.32   0.33   0.33   0.33   0.34    -      -     movq	40(%rdx), %rbx
@@ -1062,7 +1062,7 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vpxor	%ymm7, %ymm7, %ymm7
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vpxor	%ymm8, %ymm8, %ymm8
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vpxor	%ymm9, %ymm9, %ymm9
- -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$6, %rax
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$5, %rax
  -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     jne	1098
  -      -      -      -      -      -      -      -      -      -      -      -     0.52   0.48    -     0.35   0.33   0.32   0.34   0.32   0.34    -      -     vmovdqu	(%r11,%r10,4), %ymm10
  -      -      -      -      -      -      -      -     0.98    -      -     0.02    -      -      -      -      -      -      -      -      -      -      -     vpcmpeqd	%ymm11, %ymm11, %ymm11
@@ -1138,7 +1138,7 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -      -      -      -     1.00    -     1.00   0.33   0.33   0.34    -      -      -      -     1.00   vmovdqu	%ymm1, (%rsp)
  -      -      -      -      -      -      -      -      -      -      -      -     0.48   0.52   1.00   0.32   0.33   0.35    -      -      -     1.00    -     vmovdqu	%ymm2, 32(%rsp)
 0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.30   0.35   0.35   0.30   0.35    -      -     movl	56(%rdx), %eax
- -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$1, %rax
+ -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$0, %rax
  -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     jne	1334
  -      -      -      -      -      -      -      -      -      -     1.00    -     0.52   0.48    -     0.35   0.34   0.31   0.33   0.33   0.34    -      -     vbroadcastss	3531(%rip), %ymm7
  -      -      -      -      -      -      -      -      -      -     1.00    -      -     1.00    -     0.33   0.33   0.34   0.33   0.34   0.33    -      -     vbroadcastss	3350(%rip), %ymm15
@@ -1167,7 +1167,7 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -     vpor	%ymm13, %ymm12, %ymm12
  -      -      -      -      -      -      -      -      -      -      -      -      -     1.00   1.00   0.33   0.33   0.34    -      -      -      -     1.00   vmovdqu	%ymm12, (%r11,%r10,4)
  -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     jmp	2359
- -      -      -      -      -     0.48   0.52    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$2, %rax
+ -      -      -      -      -     0.48   0.52    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$1, %rax
  -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     jne	1491
  -      -      -      -      -      -      -      -      -     0.02   0.98    -     1.00    -      -     0.33   0.34   0.33   0.34   0.33   0.33    -      -     vbroadcastss	3206(%rip), %ymm15
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vxorps	%ymm14, %ymm14, %ymm14
@@ -1195,7 +1195,7 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -     vpermq	$8, %ymm12, %ymm12
  -      -      -      -      -      -      -      -      -      -      -      -     0.48   0.52   1.00   0.36   0.33   0.31    -      -      -     1.00    -     vmovdqu	%xmm12, (%r11,%r10,2)
  -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     jmp	2359
- -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$3, %rax
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$2, %rax
  -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     jne	1653
  -      -      -      -      -      -      -      -      -     0.03   0.97    -     1.00    -      -     0.34   0.33   0.33   0.33   0.33   0.34    -      -     vbroadcastss	3049(%rip), %ymm15
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vxorps	%ymm14, %ymm14, %ymm14
@@ -1225,7 +1225,7 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -     0.52    -      -     0.48    -      -      -      -      -      -      -      -      -      -      -     vpor	%ymm13, %ymm12, %ymm12
  -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50   1.00   0.30   0.36   0.34    -      -      -      -     1.00   vmovdqu	%ymm12, (%r11,%r10,4)
  -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     jmp	2359
- -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$4, %rax
+ -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$3, %rax
  -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     jne	1781
  -      -      -      -      -      -      -      -      -      -     0.96   1.04    -      -      -      -      -      -      -      -      -      -      -     vcvtps2ph	$4, %ymm9, %xmm12
  -      -      -      -      -      -      -      -      -      -     1.98   0.02    -      -      -      -      -      -      -      -      -      -      -     vcvtps2ph	$4, %ymm8, %xmm13
@@ -1248,7 +1248,7 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -     vinserti128	$1, %xmm14, %ymm13, %ymm13
  -      -      -      -      -      -      -      -      -      -      -      -     0.51   0.49   1.00   0.34   0.35   0.31    -      -      -      -     1.00   vmovdqu	%ymm13, 32(%r11,%r10,8)
  -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     jmp	2359
- -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$5, %rax
+ -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$4, %rax
  -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     jne	1864
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     movq	%r11, %r11
 0.33   0.34   0.33    -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.33   0.33   0.33   0.33   0.34    -      -     movq	40(%rdx), %rbx
@@ -1265,7 +1265,7 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -      -     0.06   1.94    -      -      -      -      -      -      -      -      -      -      -     vcvtps2ph	$4, %ymm10, %xmm12
  -      -      -      -      -      -      -      -      -      -      -      -     0.51   0.49   1.00   0.32   0.34   0.34    -      -      -      -     1.00   vmovdqu	%xmm12, (%r11,%r10,2)
  -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     jmp	2359
- -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$6, %rax
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     cmpq	$5, %rax
  -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     jne	2359
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vpxor	%ymm0, %ymm0, %ymm0
  -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     vmaxps	%ymm0, %ymm9, %ymm9

@@ -13,7 +13,6 @@ typedef umbra_val            val;
 
 int umbra_pixel_bytes(umbra_fmt fmt) {
     switch (fmt) {
-    case umbra_fmt_none:       return 0;
     case umbra_fmt_8888:       return 4;
     case umbra_fmt_565:        return 2;
     case umbra_fmt_1010102:    return 4;

@@ -214,21 +214,21 @@ static void emit_ops(Buf *b, BB const *bb,
                 emit(b,
                      "%sfloat4 v%d_c;\n"
                      "%sswitch (buf_fmts[%d]) {\n"
-                     "%s  case 1u: { uint px = ((device uint*)(p%d + y * buf_rbs[%d]))[x];\n"
+                     "%s  case %du: { uint px = ((device uint*)(p%d + y * buf_rbs[%d]))[x];\n"
                      "%s            v%d_c = float4(px & 0xFFu, (px>>8)&0xFFu, (px>>16)&0xFFu, px>>24) / 255.0; break; }\n"
-                     "%s  case 2u: { ushort px = ((device ushort*)(p%d + y * buf_rbs[%d]))[x];\n"
+                     "%s  case %du: { ushort px = ((device ushort*)(p%d + y * buf_rbs[%d]))[x];\n"
                      "%s            v%d_c = float4(float(px>>11)/31.0, float((px>>5)&0x3Fu)/63.0, float(px&0x1Fu)/31.0, 1.0); break; }\n"
-                     "%s  case 3u: { uint px = ((device uint*)(p%d + y * buf_rbs[%d]))[x];\n"
+                     "%s  case %du: { uint px = ((device uint*)(p%d + y * buf_rbs[%d]))[x];\n"
                      "%s            v%d_c = float4(float(px&0x3FFu)/1023.0, float((px>>10)&0x3FFu)/1023.0, float((px>>20)&0x3FFu)/1023.0, float(px>>30)/3.0); break; }\n"
-                     "%s  case 4u: { device half *hp = (device half*)(p%d + y * buf_rbs[%d]) + x*4;\n"
+                     "%s  case %du: { device half *hp = (device half*)(p%d + y * buf_rbs[%d]) + x*4;\n"
                      "%s            v%d_c = float4(hp[0], hp[1], hp[2], hp[3]); break; }\n"
-                     "%s  case 5u: { device uchar *row = p%d + y * buf_rbs[%d]; uint ps = buf_szs[%d]/4;\n"
+                     "%s  case %du: { device uchar *row = p%d + y * buf_rbs[%d]; uint ps = buf_szs[%d]/4;\n"
                      "%s            v%d_c = float4("
                      "float(((device half*)row)[x]),"
                      "float(((device half*)(row+ps))[x]),"
                      "float(((device half*)(row+2*ps))[x]),"
                      "float(((device half*)(row+3*ps))[x])); break; }\n"
-                     "%s  case 6u: { uint px = ((device uint*)(p%d + y * buf_rbs[%d]))[x];\n"
+                     "%s  case %du: { uint px = ((device uint*)(p%d + y * buf_rbs[%d]))[x];\n"
                      "%s            v%d_c = float4(px & 0xFFu, (px>>8)&0xFFu, (px>>16)&0xFFu, px>>24) / 255.0;\n"
                      "%s            for (int ch = 0; ch < 3; ch++) {\n"
                      "%s              float s = v%d_c[ch];\n"
@@ -242,17 +242,17 @@ static void emit_ops(Buf *b, BB const *bb,
                      "%suint v%d_3 = as_type<uint>(v%d_c.w);\n",
                      pad, i,
                      pad, p,
-                     pad, p, p,
+                     pad, umbra_fmt_8888, p, p,
                      pad, i,
-                     pad, p, p,
+                     pad, umbra_fmt_565, p, p,
                      pad, i,
-                     pad, p, p,
+                     pad, umbra_fmt_1010102, p, p,
                      pad, i,
-                     pad, p, p,
+                     pad, umbra_fmt_fp16, p, p,
                      pad, i,
-                     pad, p, p, p,
+                     pad, umbra_fmt_fp16_planar, p, p, p,
                      pad, i,
-                     pad, p, p,
+                     pad, umbra_fmt_srgb, p, p,
                      pad, i,
                      pad,
                      pad, i,
@@ -272,27 +272,27 @@ static void emit_ops(Buf *b, BB const *bb,
                      "%sfloat4 sc%d = float4(as_type<float>(%s), as_type<float>(%s),"
                      " as_type<float>(%s), as_type<float>(%s));\n"
                      "%sswitch (buf_fmts[%d]) {\n"
-                     "%s  case 1u: { sc%d = clamp(sc%d, 0.0, 1.0);\n"
+                     "%s  case %du: { sc%d = clamp(sc%d, 0.0, 1.0);\n"
                      "%s            ((device uint*)(p%d + y * buf_rbs[%d]))[x] ="
                      " uint(rint(sc%d.x*255.0)) | (uint(rint(sc%d.y*255.0))<<8)"
                      " | (uint(rint(sc%d.z*255.0))<<16) | (uint(rint(sc%d.w*255.0))<<24); break; }\n"
-                     "%s  case 2u: { sc%d = clamp(sc%d, 0.0, 1.0);\n"
+                     "%s  case %du: { sc%d = clamp(sc%d, 0.0, 1.0);\n"
                      "%s            ((device ushort*)(p%d + y * buf_rbs[%d]))[x] ="
                      " ushort((uint(rint(sc%d.x*31.0))<<11) | (uint(rint(sc%d.y*63.0))<<5)"
                      " | uint(rint(sc%d.z*31.0))); break; }\n"
-                     "%s  case 3u: { sc%d = clamp(sc%d, 0.0, 1.0);\n"
+                     "%s  case %du: { sc%d = clamp(sc%d, 0.0, 1.0);\n"
                      "%s            ((device uint*)(p%d + y * buf_rbs[%d]))[x] ="
                      " uint(rint(sc%d.x*1023.0)) | (uint(rint(sc%d.y*1023.0))<<10)"
                      " | (uint(rint(sc%d.z*1023.0))<<20) | (uint(rint(sc%d.w*3.0))<<30); break; }\n"
-                     "%s  case 4u: { device half *hp = (device half*)(p%d + y * buf_rbs[%d]) + x*4;\n"
+                     "%s  case %du: { device half *hp = (device half*)(p%d + y * buf_rbs[%d]) + x*4;\n"
                      "%s            hp[0]=half(sc%d.x); hp[1]=half(sc%d.y);"
                      " hp[2]=half(sc%d.z); hp[3]=half(sc%d.w); break; }\n"
-                     "%s  case 5u: { device uchar *row = p%d + y * buf_rbs[%d]; uint ps = buf_szs[%d]/4;\n"
+                     "%s  case %du: { device uchar *row = p%d + y * buf_rbs[%d]; uint ps = buf_szs[%d]/4;\n"
                      "%s            ((device half*)row)[x] = half(sc%d.x);"
                      " ((device half*)(row+ps))[x] = half(sc%d.y);"
                      " ((device half*)(row+2*ps))[x] = half(sc%d.z);"
                      " ((device half*)(row+3*ps))[x] = half(sc%d.w); break; }\n"
-                     "%s  case 6u: { for (int ch = 0; ch < 3; ch++) {\n"
+                     "%s  case %du: { for (int ch = 0; ch < 3; ch++) {\n"
                      "%s              float l = max(sc%d[ch], 0.0);\n"
                      "%s              float t = 1.0/sqrt(max(l, 1e-30));\n"
                      "%s              float lo = l * 12.92;\n"
@@ -306,20 +306,20 @@ static void emit_ops(Buf *b, BB const *bb,
                      "%s}\n",
                      pad, i, vx, vy, vz, vw,
                      pad, p,
-                     pad, i, i,
+                     pad, umbra_fmt_8888, i, i,
                      pad, p, p,
                      i, i, i, i,
-                     pad, i, i,
+                     pad, umbra_fmt_565, i, i,
                      pad, p, p,
                      i, i, i,
-                     pad, i, i,
+                     pad, umbra_fmt_1010102, i, i,
                      pad, p, p,
                      i, i, i, i,
-                     pad, p, p,
+                     pad, umbra_fmt_fp16, p, p,
                      pad, i, i, i, i,
-                     pad, p, p, p,
+                     pad, umbra_fmt_fp16_planar, p, p, p,
                      pad, i, i, i, i,
-                     pad,
+                     pad, umbra_fmt_srgb,
                      pad, i,
                      pad,
                      pad,

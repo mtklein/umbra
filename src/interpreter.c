@@ -216,7 +216,6 @@ static void interp_load_color(val v[4], umbra_buf const *b,
             v[ch].f32 = r.f;
         }
     } break;
-    case umbra_fmt_none: break;
     case umbra_fmt_fp16_planar: {
         size_t const ps = b->sz / 4;
         char const *p0 = src;
@@ -359,7 +358,6 @@ static void interp_store_color(val const v[], umbra_buf const *b,
             }
         }
     } break;
-    case umbra_fmt_none: break;
     case umbra_fmt_fp16_planar: {
         size_t const ps = b->sz / 4;
         U16 hr = f32_to_f16(cr);
