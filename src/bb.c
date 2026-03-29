@@ -361,15 +361,6 @@ val umbra_ceil_f32(builder *b, val x) { return math(b, op_ceil_f32, VX(x)); }
 val umbra_round_i32(builder *b, val x) { return math(b, op_round_i32, VX(x)); }
 val umbra_floor_i32(builder *b, val x) { return math(b, op_floor_i32, VX(x)); }
 val umbra_ceil_i32(builder *b, val x) { return math(b, op_ceil_i32, VX(x)); }
-val umbra_sign_f32(builder *b, val x) {
-    val const z = umbra_imm_f32(b, 0.0f);
-    return umbra_or_i32(b,
-                        umbra_and_i32(b, umbra_gt_f32(b, x, z),
-                                      umbra_imm_i32(b, 0x3f800000)),
-                        umbra_and_i32(b, umbra_lt_f32(b, x, z),
-                                      umbra_imm_i32(b, (int)0xbf800000)));
-}
-
 val umbra_add_i32(builder *b, val x, val y) {
     sort(&x, &y);
     if (is_imm32(b, val_id(x), 0)) { return y; }
@@ -474,9 +465,6 @@ val umbra_eq_f32(builder *b, val x, val y) {
     sort(&x, &y);
     return try_imm(b, math(b, op_eq_f32, VX(x), VY(y)), op_eq_f32_imm, x, y);
 }
-val umbra_ne_f32(builder *b, val x, val y) {
-    return umbra_xor_i32(b, umbra_eq_f32(b, x, y), umbra_imm_i32(b, -1));
-}
 val umbra_lt_f32(builder *b, val x, val y) {
     val const d = math(b, op_lt_f32, VX(x), VY(y));
     if (is_imm(b, val_id(y))) {
@@ -499,10 +487,6 @@ val umbra_eq_i32(builder *b, val x, val y) {
     if (val_id(x) == val_id(y)) { return umbra_imm_i32(b, -1); }
     return try_imm(b, math(b, op_eq_i32, VX(x), VY(y)), op_eq_i32_imm, x, y);
 }
-val umbra_ne_i32(builder *b, val x, val y) {
-    return umbra_xor_i32(b, umbra_eq_i32(b, x, y), umbra_imm_i32(b, -1));
-}
-
 val umbra_lt_s32(builder *b, val x, val y) {
     val const d = math(b, op_lt_s32, VX(x), VY(y));
     if (is_imm(b, val_id(y))) {
@@ -517,18 +501,12 @@ val umbra_le_s32(builder *b, val x, val y) {
     }
     return (val){.bits = d.bits};
 }
-val umbra_gt_s32(builder *b, val x, val y) { return umbra_lt_s32(b, y, x); }
-val umbra_ge_s32(builder *b, val x, val y) { return umbra_le_s32(b, y, x); }
-
 val umbra_lt_u32(builder *b, val x, val y) {
     return math(b, op_lt_u32, VX(x), VY(y));
 }
 val umbra_le_u32(builder *b, val x, val y) {
     return math(b, op_le_u32, VX(x), VY(y));
 }
-val umbra_gt_u32(builder *b, val x, val y) { return umbra_lt_u32(b, y, x); }
-val umbra_ge_u32(builder *b, val x, val y) { return umbra_le_u32(b, y, x); }
-
 static char const* op_name(enum op op) {
     static char const *names[] = {
 #define OP_NAME(name) [op_##name] = #name,

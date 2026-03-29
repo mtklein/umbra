@@ -392,25 +392,6 @@ static void test_cmp_i32(void) {
     }
     {
         backends B;
-        BINOP_I32(umbra_ne_i32, B);
-        for (int bi = 0; bi < 3; bi++) {
-            int x[] = {1, 2};
-            int y[] = {1, 9}, z[2] = {0};
-            if (!run(&B, bi, 2, 1,
-                     (umbra_buf[]){
-                         {.ptr=x, .sz=2 * 4},
-                         {.ptr=y, .sz=2 * 4},
-                         {.ptr=z, .sz=2 * 4},
-                     })) {
-                continue;
-            }
-            z[0] == 0 here;
-            z[1] == -1 here;
-        }
-        cleanup(&B);
-    }
-    {
-        backends B;
         BINOP_I32(umbra_lt_s32, B);
         for (int bi = 0; bi < 3; bi++) {
             int x[] = {1, 5, 3};
@@ -435,46 +416,6 @@ static void test_cmp_i32(void) {
         for (int bi = 0; bi < 3; bi++) {
             int x[] = {1, 5, 3};
             int y[] = {2, 5, 1}, z[3] = {0};
-            if (!run(&B, bi, 3, 1,
-                     (umbra_buf[]){
-                         {.ptr=x, .sz=3 * 4},
-                         {.ptr=y, .sz=3 * 4},
-                         {.ptr=z, .sz=3 * 4},
-                     })) {
-                continue;
-            }
-            z[0] == -1 here;
-            z[1] == -1 here;
-            z[2] == 0 here;
-        }
-        cleanup(&B);
-    }
-    {
-        backends B;
-        BINOP_I32(umbra_gt_s32, B);
-        for (int bi = 0; bi < 3; bi++) {
-            int x[] = {3, 5, 1};
-            int y[] = {2, 5, 3}, z[3] = {0};
-            if (!run(&B, bi, 3, 1,
-                     (umbra_buf[]){
-                         {.ptr=x, .sz=3 * 4},
-                         {.ptr=y, .sz=3 * 4},
-                         {.ptr=z, .sz=3 * 4},
-                     })) {
-                continue;
-            }
-            z[0] == -1 here;
-            z[1] == 0 here;
-            z[2] == 0 here;
-        }
-        cleanup(&B);
-    }
-    {
-        backends B;
-        BINOP_I32(umbra_ge_s32, B);
-        for (int bi = 0; bi < 3; bi++) {
-            int x[] = {3, 5, 1};
-            int y[] = {2, 5, 3}, z[3] = {0};
             if (!run(&B, bi, 3, 1,
                      (umbra_buf[]){
                          {.ptr=x, .sz=3 * 4},
@@ -528,46 +469,6 @@ static void test_cmp_i32(void) {
         }
         cleanup(&B);
     }
-    {
-        backends B;
-        BINOP_I32(umbra_gt_u32, B);
-        for (int bi = 0; bi < 3; bi++) {
-            int x[] = {2, -1, 1};
-            int y[] = {1, 1, 2}, z[3] = {0};
-            if (!run(&B, bi, 3, 1,
-                     (umbra_buf[]){
-                         {.ptr=x, .sz=3 * 4},
-                         {.ptr=y, .sz=3 * 4},
-                         {.ptr=z, .sz=3 * 4},
-                     })) {
-                continue;
-            }
-            z[0] == -1 here;
-            z[1] == -1 here;
-            z[2] == 0 here;
-        }
-        cleanup(&B);
-    }
-    {
-        backends B;
-        BINOP_I32(umbra_ge_u32, B);
-        for (int bi = 0; bi < 3; bi++) {
-            int x[] = {2, 2, 1};
-            int y[] = {1, 2, -1}, z[3] = {0};
-            if (!run(&B, bi, 3, 1,
-                     (umbra_buf[]){
-                         {.ptr=x, .sz=3 * 4},
-                         {.ptr=y, .sz=3 * 4},
-                         {.ptr=z, .sz=3 * 4},
-                     })) {
-                continue;
-            }
-            z[0] == -1 here;
-            z[1] == -1 here;
-            z[2] == 0 here;
-        }
-        cleanup(&B);
-    }
 }
 
 static void test_cmp_f32(void) {
@@ -589,26 +490,6 @@ static void test_cmp_f32(void) {
             z[0] == -1 here;
             z[1] == 0 here;
             z[2] == -1 here;
-        }
-        cleanup(&B);
-    }
-    {
-        backends B;
-        BINOP_CMP_F32(umbra_ne_f32, B);
-        for (int bi = 0; bi < 3; bi++) {
-            float x[] = {1, 2};
-            float y[] = {1, 9};
-            int   z[2] = {0};
-            if (!run(&B, bi, 2, 1,
-                     (umbra_buf[]){
-                         {.ptr=x, .sz=2 * 4},
-                         {.ptr=y, .sz=2 * 4},
-                         {.ptr=z, .sz=2 * 4},
-                     })) {
-                continue;
-            }
-            z[0] == 0 here;
-            z[1] == -1 here;
         }
         cleanup(&B);
     }
@@ -810,7 +691,7 @@ static void test_min_max_sqrt_f32(void) {
     }
 }
 
-static void test_abs_sign_f32(void) {
+static void test_abs_f32(void) {
     {
         struct umbra_builder *builder = umbra_builder();
         umbra_val             x = umbra_load_32(builder, (umbra_ptr){0, 0}),
@@ -829,28 +710,6 @@ static void test_abs_sign_f32(void) {
             }
             equiv(z[0], 1.5f) here;
             equiv(z[1], 2.5f) here;
-            equiv(z[2], 0.0f) here;
-        }
-        cleanup(&B);
-    }
-    {
-        struct umbra_builder *builder = umbra_builder();
-        umbra_val             x = umbra_load_32(builder, (umbra_ptr){0, 0}),
-                              r = umbra_sign_f32(builder, x);
-        umbra_store_32(builder, (umbra_ptr){1, 0}, r);
-        backends B = make(builder);
-        for (int bi = 0; bi < 3; bi++) {
-            float a[] = {-3.0f, 7.0f, 0.0f};
-            float z[3] = {0};
-            if (!run(&B, bi, 3, 1,
-                     (umbra_buf[]){
-                         {.ptr=a, .sz=3 * 4},
-                         {.ptr=z, .sz=3 * 4},
-                     })) {
-                continue;
-            }
-            equiv(z[0], -1.0f) here;
-            equiv(z[1], 1.0f) here;
             equiv(z[2], 0.0f) here;
         }
         cleanup(&B);
@@ -3106,7 +2965,7 @@ int main(void) {
     test_imm();
     test_fma_f32();
     test_min_max_sqrt_f32();
-    test_abs_sign_f32();
+    test_abs_f32();
     test_round_floor_ceil();
     test_large_n();
     test_convert();
