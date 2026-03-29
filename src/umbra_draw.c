@@ -5,10 +5,8 @@
 typedef struct umbra_builder builder;
 
 struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn coverage,
-                                       umbra_blend_fn blend, umbra_format format,
+                                       umbra_blend_fn blend,
                                        umbra_draw_layout *layout) {
-    umbra_load_fn  const load  = format.load;
-    umbra_store_fn const store = format.store;
     builder  *builder = umbra_builder();
     umbra_val const x = umbra_x(builder);
     umbra_val const y = umbra_y(builder);
@@ -38,8 +36,10 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
         umbra_imm_f32(builder, 0.0f),
         umbra_imm_f32(builder, 0.0f),
     };
-    if (load) {
-        dst = load(builder, (umbra_ptr){1, 0});
+    if (blend || coverage) {
+        umbra_val ch[4];
+        umbra_load_color(builder, (umbra_ptr){1, 0}, ch);
+        dst = (umbra_color){ch[0], ch[1], ch[2], ch[3]};
     }
 
     umbra_color out;
@@ -64,8 +64,9 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
                                             cov));
     }
 
-    if (store) {
-        store(builder, (umbra_ptr){1, 0}, out);
+    {
+        umbra_val ch[4] = {out.r, out.g, out.b, out.a};
+        umbra_store_color(builder, (umbra_ptr){1, 0}, ch);
     }
 
     if (layout) {
@@ -73,7 +74,6 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
         layout->coverage = coverage_off;
         layout->uni_len = umbra_uni_len(builder);
         layout->ps = umbra_max_ptr(builder) - 1;
-        layout->pixel_bytes = format.pixel_bytes;
     }
 
     return builder;

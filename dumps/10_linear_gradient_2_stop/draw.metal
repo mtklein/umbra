@@ -41,35 +41,31 @@ kernel void umbra_entry(
     uint v14 = as_type<uint>(as_type<float>(v10) - as_type<float>(v6));
     uint v15 = as_type<uint>(as_type<float>(v11) - as_type<float>(v7));
     uint v16 = as_type<uint>(as_type<float>(v12) - as_type<float>(v8));
-    uint v17 = 1132396544u;
-    uint v18 = x0 + pos.x;
-    uint v19 = as_type<uint>((float)(int)v18);
-    uint v20 = y0 + pos.y;
-    uint v21 = as_type<uint>((float)(int)v20);
-    uint v22 = as_type<uint>(as_type<float>(v21) * as_type<float>(v2));
-    uint v23 = as_type<uint>(fma(as_type<float>(v19), as_type<float>(v1), as_type<float>(v22)));
-    uint v24 = as_type<uint>(as_type<float>(v3) + as_type<float>(v23));
-    uint v25 = as_type<uint>(max(as_type<float>(v24), as_type<float>(0u)));
-    uint v26 = as_type<uint>(min(as_type<float>(v25), as_type<float>(1065353216u)));
-    uint v27 = as_type<uint>(fma(as_type<float>(v26), as_type<float>(v16), as_type<float>(v8)));
-    uint v28 = as_type<uint>(max(as_type<float>(v27), as_type<float>(0u)));
-    uint v29 = as_type<uint>(min(as_type<float>(v28), as_type<float>(1065353216u)));
-    uint v30 = as_type<uint>(as_type<float>(v29) * as_type<float>(1132396544u));
-    uint v31 = as_type<uint>((int)rint(as_type<float>(v30)));
-    uint v32 = as_type<uint>(fma(as_type<float>(v26), as_type<float>(v13), as_type<float>(v5)));
-    uint v33 = as_type<uint>(max(as_type<float>(v32), as_type<float>(0u)));
-    uint v34 = as_type<uint>(min(as_type<float>(v33), as_type<float>(1065353216u)));
-    uint v35 = as_type<uint>(as_type<float>(v34) * as_type<float>(1132396544u));
-    uint v36 = as_type<uint>((int)rint(as_type<float>(v35)));
-    uint v37 = as_type<uint>(fma(as_type<float>(v26), as_type<float>(v14), as_type<float>(v6)));
-    uint v38 = as_type<uint>(max(as_type<float>(v37), as_type<float>(0u)));
-    uint v39 = as_type<uint>(min(as_type<float>(v38), as_type<float>(1065353216u)));
-    uint v40 = as_type<uint>(as_type<float>(v39) * as_type<float>(1132396544u));
-    uint v41 = as_type<uint>((int)rint(as_type<float>(v40)));
-    uint v42 = as_type<uint>(fma(as_type<float>(v26), as_type<float>(v15), as_type<float>(v7)));
-    uint v43 = as_type<uint>(max(as_type<float>(v42), as_type<float>(0u)));
-    uint v44 = as_type<uint>(min(as_type<float>(v43), as_type<float>(1065353216u)));
-    uint v45 = as_type<uint>(as_type<float>(v44) * as_type<float>(1132396544u));
-    uint v46 = as_type<uint>((int)rint(as_type<float>(v45)));
-    ((device uint*)(p1 + y * buf_rbs[1]))[x] = (v36 & 0xFFu) | ((v41 & 0xFFu) << 8) | ((v46 & 0xFFu) << 16) | (v31 << 24);
+    uint v17 = x0 + pos.x;
+    uint v18 = as_type<uint>((float)(int)v17);
+    uint v19 = y0 + pos.y;
+    uint v20 = as_type<uint>((float)(int)v19);
+    uint v21 = as_type<uint>(as_type<float>(v20) * as_type<float>(v2));
+    uint v22 = as_type<uint>(fma(as_type<float>(v18), as_type<float>(v1), as_type<float>(v21)));
+    uint v23 = as_type<uint>(as_type<float>(v3) + as_type<float>(v22));
+    uint v24 = as_type<uint>(max(as_type<float>(v23), as_type<float>(0u)));
+    uint v25 = as_type<uint>(min(as_type<float>(v24), as_type<float>(1065353216u)));
+    uint v26 = as_type<uint>(fma(as_type<float>(v25), as_type<float>(v16), as_type<float>(v8)));
+    uint v27 = as_type<uint>(fma(as_type<float>(v25), as_type<float>(v13), as_type<float>(v5)));
+    uint v28 = as_type<uint>(fma(as_type<float>(v25), as_type<float>(v15), as_type<float>(v7)));
+    uint v29 = as_type<uint>(fma(as_type<float>(v25), as_type<float>(v14), as_type<float>(v6)));
+    float4 sc30 = float4(as_type<float>(v27), as_type<float>(v29), as_type<float>(v28), as_type<float>(v26));
+    switch (buf_fmts[1]) {
+      case 1u: { sc30 = clamp(sc30, 0.0, 1.0);
+                ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc30.x*255.0)) | (uint(rint(sc30.y*255.0))<<8) | (uint(rint(sc30.z*255.0))<<16) | (uint(rint(sc30.w*255.0))<<24); break; }
+      case 2u: { sc30 = clamp(sc30, 0.0, 1.0);
+                ((device ushort*)(p1 + y * buf_rbs[1]))[x] = ushort((uint(rint(sc30.x*31.0))<<11) | (uint(rint(sc30.y*63.0))<<5) | uint(rint(sc30.z*31.0))); break; }
+      case 3u: { sc30 = clamp(sc30, 0.0, 1.0);
+                ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc30.x*1023.0)) | (uint(rint(sc30.y*1023.0))<<10) | (uint(rint(sc30.z*1023.0))<<20) | (uint(rint(sc30.w*3.0))<<30); break; }
+      case 4u: { device half *hp = (device half*)(p1 + y * buf_rbs[1]) + x*4;
+                hp[0]=half(sc30.x); hp[1]=half(sc30.y); hp[2]=half(sc30.z); hp[3]=half(sc30.w); break; }
+      case 5u: ((device half*)(p1 + y * buf_rbs[1]))[x] = half(sc30.x); break;
+      case 6u: ((device float*)(p1 + y * buf_rbs[1]))[x] = sc30.x; break;
+      default: break;
+    }
 }

@@ -72,11 +72,12 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     slide_uni_f32(uni, lay->shader, hc, 4);
     slide_uni_ptr(uni, lay->coverage, st->wind_buf, wind_sz, 1, (size_t)w * sizeof(float));
     int       ps = lay->ps;
-    size_t plane_sz = (size_t)w * (size_t)h * lay->pixel_bytes;
+    int       pb = umbra_pixel_bytes(s->fmt);
+    size_t plane_sz = (size_t)w * (size_t)h * (size_t)pb;
     umbra_buf rbuf[5];
-    size_t rb = (size_t)w * lay->pixel_bytes;
+    size_t rb = (size_t)w * (size_t)pb;
     rbuf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)lay->uni_len, .read_only=1};
-    rbuf[1] = (umbra_buf){.ptr=buf, .sz=plane_sz, .row_bytes=rb};
+    rbuf[1] = (umbra_buf){.ptr=buf, .sz=plane_sz, .row_bytes=rb, .fmt=s->fmt};
     for (int i = 0; i < ps; i++) {
         rbuf[2 + i] = (umbra_buf){.ptr=(char *)buf + plane_sz * (size_t)(i + 1), .sz=plane_sz, .row_bytes=rb};
     }
@@ -101,7 +102,7 @@ slide slide_slug_wind(slug_curves *sc) {
         .shader = umbra_shader_solid,
         .coverage = umbra_coverage_wind,
         .blend = umbra_blend_srcover,
-        .format = umbra_format_8888,
+        .fmt = umbra_fmt_8888,
         .color = {0.2f, 1.0f, 0.6f, 1.0f},
         .bg = 0xff0a0a1e,
         .init = slug_init,

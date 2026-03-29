@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
 
         umbra_draw_layout         lay;
         struct umbra_builder     *bld = umbra_draw_build(s->shader, s->coverage, s->blend,
-                                                         s->format, &lay);
+                                                         &lay);
         struct umbra_basic_block *bb = umbra_basic_block(bld);
         umbra_builder_free(bld);
 
@@ -60,8 +60,7 @@ int main(int argc, char *argv[]) {
         struct umbra_program *mtl = be_m ? umbra_program(be_m, bb) : NULL;
         umbra_basic_block_free(bb);
 
-        _Bool planar = s->format.store == umbra_format_fp16_planar.store;
-        int   bpp = planar ? 2 : 4;
+        int   bpp = umbra_pixel_bytes(s->fmt);
         void *buf = calloc((size_t)(W * H), (size_t)bpp);
 
         char tmp[32];

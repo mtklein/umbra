@@ -19,13 +19,12 @@ typedef struct {
 } umbra_format;
 
 typedef struct {
-    int    shader, coverage;
-    int    uni_len, ps;
-    size_t pixel_bytes;
+    int shader, coverage;
+    int uni_len, ps;
 } umbra_draw_layout;
 
 struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn coverage,
-                                       umbra_blend_fn blend, umbra_format format,
+                                       umbra_blend_fn blend,
                                        umbra_draw_layout *layout);
 
 umbra_color umbra_shader_solid(struct umbra_builder *, umbra_val x, umbra_val y);

@@ -59,11 +59,12 @@ static void solid_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     slide_uni_f32(uni, lay->shader, hc, 4);
     if (s->coverage) { slide_uni_f32(uni, lay->coverage, rect, 4); }
     int       ps = lay->ps;
-    size_t plane_sz = (size_t)w * (size_t)h * lay->pixel_bytes;
+    int       pb = umbra_pixel_bytes(s->fmt);
+    size_t plane_sz = (size_t)w * (size_t)h * (size_t)pb;
     umbra_buf ubuf[5];
-    size_t rb = (size_t)w * lay->pixel_bytes;
+    size_t rb = (size_t)w * (size_t)pb;
     ubuf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)lay->uni_len, .read_only=1};
-    ubuf[1] = (umbra_buf){.ptr=buf, .sz=plane_sz, .row_bytes=rb};
+    ubuf[1] = (umbra_buf){.ptr=buf, .sz=plane_sz, .row_bytes=rb, .fmt=s->fmt};
     for (int i = 0; i < ps; i++) {
         ubuf[2 + i] = (umbra_buf){.ptr=(char *)buf + plane_sz * (size_t)(i + 1), .sz=plane_sz, .row_bytes=rb};
     }
@@ -76,17 +77,17 @@ static void solid_cleanup(slide *s) {
 }
 
 slide slide_solid(char const *, uint32_t, float const[4], umbra_coverage_fn,
-                  umbra_blend_fn, umbra_format);
+                  umbra_blend_fn, umbra_fmt);
 
 slide slide_solid(char const *title, uint32_t bg, float const color[4],
-                  umbra_coverage_fn coverage, umbra_blend_fn blend, umbra_format format) {
+                  umbra_coverage_fn coverage, umbra_blend_fn blend, umbra_fmt fmt) {
     return (slide){
         .title = title,
         .bg = bg,
         .shader = umbra_shader_solid,
         .coverage = coverage,
         .blend = blend,
-        .format = format,
+        .fmt = fmt,
         .color = {color[0], color[1], color[2], color[3]},
         .init = solid_init,
         .animate = solid_animate,

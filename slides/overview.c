@@ -112,7 +112,7 @@ static void overview_init(slide *s, int w, int h) {
     for (int idx = 0; idx < st->n_real; idx++) {
         slide                *sub = slide_get(idx);
         struct umbra_builder *b = umbra_draw_build(sub->shader, sub->coverage, sub->blend,
-                                                   sub->format, &st->lays[idx]);
+                                                   &st->lays[idx]);
         st->bbs[idx] = umbra_basic_block(b);
         umbra_builder_free(b);
     }
@@ -163,7 +163,7 @@ slide slide_overview(void) {
     return (slide){
         .title = "Overview",
         .shader = umbra_shader_solid,
-        .format = umbra_format_8888,
+        .fmt = umbra_fmt_8888,
         .bg = 0xff101010,
         .init = overview_init,
         .animate = overview_animate,

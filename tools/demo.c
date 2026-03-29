@@ -37,17 +37,20 @@ enum {
     FMT_8888,
     FMT_565,
     FMT_FP16,
-    FMT_FP16P,
     FMT_1010102,
     FMT_SRGB,
     NUM_FMTS,
 };
 static char const *fmt_name[] = {
-    "8888", "565", "fp16", "fp16p", "1010102", "sRGB",
+    "8888", "565", "fp16", "1010102", "sRGB",
 };
 static umbra_format const *fmt_formats[] = {
     &umbra_format_8888,   &umbra_format_565,       &umbra_format_fp16,
-    &umbra_format_fp16_planar, &umbra_format_1010102, &umbra_format_srgb_8888,
+    &umbra_format_1010102, &umbra_format_srgb_8888,
+};
+static umbra_fmt const fmt_enums[] = {
+    umbra_fmt_8888, umbra_fmt_565, umbra_fmt_fp16,
+    umbra_fmt_1010102, umbra_fmt_8888,
 };
 
 typedef struct {
@@ -155,10 +158,9 @@ static void tile_factor(int n, int *cols, int *rows) {
 
 static void build_slide_fmt(slide *s, int fmt) {
     free_programs();
-    umbra_format format = *fmt_formats[fmt];
-    if (!s->format.load) { format.load = NULL; }
+    s->fmt = fmt_enums[fmt];
 
-    builder *builder = umbra_draw_build(s->shader, s->coverage, s->blend, format,
+    builder *builder = umbra_draw_build(s->shader, s->coverage, s->blend,
                                         &draw_layout);
     struct umbra_basic_block *bb = umbra_basic_block(builder);
     umbra_builder_free(builder);
@@ -362,15 +364,13 @@ int main(void) {
         slide                *s = slide_get(cur_slide);
         struct umbra_program *b = programs[cur_backend];
 
-        int   bpp = (int)fmt_formats[cur_fmt]->pixel_bytes;
-        _Bool planar = (cur_fmt == FMT_FP16P);
-        int   row_bytes = planar ? W * 2 : W * bpp;
-        size_t plane_gap = planar ? (size_t)W * H * 2 : 0;
-        size_t row_sz = planar ? (size_t)W * 2 : (size_t)W * (size_t)bpp;
+        int   bpp = umbra_pixel_bytes(fmt_enums[cur_fmt]);
+        int   row_bytes = W * bpp;
+        size_t plane_gap = 0;
+        size_t row_sz = (size_t)W * (size_t)bpp;
 
         for (int y = 0; y < H; y++) {
-            void *row = planar ? (void *)((__fp16 *)pixbuf + y * W)
-                               : (void *)((uint8_t *)pixbuf + y * row_bytes);
+            void *row = (void *)((uint8_t *)pixbuf + y * row_bytes);
             fill_bg_row(row, W, s->bg, row_sz, plane_gap);
         }
 
@@ -412,16 +412,14 @@ int main(void) {
 
         uint8_t *rows = (uint8_t *)tex_pixels;
         for (int y = 0; y < H; y++) {
-            void *src = planar ? (void *)((__fp16 *)pixbuf + y * W)
-                               : (void *)((uint8_t *)pixbuf + y * W * bpp);
+            void *src = (void *)((uint8_t *)pixbuf + y * W * bpp);
             readback_row((uint32_t *)(rows + y * tex_pitch), src, W, row_sz, plane_gap);
         }
 
         if (want_dump) {
             __fp16 *hdata = malloc((size_t)(W * H) * 4 * sizeof(__fp16));
             for (int y = 0; y < H; y++) {
-                void *src = planar ? (void *)((__fp16 *)pixbuf + y * W)
-                                   : (void *)((uint8_t *)pixbuf + y * W * bpp);
+                void *src = (void *)((uint8_t *)pixbuf + y * W * bpp);
                 to_hdr_row(hdata + y * W * 4, src, W, row_sz, plane_gap);
             }
             float *fdata = malloc((size_t)(W * H) * 4 * sizeof(float));

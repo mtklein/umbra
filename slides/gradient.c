@@ -15,11 +15,12 @@ static void grad_2stop_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     slide_uni_f32(uni, lay->shader, s->grad, 3);
     slide_uni_f32(uni, lay->shader + 12, s->color, 8);
     int       ps = lay->ps;
-    size_t plane_sz = (size_t)w * (size_t)h * lay->pixel_bytes;
+    int       pb = umbra_pixel_bytes(s->fmt);
+    size_t plane_sz = (size_t)w * (size_t)h * (size_t)pb;
     umbra_buf ubuf[5];
-    size_t rb = (size_t)w * lay->pixel_bytes;
+    size_t rb = (size_t)w * (size_t)pb;
     ubuf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)uni_len, .read_only=1};
-    ubuf[1] = (umbra_buf){.ptr=buf, .sz=plane_sz, .row_bytes=rb};
+    ubuf[1] = (umbra_buf){.ptr=buf, .sz=plane_sz, .row_bytes=rb, .fmt=s->fmt};
     for (int i = 0; i < ps; i++) {
         ubuf[2 + i] = (umbra_buf){.ptr=(char *)buf + plane_sz * (size_t)(i + 1), .sz=plane_sz, .row_bytes=rb};
     }
@@ -35,11 +36,12 @@ static void grad_lut_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     slide_uni_f32(uni, lay->shader, s->grad, 4);
     slide_uni_ptr(uni, (lay->shader + 16 + 7) & ~7, st->lut, (size_t)(st->lut_n * 4 * 4), 0, 0);
     int       ps = lay->ps;
-    size_t plane_sz = (size_t)w * (size_t)h * lay->pixel_bytes;
+    int       pb = umbra_pixel_bytes(s->fmt);
+    size_t plane_sz = (size_t)w * (size_t)h * (size_t)pb;
     umbra_buf ubuf[5];
-    size_t rb = (size_t)w * lay->pixel_bytes;
+    size_t rb = (size_t)w * (size_t)pb;
     ubuf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)uni_len, .read_only=1};
-    ubuf[1] = (umbra_buf){.ptr=buf, .sz=plane_sz, .row_bytes=rb};
+    ubuf[1] = (umbra_buf){.ptr=buf, .sz=plane_sz, .row_bytes=rb, .fmt=s->fmt};
     for (int i = 0; i < ps; i++) {
         ubuf[2 + i] = (umbra_buf){.ptr=(char *)buf + plane_sz * (size_t)(i + 1), .sz=plane_sz, .row_bytes=rb};
     }
@@ -51,18 +53,18 @@ static void grad_lut_cleanup(slide *s) {
     s->state = NULL;
 }
 
-slide slide_gradient_2stop(char const *, uint32_t, umbra_shader_fn, umbra_format,
+slide slide_gradient_2stop(char const *, uint32_t, umbra_shader_fn, umbra_fmt,
                            float const[8], float const[4]);
-slide slide_gradient_lut(char const *, uint32_t, umbra_shader_fn, umbra_format,
+slide slide_gradient_lut(char const *, uint32_t, umbra_shader_fn, umbra_fmt,
                          float const[4], float *, int);
 
 slide slide_gradient_2stop(char const *title, uint32_t bg, umbra_shader_fn shader,
-                           umbra_format format, float const color[8], float const grad[4]) {
+                           umbra_fmt fmt, float const color[8], float const grad[4]) {
     return (slide){
         .title = title,
         .bg = bg,
         .shader = shader,
-        .format = format,
+        .fmt = fmt,
         .color = {color[0], color[1], color[2], color[3], color[4], color[5], color[6],
                   color[7]},
         .grad = {grad[0], grad[1], grad[2], grad[3]},
@@ -71,7 +73,7 @@ slide slide_gradient_2stop(char const *title, uint32_t bg, umbra_shader_fn shade
 }
 
 slide slide_gradient_lut(char const *title, uint32_t bg, umbra_shader_fn shader,
-                         umbra_format format, float const grad[4], float *lut, int lut_n) {
+                         umbra_fmt fmt, float const grad[4], float *lut, int lut_n) {
     grad_lut_state *st = malloc(sizeof *st);
     st->lut = lut;
     st->lut_n = lut_n;
@@ -80,7 +82,7 @@ slide slide_gradient_lut(char const *title, uint32_t bg, umbra_shader_fn shader,
         .title = title,
         .bg = bg,
         .shader = shader,
-        .format = format,
+        .fmt = fmt,
         .grad = {grad[0], grad[1], grad[2], grad[3]},
         .draw = grad_lut_draw,
         .cleanup = grad_lut_cleanup,

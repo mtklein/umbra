@@ -37,11 +37,12 @@ static void persp_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     slide_uni_ptr(uni, (lay->coverage + 11 * 4 + 7) & ~7, st->bitmap->data,
                   (size_t)(st->bitmap->w * st->bitmap->h * 2), 0, 0);
     int       ps = lay->ps;
-    size_t plane_sz = (size_t)w * (size_t)h * lay->pixel_bytes;
+    int       pb = umbra_pixel_bytes(s->fmt);
+    size_t plane_sz = (size_t)w * (size_t)h * (size_t)pb;
     umbra_buf ubuf[5];
-    size_t rb = (size_t)w * lay->pixel_bytes;
+    size_t rb = (size_t)w * (size_t)pb;
     ubuf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)lay->uni_len, .read_only=1};
-    ubuf[1] = (umbra_buf){.ptr=buf, .sz=plane_sz, .row_bytes=rb};
+    ubuf[1] = (umbra_buf){.ptr=buf, .sz=plane_sz, .row_bytes=rb, .fmt=s->fmt};
     for (int i = 0; i < ps; i++) {
         ubuf[2 + i] = (umbra_buf){.ptr=(char *)buf + plane_sz * (size_t)(i + 1), .sz=plane_sz, .row_bytes=rb};
     }
@@ -63,7 +64,7 @@ slide slide_persp(text_cov *bitmap) {
         .shader = umbra_shader_solid,
         .coverage = umbra_coverage_bitmap_matrix,
         .blend = umbra_blend_srcover,
-        .format = umbra_format_8888,
+        .fmt = umbra_fmt_8888,
         .color = {1.0f, 0.8f, 0.2f, 1.0f},
         .bg = 0xff0a0a1e,
         .init = persp_init,

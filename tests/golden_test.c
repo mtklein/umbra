@@ -27,6 +27,10 @@ static umbra_format const *formats[] = {
     &umbra_format_fp16,  &umbra_format_fp16_planar,
     &umbra_format_1010102, &umbra_format_srgb_8888,
 };
+static umbra_fmt const fmt_enums[] = {
+    umbra_fmt_8888, umbra_fmt_565, umbra_fmt_fp16,
+    umbra_fmt_none, umbra_fmt_1010102, umbra_fmt_8888,
+};
 
 typedef struct {
     struct umbra_program *prog;
@@ -142,19 +146,15 @@ static void render_slide(
         umbra_draw_layout const *lay) {
     slide *s = slide_get(slide_idx);
 
-    int   bpp = (int)formats[fmt]->pixel_bytes;
-    _Bool planar = (fmt == FMT_FP16P);
-    int   row_bytes = planar ? W * 2 : W * bpp;
-    size_t plane_gap = planar ? (size_t)W * H * 2 : 0;
-    size_t row_sz = planar ? (size_t)W * 2 : (size_t)W * (size_t)bpp;
+    int   bpp = umbra_pixel_bytes(fmt_enums[fmt]);
+    int   row_bytes = W * bpp;
+    size_t row_sz = (size_t)W * (size_t)bpp;
 
     for (int y = 0; y < H; y++) {
-        void *row = planar
-            ? (void*)((__fp16*)pixbuf + y * W)
-            : (void*)((uint8_t*)pixbuf + y * row_bytes);
+        void *row = (void*)((uint8_t*)pixbuf + y * row_bytes);
         fill_bg_row(fmt, row, W,
                     s->bg, row_sz,
-                    plane_gap);
+                    0);
     }
     if (s->prepare) { s->prepare(s, W, H, be); }
     s->draw(s, W, H, 0, H, pixbuf,
@@ -164,18 +164,14 @@ static void render_slide(
 static void readback_to_8888(int fmt,
                              void *pixbuf,
                              uint32_t *out) {
-    _Bool planar = (fmt == FMT_FP16P);
-    int   bpp = (int)formats[fmt]->pixel_bytes;
-    size_t plane_gap = planar ? (size_t)W * H * 2 : 0;
-    size_t row_sz = planar ? (size_t)W * 2 : (size_t)W * (size_t)bpp;
+    int   bpp = umbra_pixel_bytes(fmt_enums[fmt]);
+    size_t row_sz = (size_t)W * (size_t)bpp;
 
     for (int y = 0; y < H; y++) {
-        void *src = planar
-            ? (void*)((__fp16*)pixbuf + y * W)
-            : (void*)((uint8_t*)pixbuf
+        void *src = (void*)((uint8_t*)pixbuf
                       + y * W * bpp);
         readback_row(fmt, out + y * W, src,
-                     W, row_sz, plane_gap);
+                     W, row_sz, 0);
     }
 }
 
@@ -183,13 +179,15 @@ static void test_slide_golden(
         int slide_idx, int fmt) {
     slide *s = slide_get(slide_idx);
 
-    umbra_format format = *formats[fmt];
-    if (!s->format.load) { format.load = NULL; }
+    if (fmt_enums[fmt] == umbra_fmt_none) { return; }
+
+    umbra_fmt saved_fmt = s->fmt;
+    s->fmt = fmt_enums[fmt];
 
     umbra_draw_layout lay;
     struct umbra_builder *bld =
         umbra_draw_build(s->shader, s->coverage,
-                         s->blend, format,
+                         s->blend,
                          &lay);
     struct umbra_basic_block *bb =
         umbra_basic_block(bld);
@@ -208,14 +206,9 @@ static void test_slide_golden(
     }
     umbra_basic_block_free(bb);
 
-    _Bool planar = (fmt == FMT_FP16P);
-    size_t pixbuf_sz = planar
-        ? (size_t)(W * H * 4) * 2
-        : (size_t)(W * H) * (size_t)(int)formats[fmt]->pixel_bytes;
-    size_t pad = planar
-        ? (size_t)((H - 1) * W) * 2 : 0;
-    void *pbuf_ref = calloc(1, pixbuf_sz + pad);
-    void *pbuf_tst = calloc(1, pixbuf_sz + pad);
+    size_t pixbuf_sz = (size_t)(W * H) * (size_t)umbra_pixel_bytes(fmt_enums[fmt]);
+    void *pbuf_ref = calloc(1, pixbuf_sz);
+    void *pbuf_tst = calloc(1, pixbuf_sz);
     uint32_t *ref = malloc((size_t)(W * H) * 4);
     uint32_t *tst = malloc((size_t)(W * H) * 4);
 
@@ -225,6 +218,7 @@ static void test_slide_golden(
 
     for (int bi = 1; bi < N_BACKS; bi++) {
         if (!progs[bi]) { continue; }
+        if (bi == 1 && fmt_enums[fmt] != umbra_fmt_8888) { continue; }
         render_slide(slide_idx, fmt,
                      bes[bi], progs[bi], pbuf_tst, &lay);
         umbra_backend_flush(bes[bi]);
@@ -265,6 +259,7 @@ static void test_slide_golden(
         umbra_program_free(progs[bi]);
         umbra_backend_free(bes[bi]);
     }
+    s->fmt = saved_fmt;
 }
 
 static void test_slug_rect(void) {
@@ -289,7 +284,7 @@ static void test_slug_rect(void) {
     umbra_draw_layout lay;
     builder *bld = umbra_draw_build(
         umbra_shader_solid, umbra_coverage_wind,
-        umbra_blend_srcover, umbra_format_8888,
+        umbra_blend_srcover,
         &lay);
     struct umbra_basic_block *bb =
         umbra_basic_block(bld);
@@ -334,7 +329,7 @@ static void test_slug_rect(void) {
         wind_buf, sizeof wind_buf, 1, (size_t)W * sizeof(float));
     umbra_buf buf[] = {
         {.ptr=uni, .sz=(size_t)lay.uni_len, .read_only=1},
-        {.ptr=pixels, .sz=sizeof pixels , .row_bytes=W * 4},
+        {.ptr=pixels, .sz=sizeof pixels, .row_bytes=W * 4, .fmt=umbra_fmt_8888},
     };
     umbra_program_queue(interp, 0, 0, W, H, buf);
     umbra_backend_flush(be);
@@ -366,7 +361,7 @@ static void test_perspective_text(void) {
     builder *bld = umbra_draw_build(
         umbra_shader_solid,
         umbra_coverage_bitmap_matrix,
-        umbra_blend_srcover, umbra_format_8888,
+        umbra_blend_srcover,
         &lay);
     struct umbra_basic_block *bb =
         umbra_basic_block(bld);
@@ -395,7 +390,7 @@ static void test_perspective_text(void) {
         bmp, sizeof bmp, 0, 0);
     umbra_buf buf[] = {
         {.ptr=uni, .sz=(size_t)lay.uni_len, .read_only=1},
-        {.ptr=pixels, .sz=sizeof pixels },
+        {.ptr=pixels, .sz=sizeof pixels, .fmt=umbra_fmt_8888},
     };
     umbra_program_queue(interp, 0, 0, BW, 1, buf);
     umbra_backend_flush(be);
@@ -411,7 +406,7 @@ static void test_perspective_text(void) {
     bld = umbra_draw_build(
         umbra_shader_solid,
         umbra_coverage_bitmap_matrix,
-        umbra_blend_srcover, umbra_format_8888,
+        umbra_blend_srcover,
         &lay2);
     bb = umbra_basic_block(bld);
     umbra_builder_free(bld);
@@ -437,7 +432,7 @@ static void test_perspective_text(void) {
             (size_t)(W * H * 2), 0, 0);
         umbra_buf b2[] = {
             {.ptr=u2, .sz=(size_t)lay2.uni_len, .read_only=1},
-            {.ptr=px2, .sz=(size_t)(W * H * 4), .row_bytes=W * 4},
+            {.ptr=px2, .sz=(size_t)(W * H * 4), .row_bytes=W * 4, .fmt=umbra_fmt_8888},
         };
         umbra_program_queue(interp, 0, 0, W, H, b2);
         umbra_backend_flush(be);

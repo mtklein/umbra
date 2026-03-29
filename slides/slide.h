@@ -10,11 +10,10 @@ struct slide {
     umbra_shader_fn    shader;
     umbra_coverage_fn  coverage;
     umbra_blend_fn     blend;
-    umbra_format       format;
+    umbra_fmt          fmt;
     float              color[8];
     float              grad[4];
     uint32_t           bg;
-    uint32_t           pad_;
 
     void (*init)   (slide*, int w, int h);
     void (*animate)(slide*, float dt);
