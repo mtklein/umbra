@@ -3,33 +3,10 @@
 #include <assert.h>
 
 #if defined(__aarch64__) || defined(__AVX2__)
-#include <math.h>
-
-// Transfer function helpers called from JIT code.
-// data layout: [r0..rK-1, g0..gK-1, b0..bK-1]
-static void jit_tf_invert(float *data, umbra_transfer const *tf, int K) {
-    for (int ch = 0; ch < 3; ch++) {
-        for (int i = 0; i < K; i++) {
-            float x = data[ch * K + i];
-            if (x >= tf->e) {
-                data[ch * K + i] = powf((x - tf->b) / tf->a, tf->g);
-            } else {
-                data[ch * K + i] = (x - tf->f) / tf->c;
-            }
-        }
-    }
-}
-static void jit_tf_apply(float *data, umbra_transfer const *tf, int K) {
-    for (int ch = 0; ch < 3; ch++) {
-        for (int i = 0; i < K; i++) {
-            float x = data[ch * K + i];
-            if (x >= tf->d) {
-                data[ch * K + i] = tf->a * powf(x, 1.0f / tf->g) + tf->b;
-            } else {
-                data[ch * K + i] = tf->c * x + tf->f;
-            }
-        }
-    }
+static uint32_t f2u(float f) {
+    uint32_t u;
+    __builtin_memcpy(&u, &f, 4);
+    return u;
 }
 #endif
 
@@ -394,112 +371,192 @@ static struct ra *ra_create_arm64(struct umbra_basic_block const *bb, struct jit
     return ra_create(bb, &cfg);
 }
 
-// Emit ARM64 code to call a transfer helper (jit_tf_invert or jit_tf_apply).
-// r_ch[3] are the SIMD registers holding R, G, B channels.
-// p is the buffer index. fn is the C function pointer.
-// This saves/restores all JIT state around the call.
-static void emit_transfer_call_arm64(Buf *c, int p, _Bool scalar,
-                                     int r_ch0, int r_ch1, int r_ch2,
-                                     void (*fn)(float*, umbra_transfer const*, int)) {
-    // Check buf[p].transfer.a — if 0, skip.
+// Emit inline NEON approx_powf for one channel register.
+// ch = the SIMD register to transform in-place.
+// t0..t4 = scratch SIMD registers.
+// exp_v = SIMD register holding the exponent (g or 1/g), broadcast.
+// zero = SIMD register of all zeros.
+// one = SIMD register of all 1.0f.
+static void emit_approx_powf_arm64(Buf *c, struct pool *pool,
+                                   int ch, int t0, int t1, int t2, int t3,
+                                   int exp_v, int zero) {
+    // x = max(ch, 0)
+    put(c, FMAXNM_4s(ch, ch, zero));
+
+    // --- approx_log2(x) ---
+    // xi = reinterpret_as_int(x) — already in ch, use integer ops
+    // e = to_float(xi) * (1.0f / (1<<23))
+    put(c, SCVTF_4s(t0, ch));                           // t0 = to_float(xi)
+    arm64_pool_load(c, pool, t1, f2u(1.0f / 8388608.0f));  // t1 = 1/(1<<23)
+    put(c, FMUL_4s(t0, t0, t1));                        // t0 = e
+
+    // m = reinterpret_as_float((xi & 0x007fffff) | 0x3f000000)
+    arm64_pool_load(c, pool, t1, 0x007fffff);            // t1 = mantissa mask
+    put(c, AND_16b(t2, ch, t1));                         // t2 = xi & mask
+    arm64_pool_load(c, pool, t1, 0x3f000000);            // t1 = 0.5f exponent
+    put(c, ORR_16b(t2, t2, t1));                         // t2 = m (as float)
+
+    // result = e - 124.225515 - 1.498030*m - 1.725880/(0.352089 + m)
+    arm64_pool_load(c, pool, t1, f2u(0.3520887068f));
+    put(c, FADD_4s(t3, t2, t1));                         // t3 = 0.352089 + m
+    arm64_pool_load(c, pool, t1, f2u(1.7258800268f));
+    put(c, FDIV_4s(t3, t1, t3));                         // t3 = 1.725880 / (0.352089+m)
+    arm64_pool_load(c, pool, t1, f2u(124.2255153f));
+    put(c, FSUB_4s(t0, t0, t1));                         // t0 = e - 124.225515
+    arm64_pool_load(c, pool, t1, f2u(1.4980303049f));
+    put(c, FMLS_4s(t0, t2, t1));                         // t0 -= 1.498030 * m
+    put(c, FSUB_4s(t0, t0, t3));                         // t0 = log2(x)
+
+    // --- scaled = log2(x) * exponent ---
+    put(c, FMUL_4s(t0, t0, exp_v));                     // t0 = log2(x) * exp
+
+    // --- approx_pow2(t0) ---
+    // f = t0 - floor(t0)
+    put(c, FRINTM_4s(t1, t0));                          // t1 = floor(t0)
+    put(c, FSUB_4s(t2, t0, t1));                         // t2 = f
+
+    // approx = t0 + 121.274058 - 1.490129*f + 27.728023/(4.842526 - f)
+    arm64_pool_load(c, pool, t1, f2u(4.8425264359f));
+    put(c, FSUB_4s(t3, t1, t2));                         // t3 = 4.842526 - f
+    arm64_pool_load(c, pool, t1, f2u(27.7280235f));
+    put(c, FDIV_4s(t3, t1, t3));                         // t3 = 27.728023/(4.842526-f)
+    arm64_pool_load(c, pool, t1, f2u(121.2740575f));
+    put(c, FADD_4s(t0, t0, t1));                         // t0 = x + 121.274058
+    arm64_pool_load(c, pool, t1, f2u(1.4901290827f));
+    put(c, FMLS_4s(t0, t2, t1));                         // t0 -= 1.490129 * f
+    put(c, FADD_4s(t0, t0, t3));                         // t0 = approx
+
+    // clamp: approx = clamp(approx * (1<<23), 0, 0x7f800000)
+    arm64_pool_load(c, pool, t1, f2u(8388608.0f));       // t1 = 1<<23
+    put(c, FMUL_4s(t0, t0, t1));                         // t0 *= (1<<23)
+    put(c, FMAXNM_4s(t0, t0, zero));                    // clamp low
+    arm64_pool_load(c, pool, t1, 0x4f000000);            // t1 = (float)0x7f800000
+    put(c, FMINNM_4s(t0, t0, t1));                      // clamp high
+    put(c, FCVTNS_4s(t0, t0));                           // round to nearest int
+    // t0 now holds the result (reinterpreted as float)
+
+    // Copy result to ch. We also need to handle x==0: if original x was 0,
+    // the log2 path produces garbage but clamp to 0 handles it.
+    // For x==1 the approximation is close enough.
+    put(c, ORR_16b(ch, t0, t0));                         // ch = result
+}
+
+// Emit inline NEON transfer function for ARM64 (no function call).
+// Invert: x >= e ? pow((x-b)/a, g) : (x-f)/c
+// Apply:  x >= d ? a*pow(x, 1/g)+b : c*x+f
+static void emit_transfer_inline_arm64(Buf *c, struct pool *pool,
+                                       struct ra *ra, int *sl, int *ns,
+                                       int p,
+                                       int r_ch0, int r_ch1, int r_ch2,
+                                       _Bool invert) {
+    // Allocate temp SIMD registers BEFORE the CBZ so that any spills happen
+    // unconditionally (outside the conditional block).
+    int8_t t0    = ra_alloc(ra, sl, ns);
+    int8_t t1    = ra_alloc(ra, sl, ns);
+    int8_t t2    = ra_alloc(ra, sl, ns);
+    int8_t t3    = ra_alloc(ra, sl, ns);
+    int8_t t4    = ra_alloc(ra, sl, ns);
+    int8_t tmask = ra_alloc(ra, sl, ns);
+    int8_t lin   = ra_alloc(ra, sl, ns);
+    int8_t exp_v = ra_alloc(ra, sl, ns);
+    int8_t zero  = ra_alloc(ra, sl, ns);
+
+    // Check buf[p].transfer.a — if 0, skip the transfer block.
     {
         int const a_off = p * (int)sizeof(umbra_buf)
                         + (int)__builtin_offsetof(umbra_buf, transfer)
                         + (int)__builtin_offsetof(umbra_transfer, a);
-        // LDR w_XT, [XBUF, #a_off]  (32-bit load)
         put(c, 0xb9400000u
             | ((uint32_t)(a_off / 4) << 10)
             | ((uint32_t)XBUF << 5)
             | (uint32_t)XT);
     }
-    // CBZ w_XT, skip
     int br_skip = c->len;
     put(c, 0x34000000u | (uint32_t)XT);  // CBZ Wt, +0 (patch later)
 
-    // Save frame: we need space for:
-    //   - 3 channel Q regs: 48 bytes (for data to pass to helper)
-    //   - GPR saves: 12 regs (x0-x2, x8-x15, x30) → 7 STP pairs = 112 bytes
-    //   - SIMD saves: 20 regs (v4-v7, v16-v31) → 10 STP pairs = 320 bytes
-    // Total = 480, round up to 496 for 16-byte alignment.
-    enum { FRAME = 496 };
-    // SUB SP, SP, #FRAME
-    put(c, SUB_xi(31, 31, FRAME));
+    // Load constants that are reused across all 3 channels.
+    put(c, MOVI_4s(zero, 0, 0));                         // zero = 0
 
-    // Save GPRs using STR with unsigned offset.
-    // STR x_reg, [SP, #off]
-#define SAVE_X(reg, off) put(c, 0xf9000000u | ((uint32_t)((off)/8) << 10) | (31u << 5) | ((uint32_t)(reg) & 0x1f))
-#define LOAD_X(reg, off) put(c, 0xf9400000u | ((uint32_t)((off)/8) << 10) | (31u << 5) | ((uint32_t)(reg) & 0x1f))
-    SAVE_X( 0, 48); SAVE_X( 1, 56); SAVE_X( 2, 64); SAVE_X( 8, 72);
-    SAVE_X( 9, 80); SAVE_X(10, 88); SAVE_X(11, 96); SAVE_X(12, 104);
-    SAVE_X(13, 112); SAVE_X(14, 120); SAVE_X(15, 128); SAVE_X(30, 136);
+    // Helper macro: load scalar from transfer struct, broadcast to 4 lanes.
+    int const tf_off = p * (int)sizeof(umbra_buf)
+                     + (int)__builtin_offsetof(umbra_buf, transfer);
+#define LOAD_TF(reg, field) do {                                              \
+    int const off_ = tf_off + (int)__builtin_offsetof(umbra_transfer, field); \
+    put(c, LDR_si(reg, XBUF, off_ / 4));                                     \
+    put(c, 0x4e040400u | ((uint32_t)(reg) << 5) | (uint32_t)(reg));           \
+} while (0)
 
-    // Save SIMD regs: v4-v7 at 144, v16-v31 at 208
-    // STR Q_reg, [SP, #off]
-#define SAVE_Q(reg, off) put(c, 0x3d800000u | ((uint32_t)((off)/16) << 10) | (31u << 5) | ((uint32_t)(reg) & 0x1f))
-#define LOAD_Q(reg, off) put(c, 0x3dc00000u | ((uint32_t)((off)/16) << 10) | (31u << 5) | ((uint32_t)(reg) & 0x1f))
-    SAVE_Q( 4, 144); SAVE_Q( 5, 160); SAVE_Q( 6, 176); SAVE_Q( 7, 192);
-    SAVE_Q(16, 208); SAVE_Q(17, 224); SAVE_Q(18, 240); SAVE_Q(19, 256);
-    SAVE_Q(20, 272); SAVE_Q(21, 288); SAVE_Q(22, 304); SAVE_Q(23, 320);
-    SAVE_Q(24, 336); SAVE_Q(25, 352); SAVE_Q(26, 368); SAVE_Q(27, 384);
-    SAVE_Q(28, 400); SAVE_Q(29, 416); SAVE_Q(30, 432); SAVE_Q(31, 448);
-
-    // Store R,G,B channel data to [SP+0], [SP+16], [SP+32]
-    put(c, 0x3d800000u | (0u << 10) | (31u << 5) | ((uint32_t)r_ch0 & 0x1f));  // STR Q r_ch0, [SP, #0]
-    put(c, 0x3d800000u | (1u << 10) | (31u << 5) | ((uint32_t)r_ch1 & 0x1f));  // STR Q r_ch1, [SP, #16]
-    put(c, 0x3d800000u | (2u << 10) | (31u << 5) | ((uint32_t)r_ch2 & 0x1f));  // STR Q r_ch2, [SP, #32]
-
-    // Set up args: x0 = SP (data ptr), x1 = &buf[p].transfer, x2 = K
-    put(c, ADD_xi(0, 31, 0));  // x0 = SP
-    {
-        int const tf_off = p * (int)sizeof(umbra_buf)
-                         + (int)__builtin_offsetof(umbra_buf, transfer);
-        put(c, ADD_xi(1, XBUF, tf_off));  // x1 = XBUF + tf_off
-    }
-    if (scalar) {
-        put(c, MOVZ_w(2, 1));  // x2 = 1
-    } else {
-        put(c, MOVZ_w(2, 4));  // x2 = 4
+    // Load the exponent for powf.
+    LOAD_TF(exp_v, g);
+    if (!invert) {
+        // exp_v = 1.0 / g — use t0 as temporary for 1.0
+        arm64_pool_load(c, pool, t0, f2u(1.0f));
+        put(c, FDIV_4s(exp_v, t0, exp_v));
     }
 
-    // Load function address into x3 and BLR.
-    {
-        uint64_t addr = (uint64_t)(uintptr_t)fn;
-        // MOVZ x3, addr[15:0]
-        put(c, 0xd2800003u | ((uint32_t)(addr & 0xffff) << 5));
-        // MOVK x3, addr[31:16], LSL #16
-        put(c, 0xf2a00003u | ((uint32_t)((addr >> 16) & 0xffff) << 5));
-        // MOVK x3, addr[47:32], LSL #32
-        put(c, 0xf2c00003u | ((uint32_t)((addr >> 32) & 0xffff) << 5));
-        // MOVK x3, addr[63:48], LSL #48
-        put(c, 0xf2e00003u | ((uint32_t)((addr >> 48) & 0xffff) << 5));
-        // BLR x3
-        put(c, 0xd63f0060u);
+    // Process each of the 3 channels (R, G, B).
+    // Transfer parameters are loaded into t0/t1 on-demand per channel.
+    int const channels[3] = { r_ch0, r_ch1, r_ch2 };
+    for (int ch_i = 0; ch_i < 3; ch_i++) {
+        int const ch = channels[ch_i];
+
+        // Compute comparison mask: ch >= threshold (e for invert, d for apply).
+        if (invert) {
+            LOAD_TF(t0, e);
+        } else {
+            LOAD_TF(t0, d);
+        }
+        put(c, FCMGE_4s(tmask, ch, t0));                // tmask = ch >= thresh
+
+        if (invert) {
+            // Curved: pow((ch - b) / a, g)
+            LOAD_TF(t0, b);
+            put(c, FSUB_4s(t4, ch, t0));                // t4 = ch - b
+            LOAD_TF(t0, a);
+            put(c, FDIV_4s(t4, t4, t0));                // t4 = (ch - b) / a
+            emit_approx_powf_arm64(c, pool, t4, t0, t1, t2, t3,
+                                   exp_v, zero);
+
+            // Linear: (ch - f) / c
+            LOAD_TF(t0, f);
+            put(c, FSUB_4s(lin, ch, t0));                // lin = ch - f
+            LOAD_TF(t0, c);
+            put(c, FDIV_4s(lin, lin, t0));               // lin = (ch - f) / c
+        } else {
+            // Curved: a * pow(ch, 1/g) + b
+            put(c, ORR_16b(t4, ch, ch));                 // t4 = copy of ch
+            emit_approx_powf_arm64(c, pool, t4, t0, t1, t2, t3,
+                                   exp_v, zero);
+            LOAD_TF(t0, a);
+            put(c, FMUL_4s(t4, t0, t4));                // t4 = a * pow(ch, 1/g)
+            LOAD_TF(t0, b);
+            put(c, FADD_4s(t4, t4, t0));                // t4 += b
+
+            // Linear: c * ch + f
+            LOAD_TF(t0, c);
+            put(c, FMUL_4s(lin, t0, ch));               // lin = c * ch
+            LOAD_TF(t0, f);
+            put(c, FADD_4s(lin, lin, t0));               // lin += f
+        }
+
+        // Select: ch = tmask ? curved(t4) : linear(lin)
+        // BIT Vd, Vn, Vm: Vd = (Vm & Vn) | (~Vm & Vd)
+        // ch = lin; BIT ch, t4, tmask → ch = tmask ? t4 : lin
+        put(c, ORR_16b(ch, lin, lin));                   // ch = lin
+        put(c, BIT_16b(ch, t4, tmask));                  // ch = tmask ? t4 : lin
     }
+#undef LOAD_TF
 
-    // Restore SIMD regs (saved state from before the call)
-    LOAD_Q( 4, 144); LOAD_Q( 5, 160); LOAD_Q( 6, 176); LOAD_Q( 7, 192);
-    LOAD_Q(16, 208); LOAD_Q(17, 224); LOAD_Q(18, 240); LOAD_Q(19, 256);
-    LOAD_Q(20, 272); LOAD_Q(21, 288); LOAD_Q(22, 304); LOAD_Q(23, 320);
-    LOAD_Q(24, 336); LOAD_Q(25, 352); LOAD_Q(26, 368); LOAD_Q(27, 384);
-    LOAD_Q(28, 400); LOAD_Q(29, 416); LOAD_Q(30, 432); LOAD_Q(31, 448);
-
-    // Reload R,G,B channel data AFTER restoring saved regs (the helper modified these)
-    put(c, 0x3dc00000u | (0u << 10) | (31u << 5) | ((uint32_t)r_ch0 & 0x1f));
-    put(c, 0x3dc00000u | (1u << 10) | (31u << 5) | ((uint32_t)r_ch1 & 0x1f));
-    put(c, 0x3dc00000u | (2u << 10) | (31u << 5) | ((uint32_t)r_ch2 & 0x1f));
-
-    // Restore GPRs
-    LOAD_X( 0, 48); LOAD_X( 1, 56); LOAD_X( 2, 64); LOAD_X( 8, 72);
-    LOAD_X( 9, 80); LOAD_X(10, 88); LOAD_X(11, 96); LOAD_X(12, 104);
-    LOAD_X(13, 112); LOAD_X(14, 120); LOAD_X(15, 128); LOAD_X(30, 136);
-
-    // Restore SP
-    put(c, ADD_xi(31, 31, FRAME));
-
-#undef SAVE_X
-#undef LOAD_X
-#undef SAVE_Q
-#undef LOAD_Q
+    // Free all temp registers.
+    ra_return_reg(ra, zero);
+    ra_return_reg(ra, exp_v);
+    ra_return_reg(ra, lin);
+    ra_return_reg(ra, tmask);
+    ra_return_reg(ra, t4);
+    ra_return_reg(ra, t3);
+    ra_return_reg(ra, t2);
+    ra_return_reg(ra, t1);
+    ra_return_reg(ra, t0);
 
     // Patch CBZ
     {
@@ -1154,7 +1211,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
 
             // Apply transfer function (invert: encoded -> linear).
-            emit_transfer_call_arm64(c, p, scalar, s0.rd, r1, r2, jit_tf_invert);
+            emit_transfer_inline_arm64(c, &jc->pool, ra, sl, ns,
+                                       p, s0.rd, r1, r2, /*invert=*/1);
 
             ra_return_reg(ra, t1);
             ra_return_reg(ra, t0);
@@ -1173,7 +1231,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
 
             // Apply transfer function (apply: linear -> encoded).
-            emit_transfer_call_arm64(c, p, scalar, rr, rg, rb_, jit_tf_apply);
+            emit_transfer_inline_arm64(c, &jc->pool, ra, sl, ns,
+                                       p, rr, rg, rb_, /*invert=*/0);
 
             int8_t scale = ra_alloc(ra, sl, ns);
             int8_t z     = ra_alloc(ra, sl, ns);
@@ -1988,12 +2047,100 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     return 0;
 }
 
-// Emit x86-64 code to call a transfer helper (jit_tf_invert or jit_tf_apply).
-// r_ch[3] are the YMM registers holding R, G, B channels.
-// p is the buffer index. fn is the C function pointer.
-static void emit_transfer_call_x86(Buf *c, int p, _Bool scalar,
-                                   int r_ch0, int r_ch1, int r_ch2,
-                                   void (*fn)(float*, umbra_transfer const*, int)) {
+// Load a transfer function parameter from [XBUF + disp] and broadcast to all YMM lanes.
+static void x86_load_tf_param(Buf *c, int reg, int disp) {
+    mov_load(c, RAX, XBUF, disp);
+    vex(c, 1, 1, 0, 0, reg, 0, RAX, 0x6e);  // VMOVD xmm_reg, eax
+    vbroadcastss(c, reg, reg);                 // VBROADCASTSS ymm, xmm
+}
+
+// Emit inline AVX2 approx_powf for one channel register.
+// ch = the YMM register to transform in-place.
+// t0..t3 = scratch YMM registers.
+// exp_v = YMM register holding the exponent (g or 1/g), broadcast.
+// zero = YMM register of all zeros.
+// one = YMM register of all 1.0f.
+// ch, t0, t1, t2 are scratch YMM registers; ch is both input and output.
+// After the call, ch holds approx_powf(x, exp_v).
+// ch is reused as scratch after the initial integer extraction.
+static void emit_approx_powf_x86(Buf *c, struct pool *pool,
+                                  int ch, int t0, int t1, int t2,
+                                  int exp_v, int zero) {
+    // x = max(ch, 0)
+    vmaxps(c, ch, ch, zero);
+
+    // --- approx_log2(x) ---
+    // Extract m first, then e, then ch is free for reuse as scratch.
+    // m = reinterpret_as_float((xi & 0x007fffff) | 0x3f000000)
+    pool_broadcast(c, pool, t1, 0x007fffff);
+    vpand(c, 1, t0, ch, t1);                            // t0 = xi & mask
+    pool_broadcast(c, pool, t1, 0x3f000000);
+    vpor(c, 1, t0, t0, t1);                             // t0 = m
+
+    // e = to_float(xi) * (1.0f / (1<<23))
+    vcvtdq2ps(c, t1, ch);                               // t1 = to_float(xi)
+    pool_broadcast(c, pool, t2, f2u(1.0f / 8388608.0f));
+    vmulps(c, t1, t1, t2);                              // t1 = e
+
+    // ch is now free for reuse as 4th scratch register.
+    // result = e - 124.225515 - 1.498030*m - 1.725880/(0.352089 + m)
+    pool_broadcast(c, pool, t2, f2u(0.3520887068f));
+    vaddps(c, t2, t0, t2);                              // t2 = 0.352089 + m
+    pool_broadcast(c, pool, ch, f2u(1.7258800268f));
+    vdivps(c, ch, ch, t2);                              // ch = 1.725880 / (0.352089+m)
+    pool_broadcast(c, pool, t2, f2u(124.2255153f));
+    vsubps(c, t1, t1, t2);                              // t1 = e - 124.225515
+    pool_broadcast(c, pool, t2, f2u(1.4980303049f));
+    vfnmadd231ps(c, t1, t0, t2);                        // t1 -= 1.498030 * m
+    vsubps(c, t1, t1, ch);                              // t1 = log2(x)
+
+    // --- scaled = log2(x) * exponent ---
+    vmulps(c, t1, t1, exp_v);                           // t1 = log2(x) * exp
+
+    // --- approx_pow2(t1) ---
+    // f = t1 - floor(t1)
+    vroundps(c, t0, t1, 1);                             // t0 = floor(t1)
+    vsubps(c, t2, t1, t0);                              // t2 = f
+
+    // approx = t1 + 121.274058 - 1.490129*f + 27.728023/(4.842526 - f)
+    pool_broadcast(c, pool, ch, f2u(4.8425264359f));
+    vsubps(c, ch, ch, t2);                              // ch = 4.842526 - f
+    pool_broadcast(c, pool, t0, f2u(27.7280235f));
+    vdivps(c, t0, t0, ch);                              // t0 = 27.728023/(4.842526-f)
+    pool_broadcast(c, pool, ch, f2u(121.2740575f));
+    vaddps(c, t1, t1, ch);                              // t1 = x + 121.274058
+    pool_broadcast(c, pool, ch, f2u(1.4901290827f));
+    vfnmadd231ps(c, t1, t2, ch);                        // t1 -= 1.490129 * f
+    vaddps(c, t1, t1, t0);                              // t1 = approx
+
+    // clamp: approx = clamp(approx * (1<<23), 0, 0x7f800000)
+    pool_broadcast(c, pool, ch, f2u(8388608.0f));
+    vmulps(c, t1, t1, ch);                              // t1 *= (1<<23)
+    vmaxps(c, t1, t1, zero);                            // clamp low
+    pool_broadcast(c, pool, ch, 0x4f000000);             // (float)0x7f800000
+    vminps(c, t1, t1, ch);                              // clamp high
+    vcvtps2dq(c, ch, t1);                               // ch = round to nearest int
+}
+
+// Emit inline AVX2 transfer function for x86-64 (no function call).
+// Invert: x >= e ? pow((x-b)/a, g) : (x-f)/c
+// Apply:  x >= d ? a*pow(x, 1/g)+b : c*x+f
+static void emit_transfer_inline_x86(Buf *c, struct pool *pool,
+                                     struct ra *ra, int *sl, int *ns,
+                                     int p,
+                                     int r_ch0, int r_ch1, int r_ch2,
+                                     _Bool invert) {
+    // Allocate temp SIMD registers BEFORE the JE so that any spills happen
+    // unconditionally (outside the conditional block).
+    int8_t t0    = ra_alloc(ra, sl, ns);
+    int8_t t1    = ra_alloc(ra, sl, ns);
+    int8_t t2    = ra_alloc(ra, sl, ns);
+    int8_t tcurv = ra_alloc(ra, sl, ns);
+    int8_t tmask = ra_alloc(ra, sl, ns);
+    int8_t tlin  = ra_alloc(ra, sl, ns);
+    int8_t exp_v = ra_alloc(ra, sl, ns);
+    int8_t tzero = ra_alloc(ra, sl, ns);
+
     // Check buf[p].transfer.a — load 32-bit float, compare to zero.
     {
         int const a_off = p * (int)sizeof(umbra_buf)
@@ -2008,89 +2155,81 @@ static void emit_transfer_call_x86(Buf *c, int p, _Bool scalar,
     }
     int br_skip = jcc(c, 0x04);  // JE skip
 
-    // Save state. Layout on stack (after SUB RSP):
-    //   slots 0-2: 3 channel YMM regs (96 bytes) = data for helper
-    //   slot  3: GPR save area (5 GPRs, 40 bytes, fits in 64 bytes)
-    //   slots 5-20: 16 YMM saves (512 bytes)
-    // Total: 21 slots * 32 = 672 bytes.
-    enum { FRAME = 672 };
-    add_ri(c, RSP, -FRAME);
+    // Load constants reused across all 3 channels.
+    vpxor(c, 1, tzero, tzero, tzero);                    // zero
 
-    // Save channel data: slots 0, 1, 2
-    vspill(c, r_ch0, 0);
-    vspill(c, r_ch1, 1);
-    vspill(c, r_ch2, 2);
-
-    // Save GPRs at byte offset 96 (slot 3 area).
-#define SGPR(reg, off) do { \
-    uint8_t rex_ = 0x48; if ((reg) >= 8) { rex_ |= 0x04; } \
-    emit1(c, rex_); emit1(c, 0x89); \
-    emit1(c, (uint8_t)(0x84 | (((reg) & 7) << 3))); \
-    emit1(c, 0x24); emit4(c, (uint32_t)(off)); \
-} while (0)
-#define LGPR(reg, off) do { \
-    uint8_t rex_ = 0x48; if ((reg) >= 8) { rex_ |= 0x04; } \
-    emit1(c, rex_); emit1(c, 0x8b); \
-    emit1(c, (uint8_t)(0x84 | (((reg) & 7) << 3))); \
-    emit1(c, 0x24); emit4(c, (uint32_t)(off)); \
-} while (0)
-    SGPR(RDI, 96);
-    SGPR(RSI, 104);
-    SGPR(RDX, 112);
-    SGPR(R10, 120);
-    SGPR(R11, 128);
-
-    // Save all 16 YMM regs: slots 5-20
-    for (int r = 0; r < 16; r++) {
-        vspill(c, r, 5 + r);
-    }
-
-    // Set up args: RDI = RSP (data ptr), RSI = &buf[p].transfer, RDX = K
-    mov_rr(c, RDI, RSP);
+    // Load the exponent for powf.
+    int const tf_off = p * (int)sizeof(umbra_buf)
+                     + (int)__builtin_offsetof(umbra_buf, transfer);
     {
-        int const tf_off = p * (int)sizeof(umbra_buf)
-                         + (int)__builtin_offsetof(umbra_buf, transfer);
-        // LEA RSI, [XBUF + tf_off]
-        // XBUF=RDX(2), RSI(6): both < 8, so REX.W=0x48 only
-        emit1(c, 0x48);
-        emit1(c, 0x8d);
-        emit1(c, (uint8_t)(0x80 | ((RSI & 7) << 3) | (XBUF & 7)));
-        emit4(c, (uint32_t)tf_off);
-    }
-    mov_ri(c, RDX, scalar ? 1 : 8);
-
-    // Load function address into RAX and CALL.
-    {
-        uint64_t addr = (uint64_t)(uintptr_t)fn;
-        emit1(c, 0x48); emit1(c, 0xb8);
-        for (int b_ = 0; b_ < 8; b_++) {
-            emit1(c, (uint8_t)(addr >> (b_ * 8)));
+        int const g_off = tf_off + (int)__builtin_offsetof(umbra_transfer, g);
+        x86_load_tf_param(c, exp_v, g_off);
+        if (!invert) {
+            // exp_v = 1.0 / g — use t0 as temporary for 1.0
+            pool_broadcast(c, pool, t0, f2u(1.0f));
+            vdivps(c, exp_v, t0, exp_v);
         }
-        emit1(c, 0xff); emit1(c, 0xd0);
     }
 
-    // Restore YMM regs
-    for (int r = 0; r < 16; r++) {
-        vfill(c, r, 5 + r);
+    // Process each of the 3 channels (R, G, B).
+    // Transfer parameters are loaded into t0 on-demand per channel.
+    int const channels[3] = { r_ch0, r_ch1, r_ch2 };
+    for (int ch_i = 0; ch_i < 3; ch_i++) {
+        int const ch = channels[ch_i];
+
+        // Compute comparison mask: ch >= threshold (e for invert, d for apply).
+        if (invert) {
+            x86_load_tf_param(c, t0, tf_off + (int)__builtin_offsetof(umbra_transfer, e));
+        } else {
+            x86_load_tf_param(c, t0, tf_off + (int)__builtin_offsetof(umbra_transfer, d));
+        }
+        vcmpps(c, tmask, ch, t0, 5);                    // tmask = ch >= thresh
+
+        if (invert) {
+            // Curved: pow((ch - b) / a, g)
+            x86_load_tf_param(c, t0, tf_off + (int)__builtin_offsetof(umbra_transfer, b));
+            vsubps(c, tcurv, ch, t0);                    // tcurv = ch - b
+            x86_load_tf_param(c, t0, tf_off + (int)__builtin_offsetof(umbra_transfer, a));
+            vdivps(c, tcurv, tcurv, t0);                 // tcurv = (ch - b) / a
+            emit_approx_powf_x86(c, pool, tcurv, t0, t1, t2,
+                                 exp_v, tzero);
+
+            // Linear: (ch - f) / c
+            x86_load_tf_param(c, t0, tf_off + (int)__builtin_offsetof(umbra_transfer, f));
+            vsubps(c, tlin, ch, t0);                     // tlin = ch - f
+            x86_load_tf_param(c, t0, tf_off + (int)__builtin_offsetof(umbra_transfer, c));
+            vdivps(c, tlin, tlin, t0);                   // tlin = (ch - f) / c
+        } else {
+            // Curved: a * pow(ch, 1/g) + b
+            vmovaps(c, tcurv, ch);                       // tcurv = copy of ch
+            emit_approx_powf_x86(c, pool, tcurv, t0, t1, t2,
+                                 exp_v, tzero);
+            x86_load_tf_param(c, t0, tf_off + (int)__builtin_offsetof(umbra_transfer, a));
+            vmulps(c, tcurv, t0, tcurv);                 // tcurv = a * pow(ch, 1/g)
+            x86_load_tf_param(c, t0, tf_off + (int)__builtin_offsetof(umbra_transfer, b));
+            vaddps(c, tcurv, tcurv, t0);                 // tcurv += b
+
+            // Linear: c * ch + f
+            x86_load_tf_param(c, t0, tf_off + (int)__builtin_offsetof(umbra_transfer, c));
+            vmulps(c, tlin, t0, ch);                     // tlin = c * ch
+            x86_load_tf_param(c, t0, tf_off + (int)__builtin_offsetof(umbra_transfer, f));
+            vaddps(c, tlin, tlin, t0);                   // tlin += f
+        }
+
+        // Select: ch = tmask ? curved(tcurv) : linear(tlin)
+        // vpblendvb(c, L, d, z, y, x): d = x[msb] ? y : z
+        vpblendvb(c, 1, ch, tlin, tcurv, tmask);
     }
 
-    // Restore channel data (overwriting the YMM reg values just restored)
-    vfill(c, r_ch0, 0);
-    vfill(c, r_ch1, 1);
-    vfill(c, r_ch2, 2);
-
-    // Restore GPRs
-    LGPR(RDI, 96);
-    LGPR(RSI, 104);
-    LGPR(RDX, 112);
-    LGPR(R10, 120);
-    LGPR(R11, 128);
-
-#undef SGPR
-#undef LGPR
-
-    // Restore RSP
-    add_ri(c, RSP, FRAME);
+    // Free all temp registers.
+    ra_return_reg(ra, tzero);
+    ra_return_reg(ra, exp_v);
+    ra_return_reg(ra, tlin);
+    ra_return_reg(ra, tmask);
+    ra_return_reg(ra, tcurv);
+    ra_return_reg(ra, t2);
+    ra_return_reg(ra, t1);
+    ra_return_reg(ra, t0);
 
     // Patch JE
     patch_jcc(c, br_skip);
@@ -2828,7 +2967,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
 
             // Apply transfer function (invert: encoded -> linear).
-            emit_transfer_call_x86(c, p, scalar, s0.rd, r1, r2, jit_tf_invert);
+            emit_transfer_inline_x86(c, &jc->pool, ra, sl, ns,
+                                     p, s0.rd, r1, r2, /*invert=*/1);
 
             ra_return_reg(ra, t1);
             ra_return_reg(ra, t0);
@@ -2847,7 +2987,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
 
             // Apply transfer function (apply: linear -> encoded).
-            emit_transfer_call_x86(c, p, scalar, rr, rg, rb_, jit_tf_apply);
+            emit_transfer_inline_x86(c, &jc->pool, ra, sl, ns,
+                                     p, rr, rg, rb_, /*invert=*/0);
 
             int8_t scale = ra_alloc(ra, sl, ns);
             int8_t px    = ra_alloc(ra, sl, ns);

@@ -218,7 +218,7 @@ static void test_slide_golden(
 
     for (int bi = 1; bi < N_BACKS; bi++) {
         if (!progs[bi]) { continue; }
-        if (bi == 1 && (fmt_enums[fmt] == umbra_fmt_none || fmt == FMT_SRGB)) { continue; }
+        if (bi == 1 && fmt_enums[fmt] == umbra_fmt_none) { continue; }
         render_slide(slide_idx, fmt,
                      bes[bi], progs[bi], pbuf_tst, &lay);
         umbra_backend_flush(bes[bi]);
@@ -248,7 +248,9 @@ static void test_slide_golden(
                 backend_name[bi], fmt_name[fmt],
                 mismatches, W * H, worst);
         }
-        worst == 0 here;
+        // sRGB uses an approximate powf in the JIT, allowing up to 3 delta.
+        int const tolerance = (fmt == FMT_SRGB) ? 3 : 0;
+        worst <= tolerance here;
     }
 
     free(ref);
