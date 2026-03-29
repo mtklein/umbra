@@ -483,7 +483,7 @@ static void emit_transfer_inline_arm64(Buf *c, struct pool *pool,
 #define LOAD_TF(reg, field) do {                                              \
     int const off_ = tf_off + (int)__builtin_offsetof(umbra_transfer, field); \
     put(c, LDR_si(reg, XBUF, off_ / 4));                                     \
-    put(c, 0x4e040400u | ((uint32_t)(reg) << 5) | (uint32_t)(reg));           \
+    put(c, DUP_4s_lane(reg, reg, 0));                                        \
 } while (0)
 
     // Load the exponent for powf.
@@ -880,7 +880,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_imm_w(c, XT, (uint32_t)inst->imm);
             put(c, LDR_sx(s.rd, XP, XT));
-            put(c, 0x4e040400u | ((uint32_t)s.rd << 5) | (uint32_t)s.rd);
+            put(c, DUP_4s_lane(s.rd, s.rd, 0));
         } break;
 
         case op_gather_uniform_32: {
@@ -1156,10 +1156,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     put(c, FCVTL_4s(px, px));
                     // px now has {R, G, B, A} as fp32 in lanes 0-3.
                     // DUP each lane.
-                    put(c, 0x4e040400u | (0u << 19) | ((uint32_t)px << 5) | (uint32_t)s0.rd);
-                    put(c, 0x4e040400u | (1u << 19) | ((uint32_t)px << 5) | (uint32_t)r1);
-                    put(c, 0x4e040400u | (2u << 19) | ((uint32_t)px << 5) | (uint32_t)r2);
-                    put(c, 0x4e040400u | (3u << 19) | ((uint32_t)px << 5) | (uint32_t)r3);
+                    put(c, DUP_4s_lane(s0.rd, px, 0));
+                    put(c, DUP_4s_lane(r1,    px, 1));
+                    put(c, DUP_4s_lane(r2,    px, 2));
+                    put(c, DUP_4s_lane(r3,    px, 3));
                 } else {
                     // Load 32 bytes (4 pixels, each 4xfp16).
                     // Compute addr = XP + XCOL*8 in XT.
@@ -1209,31 +1209,27 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                                  + (int)__builtin_offsetof(umbra_buf, sz);
                 put(c, 0xf9400000u | ((uint32_t)(sz_off/8) << 10)
                                    | ((uint32_t)XBUF << 5) | (uint32_t)XT);
-                put(c, 0xd342fc00u | ((uint32_t)XT << 5) | (uint32_t)XT);
+                put(c, LSR_xi(XT, XT, 2));
                 if (scalar) {
                     // Plane 0 (R)
-                    put(c, 0x7c607800u | ((uint32_t)XI << 16)
-                                       | ((uint32_t)XP << 5) | (uint32_t)px);
+                    put(c, LDR_hx(px, XP, XI));
                     put(c, FCVTL_4s(s0.rd, px));
-                    put(c, 0x4e040400u | ((uint32_t)s0.rd << 5) | (uint32_t)s0.rd);
+                    put(c, DUP_4s_lane(s0.rd, s0.rd, 0));
                     // Plane 1 (G)
                     put(c, ADD_xr(XP, XP, XT));
-                    put(c, 0x7c607800u | ((uint32_t)XI << 16)
-                                       | ((uint32_t)XP << 5) | (uint32_t)px);
+                    put(c, LDR_hx(px, XP, XI));
                     put(c, FCVTL_4s(r1, px));
-                    put(c, 0x4e040400u | ((uint32_t)r1 << 5) | (uint32_t)r1);
+                    put(c, DUP_4s_lane(r1, r1, 0));
                     // Plane 2 (B)
                     put(c, ADD_xr(XP, XP, XT));
-                    put(c, 0x7c607800u | ((uint32_t)XI << 16)
-                                       | ((uint32_t)XP << 5) | (uint32_t)px);
+                    put(c, LDR_hx(px, XP, XI));
                     put(c, FCVTL_4s(r2, px));
-                    put(c, 0x4e040400u | ((uint32_t)r2 << 5) | (uint32_t)r2);
+                    put(c, DUP_4s_lane(r2, r2, 0));
                     // Plane 3 (A)
                     put(c, ADD_xr(XP, XP, XT));
-                    put(c, 0x7c607800u | ((uint32_t)XI << 16)
-                                       | ((uint32_t)XP << 5) | (uint32_t)px);
+                    put(c, LDR_hx(px, XP, XI));
                     put(c, FCVTL_4s(r3, px));
-                    put(c, 0x4e040400u | ((uint32_t)r3 << 5) | (uint32_t)r3);
+                    put(c, DUP_4s_lane(r3, r3, 0));
                 } else {
                     // Plane 0 (R)
                     put(c, LDR_d(s0.rd, XP, XH));
@@ -1471,7 +1467,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                                  + (int)__builtin_offsetof(umbra_buf, sz);
                 put(c, 0xf9400000u | ((uint32_t)(sz_off/8) << 10)
                                    | ((uint32_t)XBUF << 5) | (uint32_t)XT);
-                put(c, 0xd342fc00u | ((uint32_t)XT << 5) | (uint32_t)XT);
+                put(c, LSR_xi(XT, XT, 2));
                 if (scalar) {
                     put(c, FCVTN_4h(px, rr));  put(c, STR_hx(px, XP, XI));
                     put(c, ADD_xr(XP, XP, XT));

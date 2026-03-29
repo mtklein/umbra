@@ -35,6 +35,7 @@ static void test_mem(void) {
     LDR_sx(0, 1, 2) == 0xBC627820 here;
     STR_sx(3, 4, 5) == 0xBC257883 here;
     STR_hx(3, 4, 5) == 0x7C257883 here;
+    LDR_hx(0, 1, 2) == 0x7C627820 here;
     LDR_d(0, 1, 2) == 0xFC626820 here;
     STR_d(3, 4, 5) == 0xFC256883 here;
     LDR_q(0, 1, 2) == 0x3CE26820 here;
@@ -124,6 +125,10 @@ static void test_movi(void) {
 
 static void test_dup_ins(void) {
     DUP_4s_w(7, 8) == 0x4E040D07 here;
+    DUP_4s_lane(0, 1, 0) == 0x4E040420 here;
+    DUP_4s_lane(0, 1, 2) == 0x4E140420 here;
+    DUP_4s_lane(3, 4, 1) == 0x4E0C0483 here;
+    DUP_4s_lane(5, 6, 3) == 0x4E1C04C5 here;
     UMOV_ws(0, 1) == 0x0E043C20 here;
     UMOV_ws_lane(0, 1, 0) == 0x0E043C20 here;
     UMOV_ws_lane(0, 1, 2) == 0x0E143C20 here;
@@ -173,6 +178,8 @@ static void test_stp_ldp(void) {
 
 static void test_lsl(void) {
     LSL_xi(0, 1, 4) == (0xD3400000u | (60u << 16) | (59u << 10) | (1u << 5) | 0) here;
+    LSR_xi(0, 1, 2)  == 0xD342FC20 here;
+    LSR_xi(3, 4, 5)  == 0xD345FC83 here;
 }
 
 static void test_ldr_str_si(void) {
