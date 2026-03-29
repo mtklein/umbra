@@ -1,6 +1,8 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 struct umbra_builder* umbra_builder(void);
 void   umbra_builder_free(struct umbra_builder*);
@@ -12,9 +14,6 @@ struct umbra_backend* umbra_backend_interp(void);
 struct umbra_backend* umbra_backend_jit   (void);
 struct umbra_backend* umbra_backend_metal (void);
 
-void   umbra_backend_free      (struct umbra_backend*);
-void   umbra_backend_flush     (struct umbra_backend*);
-_Bool  umbra_backend_threadsafe(struct umbra_backend const*);
 
 typedef enum {
     umbra_fmt_8888,
@@ -36,13 +35,60 @@ typedef struct {
     char            pad_[3];
 } umbra_buf;
 
+struct umbra_backend {
+    struct umbra_program* (*compile)(struct umbra_backend*,
+                                     struct umbra_basic_block const*);
+    void  (*flush)(struct umbra_backend*);
+    void  (*free_fn)(struct umbra_backend*);
+    void  *ctx;
+    int     threadsafe, :32;
+};
 
-struct umbra_program* umbra_program(struct umbra_backend*,
-                                    struct umbra_basic_block const*);
-void   umbra_program_free (struct umbra_program*);
-void   umbra_program_queue(struct umbra_program*,
-                           int l, int t, int r, int b, umbra_buf[]);
-struct umbra_backend* umbra_program_backend(struct umbra_program const*);
+struct umbra_program {
+    void *ctx;
+    void (*queue)(void*, int, int, int, int, umbra_buf[]);
+    void (*dump)(void const*, FILE*);
+    void (*free_fn)(void*);
+    struct umbra_backend *backend;
+};
+
+static inline struct umbra_program *umbra_program(struct umbra_backend           *be,
+                                                  struct umbra_basic_block const *bb) {
+    return be->compile(be, bb);
+}
+static inline void umbra_program_free(struct umbra_program *p) {
+    if (p) {
+        p->free_fn(p->ctx);
+        free(p);
+    }
+}
+static inline void umbra_program_queue(struct umbra_program *p,
+                                       int l, int t, int r, int b, umbra_buf buf[]) {
+    if (r > l && b > t) {
+        p->queue(p->ctx, l, t, r, b, buf);
+    }
+}
+static inline struct umbra_backend *umbra_program_backend(struct umbra_program const *p) {
+    return p->backend;
+}
+static inline void umbra_program_dump(struct umbra_program *p, FILE *f) {
+    if (p && p->dump) {
+        p->dump(p->ctx, f);
+    }
+}
+static inline void umbra_backend_flush(struct umbra_backend *be) {
+    if (be && be->flush) {
+        be->flush(be);
+    }
+}
+static inline _Bool umbra_backend_threadsafe(struct umbra_backend const *be) {
+    return be && be->threadsafe;
+}
+static inline void umbra_backend_free(struct umbra_backend *be) {
+    if (be) {
+        be->free_fn(be);
+    }
+}
 
 typedef struct { int bits; } umbra_val;
 typedef struct { umbra_val r, g, b, a; } umbra_color;
@@ -135,7 +181,5 @@ umbra_val umbra_lt_u32(struct umbra_builder*, umbra_val, umbra_val);
 umbra_val umbra_le_u32(struct umbra_builder*, umbra_val, umbra_val);
 
 
-#include <stdio.h>
-void umbra_program_dump(struct umbra_program*, FILE*);
 void umbra_dump_builder(struct umbra_builder const*, FILE*);
 void umbra_dump_basic_block(struct umbra_basic_block const*, FILE*);

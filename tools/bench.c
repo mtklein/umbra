@@ -1,7 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "../slides/slide.h"
 #include "../slides/slug.h"
-#include "../src/program.h"
+#include "../include/umbra.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

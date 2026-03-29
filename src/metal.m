@@ -1,36 +1,9 @@
-#include "program.h"
 #include "bb.h"
 #include <assert.h>
 
 #if !defined(__APPLE__) || defined(__wasm__)
 
-struct metal_backend { int dummy; };
-struct umbra_metal  { int dummy; };
-void* umbra_metal_backend_create(void) { return 0; }
-void  umbra_metal_backend_free(void *ctx) {
-    (void)ctx;
-}
-struct umbra_metal* umbra_metal(
-    void *backend_ctx,
-    struct umbra_basic_block const *bb
-) { (void)backend_ctx; (void)bb; return 0; }
-void umbra_metal_run(
-    struct umbra_metal *m, int w, int h, int x0, int y0, umbra_buf buf[]
-) {
-    (void)m; (void)w; (void)h; (void)x0; (void)y0; (void)buf;
-}
-void umbra_metal_begin_batch(void *ctx) {
-    (void)ctx;
-}
-void umbra_metal_flush(void *ctx) {
-    (void)ctx;
-}
-void umbra_metal_free(struct umbra_metal *m) {
-    (void)m;
-}
-void umbra_dump_metal(
-    struct umbra_metal const *m, FILE *f
-) { (void)m; (void)f; }
+struct umbra_backend *umbra_backend_metal(void) { return 0; }
 
 #else
 
@@ -899,7 +872,7 @@ static char* build_source(BB const *bb,
     return src;
 }
 
-void* umbra_metal_backend_create(void) {
+static void* umbra_metal_backend_create(void) {
     @autoreleasepool {
         id<MTLDevice> device =
             MTLCreateSystemDefaultDevice();
@@ -918,7 +891,7 @@ void* umbra_metal_backend_create(void) {
     }
 }
 
-void umbra_metal_backend_free(void *ctx) {
+static void umbra_metal_backend_free(void *ctx) {
     struct metal_backend *be = ctx;
     if (be) {
         @autoreleasepool {
@@ -935,7 +908,7 @@ void umbra_metal_backend_free(void *ctx) {
     }
 }
 
-struct umbra_metal* umbra_metal(
+static struct umbra_metal* umbra_metal(
     void *backend_ctx, BB const *bb
 ) {
     struct metal_backend *be = backend_ctx;
@@ -1291,7 +1264,9 @@ static void encode_dispatch(
     free(fmts_data);
 }
 
-void umbra_metal_run(
+static void umbra_metal_begin_batch(void *ctx);
+
+static void umbra_metal_run(
     struct umbra_metal *m, int l, int t, int r, int b, umbra_buf buf[]
 ) {
     int w = r - l, h = b - t;
@@ -1328,7 +1303,7 @@ void umbra_metal_run(
     }
 }
 
-void umbra_metal_begin_batch(void *ctx) {
+static void umbra_metal_begin_batch(void *ctx) {
     struct metal_backend *be = ctx;
     if (be && !be->batch_cmdbuf) {
         be->batch_gen++;
@@ -1349,7 +1324,7 @@ void umbra_metal_begin_batch(void *ctx) {
     }
 }
 
-void umbra_metal_flush(void *ctx) {
+static void umbra_metal_flush(void *ctx) {
     struct metal_backend *be = ctx;
     if (be && be->batch_cmdbuf) {
         @autoreleasepool {
@@ -1388,7 +1363,7 @@ void umbra_metal_flush(void *ctx) {
     }
 }
 
-void umbra_metal_free(struct umbra_metal *m) {
+static void umbra_metal_free(struct umbra_metal *m) {
     assert(m);
     @autoreleasepool {
         if (m->pipeline) {
@@ -1403,13 +1378,53 @@ void umbra_metal_free(struct umbra_metal *m) {
     free(m);
 }
 
-void umbra_dump_metal(
+static void umbra_dump_metal(
     struct umbra_metal const *m, FILE *f
 ) {
     assert(m);
     if (m->src) {
         fputs(m->src, f);
     }
+}
+
+static void run_metal(void *ctx, int l, int t, int r, int b, umbra_buf buf[]) {
+    umbra_metal_run(ctx, l, t, r, b, buf);
+}
+static void dump_metal(void const *ctx, FILE *f) { umbra_dump_metal(ctx, f); }
+static void free_metal(void *ctx) { umbra_metal_free(ctx); }
+static struct umbra_program *compile_metal(struct umbra_backend           *be,
+                                           struct umbra_basic_block const *bb) {
+    struct umbra_metal *const m = umbra_metal(be->ctx, bb);
+    assert(m);
+    struct umbra_program *const prog = malloc(sizeof *prog);
+    *prog = (struct umbra_program){
+        .ctx     = m,
+        .queue   = run_metal,
+        .dump    = dump_metal,
+        .free_fn = free_metal,
+        .backend = be,
+    };
+    return prog;
+}
+static void flush_be_metal(struct umbra_backend *be) { umbra_metal_flush(be->ctx); }
+static void free_be_metal(struct umbra_backend *be) {
+    umbra_metal_flush(be->ctx);
+    umbra_metal_backend_free(be->ctx);
+    free(be);
+}
+struct umbra_backend *umbra_backend_metal(void) {
+    void *const ctx = umbra_metal_backend_create();
+    if (ctx) {
+        struct umbra_backend *const be = malloc(sizeof *be);
+        *be = (struct umbra_backend){
+            .compile = compile_metal,
+            .flush   = flush_be_metal,
+            .free_fn = free_be_metal,
+            .ctx     = ctx,
+        };
+        return be;
+    }
+    return 0;
 }
 
 #endif

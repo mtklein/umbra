@@ -1,4 +1,3 @@
-#include "program.h"
 #include "bb.h"
 #include <math.h>
 #include <stdint.h>
@@ -533,7 +532,7 @@ struct umbra_interpreter {
     int             preamble, nptr, n_deref, pad_;
 };
 
-struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) {
+static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) {
     int *id = calloc((size_t)bb->insts, sizeof *id);
 
     struct umbra_interpreter *p = malloc(sizeof *p);
@@ -997,8 +996,8 @@ struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) 
     return p;
 }
 
-void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int b,
-                             umbra_buf caller_buf[]) {
+static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int b,
+                                    umbra_buf caller_buf[]) {
     int const nall = p->nptr + p->n_deref;
     for (int i = 0; i < p->nptr; i++) { p->buf[i] = caller_buf[i]; }
     for (int i = p->nptr; i < nall; i++) { p->buf[i] = (umbra_buf){0}; }
@@ -1711,11 +1710,41 @@ void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int
     }
 }
 
-void umbra_interpreter_free(struct umbra_interpreter *p) {
+static void umbra_interpreter_free(struct umbra_interpreter *p) {
     if (p) {
         free(p->buf);
         free(p->inst);
         free(p->v);
         free(p);
     }
+}
+
+static void run_interp(void *ctx, int l, int t, int r, int b, umbra_buf buf[]) {
+    umbra_interpreter_run(ctx, l, t, r, b, buf);
+}
+static void free_interp(void *ctx) { umbra_interpreter_free(ctx); }
+static struct umbra_program *compile_interp(struct umbra_backend           *be,
+                                            struct umbra_basic_block const *bb) {
+    struct umbra_interpreter *const p = umbra_interpreter(bb);
+    assert(p);
+    struct umbra_program *const prog = malloc(sizeof *prog);
+    *prog = (struct umbra_program){
+        .ctx     = p,
+        .queue   = run_interp,
+        .dump    = 0,
+        .free_fn = free_interp,
+        .backend = be,
+    };
+    return prog;
+}
+static void free_be_interp(struct umbra_backend *be) { free(be); }
+struct umbra_backend *umbra_backend_interp(void) {
+    struct umbra_backend *const be = malloc(sizeof *be);
+    *be = (struct umbra_backend){
+        .compile    = compile_interp,
+        .flush      = 0,
+        .free_fn    = free_be_interp,
+        .threadsafe = 1,
+    };
+    return be;
 }

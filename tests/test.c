@@ -2541,8 +2541,10 @@ static void test_backend_threadsafe(void) {
     umbra_backend_free(interp);
 
     struct umbra_backend *jit = umbra_backend_jit();
-    umbra_backend_threadsafe(jit) == 1 here;
-    umbra_backend_free(jit);
+    if (jit) {
+        umbra_backend_threadsafe(jit) == 1 here;
+        umbra_backend_free(jit);
+    }
 
     struct umbra_backend *metal = umbra_backend_metal();
     if (metal) {

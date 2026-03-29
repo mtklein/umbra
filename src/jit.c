@@ -1,4 +1,3 @@
-#include "program.h"
 #include "bb.h"
 #include <assert.h>
 
@@ -12,26 +11,7 @@ static uint32_t f2u(float f) {
 
 #if !defined(__aarch64__) && !defined(__AVX2__)
 
-struct umbra_jit {
-    int dummy;
-};
-struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
-    (void)bb;
-    return 0;
-}
-void umbra_jit_run(struct umbra_jit *j, int l, int t, int r, int b, umbra_buf buf[]) {
-    (void)j;
-    (void)l;
-    (void)t;
-    (void)r;
-    (void)b;
-    (void)buf;
-}
-void umbra_jit_free(struct umbra_jit *j) { (void)j; }
-void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
-    (void)j;
-    (void)f;
-}
+struct umbra_backend *umbra_backend_jit(void) { return 0; }
 
 #elif defined(__aarch64__)
 
@@ -467,7 +447,7 @@ struct umbra_jit {
     int loop_start, loop_end;
 };
 
-struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
+static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
 
     int *sl = malloc((size_t)bb->insts * sizeof(int));
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
@@ -1608,17 +1588,17 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 #if __clang__
 __attribute__((no_sanitize("function")))
 #endif
-void umbra_jit_run(struct umbra_jit *j, int l, int t, int r, int b, umbra_buf buf[]) {
+static void umbra_jit_run(struct umbra_jit *j, int l, int t, int r, int b, umbra_buf buf[]) {
     assert(j);
     j->entry(l, t, r, b, buf);
 }
-void umbra_jit_free(struct umbra_jit *j) {
+static void umbra_jit_free(struct umbra_jit *j) {
     assert(j);
     munmap(j->code, j->code_size);
     free(j);
 }
 
-void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
+static void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
     assert(j);
     if (j->loop_start >= j->loop_end) { return; }
 
@@ -1697,6 +1677,37 @@ void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
 done:
     if (have_tmp) { remove(tmp); remove(opath); }
     if (have_asm) { remove(asm_path); }
+}
+
+static void run_jit(void *ctx, int l, int t, int r, int b, umbra_buf buf[]) {
+    umbra_jit_run(ctx, l, t, r, b, buf);
+}
+static void dump_jit(void const *ctx, FILE *f) { umbra_dump_jit_mca(ctx, f); }
+static void free_jit(void *ctx) { umbra_jit_free(ctx); }
+static struct umbra_program *compile_jit(struct umbra_backend           *be,
+                                         struct umbra_basic_block const *bb) {
+    struct umbra_jit *const j = umbra_jit(bb);
+    assert(j);
+    struct umbra_program *const prog = malloc(sizeof *prog);
+    *prog = (struct umbra_program){
+        .ctx     = j,
+        .queue   = run_jit,
+        .dump    = dump_jit,
+        .free_fn = free_jit,
+        .backend = be,
+    };
+    return prog;
+}
+static void free_be_jit(struct umbra_backend *be) { free(be); }
+struct umbra_backend *umbra_backend_jit(void) {
+    struct umbra_backend *const be = malloc(sizeof *be);
+    *be = (struct umbra_backend){
+        .compile    = compile_jit,
+        .flush      = 0,
+        .free_fn    = free_be_jit,
+        .threadsafe = 1,
+    };
+    return be;
 }
 
 #elif defined(__AVX2__)
@@ -2074,7 +2085,7 @@ struct umbra_jit {
     int loop_start, loop_end;
 };
 
-struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
+static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     int *sl = malloc((size_t)bb->insts * sizeof(int));
     for (int i = 0; i < bb->insts; i++) {
         sl[i] = -1;
@@ -3532,12 +3543,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 #if __clang__
 __attribute__((no_sanitize("function")))
 #endif
-void umbra_jit_run(struct umbra_jit *j, int l, int t, int r, int b, umbra_buf buf[]) {
+static void umbra_jit_run(struct umbra_jit *j, int l, int t, int r, int b, umbra_buf buf[]) {
     assert(j);
     j->entry(l, t, r, b, buf);
 }
 
-void umbra_jit_free(struct umbra_jit *j) {
+static void umbra_jit_free(struct umbra_jit *j) {
     assert(j);
     munmap(j->code, j->code_size);
     free(j);
@@ -3579,7 +3590,7 @@ static _Bool x86_disasm(uint8_t const *code, size_t n, char const *spath,
     return result;
 }
 
-void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
+static void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
     assert(j);
     if (j->loop_start >= j->loop_end) { return; }
 
@@ -3665,6 +3676,37 @@ done:
     if (have_s)     { remove(spath); remove(opath); }
     if (have_asm)   { remove(asmpath); }
     if (have_clean) { remove(cleanpath); }
+}
+
+static void run_jit(void *ctx, int l, int t, int r, int b, umbra_buf buf[]) {
+    umbra_jit_run(ctx, l, t, r, b, buf);
+}
+static void dump_jit(void const *ctx, FILE *f) { umbra_dump_jit_mca(ctx, f); }
+static void free_jit(void *ctx) { umbra_jit_free(ctx); }
+static struct umbra_program *compile_jit(struct umbra_backend           *be,
+                                         struct umbra_basic_block const *bb) {
+    struct umbra_jit *const j = umbra_jit(bb);
+    assert(j);
+    struct umbra_program *const prog = malloc(sizeof *prog);
+    *prog = (struct umbra_program){
+        .ctx     = j,
+        .queue   = run_jit,
+        .dump    = dump_jit,
+        .free_fn = free_jit,
+        .backend = be,
+    };
+    return prog;
+}
+static void free_be_jit(struct umbra_backend *be) { free(be); }
+struct umbra_backend *umbra_backend_jit(void) {
+    struct umbra_backend *const be = malloc(sizeof *be);
+    *be = (struct umbra_backend){
+        .compile    = compile_jit,
+        .flush      = 0,
+        .free_fn    = free_be_jit,
+        .threadsafe = 1,
+    };
+    return be;
 }
 
 #endif
