@@ -1130,20 +1130,26 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 arm64_pool_load(c, &jc->pool, one, f1.u);
                 arm64_pool_load(c, &jc->pool, st1, fh.u);
                 put(c, MOVI_4s(z, 0, 0));
+#define DEKKER(dst, val) \
+                put(c, FMUL_4s(st2, val, scale));      \
+                put(c, FSUB_4s(st0, z, st2));           \
+                put(c, FMLA_4s(st0, val, scale));       \
+                put(c, FCVTZS_4s(dst, st2));            \
+                put(c, SCVTF_4s(st3, dst));             \
+                put(c, FSUB_4s(st2, st2, st3));         \
+                put(c, FADD_4s(st2, st2, st0));         \
+                put(c, FCMGE_4s(st2, st2, st1));        \
+                put(c, SUB_4s(dst, dst, st2))
                 put(c, FMAXNM_4s(px, rr, z)); put(c, FMINNM_4s(px, px, one));
-                put(c, ORR_16b(st0, st1, st1)); put(c, FMLA_4s(st0, px, scale));
-                put(c, FCVTZS_4s(px, st0));
+                DEKKER(px, px);
                 put(c, FMAXNM_4s(t, rg, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, ORR_16b(st0, st1, st1)); put(c, FMLA_4s(st0, t, scale));
-                put(c, FCVTZS_4s(t, st0));
+                DEKKER(t, t);
                 put(c, SLI_4s_imm(px, t, 8));
                 put(c, FMAXNM_4s(t, rb_, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, ORR_16b(st0, st1, st1)); put(c, FMLA_4s(st0, t, scale));
-                put(c, FCVTZS_4s(t, st0));
+                DEKKER(t, t);
                 put(c, SLI_4s_imm(px, t, 16));
                 put(c, FMAXNM_4s(t, ra_v, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, ORR_16b(st0, st1, st1)); put(c, FMLA_4s(st0, t, scale));
-                put(c, FCVTZS_4s(t, st0));
+                DEKKER(t, t);
                 put(c, SLI_4s_imm(px, t, 24));
                 if (scalar) { put(c, STR_sx(px, XP, XI)); }
                 else        { put(c, STR_q(px, XP, XW)); }
@@ -1164,23 +1170,17 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 arm64_pool_load(c, &jc->pool, one, f1.u);
                 arm64_pool_load(c, &jc->pool, st1, fh.u);
                 put(c, MOVI_4s(z, 0, 0));
-                // B: clamp, fma(scale,val,half), truncate.
                 arm64_pool_load(c, &jc->pool, scale, s31.u);
                 put(c, FMAXNM_4s(px, rb_, z)); put(c, FMINNM_4s(px, px, one));
-                put(c, ORR_16b(st0, st1, st1)); put(c, FMLA_4s(st0, px, scale));
-                put(c, FCVTZS_4s(px, st0));
-                // G: clamp, fma(scale,val,half), truncate, shift left 5, OR.
+                DEKKER(px, px);
                 arm64_pool_load(c, &jc->pool, scale, s63.u);
                 put(c, FMAXNM_4s(t, rg, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, ORR_16b(st0, st1, st1)); put(c, FMLA_4s(st0, t, scale));
-                put(c, FCVTZS_4s(t, st0));
+                DEKKER(t, t);
                 put(c, SHL_4s_imm(t, t, 5));
                 put(c, ORR_16b(px, px, t));
-                // R: clamp, fma(scale,val,half), truncate, shift left 11, OR.
                 arm64_pool_load(c, &jc->pool, scale, s31.u);
                 put(c, FMAXNM_4s(t, rr, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, ORR_16b(st0, st1, st1)); put(c, FMLA_4s(st0, t, scale));
-                put(c, FCVTZS_4s(t, st0));
+                DEKKER(t, t);
                 put(c, SHL_4s_imm(t, t, 11));
                 put(c, ORR_16b(px, px, t));
                 // Narrow 4S -> 4H and store.
@@ -1208,26 +1208,18 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 arm64_pool_load(c, &jc->pool, one, f1.u);
                 arm64_pool_load(c, &jc->pool, st1, fh.u);
                 put(c, MOVI_4s(z, 0, 0));
-                // R: clamp, fma(scale,val,half), truncate.
                 arm64_pool_load(c, &jc->pool, scale, s1023.u);
                 put(c, FMAXNM_4s(px, rr, z)); put(c, FMINNM_4s(px, px, one));
-                put(c, ORR_16b(st0, st1, st1)); put(c, FMLA_4s(st0, px, scale));
-                put(c, FCVTZS_4s(px, st0));
-                // G
+                DEKKER(px, px);
                 put(c, FMAXNM_4s(t, rg, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, ORR_16b(st0, st1, st1)); put(c, FMLA_4s(st0, t, scale));
-                put(c, FCVTZS_4s(t, st0));
+                DEKKER(t, t);
                 put(c, SLI_4s_imm(px, t, 10));
-                // B
                 put(c, FMAXNM_4s(t, rb_, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, ORR_16b(st0, st1, st1)); put(c, FMLA_4s(st0, t, scale));
-                put(c, FCVTZS_4s(t, st0));
+                DEKKER(t, t);
                 put(c, SLI_4s_imm(px, t, 20));
-                // A: scale by 3
                 arm64_pool_load(c, &jc->pool, scale, s3.u);
                 put(c, FMAXNM_4s(t, ra_v, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, ORR_16b(st0, st1, st1)); put(c, FMLA_4s(st0, t, scale));
-                put(c, FCVTZS_4s(t, st0));
+                DEKKER(t, t);
                 put(c, SLI_4s_imm(px, t, 30));
                 if (scalar) { put(c, STR_sx(px, XP, XI)); }
                 else        { put(c, STR_q(px, XP, XW)); }
@@ -1356,6 +1348,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             put(c, B(0));
             c->buf[br_skip_srgb_s] = Bcond(0x1, c->len - br_skip_srgb_s);
 
+#undef DEKKER
             // Default: no-op for unknown formats.
 
             // Patch all B-to-done branches.
@@ -2944,16 +2937,26 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 pool_broadcast(c, &jc->pool, one, f1.u);
                 pool_broadcast(c, &jc->pool, st0, fh.u);
                 vex_rrr(c, 0, 1, 1, 0x57, z, z, z);
+#define DEKKER_X86(dst, val)                                    \
+                vmulps(c, st1, val, scale);                     \
+                vsubps(c, st2, z, st1);                         \
+                vfmadd231ps(c, st2, val, scale);                \
+                vcvttps2dq(c, dst, st1);                        \
+                vcvtdq2ps(c, st3, dst);                         \
+                vsubps(c, st1, st1, st3);                       \
+                vaddps(c, st1, st1, st2);                       \
+                vcmpps(c, st1, st0, st1, 2);                    \
+                vpsubd(c, dst, dst, st1)
                 vmaxps(c, px, rr, z); vminps(c, px, px, one);
-                vfmadd213ps(c, px, scale, st0); vcvttps2dq(c, px, px);
+                DEKKER_X86(px, px);
                 vmaxps(c, t, rg, z); vminps(c, t, t, one);
-                vfmadd213ps(c, t, scale, st0); vcvttps2dq(c, t, t);
+                DEKKER_X86(t, t);
                 vpslld_i(c, t, t, 8); vpor(c, 1, px, px, t);
                 vmaxps(c, t, rb_, z); vminps(c, t, t, one);
-                vfmadd213ps(c, t, scale, st0); vcvttps2dq(c, t, t);
+                DEKKER_X86(t, t);
                 vpslld_i(c, t, t, 16); vpor(c, 1, px, px, t);
                 vmaxps(c, t, ra_v, z); vminps(c, t, t, one);
-                vfmadd213ps(c, t, scale, st0); vcvttps2dq(c, t, t);
+                DEKKER_X86(t, t);
                 vpslld_i(c, t, t, 24); vpor(c, 1, px, px, t);
                 if (scalar) { vex_mem(c, 1, 1, 0, 0, px, 0, 0x7e, base, XI, 4, 0); }
                 else        { vmov_store(c, 1, px, base, XI, 4, 0); }
@@ -2972,20 +2975,17 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 pool_broadcast(c, &jc->pool, one, f1.u);
                 pool_broadcast(c, &jc->pool, st0, fh.u);
                 vex_rrr(c, 0, 1, 1, 0x57, z, z, z);
-                // R: clamp, scale by 31, round away, shift left 11.
                 pool_broadcast(c, &jc->pool, scale, s31.u);
                 vmaxps(c, px, rr, z); vminps(c, px, px, one);
-                vfmadd213ps(c, px, scale, st0); vcvttps2dq(c, px, px);
+                DEKKER_X86(px, px);
                 vpslld_i(c, px, px, 11);
-                // G: clamp, scale by 63, round away, shift left 5, OR.
                 pool_broadcast(c, &jc->pool, scale, s63.u);
                 vmaxps(c, t, rg, z); vminps(c, t, t, one);
-                vfmadd213ps(c, t, scale, st0); vcvttps2dq(c, t, t);
+                DEKKER_X86(t, t);
                 vpslld_i(c, t, t, 5); vpor(c, 1, px, px, t);
-                // B: clamp, scale by 31, round away, OR.
                 pool_broadcast(c, &jc->pool, scale, s31.u);
                 vmaxps(c, t, rb_, z); vminps(c, t, t, one);
-                vfmadd213ps(c, t, scale, st0); vcvttps2dq(c, t, t);
+                DEKKER_X86(t, t);
                 vpor(c, 1, px, px, t);
                 // Narrow 32->16 and store.
                 // VPACKSSDW (signed saturation) works if values are in range [0, 2047].
@@ -3028,22 +3028,18 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 pool_broadcast(c, &jc->pool, one, f1.u);
                 pool_broadcast(c, &jc->pool, st0, fh.u);
                 vex_rrr(c, 0, 1, 1, 0x57, z, z, z);
-                // R: clamp, scale by 1023, round away.
                 pool_broadcast(c, &jc->pool, scale, s1023.u);
                 vmaxps(c, px, rr, z); vminps(c, px, px, one);
-                vfmadd213ps(c, px, scale, st0); vcvttps2dq(c, px, px);
-                // G
+                DEKKER_X86(px, px);
                 vmaxps(c, t, rg, z); vminps(c, t, t, one);
-                vfmadd213ps(c, t, scale, st0); vcvttps2dq(c, t, t);
+                DEKKER_X86(t, t);
                 vpslld_i(c, t, t, 10); vpor(c, 1, px, px, t);
-                // B
                 vmaxps(c, t, rb_, z); vminps(c, t, t, one);
-                vfmadd213ps(c, t, scale, st0); vcvttps2dq(c, t, t);
+                DEKKER_X86(t, t);
                 vpslld_i(c, t, t, 20); vpor(c, 1, px, px, t);
-                // A: scale by 3
                 pool_broadcast(c, &jc->pool, scale, s3.u);
                 vmaxps(c, t, ra_v, z); vminps(c, t, t, one);
-                vfmadd213ps(c, t, scale, st0); vcvttps2dq(c, t, t);
+                DEKKER_X86(t, t);
                 vpslld_i(c, t, t, 30); vpor(c, 1, px, px, t);
                 if (scalar) { vex_mem(c, 1, 1, 0, 0, px, 0, 0x7e, base, XI, 4, 0); }
                 else        { vmov_store(c, 1, px, base, XI, 4, 0); }
@@ -3244,6 +3240,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
             br_done[n_done] = jmp(c); n_done++;
             patch_jcc(c, br_skip_srgb_s);
+#undef DEKKER_X86
 
             // Default: no-op for unknown formats.
 

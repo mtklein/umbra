@@ -626,7 +626,7 @@ static void test_multiply_half_alpha(void) {
             r == 127 here;
             g == 0 here;
             b == 128 here;
-            (a == 191 || a == 192) here;
+            a == 191 here;
         }
     }
     cleanup_draw(&B);

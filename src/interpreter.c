@@ -70,13 +70,11 @@ static F32 vec_max(F32 a, F32 b) {
 #endif
 
 #ifndef __clang__
-#if defined(__ARM_FEATURE_FMA) || defined(__FMA__)
-static F32 vec_fma(F32 x, F32 y, F32 z) { return z + x * y; }
-#else
 static F32 vec_fma(F32 x, F32 y, F32 z) {
-    return cast(F32, cast(F64, x) * cast(F64, y) + cast(F64, z));
+    F32 r;
+    for (int ii = 0; ii < K; ii++) { r[ii] = __builtin_fmaf(x[ii], y[ii], z[ii]); }
+    return r;
 }
-#endif
 #endif
 
 #if !defined(__wasm__)
@@ -267,6 +265,15 @@ static void interp_load_color(val v[4], umbra_buf const *b,
     }
 }
 
+static I32 vec_pack_round(F32 v, F32 scale) {
+    F32 const half = (F32){0} + 0.5f;
+    F32 hi   = v * scale;
+    F32 lo   = vec_fma(v, scale, -hi);
+    F32 n_f  = vec_trunc(hi);
+    F32 frac = (hi - n_f) + lo;
+    return cast(I32, n_f) - (I32)(frac >= half);
+}
+
 __attribute__((noinline))
 static void interp_store_color(val const v[], umbra_buf const *b,
                                 char *dst, int i, int rem) {
@@ -274,15 +281,10 @@ static void interp_store_color(val const v[], umbra_buf const *b,
     switch (b->fmt) {
     case umbra_fmt_8888: {
         F32 const zero = {0}, one = (F32){0} + 1.f, scale = (F32){0} + 255.f;
-        F32 const half = (F32){0} + 0.5f;
-        F32 const rc = vec_trunc(vec_fma(vec_min(vec_max(cr, zero), one), scale, half));
-        F32 const gc = vec_trunc(vec_fma(vec_min(vec_max(cg, zero), one), scale, half));
-        F32 const bc = vec_trunc(vec_fma(vec_min(vec_max(cb, zero), one), scale, half));
-        F32 const ac = vec_trunc(vec_fma(vec_min(vec_max(ca, zero), one), scale, half));
-        U32 const px = cast(U32, cast(I32, rc))
-                     | cast(U32, cast(I32, gc)) <<  8
-                     | cast(U32, cast(I32, bc)) << 16
-                     | cast(U32, cast(I32, ac)) << 24;
+        U32 const px = cast(U32, vec_pack_round(vec_min(vec_max(cr, zero), one), scale))
+                     | cast(U32, vec_pack_round(vec_min(vec_max(cg, zero), one), scale)) <<  8
+                     | cast(U32, vec_pack_round(vec_min(vec_max(cb, zero), one), scale)) << 16
+                     | cast(U32, vec_pack_round(vec_min(vec_max(ca, zero), one), scale)) << 24;
         if (rem >= K) {
             __builtin_memcpy(dst + i * 4, &px, sizeof px);
         } else {
@@ -293,13 +295,10 @@ static void interp_store_color(val const v[], umbra_buf const *b,
         }
     } break;
     case umbra_fmt_565: {
-        F32 const zero = {0}, one = (F32){0} + 1.f, half = (F32){0} + 0.5f;
-        F32 const rc = vec_trunc(vec_fma(vec_min(vec_max(cr, zero), one), (F32){0} + 31.f, half));
-        F32 const gc = vec_trunc(vec_fma(vec_min(vec_max(cg, zero), one), (F32){0} + 63.f, half));
-        F32 const bc = vec_trunc(vec_fma(vec_min(vec_max(cb, zero), one), (F32){0} + 31.f, half));
-        U32 const px32 = cast(U32, cast(I32, rc)) << 11
-                       | cast(U32, cast(I32, gc)) <<  5
-                       | cast(U32, cast(I32, bc));
+        F32 const zero = {0}, one = (F32){0} + 1.f;
+        U32 const px32 = cast(U32, vec_pack_round(vec_min(vec_max(cr, zero), one), (F32){0} + 31.f)) << 11
+                       | cast(U32, vec_pack_round(vec_min(vec_max(cg, zero), one), (F32){0} + 63.f)) <<  5
+                       | cast(U32, vec_pack_round(vec_min(vec_max(cb, zero), one), (F32){0} + 31.f));
         U16 const px = cast(U16, cast(S16, cast(I32, px32)));
         if (rem >= K) {
             __builtin_memcpy(dst + i * 2, &px, sizeof px);
@@ -311,15 +310,11 @@ static void interp_store_color(val const v[], umbra_buf const *b,
         }
     } break;
     case umbra_fmt_1010102: {
-        F32 const zero = {0}, one = (F32){0} + 1.f, half = (F32){0} + 0.5f;
-        F32 const rc = vec_trunc(vec_fma(vec_min(vec_max(cr, zero), one), (F32){0} + 1023.f, half));
-        F32 const gc = vec_trunc(vec_fma(vec_min(vec_max(cg, zero), one), (F32){0} + 1023.f, half));
-        F32 const bc = vec_trunc(vec_fma(vec_min(vec_max(cb, zero), one), (F32){0} + 1023.f, half));
-        F32 const ac = vec_trunc(vec_fma(vec_min(vec_max(ca, zero), one), (F32){0} + 3.f, half));
-        U32 const px = cast(U32, cast(I32, rc))
-                     | cast(U32, cast(I32, gc)) << 10
-                     | cast(U32, cast(I32, bc)) << 20
-                     | cast(U32, cast(I32, ac)) << 30;
+        F32 const zero = {0}, one = (F32){0} + 1.f;
+        U32 const px = cast(U32, vec_pack_round(vec_min(vec_max(cr, zero), one), (F32){0} + 1023.f))
+                     | cast(U32, vec_pack_round(vec_min(vec_max(cg, zero), one), (F32){0} + 1023.f)) << 10
+                     | cast(U32, vec_pack_round(vec_min(vec_max(cb, zero), one), (F32){0} + 1023.f)) << 20
+                     | cast(U32, vec_pack_round(vec_min(vec_max(ca, zero), one), (F32){0} + 3.f)) << 30;
         if (rem >= K) {
             __builtin_memcpy(dst + i * 4, &px, sizeof px);
         } else {
