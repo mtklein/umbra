@@ -69,6 +69,7 @@ uint32_t FRINTP_4s(int d, int n);
 uint32_t SCVTF_4s(int d, int n);
 uint32_t FCVTZS_4s(int d, int n);
 uint32_t FCVTNS_4s(int d, int n);
+uint32_t FCVTAS_4s(int d, int n);
 uint32_t FCVTMS_4s(int d, int n);
 uint32_t FCVTPS_4s(int d, int n);
 uint32_t FCMEQ_4s(int d, int n, int m);

@@ -337,23 +337,15 @@ static void emit_ops(Buf *b, BB const *bb,
                      "%s    tex_p%d_2.write(float4(sc%d.z,0,0,0), uint2(x,y));\n"
                      "%s    tex_p%d_3.write(float4(sc%d.w,0,0,0), uint2(x,y));\n"
                      "%s} else if (fmt_p%d == %du) {\n"
-                     "%s    sc%d = clamp(sc%d, 0.0, 1.0);\n"
-                     "%s    ((device uint*)(p%d + y * buf_rbs[%d]))[x] ="
-                     " uint(rint(sc%d.x*255.0))"
-                     " | (uint(rint(sc%d.y*255.0))<<8)"
-                     " | (uint(rint(sc%d.z*255.0))<<16)"
-                     " | (uint(rint(sc%d.w*255.0))<<24);\n"
+                     "%s    ((device uint*)(p%d + y * buf_rbs[%d]))[x]"
+                     " = pack_float_to_unorm4x8(clamp(sc%d, 0.0, 1.0));\n"
                      "%s} else if (fmt_p%d == %du) {\n"
                      "%s    ((device ushort*)(p%d + y * buf_rbs[%d]))[x]"
                      " = pack_float_to_unorm565("
                      "clamp(sc%d.zyx, 0.0, 1.0));\n"
                      "%s} else if (fmt_p%d == %du) {\n"
-                     "%s    sc%d = clamp(sc%d, 0.0, 1.0);\n"
-                     "%s    ((device uint*)(p%d + y * buf_rbs[%d]))[x] ="
-                     " uint(rint(sc%d.x*1023.0))"
-                     " | (uint(rint(sc%d.y*1023.0))<<10)"
-                     " | (uint(rint(sc%d.z*1023.0))<<20)"
-                     " | (uint(rint(sc%d.w*3.0))<<30);\n"
+                     "%s    ((device uint*)(p%d + y * buf_rbs[%d]))[x]"
+                     " = pack_float_to_unorm10a2(clamp(sc%d, 0.0, 1.0));\n"
                      "%s} else if (fmt_p%d == %du) {\n"
                      "%s    device half *hp = (device half*)"
                      "(p%d + y * buf_rbs[%d]) + x*4;\n"
@@ -380,12 +372,9 @@ static void emit_ops(Buf *b, BB const *bb,
                      " / (1.0131348670e-01 + t);\n"
                      "%s        sc%d[ch] = lo < 4.5700869523e-03*12.92"
                      " ? lo : hi;\n"
-                     "%s    } sc%d = clamp(sc%d, 0.0, 1.0);\n"
-                     "%s    ((device uint*)(p%d + y * buf_rbs[%d]))[x] ="
-                     " uint(rint(sc%d.x*255.0))"
-                     " | (uint(rint(sc%d.y*255.0))<<8)"
-                     " | (uint(rint(sc%d.z*255.0))<<16)"
-                     " | (uint(rint(sc%d.w*255.0))<<24);\n"
+                     "%s    }\n"
+                     "%s    ((device uint*)(p%d + y * buf_rbs[%d]))[x]"
+                     " = pack_float_to_unorm4x8(clamp(sc%d, 0.0, 1.0));\n"
                      "%s}\n",
                      pad, i,
                      fv(_fx, vx, xid, is_f),
@@ -400,15 +389,11 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, p, i,
                      pad, p, i,
                      pad, p, umbra_fmt_8888,
-                     pad, i, i,
-                     pad, p, p,
-                     i, i, i, i,
+                     pad, p, p, i,
                      pad, p, umbra_fmt_565,
                      pad, p, p, i,
                      pad, p, umbra_fmt_1010102,
-                     pad, i, i,
-                     pad, p, p,
-                     i, i, i, i,
+                     pad, p, p, i,
                      pad, p, umbra_fmt_fp16,
                      pad, p, p,
                      pad, i, i, i, i,
@@ -422,9 +407,8 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad,
                      pad,
                      pad, i,
-                     pad, i, i,
-                     pad, p, p,
-                     i, i, i, i,
+                     pad,
+                     pad, p, p, i,
                      pad);
             } break;
 

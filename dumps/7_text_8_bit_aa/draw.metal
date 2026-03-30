@@ -97,13 +97,11 @@ kernel void umbra_entry(
         tex_p1_2.write(float4(sc26.z,0,0,0), uint2(x,y));
         tex_p1_3.write(float4(sc26.w,0,0,0), uint2(x,y));
     } else if (fmt_p1 == 0u) {
-        sc26 = clamp(sc26, 0.0, 1.0);
-        ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc26.x*255.0)) | (uint(rint(sc26.y*255.0))<<8) | (uint(rint(sc26.z*255.0))<<16) | (uint(rint(sc26.w*255.0))<<24);
+        ((device uint*)(p1 + y * buf_rbs[1]))[x] = pack_float_to_unorm4x8(clamp(sc26, 0.0, 1.0));
     } else if (fmt_p1 == 1u) {
         ((device ushort*)(p1 + y * buf_rbs[1]))[x] = pack_float_to_unorm565(clamp(sc26.zyx, 0.0, 1.0));
     } else if (fmt_p1 == 2u) {
-        sc26 = clamp(sc26, 0.0, 1.0);
-        ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc26.x*1023.0)) | (uint(rint(sc26.y*1023.0))<<10) | (uint(rint(sc26.z*1023.0))<<20) | (uint(rint(sc26.w*3.0))<<30);
+        ((device uint*)(p1 + y * buf_rbs[1]))[x] = pack_float_to_unorm10a2(clamp(sc26, 0.0, 1.0));
     } else if (fmt_p1 == 3u) {
         device half *hp = (device half*)(p1 + y * buf_rbs[1]) + x*4;
         hp[0]=half(sc26.x); hp[1]=half(sc26.y); hp[2]=half(sc26.z); hp[3]=half(sc26.w);
@@ -117,7 +115,7 @@ kernel void umbra_entry(
             float lo = l * 12.92;
             float hi = (1.0545324087e+00 + t*(5.8207426220e-02 + t*(-1.2198361568e-02 + t*(7.9244317021e-04 + t*-2.0467568902e-05)))) / (1.0131348670e-01 + t);
             sc26[ch] = lo < 4.5700869523e-03*12.92 ? lo : hi;
-        } sc26 = clamp(sc26, 0.0, 1.0);
-        ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc26.x*255.0)) | (uint(rint(sc26.y*255.0))<<8) | (uint(rint(sc26.z*255.0))<<16) | (uint(rint(sc26.w*255.0))<<24);
+        }
+        ((device uint*)(p1 + y * buf_rbs[1]))[x] = pack_float_to_unorm4x8(clamp(sc26, 0.0, 1.0));
     }
 }

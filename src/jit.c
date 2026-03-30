@@ -1129,15 +1129,15 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 arm64_pool_load(c, &jc->pool, one, f1.u);
                 put(c, MOVI_4s(z, 0, 0));
                 put(c, FMAXNM_4s(px, rr, z)); put(c, FMINNM_4s(px, px, one));
-                put(c, FMUL_4s(px, px, scale)); put(c, FCVTNS_4s(px, px));
+                put(c, FMUL_4s(px, px, scale)); put(c, FCVTAS_4s(px, px));
                 put(c, FMAXNM_4s(t, rg, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTAS_4s(t, t));
                 put(c, SLI_4s_imm(px, t, 8));
                 put(c, FMAXNM_4s(t, rb_, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTAS_4s(t, t));
                 put(c, SLI_4s_imm(px, t, 16));
                 put(c, FMAXNM_4s(t, ra_v, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTAS_4s(t, t));
                 put(c, SLI_4s_imm(px, t, 24));
                 if (scalar) { put(c, STR_sx(px, XP, XI)); }
                 else        { put(c, STR_q(px, XP, XW)); }
@@ -1159,17 +1159,17 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 // B: clamp, scale by 31, round. (start with B in bits 0-4)
                 arm64_pool_load(c, &jc->pool, scale, s31.u);
                 put(c, FMAXNM_4s(px, rb_, z)); put(c, FMINNM_4s(px, px, one));
-                put(c, FMUL_4s(px, px, scale)); put(c, FCVTNS_4s(px, px));
+                put(c, FMUL_4s(px, px, scale)); put(c, FCVTAS_4s(px, px));
                 // G: clamp, scale by 63, round, shift left 5, OR.
                 arm64_pool_load(c, &jc->pool, scale, s63.u);
                 put(c, FMAXNM_4s(t, rg, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTAS_4s(t, t));
                 put(c, SHL_4s_imm(t, t, 5));
                 put(c, ORR_16b(px, px, t));
                 // R: clamp, scale by 31, round, shift left 11, OR.
                 arm64_pool_load(c, &jc->pool, scale, s31.u);
                 put(c, FMAXNM_4s(t, rr, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTAS_4s(t, t));
                 put(c, SHL_4s_imm(t, t, 11));
                 put(c, ORR_16b(px, px, t));
                 // Narrow 4S -> 4H and store.
@@ -1198,19 +1198,19 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 // R: clamp, scale by 1023, round.
                 arm64_pool_load(c, &jc->pool, scale, s1023.u);
                 put(c, FMAXNM_4s(px, rr, z)); put(c, FMINNM_4s(px, px, one));
-                put(c, FMUL_4s(px, px, scale)); put(c, FCVTNS_4s(px, px));
+                put(c, FMUL_4s(px, px, scale)); put(c, FCVTAS_4s(px, px));
                 // G: clamp, scale by 1023, round.
                 put(c, FMAXNM_4s(t, rg, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTAS_4s(t, t));
                 put(c, SLI_4s_imm(px, t, 10));
                 // B: clamp, scale by 1023, round.
                 put(c, FMAXNM_4s(t, rb_, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTAS_4s(t, t));
                 put(c, SLI_4s_imm(px, t, 20));
                 // A: clamp, scale by 3, round.
                 arm64_pool_load(c, &jc->pool, scale, s3.u);
                 put(c, FMAXNM_4s(t, ra_v, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTAS_4s(t, t));
                 put(c, SLI_4s_imm(px, t, 30));
                 if (scalar) { put(c, STR_sx(px, XP, XI)); }
                 else        { put(c, STR_q(px, XP, XW)); }
@@ -1315,7 +1315,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                                 st3, st4, st5,
                                 /*invert=*/0);
                 rr = st0; rg = st1; rb_ = st2;
-                // Same as 8888 encode.
+                // Same as 8888 but ties-even (sRGB poly tuned for it).
                 union { float f; uint32_t u; } s255 = {.f = 255.0f};
                 union { float f; uint32_t u; } f1   = {.f = 1.0f};
                 arm64_pool_load(c, &jc->pool, scale, s255.u);
@@ -2922,19 +2922,21 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             {
                 union { float f; uint32_t u; } s255 = {.f = 255.0f};
                 union { float f; uint32_t u; } f1   = {.f = 1.0f};
+                union { float f; uint32_t u; } fh   = {.f = 0.5f};
                 pool_broadcast(c, &jc->pool, scale, s255.u);
                 pool_broadcast(c, &jc->pool, one, f1.u);
+                pool_broadcast(c, &jc->pool, st0, fh.u);
                 vex_rrr(c, 0, 1, 1, 0x57, z, z, z);
                 vmaxps(c, px, rr, z); vminps(c, px, px, one);
-                vmulps(c, px, px, scale); vcvtps2dq(c, px, px);
+                vfmadd213ps(c, px, scale, st0); vcvttps2dq(c, px, px);
                 vmaxps(c, t, rg, z); vminps(c, t, t, one);
-                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
+                vfmadd213ps(c, t, scale, st0); vcvttps2dq(c, t, t);
                 vpslld_i(c, t, t, 8); vpor(c, 1, px, px, t);
                 vmaxps(c, t, rb_, z); vminps(c, t, t, one);
-                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
+                vfmadd213ps(c, t, scale, st0); vcvttps2dq(c, t, t);
                 vpslld_i(c, t, t, 16); vpor(c, 1, px, px, t);
                 vmaxps(c, t, ra_v, z); vminps(c, t, t, one);
-                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
+                vfmadd213ps(c, t, scale, st0); vcvttps2dq(c, t, t);
                 vpslld_i(c, t, t, 24); vpor(c, 1, px, px, t);
                 if (scalar) { vex_mem(c, 1, 1, 0, 0, px, 0, 0x7e, base, XI, 4, 0); }
                 else        { vmov_store(c, 1, px, base, XI, 4, 0); }
@@ -2949,22 +2951,24 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 union { float f; uint32_t u; } s31 = {.f = 31.0f};
                 union { float f; uint32_t u; } s63 = {.f = 63.0f};
                 union { float f; uint32_t u; } f1  = {.f = 1.0f};
+                union { float f; uint32_t u; } fh  = {.f = 0.5f};
                 pool_broadcast(c, &jc->pool, one, f1.u);
+                pool_broadcast(c, &jc->pool, st0, fh.u);
                 vex_rrr(c, 0, 1, 1, 0x57, z, z, z);
-                // R: clamp, scale by 31, round, shift left 11.
+                // R: clamp, scale by 31, round away, shift left 11.
                 pool_broadcast(c, &jc->pool, scale, s31.u);
                 vmaxps(c, px, rr, z); vminps(c, px, px, one);
-                vmulps(c, px, px, scale); vcvtps2dq(c, px, px);
+                vfmadd213ps(c, px, scale, st0); vcvttps2dq(c, px, px);
                 vpslld_i(c, px, px, 11);
-                // G: clamp, scale by 63, round, shift left 5, OR.
+                // G: clamp, scale by 63, round away, shift left 5, OR.
                 pool_broadcast(c, &jc->pool, scale, s63.u);
                 vmaxps(c, t, rg, z); vminps(c, t, t, one);
-                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
+                vfmadd213ps(c, t, scale, st0); vcvttps2dq(c, t, t);
                 vpslld_i(c, t, t, 5); vpor(c, 1, px, px, t);
-                // B: clamp, scale by 31, round, OR.
+                // B: clamp, scale by 31, round away, OR.
                 pool_broadcast(c, &jc->pool, scale, s31.u);
                 vmaxps(c, t, rb_, z); vminps(c, t, t, one);
-                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
+                vfmadd213ps(c, t, scale, st0); vcvttps2dq(c, t, t);
                 vpor(c, 1, px, px, t);
                 // Narrow 32->16 and store.
                 // VPACKSSDW (signed saturation) works if values are in range [0, 2047].
@@ -3003,24 +3007,26 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 union { float f; uint32_t u; } s1023 = {.f = 1023.0f};
                 union { float f; uint32_t u; } s3    = {.f = 3.0f};
                 union { float f; uint32_t u; } f1    = {.f = 1.0f};
+                union { float f; uint32_t u; } fh    = {.f = 0.5f};
                 pool_broadcast(c, &jc->pool, one, f1.u);
+                pool_broadcast(c, &jc->pool, st0, fh.u);
                 vex_rrr(c, 0, 1, 1, 0x57, z, z, z);
-                // R: clamp, scale by 1023, round.
+                // R: clamp, scale by 1023, round away.
                 pool_broadcast(c, &jc->pool, scale, s1023.u);
                 vmaxps(c, px, rr, z); vminps(c, px, px, one);
-                vmulps(c, px, px, scale); vcvtps2dq(c, px, px);
+                vfmadd213ps(c, px, scale, st0); vcvttps2dq(c, px, px);
                 // G
                 vmaxps(c, t, rg, z); vminps(c, t, t, one);
-                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
+                vfmadd213ps(c, t, scale, st0); vcvttps2dq(c, t, t);
                 vpslld_i(c, t, t, 10); vpor(c, 1, px, px, t);
                 // B
                 vmaxps(c, t, rb_, z); vminps(c, t, t, one);
-                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
+                vfmadd213ps(c, t, scale, st0); vcvttps2dq(c, t, t);
                 vpslld_i(c, t, t, 20); vpor(c, 1, px, px, t);
                 // A: scale by 3
                 pool_broadcast(c, &jc->pool, scale, s3.u);
                 vmaxps(c, t, ra_v, z); vminps(c, t, t, one);
-                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
+                vfmadd213ps(c, t, scale, st0); vcvttps2dq(c, t, t);
                 vpslld_i(c, t, t, 30); vpor(c, 1, px, px, t);
                 if (scalar) { vex_mem(c, 1, 1, 0, 0, px, 0, 0x7e, base, XI, 4, 0); }
                 else        { vmov_store(c, 1, px, base, XI, 4, 0); }
@@ -3199,6 +3205,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                               st3, st4, st5,
                               /*invert=*/0);
                 rr = st0; rg = st1; rb_ = st2;
+                // Ties-even for sRGB (polynomial tuned for it).
                 union { float f; uint32_t u; } s255 = {.f = 255.0f};
                 union { float f; uint32_t u; } f1   = {.f = 1.0f};
                 pool_broadcast(c, &jc->pool, scale, s255.u);

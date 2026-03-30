@@ -166,6 +166,7 @@ enum {
     SCVTF_4s_ = 0x4e21d800u,
     FCVTZS_4s_ = 0x4ea1b800u,
     FCVTNS_4s_ = 0x4e21a800u,
+    FCVTAS_4s_ = 0x4e21c800u,
     FCVTMS_4s_ = 0x4e21b800u,
     FCVTPS_4s_ = 0x4ea1a800u,
     FCMEQ_4s_ = 0x4e20e400u,
@@ -248,6 +249,7 @@ uint32_t FRINTP_4s(int d, int n) { return v2(FRINTP_4s_, d, n); }
 uint32_t SCVTF_4s(int d, int n) { return v2(SCVTF_4s_, d, n); }
 uint32_t FCVTZS_4s(int d, int n) { return v2(FCVTZS_4s_, d, n); }
 uint32_t FCVTNS_4s(int d, int n) { return v2(FCVTNS_4s_, d, n); }
+uint32_t FCVTAS_4s(int d, int n) { return v2(FCVTAS_4s_, d, n); }
 uint32_t FCVTMS_4s(int d, int n) { return v2(FCVTMS_4s_, d, n); }
 uint32_t FCVTPS_4s(int d, int n) { return v2(FCVTPS_4s_, d, n); }
 uint32_t FCMEQ_4s(int d, int n, int m) { return v3(FCMEQ_4s_, d, n, m); }
