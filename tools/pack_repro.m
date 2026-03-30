@@ -52,6 +52,17 @@ static int pack_unorm8_256(float v) {
     return (int)fmaf(v, 256.0f, 0.5f - v);
 }
 
+// fma(x, 256, magic - x): adds 2^23 to force ULP=1, so the
+// FMA's single rounding lands the mantissa bits on the integer.
+// No separate truncation/rounding step needed.
+static int pack_unorm8_magic(float v) {
+    float const magic = 8388608.0f;
+    float val = fmaf(v, 256.0f, magic - v);
+    uint32_t bits;
+    memcpy(&bits, &val, 4);
+    return (int)(uint8_t)bits;
+}
+
 static NSString *shader = @
 "#include <metal_stdlib>\n"
 "using namespace metal;\n"
@@ -105,8 +116,10 @@ int main(void) {
                (int)rintf(v * 255.0f));
         printf("  Dekker-corrected:     %d  ✓\n",
                pack_unorm8_dekker(v, 255.0f));
-        printf("  fma(v,256,0.5-v):     %d\n\n",
+        printf("  fma(v,256,0.5-v):     %d\n",
                pack_unorm8_256(v));
+        printf("  fma(v,256,magic-v):   %d\n\n",
+               pack_unorm8_magic(v));
 
         // Show Dekker intermediates
         {
@@ -124,8 +137,8 @@ int main(void) {
 
         // --- Exhaustive comparison over all float32 in [0,1] ---
         printf("=== Exhaustive CPU scan: all float32 in [0,1] ===\n");
-        int fma_wrong = 0, rint_wrong = 0, dekker_wrong = 0, f256_wrong = 0;
-        uint32_t fma_example = 0, rint_example = 0, f256_example = 0;
+        int fma_wrong = 0, rint_wrong = 0, dekker_wrong = 0, f256_wrong = 0, magic_wrong = 0;
+        uint32_t fma_ex = 0, rint_ex = 0, f256_ex = 0, magic_ex = 0;
         for (uint32_t bits = 0; bits <= 0x3F800000u; bits++) {
             float f = u2f(bits);
             if (f != f || f < 0 || f > 1) continue;
@@ -133,24 +146,29 @@ int main(void) {
             double rem  = (double)f * 255.0 - correct;
             if (rem >= 0.5) correct++;
 
-            int fma_r  = (int)truncf(fmaf(f, 255, 0.5f));
-            int rint_r = (int)rintf(f * 255.0f);
-            int dek_r  = pack_unorm8_dekker(f, 255.0f);
-            int f256_r = pack_unorm8_256(f);
+            int fma_r   = (int)truncf(fmaf(f, 255, 0.5f));
+            int rint_r  = (int)rintf(f * 255.0f);
+            int dek_r   = pack_unorm8_dekker(f, 255.0f);
+            int f256_r  = pack_unorm8_256(f);
+            int magic_r = pack_unorm8_magic(f);
 
-            if (fma_r != correct)  { fma_wrong++;  if (!fma_example)  fma_example  = bits; }
-            if (rint_r != correct) { rint_wrong++; if (!rint_example) rint_example = bits; }
-            if (dek_r != correct)  { dekker_wrong++; }
-            if (f256_r != correct) { f256_wrong++; if (!f256_example) f256_example = bits; }
+            if (fma_r != correct)   { fma_wrong++;   if (!fma_ex)   fma_ex   = bits; }
+            if (rint_r != correct)  { rint_wrong++;  if (!rint_ex)  rint_ex  = bits; }
+            if (dek_r != correct)   { dekker_wrong++; }
+            if (f256_r != correct)  { f256_wrong++;  if (!f256_ex)  f256_ex  = bits; }
+            if (magic_r != correct) { magic_wrong++; if (!magic_ex) magic_ex = bits; }
         }
         printf("  fma+trunc mismatches:    %d", fma_wrong);
-        if (fma_example)  printf("  (first: 0x%08x)", fma_example);
+        if (fma_ex)   printf("  (first: 0x%08x)", fma_ex);
         printf("\n");
         printf("  rint mismatches:         %d", rint_wrong);
-        if (rint_example) printf("  (first: 0x%08x)", rint_example);
+        if (rint_ex)  printf("  (first: 0x%08x)", rint_ex);
         printf("\n");
         printf("  fma(v,256,0.5-v):       %d", f256_wrong);
-        if (f256_example) printf("  (first: 0x%08x)", f256_example);
+        if (f256_ex)  printf("  (first: 0x%08x)", f256_ex);
+        printf("\n");
+        printf("  fma(v,256,magic-v):      %d", magic_wrong);
+        if (magic_ex) printf("  (first: 0x%08x)", magic_ex);
         printf("\n");
         printf("  Dekker mismatches:       %d\n", dekker_wrong);
         printf("  (out of ~1065353216 values in [0,1])\n");

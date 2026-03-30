@@ -308,13 +308,21 @@ static void emit_ops(Buf *b, BB const *bb,
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 emit(b,
                      "%sfloat4 sc%d = float4(%s, %s, %s, %s);\n"
+                     // Pre-round for fp16 textures: tex.write() to
+                     // RGBA16Float truncates float32→float16 instead of
+                     // rounding to nearest-even.
+                     // E.g. 0x3f59999a (0.850000024) → fp16 0x3acc (0.849609)
+                     // instead of the correct 0x3acd (0.850098).
                      "%sif (planes_p%d == 1) {\n"
-                     "%s    tex_p%d_0.write(sc%d, uint2(x,y));\n"
+                     "%s    float4 tw%d = (fmt_p%d == %du || fmt_p%d == %du)"
+                     " ? float4(half4(sc%d)) : sc%d;\n"
+                     "%s    tex_p%d_0.write(tw%d, uint2(x,y));\n"
                      "%s} else if (planes_p%d == 4) {\n"
-                     "%s    tex_p%d_0.write(float4(sc%d.x,0,0,0), uint2(x,y));\n"
-                     "%s    tex_p%d_1.write(float4(sc%d.y,0,0,0), uint2(x,y));\n"
-                     "%s    tex_p%d_2.write(float4(sc%d.z,0,0,0), uint2(x,y));\n"
-                     "%s    tex_p%d_3.write(float4(sc%d.w,0,0,0), uint2(x,y));\n"
+                     "%s    half4 tw%d = half4(sc%d);\n"
+                     "%s    tex_p%d_0.write(float4(tw%d.x,0,0,0), uint2(x,y));\n"
+                     "%s    tex_p%d_1.write(float4(tw%d.y,0,0,0), uint2(x,y));\n"
+                     "%s    tex_p%d_2.write(float4(tw%d.z,0,0,0), uint2(x,y));\n"
+                     "%s    tex_p%d_3.write(float4(tw%d.w,0,0,0), uint2(x,y));\n"
                      "%s} else if (fmt_p%d == %du) {\n"
                      "%s    ((device uint*)(p%d + y * buf_rbs[%d]))[x]"
                      " = pack_float_to_unorm4x8(clamp(sc%d, 0.0, 1.0));\n"
@@ -347,8 +355,10 @@ static void emit_ops(Buf *b, BB const *bb,
                      fv(_fz, vz, zid, is_f),
                      fv(_fw, vw, wid, is_f),
                      pad, p,
+                     pad, i, p, umbra_fmt_fp16, p, umbra_fmt_fp16_planar, i, i,
                      pad, p, i,
                      pad, p,
+                     pad, i, i,
                      pad, p, i,
                      pad, p, i,
                      pad, p, i,

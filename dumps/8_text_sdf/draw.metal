@@ -90,12 +90,14 @@ kernel void umbra_entry(
     float v31 = fma(v18, v30, v19_2);
     float4 sc32 = float4(v25, v28, v31, v22);
     if (planes_p1 == 1) {
-        tex_p1_0.write(sc32, uint2(x,y));
+        float4 tw32 = (fmt_p1 == 3u || fmt_p1 == 4u) ? float4(half4(sc32)) : sc32;
+        tex_p1_0.write(tw32, uint2(x,y));
     } else if (planes_p1 == 4) {
-        tex_p1_0.write(float4(sc32.x,0,0,0), uint2(x,y));
-        tex_p1_1.write(float4(sc32.y,0,0,0), uint2(x,y));
-        tex_p1_2.write(float4(sc32.z,0,0,0), uint2(x,y));
-        tex_p1_3.write(float4(sc32.w,0,0,0), uint2(x,y));
+        half4 tw32 = half4(sc32);
+        tex_p1_0.write(float4(tw32.x,0,0,0), uint2(x,y));
+        tex_p1_1.write(float4(tw32.y,0,0,0), uint2(x,y));
+        tex_p1_2.write(float4(tw32.z,0,0,0), uint2(x,y));
+        tex_p1_3.write(float4(tw32.w,0,0,0), uint2(x,y));
     } else if (fmt_p1 == 0u) {
         ((device uint*)(p1 + y * buf_rbs[1]))[x] = pack_float_to_unorm4x8(clamp(sc32, 0.0, 1.0));
     } else if (fmt_p1 == 1u) {
