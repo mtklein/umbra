@@ -60,8 +60,8 @@ int main(int argc, char *argv[]) {
         struct umbra_program *mtl = be_m ? be_m->compile(be_m, bb) : NULL;
         umbra_basic_block_free(bb);
 
-        int   bpp = umbra_pixel_bytes(s->fmt);
-        void *buf = calloc((size_t)(W * H), (size_t)bpp);
+        size_t bpp = umbra_fmt_size(s->fmt);
+        void *buf = calloc((size_t)(W * H), bpp);
 
         char tmp[32];
         printf("%-40s", s->title);

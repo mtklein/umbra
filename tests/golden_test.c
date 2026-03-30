@@ -90,9 +90,9 @@ static void free_pipes(void) {
 }
 
 static size_t pixbuf_size(int fmt) {
-    int   bpp = umbra_pixel_bytes(fmt_enums[fmt]);
-    int   planes = (fmt_enums[fmt] == umbra_fmt_fp16_planar) ? 4 : 1;
-    return (size_t)(W * H * bpp * planes);
+    size_t bpp = umbra_fmt_size(fmt_enums[fmt]);
+    size_t planes = (fmt_enums[fmt] == umbra_fmt_fp16_planar) ? 4 : 1;
+    return (size_t)W * (size_t)H * bpp * planes;
 }
 
 static void fill_bg(int fmt, void *dst, uint32_t bg) {
@@ -105,10 +105,10 @@ static void fill_bg(int fmt, void *dst, uint32_t bg) {
     uint64_t uni_[4] = {0};
     char *uni = (char*)uni_;
     slide_uni_f32(uni, 0, hc, 4);
-    int   bpp = umbra_pixel_bytes(fmt_enums[fmt]);
+    size_t bpp = umbra_fmt_size(fmt_enums[fmt]);
     umbra_buf buf[2] = {
         {.ptr=uni, .sz=(size_t)fill_pipes[fmt].uni_len, .read_only=1},
-        {.ptr=dst, .sz=pixbuf_size(fmt), .row_bytes=(size_t)(W * bpp),
+        {.ptr=dst, .sz=pixbuf_size(fmt), .row_bytes=(size_t)W * bpp,
          .fmt=fmt_enums[fmt]},
     };
     fill_pipes[fmt].prog->queue(fill_pipes[fmt].prog, 0, 0, W, H, buf);
@@ -119,11 +119,11 @@ static void readback_to_8888(int fmt,
                              uint32_t *out) {
     uint64_t uni_[2] = {0};
     char *uni = (char*)uni_;
-    int   bpp = umbra_pixel_bytes(fmt_enums[fmt]);
+    size_t bpp = umbra_fmt_size(fmt_enums[fmt]);
     int   op = readback_pipes[fmt].out_ptr;
     umbra_buf buf[3];
     buf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)readback_pipes[fmt].uni_len, .read_only=1};
-    buf[1] = (umbra_buf){.ptr=pixbuf, .sz=pixbuf_size(fmt), .row_bytes=(size_t)(W * bpp),
+    buf[1] = (umbra_buf){.ptr=pixbuf, .sz=pixbuf_size(fmt), .row_bytes=(size_t)W * bpp,
                          .read_only=1, .fmt=fmt_enums[fmt]};
     buf[op] = (umbra_buf){.ptr=out, .sz=(size_t)(W * H * 4), .row_bytes=(size_t)(W * 4),
                           .fmt=umbra_fmt_8888};

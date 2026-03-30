@@ -359,13 +359,13 @@ int main(void) {
         slide                *s = slide_get(cur_slide);
         struct umbra_program *b = programs[cur_backend];
 
-        int   bpp = umbra_pixel_bytes(fmt_enums[cur_fmt]);
-        int   row_bytes = W * bpp;
+        size_t bpp = umbra_fmt_size(fmt_enums[cur_fmt]);
+        size_t row_bytes = (size_t)W * bpp;
         size_t plane_gap = 0;
         size_t row_sz = (size_t)W * (size_t)bpp;
 
         for (int y = 0; y < H; y++) {
-            void *row = (void *)((uint8_t *)pixbuf + y * row_bytes);
+            void *row = (void *)((uint8_t *)pixbuf + (size_t)y * row_bytes);
             fill_bg_row(row, W, s->bg, row_sz, plane_gap);
         }
 
@@ -407,14 +407,14 @@ int main(void) {
 
         uint8_t *rows = (uint8_t *)tex_pixels;
         for (int y = 0; y < H; y++) {
-            void *src = (void *)((uint8_t *)pixbuf + y * W * bpp);
+            void *src = (void *)((uint8_t *)pixbuf + (size_t)y * (size_t)W * bpp);
             readback_row((uint32_t *)(rows + y * tex_pitch), src, W, row_sz, plane_gap);
         }
 
         if (want_dump) {
             __fp16 *hdata = malloc((size_t)(W * H) * 4 * sizeof(__fp16));
             for (int y = 0; y < H; y++) {
-                void *src = (void *)((uint8_t *)pixbuf + y * W * bpp);
+                void *src = (void *)((uint8_t *)pixbuf + (size_t)y * (size_t)W * bpp);
                 to_hdr_row(hdata + y * W * 4, src, W, row_sz, plane_gap);
             }
             float *fdata = malloc((size_t)(W * H) * 4 * sizeof(float));

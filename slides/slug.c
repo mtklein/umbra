@@ -71,10 +71,10 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     char     *uni = (char *)uni_;
     slide_uni_f32(uni, lay->shader, hc, 4);
     slide_uni_ptr(uni, lay->coverage, st->wind_buf, wind_sz, 1, (size_t)w * sizeof(float));
-    int       pb = umbra_pixel_bytes(s->fmt);
-    size_t plane_sz = (size_t)w * (size_t)h * (size_t)pb;
+    size_t    pb = umbra_fmt_size(s->fmt);
+    size_t plane_sz = (size_t)w * (size_t)h * pb;
     umbra_buf rbuf[2];
-    size_t rb = (size_t)w * (size_t)pb;
+    size_t rb = (size_t)w * pb;
     rbuf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)lay->uni_len, .read_only=1};
     rbuf[1] = (umbra_buf){.ptr=buf, .sz=plane_sz * (s->fmt == umbra_fmt_fp16_planar ? 4 : 1), .row_bytes=rb, .fmt=s->fmt};
     program->queue(program, 0, y0, w, y1, rbuf);

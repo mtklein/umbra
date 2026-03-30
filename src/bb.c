@@ -11,7 +11,7 @@ static umbra_val val_make(int id, int chan)  { return (umbra_val){.bits = ((val_
 typedef struct umbra_builder builder;
 typedef umbra_val            val;
 
-int umbra_pixel_bytes(umbra_fmt fmt) {
+size_t umbra_fmt_size(umbra_fmt fmt) {
     switch (fmt) {
     case umbra_fmt_8888:       return 4;
     case umbra_fmt_565:        return 2;

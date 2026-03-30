@@ -9,6 +9,13 @@ void   umbra_builder_free(struct umbra_builder*);
 struct umbra_basic_block* umbra_basic_block(struct umbra_builder*);
 void   umbra_basic_block_free(struct umbra_basic_block*);
 
+struct umbra_backend {
+    struct umbra_program* (*compile)(struct umbra_backend*,
+                                     struct umbra_basic_block const*);
+    void                  (*flush)(struct umbra_backend*);
+    void                  (*free)(struct umbra_backend*);
+    int                     threadsafe, :32;
+};
 struct umbra_backend* umbra_backend_interp(void);
 struct umbra_backend* umbra_backend_jit   (void);
 struct umbra_backend* umbra_backend_metal (void);
@@ -23,7 +30,7 @@ typedef enum {
     umbra_fmt_srgb,
 } umbra_fmt;
 
-int umbra_pixel_bytes(umbra_fmt);
+size_t umbra_fmt_size(umbra_fmt);
 
 typedef struct {
     void           *ptr;
@@ -34,12 +41,6 @@ typedef struct {
     char            pad_[3];
 } umbra_buf;
 
-struct umbra_backend {
-    struct umbra_program* (*compile)(struct umbra_backend*, struct umbra_basic_block const*);
-    void                  (*flush)(struct umbra_backend*);
-    void                  (*free)(struct umbra_backend*);
-    int                     threadsafe, :32;
-};
 
 struct umbra_program {
     void (*queue)(struct umbra_program*, int l, int t, int r, int b, umbra_buf[]);

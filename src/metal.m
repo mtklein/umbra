@@ -1494,7 +1494,7 @@ static void encode_dispatch(
 
         id<MTLBuffer> mtlBuf =
             (__bridge id<MTLBuffer>)m->per_bufs[bi];
-        size_t pb = (size_t)umbra_pixel_bytes(buf[bi].fmt);
+        size_t pb = umbra_fmt_size(buf[bi].fmt);
         int tex_base = m->color_bufs[c].tex_base;
 
         if (planes == 1) {
