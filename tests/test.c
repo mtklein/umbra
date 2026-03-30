@@ -2492,6 +2492,31 @@ static void test_srgb_cross_roundtrip(void) {
     cleanup(&B);
 }
 
+static void test_srgb_decode_endpoint(void) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_color c = umbra_load_color(b, (umbra_ptr){0, 0});
+    umbra_store_32(b, (umbra_ptr){1, 0}, c.r);
+    umbra_store_32(b, (umbra_ptr){2, 0}, c.g);
+    umbra_store_32(b, (umbra_ptr){3, 0}, c.b);
+    backends B = make(b);
+
+    uint32_t src[1] = {0xFFFFFFFFu};
+    float dr[1], dg[1], db[1];
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        dr[0] = dg[0] = db[0] = 0;
+        if (!run(&B, bi, 1, 1, (umbra_buf[]){
+            {.ptr=src, .sz=sizeof src, .fmt=umbra_fmt_srgb},
+            {.ptr=dr,  .sz=sizeof dr},
+            {.ptr=dg,  .sz=sizeof dg},
+            {.ptr=db,  .sz=sizeof db},
+        })) { continue; }
+        (dr[0] == 1.0f) here;
+        (dg[0] == 1.0f) here;
+        (db[0] == 1.0f) here;
+    }
+    cleanup(&B);
+}
+
 static void test_load_stride_neq_w(void) {
     // Regression: add(mul(y, rs_uniform), x) was optimized to a contiguous
     // load using the linear loop counter.  When rs != w, this is wrong.
@@ -3666,6 +3691,7 @@ int main(void) {
     test_load_store_color_f16_planar();
     test_srgb_roundtrip_256();
     test_srgb_cross_roundtrip();
+    test_srgb_decode_endpoint();
     test_load_stride_neq_w();
     test_jit_xs_init();
 
