@@ -23,6 +23,7 @@ typedef int16_t  S16 __attribute__((vector_size(K * 2)));
 #define vec_trunc(v) __builtin_elementwise_trunc(v)
 #define vec_floor(v) __builtin_elementwise_floor(v)
 #define vec_ceil(v) __builtin_elementwise_ceil(v)
+#define vec_fma(a,b,c) __builtin_elementwise_fma(a,b,c)
 #define vec_min(a, b) __builtin_elementwise_min(a, b)
 #define vec_max(a, b) __builtin_elementwise_max(a, b)
 #else
@@ -68,12 +69,14 @@ static F32 vec_max(F32 a, F32 b) {
 }
 #endif
 
+#ifndef __clang__
 #if defined(__ARM_FEATURE_FMA) || defined(__FMA__)
 static F32 vec_fma(F32 x, F32 y, F32 z) { return z + x * y; }
 #else
 static F32 vec_fma(F32 x, F32 y, F32 z) {
     return cast(F32, cast(F64, x) * cast(F64, y) + cast(F64, z));
 }
+#endif
 #endif
 
 #if !defined(__wasm__)

@@ -623,9 +623,9 @@ static void test_multiply_half_alpha(void) {
             int g = (int)((dst[i] >> 8) & 0xFF);
             int b = (int)((dst[i] >> 16) & 0xFF);
             int a = (int)((dst[i] >> 24) & 0xFF);
-            r == 127 here;
+            (r == 127 || r == 128) here;
             g == 0 here;
-            b == 128 here;
+            (b == 127 || b == 128) here;
             (a == 191 || a == 192) here;
         }
     }
