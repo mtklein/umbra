@@ -215,7 +215,7 @@ static void test_slide_golden(
                 backend_name[bi], fmt_name[fmt],
                 mismatches, W * H, worst);
         }
-        (worst <= 3) here;  // GPU float arithmetic + sRGB nonlinearity can amplify to ±3
+        (worst <= 2) here;  // hardware sRGB texture + float arithmetic can differ by ±2
     }
 
     free(ref);
