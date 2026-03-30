@@ -96,8 +96,7 @@ kernel void umbra_entry(
         sc52 = clamp(sc52, 0.0, 1.0);
         ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc52.x*255.0)) | (uint(rint(sc52.y*255.0))<<8) | (uint(rint(sc52.z*255.0))<<16) | (uint(rint(sc52.w*255.0))<<24);
     } else if (fmt_p1 == 1u) {
-        sc52 = clamp(sc52, 0.0, 1.0);
-        ((device ushort*)(p1 + y * buf_rbs[1]))[x] = ushort((uint(rint(sc52.x*31.0))<<11) | (uint(rint(sc52.y*63.0))<<5) | uint(rint(sc52.z*31.0)));
+        ((device ushort*)(p1 + y * buf_rbs[1]))[x] = pack_float_to_unorm565(clamp(sc52.zyx, 0.0, 1.0));
     } else if (fmt_p1 == 2u) {
         sc52 = clamp(sc52, 0.0, 1.0);
         ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc52.x*1023.0)) | (uint(rint(sc52.y*1023.0))<<10) | (uint(rint(sc52.z*1023.0))<<20) | (uint(rint(sc52.w*3.0))<<30);

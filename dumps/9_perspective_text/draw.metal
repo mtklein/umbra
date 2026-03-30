@@ -98,8 +98,8 @@ kernel void umbra_entry(
     } else if (fmt_p1 == 0u) {
         v58_c = unpack_unorm4x8_to_float(((device uint*)(p1 + y * buf_rbs[1]))[x]);
     } else if (fmt_p1 == 1u) {
-        ushort px = ((device ushort*)(p1 + y * buf_rbs[1]))[x];
-        v58_c = float4(float(px>>11)/31.0, float((px>>5)&0x3Fu)/63.0, float(px&0x1Fu)/31.0, 1.0);
+        float3 bgr = unpack_unorm565_to_float(((device ushort*)(p1 + y * buf_rbs[1]))[x]);
+        v58_c = float4(bgr.z, bgr.y, bgr.x, 1.0);
     } else if (fmt_p1 == 2u) {
         v58_c = unpack_unorm10a2_to_float(((device uint*)(p1 + y * buf_rbs[1]))[x]);
     } else if (fmt_p1 == 3u) {
@@ -145,8 +145,7 @@ kernel void umbra_entry(
         sc71 = clamp(sc71, 0.0, 1.0);
         ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc71.x*255.0)) | (uint(rint(sc71.y*255.0))<<8) | (uint(rint(sc71.z*255.0))<<16) | (uint(rint(sc71.w*255.0))<<24);
     } else if (fmt_p1 == 1u) {
-        sc71 = clamp(sc71, 0.0, 1.0);
-        ((device ushort*)(p1 + y * buf_rbs[1]))[x] = ushort((uint(rint(sc71.x*31.0))<<11) | (uint(rint(sc71.y*63.0))<<5) | uint(rint(sc71.z*31.0)));
+        ((device ushort*)(p1 + y * buf_rbs[1]))[x] = pack_float_to_unorm565(clamp(sc71.zyx, 0.0, 1.0));
     } else if (fmt_p1 == 2u) {
         sc71 = clamp(sc71, 0.0, 1.0);
         ((device uint*)(p1 + y * buf_rbs[1]))[x] = uint(rint(sc71.x*1023.0)) | (uint(rint(sc71.y*1023.0))<<10) | (uint(rint(sc71.z*1023.0))<<20) | (uint(rint(sc71.w*3.0))<<30);

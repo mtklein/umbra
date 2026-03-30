@@ -251,11 +251,9 @@ static void emit_ops(Buf *b, BB const *bb,
                      "%s    v%d_c = unpack_unorm4x8_to_float("
                      "((device uint*)(p%d + y * buf_rbs[%d]))[x]);\n"
                      "%s} else if (fmt_p%d == %du) {\n"
-                     "%s    ushort px = ((device ushort*)"
-                     "(p%d + y * buf_rbs[%d]))[x];\n"
-                     "%s    v%d_c = float4(float(px>>11)/31.0,"
-                     " float((px>>5)&0x3Fu)/63.0,"
-                     " float(px&0x1Fu)/31.0, 1.0);\n"
+                     "%s    float3 bgr = unpack_unorm565_to_float("
+                     "((device ushort*)(p%d + y * buf_rbs[%d]))[x]);\n"
+                     "%s    v%d_c = float4(bgr.z, bgr.y, bgr.x, 1.0);\n"
                      "%s} else if (fmt_p%d == %du) {\n"
                      "%s    v%d_c = unpack_unorm10a2_to_float("
                      "((device uint*)(p%d + y * buf_rbs[%d]))[x]);\n"
@@ -346,11 +344,9 @@ static void emit_ops(Buf *b, BB const *bb,
                      " | (uint(rint(sc%d.z*255.0))<<16)"
                      " | (uint(rint(sc%d.w*255.0))<<24);\n"
                      "%s} else if (fmt_p%d == %du) {\n"
-                     "%s    sc%d = clamp(sc%d, 0.0, 1.0);\n"
-                     "%s    ((device ushort*)(p%d + y * buf_rbs[%d]))[x] ="
-                     " ushort((uint(rint(sc%d.x*31.0))<<11)"
-                     " | (uint(rint(sc%d.y*63.0))<<5)"
-                     " | uint(rint(sc%d.z*31.0)));\n"
+                     "%s    ((device ushort*)(p%d + y * buf_rbs[%d]))[x]"
+                     " = pack_float_to_unorm565("
+                     "clamp(sc%d.zyx, 0.0, 1.0));\n"
                      "%s} else if (fmt_p%d == %du) {\n"
                      "%s    sc%d = clamp(sc%d, 0.0, 1.0);\n"
                      "%s    ((device uint*)(p%d + y * buf_rbs[%d]))[x] ="
@@ -408,9 +404,7 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, p, p,
                      i, i, i, i,
                      pad, p, umbra_fmt_565,
-                     pad, i, i,
-                     pad, p, p,
-                     i, i, i,
+                     pad, p, p, i,
                      pad, p, umbra_fmt_1010102,
                      pad, i, i,
                      pad, p, p,
