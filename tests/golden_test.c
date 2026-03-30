@@ -206,7 +206,8 @@ static void test_slide_golden(
             }
             mismatches++;
         }
-        if (worst > 2) {
+        int tol = (fmt_enums[fmt] == umbra_fmt_srgb) ? 2 : 1;
+        if (worst > tol) {
             dprintf(2,
                 "slide %d \"%s\" %s/%s: "
                 "%d/%d pixels differ, "
@@ -215,7 +216,7 @@ static void test_slide_golden(
                 backend_name[bi], fmt_name[fmt],
                 mismatches, W * H, worst);
         }
-        (worst <= 2) here;
+        (worst <= tol) here;
     }
 
     free(ref);

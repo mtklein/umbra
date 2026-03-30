@@ -260,9 +260,9 @@ static void test_multiply_8888(void) {
             int g = (int)((dst[i] >> 8) & 0xFF);
             int b = (int)((dst[i] >> 16) & 0xFF);
             int a = (int)((dst[i] >> 24) & 0xFF);
-            r >= 0x1E && r <= 0x22 here;
-            g >= 0x3E && g <= 0x42 here;
-            b >= 0x7E && b <= 0x82 here;
+            r == 0x20 here;
+            g == 0x40 here;
+            b == 0x80 here;
             a == 0xFF here;
         }
     }
@@ -623,9 +623,9 @@ static void test_multiply_half_alpha(void) {
             int g = (int)((dst[i] >> 8) & 0xFF);
             int b = (int)((dst[i] >> 16) & 0xFF);
             int a = (int)((dst[i] >> 24) & 0xFF);
-            (r == 127 || r == 128) here;
+            r == 127 here;
             g == 0 here;
-            (b == 127 || b == 128) here;
+            b == 128 here;
             (a == 191 || a == 192) here;
         }
     }
@@ -812,8 +812,8 @@ static void test_coverage_bitmap(void) {
             continue;
         }
         dst[0] == 0 here;
-        (dst[1] & 0xff) >= 120 && (dst[1] & 0xff) <= 136 here;
-        (dst[2] & 0xff) >= 0xfe here;
+        (dst[1] & 0xff) == 128 here;
+        (dst[2] & 0xff) == 0xff here;
         dst[3] == 0 here;
     }
     cleanup_draw(&B);
@@ -843,7 +843,7 @@ static void test_coverage_sdf(void) {
             continue;
         }
         dst[0] == 0 here;
-        (dst[4] & 0xff) >= 0xfe here;
+        (dst[4] & 0xff) == 0xff here;
     }
     cleanup_draw(&B);
 }
@@ -877,7 +877,7 @@ static void test_coverage_bitmap_matrix(void) {
             continue;
         }
         dst[0] == 0 here;
-        (dst[2] & 0xff) >= 0xfe here;
+        (dst[2] & 0xff) == 0xff here;
         dst[3] == 0 here;
     }
     cleanup_draw(&B);
@@ -940,8 +940,8 @@ static void test_linear_2(void) {
         }
         (dst[0] & 0xff) == 0xFF here;
         ((dst[0] >> 16) & 0xff) == 0 here;
-        (dst[3] & 0xff) <= 66 here;
-        ((dst[3] >> 16) & 0xff) >= 189 here;
+        (dst[3] & 0xff) == 64 here;
+        ((dst[3] >> 16) & 0xff) == 191 here;
         for (int i = 0; i < 4; i++) { (((dst[i] >> 24) & 0xff) == 0xFF) here; }
     }
     cleanup_draw(&B);
@@ -1007,7 +1007,7 @@ static void test_linear_grad(void) {
         }
         (dst[0] & 0xff) == 0xFF here;
         ((dst[0] >> 8) & 0xff) == 0 here;
-        ((dst[7] >> 16) & 0xff) >= 180 here;
+        ((dst[7] >> 16) & 0xff) == 191 here;
     }
     cleanup_draw(&B);
 }
@@ -1081,7 +1081,7 @@ static void test_gradient_lut_nonuniform(void) {
             continue;
         }
         (dst[0] & 0xff) == 0xFF here;
-        ((dst[7] >> 16) & 0xff) >= 180 here;
+        ((dst[7] >> 16) & 0xff) == 215 here;
     }
     cleanup_draw(&B);
 }
