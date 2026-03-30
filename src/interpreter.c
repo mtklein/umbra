@@ -218,22 +218,13 @@ static void interp_load_color(val v[4], umbra_buf const *b,
         v[1].f32 = cast(F32, (I32)((px >>  8) & mask)) * inv;
         v[2].f32 = cast(F32, (I32)((px >> 16) & mask)) * inv;
         v[3].f32 = cast(F32, (I32)(px >> 24))          * inv;
-        // sRGB→linear: septic polynomial approximation (no powf).
+        // sRGB→linear: cubic polynomial approximation (no powf).
         for (int ch = 0; ch < 3; ch++) {
             F32 s = v[ch].f32;
             F32 const lo = s * ((F32){0} + (1.0f/12.92f));
-            F32 const ca = (F32){0} + -4.82083022594e-01f;
-            F32 const cb = (F32){0} +  1.84310853481e+00f;
-            F32 const cc = (F32){0} + -2.79252314568e+00f;
-            F32 const cd = (F32){0} +  2.05758404732e+00f;
-            F32 const ce = (F32){0} + -4.18130934238e-01f;
-            F32 const cf = (F32){0} +  7.89776027203e-01f;
-            F32 const cg = (F32){0} + 1.0f - (ca + cb + cc + cd + ce + cf);
-            F32 const inner = ((ca * s + cb) * s + cc) * s + cd;
-            F32 const s2  = s * s;
-            F32 const mid = (inner * s + ce) * s + cf;
-            F32 const hi  = mid * s2 + cg;
-            I32 const sel = (I32)(s < ((F32){0} + 5.76281473041e-02f));
+            F32 const hi = s*s * (s * ((F32){0} + 0.3f) + ((F32){0} + 0.6975f))
+                         + ((F32){0} + 0.0025f);
+            I32 const sel = (I32)(s < ((F32){0} + 0.055f));
             union { F32 f; I32 i; } lo_u = {.f=lo}, hi_u = {.f=hi}, r;
             r.i = (sel & lo_u.i) | (~sel & hi_u.i);
             v[ch].f32 = r.f;
@@ -343,21 +334,19 @@ static void interp_store_color(val const v[], umbra_buf const *b,
         }
     } break;
     case umbra_fmt_srgb: {
-        // linear→sRGB: rsqrt/rcp quartic rational approximation (no powf).
+        // linear→sRGB: rsqrt/rcp quadratic rational approximation (no powf).
         {
-            F32 const vc  = (F32){0} + 1.0545324087e+00f;
-            F32 const vd  = (F32){0} + 1.0131348670e-01f;
-            F32 const vk1 = (F32){0} + 5.8207426220e-02f;
-            F32 const vk2 = (F32){0} + -1.2198361568e-02f;
-            F32 const vk3 = (F32){0} + 7.9244317021e-04f;
-            F32 const vk4 = (F32){0} + -2.0467568902e-05f;
+            F32 const vc  = (F32){0} + 1.12732994556f;
+            F32 const vd  = (F32){0} + 0.13738775253f;
+            F32 const vk1 = (F32){0} + 0.01347202249f;
+            F32 const vk2 = (F32){0} + -0.00233423407f;
             F32 *chs[3] = {&cr, &cg, &cb};
             for (int ci = 0; ci < 3; ci++) {
                 F32 l = vec_max(*chs[ci], (F32){0});
                 F32 const lo = l * ((F32){0} + 12.92f);
                 F32 const t  = ((F32){0} + 1.f) / vec_sqrt(vec_max(l, (F32){0} + 1e-30f));
-                F32 const hi = (vc + t * (vk1 + t * (vk2 + t * (vk3 + t * vk4)))) / (vd + t);
-                I32 const mask = (I32)(l < ((F32){0} + 4.5700869523e-03f));
+                F32 const hi = (vc + t * (vk1 + t * vk2)) / (vd + t);
+                I32 const mask = (I32)(l < ((F32){0} + 0.00465985f));
                 union { F32 f; I32 i; } lo_u = {.f=lo}, hi_u = {.f=hi}, r;
                 r.i = (mask & lo_u.i) | (~mask & hi_u.i);
                 *chs[ci] = r.f;

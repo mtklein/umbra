@@ -206,7 +206,7 @@ static void test_slide_golden(
             }
             mismatches++;
         }
-        int tol = (fmt_enums[fmt] == umbra_fmt_srgb) ? 2 : 0;
+        int tol = (fmt_enums[fmt] == umbra_fmt_srgb) ? 3 : 0;
         if (worst > tol) {
             dprintf(2,
                 "slide %d \"%s\" %s/%s: "
