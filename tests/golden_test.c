@@ -34,7 +34,6 @@ typedef struct {
 } pipe;
 
 static pipe fill_pipes[NUM_FMTS];
-static pipe readback_pipes[NUM_FMTS];
 static struct umbra_backend *interp_be;
 
 static void build_fill(int fmt) {
@@ -57,34 +56,17 @@ static void build_fill(int fmt) {
     umbra_basic_block_free(opt);
 }
 
-static void build_readback(int fmt) {
-    builder *builder = umbra_builder();
-    umbra_color c =
-        umbra_load_color(builder, (umbra_ptr){1, 0});
-    umbra_store_color(builder, (umbra_ptr){2, 0}, c);
-    readback_pipes[fmt].out_ptr = 2;
-    readback_pipes[fmt].uni_len =
-        umbra_uni_len(builder);
-    struct umbra_basic_block *opt =
-        umbra_basic_block(builder);
-    umbra_builder_free(builder);
-    readback_pipes[fmt].prog =
-        interp_be->compile(interp_be, opt);
-    umbra_basic_block_free(opt);
-}
 
 static void build_pipes(void) {
     interp_be = umbra_backend_interp();
     for (int f = 0; f < NUM_FMTS; f++) {
         build_fill(f);
-        build_readback(f);
     }
 }
 
 static void free_pipes(void) {
     for (int f = 0; f < NUM_FMTS; f++) {
         fill_pipes[f].prog->free(fill_pipes[f].prog);
-        readback_pipes[f].prog->free(readback_pipes[f].prog);
     }
     interp_be->free(interp_be);
 }
@@ -114,21 +96,6 @@ static void fill_bg(int fmt, void *dst, uint32_t bg) {
     fill_pipes[fmt].prog->queue(fill_pipes[fmt].prog, 0, 0, W, H, buf);
 }
 
-static void readback_to_8888(int fmt,
-                             void *pixbuf,
-                             uint32_t *out) {
-    uint64_t uni_[2] = {0};
-    char *uni = (char*)uni_;
-    size_t bpp = umbra_fmt_size(fmt_enums[fmt]);
-    int   op = readback_pipes[fmt].out_ptr;
-    umbra_buf buf[3];
-    buf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)readback_pipes[fmt].uni_len, .read_only=1};
-    buf[1] = (umbra_buf){.ptr=pixbuf, .sz=pixbuf_size(fmt), .row_bytes=(size_t)W * bpp,
-                         .read_only=1, .fmt=fmt_enums[fmt]};
-    buf[op] = (umbra_buf){.ptr=out, .sz=(size_t)(W * H * 4), .row_bytes=(size_t)(W * 4),
-                          .fmt=umbra_fmt_8888};
-    readback_pipes[fmt].prog->queue(readback_pipes[fmt].prog, 0, 0, W, H, buf);
-}
 
 static void render_slide(
         int slide_idx, int fmt,
@@ -177,36 +144,81 @@ static void test_slide_golden(
     size_t pixbuf_sz = pixbuf_size(fmt);
     void *pbuf_ref = calloc(1, pixbuf_sz);
     void *pbuf_tst = calloc(1, pixbuf_sz);
-    uint32_t *ref = malloc((size_t)(W * H) * 4);
-    uint32_t *tst = malloc((size_t)(W * H) * 4);
 
     render_slide(slide_idx, fmt,
                  bes[0], progs[0], pbuf_ref, &lay);
-    readback_to_8888(fmt, pbuf_ref, ref);
 
     for (int bi = 1; bi < N_BACKS; bi++) {
         if (!progs[bi]) { continue; }
         render_slide(slide_idx, fmt,
                      bes[bi], progs[bi], pbuf_tst, &lay);
         bes[bi]->flush(bes[bi]);
-        readback_to_8888(fmt, pbuf_tst, tst);
 
         int mismatches = 0;
         int worst = 0;
-        for (int i = 0; i < W * H; i++) {
-            if (ref[i] == tst[i]) { continue; }
-            for (int ch = 0; ch < 4; ch++) {
-                int a = (int)(
-                    (ref[i] >> (ch*8)) & 0xff);
-                int b = (int)(
-                    (tst[i] >> (ch*8)) & 0xff);
-                int d = a - b;
-                if (d < 0) { d = -d; }
-                if (d > worst) { worst = d; }
+        uint8_t const *r = pbuf_ref, *t = pbuf_tst;
+        int npx = W * H;
+        if (fmt_enums[fmt] == umbra_fmt_fp16_planar) npx *= 4;
+        for (int i = 0; i < npx; i++) {
+            _Bool differ = 0;
+            switch (fmt_enums[fmt]) {
+            case umbra_fmt_8888:
+            case umbra_fmt_srgb: {
+                uint32_t rp, tp;
+                __builtin_memcpy(&rp, r+i*4, 4);
+                __builtin_memcpy(&tp, t+i*4, 4);
+                for (int ch = 0; ch < 4; ch++) {
+                    int d = (int)((rp>>(ch*8))&0xFF) - (int)((tp>>(ch*8))&0xFF);
+                    if (d<0) d=-d;
+                    if (d>worst) worst=d;
+                    if (d) differ=1;
+                }
+            } break;
+            case umbra_fmt_565: {
+                uint16_t rp, tp;
+                __builtin_memcpy(&rp, r+i*2, 2);
+                __builtin_memcpy(&tp, t+i*2, 2);
+                int dr = (int)(rp>>11)    - (int)(tp>>11);
+                int dg = (int)((rp>>5)&63)- (int)((tp>>5)&63);
+                int db = (int)(rp&31)     - (int)(tp&31);
+                if (dr<0) dr=-dr; if (dg<0) dg=-dg; if (db<0) db=-db;
+                if (dr>worst) worst=dr;
+                if (dg>worst) worst=dg;
+                if (db>worst) worst=db;
+                if (rp!=tp) differ=1;
+            } break;
+            case umbra_fmt_1010102: {
+                uint32_t rp, tp;
+                __builtin_memcpy(&rp, r+i*4, 4);
+                __builtin_memcpy(&tp, t+i*4, 4);
+                int d0=(int)(rp&0x3FF)     -(int)(tp&0x3FF);
+                int d1=(int)((rp>>10)&0x3FF)-(int)((tp>>10)&0x3FF);
+                int d2=(int)((rp>>20)&0x3FF)-(int)((tp>>20)&0x3FF);
+                int d3=(int)(rp>>30)       -(int)(tp>>30);
+                if(d0<0)d0=-d0;if(d1<0)d1=-d1;if(d2<0)d2=-d2;if(d3<0)d3=-d3;
+                if(d0>worst)worst=d0;if(d1>worst)worst=d1;
+                if(d2>worst)worst=d2;if(d3>worst)worst=d3;
+                if(rp!=tp) differ=1;
+            } break;
+            case umbra_fmt_fp16:
+            case umbra_fmt_fp16_planar: {
+                uint16_t rp, tp;
+                int nb = (fmt_enums[fmt]==umbra_fmt_fp16) ? 4 : 1;
+                for (int ch=0; ch<nb; ch++) {
+                    __builtin_memcpy(&rp, r+i*nb*2+ch*2, 2);
+                    __builtin_memcpy(&tp, t+i*nb*2+ch*2, 2);
+                    int d = (int)rp - (int)tp;
+                    if (d<0) d=-d;
+                    if (d>worst) worst=d;
+                    if (rp!=tp) differ=1;
+                }
+            } break;
             }
-            mismatches++;
+            if (differ) mismatches++;
         }
-        int tol = (fmt_enums[fmt] == umbra_fmt_srgb) ? 3 : 0;
+        int tol = (fmt_enums[fmt] == umbra_fmt_srgb
+                || fmt_enums[fmt] == umbra_fmt_fp16
+                || fmt_enums[fmt] == umbra_fmt_fp16_planar) ? 1 : 0;
         if (worst > tol) {
             dprintf(2,
                 "slide %d \"%s\" %s/%s: "
@@ -219,8 +231,6 @@ static void test_slide_golden(
         (worst <= tol) here;
     }
 
-    free(ref);
-    free(tst);
     free(pbuf_ref);
     free(pbuf_tst);
     for (int bi = 0; bi < N_BACKS; bi++) {
