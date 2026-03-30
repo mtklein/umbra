@@ -373,26 +373,26 @@ static void emit_srgb_arm64(Buf *c, struct pool *pool,
             put(c, FMUL_4s(t0, ch, t0));                 // t0 = lo
 
             // hi = s²*(s²*(a*s² + b*s + c) + d*s + e) + f
-            arm64_pool_load(c, pool, t1, f2u(0.2456940264f));
+            arm64_pool_load(c, pool, t1, f2u(0.3820617706f));
             put(c, FMUL_4s(t1, ch, t1));                  // t1 = a*s
-            arm64_pool_load(c, pool, t2, f2u(-0.7771521211f));
+            arm64_pool_load(c, pool, t2, f2u(-1.161516217f));
             put(c, FADD_4s(t1, t1, t2));                   // t1 = b + a*s
             put(c, FMUL_4s(t1, ch, t1));                   // t1 = s*(b+a*s)
-            arm64_pool_load(c, pool, t2, f2u(0.8481360674f));
+            arm64_pool_load(c, pool, t2, f2u(1.260872928f));
             put(c, FADD_4s(t1, t1, t2));                   // t1 = c + s*(b+a*s) = inner
             put(c, FMUL_4s(t2, ch, ch));                   // t2 = s²
             put(c, FMUL_4s(t1, t2, t1));                   // t1 = inner*s²
-            arm64_pool_load(c, pool, t2, f2u(-0.07268945128f));
+            arm64_pool_load(c, pool, t2, f2u(-0.2746710077f));
             put(c, FMLA_4s(t1, ch, t2));                   // t1 += d*s = inner*s²+d*s
-            arm64_pool_load(c, pool, t2, f2u(0.7527475953f));
+            arm64_pool_load(c, pool, t2, f2u(0.7916235363f));
             put(c, FADD_4s(t1, t1, t2));                   // t1 = mid
             put(c, FMUL_4s(t2, ch, ch));                   // t2 = s²
             put(c, FMUL_4s(t1, t2, t1));                   // t1 = mid*s²
-            arm64_pool_load(c, pool, t2, f2u(0.002375858836f));
+            arm64_pool_load(c, pool, t2, f2u(0.002218273878f));
             put(c, FADD_4s(t1, t1, t2));                   // t1 = hi
 
             // sel: compare lo against threshold/12.92 (since lo=s/12.92, ch clobbered)
-            arm64_pool_load(c, pool, t2, f2u(0.05796349049f / 12.92f));
+            arm64_pool_load(c, pool, t2, f2u(0.055f / 12.92f));
             put(c, FCMGE_4s(t2, t0, t2));                  // t2 = lo >= thresh/12.92
             put(c, ORR_16b(ch, t0, t0));                    // ch = lo
             put(c, BIT_16b(ch, t1, t2));                    // ch = t2 ? hi : lo
@@ -410,22 +410,22 @@ static void emit_srgb_arm64(Buf *c, struct pool *pool,
             put(c, FMUL_4s(t1, ch, t1));                  // t1 = lo
 
             // numerator = C + t*(k1 + t*(k2 + t*(k3 + t*k4)))
-            arm64_pool_load(c, pool, t2, f2u(-1.013387191e-05f));
+            arm64_pool_load(c, pool, t2, f2u(-1.126239889e-05f));
             put(c, FMUL_4s(t2, t0, t2));                   // t2 = t*k4
-            arm64_pool_load(c, pool, ch, f2u(0.0005095639499f));
+            arm64_pool_load(c, pool, ch, f2u(0.0005505848605f));
             put(c, FADD_4s(t2, t2, ch));                    // t2 = k3 + t*k4
             put(c, FMUL_4s(t2, t0, t2));                    // t2 = t*(k3+t*k4)
-            arm64_pool_load(c, pool, ch, f2u(-0.009712861851f));
+            arm64_pool_load(c, pool, ch, f2u(-0.01021924645f));
             put(c, FADD_4s(t2, t2, ch));                    // t2 = k2 + t*(k3+t*k4)
             put(c, FMUL_4s(t2, t0, t2));                    // t2 = t*(k2+t*(k3+t*k4))
-            arm64_pool_load(c, pool, ch, f2u(0.0503838025f));
+            arm64_pool_load(c, pool, ch, f2u(0.05182571609f));
             put(c, FADD_4s(t2, t2, ch));                    // t2 = k1 + ...
             put(c, FMUL_4s(t2, t0, t2));                    // t2 = t*(k1+...)
-            arm64_pool_load(c, pool, ch, f2u(1.063381076f));
+            arm64_pool_load(c, pool, ch, f2u(1.063870338f));
             put(c, FADD_4s(t2, t2, ch));                    // t2 = numerator
 
             // denominator = rcp(D + t) with one NR step
-            arm64_pool_load(c, pool, ch, f2u(0.104337059f));
+            arm64_pool_load(c, pool, ch, f2u(0.1063413816f));
             put(c, FADD_4s(ch, ch, t0));                   // ch = D + t
             put(c, FRECPE_4s(t0, ch));                     // t0 = rcp estimate
             put(c, FRECPS_4s(ch, ch, t0));                 // ch = 2 - (D+t)*est
@@ -435,7 +435,7 @@ static void emit_srgb_arm64(Buf *c, struct pool *pool,
             put(c, FMUL_4s(t2, t2, t0));                   // t2 = hi
 
             // sel = l < thresh ? lo : hi
-            arm64_pool_load(c, pool, t0, f2u(0.003745175665f * 12.92f));
+            arm64_pool_load(c, pool, t0, f2u(0.00427f * 12.92f));
             put(c, FCMGE_4s(t0, t1, t0));                  // t0 = lo >= (thresh*12.92)
             put(c, ORR_16b(ch, t1, t1));                   // ch = lo
             put(c, BIT_16b(ch, t2, t0));                   // ch = t0 ? hi : lo
@@ -2023,27 +2023,27 @@ static void emit_srgb_x86(Buf *c, struct pool *pool,
             vmulps(c, t0, ch, t0);                        // t0 = lo
 
             // hi = s²*(s²*(a*s² + b*s + c) + d*s + e) + f
-            pool_broadcast(c, pool, t1, f2u(0.2456940264f));
+            pool_broadcast(c, pool, t1, f2u(0.3820617706f));
             vmulps(c, t1, ch, t1);                        // t1 = a*s
-            pool_broadcast(c, pool, t2, f2u(-0.7771521211f));
+            pool_broadcast(c, pool, t2, f2u(-1.161516217f));
             vaddps(c, t1, t1, t2);                        // t1 = b + a*s
             vmulps(c, t1, ch, t1);                        // t1 = s*(b+a*s)
-            pool_broadcast(c, pool, t2, f2u(0.8481360674f));
+            pool_broadcast(c, pool, t2, f2u(1.260872928f));
             vaddps(c, t1, t1, t2);                        // t1 = c+s*(b+a*s) = inner
             vmulps(c, t2, ch, ch);                        // t2 = s²
             vmulps(c, t1, t2, t1);                        // t1 = inner*s²
-            pool_broadcast(c, pool, t2, f2u(-0.07268945128f));
+            pool_broadcast(c, pool, t2, f2u(-0.2746710077f));
             vmulps(c, t2, ch, t2);                        // t2 = d*s
             vaddps(c, t1, t1, t2);                        // t1 = inner*s²+d*s
-            pool_broadcast(c, pool, t2, f2u(0.7527475953f));
+            pool_broadcast(c, pool, t2, f2u(0.7916235363f));
             vaddps(c, t1, t1, t2);                        // t1 = mid
             vmulps(c, t2, ch, ch);                        // t2 = s²
             vmulps(c, t1, t2, t1);                        // t1 = mid*s²
-            pool_broadcast(c, pool, t2, f2u(0.002375858836f));
+            pool_broadcast(c, pool, t2, f2u(0.002218273878f));
             vaddps(c, t1, t1, t2);                        // t1 = hi
 
             // sel: compare lo against threshold/12.92
-            pool_broadcast(c, pool, t2, f2u(0.05796349049f / 12.92f));
+            pool_broadcast(c, pool, t2, f2u(0.055f / 12.92f));
             vcmpps(c, t2, t0, t2, 5);                    // t2 = lo >= thresh/12.92
             vpblendvb(c, 1, ch, t0, t1, t2);             // ch = t2 ? hi : lo
         } else {
@@ -2059,22 +2059,22 @@ static void emit_srgb_x86(Buf *c, struct pool *pool,
             vmulps(c, t1, ch, t1);                        // t1 = lo
 
             // numerator = C + t*(k1 + t*(k2 + t*(k3 + t*k4)))
-            pool_broadcast(c, pool, t2, f2u(-1.013387191e-05f));
+            pool_broadcast(c, pool, t2, f2u(-1.126239889e-05f));
             vmulps(c, t2, t0, t2);                        // t2 = t*k4
-            pool_broadcast(c, pool, ch, f2u(0.0005095639499f));
+            pool_broadcast(c, pool, ch, f2u(0.0005505848605f));
             vaddps(c, t2, t2, ch);                        // t2 = k3 + t*k4
             vmulps(c, t2, t0, t2);                        // t2 = t*(k3+t*k4)
-            pool_broadcast(c, pool, ch, f2u(-0.009712861851f));
+            pool_broadcast(c, pool, ch, f2u(-0.01021924645f));
             vaddps(c, t2, t2, ch);                        // t2 = k2 + t*(k3+t*k4)
             vmulps(c, t2, t0, t2);                        // t2 = t*(k2+...)
-            pool_broadcast(c, pool, ch, f2u(0.0503838025f));
+            pool_broadcast(c, pool, ch, f2u(0.05182571609f));
             vaddps(c, t2, t2, ch);                        // t2 = k1 + ...
             vmulps(c, t2, t0, t2);                        // t2 = t*(k1+...)
-            pool_broadcast(c, pool, ch, f2u(1.063381076f));
+            pool_broadcast(c, pool, ch, f2u(1.063870338f));
             vaddps(c, t2, t2, ch);                        // t2 = numerator
 
             // denominator = rcp(D + t)  (VRCPPS, ~12-bit, no NR needed)
-            pool_broadcast(c, pool, ch, f2u(0.104337059f));
+            pool_broadcast(c, pool, ch, f2u(0.1063413816f));
             vaddps(c, ch, ch, t0);                        // ch = D + t
             vrcpps(c, ch, ch);                            // ch = rcp(D + t)
 
@@ -2082,7 +2082,7 @@ static void emit_srgb_x86(Buf *c, struct pool *pool,
             vmulps(c, t2, t2, ch);                        // t2 = hi
 
             // sel = lo < (thresh*12.92) ? lo : hi
-            pool_broadcast(c, pool, t0, f2u(0.003745175665f * 12.92f));
+            pool_broadcast(c, pool, t0, f2u(0.00427f * 12.92f));
             vcmpps(c, t0, t1, t0, 5);                    // t0 = lo >= threshold
             vpblendvb(c, 1, ch, t1, t2, t0);             // ch = t0 ? hi : lo
         }
