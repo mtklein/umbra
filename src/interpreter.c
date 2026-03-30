@@ -20,7 +20,7 @@ typedef int16_t  S16 __attribute__((vector_size(K * 2)));
 #define vec_sqrt(v) __builtin_elementwise_sqrt(v)
 #define vec_abs(v) __builtin_elementwise_abs(v)
 #define vec_round(v) __builtin_elementwise_roundeven(v)
-#define vec_round_away(v) __builtin_elementwise_round(v)
+#define vec_trunc(v) __builtin_elementwise_trunc(v)
 #define vec_floor(v) __builtin_elementwise_floor(v)
 #define vec_ceil(v) __builtin_elementwise_ceil(v)
 #define vec_min(a, b) __builtin_elementwise_min(a, b)
@@ -41,9 +41,9 @@ static F32 vec_round(F32 v) {
     for (int i = 0; i < K; i++) { r[i] = rintf(v[i]); }
     return r;
 }
-static F32 vec_round_away(F32 v) {
+static F32 vec_trunc(F32 v) {
     F32 r;
-    for (int i = 0; i < K; i++) { r[i] = roundf(v[i]); }
+    for (int i = 0; i < K; i++) { r[i] = truncf(v[i]); }
     return r;
 }
 static F32 vec_floor(F32 v) {
@@ -65,6 +65,14 @@ static F32 vec_max(F32 a, F32 b) {
     F32 r;
     for (int i = 0; i < K; i++) { r[i] = a[i] > b[i] ? a[i] : b[i]; }
     return r;
+}
+#endif
+
+#if defined(__ARM_FEATURE_FMA) || defined(__FMA__)
+static F32 vec_fma(F32 x, F32 y, F32 z) { return z + x * y; }
+#else
+static F32 vec_fma(F32 x, F32 y, F32 z) {
+    return cast(F32, cast(F64, x) * cast(F64, y) + cast(F64, z));
 }
 #endif
 
@@ -263,10 +271,11 @@ static void interp_store_color(val const v[], umbra_buf const *b,
     switch (b->fmt) {
     case umbra_fmt_8888: {
         F32 const zero = {0}, one = (F32){0} + 1.f, scale = (F32){0} + 255.f;
-        F32 const rc = vec_round_away(vec_min(vec_max(cr, zero), one) * scale);
-        F32 const gc = vec_round_away(vec_min(vec_max(cg, zero), one) * scale);
-        F32 const bc = vec_round_away(vec_min(vec_max(cb, zero), one) * scale);
-        F32 const ac = vec_round_away(vec_min(vec_max(ca, zero), one) * scale);
+        F32 const half = (F32){0} + 0.5f;
+        F32 const rc = vec_trunc(vec_fma(vec_min(vec_max(cr, zero), one), scale, half));
+        F32 const gc = vec_trunc(vec_fma(vec_min(vec_max(cg, zero), one), scale, half));
+        F32 const bc = vec_trunc(vec_fma(vec_min(vec_max(cb, zero), one), scale, half));
+        F32 const ac = vec_trunc(vec_fma(vec_min(vec_max(ca, zero), one), scale, half));
         U32 const px = cast(U32, cast(I32, rc))
                      | cast(U32, cast(I32, gc)) <<  8
                      | cast(U32, cast(I32, bc)) << 16
@@ -281,10 +290,10 @@ static void interp_store_color(val const v[], umbra_buf const *b,
         }
     } break;
     case umbra_fmt_565: {
-        F32 const zero = {0}, one = (F32){0} + 1.f;
-        F32 const rc = vec_round_away(vec_min(vec_max(cr, zero), one) * ((F32){0} + 31.f));
-        F32 const gc = vec_round_away(vec_min(vec_max(cg, zero), one) * ((F32){0} + 63.f));
-        F32 const bc = vec_round_away(vec_min(vec_max(cb, zero), one) * ((F32){0} + 31.f));
+        F32 const zero = {0}, one = (F32){0} + 1.f, half = (F32){0} + 0.5f;
+        F32 const rc = vec_trunc(vec_fma(vec_min(vec_max(cr, zero), one), (F32){0} + 31.f, half));
+        F32 const gc = vec_trunc(vec_fma(vec_min(vec_max(cg, zero), one), (F32){0} + 63.f, half));
+        F32 const bc = vec_trunc(vec_fma(vec_min(vec_max(cb, zero), one), (F32){0} + 31.f, half));
         U32 const px32 = cast(U32, cast(I32, rc)) << 11
                        | cast(U32, cast(I32, gc)) <<  5
                        | cast(U32, cast(I32, bc));
@@ -299,11 +308,11 @@ static void interp_store_color(val const v[], umbra_buf const *b,
         }
     } break;
     case umbra_fmt_1010102: {
-        F32 const zero = {0}, one = (F32){0} + 1.f;
-        F32 const rc = vec_round_away(vec_min(vec_max(cr, zero), one) * ((F32){0} + 1023.f));
-        F32 const gc = vec_round_away(vec_min(vec_max(cg, zero), one) * ((F32){0} + 1023.f));
-        F32 const bc = vec_round_away(vec_min(vec_max(cb, zero), one) * ((F32){0} + 1023.f));
-        F32 const ac = vec_round_away(vec_min(vec_max(ca, zero), one) * ((F32){0} + 3.f));
+        F32 const zero = {0}, one = (F32){0} + 1.f, half = (F32){0} + 0.5f;
+        F32 const rc = vec_trunc(vec_fma(vec_min(vec_max(cr, zero), one), (F32){0} + 1023.f, half));
+        F32 const gc = vec_trunc(vec_fma(vec_min(vec_max(cg, zero), one), (F32){0} + 1023.f, half));
+        F32 const bc = vec_trunc(vec_fma(vec_min(vec_max(cb, zero), one), (F32){0} + 1023.f, half));
+        F32 const ac = vec_trunc(vec_fma(vec_min(vec_max(ca, zero), one), (F32){0} + 3.f, half));
         U32 const px = cast(U32, cast(I32, rc))
                      | cast(U32, cast(I32, gc)) << 10
                      | cast(U32, cast(I32, bc)) << 20

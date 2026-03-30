@@ -1125,19 +1125,25 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             {
                 union { float f; uint32_t u; } s255 = {.f = 255.0f};
                 union { float f; uint32_t u; } f1   = {.f = 1.0f};
+                union { float f; uint32_t u; } fh   = {.f = 0.5f};
                 arm64_pool_load(c, &jc->pool, scale, s255.u);
                 arm64_pool_load(c, &jc->pool, one, f1.u);
+                arm64_pool_load(c, &jc->pool, st1, fh.u);
                 put(c, MOVI_4s(z, 0, 0));
                 put(c, FMAXNM_4s(px, rr, z)); put(c, FMINNM_4s(px, px, one));
-                put(c, FMUL_4s(px, px, scale)); put(c, FCVTAS_4s(px, px));
+                put(c, ORR_16b(st0, st1, st1)); put(c, FMLA_4s(st0, px, scale));
+                put(c, FCVTZS_4s(px, st0));
                 put(c, FMAXNM_4s(t, rg, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTAS_4s(t, t));
+                put(c, ORR_16b(st0, st1, st1)); put(c, FMLA_4s(st0, t, scale));
+                put(c, FCVTZS_4s(t, st0));
                 put(c, SLI_4s_imm(px, t, 8));
                 put(c, FMAXNM_4s(t, rb_, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTAS_4s(t, t));
+                put(c, ORR_16b(st0, st1, st1)); put(c, FMLA_4s(st0, t, scale));
+                put(c, FCVTZS_4s(t, st0));
                 put(c, SLI_4s_imm(px, t, 16));
                 put(c, FMAXNM_4s(t, ra_v, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTAS_4s(t, t));
+                put(c, ORR_16b(st0, st1, st1)); put(c, FMLA_4s(st0, t, scale));
+                put(c, FCVTZS_4s(t, st0));
                 put(c, SLI_4s_imm(px, t, 24));
                 if (scalar) { put(c, STR_sx(px, XP, XI)); }
                 else        { put(c, STR_q(px, XP, XW)); }
@@ -1154,22 +1160,27 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 union { float f; uint32_t u; } s31 = {.f = 31.0f};
                 union { float f; uint32_t u; } s63 = {.f = 63.0f};
                 union { float f; uint32_t u; } f1  = {.f = 1.0f};
+                union { float f; uint32_t u; } fh  = {.f = 0.5f};
                 arm64_pool_load(c, &jc->pool, one, f1.u);
+                arm64_pool_load(c, &jc->pool, st1, fh.u);
                 put(c, MOVI_4s(z, 0, 0));
-                // B: clamp, scale by 31, round. (start with B in bits 0-4)
+                // B: clamp, fma(scale,val,half), truncate.
                 arm64_pool_load(c, &jc->pool, scale, s31.u);
                 put(c, FMAXNM_4s(px, rb_, z)); put(c, FMINNM_4s(px, px, one));
-                put(c, FMUL_4s(px, px, scale)); put(c, FCVTAS_4s(px, px));
-                // G: clamp, scale by 63, round, shift left 5, OR.
+                put(c, ORR_16b(st0, st1, st1)); put(c, FMLA_4s(st0, px, scale));
+                put(c, FCVTZS_4s(px, st0));
+                // G: clamp, fma(scale,val,half), truncate, shift left 5, OR.
                 arm64_pool_load(c, &jc->pool, scale, s63.u);
                 put(c, FMAXNM_4s(t, rg, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTAS_4s(t, t));
+                put(c, ORR_16b(st0, st1, st1)); put(c, FMLA_4s(st0, t, scale));
+                put(c, FCVTZS_4s(t, st0));
                 put(c, SHL_4s_imm(t, t, 5));
                 put(c, ORR_16b(px, px, t));
-                // R: clamp, scale by 31, round, shift left 11, OR.
+                // R: clamp, fma(scale,val,half), truncate, shift left 11, OR.
                 arm64_pool_load(c, &jc->pool, scale, s31.u);
                 put(c, FMAXNM_4s(t, rr, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTAS_4s(t, t));
+                put(c, ORR_16b(st0, st1, st1)); put(c, FMLA_4s(st0, t, scale));
+                put(c, FCVTZS_4s(t, st0));
                 put(c, SHL_4s_imm(t, t, 11));
                 put(c, ORR_16b(px, px, t));
                 // Narrow 4S -> 4H and store.
@@ -1193,24 +1204,30 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 union { float f; uint32_t u; } s1023 = {.f = 1023.0f};
                 union { float f; uint32_t u; } s3    = {.f = 3.0f};
                 union { float f; uint32_t u; } f1    = {.f = 1.0f};
+                union { float f; uint32_t u; } fh    = {.f = 0.5f};
                 arm64_pool_load(c, &jc->pool, one, f1.u);
+                arm64_pool_load(c, &jc->pool, st1, fh.u);
                 put(c, MOVI_4s(z, 0, 0));
-                // R: clamp, scale by 1023, round.
+                // R: clamp, fma(scale,val,half), truncate.
                 arm64_pool_load(c, &jc->pool, scale, s1023.u);
                 put(c, FMAXNM_4s(px, rr, z)); put(c, FMINNM_4s(px, px, one));
-                put(c, FMUL_4s(px, px, scale)); put(c, FCVTAS_4s(px, px));
-                // G: clamp, scale by 1023, round.
+                put(c, ORR_16b(st0, st1, st1)); put(c, FMLA_4s(st0, px, scale));
+                put(c, FCVTZS_4s(px, st0));
+                // G
                 put(c, FMAXNM_4s(t, rg, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTAS_4s(t, t));
+                put(c, ORR_16b(st0, st1, st1)); put(c, FMLA_4s(st0, t, scale));
+                put(c, FCVTZS_4s(t, st0));
                 put(c, SLI_4s_imm(px, t, 10));
-                // B: clamp, scale by 1023, round.
+                // B
                 put(c, FMAXNM_4s(t, rb_, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTAS_4s(t, t));
+                put(c, ORR_16b(st0, st1, st1)); put(c, FMLA_4s(st0, t, scale));
+                put(c, FCVTZS_4s(t, st0));
                 put(c, SLI_4s_imm(px, t, 20));
-                // A: clamp, scale by 3, round.
+                // A: scale by 3
                 arm64_pool_load(c, &jc->pool, scale, s3.u);
                 put(c, FMAXNM_4s(t, ra_v, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTAS_4s(t, t));
+                put(c, ORR_16b(st0, st1, st1)); put(c, FMLA_4s(st0, t, scale));
+                put(c, FCVTZS_4s(t, st0));
                 put(c, SLI_4s_imm(px, t, 30));
                 if (scalar) { put(c, STR_sx(px, XP, XI)); }
                 else        { put(c, STR_q(px, XP, XW)); }
