@@ -64,13 +64,7 @@ kernel void umbra_entry(
         device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_szs[1]/4;
         v13_c = float4(float(((device half*)row)[x]),float(((device half*)(row+ps))[x]),float(((device half*)(row+2*ps))[x]),float(((device half*)(row+3*ps))[x]));
     } else {
-        v13_c = unpack_unorm4x8_to_float(((device uint*)(p1 + y * buf_rbs[1]))[x]);
-        for (int ch = 0; ch < 3; ch++) {
-            float s = v13_c[ch];
-            float a=-4.82083022594e-01,b=1.84310853481e+00,c=-2.79252314568e+00,d=2.05758404732e+00,e=-4.18130934238e-01,f=7.89776027203e-01;
-            float inner = ((a*s+b)*s+c)*s+d; float mid = (inner*s+e)*s+f; float s2 = s*s;
-            v13_c[ch] = s < 5.76281473041e-02 ? s/12.92 : mid*s2 + (1.0-(a+b+c+d+e+f));
-        }
+        v13_c = unpack_unorm4x8_srgb_to_float(((device uint*)(p1 + y * buf_rbs[1]))[x]);
     }
     float v13 = v13_c.x;
     float v13_1 = v13_c.y;
@@ -109,13 +103,6 @@ kernel void umbra_entry(
         device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_szs[1]/4;
         ((device half*)row)[x] = half(sc26.x); ((device half*)(row+ps))[x] = half(sc26.y); ((device half*)(row+2*ps))[x] = half(sc26.z); ((device half*)(row+3*ps))[x] = half(sc26.w);
     } else {
-        for (int ch = 0; ch < 3; ch++) {
-            float l = max(sc26[ch], 0.0);
-            float t = 1.0/sqrt(max(l, 1e-30));
-            float lo = l * 12.92;
-            float hi = (1.0545324087e+00 + t*(5.8207426220e-02 + t*(-1.2198361568e-02 + t*(7.9244317021e-04 + t*-2.0467568902e-05)))) / (1.0131348670e-01 + t);
-            sc26[ch] = lo < 4.5700869523e-03*12.92 ? lo : hi;
-        }
-        ((device uint*)(p1 + y * buf_rbs[1]))[x] = pack_float_to_unorm4x8(clamp(sc26, 0.0, 1.0));
+        ((device uint*)(p1 + y * buf_rbs[1]))[x] = pack_float_to_srgb_unorm4x8(clamp(sc26, 0.0, 1.0));
     }
 }

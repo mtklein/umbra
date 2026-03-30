@@ -105,13 +105,6 @@ kernel void umbra_entry(
         device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_szs[1]/4;
         ((device half*)row)[x] = half(sc52.x); ((device half*)(row+ps))[x] = half(sc52.y); ((device half*)(row+2*ps))[x] = half(sc52.z); ((device half*)(row+3*ps))[x] = half(sc52.w);
     } else {
-        for (int ch = 0; ch < 3; ch++) {
-            float l = max(sc52[ch], 0.0);
-            float t = 1.0/sqrt(max(l, 1e-30));
-            float lo = l * 12.92;
-            float hi = (1.0545324087e+00 + t*(5.8207426220e-02 + t*(-1.2198361568e-02 + t*(7.9244317021e-04 + t*-2.0467568902e-05)))) / (1.0131348670e-01 + t);
-            sc52[ch] = lo < 4.5700869523e-03*12.92 ? lo : hi;
-        }
-        ((device uint*)(p1 + y * buf_rbs[1]))[x] = pack_float_to_unorm4x8(clamp(sc52, 0.0, 1.0));
+        ((device uint*)(p1 + y * buf_rbs[1]))[x] = pack_float_to_srgb_unorm4x8(clamp(sc52, 0.0, 1.0));
     }
 }

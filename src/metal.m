@@ -270,23 +270,8 @@ static void emit_ops(Buf *b, BB const *bb,
                      "float(((device half*)(row+2*ps))[x]),"
                      "float(((device half*)(row+3*ps))[x]));\n"
                      "%s} else {\n"
-                     "%s    v%d_c = unpack_unorm4x8_to_float("
+                     "%s    v%d_c = unpack_unorm4x8_srgb_to_float("
                      "((device uint*)(p%d + y * buf_rbs[%d]))[x]);\n"
-                     "%s    for (int ch = 0; ch < 3; ch++) {\n"
-                     "%s        float s = v%d_c[ch];\n"
-                     "%s        float a=-4.82083022594e-01,"
-                     "b=1.84310853481e+00,"
-                     "c=-2.79252314568e+00,"
-                     "d=2.05758404732e+00,"
-                     "e=-4.18130934238e-01,"
-                     "f=7.89776027203e-01;\n"
-                     "%s        float inner = ((a*s+b)*s+c)*s+d;"
-                     " float mid = (inner*s+e)*s+f;"
-                     " float s2 = s*s;\n"
-                     "%s        v%d_c[ch] = s < 5.76281473041e-02"
-                     " ? s/12.92"
-                     " : mid*s2 + (1.0-(a+b+c+d+e+f));\n"
-                     "%s    }\n"
                      "%s}\n"
                      "%sfloat v%d = v%d_c.x;\n"
                      "%sfloat v%d_1 = v%d_c.y;\n"
@@ -312,12 +297,6 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i,
                      pad,
                      pad, i, p, p,
-                     pad,
-                     pad, i,
-                     pad,
-                     pad,
-                     pad, i,
-                     pad,
                      pad,
                      pad, i, i,
                      pad, i, i,
@@ -359,22 +338,8 @@ static void emit_ops(Buf *b, BB const *bb,
                      " ((device half*)(row+2*ps))[x] = half(sc%d.z);"
                      " ((device half*)(row+3*ps))[x] = half(sc%d.w);\n"
                      "%s} else {\n"
-                     "%s    for (int ch = 0; ch < 3; ch++) {\n"
-                     "%s        float l = max(sc%d[ch], 0.0);\n"
-                     "%s        float t = 1.0/sqrt(max(l, 1e-30));\n"
-                     "%s        float lo = l * 12.92;\n"
-                     "%s        float hi ="
-                     " (1.0545324087e+00"
-                     " + t*(5.8207426220e-02"
-                     " + t*(-1.2198361568e-02"
-                     " + t*(7.9244317021e-04"
-                     " + t*-2.0467568902e-05))))"
-                     " / (1.0131348670e-01 + t);\n"
-                     "%s        sc%d[ch] = lo < 4.5700869523e-03*12.92"
-                     " ? lo : hi;\n"
-                     "%s    }\n"
                      "%s    ((device uint*)(p%d + y * buf_rbs[%d]))[x]"
-                     " = pack_float_to_unorm4x8(clamp(sc%d, 0.0, 1.0));\n"
+                     " = pack_float_to_srgb_unorm4x8(clamp(sc%d, 0.0, 1.0));\n"
                      "%s}\n",
                      pad, i,
                      fv(_fx, vx, xid, is_f),
@@ -400,13 +365,6 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, p, umbra_fmt_fp16_planar,
                      pad, p, p, p,
                      pad, i, i, i, i,
-                     pad,
-                     pad,
-                     pad, i,
-                     pad,
-                     pad,
-                     pad,
-                     pad, i,
                      pad,
                      pad, p, p, i,
                      pad);
