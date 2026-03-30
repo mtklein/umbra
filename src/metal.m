@@ -116,11 +116,44 @@ static _Bool is_32(enum op op) {
         || op == op_deref_ptr;
 }
 
+static _Bool produces_float(enum op op) {
+    return op == op_add_f32     || op == op_sub_f32
+        || op == op_mul_f32     || op == op_div_f32
+        || op == op_min_f32     || op == op_max_f32
+        || op == op_sqrt_f32    || op == op_abs_f32    || op == op_neg_f32
+        || op == op_round_f32   || op == op_floor_f32  || op == op_ceil_f32
+        || op == op_fma_f32     || op == op_fms_f32
+        || op == op_add_f32_imm || op == op_sub_f32_imm
+        || op == op_mul_f32_imm || op == op_div_f32_imm
+        || op == op_min_f32_imm || op == op_max_f32_imm
+        || op == op_f32_from_i32
+        || op == op_f32_from_f16
+        || op == op_load_color;
+}
+
+static char const *fv(char *tmp, char const *vn,
+                      int id, _Bool const *is_f) {
+    if (is_f[id]) { return vn; }
+    snprintf(tmp, 40, "as_type<float>(%s)", vn);
+    return tmp;
+}
+static char const *uv(char *tmp, char const *vn,
+                      int id, _Bool const *is_f) {
+    if (!is_f[id]) { return vn; }
+    snprintf(tmp, 40, "as_type<uint>(%s)", vn);
+    return tmp;
+}
+
 static void emit_ops(Buf *b, BB const *bb,
                      _Bool *ptr_16, _Bool *ptr_32,
                      int const *deref_buf,
+                     _Bool *is_f,
                      int lo, int hi,
                      char const *pad) {
+    for (int i = lo; i < hi; i++) {
+        is_f[i] = produces_float(bb->inst[i].op);
+    }
+
     char vx[16], vy[16], vz[16], vw[16];
 #define VNAME(buf, vid, ch) \
     ((ch) ? (void)snprintf(buf, sizeof buf, "v%d_%d", (vid), (ch)) \
@@ -128,19 +161,22 @@ static void emit_ops(Buf *b, BB const *bb,
 
     for (int i = lo; i < hi; i++) {
         struct bb_inst const *inst = &bb->inst[i];
-        VNAME(vx, (int)inst->x.id, (int)inst->x.chan);
-        VNAME(vy, (int)inst->y.id, (int)inst->y.chan);
-        VNAME(vz, (int)inst->z.id, (int)inst->z.chan);
-        VNAME(vw, (int)inst->w.id, (int)inst->w.chan);
+        int xid = (int)inst->x.id, yid = (int)inst->y.id,
+            zid = (int)inst->z.id, wid = (int)inst->w.id;
+        VNAME(vx, xid, (int)inst->x.chan);
+        VNAME(vy, yid, (int)inst->y.chan);
+        VNAME(vz, zid, (int)inst->z.chan);
+        VNAME(vw, wid, (int)inst->w.chan);
+
+        char _fx[40], _fy[40], _fz[40], _fw[40];
+        char _ux[40], _uy[40], _uz[40];
 
         switch (inst->op) {
             case op_x:
-                emit(b, "%suint v%d = x0 + pos.x;\n",
-                     pad, i);
+                emit(b, "%suint v%d = x0 + pos.x;\n", pad, i);
                 break;
             case op_y:
-                emit(b, "%suint v%d = y0 + pos.y;\n",
-                     pad, i);
+                emit(b, "%suint v%d = y0 + pos.y;\n", pad, i);
                 break;
 
             case op_imm_32:
@@ -196,7 +232,8 @@ static void emit_ops(Buf *b, BB const *bb,
                      "%s((device uint*)"
                      "(p%d + y * buf_rbs[%d]))"
                      "[x] = %s;\n",
-                     pad, p, p, vy);
+                     pad, p, p,
+                     uv(_uy, vy, yid, is_f));
             } break;
             case op_load_color: {
                 int p = inst->ptr < 0
@@ -211,52 +248,64 @@ static void emit_ops(Buf *b, BB const *bb,
                      " tex_p%d_2.read(uint2(x,y)).r,"
                      " tex_p%d_3.read(uint2(x,y)).r);\n"
                      "%s} else if (fmt_p%d == %du) {\n"
-                     "%s    uint px = ((device uint*)(p%d + y * buf_rbs[%d]))[x];\n"
-                     "%s    v%d_c = float4(px & 0xFFu, (px>>8)&0xFFu, (px>>16)&0xFFu, px>>24) / 255.0;\n"
+                     "%s    v%d_c = unpack_unorm4x8_to_float("
+                     "((device uint*)(p%d + y * buf_rbs[%d]))[x]);\n"
                      "%s} else if (fmt_p%d == %du) {\n"
-                     "%s    ushort px = ((device ushort*)(p%d + y * buf_rbs[%d]))[x];\n"
-                     "%s    v%d_c = float4(float(px>>11)/31.0, float((px>>5)&0x3Fu)/63.0, float(px&0x1Fu)/31.0, 1.0);\n"
+                     "%s    ushort px = ((device ushort*)"
+                     "(p%d + y * buf_rbs[%d]))[x];\n"
+                     "%s    v%d_c = float4(float(px>>11)/31.0,"
+                     " float((px>>5)&0x3Fu)/63.0,"
+                     " float(px&0x1Fu)/31.0, 1.0);\n"
                      "%s} else if (fmt_p%d == %du) {\n"
-                     "%s    uint px = ((device uint*)(p%d + y * buf_rbs[%d]))[x];\n"
-                     "%s    v%d_c = float4(float(px&0x3FFu)/1023.0, float((px>>10)&0x3FFu)/1023.0, float((px>>20)&0x3FFu)/1023.0, float(px>>30)/3.0);\n"
+                     "%s    v%d_c = unpack_unorm10a2_to_float("
+                     "((device uint*)(p%d + y * buf_rbs[%d]))[x]);\n"
                      "%s} else if (fmt_p%d == %du) {\n"
-                     "%s    device half *hp = (device half*)(p%d + y * buf_rbs[%d]) + x*4;\n"
+                     "%s    device half *hp = (device half*)"
+                     "(p%d + y * buf_rbs[%d]) + x*4;\n"
                      "%s    v%d_c = float4(hp[0], hp[1], hp[2], hp[3]);\n"
                      "%s} else if (fmt_p%d == %du) {\n"
-                     "%s    device uchar *row = p%d + y * buf_rbs[%d]; uint ps = buf_szs[%d]/4;\n"
+                     "%s    device uchar *row = p%d + y * buf_rbs[%d];"
+                     " uint ps = buf_szs[%d]/4;\n"
                      "%s    v%d_c = float4("
                      "float(((device half*)row)[x]),"
                      "float(((device half*)(row+ps))[x]),"
                      "float(((device half*)(row+2*ps))[x]),"
                      "float(((device half*)(row+3*ps))[x]));\n"
                      "%s} else {\n"
-                     "%s    uint px = ((device uint*)(p%d + y * buf_rbs[%d]))[x];\n"
-                     "%s    v%d_c = float4(px & 0xFFu, (px>>8)&0xFFu, (px>>16)&0xFFu, px>>24) / 255.0;\n"
+                     "%s    v%d_c = unpack_unorm4x8_to_float("
+                     "((device uint*)(p%d + y * buf_rbs[%d]))[x]);\n"
                      "%s    for (int ch = 0; ch < 3; ch++) {\n"
                      "%s        float s = v%d_c[ch];\n"
-                     "%s        float a=-4.82083022594e-01,b=1.84310853481e+00,c=-2.79252314568e+00,d=2.05758404732e+00,e=-4.18130934238e-01,f=7.89776027203e-01;\n"
-                     "%s        float inner = ((a*s+b)*s+c)*s+d; float mid = (inner*s+e)*s+f; float s2 = s*s;\n"
-                     "%s        v%d_c[ch] = s < 5.76281473041e-02 ? s/12.92 : mid*s2 + (1.0-(a+b+c+d+e+f));\n"
+                     "%s        float a=-4.82083022594e-01,"
+                     "b=1.84310853481e+00,"
+                     "c=-2.79252314568e+00,"
+                     "d=2.05758404732e+00,"
+                     "e=-4.18130934238e-01,"
+                     "f=7.89776027203e-01;\n"
+                     "%s        float inner = ((a*s+b)*s+c)*s+d;"
+                     " float mid = (inner*s+e)*s+f;"
+                     " float s2 = s*s;\n"
+                     "%s        v%d_c[ch] = s < 5.76281473041e-02"
+                     " ? s/12.92"
+                     " : mid*s2 + (1.0-(a+b+c+d+e+f));\n"
                      "%s    }\n"
                      "%s}\n"
-                     "%suint v%d = as_type<uint>(v%d_c.x);\n"
-                     "%suint v%d_1 = as_type<uint>(v%d_c.y);\n"
-                     "%suint v%d_2 = as_type<uint>(v%d_c.z);\n"
-                     "%suint v%d_3 = as_type<uint>(v%d_c.w);\n",
+                     "%sfloat v%d = v%d_c.x;\n"
+                     "%sfloat v%d_1 = v%d_c.y;\n"
+                     "%sfloat v%d_2 = v%d_c.z;\n"
+                     "%sfloat v%d_3 = v%d_c.w;\n",
                      pad, i,
                      pad, p,
                      pad, i, p,
                      pad, p,
                      pad, i, p, p, p, p,
                      pad, p, umbra_fmt_8888,
-                     pad, p, p,
-                     pad, i,
+                     pad, i, p, p,
                      pad, p, umbra_fmt_565,
                      pad, p, p,
                      pad, i,
                      pad, p, umbra_fmt_1010102,
-                     pad, p, p,
-                     pad, i,
+                     pad, i, p, p,
                      pad, p, umbra_fmt_fp16,
                      pad, p, p,
                      pad, i,
@@ -264,8 +313,7 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, p, p, p,
                      pad, i,
                      pad,
-                     pad, p, p,
-                     pad, i,
+                     pad, i, p, p,
                      pad,
                      pad, i,
                      pad,
@@ -282,8 +330,7 @@ static void emit_ops(Buf *b, BB const *bb,
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 emit(b,
-                     "%sfloat4 sc%d = float4(as_type<float>(%s), as_type<float>(%s),"
-                     " as_type<float>(%s), as_type<float>(%s));\n"
+                     "%sfloat4 sc%d = float4(%s, %s, %s, %s);\n"
                      "%sif (planes_p%d == 1) {\n"
                      "%s    tex_p%d_0.write(sc%d, uint2(x,y));\n"
                      "%s} else if (planes_p%d == 4) {\n"
@@ -294,24 +341,31 @@ static void emit_ops(Buf *b, BB const *bb,
                      "%s} else if (fmt_p%d == %du) {\n"
                      "%s    sc%d = clamp(sc%d, 0.0, 1.0);\n"
                      "%s    ((device uint*)(p%d + y * buf_rbs[%d]))[x] ="
-                     " uint(rint(sc%d.x*255.0)) | (uint(rint(sc%d.y*255.0))<<8)"
-                     " | (uint(rint(sc%d.z*255.0))<<16) | (uint(rint(sc%d.w*255.0))<<24);\n"
+                     " uint(rint(sc%d.x*255.0))"
+                     " | (uint(rint(sc%d.y*255.0))<<8)"
+                     " | (uint(rint(sc%d.z*255.0))<<16)"
+                     " | (uint(rint(sc%d.w*255.0))<<24);\n"
                      "%s} else if (fmt_p%d == %du) {\n"
                      "%s    sc%d = clamp(sc%d, 0.0, 1.0);\n"
                      "%s    ((device ushort*)(p%d + y * buf_rbs[%d]))[x] ="
-                     " ushort((uint(rint(sc%d.x*31.0))<<11) | (uint(rint(sc%d.y*63.0))<<5)"
+                     " ushort((uint(rint(sc%d.x*31.0))<<11)"
+                     " | (uint(rint(sc%d.y*63.0))<<5)"
                      " | uint(rint(sc%d.z*31.0)));\n"
                      "%s} else if (fmt_p%d == %du) {\n"
                      "%s    sc%d = clamp(sc%d, 0.0, 1.0);\n"
                      "%s    ((device uint*)(p%d + y * buf_rbs[%d]))[x] ="
-                     " uint(rint(sc%d.x*1023.0)) | (uint(rint(sc%d.y*1023.0))<<10)"
-                     " | (uint(rint(sc%d.z*1023.0))<<20) | (uint(rint(sc%d.w*3.0))<<30);\n"
+                     " uint(rint(sc%d.x*1023.0))"
+                     " | (uint(rint(sc%d.y*1023.0))<<10)"
+                     " | (uint(rint(sc%d.z*1023.0))<<20)"
+                     " | (uint(rint(sc%d.w*3.0))<<30);\n"
                      "%s} else if (fmt_p%d == %du) {\n"
-                     "%s    device half *hp = (device half*)(p%d + y * buf_rbs[%d]) + x*4;\n"
+                     "%s    device half *hp = (device half*)"
+                     "(p%d + y * buf_rbs[%d]) + x*4;\n"
                      "%s    hp[0]=half(sc%d.x); hp[1]=half(sc%d.y);"
                      " hp[2]=half(sc%d.z); hp[3]=half(sc%d.w);\n"
                      "%s} else if (fmt_p%d == %du) {\n"
-                     "%s    device uchar *row = p%d + y * buf_rbs[%d]; uint ps = buf_szs[%d]/4;\n"
+                     "%s    device uchar *row = p%d + y * buf_rbs[%d];"
+                     " uint ps = buf_szs[%d]/4;\n"
                      "%s    ((device half*)row)[x] = half(sc%d.x);"
                      " ((device half*)(row+ps))[x] = half(sc%d.y);"
                      " ((device half*)(row+2*ps))[x] = half(sc%d.z);"
@@ -321,14 +375,27 @@ static void emit_ops(Buf *b, BB const *bb,
                      "%s        float l = max(sc%d[ch], 0.0);\n"
                      "%s        float t = 1.0/sqrt(max(l, 1e-30));\n"
                      "%s        float lo = l * 12.92;\n"
-                     "%s        float hi = (1.0545324087e+00 + t*(5.8207426220e-02 + t*(-1.2198361568e-02 + t*(7.9244317021e-04 + t*-2.0467568902e-05)))) / (1.0131348670e-01 + t);\n"
-                     "%s        sc%d[ch] = lo < 4.5700869523e-03*12.92 ? lo : hi;\n"
+                     "%s        float hi ="
+                     " (1.0545324087e+00"
+                     " + t*(5.8207426220e-02"
+                     " + t*(-1.2198361568e-02"
+                     " + t*(7.9244317021e-04"
+                     " + t*-2.0467568902e-05))))"
+                     " / (1.0131348670e-01 + t);\n"
+                     "%s        sc%d[ch] = lo < 4.5700869523e-03*12.92"
+                     " ? lo : hi;\n"
                      "%s    } sc%d = clamp(sc%d, 0.0, 1.0);\n"
                      "%s    ((device uint*)(p%d + y * buf_rbs[%d]))[x] ="
-                     " uint(rint(sc%d.x*255.0)) | (uint(rint(sc%d.y*255.0))<<8)"
-                     " | (uint(rint(sc%d.z*255.0))<<16) | (uint(rint(sc%d.w*255.0))<<24);\n"
+                     " uint(rint(sc%d.x*255.0))"
+                     " | (uint(rint(sc%d.y*255.0))<<8)"
+                     " | (uint(rint(sc%d.z*255.0))<<16)"
+                     " | (uint(rint(sc%d.w*255.0))<<24);\n"
                      "%s}\n",
-                     pad, i, vx, vy, vz, vw,
+                     pad, i,
+                     fv(_fx, vx, xid, is_f),
+                     fv(_fy, vy, yid, is_f),
+                     fv(_fz, vz, zid, is_f),
+                     fv(_fw, vw, wid, is_f),
                      pad, p,
                      pad, p, i,
                      pad, p,
@@ -402,61 +469,73 @@ static void emit_ops(Buf *b, BB const *bb,
                      "%s((device ushort*)"
                      "(p%d + y * buf_rbs[%d]))"
                      "[x] = (ushort)%s;\n",
-                     pad, p, p, vy);
+                     pad, p, p,
+                     uv(_uy, vy, yid, is_f));
             } break;
 
             case op_f32_from_f16:
                 emit(b,
-                    "%suint v%d = as_type<uint>"
-                    "((float)as_type<half>"
-                    "((ushort)%s));\n",
-                     pad, i, vx);
+                    "%sfloat v%d ="
+                    " (float)as_type<half>"
+                    "((ushort)%s);\n",
+                     pad, i,
+                     uv(_ux, vx, xid, is_f));
                 break;
             case op_f16_from_f32:
                 emit(b,
                     "%suint v%d = (uint)"
                     "as_type<ushort>"
-                    "((half)as_type<float>"
-                    "(%s));\n",
-                     pad, i, vx);
+                    "((half)%s);\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f));
                 break;
 
             case op_i32_from_s16:
                 emit(b,
                     "%suint v%d = (uint)(int)"
                     "(short)(ushort)%s;\n",
-                     pad, i, vx);
+                     pad, i,
+                     uv(_ux, vx, xid, is_f));
                 break;
             case op_i32_from_u16:
                 emit(b,
                     "%suint v%d = (uint)"
                     "(ushort)%s;\n",
-                     pad, i, vx);
+                     pad, i,
+                     uv(_ux, vx, xid, is_f));
                 break;
             case op_i16_from_i32:
                 emit(b,
                     "%suint v%d = (uint)"
                     "(ushort)%s;\n",
-                     pad, i, vx);
+                     pad, i,
+                     uv(_ux, vx, xid, is_f));
                 break;
 
             case op_shl_i32_imm:
                 emit(b, "%suint v%d = %s << %du;\n",
-                     pad, i, vx, inst->imm);
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
+                     inst->imm);
                 break;
             case op_shr_u32_imm:
                 emit(b, "%suint v%d = %s >> %du;\n",
-                     pad, i, vx, inst->imm);
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
+                     inst->imm);
                 break;
             case op_shr_s32_imm:
                 emit(b,
                     "%suint v%d ="
                     " (uint)((int)%s >> %d);\n",
-                    pad, i, vx, inst->imm);
+                    pad, i,
+                    uv(_ux, vx, xid, is_f),
+                    inst->imm);
                 break;
             case op_and_32_imm:
                 emit(b, "%suint v%d = %s & %uu;\n",
-                     pad, i, vx,
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
                      (uint32_t)inst->imm);
                 break;
 
@@ -464,339 +543,399 @@ static void emit_ops(Buf *b, BB const *bb,
                 emit(b,
                     "%suint v%d ="
                     " %s | (%s << %du);\n",
-                    pad, i, vx,
-                    vy, inst->imm);
+                    pad, i,
+                    uv(_ux, vx, xid, is_f),
+                    uv(_uy, vy, yid, is_f),
+                    inst->imm);
                 break;
 
             case op_add_f32_imm:
-                emit(b, "%suint v%d = as_type<uint>"
-                        "(as_type<float>(%s)"
-                        " + as_type<float>(%uu));\n",
-                     pad, i, vx,
+                emit(b, "%sfloat v%d = %s"
+                        " + as_type<float>(%uu);\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f),
                      (uint32_t)inst->imm);
                 break;
             case op_sub_f32_imm:
-                emit(b, "%suint v%d = as_type<uint>"
-                        "(as_type<float>(%s)"
-                        " - as_type<float>(%uu));\n",
-                     pad, i, vx,
+                emit(b, "%sfloat v%d = %s"
+                        " - as_type<float>(%uu);\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f),
                      (uint32_t)inst->imm);
                 break;
             case op_mul_f32_imm:
-                emit(b, "%suint v%d = as_type<uint>"
-                        "(as_type<float>(%s)"
-                        " * as_type<float>(%uu));\n",
-                     pad, i, vx,
+                emit(b, "%sfloat v%d = %s"
+                        " * as_type<float>(%uu);\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f),
                      (uint32_t)inst->imm);
                 break;
             case op_div_f32_imm:
-                emit(b, "%suint v%d = as_type<uint>"
-                        "(as_type<float>(%s)"
-                        " / as_type<float>(%uu));\n",
-                     pad, i, vx,
+                emit(b, "%sfloat v%d = %s"
+                        " / as_type<float>(%uu);\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f),
                      (uint32_t)inst->imm);
                 break;
             case op_min_f32_imm:
-                emit(b, "%suint v%d = as_type<uint>"
-                        "(min(as_type<float>(%s),"
-                        " as_type<float>(%uu)));\n",
-                     pad, i, vx,
+                emit(b, "%sfloat v%d ="
+                        " min(%s,"
+                        " as_type<float>(%uu));\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f),
                      (uint32_t)inst->imm);
                 break;
             case op_max_f32_imm:
-                emit(b, "%suint v%d = as_type<uint>"
-                        "(max(as_type<float>(%s),"
-                        " as_type<float>(%uu)));\n",
-                     pad, i, vx,
+                emit(b, "%sfloat v%d ="
+                        " max(%s,"
+                        " as_type<float>(%uu));\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f),
                      (uint32_t)inst->imm);
                 break;
             case op_add_i32_imm:
                 emit(b, "%suint v%d = %s + %uu;\n",
-                     pad, i, vx,
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
                      (uint32_t)inst->imm);
                 break;
             case op_sub_i32_imm:
                 emit(b, "%suint v%d = %s - %uu;\n",
-                     pad, i, vx,
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
                      (uint32_t)inst->imm);
                 break;
             case op_mul_i32_imm:
                 emit(b, "%suint v%d = %s * %uu;\n",
-                     pad, i, vx,
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
                      (uint32_t)inst->imm);
                 break;
             case op_or_32_imm:
                 emit(b, "%suint v%d = %s | %uu;\n",
-                     pad, i, vx,
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
                      (uint32_t)inst->imm);
                 break;
             case op_xor_32_imm:
                 emit(b, "%suint v%d = %s ^ %uu;\n",
-                     pad, i, vx,
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
                      (uint32_t)inst->imm);
                 break;
             case op_eq_f32_imm:
                 emit(b, "%suint v%d = "
-                        "as_type<float>(%s) == "
-                        "as_type<float>(%uu)"
+                        "%s == as_type<float>(%uu)"
                         " ? 0xffffffffu : 0u;\n",
-                     pad, i, vx,
+                     pad, i,
+                     fv(_fx, vx, xid, is_f),
                      (uint32_t)inst->imm);
                 break;
             case op_lt_f32_imm:
                 emit(b, "%suint v%d = "
-                        "as_type<float>(%s) <  "
-                        "as_type<float>(%uu)"
+                        "%s <  as_type<float>(%uu)"
                         " ? 0xffffffffu : 0u;\n",
-                     pad, i, vx,
+                     pad, i,
+                     fv(_fx, vx, xid, is_f),
                      (uint32_t)inst->imm);
                 break;
             case op_le_f32_imm:
                 emit(b, "%suint v%d = "
-                        "as_type<float>(%s) <= "
-                        "as_type<float>(%uu)"
+                        "%s <= as_type<float>(%uu)"
                         " ? 0xffffffffu : 0u;\n",
-                     pad, i, vx,
+                     pad, i,
+                     fv(_fx, vx, xid, is_f),
                      (uint32_t)inst->imm);
                 break;
             case op_eq_i32_imm:
                 emit(b, "%suint v%d = "
                         "(int)%s == (int)%uu"
                         " ? 0xffffffffu : 0u;\n",
-                     pad, i, vx,
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
                      (uint32_t)inst->imm);
                 break;
             case op_lt_s32_imm:
                 emit(b, "%suint v%d = "
                         "(int)%s <  (int)%uu"
                         " ? 0xffffffffu : 0u;\n",
-                     pad, i, vx,
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
                      (uint32_t)inst->imm);
                 break;
             case op_le_s32_imm:
                 emit(b, "%suint v%d = "
                         "(int)%s <= (int)%uu"
                         " ? 0xffffffffu : 0u;\n",
-                     pad, i, vx,
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
                      (uint32_t)inst->imm);
                 break;
             case op_add_f32:
-                emit(b, "%suint v%d = as_type<uint>"
-                        "(as_type<float>(%s)"
-                        " + as_type<float>(%s));\n",
-                     pad, i, vx, vy);
+                emit(b, "%sfloat v%d = %s + %s;\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f),
+                     fv(_fy, vy, yid, is_f));
                 break;
             case op_sub_f32:
-                emit(b, "%suint v%d = as_type<uint>"
-                        "(as_type<float>(%s)"
-                        " - as_type<float>(%s));\n",
-                     pad, i, vx, vy);
+                emit(b, "%sfloat v%d = %s - %s;\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f),
+                     fv(_fy, vy, yid, is_f));
                 break;
             case op_mul_f32:
-                emit(b, "%suint v%d = as_type<uint>"
-                        "(as_type<float>(%s)"
-                        " * as_type<float>(%s));\n",
-                     pad, i, vx, vy);
+                emit(b, "%sfloat v%d = %s * %s;\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f),
+                     fv(_fy, vy, yid, is_f));
                 break;
             case op_div_f32:
-                emit(b, "%suint v%d = as_type<uint>"
-                        "(as_type<float>(%s)"
-                        " / as_type<float>(%s));\n",
-                     pad, i, vx, vy);
+                emit(b, "%sfloat v%d = %s / %s;\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f),
+                     fv(_fy, vy, yid, is_f));
                 break;
             case op_min_f32:
-                emit(b, "%suint v%d = as_type<uint>"
-                        "(min(as_type<float>(%s),"
-                        " as_type<float>(%s)));\n",
-                     pad, i, vx, vy);
+                emit(b, "%sfloat v%d ="
+                        " min(%s, %s);\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f),
+                     fv(_fy, vy, yid, is_f));
                 break;
             case op_max_f32:
-                emit(b, "%suint v%d = as_type<uint>"
-                        "(max(as_type<float>(%s),"
-                        " as_type<float>(%s)));\n",
-                     pad, i, vx, vy);
+                emit(b, "%sfloat v%d ="
+                        " max(%s, %s);\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f),
+                     fv(_fy, vy, yid, is_f));
                 break;
             case op_sqrt_f32:
-                emit(b, "%suint v%d = as_type<uint>"
-                        "(sqrt("
-                        "as_type<float>(%s)));\n",
-                     pad, i, vx);
+                emit(b, "%sfloat v%d ="
+                        " sqrt(%s);\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f));
                 break;
             case op_abs_f32:
-                emit(b, "%suint v%d = as_type<uint>"
-                        "(fabs("
-                        "as_type<float>(%s)));\n",
-                     pad, i, vx);
+                emit(b, "%sfloat v%d ="
+                        " fabs(%s);\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f));
                 break;
             case op_neg_f32:
-                emit(b, "%suint v%d = as_type<uint>"
-                        "(-as_type<float>(%s));\n",
-                     pad, i, vx);
+                emit(b, "%sfloat v%d ="
+                        " -%s;\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f));
                 break;
             case op_round_f32:
-                emit(b, "%suint v%d = as_type<uint>"
-                        "(rint("
-                        "as_type<float>(%s)));\n",
-                     pad, i, vx);
+                emit(b, "%sfloat v%d ="
+                        " rint(%s);\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f));
                 break;
             case op_floor_f32:
-                emit(b, "%suint v%d = as_type<uint>"
-                        "(floor("
-                        "as_type<float>(%s)));\n",
-                     pad, i, vx);
+                emit(b, "%sfloat v%d ="
+                        " floor(%s);\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f));
                 break;
             case op_ceil_f32:
-                emit(b, "%suint v%d = as_type<uint>"
-                        "(ceil("
-                        "as_type<float>(%s)));\n",
-                     pad, i, vx);
+                emit(b, "%sfloat v%d ="
+                        " ceil(%s);\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f));
                 break;
             case op_round_i32:
-                emit(b, "%suint v%d = as_type<uint>"
-                        "((int)rint("
-                        "as_type<float>(%s)));\n",
-                     pad, i, vx);
+                emit(b, "%suint v%d ="
+                        " (uint)(int)rint(%s);\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f));
                 break;
             case op_floor_i32:
-                emit(b, "%suint v%d = as_type<uint>"
-                        "((int)floor("
-                        "as_type<float>(%s)));\n",
-                     pad, i, vx);
+                emit(b, "%suint v%d ="
+                        " (uint)(int)floor(%s);\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f));
                 break;
             case op_ceil_i32:
-                emit(b, "%suint v%d = as_type<uint>"
-                        "((int)ceil("
-                        "as_type<float>(%s)));\n",
-                     pad, i, vx);
+                emit(b, "%suint v%d ="
+                        " (uint)(int)ceil(%s);\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f));
                 break;
             case op_fma_f32:
-                emit(b, "%suint v%d = as_type<uint>"
-                        "(fma(as_type<float>(%s),"
-                        " as_type<float>(%s),"
-                        " as_type<float>(%s)));\n",
+                emit(b, "%sfloat v%d ="
+                        " fma(%s, %s, %s);\n",
                      pad, i,
-                     vx, vy, vz);
+                     fv(_fx, vx, xid, is_f),
+                     fv(_fy, vy, yid, is_f),
+                     fv(_fz, vz, zid, is_f));
                 break;
             case op_fms_f32:
-                emit(b, "%suint v%d = as_type<uint>"
-                        "(fma(-as_type<float>(%s),"
-                        " as_type<float>(%s),"
-                        " as_type<float>(%s)));\n",
+                emit(b, "%sfloat v%d ="
+                        " fma(-%s, %s, %s);\n",
                      pad, i,
-                     vx, vy, vz);
+                     fv(_fx, vx, xid, is_f),
+                     fv(_fy, vy, yid, is_f),
+                     fv(_fz, vz, zid, is_f));
                 break;
 
             case op_add_i32:
                 emit(b, "%suint v%d = %s + %s;\n",
-                     pad, i, vx, vy);
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
+                     uv(_uy, vy, yid, is_f));
                 break;
             case op_sub_i32:
                 emit(b, "%suint v%d = %s - %s;\n",
-                     pad, i, vx, vy);
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
+                     uv(_uy, vy, yid, is_f));
                 break;
             case op_mul_i32:
                 emit(b, "%suint v%d = %s * %s;\n",
-                     pad, i, vx, vy);
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
+                     uv(_uy, vy, yid, is_f));
                 break;
             case op_shl_i32:
                 emit(b, "%suint v%d = %s << %s;\n",
-                     pad, i, vx, vy);
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
+                     uv(_uy, vy, yid, is_f));
                 break;
             case op_shr_u32:
                 emit(b, "%suint v%d = %s >> %s;\n",
-                     pad, i, vx, vy);
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
+                     uv(_uy, vy, yid, is_f));
                 break;
             case op_shr_s32:
                 emit(b, "%suint v%d = "
                         "(uint)((int)%s"
                         " >> (int)%s);\n",
-                     pad, i, vx, vy);
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
+                     uv(_uy, vy, yid, is_f));
                 break;
 
             case op_and_32:
                 emit(b, "%suint v%d = %s & %s;\n",
-                     pad, i, vx, vy);
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
+                     uv(_uy, vy, yid, is_f));
                 break;
             case op_or_32:
                 emit(b, "%suint v%d = %s | %s;\n",
-                     pad, i, vx, vy);
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
+                     uv(_uy, vy, yid, is_f));
                 break;
             case op_xor_32:
                 emit(b, "%suint v%d = %s ^ %s;\n",
-                     pad, i, vx, vy);
-                break;
-            case op_sel_32:
-                emit(b, "%suint v%d = "
-                        "(%s & %s) | (~%s & %s);\n",
                      pad, i,
-                     vx, vy,
-                     vx, vz);
+                     uv(_ux, vx, xid, is_f),
+                     uv(_uy, vy, yid, is_f));
                 break;
+            case op_sel_32: {
+                _Bool yf = is_f[yid], zf = is_f[zid];
+                if (yf && zf) {
+                    is_f[i] = 1;
+                    emit(b, "%sfloat v%d ="
+                            " select(%s, %s,"
+                            " %s != 0u);\n",
+                         pad, i,
+                         fv(_fz, vz, zid, is_f),
+                         fv(_fy, vy, yid, is_f),
+                         uv(_ux, vx, xid, is_f));
+                } else {
+                    emit(b, "%suint v%d ="
+                            " select(%s, %s,"
+                            " %s != 0u);\n",
+                         pad, i,
+                         uv(_uz, vz, zid, is_f),
+                         uv(_uy, vy, yid, is_f),
+                         uv(_ux, vx, xid, is_f));
+                }
+            } break;
 
             case op_f32_from_i32:
-                emit(b, "%suint v%d = "
-                        "as_type<uint>"
-                        "((float)(int)%s);\n",
-                     pad, i, vx);
+                emit(b, "%sfloat v%d ="
+                        " (float)(int)%s;\n",
+                     pad, i,
+                     uv(_ux, vx, xid, is_f));
                 break;
             case op_i32_from_f32:
-                emit(b, "%suint v%d = "
-                        "(uint)(int)"
-                        "as_type<float>(%s);\n",
-                     pad, i, vx);
+                emit(b, "%suint v%d ="
+                        " (uint)(int)%s;\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f));
                 break;
 
             case op_eq_f32:
                 emit(b, "%suint v%d = "
-                        "as_type<float>(%s) == "
-                        "as_type<float>(%s)"
+                        "%s == %s"
                         " ? 0xffffffffu : 0u;\n",
-                     pad, i, vx, vy);
+                     pad, i,
+                     fv(_fx, vx, xid, is_f),
+                     fv(_fy, vy, yid, is_f));
                 break;
             case op_lt_f32:
                 emit(b, "%suint v%d = "
-                        "as_type<float>(%s) <  "
-                        "as_type<float>(%s)"
+                        "%s <  %s"
                         " ? 0xffffffffu : 0u;\n",
-                     pad, i, vx, vy);
+                     pad, i,
+                     fv(_fx, vx, xid, is_f),
+                     fv(_fy, vy, yid, is_f));
                 break;
             case op_le_f32:
                 emit(b, "%suint v%d = "
-                        "as_type<float>(%s) <= "
-                        "as_type<float>(%s)"
+                        "%s <= %s"
                         " ? 0xffffffffu : 0u;\n",
-                     pad, i, vx, vy);
+                     pad, i,
+                     fv(_fx, vx, xid, is_f),
+                     fv(_fy, vy, yid, is_f));
                 break;
 
             case op_eq_i32:
                 emit(b, "%suint v%d = "
                         "(int)%s == (int)%s"
                         " ? 0xffffffffu : 0u;\n",
-                     pad, i, vx, vy);
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
+                     uv(_uy, vy, yid, is_f));
                 break;
             case op_lt_s32:
                 emit(b, "%suint v%d = "
                         "(int)%s <  (int)%s"
                         " ? 0xffffffffu : 0u;\n",
-                     pad, i, vx, vy);
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
+                     uv(_uy, vy, yid, is_f));
                 break;
             case op_le_s32:
                 emit(b, "%suint v%d = "
                         "(int)%s <= (int)%s"
                         " ? 0xffffffffu : 0u;\n",
-                     pad, i, vx, vy);
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
+                     uv(_uy, vy, yid, is_f));
                 break;
             case op_lt_u32:
                 emit(b, "%suint v%d = "
                         "%s <  %s"
                         " ? 0xffffffffu : 0u;\n",
-                     pad, i, vx, vy);
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
+                     uv(_uy, vy, yid, is_f));
                 break;
             case op_le_u32:
                 emit(b, "%suint v%d = "
                         "%s <= %s"
                         " ? 0xffffffffu : 0u;\n",
-                     pad, i, vx, vy);
+                     pad, i,
+                     uv(_ux, vx, xid, is_f),
+                     uv(_uy, vy, yid, is_f));
                 break;
 
         }
@@ -985,11 +1124,13 @@ static char* build_source(BB const *bb,
         }
     }
 
+    _Bool *is_f = calloc((size_t)(bb->insts + 1), 1);
     emit_ops(&b, bb, ptr_16, ptr_32,
-             deref_buf,
+             deref_buf, is_f,
              0, bb->insts, "    ");
     emit(&b, "}\n");
 
+    free(is_f);
     free(ptr_16);
     free(ptr_32);
 

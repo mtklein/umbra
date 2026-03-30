@@ -42,29 +42,27 @@ kernel void umbra_entry(
     uint v7 = 1054867456u;
     uint v8 = 1090519040u;
     uint v9 = 1065353216u;
-    uint v10 = as_type<uint>(as_type<float>(v9) - as_type<float>(v4));
+    float v10 = as_type<float>(v9) - as_type<float>(v4);
     uint v11 = (uint)((device ushort*)(p2 + y * buf_rbs[2]))[x];
     uint v12 = (uint)(int)(short)(ushort)v11;
-    uint v13 = as_type<uint>((float)(int)v12);
-    uint v14 = as_type<uint>(as_type<float>(v13) * as_type<float>(998277249u));
-    uint v15 = as_type<uint>(as_type<float>(v14) - as_type<float>(1054867456u));
-    uint v16 = as_type<uint>(as_type<float>(v15) * as_type<float>(1090519040u));
-    uint v17 = as_type<uint>(max(as_type<float>(v16), as_type<float>(0u)));
-    uint v18 = as_type<uint>(min(as_type<float>(v17), as_type<float>(1065353216u)));
+    float v13 = (float)(int)v12;
+    float v14 = v13 * as_type<float>(998277249u);
+    float v15 = v14 - as_type<float>(1054867456u);
+    float v16 = v15 * as_type<float>(1090519040u);
+    float v17 = max(v16, as_type<float>(0u));
+    float v18 = min(v17, as_type<float>(1065353216u));
     float4 v19_c;
     if (planes_p1 == 1) {
         v19_c = tex_p1_0.read(uint2(x,y));
     } else if (planes_p1 == 4) {
         v19_c = float4(tex_p1_0.read(uint2(x,y)).r, tex_p1_1.read(uint2(x,y)).r, tex_p1_2.read(uint2(x,y)).r, tex_p1_3.read(uint2(x,y)).r);
     } else if (fmt_p1 == 0u) {
-        uint px = ((device uint*)(p1 + y * buf_rbs[1]))[x];
-        v19_c = float4(px & 0xFFu, (px>>8)&0xFFu, (px>>16)&0xFFu, px>>24) / 255.0;
+        v19_c = unpack_unorm4x8_to_float(((device uint*)(p1 + y * buf_rbs[1]))[x]);
     } else if (fmt_p1 == 1u) {
         ushort px = ((device ushort*)(p1 + y * buf_rbs[1]))[x];
         v19_c = float4(float(px>>11)/31.0, float((px>>5)&0x3Fu)/63.0, float(px&0x1Fu)/31.0, 1.0);
     } else if (fmt_p1 == 2u) {
-        uint px = ((device uint*)(p1 + y * buf_rbs[1]))[x];
-        v19_c = float4(float(px&0x3FFu)/1023.0, float((px>>10)&0x3FFu)/1023.0, float((px>>20)&0x3FFu)/1023.0, float(px>>30)/3.0);
+        v19_c = unpack_unorm10a2_to_float(((device uint*)(p1 + y * buf_rbs[1]))[x]);
     } else if (fmt_p1 == 3u) {
         device half *hp = (device half*)(p1 + y * buf_rbs[1]) + x*4;
         v19_c = float4(hp[0], hp[1], hp[2], hp[3]);
@@ -72,8 +70,7 @@ kernel void umbra_entry(
         device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_szs[1]/4;
         v19_c = float4(float(((device half*)row)[x]),float(((device half*)(row+ps))[x]),float(((device half*)(row+2*ps))[x]),float(((device half*)(row+3*ps))[x]));
     } else {
-        uint px = ((device uint*)(p1 + y * buf_rbs[1]))[x];
-        v19_c = float4(px & 0xFFu, (px>>8)&0xFFu, (px>>16)&0xFFu, px>>24) / 255.0;
+        v19_c = unpack_unorm4x8_to_float(((device uint*)(p1 + y * buf_rbs[1]))[x]);
         for (int ch = 0; ch < 3; ch++) {
             float s = v19_c[ch];
             float a=-4.82083022594e-01,b=1.84310853481e+00,c=-2.79252314568e+00,d=2.05758404732e+00,e=-4.18130934238e-01,f=7.89776027203e-01;
@@ -81,23 +78,23 @@ kernel void umbra_entry(
             v19_c[ch] = s < 5.76281473041e-02 ? s/12.92 : mid*s2 + (1.0-(a+b+c+d+e+f));
         }
     }
-    uint v19 = as_type<uint>(v19_c.x);
-    uint v19_1 = as_type<uint>(v19_c.y);
-    uint v19_2 = as_type<uint>(v19_c.z);
-    uint v19_3 = as_type<uint>(v19_c.w);
-    uint v20 = as_type<uint>(fma(as_type<float>(v19_3), as_type<float>(v10), as_type<float>(v4)));
-    uint v21 = as_type<uint>(as_type<float>(v20) - as_type<float>(v19_3));
-    uint v22 = as_type<uint>(fma(as_type<float>(v18), as_type<float>(v21), as_type<float>(v19_3)));
-    uint v23 = as_type<uint>(fma(as_type<float>(v19), as_type<float>(v10), as_type<float>(v1)));
-    uint v24 = as_type<uint>(as_type<float>(v23) - as_type<float>(v19));
-    uint v25 = as_type<uint>(fma(as_type<float>(v18), as_type<float>(v24), as_type<float>(v19)));
-    uint v26 = as_type<uint>(fma(as_type<float>(v19_1), as_type<float>(v10), as_type<float>(v2)));
-    uint v27 = as_type<uint>(as_type<float>(v26) - as_type<float>(v19_1));
-    uint v28 = as_type<uint>(fma(as_type<float>(v18), as_type<float>(v27), as_type<float>(v19_1)));
-    uint v29 = as_type<uint>(fma(as_type<float>(v19_2), as_type<float>(v10), as_type<float>(v3)));
-    uint v30 = as_type<uint>(as_type<float>(v29) - as_type<float>(v19_2));
-    uint v31 = as_type<uint>(fma(as_type<float>(v18), as_type<float>(v30), as_type<float>(v19_2)));
-    float4 sc32 = float4(as_type<float>(v25), as_type<float>(v28), as_type<float>(v31), as_type<float>(v22));
+    float v19 = v19_c.x;
+    float v19_1 = v19_c.y;
+    float v19_2 = v19_c.z;
+    float v19_3 = v19_c.w;
+    float v20 = fma(v19_3, v10, as_type<float>(v4));
+    float v21 = v20 - v19_3;
+    float v22 = fma(v18, v21, v19_3);
+    float v23 = fma(v19, v10, as_type<float>(v1));
+    float v24 = v23 - v19;
+    float v25 = fma(v18, v24, v19);
+    float v26 = fma(v19_1, v10, as_type<float>(v2));
+    float v27 = v26 - v19_1;
+    float v28 = fma(v18, v27, v19_1);
+    float v29 = fma(v19_2, v10, as_type<float>(v3));
+    float v30 = v29 - v19_2;
+    float v31 = fma(v18, v30, v19_2);
+    float4 sc32 = float4(v25, v28, v31, v22);
     if (planes_p1 == 1) {
         tex_p1_0.write(sc32, uint2(x,y));
     } else if (planes_p1 == 4) {
