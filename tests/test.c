@@ -1615,42 +1615,6 @@ static void test_shift_imm(void) {
     }
 }
 
-static void test_pack_channels(void) {
-    struct umbra_builder *builder = umbra_builder();
-    umbra_val             r = umbra_load_32(builder, (umbra_ptr){0, 0});
-    umbra_val             g = umbra_load_32(builder, (umbra_ptr){1, 0});
-    umbra_val             b = umbra_load_32(builder, (umbra_ptr){2, 0});
-    umbra_val             a = umbra_load_32(builder, (umbra_ptr){3, 0});
-    umbra_val             mask = umbra_imm_i32(builder, 0xff);
-    umbra_val             px = umbra_and_i32(builder, r, mask);
-    px = umbra_pack(builder, px, umbra_and_i32(builder, g, mask), 8);
-    px = umbra_pack(builder, px, umbra_and_i32(builder, b, mask), 16);
-    px = umbra_pack(builder, px, a, 24);
-    umbra_store_32(builder, (umbra_ptr){4, 0}, px);
-    backends B = make(builder);
-    for (int bi = 0; bi < 3; bi++) {
-        uint32_t rr[] = {0xAA, 0x11, 0xFF};
-        uint32_t gg[] = {0xBB, 0x22, 0x00};
-        uint32_t bb_[] = {0xCC, 0x33, 0xFF};
-        uint32_t aa[] = {0xDD, 0x44, 0x00};
-        uint32_t dst[3] = {0};
-        if (!run(&B, bi, 3, 1,
-                 (umbra_buf[]){
-                     {.ptr=rr, .sz=3 * 4},
-                     {.ptr=gg, .sz=3 * 4},
-                     {.ptr=bb_, .sz=3 * 4},
-                     {.ptr=aa, .sz=3 * 4},
-                     {.ptr=dst, .sz=3 * 4},
-                 })) {
-            continue;
-        }
-        dst[0] == 0xDDCCBBAAu here;
-        dst[1] == 0x44332211u here;
-        dst[2] == 0x00FF00FFu here;
-    }
-    cleanup(&B);
-}
-
 static void test_gather_deref_large(void) {
     struct umbra_builder *b = umbra_builder();
     umbra_val             idx = umbra_load_32(b, (umbra_ptr){0, 0});
@@ -2046,35 +2010,6 @@ static void test_codegen_regalloc(void) {
             }
             dst[0] == 10 + (-1) + 10 here;
             dst[1] == 40 + 0 + 20 here;
-        }
-        cleanup(&B);
-    }
-    {
-        struct umbra_builder *b = umbra_builder();
-        umbra_val             base = umbra_load_32(b, (umbra_ptr){0, 0});
-        umbra_val             v = umbra_load_32(b, (umbra_ptr){1, 0});
-        umbra_val             r = umbra_pack(b, base, v, 8);
-        umbra_val             s = umbra_add_i32(b, base, umbra_imm_i32(b, 1));
-        umbra_store_32(b, (umbra_ptr){2, 0}, r);
-        umbra_store_32(b, (umbra_ptr){3, 0}, s);
-        backends B = make(b);
-        for (int bi = 0; bi < 3; bi++) {
-            int ba[] = {0x0F, 0xFF};
-            int vl[] = {0x0A, 0x0B};
-            int dst[2] = {0}, dst2[2] = {0};
-            if (!run(&B, bi, 2, 1,
-                     (umbra_buf[]){
-                         {.ptr=ba, .sz=2 * 4},
-                         {.ptr=vl, .sz=2 * 4},
-                         {.ptr=dst, .sz=2 * 4},
-                         {.ptr=dst2, .sz=2 * 4},
-                     })) {
-                continue;
-            }
-            dst[0] == (0x0F | (0x0A << 8)) here;
-            dst[1] == (0xFF | (0x0B << 8)) here;
-            dst2[0] == 0x10 here;
-            dst2[1] == 0x100 here;
         }
         cleanup(&B);
     }
@@ -2764,39 +2699,9 @@ static void test_cmp_register_variants(void) {
     cleanup(&B);
 }
 
-static void test_pack_register_variants(void) {
-    // Exercise _rm, _mr, _rr variants for pack.
-    struct umbra_builder *b = umbra_builder();
-    umbra_val a = umbra_load_32(b, (umbra_ptr){0, 0});
-    umbra_val bf_ = umbra_load_32(b, (umbra_ptr){1, 0});
-    // _rm: a→and_imm→acc, pack(acc, bf_) = pack with x from acc
-    umbra_val lo = umbra_and_i32(b, a, umbra_imm_i32(b, 0xFF));
-    umbra_val p1 = umbra_pack(b, lo, bf_, 8);
-    umbra_store_32(b, (umbra_ptr){2, 0}, p1);
-    // _mr: bf_ from mem, and_imm→acc as y
-    umbra_val hi = umbra_and_i32(b, bf_, umbra_imm_i32(b, 0xFF));
-    umbra_val p2 = umbra_pack(b, a, hi, 8);
-    umbra_store_32(b, (umbra_ptr){3, 0}, p2);
-    backends B = make(b);
-    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-        int32_t sa[] = {0x12, 0x34, 0xAB, 0x00};
-        int32_t sb[] = {0x56, 0x78, 0xCD, 0xFF};
-        int32_t d1[4]={0}, d2[4]={0};
-        if (!run(&B, bi, 4, 1, (umbra_buf[]){
-            {.ptr=sa, .sz=sizeof sa}, {.ptr=sb, .sz=sizeof sb},
-            {.ptr=d1, .sz=sizeof d1}, {.ptr=d2, .sz=sizeof d2},
-        })) { continue; }
-        for (int i = 0; i < 4; i++) {
-            ((d1[i] == ((sa[i] & 0xFF) | (sb[i] << 8)))) here;
-            ((d2[i] == (sa[i] | ((sb[i] & 0xFF) << 8)))) here;
-        }
-    }
-    cleanup(&B);
-}
-
 static void test_regvar_m_patterns(void) {
     // Targets: m_cmp_rm, m_cmp_rr, r_minmax_mm, base max_f32_imm,
-    // m_float_cmp_imm_r, r/m_int_cmp_imm_r, r_pack_rm, m_pack_rr.
+    // m_float_cmp_imm_r, r/m_int_cmp_imm_r.
     struct umbra_builder *b = umbra_builder();
     umbra_val a = umbra_load_32(b, (umbra_ptr){0, 0});
     umbra_val c = umbra_load_32(b, (umbra_ptr){1, 0});
@@ -2835,22 +2740,13 @@ static void test_regvar_m_patterns(void) {
     // r_int_cmp_imm_r: chain→cmp_imm→and (result to acc, feeds ALU)
     umbra_val ai4 = umbra_add_i32(b, a, umbra_imm_i32(b, 100));
     umbra_val eq_mask = umbra_eq_i32(b, ai4, umbra_imm_i32(b, 105));
-    umbra_store_32(b, (umbra_ptr){13, 0}, umbra_and_i32(b, eq_mask, a));
-
-    // r_pack_rm: and→acc, pack(acc, mem)→acc, add→store (pack result feeds ALU)
-    umbra_val lo2 = umbra_and_i32(b, a, umbra_imm_i32(b, 0xFF));
-    umbra_val pk = umbra_pack(b, lo2, c, 8);
-    umbra_store_32(b, (umbra_ptr){11, 0}, umbra_add_i32(b, pk, umbra_imm_i32(b, 1)));
-
-    // m_pack_rr: pack(x, x) where x from acc, result to store
-    umbra_val lo3 = umbra_and_i32(b, a, umbra_imm_i32(b, 0xF));
-    umbra_store_32(b, (umbra_ptr){12, 0}, umbra_pack(b, lo3, lo3, 4));
+    umbra_store_32(b, (umbra_ptr){11, 0}, umbra_and_i32(b, eq_mask, a));
 
     backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         int32_t sa[] = {5, 0, -1, 10};
         int32_t sc[] = {3, 3, 3, 3};
-        int32_t d[14][4];
+        int32_t d[12][4];
         __builtin_memset(d, 0, sizeof d);
         if (!run(&B, bi, 4, 1, (umbra_buf[]){
             {.ptr=sa, .sz=sizeof sa}, {.ptr=sc, .sz=sizeof sc},
@@ -2859,7 +2755,6 @@ static void test_regvar_m_patterns(void) {
             {.ptr=d[6], .sz=16}, {.ptr=d[7], .sz=16},
             {.ptr=d[8], .sz=16}, {.ptr=d[9], .sz=16},
             {.ptr=d[10], .sz=16}, {.ptr=d[11], .sz=16},
-            {.ptr=d[12], .sz=16}, {.ptr=d[13], .sz=16},
         })) { continue; }
         // lt(5.5,3)=0, lt(0.5,3)=-1, lt(-0.5,3)=-1, lt(10.5,3)=0
         (d[2][0] == 0) here; (d[2][1] == -1) here; (d[2][2] == -1) here; (d[2][3] == 0) here;
@@ -3089,8 +2984,8 @@ static void test_base_imm_ops(void) {
     cleanup(&B);
 }
 
-// Exercise r_sel_32_rm, r_fms_f32_mmr, r_pack_mm/mr/rr.
-static void test_sel_fms_pack_variants(void) {
+// Exercise r_sel_32_rm, r_fms_f32_mmr.
+static void test_sel_fms_variants(void) {
     struct umbra_builder *b = umbra_builder();
     umbra_val a = umbra_load_32(b, (umbra_ptr){0, 0});
     umbra_val c = umbra_load_32(b, (umbra_ptr){1, 0});
@@ -3108,38 +3003,18 @@ static void test_sel_fms_pack_variants(void) {
     umbra_val fms_r = umbra_sub_f32(b, fms_z, umbra_mul_f32(b, fa, fc));
     umbra_store_32(b, (umbra_ptr){3, 0}, umbra_i32_from_f32(b, fms_r));
 
-    // r_pack_mm: both from memory, result→acc→chain
-    umbra_val lo_a = umbra_and_i32(b, a, umbra_imm_i32(b, 0xFF));
-    umbra_val dummy = umbra_add_i32(b, lo_a, c);
-    umbra_store_32(b, (umbra_ptr){4, 0}, dummy);
-    // Now lo_a and c are both "old" (in memory). pack(lo_a, c, 8)→acc→add→store
-    umbra_val pk_mm = umbra_pack(b, lo_a, c, 8);
-    umbra_store_32(b, (umbra_ptr){5, 0}, umbra_add_i32(b, pk_mm, umbra_imm_i32(b, 1)));
-
-    // r_pack_mr: x from mem, y from acc, result→acc→chain
-    umbra_val hi = umbra_and_i32(b, c, umbra_imm_i32(b, 0xFF));
-    umbra_val pk_mr = umbra_pack(b, a, hi, 8);
-    umbra_store_32(b, (umbra_ptr){6, 0}, umbra_add_i32(b, pk_mr, umbra_imm_i32(b, 1)));
-
-    // r_pack_rr: same val as both args, from acc, result→acc→chain
-    umbra_val lo_c = umbra_and_i32(b, c, umbra_imm_i32(b, 0xF));
-    umbra_val pk_rr = umbra_pack(b, lo_c, lo_c, 4);
-    umbra_store_32(b, (umbra_ptr){7, 0}, umbra_add_i32(b, pk_rr, umbra_imm_i32(b, 1)));
-
     backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         int32_t sa[] = {2,2,2,2}, sc[] = {5,5,5,5};
-        int32_t d[8][4];
+        int32_t d[4][4];
         __builtin_memset(d, 0, sizeof d);
-        umbra_buf bufs[8];
+        umbra_buf bufs[4];
         bufs[0] = (umbra_buf){.ptr=sa, .sz=16};
         bufs[1] = (umbra_buf){.ptr=sc, .sz=16};
-        for (int i = 2; i < 8; i++) { bufs[i] = (umbra_buf){.ptr=d[i], .sz=16}; }
+        for (int i = 2; i < 4; i++) { bufs[i] = (umbra_buf){.ptr=d[i], .sz=16}; }
         if (!run(&B, bi, 4, 1, bufs)) { continue; }
         // sel: 2<5 → true → pick a=2
         (d[2][0] == 2) here;
-        // pack_mm: (2 & 0xFF) | (5 << 8) + 1 = 2 | 1280 + 1 = 1283
-        (d[5][0] == (2 | (5 << 8)) + 1) here;
     }
     cleanup(&B);
 }
@@ -3506,12 +3381,12 @@ int main(void) {
     test_unary_m_r();
     test_base_imm_ops();
     test_base_imm_more();
-    test_sel_fms_pack_variants();
+    test_sel_fms_variants();
     test_sel_r_rm();
     test_imm_regvar();
     test_unary_r_m();
     test_base_imm_ops();
-    test_sel_fms_pack_variants();
+    test_sel_fms_variants();
     test_imm_regvar();
     test_shr_ops();
     test_neg_round_i32();
@@ -3521,7 +3396,6 @@ int main(void) {
     test_uniform_register();
     test_minmax_register_variants();
     test_cmp_register_variants();
-    test_pack_register_variants();
     test_regvar_m_patterns();
     test_preamble_register_boundary();
     test_backend_threadsafe();
@@ -3555,7 +3429,6 @@ int main(void) {
     test_gather_clamp_zero_sz();
     test_offset_load_store();
     test_shift_imm();
-    test_pack_channels();
     test_gather_deref_large();
     test_imm_fused();
     test_cmp_zero();

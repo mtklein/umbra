@@ -305,37 +305,31 @@ static val pack_unorm(builder *b, val ch, val scale) {
     return umbra_round_i32(b, umbra_mul_f32(b,
         umbra_min_f32(b, umbra_max_f32(b, ch, zero), one), scale));
 }
+static val pack(builder *b, val base, val v, int shift) {
+    return push(b, op_pack, VX(base), VY(v), .imm = shift);
+}
 void umbra_store_color(builder *b, umbra_ptr dst, umbra_color c, umbra_fmt fmt) {
     switch (fmt) {
     case umbra_fmt_8888: {
         val s = umbra_imm_f32(b, 255.0f);
-        val ri = pack_unorm(b, c.r, s);
-        val gi = pack_unorm(b, c.g, s);
-        val bi = pack_unorm(b, c.b, s);
-        val ai = pack_unorm(b, c.a, s);
-        val px = umbra_or_i32(b, ri, umbra_shl_i32(b, gi, umbra_imm_i32(b, 8)));
-        px = umbra_or_i32(b, px, umbra_shl_i32(b, bi, umbra_imm_i32(b, 16)));
-        px = umbra_or_i32(b, px, umbra_shl_i32(b, ai, umbra_imm_i32(b, 24)));
+        val px = pack_unorm(b, c.r, s);
+        px = pack(b, px, pack_unorm(b, c.g, s),  8);
+        px = pack(b, px, pack_unorm(b, c.b, s), 16);
+        px = pack(b, px, pack_unorm(b, c.a, s), 24);
         umbra_store_32(b, dst, px);
     } break;
     case umbra_fmt_565: {
-        val ri = pack_unorm(b, c.r, umbra_imm_f32(b, 31.0f));
-        val gi = pack_unorm(b, c.g, umbra_imm_f32(b, 63.0f));
-        val bi = pack_unorm(b, c.b, umbra_imm_f32(b, 31.0f));
-        val px = umbra_shl_i32(b, ri, umbra_imm_i32(b, 11));
-        px = umbra_or_i32(b, px, umbra_shl_i32(b, gi, umbra_imm_i32(b, 5)));
-        px = umbra_or_i32(b, px, bi);
+        val px = pack_unorm(b, c.b, umbra_imm_f32(b, 31.0f));
+        px = pack(b, px, pack_unorm(b, c.g, umbra_imm_f32(b, 63.0f)), 5);
+        px = pack(b, px, pack_unorm(b, c.r, umbra_imm_f32(b, 31.0f)), 11);
         umbra_store_16(b, dst, umbra_i16_from_i32(b, px));
     } break;
     case umbra_fmt_1010102: {
         val s10 = umbra_imm_f32(b, 1023.0f);
-        val ri = pack_unorm(b, c.r, s10);
-        val gi = pack_unorm(b, c.g, s10);
-        val bi = pack_unorm(b, c.b, s10);
-        val ai = pack_unorm(b, c.a, umbra_imm_f32(b, 3.0f));
-        val px = umbra_or_i32(b, ri, umbra_shl_i32(b, gi, umbra_imm_i32(b, 10)));
-        px = umbra_or_i32(b, px, umbra_shl_i32(b, bi, umbra_imm_i32(b, 20)));
-        px = umbra_or_i32(b, px, umbra_shl_i32(b, ai, umbra_imm_i32(b, 30)));
+        val px = pack_unorm(b, c.r, s10);
+        px = pack(b, px, pack_unorm(b, c.g, s10), 10);
+        px = pack(b, px, pack_unorm(b, c.b, s10), 20);
+        px = pack(b, px, pack_unorm(b, c.a, umbra_imm_f32(b, 3.0f)), 30);
         umbra_store_32(b, dst, px);
     } break;
     case umbra_fmt_fp16:
@@ -538,9 +532,6 @@ val umbra_or_i32(builder *b, val x, val y) {
     if (is_imm32(b, val_id(x), -1)) { return x; }
     if (is_imm32(b, val_id(y), -1)) { return y; }
     return try_imm(b, math(b, op_or_32, VX(x), VY(y)), op_or_32_imm, x, y);
-}
-val umbra_pack(builder *b, val base, val v, int shift) {
-    return push(b, op_pack, VX(base), VY(v), .imm = shift);
 }
 val umbra_xor_i32(builder *b, val x, val y) {
     sort(&x, &y);

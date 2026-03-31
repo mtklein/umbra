@@ -120,11 +120,6 @@ umbra_val umbra_or_i32 (struct umbra_builder*, umbra_val, umbra_val);
 umbra_val umbra_xor_i32(struct umbra_builder*, umbra_val, umbra_val);
 umbra_val umbra_sel_i32(struct umbra_builder*, umbra_val, umbra_val, umbra_val);
 
-// pack(x,y,k): insert y into x starting at bit k.
-// Like x|(y<<k) but assumes x's bits at and above k are clear;
-// when true, maps to ARM SLI (shift-left-insert) or x86 shift+or.
-umbra_val umbra_pack(struct umbra_builder*, umbra_val x, umbra_val y, int k);
-
 umbra_val umbra_eq_f32(struct umbra_builder*, umbra_val, umbra_val);
 umbra_val umbra_lt_f32(struct umbra_builder*, umbra_val, umbra_val);
 umbra_val umbra_le_f32(struct umbra_builder*, umbra_val, umbra_val);
