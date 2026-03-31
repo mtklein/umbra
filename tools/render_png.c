@@ -9,7 +9,7 @@
 enum { W = 640, H = 480 };
 
 static void render_slide(char const *label, struct umbra_backend *be, slide *s) {
-    s->fmt = umbra_fmt_srgb;
+    s->fmt = umbra_fmt_8888;
     int bpp = 4;
     size_t row_sz = (size_t)(W * bpp);
 
@@ -62,7 +62,7 @@ static void render_slide(char const *label, struct umbra_backend *be, slide *s) 
         memcpy(uni_, hc, 16);
         umbra_buf buf[] = {
             {.ptr=uni_, .sz=(size_t)fill_uni_len, .read_only=1},
-            {.ptr=row, .sz=row_sz, .fmt=umbra_fmt_srgb},
+            {.ptr=row, .sz=row_sz, .fmt=umbra_fmt_8888},
         };
         fill_prog->queue(fill_prog, 0, 0, W, 1, buf);
     }
@@ -81,7 +81,7 @@ static void render_slide(char const *label, struct umbra_backend *be, slide *s) 
         uint64_t uni_[2] = {0};
         umbra_buf buf[] = {
             {.ptr=uni_, .sz=(size_t)rb_uni_len, .read_only=1},
-            {.ptr=src, .sz=row_sz, .read_only=1, .fmt=umbra_fmt_srgb},
+            {.ptr=src, .sz=row_sz, .read_only=1, .fmt=umbra_fmt_8888},
             {.ptr=rgba + y * W, .sz=(size_t)(W*4), .fmt=umbra_fmt_8888},
         };
         rb_prog->queue(rb_prog, 0, 0, W, 1, buf);

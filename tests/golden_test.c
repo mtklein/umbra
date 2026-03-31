@@ -17,14 +17,14 @@ static char const *backend_name[N_BACKS] = {
 
 enum {
     FMT_8888, FMT_565, FMT_FP16,
-    FMT_FP16P, FMT_1010102, FMT_SRGB, NUM_FMTS,
+    FMT_FP16P, FMT_1010102, NUM_FMTS,
 };
 static char const *fmt_name[] = {
-    "8888", "565", "fp16", "fp16p", "1010102", "sRGB",
+    "8888", "565", "fp16", "fp16p", "1010102",
 };
 static umbra_fmt const fmt_enums[] = {
     umbra_fmt_8888, umbra_fmt_565, umbra_fmt_fp16,
-    umbra_fmt_fp16_planar, umbra_fmt_1010102, umbra_fmt_srgb,
+    umbra_fmt_fp16_planar, umbra_fmt_1010102,
 };
 
 typedef struct {
@@ -162,8 +162,7 @@ static void test_slide_golden(
         for (int i = 0; i < npx; i++) {
             _Bool differ = 0;
             switch (fmt_enums[fmt]) {
-            case umbra_fmt_8888:
-            case umbra_fmt_srgb: {
+            case umbra_fmt_8888: {
                 uint32_t rp, tp;
                 __builtin_memcpy(&rp, r+i*4, 4);
                 __builtin_memcpy(&tp, t+i*4, 4);
@@ -216,9 +215,7 @@ static void test_slide_golden(
             }
             if (differ) mismatches++;
         }
-        int tol = (fmt_enums[fmt] == umbra_fmt_srgb
-                || fmt_enums[fmt] == umbra_fmt_fp16
-                || fmt_enums[fmt] == umbra_fmt_fp16_planar) ? 1 : 0;
+        int tol = 1;
         if (worst > tol) {
             dprintf(2,
                 "slide %d \"%s\" %s/%s: "

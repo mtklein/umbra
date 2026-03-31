@@ -27,7 +27,6 @@ typedef enum {
     umbra_fmt_1010102,
     umbra_fmt_fp16,
     umbra_fmt_fp16_planar,
-    umbra_fmt_srgb,
 } umbra_fmt;
 
 size_t umbra_fmt_size(umbra_fmt);

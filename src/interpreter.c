@@ -20,10 +20,8 @@ typedef int16_t  S16 __attribute__((vector_size(K * 2)));
 #define vec_sqrt(v) __builtin_elementwise_sqrt(v)
 #define vec_abs(v) __builtin_elementwise_abs(v)
 #define vec_round(v) __builtin_elementwise_roundeven(v)
-#define vec_trunc(v) __builtin_elementwise_trunc(v)
 #define vec_floor(v) __builtin_elementwise_floor(v)
 #define vec_ceil(v) __builtin_elementwise_ceil(v)
-#define vec_fma(a,b,c) __builtin_elementwise_fma(a,b,c)
 #define vec_min(a, b) __builtin_elementwise_min(a, b)
 #define vec_max(a, b) __builtin_elementwise_max(a, b)
 #else
@@ -40,11 +38,6 @@ static F32 vec_abs(F32 v) {
 static F32 vec_round(F32 v) {
     F32 r;
     for (int i = 0; i < K; i++) { r[i] = rintf(v[i]); }
-    return r;
-}
-static F32 vec_trunc(F32 v) {
-    F32 r;
-    for (int i = 0; i < K; i++) { r[i] = truncf(v[i]); }
     return r;
 }
 static F32 vec_floor(F32 v) {
@@ -69,13 +62,6 @@ static F32 vec_max(F32 a, F32 b) {
 }
 #endif
 
-#ifndef __clang__
-static F32 vec_fma(F32 x, F32 y, F32 z) {
-    F32 r;
-    for (int ii = 0; ii < K; ii++) { r[ii] = __builtin_fmaf(x[ii], y[ii], z[ii]); }
-    return r;
-}
-#endif
 
 #if !defined(__wasm__)
 typedef __fp16 F16 __attribute__((vector_size(K * 2)));
@@ -200,36 +186,6 @@ static void interp_load_color(val v[4], umbra_buf const *b,
         v[2].f32 = f16_to_f32(hb);
         v[3].f32 = f16_to_f32(ha);
     } break;
-    case umbra_fmt_srgb: {
-        U32 px;
-        if (rem >= K) {
-            __builtin_memcpy(&px, src + i * 4, sizeof px);
-        } else {
-            px = (U32){0};
-            for (int ll = 0; ll < rem; ll++) {
-                uint32_t tmp;
-                __builtin_memcpy(&tmp, src + (i + ll) * 4, 4);
-                px[ll] = tmp;
-            }
-        }
-        U32 const mask = (U32){0} + 0xFFu;
-        F32 const inv  = (F32){0} + (1.f/255);
-        v[0].f32 = cast(F32, (I32)(px & mask))         * inv;
-        v[1].f32 = cast(F32, (I32)((px >>  8) & mask)) * inv;
-        v[2].f32 = cast(F32, (I32)((px >> 16) & mask)) * inv;
-        v[3].f32 = cast(F32, (I32)(px >> 24))          * inv;
-        // sRGB→linear: cubic polynomial approximation (no powf).
-        for (int ch = 0; ch < 3; ch++) {
-            F32 s = v[ch].f32;
-            F32 const lo = s * ((F32){0} + (1.0f/12.92f));
-            F32 const hi = s*s * (s * ((F32){0} + 0.3f) + ((F32){0} + 0.6975f))
-                         + ((F32){0} + 0.0025f);
-            I32 const sel = (I32)(s < ((F32){0} + 0.055f));
-            union { F32 f; I32 i; } lo_u = {.f=lo}, hi_u = {.f=hi}, r;
-            r.i = (sel & lo_u.i) | (~sel & hi_u.i);
-            v[ch].f32 = r.f;
-        }
-    } break;
     case umbra_fmt_fp16_planar: {
         size_t const ps = b->sz / 4;
         char const *p0 = src;
@@ -257,12 +213,7 @@ static void interp_load_color(val v[4], umbra_buf const *b,
 }
 
 static I32 vec_pack_round(F32 v, F32 scale) {
-    F32 const half = (F32){0} + 0.5f;
-    F32 hi   = v * scale;
-    F32 lo   = vec_fma(v, scale, -hi);
-    F32 n_f  = vec_trunc(hi);
-    F32 frac = (hi - n_f) + lo;
-    return cast(I32, n_f) - (I32)(frac >= half);
+    return cast(I32, vec_round(v * scale));
 }
 
 __attribute__((noinline))
@@ -330,43 +281,6 @@ static void interp_store_color(val const v[], umbra_buf const *b,
             for (int ll = 0; ll < rem; ll++) {
                 uint16_t h[4] = {hr[ll], hg[ll], hb[ll], ha[ll]};
                 __builtin_memcpy(dst + (i + ll) * 8, h, 8);
-            }
-        }
-    } break;
-    case umbra_fmt_srgb: {
-        // linear→sRGB: rsqrt/rcp quadratic rational approximation (no powf).
-        {
-            F32 const vc  = (F32){0} + 1.12732994556f;
-            F32 const vd  = (F32){0} + 0.13738775253f;
-            F32 const vk1 = (F32){0} + 0.01347202249f;
-            F32 const vk2 = (F32){0} + -0.00233423407f;
-            F32 *chs[3] = {&cr, &cg, &cb};
-            for (int ci = 0; ci < 3; ci++) {
-                F32 l = vec_max(*chs[ci], (F32){0});
-                F32 const lo = l * ((F32){0} + 12.92f);
-                F32 const t  = ((F32){0} + 1.f) / vec_sqrt(vec_max(l, (F32){0} + 1e-30f));
-                F32 const hi = (vc + t * (vk1 + t * vk2)) / (vd + t);
-                I32 const mask = (I32)(l < ((F32){0} + 0.00465985f));
-                union { F32 f; I32 i; } lo_u = {.f=lo}, hi_u = {.f=hi}, r;
-                r.i = (mask & lo_u.i) | (~mask & hi_u.i);
-                *chs[ci] = r.f;
-            }
-        }
-        F32 const zero = {0}, one = (F32){0} + 1.f, scale = (F32){0} + 255.f;
-        F32 const rc = vec_round(vec_min(vec_max(cr, zero), one) * scale);
-        F32 const gc = vec_round(vec_min(vec_max(cg, zero), one) * scale);
-        F32 const bc = vec_round(vec_min(vec_max(cb, zero), one) * scale);
-        F32 const ac = vec_round(vec_min(vec_max(ca, zero), one) * scale);
-        U32 const px = cast(U32, cast(I32, rc))
-                     | cast(U32, cast(I32, gc)) <<  8
-                     | cast(U32, cast(I32, bc)) << 16
-                     | cast(U32, cast(I32, ac)) << 24;
-        if (rem >= K) {
-            __builtin_memcpy(dst + i * 4, &px, sizeof px);
-        } else {
-            for (int ll = 0; ll < rem; ll++) {
-                uint32_t tmp = px[ll];
-                __builtin_memcpy(dst + (i + ll) * 4, &tmp, 4);
             }
         }
     } break;

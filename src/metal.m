@@ -270,8 +270,7 @@ static void emit_ops(Buf *b, BB const *bb,
                      "float(((device half*)(row+2*ps))[x]),"
                      "float(((device half*)(row+3*ps))[x]));\n"
                      "%s} else {\n"
-                     "%s    v%d_c = unpack_unorm4x8_srgb_to_float("
-                     "((device uint*)(p%d + y * buf_rbs[%d]))[x]);\n"
+                     "%s    v%d_c = float4(0);\n"
                      "%s}\n"
                      "%sfloat v%d = v%d_c.x;\n"
                      "%sfloat v%d_1 = v%d_c.y;\n"
@@ -296,7 +295,7 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, p, p, p,
                      pad, i,
                      pad,
-                     pad, i, p, p,
+                     pad, i,
                      pad,
                      pad, i, i,
                      pad, i, i,
@@ -345,9 +344,6 @@ static void emit_ops(Buf *b, BB const *bb,
                      " ((device half*)(row+ps))[x] = half(sc%d.y);"
                      " ((device half*)(row+2*ps))[x] = half(sc%d.z);"
                      " ((device half*)(row+3*ps))[x] = half(sc%d.w);\n"
-                     "%s} else {\n"
-                     "%s    ((device uint*)(p%d + y * buf_rbs[%d]))[x]"
-                     " = pack_float_to_srgb_unorm4x8(clamp(sc%d, 0.0, 1.0));\n"
                      "%s}\n",
                      pad, i,
                      fv(_fx, vx, xid, is_f),
@@ -375,8 +371,6 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, p, umbra_fmt_fp16_planar,
                      pad, p, p, p,
                      pad, i, i, i, i,
-                     pad,
-                     pad, p, p, i,
                      pad);
             } break;
 
@@ -984,10 +978,10 @@ static char* build_source(BB const *bb,
         emit(&b,
              "enum { FMT_8888=%d, FMT_565=%d,"
              " FMT_1010102=%d, FMT_FP16=%d,"
-             " FMT_FP16_PLANAR=%d, FMT_SRGB=%d };\n\n",
+             " FMT_FP16_PLANAR=%d };\n\n",
              umbra_fmt_8888, umbra_fmt_565,
              umbra_fmt_1010102, umbra_fmt_fp16,
-             umbra_fmt_fp16_planar, umbra_fmt_srgb);
+             umbra_fmt_fp16_planar);
     }
 
     emit(&b,
@@ -1129,7 +1123,6 @@ static MTLPixelFormat fmt_to_mtl(umbra_fmt fmt) {
     case umbra_fmt_1010102:     return MTLPixelFormatRGB10A2Unorm;
     case umbra_fmt_fp16:        return MTLPixelFormatRGBA16Float;
     case umbra_fmt_fp16_planar: return MTLPixelFormatR16Float;
-    case umbra_fmt_srgb:        return MTLPixelFormatRGBA8Unorm_sRGB;
     }
     return MTLPixelFormatRGBA8Unorm;
 }
@@ -1140,7 +1133,6 @@ static int fmt_to_planes(umbra_fmt fmt) {
     case umbra_fmt_1010102:     return 1;
     case umbra_fmt_fp16:        return 1;
     case umbra_fmt_fp16_planar: return 4;
-    case umbra_fmt_srgb:        return 1;
     case umbra_fmt_565:         return 0;
     }
     return 0;

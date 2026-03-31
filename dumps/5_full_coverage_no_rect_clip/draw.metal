@@ -4,7 +4,7 @@ using namespace metal;
 constant uint planes_p1 [[function_constant(0)]];
 constant uint fmt_p1 [[function_constant(1)]];
 
-enum { FMT_8888=0, FMT_565=1, FMT_1010102=2, FMT_FP16=3, FMT_FP16_PLANAR=4, FMT_SRGB=5 };
+enum { FMT_8888=0, FMT_565=1, FMT_1010102=2, FMT_FP16=3, FMT_FP16_PLANAR=4 };
 
 static inline int safe_ix(int ix, uint bytes, int elem) {
     int count = (int)(bytes / (uint)elem);
@@ -58,7 +58,7 @@ kernel void umbra_entry(
         device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_szs[1]/4;
         v7_c = float4(float(((device half*)row)[x]),float(((device half*)(row+ps))[x]),float(((device half*)(row+2*ps))[x]),float(((device half*)(row+3*ps))[x]));
     } else {
-        v7_c = unpack_unorm4x8_srgb_to_float(((device uint*)(p1 + y * buf_rbs[1]))[x]);
+        v7_c = float4(0);
     }
     float v7 = v7_c.x;
     float v7_1 = v7_c.y;
@@ -90,7 +90,5 @@ kernel void umbra_entry(
     } else if (fmt_p1 == 4u) {
         device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_szs[1]/4;
         ((device half*)row)[x] = half(sc12.x); ((device half*)(row+ps))[x] = half(sc12.y); ((device half*)(row+2*ps))[x] = half(sc12.z); ((device half*)(row+3*ps))[x] = half(sc12.w);
-    } else {
-        ((device uint*)(p1 + y * buf_rbs[1]))[x] = pack_float_to_srgb_unorm4x8(clamp(sc12, 0.0, 1.0));
     }
 }

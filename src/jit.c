@@ -1,14 +1,6 @@
 #include "bb.h"
 #include <assert.h>
 
-#if defined(__aarch64__) || defined(__AVX2__)
-static uint32_t f2u(float f) {
-    uint32_t u;
-    __builtin_memcpy(&u, &f, 4);
-    return u;
-}
-#endif
-
 #if !defined(__aarch64__) && !defined(__AVX2__)
 
 struct umbra_backend *umbra_backend_jit(void) { return 0; }
@@ -352,79 +344,6 @@ static struct ra *ra_create_arm64(struct umbra_basic_block const *bb, struct jit
     return ra_create(bb, &cfg);
 }
 
-// Emit inline NEON approx_powf for one channel register.
-// Skia-style sRGB conversion for 3 channels using polynomial (from) and
-// rsqrt/rcp rational (to) approximations.  t0/t1/t2 are scratch registers.
-static void emit_srgb_arm64(Buf *c, struct pool *pool,
-                             int r_ch0, int r_ch1, int r_ch2,
-                             int t0, int t1, int t2,
-                             _Bool invert) {
-    // from_srgb (invert=1): lo = s/12.92; hi = s²*(0.3*s+0.6975)+0.0025
-    // to_srgb   (invert=0): lo = l*12.92; hi = (C+t*(k1+t*k2))/(D+t)
-    //                        where t = rsqrt(l) with one NR step
-
-    int const channels[3] = { r_ch0, r_ch1, r_ch2 };
-    for (int ch_i = 0; ch_i < 3; ch_i++) {
-        int const ch = channels[ch_i];
-
-        if (invert) {
-            // lo = s * (1/12.92)
-            arm64_pool_load(c, pool, t0, f2u(1.0f/12.92f));
-            put(c, FMUL_4s(t0, ch, t0));                 // t0 = lo
-
-            // hi = s²*(0.3*s + 0.6975) + 0.0025
-            arm64_pool_load(c, pool, t1, f2u(0.3f));
-            put(c, FMUL_4s(t1, ch, t1));                  // t1 = 0.3*s
-            arm64_pool_load(c, pool, t2, f2u(0.6975f));
-            put(c, FADD_4s(t1, t1, t2));                   // t1 = 0.3*s + 0.6975
-            put(c, FMUL_4s(t2, ch, ch));                   // t2 = s²
-            put(c, FMUL_4s(t1, t2, t1));                   // t1 = s²*(0.3*s+0.6975)
-            arm64_pool_load(c, pool, t2, f2u(0.0025f));
-            put(c, FADD_4s(t1, t1, t2));                   // t1 = hi
-
-            arm64_pool_load(c, pool, t2, f2u(0.055f / 12.92f));
-            put(c, FCMGE_4s(t2, t0, t2));                  // t2 = lo >= thresh/12.92
-            put(c, ORR_16b(ch, t0, t0));                    // ch = lo
-            put(c, BIT_16b(ch, t1, t2));                    // ch = t2 ? hi : lo
-        } else {
-            // t0 = rsqrt(ch) with one NR step
-            put(c, MOVI_4s(t1, 0, 0));
-            put(c, FMAXNM_4s(ch, ch, t1));               // clamp >= 0
-            put(c, FRSQRTE_4s(t0, ch));                   // t0 = estimate
-            put(c, FMUL_4s(t1, t0, t0));                  // t1 = e*e
-            put(c, FRSQRTS_4s(t1, ch, t1));               // t1 = (3-ch*e²)/2
-            put(c, FMUL_4s(t0, t0, t1));                  // t0 = refined rsqrt = t
-
-            // lo = ch * 12.92
-            arm64_pool_load(c, pool, t1, f2u(12.92f));
-            put(c, FMUL_4s(t1, ch, t1));                  // t1 = lo
-
-            // numerator = C + t*(k1 + t*k2)
-            arm64_pool_load(c, pool, t2, f2u(-0.00233423407f));
-            put(c, FMUL_4s(t2, t0, t2));                   // t2 = t*k2
-            arm64_pool_load(c, pool, ch, f2u(0.01347202249f));
-            put(c, FADD_4s(t2, t2, ch));                    // t2 = k1 + t*k2
-            put(c, FMUL_4s(t2, t0, t2));                    // t2 = t*(k1+t*k2)
-            arm64_pool_load(c, pool, ch, f2u(1.12732994556f));
-            put(c, FADD_4s(t2, t2, ch));                    // t2 = numerator
-
-            // denominator = rcp(D + t) with one NR step
-            arm64_pool_load(c, pool, ch, f2u(0.13738775253f));
-            put(c, FADD_4s(ch, ch, t0));                   // ch = D + t
-            put(c, FRECPE_4s(t0, ch));                     // t0 = rcp estimate
-            put(c, FRECPS_4s(ch, ch, t0));                 // ch = 2 - (D+t)*est
-            put(c, FMUL_4s(t0, t0, ch));                   // t0 = refined rcp
-
-            // hi = numerator * rcp(denominator)
-            put(c, FMUL_4s(t2, t2, t0));                   // t2 = hi
-
-            arm64_pool_load(c, pool, t0, f2u(0.00465985f * 12.92f));
-            put(c, FCMGE_4s(t0, t1, t0));                  // t0 = lo >= (thresh*12.92)
-            put(c, ORR_16b(ch, t1, t1));                   // ch = lo
-            put(c, BIT_16b(ch, t2, t0));                   // ch = t0 ? hi : lo
-        }
-    }
-}
 
 static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
@@ -782,7 +701,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t px   = ra_alloc(ra, sl, ns);
             int8_t t0   = ra_alloc(ra, sl, ns);
             int8_t t1   = ra_alloc(ra, sl, ns);
-            int8_t st2  = ra_alloc(ra, sl, ns);  // extra temp for sRGB
 
             // Load fmt: LDR w_XT, [XBUF, #(p*sizeof(umbra_buf)+offsetof(fmt))]
             {
@@ -1005,39 +923,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             put(c, B(0));
             c->buf[br_skip_f16_planar] = Bcond(0x1, c->len - br_skip_f16_planar);
 
-            
-            put(c, CMP_wi(XT, umbra_fmt_srgb));
-            int br_skip_srgb = c->len;
-            put(c, Bcond(0x1, 0));
-            {
-                // Same as 8888 decode.
-                if (scalar) { put(c, LDR_sx(px, XP, XI)); }
-                else        { put(c, LDR_q(px, XP, XW)); }
-                arm64_pool_load(c, &jc->pool, t0, 0xFF);
-                put(c, AND_16b(s0.rd, px, t0));
-                put(c, USHR_4s_imm(r1, px,  8)); put(c, AND_16b(r1, r1, t0));
-                put(c, USHR_4s_imm(r2, px, 16)); put(c, AND_16b(r2, r2, t0));
-                put(c, USHR_4s_imm(r3, px, 24));
-                put(c, SCVTF_4s(s0.rd, s0.rd));
-                put(c, SCVTF_4s(r1, r1));
-                put(c, SCVTF_4s(r2, r2));
-                put(c, SCVTF_4s(r3, r3));
-                union { float f; uint32_t u; } inv255 = {.f = 1.0f/255.0f};
-                arm64_pool_load(c, &jc->pool, t0, inv255.u);
-                put(c, FMUL_4s(s0.rd, s0.rd, t0));
-                put(c, FMUL_4s(r1, r1, t0));
-                put(c, FMUL_4s(r2, r2, t0));
-                put(c, FMUL_4s(r3, r3, t0));
-                // sRGB→linear on RGB only.
-                emit_srgb_arm64(c, &jc->pool,
-                                s0.rd, r1, r2,
-                                t0, t1, st2,
-                                /*invert=*/1);
-            }
-            br_done[n_done] = c->len; n_done++;
-            put(c, B(0));
-            c->buf[br_skip_srgb] = Bcond(0x1, c->len - br_skip_srgb);
-
             // Default: zero all outputs.
             put(c, MOVI_4s(s0.rd, 0, 0));
             put(c, MOVI_4s(r1, 0, 0));
@@ -1049,7 +934,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 c->buf[br_done[j]] = B(c->len - br_done[j]);
             }
 
-            ra_return_reg(ra, st2);
             ra_return_reg(ra, t1);
             ra_return_reg(ra, t0);
             ra_return_reg(ra, px);
@@ -1071,13 +955,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t one   = ra_alloc(ra, sl, ns);
             int8_t px    = ra_alloc(ra, sl, ns);
             int8_t t     = ra_alloc(ra, sl, ns);
-            // Extra temps for sRGB: 3 for channel copies, 3 for scratch.
-            int8_t st0 = ra_alloc(ra, sl, ns);
-            int8_t st1 = ra_alloc(ra, sl, ns);
-            int8_t st2 = ra_alloc(ra, sl, ns);
-            int8_t st3 = ra_alloc(ra, sl, ns);
-            int8_t st4 = ra_alloc(ra, sl, ns);
-            int8_t st5 = ra_alloc(ra, sl, ns);
 
             // Load fmt.
             {
@@ -1089,38 +966,26 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int br_done[8];
             int n_done = 0;
 
-            
+
             put(c, CMP_wi(XT, umbra_fmt_8888));
             int br_skip_8888 = c->len;
             put(c, Bcond(0x1, 0));
             {
                 union { float f; uint32_t u; } s255 = {.f = 255.0f};
                 union { float f; uint32_t u; } f1   = {.f = 1.0f};
-                union { float f; uint32_t u; } fh   = {.f = 0.5f};
                 arm64_pool_load(c, &jc->pool, scale, s255.u);
                 arm64_pool_load(c, &jc->pool, one, f1.u);
-                arm64_pool_load(c, &jc->pool, st1, fh.u);
                 put(c, MOVI_4s(z, 0, 0));
-#define DEKKER(dst, val) \
-                put(c, FMUL_4s(st2, val, scale));      \
-                put(c, FSUB_4s(st0, z, st2));           \
-                put(c, FMLA_4s(st0, val, scale));       \
-                put(c, FCVTZS_4s(dst, st2));            \
-                put(c, SCVTF_4s(st3, dst));             \
-                put(c, FSUB_4s(st2, st2, st3));         \
-                put(c, FADD_4s(st2, st2, st0));         \
-                put(c, FCMGE_4s(st2, st2, st1));        \
-                put(c, SUB_4s(dst, dst, st2))
                 put(c, FMAXNM_4s(px, rr, z)); put(c, FMINNM_4s(px, px, one));
-                DEKKER(px, px);
+                put(c, FMUL_4s(px, px, scale)); put(c, FCVTNS_4s(px, px));
                 put(c, FMAXNM_4s(t, rg, z)); put(c, FMINNM_4s(t, t, one));
-                DEKKER(t, t);
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
                 put(c, SLI_4s_imm(px, t, 8));
                 put(c, FMAXNM_4s(t, rb_, z)); put(c, FMINNM_4s(t, t, one));
-                DEKKER(t, t);
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
                 put(c, SLI_4s_imm(px, t, 16));
                 put(c, FMAXNM_4s(t, ra_v, z)); put(c, FMINNM_4s(t, t, one));
-                DEKKER(t, t);
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
                 put(c, SLI_4s_imm(px, t, 24));
                 if (scalar) { put(c, STR_sx(px, XP, XI)); }
                 else        { put(c, STR_q(px, XP, XW)); }
@@ -1129,7 +994,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             put(c, B(0));
             c->buf[br_skip_8888] = Bcond(0x1, c->len - br_skip_8888);
 
-            
+
             put(c, CMP_wi(XT, umbra_fmt_565));
             int br_skip_565 = c->len;
             put(c, Bcond(0x1, 0));
@@ -1137,21 +1002,19 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 union { float f; uint32_t u; } s31 = {.f = 31.0f};
                 union { float f; uint32_t u; } s63 = {.f = 63.0f};
                 union { float f; uint32_t u; } f1  = {.f = 1.0f};
-                union { float f; uint32_t u; } fh  = {.f = 0.5f};
                 arm64_pool_load(c, &jc->pool, one, f1.u);
-                arm64_pool_load(c, &jc->pool, st1, fh.u);
                 put(c, MOVI_4s(z, 0, 0));
                 arm64_pool_load(c, &jc->pool, scale, s31.u);
                 put(c, FMAXNM_4s(px, rb_, z)); put(c, FMINNM_4s(px, px, one));
-                DEKKER(px, px);
+                put(c, FMUL_4s(px, px, scale)); put(c, FCVTNS_4s(px, px));
                 arm64_pool_load(c, &jc->pool, scale, s63.u);
                 put(c, FMAXNM_4s(t, rg, z)); put(c, FMINNM_4s(t, t, one));
-                DEKKER(t, t);
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
                 put(c, SHL_4s_imm(t, t, 5));
                 put(c, ORR_16b(px, px, t));
                 arm64_pool_load(c, &jc->pool, scale, s31.u);
                 put(c, FMAXNM_4s(t, rr, z)); put(c, FMINNM_4s(t, t, one));
-                DEKKER(t, t);
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
                 put(c, SHL_4s_imm(t, t, 11));
                 put(c, ORR_16b(px, px, t));
                 // Narrow 4S -> 4H and store.
@@ -1167,7 +1030,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             put(c, B(0));
             c->buf[br_skip_565] = Bcond(0x1, c->len - br_skip_565);
 
-            
+
             put(c, CMP_wi(XT, umbra_fmt_1010102));
             int br_skip_1010102 = c->len;
             put(c, Bcond(0x1, 0));
@@ -1175,22 +1038,20 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 union { float f; uint32_t u; } s1023 = {.f = 1023.0f};
                 union { float f; uint32_t u; } s3    = {.f = 3.0f};
                 union { float f; uint32_t u; } f1    = {.f = 1.0f};
-                union { float f; uint32_t u; } fh    = {.f = 0.5f};
                 arm64_pool_load(c, &jc->pool, one, f1.u);
-                arm64_pool_load(c, &jc->pool, st1, fh.u);
                 put(c, MOVI_4s(z, 0, 0));
                 arm64_pool_load(c, &jc->pool, scale, s1023.u);
                 put(c, FMAXNM_4s(px, rr, z)); put(c, FMINNM_4s(px, px, one));
-                DEKKER(px, px);
+                put(c, FMUL_4s(px, px, scale)); put(c, FCVTNS_4s(px, px));
                 put(c, FMAXNM_4s(t, rg, z)); put(c, FMINNM_4s(t, t, one));
-                DEKKER(t, t);
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
                 put(c, SLI_4s_imm(px, t, 10));
                 put(c, FMAXNM_4s(t, rb_, z)); put(c, FMINNM_4s(t, t, one));
-                DEKKER(t, t);
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
                 put(c, SLI_4s_imm(px, t, 20));
                 arm64_pool_load(c, &jc->pool, scale, s3.u);
                 put(c, FMAXNM_4s(t, ra_v, z)); put(c, FMINNM_4s(t, t, one));
-                DEKKER(t, t);
+                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
                 put(c, SLI_4s_imm(px, t, 30));
                 if (scalar) { put(c, STR_sx(px, XP, XI)); }
                 else        { put(c, STR_q(px, XP, XW)); }
@@ -1199,7 +1060,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             put(c, B(0));
             c->buf[br_skip_1010102] = Bcond(0x1, c->len - br_skip_1010102);
 
-            
+
             put(c, CMP_wi(XT, umbra_fmt_fp16));
             int br_skip_fp16 = c->len;
             put(c, Bcond(0x1, 0));
@@ -1247,7 +1108,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             put(c, B(0));
             c->buf[br_skip_fp16] = Bcond(0x1, c->len - br_skip_fp16);
 
-            
+
             put(c, CMP_wi(XT, umbra_fmt_fp16_planar));
             int br_skip_f16_planar_s = c->len;
             put(c, Bcond(0x1, 0));
@@ -1279,47 +1140,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             put(c, B(0));
             c->buf[br_skip_f16_planar_s] = Bcond(0x1, c->len - br_skip_f16_planar_s);
 
-            
-            put(c, CMP_wi(XT, umbra_fmt_srgb));
-            int br_skip_srgb_s = c->len;
-            put(c, Bcond(0x1, 0));
-            {
-                // linear→sRGB on RGB only — copy inputs first since
-                // emit_srgb_arm64 modifies channels in-place, and the
-                // originals may be preamble values reused across tiles.
-                put(c, ORR_16b(st0, rr, rr));
-                put(c, ORR_16b(st1, rg, rg));
-                put(c, ORR_16b(st2, rb_, rb_));
-                emit_srgb_arm64(c, &jc->pool,
-                                st0, st1, st2,
-                                st3, st4, st5,
-                                /*invert=*/0);
-                rr = st0; rg = st1; rb_ = st2;
-                // Same as 8888 but ties-even (sRGB poly tuned for it).
-                union { float f; uint32_t u; } s255 = {.f = 255.0f};
-                union { float f; uint32_t u; } f1   = {.f = 1.0f};
-                arm64_pool_load(c, &jc->pool, scale, s255.u);
-                arm64_pool_load(c, &jc->pool, one, f1.u);
-                put(c, MOVI_4s(z, 0, 0));
-                put(c, FMAXNM_4s(px, rr, z)); put(c, FMINNM_4s(px, px, one));
-                put(c, FMUL_4s(px, px, scale)); put(c, FCVTNS_4s(px, px));
-                put(c, FMAXNM_4s(t, rg, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
-                put(c, SLI_4s_imm(px, t, 8));
-                put(c, FMAXNM_4s(t, rb_, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
-                put(c, SLI_4s_imm(px, t, 16));
-                put(c, FMAXNM_4s(t, ra_v, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
-                put(c, SLI_4s_imm(px, t, 24));
-                if (scalar) { put(c, STR_sx(px, XP, XI)); }
-                else        { put(c, STR_q(px, XP, XW)); }
-            }
-            br_done[n_done] = c->len; n_done++;
-            put(c, B(0));
-            c->buf[br_skip_srgb_s] = Bcond(0x1, c->len - br_skip_srgb_s);
-
-#undef DEKKER
             // Default: no-op for unknown formats.
 
             // Patch all B-to-done branches.
@@ -1327,12 +1147,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 c->buf[br_done[j]] = B(c->len - br_done[j]);
             }
 
-            ra_return_reg(ra, st5);
-            ra_return_reg(ra, st4);
-            ra_return_reg(ra, st3);
-            ra_return_reg(ra, st2);
-            ra_return_reg(ra, st1);
-            ra_return_reg(ra, st0);
             ra_return_reg(ra, t);
             ra_return_reg(ra, px);
             ra_return_reg(ra, one);
@@ -1996,78 +1810,6 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     return 0;
 }
 
-// Load a transfer function parameter from [XBUF + disp] and broadcast to all YMM lanes.
-// Emit inline AVX2 approx_powf for one channel register.
-// ch = the YMM register to transform in-place.
-// t0..t3 = scratch YMM registers.
-// Skia-style sRGB conversion for 3 channels using polynomial (from) and
-// rsqrt/rcp rational (to) approximations.  t0/t1/t2 are scratch registers.
-static void emit_srgb_x86(Buf *c, struct pool *pool,
-                           int r_ch0, int r_ch1, int r_ch2,
-                           int t0, int t1, int t2,
-                           _Bool invert) {
-    // from_srgb (invert=1): lo = s/12.92; hi = s²*(0.3*s+0.6975)+0.0025
-    // to_srgb   (invert=0): lo = l*12.92; hi = (C+t*(k1+t*k2))*rcp(D+t)
-    //                        where t = rsqrt(l) via VRSQRTPS
-
-    int const channels[3] = { r_ch0, r_ch1, r_ch2 };
-    for (int ch_i = 0; ch_i < 3; ch_i++) {
-        int const ch = channels[ch_i];
-
-        if (invert) {
-            // lo = s * (1/12.92)
-            pool_broadcast(c, pool, t0, f2u(1.0f/12.92f));
-            vmulps(c, t0, ch, t0);                        // t0 = lo
-
-            // hi = s²*(0.3*s + 0.6975) + 0.0025
-            pool_broadcast(c, pool, t1, f2u(0.3f));
-            vmulps(c, t1, ch, t1);                        // t1 = 0.3*s
-            pool_broadcast(c, pool, t2, f2u(0.6975f));
-            vaddps(c, t1, t1, t2);                        // t1 = 0.3*s + 0.6975
-            vmulps(c, t2, ch, ch);                        // t2 = s²
-            vmulps(c, t1, t2, t1);                        // t1 = s²*(0.3*s+0.6975)
-            pool_broadcast(c, pool, t2, f2u(0.0025f));
-            vaddps(c, t1, t1, t2);                        // t1 = hi
-
-            pool_broadcast(c, pool, t2, f2u(0.055f / 12.92f));
-            vcmpps(c, t2, t0, t2, 5);                    // t2 = lo >= thresh/12.92
-            vpblendvb(c, 1, ch, t0, t1, t2);             // ch = t2 ? hi : lo
-        } else {
-            // Clamp >= 0
-            vpxor(c, 1, t0, t0, t0);
-            vmaxps(c, ch, ch, t0);
-
-            // t0 = rsqrt(ch) via VRSQRTPS (~12-bit, no NR)
-            vrsqrtps(c, t0, ch);                          // t0 = t
-
-            // lo = ch * 12.92
-            pool_broadcast(c, pool, t1, f2u(12.92f));
-            vmulps(c, t1, ch, t1);                        // t1 = lo
-
-            // numerator = C + t*(k1 + t*k2)
-            pool_broadcast(c, pool, t2, f2u(-0.00233423407f));
-            vmulps(c, t2, t0, t2);                        // t2 = t*k2
-            pool_broadcast(c, pool, ch, f2u(0.01347202249f));
-            vaddps(c, t2, t2, ch);                        // t2 = k1 + t*k2
-            vmulps(c, t2, t0, t2);                        // t2 = t*(k1+t*k2)
-            pool_broadcast(c, pool, ch, f2u(1.12732994556f));
-            vaddps(c, t2, t2, ch);                        // t2 = numerator
-
-            // denominator = rcp(D + t) via VRCPPS (~12-bit, no NR)
-            pool_broadcast(c, pool, ch, f2u(0.13738775253f));
-            vaddps(c, ch, ch, t0);                        // ch = D + t
-            vrcpps(c, ch, ch);                            // ch = rcp(D + t)
-
-            // hi = numerator * rcp(denominator)
-            vmulps(c, t2, t2, ch);                        // t2 = hi
-
-            pool_broadcast(c, pool, t0, f2u(0.00465985f * 12.92f));
-            vcmpps(c, t0, t1, t0, 5);                    // t0 = lo >= threshold
-            vpblendvb(c, 1, ch, t1, t2, t0);             // ch = t0 ? hi : lo
-        }
-    }
-}
-
 static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
                      int *deref_rb_gpr, struct jit_ctx *jc);
@@ -2378,8 +2120,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t px = ra_alloc(ra, sl, ns);
             int8_t t0 = ra_alloc(ra, sl, ns);
             int8_t t1 = ra_alloc(ra, sl, ns);
-            // Extra temps for sRGB.
-            int8_t st2 = ra_alloc(ra, sl, ns);  // extra temp for sRGB
 
             // Load fmt into EAX (32-bit load, zero-extends).
             {
@@ -2784,48 +2524,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             vpxor(c, 1, r2, r2, r2);
             vpxor(c, 1, r3, r3, r3);
 
-            
-            cmp_ri(c, RAX, umbra_fmt_srgb);
-            int br_skip_srgb = jcc(c, 0x05);
-            {
-                if (scalar) { vex_mem(c, 1, 1, 0, 0, px, 0, 0x6e, base, XI, 4, 0); }
-                else        { vmov_load(c, 1, px, base, XI, 4, 0); }
-                pool_broadcast(c, &jc->pool, t0, 0xFF);
-                vpand(c, 1, s0.rd, px, t0);
-                vpsrld_i(c, r1, px,  8); vpand(c, 1, r1, r1, t0);
-                vpsrld_i(c, r2, px, 16); vpand(c, 1, r2, r2, t0);
-                vpsrld_i(c, r3, px, 24);
-                vcvtdq2ps(c, s0.rd, s0.rd);
-                vcvtdq2ps(c, r1, r1);
-                vcvtdq2ps(c, r2, r2);
-                vcvtdq2ps(c, r3, r3);
-                union { float f; uint32_t u; } inv255 = {.f = 1.0f/255.0f};
-                pool_broadcast(c, &jc->pool, t0, inv255.u);
-                vmulps(c, s0.rd, s0.rd, t0);
-                vmulps(c, r1, r1, t0);
-                vmulps(c, r2, r2, t0);
-                vmulps(c, r3, r3, t0);
-                emit_srgb_x86(c, &jc->pool,
-                              s0.rd, r1, r2,
-                              t0, t1, st2,
-                              /*invert=*/1);
-            }
-            br_done[n_done] = jmp(c); n_done++;
-            patch_jcc(c, br_skip_srgb);
-
-            // Default: zero all outputs.
-            vpxor(c, 1, s0.rd, s0.rd, s0.rd);
-            vpxor(c, 1, r1, r1, r1);
-            vpxor(c, 1, r2, r2, r2);
-            vpxor(c, 1, r3, r3, r3);
-
             // Patch all JMP-to-done.
             for (int j = 0; j < n_done; j++) {
                 int32_t rel = (int32_t)(c->len - (br_done[j] + 4));
                 __builtin_memcpy(c->buf + br_done[j], &rel, 4);
             }
 
-            ra_return_reg(ra, st2);
             ra_return_reg(ra, t1);
             ra_return_reg(ra, t0);
             ra_return_reg(ra, px);
@@ -2847,13 +2551,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t t     = ra_alloc(ra, sl, ns);
             int8_t z     = ra_alloc(ra, sl, ns);
             int8_t one   = ra_alloc(ra, sl, ns);
-            // Extra temps for sRGB: 3 for channel copies, 3 for scratch.
-            int8_t st0 = ra_alloc(ra, sl, ns);
-            int8_t st1 = ra_alloc(ra, sl, ns);
-            int8_t st2 = ra_alloc(ra, sl, ns);
-            int8_t st3 = ra_alloc(ra, sl, ns);
-            int8_t st4 = ra_alloc(ra, sl, ns);
-            int8_t st5 = ra_alloc(ra, sl, ns);
 
             // Load fmt into EAX (32-bit).
             {
@@ -2872,37 +2569,25 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int br_done[8];
             int n_done = 0;
 
-            
+
             cmp_ri(c, RAX, umbra_fmt_8888);
             int br_skip_8888 = jcc(c, 0x05);
             {
                 union { float f; uint32_t u; } s255 = {.f = 255.0f};
                 union { float f; uint32_t u; } f1   = {.f = 1.0f};
-                union { float f; uint32_t u; } fh   = {.f = 0.5f};
                 pool_broadcast(c, &jc->pool, scale, s255.u);
                 pool_broadcast(c, &jc->pool, one, f1.u);
-                pool_broadcast(c, &jc->pool, st0, fh.u);
                 vex_rrr(c, 0, 1, 1, 0x57, z, z, z);
-#define DEKKER_X86(dst, val)                                    \
-                vmulps(c, st1, val, scale);                     \
-                vsubps(c, st2, z, st1);                         \
-                vfmadd231ps(c, st2, val, scale);                \
-                vcvttps2dq(c, dst, st1);                        \
-                vcvtdq2ps(c, st3, dst);                         \
-                vsubps(c, st1, st1, st3);                       \
-                vaddps(c, st1, st1, st2);                       \
-                vcmpps(c, st1, st0, st1, 2);                    \
-                vpsubd(c, dst, dst, st1)
                 vmaxps(c, px, rr, z); vminps(c, px, px, one);
-                DEKKER_X86(px, px);
+                vmulps(c, px, px, scale); vcvtps2dq(c, px, px);
                 vmaxps(c, t, rg, z); vminps(c, t, t, one);
-                DEKKER_X86(t, t);
+                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
                 vpslld_i(c, t, t, 8); vpor(c, 1, px, px, t);
                 vmaxps(c, t, rb_, z); vminps(c, t, t, one);
-                DEKKER_X86(t, t);
+                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
                 vpslld_i(c, t, t, 16); vpor(c, 1, px, px, t);
                 vmaxps(c, t, ra_v, z); vminps(c, t, t, one);
-                DEKKER_X86(t, t);
+                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
                 vpslld_i(c, t, t, 24); vpor(c, 1, px, px, t);
                 if (scalar) { vex_mem(c, 1, 1, 0, 0, px, 0, 0x7e, base, XI, 4, 0); }
                 else        { vmov_store(c, 1, px, base, XI, 4, 0); }
@@ -2917,21 +2602,19 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 union { float f; uint32_t u; } s31 = {.f = 31.0f};
                 union { float f; uint32_t u; } s63 = {.f = 63.0f};
                 union { float f; uint32_t u; } f1  = {.f = 1.0f};
-                union { float f; uint32_t u; } fh  = {.f = 0.5f};
                 pool_broadcast(c, &jc->pool, one, f1.u);
-                pool_broadcast(c, &jc->pool, st0, fh.u);
                 vex_rrr(c, 0, 1, 1, 0x57, z, z, z);
                 pool_broadcast(c, &jc->pool, scale, s31.u);
                 vmaxps(c, px, rr, z); vminps(c, px, px, one);
-                DEKKER_X86(px, px);
+                vmulps(c, px, px, scale); vcvtps2dq(c, px, px);
                 vpslld_i(c, px, px, 11);
                 pool_broadcast(c, &jc->pool, scale, s63.u);
                 vmaxps(c, t, rg, z); vminps(c, t, t, one);
-                DEKKER_X86(t, t);
+                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
                 vpslld_i(c, t, t, 5); vpor(c, 1, px, px, t);
                 pool_broadcast(c, &jc->pool, scale, s31.u);
                 vmaxps(c, t, rb_, z); vminps(c, t, t, one);
-                DEKKER_X86(t, t);
+                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
                 vpor(c, 1, px, px, t);
                 // Narrow 32->16 and store.
                 // VPACKSSDW (signed saturation) works if values are in range [0, 2047].
@@ -2970,22 +2653,20 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 union { float f; uint32_t u; } s1023 = {.f = 1023.0f};
                 union { float f; uint32_t u; } s3    = {.f = 3.0f};
                 union { float f; uint32_t u; } f1    = {.f = 1.0f};
-                union { float f; uint32_t u; } fh    = {.f = 0.5f};
                 pool_broadcast(c, &jc->pool, one, f1.u);
-                pool_broadcast(c, &jc->pool, st0, fh.u);
                 vex_rrr(c, 0, 1, 1, 0x57, z, z, z);
                 pool_broadcast(c, &jc->pool, scale, s1023.u);
                 vmaxps(c, px, rr, z); vminps(c, px, px, one);
-                DEKKER_X86(px, px);
+                vmulps(c, px, px, scale); vcvtps2dq(c, px, px);
                 vmaxps(c, t, rg, z); vminps(c, t, t, one);
-                DEKKER_X86(t, t);
+                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
                 vpslld_i(c, t, t, 10); vpor(c, 1, px, px, t);
                 vmaxps(c, t, rb_, z); vminps(c, t, t, one);
-                DEKKER_X86(t, t);
+                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
                 vpslld_i(c, t, t, 20); vpor(c, 1, px, px, t);
                 pool_broadcast(c, &jc->pool, scale, s3.u);
                 vmaxps(c, t, ra_v, z); vminps(c, t, t, one);
-                DEKKER_X86(t, t);
+                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
                 vpslld_i(c, t, t, 30); vpor(c, 1, px, px, t);
                 if (scalar) { vex_mem(c, 1, 1, 0, 0, px, 0, 0x7e, base, XI, 4, 0); }
                 else        { vmov_store(c, 1, px, base, XI, 4, 0); }
@@ -3152,42 +2833,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             br_done[n_done] = jmp(c); n_done++;
             patch_jcc(c, br_skip_f16_planar_s);
 
-            
-            cmp_ri(c, RAX, umbra_fmt_srgb);
-            int br_skip_srgb_s = jcc(c, 0x05);
-            {
-                vmovaps(c, st0, rr);
-                vmovaps(c, st1, rg);
-                vmovaps(c, st2, rb_);
-                emit_srgb_x86(c, &jc->pool,
-                              st0, st1, st2,
-                              st3, st4, st5,
-                              /*invert=*/0);
-                rr = st0; rg = st1; rb_ = st2;
-                // Ties-even for sRGB (polynomial tuned for it).
-                union { float f; uint32_t u; } s255 = {.f = 255.0f};
-                union { float f; uint32_t u; } f1   = {.f = 1.0f};
-                pool_broadcast(c, &jc->pool, scale, s255.u);
-                pool_broadcast(c, &jc->pool, one, f1.u);
-                vex_rrr(c, 0, 1, 1, 0x57, z, z, z);
-                vmaxps(c, px, rr, z); vminps(c, px, px, one);
-                vmulps(c, px, px, scale); vcvtps2dq(c, px, px);
-                vmaxps(c, t, rg, z); vminps(c, t, t, one);
-                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
-                vpslld_i(c, t, t, 8); vpor(c, 1, px, px, t);
-                vmaxps(c, t, rb_, z); vminps(c, t, t, one);
-                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
-                vpslld_i(c, t, t, 16); vpor(c, 1, px, px, t);
-                vmaxps(c, t, ra_v, z); vminps(c, t, t, one);
-                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
-                vpslld_i(c, t, t, 24); vpor(c, 1, px, px, t);
-                if (scalar) { vex_mem(c, 1, 1, 0, 0, px, 0, 0x7e, base, XI, 4, 0); }
-                else        { vmov_store(c, 1, px, base, XI, 4, 0); }
-            }
-            br_done[n_done] = jmp(c); n_done++;
-            patch_jcc(c, br_skip_srgb_s);
-#undef DEKKER_X86
-
             // Default: no-op for unknown formats.
 
             // Patch all JMP-to-done.
@@ -3196,12 +2841,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 __builtin_memcpy(c->buf + br_done[j], &rel, 4);
             }
 
-            ra_return_reg(ra, st5);
-            ra_return_reg(ra, st4);
-            ra_return_reg(ra, st3);
-            ra_return_reg(ra, st2);
-            ra_return_reg(ra, st1);
-            ra_return_reg(ra, st0);
             ra_return_reg(ra, t);
             ra_return_reg(ra, one);
             ra_return_reg(ra, z);

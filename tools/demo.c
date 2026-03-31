@@ -38,15 +38,14 @@ enum {
     FMT_565,
     FMT_FP16,
     FMT_1010102,
-    FMT_SRGB,
     NUM_FMTS,
 };
 static char const *fmt_name[] = {
-    "8888", "565", "fp16", "1010102", "sRGB",
+    "8888", "565", "fp16", "1010102",
 };
 static umbra_fmt const fmt_enums[] = {
     umbra_fmt_8888, umbra_fmt_565, umbra_fmt_fp16,
-    umbra_fmt_1010102, umbra_fmt_srgb,
+    umbra_fmt_1010102,
 };
 
 typedef struct {

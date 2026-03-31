@@ -18,7 +18,6 @@ size_t umbra_fmt_size(umbra_fmt fmt) {
     case umbra_fmt_1010102:    return 4;
     case umbra_fmt_fp16:       return 8;
     case umbra_fmt_fp16_planar: return 2;
-    case umbra_fmt_srgb:       return 4;
     }
     return 0;
 }
