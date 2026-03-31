@@ -892,7 +892,7 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     __builtin_memcpy(&y, &yb, 4);
     __builtin_memcpy(&z, &zb, 4);
 
-    switch (op) {
+    switch ((int)op) {
     case op_add_f32: r.f = x.f + y.f; break;
     case op_sub_f32: r.f = x.f - y.f; break;
     case op_mul_f32: r.f = x.f * y.f; break;
@@ -931,50 +931,7 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     case op_lt_u32: r.i = x.u <  y.u ? -1 : 0; break;
     case op_le_u32: r.i = x.u <= y.u ? -1 : 0; break;
 
-    case op_x:
-    case op_y:
-    case op_imm_32:
-    case op_uniform_32:
-    case op_load_32:
-    case op_load_16:
-    case op_load_fp16x4:
-    case op_load_fp16x4_planar:
-    case op_store_32:
-    case op_store_fp16x4:
-    case op_store_fp16x4_planar:
-    case op_store_16:
-    case op_gather_uniform_32:
-    case op_gather_32:
-    case op_gather_16:
-    case op_deref_ptr:
-    case op_f32_from_f16:
-    case op_f16_from_f32:
-    case op_i32_from_s16:
-    case op_i32_from_u16:
-    case op_i16_from_i32:
-    case op_shl_i32_imm:
-    case op_shr_u32_imm:
-    case op_shr_s32_imm:
-    case op_and_32_imm:
-    case op_or_32_imm:
-    case op_xor_32_imm:
-    case op_pack:
-    case op_add_f32_imm:
-    case op_sub_f32_imm:
-    case op_mul_f32_imm:
-    case op_div_f32_imm:
-    case op_min_f32_imm:
-    case op_max_f32_imm:
-    case op_add_i32_imm:
-    case op_sub_i32_imm:
-    case op_mul_i32_imm:
-    case op_eq_f32_imm:
-    case op_lt_f32_imm:
-    case op_le_f32_imm:
-    case op_eq_i32_imm:
-    case op_lt_s32_imm:
-    case op_le_s32_imm:
-        break;
+    default: assert(0); break;
     }
 
     int result;
