@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #if !defined(__APPLE__) || !defined(__aarch64__) || defined(__wasm__)
 
@@ -2189,6 +2190,28 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
 static void vk_program_dump(struct umbra_program const *p, FILE *f) {
     struct vk_program const *vp = (struct vk_program const *)p;
+
+    // Write SPIR-V binary to a temp file, disassemble with spirv-dis if available.
+    char tmp[] = "/tmp/umbra_spirv_XXXXXX";
+    int fd = mkstemp(tmp);
+    if (fd >= 0) {
+        size_t n = (size_t)vp->spirv_len * sizeof(uint32_t);
+        if (write(fd, vp->spirv, n) == (ssize_t)n) {
+            close(fd);
+            char cmd[256];
+            snprintf(cmd, sizeof cmd, "spirv-dis --no-color '%s' 2>/dev/null", tmp);
+            FILE *dis = popen(cmd, "r");
+            if (dis) {
+                char line[256];
+                while (fgets(line, (int)sizeof line, dis)) { fputs(line, f); }
+                if (pclose(dis) == 0) { unlink(tmp); return; }
+            }
+        } else {
+            close(fd);
+        }
+        unlink(tmp);
+    }
+    // Fallback: summary only.
     fprintf(f, "vulkan SPIR-V (%d words, %d bufs, %d push words)\n",
             vp->spirv_len, vp->total_bufs, vp->push_words);
 }
