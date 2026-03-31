@@ -250,7 +250,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_gather_uniform_32:
     case op_gather_32:
     case op_store_32:
-    case op_store_8888: case op_store_fp16x4: case op_store_fp16x4_planar:
+    case op_store_fp16x4: case op_store_fp16x4_planar:
     case op_load_16:
     case op_gather_16:
     case op_store_16:
@@ -782,48 +782,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             ra_set_chan_reg(ra, i, 2, r2);
             ra_set_chan_reg(ra, i, 3, r3);
         } break;
-        case op_store_8888: {
-            int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
-            int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
-            int8_t rb_  = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
-            int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
-            int    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            int8_t scale = ra_alloc(ra, sl, ns);
-            int8_t z     = ra_alloc(ra, sl, ns);
-            int8_t one   = ra_alloc(ra, sl, ns);
-            int8_t px    = ra_alloc(ra, sl, ns);
-            int8_t t     = ra_alloc(ra, sl, ns);
-            {
-                union { float f; uint32_t u; } s255 = {.f = 255.0f};
-                union { float f; uint32_t u; } f1   = {.f = 1.0f};
-                arm64_pool_load(c, &jc->pool, scale, s255.u);
-                arm64_pool_load(c, &jc->pool, one, f1.u);
-                put(c, MOVI_4s(z, 0, 0));
-                put(c, FMAXNM_4s(px, rr, z)); put(c, FMINNM_4s(px, px, one));
-                put(c, FMUL_4s(px, px, scale)); put(c, FCVTNS_4s(px, px));
-                put(c, FMAXNM_4s(t, rg, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
-                put(c, SLI_4s_imm(px, t, 8));
-                put(c, FMAXNM_4s(t, rb_, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
-                put(c, SLI_4s_imm(px, t, 16));
-                put(c, FMAXNM_4s(t, ra_v, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
-                put(c, SLI_4s_imm(px, t, 24));
-                if (scalar) { put(c, STR_sx(px, XP, XI)); }
-                else        { put(c, STR_q(px, XP, XW)); }
-            }
-            ra_return_reg(ra, t);
-            ra_return_reg(ra, px);
-            ra_return_reg(ra, one);
-            ra_return_reg(ra, z);
-            ra_return_reg(ra, scale);
-            FREE_CHAN(inst->x, i);
-            FREE_CHAN(inst->y, i);
-            FREE_CHAN(inst->z, i);
-            FREE_CHAN(inst->w, i);
-        } break;
         case op_store_fp16x4: {
             int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
             int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
@@ -987,7 +945,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 case op_gather_uniform_32:
                 case op_gather_32:
                 case op_store_32:
-                case op_store_8888: case op_store_fp16x4: case op_store_fp16x4_planar:
+                case op_store_fp16x4: case op_store_fp16x4_planar:
                 case op_add_f32:
                 case op_sub_f32:
                 case op_mul_f32:
@@ -1546,7 +1504,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_gather_uniform_32:
     case op_gather_32:
     case op_store_32:
-    case op_store_8888: case op_store_fp16x4: case op_store_fp16x4_planar:
+    case op_store_fp16x4: case op_store_fp16x4_planar:
     case op_load_16:
     case op_gather_16:
     case op_store_16:
@@ -2101,48 +2059,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             ra_set_chan_reg(ra, i, 1, r1);
             ra_set_chan_reg(ra, i, 2, r2);
             ra_set_chan_reg(ra, i, 3, r3);
-        } break;
-        case op_store_8888: {
-            int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
-            int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
-            int8_t rb_  = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
-            int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
-            int    p = inst->ptr;
-            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            int8_t scale = ra_alloc(ra, sl, ns);
-            int8_t px    = ra_alloc(ra, sl, ns);
-            int8_t t     = ra_alloc(ra, sl, ns);
-            int8_t z     = ra_alloc(ra, sl, ns);
-            int8_t one   = ra_alloc(ra, sl, ns);
-            {
-                union { float f; uint32_t u; } s255 = {.f = 255.0f};
-                union { float f; uint32_t u; } f1   = {.f = 1.0f};
-                pool_broadcast(c, &jc->pool, scale, s255.u);
-                pool_broadcast(c, &jc->pool, one, f1.u);
-                vex_rrr(c, 0, 1, 1, 0x57, z, z, z);
-                vmaxps(c, px, rr, z); vminps(c, px, px, one);
-                vmulps(c, px, px, scale); vcvtps2dq(c, px, px);
-                vmaxps(c, t, rg, z); vminps(c, t, t, one);
-                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
-                vpslld_i(c, t, t, 8); vpor(c, 1, px, px, t);
-                vmaxps(c, t, rb_, z); vminps(c, t, t, one);
-                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
-                vpslld_i(c, t, t, 16); vpor(c, 1, px, px, t);
-                vmaxps(c, t, ra_v, z); vminps(c, t, t, one);
-                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
-                vpslld_i(c, t, t, 24); vpor(c, 1, px, px, t);
-                if (scalar) { vex_mem(c, 1, 1, 0, 0, px, 0, 0x7e, base, XI, 4, 0); }
-                else        { vmov_store(c, 1, px, base, XI, 4, 0); }
-            }
-            ra_return_reg(ra, one);
-            ra_return_reg(ra, z);
-            ra_return_reg(ra, t);
-            ra_return_reg(ra, px);
-            ra_return_reg(ra, scale);
-            FREE_CHAN(inst->x, i);
-            FREE_CHAN(inst->y, i);
-            FREE_CHAN(inst->z, i);
-            FREE_CHAN(inst->w, i);
         } break;
         case op_store_fp16x4: {
             int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);

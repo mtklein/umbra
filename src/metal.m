@@ -97,7 +97,6 @@ static _Bool is_32(enum op op) {
         || op == op_gather_uniform_32
         || op == op_gather_32
         || op == op_store_32
-        || op == op_store_8888
         || op == op_store_fp16x4
         || op == op_store_fp16x4_planar
         || op == op_deref_ptr;
@@ -254,26 +253,6 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i, i, i,
                      pad, i, i, i,
                      pad, i, i, i);
-            } break;
-            case op_store_8888: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
-                emit(b,
-                     "%s{\n"
-                     "%s    uint ri = uint(int(rint(clamp(%s, 0.0f, 1.0f) * 255.0f)));\n"
-                     "%s    uint gi = uint(int(rint(clamp(%s, 0.0f, 1.0f) * 255.0f)));\n"
-                     "%s    uint bi = uint(int(rint(clamp(%s, 0.0f, 1.0f) * 255.0f)));\n"
-                     "%s    uint ai = uint(int(rint(clamp(%s, 0.0f, 1.0f) * 255.0f)));\n"
-                     "%s    ((device uint*)(p%d + y * buf_rbs[%d]))[x]"
-                     " = ri | (gi << 8) | (bi << 16) | (ai << 24);\n"
-                     "%s}\n",
-                     pad,
-                     pad, fv(_fx, vx, xid, is_f),
-                     pad, fv(_fy, vy, yid, is_f),
-                     pad, fv(_fz, vz, zid, is_f),
-                     pad, fv(_fw, vw, wid, is_f),
-                     pad, p, p,
-                     pad);
             } break;
             case op_store_fp16x4: {
                 int p = inst->ptr < 0
