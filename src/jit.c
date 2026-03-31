@@ -124,7 +124,7 @@ static void vst(Buf *c, int vd, int s) { put(c, STR_qi(vd, XS, s)); }
 
 static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm,
                           int scratch) {
-    switch (op) {
+    switch ((int)op) {
     case op_add_f32: put(c, FADD_4s(d, x, y)); return 1;
     case op_sub_f32: put(c, FSUB_4s(d, x, y)); return 1;
     case op_mul_f32: put(c, FMUL_4s(d, x, y)); return 1;
@@ -222,45 +222,8 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
         }
         return 1;
 
-    case op_imm_32:
-    case op_and_32_imm:
-    case op_add_f32_imm:
-    case op_sub_f32_imm:
-    case op_mul_f32_imm:
-    case op_div_f32_imm:
-    case op_min_f32_imm:
-    case op_max_f32_imm:
-    case op_add_i32_imm:
-    case op_sub_i32_imm:
-    case op_mul_i32_imm:
-    case op_or_32_imm:
-    case op_xor_32_imm:
-    case op_eq_f32_imm:
-    case op_lt_f32_imm:
-    case op_le_f32_imm:
-    case op_eq_i32_imm:
-    case op_lt_s32_imm:
-    case op_le_s32_imm:
-    case op_x:
-    case op_y:
-    case op_deref_ptr:
-    case op_uniform_32:
-    case op_load_32:
-    case op_load_fp16x4: case op_load_fp16x4_planar:
-    case op_gather_uniform_32:
-    case op_gather_32:
-    case op_store_32:
-    case op_store_fp16x4: case op_store_fp16x4_planar:
-    case op_load_16:
-    case op_gather_16:
-    case op_store_16:
-    case op_f32_from_f16:
-    case op_f16_from_f32:
-    case op_i32_from_s16:
-    case op_i32_from_u16:
-    case op_i16_from_i32: return 0;
+    default: return 0;
     }
-    return 0;
 }
 
 static int8_t const ra_pool[] = {
@@ -1279,7 +1242,7 @@ static struct ra *ra_create_x86(struct umbra_basic_block const *bb, struct jit_c
 
 static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm,
                           int scratch, int scratch2) {
-    switch (op) {
+    switch ((int)op) {
     case op_imm_32: broadcast_imm32(c, d, (uint32_t)imm); return 1;
 
     case op_add_f32: vaddps(c, d, x, y); return 1;
@@ -1374,39 +1337,8 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_min_f32_imm:
     case op_max_f32_imm:
     case op_add_i32_imm:
-    case op_sub_i32_imm:
-    case op_mul_i32_imm:
-    case op_or_32_imm:
-    case op_xor_32_imm:
-    case op_eq_f32_imm:
-    case op_lt_f32_imm:
-    case op_le_f32_imm:
-    case op_eq_i32_imm:
-    case op_lt_s32_imm:
-    case op_le_s32_imm: return 0;
-
-    case op_abs_f32:
-    case op_neg_f32:
-    case op_x:
-    case op_y:
-    case op_deref_ptr:
-    case op_uniform_32:
-    case op_load_32:
-    case op_load_fp16x4: case op_load_fp16x4_planar:
-    case op_gather_uniform_32:
-    case op_gather_32:
-    case op_store_32:
-    case op_store_fp16x4: case op_store_fp16x4_planar:
-    case op_load_16:
-    case op_gather_16:
-    case op_store_16:
-    case op_f32_from_f16:
-    case op_f16_from_f32:
-    case op_i32_from_s16:
-    case op_i32_from_u16:
-    case op_i16_from_i32: return 0;
+    default: return 0;
     }
-    return 0;
 }
 
 static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int to,
