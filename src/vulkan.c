@@ -364,39 +364,51 @@ typedef struct {
     // Per-buffer flag: true if the buffer needs 16-bit typed access.
     _Bool *buf_is_16;
     int    has_16, :32;
+
+    // Constant deduplication cache.
+    struct { uint32_t type, value, id; } *const_cache;
+    int n_consts, consts_cap;
 } SpvBuilder;
 
 static uint32_t spv_id(SpvBuilder *b) { return b->next_id++; }
 
-static uint32_t spv_const_u32(SpvBuilder *b, uint32_t value) {
+static uint32_t spv_const(SpvBuilder *b, uint32_t type, uint32_t bits) {
+    for (int i = 0; i < b->n_consts; i++) {
+        if (b->const_cache[i].type == type && b->const_cache[i].value == bits) {
+            return b->const_cache[i].id;
+        }
+    }
     uint32_t id = spv_id(b);
     spv_op(&b->types, SpvOpConstant, 4);
-    spv_word(&b->types, b->t_u32);
+    spv_word(&b->types, type);
     spv_word(&b->types, id);
-    spv_word(&b->types, value);
+    spv_word(&b->types, bits);
+    if (b->n_consts >= b->consts_cap) {
+        b->consts_cap = b->consts_cap ? 2 * b->consts_cap : 64;
+        b->const_cache = realloc(b->const_cache,
+                                 (size_t)b->consts_cap * sizeof *b->const_cache);
+    }
+    b->const_cache[b->n_consts].type  = type;
+    b->const_cache[b->n_consts].value = bits;
+    b->const_cache[b->n_consts].id    = id;
+    b->n_consts++;
     return id;
+}
+
+static uint32_t spv_const_u32(SpvBuilder *b, uint32_t value) {
+    return spv_const(b, b->t_u32, value);
 }
 
 static uint32_t spv_const_i32(SpvBuilder *b, int32_t value) {
-    uint32_t id = spv_id(b);
-    spv_op(&b->types, SpvOpConstant, 4);
-    spv_word(&b->types, b->t_i32);
-    spv_word(&b->types, id);
     uint32_t bits;
     memcpy(&bits, &value, 4);
-    spv_word(&b->types, bits);
-    return id;
+    return spv_const(b, b->t_i32, bits);
 }
 
 static uint32_t spv_const_f32(SpvBuilder *b, float value) {
-    uint32_t id = spv_id(b);
-    spv_op(&b->types, SpvOpConstant, 4);
-    spv_word(&b->types, b->t_f32);
-    spv_word(&b->types, id);
     uint32_t bits;
     memcpy(&bits, &value, 4);
-    spv_word(&b->types, bits);
-    return id;
+    return spv_const(b, b->t_f32, bits);
 }
 
 // Emit a bitcast: result = bitcast<dst_type>(src).
@@ -660,136 +672,19 @@ static void gather_safe(SpvBuilder *b, uint32_t ix_val, int buf_idx,
     *out_idx = clamped;
 }
 
-// fp16 <-> fp32 via bitwise manipulation (no Float16 capability needed).
+// fp16 <-> fp32 via native OpFConvert (requires Float16 capability).
 // f32_from_f16: convert a u32 holding a fp16 bit pattern in low 16 bits to float.
-static uint32_t spv_f16_to_f32(SpvBuilder *b, uint32_t h) {
-    // Extract sign, exponent, mantissa from fp16.
-    uint32_t c_0x8000 = spv_const_u32(b, 0x8000u);
-    uint32_t c_0x7C00 = spv_const_u32(b, 0x7C00u);
-    uint32_t c_0x03FF = spv_const_u32(b, 0x03FFu);
-    uint32_t c_10     = spv_const_u32(b, 10u);
-    uint32_t c_13     = spv_const_u32(b, 13u);
-    uint32_t c_23     = spv_const_u32(b, 23u);
-    (void)0;
-    uint32_t c_112    = spv_const_u32(b, 112u);
-
-    uint32_t sign = spv_binop(b, SpvOpBitwiseAnd, b->t_u32, h, c_0x8000);
-    sign = spv_binop(b, SpvOpShiftLeftLogical, b->t_u32, sign, spv_const_u32(b, 16u));
-
-    uint32_t exp = spv_binop(b, SpvOpBitwiseAnd, b->t_u32, h, c_0x7C00);
-    uint32_t exp_shifted = spv_binop(b, SpvOpShiftRightLogical, b->t_u32, exp, c_10);
-
-    uint32_t mant = spv_binop(b, SpvOpBitwiseAnd, b->t_u32, h, c_0x03FF);
-
-    // Check for zero/denorm exponent.
-    uint32_t exp_is_zero = spv_binop(b, SpvOpIEqual, b->t_bool, exp, b->c_0);
-    // Check for inf/nan exponent (0x1F).
-    uint32_t c_0x1F = spv_const_u32(b, 0x1Fu);
-    uint32_t exp_is_max = spv_binop(b, SpvOpIEqual, b->t_bool, exp_shifted, c_0x1F);
-
-    // Normal case: f32_exp = (exp_shifted - 15 + 127) = (exp_shifted + 112)
-    uint32_t f32_exp_normal = spv_binop(b, SpvOpIAdd, b->t_u32, exp_shifted, c_112);
-    uint32_t f32_exp_normal_shifted = spv_binop(b, SpvOpShiftLeftLogical, b->t_u32,
-                                                 f32_exp_normal, c_23);
-    uint32_t f32_mant = spv_binop(b, SpvOpShiftLeftLogical, b->t_u32, mant, c_13);
-    uint32_t normal = spv_binop(b, SpvOpBitwiseOr, b->t_u32, f32_exp_normal_shifted, f32_mant);
-    normal = spv_binop(b, SpvOpBitwiseOr, b->t_u32, normal, sign);
-
-    // Inf/NaN case: f32_exp = 0xFF
-    uint32_t c_0x7F800000 = spv_const_u32(b, 0x7F800000u);
-    uint32_t infnan = spv_binop(b, SpvOpBitwiseOr, b->t_u32, c_0x7F800000, f32_mant);
-    infnan = spv_binop(b, SpvOpBitwiseOr, b->t_u32, infnan, sign);
-
-    // Zero/denorm case: just return signed zero (denorms flush to zero for simplicity).
-    uint32_t zero = sign;
-
-    // Select: exp_is_max ? infnan : (exp_is_zero ? zero : normal)
-    uint32_t inner = spv_select(b, b->t_u32, exp_is_zero, zero, normal);
-    uint32_t result_bits = spv_select(b, b->t_u32, exp_is_max, infnan, inner);
-
-    return spv_bitcast(b, b->t_f32, result_bits);
+static uint32_t spv_f16_to_f32(SpvBuilder *b, uint32_t u32_val) {
+    uint32_t u16_val = spv_unop(b, SpvOpUConvert, b->t_u16, u32_val);
+    uint32_t h       = spv_bitcast(b, b->t_f16, u16_val);
+    return spv_unop(b, SpvOpFConvert, b->t_f32, h);
 }
 
 // f16_from_f32: convert float to u32 holding fp16 bit pattern in low 16 bits.
-static uint32_t spv_f32_to_f16(SpvBuilder *b, uint32_t f) {
-    uint32_t bits = spv_bitcast(b, b->t_u32, f);
-
-    uint32_t c_0x80000000 = spv_const_u32(b, 0x80000000u);
-    uint32_t c_0x7F800000 = spv_const_u32(b, 0x7F800000u);
-    uint32_t c_0x007FFFFF = spv_const_u32(b, 0x007FFFFFu);
-    uint32_t c_13     = spv_const_u32(b, 13u);
-    uint32_t c_16     = spv_const_u32(b, 16u);
-    uint32_t c_23     = spv_const_u32(b, 23u);
-    uint32_t c_112    = spv_const_u32(b, 112u);
-
-    uint32_t sign = spv_binop(b, SpvOpBitwiseAnd, b->t_u32, bits, c_0x80000000);
-    uint32_t sign16 = spv_binop(b, SpvOpShiftRightLogical, b->t_u32, sign, c_16);
-
-    uint32_t exp = spv_binop(b, SpvOpBitwiseAnd, b->t_u32, bits, c_0x7F800000);
-    uint32_t exp_shifted = spv_binop(b, SpvOpShiftRightLogical, b->t_u32, exp, c_23);
-
-    uint32_t mant = spv_binop(b, SpvOpBitwiseAnd, b->t_u32, bits, c_0x007FFFFF);
-
-    // round to nearest even: add rounding bias
-    uint32_t c_0x00000FFF = spv_const_u32(b, 0x00000FFFu);
-    uint32_t c_0x00001000 = spv_const_u32(b, 0x00001000u);
-    uint32_t mant_low = spv_binop(b, SpvOpBitwiseAnd, b->t_u32, mant, c_0x00001000);
-    uint32_t round_bias = spv_binop(b, SpvOpIAdd, b->t_u32, c_0x00000FFF, mant_low);
-    // if rounding would overflow mantissa, need to bump exponent
-    // simplified: add bias, then shift
-    uint32_t mant_rounded = spv_binop(b, SpvOpIAdd, b->t_u32, mant, round_bias);
-
-    // Check overflow of mantissa (bit 23 set after add).
-    uint32_t c_0x00800000 = spv_const_u32(b, 0x00800000u);
-    uint32_t mant_overflow = spv_binop(b, SpvOpBitwiseAnd, b->t_u32, mant_rounded, c_0x00800000);
-    uint32_t did_overflow = spv_binop(b, SpvOpINotEqual, b->t_bool, mant_overflow, b->c_0);
-    // If overflow, increment exponent and zero mantissa bits.
-    uint32_t exp_bump = spv_select(b, b->t_u32, did_overflow, b->c_1, b->c_0);
-    uint32_t exp_adjusted = spv_binop(b, SpvOpIAdd, b->t_u32, exp_shifted, exp_bump);
-    uint32_t final_mant = spv_select(b, b->t_u32, did_overflow, b->c_0, mant_rounded);
-
-    // h_mant = final_mant >> 13
-    uint32_t h_mant = spv_binop(b, SpvOpShiftRightLogical, b->t_u32, final_mant, c_13);
-    uint32_t c_0x03FF = spv_const_u32(b, 0x03FFu);
-    h_mant = spv_binop(b, SpvOpBitwiseAnd, b->t_u32, h_mant, c_0x03FF);
-
-    // Check: exp >= 143 (0x8F) → clamp to inf (0x7C00)
-    // exp < 113 (0x71) → clamp to zero
-    uint32_t c_113 = spv_const_u32(b, 113u);
-    uint32_t c_143 = spv_const_u32(b, 143u);
-    uint32_t c_0x7C00 = spv_const_u32(b, 0x7C00u);
-
-    uint32_t is_too_big = spv_binop(b, SpvOpUGreaterThanEqual, b->t_bool, exp_adjusted, c_143);
-    uint32_t is_too_small = spv_binop(b, SpvOpULessThan, b->t_bool, exp_adjusted, c_113);
-    // Also check original exp for inf/nan (exp_shifted == 0xFF)
-    uint32_t c_0xFF = spv_const_u32(b, 0xFFu);
-    uint32_t is_infnan = spv_binop(b, SpvOpIEqual, b->t_bool, exp_shifted, c_0xFF);
-
-    // h_exp = (exp_adjusted - 112) << 10
-    uint32_t h_exp = spv_binop(b, SpvOpISub, b->t_u32, exp_adjusted, c_112);
-    h_exp = spv_binop(b, SpvOpShiftLeftLogical, b->t_u32, h_exp,
-                       spv_const_u32(b, 10u));
-
-    // Normal: sign16 | h_exp | h_mant
-    uint32_t normal = spv_binop(b, SpvOpBitwiseOr, b->t_u32, sign16, h_exp);
-    normal = spv_binop(b, SpvOpBitwiseOr, b->t_u32, normal, h_mant);
-
-    // Inf/NaN: sign16 | 0x7C00 | (mant ? 0x0200 : 0)
-    uint32_t c_0x0200 = spv_const_u32(b, 0x0200u);
-    uint32_t mant_nonzero = spv_binop(b, SpvOpINotEqual, b->t_bool, mant, b->c_0);
-    uint32_t nan_mant = spv_select(b, b->t_u32, mant_nonzero, c_0x0200, b->c_0);
-    uint32_t infnan_val = spv_binop(b, SpvOpBitwiseOr, b->t_u32, sign16, c_0x7C00);
-    infnan_val = spv_binop(b, SpvOpBitwiseOr, b->t_u32, infnan_val, nan_mant);
-
-    // Zero/underflow: sign16
-    // Overflow: sign16 | 0x7C00
-
-    uint32_t overflow_val = spv_binop(b, SpvOpBitwiseOr, b->t_u32, sign16, c_0x7C00);
-
-    // Select chain: is_infnan ? infnan : (is_too_big ? overflow : (is_too_small ? sign16 : normal))
-    uint32_t inner1 = spv_select(b, b->t_u32, is_too_small, sign16, normal);
-    uint32_t inner2 = spv_select(b, b->t_u32, is_too_big, overflow_val, inner1);
-    return spv_select(b, b->t_u32, is_infnan, infnan_val, inner2);
+static uint32_t spv_f32_to_f16(SpvBuilder *b, uint32_t f32_val) {
+    uint32_t h   = spv_unop(b, SpvOpFConvert, b->t_f16, f32_val);
+    uint32_t u16 = spv_bitcast(b, b->t_u16, h);
+    return spv_unop(b, SpvOpUConvert, b->t_u32, u16);
 }
 
 static _Bool produces_float(enum op op) {
@@ -882,6 +777,9 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
     spv_op(&B.caps, SpvOpCapability, 2);
     spv_word(&B.caps, SpvCapabilityShader);
 
+    spv_op(&B.caps, SpvOpCapability, 2);
+    spv_word(&B.caps, SpvCapabilityFloat16);
+
     if (B.has_16) {
         spv_op(&B.caps, SpvOpCapability, 2);
         spv_word(&B.caps, SpvCapabilityStorageBuffer16BitAccess);
@@ -949,6 +847,17 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
     spv_word(&B.types, B.t_f32);
     spv_word(&B.types, 32);
 
+    B.t_u16 = spv_id(&B);
+    spv_op(&B.types, SpvOpTypeInt, 4);
+    spv_word(&B.types, B.t_u16);
+    spv_word(&B.types, 16);
+    spv_word(&B.types, 0); // unsigned
+
+    B.t_f16 = spv_id(&B);
+    spv_op(&B.types, SpvOpTypeFloat, 3);
+    spv_word(&B.types, B.t_f16);
+    spv_word(&B.types, 16);
+
     B.t_uvec3 = spv_id(&B);
     spv_op(&B.types, SpvOpTypeVector, 4);
     spv_word(&B.types, B.t_uvec3);
@@ -1013,12 +922,6 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
 
     // 16-bit storage types (only when needed).
     if (B.has_16) {
-        B.t_u16 = spv_id(&B);
-        spv_op(&B.types, SpvOpTypeInt, 4);
-        spv_word(&B.types, B.t_u16);
-        spv_word(&B.types, 16);
-        spv_word(&B.types, 0); // unsigned
-
         B.t_rta_u16 = spv_id(&B);
         spv_op(&B.types, SpvOpTypeRuntimeArray, 3);
         spv_word(&B.types, B.t_rta_u16);
@@ -1926,6 +1829,7 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
     free(B.val_3);
     free(B.is_f);
     free(B.buf_is_16);
+    free(B.const_cache);
     free(deref_buf);
 
     return spirv;
@@ -2457,11 +2361,17 @@ struct umbra_backend *umbra_backend_vulkan(void) {
         };
         char const *exts[] = {
             "VK_KHR_16bit_storage",
+            "VK_KHR_shader_float16_int8",
             "VK_KHR_external_memory",
             "VK_EXT_external_memory_host",
         };
+        VkPhysicalDeviceFloat16Int8FeaturesKHR f16_int8 = {
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FLOAT16_INT8_FEATURES_KHR,
+            .shaderFloat16 = VK_TRUE,
+        };
         VkPhysicalDevice16BitStorageFeatures f16 = {
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES,
+            .pNext = &f16_int8,
             .storageBuffer16BitAccess = VK_TRUE,
         };
         VkDeviceCreateInfo dci = {
