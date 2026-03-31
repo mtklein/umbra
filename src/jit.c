@@ -250,7 +250,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_gather_uniform_32:
     case op_gather_32:
     case op_store_32:
-    case op_store_8888: case op_store_565: case op_store_1010102: case op_store_fp16x4: case op_store_fp16x4_planar:
+    case op_store_8888: case op_store_1010102: case op_store_fp16x4: case op_store_fp16x4_planar:
     case op_load_16:
     case op_gather_16:
     case op_store_16:
@@ -824,49 +824,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             FREE_CHAN(inst->z, i);
             FREE_CHAN(inst->w, i);
         } break;
-        case op_store_565: {
-            int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
-            int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
-            int8_t rb_  = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
-            int    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            int8_t scale = ra_alloc(ra, sl, ns);
-            int8_t z     = ra_alloc(ra, sl, ns);
-            int8_t one   = ra_alloc(ra, sl, ns);
-            int8_t px    = ra_alloc(ra, sl, ns);
-            int8_t t     = ra_alloc(ra, sl, ns);
-            {
-                union { float f; uint32_t u; } s31 = {.f = 31.0f};
-                union { float f; uint32_t u; } s63 = {.f = 63.0f};
-                union { float f; uint32_t u; } f1  = {.f = 1.0f};
-                arm64_pool_load(c, &jc->pool, one, f1.u);
-                put(c, MOVI_4s(z, 0, 0));
-                arm64_pool_load(c, &jc->pool, scale, s31.u);
-                put(c, FMAXNM_4s(px, rb_, z)); put(c, FMINNM_4s(px, px, one));
-                put(c, FMUL_4s(px, px, scale)); put(c, FCVTNS_4s(px, px));
-                arm64_pool_load(c, &jc->pool, scale, s63.u);
-                put(c, FMAXNM_4s(t, rg, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
-                put(c, SHL_4s_imm(t, t, 5));
-                put(c, ORR_16b(px, px, t));
-                arm64_pool_load(c, &jc->pool, scale, s31.u);
-                put(c, FMAXNM_4s(t, rr, z)); put(c, FMINNM_4s(t, t, one));
-                put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
-                put(c, SHL_4s_imm(t, t, 11));
-                put(c, ORR_16b(px, px, t));
-                put(c, XTN_4h(px, px));
-                if (scalar) { put(c, STR_hx(px, XP, XI)); }
-                else        { put(c, STR_d(px, XP, XH)); }
-            }
-            ra_return_reg(ra, t);
-            ra_return_reg(ra, px);
-            ra_return_reg(ra, one);
-            ra_return_reg(ra, z);
-            ra_return_reg(ra, scale);
-            FREE_CHAN(inst->x, i);
-            FREE_CHAN(inst->y, i);
-            FREE_CHAN(inst->z, i);
-        } break;
         case op_store_1010102: {
             int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
             int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
@@ -1074,7 +1031,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 case op_gather_uniform_32:
                 case op_gather_32:
                 case op_store_32:
-                case op_store_8888: case op_store_565: case op_store_1010102: case op_store_fp16x4: case op_store_fp16x4_planar:
+                case op_store_8888: case op_store_1010102: case op_store_fp16x4: case op_store_fp16x4_planar:
                 case op_add_f32:
                 case op_sub_f32:
                 case op_mul_f32:
@@ -1633,7 +1590,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_gather_uniform_32:
     case op_gather_32:
     case op_store_32:
-    case op_store_8888: case op_store_565: case op_store_1010102: case op_store_fp16x4: case op_store_fp16x4_planar:
+    case op_store_8888: case op_store_1010102: case op_store_fp16x4: case op_store_fp16x4_planar:
     case op_load_16:
     case op_gather_16:
     case op_store_16:
@@ -2230,71 +2187,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             FREE_CHAN(inst->y, i);
             FREE_CHAN(inst->z, i);
             FREE_CHAN(inst->w, i);
-        } break;
-        case op_store_565: {
-            int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
-            int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
-            int8_t rb_  = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
-            int    p = inst->ptr;
-            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            int8_t scale = ra_alloc(ra, sl, ns);
-            int8_t px    = ra_alloc(ra, sl, ns);
-            int8_t t     = ra_alloc(ra, sl, ns);
-            int8_t z     = ra_alloc(ra, sl, ns);
-            int8_t one   = ra_alloc(ra, sl, ns);
-            {
-                union { float f; uint32_t u; } s31 = {.f = 31.0f};
-                union { float f; uint32_t u; } s63 = {.f = 63.0f};
-                union { float f; uint32_t u; } f1  = {.f = 1.0f};
-                pool_broadcast(c, &jc->pool, one, f1.u);
-                vex_rrr(c, 0, 1, 1, 0x57, z, z, z);
-                pool_broadcast(c, &jc->pool, scale, s31.u);
-                vmaxps(c, px, rr, z); vminps(c, px, px, one);
-                vmulps(c, px, px, scale); vcvtps2dq(c, px, px);
-                vpslld_i(c, px, px, 11);
-                pool_broadcast(c, &jc->pool, scale, s63.u);
-                vmaxps(c, t, rg, z); vminps(c, t, t, one);
-                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
-                vpslld_i(c, t, t, 5); vpor(c, 1, px, px, t);
-                pool_broadcast(c, &jc->pool, scale, s31.u);
-                vmaxps(c, t, rb_, z); vminps(c, t, t, one);
-                vmulps(c, t, t, scale); vcvtps2dq(c, t, t);
-                vpor(c, 1, px, px, t);
-                // Narrow 32->16 and store.
-                // VPACKSSDW (signed saturation) works if values are in range [0, 2047].
-                // But our values are in [0, 63<<5|31] max. Use VPACKUSDW for unsigned.
-                // VPACKUSDW: VEX.256 66.0F38 2B /r
-                vex_rrr(c, 0, 1, 1, 0x57, t, t, t);  // VXORPS t = zero
-                vex_rrr(c, 1, 2, 1, 0x2b, px, px, t); // VPACKUSDW px, px, zero
-                // After VPACKUSDW(256): result has the packed words in lo64 of each lane.
-                // VPERMQ to pack: lane0_lo64 + lane1_lo64 adjacent.
-                vex(c, 1, 3, 1, 1, px, 0, px, 0x00); emit1(c, 0x08);
-                if (scalar) {
-                    // VMOVD eax, xmm
-                    vex(c, 1, 1, 0, 0, px, 0, RAX, 0x7e);
-                    // MOV word [base + XI*2], ax
-                    emit1(c, 0x66);
-                    {
-                        uint8_t rex = 0x40;
-                        if (XI >= 8)   { rex |= 0x02; }
-                        if (base >= 8) { rex |= 0x01; }
-                        if (rex != 0x40) { emit1(c, rex); }
-                        emit1(c, 0x89);
-                        emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
-                        emit1(c, (uint8_t)((1 << 6) | ((XI & 7) << 3) | (base & 7)));
-                    }
-                } else {
-                    vmov_store(c, 0, px, base, XI, 2, 0);
-                }
-            }
-            ra_return_reg(ra, one);
-            ra_return_reg(ra, z);
-            ra_return_reg(ra, t);
-            ra_return_reg(ra, px);
-            ra_return_reg(ra, scale);
-            FREE_CHAN(inst->x, i);
-            FREE_CHAN(inst->y, i);
-            FREE_CHAN(inst->z, i);
         } break;
         case op_store_1010102: {
             int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);

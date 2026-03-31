@@ -28,7 +28,6 @@ _Bool is_store(enum op op) {
     return op == op_store_16
         || op == op_store_32
         || op == op_store_8888
-        || op == op_store_565
         || op == op_store_1010102
         || op == op_store_fp16x4
         || op == op_store_fp16x4_planar;
@@ -42,7 +41,6 @@ _Bool has_ptr(enum op op) {
         || op == op_gather_32
         || op == op_store_32
         || op == op_store_8888
-        || op == op_store_565
         || op == op_store_1010102
         || op == op_store_fp16x4
         || op == op_store_fp16x4_planar
@@ -82,7 +80,6 @@ _Bool is_varying(enum op op) {
         || op == op_store_16
         || op == op_store_32
         || op == op_store_8888
-        || op == op_store_565
         || op == op_store_1010102
         || op == op_store_fp16x4
         || op == op_store_fp16x4_planar;
@@ -309,14 +306,25 @@ umbra_color umbra_load_color(builder *b, umbra_ptr src, umbra_fmt fmt) {
     }
     return (umbra_color){0};
 }
+static val pack_unorm(builder *b, val ch, float scale) {
+    val zero = umbra_imm_f32(b, 0.0f), one = umbra_imm_f32(b, 1.0f);
+    return umbra_round_i32(b, umbra_mul_f32(b,
+        umbra_min_f32(b, umbra_max_f32(b, ch, zero), one), umbra_imm_f32(b, scale)));
+}
 void umbra_store_color(builder *b, umbra_ptr dst, umbra_color c, umbra_fmt fmt) {
     switch (fmt) {
     case umbra_fmt_8888:
         push(b, op_store_8888, VX(c.r), VY(c.g), VZ(c.b), VW(c.a), .ptr = ptr_ix(dst));
         break;
-    case umbra_fmt_565:
-        push(b, op_store_565, VX(c.r), VY(c.g), VZ(c.b), VW(c.a), .ptr = ptr_ix(dst));
-        break;
+    case umbra_fmt_565: {
+        val ri = pack_unorm(b, c.r, 31.0f);
+        val gi = pack_unorm(b, c.g, 63.0f);
+        val bi = pack_unorm(b, c.b, 31.0f);
+        val px = umbra_shl_i32(b, ri, umbra_imm_i32(b, 11));
+        px = umbra_or_i32(b, px, umbra_shl_i32(b, gi, umbra_imm_i32(b, 5)));
+        px = umbra_or_i32(b, px, bi);
+        umbra_store_16(b, dst, umbra_i16_from_i32(b, px));
+    } break;
     case umbra_fmt_1010102:
         push(b, op_store_1010102, VX(c.r), VY(c.g), VZ(c.b), VW(c.a), .ptr = ptr_ix(dst));
         break;
@@ -791,7 +799,6 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_store_16:
         case op_store_32:
         case op_store_8888:
-        case op_store_565:
         case op_store_1010102:
         case op_store_fp16x4:
         case op_store_fp16x4_planar: break;
@@ -936,7 +943,6 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     case op_load_fp16x4_planar:
     case op_store_32:
     case op_store_8888:
-    case op_store_565:
     case op_store_1010102:
     case op_store_fp16x4:
     case op_store_fp16x4_planar:
