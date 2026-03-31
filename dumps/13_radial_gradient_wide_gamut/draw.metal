@@ -46,7 +46,7 @@ kernel void umbra_entry(
     float v20 = v19 - as_type<float>(v3);
     float v21 = v20 * v20;
     float v22 = fma(v17, v17, v21);
-    float v23 = sqrt(v22);
+    float v23 = precise::sqrt(v22);
     float v24 = as_type<float>(v4) * v23;
     float v25 = max(v24, as_type<float>(0u));
     float v26 = min(v25, as_type<float>(1065353216u));

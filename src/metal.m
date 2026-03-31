@@ -574,7 +574,7 @@ static void emit_ops(Buf *b, BB const *bb,
                 break;
             case op_sqrt_f32:
                 emit(b, "%sfloat v%d ="
-                        " sqrt(%s);\n",
+                        " precise::sqrt(%s);\n",
                      pad, i,
                      fv(_fx, vx, xid, is_f));
                 break;

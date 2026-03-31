@@ -98,7 +98,7 @@ kernel void umbra_entry(
     float v72 = v71 * v71;
     float v73 = fma(-v57, v59, v72);
     float v74 = max(v73, as_type<float>(0u));
-    float v75 = sqrt(v74);
+    float v75 = precise::sqrt(v74);
     float v76 = v71 + v75;
     float v77 = v63 * v76;
     float v78 = fma(v77, v68, v70);

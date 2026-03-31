@@ -214,10 +214,7 @@ static void test_slide_golden(
             }
             if (differ) mismatches++;
         }
-        // All formats must be bit-perfect across backends, except fp16
-        // where Metal's GPU sqrt() is 1 ULP off for a few inputs.
-        int tol = (fmt_enums[fmt] == umbra_fmt_fp16 ||
-                   fmt_enums[fmt] == umbra_fmt_fp16_planar) ? 1 : 0;
+        int tol = 0;
         if (worst > tol) {
             dprintf(2,
                 "slide %d \"%s\" %s/%s: "
