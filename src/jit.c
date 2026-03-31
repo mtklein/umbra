@@ -2376,40 +2376,18 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             ra_set_chan_reg(ra, i, 2, r2);
             ra_set_chan_reg(ra, i, 3, r3);
         } break;
-        case op_store_8888: case op_store_565: case op_store_1010102: case op_store_fp16x4: case op_store_fp16x4_planar: {
+        case op_store_8888: {
             int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
             int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
             int8_t rb_  = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
             int    p = inst->ptr;
             int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-
             int8_t scale = ra_alloc(ra, sl, ns);
             int8_t px    = ra_alloc(ra, sl, ns);
             int8_t t     = ra_alloc(ra, sl, ns);
             int8_t z     = ra_alloc(ra, sl, ns);
             int8_t one   = ra_alloc(ra, sl, ns);
-
-            // Load fmt into EAX (32-bit).
-            {
-                int const fmt_off = p * (int)sizeof(umbra_buf)
-                                  + (int)__builtin_offsetof(umbra_buf, fmt);
-                emit1(c, 0x8b);
-                if (fmt_off >= -128 && fmt_off <= 127) {
-                    emit1(c, (uint8_t)(0x40 | (XBUF & 7)));
-                    emit1(c, (uint8_t)(int8_t)fmt_off);
-                } else {
-                    emit1(c, (uint8_t)(0x80 | (XBUF & 7)));
-                    emit4(c, (uint32_t)fmt_off);
-                }
-            }
-
-            int br_done[8];
-            int n_done = 0;
-
-
-            cmp_ri(c, RAX, umbra_fmt_8888);
-            int br_skip_8888 = jcc(c, 0x05);
             {
                 union { float f; uint32_t u; } s255 = {.f = 255.0f};
                 union { float f; uint32_t u; } f1   = {.f = 1.0f};
@@ -2430,12 +2408,27 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 if (scalar) { vex_mem(c, 1, 1, 0, 0, px, 0, 0x7e, base, XI, 4, 0); }
                 else        { vmov_store(c, 1, px, base, XI, 4, 0); }
             }
-            br_done[n_done] = jmp(c); n_done++;
-            patch_jcc(c, br_skip_8888);
-
-            
-            cmp_ri(c, RAX, umbra_fmt_565);
-            int br_skip_565 = jcc(c, 0x05);
+            ra_return_reg(ra, one);
+            ra_return_reg(ra, z);
+            ra_return_reg(ra, t);
+            ra_return_reg(ra, px);
+            ra_return_reg(ra, scale);
+            FREE_CHAN(inst->x, i);
+            FREE_CHAN(inst->y, i);
+            FREE_CHAN(inst->z, i);
+            FREE_CHAN(inst->w, i);
+        } break;
+        case op_store_565: {
+            int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
+            int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
+            int8_t rb_  = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
+            int    p = inst->ptr;
+            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int8_t scale = ra_alloc(ra, sl, ns);
+            int8_t px    = ra_alloc(ra, sl, ns);
+            int8_t t     = ra_alloc(ra, sl, ns);
+            int8_t z     = ra_alloc(ra, sl, ns);
+            int8_t one   = ra_alloc(ra, sl, ns);
             {
                 union { float f; uint32_t u; } s31 = {.f = 31.0f};
                 union { float f; uint32_t u; } s63 = {.f = 63.0f};
@@ -2481,12 +2474,27 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     vmov_store(c, 0, px, base, XI, 2, 0);
                 }
             }
-            br_done[n_done] = jmp(c); n_done++;
-            patch_jcc(c, br_skip_565);
-
-            
-            cmp_ri(c, RAX, umbra_fmt_1010102);
-            int br_skip_1010102 = jcc(c, 0x05);
+            ra_return_reg(ra, one);
+            ra_return_reg(ra, z);
+            ra_return_reg(ra, t);
+            ra_return_reg(ra, px);
+            ra_return_reg(ra, scale);
+            FREE_CHAN(inst->x, i);
+            FREE_CHAN(inst->y, i);
+            FREE_CHAN(inst->z, i);
+        } break;
+        case op_store_1010102: {
+            int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
+            int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
+            int8_t rb_  = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
+            int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
+            int    p = inst->ptr;
+            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int8_t scale = ra_alloc(ra, sl, ns);
+            int8_t px    = ra_alloc(ra, sl, ns);
+            int8_t t     = ra_alloc(ra, sl, ns);
+            int8_t z     = ra_alloc(ra, sl, ns);
+            int8_t one   = ra_alloc(ra, sl, ns);
             {
                 union { float f; uint32_t u; } s1023 = {.f = 1023.0f};
                 union { float f; uint32_t u; } s3    = {.f = 3.0f};
@@ -2509,64 +2517,90 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 if (scalar) { vex_mem(c, 1, 1, 0, 0, px, 0, 0x7e, base, XI, 4, 0); }
                 else        { vmov_store(c, 1, px, base, XI, 4, 0); }
             }
-            br_done[n_done] = jmp(c); n_done++;
-            patch_jcc(c, br_skip_1010102);
-
-            
-            cmp_ri(c, RAX, umbra_fmt_fp16);
-            int br_skip_fp16 = jcc(c, 0x05);
-            {
-                if (scalar) {
-                    // Pack 4 fp32 channels into one xmm, then VCVTPS2PH.
-                    // VINSERTPS px, rr, rr, 0x00 — copy rr[0] to px[0]
-                    vmovaps(c, px, rr);
-                    // VINSERTPS px, px, rg, 0x10 — rg[0] -> px[1]
-                    vex(c, 1, 3, 0, 0, px, px, rg, 0x21); emit1(c, 0x10);
-                    // VINSERTPS px, px, rb_, 0x20 — rb_[0] -> px[2]
-                    vex(c, 1, 3, 0, 0, px, px, rb_, 0x21); emit1(c, 0x20);
-                    // VINSERTPS px, px, ra_v, 0x30 — ra_v[0] -> px[3]
-                    vex(c, 1, 3, 0, 0, px, px, ra_v, 0x21); emit1(c, 0x30);
-                    // VCVTPS2PH px, px, 4 (round to nearest)
-                    vcvtps2ph(c, px, px, 4);
-                    // VMOVQ [base + XI*8], px (store 8 bytes)
-                    vex_mem(c, 1, 1, 0, 0, px, 0, 0xd6, base, XI, 8, 0);
-                } else {
-                    // Convert each channel from fp32 (8 x YMM) to fp16 (8 x XMM).
-                    vcvtps2ph(c, px, rr, 4);     // px  = [R0..R7] as fp16 in XMM
-                    vcvtps2ph(c, t, rg, 4);      // t   = [G0..G7] as fp16
-                    vcvtps2ph(c, z, rb_, 4);     // z   = [B0..B7] as fp16
-                    vcvtps2ph(c, one, ra_v, 4);  // one = [A0..A7] as fp16
-                    // Interleave to pixel order. Process low 4 then high 4 pixels.
-                    // Low 4 (VPUNPCKLWD takes low 4 words from each XMM):
-                    vex_rrr(c, 1, 1, 0, 0x61, scale, px, t);  // scale=[R0,G0,R1,G1,R2,G2,R3,G3]
-                    vex_rrr(c, 1, 1, 0, 0x61, px, z, one);    // px=[B0,A0,B1,A1,B2,A2,B3,A3]
-                    // Interleave at 32-bit to form pixel pairs:
-                    vex_rrr(c, 1, 1, 0, 0x62, t, scale, px);  // t=[R0G0,B0A0,R1G1,B1A1] (pixels 0,1)
-                    vex_rrr(c, 1, 1, 0, 0x6a, z, scale, px);  // z=[R2G2,B2A2,R3G3,B3A3] (pixels 2,3)
-                    vex(c, 1, 3, 0, 1, t, t, z, 0x38); emit1(c, 1);
-                    // t = [pixels 0-1 | pixels 2-3] (256 bits = 32 bytes)
-                    vmov_store(c, 1, t, base, XI, 8, 0);
-                    // High 4 (VPUNPCKHWD takes high 4 words):
-                    // Re-convert all channels (registers were clobbered above).
-                    vcvtps2ph(c, px, rr, 4);
-                    vcvtps2ph(c, t, rg, 4);
-                    vcvtps2ph(c, z, rb_, 4);
-                    vcvtps2ph(c, one, ra_v, 4);
-                    vex_rrr(c, 1, 1, 0, 0x69, scale, px, t);  // VPUNPCKHWD scale=[R4,G4,R5,G5,R6,G6,R7,G7]
-                    vex_rrr(c, 1, 1, 0, 0x69, px, z, one);    // VPUNPCKHWD px=[B4,A4,B5,A5,B6,A6,B7,A7]
-                    vex_rrr(c, 1, 1, 0, 0x62, t, scale, px);  // VPUNPCKLDQ t=[R4G4,B4A4,R5G5,B5A5]
-                    vex_rrr(c, 1, 1, 0, 0x6a, z, scale, px);  // VPUNPCKHDQ z=[R6G6,B6A6,R7G7,B7A7]
-                    vex(c, 1, 3, 0, 1, t, t, z, 0x38); emit1(c, 1);
-                    // t = [pixels 4-5 | pixels 6-7] (256 bits)
-                    vmov_store(c, 1, t, base, XI, 8, 32);
-                }
+            ra_return_reg(ra, one);
+            ra_return_reg(ra, z);
+            ra_return_reg(ra, t);
+            ra_return_reg(ra, px);
+            ra_return_reg(ra, scale);
+            FREE_CHAN(inst->x, i);
+            FREE_CHAN(inst->y, i);
+            FREE_CHAN(inst->z, i);
+            FREE_CHAN(inst->w, i);
+        } break;
+        case op_store_fp16x4: {
+            int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
+            int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
+            int8_t rb_  = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
+            int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
+            int    p = inst->ptr;
+            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int8_t scale = ra_alloc(ra, sl, ns);
+            int8_t px    = ra_alloc(ra, sl, ns);
+            int8_t t     = ra_alloc(ra, sl, ns);
+            int8_t z     = ra_alloc(ra, sl, ns);
+            int8_t one   = ra_alloc(ra, sl, ns);
+            if (scalar) {
+                // Pack 4 fp32 channels into one xmm, then VCVTPS2PH.
+                // VINSERTPS px, rr, rr, 0x00 — copy rr[0] to px[0]
+                vmovaps(c, px, rr);
+                // VINSERTPS px, px, rg, 0x10 — rg[0] -> px[1]
+                vex(c, 1, 3, 0, 0, px, px, rg, 0x21); emit1(c, 0x10);
+                // VINSERTPS px, px, rb_, 0x20 — rb_[0] -> px[2]
+                vex(c, 1, 3, 0, 0, px, px, rb_, 0x21); emit1(c, 0x20);
+                // VINSERTPS px, px, ra_v, 0x30 — ra_v[0] -> px[3]
+                vex(c, 1, 3, 0, 0, px, px, ra_v, 0x21); emit1(c, 0x30);
+                // VCVTPS2PH px, px, 4 (round to nearest)
+                vcvtps2ph(c, px, px, 4);
+                // VMOVQ [base + XI*8], px (store 8 bytes)
+                vex_mem(c, 1, 1, 0, 0, px, 0, 0xd6, base, XI, 8, 0);
+            } else {
+                // Convert each channel from fp32 (8 x YMM) to fp16 (8 x XMM).
+                vcvtps2ph(c, px, rr, 4);     // px  = [R0..R7] as fp16 in XMM
+                vcvtps2ph(c, t, rg, 4);      // t   = [G0..G7] as fp16
+                vcvtps2ph(c, z, rb_, 4);     // z   = [B0..B7] as fp16
+                vcvtps2ph(c, one, ra_v, 4);  // one = [A0..A7] as fp16
+                // Interleave to pixel order. Process low 4 then high 4 pixels.
+                // Low 4 (VPUNPCKLWD takes low 4 words from each XMM):
+                vex_rrr(c, 1, 1, 0, 0x61, scale, px, t);  // scale=[R0,G0,R1,G1,R2,G2,R3,G3]
+                vex_rrr(c, 1, 1, 0, 0x61, px, z, one);    // px=[B0,A0,B1,A1,B2,A2,B3,A3]
+                // Interleave at 32-bit to form pixel pairs:
+                vex_rrr(c, 1, 1, 0, 0x62, t, scale, px);  // t=[R0G0,B0A0,R1G1,B1A1] (pixels 0,1)
+                vex_rrr(c, 1, 1, 0, 0x6a, z, scale, px);  // z=[R2G2,B2A2,R3G3,B3A3] (pixels 2,3)
+                vex(c, 1, 3, 0, 1, t, t, z, 0x38); emit1(c, 1);
+                // t = [pixels 0-1 | pixels 2-3] (256 bits = 32 bytes)
+                vmov_store(c, 1, t, base, XI, 8, 0);
+                // High 4 (VPUNPCKHWD takes high 4 words):
+                // Re-convert all channels (registers were clobbered above).
+                vcvtps2ph(c, px, rr, 4);
+                vcvtps2ph(c, t, rg, 4);
+                vcvtps2ph(c, z, rb_, 4);
+                vcvtps2ph(c, one, ra_v, 4);
+                vex_rrr(c, 1, 1, 0, 0x69, scale, px, t);  // VPUNPCKHWD scale=[R4,G4,R5,G5,R6,G6,R7,G7]
+                vex_rrr(c, 1, 1, 0, 0x69, px, z, one);    // VPUNPCKHWD px=[B4,A4,B5,A5,B6,A6,B7,A7]
+                vex_rrr(c, 1, 1, 0, 0x62, t, scale, px);  // VPUNPCKLDQ t=[R4G4,B4A4,R5G5,B5A5]
+                vex_rrr(c, 1, 1, 0, 0x6a, z, scale, px);  // VPUNPCKHDQ z=[R6G6,B6A6,R7G7,B7A7]
+                vex(c, 1, 3, 0, 1, t, t, z, 0x38); emit1(c, 1);
+                // t = [pixels 4-5 | pixels 6-7] (256 bits)
+                vmov_store(c, 1, t, base, XI, 8, 32);
             }
-            br_done[n_done] = jmp(c); n_done++;
-            patch_jcc(c, br_skip_fp16);
-
-            
-            cmp_ri(c, RAX, umbra_fmt_fp16_planar);
-            int br_skip_f16_planar_s = jcc(c, 0x05);
+            ra_return_reg(ra, one);
+            ra_return_reg(ra, z);
+            ra_return_reg(ra, t);
+            ra_return_reg(ra, px);
+            ra_return_reg(ra, scale);
+            FREE_CHAN(inst->x, i);
+            FREE_CHAN(inst->y, i);
+            FREE_CHAN(inst->z, i);
+            FREE_CHAN(inst->w, i);
+        } break;
+        case op_store_fp16x4_planar: {
+            int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
+            int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
+            int8_t rb_  = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
+            int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
+            int    p = inst->ptr;
+            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int8_t px = ra_alloc(ra, sl, ns);
             {
                 int const sz_off = p * (int)sizeof(umbra_buf)
                                  + (int)__builtin_offsetof(umbra_buf, sz);
@@ -2668,22 +2702,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 }
                 last_ptr = -1;
             }
-            br_done[n_done] = jmp(c); n_done++;
-            patch_jcc(c, br_skip_f16_planar_s);
-
-            // Default: no-op for unknown formats.
-
-            // Patch all JMP-to-done.
-            for (int j = 0; j < n_done; j++) {
-                int32_t rel = (int32_t)(c->len - (br_done[j] + 4));
-                __builtin_memcpy(c->buf + br_done[j], &rel, 4);
-            }
-
-            ra_return_reg(ra, t);
-            ra_return_reg(ra, one);
-            ra_return_reg(ra, z);
             ra_return_reg(ra, px);
-            ra_return_reg(ra, scale);
             FREE_CHAN(inst->x, i);
             FREE_CHAN(inst->y, i);
             FREE_CHAN(inst->z, i);
