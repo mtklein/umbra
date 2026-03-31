@@ -66,22 +66,21 @@ static void dump_bb(char const *dir, char const *name, struct umbra_builder *b) 
         umbra_backend_jit(),
 #endif
         umbra_backend_metal(),
+        umbra_backend_vulkan(),
     };
-    struct umbra_program *progs[] = {
-#ifdef JIT_EXT
-        bes[0]->compile(bes[0], bb),
-#endif
-        bes[sizeof bes / sizeof bes[0] - 1]->compile(bes[sizeof bes / sizeof bes[0] - 1], bb),
-    };
+    int nb = (int)(sizeof bes / sizeof bes[0]);
+    struct umbra_program *progs[sizeof bes / sizeof bes[0]];
+    for (int i = 0; i < nb; i++) {
+        progs[i] = bes[i] ? bes[i]->compile(bes[i], bb) : NULL;
+    }
     char const *exts[] = {
 #ifdef JIT_EXT
         JIT_EXT,
 #endif
         "metal",
+        "vulkan",
     };
     umbra_basic_block_free(bb);
-
-    int nb = (int)(sizeof progs / sizeof progs[0]);
     for (int i = 0; i < nb; i++) {
         if (!progs[i]) { continue; }
         snprintf(p, sizeof p, "%s/%s.%s", dir, name, exts[i]);
