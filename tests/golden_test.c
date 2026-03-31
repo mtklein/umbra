@@ -90,8 +90,7 @@ static void fill_bg(int fmt, void *dst, uint32_t bg) {
     size_t bpp = umbra_fmt_size(fmt_enums[fmt]);
     umbra_buf buf[2] = {
         {.ptr=uni, .sz=(size_t)fill_pipes[fmt].uni_len, .read_only=1},
-        {.ptr=dst, .sz=pixbuf_size(fmt), .row_bytes=(size_t)W * bpp,
-         .fmt=fmt_enums[fmt]},
+        {.ptr=dst, .sz=pixbuf_size(fmt), .row_bytes=(size_t)W * bpp},
     };
     fill_pipes[fmt].prog->queue(fill_pipes[fmt].prog, 0, 0, W, H, buf);
 }
@@ -304,7 +303,7 @@ static void test_slug_rect(void) {
         wind_buf, sizeof wind_buf, 1, (size_t)W * sizeof(float));
     umbra_buf buf[] = {
         {.ptr=uni, .sz=(size_t)lay.uni_len, .read_only=1},
-        {.ptr=pixels, .sz=sizeof pixels, .row_bytes=W * 4, .fmt=umbra_fmt_8888},
+        {.ptr=pixels, .sz=sizeof pixels, .row_bytes=W * 4},
     };
     interp->queue(interp, 0, 0, W, H, buf);
     be->flush(be);
@@ -365,7 +364,7 @@ static void test_perspective_text(void) {
         bmp, sizeof bmp, 0, 0);
     umbra_buf buf[] = {
         {.ptr=uni, .sz=(size_t)lay.uni_len, .read_only=1},
-        {.ptr=pixels, .sz=sizeof pixels, .fmt=umbra_fmt_8888},
+        {.ptr=pixels, .sz=sizeof pixels},
     };
     interp->queue(interp, 0, 0, BW, 1, buf);
     be->flush(be);
@@ -407,7 +406,7 @@ static void test_perspective_text(void) {
             (size_t)(W * H * 2), 0, 0);
         umbra_buf b2[] = {
             {.ptr=u2, .sz=(size_t)lay2.uni_len, .read_only=1},
-            {.ptr=px2, .sz=(size_t)(W * H * 4), .row_bytes=W * 4, .fmt=umbra_fmt_8888},
+            {.ptr=px2, .sz=(size_t)(W * H * 4), .row_bytes=W * 4},
         };
         interp->queue(interp, 0, 0, W, H, b2);
         be->flush(be);

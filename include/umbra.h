@@ -35,9 +35,8 @@ typedef struct {
     void           *ptr;
     size_t          sz;
     size_t          row_bytes;
-    umbra_fmt       fmt;
     _Bool           read_only;
-    char            pad_[3];
+    char            pad_[7];
 } umbra_buf;
 
 

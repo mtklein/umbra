@@ -76,7 +76,7 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     umbra_buf rbuf[2];
     size_t rb = (size_t)w * pb;
     rbuf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)lay->uni_len, .read_only=1};
-    rbuf[1] = (umbra_buf){.ptr=buf, .sz=plane_sz * (s->fmt == umbra_fmt_fp16_planar ? 4 : 1), .row_bytes=rb, .fmt=s->fmt};
+    rbuf[1] = (umbra_buf){.ptr=buf, .sz=plane_sz * (s->fmt == umbra_fmt_fp16_planar ? 4 : 1), .row_bytes=rb};
     program->queue(program, 0, y0, w, y1, rbuf);
 }
 

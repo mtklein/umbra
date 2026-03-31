@@ -20,7 +20,6 @@ _Static_assert(sizeof(umbra_buf) == 32, "");
 _Static_assert(offsetof(umbra_buf, ptr)       ==  0, "");
 _Static_assert(offsetof(umbra_buf, sz)        ==  8, "");
 _Static_assert(offsetof(umbra_buf, row_bytes) == 16, "");
-_Static_assert(offsetof(umbra_buf, fmt)       == 24, "");
 
 struct pool_ref {
     int data_off, code_pos;
@@ -1390,7 +1389,6 @@ _Static_assert(sizeof(umbra_buf) == 32, "");
 _Static_assert(offsetof(umbra_buf, ptr)       ==  0, "");
 _Static_assert(offsetof(umbra_buf, sz)        ==  8, "");
 _Static_assert(offsetof(umbra_buf, row_bytes) == 16, "");
-_Static_assert(offsetof(umbra_buf, fmt)       == 24, "");
 
 struct pool_ref {
     int data_off, code_pos, extra;
@@ -1947,7 +1945,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             FREE_CHAN(inst->y, i);
         } break;
 
-        case op_load_fp16x4: case op_load_fp16x4_planar: {
+        case op_load_fp16x4: {
             struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
             int8_t r1 = ra_alloc(ra, sl, ns);
             int8_t r2 = ra_alloc(ra, sl, ns);
@@ -1959,301 +1957,130 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t t0 = ra_alloc(ra, sl, ns);
             int8_t t1 = ra_alloc(ra, sl, ns);
 
-            // Load fmt into EAX (32-bit load, zero-extends).
-            {
-                int const fmt_off = p * (int)sizeof(umbra_buf)
-                                  + (int)__builtin_offsetof(umbra_buf, fmt);
-                emit1(c, 0x8b);
-                if (fmt_off >= -128 && fmt_off <= 127) {
-                    emit1(c, (uint8_t)(0x40 | (XBUF & 7)));
-                    emit1(c, (uint8_t)(int8_t)fmt_off);
-                } else {
-                    emit1(c, (uint8_t)(0x80 | (XBUF & 7)));
-                    emit4(c, (uint32_t)fmt_off);
+            if (scalar) {
+                // Load 8 bytes (1 pixel, 4xfp16) via VMOVQ.
+                // VMOVQ xmm, m64: VEX.128 F3.0F 7E /r
+                vex_mem(c, 2, 1, 0, 0, px, 0, 0x7e, base, XI, 8, 0);
+                // VCVTPH2PS: convert 4 x fp16 -> 4 x fp32
+                vcvtph2ps(c, px, px);
+                // Broadcast each lane.
+                vex_rrr(c, 1, 1, 1, 0x70, s0.rd, 0, px); emit1(c, 0x00);
+                vex_rrr(c, 1, 1, 1, 0x70, r1,    0, px); emit1(c, 0x55);
+                vex_rrr(c, 1, 1, 1, 0x70, r2,    0, px); emit1(c, 0xAA);
+                vex_rrr(c, 1, 1, 1, 0x70, r3,    0, px); emit1(c, 0xFF);
+            } else {
+                // Re-load raw data.
+                vmov_load(c, 1, t0, base, XI, 8, 0);   // pixels 0-3 raw
+                // VPSHUFB mask: in each 128-bit lane, extract one channel.
+                uint8_t shuf_r[32], shuf_g[32], shuf_b[32], shuf_a[32];
+                for (int j = 0; j < 32; j++) {
+                    shuf_r[j] = 0x80; shuf_g[j] = 0x80;
+                    shuf_b[j] = 0x80; shuf_a[j] = 0x80;
                 }
-            }
+                shuf_r[0]=0; shuf_r[1]=1; shuf_r[2]=8;  shuf_r[3]=9;
+                shuf_g[0]=2; shuf_g[1]=3; shuf_g[2]=10; shuf_g[3]=11;
+                shuf_b[0]=4; shuf_b[1]=5; shuf_b[2]=12; shuf_b[3]=13;
+                shuf_a[0]=6; shuf_a[1]=7; shuf_a[2]=14; shuf_a[3]=15;
+                shuf_r[16]=0; shuf_r[17]=1; shuf_r[18]=8;  shuf_r[19]=9;
+                shuf_g[16]=2; shuf_g[17]=3; shuf_g[18]=10; shuf_g[19]=11;
+                shuf_b[16]=4; shuf_b[17]=5; shuf_b[18]=12; shuf_b[19]=13;
+                shuf_a[16]=6; shuf_a[17]=7; shuf_a[18]=14; shuf_a[19]=15;
 
-            int br_done[8];
-            int n_done = 0;
-
-            
-            cmp_ri(c, RAX, umbra_fmt_8888);
-            int br_skip_8888 = jcc(c, 0x05);  // JNE
-            {
-                if (scalar) { vex_mem(c, 1, 1, 0, 0, px, 0, 0x6e, base, XI, 4, 0); }
-                else        { vmov_load(c, 1, px, base, XI, 4, 0); }
-                pool_broadcast(c, &jc->pool, t0, 0xFF);
-                vpand(c, 1, s0.rd, px, t0);
-                vpsrld_i(c, r1, px,  8); vpand(c, 1, r1, r1, t0);
-                vpsrld_i(c, r2, px, 16); vpand(c, 1, r2, r2, t0);
-                vpsrld_i(c, r3, px, 24);
-                vcvtdq2ps(c, s0.rd, s0.rd);
-                vcvtdq2ps(c, r1, r1);
-                vcvtdq2ps(c, r2, r2);
-                vcvtdq2ps(c, r3, r3);
-                union { float f; uint32_t u; } inv255 = {.f = 1.0f/255.0f};
-                pool_broadcast(c, &jc->pool, t0, inv255.u);
-                vmulps(c, s0.rd, s0.rd, t0);
-                vmulps(c, r1, r1, t0);
-                vmulps(c, r2, r2, t0);
-                vmulps(c, r3, r3, t0);
-            }
-            br_done[n_done] = jmp(c); n_done++;
-            patch_jcc(c, br_skip_8888);
-
-            
-            cmp_ri(c, RAX, umbra_fmt_565);
-            int br_skip_565 = jcc(c, 0x05);
-            {
-                if (scalar) {
-                    // MOVZX eax, word [base + XI*2]
-                    {
-                        uint8_t rex = 0x40;
-                        if (XI >= 8)   { rex |= 0x02; }
-                        if (base >= 8) { rex |= 0x01; }
-                        if (rex != 0x40) { emit1(c, rex); }
-                        emit1(c, 0x0f); emit1(c, 0xb7);
-                        emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
-                        emit1(c, (uint8_t)((1 << 6) | ((XI & 7) << 3) | (base & 7)));
-                    }
-                    // VMOVD px, eax
-                    vex(c, 1, 1, 0, 0, px, 0, RAX, 0x6e);
-                    // VPBROADCASTD px, px
-                    vbroadcastss(c, px, px);
-                } else {
-                    // Load 128-bit (8 x u16).
-                    vmov_load(c, 0, px, base, XI, 2, 0);
-                    // VPMOVZXWD: zero-extend 8 x u16 -> 8 x u32
-                    vpmovzxwd(c, px, px);
+                // Low half (pixels 0-3):
+                int off_r = pool_add(&jc->pool, shuf_r, 32);
+                {
+                    int ref = vex_rip(c, 1, 2, 0, 1, s0.rd, t0, 0x00);
+                    pool_ref_at(&jc->pool, off_r, ref, 0);
                 }
-                // r5 = px >> 11
-                vpsrld_i(c, s0.rd, px, 11);
-                // g6 = (px >> 5) & 0x3F
-                vpsrld_i(c, r1, px, 5);
-                pool_broadcast(c, &jc->pool, t0, 0x3F);
-                vpand(c, 1, r1, r1, t0);
-                // b5 = px & 0x1F
-                pool_broadcast(c, &jc->pool, t0, 0x1F);
-                vpand(c, 1, r2, px, t0);
-                // Convert to float and scale.
-                vcvtdq2ps(c, s0.rd, s0.rd);
-                vcvtdq2ps(c, r1, r1);
-                vcvtdq2ps(c, r2, r2);
-                union { float f; uint32_t u; } inv31 = {.f = 1.0f/31.0f};
-                union { float f; uint32_t u; } inv63 = {.f = 1.0f/63.0f};
-                pool_broadcast(c, &jc->pool, t0, inv31.u);
-                vmulps(c, s0.rd, s0.rd, t0);
-                vmulps(c, r2, r2, t0);
-                pool_broadcast(c, &jc->pool, t0, inv63.u);
-                vmulps(c, r1, r1, t0);
-                // a = 1.0
-                union { float f; uint32_t u; } f1 = {.f = 1.0f};
-                pool_broadcast(c, &jc->pool, r3, f1.u);
-            }
-            br_done[n_done] = jmp(c); n_done++;
-            patch_jcc(c, br_skip_565);
+                // VPERMQ imm=0x08: [q0,q2,q0,q0] = [R0R1, R2R3, ...]
+                vex(c, 1, 3, 1, 1, s0.rd, 0, s0.rd, 0x00); emit1(c, 0x08);
 
-            
-            cmp_ri(c, RAX, umbra_fmt_1010102);
-            int br_skip_1010102 = jcc(c, 0x05);
-            {
-                if (scalar) { vex_mem(c, 1, 1, 0, 0, px, 0, 0x6e, base, XI, 4, 0); }
-                else        { vmov_load(c, 1, px, base, XI, 4, 0); }
-                pool_broadcast(c, &jc->pool, t0, 0x3FF);
-                vpand(c, 1, s0.rd, px, t0);
-                vpsrld_i(c, r1, px, 10); vpand(c, 1, r1, r1, t0);
-                vpsrld_i(c, r2, px, 20); vpand(c, 1, r2, r2, t0);
-                vpsrld_i(c, r3, px, 30);
-                vcvtdq2ps(c, s0.rd, s0.rd);
-                vcvtdq2ps(c, r1, r1);
-                vcvtdq2ps(c, r2, r2);
-                vcvtdq2ps(c, r3, r3);
-                union { float f; uint32_t u; } inv1023 = {.f = 1.0f/1023.0f};
-                union { float f; uint32_t u; } inv3    = {.f = 1.0f/3.0f};
-                pool_broadcast(c, &jc->pool, t0, inv1023.u);
-                vmulps(c, s0.rd, s0.rd, t0);
-                vmulps(c, r1, r1, t0);
-                vmulps(c, r2, r2, t0);
-                pool_broadcast(c, &jc->pool, t0, inv3.u);
-                vmulps(c, r3, r3, t0);
-            }
-            br_done[n_done] = jmp(c); n_done++;
-            patch_jcc(c, br_skip_1010102);
-
-            
-            cmp_ri(c, RAX, umbra_fmt_fp16);
-            int br_skip_fp16 = jcc(c, 0x05);
-            {
-                if (scalar) {
-                    // Load 8 bytes (1 pixel, 4xfp16) via VMOVQ.
-                    // VMOVQ xmm, m64: VEX.128 F3.0F 7E /r
-                    vex_mem(c, 2, 1, 0, 0, px, 0, 0x7e, base, XI, 8, 0);
-                    // VCVTPH2PS: convert 4 x fp16 -> 4 x fp32
-                    vcvtph2ps(c, px, px);
-                    // Broadcast each lane.
-                    vex_rrr(c, 1, 1, 1, 0x70, s0.rd, 0, px); emit1(c, 0x00);
-                    vex_rrr(c, 1, 1, 1, 0x70, r1,    0, px); emit1(c, 0x55);
-                    vex_rrr(c, 1, 1, 1, 0x70, r2,    0, px); emit1(c, 0xAA);
-                    vex_rrr(c, 1, 1, 1, 0x70, r3,    0, px); emit1(c, 0xFF);
-                } else {
-                    // 8 pixels * 8 bytes = 64 bytes. Load in two 32-byte halves.
-                    // Low 4 pixels (32 bytes):
-                    vmov_load(c, 1, t0, base, XI, 8, 0);
-                    // High 4 pixels (32 bytes, offset +32):
-                    vmov_load(c, 1, t1, base, XI, 8, 32);
-                    // Each 256-bit block has 4 interleaved fp16 pixels.
-                    // Extract low 128 from each = pixels 0-1 and 4-5.
-                    // Extract high 128 from each = pixels 2-3 and 6-7.
-                    // VCVTPH2PS on each 128-bit chunk → 8 fp32 per chunk.
-                    // t0 low 128 = [R0,G0,B0,A0,R1,G1,B1,A1] as fp16
-                    // t0 high 128 = [R2,G2,B2,A2,R3,G3,B3,A3] as fp16
-                    // t1 low 128 = [R4,G4,B4,A4,R5,G5,B5,A5] as fp16
-                    // t1 high 128 = [R6,G6,B6,A6,R7,G7,B7,A7] as fp16
-                    // VCVTPH2PS on t0 (128-bit input → 256-bit output):
-                    //   produces [R0,G0,B0,A0,R1,G1,B1,A1] as 8 fp32.
-                    // Then extract R0,R1 from lanes 0,4 and similarly for other channels.
-                    // This is complex. Simpler: VEXTRACTI128 to split each 256-bit block,
-                    // VCVTPH2PS on each 128-bit half, then shuffle.
-
-                    // Even simpler: convert all to fp32, then de-interleave.
-                    // After VCVTPH2PS(256) on t0: 8 x fp32 = [R0,G0,B0,A0,R1,G1,B1,A1]
-                    vcvtph2ps(c, px, t0);     // px = pixels 0-1 as fp32 (256-bit)
-                    vextracti128(c, t0, t1, 1);
-                    vcvtph2ps(c, t0, t0);     // t0 = pixels 2-3 as fp32 from t1 high half
-                    vcvtph2ps(c, t1, t1);     // t1 = pixels 4-5 as fp32 from t1 low half
-                    // Wait, this clobbers t1 before we extracted. Let me reorder.
-
-                    // Restart: load both halves, then process.
-                    vmov_load(c, 1, t0, base, XI, 8, 0);   // pixels 0-3
-                    vmov_load(c, 1, t1, base, XI, 8, 32);  // pixels 4-7
-
-                    // Split each into two 128-bit halves, convert to fp32.
-                    vextracti128(c, px, t0, 1);   // px = t0 high = pixels 2-3 as fp16
-                    vcvtph2ps(c, t0, t0);          // t0 = pixels 0-1 as 8 x fp32
-                    vcvtph2ps(c, px, px);          // px = pixels 2-3 as 8 x fp32
-                    // t0 = [R0,G0,B0,A0 | R1,G1,B1,A1] (each 128-bit lane has 1 pixel)
-                    // px = [R2,G2,B2,A2 | R3,G3,B3,A3]
-                    // Extract R0,R1,R2,R3 from lane 0 of each pixel:
-                    // VSHUFPS(d, t0, px, 0x88) per lane:
-                    //   lo: [t0[0],t0[2],px[0],px[2]] = [R0,B0,R2,B2]
-                    //   hi: [t0[4],t0[6],px[4],px[6]] = [R1,B1,R3,B3]
-                    // After VPERM2F128 to rearrange, then VSHUFPS again...
-                    // This is still complex. Let me use a completely different approach.
-
-                    // Actually, the simplest approach: for each channel, use VSHUFPS to
-                    // extract the channel from each pixel, then combine.
-                    // But with 8 pixels across 4 256-bit registers, this needs lots of shuffles.
-
-                    // The most practical approach for correctness: just use
-                    // VPSHUFB on each 256-bit half to extract channels, then merge.
-
-                    // Re-load raw data.
-                    vmov_load(c, 1, t0, base, XI, 8, 0);   // pixels 0-3 raw
-                    // VPSHUFB mask: in each 128-bit lane, extract one channel.
-                    uint8_t shuf_r[32], shuf_g[32], shuf_b[32], shuf_a[32];
-                    for (int j = 0; j < 32; j++) {
-                        shuf_r[j] = 0x80; shuf_g[j] = 0x80;
-                        shuf_b[j] = 0x80; shuf_a[j] = 0x80;
-                    }
-                    shuf_r[0]=0; shuf_r[1]=1; shuf_r[2]=8;  shuf_r[3]=9;
-                    shuf_g[0]=2; shuf_g[1]=3; shuf_g[2]=10; shuf_g[3]=11;
-                    shuf_b[0]=4; shuf_b[1]=5; shuf_b[2]=12; shuf_b[3]=13;
-                    shuf_a[0]=6; shuf_a[1]=7; shuf_a[2]=14; shuf_a[3]=15;
-                    shuf_r[16]=0; shuf_r[17]=1; shuf_r[18]=8;  shuf_r[19]=9;
-                    shuf_g[16]=2; shuf_g[17]=3; shuf_g[18]=10; shuf_g[19]=11;
-                    shuf_b[16]=4; shuf_b[17]=5; shuf_b[18]=12; shuf_b[19]=13;
-                    shuf_a[16]=6; shuf_a[17]=7; shuf_a[18]=14; shuf_a[19]=15;
-
-                    // Process R channel: VPSHUFB on low half, VPERMQ, VCVTPH2PS
-                    // gives 4 fp32 values in the low 128 bits. Then repeat for
-                    // the high half and combine.
-
-                    // Low half (pixels 0-3):
-                    int off_r = pool_add(&jc->pool, shuf_r, 32);
-                    {
-                        int ref = vex_rip(c, 1, 2, 0, 1, s0.rd, t0, 0x00);
-                        pool_ref_at(&jc->pool, off_r, ref, 0);
-                    }
-                    // VPERMQ to pack: s0 has [R0,R1,0...0 | R2,R3,0...0]
-                    // VPERMQ imm=0x08: [q0,q2,q0,q0] = [R0R1, R2R3, ...]
-                    vex(c, 1, 3, 1, 1, s0.rd, 0, s0.rd, 0x00); emit1(c, 0x08);
-                    // s0 low 64 bits = [R0,R1,R2,R3] as 4 fp16
-
-                    // High half (pixels 4-7):
-                    vmov_load(c, 1, t1, base, XI, 8, 32);
-                    {
-                        int ref = vex_rip(c, 1, 2, 0, 1, t0, t1, 0x00);
-                        pool_ref_at(&jc->pool, off_r, ref, 0);
-                    }
-                    vex(c, 1, 3, 1, 1, t0, 0, t0, 0x00); emit1(c, 0x08);
-                    // t0 low 64 bits = [R4,R5,R6,R7] as 4 fp16
-
-                    // Combine: VPUNPCKLQDQ to merge low 64 bits.
-                    // VPUNPCKLQDQ(128) = VEX.128 66.0F 6C: [s0_lo64, t0_lo64]
-                    vex_rrr(c, 1, 1, 0, 0x6c, s0.rd, s0.rd, t0);
-                    // s0 = [R0,R1,R2,R3,R4,R5,R6,R7] as 8 fp16 in XMM
-                    vcvtph2ps(c, s0.rd, s0.rd);
-
-                    // Repeat for G, B, A. Reload low half for each.
-                    int off_g = pool_add(&jc->pool, shuf_g, 32);
-                    int off_b = pool_add(&jc->pool, shuf_b, 32);
-                    int off_a = pool_add(&jc->pool, shuf_a, 32);
-
-                    // G: low half
-                    vmov_load(c, 1, t0, base, XI, 8, 0);
-                    {
-                        int ref = vex_rip(c, 1, 2, 0, 1, r1, t0, 0x00);
-                        pool_ref_at(&jc->pool, off_g, ref, 0);
-                    }
-                    vex(c, 1, 3, 1, 1, r1, 0, r1, 0x00); emit1(c, 0x08);
-                    // G: high half
-                    {
-                        int ref = vex_rip(c, 1, 2, 0, 1, t0, t1, 0x00);
-                        pool_ref_at(&jc->pool, off_g, ref, 0);
-                    }
-                    vex(c, 1, 3, 1, 1, t0, 0, t0, 0x00); emit1(c, 0x08);
-                    vex_rrr(c, 1, 1, 0, 0x6c, r1, r1, t0);
-                    vcvtph2ps(c, r1, r1);
-
-                    // B: low half
-                    vmov_load(c, 1, t0, base, XI, 8, 0);
-                    {
-                        int ref = vex_rip(c, 1, 2, 0, 1, r2, t0, 0x00);
-                        pool_ref_at(&jc->pool, off_b, ref, 0);
-                    }
-                    vex(c, 1, 3, 1, 1, r2, 0, r2, 0x00); emit1(c, 0x08);
-                    // B: high half
-                    {
-                        int ref = vex_rip(c, 1, 2, 0, 1, t0, t1, 0x00);
-                        pool_ref_at(&jc->pool, off_b, ref, 0);
-                    }
-                    vex(c, 1, 3, 1, 1, t0, 0, t0, 0x00); emit1(c, 0x08);
-                    vex_rrr(c, 1, 1, 0, 0x6c, r2, r2, t0);
-                    vcvtph2ps(c, r2, r2);
-
-                    // A: low half
-                    vmov_load(c, 1, t0, base, XI, 8, 0);
-                    {
-                        int ref = vex_rip(c, 1, 2, 0, 1, r3, t0, 0x00);
-                        pool_ref_at(&jc->pool, off_a, ref, 0);
-                    }
-                    vex(c, 1, 3, 1, 1, r3, 0, r3, 0x00); emit1(c, 0x08);
-                    // A: high half
-                    {
-                        int ref = vex_rip(c, 1, 2, 0, 1, t0, t1, 0x00);
-                        pool_ref_at(&jc->pool, off_a, ref, 0);
-                    }
-                    vex(c, 1, 3, 1, 1, t0, 0, t0, 0x00); emit1(c, 0x08);
-                    vex_rrr(c, 1, 1, 0, 0x6c, r3, r3, t0);
-                    vcvtph2ps(c, r3, r3);
+                // High half (pixels 4-7):
+                vmov_load(c, 1, t1, base, XI, 8, 32);
+                {
+                    int ref = vex_rip(c, 1, 2, 0, 1, t0, t1, 0x00);
+                    pool_ref_at(&jc->pool, off_r, ref, 0);
                 }
-            }
-            br_done[n_done] = jmp(c); n_done++;
-            patch_jcc(c, br_skip_fp16);
+                vex(c, 1, 3, 1, 1, t0, 0, t0, 0x00); emit1(c, 0x08);
 
-            
-            cmp_ri(c, RAX, umbra_fmt_fp16_planar);
-            int br_skip_f16_planar = jcc(c, 0x05);
+                // Combine: VPUNPCKLQDQ to merge low 64 bits.
+                vex_rrr(c, 1, 1, 0, 0x6c, s0.rd, s0.rd, t0);
+                vcvtph2ps(c, s0.rd, s0.rd);
+
+                // Repeat for G, B, A. Reload low half for each.
+                int off_g = pool_add(&jc->pool, shuf_g, 32);
+                int off_b = pool_add(&jc->pool, shuf_b, 32);
+                int off_a = pool_add(&jc->pool, shuf_a, 32);
+
+                // G: low half
+                vmov_load(c, 1, t0, base, XI, 8, 0);
+                {
+                    int ref = vex_rip(c, 1, 2, 0, 1, r1, t0, 0x00);
+                    pool_ref_at(&jc->pool, off_g, ref, 0);
+                }
+                vex(c, 1, 3, 1, 1, r1, 0, r1, 0x00); emit1(c, 0x08);
+                // G: high half
+                {
+                    int ref = vex_rip(c, 1, 2, 0, 1, t0, t1, 0x00);
+                    pool_ref_at(&jc->pool, off_g, ref, 0);
+                }
+                vex(c, 1, 3, 1, 1, t0, 0, t0, 0x00); emit1(c, 0x08);
+                vex_rrr(c, 1, 1, 0, 0x6c, r1, r1, t0);
+                vcvtph2ps(c, r1, r1);
+
+                // B: low half
+                vmov_load(c, 1, t0, base, XI, 8, 0);
+                {
+                    int ref = vex_rip(c, 1, 2, 0, 1, r2, t0, 0x00);
+                    pool_ref_at(&jc->pool, off_b, ref, 0);
+                }
+                vex(c, 1, 3, 1, 1, r2, 0, r2, 0x00); emit1(c, 0x08);
+                // B: high half
+                {
+                    int ref = vex_rip(c, 1, 2, 0, 1, t0, t1, 0x00);
+                    pool_ref_at(&jc->pool, off_b, ref, 0);
+                }
+                vex(c, 1, 3, 1, 1, t0, 0, t0, 0x00); emit1(c, 0x08);
+                vex_rrr(c, 1, 1, 0, 0x6c, r2, r2, t0);
+                vcvtph2ps(c, r2, r2);
+
+                // A: low half
+                vmov_load(c, 1, t0, base, XI, 8, 0);
+                {
+                    int ref = vex_rip(c, 1, 2, 0, 1, r3, t0, 0x00);
+                    pool_ref_at(&jc->pool, off_a, ref, 0);
+                }
+                vex(c, 1, 3, 1, 1, r3, 0, r3, 0x00); emit1(c, 0x08);
+                // A: high half
+                {
+                    int ref = vex_rip(c, 1, 2, 0, 1, t0, t1, 0x00);
+                    pool_ref_at(&jc->pool, off_a, ref, 0);
+                }
+                vex(c, 1, 3, 1, 1, t0, 0, t0, 0x00); emit1(c, 0x08);
+                vex_rrr(c, 1, 1, 0, 0x6c, r3, r3, t0);
+                vcvtph2ps(c, r3, r3);
+            }
+
+            ra_return_reg(ra, t1);
+            ra_return_reg(ra, t0);
+            ra_return_reg(ra, px);
+            ra_set_chan_reg(ra, i, 0, s0.rd);
+            ra_set_chan_reg(ra, i, 1, r1);
+            ra_set_chan_reg(ra, i, 2, r2);
+            ra_set_chan_reg(ra, i, 3, r3);
+        } break;
+        case op_load_fp16x4_planar: {
+            struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
+            int8_t r1 = ra_alloc(ra, sl, ns);
+            int8_t r2 = ra_alloc(ra, sl, ns);
+            int8_t r3 = ra_alloc(ra, sl, ns);
+            int    p = inst->ptr;
+            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+
+            int8_t px = ra_alloc(ra, sl, ns);
+            int8_t t0 = ra_alloc(ra, sl, ns);
+            int8_t t1 = ra_alloc(ra, sl, ns);
+
             {
                 int const sz_off = p * (int)sizeof(umbra_buf)
                                  + (int)__builtin_offsetof(umbra_buf, sz);
@@ -2352,20 +2179,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     vcvtph2ps(c, r3, px);
                 }
                 last_ptr = -1;
-            }
-            br_done[n_done] = jmp(c); n_done++;
-            patch_jcc(c, br_skip_f16_planar);
-
-            // Default: zero all outputs.
-            vpxor(c, 1, s0.rd, s0.rd, s0.rd);
-            vpxor(c, 1, r1, r1, r1);
-            vpxor(c, 1, r2, r2, r2);
-            vpxor(c, 1, r3, r3, r3);
-
-            // Patch all JMP-to-done.
-            for (int j = 0; j < n_done; j++) {
-                int32_t rel = (int32_t)(c->len - (br_done[j] + 4));
-                __builtin_memcpy(c->buf + br_done[j], &rel, 4);
             }
 
             ra_return_reg(ra, t1);

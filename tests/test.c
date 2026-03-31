@@ -2302,8 +2302,8 @@ static void test_load_store_color_8888(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
         if (!run(&B, bi, 8, 1, (umbra_buf[]){
-            {.ptr=src, .sz=sizeof src, .fmt=umbra_fmt_8888},
-            {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_8888},
+            {.ptr=src, .sz=sizeof src},
+            {.ptr=dst, .sz=sizeof dst},
         })) { continue; }
         for (int i = 0; i < 8; i++) { (dst[i] == src[i]) here; }
     }
@@ -2328,10 +2328,8 @@ static void test_load_store_color_f16_planar(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
         if (!run(&B, bi, W, H, (umbra_buf[]){
-            {.ptr=src, .sz=sizeof src, .row_bytes=W*2,
-             .fmt=umbra_fmt_fp16_planar},
-            {.ptr=dst, .sz=sizeof dst, .row_bytes=W*2,
-             .fmt=umbra_fmt_fp16_planar},
+            {.ptr=src, .sz=sizeof src, .row_bytes=W*2},
+            {.ptr=dst, .sz=sizeof dst, .row_bytes=W*2},
         })) { continue; }
         (0 == __builtin_memcmp(dst, src, sizeof src)) here;
     }
@@ -2350,8 +2348,8 @@ static void test_load_store_color_565(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
         if (!run(&B, bi, 7, 1, (umbra_buf[]){
-            {.ptr=src, .sz=sizeof src, .fmt=umbra_fmt_565},
-            {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_565},
+            {.ptr=src, .sz=sizeof src},
+            {.ptr=dst, .sz=sizeof dst},
         })) { continue; }
         for (int i = 0; i < 7; i++) { (dst[i] == src[i]) here; }
     }
@@ -2373,8 +2371,8 @@ static void test_load_store_color_1010102(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
         if (!run(&B, bi, 7, 1, (umbra_buf[]){
-            {.ptr=src, .sz=sizeof src, .fmt=umbra_fmt_1010102},
-            {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_1010102},
+            {.ptr=src, .sz=sizeof src},
+            {.ptr=dst, .sz=sizeof dst},
         })) { continue; }
         for (int i = 0; i < 7; i++) { (dst[i] == src[i]) here; }
     }
@@ -2398,8 +2396,8 @@ static void test_load_store_color_fp16(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
         if (!run(&B, bi, 7, 1, (umbra_buf[]){
-            {.ptr=src, .sz=sizeof src, .fmt=umbra_fmt_fp16},
-            {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_fp16},
+            {.ptr=src, .sz=sizeof src},
+            {.ptr=dst, .sz=sizeof dst},
         })) { continue; }
         (0 == __builtin_memcmp(dst, src, sizeof src)) here;
     }
@@ -3387,7 +3385,7 @@ static void test_ra_chan_unary(void) {
         };
         int32_t dg[4]={0}, db[4]={0}, da[4]={0};
         if (!run(&B, bi, 4, 1, (umbra_buf[]){
-            {.ptr=src, .sz=sizeof src, .fmt=umbra_fmt_fp16},
+            {.ptr=src, .sz=sizeof src},
             {.ptr=dg, .sz=16}, {.ptr=db, .sz=16}, {.ptr=da, .sz=16},
         })) { continue; }
         (dg[0] == 0) here;

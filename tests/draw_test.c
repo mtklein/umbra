@@ -54,7 +54,7 @@ static void test_solid_src(void) {
         if (!run_draw(&B, bi, 4, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=4 * 4, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=4 * 4},
                       })) {
             continue;
         }
@@ -83,7 +83,7 @@ static void test_solid_src_n1(void) {
         if (!run_draw(&B, bi, 1, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=4, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=4},
                       })) {
             continue;
         }
@@ -111,7 +111,7 @@ static void test_solid_src_n9(void) {
         if (!run_draw(&B, bi, 9, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=9 * 4, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=9 * 4},
                       })) {
             continue;
         }
@@ -139,7 +139,7 @@ static void test_solid_src_n16(void) {
         if (!run_draw(&B, bi, 16, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=16 * 4, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=16 * 4},
                       })) {
             continue;
         }
@@ -164,7 +164,7 @@ static void test_srcover_8888(void) {
         if (!run_draw(&B, bi, 2, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=2 * 4, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=2 * 4},
                       })) {
             continue;
         }
@@ -198,7 +198,7 @@ static void test_dstover_8888(void) {
         if (!run_draw(&B, bi, 2, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=2 * 4, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=2 * 4},
                       })) {
             continue;
         }
@@ -223,7 +223,7 @@ static void test_dstover_transparent(void) {
         if (!run_draw(&B, bi, 2, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=2 * 4, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=2 * 4},
                       })) {
             continue;
         }
@@ -251,7 +251,7 @@ static void test_multiply_8888(void) {
         if (!run_draw(&B, bi, 2, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=2 * 4, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=2 * 4},
                       })) {
             continue;
         }
@@ -285,7 +285,7 @@ static void test_solid_src_fp16(void) {
         if (!run_draw(&B, bi, 3, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_fp16},
+                          {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
         }
@@ -321,7 +321,7 @@ static void test_srcover_fp16(void) {
         if (!run_draw(&B, bi, 2, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_fp16},
+                          {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
         }
@@ -358,7 +358,7 @@ static void test_coverage_rect(void) {
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
         }
@@ -393,7 +393,7 @@ static void test_coverage_rect_scalar(void) {
         if (!run_draw(&B, bi, 4, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
         }
@@ -426,7 +426,7 @@ static void test_coverage_rect_n9(void) {
         if (!run_draw(&B, bi, 9, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=9 * 4, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=9 * 4},
                       })) {
             continue;
         }
@@ -460,7 +460,7 @@ static void test_coverage_rect_offset(void) {
         if (!run_draw(&B, bi, 4, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
         }
@@ -495,7 +495,7 @@ static void test_coverage_rect_outside_y(void) {
         if (!run_draw(&B, bi, 4, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
         }
@@ -522,7 +522,7 @@ static void test_no_shader(void) {
         if (!run_draw(&B, bi, 4, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=4 * 4, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=4 * 4},
                       })) {
             continue;
         }
@@ -546,7 +546,7 @@ static void test_no_blend(void) {
         if (!run_draw(&B, bi, 2, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=2 * 4, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=2 * 4},
                       })) {
             continue;
         }
@@ -585,7 +585,7 @@ static void test_gradient_shader(void) {
         if (!run_draw(&B, bi, 4, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
         }
@@ -614,7 +614,7 @@ static void test_multiply_half_alpha(void) {
         if (!run_draw(&B, bi, 2, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=2 * 4, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=2 * 4},
                       })) {
             continue;
         }
@@ -649,7 +649,7 @@ static void test_srcover_8888_n9(void) {
         if (!run_draw(&B, bi, 9, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=9 * 4, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=9 * 4},
                       })) {
             continue;
         }
@@ -682,7 +682,7 @@ static void test_full_pipeline(void) {
         if (!run_draw(&B, bi, 9, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=9 * 4, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=9 * 4},
                       })) {
             continue;
         }
@@ -720,7 +720,7 @@ static void test_solid_src_fp16_n9(void) {
         if (!run_draw(&B, bi, 9, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_fp16},
+                          {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
         }
@@ -771,7 +771,7 @@ static void test_coverage_rect_white_dst(void) {
             if (!run_draw(&B, bi, rc.n, 1,
                           (umbra_buf[]){
                               {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                              {.ptr=dst, .sz=(size_t)(rc.n * 4), .fmt=umbra_fmt_8888},
+                              {.ptr=dst, .sz=(size_t)(rc.n * 4)},
                           })) {
                 continue;
             }
@@ -807,7 +807,7 @@ static void test_coverage_bitmap(void) {
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
         }
@@ -838,7 +838,7 @@ static void test_coverage_sdf(void) {
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
         }
@@ -872,7 +872,7 @@ static void test_coverage_bitmap_matrix(void) {
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
         }
@@ -907,7 +907,7 @@ static void test_coverage_bitmap_matrix_oob(void) {
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
         }
@@ -934,7 +934,7 @@ static void test_linear_2(void) {
         if (!run_draw(&B, bi, 4, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
         }
@@ -965,7 +965,7 @@ static void test_radial_2(void) {
         if (!run_draw(&B, bi, 1, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=4, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=4},
                       })) {
             continue;
         }
@@ -1001,7 +1001,7 @@ static void test_linear_grad(void) {
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
         }
@@ -1039,7 +1039,7 @@ static void test_radial_grad(void) {
         if (!run_draw(&B, bi, 1, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=4, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=4},
                       })) {
             continue;
         }
@@ -1076,7 +1076,7 @@ static void test_gradient_lut_nonuniform(void) {
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=sizeof dst, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
         }
@@ -1110,7 +1110,7 @@ static void test_supersample(void) {
         if (!run_draw(&B, bi, 4, 1,
                       (umbra_buf[]){
                           {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-                          {.ptr=dst, .sz=4 * 4, .fmt=umbra_fmt_8888},
+                          {.ptr=dst, .sz=4 * 4},
                       })) {
             continue;
         }
@@ -1156,14 +1156,14 @@ static void test_page_aligned_buffer(void) {
         __builtin_memset(aligned, 0, N * 4);
         if (!run_draw(&B, bi, N, 1, (umbra_buf[]){
             {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-            {.ptr=aligned, .sz=N * 4, .fmt=umbra_fmt_8888},
+            {.ptr=aligned, .sz=N * 4},
         })) { continue; }
         for (int i = 0; i < N; i++) { (aligned[i] == 0xFF00FF00u) here; }
 
         __builtin_memset(offset, 0, N * 4);
         if (!run_draw(&B, bi, N, 1, (umbra_buf[]){
             {.ptr=uni, .sz=(size_t)B.lay.uni_len, .read_only=1},
-            {.ptr=offset, .sz=N * 4, .fmt=umbra_fmt_8888},
+            {.ptr=offset, .sz=N * 4},
         })) { continue; }
         for (int i = 0; i < N; i++) { (offset[i] == 0xFF00FF00u) here; }
     }
