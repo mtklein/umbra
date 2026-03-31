@@ -75,5 +75,11 @@ kernel void umbra_entry(
     float v49 = fma(v48, v12, as_type<float>(v1));
     float v50 = v49 - v48;
     float v51 = fma(as_type<float>(v24), v50, v48);
-    ((device uint*)(p1 + y * buf_rbs[1]))[x] = pack_float_to_unorm4x8(clamp(float4(v51,v38,v45,v31), 0.0, 1.0));
+    {
+        uint ri = uint(int(rint(clamp(v51, 0.0f, 1.0f) * 255.0f)));
+        uint gi = uint(int(rint(clamp(v38, 0.0f, 1.0f) * 255.0f)));
+        uint bi = uint(int(rint(clamp(v45, 0.0f, 1.0f) * 255.0f)));
+        uint ai = uint(int(rint(clamp(v31, 0.0f, 1.0f) * 255.0f)));
+        ((device uint*)(p1 + y * buf_rbs[1]))[x] = ri | (gi << 8) | (bi << 16) | (ai << 24);
+    }
 }

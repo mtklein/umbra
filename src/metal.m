@@ -29,18 +29,6 @@ struct copyback {
 
 struct deref_info { int buf_idx, src_buf, byte_off; };
 
-struct color_buf_info {
-    int buf_idx;
-    int tex_base;
-    _Bool read, write, pad_[2];
-};
-
-struct pipeline_entry {
-    uint64_t key;
-    void    *pipeline;
-    int      tg_size, :32;
-};
-
 struct metal_backend {
     struct umbra_backend base;
     void *device;
@@ -56,11 +44,7 @@ struct metal_backend {
 
 struct umbra_metal {
     struct umbra_program base;
-    void *library;
-    struct pipeline_entry *pipelines;
-    int    n_pipelines, pipelines_cap;
-    struct color_buf_info *color_bufs;
-    int    n_color_bufs, n_textures;
+    void *pipeline;
     void **per_bufs;
     char  *src;
     int    max_ptr;
@@ -245,25 +229,13 @@ static void emit_ops(Buf *b, BB const *bb,
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 emit(b,
-                     "%sfloat4 v%d_c;\n"
-                     "%sif (planes_p%d == 1) {\n"
-                     "%s    v%d_c = tex_p%d_0.read(uint2(x,y));\n"
-                     "%s} else {\n"
-                     "%s    device half *hp = (device half*)"
+                     "%sdevice half *hp%d = (device half*)"
                      "(p%d + y * buf_rbs[%d]) + x*4;\n"
-                     "%s    v%d_c = float4(hp[0], hp[1], hp[2], hp[3]);\n"
-                     "%s}\n"
-                     "%sfloat v%d = v%d_c.x;\n"
-                     "%sfloat v%d_1 = v%d_c.y;\n"
-                     "%sfloat v%d_2 = v%d_c.z;\n"
-                     "%sfloat v%d_3 = v%d_c.w;\n",
-                     pad, i,
-                     pad, p,
-                     pad, i, p,
-                     pad,
-                     pad, p, p,
-                     pad, i,
-                     pad,
+                     "%sfloat v%d = float(hp%d[0]);\n"
+                     "%sfloat v%d_1 = float(hp%d[1]);\n"
+                     "%sfloat v%d_2 = float(hp%d[2]);\n"
+                     "%sfloat v%d_3 = float(hp%d[3]);\n",
+                     pad, i, p, p,
                      pad, i, i,
                      pad, i, i,
                      pad, i, i,
@@ -273,131 +245,114 @@ static void emit_ops(Buf *b, BB const *bb,
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 emit(b,
-                     "%sfloat4 v%d_c;\n"
-                     "%sif (planes_p%d == 4) {\n"
-                     "%s    v%d_c = float4(tex_p%d_0.read(uint2(x,y)).r,"
-                     " tex_p%d_1.read(uint2(x,y)).r,"
-                     " tex_p%d_2.read(uint2(x,y)).r,"
-                     " tex_p%d_3.read(uint2(x,y)).r);\n"
-                     "%s} else {\n"
-                     "%s    device uchar *row = p%d + y * buf_rbs[%d];"
-                     " uint ps = buf_szs[%d]/4;\n"
-                     "%s    v%d_c = float4("
-                     "float(((device half*)row)[x]),"
-                     "float(((device half*)(row+ps))[x]),"
-                     "float(((device half*)(row+2*ps))[x]),"
-                     "float(((device half*)(row+3*ps))[x]));\n"
-                     "%s}\n"
-                     "%sfloat v%d = v%d_c.x;\n"
-                     "%sfloat v%d_1 = v%d_c.y;\n"
-                     "%sfloat v%d_2 = v%d_c.z;\n"
-                     "%sfloat v%d_3 = v%d_c.w;\n",
-                     pad, i,
-                     pad, p,
-                     pad, i, p, p, p, p,
-                     pad,
-                     pad, p, p, p,
-                     pad, i,
-                     pad,
+                     "%sdevice uchar *row%d = p%d + y * buf_rbs[%d];"
+                     " uint ps%d = buf_szs[%d]/4;\n"
+                     "%sfloat v%d = float(((device half*)row%d)[x]);\n"
+                     "%sfloat v%d_1 = float(((device half*)(row%d+ps%d))[x]);\n"
+                     "%sfloat v%d_2 = float(((device half*)(row%d+2*ps%d))[x]);\n"
+                     "%sfloat v%d_3 = float(((device half*)(row%d+3*ps%d))[x]);\n",
+                     pad, i, p, p, i, p,
                      pad, i, i,
-                     pad, i, i,
-                     pad, i, i,
-                     pad, i, i);
+                     pad, i, i, i,
+                     pad, i, i, i,
+                     pad, i, i, i);
             } break;
             case op_store_8888: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 emit(b,
-                     "%s((device uint*)(p%d + y * buf_rbs[%d]))[x]"
-                     " = pack_float_to_unorm4x8(clamp(float4(%s,%s,%s,%s), 0.0, 1.0));\n",
+                     "%s{\n"
+                     "%s    uint ri = uint(int(rint(clamp(%s, 0.0f, 1.0f) * 255.0f)));\n"
+                     "%s    uint gi = uint(int(rint(clamp(%s, 0.0f, 1.0f) * 255.0f)));\n"
+                     "%s    uint bi = uint(int(rint(clamp(%s, 0.0f, 1.0f) * 255.0f)));\n"
+                     "%s    uint ai = uint(int(rint(clamp(%s, 0.0f, 1.0f) * 255.0f)));\n"
+                     "%s    ((device uint*)(p%d + y * buf_rbs[%d]))[x]"
+                     " = ri | (gi << 8) | (bi << 16) | (ai << 24);\n"
+                     "%s}\n",
+                     pad,
+                     pad, fv(_fx, vx, xid, is_f),
+                     pad, fv(_fy, vy, yid, is_f),
+                     pad, fv(_fz, vz, zid, is_f),
+                     pad, fv(_fw, vw, wid, is_f),
                      pad, p, p,
-                     fv(_fx, vx, xid, is_f),
-                     fv(_fy, vy, yid, is_f),
-                     fv(_fz, vz, zid, is_f),
-                     fv(_fw, vw, wid, is_f));
+                     pad);
             } break;
             case op_store_565: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 emit(b,
-                     "%s((device ushort*)(p%d + y * buf_rbs[%d]))[x]"
-                     " = pack_float_to_unorm565("
-                     "clamp(float3(%s,%s,%s).zyx, 0.0, 1.0));\n",
+                     "%s{\n"
+                     "%s    uint ri = uint(int(rint(clamp(%s, 0.0f, 1.0f) * 31.0f)));\n"
+                     "%s    uint gi = uint(int(rint(clamp(%s, 0.0f, 1.0f) * 63.0f)));\n"
+                     "%s    uint bi = uint(int(rint(clamp(%s, 0.0f, 1.0f) * 31.0f)));\n"
+                     "%s    ((device ushort*)(p%d + y * buf_rbs[%d]))[x]"
+                     " = ushort((ri << 11) | (gi << 5) | bi);\n"
+                     "%s}\n",
+                     pad,
+                     pad, fv(_fx, vx, xid, is_f),
+                     pad, fv(_fy, vy, yid, is_f),
+                     pad, fv(_fz, vz, zid, is_f),
                      pad, p, p,
-                     fv(_fx, vx, xid, is_f),
-                     fv(_fy, vy, yid, is_f),
-                     fv(_fz, vz, zid, is_f));
+                     pad);
             } break;
             case op_store_1010102: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 emit(b,
-                     "%s((device uint*)(p%d + y * buf_rbs[%d]))[x]"
-                     " = pack_float_to_unorm10a2(clamp(float4(%s,%s,%s,%s), 0.0, 1.0));\n",
+                     "%s{\n"
+                     "%s    uint ri = uint(int(rint(clamp(%s, 0.0f, 1.0f) * 1023.0f)));\n"
+                     "%s    uint gi = uint(int(rint(clamp(%s, 0.0f, 1.0f) * 1023.0f)));\n"
+                     "%s    uint bi = uint(int(rint(clamp(%s, 0.0f, 1.0f) * 1023.0f)));\n"
+                     "%s    uint ai = uint(int(rint(clamp(%s, 0.0f, 1.0f) * 3.0f)));\n"
+                     "%s    ((device uint*)(p%d + y * buf_rbs[%d]))[x]"
+                     " = ri | (gi << 10) | (bi << 20) | (ai << 30);\n"
+                     "%s}\n",
+                     pad,
+                     pad, fv(_fx, vx, xid, is_f),
+                     pad, fv(_fy, vy, yid, is_f),
+                     pad, fv(_fz, vz, zid, is_f),
+                     pad, fv(_fw, vw, wid, is_f),
                      pad, p, p,
-                     fv(_fx, vx, xid, is_f),
-                     fv(_fy, vy, yid, is_f),
-                     fv(_fz, vz, zid, is_f),
-                     fv(_fw, vw, wid, is_f));
+                     pad);
             } break;
             case op_store_fp16x4: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 emit(b,
-                     "%sfloat4 sc%d = float4(%s, %s, %s, %s);\n"
-                     "%sif (planes_p%d == 1) {\n"
-                     "%s    tex_p%d_0.write(float4(half4(sc%d)), uint2(x,y));\n"
-                     "%s} else {\n"
+                     "%s{\n"
                      "%s    device half *hp = (device half*)"
                      "(p%d + y * buf_rbs[%d]) + x*4;\n"
-                     "%s    hp[0]=half(sc%d.x); hp[1]=half(sc%d.y);"
-                     " hp[2]=half(sc%d.z); hp[3]=half(sc%d.w);\n"
+                     "%s    hp[0] = half(%s); hp[1] = half(%s);"
+                     " hp[2] = half(%s); hp[3] = half(%s);\n"
                      "%s}\n",
-                     pad, i,
+                     pad,
+                     pad, p, p,
+                     pad,
                      fv(_fx, vx, xid, is_f),
                      fv(_fy, vy, yid, is_f),
                      fv(_fz, vz, zid, is_f),
                      fv(_fw, vw, wid, is_f),
-                     pad, p,
-                     pad, p, i,
-                     pad,
-                     pad, p, p,
-                     pad, i, i, i, i,
                      pad);
             } break;
             case op_store_fp16x4_planar: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 emit(b,
-                     "%sfloat4 sc%d = float4(%s, %s, %s, %s);\n"
-                     "%sif (planes_p%d == 4) {\n"
-                     "%s    half4 tw%d = half4(sc%d);\n"
-                     "%s    tex_p%d_0.write(float4(tw%d.x,0,0,0), uint2(x,y));\n"
-                     "%s    tex_p%d_1.write(float4(tw%d.y,0,0,0), uint2(x,y));\n"
-                     "%s    tex_p%d_2.write(float4(tw%d.z,0,0,0), uint2(x,y));\n"
-                     "%s    tex_p%d_3.write(float4(tw%d.w,0,0,0), uint2(x,y));\n"
-                     "%s} else {\n"
+                     "%s{\n"
                      "%s    device uchar *row = p%d + y * buf_rbs[%d];"
                      " uint ps = buf_szs[%d]/4;\n"
-                     "%s    ((device half*)row)[x] = half(sc%d.x);"
-                     " ((device half*)(row+ps))[x] = half(sc%d.y);"
-                     " ((device half*)(row+2*ps))[x] = half(sc%d.z);"
-                     " ((device half*)(row+3*ps))[x] = half(sc%d.w);\n"
+                     "%s    ((device half*)row)[x] = half(%s);"
+                     " ((device half*)(row+ps))[x] = half(%s);"
+                     " ((device half*)(row+2*ps))[x] = half(%s);"
+                     " ((device half*)(row+3*ps))[x] = half(%s);\n"
                      "%s}\n",
-                     pad, i,
+                     pad,
+                     pad, p, p, p,
+                     pad,
                      fv(_fx, vx, xid, is_f),
                      fv(_fy, vy, yid, is_f),
                      fv(_fz, vz, zid, is_f),
                      fv(_fw, vw, wid, is_f),
-                     pad, p,
-                     pad, i, i,
-                     pad, p, i,
-                     pad, p, i,
-                     pad, p, i,
-                     pad, p, i,
-                     pad,
-                     pad, p, p, p,
-                     pad, i, i, i, i,
                      pad);
             } break;
 
@@ -916,10 +871,7 @@ static void emit_ops(Buf *b, BB const *bb,
 static char* build_source(BB const *bb,
                            int *out_max_ptr,
                            int *out_total_bufs,
-                           int *out_deref_buf,
-                           struct color_buf_info **out_color_bufs,
-                           int *out_n_color_bufs,
-                           int *out_n_textures) {
+                           int *out_deref_buf) {
     int max_ptr = -1;
     for (int i = 0; i < bb->insts; i++) {
         if (has_ptr(bb->inst[i].op)
@@ -954,63 +906,11 @@ static char* build_source(BB const *bb,
         }
     }
 
-    int n_color_bufs = 0;
-    struct color_buf_info *color_bufs = calloc((size_t)(total_bufs + 1), sizeof *color_bufs);
-    for (int i = 0; i < bb->insts; i++) {
-        enum op op = bb->inst[i].op;
-        if (op != op_load_fp16x4 && op != op_load_fp16x4_planar
-         && op != op_store_fp16x4 && op != op_store_fp16x4_planar) { continue; }
-        int p = bb->inst[i].ptr < 0
-            ? deref_buf[~bb->inst[i].ptr]
-            : bb->inst[i].ptr;
-        int found = -1;
-        for (int c = 0; c < n_color_bufs; c++) {
-            if (color_bufs[c].buf_idx == p) { found = c; break; }
-        }
-        if (found < 0) {
-            found = n_color_bufs++;
-            color_bufs[found].buf_idx = p;
-        }
-        if (op == op_load_fp16x4 || op == op_load_fp16x4_planar) { color_bufs[found].read  = 1; }
-        if (op == op_store_fp16x4 || op == op_store_fp16x4_planar) { color_bufs[found].write = 1; }
-    }
-    int n_textures = 0;
-    for (int c = 0; c < n_color_bufs; c++) {
-        color_bufs[c].tex_base = n_textures;
-        n_textures += 4;
-    }
-    *out_color_bufs  = color_bufs;
-    *out_n_color_bufs = n_color_bufs;
-    *out_n_textures  = n_textures;
-
     Buf b = {0};
 
     emit(&b,
          "#include <metal_stdlib>\n"
          "using namespace metal;\n\n");
-
-    int fc = 0;
-    for (int c = 0; c < n_color_bufs; c++) {
-        int p = color_bufs[c].buf_idx;
-        emit(&b,
-             "constant uint planes_p%d"
-             " [[function_constant(%d)]];\n",
-             p, fc++);
-        emit(&b,
-             "constant uint fmt_p%d"
-             " [[function_constant(%d)]];\n",
-             p, fc++);
-    }
-    if (n_color_bufs) {
-        emit(&b, "\n");
-        emit(&b,
-             "enum { FMT_8888=%d, FMT_565=%d,"
-             " FMT_1010102=%d, FMT_FP16=%d,"
-             " FMT_FP16_PLANAR=%d };\n\n",
-             umbra_fmt_8888, umbra_fmt_565,
-             umbra_fmt_1010102, umbra_fmt_fp16,
-             umbra_fmt_fp16_planar);
-    }
 
     emit(&b,
          "static inline int safe_ix"
@@ -1056,19 +956,6 @@ static char* build_source(BB const *bb,
                  " [[buffer(%d)]]",
                  deref_buf[i],
                  deref_buf[i]);
-        }
-    }
-    for (int c = 0; c < n_color_bufs; c++) {
-        int p = color_bufs[c].buf_idx;
-        int tb = color_bufs[c].tex_base;
-        char const *acc = (color_bufs[c].read && color_bufs[c].write)
-            ? "read_write"
-            : color_bufs[c].write ? "write" : "read";
-        for (int t = 0; t < 4; t++) {
-            emit(&b,
-                 ",\n    texture2d<float, access::%s>"
-                 " tex_p%d_%d [[texture(%d)]]",
-                 acc, p, t, tb + t);
         }
     }
     emit(&b,
@@ -1144,102 +1031,6 @@ static void umbra_metal_backend_free(struct metal_backend *be) {
     }
 }
 
-static MTLPixelFormat fmt_to_mtl(umbra_fmt fmt) {
-    switch (fmt) {
-    case umbra_fmt_8888:        return MTLPixelFormatRGBA8Unorm;
-    case umbra_fmt_565:         return MTLPixelFormatR16Uint;
-    case umbra_fmt_1010102:     return MTLPixelFormatRGB10A2Unorm;
-    case umbra_fmt_fp16:        return MTLPixelFormatRGBA16Float;
-    case umbra_fmt_fp16_planar: return MTLPixelFormatR16Float;
-    }
-    return MTLPixelFormatRGBA8Unorm;
-}
-
-static int fmt_to_planes(umbra_fmt fmt) {
-    switch (fmt) {
-    case umbra_fmt_8888:        return 1;
-    case umbra_fmt_1010102:     return 1;
-    case umbra_fmt_fp16:        return 1;
-    case umbra_fmt_fp16_planar: return 4;
-    case umbra_fmt_565:         return 0;
-    }
-    return 0;
-}
-
-static id<MTLComputePipelineState> make_pipeline(
-    struct umbra_metal *m,
-    id<MTLDevice> device,
-    uint32_t const *planes,
-    uint32_t const *fmts,
-    int *out_tg_size
-) {
-    id<MTLLibrary> lib = (__bridge id<MTLLibrary>)m->library;
-    MTLFunctionConstantValues *cv = [MTLFunctionConstantValues new];
-    int fc = 0;
-    for (int c = 0; c < m->n_color_bufs; c++) {
-        [cv setConstantValue:&planes[c] type:MTLDataTypeUInt atIndex:(NSUInteger)fc++];
-        [cv setConstantValue:&fmts[c]   type:MTLDataTypeUInt atIndex:(NSUInteger)fc++];
-    }
-    NSError *error = nil;
-    id<MTLFunction> func = [lib newFunctionWithName:@"umbra_entry"
-                                     constantValues:cv
-                                              error:&error];
-    if (!func) { return nil; }
-    id<MTLComputePipelineState> pso =
-        [device newComputePipelineStateWithFunction:func error:&error];
-    if (pso && out_tg_size) {
-        *out_tg_size = (int)pso.maxTotalThreadsPerThreadgroup;
-    }
-    return pso;
-}
-
-static id<MTLComputePipelineState> get_pipeline(
-    struct umbra_metal *m,
-    umbra_buf buf[],
-    id<MTLDevice> device,
-    int *out_tg_size
-) {
-    uint32_t planes[64], fmts[64];
-    uint64_t key = 0;
-    for (int c = 0; c < m->n_color_bufs; c++) {
-        int bi = m->color_bufs[c].buf_idx;
-        int pl = (bi <= m->max_ptr) ? fmt_to_planes(buf[bi].fmt) : 0;
-        uint32_t fm = (bi <= m->max_ptr) ? (uint32_t)buf[bi].fmt : 0;
-        if (pl > 0 && bi <= m->max_ptr) {
-            if (buf[bi].row_bytes == 0) { pl = 0; }
-            else {
-                NSUInteger min_align = [device
-                    minimumLinearTextureAlignmentForPixelFormat:
-                        fmt_to_mtl(buf[bi].fmt)];
-                if (min_align > 0 && (buf[bi].row_bytes % min_align) != 0) {
-                    pl = 0;
-                }
-            }
-        }
-        planes[c] = (uint32_t)pl;
-        fmts[c]   = fm;
-        key = key * 131 + (uint64_t)pl * 7 + fm;
-    }
-    for (int i = 0; i < m->n_pipelines; i++) {
-        if (m->pipelines[i].key == key) {
-            *out_tg_size = m->pipelines[i].tg_size;
-            return (__bridge id<MTLComputePipelineState>)m->pipelines[i].pipeline;
-        }
-    }
-    int tg = 0;
-    id<MTLComputePipelineState> pso = make_pipeline(m, device, planes, fmts, &tg);
-    if (!pso) { return nil; }
-    if (m->n_pipelines >= m->pipelines_cap) {
-        m->pipelines_cap = m->pipelines_cap ? 2 * m->pipelines_cap : 8;
-        m->pipelines = realloc(m->pipelines,
-                               (size_t)m->pipelines_cap * sizeof *m->pipelines);
-    }
-    m->pipelines[m->n_pipelines++] = (struct pipeline_entry){
-        .key=key, .pipeline=(__bridge_retained void*)pso, .tg_size=tg,
-    };
-    *out_tg_size = tg;
-    return pso;
-}
 
 static struct umbra_metal* umbra_metal(
     struct metal_backend *be, BB const *bb
@@ -1252,10 +1043,7 @@ static struct umbra_metal* umbra_metal(
 
         int *deref_buf = calloc((size_t)bb->insts, sizeof *deref_buf);
         int  max_ptr = -1, total_bufs = 0;
-        struct color_buf_info *color_bufs = 0;
-        int n_color_bufs = 0, n_textures = 0;
-        char *src = build_source(bb, &max_ptr, &total_bufs, deref_buf,
-                                 &color_bufs, &n_color_bufs, &n_textures);
+        char *src = build_source(bb, &max_ptr, &total_bufs, deref_buf);
 
         int n_deref = 0;
         for (int i = 0; i < bb->insts; i++) {
@@ -1276,8 +1064,11 @@ static struct umbra_metal* umbra_metal(
             }
         }
 
-        NSString *source = [NSString stringWithUTF8String:src];
         NSError *error = nil;
+        id<MTLLibrary> library = nil;
+        id<MTLFunction> func = nil;
+        id<MTLComputePipelineState> pso = nil;
+
         MTLCompileOptions *opts = [MTLCompileOptions new];
         if (@available(macOS 15.0, *)) {
             opts.mathMode = MTLMathModeSafe;
@@ -1288,56 +1079,39 @@ static struct umbra_metal* umbra_metal(
 #pragma clang diagnostic pop
         }
 
-        id<MTLLibrary> library;
-        struct umbra_metal *m;
-
-        library = [device newLibraryWithSource:source options:opts error:&error];
+        NSString *source = [NSString stringWithUTF8String:src];
+        library = [device newLibraryWithSource:source
+                                       options:opts
+                                         error:&error];
         if (!library) {
             NSLog(@"Metal compile error: %@", error);
             goto fail;
         }
 
-        m = calloc(1, sizeof *m);
-        m->library       = (__bridge_retained void*)library;
-        m->color_bufs    = color_bufs;
-        m->n_color_bufs  = n_color_bufs;
-        m->n_textures    = n_textures;
-        m->src           = src;
-        m->max_ptr       = max_ptr;
-        m->total_bufs    = total_bufs;
-        m->per_bufs      = calloc((size_t)total_bufs, sizeof *m->per_bufs);
-        m->deref         = di;
-        m->n_deref       = n_deref;
+        func = [library newFunctionWithName:@"umbra_entry"];
+        if (!func) { goto fail; }
+        pso = [device newComputePipelineStateWithFunction:func error:&error];
+        if (!pso) { goto fail; }
 
         {
-            uint32_t *def_planes = calloc((size_t)(n_color_bufs + 1), sizeof *def_planes);
-            uint32_t *def_fmts   = calloc((size_t)(n_color_bufs + 1), sizeof *def_fmts);
-            int tg = 0;
-            id<MTLComputePipelineState> pso = make_pipeline(m, device, def_planes, def_fmts, &tg);
-            free(def_planes);
-            free(def_fmts);
-            if (!pso) { goto fail2; }
-            m->tg_size = tg;
-            m->pipelines_cap = 8;
-            m->pipelines = calloc((size_t)m->pipelines_cap, sizeof *m->pipelines);
-            m->pipelines[0] = (struct pipeline_entry){
-                .key=0, .pipeline=(__bridge_retained void*)pso, .tg_size=tg,
-            };
-            m->n_pipelines = 1;
+            struct umbra_metal *m = calloc(1, sizeof *m);
+            m->pipeline      = (__bridge_retained void*)pso;
+            m->tg_size       = (int)pso.maxTotalThreadsPerThreadgroup;
+            m->src           = src;
+            m->max_ptr       = max_ptr;
+            m->total_bufs    = total_bufs;
+            m->per_bufs      = calloc((size_t)total_bufs, sizeof *m->per_bufs);
+            m->deref         = di;
+            m->n_deref       = n_deref;
+
+            free(deref_buf);
+            result = m;
+            goto out;
         }
 
-        free(deref_buf);
-        result = m;
-        goto out;
-
-    fail2:
-        (void)(__bridge_transfer id)m->library;
-        free(m->per_bufs);
-        free(m);
     fail:
         free(deref_buf);
         free(di);
-        free(color_bufs);
         free(src);
     out:;
     }
@@ -1386,9 +1160,8 @@ static void encode_dispatch(
     id<MTLDevice> device =
         (__bridge id<MTLDevice>)be->device;
 
-    int tg_size = 0;
-    id<MTLComputePipelineState> pso = get_pipeline(m, buf, device, &tg_size);
-    assert(pso);
+    id<MTLComputePipelineState> pso =
+        (__bridge id<MTLComputePipelineState>)m->pipeline;
     [enc setComputePipelineState:pso];
 
     int tb = m->total_bufs;
@@ -1588,64 +1361,7 @@ static void encode_dispatch(
             offset:0
            atIndex:(NSUInteger)(m->total_bufs + 4)];
 
-    for (int c = 0; c < m->n_color_bufs; c++) {
-        int bi = m->color_bufs[c].buf_idx;
-        if (bi > m->max_ptr || !m->per_bufs[bi]) { continue; }
-        int planes = fmt_to_planes(buf[bi].fmt);
-        if (planes <= 0) { continue; }
-        if (buf[bi].row_bytes == 0) { continue; }
-        NSUInteger min_align = [device
-            minimumLinearTextureAlignmentForPixelFormat:
-                fmt_to_mtl(buf[bi].fmt)];
-        if (min_align > 0 && (buf[bi].row_bytes % min_align) != 0) { continue; }
-
-        id<MTLBuffer> mtlBuf =
-            (__bridge id<MTLBuffer>)m->per_bufs[bi];
-        size_t pb = umbra_fmt_size(buf[bi].fmt);
-        int tex_base = m->color_bufs[c].tex_base;
-
-        if (planes == 1) {
-            NSUInteger tw = (NSUInteger)(buf[bi].row_bytes / pb);
-            NSUInteger th = (NSUInteger)(buf[bi].sz / buf[bi].row_bytes);
-            MTLTextureDescriptor *desc = [MTLTextureDescriptor
-                texture2DDescriptorWithPixelFormat:fmt_to_mtl(buf[bi].fmt)
-                                             width:tw
-                                            height:th
-                                         mipmapped:NO];
-            desc.usage = (MTLTextureUsage)(MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite);
-            desc.storageMode = MTLStorageModeShared;
-            id<MTLTexture> tex = [mtlBuf
-                newTextureWithDescriptor:desc
-                                  offset:(NSUInteger)offsets[bi]
-                             bytesPerRow:(NSUInteger)buf[bi].row_bytes];
-            if (tex) {
-                [enc setTexture:tex atIndex:(NSUInteger)tex_base];
-                batch_retain_buf(be, (__bridge_retained void*)tex);
-            }
-        } else if (planes == 4) {
-            size_t plane_stride = buf[bi].sz / 4;
-            NSUInteger tw = (NSUInteger)(buf[bi].row_bytes / 2);
-            NSUInteger th = (NSUInteger)(plane_stride / buf[bi].row_bytes);
-            for (int p = 0; p < 4; p++) {
-                MTLTextureDescriptor *desc = [MTLTextureDescriptor
-                    texture2DDescriptorWithPixelFormat:MTLPixelFormatR16Float
-                                                 width:tw
-                                                height:th
-                                             mipmapped:NO];
-                desc.usage = (MTLTextureUsage)(MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite);
-                desc.storageMode = MTLStorageModeShared;
-                id<MTLTexture> tex = [mtlBuf
-                    newTextureWithDescriptor:desc
-                                      offset:(NSUInteger)(offsets[bi] + (size_t)p * plane_stride)
-                                 bytesPerRow:(NSUInteger)buf[bi].row_bytes];
-                if (tex) {
-                    [enc setTexture:tex atIndex:(NSUInteger)(tex_base + p)];
-                    batch_retain_buf(be, (__bridge_retained void*)tex);
-                }
-            }
-        }
-    }
-
+    int tg_size = m->tg_size;
     MTLSize grid =
         MTLSizeMake((NSUInteger)w, (NSUInteger)h, 1);
     int gx = 1, gy = 1;
@@ -1760,17 +1476,10 @@ static void umbra_metal_flush(struct metal_backend *be) {
 static void umbra_metal_free(struct umbra_metal *m) {
     assert(m);
     @autoreleasepool {
-        if (m->library) {
-            (void)(__bridge_transfer id)m->library;
-        }
-        for (int i = 0; i < m->n_pipelines; i++) {
-            if (m->pipelines[i].pipeline) {
-                (void)(__bridge_transfer id)m->pipelines[i].pipeline;
-            }
+        if (m->pipeline) {
+            (void)(__bridge_transfer id)m->pipeline;
         }
     }
-    free(m->pipelines);
-    free(m->color_bufs);
     free(m->per_bufs);
     free(m->deref);
     free(m->batch_data);
