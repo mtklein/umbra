@@ -9,10 +9,7 @@ struct umbra_backend *umbra_backend_vulkan(void) { return 0; }
 
 #else
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Weverything"
 #include <vulkan/vulkan.h>
-#pragma clang diagnostic pop
 
 // ---------------------------------------------------------------------------
 //  SPIR-V constants.
