@@ -122,24 +122,24 @@ static void load_count(Buf *c, int p, int elem_shift, int const *deref_gpr) {
 static void vld(Buf *c, int vd, int s) { put(c, LDR_qi(vd, XS, s)); }
 static void vst(Buf *c, int vd, int s) { put(c, STR_qi(vd, XS, s)); }
 
-static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm,
-                          int scratch) {
+static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm,
+                         int scratch) {
     switch ((int)op) {
-    case op_add_f32: put(c, FADD_4s(d, x, y)); return 1;
-    case op_sub_f32: put(c, FSUB_4s(d, x, y)); return 1;
-    case op_mul_f32: put(c, FMUL_4s(d, x, y)); return 1;
-    case op_div_f32: put(c, FDIV_4s(d, x, y)); return 1;
-    case op_min_f32: put(c, FMINNM_4s(d, x, y)); return 1;
-    case op_max_f32: put(c, FMAXNM_4s(d, x, y)); return 1;
-    case op_sqrt_f32: put(c, FSQRT_4s(d, x)); return 1;
-    case op_abs_f32: put(c, FABS_4s(d, x)); return 1;
-    case op_neg_f32: put(c, FNEG_4s(d, x)); return 1;
-    case op_round_f32: put(c, FRINTN_4s(d, x)); return 1;
-    case op_floor_f32: put(c, FRINTM_4s(d, x)); return 1;
-    case op_ceil_f32: put(c, FRINTP_4s(d, x)); return 1;
-    case op_round_i32: put(c, FCVTNS_4s(d, x)); return 1;
-    case op_floor_i32: put(c, FCVTMS_4s(d, x)); return 1;
-    case op_ceil_i32: put(c, FCVTPS_4s(d, x)); return 1;
+    case op_add_f32: put(c, FADD_4s(d, x, y)); break;
+    case op_sub_f32: put(c, FSUB_4s(d, x, y)); break;
+    case op_mul_f32: put(c, FMUL_4s(d, x, y)); break;
+    case op_div_f32: put(c, FDIV_4s(d, x, y)); break;
+    case op_min_f32: put(c, FMINNM_4s(d, x, y)); break;
+    case op_max_f32: put(c, FMAXNM_4s(d, x, y)); break;
+    case op_sqrt_f32: put(c, FSQRT_4s(d, x)); break;
+    case op_abs_f32: put(c, FABS_4s(d, x)); break;
+    case op_neg_f32: put(c, FNEG_4s(d, x)); break;
+    case op_round_f32: put(c, FRINTN_4s(d, x)); break;
+    case op_floor_f32: put(c, FRINTM_4s(d, x)); break;
+    case op_ceil_f32: put(c, FRINTP_4s(d, x)); break;
+    case op_round_i32: put(c, FCVTNS_4s(d, x)); break;
+    case op_floor_i32: put(c, FCVTMS_4s(d, x)); break;
+    case op_ceil_i32: put(c, FCVTPS_4s(d, x)); break;
     case op_fma_f32:
         if (d == z) {
             put(c, FMLA_4s(d, x, y));
@@ -151,7 +151,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
             put(c, FMLA_4s(scratch, x, y));
             put(c, ORR_16b(d, scratch, scratch));
         }
-        return 1;
+        break;
     case op_fms_f32:
         if (d == z) {
             put(c, FMLS_4s(d, x, y));
@@ -163,37 +163,37 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
             put(c, FMLS_4s(scratch, x, y));
             put(c, ORR_16b(d, scratch, scratch));
         }
-        return 1;
+        break;
 
-    case op_add_i32: put(c, ADD_4s(d, x, y)); return 1;
-    case op_sub_i32: put(c, SUB_4s(d, x, y)); return 1;
-    case op_mul_i32: put(c, MUL_4s(d, x, y)); return 1;
-    case op_shl_i32: put(c, USHL_4s(d, x, y)); return 1;
+    case op_add_i32: put(c, ADD_4s(d, x, y)); break;
+    case op_sub_i32: put(c, SUB_4s(d, x, y)); break;
+    case op_mul_i32: put(c, MUL_4s(d, x, y)); break;
+    case op_shl_i32: put(c, USHL_4s(d, x, y)); break;
     case op_shr_u32:
         put(c, NEG_4s(scratch, y));
         put(c, USHL_4s(d, x, scratch));
-        return 1;
+        break;
     case op_shr_s32:
         put(c, NEG_4s(scratch, y));
         put(c, SSHL_4s(d, x, scratch));
-        return 1;
+        break;
 
-    case op_f32_from_i32: put(c, SCVTF_4s(d, x)); return 1;
-    case op_i32_from_f32: put(c, FCVTZS_4s(d, x)); return 1;
+    case op_f32_from_i32: put(c, SCVTF_4s(d, x)); break;
+    case op_i32_from_f32: put(c, FCVTZS_4s(d, x)); break;
 
-    case op_eq_f32: put(c, FCMEQ_4s(d, x, y)); return 1;
-    case op_lt_f32: put(c, FCMGT_4s(d, y, x)); return 1;
-    case op_le_f32: put(c, FCMGE_4s(d, y, x)); return 1;
+    case op_eq_f32: put(c, FCMEQ_4s(d, x, y)); break;
+    case op_lt_f32: put(c, FCMGT_4s(d, y, x)); break;
+    case op_le_f32: put(c, FCMGE_4s(d, y, x)); break;
 
-    case op_eq_i32: put(c, CMEQ_4s(d, x, y)); return 1;
-    case op_lt_s32: put(c, CMGT_4s(d, y, x)); return 1;
-    case op_le_s32: put(c, CMGE_4s(d, y, x)); return 1;
-    case op_lt_u32: put(c, CMHI_4s(d, y, x)); return 1;
-    case op_le_u32: put(c, CMHS_4s(d, y, x)); return 1;
+    case op_eq_i32: put(c, CMEQ_4s(d, x, y)); break;
+    case op_lt_s32: put(c, CMGT_4s(d, y, x)); break;
+    case op_le_s32: put(c, CMGE_4s(d, y, x)); break;
+    case op_lt_u32: put(c, CMHI_4s(d, y, x)); break;
+    case op_le_u32: put(c, CMHS_4s(d, y, x)); break;
 
-    case op_and_32: put(c, AND_16b(d, x, y)); return 1;
-    case op_or_32: put(c, ORR_16b(d, x, y)); return 1;
-    case op_xor_32: put(c, EOR_16b(d, x, y)); return 1;
+    case op_and_32: put(c, AND_16b(d, x, y)); break;
+    case op_or_32: put(c, ORR_16b(d, x, y)); break;
+    case op_xor_32: put(c, EOR_16b(d, x, y)); break;
     case op_sel_32:
         if (d == x) {
             put(c, BSL_16b(d, y, z));
@@ -205,10 +205,10 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
             put(c, ORR_16b(d, z, z));
             put(c, BIT_16b(d, y, x));
         }
-        return 1;
-    case op_shl_i32_imm: put(c, SHL_4s_imm(d, x, imm)); return 1;
-    case op_shr_u32_imm: put(c, USHR_4s_imm(d, x, imm)); return 1;
-    case op_shr_s32_imm: put(c, SSHR_4s_imm(d, x, imm)); return 1;
+        break;
+    case op_shl_i32_imm: put(c, SHL_4s_imm(d, x, imm)); break;
+    case op_shr_u32_imm: put(c, USHR_4s_imm(d, x, imm)); break;
+    case op_shr_s32_imm: put(c, SSHR_4s_imm(d, x, imm)); break;
     case op_pack:
         if (d == x) {
             put(c, SLI_4s_imm(d, y, imm));
@@ -220,9 +220,9 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
             put(c, SLI_4s_imm(scratch, y, imm));
             put(c, ORR_16b(d, scratch, scratch));
         }
-        return 1;
+        break;
 
-    default: return 0;
+    default: assert(0); break;
     }
 }
 
@@ -1240,30 +1240,30 @@ static struct ra *ra_create_x86(struct umbra_basic_block const *bb, struct jit_c
     return ra_create(bb, &cfg);
 }
 
-static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm,
-                          int scratch, int scratch2) {
+static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm,
+                         int scratch, int scratch2) {
     switch ((int)op) {
-    case op_imm_32: broadcast_imm32(c, d, (uint32_t)imm); return 1;
+    case op_imm_32: broadcast_imm32(c, d, (uint32_t)imm); break;
 
-    case op_add_f32: vaddps(c, d, x, y); return 1;
-    case op_sub_f32: vsubps(c, d, x, y); return 1;
-    case op_mul_f32: vmulps(c, d, x, y); return 1;
-    case op_div_f32: vdivps(c, d, x, y); return 1;
-    case op_min_f32: vminps(c, d, x, y); return 1;
-    case op_max_f32: vmaxps(c, d, x, y); return 1;
-    case op_sqrt_f32: vsqrtps(c, d, x); return 1;
-    case op_round_f32: vroundps(c, d, x, 0); return 1;
-    case op_floor_f32: vroundps(c, d, x, 1); return 1;
-    case op_ceil_f32: vroundps(c, d, x, 2); return 1;
-    case op_round_i32: vcvtps2dq(c, d, x); return 1;
+    case op_add_f32: vaddps(c, d, x, y); break;
+    case op_sub_f32: vsubps(c, d, x, y); break;
+    case op_mul_f32: vmulps(c, d, x, y); break;
+    case op_div_f32: vdivps(c, d, x, y); break;
+    case op_min_f32: vminps(c, d, x, y); break;
+    case op_max_f32: vmaxps(c, d, x, y); break;
+    case op_sqrt_f32: vsqrtps(c, d, x); break;
+    case op_round_f32: vroundps(c, d, x, 0); break;
+    case op_floor_f32: vroundps(c, d, x, 1); break;
+    case op_ceil_f32: vroundps(c, d, x, 2); break;
+    case op_round_i32: vcvtps2dq(c, d, x); break;
     case op_floor_i32:
         vroundps(c, d, x, 1);
         vcvttps2dq(c, d, d);
-        return 1;
+        break;
     case op_ceil_i32:
         vroundps(c, d, x, 2);
         vcvttps2dq(c, d, d);
-        return 1;
+        break;
     case op_fma_f32:
         if (d == x) {
             vfmadd132ps(c, d, z, y);
@@ -1275,7 +1275,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
             vmovaps(c, d, z);
             vfmadd231ps(c, d, x, y);
         }
-        return 1;
+        break;
     case op_fms_f32:
         if (d == x) {
             vfnmadd132ps(c, d, z, y);
@@ -1287,47 +1287,47 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
             vmovaps(c, d, z);
             vfnmadd231ps(c, d, x, y);
         }
-        return 1;
+        break;
 
-    case op_add_i32: vpaddd(c, d, x, y); return 1;
-    case op_sub_i32: vpsubd(c, d, x, y); return 1;
-    case op_mul_i32: vpmulld(c, d, x, y); return 1;
-    case op_shl_i32: vpsllvd(c, d, x, y); return 1;
-    case op_shr_u32: vpsrlvd(c, d, x, y); return 1;
-    case op_shr_s32: vpsravd(c, d, x, y); return 1;
+    case op_add_i32: vpaddd(c, d, x, y); break;
+    case op_sub_i32: vpsubd(c, d, x, y); break;
+    case op_mul_i32: vpmulld(c, d, x, y); break;
+    case op_shl_i32: vpsllvd(c, d, x, y); break;
+    case op_shr_u32: vpsrlvd(c, d, x, y); break;
+    case op_shr_s32: vpsravd(c, d, x, y); break;
 
-    case op_and_32: vpand(c, 1, d, x, y); return 1;
-    case op_or_32: vpor(c, 1, d, x, y); return 1;
-    case op_xor_32: vpxor_3(c, 1, d, x, y); return 1;
-    case op_sel_32: vpblendvb(c, 1, d, z, y, x); return 1;
+    case op_and_32: vpand(c, 1, d, x, y); break;
+    case op_or_32: vpor(c, 1, d, x, y); break;
+    case op_xor_32: vpxor_3(c, 1, d, x, y); break;
+    case op_sel_32: vpblendvb(c, 1, d, z, y, x); break;
 
-    case op_f32_from_i32: vcvtdq2ps(c, d, x); return 1;
-    case op_i32_from_f32: vcvttps2dq(c, d, x); return 1;
+    case op_f32_from_i32: vcvtdq2ps(c, d, x); break;
+    case op_i32_from_f32: vcvttps2dq(c, d, x); break;
 
-    case op_eq_f32: vcmpps(c, d, x, y, 0); return 1;
-    case op_lt_f32: vcmpps(c, d, x, y, 1); return 1;
-    case op_le_f32: vcmpps(c, d, x, y, 2); return 1;
+    case op_eq_f32: vcmpps(c, d, x, y, 0); break;
+    case op_lt_f32: vcmpps(c, d, x, y, 1); break;
+    case op_le_f32: vcmpps(c, d, x, y, 2); break;
 
-    case op_eq_i32: vpcmpeqd(c, d, x, y); return 1;
-    case op_lt_s32: vpcmpgtd(c, d, y, x); return 1;
+    case op_eq_i32: vpcmpeqd(c, d, x, y); break;
+    case op_lt_s32: vpcmpgtd(c, d, y, x); break;
     case op_le_s32:
         vpcmpgtd(c, d, x, y);
         vpcmpeqd(c, scratch, scratch, scratch);
         vpxor_3(c, 1, d, d, scratch);
-        return 1;
+        break;
     case op_lt_u32:
         vex_rrr(c, 1, 2, 1, 0x3b, scratch2, x, y);
         vpcmpeqd(c, d, y, scratch2);
         vpcmpeqd(c, scratch, scratch, scratch);
         vpxor_3(c, 1, d, d, scratch);
-        return 1;
+        break;
     case op_le_u32:
         vex_rrr(c, 1, 2, 1, 0x3f, scratch, x, y);
         vpcmpeqd(c, d, y, scratch);
-        return 1;
-    case op_shl_i32_imm: vpslld_i(c, d, x, (uint8_t)imm); return 1;
-    case op_shr_u32_imm: vpsrld_i(c, d, x, (uint8_t)imm); return 1;
-    case op_shr_s32_imm: vpsrad_i(c, d, x, (uint8_t)imm); return 1;
+        break;
+    case op_shl_i32_imm: vpslld_i(c, d, x, (uint8_t)imm); break;
+    case op_shr_u32_imm: vpsrld_i(c, d, x, (uint8_t)imm); break;
+    case op_shr_s32_imm: vpsrad_i(c, d, x, (uint8_t)imm); break;
     case op_pack:
     case op_and_32_imm:
     case op_add_f32_imm:
@@ -1337,7 +1337,7 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_min_f32_imm:
     case op_max_f32_imm:
     case op_add_i32_imm:
-    default: return 0;
+    default: assert(0); break;
     }
 }
 
