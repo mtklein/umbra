@@ -199,6 +199,9 @@ struct vk_backend {
     VkCommandPool         cmd_pool;
     uint32_t              queue_family;
     uint32_t              mem_type_host;
+    uint32_t              mem_type_host_import; int :32;
+    PFN_vkGetMemoryHostPointerPropertiesEXT get_host_props;
+    VkDeviceSize          host_import_align;
     VkCommandBuffer       batch_cmd;
     VkFence               batch_fence;
     VkBuffer             *batch_bufs;
@@ -262,6 +265,7 @@ struct buf_cache_entry {
     void          *mapped;
     void          *host;
     VkDeviceSize   size;
+    _Bool          nocopy; int :24, :32;
 };
 
 struct vk_program {
@@ -2018,12 +2022,48 @@ static void vk_flush(struct umbra_backend *be);
 static void cache_buf(struct vk_backend *be, struct buf_cache_entry *ce,
                       void *host, size_t bytes, VkDeviceSize sz) {
     if (ce->buf && ce->host == host && ce->size >= sz) {
-        if (bytes) { memcpy(ce->mapped, host, bytes); }
+        if (bytes && !ce->nocopy) { memcpy(ce->mapped, host, bytes); }
         return;
     }
     if (ce->buf) {
         batch_track_buf(be, ce->buf, ce->mem);
     }
+    ce->nocopy = 0;
+
+    // Try zero-copy host import for page-aligned pointers.
+    VkDeviceSize align = be->host_import_align;
+    if (align && host && ((uintptr_t)host % align) == 0) {
+        VkDeviceSize import_sz = (sz + align - 1) & ~(align - 1);
+        VkBuffer buf = create_buffer(be->device, import_sz);
+        VkMemoryRequirements req;
+        vkGetBufferMemoryRequirements(be->device, buf, &req);
+        VkImportMemoryHostPointerInfoEXT imp = {
+            .sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_HOST_POINTER_INFO_EXT,
+            .handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT,
+            .pHostPointer = host,
+        };
+        VkMemoryAllocateInfo ai = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            .pNext = &imp,
+            .allocationSize = import_sz > req.size ? import_sz : req.size,
+            .memoryTypeIndex = be->mem_type_host_import,
+        };
+        VkDeviceMemory mem = VK_NULL_HANDLE;
+        if (vkAllocateMemory(be->device, &ai, 0, &mem) == VK_SUCCESS &&
+            vkBindBufferMemory(be->device, buf, mem, 0) == VK_SUCCESS) {
+            ce->buf    = buf;
+            ce->mem    = mem;
+            ce->size   = import_sz;
+            ce->mapped = host;
+            ce->host   = host;
+            ce->nocopy = 1;
+            return;
+        }
+        // Import failed — fall back.
+        if (mem) { vkFreeMemory(be->device, mem, 0); }
+        vkDestroyBuffer(be->device, buf, 0);
+    }
+
     ce->buf  = create_buffer(be->device, sz);
     ce->mem  = alloc_and_bind(be->device, ce->buf, be->mem_type_host);
     ce->size = sz;
@@ -2049,7 +2089,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
         VkDeviceSize sz = (VkDeviceSize)buf[i].sz;
         if (sz < 4) { sz = 4; }
         cache_buf(be, &vp->buf_cache[i], buf[i].ptr, buf[i].sz, sz);
-        if (!buf[i].read_only) {
+        if (!buf[i].read_only && !vp->buf_cache[i].nocopy) {
             batch_track_copy(be, buf[i].ptr, vp->buf_cache[i].mapped, buf[i].sz);
         }
     }
@@ -2084,7 +2124,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
         push_data[3 + bi] = (uint32_t)bytes;
         push_data[3 + vp->total_bufs + bi] = (uint32_t)drb;
 
-        if (!deref_read_only) {
+        if (!deref_read_only && !vp->buf_cache[bi].nocopy) {
             batch_track_copy(be, derived, vp->buf_cache[bi].mapped, bytes);
         }
     }
@@ -2357,9 +2397,12 @@ struct umbra_backend *umbra_backend_vulkan(void) {
             .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
             .apiVersion = VK_MAKE_VERSION(1, 0, 0),
         };
+        char const *inst_exts[] = { "VK_KHR_get_physical_device_properties2" };
         VkInstanceCreateInfo ci = {
             .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
             .pApplicationInfo = &app,
+            .enabledExtensionCount = 1,
+            .ppEnabledExtensionNames = inst_exts,
         };
         if (vkCreateInstance(&ci, 0, &instance) != VK_SUCCESS) { return 0; }
     }
@@ -2385,7 +2428,11 @@ struct umbra_backend *umbra_backend_vulkan(void) {
             .queueCount = 1,
             .pQueuePriorities = &prio,
         };
-        char const *exts[] = { "VK_KHR_16bit_storage" };
+        char const *exts[] = {
+            "VK_KHR_16bit_storage",
+            "VK_KHR_external_memory",
+            "VK_EXT_external_memory_host",
+        };
         VkPhysicalDevice16BitStorageFeatures f16 = {
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES,
             .storageBuffer16BitAccess = VK_TRUE,
@@ -2395,7 +2442,7 @@ struct umbra_backend *umbra_backend_vulkan(void) {
             .pNext = &f16,
             .queueCreateInfoCount = 1,
             .pQueueCreateInfos = &qci,
-            .enabledExtensionCount = 1,
+            .enabledExtensionCount = sizeof exts / sizeof *exts,
             .ppEnabledExtensionNames = exts,
         };
         if (vkCreateDevice(phys, &dci, 0, &device) != VK_SUCCESS) {
@@ -2421,14 +2468,67 @@ struct umbra_backend *umbra_backend_vulkan(void) {
         }
     }
 
+    // Query host import alignment.
+    VkDeviceSize host_import_align = 0;
+    {
+        PFN_vkVoidFunction fn =
+            vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceProperties2KHR");
+        PFN_vkGetPhysicalDeviceProperties2KHR getProps2;
+        memcpy(&getProps2, &fn, sizeof fn);
+        if (getProps2) {
+            VkPhysicalDeviceExternalMemoryHostPropertiesEXT host_props = {
+                .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_HOST_PROPERTIES_EXT,
+            };
+            VkPhysicalDeviceProperties2 props2 = {
+                .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+                .pNext = &host_props,
+            };
+            getProps2(phys, &props2);
+            host_import_align = host_props.minImportedHostPointerAlignment;
+        }
+    }
+
+    // Find memory type for host pointer import.
+    uint32_t mem_type_host_import = 0;
+    PFN_vkGetMemoryHostPointerPropertiesEXT get_host_props = 0;
+    if (host_import_align) {
+        PFN_vkVoidFunction fn2 =
+            vkGetDeviceProcAddr(device, "vkGetMemoryHostPointerPropertiesEXT");
+        memcpy(&get_host_props, &fn2, sizeof fn2);
+        if (get_host_props) {
+            // Probe with a page-aligned allocation to discover compatible memory types.
+            void *probe = 0;
+            posix_memalign(&probe, (size_t)host_import_align, (size_t)host_import_align);
+            VkMemoryHostPointerPropertiesEXT hp = {
+                .sType = VK_STRUCTURE_TYPE_MEMORY_HOST_POINTER_PROPERTIES_EXT,
+            };
+            if (get_host_props(device,
+                               VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT,
+                               probe, &hp) == VK_SUCCESS && hp.memoryTypeBits) {
+                // Pick the first compatible type.
+                for (uint32_t i = 0; i < 32; i++) {
+                    if (hp.memoryTypeBits & (1u << i)) { mem_type_host_import = i; break; }
+                }
+            } else {
+                host_import_align = 0;  // disable import
+            }
+            free(probe);
+        } else {
+            host_import_align = 0;  // disable import
+        }
+    }
+
     struct vk_backend *v = calloc(1, sizeof *v);
-    v->instance     = instance;
-    v->phys         = phys;
-    v->device       = device;
-    v->queue        = queue;
-    v->cmd_pool     = cmd_pool;
-    v->queue_family = (uint32_t)qf;
-    v->mem_type_host = find_host_memory(phys);
+    v->instance            = instance;
+    v->phys                = phys;
+    v->device              = device;
+    v->queue               = queue;
+    v->cmd_pool            = cmd_pool;
+    v->queue_family        = (uint32_t)qf;
+    v->mem_type_host       = find_host_memory(phys);
+    v->mem_type_host_import = mem_type_host_import;
+    v->host_import_align   = host_import_align;
+    v->get_host_props      = get_host_props;
     v->base.compile  = vk_compile;
     v->base.flush    = vk_flush;
     v->base.free     = vk_free;
