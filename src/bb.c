@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#pragma clang diagnostic ignored "-Wfloat-equal"
+
 static int       val_id  (umbra_val v)       { return ((val_){.bits = v.bits}).id; }
 static umbra_val val_make(int id, int chan)  { return (umbra_val){.bits = ((val_){.id=(unsigned)id, .chan=(unsigned)chan}).bits}; }
 
@@ -920,10 +922,7 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     case op_sel_32:  r.i = (x.i & y.i) | (~x.i & z.i); break;
     case op_f32_from_i32: r.f = (float)x.i; break;
     case op_i32_from_f32: r.i = (int32_t)x.f; break;
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wfloat-equal"
     case op_eq_f32: r.i = x.f == y.f ? -1 : 0; break;
-#pragma clang diagnostic pop
     case op_lt_f32: r.i = x.f <  y.f ? -1 : 0; break;
     case op_le_f32: r.i = x.f <= y.f ? -1 : 0; break;
     case op_eq_i32: r.i = x.i == y.i ? -1 : 0; break;

@@ -1,6 +1,8 @@
 #include "bb.h"
 #include <assert.h>
 
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
 #if !defined(__APPLE__) || defined(__wasm__)
 
 struct umbra_backend *umbra_backend_metal(void) { return 0; }
@@ -1012,10 +1014,7 @@ static struct umbra_metal* umbra_metal(
         if (@available(macOS 15.0, *)) {
             opts.mathMode = MTLMathModeSafe;
         } else {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
             opts.fastMathEnabled = NO;
-#pragma clang diagnostic pop
         }
 
         NSString *source = [NSString stringWithUTF8String:src];

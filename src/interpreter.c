@@ -4,6 +4,14 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#pragma clang diagnostic ignored "-Wsign-conversion"
+#pragma clang diagnostic ignored "-Wfloat-equal"
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wgnu-label-as-value"
+#else
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+
 #define cast(T, v) __builtin_convertvector(v, T)
 
 #define K 16
@@ -239,13 +247,6 @@ struct sw_inst {
     int x, y, z, w;
     int ptr;
 };
-#pragma clang diagnostic ignored "-Wsign-conversion"
-#pragma clang diagnostic ignored "-Wfloat-equal"
-#ifdef __clang__
-#pragma clang diagnostic ignored "-Wgnu-label-as-value"
-#else
-#pragma GCC diagnostic ignored "-Wpedantic"
-#endif
 
 struct umbra_interpreter {
     struct umbra_program base;
