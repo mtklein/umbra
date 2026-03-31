@@ -2021,7 +2021,11 @@ static void vk_flush(struct umbra_backend *be);
 
 static void cache_buf(struct vk_backend *be, struct buf_cache_entry *ce,
                       void *host, size_t bytes, VkDeviceSize sz, _Bool read_only) {
-    if (ce->buf && ce->host == host && ce->size >= sz) {
+    // Writable buffers can be cached — the GPU writes and we copyback on flush.
+    // Read-only buffers CANNOT be cached across dispatches within a batch because
+    // the host may modify them between queue() calls (e.g. slug curve loop index).
+    // Each dispatch needs its own snapshot.
+    if (!read_only && ce->buf && ce->host == host && ce->size >= sz) {
         if (bytes && !ce->nocopy) { memcpy(ce->mapped, host, bytes); }
         return;
     }
