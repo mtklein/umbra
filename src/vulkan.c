@@ -256,6 +256,14 @@ struct copyback {
 //  Program.
 // ---------------------------------------------------------------------------
 
+struct buf_cache_entry {
+    VkBuffer       buf;
+    VkDeviceMemory mem;
+    void          *mapped;
+    void          *host;
+    VkDeviceSize   size;
+};
+
 struct vk_program {
     struct umbra_program base;
     struct vk_backend *be;
@@ -271,6 +279,7 @@ struct vk_program {
     int push_words;       // number of uint32_t in push constants
 
     struct deref_info *deref;
+    struct buf_cache_entry *buf_cache;
 
     uint32_t *spirv;
     int       spirv_len, :32;
@@ -2004,6 +2013,25 @@ static void batch_track_pool(struct vk_backend *be, VkDescriptorPool pool) {
 //  Program implementation.
 // ---------------------------------------------------------------------------
 
+static void vk_flush(struct umbra_backend *be);
+
+static void cache_buf(struct vk_backend *be, struct buf_cache_entry *ce,
+                      void *host, size_t bytes, VkDeviceSize sz) {
+    if (ce->buf && ce->host == host && ce->size >= sz) {
+        if (bytes) { memcpy(ce->mapped, host, bytes); }
+        return;
+    }
+    if (ce->buf) {
+        batch_track_buf(be, ce->buf, ce->mem);
+    }
+    ce->buf  = create_buffer(be->device, sz);
+    ce->mem  = alloc_and_bind(be->device, ce->buf, be->mem_type_host);
+    ce->size = sz;
+    vkMapMemory(be->device, ce->mem, 0, sz, 0, &ce->mapped);
+    ce->host = host;
+    if (bytes) { memcpy(ce->mapped, host, bytes); }
+}
+
 static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b,
                               umbra_buf buf[]) {
     struct vk_program *vp = (struct vk_program *)p;
@@ -2015,21 +2043,14 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     begin_batch(be);
 
     int n = vp->total_bufs;
-    VkBuffer       *vbufs = calloc((size_t)n, sizeof *vbufs);
-    VkDeviceMemory *vmems = calloc((size_t)n, sizeof *vmems);
-    void          **maps  = calloc((size_t)n, sizeof *maps);
 
     for (int i = 0; i <= vp->max_ptr; i++) {
         if (!buf[i].ptr || !buf[i].sz) { continue; }
         VkDeviceSize sz = (VkDeviceSize)buf[i].sz;
         if (sz < 4) { sz = 4; }
-        vbufs[i] = create_buffer(be->device, sz);
-        vmems[i] = alloc_and_bind(be->device, vbufs[i], be->mem_type_host);
-        vkMapMemory(be->device, vmems[i], 0, sz, 0, &maps[i]);
-        memcpy(maps[i], buf[i].ptr, buf[i].sz);
-        batch_track_buf(be, vbufs[i], vmems[i]);
+        cache_buf(be, &vp->buf_cache[i], buf[i].ptr, buf[i].sz, sz);
         if (!buf[i].read_only) {
-            batch_track_copy(be, buf[i].ptr, maps[i], buf[i].sz);
+            batch_track_copy(be, buf[i].ptr, vp->buf_cache[i].mapped, buf[i].sz);
         }
     }
 
@@ -2058,25 +2079,20 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
         VkDeviceSize sz = (VkDeviceSize)bytes;
         if (sz < 4) { sz = 4; }
-        vbufs[bi] = create_buffer(be->device, sz);
-        vmems[bi] = alloc_and_bind(be->device, vbufs[bi], be->mem_type_host);
-        vkMapMemory(be->device, vmems[bi], 0, sz, 0, &maps[bi]);
-        memcpy(maps[bi], derived, bytes);
-        batch_track_buf(be, vbufs[bi], vmems[bi]);
+        cache_buf(be, &vp->buf_cache[bi], derived, bytes, sz);
 
         push_data[3 + bi] = (uint32_t)bytes;
         push_data[3 + vp->total_bufs + bi] = (uint32_t)drb;
 
         if (!deref_read_only) {
-            batch_track_copy(be, derived, maps[bi], bytes);
+            batch_track_copy(be, derived, vp->buf_cache[bi].mapped, bytes);
         }
     }
 
     for (int i = 0; i < n; i++) {
-        if (!vbufs[i]) {
-            vbufs[i] = create_buffer(be->device, 4);
-            vmems[i] = alloc_and_bind(be->device, vbufs[i], be->mem_type_host);
-            batch_track_buf(be, vbufs[i], vmems[i]);
+        if (!vp->buf_cache[i].buf) {
+            cache_buf(be, &vp->buf_cache[i], 0, 0, 4);
+            vp->buf_cache[i].host = 0;
         }
     }
 
@@ -2088,7 +2104,11 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
             .descriptorSetCount=1,
             .pSetLayouts=&vp->ds_layout,
         };
-        vkAllocateDescriptorSets(be->device, &ai, &ds);
+        if (vkAllocateDescriptorSets(be->device, &ai, &ds) != VK_SUCCESS) {
+            vk_flush(&be->base);
+            begin_batch(be);
+            vkAllocateDescriptorSets(be->device, &ai, &ds);
+        }
     }
     batch_track_pool(be, vp->desc_pool);
 
@@ -2096,7 +2116,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     VkWriteDescriptorSet   *writes    = calloc((size_t)n, sizeof *writes);
     for (int i = 0; i < n; i++) {
         buf_infos[i] = (VkDescriptorBufferInfo){
-            .buffer=vbufs[i], .offset=0, .range=VK_WHOLE_SIZE,
+            .buffer=vp->buf_cache[i].buf, .offset=0, .range=VK_WHOLE_SIZE,
         };
         writes[i] = (VkWriteDescriptorSet){
             .sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -2120,9 +2140,6 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     uint32_t gx = ((uint32_t)w + WG_SIZE - 1) / WG_SIZE;
     vkCmdDispatch(be->batch_cmd, gx, (uint32_t)h, 1);
 
-    free(vbufs);
-    free(vmems);
-    free(maps);
     free(push_data);
 }
 
@@ -2135,6 +2152,14 @@ static void vk_program_dump(struct umbra_program const *p, FILE *f) {
 static void vk_program_free(struct umbra_program *p) {
     struct vk_program *vp = (struct vk_program *)p;
     struct vk_backend *be = vp->be;
+
+    for (int i = 0; i < vp->total_bufs; i++) {
+        if (vp->buf_cache[i].buf) {
+            vkFreeMemory  (be->device, vp->buf_cache[i].mem, 0);
+            vkDestroyBuffer(be->device, vp->buf_cache[i].buf, 0);
+        }
+    }
+    free(vp->buf_cache);
 
     vkDestroyPipeline(be->device, vp->pipeline, 0);
     vkDestroyPipelineLayout(be->device, vp->pipe_layout, 0);
@@ -2262,6 +2287,7 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
     p->n_deref     = n_deref;
     p->push_words  = push_words;
     p->deref       = deref;
+    p->buf_cache   = calloc((size_t)total_bufs, sizeof *p->buf_cache);
     p->spirv       = spirv;
     p->spirv_len   = spirv_len;
 
