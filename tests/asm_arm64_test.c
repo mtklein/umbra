@@ -143,19 +143,6 @@ static void test_dup_ins(void) {
     INS_s(3, 0, 4) == 0x4E041C83 here;
 }
 
-static void test_compare_zero(void) {
-    CMEQ_4s_z(0, 1) == 0x4EA09820 here;
-    CMGT_4s_z(2, 3) == 0x4EA08862 here;
-    CMGE_4s_z(6, 7) == 0x6EA088E6 here;
-    CMLE_4s_z(0, 1) == 0x6EA09820 here;
-    CMLT_4s_z(2, 3) == 0x4EA0A862 here;
-    FCMEQ_4s_z(4, 5) == 0x4EA0D8A4 here;
-    FCMGT_4s_z(4, 5) == 0x4EA0C8A4 here;
-    FCMGE_4s_z(6, 7) == 0x6EA0C8E6 here;
-    FCMLE_4s_z(0, 1) == 0x6EA0D820 here;
-    FCMLT_4s_z(2, 3) == 0x4EA0E862 here;
-}
-
 static void test_load_imm_w(void) {
     // Small value: just MOVZ
     Buf b = {0};
@@ -312,7 +299,6 @@ int main(void) {
     test_shift_imm();
     test_movi();
     test_dup_ins();
-    test_compare_zero();
     test_load_imm_w();
     test_stp_ldp();
     test_lsl();

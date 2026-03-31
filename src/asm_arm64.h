@@ -96,18 +96,6 @@ uint32_t BSL_16b(int d, int n, int m);
 uint32_t BIT_16b(int d, int n, int m);
 uint32_t BIF_16b(int d, int n, int m);
 
-// compare against zero
-uint32_t CMEQ_4s_z(int d, int n);
-uint32_t CMGT_4s_z(int d, int n);
-uint32_t CMGE_4s_z(int d, int n);
-uint32_t CMLE_4s_z(int d, int n);
-uint32_t CMLT_4s_z(int d, int n);
-uint32_t FCMEQ_4s_z(int d, int n);
-uint32_t FCMGT_4s_z(int d, int n);
-uint32_t FCMGE_4s_z(int d, int n);
-uint32_t FCMLE_4s_z(int d, int n);
-uint32_t FCMLT_4s_z(int d, int n);
-
 // conversions
 uint32_t FCVTN_4h(int d, int n);
 uint32_t FCVTL_4s(int d, int n);

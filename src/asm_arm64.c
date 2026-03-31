@@ -193,18 +193,6 @@ enum {
     BIT_16b_ = 0x6ea01c00u,
     BIF_16b_ = 0x6ee01c00u,
 
-    // compare against zero (2-operand)
-    CMEQ_4s_z_ = 0x4ea09800u,
-    CMGT_4s_z_ = 0x4ea08800u,
-    CMGE_4s_z_ = 0x6ea08800u,
-    CMLE_4s_z_ = 0x6ea09800u,
-    CMLT_4s_z_ = 0x4ea0a800u,
-    FCMEQ_4s_z_ = 0x4ea0d800u,
-    FCMGT_4s_z_ = 0x4ea0c800u,
-    FCMGE_4s_z_ = 0x6ea0c800u,
-    FCMLE_4s_z_ = 0x6ea0d800u,
-    FCMLT_4s_z_ = 0x4ea0e800u,
-
     // conversions
     FCVTN_4h_ = 0x0e216800u,
     FCVTL_4s_ = 0x0e217800u,
@@ -272,17 +260,6 @@ uint32_t EOR_16b(int d, int n, int m) { return v3(EOR_16b_, d, n, m); }
 uint32_t BSL_16b(int d, int n, int m) { return v3(BSL_16b_, d, n, m); }
 uint32_t BIT_16b(int d, int n, int m) { return v3(BIT_16b_, d, n, m); }
 uint32_t BIF_16b(int d, int n, int m) { return v3(BIF_16b_, d, n, m); }
-
-uint32_t CMEQ_4s_z(int d, int n) { return v2(CMEQ_4s_z_, d, n); }
-uint32_t CMGT_4s_z(int d, int n) { return v2(CMGT_4s_z_, d, n); }
-uint32_t CMGE_4s_z(int d, int n) { return v2(CMGE_4s_z_, d, n); }
-uint32_t CMLE_4s_z(int d, int n) { return v2(CMLE_4s_z_, d, n); }
-uint32_t CMLT_4s_z(int d, int n) { return v2(CMLT_4s_z_, d, n); }
-uint32_t FCMEQ_4s_z(int d, int n) { return v2(FCMEQ_4s_z_, d, n); }
-uint32_t FCMGT_4s_z(int d, int n) { return v2(FCMGT_4s_z_, d, n); }
-uint32_t FCMGE_4s_z(int d, int n) { return v2(FCMGE_4s_z_, d, n); }
-uint32_t FCMLE_4s_z(int d, int n) { return v2(FCMLE_4s_z_, d, n); }
-uint32_t FCMLT_4s_z(int d, int n) { return v2(FCMLT_4s_z_, d, n); }
 
 uint32_t FCVTN_4h(int d, int n) { return v2(FCVTN_4h_, d, n); }
 uint32_t FCVTL_4s(int d, int n) { return v2(FCVTL_4s_, d, n); }

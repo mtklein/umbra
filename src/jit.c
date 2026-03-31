@@ -903,120 +903,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             put(c, XTN_4h(s.rd, s.rx));
         } break;
 
-        case op_eq_f32:
-        case op_lt_f32:
-        case op_le_f32:
-        case op_eq_i32:
-        case op_lt_s32:
-        case op_le_s32: {
-            _Bool x_is_0 = bb->inst[(int)inst->x.id].op == op_imm_32 && bb->inst[(int)inst->x.id].imm == 0;
-            _Bool y_is_0 = bb->inst[(int)inst->y.id].op == op_imm_32 && bb->inst[(int)inst->y.id].imm == 0;
-
-            if (x_is_0 || y_is_0) {
-                int    val = x_is_0 ? (int)inst->y.id : (int)inst->x.id;
-                int8_t rv = ra_ensure(ra, sl, ns, val);
-                _Bool  v_dead = lu(val) <= i;
-
-                int8_t rd;
-                if (v_dead) {
-                    rd = ra_claim(ra, val, i);
-                } else {
-                    rd = ra_alloc(ra, sl, ns);
-                    ra_assign(ra, i, rd);
-                }
-
-#define CZ(op_name, zr, zl) \
-    case op_name: put(c, y_is_0 ? zr(rd, rv) : zl(rd, rv)); break;
-
-                switch (inst->op) {
-                    CZ(op_eq_f32, FCMEQ_4s_z, FCMEQ_4s_z)
-                    CZ(op_eq_i32, CMEQ_4s_z, CMEQ_4s_z)
-                    CZ(op_lt_f32, FCMLT_4s_z, FCMGT_4s_z)
-                    CZ(op_lt_s32, CMLT_4s_z, CMGT_4s_z)
-                    CZ(op_le_f32, FCMLE_4s_z, FCMGE_4s_z)
-                    CZ(op_le_s32, CMLE_4s_z, CMGE_4s_z)
-                case op_x:
-                case op_y:
-                case op_deref_ptr:
-                case op_imm_32:
-                case op_uniform_32:
-                case op_load_32:
-                case op_load_fp16x4: case op_load_fp16x4_planar:
-                case op_gather_uniform_32:
-                case op_gather_32:
-                case op_store_32:
-                case op_store_fp16x4: case op_store_fp16x4_planar:
-                case op_add_f32:
-                case op_sub_f32:
-                case op_mul_f32:
-                case op_div_f32:
-                case op_min_f32:
-                case op_max_f32:
-                case op_sqrt_f32:
-                case op_abs_f32:
-                case op_neg_f32:
-                case op_round_f32:
-                case op_floor_f32:
-                case op_ceil_f32:
-                case op_round_i32:
-                case op_floor_i32:
-                case op_ceil_i32:
-                case op_fma_f32:
-                case op_fms_f32:
-                case op_add_i32:
-                case op_sub_i32:
-                case op_mul_i32:
-                case op_shl_i32:
-                case op_shr_u32:
-                case op_shr_s32:
-                case op_and_32:
-                case op_or_32:
-                case op_xor_32:
-                case op_sel_32:
-                case op_f32_from_i32:
-                case op_i32_from_f32:
-                case op_lt_u32:
-                case op_le_u32:
-                case op_load_16:
-                case op_gather_16:
-                case op_store_16:
-                case op_f32_from_f16:
-                case op_f16_from_f32:
-                case op_i32_from_s16:
-                case op_i32_from_u16:
-                case op_i16_from_i32:
-                case op_shl_i32_imm:
-                case op_shr_u32_imm:
-                case op_shr_s32_imm:
-                case op_pack:
-                case op_and_32_imm:
-                case op_add_f32_imm:
-                case op_sub_f32_imm:
-                case op_mul_f32_imm:
-                case op_div_f32_imm:
-                case op_min_f32_imm:
-                case op_max_f32_imm:
-                case op_add_i32_imm:
-                case op_sub_i32_imm:
-                case op_mul_i32_imm:
-                case op_or_32_imm:
-                case op_xor_32_imm:
-                case op_eq_f32_imm:
-                case op_lt_f32_imm:
-                case op_le_f32_imm:
-                case op_eq_i32_imm:
-                case op_lt_s32_imm:
-                case op_le_s32_imm: break;
-                }
-#undef CZ
-
-                int zero_val = x_is_0 ? (int)inst->x.id : (int)inst->y.id;
-                if (lu(zero_val) <= i) { ra_free_reg(ra, zero_val); }
-                break;
-            }
-            goto default_alu;
-        }
-
         case op_imm_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             arm64_pool_load(c, &jc->pool, s.rd, (uint32_t)inst->imm);
@@ -1051,9 +937,15 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_sel_32:
         case op_f32_from_i32:
         case op_i32_from_f32:
+        case op_eq_f32:
+        case op_lt_f32:
+        case op_le_f32:
+        case op_eq_i32:
+        case op_lt_s32:
+        case op_le_s32:
         case op_lt_u32:
         case op_le_u32:
-        default_alu: {
+        {
             int nscratch = (inst->op == op_shr_u32 || inst->op == op_shr_s32) ? 1 : 0;
             struct ra_step s = ra_step_alu(ra, sl, ns, inst, i, scalar, nscratch);
             emit_alu_reg(c, inst->op, s.rd, s.rx, s.ry, s.rz, inst->imm, s.scratch);
