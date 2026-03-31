@@ -1,6 +1,7 @@
 brew "gcc"
 brew "lld"
 brew "llvm"
+brew "molten-vk"
 brew "ninja"
 brew "sdl3"
 brew "wasi-libc"

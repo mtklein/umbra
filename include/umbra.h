@@ -19,6 +19,7 @@ struct umbra_backend {
 struct umbra_backend* umbra_backend_interp(void);
 struct umbra_backend* umbra_backend_jit   (void);
 struct umbra_backend* umbra_backend_metal (void);
+struct umbra_backend* umbra_backend_vulkan(void);
 
 
 typedef enum {
