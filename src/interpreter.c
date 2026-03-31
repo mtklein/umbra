@@ -191,11 +191,11 @@ enum {
     // ceil_f32
     op_r_ceil_f32_m, op_r_ceil_f32_r, op_m_ceil_f32_r,
     // round_i32
-    op_r_round_i32_m, op_m_round_i32_r,
+    op_r_round_i32_m, op_r_round_i32_r, op_m_round_i32_r,
     // floor_i32
     op_r_floor_i32_m, op_r_floor_i32_r, op_m_floor_i32_r,
     // ceil_i32
-    op_r_ceil_i32_m, op_m_ceil_i32_r,
+    op_r_ceil_i32_m, op_r_ceil_i32_r, op_m_ceil_i32_r,
     // f32_from_i32
     op_r_f32_from_i32_m, op_r_f32_from_i32_r, op_m_f32_from_i32_r,
     // i32_from_f32
@@ -615,11 +615,6 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
                 if      ( out_r &&  x_r) { s->tag = op_r_##name##_r; } \
                 else if (!out_r &&  x_r) { s->tag = op_m_##name##_r; } \
             } else
-#define TRY_UNARY_NO_R(name) \
-            if (tag == op_##name) { \
-                if      (!out_r &&  x_r) { s->tag = op_m_##name##_r; } \
-                else if ( out_r && !x_r) { s->tag = op_r_##name##_m; } \
-            } else
             TRY_UNARY_NO_M(sqrt_f32)
             // abs_f32: no m_r
             if (tag == op_abs_f32) {
@@ -633,14 +628,13 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
             } else
             TRY_UNARY(floor_f32)
             TRY_UNARY(ceil_f32)
-            TRY_UNARY_NO_R(round_i32)
+            TRY_UNARY(round_i32)
             TRY_UNARY(floor_i32)
-            TRY_UNARY_NO_R(ceil_i32)
+            TRY_UNARY(ceil_i32)
             TRY_UNARY(f32_from_i32)
             TRY_UNARY(i32_from_f32)
 #undef TRY_UNARY
 #undef TRY_UNARY_NO_M
-#undef TRY_UNARY_NO_R
 
             // _imm ops (only x is variable input).
 #define TRY_IMM(name) \
@@ -888,11 +882,11 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                 [op_r_ceil_f32_m] = &&L_op_r_ceil_f32_m,
                 [op_r_ceil_f32_r] = &&L_op_r_ceil_f32_r, [op_m_ceil_f32_r] = &&L_op_m_ceil_f32_r,
                 [op_r_round_i32_m] = &&L_op_r_round_i32_m,
-                [op_m_round_i32_r] = &&L_op_m_round_i32_r,
+                [op_r_round_i32_r] = &&L_op_r_round_i32_r, [op_m_round_i32_r] = &&L_op_m_round_i32_r,
                 [op_r_floor_i32_m] = &&L_op_r_floor_i32_m,
                 [op_r_floor_i32_r] = &&L_op_r_floor_i32_r, [op_m_floor_i32_r] = &&L_op_m_floor_i32_r,
                 [op_r_ceil_i32_m] = &&L_op_r_ceil_i32_m,
-                [op_m_ceil_i32_r] = &&L_op_m_ceil_i32_r,
+                [op_r_ceil_i32_r] = &&L_op_r_ceil_i32_r, [op_m_ceil_i32_r] = &&L_op_m_ceil_i32_r,
                 [op_r_f32_from_i32_m] = &&L_op_r_f32_from_i32_m,
                 [op_r_f32_from_i32_r] = &&L_op_r_f32_from_i32_r, [op_m_f32_from_i32_r] = &&L_op_m_f32_from_i32_r,
                 [op_r_i32_from_f32_m] = &&L_op_r_i32_from_f32_m,
@@ -1460,6 +1454,7 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                 CASE(op_m_neg_f32_r) v->f32  = -acc.f32;       NEXT;
                 // round_i32
                 CASE(op_r_round_i32_m) acc.i32 = cast(I32, vec_round(v[ip->x].f32)); NEXT;
+                CASE(op_r_round_i32_r) acc.i32 = cast(I32, vec_round(acc.f32));       NEXT;
                 CASE(op_m_round_i32_r) v->i32  = cast(I32, vec_round(acc.f32));       NEXT;
                 // floor_i32
                 CASE(op_r_floor_i32_m) acc.i32 = cast(I32, vec_floor(v[ip->x].f32)); NEXT;
@@ -1467,6 +1462,7 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                 CASE(op_m_floor_i32_r) v->i32  = cast(I32, vec_floor(acc.f32));       NEXT;
                 // ceil_i32
                 CASE(op_r_ceil_i32_m) acc.i32 = cast(I32, vec_ceil(v[ip->x].f32));  NEXT;
+                CASE(op_r_ceil_i32_r) acc.i32 = cast(I32, vec_ceil(acc.f32));        NEXT;
                 CASE(op_m_ceil_i32_r) v->i32  = cast(I32, vec_ceil(acc.f32));        NEXT;
                 // f32_from_i32
                 CASE(op_r_f32_from_i32_m) acc.f32 = cast(F32, v[ip->x].i32); NEXT;
