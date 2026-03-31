@@ -3450,6 +3450,44 @@ int main(void) {
     test_load_stride_neq_w();
     test_jit_xs_init();
 
+    // Exercise interpreter acc->acc register variants for ceil_i32 and eq_f32_imm.
+    // Chain: load -> mul_f32_imm -> ceil_i32 -> shl_i32_imm -> store
+    // and:   load -> add_f32_imm -> eq_f32_imm -> and_32_imm -> store
+    {
+        struct umbra_builder *b = umbra_builder();
+        umbra_val x = umbra_load_32(b, (umbra_ptr){0, 0});
+
+        umbra_val scaled = umbra_mul_f32(b, x, umbra_imm_f32(b, 1.0f));
+        umbra_val ceiled = umbra_ceil_i32(b, scaled);
+        umbra_val shifted = umbra_shl_i32(b, ceiled, umbra_imm_i32(b, 1));
+        umbra_store_32(b, (umbra_ptr){1, 0}, shifted);
+
+        umbra_val y = umbra_add_f32(b, x, umbra_imm_f32(b, 0.0f));
+        umbra_val eq = umbra_eq_f32(b, y, umbra_imm_f32(b, 0.0f));
+        umbra_val masked = umbra_and_i32(b, eq, umbra_imm_i32(b, 1));
+        umbra_store_32(b, (umbra_ptr){2, 0}, masked);
+
+        backends B = make(b);
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            float src[] = {1.5f, 0.0f, -2.3f, 3.0f};
+            int32_t dst1[4] = {0}, dst2[4] = {0};
+            if (!run(&B, bi, 4, 1, (umbra_buf[]){
+                {.ptr=src, .sz=sizeof src},
+                {.ptr=dst1, .sz=sizeof dst1},
+                {.ptr=dst2, .sz=sizeof dst2},
+            })) { continue; }
+            dst1[0] == 4 here;   // ceil(1.5)*2 = 2*2 = 4
+            dst1[1] == 0 here;   // ceil(0)*2 = 0
+            dst1[2] == -4 here;  // ceil(-2.3)*2 = -2*2 = -4
+            dst1[3] == 6 here;   // ceil(3)*2 = 3*2 = 6
+            dst2[0] == 0 here;   // 1.5 == 0? no
+            dst2[1] == 1 here;   // 0.0 == 0? yes -> -1 & 1 = 1
+            dst2[2] == 0 here;   // -2.3 == 0? no
+            dst2[3] == 0 here;   // 3.0 == 0? no
+        }
+        cleanup(&B);
+    }
+
     // Regression test: arbitrary (l,t,r,b) tile dispatch on a strided buffer.
     {
         struct umbra_builder *b = umbra_builder();
