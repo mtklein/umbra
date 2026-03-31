@@ -240,6 +240,7 @@ struct sw_inst {
     int ptr;
 };
 #pragma clang diagnostic ignored "-Wsign-conversion"
+#pragma clang diagnostic ignored "-Wfloat-equal"
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wgnu-label-as-value"
 #else
@@ -1220,10 +1221,7 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                 CASE(op_xor_32)  v->i32 = v[ip->x].i32 ^ v[ip->y].i32;  NEXT;
                 CASE(op_sel_32)  v->i32 = (v[ip->x].i32 & v[ip->y].i32) | (~v[ip->x].i32 & v[ip->z].i32); NEXT;
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wfloat-equal"
                 CASE(op_eq_f32) v->i32 = (I32)(v[ip->x].f32 == v[ip->y].f32); NEXT;
-#pragma clang diagnostic pop
                 CASE(op_lt_f32) v->i32 = (I32)(v[ip->x].f32 <  v[ip->y].f32); NEXT;
                 CASE(op_le_f32) v->i32 = (I32)(v[ip->x].f32 <= v[ip->y].f32); NEXT;
                 CASE(op_eq_i32) v->i32 = (I32)(v[ip->x].i32 == v[ip->y].i32); NEXT;
@@ -1245,10 +1243,7 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                 CASE(op_div_f32_imm) { F32_IMM; v->f32 = v[ip->x].f32 / imm; } NEXT;
                 CASE(op_min_f32_imm) { F32_IMM; v->f32 = vec_min(v[ip->x].f32, imm); } NEXT;
                 CASE(op_max_f32_imm) { F32_IMM; v->f32 = vec_max(v[ip->x].f32, imm); } NEXT;
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wfloat-equal"
                 CASE(op_eq_f32_imm)  { F32_IMM; v->i32 = (I32)(v[ip->x].f32 == imm); } NEXT;
-#pragma clang diagnostic pop
                 CASE(op_lt_f32_imm)  { F32_IMM; v->i32 = (I32)(v[ip->x].f32 <  imm); } NEXT;
                 CASE(op_le_f32_imm)  { F32_IMM; v->i32 = (I32)(v[ip->x].f32 <= imm); } NEXT;
 
@@ -1440,12 +1435,9 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                 CASE(op_r_max_f32_imm_m) { F32_IMM; acc.f32 = vec_max(v[ip->x].f32, imm); } NEXT;
                 CASE(op_r_max_f32_imm_r) { F32_IMM; acc.f32 = vec_max(acc.f32,       imm); } NEXT;
                 CASE(op_m_max_f32_imm_r) { F32_IMM; v->f32  = vec_max(acc.f32,       imm); } NEXT;
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wfloat-equal"
                 // eq_f32_imm (no _m)
                 CASE(op_r_eq_f32_imm_r) { F32_IMM; acc.i32 = (I32)(acc.f32 == imm); } NEXT;
                 CASE(op_m_eq_f32_imm_r) { F32_IMM; v->i32  = (I32)(acc.f32 == imm); } NEXT;
-#pragma clang diagnostic pop
                 // lt_f32_imm (no _m)
                 CASE(op_r_lt_f32_imm_r) { F32_IMM; acc.i32 = (I32)(acc.f32 <  imm); } NEXT;
                 CASE(op_m_lt_f32_imm_r) { F32_IMM; v->i32  = (I32)(acc.f32 <  imm); } NEXT;
