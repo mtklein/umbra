@@ -2020,7 +2020,7 @@ static void batch_track_pool(struct vk_backend *be, VkDescriptorPool pool) {
 static void vk_flush(struct umbra_backend *be);
 
 static void cache_buf(struct vk_backend *be, struct buf_cache_entry *ce,
-                      void *host, size_t bytes, VkDeviceSize sz) {
+                      void *host, size_t bytes, VkDeviceSize sz, _Bool read_only) {
     if (ce->buf && ce->host == host && ce->size >= sz) {
         if (bytes && !ce->nocopy) { memcpy(ce->mapped, host, bytes); }
         return;
@@ -2032,7 +2032,7 @@ static void cache_buf(struct vk_backend *be, struct buf_cache_entry *ce,
 
     // Try zero-copy host import for page-aligned pointers.
     VkDeviceSize align = be->host_import_align;
-    if (align && host && ((uintptr_t)host % align) == 0) {
+    if (align && host && !read_only && ((uintptr_t)host % align) == 0) {
         VkDeviceSize import_sz = (sz + align - 1) & ~(align - 1);
         VkBuffer buf = create_buffer(be->device, import_sz);
         VkMemoryRequirements req;
@@ -2088,7 +2088,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
         if (!buf[i].ptr || !buf[i].sz) { continue; }
         VkDeviceSize sz = (VkDeviceSize)buf[i].sz;
         if (sz < 4) { sz = 4; }
-        cache_buf(be, &vp->buf_cache[i], buf[i].ptr, buf[i].sz, sz);
+        cache_buf(be, &vp->buf_cache[i], buf[i].ptr, buf[i].sz, sz, buf[i].read_only);
         if (!buf[i].read_only && !vp->buf_cache[i].nocopy) {
             batch_track_copy(be, buf[i].ptr, vp->buf_cache[i].mapped, buf[i].sz);
         }
@@ -2119,7 +2119,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
         VkDeviceSize sz = (VkDeviceSize)bytes;
         if (sz < 4) { sz = 4; }
-        cache_buf(be, &vp->buf_cache[bi], derived, bytes, sz);
+        cache_buf(be, &vp->buf_cache[bi], derived, bytes, sz, deref_read_only);
 
         push_data[3 + bi] = (uint32_t)bytes;
         push_data[3 + vp->total_bufs + bi] = (uint32_t)drb;
@@ -2131,7 +2131,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
     for (int i = 0; i < n; i++) {
         if (!vp->buf_cache[i].buf) {
-            cache_buf(be, &vp->buf_cache[i], 0, 0, 4);
+            cache_buf(be, &vp->buf_cache[i], 0, 0, 4, 1);
             vp->buf_cache[i].host = 0;
         }
     }
