@@ -9,7 +9,7 @@ static inline _Bool equiv(float x, float y) {
     return (x <= y && y <= x) || (x != x && y != y);
 }
 
-enum { NUM_BACKENDS = 3 };
+enum { NUM_BACKENDS = 4 };
 
 typedef struct {
     struct umbra_backend *be[NUM_BACKENDS];
@@ -21,6 +21,7 @@ static inline test_backends test_backends_make(struct umbra_basic_block const *b
     B.be[0] = umbra_backend_interp();
     B.be[1] = umbra_backend_jit();
     B.be[2] = umbra_backend_metal();
+    B.be[3] = umbra_backend_vulkan();
     for (int i = 0; i < NUM_BACKENDS; i++) {
         B.p[i] = B.be[i] ? B.be[i]->compile(B.be[i], bb) : NULL;
     }
