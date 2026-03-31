@@ -210,8 +210,6 @@ struct vk_backend {
     int                   batch_n_bufs, batch_bufs_cap;
     struct copyback      *batch_copies;
     int                   batch_n_copies, batch_copies_cap;
-    VkDescriptorPool     *batch_pools;
-    int                   batch_n_pools, batch_pools_cap;
 };
 
 static int find_compute_queue(VkPhysicalDevice phys) {
@@ -277,6 +275,8 @@ struct vk_program {
     VkPipelineLayout        pipe_layout;
     VkPipeline              pipeline;
     VkDescriptorPool        desc_pool;
+    VkDescriptorSet         desc_set;        // pre-allocated, reused across dispatches
+    VkBuffer               *bound_bufs;      // [total_bufs] — last-bound VkBuffers for dirty tracking
 
     int max_ptr;
     int total_bufs;
@@ -1907,16 +1907,6 @@ static void batch_track_copy(struct vk_backend *be, void *host, void *mapped, si
     be->batch_copies[be->batch_n_copies++] = (struct copyback){host, mapped, bytes};
 }
 
-static void batch_track_pool(struct vk_backend *be, VkDescriptorPool pool) {
-    for (int i = 0; i < be->batch_n_pools; i++) {
-        if (be->batch_pools[i] == pool) { return; }
-    }
-    if (be->batch_n_pools >= be->batch_pools_cap) {
-        be->batch_pools_cap = be->batch_pools_cap ? 2 * be->batch_pools_cap : 16;
-        be->batch_pools = realloc(be->batch_pools, (size_t)be->batch_pools_cap * sizeof *be->batch_pools);
-    }
-    be->batch_pools[be->batch_n_pools++] = pool;
-}
 
 // ---------------------------------------------------------------------------
 //  Program implementation.
@@ -2045,44 +2035,34 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
         }
     }
 
-    VkDescriptorSet ds;
-    {
-        VkDescriptorSetAllocateInfo ai = {
-            .sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-            .descriptorPool=vp->desc_pool,
-            .descriptorSetCount=1,
-            .pSetLayouts=&vp->ds_layout,
-        };
-        if (vkAllocateDescriptorSets(be->device, &ai, &ds) != VK_SUCCESS) {
-            vk_flush(&be->base);
-            begin_batch(be);
-            vkAllocateDescriptorSets(be->device, &ai, &ds);
+    // Update only the descriptor bindings that changed since last dispatch.
+    VkDescriptorBufferInfo dirty_infos[64];
+    VkWriteDescriptorSet   dirty_writes[64];
+    int n_dirty = 0;
+    for (int i = 0; i < n; i++) {
+        if (vp->bound_bufs[i] != vp->buf_cache[i].buf) {
+            vp->bound_bufs[i] = vp->buf_cache[i].buf;
+            dirty_infos[n_dirty] = (VkDescriptorBufferInfo){
+                .buffer=vp->buf_cache[i].buf, .offset=0, .range=VK_WHOLE_SIZE,
+            };
+            dirty_writes[n_dirty] = (VkWriteDescriptorSet){
+                .sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet=vp->desc_set,
+                .dstBinding=(uint32_t)i,
+                .descriptorCount=1,
+                .descriptorType=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                .pBufferInfo=&dirty_infos[n_dirty],
+            };
+            n_dirty++;
         }
     }
-    batch_track_pool(be, vp->desc_pool);
-
-    VkDescriptorBufferInfo *buf_infos = calloc((size_t)n, sizeof *buf_infos);
-    VkWriteDescriptorSet   *writes    = calloc((size_t)n, sizeof *writes);
-    for (int i = 0; i < n; i++) {
-        buf_infos[i] = (VkDescriptorBufferInfo){
-            .buffer=vp->buf_cache[i].buf, .offset=0, .range=VK_WHOLE_SIZE,
-        };
-        writes[i] = (VkWriteDescriptorSet){
-            .sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet=ds,
-            .dstBinding=(uint32_t)i,
-            .descriptorCount=1,
-            .descriptorType=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            .pBufferInfo=&buf_infos[i],
-        };
+    if (n_dirty) {
+        vkUpdateDescriptorSets(be->device, (uint32_t)n_dirty, dirty_writes, 0, 0);
     }
-    vkUpdateDescriptorSets(be->device, (uint32_t)n, writes, 0, 0);
-    free(buf_infos);
-    free(writes);
 
     vkCmdBindPipeline(be->batch_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, vp->pipeline);
     vkCmdBindDescriptorSets(be->batch_cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
-                            vp->pipe_layout, 0, 1, &ds, 0, 0);
+                            vp->pipe_layout, 0, 1, &vp->desc_set, 0, 0);
     vkCmdPushConstants(be->batch_cmd, vp->pipe_layout, VK_SHADER_STAGE_COMPUTE_BIT,
                        0, (uint32_t)(vp->push_words * (int)sizeof(uint32_t)), push_data);
 
@@ -2131,6 +2111,7 @@ static void vk_program_free(struct umbra_program *p) {
         }
     }
     free(vp->buf_cache);
+    free(vp->bound_bufs);
 
     vkDestroyPipeline(be->device, vp->pipeline, 0);
     vkDestroyPipelineLayout(be->device, vp->pipe_layout, 0);
@@ -2232,18 +2213,27 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
     }
 
     VkDescriptorPool desc_pool;
+    VkDescriptorSet  desc_set;
     {
         VkDescriptorPoolSize ps = {
             .type=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            .descriptorCount=256 * (uint32_t)total_bufs,
+            .descriptorCount=(uint32_t)total_bufs,
         };
         VkDescriptorPoolCreateInfo ci = {
             .sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-            .maxSets=256,
+            .flags=VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+            .maxSets=1,
             .poolSizeCount=1,
             .pPoolSizes=&ps,
         };
         vkCreateDescriptorPool(vbe->device, &ci, 0, &desc_pool);
+        VkDescriptorSetAllocateInfo dai = {
+            .sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            .descriptorPool=desc_pool,
+            .descriptorSetCount=1,
+            .pSetLayouts=&ds_layout,
+        };
+        vkAllocateDescriptorSets(vbe->device, &dai, &desc_set);
     }
 
     struct vk_program *p = calloc(1, sizeof *p);
@@ -2253,6 +2243,8 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
     p->pipe_layout = pipe_layout;
     p->pipeline    = pipeline;
     p->desc_pool   = desc_pool;
+    p->desc_set    = desc_set;
+    p->bound_bufs  = calloc((size_t)total_bufs, sizeof(VkBuffer));
     p->max_ptr     = max_ptr;
     p->total_bufs  = total_bufs;
     p->n_deref     = n_deref;
@@ -2296,16 +2288,11 @@ static void vk_flush(struct umbra_backend *be) {
         vkDestroyBuffer(v->device, v->batch_bufs[i], 0);
     }
 
-    for (int i = 0; i < v->batch_n_pools; i++) {
-        vkResetDescriptorPool(v->device, v->batch_pools[i], 0);
-    }
-
     vkFreeCommandBuffers(v->device, v->cmd_pool, 1, &v->batch_cmd);
     vkDestroyFence(v->device, v->batch_fence, 0);
     v->batch_cmd      = VK_NULL_HANDLE;
     v->batch_n_bufs   = 0;
     v->batch_n_copies = 0;
-    v->batch_n_pools  = 0;
 }
 
 static void vk_free(struct umbra_backend *be) {
@@ -2317,7 +2304,6 @@ static void vk_free(struct umbra_backend *be) {
     free(v->batch_bufs);
     free(v->batch_mems);
     free(v->batch_copies);
-    free(v->batch_pools);
     free(v);
 }
 
