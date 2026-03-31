@@ -66,4 +66,4 @@
   v65  = sub_f32         v55 v45
   v66  = mul_f32         v27 v65
   v67  = fma_f32         v27 v65 v45
-      store_color     p1 v61
+      store_8888      p1 v61

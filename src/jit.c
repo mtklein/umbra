@@ -247,11 +247,11 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_deref_ptr:
     case op_uniform_32:
     case op_load_32:
-    case op_load_color:
+    case op_load_fp16x4: case op_load_fp16x4_planar:
     case op_gather_uniform_32:
     case op_gather_32:
     case op_store_32:
-    case op_store_color:
+    case op_store_8888: case op_store_565: case op_store_1010102: case op_store_fp16x4: case op_store_fp16x4_planar:
     case op_load_16:
     case op_gather_16:
     case op_store_16:
@@ -690,250 +690,41 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             FREE_CHAN(inst->y, i);
         } break;
 
-        case op_load_color: {
+        case op_load_fp16x4: {
             struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
             int8_t r1 = ra_alloc(ra, sl, ns);
             int8_t r2 = ra_alloc(ra, sl, ns);
             int8_t r3 = ra_alloc(ra, sl, ns);
             int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-
-            int8_t px   = ra_alloc(ra, sl, ns);
-            int8_t t0   = ra_alloc(ra, sl, ns);
-            int8_t t1   = ra_alloc(ra, sl, ns);
-
-            // Load fmt: LDR w_XT, [XBUF, #(p*sizeof(umbra_buf)+offsetof(fmt))]
-            {
-                int const fmt_off = p * (int)sizeof(umbra_buf)
-                                  + (int)__builtin_offsetof(umbra_buf, fmt);
-                put(c, LDR_wi(XT, XBUF, fmt_off / 4));
+            int8_t px = ra_alloc(ra, sl, ns);
+            int8_t t0 = ra_alloc(ra, sl, ns);
+            int8_t t1 = ra_alloc(ra, sl, ns);
+            if (scalar) {
+                put(c, LSL_xi(XT, XI, 3));
+                put(c, ADD_xr(XT, XP, XT));
+                put(c, LDR_di(px, XT, 0));
+                put(c, FCVTL_4s(px, px));
+                put(c, DUP_4s_lane(s0.rd, px, 0));
+                put(c, DUP_4s_lane(r1,    px, 1));
+                put(c, DUP_4s_lane(r2,    px, 2));
+                put(c, DUP_4s_lane(r3,    px, 3));
+            } else {
+                put(c, LSL_xi(XT, XI, 3));
+                put(c, ADD_xr(XT, XP, XT));
+                put(c, LDR_qi(px, XT, 0));
+                put(c, LDR_qi(t0, XT, 1));
+                put(c, UZP1_8h(t1, px, t0));
+                put(c, UZP2_8h(px, px, t0));
+                put(c, UZP1_8h(t0, t1, px));
+                put(c, UZP2_8h(t1, t1, px));
+                put(c, FCVTL_4s(s0.rd, t0));
+                put(c, FCVTL_4s(r2, t1));
+                put(c, EXT_16b(t0, t0, t0, 8));
+                put(c, FCVTL_4s(r1, t0));
+                put(c, EXT_16b(t1, t1, t1, 8));
+                put(c, FCVTL_4s(r3, t1));
             }
-
-            int br_done[8];
-            int n_done = 0;
-
-            
-            
-            put(c, CMP_wi(XT, umbra_fmt_8888));
-            int br_skip_8888 = c->len;
-            put(c, Bcond(0x1, 0));  // B.NE
-            {
-                if (scalar) { put(c, LDR_sx(px, XP, XI)); }
-                else        { put(c, LDR_q(px, XP, XW)); }
-                arm64_pool_load(c, &jc->pool, t0, 0xFF);
-                put(c, AND_16b(s0.rd, px, t0));
-                put(c, USHR_4s_imm(r1, px,  8)); put(c, AND_16b(r1, r1, t0));
-                put(c, USHR_4s_imm(r2, px, 16)); put(c, AND_16b(r2, r2, t0));
-                put(c, USHR_4s_imm(r3, px, 24));
-                put(c, SCVTF_4s(s0.rd, s0.rd));
-                put(c, SCVTF_4s(r1, r1));
-                put(c, SCVTF_4s(r2, r2));
-                put(c, SCVTF_4s(r3, r3));
-                union { float f; uint32_t u; } inv255 = {.f = 1.0f/255.0f};
-                arm64_pool_load(c, &jc->pool, t0, inv255.u);
-                put(c, FMUL_4s(s0.rd, s0.rd, t0));
-                put(c, FMUL_4s(r1, r1, t0));
-                put(c, FMUL_4s(r2, r2, t0));
-                put(c, FMUL_4s(r3, r3, t0));
-            }
-            br_done[n_done] = c->len; n_done++;
-            put(c, B(0));
-            c->buf[br_skip_8888] = Bcond(0x1, c->len - br_skip_8888);
-
-            
-            put(c, CMP_wi(XT, umbra_fmt_565));
-            int br_skip_565 = c->len;
-            put(c, Bcond(0x1, 0));
-            {
-                // Load 16-bit pixels, widen to 32-bit.
-                if (scalar) {
-                    // LDRH w_XT2, [XP, XI, LSL #1]
-                    put(c, LDRH_wr(XT, XP, XI));
-                    put(c, DUP_4s_w(px, XT));
-                } else {
-                    put(c, LDR_d(px, XP, XH));
-                    // UXTL.4S (zero-extend 4H->4S)
-                    put(c, UXTL_4s(px, px));
-                }
-                // r5 = px >> 11
-                put(c, USHR_4s_imm(s0.rd, px, 11));
-                // g6 = (px >> 5) & 0x3F
-                put(c, USHR_4s_imm(r1, px, 5));
-                arm64_pool_load(c, &jc->pool, t0, 0x3F);
-                put(c, AND_16b(r1, r1, t0));
-                // b5 = px & 0x1F
-                arm64_pool_load(c, &jc->pool, t0, 0x1F);
-                put(c, AND_16b(r2, px, t0));
-                // Convert to float and scale.
-                put(c, SCVTF_4s(s0.rd, s0.rd));
-                put(c, SCVTF_4s(r1, r1));
-                put(c, SCVTF_4s(r2, r2));
-                union { float f; uint32_t u; } inv31 = {.f = 1.0f/31.0f};
-                union { float f; uint32_t u; } inv63 = {.f = 1.0f/63.0f};
-                arm64_pool_load(c, &jc->pool, t0, inv31.u);
-                put(c, FMUL_4s(s0.rd, s0.rd, t0));
-                put(c, FMUL_4s(r2, r2, t0));
-                arm64_pool_load(c, &jc->pool, t0, inv63.u);
-                put(c, FMUL_4s(r1, r1, t0));
-                // a = 1.0
-                union { float f; uint32_t u; } f1 = {.f = 1.0f};
-                arm64_pool_load(c, &jc->pool, r3, f1.u);
-            }
-            br_done[n_done] = c->len; n_done++;
-            put(c, B(0));
-            c->buf[br_skip_565] = Bcond(0x1, c->len - br_skip_565);
-
-            
-            put(c, CMP_wi(XT, umbra_fmt_1010102));
-            int br_skip_1010102 = c->len;
-            put(c, Bcond(0x1, 0));
-            {
-                if (scalar) { put(c, LDR_sx(px, XP, XI)); }
-                else        { put(c, LDR_q(px, XP, XW)); }
-                arm64_pool_load(c, &jc->pool, t0, 0x3FF);
-                put(c, AND_16b(s0.rd, px, t0));
-                put(c, USHR_4s_imm(r1, px, 10)); put(c, AND_16b(r1, r1, t0));
-                put(c, USHR_4s_imm(r2, px, 20)); put(c, AND_16b(r2, r2, t0));
-                put(c, USHR_4s_imm(r3, px, 30));
-                put(c, SCVTF_4s(s0.rd, s0.rd));
-                put(c, SCVTF_4s(r1, r1));
-                put(c, SCVTF_4s(r2, r2));
-                put(c, SCVTF_4s(r3, r3));
-                union { float f; uint32_t u; } inv1023 = {.f = 1.0f/1023.0f};
-                union { float f; uint32_t u; } inv3    = {.f = 1.0f/3.0f};
-                arm64_pool_load(c, &jc->pool, t0, inv1023.u);
-                put(c, FMUL_4s(s0.rd, s0.rd, t0));
-                put(c, FMUL_4s(r1, r1, t0));
-                put(c, FMUL_4s(r2, r2, t0));
-                arm64_pool_load(c, &jc->pool, t0, inv3.u);
-                put(c, FMUL_4s(r3, r3, t0));
-            }
-            br_done[n_done] = c->len; n_done++;
-            put(c, B(0));
-            c->buf[br_skip_1010102] = Bcond(0x1, c->len - br_skip_1010102);
-
-            
-            put(c, CMP_wi(XT, umbra_fmt_fp16));
-            int br_skip_fp16 = c->len;
-            put(c, Bcond(0x1, 0));
-            {
-                if (scalar) {
-                    // Load 8 bytes (1 pixel, 4xfp16).
-                    put(c, LSL_xi(XT, XI, 3));
-                    put(c, ADD_xr(XT, XP, XT));
-                    // LDR Dpx, [XT, #0] (64-bit SIMD load, unsigned offset)
-                    put(c, LDR_di(px, XT, 0));
-                    // FCVTL: convert lower 4 x fp16 -> 4 x fp32
-                    put(c, FCVTL_4s(px, px));
-                    // px now has {R, G, B, A} as fp32 in lanes 0-3.
-                    // DUP each lane.
-                    put(c, DUP_4s_lane(s0.rd, px, 0));
-                    put(c, DUP_4s_lane(r1,    px, 1));
-                    put(c, DUP_4s_lane(r2,    px, 2));
-                    put(c, DUP_4s_lane(r3,    px, 3));
-                } else {
-                    // Load 32 bytes (4 pixels, each 4xfp16).
-                    // Compute addr = XP + XCOL*8 in XT.
-                    put(c, LSL_xi(XT, XI, 3));
-                    put(c, ADD_xr(XT, XP, XT));
-                    // LDR Q, [XT, #0] and LDR Q, [XT, #16]
-                    put(c, LDR_qi(px, XT, 0));
-                    put(c, LDR_qi(t0, XT, 1));
-                    // px  = [R0,G0,B0,A0, R1,G1,B1,A1] (8 x fp16)
-                    // t0  = [R2,G2,B2,A2, R3,G3,B3,A3] (8 x fp16)
-                    // De-interleave with UZP at 16-bit granularity.
-                    // UZP1.8H: 0x4e401800 | (Vm<<16) | (Vn<<5) | Vd
-                    // UZP2.8H: 0x4e405800 | (Vm<<16) | (Vn<<5) | Vd
-                    // Round 1: separate even/odd 16-bit lanes.
-                    // t1 = UZP1.8H(px, t0) = [R0,B0,R1,B1, R2,B2,R3,B3]
-                    // px = UZP2.8H(px, t0) = [G0,A0,G1,A1, G2,A2,G3,A3]
-                    put(c, UZP1_8h(t1, px, t0));
-                    put(c, UZP2_8h(px, px, t0));
-                    // Round 2: separate R/B and G/A.
-                    // t0 = UZP1.8H(t1, px) = [R0,R1,R2,R3, G0,G1,G2,G3]
-                    // t1 = UZP2.8H(t1, px) = [B0,B1,B2,B3, A0,A1,A2,A3]
-                    put(c, UZP1_8h(t0, t1, px));
-                    put(c, UZP2_8h(t1, t1, px));
-                    // FCVTL on lower halves (4 x fp16 -> 4 x fp32).
-                    put(c, FCVTL_4s(s0.rd, t0));  // R
-                    put(c, FCVTL_4s(r2, t1));      // B
-                    // For upper halves, use EXT #8 then FCVTL.
-                    // EXT.16B Vd, Vn, Vm, #8: 0x6e004000 | (imm<<11) | (Vm<<16) | (Vn<<5) | Vd
-                    // where imm = 8 bytes
-                    put(c, EXT_16b(t0, t0, t0, 8));
-                    put(c, FCVTL_4s(r1, t0));      // G
-                    put(c, EXT_16b(t1, t1, t1, 8));
-                    put(c, FCVTL_4s(r3, t1));      // A
-                }
-            }
-            br_done[n_done] = c->len; n_done++;
-            put(c, B(0));
-            c->buf[br_skip_fp16] = Bcond(0x1, c->len - br_skip_fp16);
-
-            
-            put(c, CMP_wi(XT, umbra_fmt_fp16_planar));
-            int br_skip_f16_planar = c->len;
-            put(c, Bcond(0x1, 0));
-            {
-                // XT = buf[p].sz / 4 (plane stride).  XP already has plane 0 row addr.
-                int const sz_off = p * (int)sizeof(umbra_buf)
-                                 + (int)__builtin_offsetof(umbra_buf, sz);
-                put(c, LDR_xi(XT, XBUF, sz_off / 8));
-                put(c, LSR_xi(XT, XT, 2));
-                if (scalar) {
-                    // Plane 0 (R)
-                    put(c, LDR_hx(px, XP, XI));
-                    put(c, FCVTL_4s(s0.rd, px));
-                    put(c, DUP_4s_lane(s0.rd, s0.rd, 0));
-                    // Plane 1 (G)
-                    put(c, ADD_xr(XP, XP, XT));
-                    put(c, LDR_hx(px, XP, XI));
-                    put(c, FCVTL_4s(r1, px));
-                    put(c, DUP_4s_lane(r1, r1, 0));
-                    // Plane 2 (B)
-                    put(c, ADD_xr(XP, XP, XT));
-                    put(c, LDR_hx(px, XP, XI));
-                    put(c, FCVTL_4s(r2, px));
-                    put(c, DUP_4s_lane(r2, r2, 0));
-                    // Plane 3 (A)
-                    put(c, ADD_xr(XP, XP, XT));
-                    put(c, LDR_hx(px, XP, XI));
-                    put(c, FCVTL_4s(r3, px));
-                    put(c, DUP_4s_lane(r3, r3, 0));
-                } else {
-                    // Plane 0 (R)
-                    put(c, LDR_d(s0.rd, XP, XH));
-                    put(c, FCVTL_4s(s0.rd, s0.rd));
-                    // Plane 1 (G)
-                    put(c, ADD_xr(XP, XP, XT));
-                    put(c, LDR_d(r1, XP, XH));
-                    put(c, FCVTL_4s(r1, r1));
-                    // Plane 2 (B)
-                    put(c, ADD_xr(XP, XP, XT));
-                    put(c, LDR_d(r2, XP, XH));
-                    put(c, FCVTL_4s(r2, r2));
-                    // Plane 3 (A)
-                    put(c, ADD_xr(XP, XP, XT));
-                    put(c, LDR_d(r3, XP, XH));
-                    put(c, FCVTL_4s(r3, r3));
-                }
-                last_ptr = -1;
-            }
-            br_done[n_done] = c->len; n_done++;
-            put(c, B(0));
-            c->buf[br_skip_f16_planar] = Bcond(0x1, c->len - br_skip_f16_planar);
-
-            // Default: zero all outputs.
-            put(c, MOVI_4s(s0.rd, 0, 0));
-            put(c, MOVI_4s(r1, 0, 0));
-            put(c, MOVI_4s(r2, 0, 0));
-            put(c, MOVI_4s(r3, 0, 0));
-
-            // Patch all B-to-done branches.
-            for (int j = 0; j < n_done; j++) {
-                c->buf[br_done[j]] = B(c->len - br_done[j]);
-            }
-
             ra_return_reg(ra, t1);
             ra_return_reg(ra, t0);
             ra_return_reg(ra, px);
@@ -942,34 +733,68 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             ra_set_chan_reg(ra, i, 2, r2);
             ra_set_chan_reg(ra, i, 3, r3);
         } break;
-        case op_store_color: {
+        case op_load_fp16x4_planar: {
+            struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
+            int8_t r1 = ra_alloc(ra, sl, ns);
+            int8_t r2 = ra_alloc(ra, sl, ns);
+            int8_t r3 = ra_alloc(ra, sl, ns);
+            int    p = inst->ptr;
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int8_t px = ra_alloc(ra, sl, ns);
+            {
+                int const sz_off = p * (int)sizeof(umbra_buf)
+                                 + (int)__builtin_offsetof(umbra_buf, sz);
+                put(c, LDR_xi(XT, XBUF, sz_off / 8));
+                put(c, LSR_xi(XT, XT, 2));
+            }
+            if (scalar) {
+                put(c, LDR_hx(px, XP, XI));
+                put(c, FCVTL_4s(s0.rd, px));
+                put(c, DUP_4s_lane(s0.rd, s0.rd, 0));
+                put(c, ADD_xr(XP, XP, XT));
+                put(c, LDR_hx(px, XP, XI));
+                put(c, FCVTL_4s(r1, px));
+                put(c, DUP_4s_lane(r1, r1, 0));
+                put(c, ADD_xr(XP, XP, XT));
+                put(c, LDR_hx(px, XP, XI));
+                put(c, FCVTL_4s(r2, px));
+                put(c, DUP_4s_lane(r2, r2, 0));
+                put(c, ADD_xr(XP, XP, XT));
+                put(c, LDR_hx(px, XP, XI));
+                put(c, FCVTL_4s(r3, px));
+                put(c, DUP_4s_lane(r3, r3, 0));
+            } else {
+                put(c, LDR_d(s0.rd, XP, XH));
+                put(c, FCVTL_4s(s0.rd, s0.rd));
+                put(c, ADD_xr(XP, XP, XT));
+                put(c, LDR_d(r1, XP, XH));
+                put(c, FCVTL_4s(r1, r1));
+                put(c, ADD_xr(XP, XP, XT));
+                put(c, LDR_d(r2, XP, XH));
+                put(c, FCVTL_4s(r2, r2));
+                put(c, ADD_xr(XP, XP, XT));
+                put(c, LDR_d(r3, XP, XH));
+                put(c, FCVTL_4s(r3, r3));
+            }
+            last_ptr = -1;
+            ra_return_reg(ra, px);
+            ra_set_chan_reg(ra, i, 0, s0.rd);
+            ra_set_chan_reg(ra, i, 1, r1);
+            ra_set_chan_reg(ra, i, 2, r2);
+            ra_set_chan_reg(ra, i, 3, r3);
+        } break;
+        case op_store_8888: {
             int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
             int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
             int8_t rb_  = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
             int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-
             int8_t scale = ra_alloc(ra, sl, ns);
             int8_t z     = ra_alloc(ra, sl, ns);
             int8_t one   = ra_alloc(ra, sl, ns);
             int8_t px    = ra_alloc(ra, sl, ns);
             int8_t t     = ra_alloc(ra, sl, ns);
-
-            // Load fmt.
-            {
-                int const fmt_off = p * (int)sizeof(umbra_buf)
-                                  + (int)__builtin_offsetof(umbra_buf, fmt);
-                put(c, LDR_wi(XT, XBUF, fmt_off / 4));
-            }
-
-            int br_done[8];
-            int n_done = 0;
-
-
-            put(c, CMP_wi(XT, umbra_fmt_8888));
-            int br_skip_8888 = c->len;
-            put(c, Bcond(0x1, 0));
             {
                 union { float f; uint32_t u; } s255 = {.f = 255.0f};
                 union { float f; uint32_t u; } f1   = {.f = 1.0f};
@@ -990,14 +815,27 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 if (scalar) { put(c, STR_sx(px, XP, XI)); }
                 else        { put(c, STR_q(px, XP, XW)); }
             }
-            br_done[n_done] = c->len; n_done++;
-            put(c, B(0));
-            c->buf[br_skip_8888] = Bcond(0x1, c->len - br_skip_8888);
-
-
-            put(c, CMP_wi(XT, umbra_fmt_565));
-            int br_skip_565 = c->len;
-            put(c, Bcond(0x1, 0));
+            ra_return_reg(ra, t);
+            ra_return_reg(ra, px);
+            ra_return_reg(ra, one);
+            ra_return_reg(ra, z);
+            ra_return_reg(ra, scale);
+            FREE_CHAN(inst->x, i);
+            FREE_CHAN(inst->y, i);
+            FREE_CHAN(inst->z, i);
+            FREE_CHAN(inst->w, i);
+        } break;
+        case op_store_565: {
+            int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
+            int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
+            int8_t rb_  = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
+            int    p = inst->ptr;
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int8_t scale = ra_alloc(ra, sl, ns);
+            int8_t z     = ra_alloc(ra, sl, ns);
+            int8_t one   = ra_alloc(ra, sl, ns);
+            int8_t px    = ra_alloc(ra, sl, ns);
+            int8_t t     = ra_alloc(ra, sl, ns);
             {
                 union { float f; uint32_t u; } s31 = {.f = 31.0f};
                 union { float f; uint32_t u; } s63 = {.f = 63.0f};
@@ -1017,23 +855,31 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, FMUL_4s(t, t, scale)); put(c, FCVTNS_4s(t, t));
                 put(c, SHL_4s_imm(t, t, 11));
                 put(c, ORR_16b(px, px, t));
-                // Narrow 4S -> 4H and store.
                 put(c, XTN_4h(px, px));
-                if (scalar) {
-                    // STR Hpx, [XP, XI, LSL #1]
-                    put(c, STR_hx(px, XP, XI));
-                } else {
-                    put(c, STR_d(px, XP, XH));
-                }
+                if (scalar) { put(c, STR_hx(px, XP, XI)); }
+                else        { put(c, STR_d(px, XP, XH)); }
             }
-            br_done[n_done] = c->len; n_done++;
-            put(c, B(0));
-            c->buf[br_skip_565] = Bcond(0x1, c->len - br_skip_565);
-
-
-            put(c, CMP_wi(XT, umbra_fmt_1010102));
-            int br_skip_1010102 = c->len;
-            put(c, Bcond(0x1, 0));
+            ra_return_reg(ra, t);
+            ra_return_reg(ra, px);
+            ra_return_reg(ra, one);
+            ra_return_reg(ra, z);
+            ra_return_reg(ra, scale);
+            FREE_CHAN(inst->x, i);
+            FREE_CHAN(inst->y, i);
+            FREE_CHAN(inst->z, i);
+        } break;
+        case op_store_1010102: {
+            int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
+            int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
+            int8_t rb_  = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
+            int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
+            int    p = inst->ptr;
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int8_t scale = ra_alloc(ra, sl, ns);
+            int8_t z     = ra_alloc(ra, sl, ns);
+            int8_t one   = ra_alloc(ra, sl, ns);
+            int8_t px    = ra_alloc(ra, sl, ns);
+            int8_t t     = ra_alloc(ra, sl, ns);
             {
                 union { float f; uint32_t u; } s1023 = {.f = 1023.0f};
                 union { float f; uint32_t u; } s3    = {.f = 3.0f};
@@ -1056,102 +902,94 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 if (scalar) { put(c, STR_sx(px, XP, XI)); }
                 else        { put(c, STR_q(px, XP, XW)); }
             }
-            br_done[n_done] = c->len; n_done++;
-            put(c, B(0));
-            c->buf[br_skip_1010102] = Bcond(0x1, c->len - br_skip_1010102);
-
-
-            put(c, CMP_wi(XT, umbra_fmt_fp16));
-            int br_skip_fp16 = c->len;
-            put(c, Bcond(0x1, 0));
-            {
-                if (scalar) {
-                    // Convert each f32 channel to f16, pack into one D register.
-                    put(c, FCVTN_4h(px, rr));
-                    // px now has rr[0] as fp16 in lane 0.
-                    // INS Vpx.H[1], Vrg.H[0] etc. — but FCVTN gives us the low 4 lanes.
-                    // Simpler: pack all 4 into a temp Q as fp32 [R,G,B,A], then FCVTN.
-                    // INS Vd.S[idx], Vn.S[0] = 0x6e040400 | (idx<<19) | (Vn<<5) | Vd
-                    put(c, ORR_16b(t, rr, rr));  // t = rr
-                    put(c, INS_elem_s(t, 1, rg,  0));  // INS t.S[1], rg.S[0]
-                    put(c, INS_elem_s(t, 2, rb_, 0));  // INS t.S[2], rb_.S[0]
-                    put(c, INS_elem_s(t, 3, ra_v, 0)); // INS t.S[3], ra_v.S[0]
-                    put(c, FCVTN_4h(px, t));
-                    // STR Dpx, [XP + XI*8]
-                    put(c, LSL_xi(XT, XI, 3));
-                    put(c, ADD_xr(XT, XP, XT));
-                    // STR Dpx, [XT, #0] (64-bit SIMD store, unsigned offset)
-                    put(c, STR_di(px, XT, 0));
-                } else {
-                    // Convert each channel from fp32 to fp16.
-                    put(c, FCVTN_4h(px, rr));     // px low = R0..R3 as fp16
-                    put(c, FCVTN_4h(t, rg));      // t  low = G0..G3 as fp16
-                    put(c, FCVTN_4h(z, rb_));     // z  low = B0..B3 as fp16
-                    put(c, FCVTN_4h(one, ra_v));  // one low = A0..A3 as fp16
-                    // Interleave: need [R0,G0,B0,A0, R1,G1,B1,A1, ...].
-                    // ZIP1.8H(a, px, t) = [R0,G0,R1,G1, R2,G2,R3,G3]
-                    put(c, ZIP1_8h(scale, px, t));   // scale = ZIP1.8H(px, t) = [R0,G0,R1,G1,R2,G2,R3,G3]
-                    put(c, ZIP1_8h(px, z, one));    // px = ZIP1.8H(z, one) = [B0,A0,B1,A1,B2,A2,B3,A3]
-                    // Now interleave at 32-bit granularity.
-                    // ZIP1.4S(q0, scale, px) = [R0G0,B0A0, R1G1,B1A1]
-                    // ZIP2.4S(q1, scale, px) = [R2G2,B2A2, R3G3,B3A3]
-                    put(c, ZIP1_4s(t, scale, px));    // t = first 2 pixels
-                    put(c, ZIP2_4s(z, scale, px));    // z = last 2 pixels
-                    // Store 32 bytes.
-                    put(c, LSL_xi(XT, XI, 3));
-                    put(c, ADD_xr(XT, XP, XT));
-                    put(c, STR_qi(t, XT, 0));
-                    put(c, STR_qi(z, XT, 1));
-                }
-            }
-            br_done[n_done] = c->len; n_done++;
-            put(c, B(0));
-            c->buf[br_skip_fp16] = Bcond(0x1, c->len - br_skip_fp16);
-
-
-            put(c, CMP_wi(XT, umbra_fmt_fp16_planar));
-            int br_skip_f16_planar_s = c->len;
-            put(c, Bcond(0x1, 0));
-            {
-                int const sz_off = p * (int)sizeof(umbra_buf)
-                                 + (int)__builtin_offsetof(umbra_buf, sz);
-                put(c, LDR_xi(XT, XBUF, sz_off / 8));
-                put(c, LSR_xi(XT, XT, 2));
-                if (scalar) {
-                    put(c, FCVTN_4h(px, rr));  put(c, STR_hx(px, XP, XI));
-                    put(c, ADD_xr(XP, XP, XT));
-                    put(c, FCVTN_4h(px, rg));  put(c, STR_hx(px, XP, XI));
-                    put(c, ADD_xr(XP, XP, XT));
-                    put(c, FCVTN_4h(px, rb_)); put(c, STR_hx(px, XP, XI));
-                    put(c, ADD_xr(XP, XP, XT));
-                    put(c, FCVTN_4h(px, ra_v)); put(c, STR_hx(px, XP, XI));
-                } else {
-                    put(c, FCVTN_4h(px, rr));  put(c, STR_d(px, XP, XH));
-                    put(c, ADD_xr(XP, XP, XT));
-                    put(c, FCVTN_4h(px, rg));  put(c, STR_d(px, XP, XH));
-                    put(c, ADD_xr(XP, XP, XT));
-                    put(c, FCVTN_4h(px, rb_)); put(c, STR_d(px, XP, XH));
-                    put(c, ADD_xr(XP, XP, XT));
-                    put(c, FCVTN_4h(px, ra_v)); put(c, STR_d(px, XP, XH));
-                }
-                last_ptr = -1;
-            }
-            br_done[n_done] = c->len; n_done++;
-            put(c, B(0));
-            c->buf[br_skip_f16_planar_s] = Bcond(0x1, c->len - br_skip_f16_planar_s);
-
-            // Default: no-op for unknown formats.
-
-            // Patch all B-to-done branches.
-            for (int j = 0; j < n_done; j++) {
-                c->buf[br_done[j]] = B(c->len - br_done[j]);
-            }
-
             ra_return_reg(ra, t);
             ra_return_reg(ra, px);
             ra_return_reg(ra, one);
             ra_return_reg(ra, z);
             ra_return_reg(ra, scale);
+            FREE_CHAN(inst->x, i);
+            FREE_CHAN(inst->y, i);
+            FREE_CHAN(inst->z, i);
+            FREE_CHAN(inst->w, i);
+        } break;
+        case op_store_fp16x4: {
+            int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
+            int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
+            int8_t rb_  = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
+            int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
+            int    p = inst->ptr;
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int8_t px = ra_alloc(ra, sl, ns);
+            int8_t t  = ra_alloc(ra, sl, ns);
+            int8_t z  = ra_alloc(ra, sl, ns);
+            int8_t one = ra_alloc(ra, sl, ns);
+            int8_t scale = ra_alloc(ra, sl, ns);
+            if (scalar) {
+                put(c, ORR_16b(t, rr, rr));
+                put(c, INS_elem_s(t, 1, rg,  0));
+                put(c, INS_elem_s(t, 2, rb_, 0));
+                put(c, INS_elem_s(t, 3, ra_v, 0));
+                put(c, FCVTN_4h(px, t));
+                put(c, LSL_xi(XT, XI, 3));
+                put(c, ADD_xr(XT, XP, XT));
+                put(c, STR_di(px, XT, 0));
+            } else {
+                put(c, FCVTN_4h(px, rr));
+                put(c, FCVTN_4h(t, rg));
+                put(c, FCVTN_4h(z, rb_));
+                put(c, FCVTN_4h(one, ra_v));
+                put(c, ZIP1_8h(scale, px, t));
+                put(c, ZIP1_8h(px, z, one));
+                put(c, ZIP1_4s(t, scale, px));
+                put(c, ZIP2_4s(z, scale, px));
+                put(c, LSL_xi(XT, XI, 3));
+                put(c, ADD_xr(XT, XP, XT));
+                put(c, STR_qi(t, XT, 0));
+                put(c, STR_qi(z, XT, 1));
+            }
+            ra_return_reg(ra, scale);
+            ra_return_reg(ra, one);
+            ra_return_reg(ra, z);
+            ra_return_reg(ra, t);
+            ra_return_reg(ra, px);
+            FREE_CHAN(inst->x, i);
+            FREE_CHAN(inst->y, i);
+            FREE_CHAN(inst->z, i);
+            FREE_CHAN(inst->w, i);
+        } break;
+        case op_store_fp16x4_planar: {
+            int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
+            int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
+            int8_t rb_  = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
+            int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
+            int    p = inst->ptr;
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int8_t px = ra_alloc(ra, sl, ns);
+            {
+                int const sz_off = p * (int)sizeof(umbra_buf)
+                                 + (int)__builtin_offsetof(umbra_buf, sz);
+                put(c, LDR_xi(XT, XBUF, sz_off / 8));
+                put(c, LSR_xi(XT, XT, 2));
+            }
+            if (scalar) {
+                put(c, FCVTN_4h(px, rr));  put(c, STR_hx(px, XP, XI));
+                put(c, ADD_xr(XP, XP, XT));
+                put(c, FCVTN_4h(px, rg));  put(c, STR_hx(px, XP, XI));
+                put(c, ADD_xr(XP, XP, XT));
+                put(c, FCVTN_4h(px, rb_)); put(c, STR_hx(px, XP, XI));
+                put(c, ADD_xr(XP, XP, XT));
+                put(c, FCVTN_4h(px, ra_v)); put(c, STR_hx(px, XP, XI));
+            } else {
+                put(c, FCVTN_4h(px, rr));  put(c, STR_d(px, XP, XH));
+                put(c, ADD_xr(XP, XP, XT));
+                put(c, FCVTN_4h(px, rg));  put(c, STR_d(px, XP, XH));
+                put(c, ADD_xr(XP, XP, XT));
+                put(c, FCVTN_4h(px, rb_)); put(c, STR_d(px, XP, XH));
+                put(c, ADD_xr(XP, XP, XT));
+                put(c, FCVTN_4h(px, ra_v)); put(c, STR_d(px, XP, XH));
+            }
+            last_ptr = -1;
+            ra_return_reg(ra, px);
             FREE_CHAN(inst->x, i);
             FREE_CHAN(inst->y, i);
             FREE_CHAN(inst->z, i);
@@ -1233,11 +1071,11 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 case op_imm_32:
                 case op_uniform_32:
                 case op_load_32:
-                case op_load_color:
+                case op_load_fp16x4: case op_load_fp16x4_planar:
                 case op_gather_uniform_32:
                 case op_gather_32:
                 case op_store_32:
-                case op_store_color:
+                case op_store_8888: case op_store_565: case op_store_1010102: case op_store_fp16x4: case op_store_fp16x4_planar:
                 case op_add_f32:
                 case op_sub_f32:
                 case op_mul_f32:
@@ -1793,11 +1631,11 @@ static _Bool emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int im
     case op_deref_ptr:
     case op_uniform_32:
     case op_load_32:
-    case op_load_color:
+    case op_load_fp16x4: case op_load_fp16x4_planar:
     case op_gather_uniform_32:
     case op_gather_32:
     case op_store_32:
-    case op_store_color:
+    case op_store_8888: case op_store_565: case op_store_1010102: case op_store_fp16x4: case op_store_fp16x4_planar:
     case op_load_16:
     case op_gather_16:
     case op_store_16:
@@ -2109,7 +1947,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             FREE_CHAN(inst->y, i);
         } break;
 
-        case op_load_color: {
+        case op_load_fp16x4: case op_load_fp16x4_planar: {
             struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
             int8_t r1 = ra_alloc(ra, sl, ns);
             int8_t r2 = ra_alloc(ra, sl, ns);
@@ -2538,7 +2376,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             ra_set_chan_reg(ra, i, 2, r2);
             ra_set_chan_reg(ra, i, 3, r3);
         } break;
-        case op_store_color: {
+        case op_store_8888: case op_store_565: case op_store_1010102: case op_store_fp16x4: case op_store_fp16x4_planar: {
             int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
             int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
             int8_t rb_  = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);

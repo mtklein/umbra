@@ -3,11 +3,27 @@
   v2   = uniform_32      p0[1]
   v3   = uniform_32      p0[2]
   v4   = uniform_32      p0[3]
-  v5   = imm_32          0x3f800000
-  v6   = sub_f32         v5 v4
-  v7   = load_color      p1
-  v8   = fma_f32         v7 v6 v4
-  v9   = fma_f32         v7 v6 v1
-  v10  = fma_f32         v7 v6 v3
-  v11  = fma_f32         v7 v6 v2
-      store_color     p1 v11
+  v5   = imm_32          0xff
+  v6   = imm_32          0x3b808081
+  v7   = imm_32          0x3f800000
+  v8   = sub_f32         v7 v4
+  v9   = load_32         p1
+  v10  = shr_u32_imm     v9 24
+  v11  = f32_from_i32    v10
+  v12  = mul_f32_imm     v11 0x3b808081 (a.k.a. v6)
+  v13  = fma_f32         v12 v8 v4
+  v14  = shr_u32_imm     v9 8
+  v15  = and_32_imm      v14 0xff (a.k.a. v5)
+  v16  = f32_from_i32    v15
+  v17  = mul_f32_imm     v16 0x3b808081 (a.k.a. v6)
+  v18  = fma_f32         v17 v8 v2
+  v19  = shr_u32_imm     v9 16
+  v20  = and_32_imm      v19 0xff (a.k.a. v5)
+  v21  = f32_from_i32    v20
+  v22  = mul_f32_imm     v21 0x3b808081 (a.k.a. v6)
+  v23  = fma_f32         v22 v8 v3
+  v24  = and_32_imm      v9 0xff (a.k.a. v5)
+  v25  = f32_from_i32    v24
+  v26  = mul_f32_imm     v25 0x3b808081 (a.k.a. v6)
+  v27  = fma_f32         v26 v8 v1
+      store_8888      p1 v18

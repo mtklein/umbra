@@ -53,4 +53,4 @@
   v52  = gather_32       p-2 v30
   v53  = sub_f32         v51 v52
   v54  = fma_f32         v41 v53 v52
-      store_color     p1 v46
+      store_8888      p1 v46

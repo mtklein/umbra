@@ -27,16 +27,25 @@ static int ptr_ix(umbra_ptr p) { return p.deref ? ~p.ix : p.ix; }
 _Bool is_store(enum op op) {
     return op == op_store_16
         || op == op_store_32
-        || op == op_store_color;
+        || op == op_store_8888
+        || op == op_store_565
+        || op == op_store_1010102
+        || op == op_store_fp16x4
+        || op == op_store_fp16x4_planar;
 }
 _Bool has_ptr(enum op op) {
     return op == op_uniform_32
         || op == op_load_32
-        || op == op_load_color
+        || op == op_load_fp16x4
+        || op == op_load_fp16x4_planar
         || op == op_gather_uniform_32
         || op == op_gather_32
         || op == op_store_32
-        || op == op_store_color
+        || op == op_store_8888
+        || op == op_store_565
+        || op == op_store_1010102
+        || op == op_store_fp16x4
+        || op == op_store_fp16x4_planar
         || op == op_deref_ptr
         || op == op_load_16
         || op == op_store_16
@@ -68,10 +77,15 @@ _Bool is_varying(enum op op) {
         || op == op_y
         || op == op_load_16
         || op == op_load_32
-        || op == op_load_color
+        || op == op_load_fp16x4
+        || op == op_load_fp16x4_planar
         || op == op_store_16
         || op == op_store_32
-        || op == op_store_color;
+        || op == op_store_8888
+        || op == op_store_565
+        || op == op_store_1010102
+        || op == op_store_fp16x4
+        || op == op_store_fp16x4_planar;
 }
 
 static _Bool is_pow2(int x) { return __builtin_popcount((unsigned)x) == 1; }
@@ -237,18 +251,84 @@ void umbra_store_32(builder *b, umbra_ptr dst, val v) {
 void umbra_store_16(builder *b, umbra_ptr dst, val v) {
     push(b, op_store_16, VY(v), .ptr = ptr_ix(dst));
 }
-umbra_color umbra_load_color(builder *b, umbra_ptr src) {
-    val px = push(b, op_load_color, .ptr = ptr_ix(src));
+static umbra_color fp16x4_color(val px) {
+    int const id = val_id((umbra_val){.bits = px.bits});
     return (umbra_color){
-        val_make(val_id((umbra_val){.bits = px.bits}), 0),
-        val_make(val_id((umbra_val){.bits = px.bits}), 1),
-        val_make(val_id((umbra_val){.bits = px.bits}), 2),
-        val_make(val_id((umbra_val){.bits = px.bits}), 3),
+        val_make(id, 0), val_make(id, 1),
+        val_make(id, 2), val_make(id, 3),
     };
 }
-void umbra_store_color(builder *b, umbra_ptr dst, umbra_color c) {
-    push(b, op_store_color, VX(c.r), VY(c.g), VZ(c.b), VW(c.a),
-         .ptr = ptr_ix(dst));
+umbra_color umbra_load_color(builder *b, umbra_ptr src, umbra_fmt fmt) {
+    switch (fmt) {
+    case umbra_fmt_8888: {
+        val const px   = umbra_load_32(b, src);
+        val const mask = umbra_imm_i32(b, 0xFF);
+        val const inv  = umbra_imm_f32(b, 1.0f/255);
+        val const ri   = umbra_and_i32(b, px, mask);
+        val const gi   = umbra_and_i32(b, umbra_shr_u32(b, px, umbra_imm_i32(b,  8)), mask);
+        val const bi   = umbra_and_i32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 16)), mask);
+        val const ai   = umbra_shr_u32(b, px, umbra_imm_i32(b, 24));
+        return (umbra_color){
+            umbra_mul_f32(b, umbra_f32_from_i32(b, ri), inv),
+            umbra_mul_f32(b, umbra_f32_from_i32(b, gi), inv),
+            umbra_mul_f32(b, umbra_f32_from_i32(b, bi), inv),
+            umbra_mul_f32(b, umbra_f32_from_i32(b, ai), inv),
+        };
+    }
+    case umbra_fmt_565: {
+        val const px = umbra_i32_from_u16(b, umbra_load_16(b, src));
+        val const r5 = umbra_shr_u32(b, px, umbra_imm_i32(b, 11));
+        val const g6 = umbra_and_i32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 5)),
+                                     umbra_imm_i32(b, 0x3F));
+        val const b5 = umbra_and_i32(b, px, umbra_imm_i32(b, 0x1F));
+        return (umbra_color){
+            umbra_mul_f32(b, umbra_f32_from_i32(b, r5), umbra_imm_f32(b, 1.0f/31)),
+            umbra_mul_f32(b, umbra_f32_from_i32(b, g6), umbra_imm_f32(b, 1.0f/63)),
+            umbra_mul_f32(b, umbra_f32_from_i32(b, b5), umbra_imm_f32(b, 1.0f/31)),
+            umbra_imm_f32(b, 1.0f),
+        };
+    }
+    case umbra_fmt_1010102: {
+        val const px   = umbra_load_32(b, src);
+        val const mask = umbra_imm_i32(b, 0x3FF);
+        val const ri   = umbra_and_i32(b, px, mask);
+        val const gi   = umbra_and_i32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 10)), mask);
+        val const bi   = umbra_and_i32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 20)), mask);
+        val const ai   = umbra_shr_u32(b, px, umbra_imm_i32(b, 30));
+        return (umbra_color){
+            umbra_mul_f32(b, umbra_f32_from_i32(b, ri), umbra_imm_f32(b, 1.0f/1023)),
+            umbra_mul_f32(b, umbra_f32_from_i32(b, gi), umbra_imm_f32(b, 1.0f/1023)),
+            umbra_mul_f32(b, umbra_f32_from_i32(b, bi), umbra_imm_f32(b, 1.0f/1023)),
+            umbra_mul_f32(b, umbra_f32_from_i32(b, ai), umbra_imm_f32(b, 1.0f/3)),
+        };
+    }
+    case umbra_fmt_fp16:
+        return fp16x4_color(push(b, op_load_fp16x4, .ptr = ptr_ix(src)));
+    case umbra_fmt_fp16_planar:
+        return fp16x4_color(push(b, op_load_fp16x4_planar, .ptr = ptr_ix(src)));
+    }
+    return (umbra_color){0};
+}
+void umbra_store_color(builder *b, umbra_ptr dst, umbra_color c, umbra_fmt fmt) {
+    switch (fmt) {
+    case umbra_fmt_8888:
+        push(b, op_store_8888, VX(c.r), VY(c.g), VZ(c.b), VW(c.a), .ptr = ptr_ix(dst));
+        break;
+    case umbra_fmt_565:
+        push(b, op_store_565, VX(c.r), VY(c.g), VZ(c.b), VW(c.a), .ptr = ptr_ix(dst));
+        break;
+    case umbra_fmt_1010102:
+        push(b, op_store_1010102, VX(c.r), VY(c.g), VZ(c.b), VW(c.a), .ptr = ptr_ix(dst));
+        break;
+    case umbra_fmt_fp16:
+        push(b, op_store_fp16x4, VX(c.r), VY(c.g), VZ(c.b), VW(c.a),
+             .ptr = ptr_ix(dst));
+        break;
+    case umbra_fmt_fp16_planar:
+        push(b, op_store_fp16x4_planar, VX(c.r), VY(c.g), VZ(c.b), VW(c.a),
+             .ptr = ptr_ix(dst));
+        break;
+    }
 }
 val umbra_i32_from_s16(builder *b, val x) { return push(b, op_i32_from_s16, VX(x)); }
 val umbra_i32_from_u16(builder *b, val x) { return push(b, op_i32_from_u16, VX(x)); }
@@ -702,14 +782,19 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_gather_16: fprintf(f, " p%d v%d", ip->ptr, (int)ip->x.id); break;
         case op_load_16:
         case op_load_32:
-        case op_load_color: fprintf(f, " p%d", ip->ptr); break;
+        case op_load_fp16x4:
+        case op_load_fp16x4_planar: fprintf(f, " p%d", ip->ptr); break;
         case op_deref_ptr: fprintf(f, " p%d byte%d", ip->ptr, ip->imm); break;
         case op_x:
         case op_y: break;
 
         case op_store_16:
         case op_store_32:
-        case op_store_color: break;
+        case op_store_8888:
+        case op_store_565:
+        case op_store_1010102:
+        case op_store_fp16x4:
+        case op_store_fp16x4_planar: break;
 
         case op_sqrt_f32:
         case op_abs_f32:
@@ -847,9 +932,14 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     case op_uniform_32:
     case op_load_32:
     case op_load_16:
-    case op_load_color:
+    case op_load_fp16x4:
+    case op_load_fp16x4_planar:
     case op_store_32:
-    case op_store_color:
+    case op_store_8888:
+    case op_store_565:
+    case op_store_1010102:
+    case op_store_fp16x4:
+    case op_store_fp16x4_planar:
     case op_store_16:
     case op_gather_uniform_32:
     case op_gather_32:

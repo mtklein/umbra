@@ -111,7 +111,7 @@ static void overview_init(slide *s, int w, int h) {
 
     for (int idx = 0; idx < st->n_real; idx++) {
         slide                *sub = slide_get(idx);
-        struct umbra_builder *b = umbra_draw_build(sub->shader, sub->coverage, sub->blend,
+        struct umbra_builder *b = umbra_draw_build(sub->shader, sub->coverage, sub->blend, sub->fmt,
                                                    &st->lays[idx]);
         st->bbs[idx] = umbra_basic_block(b);
         umbra_builder_free(b);

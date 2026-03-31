@@ -11,7 +11,7 @@ typedef struct {
 } umbra_draw_layout;
 
 struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn coverage,
-                                       umbra_blend_fn blend,
+                                       umbra_blend_fn blend, umbra_fmt fmt,
                                        umbra_draw_layout *layout);
 
 umbra_color umbra_shader_solid(struct umbra_builder *, umbra_val x, umbra_val y);

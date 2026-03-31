@@ -72,7 +72,6 @@ static void finish_pipe(pipe *p, builder *builder) {
 }
 
 static void build_fill(int fmt) {
-    (void)fmt;
     free_pipe(&fill_pipe);
     builder    *builder = umbra_builder();
     int         fi = umbra_reserve(builder, 4);
@@ -82,29 +81,27 @@ static void build_fill(int fmt) {
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 2),
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 3),
     };
-    umbra_store_color(builder, (umbra_ptr){1, 0}, c);
+    umbra_store_color(builder, (umbra_ptr){1, 0}, c, fmt_enums[fmt]);
     finish_pipe(&fill_pipe, builder);
 }
 
 static void build_readback(int fmt) {
-    (void)fmt;
     free_pipe(&readback_pipe);
     builder    *builder = umbra_builder();
-    umbra_color c = umbra_load_color(builder, (umbra_ptr){1, 0});
+    umbra_color c = umbra_load_color(builder, (umbra_ptr){1, 0}, fmt_enums[fmt]);
     int         op = umbra_max_ptr(builder) + 1;
-    umbra_store_color(builder, (umbra_ptr){op, 0}, c);
+    umbra_store_color(builder, (umbra_ptr){op, 0}, c, umbra_fmt_8888);
     readback_pipe.out_ptr = op;
     finish_pipe(&readback_pipe, builder);
 }
 
 static void build_hdr(int fmt) {
-    (void)fmt;
     free_pipe(&hdr_pipe);
     builder    *builder = umbra_builder();
-    umbra_color c = umbra_load_color(builder, (umbra_ptr){1, 0});
+    umbra_color c = umbra_load_color(builder, (umbra_ptr){1, 0}, fmt_enums[fmt]);
     int         op = umbra_max_ptr(builder) + 1;
     hdr_pipe.out_ptr = op;
-    umbra_store_color(builder, (umbra_ptr){op, 0}, c);
+    umbra_store_color(builder, (umbra_ptr){op, 0}, c, umbra_fmt_fp16);
     finish_pipe(&hdr_pipe, builder);
 }
 
@@ -154,7 +151,7 @@ static void build_slide_fmt(slide *s, int fmt) {
     free_programs();
     s->fmt = fmt_enums[fmt];
 
-    builder *builder = umbra_draw_build(s->shader, s->coverage, s->blend,
+    builder *builder = umbra_draw_build(s->shader, s->coverage, s->blend, fmt_enums[fmt],
                                         &draw_layout);
     struct umbra_basic_block *bb = umbra_basic_block(builder);
     umbra_builder_free(builder);

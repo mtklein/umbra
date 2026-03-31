@@ -28,4 +28,4 @@
   v27  = fma_f32         v25 v13 v5
   v28  = fma_f32         v25 v15 v7
   v29  = fma_f32         v25 v14 v6
-      store_color     p1 v29
+      store_8888      p1 v29

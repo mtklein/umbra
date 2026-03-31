@@ -35,4 +35,4 @@
   v34  = sub_f32         v24 v20
   v35  = mul_f32         v16 v34
   v36  = fma_f32         v16 v34 v20
-      store_color     p1 v30
+      store_8888      p1 v30

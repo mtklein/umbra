@@ -69,4 +69,4 @@
   v68  = sub_f32         v58 v48
   v69  = mul_f32         v30 v68
   v70  = fma_f32         v30 v68 v48
-      store_color     p1 v64
+      store_8888      p1 v64

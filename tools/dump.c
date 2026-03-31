@@ -123,7 +123,7 @@ int main(void) {
         mkdir(dir, 0755);
 
         dump_bb(dir, "draw",
-                umbra_draw_build(s->shader, s->coverage, s->blend, NULL));
+                umbra_draw_build(s->shader, s->coverage, s->blend, s->fmt, NULL));
     }
 
     dump_bb("dumps", "slug_acc", slug_build_acc(NULL));

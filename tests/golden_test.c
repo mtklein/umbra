@@ -45,7 +45,7 @@ static void build_fill(int fmt) {
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi+2),
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi+3),
     };
-    umbra_store_color(builder, (umbra_ptr){1, 0}, c);
+    umbra_store_color(builder, (umbra_ptr){1, 0}, c, fmt_enums[fmt]);
     fill_pipes[fmt].uni_len =
         umbra_uni_len(builder);
     struct umbra_basic_block *opt =
@@ -122,7 +122,7 @@ static void test_slide_golden(
     umbra_draw_layout lay;
     struct umbra_builder *bld =
         umbra_draw_build(s->shader, s->coverage,
-                         s->blend,
+                         s->blend, fmt_enums[fmt],
                          &lay);
     struct umbra_basic_block *bb =
         umbra_basic_block(bld);
@@ -259,7 +259,7 @@ static void test_slug_rect(void) {
     umbra_draw_layout lay;
     builder *bld = umbra_draw_build(
         umbra_shader_solid, umbra_coverage_wind,
-        umbra_blend_srcover,
+        umbra_blend_srcover, umbra_fmt_8888,
         &lay);
     struct umbra_basic_block *bb =
         umbra_basic_block(bld);
@@ -336,7 +336,7 @@ static void test_perspective_text(void) {
     builder *bld = umbra_draw_build(
         umbra_shader_solid,
         umbra_coverage_bitmap_matrix,
-        umbra_blend_srcover,
+        umbra_blend_srcover, umbra_fmt_8888,
         &lay);
     struct umbra_basic_block *bb =
         umbra_basic_block(bld);
@@ -381,7 +381,7 @@ static void test_perspective_text(void) {
     bld = umbra_draw_build(
         umbra_shader_solid,
         umbra_coverage_bitmap_matrix,
-        umbra_blend_srcover,
+        umbra_blend_srcover, umbra_fmt_8888,
         &lay2);
     bb = umbra_basic_block(bld);
     umbra_builder_free(bld);

@@ -1,11 +1,6 @@
 #include <metal_stdlib>
 using namespace metal;
 
-constant uint planes_p1 [[function_constant(0)]];
-constant uint fmt_p1 [[function_constant(1)]];
-
-enum { FMT_8888=0, FMT_565=1, FMT_1010102=2, FMT_FP16=3, FMT_FP16_PLANAR=4 };
-
 static inline int safe_ix(int ix, uint bytes, int elem) {
     int count = (int)(bytes / (uint)elem);
     return clamp(ix, 0, max(count-1, 0));
@@ -24,10 +19,6 @@ kernel void umbra_entry(
     device uchar *p0 [[buffer(0)]],
     device uchar *p1 [[buffer(1)]],
     device uchar *p2 [[buffer(2)]],
-    texture2d<float, access::write> tex_p1_0 [[texture(0)]],
-    texture2d<float, access::write> tex_p1_1 [[texture(1)]],
-    texture2d<float, access::write> tex_p1_2 [[texture(2)]],
-    texture2d<float, access::write> tex_p1_3 [[texture(3)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
     if (pos.x >= w) return;
@@ -84,27 +75,5 @@ kernel void umbra_entry(
     uint v49 = ((device uint*)p2)[safe_ix((int)v27,buf_szs[2],4)] & oob_mask((int)v27,buf_szs[2],4);
     float v50 = as_type<float>(v48) - as_type<float>(v49);
     float v51 = fma(v38, v50, as_type<float>(v49));
-    float4 sc52 = float4(v51, v43, v47, v39);
-    if (planes_p1 == 1) {
-        float4 tw52 = (fmt_p1 == 3u || fmt_p1 == 4u) ? float4(half4(sc52)) : sc52;
-        tex_p1_0.write(tw52, uint2(x,y));
-    } else if (planes_p1 == 4) {
-        half4 tw52 = half4(sc52);
-        tex_p1_0.write(float4(tw52.x,0,0,0), uint2(x,y));
-        tex_p1_1.write(float4(tw52.y,0,0,0), uint2(x,y));
-        tex_p1_2.write(float4(tw52.z,0,0,0), uint2(x,y));
-        tex_p1_3.write(float4(tw52.w,0,0,0), uint2(x,y));
-    } else if (fmt_p1 == 0u) {
-        ((device uint*)(p1 + y * buf_rbs[1]))[x] = pack_float_to_unorm4x8(clamp(sc52, 0.0, 1.0));
-    } else if (fmt_p1 == 1u) {
-        ((device ushort*)(p1 + y * buf_rbs[1]))[x] = pack_float_to_unorm565(clamp(sc52.zyx, 0.0, 1.0));
-    } else if (fmt_p1 == 2u) {
-        ((device uint*)(p1 + y * buf_rbs[1]))[x] = pack_float_to_unorm10a2(clamp(sc52, 0.0, 1.0));
-    } else if (fmt_p1 == 3u) {
-        device half *hp = (device half*)(p1 + y * buf_rbs[1]) + x*4;
-        hp[0]=half(sc52.x); hp[1]=half(sc52.y); hp[2]=half(sc52.z); hp[3]=half(sc52.w);
-    } else if (fmt_p1 == 4u) {
-        device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_szs[1]/4;
-        ((device half*)row)[x] = half(sc52.x); ((device half*)(row+ps))[x] = half(sc52.y); ((device half*)(row+2*ps))[x] = half(sc52.z); ((device half*)(row+3*ps))[x] = half(sc52.w);
-    }
+    ((device uint*)(p1 + y * buf_rbs[1]))[x] = pack_float_to_unorm4x8(clamp(float4(v51,v43,v47,v39), 0.0, 1.0));
 }

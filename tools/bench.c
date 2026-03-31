@@ -47,7 +47,7 @@ int main(int argc, char *argv[]) {
         if (!s->draw) { continue; }
 
         umbra_draw_layout         lay;
-        struct umbra_builder     *bld = umbra_draw_build(s->shader, s->coverage, s->blend,
+        struct umbra_builder     *bld = umbra_draw_build(s->shader, s->coverage, s->blend, s->fmt,
                                                          &lay);
         struct umbra_basic_block *bb = umbra_basic_block(bld);
         umbra_builder_free(bld);

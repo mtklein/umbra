@@ -1,11 +1,6 @@
 #include <metal_stdlib>
 using namespace metal;
 
-constant uint planes_p1 [[function_constant(0)]];
-constant uint fmt_p1 [[function_constant(1)]];
-
-enum { FMT_8888=0, FMT_565=1, FMT_1010102=2, FMT_FP16=3, FMT_FP16_PLANAR=4 };
-
 static inline int safe_ix(int ix, uint bytes, int elem) {
     int count = (int)(bytes / (uint)elem);
     return clamp(ix, 0, max(count-1, 0));
@@ -23,10 +18,6 @@ kernel void umbra_entry(
     constant uint &y0 [[buffer(6)]],
     device uchar *p0 [[buffer(0)]],
     device uchar *p1 [[buffer(1)]],
-    texture2d<float, access::read_write> tex_p1_0 [[texture(0)]],
-    texture2d<float, access::read_write> tex_p1_1 [[texture(1)]],
-    texture2d<float, access::read_write> tex_p1_2 [[texture(2)]],
-    texture2d<float, access::read_write> tex_p1_3 [[texture(3)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
     if (pos.x >= w) return;
@@ -42,72 +33,42 @@ kernel void umbra_entry(
     uint v7 = ((device const uint*)p0)[6];
     uint v8 = ((device const uint*)p0)[7];
     uint v9 = 1065353216u;
-    uint v10 = x0 + pos.x;
-    float v11 = (float)(int)v10;
-    uint v12 = v11 <  as_type<float>(v7) ? 0xffffffffu : 0u;
-    uint v13 = as_type<float>(v5) <= v11 ? 0xffffffffu : 0u;
-    uint v14 = v13 & v12;
-    uint v15 = y0 + pos.y;
-    float v16 = (float)(int)v15;
-    uint v17 = v16 <  as_type<float>(v8) ? 0xffffffffu : 0u;
-    uint v18 = as_type<float>(v6) <= v16 ? 0xffffffffu : 0u;
-    uint v19 = v18 & v17;
-    uint v20 = v14 & v19;
-    uint v21 = select(v0, v9, v20 != 0u);
-    float4 v22_c;
-    if (planes_p1 == 1) {
-        v22_c = tex_p1_0.read(uint2(x,y));
-    } else if (planes_p1 == 4) {
-        v22_c = float4(tex_p1_0.read(uint2(x,y)).r, tex_p1_1.read(uint2(x,y)).r, tex_p1_2.read(uint2(x,y)).r, tex_p1_3.read(uint2(x,y)).r);
-    } else if (fmt_p1 == 0u) {
-        v22_c = unpack_unorm4x8_to_float(((device uint*)(p1 + y * buf_rbs[1]))[x]);
-    } else if (fmt_p1 == 1u) {
-        float3 bgr = unpack_unorm565_to_float(((device ushort*)(p1 + y * buf_rbs[1]))[x]);
-        v22_c = float4(bgr.z, bgr.y, bgr.x, 1.0);
-    } else if (fmt_p1 == 2u) {
-        v22_c = unpack_unorm10a2_to_float(((device uint*)(p1 + y * buf_rbs[1]))[x]);
-    } else if (fmt_p1 == 3u) {
-        device half *hp = (device half*)(p1 + y * buf_rbs[1]) + x*4;
-        v22_c = float4(hp[0], hp[1], hp[2], hp[3]);
-    } else if (fmt_p1 == 4u) {
-        device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_szs[1]/4;
-        v22_c = float4(float(((device half*)row)[x]),float(((device half*)(row+ps))[x]),float(((device half*)(row+2*ps))[x]),float(((device half*)(row+3*ps))[x]));
-    } else {
-        v22_c = float4(0);
-    }
-    float v22 = v22_c.x;
-    float v22_1 = v22_c.y;
-    float v22_2 = v22_c.z;
-    float v22_3 = v22_c.w;
-    float v23 = as_type<float>(v1) - v22;
-    float v24 = fma(as_type<float>(v21), v23, v22);
-    float v25 = as_type<float>(v2) - v22_1;
-    float v26 = fma(as_type<float>(v21), v25, v22_1);
-    float v27 = as_type<float>(v3) - v22_2;
-    float v28 = fma(as_type<float>(v21), v27, v22_2);
-    float v29 = as_type<float>(v4) - v22_3;
-    float v30 = fma(as_type<float>(v21), v29, v22_3);
-    float4 sc31 = float4(v24, v26, v28, v30);
-    if (planes_p1 == 1) {
-        float4 tw31 = (fmt_p1 == 3u || fmt_p1 == 4u) ? float4(half4(sc31)) : sc31;
-        tex_p1_0.write(tw31, uint2(x,y));
-    } else if (planes_p1 == 4) {
-        half4 tw31 = half4(sc31);
-        tex_p1_0.write(float4(tw31.x,0,0,0), uint2(x,y));
-        tex_p1_1.write(float4(tw31.y,0,0,0), uint2(x,y));
-        tex_p1_2.write(float4(tw31.z,0,0,0), uint2(x,y));
-        tex_p1_3.write(float4(tw31.w,0,0,0), uint2(x,y));
-    } else if (fmt_p1 == 0u) {
-        ((device uint*)(p1 + y * buf_rbs[1]))[x] = pack_float_to_unorm4x8(clamp(sc31, 0.0, 1.0));
-    } else if (fmt_p1 == 1u) {
-        ((device ushort*)(p1 + y * buf_rbs[1]))[x] = pack_float_to_unorm565(clamp(sc31.zyx, 0.0, 1.0));
-    } else if (fmt_p1 == 2u) {
-        ((device uint*)(p1 + y * buf_rbs[1]))[x] = pack_float_to_unorm10a2(clamp(sc31, 0.0, 1.0));
-    } else if (fmt_p1 == 3u) {
-        device half *hp = (device half*)(p1 + y * buf_rbs[1]) + x*4;
-        hp[0]=half(sc31.x); hp[1]=half(sc31.y); hp[2]=half(sc31.z); hp[3]=half(sc31.w);
-    } else if (fmt_p1 == 4u) {
-        device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_szs[1]/4;
-        ((device half*)row)[x] = half(sc31.x); ((device half*)(row+ps))[x] = half(sc31.y); ((device half*)(row+2*ps))[x] = half(sc31.z); ((device half*)(row+3*ps))[x] = half(sc31.w);
-    }
+    uint v10 = 255u;
+    uint v11 = 998277249u;
+    uint v12 = x0 + pos.x;
+    float v13 = (float)(int)v12;
+    uint v14 = v13 <  as_type<float>(v7) ? 0xffffffffu : 0u;
+    uint v15 = as_type<float>(v5) <= v13 ? 0xffffffffu : 0u;
+    uint v16 = v15 & v14;
+    uint v17 = y0 + pos.y;
+    float v18 = (float)(int)v17;
+    uint v19 = v18 <  as_type<float>(v8) ? 0xffffffffu : 0u;
+    uint v20 = as_type<float>(v6) <= v18 ? 0xffffffffu : 0u;
+    uint v21 = v20 & v19;
+    uint v22 = v16 & v21;
+    uint v23 = select(v0, v9, v22 != 0u);
+    uint v24 = ((device uint*)(p1 + y * buf_rbs[1]))[x];
+    uint v25 = v24 >> 24u;
+    float v26 = (float)(int)v25;
+    float v27 = v26 * as_type<float>(998277249u);
+    float v28 = as_type<float>(v4) - v27;
+    float v29 = fma(as_type<float>(v23), v28, v27);
+    uint v30 = v24 >> 8u;
+    uint v31 = v30 & 255u;
+    float v32 = (float)(int)v31;
+    float v33 = v32 * as_type<float>(998277249u);
+    float v34 = as_type<float>(v2) - v33;
+    float v35 = fma(as_type<float>(v23), v34, v33);
+    uint v36 = v24 >> 16u;
+    uint v37 = v36 & 255u;
+    float v38 = (float)(int)v37;
+    float v39 = v38 * as_type<float>(998277249u);
+    float v40 = as_type<float>(v3) - v39;
+    float v41 = fma(as_type<float>(v23), v40, v39);
+    uint v42 = v24 & 255u;
+    float v43 = (float)(int)v42;
+    float v44 = v43 * as_type<float>(998277249u);
+    float v45 = as_type<float>(v1) - v44;
+    float v46 = fma(as_type<float>(v23), v45, v44);
+    ((device uint*)(p1 + y * buf_rbs[1]))[x] = pack_float_to_unorm4x8(clamp(float4(v46,v35,v41,v29), 0.0, 1.0));
 }

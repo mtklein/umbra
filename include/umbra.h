@@ -77,8 +77,8 @@ umbra_val umbra_load_32(struct umbra_builder*, umbra_ptr);
 void      umbra_store_16(struct umbra_builder*, umbra_ptr, umbra_val);
 void      umbra_store_32(struct umbra_builder*, umbra_ptr, umbra_val);
 
-umbra_color umbra_load_color (struct umbra_builder*, umbra_ptr);
-void        umbra_store_color(struct umbra_builder*, umbra_ptr, umbra_color);
+umbra_color umbra_load_color (struct umbra_builder*, umbra_ptr, umbra_fmt);
+void        umbra_store_color(struct umbra_builder*, umbra_ptr, umbra_color, umbra_fmt);
 
 umbra_val umbra_i32_from_s16(struct umbra_builder*, umbra_val);
 umbra_val umbra_i32_from_u16(struct umbra_builder*, umbra_val);

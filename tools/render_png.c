@@ -22,7 +22,7 @@ static void render_slide(char const *label, struct umbra_backend *be, slide *s) 
         umbra_uniform_32(fb, (umbra_ptr){0, 0}, fi+2),
         umbra_uniform_32(fb, (umbra_ptr){0, 0}, fi+3),
     };
-    umbra_store_color(fb, (umbra_ptr){1, 0}, fc);
+    umbra_store_color(fb, (umbra_ptr){1, 0}, fc, umbra_fmt_8888);
     int fill_uni_len = umbra_uni_len(fb);
     struct umbra_basic_block *fbb = umbra_basic_block(fb);
     umbra_builder_free(fb);
@@ -31,8 +31,8 @@ static void render_slide(char const *label, struct umbra_backend *be, slide *s) 
 
     // Readback pipe
     struct umbra_builder *rb = umbra_builder();
-    umbra_color rc = umbra_load_color(rb, (umbra_ptr){1, 0});
-    umbra_store_color(rb, (umbra_ptr){2, 0}, rc);
+    umbra_color rc = umbra_load_color(rb, (umbra_ptr){1, 0}, umbra_fmt_8888);
+    umbra_store_color(rb, (umbra_ptr){2, 0}, rc, umbra_fmt_8888);
     int rb_uni_len = umbra_uni_len(rb);
     struct umbra_basic_block *rbb = umbra_basic_block(rb);
     umbra_builder_free(rb);
@@ -41,7 +41,7 @@ static void render_slide(char const *label, struct umbra_backend *be, slide *s) 
 
     // Draw pipe
     umbra_draw_layout lay;
-    struct umbra_builder *bld = umbra_draw_build(s->shader, s->coverage, s->blend, &lay);
+    struct umbra_builder *bld = umbra_draw_build(s->shader, s->coverage, s->blend, umbra_fmt_8888, &lay);
     struct umbra_basic_block *dbb = umbra_basic_block(bld);
     umbra_builder_free(bld);
     struct umbra_program *draw_prog = be->compile(be, dbb);

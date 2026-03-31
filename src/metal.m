@@ -108,11 +108,16 @@ static _Bool is_16(enum op op) {
 static _Bool is_32(enum op op) {
     return op == op_uniform_32
         || op == op_load_32
-        || op == op_load_color
+        || op == op_load_fp16x4
+        || op == op_load_fp16x4_planar
         || op == op_gather_uniform_32
         || op == op_gather_32
         || op == op_store_32
-        || op == op_store_color
+        || op == op_store_8888
+        || op == op_store_565
+        || op == op_store_1010102
+        || op == op_store_fp16x4
+        || op == op_store_fp16x4_planar
         || op == op_deref_ptr;
 }
 
@@ -128,7 +133,8 @@ static _Bool produces_float(enum op op) {
         || op == op_min_f32_imm || op == op_max_f32_imm
         || op == op_f32_from_i32
         || op == op_f32_from_f16
-        || op == op_load_color;
+        || op == op_load_fp16x4
+        || op == op_load_fp16x4_planar;
 }
 
 static char const *fv(char *tmp, char const *vn,
@@ -235,42 +241,17 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, p, p,
                      uv(_uy, vy, yid, is_f));
             } break;
-            case op_load_color: {
+            case op_load_fp16x4: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 emit(b,
                      "%sfloat4 v%d_c;\n"
                      "%sif (planes_p%d == 1) {\n"
                      "%s    v%d_c = tex_p%d_0.read(uint2(x,y));\n"
-                     "%s} else if (planes_p%d == 4) {\n"
-                     "%s    v%d_c = float4(tex_p%d_0.read(uint2(x,y)).r,"
-                     " tex_p%d_1.read(uint2(x,y)).r,"
-                     " tex_p%d_2.read(uint2(x,y)).r,"
-                     " tex_p%d_3.read(uint2(x,y)).r);\n"
-                     "%s} else if (fmt_p%d == %du) {\n"
-                     "%s    v%d_c = unpack_unorm4x8_to_float("
-                     "((device uint*)(p%d + y * buf_rbs[%d]))[x]);\n"
-                     "%s} else if (fmt_p%d == %du) {\n"
-                     "%s    float3 bgr = unpack_unorm565_to_float("
-                     "((device ushort*)(p%d + y * buf_rbs[%d]))[x]);\n"
-                     "%s    v%d_c = float4(bgr.z, bgr.y, bgr.x, 1.0);\n"
-                     "%s} else if (fmt_p%d == %du) {\n"
-                     "%s    v%d_c = unpack_unorm10a2_to_float("
-                     "((device uint*)(p%d + y * buf_rbs[%d]))[x]);\n"
-                     "%s} else if (fmt_p%d == %du) {\n"
+                     "%s} else {\n"
                      "%s    device half *hp = (device half*)"
                      "(p%d + y * buf_rbs[%d]) + x*4;\n"
                      "%s    v%d_c = float4(hp[0], hp[1], hp[2], hp[3]);\n"
-                     "%s} else if (fmt_p%d == %du) {\n"
-                     "%s    device uchar *row = p%d + y * buf_rbs[%d];"
-                     " uint ps = buf_szs[%d]/4;\n"
-                     "%s    v%d_c = float4("
-                     "float(((device half*)row)[x]),"
-                     "float(((device half*)(row+ps))[x]),"
-                     "float(((device half*)(row+2*ps))[x]),"
-                     "float(((device half*)(row+3*ps))[x]));\n"
-                     "%s} else {\n"
-                     "%s    v%d_c = float4(0);\n"
                      "%s}\n"
                      "%sfloat v%d = v%d_c.x;\n"
                      "%sfloat v%d_1 = v%d_c.y;\n"
@@ -279,22 +260,8 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i,
                      pad, p,
                      pad, i, p,
-                     pad, p,
-                     pad, i, p, p, p, p,
-                     pad, p, umbra_fmt_8888,
-                     pad, i, p, p,
-                     pad, p, umbra_fmt_565,
-                     pad, p, p,
-                     pad, i,
-                     pad, p, umbra_fmt_1010102,
-                     pad, i, p, p,
-                     pad, p, umbra_fmt_fp16,
-                     pad, p, p,
-                     pad, i,
-                     pad, p, umbra_fmt_fp16_planar,
-                     pad, p, p, p,
-                     pad, i,
                      pad,
+                     pad, p, p,
                      pad, i,
                      pad,
                      pad, i, i,
@@ -302,42 +269,114 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i, i,
                      pad, i, i);
             } break;
-            case op_store_color: {
+            case op_load_fp16x4_planar: {
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
+                emit(b,
+                     "%sfloat4 v%d_c;\n"
+                     "%sif (planes_p%d == 4) {\n"
+                     "%s    v%d_c = float4(tex_p%d_0.read(uint2(x,y)).r,"
+                     " tex_p%d_1.read(uint2(x,y)).r,"
+                     " tex_p%d_2.read(uint2(x,y)).r,"
+                     " tex_p%d_3.read(uint2(x,y)).r);\n"
+                     "%s} else {\n"
+                     "%s    device uchar *row = p%d + y * buf_rbs[%d];"
+                     " uint ps = buf_szs[%d]/4;\n"
+                     "%s    v%d_c = float4("
+                     "float(((device half*)row)[x]),"
+                     "float(((device half*)(row+ps))[x]),"
+                     "float(((device half*)(row+2*ps))[x]),"
+                     "float(((device half*)(row+3*ps))[x]));\n"
+                     "%s}\n"
+                     "%sfloat v%d = v%d_c.x;\n"
+                     "%sfloat v%d_1 = v%d_c.y;\n"
+                     "%sfloat v%d_2 = v%d_c.z;\n"
+                     "%sfloat v%d_3 = v%d_c.w;\n",
+                     pad, i,
+                     pad, p,
+                     pad, i, p, p, p, p,
+                     pad,
+                     pad, p, p, p,
+                     pad, i,
+                     pad,
+                     pad, i, i,
+                     pad, i, i,
+                     pad, i, i,
+                     pad, i, i);
+            } break;
+            case op_store_8888: {
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
+                emit(b,
+                     "%s((device uint*)(p%d + y * buf_rbs[%d]))[x]"
+                     " = pack_float_to_unorm4x8(clamp(float4(%s,%s,%s,%s), 0.0, 1.0));\n",
+                     pad, p, p,
+                     fv(_fx, vx, xid, is_f),
+                     fv(_fy, vy, yid, is_f),
+                     fv(_fz, vz, zid, is_f),
+                     fv(_fw, vw, wid, is_f));
+            } break;
+            case op_store_565: {
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
+                emit(b,
+                     "%s((device ushort*)(p%d + y * buf_rbs[%d]))[x]"
+                     " = pack_float_to_unorm565("
+                     "clamp(float3(%s,%s,%s).zyx, 0.0, 1.0));\n",
+                     pad, p, p,
+                     fv(_fx, vx, xid, is_f),
+                     fv(_fy, vy, yid, is_f),
+                     fv(_fz, vz, zid, is_f));
+            } break;
+            case op_store_1010102: {
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
+                emit(b,
+                     "%s((device uint*)(p%d + y * buf_rbs[%d]))[x]"
+                     " = pack_float_to_unorm10a2(clamp(float4(%s,%s,%s,%s), 0.0, 1.0));\n",
+                     pad, p, p,
+                     fv(_fx, vx, xid, is_f),
+                     fv(_fy, vy, yid, is_f),
+                     fv(_fz, vz, zid, is_f),
+                     fv(_fw, vw, wid, is_f));
+            } break;
+            case op_store_fp16x4: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 emit(b,
                      "%sfloat4 sc%d = float4(%s, %s, %s, %s);\n"
-                     // Pre-round for fp16 textures: tex.write() to
-                     // RGBA16Float truncates float32→float16 instead of
-                     // rounding to nearest-even.
-                     // E.g. 0x3f59999a (0.850000024) → fp16 0x3acc (0.849609)
-                     // instead of the correct 0x3acd (0.850098).
                      "%sif (planes_p%d == 1) {\n"
-                     "%s    float4 tw%d = (fmt_p%d == %du || fmt_p%d == %du)"
-                     " ? float4(half4(sc%d)) : sc%d;\n"
-                     "%s    tex_p%d_0.write(tw%d, uint2(x,y));\n"
-                     "%s} else if (planes_p%d == 4) {\n"
+                     "%s    tex_p%d_0.write(float4(half4(sc%d)), uint2(x,y));\n"
+                     "%s} else {\n"
+                     "%s    device half *hp = (device half*)"
+                     "(p%d + y * buf_rbs[%d]) + x*4;\n"
+                     "%s    hp[0]=half(sc%d.x); hp[1]=half(sc%d.y);"
+                     " hp[2]=half(sc%d.z); hp[3]=half(sc%d.w);\n"
+                     "%s}\n",
+                     pad, i,
+                     fv(_fx, vx, xid, is_f),
+                     fv(_fy, vy, yid, is_f),
+                     fv(_fz, vz, zid, is_f),
+                     fv(_fw, vw, wid, is_f),
+                     pad, p,
+                     pad, p, i,
+                     pad,
+                     pad, p, p,
+                     pad, i, i, i, i,
+                     pad);
+            } break;
+            case op_store_fp16x4_planar: {
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
+                emit(b,
+                     "%sfloat4 sc%d = float4(%s, %s, %s, %s);\n"
+                     "%sif (planes_p%d == 4) {\n"
                      "%s    half4 tw%d = half4(sc%d);\n"
                      "%s    tex_p%d_0.write(float4(tw%d.x,0,0,0), uint2(x,y));\n"
                      "%s    tex_p%d_1.write(float4(tw%d.y,0,0,0), uint2(x,y));\n"
                      "%s    tex_p%d_2.write(float4(tw%d.z,0,0,0), uint2(x,y));\n"
                      "%s    tex_p%d_3.write(float4(tw%d.w,0,0,0), uint2(x,y));\n"
-                     "%s} else if (fmt_p%d == %du) {\n"
-                     "%s    ((device uint*)(p%d + y * buf_rbs[%d]))[x]"
-                     " = pack_float_to_unorm4x8(clamp(sc%d, 0.0, 1.0));\n"
-                     "%s} else if (fmt_p%d == %du) {\n"
-                     "%s    ((device ushort*)(p%d + y * buf_rbs[%d]))[x]"
-                     " = pack_float_to_unorm565("
-                     "clamp(sc%d.zyx, 0.0, 1.0));\n"
-                     "%s} else if (fmt_p%d == %du) {\n"
-                     "%s    ((device uint*)(p%d + y * buf_rbs[%d]))[x]"
-                     " = pack_float_to_unorm10a2(clamp(sc%d, 0.0, 1.0));\n"
-                     "%s} else if (fmt_p%d == %du) {\n"
-                     "%s    device half *hp = (device half*)"
-                     "(p%d + y * buf_rbs[%d]) + x*4;\n"
-                     "%s    hp[0]=half(sc%d.x); hp[1]=half(sc%d.y);"
-                     " hp[2]=half(sc%d.z); hp[3]=half(sc%d.w);\n"
-                     "%s} else if (fmt_p%d == %du) {\n"
+                     "%s} else {\n"
                      "%s    device uchar *row = p%d + y * buf_rbs[%d];"
                      " uint ps = buf_szs[%d]/4;\n"
                      "%s    ((device half*)row)[x] = half(sc%d.x);"
@@ -351,24 +390,12 @@ static void emit_ops(Buf *b, BB const *bb,
                      fv(_fz, vz, zid, is_f),
                      fv(_fw, vw, wid, is_f),
                      pad, p,
-                     pad, i, p, umbra_fmt_fp16, p, umbra_fmt_fp16_planar, i, i,
-                     pad, p, i,
-                     pad, p,
                      pad, i, i,
                      pad, p, i,
                      pad, p, i,
                      pad, p, i,
                      pad, p, i,
-                     pad, p, umbra_fmt_8888,
-                     pad, p, p, i,
-                     pad, p, umbra_fmt_565,
-                     pad, p, p, i,
-                     pad, p, umbra_fmt_1010102,
-                     pad, p, p, i,
-                     pad, p, umbra_fmt_fp16,
-                     pad, p, p,
-                     pad, i, i, i, i,
-                     pad, p, umbra_fmt_fp16_planar,
+                     pad,
                      pad, p, p, p,
                      pad, i, i, i, i,
                      pad);
@@ -931,7 +958,8 @@ static char* build_source(BB const *bb,
     struct color_buf_info *color_bufs = calloc((size_t)(total_bufs + 1), sizeof *color_bufs);
     for (int i = 0; i < bb->insts; i++) {
         enum op op = bb->inst[i].op;
-        if (op != op_load_color && op != op_store_color) { continue; }
+        if (op != op_load_fp16x4 && op != op_load_fp16x4_planar
+         && op != op_store_fp16x4 && op != op_store_fp16x4_planar) { continue; }
         int p = bb->inst[i].ptr < 0
             ? deref_buf[~bb->inst[i].ptr]
             : bb->inst[i].ptr;
@@ -943,8 +971,8 @@ static char* build_source(BB const *bb,
             found = n_color_bufs++;
             color_bufs[found].buf_idx = p;
         }
-        if (op == op_load_color)  { color_bufs[found].read  = 1; }
-        if (op == op_store_color) { color_bufs[found].write = 1; }
+        if (op == op_load_fp16x4 || op == op_load_fp16x4_planar) { color_bufs[found].read  = 1; }
+        if (op == op_store_fp16x4 || op == op_store_fp16x4_planar) { color_bufs[found].write = 1; }
     }
     int n_textures = 0;
     for (int c = 0; c < n_color_bufs; c++) {

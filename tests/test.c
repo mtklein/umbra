@@ -2292,8 +2292,8 @@ static void test_load_next_16(void) {
 
 static void test_load_store_color_8888(void) {
     struct umbra_builder *b = umbra_builder();
-    umbra_color c = umbra_load_color(b, (umbra_ptr){0, 0});
-    umbra_store_color(b, (umbra_ptr){1, 0}, c);
+    umbra_color c = umbra_load_color(b, (umbra_ptr){0, 0}, umbra_fmt_8888);
+    umbra_store_color(b, (umbra_ptr){1, 0}, c, umbra_fmt_8888);
     backends B = make(b);
 
     uint32_t src[8], dst[8];
@@ -2312,8 +2312,8 @@ static void test_load_store_color_8888(void) {
 
 static void test_load_store_color_f16_planar(void) {
     struct umbra_builder *b = umbra_builder();
-    umbra_color c = umbra_load_color(b, (umbra_ptr){0, 0});
-    umbra_store_color(b, (umbra_ptr){1, 0}, c);
+    umbra_color c = umbra_load_color(b, (umbra_ptr){0, 0}, umbra_fmt_fp16_planar);
+    umbra_store_color(b, (umbra_ptr){1, 0}, c, umbra_fmt_fp16_planar);
     backends B = make(b);
 
     enum { W = 8, H = 4 };
@@ -2340,8 +2340,8 @@ static void test_load_store_color_f16_planar(void) {
 
 static void test_load_store_color_565(void) {
     struct umbra_builder *b = umbra_builder();
-    umbra_color c = umbra_load_color(b, (umbra_ptr){0, 0});
-    umbra_store_color(b, (umbra_ptr){1, 0}, c);
+    umbra_color c = umbra_load_color(b, (umbra_ptr){0, 0}, umbra_fmt_565);
+    umbra_store_color(b, (umbra_ptr){1, 0}, c, umbra_fmt_565);
     backends B = make(b);
 
     uint16_t src[7], dst[7];
@@ -2360,8 +2360,8 @@ static void test_load_store_color_565(void) {
 
 static void test_load_store_color_1010102(void) {
     struct umbra_builder *b = umbra_builder();
-    umbra_color c = umbra_load_color(b, (umbra_ptr){0, 0});
-    umbra_store_color(b, (umbra_ptr){1, 0}, c);
+    umbra_color c = umbra_load_color(b, (umbra_ptr){0, 0}, umbra_fmt_1010102);
+    umbra_store_color(b, (umbra_ptr){1, 0}, c, umbra_fmt_1010102);
     backends B = make(b);
 
     uint32_t src[7], dst[7];
@@ -2383,8 +2383,8 @@ static void test_load_store_color_1010102(void) {
 
 static void test_load_store_color_fp16(void) {
     struct umbra_builder *b = umbra_builder();
-    umbra_color c = umbra_load_color(b, (umbra_ptr){0, 0});
-    umbra_store_color(b, (umbra_ptr){1, 0}, c);
+    umbra_color c = umbra_load_color(b, (umbra_ptr){0, 0}, umbra_fmt_fp16);
+    umbra_store_color(b, (umbra_ptr){1, 0}, c, umbra_fmt_fp16);
     backends B = make(b);
 
     __fp16 src[7 * 4], dst[7 * 4];
@@ -3373,24 +3373,23 @@ static void test_sel_r_rm(void) {
 // not ra_step_alu (which is used by i32_from_f32, add, etc.)
 static void test_ra_chan_unary(void) {
     struct umbra_builder *b = umbra_builder();
-    umbra_color c = umbra_load_color(b, (umbra_ptr){0, 0});
-    // abs_f32 and neg_f32 use ra_step_unary.
-    // Use c.g (chan 1) only via abs → dies at abs → triggers chan return.
+    umbra_color c = umbra_load_color(b, (umbra_ptr){0, 0}, umbra_fmt_fp16);
     umbra_store_32(b, (umbra_ptr){1, 0}, umbra_i32_from_f32(b, umbra_abs_f32(b, c.g)));
-    // Use c.b (chan 2) only via neg.
     umbra_store_32(b, (umbra_ptr){2, 0}, umbra_i32_from_f32(b, umbra_neg_f32(b, c.b)));
-    // Use c.a (chan 3) only via abs.
     umbra_store_32(b, (umbra_ptr){3, 0}, umbra_i32_from_f32(b, umbra_abs_f32(b, c.a)));
-    // c.r (chan 0) unused.
     backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-        uint32_t src[] = {0x80402010u, 0x80402010u, 0x80402010u, 0x80402010u};
+        __fp16 src[] = {
+            (__fp16)0.1f, (__fp16)0.25f, (__fp16)0.3f, (__fp16)0.9f,
+            (__fp16)0.1f, (__fp16)0.25f, (__fp16)0.3f, (__fp16)0.9f,
+            (__fp16)0.1f, (__fp16)0.25f, (__fp16)0.3f, (__fp16)0.9f,
+            (__fp16)0.1f, (__fp16)0.25f, (__fp16)0.3f, (__fp16)0.9f,
+        };
         int32_t dg[4]={0}, db[4]={0}, da[4]={0};
         if (!run(&B, bi, 4, 1, (umbra_buf[]){
-            {.ptr=src, .sz=sizeof src, .fmt=umbra_fmt_8888},
+            {.ptr=src, .sz=sizeof src, .fmt=umbra_fmt_fp16},
             {.ptr=dg, .sz=16}, {.ptr=db, .sz=16}, {.ptr=da, .sz=16},
         })) { continue; }
-        // g = 0x40/255 ≈ 0.251, abs(0.251) ≈ 0.251, i32 truncates to 0
         (dg[0] == 0) here;
     }
     cleanup(&B);

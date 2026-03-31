@@ -37,7 +37,7 @@ static void cleanup_draw(draw_backends *B) { test_backends_free(&B->tb); }
 static void test_solid_src(void) {
     umbra_draw_layout lay;
     draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
-                                                 &lay),
+                                                 umbra_fmt_8888, &lay),
                                 lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -71,7 +71,7 @@ static void test_solid_src(void) {
 static void test_solid_src_n1(void) {
     umbra_draw_layout lay;
     draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
-                                                 &lay),
+                                                 umbra_fmt_8888, &lay),
                                 lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -98,7 +98,7 @@ static void test_solid_src_n1(void) {
 static void test_solid_src_n9(void) {
     umbra_draw_layout lay;
     draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
-                                                 &lay),
+                                                 umbra_fmt_8888, &lay),
                                 lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -126,7 +126,7 @@ static void test_solid_src_n9(void) {
 static void test_solid_src_n16(void) {
     umbra_draw_layout lay;
     draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
-                                                 &lay),
+                                                 umbra_fmt_8888, &lay),
                                 lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -152,7 +152,7 @@ static void test_srcover_8888(void) {
     umbra_draw_layout lay;
     draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_srcover,
-                                   &lay),
+                                   umbra_fmt_8888, &lay),
                   lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -186,7 +186,7 @@ static void test_dstover_8888(void) {
     umbra_draw_layout lay;
     draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_dstover,
-                                   &lay),
+                                   umbra_fmt_8888, &lay),
                   lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -211,7 +211,7 @@ static void test_dstover_transparent(void) {
     umbra_draw_layout lay;
     draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_dstover,
-                                   &lay),
+                                   umbra_fmt_8888, &lay),
                   lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -239,7 +239,7 @@ static void test_multiply_8888(void) {
     umbra_draw_layout lay;
     draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_multiply,
-                                   &lay),
+                                   umbra_fmt_8888, &lay),
                   lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -272,7 +272,7 @@ static void test_multiply_8888(void) {
 static void test_solid_src_fp16(void) {
     umbra_draw_layout lay;
     draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
-                                                 &lay),
+                                                 umbra_fmt_fp16, &lay),
                                 lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -303,7 +303,7 @@ static void test_srcover_fp16(void) {
     umbra_draw_layout lay;
     draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_srcover,
-                                   &lay),
+                                   umbra_fmt_fp16, &lay),
                   lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -343,7 +343,7 @@ static void test_coverage_rect(void) {
     umbra_draw_layout lay;
     draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
                                                  umbra_blend_srcover,
-                                                 &lay),
+                                                 umbra_fmt_8888, &lay),
                                 lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -378,7 +378,7 @@ static void test_coverage_rect_scalar(void) {
     umbra_draw_layout lay;
     draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
                                                  umbra_blend_srcover,
-                                                 &lay),
+                                                 umbra_fmt_8888, &lay),
                                 lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -411,7 +411,7 @@ static void test_coverage_rect_n9(void) {
     umbra_draw_layout lay;
     draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
                                                  umbra_blend_srcover,
-                                                 &lay),
+                                                 umbra_fmt_8888, &lay),
                                 lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -445,7 +445,7 @@ static void test_coverage_rect_offset(void) {
     umbra_draw_layout lay;
     draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
                                                  umbra_blend_src,
-                                                 &lay),
+                                                 umbra_fmt_8888, &lay),
                                 lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -476,7 +476,7 @@ static void test_coverage_rect_outside_y(void) {
     umbra_draw_layout lay;
     draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
                                                  umbra_blend_srcover,
-                                                 &lay),
+                                                 umbra_fmt_8888, &lay),
                                 lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -507,7 +507,7 @@ static void test_coverage_rect_outside_y(void) {
 static void test_no_shader(void) {
     umbra_draw_layout lay;
     draw_backends B = make_draw(umbra_draw_build(NULL, NULL, umbra_blend_src,
-                                                 &lay),
+                                                 umbra_fmt_8888, &lay),
                                 lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -534,7 +534,7 @@ static void test_no_shader(void) {
 static void test_no_blend(void) {
     umbra_draw_layout lay;
     draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, NULL,
-                                                 &lay),
+                                                 umbra_fmt_8888, &lay),
                                 lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -573,7 +573,7 @@ static umbra_color gradient_shader(struct umbra_builder *builder, umbra_val x, u
 static void test_gradient_shader(void) {
     umbra_draw_layout lay;
     draw_backends B = make_draw(umbra_draw_build(gradient_shader, NULL, umbra_blend_src,
-                                                 &lay),
+                                                 umbra_fmt_8888, &lay),
                                 lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -602,7 +602,7 @@ static void test_multiply_half_alpha(void) {
     umbra_draw_layout lay;
     draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_multiply,
-                                   &lay),
+                                   umbra_fmt_8888, &lay),
                   lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -636,7 +636,7 @@ static void test_srcover_8888_n9(void) {
     umbra_draw_layout lay;
     draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_srcover,
-                                   &lay),
+                                   umbra_fmt_8888, &lay),
                   lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -667,7 +667,7 @@ static void test_full_pipeline(void) {
     umbra_draw_layout lay;
     draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
                                                  umbra_blend_srcover,
-                                                 &lay),
+                                                 umbra_fmt_8888, &lay),
                                 lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -707,7 +707,7 @@ static void test_full_pipeline(void) {
 static void test_solid_src_fp16_n9(void) {
     umbra_draw_layout lay;
     draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
-                                                 &lay),
+                                                 umbra_fmt_fp16, &lay),
                                 lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -738,7 +738,7 @@ static void test_coverage_rect_white_dst(void) {
     umbra_draw_layout lay;
     draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
                                                  umbra_blend_srcover,
-                                                 &lay),
+                                                 umbra_fmt_8888, &lay),
                                 lay);
 
     typedef struct {
@@ -792,7 +792,7 @@ static void test_coverage_bitmap(void) {
     umbra_draw_layout lay;
     draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_bitmap,
                                                  umbra_blend_srcover,
-                                                 &lay),
+                                                 umbra_fmt_8888, &lay),
                                 lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -823,7 +823,7 @@ static void test_coverage_sdf(void) {
     umbra_draw_layout lay;
     draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_sdf,
                                                  umbra_blend_srcover,
-                                                 &lay),
+                                                 umbra_fmt_8888, &lay),
                                 lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -852,7 +852,7 @@ static void test_coverage_bitmap_matrix(void) {
     umbra_draw_layout lay;
     draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_bitmap_matrix,
-                                   umbra_blend_srcover, &lay),
+                                   umbra_blend_srcover, umbra_fmt_8888, &lay),
                   lay);
 
     int ptr_off = (B.lay.coverage + 11 * 4 + 7) & ~7;
@@ -887,7 +887,7 @@ static void test_coverage_bitmap_matrix_oob(void) {
     umbra_draw_layout lay;
     draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_bitmap_matrix,
-                                   umbra_blend_srcover, &lay),
+                                   umbra_blend_srcover, umbra_fmt_8888, &lay),
                   lay);
 
     int ptr_off = (B.lay.coverage + 11 * 4 + 7) & ~7;
@@ -920,7 +920,7 @@ static void test_linear_2(void) {
     umbra_draw_layout lay;
     draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_linear_2, NULL, umbra_blend_src,
-                                   &lay),
+                                   umbra_fmt_8888, &lay),
                   lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -951,7 +951,7 @@ static void test_radial_2(void) {
     umbra_draw_layout lay;
     draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_radial_2, NULL, umbra_blend_src,
-                                   &lay),
+                                   umbra_fmt_8888, &lay),
                   lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -987,7 +987,7 @@ static void test_linear_grad(void) {
     umbra_draw_layout lay;
     draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_linear_grad, NULL, umbra_blend_src,
-                                   &lay),
+                                   umbra_fmt_8888, &lay),
                   lay);
 
     int lut_off = (B.lay.shader + 16 + 7) & ~7;
@@ -1025,7 +1025,7 @@ static void test_radial_grad(void) {
     umbra_draw_layout lay;
     draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_radial_grad, NULL, umbra_blend_src,
-                                   &lay),
+                                   umbra_fmt_8888, &lay),
                   lay);
 
     int lut_off = (B.lay.shader + 16 + 7) & ~7;
@@ -1062,7 +1062,7 @@ static void test_gradient_lut_nonuniform(void) {
     umbra_draw_layout lay;
     draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_linear_grad, NULL, umbra_blend_src,
-                                   &lay),
+                                   umbra_fmt_8888, &lay),
                   lay);
 
     int lut_off = (B.lay.shader + 16 + 7) & ~7;
@@ -1098,7 +1098,7 @@ static void test_supersample(void) {
     ss_n_ = 4;
     umbra_draw_layout lay;
     draw_backends B = make_draw(umbra_draw_build(ss_shader_, NULL, umbra_blend_src,
-                                                 &lay),
+                                                 umbra_fmt_8888, &lay),
                                 lay);
 
     for (int bi = 0; bi < 3; bi++) {
@@ -1134,7 +1134,7 @@ static void test_page_aligned_buffer(void) {
     // Test Metal zero-copy path (page-aligned) and copy path (offset by 4).
     umbra_draw_layout lay;
     draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
-                                                 &lay),
+                                                 umbra_fmt_8888, &lay),
                                 lay);
     enum { N = 64 };
     long      pgsz = sysconf(_SC_PAGESIZE);
