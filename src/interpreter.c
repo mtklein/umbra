@@ -345,10 +345,6 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
                 emit(.tag = op_store_8888, .ptr = RESOLVE_PTR(inst),
                      .x = X, .y = Y, .z = Z, .w = W);
                 break;
-            case op_store_1010102:
-                emit(.tag = op_store_1010102, .ptr = RESOLVE_PTR(inst),
-                     .x = X, .y = Y, .z = Z, .w = W);
-                break;
             case op_store_fp16x4:
                 emit(.tag = op_store_fp16x4, .ptr = RESOLVE_PTR(inst),
                      .x = X, .y = Y, .z = Z, .w = W);
@@ -766,7 +762,6 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                 [op_load_fp16x4] = &&L_op_load_fp16x4,
                 [op_load_fp16x4_planar] = &&L_op_load_fp16x4_planar,
                 [op_store_8888] = &&L_op_store_8888,
-                [op_store_1010102] = &&L_op_store_1010102,
                 [op_store_fp16x4] = &&L_op_store_fp16x4,
                 [op_store_fp16x4_planar] = &&L_op_store_fp16x4_planar,
                 [op_gather_uniform_32] = &&L_op_gather_uniform_32,
@@ -1084,25 +1079,6 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                                  | cast(U32, cast(I32, vec_round(vec_min(vec_max(cg, zero), one) * scale))) <<  8
                                  | cast(U32, cast(I32, vec_round(vec_min(vec_max(cb, zero), one) * scale))) << 16
                                  | cast(U32, cast(I32, vec_round(vec_min(vec_max(ca, zero), one) * scale))) << 24;
-                    int const i = end - K;
-                    int const rem = n - i;
-                    if (rem >= K) {
-                        __builtin_memcpy(dst + i * 4, &px, sizeof px);
-                    } else {
-                        for (int ll = 0; ll < rem; ll++) {
-                            uint32_t tmp = px[ll];
-                            __builtin_memcpy(dst + (i + ll) * 4, &tmp, 4);
-                        }
-                    }
-                } NEXT;
-                CASE(op_store_1010102) {
-                    char *dst = (char*)buf[ip->ptr].ptr + (size_t)row * buf[ip->ptr].row_bytes;
-                    F32 cr = v[ip->x].f32, cg = v[ip->y].f32, cb = v[ip->z].f32, ca = v[ip->w].f32;
-                    F32 const zero = {0}, one = (F32){0} + 1.f;
-                    U32 const px = cast(U32, cast(I32, vec_round(vec_min(vec_max(cr, zero), one) * ((F32){0} + 1023.f))))
-                                 | cast(U32, cast(I32, vec_round(vec_min(vec_max(cg, zero), one) * ((F32){0} + 1023.f)))) << 10
-                                 | cast(U32, cast(I32, vec_round(vec_min(vec_max(cb, zero), one) * ((F32){0} + 1023.f)))) << 20
-                                 | cast(U32, cast(I32, vec_round(vec_min(vec_max(ca, zero), one) * ((F32){0} + 3.f)))) << 30;
                     int const i = end - K;
                     int const rem = n - i;
                     if (rem >= K) {
