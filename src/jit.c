@@ -5,9 +5,23 @@
 
 struct umbra_backend *umbra_backend_jit(void) { return 0; }
 
-#elif defined(__aarch64__)
+#else
 
 #include "ra.h"
+
+static void free_chan(struct ra *ra, val_ operand, int i) {
+    int id = (int)operand.id, ch = (int)operand.chan;
+    if (ch) {
+        if (ra_chan_last_use(ra, id, ch) <= i) {
+            int8_t r = ra_chan_reg(ra, id, ch);
+            if (r >= 0) { ra_return_reg(ra, r); ra_set_chan_reg(ra, id, ch, -1); }
+        }
+    } else {
+        if (ra_last_use(ra, id) <= i) { ra_free_reg(ra, id); }
+    }
+}
+
+#if defined(__aarch64__)
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -480,16 +494,6 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
 static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
                      int *deref_rb_gpr, struct jit_ctx *jc) {
-#define lu(v) ra_last_use(ra, (v))
-// Free a channel register if the operand's per-channel last use has expired.
-#define FREE_CHAN(operand, i) do {                                            \
-    int id_ = (int)(operand).id, ch_ = (int)(operand).chan;                  \
-    if (ch_ && ra_chan_last_use(ra, id_, ch_) <= (i)) {                      \
-        int8_t r_ = ra_chan_reg(ra, id_, ch_);                               \
-        if (r_ >= 0) { ra_return_reg(ra, r_); ra_set_chan_reg(ra, id_, ch_, -1); } \
-    }                                                                        \
-    if (!ch_ && lu(id_) <= (i)) { ra_free_reg(ra, id_); }                   \
-} while(0)
     int last_ptr = -1;
     int dc = 0;
 
@@ -571,7 +575,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_gather_uniform_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int8_t         rx = ra_ensure(ra, sl, ns, (int)inst->x.id);
-            FREE_CHAN(inst->x, i);
+            free_chan(ra, inst->x, i);
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_count(c, p, 2, deref_gpr);
@@ -586,7 +590,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_gather_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int8_t         rx = ra_ensure(ra, sl, ns, (int)inst->x.id);
-            FREE_CHAN(inst->x, i);
+            free_chan(ra, inst->x, i);
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_count(c, p, 2, deref_gpr);
@@ -612,7 +616,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_gather_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int8_t         rx = ra_ensure(ra, sl, ns, (int)inst->x.id);
-            FREE_CHAN(inst->x, i);
+            free_chan(ra, inst->x, i);
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_count(c, p, 1, deref_gpr);
@@ -649,7 +653,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             } else {
                 put(c, STR_q(ry, XP, XW));
             }
-            FREE_CHAN(inst->y, i);
+            free_chan(ra, inst->y, i);
         } break;
 
         case op_load_fp16x4: {
@@ -785,10 +789,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             ra_return_reg(ra, z);
             ra_return_reg(ra, t);
             ra_return_reg(ra, px);
-            FREE_CHAN(inst->x, i);
-            FREE_CHAN(inst->y, i);
-            FREE_CHAN(inst->z, i);
-            FREE_CHAN(inst->w, i);
+            free_chan(ra, inst->x, i);
+            free_chan(ra, inst->y, i);
+            free_chan(ra, inst->z, i);
+            free_chan(ra, inst->w, i);
         } break;
         case op_store_fp16x4_planar: {
             int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
@@ -823,10 +827,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
             last_ptr = -1;
             ra_return_reg(ra, px);
-            FREE_CHAN(inst->x, i);
-            FREE_CHAN(inst->y, i);
-            FREE_CHAN(inst->z, i);
-            FREE_CHAN(inst->w, i);
+            free_chan(ra, inst->x, i);
+            free_chan(ra, inst->y, i);
+            free_chan(ra, inst->z, i);
+            free_chan(ra, inst->w, i);
         } break;
 
         case op_store_16: {
@@ -838,7 +842,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             } else {
                 put(c, STR_d(ry, XP, XH));
             }
-            FREE_CHAN(inst->y, i);
+            free_chan(ra, inst->y, i);
         } break;
 
         case op_f32_from_f16: {
@@ -947,7 +951,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_le_s32_imm: {
             struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
             int8_t ir = ra_ensure(ra, sl, ns, (int)inst->y.id);
-            FREE_CHAN(inst->y, i);
+            free_chan(ra, inst->y, i);
             enum op o = inst->op;
             uint32_t w =
                 o == op_add_f32_imm ? FADD_4s(s.rd, s.rx, ir)  :
@@ -1101,7 +1105,6 @@ struct umbra_backend *umbra_backend_jit(void) {
 
 #elif defined(__AVX2__)
 
-#include "ra.h"
 #include "asm_x86.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -1543,15 +1546,6 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
 static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
                      int *deref_rb_gpr, struct jit_ctx *jc) {
-#define lu(v) ra_last_use(ra, (v))
-#define FREE_CHAN(operand, i) do {                                            \
-    int id_ = (int)(operand).id, ch_ = (int)(operand).chan;                  \
-    if (ch_ && ra_chan_last_use(ra, id_, ch_) <= (i)) {                      \
-        int8_t r_ = ra_chan_reg(ra, id_, ch_);                               \
-        if (r_ >= 0) { ra_return_reg(ra, r_); ra_set_chan_reg(ra, id_, ch_, -1); } \
-    }                                                                        \
-    if (!ch_ && lu(id_) <= (i)) { ra_free_reg(ra, id_); }                   \
-} while(0)
     int       last_ptr = -1;
     int       dc = 0;
     int const deref_gprs[] = {RCX, R8, R9};
@@ -1637,7 +1631,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             } else {
                 vmov_store(c, 1, ry, base, XI, 4, 0);
             }
-            FREE_CHAN(inst->y, i);
+            free_chan(ra, inst->y, i);
         } break;
 
         case op_load_fp16x4: {
@@ -1945,10 +1939,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             ra_return_reg(ra, t);
             ra_return_reg(ra, px);
             ra_return_reg(ra, scale);
-            FREE_CHAN(inst->x, i);
-            FREE_CHAN(inst->y, i);
-            FREE_CHAN(inst->z, i);
-            FREE_CHAN(inst->w, i);
+            free_chan(ra, inst->x, i);
+            free_chan(ra, inst->y, i);
+            free_chan(ra, inst->z, i);
+            free_chan(ra, inst->w, i);
         } break;
         case op_store_fp16x4_planar: {
             int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
@@ -2060,10 +2054,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 last_ptr = -1;
             }
             ra_return_reg(ra, px);
-            FREE_CHAN(inst->x, i);
-            FREE_CHAN(inst->y, i);
-            FREE_CHAN(inst->z, i);
-            FREE_CHAN(inst->w, i);
+            free_chan(ra, inst->x, i);
+            free_chan(ra, inst->y, i);
+            free_chan(ra, inst->z, i);
+            free_chan(ra, inst->w, i);
         } break;
 
         case op_store_16: {
@@ -2087,7 +2081,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             } else {
                 vmov_store(c, 0, ry, base, XI, 2, 0);
             }
-            FREE_CHAN(inst->y, i);
+            free_chan(ra, inst->y, i);
         } break;
 
         case op_uniform_32: {
@@ -2123,7 +2117,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int            p = inst->ptr;
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
-            FREE_CHAN(inst->x, i);
+            free_chan(ra, inst->x, i);
             load_count_x86(c, p, 2);
             vpxor(c, scalar ? 0 : 1, s.rd, s.rd, s.rd);
             cmp_rr(c, RAX, XM);
@@ -2142,7 +2136,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {
                 vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
-                FREE_CHAN(inst->x, i);
+                free_chan(ra, inst->x, i);
                 load_count_x86(c, p, 2);
                 vpxor(c, 0, s.rd, s.rd, s.rd);
                 cmp_rr(c, RAX, XM);
@@ -2166,7 +2160,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 vpgatherdd(c, s.rd, base, rx, 4, mask);
                 ra_return_reg(ra, cnt);
                 ra_return_reg(ra, mask);
-                FREE_CHAN(inst->x, i);
+                free_chan(ra, inst->x, i);
             }
         } break;
 
@@ -2178,7 +2172,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             load_count_x86(c, p, 1);
             if (scalar) {
                 vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
-                FREE_CHAN(inst->x, i);
+                free_chan(ra, inst->x, i);
                 vpxor(c, 0, s.rd, s.rd, s.rd);
                 cmp_rr(c, RAX, XM);
                 int skip = jcc(c, 0x03);
@@ -2221,7 +2215,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     patch_jcc(c, skip);
                 }
                 ra_return_reg(ra, hi_idx);
-                FREE_CHAN(inst->x, i);
+                free_chan(ra, inst->x, i);
             }
         } break;
         case op_f32_from_f16: {
@@ -2598,4 +2592,5 @@ struct umbra_backend *umbra_backend_jit(void) {
     return be;
 }
 
-#endif
+#endif // __aarch64__ || __AVX2__
+#endif // outer guard
