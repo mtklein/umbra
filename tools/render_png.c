@@ -1,4 +1,5 @@
 #include "../include/umbra.h"
+#include "../include/umbra_uniforms.h"
 #include "../slides/slide.h"
 #include "../third_party/stb/stb_image_write.h"
 #include <stdint.h>

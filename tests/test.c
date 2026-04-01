@@ -1,4 +1,5 @@
 #include "test.h"
+#include "../include/umbra_uniforms.h"
 #include <stdint.h>
 #include <stdlib.h>
 
