@@ -613,6 +613,75 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
+        case op_sample_32: {
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            int8_t         rx = ra_ensure(ra, sl, ns, (int)inst->x.id);
+            int8_t hi_r  = ra_alloc(ra, sl, ns);
+            int8_t frac  = ra_alloc(ra, sl, ns);
+            int    p     = inst->ptr;
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            load_count(c, p, 2, deref_gpr);
+            if (scalar) {
+                // floor + frac
+                put(c, FRINTM_4s(hi_r, rx));
+                put(c, FSUB_4s(frac, rx, hi_r));
+                free_chan(ra, inst->x, i);
+                put(c, FCVTZS_4s(hi_r, hi_r));
+                // gather lo
+                put(c, MOVI_4s(s.rd, 0, 0));
+                put(c, UMOV_ws(XT, hi_r));
+                put(c, CMP_wr(XT, XM));
+                put(c, Bcond(0x2, 2));
+                put(c, LDR_sx(s.rd, XP, XT));
+                // gather hi (lo_i + 1), reuse hi_r
+                put(c, UMOV_ws(XT, hi_r));
+                put(c, ADD_xi(XT, XT, 1));
+                put(c, MOVI_4s(hi_r, 0, 0));
+                put(c, CMP_wr(XT, XM));
+                put(c, Bcond(0x2, 2));
+                put(c, LDR_sx(hi_r, XP, XT));
+                // lerp: s.rd = lo + (hi - lo) * frac
+                put(c, FSUB_4s(hi_r, hi_r, s.rd));
+                put(c, FMLA_4s(s.rd, hi_r, frac));
+            } else {
+                // floor + frac
+                put(c, FRINTM_4s(hi_r, rx));
+                put(c, FSUB_4s(frac, rx, hi_r));
+                free_chan(ra, inst->x, i);
+                int8_t int_ix = ra_alloc(ra, sl, ns);
+                put(c, FCVTZS_4s(int_ix, hi_r));
+                // gather lo into s.rd
+                put(c, MOVI_4s(s.rd, 0, 0));
+                for (int k = 0; k < 4; k++) {
+                    put(c, UMOV_ws_lane(XT, int_ix, k));
+                    put(c, CMP_wr(XT, XM));
+                    put(c, Bcond(0x2, 4));
+                    put(c, LSL_xi(XT, XT, 2));
+                    put(c, ADD_xr(XT, XP, XT));
+                    put(c, LD1_s(s.rd, k, XT));
+                }
+                // compute hi indices = int_ix + 1
+                put(c, MOVI_4s(hi_r, 1, 0));
+                put(c, ADD_4s(int_ix, int_ix, hi_r));
+                // gather hi into hi_r
+                put(c, MOVI_4s(hi_r, 0, 0));
+                for (int k = 0; k < 4; k++) {
+                    put(c, UMOV_ws_lane(XT, int_ix, k));
+                    put(c, CMP_wr(XT, XM));
+                    put(c, Bcond(0x2, 4));
+                    put(c, LSL_xi(XT, XT, 2));
+                    put(c, ADD_xr(XT, XP, XT));
+                    put(c, LD1_s(hi_r, k, XT));
+                }
+                ra_return_reg(ra, int_ix);
+                // lerp: s.rd = lo + (hi - lo) * frac
+                put(c, FSUB_4s(hi_r, hi_r, s.rd));
+                put(c, FMLA_4s(s.rd, hi_r, frac));
+            }
+            ra_return_reg(ra, hi_r);
+            ra_return_reg(ra, frac);
+        } break;
+
         case op_gather_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int8_t         rx = ra_ensure(ra, sl, ns, (int)inst->x.id);
@@ -2162,6 +2231,82 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 ra_return_reg(ra, mask);
                 free_chan(ra, inst->x, i);
             }
+        } break;
+
+        case op_sample_32: {
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            int8_t         rx = ra_ensure(ra, sl, ns, (int)inst->x.id);
+            int            p = inst->ptr;
+            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int8_t frac_r = ra_alloc(ra, sl, ns);
+            int8_t hi_r   = ra_alloc(ra, sl, ns);
+            if (scalar) {
+                // floor + frac
+                vroundps(c, frac_r, rx, 1);               // frac_r = floor(ix)
+                vsubps(c, frac_r, rx, frac_r);             // frac_r = ix - floor
+                vroundps(c, hi_r, rx, 1);
+                vcvttps2dq(c, hi_r, hi_r);                 // hi_r = int(floor) = lo_i
+                free_chan(ra, inst->x, i);
+                load_count_x86(c, p, 2);
+                // gather lo
+                vex(c, 1, 1, 0, 0, hi_r, 0, RAX, 0x7e);   // vmovd eax, lo_i
+                vpxor(c, 0, s.rd, s.rd, s.rd);
+                cmp_rr(c, RAX, XM);
+                int skip_lo = jcc(c, 0x03);
+                vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, RAX, 4, 0);
+                patch_jcc(c, skip_lo);
+                // gather hi (lo_i + 1)
+                vex(c, 1, 1, 0, 0, hi_r, 0, RAX, 0x7e);
+                add_ri(c, RAX, 1);
+                vpxor(c, 0, hi_r, hi_r, hi_r);
+                cmp_rr(c, RAX, XM);
+                int skip_hi = jcc(c, 0x03);
+                vex_mem(c, 1, 1, 0, 0, hi_r, 0, 0x6e, base, RAX, 4, 0);
+                patch_jcc(c, skip_hi);
+                // lerp: s.rd += (hi - lo) * frac
+                vsubps(c, hi_r, hi_r, s.rd);
+                vfmadd231ps(c, s.rd, hi_r, frac_r);
+            } else {
+                // floor + frac + int index
+                int8_t int_ix = ra_alloc(ra, sl, ns);
+                vroundps(c, hi_r, rx, 1);                  // hi_r = floor(ix)
+                vsubps(c, frac_r, rx, hi_r);                // frac_r = ix - floor
+                vcvttps2dq(c, int_ix, hi_r);                // int_ix = int(floor)
+                free_chan(ra, inst->x, i);
+                load_count_x86(c, p, 2);
+                // gather lo: build mask, vpgatherdd
+                int8_t mask = ra_alloc(ra, sl, ns);
+                int8_t cnt  = ra_alloc(ra, sl, ns);
+                vpxor(c, 1, mask, mask, mask);
+                vpcmpgtd(c, mask, mask, int_ix);
+                vex(c, 1, 1, 0, 0, cnt, 0, XM, 0x6e);
+                vbroadcastss(c, cnt, cnt);
+                vpcmpgtd(c, cnt, cnt, int_ix);
+                vex_rrr(c, 1, 1, 1, 0xDF, mask, mask, cnt);
+                vpxor(c, 1, s.rd, s.rd, s.rd);
+                vpgatherdd(c, s.rd, base, int_ix, 4, mask);
+                // compute hi index = int_ix + 1
+                vpcmpeqd(c, hi_r, hi_r, hi_r);             // all ones
+                vpsrld_i(c, hi_r, hi_r, 31);               // broadcast 1
+                vpaddd(c, int_ix, int_ix, hi_r);
+                // gather hi: rebuild mask
+                vpxor(c, 1, mask, mask, mask);
+                vpcmpgtd(c, mask, mask, int_ix);
+                vex(c, 1, 1, 0, 0, cnt, 0, XM, 0x6e);
+                vbroadcastss(c, cnt, cnt);
+                vpcmpgtd(c, cnt, cnt, int_ix);
+                vex_rrr(c, 1, 1, 1, 0xDF, mask, mask, cnt);
+                vpxor(c, 1, hi_r, hi_r, hi_r);
+                vpgatherdd(c, hi_r, base, int_ix, 4, mask);
+                ra_return_reg(ra, cnt);
+                ra_return_reg(ra, mask);
+                ra_return_reg(ra, int_ix);
+                // lerp: s.rd += (hi - lo) * frac
+                vsubps(c, hi_r, hi_r, s.rd);
+                vfmadd231ps(c, s.rd, hi_r, frac_r);
+            }
+            ra_return_reg(ra, hi_r);
+            ra_return_reg(ra, frac_r);
         } break;
 
         case op_gather_16: {

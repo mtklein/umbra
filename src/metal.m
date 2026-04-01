@@ -98,6 +98,7 @@ static _Bool is_32(enum op op) {
         || op == op_load_fp16x4_planar
         || op == op_gather_uniform_32
         || op == op_gather_32
+        || op == op_sample_32
         || op == op_store_32
         || op == op_store_fp16x4
         || op == op_store_fp16x4_planar
@@ -117,7 +118,8 @@ static _Bool produces_float(enum op op) {
         || op == op_f32_from_i32
         || op == op_f32_from_f16
         || op == op_load_fp16x4
-        || op == op_load_fp16x4_planar;
+        || op == op_load_fp16x4_planar
+        || op == op_sample_32;
 }
 
 static char const *fv(char *tmp, char const *vn,
@@ -213,6 +215,42 @@ static void emit_ops(Buf *b, BB const *bb,
                       "buf_szs[%d],4);\n",
                      pad, i, p, vx, p,
                      vx, p);
+            } break;
+            case op_sample_32: {
+                int p = inst->ptr < 0
+                    ? deref_buf[~inst->ptr] : inst->ptr;
+                _Bool mixed = ptr_32[p] && ptr_16[p];
+                emit(b,
+                     "%sfloat _si%d = floor(%s);\n"
+                     "%sfloat _fr%d = %s - _si%d;\n",
+                     pad, i, fv(_fx, vx, xid, is_f),
+                     pad, i, fv(_fx, vx, xid, is_f), i);
+                if (mixed) {
+                    emit(b,
+                         "%sfloat _lo%d = as_type<float>(p%d_32"
+                         "[safe_ix((int)_si%d,buf_szs[%d],4)]"
+                         " & oob_mask((int)_si%d,buf_szs[%d],4));\n",
+                         pad, i, p, i, p, i, p);
+                    emit(b,
+                         "%sfloat _hi%d = as_type<float>(p%d_32"
+                         "[safe_ix((int)_si%d+1,buf_szs[%d],4)]"
+                         " & oob_mask((int)_si%d+1,buf_szs[%d],4));\n",
+                         pad, i, p, i, p, i, p);
+                } else {
+                    emit(b,
+                         "%sfloat _lo%d = as_type<float>(((device uint*)p%d)"
+                         "[safe_ix((int)_si%d,buf_szs[%d],4)]"
+                         " & oob_mask((int)_si%d,buf_szs[%d],4));\n",
+                         pad, i, p, i, p, i, p);
+                    emit(b,
+                         "%sfloat _hi%d = as_type<float>(((device uint*)p%d)"
+                         "[safe_ix((int)_si%d+1,buf_szs[%d],4)]"
+                         " & oob_mask((int)_si%d+1,buf_szs[%d],4));\n",
+                         pad, i, p, i, p, i, p);
+                }
+                emit(b,
+                     "%sfloat v%d = _lo%d + (_hi%d - _lo%d) * _fr%d;\n",
+                     pad, i, i, i, i, i);
             } break;
             case op_store_32: {
                 int p = inst->ptr < 0

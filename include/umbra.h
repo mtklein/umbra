@@ -70,6 +70,7 @@ umbra_val umbra_uniform_32(struct umbra_builder*, umbra_ptr, int slot);
 
 umbra_val umbra_gather_16(struct umbra_builder*, umbra_ptr, umbra_val ix);
 umbra_val umbra_gather_32(struct umbra_builder*, umbra_ptr, umbra_val ix);
+umbra_val umbra_sample_32(struct umbra_builder*, umbra_ptr, umbra_val ix);
 
 umbra_val umbra_load_16(struct umbra_builder*, umbra_ptr);
 umbra_val umbra_load_32(struct umbra_builder*, umbra_ptr);

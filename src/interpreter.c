@@ -330,6 +330,7 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
             case op_gather_16:         emit(.tag = op_gather_16,         .ptr = RESOLVE_PTR(inst), .x = X); break;
             case op_gather_uniform_32: emit(.tag = op_gather_uniform_32, .ptr = RESOLVE_PTR(inst), .x = X); break;
             case op_gather_32:         emit(.tag = op_gather_32,         .ptr = RESOLVE_PTR(inst), .x = X); break;
+            case op_sample_32:         emit(.tag = op_sample_32,         .ptr = RESOLVE_PTR(inst), .x = X); break;
 
             case op_store_16: emit(.tag = op_store_16, .ptr = RESOLVE_PTR(inst), .x = Y); break;
             case op_store_32: emit(.tag = op_store_32, .ptr = RESOLVE_PTR(inst), .x = Y); break;
@@ -770,6 +771,7 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                 [op_store_fp16x4_planar] = &&L_op_store_fp16x4_planar,
                 [op_gather_uniform_32] = &&L_op_gather_uniform_32,
                 [op_gather_16] = &&L_op_gather_16, [op_gather_32] = &&L_op_gather_32,
+                [op_sample_32] = &&L_op_sample_32,
                 [op_deref_ptr] = &&L_op_deref_ptr,
                 [op_f32_from_f16] = &&L_op_f32_from_f16, [op_f16_from_f32] = &&L_op_f16_from_f32,
                 [op_i32_from_s16] = &&L_op_i32_from_s16, [op_i32_from_u16] = &&L_op_i32_from_u16,
@@ -1156,6 +1158,29 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                             v->i32[ll] = tmp;
                         }
                     }
+                } NEXT;
+                CASE(op_sample_32) {
+                    F32 const ix_f = v[ip->x].f32;
+                    F32 const fl   = vec_floor(ix_f);
+                    F32 const frac = ix_f - fl;
+                    I32 const lo_i = cast(I32, fl);
+                    I32 const hi_i = lo_i + 1;
+                    int const count = (int)(buf[ip->ptr].sz / 4);
+                    int const rem = n - (end - K);
+                    F32 lo_v = {0}, hi_v = {0};
+                    for (int ll = 0; ll < (rem < K ? rem : K); ll++) {
+                        if (lo_i[ll] >= 0 && lo_i[ll] < count) {
+                            float tmp;
+                            __builtin_memcpy(&tmp, (char const*)buf[ip->ptr].ptr + 4*lo_i[ll], 4);
+                            lo_v[ll] = tmp;
+                        }
+                        if (hi_i[ll] >= 0 && hi_i[ll] < count) {
+                            float tmp;
+                            __builtin_memcpy(&tmp, (char const*)buf[ip->ptr].ptr + 4*hi_i[ll], 4);
+                            hi_v[ll] = tmp;
+                        }
+                    }
+                    v->f32 = lo_v + (hi_v - lo_v) * frac;
                 } NEXT;
 
                 CASE(op_deref_ptr) {
