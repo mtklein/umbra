@@ -75,12 +75,12 @@ static void finish_pipe(pipe *p, builder *builder) {
 static void build_fill(int fmt) {
     free_pipe(&fill_pipe);
     builder    *builder = umbra_builder();
-    int         fi = umbra_reserve_f32(umbra_builder_uniforms(builder), 4).off / 4;
+    size_t fi = umbra_reserve_f32(umbra_builder_uniforms(builder), 4).off;
     umbra_color c = {
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi),
-        umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 1),
-        umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 2),
-        umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 3),
+        umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 4),
+        umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 8),
+        umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 12),
     };
     umbra_store_color(builder, (umbra_ptr){1, 0}, c, fmt_enums[fmt]);
     finish_pipe(&fill_pipe, builder);

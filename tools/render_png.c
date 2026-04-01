@@ -14,12 +14,12 @@ static void render_slide(char const *label, struct umbra_backend *be, slide *s) 
 
     // Fill pipe
     struct umbra_builder *fb = umbra_builder();
-    int fi = umbra_reserve_f32(umbra_builder_uniforms(fb), 4).off / 4;
+    size_t fi = umbra_reserve_f32(umbra_builder_uniforms(fb), 4).off;
     umbra_color fc = {
         umbra_uniform_32(fb, (umbra_ptr){0, 0}, fi),
-        umbra_uniform_32(fb, (umbra_ptr){0, 0}, fi+1),
-        umbra_uniform_32(fb, (umbra_ptr){0, 0}, fi+2),
-        umbra_uniform_32(fb, (umbra_ptr){0, 0}, fi+3),
+        umbra_uniform_32(fb, (umbra_ptr){0, 0}, fi + 4),
+        umbra_uniform_32(fb, (umbra_ptr){0, 0}, fi + 8),
+        umbra_uniform_32(fb, (umbra_ptr){0, 0}, fi + 12),
     };
     umbra_store_color(fb, (umbra_ptr){1, 0}, fc, umbra_fmt_8888);
     struct umbra_uniforms *fill_uni = umbra_builder_take_uniforms(fb);

@@ -61,7 +61,7 @@ struct umbra_builder {
 };
 
 // Internal — not in the public header.
-void umbra_uniforms_set_len(struct umbra_uniforms*, int);
+void umbra_uniforms_set_size(struct umbra_uniforms*, size_t);
 
 struct umbra_basic_block {
     struct bb_inst *inst;

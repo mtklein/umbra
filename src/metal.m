@@ -186,7 +186,7 @@ static void emit_ops(Buf *b, BB const *bb,
                     : "%suint v%d = "
                       "((device const uint*)"
                       "p%d)[%d];\n",
-                     pad, i, p, inst->imm);
+                     pad, i, p, inst->imm / 4);
             } break;
             case op_load_32: {
                 int p = inst->ptr < 0

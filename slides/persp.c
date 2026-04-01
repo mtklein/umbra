@@ -32,7 +32,7 @@ static void persp_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
     umbra_set_f32(lay->uni, (umbra_uniform){lay->shader},   hc, 4);
     umbra_set_f32(lay->uni, (umbra_uniform){lay->coverage}, st->mat, 11);
-    umbra_set_ptr(lay->uni, (umbra_uniform_ptr){(lay->coverage + 11 * 4 + 7) & ~7},
+    umbra_set_ptr(lay->uni, (umbra_uniform_ptr){(lay->coverage + 11 * 4 + 7) & ~(size_t)7},
                   st->bitmap->data,
                   (size_t)(st->bitmap->w * st->bitmap->h * 2), 0, 0);
     size_t    pb = umbra_fmt_size(s->fmt);

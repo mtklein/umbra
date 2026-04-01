@@ -520,9 +520,9 @@ static void test_no_blend(void) {
 
 static umbra_color gradient_shader(struct umbra_builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
     (void)y;
-    int       fi = umbra_reserve_f32(u, 2).off / 4;
+    size_t fi = umbra_reserve_f32(u, 2).off;
     umbra_val w = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi);
-    umbra_val a = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 1);
+    umbra_val a = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 4);
     umbra_val t = umbra_div_f32(builder, x, w);
     umbra_val zero = umbra_imm_i32(builder, 0);
     return (umbra_color){t, zero, zero, a};
@@ -797,7 +797,7 @@ static void test_coverage_bitmap_matrix(void) {
                                    umbra_blend_srcover, umbra_fmt_8888, &lay),
                   lay);
 
-    int ptr_off = (B.lay.coverage + 11 * 4 + 7) & ~7;
+    size_t ptr_off = (B.lay.coverage + 11 * 4 + 7) & ~(size_t)7;
     for (int bi = 0; bi < 3; bi++) {
         uint32_t dst[8];
         __builtin_memset(dst, 0, sizeof dst);
@@ -830,7 +830,7 @@ static void test_coverage_bitmap_matrix_oob(void) {
                                    umbra_blend_srcover, umbra_fmt_8888, &lay),
                   lay);
 
-    int ptr_off = (B.lay.coverage + 11 * 4 + 7) & ~7;
+    size_t ptr_off = (B.lay.coverage + 11 * 4 + 7) & ~(size_t)7;
     for (int bi = 0; bi < 3; bi++) {
         uint32_t dst[8];
         __builtin_memset(dst, 0, sizeof dst);
@@ -924,7 +924,7 @@ static void test_linear_grad(void) {
                                    umbra_fmt_8888, &lay),
                   lay);
 
-    int lut_off = (B.lay.shader + 16 + 7) & ~7;
+    size_t lut_off = (B.lay.shader + 16 + 7) & ~(size_t)7;
     for (int bi = 0; bi < 3; bi++) {
         uint32_t  dst[8] = {0};
         float     params[4] = {0.125f, 0, 0, 256};
@@ -960,7 +960,7 @@ static void test_radial_grad(void) {
                                    umbra_fmt_8888, &lay),
                   lay);
 
-    int lut_off = (B.lay.shader + 16 + 7) & ~7;
+    size_t lut_off = (B.lay.shader + 16 + 7) & ~(size_t)7;
     for (int bi = 0; bi < 3; bi++) {
         uint32_t  dst[1] = {0};
         float     params[4] = {0, 0, 0.1f, 64};
@@ -995,7 +995,7 @@ static void test_gradient_lut_nonuniform(void) {
                                    umbra_fmt_8888, &lay),
                   lay);
 
-    int lut_off = (B.lay.shader + 16 + 7) & ~7;
+    size_t lut_off = (B.lay.shader + 16 + 7) & ~(size_t)7;
     for (int bi = 0; bi < 3; bi++) {
         uint32_t  dst[8] = {0};
         float     params[4] = {0.125f, 0, 0, 64};

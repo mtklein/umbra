@@ -568,7 +568,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int            p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_imm_w(c, XT, (uint32_t)inst->imm);
-            put(c, LDR_sx(s.rd, XP, XT));
+            put(c, ADD_xr(XT, XP, XT));
+            put(c, LDR_si(s.rd, XT, 0));
             put(c, DUP_4s_lane(s.rd, s.rd, 0));
         } break;
 
@@ -2157,7 +2158,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int            p = inst->ptr;
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             {
-                int     disp = inst->imm * 4;
+                int     disp = inst->imm;
                 uint8_t R = (uint8_t)(~s.rd >> 3) & 1;
                 uint8_t B = (uint8_t)(~base >> 3) & 1;
                 emit1(c, 0xc4);

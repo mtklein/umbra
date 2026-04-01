@@ -38,12 +38,12 @@ static struct umbra_backend *interp_be;
 
 static void build_fill(int fmt) {
     builder *builder = umbra_builder();
-    int fi = umbra_reserve_f32(umbra_builder_uniforms(builder), 4).off / 4;
+    size_t fi = umbra_reserve_f32(umbra_builder_uniforms(builder), 4).off;
     umbra_color c = {
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi),
-        umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi+1),
-        umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi+2),
-        umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi+3),
+        umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 4),
+        umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 8),
+        umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 12),
     };
     umbra_store_color(builder, (umbra_ptr){1, 0}, c, fmt_enums[fmt]);
     fill_pipes[fmt].uni =
@@ -357,7 +357,7 @@ static void test_perspective_text(void) {
 
     umbra_set_f32(lay.uni, (umbra_uniform){lay.shader}, color, 4);
     umbra_set_f32(lay.uni, (umbra_uniform){lay.coverage}, mat, 11);
-    umbra_set_ptr(lay.uni, (umbra_uniform_ptr){(lay.coverage + 11*4 + 7) & ~7},
+    umbra_set_ptr(lay.uni, (umbra_uniform_ptr){(lay.coverage + 11*4 + 7) & ~(size_t)7},
         bmp, sizeof bmp, 0, 0);
     umbra_buf buf[] = {
         umbra_uniforms_buf(lay.uni),
@@ -395,7 +395,7 @@ static void test_perspective_text(void) {
     {
         umbra_set_f32(lay2.uni, (umbra_uniform){lay2.shader}, hc2, 4);
         umbra_set_f32(lay2.uni, (umbra_uniform){lay2.coverage}, mat2, 11);
-        umbra_set_ptr(lay2.uni, (umbra_uniform_ptr){(lay2.coverage + 11*4 + 7) & ~7},
+        umbra_set_ptr(lay2.uni, (umbra_uniform_ptr){(lay2.coverage + 11*4 + 7) & ~(size_t)7},
             tc.data,
             (size_t)(W * H * 2), 0, 0);
         umbra_buf b2[] = {

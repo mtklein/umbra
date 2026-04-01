@@ -958,7 +958,7 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                 CASE(op_uniform_32) {
                     assert(buf[ip->ptr].row_bytes == 0);
                     int32_t uni;
-                    __builtin_memcpy(&uni, (int32_t const*)buf[ip->ptr].ptr + ip->x, sizeof uni);
+                    __builtin_memcpy(&uni, (char const*)buf[ip->ptr].ptr + ip->x, sizeof uni);
                     v->i32 = (I32){0} + uni;
                 } NEXT;
 

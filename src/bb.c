@@ -15,8 +15,8 @@ typedef umbra_val            val;
 
 // --- Uniforms ---
 struct umbra_uniforms {
-    char *data;
-    int   len, cap;
+    char  *data;
+    size_t size, cap;
 };
 
 struct umbra_uniforms *umbra_uniforms_new(void) {
@@ -27,33 +27,33 @@ void umbra_uniforms_free(struct umbra_uniforms *u) {
     if (u) { free(u->data); free(u); }
 }
 
-static void uni_grow(struct umbra_uniforms *u, int need) {
+static void uni_grow(struct umbra_uniforms *u, size_t need) {
     if (need > u->cap) {
-        int cap = u->cap ? u->cap : 64;
+        size_t cap = u->cap ? u->cap : 64;
         while (cap < need) { cap *= 2; }
-        u->data = realloc(u->data, (size_t)cap);
-        __builtin_memset(u->data + u->cap, 0, (size_t)(cap - u->cap));
+        u->data = realloc(u->data, cap);
+        __builtin_memset(u->data + u->cap, 0, cap - u->cap);
         u->cap = cap;
     }
 }
 
 umbra_uniform umbra_reserve_f32(struct umbra_uniforms *u, int n) {
-    u->len = (u->len + 3) & ~3;
-    umbra_uniform h = {.off = u->len};
-    u->len += n * 4;
-    uni_grow(u, u->len);
+    u->size = (u->size + 3) & ~(size_t)3;
+    umbra_uniform h = {.off = u->size};
+    u->size += (size_t)n * 4;
+    uni_grow(u, u->size);
     return h;
 }
 umbra_uniform_ptr umbra_reserve_ptr_slot(struct umbra_uniforms *u) {
-    u->len = (u->len + 7) & ~7;
-    umbra_uniform_ptr h = {.off = u->len};
-    u->len += 24;
-    uni_grow(u, u->len);
+    u->size = (u->size + 7) & ~(size_t)7;
+    umbra_uniform_ptr h = {.off = u->size};
+    u->size += 24;
+    uni_grow(u, u->size);
     return h;
 }
 
-int  umbra_uniforms_len(struct umbra_uniforms const *u) { return u->len; }
-void umbra_uniforms_set_len(struct umbra_uniforms *u, int len) { u->len = len; }
+size_t umbra_uniforms_size(struct umbra_uniforms const *u) { return u->size; }
+void umbra_uniforms_set_size(struct umbra_uniforms *u, size_t len) { u->size = len; }
 
 void umbra_set_f32(struct umbra_uniforms *u, umbra_uniform h, float const *v, int n) {
     __builtin_memcpy(u->data + h.off, v, (size_t)n * 4);
@@ -67,7 +67,7 @@ void umbra_set_ptr(struct umbra_uniforms *u, umbra_uniform_ptr h,
     __builtin_memcpy(u->data + h.off + 16, &row_bytes, sizeof row_bytes);
 }
 umbra_buf umbra_uniforms_buf(struct umbra_uniforms const *u) {
-    return (umbra_buf){.ptr = u->data, .sz = (size_t)u->len, .read_only = 1};
+    return (umbra_buf){.ptr = u->data, .sz = u->size, .read_only = 1};
 }
 
 size_t umbra_fmt_size(umbra_fmt fmt) {
@@ -262,8 +262,8 @@ struct umbra_uniforms *umbra_builder_take_uniforms(builder *b) {
     return u;
 }
 
-umbra_ptr umbra_deref_ptr(builder *b, umbra_ptr buf, int byte_off) {
-    val const v = push(b, op_deref_ptr, .ptr = ptr_ix(buf), .imm = byte_off);
+umbra_ptr umbra_deref_ptr(builder *b, umbra_ptr buf, size_t byte_off) {
+    val const v = push(b, op_deref_ptr, .ptr = ptr_ix(buf), .imm = (int)byte_off);
     return (umbra_ptr){.ix = val_id(v), .deref = 1};
 }
 
@@ -285,8 +285,8 @@ val umbra_load_32(builder *b, umbra_ptr src) {
 val umbra_load_16(builder *b, umbra_ptr src) {
     return push(b, op_load_16, .ptr = ptr_ix(src));
 }
-val umbra_uniform_32(builder *b, umbra_ptr src, int slot) {
-    return push(b, op_uniform_32, .imm = slot, .ptr = ptr_ix(src));
+val umbra_uniform_32(builder *b, umbra_ptr src, size_t byte_off) {
+    return push(b, op_uniform_32, .imm = (int)byte_off, .ptr = ptr_ix(src));
 }
 val umbra_gather_32(builder *b, umbra_ptr src, val ix) {
     enum op const op = b->inst[val_id(ix)].uniform ? op_gather_uniform_32 : op_gather_32;
@@ -817,7 +817,7 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
     result->inst = out;
     result->insts = total;
     result->preamble = preamble;
-    result->uni_len = b->uni ? umbra_uniforms_len(b->uni) : 0;
+    result->uni_len = b->uni ? (int)umbra_uniforms_size(b->uni) : 0;
     return result;
 }
 
@@ -843,7 +843,7 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         switch (op) {
         case op_imm_32: fprintf(f, " 0x%x", (uint32_t)ip->imm); break;
         case op_uniform_32:
-            fprintf(f, " p%d[%d]", ip->ptr, ip->imm);
+            fprintf(f, " p%d byte%d", ip->ptr, ip->imm);
             break;
         case op_gather_uniform_32:
         case op_gather_32:

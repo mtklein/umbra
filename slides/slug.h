@@ -149,28 +149,28 @@ static inline void slug_free(slug_curves *sc) {
 
 typedef struct {
     struct umbra_uniforms *uni;
-    int mat, curves_off, loop_off, pad_;
+    size_t mat, curves_off, loop_off;
 } slug_acc_layout;
 
 static inline struct umbra_builder *slug_build_acc(
         slug_acc_layout *lay) {
     struct umbra_builder *b = umbra_builder();
 
-    int fi  = umbra_reserve_f32(umbra_builder_uniforms(b), 11).off / 4;
-    int co  = umbra_reserve_ptr_slot(umbra_builder_uniforms(b)).off;
+    size_t fi  = umbra_reserve_f32(umbra_builder_uniforms(b), 11).off;
+    size_t co  = umbra_reserve_ptr_slot(umbra_builder_uniforms(b)).off;
     umbra_ptr curves = umbra_deref_ptr(b,
         (umbra_ptr){0, 0}, co);
-    int ji = umbra_reserve_f32(umbra_builder_uniforms(b), 1).off / 4;
+    size_t    ji = umbra_reserve_f32(umbra_builder_uniforms(b), 1).off;
 
     umbra_val xf = umbra_f32_from_i32(b, umbra_x(b));
     umbra_val yf = umbra_f32_from_i32(b, umbra_y(b));
 
     umbra_val m[9];
     for (int i = 0; i < 9; i++) {
-        m[i] = umbra_uniform_32(b, (umbra_ptr){0, 0}, fi+i);
+        m[i] = umbra_uniform_32(b, (umbra_ptr){0, 0}, fi + (size_t)i * 4);
     }
-    umbra_val bw = umbra_uniform_32(b, (umbra_ptr){0, 0}, fi+9);
-    umbra_val bh = umbra_uniform_32(b, (umbra_ptr){0, 0}, fi+10);
+    umbra_val bw = umbra_uniform_32(b, (umbra_ptr){0, 0}, fi + 36);
+    umbra_val bh = umbra_uniform_32(b, (umbra_ptr){0, 0}, fi + 40);
 
     umbra_val pw = umbra_add_f32(b,
         umbra_add_f32(b,
@@ -319,9 +319,9 @@ static inline struct umbra_builder *slug_build_acc(
     umbra_store_32(b, (umbra_ptr){1, 0}, acc);
 
     if (lay) {
-        lay->mat        = fi  * 4;
+        lay->mat        = fi;
         lay->curves_off = co;
-        lay->loop_off   = ji  * 4;
+        lay->loop_off   = ji;
         lay->uni        = umbra_builder_take_uniforms(b);
     }
 

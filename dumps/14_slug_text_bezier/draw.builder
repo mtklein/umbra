@@ -3,10 +3,10 @@
   v2   = y              
   v3   = f32_from_i32    v1
   v4   = f32_from_i32    v2
-  v5   = uniform_32      p0[0]
-  v6   = uniform_32      p0[1]
-  v7   = uniform_32      p0[2]
-  v8   = uniform_32      p0[3]
+  v5   = uniform_32      p0 byte0
+  v6   = uniform_32      p0 byte4
+  v7   = uniform_32      p0 byte8
+  v8   = uniform_32      p0 byte12
   v9   = deref_ptr       p0 byte16
   v10  = load_32         p-10
   v11  = abs_f32         v10
