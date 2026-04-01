@@ -13,6 +13,63 @@ static umbra_val val_make(int id, int chan)  { return (umbra_val){.bits = ((val_
 typedef struct umbra_builder builder;
 typedef umbra_val            val;
 
+// --- Uniforms ---
+struct umbra_uniforms {
+    char *data;
+    int   len, cap;
+};
+
+struct umbra_uniforms *umbra_uniforms_new(void) {
+    struct umbra_uniforms *u = calloc(1, sizeof *u);
+    return u;
+}
+void umbra_uniforms_free(struct umbra_uniforms *u) {
+    if (u) { free(u->data); free(u); }
+}
+
+static void uni_grow(struct umbra_uniforms *u, int need) {
+    if (need > u->cap) {
+        int cap = u->cap ? u->cap : 64;
+        while (cap < need) { cap *= 2; }
+        u->data = realloc(u->data, (size_t)cap);
+        __builtin_memset(u->data + u->cap, 0, (size_t)(cap - u->cap));
+        u->cap = cap;
+    }
+}
+
+umbra_uniform umbra_reserve_f32(struct umbra_uniforms *u, int n) {
+    u->len = (u->len + 3) & ~3;
+    umbra_uniform h = {.off = u->len};
+    u->len += n * 4;
+    uni_grow(u, u->len);
+    return h;
+}
+umbra_uniform_ptr umbra_reserve_ptr_slot(struct umbra_uniforms *u) {
+    u->len = (u->len + 7) & ~7;
+    umbra_uniform_ptr h = {.off = u->len};
+    u->len += 24;
+    uni_grow(u, u->len);
+    return h;
+}
+
+int  umbra_uniforms_len(struct umbra_uniforms const *u) { return u->len; }
+void umbra_uniforms_set_len(struct umbra_uniforms *u, int len) { u->len = len; }
+
+void umbra_set_f32(struct umbra_uniforms *u, umbra_uniform h, float const *v, int n) {
+    __builtin_memcpy(u->data + h.off, v, (size_t)n * 4);
+}
+void umbra_set_ptr(struct umbra_uniforms *u, umbra_uniform_ptr h,
+                   void *ptr, size_t sz, _Bool read_only, size_t row_bytes) {
+    ptrdiff_t ssz = read_only ? -(ptrdiff_t)sz : (ptrdiff_t)sz;
+    __builtin_memset(u->data + h.off, 0, 24);
+    __builtin_memcpy(u->data + h.off,      &ptr,       sizeof ptr);
+    __builtin_memcpy(u->data + h.off + 8,  &ssz,       sizeof ssz);
+    __builtin_memcpy(u->data + h.off + 16, &row_bytes, sizeof row_bytes);
+}
+umbra_buf umbra_uniforms_buf(struct umbra_uniforms const *u) {
+    return (umbra_buf){.ptr = u->data, .sz = (size_t)u->len, .read_only = 1};
+}
+
 size_t umbra_fmt_size(umbra_fmt fmt) {
     switch (fmt) {
     case umbra_fmt_8888:       return 4;
@@ -171,6 +228,7 @@ static val push_(builder *b, struct bb_inst inst) {
 
 builder* umbra_builder(void) {
     builder *b = calloc(1, sizeof *b);
+    b->uni = umbra_uniforms_new();
     // Simplifies liveness analysis to know id 0 is imm=0.
     push(b, op_imm_32, .imm = 0);
     return b;
@@ -178,6 +236,7 @@ builder* umbra_builder(void) {
 
 void umbra_builder_free(builder *b) {
     if (b) {
+        umbra_uniforms_free(b->uni);
         free(b->inst);
         free(b->ht);
         free(b);
@@ -196,24 +255,22 @@ val umbra_imm_f32(builder *b, float v) {
     return umbra_imm_i32(b, u.i);
 }
 
+struct umbra_uniforms *umbra_builder_uniforms(builder *b) { return b->uni; }
+
 int umbra_reserve(builder *b, int n) {
-    b->uni_len = (b->uni_len + 3) & ~3;
-    int const ix = b->uni_len / 4;
-    b->uni_len += n * 4;
-    return ix;
+    umbra_uniform h = umbra_reserve_f32(b->uni, n);
+    return h.off / 4;
 }
 int umbra_reserve_ptr(builder *b) {
-    b->uni_len = (b->uni_len + 7) & ~7;
-    int const off = b->uni_len;
-    b->uni_len += 24;
-    return off;
+    umbra_uniform_ptr h = umbra_reserve_ptr_slot(b->uni);
+    return h.off;
 }
 umbra_ptr umbra_deref_ptr(builder *b, umbra_ptr buf, int byte_off) {
     val const v = push(b, op_deref_ptr, .ptr = ptr_ix(buf), .imm = byte_off);
     return (umbra_ptr){.ix = val_id(v), .deref = 1};
 }
-int  umbra_uni_len(builder const *b) { return b->uni_len; }
-void umbra_set_uni_len(builder *b, int len) { b->uni_len = len; }
+int  umbra_uni_len(builder const *b) { return umbra_uniforms_len(b->uni); }
+void umbra_set_uni_len(builder *b, int len) { umbra_uniforms_set_len(b->uni, len); }
 
 
 int umbra_max_ptr(builder const *b) {
@@ -765,7 +822,7 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
     result->inst = out;
     result->insts = total;
     result->preamble = preamble;
-    result->uni_len = b->uni_len;
+    result->uni_len = umbra_uniforms_len(b->uni);
     return result;
 }
 

@@ -54,10 +54,14 @@ struct hash_slot {
 };
 
 struct umbra_builder {
-    struct bb_inst   *inst;
-    struct hash_slot *ht;
-    int               insts, ht_mask, uni_len, : 32;
+    struct bb_inst    *inst;
+    struct hash_slot  *ht;
+    struct umbra_uniforms *uni;
+    int                insts, ht_mask;
 };
+
+// Internal — not in the public header.
+void umbra_uniforms_set_len(struct umbra_uniforms*, int);
 
 struct umbra_basic_block {
     struct bb_inst *inst;
