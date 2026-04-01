@@ -1137,27 +1137,32 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                     I32 const ix = v[ip->x].i32;
                     int const count = (int)(buf[ip->ptr].sz / 2);
                     int const rem = n - (end - K);
-                    v->u32 = (U32){0};
-                    for (int ll = 0; ll < (rem < K ? rem : K); ll++) {
+                    char const *ptr = (char const*)buf[ip->ptr].ptr;
+                    uint16_t tmp[K];
+                    __builtin_memset(tmp, 0, sizeof tmp);
+                    int const lim = rem < K ? rem : K;
+                    for (int ll = 0; ll < lim; ll++) {
                         if (ix[ll] >= 0 && ix[ll] < count) {
-                            uint16_t s;
-                            __builtin_memcpy(&s, (char const*)buf[ip->ptr].ptr + 2 * ix[ll], 2);
-                            __builtin_memcpy((char*)v + 2 * ll, &s, 2);
+                            __builtin_memcpy(&tmp[ll], ptr + 2 * ix[ll], 2);
                         }
                     }
+                    v->u32 = (U32){0};
+                    __builtin_memcpy(v, tmp, sizeof tmp);
                 } NEXT;
                 CASE(op_gather_32) {
                     I32 const ix = v[ip->x].i32;
                     int const count = (int)(buf[ip->ptr].sz / 4);
                     int const rem = n - (end - K);
-                    v->i32 = (I32){0};
-                    for (int ll = 0; ll < (rem < K ? rem : K); ll++) {
+                    char const *ptr = (char const*)buf[ip->ptr].ptr;
+                    int32_t tmp[K];
+                    __builtin_memset(tmp, 0, sizeof tmp);
+                    int const lim = rem < K ? rem : K;
+                    for (int ll = 0; ll < lim; ll++) {
                         if (ix[ll] >= 0 && ix[ll] < count) {
-                            int32_t tmp;
-                            __builtin_memcpy(&tmp, (char const*)buf[ip->ptr].ptr + 4 * ix[ll], 4);
-                            v->i32[ll] = tmp;
+                            __builtin_memcpy(&tmp[ll], ptr + 4 * ix[ll], 4);
                         }
                     }
+                    __builtin_memcpy(&v->i32, tmp, sizeof v->i32);
                 } NEXT;
                 CASE(op_sample_32) {
                     F32 const ix_f = v[ip->x].f32;
