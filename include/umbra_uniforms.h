@@ -3,7 +3,7 @@
 
 struct umbra_uniforms {
     char  *data;
-    size_t size, cap;
+    size_t size;
 };
 
 typedef struct { size_t off; } umbra_uniform;

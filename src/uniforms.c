@@ -16,10 +16,8 @@ umbra_uniform umbra_reserve_ptr(struct umbra_uniforms *u) {
 }
 
 static void ensure_allocated(struct umbra_uniforms *u) {
-    if (u->cap < u->size) {
-        u->data = realloc(u->data, u->size);
-        __builtin_memset(u->data + u->cap, 0, u->size - u->cap);
-        u->cap = u->size;
+    if (!u->data) {
+        u->data = calloc(1, u->size);
     }
 }
 
