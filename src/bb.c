@@ -228,7 +228,6 @@ static val push_(builder *b, struct bb_inst inst) {
 
 builder* umbra_builder(void) {
     builder *b = calloc(1, sizeof *b);
-    b->uni = umbra_uniforms_new();
     // Simplifies liveness analysis to know id 0 is imm=0.
     push(b, op_imm_32, .imm = 0);
     return b;
@@ -236,7 +235,6 @@ builder* umbra_builder(void) {
 
 void umbra_builder_free(builder *b) {
     if (b) {
-        umbra_uniforms_free(b->uni);
         free(b->inst);
         free(b->ht);
         free(b);
@@ -253,13 +251,6 @@ val umbra_imm_f32(builder *b, float v) {
         int   i;
     } const u = {.f = v};
     return umbra_imm_i32(b, u.i);
-}
-
-struct umbra_uniforms *umbra_builder_uniforms(builder *b) { return b->uni; }
-struct umbra_uniforms *umbra_builder_take_uniforms(builder *b) {
-    struct umbra_uniforms *u = b->uni;
-    b->uni = NULL;
-    return u;
 }
 
 umbra_ptr umbra_deref_ptr(builder *b, umbra_ptr buf, size_t byte_off) {
@@ -817,7 +808,6 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
     result->inst = out;
     result->insts = total;
     result->preamble = preamble;
-    result->uni_len = b->uni ? (int)umbra_uniforms_size(b->uni) : 0;
     return result;
 }
 

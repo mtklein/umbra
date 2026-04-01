@@ -52,26 +52,20 @@ typedef struct { int bits; } umbra_val;
 typedef struct { umbra_val r, g, b, a; } umbra_color;
 typedef struct { int ix, :24; _Bool deref; } umbra_ptr;
 
-// Uniform layout and data.
 typedef struct { size_t off; } umbra_uniform;
 typedef struct { size_t off; } umbra_uniform_ptr;
 
-struct umbra_uniforms;
 struct umbra_uniforms* umbra_uniforms_new (void);
-void                   umbra_uniforms_free(struct umbra_uniforms*);
+void   umbra_uniforms_free(struct umbra_uniforms*);
 
 umbra_uniform     umbra_reserve_f32     (struct umbra_uniforms*, int n);
 umbra_uniform_ptr umbra_reserve_ptr_slot(struct umbra_uniforms*);
-size_t            umbra_uniforms_size    (struct umbra_uniforms const*);
+size_t            umbra_uniforms_size   (struct umbra_uniforms const*);
 
 void      umbra_set_f32(struct umbra_uniforms*, umbra_uniform,     float const*, int n);
 void      umbra_set_ptr(struct umbra_uniforms*, umbra_uniform_ptr,
                         void *ptr, size_t sz, _Bool read_only, size_t row_bytes);
 umbra_buf umbra_uniforms_buf(struct umbra_uniforms const*);
-
-// Builder access to uniforms (builder owns one internally).
-struct umbra_uniforms* umbra_builder_uniforms(struct umbra_builder*);
-struct umbra_uniforms* umbra_builder_take_uniforms(struct umbra_builder*);
 
 umbra_ptr umbra_deref_ptr  (struct umbra_builder*, umbra_ptr buf, size_t byte_off);
 int       umbra_max_ptr    (struct umbra_builder const*);

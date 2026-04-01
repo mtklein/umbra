@@ -64,8 +64,8 @@ static void free_pipe(pipe *p) {
 
 static struct umbra_backend *pipe_be;
 
-static void finish_pipe(pipe *p, builder *builder) {
-    p->uni = umbra_builder_take_uniforms(builder);
+static void finish_pipe(pipe *p, builder *builder, struct umbra_uniforms *uni) {
+    p->uni = uni;
     struct umbra_basic_block *bb = umbra_basic_block(builder);
     umbra_builder_free(builder);
     p->program = pipe_be->compile(pipe_be, bb);
@@ -74,8 +74,9 @@ static void finish_pipe(pipe *p, builder *builder) {
 
 static void build_fill(int fmt) {
     free_pipe(&fill_pipe);
-    builder    *builder = umbra_builder();
-    size_t fi = umbra_reserve_f32(umbra_builder_uniforms(builder), 4).off;
+    builder                *builder = umbra_builder();
+    struct umbra_uniforms  *u       = umbra_uniforms_new();
+    size_t fi = umbra_reserve_f32(u, 4).off;
     umbra_color c = {
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi),
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 4),
@@ -83,7 +84,7 @@ static void build_fill(int fmt) {
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 12),
     };
     umbra_store_color(builder, (umbra_ptr){1, 0}, c, fmt_enums[fmt]);
-    finish_pipe(&fill_pipe, builder);
+    finish_pipe(&fill_pipe, builder, u);
 }
 
 static void build_readback(int fmt) {
@@ -93,7 +94,7 @@ static void build_readback(int fmt) {
     int         op = umbra_max_ptr(builder) + 1;
     umbra_store_color(builder, (umbra_ptr){op, 0}, c, umbra_fmt_8888);
     readback_pipe.out_ptr = op;
-    finish_pipe(&readback_pipe, builder);
+    finish_pipe(&readback_pipe, builder, NULL);
 }
 
 static void build_hdr(int fmt) {
@@ -103,7 +104,7 @@ static void build_hdr(int fmt) {
     int         op = umbra_max_ptr(builder) + 1;
     hdr_pipe.out_ptr = op;
     umbra_store_color(builder, (umbra_ptr){op, 0}, c, umbra_fmt_fp16);
-    finish_pipe(&hdr_pipe, builder);
+    finish_pipe(&hdr_pipe, builder, NULL);
 }
 
 static void build_pipes(int fmt) {

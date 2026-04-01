@@ -14,7 +14,7 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
     umbra_val const xf = umbra_f32_from_i32(builder, x);
     umbra_val const yf = umbra_f32_from_i32(builder, y);
 
-    struct umbra_uniforms *uni = umbra_builder_uniforms(builder);
+    struct umbra_uniforms *uni = umbra_uniforms_new();
 
     size_t      const shader_off = umbra_uniforms_size(uni);
     umbra_color src = {
@@ -68,10 +68,12 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
     umbra_store_color(builder, (umbra_ptr){1, 0}, out, fmt);
 
     if (layout) {
-        layout->uni = umbra_builder_take_uniforms(builder);
+        layout->uni = uni;
         layout->shader = shader_off;
         layout->coverage = coverage_off;
         layout->ps = umbra_max_ptr(builder) - 1;
+    } else {
+        umbra_uniforms_free(uni);
     }
 
     return builder;

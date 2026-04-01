@@ -156,11 +156,12 @@ static inline struct umbra_builder *slug_build_acc(
         slug_acc_layout *lay) {
     struct umbra_builder *b = umbra_builder();
 
-    size_t fi  = umbra_reserve_f32(umbra_builder_uniforms(b), 11).off;
-    size_t co  = umbra_reserve_ptr_slot(umbra_builder_uniforms(b)).off;
+    struct umbra_uniforms *u = umbra_uniforms_new();
+    size_t fi  = umbra_reserve_f32(u, 11).off;
+    size_t co  = umbra_reserve_ptr_slot(u).off;
     umbra_ptr curves = umbra_deref_ptr(b,
         (umbra_ptr){0, 0}, co);
-    size_t    ji = umbra_reserve_f32(umbra_builder_uniforms(b), 1).off;
+    size_t    ji = umbra_reserve_f32(u, 1).off;
 
     umbra_val xf = umbra_f32_from_i32(b, umbra_x(b));
     umbra_val yf = umbra_f32_from_i32(b, umbra_y(b));
@@ -322,7 +323,9 @@ static inline struct umbra_builder *slug_build_acc(
         lay->mat        = fi;
         lay->curves_off = co;
         lay->loop_off   = ji;
-        lay->uni        = umbra_builder_take_uniforms(b);
+        lay->uni        = u;
+    } else {
+        umbra_uniforms_free(u);
     }
 
     return b;

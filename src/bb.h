@@ -56,7 +56,6 @@ struct hash_slot {
 struct umbra_builder {
     struct bb_inst    *inst;
     struct hash_slot  *ht;
-    struct umbra_uniforms *uni;
     int                insts, ht_mask;
 };
 
@@ -65,7 +64,7 @@ void umbra_uniforms_set_size(struct umbra_uniforms*, size_t);
 
 struct umbra_basic_block {
     struct bb_inst *inst;
-    int             insts, preamble, uni_len, : 32;
+    int             insts, preamble;
 };
 
 _Bool is_store(enum op);

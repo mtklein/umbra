@@ -37,8 +37,9 @@ static pipe fill_pipes[NUM_FMTS];
 static struct umbra_backend *interp_be;
 
 static void build_fill(int fmt) {
-    builder *builder = umbra_builder();
-    size_t fi = umbra_reserve_f32(umbra_builder_uniforms(builder), 4).off;
+    builder               *builder = umbra_builder();
+    struct umbra_uniforms *u       = umbra_uniforms_new();
+    size_t fi = umbra_reserve_f32(u, 4).off;
     umbra_color c = {
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi),
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 4),
@@ -46,8 +47,7 @@ static void build_fill(int fmt) {
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 12),
     };
     umbra_store_color(builder, (umbra_ptr){1, 0}, c, fmt_enums[fmt]);
-    fill_pipes[fmt].uni =
-        umbra_builder_take_uniforms(builder);
+    fill_pipes[fmt].uni = u;
     struct umbra_basic_block *opt =
         umbra_basic_block(builder);
     umbra_builder_free(builder);
