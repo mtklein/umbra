@@ -1162,24 +1162,27 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                 CASE(op_sample_32) {
                     F32 const ix_f = v[ip->x].f32;
                     F32 const fl   = vec_floor(ix_f);
-                    F32 const frac = ix_f - fl;
-                    I32 const lo_i = cast(I32, fl);
-                    I32 const hi_i = lo_i + 1;
                     int const count = (int)(buf[ip->ptr].sz / 4);
                     int const rem = n - (end - K);
-                    F32 lo_v = {0}, hi_v = {0};
-                    for (int ll = 0; ll < (rem < K ? rem : K); ll++) {
-                        if (lo_i[ll] >= 0 && lo_i[ll] < count) {
-                            float tmp;
-                            __builtin_memcpy(&tmp, (char const*)buf[ip->ptr].ptr + 4*lo_i[ll], 4);
-                            lo_v[ll] = tmp;
+                    char const *ptr = (char const*)buf[ip->ptr].ptr;
+                    float lo[K], hi[K];
+                    __builtin_memset(lo, 0, sizeof lo);
+                    __builtin_memset(hi, 0, sizeof hi);
+                    int const lim = rem < K ? rem : K;
+                    for (int ll = 0; ll < lim; ll++) {
+                        int const li = (int)fl[ll];
+                        int const hi_ix = li + 1;
+                        if (li >= 0 && li < count) {
+                            __builtin_memcpy(&lo[ll], ptr + 4*li, 4);
                         }
-                        if (hi_i[ll] >= 0 && hi_i[ll] < count) {
-                            float tmp;
-                            __builtin_memcpy(&tmp, (char const*)buf[ip->ptr].ptr + 4*hi_i[ll], 4);
-                            hi_v[ll] = tmp;
+                        if (hi_ix >= 0 && hi_ix < count) {
+                            __builtin_memcpy(&hi[ll], ptr + 4*hi_ix, 4);
                         }
                     }
+                    F32 lo_v, hi_v, frac;
+                    __builtin_memcpy(&lo_v, lo, sizeof lo_v);
+                    __builtin_memcpy(&hi_v, hi, sizeof hi_v);
+                    frac = ix_f - fl;
                     v->f32 = lo_v + (hi_v - lo_v) * frac;
                 } NEXT;
 
