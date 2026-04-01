@@ -244,7 +244,7 @@ enum {
     // Output-only variants: no register inputs, just output to register.
     op_r_imm_32, op_r_x, op_r_y,
     op_r_pack_mm, op_r_pack_rm, op_m_pack_rm,
-    op_r_pack_mr, op_m_pack_mr, op_r_pack_rr, op_m_pack_rr,
+    op_r_pack_mr, op_m_pack_mr, op_r_pack_rr,
     // fma/fms: z is most commonly the register operand (accumulator chains)
     op_r_fma_f32_mmm, op_r_fma_f32_mmr, op_m_fma_f32_mmr,
     op_r_fms_f32_mmm, op_r_fms_f32_mmr, op_m_fms_f32_mmr,
@@ -364,7 +364,7 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
                      .x = X, .y = Y, .z = Z, .w = W);
                 break;
 
-            case op_pack: emit(.tag = op_pack, .x = X, .y = Y, .z = inst->imm); break;
+            case op_pack: emit(.tag = op_pack, .x = X, .y = Y, .z = inst->imm); break; // always upgraded to register variant
 
             case op_shl_i32_imm:
             case op_shr_u32_imm:
@@ -716,8 +716,8 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
                 else if (!out_r &&  x_r && !y_r) { s->tag = op_m_pack_rm; }
                 else if ( out_r && !x_r &&  y_r) { s->tag = op_r_pack_mr; }
                 else if (!out_r && !x_r &&  y_r) { s->tag = op_m_pack_mr; }
-                else if (!out_r &&  x_r &&  y_r) { s->tag = op_m_pack_rr; }
                 else if ( out_r && !x_r && !y_r) { s->tag = op_r_pack_mm; }
+                else { assert(0); }
             } else
 
             // Output-only ops: no register inputs, just output to register.
@@ -813,7 +813,6 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                 [op_mul_i32_imm] = &&L_op_mul_i32_imm,
                 [op_eq_i32_imm] = &&L_op_eq_i32_imm, [op_lt_s32_imm] = &&L_op_lt_s32_imm,
                 [op_le_s32_imm] = &&L_op_le_s32_imm,
-                [op_pack] = &&L_op_pack,
                 [SW_DONE] = &&L_SW_DONE,
 
                 // Binary op register variant labels.
@@ -929,7 +928,6 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                 [op_r_pack_mm] = &&L_op_r_pack_mm, [op_r_pack_rm] = &&L_op_r_pack_rm,
                 [op_m_pack_rm] = &&L_op_m_pack_rm, [op_r_pack_mr] = &&L_op_r_pack_mr,
                 [op_m_pack_mr] = &&L_op_m_pack_mr, [op_r_pack_rr] = &&L_op_r_pack_rr,
-                [op_m_pack_rr] = &&L_op_m_pack_rr,
                 [op_r_sel_32_mm] = &&L_op_r_sel_32_mm,
                 [op_r_sel_32_rm] = &&L_op_r_sel_32_rm,
                 [op_m_sel_32_rm] = &&L_op_m_sel_32_rm,
@@ -1332,10 +1330,7 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                 CASE(op_le_s32_imm)  { I32_IMM; v->i32 = (I32)(v[ip->x].i32 <= imm); } NEXT;
 #undef I32_IMM
 
-                CASE(op_pack) {
-                    I32 const sh = (I32){0} + ip->z;
-                    v->u32 = v[ip->x].u32 | (U32)(v[ip->y].i32 << sh);
-                } NEXT;
+
 
                 // Register variant dispatch — binary ops.
                 // add_f32
@@ -1577,7 +1572,6 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                 CASE(op_r_pack_mr) { PACK_SH; acc.u32 = PACK_OP(v[ip->x], acc);       } NEXT;
                 CASE(op_m_pack_mr) { PACK_SH; v->u32  = PACK_OP(v[ip->x], acc);       } NEXT;
                 CASE(op_r_pack_rr) { PACK_SH; acc.u32 = PACK_OP(acc,       acc);       } NEXT;
-                CASE(op_m_pack_rr) { PACK_SH; v->u32  = PACK_OP(acc,       acc);       } NEXT;
 #undef PACK_OP
 #undef PACK_SH
 
