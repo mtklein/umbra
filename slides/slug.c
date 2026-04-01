@@ -23,7 +23,7 @@ static void slug_init(slide *s, int w, int h) {
     umbra_builder_free(b);
 
     slide_perspective_matrix(st->mat, 0.0f, w, h, (int)st->slug->w, (int)st->slug->h);
-    st->mat[9] = st->slug->w;
+    st->mat[9]  = st->slug->w;
     st->mat[10] = st->slug->h;
 }
 
@@ -48,18 +48,19 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     __builtin_memset((char *)st->wind_buf + (size_t)y0 * wind_row, 0,
                      (size_t)(y1 - y0) * wind_row);
 
-    uint64_t au_[12] = {0};
-    char     *au = (char *)au_;
-    slide_uni_f32(au, st->acc_lay.mat, st->mat, 11);
-    slide_uni_ptr(au, st->acc_lay.curves_off, st->slug->data,
-                  (size_t)(st->slug->count * 6 * 4), 0, 0);
+    umbra_set_f32(st->acc_lay.uni, (umbra_uniform){st->acc_lay.mat}, st->mat, 11);
+    umbra_set_ptr(st->acc_lay.uni, (umbra_uniform_ptr){st->acc_lay.curves_off},
+                  st->slug->data, (size_t)(st->slug->count * 6 * 4), 0, 0);
     umbra_buf abuf[] = {
-        {.ptr=au, .sz=(size_t)st->acc_lay.uni_len, .read_only=1},
+        umbra_uniforms_buf(st->acc_lay.uni),
         {.ptr=st->wind_buf, .sz=wind_sz, .row_bytes=wind_row},
     };
     for (int j = 0; j < st->slug->count; j++) {
+        float jf;
         int32_t j32 = j;
-        __builtin_memcpy(au + st->acc_lay.loop_off, &j32, 4);
+        __builtin_memcpy(&jf, &j32, 4);
+        umbra_set_f32(st->acc_lay.uni, (umbra_uniform){st->acc_lay.loop_off}, &jf, 1);
+        abuf[0] = umbra_uniforms_buf(st->acc_lay.uni);
         acc->queue(acc, 0, y0, w, y1, abuf);
     }
     be->flush(be);
@@ -83,6 +84,7 @@ static void slug_cleanup(slide *s) {
     slug_state *st = s->state;
     free(st->wind_buf);
     umbra_basic_block_free(st->acc_bb);
+    umbra_uniforms_free(st->acc_lay.uni);
     free(st);
     s->state = NULL;
 }

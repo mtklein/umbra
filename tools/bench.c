@@ -108,14 +108,14 @@ int main(int argc, char *argv[]) {
         slide_perspective_matrix(mat, 0.0f, W, H, (int)sc.w, (int)sc.h);
         mat[9] = sc.w;
         mat[10] = sc.h;
-        uint64_t au_[12] = {0};
-        char     *au = (char *)au_;
-        slide_uni_f32(au, al.mat, mat, 11);
-        slide_uni_ptr(au, al.curves_off, sc.data, (size_t)(sc.count * 6 * 4), 0, 0);
-        int32_t j0 = 0;
-        __builtin_memcpy(au + al.loop_off, &j0, 4);
+        umbra_set_f32(al.uni, (umbra_uniform){al.mat}, mat, 11);
+        umbra_set_ptr(al.uni, (umbra_uniform_ptr){al.curves_off},
+                      sc.data, (size_t)(sc.count * 6 * 4), 0, 0);
+        float j0;
+        { int32_t z = 0; __builtin_memcpy(&j0, &z, 4); }
+        umbra_set_f32(al.uni, (umbra_uniform){al.loop_off}, &j0, 1);
         umbra_buf abuf[] = {
-            {.ptr=au, .sz=(size_t)al.uni_len, .read_only=1},
+            umbra_uniforms_buf(al.uni),
             {.ptr=wind, .sz=(size_t)(W * H * 4)},
         };
 
@@ -155,6 +155,7 @@ int main(int argc, char *argv[]) {
             if (bes[bi])   { bes[bi]->free(bes[bi]); }
         }
         free(wind);
+        umbra_uniforms_free(al.uni);
         slug_free(&sc);
     }
 

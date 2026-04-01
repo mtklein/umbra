@@ -28,9 +28,9 @@ static umbra_fmt const fmt_enums[] = {
 };
 
 typedef struct {
-    struct umbra_program *prog;
-    int                   uni_len;
-    int                   out_ptr;
+    struct umbra_program  *prog;
+    struct umbra_uniforms *uni;
+    int                    out_ptr, pad_;
 } pipe;
 
 static pipe fill_pipes[NUM_FMTS];
@@ -46,8 +46,8 @@ static void build_fill(int fmt) {
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi+3),
     };
     umbra_store_color(builder, (umbra_ptr){1, 0}, c, fmt_enums[fmt]);
-    fill_pipes[fmt].uni_len =
-        umbra_uniforms_len(umbra_builder_uniforms(builder));
+    fill_pipes[fmt].uni =
+        umbra_builder_take_uniforms(builder);
     struct umbra_basic_block *opt =
         umbra_basic_block(builder);
     umbra_builder_free(builder);
@@ -67,6 +67,7 @@ static void build_pipes(void) {
 static void free_pipes(void) {
     for (int f = 0; f < NUM_FMTS; f++) {
         fill_pipes[f].prog->free(fill_pipes[f].prog);
+        umbra_uniforms_free(fill_pipes[f].uni);
     }
     interp_be->free(interp_be);
 }
@@ -84,12 +85,10 @@ static void fill_bg(int fmt, void *dst, uint32_t bg) {
         (float)((bg >> 16) & 0xffu) / 255.0f,
         (float)((bg >> 24) & 0xffu) / 255.0f,
     };
-    uint64_t uni_[4] = {0};
-    char *uni = (char*)uni_;
-    slide_uni_f32(uni, 0, hc, 4);
+    umbra_set_f32(fill_pipes[fmt].uni, (umbra_uniform){0}, hc, 4);
     size_t bpp = umbra_fmt_size(fmt_enums[fmt]);
     umbra_buf buf[2] = {
-        {.ptr=uni, .sz=(size_t)fill_pipes[fmt].uni_len, .read_only=1},
+        umbra_uniforms_buf(fill_pipes[fmt].uni),
         {.ptr=dst, .sz=pixbuf_size(fmt), .row_bytes=(size_t)W * bpp},
     };
     fill_pipes[fmt].prog->queue(fill_pipes[fmt].prog, 0, 0, W, H, buf);
@@ -280,19 +279,19 @@ static void test_slug_rect(void) {
 
     float wind_buf[W * H];
     __builtin_memset(wind_buf, 0, sizeof wind_buf);
-    uint64_t au_[12] = {0};
-    char *au = (char*)au_;
-    slide_uni_f32(au, alay.mat, mat, 11);
-    slide_uni_ptr(au, alay.curves_off,
+    umbra_set_f32(alay.uni, (umbra_uniform){alay.mat}, mat, 11);
+    umbra_set_ptr(alay.uni, (umbra_uniform_ptr){alay.curves_off},
         rect, sizeof rect, 0, 0);
     umbra_buf abuf[] = {
-        {.ptr=au, .sz=(size_t)alay.uni_len, .read_only=1},
-        {.ptr=wind_buf, .sz=sizeof wind_buf , .row_bytes=W * sizeof(float)},
+        umbra_uniforms_buf(alay.uni),
+        {.ptr=wind_buf, .sz=sizeof wind_buf, .row_bytes=W * sizeof(float)},
     };
     for (int j = 0; j < 4; j++) {
+        float jf;
         int32_t j32 = j;
-        __builtin_memcpy(
-            au + alay.loop_off, &j32, 4);
+        __builtin_memcpy(&jf, &j32, 4);
+        umbra_set_f32(alay.uni, (umbra_uniform){alay.loop_off}, &jf, 1);
+        abuf[0] = umbra_uniforms_buf(alay.uni);
         acc->queue(acc, 0, 0, W, H, abuf);
     }
     be->flush(be);
@@ -317,6 +316,7 @@ static void test_slug_rect(void) {
     pixels[20*W + 70] == bg here;
 
     umbra_uniforms_free(lay.uni);
+    umbra_uniforms_free(alay.uni);
     acc->free(acc);
     interp->free(interp);
     be->free(be);

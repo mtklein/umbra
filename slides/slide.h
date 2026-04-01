@@ -33,25 +33,6 @@ void   slides_init        (int w, int h);
 void   slides_init_for_dump(void);
 void   slides_cleanup     (void);
 
-static inline void slide_uni_i32(char *u, int off,
-                                 int32_t v) {
-    __builtin_memcpy(u+off, &v, 4);
-}
-static inline void slide_uni_f32(char *u, int off,
-                                 float const *v,
-                                 int n) {
-    __builtin_memcpy(u+off, v, (size_t)n*4);
-}
-static inline void slide_uni_ptr(char *u, int off,
-                                 void *p, size_t sz,
-                                 _Bool read_only, size_t row_bytes) {
-    ptrdiff_t ssz = read_only ? -(ptrdiff_t)sz : (ptrdiff_t)sz;
-    __builtin_memset(u+off, 0, 24);
-    __builtin_memcpy(u+off,    &p,         sizeof p);
-    __builtin_memcpy(u+off+8,  &ssz,       sizeof ssz);
-    __builtin_memcpy(u+off+16, &row_bytes, sizeof row_bytes);
-}
-
 static inline void slide_perspective_matrix(
         float out[11], float t,
         int sw, int sh, int bw, int bh) {

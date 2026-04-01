@@ -2,7 +2,6 @@
 #include "work_group.h"
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Weverything"
@@ -50,21 +49,23 @@ static umbra_fmt const fmt_enums[] = {
 };
 
 typedef struct {
-    struct umbra_program *program;
-    int                   uni_len, out_ptr;
+    struct umbra_program  *program;
+    struct umbra_uniforms *uni;
+    int                    out_ptr, pad_;
 } pipe;
 
 static pipe fill_pipe, readback_pipe, hdr_pipe;
 
 static void free_pipe(pipe *p) {
     if (p->program) { p->program->free(p->program); }
+    umbra_uniforms_free(p->uni);
     *p = (pipe){0};
 }
 
 static struct umbra_backend *pipe_be;
 
 static void finish_pipe(pipe *p, builder *builder) {
-    p->uni_len = umbra_uniforms_len(umbra_builder_uniforms(builder));
+    p->uni = umbra_builder_take_uniforms(builder);
     struct umbra_basic_block *bb = umbra_basic_block(builder);
     umbra_builder_free(builder);
     p->program = pipe_be->compile(pipe_be, bb);
@@ -200,12 +201,10 @@ static void fill_bg_row(void *dst, int n, uint32_t bg, size_t row_sz, size_t pla
         (float)((bg >> 16) & 0xffu) / 255.0f,
         (float)((bg >> 24) & 0xffu) / 255.0f,
     };
-    uint64_t uni_[4] = {0};
-    char    *uni = (char *)uni_;
-    slide_uni_f32(uni, 0, hc, 4);
+    umbra_set_f32(fill_pipe.uni, (umbra_uniform){0}, hc, 4);
     int      ps = plane_gap ? 3 : 0;
     umbra_buf buf[5];
-    buf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)fill_pipe.uni_len, .read_only=1};
+    buf[0] = umbra_uniforms_buf(fill_pipe.uni);
     buf[1] = (umbra_buf){.ptr=dst, .sz=row_sz};
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (umbra_buf){.ptr=(char *)dst + (size_t)(i + 1) * plane_gap, .sz=row_sz};
@@ -214,12 +213,10 @@ static void fill_bg_row(void *dst, int n, uint32_t bg, size_t row_sz, size_t pla
 }
 
 static void readback_row(uint32_t *dst, void *src, int n, size_t src_sz, size_t plane_gap) {
-    uint64_t uni_[2] = {0};
-    char    *uni = (char *)uni_;
     int      ps = plane_gap ? 3 : 0;
     int      op = readback_pipe.out_ptr;
     umbra_buf buf[6];
-    buf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)readback_pipe.uni_len, .read_only=1};
+    buf[0] = umbra_uniforms_buf(readback_pipe.uni);
     buf[1] = (umbra_buf){.ptr=src, .sz=src_sz, .read_only=1};
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (umbra_buf){.ptr=(char *)src + (size_t)(i + 1) * plane_gap, .sz=src_sz};
@@ -229,12 +226,10 @@ static void readback_row(uint32_t *dst, void *src, int n, size_t src_sz, size_t 
 }
 
 static void to_hdr_row(__fp16 *dst, void *src, int n, size_t src_sz, size_t plane_gap) {
-    uint64_t uni_[2] = {0};
-    char    *uni = (char *)uni_;
     int      ps = plane_gap ? 3 : 0;
     int      op = hdr_pipe.out_ptr;
     umbra_buf buf[6];
-    buf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)hdr_pipe.uni_len, .read_only=1};
+    buf[0] = umbra_uniforms_buf(hdr_pipe.uni);
     buf[1] = (umbra_buf){.ptr=src, .sz=src_sz, .read_only=1};
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (umbra_buf){.ptr=(char *)src + (size_t)(i + 1) * plane_gap, .sz=src_sz};

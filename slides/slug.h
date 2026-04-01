@@ -148,7 +148,8 @@ static inline void slug_free(slug_curves *sc) {
 }
 
 typedef struct {
-    int mat, curves_off, loop_off, uni_len;
+    struct umbra_uniforms *uni;
+    int mat, curves_off, loop_off, pad_;
 } slug_acc_layout;
 
 static inline struct umbra_builder *slug_build_acc(
@@ -321,7 +322,7 @@ static inline struct umbra_builder *slug_build_acc(
         lay->mat        = fi  * 4;
         lay->curves_off = co;
         lay->loop_off   = ji  * 4;
-        lay->uni_len    = umbra_uniforms_len(umbra_builder_uniforms(b));
+        lay->uni        = umbra_builder_take_uniforms(b);
     }
 
     return b;
