@@ -2,7 +2,7 @@
 #include <stddef.h>
 
 struct umbra_uniforms {
-    char  *data;
+    void  *data;
     size_t size;
 };
 

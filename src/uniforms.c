@@ -24,15 +24,17 @@ static void ensure_allocated(struct umbra_uniforms *u) {
 void umbra_set_f32(struct umbra_uniforms *u, umbra_uniform h, float const *v, int n) {
     assert(h.off + (size_t)n * 4 <= u->size);
     ensure_allocated(u);
-    __builtin_memcpy(u->data + h.off, v, (size_t)n * 4);
+    char *p = (char*)u->data + h.off;
+    __builtin_memcpy(p, v, (size_t)n * 4);
 }
 void umbra_set_ptr(struct umbra_uniforms *u, umbra_uniform h,
                    void *ptr, size_t sz, _Bool read_only, size_t row_bytes) {
     assert(h.off + 24 <= u->size);
     ensure_allocated(u);
+    char *p = (char*)u->data + h.off;
     ptrdiff_t ssz = read_only ? -(ptrdiff_t)sz : (ptrdiff_t)sz;
-    __builtin_memset(u->data + h.off, 0, 24);
-    __builtin_memcpy(u->data + h.off,      &ptr,       sizeof ptr);
-    __builtin_memcpy(u->data + h.off + 8,  &ssz,       sizeof ssz);
-    __builtin_memcpy(u->data + h.off + 16, &row_bytes, sizeof row_bytes);
+    __builtin_memset(p, 0, 24);
+    __builtin_memcpy(p,      &ptr,       sizeof ptr);
+    __builtin_memcpy(p + 8,  &ssz,       sizeof ssz);
+    __builtin_memcpy(p + 16, &row_bytes, sizeof row_bytes);
 }
