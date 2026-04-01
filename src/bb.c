@@ -203,13 +203,7 @@ umbra_ptr umbra_deref_ptr(builder *b, umbra_ptr buf, size_t byte_off) {
 }
 
 
-int umbra_max_ptr(builder const *b) {
-    int m = 0;
-    for (int i = 0; i < b->insts; i++) {
-        if (has_ptr(b->inst[i].op) && m < b->inst[i].ptr) { m = b->inst[i].ptr; }
-    }
-    return m;
-}
+
 
 val umbra_gather_16(builder *b, umbra_ptr src, val ix) {
     return push(b, op_gather_16, VX(ix), .ptr = ptr_ix(src));

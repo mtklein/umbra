@@ -73,7 +73,6 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
         layout->uni = uni;
         layout->shader = shader_off;
         layout->coverage = coverage_off;
-        layout->ps = umbra_max_ptr(builder) - 1;
     } else {
         if (uni) { free(uni->data); free(uni); }
     }

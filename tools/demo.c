@@ -91,9 +91,8 @@ static void build_readback(int fmt) {
     free_pipe(&readback_pipe);
     builder    *builder = umbra_builder();
     umbra_color c = umbra_load_color(builder, (umbra_ptr){1, 0}, fmt_enums[fmt]);
-    int         op = umbra_max_ptr(builder) + 1;
-    umbra_store_color(builder, (umbra_ptr){op, 0}, c, umbra_fmt_8888);
-    readback_pipe.out_ptr = op;
+    umbra_store_color(builder, (umbra_ptr){2, 0}, c, umbra_fmt_8888);
+    readback_pipe.out_ptr = 2;
     finish_pipe(&readback_pipe, builder, NULL);
 }
 
@@ -101,9 +100,8 @@ static void build_hdr(int fmt) {
     free_pipe(&hdr_pipe);
     builder    *builder = umbra_builder();
     umbra_color c = umbra_load_color(builder, (umbra_ptr){1, 0}, fmt_enums[fmt]);
-    int         op = umbra_max_ptr(builder) + 1;
-    hdr_pipe.out_ptr = op;
-    umbra_store_color(builder, (umbra_ptr){op, 0}, c, umbra_fmt_fp16);
+    hdr_pipe.out_ptr = 2;
+    umbra_store_color(builder, (umbra_ptr){2, 0}, c, umbra_fmt_fp16);
     finish_pipe(&hdr_pipe, builder, NULL);
 }
 

@@ -52,7 +52,6 @@ typedef struct { umbra_val r, g, b, a; } umbra_color;
 typedef struct { int ix, :24; _Bool deref; } umbra_ptr;
 
 umbra_ptr umbra_deref_ptr(struct umbra_builder*, umbra_ptr buf, size_t byte_off);
-int       umbra_max_ptr  (struct umbra_builder const*);  // TODO: remove this, or make it O(1)
 
 umbra_val umbra_x(struct umbra_builder*);
 umbra_val umbra_y(struct umbra_builder*);
