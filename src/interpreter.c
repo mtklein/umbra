@@ -985,12 +985,12 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                     if (rem >= K) {
                         __builtin_memcpy(v, src + i, 4 * K);
                     } else {
-                        v->i32 = (I32){0};
+                        int32_t tmp[K];
+                        __builtin_memset(tmp, 0, sizeof tmp);
                         for (int ll = 0; ll < rem; ll++) {
-                            int32_t tmp;
-                            __builtin_memcpy(&tmp, src + i + ll, 4);
-                            v->i32[ll] = tmp;
+                            __builtin_memcpy(&tmp[ll], src + i + ll, 4);
                         }
+                        __builtin_memcpy(&v->i32, tmp, sizeof v->i32);
                     }
                 } NEXT;
                 CASE(op_store_16) {
@@ -1038,12 +1038,20 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                         hb = cast(U16, (px >> 32) & mask16);
                         ha = cast(U16,  px >> 48);
                     } else {
-                        hr = (U16){0}; hg = (U16){0}; hb = (U16){0}; ha = (U16){0};
+                        uint16_t tr[K], tg[K], tb[K], ta[K];
+                        __builtin_memset(tr, 0, sizeof tr);
+                        __builtin_memset(tg, 0, sizeof tg);
+                        __builtin_memset(tb, 0, sizeof tb);
+                        __builtin_memset(ta, 0, sizeof ta);
                         for (int ll = 0; ll < rem; ll++) {
                             uint16_t h[4];
                             __builtin_memcpy(h, src + (i + ll) * 8, 8);
-                            hr[ll] = h[0]; hg[ll] = h[1]; hb[ll] = h[2]; ha[ll] = h[3];
+                            tr[ll] = h[0]; tg[ll] = h[1]; tb[ll] = h[2]; ta[ll] = h[3];
                         }
+                        __builtin_memcpy(&hr, tr, sizeof hr);
+                        __builtin_memcpy(&hg, tg, sizeof hg);
+                        __builtin_memcpy(&hb, tb, sizeof hb);
+                        __builtin_memcpy(&ha, ta, sizeof ha);
                     }
                     v[0].f32 = f16_to_f32(hr);
                     v[1].f32 = f16_to_f32(hg);
@@ -1063,13 +1071,22 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                         __builtin_memcpy(&hb, src + ps * 2  + i * 2, sizeof hb);
                         __builtin_memcpy(&ha, src + ps * 3  + i * 2, sizeof ha);
                     } else {
+                        uint16_t tr[K], tg[K], tb[K], ta[K];
+                        __builtin_memset(tr, 0, sizeof tr);
+                        __builtin_memset(tg, 0, sizeof tg);
+                        __builtin_memset(tb, 0, sizeof tb);
+                        __builtin_memset(ta, 0, sizeof ta);
                         for (int ll = 0; ll < rem; ll++) {
                             uint16_t tmp;
-                            __builtin_memcpy(&tmp, src           + (i + ll) * 2, 2); hr[ll] = tmp;
-                            __builtin_memcpy(&tmp, src + ps      + (i + ll) * 2, 2); hg[ll] = tmp;
-                            __builtin_memcpy(&tmp, src + ps * 2  + (i + ll) * 2, 2); hb[ll] = tmp;
-                            __builtin_memcpy(&tmp, src + ps * 3  + (i + ll) * 2, 2); ha[ll] = tmp;
+                            __builtin_memcpy(&tmp, src           + (i + ll) * 2, 2); tr[ll] = tmp;
+                            __builtin_memcpy(&tmp, src + ps      + (i + ll) * 2, 2); tg[ll] = tmp;
+                            __builtin_memcpy(&tmp, src + ps * 2  + (i + ll) * 2, 2); tb[ll] = tmp;
+                            __builtin_memcpy(&tmp, src + ps * 3  + (i + ll) * 2, 2); ta[ll] = tmp;
                         }
+                        __builtin_memcpy(&hr, tr, sizeof hr);
+                        __builtin_memcpy(&hg, tg, sizeof hg);
+                        __builtin_memcpy(&hb, tb, sizeof hb);
+                        __builtin_memcpy(&ha, ta, sizeof ha);
                     }
                     v[0].f32 = f16_to_f32(hr);
                     v[1].f32 = f16_to_f32(hg);
@@ -1093,8 +1110,13 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                                      | cast(U64, ha) << 48;
                         __builtin_memcpy(dst + i * 8, &px, sizeof px);
                     } else {
+                        uint16_t tr[K], tg[K], tb[K], ta[K];
+                        __builtin_memcpy(tr, &hr, sizeof tr);
+                        __builtin_memcpy(tg, &hg, sizeof tg);
+                        __builtin_memcpy(tb, &hb, sizeof tb);
+                        __builtin_memcpy(ta, &ha, sizeof ta);
                         for (int ll = 0; ll < rem; ll++) {
-                            uint16_t h[4] = {hr[ll], hg[ll], hb[ll], ha[ll]};
+                            uint16_t h[4] = {tr[ll], tg[ll], tb[ll], ta[ll]};
                             __builtin_memcpy(dst + (i + ll) * 8, h, 8);
                         }
                     }
@@ -1115,12 +1137,16 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                         __builtin_memcpy(dst + ps * 2  + i * 2, &hb, sizeof hb);
                         __builtin_memcpy(dst + ps * 3  + i * 2, &ha, sizeof ha);
                     } else {
+                        uint16_t tr[K], tg[K], tb[K], ta[K];
+                        __builtin_memcpy(tr, &hr, sizeof tr);
+                        __builtin_memcpy(tg, &hg, sizeof tg);
+                        __builtin_memcpy(tb, &hb, sizeof tb);
+                        __builtin_memcpy(ta, &ha, sizeof ta);
                         for (int ll = 0; ll < rem; ll++) {
-                            uint16_t tmp;
-                            tmp = hr[ll]; __builtin_memcpy(dst           + (i + ll) * 2, &tmp, 2);
-                            tmp = hg[ll]; __builtin_memcpy(dst + ps      + (i + ll) * 2, &tmp, 2);
-                            tmp = hb[ll]; __builtin_memcpy(dst + ps * 2  + (i + ll) * 2, &tmp, 2);
-                            tmp = ha[ll]; __builtin_memcpy(dst + ps * 3  + (i + ll) * 2, &tmp, 2);
+                            __builtin_memcpy(dst           + (i + ll) * 2, &tr[ll], 2);
+                            __builtin_memcpy(dst + ps      + (i + ll) * 2, &tg[ll], 2);
+                            __builtin_memcpy(dst + ps * 2  + (i + ll) * 2, &tb[ll], 2);
+                            __builtin_memcpy(dst + ps * 3  + (i + ll) * 2, &ta[ll], 2);
                         }
                     }
                 } NEXT;
