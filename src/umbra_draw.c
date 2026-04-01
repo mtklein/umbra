@@ -136,31 +136,20 @@ static umbra_color lerp_2stop_(builder *builder, umbra_val t, int fi) {
 
 static umbra_color sample_lut_(builder *builder, umbra_val t_f32, int fi, umbra_ptr lut) {
     // Planar LUT: [R0..R_{N-1}, G0..G_{N-1}, B0..B_{N-1}, A0..A_{N-1}]
-    umbra_val const N_f = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 3);
+    umbra_val const N_f  = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 3);
     umbra_val const N_m1 = umbra_sub_f32(builder, N_f, umbra_imm_f32(builder, 1.0f));
     umbra_val const N_m2 = umbra_sub_f32(builder, N_f, umbra_imm_f32(builder, 2.0f));
-
     umbra_val const t_sc = umbra_mul_f32(builder, t_f32, N_m1);
-    umbra_val const idx_f = umbra_min_f32(builder, umbra_floor_f32(builder, t_sc), N_m2);
-    umbra_val const frac = umbra_sub_f32(builder, t_sc, idx_f);
+    umbra_val const frac_idx = umbra_min_f32(builder, t_sc, N_m2);
 
-    umbra_val const idx  = umbra_i32_from_f32(builder, idx_f);
-    umbra_val const nxt  = umbra_add_i32(builder, idx, umbra_imm_i32(builder, 1));
-    umbra_val const N_i  = umbra_i32_from_f32(builder, N_f);
-    umbra_val const N2_i = umbra_add_i32(builder, N_i, N_i);
-    umbra_val const N3_i = umbra_add_i32(builder, N2_i, N_i);
-
-    umbra_color c;
-    umbra_val const *ch_off[] = {&(umbra_val){0}, &N_i, &N2_i, &N3_i};
-    umbra_val *dst[] = {&c.r, &c.g, &c.b, &c.a};
-    for (int ch = 0; ch < 4; ch++) {
-        umbra_val const base = ch ? umbra_add_i32(builder, idx, *ch_off[ch]) : idx;
-        umbra_val const next = ch ? umbra_add_i32(builder, nxt, *ch_off[ch]) : nxt;
-        umbra_val const v0 = umbra_gather_32(builder, lut, base);
-        umbra_val const v1 = umbra_gather_32(builder, lut, next);
-        *dst[ch] = lerp_f(builder, v0, v1, frac);
-    }
-    return c;
+    umbra_val const N2_f = umbra_add_f32(builder, N_f, N_f);
+    umbra_val const N3_f = umbra_add_f32(builder, N2_f, N_f);
+    return (umbra_color){
+        umbra_sample_32(builder, lut, frac_idx),
+        umbra_sample_32(builder, lut, umbra_add_f32(builder, frac_idx, N_f)),
+        umbra_sample_32(builder, lut, umbra_add_f32(builder, frac_idx, N2_f)),
+        umbra_sample_32(builder, lut, umbra_add_f32(builder, frac_idx, N3_f)),
+    };
 }
 
 umbra_color umbra_shader_linear_2(builder *builder, umbra_val x, umbra_val y) {
