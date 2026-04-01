@@ -19,7 +19,7 @@ struct umbra_uniforms {
     size_t size, cap;
 };
 
-struct umbra_uniforms *umbra_uniforms_new(void) {
+struct umbra_uniforms *umbra_uniforms(void) {
     struct umbra_uniforms *u = calloc(1, sizeof *u);
     return u;
 }

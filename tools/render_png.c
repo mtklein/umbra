@@ -13,7 +13,7 @@ static void render_slide(char const *label, struct umbra_backend *be, slide *s) 
     size_t row_sz = (size_t)(W * bpp);
 
     struct umbra_builder *fb = umbra_builder();
-    struct umbra_uniforms *fill_uni = umbra_uniforms_new();
+    struct umbra_uniforms *fill_uni = umbra_uniforms();
     size_t fi = umbra_reserve_f32(fill_uni, 4).off;
     umbra_color fc = {
         umbra_uniform_32(fb, (umbra_ptr){0, 0}, fi),

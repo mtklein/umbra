@@ -55,7 +55,7 @@ typedef struct { int ix, :24; _Bool deref; } umbra_ptr;
 typedef struct { size_t off; } umbra_uniform;
 typedef struct { size_t off; } umbra_uniform_ptr;
 
-struct umbra_uniforms* umbra_uniforms_new (void);
+struct umbra_uniforms* umbra_uniforms (void);
 void   umbra_uniforms_free(struct umbra_uniforms*);
 
 umbra_uniform     umbra_reserve_f32     (struct umbra_uniforms*, int n);

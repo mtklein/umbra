@@ -14,7 +14,7 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
     umbra_val const xf = umbra_f32_from_i32(builder, x);
     umbra_val const yf = umbra_f32_from_i32(builder, y);
 
-    struct umbra_uniforms *uni = umbra_uniforms_new();
+    struct umbra_uniforms *uni = umbra_uniforms();
 
     size_t      const shader_off = umbra_uniforms_size(uni);
     umbra_color src = {

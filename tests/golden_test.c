@@ -38,7 +38,7 @@ static struct umbra_backend *interp_be;
 
 static void build_fill(int fmt) {
     builder               *builder = umbra_builder();
-    struct umbra_uniforms *u       = umbra_uniforms_new();
+    struct umbra_uniforms *u       = umbra_uniforms();
     size_t fi = umbra_reserve_f32(u, 4).off;
     umbra_color c = {
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi),
