@@ -3722,6 +3722,31 @@ int main(void) {
         cleanup(&B);
     }
 
+    // Exercise uncovered interpreter register variant: op_r_i32_from_f32_r.
+    // Need: acc holds f32, then i32_from_f32 takes acc→acc.
+    // Chain: add_f32 (→acc as f32), i32_from_f32 (acc→acc), add_i32_imm (acc→mem).
+    {
+        struct umbra_builder *b = umbra_builder();
+        umbra_val x = umbra_load_32(b, (umbra_ptr){0, 0});
+        umbra_val f = umbra_f32_from_i32(b, x);
+        umbra_val a = umbra_add_f32(b, f, umbra_imm_f32(b, 0.5f));
+        umbra_val t = umbra_i32_from_f32(b, a);
+        umbra_val r = umbra_add_i32(b, t, umbra_imm_i32(b, 100));
+        umbra_store_32(b, (umbra_ptr){1, 0}, r);
+        backends B = make(b);
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            int32_t src[4] = {1, 2, 3, 4};
+            int32_t dst[4] = {0};
+            if (!run(&B, bi, 4, 1, (umbra_buf[]){
+                    {.ptr=src, .sz=sizeof src},
+                    {.ptr=dst, .sz=sizeof dst}})) { continue; }
+            // (1+0.5)→1 +100=101, (2+0.5)→2 +100=102, etc.
+            (dst[0] == 101) here; (dst[1] == 102) here;
+            (dst[2] == 103) here; (dst[3] == 104) here;
+        }
+        cleanup(&B);
+    }
+
     return 0;
 }
 
