@@ -2,18 +2,6 @@
 #include <assert.h>
 #include <stdlib.h>
 
-struct umbra_uniforms {
-    char  *data;
-    size_t size, cap;
-};
-
-struct umbra_uniforms *umbra_uniforms(void) {
-    return calloc(1, sizeof(struct umbra_uniforms));
-}
-void umbra_uniforms_free(struct umbra_uniforms *u) {
-    if (u) { free(u->data); free(u); }
-}
-
 umbra_uniform umbra_reserve_f32(struct umbra_uniforms *u, int n) {
     u->size = (u->size + 3) & ~(size_t)3;
     umbra_uniform h = {.off = u->size};
@@ -26,9 +14,6 @@ umbra_uniform umbra_reserve_ptr(struct umbra_uniforms *u) {
     u->size += 24;
     return h;
 }
-
-size_t umbra_uniforms_size(struct umbra_uniforms const *u) { return u->size; }
-void  *umbra_uniforms_data(struct umbra_uniforms const *u) { return u->data; }
 
 static void ensure_allocated(struct umbra_uniforms *u) {
     if (u->cap < u->size) {

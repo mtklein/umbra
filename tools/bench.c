@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
             if (bes[bi])   { bes[bi]->free(bes[bi]); }
         }
         free(buf);
-        umbra_uniforms_free(lay.uni);
+        if (lay.uni) { free(lay.uni->data); free(lay.uni); }
     }
 
     {
@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
         { int32_t z = 0; __builtin_memcpy(&j0, &z, 4); }
         umbra_set_f32(al.uni, (umbra_uniform){al.loop_off}, &j0, 1);
         umbra_buf abuf[] = {
-            (umbra_buf){.ptr=umbra_uniforms_data(al.uni), .sz=umbra_uniforms_size(al.uni), .read_only=1},
+            (umbra_buf){.ptr=al.uni->data, .sz=al.uni->size, .read_only=1},
             {.ptr=wind, .sz=(size_t)(W * H * 4)},
         };
 
@@ -155,7 +155,7 @@ int main(int argc, char *argv[]) {
             if (bes[bi])   { bes[bi]->free(bes[bi]); }
         }
         free(wind);
-        umbra_uniforms_free(al.uni);
+        if (al.uni) { free(al.uni->data); free(al.uni); }
         slug_free(&sc);
     }
 

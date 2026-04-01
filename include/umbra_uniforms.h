@@ -1,10 +1,10 @@
 #pragma once
 #include <stddef.h>
 
-struct umbra_uniforms* umbra_uniforms(void);
-void   umbra_uniforms_free(struct umbra_uniforms*);
-size_t umbra_uniforms_size(struct umbra_uniforms const*);
-void*  umbra_uniforms_data(struct umbra_uniforms const*);
+struct umbra_uniforms {
+    char  *data;
+    size_t size, cap;
+};
 
 typedef struct { size_t off; } umbra_uniform;
 

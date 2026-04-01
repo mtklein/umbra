@@ -58,7 +58,7 @@ static pipe fill_pipe, readback_pipe, hdr_pipe;
 
 static void free_pipe(pipe *p) {
     if (p->program) { p->program->free(p->program); }
-    umbra_uniforms_free(p->uni);
+    if (p->uni) { free(p->uni->data); free(p->uni); }
     *p = (pipe){0};
 }
 
@@ -75,7 +75,7 @@ static void finish_pipe(pipe *p, builder *builder, struct umbra_uniforms *uni) {
 static void build_fill(int fmt) {
     free_pipe(&fill_pipe);
     builder                *builder = umbra_builder();
-    struct umbra_uniforms  *u       = umbra_uniforms();
+    struct umbra_uniforms  *u       = calloc(1, sizeof(struct umbra_uniforms));
     size_t fi = umbra_reserve_f32(u, 4).off;
     umbra_color c = {
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi),
@@ -150,7 +150,7 @@ static void tile_factor(int n, int *cols, int *rows) {
 
 static void build_slide_fmt(slide *s, int fmt) {
     free_programs();
-    umbra_uniforms_free(draw_layout.uni);
+    if (draw_layout.uni) { free(draw_layout.uni->data); free(draw_layout.uni); }
     s->fmt = fmt_enums[fmt];
 
     builder *builder = umbra_draw_build(s->shader, s->coverage, s->blend, fmt_enums[fmt],
@@ -205,7 +205,7 @@ static void fill_bg_row(void *dst, int n, uint32_t bg, size_t row_sz, size_t pla
     umbra_set_f32(fill_pipe.uni, (umbra_uniform){0}, hc, 4);
     int      ps = plane_gap ? 3 : 0;
     umbra_buf buf[5];
-    buf[0] = (umbra_buf){.ptr=umbra_uniforms_data(fill_pipe.uni), .sz=umbra_uniforms_size(fill_pipe.uni), .read_only=1};
+    buf[0] = (umbra_buf){.ptr=fill_pipe.uni->data, .sz=fill_pipe.uni->size, .read_only=1};
     buf[1] = (umbra_buf){.ptr=dst, .sz=row_sz};
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (umbra_buf){.ptr=(char *)dst + (size_t)(i + 1) * plane_gap, .sz=row_sz};
@@ -217,7 +217,7 @@ static void readback_row(uint32_t *dst, void *src, int n, size_t src_sz, size_t 
     int      ps = plane_gap ? 3 : 0;
     int      op = readback_pipe.out_ptr;
     umbra_buf buf[6];
-    buf[0] = (umbra_buf){.ptr=umbra_uniforms_data(readback_pipe.uni), .sz=umbra_uniforms_size(readback_pipe.uni), .read_only=1};
+    buf[0] = (umbra_buf){.ptr=readback_pipe.uni->data, .sz=readback_pipe.uni->size, .read_only=1};
     buf[1] = (umbra_buf){.ptr=src, .sz=src_sz, .read_only=1};
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (umbra_buf){.ptr=(char *)src + (size_t)(i + 1) * plane_gap, .sz=src_sz};
@@ -230,7 +230,7 @@ static void to_hdr_row(__fp16 *dst, void *src, int n, size_t src_sz, size_t plan
     int      ps = plane_gap ? 3 : 0;
     int      op = hdr_pipe.out_ptr;
     umbra_buf buf[6];
-    buf[0] = (umbra_buf){.ptr=umbra_uniforms_data(hdr_pipe.uni), .sz=umbra_uniforms_size(hdr_pipe.uni), .read_only=1};
+    buf[0] = (umbra_buf){.ptr=hdr_pipe.uni->data, .sz=hdr_pipe.uni->size, .read_only=1};
     buf[1] = (umbra_buf){.ptr=src, .sz=src_sz, .read_only=1};
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (umbra_buf){.ptr=(char *)src + (size_t)(i + 1) * plane_gap, .sz=src_sz};
@@ -442,7 +442,7 @@ int main(void) {
     free(xtra_progs);
     umbra_basic_block_free(saved_bb);
     free_programs();
-    umbra_uniforms_free(draw_layout.uni);
+    if (draw_layout.uni) { free(draw_layout.uni->data); free(draw_layout.uni); }
     free_pipes();
     for (int i = 0; i < NUM_BACKENDS; i++) { if (bes[i]) { bes[i]->free(bes[i]); } }
     pipe_be->free(pipe_be);

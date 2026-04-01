@@ -38,7 +38,7 @@ static struct umbra_backend *interp_be;
 
 static void build_fill(int fmt) {
     builder               *builder = umbra_builder();
-    struct umbra_uniforms *u       = umbra_uniforms();
+    struct umbra_uniforms *u       = calloc(1, sizeof(struct umbra_uniforms));
     size_t fi = umbra_reserve_f32(u, 4).off;
     umbra_color c = {
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi),
@@ -67,7 +67,7 @@ static void build_pipes(void) {
 static void free_pipes(void) {
     for (int f = 0; f < NUM_FMTS; f++) {
         fill_pipes[f].prog->free(fill_pipes[f].prog);
-        umbra_uniforms_free(fill_pipes[f].uni);
+        if (fill_pipes[f].uni) { free(fill_pipes[f].uni->data); free(fill_pipes[f].uni); }
     }
     interp_be->free(interp_be);
 }
@@ -88,7 +88,7 @@ static void fill_bg(int fmt, void *dst, uint32_t bg) {
     umbra_set_f32(fill_pipes[fmt].uni, (umbra_uniform){0}, hc, 4);
     size_t bpp = umbra_fmt_size(fmt_enums[fmt]);
     umbra_buf buf[2] = {
-        (umbra_buf){.ptr=umbra_uniforms_data(fill_pipes[fmt].uni), .sz=umbra_uniforms_size(fill_pipes[fmt].uni), .read_only=1},
+        (umbra_buf){.ptr=fill_pipes[fmt].uni->data, .sz=fill_pipes[fmt].uni->size, .read_only=1},
         {.ptr=dst, .sz=pixbuf_size(fmt), .row_bytes=(size_t)W * bpp},
     };
     fill_pipes[fmt].prog->queue(fill_pipes[fmt].prog, 0, 0, W, H, buf);
@@ -232,7 +232,7 @@ static void test_slide_golden(
         if (progs[bi]) { progs[bi]->free(progs[bi]); }
         if (bes[bi]) { bes[bi]->free(bes[bi]); }
     }
-    umbra_uniforms_free(lay.uni);
+    if (lay.uni) { free(lay.uni->data); free(lay.uni); }
     s->fmt = saved_fmt;
 }
 
@@ -283,7 +283,7 @@ static void test_slug_rect(void) {
     umbra_set_ptr(alay.uni, (umbra_uniform){alay.curves_off},
         rect, sizeof rect, 0, 0);
     umbra_buf abuf[] = {
-        (umbra_buf){.ptr=umbra_uniforms_data(alay.uni), .sz=umbra_uniforms_size(alay.uni), .read_only=1},
+        (umbra_buf){.ptr=alay.uni->data, .sz=alay.uni->size, .read_only=1},
         {.ptr=wind_buf, .sz=sizeof wind_buf, .row_bytes=W * sizeof(float)},
     };
     for (int j = 0; j < 4; j++) {
@@ -291,7 +291,7 @@ static void test_slug_rect(void) {
         int32_t j32 = j;
         __builtin_memcpy(&jf, &j32, 4);
         umbra_set_f32(alay.uni, (umbra_uniform){alay.loop_off}, &jf, 1);
-        abuf[0] = (umbra_buf){.ptr=umbra_uniforms_data(alay.uni), .sz=umbra_uniforms_size(alay.uni), .read_only=1};
+        abuf[0] = (umbra_buf){.ptr=alay.uni->data, .sz=alay.uni->size, .read_only=1};
         acc->queue(acc, 0, 0, W, H, abuf);
     }
     be->flush(be);
@@ -300,7 +300,7 @@ static void test_slug_rect(void) {
     umbra_set_ptr(lay.uni, (umbra_uniform){lay.coverage},
         wind_buf, sizeof wind_buf, 1, (size_t)W * sizeof(float));
     umbra_buf buf[] = {
-        (umbra_buf){.ptr=umbra_uniforms_data(lay.uni), .sz=umbra_uniforms_size(lay.uni), .read_only=1},
+        (umbra_buf){.ptr=lay.uni->data, .sz=lay.uni->size, .read_only=1},
         {.ptr=pixels, .sz=sizeof pixels, .row_bytes=W * 4},
     };
     interp->queue(interp, 0, 0, W, H, buf);
@@ -315,8 +315,8 @@ static void test_slug_rect(void) {
     pixels[38*W + 30] == bg here;
     pixels[20*W + 70] == bg here;
 
-    umbra_uniforms_free(lay.uni);
-    umbra_uniforms_free(alay.uni);
+    if (lay.uni) { free(lay.uni->data); free(lay.uni); }
+    if (alay.uni) { free(alay.uni->data); free(alay.uni); }
     acc->free(acc);
     interp->free(interp);
     be->free(be);
@@ -360,7 +360,7 @@ static void test_perspective_text(void) {
     umbra_set_ptr(lay.uni, (umbra_uniform){(lay.coverage + 11*4 + 7) & ~(size_t)7},
         bmp, sizeof bmp, 0, 0);
     umbra_buf buf[] = {
-        (umbra_buf){.ptr=umbra_uniforms_data(lay.uni), .sz=umbra_uniforms_size(lay.uni), .read_only=1},
+        (umbra_buf){.ptr=lay.uni->data, .sz=lay.uni->size, .read_only=1},
         {.ptr=pixels, .sz=sizeof pixels},
     };
     interp->queue(interp, 0, 0, BW, 1, buf);
@@ -399,7 +399,7 @@ static void test_perspective_text(void) {
             tc.data,
             (size_t)(W * H * 2), 0, 0);
         umbra_buf b2[] = {
-            (umbra_buf){.ptr=umbra_uniforms_data(lay2.uni), .sz=umbra_uniforms_size(lay2.uni), .read_only=1},
+            (umbra_buf){.ptr=lay2.uni->data, .sz=lay2.uni->size, .read_only=1},
             {.ptr=px2, .sz=(size_t)(W * H * 4), .row_bytes=W * 4},
         };
         interp->queue(interp, 0, 0, W, H, b2);
@@ -411,8 +411,8 @@ static void test_perspective_text(void) {
     }
     changed > 0 here;
 
-    umbra_uniforms_free(lay.uni);
-    umbra_uniforms_free(lay2.uni);
+    if (lay.uni) { free(lay.uni->data); free(lay.uni); }
+    if (lay2.uni) { free(lay2.uni->data); free(lay2.uni); }
     interp->free(interp);
     be->free(be);
     text_cov_free(&tc);

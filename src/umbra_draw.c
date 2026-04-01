@@ -2,6 +2,7 @@
 #include "bb.h"
 #include <assert.h>
 #include <math.h>
+#include <stdlib.h>
 #include <stdint.h>
 
 typedef struct umbra_builder builder;
@@ -15,9 +16,9 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
     umbra_val const xf = umbra_f32_from_i32(builder, x);
     umbra_val const yf = umbra_f32_from_i32(builder, y);
 
-    struct umbra_uniforms *uni = umbra_uniforms();
+    struct umbra_uniforms *uni = calloc(1, sizeof(struct umbra_uniforms));
 
-    size_t      const shader_off = umbra_uniforms_size(uni);
+    size_t      const shader_off = uni->size;
     umbra_color src = {
         umbra_imm_f32(builder, 0.0f),
         umbra_imm_f32(builder, 0.0f),
@@ -28,7 +29,7 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
         src = shader(builder, uni, xf, yf);
     }
 
-    size_t    const coverage_off = umbra_uniforms_size(uni);
+    size_t    const coverage_off = uni->size;
     umbra_val cov = {0};
     if (coverage) {
         cov = coverage(builder, uni, xf, yf);
@@ -74,7 +75,7 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
         layout->coverage = coverage_off;
         layout->ps = umbra_max_ptr(builder) - 1;
     } else {
-        umbra_uniforms_free(uni);
+        if (uni) { free(uni->data); free(uni); }
     }
 
     return builder;
@@ -190,19 +191,19 @@ umbra_color umbra_supersample(builder *builder, struct umbra_uniforms *u, umbra_
     if (n < 1) { n = 1; }
     if (n > 8) { n = 8; }
 
-    size_t      const saved = umbra_uniforms_size(u);
+    size_t      const saved = u->size;
     umbra_color sum = inner(builder, u, x, y);
-    size_t      const after = umbra_uniforms_size(u);
+    size_t      const after = u->size;
 
     for (int s = 1; s < n; s++) {
-        struct umbra_uniforms *scratch = umbra_uniforms();
+        struct umbra_uniforms *scratch = calloc(1, sizeof(struct umbra_uniforms));
         // Seed dummy to the same starting point so reserves return identical offsets.
         umbra_reserve_f32(scratch, (int)(saved / 4));
         umbra_val const sx = umbra_add_f32(builder, x, umbra_imm_f32(builder, jitter[s - 1][0]));
         umbra_val const sy = umbra_add_f32(builder, y, umbra_imm_f32(builder, jitter[s - 1][1]));
         umbra_color const c = inner(builder, scratch, sx, sy);
-        assert(umbra_uniforms_size(scratch) == after);
-        umbra_uniforms_free(scratch);
+        assert(scratch->size == after);
+        if (scratch) { free(scratch->data); free(scratch); }
         sum.r = umbra_add_f32(builder, sum.r, c.r);
         sum.g = umbra_add_f32(builder, sum.g, c.g);
         sum.b = umbra_add_f32(builder, sum.b, c.b);

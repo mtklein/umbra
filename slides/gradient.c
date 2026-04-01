@@ -15,7 +15,7 @@ static void grad_2stop_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     size_t plane_sz = (size_t)w * (size_t)h * pb;
     umbra_buf ubuf[2];
     size_t rb = (size_t)w * pb;
-    ubuf[0] = (umbra_buf){.ptr=umbra_uniforms_data(lay->uni), .sz=umbra_uniforms_size(lay->uni), .read_only=1};
+    ubuf[0] = (umbra_buf){.ptr=lay->uni->data, .sz=lay->uni->size, .read_only=1};
     ubuf[1] = (umbra_buf){.ptr=buf, .sz=plane_sz * (s->fmt == umbra_fmt_fp16_planar ? 4 : 1), .row_bytes=rb};
     program->queue(program, 0, y0, w, y1, ubuf);
 }
@@ -30,7 +30,7 @@ static void grad_lut_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     size_t plane_sz = (size_t)w * (size_t)h * pb;
     umbra_buf ubuf[2];
     size_t rb = (size_t)w * pb;
-    ubuf[0] = (umbra_buf){.ptr=umbra_uniforms_data(lay->uni), .sz=umbra_uniforms_size(lay->uni), .read_only=1};
+    ubuf[0] = (umbra_buf){.ptr=lay->uni->data, .sz=lay->uni->size, .read_only=1};
     ubuf[1] = (umbra_buf){.ptr=buf, .sz=plane_sz * (s->fmt == umbra_fmt_fp16_planar ? 4 : 1), .row_bytes=rb};
     program->queue(program, 0, y0, w, y1, ubuf);
 }

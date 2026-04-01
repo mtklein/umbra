@@ -14,7 +14,7 @@ static void render_slide(char const *label, struct umbra_backend *be, slide *s) 
     size_t row_sz = (size_t)(W * bpp);
 
     struct umbra_builder *fb = umbra_builder();
-    struct umbra_uniforms *fill_uni = umbra_uniforms();
+    struct umbra_uniforms *fill_uni = calloc(1, sizeof(struct umbra_uniforms));
     size_t fi = umbra_reserve_f32(fill_uni, 4).off;
     umbra_color fc = {
         umbra_uniform_32(fb, (umbra_ptr){0, 0}, fi),
@@ -57,7 +57,7 @@ static void render_slide(char const *label, struct umbra_backend *be, slide *s) 
     for (int y = 0; y < H; y++) {
         void *row = (char*)pixbuf + y * W * bpp;
         umbra_buf buf[] = {
-            (umbra_buf){.ptr=umbra_uniforms_data(fill_uni), .sz=umbra_uniforms_size(fill_uni), .read_only=1},
+            (umbra_buf){.ptr=fill_uni->data, .sz=fill_uni->size, .read_only=1},
             {.ptr=row, .sz=row_sz},
         };
         fill_prog->queue(fill_prog, 0, 0, W, 1, buf);
@@ -93,8 +93,8 @@ static void render_slide(char const *label, struct umbra_backend *be, slide *s) 
     fill_prog->free(fill_prog);
     rb_prog->free(rb_prog);
     draw_prog->free(draw_prog);
-    umbra_uniforms_free(fill_uni);
-    umbra_uniforms_free(lay.uni);
+    if (fill_uni) { free(fill_uni->data); free(fill_uni); }
+    if (lay.uni) { free(lay.uni->data); free(lay.uni); }
 }
 
 int main(void) {

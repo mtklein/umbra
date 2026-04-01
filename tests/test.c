@@ -1654,12 +1654,12 @@ static void test_shift_imm(void) {
 static void test_gather_deref_large(void) {
     struct umbra_builder *b = umbra_builder();
     umbra_val             idx = umbra_load_32(b, (umbra_ptr){0, 0});
-    struct umbra_uniforms *u   = umbra_uniforms();
+    struct umbra_uniforms *u   = calloc(1, sizeof(struct umbra_uniforms));
     size_t                off = umbra_reserve_ptr(u).off;
     umbra_ptr             src = umbra_deref_ptr(b, (umbra_ptr){1, 0}, off);
     umbra_val             val = umbra_i32_from_s16(b, umbra_gather_16(b, src, idx));
     umbra_store_32(b, (umbra_ptr){2, 0}, val);
-    umbra_uniforms_free(u);
+    if (u) { free(u->data); free(u); }
     backends B = make(b);
 
     enum { N = 33000 };
@@ -2381,9 +2381,9 @@ static void test_load_stride_neq_w(void) {
     // Regression: add(mul(y, rs_uniform), x) was optimized to a contiguous
     // load using the linear loop counter.  When rs != w, this is wrong.
     struct umbra_builder *b = umbra_builder();
-    struct umbra_uniforms *u  = umbra_uniforms();
+    struct umbra_uniforms *u  = calloc(1, sizeof(struct umbra_uniforms));
     size_t                 ri = umbra_reserve_f32(u, 1).off;
-    umbra_uniforms_free(u);
+    if (u) { free(u->data); free(u); }
     umbra_val x = umbra_x(b);
     umbra_val y = umbra_y(b);
     umbra_val rs = umbra_uniform_32(b, (umbra_ptr){0, 0}, ri);
@@ -3632,9 +3632,9 @@ int main(void) {
     // Regression test: l>0 with deref'd buffer that has row_bytes>0.
     {
         struct umbra_builder *b = umbra_builder();
-        struct umbra_uniforms *u   = umbra_uniforms();
+        struct umbra_uniforms *u   = calloc(1, sizeof(struct umbra_uniforms));
         size_t                off = umbra_reserve_ptr(u).off;
-        umbra_uniforms_free(u);
+        if (u) { free(u->data); free(u); }
         umbra_ptr             src = umbra_deref_ptr(b, (umbra_ptr){1, 0}, off);
         umbra_val             v   = umbra_load_32(b, src);
         umbra_val             one = umbra_imm_i32(b, 1);
@@ -3684,9 +3684,9 @@ int main(void) {
     // Regression test: l>0 with deref'd 16-bit buffer, row_bytes>0.
     {
         struct umbra_builder *b = umbra_builder();
-        struct umbra_uniforms *u   = umbra_uniforms();
+        struct umbra_uniforms *u   = calloc(1, sizeof(struct umbra_uniforms));
         size_t                off = umbra_reserve_ptr(u).off;
-        umbra_uniforms_free(u);
+        if (u) { free(u->data); free(u); }
         umbra_ptr             src = umbra_deref_ptr(b, (umbra_ptr){1, 0}, off);
         umbra_val             v   = umbra_f32_from_f16(b, umbra_load_16(b, src));
         umbra_val             one = umbra_imm_f32(b, 1.0f);

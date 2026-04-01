@@ -52,7 +52,7 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     umbra_set_ptr(st->acc_lay.uni, (umbra_uniform){st->acc_lay.curves_off},
                   st->slug->data, (size_t)(st->slug->count * 6 * 4), 0, 0);
     umbra_buf abuf[] = {
-        (umbra_buf){.ptr=umbra_uniforms_data(st->acc_lay.uni), .sz=umbra_uniforms_size(st->acc_lay.uni), .read_only=1},
+        (umbra_buf){.ptr=st->acc_lay.uni->data, .sz=st->acc_lay.uni->size, .read_only=1},
         {.ptr=st->wind_buf, .sz=wind_sz, .row_bytes=wind_row},
     };
     for (int j = 0; j < st->slug->count; j++) {
@@ -60,7 +60,7 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
         int32_t j32 = j;
         __builtin_memcpy(&jf, &j32, 4);
         umbra_set_f32(st->acc_lay.uni, (umbra_uniform){st->acc_lay.loop_off}, &jf, 1);
-        abuf[0] = (umbra_buf){.ptr=umbra_uniforms_data(st->acc_lay.uni), .sz=umbra_uniforms_size(st->acc_lay.uni), .read_only=1};
+        abuf[0] = (umbra_buf){.ptr=st->acc_lay.uni->data, .sz=st->acc_lay.uni->size, .read_only=1};
         acc->queue(acc, 0, y0, w, y1, abuf);
     }
     be->flush(be);
@@ -75,7 +75,7 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     size_t plane_sz = (size_t)w * (size_t)h * pb;
     umbra_buf rbuf[2];
     size_t rb = (size_t)w * pb;
-    rbuf[0] = (umbra_buf){.ptr=umbra_uniforms_data(lay->uni), .sz=umbra_uniforms_size(lay->uni), .read_only=1};
+    rbuf[0] = (umbra_buf){.ptr=lay->uni->data, .sz=lay->uni->size, .read_only=1};
     rbuf[1] = (umbra_buf){.ptr=buf, .sz=plane_sz * (s->fmt == umbra_fmt_fp16_planar ? 4 : 1), .row_bytes=rb};
     program->queue(program, 0, y0, w, y1, rbuf);
 }
@@ -84,7 +84,7 @@ static void slug_cleanup(slide *s) {
     slug_state *st = s->state;
     free(st->wind_buf);
     umbra_basic_block_free(st->acc_bb);
-    umbra_uniforms_free(st->acc_lay.uni);
+    if (st->acc_lay.uni) { free(st->acc_lay.uni->data); free(st->acc_lay.uni); }
     free(st);
     s->state = NULL;
 }
