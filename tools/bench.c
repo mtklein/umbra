@@ -28,7 +28,7 @@ static double bench(slide *s, int w, int h, umbra_draw_layout const *lay,
         }
         be->flush(be);
         double const elapsed = now() - start;
-        if (elapsed >= 0.1) { return elapsed / ((double)iters * (double)w * (double)h) * 1e12; }
+        if (elapsed >= 0.1) { return elapsed / ((double)iters * (double)w * (double)h) * 1e9; }
         iters *= 2;
     }
 }
@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
         for (int bi = 0; bi < 4; bi++) {
             if (progs[bi]) {
                 char tmp[32];
-                sprintf(tmp, "%4.0f ps/px",
+                sprintf(tmp, "%5.2f ns/px",
                         bench(s, W, H, &lay, buf, bes[bi], progs[bi]));
                 printf(" %12s", tmp);
             } else {
@@ -139,8 +139,8 @@ int main(int argc, char *argv[]) {
                 double const elapsed = now() - start;
                 if (elapsed >= 0.1) {
                     char tmp[32];
-                    sprintf(tmp, "%4.0f ps/px",
-                            elapsed / ((double)iters * (double)(W * H)) * 1e12);
+                    sprintf(tmp, "%5.2f ns/px",
+                            elapsed / ((double)iters * (double)(W * H)) * 1e9);
                     printf(" %12s", tmp);
                     break;
                 }
