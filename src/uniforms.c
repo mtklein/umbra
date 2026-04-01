@@ -47,13 +47,13 @@ void umbra_set_f32(struct umbra_uniforms *u, umbra_uniform h, float const *v, in
     __builtin_memcpy(u->data + h.off, v, (size_t)n * 4);
 }
 void umbra_set_ptr(struct umbra_uniforms *u, umbra_uniform_ptr h,
-                   void *ptr, size_t sz, _Bool read_only, size_t row_bytes) {
+                   void *ptr, size_t sz, bool read_only, size_t row_bytes) {
     ptrdiff_t ssz = read_only ? -(ptrdiff_t)sz : (ptrdiff_t)sz;
     __builtin_memset(u->data + h.off, 0, 24);
     __builtin_memcpy(u->data + h.off,      &ptr,       sizeof ptr);
     __builtin_memcpy(u->data + h.off + 8,  &ssz,       sizeof ssz);
     __builtin_memcpy(u->data + h.off + 16, &row_bytes, sizeof row_bytes);
 }
-umbra_buf umbra_uniforms_buf(struct umbra_uniforms const *u) {
-    return (umbra_buf){.ptr = u->data, .sz = u->size, .read_only = 1};
+void *umbra_uniforms_data(struct umbra_uniforms const *u) {
+    return u->data;
 }

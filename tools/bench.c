@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
         { int32_t z = 0; __builtin_memcpy(&j0, &z, 4); }
         umbra_set_f32(al.uni, (umbra_uniform){al.loop_off}, &j0, 1);
         umbra_buf abuf[] = {
-            umbra_uniforms_buf(al.uni),
+            (umbra_buf){.ptr=umbra_uniforms_data(al.uni), .sz=umbra_uniforms_size(al.uni), .read_only=1},
             {.ptr=wind, .sz=(size_t)(W * H * 4)},
         };
 

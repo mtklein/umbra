@@ -57,7 +57,7 @@ static void render_slide(char const *label, struct umbra_backend *be, slide *s) 
     for (int y = 0; y < H; y++) {
         void *row = (char*)pixbuf + y * W * bpp;
         umbra_buf buf[] = {
-            umbra_uniforms_buf(fill_uni),
+            (umbra_buf){.ptr=umbra_uniforms_data(fill_uni), .sz=umbra_uniforms_size(fill_uni), .read_only=1},
             {.ptr=row, .sz=row_sz},
         };
         fill_prog->queue(fill_prog, 0, 0, W, 1, buf);
