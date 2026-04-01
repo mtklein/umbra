@@ -1,5 +1,6 @@
 #include "../include/umbra_draw.h"
 #include "bb.h"
+#include <assert.h>
 #include <math.h>
 #include <stdint.h>
 
@@ -191,12 +192,17 @@ umbra_color umbra_supersample(builder *builder, struct umbra_uniforms *u, umbra_
 
     size_t      const saved = umbra_uniforms_size(u);
     umbra_color sum = inner(builder, u, x, y);
+    size_t      const after = umbra_uniforms_size(u);
 
     for (int s = 1; s < n; s++) {
-        umbra_uniforms_set_size(u, saved);
+        struct umbra_uniforms *scratch = umbra_uniforms();
+        // Seed dummy to the same starting point so reserves return identical offsets.
+        umbra_reserve_f32(scratch, (int)(saved / 4));
         umbra_val const sx = umbra_add_f32(builder, x, umbra_imm_f32(builder, jitter[s - 1][0]));
         umbra_val const sy = umbra_add_f32(builder, y, umbra_imm_f32(builder, jitter[s - 1][1]));
-        umbra_color const c = inner(builder, u, sx, sy);
+        umbra_color const c = inner(builder, scratch, sx, sy);
+        assert(umbra_uniforms_size(scratch) == after);
+        umbra_uniforms_free(scratch);
         sum.r = umbra_add_f32(builder, sum.r, c.r);
         sum.g = umbra_add_f32(builder, sum.g, c.g);
         sum.b = umbra_add_f32(builder, sum.b, c.b);

@@ -41,8 +41,6 @@ umbra_uniform umbra_reserve_ptr(struct umbra_uniforms *u) {
 
 size_t umbra_uniforms_size(struct umbra_uniforms const *u) { return u->size; }
 
-void umbra_uniforms_set_size(struct umbra_uniforms *u, size_t s) { u->size = s; }
-
 void umbra_set_f32(struct umbra_uniforms *u, umbra_uniform h, float const *v, int n) {
     __builtin_memcpy(u->data + h.off, v, (size_t)n * 4);
 }
