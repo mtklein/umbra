@@ -1134,10 +1134,11 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                     v->i32 = (I32){0} + gval;
                 } NEXT;
                 CASE(op_gather_16) {
-                    I32 const ix = v[ip->x].i32;
                     int const count = (int)(buf[ip->ptr].sz / 2);
                     int const rem = n - (end - K);
                     char const *ptr = (char const*)buf[ip->ptr].ptr;
+                    int32_t ix[K];
+                    __builtin_memcpy(ix, &v[ip->x].i32, sizeof ix);
                     uint16_t tmp[K];
                     __builtin_memset(tmp, 0, sizeof tmp);
                     int const lim = rem < K ? rem : K;
@@ -1150,10 +1151,11 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                     __builtin_memcpy(v, tmp, sizeof tmp);
                 } NEXT;
                 CASE(op_gather_32) {
-                    I32 const ix = v[ip->x].i32;
                     int const count = (int)(buf[ip->ptr].sz / 4);
                     int const rem = n - (end - K);
                     char const *ptr = (char const*)buf[ip->ptr].ptr;
+                    int32_t ix[K];
+                    __builtin_memcpy(ix, &v[ip->x].i32, sizeof ix);
                     int32_t tmp[K];
                     __builtin_memset(tmp, 0, sizeof tmp);
                     int const lim = rem < K ? rem : K;
@@ -1170,12 +1172,15 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                     int const count = (int)(buf[ip->ptr].sz / 4);
                     int const rem = n - (end - K);
                     char const *ptr = (char const*)buf[ip->ptr].ptr;
+                    int32_t fl_i[K];
+                    { I32 const fl_int = cast(I32, fl);
+                      __builtin_memcpy(fl_i, &fl_int, sizeof fl_i); }
                     float lo[K], hi[K];
                     __builtin_memset(lo, 0, sizeof lo);
                     __builtin_memset(hi, 0, sizeof hi);
                     int const lim = rem < K ? rem : K;
                     for (int ll = 0; ll < lim; ll++) {
-                        int const li = (int)fl[ll];
+                        int const li = fl_i[ll];
                         int const hi_ix = li + 1;
                         if (li >= 0 && li < count) {
                             __builtin_memcpy(&lo[ll], ptr + 4*li, 4);
