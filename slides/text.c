@@ -12,7 +12,7 @@ static void text_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     float       hc[4];
     for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
     umbra_set_f32(lay->uni, (umbra_uniform){lay->shader}, hc, 4);
-    umbra_set_ptr(lay->uni, (umbra_uniform_ptr){lay->coverage},
+    umbra_set_ptr(lay->uni, (umbra_uniform){lay->coverage},
                   st->tc->data, (size_t)(w * h * 2), 0, (size_t)w * 2);
     size_t    pb = umbra_fmt_size(s->fmt);
     size_t plane_sz = (size_t)w * (size_t)h * pb;

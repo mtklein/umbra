@@ -158,7 +158,7 @@ static inline struct umbra_builder *slug_build_acc(
 
     struct umbra_uniforms *u = umbra_uniforms();
     size_t fi  = umbra_reserve_f32(u, 11).off;
-    size_t co  = umbra_reserve_ptr_slot(u).off;
+    size_t co  = umbra_reserve_ptr(u).off;
     umbra_ptr curves = umbra_deref_ptr(b,
         (umbra_ptr){0, 0}, co);
     size_t    ji = umbra_reserve_f32(u, 1).off;

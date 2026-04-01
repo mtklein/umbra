@@ -109,7 +109,7 @@ int main(int argc, char *argv[]) {
         mat[9] = sc.w;
         mat[10] = sc.h;
         umbra_set_f32(al.uni, (umbra_uniform){al.mat}, mat, 11);
-        umbra_set_ptr(al.uni, (umbra_uniform_ptr){al.curves_off},
+        umbra_set_ptr(al.uni, (umbra_uniform){al.curves_off},
                       sc.data, (size_t)(sc.count * 6 * 4), 0, 0);
         float j0;
         { int32_t z = 0; __builtin_memcpy(&j0, &z, 4); }

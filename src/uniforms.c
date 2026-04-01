@@ -31,9 +31,9 @@ umbra_uniform umbra_reserve_f32(struct umbra_uniforms *u, int n) {
     uni_grow(u, u->size);
     return h;
 }
-umbra_uniform_ptr umbra_reserve_ptr_slot(struct umbra_uniforms *u) {
+umbra_uniform umbra_reserve_ptr(struct umbra_uniforms *u) {
     u->size = (u->size + 7) & ~(size_t)7;
-    umbra_uniform_ptr h = {.off = u->size};
+    umbra_uniform h = {.off = u->size};
     u->size += 24;
     uni_grow(u, u->size);
     return h;
@@ -46,7 +46,7 @@ void umbra_uniforms_set_size(struct umbra_uniforms *u, size_t s) { u->size = s; 
 void umbra_set_f32(struct umbra_uniforms *u, umbra_uniform h, float const *v, int n) {
     __builtin_memcpy(u->data + h.off, v, (size_t)n * 4);
 }
-void umbra_set_ptr(struct umbra_uniforms *u, umbra_uniform_ptr h,
+void umbra_set_ptr(struct umbra_uniforms *u, umbra_uniform h,
                    void *ptr, size_t sz, _Bool read_only, size_t row_bytes) {
     ptrdiff_t ssz = read_only ? -(ptrdiff_t)sz : (ptrdiff_t)sz;
     __builtin_memset(u->data + h.off, 0, 24);

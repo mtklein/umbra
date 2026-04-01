@@ -24,7 +24,7 @@ static void grad_lut_draw(slide *s, int w, int h, int y0, int y1, void *buf,
                              umbra_draw_layout const *lay, struct umbra_program *program) {
     grad_lut_state *st = s->state;
     umbra_set_f32(lay->uni, (umbra_uniform){lay->shader}, s->grad, 4);
-    umbra_set_ptr(lay->uni, (umbra_uniform_ptr){(lay->shader + 16 + 7) & ~(size_t)7},
+    umbra_set_ptr(lay->uni, (umbra_uniform){(lay->shader + 16 + 7) & ~(size_t)7},
                   st->lut, (size_t)(st->lut_n * 4 * 4), 0, 0);
     size_t    pb = umbra_fmt_size(s->fmt);
     size_t plane_sz = (size_t)w * (size_t)h * pb;

@@ -280,7 +280,7 @@ static void test_slug_rect(void) {
     float wind_buf[W * H];
     __builtin_memset(wind_buf, 0, sizeof wind_buf);
     umbra_set_f32(alay.uni, (umbra_uniform){alay.mat}, mat, 11);
-    umbra_set_ptr(alay.uni, (umbra_uniform_ptr){alay.curves_off},
+    umbra_set_ptr(alay.uni, (umbra_uniform){alay.curves_off},
         rect, sizeof rect, 0, 0);
     umbra_buf abuf[] = {
         (umbra_buf){.ptr=umbra_uniforms_data(alay.uni), .sz=umbra_uniforms_size(alay.uni), .read_only=1},
@@ -297,7 +297,7 @@ static void test_slug_rect(void) {
     be->flush(be);
 
     umbra_set_f32(lay.uni, (umbra_uniform){lay.shader}, color, 4);
-    umbra_set_ptr(lay.uni, (umbra_uniform_ptr){lay.coverage},
+    umbra_set_ptr(lay.uni, (umbra_uniform){lay.coverage},
         wind_buf, sizeof wind_buf, 1, (size_t)W * sizeof(float));
     umbra_buf buf[] = {
         (umbra_buf){.ptr=umbra_uniforms_data(lay.uni), .sz=umbra_uniforms_size(lay.uni), .read_only=1},
@@ -357,7 +357,7 @@ static void test_perspective_text(void) {
 
     umbra_set_f32(lay.uni, (umbra_uniform){lay.shader}, color, 4);
     umbra_set_f32(lay.uni, (umbra_uniform){lay.coverage}, mat, 11);
-    umbra_set_ptr(lay.uni, (umbra_uniform_ptr){(lay.coverage + 11*4 + 7) & ~(size_t)7},
+    umbra_set_ptr(lay.uni, (umbra_uniform){(lay.coverage + 11*4 + 7) & ~(size_t)7},
         bmp, sizeof bmp, 0, 0);
     umbra_buf buf[] = {
         (umbra_buf){.ptr=umbra_uniforms_data(lay.uni), .sz=umbra_uniforms_size(lay.uni), .read_only=1},
@@ -395,7 +395,7 @@ static void test_perspective_text(void) {
     {
         umbra_set_f32(lay2.uni, (umbra_uniform){lay2.shader}, hc2, 4);
         umbra_set_f32(lay2.uni, (umbra_uniform){lay2.coverage}, mat2, 11);
-        umbra_set_ptr(lay2.uni, (umbra_uniform_ptr){(lay2.coverage + 11*4 + 7) & ~(size_t)7},
+        umbra_set_ptr(lay2.uni, (umbra_uniform){(lay2.coverage + 11*4 + 7) & ~(size_t)7},
             tc.data,
             (size_t)(W * H * 2), 0, 0);
         umbra_buf b2[] = {

@@ -747,7 +747,7 @@ static void test_coverage_bitmap(void) {
         float     color[4] = {1, 1, 1, 1};
         uint16_t  cov[8] = {0, 128, 255, 0, 0, 0, 0, 0};
         umbra_set_f32(B.lay.uni, (umbra_uniform){B.lay.shader}, color, 4);
-        umbra_set_ptr(B.lay.uni, (umbra_uniform_ptr){B.lay.coverage}, cov, sizeof cov, 0, 0);
+        umbra_set_ptr(B.lay.uni, (umbra_uniform){B.lay.coverage}, cov, sizeof cov, 0, 0);
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           (umbra_buf){.ptr=umbra_uniforms_data(B.lay.uni), .sz=umbra_uniforms_size(B.lay.uni), .read_only=1},
@@ -776,7 +776,7 @@ static void test_coverage_sdf(void) {
         float     color[4] = {1, 1, 1, 1};
         uint16_t  cov[8] = {0, 100, 128, 200, 255, 0, 0, 0};
         umbra_set_f32(B.lay.uni, (umbra_uniform){B.lay.shader}, color, 4);
-        umbra_set_ptr(B.lay.uni, (umbra_uniform_ptr){B.lay.coverage}, cov, sizeof cov, 0, 0);
+        umbra_set_ptr(B.lay.uni, (umbra_uniform){B.lay.coverage}, cov, sizeof cov, 0, 0);
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           (umbra_buf){.ptr=umbra_uniforms_data(B.lay.uni), .sz=umbra_uniforms_size(B.lay.uni), .read_only=1},
@@ -808,7 +808,7 @@ static void test_coverage_bitmap_matrix(void) {
         };
         umbra_set_f32(B.lay.uni, (umbra_uniform){B.lay.shader}, color, 4);
         umbra_set_f32(B.lay.uni, (umbra_uniform){B.lay.coverage}, mat, 11);
-        umbra_set_ptr(B.lay.uni, (umbra_uniform_ptr){ptr_off}, bmp, sizeof bmp, 0, 0);
+        umbra_set_ptr(B.lay.uni, (umbra_uniform){ptr_off}, bmp, sizeof bmp, 0, 0);
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           (umbra_buf){.ptr=umbra_uniforms_data(B.lay.uni), .sz=umbra_uniforms_size(B.lay.uni), .read_only=1},
@@ -841,7 +841,7 @@ static void test_coverage_bitmap_matrix_oob(void) {
         };
         umbra_set_f32(B.lay.uni, (umbra_uniform){B.lay.shader}, color, 4);
         umbra_set_f32(B.lay.uni, (umbra_uniform){B.lay.coverage}, mat, 11);
-        umbra_set_ptr(B.lay.uni, (umbra_uniform_ptr){ptr_off}, bmp, sizeof bmp, 0, 0);
+        umbra_set_ptr(B.lay.uni, (umbra_uniform){ptr_off}, bmp, sizeof bmp, 0, 0);
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           (umbra_buf){.ptr=umbra_uniforms_data(B.lay.uni), .sz=umbra_uniforms_size(B.lay.uni), .read_only=1},
@@ -929,7 +929,7 @@ static void test_linear_grad(void) {
         uint32_t  dst[8] = {0};
         float     params[4] = {0.125f, 0, 0, 256};
         umbra_set_f32(B.lay.uni, (umbra_uniform){B.lay.shader}, params, 4);
-        umbra_set_ptr(B.lay.uni, (umbra_uniform_ptr){lut_off}, lut, sizeof lut, 0, 0);
+        umbra_set_ptr(B.lay.uni, (umbra_uniform){lut_off}, lut, sizeof lut, 0, 0);
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           (umbra_buf){.ptr=umbra_uniforms_data(B.lay.uni), .sz=umbra_uniforms_size(B.lay.uni), .read_only=1},
@@ -965,7 +965,7 @@ static void test_radial_grad(void) {
         uint32_t  dst[1] = {0};
         float     params[4] = {0, 0, 0.1f, 64};
         umbra_set_f32(B.lay.uni, (umbra_uniform){B.lay.shader}, params, 4);
-        umbra_set_ptr(B.lay.uni, (umbra_uniform_ptr){lut_off}, lut, sizeof lut, 0, 0);
+        umbra_set_ptr(B.lay.uni, (umbra_uniform){lut_off}, lut, sizeof lut, 0, 0);
         if (!run_draw(&B, bi, 1, 1,
                       (umbra_buf[]){
                           (umbra_buf){.ptr=umbra_uniforms_data(B.lay.uni), .sz=umbra_uniforms_size(B.lay.uni), .read_only=1},
@@ -1000,7 +1000,7 @@ static void test_gradient_lut_nonuniform(void) {
         uint32_t  dst[8] = {0};
         float     params[4] = {0.125f, 0, 0, 64};
         umbra_set_f32(B.lay.uni, (umbra_uniform){B.lay.shader}, params, 4);
-        umbra_set_ptr(B.lay.uni, (umbra_uniform_ptr){lut_off}, lut, sizeof lut, 0, 0);
+        umbra_set_ptr(B.lay.uni, (umbra_uniform){lut_off}, lut, sizeof lut, 0, 0);
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           (umbra_buf){.ptr=umbra_uniforms_data(B.lay.uni), .sz=umbra_uniforms_size(B.lay.uni), .read_only=1},
