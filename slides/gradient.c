@@ -9,7 +9,7 @@ typedef struct {
 
 static void grad_2stop_draw(slide *s, int w, int h, int y0, int y1, void *buf,
                                umbra_draw_layout const *lay, struct umbra_program *program) {
-    int       uni_len = lay->uni_len;
+    int       uni_len = umbra_uniforms_len(lay->uni);
     uint64_t  uni_[8] = {0};
     char     *uni = (char *)uni_;
     slide_uni_f32(uni, lay->shader, s->grad, 3);
@@ -26,7 +26,7 @@ static void grad_2stop_draw(slide *s, int w, int h, int y0, int y1, void *buf,
 static void grad_lut_draw(slide *s, int w, int h, int y0, int y1, void *buf,
                              umbra_draw_layout const *lay, struct umbra_program *program) {
     grad_lut_state *st = s->state;
-    int             uni_len = lay->uni_len;
+    int             uni_len = umbra_uniforms_len(lay->uni);
     uint64_t        uni_[8] = {0};
     char           *uni = (char *)uni_;
     slide_uni_f32(uni, lay->shader, s->grad, 4);

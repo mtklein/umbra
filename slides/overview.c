@@ -150,6 +150,7 @@ static void overview_cleanup(slide *s) {
     overview_state *st = s->state;
     for (int i = 0; i < st->n_real; i++) { if (st->progs[i]) { st->progs[i]->free(st->progs[i]); } }
     for (int i = 0; i < st->n_real; i++) { umbra_basic_block_free(st->bbs[i]); }
+    for (int i = 0; i < st->n_real; i++) { umbra_uniforms_free(st->lays[i].uni); }
     free(st->fb);
     free(st->tmp);
     free(st);

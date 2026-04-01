@@ -256,6 +256,11 @@ val umbra_imm_f32(builder *b, float v) {
 }
 
 struct umbra_uniforms *umbra_builder_uniforms(builder *b) { return b->uni; }
+struct umbra_uniforms *umbra_builder_take_uniforms(builder *b) {
+    struct umbra_uniforms *u = b->uni;
+    b->uni = NULL;
+    return u;
+}
 
 int umbra_reserve(builder *b, int n) {
     umbra_uniform h = umbra_reserve_f32(b->uni, n);
@@ -822,7 +827,7 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
     result->inst = out;
     result->insts = total;
     result->preamble = preamble;
-    result->uni_len = umbra_uniforms_len(b->uni);
+    result->uni_len = b->uni ? umbra_uniforms_len(b->uni) : 0;
     return result;
 }
 

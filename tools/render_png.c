@@ -98,6 +98,7 @@ static void render_slide(char const *label, struct umbra_backend *be, slide *s) 
     fill_prog->free(fill_prog);
     rb_prog->free(rb_prog);
     draw_prog->free(draw_prog);
+    umbra_uniforms_free(lay.uni);
 }
 
 int main(void) {

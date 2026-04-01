@@ -71,6 +71,7 @@ umbra_buf umbra_uniforms_buf(struct umbra_uniforms const*);
 
 // Builder access to uniforms (builder owns one internally).
 struct umbra_uniforms* umbra_builder_uniforms(struct umbra_builder*);
+struct umbra_uniforms* umbra_builder_take_uniforms(struct umbra_builder*);
 
 // Legacy API (delegates to the builder's internal uniforms object).
 int       umbra_reserve    (struct umbra_builder*, int n);

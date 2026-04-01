@@ -83,6 +83,7 @@ int main(int argc, char *argv[]) {
             if (bes[bi])   { bes[bi]->free(bes[bi]); }
         }
         free(buf);
+        umbra_uniforms_free(lay.uni);
     }
 
     {

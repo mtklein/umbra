@@ -148,6 +148,7 @@ static void tile_factor(int n, int *cols, int *rows) {
 
 static void build_slide_fmt(slide *s, int fmt) {
     free_programs();
+    umbra_uniforms_free(draw_layout.uni);
     s->fmt = fmt_enums[fmt];
 
     builder *builder = umbra_draw_build(s->shader, s->coverage, s->blend, fmt_enums[fmt],
@@ -445,6 +446,7 @@ int main(void) {
     free(xtra_progs);
     umbra_basic_block_free(saved_bb);
     free_programs();
+    umbra_uniforms_free(draw_layout.uni);
     free_pipes();
     for (int i = 0; i < NUM_BACKENDS; i++) { if (bes[i]) { bes[i]->free(bes[i]); } }
     pipe_be->free(pipe_be);

@@ -233,6 +233,7 @@ static void test_slide_golden(
         if (progs[bi]) { progs[bi]->free(progs[bi]); }
         if (bes[bi]) { bes[bi]->free(bes[bi]); }
     }
+    umbra_uniforms_free(lay.uni);
     s->fmt = saved_fmt;
 }
 
@@ -302,7 +303,7 @@ static void test_slug_rect(void) {
     slide_uni_ptr(uni, lay.coverage,
         wind_buf, sizeof wind_buf, 1, (size_t)W * sizeof(float));
     umbra_buf buf[] = {
-        {.ptr=uni, .sz=(size_t)lay.uni_len, .read_only=1},
+        {.ptr=uni, .sz=(size_t)umbra_uniforms_len(lay.uni), .read_only=1},
         {.ptr=pixels, .sz=sizeof pixels, .row_bytes=W * 4},
     };
     interp->queue(interp, 0, 0, W, H, buf);
@@ -317,6 +318,7 @@ static void test_slug_rect(void) {
     pixels[38*W + 30] == bg here;
     pixels[20*W + 70] == bg here;
 
+    umbra_uniforms_free(lay.uni);
     acc->free(acc);
     interp->free(interp);
     be->free(be);
@@ -363,7 +365,7 @@ static void test_perspective_text(void) {
         (lay.coverage + 11*4 + 7) & ~7,
         bmp, sizeof bmp, 0, 0);
     umbra_buf buf[] = {
-        {.ptr=uni, .sz=(size_t)lay.uni_len, .read_only=1},
+        {.ptr=uni, .sz=(size_t)umbra_uniforms_len(lay.uni), .read_only=1},
         {.ptr=pixels, .sz=sizeof pixels},
     };
     interp->queue(interp, 0, 0, BW, 1, buf);
@@ -405,7 +407,7 @@ static void test_perspective_text(void) {
             tc.data,
             (size_t)(W * H * 2), 0, 0);
         umbra_buf b2[] = {
-            {.ptr=u2, .sz=(size_t)lay2.uni_len, .read_only=1},
+            {.ptr=u2, .sz=(size_t)umbra_uniforms_len(lay2.uni), .read_only=1},
             {.ptr=px2, .sz=(size_t)(W * H * 4), .row_bytes=W * 4},
         };
         interp->queue(interp, 0, 0, W, H, b2);
@@ -417,6 +419,8 @@ static void test_perspective_text(void) {
     }
     changed > 0 here;
 
+    umbra_uniforms_free(lay.uni);
+    umbra_uniforms_free(lay2.uni);
     interp->free(interp);
     be->free(be);
     text_cov_free(&tc);
