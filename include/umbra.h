@@ -77,7 +77,6 @@ struct umbra_uniforms* umbra_builder_take_uniforms(struct umbra_builder*);
 int       umbra_reserve    (struct umbra_builder*, int n);
 int       umbra_reserve_ptr(struct umbra_builder*);
 int       umbra_uni_len    (struct umbra_builder const*);
-void      umbra_set_uni_len(struct umbra_builder*, int);  // used only by umbra_supersample
 
 umbra_ptr umbra_deref_ptr  (struct umbra_builder*, umbra_ptr buf, int byte_off);
 int       umbra_max_ptr    (struct umbra_builder const*);

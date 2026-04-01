@@ -275,7 +275,6 @@ umbra_ptr umbra_deref_ptr(builder *b, umbra_ptr buf, int byte_off) {
     return (umbra_ptr){.ix = val_id(v), .deref = 1};
 }
 int  umbra_uni_len(builder const *b) { return umbra_uniforms_len(b->uni); }
-void umbra_set_uni_len(builder *b, int len) { umbra_uniforms_set_len(b->uni, len); }
 
 
 int umbra_max_ptr(builder const *b) {

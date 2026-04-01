@@ -54,15 +54,13 @@ static void solid_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     };
     float hc[4];
     for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
-    uint64_t uni_[6] = {0};
-    char     *uni = (char *)uni_;
-    slide_uni_f32(uni, lay->shader, hc, 4);
-    if (s->coverage) { slide_uni_f32(uni, lay->coverage, rect, 4); }
+    umbra_set_f32(lay->uni, (umbra_uniform){lay->shader}, hc, 4);
+    if (s->coverage) { umbra_set_f32(lay->uni, (umbra_uniform){lay->coverage}, rect, 4); }
     size_t    pb = umbra_fmt_size(s->fmt);
     size_t plane_sz = (size_t)w * (size_t)h * pb;
     umbra_buf ubuf[2];
     size_t rb = (size_t)w * pb;
-    ubuf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)umbra_uniforms_len(lay->uni), .read_only=1};
+    ubuf[0] = umbra_uniforms_buf(lay->uni);
     ubuf[1] = (umbra_buf){.ptr=buf, .sz=plane_sz * (s->fmt == umbra_fmt_fp16_planar ? 4 : 1), .row_bytes=rb};
     program->queue(program, 0, y0, w, y1, ubuf);
 }

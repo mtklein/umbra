@@ -30,17 +30,16 @@ static void persp_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     persp_state *st = s->state;
     float        hc[4];
     for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
-    uint64_t uni_[12] = {0};
-    char     *uni = (char *)uni_;
-    slide_uni_f32(uni, lay->shader, hc, 4);
-    slide_uni_f32(uni, lay->coverage, st->mat, 11);
-    slide_uni_ptr(uni, (lay->coverage + 11 * 4 + 7) & ~7, st->bitmap->data,
+    umbra_set_f32(lay->uni, (umbra_uniform){lay->shader},   hc, 4);
+    umbra_set_f32(lay->uni, (umbra_uniform){lay->coverage}, st->mat, 11);
+    umbra_set_ptr(lay->uni, (umbra_uniform_ptr){(lay->coverage + 11 * 4 + 7) & ~7},
+                  st->bitmap->data,
                   (size_t)(st->bitmap->w * st->bitmap->h * 2), 0, 0);
     size_t    pb = umbra_fmt_size(s->fmt);
     size_t plane_sz = (size_t)w * (size_t)h * pb;
     umbra_buf ubuf[2];
     size_t rb = (size_t)w * pb;
-    ubuf[0] = (umbra_buf){.ptr=uni, .sz=(size_t)umbra_uniforms_len(lay->uni), .read_only=1};
+    ubuf[0] = umbra_uniforms_buf(lay->uni);
     ubuf[1] = (umbra_buf){.ptr=buf, .sz=plane_sz * (s->fmt == umbra_fmt_fp16_planar ? 4 : 1), .row_bytes=rb};
     program->queue(program, 0, y0, w, y1, ubuf);
 }
