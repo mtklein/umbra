@@ -18,7 +18,7 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
 
     struct umbra_uniforms *uni = calloc(1, sizeof(struct umbra_uniforms));
 
-    size_t      const shader_off = uni->size;
+    umbra_uniform   const shader_off = {uni->size};
     umbra_color src = {
         umbra_imm_f32(builder, 0.0f),
         umbra_imm_f32(builder, 0.0f),
@@ -29,7 +29,7 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
         src = shader(builder, uni, xf, yf);
     }
 
-    size_t    const coverage_off = uni->size;
+    umbra_uniform const coverage_off = {uni->size};
     umbra_val cov = {0};
     if (coverage) {
         cov = coverage(builder, uni, xf, yf);
@@ -196,14 +196,11 @@ umbra_color umbra_supersample(builder *builder, struct umbra_uniforms *u, umbra_
     size_t      const after = u->size;
 
     for (int s = 1; s < n; s++) {
-        struct umbra_uniforms *scratch = calloc(1, sizeof(struct umbra_uniforms));
-        // Seed dummy to the same starting point so reserves return identical offsets.
-        umbra_reserve_f32(scratch, (int)(saved / 4));
+        struct umbra_uniforms scratch = {.size = saved};
         umbra_val const sx = umbra_add_f32(builder, x, umbra_imm_f32(builder, jitter[s - 1][0]));
         umbra_val const sy = umbra_add_f32(builder, y, umbra_imm_f32(builder, jitter[s - 1][1]));
-        umbra_color const c = inner(builder, scratch, sx, sy);
-        assert(scratch->size == after);
-        if (scratch) { free(scratch->data); free(scratch); }
+        umbra_color const c = inner(builder, &scratch, sx, sy);
+        assert(scratch.size == after);
         sum.r = umbra_add_f32(builder, sum.r, c.r);
         sum.g = umbra_add_f32(builder, sum.g, c.g);
         sum.b = umbra_add_f32(builder, sum.b, c.b);

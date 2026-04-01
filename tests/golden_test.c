@@ -296,8 +296,8 @@ static void test_slug_rect(void) {
     }
     be->flush(be);
 
-    umbra_set_f32(lay.uni, (umbra_uniform){lay.shader}, color, 4);
-    umbra_set_ptr(lay.uni, (umbra_uniform){lay.coverage},
+    umbra_set_f32(lay.uni, lay.shader, color, 4);
+    umbra_set_ptr(lay.uni, lay.coverage,
         wind_buf, sizeof wind_buf, 1, (size_t)W * sizeof(float));
     umbra_buf buf[] = {
         (umbra_buf){.ptr=lay.uni->data, .sz=lay.uni->size, .read_only=1},
@@ -355,9 +355,9 @@ static void test_perspective_text(void) {
     };
     float color[4] = {1,1,1,1};
 
-    umbra_set_f32(lay.uni, (umbra_uniform){lay.shader}, color, 4);
-    umbra_set_f32(lay.uni, (umbra_uniform){lay.coverage}, mat, 11);
-    umbra_set_ptr(lay.uni, (umbra_uniform){(lay.coverage + 11*4 + 7) & ~(size_t)7},
+    umbra_set_f32(lay.uni, lay.shader, color, 4);
+    umbra_set_f32(lay.uni, lay.coverage, mat, 11);
+    umbra_set_ptr(lay.uni, (umbra_uniform){(lay.coverage.off + 44 + 7) & ~(size_t)7},
         bmp, sizeof bmp, 0, 0);
     umbra_buf buf[] = {
         (umbra_buf){.ptr=lay.uni->data, .sz=lay.uni->size, .read_only=1},
@@ -393,9 +393,9 @@ static void test_perspective_text(void) {
         W, H, tc.w, tc.h);
     float hc2[4] = {1,0.8f,0.2f,1};
     {
-        umbra_set_f32(lay2.uni, (umbra_uniform){lay2.shader}, hc2, 4);
-        umbra_set_f32(lay2.uni, (umbra_uniform){lay2.coverage}, mat2, 11);
-        umbra_set_ptr(lay2.uni, (umbra_uniform){(lay2.coverage + 11*4 + 7) & ~(size_t)7},
+        umbra_set_f32(lay2.uni, lay2.shader, hc2, 4);
+        umbra_set_f32(lay2.uni, lay2.coverage, mat2, 11);
+        umbra_set_ptr(lay2.uni, (umbra_uniform){(lay2.coverage.off + 44 + 7) & ~(size_t)7},
             tc.data,
             (size_t)(W * H * 2), 0, 0);
         umbra_buf b2[] = {

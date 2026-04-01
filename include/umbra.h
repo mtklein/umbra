@@ -10,10 +10,9 @@ struct umbra_basic_block* umbra_basic_block(struct umbra_builder*);
 void   umbra_basic_block_free(struct umbra_basic_block*);
 
 struct umbra_backend {
-    struct umbra_program* (*compile)(struct umbra_backend*,
-                                     struct umbra_basic_block const*);
-    void                  (*flush)(struct umbra_backend*);
-    void                  (*free)(struct umbra_backend*);
+    struct umbra_program* (*compile)(struct umbra_backend*, struct umbra_basic_block const*);
+    void                  (*flush  )(struct umbra_backend*);
+    void                  (*free   )(struct umbra_backend*);
     int                     threadsafe, :32;
 };
 struct umbra_backend* umbra_backend_interp(void);
@@ -33,18 +32,18 @@ typedef enum {
 size_t umbra_fmt_size(umbra_fmt);
 
 typedef struct {
-    void           *ptr;
-    size_t          sz;
-    size_t          row_bytes;
-    _Bool           read_only;
-    char            pad_[7];
+    void   *ptr;
+    size_t  sz;
+    size_t  row_bytes;
+    _Bool   read_only,
+            pad_[7];
 } umbra_buf;
 
 
 struct umbra_program {
     void (*queue)(struct umbra_program*, int l, int t, int r, int b, umbra_buf[]);
-    void (*dump)(struct umbra_program const*, FILE*);
-    void (*free)(struct umbra_program*);
+    void (*dump )(struct umbra_program const*, FILE*);
+    void (*free )(struct umbra_program*);
     struct umbra_backend *backend;
 };
 
@@ -52,8 +51,8 @@ typedef struct { int bits; } umbra_val;
 typedef struct { umbra_val r, g, b, a; } umbra_color;
 typedef struct { int ix, :24; _Bool deref; } umbra_ptr;
 
-umbra_ptr umbra_deref_ptr  (struct umbra_builder*, umbra_ptr buf, size_t byte_off);
-int       umbra_max_ptr    (struct umbra_builder const*);
+umbra_ptr umbra_deref_ptr(struct umbra_builder*, umbra_ptr buf, size_t byte_off);
+int       umbra_max_ptr  (struct umbra_builder const*);  // TODO: remove this, or make it O(1)
 
 umbra_val umbra_x(struct umbra_builder*);
 umbra_val umbra_y(struct umbra_builder*);

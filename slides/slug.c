@@ -68,8 +68,8 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
 
     float hc[4];
     for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
-    umbra_set_f32(lay->uni, (umbra_uniform){lay->shader}, hc, 4);
-    umbra_set_ptr(lay->uni, (umbra_uniform){lay->coverage},
+    umbra_set_f32(lay->uni, lay->shader, hc, 4);
+    umbra_set_ptr(lay->uni, lay->coverage,
                   st->wind_buf, wind_sz, 1, (size_t)w * sizeof(float));
     size_t    pb = umbra_fmt_size(s->fmt);
     size_t plane_sz = (size_t)w * (size_t)h * pb;
