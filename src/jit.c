@@ -627,14 +627,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, FSUB_4s(frac, rx, hi_r));
                 free_chan(ra, inst->x, i);
                 put(c, FCVTZS_4s(hi_r, hi_r));
+                // extract lo index once, use for both gathers
+                put(c, UMOV_ws(XT, hi_r));
                 // gather lo
                 put(c, MOVI_4s(s.rd, 0, 0));
-                put(c, UMOV_ws(XT, hi_r));
                 put(c, CMP_wr(XT, XM));
                 put(c, Bcond(0x2, 2));
                 put(c, LDR_sx(s.rd, XP, XT));
-                // gather hi (lo_i + 1), reuse hi_r
-                put(c, UMOV_ws(XT, hi_r));
+                // gather hi (lo_i + 1)
                 put(c, ADD_xi(XT, XT, 1));
                 put(c, MOVI_4s(hi_r, 0, 0));
                 put(c, CMP_wr(XT, XM));
@@ -650,23 +650,22 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 free_chan(ra, inst->x, i);
                 int8_t int_ix = ra_alloc(ra, sl, ns);
                 put(c, FCVTZS_4s(int_ix, hi_r));
-                // gather lo into s.rd
+                // Gather lo and hi in one pass per lane.
+                // XM holds count.  For each lane, extract index,
+                // bounds-check for lo, then add 1 and bounds-check for hi.
                 put(c, MOVI_4s(s.rd, 0, 0));
+                put(c, MOVI_4s(hi_r, 0, 0));
                 for (int k = 0; k < 4; k++) {
                     put(c, UMOV_ws_lane(XT, int_ix, k));
+                    // lo gather: if (ix >= 0 && ix < count)
                     put(c, CMP_wr(XT, XM));
                     put(c, Bcond(0x2, 4));
                     put(c, LSL_xi(XT, XT, 2));
                     put(c, ADD_xr(XT, XP, XT));
                     put(c, LD1_s(s.rd, k, XT));
-                }
-                // compute hi indices = int_ix + 1
-                put(c, MOVI_4s(hi_r, 1, 0));
-                put(c, ADD_4s(int_ix, int_ix, hi_r));
-                // gather hi into hi_r
-                put(c, MOVI_4s(hi_r, 0, 0));
-                for (int k = 0; k < 4; k++) {
+                    // hi gather: ix+1
                     put(c, UMOV_ws_lane(XT, int_ix, k));
+                    put(c, ADD_xi(XT, XT, 1));
                     put(c, CMP_wr(XT, XM));
                     put(c, Bcond(0x2, 4));
                     put(c, LSL_xi(XT, XT, 2));
@@ -2242,10 +2241,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t hi_r   = ra_alloc(ra, sl, ns);
             if (scalar) {
                 // floor + frac
-                vroundps(c, frac_r, rx, 1);               // frac_r = floor(ix)
-                vsubps(c, frac_r, rx, frac_r);             // frac_r = ix - floor
-                vroundps(c, hi_r, rx, 1);
-                vcvttps2dq(c, hi_r, hi_r);                 // hi_r = int(floor) = lo_i
+                vroundps(c, hi_r, rx, 1);                  // hi_r = floor(ix)
+                vsubps(c, frac_r, rx, hi_r);                // frac_r = ix - floor
+                vcvttps2dq(c, hi_r, hi_r);                  // hi_r = int(floor)
                 free_chan(ra, inst->x, i);
                 load_count_x86(c, p, 2);
                 // gather lo
@@ -2274,28 +2272,30 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 vcvttps2dq(c, int_ix, hi_r);                // int_ix = int(floor)
                 free_chan(ra, inst->x, i);
                 load_count_x86(c, p, 2);
-                // gather lo: build mask, vpgatherdd
+                // Load broadcast(count) once into cnt, keep it alive for both gathers.
+                // Use hi_r as temp for comparison results (it's free until the hi gather).
                 int8_t mask = ra_alloc(ra, sl, ns);
-                int8_t cnt  = ra_alloc(ra, sl, ns);
+                int8_t cnt = ra_alloc(ra, sl, ns);
+                vex(c, 1, 1, 0, 0, cnt, 0, XM, 0x6e);       // vmovd cnt, XM
+                vbroadcastss(c, cnt, cnt);                     // cnt = broadcast(count)
+                // lo mask: !neg & (count > ix)
                 vpxor(c, 1, mask, mask, mask);
-                vpcmpgtd(c, mask, mask, int_ix);
-                vex(c, 1, 1, 0, 0, cnt, 0, XM, 0x6e);
-                vbroadcastss(c, cnt, cnt);
-                vpcmpgtd(c, cnt, cnt, int_ix);
-                vex_rrr(c, 1, 1, 1, 0xDF, mask, mask, cnt);
+                vpcmpgtd(c, mask, mask, int_ix);               // mask = (0 > ix) = neg
+                vpcmpgtd(c, hi_r, cnt, int_ix);                // hi_r = (count > ix)
+                vex_rrr(c, 1, 1, 1, 0xDF, mask, mask, hi_r);  // mask = !neg & (count>ix)
+                // gather lo
                 vpxor(c, 1, s.rd, s.rd, s.rd);
                 vpgatherdd(c, s.rd, base, int_ix, 4, mask);
-                // compute hi index = int_ix + 1
-                vpcmpeqd(c, hi_r, hi_r, hi_r);             // all ones
-                vpsrld_i(c, hi_r, hi_r, 31);               // broadcast 1
+                // int_ix += 1
+                vpcmpeqd(c, hi_r, hi_r, hi_r);
+                vpsrld_i(c, hi_r, hi_r, 31);
                 vpaddd(c, int_ix, int_ix, hi_r);
-                // gather hi: rebuild mask
+                // hi mask: !neg & (count > ix+1), reusing preserved cnt
                 vpxor(c, 1, mask, mask, mask);
-                vpcmpgtd(c, mask, mask, int_ix);
-                vex(c, 1, 1, 0, 0, cnt, 0, XM, 0x6e);
-                vbroadcastss(c, cnt, cnt);
-                vpcmpgtd(c, cnt, cnt, int_ix);
-                vex_rrr(c, 1, 1, 1, 0xDF, mask, mask, cnt);
+                vpcmpgtd(c, mask, mask, int_ix);               // mask = neg
+                vpcmpgtd(c, hi_r, cnt, int_ix);                // hi_r = (count > ix+1)
+                vex_rrr(c, 1, 1, 1, 0xDF, mask, mask, hi_r);  // mask = !neg & (count>ix+1)
+                // gather hi
                 vpxor(c, 1, hi_r, hi_r, hi_r);
                 vpgatherdd(c, hi_r, base, int_ix, 4, mask);
                 ra_return_reg(ra, cnt);
