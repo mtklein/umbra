@@ -73,11 +73,6 @@ umbra_buf umbra_uniforms_buf(struct umbra_uniforms const*);
 struct umbra_uniforms* umbra_builder_uniforms(struct umbra_builder*);
 struct umbra_uniforms* umbra_builder_take_uniforms(struct umbra_builder*);
 
-// Legacy API (delegates to the builder's internal uniforms object).
-int       umbra_reserve    (struct umbra_builder*, int n);
-int       umbra_reserve_ptr(struct umbra_builder*);
-int       umbra_uni_len    (struct umbra_builder const*);
-
 umbra_ptr umbra_deref_ptr  (struct umbra_builder*, umbra_ptr buf, int byte_off);
 int       umbra_max_ptr    (struct umbra_builder const*);
 

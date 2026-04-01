@@ -262,19 +262,10 @@ struct umbra_uniforms *umbra_builder_take_uniforms(builder *b) {
     return u;
 }
 
-int umbra_reserve(builder *b, int n) {
-    umbra_uniform h = umbra_reserve_f32(b->uni, n);
-    return h.off / 4;
-}
-int umbra_reserve_ptr(builder *b) {
-    umbra_uniform_ptr h = umbra_reserve_ptr_slot(b->uni);
-    return h.off;
-}
 umbra_ptr umbra_deref_ptr(builder *b, umbra_ptr buf, int byte_off) {
     val const v = push(b, op_deref_ptr, .ptr = ptr_ix(buf), .imm = byte_off);
     return (umbra_ptr){.ix = val_id(v), .deref = 1};
 }
-int  umbra_uni_len(builder const *b) { return umbra_uniforms_len(b->uni); }
 
 
 int umbra_max_ptr(builder const *b) {

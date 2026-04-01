@@ -519,9 +519,8 @@ static void test_no_blend(void) {
 }
 
 static umbra_color gradient_shader(struct umbra_builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
-    (void)u;
     (void)y;
-    int       fi = umbra_reserve(builder, 2);
+    int       fi = umbra_reserve_f32(u, 2).off / 4;
     umbra_val w = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi);
     umbra_val a = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 1);
     umbra_val t = umbra_div_f32(builder, x, w);

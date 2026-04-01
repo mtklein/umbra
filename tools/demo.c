@@ -64,7 +64,7 @@ static void free_pipe(pipe *p) {
 static struct umbra_backend *pipe_be;
 
 static void finish_pipe(pipe *p, builder *builder) {
-    p->uni_len = umbra_uni_len(builder);
+    p->uni_len = umbra_uniforms_len(umbra_builder_uniforms(builder));
     struct umbra_basic_block *bb = umbra_basic_block(builder);
     umbra_builder_free(builder);
     p->program = pipe_be->compile(pipe_be, bb);
@@ -74,7 +74,7 @@ static void finish_pipe(pipe *p, builder *builder) {
 static void build_fill(int fmt) {
     free_pipe(&fill_pipe);
     builder    *builder = umbra_builder();
-    int         fi = umbra_reserve(builder, 4);
+    int         fi = umbra_reserve_f32(umbra_builder_uniforms(builder), 4).off / 4;
     umbra_color c = {
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi),
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 1),

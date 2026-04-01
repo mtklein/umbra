@@ -78,10 +78,9 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
 }
 
 umbra_color umbra_shader_solid(builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
-    (void)u;
     (void)x;
     (void)y;
-    int       const fi = umbra_reserve(builder, 4);
+    int       const fi = umbra_reserve_f32(u, 4).off / 4;
     umbra_val const r = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi);
     umbra_val const g = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 1);
     umbra_val const b = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 2);
@@ -168,13 +167,13 @@ umbra_color umbra_shader_radial_2(builder *builder, struct umbra_uniforms *u, um
 }
 umbra_color umbra_shader_linear_grad(builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
     int       const fi = umbra_reserve_f32(u, 4).off / 4;
-    int       const lut_off = umbra_reserve_ptr(builder);
+    int       const lut_off = umbra_reserve_ptr_slot(u).off;
     umbra_ptr const lut = umbra_deref_ptr(builder, (umbra_ptr){0, 0}, lut_off);
     return sample_lut_(builder, linear_t_(builder, fi, x, y), fi, lut);
 }
 umbra_color umbra_shader_radial_grad(builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
     int       const fi = umbra_reserve_f32(u, 4).off / 4;
-    int       const lut_off = umbra_reserve_ptr(builder);
+    int       const lut_off = umbra_reserve_ptr_slot(u).off;
     umbra_ptr const lut = umbra_deref_ptr(builder, (umbra_ptr){0, 0}, lut_off);
     return sample_lut_(builder, radial_t_(builder, fi, x, y), fi, lut);
 }
