@@ -76,7 +76,7 @@ static void build_fill(int fmt) {
     free_pipe(&fill_pipe);
     builder                *builder = umbra_builder();
     struct umbra_uniforms  *u       = calloc(1, sizeof(struct umbra_uniforms));
-    size_t fi = umbra_reserve_f32(u, 4).off;
+    size_t fi = umbra_reserve_f32(u, 4);
     umbra_color c = {
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi),
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 4),
@@ -200,7 +200,7 @@ static void fill_bg_row(void *dst, int n, uint32_t bg, size_t row_sz, size_t pla
         (float)((bg >> 16) & 0xffu) / 255.0f,
         (float)((bg >> 24) & 0xffu) / 255.0f,
     };
-    umbra_set_f32(fill_pipe.uni, (umbra_uniform){0}, hc, 4);
+    umbra_set_f32(fill_pipe.uni, 0, hc, 4);
     int      ps = plane_gap ? 3 : 0;
     umbra_buf buf[5];
     buf[0] = (umbra_buf){.ptr=fill_pipe.uni->data, .sz=fill_pipe.uni->size, .read_only=1};

@@ -520,7 +520,7 @@ static void test_no_blend(void) {
 
 static umbra_color gradient_shader(struct umbra_builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
     (void)y;
-    size_t fi = umbra_reserve_f32(u, 2).off;
+    size_t fi = umbra_reserve_f32(u, 2);
     umbra_val w = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi);
     umbra_val a = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 4);
     umbra_val t = umbra_div_f32(builder, x, w);
@@ -797,7 +797,7 @@ static void test_coverage_bitmap_matrix(void) {
                                    umbra_blend_srcover, umbra_fmt_8888, &lay),
                   lay);
 
-    size_t ptr_off = (B.lay.coverage.off + 11 * 4 + 7) & ~(size_t)7;
+    size_t ptr_off = (B.lay.coverage + 11 * 4 + 7) & ~(size_t)7;
     for (int bi = 0; bi < 3; bi++) {
         uint32_t dst[8];
         __builtin_memset(dst, 0, sizeof dst);
@@ -808,7 +808,7 @@ static void test_coverage_bitmap_matrix(void) {
         };
         umbra_set_f32(B.lay.uni, B.lay.shader, color, 4);
         umbra_set_f32(B.lay.uni, B.lay.coverage, mat, 11);
-        umbra_set_ptr(B.lay.uni, (umbra_uniform){ptr_off}, bmp, sizeof bmp, 0, 0);
+        umbra_set_ptr(B.lay.uni, ptr_off, bmp, sizeof bmp, 0, 0);
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           (umbra_buf){.ptr=B.lay.uni->data, .sz=B.lay.uni->size, .read_only=1},
@@ -830,7 +830,7 @@ static void test_coverage_bitmap_matrix_oob(void) {
                                    umbra_blend_srcover, umbra_fmt_8888, &lay),
                   lay);
 
-    size_t ptr_off = (B.lay.coverage.off + 11 * 4 + 7) & ~(size_t)7;
+    size_t ptr_off = (B.lay.coverage + 11 * 4 + 7) & ~(size_t)7;
     for (int bi = 0; bi < 3; bi++) {
         uint32_t dst[8];
         __builtin_memset(dst, 0, sizeof dst);
@@ -841,7 +841,7 @@ static void test_coverage_bitmap_matrix_oob(void) {
         };
         umbra_set_f32(B.lay.uni, B.lay.shader, color, 4);
         umbra_set_f32(B.lay.uni, B.lay.coverage, mat, 11);
-        umbra_set_ptr(B.lay.uni, (umbra_uniform){ptr_off}, bmp, sizeof bmp, 0, 0);
+        umbra_set_ptr(B.lay.uni, ptr_off, bmp, sizeof bmp, 0, 0);
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           (umbra_buf){.ptr=B.lay.uni->data, .sz=B.lay.uni->size, .read_only=1},
@@ -866,7 +866,7 @@ static void test_linear_2(void) {
         float     colors[8] = {1, 0, 0, 1, 0, 0, 1, 1};
         float     params[3] = {0.25f, 0, 0};
         umbra_set_f32(B.lay.uni, B.lay.shader, params, 3);
-        umbra_set_f32(B.lay.uni, (umbra_uniform){B.lay.shader.off + 12}, colors, 8);
+        umbra_set_f32(B.lay.uni, B.lay.shader + 12, colors, 8);
         if (!run_draw(&B, bi, 4, 1,
                       (umbra_buf[]){
                           (umbra_buf){.ptr=B.lay.uni->data, .sz=B.lay.uni->size, .read_only=1},
@@ -895,7 +895,7 @@ static void test_radial_2(void) {
         float     colors[8] = {1, 1, 1, 1, 0, 0, 0, 1};
         float     params[3] = {0, 0, 0.1f};
         umbra_set_f32(B.lay.uni, B.lay.shader, params, 3);
-        umbra_set_f32(B.lay.uni, (umbra_uniform){B.lay.shader.off + 12}, colors, 8);
+        umbra_set_f32(B.lay.uni, B.lay.shader + 12, colors, 8);
         if (!run_draw(&B, bi, 1, 1,
                       (umbra_buf[]){
                           (umbra_buf){.ptr=B.lay.uni->data, .sz=B.lay.uni->size, .read_only=1},
@@ -924,12 +924,12 @@ static void test_linear_grad(void) {
                                    umbra_fmt_8888, &lay),
                   lay);
 
-    size_t lut_off = (B.lay.shader.off + 16 + 7) & ~(size_t)7;
+    size_t lut_off = (B.lay.shader + 16 + 7) & ~(size_t)7;
     for (int bi = 0; bi < 3; bi++) {
         uint32_t  dst[8] = {0};
         float     params[4] = {0.125f, 0, 0, 256};
         umbra_set_f32(B.lay.uni, B.lay.shader, params, 4);
-        umbra_set_ptr(B.lay.uni, (umbra_uniform){lut_off}, lut, sizeof lut, 0, 0);
+        umbra_set_ptr(B.lay.uni, lut_off, lut, sizeof lut, 0, 0);
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           (umbra_buf){.ptr=B.lay.uni->data, .sz=B.lay.uni->size, .read_only=1},
@@ -960,12 +960,12 @@ static void test_radial_grad(void) {
                                    umbra_fmt_8888, &lay),
                   lay);
 
-    size_t lut_off = (B.lay.shader.off + 16 + 7) & ~(size_t)7;
+    size_t lut_off = (B.lay.shader + 16 + 7) & ~(size_t)7;
     for (int bi = 0; bi < 3; bi++) {
         uint32_t  dst[1] = {0};
         float     params[4] = {0, 0, 0.1f, 64};
         umbra_set_f32(B.lay.uni, B.lay.shader, params, 4);
-        umbra_set_ptr(B.lay.uni, (umbra_uniform){lut_off}, lut, sizeof lut, 0, 0);
+        umbra_set_ptr(B.lay.uni, lut_off, lut, sizeof lut, 0, 0);
         if (!run_draw(&B, bi, 1, 1,
                       (umbra_buf[]){
                           (umbra_buf){.ptr=B.lay.uni->data, .sz=B.lay.uni->size, .read_only=1},
@@ -995,12 +995,12 @@ static void test_gradient_lut_nonuniform(void) {
                                    umbra_fmt_8888, &lay),
                   lay);
 
-    size_t lut_off = (B.lay.shader.off + 16 + 7) & ~(size_t)7;
+    size_t lut_off = (B.lay.shader + 16 + 7) & ~(size_t)7;
     for (int bi = 0; bi < 3; bi++) {
         uint32_t  dst[8] = {0};
         float     params[4] = {0.125f, 0, 0, 64};
         umbra_set_f32(B.lay.uni, B.lay.shader, params, 4);
-        umbra_set_ptr(B.lay.uni, (umbra_uniform){lut_off}, lut, sizeof lut, 0, 0);
+        umbra_set_ptr(B.lay.uni, lut_off, lut, sizeof lut, 0, 0);
         if (!run_draw(&B, bi, 8, 1,
                       (umbra_buf[]){
                           (umbra_buf){.ptr=B.lay.uni->data, .sz=B.lay.uni->size, .read_only=1},

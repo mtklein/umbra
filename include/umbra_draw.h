@@ -10,7 +10,7 @@ typedef umbra_color (*umbra_blend_fn)(struct umbra_builder *, umbra_color src,
                                       umbra_color dst);
 typedef struct {
     struct umbra_uniforms *uni;
-    umbra_uniform shader, coverage;
+    size_t shader, coverage;
 } umbra_draw_layout;
 
 struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn coverage,

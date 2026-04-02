@@ -1655,7 +1655,7 @@ static void test_gather_deref_large(void) {
     struct umbra_builder *b = umbra_builder();
     umbra_val             idx = umbra_load_32(b, (umbra_ptr){0, 0});
     struct umbra_uniforms *u   = calloc(1, sizeof(struct umbra_uniforms));
-    size_t                off = umbra_reserve_ptr(u).off;
+    size_t                off = umbra_reserve_ptr(u);
     umbra_ptr             src = umbra_deref_ptr(b, (umbra_ptr){1, 0}, off);
     umbra_val             val = umbra_i32_from_s16(b, umbra_gather_16(b, src, idx));
     umbra_store_32(b, (umbra_ptr){2, 0}, val);
@@ -2382,7 +2382,7 @@ static void test_load_stride_neq_w(void) {
     // load using the linear loop counter.  When rs != w, this is wrong.
     struct umbra_builder *b = umbra_builder();
     struct umbra_uniforms *u  = calloc(1, sizeof(struct umbra_uniforms));
-    size_t                 ri = umbra_reserve_f32(u, 1).off;
+    size_t                 ri = umbra_reserve_f32(u, 1);
     if (u) { free(u->data); free(u); }
     umbra_val x = umbra_x(b);
     umbra_val y = umbra_y(b);
@@ -3633,7 +3633,7 @@ int main(void) {
     {
         struct umbra_builder *b = umbra_builder();
         struct umbra_uniforms *u   = calloc(1, sizeof(struct umbra_uniforms));
-        size_t                off = umbra_reserve_ptr(u).off;
+        size_t                off = umbra_reserve_ptr(u);
         if (u) { free(u->data); free(u); }
         umbra_ptr             src = umbra_deref_ptr(b, (umbra_ptr){1, 0}, off);
         umbra_val             v   = umbra_load_32(b, src);
@@ -3685,7 +3685,7 @@ int main(void) {
     {
         struct umbra_builder *b = umbra_builder();
         struct umbra_uniforms *u   = calloc(1, sizeof(struct umbra_uniforms));
-        size_t                off = umbra_reserve_ptr(u).off;
+        size_t                off = umbra_reserve_ptr(u);
         if (u) { free(u->data); free(u); }
         umbra_ptr             src = umbra_deref_ptr(b, (umbra_ptr){1, 0}, off);
         umbra_val             v   = umbra_f32_from_f16(b, umbra_load_16(b, src));

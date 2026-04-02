@@ -39,7 +39,7 @@ static struct umbra_backend *interp_be;
 static void build_fill(int fmt) {
     builder               *builder = umbra_builder();
     struct umbra_uniforms *u       = calloc(1, sizeof(struct umbra_uniforms));
-    size_t fi = umbra_reserve_f32(u, 4).off;
+    size_t fi = umbra_reserve_f32(u, 4);
     umbra_color c = {
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi),
         umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 4),
@@ -85,7 +85,7 @@ static void fill_bg(int fmt, void *dst, uint32_t bg) {
         (float)((bg >> 16) & 0xffu) / 255.0f,
         (float)((bg >> 24) & 0xffu) / 255.0f,
     };
-    umbra_set_f32(fill_pipes[fmt].uni, (umbra_uniform){0}, hc, 4);
+    umbra_set_f32(fill_pipes[fmt].uni, 0, hc, 4);
     size_t bpp = umbra_fmt_size(fmt_enums[fmt]);
     umbra_buf buf[2] = {
         (umbra_buf){.ptr=fill_pipes[fmt].uni->data, .sz=fill_pipes[fmt].uni->size, .read_only=1},
@@ -279,8 +279,8 @@ static void test_slug_rect(void) {
 
     float wind_buf[W * H];
     __builtin_memset(wind_buf, 0, sizeof wind_buf);
-    umbra_set_f32(alay.uni, (umbra_uniform){alay.mat}, mat, 11);
-    umbra_set_ptr(alay.uni, (umbra_uniform){alay.curves_off},
+    umbra_set_f32(alay.uni, alay.mat, mat, 11);
+    umbra_set_ptr(alay.uni, alay.curves_off,
         rect, sizeof rect, 0, 0);
     umbra_buf abuf[] = {
         (umbra_buf){.ptr=alay.uni->data, .sz=alay.uni->size, .read_only=1},
@@ -290,7 +290,7 @@ static void test_slug_rect(void) {
         float jf;
         int32_t j32 = j;
         __builtin_memcpy(&jf, &j32, 4);
-        umbra_set_f32(alay.uni, (umbra_uniform){alay.loop_off}, &jf, 1);
+        umbra_set_f32(alay.uni, alay.loop_off, &jf, 1);
         abuf[0] = (umbra_buf){.ptr=alay.uni->data, .sz=alay.uni->size, .read_only=1};
         acc->queue(acc, 0, 0, W, H, abuf);
     }
@@ -357,7 +357,7 @@ static void test_perspective_text(void) {
 
     umbra_set_f32(lay.uni, lay.shader, color, 4);
     umbra_set_f32(lay.uni, lay.coverage, mat, 11);
-    umbra_set_ptr(lay.uni, (umbra_uniform){(lay.coverage.off + 44 + 7) & ~(size_t)7},
+    umbra_set_ptr(lay.uni, (lay.coverage + 44 + 7) & ~(size_t)7,
         bmp, sizeof bmp, 0, 0);
     umbra_buf buf[] = {
         (umbra_buf){.ptr=lay.uni->data, .sz=lay.uni->size, .read_only=1},
@@ -395,7 +395,7 @@ static void test_perspective_text(void) {
     {
         umbra_set_f32(lay2.uni, lay2.shader, hc2, 4);
         umbra_set_f32(lay2.uni, lay2.coverage, mat2, 11);
-        umbra_set_ptr(lay2.uni, (umbra_uniform){(lay2.coverage.off + 44 + 7) & ~(size_t)7},
+        umbra_set_ptr(lay2.uni, (lay2.coverage + 44 + 7) & ~(size_t)7,
             tc.data,
             (size_t)(W * H * 2), 0, 0);
         umbra_buf b2[] = {
