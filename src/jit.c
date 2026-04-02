@@ -222,7 +222,6 @@ static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm
     case op_shl_i32_imm: put(c, SHL_4s_imm(d, x, imm)); break;
     case op_shr_u32_imm: put(c, USHR_4s_imm(d, x, imm)); break;
     case op_shr_s32_imm: put(c, SSHR_4s_imm(d, x, imm)); break;
-    default: assume(0);
     }
 }
 
@@ -1376,15 +1375,6 @@ static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm
     case op_shl_i32_imm: vpslld_i(c, d, x, (uint8_t)imm); break;
     case op_shr_u32_imm: vpsrld_i(c, d, x, (uint8_t)imm); break;
     case op_shr_s32_imm: vpsrad_i(c, d, x, (uint8_t)imm); break;
-    case op_and_32_imm:
-    case op_add_f32_imm:
-    case op_sub_f32_imm:
-    case op_mul_f32_imm:
-    case op_div_f32_imm:
-    case op_min_f32_imm:
-    case op_max_f32_imm:
-    case op_add_i32_imm:
-    default: assume(0);
     }
 }
 
