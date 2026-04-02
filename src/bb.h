@@ -13,8 +13,8 @@ typedef union {
 // Ops not covered by BINARY_OPS, UNARY_OPS, or IMM_OPS.
 #define OTHER_OPS(X)                                                                       \
     X(x) X(y) X(imm_32) X(uniform_32)                                                     \
-    X(load_32) X(load_16x4) X(load_16x4_planar) X(gather_uniform_32) X(gather_32)          \
-    X(sample_32) X(store_32) X(store_16x4) X(store_16x4_planar) X(deref_ptr)              \
+    X(load_32) X(load_16x4) X(load_16x4_planar) X(load_8x4) X(gather_uniform_32) X(gather_32) \
+    X(sample_32) X(store_32) X(store_16x4) X(store_16x4_planar) X(store_8x4) X(deref_ptr) \
     X(fma_f32) X(fms_f32) X(sel_32)                                                       \
     X(load_16) X(store_16) X(gather_16)
 

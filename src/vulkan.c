@@ -1311,6 +1311,36 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
                     B.val[i] = spv_glsl_3(&B, B.t_f32, GLSLstd450FMix, lo_f, hi_f, frac);
                 } break;
 
+                case op_load_8x4: {
+                    int p = resolve_ptr(&B, inst);
+                    uint32_t addr = compute_addr(&B, x_coord, y_coord, p, B.c_2);
+                    uint32_t px = load_ssbo_u32(&B, p, addr);
+                    uint32_t c_0xFF = spv_const_u32(&B, 0xFFu);
+                    B.val[i]   = spv_binop(&B, SpvOpBitwiseAnd, B.t_u32, px, c_0xFF);
+                    uint32_t sh8  = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, px, B.c_8);
+                    B.val_1[i] = spv_binop(&B, SpvOpBitwiseAnd, B.t_u32, sh8, c_0xFF);
+                    uint32_t sh16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, px, B.c_16);
+                    B.val_2[i] = spv_binop(&B, SpvOpBitwiseAnd, B.t_u32, sh16, c_0xFF);
+                    uint32_t c_24 = spv_const_u32(&B, 24);
+                    B.val_3[i] = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, px, c_24);
+                } break;
+                case op_store_8x4: {
+                    int p = resolve_ptr(&B, inst);
+                    uint32_t addr = compute_addr(&B, x_coord, y_coord, p, B.c_2);
+                    uint32_t r  = as_u32(&B, get_val(&B, inst->x), xid);
+                    uint32_t g  = as_u32(&B, get_val(&B, inst->y), yid);
+                    uint32_t b_ = as_u32(&B, get_val(&B, inst->z), get_id(inst->z));
+                    uint32_t a  = as_u32(&B, get_val(&B, inst->w), get_id(inst->w));
+                    uint32_t g_sh = spv_binop(&B, SpvOpShiftLeftLogical, B.t_u32, g, B.c_8);
+                    uint32_t b_sh = spv_binop(&B, SpvOpShiftLeftLogical, B.t_u32, b_, B.c_16);
+                    uint32_t c_24 = spv_const_u32(&B, 24);
+                    uint32_t a_sh = spv_binop(&B, SpvOpShiftLeftLogical, B.t_u32, a, c_24);
+                    uint32_t rg  = spv_binop(&B, SpvOpBitwiseOr, B.t_u32, r, g_sh);
+                    uint32_t rgb = spv_binop(&B, SpvOpBitwiseOr, B.t_u32, rg, b_sh);
+                    uint32_t px  = spv_binop(&B, SpvOpBitwiseOr, B.t_u32, rgb, a_sh);
+                    store_ssbo_u32(&B, p, addr, px);
+                } break;
+
                 case op_load_16x4: {
                     // Load 4 consecutive u16 values (8 bytes = 2 u32 words).
                     int p = resolve_ptr(&B, inst);

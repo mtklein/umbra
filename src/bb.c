@@ -31,19 +31,22 @@ _Bool is_store(enum op op) {
     return op == op_store_16
         || op == op_store_32
         || op == op_store_16x4
-        || op == op_store_16x4_planar;
+        || op == op_store_16x4_planar
+        || op == op_store_8x4;
 }
 _Bool has_ptr(enum op op) {
     return op == op_uniform_32
         || op == op_load_32
         || op == op_load_16x4
         || op == op_load_16x4_planar
+        || op == op_load_8x4
         || op == op_gather_uniform_32
         || op == op_gather_32
         || op == op_sample_32
         || op == op_store_32
         || op == op_store_16x4
         || op == op_store_16x4_planar
+        || op == op_store_8x4
         || op == op_deref_ptr
         || op == op_load_16
         || op == op_store_16
@@ -77,10 +80,12 @@ _Bool is_varying(enum op op) {
         || op == op_load_32
         || op == op_load_16x4
         || op == op_load_16x4_planar
+        || op == op_load_8x4
         || op == op_store_16
         || op == op_store_32
         || op == op_store_16x4
-        || op == op_store_16x4_planar;
+        || op == op_store_16x4_planar
+        || op == op_store_8x4;
 }
 
 static _Bool is_pow2(int x) { return __builtin_popcount((unsigned)x) == 1; }
@@ -240,18 +245,13 @@ static umbra_color x4_color(val px) {
 umbra_color umbra_load_color(builder *b, umbra_ptr src, enum umbra_fmt fmt) {
     switch (fmt) {
     case umbra_fmt_8888: {
-        val const px   = umbra_load_32(b, src);
-        val const mask = umbra_imm_i32(b, 0xFF);
-        val const inv  = umbra_imm_f32(b, 1.0f/255);
-        val const ri   = umbra_and_32(b, px, mask);
-        val const gi   = umbra_and_32(b, umbra_shr_u32(b, px, umbra_imm_i32(b,  8)), mask);
-        val const bi   = umbra_and_32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 16)), mask);
-        val const ai   = umbra_shr_u32(b, px, umbra_imm_i32(b, 24));
+        umbra_color c = x4_color(push(b, op_load_8x4, .ptr = ptr_ix(src)));
+        val const inv = umbra_imm_f32(b, 1.0f/255);
         return (umbra_color){
-            umbra_mul_f32(b, umbra_f32_from_i32(b, ri), inv),
-            umbra_mul_f32(b, umbra_f32_from_i32(b, gi), inv),
-            umbra_mul_f32(b, umbra_f32_from_i32(b, bi), inv),
-            umbra_mul_f32(b, umbra_f32_from_i32(b, ai), inv),
+            umbra_mul_f32(b, umbra_f32_from_i32(b, c.r), inv),
+            umbra_mul_f32(b, umbra_f32_from_i32(b, c.g), inv),
+            umbra_mul_f32(b, umbra_f32_from_i32(b, c.b), inv),
+            umbra_mul_f32(b, umbra_f32_from_i32(b, c.a), inv),
         };
     }
     case umbra_fmt_565: {
@@ -310,11 +310,10 @@ void umbra_store_color(builder *b, umbra_ptr dst, umbra_color c, enum umbra_fmt 
     switch (fmt) {
     case umbra_fmt_8888: {
         val s = umbra_imm_f32(b, 255.0f);
-        val px = pack_unorm(b, c.r, s);
-        px = pack(b, px, pack_unorm(b, c.g, s),  8);
-        px = pack(b, px, pack_unorm(b, c.b, s), 16);
-        px = pack(b, px, pack_unorm(b, c.a, s), 24);
-        umbra_store_32(b, dst, px);
+        val ri = pack_unorm(b, c.r, s), gi = pack_unorm(b, c.g, s),
+            bi = pack_unorm(b, c.b, s), ai = pack_unorm(b, c.a, s);
+        push(b, op_store_8x4, VX(ri), VY(gi), VZ(bi), VW(ai),
+             .ptr = ptr_ix(dst));
     } break;
     case umbra_fmt_565: {
         val px = pack_unorm(b, c.b, umbra_imm_f32(b, 31.0f));
@@ -788,7 +787,8 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_load_16:
         case op_load_32:
         case op_load_16x4:
-        case op_load_16x4_planar: fprintf(f, " p%d", ip->ptr); break;
+        case op_load_16x4_planar:
+        case op_load_8x4: fprintf(f, " p%d", ip->ptr); break;
         case op_deref_ptr: fprintf(f, " p%d byte%d", ip->ptr, ip->imm); break;
         case op_x:
         case op_y: break;
@@ -796,7 +796,8 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_store_16:
         case op_store_32:
         case op_store_16x4:
-        case op_store_16x4_planar: break;
+        case op_store_16x4_planar:
+        case op_store_8x4: break;
 
         case op_sqrt_f32:
         case op_abs_f32:

@@ -858,6 +858,61 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             free_chan(ra, inst->w, i);
         } break;
 
+        case op_load_8x4: {
+            struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
+            int8_t r1 = ra_alloc(ra, sl, ns);
+            int8_t r2 = ra_alloc(ra, sl, ns);
+            int8_t r3 = ra_alloc(ra, sl, ns);
+            int    p = inst->ptr;
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int8_t px   = ra_alloc(ra, sl, ns);
+            int8_t mask = ra_alloc(ra, sl, ns);
+            put(c, MOVI_4s(mask, 0xFF, 0));
+            if (scalar) {
+                put(c, LDR_sx(px, XP, XI));
+            } else {
+                put(c, LSL_xi(XT, XI, 2));
+                put(c, ADD_xr(XT, XP, XT));
+                put(c, LDR_qi(px, XT, 0));
+            }
+            put(c, AND_16b(s0.rd, px, mask));
+            put(c, USHR_4s_imm(r1, px, 8));  put(c, AND_16b(r1, r1, mask));
+            put(c, USHR_4s_imm(r2, px, 16)); put(c, AND_16b(r2, r2, mask));
+            put(c, USHR_4s_imm(r3, px, 24));
+            ra_return_reg(ra, mask);
+            ra_return_reg(ra, px);
+            ra_set_chan_reg(ra, i, 0, s0.rd);
+            ra_set_chan_reg(ra, i, 1, r1);
+            ra_set_chan_reg(ra, i, 2, r2);
+            ra_set_chan_reg(ra, i, 3, r3);
+        } break;
+        case op_store_8x4: {
+            int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
+            int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
+            int8_t rb_  = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
+            int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
+            int    p = inst->ptr;
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int8_t px = ra_alloc(ra, sl, ns);
+            int8_t t  = ra_alloc(ra, sl, ns);
+            put(c, SHL_4s_imm(t, rg, 8));    put(c, ORR_16b(px, rr, t));
+            put(c, SHL_4s_imm(t, rb_, 16));  put(c, ORR_16b(px, px, t));
+            put(c, SHL_4s_imm(t, ra_v, 24)); put(c, ORR_16b(px, px, t));
+            if (scalar) {
+                put(c, STR_sx(px, XP, XI));
+            } else {
+                put(c, LSL_xi(XT, XI, 2));
+                put(c, ADD_xr(XT, XP, XT));
+                put(c, STR_qi(px, XT, 0));
+            }
+            ra_return_reg(ra, t);
+            ra_return_reg(ra, px);
+            free_chan(ra, inst->x, i);
+            free_chan(ra, inst->y, i);
+            free_chan(ra, inst->z, i);
+            free_chan(ra, inst->w, i);
+        } break;
+
         case op_store_16: {
             int8_t ry = ra_ensure(ra, sl, ns, (int)inst->y.id);
             int    p = inst->ptr;
@@ -2006,6 +2061,59 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 }
                 last_ptr = -1;
             }
+            free_chan(ra, inst->x, i);
+            free_chan(ra, inst->y, i);
+            free_chan(ra, inst->z, i);
+            free_chan(ra, inst->w, i);
+        } break;
+
+        case op_load_8x4: {
+            struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
+            int8_t r1 = ra_alloc(ra, sl, ns);
+            int8_t r2 = ra_alloc(ra, sl, ns);
+            int8_t r3 = ra_alloc(ra, sl, ns);
+            int    p = inst->ptr;
+            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int8_t px   = ra_alloc(ra, sl, ns);
+            int8_t mask = ra_alloc(ra, sl, ns);
+            broadcast_imm32(c, mask, 0xFF);
+            if (scalar) {
+                vex_mem(c, 1, 1, 0, 0, px, 0, 0x6e, base, XI, 4, 0);
+            } else {
+                vmov_load(c, 1, px, base, XI, 4, 0);
+            }
+            vpand(c, scalar ? 0 : 1, s0.rd, px, mask);
+            vpsrld_i(c, r1, px, 8);  vpand(c, scalar ? 0 : 1, r1, r1, mask);
+            vpsrld_i(c, r2, px, 16); vpand(c, scalar ? 0 : 1, r2, r2, mask);
+            vpsrld_i(c, r3, px, 24);
+            ra_return_reg(ra, mask);
+            ra_return_reg(ra, px);
+            ra_set_chan_reg(ra, i, 0, s0.rd);
+            ra_set_chan_reg(ra, i, 1, r1);
+            ra_set_chan_reg(ra, i, 2, r2);
+            ra_set_chan_reg(ra, i, 3, r3);
+        } break;
+        case op_store_8x4: {
+            int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
+            int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
+            int8_t rb_  = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
+            int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
+            int    p = inst->ptr;
+            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int8_t px = ra_alloc(ra, sl, ns);
+            int8_t t  = ra_alloc(ra, sl, ns);
+            int L = scalar ? 0 : 1;
+            vpslld_i(c, t, rg, 8);    vpor(c, L, px, rr, t);
+            vpslld_i(c, t, rb_, 16);  vpor(c, L, px, px, t);
+            vpslld_i(c, t, ra_v, 24); vpor(c, L, px, px, t);
+            if (scalar) {
+                // VMOVD [base + XI*4], px: VEX.128.66.0F.W0 7E /r
+                vex_mem(c, 1, 1, 0, 0, px, 0, 0x7e, base, XI, 4, 0);
+            } else {
+                vmov_store(c, 1, px, base, XI, 4, 0);
+            }
+            ra_return_reg(ra, t);
+            ra_return_reg(ra, px);
             free_chan(ra, inst->x, i);
             free_chan(ra, inst->y, i);
             free_chan(ra, inst->z, i);

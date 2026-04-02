@@ -180,7 +180,7 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
     int num_slots = 1; // +1 for SW_DONE sentinel
     for (int i = 0; i < bb->insts; i++) {
         enum op const op = bb->inst[i].op;
-        if (op == op_load_16x4 || op == op_load_16x4_planar) { num_slots += 4; }
+        if (op == op_load_16x4 || op == op_load_16x4_planar || op == op_load_8x4) { num_slots += 4; }
         else                    { num_slots += 1; }
     }
     p->inst = malloc((size_t)num_slots * sizeof *p->inst);
@@ -266,6 +266,18 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
                 break;
             case op_store_16x4_planar:
                 emit(.tag = op_store_16x4_planar, .ptr = RESOLVE_PTR(inst),
+                     .x = X, .y = Y, .z = Z, .w = W);
+                break;
+            case op_load_8x4:
+                emit(.tag = op_load_8x4, .ptr = RESOLVE_PTR(inst));
+                id[i] = n;
+                n++;
+                p->inst[n++] = (struct sw_inst){.tag = op_load_8x4};
+                p->inst[n++] = (struct sw_inst){.tag = op_load_8x4};
+                p->inst[n++] = (struct sw_inst){.tag = op_load_8x4};
+                continue;
+            case op_store_8x4:
+                emit(.tag = op_store_8x4, .ptr = RESOLVE_PTR(inst),
                      .x = X, .y = Y, .z = Z, .w = W);
                 break;
 
@@ -487,6 +499,7 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                 [op_load_16x4_planar] = &&L_op_load_16x4_planar,
                 [op_store_16x4] = &&L_op_store_16x4,
                 [op_store_16x4_planar] = &&L_op_store_16x4_planar,
+                [op_load_8x4] = &&L_op_load_8x4, [op_store_8x4] = &&L_op_store_8x4,
                 [op_gather_uniform_32] = &&L_op_gather_uniform_32,
                 [op_gather_16] = &&L_op_gather_16, [op_gather_32] = &&L_op_gather_32,
                 [op_sample_32] = &&L_op_sample_32,
@@ -770,6 +783,56 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                             __builtin_memcpy(dst + ps      + (i + ll) * 2, &tg[ll], 2);
                             __builtin_memcpy(dst + ps * 2  + (i + ll) * 2, &tb[ll], 2);
                             __builtin_memcpy(dst + ps * 3  + (i + ll) * 2, &ta[ll], 2);
+                        }
+                    }
+                } NEXT;
+
+                CASE(op_load_8x4) {
+                    char const *src = (char const*)buf[ip->ptr].ptr + (size_t)row * buf[ip->ptr].row_bytes;
+                    int const i = end - K;
+                    int const rem = n - i;
+                    U32 const mask8 = (U32){0} + 0xFFu;
+                    if (rem >= K) {
+                        U32 px;
+                        __builtin_memcpy(&px, src + i * 4, sizeof px);
+                        v[0].u32 =  px        & mask8;
+                        v[1].u32 = (px >>  8) & mask8;
+                        v[2].u32 = (px >> 16) & mask8;
+                        v[3].u32 =  px >> 24;
+                    } else {
+                        uint32_t tr[K], tg[K], tb[K], ta[K];
+                        __builtin_memset(tr, 0, sizeof tr);
+                        __builtin_memset(tg, 0, sizeof tg);
+                        __builtin_memset(tb, 0, sizeof tb);
+                        __builtin_memset(ta, 0, sizeof ta);
+                        for (int ll = 0; ll < rem; ll++) {
+                            uint8_t ch[4];
+                            __builtin_memcpy(ch, src + (i + ll) * 4, 4);
+                            tr[ll] = ch[0]; tg[ll] = ch[1]; tb[ll] = ch[2]; ta[ll] = ch[3];
+                        }
+                        __builtin_memcpy(&v[0].u32, tr, sizeof v[0].u32);
+                        __builtin_memcpy(&v[1].u32, tg, sizeof v[1].u32);
+                        __builtin_memcpy(&v[2].u32, tb, sizeof v[2].u32);
+                        __builtin_memcpy(&v[3].u32, ta, sizeof v[3].u32);
+                    }
+                    ip += 3; v += 3;
+                } NEXT;
+                CASE(op_store_8x4) {
+                    char *dst = (char*)buf[ip->ptr].ptr + (size_t)row * buf[ip->ptr].row_bytes;
+                    int const i = end - K;
+                    int const rem = n - i;
+                    U32 const mask8 = (U32){0} + 0xFFu;
+                    U32 const px = (v[ip->x].u32 & mask8)
+                                 | ((v[ip->y].u32 & mask8) <<  8)
+                                 | ((v[ip->z].u32 & mask8) << 16)
+                                 | ((v[ip->w].u32 & mask8) << 24);
+                    if (rem >= K) {
+                        __builtin_memcpy(dst + i * 4, &px, sizeof px);
+                    } else {
+                        uint32_t tmp[K];
+                        __builtin_memcpy(tmp, &px, sizeof tmp);
+                        for (int ll = 0; ll < rem; ll++) {
+                            __builtin_memcpy(dst + (i + ll) * 4, &tmp[ll], 4);
                         }
                     }
                 } NEXT;
