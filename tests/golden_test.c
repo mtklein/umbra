@@ -149,8 +149,6 @@ static void test_slide_golden(
 
     for (int bi = 1; bi < N_BACKS; bi++) {
         if (!progs[bi]) { continue; }
-        // TODO: Vulkan slug accumulator codegen bug — skip until fixed.
-        if (bi == 3 && s->draw == slide_get(13)->draw) { continue; }
         render_slide(slide_idx, fmt,
                      bes[bi], progs[bi], pbuf_tst, &lay);
         bes[bi]->flush(bes[bi]);

@@ -2043,7 +2043,10 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
         }
     }
 
-    // Update only the descriptor bindings that changed since last dispatch.
+    // After a flush, the old command buffer is gone. Clear bound_bufs so all
+    // bindings are treated as dirty — stale handles from destroyed buffers
+    // could otherwise match new allocations.
+    // Check if any descriptor bindings changed.
     VkDescriptorBufferInfo dirty_infos[32];
     VkWriteDescriptorSet   dirty_writes[32];
     assume(n <= 32);
@@ -2091,6 +2094,12 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     vkCmdDispatch(be->batch_cmd, gx, (uint32_t)h, 1);
 
     free(push_data);
+
+    // A pre-allocated descriptor set can't be updated while in-flight commands
+    // reference it.  Flush now so subsequent queue() calls can safely update.
+    if (n_dirty) {
+        vk_flush(&be->base);
+    }
 }
 
 static void vk_program_dump(struct umbra_program const *p, FILE *f) {
