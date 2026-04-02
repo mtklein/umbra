@@ -36,4 +36,4 @@
   v35  = min_f32_imm     v34 0x3f800000 (a.k.a. v6)
   v36  = mul_f32_imm     v35 0x437f0000 (a.k.a. v8)
   v37  = round_i32       v36
-      store_8x4       p1 v30
+      store_8x4       p1 v23 v30 v37 v16

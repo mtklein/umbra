@@ -570,7 +570,7 @@ static uint32_t get_val(SpvBuilder *b, val_ v) {
         case 2: return b->val_2[id];
         case 3: return b->val_3[id];
     }
-    return b->val[id];
+    __builtin_unreachable();
 }
 
 static int get_id(val_ v) { return (int)v.id; }

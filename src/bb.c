@@ -671,7 +671,12 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         enum op const         op = ip->op;
 
         if (is_store(op)) {
-            fprintf(f, "      %-15s p%d v%d\n", op_name(op), ip->ptr, (int)ip->y.id);
+            if (op == op_store_8x4 || op == op_store_16x4 || op == op_store_16x4_planar) {
+                fprintf(f, "      %-15s p%d v%d v%d v%d v%d\n", op_name(op), ip->ptr,
+                        (int)ip->x.id, (int)ip->y.id, (int)ip->z.id, (int)ip->w.id);
+            } else {
+                fprintf(f, "      %-15s p%d v%d\n", op_name(op), ip->ptr, (int)ip->y.id);
+            }
             continue;
         }
 
@@ -693,8 +698,7 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_load_8x4: fprintf(f, " p%d", ip->ptr); break;
         case op_deref_ptr: fprintf(f, " p%d byte%d", ip->ptr, ip->imm); break;
         case op_x:
-        case op_y: break;
-
+        case op_y:
         case op_store_16:
         case op_store_32:
         case op_store_16x4:

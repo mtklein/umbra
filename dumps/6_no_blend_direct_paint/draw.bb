@@ -55,4 +55,4 @@
   v54  = min_f32_imm     v53 0x3f800000 (a.k.a. v9)
   v55  = mul_f32_imm     v54 0x437f0000 (a.k.a. v11)
   v56  = round_i32       v55
-      store_8x4       p1 v48
+      store_8x4       p1 v40 v48 v56 v32

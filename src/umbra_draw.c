@@ -15,7 +15,7 @@ size_t umbra_fmt_size(enum umbra_fmt fmt) {
     case umbra_fmt_fp16:       return 8;
     case umbra_fmt_fp16_planar: return 2;
     }
-    return 0;
+    __builtin_unreachable();
 }
 
 umbra_color umbra_load_color(struct umbra_builder *b, umbra_ptr src, enum umbra_fmt fmt) {
@@ -71,7 +71,7 @@ umbra_color umbra_load_color(struct umbra_builder *b, umbra_ptr src, enum umbra_
             umbra_f32_from_f16(b, bl), umbra_f32_from_f16(b, a),
         };
     }
-    return (umbra_color){0};
+    __builtin_unreachable();
 }
 
 static val pack_unorm(struct umbra_builder *b, val ch, val scale) {

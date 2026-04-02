@@ -60,4 +60,4 @@
   v59  = min_f32_imm     v58 0x3f800000 (a.k.a. v9)
   v60  = mul_f32_imm     v59 0x437f0000 (a.k.a. v12)
   v61  = round_i32       v60
-      store_8x4       p1 v52
+      store_8x4       p1 v43 v52 v61 v34

@@ -45,4 +45,4 @@
   v44  = min_f32_imm     v43 0x3f800000 (a.k.a. v5)
   v45  = mul_f32_imm     v44 0x437f0000 (a.k.a. v12)
   v46  = round_i32       v45
-      store_8x4       p1 v35
+      store_8x4       p1 v46 v35 v41 v29

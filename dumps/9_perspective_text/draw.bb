@@ -94,4 +94,4 @@
   v93  = min_f32_imm     v92 0x3f800000 (a.k.a. v17)
   v94  = mul_f32_imm     v93 0x437f0000 (a.k.a. v23)
   v95  = round_i32       v94
-      store_8x4       p1 v86
+      store_8x4       p1 v77 v86 v95 v68

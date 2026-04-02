@@ -69,4 +69,4 @@
   v68  = min_f32_imm     v67 0x3f800000 (a.k.a. v9)
   v69  = mul_f32_imm     v68 0x437f0000 (a.k.a. v12)
   v70  = round_i32       v69
-      store_8x4       p1 v62
+      store_8x4       p1 v54 v62 v70 v46
