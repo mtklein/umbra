@@ -693,7 +693,7 @@ static _Bool produces_float(enum op op) {
     return op == op_add_f32     || op == op_sub_f32
         || op == op_mul_f32     || op == op_div_f32
         || op == op_min_f32     || op == op_max_f32
-        || op == op_sqrt_f32    || op == op_abs_f32    || op == op_neg_f32
+        || op == op_sqrt_f32    || op == op_abs_f32
         || op == op_round_f32   || op == op_floor_f32  || op == op_ceil_f32
         || op == op_fma_f32     || op == op_fms_f32
         || op == op_add_f32_imm || op == op_sub_f32_imm
@@ -1459,10 +1459,6 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
                 case op_abs_f32:
                     B.val[i] = spv_glsl_1(&B, B.t_f32, GLSLstd450FAbs,
                                             as_f32(&B, get_val(&B, inst->x), xid));
-                    break;
-                case op_neg_f32:
-                    B.val[i] = spv_unop(&B, SpvOpFNegate, B.t_f32,
-                                         as_f32(&B, get_val(&B, inst->x), xid));
                     break;
                 case op_round_f32:
                     B.val[i] = spv_glsl_1(&B, B.t_f32, GLSLstd450RoundEven,

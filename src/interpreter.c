@@ -147,7 +147,7 @@ static _Bool is_commutative(enum op op) {
     X(lt_u32,  i32, u32) X(le_u32,  i32, u32)
 
 #define UNARY_OPS(X)                                                                       \
-    X(sqrt_f32,    f32, f32) X(abs_f32,     f32, f32) X(neg_f32,     f32, f32)             \
+    X(sqrt_f32,    f32, f32) X(abs_f32,     f32, f32)                                      \
     X(round_f32,   f32, f32) X(floor_f32,   f32, f32) X(ceil_f32,    f32, f32)             \
     X(round_i32,   i32, f32) X(floor_i32,   i32, f32) X(ceil_i32,    i32, f32)             \
     X(f32_from_i32,f32, i32) X(i32_from_f32,i32, f32)
@@ -328,7 +328,6 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
             case op_max_f32:
             case op_sqrt_f32:
             case op_abs_f32:
-            case op_neg_f32:
             case op_round_f32:
             case op_floor_f32:
             case op_ceil_f32:
@@ -527,7 +526,7 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                 [op_mul_f32] = &&L_op_mul_f32, [op_div_f32] = &&L_op_div_f32,
                 [op_min_f32] = &&L_op_min_f32, [op_max_f32] = &&L_op_max_f32,
                 [op_sqrt_f32] = &&L_op_sqrt_f32, [op_abs_f32] = &&L_op_abs_f32,
-                [op_neg_f32] = &&L_op_neg_f32,
+
                 [op_round_f32] = &&L_op_round_f32, [op_floor_f32] = &&L_op_floor_f32,
                 [op_ceil_f32] = &&L_op_ceil_f32,
                 [op_round_i32] = &&L_op_round_i32, [op_floor_i32] = &&L_op_floor_i32,
@@ -912,7 +911,6 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                 CASE(op_max_f32) v->f32 = vec_max(v[ip->x].f32, v[ip->y].f32); NEXT;
                 CASE(op_sqrt_f32) v->f32 = vec_sqrt(v[ip->x].f32); NEXT;
                 CASE(op_abs_f32) v->f32 = vec_abs(v[ip->x].f32); NEXT;
-                CASE(op_neg_f32) v->f32 = -v[ip->x].f32; NEXT;
                 CASE(op_round_f32) v->f32 = vec_round(v[ip->x].f32); NEXT;
                 CASE(op_floor_f32) v->f32 = vec_floor(v[ip->x].f32); NEXT;
                 CASE(op_ceil_f32)  v->f32 = vec_ceil(v[ip->x].f32);  NEXT;
@@ -1028,7 +1026,6 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                 CASE(op_m_##name##_r) v->dst  = EXPR; NEXT;
                 UN2(sqrt_f32,     f32, vec_sqrt(acc.f32))
                 UN2(abs_f32,      f32, vec_abs(acc.f32))
-                UN2(neg_f32,      f32, -acc.f32)
                 UN2(round_f32,    f32, vec_round(acc.f32))
                 UN2(floor_f32,    f32, vec_floor(acc.f32))
                 UN2(ceil_f32,     f32, vec_ceil(acc.f32))

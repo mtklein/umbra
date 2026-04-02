@@ -974,11 +974,8 @@ static void test_abs_peepholes(void) {
         struct umbra_builder *b = umbra_builder();
         umbra_val             x = umbra_load_32(b, (umbra_ptr){0});
         umbra_val             direct = umbra_abs_f32(b, x);
-        umbra_val             neg_x = umbra_neg_f32(b, x);
         umbra_val             mask = umbra_imm_i32(b, 0x7fffffff);
 
-        umbra_max_f32(b, x, neg_x).bits == (direct).bits here;
-        umbra_max_f32(b, neg_x, x).bits == (direct).bits here;
         umbra_and_32(b, x, mask).bits == (direct).bits here;
         umbra_and_32(b, mask, x).bits == (direct).bits here;
         umbra_builder_free(b);

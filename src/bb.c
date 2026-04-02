@@ -385,7 +385,6 @@ val umbra_add_f32(builder *b, val x, val y) {
 
 val umbra_sub_f32(builder *b, val x, val y) {
     if (is_imm32(b, val_id(y), 0)) { return x; }
-    if (is_imm32(b, val_id(x), 0)) { return umbra_neg_f32(b, y); }
     if (b->inst[val_id(y)].op == op_mul_f32) {
         return math(b, op_fms_f32, .x = b->inst[val_id(y)].x, .y = b->inst[val_id(y)].y, VZ(x));
     }
@@ -420,12 +419,6 @@ val umbra_min_f32(builder *b, val x, val y) {
 }
 
 val umbra_max_f32(builder *b, val x, val y) {
-    if (b->inst[val_id(x)].op == op_neg_f32 && b->inst[val_id(x)].x.id == (unsigned)val_id(y)) {
-        return umbra_abs_f32(b, y);
-    }
-    if (b->inst[val_id(y)].op == op_neg_f32 && b->inst[val_id(y)].x.id == (unsigned)val_id(x)) {
-        return umbra_abs_f32(b, x);
-    }
     sort(&x, &y);
     return try_imm(b, math(b, op_max_f32, VX(x), VY(y)), op_max_f32_imm, x,
                    y);
@@ -433,7 +426,7 @@ val umbra_max_f32(builder *b, val x, val y) {
 
 val umbra_sqrt_f32(builder *b, val x) { return math(b, op_sqrt_f32, VX(x)); }
 val umbra_abs_f32(builder *b, val x) { return math(b, op_abs_f32, VX(x)); }
-val umbra_neg_f32(builder *b, val x) { return math(b, op_neg_f32, VX(x)); }
+val umbra_neg_f32(builder *b, val x) { return umbra_sub_f32(b, umbra_imm_f32(b, 0), x); }
 val umbra_round_f32(builder *b, val x) { return math(b, op_round_f32, VX(x)); }
 val umbra_floor_f32(builder *b, val x) { return math(b, op_floor_f32, VX(x)); }
 val umbra_ceil_f32(builder *b, val x) { return math(b, op_ceil_f32, VX(x)); }
@@ -789,7 +782,6 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
 
         case op_sqrt_f32:
         case op_abs_f32:
-        case op_neg_f32:
         case op_round_f32:
         case op_floor_f32:
         case op_ceil_f32:
@@ -883,7 +875,6 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     case op_max_f32: r.f = x.f > y.f ? x.f : y.f; return r.i;
     case op_sqrt_f32:  r.f = sqrtf(x.f); return r.i;
     case op_abs_f32:   r.f = fabsf(x.f); return r.i;
-    case op_neg_f32:   r.f = -x.f; return r.i;
     case op_round_f32: r.f = rintf(x.f); return r.i;
     case op_floor_f32: r.f = floorf(x.f); return r.i;
     case op_ceil_f32:  r.f = ceilf(x.f); return r.i;
