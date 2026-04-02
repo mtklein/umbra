@@ -2,6 +2,8 @@
 #include "slug.h"
 
 typedef struct {
+    slide base;
+
     float                     persp_t;
     float                     mat[11];
     float                     color[4];
@@ -17,7 +19,7 @@ typedef struct {
 } slug_state;
 
 static void slug_init(slide *s, int w, int h) {
-    slug_state *st = s->state;
+    slug_state *st = (slug_state *)s;
     st->w = w;
     st->h = h;
     st->persp_t = 0.0f;
@@ -38,7 +40,7 @@ static void slug_init(slide *s, int w, int h) {
 }
 
 static void slug_animate(slide *s, float dt) {
-    slug_state *st = s->state;
+    slug_state *st = (slug_state *)s;
     (void)dt;
     st->persp_t += 0.016f;
     slide_perspective_matrix(st->mat, st->persp_t, st->w, st->h, (int)st->slug->w,
@@ -49,7 +51,7 @@ static void slug_animate(slide *s, float dt) {
 
 static void slug_prepare(slide *s, int w, int h, struct umbra_backend *be) {
     (void)w; (void)h;
-    slug_state *st = s->state;
+    slug_state *st = (slug_state *)s;
     if (st->acc_prog) { st->acc_prog->free(st->acc_prog); }
     st->acc_prog = be->compile(be, st->acc_bb);
     if (st->draw_prog) { st->draw_prog->free(st->draw_prog); }
@@ -57,7 +59,7 @@ static void slug_prepare(slide *s, int w, int h, struct umbra_backend *be) {
 }
 
 static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf) {
-    slug_state           *st = s->state;
+    slug_state           *st = (slug_state *)s;
     struct umbra_backend *be = st->draw_prog->backend;
     struct umbra_program *acc = st->acc_prog;
 
@@ -96,11 +98,11 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf) {
 }
 
 static struct umbra_basic_block *slug_get_bb(slide *s) {
-    return ((slug_state *)s->state)->draw_bb;
+    return ((slug_state *)s)->draw_bb;
 }
 
-static void slug_cleanup(slide *s) {
-    slug_state *st = s->state;
+static void slug_slide_free(slide *s) {
+    slug_state *st = (slug_state *)s;
     free(st->wind_buf);
     if (st->acc_prog) { st->acc_prog->free(st->acc_prog); st->acc_prog = 0; }
     umbra_basic_block_free(st->acc_bb);
@@ -109,19 +111,18 @@ static void slug_cleanup(slide *s) {
     umbra_basic_block_free(st->draw_bb);
     if (st->draw_lay.uni) { free(st->draw_lay.uni->data); free(st->draw_lay.uni); }
     free(st);
-    s->state = NULL;
 }
 
-slide slide_slug_wind(slug_curves *);
+slide *slide_slug_wind(slug_curves *);
 
-slide slide_slug_wind(slug_curves *sc) {
+slide *slide_slug_wind(slug_curves *sc) {
     slug_state *st = calloc(1, sizeof *st);
     st->slug = sc;
     st->color[0] = 0.2f;
     st->color[1] = 1.0f;
     st->color[2] = 0.6f;
     st->color[3] = 1.0f;
-    return (slide){
+    st->base = (slide){
         .title = "14. Slug Text (Bezier)",
         .fmt = umbra_fmt_8888,
         .bg = 0xff0a0a1e,
@@ -129,8 +130,8 @@ slide slide_slug_wind(slug_curves *sc) {
         .animate = slug_animate,
         .prepare = slug_prepare,
         .draw = slug_draw,
-        .cleanup = slug_cleanup,
+        .free = slug_slide_free,
         .get_bb = slug_get_bb,
-        .state = st,
     };
+    return &st->base;
 }

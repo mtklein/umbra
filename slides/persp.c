@@ -3,6 +3,8 @@
 #include <stdlib.h>
 
 typedef struct {
+    slide base;
+
     float     persp_t;
     float     mat[11];
     text_cov *bitmap;
@@ -19,7 +21,7 @@ typedef struct {
 } persp_state;
 
 static void persp_init(slide *s, int w, int h) {
-    persp_state *st = s->state;
+    persp_state *st = (persp_state *)s;
     st->w = w;
     st->h = h;
     st->persp_t = 0.0f;
@@ -32,7 +34,7 @@ static void persp_init(slide *s, int w, int h) {
 }
 
 static void persp_animate(slide *s, float dt) {
-    persp_state *st = s->state;
+    persp_state *st = (persp_state *)s;
     (void)dt;
     st->persp_t += 0.016f;
     slide_perspective_matrix(st->mat, st->persp_t, st->w, st->h, st->bitmap->w,
@@ -41,13 +43,13 @@ static void persp_animate(slide *s, float dt) {
 
 static void persp_prepare(slide *s, int w, int h, struct umbra_backend *be) {
     (void)w; (void)h;
-    persp_state *st = s->state;
+    persp_state *st = (persp_state *)s;
     if (st->prog) { st->prog->free(st->prog); }
     st->prog = be->compile(be, st->bb);
 }
 
 static void persp_draw(slide *s, int w, int h, int y0, int y1, void *buf) {
-    persp_state *st = s->state;
+    persp_state *st = (persp_state *)s;
     umbra_uniforms_fill_f32(st->lay.uni, st->lay.shader,   st->color, 4);
     umbra_uniforms_fill_f32(st->lay.uni, st->lay.coverage, st->mat, 11);
     umbra_uniforms_fill_ptr(st->lay.uni, (st->lay.coverage + 44 + 7) & ~(size_t)7,
@@ -64,28 +66,27 @@ static void persp_draw(slide *s, int w, int h, int y0, int y1, void *buf) {
 }
 
 static struct umbra_basic_block *persp_get_bb(slide *s) {
-    return ((persp_state *)s->state)->bb;
+    return ((persp_state *)s)->bb;
 }
 
-static void persp_cleanup(slide *s) {
-    persp_state *st = s->state;
+static void persp_free(slide *s) {
+    persp_state *st = (persp_state *)s;
     if (st->prog) { st->prog->free(st->prog); }
     umbra_basic_block_free(st->bb);
     if (st->lay.uni) { free(st->lay.uni->data); free(st->lay.uni); }
     free(st);
-    s->state = NULL;
 }
 
-slide slide_persp(text_cov *);
+slide *slide_persp(text_cov *);
 
-slide slide_persp(text_cov *bitmap) {
+slide *slide_persp(text_cov *bitmap) {
     persp_state *st = calloc(1, sizeof *st);
     st->bitmap = bitmap;
     st->shader = umbra_shader_solid;
     st->coverage = umbra_coverage_bitmap_matrix;
     st->blend = umbra_blend_srcover;
     st->color[0] = 1.0f; st->color[1] = 0.8f; st->color[2] = 0.2f; st->color[3] = 1.0f;
-    return (slide){
+    st->base = (slide){
         .title = "9. Perspective Text",
         .fmt = umbra_fmt_8888,
         .bg = 0xff0a0a1e,
@@ -93,8 +94,8 @@ slide slide_persp(text_cov *bitmap) {
         .animate = persp_animate,
         .prepare = persp_prepare,
         .draw = persp_draw,
-        .cleanup = persp_cleanup,
+        .free = persp_free,
         .get_bb = persp_get_bb,
-        .state = st,
     };
+    return &st->base;
 }

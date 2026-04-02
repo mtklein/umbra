@@ -14,12 +14,10 @@ struct slide {
     void (*animate)(slide*, float dt);
     void (*prepare)(slide*, int w, int h, struct umbra_backend*);
     void (*draw)   (slide*, int w, int h, int y0, int y1, void *buf);
-    void (*cleanup)(slide*);
+    void (*free)   (slide*);
 
     // Optional: return a basic block for IR dump tools.
     struct umbra_basic_block *(*get_bb)(slide*);
-
-    void *state;
 };
 
 int    slide_count        (void);

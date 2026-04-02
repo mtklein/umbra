@@ -2,17 +2,17 @@
 #include "text.h"
 #include "slug.h"
 
-extern slide slide_solid(char const *, uint32_t, float const[4], umbra_coverage_fn,
-                         umbra_blend_fn, enum umbra_fmt);
-extern slide slide_text_bitmap(text_cov *);
-extern slide slide_text_sdf(text_cov *);
-extern slide slide_persp(text_cov *);
-extern slide slide_gradient_2stop(char const *, uint32_t, umbra_shader_fn, enum umbra_fmt,
-                                  float const[8], float const[4]);
-extern slide slide_gradient_lut(char const *, uint32_t, umbra_shader_fn, enum umbra_fmt,
-                                float const[4], float *, int);
-extern slide slide_slug_wind(slug_curves *);
-extern slide slide_overview(void);
+extern slide *slide_solid(char const *, uint32_t, float const[4], umbra_coverage_fn,
+                          umbra_blend_fn, enum umbra_fmt);
+extern slide *slide_text_bitmap(text_cov *);
+extern slide *slide_text_sdf(text_cov *);
+extern slide *slide_persp(text_cov *);
+extern slide *slide_gradient_2stop(char const *, uint32_t, umbra_shader_fn, enum umbra_fmt,
+                                   float const[8], float const[4]);
+extern slide *slide_gradient_lut(char const *, uint32_t, umbra_shader_fn, enum umbra_fmt,
+                                 float const[4], float *, int);
+extern slide *slide_slug_wind(slug_curves *);
+extern slide *slide_overview(void);
 
 static text_cov    bitmap_cov, sdf_cov;
 static slug_curves slug;
@@ -21,11 +21,11 @@ enum { LUT_N = 64 };
 static float linear_lut[LUT_N * 4];
 static float radial_lut[LUT_N * 4];
 
-static slide all[18];
-static int   count;
+static slide *all[18];
+static int    count;
 
 int    slide_count(void) { return count; }
-slide *slide_get(int i) { return &all[i]; }
+slide *slide_get(int i) { return all[i]; }
 
 static void build_luts(void) {
     float const linear_stops[][4] = {
@@ -97,18 +97,18 @@ void slides_init(int w, int h) {
     register_slides();
 
     for (int i = 0; i < count; i++) {
-        if (all[i].init) { all[i].init(&all[i], w, h); }
+        if (all[i]->init) { all[i]->init(all[i], w, h); }
     }
 
     all[count++] = slide_overview();
-    all[count - 1].init(&all[count - 1], w, h);
+    all[count - 1]->init(all[count - 1], w, h);
 }
 
 void slides_init_for_dump(void) { register_slides(); }
 
 void slides_cleanup(void) {
     for (int i = 0; i < count; i++) {
-        if (all[i].cleanup) { all[i].cleanup(&all[i]); }
+        if (all[i]->free) { all[i]->free(all[i]); }
     }
     text_cov_free(&bitmap_cov);
     text_cov_free(&sdf_cov);

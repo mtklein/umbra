@@ -9,6 +9,8 @@ static uint8_t const font3x5[10][5] = {
 };
 
 typedef struct {
+    slide base;
+
     int                   w, h, cw, ch;
     int                   n_real, pad_;
     uint32_t             *fb, *tmp;
@@ -87,7 +89,7 @@ static void render_thumbnails(overview_state *st) {
 }
 
 static void overview_init(slide *s, int w, int h) {
-    overview_state *st = s->state;
+    overview_state *st = (overview_state *)s;
     st->w = w;
     st->h = h;
     st->cw = w / COLS;
@@ -98,7 +100,7 @@ static void overview_init(slide *s, int w, int h) {
 }
 
 static void overview_animate(slide *s, float dt) {
-    overview_state *st = s->state;
+    overview_state *st = (overview_state *)s;
     for (int i = 0; i < st->n_real; i++) {
         slide *sub = slide_get(i);
         if (sub->animate) { sub->animate(sub, dt); }
@@ -107,13 +109,13 @@ static void overview_animate(slide *s, float dt) {
 
 static void overview_prepare(slide *s, int w, int h, struct umbra_backend *be) {
     (void)w; (void)h;
-    overview_state *st = s->state;
+    overview_state *st = (overview_state *)s;
     st->be = be;
     render_thumbnails(st);
 }
 
 static void overview_draw(slide *s, int w, int h, int y0, int y1, void *buf) {
-    overview_state *st = s->state;
+    overview_state *st = (overview_state *)s;
     (void)w;
     (void)h;
     (void)s;
@@ -122,19 +124,18 @@ static void overview_draw(slide *s, int w, int h, int y0, int y1, void *buf) {
     __builtin_memcpy((char*)buf + off, (char*)st->fb + off, len);
 }
 
-static void overview_cleanup(slide *s) {
-    overview_state *st = s->state;
+static void overview_free(slide *s) {
+    overview_state *st = (overview_state *)s;
     free(st->fb);
     free(st->tmp);
     free(st);
-    s->state = NULL;
 }
 
-slide slide_overview(void);
+slide *slide_overview(void);
 
-slide slide_overview(void) {
+slide *slide_overview(void) {
     overview_state *st = calloc(1, sizeof *st);
-    return (slide){
+    st->base = (slide){
         .title = "Overview",
         .fmt = umbra_fmt_8888,
         .bg = 0xff101010,
@@ -142,7 +143,7 @@ slide slide_overview(void) {
         .animate = overview_animate,
         .prepare = overview_prepare,
         .draw = overview_draw,
-        .cleanup = overview_cleanup,
-        .state = st,
+        .free = overview_free,
     };
+    return &st->base;
 }
