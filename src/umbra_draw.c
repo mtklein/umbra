@@ -42,7 +42,7 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
         umbra_imm_f32(builder, 0.0f),
     };
     if (blend || coverage) {
-        dst = umbra_load_color(builder, (umbra_ptr){1, 0}, fmt);
+        dst = umbra_load_color(builder, (umbra_ptr){1}, fmt);
     }
 
     umbra_color out;
@@ -67,7 +67,7 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
                                             cov));
     }
 
-    umbra_store_color(builder, (umbra_ptr){1, 0}, out, fmt);
+    umbra_store_color(builder, (umbra_ptr){1}, out, fmt);
 
     if (layout) {
         layout->uni = uni;
@@ -84,10 +84,10 @@ umbra_color umbra_shader_solid(builder *builder, struct umbra_uniforms *u, umbra
     (void)x;
     (void)y;
     size_t const fi = umbra_reserve_f32(u, 4);
-    umbra_val const r = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi);
-    umbra_val const g = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 4);
-    umbra_val const b = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 8);
-    umbra_val const a = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 12);
+    umbra_val const r = umbra_uniform_32(builder, (umbra_ptr){0}, fi);
+    umbra_val const g = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 4);
+    umbra_val const b = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 8);
+    umbra_val const a = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 12);
     return (umbra_color){r, g, b, a};
 }
 
@@ -102,9 +102,9 @@ static umbra_val lerp_f(builder *builder, umbra_val p, umbra_val q, umbra_val t)
 }
 
 static umbra_val linear_t_(builder *builder, size_t fi, umbra_val x, umbra_val y) {
-    umbra_val const a = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi);
-    umbra_val const b = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 4);
-    umbra_val const c = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 8);
+    umbra_val const a = umbra_uniform_32(builder, (umbra_ptr){0}, fi);
+    umbra_val const b = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 4);
+    umbra_val const c = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 8);
     umbra_val const t = umbra_add_f32(builder,
                                       umbra_add_f32(builder, umbra_mul_f32(builder, a, x),
                                                     umbra_mul_f32(builder, b, y)),
@@ -113,9 +113,9 @@ static umbra_val linear_t_(builder *builder, size_t fi, umbra_val x, umbra_val y
 }
 
 static umbra_val radial_t_(builder *builder, size_t fi, umbra_val x, umbra_val y) {
-    umbra_val const cx = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi);
-    umbra_val const cy = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 4);
-    umbra_val const inv_r = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 8);
+    umbra_val const cx = umbra_uniform_32(builder, (umbra_ptr){0}, fi);
+    umbra_val const cy = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 4);
+    umbra_val const inv_r = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 8);
     umbra_val const dx = umbra_sub_f32(builder, x, cx);
     umbra_val const dy = umbra_sub_f32(builder, y, cy);
     umbra_val const d2 = umbra_add_f32(builder, umbra_mul_f32(builder, dx, dx),
@@ -124,14 +124,14 @@ static umbra_val radial_t_(builder *builder, size_t fi, umbra_val x, umbra_val y
 }
 
 static umbra_color lerp_2stop_(builder *builder, umbra_val t, size_t fi) {
-    umbra_val const r0 = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi);
-    umbra_val const g0 = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 4);
-    umbra_val const b0 = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 8);
-    umbra_val const a0 = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 12);
-    umbra_val const r1 = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 16);
-    umbra_val const g1 = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 20);
-    umbra_val const b1 = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 24);
-    umbra_val const a1 = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 28);
+    umbra_val const r0 = umbra_uniform_32(builder, (umbra_ptr){0}, fi);
+    umbra_val const g0 = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 4);
+    umbra_val const b0 = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 8);
+    umbra_val const a0 = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 12);
+    umbra_val const r1 = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 16);
+    umbra_val const g1 = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 20);
+    umbra_val const b1 = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 24);
+    umbra_val const a1 = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 28);
     return (umbra_color){
         lerp_f(builder, r0, r1, t),
         lerp_f(builder, g0, g1, t),
@@ -142,7 +142,7 @@ static umbra_color lerp_2stop_(builder *builder, umbra_val t, size_t fi) {
 
 static umbra_color sample_lut_(builder *builder, umbra_val t_f32, size_t fi, umbra_ptr lut) {
     // Planar LUT: [R0..R_{N-1}, G0..G_{N-1}, B0..B_{N-1}, A0..A_{N-1}]
-    umbra_val const N_f  = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 12);
+    umbra_val const N_f  = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 12);
     umbra_val const N_m1 = umbra_sub_f32(builder, N_f, umbra_imm_f32(builder, 1.0f));
     umbra_val const N_m2 = umbra_sub_f32(builder, N_f, umbra_imm_f32(builder, 2.0f));
     umbra_val const t_sc = umbra_mul_f32(builder, t_f32, N_m1);
@@ -171,13 +171,13 @@ umbra_color umbra_shader_radial_2(builder *builder, struct umbra_uniforms *u, um
 umbra_color umbra_shader_linear_grad(builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
     size_t const fi = umbra_reserve_f32(u, 4);
     size_t    const lut_off = umbra_reserve_ptr(u);
-    umbra_ptr const lut = umbra_deref_ptr(builder, (umbra_ptr){0, 0}, lut_off);
+    umbra_ptr const lut = umbra_deref_ptr(builder, (umbra_ptr){0}, lut_off);
     return sample_lut_(builder, linear_t_(builder, fi, x, y), fi, lut);
 }
 umbra_color umbra_shader_radial_grad(builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
     size_t const fi = umbra_reserve_f32(u, 4);
     size_t    const lut_off = umbra_reserve_ptr(u);
-    umbra_ptr const lut = umbra_deref_ptr(builder, (umbra_ptr){0, 0}, lut_off);
+    umbra_ptr const lut = umbra_deref_ptr(builder, (umbra_ptr){0}, lut_off);
     return sample_lut_(builder, radial_t_(builder, fi, x, y), fi, lut);
 }
 
@@ -264,10 +264,10 @@ umbra_color umbra_blend_multiply(builder *builder, umbra_color src, umbra_color 
 
 umbra_val umbra_coverage_rect(builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
     size_t const fi = umbra_reserve_f32(u, 4);
-    umbra_val const l = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi);
-    umbra_val const t = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 4);
-    umbra_val const r = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 8);
-    umbra_val const b = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 12);
+    umbra_val const l = umbra_uniform_32(builder, (umbra_ptr){0}, fi);
+    umbra_val const t = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 4);
+    umbra_val const r = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 8);
+    umbra_val const b = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 12);
     umbra_val const inside = umbra_and_32(builder,
                                            umbra_and_32(builder, umbra_le_f32(builder, l, x),
                                                          umbra_lt_f32(builder, x, r)),
@@ -282,7 +282,7 @@ umbra_val umbra_coverage_bitmap(builder *builder, struct umbra_uniforms *u, umbr
     (void)x;
     (void)y;
     size_t    const bmp_off = umbra_reserve_ptr(u);
-    umbra_ptr const bmp = umbra_deref_ptr(builder, (umbra_ptr){0, 0}, bmp_off);
+    umbra_ptr const bmp = umbra_deref_ptr(builder, (umbra_ptr){0}, bmp_off);
     umbra_val const val = umbra_i32_from_s16(builder, umbra_load_16(builder, bmp));
     umbra_val const inv255 = umbra_imm_f32(builder, 1.0f / 255.0f);
     return umbra_mul_f32(builder, umbra_f32_from_i32(builder, val), inv255);
@@ -292,7 +292,7 @@ umbra_val umbra_coverage_sdf(builder *builder, struct umbra_uniforms *u, umbra_v
     (void)x;
     (void)y;
     size_t    const bmp_off = umbra_reserve_ptr(u);
-    umbra_ptr const bmp = umbra_deref_ptr(builder, (umbra_ptr){0, 0}, bmp_off);
+    umbra_ptr const bmp = umbra_deref_ptr(builder, (umbra_ptr){0}, bmp_off);
     umbra_val const raw = umbra_i32_from_s16(builder, umbra_load_16(builder, bmp));
     umbra_val const inv255 = umbra_imm_f32(builder, 1.0f / 255.0f);
     umbra_val const dist = umbra_mul_f32(builder, umbra_f32_from_i32(builder, raw), inv255);
@@ -309,7 +309,7 @@ umbra_val umbra_coverage_wind(builder *builder, struct umbra_uniforms *u, umbra_
     (void)x;
     (void)y;
     size_t    const off = umbra_reserve_ptr(u);
-    umbra_ptr const w = umbra_deref_ptr(builder, (umbra_ptr){0, 0}, off);
+    umbra_ptr const w = umbra_deref_ptr(builder, (umbra_ptr){0}, off);
     umbra_val const raw = umbra_load_32(builder, w);
     return umbra_min_f32(builder, umbra_abs_f32(builder, raw),
                          umbra_imm_f32(builder, 1.0f));
@@ -318,19 +318,19 @@ umbra_val umbra_coverage_wind(builder *builder, struct umbra_uniforms *u, umbra_
 umbra_val umbra_coverage_bitmap_matrix(builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
     size_t const fi = umbra_reserve_f32(u, 11);
     size_t    const bmp_off = umbra_reserve_ptr(u);
-    umbra_ptr const bmp = umbra_deref_ptr(builder, (umbra_ptr){0, 0}, bmp_off);
+    umbra_ptr const bmp = umbra_deref_ptr(builder, (umbra_ptr){0}, bmp_off);
 
-    umbra_val const m0 = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi);
-    umbra_val const m1 = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 4);
-    umbra_val const m2 = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 8);
-    umbra_val const m3 = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 12);
-    umbra_val const m4 = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 16);
-    umbra_val const m5 = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 20);
-    umbra_val const m6 = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 24);
-    umbra_val const m7 = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 28);
-    umbra_val const m8 = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 32);
-    umbra_val const bw = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 36);
-    umbra_val const bh = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 40);
+    umbra_val const m0 = umbra_uniform_32(builder, (umbra_ptr){0}, fi);
+    umbra_val const m1 = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 4);
+    umbra_val const m2 = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 8);
+    umbra_val const m3 = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 12);
+    umbra_val const m4 = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 16);
+    umbra_val const m5 = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 20);
+    umbra_val const m6 = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 24);
+    umbra_val const m7 = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 28);
+    umbra_val const m8 = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 32);
+    umbra_val const bw = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 36);
+    umbra_val const bh = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 40);
 
     umbra_val const w = umbra_add_f32(builder,
                                       umbra_add_f32(builder, umbra_mul_f32(builder, m6, x),

@@ -160,7 +160,7 @@ static inline struct umbra_builder *slug_build_acc(
     size_t fi  = umbra_reserve_f32(u, 11);
     size_t co  = umbra_reserve_ptr(u);
     umbra_ptr curves = umbra_deref_ptr(b,
-        (umbra_ptr){0, 0}, co);
+        (umbra_ptr){0}, co);
     size_t    ji = umbra_reserve_f32(u, 1);
 
     umbra_val xf = umbra_f32_from_i32(b, umbra_x(b));
@@ -168,10 +168,10 @@ static inline struct umbra_builder *slug_build_acc(
 
     umbra_val m[9];
     for (int i = 0; i < 9; i++) {
-        m[i] = umbra_uniform_32(b, (umbra_ptr){0, 0}, fi + (size_t)i * 4);
+        m[i] = umbra_uniform_32(b, (umbra_ptr){0}, fi + (size_t)i * 4);
     }
-    umbra_val bw = umbra_uniform_32(b, (umbra_ptr){0, 0}, fi + 36);
-    umbra_val bh = umbra_uniform_32(b, (umbra_ptr){0, 0}, fi + 40);
+    umbra_val bw = umbra_uniform_32(b, (umbra_ptr){0}, fi + 36);
+    umbra_val bh = umbra_uniform_32(b, (umbra_ptr){0}, fi + 40);
 
     umbra_val pw = umbra_add_f32(b,
         umbra_add_f32(b,
@@ -203,7 +203,7 @@ static inline struct umbra_builder *slug_build_acc(
             umbra_le_f32(b, z, gy),
             umbra_lt_f32(b, gy, bh)));
 
-    umbra_val j = umbra_uniform_32(b, (umbra_ptr){0, 0}, ji);
+    umbra_val j = umbra_uniform_32(b, (umbra_ptr){0}, ji);
     umbra_val k = umbra_mul_i32(b, j,
                       umbra_imm_i32(b, 6));
 
@@ -315,9 +315,9 @@ static inline struct umbra_builder *slug_build_acc(
     umbra_val dw = umbra_sel_32(b, in,
         umbra_add_f32(b, w1, w2), z);
 
-    umbra_val acc = umbra_load_32(b, (umbra_ptr){1, 0});
+    umbra_val acc = umbra_load_32(b, (umbra_ptr){1});
     acc = umbra_add_f32(b, acc, dw);
-    umbra_store_32(b, (umbra_ptr){1, 0}, acc);
+    umbra_store_32(b, (umbra_ptr){1}, acc);
 
     if (lay) {
         lay->mat        = fi;

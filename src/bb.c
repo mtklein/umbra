@@ -25,7 +25,7 @@ size_t umbra_fmt_size(enum umbra_fmt fmt) {
     return 0;
 }
 
-static int ptr_ix(umbra_ptr p) { return p.deref ? ~p.ix : p.ix; }
+static int ptr_ix(umbra_ptr p) { return p.bits; }
 
 _Bool is_store(enum op op) {
     return op == op_store_16
@@ -199,7 +199,7 @@ val umbra_imm_f32(builder *b, float v) {
 
 umbra_ptr umbra_deref_ptr(builder *b, umbra_ptr buf, size_t off) {
     val const v = push(b, op_deref_ptr, .ptr = ptr_ix(buf), .imm = (int)off);
-    return (umbra_ptr){.ix = val_id(v), .deref = 1};
+    return (umbra_ptr){.bits = ~val_id(v)};
 }
 
 

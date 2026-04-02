@@ -78,20 +78,20 @@ static void build_fill(int fmt) {
     struct umbra_uniforms  *u       = calloc(1, sizeof(struct umbra_uniforms));
     size_t fi = umbra_reserve_f32(u, 4);
     umbra_color c = {
-        umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi),
-        umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 4),
-        umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 8),
-        umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 12),
+        umbra_uniform_32(builder, (umbra_ptr){0}, fi),
+        umbra_uniform_32(builder, (umbra_ptr){0}, fi + 4),
+        umbra_uniform_32(builder, (umbra_ptr){0}, fi + 8),
+        umbra_uniform_32(builder, (umbra_ptr){0}, fi + 12),
     };
-    umbra_store_color(builder, (umbra_ptr){1, 0}, c, fmt_enums[fmt]);
+    umbra_store_color(builder, (umbra_ptr){1}, c, fmt_enums[fmt]);
     finish_pipe(&fill_pipe, builder, u);
 }
 
 static void build_readback(int fmt) {
     free_pipe(&readback_pipe);
     builder    *builder = umbra_builder();
-    umbra_color c = umbra_load_color(builder, (umbra_ptr){1, 0}, fmt_enums[fmt]);
-    umbra_store_color(builder, (umbra_ptr){2, 0}, c, umbra_fmt_8888);
+    umbra_color c = umbra_load_color(builder, (umbra_ptr){1}, fmt_enums[fmt]);
+    umbra_store_color(builder, (umbra_ptr){2}, c, umbra_fmt_8888);
     readback_pipe.out_ptr = 2;
     finish_pipe(&readback_pipe, builder, NULL);
 }
@@ -99,9 +99,9 @@ static void build_readback(int fmt) {
 static void build_hdr(int fmt) {
     free_pipe(&hdr_pipe);
     builder    *builder = umbra_builder();
-    umbra_color c = umbra_load_color(builder, (umbra_ptr){1, 0}, fmt_enums[fmt]);
+    umbra_color c = umbra_load_color(builder, (umbra_ptr){1}, fmt_enums[fmt]);
     hdr_pipe.out_ptr = 2;
-    umbra_store_color(builder, (umbra_ptr){2, 0}, c, umbra_fmt_fp16);
+    umbra_store_color(builder, (umbra_ptr){2}, c, umbra_fmt_fp16);
     finish_pipe(&hdr_pipe, builder, NULL);
 }
 

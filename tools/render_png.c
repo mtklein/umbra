@@ -17,20 +17,20 @@ static void render_slide(char const *label, struct umbra_backend *be, slide *s) 
     struct umbra_uniforms *fill_uni = calloc(1, sizeof(struct umbra_uniforms));
     size_t fi = umbra_reserve_f32(fill_uni, 4);
     umbra_color fc = {
-        umbra_uniform_32(fb, (umbra_ptr){0, 0}, fi),
-        umbra_uniform_32(fb, (umbra_ptr){0, 0}, fi + 4),
-        umbra_uniform_32(fb, (umbra_ptr){0, 0}, fi + 8),
-        umbra_uniform_32(fb, (umbra_ptr){0, 0}, fi + 12),
+        umbra_uniform_32(fb, (umbra_ptr){0}, fi),
+        umbra_uniform_32(fb, (umbra_ptr){0}, fi + 4),
+        umbra_uniform_32(fb, (umbra_ptr){0}, fi + 8),
+        umbra_uniform_32(fb, (umbra_ptr){0}, fi + 12),
     };
-    umbra_store_color(fb, (umbra_ptr){1, 0}, fc, umbra_fmt_8888);
+    umbra_store_color(fb, (umbra_ptr){1}, fc, umbra_fmt_8888);
     struct umbra_basic_block *fbb = umbra_basic_block(fb);
     umbra_builder_free(fb);
     struct umbra_program *fill_prog = be->compile(be, fbb);
     umbra_basic_block_free(fbb);
 
     struct umbra_builder *rb = umbra_builder();
-    umbra_color rc = umbra_load_color(rb, (umbra_ptr){1, 0}, umbra_fmt_8888);
-    umbra_store_color(rb, (umbra_ptr){2, 0}, rc, umbra_fmt_8888);
+    umbra_color rc = umbra_load_color(rb, (umbra_ptr){1}, umbra_fmt_8888);
+    umbra_store_color(rb, (umbra_ptr){2}, rc, umbra_fmt_8888);
     struct umbra_basic_block *rbb = umbra_basic_block(rb);
     umbra_builder_free(rb);
     struct umbra_program *rb_prog = be->compile(be, rbb);

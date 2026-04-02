@@ -49,8 +49,7 @@ size_t umbra_fmt_size(enum umbra_fmt);
 
 typedef struct { int bits; } umbra_val;
 typedef struct { umbra_val r, g, b, a; } umbra_color;
-// TODO: make this opaque struct { int bits; }, internally { int ix :31, deref :1; } or similar.
-typedef struct { int ix, :24; _Bool deref; } umbra_ptr;
+typedef struct { int bits; } umbra_ptr;
 
 umbra_ptr umbra_deref_ptr(struct umbra_builder*, umbra_ptr buf, size_t off);
 

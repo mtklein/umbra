@@ -521,8 +521,8 @@ static void test_no_blend(void) {
 static umbra_color gradient_shader(struct umbra_builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
     (void)y;
     size_t fi = umbra_reserve_f32(u, 2);
-    umbra_val w = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi);
-    umbra_val a = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 4);
+    umbra_val w = umbra_uniform_32(builder, (umbra_ptr){0}, fi);
+    umbra_val a = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 4);
     umbra_val t = umbra_div_f32(builder, x, w);
     umbra_val zero = umbra_imm_i32(builder, 0);
     return (umbra_color){t, zero, zero, a};
