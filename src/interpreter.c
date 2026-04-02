@@ -1624,11 +1624,11 @@ static void flush_be_noop(struct umbra_backend *be) { (void)be; }
 static void free_be_interp(struct umbra_backend *be) { free(be); }
 struct umbra_backend *umbra_backend_interp(void) {
     struct umbra_backend *const be = malloc(sizeof *be);
-    *be = (struct umbra_backend){
+    __builtin_memcpy(be, &(struct umbra_backend){
         .compile    = compile_interp,
         .flush      = flush_be_noop,
         .free    = free_be_interp,
         .threadsafe = 1,
-    };
+    }, sizeof *be);
     return be;
 }
