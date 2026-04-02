@@ -53,7 +53,7 @@ typedef struct { umbra_val r, g, b, a; } umbra_color;
 // TODO: make this opaque struct { int bits; }, internally { int ix :31, deref :1; } or similar.
 typedef struct { int ix, :24; _Bool deref; } umbra_ptr;
 
-umbra_ptr umbra_deref_ptr(struct umbra_builder*, umbra_ptr buf, size_t byte_off);
+umbra_ptr umbra_deref_ptr(struct umbra_builder*, umbra_ptr buf, size_t off);
 
 umbra_val umbra_x(struct umbra_builder*);
 umbra_val umbra_y(struct umbra_builder*);
@@ -61,8 +61,7 @@ umbra_val umbra_y(struct umbra_builder*);
 umbra_val umbra_imm_i32(struct umbra_builder*, int);
 umbra_val umbra_imm_f32(struct umbra_builder*, float);
 
-// TODO: size_t names don't need to mention byte or bytes, rename this off and others similarly.
-umbra_val umbra_uniform_32(struct umbra_builder*, umbra_ptr, size_t byte_off);
+umbra_val umbra_uniform_32(struct umbra_builder*, umbra_ptr, size_t off);
 
 umbra_val umbra_gather_16(struct umbra_builder*, umbra_ptr, umbra_val ix);
 umbra_val umbra_gather_32(struct umbra_builder*, umbra_ptr, umbra_val ix);

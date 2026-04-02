@@ -197,8 +197,8 @@ val umbra_imm_f32(builder *b, float v) {
     return umbra_imm_i32(b, u.i);
 }
 
-umbra_ptr umbra_deref_ptr(builder *b, umbra_ptr buf, size_t byte_off) {
-    val const v = push(b, op_deref_ptr, .ptr = ptr_ix(buf), .imm = (int)byte_off);
+umbra_ptr umbra_deref_ptr(builder *b, umbra_ptr buf, size_t off) {
+    val const v = push(b, op_deref_ptr, .ptr = ptr_ix(buf), .imm = (int)off);
     return (umbra_ptr){.ix = val_id(v), .deref = 1};
 }
 
@@ -214,8 +214,8 @@ val umbra_load_32(builder *b, umbra_ptr src) {
 val umbra_load_16(builder *b, umbra_ptr src) {
     return push(b, op_load_16, .ptr = ptr_ix(src));
 }
-val umbra_uniform_32(builder *b, umbra_ptr src, size_t byte_off) {
-    return push(b, op_uniform_32, .imm = (int)byte_off, .ptr = ptr_ix(src));
+val umbra_uniform_32(builder *b, umbra_ptr src, size_t off) {
+    return push(b, op_uniform_32, .imm = (int)off, .ptr = ptr_ix(src));
 }
 val umbra_gather_32(builder *b, umbra_ptr src, val ix) {
     enum op const op = b->inst[val_id(ix)].uniform ? op_gather_uniform_32 : op_gather_32;

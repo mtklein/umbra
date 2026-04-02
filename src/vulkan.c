@@ -244,7 +244,7 @@ static uint32_t find_host_memory(VkPhysicalDevice phys) {
 //  Deref info — same idea as Metal backend.
 // ---------------------------------------------------------------------------
 
-struct deref_info { int buf_idx, src_buf, byte_off; };
+struct deref_info { int buf_idx, src_buf, off; };
 
 // ---------------------------------------------------------------------------
 //  Copyback tracking.
@@ -751,7 +751,7 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
             if (bb->inst[i].op == op_deref_ptr) {
                 di[d].buf_idx  = deref_buf[i];
                 di[d].src_buf  = bb->inst[i].ptr;
-                di[d].byte_off = bb->inst[i].imm;
+                di[d].off = bb->inst[i].imm;
                 d++;
             }
         }
@@ -2031,9 +2031,9 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
         void *derived;
         ptrdiff_t ssz;
         size_t drb;
-        memcpy(&derived, base + vp->deref[d].byte_off, sizeof derived);
-        memcpy(&ssz,     base + vp->deref[d].byte_off + 8, sizeof ssz);
-        memcpy(&drb,     base + vp->deref[d].byte_off + 16, sizeof drb);
+        memcpy(&derived, base + vp->deref[d].off, sizeof derived);
+        memcpy(&ssz,     base + vp->deref[d].off + 8, sizeof ssz);
+        memcpy(&drb,     base + vp->deref[d].off + 16, sizeof drb);
         size_t bytes = ssz < 0 ? (size_t)-ssz : (size_t)ssz;
         _Bool deref_read_only = ssz < 0;
         int bi = vp->deref[d].buf_idx;

@@ -29,7 +29,7 @@ struct copyback {
     size_t bytes;
 };
 
-struct deref_info { int buf_idx, src_buf, byte_off; };
+struct deref_info { int buf_idx, src_buf, off; };
 
 struct metal_backend {
     struct umbra_backend base;
@@ -1038,7 +1038,7 @@ static struct umbra_metal* umbra_metal(
                 if (bb->inst[i].op == op_deref_ptr) {
                     di[d].buf_idx  = deref_buf[i];
                     di[d].src_buf  = bb->inst[i].ptr;
-                    di[d].byte_off = bb->inst[i].imm;
+                    di[d].off = bb->inst[i].imm;
                     d++;
                 }
             }
@@ -1235,15 +1235,15 @@ static void encode_dispatch(
         size_t drb;
         __builtin_memcpy(
             &derived,
-            (char*)base + m->deref[d].byte_off,
+            (char*)base + m->deref[d].off,
             sizeof derived);
         __builtin_memcpy(
             &dsz,
-            (char*)base + m->deref[d].byte_off + 8,
+            (char*)base + m->deref[d].off + 8,
             sizeof dsz);
         __builtin_memcpy(
             &drb,
-            (char*)base + m->deref[d].byte_off + 16,
+            (char*)base + m->deref[d].off + 16,
             sizeof drb);
         size_t bytes = dsz < 0 ? (size_t)-dsz : (size_t)dsz;
         _Bool deref_read_only = dsz < 0;
