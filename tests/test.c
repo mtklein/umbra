@@ -536,48 +536,6 @@ static void test_cmp_f32(void) {
         }
         cleanup(&B);
     }
-    {
-        backends B;
-        BINOP_CMP_F32(umbra_gt_f32, B);
-        for (int bi = 0; bi < 3; bi++) {
-            float x[] = {3, 5, 1};
-            float y[] = {2, 5, 3};
-            int   z[3] = {0};
-            if (!run(&B, bi, 3, 1,
-                     (umbra_buf[]){
-                         {.ptr=x, .sz=3 * 4},
-                         {.ptr=y, .sz=3 * 4},
-                         {.ptr=z, .sz=3 * 4},
-                     })) {
-                continue;
-            }
-            z[0] == -1 here;
-            z[1] == 0 here;
-            z[2] == 0 here;
-        }
-        cleanup(&B);
-    }
-    {
-        backends B;
-        BINOP_CMP_F32(umbra_ge_f32, B);
-        for (int bi = 0; bi < 3; bi++) {
-            float x[] = {3, 5, 1};
-            float y[] = {2, 5, 3};
-            int   z[3] = {0};
-            if (!run(&B, bi, 3, 1,
-                     (umbra_buf[]){
-                         {.ptr=x, .sz=3 * 4},
-                         {.ptr=y, .sz=3 * 4},
-                         {.ptr=z, .sz=3 * 4},
-                     })) {
-                continue;
-            }
-            z[0] == -1 here;
-            z[1] == -1 here;
-            z[2] == 0 here;
-        }
-        cleanup(&B);
-    }
 }
 
 static void test_imm(void) {

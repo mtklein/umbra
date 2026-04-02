@@ -118,12 +118,9 @@ umbra_val umbra_or_32 (struct umbra_builder*, umbra_val, umbra_val);
 umbra_val umbra_xor_32(struct umbra_builder*, umbra_val, umbra_val);
 umbra_val umbra_sel_32(struct umbra_builder*, umbra_val, umbra_val, umbra_val);
 
-// TODO: remove gt/ge f32 helpers
 umbra_val umbra_eq_f32(struct umbra_builder*, umbra_val, umbra_val);
 umbra_val umbra_lt_f32(struct umbra_builder*, umbra_val, umbra_val);
 umbra_val umbra_le_f32(struct umbra_builder*, umbra_val, umbra_val);
-umbra_val umbra_gt_f32(struct umbra_builder*, umbra_val, umbra_val);
-umbra_val umbra_ge_f32(struct umbra_builder*, umbra_val, umbra_val);
 
 umbra_val umbra_eq_i32(struct umbra_builder*, umbra_val, umbra_val);
 umbra_val umbra_lt_s32(struct umbra_builder*, umbra_val, umbra_val);

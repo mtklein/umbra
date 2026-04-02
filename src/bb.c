@@ -555,9 +555,6 @@ val umbra_le_f32(builder *b, val x, val y) {
     }
     return (val){.bits = d.bits};
 }
-val umbra_gt_f32(builder *b, val x, val y) { return umbra_lt_f32(b, y, x); }
-val umbra_ge_f32(builder *b, val x, val y) { return umbra_le_f32(b, y, x); }
-
 val umbra_eq_i32(builder *b, val x, val y) {
     sort(&x, &y);
     if (val_id(x) == val_id(y)) { return umbra_imm_i32(b, -1); }

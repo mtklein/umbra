@@ -269,9 +269,9 @@ umbra_val umbra_coverage_rect(builder *builder, struct umbra_uniforms *u, umbra_
     umbra_val const r = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 8);
     umbra_val const b = umbra_uniform_32(builder, (umbra_ptr){0, 0}, fi + 12);
     umbra_val const inside = umbra_and_32(builder,
-                                           umbra_and_32(builder, umbra_ge_f32(builder, x, l),
+                                           umbra_and_32(builder, umbra_le_f32(builder, l, x),
                                                          umbra_lt_f32(builder, x, r)),
-                                           umbra_and_32(builder, umbra_ge_f32(builder, y, t),
+                                           umbra_and_32(builder, umbra_le_f32(builder, t, y),
                                                          umbra_lt_f32(builder, y, b)));
     umbra_val const one_f = umbra_imm_f32(builder, 1.0f);
     umbra_val const zero_f = umbra_imm_f32(builder, 0.0f);
@@ -353,9 +353,9 @@ umbra_val umbra_coverage_bitmap_matrix(builder *builder, struct umbra_uniforms *
 
     umbra_val const zero_f = umbra_imm_f32(builder, 0.0f);
     umbra_val const in = umbra_and_32(builder,
-                                       umbra_and_32(builder, umbra_ge_f32(builder, xp, zero_f),
+                                       umbra_and_32(builder, umbra_le_f32(builder, zero_f, xp),
                                                      umbra_lt_f32(builder, xp, bw)),
-                                       umbra_and_32(builder, umbra_ge_f32(builder, yp, zero_f),
+                                       umbra_and_32(builder, umbra_le_f32(builder, zero_f, yp),
                                                      umbra_lt_f32(builder, yp, bh)));
 
     umbra_val const one_f = umbra_imm_f32(builder, 1.0f);
