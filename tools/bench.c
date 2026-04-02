@@ -13,18 +13,15 @@ static double now(void) {
     return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
 }
 
-static double bench(slide *s, int w, int h, umbra_draw_layout const *lay,
-                    void *buf, struct umbra_backend *be,
-                    struct umbra_program *prog) {
-    if (s->prepare) { s->prepare(s, w, h, be); }
-    s->draw(s, w, h, 0, h, buf, lay, prog);
+static double bench(slide *s, int w, int h, void *buf, struct umbra_backend *be) {
+    s->prepare(s, w, h, be);
+    s->draw(s, w, h, 0, h, buf);
     be->flush(be);
     int iters = 1;
     for (;;) {
-        if (s->prepare) { s->prepare(s, w, h, be); }
         double const start = now();
         for (int it = 0; it < iters; it++) {
-            s->draw(s, w, h, 0, h, buf, lay, prog);
+            s->draw(s, w, h, 0, h, buf);
         }
         be->flush(be);
         double const elapsed = now() - start;
@@ -42,35 +39,23 @@ int main(int argc, char *argv[]) {
     int ns = slide_count() - 1;
     printf("%-40s %12s %12s %12s %12s\n", "", "interp", "jit", "metal", "vulkan");
 
+    struct umbra_backend *bes[] = {
+        umbra_backend_interp(), umbra_backend_jit(),
+        umbra_backend_metal(),  umbra_backend_vulkan(),
+    };
+
     for (int si = 0; si < ns; si++) {
         slide *s = slide_get(si);
         if (!s->draw) { continue; }
-
-        umbra_draw_layout         lay;
-        struct umbra_builder     *bld = umbra_draw_build(s->shader, s->coverage, s->blend, s->fmt,
-                                                         &lay);
-        struct umbra_basic_block *bb = umbra_basic_block(bld);
-        umbra_builder_free(bld);
-
-        struct umbra_backend *bes[] = {
-            umbra_backend_interp(), umbra_backend_jit(),
-            umbra_backend_metal(),  umbra_backend_vulkan(),
-        };
-        struct umbra_program *progs[4];
-        for (int bi = 0; bi < 4; bi++) {
-            progs[bi] = bes[bi] ? bes[bi]->compile(bes[bi], bb) : NULL;
-        }
-        umbra_basic_block_free(bb);
 
         size_t bpp = umbra_fmt_size(s->fmt);
         void *buf = calloc((size_t)(W * H), bpp);
 
         printf("%-40s", s->title);
         for (int bi = 0; bi < 4; bi++) {
-            if (progs[bi]) {
+            if (bes[bi]) {
                 char tmp[32];
-                sprintf(tmp, "%5.2f ns/px",
-                        bench(s, W, H, &lay, buf, bes[bi], progs[bi]));
+                sprintf(tmp, "%5.2f ns/px", bench(s, W, H, buf, bes[bi]));
                 printf(" %12s", tmp);
             } else {
                 printf(" %12s", "-");
@@ -78,12 +63,7 @@ int main(int argc, char *argv[]) {
         }
         printf("\n");
 
-        for (int bi = 0; bi < 4; bi++) {
-            if (progs[bi]) { progs[bi]->free(progs[bi]); }
-            if (bes[bi])   { bes[bi]->free(bes[bi]); }
-        }
         free(buf);
-        if (lay.uni) { free(lay.uni->data); free(lay.uni); }
     }
 
     {
@@ -93,10 +73,6 @@ int main(int argc, char *argv[]) {
         struct umbra_basic_block *bb = umbra_basic_block(bld);
         umbra_builder_free(bld);
 
-        struct umbra_backend *bes[] = {
-            umbra_backend_interp(), umbra_backend_jit(),
-            umbra_backend_metal(),  umbra_backend_vulkan(),
-        };
         struct umbra_program *progs[4];
         for (int bi = 0; bi < 4; bi++) {
             progs[bi] = bes[bi] ? bes[bi]->compile(bes[bi], bb) : NULL;
@@ -152,7 +128,6 @@ int main(int argc, char *argv[]) {
 
         for (int bi = 0; bi < 4; bi++) {
             if (progs[bi]) { progs[bi]->free(progs[bi]); }
-            if (bes[bi])   { bes[bi]->free(bes[bi]); }
         }
         free(wind);
         if (al.uni) { free(al.uni->data); free(al.uni); }
@@ -160,5 +135,8 @@ int main(int argc, char *argv[]) {
     }
 
     slides_cleanup();
+    for (int bi = 0; bi < 4; bi++) {
+        if (bes[bi]) { bes[bi]->free(bes[bi]); }
+    }
     return 0;
 }

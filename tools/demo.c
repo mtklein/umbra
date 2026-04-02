@@ -23,15 +23,6 @@ static char const *backend_name[NUM_BACKENDS] = {
 };
 
 static struct umbra_backend *bes[NUM_BACKENDS];
-static struct umbra_program *programs[NUM_BACKENDS];
-static umbra_draw_layout     draw_layout;
-
-static void free_programs(void) {
-    for (int i = 0; i < NUM_BACKENDS; i++) {
-        if (programs[i]) { programs[i]->free(programs[i]); }
-        programs[i] = NULL;
-    }
-}
 
 enum {
     FMT_8888,
@@ -119,7 +110,7 @@ static void free_pipes(void) {
 
 static int                    max_threads;
 static int                    n_threads = 1;
-static struct umbra_program **xtra_progs;   // [1..n_threads-1], compiled from shared backend
+static struct umbra_program **xtra_progs;
 static struct umbra_basic_block *saved_bb;
 
 static void free_xtra(void) {
@@ -146,37 +137,29 @@ static void tile_factor(int n, int *cols, int *rows) {
     *rows = n / c;
 }
 
+static int cur_backend;
+
 static void build_slide_fmt(slide *s, int fmt) {
-    free_programs();
-    if (draw_layout.uni) { free(draw_layout.uni->data); free(draw_layout.uni); }
     s->fmt = fmt_enums[fmt];
-
-    builder *builder = umbra_draw_build(s->shader, s->coverage, s->blend, fmt_enums[fmt],
-                                        &draw_layout);
-    struct umbra_basic_block *bb = umbra_basic_block(builder);
-    umbra_builder_free(builder);
-
-    for (int i = 0; i < NUM_BACKENDS; i++) {
-        programs[i] = bes[i] ? bes[i]->compile(bes[i], bb) : NULL;
+    if (bes[cur_backend]) {
+        s->prepare(s, 640, 480, bes[cur_backend]);
     }
-    umbra_basic_block_free(saved_bb);
-    saved_bb = bb;
-
+    saved_bb = (s->get_bb) ? s->get_bb(s) : NULL;
     build_pipes(fmt);
 }
 
 static int pick_backend(int cur) {
-    if (programs[cur]) { return cur; }
+    if (bes[cur]) { return cur; }
     for (int i = 1; i < NUM_BACKENDS; i++) {
         int b = (cur + i) % NUM_BACKENDS;
-        if (programs[b]) { return b; }
+        if (bes[b]) { return b; }
     }
     return 0;
 }
 static int next_backend(int cur) {
     for (int i = 1; i <= NUM_BACKENDS; i++) {
         int b = (cur + i) % NUM_BACKENDS;
-        if (programs[b]) { return b; }
+        if (bes[b]) { return b; }
     }
     return cur;
 }
@@ -241,13 +224,11 @@ typedef struct {
     slide *s;
     int    W, H, y0, y1;
     void  *buf;
-    umbra_draw_layout const *lay;
-    struct umbra_program    *prog;
 } tile_work;
 
 static void tile_fn(void *arg) {
     tile_work *tw = arg;
-    tw->s->draw(tw->s, tw->W, tw->H, tw->y0, tw->y1, tw->buf, tw->lay, tw->prog);
+    tw->s->draw(tw->s, tw->W, tw->H, tw->y0, tw->y1, tw->buf);
 }
 
 int main(void) {
@@ -295,8 +276,8 @@ int main(void) {
 
     int cur_slide = slide_count() - 1;
     int cur_fmt = FMT_8888;
+    cur_backend = pick_backend(1);
     build_slide_fmt(slide_get(cur_slide), cur_fmt);
-    int cur_backend = pick_backend(1);
 
     uint64_t fps_start = SDL_GetPerformanceCounter();
     int      fps_frames = 0;
@@ -320,6 +301,8 @@ int main(void) {
                     next = (cur_slide + slide_count() - 1) % slide_count();
                 } else if (ev.key.key == SDLK_B) {
                     cur_backend = next_backend(cur_backend);
+                    slide *s = slide_get(cur_slide);
+                    if (bes[cur_backend]) { s->prepare(s, W, H, bes[cur_backend]); }
                     rebuild_xtra(cur_backend);
                 } else if (ev.key.key == SDLK_C) {
                     cur_fmt = (cur_fmt + 1) % NUM_FMTS;
@@ -347,8 +330,7 @@ int main(void) {
         }
         if (!running) { break; }
 
-        slide                *s = slide_get(cur_slide);
-        struct umbra_program *b = programs[cur_backend];
+        slide *s = slide_get(cur_slide);
 
         size_t bpp = umbra_fmt_size(fmt_enums[cur_fmt]);
         size_t row_bytes = (size_t)W * bpp;
@@ -366,18 +348,16 @@ int main(void) {
 
         {
             int nt = n_threads;
+            if (!saved_bb && nt > 1) { nt = 1; }
             int sh = (H + nt - 1) / nt;
 
             tile_work *work = malloc((size_t)nt * sizeof *work);
             for (int t = 0; t < nt; t++) {
                 int y0 = t * sh;
                 int y1 = y0 + sh > H ? H : y0 + sh;
-                struct umbra_program *tp;
-                if (!bes[cur_backend]->threadsafe) { tp = b; }
-                else { tp = t == 0 ? b : xtra_progs[t]; }
-                work[t] = (tile_work){s, W, H, y0, y1, pixbuf, &draw_layout, tp};
+                work[t] = (tile_work){s, W, H, y0, y1, pixbuf};
             }
-            if (!bes[cur_backend]->threadsafe) {
+            if (!bes[cur_backend]->threadsafe || nt <= 1) {
                 for (int t = 0; t < nt; t++) { tile_fn(&work[t]); }
             } else {
                 work_group wg = {.pool = pool};
@@ -438,9 +418,6 @@ int main(void) {
     thread_pool_free(pool);
     free_xtra();
     free(xtra_progs);
-    umbra_basic_block_free(saved_bb);
-    free_programs();
-    if (draw_layout.uni) { free(draw_layout.uni->data); free(draw_layout.uni); }
     free_pipes();
     for (int i = 0; i < NUM_BACKENDS; i++) { if (bes[i]) { bes[i]->free(bes[i]); } }
     pipe_be->free(pipe_be);

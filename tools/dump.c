@@ -43,17 +43,8 @@ static struct umbra_builder *build_srcover(void) {
 #define JIT_EXT "avx2"
 #endif
 
-static void dump_bb(char const *dir, char const *name, struct umbra_builder *b) {
+static void dump_bb(char const *dir, char const *name, struct umbra_basic_block *bb) {
     char p[128];
-    {
-        snprintf(p, sizeof p, "%s/%s.builder", dir, name);
-        FILE *f = fopen(p, "w");
-        umbra_builder_dump(b, f);
-        fclose(f);
-    }
-
-    struct umbra_basic_block *bb = umbra_basic_block(b);
-    umbra_builder_free(b);
     {
         snprintf(p, sizeof p, "%s/%s.bb", dir, name);
         FILE *f = fopen(p, "w");
@@ -80,7 +71,6 @@ static void dump_bb(char const *dir, char const *name, struct umbra_builder *b) 
         "metal",
         "vulkan",
     };
-    umbra_basic_block_free(bb);
     for (int i = 0; i < nb; i++) {
         if (!progs[i]) { continue; }
         snprintf(p, sizeof p, "%s/%s.%s", dir, name, exts[i]);
@@ -92,6 +82,19 @@ static void dump_bb(char const *dir, char const *name, struct umbra_builder *b) 
     for (int i = 0; i < (int)(sizeof bes / sizeof bes[0]); i++) {
         if (bes[i]) { bes[i]->free(bes[i]); }
     }
+}
+
+static void dump_builder(char const *dir, char const *name, struct umbra_builder *b) {
+    char p[128];
+    snprintf(p, sizeof p, "%s/%s.builder", dir, name);
+    FILE *f = fopen(p, "w");
+    umbra_builder_dump(b, f);
+    fclose(f);
+
+    struct umbra_basic_block *bb = umbra_basic_block(b);
+    umbra_builder_free(b);
+    dump_bb(dir, name, bb);
+    umbra_basic_block_free(bb);
 }
 
 static void slugify(char const *title, char *out, size_t sz) {
@@ -111,21 +114,28 @@ static void slugify(char const *title, char *out, size_t sz) {
 }
 
 int main(void) {
-    dump_bb("dumps", "srcover", build_srcover());
+    dump_builder("dumps", "srcover", build_srcover());
 
-    slides_init_for_dump();
+    slides_init(64, 48);
 
     for (int i = 0; i < slide_count(); i++) {
         slide *s = slide_get(i);
-        char   dir[128];
+        if (!s->get_bb) { continue; }
+        struct umbra_basic_block *bb = s->get_bb(s);
+        if (!bb) { continue; }
+        char dir[128];
         slugify(s->title, dir, sizeof dir);
         mkdir(dir, 0755);
-
-        dump_bb(dir, "draw",
-                umbra_draw_build(s->shader, s->coverage, s->blend, s->fmt, NULL));
+        dump_bb(dir, "draw", bb);
     }
 
-    dump_bb("dumps", "slug_acc", slug_build_acc(NULL));
+    {
+        struct umbra_builder *b = slug_build_acc(NULL);
+        struct umbra_basic_block *bb = umbra_basic_block(b);
+        umbra_builder_free(b);
+        dump_bb("dumps", "slug_acc", bb);
+        umbra_basic_block_free(bb);
+    }
 
     slides_cleanup();
     return 0;

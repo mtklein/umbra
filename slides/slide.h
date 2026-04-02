@@ -6,25 +6,20 @@
 typedef struct slide slide;
 
 struct slide {
-    char const        *title;
-    umbra_shader_fn    shader;
-    umbra_coverage_fn  coverage;
-    umbra_blend_fn     blend;
-    enum umbra_fmt     fmt;
-    float              color[8];
-    float              grad[4];
-    uint32_t           bg;
+    char const     *title;
+    enum umbra_fmt  fmt;
+    uint32_t        bg;
 
     void (*init)   (slide*, int w, int h);
     void (*animate)(slide*, float dt);
-    void (*prepare)(slide*, int w, int h,
-                    struct umbra_backend*);
-    void (*draw)   (slide*, int w, int h,
-                    int y0, int y1, void *buf,
-                    umbra_draw_layout const*,
-                    struct umbra_program*);
+    void (*prepare)(slide*, int w, int h, struct umbra_backend*);
+    void (*draw)   (slide*, int w, int h, int y0, int y1, void *buf);
     void (*cleanup)(slide*);
-    void           *state;
+
+    // Optional: return a basic block for IR dump tools.
+    struct umbra_basic_block *(*get_bb)(slide*);
+
+    void *state;
 };
 
 int    slide_count        (void);

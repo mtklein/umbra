@@ -35,17 +35,8 @@ static void render_slide(char const *label, struct umbra_backend *be, slide *s) 
     struct umbra_program *rb_prog = be->compile(be, rbb);
     umbra_basic_block_free(rbb);
 
-    // Draw pipe
-    umbra_draw_layout lay;
-    struct umbra_builder *bld = umbra_draw_build(s->shader, s->coverage, s->blend, umbra_fmt_8888, &lay);
-    struct umbra_basic_block *dbb = umbra_basic_block(bld);
-    umbra_builder_free(bld);
-    struct umbra_program *draw_prog = be->compile(be, dbb);
-    umbra_basic_block_free(dbb);
-
     void *pixbuf = calloc(1, (size_t)(W * H * bpp));
 
-    // Fill bg
     float hc[4] = {
         (float)(s->bg & 0xFFu) / 255.0f,
         (float)((s->bg >> 8) & 0xFFu) / 255.0f,
@@ -63,13 +54,12 @@ static void render_slide(char const *label, struct umbra_backend *be, slide *s) 
     }
     be->flush(be);
 
-    // Draw
     s->init(s, W, H);
     if (s->animate) s->animate(s, 0.016f);
-    s->draw(s, W, H, 0, H, pixbuf, &lay, draw_prog);
+    s->prepare(s, W, H, be);
+    s->draw(s, W, H, 0, H, pixbuf);
     be->flush(be);
 
-    // Readback
     uint32_t *rgba = calloc((size_t)(W * H), 4);
     for (int y = 0; y < H; y++) {
         void *src = (char*)pixbuf + y * W * bpp;
@@ -91,9 +81,7 @@ static void render_slide(char const *label, struct umbra_backend *be, slide *s) 
     free(pixbuf); free(rgba);
     fill_prog->free(fill_prog);
     rb_prog->free(rb_prog);
-    draw_prog->free(draw_prog);
     if (fill_uni) { free(fill_uni->data); free(fill_uni); }
-    if (lay.uni) { free(lay.uni->data); free(lay.uni); }
 }
 
 int main(void) {

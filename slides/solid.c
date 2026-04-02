@@ -4,11 +4,20 @@
 typedef struct {
     float rx, ry, vx, vy;
     float rect_w, rect_h;
+    float color[4];
     int   w, h;
+
+    umbra_shader_fn    shader;
+    umbra_coverage_fn  coverage;
+    umbra_blend_fn     blend;
+
+    umbra_draw_layout          lay;
+    struct umbra_basic_block  *bb;
+    struct umbra_program      *prog;
 } solid_state;
 
 static void solid_init(slide *s, int w, int h) {
-    solid_state *st = malloc(sizeof *st);
+    solid_state *st = s->state;
     st->w = w;
     st->h = h;
     st->rect_w = (float)w * 5.0f / 16.0f;
@@ -17,7 +26,11 @@ static void solid_init(slide *s, int w, int h) {
     st->ry = (float)h / 6.0f;
     st->vx = 1.5f;
     st->vy = 1.1f;
-    s->state = st;
+
+    struct umbra_builder *b = umbra_draw_build(st->shader, st->coverage, st->blend, s->fmt,
+                                                &st->lay);
+    st->bb = umbra_basic_block(b);
+    umbra_builder_free(b);
 }
 
 static void solid_animate(slide *s, float dt) {
@@ -25,48 +38,44 @@ static void solid_animate(slide *s, float dt) {
     (void)dt;
     st->rx += st->vx;
     st->ry += st->vy;
-    if (st->rx < 0.0f) {
-        st->rx = 0.0f;
-        st->vx = -st->vx;
-    }
-    if ((float)st->w < st->rx + st->rect_w) {
-        st->rx = (float)st->w - st->rect_w;
-        st->vx = -st->vx;
-    }
-    if (st->ry < 0.0f) {
-        st->ry = 0.0f;
-        st->vy = -st->vy;
-    }
-    if ((float)st->h < st->ry + st->rect_h) {
-        st->ry = (float)st->h - st->rect_h;
-        st->vy = -st->vy;
-    }
+    if (st->rx < 0.0f) { st->rx = 0.0f; st->vx = -st->vx; }
+    if ((float)st->w < st->rx + st->rect_w) { st->rx = (float)st->w - st->rect_w; st->vx = -st->vx; }
+    if (st->ry < 0.0f) { st->ry = 0.0f; st->vy = -st->vy; }
+    if ((float)st->h < st->ry + st->rect_h) { st->ry = (float)st->h - st->rect_h; st->vy = -st->vy; }
 }
 
-static void solid_draw(slide *s, int w, int h, int y0, int y1, void *buf,
-                          umbra_draw_layout const *lay, struct umbra_program *program) {
+static void solid_prepare(slide *s, int w, int h, struct umbra_backend *be) {
+    (void)w; (void)h;
     solid_state *st = s->state;
-    float        rect[4] = {
-        st->rx,
-        st->ry,
-        st->rx + st->rect_w,
-        st->ry + st->rect_h,
-    };
-    float hc[4];
-    for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
-    umbra_uniforms_fill_f32(lay->uni, lay->shader, hc, 4);
-    if (s->coverage) { umbra_uniforms_fill_f32(lay->uni, lay->coverage, rect, 4); }
+    if (st->prog) { st->prog->free(st->prog); }
+    st->prog = be->compile(be, st->bb);
+}
+
+static void solid_draw(slide *s, int w, int h, int y0, int y1, void *buf) {
+    solid_state *st = s->state;
+    float rect[4] = { st->rx, st->ry, st->rx + st->rect_w, st->ry + st->rect_h };
+    umbra_uniforms_fill_f32(st->lay.uni, st->lay.shader, st->color, 4);
+    if (st->coverage) { umbra_uniforms_fill_f32(st->lay.uni, st->lay.coverage, rect, 4); }
     size_t    pb = umbra_fmt_size(s->fmt);
     size_t plane_sz = (size_t)w * (size_t)h * pb;
-    struct umbra_buf ubuf[2];
     size_t rb = (size_t)w * pb;
-    ubuf[0] = (struct umbra_buf){.ptr=lay->uni->data, .sz=lay->uni->size, .read_only=1};
-    ubuf[1] = (struct umbra_buf){.ptr=buf, .sz=plane_sz * (s->fmt == umbra_fmt_fp16_planar ? 4 : 1), .row_bytes=rb};
-    program->queue(program, 0, y0, w, y1, ubuf);
+    struct umbra_buf ubuf[] = {
+        {.ptr=st->lay.uni->data, .sz=st->lay.uni->size, .read_only=1},
+        {.ptr=buf, .sz=plane_sz * (s->fmt == umbra_fmt_fp16_planar ? 4 : 1), .row_bytes=rb},
+    };
+    st->prog->queue(st->prog, 0, y0, w, y1, ubuf);
+}
+
+static struct umbra_basic_block *solid_get_bb(slide *s) {
+    return ((solid_state *)s->state)->bb;
 }
 
 static void solid_cleanup(slide *s) {
-    free(s->state);
+    solid_state *st = s->state;
+    if (st->prog) { st->prog->free(st->prog); }
+    umbra_basic_block_free(st->bb);
+    if (st->lay.uni) { free(st->lay.uni->data); free(st->lay.uni); }
+    free(st);
     s->state = NULL;
 }
 
@@ -75,17 +84,21 @@ slide slide_solid(char const *, uint32_t, float const[4], umbra_coverage_fn,
 
 slide slide_solid(char const *title, uint32_t bg, float const color[4],
                   umbra_coverage_fn coverage, umbra_blend_fn blend, enum umbra_fmt fmt) {
+    solid_state *st = calloc(1, sizeof *st);
+    st->shader = umbra_shader_solid;
+    st->coverage = coverage;
+    st->blend = blend;
+    for (int i = 0; i < 4; i++) { st->color[i] = color[i]; }
     return (slide){
         .title = title,
         .bg = bg,
-        .shader = umbra_shader_solid,
-        .coverage = coverage,
-        .blend = blend,
         .fmt = fmt,
-        .color = {color[0], color[1], color[2], color[3]},
         .init = solid_init,
         .animate = solid_animate,
+        .prepare = solid_prepare,
         .draw = solid_draw,
         .cleanup = solid_cleanup,
+        .get_bb = solid_get_bb,
+        .state = st,
     };
 }

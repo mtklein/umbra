@@ -4,12 +4,16 @@
 typedef struct {
     float                     persp_t;
     float                     mat[11];
+    float                     color[4];
     slug_curves              *slug;
     int                       w, h;
     float                    *wind_buf;
     slug_acc_layout           acc_lay;
     struct umbra_basic_block *acc_bb;
     struct umbra_program     *acc_prog;
+    umbra_draw_layout         draw_lay;
+    struct umbra_basic_block *draw_bb;
+    struct umbra_program     *draw_prog;
 } slug_state;
 
 static void slug_init(slide *s, int w, int h) {
@@ -21,6 +25,11 @@ static void slug_init(slide *s, int w, int h) {
 
     struct umbra_builder *b = slug_build_acc(&st->acc_lay);
     st->acc_bb = umbra_basic_block(b);
+    umbra_builder_free(b);
+
+    b = umbra_draw_build(umbra_shader_solid, umbra_coverage_wind, umbra_blend_srcover, s->fmt,
+                         &st->draw_lay);
+    st->draw_bb = umbra_basic_block(b);
     umbra_builder_free(b);
 
     slide_perspective_matrix(st->mat, 0.0f, w, h, (int)st->slug->w, (int)st->slug->h);
@@ -41,13 +50,15 @@ static void slug_animate(slide *s, float dt) {
 static void slug_prepare(slide *s, int w, int h, struct umbra_backend *be) {
     (void)w; (void)h;
     slug_state *st = s->state;
+    if (st->acc_prog) { st->acc_prog->free(st->acc_prog); }
     st->acc_prog = be->compile(be, st->acc_bb);
+    if (st->draw_prog) { st->draw_prog->free(st->draw_prog); }
+    st->draw_prog = be->compile(be, st->draw_bb);
 }
 
-static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
-                       umbra_draw_layout const *lay, struct umbra_program *program) {
+static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf) {
     slug_state           *st = s->state;
-    struct umbra_backend *be = program->backend;
+    struct umbra_backend *be = st->draw_prog->backend;
     struct umbra_program *acc = st->acc_prog;
 
     size_t wind_sz  = (size_t)w * (size_t)h * sizeof(float);
@@ -71,28 +82,32 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
         acc->queue(acc, 0, y0, w, y1, abuf);
     }
     be->flush(be);
-    acc->free(acc);
-    st->acc_prog = 0;
 
-    float hc[4];
-    for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
-    umbra_uniforms_fill_f32(lay->uni, lay->shader, hc, 4);
-    umbra_uniforms_fill_ptr(lay->uni, lay->coverage,
+    umbra_uniforms_fill_f32(st->draw_lay.uni, st->draw_lay.shader, st->color, 4);
+    umbra_uniforms_fill_ptr(st->draw_lay.uni, st->draw_lay.coverage,
                   (struct umbra_buf){.ptr=st->wind_buf, .sz=wind_sz, .read_only=1, .row_bytes=(size_t)w * sizeof(float)});
     size_t    pb = umbra_fmt_size(s->fmt);
     size_t plane_sz = (size_t)w * (size_t)h * pb;
     struct umbra_buf rbuf[2];
     size_t rb = (size_t)w * pb;
-    rbuf[0] = (struct umbra_buf){.ptr=lay->uni->data, .sz=lay->uni->size, .read_only=1};
+    rbuf[0] = (struct umbra_buf){.ptr=st->draw_lay.uni->data, .sz=st->draw_lay.uni->size, .read_only=1};
     rbuf[1] = (struct umbra_buf){.ptr=buf, .sz=plane_sz * (s->fmt == umbra_fmt_fp16_planar ? 4 : 1), .row_bytes=rb};
-    program->queue(program, 0, y0, w, y1, rbuf);
+    st->draw_prog->queue(st->draw_prog, 0, y0, w, y1, rbuf);
+}
+
+static struct umbra_basic_block *slug_get_bb(slide *s) {
+    return ((slug_state *)s->state)->draw_bb;
 }
 
 static void slug_cleanup(slide *s) {
     slug_state *st = s->state;
     free(st->wind_buf);
+    if (st->acc_prog) { st->acc_prog->free(st->acc_prog); st->acc_prog = 0; }
     umbra_basic_block_free(st->acc_bb);
     if (st->acc_lay.uni) { free(st->acc_lay.uni->data); free(st->acc_lay.uni); }
+    if (st->draw_prog) { st->draw_prog->free(st->draw_prog); }
+    umbra_basic_block_free(st->draw_bb);
+    if (st->draw_lay.uni) { free(st->draw_lay.uni->data); free(st->draw_lay.uni); }
     free(st);
     s->state = NULL;
 }
@@ -102,19 +117,20 @@ slide slide_slug_wind(slug_curves *);
 slide slide_slug_wind(slug_curves *sc) {
     slug_state *st = calloc(1, sizeof *st);
     st->slug = sc;
+    st->color[0] = 0.2f;
+    st->color[1] = 1.0f;
+    st->color[2] = 0.6f;
+    st->color[3] = 1.0f;
     return (slide){
         .title = "14. Slug Text (Bezier)",
-        .shader = umbra_shader_solid,
-        .coverage = umbra_coverage_wind,
-        .blend = umbra_blend_srcover,
         .fmt = umbra_fmt_8888,
-        .color = {0.2f, 1.0f, 0.6f, 1.0f},
         .bg = 0xff0a0a1e,
         .init = slug_init,
         .animate = slug_animate,
         .prepare = slug_prepare,
         .draw = slug_draw,
         .cleanup = slug_cleanup,
+        .get_bb = slug_get_bb,
         .state = st,
     };
 }
