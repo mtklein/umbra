@@ -498,6 +498,47 @@ static void test_vex_2byte_vs_3byte(void) {
     free(b.buf);
 }
 
+static void test_vmovd_vmovq_vpsrldq(void) {
+    struct Buf b = {0};
+
+    // VMOVD xmm0, eax: C5 F9 6E C0
+    vmovd_from_gpr(&b, 0, RAX);
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xF9, 0x6E, 0xC0}) here;
+    reset(&b);
+
+    // VMOVD eax, xmm0: C5 F9 7E C0
+    vmovd_to_gpr(&b, RAX, 0);
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xF9, 0x7E, 0xC0}) here;
+    reset(&b);
+
+    // VMOVD xmm1, [rax+rcx*4]: C4 E1 79 6E 0C 88
+    vmovd_load(&b, 1, RAX, RCX, 4, 0);
+    bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE1, 0x79, 0x6E, 0x0C, 0x88}) here;
+    reset(&b);
+
+    // VMOVD [rax+rcx*4], xmm1: C4 E1 79 7E 0C 88
+    vmovd_store(&b, 1, RAX, RCX, 4, 0);
+    bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE1, 0x79, 0x7E, 0x0C, 0x88}) here;
+    reset(&b);
+
+    // VMOVQ xmm2, [rax+rcx*8]: C4 E1 7A 7E 14 C8
+    vmovq_load(&b, 2, RAX, RCX, 8, 0);
+    bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE1, 0x7A, 0x7E, 0x14, 0xC8}) here;
+    reset(&b);
+
+    // VMOVQ [rax+rcx*8], xmm2: C4 E1 79 D6 14 C8
+    vmovq_store(&b, 2, RAX, RCX, 8, 0);
+    bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE1, 0x79, 0xD6, 0x14, 0xC8}) here;
+    reset(&b);
+
+    // VPSRLDQ xmm3, xmm4, 2: C5 E1 73 DC 02
+    vpsrldq(&b, 3, 4, 2);
+    bytes_eq(&b, 5, (uint8_t[]){0xC5, 0xE1, 0x73, 0xDC, 0x02}) here;
+    reset(&b);
+
+    free(b.buf);
+}
+
 int main(void) {
     test_emit();
     test_ret_vzeroupper_nop();
@@ -518,5 +559,6 @@ int main(void) {
     test_vex_helpers();
     test_large_disp();
     test_vex_2byte_vs_3byte();
+    test_vmovd_vmovq_vpsrldq();
     return 0;
 }

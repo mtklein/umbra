@@ -1626,7 +1626,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 
         case op_x: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            vex(c, 1, 1, 0, 0, s.rd, 0, XI, 0x6e);
+            vmovd_from_gpr(c, s.rd, XI);
             if (!scalar) {
                 vbroadcastss(c, s.rd, s.rd);
                 uint32_t iota8[8] = {0, 1, 2, 3, 4, 5, 6, 7};
@@ -1639,7 +1639,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_y: {
             // y = row counter XY, broadcast.
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            vex(c, 1, 1, 0, 0, s.rd, 0, XY, 0x6e);  // VMOVD xmm, XY
+            vmovd_from_gpr(c, s.rd, XY);
             if (!scalar) {
                 vbroadcastss(c, s.rd, s.rd);
             }
@@ -1650,7 +1650,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int            p = inst->ptr;
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {
-                vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, XI, 4, 0);
+                vmovd_load(c, s.rd, base, XI, 4, 0);
             } else {
                 vmov_load(c, 1, s.rd, base, XI, 4, 0);
             }
@@ -1672,7 +1672,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
                     emit1(c, (uint8_t)((1 << 6) | ((XI & 7) << 3) | (base & 7)));
                 }
-                vex(c, 1, 1, 0, 0, s.rd, 0, RAX, 0x6e);
+                vmovd_from_gpr(c, s.rd, RAX);
             } else {
                 // Load 128-bit (8 x u16)
                 vmov_load(c, 0, s.rd, base, XI, 2, 0);
@@ -1684,7 +1684,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int    p = inst->ptr;
             int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {
-                vex_mem(c, 1, 1, 0, 0, ry, 0, 0x7e, base, XI, 4, 0);
+                vmovd_store(c, ry, base, XI, 4, 0);
             } else {
                 vmov_store(c, 1, ry, base, XI, 4, 0);
             }
@@ -1704,16 +1704,11 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t t1 = ra_alloc(ra, sl, ns);
 
             if (scalar) {
-                // Load 8 bytes (1 pixel, 4x u16) via VMOVQ.
-                vex_mem(c, 2, 1, 0, 0, px, 0, 0x7e, base, XI, 8, 0);
-                // Extract each u16 channel via VPSRLDQ byte shifts.
+                vmovq_load(c, px, base, XI, 8, 0);
                 vmovaps(c, s0.rd, px);
-                // VPSRLDQ r1, px, 2: shift right 2 bytes -> G at position 0
-                vex(c, 1, 1, 0, 0, 3, r1, px, 0x73); emit1(c, 2);
-                // VPSRLDQ r2, px, 4: shift right 4 bytes -> B at position 0
-                vex(c, 1, 1, 0, 0, 3, r2, px, 0x73); emit1(c, 4);
-                // VPSRLDQ r3, px, 6: shift right 6 bytes -> A at position 0
-                vex(c, 1, 1, 0, 0, 3, r3, px, 0x73); emit1(c, 6);
+                vpsrldq(c, r1, px, 2);
+                vpsrldq(c, r2, px, 4);
+                vpsrldq(c, r3, px, 6);
             } else {
                 // Re-load raw data.
                 vmov_load(c, 1, t0, base, XI, 8, 0);   // pixels 0-3 raw
@@ -1840,7 +1835,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                         emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
                         emit1(c, (uint8_t)((1 << 6) | ((XI & 7) << 3) | (R11 & 7)));
                     }
-                    vex(c, 1, 1, 0, 0, s0.rd, 0, RAX, 0x6e);
+                    vmovd_from_gpr(c, s0.rd, RAX);
 
                     // Plane 1 (G): advance R11 by plane_stride
                     rex_w(c, RBX, R11);
@@ -1855,7 +1850,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                         emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
                         emit1(c, (uint8_t)((1 << 6) | ((XI & 7) << 3) | (R11 & 7)));
                     }
-                    vex(c, 1, 1, 0, 0, r1, 0, RAX, 0x6e);
+                    vmovd_from_gpr(c, r1, RAX);
 
                     // Plane 2 (B): advance R11 by plane_stride
                     rex_w(c, RBX, R11);
@@ -1870,7 +1865,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                         emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
                         emit1(c, (uint8_t)((1 << 6) | ((XI & 7) << 3) | (R11 & 7)));
                     }
-                    vex(c, 1, 1, 0, 0, r2, 0, RAX, 0x6e);
+                    vmovd_from_gpr(c, r2, RAX);
 
                     // Plane 3 (A): advance R11 by plane_stride
                     rex_w(c, RBX, R11);
@@ -1885,7 +1880,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                         emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
                         emit1(c, (uint8_t)((1 << 6) | ((XI & 7) << 3) | (R11 & 7)));
                     }
-                    vex(c, 1, 1, 0, 0, r3, 0, RAX, 0x6e);
+                    vmovd_from_gpr(c, r3, RAX);
                 } else {
                     // Plane 0 (R): load 8 x u16 (16 bytes)
                     vmov_load(c, 0, s0.rd, R11, XI, 2, 0);
@@ -1935,8 +1930,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 vex_rrr(c, 1, 1, 0, 0x61, px, rr, rg);     // VPUNPCKLWD [R,G,?,?...]
                 vex_rrr(c, 1, 1, 0, 0x61, t, rb_, ra_v);   // VPUNPCKLWD [B,A,?,?...]
                 vex_rrr(c, 1, 1, 0, 0x62, z, px, t);       // VPUNPCKLDQ [R,G,B,A,?,?...]
-                // VMOVQ [base + XI*8], z (store 8 bytes)
-                vex_mem(c, 1, 1, 0, 0, z, 0, 0xd6, base, XI, 8, 0);
+                vmovq_store(c, z, base, XI, 8, 0);
             } else {
                 // Inputs are 8 x u16 in XMM.
                 // Interleave to pixel order. Process low 4 then high 4 pixels.
@@ -1978,7 +1972,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 shr_ri(c, RBX, 2);
                 if (scalar) {
                     // Plane 0 (R): VMOVD eax, rr; MOV word [R11+XI*2], ax
-                    vex(c, 1, 1, 0, 0, rr, 0, RAX, 0x7e);
+                    vmovd_to_gpr(c, RAX, rr);
                     {
                         emit1(c, 0x66);
                         uint8_t rex = 0x40;
@@ -1994,7 +1988,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     rex_w(c, RBX, R11);
                     emit1(c, 0x01);
                     emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
-                    vex(c, 1, 1, 0, 0, rg, 0, RAX, 0x7e);
+                    vmovd_to_gpr(c, RAX, rg);
                     {
                         emit1(c, 0x66);
                         uint8_t rex = 0x40;
@@ -2010,7 +2004,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     rex_w(c, RBX, R11);
                     emit1(c, 0x01);
                     emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
-                    vex(c, 1, 1, 0, 0, rb_, 0, RAX, 0x7e);
+                    vmovd_to_gpr(c, RAX, rb_);
                     {
                         emit1(c, 0x66);
                         uint8_t rex = 0x40;
@@ -2026,7 +2020,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     rex_w(c, RBX, R11);
                     emit1(c, 0x01);
                     emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
-                    vex(c, 1, 1, 0, 0, ra_v, 0, RAX, 0x7e);
+                    vmovd_to_gpr(c, RAX, ra_v);
                     {
                         emit1(c, 0x66);
                         uint8_t rex = 0x40;
@@ -2078,7 +2072,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t mask = ra_alloc(ra, sl, ns);
             broadcast_imm32(c, mask, 0xFF);
             if (scalar) {
-                vex_mem(c, 1, 1, 0, 0, px, 0, 0x6e, base, XI, 4, 0);
+                vmovd_load(c, px, base, XI, 4, 0);
             } else {
                 vmov_load(c, 1, px, base, XI, 4, 0);
             }
@@ -2107,8 +2101,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             vpslld_i(c, t, rb_, 16);  vpor(c, L, px, px, t);
             vpslld_i(c, t, ra_v, 24); vpor(c, L, px, px, t);
             if (scalar) {
-                // VMOVD [base + XI*4], px: VEX.128.66.0F.W0 7E /r
-                vex_mem(c, 1, 1, 0, 0, px, 0, 0x7e, base, XI, 4, 0);
+                vmovd_store(c, px, base, XI, 4, 0);
             } else {
                 vmov_store(c, 1, px, base, XI, 4, 0);
             }
@@ -2126,7 +2119,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {
                 // VMOVD eax, xmm
-                vex(c, 1, 1, 0, 0, ry, 0, RAX, 0x7e);
+                vmovd_to_gpr(c, RAX, ry);
                 // MOV word [base + R10*2], ax
                 {
                     emit1(c, 0x66);
@@ -2176,13 +2169,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t         rx = ra_ensure(ra, sl, ns, (int)inst->x.id);
             int            p = inst->ptr;
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
+            vmovd_to_gpr(c, RAX, rx);
             free_chan(ra, inst->x, i);
             load_count_x86(c, p, 2);
             vpxor(c, scalar ? 0 : 1, s.rd, s.rd, s.rd);
             cmp_rr(c, RAX, XM);
             int skip = jcc(c, 0x03);
-            vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, RAX, 4, 0);
+            vmovd_load(c, s.rd, base, RAX, 4, 0);
             if (!scalar) {
                 vbroadcastss(c, s.rd, s.rd);
             }
@@ -2195,13 +2188,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int            p = inst->ptr;
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {
-                vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
+                vmovd_to_gpr(c, RAX, rx);
                 free_chan(ra, inst->x, i);
                 load_count_x86(c, p, 2);
                 vpxor(c, 0, s.rd, s.rd, s.rd);
                 cmp_rr(c, RAX, XM);
                 int skip = jcc(c, 0x03);
-                vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, RAX, 4, 0);
+                vmovd_load(c, s.rd, base, RAX, 4, 0);
                 patch_jcc(c, skip);
             } else {
                 int8_t mask = ra_alloc(ra, sl, ns);
@@ -2210,7 +2203,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 // Build in-bounds mask: (ix >= 0) AND (ix < count)
                 vpxor(c, 1, mask, mask, mask);
                 vpcmpgtd(c, mask, mask, rx);          // mask = (0 > ix) = neg lanes
-                vex(c, 1, 1, 0, 0, cnt, 0, XM, 0x6e);
+                vmovd_from_gpr(c, cnt, XM);
                 vbroadcastss(c, cnt, cnt);             // cnt = broadcast(count)
                 vpcmpgtd(c, cnt, cnt, rx);             // cnt = (count > ix)
                 // in_bounds = NOT(neg) AND (count > ix) = VPANDN(neg, count>ix)
@@ -2239,19 +2232,19 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 free_chan(ra, inst->x, i);
                 load_count_x86(c, p, 2);
                 // gather lo
-                vex(c, 1, 1, 0, 0, hi_r, 0, RAX, 0x7e);   // vmovd eax, lo_i
+                vmovd_to_gpr(c, RAX, hi_r);   // vmovd eax, lo_i
                 vpxor(c, 0, s.rd, s.rd, s.rd);
                 cmp_rr(c, RAX, XM);
                 int skip_lo = jcc(c, 0x03);
-                vex_mem(c, 1, 1, 0, 0, s.rd, 0, 0x6e, base, RAX, 4, 0);
+                vmovd_load(c, s.rd, base, RAX, 4, 0);
                 patch_jcc(c, skip_lo);
                 // gather hi (lo_i + 1)
-                vex(c, 1, 1, 0, 0, hi_r, 0, RAX, 0x7e);
+                vmovd_to_gpr(c, RAX, hi_r);
                 add_ri(c, RAX, 1);
                 vpxor(c, 0, hi_r, hi_r, hi_r);
                 cmp_rr(c, RAX, XM);
                 int skip_hi = jcc(c, 0x03);
-                vex_mem(c, 1, 1, 0, 0, hi_r, 0, 0x6e, base, RAX, 4, 0);
+                vmovd_load(c, hi_r, base, RAX, 4, 0);
                 patch_jcc(c, skip_hi);
                 // lerp: s.rd += (hi - lo) * frac
                 vsubps(c, hi_r, hi_r, s.rd);
@@ -2268,7 +2261,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 // Use hi_r as temp for comparison results (it's free until the hi gather).
                 int8_t mask = ra_alloc(ra, sl, ns);
                 int8_t cnt = ra_alloc(ra, sl, ns);
-                vex(c, 1, 1, 0, 0, cnt, 0, XM, 0x6e);       // vmovd cnt, XM
+                vmovd_from_gpr(c, cnt, XM);       // vmovd cnt, XM
                 vbroadcastss(c, cnt, cnt);                     // cnt = broadcast(count)
                 // lo mask: !neg & (count > ix)
                 vpxor(c, 1, mask, mask, mask);
@@ -2308,7 +2301,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_count_x86(c, p, 1);
             if (scalar) {
-                vex(c, 1, 1, 0, 0, rx, 0, RAX, 0x7e);
+                vmovd_to_gpr(c, RAX, rx);
                 free_chan(ra, inst->x, i);
                 vpxor(c, 0, s.rd, s.rd, s.rd);
                 cmp_rr(c, RAX, XM);
@@ -2322,7 +2315,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
                     emit1(c, (uint8_t)((1 << 6) | ((RAX & 7) << 3) | (base & 7)));
                 }
-                vex(c, 1, 1, 0, 0, s.rd, 0, RAX, 0x6e);
+                vmovd_from_gpr(c, s.rd, RAX);
                 patch_jcc(c, skip);
             } else {
                 int8_t hi_idx = ra_alloc(ra, sl, ns);
@@ -2332,7 +2325,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     int src = (k < 4) ? rx : hi_idx;
                     int lane = k & 3;
                     if (lane == 0) {
-                        vex(c, 1, 1, 0, 0, src, 0, RAX, 0x7e);
+                        vmovd_to_gpr(c, RAX, src);
                     } else {
                         vpextrd(c, RAX, src, (uint8_t)lane);
                     }

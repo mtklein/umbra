@@ -348,3 +348,18 @@ void vextracti128(Buf *b, int d, int s, uint8_t imm) {
     vex_rrr(b, 1, 3, 1, 0x39, s, 0, d);
     emit1(b, imm);
 }
+
+// VMOVD xmm, r32: VEX.128.66.0F.W0 6E /r
+void vmovd_from_gpr(Buf *b, int xmm, int gpr) { vex(b, 1, 1, 0, 0, xmm, 0, gpr, 0x6e); }
+// VMOVD r32, xmm: VEX.128.66.0F.W0 7E /r
+void vmovd_to_gpr  (Buf *b, int gpr, int xmm) { vex(b, 1, 1, 0, 0, xmm, 0, gpr, 0x7e); }
+// VMOVD xmm, m32
+void vmovd_load (Buf *b, int r, int base, int idx, int scale, int disp) { vex_mem(b, 1, 1, 0, 0, r, 0, 0x6e, base, idx, scale, disp); }
+// VMOVD m32, xmm
+void vmovd_store(Buf *b, int r, int base, int idx, int scale, int disp) { vex_mem(b, 1, 1, 0, 0, r, 0, 0x7e, base, idx, scale, disp); }
+// VMOVQ xmm, m64: VEX.128.F3.0F.WIG 7E /r
+void vmovq_load (Buf *b, int r, int base, int idx, int scale, int disp) { vex_mem(b, 2, 1, 0, 0, r, 0, 0x7e, base, idx, scale, disp); }
+// VMOVQ m64, xmm: VEX.128.66.0F.WIG D6 /r
+void vmovq_store(Buf *b, int r, int base, int idx, int scale, int disp) { vex_mem(b, 1, 1, 0, 0, r, 0, 0xd6, base, idx, scale, disp); }
+// VPSRLDQ xmm_d, xmm_s, imm8: VEX.128.66.0F 73 /3 ib
+void vpsrldq(Buf *b, int d, int s, uint8_t imm) { vex(b, 1, 1, 0, 0, 3, d, s, 0x73); emit1(b, imm); }

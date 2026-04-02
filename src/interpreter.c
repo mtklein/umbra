@@ -138,15 +138,15 @@ static _Bool is_commutative(enum op op) {
 enum {
     SW_DONE = op_le_s32_imm + 1,
 
-#define BINARY_ENUM(name, rt, pt) op_r_##name##_mm, op_r_##name##_rm, op_m_##name##_rm,
+#define BINARY_ENUM(name) op_r_##name##_mm, op_r_##name##_rm, op_m_##name##_rm,
     BINARY_OPS(BINARY_ENUM)
 #undef BINARY_ENUM
 
-#define UNARY_ENUM(name, rt, pt) op_r_##name##_r, op_m_##name##_r,
+#define UNARY_ENUM(name) op_r_##name##_r, op_m_##name##_r,
     UNARY_OPS(UNARY_ENUM)
 #undef UNARY_ENUM
 
-#define IMM_ENUM(name, rt, pt) op_r_##name##_r, op_m_##name##_r,
+#define IMM_ENUM(name) op_r_##name##_r, op_m_##name##_r,
     IMM_OPS(IMM_ENUM)
 #undef IMM_ENUM
 
@@ -385,12 +385,12 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
             _Bool out_r = 0;
             if (lu[i] == i + 1 && i + 1 != p->preamble) {
                 int const next_tag = p->inst[i + 1].tag;
-#define CHECK_BINARY(name, rt, pt) || (next_tag == op_##name                          \
+#define CHECK_BINARY(name) || (next_tag == op_##name                                \
                     && p->inst[i + 1].x != p->inst[i + 1].y                            \
                     && (p->inst[i + 1].x == -1                                          \
                      || (p->inst[i + 1].y == -1 && is_commutative(op_##name))))
-#define CHECK_UNARY(name, rt, pt)  || next_tag == op_##name
-#define CHECK_IMM(name, rt, pt)    || next_tag == op_##name
+#define CHECK_UNARY(name)  || next_tag == op_##name
+#define CHECK_IMM(name)    || next_tag == op_##name
                 out_r = 0 BINARY_OPS(CHECK_BINARY) UNARY_OPS(CHECK_UNARY) IMM_OPS(CHECK_IMM)
                         || (next_tag == op_sel_32 && p->inst[i + 1].x == -1)
 #if defined(__ARM_FEATURE_FMA) || defined(__FMA__)
@@ -405,7 +405,7 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
 
             int const tag = s->tag;
 
-#define TRY_BINARY(name, rt, pt) \
+#define TRY_BINARY(name) \
             if (tag == op_##name) { \
                 if      ( out_r &&  x_r) { s->tag = op_r_##name##_rm; } \
                 else if (!out_r &&  x_r) { s->tag = op_m_##name##_rm; } \
@@ -414,7 +414,7 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
             BINARY_OPS(TRY_BINARY)
 #undef TRY_BINARY
 
-#define TRY_UNARY(name, rt, pt) \
+#define TRY_UNARY(name) \
             if (tag == op_##name) { \
                 if      ( out_r &&  x_r) { s->tag = op_r_##name##_r; } \
                 else if (!out_r &&  x_r) { s->tag = op_m_##name##_r; } \
@@ -422,7 +422,7 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
             UNARY_OPS(TRY_UNARY)
 #undef TRY_UNARY
 
-#define TRY_IMM(name, rt, pt) \
+#define TRY_IMM(name) \
             if (tag == op_##name) { \
                 if      ( out_r &&  x_r) { s->tag = op_r_##name##_r; } \
                 else if (!out_r &&  x_r) { s->tag = op_m_##name##_r; } \
@@ -542,18 +542,18 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                 [SW_DONE] = &&L_SW_DONE,
 
 
-#define BINARY_LABELS(name, rt, pt) \
+#define BINARY_LABELS(name) \
                 [op_r_##name##_mm] = &&L_op_r_##name##_mm, \
                 [op_r_##name##_rm] = &&L_op_r_##name##_rm, \
                 [op_m_##name##_rm] = &&L_op_m_##name##_rm,
                 BINARY_OPS(BINARY_LABELS)
 #undef BINARY_LABELS
-#define UNARY_LABELS(name, rt, pt) \
+#define UNARY_LABELS(name) \
                 [op_r_##name##_r] = &&L_op_r_##name##_r, \
                 [op_m_##name##_r] = &&L_op_m_##name##_r,
                 UNARY_OPS(UNARY_LABELS)
 #undef UNARY_LABELS
-#define IMM_LABELS(name, rt, pt) \
+#define IMM_LABELS(name) \
                 [op_r_##name##_r] = &&L_op_r_##name##_r, \
                 [op_m_##name##_r] = &&L_op_m_##name##_r,
                 IMM_OPS(IMM_LABELS)

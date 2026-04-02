@@ -107,3 +107,11 @@ void vpmovzxwd(struct Buf *b, int d, int s);
 void vpgatherdd(struct Buf *b, int dst, int base, int idx, int scale, int mask);
 void vpextrd(struct Buf *b, int gpr, int xmm, uint8_t imm);
 void vextracti128(struct Buf *b, int d, int s, uint8_t imm);
+
+void vmovd_from_gpr(struct Buf *b, int xmm, int gpr);
+void vmovd_to_gpr  (struct Buf *b, int gpr, int xmm);
+void vmovd_load (struct Buf *b, int reg, int base, int index, int scale, int disp);
+void vmovd_store(struct Buf *b, int reg, int base, int index, int scale, int disp);
+void vmovq_load (struct Buf *b, int reg, int base, int index, int scale, int disp);
+void vmovq_store(struct Buf *b, int reg, int base, int index, int scale, int disp);
+void vpsrldq(struct Buf *b, int d, int s, uint8_t imm);
