@@ -30,20 +30,20 @@ static int ptr_ix(umbra_ptr p) { return p.bits; }
 _Bool is_store(enum op op) {
     return op == op_store_16
         || op == op_store_32
-        || op == op_store_fp16x4
-        || op == op_store_fp16x4_planar;
+        || op == op_store_16x4
+        || op == op_store_16x4_planar;
 }
 _Bool has_ptr(enum op op) {
     return op == op_uniform_32
         || op == op_load_32
-        || op == op_load_fp16x4
-        || op == op_load_fp16x4_planar
+        || op == op_load_16x4
+        || op == op_load_16x4_planar
         || op == op_gather_uniform_32
         || op == op_gather_32
         || op == op_sample_32
         || op == op_store_32
-        || op == op_store_fp16x4
-        || op == op_store_fp16x4_planar
+        || op == op_store_16x4
+        || op == op_store_16x4_planar
         || op == op_deref_ptr
         || op == op_load_16
         || op == op_store_16
@@ -75,12 +75,12 @@ _Bool is_varying(enum op op) {
         || op == op_y
         || op == op_load_16
         || op == op_load_32
-        || op == op_load_fp16x4
-        || op == op_load_fp16x4_planar
+        || op == op_load_16x4
+        || op == op_load_16x4_planar
         || op == op_store_16
         || op == op_store_32
-        || op == op_store_fp16x4
-        || op == op_store_fp16x4_planar;
+        || op == op_store_16x4
+        || op == op_store_16x4_planar;
 }
 
 static _Bool is_pow2(int x) { return __builtin_popcount((unsigned)x) == 1; }
@@ -230,7 +230,7 @@ void umbra_store_32(builder *b, umbra_ptr dst, val v) {
 void umbra_store_16(builder *b, umbra_ptr dst, val v) {
     push(b, op_store_16, VY(v), .ptr = ptr_ix(dst));
 }
-static umbra_color fp16x4_color(val px) {
+static umbra_color x4_color(val px) {
     int const id = val_id((umbra_val){.bits = px.bits});
     return (umbra_color){
         val_make(id, 0), val_make(id, 1),
@@ -281,10 +281,20 @@ umbra_color umbra_load_color(builder *b, umbra_ptr src, enum umbra_fmt fmt) {
             umbra_mul_f32(b, umbra_f32_from_i32(b, ai), umbra_imm_f32(b, 1.0f/3)),
         };
     }
-    case umbra_fmt_fp16:
-        return fp16x4_color(push(b, op_load_fp16x4, .ptr = ptr_ix(src)));
-    case umbra_fmt_fp16_planar:
-        return fp16x4_color(push(b, op_load_fp16x4_planar, .ptr = ptr_ix(src)));
+    case umbra_fmt_fp16: {
+        umbra_color c = x4_color(push(b, op_load_16x4, .ptr = ptr_ix(src)));
+        return (umbra_color){
+            umbra_f32_from_f16(b, c.r), umbra_f32_from_f16(b, c.g),
+            umbra_f32_from_f16(b, c.b), umbra_f32_from_f16(b, c.a),
+        };
+    }
+    case umbra_fmt_fp16_planar: {
+        umbra_color c = x4_color(push(b, op_load_16x4_planar, .ptr = ptr_ix(src)));
+        return (umbra_color){
+            umbra_f32_from_f16(b, c.r), umbra_f32_from_f16(b, c.g),
+            umbra_f32_from_f16(b, c.b), umbra_f32_from_f16(b, c.a),
+        };
+    }
     }
     return (umbra_color){0};
 }
@@ -320,14 +330,18 @@ void umbra_store_color(builder *b, umbra_ptr dst, umbra_color c, enum umbra_fmt 
         px = pack(b, px, pack_unorm(b, c.a, umbra_imm_f32(b, 3.0f)), 30);
         umbra_store_32(b, dst, px);
     } break;
-    case umbra_fmt_fp16:
-        push(b, op_store_fp16x4, VX(c.r), VY(c.g), VZ(c.b), VW(c.a),
+    case umbra_fmt_fp16: {
+        val hr = umbra_f16_from_f32(b, c.r), hg = umbra_f16_from_f32(b, c.g),
+            hb = umbra_f16_from_f32(b, c.b), ha = umbra_f16_from_f32(b, c.a);
+        push(b, op_store_16x4, VX(hr), VY(hg), VZ(hb), VW(ha),
              .ptr = ptr_ix(dst));
-        break;
-    case umbra_fmt_fp16_planar:
-        push(b, op_store_fp16x4_planar, VX(c.r), VY(c.g), VZ(c.b), VW(c.a),
+    } break;
+    case umbra_fmt_fp16_planar: {
+        val hr = umbra_f16_from_f32(b, c.r), hg = umbra_f16_from_f32(b, c.g),
+            hb = umbra_f16_from_f32(b, c.b), ha = umbra_f16_from_f32(b, c.a);
+        push(b, op_store_16x4_planar, VX(hr), VY(hg), VZ(hb), VW(ha),
              .ptr = ptr_ix(dst));
-        break;
+    } break;
     }
 }
 val umbra_i32_from_s16(builder *b, val x) { return push(b, op_i32_from_s16, VX(x)); }
@@ -773,16 +787,16 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_sample_32: fprintf(f, " p%d v%d", ip->ptr, (int)ip->x.id); break;
         case op_load_16:
         case op_load_32:
-        case op_load_fp16x4:
-        case op_load_fp16x4_planar: fprintf(f, " p%d", ip->ptr); break;
+        case op_load_16x4:
+        case op_load_16x4_planar: fprintf(f, " p%d", ip->ptr); break;
         case op_deref_ptr: fprintf(f, " p%d byte%d", ip->ptr, ip->imm); break;
         case op_x:
         case op_y: break;
 
         case op_store_16:
         case op_store_32:
-        case op_store_fp16x4:
-        case op_store_fp16x4_planar: break;
+        case op_store_16x4:
+        case op_store_16x4_planar: break;
 
         case op_sqrt_f32:
         case op_abs_f32:

@@ -709,7 +709,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             free_chan(ra, inst->y, i);
         } break;
 
-        case op_load_fp16x4: {
+        case op_load_16x4: {
             struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
             int8_t r1 = ra_alloc(ra, sl, ns);
             int8_t r2 = ra_alloc(ra, sl, ns);
@@ -722,12 +722,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             if (scalar) {
                 put(c, LSL_xi(XT, XI, 3));
                 put(c, ADD_xr(XT, XP, XT));
-                put(c, LDR_di(px, XT, 0));
-                put(c, FCVTL_4s(px, px));
-                put(c, DUP_4s_lane(s0.rd, px, 0));
-                put(c, DUP_4s_lane(r1,    px, 1));
-                put(c, DUP_4s_lane(r2,    px, 2));
-                put(c, DUP_4s_lane(r3,    px, 3));
+                put(c, LDR_hi(s0.rd, XT, 0));
+                put(c, LDR_hi(r1,    XT, 1));
+                put(c, LDR_hi(r2,    XT, 2));
+                put(c, LDR_hi(r3,    XT, 3));
             } else {
                 put(c, LSL_xi(XT, XI, 3));
                 put(c, ADD_xr(XT, XP, XT));
@@ -737,12 +735,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, UZP2_8h(px, px, t0));
                 put(c, UZP1_8h(t0, t1, px));
                 put(c, UZP2_8h(t1, t1, px));
-                put(c, FCVTL_4s(s0.rd, t0));
-                put(c, FCVTL_4s(r2, t1));
-                put(c, EXT_16b(t0, t0, t0, 8));
-                put(c, FCVTL_4s(r1, t0));
-                put(c, EXT_16b(t1, t1, t1, 8));
-                put(c, FCVTL_4s(r3, t1));
+                put(c, ORR_16b(s0.rd, t0, t0));
+                put(c, EXT_16b(r1, t0, t0, 8));
+                put(c, ORR_16b(r2, t1, t1));
+                put(c, EXT_16b(r3, t1, t1, 8));
             }
             ra_return_reg(ra, t1);
             ra_return_reg(ra, t0);
@@ -752,7 +748,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             ra_set_chan_reg(ra, i, 2, r2);
             ra_set_chan_reg(ra, i, 3, r3);
         } break;
-        case op_load_fp16x4_planar: {
+        case op_load_16x4_planar: {
             struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
             int8_t r1 = ra_alloc(ra, sl, ns);
             int8_t r2 = ra_alloc(ra, sl, ns);
@@ -767,33 +763,21 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, LSR_xi(XT, XT, 2));
             }
             if (scalar) {
-                put(c, LDR_hx(px, XP, XI));
-                put(c, FCVTL_4s(s0.rd, px));
-                put(c, DUP_4s_lane(s0.rd, s0.rd, 0));
+                put(c, LDR_hx(s0.rd, XP, XI));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, LDR_hx(px, XP, XI));
-                put(c, FCVTL_4s(r1, px));
-                put(c, DUP_4s_lane(r1, r1, 0));
+                put(c, LDR_hx(r1, XP, XI));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, LDR_hx(px, XP, XI));
-                put(c, FCVTL_4s(r2, px));
-                put(c, DUP_4s_lane(r2, r2, 0));
+                put(c, LDR_hx(r2, XP, XI));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, LDR_hx(px, XP, XI));
-                put(c, FCVTL_4s(r3, px));
-                put(c, DUP_4s_lane(r3, r3, 0));
+                put(c, LDR_hx(r3, XP, XI));
             } else {
                 put(c, LDR_d(s0.rd, XP, XH));
-                put(c, FCVTL_4s(s0.rd, s0.rd));
                 put(c, ADD_xr(XP, XP, XT));
                 put(c, LDR_d(r1, XP, XH));
-                put(c, FCVTL_4s(r1, r1));
                 put(c, ADD_xr(XP, XP, XT));
                 put(c, LDR_d(r2, XP, XH));
-                put(c, FCVTL_4s(r2, r2));
                 put(c, ADD_xr(XP, XP, XT));
                 put(c, LDR_d(r3, XP, XH));
-                put(c, FCVTL_4s(r3, r3));
             }
             last_ptr = -1;
             ra_return_reg(ra, px);
@@ -802,7 +786,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             ra_set_chan_reg(ra, i, 2, r2);
             ra_set_chan_reg(ra, i, 3, r3);
         } break;
-        case op_store_fp16x4: {
+        case op_store_16x4: {
             int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
             int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
             int8_t rb_  = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
@@ -812,33 +796,23 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t px = ra_alloc(ra, sl, ns);
             int8_t t  = ra_alloc(ra, sl, ns);
             int8_t z  = ra_alloc(ra, sl, ns);
-            int8_t one = ra_alloc(ra, sl, ns);
-            int8_t scale = ra_alloc(ra, sl, ns);
             if (scalar) {
-                put(c, ORR_16b(t, rr, rr));
-                put(c, INS_elem_s(t, 1, rg,  0));
-                put(c, INS_elem_s(t, 2, rb_, 0));
-                put(c, INS_elem_s(t, 3, ra_v, 0));
-                put(c, FCVTN_4h(px, t));
+                put(c, ZIP1_8h(t, rr, rg));
+                put(c, ZIP1_8h(px, rb_, ra_v));
+                put(c, ZIP1_4s(z, t, px));
                 put(c, LSL_xi(XT, XI, 3));
                 put(c, ADD_xr(XT, XP, XT));
-                put(c, STR_di(px, XT, 0));
+                put(c, STR_di(z, XT, 0));
             } else {
-                put(c, FCVTN_4h(px, rr));
-                put(c, FCVTN_4h(t, rg));
-                put(c, FCVTN_4h(z, rb_));
-                put(c, FCVTN_4h(one, ra_v));
-                put(c, ZIP1_8h(scale, px, t));
-                put(c, ZIP1_8h(px, z, one));
-                put(c, ZIP1_4s(t, scale, px));
-                put(c, ZIP2_4s(z, scale, px));
+                put(c, ZIP1_8h(px, rr, rg));
+                put(c, ZIP1_8h(t, rb_, ra_v));
+                put(c, ZIP1_4s(z, px, t));
+                put(c, ZIP2_4s(px, px, t));
                 put(c, LSL_xi(XT, XI, 3));
                 put(c, ADD_xr(XT, XP, XT));
-                put(c, STR_qi(t, XT, 0));
-                put(c, STR_qi(z, XT, 1));
+                put(c, STR_qi(z, XT, 0));
+                put(c, STR_qi(px, XT, 1));
             }
-            ra_return_reg(ra, scale);
-            ra_return_reg(ra, one);
             ra_return_reg(ra, z);
             ra_return_reg(ra, t);
             ra_return_reg(ra, px);
@@ -847,14 +821,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             free_chan(ra, inst->z, i);
             free_chan(ra, inst->w, i);
         } break;
-        case op_store_fp16x4_planar: {
+        case op_store_16x4_planar: {
             int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
             int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
             int8_t rb_  = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
             int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            int8_t px = ra_alloc(ra, sl, ns);
             {
                 int const sz_off = p * (int)sizeof(struct umbra_buf)
                                  + (int)__builtin_offsetof(struct umbra_buf, sz);
@@ -862,24 +835,23 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, LSR_xi(XT, XT, 2));
             }
             if (scalar) {
-                put(c, FCVTN_4h(px, rr));  put(c, STR_hx(px, XP, XI));
+                put(c, STR_hx(rr, XP, XI));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, FCVTN_4h(px, rg));  put(c, STR_hx(px, XP, XI));
+                put(c, STR_hx(rg, XP, XI));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, FCVTN_4h(px, rb_)); put(c, STR_hx(px, XP, XI));
+                put(c, STR_hx(rb_, XP, XI));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, FCVTN_4h(px, ra_v)); put(c, STR_hx(px, XP, XI));
+                put(c, STR_hx(ra_v, XP, XI));
             } else {
-                put(c, FCVTN_4h(px, rr));  put(c, STR_d(px, XP, XH));
+                put(c, STR_d(rr, XP, XH));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, FCVTN_4h(px, rg));  put(c, STR_d(px, XP, XH));
+                put(c, STR_d(rg, XP, XH));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, FCVTN_4h(px, rb_)); put(c, STR_d(px, XP, XH));
+                put(c, STR_d(rb_, XP, XH));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, FCVTN_4h(px, ra_v)); put(c, STR_d(px, XP, XH));
+                put(c, STR_d(ra_v, XP, XH));
             }
             last_ptr = -1;
-            ra_return_reg(ra, px);
             free_chan(ra, inst->x, i);
             free_chan(ra, inst->y, i);
             free_chan(ra, inst->z, i);
@@ -1664,7 +1636,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             free_chan(ra, inst->y, i);
         } break;
 
-        case op_load_fp16x4: {
+        case op_load_16x4: {
             struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
             int8_t r1 = ra_alloc(ra, sl, ns);
             int8_t r2 = ra_alloc(ra, sl, ns);
@@ -1677,16 +1649,16 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t t1 = ra_alloc(ra, sl, ns);
 
             if (scalar) {
-                // Load 8 bytes (1 pixel, 4xfp16) via VMOVQ.
-                // VMOVQ xmm, m64: VEX.128 F3.0F 7E /r
+                // Load 8 bytes (1 pixel, 4x u16) via VMOVQ.
                 vex_mem(c, 2, 1, 0, 0, px, 0, 0x7e, base, XI, 8, 0);
-                // VCVTPH2PS: convert 4 x fp16 -> 4 x fp32
-                vcvtph2ps(c, px, px);
-                // Broadcast each lane.
-                vex_rrr(c, 1, 1, 1, 0x70, s0.rd, 0, px); emit1(c, 0x00);
-                vex_rrr(c, 1, 1, 1, 0x70, r1,    0, px); emit1(c, 0x55);
-                vex_rrr(c, 1, 1, 1, 0x70, r2,    0, px); emit1(c, 0xAA);
-                vex_rrr(c, 1, 1, 1, 0x70, r3,    0, px); emit1(c, 0xFF);
+                // Extract each u16 channel via VPSRLDQ byte shifts.
+                vmovaps(c, s0.rd, px);
+                // VPSRLDQ r1, px, 2: shift right 2 bytes -> G at position 0
+                vex(c, 1, 1, 0, 0, 3, r1, px, 0x73); emit1(c, 2);
+                // VPSRLDQ r2, px, 4: shift right 4 bytes -> B at position 0
+                vex(c, 1, 1, 0, 0, 3, r2, px, 0x73); emit1(c, 4);
+                // VPSRLDQ r3, px, 6: shift right 6 bytes -> A at position 0
+                vex(c, 1, 1, 0, 0, 3, r3, px, 0x73); emit1(c, 6);
             } else {
                 // Re-load raw data.
                 vmov_load(c, 1, t0, base, XI, 8, 0);   // pixels 0-3 raw
@@ -1724,7 +1696,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 
                 // Combine: VPUNPCKLQDQ to merge low 64 bits.
                 vex_rrr(c, 1, 1, 0, 0x6c, s0.rd, s0.rd, t0);
-                vcvtph2ps(c, s0.rd, s0.rd);
 
                 // Repeat for G, B, A. Reload low half for each.
                 int off_g = pool_add(&jc->pool, shuf_g, 32);
@@ -1745,7 +1716,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 }
                 vex(c, 1, 3, 1, 1, t0, 0, t0, 0x00); emit1(c, 0x08);
                 vex_rrr(c, 1, 1, 0, 0x6c, r1, r1, t0);
-                vcvtph2ps(c, r1, r1);
 
                 // B: low half
                 vmov_load(c, 1, t0, base, XI, 8, 0);
@@ -1761,7 +1731,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 }
                 vex(c, 1, 3, 1, 1, t0, 0, t0, 0x00); emit1(c, 0x08);
                 vex_rrr(c, 1, 1, 0, 0x6c, r2, r2, t0);
-                vcvtph2ps(c, r2, r2);
 
                 // A: low half
                 vmov_load(c, 1, t0, base, XI, 8, 0);
@@ -1777,7 +1746,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 }
                 vex(c, 1, 3, 1, 1, t0, 0, t0, 0x00); emit1(c, 0x08);
                 vex_rrr(c, 1, 1, 0, 0x6c, r3, r3, t0);
-                vcvtph2ps(c, r3, r3);
             }
 
             ra_return_reg(ra, t1);
@@ -1788,7 +1756,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             ra_set_chan_reg(ra, i, 2, r2);
             ra_set_chan_reg(ra, i, 3, r3);
         } break;
-        case op_load_fp16x4_planar: {
+        case op_load_16x4_planar: {
             struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
             int8_t r1 = ra_alloc(ra, sl, ns);
             int8_t r2 = ra_alloc(ra, sl, ns);
@@ -1807,7 +1775,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 mov_load(c, RBX, XBUF, sz_off);
                 shr_ri(c, RBX, 2);
                 if (scalar) {
-                    // Plane 0 (R): MOVZX eax, word [R11 + XI*2]
+                    // Plane 0 (R): MOVZX eax, word [R11 + XI*2]; VMOVD xmm, eax
                     {
                         uint8_t rex = 0x40;
                         if (XI >= 8)   { rex |= 0x02; }
@@ -1817,9 +1785,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                         emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
                         emit1(c, (uint8_t)((1 << 6) | ((XI & 7) << 3) | (R11 & 7)));
                     }
-                    vex(c, 1, 1, 0, 0, px, 0, RAX, 0x6e);
-                    vcvtph2ps(c, s0.rd, px);
-                    vbroadcastss(c, s0.rd, s0.rd);
+                    vex(c, 1, 1, 0, 0, s0.rd, 0, RAX, 0x6e);
 
                     // Plane 1 (G): advance R11 by plane_stride
                     rex_w(c, RBX, R11);
@@ -1834,9 +1800,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                         emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
                         emit1(c, (uint8_t)((1 << 6) | ((XI & 7) << 3) | (R11 & 7)));
                     }
-                    vex(c, 1, 1, 0, 0, px, 0, RAX, 0x6e);
-                    vcvtph2ps(c, r1, px);
-                    vbroadcastss(c, r1, r1);
+                    vex(c, 1, 1, 0, 0, r1, 0, RAX, 0x6e);
 
                     // Plane 2 (B): advance R11 by plane_stride
                     rex_w(c, RBX, R11);
@@ -1851,9 +1815,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                         emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
                         emit1(c, (uint8_t)((1 << 6) | ((XI & 7) << 3) | (R11 & 7)));
                     }
-                    vex(c, 1, 1, 0, 0, px, 0, RAX, 0x6e);
-                    vcvtph2ps(c, r2, px);
-                    vbroadcastss(c, r2, r2);
+                    vex(c, 1, 1, 0, 0, r2, 0, RAX, 0x6e);
 
                     // Plane 3 (A): advance R11 by plane_stride
                     rex_w(c, RBX, R11);
@@ -1868,34 +1830,28 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                         emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
                         emit1(c, (uint8_t)((1 << 6) | ((XI & 7) << 3) | (R11 & 7)));
                     }
-                    vex(c, 1, 1, 0, 0, px, 0, RAX, 0x6e);
-                    vcvtph2ps(c, r3, px);
-                    vbroadcastss(c, r3, r3);
+                    vex(c, 1, 1, 0, 0, r3, 0, RAX, 0x6e);
                 } else {
-                    // Plane 0 (R): load 8 x f16 (16 bytes), convert to 8 x f32
-                    vmov_load(c, 0, px, R11, XI, 2, 0);
-                    vcvtph2ps(c, s0.rd, px);
+                    // Plane 0 (R): load 8 x u16 (16 bytes)
+                    vmov_load(c, 0, s0.rd, R11, XI, 2, 0);
 
                     // Plane 1 (G): advance R11 by plane_stride
                     rex_w(c, RBX, R11);
                     emit1(c, 0x01);
                     emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
-                    vmov_load(c, 0, px, R11, XI, 2, 0);
-                    vcvtph2ps(c, r1, px);
+                    vmov_load(c, 0, r1, R11, XI, 2, 0);
 
                     // Plane 2 (B): advance R11 by plane_stride
                     rex_w(c, RBX, R11);
                     emit1(c, 0x01);
                     emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
-                    vmov_load(c, 0, px, R11, XI, 2, 0);
-                    vcvtph2ps(c, r2, px);
+                    vmov_load(c, 0, r2, R11, XI, 2, 0);
 
                     // Plane 3 (A): advance R11 by plane_stride
                     rex_w(c, RBX, R11);
                     emit1(c, 0x01);
                     emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
-                    vmov_load(c, 0, px, R11, XI, 2, 0);
-                    vcvtph2ps(c, r3, px);
+                    vmov_load(c, 0, r3, R11, XI, 2, 0);
                 }
                 last_ptr = -1;
             }
@@ -1908,7 +1864,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             ra_set_chan_reg(ra, i, 2, r2);
             ra_set_chan_reg(ra, i, 3, r3);
         } break;
-        case op_store_fp16x4: {
+        case op_store_16x4: {
             int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
             int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
             int8_t rb_  = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
@@ -1919,52 +1875,30 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t px    = ra_alloc(ra, sl, ns);
             int8_t t     = ra_alloc(ra, sl, ns);
             int8_t z     = ra_alloc(ra, sl, ns);
-            int8_t one   = ra_alloc(ra, sl, ns);
             if (scalar) {
-                // Pack 4 fp32 channels into one xmm, then VCVTPS2PH.
-                // VINSERTPS px, rr, rr, 0x00 — copy rr[0] to px[0]
-                vmovaps(c, px, rr);
-                // VINSERTPS px, px, rg, 0x10 — rg[0] -> px[1]
-                vex(c, 1, 3, 0, 0, px, px, rg, 0x21); emit1(c, 0x10);
-                // VINSERTPS px, px, rb_, 0x20 — rb_[0] -> px[2]
-                vex(c, 1, 3, 0, 0, px, px, rb_, 0x21); emit1(c, 0x20);
-                // VINSERTPS px, px, ra_v, 0x30 — ra_v[0] -> px[3]
-                vex(c, 1, 3, 0, 0, px, px, ra_v, 0x21); emit1(c, 0x30);
-                // VCVTPS2PH px, px, 4 (round to nearest)
-                vcvtps2ph(c, px, px, 4);
-                // VMOVQ [base + XI*8], px (store 8 bytes)
-                vex_mem(c, 1, 1, 0, 0, px, 0, 0xd6, base, XI, 8, 0);
+                // Pack 4 u16 channels into 64 bits via word interleave.
+                vex_rrr(c, 1, 1, 0, 0x61, px, rr, rg);     // VPUNPCKLWD [R,G,?,?...]
+                vex_rrr(c, 1, 1, 0, 0x61, t, rb_, ra_v);   // VPUNPCKLWD [B,A,?,?...]
+                vex_rrr(c, 1, 1, 0, 0x62, z, px, t);       // VPUNPCKLDQ [R,G,B,A,?,?...]
+                // VMOVQ [base + XI*8], z (store 8 bytes)
+                vex_mem(c, 1, 1, 0, 0, z, 0, 0xd6, base, XI, 8, 0);
             } else {
-                // Convert each channel from fp32 (8 x YMM) to fp16 (8 x XMM).
-                vcvtps2ph(c, px, rr, 4);     // px  = [R0..R7] as fp16 in XMM
-                vcvtps2ph(c, t, rg, 4);      // t   = [G0..G7] as fp16
-                vcvtps2ph(c, z, rb_, 4);     // z   = [B0..B7] as fp16
-                vcvtps2ph(c, one, ra_v, 4);  // one = [A0..A7] as fp16
+                // Inputs are 8 x u16 in XMM.
                 // Interleave to pixel order. Process low 4 then high 4 pixels.
-                // Low 4 (VPUNPCKLWD takes low 4 words from each XMM):
-                vex_rrr(c, 1, 1, 0, 0x61, scale, px, t);  // scale=[R0,G0,R1,G1,R2,G2,R3,G3]
-                vex_rrr(c, 1, 1, 0, 0x61, px, z, one);    // px=[B0,A0,B1,A1,B2,A2,B3,A3]
-                // Interleave at 32-bit to form pixel pairs:
-                vex_rrr(c, 1, 1, 0, 0x62, t, scale, px);  // t=[R0G0,B0A0,R1G1,B1A1] (pixels 0,1)
-                vex_rrr(c, 1, 1, 0, 0x6a, z, scale, px);  // z=[R2G2,B2A2,R3G3,B3A3] (pixels 2,3)
+                vex_rrr(c, 1, 1, 0, 0x61, scale, rr, rg);  // VPUNPCKLWD [R0,G0,R1,G1,R2,G2,R3,G3]
+                vex_rrr(c, 1, 1, 0, 0x61, px, rb_, ra_v);  // VPUNPCKLWD [B0,A0,B1,A1,B2,A2,B3,A3]
+                vex_rrr(c, 1, 1, 0, 0x62, t, scale, px);   // VPUNPCKLDQ pixels 0,1
+                vex_rrr(c, 1, 1, 0, 0x6a, z, scale, px);   // VPUNPCKHDQ pixels 2,3
                 vex(c, 1, 3, 0, 1, t, t, z, 0x38); emit1(c, 1);
-                // t = [pixels 0-1 | pixels 2-3] (256 bits = 32 bytes)
                 vmov_store(c, 1, t, base, XI, 8, 0);
-                // High 4 (VPUNPCKHWD takes high 4 words):
-                // Re-convert all channels (registers were clobbered above).
-                vcvtps2ph(c, px, rr, 4);
-                vcvtps2ph(c, t, rg, 4);
-                vcvtps2ph(c, z, rb_, 4);
-                vcvtps2ph(c, one, ra_v, 4);
-                vex_rrr(c, 1, 1, 0, 0x69, scale, px, t);  // VPUNPCKHWD scale=[R4,G4,R5,G5,R6,G6,R7,G7]
-                vex_rrr(c, 1, 1, 0, 0x69, px, z, one);    // VPUNPCKHWD px=[B4,A4,B5,A5,B6,A6,B7,A7]
-                vex_rrr(c, 1, 1, 0, 0x62, t, scale, px);  // VPUNPCKLDQ t=[R4G4,B4A4,R5G5,B5A5]
-                vex_rrr(c, 1, 1, 0, 0x6a, z, scale, px);  // VPUNPCKHDQ z=[R6G6,B6A6,R7G7,B7A7]
+                // High 4:
+                vex_rrr(c, 1, 1, 0, 0x69, scale, rr, rg);  // VPUNPCKHWD [R4,G4,R5,G5,R6,G6,R7,G7]
+                vex_rrr(c, 1, 1, 0, 0x69, px, rb_, ra_v);  // VPUNPCKHWD [B4,A4,B5,A5,B6,A6,B7,A7]
+                vex_rrr(c, 1, 1, 0, 0x62, t, scale, px);   // VPUNPCKLDQ
+                vex_rrr(c, 1, 1, 0, 0x6a, z, scale, px);   // VPUNPCKHDQ
                 vex(c, 1, 3, 0, 1, t, t, z, 0x38); emit1(c, 1);
-                // t = [pixels 4-5 | pixels 6-7] (256 bits)
                 vmov_store(c, 1, t, base, XI, 8, 32);
             }
-            ra_return_reg(ra, one);
             ra_return_reg(ra, z);
             ra_return_reg(ra, t);
             ra_return_reg(ra, px);
@@ -1974,14 +1908,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             free_chan(ra, inst->z, i);
             free_chan(ra, inst->w, i);
         } break;
-        case op_store_fp16x4_planar: {
+        case op_store_16x4_planar: {
             int8_t rr   = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
             int8_t rg   = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
             int8_t rb_  = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
             int    p = inst->ptr;
             int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            int8_t px = ra_alloc(ra, sl, ns);
             {
                 int const sz_off = p * (int)sizeof(struct umbra_buf)
                                  + (int)__builtin_offsetof(struct umbra_buf, sz);
@@ -1989,11 +1922,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 mov_load(c, RBX, XBUF, sz_off);
                 shr_ri(c, RBX, 2);
                 if (scalar) {
-                    // Plane 0 (R): VCVTPS2PH, store 16-bit
-                    vcvtps2ph(c, px, rr, 4);
-                    // VMOVD eax, px
-                    vex(c, 1, 1, 0, 0, px, 0, RAX, 0x7e);
-                    // MOV word [R11 + XI*2], ax
+                    // Plane 0 (R): VMOVD eax, rr; MOV word [R11+XI*2], ax
+                    vex(c, 1, 1, 0, 0, rr, 0, RAX, 0x7e);
                     {
                         emit1(c, 0x66);
                         uint8_t rex = 0x40;
@@ -2009,8 +1939,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     rex_w(c, RBX, R11);
                     emit1(c, 0x01);
                     emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
-                    vcvtps2ph(c, px, rg, 4);
-                    vex(c, 1, 1, 0, 0, px, 0, RAX, 0x7e);
+                    vex(c, 1, 1, 0, 0, rg, 0, RAX, 0x7e);
                     {
                         emit1(c, 0x66);
                         uint8_t rex = 0x40;
@@ -2026,8 +1955,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     rex_w(c, RBX, R11);
                     emit1(c, 0x01);
                     emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
-                    vcvtps2ph(c, px, rb_, 4);
-                    vex(c, 1, 1, 0, 0, px, 0, RAX, 0x7e);
+                    vex(c, 1, 1, 0, 0, rb_, 0, RAX, 0x7e);
                     {
                         emit1(c, 0x66);
                         uint8_t rex = 0x40;
@@ -2043,8 +1971,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     rex_w(c, RBX, R11);
                     emit1(c, 0x01);
                     emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
-                    vcvtps2ph(c, px, ra_v, 4);
-                    vex(c, 1, 1, 0, 0, px, 0, RAX, 0x7e);
+                    vex(c, 1, 1, 0, 0, ra_v, 0, RAX, 0x7e);
                     {
                         emit1(c, 0x66);
                         uint8_t rex = 0x40;
@@ -2056,34 +1983,29 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                         emit1(c, (uint8_t)((1 << 6) | ((XI & 7) << 3) | (R11 & 7)));
                     }
                 } else {
-                    // Plane 0 (R): VCVTPS2PH, store 128-bit (8 x f16)
-                    vcvtps2ph(c, px, rr, 4);
-                    vmov_store(c, 0, px, R11, XI, 2, 0);
+                    // Plane 0 (R): store 8 x u16 (16 bytes)
+                    vmov_store(c, 0, rr, R11, XI, 2, 0);
 
                     // Plane 1 (G): advance R11 by plane_stride
                     rex_w(c, RBX, R11);
                     emit1(c, 0x01);
                     emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
-                    vcvtps2ph(c, px, rg, 4);
-                    vmov_store(c, 0, px, R11, XI, 2, 0);
+                    vmov_store(c, 0, rg, R11, XI, 2, 0);
 
                     // Plane 2 (B): advance R11 by plane_stride
                     rex_w(c, RBX, R11);
                     emit1(c, 0x01);
                     emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
-                    vcvtps2ph(c, px, rb_, 4);
-                    vmov_store(c, 0, px, R11, XI, 2, 0);
+                    vmov_store(c, 0, rb_, R11, XI, 2, 0);
 
                     // Plane 3 (A): advance R11 by plane_stride
                     rex_w(c, RBX, R11);
                     emit1(c, 0x01);
                     emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
-                    vcvtps2ph(c, px, ra_v, 4);
-                    vmov_store(c, 0, px, R11, XI, 2, 0);
+                    vmov_store(c, 0, ra_v, R11, XI, 2, 0);
                 }
                 last_ptr = -1;
             }
-            ra_return_reg(ra, px);
             free_chan(ra, inst->x, i);
             free_chan(ra, inst->y, i);
             free_chan(ra, inst->z, i);

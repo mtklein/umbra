@@ -22,6 +22,7 @@ uint32_t LDR_sx(int d, int n, int m);
 uint32_t STR_sx(int d, int n, int m);
 uint32_t STR_hx(int d, int n, int m);
 uint32_t LDR_hx(int d, int n, int m);
+uint32_t LDR_hi(int d, int n, int imm);
 uint32_t LDR_d(int d, int n, int m);
 uint32_t STR_d(int d, int n, int m);
 uint32_t LDR_q(int d, int n, int m);

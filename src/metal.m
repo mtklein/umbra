@@ -85,6 +85,10 @@ static _Bool is_16(enum op op) {
     return op == op_load_16
         || op == op_store_16
         || op == op_gather_16
+        || op == op_load_16x4
+        || op == op_load_16x4_planar
+        || op == op_store_16x4
+        || op == op_store_16x4_planar
         || op == op_i32_from_s16
         || op == op_i32_from_u16
         || op == op_i16_from_i32
@@ -94,14 +98,10 @@ static _Bool is_16(enum op op) {
 static _Bool is_32(enum op op) {
     return op == op_uniform_32
         || op == op_load_32
-        || op == op_load_fp16x4
-        || op == op_load_fp16x4_planar
         || op == op_gather_uniform_32
         || op == op_gather_32
         || op == op_sample_32
         || op == op_store_32
-        || op == op_store_fp16x4
-        || op == op_store_fp16x4_planar
         || op == op_deref_ptr;
 }
 
@@ -117,8 +117,6 @@ static _Bool produces_float(enum op op) {
         || op == op_min_f32_imm || op == op_max_f32_imm
         || op == op_f32_from_i32
         || op == op_f32_from_f16
-        || op == op_load_fp16x4
-        || op == op_load_fp16x4_planar
         || op == op_sample_32;
 }
 
@@ -159,8 +157,8 @@ static void emit_ops(Buf *b, BB const *bb,
         VNAME(vz, zid, (int)inst->z.chan);
         VNAME(vw, wid, (int)inst->w.chan);
 
-        char _fx[40], _fy[40], _fz[40], _fw[40];
-        char _ux[40], _uy[40], _uz[40];
+        char _fx[40], _fy[40], _fz[40];
+        char _ux[40], _uy[40], _uz[40], _uw[40];
 
         switch (inst->op) {
             case op_x:
@@ -262,76 +260,76 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, p, p,
                      uv(_uy, vy, yid, is_f));
             } break;
-            case op_load_fp16x4: {
+            case op_load_16x4: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 emit(b,
-                     "%sdevice half *hp%d = (device half*)"
+                     "%sdevice ushort *hp%d = (device ushort*)"
                      "(p%d + y * buf_rbs[%d]) + x*4;\n"
-                     "%sfloat v%d = float(hp%d[0]);\n"
-                     "%sfloat v%d_1 = float(hp%d[1]);\n"
-                     "%sfloat v%d_2 = float(hp%d[2]);\n"
-                     "%sfloat v%d_3 = float(hp%d[3]);\n",
+                     "%suint v%d = (uint)hp%d[0];\n"
+                     "%suint v%d_1 = (uint)hp%d[1];\n"
+                     "%suint v%d_2 = (uint)hp%d[2];\n"
+                     "%suint v%d_3 = (uint)hp%d[3];\n",
                      pad, i, p, p,
                      pad, i, i,
                      pad, i, i,
                      pad, i, i,
                      pad, i, i);
             } break;
-            case op_load_fp16x4_planar: {
+            case op_load_16x4_planar: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 emit(b,
                      "%sdevice uchar *row%d = p%d + y * buf_rbs[%d];"
                      " uint ps%d = buf_szs[%d]/4;\n"
-                     "%sfloat v%d = float(((device half*)row%d)[x]);\n"
-                     "%sfloat v%d_1 = float(((device half*)(row%d+ps%d))[x]);\n"
-                     "%sfloat v%d_2 = float(((device half*)(row%d+2*ps%d))[x]);\n"
-                     "%sfloat v%d_3 = float(((device half*)(row%d+3*ps%d))[x]);\n",
+                     "%suint v%d = (uint)((device ushort*)row%d)[x];\n"
+                     "%suint v%d_1 = (uint)((device ushort*)(row%d+ps%d))[x];\n"
+                     "%suint v%d_2 = (uint)((device ushort*)(row%d+2*ps%d))[x];\n"
+                     "%suint v%d_3 = (uint)((device ushort*)(row%d+3*ps%d))[x];\n",
                      pad, i, p, p, i, p,
                      pad, i, i,
                      pad, i, i, i,
                      pad, i, i, i,
                      pad, i, i, i);
             } break;
-            case op_store_fp16x4: {
+            case op_store_16x4: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 emit(b,
                      "%s{\n"
-                     "%s    device half *hp = (device half*)"
+                     "%s    device ushort *hp = (device ushort*)"
                      "(p%d + y * buf_rbs[%d]) + x*4;\n"
-                     "%s    hp[0] = half(%s); hp[1] = half(%s);"
-                     " hp[2] = half(%s); hp[3] = half(%s);\n"
+                     "%s    hp[0] = ushort(%s); hp[1] = ushort(%s);"
+                     " hp[2] = ushort(%s); hp[3] = ushort(%s);\n"
                      "%s}\n",
                      pad,
                      pad, p, p,
                      pad,
-                     fv(_fx, vx, xid, is_f),
-                     fv(_fy, vy, yid, is_f),
-                     fv(_fz, vz, zid, is_f),
-                     fv(_fw, vw, wid, is_f),
+                     uv(_ux, vx, xid, is_f),
+                     uv(_uy, vy, yid, is_f),
+                     uv(_uz, vz, zid, is_f),
+                     uv(_uw, vw, wid, is_f),
                      pad);
             } break;
-            case op_store_fp16x4_planar: {
+            case op_store_16x4_planar: {
                 int p = inst->ptr < 0
                     ? deref_buf[~inst->ptr] : inst->ptr;
                 emit(b,
                      "%s{\n"
                      "%s    device uchar *row = p%d + y * buf_rbs[%d];"
                      " uint ps = buf_szs[%d]/4;\n"
-                     "%s    ((device half*)row)[x] = half(%s);"
-                     " ((device half*)(row+ps))[x] = half(%s);"
-                     " ((device half*)(row+2*ps))[x] = half(%s);"
-                     " ((device half*)(row+3*ps))[x] = half(%s);\n"
+                     "%s    ((device ushort*)row)[x] = ushort(%s);"
+                     " ((device ushort*)(row+ps))[x] = ushort(%s);"
+                     " ((device ushort*)(row+2*ps))[x] = ushort(%s);"
+                     " ((device ushort*)(row+3*ps))[x] = ushort(%s);\n"
                      "%s}\n",
                      pad,
                      pad, p, p, p,
                      pad,
-                     fv(_fx, vx, xid, is_f),
-                     fv(_fy, vy, yid, is_f),
-                     fv(_fz, vz, zid, is_f),
-                     fv(_fw, vw, wid, is_f),
+                     uv(_ux, vx, xid, is_f),
+                     uv(_uy, vy, yid, is_f),
+                     uv(_uz, vz, zid, is_f),
+                     uv(_uw, vw, wid, is_f),
                      pad);
             } break;
 

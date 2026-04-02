@@ -355,9 +355,9 @@ typedef struct {
     uint32_t c_allones, :32;  // 0xFFFFFFFF
 
     // Per-BB-instruction result IDs. Some instructions produce multiple results
-    // (e.g. load_fp16x4 produces 4 channels).
+    // (e.g. load_16x4 produces 4 channels).
     uint32_t *val;        // val[i] = SPIR-V ID for bb_inst i (channel 0)
-    uint32_t *val_1;      // channel 1 for fp16x4 loads
+    uint32_t *val_1;      // channel 1 for 16x4 loads
     uint32_t *val_2;      // channel 2
     uint32_t *val_3;      // channel 3
 
@@ -705,8 +705,6 @@ static _Bool produces_float(enum op op) {
         || op == op_min_f32_imm || op == op_max_f32_imm
         || op == op_f32_from_i32
         || op == op_f32_from_f16
-        || op == op_load_fp16x4
-        || op == op_load_fp16x4_planar
         || op == op_sample_32;
 }
 
@@ -768,7 +766,7 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
     for (int i = 0; i < bb->insts; i++) {
         enum op op = bb->inst[i].op;
         if (op == op_load_16 || op == op_store_16 || op == op_gather_16
-         || op == op_load_fp16x4_planar || op == op_store_fp16x4_planar) {
+         || op == op_load_16x4_planar || op == op_store_16x4_planar) {
             int p = bb->inst[i].ptr < 0 ? deref_buf[~bb->inst[i].ptr]
                                          : bb->inst[i].ptr;
             B.buf_is_16[p] = 1;
@@ -1313,10 +1311,9 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
                     B.val[i] = spv_glsl_3(&B, B.t_f32, GLSLstd450FMix, lo_f, hi_f, frac);
                 } break;
 
-                case op_load_fp16x4: {
-                    // Load 4 consecutive fp16 values (8 bytes = 2 u32 words).
+                case op_load_16x4: {
+                    // Load 4 consecutive u16 values (8 bytes = 2 u32 words).
                     int p = resolve_ptr(&B, inst);
-                    // Base address in u32: y * (rb/4) + x*2
                     uint32_t rb_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
                     uint32_t rb = load_push_u32(&B, rb_off);
                     uint32_t elems_per_row = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32,
@@ -1325,35 +1322,26 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
                     uint32_t x_off = spv_binop(&B, SpvOpIMul, B.t_u32, x_coord, B.c_2);
                     uint32_t base = spv_binop(&B, SpvOpIAdd, B.t_u32, row_off, x_off);
 
-                    // Load word0 (contains h[0], h[1]) and word1 (h[2], h[3]).
                     uint32_t w0 = load_ssbo_u32(&B, p, base);
                     uint32_t base1 = spv_binop(&B, SpvOpIAdd, B.t_u32, base, B.c_1);
                     uint32_t w1 = load_ssbo_u32(&B, p, base1);
 
                     uint32_t c_0xFFFF = spv_const_u32(&B, 0xFFFFu);
-                    uint32_t h0 = spv_binop(&B, SpvOpBitwiseAnd, B.t_u32, w0, c_0xFFFF);
-                    uint32_t h1 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, w0, B.c_16);
-                    uint32_t h2 = spv_binop(&B, SpvOpBitwiseAnd, B.t_u32, w1, c_0xFFFF);
-                    uint32_t h3 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, w1, B.c_16);
-
-                    B.val[i]   = spv_f16_to_f32(&B, h0);
-                    B.val_1[i] = spv_f16_to_f32(&B, h1);
-                    B.val_2[i] = spv_f16_to_f32(&B, h2);
-                    B.val_3[i] = spv_f16_to_f32(&B, h3);
+                    B.val[i]   = spv_binop(&B, SpvOpBitwiseAnd, B.t_u32, w0, c_0xFFFF);
+                    B.val_1[i] = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, w0, B.c_16);
+                    B.val_2[i] = spv_binop(&B, SpvOpBitwiseAnd, B.t_u32, w1, c_0xFFFF);
+                    B.val_3[i] = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, w1, B.c_16);
                 } break;
 
-                case op_load_fp16x4_planar: {
-                    // Direct u16 load via 16-bit storage.
+                case op_load_16x4_planar: {
                     int p = resolve_ptr(&B, inst);
                     uint32_t sz_off = spv_const_u32(&B, (uint32_t)(3 + p));
                     uint32_t sz = load_push_u32(&B, sz_off);
-                    // plane_size in bytes = sz / 4; in u16 elements = sz / 4 / 2 = sz / 8
                     uint32_t ps_u16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, sz, B.c_3);
 
                     uint32_t rb_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
                     uint32_t rb = load_push_u32(&B, rb_off);
 
-                    // addr16 within plane: y * (rb/2) + x
                     uint32_t rb_u16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, rb, B.c_1);
                     uint32_t addr16 = spv_binop(&B, SpvOpIMul, B.t_u32, y_coord, rb_u16);
                     addr16 = spv_binop(&B, SpvOpIAdd, B.t_u32, addr16, x_coord);
@@ -1366,17 +1354,16 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
                         uint32_t plane_off = spv_binop(&B, SpvOpIMul, B.t_u32, ch_id, ps_u16);
                         uint32_t final_addr = spv_binop(&B, SpvOpIAdd, B.t_u32, addr16, plane_off);
                         uint32_t h_val = load_ssbo_u16(&B, p, final_addr);
-                        uint32_t f_val = spv_f16_to_f32(&B, h_val);
                         switch (ch) {
-                            case 0: B.val[i]   = f_val; break;
-                            case 1: B.val_1[i] = f_val; break;
-                            case 2: B.val_2[i] = f_val; break;
-                            case 3: B.val_3[i] = f_val; break;
+                            case 0: B.val[i]   = h_val; break;
+                            case 1: B.val_1[i] = h_val; break;
+                            case 2: B.val_2[i] = h_val; break;
+                            case 3: B.val_3[i] = h_val; break;
                         }
                     }
                 } break;
 
-                case op_store_fp16x4: {
+                case op_store_16x4: {
                     int p = resolve_ptr(&B, inst);
                     uint32_t rb_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
                     uint32_t rb = load_push_u32(&B, rb_off);
@@ -1386,10 +1373,10 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
                     uint32_t x_off = spv_binop(&B, SpvOpIMul, B.t_u32, x_coord, B.c_2);
                     uint32_t base = spv_binop(&B, SpvOpIAdd, B.t_u32, row_off, x_off);
 
-                    uint32_t h0 = spv_f32_to_f16(&B, as_f32(&B, get_val(&B, inst->x), xid));
-                    uint32_t h1 = spv_f32_to_f16(&B, as_f32(&B, get_val(&B, inst->y), yid));
-                    uint32_t h2 = spv_f32_to_f16(&B, as_f32(&B, get_val(&B, inst->z), get_id(inst->z)));
-                    uint32_t h3 = spv_f32_to_f16(&B, as_f32(&B, get_val(&B, inst->w), get_id(inst->w)));
+                    uint32_t h0 = as_u32(&B, get_val(&B, inst->x), xid);
+                    uint32_t h1 = as_u32(&B, get_val(&B, inst->y), yid);
+                    uint32_t h2 = as_u32(&B, get_val(&B, inst->z), get_id(inst->z));
+                    uint32_t h3 = as_u32(&B, get_val(&B, inst->w), get_id(inst->w));
 
                     uint32_t h1_shifted = spv_binop(&B, SpvOpShiftLeftLogical, B.t_u32, h1, B.c_16);
                     uint32_t w0 = spv_binop(&B, SpvOpBitwiseOr, B.t_u32, h0, h1_shifted);
@@ -1401,12 +1388,10 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
                     store_ssbo_u32(&B, p, base1, w1);
                 } break;
 
-                case op_store_fp16x4_planar: {
-                    // Direct u16 store via 16-bit storage.
+                case op_store_16x4_planar: {
                     int p = resolve_ptr(&B, inst);
                     uint32_t sz_off = spv_const_u32(&B, (uint32_t)(3 + p));
                     uint32_t sz = load_push_u32(&B, sz_off);
-                    // plane_size in u16 elements = sz / 8
                     uint32_t ps_u16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, sz, B.c_3);
 
                     uint32_t rb_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
@@ -1426,8 +1411,8 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
                         uint32_t plane_off = spv_binop(&B, SpvOpIMul, B.t_u32, ch_id, ps_u16);
                         uint32_t final_addr = spv_binop(&B, SpvOpIAdd, B.t_u32, addr16, plane_off);
 
-                        uint32_t h_val = spv_f32_to_f16(&B, as_f32(&B, get_val(&B, channels[ch]),
-                                                                     channel_ids[ch]));
+                        uint32_t h_val = as_u32(&B, get_val(&B, channels[ch]),
+                                                    channel_ids[ch]);
                         store_ssbo_u16(&B, p, final_addr, h_val);
                     }
                 } break;
