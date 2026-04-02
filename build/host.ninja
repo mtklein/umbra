@@ -1,6 +1,10 @@
 out     = $builddir/host
 cc      = $clang
+exec    = leaks --atExit --
 ldflags = -framework Metal -framework Foundation -L/opt/homebrew/lib -lMoltenVK
+
+rule link
+    command = $cc $in $ldflags -o $out && codesign -s - -f --entitlements build/entitlements.plist $out
 include build/project.ninja
 
 
