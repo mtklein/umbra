@@ -9,8 +9,8 @@ typedef struct {
 
 static void grad_2stop_draw(slide *s, int w, int h, int y0, int y1, void *buf,
                                umbra_draw_layout const *lay, struct umbra_program *program) {
-    umbra_set_f32(lay->uni, lay->shader,      s->grad,  3);
-    umbra_set_f32(lay->uni, lay->shader + 12, s->color, 8);
+    umbra_uniforms_fill_f32(lay->uni, lay->shader,      s->grad,  3);
+    umbra_uniforms_fill_f32(lay->uni, lay->shader + 12, s->color, 8);
     size_t    pb = umbra_fmt_size(s->fmt);
     size_t plane_sz = (size_t)w * (size_t)h * pb;
     struct umbra_buf ubuf[2];
@@ -23,8 +23,8 @@ static void grad_2stop_draw(slide *s, int w, int h, int y0, int y1, void *buf,
 static void grad_lut_draw(slide *s, int w, int h, int y0, int y1, void *buf,
                              umbra_draw_layout const *lay, struct umbra_program *program) {
     grad_lut_state *st = s->state;
-    umbra_set_f32(lay->uni, lay->shader, s->grad, 4);
-    umbra_set_ptr(lay->uni, (lay->shader + 16 + 7) & ~(size_t)7,
+    umbra_uniforms_fill_f32(lay->uni, lay->shader, s->grad, 4);
+    umbra_uniforms_fill_ptr(lay->uni, (lay->shader + 16 + 7) & ~(size_t)7,
                   (struct umbra_buf){.ptr=st->lut, .sz=(size_t)(st->lut_n * 4 * 4)});
     size_t    pb = umbra_fmt_size(s->fmt);
     size_t plane_sz = (size_t)w * (size_t)h * pb;

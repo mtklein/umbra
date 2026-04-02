@@ -2,13 +2,13 @@
 #include <assert.h>
 #include <stdlib.h>
 
-size_t umbra_reserve_f32(struct umbra_uniforms *u, int n) {
+size_t umbra_uniforms_reserve_f32(struct umbra_uniforms *u, int n) {
     u->size = (u->size + 3) & ~(size_t)3;
     size_t h = u->size;
     u->size += (size_t)n * 4;
     return h;
 }
-size_t umbra_reserve_ptr(struct umbra_uniforms *u) {
+size_t umbra_uniforms_reserve_ptr(struct umbra_uniforms *u) {
     u->size = (u->size + 7) & ~(size_t)7;
     size_t h = u->size;
     u->size += 24;
@@ -21,13 +21,13 @@ static void ensure_allocated(struct umbra_uniforms *u) {
     }
 }
 
-void umbra_set_f32(struct umbra_uniforms *u, size_t h, float const *v, int n) {
+void umbra_uniforms_fill_f32(struct umbra_uniforms *u, size_t h, float const *v, int n) {
     assert(h + (size_t)n * 4 <= u->size);
     ensure_allocated(u);
     char *p = (char*)u->data + h;
     __builtin_memcpy(p, v, (size_t)n * 4);
 }
-void umbra_set_ptr(struct umbra_uniforms *u, size_t h, struct umbra_buf b) {
+void umbra_uniforms_fill_ptr(struct umbra_uniforms *u, size_t h, struct umbra_buf b) {
     assert(h + 24 <= u->size);
     ensure_allocated(u);
     char *p = (char*)u->data + h;

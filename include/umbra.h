@@ -15,8 +15,7 @@ struct umbra_backend {
     struct umbra_program* (*compile)(struct umbra_backend*, struct umbra_basic_block const*);
     void                  (*flush  )(struct umbra_backend*);
     void                  (*free   )(struct umbra_backend*);
-    _Bool const             threadsafe,
-                            pad_[7];
+    _Bool const             threadsafe, pad_[7];
 };
 struct umbra_backend* umbra_backend_interp(void);
 struct umbra_backend* umbra_backend_jit   (void);
@@ -27,8 +26,7 @@ struct umbra_buf {
     void   *ptr;
     size_t  sz;
     size_t  row_bytes;
-    _Bool   read_only,
-            pad_[7];
+    _Bool   read_only, pad_[7];
 };
 
 struct umbra_program {
@@ -51,10 +49,10 @@ struct umbra_uniforms {
     void  *data;
     size_t size;
 };
-size_t umbra_reserve_f32(struct umbra_uniforms*, int n);
-size_t umbra_reserve_ptr(struct umbra_uniforms*);
-void   umbra_set_f32(struct umbra_uniforms*, size_t off, float const*, int n);
-void   umbra_set_ptr(struct umbra_uniforms*, size_t off, struct umbra_buf);
+size_t umbra_uniforms_reserve_f32(struct umbra_uniforms*, int n);
+size_t umbra_uniforms_reserve_ptr(struct umbra_uniforms*);
+void   umbra_uniforms_fill_f32(struct umbra_uniforms*, size_t off, float const*, int n);
+void   umbra_uniforms_fill_ptr(struct umbra_uniforms*, size_t off, struct umbra_buf);
 
 typedef struct { int bits; } umbra_val;
 typedef struct { umbra_val r, g, b, a; } umbra_color;

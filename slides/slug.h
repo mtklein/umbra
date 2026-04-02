@@ -157,11 +157,11 @@ static inline struct umbra_builder *slug_build_acc(
     struct umbra_builder *b = umbra_builder();
 
     struct umbra_uniforms *u = calloc(1, sizeof(struct umbra_uniforms));
-    size_t fi  = umbra_reserve_f32(u, 11);
-    size_t co  = umbra_reserve_ptr(u);
+    size_t fi  = umbra_uniforms_reserve_f32(u, 11);
+    size_t co  = umbra_uniforms_reserve_ptr(u);
     umbra_ptr curves = umbra_deref_ptr(b,
         (umbra_ptr){0}, co);
-    size_t    ji = umbra_reserve_f32(u, 1);
+    size_t    ji = umbra_uniforms_reserve_f32(u, 1);
 
     umbra_val xf = umbra_f32_from_i32(b, umbra_x(b));
     umbra_val yf = umbra_f32_from_i32(b, umbra_y(b));

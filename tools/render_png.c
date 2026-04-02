@@ -14,7 +14,7 @@ static void render_slide(char const *label, struct umbra_backend *be, slide *s) 
 
     struct umbra_builder *fb = umbra_builder();
     struct umbra_uniforms *fill_uni = calloc(1, sizeof(struct umbra_uniforms));
-    size_t fi = umbra_reserve_f32(fill_uni, 4);
+    size_t fi = umbra_uniforms_reserve_f32(fill_uni, 4);
     umbra_color fc = {
         umbra_uniform_32(fb, (umbra_ptr){0}, fi),
         umbra_uniform_32(fb, (umbra_ptr){0}, fi + 4),
@@ -52,7 +52,7 @@ static void render_slide(char const *label, struct umbra_backend *be, slide *s) 
         (float)((s->bg >> 16) & 0xFFu) / 255.0f,
         (float)((s->bg >> 24) & 0xFFu) / 255.0f,
     };
-    umbra_set_f32(fill_uni, 0, hc, 4);
+    umbra_uniforms_fill_f32(fill_uni, 0, hc, 4);
     for (int y = 0; y < H; y++) {
         void *row = (char*)pixbuf + y * W * bpp;
         struct umbra_buf buf[] = {

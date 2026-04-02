@@ -83,7 +83,7 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
 umbra_color umbra_shader_solid(builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
     (void)x;
     (void)y;
-    size_t const fi = umbra_reserve_f32(u, 4);
+    size_t const fi = umbra_uniforms_reserve_f32(u, 4);
     umbra_val const r = umbra_uniform_32(builder, (umbra_ptr){0}, fi);
     umbra_val const g = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 4);
     umbra_val const b = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 8);
@@ -159,24 +159,24 @@ static umbra_color sample_lut_(builder *builder, umbra_val t_f32, size_t fi, umb
 }
 
 umbra_color umbra_shader_linear_2(builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
-    size_t const fi = umbra_reserve_f32(u, 3);
-    size_t const ci = umbra_reserve_f32(u, 8);
+    size_t const fi = umbra_uniforms_reserve_f32(u, 3);
+    size_t const ci = umbra_uniforms_reserve_f32(u, 8);
     return lerp_2stop_(builder, linear_t_(builder, fi, x, y), ci);
 }
 umbra_color umbra_shader_radial_2(builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
-    size_t const fi = umbra_reserve_f32(u, 3);
-    size_t const ci = umbra_reserve_f32(u, 8);
+    size_t const fi = umbra_uniforms_reserve_f32(u, 3);
+    size_t const ci = umbra_uniforms_reserve_f32(u, 8);
     return lerp_2stop_(builder, radial_t_(builder, fi, x, y), ci);
 }
 umbra_color umbra_shader_linear_grad(builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
-    size_t const fi = umbra_reserve_f32(u, 4);
-    size_t    const lut_off = umbra_reserve_ptr(u);
+    size_t const fi = umbra_uniforms_reserve_f32(u, 4);
+    size_t    const lut_off = umbra_uniforms_reserve_ptr(u);
     umbra_ptr const lut = umbra_deref_ptr(builder, (umbra_ptr){0}, lut_off);
     return sample_lut_(builder, linear_t_(builder, fi, x, y), fi, lut);
 }
 umbra_color umbra_shader_radial_grad(builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
-    size_t const fi = umbra_reserve_f32(u, 4);
-    size_t    const lut_off = umbra_reserve_ptr(u);
+    size_t const fi = umbra_uniforms_reserve_f32(u, 4);
+    size_t    const lut_off = umbra_uniforms_reserve_ptr(u);
     umbra_ptr const lut = umbra_deref_ptr(builder, (umbra_ptr){0}, lut_off);
     return sample_lut_(builder, radial_t_(builder, fi, x, y), fi, lut);
 }
@@ -263,7 +263,7 @@ umbra_color umbra_blend_multiply(builder *builder, umbra_color src, umbra_color 
 }
 
 umbra_val umbra_coverage_rect(builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
-    size_t const fi = umbra_reserve_f32(u, 4);
+    size_t const fi = umbra_uniforms_reserve_f32(u, 4);
     umbra_val const l = umbra_uniform_32(builder, (umbra_ptr){0}, fi);
     umbra_val const t = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 4);
     umbra_val const r = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 8);
@@ -281,7 +281,7 @@ umbra_val umbra_coverage_rect(builder *builder, struct umbra_uniforms *u, umbra_
 umbra_val umbra_coverage_bitmap(builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
     (void)x;
     (void)y;
-    size_t    const bmp_off = umbra_reserve_ptr(u);
+    size_t    const bmp_off = umbra_uniforms_reserve_ptr(u);
     umbra_ptr const bmp = umbra_deref_ptr(builder, (umbra_ptr){0}, bmp_off);
     umbra_val const val = umbra_i32_from_s16(builder, umbra_load_16(builder, bmp));
     umbra_val const inv255 = umbra_imm_f32(builder, 1.0f / 255.0f);
@@ -291,7 +291,7 @@ umbra_val umbra_coverage_bitmap(builder *builder, struct umbra_uniforms *u, umbr
 umbra_val umbra_coverage_sdf(builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
     (void)x;
     (void)y;
-    size_t    const bmp_off = umbra_reserve_ptr(u);
+    size_t    const bmp_off = umbra_uniforms_reserve_ptr(u);
     umbra_ptr const bmp = umbra_deref_ptr(builder, (umbra_ptr){0}, bmp_off);
     umbra_val const raw = umbra_i32_from_s16(builder, umbra_load_16(builder, bmp));
     umbra_val const inv255 = umbra_imm_f32(builder, 1.0f / 255.0f);
@@ -308,7 +308,7 @@ umbra_val umbra_coverage_sdf(builder *builder, struct umbra_uniforms *u, umbra_v
 umbra_val umbra_coverage_wind(builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
     (void)x;
     (void)y;
-    size_t    const off = umbra_reserve_ptr(u);
+    size_t    const off = umbra_uniforms_reserve_ptr(u);
     umbra_ptr const w = umbra_deref_ptr(builder, (umbra_ptr){0}, off);
     umbra_val const raw = umbra_load_32(builder, w);
     return umbra_min_f32(builder, umbra_abs_f32(builder, raw),
@@ -316,8 +316,8 @@ umbra_val umbra_coverage_wind(builder *builder, struct umbra_uniforms *u, umbra_
 }
 
 umbra_val umbra_coverage_bitmap_matrix(builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
-    size_t const fi = umbra_reserve_f32(u, 11);
-    size_t    const bmp_off = umbra_reserve_ptr(u);
+    size_t const fi = umbra_uniforms_reserve_f32(u, 11);
+    size_t    const bmp_off = umbra_uniforms_reserve_ptr(u);
     umbra_ptr const bmp = umbra_deref_ptr(builder, (umbra_ptr){0}, bmp_off);
 
     umbra_val const m0 = umbra_uniform_32(builder, (umbra_ptr){0}, fi);
