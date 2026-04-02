@@ -1923,6 +1923,41 @@ static void test_imm_broadcast(void) {
     }
 }
 
+// Test x86 pool_broadcast special cases: vpcmpeqd for all-ones,
+// vpcmpeqd+vpsrld for all-ones>>n, vpcmpeqd+vpslld for all-ones<<n.
+// Storing an immediate directly forces op_imm_32 through pool_broadcast.
+static void test_pool_broadcast_allones(void) {
+    // 0xffffffff: vpcmpeqd(d,d,d)
+    // 0x7fffffff: vpcmpeqd + vpsrld(1)
+    // 0xfffffffe: vpcmpeqd + vpslld(1)
+    int patterns[] = {
+        (int)0xffffffffu,
+        (int)0x7fffffffu,
+        (int)0xfffffffeu,
+    };
+    for (int pi = 0; pi < 3; pi++) {
+        struct umbra_builder *b = umbra_builder();
+        umbra_val v = umbra_imm_i32(b, patterns[pi]);
+        umbra_store_32(b, (umbra_ptr){0}, v);
+        backends B = make(b);
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            int dst[5] = {0};
+            if (!run(&B, bi, 5, 1,
+                     (struct umbra_buf[]){
+                         {.ptr=dst, .sz=5 * 4},
+                     })) {
+                continue;
+            }
+            (dst[0] == patterns[pi]) here;
+            (dst[1] == patterns[pi]) here;
+            (dst[2] == patterns[pi]) here;
+            (dst[3] == patterns[pi]) here;
+            (dst[4] == patterns[pi]) here;
+        }
+        cleanup(&B);
+    }
+}
+
 static void test_codegen_regalloc(void) {
     {
         struct umbra_builder *b = umbra_builder();
@@ -3545,6 +3580,7 @@ int main(void) {
     test_imm_fused();
     test_cmp_zero();
     test_imm_broadcast();
+    test_pool_broadcast_allones();
     test_codegen_regalloc();
     test_fms();
     test_movi_patterns();
