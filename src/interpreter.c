@@ -717,7 +717,6 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
                 else if ( out_r && !x_r &&  y_r) { s->tag = op_r_pack_mr; }
                 else if (!out_r && !x_r &&  y_r) { s->tag = op_m_pack_mr; }
                 else if ( out_r && !x_r && !y_r) { s->tag = op_r_pack_mm; }
-                else { assume(0); }
             } else
 
             // Output-only ops: no register inputs, just output to register.
