@@ -9,10 +9,10 @@
 #include "../third_party/stb/stb_truetype.h"
 #pragma clang diagnostic pop
 
-typedef struct {
+struct text_cov {
     uint16_t *data;
     int       w, h;
-} text_cov;
+};
 
 static inline unsigned char* text_load_font(const char *path) {
     FILE *f = fopen(path, "rb");
@@ -30,8 +30,8 @@ static inline unsigned char* text_load_font(const char *path) {
     return buf;
 }
 
-static inline text_cov text_rasterize(int W, int H, float font_size, _Bool sdf) {
-    text_cov tc = { .data = calloc((size_t)(W * H), sizeof(uint16_t)), .w = W, .h = H };
+static inline struct text_cov text_rasterize(int W, int H, float font_size, _Bool sdf) {
+    struct text_cov tc = { .data = calloc((size_t)(W * H), sizeof(uint16_t)), .w = W, .h = H };
 
     unsigned char *font_data = text_load_font("/System/Library/Fonts/Supplemental/Arial.ttf");
     if (!font_data) { return tc; }
@@ -104,7 +104,7 @@ static inline text_cov text_rasterize(int W, int H, float font_size, _Bool sdf) 
     return tc;
 }
 
-static inline void text_cov_free(text_cov *tc) {
+static inline void text_cov_free(struct text_cov *tc) {
     free(tc->data);
     tc->data = NULL;
 }

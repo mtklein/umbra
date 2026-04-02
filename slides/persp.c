@@ -2,26 +2,26 @@
 #include "text.h"
 #include <stdlib.h>
 
-typedef struct {
-    slide base;
+struct persp_state {
+    struct slide base;
 
-    float     persp_t;
-    float     mat[11];
-    text_cov *bitmap;
-    int       w, h;
-    float     color[4];
+    float            persp_t;
+    float            mat[11];
+    struct text_cov *bitmap;
+    int              w, h;
+    float            color[4];
 
     umbra_shader_fn    shader;
     umbra_coverage_fn  coverage;
     umbra_blend_fn     blend;
 
-    umbra_draw_layout          lay;
+    struct umbra_draw_layout   lay;
     struct umbra_basic_block  *bb;
     struct umbra_program      *prog;
-} persp_state;
+};
 
-static void persp_init(slide *s, int w, int h) {
-    persp_state *st = (persp_state *)s;
+static void persp_init(struct slide *s, int w, int h) {
+    struct persp_state *st = (struct persp_state *)s;
     st->w = w;
     st->h = h;
     st->persp_t = 0.0f;
@@ -33,23 +33,23 @@ static void persp_init(slide *s, int w, int h) {
     umbra_builder_free(b);
 }
 
-static void persp_animate(slide *s, float dt) {
-    persp_state *st = (persp_state *)s;
+static void persp_animate(struct slide *s, float dt) {
+    struct persp_state *st = (struct persp_state *)s;
     (void)dt;
     st->persp_t += 0.016f;
     slide_perspective_matrix(st->mat, st->persp_t, st->w, st->h, st->bitmap->w,
                              st->bitmap->h);
 }
 
-static void persp_prepare(slide *s, int w, int h, struct umbra_backend *be) {
+static void persp_prepare(struct slide *s, int w, int h, struct umbra_backend *be) {
     (void)w; (void)h;
-    persp_state *st = (persp_state *)s;
+    struct persp_state *st = (struct persp_state *)s;
     if (st->prog) { st->prog->free(st->prog); }
     st->prog = be->compile(be, st->bb);
 }
 
-static void persp_draw(slide *s, int w, int h, int y0, int y1, void *buf) {
-    persp_state *st = (persp_state *)s;
+static void persp_draw(struct slide *s, int w, int h, int y0, int y1, void *buf) {
+    struct persp_state *st = (struct persp_state *)s;
     umbra_uniforms_fill_f32(st->lay.uni, st->lay.shader,   st->color, 4);
     umbra_uniforms_fill_f32(st->lay.uni, st->lay.coverage, st->mat, 11);
     umbra_uniforms_fill_ptr(st->lay.uni, (st->lay.coverage + 44 + 7) & ~(size_t)7,
@@ -65,28 +65,28 @@ static void persp_draw(slide *s, int w, int h, int y0, int y1, void *buf) {
     st->prog->queue(st->prog, 0, y0, w, y1, ubuf);
 }
 
-static struct umbra_basic_block *persp_get_bb(slide *s) {
-    return ((persp_state *)s)->bb;
+static struct umbra_basic_block *persp_get_bb(struct slide *s) {
+    return ((struct persp_state *)s)->bb;
 }
 
-static void persp_free(slide *s) {
-    persp_state *st = (persp_state *)s;
+static void persp_free(struct slide *s) {
+    struct persp_state *st = (struct persp_state *)s;
     if (st->prog) { st->prog->free(st->prog); }
     umbra_basic_block_free(st->bb);
     if (st->lay.uni) { free(st->lay.uni->data); free(st->lay.uni); }
     free(st);
 }
 
-slide *slide_persp(text_cov *);
+struct slide *slide_persp(struct text_cov *);
 
-slide *slide_persp(text_cov *bitmap) {
-    persp_state *st = calloc(1, sizeof *st);
+struct slide *slide_persp(struct text_cov *bitmap) {
+    struct persp_state *st = calloc(1, sizeof *st);
     st->bitmap = bitmap;
     st->shader = umbra_shader_solid;
     st->coverage = umbra_coverage_bitmap_matrix;
     st->blend = umbra_blend_srcover;
     st->color[0] = 1.0f; st->color[1] = 0.8f; st->color[2] = 0.2f; st->color[3] = 1.0f;
-    st->base = (slide){
+    st->base = (struct slide){
         .title = "9. Perspective Text",
         .fmt = umbra_fmt_8888,
         .bg = 0xff0a0a1e,

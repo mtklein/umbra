@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-typedef struct umbra_builder builder;
+
 
 enum { W = 128, H = 96 };
 
@@ -17,15 +17,15 @@ static char const *backend_name[N_BACKS] = {
 
 static struct umbra_backend *bes[N_BACKS];
 
-typedef struct {
+struct pipe {
     struct umbra_program  *prog;
     struct umbra_uniforms *uni;
-} pipe;
+};
 
-static pipe fill_pipe;
+static struct pipe fill_pipe;
 
 static void build_fill(void) {
-    builder               *builder = umbra_builder();
+    struct umbra_builder   *builder = umbra_builder();
     struct umbra_uniforms *u       = calloc(1, sizeof(struct umbra_uniforms));
     size_t fi = umbra_uniforms_reserve_f32(u, 4);
     umbra_color c = {
@@ -80,7 +80,7 @@ static void render_slide(
         int slide_idx,
         struct umbra_backend *be,
         void *pixbuf) {
-    slide *s = slide_get(slide_idx);
+    struct slide *s = slide_get(slide_idx);
 
     fill_bg(pixbuf, s->bg);
     s->prepare(s, W, H, be);
@@ -88,7 +88,7 @@ static void render_slide(
 }
 
 static void test_slide_golden(int slide_idx) {
-    slide *s = slide_get(slide_idx);
+    struct slide *s = slide_get(slide_idx);
 
     size_t pixbuf_sz = (size_t)(W * H * 4);
     void *pbuf_ref = calloc(1, pixbuf_sz);
@@ -142,8 +142,8 @@ static void test_slug_rect(void) {
         55, 5, 30, 5,  5, 5,
     };
 
-    slug_acc_layout alay;
-    builder *ab = slug_build_acc(&alay);
+    struct slug_acc_layout alay;
+    struct umbra_builder *ab = slug_build_acc(&alay);
     struct umbra_basic_block *abb =
         umbra_basic_block(ab);
     umbra_builder_free(ab);
@@ -153,8 +153,8 @@ static void test_slug_rect(void) {
         be->compile(be, abb);
     umbra_basic_block_free(abb);
 
-    umbra_draw_layout lay;
-    builder *bld = umbra_draw_build(
+    struct umbra_draw_layout lay;
+    struct umbra_builder *bld = umbra_draw_build(
         umbra_shader_solid, umbra_coverage_wind,
         umbra_blend_srcover, umbra_fmt_8888,
         &lay);
@@ -229,8 +229,8 @@ static void test_perspective_text(void) {
     struct umbra_backend *be =
         umbra_backend_interp();
 
-    umbra_draw_layout lay;
-    builder *bld = umbra_draw_build(
+    struct umbra_draw_layout lay;
+    struct umbra_builder *bld = umbra_draw_build(
         umbra_shader_solid,
         umbra_coverage_bitmap_matrix,
         umbra_blend_srcover, umbra_fmt_8888,
@@ -269,9 +269,9 @@ static void test_perspective_text(void) {
 
     interp->free(interp);
 
-    text_cov tc = text_rasterize(W, H, 24.0f, 0);
+    struct text_cov tc = text_rasterize(W, H, 24.0f, 0);
 
-    umbra_draw_layout lay2;
+    struct umbra_draw_layout lay2;
     bld = umbra_draw_build(
         umbra_shader_solid,
         umbra_coverage_bitmap_matrix,

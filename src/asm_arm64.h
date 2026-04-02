@@ -1,12 +1,12 @@
 #pragma once
 #include <stdint.h>
 
-typedef struct {
+struct Buf {
     uint32_t *buf;
     int       len, cap;
-} Buf;
+};
 
-void     put(Buf *b, uint32_t w);
+void     put(struct Buf *b, uint32_t w);
 uint32_t RET(void);
 uint32_t ADD_xr(int d, int n, int m);
 uint32_t ADD_xi(int d, int n, int imm12);
@@ -115,4 +115,4 @@ uint32_t MVNI_4s(int d, uint8_t imm8, int shift);
 uint32_t DUP_4s_w(int d, int n);
 uint32_t DUP_4s_lane(int d, int n, int lane);
 uint32_t INS_s(int d, int idx, int n);
-void     load_imm_w(Buf *c, int rd, uint32_t v);
+void     load_imm_w(struct Buf *c, int rd, uint32_t v);

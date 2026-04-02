@@ -119,7 +119,7 @@ int main(void) {
     slides_init(64, 48);
 
     for (int i = 0; i < slide_count(); i++) {
-        slide *s = slide_get(i);
+        struct slide *s = slide_get(i);
         if (!s->get_bb) { continue; }
         struct umbra_basic_block *bb = s->get_bb(s);
         if (!bb) { continue; }

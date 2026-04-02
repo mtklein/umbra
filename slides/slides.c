@@ -2,30 +2,30 @@
 #include "text.h"
 #include "slug.h"
 
-extern slide *slide_solid(char const *, uint32_t, float const[4], umbra_coverage_fn,
-                          umbra_blend_fn, enum umbra_fmt);
-extern slide *slide_text_bitmap(text_cov *);
-extern slide *slide_text_sdf(text_cov *);
-extern slide *slide_persp(text_cov *);
-extern slide *slide_gradient_2stop(char const *, uint32_t, umbra_shader_fn, enum umbra_fmt,
-                                   float const[8], float const[4]);
-extern slide *slide_gradient_lut(char const *, uint32_t, umbra_shader_fn, enum umbra_fmt,
-                                 float const[4], float *, int);
-extern slide *slide_slug_wind(slug_curves *);
-extern slide *slide_overview(void);
+extern struct slide *slide_solid(char const *, uint32_t, float const[4], umbra_coverage_fn,
+                                umbra_blend_fn, enum umbra_fmt);
+extern struct slide *slide_text_bitmap(struct text_cov *);
+extern struct slide *slide_text_sdf(struct text_cov *);
+extern struct slide *slide_persp(struct text_cov *);
+extern struct slide *slide_gradient_2stop(char const *, uint32_t, umbra_shader_fn, enum umbra_fmt,
+                                          float const[8], float const[4]);
+extern struct slide *slide_gradient_lut(char const *, uint32_t, umbra_shader_fn, enum umbra_fmt,
+                                        float const[4], float *, int);
+extern struct slide *slide_slug_wind(struct slug_curves *);
+extern struct slide *slide_overview(void);
 
-static text_cov    bitmap_cov, sdf_cov;
-static slug_curves slug;
+static struct text_cov    bitmap_cov, sdf_cov;
+static struct slug_curves slug;
 
 enum { LUT_N = 64 };
 static float linear_lut[LUT_N * 4];
 static float radial_lut[LUT_N * 4];
 
-static slide *all[18];
-static int    count;
+static struct slide *all[18];
+static int           count;
 
-int    slide_count(void) { return count; }
-slide *slide_get(int i) { return all[i]; }
+int           slide_count(void) { return count; }
+struct slide *slide_get(int i) { return all[i]; }
 
 static void build_luts(void) {
     float const linear_stops[][4] = {

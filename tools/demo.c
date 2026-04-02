@@ -12,8 +12,6 @@
 #include "../third_party/stb/stb_image_write.h"
 #pragma clang diagnostic pop
 
-typedef struct umbra_builder builder;
-
 enum { NUM_BACKENDS = 4 };
 static char const *backend_name[NUM_BACKENDS] = {
     "interp",
@@ -39,23 +37,23 @@ static enum umbra_fmt const fmt_enums[] = {
     umbra_fmt_1010102,
 };
 
-typedef struct {
+struct pipe {
     struct umbra_program  *program;
     struct umbra_uniforms *uni;
     int                    out_ptr, pad_;
-} pipe;
+};
 
-static pipe fill_pipe, readback_pipe, hdr_pipe;
+static struct pipe fill_pipe, readback_pipe, hdr_pipe;
 
-static void free_pipe(pipe *p) {
+static void free_pipe(struct pipe *p) {
     if (p->program) { p->program->free(p->program); }
     if (p->uni) { free(p->uni->data); free(p->uni); }
-    *p = (pipe){0};
+    *p = (struct pipe){0};
 }
 
 static struct umbra_backend *pipe_be;
 
-static void finish_pipe(pipe *p, builder *builder, struct umbra_uniforms *uni) {
+static void finish_pipe(struct pipe *p, struct umbra_builder *builder, struct umbra_uniforms *uni) {
     p->uni = uni;
     struct umbra_basic_block *bb = umbra_basic_block(builder);
     umbra_builder_free(builder);
@@ -65,7 +63,7 @@ static void finish_pipe(pipe *p, builder *builder, struct umbra_uniforms *uni) {
 
 static void build_fill(int fmt) {
     free_pipe(&fill_pipe);
-    builder                *builder = umbra_builder();
+    struct umbra_builder    *builder = umbra_builder();
     struct umbra_uniforms  *u       = calloc(1, sizeof(struct umbra_uniforms));
     size_t fi = umbra_uniforms_reserve_f32(u, 4);
     umbra_color c = {
@@ -80,7 +78,7 @@ static void build_fill(int fmt) {
 
 static void build_readback(int fmt) {
     free_pipe(&readback_pipe);
-    builder    *builder = umbra_builder();
+    struct umbra_builder *builder = umbra_builder();
     umbra_color c = umbra_load_color(builder, (umbra_ptr){1}, fmt_enums[fmt]);
     umbra_store_color(builder, (umbra_ptr){2}, c, umbra_fmt_8888);
     readback_pipe.out_ptr = 2;
@@ -89,7 +87,7 @@ static void build_readback(int fmt) {
 
 static void build_hdr(int fmt) {
     free_pipe(&hdr_pipe);
-    builder    *builder = umbra_builder();
+    struct umbra_builder *builder = umbra_builder();
     umbra_color c = umbra_load_color(builder, (umbra_ptr){1}, fmt_enums[fmt]);
     hdr_pipe.out_ptr = 2;
     umbra_store_color(builder, (umbra_ptr){2}, c, umbra_fmt_fp16);
@@ -139,7 +137,7 @@ static void tile_factor(int n, int *cols, int *rows) {
 
 static int cur_backend;
 
-static void build_slide_fmt(slide *s, int fmt) {
+static void build_slide_fmt(struct slide *s, int fmt) {
     s->fmt = fmt_enums[fmt];
     if (bes[cur_backend]) {
         s->prepare(s, 640, 480, bes[cur_backend]);
@@ -164,7 +162,7 @@ static int next_backend(int cur) {
     return cur;
 }
 
-static void update_title(SDL_Window *w, slide *s, int bi, int fi, double fps, int nt) {
+static void update_title(SDL_Window *w, struct slide *s, int bi, int fi, double fps, int nt) {
     char title[256];
     int n = SDL_snprintf(title, sizeof title, "%s  [%s/%s]  %.0f fps", s->title,
                          backend_name[bi], fmt_name[fi], fps);
@@ -220,14 +218,14 @@ static void to_hdr_row(__fp16 *dst, void *src, int n, size_t src_sz, size_t plan
     hdr_pipe.program->queue(hdr_pipe.program, 0, 0, n, 1, buf);
 }
 
-typedef struct {
-    slide *s;
-    int    W, H, y0, y1;
-    void  *buf;
-} tile_work;
+struct tile_work {
+    struct slide *s;
+    int           W, H, y0, y1;
+    void         *buf;
+};
 
 static void tile_fn(void *arg) {
-    tile_work *tw = arg;
+    struct tile_work *tw = arg;
     tw->s->draw(tw->s, tw->W, tw->H, tw->y0, tw->y1, tw->buf);
 }
 
@@ -301,7 +299,7 @@ int main(void) {
                     next = (cur_slide + slide_count() - 1) % slide_count();
                 } else if (ev.key.key == SDLK_B) {
                     cur_backend = next_backend(cur_backend);
-                    slide *s = slide_get(cur_slide);
+                    struct slide *s = slide_get(cur_slide);
                     if (bes[cur_backend]) { s->prepare(s, W, H, bes[cur_backend]); }
                     rebuild_xtra(cur_backend);
                 } else if (ev.key.key == SDLK_C) {
@@ -330,7 +328,7 @@ int main(void) {
         }
         if (!running) { break; }
 
-        slide *s = slide_get(cur_slide);
+        struct slide *s = slide_get(cur_slide);
 
         size_t bpp = umbra_fmt_size(fmt_enums[cur_fmt]);
         size_t row_bytes = (size_t)W * bpp;
@@ -351,16 +349,16 @@ int main(void) {
             if (!saved_bb && nt > 1) { nt = 1; }
             int sh = (H + nt - 1) / nt;
 
-            tile_work *work = malloc((size_t)nt * sizeof *work);
+            struct tile_work *work = malloc((size_t)nt * sizeof *work);
             for (int t = 0; t < nt; t++) {
                 int y0 = t * sh;
                 int y1 = y0 + sh > H ? H : y0 + sh;
-                work[t] = (tile_work){s, W, H, y0, y1, pixbuf};
+                work[t] = (struct tile_work){s, W, H, y0, y1, pixbuf};
             }
             if (!bes[cur_backend]->threadsafe || nt <= 1) {
                 for (int t = 0; t < nt; t++) { tile_fn(&work[t]); }
             } else {
-                work_group wg = {.pool = pool};
+                struct work_group wg = {.pool = pool};
                 for (int t = 0; t < nt; t++) { work_group_add(&wg, tile_fn, &work[t]); }
                 work_group_wait(&wg);
             }

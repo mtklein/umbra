@@ -72,6 +72,8 @@ static void pool_free(struct pool *p) {
 
 #include "asm_arm64.h"
 
+typedef struct Buf Buf;
+
 // X0=l, X1=t, X2=r, X3=b, X4=buf.
 // X0=col_end, X1=l, X2=buf, X9=col, X14=row.
 enum {
@@ -1147,6 +1149,9 @@ struct umbra_backend *umbra_backend_jit(void) {
 #elif defined(__AVX2__)
 
 #include "asm_x86.h"
+
+typedef struct Buf Buf;
+
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>

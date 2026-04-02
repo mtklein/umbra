@@ -8,14 +8,14 @@ static uint8_t const font3x5[10][5] = {
     {7, 4, 7, 1, 7}, {7, 4, 7, 5, 7}, {7, 1, 1, 1, 1}, {7, 5, 7, 5, 7}, {7, 5, 7, 1, 7},
 };
 
-typedef struct {
-    slide base;
+struct overview_state {
+    struct slide base;
 
     int                   w, h, cw, ch;
     int                   n_real, pad_;
     uint32_t             *fb, *tmp;
     struct umbra_backend *be;
-} overview_state;
+};
 
 static void draw_digit(uint32_t *fb, int stride, int ox, int oy, int digit, uint32_t color) {
     for (int dy = 0; dy < 10; dy++) {
@@ -49,7 +49,7 @@ static void draw_xbox(uint32_t *fb, int stride, int x0, int y0, int cw, int ch,
     }
 }
 
-static void render_thumbnails(overview_state *st) {
+static void render_thumbnails(struct overview_state *st) {
     int w = st->w, h = st->h;
     for (int idx = 0; idx < ROWS * COLS; idx++) {
         int col = idx % COLS;
@@ -67,7 +67,7 @@ static void render_thumbnails(overview_state *st) {
             continue;
         }
 
-        slide *sub = slide_get(idx);
+        struct slide *sub = slide_get(idx);
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) { st->tmp[y * w + x] = sub->bg; }
         }
@@ -88,8 +88,8 @@ static void render_thumbnails(overview_state *st) {
     }
 }
 
-static void overview_init(slide *s, int w, int h) {
-    overview_state *st = (overview_state *)s;
+static void overview_init(struct slide *s, int w, int h) {
+    struct overview_state *st = (struct overview_state *)s;
     st->w = w;
     st->h = h;
     st->cw = w / COLS;
@@ -99,23 +99,23 @@ static void overview_init(slide *s, int w, int h) {
     st->n_real = slide_count() - 1;
 }
 
-static void overview_animate(slide *s, float dt) {
-    overview_state *st = (overview_state *)s;
+static void overview_animate(struct slide *s, float dt) {
+    struct overview_state *st = (struct overview_state *)s;
     for (int i = 0; i < st->n_real; i++) {
-        slide *sub = slide_get(i);
+        struct slide *sub = slide_get(i);
         if (sub->animate) { sub->animate(sub, dt); }
     }
 }
 
-static void overview_prepare(slide *s, int w, int h, struct umbra_backend *be) {
+static void overview_prepare(struct slide *s, int w, int h, struct umbra_backend *be) {
     (void)w; (void)h;
-    overview_state *st = (overview_state *)s;
+    struct overview_state *st = (struct overview_state *)s;
     st->be = be;
     render_thumbnails(st);
 }
 
-static void overview_draw(slide *s, int w, int h, int y0, int y1, void *buf) {
-    overview_state *st = (overview_state *)s;
+static void overview_draw(struct slide *s, int w, int h, int y0, int y1, void *buf) {
+    struct overview_state *st = (struct overview_state *)s;
     (void)w;
     (void)h;
     (void)s;
@@ -124,18 +124,18 @@ static void overview_draw(slide *s, int w, int h, int y0, int y1, void *buf) {
     __builtin_memcpy((char*)buf + off, (char*)st->fb + off, len);
 }
 
-static void overview_free(slide *s) {
-    overview_state *st = (overview_state *)s;
+static void overview_free(struct slide *s) {
+    struct overview_state *st = (struct overview_state *)s;
     free(st->fb);
     free(st->tmp);
     free(st);
 }
 
-slide *slide_overview(void);
+struct slide *slide_overview(void);
 
-slide *slide_overview(void) {
-    overview_state *st = calloc(1, sizeof *st);
-    st->base = (slide){
+struct slide *slide_overview(void) {
+    struct overview_state *st = calloc(1, sizeof *st);
+    st->base = (struct slide){
         .title = "Overview",
         .fmt = umbra_fmt_8888,
         .bg = 0xff101010,

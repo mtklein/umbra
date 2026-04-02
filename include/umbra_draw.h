@@ -7,14 +7,14 @@ typedef umbra_val (*umbra_coverage_fn)(struct umbra_builder *, struct umbra_unif
                                        umbra_val x, umbra_val y);
 typedef umbra_color (*umbra_blend_fn)(struct umbra_builder *, umbra_color src,
                                       umbra_color dst);
-typedef struct {
+struct umbra_draw_layout {
     struct umbra_uniforms *uni;
     size_t shader, coverage;
-} umbra_draw_layout;
+};
 
 struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn coverage,
                                        umbra_blend_fn blend, enum umbra_fmt fmt,
-                                       umbra_draw_layout *layout);
+                                       struct umbra_draw_layout *layout);
 
 umbra_color umbra_shader_solid      (struct umbra_builder *, struct umbra_uniforms *, umbra_val x, umbra_val y);
 umbra_color umbra_shader_linear_2   (struct umbra_builder *, struct umbra_uniforms *, umbra_val x, umbra_val y);

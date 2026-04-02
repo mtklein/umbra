@@ -1,6 +1,8 @@
 #include "asm_arm64.h"
 #include <stdlib.h>
 
+typedef struct Buf Buf;
+
 void put(Buf *b, uint32_t w) {
     if (b->len == b->cap) {
         b->cap = b->cap ? 2 * b->cap : 1024;

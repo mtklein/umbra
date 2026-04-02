@@ -3,22 +3,22 @@
 #include <stdlib.h>
 
 
-typedef struct {
+struct work_item {
     void (*fn)(void *);
     void  *ctx;
     int   *pending;
-} work_item;
+};
 
 struct thread_pool {
     pthread_mutex_t mu;
     pthread_cond_t  cv;
     pthread_t      *threads;
-    work_item      *stack;
+    struct work_item *stack;
     int             top, cap;
     int             n_threads, quit;
 };
 
-static _Bool pop(struct thread_pool *p, work_item *out) {
+static _Bool pop(struct thread_pool *p, struct work_item *out) {
     pthread_mutex_lock(&p->mu);
     while (p->top == 0 && !p->quit) {
         pthread_cond_wait(&p->cv, &p->mu);
@@ -29,7 +29,7 @@ static _Bool pop(struct thread_pool *p, work_item *out) {
     return got;
 }
 
-static _Bool try_pop(struct thread_pool *p, work_item *out) {
+static _Bool try_pop(struct thread_pool *p, struct work_item *out) {
     _Bool got = 0;
     pthread_mutex_lock(&p->mu);
     if (p->top > 0) { *out = p->stack[--p->top]; got = 1; }
@@ -40,7 +40,7 @@ static _Bool try_pop(struct thread_pool *p, work_item *out) {
 static void *worker(void *arg) {
     struct thread_pool *p = arg;
     for (;;) {
-        work_item w;
+        struct work_item w;
         if (!pop(p, &w)) { break; }
         w.fn(w.ctx);
         __atomic_fetch_sub(w.pending, 1, __ATOMIC_RELEASE);
@@ -77,7 +77,7 @@ void thread_pool_free(struct thread_pool *p) {
     free(p);
 }
 
-void work_group_add(work_group *wg, void (*fn)(void *), void *ctx) {
+void work_group_add(struct work_group *wg, void (*fn)(void *), void *ctx) {
     __atomic_fetch_add(&wg->pending, 1, __ATOMIC_RELAXED);
     struct thread_pool *p = wg->pool;
     pthread_mutex_lock(&p->mu);
@@ -85,14 +85,14 @@ void work_group_add(work_group *wg, void (*fn)(void *), void *ctx) {
         p->cap *= 2;
         p->stack = realloc(p->stack, (size_t)p->cap * sizeof *p->stack);
     }
-    p->stack[p->top++] = (work_item){fn, ctx, &wg->pending};
+    p->stack[p->top++] = (struct work_item){fn, ctx, &wg->pending};
     pthread_cond_signal(&p->cv);
     pthread_mutex_unlock(&p->mu);
 }
 
-void work_group_wait(work_group *wg) {
+void work_group_wait(struct work_group *wg) {
     while (__atomic_load_n(&wg->pending, __ATOMIC_ACQUIRE) > 0) {
-        work_item w;
+        struct work_item w;
         if (try_pop(wg->pool, &w)) {
             w.fn(w.ctx);
             __atomic_fetch_sub(w.pending, 1, __ATOMIC_RELEASE);

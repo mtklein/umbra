@@ -3,28 +3,26 @@
 #include <math.h>
 #include <stdint.h>
 
-typedef struct slide slide;
-
 struct slide {
     char const     *title;
     enum umbra_fmt  fmt;
     uint32_t        bg;
 
-    void (*init)   (slide*, int w, int h);
-    void (*animate)(slide*, float dt);
-    void (*prepare)(slide*, int w, int h, struct umbra_backend*);
-    void (*draw)   (slide*, int w, int h, int y0, int y1, void *buf);
-    void (*free)   (slide*);
+    void (*init)   (struct slide*, int w, int h);
+    void (*animate)(struct slide*, float dt);
+    void (*prepare)(struct slide*, int w, int h, struct umbra_backend*);
+    void (*draw)   (struct slide*, int w, int h, int y0, int y1, void *buf);
+    void (*free)   (struct slide*);
 
     // Optional: return a basic block for IR dump tools.
-    struct umbra_basic_block *(*get_bb)(slide*);
+    struct umbra_basic_block *(*get_bb)(struct slide*);
 };
 
-int    slide_count        (void);
-slide *slide_get          (int i);
-void   slides_init        (int w, int h);
-void   slides_init_for_dump(void);
-void   slides_cleanup     (void);
+int           slide_count        (void);
+struct slide *slide_get          (int i);
+void          slides_init        (int w, int h);
+void          slides_init_for_dump(void);
+void          slides_cleanup     (void);
 
 static inline void slide_perspective_matrix(
         float out[11], float t,

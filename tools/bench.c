@@ -13,7 +13,7 @@ static double now(void) {
     return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
 }
 
-static double bench(slide *s, int w, int h, void *buf, struct umbra_backend *be) {
+static double bench(struct slide *s, int w, int h, void *buf, struct umbra_backend *be) {
     s->prepare(s, w, h, be);
     s->draw(s, w, h, 0, h, buf);
     be->flush(be);
@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
     };
 
     for (int si = 0; si < ns; si++) {
-        slide *s = slide_get(si);
+        struct slide *s = slide_get(si);
         if (!s->draw) { continue; }
 
         size_t bpp = umbra_fmt_size(s->fmt);
@@ -67,8 +67,8 @@ int main(int argc, char *argv[]) {
     }
 
     {
-        slug_curves               sc = slug_extract("Slug", (float)H * 0.3125f);
-        slug_acc_layout           al;
+        struct slug_curves        sc = slug_extract("Slug", (float)H * 0.3125f);
+        struct slug_acc_layout    al;
         struct umbra_builder     *bld = slug_build_acc(&al);
         struct umbra_basic_block *bb = umbra_basic_block(bld);
         umbra_builder_free(bld);

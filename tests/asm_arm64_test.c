@@ -5,7 +5,7 @@
 // All encodings verified against `as` + `llvm-objdump`.
 
 static void test_buf(void) {
-    Buf b = {0};
+    struct Buf b = {0};
     put(&b, 0xDEADBEEF);
     put(&b, 0xCAFEBABE);
     b.len == 2 here;
@@ -139,14 +139,14 @@ static void test_dup_ins(void) {
 
 static void test_load_imm_w(void) {
     // Small value: just MOVZ
-    Buf b = {0};
+    struct Buf b = {0};
     load_imm_w(&b, 3, 42);
     b.len == 1 here;
     b.buf[0] == MOVZ_w(3, 42) here;
     free(b.buf);
 
     // Large value: MOVZ + MOVK
-    b = (Buf){0};
+    b = (struct Buf){0};
     load_imm_w(&b, 5, 0x12340056);
     b.len == 2 here;
     b.buf[0] == MOVZ_w(5, 0x0056) here;

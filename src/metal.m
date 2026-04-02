@@ -1464,7 +1464,7 @@ static void run_metal(struct umbra_program *prog, int l, int t, int r, int b, st
 static void dump_metal(struct umbra_program const *prog, FILE *f) { umbra_dump_metal((struct umbra_metal const*)prog, f); }
 static void free_metal(struct umbra_program *prog) { umbra_metal_free((struct umbra_metal*)prog); }
 static struct umbra_program *compile_metal(struct umbra_backend           *be,
-                                           struct umbra_basic_block const *bb) {
+                                           BB const *bb) {
     struct umbra_metal *const m = umbra_metal((struct metal_backend*)be, bb);
     m->base = (struct umbra_program){
         .queue   = run_metal,

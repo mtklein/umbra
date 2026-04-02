@@ -11,13 +11,13 @@ static inline _Bool equiv(float x, float y) {
 
 enum { NUM_BACKENDS = 4 };
 
-typedef struct {
+struct test_backends {
     struct umbra_backend *be[NUM_BACKENDS];
     struct umbra_program *p[NUM_BACKENDS];
-} test_backends;
+};
 
-static inline test_backends test_backends_make(struct umbra_basic_block const *bb) {
-    test_backends B;
+static inline struct test_backends test_backends_make(struct umbra_basic_block const *bb) {
+    struct test_backends B;
     B.be[0] = umbra_backend_interp();
     B.be[1] = umbra_backend_jit();
     B.be[2] = umbra_backend_metal();
@@ -35,7 +35,7 @@ static inline test_backends test_backends_make(struct umbra_basic_block const *b
     return B;
 }
 
-static inline _Bool test_backends_run(test_backends *B, int bi, int r, int b,
+static inline _Bool test_backends_run(struct test_backends *B, int bi, int r, int b,
                                       struct umbra_buf buf[]) {
     if (!B->p[bi]) { return 0; }
     B->p[bi]->queue(B->p[bi], 0, 0, r, b, buf);
@@ -43,7 +43,7 @@ static inline _Bool test_backends_run(test_backends *B, int bi, int r, int b,
     return 1;
 }
 
-static inline void test_backends_free(test_backends *B) {
+static inline void test_backends_free(struct test_backends *B) {
     for (int i = 0; i < NUM_BACKENDS; i++) {
         if (B->p[i]) { B->p[i]->free(B->p[i]); }
         if (B->be[i]) { B->be[i]->free(B->be[i]); }

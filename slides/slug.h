@@ -8,16 +8,16 @@
 #include "../third_party/stb/stb_truetype.h"
 #pragma clang diagnostic pop
 
-typedef struct {
+struct slug_curves {
     float *data;
     int    count;
     int    pad_;
     float  w, h;
-} slug_curves;
+};
 
-static inline slug_curves slug_extract(
+static inline struct slug_curves slug_extract(
         char const *text, float font_size) {
-    slug_curves sc = {0};
+    struct slug_curves sc = {0};
 
     FILE *fp = fopen(
         "/System/Library/Fonts/Supplemental"
@@ -142,18 +142,18 @@ static inline slug_curves slug_extract(
     return sc;
 }
 
-static inline void slug_free(slug_curves *sc) {
+static inline void slug_free(struct slug_curves *sc) {
     free(sc->data);
-    *sc = (slug_curves){0};
+    *sc = (struct slug_curves){0};
 }
 
-typedef struct {
+struct slug_acc_layout {
     struct umbra_uniforms *uni;
     size_t mat, curves_off, loop_off;
-} slug_acc_layout;
+};
 
 static inline struct umbra_builder *slug_build_acc(
-        slug_acc_layout *lay) {
+        struct slug_acc_layout *lay) {
     struct umbra_builder *b = umbra_builder();
 
     struct umbra_uniforms *u = calloc(1, sizeof(struct umbra_uniforms));

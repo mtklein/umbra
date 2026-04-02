@@ -10,8 +10,8 @@
 static int       val_id  (umbra_val v)       { return ((val_){.bits = v.bits}).id; }
 static umbra_val val_make(int id, int chan)  { return (umbra_val){.bits = ((val_){.id=(unsigned)id, .chan=(unsigned)chan}).bits}; }
 
-typedef struct umbra_builder builder;
 typedef umbra_val            val;
+typedef struct umbra_builder builder;
 
 
 size_t umbra_fmt_size(enum umbra_fmt fmt) {

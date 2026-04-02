@@ -1,38 +1,38 @@
 #pragma once
 #include <stdint.h>
 
-typedef struct {
+struct Buf {
     uint8_t *buf;
     int      len, cap;
-} Buf;
+};
 
-void emit1(Buf *b, uint8_t v);
-void emit4(Buf *b, uint32_t v);
+void emit1(struct Buf *b, uint8_t v);
+void emit4(struct Buf *b, uint32_t v);
 
-void vex(Buf *b, int pp, int mm, int W, int L, int d, int v, int s, uint8_t op);
-void vex_rrr(Buf *b, int pp, int mm, int L, uint8_t op, int d, int v, int s);
-void vex_mem(Buf *b, int pp, int mm, int W, int L, int reg, int v, uint8_t op, int base,
+void vex(struct Buf *b, int pp, int mm, int W, int L, int d, int v, int s, uint8_t op);
+void vex_rrr(struct Buf *b, int pp, int mm, int L, uint8_t op, int d, int v, int s);
+void vex_mem(struct Buf *b, int pp, int mm, int W, int L, int reg, int v, uint8_t op, int base,
              int index, int scale, int disp);
 
-int  vex_rip(Buf *b, int pp, int mm, int W, int L, int reg, int v, uint8_t op);
-void vmov_load(Buf *b, int L, int reg, int base, int index, int scale, int disp);
-void vmov_store(Buf *b, int L, int reg, int base, int index, int scale, int disp);
+int  vex_rip(struct Buf *b, int pp, int mm, int W, int L, int reg, int v, uint8_t op);
+void vmov_load(struct Buf *b, int L, int reg, int base, int index, int scale, int disp);
+void vmov_store(struct Buf *b, int L, int reg, int base, int index, int scale, int disp);
 
-void rex_w(Buf *b, int r, int b_);
-void push_r(Buf *b, int r);
-void pop_r(Buf *b, int r);
-void add_ri(Buf *b, int d, int32_t imm);
-void cmp_rr(Buf *b, int a, int c);
-void cmp_ri(Buf *b, int a, int32_t imm);
-void shr_ri(Buf *b, int r, uint8_t imm);
-void mov_ri(Buf *b, int d, int32_t imm);
-void mov_rr(Buf *b, int d, int s);
-void mov_load(Buf *b, int d, int base, int disp);
-int  jcc(Buf *b, uint8_t cc);
-int  jmp(Buf *b);
-void ret(Buf *b);
-void vzeroupper(Buf *b);
-void nop(Buf *b);
+void rex_w(struct Buf *b, int r, int b_);
+void push_r(struct Buf *b, int r);
+void pop_r(struct Buf *b, int r);
+void add_ri(struct Buf *b, int d, int32_t imm);
+void cmp_rr(struct Buf *b, int a, int c);
+void cmp_ri(struct Buf *b, int a, int32_t imm);
+void shr_ri(struct Buf *b, int r, uint8_t imm);
+void mov_ri(struct Buf *b, int d, int32_t imm);
+void mov_rr(struct Buf *b, int d, int s);
+void mov_load(struct Buf *b, int d, int base, int disp);
+int  jcc(struct Buf *b, uint8_t cc);
+int  jmp(struct Buf *b);
+void ret(struct Buf *b);
+void vzeroupper(struct Buf *b);
+void nop(struct Buf *b);
 
 enum {
     RAX = 0,
@@ -53,57 +53,57 @@ enum {
     R15 = 15
 };
 
-void vspill(Buf *b, int reg, int slot);
-void vfill(Buf *b, int reg, int slot);
+void vspill(struct Buf *b, int reg, int slot);
+void vfill(struct Buf *b, int reg, int slot);
 
-void vmovaps(Buf *b, int d, int s);
-void vpxor(Buf *b, int L, int d, int v, int s);
-void vbroadcastss(Buf *b, int d, int s);
+void vmovaps(struct Buf *b, int d, int s);
+void vpxor(struct Buf *b, int L, int d, int v, int s);
+void vbroadcastss(struct Buf *b, int d, int s);
 
-void broadcast_imm32(Buf *b, int d, uint32_t v);
+void broadcast_imm32(struct Buf *b, int d, uint32_t v);
 
-void vaddps(Buf *b, int d, int v, int s);
-void vsubps(Buf *b, int d, int v, int s);
-void vmulps(Buf *b, int d, int v, int s);
-void vdivps(Buf *b, int d, int v, int s);
-void vminps(Buf *b, int d, int v, int s);
-void vmaxps(Buf *b, int d, int v, int s);
-void vsqrtps(Buf *b, int d, int s);
-void vfmadd132ps(Buf *b, int d, int v, int s);
-void vfmadd213ps(Buf *b, int d, int v, int s);
-void vfmadd231ps(Buf *b, int d, int v, int s);
-void vfnmadd132ps(Buf *b, int d, int v, int s);
-void vfnmadd213ps(Buf *b, int d, int v, int s);
-void vfnmadd231ps(Buf *b, int d, int v, int s);
-void vcvtdq2ps(Buf *b, int d, int s);
-void vcvttps2dq(Buf *b, int d, int s);
-void vcvtps2dq(Buf *b, int d, int s);
-void vroundps(Buf *b, int d, int s, uint8_t imm);
-void vcmpps(Buf *b, int d, int v, int s, uint8_t pred);
+void vaddps(struct Buf *b, int d, int v, int s);
+void vsubps(struct Buf *b, int d, int v, int s);
+void vmulps(struct Buf *b, int d, int v, int s);
+void vdivps(struct Buf *b, int d, int v, int s);
+void vminps(struct Buf *b, int d, int v, int s);
+void vmaxps(struct Buf *b, int d, int v, int s);
+void vsqrtps(struct Buf *b, int d, int s);
+void vfmadd132ps(struct Buf *b, int d, int v, int s);
+void vfmadd213ps(struct Buf *b, int d, int v, int s);
+void vfmadd231ps(struct Buf *b, int d, int v, int s);
+void vfnmadd132ps(struct Buf *b, int d, int v, int s);
+void vfnmadd213ps(struct Buf *b, int d, int v, int s);
+void vfnmadd231ps(struct Buf *b, int d, int v, int s);
+void vcvtdq2ps(struct Buf *b, int d, int s);
+void vcvttps2dq(struct Buf *b, int d, int s);
+void vcvtps2dq(struct Buf *b, int d, int s);
+void vroundps(struct Buf *b, int d, int s, uint8_t imm);
+void vcmpps(struct Buf *b, int d, int v, int s, uint8_t pred);
 
-void vcvtph2ps(Buf *b, int d, int s);
-void vcvtps2ph(Buf *b, int d, int s, uint8_t rnd);
+void vcvtph2ps(struct Buf *b, int d, int s);
+void vcvtps2ph(struct Buf *b, int d, int s, uint8_t rnd);
 
-void vpaddd(Buf *b, int d, int v, int s);
-void vpsubd(Buf *b, int d, int v, int s);
-void vpmulld(Buf *b, int d, int v, int s);
-void vpsllvd(Buf *b, int d, int v, int s);
-void vpsrlvd(Buf *b, int d, int v, int s);
-void vpsravd(Buf *b, int d, int v, int s);
-void vpslld_i(Buf *b, int d, int s, uint8_t imm);
-void vpsrld_i(Buf *b, int d, int s, uint8_t imm);
-void vpsrad_i(Buf *b, int d, int s, uint8_t imm);
+void vpaddd(struct Buf *b, int d, int v, int s);
+void vpsubd(struct Buf *b, int d, int v, int s);
+void vpmulld(struct Buf *b, int d, int v, int s);
+void vpsllvd(struct Buf *b, int d, int v, int s);
+void vpsrlvd(struct Buf *b, int d, int v, int s);
+void vpsravd(struct Buf *b, int d, int v, int s);
+void vpslld_i(struct Buf *b, int d, int s, uint8_t imm);
+void vpsrld_i(struct Buf *b, int d, int s, uint8_t imm);
+void vpsrad_i(struct Buf *b, int d, int s, uint8_t imm);
 
-void vpand(Buf *b, int L, int d, int v, int s);
-void vpor(Buf *b, int L, int d, int v, int s);
-void vpxor_3(Buf *b, int L, int d, int v, int s);
-void vpblendvb(Buf *b, int L, int d, int z, int y, int x);
+void vpand(struct Buf *b, int L, int d, int v, int s);
+void vpor(struct Buf *b, int L, int d, int v, int s);
+void vpxor_3(struct Buf *b, int L, int d, int v, int s);
+void vpblendvb(struct Buf *b, int L, int d, int z, int y, int x);
 
-void vpcmpeqd(Buf *b, int d, int v, int s);
-void vpcmpgtd(Buf *b, int d, int v, int s);
-void vpmovsxwd(Buf *b, int d, int s);
-void vpmovzxwd(Buf *b, int d, int s);
+void vpcmpeqd(struct Buf *b, int d, int v, int s);
+void vpcmpgtd(struct Buf *b, int d, int v, int s);
+void vpmovsxwd(struct Buf *b, int d, int s);
+void vpmovzxwd(struct Buf *b, int d, int s);
 
-void vpgatherdd(Buf *b, int dst, int base, int idx, int scale, int mask);
-void vpextrd(Buf *b, int gpr, int xmm, uint8_t imm);
-void vextracti128(Buf *b, int d, int s, uint8_t imm);
+void vpgatherdd(struct Buf *b, int dst, int base, int idx, int scale, int mask);
+void vpextrd(struct Buf *b, int gpr, int xmm, uint8_t imm);
+void vextracti128(struct Buf *b, int d, int s, uint8_t imm);

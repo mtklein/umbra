@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+typedef struct Buf Buf;
+
 // ---- byte buffer ----
 
 void emit1(Buf *b, uint8_t v) {

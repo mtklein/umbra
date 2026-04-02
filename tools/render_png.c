@@ -7,7 +7,7 @@
 
 enum { W = 640, H = 480 };
 
-static void render_slide(char const *label, struct umbra_backend *be, slide *s) {
+static void render_slide(char const *label, struct umbra_backend *be, struct slide *s) {
     s->fmt = umbra_fmt_8888;
     int bpp = 4;
     size_t row_sz = (size_t)(W * bpp);
@@ -86,7 +86,7 @@ static void render_slide(char const *label, struct umbra_backend *be, slide *s) 
 
 int main(void) {
     slides_init(W, H);
-    slide *s = slide_get(0);
+    struct slide *s = slide_get(0);
 
     struct umbra_backend *interp = umbra_backend_interp();
     struct umbra_backend *jit    = umbra_backend_jit();
