@@ -419,9 +419,9 @@ int main(void) {
     free_xtra();
     free(xtra_progs);
     free_pipes();
+    slides_cleanup();
     for (int i = 0; i < NUM_BACKENDS; i++) { if (bes[i]) { bes[i]->free(bes[i]); } }
     pipe_be->free(pipe_be);
-    slides_cleanup();
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
