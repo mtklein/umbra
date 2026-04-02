@@ -9,6 +9,7 @@ typedef struct {
     float                    *wind_buf;
     slug_acc_layout           acc_lay;
     struct umbra_basic_block *acc_bb;
+    struct umbra_program     *acc_prog;
 } slug_state;
 
 static void slug_init(slide *s, int w, int h) {
@@ -37,11 +38,17 @@ static void slug_animate(slide *s, float dt) {
     st->mat[10] = st->slug->h;
 }
 
+static void slug_prepare(slide *s, int w, int h, struct umbra_backend *be) {
+    (void)w; (void)h;
+    slug_state *st = s->state;
+    st->acc_prog = be->compile(be, st->acc_bb);
+}
+
 static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
                        umbra_draw_layout const *lay, struct umbra_program *program) {
     slug_state           *st = s->state;
     struct umbra_backend *be = program->backend;
-    struct umbra_program *acc = be->compile(be, st->acc_bb);
+    struct umbra_program *acc = st->acc_prog;
 
     size_t wind_sz  = (size_t)w * (size_t)h * sizeof(float);
     size_t wind_row = (size_t)w * sizeof(float);
@@ -65,6 +72,7 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     }
     be->flush(be);
     acc->free(acc);
+    st->acc_prog = 0;
 
     float hc[4];
     for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
@@ -104,6 +112,7 @@ slide slide_slug_wind(slug_curves *sc) {
         .bg = 0xff0a0a1e,
         .init = slug_init,
         .animate = slug_animate,
+        .prepare = slug_prepare,
         .draw = slug_draw,
         .cleanup = slug_cleanup,
         .state = st,
