@@ -1611,7 +1611,6 @@ static void free_interp(struct umbra_program *prog) { umbra_interpreter_free((st
 static struct umbra_program *compile_interp(struct umbra_backend           *be,
                                             struct umbra_basic_block const *bb) {
     struct umbra_interpreter *const p = umbra_interpreter(bb);
-    assume(p);
     p->base = (struct umbra_program){
         .queue   = run_interp,
         .dump    = 0,
