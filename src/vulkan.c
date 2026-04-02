@@ -283,6 +283,8 @@ struct vk_program {
     int total_bufs;
     int n_deref;
     int push_words;
+    int uni_push_off;  // word offset of uniform data in push block, or -1
+    int :32;
 
     struct deref_info *deref;
     struct buf_cache_entry *buf_cache;
@@ -341,8 +343,11 @@ typedef struct {
     // Push constant layout:
     //   [0] = w, [1] = x0, [2] = y0,
     //   [3..3+total_bufs-1] = buf_szs, [3+total_bufs..3+2*total_bufs-1] = buf_rbs
+    //   [uni_push_off..] = uniform data (when uniforms fit in push constants)
     int total_bufs;
     int push_words;
+    int uni_push_off;  // word offset of uniform data in push block, or -1
+    int :32;
 
     // Constant cache for small integer constants.
     uint32_t c_0, c_1, c_2, c_3, c_4, c_8, c_16;
@@ -712,7 +717,8 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
                               int *out_total_bufs,
                               int *out_n_deref,
                               struct deref_info **out_deref,
-                              int *out_push_words) {
+                              int *out_push_words,
+                              int *out_uni_push_off) {
     SpvBuilder B;
     memset(&B, 0, sizeof B);
     B.next_id = 1; // 0 is reserved
@@ -771,8 +777,26 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
     }
 
     // Push constant layout: w, x0, y0, buf_szs[total_bufs], buf_rbs[total_bufs]
-    int push_words = 3 + 2 * total_bufs;
+    int meta_words = 3 + 2 * total_bufs;
+
+    // Check if uniform data (buf[0]) fits in push constants.
+    // Scan for max byte offset accessed via op_uniform_32 targeting ptr 0.
+    int uni_end = 0;
+    for (int i = 0; i < bb->insts; i++) {
+        if (bb->inst[i].op == op_uniform_32 && bb->inst[i].ptr == 0) {
+            int end = bb->inst[i].imm + 4;
+            if (end > uni_end) { uni_end = end; }
+        }
+    }
+    int uni_words = (uni_end + 3) / 4;
+    B.uni_push_off = -1;
+    if (uni_words > 0 && (meta_words + uni_words) * 4 <= 128) {
+        B.uni_push_off = meta_words;
+    }
+
+    int push_words = meta_words + (B.uni_push_off >= 0 ? uni_words : 0);
     *out_push_words = push_words;
+    *out_uni_push_off = B.uni_push_off;
     B.push_words = push_words;
 
     // --- Capabilities ---
@@ -1062,9 +1086,12 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
     spv_word(&B.decor, SpvDecorationBuiltIn);
     spv_word(&B.decor, SpvBuiltInGlobalInvocationId);
 
-    // SSBO variables (one per buffer).
+    // SSBO variables (one per buffer, skipping buf[0] when uniforms are in
+    // push constants).
+    int skip0 = B.uni_push_off >= 0;
     B.v_ssbo = calloc((size_t)total_bufs, sizeof *B.v_ssbo);
     for (int i = 0; i < total_bufs; i++) {
+        if (i == 0 && skip0) { continue; }
         B.v_ssbo[i] = spv_id(&B);
         uint32_t ptr_type = B.buf_is_16[i] ? B.t_ptr_ssbo_struct_u16
                                             : B.t_ptr_ssbo_struct;
@@ -1073,7 +1100,7 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
         spv_word(&B.globals, B.v_ssbo[i]);
         spv_word(&B.globals, SpvStorageClassUniform);
 
-        // DescriptorSet = 0, Binding = i.
+        // DescriptorSet = 0, Binding = i (shifted down by 1 when skip0).
         spv_op(&B.decor, SpvOpDecorate, 4);
         spv_word(&B.decor, B.v_ssbo[i]);
         spv_word(&B.decor, SpvDecorationDescriptorSet);
@@ -1082,7 +1109,7 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
         spv_op(&B.decor, SpvOpDecorate, 4);
         spv_word(&B.decor, B.v_ssbo[i]);
         spv_word(&B.decor, SpvDecorationBinding);
-        spv_word(&B.decor, (uint32_t)i);
+        spv_word(&B.decor, (uint32_t)(i - skip0));
     }
 
     // Push constant variable.
@@ -1209,8 +1236,13 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
 
                 case op_uniform_32: {
                     int p = resolve_ptr(&B, inst);
-                    uint32_t slot_id = spv_const_u32(&B, (uint32_t)(inst->imm / 4));
-                    B.val[i] = load_ssbo_u32(&B, p, slot_id);
+                    if (p == 0 && B.uni_push_off >= 0) {
+                        uint32_t off = spv_const_u32(&B, (uint32_t)(B.uni_push_off + inst->imm / 4));
+                        B.val[i] = load_push_u32(&B, off);
+                    } else {
+                        uint32_t slot_id = spv_const_u32(&B, (uint32_t)(inst->imm / 4));
+                        B.val[i] = load_ssbo_u32(&B, p, slot_id);
+                    }
                 } break;
 
                 case op_load_32: {
@@ -2015,9 +2047,11 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
     begin_batch(be);
 
-    int n = vp->total_bufs;
+    int n     = vp->total_bufs;
+    int skip0 = vp->uni_push_off >= 0;
 
     for (int i = 0; i <= vp->max_ptr; i++) {
+        if (i == 0 && skip0) { continue; } // uniforms go via push constants
         if (!buf[i].ptr || !buf[i].sz) { continue; }
         VkDeviceSize sz = (VkDeviceSize)buf[i].sz;
         if (sz < 4) { sz = 4; }
@@ -2062,21 +2096,30 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
         }
     }
 
-    for (int i = 0; i < n; i++) {
+    for (int i = skip0; i < n; i++) {
         if (!vp->buf_cache[i].buf) {
             cache_buf(be, &vp->buf_cache[i], 0, 0, 4, 1);
             vp->buf_cache[i].host = 0;
         }
     }
 
+    // Copy uniform data into push constants when it fits.
+    // Only copy the shader-accessed portion (push_words - uni_push_off words),
+    // not the full buf[0].sz which may include deref pointer metadata.
+    if (skip0 && buf[0].ptr) {
+        int uni_bytes = (vp->push_words - vp->uni_push_off) * (int)sizeof(uint32_t);
+        memcpy(push_data + vp->uni_push_off, buf[0].ptr, (size_t)uni_bytes);
+    }
+
     // Push descriptors: each dispatch records its own buffer bindings directly
     // in the command buffer, so no external descriptor set to protect.
+    int n_desc = n - skip0;
     VkDescriptorBufferInfo buf_infos[32];
     VkWriteDescriptorSet   writes[32];
-    assume(n <= 32);
-    for (int i = 0; i < n; i++) {
+    assume(n_desc <= 32);
+    for (int i = 0; i < n_desc; i++) {
         buf_infos[i] = (VkDescriptorBufferInfo){
-            .buffer=vp->buf_cache[i].buf, .offset=0, .range=VK_WHOLE_SIZE,
+            .buffer=vp->buf_cache[i + skip0].buf, .offset=0, .range=VK_WHOLE_SIZE,
         };
         writes[i] = (VkWriteDescriptorSet){
             .sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -2088,8 +2131,10 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     }
 
     vkCmdBindPipeline(be->batch_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, vp->pipeline);
-    vkCmdPushDescriptorSet(be->batch_cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
-                           vp->pipe_layout, 0, (uint32_t)n, writes);
+    if (n_desc) {
+        vkCmdPushDescriptorSet(be->batch_cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
+                               vp->pipe_layout, 0, (uint32_t)n_desc, writes);
+    }
     vkCmdPushConstants(be->batch_cmd, vp->pipe_layout, VK_SHADER_STAGE_COMPUTE_BIT,
                        0, (uint32_t)(vp->push_words * (int)sizeof(uint32_t)), push_data);
 
@@ -2164,11 +2209,15 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
                                          struct umbra_basic_block const *bb) {
     struct vk_backend *vbe = (struct vk_backend *)be;
 
-    int spirv_len = 0, max_ptr = -1, total_bufs = 0, n_deref = 0, push_words = 0;
+    int spirv_len = 0, max_ptr = -1, total_bufs = 0, n_deref = 0, push_words = 0,
+        uni_push_off = -1;
     struct deref_info *deref = 0;
     uint32_t *spirv = build_spirv(bb, &spirv_len, &max_ptr, &total_bufs,
-                                   &n_deref, &deref, &push_words);
+                                   &n_deref, &deref, &push_words, &uni_push_off);
     if (!spirv) { return 0; }
+
+    int skip0   = uni_push_off >= 0;
+    int n_desc  = total_bufs - skip0;
 
     // Create shader module.
     VkShaderModule shader;
@@ -2182,9 +2231,9 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
         assume(rc == VK_SUCCESS);
     }
 
-    // Descriptor set layout: one storage buffer per buffer slot.
-    VkDescriptorSetLayoutBinding *bindings = calloc((size_t)total_bufs, sizeof *bindings);
-    for (int i = 0; i < total_bufs; i++) {
+    // Descriptor set layout: one storage buffer per non-push buffer slot.
+    VkDescriptorSetLayoutBinding *bindings = calloc((size_t)(n_desc ? n_desc : 1), sizeof *bindings);
+    for (int i = 0; i < n_desc; i++) {
         bindings[i] = (VkDescriptorSetLayoutBinding){
             .binding = (uint32_t)i,
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
@@ -2197,7 +2246,7 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
         VkDescriptorSetLayoutCreateInfo ci = {
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
             .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR,
-            .bindingCount = (uint32_t)total_bufs,
+            .bindingCount = (uint32_t)n_desc,
             .pBindings = bindings,
         };
         vkCreateDescriptorSetLayout(vbe->device, &ci, 0, &ds_layout);
@@ -2250,7 +2299,8 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
     p->max_ptr     = max_ptr;
     p->total_bufs  = total_bufs;
     p->n_deref     = n_deref;
-    p->push_words  = push_words;
+    p->push_words    = push_words;
+    p->uni_push_off  = uni_push_off;
     p->deref       = deref;
     p->buf_cache   = calloc((size_t)total_bufs, sizeof *p->buf_cache);
     p->spirv       = spirv;
