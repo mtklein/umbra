@@ -294,7 +294,7 @@ static val pack_unorm(builder *b, val ch, val scale) {
         umbra_min_f32(b, umbra_max_f32(b, ch, zero), one), scale));
 }
 static val pack(builder *b, val base, val v, int shift) {
-    return push(b, op_pack, VX(base), VY(v), .imm = shift);
+    return umbra_or_32(b, base, umbra_shl_i32(b, v, umbra_imm_i32(b, shift)));
 }
 void umbra_store_color(builder *b, umbra_ptr dst, umbra_color c, enum umbra_fmt fmt) {
     switch (fmt) {
@@ -835,7 +835,6 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_shl_i32_imm:
         case op_shr_u32_imm:
         case op_shr_s32_imm: fprintf(f, " v%d %d", (int)ip->x.id, ip->imm); break;
-        case op_pack: fprintf(f, " v%d v%d %d", (int)ip->x.id, (int)ip->y.id, ip->imm); break;
         case op_and_32_imm:
         case op_add_f32_imm:
         case op_sub_f32_imm:

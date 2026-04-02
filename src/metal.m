@@ -440,16 +440,6 @@ static void emit_ops(Buf *b, BB const *bb,
                      (uint32_t)inst->imm);
                 break;
 
-            case op_pack:
-                emit(b,
-                    "%suint v%d ="
-                    " %s | (%s << %du);\n",
-                    pad, i,
-                    uv(_ux, vx, xid, is_f),
-                    uv(_uy, vy, yid, is_f),
-                    inst->imm);
-                break;
-
             case op_add_f32_imm:
                 emit(b, "%sfloat v%d = %s"
                         " + as_type<float>(%uu);\n",

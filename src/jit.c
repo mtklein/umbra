@@ -223,19 +223,6 @@ static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm
     case op_shl_i32_imm: put(c, SHL_4s_imm(d, x, imm)); break;
     case op_shr_u32_imm: put(c, USHR_4s_imm(d, x, imm)); break;
     case op_shr_s32_imm: put(c, SSHR_4s_imm(d, x, imm)); break;
-    case op_pack:
-        if (d == x) {
-            put(c, SLI_4s_imm(d, y, imm));
-        } else if (d != y) {
-            put(c, ORR_16b(d, x, x));
-            put(c, SLI_4s_imm(d, y, imm));
-        } else {
-            put(c, ORR_16b(scratch, x, x));
-            put(c, SLI_4s_imm(scratch, y, imm));
-            put(c, ORR_16b(d, scratch, scratch));
-        }
-        break;
-
     default: assume(0);
     }
 }
@@ -995,11 +982,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             emit_alu_reg(c, inst->op, s.rd, s.rx, 0, 0, inst->imm, -1);
         } break;
 
-        case op_pack: {
-            struct ra_step s = ra_step_alu(ra, sl, ns, inst, i, scalar, 1);
-            emit_alu_reg(c, inst->op, s.rd, s.rx, s.ry, 0, inst->imm, s.scratch);
-            if (s.scratch >= 0) { ra_return_reg(ra, s.scratch); }
-        } break;
         case op_and_32_imm:
         case op_add_f32_imm:
         case op_sub_f32_imm:
@@ -1396,7 +1378,6 @@ static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm
     case op_shl_i32_imm: vpslld_i(c, d, x, (uint8_t)imm); break;
     case op_shr_u32_imm: vpsrld_i(c, d, x, (uint8_t)imm); break;
     case op_shr_s32_imm: vpsrad_i(c, d, x, (uint8_t)imm); break;
-    case op_pack:
     case op_and_32_imm:
     case op_add_f32_imm:
     case op_sub_f32_imm:
@@ -2553,14 +2534,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             emit_alu_reg(c, inst->op, s.rd, s.rx, 0, 0, inst->imm, -1, -1);
         } break;
 
-        case op_pack: {
-            struct ra_step s = ra_step_alu(ra, sl, ns, inst, i, scalar, 1);
-            vpslld_i(c, s.scratch, s.ry, (uint8_t)inst->imm);
-            vpor(c, 1, s.rd, s.scratch, s.rx);
-            if (s.scratch >= 0) {
-                ra_return_reg(ra, s.scratch);
-            }
-        } break;
         }
     }
 #undef lu

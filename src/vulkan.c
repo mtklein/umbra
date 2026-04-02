@@ -1661,16 +1661,6 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
                                           spv_const_u32(&B, (uint32_t)inst->imm));
                     break;
 
-                case op_pack: {
-                    // pack(x, y, shift): x | (y << shift)
-                    uint32_t shifted = spv_binop(&B, SpvOpShiftLeftLogical, B.t_u32,
-                                                  as_u32(&B, get_val(&B, inst->y), yid),
-                                                  spv_const_u32(&B, (uint32_t)inst->imm));
-                    B.val[i] = spv_binop(&B, SpvOpBitwiseOr, B.t_u32,
-                                          as_u32(&B, get_val(&B, inst->x), xid),
-                                          shifted);
-                } break;
-
                 case op_add_f32_imm: {
                     uint32_t imm_f = spv_const_f32(&B, 0);
                     // Overwrite the constant bits directly.
