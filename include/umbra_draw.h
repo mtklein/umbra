@@ -1,6 +1,5 @@
 #pragma once
 #include "umbra.h"
-#include "umbra_uniforms.h"
 
 typedef umbra_color (*umbra_shader_fn)(struct umbra_builder *, struct umbra_uniforms *,
                                        umbra_val x, umbra_val y);

@@ -50,7 +50,7 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
 
     umbra_set_f32(st->acc_lay.uni, st->acc_lay.mat, st->mat, 11);
     umbra_set_ptr(st->acc_lay.uni, st->acc_lay.curves_off,
-                  st->slug->data, (size_t)(st->slug->count * 6 * 4), 0, 0);
+                  (struct umbra_buf){.ptr=st->slug->data, .sz=(size_t)(st->slug->count * 6 * 4)});
     struct umbra_buf abuf[] = {
         (struct umbra_buf){.ptr=st->acc_lay.uni->data, .sz=st->acc_lay.uni->size, .read_only=1},
         {.ptr=st->wind_buf, .sz=wind_sz, .row_bytes=wind_row},
@@ -70,7 +70,7 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
     for (int i = 0; i < 4; i++) { hc[i] = s->color[i]; }
     umbra_set_f32(lay->uni, lay->shader, hc, 4);
     umbra_set_ptr(lay->uni, lay->coverage,
-                  st->wind_buf, wind_sz, 1, (size_t)w * sizeof(float));
+                  (struct umbra_buf){.ptr=st->wind_buf, .sz=wind_sz, .read_only=1, .row_bytes=(size_t)w * sizeof(float)});
     size_t    pb = umbra_fmt_size(s->fmt);
     size_t plane_sz = (size_t)w * (size_t)h * pb;
     struct umbra_buf rbuf[2];

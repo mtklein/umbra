@@ -47,6 +47,15 @@ enum umbra_fmt {
 };
 size_t umbra_fmt_size(enum umbra_fmt);
 
+struct umbra_uniforms {
+    void  *data;
+    size_t size;
+};
+size_t umbra_reserve_f32(struct umbra_uniforms*, int n);
+size_t umbra_reserve_ptr(struct umbra_uniforms*);
+void   umbra_set_f32(struct umbra_uniforms*, size_t off, float const*, int n);
+void   umbra_set_ptr(struct umbra_uniforms*, size_t off, struct umbra_buf);
+
 typedef struct { int bits; } umbra_val;
 typedef struct { umbra_val r, g, b, a; } umbra_color;
 typedef struct { int bits; } umbra_ptr;

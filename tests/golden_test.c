@@ -281,7 +281,7 @@ static void test_slug_rect(void) {
     __builtin_memset(wind_buf, 0, sizeof wind_buf);
     umbra_set_f32(alay.uni, alay.mat, mat, 11);
     umbra_set_ptr(alay.uni, alay.curves_off,
-        rect, sizeof rect, 0, 0);
+        (struct umbra_buf){.ptr=rect, .sz=sizeof rect});
     struct umbra_buf abuf[] = {
         (struct umbra_buf){.ptr=alay.uni->data, .sz=alay.uni->size, .read_only=1},
         {.ptr=wind_buf, .sz=sizeof wind_buf, .row_bytes=W * sizeof(float)},
@@ -298,7 +298,7 @@ static void test_slug_rect(void) {
 
     umbra_set_f32(lay.uni, lay.shader, color, 4);
     umbra_set_ptr(lay.uni, lay.coverage,
-        wind_buf, sizeof wind_buf, 1, (size_t)W * sizeof(float));
+        (struct umbra_buf){.ptr=wind_buf, .sz=sizeof wind_buf, .read_only=1, .row_bytes=(size_t)W * sizeof(float)});
     struct umbra_buf buf[] = {
         (struct umbra_buf){.ptr=lay.uni->data, .sz=lay.uni->size, .read_only=1},
         {.ptr=pixels, .sz=sizeof pixels, .row_bytes=W * 4},
@@ -358,7 +358,7 @@ static void test_perspective_text(void) {
     umbra_set_f32(lay.uni, lay.shader, color, 4);
     umbra_set_f32(lay.uni, lay.coverage, mat, 11);
     umbra_set_ptr(lay.uni, (lay.coverage + 44 + 7) & ~(size_t)7,
-        bmp, sizeof bmp, 0, 0);
+        (struct umbra_buf){.ptr=bmp, .sz=sizeof bmp});
     struct umbra_buf buf[] = {
         (struct umbra_buf){.ptr=lay.uni->data, .sz=lay.uni->size, .read_only=1},
         {.ptr=pixels, .sz=sizeof pixels},
@@ -396,8 +396,7 @@ static void test_perspective_text(void) {
         umbra_set_f32(lay2.uni, lay2.shader, hc2, 4);
         umbra_set_f32(lay2.uni, lay2.coverage, mat2, 11);
         umbra_set_ptr(lay2.uni, (lay2.coverage + 44 + 7) & ~(size_t)7,
-            tc.data,
-            (size_t)(W * H * 2), 0, 0);
+            (struct umbra_buf){.ptr=tc.data, .sz=(size_t)(W * H * 2)});
         struct umbra_buf b2[] = {
             (struct umbra_buf){.ptr=lay2.uni->data, .sz=lay2.uni->size, .read_only=1},
             {.ptr=px2, .sz=(size_t)(W * H * 4), .row_bytes=W * 4},
