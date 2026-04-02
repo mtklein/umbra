@@ -2252,10 +2252,11 @@ static void test_load_next_16(void) {
     cleanup(&B);
 }
 
-static void test_load_store_color_8888(void) {
+static void test_load_store_8x4(void) {
     struct umbra_builder *b = umbra_builder();
-    umbra_color c = umbra_load_color(b, (umbra_ptr){0}, umbra_fmt_8888);
-    umbra_store_color(b, (umbra_ptr){1}, c, umbra_fmt_8888);
+    umbra_val r, g, bl, a;
+    umbra_load_8x4(b, (umbra_ptr){0}, &r, &g, &bl, &a);
+    umbra_store_8x4(b, (umbra_ptr){1}, r, g, bl, a);
     struct test_backends B = make(b);
 
     uint32_t src[8], dst[8];
@@ -2272,10 +2273,11 @@ static void test_load_store_color_8888(void) {
     cleanup(&B);
 }
 
-static void test_load_store_color_f16_planar(void) {
+static void test_load_store_16x4_planar(void) {
     struct umbra_builder *b = umbra_builder();
-    umbra_color c = umbra_load_color(b, (umbra_ptr){0}, umbra_fmt_fp16_planar);
-    umbra_store_color(b, (umbra_ptr){1}, c, umbra_fmt_fp16_planar);
+    umbra_val r, g, bl, a;
+    umbra_load_16x4_planar(b, (umbra_ptr){0}, &r, &g, &bl, &a);
+    umbra_store_16x4_planar(b, (umbra_ptr){1}, r, g, bl, a);
     struct test_backends B = make(b);
 
     enum { W = 8, H = 4 };
@@ -2298,53 +2300,11 @@ static void test_load_store_color_f16_planar(void) {
     cleanup(&B);
 }
 
-static void test_load_store_color_565(void) {
+static void test_load_store_16x4(void) {
     struct umbra_builder *b = umbra_builder();
-    umbra_color c = umbra_load_color(b, (umbra_ptr){0}, umbra_fmt_565);
-    umbra_store_color(b, (umbra_ptr){1}, c, umbra_fmt_565);
-    struct test_backends B = make(b);
-
-    uint16_t src[7], dst[7];
-    for (int i = 0; i < 7; i++) { src[i] = (uint16_t)(0x1234u + (unsigned)i * 0x1111u); }
-
-    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-        __builtin_memset(dst, 0, sizeof dst);
-        if (!run(&B, bi, 7, 1, (struct umbra_buf[]){
-            {.ptr=src, .sz=sizeof src},
-            {.ptr=dst, .sz=sizeof dst},
-        })) { continue; }
-        for (int i = 0; i < 7; i++) { (dst[i] == src[i]) here; }
-    }
-    cleanup(&B);
-}
-
-static void test_load_store_color_1010102(void) {
-    struct umbra_builder *b = umbra_builder();
-    umbra_color c = umbra_load_color(b, (umbra_ptr){0}, umbra_fmt_1010102);
-    umbra_store_color(b, (umbra_ptr){1}, c, umbra_fmt_1010102);
-    struct test_backends B = make(b);
-
-    uint32_t src[7], dst[7];
-    for (int i = 0; i < 7; i++) {
-        src[i] = ((unsigned)i * 73u) | ((unsigned)i * 37u << 10)
-               | ((unsigned)i * 19u << 20) | (2u << 30);
-    }
-
-    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-        __builtin_memset(dst, 0, sizeof dst);
-        if (!run(&B, bi, 7, 1, (struct umbra_buf[]){
-            {.ptr=src, .sz=sizeof src},
-            {.ptr=dst, .sz=sizeof dst},
-        })) { continue; }
-        for (int i = 0; i < 7; i++) { (dst[i] == src[i]) here; }
-    }
-    cleanup(&B);
-}
-
-static void test_load_store_color_fp16(void) {
-    struct umbra_builder *b = umbra_builder();
-    umbra_color c = umbra_load_color(b, (umbra_ptr){0}, umbra_fmt_fp16);
-    umbra_store_color(b, (umbra_ptr){1}, c, umbra_fmt_fp16);
+    umbra_val r, g, bl, a;
+    umbra_load_16x4(b, (umbra_ptr){0}, &r, &g, &bl, &a);
+    umbra_store_16x4(b, (umbra_ptr){1}, r, g, bl, a);
     struct test_backends B = make(b);
 
     __fp16 src[7 * 4], dst[7 * 4];
@@ -3270,10 +3230,14 @@ static void test_sel_r_rm(void) {
 // not ra_step_alu (which is used by i32_from_f32, add, etc.)
 static void test_ra_chan_unary(void) {
     struct umbra_builder *b = umbra_builder();
-    umbra_color c = umbra_load_color(b, (umbra_ptr){0}, umbra_fmt_fp16);
-    umbra_store_32(b, (umbra_ptr){1}, umbra_i32_from_f32(b, umbra_abs_f32(b, c.g)));
-    umbra_store_32(b, (umbra_ptr){2}, umbra_i32_from_f32(b, umbra_sub_f32(b, umbra_imm_f32(b, 0), c.b)));
-    umbra_store_32(b, (umbra_ptr){3}, umbra_i32_from_f32(b, umbra_abs_f32(b, c.a)));
+    umbra_val r, g, bl, a;
+    umbra_load_16x4(b, (umbra_ptr){0}, &r, &g, &bl, &a);
+    umbra_val gf = umbra_f32_from_f16(b, g);
+    umbra_val bf = umbra_f32_from_f16(b, bl);
+    umbra_val af = umbra_f32_from_f16(b, a);
+    umbra_store_32(b, (umbra_ptr){1}, umbra_i32_from_f32(b, umbra_abs_f32(b, gf)));
+    umbra_store_32(b, (umbra_ptr){2}, umbra_i32_from_f32(b, umbra_sub_f32(b, umbra_imm_f32(b, 0), bf)));
+    umbra_store_32(b, (umbra_ptr){3}, umbra_i32_from_f32(b, umbra_abs_f32(b, af)));
     struct test_backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __fp16 src[] = {
@@ -3627,11 +3591,9 @@ int main(void) {
     test_xy();
     test_load_next_32();
     test_load_next_16();
-    test_load_store_color_8888();
-    test_load_store_color_565();
-    test_load_store_color_1010102();
-    test_load_store_color_fp16();
-    test_load_store_color_f16_planar();
+    test_load_store_8x4();
+    test_load_store_16x4();
+    test_load_store_16x4_planar();
     test_load_stride_neq_w();
     test_jit_xs_init();
 

@@ -1133,5 +1133,48 @@ int main(void) {
     test_supersample();
     test_page_aligned_buffer();
 
+    // load_color / store_color round-trip tests for formats without dedicated x4 ops.
+    {
+        struct umbra_builder *b = umbra_builder();
+        umbra_color c = umbra_load_color(b, (umbra_ptr){0}, umbra_fmt_565);
+        umbra_store_color(b, (umbra_ptr){1}, c, umbra_fmt_565);
+        struct umbra_basic_block *bb = umbra_basic_block(b);
+        umbra_builder_free(b);
+        struct test_backends B = test_backends_make(bb);
+        umbra_basic_block_free(bb);
+        uint16_t src[7], dst[7];
+        for (int i = 0; i < 7; i++) { src[i] = (uint16_t)(0x1234u + (unsigned)i * 0x1111u); }
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            __builtin_memset(dst, 0, sizeof dst);
+            if (!test_backends_run(&B, bi, 7, 1, (struct umbra_buf[]){
+                {.ptr=src, .sz=sizeof src}, {.ptr=dst, .sz=sizeof dst},
+            })) { continue; }
+            for (int i = 0; i < 7; i++) { (dst[i] == src[i]) here; }
+        }
+        test_backends_free(&B);
+    }
+    {
+        struct umbra_builder *b = umbra_builder();
+        umbra_color c = umbra_load_color(b, (umbra_ptr){0}, umbra_fmt_1010102);
+        umbra_store_color(b, (umbra_ptr){1}, c, umbra_fmt_1010102);
+        struct umbra_basic_block *bb = umbra_basic_block(b);
+        umbra_builder_free(b);
+        struct test_backends B = test_backends_make(bb);
+        umbra_basic_block_free(bb);
+        uint32_t src[7], dst[7];
+        for (int i = 0; i < 7; i++) {
+            src[i] = ((unsigned)i * 73u) | ((unsigned)i * 37u << 10)
+                   | ((unsigned)i * 19u << 20) | (2u << 30);
+        }
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            __builtin_memset(dst, 0, sizeof dst);
+            if (!test_backends_run(&B, bi, 7, 1, (struct umbra_buf[]){
+                {.ptr=src, .sz=sizeof src}, {.ptr=dst, .sz=sizeof dst},
+            })) { continue; }
+            for (int i = 0; i < 7; i++) { (dst[i] == src[i]) here; }
+        }
+        test_backends_free(&B);
+    }
+
     return 0;
 }
