@@ -283,7 +283,7 @@ struct vk_program {
     int max_ptr;
     int total_bufs;
     int n_deref;
-    int push_words;       // number of uint32_t in push constants
+    int push_words;
 
     struct deref_info *deref;
     struct buf_cache_entry *buf_cache;
