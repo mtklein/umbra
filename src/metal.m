@@ -1504,11 +1504,11 @@ static void free_be_metal(struct umbra_backend *be) {
 struct umbra_backend *umbra_backend_metal(void) {
     struct metal_backend *const mbe = umbra_metal_backend_create();
     if (mbe) {
-        __builtin_memcpy(&mbe->base, &(struct umbra_backend){
+        mbe->base = (struct umbra_backend){
             .compile = compile_metal,
             .flush   = flush_be_metal,
             .free    = free_be_metal,
-        }, sizeof mbe->base);
+        };
         return &mbe->base;
     }
     return 0;

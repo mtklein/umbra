@@ -15,7 +15,7 @@ struct umbra_backend {
     struct umbra_program* (*compile)(struct umbra_backend*, struct umbra_basic_block const*);
     void                  (*flush  )(struct umbra_backend*);
     void                  (*free   )(struct umbra_backend*);
-    _Bool const             threadsafe, pad_[7];
+    _Bool                   threadsafe, pad_[7];
 };
 struct umbra_backend* umbra_backend_interp(void);
 struct umbra_backend* umbra_backend_jit   (void);
