@@ -3367,7 +3367,128 @@ static void test_const_eval(void) {
     }
 }
 
+static void test_acc_coverage(void) {
+    // Exercise interpreter acc chain patterns: chain_producer → op → store.
+    // Use non-trivial constants to avoid identity optimizations (x+0=x).
+    {
+        // Unary m_r: unique sub starts chain → unary(r_r) → i32_from_f32(m_r) → store.
+        struct umbra_builder *b = umbra_builder();
+        umbra_val x = umbra_load_32(b, (umbra_ptr){0});
+        umbra_val fx = umbra_f32_from_i32(b, x);
+        // Each sub has a different imm to avoid dedup.
+        umbra_val p0 = umbra_sub_f32(b, fx, umbra_imm_f32(b, 1));
+        umbra_store_32(b, (umbra_ptr){1}, umbra_i32_from_f32(b, umbra_neg_f32(b, p0)));
+        umbra_val p1 = umbra_sub_f32(b, fx, umbra_imm_f32(b, 2));
+        umbra_store_32(b, (umbra_ptr){2}, umbra_i32_from_f32(b, umbra_round_f32(b, p1)));
+        umbra_val p2 = umbra_sub_f32(b, fx, umbra_imm_f32(b, 3));
+        umbra_store_32(b, (umbra_ptr){3}, umbra_i32_from_f32(b, umbra_floor_f32(b, p2)));
+        umbra_val p3 = umbra_sub_f32(b, fx, umbra_imm_f32(b, 4));
+        umbra_store_32(b, (umbra_ptr){4}, umbra_i32_from_f32(b, umbra_ceil_f32(b, p3)));
+        backends B = make(b);
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            int32_t sa[] = {10};
+            int32_t d[5][1]; __builtin_memset(d, 0, sizeof d);
+            if (!run(&B, bi, 1, 1, (struct umbra_buf[]){
+                {.ptr=sa, .sz=4},
+                {.ptr=d[1], .sz=4}, {.ptr=d[2], .sz=4},
+                {.ptr=d[3], .sz=4}, {.ptr=d[4], .sz=4},
+            })) { continue; }
+            (d[1][0] == -9) here;  // neg(10-1)=-9
+            (d[2][0] == 8) here;   // round(10-2)=8
+            (d[3][0] == 7) here;   // floor(10-3)=7
+            (d[4][0] == 6) here;   // ceil(10-4)=6
+        }
+        cleanup(&B);
+    }
+    {
+        // Comparison m_rm: sub→acc, then le_f32(acc, mem)→store.
+        struct umbra_builder *b = umbra_builder();
+        umbra_val x = umbra_load_32(b, (umbra_ptr){0});
+        umbra_val y = umbra_load_32(b, (umbra_ptr){1});
+        umbra_val fx = umbra_f32_from_i32(b, x);
+        umbra_val fy = umbra_f32_from_i32(b, y);
+        umbra_val s = umbra_sub_f32(b, fx, umbra_imm_f32(b, 0.5f));
+        umbra_store_32(b, (umbra_ptr){2}, umbra_le_f32(b, s, fy));
+        backends B = make(b);
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            int32_t sa[] = {2, 20}, sb[] = {5, 5};
+            int32_t d[2] = {0};
+            if (!run(&B, bi, 2, 1, (struct umbra_buf[]){
+                {.ptr=sa, .sz=8}, {.ptr=sb, .sz=8}, {.ptr=d, .sz=8},
+            })) { continue; }
+            (d[0] == -1) here;  // 2-0.5=1.5<=5 → true
+            (d[1] == 0) here;   // 20-0.5=19.5<=5 → false
+        }
+        cleanup(&B);
+    }
+    {
+        // Imm acc variants: sub(a,b)(r_mm)→imm_op(m_r)→store.
+        // Each in its own builder to avoid dedup across chains.
+#define ACC_IMM_TEST_I(op, k, expected) { \
+        struct umbra_builder *b = umbra_builder(); \
+        umbra_val a = umbra_load_32(b, (umbra_ptr){0}), c = umbra_load_32(b, (umbra_ptr){1}); \
+        umbra_store_32(b, (umbra_ptr){2}, op(b, umbra_sub_i32(b, a, c), umbra_imm_i32(b, k))); \
+        backends B = make(b); \
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) { \
+            int32_t sa[]={10}, sc[]={3}, d[]={0}; \
+            if (!run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.sz=4},{.ptr=sc,.sz=4},{.ptr=d,.sz=4}})) continue; \
+            (d[0] == (expected)) here; \
+        } cleanup(&B); }
+#define ACC_IMM_TEST_F(op, k, expected) { \
+        struct umbra_builder *b = umbra_builder(); \
+        umbra_val a = umbra_load_32(b, (umbra_ptr){0}), c = umbra_load_32(b, (umbra_ptr){1}); \
+        umbra_val fa = umbra_f32_from_i32(b, a), fc = umbra_f32_from_i32(b, c); \
+        umbra_store_32(b, (umbra_ptr){2}, umbra_i32_from_f32(b, \
+            op(b, umbra_sub_f32(b, fa, fc), umbra_imm_f32(b, k)))); \
+        backends B = make(b); \
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) { \
+            int32_t sa[]={10}, sc[]={3}, d[]={0}; \
+            if (!run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.sz=4},{.ptr=sc,.sz=4},{.ptr=d,.sz=4}})) continue; \
+            (d[0] == (expected)) here; \
+        } cleanup(&B); }
+#define ACC_IMM_TEST_CMP_I(op, k, expected) { \
+        struct umbra_builder *b = umbra_builder(); \
+        umbra_val a = umbra_load_32(b, (umbra_ptr){0}), c = umbra_load_32(b, (umbra_ptr){1}); \
+        umbra_store_32(b, (umbra_ptr){2}, op(b, umbra_sub_i32(b, a, c), umbra_imm_i32(b, k))); \
+        backends B = make(b); \
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) { \
+            int32_t sa[]={10}, sc[]={3}, d[]={0}; \
+            if (!run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.sz=4},{.ptr=sc,.sz=4},{.ptr=d,.sz=4}})) continue; \
+            (d[0] == (expected)) here; \
+        } cleanup(&B); }
+#define ACC_IMM_TEST_CMP_F(op, k, expected) { \
+        struct umbra_builder *b = umbra_builder(); \
+        umbra_val a = umbra_load_32(b, (umbra_ptr){0}), c = umbra_load_32(b, (umbra_ptr){1}); \
+        umbra_val fa = umbra_f32_from_i32(b, a), fc = umbra_f32_from_i32(b, c); \
+        umbra_store_32(b, (umbra_ptr){2}, \
+            op(b, umbra_sub_f32(b, fa, fc), umbra_imm_f32(b, k))); \
+        backends B = make(b); \
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) { \
+            int32_t sa[]={10}, sc[]={3}, d[]={0}; \
+            if (!run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.sz=4},{.ptr=sc,.sz=4},{.ptr=d,.sz=4}})) continue; \
+            (d[0] == (expected)) here; \
+        } cleanup(&B); }
+        // sub(10,3)=7
+        ACC_IMM_TEST_I(umbra_shr_s32, 1, 3)          // 7>>1
+        ACC_IMM_TEST_I(umbra_and_32, 0xFF, 7)         // 7&0xFF
+        ACC_IMM_TEST_I(umbra_or_32, 0x1000, 4103)     // 7|0x1000
+        ACC_IMM_TEST_I(umbra_xor_32, 0x0F, 8)         // 7^0x0F
+        ACC_IMM_TEST_F(umbra_add_f32, 1.0f, 8)        // 7+1
+        ACC_IMM_TEST_F(umbra_sub_f32, 1.0f, 6)        // 7-1
+        ACC_IMM_TEST_CMP_F(umbra_lt_f32, 10.0f, -1)   // 7<10
+        ACC_IMM_TEST_CMP_F(umbra_le_f32, 7.0f, -1)    // 7<=7
+        ACC_IMM_TEST_CMP_I(umbra_eq_i32, 7, -1)       // 7==7
+        ACC_IMM_TEST_CMP_I(umbra_lt_s32, 10, -1)      // 7<10
+        ACC_IMM_TEST_CMP_I(umbra_le_s32, 7, -1)       // 7<=7
+#undef ACC_IMM_TEST_I
+#undef ACC_IMM_TEST_F
+#undef ACC_IMM_TEST_CMP_I
+#undef ACC_IMM_TEST_CMP_F
+    }
+}
+
 int main(void) {
+    test_acc_coverage();
     test_ra_chan_unary();
     test_mul_pow2_peephole();
     test_const_eval();

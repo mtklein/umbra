@@ -401,8 +401,10 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
             _Bool out_r = 0;
             if (lu[i] == i + 1 && i + 1 != p->preamble) {
                 int const next_tag = p->inst[i + 1].tag;
-#define CHECK_BINARY(name, rt, pt) || (next_tag == op_##name && p->inst[i + 1].x == -1 \
-                                                                       && p->inst[i + 1].y != -1)
+#define CHECK_BINARY(name, rt, pt) || (next_tag == op_##name                          \
+                    && p->inst[i + 1].x != p->inst[i + 1].y                            \
+                    && (p->inst[i + 1].x == -1                                          \
+                     || (p->inst[i + 1].y == -1 && is_commutative(op_##name))))
 #define CHECK_UNARY(name, rt, pt)  || next_tag == op_##name
 #define CHECK_IMM(name, rt, pt)    || next_tag == op_##name
                 out_r = 0 BINARY_OPS(CHECK_BINARY) UNARY_OPS(CHECK_UNARY) IMM_OPS(CHECK_IMM)
