@@ -426,7 +426,6 @@ val umbra_max_f32(builder *b, val x, val y) {
 
 val umbra_sqrt_f32(builder *b, val x) { return math(b, op_sqrt_f32, VX(x)); }
 val umbra_abs_f32(builder *b, val x) { return math(b, op_abs_f32, VX(x)); }
-val umbra_neg_f32(builder *b, val x) { return umbra_sub_f32(b, umbra_imm_f32(b, 0), x); }
 val umbra_round_f32(builder *b, val x) { return math(b, op_round_f32, VX(x)); }
 val umbra_floor_f32(builder *b, val x) { return math(b, op_floor_f32, VX(x)); }
 val umbra_ceil_f32(builder *b, val x) { return math(b, op_ceil_f32, VX(x)); }

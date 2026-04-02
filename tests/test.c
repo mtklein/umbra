@@ -676,7 +676,7 @@ static void test_abs_f32(void) {
     {
         struct umbra_builder *builder = umbra_builder();
         umbra_val             x = umbra_load_32(builder, (umbra_ptr){0}),
-                              r = umbra_neg_f32(builder, x);
+                              r = umbra_sub_f32(builder, umbra_imm_f32(builder, 0), x);
         umbra_store_32(builder, (umbra_ptr){1}, r);
         backends B = make(builder);
         for (int bi = 0; bi < 3; bi++) {
@@ -2504,7 +2504,7 @@ static void test_neg_round_i32(void) {
     umbra_val x = umbra_load_32(b, (umbra_ptr){0});
     umbra_val f = umbra_f32_from_i32(b, x);
     // Chain: neg → round_i32 exercises register variants for both.
-    umbra_val n = umbra_neg_f32(b, f);
+    umbra_val n = umbra_sub_f32(b, umbra_imm_f32(b, 0), f);
     umbra_val r = umbra_round_i32(b, n);
     umbra_store_32(b, (umbra_ptr){1}, r);
     backends B = make(b);
@@ -2708,7 +2708,7 @@ static void test_regvar_m_patterns(void) {
     umbra_store_32(b, (umbra_ptr){2}, umbra_lt_f32(b, sum, fc));
 
     // m_cmp_rr: lt_f32(x, x) where x is from acc, result to store
-    umbra_val neg = umbra_neg_f32(b, fa);
+    umbra_val neg = umbra_sub_f32(b, umbra_imm_f32(b, 0), fa);
     umbra_store_32(b, (umbra_ptr){3}, umbra_lt_f32(b, neg, neg));
 
     // r_min_mm: both from memory, result feeds next ALU
@@ -2722,7 +2722,7 @@ static void test_regvar_m_patterns(void) {
     umbra_store_32(b, (umbra_ptr){6}, mx);
 
     // m_float_cmp_imm_r: chain→lt_f32_imm→store (x from acc, result to memory)
-    umbra_val fn_ = umbra_neg_f32(b, fc);
+    umbra_val fn_ = umbra_sub_f32(b, umbra_imm_f32(b, 0), fc);
     umbra_store_32(b, (umbra_ptr){7}, umbra_lt_f32(b, fn_, umbra_imm_f32(b, 0.f)));
 
     // m_int_cmp_imm_r: chain→cmp_imm→store (x from acc, result to memory)
@@ -2833,10 +2833,10 @@ static void test_minmax_m_rm(void) {
     umbra_val fa = umbra_f32_from_i32(b, a);
     umbra_val fc = umbra_f32_from_i32(b, c);
     // neg→acc, then min(acc, fc)→store = m_min_rm
-    umbra_val na = umbra_neg_f32(b, fa);
+    umbra_val na = umbra_sub_f32(b, umbra_imm_f32(b, 0), fa);
     umbra_store_32(b, (umbra_ptr){2}, umbra_min_f32(b, na, fc));
     // neg→acc, then max(acc, fc)→store = m_max_rm
-    umbra_val nc = umbra_neg_f32(b, fc);
+    umbra_val nc = umbra_sub_f32(b, umbra_imm_f32(b, 0), fc);
     umbra_store_32(b, (umbra_ptr){3}, umbra_max_f32(b, nc, fa));
     backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
@@ -2924,7 +2924,7 @@ static void test_unary_r_m(void) {
                    umbra_i32_from_f32(b, umbra_ceil_f32(b, fa)));
     // r_neg_m, r_round_i32_m, r_ceil_i32_m:
     umbra_store_32(b, (umbra_ptr){5},
-                   umbra_i32_from_f32(b, umbra_neg_f32(b, fa)));
+                   umbra_i32_from_f32(b, umbra_sub_f32(b, umbra_imm_f32(b, 0), fa)));
     umbra_store_32(b, (umbra_ptr){6},
                    umbra_add_i32(b, umbra_round_i32(b, fa), umbra_imm_i32(b, 0)));
     umbra_store_32(b, (umbra_ptr){7},
@@ -3149,8 +3149,6 @@ static void test_unary_m_r(void) {
     MR(umbra_floor_f32, fa4)
     umbra_val fa5 = umbra_add_f32(b, fa, umbra_imm_f32(b, 4.f));
     MR(umbra_ceil_f32, fa5)
-    umbra_val fa6 = umbra_add_f32(b, fa, umbra_imm_f32(b, 5.f));
-    MR(umbra_neg_f32, fa6)
     umbra_val fa7 = umbra_add_f32(b, fa, umbra_imm_f32(b, 6.f));
     MR(umbra_round_i32, fa7)
     umbra_val fa8 = umbra_add_f32(b, fa, umbra_imm_f32(b, 7.f));
@@ -3167,10 +3165,7 @@ static void test_unary_m_r(void) {
         bufs[0] = (struct umbra_buf){.ptr=src, .sz=16};
         for (int i = 1; i < p; i++) { bufs[i] = (struct umbra_buf){.ptr=d[i], .sz=16}; }
         if (!run(&B, bi, 4, 1, bufs)) { continue; }
-        // sqrt(5)≈2.236
-        union { float f; int32_t i; } u;
-        u.f = -9.f; (d[5][0] == u.i) here;   // neg(4+5) = -9
-        (d[6][0] == 10) here;                  // round(4+6) = 10
+        (d[5][0] == 10) here;                  // round(4+6) = 10
     }
     cleanup(&B);
 }
@@ -3243,7 +3238,7 @@ static void test_ra_chan_unary(void) {
     struct umbra_builder *b = umbra_builder();
     umbra_color c = umbra_load_color(b, (umbra_ptr){0}, umbra_fmt_fp16);
     umbra_store_32(b, (umbra_ptr){1}, umbra_i32_from_f32(b, umbra_abs_f32(b, c.g)));
-    umbra_store_32(b, (umbra_ptr){2}, umbra_i32_from_f32(b, umbra_neg_f32(b, c.b)));
+    umbra_store_32(b, (umbra_ptr){2}, umbra_i32_from_f32(b, umbra_sub_f32(b, umbra_imm_f32(b, 0), c.b)));
     umbra_store_32(b, (umbra_ptr){3}, umbra_i32_from_f32(b, umbra_abs_f32(b, c.a)));
     backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
@@ -3299,7 +3294,7 @@ static void test_const_eval(void) {
         umbra_store_32(b, (umbra_ptr){5}, umbra_max_f32(b, fa, fc));
         umbra_store_32(b, (umbra_ptr){6}, umbra_sqrt_f32(b, fc));
         umbra_store_32(b, (umbra_ptr){7}, umbra_abs_f32(b, umbra_imm_f32(b, -5.f)));
-        umbra_store_32(b, (umbra_ptr){8}, umbra_neg_f32(b, fc));
+        umbra_store_32(b, (umbra_ptr){8}, umbra_sub_f32(b, umbra_imm_f32(b, 0), fc));
         umbra_store_32(b, (umbra_ptr){9}, umbra_round_f32(b, umbra_imm_f32(b, 3.7f)));
         umbra_store_32(b, (umbra_ptr){10}, umbra_floor_f32(b, umbra_imm_f32(b, 3.7f)));
         umbra_store_32(b, (umbra_ptr){11}, umbra_ceil_f32(b, umbra_imm_f32(b, 3.2f)));
@@ -3374,7 +3369,7 @@ static void test_acc_coverage(void) {
         umbra_val fx = umbra_f32_from_i32(b, x);
         // Each sub has a different imm to avoid dedup.
         umbra_val p0 = umbra_sub_f32(b, fx, umbra_imm_f32(b, 1));
-        umbra_store_32(b, (umbra_ptr){1}, umbra_i32_from_f32(b, umbra_neg_f32(b, p0)));
+        umbra_store_32(b, (umbra_ptr){1}, umbra_i32_from_f32(b, umbra_sub_f32(b, umbra_imm_f32(b, 0), p0)));
         umbra_val p1 = umbra_sub_f32(b, fx, umbra_imm_f32(b, 2));
         umbra_store_32(b, (umbra_ptr){2}, umbra_i32_from_f32(b, umbra_round_f32(b, p1)));
         umbra_val p2 = umbra_sub_f32(b, fx, umbra_imm_f32(b, 3));
