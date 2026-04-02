@@ -278,9 +278,6 @@ struct vk_program {
     VkDescriptorSetLayout   ds_layout;
     VkPipelineLayout        pipe_layout;
     VkPipeline              pipeline;
-    VkDescriptorPool        desc_pool;
-    VkDescriptorSet         desc_set;        // pre-allocated, reused across dispatches
-    VkBuffer               *bound_bufs;      // [total_bufs] — last-bound VkBuffers for dirty tracking
 
     int max_ptr;
     int total_bufs;
@@ -2072,38 +2069,27 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
         }
     }
 
-    // After a flush, the old command buffer is gone. Clear bound_bufs so all
-    // bindings are treated as dirty — stale handles from destroyed buffers
-    // could otherwise match new allocations.
-    // Check if any descriptor bindings changed.
-    VkDescriptorBufferInfo dirty_infos[32];
-    VkWriteDescriptorSet   dirty_writes[32];
+    // Push descriptors: each dispatch records its own buffer bindings directly
+    // in the command buffer, so no external descriptor set to protect.
+    VkDescriptorBufferInfo buf_infos[32];
+    VkWriteDescriptorSet   writes[32];
     assume(n <= 32);
-    int n_dirty = 0;
     for (int i = 0; i < n; i++) {
-        if (vp->bound_bufs[i] != vp->buf_cache[i].buf) {
-            vp->bound_bufs[i] = vp->buf_cache[i].buf;
-            dirty_infos[n_dirty] = (VkDescriptorBufferInfo){
-                .buffer=vp->buf_cache[i].buf, .offset=0, .range=VK_WHOLE_SIZE,
-            };
-            dirty_writes[n_dirty] = (VkWriteDescriptorSet){
-                .sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet=vp->desc_set,
-                .dstBinding=(uint32_t)i,
-                .descriptorCount=1,
-                .descriptorType=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                .pBufferInfo=&dirty_infos[n_dirty],
-            };
-            n_dirty++;
-        }
-    }
-    if (n_dirty) {
-        vkUpdateDescriptorSets(be->device, (uint32_t)n_dirty, dirty_writes, 0, 0);
+        buf_infos[i] = (VkDescriptorBufferInfo){
+            .buffer=vp->buf_cache[i].buf, .offset=0, .range=VK_WHOLE_SIZE,
+        };
+        writes[i] = (VkWriteDescriptorSet){
+            .sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstBinding=(uint32_t)i,
+            .descriptorCount=1,
+            .descriptorType=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .pBufferInfo=&buf_infos[i],
+        };
     }
 
     vkCmdBindPipeline(be->batch_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, vp->pipeline);
-    vkCmdBindDescriptorSets(be->batch_cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
-                            vp->pipe_layout, 0, 1, &vp->desc_set, 0, 0);
+    vkCmdPushDescriptorSet(be->batch_cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
+                           vp->pipe_layout, 0, (uint32_t)n, writes);
     vkCmdPushConstants(be->batch_cmd, vp->pipe_layout, VK_SHADER_STAGE_COMPUTE_BIT,
                        0, (uint32_t)(vp->push_words * (int)sizeof(uint32_t)), push_data);
 
@@ -2123,12 +2109,6 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     vkCmdDispatch(be->batch_cmd, gx, (uint32_t)h, 1);
 
     free(push_data);
-
-    // A pre-allocated descriptor set can't be updated while in-flight commands
-    // reference it.  Flush now so subsequent queue() calls can safely update.
-    if (n_dirty) {
-        vk_flush(&be->base);
-    }
 }
 
 static void vk_program_dump(struct umbra_program const *p, FILE *f) {
@@ -2170,12 +2150,10 @@ static void vk_program_free(struct umbra_program *p) {
         }
     }
     free(vp->buf_cache);
-    free(vp->bound_bufs);
 
     vkDestroyPipeline(be->device, vp->pipeline, 0);
     vkDestroyPipelineLayout(be->device, vp->pipe_layout, 0);
     vkDestroyDescriptorSetLayout(be->device, vp->ds_layout, 0);
-    vkDestroyDescriptorPool(be->device, vp->desc_pool, 0);
     vkDestroyShaderModule(be->device, vp->shader, 0);
     free(vp->deref);
     free(vp->spirv);
@@ -2218,6 +2196,7 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
     {
         VkDescriptorSetLayoutCreateInfo ci = {
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR,
             .bindingCount = (uint32_t)total_bufs,
             .pBindings = bindings,
         };
@@ -2262,39 +2241,12 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
         assume(rc == VK_SUCCESS);
     }
 
-    VkDescriptorPool desc_pool;
-    VkDescriptorSet  desc_set;
-    {
-        VkDescriptorPoolSize ps = {
-            .type=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            .descriptorCount=(uint32_t)total_bufs,
-        };
-        VkDescriptorPoolCreateInfo ci = {
-            .sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-            .flags=VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
-            .maxSets=1,
-            .poolSizeCount=1,
-            .pPoolSizes=&ps,
-        };
-        vkCreateDescriptorPool(vbe->device, &ci, 0, &desc_pool);
-        VkDescriptorSetAllocateInfo dai = {
-            .sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-            .descriptorPool=desc_pool,
-            .descriptorSetCount=1,
-            .pSetLayouts=&ds_layout,
-        };
-        vkAllocateDescriptorSets(vbe->device, &dai, &desc_set);
-    }
-
     struct vk_program *p = calloc(1, sizeof *p);
     p->be          = vbe;
     p->shader      = shader;
     p->ds_layout   = ds_layout;
     p->pipe_layout = pipe_layout;
     p->pipeline    = pipeline;
-    p->desc_pool   = desc_pool;
-    p->desc_set    = desc_set;
-    p->bound_bufs  = calloc((size_t)total_bufs, sizeof(VkBuffer));
     p->max_ptr     = max_ptr;
     p->total_bufs  = total_bufs;
     p->n_deref     = n_deref;
@@ -2401,6 +2353,7 @@ struct umbra_backend *umbra_backend_vulkan(void) {
             "VK_KHR_external_memory",
             "VK_EXT_external_memory_host",
             "VK_KHR_shader_float_controls",
+            "VK_KHR_push_descriptor",
         };
         VkPhysicalDeviceFloat16Int8FeaturesKHR f16_int8 = {
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FLOAT16_INT8_FEATURES_KHR,
