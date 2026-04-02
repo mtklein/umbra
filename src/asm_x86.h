@@ -11,7 +11,6 @@ void emit4(Buf *b, uint32_t v);
 
 void vex(Buf *b, int pp, int mm, int W, int L, int d, int v, int s, uint8_t op);
 void vex_rrr(Buf *b, int pp, int mm, int L, uint8_t op, int d, int v, int s);
-void vex_rr(Buf *b, int pp, int mm, int L, uint8_t op, int d, int s);
 void vex_mem(Buf *b, int pp, int mm, int W, int L, int reg, int v, uint8_t op, int base,
              int index, int scale, int disp);
 
@@ -22,12 +21,9 @@ void vmov_store(Buf *b, int L, int reg, int base, int index, int scale, int disp
 void rex_w(Buf *b, int r, int b_);
 void push_r(Buf *b, int r);
 void pop_r(Buf *b, int r);
-void xor_rr(Buf *b, int d, int s);
 void add_ri(Buf *b, int d, int32_t imm);
-void sub_ri(Buf *b, int d, int32_t imm);
 void cmp_rr(Buf *b, int a, int c);
 void cmp_ri(Buf *b, int a, int32_t imm);
-void test_rr(Buf *b, int a, int c);
 void shr_ri(Buf *b, int r, uint8_t imm);
 void mov_ri(Buf *b, int d, int32_t imm);
 void mov_rr(Buf *b, int d, int s);
@@ -79,8 +75,6 @@ void vfmadd231ps(Buf *b, int d, int v, int s);
 void vfnmadd132ps(Buf *b, int d, int v, int s);
 void vfnmadd213ps(Buf *b, int d, int v, int s);
 void vfnmadd231ps(Buf *b, int d, int v, int s);
-void vrsqrtps(Buf *b, int d, int s);
-void vrcpps(Buf *b, int d, int s);
 void vcvtdq2ps(Buf *b, int d, int s);
 void vcvttps2dq(Buf *b, int d, int s);
 void vcvtps2dq(Buf *b, int d, int s);
@@ -107,9 +101,6 @@ void vpblendvb(Buf *b, int L, int d, int z, int y, int x);
 
 void vpcmpeqd(Buf *b, int d, int v, int s);
 void vpcmpgtd(Buf *b, int d, int v, int s);
-void vpminsd(Buf *b, int d, int v, int s);
-void vpmaxsd(Buf *b, int d, int v, int s);
-
 void vpmovsxwd(Buf *b, int d, int s);
 void vpmovzxwd(Buf *b, int d, int s);
 

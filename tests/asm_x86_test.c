@@ -42,16 +42,6 @@ static void test_ret_vzeroupper_nop(void) {
 static void test_gpr(void) {
     Buf b = {0};
 
-    // xorl %eax, %eax => 31 c0
-    xor_rr(&b, RAX, RAX);
-    bytes_eq(&b, 2, (uint8_t[]){0x31, 0xC0}) here;
-    reset(&b);
-
-    // xorl %r10d, %r10d => 45 31 d2
-    xor_rr(&b, R10, R10);
-    bytes_eq(&b, 3, (uint8_t[]){0x45, 0x31, 0xD2}) here;
-    reset(&b);
-
     // addq $8, %rdi => 48 83 c7 08
     add_ri(&b, RDI, 8);
     bytes_eq(&b, 4, (uint8_t[]){0x48, 0x83, 0xC7, 0x08}) here;
@@ -60,11 +50,6 @@ static void test_gpr(void) {
     // addq $256, %rsi => 48 81 c6 00 01 00 00
     add_ri(&b, RSI, 256);
     bytes_eq(&b, 7, (uint8_t[]){0x48, 0x81, 0xC6, 0x00, 0x01, 0x00, 0x00}) here;
-    reset(&b);
-
-    // subq $32, %r10 => 49 83 ea 20
-    sub_ri(&b, R10, 32);
-    bytes_eq(&b, 4, (uint8_t[]){0x49, 0x83, 0xEA, 0x20}) here;
     reset(&b);
 
     // cmpq %rcx, %rdx => 48 39 ca
@@ -80,11 +65,6 @@ static void test_gpr(void) {
     // movq %rsp, %r12 => 49 89 e4
     mov_rr(&b, R12, RSP);
     bytes_eq(&b, 3, (uint8_t[]){0x49, 0x89, 0xE4}) here;
-    reset(&b);
-
-    // subq $256, %rax => 48 81 e8 00 01 00 00
-    sub_ri(&b, RAX, 256);
-    bytes_eq(&b, 7, (uint8_t[]){0x48, 0x81, 0xE8, 0x00, 0x01, 0x00, 0x00}) here;
     reset(&b);
 
     // cmpq $256, %rax => 48 81 f8 00 01 00 00
@@ -140,11 +120,6 @@ static void test_gpr(void) {
     // shrq $1, %rax => 48 d1 e8
     shr_ri(&b, RAX, 1);
     bytes_eq(&b, 3, (uint8_t[]){0x48, 0xD1, 0xE8}) here;
-    reset(&b);
-
-    // testq %rcx, %rax => 48 85 c8
-    test_rr(&b, RAX, RCX);
-    bytes_eq(&b, 3, (uint8_t[]){0x48, 0x85, 0xC8}) here;
     free(b.buf);
 }
 
@@ -184,16 +159,6 @@ static void test_avx_f32(void) {
     // vsqrtps %ymm3, %ymm2 => c5 fc 51 d3
     vsqrtps(&b, 2, 3);
     bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xFC, 0x51, 0xD3}) here;
-    reset(&b);
-
-    // vrsqrtps %ymm3, %ymm2 => c5 fc 52 d3
-    vrsqrtps(&b, 2, 3);
-    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xFC, 0x52, 0xD3}) here;
-    reset(&b);
-
-    // vrcpps %ymm3, %ymm2 => c5 fc 53 d3
-    vrcpps(&b, 2, 3);
-    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xFC, 0x53, 0xD3}) here;
     reset(&b);
 
     // vcmpps %ymm4, %ymm3, %ymm2, $0 => c5 e4 c2 d4 00
@@ -294,14 +259,6 @@ static void test_avx_i32(void) {
     bytes_eq(&b, 5, (uint8_t[]){0xC5, 0xED, 0x72, 0xE3, 0x04}) here;
     reset(&b);
 
-    // vpminsd %ymm4, %ymm3, %ymm2 => c4 e2 65 39 d4
-    vpminsd(&b, 2, 3, 4);
-    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0x39, 0xD4}) here;
-    reset(&b);
-
-    // vpmaxsd %ymm4, %ymm3, %ymm2 => c4 e2 65 3d d4
-    vpmaxsd(&b, 2, 3, 4);
-    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0x3D, 0xD4}) here;
     free(b.buf);
 }
 
@@ -503,11 +460,6 @@ static void test_vex_helpers(void) {
     // vex_rrr: pp=0,mm=1,L=1,op=0x58,d=2,v=3,s=4 => same as vaddps
     vex_rrr(&b, 0, 1, 1, 0x58, 2, 3, 4);
     bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE4, 0x58, 0xD4}) here;
-    reset(&b);
-
-    // vex_rr: pp=0,mm=1,L=1,op=0x51,d=2,s=3 => same as vsqrtps 2,3
-    vex_rr(&b, 0, 1, 1, 0x51, 2, 3);
-    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xFC, 0x51, 0xD3}) here;
     reset(&b);
 
     // vex_mem: pp=2,mm=1,W=0,L=1,reg=3,v=0,op=0x6f,base=RDI,index=RCX,scale=4,disp=0

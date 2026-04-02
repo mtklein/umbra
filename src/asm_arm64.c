@@ -23,9 +23,6 @@ uint32_t SUB_xi(int d, int n, int imm12) {
 uint32_t SUBS_xi(int d, int n, int imm12) {
     return 0xf1000000u | ((uint32_t)imm12 << 10) | ((uint32_t)n << 5) | (uint32_t)d;
 }
-uint32_t MOVZ_x(int d, uint16_t imm) {
-    return 0xd2800000u | ((uint32_t)imm << 5) | (uint32_t)d;
-}
 uint32_t MOVZ_w(int d, uint16_t imm) {
     return 0x52800000u | ((uint32_t)imm << 5) | (uint32_t)d;
 }
@@ -95,9 +92,6 @@ uint32_t LSR_xi(int d, int n, int shift) {
 uint32_t LDR_xi(int d, int n, int imm) {
     return 0xf9400000u | ((uint32_t)imm << 10) | ((uint32_t)n << 5) | (uint32_t)d;
 }
-uint32_t LDR_wi(int d, int n, int imm) {
-    return 0xb9400000u | ((uint32_t)imm << 10) | ((uint32_t)n << 5) | (uint32_t)d;
-}
 uint32_t LDRH_wi(int d, int n, int imm) {
     return 0x79400000u | ((uint32_t)imm << 10) | ((uint32_t)n << 5) | (uint32_t)d;
 }
@@ -117,31 +111,17 @@ uint32_t MADD_x(int d, int n, int m, int a) {
     return 0x9b000000u | ((uint32_t)m << 16) | ((uint32_t)a << 10)
                        | ((uint32_t)n << 5)  | (uint32_t)d;
 }
-uint32_t CMP_wi(int n, int imm12) {
-    return 0x7100001fu | ((uint32_t)imm12 << 10) | ((uint32_t)n << 5);
-}
 uint32_t CMP_wr(int n, int m) {
     return 0x6b00001fu | ((uint32_t)m << 16) | ((uint32_t)n << 5);
 }
-uint32_t CBZ_w(int t, int off19) {
-    return 0x34000000u | ((uint32_t)(off19 & 0x7ffff) << 5) | (uint32_t)t;
-}
-
 uint32_t LDR_si(int d, int n, int imm) {
     return 0xbd400000u | ((uint32_t)imm << 10) | ((uint32_t)n << 5) | (uint32_t)d;
-}
-uint32_t STR_si(int d, int n, int imm) {
-    return 0xbd000000u | ((uint32_t)imm << 10) | ((uint32_t)n << 5) | (uint32_t)d;
 }
 uint32_t LDR_qi(int d, int n, int imm) {
     return 0x3dc00000u | ((uint32_t)imm << 10) | ((uint32_t)n << 5) | (uint32_t)d;
 }
 uint32_t STR_qi(int d, int n, int imm) {
     return 0x3d800000u | ((uint32_t)imm << 10) | ((uint32_t)n << 5) | (uint32_t)d;
-}
-
-uint32_t SLI_4s_imm(int d, int n, int shift) {
-    return 0x6f005400u | ((uint32_t)(shift + 32) << 16) | ((uint32_t)n << 5) | (uint32_t)d;
 }
 
 uint32_t W(uint32_t insn) { return insn | 0x40000000u; }
@@ -216,18 +196,6 @@ uint32_t FMLS_4s(int d, int n, int m) { return v3(FMLS_4s_, d, n, m); }
 uint32_t FMINNM_4s(int d, int n, int m) { return v3(FMINNM_4s_, d, n, m); }
 uint32_t FMAXNM_4s(int d, int n, int m) { return v3(FMAXNM_4s_, d, n, m); }
 uint32_t FSQRT_4s(int d, int n) { return v2(FSQRT_4s_, d, n); }
-uint32_t FRSQRTE_4s(int d, int n) {
-    return 0x6ea1d800u | ((uint32_t)n << 5) | (uint32_t)d;
-}
-uint32_t FRSQRTS_4s(int d, int n, int m) {
-    return 0x4ea0fc00u | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d;
-}
-uint32_t FRECPE_4s(int d, int n) {
-    return 0x4ea1d800u | ((uint32_t)n << 5) | (uint32_t)d;
-}
-uint32_t FRECPS_4s(int d, int n, int m) {
-    return 0x4e20fc00u | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d;
-}
 uint32_t FABS_4s(int d, int n) { return v2(FABS_4s_, d, n); }
 uint32_t FNEG_4s(int d, int n) { return v2(FNEG_4s_, d, n); }
 uint32_t FRINTN_4s(int d, int n) { return v2(FRINTN_4s_, d, n); }
@@ -280,12 +248,6 @@ uint32_t UMOV_ws(int d, int n) { return 0x0e043c00u | ((uint32_t)n << 5) | (uint
 uint32_t UMOV_ws_lane(int d, int n, int lane) {
     uint32_t imm5 = (uint32_t)((lane << 3) | 4);
     return 0x0e003c00u | (imm5 << 16) | ((uint32_t)n << 5) | (uint32_t)d;
-}
-uint32_t UZP1_4s(int d, int n, int m) {
-    return 0x4e801800u | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d;
-}
-uint32_t UZP2_4s(int d, int n, int m) {
-    return 0x4e805800u | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d;
 }
 uint32_t ZIP1_4s(int d, int n, int m) {
     return 0x4e803800u | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d;

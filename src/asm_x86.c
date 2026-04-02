@@ -41,7 +41,7 @@ void vex_rrr(Buf *b, int pp, int mm, int L, uint8_t op, int d, int v, int s) {
     vex(b, pp, mm, 0, L, d, v, s, op);
 }
 // 2-operand: op ymm/xmm d, s  (vvvv unused = 0 -> encoded as 1111)
-void vex_rr(Buf *b, int pp, int mm, int L, uint8_t op, int d, int s) {
+static void vex_rr(Buf *b, int pp, int mm, int L, uint8_t op, int d, int s) {
     vex(b, pp, mm, 0, L, d, 0, s, op);
 }
 // shift-by-immediate: ModRM.reg=ext, VEX.vvvv=d(dest), ModRM.rm=s(src), +imm8
@@ -112,11 +112,6 @@ void pop_r(Buf *b, int r) {
     if (r >= 8) { emit1(b, 0x41); }
     emit1(b, (uint8_t)(0x58 | (r & 7)));
 }
-void xor_rr(Buf *b, int d, int s) {
-    if (d >= 8 || s >= 8) { emit1(b, (uint8_t)(0x40 | ((d >> 3) << 2) | (s >> 3))); }
-    emit1(b, 0x31);
-    emit1(b, (uint8_t)(0xc0 | ((s & 7) << 3) | (d & 7)));
-}
 void add_ri(Buf *b, int d, int32_t imm) {
     rex_w(b, 0, d);
     if (imm >= -128 && imm <= 127) {
@@ -126,18 +121,6 @@ void add_ri(Buf *b, int d, int32_t imm) {
     } else {
         emit1(b, 0x81);
         emit1(b, (uint8_t)(0xc0 | (d & 7)));
-        emit4(b, (uint32_t)imm);
-    }
-}
-void sub_ri(Buf *b, int d, int32_t imm) {
-    rex_w(b, 0, d);
-    if (imm >= -128 && imm <= 127) {
-        emit1(b, 0x83);
-        emit1(b, (uint8_t)(0xc0 | (5 << 3) | (d & 7)));
-        emit1(b, (uint8_t)(int8_t)imm);
-    } else {
-        emit1(b, 0x81);
-        emit1(b, (uint8_t)(0xc0 | (5 << 3) | (d & 7)));
         emit4(b, (uint32_t)imm);
     }
 }
@@ -157,11 +140,6 @@ void cmp_ri(Buf *b, int a, int32_t imm) {
         emit1(b, (uint8_t)(0xc0 | (7 << 3) | (a & 7)));
         emit4(b, (uint32_t)imm);
     }
-}
-void test_rr(Buf *b, int a, int c) {
-    rex_w(b, c, a);
-    emit1(b, 0x85);
-    emit1(b, (uint8_t)(0xc0 | ((c & 7) << 3) | (a & 7)));
 }
 void shr_ri(Buf *b, int r, uint8_t imm) {
     rex_w(b, 0, r);
@@ -298,8 +276,6 @@ void vdivps(Buf *b, int d, int v, int s) { vex_rrr(b, 0, 1, 1, 0x5e, d, v, s); }
 void vminps(Buf *b, int d, int v, int s) { vex_rrr(b, 0, 1, 1, 0x5d, d, v, s); }
 void vmaxps(Buf *b, int d, int v, int s) { vex_rrr(b, 0, 1, 1, 0x5f, d, v, s); }
 void vsqrtps(Buf *b, int d, int s)  { vex_rr(b, 0, 1, 1, 0x51, d, s); }
-void vrsqrtps(Buf *b, int d, int s) { vex_rr(b, 0, 1, 1, 0x52, d, s); }
-void vrcpps(Buf *b, int d, int s)   { vex_rr(b, 0, 1, 1, 0x53, d, s); }
 void vfmadd132ps(Buf *b, int d, int v, int s) { vex(b, 1, 2, 0, 1, d, v, s, 0x98); }
 void vfmadd213ps(Buf *b, int d, int v, int s) { vex(b, 1, 2, 0, 1, d, v, s, 0xa8); }
 void vfmadd231ps(Buf *b, int d, int v, int s) { vex(b, 1, 2, 0, 1, d, v, s, 0xb8); }
@@ -353,8 +329,6 @@ void vpblendvb(Buf *b, int L, int d, int z, int y, int x) {
 // ---- I32 compare ----
 void vpcmpeqd(Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 1, 0x76, d, v, s); }
 void vpcmpgtd(Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 1, 0x66, d, v, s); }
-void vpminsd(Buf *b, int d, int v, int s) { vex_rrr(b, 1, 2, 1, 0x39, d, v, s); }
-void vpmaxsd(Buf *b, int d, int v, int s) { vex_rrr(b, 1, 2, 1, 0x3d, d, v, s); }
 
 // ---- I16 arithmetic (XMM, L=0) ----
 // ---- Widening/narrowing ----

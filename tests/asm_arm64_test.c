@@ -20,7 +20,6 @@ static void test_gpr(void) {
     ADD_xi(3, 4, 16) == 0x91004083 here;
     SUB_xi(5, 6, 8) == 0xD10020C5 here;
     SUBS_xi(7, 8, 1) == 0xF1000507 here;
-    MOVZ_x(0, 42) == 0xD2800540 here;
     MOVZ_w(1, 0xFF) == 0x52801FE1 here;
     MOVK_w16(2, 0x1234) == 0x72A24682 here;
 }
@@ -54,10 +53,6 @@ static void test_neon_f32(void) {
     FMINNM_4s(0, 1, 2) == 0x4EA2C420 here;
     FMAXNM_4s(3, 4, 5) == 0x4E25C483 here;
     FSQRT_4s(3, 4) == 0x6EA1F883 here;
-    FRSQRTE_4s(0, 1) == 0x6EA1D820 here;
-    FRSQRTS_4s(0, 1, 2) == 0x4EA2FC20 here;
-    FRECPE_4s(0, 1) == 0x4EA1D820 here;
-    FRECPS_4s(0, 1, 2) == 0x4E22FC20 here;
     FABS_4s(0, 1) == 0x4EA0F820 here;
     FNEG_4s(2, 3) == 0x6EA0F862 here;
     FRINTN_4s(4, 5) == 0x4E2188A4 here;
@@ -113,7 +108,6 @@ static void test_shift_imm(void) {
     SHL_4s_imm(2, 3, 4) == 0x4F245462 here;
     USHR_4s_imm(2, 3, 4) == 0x6F3C0462 here;
     SSHR_4s_imm(2, 3, 4) == 0x4F3C0462 here;
-    SLI_4s_imm(0, 1, 8) == 0x6F285420 here;
 }
 
 static void test_movi(void) {
@@ -173,20 +167,12 @@ static void test_lsl(void) {
     LSR_xi(3, 4, 5)  == 0xD345FC83 here;
 }
 
-static void test_ldr_str_si(void) {
-    // LDR S V3, [X4, #0] = 0xBD400083
+static void test_ldr_si(void) {
     LDR_si(3, 4, 0) == 0xBD400083 here;
-    // LDR S V3, [X4, #4] → imm=1 → 0xBD400483
     LDR_si(3, 4, 1) == 0xBD400483 here;
-    // STR S V5, [X6, #0] = 0xBD0000C5
-    STR_si(5, 6, 0) == 0xBD0000C5 here;
-    // STR S V5, [X6, #4] → imm=1 → 0xBD0004C5
-    STR_si(5, 6, 1) == 0xBD0004C5 here;
 }
 
-static void test_uzp_zip(void) {
-    UZP1_4s(0, 1, 2) == (0x4E801800u | (2u << 16) | (1u << 5) | 0u) here;
-    UZP2_4s(3, 4, 5) == (0x4E805800u | (5u << 16) | (4u << 5) | 3u) here;
+static void test_zip(void) {
     ZIP1_4s(6, 7, 8) == (0x4E803800u | (8u << 16) | (7u << 5) | 6u) here;
     ZIP2_4s(0, 1, 2) == (0x4E807800u | (2u << 16) | (1u << 5) | 0u) here;
 }
@@ -196,13 +182,6 @@ static void test_ldr_xi(void) {
     LDR_xi(0, 1, 2) == 0xF9400820 here;
     // LDR x3, [x4, #0]
     LDR_xi(3, 4, 0) == 0xF9400083 here;
-}
-
-static void test_ldr_wi(void) {
-    // LDR w0, [x1, #8] (imm=2, scaled by 4)
-    LDR_wi(0, 1, 2) == 0xB9400820 here;
-    // LDR w5, [x6, #0]
-    LDR_wi(5, 6, 0) == 0xB94000C5 here;
 }
 
 static void test_ldrh_wi(void) {
@@ -239,21 +218,8 @@ static void test_madd(void) {
 }
 
 static void test_cmp(void) {
-    // CMP w4, #7
-    CMP_wi(4, 7) == 0x71001C9F here;
-    // CMP w0, #0
-    CMP_wi(0, 0) == 0x7100001F here;
-    // CMP w5, w6
     CMP_wr(5, 6) == 0x6B0600BF here;
-    // CMP w0, w0
     CMP_wr(0, 0) == 0x6B00001F here;
-}
-
-static void test_cbz(void) {
-    // CBZ w7, #0
-    CBZ_w(7, 0) == 0x34000007 here;
-    // CBZ w0, #0
-    CBZ_w(0, 0) == 0x34000000 here;
 }
 
 static void test_uzp_zip_8h(void) {
@@ -302,17 +268,15 @@ int main(void) {
     test_load_imm_w();
     test_stp_ldp();
     test_lsl();
-    test_ldr_str_si();
-    test_uzp_zip();
+    test_ldr_si();
+    test_zip();
     test_ldr_xi();
-    test_ldr_wi();
     test_ldrh_wi();
     test_ldrh_wr();
     test_ldr_wr();
     test_ldr_str_di();
     test_madd();
     test_cmp();
-    test_cbz();
     test_uzp_zip_8h();
     test_ext_16b();
     test_uxtl_4s();
