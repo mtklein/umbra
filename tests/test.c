@@ -3514,7 +3514,45 @@ static void test_acc_coverage(void) {
     }
 }
 
+static void test_acc_coverage_extra(void) {
+    // Exercise remaining uncovered interpreter acc variants:
+    // - CMP3 m_rm (comparison chain-end)
+    // - UN2 for round_f32, floor_f32, ceil_f32
+#define ACC_UNARY_F(unary, k, expected) { \
+        struct umbra_builder *b = umbra_builder(); \
+        umbra_val a = umbra_load_32(b, (umbra_ptr){0}), c = umbra_load_32(b, (umbra_ptr){1}); \
+        umbra_val s = umbra_sub_f32(b, umbra_f32_from_i32(b, a), umbra_f32_from_i32(b, c)); \
+        umbra_store_32(b, (umbra_ptr){2}, umbra_i32_from_f32(b, unary(b, s))); \
+        backends B = make(b); \
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) { \
+            int32_t sa[]={10}, sc[]={k}, d[]={0}; \
+            if (!run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.sz=4},{.ptr=sc,.sz=4},{.ptr=d,.sz=4}})) continue; \
+            (d[0] == (expected)) here; \
+        } cleanup(&B); }
+    // round(10.0-3.0)=round(7.0)=7, floor(10.0-4.0)=floor(6.0)=6, ceil(10.0-5.0)=ceil(5.0)=5
+    ACC_UNARY_F(umbra_round_f32, 3, 7)
+    ACC_UNARY_F(umbra_floor_f32, 4, 6)
+    ACC_UNARY_F(umbra_ceil_f32,  5, 5)
+#undef ACC_UNARY_F
+    // CMP m_rm: sub→acc, then eq_f32(acc, mem)→store.
+    {
+        struct umbra_builder *b = umbra_builder();
+        umbra_val a = umbra_load_32(b, (umbra_ptr){0}), c = umbra_load_32(b, (umbra_ptr){1});
+        umbra_val fa = umbra_f32_from_i32(b, a), fc = umbra_f32_from_i32(b, c);
+        umbra_val s = umbra_sub_f32(b, fa, umbra_imm_f32(b, 1));
+        umbra_store_32(b, (umbra_ptr){2}, umbra_eq_f32(b, s, fc));
+        backends B = make(b);
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            int32_t sa[]={4}, sc[]={3}, d[]={0};
+            if (!run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.sz=4},{.ptr=sc,.sz=4},{.ptr=d,.sz=4}})) continue;
+            (d[0] == -1) here;  // 4-1=3.0 == 3.0 → true
+        }
+        cleanup(&B);
+    }
+}
+
 int main(void) {
+    test_acc_coverage_extra();
     test_acc_coverage();
     test_ra_chan_unary();
     test_mul_pow2_peephole();
