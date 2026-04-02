@@ -865,9 +865,9 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
     }
 }
 
-void umbra_dump_builder(builder const *b, FILE *f) { dump_insts(b->inst, b->insts, f); }
+void umbra_builder_dump(builder const *b, FILE *f) { dump_insts(b->inst, b->insts, f); }
 
-void umbra_dump_basic_block(struct umbra_basic_block const *bb, FILE *f) {
+void umbra_basic_block_dump(struct umbra_basic_block const *bb, FILE *f) {
     dump_insts(bb->inst, bb->insts, f);
 }
 

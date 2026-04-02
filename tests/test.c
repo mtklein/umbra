@@ -2167,11 +2167,11 @@ static void test_dump(void) {
         umbra_val             x = umbra_load_32(b, (umbra_ptr){0, 0});
         umbra_val             r = umbra_add_f32(b, x, umbra_imm_f32(b, 1.0f));
         umbra_store_32(b, (umbra_ptr){1, 0}, r);
-        umbra_dump_builder(b, f);
+        umbra_builder_dump(b, f);
 
         struct umbra_basic_block *bb = umbra_basic_block(b);
         umbra_builder_free(b);
-        umbra_dump_basic_block(bb, f);
+        umbra_basic_block_dump(bb, f);
         umbra_basic_block_free(bb);
     }
     fclose(f);

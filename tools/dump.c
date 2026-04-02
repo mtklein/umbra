@@ -48,7 +48,7 @@ static void dump_bb(char const *dir, char const *name, struct umbra_builder *b) 
     {
         snprintf(p, sizeof p, "%s/%s.builder", dir, name);
         FILE *f = fopen(p, "w");
-        umbra_dump_builder(b, f);
+        umbra_builder_dump(b, f);
         fclose(f);
     }
 
@@ -57,7 +57,7 @@ static void dump_bb(char const *dir, char const *name, struct umbra_builder *b) 
     {
         snprintf(p, sizeof p, "%s/%s.bb", dir, name);
         FILE *f = fopen(p, "w");
-        umbra_dump_basic_block(bb, f);
+        umbra_basic_block_dump(bb, f);
         fclose(f);
     }
 
