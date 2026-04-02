@@ -23,9 +23,10 @@ enum {
     SpvSchema          = 0,
 
     // Capabilities
-    SpvCapabilityShader                   = 1,
-    SpvCapabilityFloat16                  = 9,
-    SpvCapabilityStorageBuffer16BitAccess = 4433,
+    SpvCapabilityShader                      = 1,
+    SpvCapabilityFloat16                     = 9,
+    SpvCapabilitySignedZeroInfNanPreserve    = 4466,
+    SpvCapabilityStorageBuffer16BitAccess    = 4433,
 
     // Addressing / Memory models
     SpvAddressingModelLogical    = 0,
@@ -35,7 +36,8 @@ enum {
     SpvExecutionModelGLCompute = 5,
 
     // Execution modes
-    SpvExecutionModeLocalSize = 17,
+    SpvExecutionModeLocalSize                = 17,
+    SpvExecutionModeSignedZeroInfNanPreserve = 4461,
 
     // Storage classes
     SpvStorageClassUniformConstant = 0,
@@ -783,6 +785,26 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
     spv_op(&B.caps, SpvOpCapability, 2);
     spv_word(&B.caps, SpvCapabilityFloat16);
 
+    spv_op(&B.caps, SpvOpCapability, 2);
+    spv_word(&B.caps, SpvCapabilitySignedZeroInfNanPreserve);
+
+    // SPV_KHR_float_controls: SignedZeroInfNanPreserve for float32 makes
+    // MoltenVK/SPIRV-Cross clear NotNaN|NotInf|NSZ from fpFastMathFlags,
+    // which produces MTLMathModeSafe + precise:: transcendentals — matching
+    // our Metal backend.
+    {
+        char const name[] = "SPV_KHR_float_controls";
+        int name_words = ((int)sizeof(name) + 3) / 4;
+        spv_op(&B.exts, 10 /*OpExtension*/, 1 + name_words);
+        for (int w = 0; w < name_words; w++) {
+            uint32_t word = 0;
+            for (int b2 = 0; b2 < 4 && w * 4 + b2 < (int)sizeof(name); b2++) {
+                word |= (uint32_t)(unsigned char)name[w * 4 + b2] << (b2 * 8);
+            }
+            spv_word(&B.exts, word);
+        }
+    }
+
     if (B.has_16) {
         spv_op(&B.caps, SpvOpCapability, 2);
         spv_word(&B.caps, SpvCapabilityStorageBuffer16BitAccess);
@@ -1100,6 +1122,11 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
         spv_word(&B.exec_mode, WG_SIZE);
         spv_word(&B.exec_mode, 1);
         spv_word(&B.exec_mode, 1);
+
+        spv_op(&B.exec_mode, SpvOpExecutionMode, 4);
+        spv_word(&B.exec_mode, fn_main);
+        spv_word(&B.exec_mode, SpvExecutionModeSignedZeroInfNanPreserve);
+        spv_word(&B.exec_mode, 32); // float32
 
         // --- Function body ---
         // OpFunction
@@ -2331,11 +2358,6 @@ static void vk_free(struct umbra_backend *be) {
 }
 
 struct umbra_backend *umbra_backend_vulkan(void) {
-    // MoltenVK reads this before vkCreateInstance.  Disable fast-math so the
-    // Metal shader compiler cannot approximate sqrt/rsqrt or reassociate
-    // floating-point operations, matching our Metal backend's MTLMathModeSafe.
-    setenv("MVK_CONFIG_FAST_MATH_ENABLED", "0", 0);
-
     VkInstance instance;
     {
         VkApplicationInfo app = {
@@ -2378,6 +2400,7 @@ struct umbra_backend *umbra_backend_vulkan(void) {
             "VK_KHR_shader_float16_int8",
             "VK_KHR_external_memory",
             "VK_EXT_external_memory_host",
+            "VK_KHR_shader_float_controls",
         };
         VkPhysicalDeviceFloat16Int8FeaturesKHR f16_int8 = {
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FLOAT16_INT8_FEATURES_KHR,
