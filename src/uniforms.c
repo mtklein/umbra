@@ -1,5 +1,5 @@
 #include "../include/umbra.h"
-#include <assert.h>
+#include "assume.h"
 #include <stdlib.h>
 
 size_t umbra_uniforms_reserve_f32(struct umbra_uniforms *u, int n) {
@@ -22,13 +22,13 @@ static void ensure_allocated(struct umbra_uniforms *u) {
 }
 
 void umbra_uniforms_fill_f32(struct umbra_uniforms *u, size_t h, float const *v, int n) {
-    assert(h + (size_t)n * 4 <= u->size);
+    assume(h + (size_t)n * 4 <= u->size);
     ensure_allocated(u);
     char *p = (char*)u->data + h;
     __builtin_memcpy(p, v, (size_t)n * 4);
 }
 void umbra_uniforms_fill_ptr(struct umbra_uniforms *u, size_t h, struct umbra_buf b) {
-    assert(h + 24 <= u->size);
+    assume(h + 24 <= u->size);
     ensure_allocated(u);
     char *p = (char*)u->data + h;
     ptrdiff_t ssz = b.read_only ? -(ptrdiff_t)b.sz : (ptrdiff_t)b.sz;

@@ -1,5 +1,5 @@
+#include "assume.h"
 #include "bb.h"
-#include <assert.h>
 
 #if !defined(__aarch64__) && !defined(__AVX2__)
 
@@ -236,7 +236,7 @@ static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm
         }
         break;
 
-    default: assert(0); break;
+    default: assume(0);
     }
 }
 
@@ -1052,17 +1052,17 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 __attribute__((no_sanitize("function")))
 #endif
 static void umbra_jit_run(struct umbra_jit *j, int l, int t, int r, int b, struct umbra_buf buf[]) {
-    assert(j);
+    assume(j);
     j->entry(l, t, r, b, buf);
 }
 static void umbra_jit_free(struct umbra_jit *j) {
-    assert(j);
+    assume(j);
     munmap(j->code, j->code_size);
     free(j);
 }
 
 static void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
-    assert(j);
+    assume(j);
     if (j->loop_start >= j->loop_end) { return; }
 
     uint32_t const *words = (uint32_t const*)j->code;
@@ -1150,7 +1150,7 @@ static void free_jit(struct umbra_program *prog) { umbra_jit_free((struct umbra_
 static struct umbra_program *compile_jit(struct umbra_backend           *be,
                                          struct umbra_basic_block const *bb) {
     struct umbra_jit *const j = umbra_jit(bb);
-    assert(j);
+    assume(j);
     j->base = (struct umbra_program){
         .queue   = run_jit,
         .dump    = dump_jit,
@@ -1409,7 +1409,7 @@ static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm
     case op_min_f32_imm:
     case op_max_f32_imm:
     case op_add_i32_imm:
-    default: assert(0); break;
+    default: assume(0);
     }
 }
 
@@ -2574,12 +2574,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 __attribute__((no_sanitize("function")))
 #endif
 static void umbra_jit_run(struct umbra_jit *j, int l, int t, int r, int b, struct umbra_buf buf[]) {
-    assert(j);
+    assume(j);
     j->entry(l, t, r, b, buf);
 }
 
 static void umbra_jit_free(struct umbra_jit *j) {
-    assert(j);
+    assume(j);
     munmap(j->code, j->code_size);
     free(j);
 }
@@ -2621,7 +2621,7 @@ static _Bool x86_disasm(uint8_t const *code, size_t n, char const *spath,
 }
 
 static void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
-    assert(j);
+    assume(j);
     if (j->loop_start >= j->loop_end) { return; }
 
     uint8_t const *code = (uint8_t const*)j->code;
@@ -2716,7 +2716,7 @@ static void free_jit(struct umbra_program *prog) { umbra_jit_free((struct umbra_
 static struct umbra_program *compile_jit(struct umbra_backend           *be,
                                          struct umbra_basic_block const *bb) {
     struct umbra_jit *const j = umbra_jit(bb);
-    assert(j);
+    assume(j);
     j->base = (struct umbra_program){
         .queue   = run_jit,
         .dump    = dump_jit,

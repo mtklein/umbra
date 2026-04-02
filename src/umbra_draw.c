@@ -1,6 +1,6 @@
 #include "../include/umbra_draw.h"
+#include "assume.h"
 #include "bb.h"
-#include <assert.h>
 #include <math.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -199,7 +199,7 @@ umbra_color umbra_supersample(builder *builder, struct umbra_uniforms *u, umbra_
         umbra_val const sx = umbra_add_f32(builder, x, umbra_imm_f32(builder, jitter[s - 1][0]));
         umbra_val const sy = umbra_add_f32(builder, y, umbra_imm_f32(builder, jitter[s - 1][1]));
         umbra_color const c = inner(builder, &scratch, sx, sy);
-        assert(scratch.size == after);
+        assume(scratch.size == after);
         sum.r = umbra_add_f32(builder, sum.r, c.r);
         sum.g = umbra_add_f32(builder, sum.g, c.g);
         sum.b = umbra_add_f32(builder, sum.b, c.b);

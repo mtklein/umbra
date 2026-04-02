@@ -1,5 +1,5 @@
+#include "assume.h"
 #include "bb.h"
-#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -2060,7 +2060,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     // Update only the descriptor bindings that changed since last dispatch.
     VkDescriptorBufferInfo dirty_infos[32];
     VkWriteDescriptorSet   dirty_writes[32];
-    assert(n <= 32);
+    assume(n <= 32);
     int n_dirty = 0;
     for (int i = 0; i < n; i++) {
         if (vp->bound_bufs[i] != vp->buf_cache[i].buf) {

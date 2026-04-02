@@ -1,7 +1,7 @@
+#include "assume.h"
 #include "bb.h"
 #include <math.h>
 #include <stdint.h>
-#include <assert.h>
 #include <stdlib.h>
 
 #pragma clang diagnostic ignored "-Wsign-conversion"
@@ -717,7 +717,7 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
                 else if ( out_r && !x_r &&  y_r) { s->tag = op_r_pack_mr; }
                 else if (!out_r && !x_r &&  y_r) { s->tag = op_m_pack_mr; }
                 else if ( out_r && !x_r && !y_r) { s->tag = op_r_pack_mm; }
-                else { assert(0); }
+                else { assume(0); }
             } else
 
             // Output-only ops: no register inputs, just output to register.
@@ -954,7 +954,7 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                 CASE(op_y) v->i32 = (I32){0} + row; NEXT;
 
                 CASE(op_uniform_32) {
-                    assert(buf[ip->ptr].row_bytes == 0);
+                    assume(buf[ip->ptr].row_bytes == 0);
                     int32_t uni;
                     __builtin_memcpy(&uni, (char const*)buf[ip->ptr].ptr + ip->x, sizeof uni);
                     v->i32 = (I32){0} + uni;
@@ -1611,7 +1611,7 @@ static void free_interp(struct umbra_program *prog) { umbra_interpreter_free((st
 static struct umbra_program *compile_interp(struct umbra_backend           *be,
                                             struct umbra_basic_block const *bb) {
     struct umbra_interpreter *const p = umbra_interpreter(bb);
-    assert(p);
+    assume(p);
     p->base = (struct umbra_program){
         .queue   = run_interp,
         .dump    = 0,

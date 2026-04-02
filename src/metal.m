@@ -1,5 +1,5 @@
+#include "assume.h"
 #include "bb.h"
-#include <assert.h>
 
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
@@ -1367,7 +1367,7 @@ static void umbra_metal_run(
     struct umbra_metal *m, int l, int t, int r, int b, struct umbra_buf buf[]
 ) {
     int w = r - l, h = b - t;
-    assert(m);
+    assume(m);
     if (w > 0 && h > 0) {
         struct metal_backend *be = (struct metal_backend*)m->base.backend;
         if (!be->batch_cmdbuf) {
@@ -1456,7 +1456,7 @@ static void umbra_metal_flush(struct metal_backend *be) {
 }
 
 static void umbra_metal_free(struct umbra_metal *m) {
-    assert(m);
+    assume(m);
     @autoreleasepool {
         if (m->pipeline) {
             (void)(__bridge_transfer id)m->pipeline;
@@ -1472,7 +1472,7 @@ static void umbra_metal_free(struct umbra_metal *m) {
 static void umbra_dump_metal(
     struct umbra_metal const *m, FILE *f
 ) {
-    assert(m);
+    assume(m);
     if (m->src) {
         fputs(m->src, f);
     }
@@ -1486,7 +1486,7 @@ static void free_metal(struct umbra_program *prog) { umbra_metal_free((struct um
 static struct umbra_program *compile_metal(struct umbra_backend           *be,
                                            struct umbra_basic_block const *bb) {
     struct umbra_metal *const m = umbra_metal((struct metal_backend*)be, bb);
-    assert(m);
+    assume(m);
     m->base = (struct umbra_program){
         .queue   = run_metal,
         .dump    = dump_metal,
