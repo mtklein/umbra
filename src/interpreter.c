@@ -488,7 +488,7 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
     #define CASE(label) L_##label:
     // The asm volatile prevents the compiler from tail-merging dispatch sites.
     // Each NEXT must be its own indirect branch for branch predictor accuracy.
-    #define NEXT        do { ip++; v++; __asm__ volatile(""); DISPATCH; } while (0)
+    #define NEXT        ip++; v++; __asm__ volatile(""); DISPATCH
     #define DONE        goto next_tile
             static void *const labels[SW_NUM_OPS] = {
                 [op_x] = &&L_op_x, [op_y] = &&L_op_y, [op_imm_32] = &&L_op_imm_32,

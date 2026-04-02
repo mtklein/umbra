@@ -2280,7 +2280,7 @@ static void test_load_store_16x4_planar(void) {
     umbra_store_16x4_planar(b, (umbra_ptr){1}, r, g, bl, a);
     struct test_backends B = make(b);
 
-    enum { W = 8, H = 4 };
+    enum { W = 35, H = 4 };
     __fp16 src[W * H * 4], dst[W * H * 4];
     for (int i = 0; i < W * H; i++) {
         src[i + W*H*0] = (__fp16)(0.1f * (float)(i + 1));
@@ -2307,8 +2307,9 @@ static void test_load_store_16x4(void) {
     umbra_store_16x4(b, (umbra_ptr){1}, r, g, bl, a);
     struct test_backends B = make(b);
 
-    __fp16 src[7 * 4], dst[7 * 4];
-    for (int i = 0; i < 7; i++) {
+    enum { W = 7 };
+    __fp16 src[W * 4], dst[W * 4];
+    for (int i = 0; i < W; i++) {
         src[i * 4 + 0] = (__fp16)(0.1f * (float)(i + 1));
         src[i * 4 + 1] = (__fp16)(0.2f * (float)(i + 1));
         src[i * 4 + 2] = (__fp16)(0.3f * (float)(i + 1));
@@ -2317,7 +2318,7 @@ static void test_load_store_16x4(void) {
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
-        if (!run(&B, bi, 7, 1, (struct umbra_buf[]){
+        if (!run(&B, bi, W, 1, (struct umbra_buf[]){
             {.ptr=src, .sz=sizeof src},
             {.ptr=dst, .sz=sizeof dst},
         })) { continue; }

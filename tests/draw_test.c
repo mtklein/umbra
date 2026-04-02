@@ -1142,14 +1142,15 @@ int main(void) {
         umbra_builder_free(b);
         struct test_backends B = test_backends_make(bb);
         umbra_basic_block_free(bb);
-        uint16_t src[7], dst[7];
-        for (int i = 0; i < 7; i++) { src[i] = (uint16_t)(0x1234u + (unsigned)i * 0x1111u); }
+        enum { W565 = 35 };
+        uint16_t src[W565], dst[W565];
+        for (int i = 0; i < W565; i++) { src[i] = (uint16_t)(0x1234u + (unsigned)i * 0x1111u); }
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             __builtin_memset(dst, 0, sizeof dst);
-            if (!test_backends_run(&B, bi, 7, 1, (struct umbra_buf[]){
+            if (!test_backends_run(&B, bi, W565, 1, (struct umbra_buf[]){
                 {.ptr=src, .sz=sizeof src}, {.ptr=dst, .sz=sizeof dst},
             })) { continue; }
-            for (int i = 0; i < 7; i++) { (dst[i] == src[i]) here; }
+            for (int i = 0; i < W565; i++) { (dst[i] == src[i]) here; }
         }
         test_backends_free(&B);
     }
