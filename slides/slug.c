@@ -50,7 +50,7 @@ static void slug_draw(slide *s, int w, int h, int y0, int y1, void *buf,
 
     umbra_uniforms_fill_f32(st->acc_lay.uni, st->acc_lay.mat, st->mat, 11);
     umbra_uniforms_fill_ptr(st->acc_lay.uni, st->acc_lay.curves_off,
-                  (struct umbra_buf){.ptr=st->slug->data, .sz=(size_t)(st->slug->count * 6 * 4)});
+                  (struct umbra_buf){.ptr=st->slug->data, .sz=(size_t)(st->slug->count * 6 * 4), .read_only=1});
     struct umbra_buf abuf[] = {
         (struct umbra_buf){.ptr=st->acc_lay.uni->data, .sz=st->acc_lay.uni->size, .read_only=1},
         {.ptr=st->wind_buf, .sz=wind_sz, .row_bytes=wind_row},
