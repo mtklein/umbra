@@ -93,7 +93,7 @@ static void build_readback(int fmt) {
     umbra_color c = umbra_load_color(builder, (umbra_ptr){1}, fmt_enums[fmt]);
     umbra_store_color(builder, (umbra_ptr){2}, c, umbra_fmt_8888);
     readback_pipe.out_ptr = 2;
-    finish_pipe(&readback_pipe, builder, NULL);
+    finish_pipe(&readback_pipe, builder, calloc(1, sizeof(struct umbra_uniforms)));
 }
 
 static void build_hdr(int fmt) {
@@ -102,7 +102,7 @@ static void build_hdr(int fmt) {
     umbra_color c = umbra_load_color(builder, (umbra_ptr){1}, fmt_enums[fmt]);
     hdr_pipe.out_ptr = 2;
     umbra_store_color(builder, (umbra_ptr){2}, c, umbra_fmt_fp16);
-    finish_pipe(&hdr_pipe, builder, NULL);
+    finish_pipe(&hdr_pipe, builder, calloc(1, sizeof(struct umbra_uniforms)));
 }
 
 static void build_pipes(int fmt) {
