@@ -135,33 +135,6 @@ static _Bool is_commutative(enum op op) {
         || op == op_eq_f32  || op == op_eq_i32;
 }
 
-// Ops that get register variants.
-#define BINARY_OPS(X)                                                                      \
-    X(add_f32, f32, f32) X(sub_f32, f32, f32) X(mul_f32, f32, f32) X(div_f32, f32, f32)   \
-    X(min_f32, f32, f32) X(max_f32, f32, f32)                                             \
-    X(add_i32, i32, i32) X(sub_i32, i32, i32) X(mul_i32, i32, i32)                        \
-    X(shl_i32, i32, i32) X(shr_u32, u32, u32) X(shr_s32, i32, i32)                        \
-    X(and_32,  i32, i32) X(or_32,   i32, i32) X(xor_32,  i32, i32)                        \
-    X(eq_f32,  i32, f32) X(lt_f32,  i32, f32) X(le_f32,  i32, f32)                        \
-    X(eq_i32,  i32, i32) X(lt_s32,  i32, i32) X(le_s32,  i32, i32)                        \
-    X(lt_u32,  i32, u32) X(le_u32,  i32, u32)
-
-#define UNARY_OPS(X)                                                                       \
-    X(sqrt_f32,    f32, f32) X(abs_f32,     f32, f32)                                      \
-    X(round_f32,   f32, f32) X(floor_f32,   f32, f32) X(ceil_f32,    f32, f32)             \
-    X(round_i32,   i32, f32) X(floor_i32,   i32, f32) X(ceil_i32,    i32, f32)             \
-    X(f32_from_i32,f32, i32) X(i32_from_f32,i32, f32)
-
-// _imm ops: x is the only variable input, y is the immediate.
-#define IMM_OPS(X)                                                                         \
-    X(shl_i32_imm, i32, i32) X(shr_u32_imm, u32, u32) X(shr_s32_imm, i32, i32)           \
-    X(and_32_imm,  u32, u32) X(or_32_imm,   u32, u32) X(xor_32_imm,  u32, u32)           \
-    X(add_f32_imm, f32, f32) X(sub_f32_imm, f32, f32) X(mul_f32_imm, f32, f32)            \
-    X(div_f32_imm, f32, f32) X(min_f32_imm, f32, f32) X(max_f32_imm, f32, f32)            \
-    X(add_i32_imm, i32, i32) X(sub_i32_imm, i32, i32) X(mul_i32_imm, i32, i32)            \
-    X(eq_f32_imm,  i32, f32) X(lt_f32_imm,  i32, f32) X(le_f32_imm,  i32, f32)           \
-    X(eq_i32_imm,  i32, i32) X(lt_s32_imm,  i32, i32) X(le_s32_imm,  i32, i32)
-
 enum {
     SW_DONE = op_le_s32_imm + 1,
 
