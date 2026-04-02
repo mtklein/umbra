@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 int dprintf(int, char const[], ...);
-#define here ? (void)0 : (dprintf(1, "%s:%d failed\n", __FILE__, __LINE__), __builtin_trap())
+#define here ? (void)0 : (dprintf(2, "%s:%d failed\n", __FILE__, __LINE__), __builtin_trap())
 
 static inline _Bool equiv(float x, float y) {
     return (x <= y && y <= x) || (x != x && y != y);
