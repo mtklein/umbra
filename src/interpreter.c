@@ -492,8 +492,7 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                 [op_sample_32] = &&L_op_sample_32,
                 [op_deref_ptr] = &&L_op_deref_ptr,
                 [op_f32_from_f16] = &&L_op_f32_from_f16, [op_f16_from_f32] = &&L_op_f16_from_f32,
-                [op_i32_from_s16] = &&L_op_i32_from_s16, [op_i32_from_u16] = &&L_op_i32_from_u16,
-                [op_i16_from_i32] = &&L_op_i16_from_i32,
+                [op_i32_from_s16] = &&L_op_i32_from_s16, [op_i32_from_u16] = &&L_op_i32_from_u16, [op_i16_from_i32] = &&L_op_i16_from_i32,
                 [op_f32_from_i32] = &&L_op_f32_from_i32, [op_i32_from_f32] = &&L_op_i32_from_f32,
                 [op_add_f32] = &&L_op_add_f32, [op_sub_f32] = &&L_op_sub_f32,
                 [op_mul_f32] = &&L_op_mul_f32, [op_div_f32] = &&L_op_div_f32,
@@ -1008,6 +1007,16 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
                 UN2(f32_from_i32, f32, cast(F32, acc.i32))
                 UN2(i32_from_f32, i32, cast(I32, acc.f32))
 #undef UN2
+                CASE(op_r_f32_from_f16_r) { U16 h; __builtin_memcpy(&h, &acc, sizeof h); acc.f32 = f16_to_f32(h); } NEXT;
+                CASE(op_m_f32_from_f16_r) { U16 h; __builtin_memcpy(&h, &acc, sizeof h); v->f32 = f16_to_f32(h); } NEXT;
+                CASE(op_r_f16_from_f32_r) { U16 const h = f32_to_f16(acc.f32); acc.u32 = (U32){0}; __builtin_memcpy(&acc, &h, sizeof h); } NEXT;
+                CASE(op_m_f16_from_f32_r) { U16 const h = f32_to_f16(acc.f32); v->u32 = (U32){0}; __builtin_memcpy(v, &h, sizeof h); } NEXT;
+                CASE(op_r_i32_from_s16_r) { U16 u; __builtin_memcpy(&u, &acc, sizeof u); S16 s; __builtin_memcpy(&s, &u, sizeof u); acc.i32 = cast(I32, s); } NEXT;
+                CASE(op_m_i32_from_s16_r) { U16 u; __builtin_memcpy(&u, &acc, sizeof u); S16 s; __builtin_memcpy(&s, &u, sizeof u); v->i32 = cast(I32, s); } NEXT;
+                CASE(op_r_i32_from_u16_r) { U16 u; __builtin_memcpy(&u, &acc, sizeof u); acc.u32 = cast(U32, u); } NEXT;
+                CASE(op_m_i32_from_u16_r) { U16 u; __builtin_memcpy(&u, &acc, sizeof u); v->u32 = cast(U32, u); } NEXT;
+                CASE(op_r_i16_from_i32_r) { U16 u = cast(U16, acc.u32); acc.u32 = (U32){0}; __builtin_memcpy(&acc, &u, sizeof u); } NEXT;
+                CASE(op_m_i16_from_i32_r) { U16 u = cast(U16, acc.u32); v->u32 = (U32){0}; __builtin_memcpy(v, &u, sizeof u); } NEXT;
 
                 // Imm acc variants: r_r (continue), m_r (end).
 #define IMM2_I(name, dst, EXPR)                                                             \

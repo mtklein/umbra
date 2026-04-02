@@ -16,8 +16,7 @@ typedef union {
     X(load_32) X(load_16x4) X(load_16x4_planar) X(gather_uniform_32) X(gather_32)          \
     X(sample_32) X(store_32) X(store_16x4) X(store_16x4_planar) X(deref_ptr)              \
     X(fma_f32) X(fms_f32) X(sel_32)                                                       \
-    X(load_16) X(store_16) X(gather_16)                                                    \
-    X(i32_from_s16) X(i32_from_u16) X(i16_from_i32) X(f32_from_f16) X(f16_from_f32)
+    X(load_16) X(store_16) X(gather_16)
 
 // Ops that get register variants.
 #define BINARY_OPS(X)                                                                      \
@@ -34,7 +33,9 @@ typedef union {
     X(sqrt_f32,    f32, f32) X(abs_f32,     f32, f32)                                      \
     X(round_f32,   f32, f32) X(floor_f32,   f32, f32) X(ceil_f32,    f32, f32)             \
     X(round_i32,   i32, f32) X(floor_i32,   i32, f32) X(ceil_i32,    i32, f32)             \
-    X(f32_from_i32,f32, i32) X(i32_from_f32,i32, f32)
+    X(f32_from_i32,f32, i32) X(i32_from_f32,i32, f32)                                      \
+    X(f32_from_f16,f32, u16) X(f16_from_f32,u16, f32)                                      \
+    X(i32_from_s16,i32, s16) X(i32_from_u16,u32, u16) X(i16_from_i32,u16, i32)
 
 // _imm ops: x is the only variable input, y is the immediate.
 #define IMM_OPS(X)                                                                         \
