@@ -10,9 +10,9 @@ static struct umbra_builder *build_srcover(void) {
 
     umbra_val px = umbra_load_32(b, (umbra_ptr){0, 0}), mask = umbra_imm_i32(b, 0xFF);
     umbra_val rgba[4] = {
-        umbra_and_i32(b, px, mask),
-        umbra_and_i32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 8)), mask),
-        umbra_and_i32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 16)), mask),
+        umbra_and_32(b, px, mask),
+        umbra_and_32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 8)), mask),
+        umbra_and_32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 16)), mask),
         umbra_shr_u32(b, px, umbra_imm_i32(b, 24)),
     };
 

@@ -243,9 +243,9 @@ umbra_color umbra_load_color(builder *b, umbra_ptr src, umbra_fmt fmt) {
         val const px   = umbra_load_32(b, src);
         val const mask = umbra_imm_i32(b, 0xFF);
         val const inv  = umbra_imm_f32(b, 1.0f/255);
-        val const ri   = umbra_and_i32(b, px, mask);
-        val const gi   = umbra_and_i32(b, umbra_shr_u32(b, px, umbra_imm_i32(b,  8)), mask);
-        val const bi   = umbra_and_i32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 16)), mask);
+        val const ri   = umbra_and_32(b, px, mask);
+        val const gi   = umbra_and_32(b, umbra_shr_u32(b, px, umbra_imm_i32(b,  8)), mask);
+        val const bi   = umbra_and_32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 16)), mask);
         val const ai   = umbra_shr_u32(b, px, umbra_imm_i32(b, 24));
         return (umbra_color){
             umbra_mul_f32(b, umbra_f32_from_i32(b, ri), inv),
@@ -257,9 +257,9 @@ umbra_color umbra_load_color(builder *b, umbra_ptr src, umbra_fmt fmt) {
     case umbra_fmt_565: {
         val const px = umbra_i32_from_u16(b, umbra_load_16(b, src));
         val const r5 = umbra_shr_u32(b, px, umbra_imm_i32(b, 11));
-        val const g6 = umbra_and_i32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 5)),
+        val const g6 = umbra_and_32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 5)),
                                      umbra_imm_i32(b, 0x3F));
-        val const b5 = umbra_and_i32(b, px, umbra_imm_i32(b, 0x1F));
+        val const b5 = umbra_and_32(b, px, umbra_imm_i32(b, 0x1F));
         return (umbra_color){
             umbra_mul_f32(b, umbra_f32_from_i32(b, r5), umbra_imm_f32(b, 1.0f/31)),
             umbra_mul_f32(b, umbra_f32_from_i32(b, g6), umbra_imm_f32(b, 1.0f/63)),
@@ -270,9 +270,9 @@ umbra_color umbra_load_color(builder *b, umbra_ptr src, umbra_fmt fmt) {
     case umbra_fmt_1010102: {
         val const px   = umbra_load_32(b, src);
         val const mask = umbra_imm_i32(b, 0x3FF);
-        val const ri   = umbra_and_i32(b, px, mask);
-        val const gi   = umbra_and_i32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 10)), mask);
-        val const bi   = umbra_and_i32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 20)), mask);
+        val const ri   = umbra_and_32(b, px, mask);
+        val const gi   = umbra_and_32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 10)), mask);
+        val const bi   = umbra_and_32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 20)), mask);
         val const ai   = umbra_shr_u32(b, px, umbra_imm_i32(b, 30));
         return (umbra_color){
             umbra_mul_f32(b, umbra_f32_from_i32(b, ri), umbra_imm_f32(b, 1.0f/1023)),
@@ -496,7 +496,7 @@ val umbra_shr_s32(builder *b, val x, val y) {
     return math(b, op_shr_s32, VX(x), VY(y));
 }
 
-val umbra_and_i32(builder *b, val x, val y) {
+val umbra_and_32(builder *b, val x, val y) {
     sort(&x, &y);
     if (val_id(x) == val_id(y)) { return x; }
     if (is_imm32(b, val_id(x), -1)) { return y; }
@@ -513,7 +513,7 @@ val umbra_and_i32(builder *b, val x, val y) {
     }
     return (val){.bits = d.bits};
 }
-val umbra_or_i32(builder *b, val x, val y) {
+val umbra_or_32(builder *b, val x, val y) {
     sort(&x, &y);
     if (val_id(x) == val_id(y)) { return x; }
     if (is_imm32(b, val_id(x), 0)) { return y; }
@@ -521,13 +521,13 @@ val umbra_or_i32(builder *b, val x, val y) {
     if (is_imm32(b, val_id(y), -1)) { return y; }
     return try_imm(b, math(b, op_or_32, VX(x), VY(y)), op_or_32_imm, x, y);
 }
-val umbra_xor_i32(builder *b, val x, val y) {
+val umbra_xor_32(builder *b, val x, val y) {
     sort(&x, &y);
     if (val_id(x) == val_id(y)) { return umbra_imm_i32(b, 0); }
     if (is_imm32(b, val_id(x), 0)) { return y; }
     return try_imm(b, math(b, op_xor_32, VX(x), VY(y)), op_xor_32_imm, x, y);
 }
-val umbra_sel_i32(builder *b, val c, val t, val fv) {
+val umbra_sel_32(builder *b, val c, val t, val fv) {
     if (val_id(t) == val_id(fv)) { return t; }
     if (is_imm32(b, val_id(c), -1)) { return t; }
     if (is_imm32(b, val_id(c), 0)) { return fv; }

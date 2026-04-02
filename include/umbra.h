@@ -113,11 +113,10 @@ umbra_val umbra_shl_i32(struct umbra_builder*, umbra_val, umbra_val);
 umbra_val umbra_shr_u32(struct umbra_builder*, umbra_val, umbra_val);
 umbra_val umbra_shr_s32(struct umbra_builder*, umbra_val, umbra_val);
 
-// TODO: these four ops are bitwise, so remove the 'i', just umbra_and_32, etc.
-umbra_val umbra_and_i32(struct umbra_builder*, umbra_val, umbra_val);
-umbra_val umbra_or_i32 (struct umbra_builder*, umbra_val, umbra_val);
-umbra_val umbra_xor_i32(struct umbra_builder*, umbra_val, umbra_val);
-umbra_val umbra_sel_i32(struct umbra_builder*, umbra_val, umbra_val, umbra_val);
+umbra_val umbra_and_32(struct umbra_builder*, umbra_val, umbra_val);
+umbra_val umbra_or_32 (struct umbra_builder*, umbra_val, umbra_val);
+umbra_val umbra_xor_32(struct umbra_builder*, umbra_val, umbra_val);
+umbra_val umbra_sel_32(struct umbra_builder*, umbra_val, umbra_val, umbra_val);
 
 // TODO: remove gt/ge f32 helpers
 umbra_val umbra_eq_f32(struct umbra_builder*, umbra_val, umbra_val);
