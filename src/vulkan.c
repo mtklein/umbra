@@ -1855,7 +1855,8 @@ static VkBuffer create_buffer(VkDevice device, VkDeviceSize size) {
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
     };
     VkBuffer buf;
-    if (vkCreateBuffer(device, &ci, 0, &buf) != VK_SUCCESS) { return VK_NULL_HANDLE; }
+    VkResult rc = vkCreateBuffer(device, &ci, 0, &buf);
+    assume(rc == VK_SUCCESS);
     return buf;
 }
 
@@ -1868,7 +1869,8 @@ static VkDeviceMemory alloc_and_bind(VkDevice device, VkBuffer buf, uint32_t mem
         .memoryTypeIndex = mem_type,
     };
     VkDeviceMemory mem;
-    if (vkAllocateMemory(device, &ai, 0, &mem) != VK_SUCCESS) { return VK_NULL_HANDLE; }
+    VkResult rc = vkAllocateMemory(device, &ai, 0, &mem);
+    assume(rc == VK_SUCCESS);
     vkBindBufferMemory(device, buf, mem, 0);
     return mem;
 }
@@ -2171,11 +2173,8 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
             .codeSize = (size_t)spirv_len * sizeof(uint32_t),
             .pCode = spirv,
         };
-        if (vkCreateShaderModule(vbe->device, &ci, 0, &shader) != VK_SUCCESS) {
-            free(spirv);
-            free(deref);
-            return 0;
-        }
+        VkResult rc = vkCreateShaderModule(vbe->device, &ci, 0, &shader);
+        assume(rc == VK_SUCCESS);
     }
 
     // Descriptor set layout: one storage buffer per buffer slot.
@@ -2232,14 +2231,8 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
             },
             .layout = pipe_layout,
         };
-        if (vkCreateComputePipelines(vbe->device, VK_NULL_HANDLE, 1, &ci, 0, &pipeline) != VK_SUCCESS) {
-            vkDestroyShaderModule(vbe->device, shader, 0);
-            vkDestroyPipelineLayout(vbe->device, pipe_layout, 0);
-            vkDestroyDescriptorSetLayout(vbe->device, ds_layout, 0);
-            free(spirv);
-            free(deref);
-            return 0;
-        }
+        VkResult rc = vkCreateComputePipelines(vbe->device, VK_NULL_HANDLE, 1, &ci, 0, &pipeline);
+        assume(rc == VK_SUCCESS);
     }
 
     VkDescriptorPool desc_pool;
