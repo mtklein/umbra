@@ -69,17 +69,17 @@ void umbra_store_16(struct umbra_builder*, umbra_ptr, umbra_val);
 void umbra_store_32(struct umbra_builder*, umbra_ptr, umbra_val);
 
 void umbra_load_8x4 (struct umbra_builder*, umbra_ptr,
-                      umbra_val *r, umbra_val *g, umbra_val *b, umbra_val *a);
+                     umbra_val*, umbra_val*, umbra_val*, umbra_val*);
 void umbra_store_8x4(struct umbra_builder*, umbra_ptr,
-                     umbra_val r, umbra_val g, umbra_val b, umbra_val a);
+                     umbra_val , umbra_val , umbra_val , umbra_val );
 
 void umbra_load_16x4 (struct umbra_builder*, umbra_ptr,
-                       umbra_val *r, umbra_val *g, umbra_val *b, umbra_val *a);
+                      umbra_val*, umbra_val*, umbra_val*, umbra_val*);
 void umbra_store_16x4(struct umbra_builder*, umbra_ptr,
-                      umbra_val r, umbra_val g, umbra_val b, umbra_val a);
+                      umbra_val , umbra_val , umbra_val , umbra_val );
 
 void umbra_load_16x4_planar (struct umbra_builder*, umbra_ptr,
-                              umbra_val *r, umbra_val *g, umbra_val *b, umbra_val *a);
+                             umbra_val *r, umbra_val *g, umbra_val *b, umbra_val *a);
 void umbra_store_16x4_planar(struct umbra_builder*, umbra_ptr,
                              umbra_val r, umbra_val g, umbra_val b, umbra_val a);
 
