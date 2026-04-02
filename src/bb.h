@@ -10,30 +10,14 @@ typedef union {
     struct { unsigned chan : 2, id : 30; };
 } val_;
 
-#define OP_LIST(X)                                                                        \
-    X(x) X(y)                                                                             \
-    X(imm_32)                                                                             \
-    X(uniform_32)                                                                         \
-    X(load_32) X(load_fp16x4) X(load_fp16x4_planar) X(gather_uniform_32) X(gather_32)    \
-    X(sample_32)                                                                        \
-    X(store_32)                                                                             \
-        X(store_fp16x4) X(store_fp16x4_planar) X(deref_ptr) X(add_f32) X(sub_f32)       \
-        X(mul_f32) X(div_f32) X(min_f32) X(max_f32) X(sqrt_f32) X(abs_f32)              \
-            X(round_f32) X(floor_f32) X(ceil_f32) X(round_i32) X(floor_i32) X(ceil_i32)    \
-            X(fma_f32) X(fms_f32) X(add_i32) X(sub_i32) X(mul_i32) X(shl_i32) X(shr_u32)\
-                X(shr_s32) X(and_32) X(or_32) X(xor_32) X(sel_32) X(f32_from_i32)        \
-                    X(i32_from_f32) X(eq_f32) X(lt_f32) X(le_f32) X(eq_i32) X(lt_s32) X( \
-                        le_s32) X(lt_u32) X(le_u32) X(load_16)              \
-                        X(store_16) X(gather_16) X(i32_from_s16) X(i32_from_u16)          \
-                            X(i16_from_i32) X(f32_from_f16) X(f16_from_f32)              \
-                                X(shl_i32_imm) X(shr_u32_imm) X(shr_s32_imm) X(and_32_imm)      \
-                                    X(add_f32_imm) X(sub_f32_imm) X(mul_f32_imm)  \
-                                        X(div_f32_imm) X(min_f32_imm) X(max_f32_imm)      \
-                                            X(add_i32_imm) X(sub_i32_imm) X(mul_i32_imm)  \
-                                                X(or_32_imm) X(xor_32_imm) X(eq_f32_imm)  \
-                                                    X(lt_f32_imm) X(le_f32_imm)            \
-                                                        X(eq_i32_imm) X(lt_s32_imm)       \
-                                                            X(le_s32_imm)
+// Ops not covered by BINARY_OPS, UNARY_OPS, or IMM_OPS.
+#define OTHER_OPS(X)                                                                       \
+    X(x) X(y) X(imm_32) X(uniform_32)                                                     \
+    X(load_32) X(load_fp16x4) X(load_fp16x4_planar) X(gather_uniform_32) X(gather_32)     \
+    X(sample_32) X(store_32) X(store_fp16x4) X(store_fp16x4_planar) X(deref_ptr)          \
+    X(fma_f32) X(fms_f32) X(sel_32)                                                       \
+    X(load_16) X(store_16) X(gather_16)                                                    \
+    X(i32_from_s16) X(i32_from_u16) X(i16_from_i32) X(f32_from_f16) X(f16_from_f32)
 
 // Ops that get register variants.
 #define BINARY_OPS(X)                                                                      \
@@ -63,9 +47,14 @@ typedef union {
     X(eq_i32_imm,  i32, i32) X(lt_s32_imm,  i32, i32) X(le_s32_imm,  i32, i32)
 
 enum op {
-#define OP_ENUM(name) op_##name,
-    OP_LIST(OP_ENUM)
-#undef OP_ENUM
+#define OP_ENUM_1(name)         op_##name,
+#define OP_ENUM_3(name, rt, pt) op_##name,
+    OTHER_OPS(OP_ENUM_1)
+    BINARY_OPS(OP_ENUM_3)
+    UNARY_OPS(OP_ENUM_3)
+    IMM_OPS(OP_ENUM_3)
+#undef OP_ENUM_1
+#undef OP_ENUM_3
 };
 
 struct bb_inst {

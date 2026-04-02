@@ -574,9 +574,14 @@ val umbra_le_u32(builder *b, val x, val y) {
 }
 static char const* op_name(enum op op) {
     static char const *names[] = {
-#define OP_NAME(name) [op_##name] = #name,
-        OP_LIST(OP_NAME)
-#undef OP_NAME
+#define OP_NAME_1(name)         [op_##name] = #name,
+#define OP_NAME_3(name, rt, pt) [op_##name] = #name,
+        OTHER_OPS(OP_NAME_1)
+        BINARY_OPS(OP_NAME_3)
+        UNARY_OPS(OP_NAME_3)
+        IMM_OPS(OP_NAME_3)
+#undef OP_NAME_1
+#undef OP_NAME_3
     };
     if ((unsigned)op < sizeof names / sizeof *names && names[op]) { return names[op]; }
     return "?";
