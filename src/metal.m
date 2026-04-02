@@ -41,7 +41,8 @@ struct metal_backend {
     int                  batch_nbufs, batch_bufs_cap;
     struct copyback     *batch_copy;
     int                  batch_ncopy, batch_copy_cap;
-    int                  batch_gen, :32;
+    int                  batch_gen;
+    _Bool                batch_has_dispatch; int :24;
 };
 
 struct umbra_metal {
@@ -1350,6 +1351,10 @@ static void encode_dispatch(
     MTLSize group =
         MTLSizeMake((NSUInteger)gx,
                     (NSUInteger)gy, 1);
+    if (be->batch_has_dispatch) {
+        [enc memoryBarrierWithScope:MTLBarrierScopeBuffers];
+    }
+    be->batch_has_dispatch = 1;
     [enc dispatchThreads:grid
        threadsPerThreadgroup:group];
     free(szs_data);
@@ -1394,6 +1399,7 @@ static void umbra_metal_run(
 static void umbra_metal_begin_batch(struct metal_backend *be) {
     if (be && !be->batch_cmdbuf) {
         be->batch_gen++;
+        be->batch_has_dispatch = 0;
         @autoreleasepool {
             id<MTLCommandQueue> queue =
                 (__bridge id<MTLCommandQueue>)

@@ -211,6 +211,7 @@ struct vk_backend {
     int                   batch_n_bufs, batch_bufs_cap;
     struct copyback      *batch_copies;
     int                   batch_n_copies, batch_copies_cap;
+    _Bool                 batch_has_dispatch; int :24, :32;
 };
 
 static int find_compute_queue(VkPhysicalDevice phys) {
@@ -1907,6 +1908,7 @@ static void begin_batch(struct vk_backend *be) {
         .flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
     };
     vkBeginCommandBuffer(be->batch_cmd, &bi);
+    be->batch_has_dispatch = 0;
 }
 
 static void batch_track_buf(struct vk_backend *be, VkBuffer buf, VkDeviceMemory mem) {
@@ -1942,7 +1944,6 @@ static void cache_buf(struct vk_backend *be, struct buf_cache_entry *ce,
     // the host may modify them between queue() calls (e.g. slug curve loop index).
     // Each dispatch needs its own snapshot.
     if (!read_only && ce->buf && ce->host == host && ce->size >= sz) {
-        if (bytes && !ce->nocopy) { memcpy(ce->mapped, host, bytes); }
         return;
     }
     if (ce->buf) {
@@ -2088,6 +2089,18 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     vkCmdPushConstants(be->batch_cmd, vp->pipe_layout, VK_SHADER_STAGE_COMPUTE_BIT,
                        0, (uint32_t)(vp->push_words * (int)sizeof(uint32_t)), push_data);
 
+    if (be->batch_has_dispatch) {
+        VkMemoryBarrier mb = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+        };
+        vkCmdPipelineBarrier(be->batch_cmd,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            0, 1, &mb, 0, NULL, 0, NULL);
+    }
+    be->batch_has_dispatch = 1;
     uint32_t gx = ((uint32_t)w + WG_SIZE - 1) / WG_SIZE;
     vkCmdDispatch(be->batch_cmd, gx, (uint32_t)h, 1);
 
