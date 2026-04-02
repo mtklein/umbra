@@ -214,7 +214,10 @@ static void test_slide_golden(
             }
             if (differ) mismatches++;
         }
-        int tol = (fmt_enums[fmt] == umbra_fmt_fp16 || fmt_enums[fmt] == umbra_fmt_fp16_planar) ? 1 : 0;
+        int tol = 0;
+        // Vulkan fp16 conversions may round differently from the interpreter's
+        // native __fp16; allow 1 ULP for fp16 formats on Vulkan only.
+        if (bi == 3 && (fmt_enums[fmt] == umbra_fmt_fp16 || fmt_enums[fmt] == umbra_fmt_fp16_planar)) { tol = 1; }
         if (worst > tol) {
             dprintf(2,
                 "slide %d \"%s\" %s/%s: "
