@@ -14,7 +14,7 @@ typedef struct umbra_builder builder;
 typedef umbra_val            val;
 
 
-size_t umbra_fmt_size(umbra_fmt fmt) {
+size_t umbra_fmt_size(enum umbra_fmt fmt) {
     switch (fmt) {
     case umbra_fmt_8888:       return 4;
     case umbra_fmt_565:        return 2;
@@ -237,7 +237,7 @@ static umbra_color fp16x4_color(val px) {
         val_make(id, 2), val_make(id, 3),
     };
 }
-umbra_color umbra_load_color(builder *b, umbra_ptr src, umbra_fmt fmt) {
+umbra_color umbra_load_color(builder *b, umbra_ptr src, enum umbra_fmt fmt) {
     switch (fmt) {
     case umbra_fmt_8888: {
         val const px   = umbra_load_32(b, src);
@@ -296,7 +296,7 @@ static val pack_unorm(builder *b, val ch, val scale) {
 static val pack(builder *b, val base, val v, int shift) {
     return push(b, op_pack, VX(base), VY(v), .imm = shift);
 }
-void umbra_store_color(builder *b, umbra_ptr dst, umbra_color c, umbra_fmt fmt) {
+void umbra_store_color(builder *b, umbra_ptr dst, umbra_color c, enum umbra_fmt fmt) {
     switch (fmt) {
     case umbra_fmt_8888: {
         val s = umbra_imm_f32(b, 255.0f);

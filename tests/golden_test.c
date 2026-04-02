@@ -22,7 +22,7 @@ enum {
 static char const *fmt_name[] = {
     "8888", "565", "fp16", "fp16p", "1010102",
 };
-static umbra_fmt const fmt_enums[] = {
+static enum umbra_fmt const fmt_enums[] = {
     umbra_fmt_8888, umbra_fmt_565, umbra_fmt_fp16,
     umbra_fmt_fp16_planar, umbra_fmt_1010102,
 };
@@ -114,7 +114,7 @@ static void test_slide_golden(
     slide *s = slide_get(slide_idx);
 
 
-    umbra_fmt saved_fmt = s->fmt;
+    enum umbra_fmt saved_fmt = s->fmt;
     s->fmt = fmt_enums[fmt];
 
     umbra_draw_layout lay;

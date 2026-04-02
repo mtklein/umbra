@@ -40,13 +40,13 @@ static void grad_lut_cleanup(slide *s) {
     s->state = NULL;
 }
 
-slide slide_gradient_2stop(char const *, uint32_t, umbra_shader_fn, umbra_fmt,
+slide slide_gradient_2stop(char const *, uint32_t, umbra_shader_fn, enum umbra_fmt,
                            float const[8], float const[4]);
-slide slide_gradient_lut(char const *, uint32_t, umbra_shader_fn, umbra_fmt,
+slide slide_gradient_lut(char const *, uint32_t, umbra_shader_fn, enum umbra_fmt,
                          float const[4], float *, int);
 
 slide slide_gradient_2stop(char const *title, uint32_t bg, umbra_shader_fn shader,
-                           umbra_fmt fmt, float const color[8], float const grad[4]) {
+                           enum umbra_fmt fmt, float const color[8], float const grad[4]) {
     return (slide){
         .title = title,
         .bg = bg,
@@ -60,7 +60,7 @@ slide slide_gradient_2stop(char const *title, uint32_t bg, umbra_shader_fn shade
 }
 
 slide slide_gradient_lut(char const *title, uint32_t bg, umbra_shader_fn shader,
-                         umbra_fmt fmt, float const grad[4], float *lut, int lut_n) {
+                         enum umbra_fmt fmt, float const grad[4], float *lut, int lut_n) {
     grad_lut_state *st = malloc(sizeof *st);
     st->lut = lut;
     st->lut_n = lut_n;

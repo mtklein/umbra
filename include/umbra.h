@@ -37,15 +37,14 @@ struct umbra_program {
     struct umbra_backend *backend;
 };
 
-// TODO: remove this typedef, just write `enum umbra_fmt`.
-typedef enum {
+enum umbra_fmt {
     umbra_fmt_8888,
     umbra_fmt_565,
     umbra_fmt_1010102,
     umbra_fmt_fp16,
     umbra_fmt_fp16_planar,
-} umbra_fmt;
-size_t umbra_fmt_size(umbra_fmt);
+};
+size_t umbra_fmt_size(enum umbra_fmt);
 
 typedef struct { int bits; } umbra_val;
 typedef struct { umbra_val r, g, b, a; } umbra_color;
@@ -72,8 +71,8 @@ umbra_val umbra_load_32(struct umbra_builder*, umbra_ptr);
 void umbra_store_16(struct umbra_builder*, umbra_ptr, umbra_val);
 void umbra_store_32(struct umbra_builder*, umbra_ptr, umbra_val);
 
-umbra_color umbra_load_color (struct umbra_builder*, umbra_ptr, umbra_fmt);
-void        umbra_store_color(struct umbra_builder*, umbra_ptr, umbra_color, umbra_fmt);
+umbra_color umbra_load_color (struct umbra_builder*, umbra_ptr, enum umbra_fmt);
+void        umbra_store_color(struct umbra_builder*, umbra_ptr, umbra_color, enum umbra_fmt);
 
 umbra_val umbra_i32_from_s16(struct umbra_builder*, umbra_val);
 umbra_val umbra_i32_from_u16(struct umbra_builder*, umbra_val);

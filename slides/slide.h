@@ -10,7 +10,7 @@ struct slide {
     umbra_shader_fn    shader;
     umbra_coverage_fn  coverage;
     umbra_blend_fn     blend;
-    umbra_fmt          fmt;
+    enum umbra_fmt     fmt;
     float              color[8];
     float              grad[4];
     uint32_t           bg;
