@@ -36,15 +36,6 @@ struct umbra_program {
     struct umbra_backend *backend;
 };
 
-enum umbra_fmt {
-    umbra_fmt_8888,
-    umbra_fmt_565,
-    umbra_fmt_1010102,
-    umbra_fmt_fp16,
-    umbra_fmt_fp16_planar,
-};
-size_t umbra_fmt_size(enum umbra_fmt);
-
 struct umbra_uniforms {
     void  *data;
     size_t size;
@@ -55,7 +46,6 @@ void   umbra_uniforms_fill_f32(struct umbra_uniforms*, size_t off, float const*,
 void   umbra_uniforms_fill_ptr(struct umbra_uniforms*, size_t off, struct umbra_buf);
 
 typedef struct { int bits; } umbra_val;
-typedef struct { umbra_val r, g, b, a; } umbra_color;
 typedef struct { int bits; } umbra_ptr;
 
 umbra_ptr umbra_deref_ptr(struct umbra_builder*, umbra_ptr buf, size_t off);
@@ -92,9 +82,6 @@ void umbra_load_16x4_planar (struct umbra_builder*, umbra_ptr,
                               umbra_val *r, umbra_val *g, umbra_val *b, umbra_val *a);
 void umbra_store_16x4_planar(struct umbra_builder*, umbra_ptr,
                              umbra_val r, umbra_val g, umbra_val b, umbra_val a);
-
-umbra_color umbra_load_color (struct umbra_builder*, umbra_ptr, enum umbra_fmt);
-void        umbra_store_color(struct umbra_builder*, umbra_ptr, umbra_color, enum umbra_fmt);
 
 umbra_val umbra_i32_from_s16(struct umbra_builder*, umbra_val);
 umbra_val umbra_i32_from_u16(struct umbra_builder*, umbra_val);

@@ -1,6 +1,20 @@
 #pragma once
 #include "umbra.h"
 
+enum umbra_fmt {
+    umbra_fmt_8888,
+    umbra_fmt_565,
+    umbra_fmt_1010102,
+    umbra_fmt_fp16,
+    umbra_fmt_fp16_planar,
+};
+size_t umbra_fmt_size(enum umbra_fmt);
+
+typedef struct { umbra_val r, g, b, a; } umbra_color;
+
+umbra_color umbra_load_color (struct umbra_builder*, umbra_ptr, enum umbra_fmt);
+void        umbra_store_color(struct umbra_builder*, umbra_ptr, umbra_color, enum umbra_fmt);
+
 typedef umbra_color (*umbra_shader_fn)(struct umbra_builder *, struct umbra_uniforms *,
                                        umbra_val x, umbra_val y);
 typedef umbra_val (*umbra_coverage_fn)(struct umbra_builder *, struct umbra_uniforms *,

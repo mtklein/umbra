@@ -14,17 +14,6 @@ typedef umbra_val            val;
 typedef struct umbra_builder builder;
 
 
-size_t umbra_fmt_size(enum umbra_fmt fmt) {
-    switch (fmt) {
-    case umbra_fmt_8888:       return 4;
-    case umbra_fmt_565:        return 2;
-    case umbra_fmt_1010102:    return 4;
-    case umbra_fmt_fp16:       return 8;
-    case umbra_fmt_fp16_planar: return 2;
-    }
-    return 0;
-}
-
 static int ptr_ix(umbra_ptr p) { return p.bits; }
 
 _Bool is_store(enum op op) {
@@ -257,100 +246,6 @@ void umbra_load_16x4_planar(builder *b, umbra_ptr src, val *r, val *g, val *bl, 
 }
 void umbra_store_16x4_planar(builder *b, umbra_ptr dst, val r, val g, val bl, val a) {
     push(b, op_store_16x4_planar, VX(r), VY(g), VZ(bl), VW(a), .ptr = ptr_ix(dst));
-}
-umbra_color umbra_load_color(builder *b, umbra_ptr src, enum umbra_fmt fmt) {
-    val r, g, bl, a;
-    switch (fmt) {
-    case umbra_fmt_8888: {
-        umbra_load_8x4(b, src, &r, &g, &bl, &a);
-        val const inv = umbra_imm_f32(b, 1.0f/255);
-        return (umbra_color){
-            umbra_mul_f32(b, umbra_f32_from_i32(b, r), inv),
-            umbra_mul_f32(b, umbra_f32_from_i32(b, g), inv),
-            umbra_mul_f32(b, umbra_f32_from_i32(b, bl), inv),
-            umbra_mul_f32(b, umbra_f32_from_i32(b, a), inv),
-        };
-    }
-    case umbra_fmt_565: {
-        val const px = umbra_i32_from_u16(b, umbra_load_16(b, src));
-        val const r5 = umbra_shr_u32(b, px, umbra_imm_i32(b, 11));
-        val const g6 = umbra_and_32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 5)),
-                                     umbra_imm_i32(b, 0x3F));
-        val const b5 = umbra_and_32(b, px, umbra_imm_i32(b, 0x1F));
-        return (umbra_color){
-            umbra_mul_f32(b, umbra_f32_from_i32(b, r5), umbra_imm_f32(b, 1.0f/31)),
-            umbra_mul_f32(b, umbra_f32_from_i32(b, g6), umbra_imm_f32(b, 1.0f/63)),
-            umbra_mul_f32(b, umbra_f32_from_i32(b, b5), umbra_imm_f32(b, 1.0f/31)),
-            umbra_imm_f32(b, 1.0f),
-        };
-    }
-    case umbra_fmt_1010102: {
-        val const px   = umbra_load_32(b, src);
-        val const mask = umbra_imm_i32(b, 0x3FF);
-        val const ri   = umbra_and_32(b, px, mask);
-        val const gi   = umbra_and_32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 10)), mask);
-        val const bi   = umbra_and_32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 20)), mask);
-        val const ai   = umbra_shr_u32(b, px, umbra_imm_i32(b, 30));
-        return (umbra_color){
-            umbra_mul_f32(b, umbra_f32_from_i32(b, ri), umbra_imm_f32(b, 1.0f/1023)),
-            umbra_mul_f32(b, umbra_f32_from_i32(b, gi), umbra_imm_f32(b, 1.0f/1023)),
-            umbra_mul_f32(b, umbra_f32_from_i32(b, bi), umbra_imm_f32(b, 1.0f/1023)),
-            umbra_mul_f32(b, umbra_f32_from_i32(b, ai), umbra_imm_f32(b, 1.0f/3)),
-        };
-    }
-    case umbra_fmt_fp16:
-        umbra_load_16x4(b, src, &r, &g, &bl, &a);
-        return (umbra_color){
-            umbra_f32_from_f16(b, r), umbra_f32_from_f16(b, g),
-            umbra_f32_from_f16(b, bl), umbra_f32_from_f16(b, a),
-        };
-    case umbra_fmt_fp16_planar:
-        umbra_load_16x4_planar(b, src, &r, &g, &bl, &a);
-        return (umbra_color){
-            umbra_f32_from_f16(b, r), umbra_f32_from_f16(b, g),
-            umbra_f32_from_f16(b, bl), umbra_f32_from_f16(b, a),
-        };
-    }
-    return (umbra_color){0};
-}
-static val pack_unorm(builder *b, val ch, val scale) {
-    val zero = umbra_imm_f32(b, 0.0f), one = umbra_imm_f32(b, 1.0f);
-    return umbra_round_i32(b, umbra_mul_f32(b,
-        umbra_min_f32(b, umbra_max_f32(b, ch, zero), one), scale));
-}
-static val pack(builder *b, val base, val v, int shift) {
-    return umbra_or_32(b, base, umbra_shl_i32(b, v, umbra_imm_i32(b, shift)));
-}
-void umbra_store_color(builder *b, umbra_ptr dst, umbra_color c, enum umbra_fmt fmt) {
-    switch (fmt) {
-    case umbra_fmt_8888: {
-        val s = umbra_imm_f32(b, 255.0f);
-        umbra_store_8x4(b, dst, pack_unorm(b, c.r, s), pack_unorm(b, c.g, s),
-                                pack_unorm(b, c.b, s), pack_unorm(b, c.a, s));
-    } break;
-    case umbra_fmt_565: {
-        val px = pack_unorm(b, c.b, umbra_imm_f32(b, 31.0f));
-        px = pack(b, px, pack_unorm(b, c.g, umbra_imm_f32(b, 63.0f)), 5);
-        px = pack(b, px, pack_unorm(b, c.r, umbra_imm_f32(b, 31.0f)), 11);
-        umbra_store_16(b, dst, umbra_i16_from_i32(b, px));
-    } break;
-    case umbra_fmt_1010102: {
-        val s10 = umbra_imm_f32(b, 1023.0f);
-        val px = pack_unorm(b, c.r, s10);
-        px = pack(b, px, pack_unorm(b, c.g, s10), 10);
-        px = pack(b, px, pack_unorm(b, c.b, s10), 20);
-        px = pack(b, px, pack_unorm(b, c.a, umbra_imm_f32(b, 3.0f)), 30);
-        umbra_store_32(b, dst, px);
-    } break;
-    case umbra_fmt_fp16:
-        umbra_store_16x4(b, dst, umbra_f16_from_f32(b, c.r), umbra_f16_from_f32(b, c.g),
-                                 umbra_f16_from_f32(b, c.b), umbra_f16_from_f32(b, c.a));
-        break;
-    case umbra_fmt_fp16_planar:
-        umbra_store_16x4_planar(b, dst, umbra_f16_from_f32(b, c.r), umbra_f16_from_f32(b, c.g),
-                                        umbra_f16_from_f32(b, c.b), umbra_f16_from_f32(b, c.a));
-        break;
-    }
 }
 val umbra_i32_from_s16(builder *b, val x) { return push(b, op_i32_from_s16, VX(x)); }
 val umbra_i32_from_u16(builder *b, val x) { return push(b, op_i32_from_u16, VX(x)); }
