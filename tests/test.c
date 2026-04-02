@@ -2307,7 +2307,7 @@ static void test_load_store_16x4(void) {
     umbra_store_16x4(b, (umbra_ptr){1}, r, g, bl, a);
     struct test_backends B = make(b);
 
-    enum { W = 7 };
+    enum { W = 35 };
     __fp16 src[W * 4], dst[W * 4];
     for (int i = 0; i < W; i++) {
         src[i * 4 + 0] = (__fp16)(0.1f * (float)(i + 1));

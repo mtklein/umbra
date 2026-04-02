@@ -1727,75 +1727,40 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 shuf_b[16]=4; shuf_b[17]=5; shuf_b[18]=12; shuf_b[19]=13;
                 shuf_a[16]=6; shuf_a[17]=7; shuf_a[18]=14; shuf_a[19]=15;
 
-                // Low half (pixels 0-3):
+                // For each channel: VPSHUFB extracts 2 u16 per 128-bit lane (4 total).
+                // VEXTRACTI128 gets the high lane, VPUNPCKLDQ merges to 4 contiguous u16.
+                // Repeat for pixels 4-7, then VPUNPCKLQDQ merges to 8 contiguous u16.
                 int off_r = pool_add(&jc->pool, shuf_r, 32);
-                {
-                    int ref = vex_rip(c, 1, 2, 0, 1, s0.rd, t0, 0x00);
-                    pool_ref_at(&jc->pool, off_r, ref, 0);
-                }
-                // VPERMQ imm=0x08: [q0,q2,q0,q0] = [R0R1, R2R3, ...]
-                vex(c, 1, 3, 1, 1, s0.rd, 0, s0.rd, 0x00); emit1(c, 0x08);
-
-                // High half (pixels 4-7):
-                vmov_load(c, 1, t1, base, XI, 8, 32);
-                {
-                    int ref = vex_rip(c, 1, 2, 0, 1, t0, t1, 0x00);
-                    pool_ref_at(&jc->pool, off_r, ref, 0);
-                }
-                vex(c, 1, 3, 1, 1, t0, 0, t0, 0x00); emit1(c, 0x08);
-
-                // Combine: VPUNPCKLQDQ to merge low 64 bits.
-                vex_rrr(c, 1, 1, 0, 0x6c, s0.rd, s0.rd, t0);
-
-                // Repeat for G, B, A. Reload low half for each.
                 int off_g = pool_add(&jc->pool, shuf_g, 32);
                 int off_b = pool_add(&jc->pool, shuf_b, 32);
                 int off_a = pool_add(&jc->pool, shuf_a, 32);
 
-                // G: low half
-                vmov_load(c, 1, t0, base, XI, 8, 0);
-                {
-                    int ref = vex_rip(c, 1, 2, 0, 1, r1, t0, 0x00);
-                    pool_ref_at(&jc->pool, off_g, ref, 0);
-                }
-                vex(c, 1, 3, 1, 1, r1, 0, r1, 0x00); emit1(c, 0x08);
-                // G: high half
-                {
-                    int ref = vex_rip(c, 1, 2, 0, 1, t0, t1, 0x00);
-                    pool_ref_at(&jc->pool, off_g, ref, 0);
-                }
-                vex(c, 1, 3, 1, 1, t0, 0, t0, 0x00); emit1(c, 0x08);
-                vex_rrr(c, 1, 1, 0, 0x6c, r1, r1, t0);
+                vmov_load(c, 1, t1, base, XI, 8, 32);  // pixels 4-7
 
-                // B: low half
-                vmov_load(c, 1, t0, base, XI, 8, 0);
-                {
-                    int ref = vex_rip(c, 1, 2, 0, 1, r2, t0, 0x00);
-                    pool_ref_at(&jc->pool, off_b, ref, 0);
-                }
-                vex(c, 1, 3, 1, 1, r2, 0, r2, 0x00); emit1(c, 0x08);
-                // B: high half
-                {
-                    int ref = vex_rip(c, 1, 2, 0, 1, t0, t1, 0x00);
-                    pool_ref_at(&jc->pool, off_b, ref, 0);
-                }
-                vex(c, 1, 3, 1, 1, t0, 0, t0, 0x00); emit1(c, 0x08);
-                vex_rrr(c, 1, 1, 0, 0x6c, r2, r2, t0);
+#define DEINTERLEAVE(dst, off)                                                  \
+                {                                                               \
+                    int ref = vex_rip(c, 1, 2, 0, 1, dst, t0, 0x00);           \
+                    pool_ref_at(&jc->pool, off, ref, 0);                        \
+                }                                                               \
+                vextracti128(c, px, dst, 1);                                    \
+                vex_rrr(c, 1, 1, 0, 0x62, dst, dst, px);                       \
+                {                                                               \
+                    int ref = vex_rip(c, 1, 2, 0, 1, px, t1, 0x00);            \
+                    pool_ref_at(&jc->pool, off, ref, 0);                        \
+                }                                                               \
+                vextracti128(c, t0, px, 1);                                     \
+                vex_rrr(c, 1, 1, 0, 0x62, px, px, t0);                         \
+                vex_rrr(c, 1, 1, 0, 0x6c, dst, dst, px)
 
-                // A: low half
                 vmov_load(c, 1, t0, base, XI, 8, 0);
-                {
-                    int ref = vex_rip(c, 1, 2, 0, 1, r3, t0, 0x00);
-                    pool_ref_at(&jc->pool, off_a, ref, 0);
-                }
-                vex(c, 1, 3, 1, 1, r3, 0, r3, 0x00); emit1(c, 0x08);
-                // A: high half
-                {
-                    int ref = vex_rip(c, 1, 2, 0, 1, t0, t1, 0x00);
-                    pool_ref_at(&jc->pool, off_a, ref, 0);
-                }
-                vex(c, 1, 3, 1, 1, t0, 0, t0, 0x00); emit1(c, 0x08);
-                vex_rrr(c, 1, 1, 0, 0x6c, r3, r3, t0);
+                DEINTERLEAVE(s0.rd, off_r);
+                vmov_load(c, 1, t0, base, XI, 8, 0);
+                DEINTERLEAVE(r1, off_g);
+                vmov_load(c, 1, t0, base, XI, 8, 0);
+                DEINTERLEAVE(r2, off_b);
+                vmov_load(c, 1, t0, base, XI, 8, 0);
+                DEINTERLEAVE(r3, off_a);
+#undef DEINTERLEAVE
             }
 
             ra_return_reg(ra, t1);
