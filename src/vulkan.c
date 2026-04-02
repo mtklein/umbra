@@ -1994,7 +1994,7 @@ static void cache_buf(struct vk_backend *be, struct buf_cache_entry *ce,
 }
 
 static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b,
-                              umbra_buf buf[]) {
+                              struct umbra_buf buf[]) {
     struct vk_program *vp = (struct vk_program *)p;
     struct vk_backend *be = vp->be;
 

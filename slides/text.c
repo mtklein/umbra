@@ -16,10 +16,10 @@ static void text_draw(slide *s, int w, int h, int y0, int y1, void *buf,
                   st->tc->data, (size_t)(w * h * 2), 0, (size_t)w * 2);
     size_t    pb = umbra_fmt_size(s->fmt);
     size_t plane_sz = (size_t)w * (size_t)h * pb;
-    umbra_buf ubuf[2];
+    struct umbra_buf ubuf[2];
     size_t rb = (size_t)w * pb;
-    ubuf[0] = (umbra_buf){.ptr=lay->uni->data, .sz=lay->uni->size, .read_only=1};
-    ubuf[1] = (umbra_buf){.ptr=buf, .sz=plane_sz * (s->fmt == umbra_fmt_fp16_planar ? 4 : 1), .row_bytes=rb};
+    ubuf[0] = (struct umbra_buf){.ptr=lay->uni->data, .sz=lay->uni->size, .read_only=1};
+    ubuf[1] = (struct umbra_buf){.ptr=buf, .sz=plane_sz * (s->fmt == umbra_fmt_fp16_planar ? 4 : 1), .row_bytes=rb};
     program->queue(program, 0, y0, w, y1, ubuf);
 }
 

@@ -1129,7 +1129,7 @@ static void batch_retain_buf(
 static void encode_dispatch(
     struct umbra_metal *m,
     int l, int t, int r, int b,
-    umbra_buf buf[],
+    struct umbra_buf buf[],
     id<MTLComputeCommandEncoder> enc
 ) {
     int w = r - l, h = b - t, x0 = l, y0 = t;
@@ -1364,7 +1364,7 @@ static void encode_dispatch(
 static void umbra_metal_begin_batch(struct metal_backend *be);
 
 static void umbra_metal_run(
-    struct umbra_metal *m, int l, int t, int r, int b, umbra_buf buf[]
+    struct umbra_metal *m, int l, int t, int r, int b, struct umbra_buf buf[]
 ) {
     int w = r - l, h = b - t;
     assert(m);
@@ -1478,7 +1478,7 @@ static void umbra_dump_metal(
     }
 }
 
-static void run_metal(struct umbra_program *prog, int l, int t, int r, int b, umbra_buf buf[]) {
+static void run_metal(struct umbra_program *prog, int l, int t, int r, int b, struct umbra_buf buf[]) {
     umbra_metal_run((struct umbra_metal*)prog, l, t, r, b, buf);
 }
 static void dump_metal(struct umbra_program const *prog, FILE *f) { umbra_dump_metal((struct umbra_metal const*)prog, f); }

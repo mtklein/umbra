@@ -263,7 +263,7 @@ struct umbra_interpreter {
     struct umbra_program base;
     struct sw_inst *inst;
     val            *v;
-    umbra_buf      *buf;
+    struct umbra_buf      *buf;
     int             preamble, nptr, n_deref, pad_;
 };
 
@@ -739,13 +739,13 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
 }
 
 static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int b,
-                                    umbra_buf caller_buf[]) {
+                                    struct umbra_buf caller_buf[]) {
     int const nall = p->nptr + p->n_deref;
     for (int i = 0; i < p->nptr; i++) { p->buf[i] = caller_buf[i]; }
-    for (int i = p->nptr; i < nall; i++) { p->buf[i] = (umbra_buf){0}; }
+    for (int i = p->nptr; i < nall; i++) { p->buf[i] = (struct umbra_buf){0}; }
 
     int const      P   = p->preamble;
-    umbra_buf     *buf = p->buf;
+    struct umbra_buf     *buf = p->buf;
 
     for (int row = t; row < b; row++) {
         for (int col = l; col < r; col += K) {
@@ -1604,7 +1604,7 @@ static void umbra_interpreter_free(struct umbra_interpreter *p) {
     }
 }
 
-static void run_interp(struct umbra_program *prog, int l, int t, int r, int b, umbra_buf buf[]) {
+static void run_interp(struct umbra_program *prog, int l, int t, int r, int b, struct umbra_buf buf[]) {
     umbra_interpreter_run((struct umbra_interpreter*)prog, l, t, r, b, buf);
 }
 static void free_interp(struct umbra_program *prog) { umbra_interpreter_free((struct umbra_interpreter*)prog); }

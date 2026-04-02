@@ -87,8 +87,8 @@ static void fill_bg(int fmt, void *dst, uint32_t bg) {
     };
     umbra_set_f32(fill_pipes[fmt].uni, 0, hc, 4);
     size_t bpp = umbra_fmt_size(fmt_enums[fmt]);
-    umbra_buf buf[2] = {
-        (umbra_buf){.ptr=fill_pipes[fmt].uni->data, .sz=fill_pipes[fmt].uni->size, .read_only=1},
+    struct umbra_buf buf[2] = {
+        (struct umbra_buf){.ptr=fill_pipes[fmt].uni->data, .sz=fill_pipes[fmt].uni->size, .read_only=1},
         {.ptr=dst, .sz=pixbuf_size(fmt), .row_bytes=(size_t)W * bpp},
     };
     fill_pipes[fmt].prog->queue(fill_pipes[fmt].prog, 0, 0, W, H, buf);
@@ -282,8 +282,8 @@ static void test_slug_rect(void) {
     umbra_set_f32(alay.uni, alay.mat, mat, 11);
     umbra_set_ptr(alay.uni, alay.curves_off,
         rect, sizeof rect, 0, 0);
-    umbra_buf abuf[] = {
-        (umbra_buf){.ptr=alay.uni->data, .sz=alay.uni->size, .read_only=1},
+    struct umbra_buf abuf[] = {
+        (struct umbra_buf){.ptr=alay.uni->data, .sz=alay.uni->size, .read_only=1},
         {.ptr=wind_buf, .sz=sizeof wind_buf, .row_bytes=W * sizeof(float)},
     };
     for (int j = 0; j < 4; j++) {
@@ -291,7 +291,7 @@ static void test_slug_rect(void) {
         int32_t j32 = j;
         __builtin_memcpy(&jf, &j32, 4);
         umbra_set_f32(alay.uni, alay.loop_off, &jf, 1);
-        abuf[0] = (umbra_buf){.ptr=alay.uni->data, .sz=alay.uni->size, .read_only=1};
+        abuf[0] = (struct umbra_buf){.ptr=alay.uni->data, .sz=alay.uni->size, .read_only=1};
         acc->queue(acc, 0, 0, W, H, abuf);
     }
     be->flush(be);
@@ -299,8 +299,8 @@ static void test_slug_rect(void) {
     umbra_set_f32(lay.uni, lay.shader, color, 4);
     umbra_set_ptr(lay.uni, lay.coverage,
         wind_buf, sizeof wind_buf, 1, (size_t)W * sizeof(float));
-    umbra_buf buf[] = {
-        (umbra_buf){.ptr=lay.uni->data, .sz=lay.uni->size, .read_only=1},
+    struct umbra_buf buf[] = {
+        (struct umbra_buf){.ptr=lay.uni->data, .sz=lay.uni->size, .read_only=1},
         {.ptr=pixels, .sz=sizeof pixels, .row_bytes=W * 4},
     };
     interp->queue(interp, 0, 0, W, H, buf);
@@ -359,8 +359,8 @@ static void test_perspective_text(void) {
     umbra_set_f32(lay.uni, lay.coverage, mat, 11);
     umbra_set_ptr(lay.uni, (lay.coverage + 44 + 7) & ~(size_t)7,
         bmp, sizeof bmp, 0, 0);
-    umbra_buf buf[] = {
-        (umbra_buf){.ptr=lay.uni->data, .sz=lay.uni->size, .read_only=1},
+    struct umbra_buf buf[] = {
+        (struct umbra_buf){.ptr=lay.uni->data, .sz=lay.uni->size, .read_only=1},
         {.ptr=pixels, .sz=sizeof pixels},
     };
     interp->queue(interp, 0, 0, BW, 1, buf);
@@ -398,8 +398,8 @@ static void test_perspective_text(void) {
         umbra_set_ptr(lay2.uni, (lay2.coverage + 44 + 7) & ~(size_t)7,
             tc.data,
             (size_t)(W * H * 2), 0, 0);
-        umbra_buf b2[] = {
-            (umbra_buf){.ptr=lay2.uni->data, .sz=lay2.uni->size, .read_only=1},
+        struct umbra_buf b2[] = {
+            (struct umbra_buf){.ptr=lay2.uni->data, .sz=lay2.uni->size, .read_only=1},
             {.ptr=px2, .sz=(size_t)(W * H * 4), .row_bytes=W * 4},
         };
         interp->queue(interp, 0, 0, W, H, b2);

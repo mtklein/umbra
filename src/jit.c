@@ -30,10 +30,10 @@ static void free_chan(struct ra *ra, val_ operand, int i) {
 #include <pthread.h>
 #include <unistd.h>
 
-_Static_assert(sizeof(umbra_buf) == 32, "");
-_Static_assert(offsetof(umbra_buf, ptr)       ==  0, "");
-_Static_assert(offsetof(umbra_buf, sz)        ==  8, "");
-_Static_assert(offsetof(umbra_buf, row_bytes) == 16, "");
+_Static_assert(sizeof(struct umbra_buf) == 32, "");
+_Static_assert(offsetof(struct umbra_buf, ptr)       ==  0, "");
+_Static_assert(offsetof(struct umbra_buf, sz)        ==  8, "");
+_Static_assert(offsetof(struct umbra_buf, row_bytes) == 16, "");
 
 struct pool_ref {
     int data_off, code_pos;
@@ -91,8 +91,8 @@ enum {
 static void load_ptr(Buf *c, int p, int *last_ptr) {
     if (*last_ptr != p) {
         *last_ptr = p;
-        int disp_ptr = p * (int)sizeof(umbra_buf);
-        int disp_rb  = p * (int)sizeof(umbra_buf) + (int)__builtin_offsetof(umbra_buf, row_bytes);
+        int disp_ptr = p * (int)sizeof(struct umbra_buf);
+        int disp_rb  = p * (int)sizeof(struct umbra_buf) + (int)__builtin_offsetof(struct umbra_buf, row_bytes);
         put(c, LDR_xi(XP, XBUF, disp_ptr / 8));
         put(c, LDR_xi(XT, XBUF, disp_rb  / 8));
         put(c, MADD_x(XP, XY, XT, XP));
@@ -120,7 +120,7 @@ static void load_count(Buf *c, int p, int elem_shift, int const *deref_gpr) {
         (void)deref_gpr;
         put(c, 0xd2a00000u | (0x7fffu << 5) | (uint32_t)XM);
     } else {
-        int disp = p * (int)sizeof(umbra_buf) + (int)__builtin_offsetof(umbra_buf, sz);
+        int disp = p * (int)sizeof(struct umbra_buf) + (int)__builtin_offsetof(struct umbra_buf, sz);
         put(c, LDR_xi(XM, XBUF, disp / 8));
         if (elem_shift) {
             put(c,
@@ -329,7 +329,7 @@ struct umbra_jit {
     struct umbra_program base;
     void  *code;
     size_t code_size;
-    void (*entry)(int, int, int, int, umbra_buf *);
+    void (*entry)(int, int, int, int, struct umbra_buf *);
     int loop_start, loop_end;
 };
 
@@ -484,7 +484,7 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     {
         union {
             void *p;
-            void (*fn)(int, int, int, int, umbra_buf *);
+            void (*fn)(int, int, int, int, struct umbra_buf *);
         } u = {.p = mem};
         j->entry = u.fn;
     }
@@ -777,8 +777,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             int8_t px = ra_alloc(ra, sl, ns);
             {
-                int const sz_off = p * (int)sizeof(umbra_buf)
-                                 + (int)__builtin_offsetof(umbra_buf, sz);
+                int const sz_off = p * (int)sizeof(struct umbra_buf)
+                                 + (int)__builtin_offsetof(struct umbra_buf, sz);
                 put(c, LDR_xi(XT, XBUF, sz_off / 8));
                 put(c, LSR_xi(XT, XT, 2));
             }
@@ -872,8 +872,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             int8_t px = ra_alloc(ra, sl, ns);
             {
-                int const sz_off = p * (int)sizeof(umbra_buf)
-                                 + (int)__builtin_offsetof(umbra_buf, sz);
+                int const sz_off = p * (int)sizeof(struct umbra_buf)
+                                 + (int)__builtin_offsetof(struct umbra_buf, sz);
                 put(c, LDR_xi(XT, XBUF, sz_off / 8));
                 put(c, LSR_xi(XT, XT, 2));
             }
@@ -1051,7 +1051,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 #if __clang__
 __attribute__((no_sanitize("function")))
 #endif
-static void umbra_jit_run(struct umbra_jit *j, int l, int t, int r, int b, umbra_buf buf[]) {
+static void umbra_jit_run(struct umbra_jit *j, int l, int t, int r, int b, struct umbra_buf buf[]) {
     assert(j);
     j->entry(l, t, r, b, buf);
 }
@@ -1142,7 +1142,7 @@ done:
     if (have_asm) { remove(asm_path); }
 }
 
-static void run_jit(struct umbra_program *prog, int l, int t, int r, int b, umbra_buf buf[]) {
+static void run_jit(struct umbra_program *prog, int l, int t, int r, int b, struct umbra_buf buf[]) {
     umbra_jit_run((struct umbra_jit*)prog, l, t, r, b, buf);
 }
 static void dump_jit(struct umbra_program const *prog, FILE *f) { umbra_dump_jit_mca((struct umbra_jit const*)prog, f); }
@@ -1183,10 +1183,10 @@ struct umbra_backend *umbra_backend_jit(void) {
 #include <sys/mman.h>
 #include <unistd.h>
 
-_Static_assert(sizeof(umbra_buf) == 32, "");
-_Static_assert(offsetof(umbra_buf, ptr)       ==  0, "");
-_Static_assert(offsetof(umbra_buf, sz)        ==  8, "");
-_Static_assert(offsetof(umbra_buf, row_bytes) == 16, "");
+_Static_assert(sizeof(struct umbra_buf) == 32, "");
+_Static_assert(offsetof(struct umbra_buf, ptr)       ==  0, "");
+_Static_assert(offsetof(struct umbra_buf, sz)        ==  8, "");
+_Static_assert(offsetof(struct umbra_buf, row_bytes) == 16, "");
 
 struct pool_ref {
     int data_off, code_pos, extra;
@@ -1236,7 +1236,7 @@ static void load_count_x86(Buf *c, int p, int elem_shift) {
     if (p < 0) {
         mov_ri(c, XM, 0x7fffffff);
     } else {
-        mov_load(c, XM, XBUF, p * (int)sizeof(umbra_buf) + (int)__builtin_offsetof(umbra_buf, sz));
+        mov_load(c, XM, XBUF, p * (int)sizeof(struct umbra_buf) + (int)__builtin_offsetof(struct umbra_buf, sz));
         if (elem_shift) {
             shr_ri(c, XM, (uint8_t)elem_shift);
         }
@@ -1245,8 +1245,8 @@ static void load_count_x86(Buf *c, int p, int elem_shift) {
 static int load_ptr_x86(Buf *c, int p, int *last_ptr) {
     if (*last_ptr != p) {
         *last_ptr = p;
-        mov_load(c, R11, XBUF, p * (int)sizeof(umbra_buf));
-        mov_load(c, RAX, XBUF, p * (int)sizeof(umbra_buf) + (int)__builtin_offsetof(umbra_buf, row_bytes));
+        mov_load(c, R11, XBUF, p * (int)sizeof(struct umbra_buf));
+        mov_load(c, RAX, XBUF, p * (int)sizeof(struct umbra_buf) + (int)__builtin_offsetof(struct umbra_buf, row_bytes));
         rex_w(c, RAX, XY);
         emit1(c, 0x0f); emit1(c, 0xaf);
         emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (XY & 7)));
@@ -1442,7 +1442,7 @@ struct umbra_jit {
     struct umbra_program base;
     void  *code;
     size_t code_size, code_len;
-    void (*entry)(int, int, int, int, umbra_buf *);
+    void (*entry)(int, int, int, int, struct umbra_buf *);
     int loop_start, loop_end;
 };
 
@@ -1605,7 +1605,7 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     {
         union {
             void *p;
-            void (*fn)(int, int, int, int, umbra_buf *);
+            void (*fn)(int, int, int, int, struct umbra_buf *);
         } u = {.p = mem};
         j->entry = u.fn;
     }
@@ -1840,8 +1840,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t t1 = ra_alloc(ra, sl, ns);
 
             {
-                int const sz_off = p * (int)sizeof(umbra_buf)
-                                 + (int)__builtin_offsetof(umbra_buf, sz);
+                int const sz_off = p * (int)sizeof(struct umbra_buf)
+                                 + (int)__builtin_offsetof(struct umbra_buf, sz);
                 mov_rr(c, R11, base);
                 mov_load(c, RBX, XBUF, sz_off);
                 shr_ri(c, RBX, 2);
@@ -2022,8 +2022,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             int8_t px = ra_alloc(ra, sl, ns);
             {
-                int const sz_off = p * (int)sizeof(umbra_buf)
-                                 + (int)__builtin_offsetof(umbra_buf, sz);
+                int const sz_off = p * (int)sizeof(struct umbra_buf)
+                                 + (int)__builtin_offsetof(struct umbra_buf, sz);
                 mov_rr(c, R11, base);
                 mov_load(c, RBX, XBUF, sz_off);
                 shr_ri(c, RBX, 2);
@@ -2573,7 +2573,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 #if __clang__
 __attribute__((no_sanitize("function")))
 #endif
-static void umbra_jit_run(struct umbra_jit *j, int l, int t, int r, int b, umbra_buf buf[]) {
+static void umbra_jit_run(struct umbra_jit *j, int l, int t, int r, int b, struct umbra_buf buf[]) {
     assert(j);
     j->entry(l, t, r, b, buf);
 }
@@ -2708,7 +2708,7 @@ done:
     if (have_clean) { remove(cleanpath); }
 }
 
-static void run_jit(struct umbra_program *prog, int l, int t, int r, int b, umbra_buf buf[]) {
+static void run_jit(struct umbra_program *prog, int l, int t, int r, int b, struct umbra_buf buf[]) {
     umbra_jit_run((struct umbra_jit*)prog, l, t, r, b, buf);
 }
 static void dump_jit(struct umbra_program const *prog, FILE *f) { umbra_dump_jit_mca((struct umbra_jit const*)prog, f); }

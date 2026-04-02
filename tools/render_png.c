@@ -56,8 +56,8 @@ static void render_slide(char const *label, struct umbra_backend *be, slide *s) 
     umbra_set_f32(fill_uni, 0, hc, 4);
     for (int y = 0; y < H; y++) {
         void *row = (char*)pixbuf + y * W * bpp;
-        umbra_buf buf[] = {
-            (umbra_buf){.ptr=fill_uni->data, .sz=fill_uni->size, .read_only=1},
+        struct umbra_buf buf[] = {
+            (struct umbra_buf){.ptr=fill_uni->data, .sz=fill_uni->size, .read_only=1},
             {.ptr=row, .sz=row_sz},
         };
         fill_prog->queue(fill_prog, 0, 0, W, 1, buf);
@@ -74,7 +74,7 @@ static void render_slide(char const *label, struct umbra_backend *be, slide *s) 
     uint32_t *rgba = calloc((size_t)(W * H), 4);
     for (int y = 0; y < H; y++) {
         void *src = (char*)pixbuf + y * W * bpp;
-        umbra_buf buf[] = {
+        struct umbra_buf buf[] = {
             {0},
             {.ptr=src, .sz=row_sz, .read_only=1},
             {.ptr=rgba + y * W, .sz=(size_t)(W*4)},

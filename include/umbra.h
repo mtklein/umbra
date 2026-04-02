@@ -22,17 +22,16 @@ struct umbra_backend* umbra_backend_jit   (void);
 struct umbra_backend* umbra_backend_metal (void);
 struct umbra_backend* umbra_backend_vulkan(void);
 
-// TODO: remove this typedef, just write `struct umbra_buf`.
-typedef struct {
+struct umbra_buf {
     void   *ptr;
     size_t  sz;
     size_t  row_bytes;
     _Bool   read_only,
             pad_[7];
-} umbra_buf;
+};
 
 struct umbra_program {
-    void (*queue)(struct umbra_program*, int l, int t, int r, int b, umbra_buf[]);
+    void (*queue)(struct umbra_program*, int l, int t, int r, int b, struct umbra_buf[]);
     void (*dump )(struct umbra_program const*, FILE*);
     void (*free )(struct umbra_program*);
     struct umbra_backend *backend;
