@@ -2331,6 +2331,11 @@ static void vk_free(struct umbra_backend *be) {
 }
 
 struct umbra_backend *umbra_backend_vulkan(void) {
+    // MoltenVK reads this before vkCreateInstance.  Disable fast-math so the
+    // Metal shader compiler cannot approximate sqrt/rsqrt or reassociate
+    // floating-point operations, matching our Metal backend's MTLMathModeSafe.
+    setenv("MVK_CONFIG_FAST_MATH_ENABLED", "0", 0);
+
     VkInstance instance;
     {
         VkApplicationInfo app = {
