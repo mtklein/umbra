@@ -135,8 +135,8 @@ static void load_count(Buf *c, int p, int elem_shift, int const *deref_gpr) {
     }
 }
 
-static int8_t const pair_lo[] = { 4,  6, 16, 18, 20, 22, 24, 26, 28, 30};
-static int8_t const pair_hi[] = { 5,  7, 17, 19, 21, 23, 25, 27, 29, 31};
+static int8_t const pair_lo[] = { 4,  6, 16, 18, 20, 22, 24, 26, 28, 30,  8, 10, 12, 14};
+static int8_t const pair_hi[] = { 5,  7, 17, 19, 21, 23, 25, 27, 29, 31,  9, 11, 13, 15};
 static int lo(int r) { return pair_lo[r]; }
 static int hi(int r) { return pair_hi[r]; }
 
@@ -229,7 +229,7 @@ static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm
     }
 }
 
-static int8_t const ra_pool[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+static int8_t const ra_pool[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13};
 
 struct jit_ctx {
     Buf                            *c;
@@ -302,8 +302,8 @@ static void arm64_remat(int reg, int val, void *ctx) {
 static struct ra *ra_create_arm64(struct umbra_basic_block const *bb, struct jit_ctx *jc) {
     struct ra_config cfg = {
         .pool = ra_pool,
-        .nregs = 10,
-        .max_reg = 10,
+        .nregs = 14,
+        .max_reg = 14,
         .spill = arm64_spill,
         .fill = arm64_fill,
         .remat = arm64_remat,
@@ -339,6 +339,13 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
 
     put(&c, STP_pre(29, 30, 31, -2));
     put(&c, ADD_xi(29, 31, 0));
+
+    // Save callee-saved Q8-Q15 (128 bytes).
+    put(&c, 0xadbc27e8u);  // STP Q8,Q9,[SP,#-128]!
+    put(&c, 0xad012feau);  // STP Q10,Q11,[SP,#32]
+    put(&c, 0xad0237ecu);  // STP Q12,Q13,[SP,#64]
+    put(&c, 0xad033feeu);  // STP Q14,Q15,[SP,#96]
+
     int stack_patch = c.len;
     put(&c, 0xd503201fu);
     put(&c, 0xd503201fu);
@@ -419,6 +426,11 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     c.buf[br_more_rows] = Bcond(0xb, loop_top - br_more_rows);
 
     put(&c, ADD_xi(31, 29, 0));
+    // Restore callee-saved Q8-Q15 from [FP-128, FP) using negative offsets.
+    put(&c, 0xad7c27e8u);  // LDP Q8,Q9,[SP,#-128]
+    put(&c, 0xad7d2feau);  // LDP Q10,Q11,[SP,#-96]
+    put(&c, 0xad7e37ecu);  // LDP Q12,Q13,[SP,#-64]
+    put(&c, 0xad7f3feeu);  // LDP Q14,Q15,[SP,#-32]
     put(&c, LDP_post(29, 30, 31, 2));
     put(&c, RET());
 
