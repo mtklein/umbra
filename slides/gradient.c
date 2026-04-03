@@ -63,8 +63,9 @@ static void grad_2stop_draw(struct slide *s, int w, int h, int y0, int y1, void 
     st->prog->queue(st->prog, 0, y0, w, y1, ubuf);
 }
 
-static struct umbra_basic_block *grad_2stop_get_bb(struct slide *s) {
-    return ((struct grad_2stop_state *)s)->bb;
+static struct umbra_builder *grad_2stop_get_builder(struct slide *s) {
+    struct grad_2stop_state *st = (struct grad_2stop_state *)s;
+    return umbra_draw_build(st->shader, st->coverage, st->blend, s->fmt, NULL);
 }
 
 static void grad_2stop_free(struct slide *s) {
@@ -106,8 +107,9 @@ static void grad_lut_draw(struct slide *s, int w, int h, int y0, int y1, void *b
     st->prog->queue(st->prog, 0, y0, w, y1, ubuf);
 }
 
-static struct umbra_basic_block *grad_lut_get_bb(struct slide *s) {
-    return ((struct grad_lut_state *)s)->bb;
+static struct umbra_builder *grad_lut_get_builder(struct slide *s) {
+    struct grad_lut_state *st = (struct grad_lut_state *)s;
+    return umbra_draw_build(st->shader, st->coverage, st->blend, s->fmt, NULL);
 }
 
 static void grad_lut_free(struct slide *s) {
@@ -139,7 +141,7 @@ struct slide *slide_gradient_2stop(char const *title, uint32_t bg, umbra_shader_
         .prepare = grad_2stop_prepare,
         .draw = grad_2stop_draw,
         .free = grad_2stop_free,
-        .get_bb = grad_2stop_get_bb,
+        .get_builder = grad_2stop_get_builder,
     };
     return &st->base;
 }
@@ -161,7 +163,7 @@ struct slide *slide_gradient_lut(char const *title, uint32_t bg, umbra_shader_fn
         .prepare = grad_lut_prepare,
         .draw = grad_lut_draw,
         .free = grad_lut_free,
-        .get_bb = grad_lut_get_bb,
+        .get_builder = grad_lut_get_builder,
     };
     return &st->base;
 }

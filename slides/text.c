@@ -48,8 +48,9 @@ static void text_draw(struct slide *s, int w, int h, int y0, int y1, void *buf) 
     st->prog->queue(st->prog, 0, y0, w, y1, ubuf);
 }
 
-static struct umbra_basic_block *text_get_bb(struct slide *s) {
-    return ((struct text_state *)s)->bb;
+static struct umbra_builder *text_get_builder(struct slide *s) {
+    struct text_state *st = (struct text_state *)s;
+    return umbra_draw_build(st->shader, st->coverage, st->blend, s->fmt, NULL);
 }
 
 static void text_free(struct slide *s) {
@@ -78,7 +79,7 @@ struct slide *slide_text_bitmap(struct text_cov *tc) {
         .prepare = text_prepare,
         .draw = text_draw,
         .free = text_free,
-        .get_bb = text_get_bb,
+        .get_builder = text_get_builder,
     };
     return &st->base;
 }
@@ -98,7 +99,7 @@ struct slide *slide_text_sdf(struct text_cov *tc) {
         .prepare = text_prepare,
         .draw = text_draw,
         .free = text_free,
-        .get_bb = text_get_bb,
+        .get_builder = text_get_builder,
     };
     return &st->base;
 }

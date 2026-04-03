@@ -68,8 +68,9 @@ static void solid_draw(struct slide *s, int w, int h, int y0, int y1, void *buf)
     st->prog->queue(st->prog, 0, y0, w, y1, ubuf);
 }
 
-static struct umbra_basic_block *solid_get_bb(struct slide *s) {
-    return ((struct solid_state *)s)->bb;
+static struct umbra_builder *solid_get_builder(struct slide *s) {
+    struct solid_state *st = (struct solid_state *)s;
+    return umbra_draw_build(st->shader, st->coverage, st->blend, s->fmt, NULL);
 }
 
 static void solid_free(struct slide *s) {
@@ -99,7 +100,7 @@ struct slide *slide_solid(char const *title, uint32_t bg, float const color[4],
         .prepare = solid_prepare,
         .draw = solid_draw,
         .free = solid_free,
-        .get_bb = solid_get_bb,
+        .get_builder = solid_get_builder,
     };
     return &st->base;
 }

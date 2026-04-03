@@ -142,7 +142,14 @@ static void build_slide_fmt(struct slide *s, int fmt) {
     if (bes[cur_backend]) {
         s->prepare(s, 640, 480, bes[cur_backend]);
     }
-    saved_bb = (s->get_bb) ? s->get_bb(s) : NULL;
+    umbra_basic_block_free(saved_bb);
+    if (s->get_builder) {
+        struct umbra_builder *b = s->get_builder(s);
+        saved_bb = umbra_basic_block(b);
+        umbra_builder_free(b);
+    } else {
+        saved_bb = NULL;
+    }
     build_pipes(fmt);
 }
 
@@ -416,6 +423,7 @@ int main(void) {
     thread_pool_free(pool);
     free_xtra();
     free(xtra_progs);
+    umbra_basic_block_free(saved_bb);
     free_pipes();
     slides_cleanup();
     for (int i = 0; i < NUM_BACKENDS; i++) { if (bes[i]) { bes[i]->free(bes[i]); } }

@@ -120,22 +120,16 @@ int main(void) {
 
     for (int i = 0; i < slide_count(); i++) {
         struct slide *s = slide_get(i);
-        if (!s->get_bb) { continue; }
-        struct umbra_basic_block *bb = s->get_bb(s);
-        if (!bb) { continue; }
+        if (!s->get_builder) { continue; }
+        struct umbra_builder *b = s->get_builder(s);
+        if (!b) { continue; }
         char dir[128];
         slugify(s->title, dir, sizeof dir);
         mkdir(dir, 0755);
-        dump_bb(dir, "draw", bb);
+        dump_builder(dir, "draw", b);
     }
 
-    {
-        struct umbra_builder *b = slug_build_acc(NULL);
-        struct umbra_basic_block *bb = umbra_basic_block(b);
-        umbra_builder_free(b);
-        dump_bb("dumps", "slug_acc", bb);
-        umbra_basic_block_free(bb);
-    }
+    dump_builder("dumps", "slug_acc", slug_build_acc(NULL));
 
     slides_cleanup();
     return 0;

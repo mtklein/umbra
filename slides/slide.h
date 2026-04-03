@@ -14,8 +14,8 @@ struct slide {
     void (*draw)   (struct slide*, int w, int h, int y0, int y1, void *buf);
     void (*free)   (struct slide*);
 
-    // Optional: return a basic block for IR dump tools.
-    struct umbra_basic_block *(*get_bb)(struct slide*);
+    // Optional: rebuild the builder for IR dump tools.
+    struct umbra_builder *(*get_builder)(struct slide*);
 };
 
 int           slide_count        (void);

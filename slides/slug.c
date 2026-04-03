@@ -97,8 +97,9 @@ static void slug_draw(struct slide *s, int w, int h, int y0, int y1, void *buf) 
     st->draw_prog->queue(st->draw_prog, 0, y0, w, y1, rbuf);
 }
 
-static struct umbra_basic_block *slug_get_bb(struct slide *s) {
-    return ((struct slug_state *)s)->draw_bb;
+static struct umbra_builder *slug_get_builder(struct slide *s) {
+    return umbra_draw_build(umbra_shader_solid, umbra_coverage_wind, umbra_blend_srcover, s->fmt,
+                            NULL);
 }
 
 static void slug_slide_free(struct slide *s) {
@@ -131,7 +132,7 @@ struct slide *slide_slug_wind(struct slug_curves *sc) {
         .prepare = slug_prepare,
         .draw = slug_draw,
         .free = slug_slide_free,
-        .get_bb = slug_get_bb,
+        .get_builder = slug_get_builder,
     };
     return &st->base;
 }

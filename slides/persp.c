@@ -65,8 +65,9 @@ static void persp_draw(struct slide *s, int w, int h, int y0, int y1, void *buf)
     st->prog->queue(st->prog, 0, y0, w, y1, ubuf);
 }
 
-static struct umbra_basic_block *persp_get_bb(struct slide *s) {
-    return ((struct persp_state *)s)->bb;
+static struct umbra_builder *persp_get_builder(struct slide *s) {
+    struct persp_state *st = (struct persp_state *)s;
+    return umbra_draw_build(st->shader, st->coverage, st->blend, s->fmt, NULL);
 }
 
 static void persp_free(struct slide *s) {
@@ -95,7 +96,7 @@ struct slide *slide_persp(struct text_cov *bitmap) {
         .prepare = persp_prepare,
         .draw = persp_draw,
         .free = persp_free,
-        .get_bb = persp_get_bb,
+        .get_builder = persp_get_builder,
     };
     return &st->base;
 }
