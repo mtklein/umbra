@@ -763,38 +763,56 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         } break;
 
         case op_load_16x4: {
-            struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
-            int8_t r1 = ra_alloc(ra, sl, ns);
-            int8_t r2 = ra_alloc(ra, sl, ns);
-            int8_t r3 = ra_alloc(ra, sl, ns);
             int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            if (scalar) {
+            _Bool fuse = !scalar
+                && i + 4 < to
+                && bb->inst[i+1].op == op_f32_from_f16 && bb->inst[i+1].x.id == (unsigned)i && bb->inst[i+1].x.chan == 0
+                && bb->inst[i+2].op == op_f32_from_f16 && bb->inst[i+2].x.id == (unsigned)i && bb->inst[i+2].x.chan == 1
+                && bb->inst[i+3].op == op_f32_from_f16 && bb->inst[i+3].x.id == (unsigned)i && bb->inst[i+3].x.chan == 2
+                && bb->inst[i+4].op == op_f32_from_f16 && bb->inst[i+4].x.id == (unsigned)i && bb->inst[i+4].x.chan == 3;
+            if (fuse) {
                 put(c, LSL_xi(XT, XI, 3));
                 put(c, ADD_xr(XT, XP, XT));
-                put(c, LDR_hi(lo(s0.rd), XT, 0));
-                put(c, LDR_hi(lo(r1),    XT, 1));
-                put(c, LDR_hi(lo(r2),    XT, 2));
-                put(c, LDR_hi(lo(r3),    XT, 3));
+                put(c, LD4_8h(0, XT));
+                for (int k = 0; k < 4; k++) {
+                    struct ra_step s = ra_step_alloc(ra, sl, ns, i + 1 + k);
+                    put(c, FCVTL_4s(lo(s.rd), k));
+                    put(c, W(FCVTL_4s(hi(s.rd), k)));
+                }
+                i += 4;
             } else {
-                put(c, LSL_xi(XT, XI, 3));
-                put(c, ADD_xr(XT, XP, XT));
-                put(c, LD4_4h(0, XT));
-                put(c, ORR_16b(lo(s0.rd), 0, 0));
-                put(c, ORR_16b(lo(r1),    1, 1));
-                put(c, ORR_16b(lo(r2),    2, 2));
-                put(c, ORR_16b(lo(r3),    3, 3));
-                put(c, ADD_xi(XT, XT, 32));
-                put(c, LD4_4h(0, XT));
-                put(c, ORR_16b(hi(s0.rd), 0, 0));
-                put(c, ORR_16b(hi(r1),    1, 1));
-                put(c, ORR_16b(hi(r2),    2, 2));
-                put(c, ORR_16b(hi(r3),    3, 3));
+                struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
+                int8_t r1 = ra_alloc(ra, sl, ns);
+                int8_t r2 = ra_alloc(ra, sl, ns);
+                int8_t r3 = ra_alloc(ra, sl, ns);
+                if (scalar) {
+                    put(c, LSL_xi(XT, XI, 3));
+                    put(c, ADD_xr(XT, XP, XT));
+                    put(c, LDR_hi(lo(s0.rd), XT, 0));
+                    put(c, LDR_hi(lo(r1),    XT, 1));
+                    put(c, LDR_hi(lo(r2),    XT, 2));
+                    put(c, LDR_hi(lo(r3),    XT, 3));
+                } else {
+                    put(c, LSL_xi(XT, XI, 3));
+                    put(c, ADD_xr(XT, XP, XT));
+                    put(c, LD4_4h(0, XT));
+                    put(c, ORR_16b(lo(s0.rd), 0, 0));
+                    put(c, ORR_16b(lo(r1),    1, 1));
+                    put(c, ORR_16b(lo(r2),    2, 2));
+                    put(c, ORR_16b(lo(r3),    3, 3));
+                    put(c, ADD_xi(XT, XT, 32));
+                    put(c, LD4_4h(0, XT));
+                    put(c, ORR_16b(hi(s0.rd), 0, 0));
+                    put(c, ORR_16b(hi(r1),    1, 1));
+                    put(c, ORR_16b(hi(r2),    2, 2));
+                    put(c, ORR_16b(hi(r3),    3, 3));
+                }
+                ra_set_chan_reg(ra, i, 0, s0.rd);
+                ra_set_chan_reg(ra, i, 1, r1);
+                ra_set_chan_reg(ra, i, 2, r2);
+                ra_set_chan_reg(ra, i, 3, r3);
             }
-            ra_set_chan_reg(ra, i, 0, s0.rd);
-            ra_set_chan_reg(ra, i, 1, r1);
-            ra_set_chan_reg(ra, i, 2, r2);
-            ra_set_chan_reg(ra, i, 3, r3);
         } break;
         case op_load_16x4_planar: {
             struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
@@ -1022,9 +1040,35 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         } break;
 
         case op_f16_from_f32: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
-            put(c, FCVTN_4h(lo(s.rd), lo(s.rx)));
-            if (!scalar) { put(c, FCVTN_4h(hi(s.rd), hi(s.rx))); }
+            _Bool fuse_store = !scalar
+                && i + 4 < to
+                && bb->inst[i+1].op == op_f16_from_f32
+                && bb->inst[i+2].op == op_f16_from_f32
+                && bb->inst[i+3].op == op_f16_from_f32
+                && bb->inst[i+4].op == op_store_16x4
+                && bb->inst[i+4].x.id == (unsigned)i   && bb->inst[i+4].x.chan == 0
+                && bb->inst[i+4].y.id == (unsigned)(i+1) && bb->inst[i+4].y.chan == 0
+                && bb->inst[i+4].z.id == (unsigned)(i+2) && bb->inst[i+4].z.chan == 0
+                && bb->inst[i+4].w.id == (unsigned)(i+3) && bb->inst[i+4].w.chan == 0;
+            if (fuse_store) {
+                for (int k = 0; k < 4; k++) {
+                    int8_t rx = ra_ensure(ra, sl, ns, (int)bb->inst[i+k].x.id);
+                    put(c, FCVTN_4h(k, lo(rx)));
+                    put(c, W(FCVTN_4h(k, hi(rx))));
+                    free_chan(ra, bb->inst[i+k].x, i+k);
+                }
+                struct bb_inst const *st = &bb->inst[i+4];
+                int p = st->ptr;
+                resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+                put(c, LSL_xi(XT, XI, 3));
+                put(c, ADD_xr(XT, XP, XT));
+                put(c, ST4_8h(0, XT));
+                i += 4;
+            } else {
+                struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+                put(c, FCVTN_4h(lo(s.rd), lo(s.rx)));
+                if (!scalar) { put(c, FCVTN_4h(hi(s.rd), hi(s.rx))); }
+            }
         } break;
 
         case op_i32_from_s16: {
