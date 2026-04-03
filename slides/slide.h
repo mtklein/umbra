@@ -5,17 +5,15 @@
 
 struct slide {
     char const     *title;
-    enum umbra_fmt  fmt;
-    uint32_t        bg;
+    uint32_t        bg, :32;
 
     void (*init)   (struct slide*, int w, int h);
     void (*animate)(struct slide*, float dt);
-    void (*prepare)(struct slide*, int w, int h, struct umbra_backend*);
-    void (*draw)   (struct slide*, int w, int h, int y0, int y1, void *buf);
+    void (*prepare)(struct slide*, struct umbra_backend*, enum umbra_fmt);
+    void (*draw)   (struct slide*, int l, int t, int r, int b, void *buf);
     void (*free)   (struct slide*);
 
-    // Optional: rebuild the builder for IR dump tools.
-    struct umbra_builder *(*get_builder)(struct slide*);
+    struct umbra_builder *(*get_builder)(struct slide*, enum umbra_fmt);
 };
 
 int           slide_count        (void);

@@ -16,15 +16,15 @@ static double now(void) {
 }
 
 static double bench(struct slide *s, int w, int h, void *buf, struct umbra_backend *be,
-                    double min_secs) {
-    s->prepare(s, w, h, be);
-    s->draw(s, w, h, 0, h, buf);
+                    enum umbra_fmt fmt, double min_secs) {
+    s->prepare(s, be, fmt);
+    s->draw(s, 0, 0, w, h, buf);
     be->flush(be);
     int iters = 1;
     for (;;) {
         double const start = now();
         for (int it = 0; it < iters; it++) {
-            s->draw(s, w, h, 0, h, buf);
+            s->draw(s, 0, 0, w, h, buf);
         }
         be->flush(be);
         double const elapsed = now() - start;
@@ -84,14 +84,6 @@ int main(int argc, char *argv[]) {
     int const H = 480;
     slides_init(W, H);
 
-    if (fmt_ov >= 0) {
-        for (int i = 0; i < slide_count() - 1; i++) {
-            slide_get(i)->fmt = (enum umbra_fmt)fmt_ov;
-        }
-        slides_cleanup();
-        slides_init(W, H);
-    }
-
     int ns = slide_count() - 1;
 
     char const *be_names[] = {"interp", "jit", "metal", "vulkan"};
@@ -111,7 +103,8 @@ int main(int argc, char *argv[]) {
         if (!s->draw) { continue; }
         if (match && !strstr(s->title, match)) { continue; }
 
-        size_t bpp = umbra_fmt_size(s->fmt);
+        enum umbra_fmt fmt = fmt_ov >= 0 ? (enum umbra_fmt)fmt_ov : umbra_fmt_8888;
+        size_t bpp = umbra_fmt_size(fmt);
         void *buf = calloc((size_t)(W * H), bpp);
 
         printf("%-40s", s->title);
@@ -121,7 +114,7 @@ int main(int argc, char *argv[]) {
                 continue;
             }
             char tmp[32];
-            sprintf(tmp, "%5.2f ns/px", bench(s, W, H, buf, bes[bi], min_s));
+            sprintf(tmp, "%5.2f ns/px", bench(s, W, H, buf, bes[bi], fmt, min_s));
             printf(" %12s", tmp);
         }
         printf("\n");

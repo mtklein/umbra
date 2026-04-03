@@ -138,13 +138,12 @@ static void tile_factor(int n, int *cols, int *rows) {
 static int cur_backend;
 
 static void build_slide_fmt(struct slide *s, int fmt) {
-    s->fmt = fmt_enums[fmt];
     if (bes[cur_backend]) {
-        s->prepare(s, 640, 480, bes[cur_backend]);
+        s->prepare(s, bes[cur_backend], fmt_enums[fmt]);
     }
     umbra_basic_block_free(saved_bb);
     if (s->get_builder) {
-        struct umbra_builder *b = s->get_builder(s);
+        struct umbra_builder *b = s->get_builder(s, fmt_enums[fmt]);
         saved_bb = umbra_basic_block(b);
         umbra_builder_free(b);
     } else {
@@ -227,13 +226,13 @@ static void to_hdr_row(__fp16 *dst, void *src, int n, size_t src_sz, size_t plan
 
 struct tile_work {
     struct slide *s;
-    int           W, H, y0, y1;
+    int           l, t, r, b;
     void         *buf;
 };
 
 static void tile_fn(void *arg) {
     struct tile_work *tw = arg;
-    tw->s->draw(tw->s, tw->W, tw->H, tw->y0, tw->y1, tw->buf);
+    tw->s->draw(tw->s, tw->l, tw->t, tw->r, tw->b, tw->buf);
 }
 
 int main(void) {
@@ -307,7 +306,7 @@ int main(void) {
                 } else if (ev.key.key == SDLK_B) {
                     cur_backend = next_backend(cur_backend);
                     struct slide *s = slide_get(cur_slide);
-                    if (bes[cur_backend]) { s->prepare(s, W, H, bes[cur_backend]); }
+                    if (bes[cur_backend]) { s->prepare(s, bes[cur_backend], fmt_enums[cur_fmt]); }
                     rebuild_xtra(cur_backend);
                 } else if (ev.key.key == SDLK_C) {
                     cur_fmt = (cur_fmt + 1) % NUM_FMTS;
@@ -349,7 +348,7 @@ int main(void) {
 
         if (s->animate) { s->animate(s, 0.016f); }
 
-        if (s->prepare) { s->prepare(s, W, H, bes[cur_backend]); }
+        if (s->prepare) { s->prepare(s, bes[cur_backend], fmt_enums[cur_fmt]); }
 
         {
             int nt = n_threads;
@@ -360,7 +359,7 @@ int main(void) {
             for (int t = 0; t < nt; t++) {
                 int y0 = t * sh;
                 int y1 = y0 + sh > H ? H : y0 + sh;
-                work[t] = (struct tile_work){s, W, H, y0, y1, pixbuf};
+                work[t] = (struct tile_work){s, 0, y0, W, y1, pixbuf};
             }
             if (!bes[cur_backend]->threadsafe || nt <= 1) {
                 for (int t = 0; t < nt; t++) { tile_fn(&work[t]); }

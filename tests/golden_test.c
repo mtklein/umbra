@@ -83,8 +83,8 @@ static void render_slide(
     struct slide *s = slide_get(slide_idx);
 
     fill_bg(pixbuf, s->bg);
-    s->prepare(s, W, H, be);
-    s->draw(s, W, H, 0, H, pixbuf);
+    s->prepare(s, be, umbra_fmt_8888);
+    s->draw(s, 0, 0, W, H, pixbuf);
 }
 
 static void test_slide_golden(int slide_idx) {

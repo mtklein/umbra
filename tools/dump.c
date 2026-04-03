@@ -121,7 +121,7 @@ int main(void) {
     for (int i = 0; i < slide_count(); i++) {
         struct slide *s = slide_get(i);
         if (!s->get_builder) { continue; }
-        struct umbra_builder *b = s->get_builder(s);
+        struct umbra_builder *b = s->get_builder(s, umbra_fmt_8888);
         if (!b) { continue; }
         char dir[128];
         slugify(s->title, dir, sizeof dir);

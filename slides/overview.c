@@ -15,6 +15,7 @@ struct overview_state {
     int                   n_real, pad_;
     uint32_t             *fb, *tmp;
     struct umbra_backend *be;
+    enum umbra_fmt        fmt, :32;
 };
 
 static void draw_digit(uint32_t *fb, int stride, int ox, int oy, int digit, uint32_t color) {
@@ -71,8 +72,8 @@ static void render_thumbnails(struct overview_state *st) {
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) { st->tmp[y * w + x] = sub->bg; }
         }
-        if (sub->prepare) { sub->prepare(sub, w, h, st->be); }
-        sub->draw(sub, w, h, 0, h, st->tmp);
+        if (sub->prepare) { sub->prepare(sub, st->be, st->fmt); }
+        sub->draw(sub, 0, 0, w, h, st->tmp);
         st->be->flush(st->be);
 
         for (int cy = 0; cy < st->ch; cy++) {
@@ -107,20 +108,18 @@ static void overview_animate(struct slide *s, float dt) {
     }
 }
 
-static void overview_prepare(struct slide *s, int w, int h, struct umbra_backend *be) {
-    (void)w; (void)h;
+static void overview_prepare(struct slide *s, struct umbra_backend *be, enum umbra_fmt fmt) {
     struct overview_state *st = (struct overview_state *)s;
     st->be = be;
+    st->fmt = fmt;
     render_thumbnails(st);
 }
 
-static void overview_draw(struct slide *s, int w, int h, int y0, int y1, void *buf) {
+static void overview_draw(struct slide *s, int l, int t, int r, int b, void *buf) {
     struct overview_state *st = (struct overview_state *)s;
-    (void)w;
-    (void)h;
-    (void)s;
-    size_t off = (size_t)y0 * (size_t)st->w * 4;
-    size_t len = (size_t)(y1 - y0) * (size_t)st->w * 4;
+    (void)s; (void)l; (void)r;
+    size_t off = (size_t)t * (size_t)st->w * 4;
+    size_t len = (size_t)(b - t) * (size_t)st->w * 4;
     __builtin_memcpy((char*)buf + off, (char*)st->fb + off, len);
 }
 
@@ -135,9 +134,9 @@ struct slide *slide_overview(void);
 
 struct slide *slide_overview(void) {
     struct overview_state *st = calloc(1, sizeof *st);
+    st->fmt = umbra_fmt_8888;
     st->base = (struct slide){
         .title = "Overview",
-        .fmt = umbra_fmt_8888,
         .bg = 0xff101010,
         .init = overview_init,
         .animate = overview_animate,
