@@ -291,7 +291,7 @@ static void arm64_pool_load_wide(Buf *c, struct pool *p, int d, void const *data
 static void arm64_remat(int reg, int val, void *ctx) {
     struct jit_ctx *j = ctx;
     arm64_pool_load(j->c, &j->pool, lo(reg), (uint32_t)j->bb->inst[val].imm);
-    arm64_pool_load(j->c, &j->pool, hi(reg), (uint32_t)j->bb->inst[val].imm);
+    put(j->c, ORR_16b(hi(reg), lo(reg), lo(reg)));
 }
 
 static struct ra *ra_create_arm64(struct umbra_basic_block const *bb, struct jit_ctx *jc) {
@@ -518,7 +518,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             put(c, DUP_4s_w(lo(s.rd), XCOL));
             if (!scalar) {
-                put(c, DUP_4s_w(hi(s.rd), XCOL));
+                put(c, ORR_16b(hi(s.rd), lo(s.rd), lo(s.rd)));
                 int8_t   tmp = ra_alloc(ra, sl, ns);
                 uint32_t iota_lo[4] = {0, 1, 2, 3};
                 uint32_t iota_hi[4] = {4, 5, 6, 7};
@@ -533,7 +533,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_y: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             put(c, DUP_4s_w(lo(s.rd), XY));
-            if (!scalar) { put(c, DUP_4s_w(hi(s.rd), XY)); }
+            if (!scalar) { put(c, ORR_16b(hi(s.rd), lo(s.rd), lo(s.rd))); }
         } break;
 
         case op_load_32: {
@@ -545,8 +545,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             } else {
                 put(c, LSL_xi(XT, XI, 2));
                 put(c, ADD_xr(XT, XP, XT));
-                put(c, LDR_qi(lo(s.rd), XT, 0));
-                put(c, LDR_qi(hi(s.rd), XT, 1));
+                put(c, LDP_qi(lo(s.rd), hi(s.rd), XT, 0));
             }
         } break;
 
@@ -585,13 +584,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             load_count(c, p, 2, deref_gpr);
             put(c, UMOV_ws(XT, lo(rx)));
             put(c, MOVI_4s(lo(s.rd), 0, 0));
-            if (!scalar) { put(c, MOVI_4s(hi(s.rd), 0, 0)); }
+            if (!scalar) { put(c, ORR_16b(hi(s.rd), lo(s.rd), lo(s.rd))); }
             put(c, CMP_wr(XT, XM));
             int skip = scalar ? 3 : 4;
             put(c, Bcond(0x2, skip));
             put(c, LDR_wr(XT, XP, XT));
             put(c, DUP_4s_w(lo(s.rd), XT));
-            if (!scalar) { put(c, DUP_4s_w(hi(s.rd), XT)); }
+            if (!scalar) { put(c, ORR_16b(hi(s.rd), lo(s.rd), lo(s.rd))); }
         } break;
 
         case op_gather_32: {
@@ -758,8 +757,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             } else {
                 put(c, LSL_xi(XT, XI, 2));
                 put(c, ADD_xr(XT, XP, XT));
-                put(c, STR_qi(lo(ry), XT, 0));
-                put(c, STR_qi(hi(ry), XT, 1));
+                put(c, STP_qi(lo(ry), hi(ry), XT, 0));
             }
             free_chan(ra, inst->y, i);
         } break;
@@ -1050,7 +1048,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_imm_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             arm64_pool_load(c, &jc->pool, lo(s.rd), (uint32_t)inst->imm);
-            arm64_pool_load(c, &jc->pool, hi(s.rd), (uint32_t)inst->imm);
+            put(c, ORR_16b(hi(s.rd), lo(s.rd), lo(s.rd)));
         } break;
 
         case op_add_f32:
