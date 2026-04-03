@@ -14,8 +14,9 @@ struct ra {
     struct ra_config      cfg;
     int                   nfree;
     int                   preamble;
+    int                   insts;
     int                   npinned;
-    int                   pinned[3];
+    int                   pinned[4];
 };
 
 int8_t ra_reg(struct ra const *ra, int val) { return ra->reg[val]; }
@@ -73,6 +74,7 @@ struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const 
     }
 
     ra->inst = bb->inst;
+    ra->insts = n;
     ra->preamble = bb->preamble;
     ra->loop_reg = malloc((size_t)bb->preamble * sizeof *ra->loop_reg);
 
@@ -91,6 +93,7 @@ void ra_reset_pool(struct ra *ra) {
         ra->free_stack[i] = ra->cfg.pool[ra->cfg.nregs - 1 - i];
     }
     for (int i = 0; i < ra->cfg.max_reg; i++) { ra->owner[i] = -1; }
+    for (int i = 0; i < ra->insts; i++) { ra->reg[i] = -1; }
 }
 
 void ra_destroy(struct ra *ra) {
