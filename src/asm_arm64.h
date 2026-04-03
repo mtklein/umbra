@@ -116,4 +116,12 @@ uint32_t MVNI_4s(int d, uint8_t imm8, int shift);
 uint32_t DUP_4s_w(int d, int n);
 uint32_t DUP_4s_lane(int d, int n, int lane);
 uint32_t INS_s(int d, int idx, int n);
+
+uint32_t LD4_4h(int t, int n);
+uint32_t ST4_4h(int t, int n);
+uint32_t LD4_8h(int t, int n);
+uint32_t ST4_8h(int t, int n);
+uint32_t LD4_8b(int t, int n);
+uint32_t ST4_8b(int t, int n);
+
 void     load_imm_w(struct Buf *c, int rd, uint32_t v);

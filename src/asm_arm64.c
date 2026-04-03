@@ -306,6 +306,16 @@ uint32_t INS_s(int d, int idx, int n) {
     return 0x4e001c00u | (imm5 << 16) | ((uint32_t)n << 5) | (uint32_t)d;
 }
 
+static uint32_t ld4st4(uint32_t base, int t, int n) {
+    return base | ((uint32_t)n << 5) | (uint32_t)t;
+}
+uint32_t LD4_4h(int t, int n) { return ld4st4(0x0c400400u, t, n); }
+uint32_t ST4_4h(int t, int n) { return ld4st4(0x0c000400u, t, n); }
+uint32_t LD4_8h(int t, int n) { return ld4st4(0x4c400400u, t, n); }
+uint32_t ST4_8h(int t, int n) { return ld4st4(0x4c000400u, t, n); }
+uint32_t LD4_8b(int t, int n) { return ld4st4(0x0c400000u, t, n); }
+uint32_t ST4_8b(int t, int n) { return ld4st4(0x0c000000u, t, n); }
+
 void load_imm_w(Buf *c, int rd, uint32_t v) {
     put(c, MOVZ_w(rd, (uint16_t)(v & 0xffff)));
     if (v >> 16) { put(c, MOVK_w16(rd, (uint16_t)(v >> 16))); }

@@ -252,6 +252,17 @@ static void test_ins_elem_s(void) {
     INS_elem_s(6, 0, 7, 2) == 0x6E0444E6 here;
 }
 
+static void test_ld4_st4(void) {
+    LD4_4h(0, 5) == 0x0C4004A0 here;
+    ST4_4h(0, 5) == 0x0C0004A0 here;
+    LD4_8h(0, 5) == 0x4C4004A0 here;
+    ST4_8h(0, 5) == 0x4C0004A0 here;
+    LD4_8b(0, 5) == 0x0C4000A0 here;
+    ST4_8b(0, 5) == 0x0C0000A0 here;
+    LD4_4h(2, 10) == 0x0C400542 here;
+    ST4_8h(8, 3) == 0x4C000468 here;
+}
+
 int main(void) {
     test_buf();
     test_gpr();
@@ -281,5 +292,6 @@ int main(void) {
     test_ext_16b();
     test_uxtl_4s();
     test_ins_elem_s();
+    test_ld4_st4();
     return 0;
 }
