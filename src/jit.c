@@ -716,9 +716,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t r3 = ra_alloc(ra, sl, ns);
             int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            int8_t px = ra_alloc(ra, sl, ns);
-            int8_t t0 = ra_alloc(ra, sl, ns);
-            int8_t t1 = ra_alloc(ra, sl, ns);
             if (scalar) {
                 put(c, LSL_xi(XT, XI, 3));
                 put(c, ADD_xr(XT, XP, XT));
@@ -729,20 +726,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             } else {
                 put(c, LSL_xi(XT, XI, 3));
                 put(c, ADD_xr(XT, XP, XT));
-                put(c, LDR_qi(px, XT, 0));
-                put(c, LDR_qi(t0, XT, 1));
-                put(c, UZP1_8h(t1, px, t0));
-                put(c, UZP2_8h(px, px, t0));
-                put(c, UZP1_8h(t0, t1, px));
-                put(c, UZP2_8h(t1, t1, px));
-                put(c, ORR_16b(s0.rd, t0, t0));
-                put(c, EXT_16b(r1, t0, t0, 8));
-                put(c, ORR_16b(r2, t1, t1));
-                put(c, EXT_16b(r3, t1, t1, 8));
+                put(c, LD4_4h(0, XT));
+                put(c, ORR_16b(s0.rd, 0, 0));
+                put(c, ORR_16b(r1,    1, 1));
+                put(c, ORR_16b(r2,    2, 2));
+                put(c, ORR_16b(r3,    3, 3));
             }
-            ra_return_reg(ra, t1);
-            ra_return_reg(ra, t0);
-            ra_return_reg(ra, px);
             ra_set_chan_reg(ra, i, 0, s0.rd);
             ra_set_chan_reg(ra, i, 1, r1);
             ra_set_chan_reg(ra, i, 2, r2);
