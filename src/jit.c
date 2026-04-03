@@ -120,17 +120,12 @@ static void resolve_ptr(Buf *c, int p, int *last_ptr, int const *deref_gpr,
 static void load_count(Buf *c, int p, int elem_shift, int const *deref_gpr) {
     if (p < 0) {
         (void)deref_gpr;
-        put(c, 0xd2a00000u | (0x7fffu << 5) | (uint32_t)XM);
+        put(c, MOVZ_x_lsl16(XM, 0x7fff));
     } else {
         int disp = p * (int)sizeof(struct umbra_buf) + (int)__builtin_offsetof(struct umbra_buf, sz);
         put(c, LDR_xi(XM, XBUF, disp / 8));
         if (elem_shift) {
-            put(c,
-                0x53000000u
-                    | ((uint32_t)elem_shift << 16)
-                    | (31u << 10)
-                    | ((uint32_t)XM << 5)
-                    | (uint32_t)XM);
+            put(c, LSR_wi(XM, XM, elem_shift));
         }
     }
 }
@@ -286,12 +281,12 @@ static void arm64_pool_load(Buf *c, struct pool *p, int d, uint32_t v) {
     uint32_t bcast[4] = {v, v, v, v};
     int      off = pool_add(p, bcast, 16);
     pool_ref_at(p, off, c->len);
-    put(c, 0x9c000000u | (uint32_t)d);
+    put(c, LDR_q_literal(d));
 }
 static void arm64_pool_load_wide(Buf *c, struct pool *p, int d, void const *data) {
     int off = pool_add(p, data, 16);
     pool_ref_at(p, off, c->len);
-    put(c, 0x9c000000u | (uint32_t)d);
+    put(c, LDR_q_literal(d));
 }
 static void arm64_remat(int reg, int val, void *ctx) {
     struct jit_ctx *j = ctx;
@@ -341,14 +336,14 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, ADD_xi(29, 31, 0));
 
     // Save callee-saved Q8-Q15 (128 bytes).
-    put(&c, 0xadbc27e8u);  // STP Q8,Q9,[SP,#-128]!
-    put(&c, 0xad012feau);  // STP Q10,Q11,[SP,#32]
-    put(&c, 0xad0237ecu);  // STP Q12,Q13,[SP,#64]
-    put(&c, 0xad033feeu);  // STP Q14,Q15,[SP,#96]
+    put(&c, STP_qi_pre(8, 9, 31, -8));
+    put(&c, STP_qi(10, 11, 31, 2));
+    put(&c, STP_qi(12, 13, 31, 4));
+    put(&c, STP_qi(14, 15, 31, 6));
 
     int stack_patch = c.len;
-    put(&c, 0xd503201fu);
-    put(&c, 0xd503201fu);
+    put(&c, NOP());
+    put(&c, NOP());
 
     // Entry: x0=l, x1=t, x2=r, x3=b, x4=buf.
     // Save before preamble clobbers args (and XM via load_count).
@@ -373,7 +368,7 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     int loop_top = c.len;
 
     // remaining = col_end - XCOL
-    put(&c, 0xcb000000u | ((uint32_t)XCOL << 16) | (0u << 5) | (uint32_t)XT); // SUB XT,X0,XCOL
+    put(&c, SUB_xr(XT, 0, XCOL));
     put(&c, SUBS_xi(31, XT, 8));
     int br_tail = c.len;
     put(&c, Bcond(0xb, 0));
@@ -393,8 +388,7 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     int tail_top = c.len;
     c.buf[br_tail] = Bcond(0xb, tail_top - br_tail);
 
-    // CMP XCOL, X0 (col_end): xcol >= col_end means row is done
-    put(&c, 0xeb00001fu | ((uint32_t)XCOL << 5));
+    put(&c, CMP_xr(XCOL, 0));
     int br_row_done = c.len;
     put(&c, Bcond(0xa, 0));  // B.GE row_done
 
@@ -414,8 +408,7 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, ADD_xi(XCOL, XWIDTH, 0));    // XCOL = x0_col
     // LDR XT, [SP] — load saved end_row
     put(&c, LDR_xi(XT, 31, 0));
-    // CMP XY, XT — XY >= end_row means done
-    put(&c, 0xeb000000u | ((uint32_t)XT << 16) | ((uint32_t)XY << 5) | 0x1fu);
+    put(&c, CMP_xr(XY, XT));
     int br_more_rows = c.len;
     put(&c, Bcond(0xb, 0));  // B.LT → more rows
 
@@ -427,10 +420,10 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
 
     put(&c, ADD_xi(31, 29, 0));
     // Restore callee-saved Q8-Q15 from [FP-128, FP) using negative offsets.
-    put(&c, 0xad7c27e8u);  // LDP Q8,Q9,[SP,#-128]
-    put(&c, 0xad7d2feau);  // LDP Q10,Q11,[SP,#-96]
-    put(&c, 0xad7e37ecu);  // LDP Q12,Q13,[SP,#-64]
-    put(&c, 0xad7f3feeu);  // LDP Q14,Q15,[SP,#-32]
+    put(&c, LDP_qi( 8,  9, 31, -8));
+    put(&c, LDP_qi(10, 11, 31, -6));
+    put(&c, LDP_qi(12, 13, 31, -4));
+    put(&c, LDP_qi(14, 15, 31, -2));
     put(&c, LDP_post(29, 30, 31, 2));
     put(&c, RET());
 
@@ -439,7 +432,7 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     }
     c.buf[stack_patch + 1] = ADD_xi(XS, 31, 0);
     while (c.len & 3) {
-        put(&c, 0xd503201fu);
+        put(&c, NOP());
     }
     int pool_start = c.len;
     for (int pi = 0; pi < jc.pool.nbytes; pi += 4) {
