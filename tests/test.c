@@ -3863,6 +3863,62 @@ int main(void) {
         cleanup(&B);
     }
 
+    // Regression test: tail→vector row transition (ra_reset_pool).
+    // 12 cols × 3 rows forces K=8 vector (8) + tail (4) per row,
+    // then re-entering vector body on the next row.
+    {
+        struct umbra_builder *b = umbra_builder();
+        umbra_val v   = umbra_load_32(b, (umbra_ptr){0});
+        umbra_val one = umbra_imm_i32(b, 1);
+        umbra_store_32(b, (umbra_ptr){1}, umbra_add_i32(b, v, one));
+        struct test_backends B = make(b);
+
+        enum { S = 20, TH = 3, L = 3, T = 0, R = 15, BT = 3 };
+        int32_t src[S * TH], dst[S * TH];
+        for (int i = 0; i < S * TH; i++) { src[i] = i; }
+
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            __builtin_memset(dst, 0, sizeof dst);
+            if (!B.p[bi]) { continue; }
+            B.p[bi]->queue(B.p[bi], L, T, R, BT,
+                                (struct umbra_buf[]){{.ptr=src, .sz=sizeof src, .row_bytes=S * 4, .read_only=1},
+                                              {.ptr=dst, .sz=sizeof dst, .row_bytes=S * 4}});
+            B.be[bi]->flush(B.be[bi]);
+            for (int row = T; row < BT; row++) {
+                for (int col = L; col < R; col++) {
+                    int idx = row * S + col;
+                    dst[idx] == src[idx] + 1 here;
+                }
+            }
+        }
+        cleanup(&B);
+    }
+
+    // Regression test: gather with partial OOB across lo/hi boundary.
+    // Buffer of 6 elements, gather indices 0..7: first 6 in-bounds, last 2 OOB (→ 0).
+    {
+        struct umbra_builder *b = umbra_builder();
+        umbra_val ix = umbra_x(b);
+        umbra_val v  = umbra_gather_32(b, (umbra_ptr){0}, ix);
+        umbra_store_32(b, (umbra_ptr){1}, v);
+        struct test_backends B = make(b);
+
+        int32_t src[6] = {10, 20, 30, 40, 50, 60};
+        int32_t dst[16];
+
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            __builtin_memset(dst, 0xff, sizeof dst);
+            if (!B.p[bi]) { continue; }
+            B.p[bi]->queue(B.p[bi], 0, 0, 16, 1,
+                                (struct umbra_buf[]){{.ptr=src, .sz=sizeof src},
+                                              {.ptr=dst, .sz=sizeof dst}});
+            B.be[bi]->flush(B.be[bi]);
+            for (int col = 0; col < 6; col++) { dst[col] == src[col] here; }
+            for (int col = 6; col < 16; col++) { dst[col] == 0 here; }
+        }
+        cleanup(&B);
+    }
+
     return 0;
 }
 
