@@ -135,8 +135,10 @@ static void load_count(Buf *c, int p, int elem_shift, int const *deref_gpr) {
     }
 }
 
-static void vld(Buf *c, int vd, int s) { put(c, LDR_qi(vd, XS, s)); }
-static void vst(Buf *c, int vd, int s) { put(c, STR_qi(vd, XS, s)); }
+static int8_t const pair_lo[] = { 4,  6, 16, 18, 20, 22, 24, 26, 28, 30};
+static int8_t const pair_hi[] = { 5,  7, 17, 19, 21, 23, 25, 27, 29, 31};
+static int lo(int r) { return pair_lo[r]; }
+static int hi(int r) { return pair_hi[r]; }
 
 static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm,
                          int scratch) {
@@ -227,9 +229,7 @@ static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm
     }
 }
 
-static int8_t const ra_pool[] = {
-    4, 5, 6, 7, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
-};
+static int8_t const ra_pool[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
 
 struct jit_ctx {
     Buf                            *c;
@@ -238,10 +238,14 @@ struct jit_ctx {
 };
 
 static void arm64_spill(int reg, int slot, void *ctx) {
-    vst(((struct jit_ctx *)ctx)->c, reg, slot);
+    Buf *c = ((struct jit_ctx *)ctx)->c;
+    put(c, STR_qi(lo(reg), XS, 2*slot));
+    put(c, STR_qi(hi(reg), XS, 2*slot+1));
 }
 static void arm64_fill(int reg, int slot, void *ctx) {
-    vld(((struct jit_ctx *)ctx)->c, reg, slot);
+    Buf *c = ((struct jit_ctx *)ctx)->c;
+    put(c, LDR_qi(lo(reg), XS, 2*slot));
+    put(c, LDR_qi(hi(reg), XS, 2*slot+1));
 }
 static _Bool arm64_movi(Buf *c, int d, uint32_t v) {
     if (v == 0) {
@@ -291,14 +295,15 @@ static void arm64_pool_load_wide(Buf *c, struct pool *p, int d, void const *data
 }
 static void arm64_remat(int reg, int val, void *ctx) {
     struct jit_ctx *j = ctx;
-    arm64_pool_load(j->c, &j->pool, reg, (uint32_t)j->bb->inst[val].imm);
+    arm64_pool_load(j->c, &j->pool, lo(reg), (uint32_t)j->bb->inst[val].imm);
+    arm64_pool_load(j->c, &j->pool, hi(reg), (uint32_t)j->bb->inst[val].imm);
 }
 
 static struct ra *ra_create_arm64(struct umbra_basic_block const *bb, struct jit_ctx *jc) {
     struct ra_config cfg = {
         .pool = ra_pool,
-        .nregs = 20,
-        .max_reg = 32,
+        .nregs = 10,
+        .max_reg = 10,
         .spill = arm64_spill,
         .fill = arm64_fill,
         .remat = arm64_remat,
@@ -362,7 +367,7 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
 
     // remaining = col_end - XCOL
     put(&c, 0xcb000000u | ((uint32_t)XCOL << 16) | (0u << 5) | (uint32_t)XT); // SUB XT,X0,XCOL
-    put(&c, SUBS_xi(31, XT, 4));
+    put(&c, SUBS_xi(31, XT, 8));
     int br_tail = c.len;
     put(&c, Bcond(0xb, 0));
     put(&c, LSL_xi(XH, XCOL, 1));
@@ -375,7 +380,7 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
 
     int loop_body_end = c.len;
 
-    put(&c, ADD_xi(XCOL, XCOL, 4));
+    put(&c, ADD_xi(XCOL, XCOL, 8));
     put(&c, B(loop_top - c.len));
 
     int tail_top = c.len;
@@ -386,7 +391,7 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     int br_row_done = c.len;
     put(&c, Bcond(0xa, 0));  // B.GE row_done
 
-    for (int i = 0; i < bb->insts; i++) { ra_free_reg(ra, i); }
+    ra_reset_pool(ra);
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
 
     emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
@@ -418,7 +423,7 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, RET());
 
     if (ns > 0) {
-        c.buf[stack_patch] = SUB_xi(31, 31, ns * 16);
+        c.buf[stack_patch] = SUB_xi(31, 31, ns * 32);
     }
     c.buf[stack_patch + 1] = ADD_xi(XS, 31, 0);
     while (c.len & 3) {
@@ -508,20 +513,24 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 
         case op_x: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            put(c, DUP_4s_w(s.rd, XCOL));
+            put(c, DUP_4s_w(lo(s.rd), XCOL));
             if (!scalar) {
+                put(c, DUP_4s_w(hi(s.rd), XCOL));
                 int8_t   tmp = ra_alloc(ra, sl, ns);
-                uint32_t iota4[4] = {0, 1, 2, 3};
-                arm64_pool_load_wide(c, &jc->pool, tmp, iota4);
-                put(c, ADD_4s(s.rd, s.rd, tmp));
+                uint32_t iota_lo[4] = {0, 1, 2, 3};
+                uint32_t iota_hi[4] = {4, 5, 6, 7};
+                arm64_pool_load_wide(c, &jc->pool, lo(tmp), iota_lo);
+                put(c, ADD_4s(lo(s.rd), lo(s.rd), lo(tmp)));
+                arm64_pool_load_wide(c, &jc->pool, lo(tmp), iota_hi);
+                put(c, ADD_4s(hi(s.rd), hi(s.rd), lo(tmp)));
                 ra_return_reg(ra, tmp);
             }
         } break;
 
         case op_y: {
-            // y = row counter XY, broadcast.
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            put(c, DUP_4s_w(s.rd, XY));
+            put(c, DUP_4s_w(lo(s.rd), XY));
+            if (!scalar) { put(c, DUP_4s_w(hi(s.rd), XY)); }
         } break;
 
         case op_load_32: {
@@ -529,9 +538,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int            p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {
-                put(c, LDR_sx(s.rd, XP, XI));
+                put(c, LDR_sx(lo(s.rd), XP, XI));
             } else {
-                put(c, LDR_q(s.rd, XP, XW));
+                put(c, LSL_xi(XT, XI, 2));
+                put(c, ADD_xr(XT, XP, XT));
+                put(c, LDR_qi(lo(s.rd), XT, 0));
+                put(c, LDR_qi(hi(s.rd), XT, 1));
             }
         } break;
 
@@ -541,9 +553,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {
                 put(c, LDRH_wr(XT, XP, XI));
-                put(c, DUP_4s_w(s.rd, XT));
+                put(c, DUP_4s_w(lo(s.rd), XT));
             } else {
-                put(c, LDR_d(s.rd, XP, XH));
+                put(c, LSL_xi(XT, XI, 1));
+                put(c, ADD_xr(XT, XP, XT));
+                put(c, LDR_di(lo(s.rd), XT, 0));
+                put(c, LDR_di(hi(s.rd), XT, 1));
             }
         } break;
 
@@ -553,8 +568,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_imm_w(c, XT, (uint32_t)inst->imm);
             put(c, ADD_xr(XT, XP, XT));
-            put(c, LDR_si(s.rd, XT, 0));
-            put(c, DUP_4s_lane(s.rd, s.rd, 0));
+            put(c, LDR_si(lo(s.rd), XT, 0));
+            put(c, DUP_4s_lane(lo(s.rd), lo(s.rd), 0));
+            put(c, ORR_16b(hi(s.rd), lo(s.rd), lo(s.rd)));
         } break;
 
         case op_gather_uniform_32: {
@@ -564,12 +580,15 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_count(c, p, 2, deref_gpr);
-            put(c, UMOV_ws(XT, rx));
-            put(c, MOVI_4s(s.rd, 0, 0));
+            put(c, UMOV_ws(XT, lo(rx)));
+            put(c, MOVI_4s(lo(s.rd), 0, 0));
+            if (!scalar) { put(c, MOVI_4s(hi(s.rd), 0, 0)); }
             put(c, CMP_wr(XT, XM));
-            put(c, Bcond(0x2, 3));
+            int skip = scalar ? 3 : 4;
+            put(c, Bcond(0x2, skip));
             put(c, LDR_wr(XT, XP, XT));
-            put(c, DUP_4s_w(s.rd, XT));
+            put(c, DUP_4s_w(lo(s.rd), XT));
+            if (!scalar) { put(c, DUP_4s_w(hi(s.rd), XT)); }
         } break;
 
         case op_gather_32: {
@@ -580,20 +599,29 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_count(c, p, 2, deref_gpr);
             if (scalar) {
-                put(c, MOVI_4s(s.rd, 0, 0));
-                put(c, UMOV_ws(XT, rx));
+                put(c, MOVI_4s(lo(s.rd), 0, 0));
+                put(c, UMOV_ws(XT, lo(rx)));
                 put(c, CMP_wr(XT, XM));
                 put(c, Bcond(0x2, 2));
-                put(c, LDR_sx(s.rd, XP, XT));
+                put(c, LDR_sx(lo(s.rd), XP, XT));
             } else {
-                put(c, MOVI_4s(s.rd, 0, 0));
+                put(c, MOVI_4s(lo(s.rd), 0, 0));
+                put(c, MOVI_4s(hi(s.rd), 0, 0));
                 for (int k = 0; k < 4; k++) {
-                    put(c, UMOV_ws_lane(XT, rx, k));
+                    put(c, UMOV_ws_lane(XT, lo(rx), k));
                     put(c, CMP_wr(XT, XM));
                     put(c, Bcond(0x2, 4));
                     put(c, LSL_xi(XT, XT, 2));
                     put(c, ADD_xr(XT, XP, XT));
-                    put(c, LD1_s(s.rd, k, XT));
+                    put(c, LD1_s(lo(s.rd), k, XT));
+                }
+                for (int k = 0; k < 4; k++) {
+                    put(c, UMOV_ws_lane(XT, hi(rx), k));
+                    put(c, CMP_wr(XT, XM));
+                    put(c, Bcond(0x2, 4));
+                    put(c, LSL_xi(XT, XT, 2));
+                    put(c, ADD_xr(XT, XP, XT));
+                    put(c, LD1_s(hi(s.rd), k, XT));
                 }
             }
         } break;
@@ -607,60 +635,70 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_count(c, p, 2, deref_gpr);
             if (scalar) {
-                // floor + frac
-                put(c, FRINTM_4s(hi_r, rx));
-                put(c, FSUB_4s(frac, rx, hi_r));
+                put(c, FRINTM_4s(lo(hi_r), lo(rx)));
+                put(c, FSUB_4s(lo(frac), lo(rx), lo(hi_r)));
                 free_chan(ra, inst->x, i);
-                put(c, FCVTZS_4s(hi_r, hi_r));
-                // extract lo index once, use for both gathers
-                put(c, UMOV_ws(XT, hi_r));
-                // gather lo
-                put(c, MOVI_4s(s.rd, 0, 0));
+                put(c, FCVTZS_4s(lo(hi_r), lo(hi_r)));
+                put(c, UMOV_ws(XT, lo(hi_r)));
+                put(c, MOVI_4s(lo(s.rd), 0, 0));
                 put(c, CMP_wr(XT, XM));
                 put(c, Bcond(0x2, 2));
-                put(c, LDR_sx(s.rd, XP, XT));
-                // gather hi (lo_i + 1)
+                put(c, LDR_sx(lo(s.rd), XP, XT));
                 put(c, ADD_xi(XT, XT, 1));
-                put(c, MOVI_4s(hi_r, 0, 0));
+                put(c, MOVI_4s(lo(hi_r), 0, 0));
                 put(c, CMP_wr(XT, XM));
                 put(c, Bcond(0x2, 2));
-                put(c, LDR_sx(hi_r, XP, XT));
-                // lerp: s.rd = lo + (hi - lo) * frac
-                put(c, FSUB_4s(hi_r, hi_r, s.rd));
-                put(c, FMLA_4s(s.rd, hi_r, frac));
+                put(c, LDR_sx(lo(hi_r), XP, XT));
+                put(c, FSUB_4s(lo(hi_r), lo(hi_r), lo(s.rd)));
+                put(c, FMLA_4s(lo(s.rd), lo(hi_r), lo(frac)));
             } else {
-                // floor + frac
-                put(c, FRINTM_4s(hi_r, rx));
-                put(c, FSUB_4s(frac, rx, hi_r));
+                put(c, FRINTM_4s(lo(hi_r), lo(rx)));
+                put(c, FSUB_4s(lo(frac), lo(rx), lo(hi_r)));
+                put(c, FRINTM_4s(hi(hi_r), hi(rx)));
+                put(c, FSUB_4s(hi(frac), hi(rx), hi(hi_r)));
                 free_chan(ra, inst->x, i);
                 int8_t int_ix = ra_alloc(ra, sl, ns);
-                put(c, FCVTZS_4s(int_ix, hi_r));
-                // Gather lo and hi in one pass per lane.
-                // XM holds count.  For each lane, extract index,
-                // bounds-check for lo, then add 1 and bounds-check for hi.
-                put(c, MOVI_4s(s.rd, 0, 0));
-                put(c, MOVI_4s(hi_r, 0, 0));
+                put(c, FCVTZS_4s(lo(int_ix), lo(hi_r)));
+                put(c, FCVTZS_4s(hi(int_ix), hi(hi_r)));
+                put(c, MOVI_4s(lo(s.rd), 0, 0));
+                put(c, MOVI_4s(lo(hi_r), 0, 0));
                 for (int k = 0; k < 4; k++) {
-                    put(c, UMOV_ws_lane(XT, int_ix, k));
-                    // lo gather: if (ix >= 0 && ix < count)
+                    put(c, UMOV_ws_lane(XT, lo(int_ix), k));
                     put(c, CMP_wr(XT, XM));
                     put(c, Bcond(0x2, 4));
                     put(c, LSL_xi(XT, XT, 2));
                     put(c, ADD_xr(XT, XP, XT));
-                    put(c, LD1_s(s.rd, k, XT));
-                    // hi gather: ix+1
-                    put(c, UMOV_ws_lane(XT, int_ix, k));
+                    put(c, LD1_s(lo(s.rd), k, XT));
+                    put(c, UMOV_ws_lane(XT, lo(int_ix), k));
                     put(c, ADD_xi(XT, XT, 1));
                     put(c, CMP_wr(XT, XM));
                     put(c, Bcond(0x2, 4));
                     put(c, LSL_xi(XT, XT, 2));
                     put(c, ADD_xr(XT, XP, XT));
-                    put(c, LD1_s(hi_r, k, XT));
+                    put(c, LD1_s(lo(hi_r), k, XT));
+                }
+                put(c, FSUB_4s(lo(hi_r), lo(hi_r), lo(s.rd)));
+                put(c, FMLA_4s(lo(s.rd), lo(hi_r), lo(frac)));
+                put(c, MOVI_4s(hi(s.rd), 0, 0));
+                put(c, MOVI_4s(hi(hi_r), 0, 0));
+                for (int k = 0; k < 4; k++) {
+                    put(c, UMOV_ws_lane(XT, hi(int_ix), k));
+                    put(c, CMP_wr(XT, XM));
+                    put(c, Bcond(0x2, 4));
+                    put(c, LSL_xi(XT, XT, 2));
+                    put(c, ADD_xr(XT, XP, XT));
+                    put(c, LD1_s(hi(s.rd), k, XT));
+                    put(c, UMOV_ws_lane(XT, hi(int_ix), k));
+                    put(c, ADD_xi(XT, XT, 1));
+                    put(c, CMP_wr(XT, XM));
+                    put(c, Bcond(0x2, 4));
+                    put(c, LSL_xi(XT, XT, 2));
+                    put(c, ADD_xr(XT, XP, XT));
+                    put(c, LD1_s(hi(hi_r), k, XT));
                 }
                 ra_return_reg(ra, int_ix);
-                // lerp: s.rd = lo + (hi - lo) * frac
-                put(c, FSUB_4s(hi_r, hi_r, s.rd));
-                put(c, FMLA_4s(s.rd, hi_r, frac));
+                put(c, FSUB_4s(hi(hi_r), hi(hi_r), hi(s.rd)));
+                put(c, FMLA_4s(hi(s.rd), hi(hi_r), hi(frac)));
             }
             ra_return_reg(ra, hi_r);
             ra_return_reg(ra, frac);
@@ -674,26 +712,37 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_count(c, p, 1, deref_gpr);
             if (scalar) {
-                put(c, MOVI_4s(s.rd, 0, 0));
-                put(c, UMOV_ws(XT, rx));
+                put(c, MOVI_4s(lo(s.rd), 0, 0));
+                put(c, UMOV_ws(XT, lo(rx)));
                 put(c, CMP_wr(XT, XM));
                 put(c, Bcond(0x2, 5));
                 put(c, LSL_xi(XT, XT, 1));
                 put(c, ADD_xr(XT, XP, XT));
                 put(c, LDRH_wi(XT, XT, 0));
-                put(c, DUP_4s_w(s.rd, XT));
+                put(c, DUP_4s_w(lo(s.rd), XT));
             } else {
-                put(c, MOVI_4s(s.rd, 0, 0));
+                put(c, MOVI_4s(lo(s.rd), 0, 0));
                 for (int k = 0; k < 4; k++) {
-                    put(c, UMOV_ws_lane(XT, rx, k));
+                    put(c, UMOV_ws_lane(XT, lo(rx), k));
                     put(c, CMP_wr(XT, XM));
                     put(c, Bcond(0x2, 5));
                     put(c, LSL_xi(XT, XT, 1));
                     put(c, ADD_xr(XT, XP, XT));
                     put(c, LDRH_wi(XT, XT, 0));
-                    put(c, INS_s(s.rd, k, XT));
+                    put(c, INS_s(lo(s.rd), k, XT));
                 }
-                put(c, XTN_4h(s.rd, s.rd));
+                put(c, XTN_4h(lo(s.rd), lo(s.rd)));
+                put(c, MOVI_4s(hi(s.rd), 0, 0));
+                for (int k = 0; k < 4; k++) {
+                    put(c, UMOV_ws_lane(XT, hi(rx), k));
+                    put(c, CMP_wr(XT, XM));
+                    put(c, Bcond(0x2, 5));
+                    put(c, LSL_xi(XT, XT, 1));
+                    put(c, ADD_xr(XT, XP, XT));
+                    put(c, LDRH_wi(XT, XT, 0));
+                    put(c, INS_s(hi(s.rd), k, XT));
+                }
+                put(c, XTN_4h(hi(s.rd), hi(s.rd)));
             }
         } break;
 
@@ -702,9 +751,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {
-                put(c, STR_sx(ry, XP, XI));
+                put(c, STR_sx(lo(ry), XP, XI));
             } else {
-                put(c, STR_q(ry, XP, XW));
+                put(c, LSL_xi(XT, XI, 2));
+                put(c, ADD_xr(XT, XP, XT));
+                put(c, STR_qi(lo(ry), XT, 0));
+                put(c, STR_qi(hi(ry), XT, 1));
             }
             free_chan(ra, inst->y, i);
         } break;
@@ -719,18 +771,24 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             if (scalar) {
                 put(c, LSL_xi(XT, XI, 3));
                 put(c, ADD_xr(XT, XP, XT));
-                put(c, LDR_hi(s0.rd, XT, 0));
-                put(c, LDR_hi(r1,    XT, 1));
-                put(c, LDR_hi(r2,    XT, 2));
-                put(c, LDR_hi(r3,    XT, 3));
+                put(c, LDR_hi(lo(s0.rd), XT, 0));
+                put(c, LDR_hi(lo(r1),    XT, 1));
+                put(c, LDR_hi(lo(r2),    XT, 2));
+                put(c, LDR_hi(lo(r3),    XT, 3));
             } else {
                 put(c, LSL_xi(XT, XI, 3));
                 put(c, ADD_xr(XT, XP, XT));
                 put(c, LD4_4h(0, XT));
-                put(c, ORR_16b(s0.rd, 0, 0));
-                put(c, ORR_16b(r1,    1, 1));
-                put(c, ORR_16b(r2,    2, 2));
-                put(c, ORR_16b(r3,    3, 3));
+                put(c, ORR_16b(lo(s0.rd), 0, 0));
+                put(c, ORR_16b(lo(r1),    1, 1));
+                put(c, ORR_16b(lo(r2),    2, 2));
+                put(c, ORR_16b(lo(r3),    3, 3));
+                put(c, ADD_xi(XT, XT, 32));
+                put(c, LD4_4h(0, XT));
+                put(c, ORR_16b(hi(s0.rd), 0, 0));
+                put(c, ORR_16b(hi(r1),    1, 1));
+                put(c, ORR_16b(hi(r2),    2, 2));
+                put(c, ORR_16b(hi(r3),    3, 3));
             }
             ra_set_chan_reg(ra, i, 0, s0.rd);
             ra_set_chan_reg(ra, i, 1, r1);
@@ -752,21 +810,33 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, LSR_xi(XT, XT, 2));
             }
             if (scalar) {
-                put(c, LDR_hx(s0.rd, XP, XI));
+                put(c, LDR_hx(lo(s0.rd), XP, XI));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, LDR_hx(r1, XP, XI));
+                put(c, LDR_hx(lo(r1), XP, XI));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, LDR_hx(r2, XP, XI));
+                put(c, LDR_hx(lo(r2), XP, XI));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, LDR_hx(r3, XP, XI));
+                put(c, LDR_hx(lo(r3), XP, XI));
             } else {
-                put(c, LDR_d(s0.rd, XP, XH));
+                put(c, LSL_xi(XH, XI, 1));
+                put(c, LDR_d(lo(s0.rd), XP, XH));
+                put(c, ADD_xi(XH, XH, 8));
+                put(c, LDR_d(hi(s0.rd), XP, XH));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, LDR_d(r1, XP, XH));
+                put(c, SUB_xi(XH, XH, 8));
+                put(c, LDR_d(lo(r1), XP, XH));
+                put(c, ADD_xi(XH, XH, 8));
+                put(c, LDR_d(hi(r1), XP, XH));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, LDR_d(r2, XP, XH));
+                put(c, SUB_xi(XH, XH, 8));
+                put(c, LDR_d(lo(r2), XP, XH));
+                put(c, ADD_xi(XH, XH, 8));
+                put(c, LDR_d(hi(r2), XP, XH));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, LDR_d(r3, XP, XH));
+                put(c, SUB_xi(XH, XH, 8));
+                put(c, LDR_d(lo(r3), XP, XH));
+                put(c, ADD_xi(XH, XH, 8));
+                put(c, LDR_d(hi(r3), XP, XH));
             }
             last_ptr = -1;
             ra_return_reg(ra, px);
@@ -786,22 +856,28 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 int8_t px = ra_alloc(ra, sl, ns);
                 int8_t t  = ra_alloc(ra, sl, ns);
                 int8_t z  = ra_alloc(ra, sl, ns);
-                put(c, ZIP1_8h(t, rr, rg));
-                put(c, ZIP1_8h(px, rb_, ra_v));
-                put(c, ZIP1_4s(z, t, px));
+                put(c, ZIP1_8h(lo(t), lo(rr), lo(rg)));
+                put(c, ZIP1_8h(lo(px), lo(rb_), lo(ra_v)));
+                put(c, ZIP1_4s(lo(z), lo(t), lo(px)));
                 put(c, LSL_xi(XT, XI, 3));
                 put(c, ADD_xr(XT, XP, XT));
-                put(c, STR_di(z, XT, 0));
+                put(c, STR_di(lo(z), XT, 0));
                 ra_return_reg(ra, z);
                 ra_return_reg(ra, t);
                 ra_return_reg(ra, px);
             } else {
-                put(c, ORR_16b(0, rr,   rr));
-                put(c, ORR_16b(1, rg,   rg));
-                put(c, ORR_16b(2, rb_,  rb_));
-                put(c, ORR_16b(3, ra_v, ra_v));
+                put(c, ORR_16b(0, lo(rr),   lo(rr)));
+                put(c, ORR_16b(1, lo(rg),   lo(rg)));
+                put(c, ORR_16b(2, lo(rb_),  lo(rb_)));
+                put(c, ORR_16b(3, lo(ra_v), lo(ra_v)));
                 put(c, LSL_xi(XT, XI, 3));
                 put(c, ADD_xr(XT, XP, XT));
+                put(c, ST4_4h(0, XT));
+                put(c, ORR_16b(0, hi(rr),   hi(rr)));
+                put(c, ORR_16b(1, hi(rg),   hi(rg)));
+                put(c, ORR_16b(2, hi(rb_),  hi(rb_)));
+                put(c, ORR_16b(3, hi(ra_v), hi(ra_v)));
+                put(c, ADD_xi(XT, XT, 32));
                 put(c, ST4_4h(0, XT));
             }
             free_chan(ra, inst->x, i);
@@ -823,21 +899,33 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, LSR_xi(XT, XT, 2));
             }
             if (scalar) {
-                put(c, STR_hx(rr, XP, XI));
+                put(c, STR_hx(lo(rr), XP, XI));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, STR_hx(rg, XP, XI));
+                put(c, STR_hx(lo(rg), XP, XI));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, STR_hx(rb_, XP, XI));
+                put(c, STR_hx(lo(rb_), XP, XI));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, STR_hx(ra_v, XP, XI));
+                put(c, STR_hx(lo(ra_v), XP, XI));
             } else {
-                put(c, STR_d(rr, XP, XH));
+                put(c, LSL_xi(XH, XI, 1));
+                put(c, STR_d(lo(rr), XP, XH));
+                put(c, ADD_xi(XH, XH, 8));
+                put(c, STR_d(hi(rr), XP, XH));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, STR_d(rg, XP, XH));
+                put(c, SUB_xi(XH, XH, 8));
+                put(c, STR_d(lo(rg), XP, XH));
+                put(c, ADD_xi(XH, XH, 8));
+                put(c, STR_d(hi(rg), XP, XH));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, STR_d(rb_, XP, XH));
+                put(c, SUB_xi(XH, XH, 8));
+                put(c, STR_d(lo(rb_), XP, XH));
+                put(c, ADD_xi(XH, XH, 8));
+                put(c, STR_d(hi(rb_), XP, XH));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, STR_d(ra_v, XP, XH));
+                put(c, SUB_xi(XH, XH, 8));
+                put(c, STR_d(lo(ra_v), XP, XH));
+                put(c, ADD_xi(XH, XH, 8));
+                put(c, STR_d(hi(ra_v), XP, XH));
             }
             last_ptr = -1;
             free_chan(ra, inst->x, i);
@@ -855,18 +943,28 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             int8_t px   = ra_alloc(ra, sl, ns);
             int8_t mask = ra_alloc(ra, sl, ns);
-            put(c, MOVI_4s(mask, 0xFF, 0));
+            put(c, MOVI_4s(lo(mask), 0xFF, 0));
             if (scalar) {
-                put(c, LDR_sx(px, XP, XI));
+                put(c, LDR_sx(lo(px), XP, XI));
+                put(c, AND_16b(lo(s0.rd), lo(px), lo(mask)));
+                put(c, USHR_4s_imm(lo(r1), lo(px), 8));  put(c, AND_16b(lo(r1), lo(r1), lo(mask)));
+                put(c, USHR_4s_imm(lo(r2), lo(px), 16)); put(c, AND_16b(lo(r2), lo(r2), lo(mask)));
+                put(c, USHR_4s_imm(lo(r3), lo(px), 24));
             } else {
+                put(c, MOVI_4s(hi(mask), 0xFF, 0));
                 put(c, LSL_xi(XT, XI, 2));
                 put(c, ADD_xr(XT, XP, XT));
-                put(c, LDR_qi(px, XT, 0));
+                put(c, LDR_qi(lo(px), XT, 0));
+                put(c, LDR_qi(hi(px), XT, 1));
+                put(c, AND_16b(lo(s0.rd), lo(px), lo(mask)));
+                put(c, AND_16b(hi(s0.rd), hi(px), hi(mask)));
+                put(c, USHR_4s_imm(lo(r1), lo(px), 8));  put(c, AND_16b(lo(r1), lo(r1), lo(mask)));
+                put(c, USHR_4s_imm(hi(r1), hi(px), 8));  put(c, AND_16b(hi(r1), hi(r1), hi(mask)));
+                put(c, USHR_4s_imm(lo(r2), lo(px), 16)); put(c, AND_16b(lo(r2), lo(r2), lo(mask)));
+                put(c, USHR_4s_imm(hi(r2), hi(px), 16)); put(c, AND_16b(hi(r2), hi(r2), hi(mask)));
+                put(c, USHR_4s_imm(lo(r3), lo(px), 24));
+                put(c, USHR_4s_imm(hi(r3), hi(px), 24));
             }
-            put(c, AND_16b(s0.rd, px, mask));
-            put(c, USHR_4s_imm(r1, px, 8));  put(c, AND_16b(r1, r1, mask));
-            put(c, USHR_4s_imm(r2, px, 16)); put(c, AND_16b(r2, r2, mask));
-            put(c, USHR_4s_imm(r3, px, 24));
             ra_return_reg(ra, mask);
             ra_return_reg(ra, px);
             ra_set_chan_reg(ra, i, 0, s0.rd);
@@ -883,15 +981,22 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             int8_t px = ra_alloc(ra, sl, ns);
             int8_t t  = ra_alloc(ra, sl, ns);
-            put(c, SHL_4s_imm(t, rg, 8));    put(c, ORR_16b(px, rr, t));
-            put(c, SHL_4s_imm(t, rb_, 16));  put(c, ORR_16b(px, px, t));
-            put(c, SHL_4s_imm(t, ra_v, 24)); put(c, ORR_16b(px, px, t));
             if (scalar) {
-                put(c, STR_sx(px, XP, XI));
+                put(c, SHL_4s_imm(lo(t), lo(rg), 8));    put(c, ORR_16b(lo(px), lo(rr), lo(t)));
+                put(c, SHL_4s_imm(lo(t), lo(rb_), 16));  put(c, ORR_16b(lo(px), lo(px), lo(t)));
+                put(c, SHL_4s_imm(lo(t), lo(ra_v), 24)); put(c, ORR_16b(lo(px), lo(px), lo(t)));
+                put(c, STR_sx(lo(px), XP, XI));
             } else {
+                put(c, SHL_4s_imm(lo(t), lo(rg), 8));    put(c, ORR_16b(lo(px), lo(rr), lo(t)));
+                put(c, SHL_4s_imm(lo(t), lo(rb_), 16));  put(c, ORR_16b(lo(px), lo(px), lo(t)));
+                put(c, SHL_4s_imm(lo(t), lo(ra_v), 24)); put(c, ORR_16b(lo(px), lo(px), lo(t)));
+                put(c, SHL_4s_imm(hi(t), hi(rg), 8));    put(c, ORR_16b(hi(px), hi(rr), hi(t)));
+                put(c, SHL_4s_imm(hi(t), hi(rb_), 16));  put(c, ORR_16b(hi(px), hi(px), hi(t)));
+                put(c, SHL_4s_imm(hi(t), hi(ra_v), 24)); put(c, ORR_16b(hi(px), hi(px), hi(t)));
                 put(c, LSL_xi(XT, XI, 2));
                 put(c, ADD_xr(XT, XP, XT));
-                put(c, STR_qi(px, XT, 0));
+                put(c, STR_qi(lo(px), XT, 0));
+                put(c, STR_qi(hi(px), XT, 1));
             }
             ra_return_reg(ra, t);
             ra_return_reg(ra, px);
@@ -906,41 +1011,50 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {
-                put(c, STR_hx(ry, XP, XI));
+                put(c, STR_hx(lo(ry), XP, XI));
             } else {
-                put(c, STR_d(ry, XP, XH));
+                put(c, LSL_xi(XT, XI, 1));
+                put(c, ADD_xr(XT, XP, XT));
+                put(c, STR_di(lo(ry), XT, 0));
+                put(c, STR_di(hi(ry), XT, 1));
             }
             free_chan(ra, inst->y, i);
         } break;
 
         case op_f32_from_f16: {
             struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
-            put(c, FCVTL_4s(s.rd, s.rx));
+            put(c, FCVTL_4s(lo(s.rd), lo(s.rx)));
+            if (!scalar) { put(c, FCVTL_4s(hi(s.rd), hi(s.rx))); }
         } break;
 
         case op_f16_from_f32: {
             struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
-            put(c, FCVTN_4h(s.rd, s.rx));
+            put(c, FCVTN_4h(lo(s.rd), lo(s.rx)));
+            if (!scalar) { put(c, FCVTN_4h(hi(s.rd), hi(s.rx))); }
         } break;
 
         case op_i32_from_s16: {
             struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
-            put(c, SXTL_4s(s.rd, s.rx));
+            put(c, SXTL_4s(lo(s.rd), lo(s.rx)));
+            if (!scalar) { put(c, SXTL_4s(hi(s.rd), hi(s.rx))); }
         } break;
 
         case op_i32_from_u16: {
             struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
-            put(c, UXTL_4s(s.rd, s.rx));
+            put(c, UXTL_4s(lo(s.rd), lo(s.rx)));
+            if (!scalar) { put(c, UXTL_4s(hi(s.rd), hi(s.rx))); }
         } break;
 
         case op_i16_from_i32: {
             struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
-            put(c, XTN_4h(s.rd, s.rx));
+            put(c, XTN_4h(lo(s.rd), lo(s.rx)));
+            if (!scalar) { put(c, XTN_4h(hi(s.rd), hi(s.rx))); }
         } break;
 
         case op_imm_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            arm64_pool_load(c, &jc->pool, s.rd, (uint32_t)inst->imm);
+            arm64_pool_load(c, &jc->pool, lo(s.rd), (uint32_t)inst->imm);
+            arm64_pool_load(c, &jc->pool, hi(s.rd), (uint32_t)inst->imm);
         } break;
 
         case op_add_f32:
@@ -982,7 +1096,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         {
             int nscratch = (inst->op == op_shr_u32 || inst->op == op_shr_s32) ? 1 : 0;
             struct ra_step s = ra_step_alu(ra, sl, ns, inst, i, scalar, nscratch);
-            emit_alu_reg(c, inst->op, s.rd, s.rx, s.ry, s.rz, inst->imm, s.scratch);
+            int sc_lo = s.scratch >= 0 ? lo(s.scratch) : -1;
+            emit_alu_reg(c, inst->op, lo(s.rd), lo(s.rx), lo(s.ry), lo(s.rz),
+                         inst->imm, sc_lo);
+            if (!scalar) {
+                int sc_hi = s.scratch >= 0 ? hi(s.scratch) : -1;
+                emit_alu_reg(c, inst->op, hi(s.rd), hi(s.rx), hi(s.ry), hi(s.rz),
+                             inst->imm, sc_hi);
+            }
             if (s.scratch >= 0) { ra_return_reg(ra, s.scratch); }
         } break;
 
@@ -990,7 +1111,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_shr_u32_imm:
         case op_shr_s32_imm: {
             struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
-            emit_alu_reg(c, inst->op, s.rd, s.rx, 0, 0, inst->imm, -1);
+            emit_alu_reg(c, inst->op, lo(s.rd), lo(s.rx), 0, 0, inst->imm, -1);
+            if (!scalar) {
+                emit_alu_reg(c, inst->op, hi(s.rd), hi(s.rx), 0, 0, inst->imm, -1);
+            }
         } break;
 
         case op_and_32_imm:
@@ -1016,25 +1140,47 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             free_chan(ra, inst->y, i);
             enum op o = inst->op;
             uint32_t w =
-                o == op_add_f32_imm ? FADD_4s(s.rd, s.rx, ir)  :
-                o == op_sub_f32_imm ? FSUB_4s(s.rd, s.rx, ir)  :
-                o == op_mul_f32_imm ? FMUL_4s(s.rd, s.rx, ir)  :
-                o == op_div_f32_imm ? FDIV_4s(s.rd, s.rx, ir)  :
-                o == op_min_f32_imm ? FMINNM_4s(s.rd, s.rx, ir):
-                o == op_max_f32_imm ? FMAXNM_4s(s.rd, s.rx, ir):
-                o == op_add_i32_imm ? ADD_4s(s.rd, s.rx, ir)   :
-                o == op_sub_i32_imm ? SUB_4s(s.rd, s.rx, ir)   :
-                o == op_mul_i32_imm ? MUL_4s(s.rd, s.rx, ir)   :
-                o == op_and_32_imm     ? AND_16b(s.rd, s.rx, ir)  :
-                o == op_or_32_imm   ? ORR_16b(s.rd, s.rx, ir)  :
-                o == op_xor_32_imm  ? EOR_16b(s.rd, s.rx, ir)  :
-                o == op_eq_f32_imm  ? FCMEQ_4s(s.rd, ir, s.rx) :
-                o == op_lt_f32_imm  ? FCMGT_4s(s.rd, ir, s.rx) :
-                o == op_le_f32_imm  ? FCMGE_4s(s.rd, ir, s.rx) :
-                o == op_eq_i32_imm  ? CMEQ_4s(s.rd, ir, s.rx)  :
-                o == op_lt_s32_imm  ? CMGT_4s(s.rd, ir, s.rx)  :
-                                      CMGE_4s(s.rd, ir, s.rx);
+                o == op_add_f32_imm ? FADD_4s(lo(s.rd), lo(s.rx), lo(ir))  :
+                o == op_sub_f32_imm ? FSUB_4s(lo(s.rd), lo(s.rx), lo(ir))  :
+                o == op_mul_f32_imm ? FMUL_4s(lo(s.rd), lo(s.rx), lo(ir))  :
+                o == op_div_f32_imm ? FDIV_4s(lo(s.rd), lo(s.rx), lo(ir))  :
+                o == op_min_f32_imm ? FMINNM_4s(lo(s.rd), lo(s.rx), lo(ir)):
+                o == op_max_f32_imm ? FMAXNM_4s(lo(s.rd), lo(s.rx), lo(ir)):
+                o == op_add_i32_imm ? ADD_4s(lo(s.rd), lo(s.rx), lo(ir))   :
+                o == op_sub_i32_imm ? SUB_4s(lo(s.rd), lo(s.rx), lo(ir))   :
+                o == op_mul_i32_imm ? MUL_4s(lo(s.rd), lo(s.rx), lo(ir))   :
+                o == op_and_32_imm  ? AND_16b(lo(s.rd), lo(s.rx), lo(ir))  :
+                o == op_or_32_imm   ? ORR_16b(lo(s.rd), lo(s.rx), lo(ir))  :
+                o == op_xor_32_imm  ? EOR_16b(lo(s.rd), lo(s.rx), lo(ir))  :
+                o == op_eq_f32_imm  ? FCMEQ_4s(lo(s.rd), lo(ir), lo(s.rx)) :
+                o == op_lt_f32_imm  ? FCMGT_4s(lo(s.rd), lo(ir), lo(s.rx)) :
+                o == op_le_f32_imm  ? FCMGE_4s(lo(s.rd), lo(ir), lo(s.rx)) :
+                o == op_eq_i32_imm  ? CMEQ_4s(lo(s.rd), lo(ir), lo(s.rx))  :
+                o == op_lt_s32_imm  ? CMGT_4s(lo(s.rd), lo(ir), lo(s.rx))  :
+                                      CMGE_4s(lo(s.rd), lo(ir), lo(s.rx));
             put(c, w);
+            if (!scalar) {
+                uint32_t w2 =
+                    o == op_add_f32_imm ? FADD_4s(hi(s.rd), hi(s.rx), hi(ir))  :
+                    o == op_sub_f32_imm ? FSUB_4s(hi(s.rd), hi(s.rx), hi(ir))  :
+                    o == op_mul_f32_imm ? FMUL_4s(hi(s.rd), hi(s.rx), hi(ir))  :
+                    o == op_div_f32_imm ? FDIV_4s(hi(s.rd), hi(s.rx), hi(ir))  :
+                    o == op_min_f32_imm ? FMINNM_4s(hi(s.rd), hi(s.rx), hi(ir)):
+                    o == op_max_f32_imm ? FMAXNM_4s(hi(s.rd), hi(s.rx), hi(ir)):
+                    o == op_add_i32_imm ? ADD_4s(hi(s.rd), hi(s.rx), hi(ir))   :
+                    o == op_sub_i32_imm ? SUB_4s(hi(s.rd), hi(s.rx), hi(ir))   :
+                    o == op_mul_i32_imm ? MUL_4s(hi(s.rd), hi(s.rx), hi(ir))   :
+                    o == op_and_32_imm  ? AND_16b(hi(s.rd), hi(s.rx), hi(ir))  :
+                    o == op_or_32_imm   ? ORR_16b(hi(s.rd), hi(s.rx), hi(ir))  :
+                    o == op_xor_32_imm  ? EOR_16b(hi(s.rd), hi(s.rx), hi(ir))  :
+                    o == op_eq_f32_imm  ? FCMEQ_4s(hi(s.rd), hi(ir), hi(s.rx)) :
+                    o == op_lt_f32_imm  ? FCMGT_4s(hi(s.rd), hi(ir), hi(s.rx)) :
+                    o == op_le_f32_imm  ? FCMGE_4s(hi(s.rd), hi(ir), hi(s.rx)) :
+                    o == op_eq_i32_imm  ? CMEQ_4s(hi(s.rd), hi(ir), hi(s.rx))  :
+                    o == op_lt_s32_imm  ? CMGT_4s(hi(s.rd), hi(ir), hi(s.rx))  :
+                                          CMGE_4s(hi(s.rd), hi(ir), hi(s.rx));
+                put(c, w2);
+            }
         } break;
         }
     }

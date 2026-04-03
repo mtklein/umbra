@@ -20,6 +20,7 @@ struct ra;
 
 struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const *cfg);
 void       ra_destroy(struct ra *ra);
+void       ra_reset_pool(struct ra *ra);
 
 // Core operations.
 void   ra_free_reg(struct ra *ra, int val);

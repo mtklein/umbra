@@ -85,6 +85,14 @@ struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const 
     return ra;
 }
 
+void ra_reset_pool(struct ra *ra) {
+    ra->nfree = ra->cfg.nregs;
+    for (int i = 0; i < ra->cfg.nregs; i++) {
+        ra->free_stack[i] = ra->cfg.pool[ra->cfg.nregs - 1 - i];
+    }
+    for (int i = 0; i < ra->cfg.max_reg; i++) { ra->owner[i] = -1; }
+}
+
 void ra_destroy(struct ra *ra) {
     free(ra->reg);
     free(ra->chan_reg);
