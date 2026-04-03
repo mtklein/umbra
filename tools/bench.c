@@ -105,7 +105,8 @@ int main(int argc, char *argv[]) {
 
         enum umbra_fmt fmt = fmt_ov >= 0 ? (enum umbra_fmt)fmt_ov : umbra_fmt_8888;
         size_t bpp = umbra_fmt_size(fmt);
-        void *buf = calloc((size_t)(W * H), bpp);
+        size_t planes = fmt == umbra_fmt_fp16_planar ? 4 : 1;
+        void *buf = calloc((size_t)(W * H) * planes, bpp);
 
         printf("%-40s", s->title);
         for (int bi = 0; bi < 4; bi++) {
