@@ -2,9 +2,11 @@
 #include "../slides/slide.h"
 #include "../slides/slug.h"
 #include "../include/umbra.h"
+#include "../include/umbra_draw.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 static double now(void) {
@@ -13,7 +15,8 @@ static double now(void) {
     return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
 }
 
-static double bench(struct slide *s, int w, int h, void *buf, struct umbra_backend *be) {
+static double bench(struct slide *s, int w, int h, void *buf, struct umbra_backend *be,
+                    double min_secs) {
     s->prepare(s, w, h, be);
     s->draw(s, w, h, 0, h, buf);
     be->flush(be);
@@ -25,48 +28,108 @@ static double bench(struct slide *s, int w, int h, void *buf, struct umbra_backe
         }
         be->flush(be);
         double const elapsed = now() - start;
-        if (elapsed >= 0.1) { return elapsed / ((double)iters * (double)w * (double)h) * 1e9; }
+        if (elapsed >= min_secs) {
+            return elapsed / ((double)iters * (double)w * (double)h) * 1e9;
+        }
         iters *= 2;
     }
 }
 
+static _Bool streq(char const *a, char const *b) { return strcmp(a, b) == 0; }
+
+static void usage(void) {
+    fprintf(stderr,
+        "Usage: bench [options]\n"
+        "  --fmt FORMAT     destination format: 8888, 565, 1010102, fp16, fp16_planar\n"
+        "  --backend NAME   run only: interp, jit, metal, vulkan\n"
+        "  --match SUBSTR   run only slides whose title contains SUBSTR\n"
+        "  --ms N           measure at least N ms per timing (default 100)\n"
+        "  --width N        canvas width in pixels (default 4096)\n"
+        "  --help           show this help\n");
+}
+
+static int parse_fmt(char const *s) {
+    if (streq(s, "8888"))        return umbra_fmt_8888;
+    if (streq(s, "565"))         return umbra_fmt_565;
+    if (streq(s, "1010102"))     return umbra_fmt_1010102;
+    if (streq(s, "fp16"))        return umbra_fmt_fp16;
+    if (streq(s, "fp16_planar")) return umbra_fmt_fp16_planar;
+    fprintf(stderr, "unknown format: %s\n", s);
+    usage();
+    exit(1);
+}
+
 int main(int argc, char *argv[]) {
-    int W = 4096;
-    for (int i = 1; i < argc; i++) { W = atoi(argv[i]); }
+    int         W       = 4096;
+    int         fmt_ov  = -1;
+    int         be_mask = 0xf;
+    double      min_s   = 0.1;
+    char const *match   = NULL;
+
+    for (int i = 1; i < argc; i++) {
+        if (streq(argv[i], "--help") || streq(argv[i], "-h")) { usage(); return 0; }
+        else if (streq(argv[i], "--fmt")     && i+1 < argc) { fmt_ov = parse_fmt(argv[++i]); }
+        else if (streq(argv[i], "--backend") && i+1 < argc) {
+            char const *b = argv[++i];
+            be_mask = streq(b, "interp") ? 1 : streq(b, "jit") ? 2 :
+                      streq(b, "metal")  ? 4 : streq(b, "vulkan") ? 8 : 0;
+            if (!be_mask) { fprintf(stderr, "unknown backend: %s\n", b); usage(); return 1; }
+        }
+        else if (streq(argv[i], "--match")   && i+1 < argc) { match = argv[++i]; }
+        else if (streq(argv[i], "--ms")      && i+1 < argc) { min_s = atof(argv[++i]) * 1e-3; }
+        else if (streq(argv[i], "--width")   && i+1 < argc) { W = atoi(argv[++i]); }
+        else { W = atoi(argv[i]); }
+    }
+
     int const H = 480;
     slides_init(W, H);
 
-    int ns = slide_count() - 1;
-    printf("%-40s %12s %12s %12s %12s\n", "", "interp", "jit", "metal", "vulkan");
+    if (fmt_ov >= 0) {
+        for (int i = 0; i < slide_count() - 1; i++) {
+            slide_get(i)->fmt = (enum umbra_fmt)fmt_ov;
+        }
+        slides_cleanup();
+        slides_init(W, H);
+    }
 
+    int ns = slide_count() - 1;
+
+    char const *be_names[] = {"interp", "jit", "metal", "vulkan"};
     struct umbra_backend *bes[] = {
         umbra_backend_interp(), umbra_backend_jit(),
         umbra_backend_metal(),  umbra_backend_vulkan(),
     };
 
+    printf("%-40s", "");
+    for (int bi = 0; bi < 4; bi++) {
+        if (be_mask & (1 << bi)) { printf(" %12s", be_names[bi]); }
+    }
+    printf("\n");
+
     for (int si = 0; si < ns; si++) {
         struct slide *s = slide_get(si);
         if (!s->draw) { continue; }
+        if (match && !strstr(s->title, match)) { continue; }
 
         size_t bpp = umbra_fmt_size(s->fmt);
         void *buf = calloc((size_t)(W * H), bpp);
 
         printf("%-40s", s->title);
         for (int bi = 0; bi < 4; bi++) {
-            if (bes[bi]) {
-                char tmp[32];
-                sprintf(tmp, "%5.2f ns/px", bench(s, W, H, buf, bes[bi]));
-                printf(" %12s", tmp);
-            } else {
-                printf(" %12s", "-");
+            if (!(be_mask & (1 << bi)) || !bes[bi]) {
+                if (be_mask & (1 << bi)) { printf(" %12s", "-"); }
+                continue;
             }
+            char tmp[32];
+            sprintf(tmp, "%5.2f ns/px", bench(s, W, H, buf, bes[bi], min_s));
+            printf(" %12s", tmp);
         }
         printf("\n");
 
         free(buf);
     }
 
-    {
+    if (!match || strstr("slug accumulator (1 curve)", match)) {
         struct slug_curves        sc = slug_extract("Slug", (float)H * 0.3125f);
         struct slug_acc_layout    al;
         struct umbra_builder     *bld = slug_build_acc(&al);
@@ -95,13 +158,15 @@ int main(int argc, char *argv[]) {
             {.ptr=wind, .sz=(size_t)(W * H * 4)},
         };
 
-        printf("\n%-40s %12s %12s %12s %12s\n", "slug accumulator (1 curve)", "interp",
-               "jit", "metal", "vulkan");
-        printf("%-40s", "");
+        printf("\n%-40s", "slug accumulator (1 curve)");
+        for (int bi = 0; bi < 4; bi++) {
+            if (be_mask & (1 << bi)) { printf(" %12s", be_names[bi]); }
+        }
+        printf("\n%-40s", "");
 
         for (int bi = 0; bi < 4; bi++) {
-            if (!progs[bi]) {
-                printf(" %12s", "-");
+            if (!(be_mask & (1 << bi)) || !progs[bi]) {
+                if (be_mask & (1 << bi)) { printf(" %12s", "-"); }
                 continue;
             }
             progs[bi]->queue(progs[bi], 0, 0, W, H, abuf);
@@ -114,7 +179,7 @@ int main(int argc, char *argv[]) {
                 }
                 bes[bi]->flush(bes[bi]);
                 double const elapsed = now() - start;
-                if (elapsed >= 0.1) {
+                if (elapsed >= min_s) {
                     char tmp[32];
                     sprintf(tmp, "%5.2f ns/px",
                             elapsed / ((double)iters * (double)(W * H)) * 1e9);
