@@ -1654,7 +1654,7 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     cmp_rr(&c, XI, RDI);                 // xi >= row_end?
     int br_row_done = jcc(&c, 0x0d);     // JGE row_done
 
-    for (int i = 0; i < bb->insts; i++) { ra_free_reg(ra, i); }
+    ra_reset_pool(ra);
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
 
     emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
