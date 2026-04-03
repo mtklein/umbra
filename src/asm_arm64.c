@@ -12,9 +12,13 @@ void put(Buf *b, uint32_t w) {
 }
 
 uint32_t RET(void) { return 0xd65f03c0u; }
+uint32_t NOP(void) { return 0xd503201fu; }
 
 uint32_t ADD_xr(int d, int n, int m) {
     return 0x8b000000u | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d;
+}
+uint32_t SUB_xr(int d, int n, int m) {
+    return 0xcb000000u | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d;
 }
 uint32_t ADD_xi(int d, int n, int imm12) {
     return 0x91000000u | ((uint32_t)imm12 << 10) | ((uint32_t)n << 5) | (uint32_t)d;
@@ -25,11 +29,21 @@ uint32_t SUB_xi(int d, int n, int imm12) {
 uint32_t SUBS_xi(int d, int n, int imm12) {
     return 0xf1000000u | ((uint32_t)imm12 << 10) | ((uint32_t)n << 5) | (uint32_t)d;
 }
+uint32_t CMP_xr(int n, int m) {
+    return 0xeb00001fu | ((uint32_t)m << 16) | ((uint32_t)n << 5);
+}
 uint32_t MOVZ_w(int d, uint16_t imm) {
     return 0x52800000u | ((uint32_t)imm << 5) | (uint32_t)d;
 }
+uint32_t MOVZ_x_lsl16(int d, uint16_t imm) {
+    return 0xd2a00000u | ((uint32_t)imm << 5) | (uint32_t)d;
+}
 uint32_t MOVK_w16(int d, uint16_t imm) {
     return 0x72a00000u | ((uint32_t)imm << 5) | (uint32_t)d;
+}
+uint32_t LSR_wi(int d, int n, int shift) {
+    return 0x53000000u | ((uint32_t)shift << 16) | (31u << 10)
+                       | ((uint32_t)n << 5) | (uint32_t)d;
 }
 uint32_t STP_pre(int t1, int t2, int n, int imm7) {
     return 0xa9800000u
@@ -65,6 +79,16 @@ uint32_t LDR_hx(int d, int n, int m) {
 uint32_t LDR_hi(int d, int n, int imm) {
     return 0x7d400000u | ((uint32_t)imm << 10) | ((uint32_t)n << 5) | (uint32_t)d;
 }
+
+static uint32_t stp_ldp_qi(uint32_t base, int t1, int t2, int n, int imm7) {
+    return base | ((uint32_t)(imm7 & 0x7f) << 15) | ((uint32_t)t2 << 10)
+               | ((uint32_t)n << 5) | (uint32_t)t1;
+}
+uint32_t STP_qi_pre(int t1, int t2, int n, int imm7) { return stp_ldp_qi(0xad800000u, t1, t2, n, imm7); }
+uint32_t STP_qi(int t1, int t2, int n, int imm7)     { return stp_ldp_qi(0xad000000u, t1, t2, n, imm7); }
+uint32_t LDP_qi(int t1, int t2, int n, int imm7)     { return stp_ldp_qi(0xad400000u, t1, t2, n, imm7); }
+
+uint32_t LDR_q_literal(int d) { return 0x9c000000u | (uint32_t)d; }
 
 uint32_t LDR_d(int d, int n, int m) {
     return 0xfc606800u | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d;

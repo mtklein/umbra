@@ -16,12 +16,17 @@ static void test_buf(void) {
 
 static void test_gpr(void) {
     RET() == 0xD65F03C0 here;
+    NOP() == 0xD503201F here;
     ADD_xr(0, 1, 2) == 0x8B020020 here;
+    SUB_xr(10, 0, 9) == 0xCB09000A here;
     ADD_xi(3, 4, 16) == 0x91004083 here;
     SUB_xi(5, 6, 8) == 0xD10020C5 here;
     SUBS_xi(7, 8, 1) == 0xF1000507 here;
+    CMP_xr(9, 0) == 0xEB00013F here;
     MOVZ_w(1, 0xFF) == 0x52801FE1 here;
+    MOVZ_x_lsl16(13, 0x7FFF) == 0xD2AFFFED here;
     MOVK_w16(2, 0x1234) == 0x72A24682 here;
+    LSR_wi(13, 13, 2) == 0x53027DAD here;
 }
 
 static void test_branch(void) {
@@ -252,6 +257,21 @@ static void test_ins_elem_s(void) {
     INS_elem_s(6, 0, 7, 2) == 0x6E0444E6 here;
 }
 
+static void test_stp_ldp_qi(void) {
+    STP_qi_pre(8, 9, 31, -8) == 0xADBC27E8 here;
+    STP_qi(10, 11, 31, 2) == 0xAD012FEA here;
+    STP_qi(12, 13, 31, 4) == 0xAD0237EC here;
+    STP_qi(14, 15, 31, 6) == 0xAD033FEE here;
+    LDP_qi(14, 15, 31, -2) == 0xAD7F3FEE here;
+    LDP_qi(12, 13, 31, -4) == 0xAD7E37EC here;
+    LDP_qi(8, 9, 31, -8) == 0xAD7C27E8 here;
+}
+
+static void test_ldr_q_literal(void) {
+    LDR_q_literal(5) == 0x9C000005 here;
+    LDR_q_literal(0) == 0x9C000000 here;
+}
+
 static void test_uxtl_8h_xtn_8b(void) {
     UXTL_8h(0, 1) == 0x2F08A420 here;
     XTN_8b(0, 1) == 0x0E212820 here;
@@ -299,6 +319,8 @@ int main(void) {
     test_ext_16b();
     test_uxtl_4s();
     test_ins_elem_s();
+    test_stp_ldp_qi();
+    test_ldr_q_literal();
     test_uxtl_8h_xtn_8b();
     test_ld4_st4();
     return 0;
