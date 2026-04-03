@@ -276,6 +276,12 @@ uint32_t EXT_16b(int d, int n, int m, int imm) {
 uint32_t UXTL_4s(int d, int n) {
     return 0x2f10a400u | ((uint32_t)n << 5) | (uint32_t)d;
 }
+uint32_t UXTL_8h(int d, int n) {
+    return 0x2f08a400u | ((uint32_t)n << 5) | (uint32_t)d;
+}
+uint32_t XTN_8b(int d, int n) {
+    return 0x0e212800u | ((uint32_t)n << 5) | (uint32_t)d;
+}
 uint32_t INS_elem_s(int d, int dst_lane, int n, int src_lane) {
     uint32_t imm5 = (uint32_t)(dst_lane << 3) | 4;
     uint32_t imm4 = (uint32_t)(src_lane << 2);

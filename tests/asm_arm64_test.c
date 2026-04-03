@@ -252,6 +252,13 @@ static void test_ins_elem_s(void) {
     INS_elem_s(6, 0, 7, 2) == 0x6E0444E6 here;
 }
 
+static void test_uxtl_8h_xtn_8b(void) {
+    UXTL_8h(0, 1) == 0x2F08A420 here;
+    XTN_8b(0, 1) == 0x0E212820 here;
+    W(UXTL_8h(0, 1)) == 0x6F08A420 here;
+    W(XTN_8b(0, 1)) == 0x4E212820 here;
+}
+
 static void test_ld4_st4(void) {
     LD4_4h(0, 5) == 0x0C4004A0 here;
     ST4_4h(0, 5) == 0x0C0004A0 here;
@@ -292,6 +299,7 @@ int main(void) {
     test_ext_16b();
     test_uxtl_4s();
     test_ins_elem_s();
+    test_uxtl_8h_xtn_8b();
     test_ld4_st4();
     return 0;
 }

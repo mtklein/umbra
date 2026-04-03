@@ -953,32 +953,35 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t r3 = ra_alloc(ra, sl, ns);
             int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            int8_t px   = ra_alloc(ra, sl, ns);
-            int8_t mask = ra_alloc(ra, sl, ns);
-            put(c, MOVI_4s(lo(mask), 0xFF, 0));
             if (scalar) {
+                int8_t px   = ra_alloc(ra, sl, ns);
+                int8_t mask = ra_alloc(ra, sl, ns);
+                put(c, MOVI_4s(lo(mask), 0xFF, 0));
                 put(c, LDR_sx(lo(px), XP, XI));
                 put(c, AND_16b(lo(s0.rd), lo(px), lo(mask)));
                 put(c, USHR_4s_imm(lo(r1), lo(px), 8));  put(c, AND_16b(lo(r1), lo(r1), lo(mask)));
                 put(c, USHR_4s_imm(lo(r2), lo(px), 16)); put(c, AND_16b(lo(r2), lo(r2), lo(mask)));
                 put(c, USHR_4s_imm(lo(r3), lo(px), 24));
+                ra_return_reg(ra, mask);
+                ra_return_reg(ra, px);
             } else {
-                put(c, MOVI_4s(hi(mask), 0xFF, 0));
                 put(c, LSL_xi(XT, XI, 2));
                 put(c, ADD_xr(XT, XP, XT));
-                put(c, LDR_qi(lo(px), XT, 0));
-                put(c, LDR_qi(hi(px), XT, 1));
-                put(c, AND_16b(lo(s0.rd), lo(px), lo(mask)));
-                put(c, AND_16b(hi(s0.rd), hi(px), hi(mask)));
-                put(c, USHR_4s_imm(lo(r1), lo(px), 8));  put(c, AND_16b(lo(r1), lo(r1), lo(mask)));
-                put(c, USHR_4s_imm(hi(r1), hi(px), 8));  put(c, AND_16b(hi(r1), hi(r1), hi(mask)));
-                put(c, USHR_4s_imm(lo(r2), lo(px), 16)); put(c, AND_16b(lo(r2), lo(r2), lo(mask)));
-                put(c, USHR_4s_imm(hi(r2), hi(px), 16)); put(c, AND_16b(hi(r2), hi(r2), hi(mask)));
-                put(c, USHR_4s_imm(lo(r3), lo(px), 24));
-                put(c, USHR_4s_imm(hi(r3), hi(px), 24));
+                put(c, LD4_8b(0, XT));
+                // V0=R(8xu8), V1=G, V2=B, V3=A.  Widen u8→u16→u32.
+                put(c, UXTL_8h(0, 0));
+                put(c, UXTL_4s(lo(s0.rd), 0));
+                put(c, W(UXTL_4s(hi(s0.rd), 0)));
+                put(c, UXTL_8h(1, 1));
+                put(c, UXTL_4s(lo(r1), 1));
+                put(c, W(UXTL_4s(hi(r1), 1)));
+                put(c, UXTL_8h(2, 2));
+                put(c, UXTL_4s(lo(r2), 2));
+                put(c, W(UXTL_4s(hi(r2), 2)));
+                put(c, UXTL_8h(3, 3));
+                put(c, UXTL_4s(lo(r3), 3));
+                put(c, W(UXTL_4s(hi(r3), 3)));
             }
-            ra_return_reg(ra, mask);
-            ra_return_reg(ra, px);
             ra_set_chan_reg(ra, i, 0, s0.rd);
             ra_set_chan_reg(ra, i, 1, r1);
             ra_set_chan_reg(ra, i, 2, r2);
@@ -991,27 +994,29 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, (int)inst->w.id, (int)inst->w.chan);
             int    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            int8_t px = ra_alloc(ra, sl, ns);
-            int8_t t  = ra_alloc(ra, sl, ns);
             if (scalar) {
+                int8_t px = ra_alloc(ra, sl, ns);
+                int8_t t  = ra_alloc(ra, sl, ns);
                 put(c, SHL_4s_imm(lo(t), lo(rg), 8));    put(c, ORR_16b(lo(px), lo(rr), lo(t)));
                 put(c, SHL_4s_imm(lo(t), lo(rb_), 16));  put(c, ORR_16b(lo(px), lo(px), lo(t)));
                 put(c, SHL_4s_imm(lo(t), lo(ra_v), 24)); put(c, ORR_16b(lo(px), lo(px), lo(t)));
                 put(c, STR_sx(lo(px), XP, XI));
+                ra_return_reg(ra, t);
+                ra_return_reg(ra, px);
             } else {
-                put(c, SHL_4s_imm(lo(t), lo(rg), 8));    put(c, ORR_16b(lo(px), lo(rr), lo(t)));
-                put(c, SHL_4s_imm(lo(t), lo(rb_), 16));  put(c, ORR_16b(lo(px), lo(px), lo(t)));
-                put(c, SHL_4s_imm(lo(t), lo(ra_v), 24)); put(c, ORR_16b(lo(px), lo(px), lo(t)));
-                put(c, SHL_4s_imm(hi(t), hi(rg), 8));    put(c, ORR_16b(hi(px), hi(rr), hi(t)));
-                put(c, SHL_4s_imm(hi(t), hi(rb_), 16));  put(c, ORR_16b(hi(px), hi(px), hi(t)));
-                put(c, SHL_4s_imm(hi(t), hi(ra_v), 24)); put(c, ORR_16b(hi(px), hi(px), hi(t)));
+                // Narrow u32→u16→u8 per channel into V0-V3, then ST4.8B.
+                put(c, XTN_4h(0, lo(rr)));   put(c, W(XTN_4h(0, hi(rr))));
+                put(c, XTN_8b(0, 0));
+                put(c, XTN_4h(1, lo(rg)));   put(c, W(XTN_4h(1, hi(rg))));
+                put(c, XTN_8b(1, 1));
+                put(c, XTN_4h(2, lo(rb_)));  put(c, W(XTN_4h(2, hi(rb_))));
+                put(c, XTN_8b(2, 2));
+                put(c, XTN_4h(3, lo(ra_v))); put(c, W(XTN_4h(3, hi(ra_v))));
+                put(c, XTN_8b(3, 3));
                 put(c, LSL_xi(XT, XI, 2));
                 put(c, ADD_xr(XT, XP, XT));
-                put(c, STR_qi(lo(px), XT, 0));
-                put(c, STR_qi(hi(px), XT, 1));
+                put(c, ST4_8b(0, XT));
             }
-            ra_return_reg(ra, t);
-            ra_return_reg(ra, px);
             free_chan(ra, inst->x, i);
             free_chan(ra, inst->y, i);
             free_chan(ra, inst->z, i);

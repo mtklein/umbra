@@ -103,6 +103,8 @@ uint32_t ZIP1_8h(int d, int n, int m);
 
 uint32_t EXT_16b(int d, int n, int m, int imm);
 uint32_t UXTL_4s(int d, int n);
+uint32_t UXTL_8h(int d, int n);
+uint32_t XTN_8b(int d, int n);
 uint32_t INS_elem_s(int d, int dst_lane, int n, int src_lane);
 
 uint32_t SHL_4s_imm(int d, int n, int sh);
