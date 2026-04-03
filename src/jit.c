@@ -372,8 +372,6 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, SUBS_xi(31, XT, 8));
     int br_tail = c.len;
     put(&c, Bcond(0xb, 0));
-    put(&c, LSL_xi(XH, XCOL, 1));
-    put(&c, LSL_xi(XW, XCOL, 2));
 
     int loop_body_start = c.len;
     emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
@@ -823,25 +821,19 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, ADD_xr(XP, XP, XT));
                 put(c, LDR_hx(lo(r3), XP, XI));
             } else {
-                put(c, LSL_xi(XH, XI, 1));
-                put(c, LDR_d(lo(s0.rd), XP, XH));
-                put(c, ADD_xi(XH, XH, 8));
-                put(c, LDR_d(hi(s0.rd), XP, XH));
-                put(c, ADD_xr(XP, XP, XT));
-                put(c, SUB_xi(XH, XH, 8));
-                put(c, LDR_d(lo(r1), XP, XH));
-                put(c, ADD_xi(XH, XH, 8));
-                put(c, LDR_d(hi(r1), XP, XH));
-                put(c, ADD_xr(XP, XP, XT));
-                put(c, SUB_xi(XH, XH, 8));
-                put(c, LDR_d(lo(r2), XP, XH));
-                put(c, ADD_xi(XH, XH, 8));
-                put(c, LDR_d(hi(r2), XP, XH));
-                put(c, ADD_xr(XP, XP, XT));
-                put(c, SUB_xi(XH, XH, 8));
-                put(c, LDR_d(lo(r3), XP, XH));
-                put(c, ADD_xi(XH, XH, 8));
-                put(c, LDR_d(hi(r3), XP, XH));
+                put(c, LSL_xi(XM, XI, 1));
+                put(c, ADD_xr(XM, XP, XM));
+                put(c, LDR_di(lo(s0.rd), XM, 0));
+                put(c, LDR_di(hi(s0.rd), XM, 1));
+                put(c, ADD_xr(XM, XM, XT));
+                put(c, LDR_di(lo(r1), XM, 0));
+                put(c, LDR_di(hi(r1), XM, 1));
+                put(c, ADD_xr(XM, XM, XT));
+                put(c, LDR_di(lo(r2), XM, 0));
+                put(c, LDR_di(hi(r2), XM, 1));
+                put(c, ADD_xr(XM, XM, XT));
+                put(c, LDR_di(lo(r3), XM, 0));
+                put(c, LDR_di(hi(r3), XM, 1));
             }
             last_ptr = -1;
             ra_return_reg(ra, px);
@@ -912,25 +904,19 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, ADD_xr(XP, XP, XT));
                 put(c, STR_hx(lo(ra_v), XP, XI));
             } else {
-                put(c, LSL_xi(XH, XI, 1));
-                put(c, STR_d(lo(rr), XP, XH));
-                put(c, ADD_xi(XH, XH, 8));
-                put(c, STR_d(hi(rr), XP, XH));
-                put(c, ADD_xr(XP, XP, XT));
-                put(c, SUB_xi(XH, XH, 8));
-                put(c, STR_d(lo(rg), XP, XH));
-                put(c, ADD_xi(XH, XH, 8));
-                put(c, STR_d(hi(rg), XP, XH));
-                put(c, ADD_xr(XP, XP, XT));
-                put(c, SUB_xi(XH, XH, 8));
-                put(c, STR_d(lo(rb_), XP, XH));
-                put(c, ADD_xi(XH, XH, 8));
-                put(c, STR_d(hi(rb_), XP, XH));
-                put(c, ADD_xr(XP, XP, XT));
-                put(c, SUB_xi(XH, XH, 8));
-                put(c, STR_d(lo(ra_v), XP, XH));
-                put(c, ADD_xi(XH, XH, 8));
-                put(c, STR_d(hi(ra_v), XP, XH));
+                put(c, LSL_xi(XM, XI, 1));
+                put(c, ADD_xr(XM, XP, XM));
+                put(c, STR_di(lo(rr), XM, 0));
+                put(c, STR_di(hi(rr), XM, 1));
+                put(c, ADD_xr(XM, XM, XT));
+                put(c, STR_di(lo(rg), XM, 0));
+                put(c, STR_di(hi(rg), XM, 1));
+                put(c, ADD_xr(XM, XM, XT));
+                put(c, STR_di(lo(rb_), XM, 0));
+                put(c, STR_di(hi(rb_), XM, 1));
+                put(c, ADD_xr(XM, XM, XT));
+                put(c, STR_di(lo(ra_v), XM, 0));
+                put(c, STR_di(hi(ra_v), XM, 1));
             }
             last_ptr = -1;
             free_chan(ra, inst->x, i);
