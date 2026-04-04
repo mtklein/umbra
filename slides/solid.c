@@ -47,7 +47,7 @@ static void solid_prepare(struct slide *s, struct umbra_backend *be, struct umbr
     if (st->fmt.name != fmt.name || !st->bb) {
         st->fmt = fmt;
         umbra_basic_block_free(st->bb);
-        if (st->lay.uni) { free(st->lay.uni->data); free(st->lay.uni); st->lay.uni = NULL; }
+        if (st->lay.uni) { free(st->lay.data); free(st->lay.uni); st->lay.uni = NULL; }
         struct umbra_builder *b = umbra_draw_build(st->shader, st->coverage, st->blend, fmt,
                                                     &st->lay);
         st->bb = umbra_basic_block(b);
@@ -60,13 +60,13 @@ static void solid_prepare(struct slide *s, struct umbra_backend *be, struct umbr
 static void solid_draw(struct slide *s, int l, int t, int r, int b, void *buf) {
     struct solid_state *st = (struct solid_state *)s;
     float rect[4] = { st->rx, st->ry, st->rx + st->rect_w, st->ry + st->rect_h };
-    umbra_uniforms_fill_f32(st->lay.uni, st->lay.shader, st->color, 4);
-    if (st->coverage) { umbra_uniforms_fill_f32(st->lay.uni, st->lay.coverage, rect, 4); }
+    umbra_uniforms_fill_f32(st->lay.data, st->lay.shader, st->color, 4);
+    if (st->coverage) { umbra_uniforms_fill_f32(st->lay.data, st->lay.coverage, rect, 4); }
     size_t pb = st->fmt.bpp;
     size_t plane_sz = (size_t)st->w * (size_t)st->h * pb;
     size_t rb = (size_t)st->w * pb;
     struct umbra_buf ubuf[] = {
-        {.ptr=st->lay.uni->data, .sz=st->lay.uni->size, .read_only=1},
+        {.ptr=st->lay.data, .sz=st->lay.uni->size, .read_only=1},
         {.ptr=buf, .sz=plane_sz * (size_t)st->fmt.planes, .row_bytes=rb},
     };
     st->prog->queue(st->prog, l, t, r, b, ubuf);
@@ -81,7 +81,7 @@ static void solid_free(struct slide *s) {
     struct solid_state *st = (struct solid_state *)s;
     if (st->prog) { st->prog->free(st->prog); }
     umbra_basic_block_free(st->bb);
-    if (st->lay.uni) { free(st->lay.uni->data); free(st->lay.uni); }
+    if (st->lay.uni) { free(st->lay.data); free(st->lay.uni); }
     free(st);
 }
 

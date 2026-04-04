@@ -1613,7 +1613,7 @@ static void test_gather_deref_large(void) {
     umbra_ptr16           src = umbra_deref_ptr16(b, (umbra_ptr32){1}, off);
     umbra_val32            val = umbra_i32_from_s16(b, umbra_gather_16(b, src, idx));
     umbra_store_32(b, (umbra_ptr32){2}, val);
-    if (u) { free(u->data); free(u); }
+    free(u);
     struct test_backends B = make(b);
 
     enum { N = 33000 };
@@ -2310,7 +2310,7 @@ static void test_load_stride_neq_w(void) {
     struct umbra_builder *b = umbra_builder();
     struct umbra_uniforms *u  = calloc(1, sizeof(struct umbra_uniforms));
     size_t                 ri = umbra_uniforms_reserve_f32(u, 1);
-    if (u) { free(u->data); free(u); }
+    free(u);
     umbra_val32 x = umbra_x(b);
     umbra_val32 y = umbra_y(b);
     umbra_val32 rs = umbra_uniform_32(b, (umbra_ptr32){0}, ri);
@@ -3717,7 +3717,7 @@ int main(void) {
         struct umbra_builder *b = umbra_builder();
         struct umbra_uniforms *u   = calloc(1, sizeof(struct umbra_uniforms));
         size_t                off = umbra_uniforms_reserve_ptr(u);
-        if (u) { free(u->data); free(u); }
+        free(u);
         umbra_ptr32           src = umbra_deref_ptr32(b, (umbra_ptr32){1}, off);
         umbra_val32            v   = umbra_load_32(b, src);
         umbra_val32            one = umbra_imm_i32(b, 1);
@@ -3769,7 +3769,7 @@ int main(void) {
         struct umbra_builder *b = umbra_builder();
         struct umbra_uniforms *u   = calloc(1, sizeof(struct umbra_uniforms));
         size_t                off = umbra_uniforms_reserve_ptr(u);
-        if (u) { free(u->data); free(u); }
+        free(u);
         umbra_ptr16           src = umbra_deref_ptr16(b, (umbra_ptr32){1}, off);
         umbra_val32            v   = umbra_f32_from_f16(b, umbra_load_16(b, src));
         umbra_val32            one = umbra_imm_f32(b, 1.0f);

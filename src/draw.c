@@ -184,10 +184,11 @@ struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
 
     if (layout) {
         layout->uni = uni;
+        layout->data = umbra_uniforms_alloc(uni);
         layout->shader = shader_off;
         layout->coverage = coverage_off;
     } else {
-        if (uni) { free(uni->data); free(uni); }
+        free(uni);
     }
 
     return builder;

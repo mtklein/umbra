@@ -149,6 +149,7 @@ static inline void slug_free(struct slug_curves *sc) {
 
 struct slug_acc_layout {
     struct umbra_uniforms *uni;
+    void                  *data;
     size_t mat, curves_off, loop_off;
 };
 
@@ -324,8 +325,9 @@ static inline struct umbra_builder *slug_build_acc(
         lay->curves_off = co;
         lay->loop_off   = ji;
         lay->uni        = u;
+        lay->data       = umbra_uniforms_alloc(u);
     } else {
-        if (u) { free(u->data); free(u); }
+        free(u);
     }
 
     return b;

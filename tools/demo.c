@@ -37,6 +37,7 @@ static struct umbra_fmt const * const fmt_enums[] = {
 struct pipe {
     struct umbra_program  *program;
     struct umbra_uniforms *uni;
+    void                  *data;
     int                    out_ptr, pad_;
 };
 
@@ -44,7 +45,7 @@ static struct pipe fill_pipe, readback_pipe, hdr_pipe;
 
 static void free_pipe(struct pipe *p) {
     if (p->program) { p->program->free(p->program); }
-    if (p->uni) { free(p->uni->data); free(p->uni); }
+    if (p->uni) { free(p->data); free(p->uni); }
     *p = (struct pipe){0};
 }
 
@@ -52,6 +53,7 @@ static struct umbra_backend *pipe_be;
 
 static void finish_pipe(struct pipe *p, struct umbra_builder *builder, struct umbra_uniforms *uni) {
     p->uni = uni;
+    p->data = umbra_uniforms_alloc(uni);
     struct umbra_basic_block *bb = umbra_basic_block(builder);
     umbra_builder_free(builder);
     p->program = pipe_be->compile(pipe_be, bb);
@@ -184,10 +186,10 @@ static void fill_bg_row(void *dst, int n, uint32_t bg, size_t row_sz, size_t pla
         (float)((bg >> 16) & 0xffu) / 255.0f,
         (float)((bg >> 24) & 0xffu) / 255.0f,
     };
-    umbra_uniforms_fill_f32(fill_pipe.uni, 0, hc, 4);
+    umbra_uniforms_fill_f32(fill_pipe.data, 0, hc, 4);
     int      ps = plane_gap ? 3 : 0;
     struct umbra_buf buf[5];
-    buf[0] = (struct umbra_buf){.ptr=fill_pipe.uni->data, .sz=fill_pipe.uni->size, .read_only=1};
+    buf[0] = (struct umbra_buf){.ptr=fill_pipe.data, .sz=fill_pipe.uni->size, .read_only=1};
     buf[1] = (struct umbra_buf){.ptr=dst, .sz=row_sz};
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (struct umbra_buf){.ptr=(char *)dst + (size_t)(i + 1) * plane_gap, .sz=row_sz};
@@ -199,7 +201,7 @@ static void readback_row(uint32_t *dst, void *src, int n, size_t src_sz, size_t 
     int      ps = plane_gap ? 3 : 0;
     int      op = readback_pipe.out_ptr;
     struct umbra_buf buf[6];
-    buf[0] = (struct umbra_buf){.ptr=readback_pipe.uni->data, .sz=readback_pipe.uni->size, .read_only=1};
+    buf[0] = (struct umbra_buf){.ptr=readback_pipe.data, .sz=readback_pipe.uni->size, .read_only=1};
     buf[1] = (struct umbra_buf){.ptr=src, .sz=src_sz, .read_only=1};
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (struct umbra_buf){.ptr=(char *)src + (size_t)(i + 1) * plane_gap, .sz=src_sz};
@@ -212,7 +214,7 @@ static void to_hdr_row(__fp16 *dst, void *src, int n, size_t src_sz, size_t plan
     int      ps = plane_gap ? 3 : 0;
     int      op = hdr_pipe.out_ptr;
     struct umbra_buf buf[6];
-    buf[0] = (struct umbra_buf){.ptr=hdr_pipe.uni->data, .sz=hdr_pipe.uni->size, .read_only=1};
+    buf[0] = (struct umbra_buf){.ptr=hdr_pipe.data, .sz=hdr_pipe.uni->size, .read_only=1};
     buf[1] = (struct umbra_buf){.ptr=src, .sz=src_sz, .read_only=1};
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (struct umbra_buf){.ptr=(char *)src + (size_t)(i + 1) * plane_gap, .sz=src_sz};

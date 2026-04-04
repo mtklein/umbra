@@ -15,22 +15,16 @@ size_t umbra_uniforms_reserve_ptr(struct umbra_uniforms *u) {
     return h;
 }
 
-static void ensure_allocated(struct umbra_uniforms *u) {
-    if (!u->data) {
-        u->data = calloc(1, u->size);
-    }
+void *umbra_uniforms_alloc(struct umbra_uniforms const *u) {
+    return calloc(1, u->size);
 }
 
-void umbra_uniforms_fill_f32(struct umbra_uniforms *u, size_t h, float const *v, int n) {
-    assume(h + (size_t)n * 4 <= u->size);
-    ensure_allocated(u);
-    char *p = (char*)u->data + h;
+void umbra_uniforms_fill_f32(void *data, size_t h, float const *v, int n) {
+    char *p = (char*)data + h;
     __builtin_memcpy(p, v, (size_t)n * 4);
 }
-void umbra_uniforms_fill_ptr(struct umbra_uniforms *u, size_t h, struct umbra_buf b) {
-    assume(h + 24 <= u->size);
-    ensure_allocated(u);
-    char *p = (char*)u->data + h;
+void umbra_uniforms_fill_ptr(void *data, size_t h, struct umbra_buf b) {
+    char *p = (char*)data + h;
     ptrdiff_t ssz = b.read_only ? -(ptrdiff_t)b.sz : (ptrdiff_t)b.sz;
     __builtin_memset(p, 0, 24);
     __builtin_memcpy(p,      &b.ptr,       sizeof b.ptr);

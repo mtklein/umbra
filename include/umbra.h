@@ -36,18 +36,13 @@ struct umbra_program {
     struct umbra_backend *backend;
 };
 
-// TODO: split into two types, one that's used for reserving (wrapping a size_t)
-// and one that's use for filling (wrapping a void*), maybe umbra_uniforms_builder
-// and umbra_uniforms_data?  Possible cleaner to not have that second type at all,
-// just have the builder finish() by returning the properly sized void* from malloc()?
-struct umbra_uniforms {
-    void  *data;
-    size_t size;
-};
+struct umbra_uniforms { size_t size; };
 size_t umbra_uniforms_reserve_f32(struct umbra_uniforms*, int n);
 size_t umbra_uniforms_reserve_ptr(struct umbra_uniforms*);
-void   umbra_uniforms_fill_f32(struct umbra_uniforms*, size_t off, float const*, int n);
-void   umbra_uniforms_fill_ptr(struct umbra_uniforms*, size_t off, struct umbra_buf);
+
+void  *umbra_uniforms_alloc(struct umbra_uniforms const*);
+void   umbra_uniforms_fill_f32(void *data, size_t off, float const*, int n);
+void   umbra_uniforms_fill_ptr(void *data, size_t off, struct umbra_buf);
 
 // TODO: try exposing the internals of these e.g. {int ch:2, id:30;} or { int deref:1, ix:31; }
 typedef struct { int bits; } umbra_val16;
