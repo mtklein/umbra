@@ -8,16 +8,16 @@
 static struct umbra_builder *build_srcover(void) {
     struct umbra_builder *b = umbra_builder();
 
-    umbra_val px = umbra_load_32(b, (umbra_ptr32){0}), mask = umbra_imm_i32(b, 0xFF);
-    umbra_val rgba[4] = {
+    umbra_val32 px = umbra_load_32(b, (umbra_ptr32){0}), mask = umbra_imm_i32(b, 0xFF);
+    umbra_val32 rgba[4] = {
         umbra_and_32(b, px, mask),
         umbra_and_32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 8)), mask),
         umbra_and_32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 16)), mask),
         umbra_shr_u32(b, px, umbra_imm_i32(b, 24)),
     };
 
-    umbra_val inv255 = umbra_imm_f32(b, 1.0f / 255.0f);
-    umbra_val sr = umbra_mul_f32(b, umbra_f32_from_i32(b, rgba[0]), inv255),
+    umbra_val32 inv255 = umbra_imm_f32(b, 1.0f / 255.0f);
+    umbra_val32 sr = umbra_mul_f32(b, umbra_f32_from_i32(b, rgba[0]), inv255),
               sg = umbra_mul_f32(b, umbra_f32_from_i32(b, rgba[1]), inv255),
               sb = umbra_mul_f32(b, umbra_f32_from_i32(b, rgba[2]), inv255),
               sa = umbra_mul_f32(b, umbra_f32_from_i32(b, rgba[3]), inv255),

@@ -518,13 +518,13 @@ static void test_no_blend(void) {
     cleanup_draw(&B);
 }
 
-static umbra_color gradient_shader(struct umbra_builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
+static umbra_color gradient_shader(struct umbra_builder *builder, struct umbra_uniforms *u, umbra_val32 x, umbra_val32 y) {
     (void)y;
     size_t fi = umbra_uniforms_reserve_f32(u, 2);
-    umbra_val w = umbra_uniform_32(builder, (umbra_ptr32){0}, fi);
-    umbra_val a = umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 4);
-    umbra_val t = umbra_div_f32(builder, x, w);
-    umbra_val zero = umbra_imm_i32(builder, 0);
+    umbra_val32 w = umbra_uniform_32(builder, (umbra_ptr32){0}, fi);
+    umbra_val32 a = umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 4);
+    umbra_val32 t = umbra_div_f32(builder, x, w);
+    umbra_val32 zero = umbra_imm_i32(builder, 0);
     return (umbra_color){t, zero, zero, a};
 }
 
@@ -1017,7 +1017,7 @@ static void test_gradient_lut_nonuniform(void) {
 
 static umbra_shader_fn ss_inner_;
 static int             ss_n_;
-static umbra_color ss_shader_(struct umbra_builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
+static umbra_color ss_shader_(struct umbra_builder *builder, struct umbra_uniforms *u, umbra_val32 x, umbra_val32 y) {
     (void)u;
     return umbra_supersample(builder, u, x, y, ss_inner_, ss_n_);
 }

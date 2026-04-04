@@ -7,10 +7,10 @@
 
 #pragma clang diagnostic ignored "-Wfloat-equal"
 
-static int       val_id  (umbra_val v)       { return ((val_){.bits = v.bits}).id; }
-static umbra_val val_make(int id, int chan)  { return (umbra_val){.bits = ((val_){.id=(unsigned)id, .chan=(unsigned)chan}).bits}; }
+static int        val_id  (umbra_val32 v)       { return ((val_){.bits = v.bits}).id; }
+static umbra_val32 val_make(int id, int chan)   { return (umbra_val32){.bits = ((val_){.id=(unsigned)id, .chan=(unsigned)chan}).bits}; }
 
-typedef umbra_val            val;
+typedef umbra_val32          val;
 typedef struct umbra_builder builder;
 
 
@@ -206,14 +206,14 @@ umbra_ptr64 umbra_deref_ptr64(builder *b, umbra_ptr32 buf, size_t off) {
     return (umbra_ptr64){.bits = ~val_id(v)};
 }
 
-val umbra_gather_16(builder *b, umbra_ptr16 src, val ix) {
-    return push(b, op_gather_16, VX(ix), .ptr = p16(src));
+umbra_val16 umbra_gather_16(builder *b, umbra_ptr16 src, val ix) {
+    return (umbra_val16){push(b, op_gather_16, VX(ix), .ptr = p16(src)).bits};
 }
 val umbra_load_32(builder *b, umbra_ptr32 src) {
     return push(b, op_load_32, .ptr = p32(src));
 }
-val umbra_load_16(builder *b, umbra_ptr16 src) {
-    return push(b, op_load_16, .ptr = p16(src));
+umbra_val16 umbra_load_16(builder *b, umbra_ptr16 src) {
+    return (umbra_val16){push(b, op_load_16, .ptr = p16(src)).bits};
 }
 val umbra_uniform_32(builder *b, umbra_ptr32 src, size_t off) {
     return push(b, op_uniform_32, .imm = (int)off, .ptr = p32(src));
@@ -228,38 +228,43 @@ val umbra_sample_32(builder *b, umbra_ptr32 src, val ix) {
 void umbra_store_32(builder *b, umbra_ptr32 dst, val v) {
     push(b, op_store_32, VY(v), .ptr = p32(dst));
 }
-void umbra_store_16(builder *b, umbra_ptr16 dst, val v) {
+void umbra_store_16(builder *b, umbra_ptr16 dst, umbra_val16 v) {
     push(b, op_store_16, VY(v), .ptr = p16(dst));
 }
-static void x4(val px, val *r, val *g, val *b, val *a) {
-    int const id = val_id((umbra_val){.bits = px.bits});
+static void x4_32(val px, val *r, val *g, val *b, val *a) {
+    int const id = val_id((val){.bits = px.bits});
     *r = val_make(id, 0); *g = val_make(id, 1);
     *b = val_make(id, 2); *a = val_make(id, 3);
 }
+static void x4_16(val px, umbra_val16 *r, umbra_val16 *g, umbra_val16 *b, umbra_val16 *a) {
+    int const id = val_id((val){.bits = px.bits});
+    *r = (umbra_val16){val_make(id, 0).bits}; *g = (umbra_val16){val_make(id, 1).bits};
+    *b = (umbra_val16){val_make(id, 2).bits}; *a = (umbra_val16){val_make(id, 3).bits};
+}
 void umbra_load_8x4(builder *b, umbra_ptr32 src, val *r, val *g, val *bl, val *a) {
-    x4(push(b, op_load_8x4, .ptr = p32(src)), r, g, bl, a);
+    x4_32(push(b, op_load_8x4, .ptr = p32(src)), r, g, bl, a);
 }
 void umbra_store_8x4(builder *b, umbra_ptr32 dst, val r, val g, val bl, val a) {
     push(b, op_store_8x4, VX(r), VY(g), VZ(bl), VW(a), .ptr = p32(dst));
 }
-void umbra_load_16x4(builder *b, umbra_ptr64 src, val *r, val *g, val *bl, val *a) {
-    x4(push(b, op_load_16x4, .ptr = p64(src)), r, g, bl, a);
+void umbra_load_16x4(builder *b, umbra_ptr64 src, umbra_val16 *r, umbra_val16 *g, umbra_val16 *bl, umbra_val16 *a) {
+    x4_16(push(b, op_load_16x4, .ptr = p64(src)), r, g, bl, a);
 }
-void umbra_store_16x4(builder *b, umbra_ptr64 dst, val r, val g, val bl, val a) {
+void umbra_store_16x4(builder *b, umbra_ptr64 dst, umbra_val16 r, umbra_val16 g, umbra_val16 bl, umbra_val16 a) {
     push(b, op_store_16x4, VX(r), VY(g), VZ(bl), VW(a), .ptr = p64(dst));
 }
-void umbra_load_16x4_planar(builder *b, umbra_ptr16 src, val *r, val *g, val *bl, val *a) {
-    x4(push(b, op_load_16x4_planar, .ptr = p16(src)), r, g, bl, a);
+void umbra_load_16x4_planar(builder *b, umbra_ptr16 src, umbra_val16 *r, umbra_val16 *g, umbra_val16 *bl, umbra_val16 *a) {
+    x4_16(push(b, op_load_16x4_planar, .ptr = p16(src)), r, g, bl, a);
 }
-void umbra_store_16x4_planar(builder *b, umbra_ptr16 dst, val r, val g, val bl, val a) {
+void umbra_store_16x4_planar(builder *b, umbra_ptr16 dst, umbra_val16 r, umbra_val16 g, umbra_val16 bl, umbra_val16 a) {
     push(b, op_store_16x4_planar, VX(r), VY(g), VZ(bl), VW(a), .ptr = p16(dst));
 }
-val umbra_i32_from_s16(builder *b, val x) { return push(b, op_i32_from_s16, VX(x)); }
-val umbra_i32_from_u16(builder *b, val x) { return push(b, op_i32_from_u16, VX(x)); }
-val umbra_i16_from_i32(builder *b, val x) { return push(b, op_i16_from_i32, VX(x)); }
+val umbra_i32_from_s16(builder *b, umbra_val16 x) { return push(b, op_i32_from_s16, VX(x)); }
+val umbra_i32_from_u16(builder *b, umbra_val16 x) { return push(b, op_i32_from_u16, VX(x)); }
+umbra_val16 umbra_i16_from_i32(builder *b, val x) { return (umbra_val16){push(b, op_i16_from_i32, VX(x)).bits}; }
 
-val umbra_f32_from_f16(builder *b, val x) { return push(b, op_f32_from_f16, VX(x)); }
-val umbra_f16_from_f32(builder *b, val x) { return push(b, op_f16_from_f32, VX(x)); }
+val umbra_f32_from_f16(builder *b, umbra_val16 x) { return push(b, op_f32_from_f16, VX(x)); }
+umbra_val16 umbra_f16_from_f32(builder *b, val x) { return (umbra_val16){push(b, op_f16_from_f32, VX(x)).bits}; }
 
 static _Bool is_imm32(builder *b, int id, int v) {
     return b->inst[id].op == op_imm_32 && b->inst[id].imm == v;

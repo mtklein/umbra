@@ -163,39 +163,39 @@ static inline struct umbra_builder *slug_build_acc(
         (umbra_ptr32){0}, co);
     size_t    ji = umbra_uniforms_reserve_f32(u, 1);
 
-    umbra_val xf = umbra_f32_from_i32(b, umbra_x(b));
-    umbra_val yf = umbra_f32_from_i32(b, umbra_y(b));
+    umbra_val32 xf = umbra_f32_from_i32(b, umbra_x(b));
+    umbra_val32 yf = umbra_f32_from_i32(b, umbra_y(b));
 
-    umbra_val m[9];
+    umbra_val32 m[9];
     for (int i = 0; i < 9; i++) {
         m[i] = umbra_uniform_32(b, (umbra_ptr32){0}, fi + (size_t)i * 4);
     }
-    umbra_val bw = umbra_uniform_32(b, (umbra_ptr32){0}, fi + 36);
-    umbra_val bh = umbra_uniform_32(b, (umbra_ptr32){0}, fi + 40);
+    umbra_val32 bw = umbra_uniform_32(b, (umbra_ptr32){0}, fi + 36);
+    umbra_val32 bh = umbra_uniform_32(b, (umbra_ptr32){0}, fi + 40);
 
-    umbra_val pw = umbra_add_f32(b,
+    umbra_val32 pw = umbra_add_f32(b,
         umbra_add_f32(b,
             umbra_mul_f32(b, m[6], xf),
             umbra_mul_f32(b, m[7], yf)), m[8]);
-    umbra_val gx = umbra_div_f32(b,
+    umbra_val32 gx = umbra_div_f32(b,
         umbra_add_f32(b,
             umbra_add_f32(b,
                 umbra_mul_f32(b, m[0], xf),
                 umbra_mul_f32(b, m[1], yf)),
             m[2]), pw);
-    umbra_val gy = umbra_div_f32(b,
+    umbra_val32 gy = umbra_div_f32(b,
         umbra_add_f32(b,
             umbra_add_f32(b,
                 umbra_mul_f32(b, m[3], xf),
                 umbra_mul_f32(b, m[4], yf)),
             m[5]), pw);
 
-    umbra_val z  = umbra_imm_f32(b, 0.0f);
-    umbra_val o  = umbra_imm_f32(b, 1.0f);
-    umbra_val tw = umbra_imm_f32(b, 2.0f);
-    umbra_val ep = umbra_imm_f32(b, 1.0f/65536.0f);
+    umbra_val32 z  = umbra_imm_f32(b, 0.0f);
+    umbra_val32 o  = umbra_imm_f32(b, 1.0f);
+    umbra_val32 tw = umbra_imm_f32(b, 2.0f);
+    umbra_val32 ep = umbra_imm_f32(b, 1.0f/65536.0f);
 
-    umbra_val in = umbra_and_32(b,
+    umbra_val32 in = umbra_and_32(b,
         umbra_and_32(b,
             umbra_le_f32(b, z, gx),
             umbra_lt_f32(b, gx, bw)),
@@ -203,119 +203,119 @@ static inline struct umbra_builder *slug_build_acc(
             umbra_le_f32(b, z, gy),
             umbra_lt_f32(b, gy, bh)));
 
-    umbra_val j = umbra_uniform_32(b, (umbra_ptr32){0}, ji);
-    umbra_val k = umbra_mul_i32(b, j,
+    umbra_val32 j = umbra_uniform_32(b, (umbra_ptr32){0}, ji);
+    umbra_val32 k = umbra_mul_i32(b, j,
                       umbra_imm_i32(b, 6));
 
-    umbra_val p0x = umbra_gather_32(b, curves, k);
-    umbra_val p0y = umbra_gather_32(b, curves,
+    umbra_val32 p0x = umbra_gather_32(b, curves, k);
+    umbra_val32 p0y = umbra_gather_32(b, curves,
         umbra_add_i32(b, k, umbra_imm_i32(b, 1)));
-    umbra_val p1x = umbra_gather_32(b, curves,
+    umbra_val32 p1x = umbra_gather_32(b, curves,
         umbra_add_i32(b, k, umbra_imm_i32(b, 2)));
-    umbra_val p1y = umbra_gather_32(b, curves,
+    umbra_val32 p1y = umbra_gather_32(b, curves,
         umbra_add_i32(b, k, umbra_imm_i32(b, 3)));
-    umbra_val p2x = umbra_gather_32(b, curves,
+    umbra_val32 p2x = umbra_gather_32(b, curves,
         umbra_add_i32(b, k, umbra_imm_i32(b, 4)));
-    umbra_val p2y = umbra_gather_32(b, curves,
+    umbra_val32 p2y = umbra_gather_32(b, curves,
         umbra_add_i32(b, k, umbra_imm_i32(b, 5)));
 
-    umbra_val q0y = umbra_sub_f32(b, p0y, gy);
-    umbra_val q1y = umbra_sub_f32(b, p1y, gy);
-    umbra_val q2y = umbra_sub_f32(b, p2y, gy);
+    umbra_val32 q0y = umbra_sub_f32(b, p0y, gy);
+    umbra_val32 q1y = umbra_sub_f32(b, p1y, gy);
+    umbra_val32 q2y = umbra_sub_f32(b, p2y, gy);
 
-    umbra_val a = umbra_add_f32(b,
+    umbra_val32 a = umbra_add_f32(b,
         umbra_sub_f32(b, q0y,
             umbra_mul_f32(b, tw, q1y)), q2y);
-    umbra_val bv = umbra_sub_f32(b, q0y, q1y);
+    umbra_val32 bv = umbra_sub_f32(b, q0y, q1y);
 
-    umbra_val disc = umbra_sub_f32(b,
+    umbra_val32 disc = umbra_sub_f32(b,
         umbra_mul_f32(b, bv, bv),
         umbra_mul_f32(b, a, q0y));
-    umbra_val ok = umbra_le_f32(b, z, disc);
-    umbra_val sd = umbra_sqrt_f32(b,
+    umbra_val32 ok = umbra_le_f32(b, z, disc);
+    umbra_val32 sd = umbra_sqrt_f32(b,
         umbra_max_f32(b, disc, z));
 
-    umbra_val abs_a = umbra_abs_f32(b, a);
-    umbra_val is_quad = umbra_lt_f32(b, ep, abs_a);
+    umbra_val32 abs_a = umbra_abs_f32(b, a);
+    umbra_val32 is_quad = umbra_lt_f32(b, ep, abs_a);
 
-    umbra_val ia = umbra_div_f32(b, o,
+    umbra_val32 ia = umbra_div_f32(b, o,
         umbra_sel_32(b, is_quad, a, o));
 
-    umbra_val qt1 = umbra_mul_f32(b,
+    umbra_val32 qt1 = umbra_mul_f32(b,
         umbra_sub_f32(b, bv, sd), ia);
-    umbra_val qt2 = umbra_mul_f32(b,
+    umbra_val32 qt2 = umbra_mul_f32(b,
         umbra_add_f32(b, bv, sd), ia);
 
-    umbra_val abs_bv = umbra_abs_f32(b, bv);
-    umbra_val lt = umbra_div_f32(b, q0y,
+    umbra_val32 abs_bv = umbra_abs_f32(b, bv);
+    umbra_val32 lt = umbra_div_f32(b, q0y,
         umbra_sel_32(b,
             umbra_lt_f32(b, ep, abs_bv),
             umbra_mul_f32(b, tw, bv), o));
 
-    umbra_val t1 = umbra_sel_32(b,
+    umbra_val32 t1 = umbra_sel_32(b,
         is_quad, qt1, lt);
-    umbra_val t2 = qt2;
+    umbra_val32 t2 = qt2;
 
-    umbra_val t1ok = umbra_and_32(b, ok,
+    umbra_val32 t1ok = umbra_and_32(b, ok,
         umbra_and_32(b,
             umbra_le_f32(b, z, t1),
             umbra_lt_f32(b, t1, o)));
-    umbra_val t2ok = umbra_and_32(b,
+    umbra_val32 t2ok = umbra_and_32(b,
         umbra_and_32(b, ok, is_quad),
         umbra_and_32(b,
             umbra_le_f32(b, z, t2),
             umbra_lt_f32(b, t2, o)));
 
-    umbra_val q0x = umbra_sub_f32(b, p0x, gx);
-    umbra_val q1x = umbra_sub_f32(b, p1x, gx);
-    umbra_val q2x = umbra_sub_f32(b, p2x, gx);
-    umbra_val ax = umbra_add_f32(b,
+    umbra_val32 q0x = umbra_sub_f32(b, p0x, gx);
+    umbra_val32 q1x = umbra_sub_f32(b, p1x, gx);
+    umbra_val32 q2x = umbra_sub_f32(b, p2x, gx);
+    umbra_val32 ax = umbra_add_f32(b,
         umbra_sub_f32(b, q0x,
             umbra_mul_f32(b, tw, q1x)), q2x);
-    umbra_val bx = umbra_mul_f32(b, tw,
+    umbra_val32 bx = umbra_mul_f32(b, tw,
         umbra_sub_f32(b, q1x, q0x));
 
-    umbra_val x1 = umbra_add_f32(b,
+    umbra_val32 x1 = umbra_add_f32(b,
         umbra_mul_f32(b,
             umbra_add_f32(b,
                 umbra_mul_f32(b, ax, t1), bx),
             t1), q0x);
-    umbra_val x2 = umbra_add_f32(b,
+    umbra_val32 x2 = umbra_add_f32(b,
         umbra_mul_f32(b,
             umbra_add_f32(b,
                 umbra_mul_f32(b, ax, t2), bx),
             t2), q0x);
 
-    umbra_val dy1 = umbra_sub_f32(b,
+    umbra_val32 dy1 = umbra_sub_f32(b,
         umbra_mul_f32(b, a, t1), bv);
-    umbra_val dy2 = umbra_sub_f32(b,
+    umbra_val32 dy2 = umbra_sub_f32(b,
         umbra_mul_f32(b, a, t2), bv);
 
-    umbra_val po = umbra_imm_f32(b, 1.0f);
-    umbra_val no = umbra_imm_f32(b, -1.0f);
+    umbra_val32 po = umbra_imm_f32(b, 1.0f);
+    umbra_val32 no = umbra_imm_f32(b, -1.0f);
 
-    umbra_val dir1 = umbra_sel_32(b,
+    umbra_val32 dir1 = umbra_sel_32(b,
         umbra_lt_f32(b, z, dy1), po,
         umbra_sel_32(b,
             umbra_lt_f32(b, dy1, z), no, z));
-    umbra_val dir2 = umbra_sel_32(b,
+    umbra_val32 dir2 = umbra_sel_32(b,
         umbra_lt_f32(b, z, dy2), po,
         umbra_sel_32(b,
             umbra_lt_f32(b, dy2, z), no, z));
 
-    umbra_val w1 = umbra_sel_32(b,
+    umbra_val32 w1 = umbra_sel_32(b,
         umbra_and_32(b, t1ok,
             umbra_lt_f32(b, z, x1)),
         dir1, z);
-    umbra_val w2 = umbra_sel_32(b,
+    umbra_val32 w2 = umbra_sel_32(b,
         umbra_and_32(b, t2ok,
             umbra_lt_f32(b, z, x2)),
         dir2, z);
 
-    umbra_val dw = umbra_sel_32(b, in,
+    umbra_val32 dw = umbra_sel_32(b, in,
         umbra_add_f32(b, w1, w2), z);
 
-    umbra_val acc = umbra_load_32(b, (umbra_ptr32){1});
+    umbra_val32 acc = umbra_load_32(b, (umbra_ptr32){1});
     acc = umbra_add_f32(b, acc, dw);
     umbra_store_32(b, (umbra_ptr32){1}, acc);
 
