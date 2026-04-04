@@ -32,7 +32,7 @@ static void test_solid_src(void) {
                                                  umbra_fmt_8888, &lay),
                                 lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[4] = {
             0xFFFFFFFF,
             0xFFFFFFFF,
@@ -64,7 +64,7 @@ static void test_solid_src_n1(void) {
                                                  umbra_fmt_8888, &lay),
                                 lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[1] = {0xFFFFFFFF};
         float     color[4] = {0, 0, 1, 1};
         umbra_uniforms_fill_f32(B.lay.uni, B.lay.shader, color, 4);
@@ -89,7 +89,7 @@ static void test_solid_src_n9(void) {
                                                  umbra_fmt_8888, &lay),
                                 lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[9];
         __builtin_memset(dst, 0xFF, sizeof dst);
         float     color[4] = {0, 1, 0, 1};
@@ -115,7 +115,7 @@ static void test_solid_src_n16(void) {
                                                  umbra_fmt_8888, &lay),
                                 lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[16];
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {1, 1, 1, 1};
@@ -139,7 +139,7 @@ static void test_srcover_8888(void) {
                                    umbra_fmt_8888, &lay),
                   lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0xFFFFFFFF, 0xFFFFFFFF};
         float     color[4] = {0, 0.5f, 0, 0.5f};
         umbra_uniforms_fill_f32(B.lay.uni, B.lay.shader, color, 4);
@@ -171,7 +171,7 @@ static void test_dstover_8888(void) {
                                    umbra_fmt_8888, &lay),
                   lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0xFFFFFFFF, 0xFFFFFFFF};
         float     color[4] = {1, 0, 0, 1};
         umbra_uniforms_fill_f32(B.lay.uni, B.lay.shader, color, 4);
@@ -194,7 +194,7 @@ static void test_dstover_transparent(void) {
                                    umbra_fmt_8888, &lay),
                   lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0, 0};
         float     color[4] = {1, 0, 0, 1};
         umbra_uniforms_fill_f32(B.lay.uni, B.lay.shader, color, 4);
@@ -220,7 +220,7 @@ static void test_multiply_8888(void) {
                                    umbra_fmt_8888, &lay),
                   lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0xFF804020, 0xFF804020};
         float     color[4] = {1, 1, 1, 1};
         umbra_uniforms_fill_f32(B.lay.uni, B.lay.shader, color, 4);
@@ -251,7 +251,7 @@ static void test_solid_src_fp16(void) {
                                                  umbra_fmt_fp16, &lay),
                                 lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __fp16 dst[4 * 3];
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {0.25f, 0.5f, 0.75f, 1};
@@ -280,7 +280,7 @@ static void test_srcover_fp16(void) {
                                    umbra_fmt_fp16, &lay),
                   lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __fp16 dst[4 * 2];
         for (int i = 0; i < 2; i++) {
             dst[i * 4 + 0] = 1;
@@ -318,7 +318,7 @@ static void test_coverage_rect(void) {
                                                  umbra_fmt_8888, &lay),
                                 lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[8];
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {1, 0, 0, 1};
@@ -351,7 +351,7 @@ static void test_coverage_rect_scalar(void) {
                                                  umbra_fmt_8888, &lay),
                                 lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[4];
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {1, 0, 0, 1};
@@ -382,7 +382,7 @@ static void test_coverage_rect_n9(void) {
                                                  umbra_fmt_8888, &lay),
                                 lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[9];
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {0, 1, 0, 1};
@@ -414,7 +414,7 @@ static void test_coverage_rect_offset(void) {
                                                  umbra_fmt_8888, &lay),
                                 lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[4];
         __builtin_memset(dst, 0, sizeof dst);
         float color[4] = {0, 1, 0, 1};
@@ -443,7 +443,7 @@ static void test_coverage_rect_outside_y(void) {
                                                  umbra_fmt_8888, &lay),
                                 lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[4] = {
             0x12345678,
             0x12345678,
@@ -472,7 +472,7 @@ static void test_no_shader(void) {
                                                  umbra_fmt_8888, &lay),
                                 lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[4] = {
             0xFFFFFFFF,
             0xFFFFFFFF,
@@ -497,7 +497,7 @@ static void test_no_blend(void) {
                                                  umbra_fmt_8888, &lay),
                                 lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0, 0};
         float     color[4] = {1, 0, 1, 1};
         umbra_uniforms_fill_f32(B.lay.uni, B.lay.shader, color, 4);
@@ -534,7 +534,7 @@ static void test_gradient_shader(void) {
                                                  umbra_fmt_8888, &lay),
                                 lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[4] = {0};
         float     params[2] = {4.0f, 1.0f};
         umbra_uniforms_fill_f32(B.lay.uni, B.lay.shader, params, 2);
@@ -561,7 +561,7 @@ static void test_multiply_half_alpha(void) {
                                    umbra_fmt_8888, &lay),
                   lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0x80FF0000, 0x80FF0000};
         float     color[4] = {1, 0, 0, 0.5f};
         umbra_uniforms_fill_f32(B.lay.uni, B.lay.shader, color, 4);
@@ -593,7 +593,7 @@ static void test_srcover_8888_n9(void) {
                                    umbra_fmt_8888, &lay),
                   lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[9];
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {1, 0, 0, 0.5f};
@@ -622,7 +622,7 @@ static void test_full_pipeline(void) {
                                                  umbra_fmt_8888, &lay),
                                 lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[9];
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {1, 0, 0, 1};
@@ -660,7 +660,7 @@ static void test_solid_src_fp16_n9(void) {
                                                  umbra_fmt_fp16, &lay),
                                 lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __fp16 dst[4 * 9];
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {0.125f, 0.25f, 0.5f, 1};
@@ -702,7 +702,7 @@ static void test_coverage_rect_white_dst(void) {
 
     for (int ci = 0; ci < ncases; ci++) {
         rect_case rc = cases[ci];
-        for (int bi = 0; bi < 3; bi++) {
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             uint32_t dst[24];
             __builtin_memset(dst, 0xFF, (size_t)rc.n * 4);
             float color[4] = {1, 0, 0, 1};
@@ -741,7 +741,7 @@ static void test_coverage_bitmap(void) {
                                                  umbra_fmt_8888, &lay),
                                 lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[8];
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {1, 1, 1, 1};
@@ -770,7 +770,7 @@ static void test_coverage_sdf(void) {
                                                  umbra_fmt_8888, &lay),
                                 lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[8];
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {1, 1, 1, 1};
@@ -798,7 +798,7 @@ static void test_coverage_bitmap_matrix(void) {
                   lay);
 
     size_t ptr_off = (B.lay.coverage + 11 * 4 + 7) & ~(size_t)7;
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[8];
         __builtin_memset(dst, 0, sizeof dst);
         float    color[4] = {1, 1, 1, 1};
@@ -831,7 +831,7 @@ static void test_coverage_bitmap_matrix_oob(void) {
                   lay);
 
     size_t ptr_off = (B.lay.coverage + 11 * 4 + 7) & ~(size_t)7;
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[8];
         __builtin_memset(dst, 0, sizeof dst);
         float    color[4] = {1, 1, 1, 1};
@@ -861,7 +861,7 @@ static void test_linear_2(void) {
                                    umbra_fmt_8888, &lay),
                   lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[4] = {0};
         float     colors[8] = {1, 0, 0, 1, 0, 0, 1, 1};
         float     params[3] = {0.25f, 0, 0};
@@ -890,7 +890,7 @@ static void test_radial_2(void) {
                                    umbra_fmt_8888, &lay),
                   lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[1] = {0};
         float     colors[8] = {1, 1, 1, 1, 0, 0, 0, 1};
         float     params[3] = {0, 0, 0.1f};
@@ -925,7 +925,7 @@ static void test_linear_grad(void) {
                   lay);
 
     size_t lut_off = (B.lay.shader + 16 + 7) & ~(size_t)7;
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[8] = {0};
         float     params[4] = {0.125f, 0, 0, 256};
         umbra_uniforms_fill_f32(B.lay.uni, B.lay.shader, params, 4);
@@ -961,7 +961,7 @@ static void test_radial_grad(void) {
                   lay);
 
     size_t lut_off = (B.lay.shader + 16 + 7) & ~(size_t)7;
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[1] = {0};
         float     params[4] = {0, 0, 0.1f, 64};
         umbra_uniforms_fill_f32(B.lay.uni, B.lay.shader, params, 4);
@@ -996,7 +996,7 @@ static void test_gradient_lut_nonuniform(void) {
                   lay);
 
     size_t lut_off = (B.lay.shader + 16 + 7) & ~(size_t)7;
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[8] = {0};
         float     params[4] = {0.125f, 0, 0, 64};
         umbra_uniforms_fill_f32(B.lay.uni, B.lay.shader, params, 4);
@@ -1030,7 +1030,7 @@ static void test_supersample(void) {
                                                  umbra_fmt_8888, &lay),
                                 lay);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[4] = {0};
         float     color[4] = {1, 0, 0, 1};
         umbra_uniforms_fill_f32(B.lay.uni, B.lay.shader, color, 4);
@@ -1077,7 +1077,7 @@ static void test_page_aligned_buffer(void) {
     float     color[4] = {0, 1, 0, 1};
     umbra_uniforms_fill_f32(B.lay.uni, B.lay.shader, color, 4);
 
-    for (int bi = 0; bi < 3; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(aligned, 0, N * 4);
         if (!run_draw(&B, bi, N, 1, (struct umbra_buf[]){
             (struct umbra_buf){.ptr=B.lay.uni->data, .sz=B.lay.uni->size, .read_only=1},

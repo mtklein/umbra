@@ -91,9 +91,10 @@ int main(int argc, char *argv[]) {
         umbra_backend_interp(), umbra_backend_jit(),
         umbra_backend_metal(),  umbra_backend_vulkan(),
     };
+    int const nb = (int)(sizeof bes / sizeof *bes);
 
     printf("%-40s", "");
-    for (int bi = 0; bi < 4; bi++) {
+    for (int bi = 0; bi < nb; bi++) {
         if (be_mask & (1 << bi)) { printf(" %12s", be_names[bi]); }
     }
     printf("\n");
@@ -109,7 +110,7 @@ int main(int argc, char *argv[]) {
         void *buf = calloc((size_t)(W * H) * planes, bpp);
 
         printf("%-40s", s->title);
-        for (int bi = 0; bi < 4; bi++) {
+        for (int bi = 0; bi < nb; bi++) {
             if (!(be_mask & (1 << bi)) || !bes[bi]) {
                 if (be_mask & (1 << bi)) { printf(" %12s", "-"); }
                 continue;
@@ -131,7 +132,7 @@ int main(int argc, char *argv[]) {
         umbra_builder_free(bld);
 
         struct umbra_program *progs[4];
-        for (int bi = 0; bi < 4; bi++) {
+        for (int bi = 0; bi < nb; bi++) {
             progs[bi] = bes[bi] ? bes[bi]->compile(bes[bi], bb) : NULL;
         }
         umbra_basic_block_free(bb);
@@ -153,12 +154,12 @@ int main(int argc, char *argv[]) {
         };
 
         printf("\n%-40s", "slug accumulator (1 curve)");
-        for (int bi = 0; bi < 4; bi++) {
+        for (int bi = 0; bi < nb; bi++) {
             if (be_mask & (1 << bi)) { printf(" %12s", be_names[bi]); }
         }
         printf("\n%-40s", "");
 
-        for (int bi = 0; bi < 4; bi++) {
+        for (int bi = 0; bi < nb; bi++) {
             if (!(be_mask & (1 << bi)) || !progs[bi]) {
                 if (be_mask & (1 << bi)) { printf(" %12s", "-"); }
                 continue;
@@ -185,7 +186,7 @@ int main(int argc, char *argv[]) {
         }
         printf("\n");
 
-        for (int bi = 0; bi < 4; bi++) {
+        for (int bi = 0; bi < nb; bi++) {
             if (progs[bi]) { progs[bi]->free(progs[bi]); }
         }
         free(wind);
@@ -194,7 +195,7 @@ int main(int argc, char *argv[]) {
     }
 
     slides_cleanup();
-    for (int bi = 0; bi < 4; bi++) {
+    for (int bi = 0; bi < nb; bi++) {
         if (bes[bi]) { bes[bi]->free(bes[bi]); }
     }
     return 0;

@@ -10,12 +10,11 @@
 
 enum { W = 128, H = 96 };
 
-enum { N_BACKS = 4 };
-static char const *backend_name[N_BACKS] = {
+static char const *backend_name[NUM_BACKENDS] = {
     "interp", "jit", "metal", "vulkan",
 };
 
-static struct umbra_backend *bes[N_BACKS];
+static struct umbra_backend *bes[NUM_BACKENDS];
 
 struct pipe {
     struct umbra_program  *prog;
@@ -55,7 +54,7 @@ static void build_pipes(void) {
 static void free_pipes(void) {
     fill_pipe.prog->free(fill_pipe.prog);
     if (fill_pipe.uni) { free(fill_pipe.uni->data); free(fill_pipe.uni); }
-    for (int bi = 0; bi < N_BACKS; bi++) {
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         if (bes[bi]) { bes[bi]->free(bes[bi]); }
     }
 }
@@ -96,7 +95,7 @@ static void test_slide_golden(int slide_idx) {
 
     render_slide(slide_idx, bes[0], pbuf_ref);
 
-    for (int bi = 1; bi < N_BACKS; bi++) {
+    for (int bi = 1; bi < NUM_BACKENDS; bi++) {
         if (!bes[bi]) { continue; }
         render_slide(slide_idx, bes[bi], pbuf_tst);
         bes[bi]->flush(bes[bi]);
