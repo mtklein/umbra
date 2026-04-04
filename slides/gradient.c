@@ -45,7 +45,7 @@ static void grad_2stop_init(struct slide *s, int w, int h) {
 
 static void grad_2stop_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
     struct grad_2stop_state *st = (struct grad_2stop_state *)s;
-    if (st->fmt.load != fmt.load || !st->bb) {
+    if (st->fmt.name != fmt.name || !st->bb) {
         st->fmt = fmt;
         umbra_basic_block_free(st->bb);
         if (st->lay.uni) { free(st->lay.uni->data); free(st->lay.uni); st->lay.uni = NULL; }
@@ -93,7 +93,7 @@ static void grad_lut_init(struct slide *s, int w, int h) {
 
 static void grad_lut_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
     struct grad_lut_state *st = (struct grad_lut_state *)s;
-    if (st->fmt.load != fmt.load || !st->bb) {
+    if (st->fmt.name != fmt.name || !st->bb) {
         st->fmt = fmt;
         umbra_basic_block_free(st->bb);
         if (st->lay.uni) { free(st->lay.uni->data); free(st->lay.uni); st->lay.uni = NULL; }

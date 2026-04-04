@@ -29,9 +29,6 @@ enum {
     FMT_1010102,
     NUM_FMTS,
 };
-static char const *fmt_name[] = {
-    "8888", "565", "fp16", "1010102",
-};
 static struct umbra_fmt const * const fmt_enums[] = {
     &umbra_fmt_8888, &umbra_fmt_565, &umbra_fmt_fp16,
     &umbra_fmt_1010102,
@@ -171,7 +168,7 @@ static int next_backend(int cur) {
 static void update_title(SDL_Window *w, struct slide *s, int bi, int fi, double fps, int nt) {
     char title[256];
     int n = SDL_snprintf(title, sizeof title, "%s  [%s/%s]  %.0f fps", s->title,
-                         backend_name[bi], fmt_name[fi], fps);
+                         backend_name[bi], fmt_enums[fi]->name, fps);
     if (nt > 1) {
         int tc, tr;
         tile_factor(nt, &tc, &tr);
@@ -396,7 +393,7 @@ int main(void) {
             for (int i = 0; i < W * H * 4; i++) { fdata[i] = (float)hdata[i]; }
             free(hdata);
             stbi_write_hdr("dump.hdr", W, H, 4, fdata);
-            SDL_Log("saved dump.hdr (%s)", fmt_name[cur_fmt]);
+            SDL_Log("saved dump.hdr (%s)", fmt_enums[cur_fmt]->name);
             free(fdata);
             want_dump = 0;
         }

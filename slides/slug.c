@@ -47,7 +47,7 @@ static void slug_animate(struct slide *s, float dt) {
 
 static void slug_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
     struct slug_state *st = (struct slug_state *)s;
-    if (st->fmt.load != fmt.load || !st->draw_bb) {
+    if (st->fmt.name != fmt.name || !st->draw_bb) {
         st->fmt = fmt;
         umbra_basic_block_free(st->draw_bb);
         if (st->draw_lay.uni) { free(st->draw_lay.uni->data); free(st->draw_lay.uni); st->draw_lay.uni = NULL; }

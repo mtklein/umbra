@@ -39,7 +39,7 @@ static void persp_animate(struct slide *s, float dt) {
 
 static void persp_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
     struct persp_state *st = (struct persp_state *)s;
-    if (st->fmt.load != fmt.load || !st->bb) {
+    if (st->fmt.name != fmt.name || !st->bb) {
         st->fmt = fmt;
         umbra_basic_block_free(st->bb);
         if (st->lay.uni) { free(st->lay.uni->data); free(st->lay.uni); st->lay.uni = NULL; }

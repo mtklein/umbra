@@ -4,8 +4,9 @@
 typedef struct { umbra_val32 r, g, b, a; } umbra_color;
 
 struct umbra_fmt {
-    size_t bpp;
-    int    planes, :32;
+    char const *name;
+    size_t      bpp;
+    int         planes, :32;
     umbra_color (*load) (struct umbra_builder*, int ptr_bits);
     void        (*store)(struct umbra_builder*, int ptr_bits, umbra_color);
 };
