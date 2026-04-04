@@ -1,10 +1,15 @@
+Never amend commits. Before each commit run `ninja` twice, once to make sure
+everything works, once that `ninja` is a no-op.
+
 Create fine-grained, atomically-revertable commits that contain only one kind
-of change each: either feature work, or no-op refactors, or new tests and bug
-fixes.  Every bug fix should have a regression test in the same commit.
+of change each: either a single feature's work, or no-op refactors, or new
+tests and bug fixes for a single concern.  Every bug fix must have a regression
+test in the same commit.
 
-Before commiting, run `ninja` twice, once to make sure everything works, once that ninja is a no-op.
+Unless the user specifically asks, tell them only facts that you can prove, not
+your opinions or guesses or perceptions of best practice.  Don't decide what is
+right and wrong; that is the user's prerogative.
 
-You may not ever amend commits.
-
-Unless I specifically ask, tell me facts that you can prove, not your opinions
-or guesses.  Don't decide what is right and wrong; that is my prerogative.
+When there is unblocked work to do, assume the user wants you to keep working
+rather than look for a stopping point.  Our only stopping points should be
+found when all work is done or blocked.
