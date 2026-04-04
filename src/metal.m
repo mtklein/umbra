@@ -1231,7 +1231,7 @@ static void encode_dispatch(
                     ? bytes : 0;
             }
             batch_retain_buf(be, retained);
-            if (!buf[i].read_only && !can_nocopy) {
+            if (!buf[i].read_only) {
                 batch_add_copy(
                     be, ptr,
                     retained, bytes);
@@ -1296,7 +1296,7 @@ static void encode_dispatch(
                     ? bytes : 0;
             }
             batch_retain_buf(be, retained);
-            if (!deref_read_only && !can_nocopy) {
+            if (!deref_read_only) {
                 batch_add_copy(
                     be, dptr,
                     retained, bytes);
