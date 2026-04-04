@@ -36,6 +36,10 @@ struct umbra_program {
     struct umbra_backend *backend;
 };
 
+// TODO: split into two types, one that's used for reserving (wrapping a size_t)
+// and one that's use for filling (wrapping a void*), maybe umbra_uniforms_builder
+// and umbra_uniforms_data?  Possible cleaner to not have that second type at all,
+// just have the builder finish() by returning the properly sized void* from malloc()?
 struct umbra_uniforms {
     void  *data;
     size_t size;
@@ -45,6 +49,7 @@ size_t umbra_uniforms_reserve_ptr(struct umbra_uniforms*);
 void   umbra_uniforms_fill_f32(struct umbra_uniforms*, size_t off, float const*, int n);
 void   umbra_uniforms_fill_ptr(struct umbra_uniforms*, size_t off, struct umbra_buf);
 
+// TODO: try exposing the internals of these e.g. {int ch:2, id:30;} or { int deref:1, ix:31; }
 typedef struct { int bits; } umbra_val16;
 typedef struct { int bits; } umbra_val32;
 typedef struct { int bits; } umbra_ptr16;
@@ -53,7 +58,7 @@ typedef struct { int bits; } umbra_ptr64;
 
 umbra_ptr16 umbra_deref_ptr16(struct umbra_builder*, umbra_ptr32 buf, size_t off);
 umbra_ptr32 umbra_deref_ptr32(struct umbra_builder*, umbra_ptr32 buf, size_t off);
-
+umbra_val32 umbra_uniform_32(struct umbra_builder*, umbra_ptr32, size_t off);
 
 umbra_val32 umbra_x(struct umbra_builder*);
 umbra_val32 umbra_y(struct umbra_builder*);
@@ -61,7 +66,6 @@ umbra_val32 umbra_y(struct umbra_builder*);
 umbra_val32 umbra_imm_i32(struct umbra_builder*, int);
 umbra_val32 umbra_imm_f32(struct umbra_builder*, float);
 
-umbra_val32 umbra_uniform_32(struct umbra_builder*, umbra_ptr32, size_t off);
 
 umbra_val16 umbra_gather_16(struct umbra_builder*, umbra_ptr16, umbra_val32 ix);
 umbra_val32 umbra_gather_32(struct umbra_builder*, umbra_ptr32, umbra_val32 ix);

@@ -8,7 +8,7 @@
   v7   = imm_32          0x3f800000
   v8   = sub_f32         v7 v4
   v9   = imm_32          0x437f0000
-  v10  = load_16         p-6
+  v10  = load_16         p-2147483643
   v11  = i32_from_s16    v10
   v12  = f32_from_i32    v11
   v13  = mul_f32_imm     v12 0x3b808081 (a.k.a. v6)

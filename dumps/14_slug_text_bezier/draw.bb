@@ -8,7 +8,7 @@
   v7   = imm_32          0x3b808081
   v8   = sub_f32         v6 v4
   v9   = imm_32          0x437f0000
-  v10  = load_32         p-6
+  v10  = load_32         p-2147483643
   v11  = abs_f32         v10
   v12  = min_f32_imm     v11 0x3f800000 (a.k.a. v6)
   v13  = load_8x4        p1

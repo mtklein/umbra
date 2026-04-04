@@ -103,10 +103,10 @@ static void load_ptr(Buf *c, int p, int *last_ptr) {
 
 static void resolve_ptr(Buf *c, int p, int *last_ptr, int const *deref_gpr,
                         int const *deref_rb_gpr) {
-    if (p < 0) {
+    if (ptr_is_deref(p)) {
         *last_ptr = -1;
-        int gpr = deref_gpr[~p];
-        int rbg = deref_rb_gpr[~p];
+        int gpr = deref_gpr[ptr_ix(p)];
+        int rbg = deref_rb_gpr[ptr_ix(p)];
         if (rbg > 0) {
             put(c, MADD_x(XP, XY, rbg, gpr));
         } else {
@@ -118,7 +118,7 @@ static void resolve_ptr(Buf *c, int p, int *last_ptr, int const *deref_gpr,
 }
 
 static void load_count(Buf *c, int p, int elem_shift, int const *deref_gpr) {
-    if (p < 0) {
+    if (ptr_is_deref(p)) {
         (void)deref_gpr;
         put(c, MOVZ_x_lsl16(XM, 0x7fff));
     } else {
@@ -1409,7 +1409,7 @@ static void patch_jcc(Buf *c, int fixup) {
 }
 
 static void load_count_x86(Buf *c, int p, int elem_shift) {
-    if (p < 0) {
+    if (ptr_is_deref(p)) {
         mov_ri(c, XM, 0x7fffffff);
     } else {
         mov_load(c, XM, XBUF, p * (int)sizeof(struct umbra_buf) + (int)__builtin_offsetof(struct umbra_buf, sz));
@@ -1585,9 +1585,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 
 static int resolve_ptr_x86(Buf *c, int p, int *last_ptr, int const *deref_gpr,
                            int const *deref_rb_gpr) {
-    if (p < 0) {
-        int gpr = deref_gpr[~p];
-        int rb  = deref_rb_gpr[~p];
+    if (ptr_is_deref(p)) {
+        int gpr = deref_gpr[ptr_ix(p)];
+        int rb  = deref_rb_gpr[ptr_ix(p)];
         if (rb > 0) {
             mov_rr(c, R11, gpr);
             mov_rr(c, RAX, XY);

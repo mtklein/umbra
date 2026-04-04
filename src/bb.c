@@ -166,11 +166,11 @@ val umbra_imm_f32(builder *b, float v) {
 
 umbra_ptr16 umbra_deref_ptr16(builder *b, umbra_ptr32 buf, size_t off) {
     val const v = push(b, op_deref_ptr, .ptr = p32(buf), .imm = (int)off);
-    return (umbra_ptr16){.bits = ~val_id(v)};
+    return (umbra_ptr16){.bits = ptr_deref(val_id(v))};
 }
 umbra_ptr32 umbra_deref_ptr32(builder *b, umbra_ptr32 buf, size_t off) {
     val const v = push(b, op_deref_ptr, .ptr = p32(buf), .imm = (int)off);
-    return (umbra_ptr32){.bits = ~val_id(v)};
+    return (umbra_ptr32){.bits = ptr_deref(val_id(v))};
 }
 
 
@@ -588,7 +588,7 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
             live[(int)b->inst[i].y.id] = 1;
             live[(int)b->inst[i].z.id] = 1;
             live[(int)b->inst[i].w.id] = 1;
-            if (b->inst[i].ptr < 0) { live[~b->inst[i].ptr] = 1; }
+            if (ptr_is_deref(b->inst[i].ptr)) { live[ptr_ix(b->inst[i].ptr)] = 1; }
         }
     }
     for (int i = 0; i < n; i++) {
@@ -624,7 +624,7 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
         out[i].y = (val_){.id = (unsigned)old_to_new[out[i].y.id], .chan = out[i].y.chan};
         out[i].z = (val_){.id = (unsigned)old_to_new[out[i].z.id], .chan = out[i].z.chan};
         out[i].w = (val_){.id = (unsigned)old_to_new[out[i].w.id], .chan = out[i].w.chan};
-        if (out[i].ptr < 0) { out[i].ptr = ~old_to_new[~out[i].ptr]; }
+        if (ptr_is_deref(out[i].ptr)) { out[i].ptr = ptr_deref(old_to_new[ptr_ix(out[i].ptr)]); }
     }
 
     free(live);

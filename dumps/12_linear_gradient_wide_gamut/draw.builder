@@ -26,13 +26,13 @@
   v25  = min_f32         v23 v24
   v26  = add_f32         v18 v18
   v27  = add_f32         v18 v26
-  v28  = sample_32       p-6 v25
+  v28  = sample_32       p-2147483643 v25
   v29  = add_f32         v18 v25
-  v30  = sample_32       p-6 v29
+  v30  = sample_32       p-2147483643 v29
   v31  = add_f32         v25 v26
-  v32  = sample_32       p-6 v31
+  v32  = sample_32       p-2147483643 v31
   v33  = add_f32         v25 v27
-  v34  = sample_32       p-6 v33
+  v34  = sample_32       p-2147483643 v33
   v35  = imm_32          0x437f0000
   v36  = max_f32         v0 v28
   v37  = max_f32_imm     v28 0x0

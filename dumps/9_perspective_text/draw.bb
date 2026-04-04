@@ -47,7 +47,7 @@
   v46  = floor_i32       v45
   v47  = mul_i32         v46 v20
   v48  = add_i32         v43 v47
-  v49  = gather_16       p-6 v48
+  v49  = gather_16       p-2147483643 v48
   v50  = i32_from_s16    v49
   v51  = f32_from_i32    v50
   v52  = mul_f32_imm     v51 0x3b808081 (a.k.a. v21)

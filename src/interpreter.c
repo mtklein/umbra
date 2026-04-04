@@ -215,7 +215,7 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
 
     int n = 0;
 #define emit(...) p->inst[n] = (struct sw_inst){ __VA_ARGS__ }
-#define RESOLVE_PTR(inst) ((inst)->ptr < 0 ? deref_slot[~(inst)->ptr] : (inst)->ptr)
+#define RESOLVE_PTR(inst) (ptr_is_deref((inst)->ptr) ? deref_slot[ptr_ix((inst)->ptr)] : (inst)->ptr)
     for (int pass = 0; pass < 2; pass++) {
         int const lo = pass ? bb->preamble : 0, hi = pass ? bb->insts : bb->preamble;
         if (pass) { p->preamble = n; }

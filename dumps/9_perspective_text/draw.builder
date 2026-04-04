@@ -56,7 +56,7 @@
   v55  = floor_i32       v19
   v56  = mul_i32         v54 v55
   v57  = add_i32         v53 v56
-  v58  = gather_16       p-10 v57
+  v58  = gather_16       p-2147483639 v57
   v59  = i32_from_s16    v58
   v60  = imm_32          0x3b808081
   v61  = f32_from_i32    v59

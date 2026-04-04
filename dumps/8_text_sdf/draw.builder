@@ -8,7 +8,7 @@
   v7   = uniform_32      p0 byte8
   v8   = uniform_32      p0 byte12
   v9   = deref_ptr       p0 byte16
-  v10  = load_16         p-10
+  v10  = load_16         p-2147483639
   v11  = i32_from_s16    v10
   v12  = imm_32          0x3b808081
   v13  = f32_from_i32    v11

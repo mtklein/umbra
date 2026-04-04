@@ -178,8 +178,8 @@ static void emit_ops(Buf *b, BB const *bb,
             case op_deref_ptr: break;
 
             case op_uniform_32: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = ptr_is_deref(inst->ptr)
+                    ? deref_buf[ptr_ix(inst->ptr)] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 emit(b, mixed
                     ? "%suint v%d = p%d_32[%d];\n"
@@ -189,8 +189,8 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i, p, inst->imm / 4);
             } break;
             case op_load_32: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = ptr_is_deref(inst->ptr)
+                    ? deref_buf[ptr_ix(inst->ptr)] : inst->ptr;
                 emit(b,
                      "%suint v%d = ((device uint*)"
                      "(p%d + y * buf_rbs[%d]))[x];\n",
@@ -198,8 +198,8 @@ static void emit_ops(Buf *b, BB const *bb,
             } break;
             case op_gather_uniform_32:
             case op_gather_32: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = ptr_is_deref(inst->ptr)
+                    ? deref_buf[ptr_ix(inst->ptr)] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 emit(b, mixed
                     ? "%suint v%d = p%d_32"
@@ -217,8 +217,8 @@ static void emit_ops(Buf *b, BB const *bb,
                      vx, p);
             } break;
             case op_sample_32: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = ptr_is_deref(inst->ptr)
+                    ? deref_buf[ptr_ix(inst->ptr)] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 emit(b,
                      "%sfloat _si%d = floor(%s);\n"
@@ -253,8 +253,8 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i, i, i, i, i);
             } break;
             case op_store_32: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = ptr_is_deref(inst->ptr)
+                    ? deref_buf[ptr_ix(inst->ptr)] : inst->ptr;
                 emit(b,
                      "%s((device uint*)"
                      "(p%d + y * buf_rbs[%d]))"
@@ -263,8 +263,8 @@ static void emit_ops(Buf *b, BB const *bb,
                      uv(_uy, vy, yid, is_f));
             } break;
             case op_load_16x4: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = ptr_is_deref(inst->ptr)
+                    ? deref_buf[ptr_ix(inst->ptr)] : inst->ptr;
                 emit(b,
                      "%sdevice ushort *hp%d = (device ushort*)"
                      "(p%d + y * buf_rbs[%d]) + x*4;\n"
@@ -279,8 +279,8 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i, i);
             } break;
             case op_load_16x4_planar: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = ptr_is_deref(inst->ptr)
+                    ? deref_buf[ptr_ix(inst->ptr)] : inst->ptr;
                 emit(b,
                      "%sdevice uchar *row%d = p%d + y * buf_rbs[%d];"
                      " uint ps%d = buf_szs[%d]/4;\n"
@@ -295,8 +295,8 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i, i, i);
             } break;
             case op_store_16x4: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = ptr_is_deref(inst->ptr)
+                    ? deref_buf[ptr_ix(inst->ptr)] : inst->ptr;
                 emit(b,
                      "%s{\n"
                      "%s    device ushort *hp = (device ushort*)"
@@ -314,8 +314,8 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad);
             } break;
             case op_store_16x4_planar: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = ptr_is_deref(inst->ptr)
+                    ? deref_buf[ptr_ix(inst->ptr)] : inst->ptr;
                 emit(b,
                      "%s{\n"
                      "%s    device uchar *row = p%d + y * buf_rbs[%d];"
@@ -336,8 +336,8 @@ static void emit_ops(Buf *b, BB const *bb,
             } break;
 
             case op_load_8x4: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = ptr_is_deref(inst->ptr)
+                    ? deref_buf[ptr_ix(inst->ptr)] : inst->ptr;
                 emit(b,
                      "%suint px%d = ((device uint*)"
                      "(p%d + y * buf_rbs[%d]))[x];\n"
@@ -352,8 +352,8 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i, i);
             } break;
             case op_store_8x4: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = ptr_is_deref(inst->ptr)
+                    ? deref_buf[ptr_ix(inst->ptr)] : inst->ptr;
                 emit(b,
                      "%s((device uint*)(p%d + y * buf_rbs[%d]))[x] ="
                      " (%s & 0xFFu) | ((%s & 0xFFu) << 8u)"
@@ -366,8 +366,8 @@ static void emit_ops(Buf *b, BB const *bb,
             } break;
 
             case op_load_16: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = ptr_is_deref(inst->ptr)
+                    ? deref_buf[ptr_ix(inst->ptr)] : inst->ptr;
                 emit(b,
                      "%suint v%d = (uint)"
                      "((device ushort*)"
@@ -375,8 +375,8 @@ static void emit_ops(Buf *b, BB const *bb,
                      pad, i, p, p);
             } break;
             case op_gather_16: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = ptr_is_deref(inst->ptr)
+                    ? deref_buf[ptr_ix(inst->ptr)] : inst->ptr;
                 _Bool mixed = ptr_32[p] && ptr_16[p];
                 emit(b, mixed
                     ? "%suint v%d = (uint)(ushort)"
@@ -394,8 +394,8 @@ static void emit_ops(Buf *b, BB const *bb,
                      vx, p);
             } break;
             case op_store_16: {
-                int p = inst->ptr < 0
-                    ? deref_buf[~inst->ptr] : inst->ptr;
+                int p = ptr_is_deref(inst->ptr)
+                    ? deref_buf[ptr_ix(inst->ptr)] : inst->ptr;
                 emit(b,
                      "%s((device ushort*)"
                      "(p%d + y * buf_rbs[%d]))"
@@ -891,8 +891,8 @@ static char* build_source(BB const *bb,
     for (int i = 0; i < bb->insts; i++) {
         enum op op = bb->inst[i].op;
         if (has_ptr(op) && op != op_deref_ptr) {
-            int p = bb->inst[i].ptr < 0
-                ? deref_buf[~bb->inst[i].ptr]
+            int p = ptr_is_deref(bb->inst[i].ptr)
+                ? deref_buf[ptr_ix(bb->inst[i].ptr)]
                 : bb->inst[i].ptr;
             if (is_32(op)) { ptr_32[p] = 1; }
             else if (is_16(op)) { ptr_16[p] = 1; }
