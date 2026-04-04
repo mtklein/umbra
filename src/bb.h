@@ -91,7 +91,6 @@ struct bb_inst {
 };
 
 // Ptr encoding: bit 31 = deref flag, bits 0-30 = index.
-static inline int   ptr_direct(int ix)    { return ix; }
 static inline int   ptr_deref(int id)     { return (int)((unsigned)id | (1u << 31)); }
 static inline _Bool ptr_is_deref(int ptr) { return ptr < 0; }
 static inline int   ptr_ix(int ptr)       { return (int)((unsigned)ptr & 0x7FFFFFFFu); }
