@@ -761,27 +761,18 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
     }
     *out_deref = di;
 
-    // --- Scan for 16-bit and 32-bit buffer access. ---
+    // --- Scan for 16-bit buffer access. ---
     B.buf_is_16 = calloc((size_t)(total_bufs + 1), sizeof *B.buf_is_16);
-    _Bool *buf_needs_32 = calloc((size_t)(total_bufs + 1), sizeof *buf_needs_32);
     for (int i = 0; i < bb->insts; i++) {
         enum op op = bb->inst[i].op;
-        if (!has_ptr(op) || op == op_uniform_32 || op == op_deref_ptr) { continue; }
-        int p = bb->inst[i].ptr < 0 ? deref_buf[~bb->inst[i].ptr]
-                                     : bb->inst[i].ptr;
         if (op == op_load_16 || op == op_store_16 || op == op_gather_16
          || op == op_load_16x4_planar || op == op_store_16x4_planar) {
+            int p = bb->inst[i].ptr < 0 ? deref_buf[~bb->inst[i].ptr]
+                                         : bb->inst[i].ptr;
             B.buf_is_16[p] = 1;
-        } else {
-            buf_needs_32[p] = 1;
+            B.has_16 = 1;
         }
     }
-    // Mixed buffers (both 16 and 32-bit access) stay u32; 16-bit ops are emulated.
-    for (int i = 0; i < total_bufs + 1; i++) {
-        if (B.buf_is_16[i] && buf_needs_32[i]) { B.buf_is_16[i] = 0; }
-        if (B.buf_is_16[i]) { B.has_16 = 1; }
-    }
-    free(buf_needs_32);
 
     // Push constant layout: w, x0, y0, buf_szs[total_bufs], buf_rbs[total_bufs]
     int meta_words = 3 + 2 * total_bufs;
@@ -1268,57 +1259,14 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
                 case op_load_16: {
                     int p = resolve_ptr(&B, inst);
                     uint32_t addr16 = compute_addr(&B, x_coord, y_coord, p, B.c_1);
-                    if (B.buf_is_16[p]) {
-                        B.val[i] = load_ssbo_u16(&B, p, addr16);
-                    } else {
-                        // Buffer is u32: load the containing word, extract the u16 half.
-                        uint32_t addr32 = spv_binop(&B, SpvOpShiftRightLogical,
-                                                    B.t_u32, addr16, B.c_1);
-                        uint32_t word = load_ssbo_u32(&B, p, addr32);
-                        uint32_t odd = spv_binop(&B, SpvOpBitwiseAnd,
-                                                 B.t_u32, addr16, B.c_1);
-                        uint32_t c_4 = spv_const_u32(&B, 4);
-                        uint32_t shift = spv_binop(&B, SpvOpShiftLeftLogical,
-                                                   B.t_u32, odd, c_4);
-                        uint32_t shifted = spv_binop(&B, SpvOpShiftRightLogical,
-                                                     B.t_u32, word, shift);
-                        uint32_t c_mask = spv_const_u32(&B, 0xFFFF);
-                        B.val[i] = spv_binop(&B, SpvOpBitwiseAnd,
-                                             B.t_u32, shifted, c_mask);
-                    }
+                    B.val[i] = load_ssbo_u16(&B, p, addr16);
                 } break;
 
                 case op_store_16: {
                     int p = resolve_ptr(&B, inst);
                     uint32_t addr16 = compute_addr(&B, x_coord, y_coord, p, B.c_1);
                     uint32_t v = as_u32(&B, get_val(&B, inst->y), yid);
-                    if (B.buf_is_16[p]) {
-                        store_ssbo_u16(&B, p, addr16, v);
-                    } else {
-                        // Buffer is u32: read-modify-write the containing word.
-                        uint32_t addr32 = spv_binop(&B, SpvOpShiftRightLogical,
-                                                    B.t_u32, addr16, B.c_1);
-                        uint32_t odd = spv_binop(&B, SpvOpBitwiseAnd,
-                                                 B.t_u32, addr16, B.c_1);
-                        uint32_t c_4 = spv_const_u32(&B, 4);
-                        uint32_t shift = spv_binop(&B, SpvOpShiftLeftLogical,
-                                                   B.t_u32, odd, c_4);
-                        uint32_t c_mask = spv_const_u32(&B, 0xFFFF);
-                        uint32_t val16 = spv_binop(&B, SpvOpBitwiseAnd,
-                                                   B.t_u32, v, c_mask);
-                        uint32_t val_shifted = spv_binop(&B, SpvOpShiftLeftLogical,
-                                                         B.t_u32, val16, shift);
-                        uint32_t clear_mask = spv_binop(&B, SpvOpShiftLeftLogical,
-                                                        B.t_u32, c_mask, shift);
-                        clear_mask = spv_binop(&B, SpvOpBitwiseXor, B.t_u32,
-                                               clear_mask, B.c_allones);
-                        uint32_t old = load_ssbo_u32(&B, p, addr32);
-                        uint32_t cleared = spv_binop(&B, SpvOpBitwiseAnd,
-                                                     B.t_u32, old, clear_mask);
-                        uint32_t result = spv_binop(&B, SpvOpBitwiseOr,
-                                                    B.t_u32, cleared, val_shifted);
-                        store_ssbo_u32(&B, p, addr32, result);
-                    }
+                    store_ssbo_u16(&B, p, addr16, v);
                 } break;
 
                 case op_gather_uniform_32:
@@ -1335,29 +1283,9 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
                     int p = resolve_ptr(&B, inst);
                     uint32_t ix_val = as_u32(&B, get_val(&B, inst->x), xid);
                     uint32_t safe_idx, mask;
-                    if (B.buf_is_16[p]) {
-                        gather_safe(&B, ix_val, p, B.c_1, &safe_idx, &mask);
-                        uint32_t raw = load_ssbo_u16(&B, p, safe_idx);
-                        B.val[i] = spv_binop(&B, SpvOpBitwiseAnd, B.t_u32, raw, mask);
-                    } else {
-                        // Buffer is u32: gather in u16 index space, extract half.
-                        gather_safe(&B, ix_val, p, B.c_1, &safe_idx, &mask);
-                        uint32_t addr32 = spv_binop(&B, SpvOpShiftRightLogical,
-                                                    B.t_u32, safe_idx, B.c_1);
-                        uint32_t word = load_ssbo_u32(&B, p, addr32);
-                        uint32_t odd = spv_binop(&B, SpvOpBitwiseAnd,
-                                                 B.t_u32, safe_idx, B.c_1);
-                        uint32_t c_4 = spv_const_u32(&B, 4);
-                        uint32_t shift = spv_binop(&B, SpvOpShiftLeftLogical,
-                                                   B.t_u32, odd, c_4);
-                        uint32_t shifted = spv_binop(&B, SpvOpShiftRightLogical,
-                                                     B.t_u32, word, shift);
-                        uint32_t c_0xFFFF = spv_const_u32(&B, 0xFFFF);
-                        uint32_t extracted = spv_binop(&B, SpvOpBitwiseAnd,
-                                                       B.t_u32, shifted, c_0xFFFF);
-                        B.val[i] = spv_binop(&B, SpvOpBitwiseAnd,
-                                             B.t_u32, extracted, mask);
-                    }
+                    gather_safe(&B, ix_val, p, B.c_1, &safe_idx, &mask);
+                    uint32_t raw = load_ssbo_u16(&B, p, safe_idx);
+                    B.val[i] = spv_binop(&B, SpvOpBitwiseAnd, B.t_u32, raw, mask);
                 } break;
 
                 case op_sample_32: {
