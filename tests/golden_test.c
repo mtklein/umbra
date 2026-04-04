@@ -34,7 +34,7 @@ static void build_fill(void) {
         umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 8),
         umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 12),
     };
-    umbra_store_8888(builder, (umbra_ptr32){1}, c);
+    umbra_store_8888(builder, (umbra_ptr32){.ix=1}, c);
     fill_pipe.uni = u;
     fill_pipe.data = umbra_uniforms_alloc(u);
     struct umbra_basic_block *opt =

@@ -8,6 +8,10 @@ int dprintf(int, char const[], ...);
 static inline _Bool equiv(float x, float y) {
     return (x <= y && y <= x) || (x != x && y != y);
 }
+static inline _Bool val_eq(umbra_val32 a, umbra_val32 b) { return a.id == b.id && a.chan == b.chan; }
+static inline _Bool val_lt(umbra_val32 a, umbra_val32 b) {
+    return a.id < b.id || (a.id == b.id && a.chan < b.chan);
+}
 
 enum { NUM_BACKENDS = 4 };
 

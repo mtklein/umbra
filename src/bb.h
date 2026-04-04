@@ -2,12 +2,10 @@
 #include <stdint.h>
 #include "../include/umbra.h"
 
-// Internally, umbra_val32 is a union giving named access to the packed fields.
-// Low 2 bits = channel, upper 30 bits = instruction index.
-// The public header sees only { int bits; }.
+// Internal val type matches public umbra_val32 layout, plus a bits overlay.
 typedef union {
     int      bits;
-    struct { unsigned chan : 2, id : 30; };
+    struct { unsigned id : 30, chan : 2; };
 } val_;
 
 // Op metadata flags.

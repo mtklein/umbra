@@ -36,20 +36,21 @@ struct umbra_program {
     struct umbra_backend *backend;
 };
 
+// TODO: rename umbra_uniforms_builder, allocate by value instead of calloc() where sensible
 struct umbra_uniforms { size_t size; };
 size_t umbra_uniforms_reserve_f32(struct umbra_uniforms*, int n);
 size_t umbra_uniforms_reserve_ptr(struct umbra_uniforms*);
 
-void  *umbra_uniforms_alloc(struct umbra_uniforms const*);
-void   umbra_uniforms_fill_f32(void *data, size_t off, float const*, int n);
-void   umbra_uniforms_fill_ptr(void *data, size_t off, struct umbra_buf);
+// TODO: try to call this void *uniforms consistently through the codebase
+void*  umbra_uniforms_alloc(struct umbra_uniforms const*);
+void   umbra_uniforms_fill_f32(void *uniforms, size_t off, float const*, int n);
+void   umbra_uniforms_fill_ptr(void *uniforms, size_t off, struct umbra_buf);
 
-// TODO: try exposing the internals of these e.g. {int ch:2, id:30;} or { int deref:1, ix:31; }
-typedef struct { int bits; } umbra_val16;
-typedef struct { int bits; } umbra_val32;
-typedef struct { int bits; } umbra_ptr16;
-typedef struct { int bits; } umbra_ptr32;
-typedef struct { int bits; } umbra_ptr64;
+typedef struct { unsigned id:30, chan:2; } umbra_val16;
+typedef struct { unsigned id:30, chan:2; } umbra_val32;
+typedef struct { unsigned ix:31, deref:1; } umbra_ptr16;
+typedef struct { unsigned ix:31, deref:1; } umbra_ptr32;
+typedef struct { unsigned ix:31, deref:1; } umbra_ptr64;
 
 umbra_ptr16 umbra_deref_ptr16(struct umbra_builder*, umbra_ptr32 buf, size_t off);
 umbra_ptr32 umbra_deref_ptr32(struct umbra_builder*, umbra_ptr32 buf, size_t off);

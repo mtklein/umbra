@@ -21,19 +21,19 @@ static struct umbra_builder *build_srcover(void) {
               sg = umbra_mul_f32(b, umbra_f32_from_i32(b, rgba[1]), inv255),
               sb = umbra_mul_f32(b, umbra_f32_from_i32(b, rgba[2]), inv255),
               sa = umbra_mul_f32(b, umbra_f32_from_i32(b, rgba[3]), inv255),
-              dr = umbra_f32_from_f16(b, umbra_load_16(b, (umbra_ptr16){1})),
-              dg = umbra_f32_from_f16(b, umbra_load_16(b, (umbra_ptr16){2})),
-              db = umbra_f32_from_f16(b, umbra_load_16(b, (umbra_ptr16){3})),
-              da = umbra_f32_from_f16(b, umbra_load_16(b, (umbra_ptr16){4})),
+              dr = umbra_f32_from_f16(b, umbra_load_16(b, (umbra_ptr16){.ix=1})),
+              dg = umbra_f32_from_f16(b, umbra_load_16(b, (umbra_ptr16){.ix=2})),
+              db = umbra_f32_from_f16(b, umbra_load_16(b, (umbra_ptr16){.ix=3})),
+              da = umbra_f32_from_f16(b, umbra_load_16(b, (umbra_ptr16){.ix=4})),
               one = umbra_imm_f32(b, 1.0f), inv_a = umbra_sub_f32(b, one, sa),
               rout = umbra_add_f32(b, sr, umbra_mul_f32(b, dr, inv_a)),
               gout = umbra_add_f32(b, sg, umbra_mul_f32(b, dg, inv_a)),
               bout = umbra_add_f32(b, sb, umbra_mul_f32(b, db, inv_a)),
               aout = umbra_add_f32(b, sa, umbra_mul_f32(b, da, inv_a));
-    umbra_store_16(b, (umbra_ptr16){1}, umbra_f16_from_f32(b, rout));
-    umbra_store_16(b, (umbra_ptr16){2}, umbra_f16_from_f32(b, gout));
-    umbra_store_16(b, (umbra_ptr16){3}, umbra_f16_from_f32(b, bout));
-    umbra_store_16(b, (umbra_ptr16){4}, umbra_f16_from_f32(b, aout));
+    umbra_store_16(b, (umbra_ptr16){.ix=1}, umbra_f16_from_f32(b, rout));
+    umbra_store_16(b, (umbra_ptr16){.ix=2}, umbra_f16_from_f32(b, gout));
+    umbra_store_16(b, (umbra_ptr16){.ix=3}, umbra_f16_from_f32(b, bout));
+    umbra_store_16(b, (umbra_ptr16){.ix=4}, umbra_f16_from_f32(b, aout));
     return b;
 }
 

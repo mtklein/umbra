@@ -1138,7 +1138,7 @@ int main(void) {
     {
         struct umbra_builder *b = umbra_builder();
         umbra_color c = umbra_load_565(b, (umbra_ptr16){0});
-        umbra_store_565(b, (umbra_ptr16){1}, c);
+        umbra_store_565(b, (umbra_ptr16){.ix=1}, c);
         struct umbra_basic_block *bb = umbra_basic_block(b);
         umbra_builder_free(b);
         struct test_backends B = test_backends_make(bb);
@@ -1158,7 +1158,7 @@ int main(void) {
     {
         struct umbra_builder *b = umbra_builder();
         umbra_color c = umbra_load_1010102(b, (umbra_ptr32){0});
-        umbra_store_1010102(b, (umbra_ptr32){1}, c);
+        umbra_store_1010102(b, (umbra_ptr32){.ix=1}, c);
         struct umbra_basic_block *bb = umbra_basic_block(b);
         umbra_builder_free(b);
         struct test_backends B = test_backends_make(bb);
@@ -1182,7 +1182,7 @@ int main(void) {
     {
         struct umbra_builder *b = umbra_builder();
         umbra_color c = umbra_load_fp16_planar(b, (umbra_ptr16){0});
-        umbra_store_fp16_planar(b, (umbra_ptr16){1}, c);
+        umbra_store_fp16_planar(b, (umbra_ptr16){.ix=1}, c);
         struct umbra_basic_block *bb = umbra_basic_block(b);
         umbra_builder_free(b);
         struct test_backends B = test_backends_make(bb);

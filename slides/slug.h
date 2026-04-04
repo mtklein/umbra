@@ -316,9 +316,9 @@ static inline struct umbra_builder *slug_build_acc(
     umbra_val32 dw = umbra_sel_32(b, in,
         umbra_add_f32(b, w1, w2), z);
 
-    umbra_val32 acc = umbra_load_32(b, (umbra_ptr32){1});
+    umbra_val32 acc = umbra_load_32(b, (umbra_ptr32){.ix=1});
     acc = umbra_add_f32(b, acc, dw);
-    umbra_store_32(b, (umbra_ptr32){1}, acc);
+    umbra_store_32(b, (umbra_ptr32){.ix=1}, acc);
 
     if (lay) {
         lay->mat        = fi;
