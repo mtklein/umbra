@@ -46,9 +46,13 @@ void   umbra_uniforms_fill_f32(struct umbra_uniforms*, size_t off, float const*,
 void   umbra_uniforms_fill_ptr(struct umbra_uniforms*, size_t off, struct umbra_buf);
 
 typedef struct { int bits; } umbra_val;
-typedef struct { int bits; } umbra_ptr;
+typedef struct { int bits; } umbra_ptr16;
+typedef struct { int bits; } umbra_ptr32;
+typedef struct { int bits; } umbra_ptr64;
 
-umbra_ptr umbra_deref_ptr(struct umbra_builder*, umbra_ptr buf, size_t off);
+umbra_ptr16 umbra_deref_ptr16(struct umbra_builder*, umbra_ptr32 buf, size_t off);
+umbra_ptr32 umbra_deref_ptr32(struct umbra_builder*, umbra_ptr32 buf, size_t off);
+umbra_ptr64 umbra_deref_ptr64(struct umbra_builder*, umbra_ptr32 buf, size_t off);
 
 umbra_val umbra_x(struct umbra_builder*);
 umbra_val umbra_y(struct umbra_builder*);
@@ -56,31 +60,31 @@ umbra_val umbra_y(struct umbra_builder*);
 umbra_val umbra_imm_i32(struct umbra_builder*, int);
 umbra_val umbra_imm_f32(struct umbra_builder*, float);
 
-umbra_val umbra_uniform_32(struct umbra_builder*, umbra_ptr, size_t off);
+umbra_val umbra_uniform_32(struct umbra_builder*, umbra_ptr32, size_t off);
 
-umbra_val umbra_gather_16(struct umbra_builder*, umbra_ptr, umbra_val ix);
-umbra_val umbra_gather_32(struct umbra_builder*, umbra_ptr, umbra_val ix);
-umbra_val umbra_sample_32(struct umbra_builder*, umbra_ptr, umbra_val ix);
+umbra_val umbra_gather_16(struct umbra_builder*, umbra_ptr16, umbra_val ix);
+umbra_val umbra_gather_32(struct umbra_builder*, umbra_ptr32, umbra_val ix);
+umbra_val umbra_sample_32(struct umbra_builder*, umbra_ptr32, umbra_val ix);
 
-umbra_val umbra_load_16(struct umbra_builder*, umbra_ptr);
-umbra_val umbra_load_32(struct umbra_builder*, umbra_ptr);
+umbra_val umbra_load_16(struct umbra_builder*, umbra_ptr16);
+umbra_val umbra_load_32(struct umbra_builder*, umbra_ptr32);
 
-void umbra_store_16(struct umbra_builder*, umbra_ptr, umbra_val);
-void umbra_store_32(struct umbra_builder*, umbra_ptr, umbra_val);
+void umbra_store_16(struct umbra_builder*, umbra_ptr16, umbra_val);
+void umbra_store_32(struct umbra_builder*, umbra_ptr32, umbra_val);
 
-void umbra_load_8x4 (struct umbra_builder*, umbra_ptr,
+void umbra_load_8x4 (struct umbra_builder*, umbra_ptr32,
                      umbra_val*, umbra_val*, umbra_val*, umbra_val*);
-void umbra_store_8x4(struct umbra_builder*, umbra_ptr,
+void umbra_store_8x4(struct umbra_builder*, umbra_ptr32,
                      umbra_val , umbra_val , umbra_val , umbra_val );
 
-void umbra_load_16x4 (struct umbra_builder*, umbra_ptr,
+void umbra_load_16x4 (struct umbra_builder*, umbra_ptr64,
                       umbra_val*, umbra_val*, umbra_val*, umbra_val*);
-void umbra_store_16x4(struct umbra_builder*, umbra_ptr,
+void umbra_store_16x4(struct umbra_builder*, umbra_ptr64,
                       umbra_val , umbra_val , umbra_val , umbra_val );
 
-void umbra_load_16x4_planar (struct umbra_builder*, umbra_ptr,
+void umbra_load_16x4_planar (struct umbra_builder*, umbra_ptr16,
                              umbra_val *r, umbra_val *g, umbra_val *b, umbra_val *a);
-void umbra_store_16x4_planar(struct umbra_builder*, umbra_ptr,
+void umbra_store_16x4_planar(struct umbra_builder*, umbra_ptr16,
                              umbra_val r, umbra_val g, umbra_val b, umbra_val a);
 
 umbra_val umbra_i32_from_s16(struct umbra_builder*, umbra_val);

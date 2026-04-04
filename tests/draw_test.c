@@ -521,8 +521,8 @@ static void test_no_blend(void) {
 static umbra_color gradient_shader(struct umbra_builder *builder, struct umbra_uniforms *u, umbra_val x, umbra_val y) {
     (void)y;
     size_t fi = umbra_uniforms_reserve_f32(u, 2);
-    umbra_val w = umbra_uniform_32(builder, (umbra_ptr){0}, fi);
-    umbra_val a = umbra_uniform_32(builder, (umbra_ptr){0}, fi + 4);
+    umbra_val w = umbra_uniform_32(builder, (umbra_ptr32){0}, fi);
+    umbra_val a = umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 4);
     umbra_val t = umbra_div_f32(builder, x, w);
     umbra_val zero = umbra_imm_i32(builder, 0);
     return (umbra_color){t, zero, zero, a};
@@ -1136,8 +1136,8 @@ int main(void) {
     // load_color / store_color round-trip tests for formats without dedicated x4 ops.
     {
         struct umbra_builder *b = umbra_builder();
-        umbra_color c = umbra_load_color(b, (umbra_ptr){0}, umbra_fmt_565);
-        umbra_store_color(b, (umbra_ptr){1}, c, umbra_fmt_565);
+        umbra_color c = umbra_load_color(b, (umbra_ptr32){0}, umbra_fmt_565);
+        umbra_store_color(b, (umbra_ptr32){1}, c, umbra_fmt_565);
         struct umbra_basic_block *bb = umbra_basic_block(b);
         umbra_builder_free(b);
         struct test_backends B = test_backends_make(bb);
@@ -1156,8 +1156,8 @@ int main(void) {
     }
     {
         struct umbra_builder *b = umbra_builder();
-        umbra_color c = umbra_load_color(b, (umbra_ptr){0}, umbra_fmt_1010102);
-        umbra_store_color(b, (umbra_ptr){1}, c, umbra_fmt_1010102);
+        umbra_color c = umbra_load_color(b, (umbra_ptr32){0}, umbra_fmt_1010102);
+        umbra_store_color(b, (umbra_ptr32){1}, c, umbra_fmt_1010102);
         struct umbra_basic_block *bb = umbra_basic_block(b);
         umbra_builder_free(b);
         struct test_backends B = test_backends_make(bb);

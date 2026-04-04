@@ -28,12 +28,12 @@ static void build_fill(void) {
     struct umbra_uniforms *u       = calloc(1, sizeof(struct umbra_uniforms));
     size_t fi = umbra_uniforms_reserve_f32(u, 4);
     umbra_color c = {
-        umbra_uniform_32(builder, (umbra_ptr){0}, fi),
-        umbra_uniform_32(builder, (umbra_ptr){0}, fi + 4),
-        umbra_uniform_32(builder, (umbra_ptr){0}, fi + 8),
-        umbra_uniform_32(builder, (umbra_ptr){0}, fi + 12),
+        umbra_uniform_32(builder, (umbra_ptr32){0}, fi),
+        umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 4),
+        umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 8),
+        umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 12),
     };
-    umbra_store_color(builder, (umbra_ptr){1}, c, umbra_fmt_8888);
+    umbra_store_color(builder, (umbra_ptr32){1}, c, umbra_fmt_8888);
     fill_pipe.uni = u;
     struct umbra_basic_block *opt =
         umbra_basic_block(builder);
