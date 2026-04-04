@@ -498,7 +498,7 @@ val umbra_le_u32(builder *b, val x, val y) {
 }
 static char const* op_name(enum op op) {
     static char const *names[] = {
-#define OP_NAME(name) [op_##name] = #name,
+#define OP_NAME(name, ...) [op_##name] = #name,
         OTHER_OPS(OP_NAME)
         BINARY_OPS(OP_NAME)
         UNARY_OPS(OP_NAME)
