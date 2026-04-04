@@ -1177,5 +1177,104 @@ int main(void) {
         test_backends_free(&B);
     }
 
+    // fp16_planar round-trip through per-format functions.
+    {
+        struct umbra_builder *b = umbra_builder();
+        umbra_color c = umbra_load_fp16_planar(b, (umbra_ptr16){0});
+        umbra_store_fp16_planar(b, (umbra_ptr16){1}, c);
+        struct umbra_basic_block *bb = umbra_basic_block(b);
+        umbra_builder_free(b);
+        struct test_backends B = test_backends_make(bb);
+        umbra_basic_block_free(bb);
+        enum { WP = 8 };
+        __fp16 src[WP * 4], dst[WP * 4];
+        for (int i = 0; i < WP * 4; i++) { src[i] = (__fp16)(1.0f + (float)i * 0.1f); }
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            __builtin_memset(dst, 0, sizeof dst);
+            if (!test_backends_run(&B, bi, WP, 1, (struct umbra_buf[]){
+                {.ptr=src, .sz=sizeof src, .row_bytes=WP*2},
+                {.ptr=dst, .sz=sizeof dst, .row_bytes=WP*2},
+            })) { continue; }
+            for (int i = 0; i < WP * 4; i++) { equiv((float)dst[i], (float)src[i]) here; }
+        }
+        test_backends_free(&B);
+    }
+
+    // Exercise umbra_draw_build generic dispatch for 565, 1010102, fp16_planar.
+    {
+        struct umbra_draw_layout lay;
+        struct umbra_builder *b = umbra_draw_build(umbra_shader_solid, NULL,
+                                                    umbra_blend_src, umbra_fmt_565, &lay);
+        struct umbra_basic_block *bb = umbra_basic_block(b);
+        umbra_builder_free(b);
+        struct test_backends B = test_backends_make(bb);
+        umbra_basic_block_free(bb);
+        float red[4] = {1, 0, 0, 1};
+        umbra_uniforms_fill_f32(lay.uni, lay.shader, red, 4);
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            uint16_t dst[4] = {0};
+            if (!test_backends_run(&B, bi, 4, 1, (struct umbra_buf[]){
+                {.ptr=lay.uni->data, .sz=lay.uni->size, .read_only=1},
+                {.ptr=dst, .sz=sizeof dst},
+            })) { continue; }
+            // 565 red = R=31, G=0, B=0 → 0xF800
+            for (int i = 0; i < 4; i++) { (dst[i] == 0xF800) here; }
+        }
+        test_backends_free(&B);
+        free(lay.uni->data); free(lay.uni);
+    }
+    {
+        struct umbra_draw_layout lay;
+        struct umbra_builder *b = umbra_draw_build(umbra_shader_solid, NULL,
+                                                    umbra_blend_src, umbra_fmt_1010102, &lay);
+        struct umbra_basic_block *bb = umbra_basic_block(b);
+        umbra_builder_free(b);
+        struct test_backends B = test_backends_make(bb);
+        umbra_basic_block_free(bb);
+        float green[4] = {0, 1, 0, 1};
+        umbra_uniforms_fill_f32(lay.uni, lay.shader, green, 4);
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            uint32_t dst[4] = {0};
+            if (!test_backends_run(&B, bi, 4, 1, (struct umbra_buf[]){
+                {.ptr=lay.uni->data, .sz=lay.uni->size, .read_only=1},
+                {.ptr=dst, .sz=sizeof dst},
+            })) { continue; }
+            // 1010102 green = R=0, G=1023, B=0, A=3 → (1023<<10)|(3<<30)
+            uint32_t expect = (1023u << 10) | (3u << 30);
+            for (int i = 0; i < 4; i++) { (dst[i] == expect) here; }
+        }
+        test_backends_free(&B);
+        free(lay.uni->data); free(lay.uni);
+    }
+
+    {
+        struct umbra_draw_layout lay;
+        struct umbra_builder *b = umbra_draw_build(umbra_shader_solid, NULL,
+                                                    umbra_blend_src, umbra_fmt_fp16_planar, &lay);
+        struct umbra_basic_block *bb = umbra_basic_block(b);
+        umbra_builder_free(b);
+        struct test_backends B = test_backends_make(bb);
+        umbra_basic_block_free(bb);
+        float blue[4] = {0, 0, 1, 1};
+        umbra_uniforms_fill_f32(lay.uni, lay.shader, blue, 4);
+        enum { WFP = 4 };
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            __fp16 dst[WFP * 4];
+            __builtin_memset(dst, 0, sizeof dst);
+            if (!test_backends_run(&B, bi, WFP, 1, (struct umbra_buf[]){
+                {.ptr=lay.uni->data, .sz=lay.uni->size, .read_only=1},
+                {.ptr=dst, .sz=sizeof dst, .row_bytes=WFP*2},
+            })) { continue; }
+            for (int i = 0; i < WFP; i++) {
+                equiv((float)dst[i + WFP*0], 0.0f) here;  // R
+                equiv((float)dst[i + WFP*1], 0.0f) here;  // G
+                equiv((float)dst[i + WFP*2], 1.0f) here;  // B
+                equiv((float)dst[i + WFP*3], 1.0f) here;  // A
+            }
+        }
+        test_backends_free(&B);
+        free(lay.uni->data); free(lay.uni);
+    }
+
     return 0;
 }

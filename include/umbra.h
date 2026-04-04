@@ -53,7 +53,7 @@ typedef struct { int bits; } umbra_ptr64;
 
 umbra_ptr16 umbra_deref_ptr16(struct umbra_builder*, umbra_ptr32 buf, size_t off);
 umbra_ptr32 umbra_deref_ptr32(struct umbra_builder*, umbra_ptr32 buf, size_t off);
-umbra_ptr64 umbra_deref_ptr64(struct umbra_builder*, umbra_ptr32 buf, size_t off);
+
 
 umbra_val32 umbra_x(struct umbra_builder*);
 umbra_val32 umbra_y(struct umbra_builder*);

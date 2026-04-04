@@ -172,10 +172,7 @@ umbra_ptr32 umbra_deref_ptr32(builder *b, umbra_ptr32 buf, size_t off) {
     val const v = push(b, op_deref_ptr, .ptr = p32(buf), .imm = (int)off);
     return (umbra_ptr32){.bits = ~val_id(v)};
 }
-umbra_ptr64 umbra_deref_ptr64(builder *b, umbra_ptr32 buf, size_t off) {
-    val const v = push(b, op_deref_ptr, .ptr = p32(buf), .imm = (int)off);
-    return (umbra_ptr64){.bits = ~val_id(v)};
-}
+
 
 umbra_val16 umbra_gather_16(builder *b, umbra_ptr16 src, val ix) {
     return (umbra_val16){push(b, op_gather_16, VX(ix), .ptr = p16(src)).bits};
