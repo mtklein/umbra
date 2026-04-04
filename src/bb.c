@@ -19,6 +19,10 @@ static umbra_val16 to_val16(umbra_val32 v)     { return (umbra_val16){.id=v.id, 
 typedef umbra_val32          val;
 typedef struct umbra_builder builder;
 
+static int ptr_deref(int id)  { return (int)((unsigned)id | (1u << 31)); }
+_Bool      ptr_is_deref(int ptr) { return ptr < 0; }
+int        ptr_ix(int ptr)       { return (int)((unsigned)ptr & 0x7FFFFFFFu); }
+
 static int ptr_bits(unsigned ix, unsigned deref) { return (int)(ix | (deref << 31)); }
 static int p16(umbra_ptr16 p) { return ptr_bits(p.ix, p.deref); }
 static int p32(umbra_ptr32 p) { return ptr_bits(p.ix, p.deref); }
