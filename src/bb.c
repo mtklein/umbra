@@ -18,66 +18,37 @@ static int p16(umbra_ptr16 p) { return p.bits; }
 static int p32(umbra_ptr32 p) { return p.bits; }
 static int p64(umbra_ptr64 p) { return p.bits; }
 
-_Bool is_store(enum op op) {
-    return op == op_store_16
-        || op == op_store_32
-        || op == op_store_16x4
-        || op == op_store_16x4_planar
-        || op == op_store_8x4;
-}
-_Bool has_ptr(enum op op) {
-    return op == op_uniform_32
-        || op == op_load_32
-        || op == op_load_16x4
-        || op == op_load_16x4_planar
-        || op == op_load_8x4
-        || op == op_gather_uniform_32
-        || op == op_gather_32
-        || op == op_sample_32
-        || op == op_store_32
-        || op == op_store_16x4
-        || op == op_store_16x4_planar
-        || op == op_store_8x4
-        || op == op_deref_ptr
-        || op == op_load_16
-        || op == op_store_16
-        || op == op_gather_16;
-}
-_Bool is_fused_imm(enum op op) {
-    return op == op_add_f32_imm
-        || op == op_sub_f32_imm
-        || op == op_mul_f32_imm
-        || op == op_div_f32_imm
-        || op == op_min_f32_imm
-        || op == op_max_f32_imm
-        || op == op_add_i32_imm
-        || op == op_sub_i32_imm
-        || op == op_mul_i32_imm
-        || op == op_and_32_imm
-        || op == op_or_32_imm
-        || op == op_xor_32_imm
-        || op == op_eq_f32_imm
-        || op == op_lt_f32_imm
-        || op == op_le_f32_imm
-        || op == op_eq_i32_imm
-        || op == op_lt_s32_imm
-        || op == op_le_s32_imm;
-}
+// Generated from X-macro flags — no hand-maintained op lists.
+#define ZERO(name, ...) case op_##name: return 0;
 
-_Bool is_varying(enum op op) {
-    return op == op_x
-        || op == op_y
-        || op == op_load_16
-        || op == op_load_32
-        || op == op_load_16x4
-        || op == op_load_16x4_planar
-        || op == op_load_8x4
-        || op == op_store_16
-        || op == op_store_32
-        || op == op_store_16x4
-        || op == op_store_16x4_planar
-        || op == op_store_8x4;
+#define CHECK_STORE(name, flags) case op_##name: return !!((flags) & OP_STORE);
+_Bool is_store(enum op op) {
+    switch (op) { OTHER_OPS(CHECK_STORE) BINARY_OPS(ZERO) UNARY_OPS(ZERO) IMM_OPS(ZERO) }
+    __builtin_unreachable();
 }
+#undef CHECK_STORE
+
+#define CHECK_PTR(name, flags) case op_##name: return !!((flags) & OP_PTR);
+_Bool has_ptr(enum op op) {
+    switch (op) { OTHER_OPS(CHECK_PTR) BINARY_OPS(ZERO) UNARY_OPS(ZERO) IMM_OPS(ZERO) }
+    __builtin_unreachable();
+}
+#undef CHECK_PTR
+
+#define CHECK_VARYING(name, flags) case op_##name: return !!((flags) & OP_VARYING);
+_Bool is_varying(enum op op) {
+    switch (op) { OTHER_OPS(CHECK_VARYING) BINARY_OPS(ZERO) UNARY_OPS(ZERO) IMM_OPS(ZERO) }
+    __builtin_unreachable();
+}
+#undef CHECK_VARYING
+
+#define ONE(name, ...) case op_##name: return 1;
+_Bool is_fused_imm(enum op op) {
+    switch (op) { IMM_OPS(ONE) OTHER_OPS(ZERO) BINARY_OPS(ZERO) UNARY_OPS(ZERO) }
+    __builtin_unreachable();
+}
+#undef ONE
+#undef ZERO
 
 static _Bool is_pow2(int x) { return __builtin_popcount((unsigned)x) == 1; }
 static _Bool is_pow2_or_zero(int x) { return __builtin_popcount((unsigned)x) <= 1; }

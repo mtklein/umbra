@@ -127,13 +127,15 @@ typedef union {
 // The existing op_<name> is the all-memory variant (mm->m for binary, m->m for unary).
 // Example: op_r_mul_f32_rm = "result to register, x from register, y from memory"
 
+// Generated from X-macro flags.
+#define CHECK(name, flags) case op_##name: return !!((flags) & OP_COMMUTATIVE);
+#define ZERO(name, ...) case op_##name: return 0;
 static _Bool is_commutative(enum op op) {
-    return op == op_add_f32 || op == op_mul_f32
-        || op == op_min_f32 || op == op_max_f32
-        || op == op_add_i32 || op == op_mul_i32
-        || op == op_and_32  || op == op_or_32  || op == op_xor_32
-        || op == op_eq_f32  || op == op_eq_i32;
+    switch (op) { BINARY_OPS(CHECK) OTHER_OPS(ZERO) UNARY_OPS(ZERO) IMM_OPS(ZERO) }
+    __builtin_unreachable();
 }
+#undef ZERO
+#undef CHECK
 
 enum {
     SW_DONE = op_le_s32_imm + 1,
