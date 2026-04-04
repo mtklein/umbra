@@ -2,20 +2,20 @@
 #include "assume.h"
 #include <stdlib.h>
 
-size_t umbra_uniforms_reserve_f32(struct umbra_uniforms *u, int n) {
+size_t umbra_uniforms_reserve_f32(struct umbra_uniforms_layout *u, int n) {
     u->size = (u->size + 3) & ~(size_t)3;
     size_t h = u->size;
     u->size += (size_t)n * 4;
     return h;
 }
-size_t umbra_uniforms_reserve_ptr(struct umbra_uniforms *u) {
+size_t umbra_uniforms_reserve_ptr(struct umbra_uniforms_layout *u) {
     u->size = (u->size + 7) & ~(size_t)7;
     size_t h = u->size;
     u->size += 24;
     return h;
 }
 
-void *umbra_uniforms_alloc(struct umbra_uniforms const *u) {
+void *umbra_uniforms_alloc(struct umbra_uniforms_layout const *u) {
     return calloc(1, u->size);
 }
 

@@ -23,8 +23,8 @@ static _Bool run_draw(struct draw_backends *B, int b, int w, int h, struct umbra
 }
 static void cleanup_draw(struct draw_backends *B) {
     test_backends_free(&B->tb);
-    free(B->lay.data);
-    free(B->lay.uni);
+    free(B->lay.uniforms);
+    
 }
 
 static void test_solid_src(void) {
@@ -41,10 +41,10 @@ static void test_solid_src(void) {
             0xFFFFFFFF,
         };
         float     color[4] = {1, 0, 0, 1};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=4 * 4},
                       })) {
             continue;
@@ -68,10 +68,10 @@ static void test_solid_src_n1(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[1] = {0xFFFFFFFF};
         float     color[4] = {0, 0, 1, 1};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 1, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=4},
                       })) {
             continue;
@@ -94,10 +94,10 @@ static void test_solid_src_n9(void) {
         uint32_t dst[9];
         __builtin_memset(dst, 0xFF, sizeof dst);
         float     color[4] = {0, 1, 0, 1};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 9, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=9 * 4},
                       })) {
             continue;
@@ -120,10 +120,10 @@ static void test_solid_src_n16(void) {
         uint32_t dst[16];
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {1, 1, 1, 1};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 16, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=16 * 4},
                       })) {
             continue;
@@ -143,10 +143,10 @@ static void test_srcover_8888(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0xFFFFFFFF, 0xFFFFFFFF};
         float     color[4] = {0, 0.5f, 0, 0.5f};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 2, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=2 * 4},
                       })) {
             continue;
@@ -175,10 +175,10 @@ static void test_dstover_8888(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0xFFFFFFFF, 0xFFFFFFFF};
         float     color[4] = {1, 0, 0, 1};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 2, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=2 * 4},
                       })) {
             continue;
@@ -198,10 +198,10 @@ static void test_dstover_transparent(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0, 0};
         float     color[4] = {1, 0, 0, 1};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 2, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=2 * 4},
                       })) {
             continue;
@@ -224,10 +224,10 @@ static void test_multiply_8888(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0xFF804020, 0xFF804020};
         float     color[4] = {1, 1, 1, 1};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 2, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=2 * 4},
                       })) {
             continue;
@@ -256,10 +256,10 @@ static void test_solid_src_fp16(void) {
         __fp16 dst[4 * 3];
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {0.25f, 0.5f, 0.75f, 1};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 3, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
@@ -290,10 +290,10 @@ static void test_srcover_fp16(void) {
             dst[i * 4 + 3] = 1;
         }
         float     color[4] = {0, 0.5f, 0, 0.5f};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 2, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
@@ -324,11 +324,11 @@ static void test_coverage_rect(void) {
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {1, 0, 0, 1};
         float     rect[4] = {2.0f, 0.0f, 5.0f, 1.0f};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.coverage, rect, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.coverage, rect, 4);
         if (!run_draw(&B, bi, 8, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
@@ -357,11 +357,11 @@ static void test_coverage_rect_scalar(void) {
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {1, 0, 0, 1};
         float     rect[4] = {1.0f, 0.0f, 3.0f, 1.0f};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.coverage, rect, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.coverage, rect, 4);
         if (!run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
@@ -388,11 +388,11 @@ static void test_coverage_rect_n9(void) {
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {0, 1, 0, 1};
         float     rect[4] = {3.0f, 0.0f, 7.0f, 1.0f};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.coverage, rect, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.coverage, rect, 4);
         if (!run_draw(&B, bi, 9, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=9 * 4},
                       })) {
             continue;
@@ -420,11 +420,11 @@ static void test_coverage_rect_offset(void) {
         __builtin_memset(dst, 0, sizeof dst);
         float color[4] = {0, 1, 0, 1};
         float rect[4] = {1.0f, 0.0f, 3.0f, 10.0f};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.coverage, rect, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.coverage, rect, 4);
         if (!run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
@@ -453,11 +453,11 @@ static void test_coverage_rect_outside_y(void) {
         };
         float     color[4] = {1, 1, 1, 1};
         float     rect[4] = {0.0f, 5.0f, 10.0f, 10.0f};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.coverage, rect, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.coverage, rect, 4);
         if (!run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
@@ -482,7 +482,7 @@ static void test_no_shader(void) {
         };
         if (!run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=4 * 4},
                       })) {
             continue;
@@ -501,10 +501,10 @@ static void test_no_blend(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0, 0};
         float     color[4] = {1, 0, 1, 1};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 2, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=2 * 4},
                       })) {
             continue;
@@ -519,7 +519,7 @@ static void test_no_blend(void) {
     cleanup_draw(&B);
 }
 
-static umbra_color gradient_shader(struct umbra_builder *builder, struct umbra_uniforms *u, umbra_val32 x, umbra_val32 y) {
+static umbra_color gradient_shader(struct umbra_builder *builder, struct umbra_uniforms_layout *u, umbra_val32 x, umbra_val32 y) {
     (void)y;
     size_t fi = umbra_uniforms_reserve_f32(u, 2);
     umbra_val32 w = umbra_uniform_32(builder, (umbra_ptr32){0}, fi);
@@ -538,10 +538,10 @@ static void test_gradient_shader(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[4] = {0};
         float     params[2] = {4.0f, 1.0f};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, params, 2);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, params, 2);
         if (!run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
@@ -565,10 +565,10 @@ static void test_multiply_half_alpha(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0x80FF0000, 0x80FF0000};
         float     color[4] = {1, 0, 0, 0.5f};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 2, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=2 * 4},
                       })) {
             continue;
@@ -598,10 +598,10 @@ static void test_srcover_8888_n9(void) {
         uint32_t dst[9];
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {1, 0, 0, 0.5f};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 9, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=9 * 4},
                       })) {
             continue;
@@ -628,11 +628,11 @@ static void test_full_pipeline(void) {
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {1, 0, 0, 1};
         float     rect[4] = {2.0f, 0.0f, 7.0f, 1.0f};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.coverage, rect, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.coverage, rect, 4);
         if (!run_draw(&B, bi, 9, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=9 * 4},
                       })) {
             continue;
@@ -665,10 +665,10 @@ static void test_solid_src_fp16_n9(void) {
         __fp16 dst[4 * 9];
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {0.125f, 0.25f, 0.5f, 1};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 9, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
@@ -713,11 +713,11 @@ static void test_coverage_rect_white_dst(void) {
                 rc.x1,
                 1.0f,
             };
-            umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
-            umbra_uniforms_fill_f32(B.lay.data, B.lay.coverage, rect, 4);
+            umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+            umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.coverage, rect, 4);
             if (!run_draw(&B, bi, rc.n, 1,
                           (struct umbra_buf[]){
-                              (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                              (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                               {.ptr=dst, .sz=(size_t)(rc.n * 4)},
                           })) {
                 continue;
@@ -747,11 +747,11 @@ static void test_coverage_bitmap(void) {
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {1, 1, 1, 1};
         uint16_t  cov[8] = {0, 128, 255, 0, 0, 0, 0, 0};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
-        umbra_uniforms_fill_ptr(B.lay.data, B.lay.coverage, (struct umbra_buf){.ptr=cov, .sz=sizeof cov});
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_uniforms_fill_ptr(B.lay.uniforms, B.lay.coverage, (struct umbra_buf){.ptr=cov, .sz=sizeof cov});
         if (!run_draw(&B, bi, 8, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
@@ -776,11 +776,11 @@ static void test_coverage_sdf(void) {
         __builtin_memset(dst, 0, sizeof dst);
         float     color[4] = {1, 1, 1, 1};
         uint16_t  cov[8] = {0, 100, 128, 200, 255, 0, 0, 0};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
-        umbra_uniforms_fill_ptr(B.lay.data, B.lay.coverage, (struct umbra_buf){.ptr=cov, .sz=sizeof cov});
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_uniforms_fill_ptr(B.lay.uniforms, B.lay.coverage, (struct umbra_buf){.ptr=cov, .sz=sizeof cov});
         if (!run_draw(&B, bi, 8, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
@@ -807,12 +807,12 @@ static void test_coverage_bitmap_matrix(void) {
         float    mat[11] = {
             1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1,
         };
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.coverage, mat, 11);
-        umbra_uniforms_fill_ptr(B.lay.data, ptr_off, (struct umbra_buf){.ptr=bmp, .sz=sizeof bmp});
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.coverage, mat, 11);
+        umbra_uniforms_fill_ptr(B.lay.uniforms, ptr_off, (struct umbra_buf){.ptr=bmp, .sz=sizeof bmp});
         if (!run_draw(&B, bi, 8, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
@@ -840,12 +840,12 @@ static void test_coverage_bitmap_matrix_oob(void) {
         float    mat[11] = {
             1, 0, 0, 0, 1, 0, 0.001f, 0, 1, 2, 2,
         };
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.coverage, mat, 11);
-        umbra_uniforms_fill_ptr(B.lay.data, ptr_off, (struct umbra_buf){.ptr=bmp, .sz=sizeof bmp});
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.coverage, mat, 11);
+        umbra_uniforms_fill_ptr(B.lay.uniforms, ptr_off, (struct umbra_buf){.ptr=bmp, .sz=sizeof bmp});
         if (!run_draw(&B, bi, 8, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
@@ -866,11 +866,11 @@ static void test_linear_2(void) {
         uint32_t  dst[4] = {0};
         float     colors[8] = {1, 0, 0, 1, 0, 0, 1, 1};
         float     params[3] = {0.25f, 0, 0};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, params, 3);
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader + 12, colors, 8);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, params, 3);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader + 12, colors, 8);
         if (!run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
@@ -895,11 +895,11 @@ static void test_radial_2(void) {
         uint32_t  dst[1] = {0};
         float     colors[8] = {1, 1, 1, 1, 0, 0, 0, 1};
         float     params[3] = {0, 0, 0.1f};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, params, 3);
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader + 12, colors, 8);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, params, 3);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader + 12, colors, 8);
         if (!run_draw(&B, bi, 1, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=4},
                       })) {
             continue;
@@ -929,11 +929,11 @@ static void test_linear_grad(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[8] = {0};
         float     params[4] = {0.125f, 0, 0, 256};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, params, 4);
-        umbra_uniforms_fill_ptr(B.lay.data, lut_off, (struct umbra_buf){.ptr=lut, .sz=sizeof lut});
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, params, 4);
+        umbra_uniforms_fill_ptr(B.lay.uniforms, lut_off, (struct umbra_buf){.ptr=lut, .sz=sizeof lut});
         if (!run_draw(&B, bi, 8, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
@@ -965,11 +965,11 @@ static void test_radial_grad(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[1] = {0};
         float     params[4] = {0, 0, 0.1f, 64};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, params, 4);
-        umbra_uniforms_fill_ptr(B.lay.data, lut_off, (struct umbra_buf){.ptr=lut, .sz=sizeof lut});
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, params, 4);
+        umbra_uniforms_fill_ptr(B.lay.uniforms, lut_off, (struct umbra_buf){.ptr=lut, .sz=sizeof lut});
         if (!run_draw(&B, bi, 1, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=4},
                       })) {
             continue;
@@ -1000,11 +1000,11 @@ static void test_gradient_lut_nonuniform(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[8] = {0};
         float     params[4] = {0.125f, 0, 0, 64};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, params, 4);
-        umbra_uniforms_fill_ptr(B.lay.data, lut_off, (struct umbra_buf){.ptr=lut, .sz=sizeof lut});
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, params, 4);
+        umbra_uniforms_fill_ptr(B.lay.uniforms, lut_off, (struct umbra_buf){.ptr=lut, .sz=sizeof lut});
         if (!run_draw(&B, bi, 8, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=sizeof dst},
                       })) {
             continue;
@@ -1018,7 +1018,7 @@ static void test_gradient_lut_nonuniform(void) {
 
 static umbra_shader_fn ss_inner_;
 static int             ss_n_;
-static umbra_color ss_shader_(struct umbra_builder *builder, struct umbra_uniforms *u, umbra_val32 x, umbra_val32 y) {
+static umbra_color ss_shader_(struct umbra_builder *builder, struct umbra_uniforms_layout *u, umbra_val32 x, umbra_val32 y) {
     (void)u;
     return umbra_supersample(builder, u, x, y, ss_inner_, ss_n_);
 }
@@ -1034,10 +1034,10 @@ static void test_supersample(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[4] = {0};
         float     color[4] = {1, 0, 0, 1};
-        umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
+        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
         if (!run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=4 * 4},
                       })) {
             continue;
@@ -1076,19 +1076,19 @@ static void test_page_aligned_buffer(void) {
 #pragma clang diagnostic pop
 
     float     color[4] = {0, 1, 0, 1};
-    umbra_uniforms_fill_f32(B.lay.data, B.lay.shader, color, 4);
+    umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(aligned, 0, N * 4);
         if (!run_draw(&B, bi, N, 1, (struct umbra_buf[]){
-            (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+            (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
             {.ptr=aligned, .sz=N * 4},
         })) { continue; }
         for (int i = 0; i < N; i++) { (aligned[i] == 0xFF00FF00u) here; }
 
         __builtin_memset(offset, 0, N * 4);
         if (!run_draw(&B, bi, N, 1, (struct umbra_buf[]){
-            (struct umbra_buf){.ptr=B.lay.data, .sz=B.lay.uni->size, .read_only=1},
+            (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
             {.ptr=offset, .sz=N * 4},
         })) { continue; }
         for (int i = 0; i < N; i++) { (offset[i] == 0xFF00FF00u) here; }
@@ -1211,18 +1211,18 @@ int main(void) {
         struct test_backends B = test_backends_make(bb);
         umbra_basic_block_free(bb);
         float red[4] = {1, 0, 0, 1};
-        umbra_uniforms_fill_f32(lay.data, lay.shader, red, 4);
+        umbra_uniforms_fill_f32(lay.uniforms, lay.shader, red, 4);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             uint16_t dst[4] = {0};
             if (!test_backends_run(&B, bi, 4, 1, (struct umbra_buf[]){
-                {.ptr=lay.data, .sz=lay.uni->size, .read_only=1},
+                {.ptr=lay.uniforms, .sz=lay.uni.size, .read_only=1},
                 {.ptr=dst, .sz=sizeof dst},
             })) { continue; }
             // 565 red = R=31, G=0, B=0 → 0xF800
             for (int i = 0; i < 4; i++) { (dst[i] == 0xF800) here; }
         }
         test_backends_free(&B);
-        free(lay.data); free(lay.uni);
+        free(lay.uniforms); 
     }
     {
         struct umbra_draw_layout lay;
@@ -1233,11 +1233,11 @@ int main(void) {
         struct test_backends B = test_backends_make(bb);
         umbra_basic_block_free(bb);
         float green[4] = {0, 1, 0, 1};
-        umbra_uniforms_fill_f32(lay.data, lay.shader, green, 4);
+        umbra_uniforms_fill_f32(lay.uniforms, lay.shader, green, 4);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             uint32_t dst[4] = {0};
             if (!test_backends_run(&B, bi, 4, 1, (struct umbra_buf[]){
-                {.ptr=lay.data, .sz=lay.uni->size, .read_only=1},
+                {.ptr=lay.uniforms, .sz=lay.uni.size, .read_only=1},
                 {.ptr=dst, .sz=sizeof dst},
             })) { continue; }
             // 1010102 green = R=0, G=1023, B=0, A=3 → (1023<<10)|(3<<30)
@@ -1245,7 +1245,7 @@ int main(void) {
             for (int i = 0; i < 4; i++) { (dst[i] == expect) here; }
         }
         test_backends_free(&B);
-        free(lay.data); free(lay.uni);
+        free(lay.uniforms); 
     }
 
     {
@@ -1257,13 +1257,13 @@ int main(void) {
         struct test_backends B = test_backends_make(bb);
         umbra_basic_block_free(bb);
         float blue[4] = {0, 0, 1, 1};
-        umbra_uniforms_fill_f32(lay.data, lay.shader, blue, 4);
+        umbra_uniforms_fill_f32(lay.uniforms, lay.shader, blue, 4);
         enum { WFP = 4 };
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             __fp16 dst[WFP * 4];
             __builtin_memset(dst, 0, sizeof dst);
             if (!test_backends_run(&B, bi, WFP, 1, (struct umbra_buf[]){
-                {.ptr=lay.data, .sz=lay.uni->size, .read_only=1},
+                {.ptr=lay.uniforms, .sz=lay.uni.size, .read_only=1},
                 {.ptr=dst, .sz=sizeof dst, .row_bytes=WFP*2},
             })) { continue; }
             for (int i = 0; i < WFP; i++) {
@@ -1274,7 +1274,7 @@ int main(void) {
             }
         }
         test_backends_free(&B);
-        free(lay.data); free(lay.uni);
+        free(lay.uniforms); 
     }
 
     return 0;

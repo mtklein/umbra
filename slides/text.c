@@ -30,7 +30,7 @@ static void text_prepare(struct slide *s, struct umbra_backend *be, struct umbra
     if (st->fmt.name != fmt.name || !st->bb) {
         st->fmt = fmt;
         umbra_basic_block_free(st->bb);
-        if (st->lay.uni) { free(st->lay.data); free(st->lay.uni); st->lay.uni = NULL; }
+        free(st->lay.uniforms);
         struct umbra_builder *b = umbra_draw_build(st->shader, st->coverage, st->blend, fmt,
                                                     &st->lay);
         st->bb = umbra_basic_block(b);
@@ -42,14 +42,14 @@ static void text_prepare(struct slide *s, struct umbra_backend *be, struct umbra
 
 static void text_draw(struct slide *s, int l, int t, int r, int b, void *buf) {
     struct text_state *st = (struct text_state *)s;
-    umbra_uniforms_fill_f32(st->lay.data, st->lay.shader, st->color, 4);
-    umbra_uniforms_fill_ptr(st->lay.data, st->lay.coverage,
+    umbra_uniforms_fill_f32(st->lay.uniforms, st->lay.shader, st->color, 4);
+    umbra_uniforms_fill_ptr(st->lay.uniforms, st->lay.coverage,
                   (struct umbra_buf){.ptr=st->tc->data, .sz=(size_t)(st->w * st->h * 2), .row_bytes=(size_t)st->w * 2});
     size_t    pb = st->fmt.bpp;
     size_t plane_sz = (size_t)st->w * (size_t)st->h * pb;
     size_t rb = (size_t)st->w * pb;
     struct umbra_buf ubuf[] = {
-        {.ptr=st->lay.data, .sz=st->lay.uni->size, .read_only=1},
+        {.ptr=st->lay.uniforms, .sz=st->lay.uni.size, .read_only=1},
         {.ptr=buf, .sz=plane_sz * (size_t)st->fmt.planes, .row_bytes=rb},
     };
     st->prog->queue(st->prog, l, t, r, b, ubuf);
@@ -64,7 +64,7 @@ static void text_free(struct slide *s) {
     struct text_state *st = (struct text_state *)s;
     if (st->prog) { st->prog->free(st->prog); }
     umbra_basic_block_free(st->bb);
-    if (st->lay.uni) { free(st->lay.data); free(st->lay.uni); }
+    free(st->lay.uniforms);
     free(st);
 }
 

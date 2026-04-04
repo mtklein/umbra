@@ -1608,7 +1608,7 @@ static void test_shift_imm(void) {
 static void test_gather_deref_large(void) {
     struct umbra_builder *b = umbra_builder();
     umbra_val32            idx = umbra_load_32(b, (umbra_ptr32){0});
-    struct umbra_uniforms *u   = calloc(1, sizeof(struct umbra_uniforms));
+    struct umbra_uniforms_layout *u   = calloc(1, sizeof(struct umbra_uniforms_layout));
     size_t                off = umbra_uniforms_reserve_ptr(u);
     umbra_ptr16           src = umbra_deref_ptr16(b, (umbra_ptr32){.ix=1}, off);
     umbra_val32            val = umbra_i32_from_s16(b, umbra_gather_16(b, src, idx));
@@ -2308,7 +2308,7 @@ static void test_load_stride_neq_w(void) {
     // Regression: add(mul(y, rs_uniform), x) was optimized to a contiguous
     // load using the linear loop counter.  When rs != w, this is wrong.
     struct umbra_builder *b = umbra_builder();
-    struct umbra_uniforms *u  = calloc(1, sizeof(struct umbra_uniforms));
+    struct umbra_uniforms_layout *u  = calloc(1, sizeof(struct umbra_uniforms_layout));
     size_t                 ri = umbra_uniforms_reserve_f32(u, 1);
     free(u);
     umbra_val32 x = umbra_x(b);
@@ -3715,7 +3715,7 @@ int main(void) {
     // Regression test: l>0 with deref'd buffer that has row_bytes>0.
     {
         struct umbra_builder *b = umbra_builder();
-        struct umbra_uniforms *u   = calloc(1, sizeof(struct umbra_uniforms));
+        struct umbra_uniforms_layout *u   = calloc(1, sizeof(struct umbra_uniforms_layout));
         size_t                off = umbra_uniforms_reserve_ptr(u);
         free(u);
         umbra_ptr32           src = umbra_deref_ptr32(b, (umbra_ptr32){.ix=1}, off);
@@ -3767,7 +3767,7 @@ int main(void) {
     // Regression test: l>0 with deref'd 16-bit buffer, row_bytes>0.
     {
         struct umbra_builder *b = umbra_builder();
-        struct umbra_uniforms *u   = calloc(1, sizeof(struct umbra_uniforms));
+        struct umbra_uniforms_layout *u   = calloc(1, sizeof(struct umbra_uniforms_layout));
         size_t                off = umbra_uniforms_reserve_ptr(u);
         free(u);
         umbra_ptr16           src = umbra_deref_ptr16(b, (umbra_ptr32){.ix=1}, off);

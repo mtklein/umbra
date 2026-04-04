@@ -36,13 +36,11 @@ struct umbra_program {
     struct umbra_backend *backend;
 };
 
-// TODO: rename umbra_uniforms_builder, allocate by value instead of calloc() where sensible
-struct umbra_uniforms { size_t size; };
-size_t umbra_uniforms_reserve_f32(struct umbra_uniforms*, int n);
-size_t umbra_uniforms_reserve_ptr(struct umbra_uniforms*);
+struct umbra_uniforms_layout { size_t size; };
+size_t umbra_uniforms_reserve_f32(struct umbra_uniforms_layout*, int n);
+size_t umbra_uniforms_reserve_ptr(struct umbra_uniforms_layout*);
 
-// TODO: try to call this void *uniforms consistently through the codebase
-void*  umbra_uniforms_alloc(struct umbra_uniforms const*);
+void*  umbra_uniforms_alloc(struct umbra_uniforms_layout const*);
 void   umbra_uniforms_fill_f32(void *uniforms, size_t off, float const*, int n);
 void   umbra_uniforms_fill_ptr(void *uniforms, size_t off, struct umbra_buf);
 

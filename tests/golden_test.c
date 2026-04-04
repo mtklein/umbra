@@ -17,17 +17,17 @@ static char const *backend_name[NUM_BACKENDS] = {
 static struct umbra_backend *bes[NUM_BACKENDS];
 
 struct pipe {
-    struct umbra_program  *prog;
-    struct umbra_uniforms *uni;
-    void                  *data;
+    struct umbra_program         *prog;
+    struct umbra_uniforms_layout  uni;
+    void                         *uniforms;
 };
 
 static struct pipe fill_pipe;
 
 static void build_fill(void) {
     struct umbra_builder   *builder = umbra_builder();
-    struct umbra_uniforms *u       = calloc(1, sizeof(struct umbra_uniforms));
-    size_t fi = umbra_uniforms_reserve_f32(u, 4);
+    struct umbra_uniforms_layout u = {0};
+    size_t fi = umbra_uniforms_reserve_f32(&u, 4);
     umbra_color c = {
         umbra_uniform_32(builder, (umbra_ptr32){0}, fi),
         umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 4),
@@ -36,7 +36,7 @@ static void build_fill(void) {
     };
     umbra_store_8888(builder, (umbra_ptr32){.ix=1}, c);
     fill_pipe.uni = u;
-    fill_pipe.data = umbra_uniforms_alloc(u);
+    fill_pipe.uniforms = umbra_uniforms_alloc(&u);
     struct umbra_basic_block *opt =
         umbra_basic_block(builder);
     umbra_builder_free(builder);
@@ -55,7 +55,7 @@ static void build_pipes(void) {
 
 static void free_pipes(void) {
     fill_pipe.prog->free(fill_pipe.prog);
-    if (fill_pipe.uni) { free(fill_pipe.data); free(fill_pipe.uni); }
+    free(fill_pipe.uniforms);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         if (bes[bi]) { bes[bi]->free(bes[bi]); }
     }
@@ -68,9 +68,9 @@ static void fill_bg(void *dst, uint32_t bg) {
         (float)((bg >> 16) & 0xffu) / 255.0f,
         (float)((bg >> 24) & 0xffu) / 255.0f,
     };
-    umbra_uniforms_fill_f32(fill_pipe.data, 0, hc, 4);
+    umbra_uniforms_fill_f32(fill_pipe.uniforms, 0, hc, 4);
     struct umbra_buf buf[2] = {
-        (struct umbra_buf){.ptr=fill_pipe.data, .sz=fill_pipe.uni->size, .read_only=1},
+        (struct umbra_buf){.ptr=fill_pipe.uniforms, .sz=fill_pipe.uni.size, .read_only=1},
         {.ptr=dst, .sz=(size_t)(W * H * 4), .row_bytes=(size_t)W * 4},
     };
     fill_pipe.prog->queue(fill_pipe.prog, 0, 0, W, H, buf);
@@ -178,28 +178,28 @@ static void test_slug_rect(void) {
 
     float wind_buf[W * H];
     __builtin_memset(wind_buf, 0, sizeof wind_buf);
-    umbra_uniforms_fill_f32(alay.data, alay.mat, mat, 11);
-    umbra_uniforms_fill_ptr(alay.data, alay.curves_off,
+    umbra_uniforms_fill_f32(alay.uniforms, alay.mat, mat, 11);
+    umbra_uniforms_fill_ptr(alay.uniforms, alay.curves_off,
         (struct umbra_buf){.ptr=rect, .sz=sizeof rect});
     struct umbra_buf abuf[] = {
-        (struct umbra_buf){.ptr=alay.data, .sz=alay.uni->size, .read_only=1},
+        (struct umbra_buf){.ptr=alay.uniforms, .sz=alay.uni.size, .read_only=1},
         {.ptr=wind_buf, .sz=sizeof wind_buf, .row_bytes=W * sizeof(float)},
     };
     for (int j = 0; j < 4; j++) {
         float jf;
         int32_t j32 = j;
         __builtin_memcpy(&jf, &j32, 4);
-        umbra_uniforms_fill_f32(alay.data, alay.loop_off, &jf, 1);
-        abuf[0] = (struct umbra_buf){.ptr=alay.data, .sz=alay.uni->size, .read_only=1};
+        umbra_uniforms_fill_f32(alay.uniforms, alay.loop_off, &jf, 1);
+        abuf[0] = (struct umbra_buf){.ptr=alay.uniforms, .sz=alay.uni.size, .read_only=1};
         acc->queue(acc, 0, 0, W, H, abuf);
     }
     be->flush(be);
 
-    umbra_uniforms_fill_f32(lay.data, lay.shader, color, 4);
-    umbra_uniforms_fill_ptr(lay.data, lay.coverage,
+    umbra_uniforms_fill_f32(lay.uniforms, lay.shader, color, 4);
+    umbra_uniforms_fill_ptr(lay.uniforms, lay.coverage,
         (struct umbra_buf){.ptr=wind_buf, .sz=sizeof wind_buf, .read_only=1, .row_bytes=(size_t)W * sizeof(float)});
     struct umbra_buf buf[] = {
-        (struct umbra_buf){.ptr=lay.data, .sz=lay.uni->size, .read_only=1},
+        (struct umbra_buf){.ptr=lay.uniforms, .sz=lay.uni.size, .read_only=1},
         {.ptr=pixels, .sz=sizeof pixels, .row_bytes=W * 4},
     };
     interp->queue(interp, 0, 0, W, H, buf);
@@ -214,8 +214,8 @@ static void test_slug_rect(void) {
     pixels[38*W + 30] == bg here;
     pixels[20*W + 70] == bg here;
 
-    if (lay.uni) { free(lay.data); free(lay.uni); }
-    if (alay.uni) { free(alay.data); free(alay.uni); }
+    free(lay.uniforms);
+    free(alay.uniforms);
     acc->free(acc);
     interp->free(interp);
     be->free(be);
@@ -254,12 +254,12 @@ static void test_perspective_text(void) {
     };
     float color[4] = {1,1,1,1};
 
-    umbra_uniforms_fill_f32(lay.data, lay.shader, color, 4);
-    umbra_uniforms_fill_f32(lay.data, lay.coverage, mat, 11);
-    umbra_uniforms_fill_ptr(lay.data, (lay.coverage + 44 + 7) & ~(size_t)7,
+    umbra_uniforms_fill_f32(lay.uniforms, lay.shader, color, 4);
+    umbra_uniforms_fill_f32(lay.uniforms, lay.coverage, mat, 11);
+    umbra_uniforms_fill_ptr(lay.uniforms, (lay.coverage + 44 + 7) & ~(size_t)7,
         (struct umbra_buf){.ptr=bmp, .sz=sizeof bmp});
     struct umbra_buf buf[] = {
-        (struct umbra_buf){.ptr=lay.data, .sz=lay.uni->size, .read_only=1},
+        (struct umbra_buf){.ptr=lay.uniforms, .sz=lay.uni.size, .read_only=1},
         {.ptr=pixels, .sz=sizeof pixels},
     };
     interp->queue(interp, 0, 0, BW, 1, buf);
@@ -292,12 +292,12 @@ static void test_perspective_text(void) {
         W, H, tc.w, tc.h);
     float hc2[4] = {1,0.8f,0.2f,1};
     {
-        umbra_uniforms_fill_f32(lay2.data, lay2.shader, hc2, 4);
-        umbra_uniforms_fill_f32(lay2.data, lay2.coverage, mat2, 11);
-        umbra_uniforms_fill_ptr(lay2.data, (lay2.coverage + 44 + 7) & ~(size_t)7,
+        umbra_uniforms_fill_f32(lay2.uniforms, lay2.shader, hc2, 4);
+        umbra_uniforms_fill_f32(lay2.uniforms, lay2.coverage, mat2, 11);
+        umbra_uniforms_fill_ptr(lay2.uniforms, (lay2.coverage + 44 + 7) & ~(size_t)7,
             (struct umbra_buf){.ptr=tc.data, .sz=(size_t)(W * H * 2)});
         struct umbra_buf b2[] = {
-            (struct umbra_buf){.ptr=lay2.data, .sz=lay2.uni->size, .read_only=1},
+            (struct umbra_buf){.ptr=lay2.uniforms, .sz=lay2.uni.size, .read_only=1},
             {.ptr=px2, .sz=(size_t)(W * H * 4), .row_bytes=W * 4},
         };
         interp->queue(interp, 0, 0, W, H, b2);
@@ -309,8 +309,8 @@ static void test_perspective_text(void) {
     }
     changed > 0 here;
 
-    if (lay.uni) { free(lay.data); free(lay.uni); }
-    if (lay2.uni) { free(lay2.data); free(lay2.uni); }
+    free(lay.uniforms);
+    free(lay2.uniforms);
     interp->free(interp);
     be->free(be);
     text_cov_free(&tc);
