@@ -13,7 +13,7 @@ struct slug_state {
     struct slug_acc_layout    acc_lay;
     struct umbra_basic_block *acc_bb;
     struct umbra_program     *acc_prog;
-    enum umbra_fmt            fmt, :32;
+    struct umbra_fmt           fmt;
     struct umbra_draw_layout  draw_lay;
     struct umbra_basic_block *draw_bb;
     struct umbra_program     *draw_prog;
@@ -45,9 +45,9 @@ static void slug_animate(struct slide *s, float dt) {
     st->mat[10] = st->slug->h;
 }
 
-static void slug_prepare(struct slide *s, struct umbra_backend *be, enum umbra_fmt fmt) {
+static void slug_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
     struct slug_state *st = (struct slug_state *)s;
-    if (st->fmt != fmt || !st->draw_bb) {
+    if (st->fmt.load != fmt.load || !st->draw_bb) {
         st->fmt = fmt;
         umbra_basic_block_free(st->draw_bb);
         if (st->draw_lay.uni) { free(st->draw_lay.uni->data); free(st->draw_lay.uni); st->draw_lay.uni = NULL; }
@@ -93,16 +93,16 @@ static void slug_draw(struct slide *s, int l, int t, int r, int b, void *buf) {
     umbra_uniforms_fill_f32(st->draw_lay.uni, st->draw_lay.shader, st->color, 4);
     umbra_uniforms_fill_ptr(st->draw_lay.uni, st->draw_lay.coverage,
                   (struct umbra_buf){.ptr=st->wind_buf, .sz=wind_sz, .read_only=1, .row_bytes=(size_t)w * sizeof(float)});
-    size_t    pb = umbra_fmt_size(st->fmt);
+    size_t    pb = st->fmt.bpp;
     size_t plane_sz = (size_t)w * (size_t)h * pb;
     struct umbra_buf rbuf[2];
     size_t rb = (size_t)w * pb;
     rbuf[0] = (struct umbra_buf){.ptr=st->draw_lay.uni->data, .sz=st->draw_lay.uni->size, .read_only=1};
-    rbuf[1] = (struct umbra_buf){.ptr=buf, .sz=plane_sz * (st->fmt == umbra_fmt_fp16_planar ? 4 : 1), .row_bytes=rb};
+    rbuf[1] = (struct umbra_buf){.ptr=buf, .sz=plane_sz * (size_t)st->fmt.planes, .row_bytes=rb};
     st->draw_prog->queue(st->draw_prog, l, t, r, b, rbuf);
 }
 
-static struct umbra_builder *slug_get_builder(struct slide *s, enum umbra_fmt fmt) {
+static struct umbra_builder *slug_get_builder(struct slide *s, struct umbra_fmt fmt) {
     (void)s;
     return umbra_draw_build(umbra_shader_solid, umbra_coverage_wind, umbra_blend_srcover, fmt,
                             NULL);

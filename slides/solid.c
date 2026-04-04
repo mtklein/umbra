@@ -13,7 +13,7 @@ struct solid_state {
     umbra_coverage_fn  coverage;
     umbra_blend_fn     blend;
 
-    enum umbra_fmt             fmt, :32;
+    struct umbra_fmt            fmt;
     struct umbra_draw_layout   lay;
     struct umbra_basic_block      *bb;
     struct umbra_program          *prog;
@@ -42,9 +42,9 @@ static void solid_animate(struct slide *s, float dt) {
     if ((float)st->h < st->ry + st->rect_h) { st->ry = (float)st->h - st->rect_h; st->vy = -st->vy; }
 }
 
-static void solid_prepare(struct slide *s, struct umbra_backend *be, enum umbra_fmt fmt) {
+static void solid_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
     struct solid_state *st = (struct solid_state *)s;
-    if (st->fmt != fmt || !st->bb) {
+    if (st->fmt.load != fmt.load || !st->bb) {
         st->fmt = fmt;
         umbra_basic_block_free(st->bb);
         if (st->lay.uni) { free(st->lay.uni->data); free(st->lay.uni); st->lay.uni = NULL; }
@@ -62,17 +62,17 @@ static void solid_draw(struct slide *s, int l, int t, int r, int b, void *buf) {
     float rect[4] = { st->rx, st->ry, st->rx + st->rect_w, st->ry + st->rect_h };
     umbra_uniforms_fill_f32(st->lay.uni, st->lay.shader, st->color, 4);
     if (st->coverage) { umbra_uniforms_fill_f32(st->lay.uni, st->lay.coverage, rect, 4); }
-    size_t pb = umbra_fmt_size(st->fmt);
+    size_t pb = st->fmt.bpp;
     size_t plane_sz = (size_t)st->w * (size_t)st->h * pb;
     size_t rb = (size_t)st->w * pb;
     struct umbra_buf ubuf[] = {
         {.ptr=st->lay.uni->data, .sz=st->lay.uni->size, .read_only=1},
-        {.ptr=buf, .sz=plane_sz * (st->fmt == umbra_fmt_fp16_planar ? 4 : 1), .row_bytes=rb},
+        {.ptr=buf, .sz=plane_sz * (size_t)st->fmt.planes, .row_bytes=rb},
     };
     st->prog->queue(st->prog, l, t, r, b, ubuf);
 }
 
-static struct umbra_builder *solid_get_builder(struct slide *s, enum umbra_fmt fmt) {
+static struct umbra_builder *solid_get_builder(struct slide *s, struct umbra_fmt fmt) {
     struct solid_state *st = (struct solid_state *)s;
     return umbra_draw_build(st->shader, st->coverage, st->blend, fmt, NULL);
 }
@@ -86,10 +86,10 @@ static void solid_free(struct slide *s) {
 }
 
 struct slide *slide_solid(char const *, uint32_t, float const[4], umbra_coverage_fn,
-                         umbra_blend_fn, enum umbra_fmt);
+                         umbra_blend_fn, struct umbra_fmt);
 
 struct slide *slide_solid(char const *title, uint32_t bg, float const color[4],
-                          umbra_coverage_fn coverage, umbra_blend_fn blend, enum umbra_fmt fmt) {
+                          umbra_coverage_fn coverage, umbra_blend_fn blend, struct umbra_fmt fmt) {
     struct solid_state *st = calloc(1, sizeof *st);
     st->shader = umbra_shader_solid;
     st->coverage = coverage;

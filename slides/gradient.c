@@ -12,7 +12,7 @@ struct grad_2stop_state {
     umbra_coverage_fn  coverage;
     umbra_blend_fn     blend;
 
-    enum umbra_fmt             fmt, :32;
+    struct umbra_fmt            fmt;
     struct umbra_draw_layout   lay;
     struct umbra_basic_block  *bb;
     struct umbra_program      *prog;
@@ -31,7 +31,7 @@ struct grad_lut_state {
     umbra_coverage_fn  coverage;
     umbra_blend_fn     blend;
 
-    enum umbra_fmt             fmt, :32;
+    struct umbra_fmt            fmt;
     struct umbra_draw_layout   lay;
     struct umbra_basic_block  *bb;
     struct umbra_program      *prog;
@@ -43,9 +43,9 @@ static void grad_2stop_init(struct slide *s, int w, int h) {
     st->h = h;
 }
 
-static void grad_2stop_prepare(struct slide *s, struct umbra_backend *be, enum umbra_fmt fmt) {
+static void grad_2stop_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
     struct grad_2stop_state *st = (struct grad_2stop_state *)s;
-    if (st->fmt != fmt || !st->bb) {
+    if (st->fmt.load != fmt.load || !st->bb) {
         st->fmt = fmt;
         umbra_basic_block_free(st->bb);
         if (st->lay.uni) { free(st->lay.uni->data); free(st->lay.uni); st->lay.uni = NULL; }
@@ -62,17 +62,17 @@ static void grad_2stop_draw(struct slide *s, int l, int t, int r, int b, void *b
     struct grad_2stop_state *st = (struct grad_2stop_state *)s;
     umbra_uniforms_fill_f32(st->lay.uni, st->lay.shader,      st->grad,  3);
     umbra_uniforms_fill_f32(st->lay.uni, st->lay.shader + 12, st->color, 8);
-    size_t    pb = umbra_fmt_size(st->fmt);
+    size_t    pb = st->fmt.bpp;
     size_t plane_sz = (size_t)st->w * (size_t)st->h * pb;
     size_t rb = (size_t)st->w * pb;
     struct umbra_buf ubuf[] = {
         {.ptr=st->lay.uni->data, .sz=st->lay.uni->size, .read_only=1},
-        {.ptr=buf, .sz=plane_sz * (st->fmt == umbra_fmt_fp16_planar ? 4 : 1), .row_bytes=rb},
+        {.ptr=buf, .sz=plane_sz * (size_t)st->fmt.planes, .row_bytes=rb},
     };
     st->prog->queue(st->prog, l, t, r, b, ubuf);
 }
 
-static struct umbra_builder *grad_2stop_get_builder(struct slide *s, enum umbra_fmt fmt) {
+static struct umbra_builder *grad_2stop_get_builder(struct slide *s, struct umbra_fmt fmt) {
     struct grad_2stop_state *st = (struct grad_2stop_state *)s;
     return umbra_draw_build(st->shader, st->coverage, st->blend, fmt, NULL);
 }
@@ -91,9 +91,9 @@ static void grad_lut_init(struct slide *s, int w, int h) {
     st->h = h;
 }
 
-static void grad_lut_prepare(struct slide *s, struct umbra_backend *be, enum umbra_fmt fmt) {
+static void grad_lut_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
     struct grad_lut_state *st = (struct grad_lut_state *)s;
-    if (st->fmt != fmt || !st->bb) {
+    if (st->fmt.load != fmt.load || !st->bb) {
         st->fmt = fmt;
         umbra_basic_block_free(st->bb);
         if (st->lay.uni) { free(st->lay.uni->data); free(st->lay.uni); st->lay.uni = NULL; }
@@ -111,17 +111,17 @@ static void grad_lut_draw(struct slide *s, int l, int t, int r, int b, void *buf
     umbra_uniforms_fill_f32(st->lay.uni, st->lay.shader, st->grad, 4);
     umbra_uniforms_fill_ptr(st->lay.uni, (st->lay.shader + 16 + 7) & ~(size_t)7,
                   (struct umbra_buf){.ptr=st->lut, .sz=(size_t)(st->lut_n * 4 * 4)});
-    size_t    pb = umbra_fmt_size(st->fmt);
+    size_t    pb = st->fmt.bpp;
     size_t plane_sz = (size_t)st->w * (size_t)st->h * pb;
     size_t rb = (size_t)st->w * pb;
     struct umbra_buf ubuf[] = {
         {.ptr=st->lay.uni->data, .sz=st->lay.uni->size, .read_only=1},
-        {.ptr=buf, .sz=plane_sz * (st->fmt == umbra_fmt_fp16_planar ? 4 : 1), .row_bytes=rb},
+        {.ptr=buf, .sz=plane_sz * (size_t)st->fmt.planes, .row_bytes=rb},
     };
     st->prog->queue(st->prog, l, t, r, b, ubuf);
 }
 
-static struct umbra_builder *grad_lut_get_builder(struct slide *s, enum umbra_fmt fmt) {
+static struct umbra_builder *grad_lut_get_builder(struct slide *s, struct umbra_fmt fmt) {
     struct grad_lut_state *st = (struct grad_lut_state *)s;
     return umbra_draw_build(st->shader, st->coverage, st->blend, fmt, NULL);
 }
@@ -134,13 +134,13 @@ static void grad_lut_free(struct slide *s) {
     free(st);
 }
 
-struct slide *slide_gradient_2stop(char const *, uint32_t, umbra_shader_fn, enum umbra_fmt,
+struct slide *slide_gradient_2stop(char const *, uint32_t, umbra_shader_fn, struct umbra_fmt,
                                   float const[8], float const[4]);
-struct slide *slide_gradient_lut(char const *, uint32_t, umbra_shader_fn, enum umbra_fmt,
+struct slide *slide_gradient_lut(char const *, uint32_t, umbra_shader_fn, struct umbra_fmt,
                                  float const[4], float *, int);
 
 struct slide *slide_gradient_2stop(char const *title, uint32_t bg, umbra_shader_fn shader,
-                                   enum umbra_fmt fmt, float const color[8], float const grad[4]) {
+                                   struct umbra_fmt fmt, float const color[8], float const grad[4]) {
     struct grad_2stop_state *st = calloc(1, sizeof *st);
     st->shader = shader;
     st->coverage = NULL;
@@ -161,7 +161,7 @@ struct slide *slide_gradient_2stop(char const *title, uint32_t bg, umbra_shader_
 }
 
 struct slide *slide_gradient_lut(char const *title, uint32_t bg, umbra_shader_fn shader,
-                                 enum umbra_fmt fmt, float const grad[4], float *lut, int lut_n) {
+                                 struct umbra_fmt fmt, float const grad[4], float *lut, int lut_n) {
     struct grad_lut_state *st = calloc(1, sizeof *st);
     st->lut = lut;
     st->lut_n = lut_n;

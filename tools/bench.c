@@ -16,7 +16,7 @@ static double now(void) {
 }
 
 static double bench(struct slide *s, int w, int h, void *buf, struct umbra_backend *be,
-                    enum umbra_fmt fmt, double min_secs) {
+                    struct umbra_fmt fmt, double min_secs) {
     s->prepare(s, be, fmt);
     s->draw(s, 0, 0, w, h, buf);
     be->flush(be);
@@ -48,7 +48,7 @@ static void usage(void) {
         "  --help           show this help\n");
 }
 
-static int parse_fmt(char const *s) {
+static struct umbra_fmt parse_fmt(char const *s) {
     if (streq(s, "8888"))        return umbra_fmt_8888;
     if (streq(s, "565"))         return umbra_fmt_565;
     if (streq(s, "1010102"))     return umbra_fmt_1010102;
@@ -61,14 +61,18 @@ static int parse_fmt(char const *s) {
 
 int main(int argc, char *argv[]) {
     int         W       = 4096;
-    int         fmt_ov  = -1;
+    struct umbra_fmt const *fmt_ov = NULL;
     int         be_mask = 0xf;
     double      min_s   = 0.1;
     char const *match   = NULL;
 
     for (int i = 1; i < argc; i++) {
         if (streq(argv[i], "--help") || streq(argv[i], "-h")) { usage(); return 0; }
-        else if (streq(argv[i], "--fmt")     && i+1 < argc) { fmt_ov = parse_fmt(argv[++i]); }
+        else if (streq(argv[i], "--fmt")     && i+1 < argc) {
+            static struct umbra_fmt parsed;
+            parsed = parse_fmt(argv[++i]);
+            fmt_ov = &parsed;
+        }
         else if (streq(argv[i], "--backend") && i+1 < argc) {
             char const *b = argv[++i];
             be_mask = streq(b, "interp") ? 1 : streq(b, "jit") ? 2 :
@@ -104,9 +108,9 @@ int main(int argc, char *argv[]) {
         if (!s->draw) { continue; }
         if (match && !strstr(s->title, match)) { continue; }
 
-        enum umbra_fmt fmt = fmt_ov >= 0 ? (enum umbra_fmt)fmt_ov : umbra_fmt_8888;
-        size_t bpp = umbra_fmt_size(fmt);
-        size_t planes = fmt == umbra_fmt_fp16_planar ? 4 : 1;
+        struct umbra_fmt fmt = fmt_ov ? *fmt_ov : umbra_fmt_8888;
+        size_t bpp = fmt.bpp;
+        size_t planes = (size_t)fmt.planes;
         void *buf = calloc((size_t)(W * H) * planes, bpp);
 
         printf("%-40s", s->title);

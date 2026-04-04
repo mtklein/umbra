@@ -3,13 +3,13 @@
 #include "slug.h"
 
 extern struct slide *slide_solid(char const *, uint32_t, float const[4], umbra_coverage_fn,
-                                umbra_blend_fn, enum umbra_fmt);
+                                umbra_blend_fn, struct umbra_fmt);
 extern struct slide *slide_text_bitmap(struct text_cov *);
 extern struct slide *slide_text_sdf(struct text_cov *);
 extern struct slide *slide_persp(struct text_cov *);
-extern struct slide *slide_gradient_2stop(char const *, uint32_t, umbra_shader_fn, enum umbra_fmt,
+extern struct slide *slide_gradient_2stop(char const *, uint32_t, umbra_shader_fn, struct umbra_fmt,
                                           float const[8], float const[4]);
-extern struct slide *slide_gradient_lut(char const *, uint32_t, umbra_shader_fn, enum umbra_fmt,
+extern struct slide *slide_gradient_lut(char const *, uint32_t, umbra_shader_fn, struct umbra_fmt,
                                         float const[4], float *, int);
 extern struct slide *slide_slug_wind(struct slug_curves *);
 extern struct slide *slide_overview(void);

@@ -32,9 +32,9 @@ enum {
 static char const *fmt_name[] = {
     "8888", "565", "fp16", "1010102",
 };
-static enum umbra_fmt const fmt_enums[] = {
-    umbra_fmt_8888, umbra_fmt_565, umbra_fmt_fp16,
-    umbra_fmt_1010102,
+static struct umbra_fmt const * const fmt_enums[] = {
+    &umbra_fmt_8888, &umbra_fmt_565, &umbra_fmt_fp16,
+    &umbra_fmt_1010102,
 };
 
 struct pipe {
@@ -72,15 +72,15 @@ static void build_fill(int fmt) {
         umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 8),
         umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 12),
     };
-    umbra_store_color(builder, (umbra_ptr32){1}, c, fmt_enums[fmt]);
+    fmt_enums[fmt]->store(builder, 1, c);
     finish_pipe(&fill_pipe, builder, u);
 }
 
 static void build_readback(int fmt) {
     free_pipe(&readback_pipe);
     struct umbra_builder *builder = umbra_builder();
-    umbra_color c = umbra_load_color(builder, (umbra_ptr32){1}, fmt_enums[fmt]);
-    umbra_store_color(builder, (umbra_ptr32){2}, c, umbra_fmt_8888);
+    umbra_color c = fmt_enums[fmt]->load(builder, 1);
+    umbra_fmt_8888.store(builder, 2, c);
     readback_pipe.out_ptr = 2;
     finish_pipe(&readback_pipe, builder, calloc(1, sizeof(struct umbra_uniforms)));
 }
@@ -88,9 +88,9 @@ static void build_readback(int fmt) {
 static void build_hdr(int fmt) {
     free_pipe(&hdr_pipe);
     struct umbra_builder *builder = umbra_builder();
-    umbra_color c = umbra_load_color(builder, (umbra_ptr32){1}, fmt_enums[fmt]);
+    umbra_color c = fmt_enums[fmt]->load(builder, 1);
     hdr_pipe.out_ptr = 2;
-    umbra_store_color(builder, (umbra_ptr32){2}, c, umbra_fmt_fp16);
+    umbra_fmt_fp16.store(builder, 2, c);
     finish_pipe(&hdr_pipe, builder, calloc(1, sizeof(struct umbra_uniforms)));
 }
 
@@ -139,11 +139,11 @@ static int cur_backend;
 
 static void build_slide_fmt(struct slide *s, int fmt) {
     if (bes[cur_backend]) {
-        s->prepare(s, bes[cur_backend], fmt_enums[fmt]);
+        s->prepare(s, bes[cur_backend], *fmt_enums[fmt]);
     }
     umbra_basic_block_free(saved_bb);
     if (s->get_builder) {
-        struct umbra_builder *b = s->get_builder(s, fmt_enums[fmt]);
+        struct umbra_builder *b = s->get_builder(s, *fmt_enums[fmt]);
         saved_bb = umbra_basic_block(b);
         umbra_builder_free(b);
     } else {
@@ -306,7 +306,7 @@ int main(void) {
                 } else if (ev.key.key == SDLK_B) {
                     cur_backend = next_backend(cur_backend);
                     struct slide *s = slide_get(cur_slide);
-                    if (bes[cur_backend]) { s->prepare(s, bes[cur_backend], fmt_enums[cur_fmt]); }
+                    if (bes[cur_backend]) { s->prepare(s, bes[cur_backend], *fmt_enums[cur_fmt]); }
                     rebuild_xtra(cur_backend);
                 } else if (ev.key.key == SDLK_C) {
                     cur_fmt = (cur_fmt + 1) % NUM_FMTS;
@@ -336,7 +336,7 @@ int main(void) {
 
         struct slide *s = slide_get(cur_slide);
 
-        size_t bpp = umbra_fmt_size(fmt_enums[cur_fmt]);
+        size_t bpp = fmt_enums[cur_fmt]->bpp;
         size_t row_bytes = (size_t)W * bpp;
         size_t plane_gap = 0;
         size_t row_sz = (size_t)W * (size_t)bpp;
@@ -348,7 +348,7 @@ int main(void) {
 
         if (s->animate) { s->animate(s, 0.016f); }
 
-        if (s->prepare) { s->prepare(s, bes[cur_backend], fmt_enums[cur_fmt]); }
+        if (s->prepare) { s->prepare(s, bes[cur_backend], *fmt_enums[cur_fmt]); }
 
         {
             int nt = n_threads;

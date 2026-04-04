@@ -15,7 +15,7 @@ struct overview_state {
     int                   n_real, pad_;
     uint32_t             *fb, *tmp;
     struct umbra_backend *be;
-    enum umbra_fmt        fmt, :32;
+    struct umbra_fmt       fmt;
 };
 
 static void draw_digit(uint32_t *fb, int stride, int ox, int oy, int digit, uint32_t color) {
@@ -108,7 +108,7 @@ static void overview_animate(struct slide *s, float dt) {
     }
 }
 
-static void overview_prepare(struct slide *s, struct umbra_backend *be, enum umbra_fmt fmt) {
+static void overview_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
     struct overview_state *st = (struct overview_state *)s;
     st->be = be;
     st->fmt = fmt;

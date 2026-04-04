@@ -21,15 +21,15 @@ static void render_slide(char const *label, struct umbra_backend *be, struct sli
         umbra_uniform_32(fb, (umbra_ptr32){0}, fi + 8),
         umbra_uniform_32(fb, (umbra_ptr32){0}, fi + 12),
     };
-    umbra_store_color(fb, (umbra_ptr32){1}, fc, umbra_fmt_8888);
+    umbra_store_8888(fb, (umbra_ptr32){1}, fc);
     struct umbra_basic_block *fbb = umbra_basic_block(fb);
     umbra_builder_free(fb);
     struct umbra_program *fill_prog = be->compile(be, fbb);
     umbra_basic_block_free(fbb);
 
     struct umbra_builder *rb = umbra_builder();
-    umbra_color rc = umbra_load_color(rb, (umbra_ptr32){1}, umbra_fmt_8888);
-    umbra_store_color(rb, (umbra_ptr32){2}, rc, umbra_fmt_8888);
+    umbra_color rc = umbra_load_8888(rb, (umbra_ptr32){1});
+    umbra_store_8888(rb, (umbra_ptr32){2}, rc);
     struct umbra_basic_block *rbb = umbra_basic_block(rb);
     umbra_builder_free(rb);
     struct umbra_program *rb_prog = be->compile(be, rbb);
