@@ -87,8 +87,8 @@ static void slug_draw(struct slide *s, int l, int t, int r, int b, void *buf) {
         umbra_uniforms_fill_f32(st->acc_lay.uniforms, st->acc_lay.loop_off, &jf, 1);
         abuf[0] = (struct umbra_buf){.ptr=st->acc_lay.uniforms, .sz=st->acc_lay.uni.size, .read_only=1};
         acc->queue(acc, l, t, r, b, abuf);
+        be->flush(be);
     }
-    be->flush(be);
 
     umbra_uniforms_fill_f32(st->draw_lay.uniforms, st->draw_lay.shader, st->color, 4);
     umbra_uniforms_fill_ptr(st->draw_lay.uniforms, st->draw_lay.coverage,
