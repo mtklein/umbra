@@ -1375,36 +1375,54 @@ static void encode_dispatch(
 }
 
 static void umbra_metal_begin_batch(struct metal_backend *be);
+static void umbra_metal_flush(struct metal_backend *be);
 
 static void umbra_metal_run(
     struct umbra_metal *m, int l, int t, int r, int b, struct umbra_buf buf[]
 ) {
     int w = r - l, h = b - t;
-    if (w > 0 && h > 0) {
-        struct metal_backend *be = (struct metal_backend*)m->base.backend;
-        if (!be->batch_cmdbuf) {
-            umbra_metal_begin_batch(be);
-        }
-        @autoreleasepool {
-            id<MTLComputeCommandEncoder> enc =
-                (__bridge
-                 id<MTLComputeCommandEncoder>)
-                    be->batch_enc;
-            if (!m->batch_data) {
-                m->batch_data = calloc(
-                    (size_t)m->total_bufs,
-                    sizeof *m->batch_data);
+    if (w <= 0 || h <= 0) { return; }
+
+    struct metal_backend *be = (struct metal_backend*)m->base.backend;
+
+    if (!m->batch_data) {
+        m->batch_data = calloc(
+            (size_t)m->total_bufs,
+            sizeof *m->batch_data);
+    }
+
+    // If a previous dispatch in this batch wrote to a buffer we need again,
+    // flush first.  This happens outside the @autoreleasepool so the old
+    // encoder is fully released before we create a new one.
+    if (be->batch_cmdbuf && be->batch_has_dispatch && m->batch_gen == be->batch_gen) {
+        for (int i = 0; i <= m->max_ptr; i++) {
+            if (!buf[i].ptr || !buf[i].sz || buf[i].read_only) { continue; }
+            struct batch_shared *sh = &m->batch_data[i];
+            char *p = buf[i].ptr;
+            if (sh->mtl && p >= sh->host && p < sh->host + sh->copy_sz) {
+                umbra_metal_flush(be);
+                break;
             }
-            if (m->batch_gen != be->batch_gen) {
-                m->batch_gen = be->batch_gen;
-                __builtin_memset(
-                    m->batch_data, 0,
-                    (size_t)m->total_bufs
-                        * sizeof *m->batch_data);
-            }
-            encode_dispatch(
-                m, l, t, r, b, buf, enc);
         }
+    }
+
+    if (!be->batch_cmdbuf) {
+        umbra_metal_begin_batch(be);
+    }
+    @autoreleasepool {
+        id<MTLComputeCommandEncoder> enc =
+            (__bridge
+             id<MTLComputeCommandEncoder>)
+                be->batch_enc;
+        if (m->batch_gen != be->batch_gen) {
+            m->batch_gen = be->batch_gen;
+            __builtin_memset(
+                m->batch_data, 0,
+                (size_t)m->total_bufs
+                    * sizeof *m->batch_data);
+        }
+        encode_dispatch(
+            m, l, t, r, b, buf, enc);
     }
 }
 
