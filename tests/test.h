@@ -1,8 +1,29 @@
 #pragma once
 #include "../include/umbra.h"
 #include <stdlib.h>
+#ifndef __wasm__
+    #include <unistd.h>
+#endif
 
 int dprintf(int, char const[], ...);
+
+static inline void *test_aligned_alloc(size_t sz) {
+#ifdef __wasm__
+    return calloc(1, sz);
+#else
+    void *p = 0;
+    posix_memalign(&p, (size_t)sysconf(_SC_PAGESIZE), sz);
+    if (p) { __builtin_memset(p, 0, sz); }
+    return p;
+#endif
+}
+static inline void *test_misaligned_alloc(size_t sz) {
+    char *p = calloc(1, sz + 1);
+    return p ? p + 1 : 0;
+}
+static inline void test_misaligned_free(void *p) {
+    if (p) { free((char*)p - 1); }
+}
 #define here ? (void)0 : (dprintf(2, "%s:%d failed\n", __FILE__, __LINE__), __builtin_trap())
 
 static inline _Bool equiv(float x, float y) {

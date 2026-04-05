@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+static void *default_alloc(size_t sz) { return calloc(1, sz); }
+
 enum { W = 640, H = 480 };
 
 static void render_slide(char const *label, struct umbra_backend *be, struct slide *s) {
@@ -85,7 +87,7 @@ static void render_slide(char const *label, struct umbra_backend *be, struct sli
 }
 
 int main(void) {
-    slides_init(W, H);
+    slides_init(W, H, default_alloc, free);
     struct slide *s = slide_get(0);
 
     struct umbra_backend *interp = umbra_backend_interp();

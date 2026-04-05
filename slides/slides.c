@@ -87,7 +87,7 @@ static void register_slides(void) {
     all[count++] = slide_slug_wind(&slug);
 }
 
-void slides_init(int w, int h) {
+void slides_init(int w, int h, slide_alloc_fn alloc, slide_free_fn sfree) {
     float font = (float)h * 0.15f;
     bitmap_cov = text_rasterize(w, h, font, 0);
     sdf_cov = text_rasterize(w, h, font, 1);
@@ -97,10 +97,14 @@ void slides_init(int w, int h) {
     register_slides();
 
     for (int i = 0; i < count; i++) {
+        all[i]->alloc = alloc;
+        all[i]->sfree = sfree;
         if (all[i]->init) { all[i]->init(all[i], w, h); }
     }
 
     all[count++] = slide_overview();
+    all[count - 1]->alloc = alloc;
+    all[count - 1]->sfree = sfree;
     all[count - 1]->init(all[count - 1], w, h);
 }
 

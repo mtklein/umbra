@@ -5,6 +5,7 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 
 
@@ -53,9 +54,9 @@ static void build_pipes(void) {
     build_fill();
 }
 
-static void free_pipes(void) {
+static void free_pipes(void (*tfree)(void *)) {
     fill_pipe.prog->free(fill_pipe.prog);
-    free(fill_pipe.uniforms);
+    tfree(fill_pipe.uniforms);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         if (bes[bi]) { bes[bi]->free(bes[bi]); }
     }
@@ -88,12 +89,13 @@ static void render_slide(
     s->draw(s, 0, 0, W, H, pixbuf);
 }
 
-static void test_slide_golden(int slide_idx) {
+static void test_slide_golden(int slide_idx,
+                              void *(*talloc)(size_t), void (*tfree)(void *)) {
     struct slide *s = slide_get(slide_idx);
 
     size_t pixbuf_sz = (size_t)(W * H * 4);
-    void *pbuf_ref = calloc(1, pixbuf_sz);
-    void *pbuf_tst = calloc(1, pixbuf_sz);
+    void *pbuf_ref = talloc(pixbuf_sz);
+    void *pbuf_tst = talloc(pixbuf_sz);
 
     render_slide(slide_idx, bes[0], pbuf_ref);
     bes[0]->flush(bes[0]);
@@ -140,11 +142,12 @@ static void test_slide_golden(int slide_idx) {
         (worst <= tol) here;
     }
 
-    free(pbuf_ref);
-    free(pbuf_tst);
+    tfree(pbuf_ref);
+    tfree(pbuf_tst);
 }
 
-static void test_slug_rect(void) {
+static void test_slug_rect(void *(*talloc)(size_t), void (*tfree)(void *)) {
+    (void)talloc;
     static float rect[] = {
          5, 5,  5,20,  5,35,
          5,35, 30,35, 55,35,
@@ -223,14 +226,15 @@ static void test_slug_rect(void) {
     pixels[38*W + 30] == bg here;
     pixels[20*W + 70] == bg here;
 
-    free(lay.uniforms);
-    free(alay.uniforms);
+    tfree(lay.uniforms);
+    tfree(alay.uniforms);
     acc->free(acc);
     interp->free(interp);
     be->free(be);
 }
 
-static void test_perspective_text(void) {
+static void test_perspective_text(void *(*talloc)(size_t), void (*tfree)(void *)) {
+    (void)talloc;
     enum { BW = 16, BH = 8 };
     uint16_t bmp[BW * BH];
     __builtin_memset(bmp, 0, sizeof bmp);
@@ -318,25 +322,31 @@ static void test_perspective_text(void) {
     }
     changed > 0 here;
 
-    free(lay.uniforms);
-    free(lay2.uniforms);
+    tfree(lay.uniforms);
+    tfree(lay2.uniforms);
     interp->free(interp);
     be->free(be);
     text_cov_free(&tc);
 }
 
-int main(void) {
-    slides_init(W, H);
+
+static void run_all_tests(void *(*talloc)(size_t), void (*tfree)(void *)) {
     build_pipes();
-
-    test_perspective_text();
-    test_slug_rect();
-
+    test_perspective_text(talloc, tfree);
+    test_slug_rect(talloc, tfree);
     for (int si = 0; si < slide_count() - 1; si++) {
-        test_slide_golden(si);
+        test_slide_golden(si, talloc, tfree);
     }
-
     slides_cleanup();
-    free_pipes();
+    free_pipes(tfree);
+}
+
+int main(void) {
+    slides_init(W, H, test_aligned_alloc, free);
+    run_all_tests(test_aligned_alloc, free);
+
+    slides_init(W, H, test_misaligned_alloc, test_misaligned_free);
+    run_all_tests(test_misaligned_alloc, test_misaligned_free);
+
     return 0;
 }

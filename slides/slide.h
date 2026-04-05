@@ -3,9 +3,15 @@
 #include <math.h>
 #include <stdint.h>
 
+typedef void *(*slide_alloc_fn)(size_t);
+typedef void  (*slide_free_fn)(void *);
+
 struct slide {
     char const     *title;
     uint32_t        bg, :32;
+
+    slide_alloc_fn  alloc;
+    slide_free_fn   sfree;
 
     void (*init)   (struct slide*, int w, int h);
     void (*animate)(struct slide*, float dt);
@@ -18,7 +24,7 @@ struct slide {
 
 int           slide_count        (void);
 struct slide *slide_get          (int i);
-void          slides_init        (int w, int h);
+void          slides_init        (int w, int h, slide_alloc_fn, slide_free_fn);
 void          slides_init_for_dump(void);
 void          slides_cleanup     (void);
 

@@ -9,6 +9,8 @@
 #include <string.h>
 #include <time.h>
 
+static void *default_alloc(size_t sz) { return calloc(1, sz); }
+
 static double now(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -86,7 +88,7 @@ int main(int argc, char *argv[]) {
     }
 
     int const H = 480;
-    slides_init(W, H);
+    slides_init(W, H, default_alloc, free);
 
     int ns = slide_count() - 1;
 
