@@ -96,37 +96,46 @@ static void test_slide_golden(int slide_idx) {
     void *pbuf_tst = calloc(1, pixbuf_sz);
 
     render_slide(slide_idx, bes[0], pbuf_ref);
+    bes[0]->flush(bes[0]);
 
     for (int bi = 1; bi < NUM_BACKENDS; bi++) {
         if (!bes[bi]) { continue; }
+        __builtin_memset(pbuf_tst, 0, pixbuf_sz);
         render_slide(slide_idx, bes[bi], pbuf_tst);
         bes[bi]->flush(bes[bi]);
 
         int mismatches = 0;
         int worst = 0;
+        int worst_px = -1;
         uint8_t const *r = pbuf_ref, *t = pbuf_tst;
         for (int i = 0; i < W * H; i++) {
-            _Bool differ = 0;
             uint32_t rp, tp;
             __builtin_memcpy(&rp, r+i*4, 4);
             __builtin_memcpy(&tp, t+i*4, 4);
-            for (int ch = 0; ch < 4; ch++) {
-                int d = (int)((rp>>(ch*8))&0xFF) - (int)((tp>>(ch*8))&0xFF);
-                if (d<0) d=-d;
-                if (d>worst) worst=d;
-                if (d) differ=1;
+            if (rp != tp) {
+                mismatches++;
+                for (int ch = 0; ch < 4; ch++) {
+                    int d = (int)((rp>>(ch*8))&0xFF) - (int)((tp>>(ch*8))&0xFF);
+                    if (d<0) d=-d;
+                    if (d>worst) { worst=d; worst_px=i; }
+                }
             }
-            if (differ) mismatches++;
         }
         int tol = 0;
         if (worst > tol) {
+            uint32_t rp, tp;
+            __builtin_memcpy(&rp, r+worst_px*4, 4);
+            __builtin_memcpy(&tp, t+worst_px*4, 4);
             dprintf(2,
                 "slide %d \"%s\" %s: "
                 "%d/%d pixels differ, "
-                "worst channel delta = %d\n",
+                "worst delta=%d at (%d,%d) "
+                "ref=%08x tst=%08x\n",
                 slide_idx + 1, s->title,
                 backend_name[bi],
-                mismatches, W * H, worst);
+                mismatches, W * H,
+                worst, worst_px % W, worst_px / W,
+                rp, tp);
         }
         (worst <= tol) here;
     }
