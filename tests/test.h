@@ -18,18 +18,25 @@ static inline void *test_aligned_alloc(size_t sz) {
 #endif
 }
 static inline void *test_misaligned_alloc(size_t sz) {
-    // 16-byte aligned but not page-aligned: enough for SIMD, defeats Metal nocopy.
+    // Page-align, then offset by 16 so it's never page-aligned but still
+    // 16-byte aligned (enough for SIMD, defeats Metal nocopy).
 #ifdef __wasm__
     return calloc(1, sz);
 #else
+    size_t pg = (size_t)sysconf(_SC_PAGESIZE);
     void *p = 0;
-    posix_memalign(&p, 16, sz);
-    if (p) { __builtin_memset(p, 0, sz); }
-    return p;
+    posix_memalign(&p, pg, sz + 16);
+    if (!p) { return 0; }
+    __builtin_memset(p, 0, sz + 16);
+    return (char*)p + 16;
 #endif
 }
 static inline void test_misaligned_free(void *p) {
+#ifdef __wasm__
     free(p);
+#else
+    if (p) { free((char*)p - 16); }
+#endif
 }
 #define here ? (void)0 : (dprintf(2, "%s:%d failed\n", __FILE__, __LINE__), __builtin_trap())
 
