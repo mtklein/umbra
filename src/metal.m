@@ -42,6 +42,7 @@ struct metal_backend {
     int                  batch_ncopy, batch_copy_cap;
     int                  batch_gen;
     _Bool                batch_has_dispatch; int :24;
+    void                *batch_fence;
 };
 
 struct umbra_metal {
@@ -1364,12 +1365,14 @@ static void encode_dispatch(
     MTLSize group =
         MTLSizeMake((NSUInteger)gx,
                     (NSUInteger)gy, 1);
+    id<MTLFence> fence = (__bridge id<MTLFence>)be->batch_fence;
     if (be->batch_has_dispatch) {
-        [enc memoryBarrierWithScope:MTLBarrierScopeBuffers];
+        [enc waitForFence:fence];
     }
     be->batch_has_dispatch = 1;
     [enc dispatchThreads:grid
        threadsPerThreadgroup:group];
+    [enc updateFence:fence];
     free(szs_data);
     free(rbs_data);
 }
@@ -1385,27 +1388,6 @@ static void umbra_metal_run(
 
     struct metal_backend *be = (struct metal_backend*)m->base.backend;
 
-    if (!m->batch_data) {
-        m->batch_data = calloc(
-            (size_t)m->total_bufs,
-            sizeof *m->batch_data);
-    }
-
-    // If a previous dispatch in this batch wrote to a buffer we need again,
-    // flush first.  This happens outside the @autoreleasepool so the old
-    // encoder is fully released before we create a new one.
-    if (be->batch_cmdbuf && be->batch_has_dispatch && m->batch_gen == be->batch_gen) {
-        for (int i = 0; i <= m->max_ptr; i++) {
-            if (!buf[i].ptr || !buf[i].sz || buf[i].read_only) { continue; }
-            struct batch_shared *sh = &m->batch_data[i];
-            char *p = buf[i].ptr;
-            if (sh->mtl && p >= sh->host && p < sh->host + sh->copy_sz) {
-                umbra_metal_flush(be);
-                break;
-            }
-        }
-    }
-
     if (!be->batch_cmdbuf) {
         umbra_metal_begin_batch(be);
     }
@@ -1414,6 +1396,11 @@ static void umbra_metal_run(
             (__bridge
              id<MTLComputeCommandEncoder>)
                 be->batch_enc;
+        if (!m->batch_data) {
+            m->batch_data = calloc(
+                (size_t)m->total_bufs,
+                sizeof *m->batch_data);
+        }
         if (m->batch_gen != be->batch_gen) {
             m->batch_gen = be->batch_gen;
             __builtin_memset(
@@ -1439,10 +1426,15 @@ static void umbra_metal_begin_batch(struct metal_backend *be) {
                  commandBufferWithUnretainedReferences];
             id<MTLComputeCommandEncoder> enc =
                 [cmdbuf computeCommandEncoder];
+            id<MTLDevice> device =
+                (__bridge id<MTLDevice>)be->device;
+            id<MTLFence> fence = [device newFence];
             be->batch_cmdbuf =
                 (__bridge_retained void*)cmdbuf;
             be->batch_enc =
                 (__bridge_retained void*)enc;
+            be->batch_fence =
+                (__bridge_retained void*)fence;
         }
     }
 }
@@ -1481,6 +1473,11 @@ static void umbra_metal_flush(struct metal_backend *be) {
                     be->batch_bufs[i];
             }
             be->batch_nbufs = 0;
+
+            if (be->batch_fence) {
+                (void)(__bridge_transfer id)be->batch_fence;
+                be->batch_fence = NULL;
+            }
         }
     }
 }
