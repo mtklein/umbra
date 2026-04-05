@@ -21,9 +21,9 @@ static struct draw_backends make_draw(struct umbra_builder *builder, struct umbr
 static _Bool run_draw(struct draw_backends *B, int b, int w, int h, struct umbra_buf buf[]) {
     return test_backends_run(&B->tb, b, w, h, buf);
 }
-static void cleanup_draw(struct draw_backends *B, void (*tfree)(void *)) {
+static void cleanup_draw(struct draw_backends *B) {
     test_backends_free(&B->tb);
-    tfree(B->lay.uniforms);
+    free(B->lay.uniforms);
 }
 
 static void test_solid_src(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -56,7 +56,7 @@ static void test_solid_src(void *(*talloc)(size_t), void (*tfree)(void *)) {
             ((dst[i] >> 24) & 0xFF) == 0xFF here;
         }
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_solid_src_n1(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -82,7 +82,7 @@ static void test_solid_src_n1(void *(*talloc)(size_t), void (*tfree)(void *)) {
         ((dst[0] >> 16) & 0xFF) == 0xFF here;
         ((dst[0] >> 24) & 0xFF) == 0xFF here;
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_solid_src_n9(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -109,7 +109,7 @@ static void test_solid_src_n9(void *(*talloc)(size_t), void (*tfree)(void *)) {
             ((dst[i] >> 24) & 0xFF) == 0xFF here;
         }
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_solid_src_n16(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -133,7 +133,7 @@ static void test_solid_src_n16(void *(*talloc)(size_t), void (*tfree)(void *)) {
         }
         for (int i = 0; i < 16; i++) { (dst[i] == 0xFFFFFFFF) here; }
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_srcover_8888(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -166,7 +166,7 @@ static void test_srcover_8888(void *(*talloc)(size_t), void (*tfree)(void *)) {
             a == 255 here;
         }
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_dstover_8888(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -190,7 +190,7 @@ static void test_dstover_8888(void *(*talloc)(size_t), void (*tfree)(void *)) {
         }
         for (int i = 0; i < 2; i++) { (dst[i] == 0xFFFFFFFF) here; }
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_dstover_transparent(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -217,7 +217,7 @@ static void test_dstover_transparent(void *(*talloc)(size_t), void (*tfree)(void
             ((dst[i] >> 24) & 0xFF) == 0xFF here;
         }
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_multiply_8888(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -250,7 +250,7 @@ static void test_multiply_8888(void *(*talloc)(size_t), void (*tfree)(void *)) {
             a == 0xFF here;
         }
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_solid_src_fp16(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -279,7 +279,7 @@ static void test_solid_src_fp16(void *(*talloc)(size_t), void (*tfree)(void *)) 
             equiv((float)dst[i * 4 + 3], 1.0f) here;
         }
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_srcover_fp16(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -318,7 +318,7 @@ static void test_srcover_fp16(void *(*talloc)(size_t), void (*tfree)(void *)) {
             equiv(a, 1.0f) here;
         }
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_coverage_rect(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -352,7 +352,7 @@ static void test_coverage_rect(void *(*talloc)(size_t), void (*tfree)(void *)) {
             }
         }
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_coverage_rect_scalar(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -384,7 +384,7 @@ static void test_coverage_rect_scalar(void *(*talloc)(size_t), void (*tfree)(voi
         ((dst[2] >> 24) & 0xFF) == 0xFF here;
         dst[3] == 0 here;
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_coverage_rect_n9(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -417,7 +417,7 @@ static void test_coverage_rect_n9(void *(*talloc)(size_t), void (*tfree)(void *)
             }
         }
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_coverage_rect_offset(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -447,7 +447,7 @@ static void test_coverage_rect_offset(void *(*talloc)(size_t), void (*tfree)(voi
         ((dst[2] >> 8) & 0xFF) == 0xFF here;
         dst[3] == 0 here;
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_coverage_rect_outside_y(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -478,7 +478,7 @@ static void test_coverage_rect_outside_y(void *(*talloc)(size_t), void (*tfree)(
         }
         for (int i = 0; i < 4; i++) { (dst[i] == 0x12345678) here; }
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_no_shader(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -504,7 +504,7 @@ static void test_no_shader(void *(*talloc)(size_t), void (*tfree)(void *)) {
         }
         for (int i = 0; i < 4; i++) { (dst[i] == 0) here; }
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_no_blend(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -532,7 +532,7 @@ static void test_no_blend(void *(*talloc)(size_t), void (*tfree)(void *)) {
             ((dst[i] >> 24) & 0xFF) == 0xFF here;
         }
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static umbra_color gradient_shader(struct umbra_builder *builder, struct umbra_uniforms_layout *u, umbra_val32 x, umbra_val32 y) {
@@ -569,7 +569,7 @@ static void test_gradient_shader(void *(*talloc)(size_t), void (*tfree)(void *))
         r3 == 191 here;
         for (int i = 0; i < 4; i++) { (((dst[i] >> 24) & 0xFF) == 0xFF) here; }
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_multiply_half_alpha(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -602,7 +602,7 @@ static void test_multiply_half_alpha(void *(*talloc)(size_t), void (*tfree)(void
             a == 192 here;
         }
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_srcover_8888_n9(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -632,7 +632,7 @@ static void test_srcover_8888_n9(void *(*talloc)(size_t), void (*tfree)(void *))
             a == 128 here;
         }
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_full_pipeline(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -672,7 +672,7 @@ static void test_full_pipeline(void *(*talloc)(size_t), void (*tfree)(void *)) {
             }
         }
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_solid_src_fp16_n9(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -701,7 +701,7 @@ static void test_solid_src_fp16_n9(void *(*talloc)(size_t), void (*tfree)(void *
             equiv((float)dst[i * 4 + 3], 1.0f) here;
         }
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_coverage_rect_white_dst(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -754,7 +754,7 @@ static void test_coverage_rect_white_dst(void *(*talloc)(size_t), void (*tfree)(
             }
         }
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_coverage_bitmap(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -784,7 +784,7 @@ static void test_coverage_bitmap(void *(*talloc)(size_t), void (*tfree)(void *))
         (dst[2] & 0xff) == 0xff here;
         dst[3] == 0 here;
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_coverage_sdf(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -812,7 +812,7 @@ static void test_coverage_sdf(void *(*talloc)(size_t), void (*tfree)(void *)) {
         dst[0] == 0 here;
         (dst[4] & 0xff) == 0xff here;
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_coverage_bitmap_matrix(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -846,7 +846,7 @@ static void test_coverage_bitmap_matrix(void *(*talloc)(size_t), void (*tfree)(v
         (dst[2] & 0xff) == 0xff here;
         dst[3] == 0 here;
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_coverage_bitmap_matrix_oob(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -878,7 +878,7 @@ static void test_coverage_bitmap_matrix_oob(void *(*talloc)(size_t), void (*tfre
         }
         (dst[0] & 0xff) == 0xFF here;
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_linear_2(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -908,7 +908,7 @@ static void test_linear_2(void *(*talloc)(size_t), void (*tfree)(void *)) {
         ((dst[3] >> 16) & 0xff) == 191 here;
         for (int i = 0; i < 4; i++) { (((dst[i] >> 24) & 0xff) == 0xFF) here; }
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_radial_2(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -935,7 +935,7 @@ static void test_radial_2(void *(*talloc)(size_t), void (*tfree)(void *)) {
         (dst[0] & 0xff) == 0xFF here;
         ((dst[0] >> 24) & 0xff) == 0xFF here;
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_linear_grad(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -971,7 +971,7 @@ static void test_linear_grad(void *(*talloc)(size_t), void (*tfree)(void *)) {
         ((dst[0] >> 8) & 0xff) == 0 here;
         ((dst[7] >> 16) & 0xff) == 191 here;
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_radial_grad(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -1007,7 +1007,7 @@ static void test_radial_grad(void *(*talloc)(size_t), void (*tfree)(void *)) {
         (dst[0] & 0xff) == 0xFF here;
         ((dst[0] >> 16) & 0xff) == 0 here;
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 static void test_gradient_lut_nonuniform(void *(*talloc)(size_t), void (*tfree)(void *)) {
@@ -1043,7 +1043,7 @@ static void test_gradient_lut_nonuniform(void *(*talloc)(size_t), void (*tfree)(
         (dst[0] & 0xff) == 0xFF here;
         ((dst[7] >> 16) & 0xff) == 215 here;
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 
@@ -1079,7 +1079,7 @@ static void test_supersample(void *(*talloc)(size_t), void (*tfree)(void *)) {
             ((dst[i] >> 24) & 0xFF) == 0xFF here;
         }
     }
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 }
 
 #if !defined(__wasm__)
@@ -1127,7 +1127,7 @@ static void test_page_aligned_buffer(void *(*talloc)(size_t), void (*tfree)(void
         for (int i = 0; i < N; i++) { (offset[i] == 0xFF00FF00u) here; }
     }
     munmap(page, alloc + (size_t)pgsz);
-    cleanup_draw(&B, tfree);
+    cleanup_draw(&B);
 #endif
 }
 
@@ -1255,7 +1255,7 @@ static void run_tests(void *(*talloc)(size_t), void (*tfree)(void *)) {
             for (int i = 0; i < 4; i++) { (dst[i] == 0xF800) here; }
         }
         test_backends_free(&B);
-        tfree(lay.uniforms);
+        free(lay.uniforms);
     }
     {
         struct umbra_draw_layout lay;
@@ -1278,7 +1278,7 @@ static void run_tests(void *(*talloc)(size_t), void (*tfree)(void *)) {
             for (int i = 0; i < 4; i++) { (dst[i] == expect) here; }
         }
         test_backends_free(&B);
-        tfree(lay.uniforms);
+        free(lay.uniforms);
     }
 
     {
@@ -1307,7 +1307,7 @@ static void run_tests(void *(*talloc)(size_t), void (*tfree)(void *)) {
             }
         }
         test_backends_free(&B);
-        tfree(lay.uniforms);
+        free(lay.uniforms);
     }
 }
 
