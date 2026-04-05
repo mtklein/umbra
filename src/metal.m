@@ -1206,22 +1206,10 @@ static void encode_dispatch(
             offsets[i] = (size_t)(ptr - sh->host);
             m->per_bufs[i] = sh->mtl;
         } else {
-            size_t pg = (size_t)sysconf(_SC_PAGESIZE);
-            size_t aligned_sz = (bytes + pg - 1) & ~(pg - 1);
-            _Bool can_nocopy = ((uintptr_t)ptr & (pg - 1)) == 0;
-            id<MTLBuffer> tmp;
-            if (can_nocopy) {
-                tmp = [device
-                    newBufferWithBytesNoCopy:ptr
-                                     length:(NSUInteger)aligned_sz
-                                    options:MTLResourceStorageModeShared
-                                deallocator:nil];
-            } else {
-                tmp = [device
-                    newBufferWithLength:(NSUInteger)bytes
-                                options:MTLResourceStorageModeShared];
-                __builtin_memcpy(tmp.contents, ptr, bytes);
-            }
+            id<MTLBuffer> tmp = [device
+                newBufferWithLength:(NSUInteger)bytes
+                            options:MTLResourceStorageModeShared];
+            __builtin_memcpy(tmp.contents, ptr, bytes);
             void *retained =
                 (__bridge_retained void*)tmp;
             if (!sh->mtl) {
@@ -1271,22 +1259,10 @@ static void encode_dispatch(
             offsets[bi] = (size_t)(dptr - sh->host);
             m->per_bufs[bi] = sh->mtl;
         } else {
-            size_t pg = (size_t)sysconf(_SC_PAGESIZE);
-            size_t aligned_sz = (bytes + pg - 1) & ~(pg - 1);
-            _Bool can_nocopy = ((uintptr_t)dptr & (pg - 1)) == 0;
-            id<MTLBuffer> tmp;
-            if (can_nocopy) {
-                tmp = [device
-                    newBufferWithBytesNoCopy:dptr
-                                     length:(NSUInteger)aligned_sz
-                                    options:MTLResourceStorageModeShared
-                                deallocator:nil];
-            } else {
-                tmp = [device
-                    newBufferWithLength:(NSUInteger)bytes
-                                options:MTLResourceStorageModeShared];
-                __builtin_memcpy(tmp.contents, dptr, bytes);
-            }
+            id<MTLBuffer> tmp = [device
+                newBufferWithLength:(NSUInteger)bytes
+                            options:MTLResourceStorageModeShared];
+            __builtin_memcpy(tmp.contents, dptr, bytes);
             void *retained =
                 (__bridge_retained void*)tmp;
             if (!sh->mtl) {
