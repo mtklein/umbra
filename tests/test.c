@@ -76,8 +76,8 @@ static void cleanup(struct test_backends *B) { test_backends_free(B); }
         B = make(b_);                                                       \
     } while (0)
 
-static void test_f32_ops(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_f32_ops(struct test_alloc const *mem) {
+    (void)mem;
     {
         struct test_backends B;
         BINOP_F32(umbra_mul_f32, B);
@@ -162,8 +162,8 @@ static void test_f32_ops(void *(*talloc)(size_t), void (*tfree)(void *)) {
     }
 }
 
-static void test_i32_ops(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_i32_ops(struct test_alloc const *mem) {
+    (void)mem;
     {
         struct test_backends B;
         BINOP_I32(umbra_add_i32, B);
@@ -371,8 +371,8 @@ static void test_i32_ops(void *(*talloc)(size_t), void (*tfree)(void *)) {
     }
 }
 
-static void test_cmp_i32(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_cmp_i32(struct test_alloc const *mem) {
+    (void)mem;
     {
         struct test_backends B;
         BINOP_I32(umbra_eq_i32, B);
@@ -474,8 +474,8 @@ static void test_cmp_i32(void *(*talloc)(size_t), void (*tfree)(void *)) {
     }
 }
 
-static void test_cmp_f32(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_cmp_f32(struct test_alloc const *mem) {
+    (void)mem;
     {
         struct test_backends B;
         BINOP_CMP_F32(umbra_eq_f32, B);
@@ -541,8 +541,8 @@ static void test_cmp_f32(void *(*talloc)(size_t), void (*tfree)(void *)) {
     }
 }
 
-static void test_imm(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_imm(struct test_alloc const *mem) {
+    (void)mem;
     {
         struct umbra_builder *builder = umbra_builder();
         umbra_val32 v = umbra_imm_i32(builder, 42);
@@ -564,8 +564,8 @@ static void test_imm(void *(*talloc)(size_t), void (*tfree)(void *)) {
     }
 }
 
-static void test_fma_f32(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_fma_f32(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *builder = umbra_builder();
     umbra_val32 x = umbra_load_32(builder, (umbra_ptr32){0}),
               y = umbra_load_32(builder, (umbra_ptr32){.ix=1}),
@@ -591,8 +591,8 @@ static void test_fma_f32(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup(&B);
 }
 
-static void test_min_max_sqrt_f32(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_min_max_sqrt_f32(struct test_alloc const *mem) {
+    (void)mem;
     {
         struct test_backends B;
         BINOP_F32(umbra_min_f32, B);
@@ -656,8 +656,8 @@ static void test_min_max_sqrt_f32(void *(*talloc)(size_t), void (*tfree)(void *)
     }
 }
 
-static void test_abs_f32(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_abs_f32(struct test_alloc const *mem) {
+    (void)mem;
     {
         struct umbra_builder *builder = umbra_builder();
         umbra_val32            x = umbra_load_32(builder, (umbra_ptr32){0}),
@@ -704,8 +704,8 @@ static void test_abs_f32(void *(*talloc)(size_t), void (*tfree)(void *)) {
     }
 }
 
-static void test_round_floor_ceil(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_round_floor_ceil(struct test_alloc const *mem) {
+    (void)mem;
     float src[] = {1.3f, 1.5f, -1.5f, -2.7f};
 
 #define RFC(op, e0, e1, e2, e3, as_int)                                     \
@@ -755,8 +755,8 @@ static void test_round_floor_ceil(void *(*talloc)(size_t), void (*tfree)(void *)
 #undef RFC
 }
 
-static void test_large_n(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_large_n(struct test_alloc const *mem) {
+    (void)mem;
     struct test_backends B;
     BINOP_F32(umbra_add_f32, B);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
@@ -778,8 +778,8 @@ static void test_large_n(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup(&B);
 }
 
-static void test_convert(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_convert(struct test_alloc const *mem) {
+    (void)mem;
     {
         struct umbra_builder *builder = umbra_builder();
         umbra_val32            x = umbra_load_32(builder, (umbra_ptr32){0});
@@ -826,8 +826,8 @@ static void test_convert(void *(*talloc)(size_t), void (*tfree)(void *)) {
     }
 }
 
-static void test_dedup(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_dedup(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *builder = umbra_builder();
     umbra_val32 v1 = umbra_imm_i32(builder, 42), v2 = umbra_imm_i32(builder, 42);
     val_eq(v1, v2) here;
@@ -839,8 +839,8 @@ static void test_dedup(void *(*talloc)(size_t), void (*tfree)(void *)) {
     umbra_builder_free(builder);
 }
 
-static void test_constprop(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_constprop(struct test_alloc const *mem) {
+    (void)mem;
     {
         struct umbra_builder *builder = umbra_builder();
         umbra_val32 x = umbra_imm_i32(builder, 3),
@@ -883,8 +883,8 @@ static void test_constprop(void *(*talloc)(size_t), void (*tfree)(void *)) {
     }
 }
 
-static void test_strength_reduction(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_strength_reduction(struct test_alloc const *mem) {
+    (void)mem;
     {
         struct umbra_builder *builder = umbra_builder();
         umbra_val32            x = umbra_load_32(builder, (umbra_ptr32){0}),
@@ -940,8 +940,8 @@ static void test_strength_reduction(void *(*talloc)(size_t), void (*tfree)(void 
     }
 }
 
-static void test_zero_imm(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_zero_imm(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *builder = umbra_builder();
     umbra_val32            zero = umbra_imm_i32(builder, 0);
     val_eq(zero, (umbra_val32){0}) here;
@@ -965,8 +965,8 @@ static void test_zero_imm(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup(&B);
 }
 
-static void test_late_imm_identity(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_late_imm_identity(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32            z1 = umbra_imm_i32(b, 1);
@@ -984,8 +984,8 @@ static void test_late_imm_identity(void *(*talloc)(size_t), void (*tfree)(void *
     umbra_builder_free(b);
 }
 
-static void test_abs_peepholes(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_abs_peepholes(struct test_alloc const *mem) {
+    (void)mem;
     {
         struct umbra_builder *b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
@@ -1007,8 +1007,8 @@ static void test_abs_peepholes(void *(*talloc)(size_t), void (*tfree)(void *)) {
     }
 }
 
-static void test_load_8x4(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_load_8x4(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *builder = umbra_builder();
     umbra_val32            px_ = umbra_load_32(builder, (umbra_ptr32){0}),
                           m_ = umbra_imm_i32(builder, 0xFF);
@@ -1059,8 +1059,8 @@ static void test_load_8x4(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup(&B);
 }
 
-static void test_store_8x4(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_store_8x4(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *builder = umbra_builder();
     umbra_val32            r = umbra_load_32(builder, (umbra_ptr32){0}),
                           g = umbra_load_32(builder, (umbra_ptr32){.ix=1}),
@@ -1101,8 +1101,8 @@ static void test_store_8x4(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup(&B);
 }
 
-static void test_srcover(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_srcover(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *builder = build_srcover();
     struct test_backends   B = make(builder);
     float const           tol = 0;
@@ -1129,8 +1129,8 @@ static void test_srcover(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup(&B);
 }
 
-static void test_hash_quality(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_hash_quality(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *builder = umbra_builder();
     enum { N = 1000 };
     int ids[N];
@@ -1147,8 +1147,8 @@ static void test_hash_quality(void *(*talloc)(size_t), void (*tfree)(void *)) {
     umbra_builder_free(builder);
 }
 
-static void test_narrow_16(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_narrow_16(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val32            v = umbra_load_32(b, (umbra_ptr32){0});
     umbra_store_16(b, (umbra_ptr16){.ix=1}, umbra_i16_from_i32(b, v));
@@ -1170,8 +1170,8 @@ static void test_narrow_16(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup(&B);
 }
 
-static void test_mixed_ptr_sizes(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_mixed_ptr_sizes(struct test_alloc const *mem) {
+    (void)mem;
     {
         struct umbra_builder *builder = umbra_builder();
         umbra_val32            a = umbra_load_32(builder, (umbra_ptr32){0});
@@ -1218,8 +1218,8 @@ static void test_mixed_ptr_sizes(void *(*talloc)(size_t), void (*tfree)(void *))
     }
 }
 
-static void test_n9(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_n9(struct test_alloc const *mem) {
+    (void)mem;
     {
         struct test_backends B;
         BINOP_F32(umbra_add_f32, B);
@@ -1301,8 +1301,8 @@ static void test_n9(void *(*talloc)(size_t), void (*tfree)(void *)) {
     }
 }
 
-static void test_preamble_pair_alias(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_preamble_pair_alias(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *builder = umbra_builder();
 
     enum { N_PRE = 24 };
@@ -1348,8 +1348,8 @@ static void test_preamble_pair_alias(void *(*talloc)(size_t), void (*tfree)(void
     cleanup(&B);
 }
 
-static void test_gather_clamp(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_gather_clamp(struct test_alloc const *mem) {
+    (void)mem;
     {
         struct umbra_builder *builder = umbra_builder();
         umbra_val32            idx = umbra_load_32(builder, (umbra_ptr32){0}),
@@ -1403,8 +1403,8 @@ static void test_gather_clamp(void *(*talloc)(size_t), void (*tfree)(void *)) {
     }
 }
 
-static void test_sample_32(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_sample_32(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val32 ix = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 fx = umbra_f32_from_i32(b, ix);
@@ -1439,8 +1439,8 @@ static void test_sample_32(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup(&B);
 }
 
-static void test_gather_clamp_zero_sz(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_gather_clamp_zero_sz(struct test_alloc const *mem) {
+    (void)mem;
     // gather_uniform with negative index → clamped to 0.
     struct umbra_builder *b = umbra_builder();
     umbra_val32            ix = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
@@ -1474,8 +1474,8 @@ static void test_gather_clamp_zero_sz(void *(*talloc)(size_t), void (*tfree)(voi
     cleanup(&B);
 }
 
-static void test_offset_load_store(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_offset_load_store(struct test_alloc const *mem) {
+    (void)mem;
     {
         struct umbra_builder *builder = umbra_builder();
         umbra_val32            ix = umbra_x(builder);
@@ -1565,8 +1565,8 @@ static void test_offset_load_store(void *(*talloc)(size_t), void (*tfree)(void *
     }
 }
 
-static void test_shift_imm(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_shift_imm(struct test_alloc const *mem) {
+    (void)mem;
     {
         struct umbra_builder *builder = umbra_builder();
         umbra_val32            x = umbra_load_32(builder, (umbra_ptr32){0});
@@ -1635,8 +1635,8 @@ static void test_shift_imm(void *(*talloc)(size_t), void (*tfree)(void *)) {
     }
 }
 
-static void test_gather_deref_large(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_gather_deref_large(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val32            idx = umbra_load_32(b, (umbra_ptr32){0});
     struct umbra_uniforms_layout *u   = calloc(1, sizeof(struct umbra_uniforms_layout));
@@ -1648,7 +1648,7 @@ static void test_gather_deref_large(void *(*talloc)(size_t), void (*tfree)(void 
     struct test_backends B = make(b);
 
     enum { N = 33000 };
-    void *data = talloc((size_t)N * sizeof(int16_t));
+    void *data = mem->alloc((size_t)N * sizeof(int16_t));
     { int16_t v;
       v = 10; __builtin_memcpy((char*)data + 0     * 2, &v, 2);
       v = 20; __builtin_memcpy((char*)data + 100   * 2, &v, 2);
@@ -1684,12 +1684,12 @@ static void test_gather_deref_large(void *(*talloc)(size_t), void (*tfree)(void 
         dst[3] == 42 here;
     }
 
-    tfree(data);
+    mem->free(data);
     cleanup(&B);
 }
 
-static void test_imm_fused(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_imm_fused(struct test_alloc const *mem) {
+    (void)mem;
     {
         struct umbra_builder *b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
@@ -1841,8 +1841,8 @@ static void test_imm_fused(void *(*talloc)(size_t), void (*tfree)(void *)) {
     }
 }
 
-static void test_cmp_zero(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_cmp_zero(struct test_alloc const *mem) {
+    (void)mem;
     {
         struct umbra_builder *b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
@@ -1931,8 +1931,8 @@ static void test_cmp_zero(void *(*talloc)(size_t), void (*tfree)(void *)) {
     }
 }
 
-static void test_imm_broadcast(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_imm_broadcast(struct test_alloc const *mem) {
+    (void)mem;
     int patterns[] = {
         (int)0xfffe0000u,
         (int)0x7fffffffu,
@@ -1961,8 +1961,8 @@ static void test_imm_broadcast(void *(*talloc)(size_t), void (*tfree)(void *)) {
 // Test x86 pool_broadcast special cases: vpcmpeqd for all-ones,
 // vpcmpeqd+vpsrld for all-ones>>n, vpcmpeqd+vpslld for all-ones<<n.
 // Storing an immediate directly forces op_imm_32 through pool_broadcast.
-static void test_pool_broadcast_allones(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_pool_broadcast_allones(struct test_alloc const *mem) {
+    (void)mem;
     // 0xffffffff: vpcmpeqd(d,d,d)
     // 0x7fffffff: vpcmpeqd + vpsrld(1)
     // 0xfffffffe: vpcmpeqd + vpslld(1)
@@ -1994,8 +1994,8 @@ static void test_pool_broadcast_allones(void *(*talloc)(size_t), void (*tfree)(v
     }
 }
 
-static void test_codegen_regalloc(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_codegen_regalloc(struct test_alloc const *mem) {
+    (void)mem;
     {
         struct umbra_builder *b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
@@ -2080,8 +2080,8 @@ static void test_codegen_regalloc(void *(*talloc)(size_t), void (*tfree)(void *)
     }
 }
 
-static void test_fms(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_fms(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val32            vx = umbra_load_32(b, (umbra_ptr32){0}),
                           vy = umbra_load_32(b, (umbra_ptr32){.ix=1}),
@@ -2107,8 +2107,8 @@ static void test_fms(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup(&B);
 }
 
-static void test_movi_patterns(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_movi_patterns(struct test_alloc const *mem) {
+    (void)mem;
     int patterns[] = {
         0x0000ff00,  0x00ff0000,        (int)0xff000000u, ~0x000000ff, ~0x0000ff00,
         ~0x00ff0000, ~(int)0xff000000u, (int)0xfffe0000u, 0x12345678,
@@ -2137,8 +2137,8 @@ static void test_movi_patterns(void *(*talloc)(size_t), void (*tfree)(void *)) {
 }
 
 
-static void test_uni_16(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_uni_16(struct test_alloc const *mem) {
+    (void)mem;
     {
         struct umbra_builder *b = umbra_builder();
         umbra_val32 idx = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
@@ -2165,8 +2165,8 @@ static void test_uni_16(void *(*talloc)(size_t), void (*tfree)(void *)) {
     }
 }
 
-static void test_dump(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_dump(struct test_alloc const *mem) {
+    (void)mem;
     FILE *f = fopen("/dev/null", "w");
     if (!f) { return; }
 
@@ -2185,8 +2185,8 @@ static void test_dump(void *(*talloc)(size_t), void (*tfree)(void *)) {
     fclose(f);
 }
 
-static void test_xy(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_xy(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val32            x = umbra_x(b);
     umbra_val32            y = umbra_y(b);
@@ -2214,8 +2214,8 @@ static void test_xy(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup(&B);
 }
 
-static void test_load_next_32(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_load_next_32(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val32            v = umbra_load_32(b, (umbra_ptr32){0});
     umbra_store_32(b, (umbra_ptr32){.ix=1}, v);
@@ -2244,8 +2244,8 @@ static void test_load_next_32(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup(&B);
 }
 
-static void test_load_next_16(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_load_next_16(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val16            v = umbra_load_16(b, (umbra_ptr16){0});
     umbra_store_16(b, (umbra_ptr16){.ix=1}, v);
@@ -2274,8 +2274,8 @@ static void test_load_next_16(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup(&B);
 }
 
-static void test_load_store_8x4(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_load_store_8x4(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val32 r, g, bl, a;
     umbra_load_8x4(b, (umbra_ptr32){0}, &r, &g, &bl, &a);
@@ -2296,8 +2296,8 @@ static void test_load_store_8x4(void *(*talloc)(size_t), void (*tfree)(void *)) 
     cleanup(&B);
 }
 
-static void test_load_store_16x4_planar(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_load_store_16x4_planar(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val16 r, g, bl, a;
     umbra_load_16x4_planar(b, (umbra_ptr16){0}, &r, &g, &bl, &a);
@@ -2324,8 +2324,8 @@ static void test_load_store_16x4_planar(void *(*talloc)(size_t), void (*tfree)(v
     cleanup(&B);
 }
 
-static void test_load_store_16x4(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_load_store_16x4(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val16 r, g, bl, a;
     umbra_load_16x4(b, (umbra_ptr64){0}, &r, &g, &bl, &a);
@@ -2352,8 +2352,8 @@ static void test_load_store_16x4(void *(*talloc)(size_t), void (*tfree)(void *))
     cleanup(&B);
 }
 
-static void test_load_stride_neq_w(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_load_stride_neq_w(struct test_alloc const *mem) {
+    (void)mem;
     // Regression: add(mul(y, rs_uniform), x) was optimized to a contiguous
     // load using the linear loop counter.  When rs != w, this is wrong.
     struct umbra_builder *b = umbra_builder();
@@ -2394,8 +2394,8 @@ static void test_load_stride_neq_w(void *(*talloc)(size_t), void (*tfree)(void *
     cleanup(&B);
 }
 
-static void test_jit_xs_init(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_jit_xs_init(struct test_alloc const *mem) {
+    (void)mem;
     // Regression: ARM64 JIT only initialized XS (spill stack pointer) when
     // ns > 0.  For tiny programs with no spills, XS was caller garbage.
     // Use enough preamble values to force eviction+fill at the back-edge.
@@ -2423,8 +2423,8 @@ static void test_jit_xs_init(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup(&B);
 }
 
-static void test_backend_threadsafe(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_backend_threadsafe(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_backend *interp = umbra_backend_interp();
     interp->threadsafe == 1 here;
     interp->free(interp);
@@ -2443,8 +2443,8 @@ static void test_backend_threadsafe(void *(*talloc)(size_t), void (*tfree)(void 
 
 }
 
-static void test_program_null_guards(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_program_null_guards(struct test_alloc const *mem) {
+    (void)mem;
 
     struct umbra_backend *be = umbra_backend_interp();
     be->flush(be);
@@ -2472,8 +2472,8 @@ static void test_program_null_guards(void *(*talloc)(size_t), void (*tfree)(void
 // The preamble runs only on the first tile; subsequent tiles start at the body.
 // If a preamble output is kept in the register and the body reads from it,
 // tile 2+ would read the previous tile's last value instead.
-static void test_preamble_register_boundary(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_preamble_register_boundary(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     // uniform is preamble (loop-invariant), add is body (uses x which varies).
     // The uniform feeds directly into the add at offset -1 if scheduled adjacently.
@@ -2499,8 +2499,8 @@ static void test_preamble_register_boundary(void *(*talloc)(size_t), void (*tfre
     cleanup(&B);
 }
 
-static void test_shr_ops(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_shr_ops(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 s = umbra_load_32(b, (umbra_ptr32){.ix=1});
@@ -2525,8 +2525,8 @@ static void test_shr_ops(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup(&B);
 }
 
-static void test_neg_round_i32(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_neg_round_i32(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val32 x = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 f = umbra_f32_from_i32(b, x);
@@ -2549,8 +2549,8 @@ static void test_neg_round_i32(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup(&B);
 }
 
-static void test_cmp_unsigned_signed(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_cmp_unsigned_signed(struct test_alloc const *mem) {
+    (void)mem;
     // Base ops (non-chain, result to store → m_*_mm).
     struct umbra_builder *b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
@@ -2605,8 +2605,8 @@ static void test_cmp_unsigned_signed(void *(*talloc)(size_t), void (*tfree)(void
     cleanup(&B);
 }
 
-static void test_max_f32_imm(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_max_f32_imm(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val32 x = umbra_f32_from_i32(b, umbra_load_32(b, (umbra_ptr32){0}));
     umbra_val32 c = umbra_max_f32(b, x, umbra_imm_f32(b, 5.f));
@@ -2623,8 +2623,8 @@ static void test_max_f32_imm(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup(&B);
 }
 
-static void test_imm_cmp_i32(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_imm_cmp_i32(struct test_alloc const *mem) {
+    (void)mem;
     // Base imm ops (result to store).
     struct umbra_builder *b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
@@ -2649,8 +2649,8 @@ static void test_imm_cmp_i32(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup(&B);
 }
 
-static void test_uniform_register(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_uniform_register(struct test_alloc const *mem) {
+    (void)mem;
     // uniform → acc: uniform consumed only by next ALU op.
     struct umbra_builder *b = umbra_builder();
     umbra_val32 u = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
@@ -2672,8 +2672,8 @@ static void test_uniform_register(void *(*talloc)(size_t), void (*tfree)(void *)
     cleanup(&B);
 }
 
-static void test_minmax_register_variants(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_minmax_register_variants(struct test_alloc const *mem) {
+    (void)mem;
     // Exercise _mm, _mr, _rr variants for min/max.
     struct umbra_builder *b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
@@ -2700,8 +2700,8 @@ static void test_minmax_register_variants(void *(*talloc)(size_t), void (*tfree)
     cleanup(&B);
 }
 
-static void test_cmp_register_variants(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_cmp_register_variants(struct test_alloc const *mem) {
+    (void)mem;
     // Exercise _rm variant for comparisons: chain a→b→cmp(b,c).
     struct umbra_builder *b = umbra_builder();
     umbra_val32 x = umbra_load_32(b, (umbra_ptr32){0});
@@ -2727,8 +2727,8 @@ static void test_cmp_register_variants(void *(*talloc)(size_t), void (*tfree)(vo
     cleanup(&B);
 }
 
-static void test_regvar_m_patterns(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_regvar_m_patterns(struct test_alloc const *mem) {
+    (void)mem;
     // Targets: m_cmp_rm, m_cmp_rr, r_minmax_mm, base max_f32_imm,
     // m_float_cmp_imm_r, r/m_int_cmp_imm_r.
     struct umbra_builder *b = umbra_builder();
@@ -2801,8 +2801,8 @@ static void test_regvar_m_patterns(void *(*talloc)(size_t), void (*tfree)(void *
 }
 
 // Exercise m_*_rr for every binary op: chain→op(acc,acc)→store.
-static void test_binary_m_rr(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_binary_m_rr(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 fa = umbra_f32_from_i32(b, a);
@@ -2861,8 +2861,8 @@ static void test_binary_m_rr(void *(*talloc)(size_t), void (*tfree)(void *)) {
 }
 
 // Exercise m_min/max_rm: chain→min/max(acc,mem)→store.
-static void test_minmax_m_rm(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_minmax_m_rm(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 c = umbra_load_32(b, (umbra_ptr32){.ix=1});
@@ -2892,8 +2892,8 @@ static void test_minmax_m_rm(void *(*talloc)(size_t), void (*tfree)(void *)) {
 }
 
 // Exercise r_cmp_rm and r_cmp_rr: chain→cmp→ALU→store.
-static void test_cmp_r_rm_rr(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_cmp_r_rm_rr(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 c = umbra_load_32(b, (umbra_ptr32){.ix=1});
@@ -2945,8 +2945,8 @@ static void test_cmp_r_rm_rr(void *(*talloc)(size_t), void (*tfree)(void *)) {
 
 // Exercise missing unary per-op variants.
 // Need r_m (mem→acc) for ops that only have r_r and m_r covered.
-static void test_unary_r_m(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_unary_r_m(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 fa = umbra_f32_from_i32(b, a);
@@ -2989,8 +2989,8 @@ static void test_unary_r_m(void *(*talloc)(size_t), void (*tfree)(void *)) {
 
 // Exercise base ops that are always upgraded: xor_32_imm, min_f32_imm.
 // Need: op(mem, imm)→store with no chain on either side.
-static void test_base_imm_ops(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_base_imm_ops(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 c = umbra_load_32(b, (umbra_ptr32){.ix=1});
@@ -3019,8 +3019,8 @@ static void test_base_imm_ops(void *(*talloc)(size_t), void (*tfree)(void *)) {
 }
 
 // Exercise r_sel_32_rm, r_fms_f32_mmr.
-static void test_sel_fms_variants(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_sel_fms_variants(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 c = umbra_load_32(b, (umbra_ptr32){.ix=1});
@@ -3055,8 +3055,8 @@ static void test_sel_fms_variants(void *(*talloc)(size_t), void (*tfree)(void *)
 }
 
 // Exercise missing IMM register variants.
-static void test_imm_regvar(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_imm_regvar(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 fa = umbra_f32_from_i32(b, a);
@@ -3129,8 +3129,8 @@ static void test_imm_regvar(void *(*talloc)(size_t), void (*tfree)(void *)) {
 // The BB optimizer schedules loads near consumers. To get _mm we need both
 // operands pinned early (via a use/store) then a barrier store between them
 // and the target op so prev_r is false.
-static void test_binary_r_mm(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_binary_r_mm(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 c = umbra_load_32(b, (umbra_ptr32){.ix=1});
@@ -3174,8 +3174,8 @@ static void test_binary_r_mm(void *(*talloc)(size_t), void (*tfree)(void *)) {
 
 // Exercise missing per-op UNARY and IMM variants more thoroughly.
 // m_unary_r: chain→unary(acc)→store (no further chain).
-static void test_unary_m_r(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_unary_m_r(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 fa = umbra_f32_from_i32(b, a);
@@ -3215,8 +3215,8 @@ static void test_unary_m_r(void *(*talloc)(size_t), void (*tfree)(void *)) {
 
 // Exercise base IMM ops: op(mem, imm)→store with no chain.
 // Covers shr_s32_imm, shr_u32_imm, or_32_imm, mul_f32_imm, etc.
-static void test_base_imm_more(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_base_imm_more(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 c = umbra_load_32(b, (umbra_ptr32){.ix=1});
@@ -3250,8 +3250,8 @@ static void test_base_imm_more(void *(*talloc)(size_t), void (*tfree)(void *)) {
 
 // r_sel_32_rm: sel with mask from acc, result→acc.
 // Need: chain→sel(acc_mask, y, z)→ALU→store
-static void test_sel_r_rm(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_sel_r_rm(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 c = umbra_load_32(b, (umbra_ptr32){.ix=1});
@@ -3279,8 +3279,8 @@ static void test_sel_r_rm(void *(*talloc)(size_t), void (*tfree)(void *)) {
 // channel of load_color where that channel dies at the unary op.
 // Must use ops that go through ra_step_unary (abs, neg, imm shifts, etc.)
 // not ra_step_alu (which is used by i32_from_f32, add, etc.)
-static void test_ra_chan_unary(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_ra_chan_unary(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val16 r, g, bl, a;
     umbra_load_16x4(b, (umbra_ptr64){0}, &r, &g, &bl, &a);
@@ -3309,8 +3309,8 @@ static void test_ra_chan_unary(void *(*talloc)(size_t), void (*tfree)(void *)) {
 }
 
 // Exercise mul-by-power-of-2 peephole where imm has lower val ID than operand.
-static void test_mul_pow2_peephole(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_mul_pow2_peephole(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_val32 four = umbra_imm_i32(b, 4);  // low ID
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});  // higher ID
@@ -3330,8 +3330,8 @@ static void test_mul_pow2_peephole(void *(*talloc)(size_t), void (*tfree)(void *
 
 // Exercise umbra_const_eval: op(imm, imm) constant folding.
 // All results are compile-time constants stored to a single output buffer.
-static void test_const_eval(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_const_eval(struct test_alloc const *mem) {
+    (void)mem;
     // Split into two programs to stay under Metal's 31-buffer limit.
     // Part 1: float ops
     {
@@ -3411,8 +3411,8 @@ static void test_const_eval(void *(*talloc)(size_t), void (*tfree)(void *)) {
     }
 }
 
-static void test_acc_coverage(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_acc_coverage(struct test_alloc const *mem) {
+    (void)mem;
     // Exercise interpreter acc chain patterns: chain_producer → op → store.
     // Use non-trivial constants to avoid identity optimizations (x+0=x).
     {
@@ -3532,8 +3532,8 @@ static void test_acc_coverage(void *(*talloc)(size_t), void (*tfree)(void *)) {
     }
 }
 
-static void test_acc_coverage_extra(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_acc_coverage_extra(struct test_alloc const *mem) {
+    (void)mem;
     // Exercise remaining uncovered interpreter acc variants:
     // - CMP3 m_rm (comparison chain-end)
     // - UN2 for round_f32, floor_f32, ceil_f32
@@ -3570,87 +3570,87 @@ static void test_acc_coverage_extra(void *(*talloc)(size_t), void (*tfree)(void 
     }
 }
 
-static void run_tests(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    test_acc_coverage_extra(talloc, tfree);
-    test_acc_coverage(talloc, tfree);
-    test_ra_chan_unary(talloc, tfree);
-    test_mul_pow2_peephole(talloc, tfree);
-    test_const_eval(talloc, tfree);
-    test_binary_m_rr(talloc, tfree);
-    test_binary_r_mm(talloc, tfree);
-    test_minmax_m_rm(talloc, tfree);
-    test_cmp_r_rm_rr(talloc, tfree);
-    test_unary_r_m(talloc, tfree);
-    test_unary_m_r(talloc, tfree);
-    test_base_imm_ops(talloc, tfree);
-    test_base_imm_more(talloc, tfree);
-    test_sel_fms_variants(talloc, tfree);
-    test_sel_r_rm(talloc, tfree);
-    test_imm_regvar(talloc, tfree);
-    test_unary_r_m(talloc, tfree);
-    test_base_imm_ops(talloc, tfree);
-    test_sel_fms_variants(talloc, tfree);
-    test_imm_regvar(talloc, tfree);
-    test_shr_ops(talloc, tfree);
-    test_neg_round_i32(talloc, tfree);
-    test_cmp_unsigned_signed(talloc, tfree);
-    test_max_f32_imm(talloc, tfree);
-    test_imm_cmp_i32(talloc, tfree);
-    test_uniform_register(talloc, tfree);
-    test_minmax_register_variants(talloc, tfree);
-    test_cmp_register_variants(talloc, tfree);
-    test_regvar_m_patterns(talloc, tfree);
-    test_preamble_register_boundary(talloc, tfree);
-    test_backend_threadsafe(talloc, tfree);
-    test_program_null_guards(talloc, tfree);
-    test_f32_ops(talloc, tfree);
-    test_i32_ops(talloc, tfree);
-    test_cmp_i32(talloc, tfree);
-    test_cmp_f32(talloc, tfree);
-    test_imm(talloc, tfree);
-    test_fma_f32(talloc, tfree);
-    test_min_max_sqrt_f32(talloc, tfree);
-    test_abs_f32(talloc, tfree);
-    test_round_floor_ceil(talloc, tfree);
-    test_large_n(talloc, tfree);
-    test_convert(talloc, tfree);
-    test_dedup(talloc, tfree);
-    test_constprop(talloc, tfree);
-    test_strength_reduction(talloc, tfree);
-    test_zero_imm(talloc, tfree);
-    test_late_imm_identity(talloc, tfree);
-    test_abs_peepholes(talloc, tfree);
-    test_load_8x4(talloc, tfree);
-    test_store_8x4(talloc, tfree);
-    test_srcover(talloc, tfree);
-    test_hash_quality(talloc, tfree);
-    test_narrow_16(talloc, tfree);
-    test_mixed_ptr_sizes(talloc, tfree);
-    test_n9(talloc, tfree);
-    test_preamble_pair_alias(talloc, tfree);
-    test_gather_clamp(talloc, tfree);
-    test_sample_32(talloc, tfree);
-    test_gather_clamp_zero_sz(talloc, tfree);
-    test_offset_load_store(talloc, tfree);
-    test_shift_imm(talloc, tfree);
-    test_gather_deref_large(talloc, tfree);
-    test_imm_fused(talloc, tfree);
-    test_cmp_zero(talloc, tfree);
-    test_imm_broadcast(talloc, tfree);
-    test_pool_broadcast_allones(talloc, tfree);
-    test_codegen_regalloc(talloc, tfree);
-    test_fms(talloc, tfree);
-    test_movi_patterns(talloc, tfree);
-    test_uni_16(talloc, tfree);
-    test_dump(talloc, tfree);
-    test_xy(talloc, tfree);
-    test_load_next_32(talloc, tfree);
-    test_load_next_16(talloc, tfree);
-    test_load_store_8x4(talloc, tfree);
-    test_load_store_16x4(talloc, tfree);
-    test_load_store_16x4_planar(talloc, tfree);
-    test_load_stride_neq_w(talloc, tfree);
-    test_jit_xs_init(talloc, tfree);
+static void run_tests(struct test_alloc const *mem) {
+    test_acc_coverage_extra(mem);
+    test_acc_coverage(mem);
+    test_ra_chan_unary(mem);
+    test_mul_pow2_peephole(mem);
+    test_const_eval(mem);
+    test_binary_m_rr(mem);
+    test_binary_r_mm(mem);
+    test_minmax_m_rm(mem);
+    test_cmp_r_rm_rr(mem);
+    test_unary_r_m(mem);
+    test_unary_m_r(mem);
+    test_base_imm_ops(mem);
+    test_base_imm_more(mem);
+    test_sel_fms_variants(mem);
+    test_sel_r_rm(mem);
+    test_imm_regvar(mem);
+    test_unary_r_m(mem);
+    test_base_imm_ops(mem);
+    test_sel_fms_variants(mem);
+    test_imm_regvar(mem);
+    test_shr_ops(mem);
+    test_neg_round_i32(mem);
+    test_cmp_unsigned_signed(mem);
+    test_max_f32_imm(mem);
+    test_imm_cmp_i32(mem);
+    test_uniform_register(mem);
+    test_minmax_register_variants(mem);
+    test_cmp_register_variants(mem);
+    test_regvar_m_patterns(mem);
+    test_preamble_register_boundary(mem);
+    test_backend_threadsafe(mem);
+    test_program_null_guards(mem);
+    test_f32_ops(mem);
+    test_i32_ops(mem);
+    test_cmp_i32(mem);
+    test_cmp_f32(mem);
+    test_imm(mem);
+    test_fma_f32(mem);
+    test_min_max_sqrt_f32(mem);
+    test_abs_f32(mem);
+    test_round_floor_ceil(mem);
+    test_large_n(mem);
+    test_convert(mem);
+    test_dedup(mem);
+    test_constprop(mem);
+    test_strength_reduction(mem);
+    test_zero_imm(mem);
+    test_late_imm_identity(mem);
+    test_abs_peepholes(mem);
+    test_load_8x4(mem);
+    test_store_8x4(mem);
+    test_srcover(mem);
+    test_hash_quality(mem);
+    test_narrow_16(mem);
+    test_mixed_ptr_sizes(mem);
+    test_n9(mem);
+    test_preamble_pair_alias(mem);
+    test_gather_clamp(mem);
+    test_sample_32(mem);
+    test_gather_clamp_zero_sz(mem);
+    test_offset_load_store(mem);
+    test_shift_imm(mem);
+    test_gather_deref_large(mem);
+    test_imm_fused(mem);
+    test_cmp_zero(mem);
+    test_imm_broadcast(mem);
+    test_pool_broadcast_allones(mem);
+    test_codegen_regalloc(mem);
+    test_fms(mem);
+    test_movi_patterns(mem);
+    test_uni_16(mem);
+    test_dump(mem);
+    test_xy(mem);
+    test_load_next_32(mem);
+    test_load_next_16(mem);
+    test_load_store_8x4(mem);
+    test_load_store_16x4(mem);
+    test_load_store_16x4_planar(mem);
+    test_load_stride_neq_w(mem);
+    test_jit_xs_init(mem);
 
     // Exercise interpreter acc->acc register variants for ceil_i32 and eq_f32_imm.
     // Chain: load -> mul_f32_imm -> ceil_i32 -> shl_i32_imm -> store
@@ -3976,7 +3976,7 @@ static void run_tests(void *(*talloc)(size_t), void (*tfree)(void *)) {
 }
 
 int main(void) {
-    run_tests(test_aligned_alloc, free);
-    run_tests(test_misaligned_alloc, test_misaligned_free);
+    run_tests(&test_aligned);
+    run_tests(&test_misaligned);
     return 0;
 }

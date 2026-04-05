@@ -26,8 +26,8 @@ static void cleanup_draw(struct draw_backends *B) {
     free(B->lay.uniforms);
 }
 
-static void test_solid_src(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_solid_src(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
                                                  umbra_fmt_8888, &lay),
@@ -59,8 +59,8 @@ static void test_solid_src(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup_draw(&B);
 }
 
-static void test_solid_src_n1(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_solid_src_n1(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
                                                  umbra_fmt_8888, &lay),
@@ -85,8 +85,8 @@ static void test_solid_src_n1(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup_draw(&B);
 }
 
-static void test_solid_src_n9(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_solid_src_n9(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
                                                  umbra_fmt_8888, &lay),
@@ -112,8 +112,8 @@ static void test_solid_src_n9(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup_draw(&B);
 }
 
-static void test_solid_src_n16(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_solid_src_n16(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
                                                  umbra_fmt_8888, &lay),
@@ -136,8 +136,8 @@ static void test_solid_src_n16(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup_draw(&B);
 }
 
-static void test_srcover_8888(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_srcover_8888(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_srcover,
@@ -169,8 +169,8 @@ static void test_srcover_8888(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup_draw(&B);
 }
 
-static void test_dstover_8888(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_dstover_8888(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_dstover,
@@ -193,8 +193,8 @@ static void test_dstover_8888(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup_draw(&B);
 }
 
-static void test_dstover_transparent(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_dstover_transparent(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_dstover,
@@ -220,8 +220,8 @@ static void test_dstover_transparent(void *(*talloc)(size_t), void (*tfree)(void
     cleanup_draw(&B);
 }
 
-static void test_multiply_8888(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_multiply_8888(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_multiply,
@@ -253,8 +253,8 @@ static void test_multiply_8888(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup_draw(&B);
 }
 
-static void test_solid_src_fp16(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_solid_src_fp16(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
                                                  umbra_fmt_fp16, &lay),
@@ -282,8 +282,8 @@ static void test_solid_src_fp16(void *(*talloc)(size_t), void (*tfree)(void *)) 
     cleanup_draw(&B);
 }
 
-static void test_srcover_fp16(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_srcover_fp16(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_srcover,
@@ -321,8 +321,8 @@ static void test_srcover_fp16(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup_draw(&B);
 }
 
-static void test_coverage_rect(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_coverage_rect(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
                                                  umbra_blend_srcover,
@@ -355,8 +355,8 @@ static void test_coverage_rect(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup_draw(&B);
 }
 
-static void test_coverage_rect_scalar(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_coverage_rect_scalar(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
                                                  umbra_blend_srcover,
@@ -387,8 +387,8 @@ static void test_coverage_rect_scalar(void *(*talloc)(size_t), void (*tfree)(voi
     cleanup_draw(&B);
 }
 
-static void test_coverage_rect_n9(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_coverage_rect_n9(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
                                                  umbra_blend_srcover,
@@ -420,8 +420,8 @@ static void test_coverage_rect_n9(void *(*talloc)(size_t), void (*tfree)(void *)
     cleanup_draw(&B);
 }
 
-static void test_coverage_rect_offset(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_coverage_rect_offset(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
                                                  umbra_blend_src,
@@ -450,8 +450,8 @@ static void test_coverage_rect_offset(void *(*talloc)(size_t), void (*tfree)(voi
     cleanup_draw(&B);
 }
 
-static void test_coverage_rect_outside_y(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_coverage_rect_outside_y(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
                                                  umbra_blend_srcover,
@@ -481,8 +481,8 @@ static void test_coverage_rect_outside_y(void *(*talloc)(size_t), void (*tfree)(
     cleanup_draw(&B);
 }
 
-static void test_no_shader(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_no_shader(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(NULL, NULL, umbra_blend_src,
                                                  umbra_fmt_8888, &lay),
@@ -507,8 +507,8 @@ static void test_no_shader(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup_draw(&B);
 }
 
-static void test_no_blend(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_no_blend(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, NULL,
                                                  umbra_fmt_8888, &lay),
@@ -545,8 +545,8 @@ static umbra_color gradient_shader(struct umbra_builder *builder, struct umbra_u
     return (umbra_color){t, zero, zero, a};
 }
 
-static void test_gradient_shader(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_gradient_shader(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(gradient_shader, NULL, umbra_blend_src,
                                                  umbra_fmt_8888, &lay),
@@ -572,8 +572,8 @@ static void test_gradient_shader(void *(*talloc)(size_t), void (*tfree)(void *))
     cleanup_draw(&B);
 }
 
-static void test_multiply_half_alpha(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_multiply_half_alpha(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_multiply,
@@ -605,8 +605,8 @@ static void test_multiply_half_alpha(void *(*talloc)(size_t), void (*tfree)(void
     cleanup_draw(&B);
 }
 
-static void test_srcover_8888_n9(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_srcover_8888_n9(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_srcover,
@@ -635,8 +635,8 @@ static void test_srcover_8888_n9(void *(*talloc)(size_t), void (*tfree)(void *))
     cleanup_draw(&B);
 }
 
-static void test_full_pipeline(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_full_pipeline(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
                                                  umbra_blend_srcover,
@@ -675,8 +675,8 @@ static void test_full_pipeline(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup_draw(&B);
 }
 
-static void test_solid_src_fp16_n9(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_solid_src_fp16_n9(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
                                                  umbra_fmt_fp16, &lay),
@@ -704,8 +704,8 @@ static void test_solid_src_fp16_n9(void *(*talloc)(size_t), void (*tfree)(void *
     cleanup_draw(&B);
 }
 
-static void test_coverage_rect_white_dst(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_coverage_rect_white_dst(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
                                                  umbra_blend_srcover,
@@ -757,8 +757,8 @@ static void test_coverage_rect_white_dst(void *(*talloc)(size_t), void (*tfree)(
     cleanup_draw(&B);
 }
 
-static void test_coverage_bitmap(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_coverage_bitmap(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_bitmap,
                                                  umbra_blend_srcover,
@@ -787,8 +787,8 @@ static void test_coverage_bitmap(void *(*talloc)(size_t), void (*tfree)(void *))
     cleanup_draw(&B);
 }
 
-static void test_coverage_sdf(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_coverage_sdf(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_sdf,
                                                  umbra_blend_srcover,
@@ -815,8 +815,8 @@ static void test_coverage_sdf(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup_draw(&B);
 }
 
-static void test_coverage_bitmap_matrix(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_coverage_bitmap_matrix(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_bitmap_matrix,
@@ -849,8 +849,8 @@ static void test_coverage_bitmap_matrix(void *(*talloc)(size_t), void (*tfree)(v
     cleanup_draw(&B);
 }
 
-static void test_coverage_bitmap_matrix_oob(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_coverage_bitmap_matrix_oob(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_bitmap_matrix,
@@ -881,8 +881,8 @@ static void test_coverage_bitmap_matrix_oob(void *(*talloc)(size_t), void (*tfre
     cleanup_draw(&B);
 }
 
-static void test_linear_2(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_linear_2(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_linear_2, NULL, umbra_blend_src,
@@ -911,8 +911,8 @@ static void test_linear_2(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup_draw(&B);
 }
 
-static void test_radial_2(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_radial_2(struct test_alloc const *mem) {
+    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_radial_2, NULL, umbra_blend_src,
@@ -938,8 +938,8 @@ static void test_radial_2(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup_draw(&B);
 }
 
-static void test_linear_grad(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_linear_grad(struct test_alloc const *mem) {
+    (void)mem;
     float const stop_colors[][4] = {
         {1, 0, 0, 1},
         {0, 1, 0, 1},
@@ -974,8 +974,8 @@ static void test_linear_grad(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup_draw(&B);
 }
 
-static void test_radial_grad(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_radial_grad(struct test_alloc const *mem) {
+    (void)mem;
     float const stop_colors[][4] = {
         {1, 0, 0, 1},
         {1, 1, 0, 1},
@@ -1010,8 +1010,8 @@ static void test_radial_grad(void *(*talloc)(size_t), void (*tfree)(void *)) {
     cleanup_draw(&B);
 }
 
-static void test_gradient_lut_nonuniform(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_gradient_lut_nonuniform(struct test_alloc const *mem) {
+    (void)mem;
     float const stop_colors[][4] = {
         {1, 0, 0, 1},
         {0, 1, 0, 1},
@@ -1054,8 +1054,8 @@ static umbra_color ss_shader_(struct umbra_builder *builder, struct umbra_unifor
     return umbra_supersample(builder, u, x, y, ss_inner_, ss_n_);
 }
 
-static void test_supersample(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_supersample(struct test_alloc const *mem) {
+    (void)mem;
     ss_inner_ = umbra_shader_solid;
     ss_n_ = 4;
     struct umbra_draw_layout lay;
@@ -1087,8 +1087,8 @@ static void test_supersample(void *(*talloc)(size_t), void (*tfree)(void *)) {
 #include <unistd.h>
 #endif
 
-static void test_page_aligned_buffer(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_page_aligned_buffer(struct test_alloc const *mem) {
+    (void)mem;
 #if defined(__wasm__)
     return;
 #else
@@ -1131,41 +1131,41 @@ static void test_page_aligned_buffer(void *(*talloc)(size_t), void (*tfree)(void
 #endif
 }
 
-static void run_tests(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    test_solid_src(talloc, tfree);
-    test_solid_src_n1(talloc, tfree);
-    test_solid_src_n9(talloc, tfree);
-    test_solid_src_n16(talloc, tfree);
-    test_srcover_8888(talloc, tfree);
-    test_dstover_8888(talloc, tfree);
-    test_dstover_transparent(talloc, tfree);
-    test_multiply_8888(talloc, tfree);
-    test_solid_src_fp16(talloc, tfree);
-    test_srcover_fp16(talloc, tfree);
-    test_coverage_rect(talloc, tfree);
-    test_coverage_rect_scalar(talloc, tfree);
-    test_coverage_rect_n9(talloc, tfree);
-    test_coverage_rect_offset(talloc, tfree);
-    test_coverage_rect_outside_y(talloc, tfree);
-    test_no_shader(talloc, tfree);
-    test_no_blend(talloc, tfree);
-    test_gradient_shader(talloc, tfree);
-    test_multiply_half_alpha(talloc, tfree);
-    test_srcover_8888_n9(talloc, tfree);
-    test_full_pipeline(talloc, tfree);
-    test_solid_src_fp16_n9(talloc, tfree);
-    test_coverage_rect_white_dst(talloc, tfree);
-    test_coverage_bitmap(talloc, tfree);
-    test_coverage_sdf(talloc, tfree);
-    test_coverage_bitmap_matrix(talloc, tfree);
-    test_coverage_bitmap_matrix_oob(talloc, tfree);
-    test_linear_2(talloc, tfree);
-    test_radial_2(talloc, tfree);
-    test_linear_grad(talloc, tfree);
-    test_radial_grad(talloc, tfree);
-    test_gradient_lut_nonuniform(talloc, tfree);
-    test_supersample(talloc, tfree);
-    test_page_aligned_buffer(talloc, tfree);
+static void run_tests(struct test_alloc const *mem) {
+    test_solid_src(mem);
+    test_solid_src_n1(mem);
+    test_solid_src_n9(mem);
+    test_solid_src_n16(mem);
+    test_srcover_8888(mem);
+    test_dstover_8888(mem);
+    test_dstover_transparent(mem);
+    test_multiply_8888(mem);
+    test_solid_src_fp16(mem);
+    test_srcover_fp16(mem);
+    test_coverage_rect(mem);
+    test_coverage_rect_scalar(mem);
+    test_coverage_rect_n9(mem);
+    test_coverage_rect_offset(mem);
+    test_coverage_rect_outside_y(mem);
+    test_no_shader(mem);
+    test_no_blend(mem);
+    test_gradient_shader(mem);
+    test_multiply_half_alpha(mem);
+    test_srcover_8888_n9(mem);
+    test_full_pipeline(mem);
+    test_solid_src_fp16_n9(mem);
+    test_coverage_rect_white_dst(mem);
+    test_coverage_bitmap(mem);
+    test_coverage_sdf(mem);
+    test_coverage_bitmap_matrix(mem);
+    test_coverage_bitmap_matrix_oob(mem);
+    test_linear_2(mem);
+    test_radial_2(mem);
+    test_linear_grad(mem);
+    test_radial_grad(mem);
+    test_gradient_lut_nonuniform(mem);
+    test_supersample(mem);
+    test_page_aligned_buffer(mem);
 
     // Per-format load/store round-trip tests for formats without dedicated x4 ops.
     {
@@ -1312,9 +1312,9 @@ static void run_tests(void *(*talloc)(size_t), void (*tfree)(void *)) {
 }
 
 int main(void) {
-    run_tests(test_aligned_alloc, free);
+    run_tests(&test_aligned);
 #ifndef __wasm__
-    run_tests(test_misaligned_alloc, test_misaligned_free);
+    run_tests(&test_misaligned);
 #endif
     return 0;
 }

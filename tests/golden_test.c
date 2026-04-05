@@ -90,12 +90,12 @@ static void render_slide(
 }
 
 static void test_slide_golden(int slide_idx,
-                              void *(*talloc)(size_t), void (*tfree)(void *)) {
+                              struct test_alloc const *mem) {
     struct slide *s = slide_get(slide_idx);
 
     size_t pixbuf_sz = (size_t)(W * H * 4);
-    void *pbuf_ref = talloc(pixbuf_sz);
-    void *pbuf_tst = talloc(pixbuf_sz);
+    void *pbuf_ref = mem->alloc(pixbuf_sz);
+    void *pbuf_tst = mem->alloc(pixbuf_sz);
 
     render_slide(slide_idx, bes[0], pbuf_ref);
     bes[0]->flush(bes[0]);
@@ -142,12 +142,12 @@ static void test_slide_golden(int slide_idx,
         (worst <= tol) here;
     }
 
-    tfree(pbuf_ref);
-    tfree(pbuf_tst);
+    mem->free(pbuf_ref);
+    mem->free(pbuf_tst);
 }
 
-static void test_slug_rect(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_slug_rect(struct test_alloc const *mem) {
+    (void)mem;
     static float rect[] = {
          5, 5,  5,20,  5,35,
          5,35, 30,35, 55,35,
@@ -233,8 +233,8 @@ static void test_slug_rect(void *(*talloc)(size_t), void (*tfree)(void *)) {
     be->free(be);
 }
 
-static void test_perspective_text(void *(*talloc)(size_t), void (*tfree)(void *)) {
-    (void)talloc; (void)tfree;
+static void test_perspective_text(struct test_alloc const *mem) {
+    (void)mem;
     enum { BW = 16, BH = 8 };
     uint16_t bmp[BW * BH];
     __builtin_memset(bmp, 0, sizeof bmp);
@@ -330,23 +330,23 @@ static void test_perspective_text(void *(*talloc)(size_t), void (*tfree)(void *)
 }
 
 
-static void run_all_tests(void *(*talloc)(size_t), void (*tfree)(void *)) {
+static void run_all_tests(struct test_alloc const *mem) {
     build_pipes();
-    test_perspective_text(talloc, tfree);
-    test_slug_rect(talloc, tfree);
+    test_perspective_text(mem);
+    test_slug_rect(mem);
     for (int si = 0; si < slide_count() - 1; si++) {
-        test_slide_golden(si, talloc, tfree);
+        test_slide_golden(si, mem);
     }
     slides_cleanup();
     free_pipes();
 }
 
 int main(void) {
-    slides_init(W, H, test_aligned_alloc, free);
-    run_all_tests(test_aligned_alloc, free);
+    slides_init(W, H, test_aligned.alloc, test_aligned.free);
+    run_all_tests(&test_aligned);
 
-    slides_init(W, H, test_misaligned_alloc, test_misaligned_free);
-    run_all_tests(test_misaligned_alloc, test_misaligned_free);
+    slides_init(W, H, test_misaligned.alloc, test_misaligned.free);
+    run_all_tests(&test_misaligned);
 
     return 0;
 }

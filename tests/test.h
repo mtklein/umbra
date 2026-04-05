@@ -7,7 +7,12 @@
 
 int dprintf(int, char const[], ...);
 
-static inline void *test_aligned_alloc(size_t sz) {
+struct test_alloc {
+    void *(*alloc)(size_t);
+    void  (*free) (void *);
+};
+
+static inline void *aligned_alloc_(size_t sz) {
 #ifdef __wasm__
     return calloc(1, sz);
 #else
@@ -17,9 +22,7 @@ static inline void *test_aligned_alloc(size_t sz) {
     return p;
 #endif
 }
-static inline void *test_misaligned_alloc(size_t sz) {
-    // Page-align, then offset by 16 so it's never page-aligned but still
-    // 16-byte aligned (enough for SIMD, defeats Metal nocopy).
+static inline void *misaligned_alloc_(size_t sz) {
 #ifdef __wasm__
     return calloc(1, sz);
 #else
@@ -31,13 +34,16 @@ static inline void *test_misaligned_alloc(size_t sz) {
     return (char*)p + 16;
 #endif
 }
-static inline void test_misaligned_free(void *p) {
+static inline void misaligned_free_(void *p) {
 #ifdef __wasm__
     free(p);
 #else
     if (p) { free((char*)p - 16); }
 #endif
 }
+
+static const struct test_alloc test_aligned   = { aligned_alloc_, free };
+static const struct test_alloc test_misaligned = { misaligned_alloc_, misaligned_free_ };
 #define here ? (void)0 : (dprintf(2, "%s:%d failed\n", __FILE__, __LINE__), __builtin_trap())
 
 static inline _Bool equiv(float x, float y) {
