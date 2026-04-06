@@ -67,6 +67,11 @@ static void slug_draw(struct slide *s, int l, int t, int r, int b, void *buf) {
     struct umbra_backend *be = st->draw_prog->backend;
     struct umbra_program *acc = st->acc_prog;
     int w = st->w, h = st->h;
+    // TODO: drop these flushes once both backends serialize the slug acc loop
+    // and the cross-program wind_buf hand-off without help.
+    _Bool flush_per_curve   = be->kind == umbra_backend_kind_metal;
+    _Bool flush_before_draw = be->kind == umbra_backend_kind_metal
+                           || be->kind == umbra_backend_kind_vulkan;
 
     size_t wind_sz  = (size_t)w * (size_t)h * sizeof(float);
     size_t wind_row = (size_t)w * sizeof(float);
@@ -87,8 +92,9 @@ static void slug_draw(struct slide *s, int l, int t, int r, int b, void *buf) {
         umbra_uniforms_fill_f32(st->acc_lay.uniforms, st->acc_lay.loop_off, &jf, 1);
         abuf[0] = (struct umbra_buf){.ptr=st->acc_lay.uniforms, .sz=st->acc_lay.uni.size, .read_only=1};
         acc->queue(acc, l, t, r, b, abuf);
-        be->flush(be);
+        if (flush_per_curve) { be->flush(be); }
     }
+    if (flush_before_draw && !flush_per_curve) { be->flush(be); }
 
     umbra_uniforms_fill_f32(st->draw_lay.uniforms, st->draw_lay.shader, st->color, 4);
     umbra_uniforms_fill_ptr(st->draw_lay.uniforms, st->draw_lay.coverage,

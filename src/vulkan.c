@@ -2512,6 +2512,7 @@ struct umbra_backend *umbra_backend_vulkan(void) {
     v->base.compile  = vk_compile;
     v->base.flush    = vk_flush;
     v->base.free     = vk_free;
+    v->base.kind     = umbra_backend_kind_vulkan;
     return &v->base;
 }
 
