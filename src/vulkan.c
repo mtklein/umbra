@@ -194,6 +194,15 @@ static void spv_op(Spv *s, int opcode, int word_count) {
 //  Backend state.
 // ---------------------------------------------------------------------------
 
+struct buf_cache_entry {
+    VkBuffer       buf;
+    VkDeviceMemory mem;
+    void          *mapped;
+    void          *host;
+    VkDeviceSize   size;
+    _Bool          nocopy; int :24, :32;
+};
+
 struct vk_backend {
     struct umbra_backend  base;
     VkInstance            instance;
@@ -208,11 +217,10 @@ struct vk_backend {
     VkDeviceSize          host_import_align;
     VkCommandBuffer       batch_cmd;
     VkFence               batch_fence;
-    VkBuffer             *batch_bufs;
-    VkDeviceMemory       *batch_mems;
-    int                   batch_n_bufs, batch_bufs_cap;
     struct copyback      *batch_copies;
     int                   batch_n_copies, batch_copies_cap;
+    struct buf_cache_entry *batch_cache;
+    int                     batch_cache_n, batch_cache_cap;
     _Bool                 batch_has_dispatch; int :24, :32;
 };
 
@@ -262,15 +270,6 @@ struct copyback {
 //  Program.
 // ---------------------------------------------------------------------------
 
-struct buf_cache_entry {
-    VkBuffer       buf;
-    VkDeviceMemory mem;
-    void          *mapped;
-    void          *host;
-    VkDeviceSize   size;
-    _Bool          nocopy; int :24, :32;
-};
-
 struct vk_program {
     struct umbra_program base;
     struct vk_backend *be;
@@ -287,7 +286,6 @@ struct vk_program {
     int :32;
 
     struct deref_info *deref;
-    struct buf_cache_entry *buf_cache;
 
     uint32_t *spirv;
     int       spirv_len, :32;
@@ -1967,17 +1965,6 @@ static void begin_batch(struct vk_backend *be) {
     be->batch_has_dispatch = 0;
 }
 
-static void batch_track_buf(struct vk_backend *be, VkBuffer buf, VkDeviceMemory mem) {
-    if (be->batch_n_bufs >= be->batch_bufs_cap) {
-        be->batch_bufs_cap = be->batch_bufs_cap ? 2 * be->batch_bufs_cap : 64;
-        be->batch_bufs = realloc(be->batch_bufs, (size_t)be->batch_bufs_cap * sizeof *be->batch_bufs);
-        be->batch_mems = realloc(be->batch_mems, (size_t)be->batch_bufs_cap * sizeof *be->batch_mems);
-    }
-    be->batch_bufs[be->batch_n_bufs] = buf;
-    be->batch_mems[be->batch_n_bufs] = mem;
-    be->batch_n_bufs++;
-}
-
 static void batch_track_copy(struct vk_backend *be, void *host, void *mapped, size_t bytes) {
     if (be->batch_n_copies >= be->batch_copies_cap) {
         be->batch_copies_cap = be->batch_copies_cap ? 2 * be->batch_copies_cap : 64;
@@ -1993,21 +1980,33 @@ static void batch_track_copy(struct vk_backend *be, void *host, void *mapped, si
 
 static void vk_flush(struct umbra_backend *be);
 
-static void cache_buf(struct vk_backend *be, struct buf_cache_entry *ce,
-                      void *host, size_t bytes, VkDeviceSize sz, _Bool read_only) {
-    // Writable buffers can be cached — the GPU writes and we copyback on flush.
-    // Read-only buffers CANNOT be cached across dispatches within a batch because
-    // the host may modify them between queue() calls (e.g. slug curve loop index).
-    // Each dispatch needs its own snapshot.
-    if (!read_only && ce->buf && ce->host == host && ce->size >= sz) {
-        return;
+// Returns an index into be->batch_cache. The entry is valid until vk_flush.
+// For writable buffers, looks up an existing entry by host pointer and
+// reuses it across programs in the same batch. Read-only buffers are never
+// reused — the host may modify them between queue() calls (e.g. slug curve
+// loop index), so each dispatch needs its own snapshot. Copyback for writable
+// non-nocopy buffers is tracked exactly once, at entry creation time.
+static int cache_buf(struct vk_backend *be, void *host, size_t bytes,
+                     VkDeviceSize sz, _Bool read_only) {
+    if (!read_only) {
+        for (int i = 0; i < be->batch_cache_n; i++) {
+            struct buf_cache_entry *ce = &be->batch_cache[i];
+            if (ce->host == host && ce->size >= sz) {
+                return i;
+            }
+        }
     }
-    if (ce->buf) {
-        batch_track_buf(be, ce->buf, ce->mem);
-    }
-    ce->nocopy = 0;
 
-    // Try zero-copy host import for page-aligned pointers.
+    if (be->batch_cache_n >= be->batch_cache_cap) {
+        be->batch_cache_cap = be->batch_cache_cap ? 2 * be->batch_cache_cap : 16;
+        be->batch_cache = realloc(be->batch_cache,
+            (size_t)be->batch_cache_cap * sizeof *be->batch_cache);
+    }
+    int idx = be->batch_cache_n++;
+    struct buf_cache_entry *ce = &be->batch_cache[idx];
+    *ce = (struct buf_cache_entry){0};
+
+    // Try zero-copy host import for page-aligned writable pointers.
     VkDeviceSize align = be->host_import_align;
     if (align && host && !read_only && ((uintptr_t)host % align) == 0) {
         VkDeviceSize import_sz = (sz + align - 1) & ~(align - 1);
@@ -2034,7 +2033,7 @@ static void cache_buf(struct vk_backend *be, struct buf_cache_entry *ce,
             ce->mapped = host;
             ce->host   = host;
             ce->nocopy = 1;
-            return;
+            return idx;
         }
         // Import failed — fall back.
         if (mem) { vkFreeMemory(be->device, mem, 0); }
@@ -2047,6 +2046,10 @@ static void cache_buf(struct vk_backend *be, struct buf_cache_entry *ce,
     vkMapMemory(be->device, ce->mem, 0, sz, 0, &ce->mapped);
     ce->host = host;
     if (bytes) { memcpy(ce->mapped, host, bytes); }
+    if (!read_only && host && bytes) {
+        batch_track_copy(be, host, ce->mapped, bytes);
+    }
+    return idx;
 }
 
 static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b,
@@ -2062,15 +2065,15 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     int n     = vp->total_bufs;
     int skip0 = vp->uni_push_off >= 0;
 
+    int cache_idx[32];
+    for (int i = 0; i < n; i++) { cache_idx[i] = -1; }
+
     for (int i = 0; i <= vp->max_ptr; i++) {
         if (i == 0 && skip0) { continue; } // uniforms go via push constants
         if (!buf[i].ptr || !buf[i].sz) { continue; }
         VkDeviceSize sz = (VkDeviceSize)buf[i].sz;
         if (sz < 4) { sz = 4; }
-        cache_buf(be, &vp->buf_cache[i], buf[i].ptr, buf[i].sz, sz, buf[i].read_only);
-        if (!buf[i].read_only && !vp->buf_cache[i].nocopy) {
-            batch_track_copy(be, buf[i].ptr, vp->buf_cache[i].mapped, buf[i].sz);
-        }
+        cache_idx[i] = cache_buf(be, buf[i].ptr, buf[i].sz, sz, buf[i].read_only);
     }
 
     uint32_t *push_data = calloc((size_t)vp->push_words, sizeof *push_data);
@@ -2098,20 +2101,15 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
         VkDeviceSize sz = (VkDeviceSize)bytes;
         if (sz < 4) { sz = 4; }
-        cache_buf(be, &vp->buf_cache[bi], derived, bytes, sz, deref_read_only);
+        cache_idx[bi] = cache_buf(be, derived, bytes, sz, deref_read_only);
 
         push_data[3 + bi] = (uint32_t)bytes;
         push_data[3 + vp->total_bufs + bi] = (uint32_t)drb;
-
-        if (!deref_read_only && !vp->buf_cache[bi].nocopy) {
-            batch_track_copy(be, derived, vp->buf_cache[bi].mapped, bytes);
-        }
     }
 
     for (int i = skip0; i < n; i++) {
-        if (!vp->buf_cache[i].buf) {
-            cache_buf(be, &vp->buf_cache[i], 0, 0, 4, 1);
-            vp->buf_cache[i].host = 0;
+        if (cache_idx[i] < 0) {
+            cache_idx[i] = cache_buf(be, 0, 0, 4, 1);
         }
     }
 
@@ -2131,7 +2129,9 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     assume(n_desc <= 32);
     for (int i = 0; i < n_desc; i++) {
         buf_infos[i] = (VkDescriptorBufferInfo){
-            .buffer=vp->buf_cache[i + skip0].buf, .offset=0, .range=VK_WHOLE_SIZE,
+            .buffer=be->batch_cache[cache_idx[i + skip0]].buf,
+            .offset=0,
+            .range=VK_WHOLE_SIZE,
         };
         writes[i] = (VkWriteDescriptorSet){
             .sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -2199,14 +2199,6 @@ static void vk_program_dump(struct umbra_program const *p, FILE *f) {
 static void vk_program_free(struct umbra_program *p) {
     struct vk_program *vp = (struct vk_program *)p;
     struct vk_backend *be = vp->be;
-
-    for (int i = 0; i < vp->total_bufs; i++) {
-        if (vp->buf_cache[i].buf) {
-            vkFreeMemory  (be->device, vp->buf_cache[i].mem, 0);
-            vkDestroyBuffer(be->device, vp->buf_cache[i].buf, 0);
-        }
-    }
-    free(vp->buf_cache);
 
     vkDestroyPipeline(be->device, vp->pipeline, 0);
     vkDestroyPipelineLayout(be->device, vp->pipe_layout, 0);
@@ -2314,7 +2306,6 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
     p->push_words    = push_words;
     p->uni_push_off  = uni_push_off;
     p->deref       = deref;
-    p->buf_cache   = calloc((size_t)total_bufs, sizeof *p->buf_cache);
     p->spirv       = spirv;
     p->spirv_len   = spirv_len;
 
@@ -2347,16 +2338,17 @@ static void vk_flush(struct umbra_backend *be) {
         memcpy(v->batch_copies[i].host, v->batch_copies[i].mapped, v->batch_copies[i].bytes);
     }
 
-    for (int i = 0; i < v->batch_n_bufs; i++) {
-        vkFreeMemory  (v->device, v->batch_mems[i], 0);
-        vkDestroyBuffer(v->device, v->batch_bufs[i], 0);
+    for (int i = 0; i < v->batch_cache_n; i++) {
+        struct buf_cache_entry *ce = &v->batch_cache[i];
+        vkFreeMemory  (v->device, ce->mem, 0);
+        vkDestroyBuffer(v->device, ce->buf, 0);
     }
 
     vkFreeCommandBuffers(v->device, v->cmd_pool, 1, &v->batch_cmd);
     vkDestroyFence(v->device, v->batch_fence, 0);
     v->batch_cmd      = VK_NULL_HANDLE;
-    v->batch_n_bufs   = 0;
     v->batch_n_copies = 0;
+    v->batch_cache_n  = 0;
 }
 
 static void vk_free(struct umbra_backend *be) {
@@ -2365,9 +2357,8 @@ static void vk_free(struct umbra_backend *be) {
     vkDestroyCommandPool(v->device, v->cmd_pool, 0);
     vkDestroyDevice(v->device, 0);
     vkDestroyInstance(v->instance, 0);
-    free(v->batch_bufs);
-    free(v->batch_mems);
     free(v->batch_copies);
+    free(v->batch_cache);
     free(v);
 }
 
