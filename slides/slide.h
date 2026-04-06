@@ -22,10 +22,34 @@ struct slide {
     struct umbra_builder *(*get_builder)(struct slide*, struct umbra_fmt);
 };
 
+struct text_cov;
+struct slug_curves;
+
+struct slide_ctx {
+    struct text_cov    *bitmap_cov;
+    struct text_cov    *sdf_cov;
+    struct slug_curves *slug;
+    float              *linear_lut;
+    float              *radial_lut;
+    int                 lut_n, :32;
+};
+
+typedef struct slide *(*slide_factory_fn)(struct slide_ctx const *);
+void slide_register(int order, slide_factory_fn factory);
+
+#define SLIDE(ORDER, NAME)                                                       \
+    static struct slide *NAME(struct slide_ctx const *ctx);                      \
+    _Pragma("clang diagnostic push")                                             \
+    _Pragma("clang diagnostic ignored \"-Wglobal-constructors\"")                \
+    __attribute__((constructor)) static void slide_ctor_##NAME(void) {           \
+        slide_register(ORDER, NAME);                                             \
+    }                                                                            \
+    _Pragma("clang diagnostic pop")                                              \
+    static struct slide *NAME(struct slide_ctx const *ctx)
+
 int           slide_count        (void);
 struct slide *slide_get          (int i);
 void          slides_init        (int w, int h, slide_alloc_fn, slide_free_fn);
-void          slides_init_for_dump(void);
 void          slides_cleanup     (void);
 
 static inline void slide_perspective_matrix(

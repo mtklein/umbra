@@ -82,11 +82,9 @@ static void persp_free(struct slide *s) {
     free(st);
 }
 
-struct slide *slide_persp(struct text_cov *);
-
-struct slide *slide_persp(struct text_cov *bitmap) {
+SLIDE(9, slide_persp) {
     struct persp_state *st = calloc(1, sizeof *st);
-    st->bitmap = bitmap;
+    st->bitmap = ctx->bitmap_cov;
     st->shader = umbra_shader_solid;
     st->coverage = umbra_coverage_bitmap_matrix;
     st->blend = umbra_blend_srcover;

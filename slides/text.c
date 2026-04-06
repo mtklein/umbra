@@ -68,12 +68,9 @@ static void text_free(struct slide *s) {
     free(st);
 }
 
-struct slide *slide_text_bitmap(struct text_cov *);
-struct slide *slide_text_sdf(struct text_cov *);
-
-struct slide *slide_text_bitmap(struct text_cov *tc) {
+SLIDE(7, slide_text_bitmap) {
     struct text_state *st = calloc(1, sizeof *st);
-    st->tc = tc;
+    st->tc = ctx->bitmap_cov;
     st->shader = umbra_shader_solid;
     st->coverage = umbra_coverage_bitmap;
     st->blend = umbra_blend_srcover;
@@ -91,9 +88,9 @@ struct slide *slide_text_bitmap(struct text_cov *tc) {
     return &st->base;
 }
 
-struct slide *slide_text_sdf(struct text_cov *tc) {
+SLIDE(8, slide_text_sdf) {
     struct text_state *st = calloc(1, sizeof *st);
-    st->tc = tc;
+    st->tc = ctx->sdf_cov;
     st->shader = umbra_shader_solid;
     st->coverage = umbra_coverage_sdf;
     st->blend = umbra_blend_srcover;

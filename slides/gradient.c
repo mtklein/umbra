@@ -134,13 +134,9 @@ static void grad_lut_free(struct slide *s) {
     free(st);
 }
 
-struct slide *slide_gradient_2stop(char const *, uint32_t, umbra_shader_fn, struct umbra_fmt,
-                                  float const[8], float const[4]);
-struct slide *slide_gradient_lut(char const *, uint32_t, umbra_shader_fn, struct umbra_fmt,
-                                 float const[4], float *, int);
-
-struct slide *slide_gradient_2stop(char const *title, uint32_t bg, umbra_shader_fn shader,
-                                   struct umbra_fmt fmt, float const color[8], float const grad[4]) {
+static struct slide *make_grad_2stop(char const *title, uint32_t bg, umbra_shader_fn shader,
+                                     struct umbra_fmt fmt, float const color[8],
+                                     float const grad[4]) {
     struct grad_2stop_state *st = calloc(1, sizeof *st);
     st->shader = shader;
     st->coverage = NULL;
@@ -160,8 +156,9 @@ struct slide *slide_gradient_2stop(char const *title, uint32_t bg, umbra_shader_
     return &st->base;
 }
 
-struct slide *slide_gradient_lut(char const *title, uint32_t bg, umbra_shader_fn shader,
-                                 struct umbra_fmt fmt, float const grad[4], float *lut, int lut_n) {
+static struct slide *make_grad_lut(char const *title, uint32_t bg, umbra_shader_fn shader,
+                                   struct umbra_fmt fmt, float const grad[4],
+                                   float *lut, int lut_n) {
     struct grad_lut_state *st = calloc(1, sizeof *st);
     st->lut = lut;
     st->lut_n = lut_n;
@@ -180,4 +177,34 @@ struct slide *slide_gradient_lut(char const *title, uint32_t bg, umbra_shader_fn
         .get_builder = grad_lut_get_builder,
     };
     return &st->base;
+}
+
+SLIDE(10, slide_gradient_linear_2) {
+    (void)ctx;
+    return make_grad_2stop("10. Linear Gradient (2-stop)", 0xff000000,
+                           umbra_shader_linear_2, umbra_fmt_8888,
+                           (float[]){1.0f, 0.4f, 0.0f, 1.0f, 0.0f, 0.3f, 1.0f, 1.0f},
+                           (float[]){1.0f / 640.0f, 0.0f, 0.0f, 0.0f});
+}
+
+SLIDE(11, slide_gradient_radial_2) {
+    (void)ctx;
+    return make_grad_2stop("11. Radial Gradient (2-stop)", 0xff000000,
+                           umbra_shader_radial_2, umbra_fmt_8888,
+                           (float[]){1.0f, 1.0f, 0.9f, 1.0f, 0.05f, 0.0f, 0.15f, 1.0f},
+                           (float[]){320.0f, 240.0f, 1.0f / 300.0f, 0.0f});
+}
+
+SLIDE(12, slide_gradient_linear_wide) {
+    return make_grad_lut("12. Linear Gradient (wide gamut)", 0xff000000,
+                         umbra_shader_linear_grad, umbra_fmt_8888,
+                         (float[]){1.0f / 640.0f, 0.0f, 0.0f, 64.0f},
+                         ctx->linear_lut, ctx->lut_n);
+}
+
+SLIDE(13, slide_gradient_radial_wide) {
+    return make_grad_lut("13. Radial Gradient (wide gamut)", 0xff000000,
+                         umbra_shader_radial_grad, umbra_fmt_8888,
+                         (float[]){320.0f, 240.0f, 1.0f / 280.0f, 64.0f},
+                         ctx->radial_lut, ctx->lut_n);
 }

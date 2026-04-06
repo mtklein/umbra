@@ -120,11 +120,9 @@ static void slug_slide_free(struct slide *s) {
     free(st);
 }
 
-struct slide *slide_slug_wind(struct slug_curves *);
-
-struct slide *slide_slug_wind(struct slug_curves *sc) {
+SLIDE(14, slide_slug_wind) {
     struct slug_state *st = calloc(1, sizeof *st);
-    st->slug = sc;
+    st->slug = ctx->slug;
     st->fmt = umbra_fmt_8888;
     st->color[0] = 0.2f;
     st->color[1] = 1.0f;

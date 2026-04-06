@@ -1,31 +1,43 @@
 #include "slide.h"
 #include "text.h"
 #include "slug.h"
+#include <stdlib.h>
 
-extern struct slide *slide_solid(char const *, uint32_t, float const[4], umbra_coverage_fn,
-                                umbra_blend_fn, struct umbra_fmt);
-extern struct slide *slide_text_bitmap(struct text_cov *);
-extern struct slide *slide_text_sdf(struct text_cov *);
-extern struct slide *slide_persp(struct text_cov *);
-extern struct slide *slide_gradient_2stop(char const *, uint32_t, umbra_shader_fn, struct umbra_fmt,
-                                          float const[8], float const[4]);
-extern struct slide *slide_gradient_lut(char const *, uint32_t, umbra_shader_fn, struct umbra_fmt,
-                                        float const[4], float *, int);
-extern struct slide *slide_slug_wind(struct slug_curves *);
-extern struct slide *slide_overview(void);
+enum { LUT_N = 64, MAX_SLIDES = 32 };
 
 static struct text_cov    bitmap_cov, sdf_cov;
 static struct slug_curves slug;
+static float              linear_lut[LUT_N * 4];
+static float              radial_lut[LUT_N * 4];
+static struct slide_ctx   ctx;
 
-enum { LUT_N = 64 };
-static float linear_lut[LUT_N * 4];
-static float radial_lut[LUT_N * 4];
+struct slide_entry {
+    int               order, :32;
+    slide_factory_fn  factory;
+};
 
-static struct slide *all[18];
+static struct slide_entry registry[MAX_SLIDES];
+static int                registry_count;
+
+static struct slide *all[MAX_SLIDES];
 static int           count;
 
+void slide_register(int order, slide_factory_fn factory) {
+    if (registry_count < MAX_SLIDES) {
+        registry[registry_count].order   = order;
+        registry[registry_count].factory = factory;
+        registry_count++;
+    }
+}
+
 int           slide_count(void) { return count; }
-struct slide *slide_get(int i) { return all[i]; }
+struct slide *slide_get(int i)  { return all[i]; }
+
+static int cmp_entry(void const *a, void const *b) {
+    int oa = ((struct slide_entry const *)a)->order;
+    int ob = ((struct slide_entry const *)b)->order;
+    return (oa > ob) - (oa < ob);
+}
 
 static void build_luts(void) {
     float const linear_stops[][4] = {
@@ -43,72 +55,31 @@ static void build_luts(void) {
     umbra_gradient_lut_even(radial_lut, LUT_N, 4, radial_stops);
 }
 
-static void register_slides(void) {
-    count = 0;
-    all[count++] = slide_solid("1. Solid Fill (src)", 0xff202020,
-                               (float[]){0.0f, 0.6f, 1.0f, 1.0f}, umbra_coverage_rect,
-                               umbra_blend_src, umbra_fmt_8888);
-    all[count++] = slide_solid("2. Source Over (srcover)", 0xff00ff00,
-                               (float[]){0.45f, 0.0f, 0.0f, 0.5f}, umbra_coverage_rect,
-                               umbra_blend_srcover, umbra_fmt_8888);
-    all[count++] = slide_solid("3. Destination Over (dstover)", 0xc0008000,
-                               (float[]){0.0f, 0.0f, 0.9f, 0.9f}, umbra_coverage_rect,
-                               umbra_blend_dstover, umbra_fmt_8888);
-    all[count++] = slide_solid("4. Multiply Blend", 0xff804020,
-                               (float[]){1.0f, 0.5f, 0.0f, 1.0f}, umbra_coverage_rect,
-                               umbra_blend_multiply, umbra_fmt_8888);
-    all[count++] = slide_solid("5. Full Coverage (no rect clip)", 0xffffffff,
-                               (float[]){0.15f, 0.0f, 0.3f, 0.3f}, NULL,
-                               umbra_blend_srcover, umbra_fmt_8888);
-    all[count++] = slide_solid("6. No Blend (direct paint)", 0xff000000,
-                               (float[]){0.9f, 0.4f, 0.1f, 1.0f}, umbra_coverage_rect,
-                               NULL, umbra_fmt_8888);
-    all[count++] = slide_text_bitmap(&bitmap_cov);
-    all[count++] = slide_text_sdf(&sdf_cov);
-    all[count++] = slide_persp(&bitmap_cov);
-    all[count++] =
-        slide_gradient_2stop("10. Linear Gradient (2-stop)", 0xff000000,
-                             umbra_shader_linear_2, umbra_fmt_8888,
-                             (float[]){1.0f, 0.4f, 0.0f, 1.0f, 0.0f, 0.3f, 1.0f, 1.0f},
-                             (float[]){1.0f / 640.0f, 0.0f, 0.0f, 0.0f});
-    all[count++] =
-        slide_gradient_2stop("11. Radial Gradient (2-stop)", 0xff000000,
-                             umbra_shader_radial_2, umbra_fmt_8888,
-                             (float[]){1.0f, 1.0f, 0.9f, 1.0f, 0.05f, 0.0f, 0.15f, 1.0f},
-                             (float[]){320.0f, 240.0f, 1.0f / 300.0f, 0.0f});
-    all[count++] = slide_gradient_lut("12. Linear Gradient (wide gamut)", 0xff000000,
-                                      umbra_shader_linear_grad, umbra_fmt_8888,
-                                      (float[]){1.0f / 640.0f, 0.0f, 0.0f, 64.0f},
-                                      linear_lut, LUT_N);
-    all[count++] = slide_gradient_lut("13. Radial Gradient (wide gamut)", 0xff000000,
-                                      umbra_shader_radial_grad, umbra_fmt_8888,
-                                      (float[]){320.0f, 240.0f, 1.0f / 280.0f, 64.0f},
-                                      radial_lut, LUT_N);
-    all[count++] = slide_slug_wind(&slug);
-}
-
 void slides_init(int w, int h, slide_alloc_fn alloc, slide_free_fn sfree) {
     float font = (float)h * 0.15f;
     bitmap_cov = text_rasterize(w, h, font, 0);
-    sdf_cov = text_rasterize(w, h, font, 1);
-    slug = slug_extract("Slug", (float)h * 0.3125f);
+    sdf_cov    = text_rasterize(w, h, font, 1);
+    slug       = slug_extract("Slug", (float)h * 0.3125f);
     build_luts();
 
-    register_slides();
+    ctx.bitmap_cov = &bitmap_cov;
+    ctx.sdf_cov    = &sdf_cov;
+    ctx.slug       = &slug;
+    ctx.linear_lut = linear_lut;
+    ctx.radial_lut = radial_lut;
+    ctx.lut_n      = LUT_N;
 
-    for (int i = 0; i < count; i++) {
-        all[i]->alloc = alloc;
-        all[i]->sfree = sfree;
-        if (all[i]->init) { all[i]->init(all[i], w, h); }
+    qsort(registry, (size_t)registry_count, sizeof registry[0], cmp_entry);
+
+    count = 0;
+    for (int i = 0; i < registry_count; i++) {
+        all[count] = registry[i].factory(&ctx);
+        all[count]->alloc = alloc;
+        all[count]->sfree = sfree;
+        if (all[count]->init) { all[count]->init(all[count], w, h); }
+        count++;
     }
-
-    all[count++] = slide_overview();
-    all[count - 1]->alloc = alloc;
-    all[count - 1]->sfree = sfree;
-    all[count - 1]->init(all[count - 1], w, h);
 }
-
-void slides_init_for_dump(void) { register_slides(); }
 
 void slides_cleanup(void) {
     for (int i = 0; i < count; i++) {
