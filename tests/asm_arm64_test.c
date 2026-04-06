@@ -4,7 +4,8 @@
 
 // All encodings verified against `as` + `llvm-objdump`.
 
-static void test_buf(void) {
+TEST(test_buf) {
+    (void)mem;
     struct Buf b = {0};
     put(&b, 0xDEADBEEF);
     put(&b, 0xCAFEBABE);
@@ -14,7 +15,8 @@ static void test_buf(void) {
     free(b.buf);
 }
 
-static void test_gpr(void) {
+TEST(test_gpr) {
+    (void)mem;
     RET() == 0xD65F03C0 here;
     NOP() == 0xD503201F here;
     ADD_xr(0, 1, 2) == 0x8B020020 here;
@@ -29,13 +31,15 @@ static void test_gpr(void) {
     LSR_wi(13, 13, 2) == 0x53027DAD here;
 }
 
-static void test_branch(void) {
+TEST(test_branch) {
+    (void)mem;
     B(4) == 0x14000004 here;
     Bcond(0, 3) == 0x54000060 here;  // B.EQ +3
     Bcond(1, 10) == 0x54000141 here; // B.NE +10
 }
 
-static void test_mem(void) {
+TEST(test_mem) {
+    (void)mem;
     LDR_sx(0, 1, 2) == 0xBC627820 here;
     STR_sx(3, 4, 5) == 0xBC257883 here;
     STR_hx(3, 4, 5) == 0x7C257883 here;
@@ -48,7 +52,8 @@ static void test_mem(void) {
     STR_qi(8, 9, 2) == 0x3D800928 here;
 }
 
-static void test_neon_f32(void) {
+TEST(test_neon_f32) {
+    (void)mem;
     FADD_4s(4, 5, 6) == 0x4E26D4A4 here;
     FSUB_4s(0, 1, 2) == 0x4EA2D420 here;
     FMUL_4s(7, 8, 9) == 0x6E29DD07 here;
@@ -73,7 +78,8 @@ static void test_neon_f32(void) {
     FCMGE_4s(6, 7, 8) == 0x6E28E4E6 here;
 }
 
-static void test_neon_i32(void) {
+TEST(test_neon_i32) {
+    (void)mem;
     ADD_4s(0, 1, 2) == 0x4EA28420 here;
     SUB_4s(3, 4, 5) == 0x6EA58483 here;
     MUL_4s(6, 7, 8) == 0x4EA89CE6 here;
@@ -87,7 +93,8 @@ static void test_neon_i32(void) {
     CMHS_4s(3, 4, 5) == 0x6EA53C83 here;
 }
 
-static void test_neon_bitwise(void) {
+TEST(test_neon_bitwise) {
+    (void)mem;
     AND_16b(10, 11, 12) == 0x4E2C1D6A here;
     ORR_16b(0, 1, 2) == 0x4EA21C20 here;
     EOR_16b(3, 4, 5) == 0x6E251C83 here;
@@ -96,26 +103,30 @@ static void test_neon_bitwise(void) {
     BIF_16b(3, 4, 5) == 0x6EE51C83 here;
 }
 
-static void test_conversions(void) {
+TEST(test_conversions) {
+    (void)mem;
     FCVTN_4h(2, 3) == 0x0E216862 here;
     FCVTL_4s(4, 5) == 0x0E2178A4 here;
     XTN_4h(6, 7) == 0x0E6128E6 here;
     SXTL_4s(8, 9) == 0x0F10A528 here;
 }
 
-static void test_W_promotion(void) {
+TEST(test_W_promotion) {
+    (void)mem;
     W(FCVTN_4h(2, 3)) == 0x4E216862 here; // fcvtn2
     W(XTN_4h(6, 7)) == 0x4E6128E6 here;   // xtn2
     W(SXTL_4s(8, 9)) == 0x4F10A528 here;  // sxtl2
 }
 
-static void test_shift_imm(void) {
+TEST(test_shift_imm) {
+    (void)mem;
     SHL_4s_imm(2, 3, 4) == 0x4F245462 here;
     USHR_4s_imm(2, 3, 4) == 0x6F3C0462 here;
     SSHR_4s_imm(2, 3, 4) == 0x4F3C0462 here;
 }
 
-static void test_movi(void) {
+TEST(test_movi) {
+    (void)mem;
     MOVI_4s(5, 0xFF, 0) == 0x4F0707E5 here;
     MVNI_4s(6, 0xAB, 0) == 0x6F050566 here;
     (MOVI_4s(0, 0x42, 8)
@@ -126,7 +137,8 @@ static void test_movi(void) {
          | 0)) here;
 }
 
-static void test_dup_ins(void) {
+TEST(test_dup_ins) {
+    (void)mem;
     DUP_4s_w(7, 8) == 0x4E040D07 here;
     DUP_4s_lane(0, 1, 0) == 0x4E040420 here;
     DUP_4s_lane(0, 1, 2) == 0x4E140420 here;
@@ -142,7 +154,8 @@ static void test_dup_ins(void) {
     INS_s(3, 0, 4) == 0x4E041C83 here;
 }
 
-static void test_load_imm_w(void) {
+TEST(test_load_imm_w) {
+    (void)mem;
     // Small value: just MOVZ
     struct Buf b = {0};
     load_imm_w(&b, 3, 42);
@@ -159,54 +172,63 @@ static void test_load_imm_w(void) {
     free(b.buf);
 }
 
-static void test_stp_ldp(void) {
+TEST(test_stp_ldp) {
+    (void)mem;
     (STP_pre(19, 20, 31, -2)
      == (0xA9800000u | ((uint32_t)(-2 & 0x7f) << 15) | (20u << 10) | (31u << 5) | 19)) here;
     (LDP_post(19, 20, 31, 2) == (0xA8C00000u | (2u << 15) | (20u << 10) | (31u << 5) | 19))
         here;
 }
 
-static void test_lsl(void) {
+TEST(test_lsl) {
+    (void)mem;
     LSL_xi(0, 1, 4) == (0xD3400000u | (60u << 16) | (59u << 10) | (1u << 5) | 0) here;
     LSR_xi(0, 1, 2)  == 0xD342FC20 here;
     LSR_xi(3, 4, 5)  == 0xD345FC83 here;
 }
 
-static void test_ldr_si(void) {
+TEST(test_ldr_si) {
+    (void)mem;
     LDR_si(3, 4, 0) == 0xBD400083 here;
     LDR_si(3, 4, 1) == 0xBD400483 here;
 }
 
-static void test_zip(void) {
+TEST(test_zip) {
+    (void)mem;
     ZIP1_4s(6, 7, 8) == (0x4E803800u | (8u << 16) | (7u << 5) | 6u) here;
     ZIP2_4s(0, 1, 2) == (0x4E807800u | (2u << 16) | (1u << 5) | 0u) here;
 }
 
-static void test_ldr_xi(void) {
+TEST(test_ldr_xi) {
+    (void)mem;
     // LDR x0, [x1, #16] (imm=2, scaled by 8)
     LDR_xi(0, 1, 2) == 0xF9400820 here;
     // LDR x3, [x4, #0]
     LDR_xi(3, 4, 0) == 0xF9400083 here;
 }
 
-static void test_ldrh_wi(void) {
+TEST(test_ldrh_wi) {
+    (void)mem;
     // LDRH w0, [x1, #4] (imm=2, scaled by 2)
     LDRH_wi(0, 1, 2) == 0x79400820 here;
     // LDRH w3, [x4, #0]
     LDRH_wi(3, 4, 0) == 0x79400083 here;
 }
 
-static void test_ldrh_wr(void) {
+TEST(test_ldrh_wr) {
+    (void)mem;
     // LDRH w3, [x4, x5, LSL #1]
     LDRH_wr(3, 4, 5) == 0x78657883 here;
 }
 
-static void test_ldr_wr(void) {
+TEST(test_ldr_wr) {
+    (void)mem;
     // LDR w3, [x4, x5, LSL #2]
     LDR_wr(3, 4, 5) == 0xB8657883 here;
 }
 
-static void test_ldr_str_di(void) {
+TEST(test_ldr_str_di) {
+    (void)mem;
     // LDR d3, [x4, #16] (imm=2, scaled by 8)
     LDR_di(3, 4, 2) == 0xFD400883 here;
     // LDR d0, [x1, #0]
@@ -217,17 +239,20 @@ static void test_ldr_str_di(void) {
     STR_di(0, 1, 0) == 0xFD000020 here;
 }
 
-static void test_madd(void) {
+TEST(test_madd) {
+    (void)mem;
     // MADD x0, x1, x2, x3
     MADD_x(0, 1, 2, 3) == 0x9B020C20 here;
 }
 
-static void test_cmp(void) {
+TEST(test_cmp) {
+    (void)mem;
     CMP_wr(5, 6) == 0x6B0600BF here;
     CMP_wr(0, 0) == 0x6B00001F here;
 }
 
-static void test_uzp_zip_8h(void) {
+TEST(test_uzp_zip_8h) {
+    (void)mem;
     // UZP1.8H v0, v1, v2
     UZP1_8h(0, 1, 2) == 0x4E421820 here;
     // UZP2.8H v3, v4, v5
@@ -236,17 +261,20 @@ static void test_uzp_zip_8h(void) {
     ZIP1_8h(6, 7, 8) == 0x4E4838E6 here;
 }
 
-static void test_ext_16b(void) {
+TEST(test_ext_16b) {
+    (void)mem;
     // EXT.16B v0, v1, v2, #8
     EXT_16b(0, 1, 2, 8) == 0x6E024020 here;
 }
 
-static void test_uxtl_4s(void) {
+TEST(test_uxtl_4s) {
+    (void)mem;
     // USHLL.4S v3, v4, #0 (= UXTL.4S)
     UXTL_4s(3, 4) == 0x2F10A483 here;
 }
 
-static void test_ins_elem_s(void) {
+TEST(test_ins_elem_s) {
+    (void)mem;
     // INS v0.s[1], v1.s[0]
     INS_elem_s(0, 1, 1, 0) == 0x6E0C0420 here;
     // INS v2.s[2], v3.s[0]
@@ -257,7 +285,8 @@ static void test_ins_elem_s(void) {
     INS_elem_s(6, 0, 7, 2) == 0x6E0444E6 here;
 }
 
-static void test_stp_ldp_qi(void) {
+TEST(test_stp_ldp_qi) {
+    (void)mem;
     STP_qi_pre(8, 9, 31, -8) == 0xADBC27E8 here;
     STP_qi(10, 11, 31, 2) == 0xAD012FEA here;
     STP_qi(12, 13, 31, 4) == 0xAD0237EC here;
@@ -267,19 +296,22 @@ static void test_stp_ldp_qi(void) {
     LDP_qi(8, 9, 31, -8) == 0xAD7C27E8 here;
 }
 
-static void test_ldr_q_literal(void) {
+TEST(test_ldr_q_literal) {
+    (void)mem;
     LDR_q_literal(5) == 0x9C000005 here;
     LDR_q_literal(0) == 0x9C000000 here;
 }
 
-static void test_uxtl_8h_xtn_8b(void) {
+TEST(test_uxtl_8h_xtn_8b) {
+    (void)mem;
     UXTL_8h(0, 1) == 0x2F08A420 here;
     XTN_8b(0, 1) == 0x0E212820 here;
     W(UXTL_8h(0, 1)) == 0x6F08A420 here;
     W(XTN_8b(0, 1)) == 0x4E212820 here;
 }
 
-static void test_ld4_st4(void) {
+TEST(test_ld4_st4) {
+    (void)mem;
     LD4_4h(0, 5) == 0x0C4004A0 here;
     ST4_4h(0, 5) == 0x0C0004A0 here;
     LD4_8h(0, 5) == 0x4C4004A0 here;
@@ -288,40 +320,4 @@ static void test_ld4_st4(void) {
     ST4_8b(0, 5) == 0x0C0000A0 here;
     LD4_4h(2, 10) == 0x0C400542 here;
     ST4_8h(8, 3) == 0x4C000468 here;
-}
-
-int main(void) {
-    test_buf();
-    test_gpr();
-    test_branch();
-    test_mem();
-    test_neon_f32();
-    test_neon_i32();
-    test_neon_bitwise();
-    test_conversions();
-    test_W_promotion();
-    test_shift_imm();
-    test_movi();
-    test_dup_ins();
-    test_load_imm_w();
-    test_stp_ldp();
-    test_lsl();
-    test_ldr_si();
-    test_zip();
-    test_ldr_xi();
-    test_ldrh_wi();
-    test_ldrh_wr();
-    test_ldr_wr();
-    test_ldr_str_di();
-    test_madd();
-    test_cmp();
-    test_uzp_zip_8h();
-    test_ext_16b();
-    test_uxtl_4s();
-    test_ins_elem_s();
-    test_stp_ldp_qi();
-    test_ldr_q_literal();
-    test_uxtl_8h_xtn_8b();
-    test_ld4_st4();
-    return 0;
 }

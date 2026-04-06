@@ -11,7 +11,8 @@ static _Bool bytes_eq(struct Buf *b, int n, uint8_t const exp[]) {
 
 static void reset(struct Buf *b) { b->len = 0; }
 
-static void test_emit(void) {
+TEST(test_emit) {
+    (void)mem;
     struct Buf b = {0};
     emit1(&b, 0xAB);
     emit4(&b, 0xDEADBEEF);
@@ -24,7 +25,8 @@ static void test_emit(void) {
     free(b.buf);
 }
 
-static void test_ret_vzeroupper_nop(void) {
+TEST(test_ret_vzeroupper_nop) {
+    (void)mem;
     struct Buf b = {0};
     ret(&b);
     bytes_eq(&b, 1, (uint8_t[]){0xC3}) here;
@@ -39,7 +41,8 @@ static void test_ret_vzeroupper_nop(void) {
     free(b.buf);
 }
 
-static void test_gpr(void) {
+TEST(test_gpr) {
+    (void)mem;
     struct Buf b = {0};
 
     // addq $8, %rdi => 48 83 c7 08
@@ -123,7 +126,8 @@ static void test_gpr(void) {
     free(b.buf);
 }
 
-static void test_avx_f32(void) {
+TEST(test_avx_f32) {
+    (void)mem;
     struct Buf b = {0};
 
     // vaddps %ymm4, %ymm3, %ymm2 => c5 e4 58 d4
@@ -187,7 +191,8 @@ static void test_avx_f32(void) {
     free(b.buf);
 }
 
-static void test_avx_fma(void) {
+TEST(test_avx_fma) {
+    (void)mem;
     struct Buf b = {0};
 
     // vfmadd132ps %ymm4, %ymm3, %ymm2 => c4 e2 65 98 d4
@@ -221,7 +226,8 @@ static void test_avx_fma(void) {
     free(b.buf);
 }
 
-static void test_avx_i32(void) {
+TEST(test_avx_i32) {
+    (void)mem;
     struct Buf b = {0};
 
     // vpaddd %ymm8, %ymm9, %ymm10 => c4 41 35 fe d0
@@ -262,7 +268,8 @@ static void test_avx_i32(void) {
     free(b.buf);
 }
 
-static void test_avx_bitwise(void) {
+TEST(test_avx_bitwise) {
+    (void)mem;
     struct Buf b = {0};
 
     // vpxor %ymm3, %ymm3, %ymm3 => c5 e5 ef db
@@ -291,7 +298,8 @@ static void test_avx_bitwise(void) {
     free(b.buf);
 }
 
-static void test_avx_cmp(void) {
+TEST(test_avx_cmp) {
+    (void)mem;
     struct Buf b = {0};
 
     // vpcmpeqd %ymm4, %ymm4, %ymm4 => c5 dd 76 e4
@@ -305,7 +313,8 @@ static void test_avx_cmp(void) {
     free(b.buf);
 }
 
-static void test_avx_shift(void) {
+TEST(test_avx_shift) {
+    (void)mem;
     struct Buf b = {0};
 
     // vpsrld $4, %ymm3, %ymm2 => c5 ed 72 d3 04
@@ -319,7 +328,8 @@ static void test_avx_shift(void) {
     free(b.buf);
 }
 
-static void test_avx_convert(void) {
+TEST(test_avx_convert) {
+    (void)mem;
     struct Buf b = {0};
 
     // vcvtph2ps %xmm3, %ymm2 => c4 e2 7d 13 d3
@@ -343,7 +353,8 @@ static void test_avx_convert(void) {
     free(b.buf);
 }
 
-static void test_avx_extract(void) {
+TEST(test_avx_extract) {
+    (void)mem;
     struct Buf b = {0};
 
     // vextracti128 $1, %ymm7, %xmm6 => c4 e3 7d 39 fe 01
@@ -357,7 +368,8 @@ static void test_avx_extract(void) {
     free(b.buf);
 }
 
-static void test_avx_mov(void) {
+TEST(test_avx_mov) {
+    (void)mem;
     struct Buf b = {0};
 
     // vmovaps %ymm3, %ymm4 => c5 fc 28 e3
@@ -373,7 +385,8 @@ static void test_avx_mov(void) {
     free(b.buf);
 }
 
-static void test_avx_broadcast(void) {
+TEST(test_avx_broadcast) {
+    (void)mem;
     struct Buf b = {0};
 
     // vbroadcastss %xmm0, %ymm2 => c4 e2 7d 18 d0
@@ -382,7 +395,8 @@ static void test_avx_broadcast(void) {
     free(b.buf);
 }
 
-static void test_broadcast_imm32(void) {
+TEST(test_broadcast_imm32) {
+    (void)mem;
     struct Buf b = {0};
 
     // Zero => vpxor ymm3,ymm3,ymm3 => c5 e5 ef db
@@ -411,7 +425,8 @@ static void test_broadcast_imm32(void) {
     free(b.buf);
 }
 
-static void test_spill_fill(void) {
+TEST(test_spill_fill) {
+    (void)mem;
     struct Buf b = {0};
 
     // vspill ymm3 to slot 0: vmovdqu [rsp], ymm3 => c5 fe 7f 1c 24
@@ -435,7 +450,8 @@ static void test_spill_fill(void) {
     free(b.buf);
 }
 
-static void test_gather(void) {
+TEST(test_gather) {
+    (void)mem;
     struct Buf b = {0};
 
     // vpgatherdd ymm2, [rdi+rcx*4], ymm5 => c4 e2 55 90 14 8f
@@ -444,7 +460,8 @@ static void test_gather(void) {
     free(b.buf);
 }
 
-static void test_vex_helpers(void) {
+TEST(test_vex_helpers) {
+    (void)mem;
     struct Buf b = {0};
 
     // vex 2-byte: pp=0,mm=1,W=0,L=1,d=2,v=3,s=4,op=0x58 (same as vaddps 2,3,4)
@@ -469,7 +486,8 @@ static void test_vex_helpers(void) {
     free(b.buf);
 }
 
-static void test_large_disp(void) {
+TEST(test_large_disp) {
+    (void)mem;
     struct Buf b = {0};
 
     // vmovdqu 256(%rdi,%r10,4), %ymm0
@@ -479,7 +497,8 @@ static void test_large_disp(void) {
     free(b.buf);
 }
 
-static void test_vex_2byte_vs_3byte(void) {
+TEST(test_vex_2byte_vs_3byte) {
+    (void)mem;
     struct Buf b = {0};
 
     // Low regs => 2-byte VEX (C5)
@@ -498,7 +517,8 @@ static void test_vex_2byte_vs_3byte(void) {
     free(b.buf);
 }
 
-static void test_vmovd_vmovq_vpsrldq(void) {
+TEST(test_vmovd_vmovq_vpsrldq) {
+    (void)mem;
     struct Buf b = {0};
 
     // VMOVD xmm0, eax: C5 F9 6E C0
@@ -539,26 +559,3 @@ static void test_vmovd_vmovq_vpsrldq(void) {
     free(b.buf);
 }
 
-int main(void) {
-    test_emit();
-    test_ret_vzeroupper_nop();
-    test_gpr();
-    test_avx_f32();
-    test_avx_fma();
-    test_avx_i32();
-    test_avx_bitwise();
-    test_avx_cmp();
-    test_avx_shift();
-    test_avx_convert();
-    test_avx_extract();
-    test_avx_mov();
-    test_avx_broadcast();
-    test_broadcast_imm32();
-    test_spill_fill();
-    test_gather();
-    test_vex_helpers();
-    test_large_disp();
-    test_vex_2byte_vs_3byte();
-    test_vmovd_vmovq_vpsrldq();
-    return 0;
-}

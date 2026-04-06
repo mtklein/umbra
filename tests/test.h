@@ -1,9 +1,6 @@
 #pragma once
 #include "../include/umbra.h"
 #include <stdlib.h>
-#ifndef __wasm__
-    #include <unistd.h>
-#endif
 
 int dprintf(int, char const[], ...);
 
@@ -12,38 +9,19 @@ struct test_alloc {
     void  (*free) (void *);
 };
 
-static inline void *aligned_alloc_(size_t sz) {
-#ifdef __wasm__
-    return calloc(1, sz);
-#else
-    void *p = 0;
-    posix_memalign(&p, (size_t)sysconf(_SC_PAGESIZE), sz);
-    if (p) { __builtin_memset(p, 0, sz); }
-    return p;
-#endif
-}
-static inline void *misaligned_alloc_(size_t sz) {
-#ifdef __wasm__
-    return calloc(1, sz);
-#else
-    size_t pg = (size_t)sysconf(_SC_PAGESIZE);
-    void *p = 0;
-    posix_memalign(&p, pg, sz + 16);
-    if (!p) { return 0; }
-    __builtin_memset(p, 0, sz + 16);
-    return (char*)p + 16;
-#endif
-}
-static inline void misaligned_free_(void *p) {
-#ifdef __wasm__
-    free(p);
-#else
-    if (p) { free((char*)p - 16); }
-#endif
-}
+typedef void (*test_fn)(struct test_alloc const *);
+void test_register(char const *name, test_fn fn);
 
-static const struct test_alloc test_aligned   = { aligned_alloc_, free };
-static const struct test_alloc test_misaligned = { misaligned_alloc_, misaligned_free_ };
+#define TEST(NAME)                                                                \
+    static void NAME(struct test_alloc const *mem);                               \
+    _Pragma("clang diagnostic push")                                              \
+    _Pragma("clang diagnostic ignored \"-Wglobal-constructors\"")                 \
+    __attribute__((constructor)) static void test_ctor_##NAME(void) {             \
+        test_register(#NAME, NAME);                                               \
+    }                                                                             \
+    _Pragma("clang diagnostic pop")                                               \
+    static void NAME(struct test_alloc const *mem)
+
 #define here ? (void)0 : (dprintf(2, "%s:%d failed\n", __FILE__, __LINE__), __builtin_trap())
 
 static inline _Bool equiv(float x, float y) {

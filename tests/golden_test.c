@@ -1,7 +1,10 @@
+#include "test.h"
+
+#ifndef __wasm__
+
 #include "../slides/slide.h"
 #include "../slides/text.h"
 #include "../slides/slug.h"
-#include "test.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -146,7 +149,7 @@ static void test_slide_golden(int slide_idx,
     mem->free(pbuf_tst);
 }
 
-static void test_slug_rect(struct test_alloc const *mem) {
+TEST(test_slug_rect) {
     (void)mem;
     static float rect[] = {
          5, 5,  5,20,  5,35,
@@ -233,7 +236,7 @@ static void test_slug_rect(struct test_alloc const *mem) {
     be->free(be);
 }
 
-static void test_perspective_text(struct test_alloc const *mem) {
+TEST(test_perspective_text) {
     (void)mem;
     enum { BW = 16, BH = 8 };
     uint16_t bmp[BW * BH];
@@ -330,10 +333,9 @@ static void test_perspective_text(struct test_alloc const *mem) {
 }
 
 
-static void run_all_tests(struct test_alloc const *mem) {
+TEST(test_golden_slides) {
     build_pipes();
-    test_perspective_text(mem);
-    test_slug_rect(mem);
+    slides_init(W, H, mem->alloc, mem->free);
     for (int si = 0; si < slide_count() - 1; si++) {
         test_slide_golden(si, mem);
     }
@@ -341,12 +343,4 @@ static void run_all_tests(struct test_alloc const *mem) {
     free_pipes();
 }
 
-int main(void) {
-    slides_init(W, H, test_aligned.alloc, test_aligned.free);
-    run_all_tests(&test_aligned);
-
-    slides_init(W, H, test_misaligned.alloc, test_misaligned.free);
-    run_all_tests(&test_misaligned);
-
-    return 0;
-}
+#endif /* !__wasm__ */

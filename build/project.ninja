@@ -14,9 +14,12 @@ build $out/src/metal.o:          compile_m src/metal.m
 build $out/src/vulkan.o:         compile   src/vulkan.c
     cflags = -isystem /opt/homebrew/Cellar/molten-vk/1.4.1/libexec/include
 build $out/src/draw.o:           compile   src/draw.c
+build $out/tests/test_main.o:    compile   tests/test_main.c
 build $out/tests/test.o:         compile   tests/test.c
 build $out/tests/ra_test.o:      compile   tests/ra_test.c
 build $out/tests/draw_test.o:    compile   tests/draw_test.c
+build $out/tests/golden_test.o:  compile   tests/golden_test.c
+    cflags = -Wno-cast-align
 build $out/tools/bench.o:        compile   tools/bench.c
 build $out/tools/dump.o:         compile   tools/dump.c
 build $out/slides/slides.o:      compile   slides/slides.c
@@ -29,16 +32,9 @@ build $out/slides/overview.o:    compile   slides/overview.c
 build $out/tests/asm_arm64_test.o: compile tests/asm_arm64_test.c
 build $out/tests/asm_x86_test.o:   compile tests/asm_x86_test.c
 
-build $out/test:      link $out/tests/test.o      $out/src/bb.o $out/src/uniforms.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/vulkan.o
-build $out/ra_test:   link $out/tests/ra_test.o   $out/src/bb.o $out/src/uniforms.o $out/src/ra.o $out/src/interpreter.o
-build $out/draw_test: link $out/tests/draw_test.o $out/src/bb.o $out/src/uniforms.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/vulkan.o $out/src/draw.o
+build $out/test:      link $out/tests/test_main.o $out/tests/test.o $out/tests/ra_test.o $out/tests/draw_test.o $out/tests/asm_arm64_test.o $out/tests/asm_x86_test.o $out/tests/golden_test.o $out/src/bb.o $out/src/uniforms.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/vulkan.o $out/src/draw.o $out/stb_truetype.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/overview.o
+    ldflags = $ldflags -lm
 build $out/bench:     link $out/tools/bench.o           $out/src/bb.o $out/src/uniforms.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/vulkan.o $out/src/draw.o $out/stb_truetype.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/overview.o
-build $out/dump:      link $out/tools/dump.o            $out/src/bb.o $out/src/uniforms.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/vulkan.o $out/src/draw.o $out/stb_truetype.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/overview.o
-build $out/asm_arm64_test:  link $out/tests/asm_arm64_test.o $out/src/asm_arm64.o
-build $out/asm_x86_test:    link $out/tests/asm_x86_test.o   $out/src/asm_x86.o
+build $out/dump:      link $out/tools/dump.o            $out/src/bb.o $out/src/uniforms.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/vulkan.o $out/src/draw.o $out/stb_truetype.o $out/stb_image_write.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/overview.o
 
 build $out/test.log:             run  $out/test
-build $out/ra_test.log:          run  $out/ra_test
-build $out/draw_test.log:        run  $out/draw_test
-build $out/asm_arm64_test.log:   run  $out/asm_arm64_test
-build $out/asm_x86_test.log:     run  $out/asm_x86_test
