@@ -16,10 +16,11 @@ struct umbra_backend *umbra_backend_metal(void) { return 0; }
 
 typedef struct umbra_basic_block BB;
 
-struct batch_shared {
-    void *mtl;
-    char *host;
-    size_t copy_sz;
+struct buf_cache_entry {
+    void   *mtl;     // retained id<MTLBuffer>
+    void   *host;
+    size_t  size;
+    _Bool   nocopy; int :24, :32;
 };
 
 struct copyback {
@@ -36,27 +37,25 @@ struct metal_backend {
     void *queue;
     void *batch_cmdbuf;
     void *batch_enc;
-    void               **batch_bufs;
-    int                  batch_nbufs, batch_bufs_cap;
-    struct copyback     *batch_copy;
-    int                  batch_ncopy, batch_copy_cap;
-    int                  batch_gen;
-    _Bool                batch_has_dispatch; int :24;
-    void                *batch_fence;
+    void                  **batch_bufs;
+    int                     batch_nbufs, batch_bufs_cap;
+    struct copyback        *batch_copy;
+    int                     batch_ncopy, batch_copy_cap;
+    struct buf_cache_entry *batch_cache;
+    int                     batch_cache_n, batch_cache_cap;
+    _Bool                   batch_has_dispatch; int :24, :32;
+    void                   *batch_fence;
 };
 
 struct umbra_metal {
     struct umbra_program base;
     void *pipeline;
-    void **per_bufs;
     char  *src;
+    struct deref_info *deref;
     int    max_ptr;
     int    total_bufs;
     int    tg_size;
     int    n_deref;
-    struct deref_info    *deref;
-    struct batch_shared  *batch_data;
-    int                  batch_gen, :32;
 };
 
 typedef struct {
@@ -1021,6 +1020,7 @@ static void umbra_metal_backend_free(struct metal_backend *be) {
         }
         free(be->batch_bufs);
         free(be->batch_copy);
+        free(be->batch_cache);
         free(be);
     }
 }
@@ -1091,7 +1091,6 @@ static struct umbra_metal* umbra_metal(
             m->src           = src;
             m->max_ptr       = max_ptr;
             m->total_bufs    = total_bufs;
-            m->per_bufs      = calloc((size_t)total_bufs, sizeof *m->per_bufs);
             m->deref         = di;
             m->n_deref       = n_deref;
 
@@ -1140,6 +1139,60 @@ static void batch_retain_buf(
 }
 
 
+// Returns an index into be->batch_cache. The entry is valid until
+// umbra_metal_flush. For writable buffers, looks up an existing entry by
+// host pointer and reuses it across programs in the same batch. Read-only
+// buffers are never reused — the host may modify them between queue() calls
+// (e.g. slug curve loop index), so each dispatch needs its own snapshot.
+// Copyback for writable non-nocopy buffers is tracked exactly once, at
+// entry creation time.
+static int cache_buf(struct metal_backend *be, void *host, size_t bytes,
+                     _Bool read_only) {
+    if (!read_only) {
+        for (int i = 0; i < be->batch_cache_n; i++) {
+            struct buf_cache_entry *ce = &be->batch_cache[i];
+            if (ce->host == host && ce->size >= bytes) {
+                return i;
+            }
+        }
+    }
+
+    if (be->batch_cache_n >= be->batch_cache_cap) {
+        be->batch_cache_cap = be->batch_cache_cap ? 2 * be->batch_cache_cap : 16;
+        be->batch_cache = realloc(be->batch_cache,
+            (size_t)be->batch_cache_cap * sizeof *be->batch_cache);
+    }
+    int idx = be->batch_cache_n++;
+    struct buf_cache_entry *ce = &be->batch_cache[idx];
+    *ce = (struct buf_cache_entry){0};
+
+    id<MTLDevice> device = (__bridge id<MTLDevice>)be->device;
+    size_t pg = (size_t)sysconf(_SC_PAGESIZE);
+    size_t aligned_sz = (bytes + pg - 1) & ~(pg - 1);
+    _Bool can_nocopy = host && ((uintptr_t)host & (pg - 1)) == 0;
+    id<MTLBuffer> tmp;
+    if (can_nocopy) {
+        tmp = [device newBufferWithBytesNoCopy:host
+                                       length:(NSUInteger)aligned_sz
+                                      options:MTLResourceStorageModeShared
+                                  deallocator:nil];
+        ce->nocopy = 1;
+    } else {
+        tmp = [device newBufferWithLength:(NSUInteger)(bytes ? bytes : 1)
+                                  options:MTLResourceStorageModeShared];
+        if (host && bytes) {
+            __builtin_memcpy(tmp.contents, host, bytes);
+        }
+    }
+    ce->mtl  = (__bridge_retained void*)tmp;
+    ce->host = host;
+    ce->size = bytes;
+    if (!read_only && !ce->nocopy && host && bytes) {
+        batch_add_copy(be, host, ce->mtl, bytes);
+    }
+    return idx;
+}
+
 static void encode_dispatch(
     struct umbra_metal *m,
     int l, int t, int r, int b,
@@ -1165,8 +1218,8 @@ static void encode_dispatch(
         rbs_data[i]  = (uint32_t)buf[i].row_bytes;
     }
 
-    __builtin_memset(m->per_bufs, 0,
-                     (size_t)tb * sizeof(void*));
+    int cache_idx[32];
+    for (int i = 0; i < tb; i++) { cache_idx[i] = -1; }
 
     uint32_t w32 = (uint32_t)w;
     id<MTLBuffer> per_w =
@@ -1193,53 +1246,9 @@ static void encode_dispatch(
     batch_retain_buf(
         be, (__bridge_retained void*)per_y0);
 
-    size_t offsets[32] = {0};
     for (int i = 0; i <= m->max_ptr; i++) {
         if (!buf[i].ptr || !buf[i].sz) { continue; }
-        size_t bytes = buf[i].sz;
-        struct batch_shared *sh =
-            &m->batch_data[i];
-        char *ptr = buf[i].ptr;
-        _Bool overlap = sh->mtl
-            && ptr >= sh->host
-            && ptr <  sh->host + sh->copy_sz;
-        if (overlap) {
-            offsets[i] = (size_t)(ptr - sh->host);
-            m->per_bufs[i] = sh->mtl;
-        } else {
-            size_t pg = (size_t)sysconf(_SC_PAGESIZE);
-            size_t aligned_sz = (bytes + pg - 1) & ~(pg - 1);
-            _Bool can_nocopy = ((uintptr_t)ptr & (pg - 1)) == 0;
-            id<MTLBuffer> tmp;
-            if (can_nocopy) {
-                tmp = [device
-                    newBufferWithBytesNoCopy:ptr
-                                     length:(NSUInteger)aligned_sz
-                                    options:MTLResourceStorageModeShared
-                                deallocator:nil];
-            } else {
-                tmp = [device
-                    newBufferWithLength:(NSUInteger)bytes
-                                options:MTLResourceStorageModeShared];
-                __builtin_memcpy(tmp.contents, ptr, bytes);
-            }
-            void *retained =
-                (__bridge_retained void*)tmp;
-            if (!sh->mtl) {
-                sh->mtl     = retained;
-                sh->host    = ptr;
-                sh->copy_sz = !buf[i].read_only
-                    ? bytes : 0;
-            }
-            batch_retain_buf(be, retained);
-            if (!buf[i].read_only && !can_nocopy) {
-                batch_add_copy(
-                    be, ptr,
-                    retained, bytes);
-            }
-            offsets[i] = 0;
-            m->per_bufs[i] = retained;
-        }
+        cache_idx[i] = cache_buf(be, buf[i].ptr, buf[i].sz, buf[i].read_only);
     }
 
     for (int d = 0; d < m->n_deref; d++) {
@@ -1262,49 +1271,7 @@ static void encode_dispatch(
         size_t bytes = dsz < 0 ? (size_t)-dsz : (size_t)dsz;
         _Bool deref_read_only = dsz < 0;
         int bi = m->deref[d].buf_idx;
-        struct batch_shared *sh =
-            &m->batch_data[bi];
-        char *dptr = derived;
-        _Bool overlap = sh->mtl
-            && dptr >= sh->host
-            && dptr <  sh->host + sh->copy_sz;
-        if (overlap) {
-            offsets[bi] = (size_t)(dptr - sh->host);
-            m->per_bufs[bi] = sh->mtl;
-        } else {
-            size_t pg = (size_t)sysconf(_SC_PAGESIZE);
-            size_t aligned_sz = (bytes + pg - 1) & ~(pg - 1);
-            _Bool can_nocopy = ((uintptr_t)dptr & (pg - 1)) == 0;
-            id<MTLBuffer> tmp;
-            if (can_nocopy) {
-                tmp = [device
-                    newBufferWithBytesNoCopy:dptr
-                                     length:(NSUInteger)aligned_sz
-                                    options:MTLResourceStorageModeShared
-                                deallocator:nil];
-            } else {
-                tmp = [device
-                    newBufferWithLength:(NSUInteger)bytes
-                                options:MTLResourceStorageModeShared];
-                __builtin_memcpy(tmp.contents, dptr, bytes);
-            }
-            void *retained =
-                (__bridge_retained void*)tmp;
-            if (!sh->mtl) {
-                sh->mtl     = retained;
-                sh->host    = dptr;
-                sh->copy_sz = !deref_read_only
-                    ? bytes : 0;
-            }
-            batch_retain_buf(be, retained);
-            if (!deref_read_only && !can_nocopy) {
-                batch_add_copy(
-                    be, dptr,
-                    retained, bytes);
-            }
-            offsets[bi] = 0;
-            m->per_bufs[bi] = retained;
-        }
+        cache_idx[bi] = cache_buf(be, derived, bytes, deref_read_only);
         szs_data[bi] = (uint32_t)bytes;
         rbs_data[bi] = (uint32_t)drb;
     }
@@ -1327,12 +1294,12 @@ static void encode_dispatch(
         per_rbs.contents, rbs_data, sz_bytes);
     batch_retain_buf(
         be, (__bridge_retained void*)per_rbs);
-    for (int i = 0; i < m->total_bufs; i++) {
-        if (m->per_bufs[i]) {
+    for (int i = 0; i < tb; i++) {
+        if (cache_idx[i] >= 0) {
             [enc setBuffer:
                 (__bridge id<MTLBuffer>)
-                    m->per_bufs[i]
-                offset:(NSUInteger)offsets[i]
+                    be->batch_cache[cache_idx[i]].mtl
+                offset:0
                atIndex:(NSUInteger)i];
         }
     }
@@ -1396,18 +1363,6 @@ static void umbra_metal_run(
             (__bridge
              id<MTLComputeCommandEncoder>)
                 be->batch_enc;
-        if (!m->batch_data) {
-            m->batch_data = calloc(
-                (size_t)m->total_bufs,
-                sizeof *m->batch_data);
-        }
-        if (m->batch_gen != be->batch_gen) {
-            m->batch_gen = be->batch_gen;
-            __builtin_memset(
-                m->batch_data, 0,
-                (size_t)m->total_bufs
-                    * sizeof *m->batch_data);
-        }
         encode_dispatch(
             m, l, t, r, b, buf, enc);
     }
@@ -1415,7 +1370,6 @@ static void umbra_metal_run(
 
 static void umbra_metal_begin_batch(struct metal_backend *be) {
     if (be && !be->batch_cmdbuf) {
-        be->batch_gen++;
         be->batch_has_dispatch = 0;
         @autoreleasepool {
             id<MTLCommandQueue> queue =
@@ -1474,6 +1428,12 @@ static void umbra_metal_flush(struct metal_backend *be) {
             }
             be->batch_nbufs = 0;
 
+            for (int i = 0; i < be->batch_cache_n; i++) {
+                (void)(__bridge_transfer id)
+                    be->batch_cache[i].mtl;
+            }
+            be->batch_cache_n = 0;
+
             if (be->batch_fence) {
                 (void)(__bridge_transfer id)be->batch_fence;
                 be->batch_fence = NULL;
@@ -1488,9 +1448,7 @@ static void umbra_metal_free(struct umbra_metal *m) {
             (void)(__bridge_transfer id)m->pipeline;
         }
     }
-    free(m->per_bufs);
     free(m->deref);
-    free(m->batch_data);
     free(m->src);
     free(m);
 }
