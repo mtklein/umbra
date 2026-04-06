@@ -107,44 +107,44 @@ static struct slide *make_solid(char const *title, uint32_t bg, float const colo
     return &st->base;
 }
 
-SLIDE(1, slide_solid_src) {
+SLIDE(slide_solid_src) {
     (void)ctx;
-    return make_solid("1. Solid Fill (src)", 0xff202020,
+    return make_solid("Solid Fill (src)", 0xff202020,
                       (float[]){0.0f, 0.6f, 1.0f, 1.0f},
                       umbra_coverage_rect, umbra_blend_src, umbra_fmt_8888);
 }
 
-SLIDE(2, slide_solid_srcover) {
+SLIDE(slide_solid_srcover) {
     (void)ctx;
-    return make_solid("2. Source Over (srcover)", 0xff00ff00,
+    return make_solid("Source Over (srcover)", 0xff00ff00,
                       (float[]){0.45f, 0.0f, 0.0f, 0.5f},
                       umbra_coverage_rect, umbra_blend_srcover, umbra_fmt_8888);
 }
 
-SLIDE(3, slide_solid_dstover) {
+SLIDE(slide_solid_dstover) {
     (void)ctx;
-    return make_solid("3. Destination Over (dstover)", 0xc0008000,
+    return make_solid("Destination Over (dstover)", 0xc0008000,
                       (float[]){0.0f, 0.0f, 0.9f, 0.9f},
                       umbra_coverage_rect, umbra_blend_dstover, umbra_fmt_8888);
 }
 
-SLIDE(4, slide_solid_multiply) {
+SLIDE(slide_solid_multiply) {
     (void)ctx;
-    return make_solid("4. Multiply Blend", 0xff804020,
+    return make_solid("Multiply Blend", 0xff804020,
                       (float[]){1.0f, 0.5f, 0.0f, 1.0f},
                       umbra_coverage_rect, umbra_blend_multiply, umbra_fmt_8888);
 }
 
-SLIDE(5, slide_solid_full_cov) {
+SLIDE(slide_solid_full_cov) {
     (void)ctx;
-    return make_solid("5. Full Coverage (no rect clip)", 0xffffffff,
+    return make_solid("Full Coverage (no rect clip)", 0xffffffff,
                       (float[]){0.15f, 0.0f, 0.3f, 0.3f},
                       NULL, umbra_blend_srcover, umbra_fmt_8888);
 }
 
-SLIDE(6, slide_solid_no_blend) {
+SLIDE(slide_solid_no_blend) {
     (void)ctx;
-    return make_solid("6. No Blend (direct paint)", 0xff000000,
+    return make_solid("No Blend (direct paint)", 0xff000000,
                       (float[]){0.9f, 0.4f, 0.1f, 1.0f},
                       umbra_coverage_rect, NULL, umbra_fmt_8888);
 }

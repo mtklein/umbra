@@ -130,7 +130,9 @@ static void overview_free(struct slide *s) {
     free(st);
 }
 
-SLIDE(15, slide_overview) {
+struct slide *make_overview(struct slide_ctx const *);
+
+struct slide *make_overview(struct slide_ctx const *ctx) {
     (void)ctx;
     struct overview_state *st = calloc(1, sizeof *st);
     st->fmt = umbra_fmt_8888;

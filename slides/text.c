@@ -68,7 +68,7 @@ static void text_free(struct slide *s) {
     free(st);
 }
 
-SLIDE(7, slide_text_bitmap) {
+SLIDE(slide_text_bitmap) {
     struct text_state *st = calloc(1, sizeof *st);
     st->tc = ctx->bitmap_cov;
     st->shader = umbra_shader_solid;
@@ -77,7 +77,7 @@ SLIDE(7, slide_text_bitmap) {
     st->fmt = umbra_fmt_8888;
     st->color[0] = 1.0f; st->color[1] = 1.0f; st->color[2] = 1.0f; st->color[3] = 1.0f;
     st->base = (struct slide){
-        .title = "7. Text (8-bit AA)",
+        .title = "Text (8-bit AA)",
         .bg = 0xff1a1a2e,
         .init = text_init,
         .prepare = text_prepare,
@@ -88,7 +88,7 @@ SLIDE(7, slide_text_bitmap) {
     return &st->base;
 }
 
-SLIDE(8, slide_text_sdf) {
+SLIDE(slide_text_sdf) {
     struct text_state *st = calloc(1, sizeof *st);
     st->tc = ctx->sdf_cov;
     st->shader = umbra_shader_solid;
@@ -97,7 +97,7 @@ SLIDE(8, slide_text_sdf) {
     st->fmt = umbra_fmt_8888;
     st->color[0] = 0.2f; st->color[1] = 0.8f; st->color[2] = 1.0f; st->color[3] = 1.0f;
     st->base = (struct slide){
-        .title = "8. Text (SDF)",
+        .title = "Text (SDF)",
         .bg = 0xff1a1a2e,
         .init = text_init,
         .prepare = text_prepare,

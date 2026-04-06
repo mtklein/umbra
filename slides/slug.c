@@ -120,7 +120,7 @@ static void slug_slide_free(struct slide *s) {
     free(st);
 }
 
-SLIDE(14, slide_slug_wind) {
+SLIDE(slide_slug_wind) {
     struct slug_state *st = calloc(1, sizeof *st);
     st->slug = ctx->slug;
     st->fmt = umbra_fmt_8888;
@@ -129,7 +129,7 @@ SLIDE(14, slide_slug_wind) {
     st->color[2] = 0.6f;
     st->color[3] = 1.0f;
     st->base = (struct slide){
-        .title = "14. Slug Text (Bezier)",
+        .title = "Slug Text (Bezier)",
         .bg = 0xff0a0a1e,
         .init = slug_init,
         .animate = slug_animate,

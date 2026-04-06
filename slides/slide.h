@@ -35,14 +35,14 @@ struct slide_ctx {
 };
 
 typedef struct slide *(*slide_factory_fn)(struct slide_ctx const *);
-void slide_register(int order, slide_factory_fn factory);
+void slide_register(slide_factory_fn factory);
 
-#define SLIDE(ORDER, NAME)                                                       \
+#define SLIDE(NAME)                                                              \
     static struct slide *NAME(struct slide_ctx const *ctx);                      \
     _Pragma("clang diagnostic push")                                             \
     _Pragma("clang diagnostic ignored \"-Wglobal-constructors\"")                \
     __attribute__((constructor)) static void slide_ctor_##NAME(void) {           \
-        slide_register(ORDER, NAME);                                             \
+        slide_register(NAME);                                                    \
     }                                                                            \
     _Pragma("clang diagnostic pop")                                              \
     static struct slide *NAME(struct slide_ctx const *ctx)

@@ -82,7 +82,7 @@ static void persp_free(struct slide *s) {
     free(st);
 }
 
-SLIDE(9, slide_persp) {
+SLIDE(slide_persp) {
     struct persp_state *st = calloc(1, sizeof *st);
     st->bitmap = ctx->bitmap_cov;
     st->shader = umbra_shader_solid;
@@ -91,7 +91,7 @@ SLIDE(9, slide_persp) {
     st->fmt = umbra_fmt_8888;
     st->color[0] = 1.0f; st->color[1] = 0.8f; st->color[2] = 0.2f; st->color[3] = 1.0f;
     st->base = (struct slide){
-        .title = "9. Perspective Text",
+        .title = "Perspective Text",
         .bg = 0xff0a0a1e,
         .init = persp_init,
         .animate = persp_animate,
