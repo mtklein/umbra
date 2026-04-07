@@ -2089,8 +2089,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     }
 
     for (int d = 0; d < vp->n_deref; d++) {
-        char *base = (char *)buf[vp->deref[d].src_buf].ptr
-                   + (size_t)0 * buf[vp->deref[d].src_buf].row_bytes;
+        char *base = (char *)buf[vp->deref[d].src_buf].ptr;
         void *derived;
         ptrdiff_t ssz;
         size_t drb;
