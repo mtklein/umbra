@@ -1120,8 +1120,8 @@ static void batch_add_copy(
 // read-only request with no matching writable entry creates a fresh
 // snapshot, because the host may have mutated the bytes since any prior
 // read-only entry was made (e.g. slug acc loop counter in the uniforms
-// buffer). Copyback for writable non-nocopy buffers is tracked exactly
-// once, at entry creation time.
+// buffer). Copyback for writable buffers is tracked exactly once, at entry
+// creation time.
 static int cache_buf(struct metal_backend *be, void *host, size_t bytes,
                      _Bool read_only) {
     for (int i = 0; i < be->batch_cache_n; i++) {
