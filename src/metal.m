@@ -1184,11 +1184,23 @@ static void encode_dispatch(
         rbs_data[i]  = (uint32_t)buf[i].row_bytes;
     }
 
-    int cache_idx[32];
-    for (int i = 0; i < tb; i++) { cache_idx[i] = -1; }
+    // cache_idx[i]: -1 = skip, -2 = bind via setBytes (small read-only flat buffer),
+    // otherwise an index into be->batch_cache for setBuffer.
+    // inline_ptr[i]/inline_len[i] hold the host bytes when cache_idx[i] == -2.
+    enum { INLINE_BYTES_MAX = 4096 };
+    int     cache_idx [32];
+    void   *inline_ptr[32];
+    size_t  inline_len[32];
+    for (int i = 0; i < tb; i++) { cache_idx[i] = -1; inline_ptr[i] = NULL; inline_len[i] = 0; }
 
     for (int i = 0; i <= m->max_ptr; i++) {
         if (!buf[i].ptr || !buf[i].sz) { continue; }
+        if (buf[i].read_only && !buf[i].row_bytes && buf[i].sz <= INLINE_BYTES_MAX) {
+            inline_ptr[i] = buf[i].ptr;
+            inline_len[i] = buf[i].sz;
+            cache_idx[i]  = -2;
+            continue;
+        }
         cache_idx[i] = cache_buf(be, buf[i].ptr, buf[i].sz, buf[i].read_only);
     }
 
@@ -1218,7 +1230,9 @@ static void encode_dispatch(
     }
 
     for (int i = 0; i < tb; i++) {
-        if (cache_idx[i] >= 0) {
+        if (cache_idx[i] == -2) {
+            [enc setBytes:inline_ptr[i] length:inline_len[i] atIndex:(NSUInteger)i];
+        } else if (cache_idx[i] >= 0) {
             [enc setBuffer:
                 (__bridge id<MTLBuffer>)
                     be->batch_cache[cache_idx[i]].mtl
