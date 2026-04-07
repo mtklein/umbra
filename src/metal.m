@@ -1032,12 +1032,7 @@ static struct umbra_metal* umbra_metal(
         int  max_ptr = -1, total_bufs = 0;
         char *src = build_source(bb, &max_ptr, &total_bufs, deref_buf);
 
-        int n_deref = 0;
-        for (int i = 0; i < bb->insts; i++) {
-            if (bb->inst[i].op == op_deref_ptr) {
-                n_deref++;
-            }
-        }
+        int n_deref = total_bufs - max_ptr - 1;
         struct deref_info *di = calloc((size_t)(n_deref ? n_deref : 1), sizeof *di);
         {
             int d = 0;
