@@ -372,9 +372,9 @@ static void run_long_batch_no_oom(struct umbra_backend *be) {
         {.ptr=color, .sz=sizeof color, .read_only=1},
         {.ptr=&pixel, .sz=sizeof pixel, .row_bytes=sizeof pixel},
     };
-    // 100 000 × 16-byte uniforms = ~1.6 MiB of ring traffic, one
-    // backpressure event at the 1 MiB high water mark.
-    int const N = 100000;
+    // 12 000 × 16-byte uniforms = ~192 KiB of ring traffic, ~3 backpressure
+    // events at the 64 KiB high water mark.
+    int const N = 12000;
     for (int i = 0; i < N; i++) {
         color[0] = (float)((i & 0xff) / 255.0f);
         p->queue(p, 0, 0, 1, 1, bufs);

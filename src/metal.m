@@ -991,16 +991,13 @@ static char* build_source(BB const *bb,
     return src;
 }
 
-enum {
-    METAL_RING_CHUNK_BYTES = 256 * 1024,
-    METAL_RING_HIGH_WATER  =   1 * 1024 * 1024,
-};
+enum { METAL_RING_HIGH_WATER = 64 * 1024 };
 
 static struct uniform_ring_chunk metal_ring_new_chunk(size_t min_bytes, void *ctx) {
     struct metal_backend *be = ctx;
     @autoreleasepool {
         id<MTLDevice> device = (__bridge id<MTLDevice>)be->device;
-        size_t cap = min_bytes > METAL_RING_CHUNK_BYTES ? min_bytes : METAL_RING_CHUNK_BYTES;
+        size_t cap = min_bytes > METAL_RING_HIGH_WATER ? min_bytes : METAL_RING_HIGH_WATER;
         id<MTLBuffer> buf = [device newBufferWithLength:(NSUInteger)cap
                                                 options:MTLResourceStorageModeShared];
         return (struct uniform_ring_chunk){

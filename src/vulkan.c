@@ -1921,10 +1921,7 @@ static VkDeviceMemory alloc_and_bind(VkDevice device, VkBuffer buf, uint32_t mem
 //  Uniform ring chunk lifecycle.
 // ---------------------------------------------------------------------------
 
-enum {
-    VK_RING_CHUNK_BYTES = 256 * 1024,
-    VK_RING_HIGH_WATER  =   1 * 1024 * 1024,
-};
+enum { VK_RING_HIGH_WATER = 64 * 1024 };
 
 struct vk_ring_chunk {
     VkBuffer       buf;
@@ -1933,7 +1930,7 @@ struct vk_ring_chunk {
 
 static struct uniform_ring_chunk vk_ring_new_chunk(size_t min_bytes, void *ctx) {
     struct vk_backend *be = ctx;
-    size_t cap = min_bytes > VK_RING_CHUNK_BYTES ? min_bytes : VK_RING_CHUNK_BYTES;
+    size_t cap = min_bytes > VK_RING_HIGH_WATER ? min_bytes : VK_RING_HIGH_WATER;
     struct vk_ring_chunk *chunk = calloc(1, sizeof *chunk);
     chunk->buf = create_buffer(be->device, (VkDeviceSize)cap);
     chunk->mem = alloc_and_bind(be->device, chunk->buf, be->mem_type_host);
