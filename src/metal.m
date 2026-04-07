@@ -1,4 +1,5 @@
 #include "bb.h"
+#include "uniform_ring.h"
 
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
@@ -41,6 +42,7 @@ struct metal_backend {
     int                     batch_ncopy, batch_copy_cap;
     struct buf_cache_entry *batch_cache;
     int                     batch_cache_n, batch_cache_cap;
+    struct uniform_ring     uni_ring;
 };
 
 struct umbra_metal {
@@ -985,6 +987,31 @@ static char* build_source(BB const *bb,
     return src;
 }
 
+enum { METAL_RING_CHUNK_BYTES = 256 * 1024 };
+
+static struct uniform_ring_chunk metal_ring_new_chunk(size_t min_bytes, void *ctx) {
+    struct metal_backend *be = ctx;
+    @autoreleasepool {
+        id<MTLDevice> device = (__bridge id<MTLDevice>)be->device;
+        size_t cap = min_bytes > METAL_RING_CHUNK_BYTES ? min_bytes : METAL_RING_CHUNK_BYTES;
+        id<MTLBuffer> buf = [device newBufferWithLength:(NSUInteger)cap
+                                                options:MTLResourceStorageModeShared];
+        return (struct uniform_ring_chunk){
+            .handle=(__bridge_retained void*)buf,
+            .mapped=buf.contents,
+            .cap   =cap,
+            .used  =0,
+        };
+    }
+}
+
+static void metal_ring_free_chunk(void *handle, void *ctx) {
+    (void)ctx;
+    @autoreleasepool {
+        (void)(__bridge_transfer id<MTLBuffer>)handle;
+    }
+}
+
 static struct metal_backend* umbra_metal_backend_create(void) {
     @autoreleasepool {
         id<MTLDevice> device =
@@ -998,6 +1025,12 @@ static struct metal_backend* umbra_metal_backend_create(void) {
                 (__bridge_retained void*)device;
             be->queue =
                 (__bridge_retained void*)queue;
+            be->uni_ring = (struct uniform_ring){
+                .align     =16,
+                .ctx       =be,
+                .new_chunk =metal_ring_new_chunk,
+                .free_chunk=metal_ring_free_chunk,
+            };
             return be;
         }
         return 0;
@@ -1006,6 +1039,7 @@ static struct metal_backend* umbra_metal_backend_create(void) {
 
 static void umbra_metal_backend_free(struct metal_backend *be) {
     if (be) {
+        uniform_ring_free(&be->uni_ring);
         @autoreleasepool {
             if (be->device) {
                 (void)(__bridge_transfer id)be->device;
@@ -1184,24 +1218,26 @@ static void encode_dispatch(
         rbs_data[i]  = (uint32_t)buf[i].row_bytes;
     }
 
-    // cache_idx[i]: -1 = skip, -2 = bind via setBytes (small read-only flat buffer),
-    // otherwise an index into be->batch_cache for setBuffer.
-    // inline_ptr[i]/inline_len[i] hold the host bytes when cache_idx[i] == -2.
-    enum { INLINE_BYTES_MAX = 4096 };
-    int     cache_idx [32];
-    void   *inline_ptr[32];
-    size_t  inline_len[32];
-    for (int i = 0; i < tb; i++) { cache_idx[i] = -1; inline_ptr[i] = NULL; inline_len[i] = 0; }
+    // For each top-level / deref'd binding we need an MTLBuffer + offset.
+    // Read-only flat buffers go through the per-batch uniform ring (bump-
+    // allocated into a chunk MTLBuffer, no growth in the cmdbuf inline area).
+    // Everything else (writable, row-structured, deref'd) goes through
+    // cache_buf so the writable->readonly handoff path is preserved.
+    void   *bind_handle[32];
+    size_t  bind_offset[32];
+    for (int i = 0; i < tb; i++) { bind_handle[i] = 0; bind_offset[i] = 0; }
 
     for (int i = 0; i <= m->max_ptr; i++) {
         if (!buf[i].ptr || !buf[i].sz) { continue; }
-        if (buf[i].read_only && !buf[i].row_bytes && buf[i].sz <= INLINE_BYTES_MAX) {
-            inline_ptr[i] = buf[i].ptr;
-            inline_len[i] = buf[i].sz;
-            cache_idx[i]  = -2;
+        if (buf[i].read_only && !buf[i].row_bytes) {
+            struct uniform_ring_loc loc =
+                uniform_ring_alloc(&be->uni_ring, buf[i].ptr, buf[i].sz);
+            bind_handle[i] = loc.handle;
+            bind_offset[i] = loc.offset;
             continue;
         }
-        cache_idx[i] = cache_buf(be, buf[i].ptr, buf[i].sz, buf[i].read_only);
+        int idx = cache_buf(be, buf[i].ptr, buf[i].sz, buf[i].read_only);
+        bind_handle[i] = be->batch_cache[idx].mtl;
     }
 
     for (int d = 0; d < m->n_deref; d++) {
@@ -1224,20 +1260,17 @@ static void encode_dispatch(
         size_t bytes = dsz < 0 ? (size_t)-dsz : (size_t)dsz;
         _Bool deref_read_only = dsz < 0;
         int bi = m->deref[d].buf_idx;
-        cache_idx[bi] = cache_buf(be, derived, bytes, deref_read_only);
+        int idx = cache_buf(be, derived, bytes, deref_read_only);
+        bind_handle[bi] = be->batch_cache[idx].mtl;
         szs_data[bi] = (uint32_t)bytes;
         rbs_data[bi] = (uint32_t)drb;
     }
 
     for (int i = 0; i < tb; i++) {
-        if (cache_idx[i] == -2) {
-            [enc setBytes:inline_ptr[i] length:inline_len[i] atIndex:(NSUInteger)i];
-        } else if (cache_idx[i] >= 0) {
-            [enc setBuffer:
-                (__bridge id<MTLBuffer>)
-                    be->batch_cache[cache_idx[i]].mtl
-                offset:0
-               atIndex:(NSUInteger)i];
+        if (bind_handle[i]) {
+            [enc setBuffer:(__bridge id<MTLBuffer>)bind_handle[i]
+                    offset:(NSUInteger)bind_offset[i]
+                   atIndex:(NSUInteger)i];
         }
     }
 
@@ -1343,6 +1376,8 @@ static void umbra_metal_flush(struct metal_backend *be) {
                     be->batch_cache[i].mtl;
             }
             be->batch_cache_n = 0;
+
+            uniform_ring_reset(&be->uni_ring);
 
             if (be->prev_fence) {
                 (void)(__bridge_transfer id)be->prev_fence;
