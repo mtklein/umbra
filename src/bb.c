@@ -80,6 +80,20 @@ static uint32_t bb_inst_hash(struct bb_inst const *inst) {
     return h ? h : 1;
 }
 
+struct dedup_ctx {
+    struct bb_inst const *probe;
+    struct bb_inst const *insts;
+    int                   hit, pad_;
+};
+static _Bool dedup_match(int id, void *ctx) {
+    struct dedup_ctx *c = ctx;
+    if (__builtin_memcmp(c->probe, &c->insts[id], sizeof *c->probe) == 0) {
+        c->hit = id;
+        return 1;
+    }
+    return 0;
+}
+
 static val push_(builder *b, struct bb_inst inst) {
     {
         enum op const op = inst.op;
@@ -100,44 +114,20 @@ static val push_(builder *b, struct bb_inst inst) {
 
     uint32_t const h = bb_inst_hash(&inst);
 
-    for (int slot = (int)h; b->ht_mask; slot++) {
-        if (b->ht[slot & b->ht_mask].hash == 0) { break; }
-        if (h == b->ht[slot & b->ht_mask].hash
-            && 0
-                == __builtin_memcmp(&inst, &b->inst[b->ht[slot & b->ht_mask].ix],
-                                    sizeof inst)) {
-            return (val){.id = (unsigned)b->ht[slot & b->ht_mask].ix};
-        }
+    struct dedup_ctx ctx = {.probe = &inst, .insts = b->inst};
+    if (hash_lookup(b->ht, h, dedup_match, &ctx)) {
+        return (val){.id = (unsigned)ctx.hit};
     }
 
     if (is_pow2_or_zero(b->insts)) {
-        int const inst_cap = b->insts ? 2 * b->insts : 1, ht_cap = 2 * inst_cap;
+        int const inst_cap = b->insts ? 2 * b->insts : 1;
         b->inst = realloc(b->inst, (size_t)inst_cap * sizeof *b->inst);
-
-        struct hash_slot *old = b->ht;
-        int const         old_cap = b->ht ? b->ht_mask + 1 : 0;
-        b->ht = calloc((size_t)ht_cap, sizeof *b->ht);
-        b->ht_mask = ht_cap - 1;
-        for (int i = 0; i < old_cap; i++) {
-            for (int slot = (int)old[i].hash; old[i].hash; slot++) {
-                if (b->ht[slot & b->ht_mask].hash == 0) {
-                    b->ht[slot & b->ht_mask] = old[i];
-                    break;
-                }
-            }
-        }
-        free(old);
     }
 
     int const id = b->insts++;
     b->inst[id] = inst;
     if (!is_store(inst.op)) {
-        for (int slot = (int)h;; slot++) {
-            if (b->ht[slot & b->ht_mask].hash == 0) {
-                b->ht[slot & b->ht_mask] = (struct hash_slot){h, id};
-                break;
-            }
-        }
+        hash_insert(&b->ht, h, id);
     }
     return (val){.id = (unsigned)id};
 }
@@ -157,7 +147,7 @@ builder* umbra_builder(void) {
 void umbra_builder_free(builder *b) {
     if (b) {
         free(b->inst);
-        free(b->ht);
+        free(b->ht.data);
         free(b);
     }
 }
