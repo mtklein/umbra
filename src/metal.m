@@ -20,7 +20,7 @@ struct buf_cache_entry {
     void   *mtl;     // retained id<MTLBuffer>
     void   *host;
     size_t  size;
-    _Bool   nocopy, writable; int :16, :32;
+    _Bool   writable; int :24, :32;
 };
 
 struct copyback {
@@ -36,7 +36,7 @@ struct metal_backend {
     void *device;
     void *queue;
     void *batch_cmdbuf;
-    void *batch_enc;
+    void *prev_fence;       // fence updated by the previous encoder (NULL for first)
     void                  **batch_bufs;
     int                     batch_nbufs, batch_bufs_cap;
     struct copyback        *batch_copy;
@@ -1166,28 +1166,21 @@ static int cache_buf(struct metal_backend *be, void *host, size_t bytes,
     *ce = (struct buf_cache_entry){0};
 
     id<MTLDevice> device = (__bridge id<MTLDevice>)be->device;
-    size_t pg = (size_t)sysconf(_SC_PAGESIZE);
-    size_t aligned_sz = (bytes + pg - 1) & ~(pg - 1);
-    _Bool can_nocopy = host && ((uintptr_t)host & (pg - 1)) == 0;
-    id<MTLBuffer> tmp;
-    if (can_nocopy) {
-        tmp = [device newBufferWithBytesNoCopy:host
-                                       length:(NSUInteger)aligned_sz
-                                      options:MTLResourceStorageModeShared
-                                  deallocator:nil];
-        ce->nocopy = 1;
-    } else {
-        tmp = [device newBufferWithLength:(NSUInteger)(bytes ? bytes : 1)
-                                  options:MTLResourceStorageModeShared];
-        if (host && bytes) {
-            __builtin_memcpy(tmp.contents, host, bytes);
-        }
+    // MoltenVK exemplar: always allocate a fresh shared MTLBuffer and copy
+    // host data in. The newBufferWithBytesNoCopy fast path interacts badly
+    // with Metal's hazard tracking on at least some driver paths (Rosetta in
+    // particular), and going through the copy path is what MoltenVK does.
+    id<MTLBuffer> tmp =
+        [device newBufferWithLength:(NSUInteger)(bytes ? bytes : 1)
+                            options:MTLResourceStorageModeShared];
+    if (host && bytes) {
+        __builtin_memcpy(tmp.contents, host, bytes);
     }
     ce->mtl      = (__bridge_retained void*)tmp;
     ce->host     = host;
     ce->size     = bytes;
     ce->writable = !read_only;
-    if (!read_only && !ce->nocopy && host && bytes) {
+    if (!read_only && host && bytes) {
         batch_add_copy(be, host, ce->mtl, bytes);
     }
     return idx;
@@ -1353,12 +1346,30 @@ static void umbra_metal_run(
         umbra_metal_begin_batch(be);
     }
     @autoreleasepool {
+        // MoltenVK pattern for compute pipeline barriers: end the previous
+        // encoder, start a new one with serial dispatch, bridge them with a
+        // freshly-allocated MTLFence updateFence/waitForFence pair. Each
+        // encoder boundary uses its own fence object — MoltenVK uses a fence
+        // pool rather than reusing one fence across an entire batch, and we
+        // saw 385-px flakes when reusing one fence across all 14 acc
+        // dispatches in a slug frame.
+        id<MTLCommandBuffer> cmdbuf =
+            (__bridge id<MTLCommandBuffer>)be->batch_cmdbuf;
+        id<MTLDevice> device =
+            (__bridge id<MTLDevice>)be->device;
         id<MTLComputeCommandEncoder> enc =
-            (__bridge
-             id<MTLComputeCommandEncoder>)
-                be->batch_enc;
-        encode_dispatch(
-            m, l, t, r, b, buf, enc);
+            [cmdbuf computeCommandEncoderWithDispatchType:MTLDispatchTypeSerial];
+        if (be->prev_fence) {
+            id<MTLFence> wait =
+                (__bridge_transfer id<MTLFence>)be->prev_fence;
+            be->prev_fence = NULL;
+            [enc waitForFence:wait];
+        }
+        encode_dispatch(m, l, t, r, b, buf, enc);
+        id<MTLFence> update = [device newFence];
+        [enc updateFence:update];
+        [enc endEncoding];
+        be->prev_fence = (__bridge_retained void*)update;
     }
 }
 
@@ -1369,14 +1380,9 @@ static void umbra_metal_begin_batch(struct metal_backend *be) {
                 (__bridge id<MTLCommandQueue>)
                     be->queue;
             id<MTLCommandBuffer> cmdbuf =
-                [queue
-                 commandBufferWithUnretainedReferences];
-            id<MTLComputeCommandEncoder> enc =
-                [cmdbuf computeCommandEncoder];
+                [queue commandBuffer];
             be->batch_cmdbuf =
                 (__bridge_retained void*)cmdbuf;
-            be->batch_enc =
-                (__bridge_retained void*)enc;
         }
     }
 }
@@ -1384,17 +1390,11 @@ static void umbra_metal_begin_batch(struct metal_backend *be) {
 static void umbra_metal_flush(struct metal_backend *be) {
     if (be && be->batch_cmdbuf) {
         @autoreleasepool {
-            id<MTLComputeCommandEncoder> enc =
-                (__bridge_transfer
-                 id<MTLComputeCommandEncoder>)
-                    be->batch_enc;
             id<MTLCommandBuffer> cmdbuf =
                 (__bridge_transfer id<MTLCommandBuffer>)
                     be->batch_cmdbuf;
-            be->batch_enc    = NULL;
             be->batch_cmdbuf = NULL;
 
-            [enc endEncoding];
             [cmdbuf commit];
             [cmdbuf waitUntilCompleted];
 
@@ -1421,6 +1421,11 @@ static void umbra_metal_flush(struct metal_backend *be) {
                     be->batch_cache[i].mtl;
             }
             be->batch_cache_n = 0;
+
+            if (be->prev_fence) {
+                (void)(__bridge_transfer id)be->prev_fence;
+                be->prev_fence = NULL;
+            }
         }
     }
 }
