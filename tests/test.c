@@ -688,7 +688,7 @@ TEST(test_round_floor_ceil) {
         umbra_val32            r_ = op(b_, x_);                              \
         umbra_store_32(b_, (umbra_ptr32){.ix=1}, r_);                       \
         struct test_backends B_ = make(b_);                                          \
-        for (int bi_ = 0; bi_ < 3; bi_++) {                                 \
+        for (int bi_ = 0; bi_ < NUM_BACKENDS; bi_++) {                      \
             float s_[4];                                                    \
             __builtin_memcpy(s_, src, 16);                                  \
             int d_[4] = {0};                                                \
