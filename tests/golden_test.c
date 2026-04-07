@@ -92,13 +92,12 @@ static void render_slide(
     s->draw(s, 0, 0, W, H, pixbuf);
 }
 
-static void test_slide_golden(int slide_idx,
-                              struct test_alloc const *mem) {
+static void test_slide_golden(int slide_idx) {
     struct slide *s = slide_get(slide_idx);
 
     size_t pixbuf_sz = (size_t)(W * H * 4);
-    void *pbuf_ref = mem->alloc(pixbuf_sz);
-    void *pbuf_tst = mem->alloc(pixbuf_sz);
+    void *pbuf_ref = malloc(pixbuf_sz);
+    void *pbuf_tst = malloc(pixbuf_sz);
 
     render_slide(slide_idx, bes[0], pbuf_ref);
     bes[0]->flush(bes[0]);
@@ -145,12 +144,11 @@ static void test_slide_golden(int slide_idx,
         (worst <= tol) here;
     }
 
-    mem->free(pbuf_ref);
-    mem->free(pbuf_tst);
+    free(pbuf_ref);
+    free(pbuf_tst);
 }
 
 TEST(test_slug_rect) {
-    (void)mem;
     static float rect[] = {
          5, 5,  5,20,  5,35,
          5,35, 30,35, 55,35,
@@ -236,7 +234,6 @@ TEST(test_slug_rect) {
 }
 
 TEST(test_perspective_text) {
-    (void)mem;
     enum { BW = 16, BH = 8 };
     uint16_t bmp[BW * BH];
     __builtin_memset(bmp, 0, sizeof bmp);
@@ -336,7 +333,7 @@ TEST(test_golden_slides) {
     build_pipes();
     slides_init(W, H);
     for (int si = 0; si < slide_count() - 1; si++) {
-        test_slide_golden(si, mem);
+        test_slide_golden(si);
     }
     slides_cleanup();
     free_pipes();

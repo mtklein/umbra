@@ -1,7 +1,4 @@
 #include "test.h"
-#include <stdlib.h>
-
-static struct test_alloc const test_mem = { malloc, free };
 
 enum { TEST_CAP = 4096 };
 
@@ -23,7 +20,7 @@ void test_register(char const *name, test_fn fn) {
 
 int main(void) {
     for (int i = 0; i < test_count; i++) {
-        registry[i].fn(&test_mem);
+        registry[i].fn();
     }
     return 0;
 }

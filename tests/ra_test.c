@@ -44,7 +44,6 @@ static void free_bb(struct umbra_basic_block *bb) {
 }
 
 TEST(test_basic_alloc_free) {
-    (void)mem;
     static int8_t const pool[] = {10, 11, 12, 13};
     struct ra_config    cfg = {
         .pool = pool,
@@ -82,7 +81,6 @@ TEST(test_basic_alloc_free) {
 }
 
 TEST(test_eviction_belady) {
-    (void)mem;
     static int8_t const pool[] = {5, 6};
     struct ra_config    cfg = {
         .pool = pool,
@@ -120,7 +118,6 @@ TEST(test_eviction_belady) {
 }
 
 TEST(test_dead_value_evicted_first) {
-    (void)mem;
     // dead values (last_use=-1) evicted first
     static int8_t const pool[] = {5, 6};
     struct ra_config    cfg = {
@@ -157,7 +154,6 @@ TEST(test_dead_value_evicted_first) {
 }
 
 TEST(test_ensure_and_fill) {
-    (void)mem;
     static int8_t const pool[] = {5, 6};
     struct ra_config    cfg = {
         .pool = pool,
@@ -202,7 +198,6 @@ TEST(test_ensure_and_fill) {
 }
 
 TEST(test_claim) {
-    (void)mem;
     static int8_t const pool[] = {5, 6, 7};
     struct ra_config    cfg = {
         .pool = pool,
@@ -233,7 +228,6 @@ TEST(test_claim) {
 }
 
 TEST(test_last_use_preamble) {
-    (void)mem;
     // preamble used in varying: last_use = n
     static int8_t const pool[] = {5, 6, 7};
     struct ra_config    cfg = {
@@ -256,7 +250,6 @@ TEST(test_last_use_preamble) {
 }
 
 TEST(test_many_values_stress) {
-    (void)mem;
     // many values, few registers, lots of spills
     static int8_t const pool[] = {0, 1, 2};
     struct ra_config    cfg = {
@@ -301,7 +294,6 @@ TEST(test_many_values_stress) {
 }
 
 TEST(test_step_alloc) {
-    (void)mem;
     static int8_t const pool[] = {5, 6, 7, 8};
     struct ra_config    cfg = {
         .pool = pool,
@@ -333,7 +325,6 @@ TEST(test_step_alloc) {
 }
 
 TEST(test_step_unary) {
-    (void)mem;
     static int8_t const pool[] = {5, 6, 7, 8};
     struct ra_config    cfg = {
         .pool = pool,
@@ -377,7 +368,6 @@ TEST(test_step_unary) {
 }
 
 TEST(test_step_unary_alive) {
-    (void)mem;
     static int8_t const pool[] = {5, 6, 7, 8};
     struct ra_config    cfg = {
         .pool = pool,
@@ -423,7 +413,6 @@ TEST(test_step_unary_alive) {
 }
 
 TEST(test_step_alu) {
-    (void)mem;
     static int8_t const pool[] = {5, 6, 7, 8};
     struct ra_config    cfg = {
         .pool = pool,
@@ -473,7 +462,6 @@ TEST(test_step_alu) {
 }
 
 TEST(test_step_alu_scratch) {
-    (void)mem;
     static int8_t const pool[] = {5, 6, 7, 8};
     struct ra_config    cfg = {
         .pool = pool,

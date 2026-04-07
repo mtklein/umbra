@@ -4,23 +4,18 @@
 
 int dprintf(int, char const[], ...);
 
-struct test_alloc {
-    void *(*alloc)(size_t);
-    void  (*free) (void *);
-};
-
-typedef void (*test_fn)(struct test_alloc const *);
+typedef void (*test_fn)(void);
 void test_register(char const *name, test_fn fn);
 
 #define TEST(NAME)                                                                \
-    static void NAME(struct test_alloc const *mem);                               \
+    static void NAME(void);                                                       \
     _Pragma("clang diagnostic push")                                              \
     _Pragma("clang diagnostic ignored \"-Wglobal-constructors\"")                 \
     __attribute__((constructor)) static void test_ctor_##NAME(void) {             \
         test_register(#NAME, NAME);                                               \
     }                                                                             \
     _Pragma("clang diagnostic pop")                                               \
-    static void NAME(struct test_alloc const *mem)
+    static void NAME(void)
 
 #define here ? (void)0 : (dprintf(2, "%s:%d failed\n", __FILE__, __LINE__), __builtin_trap())
 

@@ -27,7 +27,6 @@ static void cleanup_draw(struct draw_backends *B) {
 }
 
 TEST(test_solid_src) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
                                                  umbra_fmt_8888, &lay),
@@ -60,7 +59,6 @@ TEST(test_solid_src) {
 }
 
 TEST(test_solid_src_n1) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
                                                  umbra_fmt_8888, &lay),
@@ -86,7 +84,6 @@ TEST(test_solid_src_n1) {
 }
 
 TEST(test_solid_src_n9) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
                                                  umbra_fmt_8888, &lay),
@@ -113,7 +110,6 @@ TEST(test_solid_src_n9) {
 }
 
 TEST(test_solid_src_n16) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
                                                  umbra_fmt_8888, &lay),
@@ -137,7 +133,6 @@ TEST(test_solid_src_n16) {
 }
 
 TEST(test_srcover_8888) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_srcover,
@@ -170,7 +165,6 @@ TEST(test_srcover_8888) {
 }
 
 TEST(test_dstover_8888) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_dstover,
@@ -194,7 +188,6 @@ TEST(test_dstover_8888) {
 }
 
 TEST(test_dstover_transparent) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_dstover,
@@ -221,7 +214,6 @@ TEST(test_dstover_transparent) {
 }
 
 TEST(test_multiply_8888) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_multiply,
@@ -254,7 +246,6 @@ TEST(test_multiply_8888) {
 }
 
 TEST(test_solid_src_fp16) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
                                                  umbra_fmt_fp16, &lay),
@@ -283,7 +274,6 @@ TEST(test_solid_src_fp16) {
 }
 
 TEST(test_srcover_fp16) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_srcover,
@@ -322,7 +312,6 @@ TEST(test_srcover_fp16) {
 }
 
 TEST(test_coverage_rect) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
                                                  umbra_blend_srcover,
@@ -356,7 +345,6 @@ TEST(test_coverage_rect) {
 }
 
 TEST(test_coverage_rect_scalar) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
                                                  umbra_blend_srcover,
@@ -388,7 +376,6 @@ TEST(test_coverage_rect_scalar) {
 }
 
 TEST(test_coverage_rect_n9) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
                                                  umbra_blend_srcover,
@@ -421,7 +408,6 @@ TEST(test_coverage_rect_n9) {
 }
 
 TEST(test_coverage_rect_offset) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
                                                  umbra_blend_src,
@@ -451,7 +437,6 @@ TEST(test_coverage_rect_offset) {
 }
 
 TEST(test_coverage_rect_outside_y) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
                                                  umbra_blend_srcover,
@@ -482,7 +467,6 @@ TEST(test_coverage_rect_outside_y) {
 }
 
 TEST(test_no_shader) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(NULL, NULL, umbra_blend_src,
                                                  umbra_fmt_8888, &lay),
@@ -508,7 +492,6 @@ TEST(test_no_shader) {
 }
 
 TEST(test_no_blend) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, NULL,
                                                  umbra_fmt_8888, &lay),
@@ -546,7 +529,6 @@ static umbra_color gradient_shader(struct umbra_builder *builder, struct umbra_u
 }
 
 TEST(test_gradient_shader) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(gradient_shader, NULL, umbra_blend_src,
                                                  umbra_fmt_8888, &lay),
@@ -573,7 +555,6 @@ TEST(test_gradient_shader) {
 }
 
 TEST(test_multiply_half_alpha) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_multiply,
@@ -606,7 +587,6 @@ TEST(test_multiply_half_alpha) {
 }
 
 TEST(test_srcover_8888_n9) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_srcover,
@@ -636,7 +616,6 @@ TEST(test_srcover_8888_n9) {
 }
 
 TEST(test_full_pipeline) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
                                                  umbra_blend_srcover,
@@ -676,7 +655,6 @@ TEST(test_full_pipeline) {
 }
 
 TEST(test_solid_src_fp16_n9) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
                                                  umbra_fmt_fp16, &lay),
@@ -705,7 +683,6 @@ TEST(test_solid_src_fp16_n9) {
 }
 
 TEST(test_coverage_rect_white_dst) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
                                                  umbra_blend_srcover,
@@ -758,7 +735,6 @@ TEST(test_coverage_rect_white_dst) {
 }
 
 TEST(test_coverage_bitmap) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_bitmap,
                                                  umbra_blend_srcover,
@@ -788,7 +764,6 @@ TEST(test_coverage_bitmap) {
 }
 
 TEST(test_coverage_sdf) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_sdf,
                                                  umbra_blend_srcover,
@@ -816,7 +791,6 @@ TEST(test_coverage_sdf) {
 }
 
 TEST(test_coverage_bitmap_matrix) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_bitmap_matrix,
@@ -850,7 +824,6 @@ TEST(test_coverage_bitmap_matrix) {
 }
 
 TEST(test_coverage_bitmap_matrix_oob) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_bitmap_matrix,
@@ -882,7 +855,6 @@ TEST(test_coverage_bitmap_matrix_oob) {
 }
 
 TEST(test_linear_2) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_linear_2, NULL, umbra_blend_src,
@@ -912,7 +884,6 @@ TEST(test_linear_2) {
 }
 
 TEST(test_radial_2) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(umbra_shader_radial_2, NULL, umbra_blend_src,
@@ -939,7 +910,6 @@ TEST(test_radial_2) {
 }
 
 TEST(test_linear_grad) {
-    (void)mem;
     float const stop_colors[][4] = {
         {1, 0, 0, 1},
         {0, 1, 0, 1},
@@ -975,7 +945,6 @@ TEST(test_linear_grad) {
 }
 
 TEST(test_radial_grad) {
-    (void)mem;
     float const stop_colors[][4] = {
         {1, 0, 0, 1},
         {1, 1, 0, 1},
@@ -1011,7 +980,6 @@ TEST(test_radial_grad) {
 }
 
 TEST(test_gradient_lut_nonuniform) {
-    (void)mem;
     float const stop_colors[][4] = {
         {1, 0, 0, 1},
         {0, 1, 0, 1},
@@ -1055,7 +1023,6 @@ static umbra_color ss_shader_(struct umbra_builder *builder, struct umbra_unifor
 }
 
 TEST(test_supersample) {
-    (void)mem;
     ss_inner_ = umbra_shader_solid;
     ss_n_ = 4;
     struct umbra_draw_layout lay;
@@ -1088,7 +1055,6 @@ TEST(test_supersample) {
 #endif
 
 TEST(test_page_aligned_buffer) {
-    (void)mem;
 #if defined(__wasm__)
     return;
 #else
@@ -1132,7 +1098,6 @@ TEST(test_page_aligned_buffer) {
 }
 
 TEST(test_565_round_trip) {
-    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_color c = umbra_load_565(b, (umbra_ptr16){0});
     umbra_store_565(b, (umbra_ptr16){.ix=1}, c);
@@ -1154,7 +1119,6 @@ TEST(test_565_round_trip) {
 }
 
 TEST(test_1010102_round_trip) {
-    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_color c = umbra_load_1010102(b, (umbra_ptr32){0});
     umbra_store_1010102(b, (umbra_ptr32){.ix=1}, c);
@@ -1178,7 +1142,6 @@ TEST(test_1010102_round_trip) {
 }
 
 TEST(test_fp16_planar_round_trip) {
-    (void)mem;
     struct umbra_builder *b = umbra_builder();
     umbra_color c = umbra_load_fp16_planar(b, (umbra_ptr16){0});
     umbra_store_fp16_planar(b, (umbra_ptr16){.ix=1}, c);
@@ -1201,7 +1164,6 @@ TEST(test_fp16_planar_round_trip) {
 }
 
 TEST(test_solid_src_565) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct umbra_builder *b = umbra_draw_build(umbra_shader_solid, NULL,
                                                 umbra_blend_src, umbra_fmt_565, &lay);
@@ -1225,7 +1187,6 @@ TEST(test_solid_src_565) {
 }
 
 TEST(test_solid_src_1010102) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct umbra_builder *b = umbra_draw_build(umbra_shader_solid, NULL,
                                                 umbra_blend_src, umbra_fmt_1010102, &lay);
@@ -1250,7 +1211,6 @@ TEST(test_solid_src_1010102) {
 }
 
 TEST(test_solid_src_fp16_planar) {
-    (void)mem;
     struct umbra_draw_layout lay;
     struct umbra_builder *b = umbra_draw_build(umbra_shader_solid, NULL,
                                                 umbra_blend_src, umbra_fmt_fp16_planar, &lay);
