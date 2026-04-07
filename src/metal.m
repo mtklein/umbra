@@ -1264,9 +1264,6 @@ static void encode_dispatch(
     free(rbs_data);
 }
 
-static void umbra_metal_begin_batch(struct metal_backend *be);
-static void umbra_metal_flush(struct metal_backend *be);
-
 static void umbra_metal_run(
     struct umbra_metal *m, int l, int t, int r, int b, struct umbra_buf buf[]
 ) {
@@ -1275,10 +1272,13 @@ static void umbra_metal_run(
 
     struct metal_backend *be = (struct metal_backend*)m->base.backend;
 
-    if (!be->batch_cmdbuf) {
-        umbra_metal_begin_batch(be);
-    }
     @autoreleasepool {
+        if (!be->batch_cmdbuf) {
+            id<MTLCommandQueue> queue =
+                (__bridge id<MTLCommandQueue>)be->queue;
+            be->batch_cmdbuf =
+                (__bridge_retained void*)[queue commandBuffer];
+        }
         // MoltenVK pattern for compute pipeline barriers: end the previous
         // encoder, start a new one with serial dispatch, bridge them with a
         // freshly-allocated MTLFence updateFence/waitForFence pair. Each
@@ -1303,16 +1303,6 @@ static void umbra_metal_run(
         [enc updateFence:update];
         [enc endEncoding];
         be->prev_fence = (__bridge_retained void*)update;
-    }
-}
-
-static void umbra_metal_begin_batch(struct metal_backend *be) {
-    @autoreleasepool {
-        id<MTLCommandQueue> queue =
-            (__bridge id<MTLCommandQueue>)be->queue;
-        id<MTLCommandBuffer> cmdbuf =
-            [queue commandBuffer];
-        be->batch_cmdbuf = (__bridge_retained void*)cmdbuf;
     }
 }
 
