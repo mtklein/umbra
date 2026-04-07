@@ -3,8 +3,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-static void *default_alloc(size_t sz) { return calloc(1, sz); }
-
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Weverything"
 #include <SDL3/SDL.h>
@@ -263,7 +261,7 @@ int main(void) {
         return 1;
     }
 
-    slides_init(W, H, default_alloc, free);
+    slides_init(W, H);
 
     max_threads = SDL_GetNumLogicalCPUCores();
     if (max_threads < 1) { max_threads = 1; }

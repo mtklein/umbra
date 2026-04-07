@@ -5,8 +5,6 @@
 #include <string.h>
 #include <sys/stat.h>
 
-static void *default_alloc(size_t sz) { return calloc(1, sz); }
-
 static struct umbra_builder *build_srcover(void) {
     struct umbra_builder *b = umbra_builder();
 
@@ -118,7 +116,7 @@ static void slugify(char const *title, char *out, size_t sz) {
 int main(void) {
     dump_builder("dumps", "srcover", build_srcover());
 
-    slides_init(64, 48, default_alloc, free);
+    slides_init(64, 48);
 
     for (int i = 0; i < slide_count(); i++) {
         struct slide *s = slide_get(i);

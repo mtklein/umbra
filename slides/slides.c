@@ -44,15 +44,13 @@ static void build_luts(void) {
     umbra_gradient_lut_even(radial_lut, LUT_N, 4, radial_stops);
 }
 
-static void add_slide(struct slide *s, int w, int h, slide_alloc_fn alloc, slide_free_fn sfree) {
+static void add_slide(struct slide *s, int w, int h) {
     all[count] = s;
-    s->alloc = alloc;
-    s->sfree = sfree;
     if (s->init) { s->init(s, w, h); }
     count++;
 }
 
-void slides_init(int w, int h, slide_alloc_fn alloc, slide_free_fn sfree) {
+void slides_init(int w, int h) {
     float font = (float)h * 0.15f;
     bitmap_cov = text_rasterize(w, h, font, 0);
     sdf_cov    = text_rasterize(w, h, font, 1);
@@ -68,9 +66,9 @@ void slides_init(int w, int h, slide_alloc_fn alloc, slide_free_fn sfree) {
 
     count = 0;
     for (int i = 0; i < registry_count; i++) {
-        add_slide(registry[i](&ctx), w, h, alloc, sfree);
+        add_slide(registry[i](&ctx), w, h);
     }
-    add_slide(make_overview(&ctx), w, h, alloc, sfree);
+    add_slide(make_overview(&ctx), w, h);
 }
 
 void slides_cleanup(void) {

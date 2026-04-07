@@ -334,7 +334,7 @@ TEST(test_perspective_text) {
 
 TEST(test_golden_slides) {
     build_pipes();
-    slides_init(W, H, mem->alloc, mem->free);
+    slides_init(W, H);
     for (int si = 0; si < slide_count() - 1; si++) {
         test_slide_golden(si, mem);
     }

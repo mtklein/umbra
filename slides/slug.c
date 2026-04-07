@@ -24,7 +24,7 @@ static void slug_init(struct slide *s, int w, int h) {
     st->w = w;
     st->h = h;
     st->persp_t = 0.0f;
-    st->wind_buf = s->alloc((size_t)w * (size_t)h * sizeof(float));
+    st->wind_buf = malloc((size_t)w * (size_t)h * sizeof(float));
 
     struct umbra_builder *b = slug_build_acc(&st->acc_lay);
     st->acc_bb = umbra_basic_block(b);
@@ -107,7 +107,7 @@ static struct umbra_builder *slug_get_builder(struct slide *s, struct umbra_fmt 
 
 static void slug_slide_free(struct slide *s) {
     struct slug_state *st = (struct slug_state *)s;
-    st->base.sfree(st->wind_buf);
+    free(st->wind_buf);
     if (st->acc_prog) { st->acc_prog->free(st->acc_prog); st->acc_prog = 0; }
     umbra_basic_block_free(st->acc_bb);
     free(st->acc_lay.uniforms);
