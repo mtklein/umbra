@@ -7,6 +7,10 @@ static _Bool match_pointee(int val, void *ctx) {
     return val == *(int const *)ctx;
 }
 
+static _Bool match_int(int val, void *ctx) {
+    return val == (int)(intptr_t)ctx;
+}
+
 #if defined(__clang__)
     __attribute__((no_sanitize("unsigned-integer-overflow", "unsigned-shift-base")))
 #endif
@@ -31,7 +35,7 @@ static void run_one(int const n, unsigned (*hash_fn)(int)) {
         !hash_lookup(h, hash_fn(i), match_pointee, &i) here;
     }
     for (int i = 0; i < n; i += 2) {
-        hash_lookup(h, hash_fn(i), NULL, (void *)(intptr_t)i) here;
+        hash_lookup(h, hash_fn(i), match_int, (void *)(intptr_t)i) here;
     }
     free(h.data);
 }
@@ -59,7 +63,7 @@ TEST(hash_basics) {
 TEST(hash_zero_user_hash) {
     struct hash h = {0};
     hash_insert(&h, 0, 42);
-    hash_lookup(h, 0, NULL, (void *)(intptr_t)42) here;
+    hash_lookup(h, 0, match_int, (void *)(intptr_t)42) here;
     free(h.data);
 }
 
