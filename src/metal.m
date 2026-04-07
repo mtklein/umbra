@@ -43,8 +43,6 @@ struct metal_backend {
     int                     batch_ncopy, batch_copy_cap;
     struct buf_cache_entry *batch_cache;
     int                     batch_cache_n, batch_cache_cap;
-    _Bool                   batch_has_dispatch; int :24, :32;
-    void                   *batch_fence;
 };
 
 struct umbra_metal {
@@ -1334,14 +1332,8 @@ static void encode_dispatch(
     MTLSize group =
         MTLSizeMake((NSUInteger)gx,
                     (NSUInteger)gy, 1);
-    id<MTLFence> fence = (__bridge id<MTLFence>)be->batch_fence;
-    if (be->batch_has_dispatch) {
-        [enc waitForFence:fence];
-    }
-    be->batch_has_dispatch = 1;
     [enc dispatchThreads:grid
        threadsPerThreadgroup:group];
-    [enc updateFence:fence];
     free(szs_data);
     free(rbs_data);
 }
@@ -1372,7 +1364,6 @@ static void umbra_metal_run(
 
 static void umbra_metal_begin_batch(struct metal_backend *be) {
     if (be && !be->batch_cmdbuf) {
-        be->batch_has_dispatch = 0;
         @autoreleasepool {
             id<MTLCommandQueue> queue =
                 (__bridge id<MTLCommandQueue>)
@@ -1382,15 +1373,10 @@ static void umbra_metal_begin_batch(struct metal_backend *be) {
                  commandBufferWithUnretainedReferences];
             id<MTLComputeCommandEncoder> enc =
                 [cmdbuf computeCommandEncoder];
-            id<MTLDevice> device =
-                (__bridge id<MTLDevice>)be->device;
-            id<MTLFence> fence = [device newFence];
             be->batch_cmdbuf =
                 (__bridge_retained void*)cmdbuf;
             be->batch_enc =
                 (__bridge_retained void*)enc;
-            be->batch_fence =
-                (__bridge_retained void*)fence;
         }
     }
 }
@@ -1435,11 +1421,6 @@ static void umbra_metal_flush(struct metal_backend *be) {
                     be->batch_cache[i].mtl;
             }
             be->batch_cache_n = 0;
-
-            if (be->batch_fence) {
-                (void)(__bridge_transfer id)be->batch_fence;
-                be->batch_fence = NULL;
-            }
         }
     }
 }
