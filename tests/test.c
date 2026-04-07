@@ -48,38 +48,20 @@ static _Bool run(struct test_backends *B, int b, int w, int h, struct umbra_buf 
 }
 static void cleanup(struct test_backends *B) { test_backends_free(B); }
 
-#define BINOP_F32(op, B)                                                             \
+#define BINOP(op, B)                                                                 \
     do {                                                                             \
         struct umbra_builder *b_ = umbra_builder();                                  \
-        umbra_val32 x_ = umbra_load_32(b_, (umbra_ptr32){0}),                      \
-                  y_ = umbra_load_32(b_, (umbra_ptr32){.ix=1}), r_ = op(b_, x_, y_); \
+        umbra_val32 x_ = umbra_load_32(b_, (umbra_ptr32){0}),                        \
+                    y_ = umbra_load_32(b_, (umbra_ptr32){.ix=1}),                    \
+                    r_ = op(b_, x_, y_);                                             \
         umbra_store_32(b_, (umbra_ptr32){.ix=2}, r_);                                \
         B = make(b_);                                                                \
-    } while (0)
-
-#define BINOP_I32(op, B)                                                              \
-    do {                                                                              \
-        struct umbra_builder *b_ = umbra_builder();                                   \
-        umbra_val32 x_ = umbra_load_32(b_, (umbra_ptr32){0}),                      \
-                  y_ = umbra_load_32(b_, (umbra_ptr32){.ix=1}), r_ = op(b_, x_, y_);  \
-        umbra_store_32(b_, (umbra_ptr32){.ix=2}, r_);                                 \
-        B = make(b_);                                                                 \
-    } while (0)
-
-#define BINOP_CMP_F32(op, B)                                                \
-    do {                                                                    \
-        struct umbra_builder *b_ = umbra_builder();                         \
-        umbra_val32            x_ = umbra_load_32(b_, (umbra_ptr32){0}), \
-                              y_ = umbra_load_32(b_, (umbra_ptr32){.ix=1}); \
-        umbra_val32            r_ = op(b_, x_, y_);                          \
-        umbra_store_32(b_, (umbra_ptr32){.ix=2}, r_);                       \
-        B = make(b_);                                                       \
     } while (0)
 
 TEST(test_f32_ops) {
     {
         struct test_backends B;
-        BINOP_F32(umbra_mul_f32, B);
+        BINOP(umbra_mul_f32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float x[] = {1, 2, 3, 4, 5};
             float y[] = {6, 7, 8, 9, 0}, z[5] = {0};
@@ -101,7 +83,7 @@ TEST(test_f32_ops) {
     }
     {
         struct test_backends B;
-        BINOP_F32(umbra_add_f32, B);
+        BINOP(umbra_add_f32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float x[] = {1, 2, 3};
             float y[] = {10, 20, 30}, z[3] = {0};
@@ -121,7 +103,7 @@ TEST(test_f32_ops) {
     }
     {
         struct test_backends B;
-        BINOP_F32(umbra_sub_f32, B);
+        BINOP(umbra_sub_f32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float x[] = {10, 20, 30};
             float y[] = {1, 2, 3}, z[3] = {0};
@@ -141,7 +123,7 @@ TEST(test_f32_ops) {
     }
     {
         struct test_backends B;
-        BINOP_F32(umbra_div_f32, B);
+        BINOP(umbra_div_f32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float x[] = {10, 20, 30};
             float y[] = {2, 4, 5}, z[3] = {0};
@@ -164,7 +146,7 @@ TEST(test_f32_ops) {
 TEST(test_i32_ops) {
     {
         struct test_backends B;
-        BINOP_I32(umbra_add_i32, B);
+        BINOP(umbra_add_i32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {1, 2, 3};
             int y[] = {10, 20, 30}, z[3] = {0};
@@ -184,7 +166,7 @@ TEST(test_i32_ops) {
     }
     {
         struct test_backends B;
-        BINOP_I32(umbra_sub_i32, B);
+        BINOP(umbra_sub_i32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {10, 20, 30};
             int y[] = {1, 2, 3}, z[3] = {0};
@@ -204,7 +186,7 @@ TEST(test_i32_ops) {
     }
     {
         struct test_backends B;
-        BINOP_I32(umbra_mul_i32, B);
+        BINOP(umbra_mul_i32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {2, 3, 4};
             int y[] = {5, 6, 7}, z[3] = {0};
@@ -224,7 +206,7 @@ TEST(test_i32_ops) {
     }
     {
         struct test_backends B;
-        BINOP_I32(umbra_shl_i32, B);
+        BINOP(umbra_shl_i32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {1, 3, 7};
             int y[] = {1, 2, 3}, z[3] = {0};
@@ -244,7 +226,7 @@ TEST(test_i32_ops) {
     }
     {
         struct test_backends B;
-        BINOP_I32(umbra_shr_u32, B);
+        BINOP(umbra_shr_u32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {-1, 8, 64};
             int y[] = {1, 1, 3}, z[3] = {0};
@@ -264,7 +246,7 @@ TEST(test_i32_ops) {
     }
     {
         struct test_backends B;
-        BINOP_I32(umbra_shr_s32, B);
+        BINOP(umbra_shr_s32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {-8, 8, 64};
             int y[] = {1, 1, 3}, z[3] = {0};
@@ -284,7 +266,7 @@ TEST(test_i32_ops) {
     }
     {
         struct test_backends B;
-        BINOP_I32(umbra_and_32, B);
+        BINOP(umbra_and_32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {0xff, 0x0f};
             int y[] = {0x0f, 0xff}, z[2] = {0};
@@ -303,7 +285,7 @@ TEST(test_i32_ops) {
     }
     {
         struct test_backends B;
-        BINOP_I32(umbra_or_32, B);
+        BINOP(umbra_or_32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {0xf0, 0x0f};
             int y[] = {0x0f, 0xf0}, z[2] = {0};
@@ -322,7 +304,7 @@ TEST(test_i32_ops) {
     }
     {
         struct test_backends B;
-        BINOP_I32(umbra_xor_32, B);
+        BINOP(umbra_xor_32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {0xff, 0xff};
             int y[] = {0x0f, 0xff}, z[2] = {0};
@@ -372,7 +354,7 @@ TEST(test_i32_ops) {
 TEST(test_cmp_i32) {
     {
         struct test_backends B;
-        BINOP_I32(umbra_eq_i32, B);
+        BINOP(umbra_eq_i32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {1, 2, 3};
             int y[] = {1, 9, 3}, z[3] = {0};
@@ -392,7 +374,7 @@ TEST(test_cmp_i32) {
     }
     {
         struct test_backends B;
-        BINOP_I32(umbra_lt_s32, B);
+        BINOP(umbra_lt_s32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {1, 5, 3};
             int y[] = {2, 5, 1}, z[3] = {0};
@@ -412,7 +394,7 @@ TEST(test_cmp_i32) {
     }
     {
         struct test_backends B;
-        BINOP_I32(umbra_le_s32, B);
+        BINOP(umbra_le_s32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {1, 5, 3};
             int y[] = {2, 5, 1}, z[3] = {0};
@@ -432,7 +414,7 @@ TEST(test_cmp_i32) {
     }
     {
         struct test_backends B;
-        BINOP_I32(umbra_lt_u32, B);
+        BINOP(umbra_lt_u32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {1, -1};
             int y[] = {2, 1}, z[2] = {0};
@@ -451,7 +433,7 @@ TEST(test_cmp_i32) {
     }
     {
         struct test_backends B;
-        BINOP_I32(umbra_le_u32, B);
+        BINOP(umbra_le_u32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {1, 2, -1};
             int y[] = {2, 2, 1}, z[3] = {0};
@@ -474,7 +456,7 @@ TEST(test_cmp_i32) {
 TEST(test_cmp_f32) {
     {
         struct test_backends B;
-        BINOP_CMP_F32(umbra_eq_f32, B);
+        BINOP(umbra_eq_f32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float x[] = {1, 2, 3};
             float y[] = {1, 9, 3};
@@ -495,7 +477,7 @@ TEST(test_cmp_f32) {
     }
     {
         struct test_backends B;
-        BINOP_CMP_F32(umbra_lt_f32, B);
+        BINOP(umbra_lt_f32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float x[] = {1, 5, 3};
             float y[] = {2, 5, 1};
@@ -516,7 +498,7 @@ TEST(test_cmp_f32) {
     }
     {
         struct test_backends B;
-        BINOP_CMP_F32(umbra_le_f32, B);
+        BINOP(umbra_le_f32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float x[] = {1, 5, 3};
             float y[] = {2, 5, 1};
@@ -588,7 +570,7 @@ TEST(test_fma_f32) {
 TEST(test_min_max_sqrt_f32) {
     {
         struct test_backends B;
-        BINOP_F32(umbra_min_f32, B);
+        BINOP(umbra_min_f32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float x[] = {5, 1, 3};
             float y[] = {2, 4, 3}, z[3] = {0};
@@ -608,7 +590,7 @@ TEST(test_min_max_sqrt_f32) {
     }
     {
         struct test_backends B;
-        BINOP_F32(umbra_max_f32, B);
+        BINOP(umbra_max_f32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float x[] = {5, 1, 3};
             float y[] = {2, 4, 3}, z[3] = {0};
@@ -748,7 +730,7 @@ TEST(test_round_floor_ceil) {
 
 TEST(test_large_n) {
     struct test_backends B;
-    BINOP_F32(umbra_add_f32, B);
+    BINOP(umbra_add_f32, B);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         float x[100], y[100], z[100];
         for (int i = 0; i < 100; i++) {
@@ -1198,7 +1180,7 @@ TEST(test_mixed_ptr_sizes) {
 TEST(test_n9) {
     {
         struct test_backends B;
-        BINOP_F32(umbra_add_f32, B);
+        BINOP(umbra_add_f32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float x[9], y[9], z[9] = {0};
             for (int i = 0; i < 9; i++) {
@@ -1219,7 +1201,7 @@ TEST(test_n9) {
     }
     {
         struct test_backends B;
-        BINOP_I32(umbra_mul_i32, B);
+        BINOP(umbra_mul_i32, B);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[9], y[9], z[9] = {0};
             for (int i = 0; i < 9; i++) {
