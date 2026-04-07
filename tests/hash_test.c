@@ -11,13 +11,17 @@ static _Bool match_int(int val, void *ctx) {
     return val == (int)(intptr_t)ctx;
 }
 
-#if defined(__clang__)
-    __attribute__((no_sanitize("unsigned-integer-overflow", "unsigned-shift-base")))
-#endif
 static unsigned murmur3_scramble(int x) {
-    unsigned bits = (unsigned)x * 0xcc9e2d51u;
+    unsigned bits;
+    __builtin_mul_overflow((unsigned)x, 0xcc9e2d51u, &bits);
+#if __has_builtin(__builtin_rotateleft32)
+    bits = __builtin_rotateleft32(bits, 15);
+#else
     bits = (bits << 15) | (bits >> 17);
-    return bits * 0x1b873593u;
+#endif
+    unsigned out;
+    __builtin_mul_overflow(bits, 0x1b873593u, &out);
+    return out;
 }
 static unsigned     zero(int x) { (void)x; return 0; }
 static unsigned identity(int x) { return (unsigned)x; }
