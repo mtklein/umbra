@@ -1024,8 +1024,6 @@ static void umbra_metal_backend_free(struct metal_backend *be) {
 static struct umbra_metal* umbra_metal(
     struct metal_backend *be, BB const *bb
 ) {
-    if (!be) { return 0; }
-
     struct umbra_metal *result = 0;
     @autoreleasepool {
         id<MTLDevice> device = (__bridge id<MTLDevice>)be->device;
@@ -1309,21 +1307,17 @@ static void umbra_metal_run(
 }
 
 static void umbra_metal_begin_batch(struct metal_backend *be) {
-    if (be && !be->batch_cmdbuf) {
-        @autoreleasepool {
-            id<MTLCommandQueue> queue =
-                (__bridge id<MTLCommandQueue>)
-                    be->queue;
-            id<MTLCommandBuffer> cmdbuf =
-                [queue commandBuffer];
-            be->batch_cmdbuf =
-                (__bridge_retained void*)cmdbuf;
-        }
+    @autoreleasepool {
+        id<MTLCommandQueue> queue =
+            (__bridge id<MTLCommandQueue>)be->queue;
+        id<MTLCommandBuffer> cmdbuf =
+            [queue commandBuffer];
+        be->batch_cmdbuf = (__bridge_retained void*)cmdbuf;
     }
 }
 
 static void umbra_metal_flush(struct metal_backend *be) {
-    if (be && be->batch_cmdbuf) {
+    if (be->batch_cmdbuf) {
         @autoreleasepool {
             id<MTLCommandBuffer> cmdbuf =
                 (__bridge_transfer id<MTLCommandBuffer>)
