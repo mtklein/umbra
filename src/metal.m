@@ -32,17 +32,21 @@ struct copyback {
 
 struct deref_info { int buf_idx, src_buf, off; };
 
+enum { METAL_N_FRAMES = 2 };
+
 struct metal_backend {
     struct umbra_backend base;
     void *device;
     void *queue;
-    void *batch_cmdbuf;
+    void *batch_cmdbuf;     // currently-encoding cmdbuf for cur_frame, or NULL
     void *prev_fence;       // fence updated by the previous encoder (NULL for first)
+    void *frame_committed[METAL_N_FRAMES];  // last committed cmdbuf per frame, or NULL
+    int   cur_frame, :32;
     struct copyback        *batch_copy;
     int                     batch_ncopy, batch_copy_cap;
     struct buf_cache_entry *batch_cache;
     int                     batch_cache_n, batch_cache_cap;
-    struct uniform_ring     uni_ring;
+    struct uniform_ring     uni_rings[METAL_N_FRAMES];
 };
 
 struct umbra_metal {
@@ -1028,12 +1032,14 @@ static struct metal_backend* umbra_metal_backend_create(void) {
                 (__bridge_retained void*)device;
             be->queue =
                 (__bridge_retained void*)queue;
-            be->uni_ring = (struct uniform_ring){
-                .align     =16,
-                .ctx       =be,
-                .new_chunk =metal_ring_new_chunk,
-                .free_chunk=metal_ring_free_chunk,
-            };
+            for (int i = 0; i < METAL_N_FRAMES; i++) {
+                be->uni_rings[i] = (struct uniform_ring){
+                    .align     =16,
+                    .ctx       =be,
+                    .new_chunk =metal_ring_new_chunk,
+                    .free_chunk=metal_ring_free_chunk,
+                };
+            }
             return be;
         }
         return 0;
@@ -1042,7 +1048,9 @@ static struct metal_backend* umbra_metal_backend_create(void) {
 
 static void umbra_metal_backend_free(struct metal_backend *be) {
     if (be) {
-        uniform_ring_free(&be->uni_ring);
+        for (int i = 0; i < METAL_N_FRAMES; i++) {
+            uniform_ring_free(&be->uni_rings[i]);
+        }
         @autoreleasepool {
             if (be->device) {
                 (void)(__bridge_transfer id)be->device;
@@ -1230,11 +1238,12 @@ static void encode_dispatch(
     size_t  bind_offset[32];
     for (int i = 0; i < tb; i++) { bind_handle[i] = 0; bind_offset[i] = 0; }
 
+    struct uniform_ring *cur_ring = &be->uni_rings[be->cur_frame];
     for (int i = 0; i <= m->max_ptr; i++) {
         if (!buf[i].ptr || !buf[i].sz) { continue; }
         if (buf[i].read_only && !buf[i].row_bytes) {
             struct uniform_ring_loc loc =
-                uniform_ring_alloc(&be->uni_ring, buf[i].ptr, buf[i].sz);
+                uniform_ring_alloc(cur_ring, buf[i].ptr, buf[i].sz);
             bind_handle[i] = loc.handle;
             bind_offset[i] = loc.offset;
             continue;
@@ -1352,34 +1361,51 @@ static void umbra_metal_run(
         be->prev_fence = (__bridge_retained void*)update;
     }
 
-    if (uniform_ring_used(&be->uni_ring) > METAL_RING_HIGH_WATER) {
+    if (uniform_ring_used(&be->uni_rings[be->cur_frame]) > METAL_RING_HIGH_WATER) {
         metal_submit_cmdbuf(be);
     }
 }
 
-// Submit and drain the in-flight cmdbuf without ending the user's logical
-// batch: writebacks and the cache_buf entries are kept live so the next
-// sub-batch can continue binding the same writable MTLBuffers. Used both as
-// an intra-batch backpressure release and as the first step of a full flush.
+// Drain a single frame: wait for its in-flight cmdbuf to complete, release
+// it, and reset the frame's ring. Safe to call on a frame with no in-flight
+// cmdbuf (no-op).
+static void metal_drain_frame(struct metal_backend *be, int frame) {
+    if (be->frame_committed[frame]) {
+        @autoreleasepool {
+            id<MTLCommandBuffer> prior =
+                (__bridge_transfer id<MTLCommandBuffer>)be->frame_committed[frame];
+            be->frame_committed[frame] = NULL;
+            [prior waitUntilCompleted];
+        }
+    }
+    uniform_ring_reset(&be->uni_rings[frame]);
+}
+
+// Backpressure release: commit the current frame's cmdbuf without blocking,
+// rotate to the other frame, and drain it (waiting only if its prior cmdbuf
+// from the previous cycle is still in flight). Writebacks and cache_buf
+// entries stay live across rotation so the next sub-batch keeps binding the
+// same writable MTLBuffers.
 static void metal_submit_cmdbuf(struct metal_backend *be) {
     if (!be->batch_cmdbuf) { return; }
     @autoreleasepool {
         id<MTLCommandBuffer> cmdbuf =
-            (__bridge_transfer id<MTLCommandBuffer>)be->batch_cmdbuf;
-        be->batch_cmdbuf = NULL;
+            (__bridge id<MTLCommandBuffer>)be->batch_cmdbuf;
         [cmdbuf commit];
-        [cmdbuf waitUntilCompleted];
         if (be->prev_fence) {
             (void)(__bridge_transfer id)be->prev_fence;
             be->prev_fence = NULL;
         }
     }
-    uniform_ring_reset(&be->uni_ring);
+    be->frame_committed[be->cur_frame] = be->batch_cmdbuf;
+    be->batch_cmdbuf                   = NULL;
+    be->cur_frame                      ^= 1;
+    metal_drain_frame(be, be->cur_frame);
 }
 
 static void umbra_metal_flush(struct metal_backend *be) {
-    if (!be->batch_cmdbuf) { return; }
     metal_submit_cmdbuf(be);
+    for (int i = 0; i < METAL_N_FRAMES; i++) { metal_drain_frame(be, i); }
     @autoreleasepool {
         for (int i = 0; i < be->batch_ncopy; i++) {
             struct copyback *c =
