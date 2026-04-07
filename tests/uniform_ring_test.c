@@ -162,3 +162,28 @@ TEST(uniform_ring_null_bytes_reserves_only) {
 
     uniform_ring_free(&r);
 }
+
+TEST(uniform_ring_used_tracks_high_water) {
+    struct fake_be be = {.default_cap=256};
+    struct uniform_ring r = make_ring(&be);
+
+    uniform_ring_used(&r) == 0 here;
+
+    int payload = 0;
+    uniform_ring_alloc(&r, &payload, sizeof payload);
+    uniform_ring_used(&r) == 16 here;
+
+    uniform_ring_alloc(&r, &payload, sizeof payload);
+    uniform_ring_used(&r) == 32 here;
+
+    for (int i = 0; i < 30; i++) {
+        uniform_ring_alloc(&r, &payload, sizeof payload);
+    }
+    be.n_create == 2 here;
+    uniform_ring_used(&r) == 32 * 16 here;
+
+    uniform_ring_reset(&r);
+    uniform_ring_used(&r) == 0 here;
+
+    uniform_ring_free(&r);
+}

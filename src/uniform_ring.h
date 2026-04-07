@@ -23,5 +23,6 @@ struct uniform_ring {
 };
 
 struct uniform_ring_loc uniform_ring_alloc(struct uniform_ring *, void const *bytes, size_t len);
+size_t                  uniform_ring_used (struct uniform_ring const *);
 void                    uniform_ring_reset(struct uniform_ring *);
 void                    uniform_ring_free (struct uniform_ring *);
