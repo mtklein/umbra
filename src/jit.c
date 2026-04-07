@@ -117,9 +117,8 @@ static void resolve_ptr(Buf *c, int p, int *last_ptr, int const *deref_gpr,
     }
 }
 
-static void load_count(Buf *c, int p, int elem_shift, int const *deref_gpr) {
+static void load_count(Buf *c, int p, int elem_shift) {
     if (ptr_is_deref(p)) {
-        (void)deref_gpr;
         put(c, MOVZ_x_lsl16(XM, 0x7fff));
     } else {
         int disp = p * (int)sizeof(struct umbra_buf) + (int)__builtin_offsetof(struct umbra_buf, sz);
@@ -581,7 +580,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             free_chan(ra, inst->x, i);
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            load_count(c, p, 2, deref_gpr);
+            load_count(c, p, 2);
             put(c, UMOV_ws(XT, lo(rx)));
             put(c, MOVI_4s(lo(s.rd), 0, 0));
             if (!scalar) { put(c, ORR_16b(hi(s.rd), lo(s.rd), lo(s.rd))); }
@@ -599,7 +598,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             free_chan(ra, inst->x, i);
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            load_count(c, p, 2, deref_gpr);
+            load_count(c, p, 2);
             if (scalar) {
                 put(c, MOVI_4s(lo(s.rd), 0, 0));
                 put(c, UMOV_ws(XT, lo(rx)));
@@ -635,7 +634,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t frac  = ra_alloc(ra, sl, ns);
             int    p     = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            load_count(c, p, 2, deref_gpr);
+            load_count(c, p, 2);
             if (scalar) {
                 put(c, FRINTM_4s(lo(hi_r), lo(rx)));
                 put(c, FSUB_4s(lo(frac), lo(rx), lo(hi_r)));
@@ -712,7 +711,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             free_chan(ra, inst->x, i);
             int p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            load_count(c, p, 1, deref_gpr);
+            load_count(c, p, 1);
             if (scalar) {
                 put(c, MOVI_4s(lo(s.rd), 0, 0));
                 put(c, UMOV_ws(XT, lo(rx)));
