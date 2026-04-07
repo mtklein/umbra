@@ -4,6 +4,7 @@ build $out/stb_image_write.o:   compile tools/stb_image_write.c
     cflags = -Wno-everything -fno-sanitize=all
 
 build $out/src/uniforms.o:       compile   src/uniforms.c
+build $out/src/uniform_ring.o:   compile   src/uniform_ring.c
 build $out/src/hash.o:           compile   src/hash.c
 build $out/src/bb.o:             compile   src/bb.c
 build $out/src/ra.o:             compile   src/ra.c
@@ -18,6 +19,7 @@ build $out/src/draw.o:           compile   src/draw.c
 build $out/tests/test_main.o:    compile   tests/test_main.c
 build $out/tests/test.o:         compile   tests/test.c
 build $out/tests/hash_test.o:    compile   tests/hash_test.c
+build $out/tests/uniform_ring_test.o: compile tests/uniform_ring_test.c
 build $out/tests/ra_test.o:      compile   tests/ra_test.c
 build $out/tests/draw_test.o:    compile   tests/draw_test.c
 build $out/tests/golden_test.o:  compile   tests/golden_test.c
@@ -35,9 +37,9 @@ build $out/slides/overview.o:    compile   slides/overview.c
 build $out/tests/asm_arm64_test.o: compile tests/asm_arm64_test.c
 build $out/tests/asm_x86_test.o:   compile tests/asm_x86_test.c
 
-build $out/test:      link $out/tests/test_main.o $out/tests/test.o $out/tests/hash_test.o $out/tests/ra_test.o $out/tests/draw_test.o $out/tests/asm_arm64_test.o $out/tests/asm_x86_test.o $out/tests/golden_test.o $out/src/bb.o $out/src/hash.o $out/src/uniforms.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/vulkan.o $out/src/draw.o $out/stb_truetype.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/anim.o $out/slides/overview.o
+build $out/test:      link $out/tests/test_main.o $out/tests/test.o $out/tests/hash_test.o $out/tests/uniform_ring_test.o $out/tests/ra_test.o $out/tests/draw_test.o $out/tests/asm_arm64_test.o $out/tests/asm_x86_test.o $out/tests/golden_test.o $out/src/bb.o $out/src/hash.o $out/src/uniforms.o $out/src/uniform_ring.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/vulkan.o $out/src/draw.o $out/stb_truetype.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/anim.o $out/slides/overview.o
     ldflags = $ldflags -lm
-build $out/bench:     link $out/tools/bench.o           $out/src/bb.o $out/src/hash.o $out/src/uniforms.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/vulkan.o $out/src/draw.o $out/stb_truetype.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/anim.o $out/slides/overview.o
-build $out/dump:      link $out/tools/dump.o            $out/src/bb.o $out/src/hash.o $out/src/uniforms.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/vulkan.o $out/src/draw.o $out/stb_truetype.o $out/stb_image_write.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/anim.o $out/slides/overview.o
+build $out/bench:     link $out/tools/bench.o           $out/src/bb.o $out/src/hash.o $out/src/uniforms.o $out/src/uniform_ring.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/vulkan.o $out/src/draw.o $out/stb_truetype.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/anim.o $out/slides/overview.o
+build $out/dump:      link $out/tools/dump.o            $out/src/bb.o $out/src/hash.o $out/src/uniforms.o $out/src/uniform_ring.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/vulkan.o $out/src/draw.o $out/stb_truetype.o $out/stb_image_write.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/anim.o $out/slides/overview.o
 
 build $out/test.log:             run  $out/test
