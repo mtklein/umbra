@@ -37,8 +37,6 @@ struct metal_backend {
     void *queue;
     void *batch_cmdbuf;
     void *prev_fence;       // fence updated by the previous encoder (NULL for first)
-    void                  **batch_bufs;
-    int                     batch_nbufs, batch_bufs_cap;
     struct copyback        *batch_copy;
     int                     batch_ncopy, batch_copy_cap;
     struct buf_cache_entry *batch_cache;
@@ -1016,7 +1014,6 @@ static void umbra_metal_backend_free(struct metal_backend *be) {
                 (void)(__bridge_transfer id)be->queue;
             }
         }
-        free(be->batch_bufs);
         free(be->batch_copy);
         free(be->batch_cache);
         free(be);
@@ -1122,21 +1119,6 @@ static void batch_add_copy(
         (struct copyback){host, raw_ptr, bytes};
 }
 
-static void batch_retain_buf(
-    struct metal_backend *be, void *retained
-) {
-    if (be->batch_nbufs >= be->batch_bufs_cap) {
-        be->batch_bufs_cap = be->batch_bufs_cap
-            ? 2 * be->batch_bufs_cap : 64;
-        be->batch_bufs = realloc(
-            be->batch_bufs,
-            (size_t)be->batch_bufs_cap
-                * sizeof(void*));
-    }
-    be->batch_bufs[be->batch_nbufs++] = retained;
-}
-
-
 // Returns an index into be->batch_cache. The entry is valid until
 // umbra_metal_flush. Writable lookups reuse any existing entry for the same
 // host pointer. Read-only lookups reuse only an existing *writable* entry
@@ -1194,8 +1176,6 @@ static void encode_dispatch(
 ) {
     int w = r - l, h = b - t, x0 = l, y0 = t;
     struct metal_backend *be = (struct metal_backend*)m->base.backend;
-    id<MTLDevice> device =
-        (__bridge id<MTLDevice>)be->device;
 
     id<MTLComputePipelineState> pso =
         (__bridge id<MTLComputePipelineState>)m->pipeline;
@@ -1213,31 +1193,6 @@ static void encode_dispatch(
 
     int cache_idx[32];
     for (int i = 0; i < tb; i++) { cache_idx[i] = -1; }
-
-    uint32_t w32 = (uint32_t)w;
-    id<MTLBuffer> per_w =
-        [device newBufferWithLength:sizeof w32
-                options:
-                    MTLResourceStorageModeShared];
-    *(uint32_t*)per_w.contents = w32;
-    batch_retain_buf(
-        be, (__bridge_retained void*)per_w);
-    uint32_t x032 = (uint32_t)x0;
-    id<MTLBuffer> per_x0 =
-        [device newBufferWithLength:sizeof x032
-                options:
-                    MTLResourceStorageModeShared];
-    *(uint32_t*)per_x0.contents = x032;
-    batch_retain_buf(
-        be, (__bridge_retained void*)per_x0);
-    uint32_t y032 = (uint32_t)y0;
-    id<MTLBuffer> per_y0 =
-        [device newBufferWithLength:sizeof y032
-                options:
-                    MTLResourceStorageModeShared];
-    *(uint32_t*)per_y0.contents = y032;
-    batch_retain_buf(
-        be, (__bridge_retained void*)per_y0);
 
     for (int i = 0; i <= m->max_ptr; i++) {
         if (!buf[i].ptr || !buf[i].sz) { continue; }
@@ -1269,24 +1224,6 @@ static void encode_dispatch(
         rbs_data[bi] = (uint32_t)drb;
     }
 
-    size_t sz_bytes = (size_t)(tb + 1)
-                    * sizeof(uint32_t);
-    id<MTLBuffer> per_sz =
-        [device newBufferWithLength:sz_bytes
-                options:
-                    MTLResourceStorageModeShared];
-    __builtin_memcpy(
-        per_sz.contents, szs_data, sz_bytes);
-    batch_retain_buf(
-        be, (__bridge_retained void*)per_sz);
-    id<MTLBuffer> per_rbs =
-        [device newBufferWithLength:sz_bytes
-                options:
-                    MTLResourceStorageModeShared];
-    __builtin_memcpy(
-        per_rbs.contents, rbs_data, sz_bytes);
-    batch_retain_buf(
-        be, (__bridge_retained void*)per_rbs);
     for (int i = 0; i < tb; i++) {
         if (cache_idx[i] >= 0) {
             [enc setBuffer:
@@ -1296,21 +1233,19 @@ static void encode_dispatch(
                atIndex:(NSUInteger)i];
         }
     }
-    [enc setBuffer:per_w
-            offset:0
-           atIndex:(NSUInteger)(m->total_bufs + 0)];
-    [enc setBuffer:per_sz
-            offset:0
-           atIndex:(NSUInteger)(m->total_bufs + 1)];
-    [enc setBuffer:per_rbs
-            offset:0
-           atIndex:(NSUInteger)(m->total_bufs + 2)];
-    [enc setBuffer:per_x0
-            offset:0
-           atIndex:(NSUInteger)(m->total_bufs + 3)];
-    [enc setBuffer:per_y0
-            offset:0
-           atIndex:(NSUInteger)(m->total_bufs + 4)];
+
+    // Tiny per-dispatch metadata: width, x0, y0, sizes[], row_bytes[].
+    // These are write-once-read-once-by-one-shader and small enough to go
+    // through setBytes:, the documented Metal idiom for inline data.
+    uint32_t w32  = (uint32_t)w;
+    uint32_t x032 = (uint32_t)x0;
+    uint32_t y032 = (uint32_t)y0;
+    size_t   sz_bytes = (size_t)(tb + 1) * sizeof(uint32_t);
+    [enc setBytes:&w32  length:sizeof w32  atIndex:(NSUInteger)(m->total_bufs + 0)];
+    [enc setBytes:szs_data length:sz_bytes atIndex:(NSUInteger)(m->total_bufs + 1)];
+    [enc setBytes:rbs_data length:sz_bytes atIndex:(NSUInteger)(m->total_bufs + 2)];
+    [enc setBytes:&x032 length:sizeof x032 atIndex:(NSUInteger)(m->total_bufs + 3)];
+    [enc setBytes:&y032 length:sizeof y032 atIndex:(NSUInteger)(m->total_bufs + 4)];
 
     int tg_size = m->tg_size;
     MTLSize grid =
@@ -1409,12 +1344,6 @@ static void umbra_metal_flush(struct metal_backend *be) {
                     (size_t)c->bytes);
             }
             be->batch_ncopy = 0;
-
-            for (int i = 0; i < be->batch_nbufs; i++) {
-                (void)(__bridge_transfer id)
-                    be->batch_bufs[i];
-            }
-            be->batch_nbufs = 0;
 
             for (int i = 0; i < be->batch_cache_n; i++) {
                 (void)(__bridge_transfer id)
