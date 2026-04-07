@@ -20,7 +20,7 @@ struct buf_cache_entry {
     void   *mtl;     // retained id<MTLBuffer>
     void   *host;
     size_t  size;
-    _Bool   nocopy; int :24, :32;
+    _Bool   nocopy, writable; int :16, :32;
 };
 
 struct copyback {
@@ -1140,20 +1140,21 @@ static void batch_retain_buf(
 
 
 // Returns an index into be->batch_cache. The entry is valid until
-// umbra_metal_flush. For writable buffers, looks up an existing entry by
-// host pointer and reuses it across programs in the same batch. Read-only
-// buffers are never reused — the host may modify them between queue() calls
-// (e.g. slug curve loop index), so each dispatch needs its own snapshot.
-// Copyback for writable non-nocopy buffers is tracked exactly once, at
-// entry creation time.
+// umbra_metal_flush. Writable lookups reuse any existing entry for the same
+// host pointer. Read-only lookups reuse only an existing *writable* entry
+// for the same host pointer — that's the cross-program hand-off case (e.g.
+// slug acc writes wind_buf, slug draw reads it via a read-only deref). A
+// read-only request with no matching writable entry creates a fresh
+// snapshot, because the host may have mutated the bytes since any prior
+// read-only entry was made (e.g. slug acc loop counter in the uniforms
+// buffer). Copyback for writable non-nocopy buffers is tracked exactly
+// once, at entry creation time.
 static int cache_buf(struct metal_backend *be, void *host, size_t bytes,
                      _Bool read_only) {
-    if (!read_only) {
-        for (int i = 0; i < be->batch_cache_n; i++) {
-            struct buf_cache_entry *ce = &be->batch_cache[i];
-            if (ce->host == host && ce->size >= bytes) {
-                return i;
-            }
+    for (int i = 0; i < be->batch_cache_n; i++) {
+        struct buf_cache_entry *ce = &be->batch_cache[i];
+        if (ce->host == host && ce->size >= bytes && (!read_only || ce->writable)) {
+            return i;
         }
     }
 
@@ -1184,9 +1185,10 @@ static int cache_buf(struct metal_backend *be, void *host, size_t bytes,
             __builtin_memcpy(tmp.contents, host, bytes);
         }
     }
-    ce->mtl  = (__bridge_retained void*)tmp;
-    ce->host = host;
-    ce->size = bytes;
+    ce->mtl      = (__bridge_retained void*)tmp;
+    ce->host     = host;
+    ce->size     = bytes;
+    ce->writable = !read_only;
     if (!read_only && !ce->nocopy && host && bytes) {
         batch_add_copy(be, host, ce->mtl, bytes);
     }

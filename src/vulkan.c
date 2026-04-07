@@ -200,7 +200,7 @@ struct buf_cache_entry {
     void          *mapped;
     void          *host;
     VkDeviceSize   size;
-    _Bool          nocopy; int :24, :32;
+    _Bool          nocopy, writable; int :16, :32;
 };
 
 struct vk_backend {
@@ -1981,19 +1981,19 @@ static void batch_track_copy(struct vk_backend *be, void *host, void *mapped, si
 static void vk_flush(struct umbra_backend *be);
 
 // Returns an index into be->batch_cache. The entry is valid until vk_flush.
-// For writable buffers, looks up an existing entry by host pointer and
-// reuses it across programs in the same batch. Read-only buffers are never
-// reused — the host may modify them between queue() calls (e.g. slug curve
-// loop index), so each dispatch needs its own snapshot. Copyback for writable
-// non-nocopy buffers is tracked exactly once, at entry creation time.
+// Writable lookups reuse any existing entry for the same host pointer.
+// Read-only lookups reuse only an existing *writable* entry for the same host
+// pointer — that's the cross-program hand-off case (e.g. slug acc writes
+// wind_buf, slug draw reads it via a read-only deref). A read-only request
+// with no matching writable entry creates a fresh snapshot, because the host
+// may have mutated the bytes since any prior read-only entry was made
+// (e.g. slug acc loop counter in the uniforms buffer).
 static int cache_buf(struct vk_backend *be, void *host, size_t bytes,
                      VkDeviceSize sz, _Bool read_only) {
-    if (!read_only) {
-        for (int i = 0; i < be->batch_cache_n; i++) {
-            struct buf_cache_entry *ce = &be->batch_cache[i];
-            if (ce->host == host && ce->size >= sz) {
-                return i;
-            }
+    for (int i = 0; i < be->batch_cache_n; i++) {
+        struct buf_cache_entry *ce = &be->batch_cache[i];
+        if (ce->host == host && ce->size >= sz && (!read_only || ce->writable)) {
+            return i;
         }
     }
 
@@ -2027,12 +2027,13 @@ static int cache_buf(struct vk_backend *be, void *host, size_t bytes,
         VkDeviceMemory mem = VK_NULL_HANDLE;
         if (vkAllocateMemory(be->device, &ai, 0, &mem) == VK_SUCCESS &&
             vkBindBufferMemory(be->device, buf, mem, 0) == VK_SUCCESS) {
-            ce->buf    = buf;
-            ce->mem    = mem;
-            ce->size   = import_sz;
-            ce->mapped = host;
-            ce->host   = host;
-            ce->nocopy = 1;
+            ce->buf      = buf;
+            ce->mem      = mem;
+            ce->size     = import_sz;
+            ce->mapped   = host;
+            ce->host     = host;
+            ce->nocopy   = 1;
+            ce->writable = 1;
             return idx;
         }
         // Import failed — fall back.
@@ -2040,11 +2041,12 @@ static int cache_buf(struct vk_backend *be, void *host, size_t bytes,
         vkDestroyBuffer(be->device, buf, 0);
     }
 
-    ce->buf  = create_buffer(be->device, sz);
-    ce->mem  = alloc_and_bind(be->device, ce->buf, be->mem_type_host);
-    ce->size = sz;
+    ce->buf      = create_buffer(be->device, sz);
+    ce->mem      = alloc_and_bind(be->device, ce->buf, be->mem_type_host);
+    ce->size     = sz;
     vkMapMemory(be->device, ce->mem, 0, sz, 0, &ce->mapped);
-    ce->host = host;
+    ce->host     = host;
+    ce->writable = !read_only;
     if (bytes) { memcpy(ce->mapped, host, bytes); }
     if (!read_only && host && bytes) {
         batch_track_copy(be, host, ce->mapped, bytes);
