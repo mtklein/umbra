@@ -54,10 +54,10 @@ struct ra_step ra_step_alloc(struct ra *ra, int *sl, int *ns, int i);
 
 // Unary conversion: ensure x, claim rd if x dead, else alloc rd.
 struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct bb_inst const *inst,
-                             int i, _Bool scalar);
+                             int i);
 
 // Full ALU: ensure x/y/z, dead analysis, claim/alloc rd,
 // alloc scratch if needed, free dead inputs.
 // FMA accumulator targeting and sel mask claiming are handled internally.
 struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const *inst,
-                           int i, _Bool scalar, int nscratch);
+                           int i, int nscratch);

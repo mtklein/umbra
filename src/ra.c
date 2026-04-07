@@ -223,8 +223,7 @@ struct ra_step ra_step_alloc(struct ra *ra, int *sl, int *ns, int i) {
 }
 
 struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct bb_inst const *inst,
-                             int i, _Bool scalar) {
-    (void)scalar;
+                             int i) {
     struct ra_step s = step0();
     s.rx = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
     _Bool const x_dead = inst->x.chan
@@ -245,8 +244,7 @@ struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct bb_inst con
 }
 
 struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const *inst,
-                           int i, _Bool scalar, int nscratch) {
-    (void)scalar;
+                           int i, int nscratch) {
     int           *lu = ra->last_use;
     struct ra_step s = step0();
 

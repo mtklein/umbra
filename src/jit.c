@@ -1034,7 +1034,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         } break;
 
         case op_f32_from_f16: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
             put(c, FCVTL_4s(lo(s.rd), lo(s.rx)));
             if (!scalar) { put(c, FCVTL_4s(hi(s.rd), hi(s.rx))); }
         } break;
@@ -1065,26 +1065,26 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, ST4_8h(0, XT));
                 i += 4;
             } else {
-                struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+                struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
                 put(c, FCVTN_4h(lo(s.rd), lo(s.rx)));
                 if (!scalar) { put(c, FCVTN_4h(hi(s.rd), hi(s.rx))); }
             }
         } break;
 
         case op_i32_from_s16: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
             put(c, SXTL_4s(lo(s.rd), lo(s.rx)));
             if (!scalar) { put(c, SXTL_4s(hi(s.rd), hi(s.rx))); }
         } break;
 
         case op_i32_from_u16: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
             put(c, UXTL_4s(lo(s.rd), lo(s.rx)));
             if (!scalar) { put(c, UXTL_4s(hi(s.rd), hi(s.rx))); }
         } break;
 
         case op_i16_from_i32: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
             put(c, XTN_4h(lo(s.rd), lo(s.rx)));
             if (!scalar) { put(c, XTN_4h(hi(s.rd), hi(s.rx))); }
         } break;
@@ -1133,7 +1133,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_le_u32:
         {
             int nscratch = (inst->op == op_shr_u32 || inst->op == op_shr_s32) ? 1 : 0;
-            struct ra_step s = ra_step_alu(ra, sl, ns, inst, i, scalar, nscratch);
+            struct ra_step s = ra_step_alu(ra, sl, ns, inst, i, nscratch);
             int sc_lo = s.scratch >= 0 ? lo(s.scratch) : -1;
             emit_alu_reg(c, inst->op, lo(s.rd), lo(s.rx), lo(s.ry), lo(s.rz),
                          inst->imm, sc_lo);
@@ -1148,7 +1148,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_shl_i32_imm:
         case op_shr_u32_imm:
         case op_shr_s32_imm: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
             emit_alu_reg(c, inst->op, lo(s.rd), lo(s.rx), 0, 0, inst->imm, -1);
             if (!scalar) {
                 emit_alu_reg(c, inst->op, hi(s.rd), hi(s.rx), 0, 0, inst->imm, -1);
@@ -1173,7 +1173,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_eq_i32_imm:
         case op_lt_s32_imm:
         case op_le_s32_imm: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
             int8_t ir = ra_ensure(ra, sl, ns, (int)inst->y.id);
             free_chan(ra, inst->y, i);
             enum op o = inst->op;
@@ -2486,27 +2486,27 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
         case op_f32_from_f16: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
             vcvtph2ps(c, s.rd, s.rx);
         } break;
 
         case op_f16_from_f32: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
             vcvtps2ph(c, s.rd, s.rx, 4);
         } break;
 
         case op_i32_from_s16: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
             vpmovsxwd(c, s.rd, s.rx);
         } break;
 
         case op_i32_from_u16: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
             vpmovzxwd(c, s.rd, s.rx);
         } break;
 
         case op_i16_from_i32: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
             if (scalar) {
                 vmovaps(c, s.rd, s.rx);
             } else {
@@ -2523,14 +2523,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         } break;
 
         case op_lt_s32_imm: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
             int8_t tmp = ra_alloc(ra, sl, ns);
             pool_broadcast(c, &jc->pool, tmp, (uint32_t)inst->imm);
             vpcmpgtd(c, s.rd, tmp, s.rx);
             ra_return_reg(ra, tmp);
         } break;
         case op_le_s32_imm: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
             int8_t tmp = ra_alloc(ra, sl, ns);
             pool_broadcast(c, &jc->pool, tmp, (uint32_t)inst->imm);
             vpcmpgtd(c, s.rd, s.rx, tmp);
@@ -2554,7 +2554,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_lt_f32_imm:
         case op_le_f32_imm:
         case op_eq_i32_imm: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
             uint32_t       v = (uint32_t)inst->imm;
             uint32_t       bcast[8] = {v, v, v, v, v, v, v, v};
             int            off = pool_add(&jc->pool, bcast, 32);
@@ -2610,7 +2610,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         } break;
 
         case op_abs_f32: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
             uint32_t       mask[8] = {0x7fffffffu, 0x7fffffffu, 0x7fffffffu, 0x7fffffffu,
                                       0x7fffffffu, 0x7fffffffu, 0x7fffffffu, 0x7fffffffu};
             int            off = pool_add(&jc->pool, mask, 32);
@@ -2655,7 +2655,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int            nscratch = (inst->op == op_lt_u32)                 ? 2
                            : (inst->op == op_le_s32 || inst->op == op_le_u32) ? 1
                                                                               : 0;
-            struct ra_step s = ra_step_alu(ra, sl, ns, inst, i, scalar, nscratch);
+            struct ra_step s = ra_step_alu(ra, sl, ns, inst, i, nscratch);
             emit_alu_reg(c, inst->op, s.rd, s.rx, s.ry, s.rz, inst->imm, s.scratch,
                          s.scratch2);
             if (s.scratch >= 0) { ra_return_reg(ra, s.scratch); }
@@ -2665,7 +2665,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_shl_i32_imm:
         case op_shr_u32_imm:
         case op_shr_s32_imm: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i, scalar);
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
             emit_alu_reg(c, inst->op, s.rd, s.rx, 0, 0, inst->imm, -1, -1);
         } break;
 

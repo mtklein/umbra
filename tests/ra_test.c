@@ -355,7 +355,7 @@ TEST(test_step_unary) {
 
     // x dead at inst 1: claim x's register
     ra_set_last_use(ra, 0, 1);
-    struct ra_step s = ra_step_unary(ra, sl, &ns, &bb->inst[1], 1, 0);
+    struct ra_step s = ra_step_unary(ra, sl, &ns, &bb->inst[1], 1);
     s.rx == r0 here;
     s.rd == r0 here;
     ra_reg(ra, 1) == s.rd here;
@@ -401,7 +401,7 @@ TEST(test_step_unary_alive) {
 
     // x still alive: rd must differ
     ra_set_last_use(ra, 0, 2);
-    struct ra_step s = ra_step_unary(ra, sl, &ns, &bb->inst[1], 1, 0);
+    struct ra_step s = ra_step_unary(ra, sl, &ns, &bb->inst[1], 1);
     s.rx == r0 here;
     s.rd != r0 here;
     ra_reg(ra, 0) == r0 here;
@@ -449,7 +449,7 @@ TEST(test_step_alu) {
     // both dead: rd claims one
     ra_set_last_use(ra, 0, 2);
     ra_set_last_use(ra, 1, 2);
-    struct ra_step s = ra_step_alu(ra, sl, &ns, &bb->inst[2], 2, 0, 0);
+    struct ra_step s = ra_step_alu(ra, sl, &ns, &bb->inst[2], 2, 0);
     s.rx == r0 here;
     s.ry == r1 here;
     s.rd >= 0 here;
@@ -497,7 +497,7 @@ TEST(test_step_alu_scratch) {
 
     ra_set_last_use(ra, 0, 2);
     ra_set_last_use(ra, 1, 2);
-    struct ra_step s = ra_step_alu(ra, sl, &ns, &bb->inst[2], 2, 0, 1);
+    struct ra_step s = ra_step_alu(ra, sl, &ns, &bb->inst[2], 2, 1);
     s.rd >= 0 here;
     s.scratch >= 0 here;
     s.scratch != s.rd here;
