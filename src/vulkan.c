@@ -1988,6 +1988,7 @@ static void batch_track_copy(struct vk_backend *be, void *host, void *mapped, si
 // ---------------------------------------------------------------------------
 
 static void vk_flush(struct umbra_backend *be);
+static void vk_submit_cmdbuf(struct vk_backend *be);
 
 // Returns an index into be->batch_cache. The entry is valid until vk_flush.
 // Writable lookups reuse any existing entry for the same host pointer.
@@ -2191,6 +2192,10 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     vkCmdDispatch(be->batch_cmd, gx, (uint32_t)h, 1);
 
     free(push_data);
+
+    if (uniform_ring_used(&be->uni_ring) > VK_RING_HIGH_WATER) {
+        vk_submit_cmdbuf(be);
+    }
 }
 
 static void vk_program_dump(struct umbra_program const *p, FILE *f) {
@@ -2342,8 +2347,11 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
 //  Backend lifecycle.
 // ---------------------------------------------------------------------------
 
-static void vk_flush(struct umbra_backend *be) {
-    struct vk_backend *v = (struct vk_backend *)be;
+// Submit and drain the in-flight cmdbuf without ending the user's logical
+// batch: writebacks and the cache_buf entries are kept live so the next
+// sub-batch can continue binding the same VkBuffers. Used both as an
+// intra-batch backpressure release and as the first step of a full flush.
+static void vk_submit_cmdbuf(struct vk_backend *v) {
     if (!v->batch_cmd) { return; }
 
     vkEndCommandBuffer(v->batch_cmd);
@@ -2356,6 +2364,21 @@ static void vk_flush(struct umbra_backend *be) {
     vkQueueSubmit(v->queue, 1, &si, v->batch_fence);
     vkWaitForFences(v->device, 1, &v->batch_fence, VK_TRUE, UINT64_MAX);
 
+    vkFreeCommandBuffers(v->device, v->cmd_pool, 1, &v->batch_cmd);
+    vkDestroyFence(v->device, v->batch_fence, 0);
+    v->batch_cmd           = VK_NULL_HANDLE;
+    v->batch_fence         = VK_NULL_HANDLE;
+    v->batch_has_dispatch  = 0;
+
+    uniform_ring_reset(&v->uni_ring);
+}
+
+static void vk_flush(struct umbra_backend *be) {
+    struct vk_backend *v = (struct vk_backend *)be;
+    if (!v->batch_cmd) { return; }
+
+    vk_submit_cmdbuf(v);
+
     for (int i = 0; i < v->batch_n_copies; i++) {
         memcpy(v->batch_copies[i].host, v->batch_copies[i].mapped, v->batch_copies[i].bytes);
     }
@@ -2366,13 +2389,8 @@ static void vk_flush(struct umbra_backend *be) {
         vkDestroyBuffer(v->device, ce->buf, 0);
     }
 
-    vkFreeCommandBuffers(v->device, v->cmd_pool, 1, &v->batch_cmd);
-    vkDestroyFence(v->device, v->batch_fence, 0);
-    v->batch_cmd      = VK_NULL_HANDLE;
     v->batch_n_copies = 0;
     v->batch_cache_n  = 0;
-
-    uniform_ring_reset(&v->uni_ring);
 }
 
 static void vk_free(struct umbra_backend *be) {
