@@ -1,5 +1,6 @@
 #include "assume.h"
 #include "bb.h"
+#include "uniform_ring.h"
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -221,6 +222,7 @@ struct vk_backend {
     int                   batch_n_copies, batch_copies_cap;
     struct buf_cache_entry *batch_cache;
     int                     batch_cache_n, batch_cache_cap;
+    struct uniform_ring   uni_ring;
     _Bool                 batch_has_dispatch; int :24, :32;
 };
 
@@ -282,8 +284,6 @@ struct vk_program {
     int total_bufs;
     int n_deref;
     int push_words;
-    int uni_push_off;  // word offset of uniform data in push block, or -1
-    int :32;
 
     struct deref_info *deref;
 
@@ -341,11 +341,8 @@ typedef struct {
     // Push constant layout:
     //   [0] = w, [1] = x0, [2] = y0,
     //   [3..3+total_bufs-1] = buf_szs, [3+total_bufs..3+2*total_bufs-1] = buf_rbs
-    //   [uni_push_off..] = uniform data (when uniforms fit in push constants)
     int total_bufs;
     int push_words;
-    int uni_push_off;  // word offset of uniform data in push block, or -1
-    int :32;
 
     // Constant cache for small integer constants.
     uint32_t c_0, c_1, c_2, c_3, c_4, c_8, c_16;
@@ -713,8 +710,7 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
                               int *out_total_bufs,
                               int *out_n_deref,
                               struct deref_info **out_deref,
-                              int *out_push_words,
-                              int *out_uni_push_off) {
+                              int *out_push_words) {
     SpvBuilder B;
     memset(&B, 0, sizeof B);
     B.next_id = 1; // 0 is reserved
@@ -771,27 +767,12 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
         }
     }
 
-    // Push constant layout: w, x0, y0, buf_szs[total_bufs], buf_rbs[total_bufs]
-    int meta_words = 3 + 2 * total_bufs;
-
-    // Check if uniform data (buf[0]) fits in push constants.
-    // Scan for max byte offset accessed via op_uniform_32 targeting ptr 0.
-    int uni_end = 0;
-    for (int i = 0; i < bb->insts; i++) {
-        if (bb->inst[i].op == op_uniform_32 && bb->inst[i].ptr == 0) {
-            int end = bb->inst[i].imm + 4;
-            if (end > uni_end) { uni_end = end; }
-        }
-    }
-    int uni_words = (uni_end + 3) / 4;
-    B.uni_push_off = -1;
-    if (uni_words > 0 && (meta_words + uni_words) * 4 <= 128) {
-        B.uni_push_off = meta_words;
-    }
-
-    int push_words = meta_words + (B.uni_push_off >= 0 ? uni_words : 0);
+    // Push constant layout: w, x0, y0, buf_szs[total_bufs], buf_rbs[total_bufs].
+    // User uniforms (buf[0]) go through the per-batch uniform ring as a
+    // storage buffer at descriptor binding 0; only this small backend-side
+    // metadata rides in push constants.
+    int push_words = 3 + 2 * total_bufs;
     *out_push_words = push_words;
-    *out_uni_push_off = B.uni_push_off;
     B.push_words = push_words;
 
     // --- Capabilities ---
@@ -1081,12 +1062,9 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
     spv_word(&B.decor, SpvDecorationBuiltIn);
     spv_word(&B.decor, SpvBuiltInGlobalInvocationId);
 
-    // SSBO variables (one per buffer, skipping buf[0] when uniforms are in
-    // push constants).
-    int skip0 = B.uni_push_off >= 0;
+    // SSBO variables: one per buffer, descriptor binding = buffer index.
     B.v_ssbo = calloc((size_t)total_bufs, sizeof *B.v_ssbo);
     for (int i = 0; i < total_bufs; i++) {
-        if (i == 0 && skip0) { continue; }
         B.v_ssbo[i] = spv_id(&B);
         uint32_t ptr_type = B.buf_is_16[i] ? B.t_ptr_ssbo_struct_u16
                                             : B.t_ptr_ssbo_struct;
@@ -1095,7 +1073,6 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
         spv_word(&B.globals, B.v_ssbo[i]);
         spv_word(&B.globals, SpvStorageClassUniform);
 
-        // DescriptorSet = 0, Binding = i (shifted down by 1 when skip0).
         spv_op(&B.decor, SpvOpDecorate, 4);
         spv_word(&B.decor, B.v_ssbo[i]);
         spv_word(&B.decor, SpvDecorationDescriptorSet);
@@ -1104,7 +1081,7 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
         spv_op(&B.decor, SpvOpDecorate, 4);
         spv_word(&B.decor, B.v_ssbo[i]);
         spv_word(&B.decor, SpvDecorationBinding);
-        spv_word(&B.decor, (uint32_t)(i - skip0));
+        spv_word(&B.decor, (uint32_t)i);
     }
 
     // Push constant variable.
@@ -1231,13 +1208,8 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
 
                 case op_uniform_32: {
                     int p = resolve_ptr(&B, inst);
-                    if (p == 0 && B.uni_push_off >= 0) {
-                        uint32_t off = spv_const_u32(&B, (uint32_t)(B.uni_push_off + inst->imm / 4));
-                        B.val[i] = load_push_u32(&B, off);
-                    } else {
-                        uint32_t slot_id = spv_const_u32(&B, (uint32_t)(inst->imm / 4));
-                        B.val[i] = load_ssbo_u32(&B, p, slot_id);
-                    }
+                    uint32_t slot_id = spv_const_u32(&B, (uint32_t)(inst->imm / 4));
+                    B.val[i] = load_ssbo_u32(&B, p, slot_id);
                 } break;
 
                 case op_load_32: {
@@ -1942,6 +1914,44 @@ static VkDeviceMemory alloc_and_bind(VkDevice device, VkBuffer buf, uint32_t mem
 
 
 // ---------------------------------------------------------------------------
+//  Uniform ring chunk lifecycle.
+// ---------------------------------------------------------------------------
+
+enum {
+    VK_RING_CHUNK_BYTES = 256 * 1024,
+    VK_RING_HIGH_WATER  =   1 * 1024 * 1024,
+};
+
+struct vk_ring_chunk {
+    VkBuffer       buf;
+    VkDeviceMemory mem;
+};
+
+static struct uniform_ring_chunk vk_ring_new_chunk(size_t min_bytes, void *ctx) {
+    struct vk_backend *be = ctx;
+    size_t cap = min_bytes > VK_RING_CHUNK_BYTES ? min_bytes : VK_RING_CHUNK_BYTES;
+    struct vk_ring_chunk *chunk = calloc(1, sizeof *chunk);
+    chunk->buf = create_buffer(be->device, (VkDeviceSize)cap);
+    chunk->mem = alloc_and_bind(be->device, chunk->buf, be->mem_type_host);
+    void *mapped = 0;
+    vkMapMemory(be->device, chunk->mem, 0, (VkDeviceSize)cap, 0, &mapped);
+    return (struct uniform_ring_chunk){
+        .handle=chunk,
+        .mapped=mapped,
+        .cap   =cap,
+        .used  =0,
+    };
+}
+
+static void vk_ring_free_chunk(void *handle, void *ctx) {
+    struct vk_backend    *be    = ctx;
+    struct vk_ring_chunk *chunk = handle;
+    vkFreeMemory   (be->device, chunk->mem, 0);
+    vkDestroyBuffer(be->device, chunk->buf, 0);
+    free(chunk);
+}
+
+// ---------------------------------------------------------------------------
 //  Batch helpers.
 // ---------------------------------------------------------------------------
 
@@ -2063,18 +2073,38 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
     begin_batch(be);
 
-    int n     = vp->total_bufs;
-    int skip0 = vp->uni_push_off >= 0;
+    int n = vp->total_bufs;
 
-    int cache_idx[32];
-    for (int i = 0; i < n; i++) { cache_idx[i] = -1; }
+    // For each binding we need a (VkBuffer, offset, range) triple. Read-only
+    // flat top-level buffers go through the per-batch uniform ring; everything
+    // else (writable, row-structured, deref'd) goes through cache_buf so the
+    // writable->readonly handoff path is preserved.
+    VkBuffer     bind_buffer[32];
+    VkDeviceSize bind_offset[32];
+    VkDeviceSize bind_range [32];
+    assume(n <= 32);
+    for (int i = 0; i < n; i++) {
+        bind_buffer[i] = VK_NULL_HANDLE;
+        bind_offset[i] = 0;
+        bind_range [i] = 0;
+    }
 
     for (int i = 0; i <= vp->max_ptr; i++) {
-        if (i == 0 && skip0) { continue; } // uniforms go via push constants
         if (!buf[i].ptr || !buf[i].sz) { continue; }
+        if (buf[i].read_only && !buf[i].row_bytes) {
+            struct uniform_ring_loc loc =
+                uniform_ring_alloc(&be->uni_ring, buf[i].ptr, buf[i].sz);
+            struct vk_ring_chunk *chunk = loc.handle;
+            bind_buffer[i] = chunk->buf;
+            bind_offset[i] = (VkDeviceSize)loc.offset;
+            bind_range [i] = (VkDeviceSize)buf[i].sz;
+            continue;
+        }
         VkDeviceSize sz = (VkDeviceSize)buf[i].sz;
         if (sz < 4) { sz = 4; }
-        cache_idx[i] = cache_buf(be, buf[i].ptr, buf[i].sz, sz, buf[i].read_only);
+        int idx = cache_buf(be, buf[i].ptr, buf[i].sz, sz, buf[i].read_only);
+        bind_buffer[i] = be->batch_cache[idx].buf;
+        bind_range [i] = VK_WHOLE_SIZE;
     }
 
     uint32_t *push_data = calloc((size_t)vp->push_words, sizeof *push_data);
@@ -2101,37 +2131,31 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
         VkDeviceSize sz = (VkDeviceSize)bytes;
         if (sz < 4) { sz = 4; }
-        cache_idx[bi] = cache_buf(be, derived, bytes, sz, deref_read_only);
+        int idx = cache_buf(be, derived, bytes, sz, deref_read_only);
+        bind_buffer[bi] = be->batch_cache[idx].buf;
+        bind_range [bi] = VK_WHOLE_SIZE;
 
         push_data[3 + bi] = (uint32_t)bytes;
         push_data[3 + vp->total_bufs + bi] = (uint32_t)drb;
     }
 
-    for (int i = skip0; i < n; i++) {
-        if (cache_idx[i] < 0) {
-            cache_idx[i] = cache_buf(be, 0, 0, 4, 1);
+    for (int i = 0; i < n; i++) {
+        if (bind_buffer[i] == VK_NULL_HANDLE) {
+            int idx = cache_buf(be, 0, 0, 4, 1);
+            bind_buffer[i] = be->batch_cache[idx].buf;
+            bind_range [i] = VK_WHOLE_SIZE;
         }
-    }
-
-    // Copy uniform data into push constants when it fits.
-    // Only copy the shader-accessed portion (push_words - uni_push_off words),
-    // not the full buf[0].sz which may include deref pointer metadata.
-    if (skip0 && buf[0].ptr) {
-        int uni_bytes = (vp->push_words - vp->uni_push_off) * (int)sizeof(uint32_t);
-        memcpy(push_data + vp->uni_push_off, buf[0].ptr, (size_t)uni_bytes);
     }
 
     // Push descriptors: each dispatch records its own buffer bindings directly
     // in the command buffer, so no external descriptor set to protect.
-    int n_desc = n - skip0;
     VkDescriptorBufferInfo buf_infos[32];
     VkWriteDescriptorSet   writes[32];
-    assume(n_desc <= 32);
-    for (int i = 0; i < n_desc; i++) {
+    for (int i = 0; i < n; i++) {
         buf_infos[i] = (VkDescriptorBufferInfo){
-            .buffer=be->batch_cache[cache_idx[i + skip0]].buf,
-            .offset=0,
-            .range=VK_WHOLE_SIZE,
+            .buffer=bind_buffer[i],
+            .offset=bind_offset[i],
+            .range =bind_range [i],
         };
         writes[i] = (VkWriteDescriptorSet){
             .sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -2141,6 +2165,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
             .pBufferInfo=&buf_infos[i],
         };
     }
+    int n_desc = n;
 
     vkCmdBindPipeline(be->batch_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, vp->pipeline);
     if (n_desc) {
@@ -2213,15 +2238,13 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
                                          struct umbra_basic_block const *bb) {
     struct vk_backend *vbe = (struct vk_backend *)be;
 
-    int spirv_len = 0, max_ptr = -1, total_bufs = 0, n_deref = 0, push_words = 0,
-        uni_push_off = -1;
+    int spirv_len = 0, max_ptr = -1, total_bufs = 0, n_deref = 0, push_words = 0;
     struct deref_info *deref = 0;
     uint32_t *spirv = build_spirv(bb, &spirv_len, &max_ptr, &total_bufs,
-                                   &n_deref, &deref, &push_words, &uni_push_off);
+                                   &n_deref, &deref, &push_words);
     if (!spirv) { return 0; }
 
-    int skip0   = uni_push_off >= 0;
-    int n_desc  = total_bufs - skip0;
+    int n_desc = total_bufs;
 
     // Create shader module.
     VkShaderModule shader;
@@ -2304,7 +2327,6 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
     p->total_bufs  = total_bufs;
     p->n_deref     = n_deref;
     p->push_words    = push_words;
-    p->uni_push_off  = uni_push_off;
     p->deref       = deref;
     p->spirv       = spirv;
     p->spirv_len   = spirv_len;
@@ -2349,11 +2371,14 @@ static void vk_flush(struct umbra_backend *be) {
     v->batch_cmd      = VK_NULL_HANDLE;
     v->batch_n_copies = 0;
     v->batch_cache_n  = 0;
+
+    uniform_ring_reset(&v->uni_ring);
 }
 
 static void vk_free(struct umbra_backend *be) {
     vk_flush(be);
     struct vk_backend *v = (struct vk_backend *)be;
+    uniform_ring_free(&v->uni_ring);
     vkDestroyCommandPool(v->device, v->cmd_pool, 0);
     vkDestroyDevice(v->device, 0);
     vkDestroyInstance(v->instance, 0);
@@ -2498,6 +2523,11 @@ struct umbra_backend *umbra_backend_vulkan(void) {
         }
     }
 
+    VkPhysicalDeviceProperties props;
+    vkGetPhysicalDeviceProperties(phys, &props);
+    size_t ssbo_align = (size_t)props.limits.minStorageBufferOffsetAlignment;
+    if (ssbo_align < 16) { ssbo_align = 16; }
+
     struct vk_backend *v = calloc(1, sizeof *v);
     v->instance            = instance;
     v->phys                = phys;
@@ -2509,6 +2539,12 @@ struct umbra_backend *umbra_backend_vulkan(void) {
     v->mem_type_host_import = mem_type_host_import;
     v->host_import_align   = host_import_align;
     v->get_host_props      = get_host_props;
+    v->uni_ring = (struct uniform_ring){
+        .align     =ssbo_align,
+        .ctx       =v,
+        .new_chunk =vk_ring_new_chunk,
+        .free_chunk=vk_ring_free_chunk,
+    };
     v->base.compile  = vk_compile;
     v->base.flush    = vk_flush;
     v->base.free     = vk_free;
