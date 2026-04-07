@@ -204,6 +204,8 @@ struct buf_cache_entry {
     _Bool          nocopy, writable; int :16, :32;
 };
 
+enum { VK_N_FRAMES = 2 };
+
 struct vk_backend {
     struct umbra_backend  base;
     VkInstance            instance;
@@ -216,13 +218,15 @@ struct vk_backend {
     uint32_t              mem_type_host_import; int :32;
     PFN_vkGetMemoryHostPointerPropertiesEXT get_host_props;
     VkDeviceSize          host_import_align;
-    VkCommandBuffer       batch_cmd;
-    VkFence               batch_fence;
+    VkCommandBuffer       batch_cmd;                       // currently-encoding cmdbuf, or NULL
+    VkCommandBuffer       frame_committed[VK_N_FRAMES];    // last committed cmdbuf per frame
+    VkFence               frame_fences   [VK_N_FRAMES];    // signals when frame_committed[i] is done
     struct copyback      *batch_copies;
     int                   batch_n_copies, batch_copies_cap;
     struct buf_cache_entry *batch_cache;
     int                     batch_cache_n, batch_cache_cap;
-    struct uniform_ring   uni_ring;
+    struct uniform_ring   uni_rings[VK_N_FRAMES];
+    int                   cur_frame, :32;
     _Bool                 batch_has_dispatch; int :24, :32;
 };
 
@@ -1964,8 +1968,6 @@ static void begin_batch(struct vk_backend *be) {
         .commandBufferCount=1,
     };
     vkAllocateCommandBuffers(be->device, &ai, &be->batch_cmd);
-    VkFenceCreateInfo fi = { .sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
-    vkCreateFence(be->device, &fi, 0, &be->batch_fence);
     VkCommandBufferBeginInfo bi = {
         .sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         .flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
@@ -2090,11 +2092,12 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
         bind_range [i] = 0;
     }
 
+    struct uniform_ring *cur_ring = &be->uni_rings[be->cur_frame];
     for (int i = 0; i <= vp->max_ptr; i++) {
         if (!buf[i].ptr || !buf[i].sz) { continue; }
         if (buf[i].read_only && !buf[i].row_bytes) {
             struct uniform_ring_loc loc =
-                uniform_ring_alloc(&be->uni_ring, buf[i].ptr, buf[i].sz);
+                uniform_ring_alloc(cur_ring, buf[i].ptr, buf[i].sz);
             struct vk_ring_chunk *chunk = loc.handle;
             bind_buffer[i] = chunk->buf;
             bind_offset[i] = (VkDeviceSize)loc.offset;
@@ -2193,7 +2196,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
     free(push_data);
 
-    if (uniform_ring_used(&be->uni_ring) > VK_RING_HIGH_WATER) {
+    if (uniform_ring_used(&be->uni_rings[be->cur_frame]) > VK_RING_HIGH_WATER) {
         vk_submit_cmdbuf(be);
     }
 }
@@ -2347,10 +2350,23 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
 //  Backend lifecycle.
 // ---------------------------------------------------------------------------
 
-// Submit and drain the in-flight cmdbuf without ending the user's logical
-// batch: writebacks and the cache_buf entries are kept live so the next
-// sub-batch can continue binding the same VkBuffers. Used both as an
-// intra-batch backpressure release and as the first step of a full flush.
+// Drain a single frame: wait for its in-flight cmdbuf to complete, free
+// it, reset its fence, and reset the frame's ring. No-op on a frame with
+// no in-flight cmdbuf.
+static void vk_drain_frame(struct vk_backend *v, int frame) {
+    if (v->frame_committed[frame]) {
+        vkWaitForFences(v->device, 1, &v->frame_fences[frame], VK_TRUE, UINT64_MAX);
+        vkResetFences(v->device, 1, &v->frame_fences[frame]);
+        vkFreeCommandBuffers(v->device, v->cmd_pool, 1, &v->frame_committed[frame]);
+        v->frame_committed[frame] = VK_NULL_HANDLE;
+    }
+    uniform_ring_reset(&v->uni_rings[frame]);
+}
+
+// Backpressure release: submit the current frame's cmdbuf without waiting,
+// rotate to the other frame, and drain it. Drain only blocks if the new
+// frame's prior cmdbuf is still running. Writebacks and cache_buf entries
+// stay live across rotation.
 static void vk_submit_cmdbuf(struct vk_backend *v) {
     if (!v->batch_cmd) { return; }
 
@@ -2361,23 +2377,21 @@ static void vk_submit_cmdbuf(struct vk_backend *v) {
         .commandBufferCount=1,
         .pCommandBuffers=&v->batch_cmd,
     };
-    vkQueueSubmit(v->queue, 1, &si, v->batch_fence);
-    vkWaitForFences(v->device, 1, &v->batch_fence, VK_TRUE, UINT64_MAX);
+    vkQueueSubmit(v->queue, 1, &si, v->frame_fences[v->cur_frame]);
 
-    vkFreeCommandBuffers(v->device, v->cmd_pool, 1, &v->batch_cmd);
-    vkDestroyFence(v->device, v->batch_fence, 0);
-    v->batch_cmd           = VK_NULL_HANDLE;
-    v->batch_fence         = VK_NULL_HANDLE;
-    v->batch_has_dispatch  = 0;
+    v->frame_committed[v->cur_frame] = v->batch_cmd;
+    v->batch_cmd                     = VK_NULL_HANDLE;
+    v->batch_has_dispatch            = 0;
 
-    uniform_ring_reset(&v->uni_ring);
+    v->cur_frame ^= 1;
+    vk_drain_frame(v, v->cur_frame);
 }
 
 static void vk_flush(struct umbra_backend *be) {
     struct vk_backend *v = (struct vk_backend *)be;
-    if (!v->batch_cmd) { return; }
 
     vk_submit_cmdbuf(v);
+    for (int i = 0; i < VK_N_FRAMES; i++) { vk_drain_frame(v, i); }
 
     for (int i = 0; i < v->batch_n_copies; i++) {
         memcpy(v->batch_copies[i].host, v->batch_copies[i].mapped, v->batch_copies[i].bytes);
@@ -2396,7 +2410,10 @@ static void vk_flush(struct umbra_backend *be) {
 static void vk_free(struct umbra_backend *be) {
     vk_flush(be);
     struct vk_backend *v = (struct vk_backend *)be;
-    uniform_ring_free(&v->uni_ring);
+    for (int i = 0; i < VK_N_FRAMES; i++) {
+        uniform_ring_free(&v->uni_rings[i]);
+        vkDestroyFence(v->device, v->frame_fences[i], 0);
+    }
     vkDestroyCommandPool(v->device, v->cmd_pool, 0);
     vkDestroyDevice(v->device, 0);
     vkDestroyInstance(v->instance, 0);
@@ -2557,12 +2574,16 @@ struct umbra_backend *umbra_backend_vulkan(void) {
     v->mem_type_host_import = mem_type_host_import;
     v->host_import_align   = host_import_align;
     v->get_host_props      = get_host_props;
-    v->uni_ring = (struct uniform_ring){
-        .align     =ssbo_align,
-        .ctx       =v,
-        .new_chunk =vk_ring_new_chunk,
-        .free_chunk=vk_ring_free_chunk,
-    };
+    for (int i = 0; i < VK_N_FRAMES; i++) {
+        v->uni_rings[i] = (struct uniform_ring){
+            .align     =ssbo_align,
+            .ctx       =v,
+            .new_chunk =vk_ring_new_chunk,
+            .free_chunk=vk_ring_free_chunk,
+        };
+        VkFenceCreateInfo fi = { .sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+        vkCreateFence(device, &fi, 0, &v->frame_fences[i]);
+    }
     v->base.compile  = vk_compile;
     v->base.flush    = vk_flush;
     v->base.free     = vk_free;
