@@ -733,14 +733,13 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
     int *deref_buf = calloc((size_t)(bb->insts + 1), sizeof *deref_buf);
     B.deref_buf = deref_buf;
     int next_buf = max_ptr + 1;
-    int n_deref = 0;
     for (int i = 0; i < bb->insts; i++) {
         if (bb->inst[i].op == op_deref_ptr) {
             deref_buf[i] = next_buf++;
-            n_deref++;
         }
     }
     int total_bufs = next_buf;
+    int n_deref    = total_bufs - max_ptr - 1;
     *out_total_bufs = total_bufs;
     *out_n_deref = n_deref;
     B.total_bufs = total_bufs;
