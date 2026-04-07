@@ -1341,7 +1341,6 @@ struct umbra_backend *umbra_backend_jit(void) {
         .flush      = flush_be_noop,
         .free    = free_be_jit,
         .threadsafe = 1,
-        .kind       = umbra_backend_kind_jit,
     };
     return be;
 }
@@ -2835,7 +2834,6 @@ struct umbra_backend *umbra_backend_jit(void) {
         .flush      = flush_be_noop,
         .free    = free_be_jit,
         .threadsafe = 1,
-        .kind       = umbra_backend_kind_jit,
     };
     return be;
 }

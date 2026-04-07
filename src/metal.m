@@ -1478,7 +1478,6 @@ struct umbra_backend *umbra_backend_metal(void) {
             .compile = compile_metal,
             .flush   = flush_be_metal,
             .free    = free_be_metal,
-            .kind    = umbra_backend_kind_metal,
         };
         return &mbe->base;
     }

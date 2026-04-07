@@ -11,19 +11,11 @@ struct umbra_basic_block* umbra_basic_block(struct umbra_builder*);
 void   umbra_basic_block_free(struct umbra_basic_block*);
 void   umbra_basic_block_dump(struct umbra_basic_block const*, FILE*);
 
-enum umbra_backend_kind {
-    umbra_backend_kind_interp = 0,
-    umbra_backend_kind_jit    = 1,
-    umbra_backend_kind_metal  = 2,
-    umbra_backend_kind_vulkan = 3,
-};
-
 struct umbra_backend {
     struct umbra_program* (*compile)(struct umbra_backend*, struct umbra_basic_block const*);
     void                  (*flush  )(struct umbra_backend*);
     void                  (*free   )(struct umbra_backend*);
-    _Bool                   threadsafe, pad_[3];
-    int                     kind;
+    _Bool                   threadsafe, pad_[7];
 };
 struct umbra_backend* umbra_backend_interp(void);
 struct umbra_backend* umbra_backend_jit   (void);
