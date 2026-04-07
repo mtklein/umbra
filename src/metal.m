@@ -987,7 +987,10 @@ static char* build_source(BB const *bb,
     return src;
 }
 
-enum { METAL_RING_CHUNK_BYTES = 256 * 1024 };
+enum {
+    METAL_RING_CHUNK_BYTES = 256 * 1024,
+    METAL_RING_HIGH_WATER  =   1 * 1024 * 1024,
+};
 
 static struct uniform_ring_chunk metal_ring_new_chunk(size_t min_bytes, void *ctx) {
     struct metal_backend *be = ctx;
@@ -1306,6 +1309,8 @@ static void encode_dispatch(
     free(rbs_data);
 }
 
+static void metal_submit_cmdbuf(struct metal_backend *be);
+
 static void umbra_metal_run(
     struct umbra_metal *m, int l, int t, int r, int b, struct umbra_buf buf[]
 ) {
@@ -1346,44 +1351,53 @@ static void umbra_metal_run(
         [enc endEncoding];
         be->prev_fence = (__bridge_retained void*)update;
     }
+
+    if (uniform_ring_used(&be->uni_ring) > METAL_RING_HIGH_WATER) {
+        metal_submit_cmdbuf(be);
+    }
+}
+
+// Submit and drain the in-flight cmdbuf without ending the user's logical
+// batch: writebacks and the cache_buf entries are kept live so the next
+// sub-batch can continue binding the same writable MTLBuffers. Used both as
+// an intra-batch backpressure release and as the first step of a full flush.
+static void metal_submit_cmdbuf(struct metal_backend *be) {
+    if (!be->batch_cmdbuf) { return; }
+    @autoreleasepool {
+        id<MTLCommandBuffer> cmdbuf =
+            (__bridge_transfer id<MTLCommandBuffer>)be->batch_cmdbuf;
+        be->batch_cmdbuf = NULL;
+        [cmdbuf commit];
+        [cmdbuf waitUntilCompleted];
+        if (be->prev_fence) {
+            (void)(__bridge_transfer id)be->prev_fence;
+            be->prev_fence = NULL;
+        }
+    }
+    uniform_ring_reset(&be->uni_ring);
 }
 
 static void umbra_metal_flush(struct metal_backend *be) {
-    if (be->batch_cmdbuf) {
-        @autoreleasepool {
-            id<MTLCommandBuffer> cmdbuf =
-                (__bridge_transfer id<MTLCommandBuffer>)
-                    be->batch_cmdbuf;
-            be->batch_cmdbuf = NULL;
-
-            [cmdbuf commit];
-            [cmdbuf waitUntilCompleted];
-
-            for (int i = 0; i < be->batch_ncopy; i++) {
-                struct copyback *c =
-                    &be->batch_copy[i];
-                id<MTLBuffer> mtlbuf =
-                    (__bridge id<MTLBuffer>)c->mtlbuf;
-                __builtin_memcpy(
-                    c->host,
-                    mtlbuf.contents,
-                    (size_t)c->bytes);
-            }
-            be->batch_ncopy = 0;
-
-            for (int i = 0; i < be->batch_cache_n; i++) {
-                (void)(__bridge_transfer id)
-                    be->batch_cache[i].mtl;
-            }
-            be->batch_cache_n = 0;
-
-            uniform_ring_reset(&be->uni_ring);
-
-            if (be->prev_fence) {
-                (void)(__bridge_transfer id)be->prev_fence;
-                be->prev_fence = NULL;
-            }
+    if (!be->batch_cmdbuf) { return; }
+    metal_submit_cmdbuf(be);
+    @autoreleasepool {
+        for (int i = 0; i < be->batch_ncopy; i++) {
+            struct copyback *c =
+                &be->batch_copy[i];
+            id<MTLBuffer> mtlbuf =
+                (__bridge id<MTLBuffer>)c->mtlbuf;
+            __builtin_memcpy(
+                c->host,
+                mtlbuf.contents,
+                (size_t)c->bytes);
         }
+        be->batch_ncopy = 0;
+
+        for (int i = 0; i < be->batch_cache_n; i++) {
+            (void)(__bridge_transfer id)
+                be->batch_cache[i].mtl;
+        }
+        be->batch_cache_n = 0;
     }
 }
 

@@ -339,4 +339,51 @@ TEST(test_golden_slides) {
     free_pipes();
 }
 
+// Provokes the cmdbuf-grows-without-bound failure mode the Metal ring
+// backpressure path exists to fix. Without that path, queuing this many
+// byte-distinct uniforms in a single batch eventually trips
+// `IOGPUDeviceShmem` allocation in CommandBuffer encoding. With the path,
+// the ring overflows its high-water mark a few times mid-batch and
+// `metal_submit_cmdbuf` drains the in-flight cmdbuf so the next sub-batch
+// starts fresh.
+TEST(test_metal_long_batch_no_oom) {
+    struct umbra_backend *be = umbra_backend_metal();
+    if (!be) { return; }
+
+    struct umbra_builder *bld = umbra_builder();
+    umbra_color c = {
+        umbra_uniform_32(bld, (umbra_ptr32){0}, 0),
+        umbra_uniform_32(bld, (umbra_ptr32){0}, 4),
+        umbra_uniform_32(bld, (umbra_ptr32){0}, 8),
+        umbra_uniform_32(bld, (umbra_ptr32){0}, 12),
+    };
+    umbra_store_8888(bld, (umbra_ptr32){.ix=1}, c);
+    struct umbra_basic_block *bb = umbra_basic_block(bld);
+    umbra_builder_free(bld);
+
+    struct umbra_program *p = be->compile(be, bb);
+    umbra_basic_block_free(bb);
+    p != 0 here;
+
+    float    color[4] = {0, 0, 0, 1};
+    uint32_t pixel    = 0;
+    struct umbra_buf bufs[] = {
+        {.ptr=color, .sz=sizeof color, .read_only=1},
+        {.ptr=&pixel, .sz=sizeof pixel, .row_bytes=sizeof pixel},
+    };
+    int const N = 200000;
+    for (int i = 0; i < N; i++) {
+        color[0] = (float)((i & 0xff) / 255.0f);
+        p->queue(p, 0, 0, 1, 1, bufs);
+    }
+    be->flush(be);
+
+    uint32_t expected_r = (uint32_t)((N - 1) & 0xff);
+    (pixel & 0xff)   == expected_r here;
+    (pixel >> 24)    == 0xff here;
+
+    p->free(p);
+    be->free(be);
+}
+
 #endif /* !__wasm__ */
