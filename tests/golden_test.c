@@ -168,7 +168,7 @@ TEST(test_slug_rect) {
     umbra_basic_block_free(abb);
 
     struct umbra_draw_layout lay;
-    struct umbra_builder *bld = umbra_draw_build(
+    struct umbra_builder *const bld = umbra_draw_build(
         umbra_shader_solid, umbra_coverage_wind,
         umbra_blend_srcover, umbra_fmt_8888,
         &lay);
@@ -351,7 +351,7 @@ TEST(test_golden_slides) {
 // parallel ninja test execution).
 static void run_long_batch_no_oom(struct umbra_backend *be) {
     if (be) {
-        struct umbra_builder *bld = umbra_builder();
+        struct umbra_builder *const bld = umbra_builder();
         umbra_color c = {
             umbra_uniform_32(bld, (umbra_ptr32){0}, 0),
             umbra_uniform_32(bld, (umbra_ptr32){0}, 4),
@@ -359,7 +359,7 @@ static void run_long_batch_no_oom(struct umbra_backend *be) {
             umbra_uniform_32(bld, (umbra_ptr32){0}, 12),
         };
         umbra_store_8888(bld, (umbra_ptr32){.ix=1}, c);
-        struct umbra_basic_block *bb = umbra_basic_block(bld);
+        struct umbra_basic_block *const bb = umbra_basic_block(bld);
         umbra_builder_free(bld);
 
         struct umbra_program *p = be->compile(be, bb);

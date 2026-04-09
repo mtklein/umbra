@@ -9,7 +9,7 @@ struct draw_backends {
 
 
 static struct draw_backends make_draw(struct umbra_builder *builder, struct umbra_draw_layout lay) {
-    struct umbra_basic_block *bb = umbra_basic_block(builder);
+    struct umbra_basic_block *const bb = umbra_basic_block(builder);
     umbra_builder_free(builder);
     struct draw_backends B = {
         test_backends_make(bb),
@@ -1067,10 +1067,10 @@ TEST(test_page_aligned_buffer) {
 }
 
 TEST(test_565_round_trip) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_color c = umbra_load_565(b, (umbra_ptr16){0});
     umbra_store_565(b, (umbra_ptr16){.ix=1}, c);
-    struct umbra_basic_block *bb = umbra_basic_block(b);
+    struct umbra_basic_block *const bb = umbra_basic_block(b);
     umbra_builder_free(b);
     struct test_backends B = test_backends_make(bb);
     umbra_basic_block_free(bb);
@@ -1088,10 +1088,10 @@ TEST(test_565_round_trip) {
 }
 
 TEST(test_1010102_round_trip) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_color c = umbra_load_1010102(b, (umbra_ptr32){0});
     umbra_store_1010102(b, (umbra_ptr32){.ix=1}, c);
-    struct umbra_basic_block *bb = umbra_basic_block(b);
+    struct umbra_basic_block *const bb = umbra_basic_block(b);
     umbra_builder_free(b);
     struct test_backends B = test_backends_make(bb);
     umbra_basic_block_free(bb);
@@ -1111,10 +1111,10 @@ TEST(test_1010102_round_trip) {
 }
 
 TEST(test_fp16_planar_round_trip) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_color c = umbra_load_fp16_planar(b, (umbra_ptr16){0});
     umbra_store_fp16_planar(b, (umbra_ptr16){.ix=1}, c);
-    struct umbra_basic_block *bb = umbra_basic_block(b);
+    struct umbra_basic_block *const bb = umbra_basic_block(b);
     umbra_builder_free(b);
     struct test_backends B = test_backends_make(bb);
     umbra_basic_block_free(bb);
@@ -1134,9 +1134,9 @@ TEST(test_fp16_planar_round_trip) {
 
 TEST(test_solid_src_565) {
     struct umbra_draw_layout lay;
-    struct umbra_builder *b = umbra_draw_build(umbra_shader_solid, NULL,
+    struct umbra_builder *const b = umbra_draw_build(umbra_shader_solid, NULL,
                                                 umbra_blend_src, umbra_fmt_565, &lay);
-    struct umbra_basic_block *bb = umbra_basic_block(b);
+    struct umbra_basic_block *const bb = umbra_basic_block(b);
     umbra_builder_free(b);
     struct test_backends B = test_backends_make(bb);
     umbra_basic_block_free(bb);
@@ -1157,9 +1157,9 @@ TEST(test_solid_src_565) {
 
 TEST(test_solid_src_1010102) {
     struct umbra_draw_layout lay;
-    struct umbra_builder *b = umbra_draw_build(umbra_shader_solid, NULL,
+    struct umbra_builder *const b = umbra_draw_build(umbra_shader_solid, NULL,
                                                 umbra_blend_src, umbra_fmt_1010102, &lay);
-    struct umbra_basic_block *bb = umbra_basic_block(b);
+    struct umbra_basic_block *const bb = umbra_basic_block(b);
     umbra_builder_free(b);
     struct test_backends B = test_backends_make(bb);
     umbra_basic_block_free(bb);
@@ -1181,9 +1181,9 @@ TEST(test_solid_src_1010102) {
 
 TEST(test_solid_src_fp16_planar) {
     struct umbra_draw_layout lay;
-    struct umbra_builder *b = umbra_draw_build(umbra_shader_solid, NULL,
+    struct umbra_builder *const b = umbra_draw_build(umbra_shader_solid, NULL,
                                                 umbra_blend_src, umbra_fmt_fp16_planar, &lay);
-    struct umbra_basic_block *bb = umbra_basic_block(b);
+    struct umbra_basic_block *const bb = umbra_basic_block(b);
     umbra_builder_free(b);
     struct test_backends B = test_backends_make(bb);
     umbra_basic_block_free(bb);

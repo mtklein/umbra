@@ -4,7 +4,7 @@
 #include <stdlib.h>
 
 static struct umbra_builder *build_srcover(void) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
 
     umbra_val32 px = umbra_load_32(b, (umbra_ptr32){0}), mask = umbra_imm_i32(b, 0xFF);
     umbra_val32 rgba[4] = {
@@ -37,7 +37,7 @@ static struct umbra_builder *build_srcover(void) {
 
 
 static struct test_backends make(struct umbra_builder *builder) {
-    struct umbra_basic_block *bb = umbra_basic_block(builder);
+    struct umbra_basic_block *const bb = umbra_basic_block(builder);
     umbra_builder_free(builder);
     struct test_backends B = test_backends_make(bb);
     umbra_basic_block_free(bb);
@@ -50,7 +50,7 @@ static void cleanup(struct test_backends *B) { test_backends_free(B); }
 
 #define BINOP(op, B)                                                                 \
     do {                                                                             \
-        struct umbra_builder *b_ = umbra_builder();                                  \
+        struct umbra_builder *const b_ = umbra_builder();                                  \
         umbra_val32 x_ = umbra_load_32(b_, (umbra_ptr32){0}),                        \
                     y_ = umbra_load_32(b_, (umbra_ptr32){.ix=1}),                    \
                     r_ = op(b_, x_, y_);                                             \
@@ -309,7 +309,7 @@ TEST(test_i32_ops) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32            c = umbra_load_32(builder, (umbra_ptr32){0}),
                               t = umbra_load_32(builder, (umbra_ptr32){.ix=1}),
                               f = umbra_load_32(builder, (umbra_ptr32){.ix=2}),
@@ -499,7 +499,7 @@ TEST(test_cmp_f32) {
 
 TEST(test_imm) {
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32 v = umbra_imm_i32(builder, 42);
         umbra_store_32(builder, (umbra_ptr32){0}, v);
         struct test_backends B = make(builder);
@@ -519,7 +519,7 @@ TEST(test_imm) {
 }
 
 TEST(test_fma_f32) {
-    struct umbra_builder *builder = umbra_builder();
+    struct umbra_builder *const builder = umbra_builder();
     umbra_val32 x = umbra_load_32(builder, (umbra_ptr32){0}),
               y = umbra_load_32(builder, (umbra_ptr32){.ix=1}),
               w = umbra_load_32(builder, (umbra_ptr32){.ix=2}),
@@ -583,7 +583,7 @@ TEST(test_min_max_sqrt_f32) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32            x = umbra_load_32(builder, (umbra_ptr32){0}),
                               r = umbra_sqrt_f32(builder, x);
         umbra_store_32(builder, (umbra_ptr32){.ix=1}, r);
@@ -606,7 +606,7 @@ TEST(test_min_max_sqrt_f32) {
 
 TEST(test_abs_f32) {
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32            x = umbra_load_32(builder, (umbra_ptr32){0}),
                               r = umbra_abs_f32(builder, x);
         umbra_store_32(builder, (umbra_ptr32){.ix=1}, r);
@@ -627,7 +627,7 @@ TEST(test_abs_f32) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32            x = umbra_load_32(builder, (umbra_ptr32){0}),
                               r = umbra_sub_f32(builder, umbra_imm_f32(builder, 0), x);
         umbra_store_32(builder, (umbra_ptr32){.ix=1}, r);
@@ -654,7 +654,7 @@ TEST(test_round_floor_ceil) {
 
 #define RFC(op, e0, e1, e2, e3, as_int)                                     \
     do {                                                                    \
-        struct umbra_builder *b_ = umbra_builder();                         \
+        struct umbra_builder *const b_ = umbra_builder();                         \
         umbra_val32            x_ = umbra_load_32(b_, (umbra_ptr32){0}); \
         umbra_val32            r_ = op(b_, x_);                              \
         umbra_store_32(b_, (umbra_ptr32){.ix=1}, r_);                       \
@@ -721,7 +721,7 @@ TEST(test_large_n) {
 
 TEST(test_convert) {
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32            x = umbra_load_32(builder, (umbra_ptr32){0});
         umbra_val32            r = umbra_f32_from_i32(builder, x);
         umbra_store_32(builder, (umbra_ptr32){.ix=1}, r);
@@ -742,7 +742,7 @@ TEST(test_convert) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32            x = umbra_load_32(builder, (umbra_ptr32){0});
         umbra_val32            r = umbra_i32_from_f32(builder, x);
         umbra_store_32(builder, (umbra_ptr32){.ix=1}, r);
@@ -765,7 +765,7 @@ TEST(test_convert) {
 }
 
 TEST(test_dedup) {
-    struct umbra_builder *builder = umbra_builder();
+    struct umbra_builder *const builder = umbra_builder();
     umbra_val32 v1 = umbra_imm_i32(builder, 42), v2 = umbra_imm_i32(builder, 42);
     val_eq(v1, v2) here;
     umbra_val32 c = umbra_imm_i32(builder, 99);
@@ -778,7 +778,7 @@ TEST(test_dedup) {
 
 TEST(test_constprop) {
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32 x = umbra_imm_i32(builder, 3),
                   y = umbra_imm_i32(builder, 5), s = umbra_add_i32(builder, x, y);
         umbra_store_32(builder, (umbra_ptr32){0}, s);
@@ -797,7 +797,7 @@ TEST(test_constprop) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32 a = umbra_imm_f32(builder, 2.0f), y = umbra_imm_f32(builder, 3.0f),
                   s = umbra_mul_f32(builder, a, y);
         umbra_store_32(builder, (umbra_ptr32){0}, s);
@@ -819,21 +819,21 @@ TEST(test_constprop) {
 
 TEST(test_strength_reduction) {
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32            x = umbra_load_32(builder, (umbra_ptr32){0}),
                   z = umbra_imm_i32(builder, 0), s = umbra_add_i32(builder, x, z);
         val_eq(s, x) here;
         umbra_builder_free(builder);
     }
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32            x = umbra_load_32(builder, (umbra_ptr32){0}),
                   one = umbra_imm_i32(builder, 1), s = umbra_mul_i32(builder, x, one);
         val_eq(s, x) here;
         umbra_builder_free(builder);
     }
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32            x = umbra_load_32(builder, (umbra_ptr32){0}),
                               eight = umbra_imm_i32(builder, 8),
                               s = umbra_mul_i32(builder, x, eight);
@@ -852,7 +852,7 @@ TEST(test_strength_reduction) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32            x = umbra_load_32(builder, (umbra_ptr32){0}),
                               s = umbra_sub_i32(builder, x, x);
         umbra_store_32(builder, (umbra_ptr32){.ix=1}, s);
@@ -872,7 +872,7 @@ TEST(test_strength_reduction) {
 }
 
 TEST(test_zero_imm) {
-    struct umbra_builder *builder = umbra_builder();
+    struct umbra_builder *const builder = umbra_builder();
     umbra_val32            zero = umbra_imm_i32(builder, 0);
     val_eq(zero, (umbra_val32){0}) here;
     umbra_val32            x = umbra_load_32(builder, (umbra_ptr32){0}),
@@ -895,7 +895,7 @@ TEST(test_zero_imm) {
 }
 
 TEST(test_late_imm_identity) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32            z1 = umbra_imm_i32(b, 1);
     umbra_val32            zm = umbra_imm_i32(b, -1);
@@ -914,7 +914,7 @@ TEST(test_late_imm_identity) {
 
 TEST(test_abs_peepholes) {
     {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
         umbra_val32            direct = umbra_abs_f32(b, x);
         umbra_val32            mask = umbra_imm_i32(b, 0x7fffffff);
@@ -924,7 +924,7 @@ TEST(test_abs_peepholes) {
         umbra_builder_free(b);
     }
     {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32            mask = umbra_imm_i32(b, 0x7fffffff);
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
         val_lt(mask, x) here;
@@ -935,7 +935,7 @@ TEST(test_abs_peepholes) {
 }
 
 TEST(test_load_8x4) {
-    struct umbra_builder *builder = umbra_builder();
+    struct umbra_builder *const builder = umbra_builder();
     umbra_val32            px_ = umbra_load_32(builder, (umbra_ptr32){0}),
                           m_ = umbra_imm_i32(builder, 0xFF);
     umbra_val32 r = umbra_and_32(builder, px_, m_),
@@ -985,7 +985,7 @@ TEST(test_load_8x4) {
 }
 
 TEST(test_store_8x4) {
-    struct umbra_builder *builder = umbra_builder();
+    struct umbra_builder *const builder = umbra_builder();
     umbra_val32            r = umbra_load_32(builder, (umbra_ptr32){0}),
                           g = umbra_load_32(builder, (umbra_ptr32){.ix=1}),
                           b = umbra_load_32(builder, (umbra_ptr32){.ix=2}),
@@ -1051,7 +1051,7 @@ TEST(test_srcover) {
 }
 
 TEST(test_hash_quality) {
-    struct umbra_builder *builder = umbra_builder();
+    struct umbra_builder *const builder = umbra_builder();
     enum { N = 1000 };
     int ids[N];
     for (int i = 0; i < N; i++) { ids[i] = umbra_imm_i32(builder, i).id; }
@@ -1068,7 +1068,7 @@ TEST(test_hash_quality) {
 }
 
 TEST(test_narrow_16) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32            v = umbra_load_32(b, (umbra_ptr32){0});
     umbra_store_16(b, (umbra_ptr16){.ix=1}, umbra_i16_from_i32(b, v));
     struct test_backends B = make(b);
@@ -1090,7 +1090,7 @@ TEST(test_narrow_16) {
 
 TEST(test_mixed_ptr_sizes) {
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32            a = umbra_load_32(builder, (umbra_ptr32){0});
         umbra_val32 r = umbra_add_i32(builder, a, umbra_imm_i32(builder, 1));
         umbra_store_32(builder, (umbra_ptr32){.ix=1}, r);
@@ -1111,7 +1111,7 @@ TEST(test_mixed_ptr_sizes) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32 a = umbra_f32_from_f16(builder,
                                       umbra_load_16(builder, (umbra_ptr16){0}));
         umbra_val32 r = umbra_add_f32(builder, a, umbra_imm_f32(builder, 1.0f));
@@ -1175,7 +1175,7 @@ TEST(test_n9) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32            px_ = umbra_load_32(builder, (umbra_ptr32){0}),
                               m_ = umbra_imm_i32(builder, 0xFF);
         umbra_val32            ch[4] = {
@@ -1213,7 +1213,7 @@ TEST(test_n9) {
 }
 
 TEST(test_preamble_pair_alias) {
-    struct umbra_builder *builder = umbra_builder();
+    struct umbra_builder *const builder = umbra_builder();
 
     enum { N_PRE = 24 };
     umbra_val32 pre[N_PRE];
@@ -1259,7 +1259,7 @@ TEST(test_preamble_pair_alias) {
 
 TEST(test_gather_clamp) {
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32            idx = umbra_load_32(builder, (umbra_ptr32){0}),
                               val = umbra_gather_32(builder, (umbra_ptr32){.ix=1}, idx);
         umbra_store_32(builder, (umbra_ptr32){.ix=2}, val);
@@ -1283,7 +1283,7 @@ TEST(test_gather_clamp) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32            idx = umbra_load_32(builder, (umbra_ptr32){0});
         umbra_val32 val = umbra_i32_from_s16(builder,
                                         umbra_gather_16(builder, (umbra_ptr16){.ix=1}, idx));
@@ -1310,7 +1310,7 @@ TEST(test_gather_clamp) {
 }
 
 TEST(test_sample_32) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 ix = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 fx = umbra_f32_from_i32(b, ix);
     // Scale: fractional index = fx * 0.5
@@ -1345,7 +1345,7 @@ TEST(test_sample_32) {
 
 TEST(test_gather_clamp_zero_sz) {
     // gather_uniform with negative index → clamped to 0.
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32            ix = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
     umbra_val32            v = umbra_gather_32(b, (umbra_ptr32){.ix=1}, ix);
     umbra_store_32(b, (umbra_ptr32){.ix=2}, v);
@@ -1381,7 +1381,7 @@ TEST(test_gather_clamp_zero_sz) {
 
 TEST(test_offset_load_store) {
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32            ix = umbra_x(builder);
         umbra_val32            off = umbra_uniform_32(builder, (umbra_ptr32){.ix=1}, 0);
         umbra_val32            ixo = umbra_add_i32(builder, ix, off);
@@ -1407,7 +1407,7 @@ TEST(test_offset_load_store) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32            ix = umbra_x(builder);
         umbra_val32            off = umbra_uniform_32(builder, (umbra_ptr32){.ix=1}, 0);
         umbra_val32            ixo = umbra_add_i32(builder, ix, off);
@@ -1433,7 +1433,7 @@ TEST(test_offset_load_store) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32            ix = umbra_x(builder);
         umbra_val32            off = umbra_uniform_32(builder, (umbra_ptr32){.ix=1}, 0);
         umbra_val32            ixo = umbra_add_i32(builder, ix, off);
@@ -1468,7 +1468,7 @@ TEST(test_offset_load_store) {
 
 TEST(test_shift_imm) {
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32            x = umbra_load_32(builder, (umbra_ptr32){0});
         umbra_val32 r = umbra_shl_i32(builder, x, umbra_imm_i32(builder, 8));
         umbra_store_32(builder, (umbra_ptr32){.ix=1}, r);
@@ -1490,7 +1490,7 @@ TEST(test_shift_imm) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32            x = umbra_load_32(builder, (umbra_ptr32){0});
         umbra_val32 r = umbra_shr_u32(builder, x, umbra_imm_i32(builder, 8));
         umbra_store_32(builder, (umbra_ptr32){.ix=1}, r);
@@ -1511,7 +1511,7 @@ TEST(test_shift_imm) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *builder = umbra_builder();
+        struct umbra_builder *const builder = umbra_builder();
         umbra_val32            x = umbra_load_32(builder, (umbra_ptr32){0});
         umbra_val32 r = umbra_shr_s32(builder, x, umbra_imm_i32(builder, 4));
         umbra_store_32(builder, (umbra_ptr32){.ix=1}, r);
@@ -1533,7 +1533,7 @@ TEST(test_shift_imm) {
 }
 
 TEST(test_gather_deref_large) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32            idx = umbra_load_32(b, (umbra_ptr32){0});
     struct umbra_uniforms_layout *u   = calloc(1, sizeof(struct umbra_uniforms_layout));
     size_t                off = umbra_uniforms_reserve_ptr(u);
@@ -1585,7 +1585,7 @@ TEST(test_gather_deref_large) {
 
 TEST(test_imm_fused) {
     {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
         umbra_val32            r = umbra_div_f32(b, x, umbra_imm_f32(b, 2.0f));
         umbra_store_32(b, (umbra_ptr32){.ix=1}, r);
@@ -1605,7 +1605,7 @@ TEST(test_imm_fused) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
         umbra_val32            r = umbra_sub_i32(b, x, umbra_imm_i32(b, 5));
         umbra_store_32(b, (umbra_ptr32){.ix=1}, r);
@@ -1625,7 +1625,7 @@ TEST(test_imm_fused) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
         umbra_val32            r = umbra_or_32(b, x, umbra_imm_i32(b, 0xf0));
         umbra_store_32(b, (umbra_ptr32){.ix=1}, r);
@@ -1645,7 +1645,7 @@ TEST(test_imm_fused) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
         umbra_val32            r = umbra_eq_f32(b, x, umbra_imm_f32(b, 2.0f));
         umbra_store_32(b, (umbra_ptr32){.ix=1}, r);
@@ -1666,7 +1666,7 @@ TEST(test_imm_fused) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
         umbra_val32            r = umbra_le_f32(b, x, umbra_imm_f32(b, 2.0f));
         umbra_store_32(b, (umbra_ptr32){.ix=1}, r);
@@ -1687,7 +1687,7 @@ TEST(test_imm_fused) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
         umbra_val32            r = umbra_lt_s32(b, x, umbra_imm_i32(b, 5));
         umbra_store_32(b, (umbra_ptr32){.ix=1}, r);
@@ -1707,7 +1707,7 @@ TEST(test_imm_fused) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
         umbra_val32            r = umbra_le_s32(b, x, umbra_imm_i32(b, 5));
         umbra_store_32(b, (umbra_ptr32){.ix=1}, r);
@@ -1730,7 +1730,7 @@ TEST(test_imm_fused) {
 
 TEST(test_cmp_zero) {
     {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
         umbra_val32            r = umbra_lt_s32(b, x, umbra_imm_i32(b, 0));
         umbra_store_32(b, (umbra_ptr32){.ix=1}, r);
@@ -1750,7 +1750,7 @@ TEST(test_cmp_zero) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
         umbra_val32            r = umbra_le_f32(b, x, umbra_imm_f32(b, 0.0f));
         umbra_store_32(b, (umbra_ptr32){.ix=1}, r);
@@ -1771,7 +1771,7 @@ TEST(test_cmp_zero) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
         umbra_val32            r = umbra_eq_f32(b, x, umbra_imm_f32(b, 0.0f));
         umbra_store_32(b, (umbra_ptr32){.ix=1}, r);
@@ -1792,7 +1792,7 @@ TEST(test_cmp_zero) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
         umbra_val32            r = umbra_le_s32(b, x, umbra_imm_i32(b, 0));
         umbra_store_32(b, (umbra_ptr32){.ix=1}, r);
@@ -1819,7 +1819,7 @@ TEST(test_imm_broadcast) {
         (int)0x7fffffffu,
     };
     for (int pi = 0; pi < 2; pi++) {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32            v = umbra_imm_i32(b, patterns[pi]);
         umbra_store_32(b, (umbra_ptr32){0}, v);
         struct test_backends B = make(b);
@@ -1851,7 +1851,7 @@ TEST(test_pool_broadcast_allones) {
         (int)0xfffffffeu,
     };
     for (int pi = 0; pi < 3; pi++) {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32 v = umbra_imm_i32(b, patterns[pi]);
         umbra_store_32(b, (umbra_ptr32){0}, v);
         struct test_backends B = make(b);
@@ -1874,7 +1874,7 @@ TEST(test_pool_broadcast_allones) {
 
 TEST(test_codegen_regalloc) {
     {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
         umbra_val32            y = umbra_load_32(b, (umbra_ptr32){.ix=1});
         umbra_val32            z = umbra_load_32(b, (umbra_ptr32){.ix=2});
@@ -1900,7 +1900,7 @@ TEST(test_codegen_regalloc) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
         umbra_val32            y = umbra_load_32(b, (umbra_ptr32){.ix=1});
         umbra_val32            z = umbra_load_32(b, (umbra_ptr32){.ix=2});
@@ -1927,7 +1927,7 @@ TEST(test_codegen_regalloc) {
         cleanup(&B);
     }
     {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
         umbra_val32            y = umbra_load_32(b, (umbra_ptr32){.ix=1});
         umbra_val32            z = umbra_load_32(b, (umbra_ptr32){.ix=2});
@@ -1955,7 +1955,7 @@ TEST(test_codegen_regalloc) {
 }
 
 TEST(test_fms) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32            vx = umbra_load_32(b, (umbra_ptr32){0}),
                           vy = umbra_load_32(b, (umbra_ptr32){.ix=1}),
                           vz = umbra_load_32(b, (umbra_ptr32){.ix=2});
@@ -1985,7 +1985,7 @@ TEST(test_movi_patterns) {
         ~0x00ff0000, ~(int)0xff000000u, (int)0xfffe0000u, 0x12345678,
     };
     for (int pi = 0; pi < 9; pi++) {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
         umbra_val32            r = umbra_or_32(b, x, umbra_imm_i32(b, patterns[pi]));
         umbra_store_32(b, (umbra_ptr32){.ix=1}, r);
@@ -2009,7 +2009,7 @@ TEST(test_movi_patterns) {
 
 TEST(test_uni_16) {
     {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32 idx = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
         umbra_val32 v = umbra_i32_from_u16(b, umbra_gather_16(b, (umbra_ptr16){.ix=1}, idx));
         umbra_store_32(b, (umbra_ptr32){.ix=2}, v);
@@ -2036,13 +2036,13 @@ TEST(test_uni_16) {
 TEST(test_dump) {
     FILE *f = fopen("/dev/null", "w");
     if (f) {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
         umbra_val32            r = umbra_add_f32(b, x, umbra_imm_f32(b, 1.0f));
         umbra_store_32(b, (umbra_ptr32){.ix=1}, r);
         umbra_builder_dump(b, f);
 
-        struct umbra_basic_block *bb = umbra_basic_block(b);
+        struct umbra_basic_block *const bb = umbra_basic_block(b);
         umbra_builder_free(b);
         umbra_basic_block_dump(bb, f);
         umbra_basic_block_free(bb);
@@ -2051,7 +2051,7 @@ TEST(test_dump) {
 }
 
 TEST(test_xy) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32            x = umbra_x(b);
     umbra_val32            y = umbra_y(b);
     umbra_store_32(b, (umbra_ptr32){0}, x);
@@ -2078,7 +2078,7 @@ TEST(test_xy) {
 }
 
 TEST(test_load_next_32) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32            v = umbra_load_32(b, (umbra_ptr32){0});
     umbra_store_32(b, (umbra_ptr32){.ix=1}, v);
     struct test_backends B = make(b);
@@ -2109,7 +2109,7 @@ TEST(test_load_next_32) {
 }
 
 TEST(test_load_next_16) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val16            v = umbra_load_16(b, (umbra_ptr16){0});
     umbra_store_16(b, (umbra_ptr16){.ix=1}, v);
     struct test_backends B = make(b);
@@ -2140,7 +2140,7 @@ TEST(test_load_next_16) {
 }
 
 TEST(test_load_store_8x4) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 r, g, bl, a;
     umbra_load_8x4(b, (umbra_ptr32){0}, &r, &g, &bl, &a);
     umbra_store_8x4(b, (umbra_ptr32){.ix=1}, r, g, bl, a);
@@ -2162,7 +2162,7 @@ TEST(test_load_store_8x4) {
 }
 
 TEST(test_load_store_16x4_planar) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val16 r, g, bl, a;
     umbra_load_16x4_planar(b, (umbra_ptr16){0}, &r, &g, &bl, &a);
     umbra_store_16x4_planar(b, (umbra_ptr16){.ix=1}, r, g, bl, a);
@@ -2190,7 +2190,7 @@ TEST(test_load_store_16x4_planar) {
 }
 
 TEST(test_load_store_16x4) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val16 r, g, bl, a;
     umbra_load_16x4(b, (umbra_ptr64){0}, &r, &g, &bl, &a);
     umbra_store_16x4(b, (umbra_ptr64){.ix=1}, r, g, bl, a);
@@ -2220,7 +2220,7 @@ TEST(test_load_store_16x4) {
 TEST(test_load_stride_neq_w) {
     // Regression: add(mul(y, rs_uniform), x) was optimized to a contiguous
     // load using the linear loop counter.  When rs != w, this is wrong.
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     struct umbra_uniforms_layout *u  = calloc(1, sizeof(struct umbra_uniforms_layout));
     size_t                 ri = umbra_uniforms_reserve_f32(u, 1);
     free(u);
@@ -2263,7 +2263,7 @@ TEST(test_jit_xs_init) {
     // Regression: ARM64 JIT only initialized XS (spill stack pointer) when
     // ns > 0.  For tiny programs with no spills, XS was caller garbage.
     // Use enough preamble values to force eviction+fill at the back-edge.
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     enum { N = 25 };
     umbra_val32 pre[N];
     for (int i = 0; i < N; i++) { pre[i] = umbra_imm_i32(b, i + 1); }
@@ -2312,9 +2312,9 @@ TEST(test_program_null_guards) {
     struct umbra_backend *be = umbra_backend_interp();
     be->flush(be);
 
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_store_32(b, (umbra_ptr32){0}, umbra_load_32(b, (umbra_ptr32){0}));
-    struct umbra_basic_block *bb = umbra_basic_block(b);
+    struct umbra_basic_block *const bb = umbra_basic_block(b);
     umbra_builder_free(b);
     struct umbra_program *p = be->compile(be, bb);
     umbra_basic_block_free(bb);
@@ -2336,7 +2336,7 @@ TEST(test_program_null_guards) {
 // If a preamble output is kept in the register and the body reads from it,
 // tile 2+ would read the previous tile's last value instead.
 TEST(test_preamble_register_boundary) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     // uniform is preamble (loop-invariant), add is body (uses x which varies).
     // The uniform feeds directly into the add at offset -1 if scheduled adjacently.
     umbra_val32 u = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
@@ -2361,7 +2361,7 @@ TEST(test_preamble_register_boundary) {
 }
 
 TEST(test_shr_ops) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 s = umbra_load_32(b, (umbra_ptr32){.ix=1});
     // Chain: shr_u32 → shr_s32 exercises _rm variant on second op.
@@ -2387,7 +2387,7 @@ TEST(test_shr_ops) {
 }
 
 TEST(test_neg_round_i32) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 x = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 f = umbra_f32_from_i32(b, x);
     // Chain: neg → round_i32 exercises register variants for both.
@@ -2468,7 +2468,7 @@ TEST(test_cmp_unsigned_signed) {
 }
 
 TEST(test_max_f32_imm) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 x = umbra_f32_from_i32(b, umbra_load_32(b, (umbra_ptr32){0}));
     umbra_val32 c = umbra_max_f32(b, x, umbra_imm_f32(b, 5.f));
     umbra_store_32(b, (umbra_ptr32){.ix=1}, umbra_i32_from_f32(b, c));
@@ -2487,7 +2487,7 @@ TEST(test_max_f32_imm) {
 
 TEST(test_imm_cmp_i32) {
     // Base imm ops (result to store).
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 m1 = umbra_eq_i32(b, a, umbra_imm_i32(b, 5));
     umbra_val32 m2 = umbra_lt_s32(b, a, umbra_imm_i32(b, 5));
@@ -2513,7 +2513,7 @@ TEST(test_imm_cmp_i32) {
 
 TEST(test_uniform_register) {
     // uniform → acc: uniform consumed only by next ALU op.
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 u = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
     umbra_val32 x = umbra_load_32(b, (umbra_ptr32){.ix=1});
     umbra_val32 r = umbra_add_i32(b, u, x);
@@ -2536,7 +2536,7 @@ TEST(test_uniform_register) {
 
 TEST(test_minmax_register_variants) {
     // Exercise _mm, _mr, _rr variants for min/max.
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 bf_ = umbra_load_32(b, (umbra_ptr32){.ix=1});
     umbra_val32 fa = umbra_f32_from_i32(b, a);
@@ -2564,7 +2564,7 @@ TEST(test_minmax_register_variants) {
 
 TEST(test_cmp_register_variants) {
     // Exercise _rm variant for comparisons: chain a→b→cmp(b,c).
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 x = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 y = umbra_load_32(b, (umbra_ptr32){.ix=1});
     // add puts result in acc, then lt_f32 gets x from acc → _rm
@@ -2592,7 +2592,7 @@ TEST(test_cmp_register_variants) {
 TEST(test_regvar_m_patterns) {
     // Targets: m_cmp_rm, m_cmp_rr, r_minmax_mm, base max_f32_imm,
     // m_float_cmp_imm_r, r/m_int_cmp_imm_r.
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 c = umbra_load_32(b, (umbra_ptr32){.ix=1});
     umbra_val32 fa = umbra_f32_from_i32(b, a);
@@ -2664,7 +2664,7 @@ TEST(test_regvar_m_patterns) {
 
 // Exercise m_*_rr for every binary op: chain→op(acc,acc)→store.
 TEST(test_binary_m_rr) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 fa = umbra_f32_from_i32(b, a);
     int p = 1;
@@ -2724,7 +2724,7 @@ TEST(test_binary_m_rr) {
 
 // Exercise m_min/max_rm: chain→min/max(acc,mem)→store.
 TEST(test_minmax_m_rm) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 c = umbra_load_32(b, (umbra_ptr32){.ix=1});
     umbra_val32 fa = umbra_f32_from_i32(b, a);
@@ -2755,7 +2755,7 @@ TEST(test_minmax_m_rm) {
 
 // Exercise r_cmp_rm and r_cmp_rr: chain→cmp→ALU→store.
 TEST(test_cmp_r_rm_rr) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 c = umbra_load_32(b, (umbra_ptr32){.ix=1});
     umbra_val32 fa = umbra_f32_from_i32(b, a);
@@ -2808,7 +2808,7 @@ TEST(test_cmp_r_rm_rr) {
 // Exercise missing unary per-op variants.
 // Need r_m (mem→acc) for ops that only have r_r and m_r covered.
 TEST(test_unary_r_m) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 fa = umbra_f32_from_i32(b, a);
     // r_sqrt_m: sqrt(mem) → acc → store via chain
@@ -2852,7 +2852,7 @@ TEST(test_unary_r_m) {
 // Exercise base ops that are always upgraded: xor_32_imm, min_f32_imm.
 // Need: op(mem, imm)→store with no chain on either side.
 TEST(test_base_imm_ops) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 c = umbra_load_32(b, (umbra_ptr32){.ix=1});
     // xor_32_imm base: neither chained
@@ -2882,7 +2882,7 @@ TEST(test_base_imm_ops) {
 
 // Exercise r_sel_32_rm, r_fms_f32_mmr.
 TEST(test_sel_fms_variants) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 c = umbra_load_32(b, (umbra_ptr32){.ix=1});
     umbra_val32 fa = umbra_f32_from_i32(b, a);
@@ -2918,7 +2918,7 @@ TEST(test_sel_fms_variants) {
 
 // Exercise missing IMM register variants.
 TEST(test_imm_regvar) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 fa = umbra_f32_from_i32(b, a);
     int p = 1;
@@ -2992,7 +2992,7 @@ TEST(test_imm_regvar) {
 // operands pinned early (via a use/store) then a barrier store between them
 // and the target op so prev_r is false.
 TEST(test_binary_r_mm) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 c = umbra_load_32(b, (umbra_ptr32){.ix=1});
     umbra_val32 fa = umbra_f32_from_i32(b, a);
@@ -3037,7 +3037,7 @@ TEST(test_binary_r_mm) {
 // Exercise missing per-op UNARY and IMM variants more thoroughly.
 // m_unary_r: chain→unary(acc)→store (no further chain).
 TEST(test_unary_m_r) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 fa = umbra_f32_from_i32(b, a);
     int p = 1;
@@ -3078,7 +3078,7 @@ TEST(test_unary_m_r) {
 // Exercise base IMM ops: op(mem, imm)→store with no chain.
 // Covers shr_s32_imm, shr_u32_imm, or_32_imm, mul_f32_imm, etc.
 TEST(test_base_imm_more) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 c = umbra_load_32(b, (umbra_ptr32){.ix=1});
     umbra_val32 fc = umbra_f32_from_i32(b, c);
@@ -3113,7 +3113,7 @@ TEST(test_base_imm_more) {
 // r_sel_32_rm: sel with mask from acc, result→acc.
 // Need: chain→sel(acc_mask, y, z)→ALU→store
 TEST(test_sel_r_rm) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 c = umbra_load_32(b, (umbra_ptr32){.ix=1});
     umbra_val32 fa = umbra_f32_from_i32(b, a);
@@ -3142,7 +3142,7 @@ TEST(test_sel_r_rm) {
 // Must use ops that go through ra_step_unary (abs, neg, imm shifts, etc.)
 // not ra_step_alu (which is used by i32_from_f32, add, etc.)
 TEST(test_ra_chan_unary) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val16 r, g, bl, a;
     umbra_load_16x4(b, (umbra_ptr64){0}, &r, &g, &bl, &a);
     umbra_val32 gf = umbra_f32_from_f16(b, g);
@@ -3172,7 +3172,7 @@ TEST(test_ra_chan_unary) {
 
 // Exercise mul-by-power-of-2 peephole where imm has lower val ID than operand.
 TEST(test_mul_pow2_peephole) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 four = umbra_imm_i32(b, 4);  // low ID
     umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0});  // higher ID
     umbra_val32 r = umbra_mul_i32(b, a, four);  // sort puts four as x → pow2 x-path
@@ -3196,7 +3196,7 @@ TEST(test_const_eval) {
     // Split into two programs to stay under Metal's 31-buffer limit.
     // Part 1: float ops
     {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32 fa = umbra_imm_f32(b, 10.f);
         umbra_val32 fc = umbra_imm_f32(b, 3.f);
         umbra_store_32(b, (umbra_ptr32){0}, umbra_add_f32(b, fa, fc));
@@ -3239,7 +3239,7 @@ TEST(test_const_eval) {
     }
     // Part 2: integer ops
     {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32 a = umbra_imm_i32(b, 10);
         umbra_val32 c = umbra_imm_i32(b, 3);
         umbra_store_32(b, (umbra_ptr32){0}, umbra_sub_i32(b, a, c));
@@ -3279,7 +3279,7 @@ TEST(test_acc_coverage) {
     // Use non-trivial constants to avoid identity optimizations (x+0=x).
     {
         // Unary m_r: unique sub starts chain → unary(r_r) → i32_from_f32(m_r) → store.
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32 x = umbra_load_32(b, (umbra_ptr32){0});
         umbra_val32 fx = umbra_f32_from_i32(b, x);
         // Each sub has a different imm to avoid dedup.
@@ -3310,7 +3310,7 @@ TEST(test_acc_coverage) {
     }
     {
         // Comparison m_rm: sub→acc, then le_f32(acc, mem)→store.
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32 x = umbra_load_32(b, (umbra_ptr32){0});
         umbra_val32 y = umbra_load_32(b, (umbra_ptr32){.ix=1});
         umbra_val32 fx = umbra_f32_from_i32(b, x);
@@ -3334,7 +3334,7 @@ TEST(test_acc_coverage) {
         // Imm acc variants: sub(a,b)(r_mm)→imm_op(m_r)→store.
         // Each in its own builder to avoid dedup across chains.
 #define ACC_IMM_TEST_I(op, k, expected) { \
-        struct umbra_builder *b = umbra_builder(); \
+        struct umbra_builder *const b = umbra_builder(); \
         umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0}), c = umbra_load_32(b, (umbra_ptr32){.ix=1}); \
         umbra_store_32(b, (umbra_ptr32){.ix=2}, op(b, umbra_sub_i32(b, a, c), umbra_imm_i32(b, k))); \
         struct test_backends B = make(b); \
@@ -3345,7 +3345,7 @@ TEST(test_acc_coverage) {
             } \
         } cleanup(&B); }
 #define ACC_IMM_TEST_F(op, k, expected) { \
-        struct umbra_builder *b = umbra_builder(); \
+        struct umbra_builder *const b = umbra_builder(); \
         umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0}), c = umbra_load_32(b, (umbra_ptr32){.ix=1}); \
         umbra_val32 fa = umbra_f32_from_i32(b, a), fc = umbra_f32_from_i32(b, c); \
         umbra_store_32(b, (umbra_ptr32){.ix=2}, umbra_i32_from_f32(b, \
@@ -3358,7 +3358,7 @@ TEST(test_acc_coverage) {
             } \
         } cleanup(&B); }
 #define ACC_IMM_TEST_CMP_I(op, k, expected) { \
-        struct umbra_builder *b = umbra_builder(); \
+        struct umbra_builder *const b = umbra_builder(); \
         umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0}), c = umbra_load_32(b, (umbra_ptr32){.ix=1}); \
         umbra_store_32(b, (umbra_ptr32){.ix=2}, op(b, umbra_sub_i32(b, a, c), umbra_imm_i32(b, k))); \
         struct test_backends B = make(b); \
@@ -3369,7 +3369,7 @@ TEST(test_acc_coverage) {
             } \
         } cleanup(&B); }
 #define ACC_IMM_TEST_CMP_F(op, k, expected) { \
-        struct umbra_builder *b = umbra_builder(); \
+        struct umbra_builder *const b = umbra_builder(); \
         umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0}), c = umbra_load_32(b, (umbra_ptr32){.ix=1}); \
         umbra_val32 fa = umbra_f32_from_i32(b, a), fc = umbra_f32_from_i32(b, c); \
         umbra_store_32(b, (umbra_ptr32){.ix=2}, \
@@ -3405,7 +3405,7 @@ TEST(test_acc_coverage_extra) {
     // - CMP3 m_rm (comparison chain-end)
     // - UN2 for round_f32, floor_f32, ceil_f32
 #define ACC_UNARY_F(unary, k, expected) { \
-        struct umbra_builder *b = umbra_builder(); \
+        struct umbra_builder *const b = umbra_builder(); \
         umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0}), c = umbra_load_32(b, (umbra_ptr32){.ix=1}); \
         umbra_val32 s = umbra_sub_f32(b, umbra_f32_from_i32(b, a), umbra_f32_from_i32(b, c)); \
         umbra_store_32(b, (umbra_ptr32){.ix=2}, umbra_i32_from_f32(b, unary(b, s))); \
@@ -3423,7 +3423,7 @@ TEST(test_acc_coverage_extra) {
 #undef ACC_UNARY_F
     // CMP m_rm: sub→acc, then eq_f32(acc, mem)→store.
     {
-        struct umbra_builder *b = umbra_builder();
+        struct umbra_builder *const b = umbra_builder();
         umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0}), c = umbra_load_32(b, (umbra_ptr32){.ix=1});
         umbra_val32 fa = umbra_f32_from_i32(b, a), fc = umbra_f32_from_i32(b, c);
         umbra_val32 s = umbra_sub_f32(b, fa, umbra_imm_f32(b, 1));
@@ -3440,7 +3440,7 @@ TEST(test_acc_coverage_extra) {
 }
 
 TEST(test_acc_acc_register_variants) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 x = umbra_load_32(b, (umbra_ptr32){0});
 
     umbra_val32 scaled = umbra_mul_f32(b, x, umbra_imm_f32(b, 1.0f));
@@ -3476,7 +3476,7 @@ TEST(test_acc_acc_register_variants) {
 }
 
 TEST(test_strided_2d_dispatch) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 x   = umbra_x(b);
     umbra_val32 y   = umbra_y(b);
     umbra_val32 k   = umbra_imm_i32(b, 1000);
@@ -3509,7 +3509,7 @@ TEST(test_strided_2d_dispatch) {
 }
 
 TEST(test_strided_load_arbitrary_tile) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 v   = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 one = umbra_imm_i32(b, 1);
     umbra_store_32(b, (umbra_ptr32){.ix=1}, umbra_add_i32(b, v, one));
@@ -3543,7 +3543,7 @@ TEST(test_strided_load_arbitrary_tile) {
 }
 
 TEST(test_two_buffers_different_row_bytes) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32            v   = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32            one = umbra_imm_i32(b, 1);
     umbra_store_32(b, (umbra_ptr32){.ix=1}, umbra_add_i32(b, v, one));
@@ -3572,7 +3572,7 @@ TEST(test_two_buffers_different_row_bytes) {
 }
 
 TEST(test_deref_row_bytes_l_gt_0) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     struct umbra_uniforms_layout *u   = calloc(1, sizeof(struct umbra_uniforms_layout));
     size_t                off = umbra_uniforms_reserve_ptr(u);
     free(u);
@@ -3623,7 +3623,7 @@ TEST(test_deref_row_bytes_l_gt_0) {
 }
 
 TEST(test_deref_16bit_row_bytes_l_gt_0) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     struct umbra_uniforms_layout *u   = calloc(1, sizeof(struct umbra_uniforms_layout));
     size_t                off = umbra_uniforms_reserve_ptr(u);
     free(u);
@@ -3672,7 +3672,7 @@ TEST(test_deref_16bit_row_bytes_l_gt_0) {
 }
 
 TEST(test_i32_from_f32_acc_acc) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 x = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 f = umbra_f32_from_i32(b, x);
     umbra_val32 a = umbra_add_f32(b, f, umbra_imm_f32(b, 0.5f));
@@ -3695,7 +3695,7 @@ TEST(test_i32_from_f32_acc_acc) {
 }
 
 TEST(test_tail_to_vector_row_transition) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 v   = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 one = umbra_imm_i32(b, 1);
     umbra_store_32(b, (umbra_ptr32){.ix=1}, umbra_add_i32(b, v, one));
@@ -3723,7 +3723,7 @@ TEST(test_tail_to_vector_row_transition) {
 }
 
 TEST(test_gather_partial_oob) {
-    struct umbra_builder *b = umbra_builder();
+    struct umbra_builder *const b = umbra_builder();
     umbra_val32 ix = umbra_x(b);
     umbra_val32 v  = umbra_gather_32(b, (umbra_ptr32){0}, ix);
     umbra_store_32(b, (umbra_ptr32){.ix=1}, v);
