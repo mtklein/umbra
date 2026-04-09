@@ -1,11 +1,6 @@
 #pragma once
 #include <stddef.h>
 
-// TODO: the ring assumes single-threaded encode (uniform_ring_pool's cur and
-// chunk allocation are unguarded). If a client ever wanted to encode
-// dispatches from multiple threads, callers would need locks around the
-// pool and its rings.
-
 struct uniform_ring_chunk {
     void  *handle;
     void  *mapped;
