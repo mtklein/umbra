@@ -39,6 +39,16 @@ Use East `const`, and use it liberally, especially to distinguish variables
 that name a value like `double const start_time = now()` from locals that are
 locations to hold a updating value like `double elapsed = 0; elapsed += ...`.
 
+Use const pointers only in the extremely unusual situations where it helps
+readability to know which of several pointers will be mutating and which won't.
+Pointer-to-const is such an important concept that we want almost all uses of
+pointers and const together to be for pointer-to-const:
+
+    int const x = ...;         // Great!
+    int const *p = &x;         // Extremely valuable, especially as function arguments.
+    int const *const p = &x;   // Confusing, avoid this unless really helpful for readability.
+    int       *const p = ...;  // Avoid this especially, looks too much like int const *p.
+
 Generally keep a pointer's `*` attached to a variable name, but attach it to a
 function's return type rather than its name, and always keep the `*` attached
 to something rather than floating alone:
