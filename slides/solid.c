@@ -57,8 +57,9 @@ static void solid_prepare(struct slide *s, struct umbra_backend *be, struct umbr
     st->prog = be->compile(be, st->bb);
 }
 
-static void solid_draw(struct slide *s, int l, int t, int r, int b, void *buf) {
+static void solid_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
     struct solid_state *st = (struct solid_state *)s;
+    (void)frame;
     float rect[4] = { st->rx, st->ry, st->rx + st->rect_w, st->ry + st->rect_h };
     umbra_uniforms_fill_f32(st->lay.uniforms, st->lay.shader, st->color, 4);
     if (st->coverage) { umbra_uniforms_fill_f32(st->lay.uniforms, st->lay.coverage, rect, 4); }

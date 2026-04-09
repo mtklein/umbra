@@ -58,8 +58,9 @@ static void grad_2stop_prepare(struct slide *s, struct umbra_backend *be, struct
     st->prog = be->compile(be, st->bb);
 }
 
-static void grad_2stop_draw(struct slide *s, int l, int t, int r, int b, void *buf) {
+static void grad_2stop_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
     struct grad_2stop_state *st = (struct grad_2stop_state *)s;
+    (void)frame;
     umbra_uniforms_fill_f32(st->lay.uniforms, st->lay.shader,      st->grad,  3);
     umbra_uniforms_fill_f32(st->lay.uniforms, st->lay.shader + 12, st->color, 8);
     size_t    pb = st->fmt.bpp;
@@ -106,8 +107,9 @@ static void grad_lut_prepare(struct slide *s, struct umbra_backend *be, struct u
     st->prog = be->compile(be, st->bb);
 }
 
-static void grad_lut_draw(struct slide *s, int l, int t, int r, int b, void *buf) {
+static void grad_lut_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
     struct grad_lut_state *st = (struct grad_lut_state *)s;
+    (void)frame;
     umbra_uniforms_fill_f32(st->lay.uniforms, st->lay.shader, st->grad, 4);
     umbra_uniforms_fill_ptr(st->lay.uniforms, (st->lay.shader + 16 + 7) & ~(size_t)7,
                   (struct umbra_buf){.ptr=st->lut, .sz=(size_t)(st->lut_n * 4 * 4)});

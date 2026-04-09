@@ -5,8 +5,7 @@
 struct anim_state {
     struct slide base;
 
-    float t;
-    int   w, h, :32;
+    int   w, h;
 
     struct umbra_fmt           fmt;
     struct umbra_draw_layout   lay;
@@ -18,7 +17,6 @@ static void anim_init(struct slide *s, int w, int h) {
     struct anim_state *st = (struct anim_state *)s;
     st->w = w;
     st->h = h;
-    st->t = 0.0f;
 }
 
 static void anim_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
@@ -34,20 +32,15 @@ static void anim_prepare(struct slide *s, struct umbra_backend *be, struct umbra
     }
     if (st->prog) { st->prog->free(st->prog); }
     st->prog = be->compile(be, st->bb);
-    // TODO: golden_test correctness depends on prepare() resetting t to 0.
-    // Brittle: any slide that mutates state inside draw() has the same
-    // coupling. The cleaner shape would be to pass a frame index into draw()
-    // explicitly, but bench's draw() signature doesn't accept one.
-    st->t = 0.0f;
 }
 
-static void anim_draw(struct slide *s, int l, int t, int r, int b, void *buf) {
+static void anim_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
     struct anim_state *st = (struct anim_state *)s;
-    st->t += 0.016f;
+    float ft = (float)frame * 0.016f;
     float color[4] = {
-        0.5f + 0.5f * sinf(st->t),
-        0.5f + 0.5f * sinf(st->t + 2.094f),
-        0.5f + 0.5f * sinf(st->t + 4.189f),
+        0.5f + 0.5f * sinf(ft),
+        0.5f + 0.5f * sinf(ft + 2.094f),
+        0.5f + 0.5f * sinf(ft + 4.189f),
         1.0f,
     };
     umbra_uniforms_fill_f32(st->lay.uniforms, st->lay.shader, color, 4);

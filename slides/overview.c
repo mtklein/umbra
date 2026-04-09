@@ -73,7 +73,7 @@ static void render_thumbnails(struct overview_state *st) {
             for (int x = 0; x < w; x++) { st->tmp[y * w + x] = sub->bg; }
         }
         if (sub->prepare) { sub->prepare(sub, st->be, st->fmt); }
-        sub->draw(sub, 0, 0, w, h, st->tmp);
+        sub->draw(sub, 0, 0, 0, w, h, st->tmp);
         st->be->flush(st->be);
 
         for (int cy = 0; cy < st->ch; cy++) {
@@ -115,9 +115,9 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
     render_thumbnails(st);
 }
 
-static void overview_draw(struct slide *s, int l, int t, int r, int b, void *buf) {
+static void overview_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
     struct overview_state *st = (struct overview_state *)s;
-    (void)s; (void)l; (void)r;
+    (void)s; (void)frame; (void)l; (void)r;
     size_t off = (size_t)t * (size_t)st->w * 4;
     size_t len = (size_t)(b - t) * (size_t)st->w * 4;
     __builtin_memcpy((char*)buf + off, (char*)st->fb + off, len);

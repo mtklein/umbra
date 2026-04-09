@@ -52,8 +52,9 @@ static void persp_prepare(struct slide *s, struct umbra_backend *be, struct umbr
     st->prog = be->compile(be, st->bb);
 }
 
-static void persp_draw(struct slide *s, int l, int t, int r, int b, void *buf) {
+static void persp_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
     struct persp_state *st = (struct persp_state *)s;
+    (void)frame;
     umbra_uniforms_fill_f32(st->lay.uniforms, st->lay.shader,   st->color, 4);
     umbra_uniforms_fill_f32(st->lay.uniforms, st->lay.coverage, st->mat, 11);
     umbra_uniforms_fill_ptr(st->lay.uniforms, (st->lay.coverage + 44 + 7) & ~(size_t)7,

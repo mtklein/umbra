@@ -89,7 +89,7 @@ static void render_slide(
 
     fill_bg(pixbuf, s->bg);
     s->prepare(s, be, umbra_fmt_8888);
-    s->draw(s, 0, 0, W, H, pixbuf);
+    s->draw(s, 0, 0, 0, W, H, pixbuf);
 }
 
 static void test_slide_golden(int slide_idx) {

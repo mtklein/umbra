@@ -40,8 +40,9 @@ static void text_prepare(struct slide *s, struct umbra_backend *be, struct umbra
     st->prog = be->compile(be, st->bb);
 }
 
-static void text_draw(struct slide *s, int l, int t, int r, int b, void *buf) {
+static void text_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
     struct text_state *st = (struct text_state *)s;
+    (void)frame;
     umbra_uniforms_fill_f32(st->lay.uniforms, st->lay.shader, st->color, 4);
     umbra_uniforms_fill_ptr(st->lay.uniforms, st->lay.coverage,
                   (struct umbra_buf){.ptr=st->tc->data, .sz=(size_t)(st->w * st->h * 2), .row_bytes=(size_t)st->w * 2});

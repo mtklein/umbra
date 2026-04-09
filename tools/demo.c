@@ -225,13 +225,14 @@ static void to_hdr_row(__fp16 *dst, void *src, int n, size_t src_sz, size_t plan
 
 struct tile_work {
     struct slide *s;
-    int           l, t, r, b;
+    int           frame;
+    int           l, t, r, b, :32;
     void         *buf;
 };
 
 static void tile_fn(void *arg) {
     struct tile_work *tw = arg;
-    tw->s->draw(tw->s, tw->l, tw->t, tw->r, tw->b, tw->buf);
+    tw->s->draw(tw->s, tw->frame, tw->l, tw->t, tw->r, tw->b, tw->buf);
 }
 
 int main(void) {
@@ -284,6 +285,7 @@ int main(void) {
 
     uint64_t fps_start = SDL_GetPerformanceCounter();
     int      fps_frames = 0;
+    int      frame = 0;
     double   fps = 0.0;
 
     _Bool want_dump = 0;
@@ -358,7 +360,7 @@ int main(void) {
             for (int t = 0; t < nt; t++) {
                 int y0 = t * sh;
                 int y1 = y0 + sh > H ? H : y0 + sh;
-                work[t] = (struct tile_work){s, 0, y0, W, y1, pixbuf};
+                work[t] = (struct tile_work){s, frame, 0, y0, W, y1, pixbuf};
             }
             if (!bes[cur_backend]->threadsafe || nt <= 1) {
                 for (int t = 0; t < nt; t++) { tile_fn(&work[t]); }
@@ -405,6 +407,7 @@ int main(void) {
         SDL_RenderPresent(renderer);
 
         fps_frames++;
+        frame++;
         uint64_t now = SDL_GetPerformanceCounter();
         uint64_t freq = SDL_GetPerformanceFrequency();
         double   elapsed = (double)(now - fps_start) / (double)freq;
