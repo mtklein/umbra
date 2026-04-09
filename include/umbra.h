@@ -15,6 +15,11 @@ struct umbra_backend {
     struct umbra_program* (*compile)(struct umbra_backend*, struct umbra_basic_block const*);
     void                  (*flush  )(struct umbra_backend*);
     void                  (*free   )(struct umbra_backend*);
+    // Debug accessor: monotonic count of uniform-ring rotations triggered by
+    // backpressure since the backend was created. NULL on backends with no
+    // uniform ring (interp, jit). Used by tests to assert that the rotation
+    // path actually fired.
+    int                   (*ring_rotations)(struct umbra_backend const*);
     _Bool                   threadsafe, pad_[7];
 };
 struct umbra_backend* umbra_backend_interp(void);

@@ -341,20 +341,14 @@ TEST(test_golden_slides) {
 
 // Smoke test for the GPU backends' uniform_ring backpressure path.
 // Queues enough byte-distinct uniforms to push ring usage past the
-// 1 MiB high water mark a few times within one batch, exercising the
-// rotate / drain / reset cycle, and asserts the last dispatch's color
-// landed in the destination pixel. Doesn't try to provoke the silent-
-// cmdbuf-corruption failure mode that triggered without backpressure
-// (that requires very large N which becomes flaky under parallel
-// ninja test execution); the bench is the canonical regression for
-// that, this test just verifies the mechanism is wired up.
-//
-// TODO: this test doesn't actually *prove* backpressure triggered — if it
-// were silently disabled, the final-pixel check would still pass (the
-// corruption threshold is much higher than N=12000). The cleaner shape is to
-// expose a rotation counter on each backend (~20 lines of plumbing on each
-// side) and assert it incremented inside the test. The animated bench at
-// `--ms 8000` remains the canonical regression for the original failure mode.
+// 64 KiB high water mark a few times within one batch, exercising the
+// rotate / drain / reset cycle, and asserts both that (a) the last
+// dispatch's color landed in the destination pixel and (b) the
+// backend's rotation counter actually advanced — proving the rotate
+// path fired and wasn't silently disabled. The bench is still the
+// canonical regression for the original silent-cmdbuf-corruption
+// failure mode (that requires very large N which becomes flaky under
+// parallel ninja test execution).
 static void run_long_batch_no_oom(struct umbra_backend *be) {
     if (!be) { return; }
 
@@ -372,6 +366,8 @@ static void run_long_batch_no_oom(struct umbra_backend *be) {
     struct umbra_program *p = be->compile(be, bb);
     umbra_basic_block_free(bb);
     p != 0 here;
+
+    int rotations_before = be->ring_rotations ? be->ring_rotations(be) : 0;
 
     float    color[4] = {0, 0, 0, 1};
     uint32_t pixel    = 0;
@@ -391,6 +387,10 @@ static void run_long_batch_no_oom(struct umbra_backend *be) {
     uint32_t expected_r = (uint32_t)((N - 1) & 0xff);
     (pixel & 0xff)   == expected_r here;
     (pixel >> 24)    == 0xff here;
+
+    be->ring_rotations != 0 here;
+    int rotations_after = be->ring_rotations(be);
+    (rotations_after > rotations_before) here;
 
     p->free(p);
     be->free(be);

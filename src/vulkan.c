@@ -2412,6 +2412,10 @@ static void vk_flush(struct umbra_backend *be) {
     v->batch_cache_n  = 0;
 }
 
+static int vk_ring_rotations(struct umbra_backend const *be) {
+    return ((struct vk_backend const*)be)->uni_pool.rotations;
+}
+
 static void vk_free(struct umbra_backend *be) {
     vk_flush(be);
     struct vk_backend *v = (struct vk_backend *)be;
@@ -2595,9 +2599,10 @@ struct umbra_backend *umbra_backend_vulkan(void) {
         VkFenceCreateInfo fi = { .sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
         vkCreateFence(device, &fi, 0, &v->frame_fences[i]);
     }
-    v->base.compile  = vk_compile;
-    v->base.flush    = vk_flush;
-    v->base.free     = vk_free;
+    v->base.compile        = vk_compile;
+    v->base.flush          = vk_flush;
+    v->base.free           = vk_free;
+    v->base.ring_rotations = vk_ring_rotations;
     return &v->base;
 }
 

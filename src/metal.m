@@ -1479,13 +1479,17 @@ static void free_be_metal(struct umbra_backend *be) {
     umbra_metal_flush(mbe);
     umbra_metal_backend_free(mbe);
 }
+static int ring_rotations_metal(struct umbra_backend const *be) {
+    return ((struct metal_backend const*)be)->uni_pool.rotations;
+}
 struct umbra_backend *umbra_backend_metal(void) {
     struct metal_backend *const mbe = umbra_metal_backend_create();
     if (mbe) {
         mbe->base = (struct umbra_backend){
-            .compile = compile_metal,
-            .flush   = flush_be_metal,
-            .free    = free_be_metal,
+            .compile        = compile_metal,
+            .flush          = flush_be_metal,
+            .free           = free_be_metal,
+            .ring_rotations = ring_rotations_metal,
         };
         return &mbe->base;
     }
