@@ -28,6 +28,10 @@ parallel constructs vertically, e.g.
     if (inst.x) { foo(&inst, x); }
     if (inst.y) { foo(&inst, y); }
 
+Use East `const`, and use it liberally, especially to distinguish variables
+that name a value like `double const start_time = now()` from locals that are
+locations to hold a updating value like `double elapsed = 0; elapsed += ...`.
+
 Generally keep a pointer's `*` attached to a variable name, but attach it to a
 function's return type rather than its name, and always keep the `*` attached
 to something rather than floating alone:
