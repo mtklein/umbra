@@ -10,11 +10,11 @@ struct umbra_fmt {
     umbra_color (*load) (struct umbra_builder*, int ptr_bits);
     void        (*store)(struct umbra_builder*, int ptr_bits, umbra_color);
 };
-extern const struct umbra_fmt umbra_fmt_8888;
-extern const struct umbra_fmt umbra_fmt_565;
-extern const struct umbra_fmt umbra_fmt_1010102;
-extern const struct umbra_fmt umbra_fmt_fp16;
-extern const struct umbra_fmt umbra_fmt_fp16_planar;
+extern struct umbra_fmt const umbra_fmt_8888;
+extern struct umbra_fmt const umbra_fmt_565;
+extern struct umbra_fmt const umbra_fmt_1010102;
+extern struct umbra_fmt const umbra_fmt_fp16;
+extern struct umbra_fmt const umbra_fmt_fp16_planar;
 
 umbra_color umbra_load_8888       (struct umbra_builder*, umbra_ptr32);
 void        umbra_store_8888      (struct umbra_builder*, umbra_ptr32, umbra_color);

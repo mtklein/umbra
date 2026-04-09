@@ -8,7 +8,7 @@
 #include "../third_party/stb/stb_truetype.h"
 #pragma clang diagnostic pop
 
-static unsigned char* text_load_font(const char *path) {
+static unsigned char* text_load_font(char const *path) {
     FILE *f = fopen(path, "rb");
     if (!f) { return NULL; }
     fseek(f, 0, SEEK_END);

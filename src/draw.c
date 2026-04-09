@@ -114,11 +114,11 @@ static void store_1010102_(struct umbra_builder *b, int p, umbra_color c) { umbr
 static void store_fp16_(struct umbra_builder *b, int p, umbra_color c) { umbra_store_fp16(b, (umbra_ptr64){.ix=(unsigned)p}, c); }
 static void store_fp16p_(struct umbra_builder *b, int p, umbra_color c) { umbra_store_fp16_planar(b, (umbra_ptr16){.ix=(unsigned)p}, c); }
 
-const struct umbra_fmt umbra_fmt_8888        = { .name="8888",        .bpp=4, .planes=1, .load=load_8888_,    .store=store_8888_ };
-const struct umbra_fmt umbra_fmt_565         = { .name="565",         .bpp=2, .planes=1, .load=load_565_,     .store=store_565_ };
-const struct umbra_fmt umbra_fmt_1010102     = { .name="1010102",     .bpp=4, .planes=1, .load=load_1010102_, .store=store_1010102_ };
-const struct umbra_fmt umbra_fmt_fp16        = { .name="fp16",        .bpp=8, .planes=1, .load=load_fp16_,    .store=store_fp16_ };
-const struct umbra_fmt umbra_fmt_fp16_planar = { .name="fp16_planar", .bpp=2, .planes=4, .load=load_fp16p_,   .store=store_fp16p_ };
+struct umbra_fmt const umbra_fmt_8888        = { .name="8888",        .bpp=4, .planes=1, .load=load_8888_,    .store=store_8888_ };
+struct umbra_fmt const umbra_fmt_565         = { .name="565",         .bpp=2, .planes=1, .load=load_565_,     .store=store_565_ };
+struct umbra_fmt const umbra_fmt_1010102     = { .name="1010102",     .bpp=4, .planes=1, .load=load_1010102_, .store=store_1010102_ };
+struct umbra_fmt const umbra_fmt_fp16        = { .name="fp16",        .bpp=8, .planes=1, .load=load_fp16_,    .store=store_fp16_ };
+struct umbra_fmt const umbra_fmt_fp16_planar = { .name="fp16_planar", .bpp=2, .planes=4, .load=load_fp16p_,   .store=store_fp16p_ };
 
 struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn coverage,
                                        umbra_blend_fn blend, struct umbra_fmt fmt,
