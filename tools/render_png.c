@@ -92,14 +92,12 @@ int main(void) {
     struct umbra_backend *metal  = umbra_backend_metal();
 
     render_slide("interp", interp, s);
-    // STYLE: always use {} — these single-statement ifs violate the rule.
-    if (jit)   render_slide("jit", jit, s);
-    if (metal) render_slide("metal", metal, s);
+    if (jit)   { render_slide("jit",   jit,   s); }
+    if (metal) { render_slide("metal", metal, s); }
 
     interp->free(interp);
-    // STYLE: always use {} — same here.
-    if (jit)   jit->free(jit);
-    if (metal) metal->free(metal);
+    if (jit)   { jit  ->free(jit);   }
+    if (metal) { metal->free(metal); }
     slides_cleanup();
 
     open("/tmp/srgb_interp.png", 0); // just to trigger open
