@@ -1,6 +1,8 @@
 #pragma once
 #include <stdint.h>
 
+// STYLE: avoid "len" — these are 32-bit instruction words, so a count not a byte
+// STYLE: count. Rename `len`→`words` and field-name parallel: `uint32_t *word; int words, cap;`.
 struct Buf {
     uint32_t *buf;
     int       len, cap;

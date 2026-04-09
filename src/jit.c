@@ -340,6 +340,10 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, STP_qi(12, 13, 31, 4));
     put(&c, STP_qi(14, 15, 31, 6));
 
+    // STYLE: every `c.len` reference in this file (and the asm_x86 jit below)
+    // STYLE: rides on struct Buf's `len` field — see asm_arm64.h / asm_x86.h.
+    // STYLE: Renaming the field cascades here. Also `stack_patch` and the other
+    // STYLE: code-offset locals never change after init and should be `int const`.
     int stack_patch = c.len;
     put(&c, NOP());
     put(&c, NOP());

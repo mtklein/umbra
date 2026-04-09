@@ -172,6 +172,9 @@ enum {
 //  SPIR-V binary buffer.
 // ---------------------------------------------------------------------------
 
+// STYLE: same "len" issue as struct Buf in asm_*.h — these are uint32_t words,
+// STYLE: not bytes. Field should be `words` (matching the buffer being singular,
+// STYLE: e.g. `uint32_t *word; int words, cap;`).
 typedef struct {
     uint32_t *buf;
     int       len, cap;
@@ -290,6 +293,10 @@ struct vk_program {
 
     struct deref_info *deref;
 
+    // STYLE: avoid "len" — this counts uint32_t words, so `int spirv_words` and
+    // STYLE: matching `out_spirv_words` parameter / `spirv_words` local in
+    // STYLE: build_spirv() / vk_compile() (and the singular `*spirv` → `*word`
+    // STYLE: per the array-name-singular rule).
     uint32_t *spirv;
     int       spirv_len, :32;
 };
@@ -2094,6 +2101,8 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     }
 
     for (int i = 0; i <= vp->max_ptr; i++) {
+        // STYLE: prefer positive nesting over `if (!cond) continue;` — wrap the
+        // STYLE: rest of the loop body in `if (buf[i].ptr && buf[i].sz) { ... }`.
         if (!buf[i].ptr || !buf[i].sz) { continue; }
         if (buf[i].read_only && !buf[i].row_bytes) {
             struct uniform_ring_loc loc =

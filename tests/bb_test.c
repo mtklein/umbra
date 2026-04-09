@@ -2110,6 +2110,10 @@ TEST(test_uni_16) {
 
 TEST(test_dump) {
     FILE *f = fopen("/dev/null", "w");
+    // STYLE: prefer positive control flow — `if (f) { /* whole body */ }` rather
+    // STYLE: than `if (!f) return;`. Same negative-early-return shape repeats
+    // STYLE: throughout this file's `if (!run_*(...)) { continue; }` blocks; prefer
+    // STYLE: nesting the assertions inside the positive test.
     if (!f) { return; }
 
     {

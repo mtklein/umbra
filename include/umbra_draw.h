@@ -27,6 +27,11 @@ void        umbra_store_fp16      (struct umbra_builder*, umbra_ptr64, umbra_col
 umbra_color umbra_load_fp16_planar(struct umbra_builder*, umbra_ptr16);
 void        umbra_store_fp16_planar(struct umbra_builder*, umbra_ptr16, umbra_color);
 
+// STYLE: anonymous parameters have nothing to attach `*` to, so it should sit
+// STYLE: against the type per the rule "always keep `*` attached to something":
+// STYLE: `(struct umbra_builder*, struct umbra_uniforms_layout*, ...)`. Same
+// STYLE: applies to all the `umbra_shader_*`/`umbra_coverage_*`/`umbra_blend_*`
+// STYLE: declarations below and to the `umbra_draw_build` return type.
 typedef umbra_color (*umbra_shader_fn)(struct umbra_builder *, struct umbra_uniforms_layout *,
                                        umbra_val32 x, umbra_val32 y);
 typedef umbra_val32 (*umbra_coverage_fn)(struct umbra_builder *, struct umbra_uniforms_layout *,

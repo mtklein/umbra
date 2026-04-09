@@ -1,6 +1,10 @@
 #pragma once
 #include <stdint.h>
 
+// STYLE: avoid "len" — `buf` here is a byte buffer, so this is a byte count and
+// STYLE: should be `size_t size`, paired with a byte-count `cap`. The field name
+// STYLE: `buf` is also redundant with the type name; consider `byte` (singular)
+// STYLE: per the "name an array in the singular" rule.
 struct Buf {
     uint8_t *buf;
     int      len, cap;

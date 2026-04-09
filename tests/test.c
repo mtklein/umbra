@@ -38,6 +38,10 @@ struct test_backends test_backends_make(struct umbra_basic_block const *bb) {
     return B;
 }
 
+// STYLE: prefer positive control flow per CLAUDE.md — restructure as
+// STYLE: `if (B->p[bi]) { queue; flush; return 1; } return 0;` so the
+// STYLE: action sits inside the positive test and the failure path is the
+// STYLE: trailing return.
 _Bool test_backends_run(struct test_backends *B, int bi, int r, int b,
                         struct umbra_buf buf[]) {
     if (!B->p[bi]) { return 0; }

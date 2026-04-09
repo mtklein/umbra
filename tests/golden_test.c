@@ -349,6 +349,8 @@ TEST(test_golden_slides) {
 // canonical regression for the original silent-cmdbuf-corruption
 // failure mode (that requires very large N which becomes flaky under
 // parallel ninja test execution).
+// STYLE: prefer positive nesting — wrap the body in `if (be) { ... }` rather
+// STYLE: than `if (!be) return;`.
 static void run_long_batch_no_oom(struct umbra_backend *be) {
     if (!be) { return; }
 

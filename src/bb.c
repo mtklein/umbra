@@ -575,6 +575,10 @@ static void schedule(struct bb_inst const *in, int n, _Bool const *body,
     free(ready);
 }
 
+// STYLE: vertically align this pair of allocations and the matching frees:
+// STYLE:   _Bool *live    = calloc((size_t)n, 1);
+// STYLE:   _Bool *varying = calloc((size_t)n, 1);
+// STYLE: Same idea applies to the malloc/calloc cluster a few lines below.
 struct umbra_basic_block* umbra_basic_block(builder *b) {
     int const n = b->insts;
 
@@ -608,6 +612,8 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
 
     int j = 0;
     for (int i = 0; i < n; i++) {
+        // STYLE: prefer the positive nest:
+        // STYLE:   if (live[i] && !varying[i] && !is_store(b->inst[i].op)) { ... }
         if (!live[i] || varying[i] || is_store(b->inst[i].op)) { continue; }
         old_to_new[i] = j;
         out[j++] = b->inst[i];

@@ -3,6 +3,9 @@
 
 static size_t align_up(size_t x, size_t a) { return (x + a - 1) & ~(a - 1); }
 
+// STYLE: rename `len` parameter to `size` (it's a byte count) — touches the
+// STYLE: header signature too. Also `reserved` and `off` here never change after
+// STYLE: assignment, so they should be `size_t const`.
 struct uniform_ring_loc uniform_ring_alloc(struct uniform_ring *r, void const *bytes, size_t len) {
     size_t reserved = align_up(len, r->align);
     for (;;) {
@@ -15,6 +18,8 @@ struct uniform_ring_loc uniform_ring_alloc(struct uniform_ring *r, void const *b
                 return (struct uniform_ring_loc){.handle=c->handle, .offset=off};
             }
             r->cur++;
+            // STYLE: prefer positive nesting over `continue` — restructure the
+            // STYLE: outer loop so the chunk-fits branch is the natural fall-through.
             continue;
         }
         if (r->n >= r->cap) {

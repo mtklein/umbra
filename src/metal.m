@@ -61,6 +61,9 @@ struct umbra_metal {
     int    n_deref;
 };
 
+// STYLE: avoid "len" — `buf` is a char text buffer, so this is a byte count
+// STYLE: and should be `size_t size` (matching `cap`). Several `b.len` reads in
+// STYLE: build_source() ride on this name.
 typedef struct {
     char *buf;
     int   len, cap;
@@ -1256,6 +1259,9 @@ static void encode_dispatch(
     for (int i = 0; i < tb; i++) { bind_handle[i] = 0; bind_offset[i] = 0; }
 
     for (int i = 0; i <= m->max_ptr; i++) {
+        // STYLE: prefer positive nesting over `if (!cond) { continue; }`. The
+        // STYLE: second `continue` below at the end of the read-only branch is
+        // STYLE: also begging to become a plain `else`.
         if (!buf[i].ptr || !buf[i].sz) { continue; }
         if (buf[i].read_only && !buf[i].row_bytes) {
             struct uniform_ring_loc loc =

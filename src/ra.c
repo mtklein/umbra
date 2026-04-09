@@ -36,6 +36,15 @@ void ra_set_chan_reg(struct ra *ra, int val, int chan, int8_t r) {
     ra->chan_reg[val][chan] = r;
 }
 
+// STYLE: vertically align this group of related field assignments — they're a
+// STYLE: parallel construct and the style guide explicitly calls out aligning
+// STYLE: them. e.g.
+// STYLE:   ra->reg            = malloc(...);
+// STYLE:   ra->last_use       = malloc(...);
+// STYLE:   ra->owner          = malloc(...);
+// STYLE:   ra->free_stack     = malloc(...);
+// STYLE:   ra->chan_reg       = malloc(...);
+// STYLE:   ra->chan_last_use  = malloc(...);
 struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const *cfg) {
     int const  n = bb->insts;
     struct ra *ra = malloc(sizeof *ra);
