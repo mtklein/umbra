@@ -2039,7 +2039,12 @@ TEST(test_dump) {
         struct umbra_builder *b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
         umbra_val32            r = umbra_add_f32(b, x, umbra_imm_f32(b, 1.0f));
+        // shl_i32 by an immediate folds to op_shl_i32_imm in the builder, which
+        // dump_insts has its own switch case for; covering it here keeps the
+        // dump table from rotting.
+        umbra_val32            s = umbra_shl_i32(b, x, umbra_imm_i32(b, 3));
         umbra_store_32(b, (umbra_ptr32){.ix=1}, r);
+        umbra_store_32(b, (umbra_ptr32){.ix=2}, s);
         umbra_builder_dump(b, f);
 
         struct umbra_basic_block *bb = umbra_basic_block(b);
@@ -3256,18 +3261,26 @@ TEST(test_const_eval) {
         umbra_store_32(b, (umbra_ptr32){.ix=11}, umbra_le_s32(b, a, c));
         umbra_store_32(b, (umbra_ptr32){.ix=12}, umbra_lt_u32(b, a, c));
         umbra_store_32(b, (umbra_ptr32){.ix=13}, umbra_le_u32(b, a, c));
+        // sel_32 with c that's neither 0 nor -1 falls through the short-circuits
+        // in umbra_sel_32 and reaches the const_eval path: result is bit-wise
+        // (c & t) | (~c & f).  c=5, t=0xff, f=0xf0 → 5 | 0xf0 = 0xf5.
+        umbra_store_32(b, (umbra_ptr32){.ix=14},
+            umbra_sel_32(b, umbra_imm_i32(b, 5),
+                            umbra_imm_i32(b, 0xff),
+                            umbra_imm_i32(b, 0xf0)));
         struct test_backends B = make(b);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-            int32_t d[14][4];
+            int32_t d[15][4];
             __builtin_memset(d, 0, sizeof d);
-            struct umbra_buf bufs[14];
-            for (int i = 0; i < 14; i++) { bufs[i] = (struct umbra_buf){.ptr=d[i], .sz=16}; }
+            struct umbra_buf bufs[15];
+            for (int i = 0; i < 15; i++) { bufs[i] = (struct umbra_buf){.ptr=d[i], .sz=16}; }
             if (run(&B, bi, 4, 1, bufs)) {
-                (d[0][0] == 7)  here;   // 10-3
-                (d[1][0] == 30) here;   // 10*3
-                (d[7][0] == 9)  here;   // 10^3
-                (d[8][0] == 10) here;   // sel(-1, 10, 3) = 10
-                (d[9][0] == 0)  here;   // eq(10,3)=0
+                (d[0][0]  == 7)    here;   // 10-3
+                (d[1][0]  == 30)   here;   // 10*3
+                (d[7][0]  == 9)    here;   // 10^3
+                (d[8][0]  == 10)   here;   // sel(-1, 10, 3) = 10
+                (d[9][0]  == 0)    here;   // eq(10,3)=0
+                (d[14][0] == 0xf5) here;   // sel(5, 0xff, 0xf0) folds via const_eval
             }
         }
         cleanup(&B);
