@@ -6,22 +6,22 @@
 // All encodings verified against clang -target x86_64 + llvm-objdump.
 
 static _Bool bytes_eq(struct Buf *b, int n, uint8_t const exp[]) {
-    return b->len == n && memcmp(b->buf, exp, (size_t)n) == 0;
+    return b->size == (size_t)n && memcmp(b->byte, exp, (size_t)n) == 0;
 }
 
-static void reset(struct Buf *b) { b->len = 0; }
+static void reset(struct Buf *b) { b->size = 0; }
 
 TEST(test_emit) {
     struct Buf b = {0};
     emit1(&b, 0xAB);
     emit4(&b, 0xDEADBEEF);
-    b.len == 5 here;
-    b.buf[0] == 0xAB here;
-    b.buf[1] == 0xEF here;
-    b.buf[2] == 0xBE here;
-    b.buf[3] == 0xAD here;
-    b.buf[4] == 0xDE here;
-    free(b.buf);
+    b.size == 5 here;
+    b.byte[0] == 0xAB here;
+    b.byte[1] == 0xEF here;
+    b.byte[2] == 0xBE here;
+    b.byte[3] == 0xAD here;
+    b.byte[4] == 0xDE here;
+    free(b.byte);
 }
 
 TEST(test_ret_vzeroupper_nop) {
@@ -36,7 +36,7 @@ TEST(test_ret_vzeroupper_nop) {
 
     nop(&b);
     bytes_eq(&b, 1, (uint8_t[]){0x90}) here;
-    free(b.buf);
+    free(b.byte);
 }
 
 TEST(test_gpr) {
@@ -120,7 +120,7 @@ TEST(test_gpr) {
     // shrq $1, %rax => 48 d1 e8
     shr_ri(&b, RAX, 1);
     bytes_eq(&b, 3, (uint8_t[]){0x48, 0xD1, 0xE8}) here;
-    free(b.buf);
+    free(b.byte);
 }
 
 TEST(test_avx_f32) {
@@ -184,7 +184,7 @@ TEST(test_avx_f32) {
     // vroundps %ymm3, %ymm2, $8 => c4 e3 7d 08 d3 08
     vroundps(&b, 2, 3, 8);
     bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE3, 0x7D, 0x08, 0xD3, 0x08}) here;
-    free(b.buf);
+    free(b.byte);
 }
 
 TEST(test_avx_fma) {
@@ -218,7 +218,7 @@ TEST(test_avx_fma) {
     // vfnmadd231ps %ymm4, %ymm3, %ymm2 => c4 e2 65 bc d4
     vfnmadd231ps(&b, 2, 3, 4);
     bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0xBC, 0xD4}) here;
-    free(b.buf);
+    free(b.byte);
 }
 
 TEST(test_avx_i32) {
@@ -259,7 +259,7 @@ TEST(test_avx_i32) {
     bytes_eq(&b, 5, (uint8_t[]){0xC5, 0xED, 0x72, 0xE3, 0x04}) here;
     reset(&b);
 
-    free(b.buf);
+    free(b.byte);
 }
 
 TEST(test_avx_bitwise) {
@@ -288,7 +288,7 @@ TEST(test_avx_bitwise) {
     // vpblendvb %ymm5, %ymm4, %ymm3, %ymm2 => c4 e3 65 4c d4 50
     vpblendvb(&b, 1, 2, 3, 4, 5);
     bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE3, 0x65, 0x4C, 0xD4, 0x50}) here;
-    free(b.buf);
+    free(b.byte);
 }
 
 TEST(test_avx_cmp) {
@@ -302,7 +302,7 @@ TEST(test_avx_cmp) {
     // vpcmpgtd %ymm4, %ymm3, %ymm2 => c5 e5 66 d4
     vpcmpgtd(&b, 2, 3, 4);
     bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE5, 0x66, 0xD4}) here;
-    free(b.buf);
+    free(b.byte);
 }
 
 TEST(test_avx_shift) {
@@ -316,7 +316,7 @@ TEST(test_avx_shift) {
     // vpslld $8, %ymm5, %ymm4 => c5 dd 72 f5 08
     vpslld_i(&b, 4, 5, 8);
     bytes_eq(&b, 5, (uint8_t[]){0xC5, 0xDD, 0x72, 0xF5, 0x08}) here;
-    free(b.buf);
+    free(b.byte);
 }
 
 TEST(test_avx_convert) {
@@ -340,7 +340,7 @@ TEST(test_avx_convert) {
     // vpmovsxwd %xmm8, %ymm9 => c4 42 7d 23 c8
     vpmovsxwd(&b, 9, 8);
     bytes_eq(&b, 5, (uint8_t[]){0xC4, 0x42, 0x7D, 0x23, 0xC8}) here;
-    free(b.buf);
+    free(b.byte);
 }
 
 TEST(test_avx_extract) {
@@ -354,7 +354,7 @@ TEST(test_avx_extract) {
     // vpextrd $1, %xmm3, %eax => c4 e3 79 16 d8 01
     vpextrd(&b, RAX, 3, 1);
     bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE3, 0x79, 0x16, 0xD8, 0x01}) here;
-    free(b.buf);
+    free(b.byte);
 }
 
 TEST(test_avx_mov) {
@@ -370,7 +370,7 @@ TEST(test_avx_mov) {
     bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE1, 0x7E, 0x7F, 0x1C, 0x8F}) here;
     reset(&b);
 
-    free(b.buf);
+    free(b.byte);
 }
 
 TEST(test_avx_broadcast) {
@@ -379,7 +379,7 @@ TEST(test_avx_broadcast) {
     // vbroadcastss %xmm0, %ymm2 => c4 e2 7d 18 d0
     vbroadcastss(&b, 2, 0);
     bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x7D, 0x18, 0xD0}) here;
-    free(b.buf);
+    free(b.byte);
 }
 
 TEST(test_broadcast_imm32) {
@@ -397,18 +397,18 @@ TEST(test_broadcast_imm32) {
 
     // Shift-right pattern: 0x7FFFFFFF => vpcmpeqd + vpsrld $1
     broadcast_imm32(&b, 5, 0x7FFFFFFF);
-    b.len == 9 here;
+    b.size == 9 here;
     reset(&b);
 
     // Shift-left pattern: 0xFFFF0000 => vpcmpeqd + vpslld $16
     broadcast_imm32(&b, 6, 0xFFFF0000);
-    b.len == 9 here;
+    b.size == 9 here;
     reset(&b);
 
     // General fallback: 0xDEADBEEF => mov eax + vmovd + vbroadcastss
     broadcast_imm32(&b, 7, 0xDEADBEEF);
-    b.buf[0] == 0xB8 here;
-    free(b.buf);
+    b.byte[0] == 0xB8 here;
+    free(b.byte);
 }
 
 TEST(test_spill_fill) {
@@ -432,7 +432,7 @@ TEST(test_spill_fill) {
     // vfill ymm3 from slot 1 (disp=32): c5 fe 6f 5c 24 20
     vfill(&b, 3, 1);
     bytes_eq(&b, 6, (uint8_t[]){0xC5, 0xFE, 0x6F, 0x5C, 0x24, 0x20}) here;
-    free(b.buf);
+    free(b.byte);
 }
 
 TEST(test_gather) {
@@ -441,7 +441,7 @@ TEST(test_gather) {
     // vpgatherdd ymm2, [rdi+rcx*4], ymm5 => c4 e2 55 90 14 8f
     vpgatherdd(&b, 2, RDI, RCX, 4, 5);
     bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE2, 0x55, 0x90, 0x14, 0x8F}) here;
-    free(b.buf);
+    free(b.byte);
 }
 
 TEST(test_vex_helpers) {
@@ -466,7 +466,7 @@ TEST(test_vex_helpers) {
     // (same as vmov_load L=1,3,RDI,RCX,4,0)
     vex_mem(&b, 2, 1, 0, 1, 3, 0, 0x6f, RDI, RCX, 4, 0);
     bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE1, 0x7E, 0x6F, 0x1C, 0x8F}) here;
-    free(b.buf);
+    free(b.byte);
 }
 
 TEST(test_large_disp) {
@@ -474,9 +474,9 @@ TEST(test_large_disp) {
 
     // vmovdqu 256(%rdi,%r10,4), %ymm0
     vmov_load(&b, 1, 0, RDI, R10, 4, 256);
-    b.buf[0] == 0xC4 here;
-    b.len == 10 here;
-    free(b.buf);
+    b.byte[0] == 0xC4 here;
+    b.size == 10 here;
+    free(b.byte);
 }
 
 TEST(test_vex_2byte_vs_3byte) {
@@ -484,18 +484,18 @@ TEST(test_vex_2byte_vs_3byte) {
 
     // Low regs => 2-byte VEX (C5)
     vaddps(&b, 4, 3, 2);
-    b.buf[0] == 0xC5 here;
+    b.byte[0] == 0xC5 here;
     reset(&b);
 
     // High reg in rm => 3-byte VEX (C4)
     vpaddd(&b, 10, 9, 8);
-    b.buf[0] == 0xC4 here;
+    b.byte[0] == 0xC4 here;
     reset(&b);
 
     // mm==2 (0F38) always needs 3-byte VEX
     vcvtph2ps(&b, 2, 3);
-    b.buf[0] == 0xC4 here;
-    free(b.buf);
+    b.byte[0] == 0xC4 here;
+    free(b.byte);
 }
 
 TEST(test_vmovd_vmovq_vpsrldq) {
@@ -536,6 +536,6 @@ TEST(test_vmovd_vmovq_vpsrldq) {
     bytes_eq(&b, 5, (uint8_t[]){0xC5, 0xE1, 0x73, 0xDC, 0x02}) here;
     reset(&b);
 
-    free(b.buf);
+    free(b.byte);
 }
 

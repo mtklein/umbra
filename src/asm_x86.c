@@ -7,11 +7,11 @@ typedef struct Buf Buf;
 // ---- byte buffer ----
 
 void emit1(Buf *b, uint8_t v) {
-    if (b->len == b->cap) {
+    if (b->size == b->cap) {
         b->cap = b->cap ? 2 * b->cap : 4096;
-        b->buf = realloc(b->buf, (size_t)b->cap);
+        b->byte = realloc(b->byte, b->cap);
     }
-    b->buf[b->len++] = v;
+    b->byte[b->size++] = v;
 }
 void emit4(Buf *b, uint32_t v) {
     emit1(b, (uint8_t)v);
@@ -88,7 +88,7 @@ int vex_rip(Buf *b, int pp, int mm, int W, int L, int reg, int v, uint8_t op) {
     emit1(b, (uint8_t)((W << 7) | ((~v & 0xf) << 3) | (L << 2) | pp));
     emit1(b, op);
     emit1(b, (uint8_t)(((reg & 7) << 3) | 5));
-    int pos = b->len;
+    int pos = (int)b->size;
     emit4(b, 0);
     return pos;
 }
@@ -184,13 +184,13 @@ void mov_load(Buf *b, int d, int base, int disp) {
 int jcc(Buf *b, uint8_t cc) {
     emit1(b, 0x0f);
     emit1(b, (uint8_t)(0x80 | cc));
-    int pos = b->len;
+    int pos = (int)b->size;
     emit4(b, 0);
     return pos;
 }
 int jmp(Buf *b) {
     emit1(b, 0xe9);
-    int pos = b->len;
+    int pos = (int)b->size;
     emit4(b, 0);
     return pos;
 }

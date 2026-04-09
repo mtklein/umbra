@@ -1403,8 +1403,8 @@ enum { XWIDTH = RSI, XBUF = RDX, XCOL_X86 = R10, XH_X86 = R12, XM = R13, XY = R1
 #define XI XCOL_X86
 
 static void patch_jcc(Buf *c, int fixup) {
-    int32_t rel = (int32_t)(c->len - (fixup + 4));
-    __builtin_memcpy(c->buf + fixup, &rel, 4);
+    int32_t rel = (int32_t)(c->size - (size_t)(fixup + 4));
+    __builtin_memcpy(c->byte + fixup, &rel, 4);
 }
 
 static void load_count_x86(Buf *c, int p, int elem_shift) {
@@ -1630,7 +1630,7 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     push_r(&c, R15);
     push_r(&c, RBX);
 
-    int stack_patch = c.len;
+    int stack_patch = (int)c.size;
     for (int i = 0; i < 7; i++) {
         nop(&c);
     }
@@ -1650,7 +1650,7 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     mov_rr(&c, RDI, XI);             // RDI = r = col_end
     mov_rr(&c, XI, RSI);             // XI = l
 
-    int loop_top = c.len;
+    int loop_top = (int)c.size;
 
     // remaining = row_end (RDI) - XI
     mov_rr(&c, R11, RDI);
@@ -1661,21 +1661,21 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     cmp_ri(&c, R11, 8);
     int br_tail = jcc(&c, 0x0c);
 
-    int loop_body_start = c.len;
+    int loop_body_start = (int)c.size;
     emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
 
     ra_end_loop(ra, sl);
 
-    int loop_body_end = c.len;
+    int loop_body_end = (int)c.size;
 
     add_ri(&c, XI, 8);
     {
         int     j = jmp(&c);
         int32_t rel = (int32_t)(loop_top - (j + 4));
-        __builtin_memcpy(c.buf + j, &rel, 4);
+        __builtin_memcpy(c.byte + j, &rel, 4);
     }
 
-    int tail_top = c.len;
+    int tail_top = (int)c.size;
     patch_jcc(&c, br_tail);
 
     cmp_rr(&c, XI, RDI);                 // xi >= row_end?
@@ -1691,7 +1691,7 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     {
         int     j = jmp(&c);
         int32_t rel = (int32_t)(tail_top - (j + 4));
-        __builtin_memcpy(c.buf + j, &rel, 4);
+        __builtin_memcpy(c.byte + j, &rel, 4);
     }
 
     // row_done:
@@ -1703,7 +1703,7 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     int br_more_rows = jcc(&c, 0x0c);    // JL → more rows
     {
         int32_t rel = (int32_t)(loop_top - (br_more_rows + 4));
-        __builtin_memcpy(c.buf + br_more_rows, &rel, 4);
+        __builtin_memcpy(c.byte + br_more_rows, &rel, 4);
     }
 
     if (ns > 0) {
@@ -1719,14 +1719,14 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
 
     if (ns > 0) {
         int pos = stack_patch;
-        c.buf[pos++] = 0x48;
-        c.buf[pos++] = 0x81;
-        c.buf[pos++] = (uint8_t)(0xc0 | (5 << 3) | (RSP & 7));
+        c.byte[pos++] = 0x48;
+        c.byte[pos++] = 0x81;
+        c.byte[pos++] = (uint8_t)(0xc0 | (5 << 3) | (RSP & 7));
         int32_t sz = ns * 32;
-        __builtin_memcpy(c.buf + pos, &sz, 4);
+        __builtin_memcpy(c.byte + pos, &sz, 4);
     }
 
-    int pool_start = c.len;
+    int pool_start = (int)c.size;
     for (int i = 0; i < jc.pool.nbytes; i++) {
         emit1(&c, jc.pool.data[i]);
     }
@@ -1734,7 +1734,7 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
         struct pool_ref *r = &jc.pool.refs[i];
         int              entry_off = pool_start + r->data_off;
         int32_t          rel = (int32_t)(entry_off - (r->code_pos + 4 + r->extra));
-        __builtin_memcpy(c.buf + r->code_pos, &rel, 4);
+        __builtin_memcpy(c.byte + r->code_pos, &rel, 4);
     }
     pool_free(&jc.pool);
 
@@ -1743,17 +1743,17 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     free(deref_gpr);
     free(deref_rb_gpr);
 
-    size_t code_sz = (size_t)c.len;
+    size_t code_sz = c.size;
     size_t pg = (size_t)sysconf(_SC_PAGESIZE);
     size_t alloc = (code_sz + pg - 1) & ~(pg - 1);
 
     void *mem = mmap(NULL, alloc + pg, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
     assume(mem != MAP_FAILED);
     mprotect((char *)mem + alloc, pg, PROT_NONE);
-    __builtin_memcpy(mem, c.buf, code_sz);
+    __builtin_memcpy(mem, c.byte, code_sz);
     int ok = mprotect(mem, alloc, PROT_READ | PROT_EXEC);
     assume(ok == 0);
-    free(c.buf);
+    free(c.byte);
 
     struct umbra_jit *j = malloc(sizeof *j);
     j->code = mem;
