@@ -65,19 +65,18 @@ TEST(test_f32_ops) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float x[] = {1, 2, 3, 4, 5};
             float y[] = {6, 7, 8, 9, 0}, z[5] = {0};
-            if (!run(&B, bi, 5, 1,
+            if (run(&B, bi, 5, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=5 * 4},
                          {.ptr=y, .sz=5 * 4},
                          {.ptr=z, .sz=5 * 4},
                      })) {
-                continue;
+                equiv(z[0], 6) here;
+                equiv(z[1], 14) here;
+                equiv(z[2], 24) here;
+                equiv(z[3], 36) here;
+                equiv(z[4], 0) here;
             }
-            equiv(z[0], 6) here;
-            equiv(z[1], 14) here;
-            equiv(z[2], 24) here;
-            equiv(z[3], 36) here;
-            equiv(z[4], 0) here;
         }
         cleanup(&B);
     }
@@ -87,17 +86,16 @@ TEST(test_f32_ops) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float x[] = {1, 2, 3};
             float y[] = {10, 20, 30}, z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=3 * 4},
                          {.ptr=y, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                equiv(z[0], 11) here;
+                equiv(z[1], 22) here;
+                equiv(z[2], 33) here;
             }
-            equiv(z[0], 11) here;
-            equiv(z[1], 22) here;
-            equiv(z[2], 33) here;
         }
         cleanup(&B);
     }
@@ -107,17 +105,16 @@ TEST(test_f32_ops) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float x[] = {10, 20, 30};
             float y[] = {1, 2, 3}, z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=3 * 4},
                          {.ptr=y, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                equiv(z[0], 9) here;
+                equiv(z[1], 18) here;
+                equiv(z[2], 27) here;
             }
-            equiv(z[0], 9) here;
-            equiv(z[1], 18) here;
-            equiv(z[2], 27) here;
         }
         cleanup(&B);
     }
@@ -127,17 +124,16 @@ TEST(test_f32_ops) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float x[] = {10, 20, 30};
             float y[] = {2, 4, 5}, z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=3 * 4},
                          {.ptr=y, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                equiv(z[0], 5) here;
+                equiv(z[1], 5) here;
+                equiv(z[2], 6) here;
             }
-            equiv(z[0], 5) here;
-            equiv(z[1], 5) here;
-            equiv(z[2], 6) here;
         }
         cleanup(&B);
     }
@@ -150,17 +146,16 @@ TEST(test_i32_ops) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {1, 2, 3};
             int y[] = {10, 20, 30}, z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=3 * 4},
                          {.ptr=y, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                z[0] == 11 here;
+                z[1] == 22 here;
+                z[2] == 33 here;
             }
-            z[0] == 11 here;
-            z[1] == 22 here;
-            z[2] == 33 here;
         }
         cleanup(&B);
     }
@@ -170,17 +165,16 @@ TEST(test_i32_ops) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {10, 20, 30};
             int y[] = {1, 2, 3}, z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=3 * 4},
                          {.ptr=y, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                z[0] == 9 here;
+                z[1] == 18 here;
+                z[2] == 27 here;
             }
-            z[0] == 9 here;
-            z[1] == 18 here;
-            z[2] == 27 here;
         }
         cleanup(&B);
     }
@@ -190,17 +184,16 @@ TEST(test_i32_ops) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {2, 3, 4};
             int y[] = {5, 6, 7}, z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=3 * 4},
                          {.ptr=y, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                z[0] == 10 here;
+                z[1] == 18 here;
+                z[2] == 28 here;
             }
-            z[0] == 10 here;
-            z[1] == 18 here;
-            z[2] == 28 here;
         }
         cleanup(&B);
     }
@@ -210,17 +203,16 @@ TEST(test_i32_ops) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {1, 3, 7};
             int y[] = {1, 2, 3}, z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=3 * 4},
                          {.ptr=y, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                z[0] == 2 here;
+                z[1] == 12 here;
+                z[2] == 56 here;
             }
-            z[0] == 2 here;
-            z[1] == 12 here;
-            z[2] == 56 here;
         }
         cleanup(&B);
     }
@@ -230,17 +222,16 @@ TEST(test_i32_ops) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {-1, 8, 64};
             int y[] = {1, 1, 3}, z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=3 * 4},
                          {.ptr=y, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                z[0] == (int)(0xffffffffu >> 1) here;
+                z[1] == 4 here;
+                z[2] == 8 here;
             }
-            z[0] == (int)(0xffffffffu >> 1) here;
-            z[1] == 4 here;
-            z[2] == 8 here;
         }
         cleanup(&B);
     }
@@ -250,17 +241,16 @@ TEST(test_i32_ops) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {-8, 8, 64};
             int y[] = {1, 1, 3}, z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=3 * 4},
                          {.ptr=y, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                z[0] == -4 here;
+                z[1] == 4 here;
+                z[2] == 8 here;
             }
-            z[0] == -4 here;
-            z[1] == 4 here;
-            z[2] == 8 here;
         }
         cleanup(&B);
     }
@@ -270,16 +260,15 @@ TEST(test_i32_ops) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {0xff, 0x0f};
             int y[] = {0x0f, 0xff}, z[2] = {0};
-            if (!run(&B, bi, 2, 1,
+            if (run(&B, bi, 2, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=2 * 4},
                          {.ptr=y, .sz=2 * 4},
                          {.ptr=z, .sz=2 * 4},
                      })) {
-                continue;
+                z[0] == 0x0f here;
+                z[1] == 0x0f here;
             }
-            z[0] == 0x0f here;
-            z[1] == 0x0f here;
         }
         cleanup(&B);
     }
@@ -289,16 +278,15 @@ TEST(test_i32_ops) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {0xf0, 0x0f};
             int y[] = {0x0f, 0xf0}, z[2] = {0};
-            if (!run(&B, bi, 2, 1,
+            if (run(&B, bi, 2, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=2 * 4},
                          {.ptr=y, .sz=2 * 4},
                          {.ptr=z, .sz=2 * 4},
                      })) {
-                continue;
+                z[0] == 0xff here;
+                z[1] == 0xff here;
             }
-            z[0] == 0xff here;
-            z[1] == 0xff here;
         }
         cleanup(&B);
     }
@@ -308,16 +296,15 @@ TEST(test_i32_ops) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {0xff, 0xff};
             int y[] = {0x0f, 0xff}, z[2] = {0};
-            if (!run(&B, bi, 2, 1,
+            if (run(&B, bi, 2, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=2 * 4},
                          {.ptr=y, .sz=2 * 4},
                          {.ptr=z, .sz=2 * 4},
                      })) {
-                continue;
+                z[0] == 0xf0 here;
+                z[1] == 0x00 here;
             }
-            z[0] == 0xf0 here;
-            z[1] == 0x00 here;
         }
         cleanup(&B);
     }
@@ -334,18 +321,17 @@ TEST(test_i32_ops) {
             int va[] = {10, 20, 30};
             int vb[] = {40, 50, 60};
             int z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=cond, .sz=3 * 4},
                          {.ptr=va, .sz=3 * 4},
                          {.ptr=vb, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                z[0] == 10 here;
+                z[1] == 50 here;
+                z[2] == 30 here;
             }
-            z[0] == 10 here;
-            z[1] == 50 here;
-            z[2] == 30 here;
         }
         cleanup(&B);
     }
@@ -358,17 +344,16 @@ TEST(test_cmp_i32) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {1, 2, 3};
             int y[] = {1, 9, 3}, z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=3 * 4},
                          {.ptr=y, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                z[0] == -1 here;
+                z[1] == 0 here;
+                z[2] == -1 here;
             }
-            z[0] == -1 here;
-            z[1] == 0 here;
-            z[2] == -1 here;
         }
         cleanup(&B);
     }
@@ -378,17 +363,16 @@ TEST(test_cmp_i32) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {1, 5, 3};
             int y[] = {2, 5, 1}, z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=3 * 4},
                          {.ptr=y, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                z[0] == -1 here;
+                z[1] == 0 here;
+                z[2] == 0 here;
             }
-            z[0] == -1 here;
-            z[1] == 0 here;
-            z[2] == 0 here;
         }
         cleanup(&B);
     }
@@ -398,17 +382,16 @@ TEST(test_cmp_i32) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {1, 5, 3};
             int y[] = {2, 5, 1}, z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=3 * 4},
                          {.ptr=y, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                z[0] == -1 here;
+                z[1] == -1 here;
+                z[2] == 0 here;
             }
-            z[0] == -1 here;
-            z[1] == -1 here;
-            z[2] == 0 here;
         }
         cleanup(&B);
     }
@@ -418,16 +401,15 @@ TEST(test_cmp_i32) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {1, -1};
             int y[] = {2, 1}, z[2] = {0};
-            if (!run(&B, bi, 2, 1,
+            if (run(&B, bi, 2, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=2 * 4},
                          {.ptr=y, .sz=2 * 4},
                          {.ptr=z, .sz=2 * 4},
                      })) {
-                continue;
+                z[0] == -1 here;
+                z[1] == 0 here;
             }
-            z[0] == -1 here;
-            z[1] == 0 here;
         }
         cleanup(&B);
     }
@@ -437,17 +419,16 @@ TEST(test_cmp_i32) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int x[] = {1, 2, -1};
             int y[] = {2, 2, 1}, z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=3 * 4},
                          {.ptr=y, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                z[0] == -1 here;
+                z[1] == -1 here;
+                z[2] == 0 here;
             }
-            z[0] == -1 here;
-            z[1] == -1 here;
-            z[2] == 0 here;
         }
         cleanup(&B);
     }
@@ -461,17 +442,16 @@ TEST(test_cmp_f32) {
             float x[] = {1, 2, 3};
             float y[] = {1, 9, 3};
             int   z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=3 * 4},
                          {.ptr=y, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                z[0] == -1 here;
+                z[1] == 0 here;
+                z[2] == -1 here;
             }
-            z[0] == -1 here;
-            z[1] == 0 here;
-            z[2] == -1 here;
         }
         cleanup(&B);
     }
@@ -482,17 +462,16 @@ TEST(test_cmp_f32) {
             float x[] = {1, 5, 3};
             float y[] = {2, 5, 1};
             int   z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=3 * 4},
                          {.ptr=y, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                z[0] == -1 here;
+                z[1] == 0 here;
+                z[2] == 0 here;
             }
-            z[0] == -1 here;
-            z[1] == 0 here;
-            z[2] == 0 here;
         }
         cleanup(&B);
     }
@@ -503,17 +482,16 @@ TEST(test_cmp_f32) {
             float x[] = {1, 5, 3};
             float y[] = {2, 5, 1};
             int   z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=3 * 4},
                          {.ptr=y, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                z[0] == -1 here;
+                z[1] == -1 here;
+                z[2] == 0 here;
             }
-            z[0] == -1 here;
-            z[1] == -1 here;
-            z[2] == 0 here;
         }
         cleanup(&B);
     }
@@ -527,15 +505,14 @@ TEST(test_imm) {
         struct test_backends B = make(builder);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                z[0] == 42 here;
+                z[1] == 42 here;
+                z[2] == 42 here;
             }
-            z[0] == 42 here;
-            z[1] == 42 here;
-            z[2] == 42 here;
         }
         cleanup(&B);
     }
@@ -552,17 +529,16 @@ TEST(test_fma_f32) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         float a[] = {2, 3}, c[] = {4, 5};
         float d[] = {10, 20}, z[2] = {0};
-        if (!run(&B, bi, 2, 1,
+        if (run(&B, bi, 2, 1,
                  (struct umbra_buf[]){
                      {.ptr=a, .sz=2 * 4},
                      {.ptr=c, .sz=2 * 4},
                      {.ptr=d, .sz=2 * 4},
                      {.ptr=z, .sz=2 * 4},
                  })) {
-            continue;
+            equiv(z[0], 18) here;
+            equiv(z[1], 35) here;
         }
-        equiv(z[0], 18) here;
-        equiv(z[1], 35) here;
     }
     cleanup(&B);
 }
@@ -574,17 +550,16 @@ TEST(test_min_max_sqrt_f32) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float x[] = {5, 1, 3};
             float y[] = {2, 4, 3}, z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=3 * 4},
                          {.ptr=y, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                equiv(z[0], 2) here;
+                equiv(z[1], 1) here;
+                equiv(z[2], 3) here;
             }
-            equiv(z[0], 2) here;
-            equiv(z[1], 1) here;
-            equiv(z[2], 3) here;
         }
         cleanup(&B);
     }
@@ -594,17 +569,16 @@ TEST(test_min_max_sqrt_f32) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float x[] = {5, 1, 3};
             float y[] = {2, 4, 3}, z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=3 * 4},
                          {.ptr=y, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                equiv(z[0], 5) here;
+                equiv(z[1], 4) here;
+                equiv(z[2], 3) here;
             }
-            equiv(z[0], 5) here;
-            equiv(z[1], 4) here;
-            equiv(z[2], 3) here;
         }
         cleanup(&B);
     }
@@ -616,16 +590,15 @@ TEST(test_min_max_sqrt_f32) {
         struct test_backends B = make(builder);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float a[] = {4, 9, 16}, z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=a, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                equiv(z[0], 2) here;
+                equiv(z[1], 3) here;
+                equiv(z[2], 4) here;
             }
-            equiv(z[0], 2) here;
-            equiv(z[1], 3) here;
-            equiv(z[2], 4) here;
         }
         cleanup(&B);
     }
@@ -641,16 +614,15 @@ TEST(test_abs_f32) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float a[] = {-1.5f, 2.5f, -0.0f};
             float z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=a, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                equiv(z[0], 1.5f) here;
+                equiv(z[1], 2.5f) here;
+                equiv(z[2], 0.0f) here;
             }
-            equiv(z[0], 1.5f) here;
-            equiv(z[1], 2.5f) here;
-            equiv(z[2], 0.0f) here;
         }
         cleanup(&B);
     }
@@ -663,16 +635,15 @@ TEST(test_abs_f32) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float a[] = {-1.5f, 2.5f, 0.0f};
             float z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=a, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                equiv(z[0], 1.5f) here;
+                equiv(z[1], -2.5f) here;
+                equiv(z[2], 0.0f) here;
             }
-            equiv(z[0], 1.5f) here;
-            equiv(z[1], -2.5f) here;
-            equiv(z[2], 0.0f) here;
         }
         cleanup(&B);
     }
@@ -692,28 +663,27 @@ TEST(test_round_floor_ceil) {
             float s_[4];                                                    \
             __builtin_memcpy(s_, src, 16);                                  \
             int d_[4] = {0};                                                \
-            if (!run(&B_, bi_, 4, 1,                                        \
-                     (struct umbra_buf[]){                                         \
-                         {.ptr=s_, .sz=16},                                          \
-                         {.ptr=d_, .sz=16},                                          \
-                     })) {                                                  \
-                continue;                                                   \
-            }                                                               \
-            if (as_int) {                                                   \
-                d_[0] == (int)(e0) here;                                  \
-                d_[1] == (int)(e1) here;                                  \
-                d_[2] == (int)(e2) here;                                  \
-                d_[3] == (int)(e3) here;                                  \
-            } else {                                                        \
-                float g0, g1, g2, g3;                                       \
-                __builtin_memcpy(&g0, d_ + 0, 4);                           \
-                __builtin_memcpy(&g1, d_ + 1, 4);                           \
-                __builtin_memcpy(&g2, d_ + 2, 4);                           \
-                __builtin_memcpy(&g3, d_ + 3, 4);                           \
-                equiv(g0, (float)(e0)) here;                                \
-                equiv(g1, (float)(e1)) here;                                \
-                equiv(g2, (float)(e2)) here;                                \
-                equiv(g3, (float)(e3)) here;                                \
+            if (run(&B_, bi_, 4, 1,                                         \
+                    (struct umbra_buf[]){                                   \
+                        {.ptr=s_, .sz=16},                                  \
+                        {.ptr=d_, .sz=16},                                  \
+                    })) {                                                   \
+                if (as_int) {                                               \
+                    d_[0] == (int)(e0) here;                                \
+                    d_[1] == (int)(e1) here;                                \
+                    d_[2] == (int)(e2) here;                                \
+                    d_[3] == (int)(e3) here;                                \
+                } else {                                                    \
+                    float g0, g1, g2, g3;                                   \
+                    __builtin_memcpy(&g0, d_ + 0, 4);                       \
+                    __builtin_memcpy(&g1, d_ + 1, 4);                       \
+                    __builtin_memcpy(&g2, d_ + 2, 4);                       \
+                    __builtin_memcpy(&g3, d_ + 3, 4);                       \
+                    equiv(g0, (float)(e0)) here;                            \
+                    equiv(g1, (float)(e1)) here;                            \
+                    equiv(g2, (float)(e2)) here;                            \
+                    equiv(g3, (float)(e3)) here;                            \
+                }                                                           \
             }                                                               \
         }                                                                   \
         cleanup(&B_);                                                       \
@@ -737,15 +707,14 @@ TEST(test_large_n) {
             x[i] = (float)i;
             y[i] = (float)(100 - i);
         }
-        if (!run(&B, bi, 100, 1,
+        if (run(&B, bi, 100, 1,
                  (struct umbra_buf[]){
                      {.ptr=x, .sz=100 * 4},
                      {.ptr=y, .sz=100 * 4},
                      {.ptr=z, .sz=100 * 4},
                  })) {
-            continue;
+            for (int i = 0; i < 100; i++) { equiv(z[i], 100) here; }
         }
-        for (int i = 0; i < 100; i++) { equiv(z[i], 100) here; }
     }
     cleanup(&B);
 }
@@ -760,16 +729,15 @@ TEST(test_convert) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int   a[] = {1, 255, -3};
             float z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=a, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                equiv(z[0], 1) here;
+                equiv(z[1], 255) here;
+                equiv(z[2], -3) here;
             }
-            equiv(z[0], 1) here;
-            equiv(z[1], 255) here;
-            equiv(z[2], -3) here;
         }
         cleanup(&B);
     }
@@ -782,16 +750,15 @@ TEST(test_convert) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float a[] = {1.9f, 255.0f, -3.7f};
             int   z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=a, .sz=3 * 4},
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                z[0] == 1 here;
+                z[1] == 255 here;
+                z[2] == -3 here;
             }
-            z[0] == 1 here;
-            z[1] == 255 here;
-            z[2] == -3 here;
         }
         cleanup(&B);
     }
@@ -818,15 +785,14 @@ TEST(test_constprop) {
         struct test_backends B = make(builder);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                z[0] == 8 here;
+                z[1] == 8 here;
+                z[2] == 8 here;
             }
-            z[0] == 8 here;
-            z[1] == 8 here;
-            z[2] == 8 here;
         }
         cleanup(&B);
     }
@@ -838,15 +804,14 @@ TEST(test_constprop) {
         struct test_backends B = make(builder);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float z[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=z, .sz=3 * 4},
                      })) {
-                continue;
+                equiv(z[0], 6) here;
+                equiv(z[1], 6) here;
+                equiv(z[2], 6) here;
             }
-            equiv(z[0], 6) here;
-            equiv(z[1], 6) here;
-            equiv(z[2], 6) here;
         }
         cleanup(&B);
     }
@@ -876,14 +841,13 @@ TEST(test_strength_reduction) {
         struct test_backends B = make(builder);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int32_t a[] = {1, 2, 3, 4, 5}, c[5] = {0};
-            if (!run(&B, bi, 5, 1,
+            if (run(&B, bi, 5, 1,
                      (struct umbra_buf[]){
                          {.ptr=a, .sz=5 * 4},
                          {.ptr=c, .sz=5 * 4},
                      })) {
-                continue;
+                for (int i = 0; i < 5; i++) { (c[i] == a[i] * 8) here; }
             }
-            for (int i = 0; i < 5; i++) { (c[i] == a[i] * 8) here; }
         }
         cleanup(&B);
     }
@@ -895,14 +859,13 @@ TEST(test_strength_reduction) {
         struct test_backends B = make(builder);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int32_t a[] = {1, 2, 3}, c[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=a, .sz=3 * 4},
                          {.ptr=c, .sz=3 * 4},
                      })) {
-                continue;
+                for (int i = 0; i < 3; i++) { (c[i] == 0) here; }
             }
-            for (int i = 0; i < 3; i++) { (c[i] == 0) here; }
         }
         cleanup(&B);
     }
@@ -918,16 +881,15 @@ TEST(test_zero_imm) {
     struct test_backends B = make(builder);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         int a[] = {0, 1, 0}, z[3] = {0};
-        if (!run(&B, bi, 3, 1,
+        if (run(&B, bi, 3, 1,
                  (struct umbra_buf[]){
                      {.ptr=a, .sz=3 * 4},
                      {.ptr=z, .sz=3 * 4},
                  })) {
-            continue;
+            z[0] == -1 here;
+            z[1] == 0 here;
+            z[2] == -1 here;
         }
-        z[0] == -1 here;
-        z[1] == 0 here;
-        z[2] == -1 here;
     }
     cleanup(&B);
 }
@@ -997,7 +959,7 @@ TEST(test_load_8x4) {
         };
         int32_t rr[3] = {0}, gg[3] = {0};
         int32_t b_[3] = {0}, aa[3] = {0};
-        if (!run(&B, bi, 3, 1,
+        if (run(&B, bi, 3, 1,
                  (struct umbra_buf[]){
                      {.ptr=src, .sz=3 * 4},
                      {.ptr=rr, .sz=3 * 4},
@@ -1005,20 +967,19 @@ TEST(test_load_8x4) {
                      {.ptr=b_, .sz=3 * 4},
                      {.ptr=aa, .sz=3 * 4},
                  })) {
-            continue;
+            rr[0] == 0xDD here;
+            gg[0] == 0xCC here;
+            b_[0] == 0xBB here;
+            aa[0] == 0xAA here;
+            rr[1] == 0x44 here;
+            gg[1] == 0x33 here;
+            b_[1] == 0x22 here;
+            aa[1] == 0x11 here;
+            rr[2] == 0x00 here;
+            gg[2] == 0xFF here;
+            b_[2] == 0x00 here;
+            aa[2] == 0xFF here;
         }
-        rr[0] == 0xDD here;
-        gg[0] == 0xCC here;
-        b_[0] == 0xBB here;
-        aa[0] == 0xAA here;
-        rr[1] == 0x44 here;
-        gg[1] == 0x33 here;
-        b_[1] == 0x22 here;
-        aa[1] == 0x11 here;
-        rr[2] == 0x00 here;
-        gg[2] == 0xFF here;
-        b_[2] == 0x00 here;
-        aa[2] == 0xFF here;
     }
     cleanup(&B);
 }
@@ -1047,7 +1008,7 @@ TEST(test_store_8x4) {
         int32_t  b_[] = {0xBB, 0x22, 0x00};
         int32_t  aa[] = {0xAA, 0x11, 0xFF};
         uint32_t dst[3] = {0};
-        if (!run(&B, bi, 3, 1,
+        if (run(&B, bi, 3, 1,
                  (struct umbra_buf[]){
                      {.ptr=rr, .sz=3 * 4},
                      {.ptr=gg, .sz=3 * 4},
@@ -1055,11 +1016,10 @@ TEST(test_store_8x4) {
                      {.ptr=aa, .sz=3 * 4},
                      {.ptr=dst, .sz=3 * 4},
                  })) {
-            continue;
+            dst[0] == 0xAABBCCDDu here;
+            dst[1] == 0x11223344u here;
+            dst[2] == 0xFF00FF00u here;
         }
-        dst[0] == 0xAABBCCDDu here;
-        dst[1] == 0x11223344u here;
-        dst[2] == 0xFF00FF00u here;
     }
     cleanup(&B);
 }
@@ -1076,7 +1036,7 @@ TEST(test_srcover) {
         };
         __fp16 dst_r[] = {0.5, 0.5, 0.5}, dst_g[] = {0.5, 0.5, 0.5},
                dst_b[] = {0.5, 0.5, 0.5}, dst_a[] = {0.5, 0.5, 0.5};
-        if (!run(&B, bi, 3, 1,
+        if (run(&B, bi, 3, 1,
                  (struct umbra_buf[]){
                      {.ptr=src_px, .sz=3 * 4},
                      {.ptr=dst_r, .sz=3 * 2},
@@ -1084,9 +1044,8 @@ TEST(test_srcover) {
                      {.ptr=dst_b, .sz=3 * 2},
                      {.ptr=dst_a, .sz=3 * 2},
                  })) {
-            continue;
+            (float)dst_r[0] > 0.28f - tol && (float)dst_r[0] < 0.34f + tol here;
         }
-        (float)dst_r[0] > 0.28f - tol && (float)dst_r[0] < 0.34f + tol here;
     }
     cleanup(&B);
 }
@@ -1116,16 +1075,15 @@ TEST(test_narrow_16) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         int      src[] = {0x00010002, 0x00030004, 0x00050006};
         uint16_t dst[3] = {0};
-        if (!run(&B, bi, 3, 1,
+        if (run(&B, bi, 3, 1,
                  (struct umbra_buf[]){
                      {.ptr=src, .sz=3 * 4},
                      {.ptr=dst, .sz=3 * 2},
                  })) {
-            continue;
+            dst[0] == 0x0002 here;
+            dst[1] == 0x0004 here;
+            dst[2] == 0x0006 here;
         }
-        dst[0] == 0x0002 here;
-        dst[1] == 0x0004 here;
-        dst[2] == 0x0006 here;
     }
     cleanup(&B);
 }
@@ -1140,16 +1098,15 @@ TEST(test_mixed_ptr_sizes) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             uint32_t x[] = {10, 20, 30};
             uint32_t y[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=3 * 4},
                          {.ptr=y, .sz=3 * 4},
                      })) {
-                continue;
+                y[0] == 11 here;
+                y[1] == 21 here;
+                y[2] == 31 here;
             }
-            y[0] == 11 here;
-            y[1] == 21 here;
-            y[2] == 31 here;
         }
         cleanup(&B);
     }
@@ -1162,16 +1119,15 @@ TEST(test_mixed_ptr_sizes) {
         struct test_backends B = make(builder);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             __fp16 x[] = {1, 2, 3}, y[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=3 * 2},
                          {.ptr=y, .sz=3 * 2},
                      })) {
-                continue;
+                equiv((float)y[0], 2) here;
+                equiv((float)y[1], 3) here;
+                equiv((float)y[2], 4) here;
             }
-            equiv((float)y[0], 2) here;
-            equiv((float)y[1], 3) here;
-            equiv((float)y[2], 4) here;
         }
         cleanup(&B);
     }
@@ -1187,15 +1143,14 @@ TEST(test_n9) {
                 x[i] = (float)(i + 1);
                 y[i] = (float)(10 * (i + 1));
             }
-            if (!run(&B, bi, 9, 1,
+            if (run(&B, bi, 9, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=9 * 4},
                          {.ptr=y, .sz=9 * 4},
                          {.ptr=z, .sz=9 * 4},
                      })) {
-                continue;
+                for (int i = 0; i < 9; i++) { equiv(z[i], x[i] + y[i]) here; }
             }
-            for (int i = 0; i < 9; i++) { equiv(z[i], x[i] + y[i]) here; }
         }
         cleanup(&B);
     }
@@ -1208,15 +1163,14 @@ TEST(test_n9) {
                 x[i] = i + 1;
                 y[i] = i + 2;
             }
-            if (!run(&B, bi, 9, 1,
+            if (run(&B, bi, 9, 1,
                      (struct umbra_buf[]){
                          {.ptr=x, .sz=9 * 4},
                          {.ptr=y, .sz=9 * 4},
                          {.ptr=z, .sz=9 * 4},
                      })) {
-                continue;
+                for (int i = 0; i < 9; i++) { (z[i] == x[i] * y[i]) here; }
             }
-            for (int i = 0; i < 9; i++) { (z[i] == x[i] * y[i]) here; }
         }
         cleanup(&B);
     }
@@ -1246,14 +1200,13 @@ TEST(test_n9) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             uint32_t src[9], dst[9] = {0};
             for (int i = 0; i < 9; i++) { src[i] = 0xAABBCC00u + (uint32_t)i; }
-            if (!run(&B, bi, 9, 1,
+            if (run(&B, bi, 9, 1,
                      (struct umbra_buf[]){
                          {.ptr=src, .sz=9 * 4},
                          {.ptr=dst, .sz=9 * 4},
                      })) {
-                continue;
+                for (int i = 0; i < 9; i++) { (dst[i] == src[i]) here; }
             }
-            for (int i = 0; i < 9; i++) { (dst[i] == src[i]) here; }
         }
         cleanup(&B);
     }
@@ -1287,20 +1240,19 @@ TEST(test_preamble_pair_alias) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         float in[16], out[16] = {0};
         for (int i = 0; i < 16; i++) { in[i] = (float)(i + 1); }
-        if (!run(&B, bi, 16, 1,
+        if (run(&B, bi, 16, 1,
                  (struct umbra_buf[]){
                      {.ptr=in, .sz=16 * 4},
                      {.ptr=out, .sz=16 * 4},
                  })) {
-            continue;
+            float ref[16];
+            B.p[0]->queue(B.p[0], 0, 0, 16, 1,
+                                (struct umbra_buf[]){
+                                    {.ptr=in, .sz=16 * 4},
+                                    {.ptr=ref, .sz=16 * 4},
+                                });
+            for (int i = 0; i < 16; i++) { equiv(out[i], ref[i]) here; }
         }
-        float ref[16];
-        B.p[0]->queue(B.p[0], 0, 0, 16, 1,
-                            (struct umbra_buf[]){
-                                {.ptr=in, .sz=16 * 4},
-                                {.ptr=ref, .sz=16 * 4},
-                            });
-        for (int i = 0; i < 16; i++) { equiv(out[i], ref[i]) here; }
     }
     cleanup(&B);
 }
@@ -1316,18 +1268,17 @@ TEST(test_gather_clamp) {
             int32_t indices[4] = {-5, 0, 2, 100};
             int32_t src[3] = {10, 20, 30};
             int32_t dst[4] = {0};
-            if (!run(&B, bi, 4, 1,
+            if (run(&B, bi, 4, 1,
                      (struct umbra_buf[]){
                          {.ptr=indices, .sz=sizeof indices},
                          {.ptr=src, .sz=sizeof src},
                          {.ptr=dst, .sz=sizeof dst},
                      })) {
-                continue;
+                dst[0] == 0 here;
+                dst[1] == 10 here;
+                dst[2] == 30 here;
+                dst[3] == 0 here;
             }
-            dst[0] == 0 here;
-            dst[1] == 10 here;
-            dst[2] == 30 here;
-            dst[3] == 0 here;
         }
         cleanup(&B);
     }
@@ -1342,18 +1293,17 @@ TEST(test_gather_clamp) {
             int32_t indices[4] = {-1, 1, 3, 999};
             int16_t src[3] = {100, 200, 300};
             int32_t dst[4] = {0};
-            if (!run(&B, bi, 4, 1,
+            if (run(&B, bi, 4, 1,
                      (struct umbra_buf[]){
                          {.ptr=indices, .sz=sizeof indices},
                          {.ptr=src, .sz=sizeof src},
                          {.ptr=dst, .sz=sizeof dst},
                      })) {
-                continue;
+                dst[0] == 0 here;
+                dst[1] == 200 here;
+                dst[2] == 0 here;
+                dst[3] == 0 here;
             }
-            dst[0] == 0 here;
-            dst[1] == 200 here;
-            dst[2] == 0 here;
-            dst[3] == 0 here;
         }
         cleanup(&B);
     }
@@ -1374,22 +1324,21 @@ TEST(test_sample_32) {
         int32_t indices[4] = {0, 1, 2, 3};
         float   lut[4]     = {10.0f, 20.0f, 30.0f, 40.0f};
         float   dst[4]     = {0};
-        if (!run(&B, bi, 4, 1,
+        if (run(&B, bi, 4, 1,
                  (struct umbra_buf[]){
                      {.ptr=indices, .sz=sizeof indices},
                      {.ptr=lut,     .sz=sizeof lut, .read_only=1},
                      {.ptr=dst,     .sz=sizeof dst},
                  })) {
-            continue;
+            // ix=0.0 → lut[0] = 10.0
+            equiv(dst[0], 10.0f) here;
+            // ix=0.5 → lerp(lut[0], lut[1], 0.5) = 15.0
+            equiv(dst[1], 15.0f) here;
+            // ix=1.0 → lut[1] = 20.0
+            equiv(dst[2], 20.0f) here;
+            // ix=1.5 → lerp(lut[1], lut[2], 0.5) = 25.0
+            equiv(dst[3], 25.0f) here;
         }
-        // ix=0.0 → lut[0] = 10.0
-        equiv(dst[0], 10.0f) here;
-        // ix=0.5 → lerp(lut[0], lut[1], 0.5) = 15.0
-        equiv(dst[1], 15.0f) here;
-        // ix=1.0 → lut[1] = 20.0
-        equiv(dst[2], 20.0f) here;
-        // ix=1.5 → lerp(lut[1], lut[2], 0.5) = 25.0
-        equiv(dst[3], 25.0f) here;
     }
     cleanup(&B);
 }
@@ -1405,12 +1354,13 @@ TEST(test_gather_clamp_zero_sz) {
         int32_t neg_idx[] = {-10};
         int32_t src[3] = {100, 200, 300};
         int32_t dst[1] = {0};
-        if (!run(&B, bi, 1, 1, (struct umbra_buf[]){
+        if (run(&B, bi, 1, 1, (struct umbra_buf[]){
             {.ptr=neg_idx, .sz=4},
             {.ptr=src, .sz=sizeof src},
             {.ptr=dst, .sz=4},
-        })) { continue; }
-        dst[0] == 0 here;
+        })) {
+            dst[0] == 0 here;
+        }
     }
 
     // gather_uniform with over-range index → OOB returns 0.
@@ -1418,12 +1368,13 @@ TEST(test_gather_clamp_zero_sz) {
         int32_t big_idx[] = {999};
         int32_t src[3] = {100, 200, 300};
         int32_t dst[1] = {0};
-        if (!run(&B, bi, 1, 1, (struct umbra_buf[]){
+        if (run(&B, bi, 1, 1, (struct umbra_buf[]){
             {.ptr=big_idx, .sz=4},
             {.ptr=src, .sz=sizeof src},
             {.ptr=dst, .sz=4},
-        })) { continue; }
-        dst[0] == 0 here;
+        })) {
+            dst[0] == 0 here;
+        }
     }
     cleanup(&B);
 }
@@ -1444,15 +1395,14 @@ TEST(test_offset_load_store) {
             };
             int32_t uni[1] = {4};
             int32_t dst[8] = {0};
-            if (!run(&B, bi, 8, 1,
+            if (run(&B, bi, 8, 1,
                      (struct umbra_buf[]){
                          {.ptr=src, .sz=sizeof src},
                          {.ptr=uni, .sz=sizeof uni, .read_only=1},
                          {.ptr=dst, .sz=sizeof dst},
                      })) {
-                continue;
+                for (int k = 0; k < 8; k++) { (dst[k] == 14 + k) here; }
             }
-            for (int k = 0; k < 8; k++) { (dst[k] == 14 + k) here; }
         }
         cleanup(&B);
     }
@@ -1471,15 +1421,14 @@ TEST(test_offset_load_store) {
             };
             int32_t uni[1] = {3};
             int32_t dst[8] = {0};
-            if (!run(&B, bi, 8, 1,
+            if (run(&B, bi, 8, 1,
                      (struct umbra_buf[]){
                          {.ptr=src, .sz=sizeof src},
                          {.ptr=uni, .sz=sizeof uni, .read_only=1},
                          {.ptr=dst, .sz=sizeof dst},
                      })) {
-                continue;
+                for (int k = 0; k < 8; k++) { (dst[k] == 103 + k) here; }
             }
-            for (int k = 0; k < 8; k++) { (dst[k] == 103 + k) here; }
         }
         cleanup(&B);
     }
@@ -1500,18 +1449,17 @@ TEST(test_offset_load_store) {
             }
             int32_t  uni[1] = {5};
             uint16_t dst[8] = {0};
-            if (!run(&B, bi, 8, 1,
+            if (run(&B, bi, 8, 1,
                      (struct umbra_buf[]){
                          {.ptr=src, .sz=sizeof src},
                          {.ptr=uni, .sz=sizeof uni, .read_only=1},
                          {.ptr=dst, .sz=sizeof dst},
                      })) {
-                continue;
-            }
-            for (int k = 0; k < 8; k++) {
-                __fp16 h;
-                __builtin_memcpy(&h, &dst[k], 2);
-                equiv((float)h, (float)(15 + k)) here;
+                for (int k = 0; k < 8; k++) {
+                    __fp16 h;
+                    __builtin_memcpy(&h, &dst[k], 2);
+                    equiv((float)h, (float)(15 + k)) here;
+                }
             }
         }
         cleanup(&B);
@@ -1528,17 +1476,16 @@ TEST(test_shift_imm) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             uint32_t src[] = {1, 2, 3, 0xff};
             uint32_t dst[4] = {0};
-            if (!run(&B, bi, 4, 1,
+            if (run(&B, bi, 4, 1,
                      (struct umbra_buf[]){
                          {.ptr=src, .sz=4 * 4},
                          {.ptr=dst, .sz=4 * 4},
                      })) {
-                continue;
+                dst[0] == 0x100u here;
+                dst[1] == 0x200u here;
+                dst[2] == 0x300u here;
+                dst[3] == 0xff00u here;
             }
-            dst[0] == 0x100u here;
-            dst[1] == 0x200u here;
-            dst[2] == 0x300u here;
-            dst[3] == 0xff00u here;
         }
         cleanup(&B);
     }
@@ -1551,16 +1498,15 @@ TEST(test_shift_imm) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             uint32_t src[] = {0x100, 0x200, 0xff00};
             uint32_t dst[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=src, .sz=3 * 4},
                          {.ptr=dst, .sz=3 * 4},
                      })) {
-                continue;
+                dst[0] == 1 here;
+                dst[1] == 2 here;
+                dst[2] == 0xff here;
             }
-            dst[0] == 1 here;
-            dst[1] == 2 here;
-            dst[2] == 0xff here;
         }
         cleanup(&B);
     }
@@ -1573,15 +1519,14 @@ TEST(test_shift_imm) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             uint32_t src[] = {0x80, 0xfffffff0u};
             uint32_t dst[2] = {0};
-            if (!run(&B, bi, 2, 1,
+            if (run(&B, bi, 2, 1,
                      (struct umbra_buf[]){
                          {.ptr=src, .sz=2 * 4},
                          {.ptr=dst, .sz=2 * 4},
                      })) {
-                continue;
+                dst[0] == 8 here;
+                dst[1] == 0xffffffffu here;
             }
-            dst[0] == 8 here;
-            dst[1] == 0xffffffffu here;
         }
         cleanup(&B);
     }
@@ -1621,18 +1566,17 @@ TEST(test_gather_deref_large) {
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
-        if (!run(&B, bi, 4, 1,
+        if (run(&B, bi, 4, 1,
                  (struct umbra_buf[]){
                      {.ptr=indices, .sz=sizeof indices},
                      {.ptr=uni, .sz=sizeof uni_, .read_only=1},
                      {.ptr=dst, .sz=sizeof dst},
                  })) {
-            continue;
+            dst[0] == 10 here;
+            dst[1] == 20 here;
+            dst[2] == 30 here;
+            dst[3] == 42 here;
         }
-        dst[0] == 10 here;
-        dst[1] == 20 here;
-        dst[2] == 30 here;
-        dst[3] == 42 here;
     }
 
     free(data);
@@ -1648,16 +1592,15 @@ TEST(test_imm_fused) {
         struct test_backends B = make(b);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float src[] = {10, 20, 30}, dst[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=src, .sz=3 * 4},
                          {.ptr=dst, .sz=3 * 4},
                      })) {
-                continue;
+                equiv(dst[0], 5) here;
+                equiv(dst[1], 10) here;
+                equiv(dst[2], 15) here;
             }
-            equiv(dst[0], 5) here;
-            equiv(dst[1], 10) here;
-            equiv(dst[2], 15) here;
         }
         cleanup(&B);
     }
@@ -1669,16 +1612,15 @@ TEST(test_imm_fused) {
         struct test_backends B = make(b);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int src[] = {10, 20, 30}, dst[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=src, .sz=3 * 4},
                          {.ptr=dst, .sz=3 * 4},
                      })) {
-                continue;
+                dst[0] == 5 here;
+                dst[1] == 15 here;
+                dst[2] == 25 here;
             }
-            dst[0] == 5 here;
-            dst[1] == 15 here;
-            dst[2] == 25 here;
         }
         cleanup(&B);
     }
@@ -1690,16 +1632,15 @@ TEST(test_imm_fused) {
         struct test_backends B = make(b);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int src[] = {0x0f, 0x00, 0xff}, dst[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=src, .sz=3 * 4},
                          {.ptr=dst, .sz=3 * 4},
                      })) {
-                continue;
+                dst[0] == 0xff here;
+                dst[1] == 0xf0 here;
+                dst[2] == 0xff here;
             }
-            dst[0] == 0xff here;
-            dst[1] == 0xf0 here;
-            dst[2] == 0xff here;
         }
         cleanup(&B);
     }
@@ -1712,16 +1653,15 @@ TEST(test_imm_fused) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float src[] = {1, 2, 3};
             int   dst[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=src, .sz=3 * 4},
                          {.ptr=dst, .sz=3 * 4},
                      })) {
-                continue;
+                dst[0] == 0 here;
+                dst[1] == -1 here;
+                dst[2] == 0 here;
             }
-            dst[0] == 0 here;
-            dst[1] == -1 here;
-            dst[2] == 0 here;
         }
         cleanup(&B);
     }
@@ -1734,16 +1674,15 @@ TEST(test_imm_fused) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float src[] = {1, 2, 3};
             int   dst[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=src, .sz=3 * 4},
                          {.ptr=dst, .sz=3 * 4},
                      })) {
-                continue;
+                dst[0] == -1 here;
+                dst[1] == -1 here;
+                dst[2] == 0 here;
             }
-            dst[0] == -1 here;
-            dst[1] == -1 here;
-            dst[2] == 0 here;
         }
         cleanup(&B);
     }
@@ -1755,16 +1694,15 @@ TEST(test_imm_fused) {
         struct test_backends B = make(b);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int src[] = {3, 5, 7}, dst[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=src, .sz=3 * 4},
                          {.ptr=dst, .sz=3 * 4},
                      })) {
-                continue;
+                dst[0] == -1 here;
+                dst[1] == 0 here;
+                dst[2] == 0 here;
             }
-            dst[0] == -1 here;
-            dst[1] == 0 here;
-            dst[2] == 0 here;
         }
         cleanup(&B);
     }
@@ -1776,16 +1714,15 @@ TEST(test_imm_fused) {
         struct test_backends B = make(b);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int src[] = {3, 5, 7}, dst[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=src, .sz=3 * 4},
                          {.ptr=dst, .sz=3 * 4},
                      })) {
-                continue;
+                dst[0] == -1 here;
+                dst[1] == -1 here;
+                dst[2] == 0 here;
             }
-            dst[0] == -1 here;
-            dst[1] == -1 here;
-            dst[2] == 0 here;
         }
         cleanup(&B);
     }
@@ -1800,16 +1737,15 @@ TEST(test_cmp_zero) {
         struct test_backends B = make(b);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int src[] = {-1, 0, 1}, dst[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=src, .sz=3 * 4},
                          {.ptr=dst, .sz=3 * 4},
                      })) {
-                continue;
+                dst[0] == -1 here;
+                dst[1] == 0 here;
+                dst[2] == 0 here;
             }
-            dst[0] == -1 here;
-            dst[1] == 0 here;
-            dst[2] == 0 here;
         }
         cleanup(&B);
     }
@@ -1822,16 +1758,15 @@ TEST(test_cmp_zero) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float src[] = {-1, 0, 1};
             int   dst[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=src, .sz=3 * 4},
                          {.ptr=dst, .sz=3 * 4},
                      })) {
-                continue;
+                dst[0] == -1 here;
+                dst[1] == -1 here;
+                dst[2] == 0 here;
             }
-            dst[0] == -1 here;
-            dst[1] == -1 here;
-            dst[2] == 0 here;
         }
         cleanup(&B);
     }
@@ -1844,16 +1779,15 @@ TEST(test_cmp_zero) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float src[] = {-1, 0, 1};
             int   dst[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=src, .sz=3 * 4},
                          {.ptr=dst, .sz=3 * 4},
                      })) {
-                continue;
+                dst[0] == 0 here;
+                dst[1] == -1 here;
+                dst[2] == 0 here;
             }
-            dst[0] == 0 here;
-            dst[1] == -1 here;
-            dst[2] == 0 here;
         }
         cleanup(&B);
     }
@@ -1865,16 +1799,15 @@ TEST(test_cmp_zero) {
         struct test_backends B = make(b);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int src[] = {-1, 0, 1}, dst[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=src, .sz=3 * 4},
                          {.ptr=dst, .sz=3 * 4},
                      })) {
-                continue;
+                dst[0] == -1 here;
+                dst[1] == -1 here;
+                dst[2] == 0 here;
             }
-            dst[0] == -1 here;
-            dst[1] == -1 here;
-            dst[2] == 0 here;
         }
         cleanup(&B);
     }
@@ -1892,15 +1825,14 @@ TEST(test_imm_broadcast) {
         struct test_backends B = make(b);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int dst[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=dst, .sz=3 * 4},
                      })) {
-                continue;
+                dst[0] == patterns[pi] here;
+                dst[1] == patterns[pi] here;
+                dst[2] == patterns[pi] here;
             }
-            dst[0] == patterns[pi] here;
-            dst[1] == patterns[pi] here;
-            dst[2] == patterns[pi] here;
         }
         cleanup(&B);
     }
@@ -1925,17 +1857,16 @@ TEST(test_pool_broadcast_allones) {
         struct test_backends B = make(b);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int dst[5] = {0};
-            if (!run(&B, bi, 5, 1,
+            if (run(&B, bi, 5, 1,
                      (struct umbra_buf[]){
                          {.ptr=dst, .sz=5 * 4},
                      })) {
-                continue;
+                (dst[0] == patterns[pi]) here;
+                (dst[1] == patterns[pi]) here;
+                (dst[2] == patterns[pi]) here;
+                (dst[3] == patterns[pi]) here;
+                (dst[4] == patterns[pi]) here;
             }
-            (dst[0] == patterns[pi]) here;
-            (dst[1] == patterns[pi]) here;
-            (dst[2] == patterns[pi]) here;
-            (dst[3] == patterns[pi]) here;
-            (dst[4] == patterns[pi]) here;
         }
         cleanup(&B);
     }
@@ -1955,17 +1886,16 @@ TEST(test_codegen_regalloc) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float a[] = {2, 3}, c[] = {5, 6}, d[] = {100, 200};
             float dst[4] = {0};
-            if (!run(&B, bi, 2, 1,
+            if (run(&B, bi, 2, 1,
                      (struct umbra_buf[]){
                          {.ptr=a, .sz=2 * 4},
                          {.ptr=c, .sz=2 * 4},
                          {.ptr=d, .sz=2 * 4},
                          {.ptr=dst, .sz=2 * 4},
                      })) {
-                continue;
+                equiv(dst[0], 90 + 100 + 5) here;
+                equiv(dst[1], 182 + 200 + 6) here;
             }
-            equiv(dst[0], 90 + 100 + 5) here;
-            equiv(dst[1], 182 + 200 + 6) here;
         }
         cleanup(&B);
     }
@@ -1983,17 +1913,16 @@ TEST(test_codegen_regalloc) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             float a[] = {2, 3}, c[] = {5, 6}, d[] = {100, 200};
             float dst[4] = {0};
-            if (!run(&B, bi, 2, 1,
+            if (run(&B, bi, 2, 1,
                      (struct umbra_buf[]){
                          {.ptr=a, .sz=2 * 4},
                          {.ptr=c, .sz=2 * 4},
                          {.ptr=d, .sz=2 * 4},
                          {.ptr=dst, .sz=2 * 4},
                      })) {
-                continue;
+                equiv(dst[0], 90 + 2 + 5 + 100) here;
+                equiv(dst[1], 182 + 3 + 6 + 200) here;
             }
-            equiv(dst[0], 90 + 2 + 5 + 100) here;
-            equiv(dst[1], 182 + 3 + 6 + 200) here;
         }
         cleanup(&B);
     }
@@ -2010,17 +1939,16 @@ TEST(test_codegen_regalloc) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int m[] = {-1, 0}, t[] = {10, 20}, f[] = {30, 40};
             int dst[2] = {0};
-            if (!run(&B, bi, 2, 1,
+            if (run(&B, bi, 2, 1,
                      (struct umbra_buf[]){
                          {.ptr=m, .sz=2 * 4},
                          {.ptr=t, .sz=2 * 4},
                          {.ptr=f, .sz=2 * 4},
                          {.ptr=dst, .sz=2 * 4},
                      })) {
-                continue;
+                dst[0] == 10 + (-1) + 10 here;
+                dst[1] == 40 + 0 + 20 here;
             }
-            dst[0] == 10 + (-1) + 10 here;
-            dst[1] == 40 + 0 + 20 here;
         }
         cleanup(&B);
     }
@@ -2036,18 +1964,17 @@ TEST(test_fms) {
     struct test_backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         float a[] = {2, 3, 4}, c[] = {5, 6, 7}, d[] = {100, 200, 300}, dst[3] = {0};
-        if (!run(&B, bi, 3, 1,
+        if (run(&B, bi, 3, 1,
                  (struct umbra_buf[]){
                      {.ptr=a, .sz=3 * 4},
                      {.ptr=c, .sz=3 * 4},
                      {.ptr=d, .sz=3 * 4},
                      {.ptr=dst, .sz=3 * 4},
                  })) {
-            continue;
+            equiv(dst[0], 90) here;
+            equiv(dst[1], 182) here;
+            equiv(dst[2], 272) here;
         }
-        equiv(dst[0], 90) here;
-        equiv(dst[1], 182) here;
-        equiv(dst[2], 272) here;
     }
     cleanup(&B);
 }
@@ -2065,16 +1992,15 @@ TEST(test_movi_patterns) {
         struct test_backends B = make(b);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int src[] = {0, 0, 0}, dst[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=src, .sz=3 * 4},
                          {.ptr=dst, .sz=3 * 4},
                      })) {
-                continue;
+                dst[0] == patterns[pi] here;
+                dst[1] == patterns[pi] here;
+                dst[2] == patterns[pi] here;
             }
-            dst[0] == patterns[pi] here;
-            dst[1] == patterns[pi] here;
-            dst[2] == patterns[pi] here;
         }
         cleanup(&B);
     }
@@ -2092,17 +2018,16 @@ TEST(test_uni_16) {
             int      idx_val[] = {1};
             uint16_t src[] = {100, 200, 300, 400};
             int      dst[3] = {0};
-            if (!run(&B, bi, 3, 1,
+            if (run(&B, bi, 3, 1,
                      (struct umbra_buf[]){
                          {.ptr=idx_val, .sz=4},
                          {.ptr=src, .sz=8},
                          {.ptr=dst, .sz=3 * 4},
                      })) {
-                continue;
+                dst[0] == 200 here;
+                dst[1] == 200 here;
+                dst[2] == 200 here;
             }
-            dst[0] == 200 here;
-            dst[1] == 200 here;
-            dst[2] == 200 here;
         }
         cleanup(&B);
     }
@@ -2138,16 +2063,15 @@ TEST(test_xy) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(xbuf, 0, sizeof xbuf);
         __builtin_memset(ybuf, 0, sizeof ybuf);
-        if (!run(&B, bi, W, H,
+        if (run(&B, bi, W, H,
                  (struct umbra_buf[]){
                      {.ptr=xbuf, .sz=sizeof xbuf, .row_bytes=W * 4},
                      {.ptr=ybuf, .sz=sizeof ybuf, .row_bytes=W * 4},
                  })) {
-            continue;
-        }
-        for (int j = 0; j < N; j++) {
-            xbuf[j] == j % W here;
-            ybuf[j] == j / W here;
+            for (int j = 0; j < N; j++) {
+                xbuf[j] == j % W here;
+                ybuf[j] == j / W here;
+            }
         }
     }
     cleanup(&B);
@@ -2164,20 +2088,22 @@ TEST(test_load_next_32) {
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
-        if (!run(&B, bi, 16, 1, (struct umbra_buf[]){
+        if (run(&B, bi, 16, 1, (struct umbra_buf[]){
             {.ptr=src, .sz=sizeof src},
             {.ptr=dst, .sz=sizeof dst},
-        })) { continue; }
-        for (int i = 0; i < 16; i++) { (dst[i] == src[i]) here; }
+        })) {
+            for (int i = 0; i < 16; i++) { (dst[i] == src[i]) here; }
+        }
     }
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
-        if (!run(&B, bi, 4, 4, (struct umbra_buf[]){
+        if (run(&B, bi, 4, 4, (struct umbra_buf[]){
             {.ptr=src, .sz=sizeof src, .row_bytes=4*4},
             {.ptr=dst, .sz=sizeof dst, .row_bytes=4*4},
-        })) { continue; }
-        for (int i = 0; i < 16; i++) { (dst[i] == src[i]) here; }
+        })) {
+            for (int i = 0; i < 16; i++) { (dst[i] == src[i]) here; }
+        }
     }
     cleanup(&B);
 }
@@ -2193,20 +2119,22 @@ TEST(test_load_next_16) {
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
-        if (!run(&B, bi, 16, 1, (struct umbra_buf[]){
+        if (run(&B, bi, 16, 1, (struct umbra_buf[]){
             {.ptr=src, .sz=sizeof src},
             {.ptr=dst, .sz=sizeof dst},
-        })) { continue; }
-        for (int i = 0; i < 16; i++) { (dst[i] == src[i]) here; }
+        })) {
+            for (int i = 0; i < 16; i++) { (dst[i] == src[i]) here; }
+        }
     }
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
-        if (!run(&B, bi, 4, 4, (struct umbra_buf[]){
+        if (run(&B, bi, 4, 4, (struct umbra_buf[]){
             {.ptr=src, .sz=sizeof src, .row_bytes=4*2},
             {.ptr=dst, .sz=sizeof dst, .row_bytes=4*2},
-        })) { continue; }
-        for (int i = 0; i < 16; i++) { (dst[i] == src[i]) here; }
+        })) {
+            for (int i = 0; i < 16; i++) { (dst[i] == src[i]) here; }
+        }
     }
     cleanup(&B);
 }
@@ -2223,11 +2151,12 @@ TEST(test_load_store_8x4) {
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
-        if (!run(&B, bi, 8, 1, (struct umbra_buf[]){
+        if (run(&B, bi, 8, 1, (struct umbra_buf[]){
             {.ptr=src, .sz=sizeof src},
             {.ptr=dst, .sz=sizeof dst},
-        })) { continue; }
-        for (int i = 0; i < 8; i++) { (dst[i] == src[i]) here; }
+        })) {
+            for (int i = 0; i < 8; i++) { (dst[i] == src[i]) here; }
+        }
     }
     cleanup(&B);
 }
@@ -2250,11 +2179,12 @@ TEST(test_load_store_16x4_planar) {
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
-        if (!run(&B, bi, W, H, (struct umbra_buf[]){
+        if (run(&B, bi, W, H, (struct umbra_buf[]){
             {.ptr=src, .sz=sizeof src, .row_bytes=W*2},
             {.ptr=dst, .sz=sizeof dst, .row_bytes=W*2},
-        })) { continue; }
-        (0 == __builtin_memcmp(dst, src, sizeof src)) here;
+        })) {
+            (0 == __builtin_memcmp(dst, src, sizeof src)) here;
+        }
     }
     cleanup(&B);
 }
@@ -2277,11 +2207,12 @@ TEST(test_load_store_16x4) {
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
-        if (!run(&B, bi, W, 1, (struct umbra_buf[]){
+        if (run(&B, bi, W, 1, (struct umbra_buf[]){
             {.ptr=src, .sz=sizeof src},
             {.ptr=dst, .sz=sizeof dst},
-        })) { continue; }
-        (0 == __builtin_memcmp(dst, src, sizeof src)) here;
+        })) {
+            (0 == __builtin_memcmp(dst, src, sizeof src)) here;
+        }
     }
     cleanup(&B);
 }
@@ -2317,12 +2248,13 @@ TEST(test_load_stride_neq_w) {
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
-        if (!run(&B, bi, 4, 2, (struct umbra_buf[]){
+        if (run(&B, bi, 4, 2, (struct umbra_buf[]){
             {.ptr=uni, .sz=(size_t)(ri * 4 + 4), .read_only=1},
             {.ptr=src, .sz=sizeof src},
             {.ptr=dst, .sz=sizeof dst, .row_bytes=4*4},
-        })) { continue; }
-        for (int i = 0; i < 8; i++) { (dst[i] == expected[i]) here; }
+        })) {
+            for (int i = 0; i < 8; i++) { (dst[i] == expected[i]) here; }
+        }
     }
     cleanup(&B);
 }
@@ -2346,11 +2278,12 @@ TEST(test_jit_xs_init) {
 #if defined(__aarch64__)
         __asm__ volatile("mov x15, #0xdead" ::: "x15");
 #endif
-        if (!run(&B, bi, 4, 1, (struct umbra_buf[]){
+        if (run(&B, bi, 4, 1, (struct umbra_buf[]){
             {.ptr=src, .sz=sizeof src},
             {.ptr=dst, .sz=sizeof dst},
-        })) { continue; }
-        for (int i = 0; i < 4; i++) { (dst[i] == src[i] + sum_pre) here; }
+        })) {
+            for (int i = 0; i < 4; i++) { (dst[i] == src[i] + sum_pre) here; }
+        }
     }
     cleanup(&B);
 }
@@ -2417,12 +2350,11 @@ TEST(test_preamble_register_boundary) {
     int32_t dst[32];
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
-        if (!run(&B, bi, 32, 1,
+        if (run(&B, bi, 32, 1,
                  (struct umbra_buf[]){{.ptr=&uni, .sz=4, .read_only=1}, {.ptr=dst, .sz=sizeof dst}})) {
-            continue;
-        }
-        for (int col = 0; col < 32; col++) {
-            dst[col] == col + 1000 here;
+            for (int col = 0; col < 32; col++) {
+                dst[col] == col + 1000 here;
+            }
         }
     }
     cleanup(&B);
@@ -2441,13 +2373,14 @@ TEST(test_shr_ops) {
         int32_t va[] = {0x12345678, (int32_t)0xFF000000u, 0x7FFFFFFF, 0};
         int32_t vs[] = {4, 8, 16, 0};
         int32_t dst[4] = {0};
-        if (!run(&B, bi, 4, 1, (struct umbra_buf[]){
+        if (run(&B, bi, 4, 1, (struct umbra_buf[]){
             {.ptr=va, .sz=sizeof va}, {.ptr=vs, .sz=sizeof vs},
             {.ptr=dst, .sz=sizeof dst},
-        })) { continue; }
-        for (int i = 0; i < 4; i++) {
-            int32_t expect = (int32_t)((uint32_t)va[i] >> vs[i]) >> vs[i];
-            (dst[i] == expect) here;
+        })) {
+            for (int i = 0; i < 4; i++) {
+                int32_t expect = (int32_t)((uint32_t)va[i] >> vs[i]) >> vs[i];
+                (dst[i] == expect) here;
+            }
         }
     }
     cleanup(&B);
@@ -2465,13 +2398,14 @@ TEST(test_neg_round_i32) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         int32_t src[] = {3, -7, 0, 100};
         int32_t dst[4] = {0};
-        if (!run(&B, bi, 4, 1, (struct umbra_buf[]){
+        if (run(&B, bi, 4, 1, (struct umbra_buf[]){
             {.ptr=src, .sz=sizeof src}, {.ptr=dst, .sz=sizeof dst},
-        })) { continue; }
-        (dst[0] == -3) here;
-        (dst[1] ==  7) here;
-        (dst[2] ==  0) here;
-        (dst[3] == -100) here;
+        })) {
+            (dst[0] == -3) here;
+            (dst[1] ==  7) here;
+            (dst[2] ==  0) here;
+            (dst[3] == -100) here;
+        }
     }
     cleanup(&B);
 }
@@ -2492,13 +2426,14 @@ TEST(test_cmp_unsigned_signed) {
         int32_t sa[] = {-1, 0, 5, 10};
         int32_t sc[] = { 0, 0, 5,  5};
         int32_t d1[4]={0}, d2[4]={0}, d3[4]={0};
-        if (!run(&B, bi, 4, 1, (struct umbra_buf[]){
+        if (run(&B, bi, 4, 1, (struct umbra_buf[]){
             {.ptr=sa, .sz=sizeof sa}, {.ptr=sc, .sz=sizeof sc},
             {.ptr=d1, .sz=sizeof d1}, {.ptr=d2, .sz=sizeof d2}, {.ptr=d3, .sz=sizeof d3},
-        })) { continue; }
-        (d1[0] == -1) here; (d1[1] == -1) here; (d1[2] == -1) here; (d1[3] == 0) here;
-        (d2[0] == 0) here; (d2[1] == 0) here; (d2[2] == 0) here; (d2[3] == 0) here;
-        (d3[0] == 0) here; (d3[1] == -1) here; (d3[2] == -1) here; (d3[3] == 0) here;
+        })) {
+            (d1[0] == -1) here; (d1[1] == -1) here; (d1[2] == -1) here; (d1[3] == 0) here;
+            (d2[0] == 0) here; (d2[1] == 0) here; (d2[2] == 0) here; (d2[3] == 0) here;
+            (d3[0] == 0) here; (d3[1] == -1) here; (d3[2] == -1) here; (d3[3] == 0) here;
+        }
     }
     cleanup(&B);
 
@@ -2520,13 +2455,14 @@ TEST(test_cmp_unsigned_signed) {
         int32_t sa2[] = {-1, 0, 5, 10};
         int32_t sc2[] = { 0, 0, 5,  5};
         int32_t d12[4]={0}, d22[4]={0}, d32[4]={0};
-        if (!run(&B, bi, 4, 1, (struct umbra_buf[]){
+        if (run(&B, bi, 4, 1, (struct umbra_buf[]){
             {.ptr=sa2, .sz=sizeof sa2}, {.ptr=sc2, .sz=sizeof sc2},
             {.ptr=d12, .sz=sizeof d12}, {.ptr=d22, .sz=sizeof d22}, {.ptr=d32, .sz=sizeof d32},
-        })) { continue; }
-        (d12[0] == 1) here; (d12[1] == 1) here; (d12[2] == 1) here; (d12[3] == 0) here;
-        (d22[0] == 0) here; (d22[1] == 0) here; (d22[2] == 0) here; (d22[3] == 0) here;
-        (d32[0] == 0) here; (d32[1] == 1) here; (d32[2] == 1) here; (d32[3] == 0) here;
+        })) {
+            (d12[0] == 1) here; (d12[1] == 1) here; (d12[2] == 1) here; (d12[3] == 0) here;
+            (d22[0] == 0) here; (d22[1] == 0) here; (d22[2] == 0) here; (d22[3] == 0) here;
+            (d32[0] == 0) here; (d32[1] == 1) here; (d32[2] == 1) here; (d32[3] == 0) here;
+        }
     }
     cleanup(&B);
 }
@@ -2540,10 +2476,11 @@ TEST(test_max_f32_imm) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         int32_t src[] = {-5, 0, 3, 100};
         int32_t dst[4] = {0};
-        if (!run(&B, bi, 4, 1, (struct umbra_buf[]){
+        if (run(&B, bi, 4, 1, (struct umbra_buf[]){
             {.ptr=src, .sz=sizeof src}, {.ptr=dst, .sz=sizeof dst},
-        })) { continue; }
-        (dst[0] == 5) here; (dst[1] == 5) here; (dst[2] == 5) here; (dst[3] == 100) here;
+        })) {
+            (dst[0] == 5) here; (dst[1] == 5) here; (dst[2] == 5) here; (dst[3] == 100) here;
+        }
     }
     cleanup(&B);
 }
@@ -2562,13 +2499,14 @@ TEST(test_imm_cmp_i32) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         int32_t src[] = {3, 5, 7, -1};
         int32_t d1[4]={0}, d2[4]={0}, d3[4]={0};
-        if (!run(&B, bi, 4, 1, (struct umbra_buf[]){
+        if (run(&B, bi, 4, 1, (struct umbra_buf[]){
             {.ptr=src, .sz=sizeof src},
             {.ptr=d1, .sz=sizeof d1}, {.ptr=d2, .sz=sizeof d2}, {.ptr=d3, .sz=sizeof d3},
-        })) { continue; }
-        (d1[0]==0) here; (d1[1]==-1) here; (d1[2]==0) here; (d1[3]==0) here;
-        (d2[0]==-1) here; (d2[1]==0) here; (d2[2]==0) here; (d2[3]==-1) here;
-        (d3[0]==-1) here; (d3[1]==-1) here; (d3[2]==0) here; (d3[3]==-1) here;
+        })) {
+            (d1[0]==0) here; (d1[1]==-1) here; (d1[2]==0) here; (d1[3]==0) here;
+            (d2[0]==-1) here; (d2[1]==0) here; (d2[2]==0) here; (d2[3]==-1) here;
+            (d3[0]==-1) here; (d3[1]==-1) here; (d3[2]==0) here; (d3[3]==-1) here;
+        }
     }
     cleanup(&B);
 }
@@ -2585,12 +2523,13 @@ TEST(test_uniform_register) {
         int32_t uni = 1000;
         int32_t src[] = {1, 2, 3, 4};
         int32_t dst[4] = {0};
-        if (!run(&B, bi, 4, 1, (struct umbra_buf[]){
+        if (run(&B, bi, 4, 1, (struct umbra_buf[]){
             {.ptr=&uni, .sz=4, .read_only=1},
             {.ptr=src, .sz=sizeof src},
             {.ptr=dst, .sz=sizeof dst},
-        })) { continue; }
-        for (int i = 0; i < 4; i++) { (dst[i] == 1000 + src[i]) here; }
+        })) {
+            for (int i = 0; i < 4; i++) { (dst[i] == 1000 + src[i]) here; }
+        }
     }
     cleanup(&B);
 }
@@ -2612,12 +2551,13 @@ TEST(test_minmax_register_variants) {
         int32_t sa[] = {1, 10, 5, -3};
         int32_t sb[] = {5, 2, 5, 7};
         int32_t dst[4] = {0};
-        if (!run(&B, bi, 4, 1, (struct umbra_buf[]){
+        if (run(&B, bi, 4, 1, (struct umbra_buf[]){
             {.ptr=sa, .sz=sizeof sa}, {.ptr=sb, .sz=sizeof sb},
             {.ptr=dst, .sz=sizeof dst},
-        })) { continue; }
-        // min then max(x,x) = min
-        (dst[0] == 1) here; (dst[1] == 2) here; (dst[2] == 5) here; (dst[3] == -3) here;
+        })) {
+            // min then max(x,x) = min
+            (dst[0] == 1) here; (dst[1] == 2) here; (dst[2] == 5) here; (dst[3] == -3) here;
+        }
     }
     cleanup(&B);
 }
@@ -2638,12 +2578,13 @@ TEST(test_cmp_register_variants) {
         int32_t sx[] = {1, 10, 5, 0};
         int32_t sy[] = {5, 5, 5, 5};
         int32_t dst[4] = {0};
-        if (!run(&B, bi, 4, 1, (struct umbra_buf[]){
+        if (run(&B, bi, 4, 1, (struct umbra_buf[]){
             {.ptr=sx, .sz=sizeof sx}, {.ptr=sy, .sz=sizeof sy},
             {.ptr=dst, .sz=sizeof dst},
-        })) { continue; }
-        // 1.5<5 → -1, 10.5<5 → 0, 5.5<5 → 0, 0.5<5 → -1
-        (dst[0] == -1) here; (dst[1] == 0) here; (dst[2] == 0) here; (dst[3] == -1) here;
+        })) {
+            // 1.5<5 → -1, 10.5<5 → 0, 5.5<5 → 0, 0.5<5 → -1
+            (dst[0] == -1) here; (dst[1] == 0) here; (dst[2] == 0) here; (dst[3] == -1) here;
+        }
     }
     cleanup(&B);
 }
@@ -2697,25 +2638,26 @@ TEST(test_regvar_m_patterns) {
         int32_t sc[] = {3, 3, 3, 3};
         int32_t d[12][4];
         __builtin_memset(d, 0, sizeof d);
-        if (!run(&B, bi, 4, 1, (struct umbra_buf[]){
+        if (run(&B, bi, 4, 1, (struct umbra_buf[]){
             {.ptr=sa, .sz=sizeof sa}, {.ptr=sc, .sz=sizeof sc},
             {.ptr=d[2], .sz=16}, {.ptr=d[3], .sz=16},
             {.ptr=d[4], .sz=16}, {.ptr=d[5], .sz=16},
             {.ptr=d[6], .sz=16}, {.ptr=d[7], .sz=16},
             {.ptr=d[8], .sz=16}, {.ptr=d[9], .sz=16},
             {.ptr=d[10], .sz=16}, {.ptr=d[11], .sz=16},
-        })) { continue; }
-        // lt(5.5,3)=0, lt(0.5,3)=-1, lt(-0.5,3)=-1, lt(10.5,3)=0
-        (d[2][0] == 0) here; (d[2][1] == -1) here; (d[2][2] == -1) here; (d[2][3] == 0) here;
-        // lt(x,x) always 0
-        for (int i = 0; i < 4; i++) { (d[3][i] == 0) here; }
-        // min(5.0,3.0)=3 min(0.0,3.0)=0 min(-1.0,3.0)=-1 min(10.0,3.0)=3
-        (d[5][0] == 3) here; (d[5][1] == 0) here; (d[5][2] == -1) here; (d[5][3] == 3) here;
-        // max(3.0,5.0)=5.0 for all (fc=3, imm=5), stored as float bits
-        union { float f; int32_t i; } five = {.f=5.f};
-        for (int i = 0; i < 4; i++) { (d[6][i] == five.i) here; }
-        // eq(5+1,6)=-1, eq(0+1,6)=0, eq(-1+1,6)=0, eq(10+1,6)=0
-        (d[8][0] == -1) here; (d[8][1] == 0) here; (d[8][2] == 0) here; (d[8][3] == 0) here;
+        })) {
+            // lt(5.5,3)=0, lt(0.5,3)=-1, lt(-0.5,3)=-1, lt(10.5,3)=0
+            (d[2][0] == 0) here; (d[2][1] == -1) here; (d[2][2] == -1) here; (d[2][3] == 0) here;
+            // lt(x,x) always 0
+            for (int i = 0; i < 4; i++) { (d[3][i] == 0) here; }
+            // min(5.0,3.0)=3 min(0.0,3.0)=0 min(-1.0,3.0)=-1 min(10.0,3.0)=3
+            (d[5][0] == 3) here; (d[5][1] == 0) here; (d[5][2] == -1) here; (d[5][3] == 3) here;
+            // max(3.0,5.0)=5.0 for all (fc=3, imm=5), stored as float bits
+            union { float f; int32_t i; } five = {.f=5.f};
+            for (int i = 0; i < 4; i++) { (d[6][i] == five.i) here; }
+            // eq(5+1,6)=-1, eq(0+1,6)=0, eq(-1+1,6)=0, eq(10+1,6)=0
+            (d[8][0] == -1) here; (d[8][1] == 0) here; (d[8][2] == 0) here; (d[8][3] == 0) here;
+        }
     }
     cleanup(&B);
 }
@@ -2763,18 +2705,19 @@ TEST(test_binary_m_rr) {
         for (int i = 1; i < nbufs; i++) {
             bufs[i] = (struct umbra_buf){.ptr=d[i], .sz=16};
         }
-        if (!run(&B, bi, 4, 1, bufs)) { continue; }
-        // sub(3,3)=0, mul(4,4)=16, div(5,5)=1
-        union { float f; int32_t i; } u;
-        u.f = 0.f;  (d[1][0] == u.i) here;
-        u.f = 16.f; (d[2][0] == u.i) here;
-        u.f = 1.f;  (d[3][0] == u.i) here;
-        // add(102,102)=204, sub(202,202)=0, mul(302,302)=91204
-        (d[6][0] == 204) here;
-        (d[7][0] == 0)   here;
-        (d[8][0] == 302*302) here;
-        // xor(x,x) = 0 for any x
-        (d[14][0] == 0) here;
+        if (run(&B, bi, 4, 1, bufs)) {
+            // sub(3,3)=0, mul(4,4)=16, div(5,5)=1
+            union { float f; int32_t i; } u;
+            u.f = 0.f;  (d[1][0] == u.i) here;
+            u.f = 16.f; (d[2][0] == u.i) here;
+            u.f = 1.f;  (d[3][0] == u.i) here;
+            // add(102,102)=204, sub(202,202)=0, mul(302,302)=91204
+            (d[6][0] == 204) here;
+            (d[7][0] == 0)   here;
+            (d[8][0] == 302*302) here;
+            // xor(x,x) = 0 for any x
+            (d[14][0] == 0) here;
+        }
     }
     cleanup(&B);
 }
@@ -2796,15 +2739,16 @@ TEST(test_minmax_m_rm) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         int32_t sa[] = {5,5,5,5}, sc[] = {3,3,3,3};
         int32_t d2[4]={0}, d3[4]={0};
-        if (!run(&B, bi, 4, 1, (struct umbra_buf[]){
+        if (run(&B, bi, 4, 1, (struct umbra_buf[]){
             {.ptr=sa, .sz=16}, {.ptr=sc, .sz=16},
             {.ptr=d2, .sz=16}, {.ptr=d3, .sz=16},
-        })) { continue; }
-        // min(-5, 3) = -5
-        union { float f; int32_t i; } u;
-        u.f = -5.f; (d2[0] == u.i) here;
-        // max(-3, 5) = 5
-        u.f = 5.f;  (d3[0] == u.i) here;
+        })) {
+            // min(-5, 3) = -5
+            union { float f; int32_t i; } u;
+            u.f = -5.f; (d2[0] == u.i) here;
+            // max(-3, 5) = 5
+            u.f = 5.f;  (d3[0] == u.i) here;
+        }
     }
     cleanup(&B);
 }
@@ -2849,13 +2793,14 @@ TEST(test_cmp_r_rm_rr) {
         bufs[0] = (struct umbra_buf){.ptr=sa, .sz=16};
         bufs[1] = (struct umbra_buf){.ptr=sc, .sz=16};
         for (int i = 2; i < 12; i++) { bufs[i] = (struct umbra_buf){.ptr=d[i], .sz=16}; }
-        if (!run(&B, bi, 4, 1, bufs)) { continue; }
-        // lt(2.5, 3)=1, le(3.5, 3)=0, eq(4.5, 3)=0
-        (d[2][0] == 1) here; (d[3][0] == 0) here; (d[4][0] == 0) here;
-        // lt(x,x)=0, eq(x,x)=1, le(x,x)=1
-        (d[5][0] == 0) here; (d[6][0] == 1) here;
-        (d[7][0] == 1) here; (d[8][0] == 0) here;
-        (d[9][0] == 1) here; (d[10][0] == 0) here; (d[11][0] == 1) here;
+        if (run(&B, bi, 4, 1, bufs)) {
+            // lt(2.5, 3)=1, le(3.5, 3)=0, eq(4.5, 3)=0
+            (d[2][0] == 1) here; (d[3][0] == 0) here; (d[4][0] == 0) here;
+            // lt(x,x)=0, eq(x,x)=1, le(x,x)=1
+            (d[5][0] == 0) here; (d[6][0] == 1) here;
+            (d[7][0] == 1) here; (d[8][0] == 0) here;
+            (d[9][0] == 1) here; (d[10][0] == 0) here; (d[11][0] == 1) here;
+        }
     }
     cleanup(&B);
 }
@@ -2894,11 +2839,12 @@ TEST(test_unary_r_m) {
         struct umbra_buf bufs[9];
         bufs[0] = (struct umbra_buf){.ptr=src, .sz=16};
         for (int i = 1; i < 9; i++) { bufs[i] = (struct umbra_buf){.ptr=d[i], .sz=16}; }
-        if (!run(&B, bi, 4, 1, bufs)) { continue; }
-        (d[1][0] == 2) here;  // sqrt(4)=2
-        (d[2][0] == 4) here;  // round(4.0)=4
-        (d[5][0] == -4) here; // i32_from_f32(neg(4.0))=-4
-        (d[8][0] == 4) here;  // i32_from_f32(f32_from_i32(4))=4
+        if (run(&B, bi, 4, 1, bufs)) {
+            (d[1][0] == 2) here;  // sqrt(4)=2
+            (d[2][0] == 4) here;  // round(4.0)=4
+            (d[5][0] == -4) here; // i32_from_f32(neg(4.0))=-4
+            (d[8][0] == 4) here;  // i32_from_f32(f32_from_i32(4))=4
+        }
     }
     cleanup(&B);
 }
@@ -2921,14 +2867,15 @@ TEST(test_base_imm_ops) {
         int32_t sa[] = {0x12, 0x12, 0x12, 0x12};
         int32_t sc[] = {5, 1, 5, 1};
         int32_t d2[4]={0}, d3[4]={0};
-        if (!run(&B, bi, 4, 1, (struct umbra_buf[]){
+        if (run(&B, bi, 4, 1, (struct umbra_buf[]){
             {.ptr=sa, .sz=16}, {.ptr=sc, .sz=16},
             {.ptr=d2, .sz=16}, {.ptr=d3, .sz=16},
-        })) { continue; }
-        (d2[0] == (0x12 ^ 0xFF)) here;
-        union { float f; int32_t i; } u;
-        u.f = 2.f; (d3[0] == u.i) here;  // min(5, 2) = 2
-        u.f = 1.f; (d3[1] == u.i) here;  // min(1, 2) = 1
+        })) {
+            (d2[0] == (0x12 ^ 0xFF)) here;
+            union { float f; int32_t i; } u;
+            u.f = 2.f; (d3[0] == u.i) here;  // min(5, 2) = 2
+            u.f = 1.f; (d3[1] == u.i) here;  // min(1, 2) = 1
+        }
     }
     cleanup(&B);
 }
@@ -2961,9 +2908,10 @@ TEST(test_sel_fms_variants) {
         bufs[0] = (struct umbra_buf){.ptr=sa, .sz=16};
         bufs[1] = (struct umbra_buf){.ptr=sc, .sz=16};
         for (int i = 2; i < 4; i++) { bufs[i] = (struct umbra_buf){.ptr=d[i], .sz=16}; }
-        if (!run(&B, bi, 4, 1, bufs)) { continue; }
-        // sel: 2<5 → true → pick a=2
-        (d[2][0] == 2) here;
+        if (run(&B, bi, 4, 1, bufs)) {
+            // sel: 2<5 → true → pick a=2
+            (d[2][0] == 2) here;
+        }
     }
     cleanup(&B);
 }
@@ -3027,13 +2975,14 @@ TEST(test_imm_regvar) {
         struct umbra_buf bufs[13];
         bufs[0] = (struct umbra_buf){.ptr=src, .sz=16};
         for (int i = 1; i < nbufs; i++) { bufs[i] = (struct umbra_buf){.ptr=d[i], .sz=16}; }
-        if (!run(&B, bi, 4, 1, bufs)) { continue; }
-        // mul(3*2)=6, eq(12,12)=1, lt(22,25)=1, le(32,32)=1, eq_i32(2,2)=1
-        (d[1][0] == 6) here;
-        (d[9][0] == 1) here;
-        (d[10][0] == 1) here;
-        (d[11][0] == 1) here;
-        (d[12][0] == 1) here;
+        if (run(&B, bi, 4, 1, bufs)) {
+            // mul(3*2)=6, eq(12,12)=1, lt(22,25)=1, le(32,32)=1, eq_i32(2,2)=1
+            (d[1][0] == 6) here;
+            (d[9][0] == 1) here;
+            (d[10][0] == 1) here;
+            (d[11][0] == 1) here;
+            (d[12][0] == 1) here;
+        }
     }
     cleanup(&B);
 }
@@ -3074,12 +3023,13 @@ TEST(test_binary_r_mm) {
         bufs[0] = (struct umbra_buf){.ptr=sa, .sz=16};
         bufs[1] = (struct umbra_buf){.ptr=sc, .sz=16};
         for (int i = 2; i < 15; i++) { bufs[i] = (struct umbra_buf){.ptr=d[i], .sz=16}; }
-        if (!run(&B, bi, 4, 1, bufs)) { continue; }
-        (d[3][0] == 4)  here;  // sub(6,2)=4
-        (d[4][0] == 12) here;  // mul(6,2)=12
-        (d[5][0] == 3)  here;  // div(6,2)=3
-        (d[7][0] == 5)  here;  // sub(6,2)+1=5
-        (d[10][0] == (6^2)+1) here;
+        if (run(&B, bi, 4, 1, bufs)) {
+            (d[3][0] == 4)  here;  // sub(6,2)=4
+            (d[4][0] == 12) here;  // mul(6,2)=12
+            (d[5][0] == 3)  here;  // div(6,2)=3
+            (d[7][0] == 5)  here;  // sub(6,2)+1=5
+            (d[10][0] == (6^2)+1) here;
+        }
     }
     cleanup(&B);
 }
@@ -3118,8 +3068,9 @@ TEST(test_unary_m_r) {
         struct umbra_buf bufs[9];
         bufs[0] = (struct umbra_buf){.ptr=src, .sz=16};
         for (int i = 1; i < p; i++) { bufs[i] = (struct umbra_buf){.ptr=d[i], .sz=16}; }
-        if (!run(&B, bi, 4, 1, bufs)) { continue; }
-        (d[5][0] == 10) here;                  // round(4+6) = 10
+        if (run(&B, bi, 4, 1, bufs)) {
+            (d[5][0] == 10) here;                  // round(4+6) = 10
+        }
     }
     cleanup(&B);
 }
@@ -3149,11 +3100,12 @@ TEST(test_base_imm_more) {
         bufs[0] = (struct umbra_buf){.ptr=sa, .sz=16};
         bufs[1] = (struct umbra_buf){.ptr=sc, .sz=16};
         for (int i = 2; i < p; i++) { bufs[i] = (struct umbra_buf){.ptr=d[i], .sz=16}; }
-        if (!run(&B, bi, 4, 1, bufs)) { continue; }
-        (d[2][0] == 8) here;   // 16 >> 1
-        (d[3][0] == 4) here;   // 16 >>> 2
-        (d[4][0] == (16 | 0xF0)) here;
-        (d[7][0] == 15) here;  // 16 - 1
+        if (run(&B, bi, 4, 1, bufs)) {
+            (d[2][0] == 8) here;   // 16 >> 1
+            (d[3][0] == 4) here;   // 16 >>> 2
+            (d[4][0] == (16 | 0xF0)) here;
+            (d[7][0] == 15) here;  // 16 - 1
+        }
     }
     cleanup(&B);
 }
@@ -3175,11 +3127,12 @@ TEST(test_sel_r_rm) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         int32_t sa[] = {2,8,2,8}, sc[] = {5,5,5,5};
         int32_t d[4] = {0};
-        if (!run(&B, bi, 4, 1, (struct umbra_buf[]){
+        if (run(&B, bi, 4, 1, (struct umbra_buf[]){
             {.ptr=sa, .sz=16}, {.ptr=sc, .sz=16}, {.ptr=d, .sz=16},
-        })) { continue; }
-        // 2<5→sel a=2, 8<5=false→sel c=5; +1
-        (d[0] == 3) here; (d[1] == 6) here;
+        })) {
+            // 2<5→sel a=2, 8<5=false→sel c=5; +1
+            (d[0] == 3) here; (d[1] == 6) here;
+        }
     }
     cleanup(&B);
 }
@@ -3207,11 +3160,12 @@ TEST(test_ra_chan_unary) {
             (__fp16)0.1f, (__fp16)0.25f, (__fp16)0.3f, (__fp16)0.9f,
         };
         int32_t dg[4]={0}, db[4]={0}, da[4]={0};
-        if (!run(&B, bi, 4, 1, (struct umbra_buf[]){
+        if (run(&B, bi, 4, 1, (struct umbra_buf[]){
             {.ptr=src, .sz=sizeof src},
             {.ptr=dg, .sz=16}, {.ptr=db, .sz=16}, {.ptr=da, .sz=16},
-        })) { continue; }
-        (dg[0] == 0) here;
+        })) {
+            (dg[0] == 0) here;
+        }
     }
     cleanup(&B);
 }
@@ -3227,10 +3181,11 @@ TEST(test_mul_pow2_peephole) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         int32_t src[] = {3,7,10,0};
         int32_t dst[4] = {0};
-        if (!run(&B, bi, 4, 1, (struct umbra_buf[]){
+        if (run(&B, bi, 4, 1, (struct umbra_buf[]){
             {.ptr=src, .sz=sizeof src}, {.ptr=dst, .sz=sizeof dst},
-        })) { continue; }
-        (dst[0] == 12) here; (dst[1] == 28) here; (dst[2] == 40) here; (dst[3] == 0) here;
+        })) {
+            (dst[0] == 12) here; (dst[1] == 28) here; (dst[2] == 40) here; (dst[3] == 0) here;
+        }
     }
     cleanup(&B);
 }
@@ -3270,14 +3225,15 @@ TEST(test_const_eval) {
             __builtin_memset(d, 0, sizeof d);
             struct umbra_buf bufs[20];
             for (int i = 0; i < 20; i++) { bufs[i] = (struct umbra_buf){.ptr=d[i], .sz=16}; }
-            if (!run(&B, bi, 4, 1, bufs)) { continue; }
-            union { float f; int32_t i; } u;
-            u.f = 13.f; (d[0][0] == u.i) here;
-            u.f = 7.f;  (d[1][0] == u.i) here;
-            (d[12][0] == 4) here;
-            (d[13][0] == 3) here;
-            (d[14][0] == 4) here;
-            (d[16][0] == 10) here;
+            if (run(&B, bi, 4, 1, bufs)) {
+                union { float f; int32_t i; } u;
+                u.f = 13.f; (d[0][0] == u.i) here;
+                u.f = 7.f;  (d[1][0] == u.i) here;
+                (d[12][0] == 4) here;
+                (d[13][0] == 3) here;
+                (d[14][0] == 4) here;
+                (d[16][0] == 10) here;
+            }
         }
         cleanup(&B);
     }
@@ -3306,12 +3262,13 @@ TEST(test_const_eval) {
             __builtin_memset(d, 0, sizeof d);
             struct umbra_buf bufs[14];
             for (int i = 0; i < 14; i++) { bufs[i] = (struct umbra_buf){.ptr=d[i], .sz=16}; }
-            if (!run(&B, bi, 4, 1, bufs)) { continue; }
-            (d[0][0] == 7)  here;   // 10-3
-            (d[1][0] == 30) here;   // 10*3
-            (d[7][0] == 9)  here;   // 10^3
-            (d[8][0] == 10) here;   // sel(-1, 10, 3) = 10
-            (d[9][0] == 0)  here;   // eq(10,3)=0
+            if (run(&B, bi, 4, 1, bufs)) {
+                (d[0][0] == 7)  here;   // 10-3
+                (d[1][0] == 30) here;   // 10*3
+                (d[7][0] == 9)  here;   // 10^3
+                (d[8][0] == 10) here;   // sel(-1, 10, 3) = 10
+                (d[9][0] == 0)  here;   // eq(10,3)=0
+            }
         }
         cleanup(&B);
     }
@@ -3338,15 +3295,16 @@ TEST(test_acc_coverage) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int32_t sa[] = {10};
             int32_t d[5][1]; __builtin_memset(d, 0, sizeof d);
-            if (!run(&B, bi, 1, 1, (struct umbra_buf[]){
+            if (run(&B, bi, 1, 1, (struct umbra_buf[]){
                 {.ptr=sa, .sz=4},
                 {.ptr=d[1], .sz=4}, {.ptr=d[2], .sz=4},
                 {.ptr=d[3], .sz=4}, {.ptr=d[4], .sz=4},
-            })) { continue; }
-            (d[1][0] == -9) here;  // neg(10-1)=-9
-            (d[2][0] == 8) here;   // round(10-2)=8
-            (d[3][0] == 7) here;   // floor(10-3)=7
-            (d[4][0] == 6) here;   // ceil(10-4)=6
+            })) {
+                (d[1][0] == -9) here;  // neg(10-1)=-9
+                (d[2][0] == 8) here;   // round(10-2)=8
+                (d[3][0] == 7) here;   // floor(10-3)=7
+                (d[4][0] == 6) here;   // ceil(10-4)=6
+            }
         }
         cleanup(&B);
     }
@@ -3363,11 +3321,12 @@ TEST(test_acc_coverage) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int32_t sa[] = {2, 20}, sb[] = {5, 5};
             int32_t d[2] = {0};
-            if (!run(&B, bi, 2, 1, (struct umbra_buf[]){
+            if (run(&B, bi, 2, 1, (struct umbra_buf[]){
                 {.ptr=sa, .sz=8}, {.ptr=sb, .sz=8}, {.ptr=d, .sz=8},
-            })) { continue; }
-            (d[0] == -1) here;  // 2-0.5=1.5<=5 → true
-            (d[1] == 0) here;   // 20-0.5=19.5<=5 → false
+            })) {
+                (d[0] == -1) here;  // 2-0.5=1.5<=5 → true
+                (d[1] == 0) here;   // 20-0.5=19.5<=5 → false
+            }
         }
         cleanup(&B);
     }
@@ -3381,8 +3340,9 @@ TEST(test_acc_coverage) {
         struct test_backends B = make(b); \
         for (int bi = 0; bi < NUM_BACKENDS; bi++) { \
             int32_t sa[]={10}, sc[]={3}, d[]={0}; \
-            if (!run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.sz=4},{.ptr=sc,.sz=4},{.ptr=d,.sz=4}})) continue; \
-            (d[0] == (expected)) here; \
+            if (run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.sz=4},{.ptr=sc,.sz=4},{.ptr=d,.sz=4}})) { \
+                (d[0] == (expected)) here; \
+            } \
         } cleanup(&B); }
 #define ACC_IMM_TEST_F(op, k, expected) { \
         struct umbra_builder *b = umbra_builder(); \
@@ -3393,8 +3353,9 @@ TEST(test_acc_coverage) {
         struct test_backends B = make(b); \
         for (int bi = 0; bi < NUM_BACKENDS; bi++) { \
             int32_t sa[]={10}, sc[]={3}, d[]={0}; \
-            if (!run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.sz=4},{.ptr=sc,.sz=4},{.ptr=d,.sz=4}})) continue; \
-            (d[0] == (expected)) here; \
+            if (run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.sz=4},{.ptr=sc,.sz=4},{.ptr=d,.sz=4}})) { \
+                (d[0] == (expected)) here; \
+            } \
         } cleanup(&B); }
 #define ACC_IMM_TEST_CMP_I(op, k, expected) { \
         struct umbra_builder *b = umbra_builder(); \
@@ -3403,8 +3364,9 @@ TEST(test_acc_coverage) {
         struct test_backends B = make(b); \
         for (int bi = 0; bi < NUM_BACKENDS; bi++) { \
             int32_t sa[]={10}, sc[]={3}, d[]={0}; \
-            if (!run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.sz=4},{.ptr=sc,.sz=4},{.ptr=d,.sz=4}})) continue; \
-            (d[0] == (expected)) here; \
+            if (run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.sz=4},{.ptr=sc,.sz=4},{.ptr=d,.sz=4}})) { \
+                (d[0] == (expected)) here; \
+            } \
         } cleanup(&B); }
 #define ACC_IMM_TEST_CMP_F(op, k, expected) { \
         struct umbra_builder *b = umbra_builder(); \
@@ -3415,8 +3377,9 @@ TEST(test_acc_coverage) {
         struct test_backends B = make(b); \
         for (int bi = 0; bi < NUM_BACKENDS; bi++) { \
             int32_t sa[]={10}, sc[]={3}, d[]={0}; \
-            if (!run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.sz=4},{.ptr=sc,.sz=4},{.ptr=d,.sz=4}})) continue; \
-            (d[0] == (expected)) here; \
+            if (run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.sz=4},{.ptr=sc,.sz=4},{.ptr=d,.sz=4}})) { \
+                (d[0] == (expected)) here; \
+            } \
         } cleanup(&B); }
         // sub(10,3)=7
         ACC_IMM_TEST_I(umbra_shr_s32, 1, 3)          // 7>>1
@@ -3449,8 +3412,9 @@ TEST(test_acc_coverage_extra) {
         struct test_backends B = make(b); \
         for (int bi = 0; bi < NUM_BACKENDS; bi++) { \
             int32_t sa[]={10}, sc[]={k}, d[]={0}; \
-            if (!run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.sz=4},{.ptr=sc,.sz=4},{.ptr=d,.sz=4}})) continue; \
-            (d[0] == (expected)) here; \
+            if (run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.sz=4},{.ptr=sc,.sz=4},{.ptr=d,.sz=4}})) { \
+                (d[0] == (expected)) here; \
+            } \
         } cleanup(&B); }
     // round(10.0-3.0)=round(7.0)=7, floor(10.0-4.0)=floor(6.0)=6, ceil(10.0-5.0)=ceil(5.0)=5
     ACC_UNARY_F(umbra_round_f32, 3, 7)
@@ -3467,8 +3431,9 @@ TEST(test_acc_coverage_extra) {
         struct test_backends B = make(b);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int32_t sa[]={4}, sc[]={3}, d[]={0};
-            if (!run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.sz=4},{.ptr=sc,.sz=4},{.ptr=d,.sz=4}})) continue;
-            (d[0] == -1) here;  // 4-1=3.0 == 3.0 → true
+            if (run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.sz=4},{.ptr=sc,.sz=4},{.ptr=d,.sz=4}})) {
+                (d[0] == -1) here;  // 4-1=3.0 == 3.0 → true
+            }
         }
         cleanup(&B);
     }
@@ -3492,19 +3457,20 @@ TEST(test_acc_acc_register_variants) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         float src[] = {1.5f, 0.0f, -2.3f, 3.0f};
         int32_t dst1[4] = {0}, dst2[4] = {0};
-        if (!run(&B, bi, 4, 1, (struct umbra_buf[]){
+        if (run(&B, bi, 4, 1, (struct umbra_buf[]){
             {.ptr=src, .sz=sizeof src},
             {.ptr=dst1, .sz=sizeof dst1},
             {.ptr=dst2, .sz=sizeof dst2},
-        })) { continue; }
-        dst1[0] == 4 here;   // ceil(1.5)*2 = 2*2 = 4
-        dst1[1] == 0 here;   // ceil(0)*2 = 0
-        dst1[2] == -4 here;  // ceil(-2.3)*2 = -2*2 = -4
-        dst1[3] == 6 here;   // ceil(3)*2 = 3*2 = 6
-        dst2[0] == 0 here;   // 1.5 == 0? no
-        dst2[1] == 1 here;   // 0.0 == 0? yes -> -1 & 1 = 1
-        dst2[2] == 0 here;   // -2.3 == 0? no
-        dst2[3] == 0 here;   // 3.0 == 0? no
+        })) {
+            dst1[0] == 4 here;   // ceil(1.5)*2 = 2*2 = 4
+            dst1[1] == 0 here;   // ceil(0)*2 = 0
+            dst1[2] == -4 here;  // ceil(-2.3)*2 = -2*2 = -4
+            dst1[3] == 6 here;   // ceil(3)*2 = 3*2 = 6
+            dst2[0] == 0 here;   // 1.5 == 0? no
+            dst2[1] == 1 here;   // 0.0 == 0? yes -> -1 & 1 = 1
+            dst2[2] == 0 here;   // -2.3 == 0? no
+            dst2[3] == 0 here;   // 3.0 == 0? no
+        }
     }
     cleanup(&B);
 }
@@ -3717,12 +3683,13 @@ TEST(test_i32_from_f32_acc_acc) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         int32_t src[4] = {1, 2, 3, 4};
         int32_t dst[4] = {0};
-        if (!run(&B, bi, 4, 1, (struct umbra_buf[]){
+        if (run(&B, bi, 4, 1, (struct umbra_buf[]){
                 {.ptr=src, .sz=sizeof src},
-                {.ptr=dst, .sz=sizeof dst}})) { continue; }
-        // (1+0.5)→1 +100=101, (2+0.5)→2 +100=102, etc.
-        (dst[0] == 101) here; (dst[1] == 102) here;
-        (dst[2] == 103) here; (dst[3] == 104) here;
+                {.ptr=dst, .sz=sizeof dst}})) {
+            // (1+0.5)→1 +100=101, (2+0.5)→2 +100=102, etc.
+            (dst[0] == 101) here; (dst[1] == 102) here;
+            (dst[2] == 103) here; (dst[3] == 104) here;
+        }
     }
     cleanup(&B);
 }
