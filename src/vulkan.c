@@ -561,8 +561,8 @@ static uint32_t as_f32(SpvBuilder *b, uint32_t val, int inst_id) {
 
 // Get the SPIR-V result ID for a bb_inst operand, handling channel extraction.
 static uint32_t get_val(SpvBuilder *b, val_ v) {
-    int id = (int)v.id;
-    int ch = (int)v.chan;
+    int const id = (int)v.id,
+              ch = (int)v.chan;
     switch (ch) {
         case 0: return b->val[id];
         case 1: return b->val_1[id];
@@ -585,34 +585,34 @@ static int resolve_ptr(SpvBuilder *b, struct bb_inst const *inst) {
 // Push layout is struct { uint data[N]; }, so we need two indices:
 // member 0, then array element.
 static uint32_t load_meta_u32(SpvBuilder *b, uint32_t offset_id) {
-    uint32_t ptr = spv_access_chain_2(b, b->t_ptr_push_u32, b->v_push, b->c_0, offset_id);
+    uint32_t const ptr = spv_access_chain_2(b, b->t_ptr_push_u32, b->v_push, b->c_0, offset_id);
     return spv_load(b, b->t_u32, ptr);
 }
 
 // Load from SSBO[buf_idx] at element_index.
 static uint32_t load_ssbo_u32(SpvBuilder *b, int buf_idx, uint32_t elem_idx) {
-    uint32_t ptr = spv_access_chain_2(b, b->t_ptr_ssbo_u32,
-                                       b->v_ssbo[buf_idx],
-                                       b->c_0, elem_idx);
+    uint32_t const ptr = spv_access_chain_2(b, b->t_ptr_ssbo_u32,
+                                            b->v_ssbo[buf_idx],
+                                            b->c_0, elem_idx);
     return spv_load(b, b->t_u32, ptr);
 }
 
 // Store to SSBO[buf_idx] at element_index.
 static void store_ssbo_u32(SpvBuilder *b, int buf_idx, uint32_t elem_idx, uint32_t value) {
-    uint32_t ptr = spv_access_chain_2(b, b->t_ptr_ssbo_u32,
-                                       b->v_ssbo[buf_idx],
-                                       b->c_0, elem_idx);
+    uint32_t const ptr = spv_access_chain_2(b, b->t_ptr_ssbo_u32,
+                                            b->v_ssbo[buf_idx],
+                                            b->c_0, elem_idx);
     spv_store(b, ptr, value);
 }
 
 // Load u16 from SSBO[buf_idx] at element_index, zero-extended to u32.
 static uint32_t load_ssbo_u16(SpvBuilder *b, int buf_idx, uint32_t elem_idx) {
-    uint32_t ptr = spv_access_chain_2(b, b->t_ptr_ssbo_u16,
-                                       b->v_ssbo[buf_idx],
-                                       b->c_0, elem_idx);
-    uint32_t raw = spv_load(b, b->t_u16, ptr);
+    uint32_t const ptr = spv_access_chain_2(b, b->t_ptr_ssbo_u16,
+                                            b->v_ssbo[buf_idx],
+                                            b->c_0, elem_idx);
+    uint32_t const raw = spv_load(b, b->t_u16, ptr);
     // Zero-extend u16 -> u32.
-    uint32_t id = spv_id(b);
+    uint32_t const id = spv_id(b);
     spv_op(&b->func, SpvOpUConvert, 4);
     spv_word(&b->func, b->t_u32);
     spv_word(&b->func, id);
@@ -623,14 +623,14 @@ static uint32_t load_ssbo_u16(SpvBuilder *b, int buf_idx, uint32_t elem_idx) {
 // Store u16 to SSBO[buf_idx] at element_index, truncating from u32.
 static void store_ssbo_u16(SpvBuilder *b, int buf_idx, uint32_t elem_idx, uint32_t value) {
     // Truncate u32 -> u16.
-    uint32_t val16 = spv_id(b);
+    uint32_t const val16 = spv_id(b);
     spv_op(&b->func, SpvOpUConvert, 4);
     spv_word(&b->func, b->t_u16);
     spv_word(&b->func, val16);
     spv_word(&b->func, value);
-    uint32_t ptr = spv_access_chain_2(b, b->t_ptr_ssbo_u16,
-                                       b->v_ssbo[buf_idx],
-                                       b->c_0, elem_idx);
+    uint32_t const ptr = spv_access_chain_2(b, b->t_ptr_ssbo_u16,
+                                            b->v_ssbo[buf_idx],
+                                            b->c_0, elem_idx);
     spv_store(b, ptr, val16);
 }
 
@@ -640,12 +640,12 @@ static void store_ssbo_u16(SpvBuilder *b, int buf_idx, uint32_t elem_idx, uint32
 static uint32_t compute_addr(SpvBuilder *b, uint32_t x, uint32_t y,
                               int buf_idx, uint32_t stride_shift) {
     // buf_rbs[buf_idx] is at push offset 3 + total_bufs + buf_idx
-    uint32_t rb_off = spv_const_u32(b, (uint32_t)(3 + b->total_bufs + buf_idx));
-    uint32_t rb = load_meta_u32(b, rb_off);
+    uint32_t const rb_off = spv_const_u32(b, (uint32_t)(3 + b->total_bufs + buf_idx));
+    uint32_t const rb     = load_meta_u32(b, rb_off);
     // row_bytes >> stride_shift = number of elements per row
-    uint32_t elems_per_row = spv_binop(b, SpvOpShiftRightLogical, b->t_u32,
-                                        rb, stride_shift);
-    uint32_t row_off = spv_binop(b, SpvOpIMul, b->t_u32, y, elems_per_row);
+    uint32_t const elems_per_row = spv_binop(b, SpvOpShiftRightLogical, b->t_u32,
+                                             rb, stride_shift);
+    uint32_t const row_off = spv_binop(b, SpvOpIMul, b->t_u32, y, elems_per_row);
     return spv_binop(b, SpvOpIAdd, b->t_u32, row_off, x);
 }
 
@@ -656,24 +656,24 @@ static uint32_t compute_addr(SpvBuilder *b, uint32_t x, uint32_t y,
 static void gather_safe(SpvBuilder *b, uint32_t ix_val, int buf_idx,
                          uint32_t elem_shift,
                          uint32_t *out_idx, uint32_t *out_mask) {
-    uint32_t sz_off = spv_const_u32(b, (uint32_t)(3 + buf_idx));
-    uint32_t sz = load_meta_u32(b, sz_off);
-    uint32_t count = spv_binop(b, SpvOpShiftRightLogical, b->t_u32, sz, elem_shift);
+    uint32_t const sz_off = spv_const_u32(b, (uint32_t)(3 + buf_idx));
+    uint32_t const sz     = load_meta_u32(b, sz_off);
+    uint32_t const count  = spv_binop(b, SpvOpShiftRightLogical, b->t_u32, sz, elem_shift);
 
     // max_idx = max(count-1, 0)
-    uint32_t count_minus_1 = spv_binop(b, SpvOpISub, b->t_u32, count, b->c_1);
+    uint32_t const count_minus_1 = spv_binop(b, SpvOpISub, b->t_u32, count, b->c_1);
     // clamp: UMin(UMax(ix, 0), max_idx) — but ix is uint so UMax(ix,0)=ix
     // Actually we need to handle negative indices (signed). Use SMax then UMin.
     // Use GLSL.std.450 UMin and SMax:
     // clamped = UMin(ix, count_minus_1)  — this clamps the upper bound
-    uint32_t clamped = spv_glsl_2(b, b->t_u32, 38 /*UMin*/, ix_val, count_minus_1);
+    uint32_t const clamped = spv_glsl_2(b, b->t_u32, 38 /*UMin*/, ix_val, count_minus_1);
 
     // OOB check: ix >= 0 && ix < count  (signed comparison for < 0)
     // in_bounds = (ix >=s 0) && (ix <u count)
-    uint32_t ge_zero = spv_binop(b, SpvOpSGreaterThanEqual, b->t_bool, ix_val,
-                                  b->c_0);
-    uint32_t lt_count = spv_binop(b, SpvOpULessThan, b->t_bool, ix_val, count);
-    uint32_t in_bounds = spv_binop(b, SpvOpLogicalAnd, b->t_bool, ge_zero, lt_count);
+    uint32_t const ge_zero   = spv_binop(b, SpvOpSGreaterThanEqual, b->t_bool, ix_val,
+                                         b->c_0);
+    uint32_t const lt_count  = spv_binop(b, SpvOpULessThan, b->t_bool, ix_val, count);
+    uint32_t const in_bounds = spv_binop(b, SpvOpLogicalAnd, b->t_bool, ge_zero, lt_count);
     // mask = in_bounds ? 0xFFFFFFFF : 0
     *out_mask = spv_select(b, b->t_u32, in_bounds, b->c_allones, b->c_0);
     *out_idx = clamped;
@@ -682,15 +682,15 @@ static void gather_safe(SpvBuilder *b, uint32_t ix_val, int buf_idx,
 // fp16 <-> fp32 via native OpFConvert (requires Float16 capability).
 // f32_from_f16: convert a u32 holding a fp16 bit pattern in low 16 bits to float.
 static uint32_t spv_f16_to_f32(SpvBuilder *b, uint32_t u32_val) {
-    uint32_t u16_val = spv_unop(b, SpvOpUConvert, b->t_u16, u32_val);
-    uint32_t h       = spv_bitcast(b, b->t_f16, u16_val);
+    uint32_t const u16_val = spv_unop(b, SpvOpUConvert, b->t_u16, u32_val);
+    uint32_t const h       = spv_bitcast(b, b->t_f16, u16_val);
     return spv_unop(b, SpvOpFConvert, b->t_f32, h);
 }
 
 // f16_from_f32: convert float to u32 holding fp16 bit pattern in low 16 bits.
 static uint32_t spv_f32_to_f16(SpvBuilder *b, uint32_t f32_val) {
-    uint32_t h   = spv_unop(b, SpvOpFConvert, b->t_f16, f32_val);
-    uint32_t u16 = spv_bitcast(b, b->t_u16, h);
+    uint32_t const h   = spv_unop(b, SpvOpFConvert, b->t_f16, f32_val);
+    uint32_t const u16 = spv_bitcast(b, b->t_u16, h);
     return spv_unop(b, SpvOpUConvert, b->t_u32, u16);
 }
 
@@ -740,8 +740,8 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
             deref_buf[i] = next_buf++;
         }
     }
-    int total_bufs = next_buf;
-    int n_deref    = total_bufs - max_ptr - 1;
+    int const total_bufs = next_buf;
+    int const n_deref    = total_bufs - max_ptr - 1;
     *out_total_bufs = total_bufs;
     *out_n_deref = n_deref;
     B.total_bufs = total_bufs;

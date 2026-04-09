@@ -1286,10 +1286,10 @@ static void encode_dispatch(
             &drb,
             (char*)base + m->deref[d].off + 16,
             sizeof drb);
-        size_t bytes = dsz < 0 ? (size_t)-dsz : (size_t)dsz;
-        _Bool deref_read_only = dsz < 0;
-        int bi = m->deref[d].buf_idx;
-        int idx = cache_buf(be, derived, bytes, deref_read_only);
+        size_t const bytes           = dsz < 0 ? (size_t)-dsz : (size_t)dsz;
+        _Bool  const deref_read_only = dsz < 0;
+        int    const bi              = m->deref[d].buf_idx;
+        int    const idx             = cache_buf(be, derived, bytes, deref_read_only);
         bind_handle[bi] = be->batch_cache[idx].mtl;
         szs_data[bi] = (uint32_t)bytes;
         rbs_data[bi] = (uint32_t)drb;
@@ -1306,17 +1306,17 @@ static void encode_dispatch(
     // Tiny per-dispatch metadata: width, x0, y0, sizes[], row_bytes[].
     // These are write-once-read-once-by-one-shader and small enough to go
     // through setBytes:, the documented Metal idiom for inline data.
-    uint32_t w32  = (uint32_t)w;
-    uint32_t x032 = (uint32_t)x0;
-    uint32_t y032 = (uint32_t)y0;
-    size_t   sz_bytes = (size_t)(tb + 1) * sizeof(uint32_t);
+    uint32_t const w32      = (uint32_t)w,
+                   x032     = (uint32_t)x0,
+                   y032     = (uint32_t)y0;
+    size_t   const sz_bytes = (size_t)(tb + 1) * sizeof(uint32_t);
     [enc setBytes:&w32  length:sizeof w32  atIndex:(NSUInteger)(m->total_bufs + 0)];
     [enc setBytes:szs_data length:sz_bytes atIndex:(NSUInteger)(m->total_bufs + 1)];
     [enc setBytes:rbs_data length:sz_bytes atIndex:(NSUInteger)(m->total_bufs + 2)];
     [enc setBytes:&x032 length:sizeof x032 atIndex:(NSUInteger)(m->total_bufs + 3)];
     [enc setBytes:&y032 length:sizeof y032 atIndex:(NSUInteger)(m->total_bufs + 4)];
 
-    int tg_size = m->tg_size;
+    int const tg_size = m->tg_size;
     MTLSize grid =
         MTLSizeMake((NSUInteger)w, (NSUInteger)h, 1);
     int gx = 1, gy = 1;
