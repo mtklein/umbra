@@ -39,7 +39,9 @@ struct metal_backend {
     void *device;
     void *queue;
     void *batch_cmdbuf;     // currently-encoding cmdbuf for cur_frame, or NULL
-    void *prev_fence;       // fence updated by the previous encoder (NULL for first)
+    void *prev_fence;       // fence updated by the previous encoder within the
+                            // current cmdbuf (per-cmdbuf compute serialization,
+                            // NOT per-frame); reset to NULL on commit/rotation
     void *frame_committed[METAL_N_FRAMES];  // last committed cmdbuf per frame, or NULL
     int   cur_frame, :32;
     struct copyback        *batch_copy;
