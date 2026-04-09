@@ -27,16 +27,11 @@ void        umbra_store_fp16      (struct umbra_builder*, umbra_ptr64, umbra_col
 umbra_color umbra_load_fp16_planar(struct umbra_builder*, umbra_ptr16);
 void        umbra_store_fp16_planar(struct umbra_builder*, umbra_ptr16, umbra_color);
 
-// STYLE: anonymous parameters have nothing to attach `*` to, so it should sit
-// STYLE: against the type per the rule "always keep `*` attached to something":
-// STYLE: `(struct umbra_builder*, struct umbra_uniforms_layout*, ...)`. Same
-// STYLE: applies to all the `umbra_shader_*`/`umbra_coverage_*`/`umbra_blend_*`
-// STYLE: declarations below and to the `umbra_draw_build` return type.
-typedef umbra_color (*umbra_shader_fn)(struct umbra_builder *, struct umbra_uniforms_layout *,
+typedef umbra_color (*umbra_shader_fn)(struct umbra_builder*, struct umbra_uniforms_layout*,
                                        umbra_val32 x, umbra_val32 y);
-typedef umbra_val32 (*umbra_coverage_fn)(struct umbra_builder *, struct umbra_uniforms_layout *,
-                                       umbra_val32 x, umbra_val32 y);
-typedef umbra_color (*umbra_blend_fn)(struct umbra_builder *, umbra_color src,
+typedef umbra_val32 (*umbra_coverage_fn)(struct umbra_builder*, struct umbra_uniforms_layout*,
+                                         umbra_val32 x, umbra_val32 y);
+typedef umbra_color (*umbra_blend_fn)(struct umbra_builder*, umbra_color src,
                                       umbra_color dst);
 struct umbra_draw_layout {
     struct umbra_uniforms_layout uni;
@@ -44,17 +39,17 @@ struct umbra_draw_layout {
     size_t shader, coverage;
 };
 
-struct umbra_builder *umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn coverage,
+struct umbra_builder* umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn coverage,
                                        umbra_blend_fn blend, struct umbra_fmt fmt,
                                        struct umbra_draw_layout *layout);
 
-umbra_color umbra_shader_solid      (struct umbra_builder *, struct umbra_uniforms_layout *, umbra_val32 x, umbra_val32 y);
-umbra_color umbra_shader_linear_2   (struct umbra_builder *, struct umbra_uniforms_layout *, umbra_val32 x, umbra_val32 y);
-umbra_color umbra_shader_radial_2   (struct umbra_builder *, struct umbra_uniforms_layout *, umbra_val32 x, umbra_val32 y);
-umbra_color umbra_shader_linear_grad(struct umbra_builder *, struct umbra_uniforms_layout *, umbra_val32 x, umbra_val32 y);
-umbra_color umbra_shader_radial_grad(struct umbra_builder *, struct umbra_uniforms_layout *, umbra_val32 x, umbra_val32 y);
+umbra_color umbra_shader_solid      (struct umbra_builder*, struct umbra_uniforms_layout*, umbra_val32 x, umbra_val32 y);
+umbra_color umbra_shader_linear_2   (struct umbra_builder*, struct umbra_uniforms_layout*, umbra_val32 x, umbra_val32 y);
+umbra_color umbra_shader_radial_2   (struct umbra_builder*, struct umbra_uniforms_layout*, umbra_val32 x, umbra_val32 y);
+umbra_color umbra_shader_linear_grad(struct umbra_builder*, struct umbra_uniforms_layout*, umbra_val32 x, umbra_val32 y);
+umbra_color umbra_shader_radial_grad(struct umbra_builder*, struct umbra_uniforms_layout*, umbra_val32 x, umbra_val32 y);
 
-umbra_color umbra_supersample(struct umbra_builder *, struct umbra_uniforms_layout *,
+umbra_color umbra_supersample(struct umbra_builder*, struct umbra_uniforms_layout*,
                               umbra_val32 x, umbra_val32 y,
                               umbra_shader_fn inner, int n);
 
@@ -62,13 +57,13 @@ void umbra_gradient_lut_even(float *out, int lut_n, int n_stops, float const col
 void umbra_gradient_lut(float *out, int lut_n, int n_stops, float const positions[],
                         float const colors[][4]);
 
-umbra_val32 umbra_coverage_rect         (struct umbra_builder *, struct umbra_uniforms_layout *, umbra_val32 x, umbra_val32 y);
-umbra_val32 umbra_coverage_bitmap       (struct umbra_builder *, struct umbra_uniforms_layout *, umbra_val32 x, umbra_val32 y);
-umbra_val32 umbra_coverage_sdf          (struct umbra_builder *, struct umbra_uniforms_layout *, umbra_val32 x, umbra_val32 y);
-umbra_val32 umbra_coverage_bitmap_matrix(struct umbra_builder *, struct umbra_uniforms_layout *, umbra_val32 x, umbra_val32 y);
-umbra_val32 umbra_coverage_wind         (struct umbra_builder *, struct umbra_uniforms_layout *, umbra_val32 x, umbra_val32 y);
+umbra_val32 umbra_coverage_rect         (struct umbra_builder*, struct umbra_uniforms_layout*, umbra_val32 x, umbra_val32 y);
+umbra_val32 umbra_coverage_bitmap       (struct umbra_builder*, struct umbra_uniforms_layout*, umbra_val32 x, umbra_val32 y);
+umbra_val32 umbra_coverage_sdf          (struct umbra_builder*, struct umbra_uniforms_layout*, umbra_val32 x, umbra_val32 y);
+umbra_val32 umbra_coverage_bitmap_matrix(struct umbra_builder*, struct umbra_uniforms_layout*, umbra_val32 x, umbra_val32 y);
+umbra_val32 umbra_coverage_wind         (struct umbra_builder*, struct umbra_uniforms_layout*, umbra_val32 x, umbra_val32 y);
 
-umbra_color umbra_blend_src     (struct umbra_builder *, umbra_color src, umbra_color dst);
-umbra_color umbra_blend_srcover (struct umbra_builder *, umbra_color src, umbra_color dst);
-umbra_color umbra_blend_dstover (struct umbra_builder *, umbra_color src, umbra_color dst);
-umbra_color umbra_blend_multiply(struct umbra_builder *, umbra_color src, umbra_color dst);
+umbra_color umbra_blend_src     (struct umbra_builder*, umbra_color src, umbra_color dst);
+umbra_color umbra_blend_srcover (struct umbra_builder*, umbra_color src, umbra_color dst);
+umbra_color umbra_blend_dstover (struct umbra_builder*, umbra_color src, umbra_color dst);
+umbra_color umbra_blend_multiply(struct umbra_builder*, umbra_color src, umbra_color dst);

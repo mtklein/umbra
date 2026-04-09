@@ -15,9 +15,7 @@ size_t umbra_uniforms_reserve_ptr(struct umbra_uniforms_layout *u) {
     return h;
 }
 
-// STYLE: this returns a pointer, so attach `*` to the return type rather than
-// STYLE: the function name: `void* umbra_uniforms_alloc(...)`.
-void *umbra_uniforms_alloc(struct umbra_uniforms_layout const *u) {
+void* umbra_uniforms_alloc(struct umbra_uniforms_layout const *u) {
     return calloc(1, u->size);
 }
 
