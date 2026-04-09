@@ -349,53 +349,51 @@ TEST(test_golden_slides) {
 // canonical regression for the original silent-cmdbuf-corruption
 // failure mode (that requires very large N which becomes flaky under
 // parallel ninja test execution).
-// STYLE: prefer positive nesting — wrap the body in `if (be) { ... }` rather
-// STYLE: than `if (!be) return;`.
 static void run_long_batch_no_oom(struct umbra_backend *be) {
-    if (!be) { return; }
+    if (be) {
+        struct umbra_builder *bld = umbra_builder();
+        umbra_color c = {
+            umbra_uniform_32(bld, (umbra_ptr32){0}, 0),
+            umbra_uniform_32(bld, (umbra_ptr32){0}, 4),
+            umbra_uniform_32(bld, (umbra_ptr32){0}, 8),
+            umbra_uniform_32(bld, (umbra_ptr32){0}, 12),
+        };
+        umbra_store_8888(bld, (umbra_ptr32){.ix=1}, c);
+        struct umbra_basic_block *bb = umbra_basic_block(bld);
+        umbra_builder_free(bld);
 
-    struct umbra_builder *bld = umbra_builder();
-    umbra_color c = {
-        umbra_uniform_32(bld, (umbra_ptr32){0}, 0),
-        umbra_uniform_32(bld, (umbra_ptr32){0}, 4),
-        umbra_uniform_32(bld, (umbra_ptr32){0}, 8),
-        umbra_uniform_32(bld, (umbra_ptr32){0}, 12),
-    };
-    umbra_store_8888(bld, (umbra_ptr32){.ix=1}, c);
-    struct umbra_basic_block *bb = umbra_basic_block(bld);
-    umbra_builder_free(bld);
+        struct umbra_program *p = be->compile(be, bb);
+        umbra_basic_block_free(bb);
+        p != 0 here;
 
-    struct umbra_program *p = be->compile(be, bb);
-    umbra_basic_block_free(bb);
-    p != 0 here;
+        int rotations_before = be->ring_rotations ? be->ring_rotations(be) : 0;
 
-    int rotations_before = be->ring_rotations ? be->ring_rotations(be) : 0;
+        float    color[4] = {0, 0, 0, 1};
+        uint32_t pixel    = 0;
+        struct umbra_buf bufs[] = {
+            {.ptr=color, .sz=sizeof color, .read_only=1},
+            {.ptr=&pixel, .sz=sizeof pixel, .row_bytes=sizeof pixel},
+        };
+        // 12 000 × 16-byte uniforms = ~192 KiB of ring traffic, ~3 backpressure
+        // events at the 64 KiB high water mark.
+        int const N = 12000;
+        for (int i = 0; i < N; i++) {
+            color[0] = (float)((i & 0xff) / 255.0f);
+            p->queue(p, 0, 0, 1, 1, bufs);
+        }
+        be->flush(be);
 
-    float    color[4] = {0, 0, 0, 1};
-    uint32_t pixel    = 0;
-    struct umbra_buf bufs[] = {
-        {.ptr=color, .sz=sizeof color, .read_only=1},
-        {.ptr=&pixel, .sz=sizeof pixel, .row_bytes=sizeof pixel},
-    };
-    // 12 000 × 16-byte uniforms = ~192 KiB of ring traffic, ~3 backpressure
-    // events at the 64 KiB high water mark.
-    int const N = 12000;
-    for (int i = 0; i < N; i++) {
-        color[0] = (float)((i & 0xff) / 255.0f);
-        p->queue(p, 0, 0, 1, 1, bufs);
+        uint32_t expected_r = (uint32_t)((N - 1) & 0xff);
+        (pixel & 0xff)   == expected_r here;
+        (pixel >> 24)    == 0xff here;
+
+        be->ring_rotations != 0 here;
+        int rotations_after = be->ring_rotations(be);
+        (rotations_after > rotations_before) here;
+
+        p->free(p);
+        be->free(be);
     }
-    be->flush(be);
-
-    uint32_t expected_r = (uint32_t)((N - 1) & 0xff);
-    (pixel & 0xff)   == expected_r here;
-    (pixel >> 24)    == 0xff here;
-
-    be->ring_rotations != 0 here;
-    int rotations_after = be->ring_rotations(be);
-    (rotations_after > rotations_before) here;
-
-    p->free(p);
-    be->free(be);
 }
 
 TEST(test_metal_long_batch_no_oom) {

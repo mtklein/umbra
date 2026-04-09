@@ -2110,13 +2110,7 @@ TEST(test_uni_16) {
 
 TEST(test_dump) {
     FILE *f = fopen("/dev/null", "w");
-    // STYLE: prefer positive control flow — `if (f) { /* whole body */ }` rather
-    // STYLE: than `if (!f) return;`. Same negative-early-return shape repeats
-    // STYLE: throughout this file's `if (!run_*(...)) { continue; }` blocks; prefer
-    // STYLE: nesting the assertions inside the positive test.
-    if (!f) { return; }
-
-    {
+    if (f) {
         struct umbra_builder *b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});
         umbra_val32            r = umbra_add_f32(b, x, umbra_imm_f32(b, 1.0f));
@@ -2127,8 +2121,8 @@ TEST(test_dump) {
         umbra_builder_free(b);
         umbra_basic_block_dump(bb, f);
         umbra_basic_block_free(bb);
+        fclose(f);
     }
-    fclose(f);
 }
 
 TEST(test_xy) {

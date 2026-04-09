@@ -41,12 +41,6 @@ TEST(test_solid_src) {
         };
         float     color[4] = {1, 0, 0, 1};
         umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
-        // STYLE: this `if (!run_draw(...)) { continue; }` shape repeats dozens
-        // STYLE: of times across draw_test.c (and bb_test.c). Prefer positive
-        // STYLE: nesting: `if (run_draw(...)) { /* assertions */ }`. A small
-        // STYLE: helper macro `RUN_OR_SKIP(...)` would also wrap the negation
-        // STYLE: into a single named intent if the literal `if/continue` shape
-        // STYLE: must stay.
         if (!run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
