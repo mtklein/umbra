@@ -1915,7 +1915,8 @@ static VkDeviceMemory alloc_and_bind(VkDevice device, VkBuffer buf, uint32_t mem
     VkDeviceMemory mem;
     VkResult rc = vkAllocateMemory(device, &ai, 0, &mem);
     assume(rc == VK_SUCCESS);
-    vkBindBufferMemory(device, buf, mem, 0);
+    rc = vkBindBufferMemory(device, buf, mem, 0);
+    assume(rc == VK_SUCCESS);
     return mem;
 }
 
@@ -1938,7 +1939,8 @@ static struct uniform_ring_chunk vk_ring_new_chunk(size_t min_bytes, void *ctx) 
     chunk->buf = create_buffer(be->device, (VkDeviceSize)cap);
     chunk->mem = alloc_and_bind(be->device, chunk->buf, be->mem_type_host);
     void *mapped = 0;
-    vkMapMemory(be->device, chunk->mem, 0, (VkDeviceSize)cap, 0, &mapped);
+    VkResult rc = vkMapMemory(be->device, chunk->mem, 0, (VkDeviceSize)cap, 0, &mapped);
+    assume(rc == VK_SUCCESS);
     return (struct uniform_ring_chunk){
         .handle=chunk,
         .mapped=mapped,
