@@ -141,7 +141,7 @@ static void test_slide_golden(int slide_idx) {
                 worst, worst_px % W, worst_px / W,
                 rp, tp);
         }
-        (worst <= tol) here;
+        worst <= tol here;
     }
 
     free(pbuf_ref);
@@ -389,7 +389,7 @@ static void run_long_batch_no_oom(struct umbra_backend *be) {
 
         be->ring_rotations != 0 here;
         int rotations_after = be->ring_rotations(be);
-        (rotations_after > rotations_before) here;
+        rotations_after > rotations_before here;
 
         p->free(p);
         be->free(be);

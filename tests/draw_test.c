@@ -122,7 +122,7 @@ TEST(test_solid_src_n16) {
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=16 * 4},
                       })) {
-            for (int i = 0; i < 16; i++) { (dst[i] == 0xFFFFFFFF) here; }
+            for (int i = 0; i < 16; i++) { dst[i] == 0xFFFFFFFF here; }
         }
     }
     cleanup_draw(&B);
@@ -175,7 +175,7 @@ TEST(test_dstover_8888) {
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=2 * 4},
                       })) {
-            for (int i = 0; i < 2; i++) { (dst[i] == 0xFFFFFFFF) here; }
+            for (int i = 0; i < 2; i++) { dst[i] == 0xFFFFFFFF here; }
         }
     }
     cleanup_draw(&B);
@@ -445,7 +445,7 @@ TEST(test_coverage_rect_outside_y) {
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=sizeof dst},
                       })) {
-            for (int i = 0; i < 4; i++) { (dst[i] == 0x12345678) here; }
+            for (int i = 0; i < 4; i++) { dst[i] == 0x12345678 here; }
         }
     }
     cleanup_draw(&B);
@@ -469,7 +469,7 @@ TEST(test_no_shader) {
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                           {.ptr=dst, .sz=4 * 4},
                       })) {
-            for (int i = 0; i < 4; i++) { (dst[i] == 0) here; }
+            for (int i = 0; i < 4; i++) { dst[i] == 0 here; }
         }
     }
     cleanup_draw(&B);
@@ -1050,14 +1050,14 @@ TEST(test_page_aligned_buffer) {
             (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
             {.ptr=aligned, .sz=N * 4},
         })) {
-            for (int i = 0; i < N; i++) { (aligned[i] == 0xFF00FF00u) here; }
+            for (int i = 0; i < N; i++) { aligned[i] == 0xFF00FF00u here; }
 
             __builtin_memset(offset, 0, N * 4);
             if (run_draw(&B, bi, N, 1, (struct umbra_buf[]){
                 (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size, .read_only=1},
                 {.ptr=offset, .sz=N * 4},
             })) {
-                for (int i = 0; i < N; i++) { (offset[i] == 0xFF00FF00u) here; }
+                for (int i = 0; i < N; i++) { offset[i] == 0xFF00FF00u here; }
             }
         }
     }
@@ -1082,7 +1082,7 @@ TEST(test_565_round_trip) {
         if (!test_backends_run(&B, bi, W565, 1, (struct umbra_buf[]){
             {.ptr=src, .sz=sizeof src}, {.ptr=dst, .sz=sizeof dst},
         })) { continue; }
-        for (int i = 0; i < W565; i++) { (dst[i] == src[i]) here; }
+        for (int i = 0; i < W565; i++) { dst[i] == src[i] here; }
     }
     test_backends_free(&B);
 }
@@ -1105,7 +1105,7 @@ TEST(test_1010102_round_trip) {
         if (!test_backends_run(&B, bi, 7, 1, (struct umbra_buf[]){
             {.ptr=src, .sz=sizeof src}, {.ptr=dst, .sz=sizeof dst},
         })) { continue; }
-        for (int i = 0; i < 7; i++) { (dst[i] == src[i]) here; }
+        for (int i = 0; i < 7; i++) { dst[i] == src[i] here; }
     }
     test_backends_free(&B);
 }
@@ -1149,7 +1149,7 @@ TEST(test_solid_src_565) {
             {.ptr=dst, .sz=sizeof dst},
         })) { continue; }
         // 565 red = R=31, G=0, B=0 → 0xF800
-        for (int i = 0; i < 4; i++) { (dst[i] == 0xF800) here; }
+        for (int i = 0; i < 4; i++) { dst[i] == 0xF800 here; }
     }
     test_backends_free(&B);
     free(lay.uniforms);
@@ -1173,7 +1173,7 @@ TEST(test_solid_src_1010102) {
         })) { continue; }
         // 1010102 green = R=0, G=1023, B=0, A=3 → (1023<<10)|(3<<30)
         uint32_t expect = (1023u << 10) | (3u << 30);
-        for (int i = 0; i < 4; i++) { (dst[i] == expect) here; }
+        for (int i = 0; i < 4; i++) { dst[i] == expect here; }
     }
     test_backends_free(&B);
     free(lay.uniforms);
