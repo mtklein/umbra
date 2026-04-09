@@ -3,23 +3,18 @@
 
 static size_t align_up(size_t x, size_t a) { return (x + a - 1) & ~(a - 1); }
 
-// STYLE: rename `len` parameter to `size` (it's a byte count) — touches the
-// STYLE: header signature too. Also `reserved` and `off` here never change after
-// STYLE: assignment, so they should be `size_t const`.
-struct uniform_ring_loc uniform_ring_alloc(struct uniform_ring *r, void const *bytes, size_t len) {
-    size_t reserved = align_up(len, r->align);
+struct uniform_ring_loc uniform_ring_alloc(struct uniform_ring *r, void const *bytes, size_t size) {
+    size_t const reserved = align_up(size, r->align);
     for (;;) {
         if (r->cur < r->n) {
             struct uniform_ring_chunk *c = &r->chunks[r->cur];
             if (c->used + reserved <= c->cap) {
-                size_t off = c->used;
-                if (bytes && len) { __builtin_memcpy((char*)c->mapped + off, bytes, len); }
+                size_t const off = c->used;
+                if (bytes && size) { __builtin_memcpy((char*)c->mapped + off, bytes, size); }
                 c->used = off + reserved;
                 return (struct uniform_ring_loc){.handle=c->handle, .offset=off};
             }
             r->cur++;
-            // STYLE: prefer positive nesting over `continue` — restructure the
-            // STYLE: outer loop so the chunk-fits branch is the natural fall-through.
             continue;
         }
         if (r->n >= r->cap) {
@@ -53,8 +48,8 @@ void uniform_ring_pool_free(struct uniform_ring_pool *p) {
 }
 
 struct uniform_ring_loc uniform_ring_pool_alloc(struct uniform_ring_pool *p,
-                                                void const *bytes, size_t len) {
-    return uniform_ring_alloc(&p->rings[p->cur], bytes, len);
+                                                void const *bytes, size_t size) {
+    return uniform_ring_alloc(&p->rings[p->cur], bytes, size);
 }
 
 _Bool uniform_ring_pool_should_rotate(struct uniform_ring_pool const *p) {

@@ -22,9 +22,7 @@ struct uniform_ring {
     void                      (*free_chunk)(void *handle, void *ctx);
 };
 
-// STYLE: avoid "len" — this parameter is a byte count, so name it `size` (or
-// STYLE: even drop the name, since `bytes` already implies what's being measured).
-struct uniform_ring_loc uniform_ring_alloc(struct uniform_ring *, void const *bytes, size_t len);
+struct uniform_ring_loc uniform_ring_alloc(struct uniform_ring *, void const *bytes, size_t size);
 size_t                  uniform_ring_used (struct uniform_ring const *);
 void                    uniform_ring_reset(struct uniform_ring *);
 
@@ -67,8 +65,7 @@ struct uniform_ring_pool {
 void                    uniform_ring_pool_free          (struct uniform_ring_pool *);
 
 struct uniform_ring_loc uniform_ring_pool_alloc         (struct uniform_ring_pool *,
-                                                         // STYLE: same "len" issue — byte count should be `size`.
-                                                         void const *bytes, size_t len);
+                                                         void const *bytes, size_t size);
 
 // True when the current frame's ring usage has exceeded high_water.
 _Bool                   uniform_ring_pool_should_rotate (struct uniform_ring_pool const *);
