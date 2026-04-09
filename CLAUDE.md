@@ -23,10 +23,17 @@ Style
 
 Indent with 4 spaces, wrap to 100 columns, and always use {}.  Almost always
 begin a new line after {, even for short expressions, except prefer to align
-parallel constructs vertically, e.g.
+parallel constructs vertically.  It's nice to vertically align consecutive
+related assignments of the same type, with one shared type declaration:
 
     if (inst.x) { foo(&inst, x); }
     if (inst.y) { foo(&inst, y); }
+
+    int const foo = fn(inst.x),
+              bar = fn(inst.y),
+              baz = fn(inst.z),
+             quux = fn(inst.w);
+    float const not_int = ...;
 
 Use East `const`, and use it liberally, especially to distinguish variables
 that name a value like `double const start_time = now()` from locals that are
