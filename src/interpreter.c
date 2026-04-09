@@ -175,9 +175,9 @@ struct umbra_interpreter {
 };
 
 static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) {
-    int *id = calloc((size_t)bb->insts, sizeof *id);
+    int *const id = calloc((size_t)bb->insts, sizeof *id);
 
-    struct umbra_interpreter *p = malloc(sizeof *p);
+    struct umbra_interpreter *const p = malloc(sizeof *p);
     // Count slots, leaving room for multi-result ops (load_32x2 uses 2, load_8x4 uses 4).
     int num_slots = 1; // +1 for SW_DONE sentinel
     for (int i = 0; i < bb->insts; i++) {
@@ -203,7 +203,7 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
     int const total_ptrs = p->nptr + n_deref;
     p->buf = calloc((size_t)total_ptrs, sizeof *p->buf);
 
-    int *deref_slot = calloc((size_t)bb->insts, sizeof *deref_slot);
+    int *const deref_slot = calloc((size_t)bb->insts, sizeof *deref_slot);
     {
         int di = 0;
         for (int i = 0; i < bb->insts; i++) {

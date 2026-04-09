@@ -20,12 +20,12 @@ void* umbra_uniforms_alloc(struct umbra_uniforms_layout const *u) {
 }
 
 void umbra_uniforms_fill_f32(void *data, size_t h, float const *v, int n) {
-    char *p = (char*)data + h;
+    char *const p = (char*)data + h;
     __builtin_memcpy(p, v, (size_t)n * 4);
 }
 void umbra_uniforms_fill_ptr(void *data, size_t h, struct umbra_buf b) {
-    char *p = (char*)data + h;
-    ptrdiff_t ssz = b.read_only ? -(ptrdiff_t)b.sz : (ptrdiff_t)b.sz;
+    char      *const p   = (char*)data + h;
+    ptrdiff_t  const ssz = b.read_only ? -(ptrdiff_t)b.sz : (ptrdiff_t)b.sz;
     __builtin_memset(p, 0, 24);
     __builtin_memcpy(p,      &b.ptr,       sizeof b.ptr);
     __builtin_memcpy(p + 8,  &ssz,         sizeof ssz);

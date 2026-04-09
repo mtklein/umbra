@@ -138,7 +138,7 @@ static val push_(builder *b, struct bb_inst inst) {
 #define VW(v) .w = (val_){.id = (v).id, .chan = (v).chan}
 
 builder* umbra_builder(void) {
-    builder *b = calloc(1, sizeof *b);
+    builder *const b = calloc(1, sizeof *b);
     // Simplifies liveness analysis to know id 0 is imm=0.
     push(b, op_imm_32, .imm = 0);
     return b;
@@ -484,9 +484,9 @@ static char const* op_name(enum op op) {
 
 static void schedule(struct bb_inst const *in, int n, _Bool const *body,
                      struct bb_inst *out, int *old_to_new, int preamble, int total) {
-    int *last_use = calloc((size_t)n, sizeof *last_use);
-    int *n_deps = calloc((size_t)n, sizeof *n_deps);
-    int *n_users = calloc((size_t)n, sizeof *n_users);
+    int *const last_use = calloc((size_t)n, sizeof *last_use);
+    int *const n_deps   = calloc((size_t)n, sizeof *n_deps);
+    int *const n_users  = calloc((size_t)n, sizeof *n_users);
 
     for (int i = 0; i < n; i++) { last_use[i] = -1; }
     for (int i = 0; i < n; i++) {
@@ -505,12 +505,12 @@ static void schedule(struct bb_inst const *in, int n, _Bool const *body,
         }
     }
 
-    int *user_off = calloc((size_t)(n + 1), sizeof *user_off);
+    int *const user_off = calloc((size_t)(n + 1), sizeof *user_off);
     for (int i = 0; i < n; i++) {
         user_off[i + 1] = user_off[i] + n_users[i];
         n_users[i] = 0;
     }
-    int *users = calloc((size_t)user_off[n], sizeof *users);
+    int *const users = calloc((size_t)user_off[n], sizeof *users);
     for (int i = 0; i < n; i++) {
         if (!body[i]) { continue; }
         n_users[i] = 0;
@@ -523,8 +523,8 @@ static void schedule(struct bb_inst const *in, int n, _Bool const *body,
         }
     }
 
-    int *ready = calloc((size_t)n, sizeof *ready);
-    int  nready = 0;
+    int *const ready  = calloc((size_t)n, sizeof *ready);
+    int        nready = 0;
     for (int i = 0; i < n; i++) {
         if (body[i] && n_deps[i] == 0) { ready[nready++] = i; }
     }
@@ -578,8 +578,8 @@ static void schedule(struct bb_inst const *in, int n, _Bool const *body,
 struct umbra_basic_block* umbra_basic_block(builder *b) {
     int const n = b->insts;
 
-    _Bool *live    = calloc((size_t)n, 1);
-    _Bool *varying = calloc((size_t)n, 1);
+    _Bool *const live    = calloc((size_t)n, 1);
+    _Bool *const varying = calloc((size_t)n, 1);
 
     for (int i = n; i-- > 0;) {
         if (is_store(b->inst[i].op)) { live[i] = 1; }
@@ -602,8 +602,8 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
     int total = 0;
     for (int i = 0; i < n; i++) { total += live[i]; }
 
-    struct bb_inst *out        = malloc((size_t)total * sizeof *out);
-    int            *old_to_new = malloc((size_t)n     * sizeof *old_to_new);
+    struct bb_inst *const out        = malloc((size_t)total * sizeof *out);
+    int            *const old_to_new = malloc((size_t)n     * sizeof *old_to_new);
     for (int i = 0; i < n; i++) { old_to_new[i] = -1; }
 
     int j = 0;
@@ -615,7 +615,7 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
     }
     int const preamble = j;
 
-    _Bool *body = calloc((size_t)n, 1);
+    _Bool *const body = calloc((size_t)n, 1);
     for (int i = 0; i < n; i++) { body[i] = live[i] && varying[i]; }
     schedule(b->inst, n, body, out, old_to_new, preamble, total);
     free(body);
@@ -632,7 +632,7 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
     free(varying);
     free(old_to_new);
 
-    struct umbra_basic_block *result = malloc(sizeof *result);
+    struct umbra_basic_block *const result = malloc(sizeof *result);
     result->inst = out;
     result->insts = total;
     result->preamble = preamble;

@@ -246,7 +246,7 @@ struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct bb_inst con
     // it. Stays pinned until the next ra_step_* resets npinned.
     ra->pinned[ra->npinned++] = i;
     if (x_dead && inst->x.chan) {
-        int8_t r = ra->chan_reg[(int)inst->x.id][(int)inst->x.chan];
+        int8_t const r = ra->chan_reg[(int)inst->x.id][(int)inst->x.chan];
         if (r >= 0) { ra_return_reg(ra, r); ra->chan_reg[(int)inst->x.id][(int)inst->x.chan] = -1; }
     }
     return s;
@@ -254,7 +254,7 @@ struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct bb_inst con
 
 struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const *inst,
                            int i, int nscratch) {
-    int           *lu = ra->last_use;
+    int *const     lu = ra->last_use;
     struct ra_step s = step0();
 
     ra->npinned = 0;
