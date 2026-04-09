@@ -36,26 +36,16 @@ void ra_set_chan_reg(struct ra *ra, int val, int chan, int8_t r) {
     ra->chan_reg[val][chan] = r;
 }
 
-// STYLE: vertically align this group of related field assignments — they're a
-// STYLE: parallel construct and the style guide explicitly calls out aligning
-// STYLE: them. e.g.
-// STYLE:   ra->reg            = malloc(...);
-// STYLE:   ra->last_use       = malloc(...);
-// STYLE:   ra->owner          = malloc(...);
-// STYLE:   ra->free_stack     = malloc(...);
-// STYLE:   ra->chan_reg       = malloc(...);
-// STYLE:   ra->chan_last_use  = malloc(...);
 struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const *cfg) {
-    int const  n = bb->insts;
+    int const  n  = bb->insts;
     struct ra *ra = malloc(sizeof *ra);
-    ra->cfg = *cfg;
-    ra->reg = malloc((size_t)n * sizeof *ra->reg);
-    ra->last_use = malloc((size_t)n * sizeof *ra->last_use);
-    ra->owner = malloc((size_t)cfg->max_reg * sizeof *ra->owner);
-    ra->free_stack = malloc((size_t)cfg->max_reg * sizeof *ra->free_stack);
-
-    ra->chan_reg = malloc((size_t)n * sizeof *ra->chan_reg);
-    ra->chan_last_use = malloc((size_t)n * sizeof *ra->chan_last_use);
+    ra->cfg           = *cfg;
+    ra->reg           = malloc((size_t)n           * sizeof *ra->reg);
+    ra->last_use      = malloc((size_t)n           * sizeof *ra->last_use);
+    ra->owner         = malloc((size_t)cfg->max_reg * sizeof *ra->owner);
+    ra->free_stack    = malloc((size_t)cfg->max_reg * sizeof *ra->free_stack);
+    ra->chan_reg      = malloc((size_t)n           * sizeof *ra->chan_reg);
+    ra->chan_last_use = malloc((size_t)n           * sizeof *ra->chan_last_use);
     for (int i = 0; i < n; i++) { ra->reg[i] = -1; }
     for (int i = 0; i < n; i++) {
         for (int c = 0; c < 4; c++) { ra->chan_reg[i][c] = -1; ra->chan_last_use[i][c] = -1; }
