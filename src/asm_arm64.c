@@ -104,7 +104,8 @@ uint32_t STR_q(int d, int n, int m) {
 }
 
 uint32_t LSL_xi(int d, int n, int shift) {
-    int immr = (-shift) & 63, imms = 63 - shift;
+    int const immr = (-shift) & 63,
+              imms = 63 - shift;
     return 0xd3400000u
         | ((uint32_t)immr << 16)
         | ((uint32_t)imms << 10)
@@ -275,7 +276,7 @@ uint32_t SSHR_4s_imm(int d, int n, int sh) {
 }
 uint32_t UMOV_ws(int d, int n) { return 0x0e043c00u | ((uint32_t)n << 5) | (uint32_t)d; }
 uint32_t UMOV_ws_lane(int d, int n, int lane) {
-    uint32_t imm5 = (uint32_t)((lane << 3) | 4);
+    uint32_t const imm5 = (uint32_t)((lane << 3) | 4);
     return 0x0e003c00u | (imm5 << 16) | ((uint32_t)n << 5) | (uint32_t)d;
 }
 uint32_t ZIP1_4s(int d, int n, int m) {
@@ -307,19 +308,20 @@ uint32_t XTN_8b(int d, int n) {
     return 0x0e212800u | ((uint32_t)n << 5) | (uint32_t)d;
 }
 uint32_t INS_elem_s(int d, int dst_lane, int n, int src_lane) {
-    uint32_t imm5 = (uint32_t)(dst_lane << 3) | 4;
-    uint32_t imm4 = (uint32_t)(src_lane << 2);
+    uint32_t const imm5 = (uint32_t)(dst_lane << 3) | 4,
+                   imm4 = (uint32_t)(src_lane << 2);
     return 0x6e000400u | (imm5 << 16) | (imm4 << 11) | ((uint32_t)n << 5) | (uint32_t)d;
 }
 uint32_t LD1_s(int t, int idx, int n) {
-    uint32_t Q = ((uint32_t)idx >> 1) & 1;
-    uint32_t S = (uint32_t)idx & 1;
+    uint32_t const Q = ((uint32_t)idx >> 1) & 1,
+                   S = (uint32_t)idx & 1;
     return 0x0d408000u | (Q << 30) | (S << 12) | ((uint32_t)n << 5) | (uint32_t)t;
 }
 
 uint32_t MOVI_4s(int d, uint8_t imm8, int shift) {
-    int      cmode = (shift / 8) * 2;
-    uint32_t abc = (imm8 >> 5) & 7, defgh = imm8 & 0x1f;
+    int      const cmode = (shift / 8) * 2;
+    uint32_t const abc   = (imm8 >> 5) & 7,
+                   defgh = imm8 & 0x1f;
     return 0x4f000400u | (abc << 16) | ((uint32_t)cmode << 12) | (defgh << 5) | (uint32_t)d;
 }
 uint32_t MVNI_4s(int d, uint8_t imm8, int shift) {
@@ -327,12 +329,12 @@ uint32_t MVNI_4s(int d, uint8_t imm8, int shift) {
 }
 uint32_t DUP_4s_w(int d, int n) { return 0x4e040c00u | ((uint32_t)n << 5) | (uint32_t)d; }
 uint32_t DUP_4s_lane(int d, int n, int lane) {
-    uint32_t imm5 = (uint32_t)(lane << 3) | 4;
+    uint32_t const imm5 = (uint32_t)(lane << 3) | 4;
     return 0x4e000400u | (imm5 << 16) | ((uint32_t)n << 5) | (uint32_t)d;
 }
 
 uint32_t INS_s(int d, int idx, int n) {
-    uint32_t imm5 = (uint32_t)(idx << 3) | 4;
+    uint32_t const imm5 = (uint32_t)(idx << 3) | 4;
     return 0x4e001c00u | (imm5 << 16) | ((uint32_t)n << 5) | (uint32_t)d;
 }
 

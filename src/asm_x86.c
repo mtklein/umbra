@@ -25,7 +25,9 @@ void emit4(Buf *b, uint32_t v) {
 // d=ModRM.reg  v=VEX.vvvv(NDS)  s=ModRM.rm
 
 void vex(Buf *b, int pp, int mm, int W, int L, int d, int v, int s, uint8_t op) {
-    int R = ~d >> 3, X = 1, B = ~s >> 3;
+    int const R = ~d >> 3,
+              X = 1,
+              B = ~s >> 3;
     if (mm == 1 && W == 0 && (B & 1) && (X & 1)) {
         emit1(b, 0xc5);
         emit1(b, (uint8_t)(((R & 1) << 7) | ((~v & 0xf) << 3) | (L << 2) | pp));
@@ -55,23 +57,20 @@ static void vex_shift(Buf *b, int pp, int mm, int L, uint8_t op, int ext, int d,
 // VEX memory operands: [base + index*scale + disp]
 void vex_mem(Buf *b, int pp, int mm, int W, int L, int reg, int v, uint8_t op, int base,
              int index, int scale, int disp) {
-    int R = ~reg >> 3, X = ~index >> 3, B = ~base >> 3;
+    int const R = ~reg   >> 3,
+              X = ~index >> 3,
+              B = ~base  >> 3;
     emit1(b, 0xc4);
     emit1(b, (uint8_t)(((R & 1) << 7) | ((X & 1) << 6) | ((B & 1) << 5) | mm));
     emit1(b, (uint8_t)((W << 7) | ((~v & 0xf) << 3) | (L << 2) | pp));
     emit1(b, op);
 
-    int mod = 0;
-    if (disp == 0 && (base & 7) != 5) {
-        mod = 0;
-    } else if (disp >= -128 && disp <= 127) {
-        mod = 1;
-    } else {
-        mod = 2;
-    }
+    int const mod = (disp == 0 && (base & 7) != 5) ? 0
+                  : (disp >= -128 && disp <= 127)  ? 1
+                                                   : 2;
 
     emit1(b, (uint8_t)((mod << 6) | ((reg & 7) << 3) | 4)); // SIB follows
-    int ss = (scale == 1) ? 0 : (scale == 2) ? 1 : (scale == 4) ? 2 : 3;
+    int const ss = (scale == 1) ? 0 : (scale == 2) ? 1 : (scale == 4) ? 2 : 3;
     emit1(b, (uint8_t)((ss << 6) | ((index & 7) << 3) | (base & 7)));
 
     if (mod == 1) {
@@ -82,13 +81,13 @@ void vex_mem(Buf *b, int pp, int mm, int W, int L, int reg, int v, uint8_t op, i
 }
 
 int vex_rip(Buf *b, int pp, int mm, int W, int L, int reg, int v, uint8_t op) {
-    int R = ~reg >> 3;
+    int const R = ~reg >> 3;
     emit1(b, 0xc4);
     emit1(b, (uint8_t)(((R & 1) << 7) | (1 << 6) | (1 << 5) | mm));
     emit1(b, (uint8_t)((W << 7) | ((~v & 0xf) << 3) | (L << 2) | pp));
     emit1(b, op);
     emit1(b, (uint8_t)(((reg & 7) << 3) | 5));
-    int pos = (int)b->size;
+    int const pos = (int)b->size;
     emit4(b, 0);
     return pos;
 }
@@ -184,13 +183,13 @@ void mov_load(Buf *b, int d, int base, int disp) {
 int jcc(Buf *b, uint8_t cc) {
     emit1(b, 0x0f);
     emit1(b, (uint8_t)(0x80 | cc));
-    int pos = (int)b->size;
+    int const pos = (int)b->size;
     emit4(b, 0);
     return pos;
 }
 int jmp(Buf *b) {
     emit1(b, 0xe9);
-    int pos = (int)b->size;
+    int const pos = (int)b->size;
     emit4(b, 0);
     return pos;
 }
@@ -204,8 +203,8 @@ void nop(Buf *b) { emit1(b, 0x90); }
 
 // ---- Spill: VMOVDQU [RSP+slot*32], ymm or VMOVDQU ymm, [RSP+slot*32] ----
 void vspill(Buf *b, int reg, int slot) {
-    int disp = slot * 32;
-    int R = ~reg >> 3;
+    int const disp = slot * 32,
+              R    = ~reg >> 3;
     emit1(b, 0xc5);
     emit1(b, (uint8_t)(((R & 1) << 7) | 0x7e));
     emit1(b, 0x7f);
@@ -223,8 +222,8 @@ void vspill(Buf *b, int reg, int slot) {
     }
 }
 void vfill(Buf *b, int reg, int slot) {
-    int disp = slot * 32;
-    int R = ~reg >> 3;
+    int const disp = slot * 32,
+              R    = ~reg >> 3;
     emit1(b, 0xc5);
     emit1(b, (uint8_t)(((R & 1) << 7) | 0x7e));
     emit1(b, 0x6f);
@@ -249,8 +248,8 @@ void vpxor(Buf *b, int L, int d, int v, int s) { vex_rrr(b, 1, 1, L, 0xef, d, v,
 void vbroadcastss(Buf *b, int d, int s) { vex_rrr(b, 1, 2, 1, 0x18, d, 0, s); }
 
 void broadcast_imm32(Buf *b, int d, uint32_t v) {
-    int shr = v ? __builtin_clz(v) : 0;
-    int shl = v ? __builtin_ctz(v) : 0;
+    int const shr = v ? __builtin_clz(v) : 0,
+              shl = v ? __builtin_ctz(v) : 0;
 
     if (v == 0) {
         vpxor(b, 1, d, d, d);
