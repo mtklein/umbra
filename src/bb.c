@@ -787,14 +787,18 @@ int umbra_const_eval(enum op op, int xb, int yb, int zb) {
     case op_round_i32: { float t = rintf(x.f);  r.i = (int32_t)t; } return r.i;
     case op_floor_i32: { float t = floorf(x.f); r.i = (int32_t)t; } return r.i;
     case op_ceil_i32:  { float t = ceilf(x.f);  r.i = (int32_t)t; } return r.i;
-    case op_fma_f32:   r.f = z.f + x.f * y.f; return r.i;
-    case op_fms_f32:   r.f = z.f - x.f * y.f; return r.i;
+    // op_fma_f32 / op_fms_f32: only produced by the mul→fma rewrite in
+    // umbra_add_f32 / umbra_sub_f32, which only fires when an operand's
+    // op == op_mul_f32. By the time we'd want to fold a fully-imm fma,
+    // the inner mul has already been folded to op_imm_32, so we never
+    // reach a const_eval with op_fma_f32 or op_fms_f32.
+    //
+    // op_shl_i32 / op_shr_u32 / op_shr_s32: the builders short-circuit
+    // to op_*_imm whenever the shift amount is imm, so the non-imm shift
+    // forms never reach const_eval with all-imm inputs either.
     case op_add_i32: r.i = x.i + y.i; return r.i;
     case op_sub_i32: r.i = x.i - y.i; return r.i;
     case op_mul_i32: r.i = x.i * y.i; return r.i;
-    case op_shl_i32: r.i = x.i << y.i; return r.i;
-    case op_shr_u32: r.u = x.u >> y.u; return r.i;
-    case op_shr_s32: r.i = x.i >> y.i; return r.i;
     case op_and_32:  r.i = x.i & y.i; return r.i;
     case op_or_32:   r.i = x.i | y.i; return r.i;
     case op_xor_32:  r.i = x.i ^ y.i; return r.i;
