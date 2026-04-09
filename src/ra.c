@@ -2,14 +2,20 @@
 #include <limits.h>
 #include <stdlib.h>
 
+// Per-instruction state. Indexed by val (a bb_inst id).
+struct ra_slot {
+    int    last_use;
+    int    chan_last_use[4];
+    int8_t reg;
+    int8_t chan_reg[4];
+    int8_t pad_[3];
+};
+
 struct ra {
-    int                  *last_use;
-    int                 (*chan_last_use)[4];
-    int8_t               *reg;
-    int                  *owner;
-    int8_t               *free_stack;
-    int8_t               *loop_reg;
-    int8_t              (*chan_reg)[4];
+    struct ra_slot       *slot;       // n entries (one per bb_inst)
+    int                  *owner;      // max_reg entries (val owning physical reg, -1 if free)
+    int8_t               *free_stack; // max_reg entries (stack of free register ids)
+    int8_t               *loop_reg;   // preamble entries (snapshot of slot[i].reg at loop top)
     struct bb_inst const *inst;
     struct ra_config      cfg;
     int                   nfree;
@@ -19,57 +25,58 @@ struct ra {
     int                   pinned[4];
 };
 
-int8_t ra_reg(struct ra const *ra, int val) { return ra->reg[val]; }
-int8_t ra_chan_reg(struct ra const *ra, int val, int chan) { return ra->chan_reg[val][chan]; }
-int    ra_last_use(struct ra const *ra, int val) { return ra->last_use[val]; }
-int    ra_chan_last_use(struct ra const *ra, int val, int chan) { return ra->chan_last_use[val][chan]; }
+int8_t ra_reg(struct ra const *ra, int val) { return ra->slot[val].reg; }
+int8_t ra_chan_reg(struct ra const *ra, int val, int chan) { return ra->slot[val].chan_reg[chan]; }
+int    ra_last_use(struct ra const *ra, int val) { return ra->slot[val].last_use; }
+int    ra_chan_last_use(struct ra const *ra, int val, int chan) {
+    return ra->slot[val].chan_last_use[chan];
+}
 
-void ra_set_last_use(struct ra *ra, int val, int lu) { ra->last_use[val] = lu; }
+void ra_set_last_use(struct ra *ra, int val, int lu) { ra->slot[val].last_use = lu; }
 
 void ra_return_reg(struct ra *ra, int8_t r) { ra->free_stack[ra->nfree++] = r; }
 
 void ra_assign(struct ra *ra, int val, int8_t r) {
-    ra->reg[val] = r;
+    ra->slot[val].reg = r;
     ra->owner[(int)r] = val;
 }
 void ra_set_chan_reg(struct ra *ra, int val, int chan, int8_t r) {
-    ra->chan_reg[val][chan] = r;
+    ra->slot[val].chan_reg[chan] = r;
 }
 
-// TODO: seems like we've got a lot of allocs here, simpler as AoS than SoA?
 struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const *cfg) {
     int const  n  = bb->insts;
     struct ra *ra = malloc(sizeof *ra);
-    ra->cfg           = *cfg;
-    ra->reg           = malloc((size_t)n           * sizeof *ra->reg);
-    ra->last_use      = malloc((size_t)n           * sizeof *ra->last_use);
-    ra->owner         = malloc((size_t)cfg->max_reg * sizeof *ra->owner);
-    ra->free_stack    = malloc((size_t)cfg->max_reg * sizeof *ra->free_stack);
-    ra->chan_reg      = malloc((size_t)n           * sizeof *ra->chan_reg);
-    ra->chan_last_use = malloc((size_t)n           * sizeof *ra->chan_last_use);
-    for (int i = 0; i < n; i++) { ra->reg[i] = -1; }
+    ra->cfg        = *cfg;
+    ra->slot       = malloc((size_t)n            * sizeof *ra->slot);
+    ra->owner      = malloc((size_t)cfg->max_reg * sizeof *ra->owner);
+    ra->free_stack = malloc((size_t)cfg->max_reg * sizeof *ra->free_stack);
     for (int i = 0; i < n; i++) {
-        for (int c = 0; c < 4; c++) { ra->chan_reg[i][c] = -1; ra->chan_last_use[i][c] = -1; }
+        ra->slot[i].reg      = -1;
+        ra->slot[i].last_use = -1;
+        for (int c = 0; c < 4; c++) {
+            ra->slot[i].chan_reg     [c] = -1;
+            ra->slot[i].chan_last_use[c] = -1;
+        }
     }
     for (int i = 0; i < cfg->max_reg; i++) { ra->owner[i] = -1; }
 
-    for (int i = 0; i < n; i++) { ra->last_use[i] = -1; }
     for (int i = 0; i < n; i++) {
         struct bb_inst const *inst = &bb->inst[i];
-        ra->last_use[(int)inst->x.id] = i;
-        ra->chan_last_use[(int)inst->x.id][(int)inst->x.chan] = i;
+        ra->slot[(int)inst->x.id].last_use                          = i;
+        ra->slot[(int)inst->x.id].chan_last_use[(int)inst->x.chan]  = i;
         if (!cfg->ignore_imm_y || !is_fused_imm(inst->op)) {
-            ra->last_use[(int)inst->y.id] = i;
-            ra->chan_last_use[(int)inst->y.id][(int)inst->y.chan] = i;
+            ra->slot[(int)inst->y.id].last_use                          = i;
+            ra->slot[(int)inst->y.id].chan_last_use[(int)inst->y.chan]  = i;
         }
-        ra->last_use[(int)inst->z.id] = i;
-        ra->chan_last_use[(int)inst->z.id][(int)inst->z.chan] = i;
-        ra->last_use[(int)inst->w.id] = i;
-        ra->chan_last_use[(int)inst->w.id][(int)inst->w.chan] = i;
+        ra->slot[(int)inst->z.id].last_use                          = i;
+        ra->slot[(int)inst->z.id].chan_last_use[(int)inst->z.chan]  = i;
+        ra->slot[(int)inst->w.id].last_use                          = i;
+        ra->slot[(int)inst->w.id].chan_last_use[(int)inst->w.chan]  = i;
     }
     for (int i = 0; i < bb->preamble; i++) {
-        if (ra->last_use[i] >= bb->preamble) {
-            ra->last_use[i] = n;
+        if (ra->slot[i].last_use >= bb->preamble) {
+            ra->slot[i].last_use = n;
         }
     }
 
@@ -93,14 +100,11 @@ void ra_reset_pool(struct ra *ra) {
         ra->free_stack[i] = ra->cfg.pool[ra->cfg.nregs - 1 - i];
     }
     for (int i = 0; i < ra->cfg.max_reg; i++) { ra->owner[i] = -1; }
-    for (int i = 0; i < ra->insts; i++) { ra->reg[i] = -1; }
+    for (int i = 0; i < ra->insts; i++) { ra->slot[i].reg = -1; }
 }
 
 void ra_destroy(struct ra *ra) {
-    free(ra->reg);
-    free(ra->chan_reg);
-    free(ra->chan_last_use);
-    free(ra->last_use);
+    free(ra->slot);
     free(ra->owner);
     free(ra->free_stack);
     free(ra->loop_reg);
@@ -109,7 +113,7 @@ void ra_destroy(struct ra *ra) {
 
 void ra_begin_loop(struct ra *ra) {
     for (int i = 0; i < ra->preamble; i++) {
-        ra->loop_reg[i] = ra->reg[i];
+        ra->loop_reg[i] = ra->slot[i].reg;
     }
 }
 
@@ -121,7 +125,7 @@ void ra_end_loop(struct ra *ra, int *sl) {
     for (int i = 0; i < ra->preamble; i++) {
         int8_t const target = ra->loop_reg[i];
         if (target < 0) { continue; }
-        if (ra->reg[i] == target) { continue; }
+        if (ra->slot[i].reg == target) { continue; }
         if (sl[i] >= 0) {
             ra->cfg.fill(target, sl[i], ra->cfg.ctx);
         } else if (can_remat(ra, i)) {
@@ -131,11 +135,11 @@ void ra_end_loop(struct ra *ra, int *sl) {
 }
 
 void ra_free_reg(struct ra *ra, int val) {
-    int8_t const r = ra->reg[val];
+    int8_t const r = ra->slot[val].reg;
     if (r >= 0) {
         ra->free_stack[ra->nfree++] = r;
         ra->owner[(int)r] = -1;
-        ra->reg[val] = -1;
+        ra->slot[val].reg = -1;
     }
 }
 
@@ -156,7 +160,7 @@ int8_t ra_alloc(struct ra *ra, int *sl, int *ns) {
             }
         }
         if (skip) { continue; }
-        int const lu = ra->last_use[val] < 0 ? INT_MAX : ra->last_use[val];
+        int const lu = ra->slot[val].last_use < 0 ? INT_MAX : ra->slot[val].last_use;
         if (best_lu < lu) {
             best_lu = lu;
             best_r = r;
@@ -169,36 +173,36 @@ int8_t ra_alloc(struct ra *ra, int *sl, int *ns) {
         if (sl[evicted] < 0) {
             sl[evicted] = (*ns)++;
         }
-        ra->cfg.spill(ra->reg[evicted], sl[evicted], ra->cfg.ctx);
+        ra->cfg.spill(ra->slot[evicted].reg, sl[evicted], ra->cfg.ctx);
     }
-    ra->owner[(int)ra->reg[evicted]] = -1;
-    int8_t const r = ra->reg[evicted];
-    ra->reg[evicted] = -1;
+    int8_t const r = ra->slot[evicted].reg;
+    ra->owner[(int)r] = -1;
+    ra->slot[evicted].reg = -1;
     return r;
 }
 
 int8_t ra_ensure_chan(struct ra *ra, int *sl, int *ns, int val, int chan) {
-    if (chan != 0) { return ra->chan_reg[val][chan]; }
+    if (chan != 0) { return ra->slot[val].chan_reg[chan]; }
     return ra_ensure(ra, sl, ns, val);
 }
 int8_t ra_ensure(struct ra *ra, int *sl, int *ns, int val) {
-    if (ra->reg[val] < 0) {
+    if (ra->slot[val].reg < 0) {
         int8_t const r = ra_alloc(ra, sl, ns);
         if (sl[val] >= 0) {
             ra->cfg.fill(r, sl[val], ra->cfg.ctx);
         } else if (can_remat(ra, val)) {
             ra->cfg.remat(r, val, ra->cfg.ctx);
         }
-        ra->reg[val] = r;
+        ra->slot[val].reg = r;
         ra->owner[(int)r] = val;
     }
-    return ra->reg[val];
+    return ra->slot[val].reg;
 }
 
 int8_t ra_claim(struct ra *ra, int old_val, int new_val) {
-    int8_t const r = ra->reg[old_val];
-    ra->reg[old_val] = -1;
-    ra->reg[new_val] = r;
+    int8_t const r = ra->slot[old_val].reg;
+    ra->slot[old_val].reg = -1;
+    ra->slot[new_val].reg = r;
     ra->owner[(int)r] = new_val;
     return r;
 }
@@ -217,7 +221,7 @@ static struct ra_step step0(void) {
 struct ra_step ra_step_alloc(struct ra *ra, int *sl, int *ns, int i) {
     struct ra_step s = step0();
     s.rd = ra_alloc(ra, sl, ns);
-    ra->reg[i] = s.rd;
+    ra->slot[i].reg = s.rd;
     ra->owner[(int)s.rd] = i;
     return s;
 }
@@ -232,13 +236,13 @@ struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct bb_inst con
         ra->pinned[ra->npinned++] = (int)inst->x.id;
     }
     _Bool const x_dead = inst->x.chan
-        ? ra->chan_last_use[(int)inst->x.id][(int)inst->x.chan] <= i
-        : ra->last_use[(int)inst->x.id] <= i;
+        ? ra->slot[(int)inst->x.id].chan_last_use[(int)inst->x.chan] <= i
+        : ra->slot[(int)inst->x.id].last_use <= i;
     if (x_dead && !inst->x.chan) {
         s.rd = ra_claim(ra, (int)inst->x.id, i);
     } else {
         s.rd = ra_alloc(ra, sl, ns);
-        ra->reg[i] = s.rd;
+        ra->slot[i].reg = s.rd;
         ra->owner[(int)s.rd] = i;
     }
     // Pin the new value so any subsequent ra_alloc / ra_ensure (e.g. the
@@ -246,16 +250,19 @@ struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct bb_inst con
     // it. Stays pinned until the next ra_step_* resets npinned.
     ra->pinned[ra->npinned++] = i;
     if (x_dead && inst->x.chan) {
-        int8_t const r = ra->chan_reg[(int)inst->x.id][(int)inst->x.chan];
-        if (r >= 0) { ra_return_reg(ra, r); ra->chan_reg[(int)inst->x.id][(int)inst->x.chan] = -1; }
+        int8_t const r = ra->slot[(int)inst->x.id].chan_reg[(int)inst->x.chan];
+        if (r >= 0) {
+            ra_return_reg(ra, r);
+            ra->slot[(int)inst->x.id].chan_reg[(int)inst->x.chan] = -1;
+        }
     }
     return s;
 }
 
 struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const *inst,
                            int i, int nscratch) {
-    int *    lu = ra->last_use;
-    struct ra_step s = step0();
+    struct ra_slot const *slot = ra->slot;
+    struct ra_step        s    = step0();
 
     ra->npinned = 0;
     if ((int)inst->x.id < i) {
@@ -278,9 +285,9 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const
     // Channel operands can't be claimed (claim uses reg[id], not chan_reg),
     // so only mark scalar operands as dead for the claim logic.
     // Channel registers are freed separately below.
-    _Bool x_dead = !inst->x.chan && (int)inst->x.id < i && lu[(int)inst->x.id] <= i;
-    _Bool y_dead = !inst->y.chan && (int)inst->y.id < i && lu[(int)inst->y.id] <= i;
-    _Bool z_dead = !inst->z.chan && (int)inst->z.id < i && lu[(int)inst->z.id] <= i;
+    _Bool x_dead = !inst->x.chan && (int)inst->x.id < i && slot[(int)inst->x.id].last_use <= i;
+    _Bool y_dead = !inst->y.chan && (int)inst->y.id < i && slot[(int)inst->y.id].last_use <= i;
+    _Bool z_dead = !inst->z.chan && (int)inst->z.id < i && slot[(int)inst->z.id].last_use <= i;
     if (inst->y.bits == inst->x.bits) { y_dead = 0; }
     if (inst->z.bits == inst->x.bits) { z_dead = 0; }
     if (inst->z.bits == inst->y.bits) { z_dead = 0; }
@@ -300,7 +307,7 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const
         y_dead = 0;
     } else if (fma && !z_dead) {
         s.rd = ra_alloc(ra, sl, ns);
-        ra->reg[i] = s.rd;
+        ra->slot[i].reg = s.rd;
         ra->owner[(int)s.rd] = i;
     } else if (op == op_sel_32 && x_dead) {
         s.rd = ra_claim(ra, (int)inst->x.id, i);
@@ -326,7 +333,7 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const
 
     if (s.rd < 0) {
         s.rd = ra_alloc(ra, sl, ns);
-        ra->reg[i] = s.rd;
+        ra->slot[i].reg = s.rd;
         ra->owner[(int)s.rd] = i;
     }
 
@@ -340,12 +347,12 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const
     if (z_dead) { ra_free_reg(ra, (int)inst->z.id); }
 
     // Free channel registers whose per-channel last use has expired.
-#define FREE_CHAN_RA(op) do {                                                           \
-    if ((op).chan && (int)(op).id < i &&                                                \
-        ra->chan_last_use[(int)(op).id][(int)(op).chan] <= i) {                         \
-        int8_t r_ = ra->chan_reg[(int)(op).id][(int)(op).chan];                         \
-        if (r_ >= 0) { ra_return_reg(ra, r_); ra->chan_reg[(int)(op).id][(int)(op).chan] = -1; } \
-    }                                                                                   \
+#define FREE_CHAN_RA(op) do {                                                            \
+    struct ra_slot *s_ = &ra->slot[(int)(op).id];                                        \
+    if ((op).chan && (int)(op).id < i && s_->chan_last_use[(int)(op).chan] <= i) {      \
+        int8_t r_ = s_->chan_reg[(int)(op).chan];                                        \
+        if (r_ >= 0) { ra_return_reg(ra, r_); s_->chan_reg[(int)(op).chan] = -1; }      \
+    }                                                                                    \
 } while(0)
     FREE_CHAN_RA(inst->x);
     FREE_CHAN_RA(inst->y);
