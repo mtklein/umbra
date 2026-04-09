@@ -38,28 +38,42 @@ static void prog_draw(void *vctx) {
     c->p->queue(c->p, 0, 0, c->w, c->h, c->bufs);
 }
 
-// Pilot + min-of-K timing.
+// Doubling pilot + min-of-K timing.
 //
-// 1. Pilot: time one draw. Doubles as warmup; the cold-start pilot may be
-//    slower than steady-state but min-of-K below filters that out as long
-//    as at least one of the K samples lands in steady-state.
-// 2. Calibrate iters so each timed sample is ~target_secs long.
-// 3. Take up to `samples` samples; bail early once we've spent the wall
-//    budget so a single very expensive draw can't multiply by samples.
-// 4. Report the fastest sample as ns/px.
-//
-// Min is robust to one-sided positive jitter (preemption, thermal blips,
-// GPU contention) — the noise we actually see in practice — and gives a
-// stable point estimate for regression detection across commits.
+// 1. Pilot: time iters=1, then 2, 4, 8, ..., until one round takes at
+//    least target_secs/2. Each pilot round is `iters` draws + one flush
+//    so the per-iter draw cost dominates the time once iters is large
+//    enough — that's what makes the calibration robust to per-flush
+//    fixed cost (cmdbuf submit, waitUntilCompleted, autorelease). A
+//    naive "time one draw, divide" pilot was conflating draw with flush
+//    and getting iters wildly wrong on cheap GPU benches: metal's flush
+//    is more expensive than vulkan's, so metal looked slower than
+//    vulkan, which is impossible since vulkan is MoltenVK on top of
+//    metal on Apple Silicon.
+// 2. Scale the converged iters so each timed sample is ~target_secs:
+//    target_iters = pilot_iters * target_secs / pilot_time.
+// 3. Take up to `samples` samples at the calibrated iters and report
+//    the min as ns/px. Bail early once total wall exceeds the budget so
+//    a single very expensive draw can't multiply by samples. Min is
+//    robust to one-sided positive jitter (preemption, thermal blips,
+//    GPU contention) — the noise we actually see in practice — and
+//    gives a stable point estimate for regression detection across
+//    commits.
 static double bench(draw_fn draw, void *ctx, struct umbra_backend *be,
                     int w, int h, int samples, double target_secs) {
-    double const pilot_start = now();
-    draw(ctx);
-    be->flush(be);
-    double const t_one = now() - pilot_start;
+    int    iters   = 1;
+    double t_pilot = 0;
+    for (int p = 0; p < 20; p++) {
+        double const start = now();
+        for (int it = 0; it < iters; it++) { draw(ctx); }
+        be->flush(be);
+        t_pilot = now() - start;
+        if (t_pilot >= target_secs / 2) { break; }
+        iters *= 2;
+    }
 
-    int iters = (int)(target_secs / (t_one > 1e-9 ? t_one : 1e-9));
-    if (iters < 1) { iters = 1; }
+    int const calibrated = (int)((double)iters * target_secs / t_pilot);
+    if (calibrated > iters) { iters = calibrated; }
 
     double const wall_budget    = (double)samples * target_secs;
     double       best           = 0;
@@ -144,6 +158,8 @@ int main(int argc, char *argv[]) {
     };
     int const nb = (int)(sizeof bes / sizeof *bes);
 
+    _Bool any_anomaly = 0;
+
     printf("%-40s", "");
     for (int bi = 0; bi < nb; bi++) {
         if (be_mask & (1 << bi)) { printf(" %12s", be_names[bi]); }
@@ -160,19 +176,35 @@ int main(int argc, char *argv[]) {
         size_t planes = (size_t)fmt.planes;
         void *buf = calloc((size_t)(W * H) * planes, bpp);
 
-        printf("%-40s", s->title);
+        double ns_px[4] = {-1, -1, -1, -1};
         for (int bi = 0; bi < nb; bi++) {
-            if (!(be_mask & (1 << bi)) || !bes[bi]) {
-                if (be_mask & (1 << bi)) { printf(" %12s", "-"); }
-                continue;
-            }
+            if (!(be_mask & (1 << bi)) || !bes[bi]) { continue; }
             s->prepare(s, bes[bi], fmt);
             struct slide_draw_ctx sctx = {.s=s, .buf=buf, .frame=0, .w=W, .h=H};
+            ns_px[bi] = bench(slide_draw, &sctx, bes[bi], W, H, samples, target_secs);
+        }
+
+        printf("%-40s", s->title);
+        for (int bi = 0; bi < nb; bi++) {
+            if (!(be_mask & (1 << bi))) { continue; }
+            if (ns_px[bi] < 0) { printf(" %12s", "-"); continue; }
             char tmp[32];
-            sprintf(tmp, "%5.2f ns/px",
-                    bench(slide_draw, &sctx, bes[bi], W, H, samples, target_secs));
+            sprintf(tmp, "%5.2f ns/px", ns_px[bi]);
             printf(" %12s", tmp);
         }
+        // Anomaly markers: interp should never beat jit, and vulkan should
+        // never beat metal on Apple Silicon (vulkan is MoltenVK on top of
+        // metal). Either case is a measurement bug or a real perf
+        // regression worth investigating. Compare rounded-to-printed
+        // precision so visually-tied numbers don't fire on float noise.
+        int const ri = ns_px[0] >= 0 ? (int)(ns_px[0] * 100 + 0.5) : -1;
+        int const rj = ns_px[1] >= 0 ? (int)(ns_px[1] * 100 + 0.5) : -1;
+        int const rm = ns_px[2] >= 0 ? (int)(ns_px[2] * 100 + 0.5) : -1;
+        int const rv = ns_px[3] >= 0 ? (int)(ns_px[3] * 100 + 0.5) : -1;
+        _Bool anomaly = 0;
+        if (ri >= 0 && rj >= 0 && ri < rj) { anomaly = 1; }
+        if (rv >= 0 && rm >= 0 && rv < rm) { anomaly = 1; }
+        if (anomaly) { printf(" !"); any_anomaly = 1; }
         printf("\n");
 
         free(buf);
@@ -213,17 +245,27 @@ int main(int argc, char *argv[]) {
         }
         printf("\n%-40s", "");
 
+        double ns_px[4] = {-1, -1, -1, -1};
         for (int bi = 0; bi < nb; bi++) {
-            if (!(be_mask & (1 << bi)) || !progs[bi]) {
-                if (be_mask & (1 << bi)) { printf(" %12s", "-"); }
-                continue;
-            }
+            if (!(be_mask & (1 << bi)) || !progs[bi]) { continue; }
             struct prog_draw_ctx pctx = {.p=progs[bi], .bufs=abuf, .w=W, .h=H};
+            ns_px[bi] = bench(prog_draw, &pctx, bes[bi], W, H, samples, target_secs);
+        }
+        for (int bi = 0; bi < nb; bi++) {
+            if (!(be_mask & (1 << bi))) { continue; }
+            if (ns_px[bi] < 0) { printf(" %12s", "-"); continue; }
             char tmp[32];
-            sprintf(tmp, "%5.2f ns/px",
-                    bench(prog_draw, &pctx, bes[bi], W, H, samples, target_secs));
+            sprintf(tmp, "%5.2f ns/px", ns_px[bi]);
             printf(" %12s", tmp);
         }
+        int const ri = ns_px[0] >= 0 ? (int)(ns_px[0] * 100 + 0.5) : -1;
+        int const rj = ns_px[1] >= 0 ? (int)(ns_px[1] * 100 + 0.5) : -1;
+        int const rm = ns_px[2] >= 0 ? (int)(ns_px[2] * 100 + 0.5) : -1;
+        int const rv = ns_px[3] >= 0 ? (int)(ns_px[3] * 100 + 0.5) : -1;
+        _Bool anomaly = 0;
+        if (ri >= 0 && rj >= 0 && ri < rj) { anomaly = 1; }
+        if (rv >= 0 && rm >= 0 && rv < rm) { anomaly = 1; }
+        if (anomaly) { printf(" !"); any_anomaly = 1; }
         printf("\n");
 
         for (int bi = 0; bi < nb; bi++) {
@@ -238,5 +280,5 @@ int main(int argc, char *argv[]) {
     for (int bi = 0; bi < nb; bi++) {
         if (bes[bi]) { bes[bi]->free(bes[bi]); }
     }
-    return 0;
+    return any_anomaly ? 1 : 0;
 }
