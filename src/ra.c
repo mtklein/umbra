@@ -8,7 +8,7 @@ struct ra_slot {
     int    chan_last_use[4];
     int8_t reg;
     int8_t chan_reg[4];
-    int8_t pad_[3];
+    int    :24;
 };
 
 struct ra {
