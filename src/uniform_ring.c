@@ -46,3 +46,30 @@ void uniform_ring_free(struct uniform_ring *r) {
     r->chunks = 0;
     r->n = r->cap = r->cur = 0;
 }
+
+void uniform_ring_pool_free(struct uniform_ring_pool *p) {
+    for (int i = 0; i < p->n; i++) { uniform_ring_free(&p->rings[i]); }
+}
+
+struct uniform_ring_loc uniform_ring_pool_alloc(struct uniform_ring_pool *p,
+                                                void const *bytes, size_t len) {
+    return uniform_ring_alloc(&p->rings[p->cur], bytes, len);
+}
+
+_Bool uniform_ring_pool_should_rotate(struct uniform_ring_pool const *p) {
+    return uniform_ring_used(&p->rings[p->cur]) > p->high_water;
+}
+
+void uniform_ring_pool_rotate(struct uniform_ring_pool *p) {
+    p->cur = (p->cur + 1) % p->n;
+    p->rotations++;
+    p->wait_frame(p->cur, p->ctx);
+    uniform_ring_reset(&p->rings[p->cur]);
+}
+
+void uniform_ring_pool_drain_all(struct uniform_ring_pool *p) {
+    for (int i = 0; i < p->n; i++) {
+        p->wait_frame(i, p->ctx);
+        uniform_ring_reset(&p->rings[i]);
+    }
+}

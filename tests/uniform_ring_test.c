@@ -202,6 +202,139 @@ TEST(uniform_ring_null_bytes_reserves_only) {
     uniform_ring_free(&r);
 }
 
+static struct uniform_ring_pool make_pool(struct fake_be *be, int n, size_t high_water) {
+    struct uniform_ring_pool p = {
+        .n         =n,
+        .high_water=high_water,
+        .ctx       =be,
+        .wait_frame=0,  // set by callers that need it
+    };
+    for (int i = 0; i < n; i++) {
+        p.rings[i] = (struct uniform_ring){
+            .align     =16,
+            .ctx       =be,
+            .new_chunk =fake_new,
+            .free_chunk=fake_free,
+        };
+    }
+    return p;
+}
+
+struct wait_log {
+    int frames[16];
+    int n;
+};
+
+static void wait_log_record(int frame, void *ctx) {
+    struct wait_log *w = ctx;
+    if (w->n < 16) { w->frames[w->n++] = frame; }
+}
+
+TEST(uniform_ring_pool_basic_alloc) {
+    struct fake_be be = {.default_cap=256};
+    struct uniform_ring_pool p = make_pool(&be, 2, 64);
+
+    int x = 0x1ABCDEF0;
+    struct uniform_ring_loc l = uniform_ring_pool_alloc(&p, &x, sizeof x);
+    l.handle != 0 here;
+    p.cur == 0 here;
+    p.rotations == 0 here;
+    __builtin_memcmp((char*)l.handle + l.offset, &x, sizeof x) == 0 here;
+
+    uniform_ring_pool_free(&p);
+}
+
+TEST(uniform_ring_pool_should_rotate_threshold) {
+    struct fake_be be = {.default_cap=1024};
+    struct uniform_ring_pool p = make_pool(&be, 2, 64);
+
+    int payload = 0;
+    !uniform_ring_pool_should_rotate(&p) here;
+    for (int i = 0; i < 4; i++) { uniform_ring_pool_alloc(&p, &payload, sizeof payload); }
+    !uniform_ring_pool_should_rotate(&p) here;  // 64 used == high_water, not >
+    uniform_ring_pool_alloc(&p, &payload, sizeof payload);
+    uniform_ring_pool_should_rotate(&p) here;
+
+    uniform_ring_pool_free(&p);
+}
+
+TEST(uniform_ring_pool_rotate_increments_and_waits) {
+    struct fake_be be = {.default_cap=1024};
+    struct uniform_ring_pool p = make_pool(&be, 2, 64);
+    struct wait_log w = {0};
+    p.ctx        = &w;  // wait_frame ctx is the pool ctx
+    p.wait_frame = wait_log_record;
+    // Each ring still uses its own ctx (the fake_be) for chunk alloc.
+    for (int i = 0; i < p.n; i++) { p.rings[i].ctx = &be; }
+
+    int payload = 0;
+    uniform_ring_pool_alloc(&p, &payload, sizeof payload);
+    uniform_ring_pool_rotate(&p);
+    p.cur == 1 here;
+    p.rotations == 1 here;
+    w.n == 1 here;
+    w.frames[0] == 1 here;
+
+    uniform_ring_pool_alloc(&p, &payload, sizeof payload);
+    uniform_ring_pool_rotate(&p);
+    p.cur == 0 here;
+    p.rotations == 2 here;
+    w.n == 2 here;
+    w.frames[1] == 0 here;
+
+    uniform_ring_pool_free(&p);
+}
+
+TEST(uniform_ring_pool_rotate_resets_new_cur_ring) {
+    struct fake_be be = {.default_cap=1024};
+    struct uniform_ring_pool p = make_pool(&be, 2, 64);
+    struct wait_log w = {0};
+    p.ctx        = &w;
+    p.wait_frame = wait_log_record;
+    for (int i = 0; i < p.n; i++) { p.rings[i].ctx = &be; }
+
+    // Pre-fill ring 1 with some bytes from a "previous cycle".
+    p.cur = 1;
+    int payload = 0xDEAD;
+    uniform_ring_pool_alloc(&p, &payload, sizeof payload);
+    uniform_ring_used(&p.rings[1]) > 0 here;
+    p.cur = 0;
+
+    // Allocate on ring 0, then rotate. The pool should land on ring 1 with
+    // a freshly-reset ring (used == 0) after wait_frame.
+    uniform_ring_pool_alloc(&p, &payload, sizeof payload);
+    uniform_ring_pool_rotate(&p);
+    p.cur == 1 here;
+    uniform_ring_used(&p.rings[1]) == 0 here;
+
+    uniform_ring_pool_free(&p);
+}
+
+TEST(uniform_ring_pool_drain_all_visits_every_frame) {
+    struct fake_be be = {.default_cap=1024};
+    struct uniform_ring_pool p = make_pool(&be, 3, 64);
+    struct wait_log w = {0};
+    p.ctx        = &w;
+    p.wait_frame = wait_log_record;
+    for (int i = 0; i < p.n; i++) { p.rings[i].ctx = &be; }
+
+    int payload = 0;
+    for (int f = 0; f < 3; f++) {
+        p.cur = f;
+        uniform_ring_pool_alloc(&p, &payload, sizeof payload);
+    }
+    p.cur = 0;
+
+    uniform_ring_pool_drain_all(&p);
+    w.n == 3 here;
+    w.frames[0] == 0 here;
+    w.frames[1] == 1 here;
+    w.frames[2] == 2 here;
+    for (int i = 0; i < 3; i++) { uniform_ring_used(&p.rings[i]) == 0 here; }
+
+    uniform_ring_pool_free(&p);
+}
+
 TEST(uniform_ring_used_tracks_high_water) {
     struct fake_be be = {.default_cap=256};
     struct uniform_ring r = make_ring(&be);
