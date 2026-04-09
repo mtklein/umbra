@@ -3,13 +3,12 @@
 
 typedef struct { umbra_val32 r, g, b, a; } umbra_color;
 
-// TODO: rename ptr_bits to ptr or ptr_ix in these interfaces.  a little unclear what ptr_bits is.
 struct umbra_fmt {
     char const *name;
     size_t      bpp;
     int         planes, :32;
-    umbra_color (*load) (struct umbra_builder*, int ptr_bits);
-    void        (*store)(struct umbra_builder*, int ptr_bits, umbra_color);
+    umbra_color (*load) (struct umbra_builder*, int ptr_ix);
+    void        (*store)(struct umbra_builder*, int ptr_ix, umbra_color);
 };
 extern struct umbra_fmt const umbra_fmt_8888;
 extern struct umbra_fmt const umbra_fmt_565;
