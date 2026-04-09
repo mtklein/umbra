@@ -2094,23 +2094,22 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     }
 
     for (int i = 0; i <= vp->max_ptr; i++) {
-        // STYLE: prefer positive nesting over `if (!cond) continue;` — wrap the
-        // STYLE: rest of the loop body in `if (buf[i].ptr && buf[i].sz) { ... }`.
-        if (!buf[i].ptr || !buf[i].sz) { continue; }
-        if (buf[i].read_only && !buf[i].row_bytes) {
-            struct uniform_ring_loc loc =
-                uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, buf[i].sz);
-            struct vk_ring_chunk *chunk = loc.handle;
-            bind_buffer[i] = chunk->buf;
-            bind_offset[i] = (VkDeviceSize)loc.offset;
-            bind_range [i] = (VkDeviceSize)buf[i].sz;
-            continue;
+        if (buf[i].ptr && buf[i].sz) {
+            if (buf[i].read_only && !buf[i].row_bytes) {
+                struct uniform_ring_loc loc =
+                    uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, buf[i].sz);
+                struct vk_ring_chunk *chunk = loc.handle;
+                bind_buffer[i] = chunk->buf;
+                bind_offset[i] = (VkDeviceSize)loc.offset;
+                bind_range [i] = (VkDeviceSize)buf[i].sz;
+            } else {
+                VkDeviceSize sz = (VkDeviceSize)buf[i].sz;
+                if (sz < 4) { sz = 4; }
+                int idx = cache_buf(be, buf[i].ptr, buf[i].sz, sz, buf[i].read_only);
+                bind_buffer[i] = be->batch_cache[idx].buf;
+                bind_range [i] = VK_WHOLE_SIZE;
+            }
         }
-        VkDeviceSize sz = (VkDeviceSize)buf[i].sz;
-        if (sz < 4) { sz = 4; }
-        int idx = cache_buf(be, buf[i].ptr, buf[i].sz, sz, buf[i].read_only);
-        bind_buffer[i] = be->batch_cache[idx].buf;
-        bind_range [i] = VK_WHOLE_SIZE;
     }
 
     uint32_t *push_data = calloc((size_t)vp->push_words, sizeof *push_data);

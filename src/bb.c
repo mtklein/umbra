@@ -612,11 +612,10 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
 
     int j = 0;
     for (int i = 0; i < n; i++) {
-        // STYLE: prefer the positive nest:
-        // STYLE:   if (live[i] && !varying[i] && !is_store(b->inst[i].op)) { ... }
-        if (!live[i] || varying[i] || is_store(b->inst[i].op)) { continue; }
-        old_to_new[i] = j;
-        out[j++] = b->inst[i];
+        if (live[i] && !varying[i] && !is_store(b->inst[i].op)) {
+            old_to_new[i] = j;
+            out[j++] = b->inst[i];
+        }
     }
     int const preamble = j;
 

@@ -15,13 +15,13 @@ struct uniform_ring_loc uniform_ring_alloc(struct uniform_ring *r, void const *b
                 return (struct uniform_ring_loc){.handle=c->handle, .offset=off};
             }
             r->cur++;
-            continue;
+        } else {
+            if (r->n >= r->cap) {
+                r->cap = r->cap ? 2 * r->cap : 4;
+                r->chunks = realloc(r->chunks, (size_t)r->cap * sizeof *r->chunks);
+            }
+            r->chunks[r->n++] = r->new_chunk(reserved, r->ctx);
         }
-        if (r->n >= r->cap) {
-            r->cap = r->cap ? 2 * r->cap : 4;
-            r->chunks = realloc(r->chunks, (size_t)r->cap * sizeof *r->chunks);
-        }
-        r->chunks[r->n++] = r->new_chunk(reserved, r->ctx);
     }
 }
 
