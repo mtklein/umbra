@@ -55,7 +55,6 @@ static void render_slide(char const *label, struct umbra_backend *be, struct sli
     be->flush(be);
 
     s->init(s, W, H);
-    if (s->animate) s->animate(s, 0.016f);
     s->prepare(s, W, H, be);
     s->draw(s, 0, W, H, 0, H, pixbuf);
     be->flush(be);

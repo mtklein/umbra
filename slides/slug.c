@@ -4,8 +4,6 @@
 struct slug_state {
     struct slide base;
 
-    float                     persp_t;
-    float                     mat[11];
     float                     color[4];
     struct slug_curves       *slug;
     int                       w, h;
@@ -23,26 +21,11 @@ static void slug_init(struct slide *s, int w, int h) {
     struct slug_state *st = (struct slug_state *)s;
     st->w = w;
     st->h = h;
-    st->persp_t = 0.0f;
     st->wind_buf = malloc((size_t)w * (size_t)h * sizeof(float));
 
     struct umbra_builder *b = slug_build_acc(&st->acc_lay);
     st->acc_bb = umbra_basic_block(b);
     umbra_builder_free(b);
-
-    slide_perspective_matrix(st->mat, 0.0f, w, h, (int)st->slug->w, (int)st->slug->h);
-    st->mat[9]  = st->slug->w;
-    st->mat[10] = st->slug->h;
-}
-
-static void slug_animate(struct slide *s, float dt) {
-    struct slug_state *st = (struct slug_state *)s;
-    (void)dt;
-    st->persp_t += 0.016f;
-    slide_perspective_matrix(st->mat, st->persp_t, st->w, st->h, (int)st->slug->w,
-                             (int)st->slug->h);
-    st->mat[9] = st->slug->w;
-    st->mat[10] = st->slug->h;
 }
 
 static void slug_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
@@ -64,7 +47,6 @@ static void slug_prepare(struct slide *s, struct umbra_backend *be, struct umbra
 
 static void slug_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
     struct slug_state           *st = (struct slug_state *)s;
-    (void)frame;
     struct umbra_program *acc = st->acc_prog;
     int w = st->w, h = st->h;
 
@@ -73,7 +55,12 @@ static void slug_draw(struct slide *s, int frame, int l, int t, int r, int b, vo
     __builtin_memset((char *)st->wind_buf + (size_t)t * wind_row, 0,
                      (size_t)(b - t) * wind_row);
 
-    umbra_uniforms_fill_f32(st->acc_lay.uniforms, st->acc_lay.mat, st->mat, 11);
+    float mat[11];
+    slide_perspective_matrix(mat, (float)frame * 0.016f, w, h,
+                             (int)st->slug->w, (int)st->slug->h);
+    mat[9]  = st->slug->w;
+    mat[10] = st->slug->h;
+    umbra_uniforms_fill_f32(st->acc_lay.uniforms, st->acc_lay.mat, mat, 11);
     umbra_uniforms_fill_ptr(st->acc_lay.uniforms, st->acc_lay.curves_off,
                   (struct umbra_buf){.ptr=st->slug->data, .sz=(size_t)(st->slug->count * 6 * 4), .read_only=1});
     struct umbra_buf abuf[] = {
@@ -130,7 +117,6 @@ SLIDE(slide_slug_wind) {
         .title = "Slug Text (Bezier)",
         .bg = 0xff0a0a1e,
         .init = slug_init,
-        .animate = slug_animate,
         .prepare = slug_prepare,
         .draw = slug_draw,
         .free = slug_slide_free,

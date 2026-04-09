@@ -8,7 +8,6 @@ struct slide {
     uint32_t        bg, :32;
 
     void (*init)   (struct slide*, int w, int h);
-    void (*animate)(struct slide*, float dt);
     void (*prepare)(struct slide*, struct umbra_backend*, struct umbra_fmt);
     void (*draw)   (struct slide*, int frame, int l, int t, int r, int b, void *buf);
     void (*free)   (struct slide*);

@@ -347,8 +347,6 @@ int main(void) {
             fill_bg_row(row, W, s->bg, row_sz, plane_gap);
         }
 
-        if (s->animate) { s->animate(s, 0.016f); }
-
         if (s->prepare) { s->prepare(s, bes[cur_backend], *fmt_enums[cur_fmt]); }
 
         {

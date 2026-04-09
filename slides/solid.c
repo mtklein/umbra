@@ -31,15 +31,14 @@ static void solid_init(struct slide *s, int w, int h) {
     st->vy = 1.1f;
 }
 
-static void solid_animate(struct slide *s, float dt) {
-    struct solid_state *st = (struct solid_state *)s;
-    (void)dt;
-    st->rx += st->vx;
-    st->ry += st->vy;
-    if (st->rx < 0.0f) { st->rx = 0.0f; st->vx = -st->vx; }
-    if ((float)st->w < st->rx + st->rect_w) { st->rx = (float)st->w - st->rect_w; st->vx = -st->vx; }
-    if (st->ry < 0.0f) { st->ry = 0.0f; st->vy = -st->vy; }
-    if ((float)st->h < st->ry + st->rect_h) { st->ry = (float)st->h - st->rect_h; st->vy = -st->vy; }
+// Triangle-wave bounce: position oscillates in [0, range] starting at the
+// init-time offset, advancing |v| pixels per frame. Equivalent to the prior
+// stateful integrate-and-bounce but expressed as a closed form of `frame`.
+static float bounce(float p0, float v, int frame, float range) {
+    float p = fmodf(p0 + (float)frame * v, 2.0f * range);
+    if (p < 0.0f) { p += 2.0f * range; }
+    if (p > range) { p = 2.0f * range - p; }
+    return p;
 }
 
 static void solid_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
@@ -59,8 +58,9 @@ static void solid_prepare(struct slide *s, struct umbra_backend *be, struct umbr
 
 static void solid_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
     struct solid_state *st = (struct solid_state *)s;
-    (void)frame;
-    float rect[4] = { st->rx, st->ry, st->rx + st->rect_w, st->ry + st->rect_h };
+    float rx = bounce(st->rx, st->vx, frame, (float)st->w - st->rect_w);
+    float ry = bounce(st->ry, st->vy, frame, (float)st->h - st->rect_h);
+    float rect[4] = { rx, ry, rx + st->rect_w, ry + st->rect_h };
     umbra_uniforms_fill_f32(st->lay.uniforms, st->lay.shader, st->color, 4);
     if (st->coverage) { umbra_uniforms_fill_f32(st->lay.uniforms, st->lay.coverage, rect, 4); }
     size_t pb = st->fmt.bpp;
@@ -99,7 +99,6 @@ static struct slide *make_solid(char const *title, uint32_t bg, float const colo
         .title = title,
         .bg = bg,
         .init = solid_init,
-        .animate = solid_animate,
         .prepare = solid_prepare,
         .draw = solid_draw,
         .free = solid_free,

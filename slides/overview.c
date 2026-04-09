@@ -100,14 +100,6 @@ static void overview_init(struct slide *s, int w, int h) {
     st->n_real = slide_count() - 1;
 }
 
-static void overview_animate(struct slide *s, float dt) {
-    struct overview_state *st = (struct overview_state *)s;
-    for (int i = 0; i < st->n_real; i++) {
-        struct slide *sub = slide_get(i);
-        if (sub->animate) { sub->animate(sub, dt); }
-    }
-}
-
 static void overview_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
     struct overview_state *st = (struct overview_state *)s;
     st->be = be;
@@ -140,7 +132,6 @@ struct slide *make_overview(struct slide_ctx const *ctx) {
         .title = "Overview",
         .bg = 0xff101010,
         .init = overview_init,
-        .animate = overview_animate,
         .prepare = overview_prepare,
         .draw = overview_draw,
         .free = overview_free,
