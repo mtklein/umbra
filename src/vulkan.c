@@ -13,11 +13,6 @@ struct umbra_backend *umbra_backend_vulkan(void) { return 0; }
 
 #include <vulkan/vulkan.h>
 
-// TODO: this backend is only ever exercised through MoltenVK on Apple silicon.
-// MoltenVK adds translation overhead per Vulkan call; we don't pay attention
-// to it anywhere — just use Vulkan as if native. If we ever ran on real
-// Vulkan hardware (Linux, Windows) the call-pattern picture might shift.
-
 // ---------------------------------------------------------------------------
 //  SPIR-V constants.
 // ---------------------------------------------------------------------------
