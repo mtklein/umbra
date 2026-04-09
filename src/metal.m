@@ -61,12 +61,9 @@ struct umbra_metal {
     int    n_deref;
 };
 
-// STYLE: avoid "len" — `buf` is a char text buffer, so this is a byte count
-// STYLE: and should be `size_t size` (matching `cap`). Several `b.len` reads in
-// STYLE: build_source() ride on this name.
 typedef struct {
-    char *buf;
-    int   len, cap;
+    char  *text;
+    size_t size, cap;
 } Buf;
 
 __attribute__((format(printf, 2, 3)))
@@ -74,16 +71,16 @@ static void emit(Buf *b, char const *fmt, ...) {
     va_list ap;
     for (;;) {
         va_start(ap, fmt);
-        int n = vsnprintf(b->buf + b->len,
-                          (size_t)(b->cap - b->len),
+        int n = vsnprintf(b->text + b->size,
+                          b->cap - b->size,
                           fmt, ap);
         va_end(ap);
-        if (b->len + n < b->cap) {
-            b->len += n;
+        if (b->size + (size_t)n < b->cap) {
+            b->size += (size_t)n;
             return;
         }
         b->cap = b->cap ? 2*b->cap : 4096;
-        b->buf = realloc(b->buf, (size_t)b->cap);
+        b->text = realloc(b->text, b->cap);
     }
 }
 
@@ -988,10 +985,10 @@ static char* build_source(BB const *bb,
     free(ptr_16);
     free(ptr_32);
 
-    char *src = malloc((size_t)b.len + 1);
-    __builtin_memcpy(src, b.buf, (size_t)b.len);
-    src[b.len] = '\0';
-    free(b.buf);
+    char *src = malloc(b.size + 1);
+    __builtin_memcpy(src, b.text, b.size);
+    src[b.size] = '\0';
+    free(b.text);
     return src;
 }
 
