@@ -335,6 +335,34 @@ TEST(uniform_ring_pool_drain_all_visits_every_frame) {
     uniform_ring_pool_free(&p);
 }
 
+TEST(uniform_ring_pool_drain_all_releases_chunks) {
+    struct fake_be be = {.default_cap=1024};
+    struct uniform_ring_pool p = make_pool(&be, 3, 64);
+    struct wait_log w = {0};
+    p.ctx        = &w;
+    p.wait_frame = wait_log_record;
+    for (int i = 0; i < p.n; i++) { p.rings[i].ctx = &be; }
+
+    int payload = 0;
+    for (int f = 0; f < 3; f++) {
+        p.cur = f;
+        uniform_ring_pool_alloc(&p, &payload, sizeof payload);
+    }
+    p.cur = 0;
+    be.n_create  == 3 here;
+    be.n_destroy == 0 here;
+
+    uniform_ring_pool_drain_all(&p);
+    be.n_destroy == 3 here;
+
+    // Ring is still usable after drain — next alloc creates a fresh chunk.
+    uniform_ring_pool_alloc(&p, &payload, sizeof payload);
+    be.n_create == 4 here;
+
+    uniform_ring_pool_free(&p);
+    be.n_destroy == 4 here;
+}
+
 TEST(uniform_ring_used_tracks_high_water) {
     struct fake_be be = {.default_cap=256};
     struct uniform_ring r = make_ring(&be);

@@ -3,10 +3,6 @@
 
 static size_t align_up(size_t x, size_t a) { return (x + a - 1) & ~(a - 1); }
 
-// TODO: there's no hard cap on chunk count. The ring grows without bound if a
-// single batch needs more than `threshold` of contiguous space (rare — only
-// happens for >64 KiB single uniforms). A cap would convert that into a clean
-// runtime error rather than unbounded memory growth. Not a real issue today.
 struct uniform_ring_loc uniform_ring_alloc(struct uniform_ring *r, void const *bytes, size_t len) {
     size_t reserved = align_up(len, r->align);
     for (;;) {
@@ -70,6 +66,6 @@ void uniform_ring_pool_rotate(struct uniform_ring_pool *p) {
 void uniform_ring_pool_drain_all(struct uniform_ring_pool *p) {
     for (int i = 0; i < p->n; i++) {
         p->wait_frame(i, p->ctx);
-        uniform_ring_reset(&p->rings[i]);
+        uniform_ring_free(&p->rings[i]);
     }
 }
