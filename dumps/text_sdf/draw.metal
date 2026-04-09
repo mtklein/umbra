@@ -1,11 +1,11 @@
 #include <metal_stdlib>
 using namespace metal;
 
-static inline int safe_ix(int ix, uint bytes, int elem) {
+int safe_ix(int ix, uint bytes, int elem) {
     int count = (int)(bytes / (uint)elem);
     return clamp(ix, 0, max(count-1, 0));
 }
-static inline uint oob_mask(int ix, uint bytes, int elem) {
+uint oob_mask(int ix, uint bytes, int elem) {
     int count = (int)(bytes / (uint)elem);
     return (ix >= 0 && ix < count) ? ~0u : 0u;
 }

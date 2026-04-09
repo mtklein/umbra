@@ -912,7 +912,7 @@ static char* build_source(BB const *bb,
          "using namespace metal;\n\n");
 
     emit(&b,
-         "static inline int safe_ix"
+         "int safe_ix"
          "(int ix, uint bytes, int elem) {\n");
     emit(&b,
          "    int count = (int)"
@@ -921,7 +921,7 @@ static char* build_source(BB const *bb,
          "    return clamp(ix, 0,"
          " max(count-1, 0));\n}\n");
     emit(&b,
-         "static inline uint oob_mask"
+         "uint oob_mask"
          "(int ix, uint bytes, int elem) {\n");
     emit(&b,
          "    int count = (int)"
