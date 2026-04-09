@@ -41,9 +41,9 @@ struct metal_backend {
     void *device;
     void *queue;
     void *batch_cmdbuf;     // currently-encoding cmdbuf for uni_pool.cur, or NULL
-    void *prev_fence;       // fence updated by the previous encoder within the
-                            // current cmdbuf (per-cmdbuf compute serialization,
-                            // NOT per-frame); reset to NULL on commit/rotation
+    void *batch_enc;        // single MTLDispatchTypeSerial compute encoder
+                            // open on batch_cmdbuf for the entire batch;
+                            // ended in metal_submit_cmdbuf right before commit
     void *frame_committed[METAL_N_FRAMES];  // last committed cmdbuf per frame, or NULL
     struct copyback        *batch_copy;
     int                     batch_ncopy, batch_copy_cap;
@@ -1353,30 +1353,24 @@ static void umbra_metal_run(
             be->batch_cmdbuf =
                 (__bridge_retained void*)[queue commandBuffer];
         }
-        // MoltenVK pattern for compute pipeline barriers: end the previous
-        // encoder, start a new one with serial dispatch, bridge them with a
-        // freshly-allocated MTLFence updateFence/waitForFence pair. Each
-        // encoder boundary uses its own fence object — MoltenVK uses a fence
-        // pool rather than reusing one fence across an entire batch, and we
-        // saw 385-px flakes when reusing one fence across all 14 acc
-        // dispatches in a slug frame.
-        id<MTLCommandBuffer> cmdbuf =
-            (__bridge id<MTLCommandBuffer>)be->batch_cmdbuf;
-        id<MTLDevice> device =
-            (__bridge id<MTLDevice>)be->device;
-        id<MTLComputeCommandEncoder> enc =
-            [cmdbuf computeCommandEncoderWithDispatchType:MTLDispatchTypeSerial];
-        if (be->prev_fence) {
-            id<MTLFence> wait =
-                (__bridge_transfer id<MTLFence>)be->prev_fence;
-            be->prev_fence = NULL;
-            [enc waitForFence:wait];
+        // One MTLDispatchTypeSerial compute encoder for the entire batch:
+        // matches what MoltenVK does for consecutive vkCmdDispatch calls.
+        // Serial dispatch type guarantees that dispatch N+1 starts after
+        // dispatch N completes within the encoder, and Metal's hazard
+        // tracking on the plain commandBuffer (NOT
+        // commandBufferWithUnretainedReferences) propagates writes between
+        // dispatches. So no MTLFence chain or per-dispatch encoder churn
+        // is needed; per-dispatch CPU overhead drops to setBuffer +
+        // dispatchThreads.
+        if (!be->batch_enc) {
+            id<MTLCommandBuffer> cmdbuf =
+                (__bridge id<MTLCommandBuffer>)be->batch_cmdbuf;
+            be->batch_enc = (__bridge_retained void*)
+                [cmdbuf computeCommandEncoderWithDispatchType:MTLDispatchTypeSerial];
         }
+        id<MTLComputeCommandEncoder> enc =
+            (__bridge id<MTLComputeCommandEncoder>)be->batch_enc;
         encode_dispatch(m, l, t, r, b, buf, enc);
-        id<MTLFence> update = [device newFence];
-        [enc updateFence:update];
-        [enc endEncoding];
-        be->prev_fence = (__bridge_retained void*)update;
     }
 
     if (uniform_ring_pool_should_rotate(&be->uni_pool)) {
@@ -1401,13 +1395,15 @@ static void umbra_metal_run(
 static void metal_submit_cmdbuf(struct metal_backend *be) {
     if (!be->batch_cmdbuf) { return; }
     @autoreleasepool {
+        if (be->batch_enc) {
+            id<MTLComputeCommandEncoder> enc =
+                (__bridge_transfer id<MTLComputeCommandEncoder>)be->batch_enc;
+            be->batch_enc = NULL;
+            [enc endEncoding];
+        }
         id<MTLCommandBuffer> cmdbuf =
             (__bridge id<MTLCommandBuffer>)be->batch_cmdbuf;
         [cmdbuf commit];
-        if (be->prev_fence) {
-            (void)(__bridge_transfer id)be->prev_fence;
-            be->prev_fence = NULL;
-        }
     }
     be->frame_committed[be->uni_pool.cur] = be->batch_cmdbuf;
     be->batch_cmdbuf                      = NULL;
