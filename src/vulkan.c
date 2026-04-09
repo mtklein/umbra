@@ -2007,11 +2007,6 @@ static void vk_submit_cmdbuf(struct vk_backend *be);
 // with no matching writable entry creates a fresh snapshot, because the host
 // may have mutated the bytes since any prior read-only entry was made
 // (e.g. slug acc loop counter in the uniforms buffer).
-//
-// TODO: a content-addressed cache is a viable alternative to the ring for
-// the slug-curves-style "stable host pointer, large blob" path. The original
-// uniform_ring discussion landed on ring; content cache stays viable for
-// that specific case if we ever care to try it.
 static int cache_buf(struct vk_backend *be, void *host, size_t bytes,
                      VkDeviceSize sz, _Bool read_only) {
     for (int i = 0; i < be->batch_cache_n; i++) {
