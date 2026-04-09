@@ -8,10 +8,10 @@ TEST(test_buf) {
     struct Buf b = {0};
     put(&b, 0xDEADBEEF);
     put(&b, 0xCAFEBABE);
-    b.len == 2 here;
-    b.buf[0] == 0xDEADBEEF here;
-    b.buf[1] == 0xCAFEBABE here;
-    free(b.buf);
+    b.words == 2 here;
+    b.word[0] == 0xDEADBEEF here;
+    b.word[1] == 0xCAFEBABE here;
+    free(b.word);
 }
 
 TEST(test_gpr) {
@@ -146,17 +146,17 @@ TEST(test_load_imm_w) {
     // Small value: just MOVZ
     struct Buf b = {0};
     load_imm_w(&b, 3, 42);
-    b.len == 1 here;
-    b.buf[0] == MOVZ_w(3, 42) here;
-    free(b.buf);
+    b.words == 1 here;
+    b.word[0] == MOVZ_w(3, 42) here;
+    free(b.word);
 
     // Large value: MOVZ + MOVK
     b = (struct Buf){0};
     load_imm_w(&b, 5, 0x12340056);
-    b.len == 2 here;
-    b.buf[0] == MOVZ_w(5, 0x0056) here;
-    b.buf[1] == MOVK_w16(5, 0x1234) here;
-    free(b.buf);
+    b.words == 2 here;
+    b.word[0] == MOVZ_w(5, 0x0056) here;
+    b.word[1] == MOVK_w16(5, 0x1234) here;
+    free(b.word);
 }
 
 TEST(test_stp_ldp) {

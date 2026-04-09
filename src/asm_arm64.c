@@ -4,11 +4,11 @@
 typedef struct Buf Buf;
 
 void put(Buf *b, uint32_t w) {
-    if (b->len == b->cap) {
+    if (b->words == b->cap) {
         b->cap = b->cap ? 2 * b->cap : 1024;
-        b->buf = realloc(b->buf, (size_t)b->cap * 4);
+        b->word = realloc(b->word, (size_t)b->cap * 4);
     }
-    b->buf[b->len++] = w;
+    b->word[b->words++] = w;
 }
 
 uint32_t RET(void) { return 0xd65f03c0u; }

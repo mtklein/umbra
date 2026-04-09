@@ -279,12 +279,12 @@ static void arm64_pool_load(Buf *c, struct pool *p, int d, uint32_t v) {
     }
     uint32_t bcast[4] = {v, v, v, v};
     int      off = pool_add(p, bcast, 16);
-    pool_ref_at(p, off, c->len);
+    pool_ref_at(p, off, c->words);
     put(c, LDR_q_literal(d));
 }
 static void arm64_pool_load_wide(Buf *c, struct pool *p, int d, void const *data) {
     int off = pool_add(p, data, 16);
-    pool_ref_at(p, off, c->len);
+    pool_ref_at(p, off, c->words);
     put(c, LDR_q_literal(d));
 }
 static void arm64_remat(int reg, int val, void *ctx) {
@@ -340,11 +340,7 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, STP_qi(12, 13, 31, 4));
     put(&c, STP_qi(14, 15, 31, 6));
 
-    // STYLE: every `c.len` reference in this file (and the asm_x86 jit below)
-    // STYLE: rides on struct Buf's `len` field — see asm_arm64.h / asm_x86.h.
-    // STYLE: Renaming the field cascades here. Also `stack_patch` and the other
-    // STYLE: code-offset locals never change after init and should be `int const`.
-    int stack_patch = c.len;
+    int stack_patch = c.words;
     put(&c, NOP());
     put(&c, NOP());
 
@@ -368,29 +364,29 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, ADD_xi(XCOL, XH, 0));     // XCOL = l
     put(&c, STP_pre(XM, 15, 31, -2)); // push end_row
 
-    int loop_top = c.len;
+    int loop_top = c.words;
 
     // remaining = col_end - XCOL
     put(&c, SUB_xr(XT, 0, XCOL));
     put(&c, SUBS_xi(31, XT, 8));
-    int br_tail = c.len;
+    int br_tail = c.words;
     put(&c, Bcond(0xb, 0));
 
-    int loop_body_start = c.len;
+    int loop_body_start = c.words;
     emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
 
     ra_end_loop(ra, sl);
 
-    int loop_body_end = c.len;
+    int loop_body_end = c.words;
 
     put(&c, ADD_xi(XCOL, XCOL, 8));
-    put(&c, B(loop_top - c.len));
+    put(&c, B(loop_top - c.words));
 
-    int tail_top = c.len;
-    c.buf[br_tail] = Bcond(0xb, tail_top - br_tail);
+    int tail_top = c.words;
+    c.word[br_tail] = Bcond(0xb, tail_top - br_tail);
 
     put(&c, CMP_xr(XCOL, 0));
-    int br_row_done = c.len;
+    int br_row_done = c.words;
     put(&c, Bcond(0xa, 0));  // B.GE row_done
 
     ra_reset_pool(ra);
@@ -400,24 +396,24 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 1, deref_gpr, deref_rb_gpr, &jc);
 
     put(&c, ADD_xi(XCOL, XCOL, 1));
-    put(&c, B(tail_top - c.len));
+    put(&c, B(tail_top - c.words));
 
-    int row_done = c.len;
-    c.buf[br_row_done] = Bcond(0xa, row_done - br_row_done);
+    int row_done = c.words;
+    c.word[br_row_done] = Bcond(0xa, row_done - br_row_done);
 
     put(&c, ADD_xi(XY, XY, 1));
     put(&c, ADD_xi(XCOL, XWIDTH, 0));    // XCOL = x0_col
     // LDR XT, [SP] — load saved end_row
     put(&c, LDR_xi(XT, 31, 0));
     put(&c, CMP_xr(XY, XT));
-    int br_more_rows = c.len;
+    int br_more_rows = c.words;
     put(&c, Bcond(0xb, 0));  // B.LT → more rows
 
     // Restore stack (saved end_row)
     put(&c, LDP_post(0, 15, 31, 2));
 
     // Patch: B.LT → loop_top
-    c.buf[br_more_rows] = Bcond(0xb, loop_top - br_more_rows);
+    c.word[br_more_rows] = Bcond(0xb, loop_top - br_more_rows);
 
     put(&c, ADD_xi(31, 29, 0));
     // Restore callee-saved Q8-Q15 from [FP-128, FP) using negative offsets.
@@ -429,13 +425,13 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     put(&c, RET());
 
     if (ns > 0) {
-        c.buf[stack_patch] = SUB_xi(31, 31, ns * 32);
+        c.word[stack_patch] = SUB_xi(31, 31, ns * 32);
     }
-    c.buf[stack_patch + 1] = ADD_xi(XS, 31, 0);
-    while (c.len & 3) {
+    c.word[stack_patch + 1] = ADD_xi(XS, 31, 0);
+    while (c.words & 3) {
         put(&c, NOP());
     }
-    int pool_start = c.len;
+    int pool_start = c.words;
     for (int pi = 0; pi < jc.pool.nbytes; pi += 4) {
         uint32_t w;
         __builtin_memcpy(&w, jc.pool.data + pi, 4);
@@ -445,9 +441,9 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
         struct pool_ref *r = &jc.pool.refs[pi];
         int              word_off = pool_start + r->data_off / 4;
         int              imm19 = word_off - r->code_pos;
-        c.buf[r->code_pos] = 0x9c000000u
+        c.word[r->code_pos] = 0x9c000000u
             | ((uint32_t)(imm19 & 0x7ffff) << 5)
-            | (c.buf[r->code_pos] & 0x1fu);
+            | (c.word[r->code_pos] & 0x1fu);
     }
     pool_free(&jc.pool);
 
@@ -456,7 +452,7 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     free(deref_gpr);
     free(deref_rb_gpr);
 
-    size_t code_sz = (size_t)c.len * 4;
+    size_t code_sz = (size_t)c.words * 4;
     size_t pg = 16384;
     size_t alloc = (code_sz + pg - 1) & ~(pg - 1);
 
@@ -466,10 +462,10 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     mprotect((char *)mem + alloc, pg, PROT_NONE);
 
     pthread_jit_write_protect_np(0);
-    __builtin_memcpy(mem, c.buf, code_sz);
+    __builtin_memcpy(mem, c.word, code_sz);
     pthread_jit_write_protect_np(1);
     __builtin___clear_cache(mem, (char *)mem + alloc);
-    free(c.buf);
+    free(c.word);
 
     struct umbra_jit *j = malloc(sizeof *j);
     j->code = mem;
