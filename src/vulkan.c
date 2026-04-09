@@ -345,11 +345,6 @@ typedef struct {
     // uniform ring as a storage buffer at binding 0):
     //   [0] = w, [1] = x0, [2] = y0,
     //   [3..3+total_bufs-1] = buf_szs, [3+total_bufs..3+2*total_bufs-1] = buf_rbs
-    // TODO: we deliberately route ALL user uniforms through the ring for
-    // parity with metal. If a measurable win showed up for some workload, we
-    // could re-add push constants as an optimization layer in front of the
-    // ring (for slug at 80 B that'd save ~7 setBuffer calls per round in
-    // favor of a single push-constant write). Probably not measurable.
     int total_bufs;
     int push_words;
 
