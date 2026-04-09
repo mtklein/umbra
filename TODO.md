@@ -5,12 +5,6 @@ Roughly in order of "value per effort" within each section.
 
 ## Small things to fix in a tomorrow-pass
 
-- `slides/anim.c` defines `animate` but `draw` also bumps `t` internally.
-  Originally `draw` had to bump because `bench` doesn't call `animate`, and
-  `prepare` resets `t` to 0 to keep golden_test deterministic across
-  backends. Net result: `animate` is never called by anything that matters.
-  Either drop it or have `draw` use it.
-
 - `prev_fence` field in `struct metal_backend` lives next to
   `frame_committed[]` but is per-cmdbuf compute-serialization, not
   per-frame. Worth a one-line comment clarifying that distinction. The
@@ -21,11 +15,6 @@ Roughly in order of "value per effort" within each section.
   so one of those two calls is always a no-op. Could be
   `drain_frame(cur_frame ^ 1)` (the just-submitted one). Loop is harder to
   mess up but reads as confusing.
-
-- `load_push_u32` in `vulkan.c` is now misleading: it loads from the
-  metadata-only push constant block, not from any user uniforms (those are
-  in storage buffers). Rename to `load_meta_u32`. Same for the SPIR-V
-  section comment "Push constant layout".
 
 - The dump tool's `slugify` produces `dumps/animated_t_in_uniforms/`. The
   parens get squashed to underscores. Cosmetic.
@@ -140,7 +129,5 @@ If I had a tomorrow:
 
 1. Add the rotation counter and use it in the smoke test (real
    correctness improvement).
-2. Drop `animate` from `slides/anim.c` (one-line cleanup).
-3. Rename `load_push_u32` to `load_meta_u32` (mechanical).
 
 Everything else is fine to leave.
