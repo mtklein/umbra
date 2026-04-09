@@ -172,22 +172,19 @@ enum {
 //  SPIR-V binary buffer.
 // ---------------------------------------------------------------------------
 
-// STYLE: same "len" issue as struct Buf in asm_*.h — these are uint32_t words,
-// STYLE: not bytes. Field should be `words` (matching the buffer being singular,
-// STYLE: e.g. `uint32_t *word; int words, cap;`).
 typedef struct {
-    uint32_t *buf;
-    int       len, cap;
+    uint32_t *word;
+    int       words, cap;
 } Spv;
 
 static void spv_grow(Spv *s) {
     s->cap = s->cap ? 2 * s->cap : 1024;
-    s->buf = realloc(s->buf, (size_t)s->cap * sizeof(uint32_t));
+    s->word = realloc(s->word, (size_t)s->cap * sizeof(uint32_t));
 }
 
 static void spv_word(Spv *s, uint32_t w) {
-    if (s->len >= s->cap) { spv_grow(s); }
-    s->buf[s->len++] = w;
+    if (s->words >= s->cap) { spv_grow(s); }
+    s->word[s->words++] = w;
 }
 
 static void spv_op(Spv *s, int opcode, int word_count) {
@@ -293,12 +290,8 @@ struct vk_program {
 
     struct deref_info *deref;
 
-    // STYLE: avoid "len" — this counts uint32_t words, so `int spirv_words` and
-    // STYLE: matching `out_spirv_words` parameter / `spirv_words` local in
-    // STYLE: build_spirv() / vk_compile() (and the singular `*spirv` → `*word`
-    // STYLE: per the array-name-singular rule).
     uint32_t *spirv;
-    int       spirv_len, :32;
+    int       spirv_words, :32;
 };
 
 // ---------------------------------------------------------------------------
@@ -718,7 +711,7 @@ static _Bool produces_float(enum op op) {
 
 // Build the full SPIR-V binary for a basic block.
 static uint32_t *build_spirv(struct umbra_basic_block const *bb,
-                              int *out_spirv_len,
+                              int *out_spirv_words,
                               int *out_max_ptr,
                               int *out_total_bufs,
                               int *out_n_deref,
@@ -1828,16 +1821,16 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
 
     // --- Concatenate all sections into final SPIR-V binary. ---
     int total_words = 5 // header
-        + B.caps.len
-        + B.exts.len
-        + B.ext_import.len
-        + B.mem_model.len
-        + B.entry.len
-        + B.exec_mode.len
-        + B.decor.len
-        + B.types.len
-        + B.globals.len
-        + B.func.len;
+        + B.caps.words
+        + B.exts.words
+        + B.ext_import.words
+        + B.mem_model.words
+        + B.entry.words
+        + B.exec_mode.words
+        + B.decor.words
+        + B.types.words
+        + B.globals.words
+        + B.func.words;
 
     uint32_t *spirv = malloc((size_t)total_words * sizeof(uint32_t));
     int off = 0;
@@ -1850,8 +1843,8 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
     spirv[off++] = SpvSchema;
 
     #define COPY_SECTION(s) do { \
-        memcpy(spirv + off, (s).buf, (size_t)(s).len * sizeof(uint32_t)); \
-        off += (s).len; \
+        memcpy(spirv + off, (s).word, (size_t)(s).words * sizeof(uint32_t)); \
+        off += (s).words; \
     } while (0)
 
     COPY_SECTION(B.caps);
@@ -1867,19 +1860,19 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
 
     #undef COPY_SECTION
 
-    *out_spirv_len = total_words;
+    *out_spirv_words = total_words;
 
     // Free temporary buffers.
-    free(B.caps.buf);
-    free(B.exts.buf);
-    free(B.ext_import.buf);
-    free(B.mem_model.buf);
-    free(B.entry.buf);
-    free(B.exec_mode.buf);
-    free(B.decor.buf);
-    free(B.types.buf);
-    free(B.globals.buf);
-    free(B.func.buf);
+    free(B.caps.word);
+    free(B.exts.word);
+    free(B.ext_import.word);
+    free(B.mem_model.word);
+    free(B.entry.word);
+    free(B.exec_mode.word);
+    free(B.decor.word);
+    free(B.types.word);
+    free(B.globals.word);
+    free(B.func.word);
     free(B.v_ssbo);
     free(B.val);
     free(B.val_1);
@@ -2217,7 +2210,7 @@ static void vk_program_dump(struct umbra_program const *p, FILE *f) {
     char tmp[] = "/tmp/umbra_spirv_XXXXXX";
     int fd = mkstemp(tmp);
     if (fd >= 0) {
-        size_t n = (size_t)vp->spirv_len * sizeof(uint32_t);
+        size_t n = (size_t)vp->spirv_words * sizeof(uint32_t);
         if (write(fd, vp->spirv, n) == (ssize_t)n) {
             close(fd);
             char cmd[256];
@@ -2235,7 +2228,7 @@ static void vk_program_dump(struct umbra_program const *p, FILE *f) {
     }
     // Fallback: summary only.
     fprintf(f, "vulkan SPIR-V (%d words, %d bufs, %d push words)\n",
-            vp->spirv_len, vp->total_bufs, vp->push_words);
+            vp->spirv_words, vp->total_bufs, vp->push_words);
 }
 
 static void vk_program_free(struct umbra_program *p) {
@@ -2255,9 +2248,9 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
                                          struct umbra_basic_block const *bb) {
     struct vk_backend *vbe = (struct vk_backend *)be;
 
-    int spirv_len = 0, max_ptr = -1, total_bufs = 0, n_deref = 0, push_words = 0;
+    int spirv_words = 0, max_ptr = -1, total_bufs = 0, n_deref = 0, push_words = 0;
     struct deref_info *deref = 0;
-    uint32_t *spirv = build_spirv(bb, &spirv_len, &max_ptr, &total_bufs,
+    uint32_t *spirv = build_spirv(bb, &spirv_words, &max_ptr, &total_bufs,
                                    &n_deref, &deref, &push_words);
     if (!spirv) { return 0; }
 
@@ -2268,7 +2261,7 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
     {
         VkShaderModuleCreateInfo ci = {
             .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-            .codeSize = (size_t)spirv_len * sizeof(uint32_t),
+            .codeSize = (size_t)spirv_words * sizeof(uint32_t),
             .pCode = spirv,
         };
         VkResult rc = vkCreateShaderModule(vbe->device, &ci, 0, &shader);
@@ -2346,7 +2339,7 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
     p->push_words    = push_words;
     p->deref       = deref;
     p->spirv       = spirv;
-    p->spirv_len   = spirv_len;
+    p->spirv_words = spirv_words;
 
     p->base.queue   = vk_program_queue;
     p->base.dump    = vk_program_dump;
