@@ -1,4 +1,5 @@
 #include "slide.h"
+#include <math.h>
 #include <stdlib.h>
 
 struct solid_state {
