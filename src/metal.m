@@ -1420,11 +1420,6 @@ static void metal_submit_cmdbuf(struct metal_backend *be) {
 
 static void umbra_metal_flush(struct metal_backend *be) {
     metal_submit_cmdbuf(be);
-    // TODO: metal_submit_cmdbuf already drained the new cur_frame after the
-    // rotate, so one of these METAL_N_FRAMES iterations is always a no-op.
-    // Could be `metal_drain_frame(be, be->cur_frame ^ 1)` (the just-submitted
-    // one). The loop is harder to mess up but reads as confusing.
-    // (vk_flush has the same shape.)
     for (int i = 0; i < METAL_N_FRAMES; i++) { metal_drain_frame(be, i); }
     @autoreleasepool {
         for (int i = 0; i < be->batch_ncopy; i++) {
