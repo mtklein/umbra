@@ -1168,13 +1168,6 @@ static void batch_add_copy(
 // read-only entry was made (e.g. slug acc loop counter in the uniforms
 // buffer). Copyback for writable buffers is tracked exactly once, at entry
 // creation time.
-//
-// TODO: cache_buf currently lives in parallel with the per-frame uniform
-// ring. The split is "writable + row-structured + deref'd → cache_buf" and
-// "read-only flat → ring" — two caching mechanisms with different lifetime
-// rules. A long-term cleanup would route the deref'd read-only path through
-// the ring too (with content hashing to preserve the writable→readonly
-// hand-off). Originally noted in the metal-route-to-ring commit message.
 static int cache_buf(struct metal_backend *be, void *host, size_t bytes,
                      _Bool read_only) {
     for (int i = 0; i < be->batch_cache_n; i++) {
