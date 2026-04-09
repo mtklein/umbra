@@ -23,7 +23,7 @@ static _Bool pop(struct thread_pool *p, struct work_item *out) {
     while (p->top == 0 && !p->quit) {
         pthread_cond_wait(&p->cv, &p->mu);
     }
-    _Bool got = p->top > 0;
+    _Bool const got = p->top > 0;
     if (got) { *out = p->stack[--p->top]; }
     pthread_mutex_unlock(&p->mu);
     return got;
@@ -49,7 +49,7 @@ static void *worker(void *arg) {
 }
 
 struct thread_pool* thread_pool(int n) {
-    struct thread_pool *p = calloc(1, sizeof *p);
+    struct thread_pool *const p = calloc(1, sizeof *p);
     pthread_mutex_init(&p->mu, NULL);
     pthread_cond_init(&p->cv, NULL);
     p->cap = 64;
@@ -79,7 +79,7 @@ void thread_pool_free(struct thread_pool *p) {
 
 void work_group_add(struct work_group *wg, void (*fn)(void *), void *ctx) {
     __atomic_fetch_add(&wg->pending, 1, __ATOMIC_RELAXED);
-    struct thread_pool *p = wg->pool;
+    struct thread_pool *const p = wg->pool;
     pthread_mutex_lock(&p->mu);
     if (p->top == p->cap) {
         p->cap *= 2;

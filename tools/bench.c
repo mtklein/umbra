@@ -171,10 +171,10 @@ int main(int argc, char *argv[]) {
         if (!s->draw) { continue; }
         if (match && !strstr(s->title, match)) { continue; }
 
-        struct umbra_fmt fmt = fmt_ov ? *fmt_ov : umbra_fmt_8888;
-        size_t bpp = fmt.bpp;
-        size_t planes = (size_t)fmt.planes;
-        void *buf = calloc((size_t)(W * H) * planes, bpp);
+        struct umbra_fmt const fmt    = fmt_ov ? *fmt_ov : umbra_fmt_8888;
+        size_t           const bpp    = fmt.bpp;
+        size_t           const planes = (size_t)fmt.planes;
+        void            *const buf    = calloc((size_t)(W * H) * planes, bpp);
 
         double ns_px[4] = {-1, -1, -1, -1};
         for (int bi = 0; bi < nb; bi++) {
@@ -211,10 +211,10 @@ int main(int argc, char *argv[]) {
     }
 
     if (!match || strstr("slug accumulator (1 curve)", match)) {
-        struct slug_curves        sc = slug_extract("Slug", (float)H * 0.3125f);
-        struct slug_acc_layout    al;
-        struct umbra_builder     *bld = slug_build_acc(&al);
-        struct umbra_basic_block *bb = umbra_basic_block(bld);
+        struct slug_curves              sc  = slug_extract("Slug", (float)H * 0.3125f);
+        struct slug_acc_layout          al;
+        struct umbra_builder     *const bld = slug_build_acc(&al);
+        struct umbra_basic_block *const bb  = umbra_basic_block(bld);
         umbra_builder_free(bld);
 
         struct umbra_program *progs[4];
@@ -223,7 +223,7 @@ int main(int argc, char *argv[]) {
         }
         umbra_basic_block_free(bb);
 
-        float *wind = calloc((size_t)(W * H), 4);
+        float *const wind = calloc((size_t)(W * H), 4);
         float  mat[11] = {0};
         slide_perspective_matrix(mat, 0.0f, W, H, (int)sc.w, (int)sc.h);
         mat[9] = sc.w;

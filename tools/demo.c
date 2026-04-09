@@ -243,20 +243,20 @@ int main(void) {
         return 1;
     }
 
-    SDL_Window *window = SDL_CreateWindow("umbra demo", W, H, 0);
+    SDL_Window *const window = SDL_CreateWindow("umbra demo", W, H, 0);
     if (!window) {
         SDL_Log("SDL_CreateWindow failed: %s", SDL_GetError());
         return 1;
     }
 
-    SDL_Renderer *renderer = SDL_CreateRenderer(window, NULL);
+    SDL_Renderer *const renderer = SDL_CreateRenderer(window, NULL);
     if (!renderer) {
         SDL_Log("SDL_CreateRenderer failed: %s", SDL_GetError());
         return 1;
     }
 
-    SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32,
-                                             SDL_TEXTUREACCESS_STREAMING, W, H);
+    SDL_Texture *const texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32,
+                                                   SDL_TEXTUREACCESS_STREAMING, W, H);
     if (!texture) {
         SDL_Log("SDL_CreateTexture failed: %s", SDL_GetError());
         return 1;
@@ -266,7 +266,7 @@ int main(void) {
 
     max_threads = SDL_GetNumLogicalCPUCores();
     if (max_threads < 1) { max_threads = 1; }
-    struct thread_pool *pool = thread_pool(max_threads);
+    struct thread_pool *const pool = thread_pool(max_threads);
     xtra_progs = calloc((size_t)max_threads, sizeof *xtra_progs);
 
     bes[0] = umbra_backend_interp();
@@ -276,7 +276,7 @@ int main(void) {
     pipe_be = umbra_backend_jit();
     if (!pipe_be) { pipe_be = umbra_backend_interp(); }
 
-    void *pixbuf = malloc(W * H * 8);
+    void *const pixbuf = malloc(W * H * 8);
 
     int cur_slide = slide_count() - 1;
     int cur_fmt = FMT_8888;
