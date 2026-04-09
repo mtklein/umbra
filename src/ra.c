@@ -225,7 +225,12 @@ struct ra_step ra_step_alloc(struct ra *ra, int *sl, int *ns, int i) {
 struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct bb_inst const *inst,
                              int i) {
     struct ra_step s = step0();
+    ra->npinned = 0;
     s.rx = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
+    // Pin the input so the rd allocation below cannot evict it.
+    if ((int)inst->x.id < i && !inst->x.chan) {
+        ra->pinned[ra->npinned++] = (int)inst->x.id;
+    }
     _Bool const x_dead = inst->x.chan
         ? ra->chan_last_use[(int)inst->x.id][(int)inst->x.chan] <= i
         : ra->last_use[(int)inst->x.id] <= i;
@@ -236,6 +241,10 @@ struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct bb_inst con
         ra->reg[i] = s.rd;
         ra->owner[(int)s.rd] = i;
     }
+    // Pin the new value so any subsequent ra_alloc / ra_ensure (e.g. the
+    // backend's ra_ensure for inst->y.id in _imm op handling) cannot evict
+    // it. Stays pinned until the next ra_step_* resets npinned.
+    ra->pinned[ra->npinned++] = i;
     if (x_dead && inst->x.chan) {
         int8_t r = ra->chan_reg[(int)inst->x.id][(int)inst->x.chan];
         if (r >= 0) { ra_return_reg(ra, r); ra->chan_reg[(int)inst->x.id][(int)inst->x.chan] = -1; }

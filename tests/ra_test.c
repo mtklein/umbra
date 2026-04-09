@@ -412,6 +412,89 @@ TEST(test_step_unary_alive) {
     free(bb);
 }
 
+TEST(test_step_unary_pins_inputs_and_dest) {
+    // Regression: ra_step_unary used to leave both its input rx and the
+    // newly-allocated dest rd unpinned. A backend (ARM64 _imm op handling)
+    // that called ra_ensure(inst->y.id) right after ra_step_unary could
+    // then evict either or both, with the freed register collapsing into
+    // the imm's register. The result was FSUB v, v, v = 0 instead of
+    // v - imm — observed in the perspective coverage shader where it made
+    // the bw-1 / bh-1 clamp values revert to bw / bh, which let the gather
+    // index reach bw*bh and run one element off the end of the bitmap.
+    static int8_t const pool[] = {5, 6, 7};
+    struct ra_config    cfg = {
+        .pool = pool,
+        .nregs = 3,
+        .max_reg = 10,
+        .spill = test_spill,
+        .fill = test_fill,
+        .ctx = 0,
+    };
+
+    // 4 values:
+    //   inst[0] = imm_32 (the immediate, e.g. 1.0f)
+    //   inst[1] = imm_32 (stand-in for the runtime input to be subtracted)
+    //   inst[2] = imm_32 (filler so all 3 regs are occupied)
+    //   inst[3] = sub_f32_imm inst[1] (with .y.id = 0 referencing the imm)
+    struct umbra_basic_block *bb = malloc(sizeof *bb);
+    bb->inst = calloc(4, sizeof *bb->inst);
+    bb->insts = 4;
+    bb->preamble = 0;
+
+    bb->inst[0].op = op_imm_32;
+    bb->inst[0].imm = 0x3f800000;  // 1.0f
+    bb->inst[1].op = op_imm_32;
+    bb->inst[1].imm = 0x45800000;  // 4096.0f
+    bb->inst[2].op = op_imm_32;
+    bb->inst[2].imm = 0;
+    bb->inst[3].op = op_sub_f32_imm;
+    bb->inst[3].x = (val_){.id = 1};
+    bb->inst[3].y = (val_){.id = 0};
+
+    struct ra *ra = ra_create(bb, &cfg);
+    int        sl[4] = {-1, -1, -1, -1};
+    int        ns = 0;
+    reset_records();
+
+    // Last-use schedule: inst[0] used latest (so it's the eviction target
+    // during the rd allocation), inst[1] (rx) alive past i=3, inst[3] (rd)
+    // alive past i=3, inst[2] dies right after i=3. Without the pinning
+    // fix, ra_step_unary's rd alloc evicts inst[0] (its lu is highest);
+    // then the subsequent ra_ensure(inst[0]) allocates again and the only
+    // remaining unpinned candidate is the freshly-allocated rd, which gets
+    // evicted, collapsing rd onto the same register as ir.
+    ra_set_last_use(ra, 0, 5);
+    ra_set_last_use(ra, 1, 4);
+    ra_set_last_use(ra, 2, 4);
+    ra_set_last_use(ra, 3, 5);
+
+    int8_t r0 = ra_alloc(ra, sl, &ns); ra_assign(ra, 0, r0);
+    int8_t r1 = ra_alloc(ra, sl, &ns); ra_assign(ra, 1, r1);
+    int8_t r2 = ra_alloc(ra, sl, &ns); ra_assign(ra, 2, r2);
+
+    struct ra_step s = ra_step_unary(ra, sl, &ns, &bb->inst[3], 3);
+
+    // Sanity: rx is the input register; rd is the new dest register.
+    s.rx == r1 here;
+    s.rd >= 0 here;
+    s.rd != s.rx here;
+    ra_reg(ra, 1) == r1 here;
+    ra_reg(ra, 3) == s.rd here;
+
+    // The crux: simulate the JIT _imm body's ra_ensure(inst->y.id) call.
+    // Neither s.rx nor s.rd may collapse onto the returned register —
+    // otherwise the FSUB rd, rx, ir would overwrite or self-cancel.
+    int8_t ir = ra_ensure(ra, sl, &ns, 0);
+    ir != s.rx here;
+    ir != s.rd here;
+    ra_reg(ra, 1) == r1 here;
+    ra_reg(ra, 3) == s.rd here;
+
+    ra_destroy(ra);
+    free(bb->inst);
+    free(bb);
+}
+
 TEST(test_step_alu) {
     static int8_t const pool[] = {5, 6, 7, 8};
     struct ra_config    cfg = {
