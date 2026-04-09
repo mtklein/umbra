@@ -21,12 +21,6 @@ static void anim_init(struct slide *s, int w, int h) {
     st->t = 0.0f;
 }
 
-static void anim_animate(struct slide *s, float dt) {
-    struct anim_state *st = (struct anim_state *)s;
-    (void)dt;
-    st->t += 0.016f;
-}
-
 static void anim_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
     struct anim_state *st = (struct anim_state *)s;
     if (st->fmt.name != fmt.name || !st->bb) {
@@ -84,7 +78,6 @@ SLIDE(slide_anim_t) {
         .title = "Animated (t in uniforms)",
         .bg = 0xff000000,
         .init = anim_init,
-        .animate = anim_animate,
         .prepare = anim_prepare,
         .draw = anim_draw,
         .free = anim_free,
