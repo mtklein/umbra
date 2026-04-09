@@ -15,30 +15,65 @@ static double now(void) {
     return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
 }
 
-// TODO: this "double iters until elapsed > min_secs" loop is sensitive to
-// noise — one slow round during the doubling can converge at half the iters
-// and inflate ns/px. Saw this manifest as bimodal noise during the threshold
-// sweep. A cleaner bench would do warmup + N median-of-K runs + drop-outlier
-// filtering.
-static double bench(struct slide *s, int w, int h, void *buf, struct umbra_backend *be,
-                    struct umbra_fmt fmt, double min_secs) {
-    s->prepare(s, be, fmt);
-    int frame = 0;
-    s->draw(s, frame++, 0, 0, w, h, buf);
+typedef void (*draw_fn)(void *ctx);
+
+struct slide_draw_ctx {
+    struct slide *s;
+    void         *buf;
+    int           frame;
+    int           w, h, :32;
+};
+static void slide_draw(void *vctx) {
+    struct slide_draw_ctx *c = vctx;
+    c->s->draw(c->s, c->frame++, 0, 0, c->w, c->h, c->buf);
+}
+
+struct prog_draw_ctx {
+    struct umbra_program *p;
+    struct umbra_buf     *bufs;
+    int                   w, h;
+};
+static void prog_draw(void *vctx) {
+    struct prog_draw_ctx *c = vctx;
+    c->p->queue(c->p, 0, 0, c->w, c->h, c->bufs);
+}
+
+// Pilot + min-of-K timing.
+//
+// 1. Pilot: time one draw. Doubles as warmup; the cold-start pilot may be
+//    slower than steady-state but min-of-K below filters that out as long
+//    as at least one of the K samples lands in steady-state.
+// 2. Calibrate iters so each timed sample is ~target_secs long.
+// 3. Take up to `samples` samples; bail early once we've spent the wall
+//    budget so a single very expensive draw can't multiply by samples.
+// 4. Report the fastest sample as ns/px.
+//
+// Min is robust to one-sided positive jitter (preemption, thermal blips,
+// GPU contention) — the noise we actually see in practice — and gives a
+// stable point estimate for regression detection across commits.
+static double bench(draw_fn draw, void *ctx, struct umbra_backend *be,
+                    int w, int h, int samples, double target_secs) {
+    double const pilot_start = now();
+    draw(ctx);
     be->flush(be);
-    int iters = 1;
-    for (;;) {
+    double const t_one = now() - pilot_start;
+
+    int iters = (int)(target_secs / (t_one > 1e-9 ? t_one : 1e-9));
+    if (iters < 1) { iters = 1; }
+
+    double const wall_budget    = (double)samples * target_secs;
+    double       best           = 0;
+    double       total_elapsed  = 0;
+    for (int k = 0; k < samples; k++) {
         double const start = now();
-        for (int it = 0; it < iters; it++) {
-            s->draw(s, frame++, 0, 0, w, h, buf);
-        }
+        for (int it = 0; it < iters; it++) { draw(ctx); }
         be->flush(be);
-        double const elapsed = now() - start;
-        if (elapsed >= min_secs) {
-            return elapsed / ((double)iters * (double)w * (double)h) * 1e9;
-        }
-        iters *= 2;
+        double const dt = now() - start;
+        if (k == 0 || dt < best) { best = dt; }
+        total_elapsed += dt;
+        if (total_elapsed >= wall_budget) { break; }
     }
+    return best / ((double)iters * (double)w * (double)h) * 1e9;
 }
 
 static _Bool streq(char const *a, char const *b) { return strcmp(a, b) == 0; }
@@ -49,7 +84,8 @@ static void usage(void) {
         "  --fmt FORMAT     destination format: 8888, 565, 1010102, fp16, fp16_planar\n"
         "  --backend NAME   run only: interp, jit, metal, vulkan\n"
         "  --match SUBSTR   run only slides whose title contains SUBSTR\n"
-        "  --ms N           measure at least N ms per timing (default 100)\n"
+        "  --samples N      timing samples per measurement, take min (default 5)\n"
+        "  --target-ms N    target ms per sample (default 15)\n"
         "  --width N        canvas width in pixels (default 4096)\n"
         "  --help           show this help\n");
 }
@@ -66,11 +102,12 @@ static struct umbra_fmt parse_fmt(char const *s) {
 }
 
 int main(int argc, char *argv[]) {
-    int         W       = 4096;
+    int         W         = 4096;
     struct umbra_fmt const *fmt_ov = NULL;
-    int         be_mask = 0xf;
-    double      min_s   = 0.1;
-    char const *match   = NULL;
+    int         be_mask   = 0xf;
+    int         samples   = 5;
+    int         target_ms = 15;
+    char const *match     = NULL;
 
     for (int i = 1; i < argc; i++) {
         if (streq(argv[i], "--help") || streq(argv[i], "-h")) { usage(); return 0; }
@@ -85,11 +122,15 @@ int main(int argc, char *argv[]) {
                       streq(b, "metal")  ? 4 : streq(b, "vulkan") ? 8 : 0;
             if (!be_mask) { fprintf(stderr, "unknown backend: %s\n", b); usage(); return 1; }
         }
-        else if (streq(argv[i], "--match")   && i+1 < argc) { match = argv[++i]; }
-        else if (streq(argv[i], "--ms")      && i+1 < argc) { min_s = atof(argv[++i]) * 1e-3; }
-        else if (streq(argv[i], "--width")   && i+1 < argc) { W = atoi(argv[++i]); }
+        else if (streq(argv[i], "--match")     && i+1 < argc) { match = argv[++i]; }
+        else if (streq(argv[i], "--samples")   && i+1 < argc) { samples = atoi(argv[++i]); }
+        else if (streq(argv[i], "--target-ms") && i+1 < argc) { target_ms = atoi(argv[++i]); }
+        else if (streq(argv[i], "--width")     && i+1 < argc) { W = atoi(argv[++i]); }
         else { W = atoi(argv[i]); }
     }
+    if (samples < 1)   { samples   = 1; }
+    if (target_ms < 1) { target_ms = 1; }
+    double const target_secs = (double)target_ms * 1e-3;
 
     int const H = 480;
     slides_init(W, H);
@@ -125,8 +166,11 @@ int main(int argc, char *argv[]) {
                 if (be_mask & (1 << bi)) { printf(" %12s", "-"); }
                 continue;
             }
+            s->prepare(s, bes[bi], fmt);
+            struct slide_draw_ctx sctx = {.s=s, .buf=buf, .frame=0, .w=W, .h=H};
             char tmp[32];
-            sprintf(tmp, "%5.2f ns/px", bench(s, W, H, buf, bes[bi], fmt, min_s));
+            sprintf(tmp, "%5.2f ns/px",
+                    bench(slide_draw, &sctx, bes[bi], W, H, samples, target_secs));
             printf(" %12s", tmp);
         }
         printf("\n");
@@ -174,25 +218,11 @@ int main(int argc, char *argv[]) {
                 if (be_mask & (1 << bi)) { printf(" %12s", "-"); }
                 continue;
             }
-            progs[bi]->queue(progs[bi], 0, 0, W, H, abuf);
-            bes[bi]->flush(bes[bi]);
-            int iters = 1;
-            for (;;) {
-                double const start = now();
-                for (int it = 0; it < iters; it++) {
-                    progs[bi]->queue(progs[bi], 0, 0, W, H, abuf);
-                }
-                bes[bi]->flush(bes[bi]);
-                double const elapsed = now() - start;
-                if (elapsed >= min_s) {
-                    char tmp[32];
-                    sprintf(tmp, "%5.2f ns/px",
-                            elapsed / ((double)iters * (double)(W * H)) * 1e9);
-                    printf(" %12s", tmp);
-                    break;
-                }
-                iters *= 2;
-            }
+            struct prog_draw_ctx pctx = {.p=progs[bi], .bufs=abuf, .w=W, .h=H};
+            char tmp[32];
+            sprintf(tmp, "%5.2f ns/px",
+                    bench(prog_draw, &pctx, bes[bi], W, H, samples, target_secs));
+            printf(" %12s", tmp);
         }
         printf("\n");
 
