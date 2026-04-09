@@ -5,11 +5,6 @@ Roughly in order of "value per effort" within each section.
 
 ## Small things to fix in a tomorrow-pass
 
-- `prev_fence` field in `struct metal_backend` lives next to
-  `frame_committed[]` but is per-cmdbuf compute-serialization, not
-  per-frame. Worth a one-line comment clarifying that distinction. The
-  current comment is correct but doesn't acknowledge the rotation reset.
-
 - `umbra_metal_flush` and `vk_flush` both call `drain_frame(0); drain_frame(1);`
   after `submit_cmdbuf`. `submit_cmdbuf` already drained the new cur_frame,
   so one of those two calls is always a no-op. Could be
@@ -29,12 +24,6 @@ Roughly in order of "value per effort" within each section.
   doesn't *prove* the mechanism is wired. A cleaner shape: expose a
   rotation counter on each backend and assert it incremented. ~20 lines on
   each side.
-
-- `uniform_ring` lifetime ordering. `uniform_ring_free` calls each chunk's
-  `free_chunk` callback, which on the backends uses the device pointer. So
-  the backend MUST call `uniform_ring_free` before destroying the device.
-  Both backends do this correctly because of code ordering, but it isn't
-  documented. A header comment would help.
 
 - `metal_drain_frame`/`vk_drain_frame` are mirror-image functions in
   different files. Same for `metal_submit_cmdbuf`/`vk_submit_cmdbuf`. Can't
