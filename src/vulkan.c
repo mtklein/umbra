@@ -225,8 +225,7 @@ struct vk_backend {
     int                   batch_n_copies, batch_copies_cap;
     struct buf_cache_entry *batch_cache;
     int                     batch_cache_n, batch_cache_cap;
-    struct uniform_ring   uni_rings[VK_N_FRAMES];
-    int                   cur_frame, :32;
+    struct uniform_ring_pool uni_pool;
     _Bool                 batch_has_dispatch; int :24, :32;
 };
 
@@ -2099,12 +2098,11 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
         bind_range [i] = 0;
     }
 
-    struct uniform_ring *cur_ring = &be->uni_rings[be->cur_frame];
     for (int i = 0; i <= vp->max_ptr; i++) {
         if (!buf[i].ptr || !buf[i].sz) { continue; }
         if (buf[i].read_only && !buf[i].row_bytes) {
             struct uniform_ring_loc loc =
-                uniform_ring_alloc(cur_ring, buf[i].ptr, buf[i].sz);
+                uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, buf[i].sz);
             struct vk_ring_chunk *chunk = loc.handle;
             bind_buffer[i] = chunk->buf;
             bind_offset[i] = (VkDeviceSize)loc.offset;
@@ -2203,7 +2201,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
     free(push_data);
 
-    if (uniform_ring_used(&be->uni_rings[be->cur_frame]) > VK_RING_HIGH_WATER) {
+    if (uniform_ring_pool_should_rotate(&be->uni_pool)) {
         vk_submit_cmdbuf(be);
     }
 }
@@ -2357,23 +2355,24 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
 //  Backend lifecycle.
 // ---------------------------------------------------------------------------
 
-// Drain a single frame: wait for its in-flight cmdbuf to complete, free
-// it, reset its fence, and reset the frame's ring. No-op on a frame with
-// no in-flight cmdbuf.
-static void vk_drain_frame(struct vk_backend *v, int frame) {
+// uniform_ring_pool wait_frame callback: wait for the frame's in-flight
+// cmdbuf to retire, free it, and reset its fence. The pool resets the
+// ring after this returns.
+static void vk_wait_frame(int frame, void *ctx) {
+    struct vk_backend *v = ctx;
     if (v->frame_committed[frame]) {
         vkWaitForFences(v->device, 1, &v->frame_fences[frame], VK_TRUE, UINT64_MAX);
         vkResetFences(v->device, 1, &v->frame_fences[frame]);
         vkFreeCommandBuffers(v->device, v->cmd_pool, 1, &v->frame_committed[frame]);
         v->frame_committed[frame] = VK_NULL_HANDLE;
     }
-    uniform_ring_reset(&v->uni_rings[frame]);
 }
 
 // Backpressure release: submit the current frame's cmdbuf without waiting,
-// rotate to the other frame, and drain it. Drain only blocks if the new
-// frame's prior cmdbuf is still running. Writebacks and cache_buf entries
-// stay live across rotation.
+// stash it in frame_committed[cur], then rotate the pool. Pool calls
+// vk_wait_frame on the new cur (only blocks if its prior cmdbuf is still
+// running) and resets that ring. Writebacks and cache_buf entries stay
+// live across rotation.
 static void vk_submit_cmdbuf(struct vk_backend *v) {
     if (!v->batch_cmd) { return; }
 
@@ -2384,21 +2383,20 @@ static void vk_submit_cmdbuf(struct vk_backend *v) {
         .commandBufferCount=1,
         .pCommandBuffers=&v->batch_cmd,
     };
-    vkQueueSubmit(v->queue, 1, &si, v->frame_fences[v->cur_frame]);
+    vkQueueSubmit(v->queue, 1, &si, v->frame_fences[v->uni_pool.cur]);
 
-    v->frame_committed[v->cur_frame] = v->batch_cmd;
-    v->batch_cmd                     = VK_NULL_HANDLE;
-    v->batch_has_dispatch            = 0;
+    v->frame_committed[v->uni_pool.cur] = v->batch_cmd;
+    v->batch_cmd                        = VK_NULL_HANDLE;
+    v->batch_has_dispatch               = 0;
 
-    v->cur_frame ^= 1;
-    vk_drain_frame(v, v->cur_frame);
+    uniform_ring_pool_rotate(&v->uni_pool);
 }
 
 static void vk_flush(struct umbra_backend *be) {
     struct vk_backend *v = (struct vk_backend *)be;
 
     vk_submit_cmdbuf(v);
-    for (int i = 0; i < VK_N_FRAMES; i++) { vk_drain_frame(v, i); }
+    uniform_ring_pool_drain_all(&v->uni_pool);
 
     for (int i = 0; i < v->batch_n_copies; i++) {
         memcpy(v->batch_copies[i].host, v->batch_copies[i].mapped, v->batch_copies[i].bytes);
@@ -2417,8 +2415,8 @@ static void vk_flush(struct umbra_backend *be) {
 static void vk_free(struct umbra_backend *be) {
     vk_flush(be);
     struct vk_backend *v = (struct vk_backend *)be;
+    uniform_ring_pool_free(&v->uni_pool);
     for (int i = 0; i < VK_N_FRAMES; i++) {
-        uniform_ring_free(&v->uni_rings[i]);
         vkDestroyFence(v->device, v->frame_fences[i], 0);
     }
     vkDestroyCommandPool(v->device, v->cmd_pool, 0);
@@ -2581,8 +2579,14 @@ struct umbra_backend *umbra_backend_vulkan(void) {
     v->mem_type_host_import = mem_type_host_import;
     v->host_import_align   = host_import_align;
     v->get_host_props      = get_host_props;
+    v->uni_pool = (struct uniform_ring_pool){
+        .n         =VK_N_FRAMES,
+        .high_water=VK_RING_HIGH_WATER,
+        .ctx       =v,
+        .wait_frame=vk_wait_frame,
+    };
     for (int i = 0; i < VK_N_FRAMES; i++) {
-        v->uni_rings[i] = (struct uniform_ring){
+        v->uni_pool.rings[i] = (struct uniform_ring){
             .align     =ssbo_align,
             .ctx       =v,
             .new_chunk =vk_ring_new_chunk,
