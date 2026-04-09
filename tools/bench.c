@@ -174,7 +174,7 @@ int main(int argc, char *argv[]) {
         struct umbra_fmt const fmt    = fmt_ov ? *fmt_ov : umbra_fmt_8888;
         size_t           const bpp    = fmt.bpp;
         size_t           const planes = (size_t)fmt.planes;
-        void            *buf    = calloc((size_t)(W * H) * planes, bpp);
+        void                  *buf    = calloc((size_t)(W * H) * planes, bpp);
 
         double ns_px[4] = {-1, -1, -1, -1};
         for (int bi = 0; bi < nb; bi++) {
@@ -211,10 +211,10 @@ int main(int argc, char *argv[]) {
     }
 
     if (!match || strstr("slug accumulator (1 curve)", match)) {
-        struct slug_curves              sc  = slug_extract("Slug", (float)H * 0.3125f);
-        struct slug_acc_layout          al;
-        struct umbra_builder     *bld = slug_build_acc(&al);
-        struct umbra_basic_block *bb  = umbra_basic_block(bld);
+        struct slug_curves       sc  = slug_extract("Slug", (float)H * 0.3125f);
+        struct slug_acc_layout   al;
+        struct umbra_builder    *bld = slug_build_acc(&al);
+        struct umbra_basic_block *bb = umbra_basic_block(bld);
         umbra_builder_free(bld);
 
         struct umbra_program *progs[4];

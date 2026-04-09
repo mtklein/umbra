@@ -442,9 +442,9 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
         put(&c, w);
     }
     for (int pi = 0; pi < jc.pool.nrefs; pi++) {
-        struct pool_ref *r        = &jc.pool.refs[pi];
-        int        const word_off = pool_start + r->data_off / 4,
-                         imm19    = word_off - r->code_pos;
+        struct pool_ref *r = &jc.pool.refs[pi];
+        int const word_off = pool_start + r->data_off / 4,
+                  imm19    = word_off - r->code_pos;
         c.word[r->code_pos] = 0x9c000000u
             | ((uint32_t)(imm19 & 0x7ffff) << 5)
             | (c.word[r->code_pos] & 0x1fu);
@@ -1735,9 +1735,9 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
         emit1(&c, jc.pool.data[i]);
     }
     for (int i = 0; i < jc.pool.nrefs; i++) {
-        struct pool_ref *r         = &jc.pool.refs[i];
-        int        const entry_off = pool_start + r->data_off;
-        int32_t    const rel       = (int32_t)(entry_off - (r->code_pos + 4 + r->extra));
+        struct pool_ref *r = &jc.pool.refs[i];
+        int     const entry_off = pool_start + r->data_off;
+        int32_t const rel       = (int32_t)(entry_off - (r->code_pos + 4 + r->extra));
         __builtin_memcpy(c.byte + r->code_pos, &rel, 4);
     }
     pool_free(&jc.pool);

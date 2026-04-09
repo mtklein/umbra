@@ -262,7 +262,7 @@ struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct bb_inst con
 struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const *inst,
                            int i, int nscratch) {
     struct ra_slot const *slot = ra->slot;
-    struct ra_step        s    = step0();
+    struct ra_step s = step0();
 
     ra->npinned = 0;
     if ((int)inst->x.id < i) {
