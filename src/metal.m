@@ -40,17 +40,16 @@ struct metal_backend {
     struct umbra_backend base;
     void *device;
     void *queue;
-    void *batch_cmdbuf;     // currently-encoding cmdbuf for cur_frame, or NULL
+    void *batch_cmdbuf;     // currently-encoding cmdbuf for uni_pool.cur, or NULL
     void *prev_fence;       // fence updated by the previous encoder within the
                             // current cmdbuf (per-cmdbuf compute serialization,
                             // NOT per-frame); reset to NULL on commit/rotation
     void *frame_committed[METAL_N_FRAMES];  // last committed cmdbuf per frame, or NULL
-    int   cur_frame, :32;
     struct copyback        *batch_copy;
     int                     batch_ncopy, batch_copy_cap;
     struct buf_cache_entry *batch_cache;
     int                     batch_cache_n, batch_cache_cap;
-    struct uniform_ring     uni_rings[METAL_N_FRAMES];
+    struct uniform_ring_pool uni_pool;
 };
 
 struct umbra_metal {
@@ -1020,6 +1019,21 @@ static void metal_ring_free_chunk(void *handle, void *ctx) {
     }
 }
 
+// uniform_ring_pool wait_frame callback. Releases any in-flight cmdbuf
+// stashed in frame_committed[frame] and waits for it to retire. The pool
+// itself resets the ring after this returns.
+static void metal_wait_frame(int frame, void *ctx) {
+    struct metal_backend *be = ctx;
+    if (be->frame_committed[frame]) {
+        @autoreleasepool {
+            id<MTLCommandBuffer> prior =
+                (__bridge_transfer id<MTLCommandBuffer>)be->frame_committed[frame];
+            be->frame_committed[frame] = NULL;
+            [prior waitUntilCompleted];
+        }
+    }
+}
+
 static struct metal_backend* umbra_metal_backend_create(void) {
     @autoreleasepool {
         id<MTLDevice> device =
@@ -1033,8 +1047,14 @@ static struct metal_backend* umbra_metal_backend_create(void) {
                 (__bridge_retained void*)device;
             be->queue =
                 (__bridge_retained void*)queue;
+            be->uni_pool = (struct uniform_ring_pool){
+                .n         =METAL_N_FRAMES,
+                .high_water=METAL_RING_HIGH_WATER,
+                .ctx       =be,
+                .wait_frame=metal_wait_frame,
+            };
             for (int i = 0; i < METAL_N_FRAMES; i++) {
-                be->uni_rings[i] = (struct uniform_ring){
+                be->uni_pool.rings[i] = (struct uniform_ring){
                     .align     =16,
                     .ctx       =be,
                     .new_chunk =metal_ring_new_chunk,
@@ -1049,9 +1069,7 @@ static struct metal_backend* umbra_metal_backend_create(void) {
 
 static void umbra_metal_backend_free(struct metal_backend *be) {
     if (be) {
-        for (int i = 0; i < METAL_N_FRAMES; i++) {
-            uniform_ring_free(&be->uni_rings[i]);
-        }
+        uniform_ring_pool_free(&be->uni_pool);
         @autoreleasepool {
             if (be->device) {
                 (void)(__bridge_transfer id)be->device;
@@ -1239,12 +1257,11 @@ static void encode_dispatch(
     size_t  bind_offset[32];
     for (int i = 0; i < tb; i++) { bind_handle[i] = 0; bind_offset[i] = 0; }
 
-    struct uniform_ring *cur_ring = &be->uni_rings[be->cur_frame];
     for (int i = 0; i <= m->max_ptr; i++) {
         if (!buf[i].ptr || !buf[i].sz) { continue; }
         if (buf[i].read_only && !buf[i].row_bytes) {
             struct uniform_ring_loc loc =
-                uniform_ring_alloc(cur_ring, buf[i].ptr, buf[i].sz);
+                uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, buf[i].sz);
             bind_handle[i] = loc.handle;
             bind_offset[i] = loc.offset;
             continue;
@@ -1362,38 +1379,25 @@ static void umbra_metal_run(
         be->prev_fence = (__bridge_retained void*)update;
     }
 
-    if (uniform_ring_used(&be->uni_rings[be->cur_frame]) > METAL_RING_HIGH_WATER) {
+    if (uniform_ring_pool_should_rotate(&be->uni_pool)) {
         metal_submit_cmdbuf(be);
     }
 }
 
-// Drain a single frame: wait for its in-flight cmdbuf to complete, release
-// it, and reset the frame's ring. Safe to call on a frame with no in-flight
-// cmdbuf (no-op).
-//
-// TODO: [waitUntilCompleted] is a hard CPU stall. The "right" answer for the
-// pipelined design is MTLSharedEvent (and timeline VkSemaphore on the vulkan
-// side) with async completion handlers — we picked simple-first. Wait points
-// are now rare enough (one per ring rotation = ~one per 4 k dispatches at
-// 64 KiB) that the stall is invisible. Worth revisiting only if a future
-// workload encodes much faster than this.
-static void metal_drain_frame(struct metal_backend *be, int frame) {
-    if (be->frame_committed[frame]) {
-        @autoreleasepool {
-            id<MTLCommandBuffer> prior =
-                (__bridge_transfer id<MTLCommandBuffer>)be->frame_committed[frame];
-            be->frame_committed[frame] = NULL;
-            [prior waitUntilCompleted];
-        }
-    }
-    uniform_ring_reset(&be->uni_rings[frame]);
-}
-
 // Backpressure release: commit the current frame's cmdbuf without blocking,
-// rotate to the other frame, and drain it (waiting only if its prior cmdbuf
-// from the previous cycle is still in flight). Writebacks and cache_buf
-// entries stay live across rotation so the next sub-batch keeps binding the
-// same writable MTLBuffers.
+// stash it in frame_committed[cur], then rotate the pool. Pool calls
+// metal_wait_frame on the new cur (waiting only if its prior cmdbuf from
+// the previous cycle is still in flight) and resets that ring. Writebacks
+// and cache_buf entries stay live across rotation so the next sub-batch
+// keeps binding the same writable MTLBuffers.
+//
+// TODO: [waitUntilCompleted] in metal_wait_frame is a hard CPU stall. The
+// "right" answer for the pipelined design is MTLSharedEvent (and timeline
+// VkSemaphore on the vulkan side) with async completion handlers — we
+// picked simple-first. Wait points are now rare enough (one per ring
+// rotation = ~one per 4 k dispatches at 64 KiB) that the stall is
+// invisible. Worth revisiting only if a future workload encodes much
+// faster than this.
 static void metal_submit_cmdbuf(struct metal_backend *be) {
     if (!be->batch_cmdbuf) { return; }
     @autoreleasepool {
@@ -1405,15 +1409,14 @@ static void metal_submit_cmdbuf(struct metal_backend *be) {
             be->prev_fence = NULL;
         }
     }
-    be->frame_committed[be->cur_frame] = be->batch_cmdbuf;
-    be->batch_cmdbuf                   = NULL;
-    be->cur_frame                      ^= 1;
-    metal_drain_frame(be, be->cur_frame);
+    be->frame_committed[be->uni_pool.cur] = be->batch_cmdbuf;
+    be->batch_cmdbuf                      = NULL;
+    uniform_ring_pool_rotate(&be->uni_pool);
 }
 
 static void umbra_metal_flush(struct metal_backend *be) {
     metal_submit_cmdbuf(be);
-    for (int i = 0; i < METAL_N_FRAMES; i++) { metal_drain_frame(be, i); }
+    uniform_ring_pool_drain_all(&be->uni_pool);
     @autoreleasepool {
         for (int i = 0; i < be->batch_ncopy; i++) {
             struct copyback *c =
