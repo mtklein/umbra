@@ -32,8 +32,6 @@ struct copyback {
 
 struct deref_info { int buf_idx, src_buf, off; };
 
-// TODO: bump to N=3 (or higher) if a workload ever shows benefit. We have no
-// evidence it would help today; the change itself is easy.
 enum { METAL_N_FRAMES = 2 };
 
 struct metal_backend {
@@ -1384,14 +1382,6 @@ static void umbra_metal_run(
 // the previous cycle is still in flight) and resets that ring. Writebacks
 // and cache_buf entries stay live across rotation so the next sub-batch
 // keeps binding the same writable MTLBuffers.
-//
-// TODO: [waitUntilCompleted] in metal_wait_frame is a hard CPU stall. The
-// "right" answer for the pipelined design is MTLSharedEvent (and timeline
-// VkSemaphore on the vulkan side) with async completion handlers — we
-// picked simple-first. Wait points are now rare enough (one per ring
-// rotation = ~one per 4 k dispatches at 64 KiB) that the stall is
-// invisible. Worth revisiting only if a future workload encodes much
-// faster than this.
 static void metal_submit_cmdbuf(struct metal_backend *be) {
     if (!be->batch_cmdbuf) { return; }
     @autoreleasepool {
