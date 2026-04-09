@@ -3,8 +3,8 @@
 #include <stdlib.h>
 
 static void just_insert(struct hash *h, unsigned hash, int val) {
-    unsigned *const hptr = h->data;
-    int      *const vptr = (int*)(hptr + h->slots);
+    unsigned *hptr = h->data;
+    int      *vptr = (int*)(hptr + h->slots);
     unsigned  const mask = h->slots - 1;
 
     unsigned i;

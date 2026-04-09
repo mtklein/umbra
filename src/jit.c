@@ -292,7 +292,7 @@ static void arm64_pool_load_wide(Buf *c, struct pool *p, int d, void const *data
     put(c, LDR_q_literal(d));
 }
 static void arm64_remat(int reg, int val, void *ctx) {
-    struct jit_ctx *const j = ctx;
+    struct jit_ctx *j = ctx;
     arm64_pool_load(j->c, &j->pool, lo(reg), (uint32_t)j->bb->inst[val].imm);
     put(j->c, ORR_16b(hi(reg), lo(reg), lo(reg)));
 }
@@ -442,9 +442,9 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
         put(&c, w);
     }
     for (int pi = 0; pi < jc.pool.nrefs; pi++) {
-        struct pool_ref *const r        = &jc.pool.refs[pi];
-        int              const word_off = pool_start + r->data_off / 4,
-                               imm19    = word_off - r->code_pos;
+        struct pool_ref *r        = &jc.pool.refs[pi];
+        int        const word_off = pool_start + r->data_off / 4,
+                         imm19    = word_off - r->code_pos;
         c.word[r->code_pos] = 0x9c000000u
             | ((uint32_t)(imm19 & 0x7ffff) << 5)
             | (c.word[r->code_pos] & 0x1fu);
@@ -460,8 +460,8 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
                  pg      = 16384,
                  alloc   = (code_sz + pg - 1) & ~(pg - 1);
 
-    void *const mem = mmap(NULL, alloc + pg, PROT_READ | PROT_WRITE | PROT_EXEC,
-                           MAP_PRIVATE | MAP_ANON | MAP_JIT, -1, 0);
+    void *mem = mmap(NULL, alloc + pg, PROT_READ | PROT_WRITE | PROT_EXEC,
+                     MAP_PRIVATE | MAP_ANON | MAP_JIT, -1, 0);
     assume(mem != MAP_FAILED);
     mprotect((char *)mem + alloc, pg, PROT_NONE);
 
@@ -471,7 +471,7 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     __builtin___clear_cache(mem, (char *)mem + alloc);
     free(c.word);
 
-    struct umbra_jit *const j = malloc(sizeof *j);
+    struct umbra_jit *j = malloc(sizeof *j);
     j->code = mem;
     j->code_size = alloc + pg;
     j->loop_start = loop_body_start;
@@ -1735,9 +1735,9 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
         emit1(&c, jc.pool.data[i]);
     }
     for (int i = 0; i < jc.pool.nrefs; i++) {
-        struct pool_ref *const r         = &jc.pool.refs[i];
-        int              const entry_off = pool_start + r->data_off;
-        int32_t          const rel       = (int32_t)(entry_off - (r->code_pos + 4 + r->extra));
+        struct pool_ref *r         = &jc.pool.refs[i];
+        int        const entry_off = pool_start + r->data_off;
+        int32_t    const rel       = (int32_t)(entry_off - (r->code_pos + 4 + r->extra));
         __builtin_memcpy(c.byte + r->code_pos, &rel, 4);
     }
     pool_free(&jc.pool);
@@ -1751,8 +1751,8 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
                  pg      = (size_t)sysconf(_SC_PAGESIZE),
                  alloc   = (code_sz + pg - 1) & ~(pg - 1);
 
-    void *const mem = mmap(NULL, alloc + pg, PROT_READ | PROT_WRITE,
-                           MAP_PRIVATE | MAP_ANON, -1, 0);
+    void *mem = mmap(NULL, alloc + pg, PROT_READ | PROT_WRITE,
+                     MAP_PRIVATE | MAP_ANON, -1, 0);
     assume(mem != MAP_FAILED);
     mprotect((char *)mem + alloc, pg, PROT_NONE);
     __builtin_memcpy(mem, c.byte, code_sz);
@@ -1760,7 +1760,7 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     assume(ok == 0);
     free(c.byte);
 
-    struct umbra_jit *const j = malloc(sizeof *j);
+    struct umbra_jit *j = malloc(sizeof *j);
     j->code = mem;
     j->code_size = alloc + pg;
     j->loop_start = loop_body_start;
