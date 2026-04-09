@@ -149,6 +149,45 @@ TEST(uniform_ring_small_then_big) {
     uniform_ring_free(&r);
 }
 
+TEST(uniform_ring_large_payloads) {
+    struct fake_be be = {.default_cap=64*1024};
+    struct uniform_ring r = make_ring(&be);
+
+    char block[4096];
+    for (int i = 0; i < 20; i++) {
+        __builtin_memset(block, i + 1, sizeof block);
+        struct uniform_ring_loc l = uniform_ring_alloc(&r, block, sizeof block);
+        l.handle != 0 here;
+        __builtin_memcmp((char*)l.handle + l.offset, block, sizeof block) == 0 here;
+    }
+    // 16 4-KiB blocks fit per 64-KiB chunk, so 20 blocks need 2 chunks.
+    be.n_create == 2 here;
+    uniform_ring_used(&r) == 20 * 4096 here;
+
+    uniform_ring_free(&r);
+    be.n_destroy == 2 here;
+}
+
+TEST(uniform_ring_huge_single_payload) {
+    struct fake_be be = {.default_cap=64*1024};
+    struct uniform_ring r = make_ring(&be);
+
+    // A single uniform larger than default_cap forces new_chunk(min_bytes=reserved).
+    size_t big_bytes = 256 * 1024;
+    char  *big       = calloc(1, big_bytes);
+    for (size_t i = 0; i < big_bytes; i++) { big[i] = (char)(i & 0xff); }
+
+    struct uniform_ring_loc l = uniform_ring_alloc(&r, big, big_bytes);
+    l.handle != 0 here;
+    l.offset == 0 here;
+    be.n_create == 1 here;
+    __builtin_memcmp((char*)l.handle + l.offset, big, big_bytes) == 0 here;
+
+    free(big);
+    uniform_ring_free(&r);
+    be.n_destroy == 1 here;
+}
+
 TEST(uniform_ring_null_bytes_reserves_only) {
     struct fake_be be = {.default_cap=256};
     struct uniform_ring r = make_ring(&be);
