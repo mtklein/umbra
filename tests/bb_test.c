@@ -3684,6 +3684,57 @@ TEST(test_deref_16bit_row_bytes_l_gt_0) {
     cleanup(&B);
 }
 
+// Three derefs in one BB exercise the rb_gpr=0 branch in the JIT pointer
+// resolver: only the first two derefs get a row_bytes register, so the third
+// deref's per-pixel pointer is just a copy of the deref'd base. The flat
+// source buffer makes this safe — every (x,y) reads bufC[x] regardless of y.
+TEST(test_deref_third_uses_else_branch) {
+    enum { W = 8, H = 3 };
+    struct umbra_builder         *b = umbra_builder();
+    struct umbra_uniforms_layout  uni = {0};
+    size_t off1 = umbra_uniforms_reserve_ptr(&uni);
+    size_t off2 = umbra_uniforms_reserve_ptr(&uni);
+    size_t off3 = umbra_uniforms_reserve_ptr(&uni);
+    umbra_ptr32 d1  = umbra_deref_ptr32(b, (umbra_ptr32){0}, off1);
+    umbra_ptr32 d2  = umbra_deref_ptr32(b, (umbra_ptr32){0}, off2);
+    umbra_ptr32 d3  = umbra_deref_ptr32(b, (umbra_ptr32){0}, off3);
+    umbra_val32 v1  = umbra_load_32(b, d1);
+    umbra_val32 v2  = umbra_load_32(b, d2);
+    umbra_val32 v3  = umbra_load_32(b, d3);
+    umbra_val32 sum = umbra_add_i32(b, umbra_add_i32(b, v1, v2), v3);
+    umbra_store_32(b, (umbra_ptr32){.ix=1}, sum);
+    struct test_backends B = make(b);
+
+    void   *uniforms = umbra_uniforms_alloc(&uni);
+    int32_t bufA[W * H], bufB[W * H], bufC[W];
+    for (int i = 0; i < W * H; i++) { bufA[i] = i;       bufB[i] = i * 10; }
+    for (int i = 0; i < W;     i++) { bufC[i] = 1000 + i; }
+    umbra_uniforms_fill_ptr(uniforms, off1,
+        (struct umbra_buf){.ptr=bufA, .sz=sizeof bufA, .row_bytes=W * 4});
+    umbra_uniforms_fill_ptr(uniforms, off2,
+        (struct umbra_buf){.ptr=bufB, .sz=sizeof bufB, .row_bytes=W * 4});
+    // bufC is flat (row_bytes==0): broadcast the same row to every y.
+    umbra_uniforms_fill_ptr(uniforms, off3,
+        (struct umbra_buf){.ptr=bufC, .sz=sizeof bufC});
+
+    int32_t dst[W * H];
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        __builtin_memset(dst, 0, sizeof dst);
+        if (run(&B, bi, W, H, (struct umbra_buf[]){
+                {.ptr=uniforms, .sz=uni.size, .read_only=1},
+                {.ptr=dst, .sz=sizeof dst, .row_bytes=W * 4}})) {
+            for (int y = 0; y < H; y++) {
+                for (int x = 0; x < W; x++) {
+                    int idx = y * W + x;
+                    dst[idx] == bufA[idx] + bufB[idx] + bufC[x] here;
+                }
+            }
+        }
+    }
+    free(uniforms);
+    cleanup(&B);
+}
+
 TEST(test_i32_from_f32_acc_acc) {
     struct umbra_builder *b = umbra_builder();
     umbra_val32 x = umbra_load_32(b, (umbra_ptr32){0});
