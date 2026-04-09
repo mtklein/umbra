@@ -84,32 +84,6 @@ static void emit(Buf *b, char const *fmt, ...) {
     }
 }
 
-static _Bool is_16(enum op op) {
-    return op == op_load_16
-        || op == op_store_16
-        || op == op_gather_16
-        || op == op_load_16x4
-        || op == op_load_16x4_planar
-        || op == op_store_16x4
-        || op == op_store_16x4_planar
-        || op == op_i32_from_s16
-        || op == op_i32_from_u16
-        || op == op_i16_from_i32
-        || op == op_f32_from_f16
-        || op == op_f16_from_f32;
-}
-static _Bool is_32(enum op op) {
-    return op == op_uniform_32
-        || op == op_load_32
-        || op == op_load_8x4
-        || op == op_gather_uniform_32
-        || op == op_gather_32
-        || op == op_sample_32
-        || op == op_store_32
-        || op == op_store_8x4
-        || op == op_deref_ptr;
-}
-
 static _Bool produces_float(enum op op) {
     return op == op_add_f32     || op == op_sub_f32
         || op == op_mul_f32     || op == op_div_f32
@@ -139,7 +113,6 @@ static char const *uv(char *tmp, char const *vn,
 }
 
 static void emit_ops(Buf *b, BB const *bb,
-                     _Bool *ptr_16, _Bool *ptr_32,
                      int const *deref_buf,
                      _Bool *is_f,
                      int lo, int hi,
@@ -183,12 +156,10 @@ static void emit_ops(Buf *b, BB const *bb,
             case op_uniform_32: {
                 int p = ptr_is_deref(inst->ptr)
                     ? deref_buf[ptr_ix(inst->ptr)] : inst->ptr;
-                _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed
-                    ? "%suint v%d = p%d_32[%d];\n"
-                    : "%suint v%d = "
-                      "((device const uint*)"
-                      "p%d)[%d];\n",
+                emit(b,
+                     "%suint v%d = "
+                     "((device const uint*)"
+                     "p%d)[%d];\n",
                      pad, i, p, inst->imm / 4);
             } break;
             case op_load_32: {
@@ -203,54 +174,34 @@ static void emit_ops(Buf *b, BB const *bb,
             case op_gather_32: {
                 int p = ptr_is_deref(inst->ptr)
                     ? deref_buf[ptr_ix(inst->ptr)] : inst->ptr;
-                _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed
-                    ? "%suint v%d = p%d_32"
-                      "[safe_ix((int)%s,"
-                      "buf_szs[%d],4)]"
-                      " & oob_mask((int)%s,"
-                      "buf_szs[%d],4);\n"
-                    : "%suint v%d = "
-                      "((device uint*)p%d)"
-                      "[safe_ix((int)%s,"
-                      "buf_szs[%d],4)]"
-                      " & oob_mask((int)%s,"
-                      "buf_szs[%d],4);\n",
+                emit(b,
+                     "%suint v%d = "
+                     "((device uint*)p%d)"
+                     "[safe_ix((int)%s,"
+                     "buf_szs[%d],4)]"
+                     " & oob_mask((int)%s,"
+                     "buf_szs[%d],4);\n",
                      pad, i, p, vx, p,
                      vx, p);
             } break;
             case op_sample_32: {
                 int p = ptr_is_deref(inst->ptr)
                     ? deref_buf[ptr_ix(inst->ptr)] : inst->ptr;
-                _Bool mixed = ptr_32[p] && ptr_16[p];
                 emit(b,
                      "%sfloat _si%d = floor(%s);\n"
                      "%sfloat _fr%d = %s - _si%d;\n",
                      pad, i, fv(_fx, vx, xid, is_f),
                      pad, i, fv(_fx, vx, xid, is_f), i);
-                if (mixed) {
-                    emit(b,
-                         "%sfloat _lo%d = as_type<float>(p%d_32"
-                         "[safe_ix((int)_si%d,buf_szs[%d],4)]"
-                         " & oob_mask((int)_si%d,buf_szs[%d],4));\n",
-                         pad, i, p, i, p, i, p);
-                    emit(b,
-                         "%sfloat _hi%d = as_type<float>(p%d_32"
-                         "[safe_ix((int)_si%d+1,buf_szs[%d],4)]"
-                         " & oob_mask((int)_si%d+1,buf_szs[%d],4));\n",
-                         pad, i, p, i, p, i, p);
-                } else {
-                    emit(b,
-                         "%sfloat _lo%d = as_type<float>(((device uint*)p%d)"
-                         "[safe_ix((int)_si%d,buf_szs[%d],4)]"
-                         " & oob_mask((int)_si%d,buf_szs[%d],4));\n",
-                         pad, i, p, i, p, i, p);
-                    emit(b,
-                         "%sfloat _hi%d = as_type<float>(((device uint*)p%d)"
-                         "[safe_ix((int)_si%d+1,buf_szs[%d],4)]"
-                         " & oob_mask((int)_si%d+1,buf_szs[%d],4));\n",
-                         pad, i, p, i, p, i, p);
-                }
+                emit(b,
+                     "%sfloat _lo%d = as_type<float>(((device uint*)p%d)"
+                     "[safe_ix((int)_si%d,buf_szs[%d],4)]"
+                     " & oob_mask((int)_si%d,buf_szs[%d],4));\n",
+                     pad, i, p, i, p, i, p);
+                emit(b,
+                     "%sfloat _hi%d = as_type<float>(((device uint*)p%d)"
+                     "[safe_ix((int)_si%d+1,buf_szs[%d],4)]"
+                     " & oob_mask((int)_si%d+1,buf_szs[%d],4));\n",
+                     pad, i, p, i, p, i, p);
                 emit(b,
                      "%sfloat v%d = _lo%d + (_hi%d - _lo%d) * _fr%d;\n",
                      pad, i, i, i, i, i);
@@ -380,19 +331,13 @@ static void emit_ops(Buf *b, BB const *bb,
             case op_gather_16: {
                 int p = ptr_is_deref(inst->ptr)
                     ? deref_buf[ptr_ix(inst->ptr)] : inst->ptr;
-                _Bool mixed = ptr_32[p] && ptr_16[p];
-                emit(b, mixed
-                    ? "%suint v%d = (uint)(ushort)"
-                      "p%d_16[safe_ix((int)%s,"
-                      "buf_szs[%d],2)]"
-                      " & oob_mask((int)%s,"
-                      "buf_szs[%d],2);\n"
-                    : "%suint v%d = (uint)"
-                      "((device ushort*)p%d)"
-                      "[safe_ix((int)%s,"
-                      "buf_szs[%d],2)]"
-                      " & oob_mask((int)%s,"
-                      "buf_szs[%d],2);\n",
+                emit(b,
+                     "%suint v%d = (uint)"
+                     "((device ushort*)p%d)"
+                     "[safe_ix((int)%s,"
+                     "buf_szs[%d],2)]"
+                     " & oob_mask((int)%s,"
+                     "buf_szs[%d],2);\n",
                      pad, i, p, vx, p,
                      vx, p);
             } break;
@@ -889,19 +834,6 @@ static char* build_source(BB const *bb,
     int total_bufs = next_buf;
     *out_total_bufs = total_bufs;
 
-    _Bool *ptr_16 = calloc((size_t)(total_bufs + 1), 1);
-    _Bool *ptr_32 = calloc((size_t)(total_bufs + 1), 1);
-    for (int i = 0; i < bb->insts; i++) {
-        enum op op = bb->inst[i].op;
-        if (has_ptr(op) && op != op_deref_ptr) {
-            int p = ptr_is_deref(bb->inst[i].ptr)
-                ? deref_buf[ptr_ix(bb->inst[i].ptr)]
-                : bb->inst[i].ptr;
-            if (is_32(op)) { ptr_32[p] = 1; }
-            else if (is_16(op)) { ptr_16[p] = 1; }
-        }
-    }
-
     Buf b = {0};
 
     emit(&b,
@@ -962,28 +894,11 @@ static char* build_source(BB const *bb,
          "    uint x = x0 + pos.x;\n"
          "    uint y = y0 + pos.y;\n");
 
-    for (int p = 0; p < total_bufs; p++) {
-        if (ptr_32[p] && ptr_16[p]) {
-            emit(&b,
-                 "    device uint   *p%d_32"
-                 " = (device uint*)p%d;\n",
-                 p, p);
-            emit(&b,
-                 "    device ushort *p%d_16"
-                 " = (device ushort*)p%d;\n",
-                 p, p);
-        }
-    }
-
     _Bool *is_f = calloc((size_t)(bb->insts + 1), 1);
-    emit_ops(&b, bb, ptr_16, ptr_32,
-             deref_buf, is_f,
-             0, bb->insts, "    ");
+    emit_ops(&b, bb, deref_buf, is_f, 0, bb->insts, "    ");
     emit(&b, "}\n");
 
     free(is_f);
-    free(ptr_16);
-    free(ptr_32);
 
     char *src = malloc(b.size + 1);
     __builtin_memcpy(src, b.text, b.size);
