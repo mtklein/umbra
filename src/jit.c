@@ -1606,7 +1606,7 @@ static int resolve_ptr_x86(Buf *c, int p, int *last_ptr, int const *deref_gpr,
 struct umbra_jit {
     struct umbra_program base;
     void  *code;
-    size_t code_size, code_len;
+    size_t code_size;
     void (*entry)(int, int, int, int, struct umbra_buf *);
     int loop_start, loop_end;
 };
@@ -1758,7 +1758,6 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     struct umbra_jit *j = malloc(sizeof *j);
     j->code = mem;
     j->code_size = alloc + pg;
-    j->code_len = code_sz;
     j->loop_start = loop_body_start;
     j->loop_end = loop_body_end;
     {
