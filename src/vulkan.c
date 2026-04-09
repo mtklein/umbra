@@ -342,7 +342,8 @@ typedef struct {
     uint32_t v_global_id;  // gl_GlobalInvocationID
     uint32_t v_push;       // push constant block variable
 
-    // Push constant layout:
+    // Metadata push constant layout (no user uniforms — those go through the
+    // uniform ring as a storage buffer at binding 0):
     //   [0] = w, [1] = x0, [2] = y0,
     //   [3..3+total_bufs-1] = buf_szs, [3+total_bufs..3+2*total_bufs-1] = buf_rbs
     int total_bufs;
@@ -579,10 +580,12 @@ static int resolve_ptr(SpvBuilder *b, struct bb_inst const *inst) {
     return ptr_is_deref(inst->ptr) ? b->deref_buf[ptr_ix(inst->ptr)] : inst->ptr;
 }
 
-// Load a push constant at a given word offset.
+// Load a metadata word from the push constant block at a given word offset.
+// The push block carries only backend-side metadata (w, x0, y0, buf_szs,
+// buf_rbs); user uniforms ride in storage buffer binding 0 via the ring.
 // Push layout is struct { uint data[N]; }, so we need two indices:
 // member 0, then array element.
-static uint32_t load_push_u32(SpvBuilder *b, uint32_t offset_id) {
+static uint32_t load_meta_u32(SpvBuilder *b, uint32_t offset_id) {
     uint32_t ptr = spv_access_chain_2(b, b->t_ptr_push_u32, b->v_push, b->c_0, offset_id);
     return spv_load(b, b->t_u32, ptr);
 }
@@ -639,7 +642,7 @@ static uint32_t compute_addr(SpvBuilder *b, uint32_t x, uint32_t y,
                               int buf_idx, uint32_t stride_shift) {
     // buf_rbs[buf_idx] is at push offset 3 + total_bufs + buf_idx
     uint32_t rb_off = spv_const_u32(b, (uint32_t)(3 + b->total_bufs + buf_idx));
-    uint32_t rb = load_push_u32(b, rb_off);
+    uint32_t rb = load_meta_u32(b, rb_off);
     // row_bytes >> stride_shift = number of elements per row
     uint32_t elems_per_row = spv_binop(b, SpvOpShiftRightLogical, b->t_u32,
                                         rb, stride_shift);
@@ -655,7 +658,7 @@ static void gather_safe(SpvBuilder *b, uint32_t ix_val, int buf_idx,
                          uint32_t elem_shift,
                          uint32_t *out_idx, uint32_t *out_mask) {
     uint32_t sz_off = spv_const_u32(b, (uint32_t)(3 + buf_idx));
-    uint32_t sz = load_push_u32(b, sz_off);
+    uint32_t sz = load_meta_u32(b, sz_off);
     uint32_t count = spv_binop(b, SpvOpShiftRightLogical, b->t_u32, sz, elem_shift);
 
     // max_idx = max(count-1, 0)
@@ -1147,7 +1150,7 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
         uint32_t gid_y = spv_composite_extract(&B, B.t_u32, gid, 1);
 
         // Load w from push constants [0].
-        uint32_t w_val = load_push_u32(&B, B.c_0);
+        uint32_t w_val = load_meta_u32(&B, B.c_0);
 
         // Guard: if (gid_x >= w) return.
         uint32_t oob = spv_binop(&B, SpvOpUGreaterThanEqual, B.t_bool, gid_x, w_val);
@@ -1169,8 +1172,8 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
         spv_word(&B.func, label_body);
 
         // x0 and y0 from push constants [1] and [2].
-        uint32_t x0 = load_push_u32(&B, B.c_1);
-        uint32_t y0 = load_push_u32(&B, B.c_2);
+        uint32_t x0 = load_meta_u32(&B, B.c_1);
+        uint32_t y0 = load_meta_u32(&B, B.c_2);
 
         uint32_t x_coord = spv_binop(&B, SpvOpIAdd, B.t_u32, x0, gid_x);
         uint32_t y_coord = spv_binop(&B, SpvOpIAdd, B.t_u32, y0, gid_y);
@@ -1315,7 +1318,7 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
                     // Load 4 consecutive u16 values (8 bytes = 2 u32 words).
                     int p = resolve_ptr(&B, inst);
                     uint32_t rb_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
-                    uint32_t rb = load_push_u32(&B, rb_off);
+                    uint32_t rb = load_meta_u32(&B, rb_off);
                     uint32_t elems_per_row = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32,
                                                         rb, B.c_2);
                     uint32_t row_off = spv_binop(&B, SpvOpIMul, B.t_u32, y_coord, elems_per_row);
@@ -1336,11 +1339,11 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
                 case op_load_16x4_planar: {
                     int p = resolve_ptr(&B, inst);
                     uint32_t sz_off = spv_const_u32(&B, (uint32_t)(3 + p));
-                    uint32_t sz = load_push_u32(&B, sz_off);
+                    uint32_t sz = load_meta_u32(&B, sz_off);
                     uint32_t ps_u16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, sz, B.c_3);
 
                     uint32_t rb_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
-                    uint32_t rb = load_push_u32(&B, rb_off);
+                    uint32_t rb = load_meta_u32(&B, rb_off);
 
                     uint32_t rb_u16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, rb, B.c_1);
                     uint32_t addr16 = spv_binop(&B, SpvOpIMul, B.t_u32, y_coord, rb_u16);
@@ -1366,7 +1369,7 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
                 case op_store_16x4: {
                     int p = resolve_ptr(&B, inst);
                     uint32_t rb_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
-                    uint32_t rb = load_push_u32(&B, rb_off);
+                    uint32_t rb = load_meta_u32(&B, rb_off);
                     uint32_t elems_per_row = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32,
                                                         rb, B.c_2);
                     uint32_t row_off = spv_binop(&B, SpvOpIMul, B.t_u32, y_coord, elems_per_row);
@@ -1391,11 +1394,11 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
                 case op_store_16x4_planar: {
                     int p = resolve_ptr(&B, inst);
                     uint32_t sz_off = spv_const_u32(&B, (uint32_t)(3 + p));
-                    uint32_t sz = load_push_u32(&B, sz_off);
+                    uint32_t sz = load_meta_u32(&B, sz_off);
                     uint32_t ps_u16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, sz, B.c_3);
 
                     uint32_t rb_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
-                    uint32_t rb = load_push_u32(&B, rb_off);
+                    uint32_t rb = load_meta_u32(&B, rb_off);
                     uint32_t rb_u16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, rb, B.c_1);
                     uint32_t addr16 = spv_binop(&B, SpvOpIMul, B.t_u32, y_coord, rb_u16);
                     addr16 = spv_binop(&B, SpvOpIAdd, B.t_u32, addr16, x_coord);
