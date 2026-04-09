@@ -116,20 +116,16 @@ static struct umbra_fmt parse_fmt(char const *s) {
 }
 
 int main(int argc, char *argv[]) {
-    int         W         = 4096;
-    struct umbra_fmt const *fmt_ov = NULL;
-    int         be_mask   = 0xf;
-    int         samples   = 5;
-    int         target_ms = 15;
-    char const *match     = NULL;
+    int              W         = 4096;
+    struct umbra_fmt fmt       = umbra_fmt_8888;
+    int              be_mask   = 0xf;
+    int              samples   = 5;
+    int              target_ms = 15;
+    char const      *match     = NULL;
 
     for (int i = 1; i < argc; i++) {
         if (streq(argv[i], "--help") || streq(argv[i], "-h")) { usage(); return 0; }
-        else if (streq(argv[i], "--fmt")     && i+1 < argc) {
-            static struct umbra_fmt parsed;
-            parsed = parse_fmt(argv[++i]);
-            fmt_ov = &parsed;
-        }
+        else if (streq(argv[i], "--fmt")     && i+1 < argc) { fmt = parse_fmt(argv[++i]); }
         else if (streq(argv[i], "--backend") && i+1 < argc) {
             char const *b = argv[++i];
             be_mask = streq(b, "interp") ? 1 : streq(b, "jit") ? 2 :
@@ -171,10 +167,9 @@ int main(int argc, char *argv[]) {
         if (!s->draw) { continue; }
         if (match && !strstr(s->title, match)) { continue; }
 
-        struct umbra_fmt const fmt    = fmt_ov ? *fmt_ov : umbra_fmt_8888;
-        size_t           const bpp    = fmt.bpp;
-        size_t           const planes = (size_t)fmt.planes;
-        void                  *buf    = calloc((size_t)(W * H) * planes, bpp);
+        size_t const bpp    = fmt.bpp;
+        size_t const planes = (size_t)fmt.planes;
+        void        *buf    = calloc((size_t)(W * H) * planes, bpp);
 
         double ns_px[4] = {-1, -1, -1, -1};
         for (int bi = 0; bi < nb; bi++) {
