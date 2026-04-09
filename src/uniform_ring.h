@@ -1,6 +1,18 @@
 #pragma once
 #include <stddef.h>
 
+// TODO: the per-backend metal_drain_frame/vk_drain_frame and
+// metal_submit_cmdbuf/vk_submit_cmdbuf pairs are mirror-image: same algorithm,
+// different APIs. Can't share code, but the parallel structure could be
+// enforced more explicitly — e.g. by sketching the canonical "this is what
+// you should do, don't drift" pseudo-code right here. Today the parity is
+// enforced only by hand-comparison.
+
+// TODO: the ring assumes single-threaded encode (cur_frame ownership and
+// chunk allocation are unguarded). If a client ever wanted to encode
+// dispatches from multiple threads, callers would need locks around
+// cur_frame and the rings.
+
 struct uniform_ring_chunk {
     void  *handle;
     void  *mapped;

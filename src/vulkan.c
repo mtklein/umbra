@@ -13,6 +13,11 @@ struct umbra_backend *umbra_backend_vulkan(void) { return 0; }
 
 #include <vulkan/vulkan.h>
 
+// TODO: this backend is only ever exercised through MoltenVK on Apple silicon.
+// MoltenVK adds translation overhead per Vulkan call; we don't pay attention
+// to it anywhere — just use Vulkan as if native. If we ever ran on real
+// Vulkan hardware (Linux, Windows) the call-pattern picture might shift.
+
 // ---------------------------------------------------------------------------
 //  SPIR-V constants.
 // ---------------------------------------------------------------------------
@@ -346,6 +351,11 @@ typedef struct {
     // uniform ring as a storage buffer at binding 0):
     //   [0] = w, [1] = x0, [2] = y0,
     //   [3..3+total_bufs-1] = buf_szs, [3+total_bufs..3+2*total_bufs-1] = buf_rbs
+    // TODO: we deliberately route ALL user uniforms through the ring for
+    // parity with metal. If a measurable win showed up for some workload, we
+    // could re-add push constants as an optimization layer in front of the
+    // ring (for slug at 80 B that'd save ~7 setBuffer calls per round in
+    // favor of a single push-constant write). Probably not measurable.
     int total_bufs;
     int push_words;
 
@@ -2002,6 +2012,11 @@ static void vk_submit_cmdbuf(struct vk_backend *be);
 // with no matching writable entry creates a fresh snapshot, because the host
 // may have mutated the bytes since any prior read-only entry was made
 // (e.g. slug acc loop counter in the uniforms buffer).
+//
+// TODO: a content-addressed cache is a viable alternative to the ring for
+// the slug-curves-style "stable host pointer, large blob" path. The original
+// uniform_ring discussion landed on ring; content cache stays viable for
+// that specific case if we ever care to try it.
 static int cache_buf(struct vk_backend *be, void *host, size_t bytes,
                      VkDeviceSize sz, _Bool read_only) {
     for (int i = 0; i < be->batch_cache_n; i++) {

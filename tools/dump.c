@@ -97,6 +97,9 @@ static void dump_builder(char const *dir, char const *name, struct umbra_builder
     umbra_basic_block_free(bb);
 }
 
+// TODO: cosmetic — titles with parens like "Animated (t in uniforms)" come
+// out as `dumps/animated_t_in_uniforms/`, with the parens squashed into
+// underscores instead of dropped. Doesn't break anything; just ugly.
 static void slugify(char const *title, char *out, size_t sz) {
     int n = snprintf(out, sz, "dumps/");
     for (int i = 0; title[i] && n < (int)sz - 1; i++) {

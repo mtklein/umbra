@@ -32,6 +32,8 @@ struct copyback {
 
 struct deref_info { int buf_idx, src_buf, off; };
 
+// TODO: bump to N=3 (or higher) if a workload ever shows benefit. We have no
+// evidence it would help today; the change itself is easy.
 enum { METAL_N_FRAMES = 2 };
 
 struct metal_backend {
@@ -1166,6 +1168,13 @@ static void batch_add_copy(
 // read-only entry was made (e.g. slug acc loop counter in the uniforms
 // buffer). Copyback for writable buffers is tracked exactly once, at entry
 // creation time.
+//
+// TODO: cache_buf currently lives in parallel with the per-frame uniform
+// ring. The split is "writable + row-structured + deref'd → cache_buf" and
+// "read-only flat → ring" — two caching mechanisms with different lifetime
+// rules. A long-term cleanup would route the deref'd read-only path through
+// the ring too (with content hashing to preserve the writable→readonly
+// hand-off). Originally noted in the metal-route-to-ring commit message.
 static int cache_buf(struct metal_backend *be, void *host, size_t bytes,
                      _Bool read_only) {
     for (int i = 0; i < be->batch_cache_n; i++) {
@@ -1368,6 +1377,13 @@ static void umbra_metal_run(
 // Drain a single frame: wait for its in-flight cmdbuf to complete, release
 // it, and reset the frame's ring. Safe to call on a frame with no in-flight
 // cmdbuf (no-op).
+//
+// TODO: [waitUntilCompleted] is a hard CPU stall. The "right" answer for the
+// pipelined design is MTLSharedEvent (and timeline VkSemaphore on the vulkan
+// side) with async completion handlers — we picked simple-first. Wait points
+// are now rare enough (one per ring rotation = ~one per 4 k dispatches at
+// 64 KiB) that the stall is invisible. Worth revisiting only if a future
+// workload encodes much faster than this.
 static void metal_drain_frame(struct metal_backend *be, int frame) {
     if (be->frame_committed[frame]) {
         @autoreleasepool {
@@ -1404,6 +1420,11 @@ static void metal_submit_cmdbuf(struct metal_backend *be) {
 
 static void umbra_metal_flush(struct metal_backend *be) {
     metal_submit_cmdbuf(be);
+    // TODO: metal_submit_cmdbuf already drained the new cur_frame after the
+    // rotate, so one of these METAL_N_FRAMES iterations is always a no-op.
+    // Could be `metal_drain_frame(be, be->cur_frame ^ 1)` (the just-submitted
+    // one). The loop is harder to mess up but reads as confusing.
+    // (vk_flush has the same shape.)
     for (int i = 0; i < METAL_N_FRAMES; i++) { metal_drain_frame(be, i); }
     @autoreleasepool {
         for (int i = 0; i < be->batch_ncopy; i++) {

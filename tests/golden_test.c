@@ -348,6 +348,13 @@ TEST(test_golden_slides) {
 // (that requires very large N which becomes flaky under parallel
 // ninja test execution); the bench is the canonical regression for
 // that, this test just verifies the mechanism is wired up.
+//
+// TODO: this test doesn't actually *prove* backpressure triggered — if it
+// were silently disabled, the final-pixel check would still pass (the
+// corruption threshold is much higher than N=12000). The cleaner shape is to
+// expose a rotation counter on each backend (~20 lines of plumbing on each
+// side) and assert it incremented inside the test. The animated bench at
+// `--ms 8000` remains the canonical regression for the original failure mode.
 static void run_long_batch_no_oom(struct umbra_backend *be) {
     if (!be) { return; }
 

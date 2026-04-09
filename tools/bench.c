@@ -15,6 +15,11 @@ static double now(void) {
     return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
 }
 
+// TODO: this "double iters until elapsed > min_secs" loop is sensitive to
+// noise — one slow round during the doubling can converge at half the iters
+// and inflate ns/px. Saw this manifest as bimodal noise during the threshold
+// sweep. A cleaner bench would do warmup + N median-of-K runs + drop-outlier
+// filtering.
 static double bench(struct slide *s, int w, int h, void *buf, struct umbra_backend *be,
                     struct umbra_fmt fmt, double min_secs) {
     s->prepare(s, be, fmt);

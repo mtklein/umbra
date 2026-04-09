@@ -34,6 +34,10 @@ static void anim_prepare(struct slide *s, struct umbra_backend *be, struct umbra
     }
     if (st->prog) { st->prog->free(st->prog); }
     st->prog = be->compile(be, st->bb);
+    // TODO: golden_test correctness depends on prepare() resetting t to 0.
+    // Brittle: any slide that mutates state inside draw() has the same
+    // coupling. The cleaner shape would be to pass a frame index into draw()
+    // explicitly, but bench's draw() signature doesn't accept one.
     st->t = 0.0f;
 }
 
