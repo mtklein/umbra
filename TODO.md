@@ -75,12 +75,6 @@ Roughly in order of "value per effort" within each section.
   bimodal noise during the threshold sweep. A cleaner bench would do
   warmup + N median-of-K runs + drop-outlier filtering.
 
-- Error handling on Vulkan chunk allocation. `vkCreateBuffer` and
-  `vkAllocateMemory` can fail; we don't check return codes in
-  `vk_ring_new_chunk`. On failure we'd crash later when binding. Codebase
-  uses `assume()` for unrecoverable Vulkan failures elsewhere; ring's
-  new_chunk doesn't follow that pattern. ~3 lines of `assume()`.
-
 - Animated slide test depends on `prepare()` resetting `t = 0` for
   golden_test correctness. Brittle: any slide that mutates state in
   `draw()` has the same coupling. Working around it with a "frame index"
