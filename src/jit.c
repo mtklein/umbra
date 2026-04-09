@@ -1326,7 +1326,7 @@ static void dump_jit(struct umbra_program const *prog, FILE *f) { umbra_dump_jit
 static void free_jit(struct umbra_program *prog) { umbra_jit_free((struct umbra_jit*)prog); }
 static struct umbra_program *compile_jit(struct umbra_backend           *be,
                                          struct umbra_basic_block const *bb) {
-    struct umbra_jit *const j = umbra_jit(bb);
+    struct umbra_jit *j = umbra_jit(bb);
     j->base = (struct umbra_program){
         .queue   = run_jit,
         .dump    = dump_jit,
@@ -1338,7 +1338,7 @@ static struct umbra_program *compile_jit(struct umbra_backend           *be,
 static void flush_be_noop(struct umbra_backend *be) { (void)be; }
 static void free_be_jit(struct umbra_backend *be) { free(be); }
 struct umbra_backend *umbra_backend_jit(void) {
-    struct umbra_backend *const be = malloc(sizeof *be);
+    struct umbra_backend *be = malloc(sizeof *be);
     *be = (struct umbra_backend){
         .compile    = compile_jit,
         .flush      = flush_be_noop,
@@ -2819,7 +2819,7 @@ static void dump_jit(struct umbra_program const *prog, FILE *f) { umbra_dump_jit
 static void free_jit(struct umbra_program *prog) { umbra_jit_free((struct umbra_jit*)prog); }
 static struct umbra_program *compile_jit(struct umbra_backend           *be,
                                          struct umbra_basic_block const *bb) {
-    struct umbra_jit *const j = umbra_jit(bb);
+    struct umbra_jit *j = umbra_jit(bb);
     j->base = (struct umbra_program){
         .queue   = run_jit,
         .dump    = dump_jit,
@@ -2831,7 +2831,7 @@ static struct umbra_program *compile_jit(struct umbra_backend           *be,
 static void flush_be_noop(struct umbra_backend *be) { (void)be; }
 static void free_be_jit(struct umbra_backend *be) { free(be); }
 struct umbra_backend *umbra_backend_jit(void) {
-    struct umbra_backend *const be = malloc(sizeof *be);
+    struct umbra_backend *be = malloc(sizeof *be);
     *be = (struct umbra_backend){
         .compile    = compile_jit,
         .flush      = flush_be_noop,

@@ -1451,7 +1451,7 @@ static void dump_metal(struct umbra_program const *prog, FILE *f) { umbra_dump_m
 static void free_metal(struct umbra_program *prog) { umbra_metal_free((struct umbra_metal*)prog); }
 static struct umbra_program *compile_metal(struct umbra_backend           *be,
                                            BB const *bb) {
-    struct umbra_metal *const m = umbra_metal((struct metal_backend*)be, bb);
+    struct umbra_metal *m = umbra_metal((struct metal_backend*)be, bb);
     m->base = (struct umbra_program){
         .queue   = run_metal,
         .dump    = dump_metal,
@@ -1470,7 +1470,7 @@ static int ring_rotations_metal(struct umbra_backend const *be) {
     return ((struct metal_backend const*)be)->uni_pool.rotations;
 }
 struct umbra_backend *umbra_backend_metal(void) {
-    struct metal_backend *const mbe = umbra_metal_backend_create();
+    struct metal_backend *mbe = umbra_metal_backend_create();
     if (mbe) {
         mbe->base = (struct umbra_backend){
             .compile        = compile_metal,

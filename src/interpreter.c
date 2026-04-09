@@ -1179,7 +1179,7 @@ static void run_interp(struct umbra_program *prog, int l, int t, int r, int b, s
 static void free_interp(struct umbra_program *prog) { umbra_interpreter_free((struct umbra_interpreter*)prog); }
 static struct umbra_program *compile_interp(struct umbra_backend           *be,
                                             struct umbra_basic_block const *bb) {
-    struct umbra_interpreter *const p = umbra_interpreter(bb);
+    struct umbra_interpreter *p = umbra_interpreter(bb);
     p->base = (struct umbra_program){
         .queue   = run_interp,
         .dump    = 0,
@@ -1191,7 +1191,7 @@ static struct umbra_program *compile_interp(struct umbra_backend           *be,
 static void flush_be_noop(struct umbra_backend *be) { (void)be; }
 static void free_be_interp(struct umbra_backend *be) { free(be); }
 struct umbra_backend *umbra_backend_interp(void) {
-    struct umbra_backend *const be = malloc(sizeof *be);
+    struct umbra_backend *be = malloc(sizeof *be);
     *be = (struct umbra_backend){
         .compile    = compile_interp,
         .flush      = flush_be_noop,
