@@ -36,6 +36,9 @@ struct test_backends test_backends_make(struct umbra_basic_block const *bb) {
 #if (defined(__APPLE__) && defined(__clang__)) && !defined(__wasm__)
     B.p[2] != 0 here;
 #endif
+#if defined(__APPLE__) && defined(__aarch64__) && !defined(__wasm__)
+    B.p[4] != 0 here;
+#endif
     return B;
 }
 

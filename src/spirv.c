@@ -236,9 +236,9 @@ typedef struct {
     int push_words;
 
     // Constant cache for small integer constants.
-    uint32_t c_0, c_1, c_2, c_3, c_4, c_8, c_16;
+    uint32_t c_0, c_1, c_2, c_3, c_8, c_16;
     uint32_t c_0f;  // float 0.0
-    uint32_t c_allones, :32;  // 0xFFFFFFFF
+    uint32_t c_allones;  // 0xFFFFFFFF
 
     // Per-BB-instruction result IDs. Some instructions produce multiple results
     // (e.g. load_16x4 produces 4 channels).
@@ -1002,7 +1002,6 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
     B.c_1 = spv_const_u32(&B, 1);
     B.c_2 = spv_const_u32(&B, 2);
     B.c_3 = spv_const_u32(&B, 3);
-    B.c_4 = spv_const_u32(&B, 4);
     B.c_8 = spv_const_u32(&B, 8);
     B.c_16 = spv_const_u32(&B, 16);
     B.c_0f = spv_const_f32(&B, 0.0f);

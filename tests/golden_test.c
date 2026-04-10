@@ -405,6 +405,10 @@ TEST(test_vulkan_long_batch_no_oom) {
     run_long_batch_no_oom(umbra_backend_vulkan());
 }
 
+TEST(test_wgpu_long_batch_no_oom) {
+    run_long_batch_no_oom(umbra_backend_wgpu());
+}
+
 // Regression test for tiled writable buffer sync. Simulates the slug slide's
 // tiling pattern: a writable buffer is cleared per-tile on the host between
 // queue() calls within a single flush. Without proper sync, GPU backends can
@@ -469,6 +473,10 @@ TEST(test_metal_tiled_writable_sync) {
 
 TEST(test_vulkan_tiled_writable_sync) {
     run_tiled_writable_sync(umbra_backend_vulkan());
+}
+
+TEST(test_wgpu_tiled_writable_sync) {
+    run_tiled_writable_sync(umbra_backend_wgpu());
 }
 
 #endif /* !__wasm__ */
