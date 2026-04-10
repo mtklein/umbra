@@ -204,7 +204,7 @@ int main(int argc, char *argv[]) {
             char tmp[32];
             if (gpu[bi] >= 0 && ns_px[bi] > 0) {
                 int pct = 100 - (int)(gpu[bi] / ns_px[bi] * 100 + 0.5);
-                sprintf(tmp, "%.2f  %d", ns_px[bi], pct);
+                sprintf(tmp, "%6.2f %3d", ns_px[bi], pct);
             } else {
                 sprintf(tmp, "%.2f", ns_px[bi]);
             }
@@ -284,7 +284,7 @@ int main(int argc, char *argv[]) {
             char tmp[32];
             if (gpu[bi] >= 0 && ns_px[bi] > 0) {
                 int pct = 100 - (int)(gpu[bi] / ns_px[bi] * 100 + 0.5);
-                sprintf(tmp, "%.2f  %d", ns_px[bi], pct);
+                sprintf(tmp, "%6.2f %3d", ns_px[bi], pct);
             } else {
                 sprintf(tmp, "%.2f", ns_px[bi]);
             }
