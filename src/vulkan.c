@@ -119,6 +119,7 @@ struct vk_program {
     int push_words;
 
     struct deref_info *deref;
+    uint8_t          *buf_rw;
 
     uint32_t *spirv;
     int       spirv_words, :32;
@@ -495,6 +496,7 @@ static void vk_program_free(struct umbra_program *p) {
     vkDestroyDescriptorSetLayout(be->device, vp->ds_layout, 0);
     vkDestroyShaderModule(be->device, vp->shader, 0);
     free(vp->deref);
+    free(vp->buf_rw);
     free(vp->spirv);
     free(vp);
 }
@@ -505,9 +507,10 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
 
     int spirv_words = 0, max_ptr = -1, total_bufs = 0, n_deref = 0, push_words = 0;
     struct deref_info *deref = 0;
+    uint8_t *buf_rw = 0;
     uint32_t *spirv = build_spirv(bb, SPIRV_FLOAT_CONTROLS | SPIRV_ALWAYS_16BIT,
                                    &spirv_words, &max_ptr, &total_bufs,
-                                   &n_deref, &deref, &push_words);
+                                   &n_deref, &deref, &push_words, &buf_rw);
     if (!spirv) { return 0; }
 
     int n_desc = total_bufs;
@@ -594,6 +597,7 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
     p->n_deref     = n_deref;
     p->push_words    = push_words;
     p->deref       = deref;
+    p->buf_rw      = buf_rw;
     p->spirv       = spirv;
     p->spirv_words = spirv_words;
 

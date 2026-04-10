@@ -13,6 +13,8 @@ enum {
     SPIRV_NO_16BIT_TYPES   = 8,  // Use f16 storage instead of u16 (for naga/wgpu).
 };
 
+enum { BUF_READ = 1, BUF_WRITTEN = 2 };
+
 uint32_t *build_spirv(struct umbra_basic_block const *bb,
                       int flags,
                       int *out_spirv_words,
@@ -20,4 +22,5 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
                       int *out_total_bufs,
                       int *out_n_deref,
                       struct deref_info **out_deref,
-                      int *out_push_words);
+                      int *out_push_words,
+                      uint8_t **out_buf_rw);

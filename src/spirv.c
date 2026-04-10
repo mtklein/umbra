@@ -629,7 +629,8 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
                               int *out_total_bufs,
                               int *out_n_deref,
                               struct deref_info **out_deref,
-                              int *out_push_words) {
+                              int *out_push_words,
+                              uint8_t **out_buf_rw) {
     SpvBuilder B;
     memset(&B, 0, sizeof B);
     B.next_id = 1; // 0 is reserved
@@ -685,6 +686,16 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
             B.has_16 = 1;
         }
     }
+
+    // --- Scan for per-buffer read/written access. ---
+    uint8_t *buf_rw = calloc((size_t)(total_bufs + 1), sizeof *buf_rw);
+    for (int i = 0; i < bb->insts; i++) {
+        if (!op_has_ptr(bb->inst[i].op)) { continue; }
+        int p = bb->inst[i].ptr.deref ? deref_buf[bb->inst[i].ptr.ix]
+                                      : bb->inst[i].ptr.bits;
+        buf_rw[p] |= op_is_store(bb->inst[i].op) ? BUF_WRITTEN : BUF_READ;
+    }
+    *out_buf_rw = buf_rw;
 
     // Push constant layout: w, x0, y0, buf_szs[total_bufs], buf_rbs[total_bufs].
     // User uniforms (buf[0]) go through the per-batch uniform ring as a

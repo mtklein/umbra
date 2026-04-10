@@ -38,6 +38,7 @@ struct copyback {
 };
 
 struct deref_info { int buf_idx, src_buf, off; };
+enum { BUF_READ = 1, BUF_WRITTEN = 2 };
 
 enum { METAL_N_FRAMES = 2 };
 
@@ -63,8 +64,9 @@ struct metal_backend {
 struct umbra_metal {
     struct umbra_program base;
     void *pipeline;
-    char  *src;
+    char     *src;
     struct deref_info *deref;
+    uint8_t  *buf_rw;
     double compile_secs;
     int    max_ptr;
     int    total_bufs;
@@ -1042,6 +1044,14 @@ static struct umbra_metal* umbra_metal(
             }
         }
 
+        uint8_t *buf_rw = calloc((size_t)(total_bufs + 1), sizeof *buf_rw);
+        for (int i = 0; i < bb->insts; i++) {
+            if (!op_has_ptr(bb->inst[i].op)) { continue; }
+            int p = bb->inst[i].ptr.deref ? deref_buf[bb->inst[i].ptr.ix]
+                                          : bb->inst[i].ptr.bits;
+            buf_rw[p] |= op_is_store(bb->inst[i].op) ? BUF_WRITTEN : BUF_READ;
+        }
+
         NSError *error = nil;
         id<MTLLibrary> library = nil;
         id<MTLFunction> func = nil;
@@ -1084,6 +1094,7 @@ static struct umbra_metal* umbra_metal(
             m->total_bufs    = total_bufs;
             m->deref         = di;
             m->n_deref       = n_deref;
+            m->buf_rw        = buf_rw;
 
             free(deref_buf);
             result = m;
@@ -1093,6 +1104,7 @@ static struct umbra_metal* umbra_metal(
     fail:
         free(deref_buf);
         free(di);
+        free(buf_rw);
         free(src);
     out:;
     }
@@ -1416,6 +1428,7 @@ static void umbra_metal_free(struct umbra_metal *m) {
         }
     }
     free(m->deref);
+    free(m->buf_rw);
     free(m->src);
     free(m);
 }
