@@ -28,37 +28,20 @@ static int p16(umbra_ptr16 p) { return ptr_bits(p.ix, p.deref); }
 static int p32(umbra_ptr32 p) { return ptr_bits(p.ix, p.deref); }
 static int p64(umbra_ptr64 p) { return ptr_bits(p.ix, p.deref); }
 
-// Generated from X-macro flags — no hand-maintained op lists.
-#define ZERO(name, ...) case op_##name: return 0;
+// Op flag table generated from X-macro flags at compile time.
+enum { OP_FUSED_IMM = 1 << 4 };
+#define      FLAG(name, flags) [op_##name] = (flags),
+#define FUSED_FLAG(name, flags) [op_##name] = (flags) | OP_FUSED_IMM,
+static uint8_t const op_flags[] = {
+    OTHER_OPS(FLAG) BINARY_OPS(FLAG) UNARY_OPS(FLAG) IMM_OPS(FUSED_FLAG)
+};
+#undef FUSED_FLAG
+#undef FLAG
 
-#define CHECK_STORE(name, flags) case op_##name: return !!((flags) & OP_STORE);
-_Bool is_store(enum op op) {
-    switch (op) { OTHER_OPS(CHECK_STORE) BINARY_OPS(ZERO) UNARY_OPS(ZERO) IMM_OPS(ZERO) }
-    __builtin_unreachable();
-}
-#undef CHECK_STORE
-
-#define CHECK_PTR(name, flags) case op_##name: return !!((flags) & OP_PTR);
-_Bool has_ptr(enum op op) {
-    switch (op) { OTHER_OPS(CHECK_PTR) BINARY_OPS(ZERO) UNARY_OPS(ZERO) IMM_OPS(ZERO) }
-    __builtin_unreachable();
-}
-#undef CHECK_PTR
-
-#define CHECK_VARYING(name, flags) case op_##name: return !!((flags) & OP_VARYING);
-_Bool is_varying(enum op op) {
-    switch (op) { OTHER_OPS(CHECK_VARYING) BINARY_OPS(ZERO) UNARY_OPS(ZERO) IMM_OPS(ZERO) }
-    __builtin_unreachable();
-}
-#undef CHECK_VARYING
-
-#define ONE(name, ...) case op_##name: return 1;
-_Bool is_fused_imm(enum op op) {
-    switch (op) { IMM_OPS(ONE) OTHER_OPS(ZERO) BINARY_OPS(ZERO) UNARY_OPS(ZERO) }
-    __builtin_unreachable();
-}
-#undef ONE
-#undef ZERO
+_Bool is_store    (enum op op) { return !!(op_flags[op] & OP_STORE); }
+_Bool has_ptr     (enum op op) { return !!(op_flags[op] & OP_PTR); }
+_Bool is_varying  (enum op op) { return !!(op_flags[op] & OP_VARYING); }
+_Bool is_fused_imm(enum op op) { return !!(op_flags[op] & OP_FUSED_IMM); }
 
 static _Bool is_pow2(int x) { return __builtin_popcount((unsigned)x) == 1; }
 

@@ -128,14 +128,10 @@ typedef union {
 // Example: op_r_mul_f32_rm = "result to register, x from register, y from memory"
 
 // Generated from X-macro flags.
-#define CHECK(name, flags) case op_##name: return !!((flags) & OP_COMMUTATIVE);
-#define ZERO(name, ...) case op_##name: return 0;
-static _Bool is_commutative(enum op op) {
-    switch (op) { BINARY_OPS(CHECK) OTHER_OPS(ZERO) UNARY_OPS(ZERO) IMM_OPS(ZERO) }
-    __builtin_unreachable();
-}
-#undef ZERO
-#undef CHECK
+#define COMM_FLAG(name, flags) [op_##name] = (flags),
+static uint8_t const binary_flags[] = { BINARY_OPS(COMM_FLAG) };
+#undef COMM_FLAG
+static _Bool is_commutative(enum op op) { return !!(binary_flags[op] & OP_COMMUTATIVE); }
 
 enum {
     SW_DONE = op_le_s32_imm + 1,
