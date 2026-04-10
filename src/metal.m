@@ -1258,27 +1258,16 @@ static void encode_dispatch(
 
     for (int d = 0; d < m->n_deref; d++) {
         void *base = buf[m->deref[d].src_buf].ptr;
-        void *derived;
-        ptrdiff_t dsz;
-        size_t drb;
-        __builtin_memcpy(
-            &derived,
-            (char*)base + m->deref[d].off,
-            sizeof derived);
-        __builtin_memcpy(
-            &dsz,
-            (char*)base + m->deref[d].off + 8,
-            sizeof dsz);
-        __builtin_memcpy(
-            &drb,
-            (char*)base + m->deref[d].off + 16,
-            sizeof drb);
-        size_t const bytes = dsz < 0 ? (size_t)-dsz : (size_t)dsz;
-        int    const bi    = m->deref[d].buf_idx;
-        _Bool  const ro    = !(m->buf_rw[bi] & BUF_WRITTEN);
-        int    const idx   = cache_buf(be, derived, bytes, ro);
+        void  *derived;
+        size_t dsz, drb;
+        __builtin_memcpy(&derived, (char*)base + m->deref[d].off,      sizeof derived);
+        __builtin_memcpy(&dsz,     (char*)base + m->deref[d].off + 8,  sizeof dsz);
+        __builtin_memcpy(&drb,     (char*)base + m->deref[d].off + 16, sizeof drb);
+        int   const bi  = m->deref[d].buf_idx;
+        _Bool const ro  = !(m->buf_rw[bi] & BUF_WRITTEN);
+        int   const idx = cache_buf(be, derived, dsz, ro);
         bind_handle[bi] = be->batch_cache[idx].mtl;
-        szs_data[bi] = (uint32_t)bytes;
+        szs_data[bi] = (uint32_t)dsz;
         rbs_data[bi] = (uint32_t)drb;
     }
 

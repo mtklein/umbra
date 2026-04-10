@@ -909,14 +909,13 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
 
                 CASE(op_deref_ptr) {
                     char *base = (char*)buf[ip->ptr].ptr + (size_t)row * buf[ip->ptr].row_bytes;
-                    void *derived;
-                    ptrdiff_t ssz;
-                    size_t drb;
+                    void  *derived;
+                    size_t dsz, drb;
                     __builtin_memcpy(&derived, base + ip->x,      sizeof derived);
-                    __builtin_memcpy(&ssz,     base + ip->x + 8,  sizeof ssz);
+                    __builtin_memcpy(&dsz,     base + ip->x + 8,  sizeof dsz);
                     __builtin_memcpy(&drb,     base + ip->x + 16, sizeof drb);
                     buf[ip->y].ptr       = derived;
-                    buf[ip->y].sz        = ssz < 0 ? (size_t)-ssz : (size_t)ssz;
+                    buf[ip->y].sz        = dsz;
                     buf[ip->y].row_bytes = drb;
                 } NEXT;
 

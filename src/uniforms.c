@@ -25,9 +25,8 @@ void umbra_uniforms_fill_f32(void *data, size_t h, float const *v, int n) {
 }
 void umbra_uniforms_fill_ptr(void *data, size_t h, struct umbra_buf b) {
     char *p = (char*)data + h;
-    ptrdiff_t const ssz = b.read_only ? -(ptrdiff_t)b.sz : (ptrdiff_t)b.sz;
     __builtin_memset(p, 0, 24);
     __builtin_memcpy(p,      &b.ptr,       sizeof b.ptr);
-    __builtin_memcpy(p + 8,  &ssz,         sizeof ssz);
+    __builtin_memcpy(p + 8,  &b.sz,        sizeof b.sz);
     __builtin_memcpy(p + 16, &b.row_bytes, sizeof b.row_bytes);
 }

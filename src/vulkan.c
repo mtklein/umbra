@@ -382,23 +382,21 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
     for (int d = 0; d < vp->n_deref; d++) {
         char *base = (char *)buf[vp->deref[d].src_buf].ptr;
-        void *derived;
-        ptrdiff_t ssz;
-        size_t drb;
-        memcpy(&derived, base + vp->deref[d].off, sizeof derived);
-        memcpy(&ssz,     base + vp->deref[d].off + 8, sizeof ssz);
+        void  *derived;
+        size_t dsz, drb;
+        memcpy(&derived, base + vp->deref[d].off,      sizeof derived);
+        memcpy(&dsz,     base + vp->deref[d].off + 8,  sizeof dsz);
         memcpy(&drb,     base + vp->deref[d].off + 16, sizeof drb);
-        size_t bytes = ssz < 0 ? (size_t)-ssz : (size_t)ssz;
         int bi = vp->deref[d].buf_idx;
 
-        VkDeviceSize sz = (VkDeviceSize)bytes;
+        VkDeviceSize sz = (VkDeviceSize)dsz;
         if (sz < 4) { sz = 4; }
         _Bool const ro = !(vp->buf_rw[bi] & BUF_WRITTEN);
-        int idx = cache_buf(be, derived, bytes, sz, ro);
+        int idx = cache_buf(be, derived, dsz, sz, ro);
         bind_buffer[bi] = be->batch_cache[idx].buf;
         bind_range [bi] = VK_WHOLE_SIZE;
 
-        push_data[3 + bi] = (uint32_t)bytes;
+        push_data[3 + bi] = (uint32_t)dsz;
         push_data[3 + vp->total_bufs + bi] = (uint32_t)drb;
     }
 
