@@ -1,6 +1,7 @@
 #include "../include/umbra.h"
 #include "assume.h"
 #include "basic_block.h"
+#include <stdint.h>
 #include <stdlib.h>
 
 typedef struct umbra_builder builder;
