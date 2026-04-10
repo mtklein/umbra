@@ -42,6 +42,7 @@ int op_eval(enum op op, int xb, int yb, int zb, int wb) {
     (void)w;
 
     switch ((int)op) {
+    default: __builtin_unreachable();
     case op_add_f32: r.f = x.f + y.f; return r.i;
     case op_sub_f32: r.f = x.f - y.f; return r.i;
     case op_mul_f32: r.f = x.f * y.f; return r.i;
@@ -74,5 +75,4 @@ int op_eval(enum op op, int xb, int yb, int zb, int wb) {
     case op_lt_u32: r.i = x.u <  y.u ? -1 : 0; return r.i;
     case op_le_u32: r.i = x.u <= y.u ? -1 : 0; return r.i;
     }
-    __builtin_unreachable();
 }
