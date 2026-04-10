@@ -563,42 +563,46 @@ static void schedule(struct bb_inst *in, int n,
 struct umbra_basic_block* umbra_basic_block(builder *b) {
     int const n = b->insts;
 
+    int live = 0;
     for (int i = n; i-- > 0;) {
-        if (is_store(b->inst[i].op)) { b->inst[i].live = 1; }
+        if (is_store(b->inst[i].op)) {
+            b->inst[i].live = 1;
+        }
         if (b->inst[i].live) {
+            live++;
             b->inst[(int)b->inst[i].x.id].live = 1;
             b->inst[(int)b->inst[i].y.id].live = 1;
             b->inst[(int)b->inst[i].z.id].live = 1;
             b->inst[(int)b->inst[i].w.id].live = 1;
-            if (ptr_is_deref(b->inst[i].ptr)) { b->inst[ptr_ix(b->inst[i].ptr)].live = 1; }
+            if (ptr_is_deref(b->inst[i].ptr)) {
+                b->inst[ptr_ix(b->inst[i].ptr)].live = 1;
+            }
         }
     }
+
     for (int i = 0; i < n; i++) {
         b->inst[i].varying = is_varying(b->inst[i].op)
-            || b->inst[(int)b->inst[i].x.id].varying
-            || b->inst[(int)b->inst[i].y.id].varying
-            || b->inst[(int)b->inst[i].z.id].varying
-            || b->inst[(int)b->inst[i].w.id].varying;
+                          || b->inst[(int)b->inst[i].x.id].varying
+                          || b->inst[(int)b->inst[i].y.id].varying
+                          || b->inst[(int)b->inst[i].z.id].varying
+                          || b->inst[(int)b->inst[i].w.id].varying;
     }
 
-    int total = 0;
-    for (int i = 0; i < n; i++) { total += b->inst[i].live; }
-
-    struct bb_inst *out = malloc((size_t)total * sizeof *out);
-    for (int i = 0; i < n; i++) { b->inst[i].final_id = -1; }
-
-    int j = 0;
+    struct bb_inst *out = malloc((size_t)live * sizeof *out);
+    for (int i = 0; i < n; i++) {
+        b->inst[i].final_id = -1;
+    }
+    int preamble = 0;
     for (int i = 0; i < n; i++) {
         if (b->inst[i].live && !b->inst[i].varying && !is_store(b->inst[i].op)) {
-            b->inst[i].final_id = j;
-            out[j++] = b->inst[i];
+            b->inst[i].final_id = preamble;
+            out[preamble++] = b->inst[i];
         }
     }
-    int const preamble = j;
 
-    schedule(b->inst, n, out, preamble, total);
+    schedule(b->inst, n, out, preamble, live);
 
-    for (int i = 0; i < total; i++) {
+    for (int i = 0; i < live; i++) {
         out[i].x = (val_){.id = (unsigned)b->inst[out[i].x.id].final_id, .chan = out[i].x.chan};
         out[i].y = (val_){.id = (unsigned)b->inst[out[i].y.id].final_id, .chan = out[i].y.chan};
         out[i].z = (val_){.id = (unsigned)b->inst[out[i].z.id].final_id, .chan = out[i].z.chan};
@@ -609,8 +613,8 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
     }
 
     struct umbra_basic_block *result = malloc(sizeof *result);
-    result->inst = out;
-    result->insts = total;
+    result->inst     = out;
+    result->insts    = live;
     result->preamble = preamble;
     return result;
 }
