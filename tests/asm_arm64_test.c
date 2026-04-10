@@ -284,6 +284,99 @@ TEST(test_uxtl_8h_xtn_8b) {
     W(XTN_8b(0, 1)) == 0x4E212820 here;
 }
 
+TEST(test_fmov_4s_imm) {
+    // FMOV v0.4s, #2.0 → imm8 = 0b_0_000_0000 = 0x00
+    FMOV_4s_imm(0, 0x00) == 0x4F00F400 here;
+    // FMOV v5.4s, #1.0 → imm8 = 0b_0_111_0000 = 0x70
+    FMOV_4s_imm(5, 0x70) == 0x4F03F605 here;
+}
+
+TEST(test_movi_4s) {
+    struct asm_arm64 b = {0};
+
+    // Zero.
+    movi_4s(&b, 7, 0) == 1 here;
+    b.words == 1 here;
+    b.word[0] == MOVI_4s(7, 0, 0) here;
+    asm_arm64_free(&b);
+
+    // Byte in lane 0: 0x42.
+    b = (struct asm_arm64){0};
+    movi_4s(&b, 3, 0x42) == 1 here;
+    b.words == 1 here;
+    b.word[0] == MOVI_4s(3, 0x42, 0) here;
+    asm_arm64_free(&b);
+
+    // Byte in lane 1: 0x0000AB00.
+    b = (struct asm_arm64){0};
+    movi_4s(&b, 0, 0x0000AB00u) == 1 here;
+    b.words == 1 here;
+    b.word[0] == MOVI_4s(0, 0xAB, 8) here;
+    asm_arm64_free(&b);
+
+    // Byte in lane 2: 0x00FF0000.
+    b = (struct asm_arm64){0};
+    movi_4s(&b, 1, 0x00FF0000u) == 1 here;
+    b.words == 1 here;
+    b.word[0] == MOVI_4s(1, 0xFF, 16) here;
+    asm_arm64_free(&b);
+
+    // Byte in lane 3: 0x01000000.
+    b = (struct asm_arm64){0};
+    movi_4s(&b, 2, 0x01000000u) == 1 here;
+    b.words == 1 here;
+    b.word[0] == MOVI_4s(2, 0x01, 24) here;
+    asm_arm64_free(&b);
+
+    // MVNI lane 0: ~0x000000FF = 0xFFFFFF00.
+    b = (struct asm_arm64){0};
+    movi_4s(&b, 4, 0xFFFFFF00u) == 1 here;
+    b.words == 1 here;
+    b.word[0] == MVNI_4s(4, 0xFF, 0) here;
+    asm_arm64_free(&b);
+
+    // MVNI lane 1: ~0x0000FF00 = 0xFFFF00FF.
+    b = (struct asm_arm64){0};
+    movi_4s(&b, 5, 0xFFFF00FFu) == 1 here;
+    b.words == 1 here;
+    b.word[0] == MVNI_4s(5, 0xFF, 8) here;
+    asm_arm64_free(&b);
+
+    // MVNI lane 2: ~0x00010000 = 0xFFFEFFFF.
+    b = (struct asm_arm64){0};
+    movi_4s(&b, 6, 0xFFFEFFFFu) == 1 here;
+    b.words == 1 here;
+    b.word[0] == MVNI_4s(6, 0x01, 16) here;
+    asm_arm64_free(&b);
+
+    // MVNI lane 3: ~0x80000000 = 0x7FFFFFFF.
+    b = (struct asm_arm64){0};
+    movi_4s(&b, 0, 0x7FFFFFFFu) == 1 here;
+    b.words == 1 here;
+    b.word[0] == MVNI_4s(0, 0x80, 24) here;
+    asm_arm64_free(&b);
+
+    // FMOV path: 1.0f = 0x3F800000.
+    b = (struct asm_arm64){0};
+    movi_4s(&b, 8, 0x3F800000u) == 1 here;
+    b.words == 1 here;
+    b.word[0] == FMOV_4s_imm(8, 0x70) here;
+    asm_arm64_free(&b);
+
+    // FMOV path: -1.0f = 0xBF800000.
+    b = (struct asm_arm64){0};
+    movi_4s(&b, 9, 0xBF800000u) == 1 here;
+    b.words == 1 here;
+    b.word[0] == FMOV_4s_imm(9, 0xF0) here;
+    asm_arm64_free(&b);
+
+    // Value that doesn't fit any encoding → returns 0, emits nothing.
+    b = (struct asm_arm64){0};
+    movi_4s(&b, 0, 0x12345678u) == 0 here;
+    b.words == 0 here;
+    // No asm_arm64_free needed — nothing was allocated.
+}
+
 TEST(test_ld4_st4) {
     LD4_4h(0, 5) == 0x0C4004A0 here;
     ST4_4h(0, 5) == 0x0C0004A0 here;

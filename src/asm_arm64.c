@@ -360,6 +360,46 @@ uint32_t ST4_8h(int t, int n) { return ld4st4(0x4c000400u, t, n); }
 uint32_t LD4_8b(int t, int n) { return ld4st4(0x0c400000u, t, n); }
 uint32_t ST4_8b(int t, int n) { return ld4st4(0x0c000000u, t, n); }
 
+uint32_t FMOV_4s_imm(int d, uint8_t imm8) {
+    return 0x4f00f400u | ((uint32_t)(imm8 >> 5) << 16) | ((uint32_t)(imm8 & 0x1fu) << 5)
+                       | (uint32_t)d;
+}
+
+_Bool movi_4s(buf *c, int d, uint32_t v) {
+    if (v == 0) {
+        put(c, MOVI_4s(d, 0, 0));
+    } else if (v == (v & 0x000000ffu)) {
+        put(c, MOVI_4s(d, (uint8_t)v, 0));
+    } else if (v == (v & 0x0000ff00u)) {
+        put(c, MOVI_4s(d, (uint8_t)(v >> 8), 8));
+    } else if (v == (v & 0x00ff0000u)) {
+        put(c, MOVI_4s(d, (uint8_t)(v >> 16), 16));
+    } else if (v == (v & 0xff000000u)) {
+        put(c, MOVI_4s(d, (uint8_t)(v >> 24), 24));
+    } else if ((~v) == ((~v) & 0x000000ffu)) {
+        put(c, MVNI_4s(d, (uint8_t)~v, 0));
+    } else if ((~v) == ((~v) & 0x0000ff00u)) {
+        put(c, MVNI_4s(d, (uint8_t)(~v >> 8), 8));
+    } else if ((~v) == ((~v) & 0x00ff0000u)) {
+        put(c, MVNI_4s(d, (uint8_t)(~v >> 16), 16));
+    } else if ((~v) == ((~v) & 0xff000000u)) {
+        put(c, MVNI_4s(d, (uint8_t)(~v >> 24), 24));
+    } else {
+        uint32_t const s = v >> 31,
+                       e = (v >> 23) & 0xffu,
+                       f = v & 0x7fffffu;
+        if ((f & 0x7ffffu) == 0 && e >= 124 && e <= 131) {
+            uint32_t const E    = e - 124;
+            uint32_t const imm8 =
+                (s << 7) | (((~E >> 2) & 1) << 6) | ((E & 3) << 4) | ((f >> 19) & 0xf);
+            put(c, FMOV_4s_imm(d, (uint8_t)imm8));
+        } else {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 void load_imm_w(buf *c, int rd, uint32_t v) {
     put(c, MOVZ_w(rd, (uint16_t)(v & 0xffff)));
     if (v >> 16) { put(c, MOVK_w16(rd, (uint16_t)(v >> 16))); }

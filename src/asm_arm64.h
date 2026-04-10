@@ -138,4 +138,6 @@ uint32_t ST4_8h(int t, int n);
 uint32_t LD4_8b(int t, int n);
 uint32_t ST4_8b(int t, int n);
 
+uint32_t FMOV_4s_imm(int d, uint8_t imm8);
+_Bool    movi_4s(struct asm_arm64 *c, int d, uint32_t v);
 void     load_imm_w(struct asm_arm64 *c, int rd, uint32_t v);

@@ -224,42 +224,8 @@ static void arm64_fill(int reg, int slot, void *ctx) {
     put(c, LDR_qi(lo(reg), XS, 2*slot));
     put(c, LDR_qi(hi(reg), XS, 2*slot+1));
 }
-static _Bool arm64_movi(Buf *c, int d, uint32_t v) {
-    if (v == 0) {
-        put(c, MOVI_4s(d, 0, 0));
-    } else if (v == (v & 0x000000ffu)) {
-        put(c, MOVI_4s(d, (uint8_t)v, 0));
-    } else if (v == (v & 0x0000ff00u)) {
-        put(c, MOVI_4s(d, (uint8_t)(v >> 8), 8));
-    } else if (v == (v & 0x00ff0000u)) {
-        put(c, MOVI_4s(d, (uint8_t)(v >> 16), 16));
-    } else if (v == (v & 0xff000000u)) {
-        put(c, MOVI_4s(d, (uint8_t)(v >> 24), 24));
-    } else if ((~v) == ((~v) & 0x000000ffu)) {
-        put(c, MVNI_4s(d, (uint8_t)~v, 0));
-    } else if ((~v) == ((~v) & 0x0000ff00u)) {
-        put(c, MVNI_4s(d, (uint8_t)(~v >> 8), 8));
-    } else if ((~v) == ((~v) & 0x00ff0000u)) {
-        put(c, MVNI_4s(d, (uint8_t)(~v >> 16), 16));
-    } else if ((~v) == ((~v) & 0xff000000u)) {
-        put(c, MVNI_4s(d, (uint8_t)(~v >> 24), 24));
-    } else {
-        uint32_t const s = v >> 31,
-                       e = (v >> 23) & 0xffu,
-                       f = v & 0x7fffffu;
-        if ((f & 0x7ffffu) == 0 && e >= 124 && e <= 131) {
-            uint32_t const E    = e - 124;
-            uint32_t const imm8 =
-                (s << 7) | (((~E >> 2) & 1) << 6) | ((E & 3) << 4) | ((f >> 19) & 0xf);
-            put(c, 0x4f00f400u | ((imm8 >> 5) << 16) | ((imm8 & 0x1fu) << 5) | (uint32_t)d);
-        } else {
-            return 0;
-        }
-    }
-    return 1;
-}
 static void arm64_pool_load(Buf *c, struct pool *p, int d, uint32_t v) {
-    if (arm64_movi(c, d, v)) {
+    if (movi_4s(c, d, v)) {
         return;
     }
     uint32_t  const bcast[4] = {v, v, v, v};
