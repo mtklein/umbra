@@ -352,7 +352,8 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
     for (int i = 0; i <= vp->max_ptr; i++) {
         if (buf[i].ptr && buf[i].sz) {
-            if (buf[i].read_only && !buf[i].row_bytes) {
+            _Bool const ro = !(vp->buf_rw[i] & BUF_WRITTEN);
+            if (ro && !buf[i].row_bytes) {
                 struct uniform_ring_loc loc =
                     uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, buf[i].sz);
                 struct vk_ring_chunk *chunk = loc.handle;
@@ -362,7 +363,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
             } else {
                 VkDeviceSize sz = (VkDeviceSize)buf[i].sz;
                 if (sz < 4) { sz = 4; }
-                int idx = cache_buf(be, buf[i].ptr, buf[i].sz, sz, buf[i].read_only);
+                int idx = cache_buf(be, buf[i].ptr, buf[i].sz, sz, ro);
                 bind_buffer[i] = be->batch_cache[idx].buf;
                 bind_range [i] = VK_WHOLE_SIZE;
             }
@@ -388,12 +389,12 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
         memcpy(&ssz,     base + vp->deref[d].off + 8, sizeof ssz);
         memcpy(&drb,     base + vp->deref[d].off + 16, sizeof drb);
         size_t bytes = ssz < 0 ? (size_t)-ssz : (size_t)ssz;
-        _Bool deref_read_only = ssz < 0;
         int bi = vp->deref[d].buf_idx;
 
         VkDeviceSize sz = (VkDeviceSize)bytes;
         if (sz < 4) { sz = 4; }
-        int idx = cache_buf(be, derived, bytes, sz, deref_read_only);
+        _Bool const ro = !(vp->buf_rw[bi] & BUF_WRITTEN);
+        int idx = cache_buf(be, derived, bytes, sz, ro);
         bind_buffer[bi] = be->batch_cache[idx].buf;
         bind_range [bi] = VK_WHOLE_SIZE;
 

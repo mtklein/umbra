@@ -1243,13 +1243,14 @@ static void encode_dispatch(
 
     for (int i = 0; i <= m->max_ptr; i++) {
         if (buf[i].ptr && buf[i].sz) {
-            if (buf[i].read_only && !buf[i].row_bytes) {
+            _Bool const ro = !(m->buf_rw[i] & BUF_WRITTEN);
+            if (ro && !buf[i].row_bytes) {
                 struct uniform_ring_loc loc =
                     uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, buf[i].sz);
                 bind_handle[i] = loc.handle;
                 bind_offset[i] = loc.offset;
             } else {
-                int idx = cache_buf(be, buf[i].ptr, buf[i].sz, buf[i].read_only);
+                int idx = cache_buf(be, buf[i].ptr, buf[i].sz, ro);
                 bind_handle[i] = be->batch_cache[idx].mtl;
             }
         }
@@ -1272,10 +1273,10 @@ static void encode_dispatch(
             &drb,
             (char*)base + m->deref[d].off + 16,
             sizeof drb);
-        size_t const bytes           = dsz < 0 ? (size_t)-dsz : (size_t)dsz;
-        _Bool  const deref_read_only = dsz < 0;
-        int    const bi              = m->deref[d].buf_idx;
-        int    const idx             = cache_buf(be, derived, bytes, deref_read_only);
+        size_t const bytes = dsz < 0 ? (size_t)-dsz : (size_t)dsz;
+        int    const bi    = m->deref[d].buf_idx;
+        _Bool  const ro    = !(m->buf_rw[bi] & BUF_WRITTEN);
+        int    const idx   = cache_buf(be, derived, bytes, ro);
         bind_handle[bi] = be->batch_cache[idx].mtl;
         szs_data[bi] = (uint32_t)bytes;
         rbs_data[bi] = (uint32_t)drb;

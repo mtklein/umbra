@@ -513,7 +513,8 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
 
     for (int i = 0; i <= p->max_ptr; i++) {
         if (buf[i].ptr && buf[i].sz) {
-            if (buf[i].read_only && !buf[i].row_bytes) {
+            _Bool const ro = !(p->buf_rw[i] & BUF_WRITTEN);
+            if (ro && !buf[i].row_bytes) {
                 struct uniform_ring_loc loc =
                     uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, buf[i].sz);
                 struct wgpu_ring_chunk *chunk = loc.handle;
@@ -539,7 +540,7 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
             } else {
                 uint64_t sz = buf[i].sz;
                 if (sz < 4) { sz = 4; }
-                int idx = cache_buf(be, buf[i].ptr, buf[i].sz, buf[i].read_only);
+                int idx = cache_buf(be, buf[i].ptr, buf[i].sz, ro);
                 bind_buf [i] = be->batch_cache[idx].buf;
                 bind_size[i] = be->batch_cache[idx].size;
             }
@@ -566,10 +567,10 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
         memcpy(&ssz,     base + p->deref[d].off + 8, sizeof ssz);
         memcpy(&drb,     base + p->deref[d].off + 16, sizeof drb);
         size_t bytes = ssz < 0 ? (size_t)-ssz : (size_t)ssz;
-        _Bool deref_read_only = ssz < 0;
         int bi = p->deref[d].buf_idx;
 
-        int idx = cache_buf(be, derived, bytes, deref_read_only);
+        _Bool const ro = !(p->buf_rw[bi] & BUF_WRITTEN);
+        int idx = cache_buf(be, derived, bytes, ro);
         bind_buf [bi] = be->batch_cache[idx].buf;
         bind_size[bi] = be->batch_cache[idx].size;
 
