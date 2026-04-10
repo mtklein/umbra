@@ -13,12 +13,13 @@ struct ra_slot {
     int    :24;
 };
 
-// pool_mask is a bitmap indexed by *pool position* (cfg.pool index
-// 0..nregs-1), not by physical register id, so the bit math works
-// even when cfg.pool is sparse like {5,6,7,8}. pool_inv inverts
-// cfg.pool: pool_inv[reg] = bit position, or -1 for registers not in
-// the pool. Real backends use nregs ≤ 16; the cap of 32 below leaves
-// headroom while keeping the bitmap in a single word.
+// pool_mask and pinned_set are bitmaps indexed by *pool position*
+// (cfg.pool index 0..nregs-1), not by physical register id, so the
+// bit math works even when cfg.pool is sparse like {5,6,7,8}.
+// pool_inv inverts cfg.pool: pool_inv[reg] = bit position, or -1 for
+// registers not in the pool. Real backends use nregs ≤ 16; the cap
+// of 32 below leaves headroom while keeping each bitmap in a single
+// word.
 struct ra {
     struct ra_slot       *slot;       // n entries (one per bb_inst)
     int                  *owner;      // max_reg entries (val owning physical reg, -1 if free)
@@ -28,11 +29,10 @@ struct ra {
     struct bb_inst const *inst;
     struct ra_config      cfg;
     uint32_t              pool_mask;  // (1 << nregs) - 1
+    uint32_t              pinned_set; // bit i set => cfg.pool[i] is pinned
     int                   nfree;
     int                   preamble;
     int                   insts;
-    int                   npinned;
-    int                   pinned[4];
     int                   :32;
 };
 
@@ -102,7 +102,7 @@ struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const 
     ra->loop_reg = malloc((size_t)bb->preamble * sizeof *ra->loop_reg);
 
     ra->nfree = cfg->nregs;
-    ra->npinned = 0;
+    ra->pinned_set = 0;
     for (int i = 0; i < cfg->nregs; i++) {
         ra->free_stack[i] = cfg->pool[cfg->nregs - 1 - i];
     }
@@ -117,6 +117,7 @@ void ra_reset_pool(struct ra *ra) {
     }
     for (int i = 0; i < ra->cfg.max_reg; i++) { ra->owner[i] = -1; }
     for (int i = 0; i < ra->insts; i++) { ra->slot[i].reg = -1; }
+    ra->pinned_set = 0;
 }
 
 void ra_destroy(struct ra *ra) {
@@ -165,29 +166,14 @@ int8_t ra_alloc(struct ra *ra, int *sl, int *ns) {
         return ra->free_stack[--ra->nfree];
     }
 
-    // Slow path: every pool register is allocated. Project the pinned
-    // val list onto a pool-bit set so we can iterate "in-use, not
-    // pinned" candidates with one ctz per step instead of scanning
-    // max_reg with an inner npinned scan per candidate. Recomputing
-    // pinned_set from pinned[] each call (rather than maintaining it
-    // incrementally) keeps the projection in lock-step with whatever
-    // owner[r] holds at scan time, which matters because ra_claim and
-    // ra_free_reg can move a pinned val's register out from under us
-    // mid-step.
-    uint32_t pinned_set = 0;
-    for (int p = 0; p < ra->npinned; p++) {
-        int8_t const r = ra->slot[ra->pinned[p]].reg;
-        if (r >= 0) {
-            int8_t const bit = ra->pool_inv[(int)r];
-            if (bit >= 0) { pinned_set |= (uint32_t)1 << bit; }
-        }
-    }
-
-    // Bits with owner < 0 are scratch registers that have been popped
-    // from the LIFO but not yet bound to a val (e.g. a backend
-    // mid-emit); they're skipped just like before.
+    // Slow path: every pool register is allocated. Walk the in-use
+    // non-pinned pool bits with ctz instead of scanning max_reg with
+    // an inner pinned scan per candidate. Bits with owner < 0 are
+    // scratch registers that have been popped from the LIFO but not
+    // yet bound to a val (a backend mid-emit); they're skipped just
+    // like before.
     int best_r = -1, best_lu = -1;
-    for (uint32_t cand = ra->pool_mask & ~pinned_set; cand; cand &= cand - 1) {
+    for (uint32_t cand = ra->pool_mask & ~ra->pinned_set; cand; cand &= cand - 1) {
         int const bit = __builtin_ctz(cand);
         int const r   = ra->cfg.pool[bit];
         int const val = ra->owner[r];
@@ -239,6 +225,18 @@ int8_t ra_claim(struct ra *ra, int old_val, int new_val) {
     return r;
 }
 
+// Pin the pool bit currently holding val so the eviction scan in
+// ra_alloc / ra_ensure can't pick it. A val whose slot[].reg is -1
+// (chan-only or not yet materialized) has nothing to pin in the main
+// pool, matching the old "owner[r]==pinned_val never matched" no-op.
+static inline void pin_val(struct ra *ra, int val) {
+    int8_t const r = ra->slot[val].reg;
+    if (r >= 0) {
+        int8_t const bit = ra->pool_inv[(int)r];
+        if (bit >= 0) { ra->pinned_set |= (uint32_t)1 << bit; }
+    }
+}
+
 static struct ra_step step0(void) {
     return (struct ra_step){
         .rd = -1,
@@ -261,11 +259,11 @@ struct ra_step ra_step_alloc(struct ra *ra, int *sl, int *ns, int i) {
 struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct bb_inst const *inst,
                              int i) {
     struct ra_step s = step0();
-    ra->npinned = 0;
+    ra->pinned_set = 0;
     s.rx = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
     // Pin the input so the rd allocation below cannot evict it.
     if ((int)inst->x.id < i && !inst->x.chan) {
-        ra->pinned[ra->npinned++] = (int)inst->x.id;
+        pin_val(ra, (int)inst->x.id);
     }
     _Bool const x_dead = inst->x.chan
         ? ra->slot[(int)inst->x.id].chan_last_use[(int)inst->x.chan] <= i
@@ -279,8 +277,8 @@ struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct bb_inst con
     }
     // Pin the new value so any subsequent ra_alloc / ra_ensure (e.g. the
     // backend's ra_ensure for inst->y.id in _imm op handling) cannot evict
-    // it. Stays pinned until the next ra_step_* resets npinned.
-    ra->pinned[ra->npinned++] = i;
+    // it. Stays pinned until the next ra_step_* resets pinned_set.
+    pin_val(ra, i);
     if (x_dead && inst->x.chan) {
         int8_t const r = ra->slot[(int)inst->x.id].chan_reg[(int)inst->x.chan];
         if (r >= 0) {
@@ -296,20 +294,20 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const
     struct ra_slot const *slot = ra->slot;
     struct ra_step s = step0();
 
-    ra->npinned = 0;
+    ra->pinned_set = 0;
     if ((int)inst->x.id < i) {
         s.rx = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
-        ra->pinned[ra->npinned++] = (int)inst->x.id;
+        pin_val(ra, (int)inst->x.id);
     }
     if ((int)inst->y.id < i) {
         s.ry = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
-        if (inst->y.bits != inst->x.bits) { ra->pinned[ra->npinned++] = (int)inst->y.id; }
+        if (inst->y.bits != inst->x.bits) { pin_val(ra, (int)inst->y.id); }
     }
     if ((int)inst->z.id < i) {
         s.rz = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
         if (inst->z.bits != inst->x.bits &&
             inst->z.bits != inst->y.bits) {
-            ra->pinned[ra->npinned++] = (int)inst->z.id;
+            pin_val(ra, (int)inst->z.id);
         }
     }
 
@@ -376,13 +374,13 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const
     // contents to a slot and then handing the same register back as
     // s.scratch — collapsing s.rd onto s.scratch and corrupting the
     // dest val's would-be spill slot.
-    ra->pinned[ra->npinned++] = i;
+    pin_val(ra, i);
 
     _Bool const fma_scratch = fma && s.rd != s.rz && (s.rd == s.rx || s.rd == s.ry);
     if (nscratch >= 1 || fma_scratch) { s.scratch = ra_alloc(ra, sl, ns); }
     if (nscratch >= 2) { s.scratch2 = ra_alloc(ra, sl, ns); }
 
-    ra->npinned = 0;
+    ra->pinned_set = 0;
     if (x_dead) { ra_free_reg(ra, (int)inst->x.id); }
     if (y_dead) { ra_free_reg(ra, (int)inst->y.id); }
     if (z_dead) { ra_free_reg(ra, (int)inst->z.id); }
