@@ -10,6 +10,7 @@ enum {
     SPIRV_FLOAT_CONTROLS   = 1,
     SPIRV_ALWAYS_16BIT     = 2,  // Always emit Float16 cap + 16-bit types.
     SPIRV_PUSH_VIA_SSBO    = 4,  // Emit push data as an SSBO instead of PushConstant.
+    SPIRV_NO_16BIT_TYPES   = 8,  // Emulate 16-bit via u32 shift/mask + UnpackHalf2x16.
 };
 
 uint32_t *build_spirv(struct umbra_basic_block const *bb,

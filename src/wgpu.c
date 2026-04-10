@@ -171,13 +171,28 @@ static void batch_track_copy(struct wgpu_backend *be,
 //  Buffer cache.
 // ---------------------------------------------------------------------------
 
+// WebGPU requires buffer writes to be 4-byte aligned.
+static void queue_write_aligned(struct wgpu_backend *be, WGPUBuffer buf,
+                                void const *data, size_t bytes) {
+    size_t aligned = (bytes + 3) & ~(size_t)3;
+    if (aligned == bytes) {
+        wgpuQueueWriteBuffer(be->queue, buf, 0, data, bytes);
+    } else {
+        // Pad to 4-byte alignment with zeros on the stack.
+        char tmp[4] = {0};
+        __builtin_memcpy(tmp, (char const *)data + (bytes & ~(size_t)3), bytes & 3);
+        wgpuQueueWriteBuffer(be->queue, buf, 0, data, bytes & ~(size_t)3);
+        wgpuQueueWriteBuffer(be->queue, buf, bytes & ~(size_t)3, tmp, 4);
+    }
+}
+
 static int cache_buf(struct wgpu_backend *be, void *host, size_t bytes,
                      _Bool read_only) {
     for (int i = 0; i < be->batch_cache_n; i++) {
         struct wgpu_buf_cache_entry *ce = &be->batch_cache[i];
         if (ce->host == host && ce->size >= bytes && (!read_only || ce->writable)) {
             if (host && bytes) {
-                wgpuQueueWriteBuffer(be->queue, ce->buf, 0, host, bytes);
+                queue_write_aligned(be, ce->buf, host, bytes);
             }
             return i;
         }
@@ -192,7 +207,7 @@ static int cache_buf(struct wgpu_backend *be, void *host, size_t bytes,
     struct wgpu_buf_cache_entry *ce = &be->batch_cache[idx];
     *ce = (struct wgpu_buf_cache_entry){0};
 
-    uint64_t alloc_size = bytes ? bytes : 4;
+    uint64_t alloc_size = bytes ? (bytes + 3) & ~(uint64_t)3 : 4;
     // Reuse from free pool.
     for (int i = 0; i < be->free_bufs_n; i++) {
         if (be->free_bufs[i].size >= alloc_size) {
@@ -212,7 +227,7 @@ fill:
     ce->host     = host;
     ce->writable = !read_only;
     if (host && bytes) {
-        wgpuQueueWriteBuffer(be->queue, ce->buf, 0, host, bytes);
+        queue_write_aligned(be, ce->buf, host, bytes);
     }
     if (!read_only && host && bytes) {
         batch_track_copy(be, host, ce->buf, bytes);
@@ -264,12 +279,13 @@ static void wgpu_flush(struct umbra_backend *base) {
     for (int i = 0; i < be->batch_n_copies; i++) {
         struct wgpu_copyback *c = &be->batch_copies[i];
         // Create a staging buffer, copy, map, read back.
+        size_t aligned_sz = (c->bytes + 3) & ~(size_t)3;
         WGPUBuffer staging = wgpuDeviceCreateBuffer(be->device, &(WGPUBufferDescriptor){
             .usage = WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst,
-            .size  = c->bytes,
+            .size  = aligned_sz,
         });
         WGPUCommandEncoder enc = wgpuDeviceCreateCommandEncoder(be->device, NULL);
-        wgpuCommandEncoderCopyBufferToBuffer(enc, c->buf, 0, staging, 0, c->bytes);
+        wgpuCommandEncoderCopyBufferToBuffer(enc, c->buf, 0, staging, 0, aligned_sz);
         WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(enc, NULL);
         wgpuCommandEncoderRelease(enc);
 
@@ -278,13 +294,12 @@ static void wgpu_flush(struct umbra_backend *base) {
         wgpuDevicePoll(be->device, 1, &si);
 
         // Map the staging buffer synchronously.
-        wgpuBufferMapAsync(staging, WGPUMapMode_Read, 0, c->bytes,
+        wgpuBufferMapAsync(staging, WGPUMapMode_Read, 0, aligned_sz,
             (WGPUBufferMapCallbackInfo){
-                .mode     = WGPUCallbackMode_AllowSpontaneous,
                 .callback = map_cb,
             });
         wgpuDevicePoll(be->device, 1, NULL);
-        void const *mapped = wgpuBufferGetConstMappedRange(staging, 0, c->bytes);
+        void const *mapped = wgpuBufferGetConstMappedRange(staging, 0, aligned_sz);
         if (mapped) {
             memcpy(c->host, mapped, c->bytes);
         }
@@ -317,9 +332,11 @@ static struct umbra_program *wgpu_compile(struct umbra_backend *base,
                                           struct umbra_basic_block const *bb) {
     struct wgpu_backend *be = (struct wgpu_backend *)base;
 
+    wgpu_had_error = 0;
     int spirv_words = 0, max_ptr = -1, total_bufs = 0, n_deref = 0, push_words = 0;
     struct deref_info *deref = 0;
-    uint32_t *spirv = build_spirv(bb, SPIRV_PUSH_VIA_SSBO, &spirv_words, &max_ptr, &total_bufs,
+    uint32_t *spirv = build_spirv(bb, SPIRV_PUSH_VIA_SSBO | SPIRV_NO_16BIT_TYPES,
+                                   &spirv_words, &max_ptr, &total_bufs,
                                    &n_deref, &deref, &push_words);
     if (!spirv) { return 0; }
 
@@ -328,15 +345,11 @@ static struct umbra_program *wgpu_compile(struct umbra_backend *base,
         .codeSize = (uint32_t)spirv_words,
         .code     = spirv,
     };
-    wgpu_had_error = 0;
     WGPUShaderModule shader = wgpuDeviceCreateShaderModule(be->device,
         &(WGPUShaderModuleDescriptor){
             .nextInChain = &spirv_src.chain,
         });
-    if (!shader || wgpu_had_error) {
-        if (shader) { wgpuShaderModuleRelease(shader); }
-        free(spirv); free(deref); return 0;
-    }
+    if (!shader) { free(spirv); free(deref); return 0; }
 
     // Bind group layout: one storage buffer per data slot + one for push data.
     int n_desc = total_bufs + 1;
@@ -358,15 +371,13 @@ static struct umbra_program *wgpu_compile(struct umbra_backend *base,
         });
     free(entries);
 
-    wgpu_had_error = 0;
     WGPUPipelineLayout pipe_layout = wgpuDeviceCreatePipelineLayout(be->device,
         &(WGPUPipelineLayoutDescriptor){
             .bindGroupLayoutCount  = 1,
             .bindGroupLayouts      = &bg_layout,
         });
 
-    WGPUComputePipeline pipeline = wgpu_had_error ? NULL
-        : wgpuDeviceCreateComputePipeline(be->device,
+    WGPUComputePipeline pipeline = wgpuDeviceCreateComputePipeline(be->device,
             &(WGPUComputePipelineDescriptor){
                 .layout  = pipe_layout,
                 .compute = {
@@ -433,11 +444,24 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
                     uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, buf[i].sz);
                 struct wgpu_ring_chunk *chunk = loc.handle;
                 // The ring wrote to a malloc'd shadow buffer; upload to GPU.
-                wgpuQueueWriteBuffer(be->queue, chunk->buf,
-                    loc.offset, buf[i].ptr, buf[i].sz);
+                {
+                    size_t sz = buf[i].sz, sz4 = (sz + 3) & ~(size_t)3;
+                    if (sz == sz4) {
+                        wgpuQueueWriteBuffer(be->queue, chunk->buf, loc.offset,
+                                             buf[i].ptr, sz);
+                    } else {
+                        char tmp[4] = {0};
+                        size_t tail = sz & ~(size_t)3;
+                        __builtin_memcpy(tmp, (char *)buf[i].ptr + tail, sz - tail);
+                        wgpuQueueWriteBuffer(be->queue, chunk->buf, loc.offset,
+                                             buf[i].ptr, tail);
+                        wgpuQueueWriteBuffer(be->queue, chunk->buf,
+                                             loc.offset + tail, tmp, 4);
+                    }
+                }
                 bind_buf   [i] = chunk->buf;
                 bind_offset[i] = loc.offset;
-                bind_size  [i] = buf[i].sz;
+                bind_size  [i] = (buf[i].sz + 3) & ~(size_t)3;
             } else {
                 uint64_t sz = buf[i].sz;
                 if (sz < 4) { sz = 4; }
@@ -504,7 +528,7 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
             .binding = (uint32_t)i,
             .buffer  = bind_buf[i],
             .offset  = bind_offset[i],
-            .size    = bind_size[i] - bind_offset[i],
+            .size    = bind_size[i],
         };
     }
     bg_entries[n] = (WGPUBindGroupEntry){
@@ -656,16 +680,15 @@ struct umbra_backend *umbra_backend_wgpu(void) {
     }
     free(adapters);
 
-    // Request device with the adapter's max storage buffers (we need n+1 for
-    // the push-via-SSBO binding).
-    WGPULimits adapter_limits = WGPU_LIMITS_INIT;
+    // Request the adapter's actual limits so we get the full storage buffer
+    // count (default 8 is too few for push-via-SSBO on shaders with 8 bufs).
+    WGPULimits adapter_limits = {0};
     wgpuAdapterGetLimits(adapter, &adapter_limits);
-    WGPULimits limits = WGPU_LIMITS_INIT;
-    limits.maxStorageBuffersPerShaderStage = adapter_limits.maxStorageBuffersPerShaderStage;
+    adapter_limits.nextInChain = NULL;
 
     WGPUDevice dev = NULL;
     WGPUDeviceDescriptor dev_desc    = WGPU_DEVICE_DESCRIPTOR_INIT;
-    dev_desc.requiredLimits           = &limits;
+    dev_desc.requiredLimits           = &adapter_limits;
     dev_desc.uncapturedErrorCallbackInfo.callback = (WGPUUncapturedErrorCallback)error_cb;
     wgpuAdapterRequestDevice(adapter, &dev_desc,
         (WGPURequestDeviceCallbackInfo){
