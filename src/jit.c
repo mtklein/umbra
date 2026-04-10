@@ -87,7 +87,7 @@ static void free_be_jit(struct umbra_backend *be) {
     free(jbe);
 }
 
-struct umbra_backend *umbra_backend_jit(void) {
+struct umbra_backend* umbra_backend_jit(void) {
     struct jit_backend *be = calloc(1, sizeof *be);
     be->base = (struct umbra_backend){
         .compile = compile_jit,
