@@ -565,44 +565,44 @@ static void schedule(struct bb_inst *in, int n, lv const *lv,
 struct umbra_basic_block* umbra_basic_block(builder *b) {
     int const n = b->insts;
 
-    lv *lv_ = calloc((size_t)n, sizeof *lv_);
+    lv *lv = calloc((size_t)n, sizeof *lv);
 
     for (int i = n; i-- > 0;) {
-        if (is_store(b->inst[i].op)) { lv_[i] |= LV_LIVE; }
-        if (lv_[i] & LV_LIVE) {
-            lv_[(int)b->inst[i].x.id] |= LV_LIVE;
-            lv_[(int)b->inst[i].y.id] |= LV_LIVE;
-            lv_[(int)b->inst[i].z.id] |= LV_LIVE;
-            lv_[(int)b->inst[i].w.id] |= LV_LIVE;
-            if (ptr_is_deref(b->inst[i].ptr)) { lv_[ptr_ix(b->inst[i].ptr)] |= LV_LIVE; }
+        if (is_store(b->inst[i].op)) { lv[i] |= LV_LIVE; }
+        if (lv[i] & LV_LIVE) {
+            lv[(int)b->inst[i].x.id] |= LV_LIVE;
+            lv[(int)b->inst[i].y.id] |= LV_LIVE;
+            lv[(int)b->inst[i].z.id] |= LV_LIVE;
+            lv[(int)b->inst[i].w.id] |= LV_LIVE;
+            if (ptr_is_deref(b->inst[i].ptr)) { lv[ptr_ix(b->inst[i].ptr)] |= LV_LIVE; }
         }
     }
     for (int i = 0; i < n; i++) {
         if (is_varying(b->inst[i].op)
-                || (lv_[(int)b->inst[i].x.id] & LV_VARYING)
-                || (lv_[(int)b->inst[i].y.id] & LV_VARYING)
-                || (lv_[(int)b->inst[i].z.id] & LV_VARYING)
-                || (lv_[(int)b->inst[i].w.id] & LV_VARYING)) {
-            lv_[i] |= LV_VARYING;
+                || (lv[(int)b->inst[i].x.id] & LV_VARYING)
+                || (lv[(int)b->inst[i].y.id] & LV_VARYING)
+                || (lv[(int)b->inst[i].z.id] & LV_VARYING)
+                || (lv[(int)b->inst[i].w.id] & LV_VARYING)) {
+            lv[i] |= LV_VARYING;
         }
     }
 
     int total = 0;
-    for (int i = 0; i < n; i++) { total += (lv_[i] & LV_LIVE) != 0; }
+    for (int i = 0; i < n; i++) { total += (lv[i] & LV_LIVE) != 0; }
 
     struct bb_inst *out = malloc((size_t)total * sizeof *out);
     for (int i = 0; i < n; i++) { b->inst[i].final_id = -1; }
 
     int j = 0;
     for (int i = 0; i < n; i++) {
-        if ((lv_[i] & LV_BODY) == LV_LIVE && !is_store(b->inst[i].op)) {
+        if ((lv[i] & LV_BODY) == LV_LIVE && !is_store(b->inst[i].op)) {
             b->inst[i].final_id = j;
             out[j++] = b->inst[i];
         }
     }
     int const preamble = j;
 
-    schedule(b->inst, n, lv_, out, preamble, total);
+    schedule(b->inst, n, lv, out, preamble, total);
 
     for (int i = 0; i < total; i++) {
         out[i].x = (val_){.id = (unsigned)b->inst[out[i].x.id].final_id, .chan = out[i].x.chan};
@@ -614,7 +614,7 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
         }
     }
 
-    free(lv_);
+    free(lv);
 
     struct umbra_basic_block *result = malloc(sizeof *result);
     result->inst = out;
