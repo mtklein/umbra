@@ -91,13 +91,13 @@ Critical sequence based on the simulation:
  +----> 58.   vminps	990(%rip), %ymm10, %ymm10         ## REGISTER dependency:  %ymm10
  +----> 59.   vmulps	1013(%rip), %ymm10, %ymm10        ## REGISTER dependency:  %ymm10
  +----> 60.   vcvtps2dq	%ymm10, %ymm10                    ## REGISTER dependency:  %ymm10
- |      61.   vpslld	$8, %ymm14, %ymm8
- |      62.   vpor	%ymm8, %ymm12, %ymm11
- +----> 63.   vpslld	$16, %ymm10, %ymm8                ## REGISTER dependency:  %ymm10
- |      64.   vpor	%ymm8, %ymm11, %ymm11
- |      65.   vpslld	$24, %ymm13, %ymm8
- |      66.   vpor	%ymm8, %ymm11, %ymm11
- |      67.   vmovdqu	%ymm11, (%r11,%r10,4)
+ |      61.   vpslld	$8, %ymm14, %ymm11
+ |      62.   vpor	%ymm11, %ymm12, %ymm8
+ +----> 63.   vpslld	$16, %ymm10, %ymm11               ## REGISTER dependency:  %ymm10
+ |      64.   vpor	%ymm11, %ymm8, %ymm8
+ |      65.   vpslld	$24, %ymm13, %ymm11
+ |      66.   vpor	%ymm11, %ymm8, %ymm8
+ |      67.   vmovdqu	%ymm8, (%r11,%r10,4)
  |
  |    < loop carried > 
  |
@@ -174,13 +174,13 @@ Instruction Info:
  1      9     0.50    *                   vminps	990(%rip), %ymm10, %ymm10
  1      10    0.50    *                   vmulps	1013(%rip), %ymm10, %ymm10
  1      4     0.50                        vcvtps2dq	%ymm10, %ymm10
- 1      1     0.50                        vpslld	$8, %ymm14, %ymm8
- 1      1     0.25                        vpor	%ymm8, %ymm12, %ymm11
- 1      1     0.50                        vpslld	$16, %ymm10, %ymm8
- 1      1     0.25                        vpor	%ymm8, %ymm11, %ymm11
- 1      1     0.50                        vpslld	$24, %ymm13, %ymm8
- 1      1     0.25                        vpor	%ymm8, %ymm11, %ymm11
- 1      1     1.00           *            vmovdqu	%ymm11, (%r11,%r10,4)
+ 1      1     0.50                        vpslld	$8, %ymm14, %ymm11
+ 1      1     0.25                        vpor	%ymm11, %ymm12, %ymm8
+ 1      1     0.50                        vpslld	$16, %ymm10, %ymm11
+ 1      1     0.25                        vpor	%ymm11, %ymm8, %ymm8
+ 1      1     0.50                        vpslld	$24, %ymm13, %ymm11
+ 1      1     0.25                        vpor	%ymm11, %ymm8, %ymm8
+ 1      1     1.00           *            vmovdqu	%ymm8, (%r11,%r10,4)
 
 
 Resources:
@@ -276,10 +276,10 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -     0.96   0.04    -      -     0.49   0.51    -     0.31   0.36   0.33   0.02   0.95   0.03    -      -     vminps	990(%rip), %ymm10, %ymm10
  -      -      -      -      -      -      -      -     0.53   0.47    -      -     0.50   0.50    -     0.35   0.32   0.33   0.92   0.06   0.02    -      -     vmulps	1013(%rip), %ymm10, %ymm10
  -      -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -      -      -      -      -     vcvtps2dq	%ymm10, %ymm10
- -      -      -      -      -      -      -      -      -     0.49   0.51    -      -      -      -      -      -      -      -      -      -      -      -     vpslld	$8, %ymm14, %ymm8
- -      -      -      -      -      -      -      -     0.46   0.25   0.02   0.27    -      -      -      -      -      -      -      -      -      -      -     vpor	%ymm8, %ymm12, %ymm11
- -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -      -      -     vpslld	$16, %ymm10, %ymm8
- -      -      -      -      -      -      -      -     0.72   0.26   0.02    -      -      -      -      -      -      -      -      -      -      -      -     vpor	%ymm8, %ymm11, %ymm11
- -      -      -      -      -      -      -      -      -     0.03   0.97    -      -      -      -      -      -      -      -      -      -      -      -     vpslld	$24, %ymm13, %ymm8
- -      -      -      -      -      -      -      -     0.71   0.25   0.02   0.02    -      -      -      -      -      -      -      -      -      -      -     vpor	%ymm8, %ymm11, %ymm11
- -      -      -      -      -      -      -      -      -      -      -      -     0.05   0.95   1.00   0.32   0.33   0.35    -      -      -     0.50   0.50   vmovdqu	%ymm11, (%r11,%r10,4)
+ -      -      -      -      -      -      -      -      -     0.49   0.51    -      -      -      -      -      -      -      -      -      -      -      -     vpslld	$8, %ymm14, %ymm11
+ -      -      -      -      -      -      -      -     0.46   0.25   0.02   0.27    -      -      -      -      -      -      -      -      -      -      -     vpor	%ymm11, %ymm12, %ymm8
+ -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -      -      -     vpslld	$16, %ymm10, %ymm11
+ -      -      -      -      -      -      -      -     0.72   0.26   0.02    -      -      -      -      -      -      -      -      -      -      -      -     vpor	%ymm11, %ymm8, %ymm8
+ -      -      -      -      -      -      -      -      -     0.03   0.97    -      -      -      -      -      -      -      -      -      -      -      -     vpslld	$24, %ymm13, %ymm11
+ -      -      -      -      -      -      -      -     0.71   0.25   0.02   0.02    -      -      -      -      -      -      -      -      -      -      -     vpor	%ymm11, %ymm8, %ymm8
+ -      -      -      -      -      -      -      -      -      -      -      -     0.05   0.95   1.00   0.32   0.33   0.35    -      -      -     0.50   0.50   vmovdqu	%ymm8, (%r11,%r10,4)

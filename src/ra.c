@@ -13,24 +13,23 @@ struct ra_slot {
     int    :24;
 };
 
-// pool_mask and pinned_set are bitmaps indexed by *pool position*
-// (cfg.pool index 0..nregs-1), not by physical register id, so the
-// bit math works even when cfg.pool is sparse like {5,6,7,8}.
-// pool_inv inverts cfg.pool: pool_inv[reg] = bit position, or -1 for
-// registers not in the pool. Real backends use nregs ≤ 16; the cap
-// of 32 below leaves headroom while keeping each bitmap in a single
-// word.
+// pool_mask, pinned_set, and free_set are bitmaps indexed by *pool
+// position* (cfg.pool index 0..nregs-1), not by physical register
+// id, so the bit math works even when cfg.pool is sparse like
+// {5,6,7,8}. pool_inv inverts cfg.pool: pool_inv[reg] = bit position,
+// or -1 for registers not in the pool. Real backends use nregs ≤ 16;
+// the cap of 32 below leaves headroom while keeping each bitmap in a
+// single word.
 struct ra {
     struct ra_slot       *slot;       // n entries (one per bb_inst)
     int                  *owner;      // max_reg entries (val owning physical reg, -1 if free)
-    int8_t               *free_stack; // nregs entries (LIFO of free register ids)
     int8_t               *pool_inv;   // max_reg entries (reg id -> pool bit, or -1)
     int8_t               *loop_reg;   // preamble entries (snapshot of slot[i].reg at loop top)
     struct bb_inst const *inst;
     struct ra_config      cfg;
     uint32_t              pool_mask;  // (1 << nregs) - 1
+    uint32_t              free_set;   // bit i set => cfg.pool[i] is free
     uint32_t              pinned_set; // bit i set => cfg.pool[i] is pinned
-    int                   nfree;
     int                   preamble;
     int                   insts;
     int                   :32;
@@ -45,7 +44,10 @@ int    ra_chan_last_use(struct ra const *ra, int val, int chan) {
 
 void ra_set_last_use(struct ra *ra, int val, int lu) { ra->slot[val].last_use = lu; }
 
-void ra_return_reg(struct ra *ra, int8_t r) { ra->free_stack[ra->nfree++] = r; }
+void ra_return_reg(struct ra *ra, int8_t r) {
+    int8_t const bit = ra->pool_inv[(int)r];
+    ra->free_set |= (uint32_t)1 << bit;
+}
 
 void ra_assign(struct ra *ra, int val, int8_t r) {
     ra->slot[val].reg = r;
@@ -62,7 +64,6 @@ struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const 
     ra->cfg        = *cfg;
     ra->slot       = malloc((size_t)n            * sizeof *ra->slot);
     ra->owner      = malloc((size_t)cfg->max_reg * sizeof *ra->owner);
-    ra->free_stack = malloc((size_t)cfg->nregs   * sizeof *ra->free_stack);
     ra->pool_inv   = malloc((size_t)cfg->max_reg * sizeof *ra->pool_inv);
     for (int i = 0; i < n; i++) {
         ra->slot[i].reg      = -1;
@@ -101,29 +102,22 @@ struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const 
     ra->preamble = bb->preamble;
     ra->loop_reg = malloc((size_t)bb->preamble * sizeof *ra->loop_reg);
 
-    ra->nfree = cfg->nregs;
+    ra->free_set   = ra->pool_mask;
     ra->pinned_set = 0;
-    for (int i = 0; i < cfg->nregs; i++) {
-        ra->free_stack[i] = cfg->pool[cfg->nregs - 1 - i];
-    }
 
     return ra;
 }
 
 void ra_reset_pool(struct ra *ra) {
-    ra->nfree = ra->cfg.nregs;
-    for (int i = 0; i < ra->cfg.nregs; i++) {
-        ra->free_stack[i] = ra->cfg.pool[ra->cfg.nregs - 1 - i];
-    }
+    ra->free_set   = ra->pool_mask;
+    ra->pinned_set = 0;
     for (int i = 0; i < ra->cfg.max_reg; i++) { ra->owner[i] = -1; }
     for (int i = 0; i < ra->insts; i++) { ra->slot[i].reg = -1; }
-    ra->pinned_set = 0;
 }
 
 void ra_destroy(struct ra *ra) {
     free(ra->slot);
     free(ra->owner);
-    free(ra->free_stack);
     free(ra->pool_inv);
     free(ra->loop_reg);
     free(ra);
@@ -155,23 +149,29 @@ void ra_end_loop(struct ra *ra, int *sl) {
 void ra_free_reg(struct ra *ra, int val) {
     int8_t const r = ra->slot[val].reg;
     if (r >= 0) {
-        ra->free_stack[ra->nfree++] = r;
+        int8_t const bit = ra->pool_inv[(int)r];
+        ra->free_set |= (uint32_t)1 << bit;
         ra->owner[(int)r] = -1;
         ra->slot[val].reg = -1;
     }
 }
 
 int8_t ra_alloc(struct ra *ra, int *sl, int *ns) {
-    if (ra->nfree > 0) {
-        return ra->free_stack[--ra->nfree];
+    // Fast path: pop the lowest free pool bit. Allocations come out
+    // in cfg.pool order (pool[0] first), not LIFO; this is fine for
+    // every existing backend since their pools are dense ascending
+    // ranges anyway.
+    if (ra->free_set) {
+        int const bit = __builtin_ctz(ra->free_set);
+        ra->free_set &= ra->free_set - 1;
+        return ra->cfg.pool[bit];
     }
 
-    // Slow path: every pool register is allocated. Walk the in-use
-    // non-pinned pool bits with ctz instead of scanning max_reg with
-    // an inner pinned scan per candidate. Bits with owner < 0 are
-    // scratch registers that have been popped from the LIFO but not
-    // yet bound to a val (a backend mid-emit); they're skipped just
-    // like before.
+    // Slow path: every pool register is allocated. Walk the
+    // non-pinned pool bits with ctz, look up each candidate's owner,
+    // and pick the val with the farthest last_use (Belady). Bits
+    // with owner < 0 are scratch registers that were popped but not
+    // yet bound to a val (a backend mid-emit) and are skipped.
     int best_r = -1, best_lu = -1;
     for (uint32_t cand = ra->pool_mask & ~ra->pinned_set; cand; cand &= cand - 1) {
         int const bit = __builtin_ctz(cand);
