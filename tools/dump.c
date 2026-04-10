@@ -5,6 +5,20 @@
 #include <string.h>
 #include <sys/stat.h>
 
+// Write to path~ then rename for atomicity — avoids half-written dumps
+// visible in git diff when building in the same worktree.
+static FILE* atomic_open(char const *path) {
+    char tmp[256];
+    snprintf(tmp, sizeof tmp, "%s~", path);
+    return fopen(tmp, "w");
+}
+static void atomic_close(FILE *f, char const *path) {
+    fclose(f);
+    char tmp[256];
+    snprintf(tmp, sizeof tmp, "%s~", path);
+    rename(tmp, path);
+}
+
 static struct umbra_builder *build_srcover(void) {
     struct umbra_builder *b = umbra_builder();
 
@@ -47,9 +61,9 @@ static void dump_bb(char const *dir, char const *name, struct umbra_basic_block 
     char p[128];
     {
         snprintf(p, sizeof p, "%s/%s.bb", dir, name);
-        FILE *f = fopen(p, "w");
+        FILE *f = atomic_open(p);
         umbra_basic_block_dump(bb, f);
-        fclose(f);
+        atomic_close(f, p);
     }
 
     struct umbra_backend *bes[] = {
@@ -74,9 +88,9 @@ static void dump_bb(char const *dir, char const *name, struct umbra_basic_block 
     for (int i = 0; i < nb; i++) {
         if (!progs[i]) { continue; }
         snprintf(p, sizeof p, "%s/%s.%s", dir, name, exts[i]);
-        FILE *f = fopen(p, "w");
+        FILE *f = atomic_open(p);
         if (progs[i]->dump) { progs[i]->dump(progs[i], f); }
-        fclose(f);
+        atomic_close(f, p);
         progs[i]->free(progs[i]);
     }
     for (int i = 0; i < (int)(sizeof bes / sizeof bes[0]); i++) {
@@ -87,9 +101,9 @@ static void dump_bb(char const *dir, char const *name, struct umbra_basic_block 
 static void dump_builder(char const *dir, char const *name, struct umbra_builder *b) {
     char p[128];
     snprintf(p, sizeof p, "%s/%s.builder", dir, name);
-    FILE *f = fopen(p, "w");
+    FILE *f = atomic_open(p);
     umbra_builder_dump(b, f);
-    fclose(f);
+    atomic_close(f, p);
 
     struct umbra_basic_block *bb = umbra_basic_block(b);
     umbra_builder_free(b);
