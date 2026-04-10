@@ -63,6 +63,14 @@ struct wgpu_backend {
     struct wgpu_copyback        *batch_copies;
     int                          batch_n_copies, batch_copies_cap;
 
+    // Bind group cache: reuse across dispatches when data bindings don't change.
+    WGPUBindGroup             cached_bg;
+    WGPUBuffer                cached_bg_push_buf;  // ring chunk buf used for push binding
+    WGPUBuffer                cached_bg_bufs[32];
+    uint64_t                  cached_bg_off [32];
+    uint64_t                  cached_bg_sz  [32];
+    int                       cached_bg_n, :32;
+
     struct uniform_ring_pool  uni_pool;
     double                    gpu_time_accum;
     double                    ts_period;
@@ -364,6 +372,12 @@ static void wgpu_flush(struct umbra_backend *base) {
         };
     }
     be->batch_cache_n = 0;
+
+    // Invalidate cached bind group — it references batch cache buffers.
+    if (be->cached_bg) {
+        wgpuBindGroupRelease(be->cached_bg);
+        be->cached_bg = NULL;
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -397,12 +411,16 @@ static struct umbra_program *wgpu_compile(struct umbra_backend *base,
     int n_desc = total_bufs + 1;
     WGPUBindGroupLayoutEntry *entries =
         calloc((size_t)n_desc, sizeof *entries);
+    // Binding 0 (user uniforms) and the last binding (push data) use dynamic
+    // offsets so we can reuse the bind group across dispatches that differ only
+    // in ring-allocated uniform/push data.
     for (int i = 0; i < n_desc; i++) {
         entries[i] = (WGPUBindGroupLayoutEntry){
             .binding    = (uint32_t)i,
             .visibility = WGPUShaderStage_Compute,
             .buffer = {
-                .type = WGPUBufferBindingType_Storage,
+                .type             = WGPUBufferBindingType_Storage,
+                .hasDynamicOffset = i == 0 || i == n_desc - 1,
             },
         };
     }
@@ -554,36 +572,59 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
         }
     }
 
-    // Upload push data as a storage buffer at binding=total_bufs.
+    // Upload push data via the uniform ring (avoids per-dispatch buffer alloc).
     size_t push_sz = (size_t)p->push_words * sizeof(uint32_t);
-    WGPUBuffer push_buf = wgpuDeviceCreateBuffer(be->device, &(WGPUBufferDescriptor){
-        .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
-        .size  = push_sz,
-    });
-    wgpuQueueWriteBuffer(be->queue, push_buf, 0, push_data, push_sz);
+    struct uniform_ring_loc push_loc =
+        uniform_ring_pool_alloc(&be->uni_pool, push_data, push_sz);
+    struct wgpu_ring_chunk *push_chunk = push_loc.handle;
+    wgpuQueueWriteBuffer(be->queue, push_chunk->buf, push_loc.offset,
+                         push_data, push_sz);
 
-    // Create bind group: data buffers + push data SSBO.
-    int n_bg = n + 1;
-    WGPUBindGroupEntry bg_entries[33];
-    for (int i = 0; i < n; i++) {
-        bg_entries[i] = (WGPUBindGroupEntry){
-            .binding = (uint32_t)i,
-            .buffer  = bind_buf[i],
-            .offset  = bind_offset[i],
-            .size    = bind_size[i],
+    // Reuse bind group if buffer bindings haven't changed.  Bindings 0 (user
+    // uniforms) and n (push data) use dynamic offsets, so only buffer handles
+    // matter for those — offsets are passed at SetBindGroup time.
+    _Bool bg_hit = be->cached_bg
+                && be->cached_bg_n == n
+                && be->cached_bg_bufs[0]    == bind_buf[0]
+                && be->cached_bg_sz  [0]    == bind_size[0]
+                && be->cached_bg_push_buf   == push_chunk->buf
+                && !memcmp(be->cached_bg_bufs + 1, bind_buf + 1,
+                           (size_t)(n - 1) * sizeof bind_buf[0])
+                && !memcmp(be->cached_bg_off  + 1, bind_offset + 1,
+                           (size_t)(n - 1) * sizeof bind_offset[0])
+                && !memcmp(be->cached_bg_sz   + 1, bind_size + 1,
+                           (size_t)(n - 1) * sizeof bind_size[0]);
+    if (!bg_hit) {
+        if (be->cached_bg) { wgpuBindGroupRelease(be->cached_bg); }
+        int n_bg = n + 1;
+        WGPUBindGroupEntry bg_entries[33];
+        for (int i = 0; i < n; i++) {
+            bg_entries[i] = (WGPUBindGroupEntry){
+                .binding = (uint32_t)i,
+                .buffer  = bind_buf[i],
+                .offset  = i == 0 ? 0 : bind_offset[i],
+                .size    = bind_size[i],
+            };
+        }
+        size_t push_sz_aligned = (push_sz + 3) & ~(size_t)3;
+        bg_entries[n] = (WGPUBindGroupEntry){
+            .binding = (uint32_t)n,
+            .buffer  = push_chunk->buf,
+            .offset  = 0,
+            .size    = push_sz_aligned,
         };
+        be->cached_bg = wgpuDeviceCreateBindGroup(be->device,
+            &(WGPUBindGroupDescriptor){
+                .layout     = p->bg_layout,
+                .entryCount = (size_t)n_bg,
+                .entries    = bg_entries,
+            });
+        be->cached_bg_n = n;
+        be->cached_bg_push_buf = push_chunk->buf;
+        memcpy(be->cached_bg_bufs, bind_buf,    (size_t)n * sizeof bind_buf[0]);
+        memcpy(be->cached_bg_off,  bind_offset, (size_t)n * sizeof bind_offset[0]);
+        memcpy(be->cached_bg_sz,   bind_size,   (size_t)n * sizeof bind_size[0]);
     }
-    bg_entries[n] = (WGPUBindGroupEntry){
-        .binding = (uint32_t)n,
-        .buffer  = push_buf,
-        .size    = push_sz,
-    };
-    WGPUBindGroup bg = wgpuDeviceCreateBindGroup(be->device,
-        &(WGPUBindGroupDescriptor){
-            .layout     = p->bg_layout,
-            .entryCount = (size_t)n_bg,
-            .entries    = bg_entries,
-        });
 
     // Barrier: end/begin compute pass between dispatches.
     if (be->batch_has_dispatch) {
@@ -592,13 +633,16 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
         be->batch_pass = begin_pass(be, 0);
     }
 
+    uint32_t dyn_offsets[2] = {
+        (uint32_t)bind_offset[0],   // uniform buffer offset
+        (uint32_t)push_loc.offset,  // push data offset
+    };
     wgpuComputePassEncoderSetPipeline(be->batch_pass, p->pipeline);
-    wgpuComputePassEncoderSetBindGroup(be->batch_pass, 0, bg, 0, NULL);
+    wgpuComputePassEncoderSetBindGroup(be->batch_pass, 0, be->cached_bg,
+                                       2, dyn_offsets);
 
     uint32_t gx = ((uint32_t)w + SPIRV_WG_SIZE - 1) / SPIRV_WG_SIZE;
     wgpuComputePassEncoderDispatchWorkgroups(be->batch_pass, gx, (uint32_t)h, 1);
-    wgpuBindGroupRelease(bg);
-    wgpuBufferRelease(push_buf);
 
     be->batch_has_dispatch = 1;
 
