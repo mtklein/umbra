@@ -544,7 +544,6 @@ static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int preambl
     int prev_scheduled = -1;
     while (nready > 0) {
         int pick = -1;
-
         // Prefer chaining: pick any ready user of the previously scheduled instruction.
         if (prev_scheduled >= 0) {
             for (int u = meta[prev_scheduled].user_off;
@@ -555,16 +554,19 @@ static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int preambl
                 }
             }
         }
-
         // No chain: pick the best-scoring ready instruction.
         if (pick < 0) {
             int best_score = sched_score(in, meta, ready[0], live);
             pick = 0;
             for (int r = 1; r < nready; r++) {
                 int const s = sched_score(in, meta, ready[r], live);
-                if (s > best_score) { best_score = s; pick = r; }
+                if (best_score < s) {
+                    best_score = s;
+                    pick = r;
+                }
             }
         }
+        assume(pick >= 0);
 
         // Remove ready[pick], maintaining ready_idx bookkeeping.
         int const id = ready[pick];
