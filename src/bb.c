@@ -463,7 +463,9 @@ static char const* op_name(enum op op) {
         IMM_OPS(OP_NAME)
 #undef OP_NAME
     };
-    if ((unsigned)op < sizeof names / sizeof *names && names[op]) { return names[op]; }
+    if ((unsigned)op < sizeof names / sizeof *names && names[op]) {
+        return names[op];
+    }
     return "?";
 }
 
@@ -471,25 +473,24 @@ struct sched {
     int last_use, n_deps, n_users, user_off;
 };
 
-static _Bool is_body(struct bb_inst const *inst) { return inst->live && inst->varying; }
+static _Bool is_body(struct bb_inst const *inst) {
+    return inst->live && inst->varying;
+}
 
-static void schedule(struct bb_inst *in, int n,
-                     struct bb_inst *out, int preamble, int total) {
+static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int preamble, int total) {
     struct sched *meta = calloc((size_t)(n + 1), sizeof *meta);
 
-    for (int i = 0; i < n; i++) { meta[i].last_use = -1; }
     for (int i = 0; i < n; i++) {
-        if (!is_body(&in[i])) { continue; }
-        int const deps[] = {(int)in[i].x.id, (int)in[i].y.id, (int)in[i].z.id, (int)in[i].w.id};
-        for (int k = 0; k < 4; k++) { meta[deps[k]].last_use = i; }
-    }
-    for (int i = 0; i < n; i++) {
-        if (!is_body(&in[i])) { continue; }
-        int const deps[] = {(int)in[i].x.id, (int)in[i].y.id, (int)in[i].z.id, (int)in[i].w.id};
-        for (int k = 0; k < 4; k++) {
-            if (is_body(&in[deps[k]])) {
-                meta[i].n_deps++;
-                meta[deps[k]].n_users++;
+        meta[i].last_use = -1;
+        if (is_body(in + i)) {
+            unsigned const deps[] = {in[i].x.id, in[i].y.id, in[i].z.id, in[i].w.id};
+            for (int k = 0; k < 4; k++) {
+                unsigned const d = deps[k];
+                meta[d].last_use = i;
+                if (is_body(in + d)) {
+                    meta[i].n_deps++;
+                    meta[d].n_users++;
+                }
             }
         }
     }
@@ -503,19 +504,22 @@ static void schedule(struct bb_inst *in, int n,
     int *ready = buf + meta[n].user_off;
 
     for (int i = 0; i < n; i++) {
-        if (!is_body(&in[i])) { continue; }
-        int const deps[] = {(int)in[i].x.id, (int)in[i].y.id, (int)in[i].z.id, (int)in[i].w.id};
-        for (int k = 0; k < 4; k++) {
-            if (is_body(&in[deps[k]])) {
-                int const d = deps[k];
-                users[meta[d].user_off + meta[d].n_users++] = i;
+        if (is_body(in + i)) {
+            unsigned const deps[] = {in[i].x.id, in[i].y.id, in[i].z.id, in[i].w.id};
+            for (int k = 0; k < 4; k++) {
+                if (is_body(in + deps[k])) {
+                    unsigned const d = deps[k];
+                    users[meta[d].user_off + meta[d].n_users++] = i;
+                }
             }
         }
     }
 
     int nready = 0;
     for (int i = 0; i < n; i++) {
-        if (is_body(&in[i]) && meta[i].n_deps == 0) { ready[nready++] = i; }
+        if (is_body(in + i) && meta[i].n_deps == 0) {
+            ready[nready++] = i;
+        }
     }
 
     int j = preamble;
@@ -524,11 +528,15 @@ static void schedule(struct bb_inst *in, int n,
         int best = 0, best_score = -9999;
         for (int r = 0; r < nready; r++) {
             int const id = ready[r];
-            int       kills = 0;
-            int const deps[] = {(int)in[id].x.id, (int)in[id].y.id, (int)in[id].z.id, (int)in[id].w.id};
+            unsigned const deps[] = {in[id].x.id, in[id].y.id, in[id].z.id, in[id].w.id};
+
+            int kills = 0;
             for (int k = 0; k < 4; k++) {
-                if (meta[deps[k]].last_use == id) { kills++; }
+                if (meta[deps[k]].last_use == id) {
+                    kills++;
+                }
             }
+
             int const defines = is_store(in[id].op) ? 0 : 1;
             int const net = kills - defines;
             int const lu = meta[id].last_use < 0 ? total : meta[id].last_use;
@@ -536,7 +544,9 @@ static void schedule(struct bb_inst *in, int n,
             // the interpreter can keep the value in a register.
             int chain = 0;
             for (int k = 0; k < 3; k++) {
-                if (deps[k] == prev_scheduled) { chain = 1; }
+                if ((int)deps[k] == prev_scheduled) {
+                    chain = 1;
+                }
             }
             int const score = net * total - lu + chain * total * 2;
             if (best_score < score) {
@@ -570,10 +580,10 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
         }
         if (b->inst[i].live) {
             live++;
-            b->inst[(int)b->inst[i].x.id].live = 1;
-            b->inst[(int)b->inst[i].y.id].live = 1;
-            b->inst[(int)b->inst[i].z.id].live = 1;
-            b->inst[(int)b->inst[i].w.id].live = 1;
+            b->inst[b->inst[i].x.id].live = 1;
+            b->inst[b->inst[i].y.id].live = 1;
+            b->inst[b->inst[i].z.id].live = 1;
+            b->inst[b->inst[i].w.id].live = 1;
             if (ptr_is_deref(b->inst[i].ptr)) {
                 b->inst[ptr_ix(b->inst[i].ptr)].live = 1;
             }
@@ -582,16 +592,13 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
 
     for (int i = 0; i < n; i++) {
         b->inst[i].varying = is_varying(b->inst[i].op)
-                          || b->inst[(int)b->inst[i].x.id].varying
-                          || b->inst[(int)b->inst[i].y.id].varying
-                          || b->inst[(int)b->inst[i].z.id].varying
-                          || b->inst[(int)b->inst[i].w.id].varying;
+                          || b->inst[b->inst[i].x.id].varying
+                          || b->inst[b->inst[i].y.id].varying
+                          || b->inst[b->inst[i].z.id].varying
+                          || b->inst[b->inst[i].w.id].varying;
     }
 
     struct bb_inst *out = malloc((size_t)live * sizeof *out);
-    for (int i = 0; i < n; i++) {
-        b->inst[i].final_id = -1;
-    }
     int preamble = 0;
     for (int i = 0; i < n; i++) {
         if (b->inst[i].live && !b->inst[i].varying && !is_store(b->inst[i].op)) {
