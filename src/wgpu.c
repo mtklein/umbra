@@ -320,7 +320,7 @@ static struct umbra_program *wgpu_compile(struct umbra_backend *base,
 
     int spirv_words = 0, max_ptr = -1, total_bufs = 0, n_deref = 0, push_words = 0;
     struct deref_info *deref = 0;
-    uint32_t *spirv = build_spirv(bb, 0, &spirv_words, &max_ptr, &total_bufs,
+    uint32_t *spirv = build_spirv(bb, SPIRV_PUSH_VIA_SSBO, &spirv_words, &max_ptr, &total_bufs,
                                    &n_deref, &deref, &push_words);
     if (!spirv) { return 0; }
 
@@ -335,10 +335,10 @@ static struct umbra_program *wgpu_compile(struct umbra_backend *base,
         });
     if (!shader) { free(spirv); free(deref); return 0; }
 
-    // Bind group layout: one storage buffer per slot.
-    int n_desc = total_bufs;
+    // Bind group layout: one storage buffer per data slot + one for push data.
+    int n_desc = total_bufs + 1;
     WGPUBindGroupLayoutEntry *entries =
-        calloc((size_t)(n_desc ? n_desc : 1), sizeof *entries);
+        calloc((size_t)n_desc, sizeof *entries);
     for (int i = 0; i < n_desc; i++) {
         entries[i] = (WGPUBindGroupLayoutEntry){
             .binding    = (uint32_t)i,
@@ -355,15 +355,9 @@ static struct umbra_program *wgpu_compile(struct umbra_backend *base,
         });
     free(entries);
 
-    // Pipeline layout with immediates for push constants.
     wgpu_had_error = 0;
-    WGPUPipelineLayoutExtras extras = {
-        .chain = {.sType = (WGPUSType)WGPUSType_PipelineLayoutExtras},
-        .immediateDataSize = (uint32_t)(push_words * (int)sizeof(uint32_t)),
-    };
     WGPUPipelineLayout pipe_layout = wgpuDeviceCreatePipelineLayout(be->device,
         &(WGPUPipelineLayoutDescriptor){
-            .nextInChain           = &extras.chain,
             .bindGroupLayoutCount  = 1,
             .bindGroupLayouts      = &bg_layout,
         });
@@ -491,8 +485,17 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
         }
     }
 
-    // Create bind group.
-    WGPUBindGroupEntry bg_entries[32];
+    // Upload push data as a storage buffer at binding=total_bufs.
+    size_t push_sz = (size_t)p->push_words * sizeof(uint32_t);
+    WGPUBuffer push_buf = wgpuDeviceCreateBuffer(be->device, &(WGPUBufferDescriptor){
+        .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
+        .size  = push_sz,
+    });
+    wgpuQueueWriteBuffer(be->queue, push_buf, 0, push_data, push_sz);
+
+    // Create bind group: data buffers + push data SSBO.
+    int n_bg = n + 1;
+    WGPUBindGroupEntry bg_entries[33];
     for (int i = 0; i < n; i++) {
         bg_entries[i] = (WGPUBindGroupEntry){
             .binding = (uint32_t)i,
@@ -501,10 +504,15 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
             .size    = bind_size[i] - bind_offset[i],
         };
     }
+    bg_entries[n] = (WGPUBindGroupEntry){
+        .binding = (uint32_t)n,
+        .buffer  = push_buf,
+        .size    = push_sz,
+    };
     WGPUBindGroup bg = wgpuDeviceCreateBindGroup(be->device,
         &(WGPUBindGroupDescriptor){
             .layout     = p->bg_layout,
-            .entryCount = (size_t)n,
+            .entryCount = (size_t)n_bg,
             .entries    = bg_entries,
         });
 
@@ -517,12 +525,11 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
 
     wgpuComputePassEncoderSetPipeline(be->batch_pass, p->pipeline);
     wgpuComputePassEncoderSetBindGroup(be->batch_pass, 0, bg, 0, NULL);
-    wgpuComputePassEncoderSetImmediates(be->batch_pass, 0,
-        (uint32_t)(p->push_words * (int)sizeof(uint32_t)), push_data);
 
     uint32_t gx = ((uint32_t)w + SPIRV_WG_SIZE - 1) / SPIRV_WG_SIZE;
     wgpuComputePassEncoderDispatchWorkgroups(be->batch_pass, gx, (uint32_t)h, 1);
     wgpuBindGroupRelease(bg);
+    wgpuBufferRelease(push_buf);
 
     be->batch_has_dispatch = 1;
     be->dispatches++;
@@ -646,17 +653,13 @@ struct umbra_backend *umbra_backend_wgpu(void) {
     }
     free(adapters);
 
-    // Request device with required features.
-    WGPUFeatureName features[] = {
-        (WGPUFeatureName)WGPUNativeFeature_Immediates,
-    };
+    // Request device with enough storage buffer bindings for our SSBO-based
+    // push constants (total_bufs can reach 8, plus 1 for the push data SSBO).
     WGPULimits limits = WGPU_LIMITS_INIT;
-    limits.maxImmediateSize = 256;
+    limits.maxStorageBuffersPerShaderStage = 32;
 
     WGPUDevice dev = NULL;
     WGPUDeviceDescriptor dev_desc    = WGPU_DEVICE_DESCRIPTOR_INIT;
-    dev_desc.requiredFeatureCount     = sizeof features / sizeof features[0];
-    dev_desc.requiredFeatures         = features;
     dev_desc.requiredLimits           = &limits;
     dev_desc.uncapturedErrorCallbackInfo.callback = (WGPUUncapturedErrorCallback)error_cb;
     wgpuAdapterRequestDevice(adapter, &dev_desc,

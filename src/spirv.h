@@ -9,6 +9,7 @@ struct deref_info { int buf_idx, src_buf, off; };
 enum {
     SPIRV_FLOAT_CONTROLS   = 1,
     SPIRV_ALWAYS_16BIT     = 2,  // Always emit Float16 cap + 16-bit types.
+    SPIRV_PUSH_VIA_SSBO    = 4,  // Emit push data as an SSBO instead of PushConstant.
 };
 
 uint32_t *build_spirv(struct umbra_basic_block const *bb,

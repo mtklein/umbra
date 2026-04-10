@@ -696,6 +696,20 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
         }
     }
 
+    // SPV_KHR_storage_buffer_storage_class: required for StorageBuffer SC.
+    {
+        char const name[] = "SPV_KHR_storage_buffer_storage_class";
+        int name_words = ((int)sizeof(name) + 3) / 4;
+        spv_op(&B.exts, 10 /*OpExtension*/, 1 + name_words);
+        for (int w = 0; w < name_words; w++) {
+            uint32_t word = 0;
+            for (int b2 = 0; b2 < 4 && w * 4 + b2 < (int)sizeof(name); b2++) {
+                word |= (uint32_t)(unsigned char)name[w * 4 + b2] << (b2 * 8);
+            }
+            spv_word(&B.exts, word);
+        }
+    }
+
     if (B.has_16) {
         spv_op(&B.caps, SpvOpCapability, 2);
         spv_word(&B.caps, SpvCapabilityStorageBuffer16BitAccess);
@@ -908,16 +922,19 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
     spv_word(&B.decor, SpvDecorationOffset);
     spv_word(&B.decor, 0);
 
+    uint32_t push_sc = (flags & SPIRV_PUSH_VIA_SSBO) ? (uint32_t)SpvStorageClassStorageBuffer
+                                                       : (uint32_t)SpvStorageClassPushConstant;
+
     uint32_t t_ptr_push_struct = spv_id(&B);
     spv_op(&B.types, SpvOpTypePointer, 4);
     spv_word(&B.types, t_ptr_push_struct);
-    spv_word(&B.types, SpvStorageClassPushConstant);
+    spv_word(&B.types, push_sc);
     spv_word(&B.types, t_push_struct);
 
     B.t_ptr_push_u32 = spv_id(&B);
     spv_op(&B.types, SpvOpTypePointer, 4);
     spv_word(&B.types, B.t_ptr_push_u32);
-    spv_word(&B.types, SpvStorageClassPushConstant);
+    spv_word(&B.types, push_sc);
     spv_word(&B.types, B.t_u32);
 
     // Function-local pointer types.
@@ -980,12 +997,23 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
         spv_word(&B.decor, (uint32_t)i);
     }
 
-    // Push constant variable.
+    // Push constant / push-via-SSBO variable.
     B.v_push = spv_id(&B);
     spv_op(&B.globals, SpvOpVariable, 4);
     spv_word(&B.globals, t_ptr_push_struct);
     spv_word(&B.globals, B.v_push);
-    spv_word(&B.globals, SpvStorageClassPushConstant);
+    spv_word(&B.globals, push_sc);
+    if (flags & SPIRV_PUSH_VIA_SSBO) {
+        spv_op(&B.decor, SpvOpDecorate, 4);
+        spv_word(&B.decor, B.v_push);
+        spv_word(&B.decor, SpvDecorationDescriptorSet);
+        spv_word(&B.decor, 0);
+
+        spv_op(&B.decor, SpvOpDecorate, 4);
+        spv_word(&B.decor, B.v_push);
+        spv_word(&B.decor, SpvDecorationBinding);
+        spv_word(&B.decor, (uint32_t)total_bufs);
+    }
 
     // --- Entry point ---
     // OpEntryPoint GLCompute %main "main" %gl_GlobalInvocationID
