@@ -271,6 +271,86 @@ int main(int argc, char *argv[]) {
         slug_free(&sc);
     }
 
+    // Compile-time benchmarks: time builder → basic_block → compile → free
+    // per slide.
+    if (!match || strstr("compile", match)) {
+        printf("\n%-40s", "compile (ns/call)");
+        for (int bi = 0; bi < nb; bi++) {
+            if (be_mask & (1 << bi)) { printf(" %12s", be_names[bi]); }
+        }
+        printf("\n");
+
+        for (int si = 0; si < ns; si++) {
+            struct slide *s = slide_get(si);
+            if (!s->get_builder) { continue; }
+            if (match && !strstr(s->title, match) && !strstr("compile", match)) {
+                continue;
+            }
+
+            double ns_call[4] = {-1, -1, -1, -1};
+            for (int bi = 0; bi < nb; bi++) {
+                if (!(be_mask & (1 << bi)) || !bes[bi]) { continue; }
+                    // Warm up: single compile to populate caches.
+                    {
+                        struct umbra_builder *b = s->get_builder(s, fmt);
+                        if (!b) { continue; }
+                        struct umbra_basic_block *bb = umbra_basic_block(b);
+                        umbra_builder_free(b);
+                        struct umbra_program *p = bes[bi]->compile(bes[bi], bb);
+                        p->free(p);
+                        umbra_basic_block_free(bb);
+                    }
+
+                    int    iters   = 1;
+                    double t_pilot = 0;
+                    for (int pi = 0; pi < 20; pi++) {
+                        double const start = now();
+                        for (int it = 0; it < iters; it++) {
+                            struct umbra_builder *b = s->get_builder(s, fmt);
+                            struct umbra_basic_block *bb = umbra_basic_block(b);
+                            umbra_builder_free(b);
+                            struct umbra_program *p = bes[bi]->compile(bes[bi], bb);
+                            p->free(p);
+                            umbra_basic_block_free(bb);
+                        }
+                        t_pilot = now() - start;
+                        if (t_pilot >= target_secs / 2) { break; }
+                        iters *= 2;
+                    }
+                    int const cal = (int)((double)iters * target_secs / t_pilot);
+                    if (cal > iters) { iters = cal; }
+
+                    double best = 0;
+                    double total = 0;
+                    for (int k = 0; k < samples; k++) {
+                        double const start = now();
+                        for (int it = 0; it < iters; it++) {
+                            struct umbra_builder *b = s->get_builder(s, fmt);
+                            struct umbra_basic_block *bb = umbra_basic_block(b);
+                            umbra_builder_free(b);
+                            struct umbra_program *p = bes[bi]->compile(bes[bi], bb);
+                            p->free(p);
+                            umbra_basic_block_free(bb);
+                        }
+                        double const dt = now() - start;
+                        if (k == 0 || dt < best) { best = dt; }
+                        total += dt;
+                        if (total >= (double)samples * target_secs) { break; }
+                    }
+                    ns_call[bi] = best / (double)iters * 1e9;
+                }
+            printf("%-40s", s->title);
+            for (int bi = 0; bi < nb; bi++) {
+                if (!(be_mask & (1 << bi))) { continue; }
+                if (ns_call[bi] < 0) { printf(" %12s", "-"); continue; }
+                char tmp[32];
+                sprintf(tmp, "%5.0f ns", ns_call[bi]);
+                printf(" %12s", tmp);
+            }
+            printf("\n");
+        }
+    }
+
     slides_cleanup();
     for (int bi = 0; bi < nb; bi++) {
         if (bes[bi]) { bes[bi]->free(bes[bi]); }
