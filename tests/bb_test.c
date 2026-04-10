@@ -3821,3 +3821,31 @@ TEST(test_gather_partial_oob) {
     cleanup(&B);
 }
 
+// Build a program large enough to overflow the JIT's initial code buffer estimate,
+// exercising the put() grow path on arm64 (mmap resize) and x86 (realloc).
+TEST(test_jit_code_buffer_overflow) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_ptr32 p = {0};
+    for (int i = 0; i < 500; i++) {
+        umbra_val32 r, g, bl, a;
+        umbra_load_8x4(b, p, &r, &g, &bl, &a);
+        umbra_store_8x4(b, p, r, g, bl, a);
+    }
+    struct umbra_basic_block *bb = umbra_basic_block(b);
+    umbra_builder_free(b);
+
+    struct umbra_backend *be = umbra_backend_jit();
+    if (be) {
+        struct umbra_program *prog = be->compile(be, bb);
+        prog->free(prog);
+        be->free(be);
+    }
+
+    be = umbra_backend_interp();
+    { struct umbra_program *prog = be->compile(be, bb);
+      prog->free(prog); }
+    be->free(be);
+
+    umbra_basic_block_free(bb);
+}
+

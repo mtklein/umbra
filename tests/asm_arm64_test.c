@@ -11,6 +11,12 @@ TEST(test_buf) {
     b.words == 2 here;
     b.word[0] == 0xDEADBEEF here;
     b.word[1] == 0xCAFEBABE here;
+
+    // Push past initial cap (1024) to cover the realloc doubling path.
+    for (int i = b.words; i < 1025; i++) { put(&b, NOP()); }
+    b.words == 1025 here;
+    b.word[0] == 0xDEADBEEF here;
+    b.word[1] == 0xCAFEBABE here;
     free(b.word);
 }
 
