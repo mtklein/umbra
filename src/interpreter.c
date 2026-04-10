@@ -187,8 +187,9 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
     int max_ptr = -1;
     int n_deref = 0;
     for (int i = 0; i < bb->insts; i++) {
-        if (op_has_ptr(bb->inst[i].op) && bb->inst[i].ptr >= 0 && max_ptr < bb->inst[i].ptr) {
-            max_ptr = bb->inst[i].ptr;
+        if (op_has_ptr(bb->inst[i].op) && bb->inst[i].ptr.bits >= 0
+                                       && max_ptr < bb->inst[i].ptr.bits) {
+            max_ptr = bb->inst[i].ptr.bits;
         }
         if (bb->inst[i].op == op_deref_ptr) {
             n_deref++;
@@ -211,7 +212,7 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
 
     int n = 0;
 #define emit(...) p->inst[n] = (struct sw_inst){ __VA_ARGS__ }
-#define RESOLVE_PTR(inst) (ptr_is_deref((inst)->ptr) ? deref_slot[ptr_ix((inst)->ptr)] : (inst)->ptr)
+#define RESOLVE_PTR(inst) ((inst)->ptr.deref ? deref_slot[(int)(inst)->ptr.ix] : (inst)->ptr.bits)
     for (int pass = 0; pass < 2; pass++) {
         int const lo = pass ? bb->preamble : 0, hi = pass ? bb->insts : bb->preamble;
         if (pass) { p->preamble = n; }
@@ -227,7 +228,7 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
             case op_imm_32: emit(.tag = op_imm_32, .x = inst->imm); break;
 
             case op_deref_ptr:
-                emit(.tag = op_deref_ptr, .ptr = inst->ptr, .x = inst->imm, .y = deref_slot[i]);
+                emit(.tag = op_deref_ptr, .ptr = inst->ptr.bits, .x = inst->imm, .y = deref_slot[i]);
                 break;
 
             case op_uniform_32: emit(.tag = op_uniform_32, .ptr = RESOLVE_PTR(inst), .x = inst->imm); break;

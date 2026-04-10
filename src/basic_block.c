@@ -129,7 +129,6 @@ static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int preambl
     free(buf);
 }
 
-static int ptr_deref(int id) { return (int)((unsigned)id | (1u << 31)); }
 
 struct umbra_basic_block* umbra_basic_block(struct umbra_builder *b) {
     int const n = b->insts;
@@ -145,8 +144,8 @@ struct umbra_basic_block* umbra_basic_block(struct umbra_builder *b) {
             b->inst[b->inst[i].y.id].live = 1;
             b->inst[b->inst[i].z.id].live = 1;
             b->inst[b->inst[i].w.id].live = 1;
-            if (ptr_is_deref(b->inst[i].ptr)) {
-                b->inst[ptr_ix(b->inst[i].ptr)].live = 1;
+            if (b->inst[i].ptr.deref) {
+                b->inst[(int)b->inst[i].ptr.ix].live = 1;
             }
         }
     }
@@ -175,8 +174,8 @@ struct umbra_basic_block* umbra_basic_block(struct umbra_builder *b) {
         out[i].y = (val){.id = b->inst[out[i].y.id].final_id, .chan = out[i].y.chan};
         out[i].z = (val){.id = b->inst[out[i].z.id].final_id, .chan = out[i].z.chan};
         out[i].w = (val){.id = b->inst[out[i].w.id].final_id, .chan = out[i].w.chan};
-        if (ptr_is_deref(out[i].ptr)) {
-            out[i].ptr = ptr_deref(b->inst[ptr_ix(out[i].ptr)].final_id);
+        if (out[i].ptr.deref) {
+            out[i].ptr = (ptr){.ix = (unsigned)b->inst[(int)out[i].ptr.ix].final_id, .deref = 1};
         }
     }
 
@@ -201,10 +200,10 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
 
         if (op_is_store(op)) {
             if (op == op_store_8x4 || op == op_store_16x4 || op == op_store_16x4_planar) {
-                fprintf(f, "      %-15s p%d v%d v%d v%d v%d\n", op_name(op), ip->ptr,
+                fprintf(f, "      %-15s p%d v%d v%d v%d v%d\n", op_name(op), ip->ptr.bits,
                         ip->x.id, ip->y.id, ip->z.id, ip->w.id);
             } else {
-                fprintf(f, "      %-15s p%d v%d\n", op_name(op), ip->ptr, ip->y.id);
+                fprintf(f, "      %-15s p%d v%d\n", op_name(op), ip->ptr.bits, ip->y.id);
             }
             continue;
         }
@@ -214,18 +213,18 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         switch (op) {
         case op_imm_32: fprintf(f, " 0x%x", (uint32_t)ip->imm); break;
         case op_uniform_32:
-            fprintf(f, " p%d byte%d", ip->ptr, ip->imm);
+            fprintf(f, " p%d byte%d", ip->ptr.bits, ip->imm);
             break;
         case op_gather_uniform_32:
         case op_gather_32:
         case op_gather_16:
-        case op_sample_32: fprintf(f, " p%d v%d", ip->ptr, ip->x.id); break;
+        case op_sample_32: fprintf(f, " p%d v%d", ip->ptr.bits, ip->x.id); break;
         case op_load_16:
         case op_load_32:
         case op_load_16x4:
         case op_load_16x4_planar:
-        case op_load_8x4: fprintf(f, " p%d", ip->ptr); break;
-        case op_deref_ptr: fprintf(f, " p%d byte%d", ip->ptr, ip->imm); break;
+        case op_load_8x4: fprintf(f, " p%d", ip->ptr.bits); break;
+        case op_deref_ptr: fprintf(f, " p%d byte%d", ip->ptr.bits, ip->imm); break;
         case op_x:
         case op_y:
         case op_store_16:

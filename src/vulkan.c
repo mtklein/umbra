@@ -576,7 +576,7 @@ static int get_id(val v) { return v.id; }
 
 // Resolve a pointer index: if negative, it's a deref reference.
 static int resolve_ptr(SpvBuilder *b, struct bb_inst const *inst) {
-    return ptr_is_deref(inst->ptr) ? b->deref_buf[ptr_ix(inst->ptr)] : inst->ptr;
+    return inst->ptr.deref ? b->deref_buf[(int)inst->ptr.ix] : inst->ptr.bits;
 }
 
 // Load a metadata word from the push constant block at a given word offset.
@@ -724,9 +724,9 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
     // --- Analyze the BB to find buffer usage. ---
     int max_ptr = -1;
     for (int i = 0; i < bb->insts; i++) {
-        if (op_has_ptr(bb->inst[i].op) && bb->inst[i].ptr >= 0) {
-            if (bb->inst[i].ptr > max_ptr) {
-                max_ptr = bb->inst[i].ptr;
+        if (op_has_ptr(bb->inst[i].op) && bb->inst[i].ptr.bits >= 0) {
+            if (bb->inst[i].ptr.bits > max_ptr) {
+                max_ptr = bb->inst[i].ptr.bits;
             }
         }
     }
@@ -752,7 +752,7 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
         for (int i = 0; i < bb->insts; i++) {
             if (bb->inst[i].op == op_deref_ptr) {
                 di[d].buf_idx  = deref_buf[i];
-                di[d].src_buf  = bb->inst[i].ptr;
+                di[d].src_buf  = bb->inst[i].ptr.bits;
                 di[d].off = bb->inst[i].imm;
                 d++;
             }
@@ -766,8 +766,8 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
         enum op op = bb->inst[i].op;
         if (op == op_load_16 || op == op_store_16 || op == op_gather_16
          || op == op_load_16x4_planar || op == op_store_16x4_planar) {
-            int p = ptr_is_deref(bb->inst[i].ptr) ? deref_buf[ptr_ix(bb->inst[i].ptr)]
-                                                   : bb->inst[i].ptr;
+            int p = bb->inst[i].ptr.deref ? deref_buf[(int)bb->inst[i].ptr.ix]
+                                         : bb->inst[i].ptr.bits;
             B.buf_is_16[p] = 1;
             B.has_16 = 1;
         }
