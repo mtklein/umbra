@@ -21,6 +21,7 @@ struct umbra_backend *umbra_backend_wgpu(void) { return 0; }
 struct wgpu_buf_cache_entry {
     WGPUBuffer  buf;
     void       *host;
+    void       *shadow;   // last-uploaded snapshot; skip re-upload if unchanged
     uint64_t    size;
     _Bool       writable; int :24, :32;
 };
@@ -220,7 +221,12 @@ static int cache_buf(struct wgpu_backend *be, void *host, size_t bytes,
         struct wgpu_buf_cache_entry *ce = &be->batch_cache[i];
         if (ce->host == host && ce->size >= bytes && (!read_only || ce->writable)) {
             if (host && bytes) {
-                queue_write_aligned(be, ce->buf, host, bytes);
+                // Skip re-upload if host data hasn't changed since last upload.
+                if (!ce->shadow || memcmp(ce->shadow, host, bytes)) {
+                    queue_write_aligned(be, ce->buf, host, bytes);
+                    if (!ce->shadow) { ce->shadow = malloc(bytes); }
+                    memcpy(ce->shadow, host, bytes);
+                }
             }
             return i;
         }
@@ -256,6 +262,10 @@ fill:
     ce->writable = !read_only;
     if (host && bytes) {
         queue_write_aligned(be, ce->buf, host, bytes);
+        if (bytes <= 1024 * 1024) {
+            ce->shadow = malloc(bytes);
+            memcpy(ce->shadow, host, bytes);
+        }
     }
     if (!read_only && host && bytes) {
         batch_track_copy(be, host, ce->buf, bytes);
@@ -370,6 +380,7 @@ static void wgpu_flush(struct umbra_backend *base) {
             .buf  = be->batch_cache[i].buf,
             .size = be->batch_cache[i].size,
         };
+        free(be->batch_cache[i].shadow);
     }
     be->batch_cache_n = 0;
 
