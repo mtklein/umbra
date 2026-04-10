@@ -1,15 +1,12 @@
 #include "asm_arm64.h"
 #include <stdlib.h>
-#if defined(__aarch64__)
 #include <string.h>
 #include <sys/mman.h>
-#endif
 
 typedef struct Buf Buf;
 
 void put(Buf *b, uint32_t w) {
     if (b->words == b->cap) {
-#if defined(__aarch64__)
         if (b->mmap_size) {
             size_t const pg       = 16384,
                          new_size = 2 * b->mmap_size;
@@ -20,9 +17,7 @@ void put(Buf *b, uint32_t w) {
             b->word      = m;
             b->cap       = (int)((new_size - pg) / 4);
             b->mmap_size = new_size;
-        } else
-#endif
-        {
+        } else {
             b->cap = b->cap ? 2 * b->cap : 1024;
             b->word = realloc(b->word, (size_t)b->cap * 4);
         }
