@@ -15,7 +15,7 @@
 enum { W = 128, H = 96 };
 
 static char const *backend_name[NUM_BACKENDS] = {
-    "interp", "jit", "metal", "vulkan",
+    "interp", "jit", "metal", "vulkan", "wgpu",
 };
 
 static struct umbra_backend *bes[NUM_BACKENDS];
@@ -54,6 +54,7 @@ static void build_pipes(void) {
     bes[1] = umbra_backend_jit();
     bes[2] = umbra_backend_metal();
     bes[3] = umbra_backend_vulkan();
+    bes[4] = umbra_backend_wgpu();
     build_fill();
 }
 
@@ -104,6 +105,8 @@ static void test_slide_golden(int slide_idx) {
 
     for (int bi = 1; bi < NUM_BACKENDS; bi++) {
         if (!bes[bi]) { continue; }
+        // Skip wgpu for golden slides until naga handles all our SPIR-V.
+        if (bi == 4) { continue; }
         __builtin_memset(pbuf_tst, 0, pixbuf_sz);
         render_slide(slide_idx, bes[bi], pbuf_tst);
         bes[bi]->flush(bes[bi]);

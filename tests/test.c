@@ -25,6 +25,7 @@ struct test_backends test_backends_make(struct umbra_basic_block const *bb) {
     B.be[1] = umbra_backend_jit();
     B.be[2] = umbra_backend_metal();
     B.be[3] = umbra_backend_vulkan();
+    B.be[4] = umbra_backend_wgpu();
     for (int i = 0; i < NUM_BACKENDS; i++) {
         B.p[i] = B.be[i] ? B.be[i]->compile(B.be[i], bb) : NULL;
     }

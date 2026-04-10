@@ -1,5 +1,5 @@
 #include "assume.h"
-#include "basic_block.h"
+#include "spirv.h"
 #include "uniform_ring.h"
 #include <stdlib.h>
 #include <string.h>
@@ -165,7 +165,6 @@ enum {
     GLSLstd450FMix  = 46,
     GLSLstd450Fma   = 50,
 
-    WG_SIZE = 64,
 };
 
 // ---------------------------------------------------------------------------
@@ -267,11 +266,7 @@ static uint32_t find_host_memory(VkPhysicalDevice phys) {
     return 0;
 }
 
-// ---------------------------------------------------------------------------
-//  Deref info — same idea as Metal backend.
-// ---------------------------------------------------------------------------
-
-struct deref_info { int buf_idx, src_buf, off; };
+// deref_info is in spirv.h, shared with the wgpu backend.
 
 // ---------------------------------------------------------------------------
 //  Copyback tracking.
@@ -722,7 +717,8 @@ static _Bool produces_float(enum op op) {
 }
 
 // Build the full SPIR-V binary for a basic block.
-static uint32_t *build_spirv(struct umbra_basic_block const *bb,
+uint32_t *build_spirv(struct umbra_basic_block const *bb,
+                              int flags,
                               int *out_spirv_words,
                               int *out_max_ptr,
                               int *out_total_bufs,
@@ -797,17 +793,19 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
     spv_op(&B.caps, SpvOpCapability, 2);
     spv_word(&B.caps, SpvCapabilityShader);
 
-    spv_op(&B.caps, SpvOpCapability, 2);
-    spv_word(&B.caps, SpvCapabilityFloat16);
+    if (B.has_16 || (flags & SPIRV_ALWAYS_16BIT)) {
+        spv_op(&B.caps, SpvOpCapability, 2);
+        spv_word(&B.caps, SpvCapabilityFloat16);
+    }
 
-    spv_op(&B.caps, SpvOpCapability, 2);
-    spv_word(&B.caps, SpvCapabilitySignedZeroInfNanPreserve);
+    if (flags & SPIRV_FLOAT_CONTROLS) {
+        spv_op(&B.caps, SpvOpCapability, 2);
+        spv_word(&B.caps, SpvCapabilitySignedZeroInfNanPreserve);
 
-    // SPV_KHR_float_controls: SignedZeroInfNanPreserve for float32 makes
-    // MoltenVK/SPIRV-Cross clear NotNaN|NotInf|NSZ from fpFastMathFlags,
-    // which produces MTLMathModeSafe + precise:: transcendentals — matching
-    // our Metal backend.
-    {
+        // SPV_KHR_float_controls: SignedZeroInfNanPreserve for float32 makes
+        // MoltenVK/SPIRV-Cross clear NotNaN|NotInf|NSZ from fpFastMathFlags,
+        // which produces MTLMathModeSafe + precise:: transcendentals — matching
+        // our Metal backend.
         char const name[] = "SPV_KHR_float_controls";
         int name_words = ((int)sizeof(name) + 3) / 4;
         spv_op(&B.exts, 10 /*OpExtension*/, 1 + name_words);
@@ -887,16 +885,18 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
     spv_word(&B.types, B.t_f32);
     spv_word(&B.types, 32);
 
-    B.t_u16 = spv_id(&B);
-    spv_op(&B.types, SpvOpTypeInt, 4);
-    spv_word(&B.types, B.t_u16);
-    spv_word(&B.types, 16);
-    spv_word(&B.types, 0); // unsigned
+    if (B.has_16 || (flags & SPIRV_ALWAYS_16BIT)) {
+        B.t_u16 = spv_id(&B);
+        spv_op(&B.types, SpvOpTypeInt, 4);
+        spv_word(&B.types, B.t_u16);
+        spv_word(&B.types, 16);
+        spv_word(&B.types, 0); // unsigned
 
-    B.t_f16 = spv_id(&B);
-    spv_op(&B.types, SpvOpTypeFloat, 3);
-    spv_word(&B.types, B.t_f16);
-    spv_word(&B.types, 16);
+        B.t_f16 = spv_id(&B);
+        spv_op(&B.types, SpvOpTypeFloat, 3);
+        spv_word(&B.types, B.t_f16);
+        spv_word(&B.types, 16);
+    }
 
     B.t_uvec3 = spv_id(&B);
     spv_op(&B.types, SpvOpTypeVector, 4);
@@ -1133,14 +1133,16 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
         spv_op(&B.exec_mode, SpvOpExecutionMode, 6);
         spv_word(&B.exec_mode, fn_main);
         spv_word(&B.exec_mode, SpvExecutionModeLocalSize);
-        spv_word(&B.exec_mode, WG_SIZE);
+        spv_word(&B.exec_mode, SPIRV_WG_SIZE);
         spv_word(&B.exec_mode, 1);
         spv_word(&B.exec_mode, 1);
 
-        spv_op(&B.exec_mode, SpvOpExecutionMode, 4);
-        spv_word(&B.exec_mode, fn_main);
-        spv_word(&B.exec_mode, SpvExecutionModeSignedZeroInfNanPreserve);
-        spv_word(&B.exec_mode, 32); // float32
+        if (flags & SPIRV_FLOAT_CONTROLS) {
+            spv_op(&B.exec_mode, SpvOpExecutionMode, 4);
+            spv_word(&B.exec_mode, fn_main);
+            spv_word(&B.exec_mode, SpvExecutionModeSignedZeroInfNanPreserve);
+            spv_word(&B.exec_mode, 32); // float32
+        }
 
         // --- Function body ---
         // OpFunction
@@ -2222,7 +2224,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
             0, 1, &mb, 0, NULL, 0, NULL);
     }
     be->batch_has_dispatch = 1;
-    uint32_t gx = ((uint32_t)w + WG_SIZE - 1) / WG_SIZE;
+    uint32_t gx = ((uint32_t)w + SPIRV_WG_SIZE - 1) / SPIRV_WG_SIZE;
     vkCmdDispatch(be->batch_cmd, gx, (uint32_t)h, 1);
 
 
@@ -2279,7 +2281,8 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
 
     int spirv_words = 0, max_ptr = -1, total_bufs = 0, n_deref = 0, push_words = 0;
     struct deref_info *deref = 0;
-    uint32_t *spirv = build_spirv(bb, &spirv_words, &max_ptr, &total_bufs,
+    uint32_t *spirv = build_spirv(bb, SPIRV_FLOAT_CONTROLS | SPIRV_ALWAYS_16BIT,
+                                   &spirv_words, &max_ptr, &total_bufs,
                                    &n_deref, &deref, &push_words);
     if (!spirv) { return 0; }
 

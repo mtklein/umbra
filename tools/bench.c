@@ -105,7 +105,7 @@ static void usage(void) {
     fprintf(stderr,
         "Usage: bench [options]\n"
         "  --fmt FORMAT     destination format: 8888, 565, 1010102, fp16, fp16_planar\n"
-        "  --backend NAME   run only: interp, jit, metal, vulkan\n"
+        "  --backend NAME   run only: interp, jit, metal, vulkan, wgpu\n"
         "  --match SUBSTR   run only slides whose title contains SUBSTR\n"
         "  --samples N      timing samples per measurement, take min (default 5)\n"
         "  --target-ms N    target ms per sample (default 15)\n"
@@ -127,7 +127,7 @@ static struct umbra_fmt parse_fmt(char const *s) {
 int main(int argc, char *argv[]) {
     int              W         = 4096;
     struct umbra_fmt fmt       = umbra_fmt_8888;
-    int              be_mask   = 0xf;
+    int              be_mask   = 0x1f;
     int              samples   = 5;
     int              target_ms = 15;
     char const      *match     = NULL;
@@ -137,8 +137,9 @@ int main(int argc, char *argv[]) {
         else if (streq(argv[i], "--fmt")     && i+1 < argc) { fmt = parse_fmt(argv[++i]); }
         else if (streq(argv[i], "--backend") && i+1 < argc) {
             char const *b = argv[++i];
-            be_mask = streq(b, "interp") ? 1 : streq(b, "jit") ? 2 :
-                      streq(b, "metal")  ? 4 : streq(b, "vulkan") ? 8 : 0;
+            be_mask = streq(b, "interp") ? 1  : streq(b, "jit")    ? 2 :
+                      streq(b, "metal")  ? 4  : streq(b, "vulkan") ? 8 :
+                      streq(b, "wgpu")   ? 16 : 0;
             if (!be_mask) { fprintf(stderr, "unknown backend: %s\n", b); usage(); return 1; }
         }
         else if (streq(argv[i], "--match")     && i+1 < argc) { match = argv[++i]; }
@@ -156,10 +157,11 @@ int main(int argc, char *argv[]) {
 
     int ns = slide_count() - 1;
 
-    char const *be_names[] = {"interp", "jit", "metal", "vulkan"};
+    char const *be_names[] = {"interp", "jit", "metal", "vulkan", "wgpu"};
     struct umbra_backend *bes[] = {
         umbra_backend_interp(), umbra_backend_jit(),
         umbra_backend_metal(),  umbra_backend_vulkan(),
+        umbra_backend_wgpu(),
     };
     int const nb = (int)(sizeof bes / sizeof *bes);
 
@@ -187,8 +189,8 @@ int main(int argc, char *argv[]) {
         size_t const planes = (size_t)fmt.planes;
         void        *buf    = calloc((size_t)(W * H) * planes, bpp);
 
-        double ns_px[4] = {-1, -1, -1, -1};
-        double gpu[4]   = {-1, -1, -1, -1};
+        double ns_px[5] = {-1, -1, -1, -1, -1};
+        double gpu[5]   = {-1, -1, -1, -1, -1};
         for (int bi = 0; bi < nb; bi++) {
             if (!(be_mask & (1 << bi)) || !bes[bi]) { continue; }
             s->prepare(s, bes[bi], fmt);
@@ -235,7 +237,7 @@ int main(int argc, char *argv[]) {
         struct umbra_basic_block *bb = umbra_basic_block(bld);
         umbra_builder_free(bld);
 
-        struct umbra_program *progs[4];
+        struct umbra_program *progs[5];
         for (int bi = 0; bi < nb; bi++) {
             progs[bi] = bes[bi] ? bes[bi]->compile(bes[bi], bb) : NULL;
         }
@@ -257,8 +259,8 @@ int main(int argc, char *argv[]) {
             {.ptr=wind, .sz=(size_t)(W * H * 4)},
         };
 
-        double ns_px[4] = {-1, -1, -1, -1};
-        double gpu[4]   = {-1, -1, -1, -1};
+        double ns_px[5] = {-1, -1, -1, -1, -1};
+        double gpu[5]   = {-1, -1, -1, -1, -1};
         for (int bi = 0; bi < nb; bi++) {
             if (!(be_mask & (1 << bi)) || !progs[bi]) { continue; }
             struct prog_draw_ctx pctx = {.p=progs[bi], .bufs=abuf, .w=W, .h=H};

@@ -23,7 +23,7 @@ _Bool equiv (float x, float y);
 _Bool val_eq(umbra_val32 a, umbra_val32 b);
 _Bool val_lt(umbra_val32 a, umbra_val32 b);
 
-enum { NUM_BACKENDS = 4 };
+enum { NUM_BACKENDS = 5 };
 
 struct test_backends {
     struct umbra_backend *be[NUM_BACKENDS];
