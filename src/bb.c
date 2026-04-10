@@ -467,8 +467,8 @@ static char const* op_name(enum op op) {
     return "?";
 }
 
-static void schedule(struct bb_inst const *in, int n, _Bool const *body,
-                     struct bb_inst *out, int *old_to_new, int preamble, int total) {
+static void schedule(struct bb_inst *in, int n, _Bool const *body,
+                     struct bb_inst *out, int preamble, int total) {
     int *last_use = calloc((size_t)n, sizeof *last_use);
     int *n_deps   = calloc((size_t)n, sizeof *n_deps);
     int *n_users  = calloc((size_t)n, sizeof *n_users);
@@ -543,7 +543,7 @@ static void schedule(struct bb_inst const *in, int n, _Bool const *body,
         int const id = ready[best];
         ready[best] = ready[--nready];
 
-        old_to_new[id] = j;
+        in[id].final_id = j;
         out[j++] = in[id];
         prev_scheduled = id;
 
@@ -587,14 +587,13 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
     int total = 0;
     for (int i = 0; i < n; i++) { total += live[i]; }
 
-    struct bb_inst *out        = malloc((size_t)total * sizeof *out);
-    int            *old_to_new = malloc((size_t)n     * sizeof *old_to_new);
-    for (int i = 0; i < n; i++) { old_to_new[i] = -1; }
+    struct bb_inst *out = malloc((size_t)total * sizeof *out);
+    for (int i = 0; i < n; i++) { b->inst[i].final_id = -1; }
 
     int j = 0;
     for (int i = 0; i < n; i++) {
         if (live[i] && !varying[i] && !is_store(b->inst[i].op)) {
-            old_to_new[i] = j;
+            b->inst[i].final_id = j;
             out[j++] = b->inst[i];
         }
     }
@@ -602,20 +601,21 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
 
     _Bool *body = calloc((size_t)n, 1);
     for (int i = 0; i < n; i++) { body[i] = live[i] && varying[i]; }
-    schedule(b->inst, n, body, out, old_to_new, preamble, total);
+    schedule(b->inst, n, body, out, preamble, total);
     free(body);
 
     for (int i = 0; i < total; i++) {
-        out[i].x = (val_){.id = (unsigned)old_to_new[out[i].x.id], .chan = out[i].x.chan};
-        out[i].y = (val_){.id = (unsigned)old_to_new[out[i].y.id], .chan = out[i].y.chan};
-        out[i].z = (val_){.id = (unsigned)old_to_new[out[i].z.id], .chan = out[i].z.chan};
-        out[i].w = (val_){.id = (unsigned)old_to_new[out[i].w.id], .chan = out[i].w.chan};
-        if (ptr_is_deref(out[i].ptr)) { out[i].ptr = ptr_deref(old_to_new[ptr_ix(out[i].ptr)]); }
+        out[i].x = (val_){.id = (unsigned)b->inst[out[i].x.id].final_id, .chan = out[i].x.chan};
+        out[i].y = (val_){.id = (unsigned)b->inst[out[i].y.id].final_id, .chan = out[i].y.chan};
+        out[i].z = (val_){.id = (unsigned)b->inst[out[i].z.id].final_id, .chan = out[i].z.chan};
+        out[i].w = (val_){.id = (unsigned)b->inst[out[i].w.id].final_id, .chan = out[i].w.chan};
+        if (ptr_is_deref(out[i].ptr)) {
+            out[i].ptr = ptr_deref(b->inst[ptr_ix(out[i].ptr)].final_id);
+        }
     }
 
     free(live);
     free(varying);
-    free(old_to_new);
 
     struct umbra_basic_block *result = malloc(sizeof *result);
     result->inst = out;

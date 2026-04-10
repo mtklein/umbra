@@ -86,9 +86,11 @@ enum op {
 
 struct bb_inst {
     enum op op;
-    _Bool       uniform, pad_[3];
-    val_        x, y, z, w;
-    int         ptr, imm;
+    val_    x, y, z, w;
+    int     ptr, imm;
+
+    // Compiler bookkeeping, doesn't need to be hashed.
+    union { _Bool uniform; int final_id; };
 };
 
 // Ptr encoding: bit 31 = deref flag, bits 0-30 = index.
