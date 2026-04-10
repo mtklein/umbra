@@ -3,7 +3,6 @@
 #include <stdio.h>
 
 struct jit_backend;
-
 void acquire_code_buf(struct jit_backend*, void **mem, size_t *size, size_t min_size);
 void release_code_buf(struct jit_backend*, void  *mem, size_t  size);
 
