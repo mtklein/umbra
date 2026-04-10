@@ -206,7 +206,7 @@ int main(int argc, char *argv[]) {
                 int pct = 100 - (int)(gpu[bi] / ns_px[bi] * 100 + 0.5);
                 sprintf(tmp, "%6.2f %3d", ns_px[bi], pct);
             } else {
-                sprintf(tmp, "%.2f", ns_px[bi]);
+                sprintf(tmp, "%6.2f", ns_px[bi]);
             }
             printf("  %-13s", tmp);
         }
@@ -286,7 +286,7 @@ int main(int argc, char *argv[]) {
                 int pct = 100 - (int)(gpu[bi] / ns_px[bi] * 100 + 0.5);
                 sprintf(tmp, "%6.2f %3d", ns_px[bi], pct);
             } else {
-                sprintf(tmp, "%.2f", ns_px[bi]);
+                sprintf(tmp, "%6.2f", ns_px[bi]);
             }
             printf("  %-13s", tmp);
         }
@@ -381,7 +381,7 @@ int main(int argc, char *argv[]) {
                 if (!(be_mask & (1 << bi))) { continue; }
                 if (us_call[bi] < 0) { printf("  %-13s", "-"); continue; }
                 char tmp[32];
-                sprintf(tmp, "%.1f", us_call[bi]);
+                sprintf(tmp, "%6.1f", us_call[bi]);
                 printf("  %-13s", tmp);
             }
             printf("\n");
