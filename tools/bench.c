@@ -167,7 +167,14 @@ int main(int argc, char *argv[]) {
 
     printf("%-40s", "ns/px");
     for (int bi = 0; bi < nb; bi++) {
-        if (be_mask & (1 << bi)) { printf("| %-13s", be_names[bi]); }
+        if (!(be_mask & (1 << bi))) { continue; }
+        char hdr[32];
+        if (bes[bi] && bes[bi]->gpu_time) {
+            sprintf(hdr, "%s gpu%%", be_names[bi]);
+        } else {
+            sprintf(hdr, "%s", be_names[bi]);
+        }
+        printf("| %-13s", hdr);
     }
     printf("\n");
 
@@ -197,7 +204,7 @@ int main(int argc, char *argv[]) {
             char tmp[32];
             if (gpu[bi] >= 0 && ns_px[bi] > 0) {
                 int pct = (int)(gpu[bi] / ns_px[bi] * 100 + 0.5);
-                sprintf(tmp, "%.2f (%d%%)", ns_px[bi], pct);
+                sprintf(tmp, "%.2f  %d", ns_px[bi], pct);
             } else {
                 sprintf(tmp, "%.2f", ns_px[bi]);
             }
@@ -252,7 +259,14 @@ int main(int argc, char *argv[]) {
 
         printf("\n%-40s", "slug accumulator (1 curve)");
         for (int bi = 0; bi < nb; bi++) {
-            if (be_mask & (1 << bi)) { printf("| %-13s", be_names[bi]); }
+            if (!(be_mask & (1 << bi))) { continue; }
+            char hdr[32];
+            if (bes[bi] && bes[bi]->gpu_time) {
+                sprintf(hdr, "%s gpu%%", be_names[bi]);
+            } else {
+                sprintf(hdr, "%s", be_names[bi]);
+            }
+            printf("| %-13s", hdr);
         }
         printf("\n%-40s", "");
 
@@ -270,7 +284,7 @@ int main(int argc, char *argv[]) {
             char tmp[32];
             if (gpu[bi] >= 0 && ns_px[bi] > 0) {
                 int pct = (int)(gpu[bi] / ns_px[bi] * 100 + 0.5);
-                sprintf(tmp, "%.2f (%d%%)", ns_px[bi], pct);
+                sprintf(tmp, "%.2f  %d", ns_px[bi], pct);
             } else {
                 sprintf(tmp, "%.2f", ns_px[bi]);
             }
