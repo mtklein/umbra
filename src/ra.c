@@ -337,6 +337,15 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const
         ra->owner[(int)s.rd] = i;
     }
 
+    // Pin the dest before any scratch allocation. Without this, a
+    // scratch ra_alloc that hits the slow path can pick the dest's
+    // register (Belady would prefer it whenever last_use(i) is the
+    // farthest among unpinned candidates), spilling its uninitialized
+    // contents to a slot and then handing the same register back as
+    // s.scratch — collapsing s.rd onto s.scratch and corrupting the
+    // dest val's would-be spill slot.
+    ra->pinned[ra->npinned++] = i;
+
     _Bool const fma_scratch = fma && s.rd != s.rz && (s.rd == s.rx || s.rd == s.ry);
     if (nscratch >= 1 || fma_scratch) { s.scratch = ra_alloc(ra, sl, ns); }
     if (nscratch >= 2) { s.scratch2 = ra_alloc(ra, sl, ns); }

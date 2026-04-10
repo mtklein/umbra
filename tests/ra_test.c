@@ -544,6 +544,84 @@ TEST(test_step_alu) {
     free(bb);
 }
 
+TEST(test_step_alu_scratch_does_not_evict_dest) {
+    // Regression: ra_step_alu used to leave the freshly-claimed dest
+    // unpinned. With every pool register in use, a subsequent scratch
+    // alloc would walk Belady and pick whichever non-pinned val had
+    // the farthest last_use — potentially the dest itself, since the
+    // dest's val id was never added to pinned[]. The eviction would
+    // then "spill" the dest's register (which the backend hadn't
+    // written yet) and return that same register as the scratch,
+    // collapsing s.rd onto s.scratch and silently corrupting the
+    // would-be-spilled value.
+    static int8_t const pool[] = {0, 1, 2};
+    struct ra_config    cfg = {
+        .pool = pool,
+        .nregs = 3,
+        .max_reg = 3,
+        .spill = test_spill,
+        .fill = test_fill,
+        .ctx = 0,
+    };
+
+    // 4 vals: three imms occupy the pool, then a shr_u32 (op that
+    // takes nscratch=1 in jit.c) consumes val 0 (so it can claim its
+    // register) and reads val 1 (which gets pinned).
+    struct umbra_basic_block *bb = malloc(sizeof *bb);
+    bb->inst = calloc(4, sizeof *bb->inst);
+    bb->insts = 4;
+    bb->preamble = 0;
+
+    bb->inst[0].op = op_imm_32;
+    bb->inst[0].imm = 16;
+    bb->inst[1].op = op_imm_32;
+    bb->inst[1].imm = 1;
+    bb->inst[2].op = op_imm_32;
+    bb->inst[2].imm = 0;
+    bb->inst[3].op = op_shr_u32;
+    bb->inst[3].x = (val_){.id = 0};
+    bb->inst[3].y = (val_){.id = 1};
+
+    struct ra *ra = ra_create(bb, &cfg);
+    int        sl[4] = {-1, -1, -1, -1};
+    int        ns = 0;
+    reset_records();
+
+    int8_t r0 = ra_alloc(ra, sl, &ns); ra_assign(ra, 0, r0);
+    int8_t r1 = ra_alloc(ra, sl, &ns); ra_assign(ra, 1, r1);
+    int8_t r2 = ra_alloc(ra, sl, &ns); ra_assign(ra, 2, r2);
+
+    // Last-use schedule:
+    //   val 0: dies at i=3 → step claims its register for the dest
+    //   val 1: alive past 3 and farthest out → pinned, never evicted
+    //   val 2: alive past 3 but nearer than val 3
+    //   val 3 (the dest): alive farther than val 2
+    // So among non-pinned candidates {dest val 3 in r0, val 2 in r2},
+    // val 3 has the higher last_use — Belady picks it for eviction
+    // unless the dest is pinned.
+    ra_set_last_use(ra, 0, 3);
+    ra_set_last_use(ra, 1, 9);
+    ra_set_last_use(ra, 2, 4);
+    ra_set_last_use(ra, 3, 6);
+
+    struct ra_step s = ra_step_alu(ra, sl, &ns, &bb->inst[3], 3, 1);
+
+    s.rd >= 0 here;
+    s.scratch >= 0 here;
+    // The crux: the scratch must NOT collapse onto the dest. The
+    // backend will emit `op rd, rx, ry; <use scratch>` and would
+    // clobber rd otherwise.
+    s.rd != s.scratch here;
+    // The dest val must still be live in its register.
+    ra_reg(ra, 3) == s.rd here;
+    // val 1 was pinned and must still hold its register.
+    ra_reg(ra, 1) == r1 here;
+
+    ra_destroy(ra);
+    free(bb->inst);
+    free(bb);
+}
+
 TEST(test_step_alu_scratch) {
     static int8_t const pool[] = {5, 6, 7, 8};
     struct ra_config    cfg = {
