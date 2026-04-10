@@ -133,9 +133,8 @@ static void map_cb(WGPUMapAsyncStatus status, WGPUStringView msg,
 static void device_request_cb(WGPURequestDeviceStatus status, WGPUDevice dev,
                               WGPUStringView msg, void *u1, void *u2) {
     (void)msg; (void)u2;
-    WGPUDevice *out = u1;
     if (status == WGPURequestDeviceStatus_Success) {
-        *out = dev;
+        *(WGPUDevice *)u1 = dev;
     }
 }
 
@@ -329,11 +328,15 @@ static struct umbra_program *wgpu_compile(struct umbra_backend *base,
         .codeSize = (uint32_t)spirv_words,
         .code     = spirv,
     };
+    wgpu_had_error = 0;
     WGPUShaderModule shader = wgpuDeviceCreateShaderModule(be->device,
         &(WGPUShaderModuleDescriptor){
             .nextInChain = &spirv_src.chain,
         });
-    if (!shader) { free(spirv); free(deref); return 0; }
+    if (!shader || wgpu_had_error) {
+        if (shader) { wgpuShaderModuleRelease(shader); }
+        free(spirv); free(deref); return 0;
+    }
 
     // Bind group layout: one storage buffer per data slot + one for push data.
     int n_desc = total_bufs + 1;
@@ -653,10 +656,12 @@ struct umbra_backend *umbra_backend_wgpu(void) {
     }
     free(adapters);
 
-    // Request device with enough storage buffer bindings for our SSBO-based
-    // push constants (total_bufs can reach 8, plus 1 for the push data SSBO).
+    // Request device with the adapter's max storage buffers (we need n+1 for
+    // the push-via-SSBO binding).
+    WGPULimits adapter_limits = WGPU_LIMITS_INIT;
+    wgpuAdapterGetLimits(adapter, &adapter_limits);
     WGPULimits limits = WGPU_LIMITS_INIT;
-    limits.maxStorageBuffersPerShaderStage = 32;
+    limits.maxStorageBuffersPerShaderStage = adapter_limits.maxStorageBuffersPerShaderStage;
 
     WGPUDevice dev = NULL;
     WGPUDeviceDescriptor dev_desc    = WGPU_DEVICE_DESCRIPTOR_INIT;
@@ -664,7 +669,6 @@ struct umbra_backend *umbra_backend_wgpu(void) {
     dev_desc.uncapturedErrorCallbackInfo.callback = (WGPUUncapturedErrorCallback)error_cb;
     wgpuAdapterRequestDevice(adapter, &dev_desc,
         (WGPURequestDeviceCallbackInfo){
-            .mode      = WGPUCallbackMode_AllowSpontaneous,
             .callback  = device_request_cb,
             .userdata1 = &dev,
         });
