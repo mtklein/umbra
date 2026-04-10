@@ -576,7 +576,7 @@ static int get_id(val v) { return v.id; }
 
 // Resolve a pointer index: if negative, it's a deref reference.
 static int resolve_ptr(SpvBuilder *b, struct bb_inst const *inst) {
-    return inst->ptr.deref ? b->deref_buf[(int)inst->ptr.ix] : inst->ptr.bits;
+    return inst->ptr.deref ? b->deref_buf[inst->ptr.ix] : inst->ptr.bits;
 }
 
 // Load a metadata word from the push constant block at a given word offset.
@@ -766,7 +766,7 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
         enum op op = bb->inst[i].op;
         if (op == op_load_16 || op == op_store_16 || op == op_gather_16
          || op == op_load_16x4_planar || op == op_store_16x4_planar) {
-            int p = bb->inst[i].ptr.deref ? deref_buf[(int)bb->inst[i].ptr.ix]
+            int p = bb->inst[i].ptr.deref ? deref_buf[bb->inst[i].ptr.ix]
                                          : bb->inst[i].ptr.bits;
             B.buf_is_16[p] = 1;
             B.has_16 = 1;

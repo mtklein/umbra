@@ -17,7 +17,7 @@ typedef union {
     umbra_ptr16 p16;
     umbra_ptr32 p32;
     umbra_ptr64 p64;
-    struct { unsigned ix : 31, deref : 1; };
+    struct { int ix : 31, deref : 1; };
 } ptr;
 
 struct bb_inst {

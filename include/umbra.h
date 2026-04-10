@@ -51,9 +51,9 @@ void   umbra_uniforms_fill_ptr(void *uniforms, size_t off, struct umbra_buf);
 
 typedef struct { int id:30; unsigned chan:2; } umbra_val16;
 typedef struct { int id:30; unsigned chan:2; } umbra_val32;
-typedef struct { unsigned ix:31, deref:1; } umbra_ptr16;
-typedef struct { unsigned ix:31, deref:1; } umbra_ptr32;
-typedef struct { unsigned ix:31, deref:1; } umbra_ptr64;
+typedef struct { int ix:31, deref:1; } umbra_ptr16;
+typedef struct { int ix:31, deref:1; } umbra_ptr32;
+typedef struct { int ix:31, deref:1; } umbra_ptr64;
 
 umbra_ptr16 umbra_deref_ptr16(struct umbra_builder*, umbra_ptr32 buf, size_t off);
 umbra_ptr32 umbra_deref_ptr32(struct umbra_builder*, umbra_ptr32 buf, size_t off);

@@ -2689,11 +2689,11 @@ TEST(test_binary_m_rr) {
     // Each needs a unique chain source so dedup doesn't merge them.
 #define RR_F32(op, k) { \
         umbra_val32 src = umbra_add_f32(b, fa, umbra_imm_f32(b, (float)(k))); \
-        umbra_store_32(b, (umbra_ptr32){.ix=(unsigned)(p++)}, op(b, src, src)); \
+        umbra_store_32(b, (umbra_ptr32){.ix=(p++)}, op(b, src, src)); \
     }
 #define RR_I32(op, k) { \
         umbra_val32 src = umbra_add_i32(b, a, umbra_imm_i32(b, (k))); \
-        umbra_store_32(b, (umbra_ptr32){.ix=(unsigned)(p++)}, op(b, src, src)); \
+        umbra_store_32(b, (umbra_ptr32){.ix=(p++)}, op(b, src, src)); \
     }
     RR_F32(umbra_sub_f32, 1)
     RR_F32(umbra_mul_f32, 2)
@@ -2782,7 +2782,7 @@ TEST(test_cmp_r_rm_rr) {
     // r_cmp_rm: chain→cmp(acc, mem)→sel→store
 #define CMP_RM(cmp, chain_op, chain_k) { \
         umbra_val32 src = chain_op(b, fa, umbra_imm_f32(b, (float)(chain_k))); \
-        umbra_store_32(b, (umbra_ptr32){.ix=(unsigned)(p++)}, umbra_sel_32(b, cmp(b, src, fc), one, zero)); \
+        umbra_store_32(b, (umbra_ptr32){.ix=(p++)}, umbra_sel_32(b, cmp(b, src, fc), one, zero)); \
     }
     CMP_RM(umbra_lt_f32, umbra_add_f32, 0.5f)
     CMP_RM(umbra_le_f32, umbra_add_f32, 1.5f)
@@ -2791,7 +2791,7 @@ TEST(test_cmp_r_rm_rr) {
     // r_cmp_rr: chain→cmp(acc, acc)→sel→store
 #define CMP_RR(cmp, chain_op, chain_k) { \
         umbra_val32 src = chain_op(b, fa, umbra_imm_f32(b, (float)(chain_k))); \
-        umbra_store_32(b, (umbra_ptr32){.ix=(unsigned)(p++)}, umbra_sel_32(b, cmp(b, src, src), one, zero)); \
+        umbra_store_32(b, (umbra_ptr32){.ix=(p++)}, umbra_sel_32(b, cmp(b, src, src), one, zero)); \
     }
     CMP_RR(umbra_lt_f32, umbra_add_f32, 3.5f)
     CMP_RR(umbra_eq_f32, umbra_add_f32, 4.5f)
@@ -2945,12 +2945,12 @@ TEST(test_imm_regvar) {
 #define IMM_CHAIN_F(op, k) { \
         umbra_val32 src = umbra_add_f32(b, fa, umbra_imm_f32(b, (float)(k))); \
         umbra_val32 r = op(b, src, umbra_imm_f32(b, 2.f)); \
-        umbra_store_32(b, (umbra_ptr32){.ix=(unsigned)(p++)}, umbra_i32_from_f32(b, r)); \
+        umbra_store_32(b, (umbra_ptr32){.ix=(p++)}, umbra_i32_from_f32(b, r)); \
     }
 #define IMM_CHAIN_I(op, k) { \
         umbra_val32 src = umbra_add_i32(b, a, umbra_imm_i32(b, (k))); \
         umbra_val32 r = op(b, src, umbra_imm_i32(b, 3)); \
-        umbra_store_32(b, (umbra_ptr32){.ix=(unsigned)(p++)}, umbra_add_i32(b, r, umbra_imm_i32(b, 1))); \
+        umbra_store_32(b, (umbra_ptr32){.ix=(p++)}, umbra_add_i32(b, r, umbra_imm_i32(b, 1))); \
     }
     IMM_CHAIN_F(umbra_mul_f32, 1)
     IMM_CHAIN_F(umbra_div_f32, 2)
@@ -2964,22 +2964,22 @@ TEST(test_imm_regvar) {
     {
         umbra_val32 src = umbra_add_f32(b, fa, umbra_imm_f32(b, 10.f));
         umbra_val32 m = umbra_eq_f32(b, src, umbra_imm_f32(b, 12.f));
-        umbra_store_32(b, (umbra_ptr32){.ix=(unsigned)(p++)}, umbra_and_32(b, m, umbra_imm_i32(b, 1)));
+        umbra_store_32(b, (umbra_ptr32){.ix=(p++)}, umbra_and_32(b, m, umbra_imm_i32(b, 1)));
     }
     {
         umbra_val32 src = umbra_add_f32(b, fa, umbra_imm_f32(b, 20.f));
         umbra_val32 m = umbra_lt_f32(b, src, umbra_imm_f32(b, 25.f));
-        umbra_store_32(b, (umbra_ptr32){.ix=(unsigned)(p++)}, umbra_and_32(b, m, umbra_imm_i32(b, 1)));
+        umbra_store_32(b, (umbra_ptr32){.ix=(p++)}, umbra_and_32(b, m, umbra_imm_i32(b, 1)));
     }
     {
         umbra_val32 src = umbra_add_f32(b, fa, umbra_imm_f32(b, 30.f));
         umbra_val32 m = umbra_le_f32(b, src, umbra_imm_f32(b, 32.f));
-        umbra_store_32(b, (umbra_ptr32){.ix=(unsigned)(p++)}, umbra_and_32(b, m, umbra_imm_i32(b, 1)));
+        umbra_store_32(b, (umbra_ptr32){.ix=(p++)}, umbra_and_32(b, m, umbra_imm_i32(b, 1)));
     }
     // Int CMP imm r_m variant: chain→cmp_imm(mem)→chain
     {
         umbra_val32 m = umbra_eq_i32(b, a, umbra_imm_i32(b, 2));
-        umbra_store_32(b, (umbra_ptr32){.ix=(unsigned)(p++)}, umbra_and_32(b, m, umbra_imm_i32(b, 1)));
+        umbra_store_32(b, (umbra_ptr32){.ix=(p++)}, umbra_and_32(b, m, umbra_imm_i32(b, 1)));
     }
 #undef IMM_CHAIN_F
 #undef IMM_CHAIN_I
@@ -3060,7 +3060,7 @@ TEST(test_unary_m_r) {
     int p = 1;
     // Each: chain→unary→store
 #define MR(unary, chain_val) { \
-        umbra_store_32(b, (umbra_ptr32){.ix=(unsigned)(p++)}, unary(b, chain_val)); \
+        umbra_store_32(b, (umbra_ptr32){.ix=(p++)}, unary(b, chain_val)); \
     }
     umbra_val32 fa2 = umbra_add_f32(b, fa, umbra_imm_f32(b, 1.f));
     MR(umbra_sqrt_f32, fa2)
@@ -3102,12 +3102,12 @@ TEST(test_base_imm_more) {
     int p = 2;
     // Each: op(mem, imm)→store, no chain on either side.
     // Use multiple loads so dedup doesn't merge chains.
-    umbra_store_32(b, (umbra_ptr32){.ix=(unsigned)(p++)}, umbra_shr_s32(b, a, umbra_imm_i32(b, 1)));
-    umbra_store_32(b, (umbra_ptr32){.ix=(unsigned)(p++)}, umbra_shr_u32(b, a, umbra_imm_i32(b, 2)));
-    umbra_store_32(b, (umbra_ptr32){.ix=(unsigned)(p++)}, umbra_or_32(b, a, umbra_imm_i32(b, 0xF0)));
-    umbra_store_32(b, (umbra_ptr32){.ix=(unsigned)(p++)}, umbra_mul_f32(b, fc, umbra_imm_f32(b, 3.f)));
-    umbra_store_32(b, (umbra_ptr32){.ix=(unsigned)(p++)}, umbra_mul_i32(b, a, umbra_imm_i32(b, 7)));
-    umbra_store_32(b, (umbra_ptr32){.ix=(unsigned)(p++)}, umbra_sub_i32(b, a, umbra_imm_i32(b, 1)));
+    umbra_store_32(b, (umbra_ptr32){.ix=(p++)}, umbra_shr_s32(b, a, umbra_imm_i32(b, 1)));
+    umbra_store_32(b, (umbra_ptr32){.ix=(p++)}, umbra_shr_u32(b, a, umbra_imm_i32(b, 2)));
+    umbra_store_32(b, (umbra_ptr32){.ix=(p++)}, umbra_or_32(b, a, umbra_imm_i32(b, 0xF0)));
+    umbra_store_32(b, (umbra_ptr32){.ix=(p++)}, umbra_mul_f32(b, fc, umbra_imm_f32(b, 3.f)));
+    umbra_store_32(b, (umbra_ptr32){.ix=(p++)}, umbra_mul_i32(b, a, umbra_imm_i32(b, 7)));
+    umbra_store_32(b, (umbra_ptr32){.ix=(p++)}, umbra_sub_i32(b, a, umbra_imm_i32(b, 1)));
     struct test_backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         int32_t sa[] = {16,16,16,16}, sc[] = {5,5,5,5};

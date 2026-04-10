@@ -117,11 +117,11 @@ umbra_val32 umbra_imm_f32(builder *b, float v) {
 
 umbra_ptr16 umbra_deref_ptr16(builder *b, umbra_ptr32 buf, size_t off) {
     val const v = push(b, op_deref_ptr, .ptr = {.p32 = buf}, .imm = (int)off);
-    return (umbra_ptr16){.ix = (unsigned)v.id, .deref = 1};
+    return (umbra_ptr16){.ix = v.id, .deref = -1};
 }
 umbra_ptr32 umbra_deref_ptr32(builder *b, umbra_ptr32 buf, size_t off) {
     val const v = push(b, op_deref_ptr, .ptr = {.p32 = buf}, .imm = (int)off);
-    return (umbra_ptr32){.ix = (unsigned)v.id, .deref = 1};
+    return (umbra_ptr32){.ix = v.id, .deref = -1};
 }
 
 

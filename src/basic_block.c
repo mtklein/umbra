@@ -145,7 +145,7 @@ struct umbra_basic_block* umbra_basic_block(struct umbra_builder *b) {
             b->inst[b->inst[i].z.id].live = 1;
             b->inst[b->inst[i].w.id].live = 1;
             if (b->inst[i].ptr.deref) {
-                b->inst[(int)b->inst[i].ptr.ix].live = 1;
+                b->inst[b->inst[i].ptr.ix].live = 1;
             }
         }
     }
@@ -175,7 +175,7 @@ struct umbra_basic_block* umbra_basic_block(struct umbra_builder *b) {
         out[i].z = (val){.id = b->inst[out[i].z.id].final_id, .chan = out[i].z.chan};
         out[i].w = (val){.id = b->inst[out[i].w.id].final_id, .chan = out[i].w.chan};
         if (out[i].ptr.deref) {
-            out[i].ptr = (ptr){.ix = (unsigned)b->inst[(int)out[i].ptr.ix].final_id, .deref = 1};
+            out[i].ptr = (ptr){.ix = b->inst[out[i].ptr.ix].final_id, .deref = -1};
         }
     }
 

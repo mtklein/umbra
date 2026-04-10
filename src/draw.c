@@ -101,16 +101,16 @@ void umbra_store_fp16_planar(struct umbra_builder *b, umbra_ptr16 dst, umbra_col
 }
 
 // Generic wrappers for struct umbra_fmt function pointers (type-erased ptr).
-static umbra_color load_8888_(struct umbra_builder *b, int p) { return umbra_load_8888(b, (umbra_ptr32){.ix=(unsigned)p}); }
-static umbra_color load_565_(struct umbra_builder *b, int p) { return umbra_load_565(b, (umbra_ptr16){.ix=(unsigned)p}); }
-static umbra_color load_1010102_(struct umbra_builder *b, int p) { return umbra_load_1010102(b, (umbra_ptr32){.ix=(unsigned)p}); }
-static umbra_color load_fp16_(struct umbra_builder *b, int p) { return umbra_load_fp16(b, (umbra_ptr64){.ix=(unsigned)p}); }
-static umbra_color load_fp16p_(struct umbra_builder *b, int p) { return umbra_load_fp16_planar(b, (umbra_ptr16){.ix=(unsigned)p}); }
-static void store_8888_(struct umbra_builder *b, int p, umbra_color c) { umbra_store_8888(b, (umbra_ptr32){.ix=(unsigned)p}, c); }
-static void store_565_(struct umbra_builder *b, int p, umbra_color c) { umbra_store_565(b, (umbra_ptr16){.ix=(unsigned)p}, c); }
-static void store_1010102_(struct umbra_builder *b, int p, umbra_color c) { umbra_store_1010102(b, (umbra_ptr32){.ix=(unsigned)p}, c); }
-static void store_fp16_(struct umbra_builder *b, int p, umbra_color c) { umbra_store_fp16(b, (umbra_ptr64){.ix=(unsigned)p}, c); }
-static void store_fp16p_(struct umbra_builder *b, int p, umbra_color c) { umbra_store_fp16_planar(b, (umbra_ptr16){.ix=(unsigned)p}, c); }
+static umbra_color load_8888_(struct umbra_builder *b, int p) { return umbra_load_8888(b, (umbra_ptr32){.ix=p}); }
+static umbra_color load_565_(struct umbra_builder *b, int p) { return umbra_load_565(b, (umbra_ptr16){.ix=p}); }
+static umbra_color load_1010102_(struct umbra_builder *b, int p) { return umbra_load_1010102(b, (umbra_ptr32){.ix=p}); }
+static umbra_color load_fp16_(struct umbra_builder *b, int p) { return umbra_load_fp16(b, (umbra_ptr64){.ix=p}); }
+static umbra_color load_fp16p_(struct umbra_builder *b, int p) { return umbra_load_fp16_planar(b, (umbra_ptr16){.ix=p}); }
+static void store_8888_(struct umbra_builder *b, int p, umbra_color c) { umbra_store_8888(b, (umbra_ptr32){.ix=p}, c); }
+static void store_565_(struct umbra_builder *b, int p, umbra_color c) { umbra_store_565(b, (umbra_ptr16){.ix=p}, c); }
+static void store_1010102_(struct umbra_builder *b, int p, umbra_color c) { umbra_store_1010102(b, (umbra_ptr32){.ix=p}, c); }
+static void store_fp16_(struct umbra_builder *b, int p, umbra_color c) { umbra_store_fp16(b, (umbra_ptr64){.ix=p}, c); }
+static void store_fp16p_(struct umbra_builder *b, int p, umbra_color c) { umbra_store_fp16_planar(b, (umbra_ptr16){.ix=p}, c); }
 
 struct umbra_fmt const umbra_fmt_8888        = { .name="8888",        .bpp=4, .planes=1, .load=load_8888_,    .store=store_8888_ };
 struct umbra_fmt const umbra_fmt_565         = { .name="565",         .bpp=2, .planes=1, .load=load_565_,     .store=store_565_ };

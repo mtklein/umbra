@@ -142,8 +142,8 @@ static void resolve_ptr(Buf *c, ptr p, int *last_ptr, int const *deref_gpr,
                         int const *deref_rb_gpr) {
     if (p.deref) {
         *last_ptr = -1;
-        int const gpr = deref_gpr[(int)p.ix],
-                  rbg = deref_rb_gpr[(int)p.ix];
+        int const gpr = deref_gpr[p.ix],
+                  rbg = deref_rb_gpr[p.ix];
         if (rbg > 0) {
             put(c, MADD_x(XP, XY, rbg, gpr));
         } else {
@@ -1591,8 +1591,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 static int resolve_ptr_x86(Buf *c, ptr p, int *last_ptr, int const *deref_gpr,
                            int const *deref_rb_gpr) {
     if (p.deref) {
-        int const gpr = deref_gpr[(int)p.ix],
-                  rb  = deref_rb_gpr[(int)p.ix];
+        int const gpr = deref_gpr[p.ix],
+                  rb  = deref_rb_gpr[p.ix];
         if (rb > 0) {
             mov_rr(c, R11, gpr);
             mov_rr(c, RAX, XY);
