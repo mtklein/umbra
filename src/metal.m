@@ -1122,15 +1122,20 @@ static void batch_add_copy(
 // for the same host pointer — that's the cross-program hand-off case (e.g.
 // slug acc writes wind_buf, slug draw reads it via a read-only deref). A
 // read-only request with no matching writable entry creates a fresh
-// snapshot, because the host may have mutated the bytes since any prior
-// read-only entry was made (e.g. slug acc loop counter in the uniforms
-// buffer). Copyback for writable buffers is tracked exactly once, at entry
-// creation time.
+// Always re-snapshot host data, because the host may have mutated the bytes
+// since any prior entry was made (e.g. slug acc loop counter in the uniforms
+// buffer, or tiled clears of a writable winding buffer between tiles).
+// Copyback for writable buffers is tracked exactly once, at entry creation
+// time.
 static int cache_buf(struct metal_backend *be, void *host, size_t bytes,
                      _Bool read_only) {
     for (int i = 0; i < be->batch_cache_n; i++) {
         struct buf_cache_entry *ce = &be->batch_cache[i];
         if (ce->host == host && ce->size >= bytes && (!read_only || ce->writable)) {
+            if (host && bytes) {
+                id<MTLBuffer> tmp = (__bridge id<MTLBuffer>)ce->mtl;
+                __builtin_memcpy(tmp.contents, host, bytes);
+            }
             return i;
         }
     }
