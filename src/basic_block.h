@@ -31,7 +31,7 @@ struct bb_inst {
 
 struct umbra_builder {
     struct bb_inst *inst;
-    int             insts, inst_cap;
+    int             insts, cap;
     struct hash     ht;
 };
 

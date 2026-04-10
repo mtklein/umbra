@@ -66,9 +66,9 @@ static val push_(builder *b, struct bb_inst inst) {
         return (val){.id = ctx.hit};
     }
 
-    if (b->insts == b->inst_cap) {
-        b->inst_cap = b->inst_cap ? 2 * b->inst_cap : 32;
-        b->inst = realloc(b->inst, (size_t)b->inst_cap * sizeof *b->inst);
+    if (b->insts == b->cap) {
+        b->cap = b->cap ? 2 * b->cap : 32;
+        b->inst = realloc(b->inst, (size_t)b->cap * sizeof *b->inst);
     }
 
     int const id = b->insts++;
@@ -88,8 +88,8 @@ static val push_(builder *b, struct bb_inst inst) {
 
 builder* umbra_builder(void) {
     builder *b = calloc(1, sizeof *b);
-    b->inst_cap = 128;
-    b->inst = malloc((size_t)b->inst_cap * sizeof *b->inst);
+    b->cap = 128;
+    b->inst = malloc((size_t)b->cap * sizeof *b->inst);
     b->ht = (struct hash){.slots = 128, .data = calloc(128, sizeof(unsigned) + sizeof(int))};
     // Simplifies liveness analysis to know id 0 is imm=0.
     push(b, op_imm_32, .imm = 0);
