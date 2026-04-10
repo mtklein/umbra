@@ -460,15 +460,13 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
                  pg      = 16384,
                  alloc   = (code_sz + pg - 1) & ~(pg - 1);
 
-    void *mem = mmap(NULL, alloc + pg, PROT_READ | PROT_WRITE | PROT_EXEC,
-                     MAP_PRIVATE | MAP_ANON | MAP_JIT, -1, 0);
+    void *mem = mmap(NULL, alloc + pg, PROT_READ | PROT_WRITE,
+                     MAP_PRIVATE | MAP_ANON, -1, 0);
     assume(mem != MAP_FAILED);
     mprotect((char *)mem + alloc, pg, PROT_NONE);
-
-    pthread_jit_write_protect_np(0);
     __builtin_memcpy(mem, c.word, code_sz);
-    pthread_jit_write_protect_np(1);
-    __builtin___clear_cache(mem, (char *)mem + alloc);
+    { int const ok = mprotect(mem, alloc, PROT_READ | PROT_EXEC); assume(ok == 0); }
+    __builtin___clear_cache(mem, (char *)mem + code_sz);
     free(c.word);
 
     struct umbra_jit *j = malloc(sizeof *j);
