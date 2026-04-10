@@ -360,7 +360,7 @@ int main(void) {
                 int y1 = y0 + sh > H ? H : y0 + sh;
                 work[t] = (struct tile_work){s, frame, 0, y0, W, y1, pixbuf};
             }
-            if (!bes[cur_backend]->threadsafe || nt <= 1) {
+            if (nt <= 1 || !xtra_progs[1]->threadsafe) {
                 for (int t = 0; t < nt; t++) { tile_fn(&work[t]); }
             } else {
                 struct work_group wg = {.pool = pool};

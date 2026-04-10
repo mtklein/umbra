@@ -1177,10 +1177,11 @@ static struct umbra_program *compile_interp(struct umbra_backend           *be,
                                             struct umbra_basic_block const *bb) {
     struct umbra_interpreter *p = umbra_interpreter(bb);
     p->base = (struct umbra_program){
-        .queue   = run_interp,
-        .dump    = 0,
-        .free    = free_interp,
-        .backend = be,
+        .queue      = run_interp,
+        .dump       = 0,
+        .free       = free_interp,
+        .backend    = be,
+        .threadsafe = 1,
     };
     return &p->base;
 }
@@ -1192,7 +1193,6 @@ struct umbra_backend *umbra_backend_interp(void) {
         .compile    = compile_interp,
         .flush      = flush_be_noop,
         .free    = free_be_interp,
-        .threadsafe = 1,
     };
     return be;
 }

@@ -2293,23 +2293,35 @@ TEST(test_jit_xs_init) {
     cleanup(&B);
 }
 
-TEST(test_backend_threadsafe) {
+TEST(test_program_threadsafe) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_store_32(b, (umbra_ptr32){0}, umbra_x(b));
+    struct umbra_basic_block *bb = umbra_basic_block(b);
+    umbra_builder_free(b);
+
     struct umbra_backend *interp = umbra_backend_interp();
-    interp->threadsafe == 1 here;
+    { struct umbra_program *p = interp->compile(interp, bb);
+      p->threadsafe == 1 here;
+      p->free(p); }
     interp->free(interp);
 
     struct umbra_backend *jit = umbra_backend_jit();
     if (jit) {
-        jit->threadsafe == 1 here;
+        struct umbra_program *p = jit->compile(jit, bb);
+        p->threadsafe == 1 here;
+        p->free(p);
         jit->free(jit);
     }
 
     struct umbra_backend *metal = umbra_backend_metal();
     if (metal) {
-        metal->threadsafe == 0 here;
+        struct umbra_program *p = metal->compile(metal, bb);
+        p->threadsafe == 0 here;
+        p->free(p);
         metal->free(metal);
     }
 
+    umbra_basic_block_free(bb);
 }
 
 TEST(test_program_null_guards) {

@@ -96,4 +96,5 @@ array in the singular and its count in plural, e.g. `struct inst *inst; int
 insts;`.  If ambiguous, use "size" in the name of byte counts and "count" in
 others; always avoid "len".
 
-Use `here` with no parens for test asserts, and use assume() in non-test code.
+Use `here` with no parens for test asserts: `x == 3 here;`, never
+`(x == 3) here;`.  Use assume() in non-test code.

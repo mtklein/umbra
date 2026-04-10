@@ -1292,10 +1292,11 @@ static struct umbra_program *compile_jit(struct umbra_backend           *be,
                                          struct umbra_basic_block const *bb) {
     struct umbra_jit *j = umbra_jit(bb);
     j->base = (struct umbra_program){
-        .queue   = run_jit,
-        .dump    = dump_jit,
-        .free    = free_jit,
-        .backend = be,
+        .queue      = run_jit,
+        .dump       = dump_jit,
+        .free       = free_jit,
+        .backend    = be,
+        .threadsafe = 1,
     };
     return &j->base;
 }
@@ -1307,7 +1308,6 @@ struct umbra_backend *umbra_backend_jit(void) {
         .compile    = compile_jit,
         .flush      = flush_be_noop,
         .free    = free_be_jit,
-        .threadsafe = 1,
     };
     return be;
 }
@@ -2785,10 +2785,11 @@ static struct umbra_program *compile_jit(struct umbra_backend           *be,
                                          struct umbra_basic_block const *bb) {
     struct umbra_jit *j = umbra_jit(bb);
     j->base = (struct umbra_program){
-        .queue   = run_jit,
-        .dump    = dump_jit,
-        .free    = free_jit,
-        .backend = be,
+        .queue      = run_jit,
+        .dump       = dump_jit,
+        .free       = free_jit,
+        .backend    = be,
+        .threadsafe = 1,
     };
     return &j->base;
 }
@@ -2800,7 +2801,6 @@ struct umbra_backend *umbra_backend_jit(void) {
         .compile    = compile_jit,
         .flush      = flush_be_noop,
         .free    = free_be_jit,
-        .threadsafe = 1,
     };
     return be;
 }

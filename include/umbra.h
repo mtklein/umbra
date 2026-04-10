@@ -20,7 +20,6 @@ struct umbra_backend {
     // uniform ring (interp, jit). Used by tests to assert that the rotation
     // path actually fired.
     int                   (*ring_rotations)(struct umbra_backend const*);
-    _Bool                   threadsafe, pad_[7];
 };
 struct umbra_backend* umbra_backend_interp(void);
 struct umbra_backend* umbra_backend_jit   (void);
@@ -39,6 +38,7 @@ struct umbra_program {
     void (*dump )(struct umbra_program const*, FILE*);
     void (*free )(struct umbra_program*);
     struct umbra_backend *backend;
+    _Bool                 threadsafe, pad_[7];
 };
 
 struct umbra_uniforms_layout { size_t size; };
