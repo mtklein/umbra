@@ -274,7 +274,7 @@ int main(int argc, char *argv[]) {
     // Compile-time benchmarks: time builder → basic_block → compile → free
     // per slide.
     if (!match || strstr("compile", match)) {
-        printf("\n%-40s", "compile (ns/call)");
+        printf("\n%-40s", "compile (µs/call)");
         for (int bi = 0; bi < nb; bi++) {
             if (be_mask & (1 << bi)) { printf(" %12s", be_names[bi]); }
         }
@@ -287,7 +287,7 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            double ns_call[4] = {-1, -1, -1, -1};
+            double us_call[4] = {-1, -1, -1, -1};
             for (int bi = 0; bi < nb; bi++) {
                 if (!(be_mask & (1 << bi)) || !bes[bi]) { continue; }
                     // Warm up: single compile to populate caches.
@@ -337,14 +337,14 @@ int main(int argc, char *argv[]) {
                         total += dt;
                         if (total >= (double)samples * target_secs) { break; }
                     }
-                    ns_call[bi] = best / (double)iters * 1e9;
+                    us_call[bi] = best / (double)iters * 1e6;
                 }
             printf("%-40s", s->title);
             for (int bi = 0; bi < nb; bi++) {
                 if (!(be_mask & (1 << bi))) { continue; }
-                if (ns_call[bi] < 0) { printf(" %12s", "-"); continue; }
+                if (us_call[bi] < 0) { printf(" %12s", "-"); continue; }
                 char tmp[32];
-                sprintf(tmp, "%5.0f ns", ns_call[bi]);
+                sprintf(tmp, "%5.1f µs", us_call[bi]);
                 printf(" %12s", tmp);
             }
             printf("\n");
