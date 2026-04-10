@@ -1,0 +1,18 @@
+#!/bin/sh
+# Block git commit --amend.  Always create new commits.
+if git rev-parse --verify HEAD >/dev/null 2>&1; then
+    parent_of_new=$(git log --format=%P -1 HEAD)
+    # When amending, the index is committed on top of HEAD's parent,
+    # replacing HEAD.  We can detect this via the ps output or simply
+    # by checking for --amend in /proc/self/cmdline.  The simplest
+    # portable check: inspect the caller's command line.
+    case "$GIT_REFLOG_ACTION" in
+        *amend*) echo "error: --amend is not allowed.  Create a new commit instead." >&2; exit 1;;
+    esac
+fi
+# Also check if --amend appears in the parent process command line
+# (GIT_REFLOG_ACTION isn't always set by all git versions).
+if ps -o args= -p $PPID 2>/dev/null | grep -q -- '--amend'; then
+    echo "error: --amend is not allowed.  Create a new commit instead." >&2
+    exit 1
+fi
