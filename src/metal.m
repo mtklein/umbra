@@ -14,6 +14,7 @@ struct umbra_backend *umbra_backend_metal(void) { return 0; }
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 typedef struct umbra_basic_block BB;
 
@@ -48,6 +49,8 @@ struct metal_backend {
     struct buf_cache_entry *batch_cache;
     int                     batch_cache_n, batch_cache_cap;
     struct uniform_ring_pool uni_pool;
+    double gpu_time_accum;
+    int    dispatches, batches;
 };
 
 struct umbra_metal {
@@ -55,10 +58,12 @@ struct umbra_metal {
     void *pipeline;
     char  *src;
     struct deref_info *deref;
+    double compile_secs;
     int    max_ptr;
     int    total_bufs;
     int    tg_size;
     int    n_deref;
+    int    simd_width, :32;
 };
 
 typedef struct {
@@ -943,6 +948,8 @@ static void metal_wait_frame(int frame, void *ctx) {
                 (__bridge_transfer id<MTLCommandBuffer>)be->frame_committed[frame];
             be->frame_committed[frame] = NULL;
             [prior waitUntilCompleted];
+            be->gpu_time_accum += prior.GPUEndTime - prior.GPUStartTime;
+            be->batches++;
         }
     }
 }
@@ -1036,9 +1043,14 @@ static struct umbra_metal* umbra_metal(
         }
 
         NSString *source = [NSString stringWithUTF8String:src];
+        struct timespec t0, t1;
+        clock_gettime(CLOCK_MONOTONIC, &t0);
         library = [device newLibraryWithSource:source
                                        options:opts
                                          error:&error];
+        clock_gettime(CLOCK_MONOTONIC, &t1);
+        double compile_secs = (double)(t1.tv_sec - t0.tv_sec)
+                            + (double)(t1.tv_nsec - t0.tv_nsec) * 1e-9;
         if (!library) {
             NSLog(@"Metal compile error: %@", error);
             goto fail;
@@ -1053,6 +1065,8 @@ static struct umbra_metal* umbra_metal(
             struct umbra_metal *m = calloc(1, sizeof *m);
             m->pipeline      = (__bridge_retained void*)pso;
             m->tg_size       = (int)pso.maxTotalThreadsPerThreadgroup;
+            m->simd_width    = (int)pso.threadExecutionWidth;
+            m->compile_secs  = compile_secs;
             m->src           = src;
             m->max_ptr       = max_ptr;
             m->total_bufs    = total_bufs;
@@ -1246,6 +1260,7 @@ static void encode_dispatch(
                     (NSUInteger)gy, 1);
     [enc dispatchThreads:grid
        threadsPerThreadgroup:group];
+    be->dispatches++;
     free(szs_data);
     free(rbs_data);
 }
@@ -1384,6 +1399,9 @@ static void free_be_metal(struct umbra_backend *be) {
 static int ring_rotations_metal(struct umbra_backend const *be) {
     return ((struct metal_backend const*)be)->uni_pool.rotations;
 }
+static double gpu_time_metal(struct umbra_backend const *be) {
+    return ((struct metal_backend const*)be)->gpu_time_accum;
+}
 struct umbra_backend *umbra_backend_metal(void) {
     struct metal_backend *mbe = umbra_metal_backend_create();
     if (mbe) {
@@ -1392,6 +1410,7 @@ struct umbra_backend *umbra_backend_metal(void) {
             .flush          = flush_be_metal,
             .free           = free_be_metal,
             .ring_rotations = ring_rotations_metal,
+            .gpu_time       = gpu_time_metal,
         };
         return &mbe->base;
     }

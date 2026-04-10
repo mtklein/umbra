@@ -60,7 +60,8 @@ static void prog_draw(void *vctx) {
 //    gives a stable point estimate for regression detection across
 //    commits.
 static double bench(draw_fn draw, void *ctx, struct umbra_backend *be,
-                    int w, int h, int samples, double target_secs) {
+                    int w, int h, int samples, double target_secs,
+                    double *out_gpu_ns_px) {
     int    iters   = 1;
     double t_pilot = 0;
     for (int p = 0; p < 20; p++) {
@@ -77,17 +78,25 @@ static double bench(draw_fn draw, void *ctx, struct umbra_backend *be,
 
     double const wall_budget    = (double)samples * target_secs;
     double       best           = 0;
+    double       best_gpu       = 0;
     double       total_elapsed  = 0;
     for (int k = 0; k < samples; k++) {
+        double const gpu0  = be->gpu_time ? be->gpu_time(be) : 0;
         double const start = now();
         for (int it = 0; it < iters; it++) { draw(ctx); }
         be->flush(be);
-        double const dt = now() - start;
-        if (k == 0 || dt < best) { best = dt; }
+        double const dt     = now() - start;
+        double const gpu_dt = be->gpu_time ? be->gpu_time(be) - gpu0 : 0;
+        if (k == 0 || dt < best)         { best     = dt; }
+        if (k == 0 || gpu_dt < best_gpu) { best_gpu = gpu_dt; }
         total_elapsed += dt;
         if (total_elapsed >= wall_budget) { break; }
     }
-    return best / ((double)iters * (double)w * (double)h) * 1e9;
+    double const px = (double)iters * (double)w * (double)h;
+    if (out_gpu_ns_px) {
+        *out_gpu_ns_px = be->gpu_time ? best_gpu / px * 1e9 : -1;
+    }
+    return best / px * 1e9;
 }
 
 static _Bool streq(char const *a, char const *b) { return strcmp(a, b) == 0; }
@@ -172,11 +181,13 @@ int main(int argc, char *argv[]) {
         void        *buf    = calloc((size_t)(W * H) * planes, bpp);
 
         double ns_px[4] = {-1, -1, -1, -1};
+        double gpu[4]   = {-1, -1, -1, -1};
         for (int bi = 0; bi < nb; bi++) {
             if (!(be_mask & (1 << bi)) || !bes[bi]) { continue; }
             s->prepare(s, bes[bi], fmt);
             struct slide_draw_ctx sctx = {.s=s, .buf=buf, .frame=0, .w=W, .h=H};
-            ns_px[bi] = bench(slide_draw, &sctx, bes[bi], W, H, samples, target_secs);
+            ns_px[bi] = bench(slide_draw, &sctx, bes[bi], W, H, samples, target_secs,
+                              &gpu[bi]);
         }
 
         printf("%-40s", s->title);
@@ -201,6 +212,22 @@ int main(int argc, char *argv[]) {
         if (rv >= 0 && rm >= 0 && rv < rm) { anomaly = 1; }
         if (anomaly) { printf(" !"); any_anomaly = 1; }
         printf("\n");
+
+        _Bool any_gpu = 0;
+        for (int bi = 0; bi < nb; bi++) {
+            if (gpu[bi] >= 0) { any_gpu = 1; }
+        }
+        if (any_gpu) {
+            printf("%-40s", "  gpu");
+            for (int bi = 0; bi < nb; bi++) {
+                if (!(be_mask & (1 << bi))) { continue; }
+                if (gpu[bi] < 0) { printf(" %12s", ""); continue; }
+                char tmp[32];
+                sprintf(tmp, "%5.2f ns/px", gpu[bi]);
+                printf(" %12s", tmp);
+            }
+            printf("\n");
+        }
 
         free(buf);
     }
@@ -241,10 +268,12 @@ int main(int argc, char *argv[]) {
         printf("\n%-40s", "");
 
         double ns_px[4] = {-1, -1, -1, -1};
+        double gpu[4]   = {-1, -1, -1, -1};
         for (int bi = 0; bi < nb; bi++) {
             if (!(be_mask & (1 << bi)) || !progs[bi]) { continue; }
             struct prog_draw_ctx pctx = {.p=progs[bi], .bufs=abuf, .w=W, .h=H};
-            ns_px[bi] = bench(prog_draw, &pctx, bes[bi], W, H, samples, target_secs);
+            ns_px[bi] = bench(prog_draw, &pctx, bes[bi], W, H, samples, target_secs,
+                              &gpu[bi]);
         }
         for (int bi = 0; bi < nb; bi++) {
             if (!(be_mask & (1 << bi))) { continue; }
@@ -262,6 +291,24 @@ int main(int argc, char *argv[]) {
         if (rv >= 0 && rm >= 0 && rv < rm) { anomaly = 1; }
         if (anomaly) { printf(" !"); any_anomaly = 1; }
         printf("\n");
+
+        {
+            _Bool any_gpu = 0;
+            for (int bi = 0; bi < nb; bi++) {
+                if (gpu[bi] >= 0) { any_gpu = 1; }
+            }
+            if (any_gpu) {
+                printf("%-40s", "  gpu");
+                for (int bi = 0; bi < nb; bi++) {
+                    if (!(be_mask & (1 << bi))) { continue; }
+                    if (gpu[bi] < 0) { printf(" %12s", ""); continue; }
+                    char tmp[32];
+                    sprintf(tmp, "%5.2f ns/px", gpu[bi]);
+                    printf(" %12s", tmp);
+                }
+                printf("\n");
+            }
+        }
 
         for (int bi = 0; bi < nb; bi++) {
             if (progs[bi]) { progs[bi]->free(progs[bi]); }

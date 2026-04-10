@@ -221,6 +221,9 @@ struct vk_backend {
     VkCommandBuffer       batch_cmd;                       // currently-encoding cmdbuf, or NULL
     VkCommandBuffer       frame_committed[VK_N_FRAMES];    // last committed cmdbuf per frame
     VkFence               frame_fences   [VK_N_FRAMES];    // signals when frame_committed[i] is done
+    VkQueryPool           ts_pool;                         // 2 timestamps per frame
+    double                timestamp_period;                // ns per tick
+    double                gpu_time_accum;
     struct copyback      *batch_copies;
     int                   batch_n_copies, batch_copies_cap;
     struct buf_cache_entry *batch_cache;
@@ -1974,6 +1977,12 @@ static void begin_batch(struct vk_backend *be) {
         .flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
     };
     vkBeginCommandBuffer(be->batch_cmd, &bi);
+    if (be->ts_pool) {
+        uint32_t const base = (uint32_t)be->uni_pool.cur * 2;
+        vkCmdResetQueryPool(be->batch_cmd, be->ts_pool, base, 2);
+        vkCmdWriteTimestamp(be->batch_cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                            be->ts_pool, base);
+    }
     be->batch_has_dispatch = 0;
 }
 
@@ -2358,6 +2367,16 @@ static void vk_wait_frame(int frame, void *ctx) {
     struct vk_backend *v = ctx;
     if (v->frame_committed[frame]) {
         vkWaitForFences(v->device, 1, &v->frame_fences[frame], VK_TRUE, UINT64_MAX);
+        if (v->ts_pool) {
+            uint64_t ts[2];
+            VkResult r = vkGetQueryPoolResults(v->device, v->ts_pool,
+                                               (uint32_t)frame * 2, 2,
+                                               sizeof ts, ts, sizeof ts[0],
+                                               VK_QUERY_RESULT_64_BIT);
+            if (r == VK_SUCCESS) {
+                v->gpu_time_accum += (double)(ts[1] - ts[0]) * v->timestamp_period * 1e-9;
+            }
+        }
         vkResetFences(v->device, 1, &v->frame_fences[frame]);
         vkFreeCommandBuffers(v->device, v->cmd_pool, 1, &v->frame_committed[frame]);
         v->frame_committed[frame] = VK_NULL_HANDLE;
@@ -2372,6 +2391,10 @@ static void vk_wait_frame(int frame, void *ctx) {
 static void vk_submit_cmdbuf(struct vk_backend *v) {
     if (!v->batch_cmd) { return; }
 
+    if (v->ts_pool) {
+        vkCmdWriteTimestamp(v->batch_cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                            v->ts_pool, (uint32_t)v->uni_pool.cur * 2 + 1);
+    }
     vkEndCommandBuffer(v->batch_cmd);
 
     VkSubmitInfo si = {
@@ -2411,6 +2434,9 @@ static void vk_flush(struct umbra_backend *be) {
 static int vk_ring_rotations(struct umbra_backend const *be) {
     return ((struct vk_backend const*)be)->uni_pool.rotations;
 }
+static double vk_gpu_time(struct umbra_backend const *be) {
+    return ((struct vk_backend const*)be)->gpu_time_accum;
+}
 
 static void vk_free(struct umbra_backend *be) {
     vk_flush(be);
@@ -2419,6 +2445,7 @@ static void vk_free(struct umbra_backend *be) {
     for (int i = 0; i < VK_N_FRAMES; i++) {
         vkDestroyFence(v->device, v->frame_fences[i], 0);
     }
+    if (v->ts_pool) { vkDestroyQueryPool(v->device, v->ts_pool, 0); }
     vkDestroyCommandPool(v->device, v->cmd_pool, 0);
     vkDestroyDevice(v->device, 0);
     vkDestroyInstance(v->instance, 0);
@@ -2568,6 +2595,16 @@ struct umbra_backend *umbra_backend_vulkan(void) {
     size_t ssbo_align = (size_t)props.limits.minStorageBufferOffsetAlignment;
     if (ssbo_align < 16) { ssbo_align = 16; }
 
+    VkQueryPool ts_pool = VK_NULL_HANDLE;
+    if (props.limits.timestampComputeAndGraphics) {
+        VkQueryPoolCreateInfo qci = {
+            .sType      = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
+            .queryType  = VK_QUERY_TYPE_TIMESTAMP,
+            .queryCount = VK_N_FRAMES * 2,
+        };
+        vkCreateQueryPool(device, &qci, 0, &ts_pool);
+    }
+
     struct vk_backend *v = calloc(1, sizeof *v);
     v->instance            = instance;
     v->phys                = phys;
@@ -2579,6 +2616,8 @@ struct umbra_backend *umbra_backend_vulkan(void) {
     v->mem_type_host_import = mem_type_host_import;
     v->host_import_align   = host_import_align;
     v->get_host_props      = get_host_props;
+    v->ts_pool             = ts_pool;
+    v->timestamp_period    = (double)props.limits.timestampPeriod;
     v->uni_pool = (struct uniform_ring_pool){
         .n         =VK_N_FRAMES,
         .high_water=VK_RING_HIGH_WATER,
@@ -2599,6 +2638,7 @@ struct umbra_backend *umbra_backend_vulkan(void) {
     v->base.flush          = vk_flush;
     v->base.free           = vk_free;
     v->base.ring_rotations = vk_ring_rotations;
+    v->base.gpu_time       = vk_gpu_time;
     return &v->base;
 }
 

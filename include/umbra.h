@@ -20,6 +20,9 @@ struct umbra_backend {
     // uniform ring (interp, jit). Used by tests to assert that the rotation
     // path actually fired.
     int                   (*ring_rotations)(struct umbra_backend const*);
+    // Accumulated GPU execution time in seconds across all flushed batches.
+    // NULL on backends without GPU timing (interp, jit).
+    double                (*gpu_time)(struct umbra_backend const*);
 };
 struct umbra_backend* umbra_backend_interp(void);
 struct umbra_backend* umbra_backend_jit   (void);
