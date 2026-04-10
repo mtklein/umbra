@@ -264,7 +264,7 @@ static int resolve_ptr_x86(Buf *c, ptr p, int *last_ptr, int const *deref_gpr,
     return load_ptr_x86(c, p, last_ptr);
 }
 
-struct umbra_jit *umbra_jit(struct jit_backend *be,
+struct umbra_jit_program *umbra_jit(struct jit_backend *be,
                             struct umbra_basic_block const *bb) {
     int *sl = malloc((size_t)bb->insts * sizeof(int));
     for (int i = 0; i < bb->insts; i++) {
@@ -401,23 +401,25 @@ struct umbra_jit *umbra_jit(struct jit_backend *be,
                  pg      = (size_t)sysconf(_SC_PAGESIZE),
                  alloc   = (code_sz + pg - 1) & ~(pg - 1);
 
-    struct code_buf cb = acquire_code_buf(be, alloc + pg);
-    __builtin_memcpy(cb.mem, c.byte, code_sz);
-    mprotect((char *)cb.mem + alloc, pg, PROT_NONE);
-    int const ok = mprotect(cb.mem, alloc, PROT_READ | PROT_EXEC);
+    void  *buf_mem;
+    size_t buf_size;
+    acquire_code_buf(be, alloc + pg, &buf_mem, &buf_size);
+    __builtin_memcpy(buf_mem, c.byte, code_sz);
+    mprotect((char *)buf_mem + alloc, pg, PROT_NONE);
+    int const ok = mprotect(buf_mem, alloc, PROT_READ | PROT_EXEC);
     assume(ok == 0);
     free(c.byte);
 
-    struct umbra_jit *j = malloc(sizeof *j);
-    j->code = cb.mem;
-    j->code_size = cb.size;
+    struct umbra_jit_program *j = malloc(sizeof *j);
+    j->code = buf_mem;
+    j->code_size = buf_size;
     j->loop_start = loop_body_start;
     j->loop_end = loop_body_end;
     {
         union {
             void *p;
             void (*fn)(int, int, int, int, struct umbra_buf *);
-        } u = {.p = cb.mem};
+        } u = {.p = buf_mem};
         j->entry = u.fn;
     }
     return j;
@@ -511,7 +513,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             } else {
                 vmov_store(c, 1, ry, base, XI, 4, 0);
             }
-            free_chan(ra, inst->y, i);
+            ra_free_chan(ra, inst->y, i);
         } break;
 
         case op_load_16x4: {
@@ -740,10 +742,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             ra_return_reg(ra, t);
             ra_return_reg(ra, px);
             ra_return_reg(ra, scale);
-            free_chan(ra, inst->x, i);
-            free_chan(ra, inst->y, i);
-            free_chan(ra, inst->z, i);
-            free_chan(ra, inst->w, i);
+            ra_free_chan(ra, inst->x, i);
+            ra_free_chan(ra, inst->y, i);
+            ra_free_chan(ra, inst->z, i);
+            ra_free_chan(ra, inst->w, i);
         } break;
         case op_store_16x4_planar: {
             int8_t rr   = ra_ensure_chan(ra, sl, ns, inst->x.id, (int)inst->x.chan);
@@ -843,10 +845,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 }
                 last_ptr = -1;
             }
-            free_chan(ra, inst->x, i);
-            free_chan(ra, inst->y, i);
-            free_chan(ra, inst->z, i);
-            free_chan(ra, inst->w, i);
+            ra_free_chan(ra, inst->x, i);
+            ra_free_chan(ra, inst->y, i);
+            ra_free_chan(ra, inst->z, i);
+            ra_free_chan(ra, inst->w, i);
         } break;
 
         case op_load_8x4: {
@@ -895,10 +897,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
             ra_return_reg(ra, t);
             ra_return_reg(ra, px);
-            free_chan(ra, inst->x, i);
-            free_chan(ra, inst->y, i);
-            free_chan(ra, inst->z, i);
-            free_chan(ra, inst->w, i);
+            ra_free_chan(ra, inst->x, i);
+            ra_free_chan(ra, inst->y, i);
+            ra_free_chan(ra, inst->z, i);
+            ra_free_chan(ra, inst->w, i);
         } break;
 
         case op_store_16: {
@@ -922,7 +924,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             } else {
                 vmov_store(c, 0, ry, base, XI, 2, 0);
             }
-            free_chan(ra, inst->y, i);
+            ra_free_chan(ra, inst->y, i);
         } break;
 
         case op_uniform_32: {
@@ -958,7 +960,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             ptr            p = inst->ptr;
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             vmovd_to_gpr(c, RAX, rx);
-            free_chan(ra, inst->x, i);
+            ra_free_chan(ra, inst->x, i);
             load_count_x86(c, p, 2);
             vpxor(c, scalar ? 0 : 1, s.rd, s.rd, s.rd);
             cmp_rr(c, RAX, XM);
@@ -977,7 +979,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             if (scalar) {
                 vmovd_to_gpr(c, RAX, rx);
-                free_chan(ra, inst->x, i);
+                ra_free_chan(ra, inst->x, i);
                 load_count_x86(c, p, 2);
                 vpxor(c, 0, s.rd, s.rd, s.rd);
                 cmp_rr(c, RAX, XM);
@@ -1001,7 +1003,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 vpgatherdd(c, s.rd, base, rx, 4, mask);
                 ra_return_reg(ra, cnt);
                 ra_return_reg(ra, mask);
-                free_chan(ra, inst->x, i);
+                ra_free_chan(ra, inst->x, i);
             }
         } break;
 
@@ -1017,7 +1019,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 vroundps(c, hi_r, rx, 1);                  // hi_r = floor(ix)
                 vsubps(c, frac_r, rx, hi_r);                // frac_r = ix - floor
                 vcvttps2dq(c, hi_r, hi_r);                  // hi_r = int(floor)
-                free_chan(ra, inst->x, i);
+                ra_free_chan(ra, inst->x, i);
                 load_count_x86(c, p, 2);
                 // gather lo
                 vmovd_to_gpr(c, RAX, hi_r);   // vmovd eax, lo_i
@@ -1043,7 +1045,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 vroundps(c, hi_r, rx, 1);                  // hi_r = floor(ix)
                 vsubps(c, frac_r, rx, hi_r);                // frac_r = ix - floor
                 vcvttps2dq(c, int_ix, hi_r);                // int_ix = int(floor)
-                free_chan(ra, inst->x, i);
+                ra_free_chan(ra, inst->x, i);
                 load_count_x86(c, p, 2);
                 // Load broadcast(count) once into cnt, keep it alive for both gathers.
                 // Use hi_r as temp for comparison results (it's free until the hi gather).
@@ -1090,7 +1092,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             load_count_x86(c, p, 1);
             if (scalar) {
                 vmovd_to_gpr(c, RAX, rx);
-                free_chan(ra, inst->x, i);
+                ra_free_chan(ra, inst->x, i);
                 vpxor(c, 0, s.rd, s.rd, s.rd);
                 cmp_rr(c, RAX, XM);
                 int skip = jcc(c, 0x03);
@@ -1133,7 +1135,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     patch_jcc(c, skip);
                 }
                 ra_return_reg(ra, hi_idx);
-                free_chan(ra, inst->x, i);
+                ra_free_chan(ra, inst->x, i);
             }
         } break;
         case op_f32_from_f16: {
@@ -1328,7 +1330,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 #if __clang__
 __attribute__((no_sanitize("function")))
 #endif
-void umbra_jit_run(struct umbra_jit *j, int l, int t, int r, int b, struct umbra_buf buf[]) {
+void umbra_jit_run(struct umbra_jit_program *j, int l, int t, int r, int b, struct umbra_buf buf[]) {
     j->entry(l, t, r, b, buf);
 }
 
@@ -1368,7 +1370,7 @@ static _Bool x86_disasm(uint8_t const *code, size_t n, char const *spath,
     return result;
 }
 
-void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
+void umbra_dump_jit_mca(struct umbra_jit_program const *j, FILE *f) {
     if (j->loop_start >= j->loop_end) { return; }
 
     uint8_t const *code = (uint8_t const*)j->code;

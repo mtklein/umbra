@@ -296,7 +296,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
                      int *deref_rb_gpr, struct jit_ctx *jc);
 
-struct umbra_jit *umbra_jit(struct jit_backend *be,
+struct umbra_jit_program *umbra_jit(struct jit_backend *be,
                             struct umbra_basic_block const *bb) {
 
     int *sl = malloc((size_t)bb->insts * sizeof(int));
@@ -307,13 +307,15 @@ struct umbra_jit *umbra_jit(struct jit_backend *be,
 
     size_t const pg  = 16384,
                  est = (size_t)(bb->insts * 40 + 256);
-    struct code_buf cb = acquire_code_buf(be, est + pg);
+    void  *buf_mem;
+    size_t buf_size;
+    acquire_code_buf(be, est + pg, &buf_mem, &buf_size);
 
     Buf c = {
-        .word      = cb.mem,
+        .word      = buf_mem,
         .words     = 0,
-        .cap       = (int)((cb.size - pg) / 4),
-        .mmap_size = cb.size,
+        .cap       = (int)((buf_size - pg) / 4),
+        .mmap_size = buf_size,
     };
     struct jit_ctx jc = {.c = &c, .bb = bb, .pool = {0}};
     struct ra     *ra = ra_create_arm64(bb, &jc);
@@ -449,7 +451,7 @@ struct umbra_jit *umbra_jit(struct jit_backend *be,
     { int const ok = mprotect(c.word, alloc, PROT_READ | PROT_EXEC); assume(ok == 0); }
     __builtin___clear_cache(c.word, (char *)c.word + code_sz);
 
-    struct umbra_jit *j = malloc(sizeof *j);
+    struct umbra_jit_program *j = malloc(sizeof *j);
     j->code = c.word;
     j->code_size = c.mmap_size;
     j->loop_start = loop_body_start;
@@ -559,7 +561,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_gather_uniform_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
-            free_chan(ra, inst->x, i);
+            ra_free_chan(ra, inst->x, i);
             ptr p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_count(c, p, 2);
@@ -577,7 +579,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_gather_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
-            free_chan(ra, inst->x, i);
+            ra_free_chan(ra, inst->x, i);
             ptr p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_count(c, p, 2);
@@ -620,7 +622,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             if (scalar) {
                 put(c, FRINTM_4s(lo(hi_r), lo(rx)));
                 put(c, FSUB_4s(lo(frac), lo(rx), lo(hi_r)));
-                free_chan(ra, inst->x, i);
+                ra_free_chan(ra, inst->x, i);
                 put(c, FCVTZS_4s(lo(hi_r), lo(hi_r)));
                 put(c, UMOV_ws(XT, lo(hi_r)));
                 put(c, MOVI_4s(lo(s.rd), 0, 0));
@@ -639,7 +641,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, FSUB_4s(lo(frac), lo(rx), lo(hi_r)));
                 put(c, FRINTM_4s(hi(hi_r), hi(rx)));
                 put(c, FSUB_4s(hi(frac), hi(rx), hi(hi_r)));
-                free_chan(ra, inst->x, i);
+                ra_free_chan(ra, inst->x, i);
                 int8_t int_ix = ra_alloc(ra, sl, ns);
                 put(c, FCVTZS_4s(lo(int_ix), lo(hi_r)));
                 put(c, FCVTZS_4s(hi(int_ix), hi(hi_r)));
@@ -690,7 +692,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_gather_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
-            free_chan(ra, inst->x, i);
+            ra_free_chan(ra, inst->x, i);
             ptr p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
             load_count(c, p, 1);
@@ -740,7 +742,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, ADD_xr(XT, XP, XT));
                 put(c, STP_qi(lo(ry), hi(ry), XT, 0));
             }
-            free_chan(ra, inst->y, i);
+            ra_free_chan(ra, inst->y, i);
         } break;
 
         case op_load_16x4: {
@@ -856,10 +858,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, ADD_xi(XT, XT, 32));
                 put(c, ST4_4h(0, XT));
             }
-            free_chan(ra, inst->x, i);
-            free_chan(ra, inst->y, i);
-            free_chan(ra, inst->z, i);
-            free_chan(ra, inst->w, i);
+            ra_free_chan(ra, inst->x, i);
+            ra_free_chan(ra, inst->y, i);
+            ra_free_chan(ra, inst->z, i);
+            ra_free_chan(ra, inst->w, i);
         } break;
         case op_store_16x4_planar: {
             int8_t rr   = ra_ensure_chan(ra, sl, ns, inst->x.id, (int)inst->x.chan);
@@ -898,10 +900,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, STR_di(hi(ra_v), XM, 1));
             }
             last_ptr = -1;
-            free_chan(ra, inst->x, i);
-            free_chan(ra, inst->y, i);
-            free_chan(ra, inst->z, i);
-            free_chan(ra, inst->w, i);
+            ra_free_chan(ra, inst->x, i);
+            ra_free_chan(ra, inst->y, i);
+            ra_free_chan(ra, inst->z, i);
+            ra_free_chan(ra, inst->w, i);
         } break;
 
         case op_load_8x4: {
@@ -975,10 +977,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, ADD_xr(XT, XP, XT));
                 put(c, ST4_8b(0, XT));
             }
-            free_chan(ra, inst->x, i);
-            free_chan(ra, inst->y, i);
-            free_chan(ra, inst->z, i);
-            free_chan(ra, inst->w, i);
+            ra_free_chan(ra, inst->x, i);
+            ra_free_chan(ra, inst->y, i);
+            ra_free_chan(ra, inst->z, i);
+            ra_free_chan(ra, inst->w, i);
         } break;
 
         case op_store_16: {
@@ -993,7 +995,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, STR_di(lo(ry), XT, 0));
                 put(c, STR_di(hi(ry), XT, 1));
             }
-            free_chan(ra, inst->y, i);
+            ra_free_chan(ra, inst->y, i);
         } break;
 
         case op_f32_from_f16: {
@@ -1112,7 +1114,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_le_s32_imm: {
             struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
             int8_t ir = ra_ensure(ra, sl, ns, inst->y.id);
-            free_chan(ra, inst->y, i);
+            ra_free_chan(ra, inst->y, i);
             enum op o = inst->op;
             uint32_t w =
                 o == op_add_f32_imm ? FADD_4s(lo(s.rd), lo(s.rx), lo(ir))  :
@@ -1165,10 +1167,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 #if __clang__
 __attribute__((no_sanitize("function")))
 #endif
-void umbra_jit_run(struct umbra_jit *j, int l, int t, int r, int b, struct umbra_buf buf[]) {
+void umbra_jit_run(struct umbra_jit_program *j, int l, int t, int r, int b, struct umbra_buf buf[]) {
     j->entry(l, t, r, b, buf);
 }
-void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
+void umbra_dump_jit_mca(struct umbra_jit_program const *j, FILE *f) {
     if (j->loop_start >= j->loop_end) { return; }
 
     uint32_t const *words = (uint32_t const*)j->code;

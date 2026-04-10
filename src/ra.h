@@ -23,6 +23,7 @@ void       ra_destroy(struct ra *ra);
 void       ra_reset_pool(struct ra *ra);
 
 // Core operations.
+void   ra_free_chan(struct ra *ra, val operand, int i);
 void   ra_free_reg(struct ra *ra, int val);
 int8_t ra_alloc(struct ra *ra, int *sl, int *ns);
 int8_t ra_ensure(struct ra *ra, int *sl, int *ns, int val);

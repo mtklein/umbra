@@ -146,6 +146,18 @@ void ra_end_loop(struct ra *ra, int *sl) {
     }
 }
 
+void ra_free_chan(struct ra *ra, val operand, int i) {
+    int id = operand.id, ch = (int)operand.chan;
+    if (ch) {
+        if (ra_chan_last_use(ra, id, ch) <= i) {
+            int8_t r = ra_chan_reg(ra, id, ch);
+            if (r >= 0) { ra_return_reg(ra, r); ra_set_chan_reg(ra, id, ch, -1); }
+        }
+    } else {
+        if (ra_last_use(ra, id) <= i) { ra_free_reg(ra, id); }
+    }
+}
+
 void ra_free_reg(struct ra *ra, int val) {
     int8_t const r = ra->slot[val].reg;
     if (r >= 0) {
