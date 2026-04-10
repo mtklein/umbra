@@ -21,6 +21,42 @@ static void free_chan(struct ra *ra, val_ operand, int i) {
     }
 }
 
+#include <stdlib.h>
+#include <sys/mman.h>
+
+struct code_buf { void *mem; size_t size; };
+
+struct jit_backend {
+    struct umbra_backend base;
+    struct code_buf     *cache;
+    int                  count, cap;
+};
+
+static struct code_buf acquire_code_buf(struct jit_backend *be, size_t min_size) {
+    for (int i = be->count; i-- > 0;) {
+        if (be->cache[i].size >= min_size) {
+            struct code_buf buf = be->cache[i];
+            be->cache[i] = be->cache[--be->count];
+            mprotect(buf.mem, buf.size, PROT_READ | PROT_WRITE);
+            return buf;
+        }
+    }
+    size_t const pg = 16384;
+    size_t const alloc = (min_size + pg - 1) & ~(pg - 1);
+    void *mem = mmap(NULL, alloc, PROT_READ | PROT_WRITE,
+                     MAP_PRIVATE | MAP_ANON, -1, 0);
+    assume(mem != MAP_FAILED);
+    return (struct code_buf){.mem = mem, .size = alloc};
+}
+
+static void release_code_buf(struct jit_backend *be, void *mem, size_t size) {
+    if (be->count == be->cap) {
+        be->cap = be->cap ? 2 * be->cap : 4;
+        be->cache = realloc(be->cache, (size_t)be->cap * sizeof *be->cache);
+    }
+    be->cache[be->count++] = (struct code_buf){.mem = mem, .size = size};
+}
+
 #if defined(__aarch64__)
 #include <stddef.h>
 #include <stdint.h>
@@ -323,7 +359,8 @@ struct umbra_jit {
     int loop_start, loop_end;
 };
 
-static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
+static struct umbra_jit *umbra_jit(struct jit_backend *be,
+                                   struct umbra_basic_block const *bb) {
 
     int *sl = malloc((size_t)bb->insts * sizeof(int));
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
@@ -333,17 +370,13 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
 
     size_t const pg  = 16384,
                  est = (size_t)(bb->insts * 40 + 256);
-    size_t       mmap_size = (est + pg - 1) & ~(pg - 1);
-    void        *mem = mmap(NULL, mmap_size + pg, PROT_READ | PROT_WRITE,
-                            MAP_PRIVATE | MAP_ANON, -1, 0);
-    assume(mem != MAP_FAILED);
-    mprotect((char *)mem + mmap_size, pg, PROT_NONE);
+    struct code_buf cb = acquire_code_buf(be, est + pg);
 
     Buf c = {
-        .word      = mem,
+        .word      = cb.mem,
         .words     = 0,
-        .cap       = (int)(mmap_size / 4),
-        .mmap_size = mmap_size + pg,
+        .cap       = (int)((cb.size - pg) / 4),
+        .mmap_size = cb.size,
     };
     struct jit_ctx jc = {.c = &c, .bb = bb, .pool = {0}};
     struct ra     *ra = ra_create_arm64(bb, &jc);
@@ -1198,11 +1231,6 @@ __attribute__((no_sanitize("function")))
 static void umbra_jit_run(struct umbra_jit *j, int l, int t, int r, int b, struct umbra_buf buf[]) {
     j->entry(l, t, r, b, buf);
 }
-static void umbra_jit_free(struct umbra_jit *j) {
-    munmap(j->code, j->code_size);
-    free(j);
-}
-
 static void umbra_dump_jit_mca(struct umbra_jit const *j, FILE *f) {
     if (j->loop_start >= j->loop_end) { return; }
 
@@ -1287,10 +1315,15 @@ static void run_jit(struct umbra_program *prog, int l, int t, int r, int b, stru
     umbra_jit_run((struct umbra_jit*)prog, l, t, r, b, buf);
 }
 static void dump_jit(struct umbra_program const *prog, FILE *f) { umbra_dump_jit_mca((struct umbra_jit const*)prog, f); }
-static void free_jit(struct umbra_program *prog) { umbra_jit_free((struct umbra_jit*)prog); }
+static void free_jit(struct umbra_program *prog) {
+    struct umbra_jit    *j  = (struct umbra_jit*)prog;
+    struct jit_backend  *be = (struct jit_backend*)prog->backend;
+    release_code_buf(be, j->code, j->code_size);
+    free(j);
+}
 static struct umbra_program *compile_jit(struct umbra_backend           *be,
                                          struct umbra_basic_block const *bb) {
-    struct umbra_jit *j = umbra_jit(bb);
+    struct umbra_jit *j = umbra_jit((struct jit_backend*)be, bb);
     j->base = (struct umbra_program){
         .queue      = run_jit,
         .dump       = dump_jit,
@@ -1301,15 +1334,20 @@ static struct umbra_program *compile_jit(struct umbra_backend           *be,
     return &j->base;
 }
 static void flush_be_noop(struct umbra_backend *be) { (void)be; }
-static void free_be_jit(struct umbra_backend *be) { free(be); }
+static void free_be_jit(struct umbra_backend *be) {
+    struct jit_backend *jbe = (struct jit_backend*)be;
+    for (int i = 0; i < jbe->count; i++) { munmap(jbe->cache[i].mem, jbe->cache[i].size); }
+    free(jbe->cache);
+    free(jbe);
+}
 struct umbra_backend *umbra_backend_jit(void) {
-    struct umbra_backend *be = malloc(sizeof *be);
-    *be = (struct umbra_backend){
-        .compile    = compile_jit,
-        .flush      = flush_be_noop,
+    struct jit_backend *be = calloc(1, sizeof *be);
+    be->base = (struct umbra_backend){
+        .compile = compile_jit,
+        .flush   = flush_be_noop,
         .free    = free_be_jit,
     };
-    return be;
+    return &be->base;
 }
 
 #elif defined(__AVX2__)
@@ -1579,7 +1617,8 @@ struct umbra_jit {
     int loop_start, loop_end;
 };
 
-static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
+static struct umbra_jit *umbra_jit(struct jit_backend *be,
+                                   struct umbra_basic_block const *bb) {
     int *sl = malloc((size_t)bb->insts * sizeof(int));
     for (int i = 0; i < bb->insts; i++) {
         sl[i] = -1;
@@ -1715,25 +1754,23 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
                  pg      = (size_t)sysconf(_SC_PAGESIZE),
                  alloc   = (code_sz + pg - 1) & ~(pg - 1);
 
-    void *mem = mmap(NULL, alloc + pg, PROT_READ | PROT_WRITE,
-                     MAP_PRIVATE | MAP_ANON, -1, 0);
-    assume(mem != MAP_FAILED);
-    mprotect((char *)mem + alloc, pg, PROT_NONE);
-    __builtin_memcpy(mem, c.byte, code_sz);
-    int const ok = mprotect(mem, alloc, PROT_READ | PROT_EXEC);
+    struct code_buf cb = acquire_code_buf(be, alloc + pg);
+    __builtin_memcpy(cb.mem, c.byte, code_sz);
+    mprotect((char *)cb.mem + alloc, pg, PROT_NONE);
+    int const ok = mprotect(cb.mem, alloc, PROT_READ | PROT_EXEC);
     assume(ok == 0);
     free(c.byte);
 
     struct umbra_jit *j = malloc(sizeof *j);
-    j->code = mem;
-    j->code_size = alloc + pg;
+    j->code = cb.mem;
+    j->code_size = cb.size;
     j->loop_start = loop_body_start;
     j->loop_end = loop_body_end;
     {
         union {
             void *p;
             void (*fn)(int, int, int, int, struct umbra_buf *);
-        } u = {.p = mem};
+        } u = {.p = cb.mem};
         j->entry = u.fn;
     }
     return j;
@@ -2648,11 +2685,6 @@ static void umbra_jit_run(struct umbra_jit *j, int l, int t, int r, int b, struc
     j->entry(l, t, r, b, buf);
 }
 
-static void umbra_jit_free(struct umbra_jit *j) {
-    munmap(j->code, j->code_size);
-    free(j);
-}
-
 static _Bool x86_disasm(uint8_t const *code, size_t n, char const *spath,
                         char const *opath, FILE *f) {
     _Bool result = 0;
@@ -2780,10 +2812,15 @@ static void run_jit(struct umbra_program *prog, int l, int t, int r, int b, stru
     umbra_jit_run((struct umbra_jit*)prog, l, t, r, b, buf);
 }
 static void dump_jit(struct umbra_program const *prog, FILE *f) { umbra_dump_jit_mca((struct umbra_jit const*)prog, f); }
-static void free_jit(struct umbra_program *prog) { umbra_jit_free((struct umbra_jit*)prog); }
+static void free_jit(struct umbra_program *prog) {
+    struct umbra_jit    *j  = (struct umbra_jit*)prog;
+    struct jit_backend  *be = (struct jit_backend*)prog->backend;
+    release_code_buf(be, j->code, j->code_size);
+    free(j);
+}
 static struct umbra_program *compile_jit(struct umbra_backend           *be,
                                          struct umbra_basic_block const *bb) {
-    struct umbra_jit *j = umbra_jit(bb);
+    struct umbra_jit *j = umbra_jit((struct jit_backend*)be, bb);
     j->base = (struct umbra_program){
         .queue      = run_jit,
         .dump       = dump_jit,
@@ -2794,15 +2831,20 @@ static struct umbra_program *compile_jit(struct umbra_backend           *be,
     return &j->base;
 }
 static void flush_be_noop(struct umbra_backend *be) { (void)be; }
-static void free_be_jit(struct umbra_backend *be) { free(be); }
+static void free_be_jit(struct umbra_backend *be) {
+    struct jit_backend *jbe = (struct jit_backend*)be;
+    for (int i = 0; i < jbe->count; i++) { munmap(jbe->cache[i].mem, jbe->cache[i].size); }
+    free(jbe->cache);
+    free(jbe);
+}
 struct umbra_backend *umbra_backend_jit(void) {
-    struct umbra_backend *be = malloc(sizeof *be);
-    *be = (struct umbra_backend){
-        .compile    = compile_jit,
-        .flush      = flush_be_noop,
+    struct jit_backend *be = calloc(1, sizeof *be);
+    be->base = (struct umbra_backend){
+        .compile = compile_jit,
+        .flush   = flush_be_noop,
         .free    = free_be_jit,
     };
-    return be;
+    return &be->base;
 }
 
 #endif // __aarch64__ || __AVX2__
