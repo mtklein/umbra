@@ -143,8 +143,11 @@ static _Bool wgpu_had_error;
 
 static void error_cb(WGPUDevice const *dev, WGPUErrorType type, WGPUStringView msg,
                      void *u1, void *u2) {
-    (void)dev; (void)type; (void)msg; (void)u1; (void)u2;
-    wgpu_had_error = 1;
+    (void)dev; (void)u1; (void)u2;
+    if (type != WGPUErrorType_NoError) {
+        wgpu_had_error = 1;
+        dprintf(2, "wgpu error: %.*s\n", (int)msg.length, msg.data);
+    }
 }
 
 static void begin_batch(struct wgpu_backend *be) {
@@ -326,15 +329,11 @@ static struct umbra_program *wgpu_compile(struct umbra_backend *base,
         .codeSize = (uint32_t)spirv_words,
         .code     = spirv,
     };
-    wgpu_had_error = 0;
     WGPUShaderModule shader = wgpuDeviceCreateShaderModule(be->device,
         &(WGPUShaderModuleDescriptor){
             .nextInChain = &spirv_src.chain,
         });
-    if (!shader || wgpu_had_error) {
-        if (shader) { wgpuShaderModuleRelease(shader); }
-        free(spirv); free(deref); return 0;
-    }
+    if (!shader) { free(spirv); free(deref); return 0; }
 
     // Bind group layout: one storage buffer per slot.
     int n_desc = total_bufs;
@@ -357,6 +356,7 @@ static struct umbra_program *wgpu_compile(struct umbra_backend *base,
     free(entries);
 
     // Pipeline layout with immediates for push constants.
+    wgpu_had_error = 0;
     WGPUPipelineLayoutExtras extras = {
         .chain = {.sType = (WGPUSType)WGPUSType_PipelineLayoutExtras},
         .immediateDataSize = (uint32_t)(push_words * (int)sizeof(uint32_t)),
@@ -368,15 +368,15 @@ static struct umbra_program *wgpu_compile(struct umbra_backend *base,
             .bindGroupLayouts      = &bg_layout,
         });
 
-    wgpu_had_error = 0;
-    WGPUComputePipeline pipeline = wgpuDeviceCreateComputePipeline(be->device,
-        &(WGPUComputePipelineDescriptor){
-            .layout  = pipe_layout,
-            .compute = {
-                .module     = shader,
-                .entryPoint = {.data = "main", .length = 4},
-            },
-        });
+    WGPUComputePipeline pipeline = wgpu_had_error ? NULL
+        : wgpuDeviceCreateComputePipeline(be->device,
+            &(WGPUComputePipelineDescriptor){
+                .layout  = pipe_layout,
+                .compute = {
+                    .module     = shader,
+                    .entryPoint = {.data = "main", .length = 4},
+                },
+            });
     if (!pipeline || wgpu_had_error) {
         if (pipeline) { wgpuComputePipelineRelease(pipeline); }
         wgpuPipelineLayoutRelease(pipe_layout);
@@ -652,6 +652,7 @@ struct umbra_backend *umbra_backend_wgpu(void) {
     };
     WGPULimits limits = WGPU_LIMITS_INIT;
     limits.maxImmediateSize = 256;
+
     WGPUDevice dev = NULL;
     WGPUDeviceDescriptor dev_desc    = WGPU_DEVICE_DESCRIPTOR_INIT;
     dev_desc.requiredFeatureCount     = sizeof features / sizeof features[0];

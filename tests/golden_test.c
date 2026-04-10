@@ -105,8 +105,9 @@ static void test_slide_golden(int slide_idx) {
 
     for (int bi = 1; bi < NUM_BACKENDS; bi++) {
         if (!bes[bi]) { continue; }
-        // wgpu (bi==4): some shaders compile but others fail, and slides
-        // crash on NULL programs.  Skip until all shaders pass naga.
+        // wgpu (bi==4): wgpu-native's immediate data limit validation is
+        // broken (reports 0 despite device having UINT32_MAX), so all
+        // pipelines fail.  Skip until resolved.
         if (bi == 4) { continue; }
         __builtin_memset(pbuf_tst, 0, pixbuf_sz);
         render_slide(slide_idx, bes[bi], pbuf_tst);
