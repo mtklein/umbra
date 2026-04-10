@@ -3849,19 +3849,48 @@ TEST(test_jit_code_buffer_overflow) {
     umbra_basic_block_free(bb);
 }
 
-// Cover const-fold branches in op_eval that need specific operand orderings.
+// Cover const-fold true-branches in op_eval comparisons and min.
 TEST(test_const_fold_coverage) {
     struct umbra_builder *b = umbra_builder();
-    // min(1.0, 2.0) const-folds with x < y true.
-    umbra_val32 r = umbra_min_f32(b, umbra_imm_f32(b, 1.f), umbra_imm_f32(b, 2.f));
-    umbra_store_32(b, (umbra_ptr32){0}, r);
+    umbra_val32 one = umbra_imm_f32(b, 1.f),
+                two = umbra_imm_f32(b, 2.f);
+    umbra_val32 i1  = umbra_imm_i32(b, 1),
+                i2  = umbra_imm_i32(b, 2);
+
+    int p = 0;
+    // min(1,2) → 1  (x < y true)
+    umbra_store_32(b, (umbra_ptr32){.ix=p++}, umbra_min_f32(b, one, two));
+    // eq_f32(1,1) → -1
+    umbra_store_32(b, (umbra_ptr32){.ix=p++}, umbra_eq_f32(b, one, one));
+    // lt_f32(1,2) → -1
+    umbra_store_32(b, (umbra_ptr32){.ix=p++}, umbra_lt_f32(b, one, two));
+    // le_f32(1,1) → -1
+    umbra_store_32(b, (umbra_ptr32){.ix=p++}, umbra_le_f32(b, one, one));
+    // eq_i32(1,1) → -1
+    umbra_store_32(b, (umbra_ptr32){.ix=p++}, umbra_eq_i32(b, i1, i1));
+    // lt_s32(1,2) → -1
+    umbra_store_32(b, (umbra_ptr32){.ix=p++}, umbra_lt_s32(b, i1, i2));
+    // le_s32(1,1) → -1
+    umbra_store_32(b, (umbra_ptr32){.ix=p++}, umbra_le_s32(b, i1, i1));
+    // lt_u32(1,2) → -1
+    umbra_store_32(b, (umbra_ptr32){.ix=p++}, umbra_lt_u32(b, i1, i2));
+    // le_u32(1,1) → -1
+    umbra_store_32(b, (umbra_ptr32){.ix=p++}, umbra_le_u32(b, i1, i1));
 
     struct test_backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-        float out[8] = {0};
-        if (run(&B, bi, 8, 1,
-                (struct umbra_buf[]){{.ptr=out, .sz=sizeof out}})) {
-            out[0] == 1.f here;
+        int32_t out[9][8];
+        __builtin_memset(out, 0, sizeof out);
+        struct umbra_buf bufs[9];
+        for (int i = 0; i < 9; i++) {
+            bufs[i] = (struct umbra_buf){.ptr = out[i], .sz = sizeof out[i]};
+        }
+        if (run(&B, bi, 8, 1, bufs)) {
+            union { float f; int32_t i; } v;
+            v.i = out[0][0]; v.f == 1.f here;  // min
+            for (int i = 1; i < 9; i++) {
+                out[i][0] == -1 here;           // all comparisons true → -1
+            }
         }
     }
     cleanup(&B);
