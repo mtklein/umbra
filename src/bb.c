@@ -61,7 +61,6 @@ _Bool is_fused_imm(enum op op) {
 #undef ZERO
 
 static _Bool is_pow2(int x) { return __builtin_popcount((unsigned)x) == 1; }
-static _Bool is_pow2_or_zero(int x) { return __builtin_popcount((unsigned)x) <= 1; }
 
 static uint32_t mul_overflow(uint32_t x, uint32_t y) {
     __builtin_mul_overflow(x, y, &x);
@@ -119,9 +118,9 @@ static val push_(builder *b, struct bb_inst inst) {
         return (val){.id = (unsigned)ctx.hit};
     }
 
-    if (is_pow2_or_zero(b->insts)) {
-        int const inst_cap = b->insts ? 2 * b->insts : 1;
-        b->inst = realloc(b->inst, (size_t)inst_cap * sizeof *b->inst);
+    if (b->insts == b->inst_cap) {
+        b->inst_cap = b->inst_cap ? 2 * b->inst_cap : 32;
+        b->inst = realloc(b->inst, (size_t)b->inst_cap * sizeof *b->inst);
     }
 
     int const id = b->insts++;
@@ -139,6 +138,9 @@ static val push_(builder *b, struct bb_inst inst) {
 
 builder* umbra_builder(void) {
     builder *b = calloc(1, sizeof *b);
+    b->inst_cap = 128;
+    b->inst = malloc((size_t)b->inst_cap * sizeof *b->inst);
+    b->ht = (struct hash){.slots = 128, .data = calloc(128, sizeof(unsigned) + sizeof(int))};
     // Simplifies liveness analysis to know id 0 is imm=0.
     push(b, op_imm_32, .imm = 0);
     return b;

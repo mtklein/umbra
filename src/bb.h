@@ -97,7 +97,7 @@ int   ptr_ix(int ptr);
 
 struct umbra_builder {
     struct bb_inst *inst;
-    int             insts, pad_;
+    int             insts, inst_cap;
     struct hash     ht;
 };
 
