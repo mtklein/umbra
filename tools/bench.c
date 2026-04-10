@@ -174,7 +174,7 @@ int main(int argc, char *argv[]) {
         } else {
             sprintf(hdr, "%s", be_names[bi]);
         }
-        printf("| %-13s", hdr);
+        printf("  %-13s", hdr);
     }
     printf("\n");
 
@@ -257,19 +257,6 @@ int main(int argc, char *argv[]) {
             {.ptr=wind, .sz=(size_t)(W * H * 4)},
         };
 
-        printf("\n%-40s", "slug accumulator (1 curve)");
-        for (int bi = 0; bi < nb; bi++) {
-            if (!(be_mask & (1 << bi))) { continue; }
-            char hdr[32];
-            if (bes[bi] && bes[bi]->gpu_time) {
-                sprintf(hdr, "%s cpu%%", be_names[bi]);
-            } else {
-                sprintf(hdr, "%s", be_names[bi]);
-            }
-            printf("| %-13s", hdr);
-        }
-        printf("\n%-40s", "");
-
         double ns_px[4] = {-1, -1, -1, -1};
         double gpu[4]   = {-1, -1, -1, -1};
         for (int bi = 0; bi < nb; bi++) {
@@ -278,6 +265,8 @@ int main(int argc, char *argv[]) {
             ns_px[bi] = bench(prog_draw, &pctx, bes[bi], W, H, samples, target_secs,
                               &gpu[bi]);
         }
+
+        printf("%-40s", "Slug Accumulator (1 curve)");
         for (int bi = 0; bi < nb; bi++) {
             if (!(be_mask & (1 << bi))) { continue; }
             if (ns_px[bi] < 0) { printf("  %-13s", "-"); continue; }
@@ -313,7 +302,7 @@ int main(int argc, char *argv[]) {
     if (!match || strstr("compile", match)) {
         printf("\n%-40s", "compile (µs)");
         for (int bi = 0; bi < nb; bi++) {
-            if (be_mask & (1 << bi)) { printf("| %-13s", be_names[bi]); }
+            if (be_mask & (1 << bi)) { printf("   %-12s", be_names[bi]); }
         }
         printf("\n");
 
