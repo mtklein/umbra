@@ -29,10 +29,7 @@ char const* op_name(enum op op) {
         IMM_OPS(OP_NAME)
 #undef OP_NAME
     };
-    if ((unsigned)op < sizeof names / sizeof *names && names[op]) {
-        return names[op];
-    }
-    __builtin_unreachable();
+    return names[op];
 }
 
 int op_eval(enum op op, int xb, int yb, int zb, int wb) {
@@ -77,5 +74,5 @@ int op_eval(enum op op, int xb, int yb, int zb, int wb) {
     case op_lt_u32: r.i = x.u <  y.u ? -1 : 0; return r.i;
     case op_le_u32: r.i = x.u <= y.u ? -1 : 0; return r.i;
     }
-    assume(0);
+    __builtin_unreachable();
 }
