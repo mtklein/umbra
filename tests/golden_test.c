@@ -105,7 +105,8 @@ static void test_slide_golden(int slide_idx) {
 
     for (int bi = 1; bi < NUM_BACKENDS; bi++) {
         if (!bes[bi]) { continue; }
-        // Skip wgpu for golden slides until naga handles all our SPIR-V.
+        // wgpu (bi==4): some shaders compile but others fail, and slides
+        // crash on NULL programs.  Skip until all shaders pass naga.
         if (bi == 4) { continue; }
         __builtin_memset(pbuf_tst, 0, pixbuf_sz);
         render_slide(slide_idx, bes[bi], pbuf_tst);

@@ -653,15 +653,12 @@ struct umbra_backend *umbra_backend_wgpu(void) {
     WGPULimits limits = WGPU_LIMITS_INIT;
     limits.maxImmediateSize = 256;
     WGPUDevice dev = NULL;
-    wgpuAdapterRequestDevice(adapter,
-        &(WGPUDeviceDescriptor){
-            .requiredFeatureCount = sizeof features / sizeof features[0],
-            .requiredFeatures     = features,
-            .requiredLimits       = &limits,
-            .uncapturedErrorCallbackInfo = {
-                .callback = (WGPUUncapturedErrorCallback)error_cb,
-            },
-        },
+    WGPUDeviceDescriptor dev_desc    = WGPU_DEVICE_DESCRIPTOR_INIT;
+    dev_desc.requiredFeatureCount     = sizeof features / sizeof features[0];
+    dev_desc.requiredFeatures         = features;
+    dev_desc.requiredLimits           = &limits;
+    dev_desc.uncapturedErrorCallbackInfo.callback = (WGPUUncapturedErrorCallback)error_cb;
+    wgpuAdapterRequestDevice(adapter, &dev_desc,
         (WGPURequestDeviceCallbackInfo){
             .mode      = WGPUCallbackMode_AllowSpontaneous,
             .callback  = device_request_cb,

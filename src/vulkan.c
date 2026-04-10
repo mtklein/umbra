@@ -934,10 +934,10 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
     spv_word(&B.types, B.t_struct_rta_u32);
     spv_word(&B.types, B.t_rta_u32);
 
-    // Decorate struct as BufferBlock (SPIR-V 1.0 way for SSBO).
+    // Decorate struct as Block with StorageBuffer storage class (SPIR-V 1.3).
     spv_op(&B.decor, SpvOpDecorate, 3);
     spv_word(&B.decor, B.t_struct_rta_u32);
-    spv_word(&B.decor, SpvDecorationBufferBlock);
+    spv_word(&B.decor, SpvDecorationBlock);
 
     // MemberDecorate offset 0.
     spv_op(&B.decor, SpvOpMemberDecorate, 5);
@@ -950,14 +950,14 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
     B.t_ptr_ssbo_struct = spv_id(&B);
     spv_op(&B.types, SpvOpTypePointer, 4);
     spv_word(&B.types, B.t_ptr_ssbo_struct);
-    spv_word(&B.types, SpvStorageClassUniform); // BufferBlock uses Uniform SC in SPIR-V 1.0
+    spv_word(&B.types, SpvStorageClassStorageBuffer);
     spv_word(&B.types, B.t_struct_rta_u32);
 
     // Pointer to u32 in SSBO.
     B.t_ptr_ssbo_u32 = spv_id(&B);
     spv_op(&B.types, SpvOpTypePointer, 4);
     spv_word(&B.types, B.t_ptr_ssbo_u32);
-    spv_word(&B.types, SpvStorageClassUniform);
+    spv_word(&B.types, SpvStorageClassStorageBuffer);
     spv_word(&B.types, B.t_u32);
 
     // 16-bit storage types (only when needed).
@@ -979,7 +979,7 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
 
         spv_op(&B.decor, SpvOpDecorate, 3);
         spv_word(&B.decor, B.t_struct_rta_u16);
-        spv_word(&B.decor, SpvDecorationBufferBlock);
+        spv_word(&B.decor, SpvDecorationBlock);
 
         spv_op(&B.decor, SpvOpMemberDecorate, 5);
         spv_word(&B.decor, B.t_struct_rta_u16);
@@ -990,13 +990,13 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
         B.t_ptr_ssbo_struct_u16 = spv_id(&B);
         spv_op(&B.types, SpvOpTypePointer, 4);
         spv_word(&B.types, B.t_ptr_ssbo_struct_u16);
-        spv_word(&B.types, SpvStorageClassUniform);
+        spv_word(&B.types, SpvStorageClassStorageBuffer);
         spv_word(&B.types, B.t_struct_rta_u16);
 
         B.t_ptr_ssbo_u16 = spv_id(&B);
         spv_op(&B.types, SpvOpTypePointer, 4);
         spv_word(&B.types, B.t_ptr_ssbo_u16);
-        spv_word(&B.types, SpvStorageClassUniform);
+        spv_word(&B.types, SpvStorageClassStorageBuffer);
         spv_word(&B.types, B.t_u16);
     }
 
@@ -1089,7 +1089,7 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
         spv_op(&B.globals, SpvOpVariable, 4);
         spv_word(&B.globals, ptr_type);
         spv_word(&B.globals, B.v_ssbo[i]);
-        spv_word(&B.globals, SpvStorageClassUniform);
+        spv_word(&B.globals, SpvStorageClassStorageBuffer);
 
         spv_op(&B.decor, SpvOpDecorate, 4);
         spv_word(&B.decor, B.v_ssbo[i]);
