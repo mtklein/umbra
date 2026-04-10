@@ -296,8 +296,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
                      int *deref_rb_gpr, struct jit_ctx *jc);
 
-struct umbra_jit_program *umbra_jit(struct jit_backend *be,
-                            struct umbra_basic_block const *bb) {
+struct umbra_jit_program *umbra_jit_program(struct jit_backend *be,
+                                           struct umbra_basic_block const *bb) {
 
     int *sl = malloc((size_t)bb->insts * sizeof(int));
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
@@ -309,7 +309,7 @@ struct umbra_jit_program *umbra_jit(struct jit_backend *be,
                  est = (size_t)(bb->insts * 40 + 256);
     void  *buf_mem;
     size_t buf_size;
-    acquire_code_buf(be, est + pg, &buf_mem, &buf_size);
+    acquire_code_buf(be, &buf_mem, &buf_size, est + pg);
 
     Buf c = {
         .word      = buf_mem,
@@ -1167,10 +1167,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 #if __clang__
 __attribute__((no_sanitize("function")))
 #endif
-void umbra_jit_run(struct umbra_jit_program *j, int l, int t, int r, int b, struct umbra_buf buf[]) {
+void umbra_jit_program_run(struct umbra_jit_program *j, int l, int t, int r, int b, struct umbra_buf buf[]) {
     j->entry(l, t, r, b, buf);
 }
-void umbra_dump_jit_mca(struct umbra_jit_program const *j, FILE *f) {
+void umbra_jit_program_dump(struct umbra_jit_program const *j, FILE *f) {
     if (j->loop_start >= j->loop_end) { return; }
 
     uint32_t const *words = (uint32_t const*)j->code;
