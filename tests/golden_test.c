@@ -404,4 +404,70 @@ TEST(test_vulkan_long_batch_no_oom) {
     run_long_batch_no_oom(umbra_backend_vulkan());
 }
 
+// Regression test for tiled writable buffer sync. Simulates the slug slide's
+// tiling pattern: a writable buffer is cleared per-tile on the host between
+// queue() calls within a single flush. Without proper sync, GPU backends can
+// see stale data from a prior frame in the second tile's rows.
+static void run_tiled_writable_sync(struct umbra_backend *be) {
+    if (!be) { return; }
+
+    // Build: load f32 from buf[0], add 1.0, store back.
+    struct umbra_builder *b = umbra_builder();
+    umbra_val32 v   = umbra_load_32(b, (umbra_ptr32){.ix=0});
+    umbra_val32 one = umbra_imm_f32(b, 1.0f);
+    umbra_store_32(b, (umbra_ptr32){.ix=0}, umbra_add_f32(b, v, one));
+    struct umbra_basic_block *bb = umbra_basic_block(b);
+    umbra_builder_free(b);
+
+    struct umbra_program *p = be->compile(be, bb);
+    umbra_basic_block_free(bb);
+    p != 0 here;
+
+    // Page-aligned buffer exercises Metal/Vulkan zero-copy host import.
+    enum { BW = 128, BH = 128 };
+    size_t buf_sz  = BW * BH * sizeof(float),
+           half_sz = buf_sz / 2;
+    float *data = NULL;
+    posix_memalign((void **)&data, (size_t)getpagesize(), buf_sz);
+    data != NULL here;
+
+    struct umbra_buf bufs[] = {
+        {.ptr=data, .sz=buf_sz, .row_bytes=BW * sizeof(float)},
+    };
+
+    // Three frames to catch cross-frame staleness.
+    for (int frame = 0; frame < 3; frame++) {
+        // Sentinel simulates stale accumulation from a prior frame.
+        float sentinel = (float)(frame + 2) * 10.0f;
+        for (int i = 0; i < BW * BH; i++) { data[i] = sentinel; }
+
+        // Tile 1: clear top half, queue.
+        __builtin_memset(data, 0, half_sz);
+        p->queue(p, 0, 0, BW, BH / 2, bufs);
+
+        // Tile 2: clear bottom half, queue.
+        __builtin_memset((char *)data + half_sz, 0, half_sz);
+        p->queue(p, 0, BH / 2, BW, BH, bufs);
+
+        be->flush(be);
+
+        // Every element should be exactly 1.0f (0.0 + 1.0).
+        for (int i = 0; i < BW * BH; i++) {
+            data[i] == 1.0f here;
+        }
+    }
+
+    free(data);
+    p->free(p);
+    be->free(be);
+}
+
+TEST(test_metal_tiled_writable_sync) {
+    run_tiled_writable_sync(umbra_backend_metal());
+}
+
+TEST(test_vulkan_tiled_writable_sync) {
+    run_tiled_writable_sync(umbra_backend_vulkan());
+}
+
 #endif /* !__wasm__ */
