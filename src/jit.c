@@ -2,7 +2,9 @@
 
 #if !defined(__aarch64__) && !defined(__AVX2__)
 
-struct umbra_backend *umbra_backend_jit(void) { return 0; }
+struct umbra_backend* umbra_backend_jit(void) {
+    return 0;
+}
 
 #else
 
@@ -49,16 +51,19 @@ static void run_jit(struct umbra_program *prog,
                     int l, int t, int r, int b, struct umbra_buf buf[]) {
     umbra_jit_program_run((struct umbra_jit_program*)prog, l, t, r, b, buf);
 }
+
 static void dump_jit(struct umbra_program const *prog, FILE *f) {
     umbra_jit_program_dump((struct umbra_jit_program const*)prog, f);
 }
+
 static void free_jit(struct umbra_program *prog) {
-    struct umbra_jit_program    *j  = (struct umbra_jit_program*)prog;
-    struct jit_backend  *be = (struct jit_backend*)prog->backend;
+    struct umbra_jit_program *j  = (struct umbra_jit_program*)prog;
+    struct jit_backend       *be = (struct jit_backend*)      prog->backend;
     release_code_buf(be, j->code, j->code_size);
     free(j);
 }
-static struct umbra_program *compile_jit(struct umbra_backend           *be,
+
+static struct umbra_program* compile_jit(struct umbra_backend           *be,
                                          struct umbra_basic_block const *bb) {
     struct umbra_jit_program *j = umbra_jit_program((struct jit_backend*)be, bb);
     j->base = (struct umbra_program){
@@ -70,13 +75,18 @@ static struct umbra_program *compile_jit(struct umbra_backend           *be,
     };
     return &j->base;
 }
-static void flush_be_noop(struct umbra_backend *be) { (void)be; }
+
+static void flush_be_noop(struct umbra_backend *be) {
+    (void)be;
+}
+
 static void free_be_jit(struct umbra_backend *be) {
     struct jit_backend *jbe = (struct jit_backend*)be;
     for (int i = 0; i < jbe->count; i++) { munmap(jbe->cache[i].mem, jbe->cache[i].size); }
     free(jbe->cache);
     free(jbe);
 }
+
 struct umbra_backend *umbra_backend_jit(void) {
     struct jit_backend *be = calloc(1, sizeof *be);
     be->base = (struct umbra_backend){
