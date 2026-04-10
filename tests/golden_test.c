@@ -392,6 +392,9 @@ static void run_long_batch_no_oom(struct umbra_backend *be) {
         int rotations_after = be->ring_rotations(be);
         rotations_after > rotations_before here;
 
+        be->gpu_time != 0 here;
+        be->gpu_time(be) >= 0.0 here;
+
         p->free(p);
         be->free(be);
     }
@@ -480,12 +483,10 @@ TEST(test_wgpu_tiled_writable_sync) {
 }
 
 // Exercise wgpu paths not covered by golden/stress tests:
-// gpu_time accessor, dump, and unaligned uniform ring upload.
+// dump and unaligned uniform ring upload.
 TEST(test_wgpu_misc) {
     struct umbra_backend *be = umbra_backend_wgpu();
     if (!be) { return; }
-
-    be->gpu_time(be);
 
     // Simple shader: paint one pixel with uniform color.
     struct umbra_builder *bld = umbra_builder();
