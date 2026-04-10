@@ -8,7 +8,8 @@ struct Buf {
     size_t    mmap_size;
 };
 
-void     put(struct Buf *b, uint32_t w);
+void     put     (struct Buf *b, uint32_t w);
+void     Buf_free(struct Buf *b);
 uint32_t RET(void);
 uint32_t NOP(void);
 uint32_t ADD_xr(int d, int n, int m);

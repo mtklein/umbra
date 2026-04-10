@@ -1,5 +1,4 @@
 #include "asm_arm64.h"
-#include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 
@@ -7,22 +6,21 @@ typedef struct Buf Buf;
 
 void put(Buf *b, uint32_t w) {
     if (b->words == b->cap) {
-        if (b->mmap_size) {
-            size_t const pg       = 16384,
-                         new_size = 2 * b->mmap_size;
-            void *m = mmap(NULL, new_size, PROT_READ | PROT_WRITE,
-                           MAP_PRIVATE | MAP_ANON, -1, 0);
-            memcpy(m, b->word, (size_t)b->words * 4);
-            munmap(b->word, b->mmap_size);
-            b->word      = m;
-            b->cap       = (int)((new_size - pg) / 4);
-            b->mmap_size = new_size;
-        } else {
-            b->cap = b->cap ? 2 * b->cap : 1024;
-            b->word = realloc(b->word, (size_t)b->cap * 4);
-        }
+        size_t const pg       = 16384,
+                     new_size = b->mmap_size ? 2 * b->mmap_size : 4 * pg;
+        void *m = mmap(NULL, new_size, PROT_READ | PROT_WRITE,
+                       MAP_PRIVATE | MAP_ANON, -1, 0);
+        memcpy(m, b->word, (size_t)b->words * 4);
+        if (b->mmap_size) { munmap(b->word, b->mmap_size); }
+        b->word      = m;
+        b->cap       = (int)((new_size - pg) / 4);
+        b->mmap_size = new_size;
     }
     b->word[b->words++] = w;
+}
+
+void Buf_free(Buf *b) {
+    munmap(b->word, b->mmap_size);
 }
 
 uint32_t RET(void) { return 0xd65f03c0u; }

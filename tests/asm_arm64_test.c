@@ -1,6 +1,5 @@
 #include "../src/asm_arm64.h"
 #include "test.h"
-#include <stdlib.h>
 
 // All encodings verified against `as` + `llvm-objdump`.
 
@@ -12,12 +11,12 @@ TEST(test_buf) {
     b.word[0] == 0xDEADBEEF here;
     b.word[1] == 0xCAFEBABE here;
 
-    // Push past initial cap (1024) to cover the realloc doubling path.
+    // Push past initial mmap to cover the grow path.
     for (int i = b.words; i < 1025; i++) { put(&b, NOP()); }
     b.words == 1025 here;
     b.word[0] == 0xDEADBEEF here;
     b.word[1] == 0xCAFEBABE here;
-    free(b.word);
+    Buf_free(&b);
 }
 
 TEST(test_gpr) {
@@ -154,7 +153,7 @@ TEST(test_load_imm_w) {
     load_imm_w(&b, 3, 42);
     b.words == 1 here;
     b.word[0] == MOVZ_w(3, 42) here;
-    free(b.word);
+    Buf_free(&b);
 
     // Large value: MOVZ + MOVK
     b = (struct Buf){0};
@@ -162,7 +161,7 @@ TEST(test_load_imm_w) {
     b.words == 2 here;
     b.word[0] == MOVZ_w(5, 0x0056) here;
     b.word[1] == MOVK_w16(5, 0x1234) here;
-    free(b.word);
+    Buf_free(&b);
 }
 
 TEST(test_stp_ldp) {
