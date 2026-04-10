@@ -5,14 +5,14 @@
 
 // All encodings verified against clang -target x86_64 + llvm-objdump.
 
-static _Bool bytes_eq(struct Buf *b, int n, uint8_t const exp[]) {
+static _Bool bytes_eq(struct asm_x86 *b, int n, uint8_t const exp[]) {
     return b->size == (size_t)n && memcmp(b->byte, exp, (size_t)n) == 0;
 }
 
-static void reset(struct Buf *b) { b->size = 0; }
+static void reset(struct asm_x86 *b) { b->size = 0; }
 
 TEST(test_emit) {
-    struct Buf b = {0};
+    struct asm_x86 b = {0};
     emit1(&b, 0xAB);
     emit4(&b, 0xDEADBEEF);
     b.size == 5 here;
@@ -25,7 +25,7 @@ TEST(test_emit) {
 }
 
 TEST(test_ret_vzeroupper_nop) {
-    struct Buf b = {0};
+    struct asm_x86 b = {0};
     ret(&b);
     bytes_eq(&b, 1, (uint8_t[]){0xC3}) here;
     reset(&b);
@@ -40,7 +40,7 @@ TEST(test_ret_vzeroupper_nop) {
 }
 
 TEST(test_gpr) {
-    struct Buf b = {0};
+    struct asm_x86 b = {0};
 
     // addq $8, %rdi => 48 83 c7 08
     add_ri(&b, RDI, 8);
@@ -124,7 +124,7 @@ TEST(test_gpr) {
 }
 
 TEST(test_avx_f32) {
-    struct Buf b = {0};
+    struct asm_x86 b = {0};
 
     // vaddps %ymm4, %ymm3, %ymm2 => c5 e4 58 d4
     vaddps(&b, 2, 3, 4);
@@ -188,7 +188,7 @@ TEST(test_avx_f32) {
 }
 
 TEST(test_avx_fma) {
-    struct Buf b = {0};
+    struct asm_x86 b = {0};
 
     // vfmadd132ps %ymm4, %ymm3, %ymm2 => c4 e2 65 98 d4
     vfmadd132ps(&b, 2, 3, 4);
@@ -222,7 +222,7 @@ TEST(test_avx_fma) {
 }
 
 TEST(test_avx_i32) {
-    struct Buf b = {0};
+    struct asm_x86 b = {0};
 
     // vpaddd %ymm8, %ymm9, %ymm10 => c4 41 35 fe d0
     vpaddd(&b, 10, 9, 8);
@@ -263,7 +263,7 @@ TEST(test_avx_i32) {
 }
 
 TEST(test_avx_bitwise) {
-    struct Buf b = {0};
+    struct asm_x86 b = {0};
 
     // vpxor %ymm3, %ymm3, %ymm3 => c5 e5 ef db
     vpxor(&b, 1, 3, 3, 3);
@@ -292,7 +292,7 @@ TEST(test_avx_bitwise) {
 }
 
 TEST(test_avx_cmp) {
-    struct Buf b = {0};
+    struct asm_x86 b = {0};
 
     // vpcmpeqd %ymm4, %ymm4, %ymm4 => c5 dd 76 e4
     vpcmpeqd(&b, 4, 4, 4);
@@ -306,7 +306,7 @@ TEST(test_avx_cmp) {
 }
 
 TEST(test_avx_shift) {
-    struct Buf b = {0};
+    struct asm_x86 b = {0};
 
     // vpsrld $4, %ymm3, %ymm2 => c5 ed 72 d3 04
     vpsrld_i(&b, 2, 3, 4);
@@ -320,7 +320,7 @@ TEST(test_avx_shift) {
 }
 
 TEST(test_avx_convert) {
-    struct Buf b = {0};
+    struct asm_x86 b = {0};
 
     // vcvtph2ps %xmm3, %ymm2 => c4 e2 7d 13 d3
     vcvtph2ps(&b, 2, 3);
@@ -344,7 +344,7 @@ TEST(test_avx_convert) {
 }
 
 TEST(test_avx_extract) {
-    struct Buf b = {0};
+    struct asm_x86 b = {0};
 
     // vextracti128 $1, %ymm7, %xmm6 => c4 e3 7d 39 fe 01
     vextracti128(&b, 6, 7, 1);
@@ -358,7 +358,7 @@ TEST(test_avx_extract) {
 }
 
 TEST(test_avx_mov) {
-    struct Buf b = {0};
+    struct asm_x86 b = {0};
 
     // vmovaps %ymm3, %ymm4 => c5 fc 28 e3
     vmovaps(&b, 4, 3);
@@ -374,7 +374,7 @@ TEST(test_avx_mov) {
 }
 
 TEST(test_avx_broadcast) {
-    struct Buf b = {0};
+    struct asm_x86 b = {0};
 
     // vbroadcastss %xmm0, %ymm2 => c4 e2 7d 18 d0
     vbroadcastss(&b, 2, 0);
@@ -383,7 +383,7 @@ TEST(test_avx_broadcast) {
 }
 
 TEST(test_broadcast_imm32) {
-    struct Buf b = {0};
+    struct asm_x86 b = {0};
 
     // Zero => vpxor ymm3,ymm3,ymm3 => c5 e5 ef db
     broadcast_imm32(&b, 3, 0);
@@ -412,7 +412,7 @@ TEST(test_broadcast_imm32) {
 }
 
 TEST(test_spill_fill) {
-    struct Buf b = {0};
+    struct asm_x86 b = {0};
 
     // vspill ymm3 to slot 0: vmovdqu [rsp], ymm3 => c5 fe 7f 1c 24
     vspill(&b, 3, 0);
@@ -436,7 +436,7 @@ TEST(test_spill_fill) {
 }
 
 TEST(test_gather) {
-    struct Buf b = {0};
+    struct asm_x86 b = {0};
 
     // vpgatherdd ymm2, [rdi+rcx*4], ymm5 => c4 e2 55 90 14 8f
     vpgatherdd(&b, 2, RDI, RCX, 4, 5);
@@ -445,7 +445,7 @@ TEST(test_gather) {
 }
 
 TEST(test_vex_helpers) {
-    struct Buf b = {0};
+    struct asm_x86 b = {0};
 
     // vex 2-byte: pp=0,mm=1,W=0,L=1,d=2,v=3,s=4,op=0x58 (same as vaddps 2,3,4)
     vex(&b, 0, 1, 0, 1, 2, 3, 4, 0x58);
@@ -470,7 +470,7 @@ TEST(test_vex_helpers) {
 }
 
 TEST(test_large_disp) {
-    struct Buf b = {0};
+    struct asm_x86 b = {0};
 
     // vmovdqu 256(%rdi,%r10,4), %ymm0
     vmov_load(&b, 1, 0, RDI, R10, 4, 256);
@@ -480,7 +480,7 @@ TEST(test_large_disp) {
 }
 
 TEST(test_vex_2byte_vs_3byte) {
-    struct Buf b = {0};
+    struct asm_x86 b = {0};
 
     // Low regs => 2-byte VEX (C5)
     vaddps(&b, 4, 3, 2);
@@ -499,7 +499,7 @@ TEST(test_vex_2byte_vs_3byte) {
 }
 
 TEST(test_vmovd_vmovq_vpsrldq) {
-    struct Buf b = {0};
+    struct asm_x86 b = {0};
 
     // VMOVD xmm0, eax: C5 F9 6E C0
     vmovd_from_gpr(&b, 0, RAX);

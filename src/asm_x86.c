@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct Buf Buf;
+typedef struct asm_x86 Buf;
 
 // ---- byte buffer ----
 

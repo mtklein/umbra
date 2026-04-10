@@ -2,9 +2,9 @@
 #include <string.h>
 #include <sys/mman.h>
 
-typedef struct Buf Buf;
+typedef struct asm_arm64 buf;
 
-void put(Buf *b, uint32_t w) {
+void put(buf *b, uint32_t w) {
     if (b->words == b->cap) {
         size_t const pg       = 16384,
                      new_size = b->mmap_size ? 2 * b->mmap_size : 4 * pg;
@@ -19,7 +19,7 @@ void put(Buf *b, uint32_t w) {
     b->word[b->words++] = w;
 }
 
-void Buf_free(Buf *b) {
+void asm_arm64_free(buf *b) {
     munmap(b->word, b->mmap_size);
 }
 
@@ -360,7 +360,7 @@ uint32_t ST4_8h(int t, int n) { return ld4st4(0x4c000400u, t, n); }
 uint32_t LD4_8b(int t, int n) { return ld4st4(0x0c400000u, t, n); }
 uint32_t ST4_8b(int t, int n) { return ld4st4(0x0c000000u, t, n); }
 
-void load_imm_w(Buf *c, int rd, uint32_t v) {
+void load_imm_w(buf *c, int rd, uint32_t v) {
     put(c, MOVZ_w(rd, (uint16_t)(v & 0xffff)));
     if (v >> 16) { put(c, MOVK_w16(rd, (uint16_t)(v >> 16))); }
 }

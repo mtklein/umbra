@@ -4,7 +4,7 @@
 // All encodings verified against `as` + `llvm-objdump`.
 
 TEST(test_buf) {
-    struct Buf b = {0};
+    struct asm_arm64 b = {0};
     put(&b, 0xDEADBEEF);
     put(&b, 0xCAFEBABE);
     b.words == 2 here;
@@ -16,7 +16,7 @@ TEST(test_buf) {
     b.words == 1025 here;
     b.word[0] == 0xDEADBEEF here;
     b.word[1] == 0xCAFEBABE here;
-    Buf_free(&b);
+    asm_arm64_free(&b);
 }
 
 TEST(test_gpr) {
@@ -149,19 +149,19 @@ TEST(test_dup_ins) {
 
 TEST(test_load_imm_w) {
     // Small value: just MOVZ
-    struct Buf b = {0};
+    struct asm_arm64 b = {0};
     load_imm_w(&b, 3, 42);
     b.words == 1 here;
     b.word[0] == MOVZ_w(3, 42) here;
-    Buf_free(&b);
+    asm_arm64_free(&b);
 
     // Large value: MOVZ + MOVK
-    b = (struct Buf){0};
+    b = (struct asm_arm64){0};
     load_imm_w(&b, 5, 0x12340056);
     b.words == 2 here;
     b.word[0] == MOVZ_w(5, 0x0056) here;
     b.word[1] == MOVK_w16(5, 0x1234) here;
-    Buf_free(&b);
+    asm_arm64_free(&b);
 }
 
 TEST(test_stp_ldp) {

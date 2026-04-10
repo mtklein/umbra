@@ -2,14 +2,14 @@
 #include <stddef.h>
 #include <stdint.h>
 
-struct Buf {
+struct asm_arm64 {
     uint32_t *word;
     int       words, cap;
     size_t    mmap_size;
 };
 
-void     put     (struct Buf *b, uint32_t w);
-void     Buf_free(struct Buf *b);
+void     put     (struct asm_arm64 *b, uint32_t w);
+void     asm_arm64_free(struct asm_arm64 *b);
 uint32_t RET(void);
 uint32_t NOP(void);
 uint32_t ADD_xr(int d, int n, int m);
@@ -138,4 +138,4 @@ uint32_t ST4_8h(int t, int n);
 uint32_t LD4_8b(int t, int n);
 uint32_t ST4_8b(int t, int n);
 
-void     load_imm_w(struct Buf *c, int rd, uint32_t v);
+void     load_imm_w(struct asm_arm64 *c, int rd, uint32_t v);
