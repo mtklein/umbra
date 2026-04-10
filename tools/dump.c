@@ -72,6 +72,7 @@ static void dump_bb(char const *dir, char const *name, struct umbra_basic_block 
 #endif
         umbra_backend_metal(),
         umbra_backend_vulkan(),
+        umbra_backend_wgpu(),
     };
     int nb = (int)(sizeof bes / sizeof bes[0]);
     struct umbra_program *progs[sizeof bes / sizeof bes[0]];
@@ -84,6 +85,7 @@ static void dump_bb(char const *dir, char const *name, struct umbra_basic_block 
 #endif
         "metal",
         "vulkan",
+        "wgpu",
     };
     for (int i = 0; i < nb; i++) {
         if (!progs[i]) { continue; }

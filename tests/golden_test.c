@@ -479,4 +479,50 @@ TEST(test_wgpu_tiled_writable_sync) {
     run_tiled_writable_sync(umbra_backend_wgpu());
 }
 
+// Exercise wgpu paths not covered by golden/stress tests:
+// gpu_time accessor, dump, and unaligned uniform ring upload.
+TEST(test_wgpu_misc) {
+    struct umbra_backend *be = umbra_backend_wgpu();
+    if (!be) { return; }
+
+    be->gpu_time(be);
+
+    // Simple shader: paint one pixel with uniform color.
+    struct umbra_builder *bld = umbra_builder();
+    umbra_color c = {
+        umbra_uniform_32(bld, (umbra_ptr32){0}, 0),
+        umbra_imm_f32(bld, 0.0f),
+        umbra_imm_f32(bld, 0.0f),
+        umbra_imm_f32(bld, 1.0f),
+    };
+    umbra_store_8888(bld, (umbra_ptr32){.ix=1}, c);
+    struct umbra_basic_block *bb = umbra_basic_block(bld);
+    umbra_builder_free(bld);
+
+    struct umbra_program *p = be->compile(be, bb);
+    umbra_basic_block_free(bb);
+    p != 0 here;
+
+    // Exercise dump.
+    FILE *devnull = fopen("/dev/null", "w");
+    p->dump(p, devnull);
+    fclose(devnull);
+
+    // sz=7 triggers the unaligned uniform write path (not a multiple of 4).
+    float uniform_data[2] = {1.0f, 0.0f};
+    uint32_t pixel = 0;
+    struct umbra_buf bufs[] = {
+        {.ptr=uniform_data, .sz=7, .read_only=1},
+        {.ptr=&pixel, .sz=sizeof pixel, .row_bytes=sizeof pixel},
+    };
+    p->queue(p, 0, 0, 1, 1, bufs);
+    be->flush(be);
+
+    (pixel & 0xff)   == 0xff here;  // red = 1.0
+    (pixel >> 24)    == 0xff here;  // alpha = 1.0
+
+    p->free(p);
+    be->free(be);
+}
+
 #endif /* !__wasm__ */
