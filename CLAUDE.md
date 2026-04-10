@@ -16,7 +16,8 @@ right and wrong; that is the user's prerogative.
 
 When there is unblocked work to do, assume the user wants you to keep working
 rather than look for a stopping point.  Our only stopping points should be
-found when all work is done or blocked.
+found when all work is done or blocked.  When you find a bug that you can fix
+and write a regression test for, follow the side quest depth-first to fix it.
 
 Style
 -----
@@ -94,3 +95,5 @@ Count bytes with `size_t` and anything else with `int`.  Prefer to name an
 array in the singular and its count in plural, e.g. `struct inst *inst; int
 insts;`.  If ambiguous, use "size" in the name of byte counts and "count" in
 others; always avoid "len".
+
+Use `here` with no parens for test asserts, and use assume() in non-test code.
