@@ -2142,7 +2142,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
         }
     }
 
-    uint32_t *push_data = calloc((size_t)vp->push_words, sizeof *push_data);
+    uint32_t push_data[67] = {0};
     push_data[0] = (uint32_t)w;
     push_data[1] = (uint32_t)l;
     push_data[2] = (uint32_t)t;
@@ -2225,7 +2225,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     uint32_t gx = ((uint32_t)w + WG_SIZE - 1) / WG_SIZE;
     vkCmdDispatch(be->batch_cmd, gx, (uint32_t)h, 1);
 
-    free(push_data);
+
 
     if (uniform_ring_pool_should_rotate(&be->uni_pool)) {
         vk_submit_cmdbuf(be);

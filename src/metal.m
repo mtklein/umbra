@@ -1186,8 +1186,8 @@ static void encode_dispatch(
     [enc setComputePipelineState:pso];
 
     int tb = m->total_bufs;
-    uint32_t *szs_data  = calloc((size_t)(tb + 1), sizeof *szs_data);
-    uint32_t *rbs_data  = calloc((size_t)(tb + 1), sizeof *rbs_data);
+    uint32_t szs_data[33] = {0};
+    uint32_t rbs_data[33] = {0};
     for (int i = 0; i <= m->max_ptr; i++) {
         if (buf[i].ptr && buf[i].sz) {
             szs_data[i] = (uint32_t)buf[i].sz;
@@ -1281,8 +1281,6 @@ static void encode_dispatch(
     [enc dispatchThreads:grid
        threadsPerThreadgroup:group];
     be->dispatches++;
-    free(szs_data);
-    free(rbs_data);
 }
 
 static void metal_submit_cmdbuf(struct metal_backend *be);
