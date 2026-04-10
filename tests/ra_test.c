@@ -670,3 +670,52 @@ TEST(test_step_alu_scratch) {
     free(bb);
 }
 
+TEST(test_sparse_pool_eviction) {
+    // Slow-path eviction projects pinned vals through pool_inv to a
+    // pool-bit set and decodes ctz(bit) back through cfg.pool. This
+    // test uses a non-contiguous pool {1, 4, 9} so any place that
+    // confused a register id with its pool index would mis-skip an
+    // eviction candidate or pick a register outside the pool.
+    static int8_t const pool[] = {1, 4, 9};
+    struct ra_config    cfg = {
+        .pool = pool,
+        .nregs = 3,
+        .max_reg = 16,
+        .spill = test_spill,
+        .fill = test_fill,
+        .ctx = 0,
+    };
+    struct umbra_basic_block *bb = make_bb(4, 0);
+    struct ra                *ra = ra_create(bb, &cfg);
+    int                       sl[4] = {-1, -1, -1, -1};
+    int                       ns = 0;
+    reset_records();
+
+    // LIFO fast-path: pool[0]=1 first, then 4, then 9.
+    int8_t r0 = ra_alloc(ra, sl, &ns); ra_assign(ra, 0, r0);
+    int8_t r1 = ra_alloc(ra, sl, &ns); ra_assign(ra, 1, r1);
+    int8_t r2 = ra_alloc(ra, sl, &ns); ra_assign(ra, 2, r2);
+    r0 == 1 here;
+    r1 == 4 here;
+    r2 == 9 here;
+
+    // Belady picks the val with max last_use. Set val 1 (in reg 4) as
+    // the farthest so the slow path's ctz iteration must walk past
+    // bit 0 (reg 1) and select bit 1 (reg 4) — i.e., the answer
+    // depends on cfg.pool[bit] decoding the bit back to the right
+    // physical register.
+    ra_set_last_use(ra, 0, 2);
+    ra_set_last_use(ra, 1, 5);
+    ra_set_last_use(ra, 2, 3);
+
+    int8_t r3 = ra_alloc(ra, sl, &ns);
+    nspills == 1 here;
+    spills[0].reg == 4 here;
+    r3 == 4 here;
+    ra_reg(ra, 1) == -1 here;
+    sl[1] >= 0 here;
+
+    ra_destroy(ra);
+    free_bb(bb);
+}
+
