@@ -187,7 +187,7 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
     int max_ptr = -1;
     int n_deref = 0;
     for (int i = 0; i < bb->insts; i++) {
-        if (has_ptr(bb->inst[i].op) && bb->inst[i].ptr >= 0 && max_ptr < bb->inst[i].ptr) {
+        if (op_has_ptr(bb->inst[i].op) && bb->inst[i].ptr >= 0 && max_ptr < bb->inst[i].ptr) {
             max_ptr = bb->inst[i].ptr;
         }
         if (bb->inst[i].op == op_deref_ptr) {

@@ -82,7 +82,7 @@ struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const 
         struct bb_inst const *inst = &bb->inst[i];
         ra->slot[inst->x.id].last_use                          = i;
         ra->slot[inst->x.id].chan_last_use[(int)inst->x.chan]  = i;
-        if (!cfg->ignore_imm_y || !is_fused_imm(inst->op)) {
+        if (!cfg->ignore_imm_y || !op_is_fused_imm(inst->op)) {
             ra->slot[inst->y.id].last_use                          = i;
             ra->slot[inst->y.id].chan_last_use[(int)inst->y.chan]  = i;
         }

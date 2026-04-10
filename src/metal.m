@@ -803,7 +803,7 @@ static void emit_ops(Buf *b, BB const *bb,
 
         }
 
-        if (is_store(inst->op) && i+1 < hi) {
+        if (op_is_store(inst->op) && i+1 < hi) {
             emit(b, "\n");
         }
     }
@@ -815,7 +815,7 @@ static char* build_source(BB const *bb,
                            int *out_deref_buf) {
     int max_ptr = -1;
     for (int i = 0; i < bb->insts; i++) {
-        if (has_ptr(bb->inst[i].op)
+        if (op_has_ptr(bb->inst[i].op)
                 && bb->inst[i].ptr >= 0) {
             if (bb->inst[i].ptr > max_ptr) {
                 max_ptr = bb->inst[i].ptr;

@@ -1,10 +1,7 @@
 #include "../include/umbra.h"
 #include "assume.h"
 #include "basic_block.h"
-#include <math.h>
 #include <stdlib.h>
-
-#pragma clang diagnostic ignored "-Wfloat-equal"
 
 typedef struct umbra_builder builder;
 
@@ -17,21 +14,6 @@ static int ptr_bits(unsigned ix, unsigned deref) { return (int)(ix | (deref << 3
 static int p16(umbra_ptr16 p) { return ptr_bits(p.ix, p.deref); }
 static int p32(umbra_ptr32 p) { return ptr_bits(p.ix, p.deref); }
 static int p64(umbra_ptr64 p) { return ptr_bits(p.ix, p.deref); }
-
-// Op flag table generated from X-macro flags at compile time.
-enum { OP_FUSED_IMM = 1 << 4 };
-#define      FLAG(name, flags) [op_##name] = (flags),
-#define FUSED_FLAG(name, flags) [op_##name] = (flags) | OP_FUSED_IMM,
-static uint8_t const op_flags[] = {
-    OTHER_OPS(FLAG) BINARY_OPS(FLAG) UNARY_OPS(FLAG) IMM_OPS(FUSED_FLAG)
-};
-#undef FUSED_FLAG
-#undef FLAG
-
-_Bool is_store    (enum op op) { return !!(op_flags[op] & OP_STORE); }
-_Bool has_ptr     (enum op op) { return !!(op_flags[op] & OP_PTR); }
-_Bool is_varying  (enum op op) { return !!(op_flags[op] & OP_VARYING); }
-_Bool is_fused_imm(enum op op) { return !!(op_flags[op] & OP_FUSED_IMM); }
 
 static _Bool is_pow2(int x) { return __builtin_popcount((unsigned)x) == 1; }
 
@@ -71,7 +53,7 @@ static val push_(builder *b, struct bb_inst inst) {
         enum op const op = inst.op;
         if (op == op_imm_32 || op == op_uniform_32 || op == op_deref_ptr) {
             inst.uniform = 1;
-        } else if (is_varying(op)
+        } else if (op_is_varying(op)
                    || op == op_gather_32
                    || op == op_gather_16
                    || op == op_sample_32) {
@@ -98,7 +80,7 @@ static val push_(builder *b, struct bb_inst inst) {
 
     int const id = b->insts++;
     b->inst[id] = inst;
-    if (!is_store(inst.op)) {
+    if (!op_is_store(inst.op)) {
         hash_insert(&b->ht, h, id);
     }
     return (val){.id = id};
@@ -219,7 +201,7 @@ static _Bool is_imm(builder *b, int id) { return b->inst[id].op == op_imm_32; }
 
 static val math_(builder *b, struct bb_inst inst) {
     if (is_imm(b, inst.x.id) && is_imm(b, inst.y.id) && is_imm(b, inst.z.id)) {
-        int const result = umbra_const_eval(inst.op, b->inst[inst.x.id].imm,
+        int const result = op_eval(inst.op, b->inst[inst.x.id].imm,
                                             b->inst[inst.y.id].imm, b->inst[inst.z.id].imm);
         return (val){.v32 = umbra_imm_i32(b, result)};
     }

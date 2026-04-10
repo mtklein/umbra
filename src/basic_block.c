@@ -1,26 +1,8 @@
 #include "../include/umbra.h"
 #include "assume.h"
 #include "basic_block.h"
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-
-#pragma clang diagnostic ignored "-Wfloat-equal"
-
-static char const* op_name(enum op op) {
-    static char const *names[] = {
-#define OP_NAME(name, ...) [op_##name] = #name,
-        OTHER_OPS(OP_NAME)
-        BINARY_OPS(OP_NAME)
-        UNARY_OPS(OP_NAME)
-        IMM_OPS(OP_NAME)
-#undef OP_NAME
-    };
-    if ((unsigned)op < sizeof names / sizeof *names && names[op]) {
-        return names[op];
-    }
-    return "?";
-}
 
 struct sched {
     int last_use, n_deps, n_users, user_off, ready_idx;
@@ -37,7 +19,7 @@ static int sched_score(struct bb_inst const *in, struct sched const *meta, int c
         int const d = deps[k];
         kills += meta[d].last_use == c;
     }
-    int const defines = is_store(in[c].op) ? 0 : 1;
+    int const defines = op_is_store(in[c].op) ? 0 : 1;
     int const last_use = meta[c].last_use < 0 ? live : meta[c].last_use;
     // Prefer instructions that decrease register pressure.  (kills-defines)
     // Break ties in favor of instructions that die soon.    (last_use)
@@ -154,7 +136,7 @@ struct umbra_basic_block* umbra_basic_block(struct umbra_builder *b) {
 
     int live = 0;
     for (int i = n; i-- > 0;) {
-        if (is_store(b->inst[i].op)) {
+        if (op_is_store(b->inst[i].op)) {
             b->inst[i].live = 1;
         }
         if (b->inst[i].live) {
@@ -170,7 +152,7 @@ struct umbra_basic_block* umbra_basic_block(struct umbra_builder *b) {
     }
 
     for (int i = 0; i < n; i++) {
-        b->inst[i].varying = is_varying(b->inst[i].op)
+        b->inst[i].varying = op_is_varying(b->inst[i].op)
                           || b->inst[b->inst[i].x.id].varying
                           || b->inst[b->inst[i].y.id].varying
                           || b->inst[b->inst[i].z.id].varying
@@ -180,7 +162,7 @@ struct umbra_basic_block* umbra_basic_block(struct umbra_builder *b) {
     struct bb_inst *out = malloc((size_t)live * sizeof *out);
     int preamble = 0;
     for (int i = 0; i < n; i++) {
-        if (b->inst[i].live && !b->inst[i].varying && !is_store(b->inst[i].op)) {
+        if (b->inst[i].live && !b->inst[i].varying && !op_is_store(b->inst[i].op)) {
             b->inst[i].final_id = preamble;
             out[preamble++] = b->inst[i];
         }
@@ -217,7 +199,7 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         struct bb_inst const *ip = &inst[i];
         enum op const         op = ip->op;
 
-        if (is_store(op)) {
+        if (op_is_store(op)) {
             if (op == op_store_8x4 || op == op_store_16x4 || op == op_store_16x4_planar) {
                 fprintf(f, "      %-15s p%d v%d v%d v%d v%d\n", op_name(op), ip->ptr,
                         ip->x.id, ip->y.id, ip->z.id, ip->w.id);
@@ -331,56 +313,4 @@ void umbra_builder_dump(struct umbra_builder const *b, FILE *f) {
 
 void umbra_basic_block_dump(struct umbra_basic_block const *bb, FILE *f) {
     dump_insts(bb->inst, bb->insts, f);
-}
-
-int umbra_const_eval(enum op op, int xb, int yb, int zb) {
-    typedef union { int i; float f; uint32_t u; } s32;
-    s32 x = {xb},
-        y = {yb},
-        z = {zb},
-        r = { 0};
-
-    switch ((int)op) {
-    case op_add_f32: r.f = x.f + y.f; return r.i;
-    case op_sub_f32: r.f = x.f - y.f; return r.i;
-    case op_mul_f32: r.f = x.f * y.f; return r.i;
-    case op_div_f32: r.f = x.f / y.f; return r.i;
-    case op_min_f32: r.f = x.f < y.f ? x.f : y.f; return r.i;
-    case op_max_f32: r.f = x.f > y.f ? x.f : y.f; return r.i;
-    case op_sqrt_f32:  r.f = sqrtf(x.f); return r.i;
-    case op_abs_f32:   r.f = fabsf(x.f); return r.i;
-    case op_round_f32: r.f = rintf(x.f); return r.i;
-    case op_floor_f32: r.f = floorf(x.f); return r.i;
-    case op_ceil_f32:  r.f = ceilf(x.f); return r.i;
-    case op_round_i32: { float t = rintf(x.f);  r.i = (int32_t)t; } return r.i;
-    case op_floor_i32: { float t = floorf(x.f); r.i = (int32_t)t; } return r.i;
-    case op_ceil_i32:  { float t = ceilf(x.f);  r.i = (int32_t)t; } return r.i;
-    // op_fma_f32 / op_fms_f32: only produced by the mul→fma rewrite in
-    // umbra_add_f32 / umbra_sub_f32, which only fires when an operand's
-    // op == op_mul_f32. By the time we'd want to fold a fully-imm fma,
-    // the inner mul has already been folded to op_imm_32, so we never
-    // reach a const_eval with op_fma_f32 or op_fms_f32.
-    //
-    // op_shl_i32 / op_shr_u32 / op_shr_s32: the builders short-circuit
-    // to op_*_imm whenever the shift amount is imm, so the non-imm shift
-    // forms never reach const_eval with all-imm inputs either.
-    case op_add_i32: r.i = x.i + y.i; return r.i;
-    case op_sub_i32: r.i = x.i - y.i; return r.i;
-    case op_mul_i32: r.i = x.i * y.i; return r.i;
-    case op_and_32:  r.i = x.i & y.i; return r.i;
-    case op_or_32:   r.i = x.i | y.i; return r.i;
-    case op_xor_32:  r.i = x.i ^ y.i; return r.i;
-    case op_sel_32:  r.i = (x.i & y.i) | (~x.i & z.i); return r.i;
-    case op_f32_from_i32: r.f = (float)x.i; return r.i;
-    case op_i32_from_f32: r.i = (int32_t)x.f; return r.i;
-    case op_eq_f32: r.i = x.f == y.f ? -1 : 0; return r.i;
-    case op_lt_f32: r.i = x.f <  y.f ? -1 : 0; return r.i;
-    case op_le_f32: r.i = x.f <= y.f ? -1 : 0; return r.i;
-    case op_eq_i32: r.i = x.i == y.i ? -1 : 0; return r.i;
-    case op_lt_s32: r.i = x.i <  y.i ? -1 : 0; return r.i;
-    case op_le_s32: r.i = x.i <= y.i ? -1 : 0; return r.i;
-    case op_lt_u32: r.i = x.u <  y.u ? -1 : 0; return r.i;
-    case op_le_u32: r.i = x.u <= y.u ? -1 : 0; return r.i;
-    }
-    assume(0);
 }

@@ -724,7 +724,7 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
     // --- Analyze the BB to find buffer usage. ---
     int max_ptr = -1;
     for (int i = 0; i < bb->insts; i++) {
-        if (has_ptr(bb->inst[i].op) && bb->inst[i].ptr >= 0) {
+        if (op_has_ptr(bb->inst[i].op) && bb->inst[i].ptr >= 0) {
             if (bb->inst[i].ptr > max_ptr) {
                 max_ptr = bb->inst[i].ptr;
             }
