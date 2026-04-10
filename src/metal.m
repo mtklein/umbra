@@ -128,8 +128,8 @@ static void emit_ops(Buf *b, BB const *bb,
 
     for (int i = lo; i < hi; i++) {
         struct bb_inst const *inst = &bb->inst[i];
-        int xid = (int)inst->x.id, yid = (int)inst->y.id,
-            zid = (int)inst->z.id, wid = (int)inst->w.id;
+        int xid = inst->x.id, yid = inst->y.id,
+            zid = inst->z.id, wid = inst->w.id;
         VNAME(vx, xid, (int)inst->x.chan);
         VNAME(vy, yid, (int)inst->y.chan);
         VNAME(vz, zid, (int)inst->z.chan);

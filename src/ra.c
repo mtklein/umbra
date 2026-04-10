@@ -80,16 +80,16 @@ struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const 
 
     for (int i = 0; i < n; i++) {
         struct bb_inst const *inst = &bb->inst[i];
-        ra->slot[(int)inst->x.id].last_use                          = i;
-        ra->slot[(int)inst->x.id].chan_last_use[(int)inst->x.chan]  = i;
+        ra->slot[inst->x.id].last_use                          = i;
+        ra->slot[inst->x.id].chan_last_use[(int)inst->x.chan]  = i;
         if (!cfg->ignore_imm_y || !is_fused_imm(inst->op)) {
-            ra->slot[(int)inst->y.id].last_use                          = i;
-            ra->slot[(int)inst->y.id].chan_last_use[(int)inst->y.chan]  = i;
+            ra->slot[inst->y.id].last_use                          = i;
+            ra->slot[inst->y.id].chan_last_use[(int)inst->y.chan]  = i;
         }
-        ra->slot[(int)inst->z.id].last_use                          = i;
-        ra->slot[(int)inst->z.id].chan_last_use[(int)inst->z.chan]  = i;
-        ra->slot[(int)inst->w.id].last_use                          = i;
-        ra->slot[(int)inst->w.id].chan_last_use[(int)inst->w.chan]  = i;
+        ra->slot[inst->z.id].last_use                          = i;
+        ra->slot[inst->z.id].chan_last_use[(int)inst->z.chan]  = i;
+        ra->slot[inst->w.id].last_use                          = i;
+        ra->slot[inst->w.id].chan_last_use[(int)inst->w.chan]  = i;
     }
     for (int i = 0; i < bb->preamble; i++) {
         if (ra->slot[i].last_use >= bb->preamble) {
@@ -260,16 +260,16 @@ struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct bb_inst con
                              int i) {
     struct ra_step s = step0();
     ra->pinned_set = 0;
-    s.rx = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
+    s.rx = ra_ensure_chan(ra, sl, ns, inst->x.id, (int)inst->x.chan);
     // Pin the input so the rd allocation below cannot evict it.
-    if ((int)inst->x.id < i && !inst->x.chan) {
-        pin_val(ra, (int)inst->x.id);
+    if (inst->x.id < i && !inst->x.chan) {
+        pin_val(ra, inst->x.id);
     }
     _Bool const x_dead = inst->x.chan
-        ? ra->slot[(int)inst->x.id].chan_last_use[(int)inst->x.chan] <= i
-        : ra->slot[(int)inst->x.id].last_use <= i;
+        ? ra->slot[inst->x.id].chan_last_use[(int)inst->x.chan] <= i
+        : ra->slot[inst->x.id].last_use <= i;
     if (x_dead && !inst->x.chan) {
-        s.rd = ra_claim(ra, (int)inst->x.id, i);
+        s.rd = ra_claim(ra, inst->x.id, i);
     } else {
         s.rd = ra_alloc(ra, sl, ns);
         ra->slot[i].reg = s.rd;
@@ -280,10 +280,10 @@ struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct bb_inst con
     // it. Stays pinned until the next ra_step_* resets pinned_set.
     pin_val(ra, i);
     if (x_dead && inst->x.chan) {
-        int8_t const r = ra->slot[(int)inst->x.id].chan_reg[(int)inst->x.chan];
+        int8_t const r = ra->slot[inst->x.id].chan_reg[(int)inst->x.chan];
         if (r >= 0) {
             ra_return_reg(ra, r);
-            ra->slot[(int)inst->x.id].chan_reg[(int)inst->x.chan] = -1;
+            ra->slot[inst->x.id].chan_reg[(int)inst->x.chan] = -1;
         }
     }
     return s;
@@ -295,19 +295,19 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const
     struct ra_step s = step0();
 
     ra->pinned_set = 0;
-    if ((int)inst->x.id < i) {
-        s.rx = ra_ensure_chan(ra, sl, ns, (int)inst->x.id, (int)inst->x.chan);
-        pin_val(ra, (int)inst->x.id);
+    if (inst->x.id < i) {
+        s.rx = ra_ensure_chan(ra, sl, ns, inst->x.id, (int)inst->x.chan);
+        pin_val(ra, inst->x.id);
     }
-    if ((int)inst->y.id < i) {
-        s.ry = ra_ensure_chan(ra, sl, ns, (int)inst->y.id, (int)inst->y.chan);
-        if (inst->y.bits != inst->x.bits) { pin_val(ra, (int)inst->y.id); }
+    if (inst->y.id < i) {
+        s.ry = ra_ensure_chan(ra, sl, ns, inst->y.id, (int)inst->y.chan);
+        if (inst->y.bits != inst->x.bits) { pin_val(ra, inst->y.id); }
     }
-    if ((int)inst->z.id < i) {
-        s.rz = ra_ensure_chan(ra, sl, ns, (int)inst->z.id, (int)inst->z.chan);
+    if (inst->z.id < i) {
+        s.rz = ra_ensure_chan(ra, sl, ns, inst->z.id, (int)inst->z.chan);
         if (inst->z.bits != inst->x.bits &&
             inst->z.bits != inst->y.bits) {
-            pin_val(ra, (int)inst->z.id);
+            pin_val(ra, inst->z.id);
         }
     }
 
@@ -315,9 +315,9 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const
     // Channel operands can't be claimed (claim uses reg[id], not chan_reg),
     // so only mark scalar operands as dead for the claim logic.
     // Channel registers are freed separately below.
-    _Bool x_dead = !inst->x.chan && (int)inst->x.id < i && slot[(int)inst->x.id].last_use <= i;
-    _Bool y_dead = !inst->y.chan && (int)inst->y.id < i && slot[(int)inst->y.id].last_use <= i;
-    _Bool z_dead = !inst->z.chan && (int)inst->z.id < i && slot[(int)inst->z.id].last_use <= i;
+    _Bool x_dead = !inst->x.chan && inst->x.id < i && slot[inst->x.id].last_use <= i;
+    _Bool y_dead = !inst->y.chan && inst->y.id < i && slot[inst->y.id].last_use <= i;
+    _Bool z_dead = !inst->z.chan && inst->z.id < i && slot[inst->z.id].last_use <= i;
     if (inst->y.bits == inst->x.bits) { y_dead = 0; }
     if (inst->z.bits == inst->x.bits) { z_dead = 0; }
     if (inst->z.bits == inst->y.bits) { z_dead = 0; }
@@ -327,36 +327,36 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const
     _Bool const   destructive = fma || op == op_sel_32;
 
     if (fma && z_dead) {
-        s.rd = ra_claim(ra, (int)inst->z.id, i);
+        s.rd = ra_claim(ra, inst->z.id, i);
         z_dead = 0;
     } else if (fma && x_dead) {
-        s.rd = ra_claim(ra, (int)inst->x.id, i);
+        s.rd = ra_claim(ra, inst->x.id, i);
         x_dead = 0;
     } else if (fma && y_dead) {
-        s.rd = ra_claim(ra, (int)inst->y.id, i);
+        s.rd = ra_claim(ra, inst->y.id, i);
         y_dead = 0;
     } else if (fma && !z_dead) {
         s.rd = ra_alloc(ra, sl, ns);
         ra->slot[i].reg = s.rd;
         ra->owner[(int)s.rd] = i;
     } else if (op == op_sel_32 && x_dead) {
-        s.rd = ra_claim(ra, (int)inst->x.id, i);
+        s.rd = ra_claim(ra, inst->x.id, i);
         x_dead = 0;
     } else if (op == op_sel_32 && y_dead) {
-        s.rd = ra_claim(ra, (int)inst->y.id, i);
+        s.rd = ra_claim(ra, inst->y.id, i);
         y_dead = 0;
     } else if (op == op_sel_32 && z_dead) {
-        s.rd = ra_claim(ra, (int)inst->z.id, i);
+        s.rd = ra_claim(ra, inst->z.id, i);
         z_dead = 0;
     }
 
     if (!destructive) {
         if (s.rd < 0 && x_dead) {
-            s.rd = ra_claim(ra, (int)inst->x.id, i);
+            s.rd = ra_claim(ra, inst->x.id, i);
             x_dead = 0;
         }
         if (s.rd < 0 && y_dead) {
-            s.rd = ra_claim(ra, (int)inst->y.id, i);
+            s.rd = ra_claim(ra, inst->y.id, i);
             y_dead = 0;
         }
     }
@@ -381,14 +381,14 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const
     if (nscratch >= 2) { s.scratch2 = ra_alloc(ra, sl, ns); }
 
     ra->pinned_set = 0;
-    if (x_dead) { ra_free_reg(ra, (int)inst->x.id); }
-    if (y_dead) { ra_free_reg(ra, (int)inst->y.id); }
-    if (z_dead) { ra_free_reg(ra, (int)inst->z.id); }
+    if (x_dead) { ra_free_reg(ra, inst->x.id); }
+    if (y_dead) { ra_free_reg(ra, inst->y.id); }
+    if (z_dead) { ra_free_reg(ra, inst->z.id); }
 
     // Free channel registers whose per-channel last use has expired.
 #define FREE_CHAN_RA(op) do {                                                            \
-    struct ra_slot *s_ = &ra->slot[(int)(op).id];                                        \
-    if ((op).chan && (int)(op).id < i && s_->chan_last_use[(int)(op).chan] <= i) {      \
+    struct ra_slot *s_ = &ra->slot[(op).id];                                        \
+    if ((op).chan && (op).id < i && s_->chan_last_use[(int)(op).chan] <= i) {      \
         int8_t r_ = s_->chan_reg[(int)(op).chan];                                        \
         if (r_ >= 0) { ra_return_reg(ra, r_); s_->chan_reg[(int)(op).chan] = -1; }      \
     }                                                                                    \

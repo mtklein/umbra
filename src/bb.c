@@ -11,9 +11,9 @@
 static val_ to_val_(umbra_val32 v) { val_ r; __builtin_memcpy(&r, &v, 4); return r; }
 static umbra_val32 from_val_(val_ v) { umbra_val32 r; __builtin_memcpy(&r, &v, 4); return r; }
 
-static int         val_id   (umbra_val32 v)    { return (int)to_val_(v).id; }
-static umbra_val32 val_make (int id, int chan) { return from_val_((val_){.id=(unsigned)id, .chan=(unsigned)chan}); }
-static umbra_val16 val_make16(int id, int chan) { umbra_val16 r = {.id=(unsigned)id, .chan=(unsigned)chan}; return r; }
+static int         val_id   (umbra_val32 v)    { return to_val_(v).id; }
+static umbra_val32 val_make (int id, int chan) { return from_val_((val_){.id=id, .chan=(unsigned)chan}); }
+static umbra_val16 val_make16(int id, int chan) { umbra_val16 r = {.id=id, .chan=(unsigned)chan}; return r; }
 static umbra_val16 to_val16(umbra_val32 v)     { return (umbra_val16){.id=v.id, .chan=v.chan}; }
 
 typedef umbra_val32          val;
@@ -98,7 +98,7 @@ static val push_(builder *b, struct bb_inst inst) {
 
     struct dedup_ctx ctx = {.probe = &inst, .insts = b->inst};
     if (hash_lookup(b->ht, h, dedup_match, &ctx)) {
-        return (val){.id = (unsigned)ctx.hit};
+        return (val){.id = ctx.hit};
     }
 
     if (b->insts == b->inst_cap) {
@@ -111,7 +111,7 @@ static val push_(builder *b, struct bb_inst inst) {
     if (!is_store(inst.op)) {
         hash_insert(&b->ht, h, id);
     }
-    return (val){.id = (unsigned)id};
+    return (val){.id = id};
 }
 #define push(b, ...) push_(b, (struct bb_inst){.op = __VA_ARGS__})
 #define VX(v) .x = (val_){.id = (v).id, .chan = (v).chan}
@@ -483,9 +483,9 @@ static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int preambl
     for (int i = 0; i < n; i++) {
         meta[i].last_use = -1;
         if (is_body(in + i)) {
-            unsigned const deps[] = {in[i].x.id, in[i].y.id, in[i].z.id, in[i].w.id};
+            int const deps[] = {in[i].x.id, in[i].y.id, in[i].z.id, in[i].w.id};
             for (int k = 0; k < 4; k++) {
-                unsigned const d = deps[k];
+                int const d = deps[k];
                 meta[d].last_use = i;
                 if (is_body(in + d)) {
                     meta[i].n_deps++;
@@ -505,10 +505,10 @@ static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int preambl
 
     for (int i = 0; i < n; i++) {
         if (is_body(in + i)) {
-            unsigned const deps[] = {in[i].x.id, in[i].y.id, in[i].z.id, in[i].w.id};
+            int const deps[] = {in[i].x.id, in[i].y.id, in[i].z.id, in[i].w.id};
             for (int k = 0; k < 4; k++) {
                 if (is_body(in + deps[k])) {
-                    unsigned const d = deps[k];
+                    int const d = deps[k];
                     users[meta[d].user_off + meta[d].n_users++] = i;
                 }
             }
@@ -528,7 +528,7 @@ static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int preambl
         int best = 0, best_score = -9999;
         for (int r = 0; r < nready; r++) {
             int const id = ready[r];
-            unsigned const deps[] = {in[id].x.id, in[id].y.id, in[id].z.id, in[id].w.id};
+            int const deps[] = {in[id].x.id, in[id].y.id, in[id].z.id, in[id].w.id};
 
             int kills = 0;
             for (int k = 0; k < 4; k++) {
@@ -610,10 +610,10 @@ struct umbra_basic_block* umbra_basic_block(builder *b) {
     schedule(b->inst, n, out, preamble, live);
 
     for (int i = 0; i < live; i++) {
-        out[i].x = (val_){.id = (unsigned)b->inst[out[i].x.id].final_id, .chan = out[i].x.chan};
-        out[i].y = (val_){.id = (unsigned)b->inst[out[i].y.id].final_id, .chan = out[i].y.chan};
-        out[i].z = (val_){.id = (unsigned)b->inst[out[i].z.id].final_id, .chan = out[i].z.chan};
-        out[i].w = (val_){.id = (unsigned)b->inst[out[i].w.id].final_id, .chan = out[i].w.chan};
+        out[i].x = (val_){.id = b->inst[out[i].x.id].final_id, .chan = out[i].x.chan};
+        out[i].y = (val_){.id = b->inst[out[i].y.id].final_id, .chan = out[i].y.chan};
+        out[i].z = (val_){.id = b->inst[out[i].z.id].final_id, .chan = out[i].z.chan};
+        out[i].w = (val_){.id = b->inst[out[i].w.id].final_id, .chan = out[i].w.chan};
         if (ptr_is_deref(out[i].ptr)) {
             out[i].ptr = ptr_deref(b->inst[ptr_ix(out[i].ptr)].final_id);
         }
@@ -641,9 +641,9 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         if (is_store(op)) {
             if (op == op_store_8x4 || op == op_store_16x4 || op == op_store_16x4_planar) {
                 fprintf(f, "      %-15s p%d v%d v%d v%d v%d\n", op_name(op), ip->ptr,
-                        (int)ip->x.id, (int)ip->y.id, (int)ip->z.id, (int)ip->w.id);
+                        ip->x.id, ip->y.id, ip->z.id, ip->w.id);
             } else {
-                fprintf(f, "      %-15s p%d v%d\n", op_name(op), ip->ptr, (int)ip->y.id);
+                fprintf(f, "      %-15s p%d v%d\n", op_name(op), ip->ptr, ip->y.id);
             }
             continue;
         }
@@ -658,7 +658,7 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_gather_uniform_32:
         case op_gather_32:
         case op_gather_16:
-        case op_sample_32: fprintf(f, " p%d v%d", ip->ptr, (int)ip->x.id); break;
+        case op_sample_32: fprintf(f, " p%d v%d", ip->ptr, ip->x.id); break;
         case op_load_16:
         case op_load_32:
         case op_load_16x4:
@@ -687,7 +687,7 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_i32_from_u16:
         case op_i16_from_i32:
         case op_f32_from_f16:
-        case op_f16_from_f32: fprintf(f, " v%d", (int)ip->x.id); break;
+        case op_f16_from_f32: fprintf(f, " v%d", ip->x.id); break;
 
         case op_add_f32:
         case op_sub_f32:
@@ -711,15 +711,15 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_lt_s32:
         case op_le_s32:
         case op_lt_u32:
-        case op_le_u32: fprintf(f, " v%d v%d", (int)ip->x.id, (int)ip->y.id); break;
+        case op_le_u32: fprintf(f, " v%d v%d", ip->x.id, ip->y.id); break;
 
         case op_fma_f32:
         case op_fms_f32:
-        case op_sel_32: fprintf(f, " v%d v%d v%d", (int)ip->x.id, (int)ip->y.id, (int)ip->z.id); break;
+        case op_sel_32: fprintf(f, " v%d v%d v%d", ip->x.id, ip->y.id, ip->z.id); break;
 
         case op_shl_i32_imm:
         case op_shr_u32_imm:
-        case op_shr_s32_imm: fprintf(f, " v%d %d", (int)ip->x.id, ip->imm); break;
+        case op_shr_s32_imm: fprintf(f, " v%d %d", ip->x.id, ip->imm); break;
         case op_and_32_imm:
         case op_add_f32_imm:
         case op_sub_f32_imm:
@@ -738,8 +738,8 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_eq_i32_imm:
         case op_lt_s32_imm:
         case op_le_s32_imm:
-            fprintf(f, " v%d 0x%x", (int)ip->x.id, (uint32_t)ip->imm);
-            if (ip->y.bits) { fprintf(f, " (a.k.a. v%d)", (int)ip->y.id); }
+            fprintf(f, " v%d 0x%x", ip->x.id, (uint32_t)ip->imm);
+            if (ip->y.bits) { fprintf(f, " (a.k.a. v%d)", ip->y.id); }
             break;
         }
         fprintf(f, "\n");

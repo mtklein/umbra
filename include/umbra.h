@@ -49,8 +49,8 @@ void*  umbra_uniforms_alloc(struct umbra_uniforms_layout const*);
 void   umbra_uniforms_fill_f32(void *uniforms, size_t off, float const*, int n);
 void   umbra_uniforms_fill_ptr(void *uniforms, size_t off, struct umbra_buf);
 
-typedef struct { unsigned id:30, chan:2; } umbra_val16;
-typedef struct { unsigned id:30, chan:2; } umbra_val32;
+typedef struct { int id:30; unsigned chan:2; } umbra_val16;
+typedef struct { int id:30; unsigned chan:2; } umbra_val32;
 typedef struct { unsigned ix:31, deref:1; } umbra_ptr16;
 typedef struct { unsigned ix:31, deref:1; } umbra_ptr32;
 typedef struct { unsigned ix:31, deref:1; } umbra_ptr64;

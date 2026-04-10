@@ -32,7 +32,7 @@ static struct umbra_basic_block *make_bb(int n, int pre) {
 
     for (int i = 1; i < n; i++) {
         bb->inst[i].op = op_add_i32;
-        bb->inst[i].x = (val_){.id = (unsigned)(i - 1)};
+        bb->inst[i].x = (val_){.id = i - 1};
         bb->inst[i].y = (val_){0};
     }
     return bb;

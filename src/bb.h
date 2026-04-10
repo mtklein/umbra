@@ -6,7 +6,7 @@
 // Internal val type matches public umbra_val32 layout, plus a bits overlay.
 typedef union {
     int      bits;
-    struct { unsigned id : 30, chan : 2; };
+    struct { int id : 30; unsigned chan : 2; };
 } val_;
 
 // Op metadata flags.
