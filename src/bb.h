@@ -90,7 +90,8 @@ struct bb_inst {
     int     ptr, imm;
 
     // Compiler bookkeeping, doesn't need to be hashed.
-    union { _Bool uniform; int final_id; };
+    _Bool live, uniform, varying, pad_;
+    int   final_id;
 };
 
 // Ptr encoding: bit 31 = deref flag, bits 0-30 = index.
