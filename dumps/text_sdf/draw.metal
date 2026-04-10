@@ -48,18 +48,18 @@ kernel void umbra_entry(
     uint v20_1 = (px20 >> 8u) & 0xFFu;
     uint v20_2 = (px20 >> 16u) & 0xFFu;
     uint v20_3 = px20 >> 24u;
-    float v21 = (float)(int)v20_3;
+    float v21 = (float)(int)v20;
     float v22 = v21 * as_type<float>(998277249u);
-    float v23 = fma(v22, v10, as_type<float>(v4));
+    float v23 = fma(v22, v10, as_type<float>(v1));
     float v24 = v23 - v22;
     float v25 = fma(v19, v24, v22);
     float v26 = max(v25, as_type<float>(0u));
     float v27 = min(v26, as_type<float>(1065353216u));
     float v28 = v27 * as_type<float>(1132396544u);
     uint v29 = (uint)(int)rint(v28);
-    float v30 = (float)(int)v20;
+    float v30 = (float)(int)v20_3;
     float v31 = v30 * as_type<float>(998277249u);
-    float v32 = fma(v31, v10, as_type<float>(v1));
+    float v32 = fma(v31, v10, as_type<float>(v4));
     float v33 = v32 - v31;
     float v34 = fma(v19, v33, v31);
     float v35 = max(v34, as_type<float>(0u));
@@ -84,5 +84,5 @@ kernel void umbra_entry(
     float v54 = min(v53, as_type<float>(1065353216u));
     float v55 = v54 * as_type<float>(1132396544u);
     uint v56 = (uint)(int)rint(v55);
-    ((device uint*)(p1 + y * buf_rbs[1]))[x] = (v38 & 0xFFu) | ((v47 & 0xFFu) << 8u) | ((v56 & 0xFFu) << 16u) | (v29 << 24u);
+    ((device uint*)(p1 + y * buf_rbs[1]))[x] = (v29 & 0xFFu) | ((v47 & 0xFFu) << 8u) | ((v56 & 0xFFu) << 16u) | (v38 << 24u);
 }

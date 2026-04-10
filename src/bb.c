@@ -470,11 +470,22 @@ static char const* op_name(enum op op) {
 }
 
 struct sched {
-    int last_use, n_deps, n_users, user_off;
+    int last_use, n_deps, n_users, user_off, ready_idx;
 };
 
 static _Bool is_body(struct bb_inst const *inst) {
     return inst->live && inst->varying;
+}
+
+static int sched_score(struct bb_inst const *in, struct sched const *meta, int c, int total) {
+    int kills = 0;
+    int const deps[] = {in[c].x.id, in[c].y.id, in[c].z.id, in[c].w.id};
+    for (int k = 0; k < 4; k++) {
+        if (meta[deps[k]].last_use == c) { kills++; }
+    }
+    int const defines = is_store(in[c].op) ? 0 : 1;
+    int const lu = meta[c].last_use < 0 ? total : meta[c].last_use;
+    return (kills - defines) * total - lu;
 }
 
 static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int preamble, int total) {
@@ -522,47 +533,55 @@ static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int preambl
         }
     }
 
+    for (int i = 0; i < nready; i++) {
+        meta[ready[i]].ready_idx = i;
+    }
+
     int j = preamble;
     int prev_scheduled = -1;
     while (nready > 0) {
-        int best = 0, best_score = -9999;
-        for (int r = 0; r < nready; r++) {
-            int const id = ready[r];
-            int const deps[] = {in[id].x.id, in[id].y.id, in[id].z.id, in[id].w.id};
+        int pick = -1;
 
-            int kills = 0;
-            for (int k = 0; k < 4; k++) {
-                if (meta[deps[k]].last_use == id) {
-                    kills++;
+        // Prefer chaining: pick any ready user of the previously scheduled instruction.
+        if (prev_scheduled >= 0) {
+            for (int u = meta[prev_scheduled].user_off;
+                     u < meta[prev_scheduled].user_off + meta[prev_scheduled].n_users; u++) {
+                if (meta[users[u]].n_deps == 0) {
+                    pick = meta[users[u]].ready_idx;
+                    break;
                 }
-            }
-
-            int const defines = is_store(in[id].op) ? 0 : 1;
-            int const net = kills - defines;
-            int const lu = meta[id].last_use < 0 ? total : meta[id].last_use;
-            // Bonus for chaining: if this op consumes the previous output,
-            // the interpreter can keep the value in a register.
-            int chain = 0;
-            for (int k = 0; k < 3; k++) {
-                if ((int)deps[k] == prev_scheduled) {
-                    chain = 1;
-                }
-            }
-            int const score = net * total - lu + chain * total * 2;
-            if (best_score < score) {
-                best_score = score;
-                best = r;
             }
         }
-        int const id = ready[best];
-        ready[best] = ready[--nready];
+
+        // No chain: pick the best-scoring ready instruction.
+        if (pick < 0) {
+            int best_score = sched_score(in, meta, ready[0], total);
+            pick = 0;
+            for (int r = 1; r < nready; r++) {
+                int const s = sched_score(in, meta, ready[r], total);
+                if (s > best_score) { best_score = s; pick = r; }
+            }
+        }
+
+        // Remove ready[pick], maintaining ready_idx bookkeeping.
+        int const id = ready[pick];
+        {
+            int const last = --nready;
+            if (pick != last) {
+                ready[pick] = ready[last];
+                meta[ready[pick]].ready_idx = pick;
+            }
+        }
 
         in[id].final_id = j;
         out[j++] = in[id];
         prev_scheduled = id;
 
         for (int u = meta[id].user_off; u < meta[id].user_off + meta[id].n_users; u++) {
-            if (--meta[users[u]].n_deps == 0) { ready[nready++] = users[u]; }
+            if (--meta[users[u]].n_deps == 0) {
+                meta[users[u]].ready_idx = nready;
+                ready[nready++] = users[u];
+            }
         }
     }
 

@@ -12,20 +12,20 @@
   v11  = imm_32          0x437f0000
   v12  = x              
   v13  = f32_from_i32    v12
-  v14  = lt_f32          v13 v7
-  v15  = le_f32          v5 v13
-  v16  = and_32          v15 v14
+  v14  = le_f32          v5 v13
+  v15  = lt_f32          v13 v7
+  v16  = and_32          v14 v15
   v17  = y              
   v18  = f32_from_i32    v17
-  v19  = lt_f32          v18 v8
-  v20  = le_f32          v6 v18
-  v21  = and_32          v20 v19
+  v19  = le_f32          v6 v18
+  v20  = lt_f32          v18 v8
+  v21  = and_32          v19 v20
   v22  = and_32          v16 v21
   v23  = sel_32          v22 v9 v0
   v24  = load_8x4        p1
   v25  = f32_from_i32    v24
   v26  = mul_f32_imm     v25 0x3b808081 (a.k.a. v10)
-  v27  = sub_f32         v4 v26
+  v27  = sub_f32         v1 v26
   v28  = fma_f32         v23 v27 v26
   v29  = max_f32_imm     v28 0x0
   v30  = min_f32_imm     v29 0x3f800000 (a.k.a. v9)
@@ -33,7 +33,7 @@
   v32  = round_i32       v31
   v33  = f32_from_i32    v24
   v34  = mul_f32_imm     v33 0x3b808081 (a.k.a. v10)
-  v35  = sub_f32         v1 v34
+  v35  = sub_f32         v4 v34
   v36  = fma_f32         v23 v35 v34
   v37  = max_f32_imm     v36 0x0
   v38  = min_f32_imm     v37 0x3f800000 (a.k.a. v9)
@@ -55,4 +55,4 @@
   v54  = min_f32_imm     v53 0x3f800000 (a.k.a. v9)
   v55  = mul_f32_imm     v54 0x437f0000 (a.k.a. v11)
   v56  = round_i32       v55
-      store_8x4       p1 v40 v48 v56 v32
+      store_8x4       p1 v32 v48 v56 v40

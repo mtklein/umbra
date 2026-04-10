@@ -21,7 +21,7 @@
   v20  = load_8x4        p1
   v21  = f32_from_i32    v20
   v22  = mul_f32_imm     v21 0x3b808081 (a.k.a. v6)
-  v23  = fma_f32         v22 v10 v4
+  v23  = fma_f32         v22 v10 v1
   v24  = sub_f32         v23 v22
   v25  = fma_f32         v19 v24 v22
   v26  = max_f32_imm     v25 0x0
@@ -30,7 +30,7 @@
   v29  = round_i32       v28
   v30  = f32_from_i32    v20
   v31  = mul_f32_imm     v30 0x3b808081 (a.k.a. v6)
-  v32  = fma_f32         v31 v10 v1
+  v32  = fma_f32         v31 v10 v4
   v33  = sub_f32         v32 v31
   v34  = fma_f32         v19 v33 v31
   v35  = max_f32_imm     v34 0x0
@@ -55,4 +55,4 @@
   v54  = min_f32_imm     v53 0x3f800000 (a.k.a. v9)
   v55  = mul_f32_imm     v54 0x437f0000 (a.k.a. v11)
   v56  = round_i32       v55
-      store_8x4       p1 v38 v47 v56 v29
+      store_8x4       p1 v29 v47 v56 v38

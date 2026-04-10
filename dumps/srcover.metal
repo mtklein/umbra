@@ -31,42 +31,42 @@ kernel void umbra_entry(
     uint v2 = 998277249u;
     uint v3 = 1065353216u;
     uint v4 = ((device uint*)(p0 + y * buf_rbs[0]))[x];
-    uint v5 = v4 >> 24u;
+    uint v5 = v4 & 255u;
     float v6 = (float)(int)v5;
     float v7 = v6 * as_type<float>(998277249u);
-    float v8 = as_type<float>(v3) - v7;
-    uint v9 = v4 >> 8u;
-    uint v10 = v9 & 255u;
-    float v11 = (float)(int)v10;
-    float v12 = v11 * as_type<float>(998277249u);
-    uint v13 = v4 >> 16u;
-    uint v14 = v13 & 255u;
-    float v15 = (float)(int)v14;
-    float v16 = v15 * as_type<float>(998277249u);
-    uint v17 = v4 & 255u;
+    uint v8 = v4 >> 24u;
+    float v9 = (float)(int)v8;
+    float v10 = v9 * as_type<float>(998277249u);
+    float v11 = as_type<float>(v3) - v10;
+    uint v12 = v4 >> 8u;
+    uint v13 = v12 & 255u;
+    float v14 = (float)(int)v13;
+    float v15 = v14 * as_type<float>(998277249u);
+    uint v16 = v4 >> 16u;
+    uint v17 = v16 & 255u;
     float v18 = (float)(int)v17;
     float v19 = v18 * as_type<float>(998277249u);
     uint v20 = (uint)((device ushort*)(p1 + y * buf_rbs[1]))[x];
     float v21 = (float)as_type<half>((ushort)v20);
-    float v22 = fma(v21, v8, v19);
+    float v22 = fma(v21, v11, v7);
     uint v23 = (uint)as_type<ushort>((half)v22);
     ((device ushort*)(p1 + y * buf_rbs[1]))[x] = (ushort)v23;
 
     uint v25 = (uint)((device ushort*)(p2 + y * buf_rbs[2]))[x];
     float v26 = (float)as_type<half>((ushort)v25);
-    float v27 = fma(v26, v8, v12);
+    float v27 = fma(v26, v11, v15);
     uint v28 = (uint)as_type<ushort>((half)v27);
     ((device ushort*)(p2 + y * buf_rbs[2]))[x] = (ushort)v28;
 
     uint v30 = (uint)((device ushort*)(p3 + y * buf_rbs[3]))[x];
     float v31 = (float)as_type<half>((ushort)v30);
-    float v32 = fma(v31, v8, v16);
+    float v32 = fma(v31, v11, v19);
     uint v33 = (uint)as_type<ushort>((half)v32);
     ((device ushort*)(p3 + y * buf_rbs[3]))[x] = (ushort)v33;
 
     uint v35 = (uint)((device ushort*)(p4 + y * buf_rbs[4]))[x];
     float v36 = (float)as_type<half>((ushort)v35);
-    float v37 = fma(v36, v8, v7);
+    float v37 = fma(v36, v11, v10);
     uint v38 = (uint)as_type<ushort>((half)v37);
     ((device ushort*)(p4 + y * buf_rbs[4]))[x] = (ushort)v38;
 }
