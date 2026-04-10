@@ -167,7 +167,7 @@ int main(int argc, char *argv[]) {
 
     printf("%-40s", "ns/px");
     for (int bi = 0; bi < nb; bi++) {
-        if (be_mask & (1 << bi)) { printf(" %12s", be_names[bi]); }
+        if (be_mask & (1 << bi)) { printf("| %-13s", be_names[bi]); }
     }
     printf("\n");
 
@@ -193,15 +193,15 @@ int main(int argc, char *argv[]) {
         printf("%-40s", s->title);
         for (int bi = 0; bi < nb; bi++) {
             if (!(be_mask & (1 << bi))) { continue; }
-            if (ns_px[bi] < 0) { printf(" %12s", "-"); continue; }
+            if (ns_px[bi] < 0) { printf("  %-13s", "-"); continue; }
             char tmp[32];
             if (gpu[bi] >= 0 && ns_px[bi] > 0) {
                 int pct = (int)(gpu[bi] / ns_px[bi] * 100 + 0.5);
                 sprintf(tmp, "%.2f (%d%%)", ns_px[bi], pct);
             } else {
-                sprintf(tmp, "%5.2f", ns_px[bi]);
+                sprintf(tmp, "%.2f", ns_px[bi]);
             }
-            printf(" %12s", tmp);
+            printf("  %-13s", tmp);
         }
         // Anomaly markers: interp should never beat jit, and vulkan should
         // never beat metal on Apple Silicon (vulkan is MoltenVK on top of
@@ -252,7 +252,7 @@ int main(int argc, char *argv[]) {
 
         printf("\n%-40s", "slug accumulator (1 curve)");
         for (int bi = 0; bi < nb; bi++) {
-            if (be_mask & (1 << bi)) { printf(" %12s", be_names[bi]); }
+            if (be_mask & (1 << bi)) { printf("| %-13s", be_names[bi]); }
         }
         printf("\n%-40s", "");
 
@@ -266,7 +266,7 @@ int main(int argc, char *argv[]) {
         }
         for (int bi = 0; bi < nb; bi++) {
             if (!(be_mask & (1 << bi))) { continue; }
-            if (ns_px[bi] < 0) { printf(" %12s", "-"); continue; }
+            if (ns_px[bi] < 0) { printf("  %-13s", "-"); continue; }
             char tmp[32];
             if (gpu[bi] >= 0 && ns_px[bi] > 0) {
                 int pct = (int)(gpu[bi] / ns_px[bi] * 100 + 0.5);
@@ -274,7 +274,7 @@ int main(int argc, char *argv[]) {
             } else {
                 sprintf(tmp, "%.2f", ns_px[bi]);
             }
-            printf(" %12s", tmp);
+            printf("  %-13s", tmp);
         }
         int const ri = ns_px[0] >= 0 ? (int)(ns_px[0] * 100 + 0.5) : -1;
         int const rj = ns_px[1] >= 0 ? (int)(ns_px[1] * 100 + 0.5) : -1;
@@ -299,7 +299,7 @@ int main(int argc, char *argv[]) {
     if (!match || strstr("compile", match)) {
         printf("\n%-40s", "compile (µs)");
         for (int bi = 0; bi < nb; bi++) {
-            if (be_mask & (1 << bi)) { printf(" %12s", be_names[bi]); }
+            if (be_mask & (1 << bi)) { printf("| %-13s", be_names[bi]); }
         }
         printf("\n");
 
@@ -365,10 +365,10 @@ int main(int argc, char *argv[]) {
             printf("%-40s", s->title);
             for (int bi = 0; bi < nb; bi++) {
                 if (!(be_mask & (1 << bi))) { continue; }
-                if (us_call[bi] < 0) { printf(" %12s", "-"); continue; }
+                if (us_call[bi] < 0) { printf("  %-13s", "-"); continue; }
                 char tmp[32];
                 sprintf(tmp, "%.1f", us_call[bi]);
-                printf(" %12s", tmp);
+                printf("  %-13s", tmp);
             }
             printf("\n");
         }
