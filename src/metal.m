@@ -1128,14 +1128,8 @@ static void batch_add_copy(
 }
 
 // Returns an index into be->batch_cache. The entry is valid until
-// umbra_metal_flush. Writable lookups reuse any existing entry for the same
-// host pointer. Read-only lookups reuse only an existing *writable* entry
-// for the same host pointer — that's the cross-program hand-off case (e.g.
-// slug acc writes wind_buf, slug draw reads it via a read-only deref). A
-// read-only request with no matching writable entry creates a fresh
-// snapshot, because the host may have mutated the bytes since any prior
-// read-only entry was made (e.g. slug acc loop counter in the uniforms
-// buffer). Non-nocopy cache hits re-snapshot host data for the same reason
+// umbra_metal_flush. Lookups reuse any existing entry for the same host
+// pointer; non-nocopy cache hits re-snapshot host data to pick up mutations
 // (e.g. tiled clears of a writable winding buffer between tiles). Nocopy
 // entries alias host memory directly and need no sync. Copyback for
 // non-nocopy writable buffers is tracked exactly once, at entry creation
@@ -1144,7 +1138,7 @@ static int cache_buf(struct metal_backend *be, void *host, size_t bytes,
                      _Bool read_only) {
     for (int i = 0; i < be->batch_cache_n; i++) {
         struct buf_cache_entry *ce = &be->batch_cache[i];
-        if (ce->host == host && ce->size >= bytes && (!read_only || ce->writable)) {
+        if (ce->host == host && ce->size >= bytes) {
             if (!ce->nocopy && host && bytes) {
                 id<MTLBuffer> tmp = (__bridge id<MTLBuffer>)ce->mtl;
                 __builtin_memcpy(tmp.contents, host, bytes);
@@ -1162,9 +1156,9 @@ static int cache_buf(struct metal_backend *be, void *host, size_t bytes,
     struct buf_cache_entry *ce = &be->batch_cache[idx];
     *ce = (struct buf_cache_entry){0};
 
-    // Try zero-copy host import for page-aligned writable pointers.
+    // Try zero-copy host import for page-aligned pointers.
     size_t page = (size_t)getpagesize();
-    if (host && !read_only && ((uintptr_t)host % page) == 0) {
+    if (host && ((uintptr_t)host % page) == 0) {
         size_t import_sz = (bytes + page - 1) & ~(page - 1);
         id<MTLDevice> device = (__bridge id<MTLDevice>)be->device;
         id<MTLBuffer> buf = [device newBufferWithBytesNoCopy:host
@@ -1175,7 +1169,7 @@ static int cache_buf(struct metal_backend *be, void *host, size_t bytes,
             ce->mtl      = (__bridge_retained void*)buf;
             ce->host     = host;
             ce->size     = bytes;
-            ce->writable = 1;
+            ce->writable = !read_only;
             ce->nocopy   = 1;
             return idx;
         }

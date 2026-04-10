@@ -220,7 +220,7 @@ static int cache_buf(struct wgpu_backend *be, void *host, size_t bytes,
                      _Bool read_only) {
     for (int i = 0; i < be->batch_cache_n; i++) {
         struct wgpu_buf_cache_entry *ce = &be->batch_cache[i];
-        if (ce->host == host && ce->size >= bytes && (!read_only || ce->writable)) {
+        if (ce->host == host && ce->size >= bytes) {
             if (host && bytes) {
                 // Skip re-upload if host data hasn't changed since last upload.
                 if (!ce->shadow || memcmp(ce->shadow, host, bytes)) {

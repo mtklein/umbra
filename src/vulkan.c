@@ -239,18 +239,12 @@ static void vk_flush(struct umbra_backend *be);
 static void vk_submit_cmdbuf(struct vk_backend *be);
 
 // Returns an index into be->batch_cache. The entry is valid until vk_flush.
-// Writable lookups reuse any existing entry for the same host pointer.
-// Read-only lookups reuse only an existing *writable* entry for the same host
-// pointer — that's the cross-program hand-off case (e.g. slug acc writes
-// wind_buf, slug draw reads it via a read-only deref). A read-only request
-// with no matching writable entry creates a fresh snapshot, because the host
-// may have mutated the bytes since any prior read-only entry was made
-// (e.g. slug acc loop counter in the uniforms buffer).
+// Lookups reuse any existing entry for the same host pointer.
 static int cache_buf(struct vk_backend *be, void *host, size_t bytes,
                      VkDeviceSize sz, _Bool read_only) {
     for (int i = 0; i < be->batch_cache_n; i++) {
         struct buf_cache_entry *ce = &be->batch_cache[i];
-        if (ce->host == host && ce->size >= sz && (!read_only || ce->writable)) {
+        if (ce->host == host && ce->size >= sz) {
             return i;
         }
     }
@@ -264,9 +258,9 @@ static int cache_buf(struct vk_backend *be, void *host, size_t bytes,
     struct buf_cache_entry *ce = &be->batch_cache[idx];
     *ce = (struct buf_cache_entry){0};
 
-    // Try zero-copy host import for page-aligned writable pointers.
+    // Try zero-copy host import for page-aligned pointers.
     VkDeviceSize align = be->host_import_align;
-    if (align && host && !read_only && ((uintptr_t)host % align) == 0) {
+    if (align && host && ((uintptr_t)host % align) == 0) {
         VkDeviceSize import_sz = (sz + align - 1) & ~(align - 1);
         VkBuffer buf = create_buffer(be->device, import_sz);
         VkMemoryRequirements req;
@@ -291,7 +285,7 @@ static int cache_buf(struct vk_backend *be, void *host, size_t bytes,
             ce->mapped   = host;
             ce->host     = host;
             ce->nocopy   = 1;
-            ce->writable = 1;
+            ce->writable = !read_only;
             return idx;
         }
         // Import failed — fall back.
