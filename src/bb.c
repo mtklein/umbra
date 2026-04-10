@@ -477,18 +477,21 @@ static _Bool is_body(struct bb_inst const *inst) {
     return inst->live && inst->varying;
 }
 
-static int sched_score(struct bb_inst const *in, struct sched const *meta, int c, int total) {
+static int sched_score(struct bb_inst const *in, struct sched const *meta, int c, int live) {
     int kills = 0;
     int const deps[] = {in[c].x.id, in[c].y.id, in[c].z.id, in[c].w.id};
     for (int k = 0; k < 4; k++) {
-        if (meta[deps[k]].last_use == c) { kills++; }
+        int const d = deps[k];
+        kills += meta[d].last_use == c;
     }
     int const defines = is_store(in[c].op) ? 0 : 1;
-    int const lu = meta[c].last_use < 0 ? total : meta[c].last_use;
-    return (kills - defines) * total - lu;
+    int const last_use = meta[c].last_use < 0 ? live : meta[c].last_use;
+    // Prefer instructions that decrease register pressure.  (kills-defines)
+    // Break ties in favor of instructions that die soon.    (last_use)
+    return (kills - defines)*live - last_use;
 }
 
-static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int preamble, int total) {
+static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int preamble, int live) {
     struct sched *meta = calloc((size_t)(n + 1), sizeof *meta);
 
     for (int i = 0; i < n; i++) {
@@ -555,10 +558,10 @@ static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int preambl
 
         // No chain: pick the best-scoring ready instruction.
         if (pick < 0) {
-            int best_score = sched_score(in, meta, ready[0], total);
+            int best_score = sched_score(in, meta, ready[0], live);
             pick = 0;
             for (int r = 1; r < nready; r++) {
-                int const s = sched_score(in, meta, ready[r], total);
+                int const s = sched_score(in, meta, ready[r], live);
                 if (s > best_score) { best_score = s; pick = r; }
             }
         }
