@@ -35,12 +35,14 @@ char const* op_name(enum op op) {
     return "?";
 }
 
-int op_eval(enum op op, int xb, int yb, int zb) {
+int op_eval(enum op op, int xb, int yb, int zb, int wb) {
     typedef union { int i; float f; uint32_t u; } s32;
     s32 x = {xb},
         y = {yb},
         z = {zb},
+        w = {wb},
         r = { 0};
+    (void)w;
 
     switch ((int)op) {
     case op_add_f32: r.f = x.f + y.f; return r.i;

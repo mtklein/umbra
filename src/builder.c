@@ -202,7 +202,9 @@ static _Bool is_imm(builder *b, int id) { return b->inst[id].op == op_imm_32; }
 static val math_(builder *b, struct bb_inst inst) {
     if (is_imm(b, inst.x.id) && is_imm(b, inst.y.id) && is_imm(b, inst.z.id)) {
         int const result = op_eval(inst.op, b->inst[inst.x.id].imm,
-                                            b->inst[inst.y.id].imm, b->inst[inst.z.id].imm);
+                                            b->inst[inst.y.id].imm,
+                                            b->inst[inst.z.id].imm,
+                                            b->inst[inst.w.id].imm);
         return (val){.v32 = umbra_imm_i32(b, result)};
     }
     return push_(b, inst);
