@@ -15,6 +15,7 @@ struct umbra_backend *umbra_backend_metal(void) { return 0; }
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <unistd.h>
 
 typedef struct umbra_basic_block BB;
 
@@ -22,7 +23,7 @@ struct buf_cache_entry {
     void   *mtl;     // retained id<MTLBuffer>
     void   *host;
     size_t  size;
-    _Bool   writable; int :24, :32;
+    _Bool   writable, nocopy; int :16, :32;
 };
 
 struct free_buf {
@@ -1122,17 +1123,19 @@ static void batch_add_copy(
 // for the same host pointer — that's the cross-program hand-off case (e.g.
 // slug acc writes wind_buf, slug draw reads it via a read-only deref). A
 // read-only request with no matching writable entry creates a fresh
-// Always re-snapshot host data, because the host may have mutated the bytes
-// since any prior entry was made (e.g. slug acc loop counter in the uniforms
-// buffer, or tiled clears of a writable winding buffer between tiles).
-// Copyback for writable buffers is tracked exactly once, at entry creation
+// snapshot, because the host may have mutated the bytes since any prior
+// read-only entry was made (e.g. slug acc loop counter in the uniforms
+// buffer). Non-nocopy cache hits re-snapshot host data for the same reason
+// (e.g. tiled clears of a writable winding buffer between tiles). Nocopy
+// entries alias host memory directly and need no sync. Copyback for
+// non-nocopy writable buffers is tracked exactly once, at entry creation
 // time.
 static int cache_buf(struct metal_backend *be, void *host, size_t bytes,
                      _Bool read_only) {
     for (int i = 0; i < be->batch_cache_n; i++) {
         struct buf_cache_entry *ce = &be->batch_cache[i];
         if (ce->host == host && ce->size >= bytes && (!read_only || ce->writable)) {
-            if (host && bytes) {
+            if (!ce->nocopy && host && bytes) {
                 id<MTLBuffer> tmp = (__bridge id<MTLBuffer>)ce->mtl;
                 __builtin_memcpy(tmp.contents, host, bytes);
             }
@@ -1148,6 +1151,25 @@ static int cache_buf(struct metal_backend *be, void *host, size_t bytes,
     int idx = be->batch_cache_n++;
     struct buf_cache_entry *ce = &be->batch_cache[idx];
     *ce = (struct buf_cache_entry){0};
+
+    // Try zero-copy host import for page-aligned writable pointers.
+    size_t page = (size_t)getpagesize();
+    if (host && !read_only && ((uintptr_t)host % page) == 0) {
+        size_t import_sz = (bytes + page - 1) & ~(page - 1);
+        id<MTLDevice> device = (__bridge id<MTLDevice>)be->device;
+        id<MTLBuffer> buf = [device newBufferWithBytesNoCopy:host
+                                                      length:(NSUInteger)import_sz
+                                                     options:MTLResourceStorageModeShared
+                                                 deallocator:nil];
+        if (buf) {
+            ce->mtl      = (__bridge_retained void*)buf;
+            ce->host     = host;
+            ce->size     = bytes;
+            ce->writable = 1;
+            ce->nocopy   = 1;
+            return idx;
+        }
+    }
 
     // Try to reuse a buffer from the free pool.
     id<MTLBuffer> tmp = nil;
@@ -1377,10 +1399,14 @@ static void umbra_metal_flush(struct metal_backend *be) {
                 (size_t)be->free_bufs_cap * sizeof *be->free_bufs);
         }
         for (int i = 0; i < be->batch_cache_n; i++) {
-            be->free_bufs[be->free_bufs_n++] = (struct free_buf){
-                .mtl  = be->batch_cache[i].mtl,
-                .size = be->batch_cache[i].size,
-            };
+            if (be->batch_cache[i].nocopy) {
+                (void)(__bridge_transfer id<MTLBuffer>)be->batch_cache[i].mtl;
+            } else {
+                be->free_bufs[be->free_bufs_n++] = (struct free_buf){
+                    .mtl  = be->batch_cache[i].mtl,
+                    .size = be->batch_cache[i].size,
+                };
+            }
         }
         be->batch_cache_n = 0;
     }
