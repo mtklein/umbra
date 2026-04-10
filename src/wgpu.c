@@ -686,8 +686,11 @@ struct umbra_backend *umbra_backend_wgpu(void) {
     wgpuAdapterGetLimits(adapter, &adapter_limits);
     adapter_limits.nextInChain = NULL;
 
+    WGPUFeatureName features[] = { WGPUFeatureName_ShaderF16 };
     WGPUDevice dev = NULL;
     WGPUDeviceDescriptor dev_desc    = WGPU_DEVICE_DESCRIPTOR_INIT;
+    dev_desc.requiredFeatureCount     = sizeof features / sizeof features[0];
+    dev_desc.requiredFeatures         = features;
     dev_desc.requiredLimits           = &adapter_limits;
     dev_desc.uncapturedErrorCallbackInfo.callback = (WGPUUncapturedErrorCallback)error_cb;
     wgpuAdapterRequestDevice(adapter, &dev_desc,

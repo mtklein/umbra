@@ -507,54 +507,38 @@ static void store_ssbo_u32(SpvBuilder *b, int buf_idx, uint32_t elem_idx, uint32
 }
 
 // Load u16 from SSBO[buf_idx] at element_index, zero-extended to u32.
+// When emit_16, the buffer is RuntimeArray<u16> and we use OpUConvert.
+// Otherwise, it's RuntimeArray<f16> and we bitcast f16→f32→u32.
 static uint32_t load_ssbo_u16(SpvBuilder *b, int buf_idx, uint32_t elem_idx) {
+    uint32_t const ptr = spv_access_chain_2(b, b->t_ptr_ssbo_u16,
+                                            b->v_ssbo[buf_idx],
+                                            b->c_0, elem_idx);
     if (b->emit_16) {
-        uint32_t const ptr = spv_access_chain_2(b, b->t_ptr_ssbo_u16,
-                                                b->v_ssbo[buf_idx],
-                                                b->c_0, elem_idx);
         uint32_t const raw = spv_load(b, b->t_u16, ptr);
         return spv_unop(b, SpvOpUConvert, b->t_u32, raw);
     }
-    // Emulate: load u32 at idx/2, shift right by (idx&1)*16, mask to 16 bits.
-    uint32_t const half_idx = spv_binop(b, SpvOpShiftRightLogical, b->t_u32,
-                                        elem_idx, b->c_1);
-    uint32_t const word = load_ssbo_u32(b, buf_idx, half_idx);
-    uint32_t const odd  = spv_binop(b, SpvOpBitwiseAnd, b->t_u32, elem_idx, b->c_1);
-    uint32_t const shift = spv_binop(b, SpvOpShiftLeftLogical, b->t_u32, odd, b->c_4);
-        // odd*16: c_4 = 4, but we need 16. odd is 0 or 1, shift by 4 gives 0 or 16.
-        // Actually odd<<4 gives 0 or 16. That's the bit shift amount.
-    uint32_t const shifted = spv_binop(b, SpvOpShiftRightLogical, b->t_u32, word, shift);
-    uint32_t const mask16 = spv_const_u32(b, 0xFFFF);
-    return spv_binop(b, SpvOpBitwiseAnd, b->t_u32, shifted, mask16);
+    // Load f16, convert to f32, pack back to u32 with raw bits via PackHalf2x16.
+    uint32_t const h = spv_load(b, b->t_f16, ptr);
+    uint32_t const f = spv_unop(b, SpvOpFConvert, b->t_f32, h);
+    uint32_t const v2 = spv_composite_construct_2(b, b->t_fvec2, f, b->c_0f);
+    return spv_glsl_1(b, b->t_u32, 58 /*PackHalf2x16*/, v2);
 }
 
 // Store u16 to SSBO[buf_idx] at element_index, truncating from u32.
-// NOTE: when !emit_16, this is a non-atomic read-modify-write of a u32.
-// Adjacent u16 stores within the same u32 from different lanes will race.
 static void store_ssbo_u16(SpvBuilder *b, int buf_idx, uint32_t elem_idx, uint32_t value) {
+    uint32_t const ptr = spv_access_chain_2(b, b->t_ptr_ssbo_u16,
+                                            b->v_ssbo[buf_idx],
+                                            b->c_0, elem_idx);
     if (b->emit_16) {
         uint32_t const val16 = spv_unop(b, SpvOpUConvert, b->t_u16, value);
-        uint32_t const ptr = spv_access_chain_2(b, b->t_ptr_ssbo_u16,
-                                                b->v_ssbo[buf_idx],
-                                                b->c_0, elem_idx);
         spv_store(b, ptr, val16);
         return;
     }
-    // Emulate: read-modify-write the containing u32.
-    uint32_t const half_idx = spv_binop(b, SpvOpShiftRightLogical, b->t_u32,
-                                        elem_idx, b->c_1);
-    uint32_t const odd   = spv_binop(b, SpvOpBitwiseAnd, b->t_u32, elem_idx, b->c_1);
-    uint32_t const shift = spv_binop(b, SpvOpShiftLeftLogical, b->t_u32, odd, b->c_4);
-    uint32_t const mask16 = spv_const_u32(b, 0xFFFF);
-    uint32_t const smask = spv_binop(b, SpvOpShiftLeftLogical, b->t_u32, mask16, shift);
-    uint32_t const cmask = spv_unop(b, SpvOpNot, b->t_u32, smask);
-    uint32_t const old   = load_ssbo_u32(b, buf_idx, half_idx);
-    uint32_t const val16 = spv_binop(b, SpvOpBitwiseAnd, b->t_u32, value, mask16);
-    uint32_t const sval  = spv_binop(b, SpvOpShiftLeftLogical, b->t_u32, val16, shift);
-    uint32_t const merged = spv_binop(b, SpvOpBitwiseOr, b->t_u32,
-                                      spv_binop(b, SpvOpBitwiseAnd, b->t_u32, old, cmask),
-                                      sval);
-    store_ssbo_u32(b, buf_idx, half_idx, merged);
+    // Reinterpret the low 16 bits of value as f16 via UnpackHalf2x16→FConvert.
+    uint32_t const v2 = spv_glsl_1(b, b->t_fvec2, 62 /*UnpackHalf2x16*/, value);
+    uint32_t const f  = spv_composite_extract(b, b->t_f32, v2, 0);
+    uint32_t const h  = spv_unop(b, SpvOpFConvert, b->t_f16, f);
+    spv_store(b, ptr, h);
 }
 
 // Compute linear address for row-structured buffer:
@@ -695,7 +679,6 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
     *out_deref = di;
 
     // --- Scan for 16-bit buffer access. ---
-    _Bool has_16_store = 0;
     B.buf_is_16 = calloc((size_t)(total_bufs + 1), sizeof *B.buf_is_16);
     for (int i = 0; i < bb->insts; i++) {
         enum op op = bb->inst[i].op;
@@ -705,18 +688,7 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
                                          : bb->inst[i].ptr.bits;
             B.buf_is_16[p] = 1;
             B.has_16 = 1;
-            if (op == op_store_16 || op == op_store_16x4_planar) {
-                has_16_store = 1;
-            }
         }
-    }
-    // When emulating 16-bit via u32 shift/mask, stores are racy (non-atomic
-    // read-modify-write).  Bail rather than produce wrong results.
-    if ((flags & SPIRV_NO_16BIT_TYPES) && has_16_store) {
-        free(B.buf_is_16);
-        free(deref_buf);
-        free(di);
-        return 0;
     }
 
     // Push constant layout: w, x0, y0, buf_szs[total_bufs], buf_rbs[total_bufs].
@@ -734,7 +706,7 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
     _Bool const emit_16 = !(flags & SPIRV_NO_16BIT_TYPES)
                         && (B.has_16 || (flags & SPIRV_ALWAYS_16BIT));
     B.emit_16 = emit_16;
-    if (emit_16) {
+    if (B.has_16 || (flags & SPIRV_ALWAYS_16BIT)) {
         spv_op(&B.caps, SpvOpCapability, 2);
         spv_word(&B.caps, SpvCapabilityFloat16);
     }
@@ -773,7 +745,7 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
         }
     }
 
-    if (B.has_16 && emit_16) {
+    if (B.has_16) {
         spv_op(&B.caps, SpvOpCapability, 2);
         spv_word(&B.caps, SpvCapabilityStorageBuffer16BitAccess);
 
@@ -846,7 +818,9 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
         spv_word(&B.types, B.t_u16);
         spv_word(&B.types, 16);
         spv_word(&B.types, 0); // unsigned
+    }
 
+    if (B.has_16 || (flags & SPIRV_ALWAYS_16BIT)) {
         B.t_f16 = spv_id(&B);
         spv_op(&B.types, SpvOpTypeFloat, 3);
         spv_word(&B.types, B.t_f16);
@@ -921,12 +895,16 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
     spv_word(&B.types, SpvStorageClassStorageBuffer);
     spv_word(&B.types, B.t_u32);
 
-    // 16-bit storage types (only when native 16-bit is available).
-    if (B.has_16 && emit_16) {
+    // 16-bit storage types.  When emit_16 is true, use native u16 element
+    // type.  When false (wgpu/naga path), use f16 as the element type
+    // since naga supports f16 via ShaderF16 but not u16.
+    if (B.has_16) {
+        uint32_t t_elem_16 = emit_16 ? B.t_u16 : B.t_f16;
+
         B.t_rta_u16 = spv_id(&B);
         spv_op(&B.types, SpvOpTypeRuntimeArray, 3);
         spv_word(&B.types, B.t_rta_u16);
-        spv_word(&B.types, B.t_u16);
+        spv_word(&B.types, t_elem_16);
 
         spv_op(&B.decor, SpvOpDecorate, 4);
         spv_word(&B.decor, B.t_rta_u16);
@@ -958,7 +936,7 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
         spv_op(&B.types, SpvOpTypePointer, 4);
         spv_word(&B.types, B.t_ptr_ssbo_u16);
         spv_word(&B.types, SpvStorageClassStorageBuffer);
-        spv_word(&B.types, B.t_u16);
+        spv_word(&B.types, t_elem_16);
     }
 
     // Push constant block: struct { uint data[push_words]; }
@@ -1048,8 +1026,8 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
     B.v_ssbo = calloc((size_t)total_bufs, sizeof *B.v_ssbo);
     for (int i = 0; i < total_bufs; i++) {
         B.v_ssbo[i] = spv_id(&B);
-        uint32_t ptr_type = (B.buf_is_16[i] && emit_16) ? B.t_ptr_ssbo_struct_u16
-                                                              : B.t_ptr_ssbo_struct;
+        uint32_t ptr_type = B.buf_is_16[i] ? B.t_ptr_ssbo_struct_u16
+                                          : B.t_ptr_ssbo_struct;
         spv_op(&B.globals, SpvOpVariable, 4);
         spv_word(&B.globals, ptr_type);
         spv_word(&B.globals, B.v_ssbo[i]);
