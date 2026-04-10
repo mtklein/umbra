@@ -169,8 +169,8 @@ Critical sequence based on the simulation:
  |      140.  vaddps	%ymm12, %ymm11, %ymm11
  |      141.  vmovdqu	544(%rsp), %ymm0
  |      142.  vpblendvb	%ymm0, %ymm11, %ymm1, %ymm0
- |      143.  movq	32(%rdx), %r11
- +----> 144.  movq	48(%rdx), %rax                    ## RESOURCE interference:  Zn4LSU [ probability: 99% ]
+ |      143.  movq	24(%rdx), %r11
+ +----> 144.  movq	40(%rdx), %rax                    ## RESOURCE interference:  Zn4LSU [ probability: 99% ]
  +----> 145.  imulq	%r14, %rax                        ## REGISTER dependency:  %rax
  +----> 146.  addq	%rax, %r11                        ## REGISTER dependency:  %rax
  +----> 147.  vmovdqu	(%r11,%r10,4), %ymm2              ## REGISTER dependency:  %r11
@@ -350,8 +350,8 @@ Instruction Info:
  1      3     0.50                        vaddps	%ymm12, %ymm11, %ymm11
  1      8     0.50    *                   vmovdqu	544(%rsp), %ymm0
  1      1     0.50                        vpblendvb	%ymm0, %ymm11, %ymm1, %ymm0
- 1      5     0.33    *                   movq	32(%rdx), %r11
- 1      5     0.33    *                   movq	48(%rdx), %rax
+ 1      5     0.33    *                   movq	24(%rdx), %r11
+ 1      5     0.33    *                   movq	40(%rdx), %rax
  1      3     1.00                        imulq	%r14, %rax
  1      1     0.25                        addq	%rax, %r11
  1      8     0.50    *                   vmovdqu	(%r11,%r10,4), %ymm2
@@ -550,8 +550,8 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     vaddps	%ymm12, %ymm11, %ymm11
  -      -      -      -      -      -      -      -      -      -      -      -     0.99   0.01    -      -     0.98   0.02   0.34   0.34   0.32    -      -     vmovdqu	544(%rsp), %ymm0
  -      -      -      -      -      -      -      -     0.98    -      -     0.02    -      -      -      -      -      -      -      -      -      -      -     vpblendvb	%ymm0, %ymm11, %ymm1, %ymm0
-0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.01   0.99    -     0.33   0.34   0.33    -      -     movq	32(%rdx), %r11
-0.33   0.34   0.33    -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00   0.34   0.33   0.33    -      -     movq	48(%rdx), %rax
+0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.01   0.99    -     0.33   0.34   0.33    -      -     movq	24(%rdx), %r11
+0.33   0.34   0.33    -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00   0.34   0.33   0.33    -      -     movq	40(%rdx), %rax
  -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     imulq	%r14, %rax
  -      -      -     0.33    -     0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     addq	%rax, %r11
  -      -      -      -      -      -      -      -      -      -      -      -     0.99   0.01    -      -     0.99   0.01   0.34   0.33   0.33    -      -     vmovdqu	(%r11,%r10,4), %ymm2

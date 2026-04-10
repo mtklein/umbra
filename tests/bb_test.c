@@ -1327,7 +1327,7 @@ TEST(test_sample_32) {
         if (run(&B, bi, 4, 1,
                  (struct umbra_buf[]){
                      {.ptr=indices, .sz=sizeof indices},
-                     {.ptr=lut,     .sz=sizeof lut, .read_only=1},
+                     {.ptr=lut,     .sz=sizeof lut},
                      {.ptr=dst,     .sz=sizeof dst},
                  })) {
             // ix=0.0 → lut[0] = 10.0
@@ -1398,7 +1398,7 @@ TEST(test_offset_load_store) {
             if (run(&B, bi, 8, 1,
                      (struct umbra_buf[]){
                          {.ptr=src, .sz=sizeof src},
-                         {.ptr=uni, .sz=sizeof uni, .read_only=1},
+                         {.ptr=uni, .sz=sizeof uni},
                          {.ptr=dst, .sz=sizeof dst},
                      })) {
                 for (int k = 0; k < 8; k++) { dst[k] == 14 + k here; }
@@ -1424,7 +1424,7 @@ TEST(test_offset_load_store) {
             if (run(&B, bi, 8, 1,
                      (struct umbra_buf[]){
                          {.ptr=src, .sz=sizeof src},
-                         {.ptr=uni, .sz=sizeof uni, .read_only=1},
+                         {.ptr=uni, .sz=sizeof uni},
                          {.ptr=dst, .sz=sizeof dst},
                      })) {
                 for (int k = 0; k < 8; k++) { dst[k] == 103 + k here; }
@@ -1452,7 +1452,7 @@ TEST(test_offset_load_store) {
             if (run(&B, bi, 8, 1,
                      (struct umbra_buf[]){
                          {.ptr=src, .sz=sizeof src},
-                         {.ptr=uni, .sz=sizeof uni, .read_only=1},
+                         {.ptr=uni, .sz=sizeof uni},
                          {.ptr=dst, .sz=sizeof dst},
                      })) {
                 for (int k = 0; k < 8; k++) {
@@ -1569,7 +1569,7 @@ TEST(test_gather_deref_large) {
         if (run(&B, bi, 4, 1,
                  (struct umbra_buf[]){
                      {.ptr=indices, .sz=sizeof indices},
-                     {.ptr=uni, .sz=sizeof uni_, .read_only=1},
+                     {.ptr=uni, .sz=sizeof uni_},
                      {.ptr=dst, .sz=sizeof dst},
                  })) {
             dst[0] == 10 here;
@@ -2254,7 +2254,7 @@ TEST(test_load_stride_neq_w) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
         if (run(&B, bi, 4, 2, (struct umbra_buf[]){
-            {.ptr=uni, .sz=(size_t)(ri * 4 + 4), .read_only=1},
+            {.ptr=uni, .sz=(size_t)(ri * 4 + 4)},
             {.ptr=src, .sz=sizeof src},
             {.ptr=dst, .sz=sizeof dst, .row_bytes=4*4},
         })) {
@@ -2368,7 +2368,7 @@ TEST(test_preamble_register_boundary) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
         if (run(&B, bi, 32, 1,
-                 (struct umbra_buf[]){{.ptr=&uni, .sz=4, .read_only=1}, {.ptr=dst, .sz=sizeof dst}})) {
+                 (struct umbra_buf[]){{.ptr=&uni, .sz=4}, {.ptr=dst, .sz=sizeof dst}})) {
             for (int col = 0; col < 32; col++) {
                 dst[col] == col + 1000 here;
             }
@@ -2541,7 +2541,7 @@ TEST(test_uniform_register) {
         int32_t src[] = {1, 2, 3, 4};
         int32_t dst[4] = {0};
         if (run(&B, bi, 4, 1, (struct umbra_buf[]){
-            {.ptr=&uni, .sz=4, .read_only=1},
+            {.ptr=&uni, .sz=4},
             {.ptr=src, .sz=sizeof src},
             {.ptr=dst, .sz=sizeof dst},
         })) {
@@ -3548,7 +3548,7 @@ TEST(test_strided_load_arbitrary_tile) {
         __builtin_memset(dst, 0, sizeof dst);
         if (!B.p[bi]) { continue; }
         B.p[bi]->queue(B.p[bi], L, T, R, BT,
-                            (struct umbra_buf[]){{.ptr=src, .sz=sizeof src, .row_bytes=S * 4, .read_only=1},
+                            (struct umbra_buf[]){{.ptr=src, .sz=sizeof src, .row_bytes=S * 4},
                                           {.ptr=dst, .sz=sizeof dst, .row_bytes=S * 4}});
         B.be[bi]->flush(B.be[bi]);
         for (int row = T; row < BT; row++) {
@@ -3582,7 +3582,7 @@ TEST(test_two_buffers_different_row_bytes) {
         __builtin_memset(dst, 0, sizeof dst);
         if (!B.p[bi]) { continue; }
         B.p[bi]->queue(B.p[bi], L, T, R, BT,
-                            (struct umbra_buf[]){{.ptr=src, .sz=sizeof src, .row_bytes=SW * 4, .read_only=1},
+                            (struct umbra_buf[]){{.ptr=src, .sz=sizeof src, .row_bytes=SW * 4},
                                           {.ptr=dst, .sz=sizeof dst, .row_bytes=DW * 4}});
         B.be[bi]->flush(B.be[bi]);
         for (int row = T; row < BT; row++) {
@@ -3628,7 +3628,7 @@ TEST(test_deref_row_bytes_l_gt_0) {
         if (!B.p[bi]) { continue; }
         B.p[bi]->queue(B.p[bi], L, T, R, BT,
                             (struct umbra_buf[]){{0},
-                                          {.ptr=uni, .sz=sizeof uni_, .read_only=1},
+                                          {.ptr=uni, .sz=sizeof uni_},
                                           {.ptr=dst_px, .sz=sizeof dst_px, .row_bytes=S * 4}});
         B.be[bi]->flush(B.be[bi]);
         for (int row = T; row < BT; row++) {
@@ -3683,7 +3683,7 @@ TEST(test_deref_16bit_row_bytes_l_gt_0) {
         if (!B.p[bi]) { continue; }
         B.p[bi]->queue(B.p[bi], L, T, R, BT,
                             (struct umbra_buf[]){{0},
-                                          {.ptr=uni, .sz=sizeof uni_, .read_only=1},
+                                          {.ptr=uni, .sz=sizeof uni_},
                                           {.ptr=dst_px, .sz=sizeof dst_px, .row_bytes=S * 4}});
         B.be[bi]->flush(B.be[bi]);
         for (int row = T; row < BT; row++) {
@@ -3733,7 +3733,7 @@ TEST(test_deref_third_uses_else_branch) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
         if (run(&B, bi, W, H, (struct umbra_buf[]){
-                {.ptr=uniforms, .sz=uni.size, .read_only=1},
+                {.ptr=uniforms, .sz=uni.size},
                 {.ptr=dst, .sz=sizeof dst, .row_bytes=W * 4}})) {
             for (int y = 0; y < H; y++) {
                 for (int x = 0; x < W; x++) {
@@ -3785,7 +3785,7 @@ TEST(test_tail_to_vector_row_transition) {
         __builtin_memset(dst, 0, sizeof dst);
         if (!B.p[bi]) { continue; }
         B.p[bi]->queue(B.p[bi], L, T, R, BT,
-                            (struct umbra_buf[]){{.ptr=src, .sz=sizeof src, .row_bytes=S * 4, .read_only=1},
+                            (struct umbra_buf[]){{.ptr=src, .sz=sizeof src, .row_bytes=S * 4},
                                           {.ptr=dst, .sz=sizeof dst, .row_bytes=S * 4}});
         B.be[bi]->flush(B.be[bi]);
         for (int row = T; row < BT; row++) {

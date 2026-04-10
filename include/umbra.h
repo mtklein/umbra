@@ -34,7 +34,6 @@ struct umbra_buf {
     void   *ptr;
     size_t  sz;
     size_t  row_bytes;
-    _Bool   read_only, pad_[7];
 };
 
 struct umbra_program {

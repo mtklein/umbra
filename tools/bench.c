@@ -255,7 +255,7 @@ int main(int argc, char *argv[]) {
         { int32_t z = 0; __builtin_memcpy(&j0, &z, 4); }
         umbra_uniforms_fill_f32(al.uniforms, al.loop_off, &j0, 1);
         struct umbra_buf abuf[] = {
-            (struct umbra_buf){.ptr=al.uniforms, .sz=al.uni.size, .read_only=1},
+            (struct umbra_buf){.ptr=al.uniforms, .sz=al.uni.size},
             {.ptr=wind, .sz=(size_t)(W * H * 4)},
         };
 

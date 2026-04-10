@@ -75,7 +75,7 @@ static void fill_bg(void *dst, uint32_t bg) {
     };
     umbra_uniforms_fill_f32(fill_pipe.uniforms, 0, hc, 4);
     struct umbra_buf buf[2] = {
-        (struct umbra_buf){.ptr=fill_pipe.uniforms, .sz=fill_pipe.uni.size, .read_only=1},
+        (struct umbra_buf){.ptr=fill_pipe.uniforms, .sz=fill_pipe.uni.size},
         {.ptr=dst, .sz=(size_t)(W * H * 4), .row_bytes=(size_t)W * 4},
     };
     fill_pipe.prog->queue(fill_pipe.prog, 0, 0, W, H, buf);
@@ -196,7 +196,7 @@ TEST(test_slug_rect) {
     umbra_uniforms_fill_ptr(alay.uniforms, alay.curves_off,
         (struct umbra_buf){.ptr=rect, .sz=sizeof rect});
     struct umbra_buf abuf[] = {
-        (struct umbra_buf){.ptr=alay.uniforms, .sz=alay.uni.size, .read_only=1},
+        (struct umbra_buf){.ptr=alay.uniforms, .sz=alay.uni.size},
         {.ptr=wind_buf, .sz=sizeof wind_buf, .row_bytes=W * sizeof(float)},
     };
     for (int j = 0; j < 4; j++) {
@@ -210,9 +210,9 @@ TEST(test_slug_rect) {
 
     umbra_uniforms_fill_f32(lay.uniforms, lay.shader, color, 4);
     umbra_uniforms_fill_ptr(lay.uniforms, lay.coverage,
-        (struct umbra_buf){.ptr=wind_buf, .sz=sizeof wind_buf, .read_only=1, .row_bytes=(size_t)W * sizeof(float)});
+        (struct umbra_buf){.ptr=wind_buf, .sz=sizeof wind_buf, .row_bytes=(size_t)W * sizeof(float)});
     struct umbra_buf buf[] = {
-        (struct umbra_buf){.ptr=lay.uniforms, .sz=lay.uni.size, .read_only=1},
+        (struct umbra_buf){.ptr=lay.uniforms, .sz=lay.uni.size},
         {.ptr=pixels, .sz=sizeof pixels, .row_bytes=W * 4},
     };
     interp->queue(interp, 0, 0, W, H, buf);
@@ -272,7 +272,7 @@ TEST(test_perspective_text) {
     umbra_uniforms_fill_ptr(lay.uniforms, (lay.coverage + 44 + 7) & ~(size_t)7,
         (struct umbra_buf){.ptr=bmp, .sz=sizeof bmp});
     struct umbra_buf buf[] = {
-        (struct umbra_buf){.ptr=lay.uniforms, .sz=lay.uni.size, .read_only=1},
+        (struct umbra_buf){.ptr=lay.uniforms, .sz=lay.uni.size},
         {.ptr=pixels, .sz=sizeof pixels},
     };
     interp->queue(interp, 0, 0, BW, 1, buf);
@@ -310,7 +310,7 @@ TEST(test_perspective_text) {
         umbra_uniforms_fill_ptr(lay2.uniforms, (lay2.coverage + 44 + 7) & ~(size_t)7,
             (struct umbra_buf){.ptr=tc.data, .sz=(size_t)(W * H * 2)});
         struct umbra_buf b2[] = {
-            (struct umbra_buf){.ptr=lay2.uniforms, .sz=lay2.uni.size, .read_only=1},
+            (struct umbra_buf){.ptr=lay2.uniforms, .sz=lay2.uni.size},
             {.ptr=px2, .sz=(size_t)(W * H * 4), .row_bytes=W * 4},
         };
         interp->queue(interp, 0, 0, W, H, b2);
@@ -372,7 +372,7 @@ static void run_long_batch_no_oom(struct umbra_backend *be) {
         float    color[4] = {0, 0, 0, 1};
         uint32_t pixel    = 0;
         struct umbra_buf bufs[] = {
-            {.ptr=color, .sz=sizeof color, .read_only=1},
+            {.ptr=color, .sz=sizeof color},
             {.ptr=&pixel, .sz=sizeof pixel, .row_bytes=sizeof pixel},
         };
         // 12 000 × 16-byte uniforms = ~192 KiB of ring traffic, ~3 backpressure
@@ -513,7 +513,7 @@ TEST(test_wgpu_misc) {
     float uniform_data[2] = {1.0f, 0.0f};
     uint32_t pixel = 0;
     struct umbra_buf bufs[] = {
-        {.ptr=uniform_data, .sz=7, .read_only=1},
+        {.ptr=uniform_data, .sz=7},
         {.ptr=&pixel, .sz=sizeof pixel, .row_bytes=sizeof pixel},
     };
     p->queue(p, 0, 0, 1, 1, bufs);

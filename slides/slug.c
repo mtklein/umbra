@@ -377,9 +377,9 @@ static void slug_draw(struct slide *s, int frame, int l, int t, int r, int b, vo
     mat[10] = st->slug->h;
     umbra_uniforms_fill_f32(st->acc_lay.uniforms, st->acc_lay.mat, mat, 11);
     umbra_uniforms_fill_ptr(st->acc_lay.uniforms, st->acc_lay.curves_off,
-                  (struct umbra_buf){.ptr=st->slug->data, .sz=(size_t)(st->slug->count * 6 * 4), .read_only=1});
+                  (struct umbra_buf){.ptr=st->slug->data, .sz=(size_t)(st->slug->count * 6 * 4)});
     struct umbra_buf abuf[] = {
-        (struct umbra_buf){.ptr=st->acc_lay.uniforms, .sz=st->acc_lay.uni.size, .read_only=1},
+        (struct umbra_buf){.ptr=st->acc_lay.uniforms, .sz=st->acc_lay.uni.size},
         {.ptr=st->wind_buf, .sz=wind_sz, .row_bytes=wind_row},
     };
     for (int j = 0; j < st->slug->count; j++) {
@@ -392,12 +392,12 @@ static void slug_draw(struct slide *s, int frame, int l, int t, int r, int b, vo
 
     umbra_uniforms_fill_f32(st->draw_lay.uniforms, st->draw_lay.shader, st->color, 4);
     umbra_uniforms_fill_ptr(st->draw_lay.uniforms, st->draw_lay.coverage,
-                  (struct umbra_buf){.ptr=st->wind_buf, .sz=wind_sz, .read_only=1, .row_bytes=(size_t)w * sizeof(float)});
+                  (struct umbra_buf){.ptr=st->wind_buf, .sz=wind_sz, .row_bytes=(size_t)w * sizeof(float)});
     size_t    pb = st->fmt.bpp;
     size_t plane_sz = (size_t)w * (size_t)h * pb;
     struct umbra_buf rbuf[2];
     size_t rb = (size_t)w * pb;
-    rbuf[0] = (struct umbra_buf){.ptr=st->draw_lay.uniforms, .sz=st->draw_lay.uni.size, .read_only=1};
+    rbuf[0] = (struct umbra_buf){.ptr=st->draw_lay.uniforms, .sz=st->draw_lay.uni.size};
     rbuf[1] = (struct umbra_buf){.ptr=buf, .sz=plane_sz * (size_t)st->fmt.planes, .row_bytes=rb};
     st->draw_prog->queue(st->draw_prog, l, t, r, b, rbuf);
 }

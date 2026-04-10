@@ -15,7 +15,7 @@ typedef struct asm_x86 Buf;
 #include <sys/mman.h>
 #include <unistd.h>
 
-_Static_assert(sizeof(struct umbra_buf) == 32, "");
+_Static_assert(sizeof(struct umbra_buf) == 24, "");
 _Static_assert(offsetof(struct umbra_buf, ptr)       ==  0, "");
 _Static_assert(offsetof(struct umbra_buf, sz)        ==  8, "");
 _Static_assert(offsetof(struct umbra_buf, row_bytes) == 16, "");

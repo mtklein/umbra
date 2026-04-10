@@ -151,7 +151,7 @@ static void text_draw(struct slide *s, int frame, int l, int t, int r, int b, vo
     size_t plane_sz = (size_t)st->w * (size_t)st->h * pb;
     size_t rb = (size_t)st->w * pb;
     struct umbra_buf ubuf[] = {
-        {.ptr=st->lay.uniforms, .sz=st->lay.uni.size, .read_only=1},
+        {.ptr=st->lay.uniforms, .sz=st->lay.uni.size},
         {.ptr=buf, .sz=plane_sz * (size_t)st->fmt.planes, .row_bytes=rb},
     };
     st->prog->queue(st->prog, l, t, r, b, ubuf);

@@ -190,7 +190,7 @@ static void fill_bg_row(void *dst, int n, uint32_t bg, size_t row_sz, size_t pla
     umbra_uniforms_fill_f32(fill_pipe.uniforms, 0, hc, 4);
     int      ps = plane_gap ? 3 : 0;
     struct umbra_buf buf[5];
-    buf[0] = (struct umbra_buf){.ptr=fill_pipe.uniforms, .sz=fill_pipe.uni.size, .read_only=1};
+    buf[0] = (struct umbra_buf){.ptr=fill_pipe.uniforms, .sz=fill_pipe.uni.size};
     buf[1] = (struct umbra_buf){.ptr=dst, .sz=row_sz};
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (struct umbra_buf){.ptr=(char *)dst + (size_t)(i + 1) * plane_gap, .sz=row_sz};
@@ -202,8 +202,8 @@ static void readback_row(uint32_t *dst, void *src, int n, size_t src_sz, size_t 
     int      ps = plane_gap ? 3 : 0;
     int      op = readback_pipe.out_ptr;
     struct umbra_buf buf[6];
-    buf[0] = (struct umbra_buf){.ptr=readback_pipe.uniforms, .sz=readback_pipe.uni.size, .read_only=1};
-    buf[1] = (struct umbra_buf){.ptr=src, .sz=src_sz, .read_only=1};
+    buf[0] = (struct umbra_buf){.ptr=readback_pipe.uniforms, .sz=readback_pipe.uni.size};
+    buf[1] = (struct umbra_buf){.ptr=src, .sz=src_sz};
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (struct umbra_buf){.ptr=(char *)src + (size_t)(i + 1) * plane_gap, .sz=src_sz};
     }
@@ -215,8 +215,8 @@ static void to_hdr_row(__fp16 *dst, void *src, int n, size_t src_sz, size_t plan
     int      ps = plane_gap ? 3 : 0;
     int      op = hdr_pipe.out_ptr;
     struct umbra_buf buf[6];
-    buf[0] = (struct umbra_buf){.ptr=hdr_pipe.uniforms, .sz=hdr_pipe.uni.size, .read_only=1};
-    buf[1] = (struct umbra_buf){.ptr=src, .sz=src_sz, .read_only=1};
+    buf[0] = (struct umbra_buf){.ptr=hdr_pipe.uniforms, .sz=hdr_pipe.uni.size};
+    buf[1] = (struct umbra_buf){.ptr=src, .sz=src_sz};
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (struct umbra_buf){.ptr=(char *)src + (size_t)(i + 1) * plane_gap, .sz=src_sz};
     }
