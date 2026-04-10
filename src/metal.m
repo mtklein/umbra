@@ -58,7 +58,6 @@ struct metal_backend {
     int                     free_bufs_n, free_bufs_cap;
     struct uniform_ring_pool uni_pool;
     double gpu_time_accum;
-    int    dispatches, batches;
 };
 
 struct umbra_metal {
@@ -957,7 +956,6 @@ static void metal_wait_frame(int frame, void *ctx) {
             be->frame_committed[frame] = NULL;
             [prior waitUntilCompleted];
             be->gpu_time_accum += prior.GPUEndTime - prior.GPUStartTime;
-            be->batches++;
         }
     }
 }
@@ -1307,7 +1305,6 @@ static void encode_dispatch(
                     (NSUInteger)gy, 1);
     [enc dispatchThreads:grid
        threadsPerThreadgroup:group];
-    be->dispatches++;
 }
 
 static void metal_submit_cmdbuf(struct metal_backend *be);
