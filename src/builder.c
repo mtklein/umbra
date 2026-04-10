@@ -67,7 +67,7 @@ static val push_(builder *b, struct bb_inst inst) {
     }
 
     if (b->insts == b->cap) {
-        b->cap = b->cap ? 2 * b->cap : 32;
+        b->cap *= 2;
         b->inst = realloc(b->inst, (size_t)b->cap * sizeof *b->inst);
     }
 

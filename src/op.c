@@ -32,7 +32,7 @@ char const* op_name(enum op op) {
     if ((unsigned)op < sizeof names / sizeof *names && names[op]) {
         return names[op];
     }
-    return "?";
+    __builtin_unreachable();
 }
 
 int op_eval(enum op op, int xb, int yb, int zb, int wb) {

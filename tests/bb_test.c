@@ -3849,3 +3849,20 @@ TEST(test_jit_code_buffer_overflow) {
     umbra_basic_block_free(bb);
 }
 
+// Cover const-fold branches in op_eval that need specific operand orderings.
+TEST(test_const_fold_coverage) {
+    struct umbra_builder *b = umbra_builder();
+    // min(1.0, 2.0) const-folds with x < y true.
+    umbra_val32 r = umbra_min_f32(b, umbra_imm_f32(b, 1.f), umbra_imm_f32(b, 2.f));
+    umbra_store_32(b, (umbra_ptr32){0}, r);
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        float out[8] = {0};
+        if (run(&B, bi, 8, 1,
+                (struct umbra_buf[]){{.ptr=out, .sz=sizeof out}})) {
+            out[0] == 1.f here;
+        }
+    }
+    cleanup(&B);
+}
