@@ -1,5 +1,5 @@
 #pragma once
-#include "bb.h"
+#include "basic_block.h"
 #include <stdint.h>
 
 typedef void (*ra_spill_fn)(int reg, int slot, void *ctx);

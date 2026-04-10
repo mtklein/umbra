@@ -1,5 +1,5 @@
 #include "../src/ra.h"
-#include "../src/bb.h"
+#include "../src/basic_block.h"
 #include "test.h"
 #include <stdlib.h>
 #include <string.h>

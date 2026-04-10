@@ -1,5 +1,5 @@
 #include "assume.h"
-#include "bb.h"
+#include "basic_block.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>

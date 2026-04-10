@@ -1,7 +1,6 @@
 #pragma once
 #include <stdint.h>
 #include "../include/umbra.h"
-#include "hash.h"
 
 // Internal val type matches public umbra_val32 layout, plus a bits overlay.
 typedef union {
@@ -98,17 +97,6 @@ struct bb_inst {
 _Bool ptr_is_deref(int ptr);
 int   ptr_ix(int ptr);
 
-struct umbra_builder {
-    struct bb_inst *inst;
-    int             insts, inst_cap;
-    struct hash     ht;
-};
-
-struct umbra_basic_block {
-    struct bb_inst *inst;
-    int             insts, preamble;
-};
-
 _Bool is_store(enum op);
 _Bool has_ptr(enum op);
 _Bool is_varying(enum op);
@@ -116,4 +104,3 @@ _Bool is_varying(enum op);
 _Bool is_fused_imm(enum op);
 
 int umbra_const_eval(enum op, int, int, int);
-

@@ -1,5 +1,5 @@
 #include "assume.h"
-#include "bb.h"
+#include "basic_block.h"
 #include "uniform_ring.h"
 #include <stdlib.h>
 #include <string.h>

@@ -1,5 +1,5 @@
 #include "assume.h"
-#include "bb.h"
+#include "basic_block.h"
 
 #if !defined(__aarch64__) && !defined(__AVX2__)
 
