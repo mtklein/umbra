@@ -9,7 +9,7 @@ struct umbra_backend *umbra_backend_jit(void) { return 0; }
 
 #include "ra.h"
 
-static void free_chan(struct ra *ra, val_ operand, int i) {
+static void free_chan(struct ra *ra, val operand, int i) {
     int id = operand.id, ch = (int)operand.chan;
     if (ch) {
         if (ra_chan_last_use(ra, id, ch) <= i) {

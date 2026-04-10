@@ -560,7 +560,7 @@ static uint32_t as_f32(SpvBuilder *b, uint32_t val, int inst_id) {
 }
 
 // Get the SPIR-V result ID for a bb_inst operand, handling channel extraction.
-static uint32_t get_val(SpvBuilder *b, val_ v) {
+static uint32_t get_val(SpvBuilder *b, val v) {
     int const id = v.id,
               ch = (int)v.chan;
     switch (ch) {
@@ -572,7 +572,7 @@ static uint32_t get_val(SpvBuilder *b, val_ v) {
     __builtin_unreachable();
 }
 
-static int get_id(val_ v) { return v.id; }
+static int get_id(val v) { return v.id; }
 
 // Resolve a pointer index: if negative, it's a deref reference.
 static int resolve_ptr(SpvBuilder *b, struct bb_inst const *inst) {
@@ -1402,7 +1402,7 @@ static uint32_t *build_spirv(struct umbra_basic_block const *bb,
                     uint32_t addr16 = spv_binop(&B, SpvOpIMul, B.t_u32, y_coord, rb_u16);
                     addr16 = spv_binop(&B, SpvOpIAdd, B.t_u32, addr16, x_coord);
 
-                    val_ channels[4] = { inst->x, inst->y, inst->z, inst->w };
+                    val channels[4] = { inst->x, inst->y, inst->z, inst->w };
                     int channel_ids[4] = { xid, yid, get_id(inst->z), get_id(inst->w) };
 
                     for (int ch = 0; ch < 4; ch++) {

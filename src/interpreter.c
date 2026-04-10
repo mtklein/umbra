@@ -119,7 +119,7 @@ typedef union {
     I32 i32;
     U32 u32;
     F32 f32;
-} val;
+} ival;
 
 // Tag values: all enum op values (0..op_le_s32_imm), plus interpreter-only ops.
 //
@@ -165,7 +165,7 @@ struct sw_inst {
 struct umbra_interpreter {
     struct umbra_program base;
     struct sw_inst *inst;
-    val            *v;
+    ival           *v;
     struct umbra_buf      *buf;
     int             preamble, nptr, n_deref, pad_;
 };
@@ -476,9 +476,9 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
             int const              end = col + K;
             int const              n   = r;
             struct sw_inst const  *ip  = p->inst + (col == l ? 0 : P);
-            val                   *v   = p->v    + (col == l ? 0 : P);
+            ival                  *v   = p->v    + (col == l ? 0 : P);
 
-            val acc = {0};
+            ival acc = {0};
 #define F32_IMM union { int i; float f; } const u = {.i = ip->y}; F32 const imm = (F32){0} + u.f
             // Computed goto on native, switch on WASM.
 #if defined(__GNUC__) && !defined(__wasm__)

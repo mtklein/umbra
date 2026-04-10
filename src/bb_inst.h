@@ -2,11 +2,13 @@
 #include <stdint.h>
 #include "../include/umbra.h"
 
-// Internal val type matches public umbra_val32 layout, plus a bits overlay.
+// Type-erased val: holds either width, plus a bits overlay for hashing/equality.
 typedef union {
-    int      bits;
+    int         bits;
+    umbra_val32 v32;
+    umbra_val16 v16;
     struct { int id : 30; unsigned chan : 2; };
-} val_;
+} val;
 
 // Op metadata flags.
 //   OTHER_OPS:  X(name, flags) where flags combine OP_STORE, OP_PTR, OP_VARYING.
@@ -85,7 +87,7 @@ enum op {
 
 struct bb_inst {
     enum op op;
-    val_    x, y, z, w;
+    val     x, y, z, w;
     int     ptr, imm;
 
     // Compiler bookkeeping, doesn't need to be hashed.

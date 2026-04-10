@@ -5,18 +5,16 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-typedef umbra_val32 val;
-
-static val pack_unorm(struct umbra_builder *b, val ch, val scale) {
-    val zero = umbra_imm_f32(b, 0.0f), one = umbra_imm_f32(b, 1.0f);
+static umbra_val32 pack_unorm(struct umbra_builder *b, umbra_val32 ch, umbra_val32 scale) {
+    umbra_val32 zero = umbra_imm_f32(b, 0.0f), one = umbra_imm_f32(b, 1.0f);
     return umbra_round_i32(b, umbra_mul_f32(b,
         umbra_min_f32(b, umbra_max_f32(b, ch, zero), one), scale));
 }
 
 umbra_color umbra_load_8888(struct umbra_builder *b, umbra_ptr32 src) {
-    val r, g, bl, a;
+    umbra_val32 r, g, bl, a;
     umbra_load_8x4(b, src, &r, &g, &bl, &a);
-    val const inv = umbra_imm_f32(b, 1.0f/255);
+    umbra_val32 const inv = umbra_imm_f32(b, 1.0f/255);
     return (umbra_color){
         umbra_mul_f32(b, umbra_f32_from_i32(b, r), inv),
         umbra_mul_f32(b, umbra_f32_from_i32(b, g), inv),
@@ -25,17 +23,17 @@ umbra_color umbra_load_8888(struct umbra_builder *b, umbra_ptr32 src) {
     };
 }
 void umbra_store_8888(struct umbra_builder *b, umbra_ptr32 dst, umbra_color c) {
-    val s = umbra_imm_f32(b, 255.0f);
+    umbra_val32 s = umbra_imm_f32(b, 255.0f);
     umbra_store_8x4(b, dst, pack_unorm(b, c.r, s), pack_unorm(b, c.g, s),
                             pack_unorm(b, c.b, s), pack_unorm(b, c.a, s));
 }
 
 umbra_color umbra_load_565(struct umbra_builder *b, umbra_ptr16 src) {
-    val const px = umbra_i32_from_u16(b, umbra_load_16(b, src));
-    val const r5 = umbra_shr_u32(b, px, umbra_imm_i32(b, 11));
-    val const g6 = umbra_and_32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 5)),
-                                 umbra_imm_i32(b, 0x3F));
-    val const b5 = umbra_and_32(b, px, umbra_imm_i32(b, 0x1F));
+    umbra_val32 const px = umbra_i32_from_u16(b, umbra_load_16(b, src));
+    umbra_val32 const r5 = umbra_shr_u32(b, px, umbra_imm_i32(b, 11));
+    umbra_val32 const g6 = umbra_and_32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 5)),
+                                         umbra_imm_i32(b, 0x3F));
+    umbra_val32 const b5 = umbra_and_32(b, px, umbra_imm_i32(b, 0x1F));
     return (umbra_color){
         umbra_mul_f32(b, umbra_f32_from_i32(b, r5), umbra_imm_f32(b, 1.0f/31)),
         umbra_mul_f32(b, umbra_f32_from_i32(b, g6), umbra_imm_f32(b, 1.0f/63)),
@@ -44,7 +42,7 @@ umbra_color umbra_load_565(struct umbra_builder *b, umbra_ptr16 src) {
     };
 }
 void umbra_store_565(struct umbra_builder *b, umbra_ptr16 dst, umbra_color c) {
-    val px = pack_unorm(b, c.b, umbra_imm_f32(b, 31.0f));
+    umbra_val32 px = pack_unorm(b, c.b, umbra_imm_f32(b, 31.0f));
     px = umbra_or_32(b, px, umbra_shl_i32(b, pack_unorm(b, c.g, umbra_imm_f32(b, 63.0f)),
                                             umbra_imm_i32(b, 5)));
     px = umbra_or_32(b, px, umbra_shl_i32(b, pack_unorm(b, c.r, umbra_imm_f32(b, 31.0f)),
@@ -53,12 +51,12 @@ void umbra_store_565(struct umbra_builder *b, umbra_ptr16 dst, umbra_color c) {
 }
 
 umbra_color umbra_load_1010102(struct umbra_builder *b, umbra_ptr32 src) {
-    val const px   = umbra_load_32(b, src);
-    val const mask = umbra_imm_i32(b, 0x3FF);
-    val const ri   = umbra_and_32(b, px, mask);
-    val const gi   = umbra_and_32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 10)), mask);
-    val const bi   = umbra_and_32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 20)), mask);
-    val const ai   = umbra_shr_u32(b, px, umbra_imm_i32(b, 30));
+    umbra_val32 const px   = umbra_load_32(b, src);
+    umbra_val32 const mask = umbra_imm_i32(b, 0x3FF);
+    umbra_val32 const ri   = umbra_and_32(b, px, mask);
+    umbra_val32 const gi   = umbra_and_32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 10)), mask);
+    umbra_val32 const bi   = umbra_and_32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 20)), mask);
+    umbra_val32 const ai   = umbra_shr_u32(b, px, umbra_imm_i32(b, 30));
     return (umbra_color){
         umbra_mul_f32(b, umbra_f32_from_i32(b, ri), umbra_imm_f32(b, 1.0f/1023)),
         umbra_mul_f32(b, umbra_f32_from_i32(b, gi), umbra_imm_f32(b, 1.0f/1023)),
@@ -67,8 +65,8 @@ umbra_color umbra_load_1010102(struct umbra_builder *b, umbra_ptr32 src) {
     };
 }
 void umbra_store_1010102(struct umbra_builder *b, umbra_ptr32 dst, umbra_color c) {
-    val s10 = umbra_imm_f32(b, 1023.0f);
-    val px = pack_unorm(b, c.r, s10);
+    umbra_val32 s10 = umbra_imm_f32(b, 1023.0f);
+    umbra_val32 px = pack_unorm(b, c.r, s10);
     px = umbra_or_32(b, px, umbra_shl_i32(b, pack_unorm(b, c.g, s10), umbra_imm_i32(b, 10)));
     px = umbra_or_32(b, px, umbra_shl_i32(b, pack_unorm(b, c.b, s10), umbra_imm_i32(b, 20)));
     px = umbra_or_32(b, px, umbra_shl_i32(b, pack_unorm(b, c.a, umbra_imm_f32(b, 3.0f)),

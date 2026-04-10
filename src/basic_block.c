@@ -189,10 +189,10 @@ struct umbra_basic_block* umbra_basic_block(struct umbra_builder *b) {
     schedule(b->inst, n, out, preamble, live);
 
     for (int i = 0; i < live; i++) {
-        out[i].x = (val_){.id = b->inst[out[i].x.id].final_id, .chan = out[i].x.chan};
-        out[i].y = (val_){.id = b->inst[out[i].y.id].final_id, .chan = out[i].y.chan};
-        out[i].z = (val_){.id = b->inst[out[i].z.id].final_id, .chan = out[i].z.chan};
-        out[i].w = (val_){.id = b->inst[out[i].w.id].final_id, .chan = out[i].w.chan};
+        out[i].x = (val){.id = b->inst[out[i].x.id].final_id, .chan = out[i].x.chan};
+        out[i].y = (val){.id = b->inst[out[i].y.id].final_id, .chan = out[i].y.chan};
+        out[i].z = (val){.id = b->inst[out[i].z.id].final_id, .chan = out[i].z.chan};
+        out[i].w = (val){.id = b->inst[out[i].w.id].final_id, .chan = out[i].w.chan};
         if (ptr_is_deref(out[i].ptr)) {
             out[i].ptr = ptr_deref(b->inst[ptr_ix(out[i].ptr)].final_id);
         }

@@ -32,8 +32,8 @@ static struct umbra_basic_block *make_bb(int n, int pre) {
 
     for (int i = 1; i < n; i++) {
         bb->inst[i].op = op_add_i32;
-        bb->inst[i].x = (val_){.id = i - 1};
-        bb->inst[i].y = (val_){0};
+        bb->inst[i].x = (val){.id = i - 1};
+        bb->inst[i].y = (val){0};
     }
     return bb;
 }
@@ -343,7 +343,7 @@ TEST(test_step_unary) {
     bb->inst[0].op = op_imm_32;
     bb->inst[0].imm = 42;
     bb->inst[1].op = op_f32_from_i32;
-    bb->inst[1].x = (val_){0};
+    bb->inst[1].x = (val){0};
 
     struct ra *ra = ra_create(bb, &cfg);
     int        sl[2] = {-1, -1};
@@ -386,10 +386,10 @@ TEST(test_step_unary_alive) {
     bb->inst[0].op = op_imm_32;
     bb->inst[0].imm = 42;
     bb->inst[1].op = op_f32_from_i32;
-    bb->inst[1].x = (val_){0};
+    bb->inst[1].x = (val){0};
     bb->inst[2].op = op_add_i32;
-    bb->inst[2].x = (val_){0};
-    bb->inst[2].y = (val_){0};
+    bb->inst[2].x = (val){0};
+    bb->inst[2].y = (val){0};
 
     struct ra *ra = ra_create(bb, &cfg);
     int        sl[3] = {-1, -1, -1};
@@ -448,8 +448,8 @@ TEST(test_step_unary_pins_inputs_and_dest) {
     bb->inst[2].op = op_imm_32;
     bb->inst[2].imm = 0;
     bb->inst[3].op = op_sub_f32_imm;
-    bb->inst[3].x = (val_){.id = 1};
-    bb->inst[3].y = (val_){.id = 0};
+    bb->inst[3].x = (val){.id = 1};
+    bb->inst[3].y = (val){.id = 0};
 
     struct ra *ra = ra_create(bb, &cfg);
     int        sl[4] = {-1, -1, -1, -1};
@@ -516,8 +516,8 @@ TEST(test_step_alu) {
     bb->inst[1].op = op_imm_32;
     bb->inst[1].imm = 2;
     bb->inst[2].op = op_add_i32;
-    bb->inst[2].x = (val_){0};
-    bb->inst[2].y = (val_){.id = 1};
+    bb->inst[2].x = (val){0};
+    bb->inst[2].y = (val){.id = 1};
 
     struct ra *ra = ra_create(bb, &cfg);
     int        sl[3] = {-1, -1, -1};
@@ -579,8 +579,8 @@ TEST(test_step_alu_scratch_does_not_evict_dest) {
     bb->inst[2].op = op_imm_32;
     bb->inst[2].imm = 0;
     bb->inst[3].op = op_shr_u32;
-    bb->inst[3].x = (val_){.id = 0};
-    bb->inst[3].y = (val_){.id = 1};
+    bb->inst[3].x = (val){.id = 0};
+    bb->inst[3].y = (val){.id = 1};
 
     struct ra *ra = ra_create(bb, &cfg);
     int        sl[4] = {-1, -1, -1, -1};
@@ -643,8 +643,8 @@ TEST(test_step_alu_scratch) {
     bb->inst[1].op = op_imm_32;
     bb->inst[1].imm = 2;
     bb->inst[2].op = op_add_i32;
-    bb->inst[2].x = (val_){0};
-    bb->inst[2].y = (val_){.id = 1};
+    bb->inst[2].x = (val){0};
+    bb->inst[2].y = (val){.id = 1};
 
     struct ra *ra = ra_create(bb, &cfg);
     int        sl[3] = {-1, -1, -1};
