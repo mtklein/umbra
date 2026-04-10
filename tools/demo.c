@@ -12,12 +12,13 @@
 #include "../third_party/stb/stb_image_write.h"
 #pragma clang diagnostic pop
 
-enum { NUM_BACKENDS = 4 };
+enum { NUM_BACKENDS = 5 };
 static char const *backend_name[NUM_BACKENDS] = {
     "interp",
     "jit",
     "metal",
     "vulkan",
+    "wgpu",
 };
 
 static struct umbra_backend *bes[NUM_BACKENDS];
@@ -273,6 +274,7 @@ int main(void) {
     bes[1] = umbra_backend_jit();
     bes[2] = umbra_backend_metal();
     bes[3] = umbra_backend_vulkan();
+    bes[4] = umbra_backend_wgpu();
     pipe_be = umbra_backend_jit();
     if (!pipe_be) { pipe_be = umbra_backend_interp(); }
 
