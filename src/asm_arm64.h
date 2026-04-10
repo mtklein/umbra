@@ -1,9 +1,11 @@
 #pragma once
+#include <stddef.h>
 #include <stdint.h>
 
 struct Buf {
     uint32_t *word;
     int       words, cap;
+    size_t    mmap_size;
 };
 
 void     put(struct Buf *b, uint32_t w);

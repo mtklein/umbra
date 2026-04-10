@@ -331,7 +331,20 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     int *deref_gpr    = calloc((size_t)bb->insts, sizeof(int));
     int *deref_rb_gpr = calloc((size_t)bb->insts, sizeof(int));
 
-    Buf            c = {0};
+    size_t const pg  = 16384,
+                 est = (size_t)(bb->insts * 40 + 256);
+    size_t       mmap_size = (est + pg - 1) & ~(pg - 1);
+    void        *mem = mmap(NULL, mmap_size + pg, PROT_READ | PROT_WRITE,
+                            MAP_PRIVATE | MAP_ANON, -1, 0);
+    assume(mem != MAP_FAILED);
+    mprotect((char *)mem + mmap_size, pg, PROT_NONE);
+
+    Buf c = {
+        .word      = mem,
+        .words     = 0,
+        .cap       = (int)(mmap_size / 4),
+        .mmap_size = mmap_size + pg,
+    };
     struct jit_ctx jc = {.c = &c, .bb = bb, .pool = {0}};
     struct ra     *ra = ra_create_arm64(bb, &jc);
 
@@ -457,28 +470,25 @@ static struct umbra_jit *umbra_jit(struct umbra_basic_block const *bb) {
     free(deref_rb_gpr);
 
     size_t const code_sz = (size_t)c.words * 4,
-                 pg      = 16384,
                  alloc   = (code_sz + pg - 1) & ~(pg - 1);
 
-    void *mem = mmap(NULL, alloc + pg, PROT_READ | PROT_WRITE,
-                     MAP_PRIVATE | MAP_ANON, -1, 0);
-    assume(mem != MAP_FAILED);
-    mprotect((char *)mem + alloc, pg, PROT_NONE);
-    __builtin_memcpy(mem, c.word, code_sz);
-    { int const ok = mprotect(mem, alloc, PROT_READ | PROT_EXEC); assume(ok == 0); }
-    __builtin___clear_cache(mem, (char *)mem + code_sz);
-    free(c.word);
+    if (alloc + pg < c.mmap_size) {
+        mprotect((char *)c.word + alloc + pg, c.mmap_size - alloc - pg, PROT_NONE);
+    }
+    mprotect((char *)c.word + alloc, pg, PROT_NONE);
+    { int const ok = mprotect(c.word, alloc, PROT_READ | PROT_EXEC); assume(ok == 0); }
+    __builtin___clear_cache(c.word, (char *)c.word + code_sz);
 
     struct umbra_jit *j = malloc(sizeof *j);
-    j->code = mem;
-    j->code_size = alloc + pg;
+    j->code = c.word;
+    j->code_size = c.mmap_size;
     j->loop_start = loop_body_start;
     j->loop_end = loop_body_end;
     {
         union {
             void *p;
             void (*fn)(int, int, int, int, struct umbra_buf *);
-        } u = {.p = mem};
+        } u = {.p = c.word};
         j->entry = u.fn;
     }
     return j;
