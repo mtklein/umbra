@@ -69,7 +69,6 @@ struct wgpu_backend {
     WGPUQuerySet              ts_query;
     WGPUBuffer                ts_resolve;
     WGPUBuffer                ts_staging;
-    int                       dispatches, batches;
 };
 
 struct wgpu_program {
@@ -97,6 +96,7 @@ struct wgpu_program {
 
 struct wgpu_ring_chunk {
     WGPUBuffer buf;
+    void      *mapped;
 };
 
 static struct uniform_ring_chunk wgpu_ring_new_chunk(size_t min_bytes, void *ctx) {
@@ -107,7 +107,8 @@ static struct uniform_ring_chunk wgpu_ring_new_chunk(size_t min_bytes, void *ctx
         .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
         .size  = cap,
     });
-    void *mapped = malloc(cap);
+    chunk->mapped = malloc(cap);
+    void *mapped = chunk->mapped;
     return (struct uniform_ring_chunk){
         .handle = chunk,
         .mapped = mapped,
@@ -120,6 +121,7 @@ static void wgpu_ring_free_chunk(void *handle, void *ctx) {
     (void)ctx;
     struct wgpu_ring_chunk *chunk = handle;
     wgpuBufferRelease(chunk->buf);
+    free(chunk->mapped);
     free(chunk);
 }
 
@@ -282,7 +284,7 @@ static void wgpu_wait_frame(int frame, void *ctx) {
 static void wgpu_submit_cmdbuf(struct wgpu_backend *be) {
     if (!be->batch_enc) { return; }
 
-    wgpuComputePassEncoderEnd(be->batch_enc ? be->batch_pass : NULL);
+    wgpuComputePassEncoderEnd(be->batch_pass);
     wgpuComputePassEncoderRelease(be->batch_pass);
     be->batch_pass = NULL;
 
@@ -305,7 +307,6 @@ static void wgpu_submit_cmdbuf(struct wgpu_backend *be) {
     wgpuCommandBufferRelease(cmd);
     be->frame_has_work[cur] = 1;
     be->batch_has_dispatch  = 0;
-    be->batches++;
 
     uniform_ring_pool_rotate(&be->uni_pool);
 }
@@ -600,7 +601,6 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
     wgpuBufferRelease(push_buf);
 
     be->batch_has_dispatch = 1;
-    be->dispatches++;
 
     if (uniform_ring_pool_should_rotate(&be->uni_pool)) {
         wgpu_submit_cmdbuf(be);

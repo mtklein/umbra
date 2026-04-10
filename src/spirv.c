@@ -217,8 +217,6 @@ typedef struct {
     uint32_t t_struct_rta_u16;      // struct { RuntimeArray<u16> }
     uint32_t t_ptr_ssbo_struct;     // pointer to struct { RuntimeArray<u32> }
     uint32_t t_ptr_ssbo_struct_u16; // pointer to struct { RuntimeArray<u16> }
-    uint32_t t_ptr_func_u32;
-    uint32_t t_ptr_func_f32;
 
     // GLSL.std.450 import.
     uint32_t ext_glsl;
@@ -313,9 +311,6 @@ static uint32_t spv_bitcast(SpvBuilder *b, uint32_t dst_type, uint32_t src) {
     spv_word(&b->func, src);
     return id;
 }
-
-// Emit: result = OpAccessChain ptr_type base [indices...]
-// (spv_access_chain_1 removed — we always need at least 2 indices for our layouts.)
 
 static uint32_t spv_access_chain_2(SpvBuilder *b, uint32_t ptr_type,
                                     uint32_t base, uint32_t ix0, uint32_t ix1) {
@@ -983,19 +978,6 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
     spv_word(&B.types, B.t_ptr_push_u32);
     spv_word(&B.types, push_sc);
     spv_word(&B.types, B.t_u32);
-
-    // Function-local pointer types.
-    B.t_ptr_func_u32 = spv_id(&B);
-    spv_op(&B.types, SpvOpTypePointer, 4);
-    spv_word(&B.types, B.t_ptr_func_u32);
-    spv_word(&B.types, SpvStorageClassFunction);
-    spv_word(&B.types, B.t_u32);
-
-    B.t_ptr_func_f32 = spv_id(&B);
-    spv_op(&B.types, SpvOpTypePointer, 4);
-    spv_word(&B.types, B.t_ptr_func_f32);
-    spv_word(&B.types, SpvStorageClassFunction);
-    spv_word(&B.types, B.t_f32);
 
     // --- Constants ---
     B.c_0 = spv_const_u32(&B, 0);
