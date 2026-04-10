@@ -165,7 +165,7 @@ int main(int argc, char *argv[]) {
 
     _Bool any_anomaly = 0;
 
-    printf("%-40s", "");
+    printf("%-40s", "ns/px");
     for (int bi = 0; bi < nb; bi++) {
         if (be_mask & (1 << bi)) { printf(" %12s", be_names[bi]); }
     }
@@ -195,7 +195,12 @@ int main(int argc, char *argv[]) {
             if (!(be_mask & (1 << bi))) { continue; }
             if (ns_px[bi] < 0) { printf(" %12s", "-"); continue; }
             char tmp[32];
-            sprintf(tmp, "%5.2f ns/px", ns_px[bi]);
+            if (gpu[bi] >= 0 && ns_px[bi] > 0) {
+                int pct = (int)(gpu[bi] / ns_px[bi] * 100 + 0.5);
+                sprintf(tmp, "%.2f (%d%%)", ns_px[bi], pct);
+            } else {
+                sprintf(tmp, "%5.2f", ns_px[bi]);
+            }
             printf(" %12s", tmp);
         }
         // Anomaly markers: interp should never beat jit, and vulkan should
@@ -212,22 +217,6 @@ int main(int argc, char *argv[]) {
         if (rv >= 0 && rm >= 0 && rv < rm) { anomaly = 1; }
         if (anomaly) { printf(" !"); any_anomaly = 1; }
         printf("\n");
-
-        _Bool any_gpu = 0;
-        for (int bi = 0; bi < nb; bi++) {
-            if (gpu[bi] >= 0) { any_gpu = 1; }
-        }
-        if (any_gpu) {
-            printf("%-40s", "  gpu");
-            for (int bi = 0; bi < nb; bi++) {
-                if (!(be_mask & (1 << bi))) { continue; }
-                if (gpu[bi] < 0) { printf(" %12s", ""); continue; }
-                char tmp[32];
-                sprintf(tmp, "%5.2f ns/px", gpu[bi]);
-                printf(" %12s", tmp);
-            }
-            printf("\n");
-        }
 
         free(buf);
     }
@@ -279,7 +268,12 @@ int main(int argc, char *argv[]) {
             if (!(be_mask & (1 << bi))) { continue; }
             if (ns_px[bi] < 0) { printf(" %12s", "-"); continue; }
             char tmp[32];
-            sprintf(tmp, "%5.2f ns/px", ns_px[bi]);
+            if (gpu[bi] >= 0 && ns_px[bi] > 0) {
+                int pct = (int)(gpu[bi] / ns_px[bi] * 100 + 0.5);
+                sprintf(tmp, "%.2f (%d%%)", ns_px[bi], pct);
+            } else {
+                sprintf(tmp, "%.2f", ns_px[bi]);
+            }
             printf(" %12s", tmp);
         }
         int const ri = ns_px[0] >= 0 ? (int)(ns_px[0] * 100 + 0.5) : -1;
@@ -292,24 +286,6 @@ int main(int argc, char *argv[]) {
         if (anomaly) { printf(" !"); any_anomaly = 1; }
         printf("\n");
 
-        {
-            _Bool any_gpu = 0;
-            for (int bi = 0; bi < nb; bi++) {
-                if (gpu[bi] >= 0) { any_gpu = 1; }
-            }
-            if (any_gpu) {
-                printf("%-40s", "  gpu");
-                for (int bi = 0; bi < nb; bi++) {
-                    if (!(be_mask & (1 << bi))) { continue; }
-                    if (gpu[bi] < 0) { printf(" %12s", ""); continue; }
-                    char tmp[32];
-                    sprintf(tmp, "%5.2f ns/px", gpu[bi]);
-                    printf(" %12s", tmp);
-                }
-                printf("\n");
-            }
-        }
-
         for (int bi = 0; bi < nb; bi++) {
             if (progs[bi]) { progs[bi]->free(progs[bi]); }
         }
@@ -321,7 +297,7 @@ int main(int argc, char *argv[]) {
     // Compile-time benchmarks: time builder → basic_block → compile → free
     // per slide.
     if (!match || strstr("compile", match)) {
-        printf("\n%-40s", "compile (µs/call)");
+        printf("\n%-40s", "compile (µs)");
         for (int bi = 0; bi < nb; bi++) {
             if (be_mask & (1 << bi)) { printf(" %12s", be_names[bi]); }
         }
@@ -391,7 +367,7 @@ int main(int argc, char *argv[]) {
                 if (!(be_mask & (1 << bi))) { continue; }
                 if (us_call[bi] < 0) { printf(" %12s", "-"); continue; }
                 char tmp[32];
-                sprintf(tmp, "%5.1f µs", us_call[bi]);
+                sprintf(tmp, "%.1f", us_call[bi]);
                 printf(" %12s", tmp);
             }
             printf("\n");
