@@ -25,6 +25,11 @@ struct buf_cache_entry {
     _Bool   writable; int :24, :32;
 };
 
+struct free_buf {
+    void  *mtl;      // retained id<MTLBuffer>
+    size_t size;
+};
+
 struct copyback {
     void *host;
     void *mtlbuf;
@@ -48,6 +53,8 @@ struct metal_backend {
     int                     batch_ncopy, batch_copy_cap;
     struct buf_cache_entry *batch_cache;
     int                     batch_cache_n, batch_cache_cap;
+    struct free_buf        *free_bufs;
+    int                     free_bufs_n, free_bufs_cap;
     struct uniform_ring_pool uni_pool;
     double gpu_time_accum;
     int    dispatches, batches;
@@ -998,6 +1005,12 @@ static void umbra_metal_backend_free(struct metal_backend *be) {
                 (void)(__bridge_transfer id)be->queue;
             }
         }
+        @autoreleasepool {
+            for (int i = 0; i < be->free_bufs_n; i++) {
+                (void)(__bridge_transfer id)be->free_bufs[i].mtl;
+            }
+        }
+        free(be->free_bufs);
         free(be->batch_copy);
         free(be->batch_cache);
         free(be);
@@ -1131,14 +1144,21 @@ static int cache_buf(struct metal_backend *be, void *host, size_t bytes,
     struct buf_cache_entry *ce = &be->batch_cache[idx];
     *ce = (struct buf_cache_entry){0};
 
-    id<MTLDevice> device = (__bridge id<MTLDevice>)be->device;
-    // MoltenVK exemplar: always allocate a fresh shared MTLBuffer and copy
-    // host data in. The newBufferWithBytesNoCopy fast path interacts badly
-    // with Metal's hazard tracking on at least some driver paths (Rosetta in
-    // particular), and going through the copy path is what MoltenVK does.
-    id<MTLBuffer> tmp =
-        [device newBufferWithLength:(NSUInteger)(bytes ? bytes : 1)
-                            options:MTLResourceStorageModeShared];
+    // Try to reuse a buffer from the free pool.
+    id<MTLBuffer> tmp = nil;
+    size_t alloc_size = bytes ? bytes : 1;
+    for (int i = 0; i < be->free_bufs_n; i++) {
+        if (be->free_bufs[i].size >= alloc_size) {
+            tmp = (__bridge_transfer id<MTLBuffer>)be->free_bufs[i].mtl;
+            be->free_bufs[i] = be->free_bufs[--be->free_bufs_n];
+            break;
+        }
+    }
+    if (!tmp) {
+        id<MTLDevice> device = (__bridge id<MTLDevice>)be->device;
+        tmp = [device newBufferWithLength:(NSUInteger)alloc_size
+                                  options:MTLResourceStorageModeShared];
+    }
     if (host && bytes) {
         __builtin_memcpy(tmp.contents, host, bytes);
     }
@@ -1347,9 +1367,17 @@ static void umbra_metal_flush(struct metal_backend *be) {
         }
         be->batch_ncopy = 0;
 
+        int need = be->free_bufs_n + be->batch_cache_n;
+        if (need > be->free_bufs_cap) {
+            be->free_bufs_cap = need;
+            be->free_bufs = realloc(be->free_bufs,
+                (size_t)be->free_bufs_cap * sizeof *be->free_bufs);
+        }
         for (int i = 0; i < be->batch_cache_n; i++) {
-            (void)(__bridge_transfer id)
-                be->batch_cache[i].mtl;
+            be->free_bufs[be->free_bufs_n++] = (struct free_buf){
+                .mtl  = be->batch_cache[i].mtl,
+                .size = be->batch_cache[i].size,
+            };
         }
         be->batch_cache_n = 0;
     }

@@ -204,6 +204,13 @@ struct buf_cache_entry {
     _Bool          nocopy, writable; int :16, :32;
 };
 
+struct free_vk_buf {
+    VkBuffer       buf;
+    VkDeviceMemory mem;
+    void          *mapped;
+    VkDeviceSize   size;
+};
+
 enum { VK_N_FRAMES = 2 };
 
 struct vk_backend {
@@ -228,6 +235,8 @@ struct vk_backend {
     int                   batch_n_copies, batch_copies_cap;
     struct buf_cache_entry *batch_cache;
     int                     batch_cache_n, batch_cache_cap;
+    struct free_vk_buf     *free_bufs;
+    int                     free_bufs_n, free_bufs_cap;
     struct uniform_ring_pool uni_pool;
     _Bool                 batch_has_dispatch; int :24, :32;
 };
@@ -2063,10 +2072,22 @@ static int cache_buf(struct vk_backend *be, void *host, size_t bytes,
         vkDestroyBuffer(be->device, buf, 0);
     }
 
+    // Try to reuse a buffer from the free pool.
+    for (int i = 0; i < be->free_bufs_n; i++) {
+        if (be->free_bufs[i].size >= sz) {
+            ce->buf    = be->free_bufs[i].buf;
+            ce->mem    = be->free_bufs[i].mem;
+            ce->mapped = be->free_bufs[i].mapped;
+            ce->size   = be->free_bufs[i].size;
+            be->free_bufs[i] = be->free_bufs[--be->free_bufs_n];
+            goto fill;
+        }
+    }
     ce->buf      = create_buffer(be->device, sz);
     ce->mem      = alloc_and_bind(be->device, ce->buf, be->mem_type_host);
     ce->size     = sz;
     vkMapMemory(be->device, ce->mem, 0, sz, 0, &ce->mapped);
+fill:
     ce->host     = host;
     ce->writable = !read_only;
     if (bytes) { memcpy(ce->mapped, host, bytes); }
@@ -2421,10 +2442,31 @@ static void vk_flush(struct umbra_backend *be) {
         memcpy(v->batch_copies[i].host, v->batch_copies[i].mapped, v->batch_copies[i].bytes);
     }
 
-    for (int i = 0; i < v->batch_cache_n; i++) {
-        struct buf_cache_entry *ce = &v->batch_cache[i];
-        vkFreeMemory  (v->device, ce->mem, 0);
-        vkDestroyBuffer(v->device, ce->buf, 0);
+    {
+        int recyclable = 0;
+        for (int i = 0; i < v->batch_cache_n; i++) {
+            if (!v->batch_cache[i].nocopy) { recyclable++; }
+        }
+        int need = v->free_bufs_n + recyclable;
+        if (need > v->free_bufs_cap) {
+            v->free_bufs_cap = need;
+            v->free_bufs = realloc(v->free_bufs,
+                (size_t)v->free_bufs_cap * sizeof *v->free_bufs);
+        }
+        for (int i = 0; i < v->batch_cache_n; i++) {
+            struct buf_cache_entry *ce = &v->batch_cache[i];
+            if (ce->nocopy) {
+                vkFreeMemory  (v->device, ce->mem, 0);
+                vkDestroyBuffer(v->device, ce->buf, 0);
+            } else {
+                v->free_bufs[v->free_bufs_n++] = (struct free_vk_buf){
+                    .buf    = ce->buf,
+                    .mem    = ce->mem,
+                    .mapped = ce->mapped,
+                    .size   = ce->size,
+                };
+            }
+        }
     }
 
     v->batch_n_copies = 0;
@@ -2445,10 +2487,15 @@ static void vk_free(struct umbra_backend *be) {
     for (int i = 0; i < VK_N_FRAMES; i++) {
         vkDestroyFence(v->device, v->frame_fences[i], 0);
     }
+    for (int i = 0; i < v->free_bufs_n; i++) {
+        vkFreeMemory  (v->device, v->free_bufs[i].mem, 0);
+        vkDestroyBuffer(v->device, v->free_bufs[i].buf, 0);
+    }
     if (v->ts_pool) { vkDestroyQueryPool(v->device, v->ts_pool, 0); }
     vkDestroyCommandPool(v->device, v->cmd_pool, 0);
     vkDestroyDevice(v->device, 0);
     vkDestroyInstance(v->instance, 0);
+    free(v->free_bufs);
     free(v->batch_copies);
     free(v->batch_cache);
     free(v);
