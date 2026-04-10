@@ -393,7 +393,7 @@ static void run_long_batch_no_oom(struct umbra_backend *be) {
         rotations_after > rotations_before here;
 
         be->gpu_time != 0 here;
-        be->gpu_time(be) >= 0.0 here;
+        be->gpu_time(be) > 0.0 here;
 
         p->free(p);
         be->free(be);
