@@ -166,6 +166,64 @@ TEST(test_gpu_buf_cache_read_modified_within_batch) {
     gpu_buf_cache_free(&c);
 }
 
+static gpu_buf mock_import_ok(void *host, size_t bytes, void *ctx) {
+    ((struct mock_ctx *)ctx)->imports++;
+    return (gpu_buf){.ptr = host, .size = bytes};
+}
+
+static void mock_release_nofree(gpu_buf buf, void *ctx) {
+    ((struct mock_ctx *)ctx)->releases++;
+    (void)buf;
+}
+
+TEST(test_gpu_buf_cache_import_nocopy) {
+    struct mock_ctx m = {0};
+    struct gpu_buf_cache c = {
+        .ops = {mock_alloc, mock_upload, mock_import_ok, mock_release_nofree},
+        .ctx = &m,
+    };
+
+    char data[64];
+    memset(data, 0x42, sizeof data);
+
+    // Successful import: no alloc, no upload.
+    int i = gpu_buf_cache_get(&c, data, sizeof data, BUF_READ);
+    i == 0 here;
+    m.imports == 1 here;
+    m.allocs  == 0 here;
+    m.uploads == 0 here;
+    c.entry[0].nocopy   here;
+    c.entry[0].uploaded here;
+    c.entry[0].buf.ptr == data here;
+
+    // Cache hit within batch: still no upload.
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ);
+    m.uploads == 0 here;
+
+    gpu_buf_cache_free(&c);
+    m.releases == 1 here;
+}
+
+TEST(test_gpu_buf_cache_import_nocopy_writable) {
+    struct mock_ctx m = {0};
+    struct gpu_buf_cache c = {
+        .ops = {mock_alloc, mock_upload, mock_import_ok, mock_release_nofree},
+        .ctx = &m,
+    };
+
+    char data[64];
+    memset(data, 0x42, sizeof data);
+
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_WRITTEN);
+    m.allocs  == 0 here;
+    m.uploads == 0 here;
+    c.entry[0].nocopy       here;
+    c.entry[0].copy_tracked here;
+    c.entry[0].writable     here;
+
+    gpu_buf_cache_free(&c);
+}
+
 TEST(test_gpu_buf_cache_upload_bytes_tracked) {
     struct mock_ctx m = {0};
     struct gpu_buf_cache c = make_cache(&m);
