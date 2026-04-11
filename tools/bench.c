@@ -124,20 +124,40 @@ static struct umbra_fmt parse_fmt(char const *s) {
     exit(1);
 }
 
-// Display order: I(interp), J(jit), W(wgpu), V(vulkan), M(metal).
-// Expected ranking: slowest to fastest, left to right.
+// Display order: M(metal), V(vulkan), W(wgpu), J(jit), I(interp).
+// Expected ranking: fastest to slowest, left to right.
 enum { ND = 5 };
-static int const disp_idx[ND] = {0, 1, 4, 3, 2};
-static char const disp_lbl[ND] = {'I', 'J', 'W', 'V', 'M'};
+static int const disp_idx[ND] = {2, 3, 4, 1, 0};
+static char const *const disp_name[ND] = {"metal", "vulkan", "wgpu", "jit", "interp"};
+static _Bool const disp_gpu[ND] = {1, 1, 1, 0, 0};
+
+static void print_header(char const *label, int be_mask, _Bool first_row) {
+    printf("%-30s", label);
+    for (int d = 0; d < ND; d++) {
+        if (!(be_mask & (1 << disp_idx[d]))) { continue; }
+        if (first_row) {
+            if (disp_gpu[d]) {
+                char hdr[32];
+                sprintf(hdr, "%s cpu%%", disp_name[d]);
+                printf("  %-11s", hdr);
+            } else {
+                printf("  %-11s", disp_name[d]);
+            }
+        } else {
+            printf("  %-11s", disp_name[d]);
+        }
+    }
+    printf("\n");
+}
 
 // Returns 1 if any adjacent pair violates the expected ranking.
 static _Bool print_row(char const *title, double ns_px[5], double gpu[5],
-                       int be_mask) {
+                       int be_mask, _Bool first_row) {
     printf("%-30s", title);
 
-    // Find the rightmost (fastest-expected) backend with data.
+    // The leftmost (fastest-expected) backend with data is the base.
     int base = -1;
-    for (int d = ND - 1; d >= 0; d--) {
+    for (int d = 0; d < ND; d++) {
         int bi = disp_idx[d];
         if ((be_mask & (1 << bi)) && ns_px[bi] >= 0) { base = d; break; }
     }
@@ -146,31 +166,34 @@ static _Bool print_row(char const *title, double ns_px[5], double gpu[5],
         int bi = disp_idx[d];
         if (!(be_mask & (1 << bi))) { continue; }
         if (ns_px[bi] < 0) {
-            printf("  %8s", "-");
+            printf("  %-11s", "-");
             continue;
         }
+        char tmp[32];
         if (d == base) {
-            // Rightmost: raw ns/px.
-            if (gpu[bi] >= 0 && ns_px[bi] > 0) {
+            // Leftmost: raw ns/px.
+            if (disp_gpu[d] && gpu[bi] >= 0 && ns_px[bi] > 0) {
                 int pct = 100 - (int)(gpu[bi] / ns_px[bi] * 100 + 0.5);
-                printf("  %5.2f %2d%%", ns_px[bi], pct);
+                if (first_row) { sprintf(tmp, "%.2f ns/px %d%%", ns_px[bi], pct); }
+                else           { sprintf(tmp, "%.2f %d%%",       ns_px[bi], pct); }
             } else {
-                printf("  %5.2f    ", ns_px[bi]);
+                if (first_row) { sprintf(tmp, "%.2f ns/px", ns_px[bi]); }
+                else           { sprintf(tmp, "%.2f",       ns_px[bi]); }
             }
         } else {
             // Multiplier of the base.
             double mul = base >= 0 ? ns_px[bi] / ns_px[disp_idx[base]] : 0;
-            if (gpu[bi] >= 0 && ns_px[bi] > 0) {
+            if (disp_gpu[d] && gpu[bi] >= 0 && ns_px[bi] > 0) {
                 int pct = 100 - (int)(gpu[bi] / ns_px[bi] * 100 + 0.5);
-                printf(" %5.1fx %2d%%", mul, pct);
+                sprintf(tmp, "%.1f\xc3\x97 %d%%", mul, pct);
             } else {
-                printf("  %5.1fx   ", mul);
+                sprintf(tmp, "%.1f\xc3\x97", mul);
             }
         }
+        printf("  %-11s", tmp);
     }
 
-    // Anomaly: check each adjacent pair in display order is non-increasing.
-    // Round to printed precision so visually-tied numbers don't fire.
+    // Anomaly: each adjacent pair left→right should be non-decreasing.
     _Bool anomaly = 0;
     for (int d = 0; d + 1 < ND; d++) {
         int a = disp_idx[d], b = disp_idx[d + 1];
@@ -178,7 +201,7 @@ static _Bool print_row(char const *title, double ns_px[5], double gpu[5],
         if (ns_px[a] < 0 || ns_px[b] < 0) { continue; }
         int ra = (int)(ns_px[a] * 100 + 0.5);
         int rb = (int)(ns_px[b] * 100 + 0.5);
-        if (ra < rb) { anomaly = 1; }
+        if (ra > rb) { anomaly = 1; }
     }
     if (anomaly) { printf(" !"); }
     printf("\n");
@@ -227,14 +250,8 @@ int main(int argc, char *argv[]) {
 
     _Bool any_anomaly = 0;
 
-    // Header.
-    printf("%-30s", "ns/px");
-    for (int d = 0; d < ND; d++) {
-        int bi = disp_idx[d];
-        if (!(be_mask & (1 << bi))) { continue; }
-        printf("  %8c", disp_lbl[d]);
-    }
-    printf("\n");
+    print_header("", be_mask, 1);
+    _Bool first_row = 1;
 
     for (int si = 0; si < ns; si++) {
         struct slide *s = slide_get(si);
@@ -254,7 +271,8 @@ int main(int argc, char *argv[]) {
             ns_px[bi] = bench(slide_draw, &sctx, bes[bi], W, H, samples, target_secs,
                               &gpu[bi]);
         }
-        any_anomaly |= print_row(s->title, ns_px, gpu, be_mask);
+        any_anomaly |= print_row(s->title, ns_px, gpu, be_mask, first_row);
+        first_row = 0;
         free(buf);
     }
 
@@ -295,7 +313,9 @@ int main(int argc, char *argv[]) {
             ns_px[bi] = bench(prog_draw, &pctx, bes[bi], W, H, samples, target_secs,
                               &gpu[bi]);
         }
-        any_anomaly |= print_row("Slug Accumulator (1 curve)", ns_px, gpu, be_mask);
+        any_anomaly |= print_row("Slug Accumulator (1 curve)", ns_px, gpu,
+                                 be_mask, first_row);
+        first_row = 0;
 
         for (int bi = 0; bi < nb; bi++) {
             if (progs[bi]) { progs[bi]->free(progs[bi]); }
@@ -307,12 +327,9 @@ int main(int argc, char *argv[]) {
 
     // Compile-time benchmarks.
     if (!match || strstr("compile", match)) {
-        printf("\n%-30s", "compile (µs)");
-        for (int d = 0; d < ND; d++) {
-            int bi = disp_idx[d];
-            if (be_mask & (1 << bi)) { printf("  %8c", disp_lbl[d]); }
-        }
         printf("\n");
+        print_header("compile", be_mask, 0);
+        _Bool first_compile = 1;
 
         for (int si = 0; si < ns; si++) {
             struct slide *s = slide_get(si);
@@ -373,13 +390,36 @@ int main(int argc, char *argv[]) {
                 us_call[bi] = best / (double)iters * 1e6;
             }
             printf("%-30s", s->title);
+            // Find leftmost (fastest) backend with data as the base.
+            int cbase = -1;
+            for (int d = 0; d < ND; d++) {
+                int bi = disp_idx[d];
+                if ((be_mask & (1 << bi)) && us_call[bi] >= 0) {
+                    cbase = d;
+                    break;
+                }
+            }
             for (int d = 0; d < ND; d++) {
                 int bi = disp_idx[d];
                 if (!(be_mask & (1 << bi))) { continue; }
-                if (us_call[bi] < 0) { printf("  %8s", "-"); }
-                else                  { printf("  %8.1f", us_call[bi]); }
+                if (us_call[bi] < 0) {
+                    printf("  %-11s", "-");
+                } else if (d == cbase) {
+                    char tmp[32];
+                    if (first_compile) { sprintf(tmp, "%.1f \xc2\xb5s", us_call[bi]); }
+                    else               { sprintf(tmp, "%.1f",           us_call[bi]); }
+                    printf("  %-11s", tmp);
+                } else {
+                    double mul = cbase >= 0
+                               ? us_call[bi] / us_call[disp_idx[cbase]]
+                               : 0;
+                    char tmp[32];
+                    sprintf(tmp, "%.1f\xc3\x97", mul);
+                    printf("  %-11s", tmp);
+                }
             }
             printf("\n");
+            first_compile = 0;
         }
     }
 
