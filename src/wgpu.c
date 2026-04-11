@@ -320,6 +320,20 @@ static void wgpu_submit_cmdbuf(struct wgpu_backend *be) {
     wgpuCommandEncoderRelease(be->batch_enc);
     be->batch_enc = NULL;
 
+    // Bulk-upload all ring data accumulated since the last submit.
+    // Ring alloc copies into shadow; one QueueWriteBuffer per chunk replaces
+    // the N per-dispatch uploads that were here before.
+    {
+        struct uniform_ring *ring = &be->uni_pool.rings[be->uni_pool.cur];
+        for (int i = 0; i < ring->n; i++) {
+            if (ring->chunks[i].used) {
+                struct wgpu_ring_chunk *wc = ring->chunks[i].handle;
+                wgpuQueueWriteBuffer(be->queue, wc->buf, 0,
+                                     ring->chunks[i].mapped, ring->chunks[i].used);
+            }
+        }
+    }
+
     int cur = be->uni_pool.cur;
     be->frame_submitted[cur] =
         wgpuQueueSubmitForIndex(be->queue, 1, &cmd);
@@ -515,25 +529,10 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
         if (buf[i].ptr && buf[i].sz) {
             uint8_t const rw = p->buf_rw[i];
             if (!(rw & BUF_WRITTEN) && !buf[i].row_bytes) {
+                // Ring alloc copies data into shadow; bulk-uploaded at submit.
                 struct uniform_ring_loc loc =
                     uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, buf[i].sz);
                 struct wgpu_ring_chunk *chunk = loc.handle;
-                // The ring wrote to a malloc'd shadow buffer; upload to GPU.
-                {
-                    size_t sz = buf[i].sz, sz4 = (sz + 3) & ~(size_t)3;
-                    if (sz == sz4) {
-                        wgpuQueueWriteBuffer(be->queue, chunk->buf, loc.offset,
-                                             buf[i].ptr, sz);
-                    } else {
-                        char tmp[4] = {0};
-                        size_t tail = sz & ~(size_t)3;
-                        __builtin_memcpy(tmp, (char *)buf[i].ptr + tail, sz - tail);
-                        wgpuQueueWriteBuffer(be->queue, chunk->buf, loc.offset,
-                                             buf[i].ptr, tail);
-                        wgpuQueueWriteBuffer(be->queue, chunk->buf,
-                                             loc.offset + tail, tmp, 4);
-                    }
-                }
                 bind_buf   [i] = chunk->buf;
                 bind_offset[i] = loc.offset;
                 bind_size  [i] = (buf[i].sz + 3) & ~(size_t)3;
@@ -584,13 +583,11 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
         }
     }
 
-    // Upload push data via the uniform ring (avoids per-dispatch buffer alloc).
+    // Push data via ring; bulk-uploaded at submit.
     size_t push_sz = (size_t)p->push_words * sizeof(uint32_t);
     struct uniform_ring_loc push_loc =
         uniform_ring_pool_alloc(&be->uni_pool, push_data, push_sz);
     struct wgpu_ring_chunk *push_chunk = push_loc.handle;
-    wgpuQueueWriteBuffer(be->queue, push_chunk->buf, push_loc.offset,
-                         push_data, push_sz);
 
     // Reuse bind group if buffer bindings haven't changed.  Bindings 0 (user
     // uniforms) and n (push data) use dynamic offsets, so only buffer handles
