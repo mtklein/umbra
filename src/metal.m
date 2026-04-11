@@ -37,7 +37,7 @@ struct metal_backend {
     int    total_dispatches; int :32;
 };
 
-struct umbra_metal {
+struct metal_program {
     struct umbra_program base;
     void *pipeline;
     char     *src;
@@ -936,7 +936,7 @@ static void metal_wait_frame(int frame, void *ctx) {
     }
 }
 
-static struct metal_backend* umbra_metal_backend_create(void) {
+static struct metal_backend* metal_backend_create(void) {
     @autoreleasepool {
         id<MTLDevice> device =
             MTLCreateSystemDefaultDevice();
@@ -969,7 +969,7 @@ static struct metal_backend* umbra_metal_backend_create(void) {
     }
 }
 
-static void umbra_metal_backend_free(struct metal_backend *be) {
+static void metal_backend_free(struct metal_backend *be) {
     if (be) {
         uniform_ring_pool_free(&be->uni_pool);
         @autoreleasepool {
@@ -986,10 +986,10 @@ static void umbra_metal_backend_free(struct metal_backend *be) {
 }
 
 
-static struct umbra_metal* umbra_metal(
+static struct metal_program* metal_program(
     struct metal_backend *be, BB const *bb
 ) {
-    struct umbra_metal *result = 0;
+    struct metal_program *result = 0;
     @autoreleasepool {
         id<MTLDevice> device = (__bridge id<MTLDevice>)be->device;
 
@@ -1014,9 +1014,9 @@ static struct umbra_metal* umbra_metal(
         uint8_t *buf_rw = calloc((size_t)(total_bufs + 1), sizeof *buf_rw);
         for (int i = 0; i < bb->insts; i++) {
             if (!op_has_ptr(bb->inst[i].op)) { continue; }
-            int p = bb->inst[i].ptr.deref ? deref_buf[bb->inst[i].ptr.ix]
-                                          : bb->inst[i].ptr.bits;
-            buf_rw[p] |= op_is_store(bb->inst[i].op) ? BUF_WRITTEN : BUF_READ;
+            int bi = bb->inst[i].ptr.deref ? deref_buf[bb->inst[i].ptr.ix]
+                                           : bb->inst[i].ptr.bits;
+            buf_rw[bi] |= op_is_store(bb->inst[i].op) ? BUF_WRITTEN : BUF_READ;
         }
 
         NSError *error = nil;
@@ -1046,18 +1046,18 @@ static struct umbra_metal* umbra_metal(
         if (!pso) { goto fail; }
 
         {
-            struct umbra_metal *m = calloc(1, sizeof *m);
-            m->pipeline      = (__bridge_retained void*)pso;
-            m->tg_size       = (int)pso.maxTotalThreadsPerThreadgroup;
-            m->src           = src;
-            m->max_ptr       = max_ptr;
-            m->total_bufs    = total_bufs;
-            m->deref         = di;
-            m->n_deref       = n_deref;
-            m->buf_rw        = buf_rw;
+            struct metal_program *p = calloc(1, sizeof *p);
+            p->pipeline      = (__bridge_retained void*)pso;
+            p->tg_size       = (int)pso.maxTotalThreadsPerThreadgroup;
+            p->src           = src;
+            p->max_ptr       = max_ptr;
+            p->total_bufs    = total_bufs;
+            p->deref         = di;
+            p->n_deref       = n_deref;
+            p->buf_rw        = buf_rw;
 
             free(deref_buf);
-            result = m;
+            result = p;
             goto out;
         }
 
@@ -1112,22 +1112,22 @@ static void metal_cache_release(gpu_buf buf, void *ctx) {
 }
 
 static void encode_dispatch(
-    struct umbra_metal *m,
+    struct metal_program *p,
     int l, int t, int r, int b,
     struct umbra_buf buf[],
     id<MTLComputeCommandEncoder> enc
 ) {
     int w = r - l, h = b - t, x0 = l, y0 = t;
-    struct metal_backend *be = (struct metal_backend*)m->base.backend;
+    struct metal_backend *be = (struct metal_backend*)p->base.backend;
 
     id<MTLComputePipelineState> pso =
-        (__bridge id<MTLComputePipelineState>)m->pipeline;
+        (__bridge id<MTLComputePipelineState>)p->pipeline;
     [enc setComputePipelineState:pso];
 
-    int tb = m->total_bufs;
+    int tb = p->total_bufs;
     uint32_t szs_data[33] = {0};
     uint32_t rbs_data[33] = {0};
-    for (int i = 0; i <= m->max_ptr; i++) {
+    for (int i = 0; i <= p->max_ptr; i++) {
         if (buf[i].ptr && buf[i].sz) {
             szs_data[i] = (uint32_t)buf[i].sz;
         }
@@ -1143,9 +1143,9 @@ static void encode_dispatch(
     size_t  bind_offset[32];
     for (int i = 0; i < tb; i++) { bind_handle[i] = 0; bind_offset[i] = 0; }
 
-    for (int i = 0; i <= m->max_ptr; i++) {
+    for (int i = 0; i <= p->max_ptr; i++) {
         if (buf[i].ptr && buf[i].sz) {
-            uint8_t const rw = m->buf_rw[i];
+            uint8_t const rw = p->buf_rw[i];
             if (!(rw & BUF_WRITTEN) && !buf[i].row_bytes) {
                 struct uniform_ring_loc loc =
                     uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, buf[i].sz);
@@ -1158,15 +1158,15 @@ static void encode_dispatch(
         }
     }
 
-    for (int d = 0; d < m->n_deref; d++) {
-        void *base = buf[m->deref[d].src_buf].ptr;
+    for (int d = 0; d < p->n_deref; d++) {
+        void *base = buf[p->deref[d].src_buf].ptr;
         void  *derived;
         size_t dsz, drb;
-        __builtin_memcpy(&derived, (char*)base + m->deref[d].off,      sizeof derived);
-        __builtin_memcpy(&dsz,     (char*)base + m->deref[d].off + 8,  sizeof dsz);
-        __builtin_memcpy(&drb,     (char*)base + m->deref[d].off + 16, sizeof drb);
-        int const bi  = m->deref[d].buf_idx;
-        int const idx = gpu_buf_cache_get(&be->cache, derived, dsz, m->buf_rw[bi]);
+        __builtin_memcpy(&derived, (char*)base + p->deref[d].off,      sizeof derived);
+        __builtin_memcpy(&dsz,     (char*)base + p->deref[d].off + 8,  sizeof dsz);
+        __builtin_memcpy(&drb,     (char*)base + p->deref[d].off + 16, sizeof drb);
+        int const bi  = p->deref[d].buf_idx;
+        int const idx = gpu_buf_cache_get(&be->cache, derived, dsz, p->buf_rw[bi]);
         bind_handle[bi] = be->cache.entry[idx].buf.ptr;
         szs_data[bi] = (uint32_t)dsz;
         rbs_data[bi] = (uint32_t)drb;
@@ -1187,13 +1187,13 @@ static void encode_dispatch(
                    x032     = (uint32_t)x0,
                    y032     = (uint32_t)y0;
     size_t   const sz_bytes = (size_t)(tb + 1) * sizeof(uint32_t);
-    [enc setBytes:&w32  length:sizeof w32  atIndex:(NSUInteger)(m->total_bufs + 0)];
-    [enc setBytes:szs_data length:sz_bytes atIndex:(NSUInteger)(m->total_bufs + 1)];
-    [enc setBytes:rbs_data length:sz_bytes atIndex:(NSUInteger)(m->total_bufs + 2)];
-    [enc setBytes:&x032 length:sizeof x032 atIndex:(NSUInteger)(m->total_bufs + 3)];
-    [enc setBytes:&y032 length:sizeof y032 atIndex:(NSUInteger)(m->total_bufs + 4)];
+    [enc setBytes:&w32  length:sizeof w32  atIndex:(NSUInteger)(p->total_bufs + 0)];
+    [enc setBytes:szs_data length:sz_bytes atIndex:(NSUInteger)(p->total_bufs + 1)];
+    [enc setBytes:rbs_data length:sz_bytes atIndex:(NSUInteger)(p->total_bufs + 2)];
+    [enc setBytes:&x032 length:sizeof x032 atIndex:(NSUInteger)(p->total_bufs + 3)];
+    [enc setBytes:&y032 length:sizeof y032 atIndex:(NSUInteger)(p->total_bufs + 4)];
 
-    int const tg_size = m->tg_size;
+    int const tg_size = p->tg_size;
     MTLSize grid =
         MTLSizeMake((NSUInteger)w, (NSUInteger)h, 1);
     int gx = 1, gy = 1;
@@ -1213,13 +1213,13 @@ static void encode_dispatch(
 
 static void metal_submit_cmdbuf(struct metal_backend *be);
 
-static void umbra_metal_run(
-    struct umbra_metal *m, int l, int t, int r, int b, struct umbra_buf buf[]
+static void metal_program_queue(
+    struct metal_program *p, int l, int t, int r, int b, struct umbra_buf buf[]
 ) {
     int w = r - l, h = b - t;
     if (w <= 0 || h <= 0) { return; }
 
-    struct metal_backend *be = (struct metal_backend*)m->base.backend;
+    struct metal_backend *be = (struct metal_backend*)p->base.backend;
 
     @autoreleasepool {
         if (!be->batch_cmdbuf) {
@@ -1245,7 +1245,7 @@ static void umbra_metal_run(
         }
         id<MTLComputeCommandEncoder> enc =
             (__bridge id<MTLComputeCommandEncoder>)be->batch_enc;
-        encode_dispatch(m, l, t, r, b, buf, enc);
+        encode_dispatch(p, l, t, r, b, buf, enc);
     }
 
     if (uniform_ring_pool_should_rotate(&be->uni_pool)) {
@@ -1277,7 +1277,7 @@ static void metal_submit_cmdbuf(struct metal_backend *be) {
     uniform_ring_pool_rotate(&be->uni_pool);
 }
 
-static void umbra_metal_flush(struct metal_backend *be) {
+static void metal_flush(struct metal_backend *be) {
     metal_submit_cmdbuf(be);
     uniform_ring_pool_drain_all(&be->uni_pool);
     @autoreleasepool {
@@ -1286,47 +1286,47 @@ static void umbra_metal_flush(struct metal_backend *be) {
     }
 }
 
-static void umbra_metal_free(struct umbra_metal *m) {
+static void metal_program_free(struct metal_program *p) {
     @autoreleasepool {
-        if (m->pipeline) {
-            (void)(__bridge_transfer id)m->pipeline;
+        if (p->pipeline) {
+            (void)(__bridge_transfer id)p->pipeline;
         }
     }
-    free(m->deref);
-    free(m->buf_rw);
-    free(m->src);
-    free(m);
+    free(p->deref);
+    free(p->buf_rw);
+    free(p->src);
+    free(p);
 }
 
-static void umbra_dump_metal(
-    struct umbra_metal const *m, FILE *f
+static void metal_program_dump(
+    struct metal_program const *p, FILE *f
 ) {
-    if (m->src) {
-        fputs(m->src, f);
+    if (p->src) {
+        fputs(p->src, f);
     }
 }
 
 static void run_metal(struct umbra_program *prog, int l, int t, int r, int b, struct umbra_buf buf[]) {
-    umbra_metal_run((struct umbra_metal*)prog, l, t, r, b, buf);
+    metal_program_queue((struct metal_program*)prog, l, t, r, b, buf);
 }
-static void dump_metal(struct umbra_program const *prog, FILE *f) { umbra_dump_metal((struct umbra_metal const*)prog, f); }
-static void free_metal(struct umbra_program *prog) { umbra_metal_free((struct umbra_metal*)prog); }
+static void dump_metal(struct umbra_program const *prog, FILE *f) { metal_program_dump((struct metal_program const*)prog, f); }
+static void free_metal(struct umbra_program *prog) { metal_program_free((struct metal_program*)prog); }
 static struct umbra_program *compile_metal(struct umbra_backend           *be,
                                            BB const *bb) {
-    struct umbra_metal *m = umbra_metal((struct metal_backend*)be, bb);
-    m->base = (struct umbra_program){
+    struct metal_program *p = metal_program((struct metal_backend*)be, bb);
+    p->base = (struct umbra_program){
         .queue   = run_metal,
         .dump    = dump_metal,
         .free    = free_metal,
         .backend = be,
     };
-    return &m->base;
+    return &p->base;
 }
-static void flush_be_metal(struct umbra_backend *be) { umbra_metal_flush((struct metal_backend*)be); }
+static void flush_be_metal(struct umbra_backend *be) { metal_flush((struct metal_backend*)be); }
 static void free_be_metal(struct umbra_backend *be) {
     struct metal_backend *mbe = (struct metal_backend*)be;
-    umbra_metal_flush(mbe);
-    umbra_metal_backend_free(mbe);
+    metal_flush(mbe);
+    metal_backend_free(mbe);
 }
 static struct umbra_backend_stats stats_metal(struct umbra_backend const *be) {
     struct metal_backend const *mbe = (struct metal_backend const*)be;
@@ -1338,7 +1338,7 @@ static struct umbra_backend_stats stats_metal(struct umbra_backend const *be) {
     };
 }
 struct umbra_backend *umbra_backend_metal(void) {
-    struct metal_backend *mbe = umbra_metal_backend_create();
+    struct metal_backend *mbe = metal_backend_create();
     if (mbe) {
         mbe->base = (struct umbra_backend){
             .compile        = compile_metal,

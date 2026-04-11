@@ -264,7 +264,7 @@ static int resolve_ptr_x86(Buf *c, ptr p, int *last_ptr, int const *deref_gpr,
     return load_ptr_x86(c, p, last_ptr);
 }
 
-struct umbra_jit_program *umbra_jit_program(struct jit_backend *be,
+struct jit_program *jit_program(struct jit_backend *be,
                                            struct umbra_basic_block const *bb) {
     int *sl = malloc((size_t)bb->insts * sizeof(int));
     for (int i = 0; i < bb->insts; i++) {
@@ -410,7 +410,7 @@ struct umbra_jit_program *umbra_jit_program(struct jit_backend *be,
     assume(ok == 0);
     free(c.byte);
 
-    struct umbra_jit_program *j = malloc(sizeof *j);
+    struct jit_program *j = malloc(sizeof *j);
     j->code = buf_mem;
     j->code_size = buf_size;
     j->loop_start = loop_body_start;
@@ -1330,7 +1330,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 #if __clang__
 __attribute__((no_sanitize("function")))
 #endif
-void umbra_jit_program_run(struct umbra_jit_program *j, int l, int t, int r, int b, struct umbra_buf buf[]) {
+void jit_program_run(struct jit_program *j, int l, int t, int r, int b, struct umbra_buf buf[]) {
     j->entry(l, t, r, b, buf);
 }
 
@@ -1370,7 +1370,7 @@ static _Bool x86_disasm(uint8_t const *code, size_t n, char const *spath,
     return result;
 }
 
-void umbra_jit_program_dump(struct umbra_jit_program const *j, FILE *f) {
+void jit_program_dump(struct jit_program const *j, FILE *f) {
     if (j->loop_start >= j->loop_end) { return; }
 
     uint8_t const *code = (uint8_t const*)j->code;

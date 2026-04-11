@@ -162,7 +162,7 @@ struct sw_inst {
     int ptr;
 };
 
-struct umbra_interpreter {
+struct interp_program {
     struct umbra_program base;
     struct sw_inst *inst;
     ival           *v;
@@ -170,10 +170,10 @@ struct umbra_interpreter {
     int             preamble, nptr, n_deref, pad_;
 };
 
-static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block const *bb) {
+static struct interp_program* interp_program(struct umbra_basic_block const *bb) {
     int *id = calloc((size_t)bb->insts, sizeof *id);
 
-    struct umbra_interpreter *p = malloc(sizeof *p);
+    struct interp_program *p = malloc(sizeof *p);
     // Count slots, leaving room for multi-result ops (load_32x2 uses 2, load_8x4 uses 4).
     int num_slots = 1; // +1 for SW_DONE sentinel
     for (int i = 0; i < bb->insts; i++) {
@@ -463,7 +463,7 @@ static struct umbra_interpreter* umbra_interpreter(struct umbra_basic_block cons
     return p;
 }
 
-static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int r, int b,
+static void interp_program_run(struct interp_program *p, int l, int t, int r, int b,
                                     struct umbra_buf caller_buf[]) {
     int const nall = p->nptr + p->n_deref;
     for (int i = 0; i < p->nptr; i++) { p->buf[i] = caller_buf[i]; }
@@ -1160,7 +1160,7 @@ static void umbra_interpreter_run(struct umbra_interpreter *p, int l, int t, int
     }
 }
 
-static void umbra_interpreter_free(struct umbra_interpreter *p) {
+static void interp_program_free(struct interp_program *p) {
     if (p) {
         free(p->buf);
         free(p->inst);
@@ -1170,12 +1170,12 @@ static void umbra_interpreter_free(struct umbra_interpreter *p) {
 }
 
 static void run_interp(struct umbra_program *prog, int l, int t, int r, int b, struct umbra_buf buf[]) {
-    umbra_interpreter_run((struct umbra_interpreter*)prog, l, t, r, b, buf);
+    interp_program_run((struct interp_program*)prog, l, t, r, b, buf);
 }
-static void free_interp(struct umbra_program *prog) { umbra_interpreter_free((struct umbra_interpreter*)prog); }
+static void free_interp(struct umbra_program *prog) { interp_program_free((struct interp_program*)prog); }
 static struct umbra_program *compile_interp(struct umbra_backend           *be,
                                             struct umbra_basic_block const *bb) {
-    struct umbra_interpreter *p = umbra_interpreter(bb);
+    struct interp_program *p = interp_program(bb);
     p->base = (struct umbra_program){
         .queue      = run_interp,
         .dump       = 0,

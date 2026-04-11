@@ -49,15 +49,15 @@ void release_code_buf(struct jit_backend *be, void *mem, size_t size) {
 
 static void run_jit(struct umbra_program *prog,
                     int l, int t, int r, int b, struct umbra_buf buf[]) {
-    umbra_jit_program_run((struct umbra_jit_program*)prog, l, t, r, b, buf);
+    jit_program_run((struct jit_program*)prog, l, t, r, b, buf);
 }
 
 static void dump_jit(struct umbra_program const *prog, FILE *f) {
-    umbra_jit_program_dump((struct umbra_jit_program const*)prog, f);
+    jit_program_dump((struct jit_program const*)prog, f);
 }
 
 static void free_jit(struct umbra_program *prog) {
-    struct umbra_jit_program *j  = (struct umbra_jit_program*)prog;
+    struct jit_program *j  = (struct jit_program*)prog;
     struct jit_backend       *be = (struct jit_backend*)      prog->backend;
     release_code_buf(be, j->code, j->code_size);
     free(j);
@@ -65,7 +65,7 @@ static void free_jit(struct umbra_program *prog) {
 
 static struct umbra_program* compile_jit(struct umbra_backend           *be,
                                          struct umbra_basic_block const *bb) {
-    struct umbra_jit_program *j = umbra_jit_program((struct jit_backend*)be, bb);
+    struct jit_program *j = jit_program((struct jit_backend*)be, bb);
     j->base = (struct umbra_program){
         .queue      = run_jit,
         .dump       = dump_jit,
