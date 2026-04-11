@@ -24,7 +24,8 @@ struct wgpu_buf_cache_entry {
     void       *shadow;   // last-uploaded snapshot; skip re-upload if unchanged
     uint64_t    size;
     _Bool       writable;
-    _Bool       copy_tracked; int :16, :32;
+    _Bool       copy_tracked;
+    _Bool       uploaded; int :8, :32;
 };
 
 struct wgpu_free_buf {
@@ -223,11 +224,19 @@ static int cache_buf(struct wgpu_backend *be, void *host, size_t bytes,
         struct wgpu_buf_cache_entry *ce = &be->batch_cache[i];
         if (ce->host == host && ce->size >= bytes) {
             if (host && bytes) {
-                // Skip re-upload if host data hasn't changed since last upload.
-                if (!ce->shadow || memcmp(ce->shadow, host, bytes)) {
+                // For non-writable entries, skip re-upload within a batch once
+                // we've verified or uploaded the data.  Writable entries must
+                // always re-check because the host may modify data between
+                // dispatches (e.g. tiled clears).
+                if (ce->uploaded && !ce->writable) {
+                    // Already verified/uploaded this batch; skip.
+                } else if (!ce->shadow || memcmp(ce->shadow, host, bytes)) {
                     queue_write_aligned(be, ce->buf, host, bytes);
                     if (!ce->shadow) { ce->shadow = malloc(bytes); }
                     memcpy(ce->shadow, host, bytes);
+                    ce->uploaded = 1;
+                } else {
+                    ce->uploaded = 1;
                 }
             }
             if ((rw & BUF_WRITTEN) && !ce->copy_tracked && host && bytes) {
@@ -266,8 +275,10 @@ static int cache_buf(struct wgpu_backend *be, void *host, size_t bytes,
 fill:
     ce->host     = host;
     ce->writable = rw & BUF_WRITTEN;
+    ce->uploaded = 0;
     if (host && bytes) {
         queue_write_aligned(be, ce->buf, host, bytes);
+        ce->uploaded = 1;
         if (bytes <= 1024 * 1024) {
             ce->shadow = malloc(bytes);
             memcpy(ce->shadow, host, bytes);
@@ -390,11 +401,12 @@ static void wgpu_flush(struct umbra_backend *base) {
     be->batch_n_copies = 0;
 
     // Cache entries persist across flushes so shadows can skip re-upload for
-    // unchanged data (e.g. font atlases).  Reset per-batch copyback tracking,
-    // and clear shadows for writable entries: the GPU has modified their data,
-    // so the shadow no longer reflects what's on the GPU buffer.
+    // unchanged data (e.g. font atlases).  Reset per-batch flags, and clear
+    // shadows for writable entries: the GPU has modified their data, so the
+    // shadow no longer reflects what's on the GPU buffer.
     for (int i = 0; i < be->batch_cache_n; i++) {
         be->batch_cache[i].copy_tracked = 0;
+        be->batch_cache[i].uploaded     = 0;
         if (be->batch_cache[i].writable) {
             free(be->batch_cache[i].shadow);
             be->batch_cache[i].shadow = NULL;
