@@ -3895,3 +3895,44 @@ TEST(test_const_fold_coverage) {
     }
     cleanup(&B);
 }
+
+TEST(test_stats_safe) {
+    struct umbra_backend *be[] = {
+        umbra_backend_interp(),
+        umbra_backend_jit(),
+        umbra_backend_metal(),
+        umbra_backend_vulkan(),
+        umbra_backend_wgpu(),
+    };
+    // stats must be safe to call on a fresh backend with no prior work.
+    for (int i = 0; i < NUM_BACKENDS; i++) {
+        if (be[i]) {
+            struct umbra_backend_stats st = be[i]->stats(be[i]);
+            st.gpu_sec == 0.0 here;
+            st.upload_bytes == 0 here;
+            st.uniform_ring_rotations == 0 here;
+            st.dispatches == 0 here;
+        }
+    }
+
+    // Also safe after compile+flush with no queued work.
+    struct umbra_builder *b = umbra_builder();
+    umbra_store_32(b, (umbra_ptr32){0}, umbra_x(b));
+    struct umbra_basic_block *bb = umbra_basic_block(b);
+    umbra_builder_free(b);
+
+    for (int i = 0; i < NUM_BACKENDS; i++) {
+        if (be[i]) {
+            struct umbra_program *p = be[i]->compile(be[i], bb);
+            be[i]->flush(be[i]);
+            struct umbra_backend_stats st = be[i]->stats(be[i]);
+            st.dispatches == 0 here;
+            p->free(p);
+        }
+    }
+
+    umbra_basic_block_free(bb);
+    for (int i = 0; i < NUM_BACKENDS; i++) {
+        if (be[i]) { be[i]->free(be[i]); }
+    }
+}
