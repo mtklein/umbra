@@ -59,6 +59,8 @@ struct metal_backend {
     int                     free_bufs_n, free_bufs_cap;
     struct uniform_ring_pool uni_pool;
     double gpu_time_accum;
+    int    total_dispatches; int :32;
+    size_t total_upload_bytes;
 };
 
 struct umbra_metal {
@@ -1140,6 +1142,7 @@ static int cache_buf(struct metal_backend *be, void *host, size_t bytes,
             if (!ce->nocopy && host && bytes) {
                 id<MTLBuffer> tmp = (__bridge id<MTLBuffer>)ce->mtl;
                 __builtin_memcpy(tmp.contents, host, bytes);
+                be->total_upload_bytes += bytes;
             }
             return i;
         }
@@ -1190,6 +1193,7 @@ static int cache_buf(struct metal_backend *be, void *host, size_t bytes,
     }
     if (host && bytes) {
         __builtin_memcpy(tmp.contents, host, bytes);
+        be->total_upload_bytes += bytes;
     }
     ce->mtl      = (__bridge_retained void*)tmp;
     ce->host     = host;
@@ -1298,6 +1302,7 @@ static void encode_dispatch(
                     (NSUInteger)gy, 1);
     [enc dispatchThreads:grid
        threadsPerThreadgroup:group];
+    be->total_dispatches++;
 }
 
 static void metal_submit_cmdbuf(struct metal_backend *be);
@@ -1444,11 +1449,14 @@ static void free_be_metal(struct umbra_backend *be) {
     umbra_metal_flush(mbe);
     umbra_metal_backend_free(mbe);
 }
-static int ring_rotations_metal(struct umbra_backend const *be) {
-    return ((struct metal_backend const*)be)->uni_pool.rotations;
-}
-static double gpu_time_metal(struct umbra_backend const *be) {
-    return ((struct metal_backend const*)be)->gpu_time_accum;
+static struct umbra_backend_stats stats_metal(struct umbra_backend const *be) {
+    struct metal_backend const *mbe = (struct metal_backend const*)be;
+    return (struct umbra_backend_stats){
+        .gpu_sec         = mbe->gpu_time_accum,
+        .uniform_ring_rotations = mbe->uni_pool.rotations,
+        .dispatches      = mbe->total_dispatches,
+        .upload_bytes    = mbe->total_upload_bytes,
+    };
 }
 struct umbra_backend *umbra_backend_metal(void) {
     struct metal_backend *mbe = umbra_metal_backend_create();
@@ -1457,8 +1465,7 @@ struct umbra_backend *umbra_backend_metal(void) {
             .compile        = compile_metal,
             .flush          = flush_be_metal,
             .free           = free_be_metal,
-            .ring_rotations = ring_rotations_metal,
-            .gpu_time       = gpu_time_metal,
+            .stats          = stats_metal,
         };
         return &mbe->base;
     }

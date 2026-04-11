@@ -14,6 +14,8 @@ struct umbra_backend *umbra_backend_wgpu(void) { return 0; }
 
 #include <wgpu.h>
 
+// TODO: checksums instead of shadow?
+
 // ---------------------------------------------------------------------------
 //  Buffer cache / copyback / free pool.
 // ---------------------------------------------------------------------------
@@ -75,6 +77,9 @@ struct wgpu_backend {
     int                       cached_bg_n, :32;
 
     struct uniform_ring_pool  uni_pool;
+    int                       total_dispatches; int :32;
+    size_t                    total_upload_bytes;
+
     double                    gpu_time_accum;
     double                    ts_period;
     WGPUQuerySet              ts_query;
@@ -168,6 +173,7 @@ static void error_cb(WGPUDevice const *dev, WGPUErrorType type, WGPUStringView m
 }
 
 static WGPUComputePassEncoder begin_pass(struct wgpu_backend *be, _Bool begin_ts) {
+    // TODO: probably just can require ts_query support for now
     if (be->ts_query) {
         WGPUPassTimestampWrites ts = {
             .querySet                = be->ts_query,
@@ -191,6 +197,7 @@ static void begin_batch(struct wgpu_backend *be) {
 static void batch_track_copy(struct wgpu_backend *be,
                              void *host, WGPUBuffer buf, size_t bytes) {
     if (be->batch_n_copies >= be->batch_copies_cap) {
+        // TODO: test exercising growth here
         be->batch_copies_cap = be->batch_copies_cap ? 2 * be->batch_copies_cap : 64;
         be->batch_copies = realloc(be->batch_copies,
             (size_t)be->batch_copies_cap * sizeof *be->batch_copies);
@@ -216,6 +223,7 @@ static void queue_write_aligned(struct wgpu_backend *be, WGPUBuffer buf,
         wgpuQueueWriteBuffer(be->queue, buf, 0, data, bytes & ~(size_t)3);
         wgpuQueueWriteBuffer(be->queue, buf, bytes & ~(size_t)3, tmp, 4);
     }
+    be->total_upload_bytes += bytes;
 }
 
 static int cache_buf(struct wgpu_backend *be, void *host, size_t bytes,
@@ -259,6 +267,7 @@ static int cache_buf(struct wgpu_backend *be, void *host, size_t bytes,
     uint64_t alloc_size = bytes ? (bytes + 3) & ~(uint64_t)3 : 4;
     // Reuse from free pool.
     for (int i = 0; i < be->free_bufs_n; i++) {
+        // TODO: seems to be uncovered by tests?
         if (be->free_bufs[i].size >= alloc_size) {
             ce->buf  = be->free_bufs[i].buf;
             ce->size = be->free_bufs[i].size;
@@ -347,6 +356,7 @@ static void wgpu_submit_cmdbuf(struct wgpu_backend *be) {
                 struct wgpu_ring_chunk *wc = ring->chunks[i].handle;
                 wgpuQueueWriteBuffer(be->queue, wc->buf, 0,
                                      ring->chunks[i].mapped, ring->chunks[i].used);
+                be->total_upload_bytes += ring->chunks[i].used;
             }
         }
     }
@@ -521,6 +531,7 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
     struct wgpu_program *p  = (struct wgpu_program *)prog;
     struct wgpu_backend *be = p->be;
 
+    // TODO: I don't think we need to check this
     int w = r - l, h = b - t;
     if (w <= 0 || h <= 0) { return; }
 
@@ -552,7 +563,7 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
                 bind_size  [i] = (buf[i].sz + 3) & ~(size_t)3;
             } else {
                 uint64_t sz = buf[i].sz;
-                if (sz < 4) { sz = 4; }
+                if (sz < 4) { sz = 4; }  // TODO: untested?
                 int idx = cache_buf(be, buf[i].ptr, buf[i].sz, rw);
                 bind_buf [i] = be->batch_cache[idx].buf;
                 bind_size[i] = be->batch_cache[idx].size;
@@ -666,6 +677,7 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
 
     uint32_t gx = ((uint32_t)w + SPIRV_WG_SIZE - 1) / SPIRV_WG_SIZE;
     wgpuComputePassEncoderDispatchWorkgroups(be->batch_pass, gx, (uint32_t)h, 1);
+    be->total_dispatches++;
 
     be->batch_has_dispatch = 1;
 
@@ -716,11 +728,14 @@ static void wgpu_program_free(struct umbra_program *prog) {
 //  Backend: creation and destruction.
 // ---------------------------------------------------------------------------
 
-static int wgpu_ring_rotations(struct umbra_backend const *base) {
-    return ((struct wgpu_backend const *)base)->uni_pool.rotations;
-}
-static double wgpu_gpu_time(struct umbra_backend const *base) {
-    return ((struct wgpu_backend const *)base)->gpu_time_accum;
+static struct umbra_backend_stats wgpu_stats(struct umbra_backend const *be) {
+    struct wgpu_backend const *wbe = (struct wgpu_backend const *)be;
+    return (struct umbra_backend_stats){
+        .gpu_sec         = wbe->gpu_time_accum,
+        .uniform_ring_rotations = wbe->uni_pool.rotations,
+        .dispatches      = wbe->total_dispatches,
+        .upload_bytes    = wbe->total_upload_bytes,
+    };
 }
 
 static void wgpu_free(struct umbra_backend *base) {
@@ -732,7 +747,7 @@ static void wgpu_free(struct umbra_backend *base) {
         free(be->batch_cache[i].shadow);
     }
     for (int i = 0; i < be->free_bufs_n; i++) {
-        wgpuBufferRelease(be->free_bufs[i].buf);
+        wgpuBufferRelease(be->free_bufs[i].buf);  // TODO: not covered by tests?
     }
     if (be->ts_query) {
         wgpuQuerySetRelease(be->ts_query);
@@ -852,8 +867,7 @@ struct umbra_backend *umbra_backend_wgpu(void) {
         .compile        = wgpu_compile_fn,
         .flush          = wgpu_flush,
         .free           = (void (*)(struct umbra_backend *))wgpu_free,
-        .ring_rotations = wgpu_ring_rotations,
-        .gpu_time       = wgpu_gpu_time,
+        .stats          = wgpu_stats,
     };
 
     // Initialize uniform ring pool.

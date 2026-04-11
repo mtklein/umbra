@@ -11,18 +11,18 @@ struct umbra_basic_block* umbra_basic_block(struct umbra_builder*);
 void   umbra_basic_block_free(struct umbra_basic_block*);
 void   umbra_basic_block_dump(struct umbra_basic_block const*, FILE*);
 
+struct umbra_backend_stats {
+    double gpu_sec;
+    size_t upload_bytes;
+    int    uniform_ring_rotations, dispatches;
+    size_t pad_;
+};
+
 struct umbra_backend {
     struct umbra_program* (*compile)(struct umbra_backend*, struct umbra_basic_block const*);
     void                  (*flush  )(struct umbra_backend*);
     void                  (*free   )(struct umbra_backend*);
-    // Debug accessor: monotonic count of uniform-ring rotations triggered by
-    // backpressure since the backend was created. NULL on backends with no
-    // uniform ring (interp, jit). Used by tests to assert that the rotation
-    // path actually fired.
-    int                   (*ring_rotations)(struct umbra_backend const*);
-    // Accumulated GPU execution time in seconds across all flushed batches.
-    // NULL on backends without GPU timing (interp, jit).
-    double                (*gpu_time)(struct umbra_backend const*);
+    struct umbra_backend_stats (*stats)(struct umbra_backend const*);
 };
 struct umbra_backend* umbra_backend_interp(void);
 struct umbra_backend* umbra_backend_jit   (void);

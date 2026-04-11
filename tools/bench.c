@@ -81,12 +81,12 @@ static double bench(draw_fn draw, void *ctx, struct umbra_backend *be,
     double       best_gpu       = 0;
     double       total_elapsed  = 0;
     for (int k = 0; k < samples; k++) {
-        double const gpu0  = be->gpu_time ? be->gpu_time(be) : 0;
+        double const gpu0  = be->stats(be).gpu_sec;
         double const start = now();
         for (int it = 0; it < iters; it++) { draw(ctx); }
         be->flush(be);
         double const dt     = now() - start;
-        double const gpu_dt = be->gpu_time ? be->gpu_time(be) - gpu0 : 0;
+        double const gpu_dt = be->stats(be).gpu_sec - gpu0;
         if (k == 0 || dt < best)         { best     = dt; }
         if (k == 0 || gpu_dt < best_gpu) { best_gpu = gpu_dt; }
         total_elapsed += dt;
@@ -94,7 +94,7 @@ static double bench(draw_fn draw, void *ctx, struct umbra_backend *be,
     }
     double const px = (double)iters * (double)w * (double)h;
     if (out_gpu_ns_px) {
-        *out_gpu_ns_px = be->gpu_time ? best_gpu / px * 1e9 : -1;
+        *out_gpu_ns_px = best_gpu > 0 ? best_gpu / px * 1e9 : -1;
     }
     return best / px * 1e9;
 }
@@ -122,6 +122,67 @@ static struct umbra_fmt parse_fmt(char const *s) {
     fprintf(stderr, "unknown format: %s\n", s);
     usage();
     exit(1);
+}
+
+// Display order: I(interp), J(jit), W(wgpu), V(vulkan), M(metal).
+// Expected ranking: slowest to fastest, left to right.
+enum { ND = 5 };
+static int const disp_idx[ND] = {0, 1, 4, 3, 2};
+static char const disp_lbl[ND] = {'I', 'J', 'W', 'V', 'M'};
+
+// Returns 1 if any adjacent pair violates the expected ranking.
+static _Bool print_row(char const *title, double ns_px[5], double gpu[5],
+                       int be_mask) {
+    printf("%-30s", title);
+
+    // Find the rightmost (fastest-expected) backend with data.
+    int base = -1;
+    for (int d = ND - 1; d >= 0; d--) {
+        int bi = disp_idx[d];
+        if ((be_mask & (1 << bi)) && ns_px[bi] >= 0) { base = d; break; }
+    }
+
+    for (int d = 0; d < ND; d++) {
+        int bi = disp_idx[d];
+        if (!(be_mask & (1 << bi))) { continue; }
+        if (ns_px[bi] < 0) {
+            printf("  %8s", "-");
+            continue;
+        }
+        if (d == base) {
+            // Rightmost: raw ns/px.
+            if (gpu[bi] >= 0 && ns_px[bi] > 0) {
+                int pct = 100 - (int)(gpu[bi] / ns_px[bi] * 100 + 0.5);
+                printf("  %5.2f %2d%%", ns_px[bi], pct);
+            } else {
+                printf("  %5.2f    ", ns_px[bi]);
+            }
+        } else {
+            // Multiplier of the base.
+            double mul = base >= 0 ? ns_px[bi] / ns_px[disp_idx[base]] : 0;
+            if (gpu[bi] >= 0 && ns_px[bi] > 0) {
+                int pct = 100 - (int)(gpu[bi] / ns_px[bi] * 100 + 0.5);
+                printf(" %5.1fx %2d%%", mul, pct);
+            } else {
+                printf("  %5.1fx   ", mul);
+            }
+        }
+    }
+
+    // Anomaly: check each adjacent pair in display order is non-increasing.
+    // Round to printed precision so visually-tied numbers don't fire.
+    _Bool anomaly = 0;
+    for (int d = 0; d + 1 < ND; d++) {
+        int a = disp_idx[d], b = disp_idx[d + 1];
+        if (!(be_mask & (1 << a)) || !(be_mask & (1 << b))) { continue; }
+        if (ns_px[a] < 0 || ns_px[b] < 0) { continue; }
+        int ra = (int)(ns_px[a] * 100 + 0.5);
+        int rb = (int)(ns_px[b] * 100 + 0.5);
+        if (ra < rb) { anomaly = 1; }
+    }
+    if (anomaly) { printf(" !"); }
+    printf("\n");
+    return anomaly;
 }
 
 int main(int argc, char *argv[]) {
@@ -157,7 +218,6 @@ int main(int argc, char *argv[]) {
 
     int ns = slide_count() - 1;
 
-    char const *be_names[] = {"interp", "jit", "metal", "vulkan", "wgpu"};
     struct umbra_backend *bes[] = {
         umbra_backend_interp(), umbra_backend_jit(),
         umbra_backend_metal(),  umbra_backend_vulkan(),
@@ -167,16 +227,12 @@ int main(int argc, char *argv[]) {
 
     _Bool any_anomaly = 0;
 
-    printf("%-40s", "ns/px");
-    for (int bi = 0; bi < nb; bi++) {
+    // Header.
+    printf("%-30s", "ns/px");
+    for (int d = 0; d < ND; d++) {
+        int bi = disp_idx[d];
         if (!(be_mask & (1 << bi))) { continue; }
-        char hdr[32];
-        if (bes[bi] && bes[bi]->gpu_time) {
-            sprintf(hdr, "%s cpu%%", be_names[bi]);
-        } else {
-            sprintf(hdr, "%s", be_names[bi]);
-        }
-        printf("  %-13s", hdr);
+        printf("  %8c", disp_lbl[d]);
     }
     printf("\n");
 
@@ -198,35 +254,7 @@ int main(int argc, char *argv[]) {
             ns_px[bi] = bench(slide_draw, &sctx, bes[bi], W, H, samples, target_secs,
                               &gpu[bi]);
         }
-
-        printf("%-40s", s->title);
-        for (int bi = 0; bi < nb; bi++) {
-            if (!(be_mask & (1 << bi))) { continue; }
-            if (ns_px[bi] < 0) { printf("  %-13s", "-"); continue; }
-            char tmp[32];
-            if (gpu[bi] >= 0 && ns_px[bi] > 0) {
-                int pct = 100 - (int)(gpu[bi] / ns_px[bi] * 100 + 0.5);
-                sprintf(tmp, "%6.2f %3d", ns_px[bi], pct);
-            } else {
-                sprintf(tmp, "%6.2f", ns_px[bi]);
-            }
-            printf("  %-13s", tmp);
-        }
-        // Anomaly markers: interp should never beat jit, and vulkan should
-        // never beat metal on Apple Silicon (vulkan is MoltenVK on top of
-        // metal). Either case is a measurement bug or a real perf
-        // regression worth investigating. Compare rounded-to-printed
-        // precision so visually-tied numbers don't fire on float noise.
-        int const ri = ns_px[0] >= 0 ? (int)(ns_px[0] * 100 + 0.5) : -1;
-        int const rj = ns_px[1] >= 0 ? (int)(ns_px[1] * 100 + 0.5) : -1;
-        int const rm = ns_px[2] >= 0 ? (int)(ns_px[2] * 100 + 0.5) : -1;
-        int const rv = ns_px[3] >= 0 ? (int)(ns_px[3] * 100 + 0.5) : -1;
-        _Bool anomaly = 0;
-        if (ri >= 0 && rj >= 0 && ri < rj) { anomaly = 1; }
-        if (rv >= 0 && rm >= 0 && rv < rm) { anomaly = 1; }
-        if (anomaly) { printf(" !"); any_anomaly = 1; }
-        printf("\n");
-
+        any_anomaly |= print_row(s->title, ns_px, gpu, be_mask);
         free(buf);
     }
 
@@ -267,29 +295,7 @@ int main(int argc, char *argv[]) {
             ns_px[bi] = bench(prog_draw, &pctx, bes[bi], W, H, samples, target_secs,
                               &gpu[bi]);
         }
-
-        printf("%-40s", "Slug Accumulator (1 curve)");
-        for (int bi = 0; bi < nb; bi++) {
-            if (!(be_mask & (1 << bi))) { continue; }
-            if (ns_px[bi] < 0) { printf("  %-13s", "-"); continue; }
-            char tmp[32];
-            if (gpu[bi] >= 0 && ns_px[bi] > 0) {
-                int pct = 100 - (int)(gpu[bi] / ns_px[bi] * 100 + 0.5);
-                sprintf(tmp, "%6.2f %3d", ns_px[bi], pct);
-            } else {
-                sprintf(tmp, "%6.2f", ns_px[bi]);
-            }
-            printf("  %-13s", tmp);
-        }
-        int const ri = ns_px[0] >= 0 ? (int)(ns_px[0] * 100 + 0.5) : -1;
-        int const rj = ns_px[1] >= 0 ? (int)(ns_px[1] * 100 + 0.5) : -1;
-        int const rm = ns_px[2] >= 0 ? (int)(ns_px[2] * 100 + 0.5) : -1;
-        int const rv = ns_px[3] >= 0 ? (int)(ns_px[3] * 100 + 0.5) : -1;
-        _Bool anomaly = 0;
-        if (ri >= 0 && rj >= 0 && ri < rj) { anomaly = 1; }
-        if (rv >= 0 && rm >= 0 && rv < rm) { anomaly = 1; }
-        if (anomaly) { printf(" !"); any_anomaly = 1; }
-        printf("\n");
+        any_anomaly |= print_row("Slug Accumulator (1 curve)", ns_px, gpu, be_mask);
 
         for (int bi = 0; bi < nb; bi++) {
             if (progs[bi]) { progs[bi]->free(progs[bi]); }
@@ -299,12 +305,12 @@ int main(int argc, char *argv[]) {
         slug_free(&sc);
     }
 
-    // Compile-time benchmarks: time builder → basic_block → compile → free
-    // per slide.
+    // Compile-time benchmarks.
     if (!match || strstr("compile", match)) {
-        printf("\n%-40s", "compile (µs)");
-        for (int bi = 0; bi < nb; bi++) {
-            if (be_mask & (1 << bi)) { printf("   %-12s", be_names[bi]); }
+        printf("\n%-30s", "compile (µs)");
+        for (int d = 0; d < ND; d++) {
+            int bi = disp_idx[d];
+            if (be_mask & (1 << bi)) { printf("  %8c", disp_lbl[d]); }
         }
         printf("\n");
 
@@ -315,65 +321,63 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            double us_call[4] = {-1, -1, -1, -1};
+            double us_call[5] = {-1, -1, -1, -1, -1};
             for (int bi = 0; bi < nb; bi++) {
                 if (!(be_mask & (1 << bi)) || !bes[bi]) { continue; }
-                    // Warm up: single compile to populate caches.
-                    {
-                        struct umbra_builder *b = s->get_builder(s, fmt);
-                        if (!b) { continue; }
-                        struct umbra_basic_block *bb = umbra_basic_block(b);
-                        umbra_builder_free(b);
-                        struct umbra_program *p = bes[bi]->compile(bes[bi], bb);
-                        p->free(p);
-                        umbra_basic_block_free(bb);
-                    }
-
-                    int    iters   = 1;
-                    double t_pilot = 0;
-                    for (int pi = 0; pi < 20; pi++) {
-                        double const start = now();
-                        for (int it = 0; it < iters; it++) {
-                            struct umbra_builder *b = s->get_builder(s, fmt);
-                            struct umbra_basic_block *bb = umbra_basic_block(b);
-                            umbra_builder_free(b);
-                            struct umbra_program *p = bes[bi]->compile(bes[bi], bb);
-                            p->free(p);
-                            umbra_basic_block_free(bb);
-                        }
-                        t_pilot = now() - start;
-                        if (t_pilot >= target_secs / 2) { break; }
-                        iters *= 2;
-                    }
-                    int const cal = (int)((double)iters * target_secs / t_pilot);
-                    if (cal > iters) { iters = cal; }
-
-                    double best = 0;
-                    double total = 0;
-                    for (int k = 0; k < samples; k++) {
-                        double const start = now();
-                        for (int it = 0; it < iters; it++) {
-                            struct umbra_builder *b = s->get_builder(s, fmt);
-                            struct umbra_basic_block *bb = umbra_basic_block(b);
-                            umbra_builder_free(b);
-                            struct umbra_program *p = bes[bi]->compile(bes[bi], bb);
-                            p->free(p);
-                            umbra_basic_block_free(bb);
-                        }
-                        double const dt = now() - start;
-                        if (k == 0 || dt < best) { best = dt; }
-                        total += dt;
-                        if (total >= (double)samples * target_secs) { break; }
-                    }
-                    us_call[bi] = best / (double)iters * 1e6;
+                {
+                    struct umbra_builder *b = s->get_builder(s, fmt);
+                    if (!b) { continue; }
+                    struct umbra_basic_block *bb2 = umbra_basic_block(b);
+                    umbra_builder_free(b);
+                    struct umbra_program *p = bes[bi]->compile(bes[bi], bb2);
+                    p->free(p);
+                    umbra_basic_block_free(bb2);
                 }
-            printf("%-40s", s->title);
-            for (int bi = 0; bi < nb; bi++) {
+
+                int    iters   = 1;
+                double t_pilot = 0;
+                for (int pi = 0; pi < 20; pi++) {
+                    double const start = now();
+                    for (int it = 0; it < iters; it++) {
+                        struct umbra_builder *b = s->get_builder(s, fmt);
+                        struct umbra_basic_block *bb2 = umbra_basic_block(b);
+                        umbra_builder_free(b);
+                        struct umbra_program *p = bes[bi]->compile(bes[bi], bb2);
+                        p->free(p);
+                        umbra_basic_block_free(bb2);
+                    }
+                    t_pilot = now() - start;
+                    if (t_pilot >= target_secs / 2) { break; }
+                    iters *= 2;
+                }
+                int const cal = (int)((double)iters * target_secs / t_pilot);
+                if (cal > iters) { iters = cal; }
+
+                double best = 0;
+                double total = 0;
+                for (int k = 0; k < samples; k++) {
+                    double const start = now();
+                    for (int it = 0; it < iters; it++) {
+                        struct umbra_builder *b = s->get_builder(s, fmt);
+                        struct umbra_basic_block *bb2 = umbra_basic_block(b);
+                        umbra_builder_free(b);
+                        struct umbra_program *p = bes[bi]->compile(bes[bi], bb2);
+                        p->free(p);
+                        umbra_basic_block_free(bb2);
+                    }
+                    double const dt = now() - start;
+                    if (k == 0 || dt < best) { best = dt; }
+                    total += dt;
+                    if (total >= (double)samples * target_secs) { break; }
+                }
+                us_call[bi] = best / (double)iters * 1e6;
+            }
+            printf("%-30s", s->title);
+            for (int d = 0; d < ND; d++) {
+                int bi = disp_idx[d];
                 if (!(be_mask & (1 << bi))) { continue; }
-                if (us_call[bi] < 0) { printf("  %-13s", "-"); continue; }
-                char tmp[32];
-                sprintf(tmp, "%6.1f", us_call[bi]);
-                printf("  %-13s", tmp);
+                if (us_call[bi] < 0) { printf("  %8s", "-"); }
+                else                  { printf("  %8.1f", us_call[bi]); }
             }
             printf("\n");
         }

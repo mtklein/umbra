@@ -60,7 +60,9 @@ struct vk_backend {
     struct free_vk_buf     *free_bufs;
     int                     free_bufs_n, free_bufs_cap;
     struct uniform_ring_pool uni_pool;
-    _Bool                 batch_has_dispatch; int :24, :32;
+    size_t                total_upload_bytes;
+    int                   total_dispatches;
+    _Bool                 batch_has_dispatch; int :24;
 };
 
 static int find_compute_queue(VkPhysicalDevice phys) {
@@ -311,7 +313,7 @@ static int cache_buf(struct vk_backend *be, void *host, size_t bytes,
 fill:
     ce->host     = host;
     ce->writable = rw & BUF_WRITTEN;
-    if (bytes) { memcpy(ce->mapped, host, bytes); }
+    if (bytes) { memcpy(ce->mapped, host, bytes); be->total_upload_bytes += bytes; }
     if ((rw & BUF_WRITTEN) && host && bytes) {
         batch_track_copy(be, host, ce->mapped, bytes);
     }
@@ -443,8 +445,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     be->batch_has_dispatch = 1;
     uint32_t gx = ((uint32_t)w + SPIRV_WG_SIZE - 1) / SPIRV_WG_SIZE;
     vkCmdDispatch(be->batch_cmd, gx, (uint32_t)h, 1);
-
-
+    be->total_dispatches++;
 
     if (uniform_ring_pool_should_rotate(&be->uni_pool)) {
         vk_submit_cmdbuf(be);
@@ -696,11 +697,14 @@ static void vk_flush(struct umbra_backend *be) {
     v->batch_cache_n  = 0;
 }
 
-static int vk_ring_rotations(struct umbra_backend const *be) {
-    return ((struct vk_backend const*)be)->uni_pool.rotations;
-}
-static double vk_gpu_time(struct umbra_backend const *be) {
-    return ((struct vk_backend const*)be)->gpu_time_accum;
+static struct umbra_backend_stats vk_stats(struct umbra_backend const *be) {
+    struct vk_backend const *v = (struct vk_backend const*)be;
+    return (struct umbra_backend_stats){
+        .gpu_sec        = v->gpu_time_accum,
+        .uniform_ring_rotations = v->uni_pool.rotations,
+        .dispatches     = v->total_dispatches,
+        .upload_bytes   = v->total_upload_bytes,
+    };
 }
 
 static void vk_free(struct umbra_backend *be) {
@@ -907,8 +911,7 @@ struct umbra_backend *umbra_backend_vulkan(void) {
     v->base.compile        = vk_compile;
     v->base.flush          = vk_flush;
     v->base.free           = vk_free;
-    v->base.ring_rotations = vk_ring_rotations;
-    v->base.gpu_time       = vk_gpu_time;
+    v->base.stats          = vk_stats;
     return &v->base;
 }
 

@@ -1187,12 +1187,17 @@ static struct umbra_program *compile_interp(struct umbra_backend           *be,
 }
 static void flush_be_noop(struct umbra_backend *be) { (void)be; }
 static void free_be_interp(struct umbra_backend *be) { free(be); }
+static struct umbra_backend_stats stats_zero(struct umbra_backend const *be) {
+    (void)be;
+    return (struct umbra_backend_stats){0};
+}
 struct umbra_backend *umbra_backend_interp(void) {
     struct umbra_backend *be = malloc(sizeof *be);
     *be = (struct umbra_backend){
-        .compile    = compile_interp,
-        .flush      = flush_be_noop,
+        .compile = compile_interp,
+        .flush   = flush_be_noop,
         .free    = free_be_interp,
+        .stats   = stats_zero,
     };
     return be;
 }

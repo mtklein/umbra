@@ -367,7 +367,7 @@ static void run_long_batch_no_oom(struct umbra_backend *be) {
         umbra_basic_block_free(bb);
         p != 0 here;
 
-        int rotations_before = be->ring_rotations ? be->ring_rotations(be) : 0;
+        int rotations_before = be->stats(be).uniform_ring_rotations;
 
         float    color[4] = {0, 0, 0, 1};
         uint32_t pixel    = 0;
@@ -388,12 +388,9 @@ static void run_long_batch_no_oom(struct umbra_backend *be) {
         (pixel & 0xff)   == expected_r here;
         (pixel >> 24)    == 0xff here;
 
-        be->ring_rotations != 0 here;
-        int rotations_after = be->ring_rotations(be);
-        rotations_after > rotations_before here;
-
-        be->gpu_time != 0 here;
-        be->gpu_time(be) > 0.0 here;
+        struct umbra_backend_stats st = be->stats(be);
+        st.uniform_ring_rotations > rotations_before here;
+        st.gpu_sec > 0.0 here;
 
         p->free(p);
         be->free(be);
