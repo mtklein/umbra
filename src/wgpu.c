@@ -173,18 +173,14 @@ static void error_cb(WGPUDevice const *dev, WGPUErrorType type, WGPUStringView m
 }
 
 static WGPUComputePassEncoder begin_pass(struct wgpu_backend *be, _Bool begin_ts) {
-    // TODO: probably just can require ts_query support for now
-    if (be->ts_query) {
-        WGPUPassTimestampWrites ts = {
-            .querySet                = be->ts_query,
-            .beginningOfPassWriteIndex = begin_ts ? (uint32_t)be->uni_pool.cur * 2
-                                                  : WGPU_QUERY_SET_INDEX_UNDEFINED,
-            .endOfPassWriteIndex     = (uint32_t)be->uni_pool.cur * 2 + 1,
-        };
-        return wgpuCommandEncoderBeginComputePass(be->batch_enc,
-            &(WGPUComputePassDescriptor){.timestampWrites = &ts});
-    }
-    return wgpuCommandEncoderBeginComputePass(be->batch_enc, NULL);
+    WGPUPassTimestampWrites ts = {
+        .querySet                = be->ts_query,
+        .beginningOfPassWriteIndex = begin_ts ? (uint32_t)be->uni_pool.cur * 2
+                                              : WGPU_QUERY_SET_INDEX_UNDEFINED,
+        .endOfPassWriteIndex     = (uint32_t)be->uni_pool.cur * 2 + 1,
+    };
+    return wgpuCommandEncoderBeginComputePass(be->batch_enc,
+        &(WGPUComputePassDescriptor){.timestampWrites = &ts});
 }
 
 static void begin_batch(struct wgpu_backend *be) {
@@ -197,7 +193,6 @@ static void begin_batch(struct wgpu_backend *be) {
 static void batch_track_copy(struct wgpu_backend *be,
                              void *host, WGPUBuffer buf, size_t bytes) {
     if (be->batch_n_copies >= be->batch_copies_cap) {
-        // TODO: test exercising growth here
         be->batch_copies_cap = be->batch_copies_cap ? 2 * be->batch_copies_cap : 64;
         be->batch_copies = realloc(be->batch_copies,
             (size_t)be->batch_copies_cap * sizeof *be->batch_copies);
@@ -266,9 +261,8 @@ static int cache_buf(struct wgpu_backend *be, void *host, size_t bytes,
     *ce = (struct wgpu_buf_cache_entry){0};
 
     uint64_t alloc_size = bytes ? (bytes + 3) & ~(uint64_t)3 : 4;
-    // Reuse from free pool.
+    // Reuse from free pool (currently unused with persistent cache).
     for (int i = 0; i < be->free_bufs_n; i++) {
-        // TODO: seems to be uncovered by tests?
         if (be->free_bufs[i].size >= alloc_size) {
             ce->buf  = be->free_bufs[i].buf;
             ce->size = be->free_bufs[i].size;
@@ -308,20 +302,18 @@ static void wgpu_wait_frame(int frame, void *ctx) {
     if (be->frame_has_work[frame]) {
         wgpuDevicePoll(be->device, 1, &be->frame_submitted[frame]);
         be->frame_has_work[frame] = 0;
-        if (be->ts_query) {
-            uint64_t const off = (uint64_t)frame * TS_RESOLVE_ALIGN;
-            uint64_t const sz  = 2 * sizeof(uint64_t);
-            wgpuBufferMapAsync(be->ts_staging, WGPUMapMode_Read, off, sz,
-                (WGPUBufferMapCallbackInfo){.callback = map_cb});
-            wgpuDevicePoll(be->device, 1, NULL);
-            void const *mapped = wgpuBufferGetConstMappedRange(be->ts_staging, off, sz);
-            if (mapped) {
-                uint64_t ts[2];
-                memcpy(ts, mapped, sizeof ts);
-                be->gpu_time_accum += (double)(ts[1] - ts[0]) * be->ts_period;
-            }
-            wgpuBufferUnmap(be->ts_staging);
+        uint64_t const off = (uint64_t)frame * TS_RESOLVE_ALIGN;
+        uint64_t const sz  = 2 * sizeof(uint64_t);
+        wgpuBufferMapAsync(be->ts_staging, WGPUMapMode_Read, off, sz,
+            (WGPUBufferMapCallbackInfo){.callback = map_cb});
+        wgpuDevicePoll(be->device, 1, NULL);
+        void const *mapped = wgpuBufferGetConstMappedRange(be->ts_staging, off, sz);
+        if (mapped) {
+            uint64_t ts[2];
+            memcpy(ts, mapped, sizeof ts);
+            be->gpu_time_accum += (double)(ts[1] - ts[0]) * be->ts_period;
         }
+        wgpuBufferUnmap(be->ts_staging);
     }
 }
 
@@ -332,14 +324,12 @@ static void wgpu_submit_cmdbuf(struct wgpu_backend *be) {
     wgpuComputePassEncoderRelease(be->batch_pass);
     be->batch_pass = NULL;
 
-    if (be->ts_query) {
-        uint32_t const base = (uint32_t)be->uni_pool.cur * 2;
-        uint64_t const off  = (uint64_t)be->uni_pool.cur * TS_RESOLVE_ALIGN;
-        wgpuCommandEncoderResolveQuerySet(be->batch_enc, be->ts_query,
-                                          base, 2, be->ts_resolve, off);
-        wgpuCommandEncoderCopyBufferToBuffer(be->batch_enc,
-            be->ts_resolve, off, be->ts_staging, off, 2 * sizeof(uint64_t));
-    }
+    uint32_t const base = (uint32_t)be->uni_pool.cur * 2;
+    uint64_t const off  = (uint64_t)be->uni_pool.cur * TS_RESOLVE_ALIGN;
+    wgpuCommandEncoderResolveQuerySet(be->batch_enc, be->ts_query,
+                                      base, 2, be->ts_resolve, off);
+    wgpuCommandEncoderCopyBufferToBuffer(be->batch_enc,
+        be->ts_resolve, off, be->ts_staging, off, 2 * sizeof(uint64_t));
 
     WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(be->batch_enc, NULL);
     wgpuCommandEncoderRelease(be->batch_enc);
@@ -529,9 +519,7 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
     struct wgpu_program *p  = (struct wgpu_program *)prog;
     struct wgpu_backend *be = p->be;
 
-    // TODO: I don't think we need to check this
     int w = r - l, h = b - t;
-    if (w <= 0 || h <= 0) { return; }
 
     begin_batch(be);
 
@@ -560,8 +548,6 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
                 bind_offset[i] = loc.offset;
                 bind_size  [i] = (buf[i].sz + 3) & ~(size_t)3;
             } else {
-                uint64_t sz = buf[i].sz;
-                if (sz < 4) { sz = 4; }  // TODO: untested?
                 int idx = cache_buf(be, buf[i].ptr, buf[i].sz, rw);
                 bind_buf [i] = be->batch_cache[idx].buf;
                 bind_size[i] = be->batch_cache[idx].size;
@@ -744,13 +730,11 @@ static void wgpu_free(struct umbra_backend *base) {
         wgpuBufferRelease(be->batch_cache[i].buf);
     }
     for (int i = 0; i < be->free_bufs_n; i++) {
-        wgpuBufferRelease(be->free_bufs[i].buf);  // TODO: not covered by tests?
+        wgpuBufferRelease(be->free_bufs[i].buf);
     }
-    if (be->ts_query) {
-        wgpuQuerySetRelease(be->ts_query);
-        wgpuBufferRelease(be->ts_resolve);
-        wgpuBufferRelease(be->ts_staging);
-    }
+    wgpuQuerySetRelease(be->ts_query);
+    wgpuBufferRelease(be->ts_resolve);
+    wgpuBufferRelease(be->ts_staging);
     wgpuQueueRelease(be->queue);
     wgpuDeviceRelease(be->device);
     wgpuAdapterRelease(be->adapter);
@@ -816,11 +800,11 @@ struct umbra_backend *umbra_backend_wgpu(void) {
     wgpuAdapterGetLimits(adapter, &adapter_limits);
     adapter_limits.nextInChain = NULL;
 
-    _Bool has_ts = wgpuAdapterHasFeature(adapter, WGPUFeatureName_TimestampQuery);
-    WGPUFeatureName features[2];
-    int n_features = 0;
-    features[n_features++] = WGPUFeatureName_ShaderF16;
-    if (has_ts) { features[n_features++] = WGPUFeatureName_TimestampQuery; }
+    WGPUFeatureName features[] = {
+        WGPUFeatureName_ShaderF16,
+        WGPUFeatureName_TimestampQuery,
+    };
+    int n_features = (int)(sizeof features / sizeof features[0]);
     WGPUDevice dev = NULL;
     WGPUDeviceDescriptor dev_desc    = WGPU_DEVICE_DESCRIPTOR_INIT;
     dev_desc.requiredFeatureCount     = (size_t)n_features;
@@ -845,21 +829,19 @@ struct umbra_backend *umbra_backend_wgpu(void) {
     be->adapter  = adapter;
     be->device   = dev;
     be->queue    = queue;
-    if (has_ts) {
-        be->ts_query = wgpuDeviceCreateQuerySet(dev, &(WGPUQuerySetDescriptor){
-            .type  = WGPUQueryType_Timestamp,
-            .count = WGPU_N_FRAMES * 2,
-        });
-        be->ts_resolve = wgpuDeviceCreateBuffer(dev, &(WGPUBufferDescriptor){
-            .usage = WGPUBufferUsage_QueryResolve | WGPUBufferUsage_CopySrc,
-            .size  = WGPU_N_FRAMES * TS_RESOLVE_ALIGN,
-        });
-        be->ts_staging = wgpuDeviceCreateBuffer(dev, &(WGPUBufferDescriptor){
-            .usage = WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst,
-            .size  = WGPU_N_FRAMES * TS_RESOLVE_ALIGN,
-        });
-        be->ts_period = (double)wgpuQueueGetTimestampPeriod(queue) * 1e-9;
-    }
+    be->ts_query = wgpuDeviceCreateQuerySet(dev, &(WGPUQuerySetDescriptor){
+        .type  = WGPUQueryType_Timestamp,
+        .count = WGPU_N_FRAMES * 2,
+    });
+    be->ts_resolve = wgpuDeviceCreateBuffer(dev, &(WGPUBufferDescriptor){
+        .usage = WGPUBufferUsage_QueryResolve | WGPUBufferUsage_CopySrc,
+        .size  = WGPU_N_FRAMES * TS_RESOLVE_ALIGN,
+    });
+    be->ts_staging = wgpuDeviceCreateBuffer(dev, &(WGPUBufferDescriptor){
+        .usage = WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst,
+        .size  = WGPU_N_FRAMES * TS_RESOLVE_ALIGN,
+    });
+    be->ts_period = (double)wgpuQueueGetTimestampPeriod(queue) * 1e-9;
     be->base = (struct umbra_backend){
         .compile        = wgpu_compile_fn,
         .flush          = wgpu_flush,
