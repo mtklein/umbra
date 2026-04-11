@@ -23,7 +23,7 @@ struct buf_cache_entry {
     void   *mtl;     // retained id<MTLBuffer>
     void   *host;
     size_t  size;
-    _Bool   writable, nocopy; int :16, :32;
+    _Bool   writable, nocopy, uploaded; int :8, :32;
 };
 
 struct free_buf {
@@ -1139,10 +1139,11 @@ static int cache_buf(struct metal_backend *be, void *host, size_t bytes,
     for (int i = 0; i < be->batch_cache_n; i++) {
         struct buf_cache_entry *ce = &be->batch_cache[i];
         if (ce->host == host && ce->size >= bytes) {
-            if (!ce->nocopy && host && bytes) {
+            if (!ce->nocopy && !ce->uploaded && host && bytes) {
                 id<MTLBuffer> tmp = (__bridge id<MTLBuffer>)ce->mtl;
                 __builtin_memcpy(tmp.contents, host, bytes);
                 be->total_upload_bytes += bytes;
+                ce->uploaded = 1;
             }
             return i;
         }
@@ -1199,6 +1200,7 @@ static int cache_buf(struct metal_backend *be, void *host, size_t bytes,
     ce->host     = host;
     ce->size     = bytes;
     ce->writable = rw & BUF_WRITTEN;
+    ce->uploaded = 1;
     if ((rw & BUF_WRITTEN) && host && bytes) {
         batch_add_copy(be, host, ce->mtl, bytes);
     }
