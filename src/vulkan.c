@@ -238,10 +238,10 @@ static void batch_track_copy(struct vk_backend *be, void *host, void *mapped, si
 static void vk_flush(struct umbra_backend *be);
 static void vk_submit_cmdbuf(struct vk_backend *be);
 
-// Returns an index into be->batch_cache. The entry is valid until vk_flush.
-// Lookups reuse any existing entry for the same host pointer.
+// Returns an index into be->batch_cache.  rw is the BUF_READ|BUF_WRITTEN
+// mask: copyback is only tracked when BUF_WRITTEN is set.
 static int cache_buf(struct vk_backend *be, void *host, size_t bytes,
-                     VkDeviceSize sz, _Bool read_only) {
+                     VkDeviceSize sz, uint8_t rw) {
     for (int i = 0; i < be->batch_cache_n; i++) {
         struct buf_cache_entry *ce = &be->batch_cache[i];
         if (ce->host == host && ce->size >= sz) {
@@ -285,7 +285,7 @@ static int cache_buf(struct vk_backend *be, void *host, size_t bytes,
             ce->mapped   = host;
             ce->host     = host;
             ce->nocopy   = 1;
-            ce->writable = !read_only;
+            ce->writable = rw & BUF_WRITTEN;
             return idx;
         }
         // Import failed — fall back.
@@ -310,9 +310,9 @@ static int cache_buf(struct vk_backend *be, void *host, size_t bytes,
     vkMapMemory(be->device, ce->mem, 0, sz, 0, &ce->mapped);
 fill:
     ce->host     = host;
-    ce->writable = !read_only;
+    ce->writable = rw & BUF_WRITTEN;
     if (bytes) { memcpy(ce->mapped, host, bytes); }
-    if (!read_only && host && bytes) {
+    if ((rw & BUF_WRITTEN) && host && bytes) {
         batch_track_copy(be, host, ce->mapped, bytes);
     }
     return idx;
@@ -346,8 +346,8 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
     for (int i = 0; i <= vp->max_ptr; i++) {
         if (buf[i].ptr && buf[i].sz) {
-            _Bool const ro = !(vp->buf_rw[i] & BUF_WRITTEN);
-            if (ro && !buf[i].row_bytes) {
+            uint8_t const rw = vp->buf_rw[i];
+            if (!(rw & BUF_WRITTEN) && !buf[i].row_bytes) {
                 struct uniform_ring_loc loc =
                     uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, buf[i].sz);
                 struct vk_ring_chunk *chunk = loc.handle;
@@ -357,7 +357,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
             } else {
                 VkDeviceSize sz = (VkDeviceSize)buf[i].sz;
                 if (sz < 4) { sz = 4; }
-                int idx = cache_buf(be, buf[i].ptr, buf[i].sz, sz, ro);
+                int idx = cache_buf(be, buf[i].ptr, buf[i].sz, sz, rw);
                 bind_buffer[i] = be->batch_cache[idx].buf;
                 bind_range [i] = VK_WHOLE_SIZE;
             }
@@ -385,8 +385,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
         VkDeviceSize sz = (VkDeviceSize)dsz;
         if (sz < 4) { sz = 4; }
-        _Bool const ro = !(vp->buf_rw[bi] & BUF_WRITTEN);
-        int idx = cache_buf(be, derived, dsz, sz, ro);
+        int idx = cache_buf(be, derived, dsz, sz, vp->buf_rw[bi]);
         bind_buffer[bi] = be->batch_cache[idx].buf;
         bind_range [bi] = VK_WHOLE_SIZE;
 
@@ -396,7 +395,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
     for (int i = 0; i < n; i++) {
         if (bind_buffer[i] == VK_NULL_HANDLE) {
-            int idx = cache_buf(be, 0, 0, 4, 1);
+            int idx = cache_buf(be, 0, 0, 4, 0);
             bind_buffer[i] = be->batch_cache[idx].buf;
             bind_range [i] = VK_WHOLE_SIZE;
         }
