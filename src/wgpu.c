@@ -23,7 +23,8 @@ struct wgpu_buf_cache_entry {
     void       *host;
     void       *shadow;   // last-uploaded snapshot; skip re-upload if unchanged
     uint64_t    size;
-    _Bool       writable; int :24, :32;
+    _Bool       writable;
+    _Bool       copy_tracked; int :16, :32;
 };
 
 struct wgpu_free_buf {
@@ -229,6 +230,10 @@ static int cache_buf(struct wgpu_backend *be, void *host, size_t bytes,
                     memcpy(ce->shadow, host, bytes);
                 }
             }
+            if ((rw & BUF_WRITTEN) && !ce->copy_tracked && host && bytes) {
+                batch_track_copy(be, host, ce->buf, bytes);
+                ce->copy_tracked = 1;
+            }
             return i;
         }
     }
@@ -270,6 +275,7 @@ fill:
     }
     if ((rw & BUF_WRITTEN) && host && bytes) {
         batch_track_copy(be, host, ce->buf, bytes);
+        ce->copy_tracked = 1;
     }
     return idx;
 }
@@ -383,21 +389,17 @@ static void wgpu_flush(struct umbra_backend *base) {
     }
     be->batch_n_copies = 0;
 
-    // Recycle batch cache buffers.
-    int need = be->free_bufs_n + be->batch_cache_n;
-    if (need > be->free_bufs_cap) {
-        be->free_bufs_cap = need;
-        be->free_bufs = realloc(be->free_bufs,
-            (size_t)be->free_bufs_cap * sizeof *be->free_bufs);
-    }
+    // Cache entries persist across flushes so shadows can skip re-upload for
+    // unchanged data (e.g. font atlases).  Reset per-batch copyback tracking,
+    // and clear shadows for writable entries: the GPU has modified their data,
+    // so the shadow no longer reflects what's on the GPU buffer.
     for (int i = 0; i < be->batch_cache_n; i++) {
-        be->free_bufs[be->free_bufs_n++] = (struct wgpu_free_buf){
-            .buf  = be->batch_cache[i].buf,
-            .size = be->batch_cache[i].size,
-        };
-        free(be->batch_cache[i].shadow);
+        be->batch_cache[i].copy_tracked = 0;
+        if (be->batch_cache[i].writable) {
+            free(be->batch_cache[i].shadow);
+            be->batch_cache[i].shadow = NULL;
+        }
     }
-    be->batch_cache_n = 0;
 
     // Invalidate cached bind group — it references batch cache buffers.
     if (be->cached_bg) {
@@ -713,6 +715,10 @@ static void wgpu_free(struct umbra_backend *base) {
     wgpu_flush(base);
     struct wgpu_backend *be = (struct wgpu_backend *)base;
     uniform_ring_pool_free(&be->uni_pool);
+    for (int i = 0; i < be->batch_cache_n; i++) {
+        wgpuBufferRelease(be->batch_cache[i].buf);
+        free(be->batch_cache[i].shadow);
+    }
     for (int i = 0; i < be->free_bufs_n; i++) {
         wgpuBufferRelease(be->free_bufs[i].buf);
     }
