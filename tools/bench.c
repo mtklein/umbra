@@ -145,7 +145,7 @@ static void print_ns_header(int be_mask) {
 }
 
 static void print_compile_header(int be_mask) {
-    printf("\n%-*s", TITLE_W, "compile \xc2\xb5s");
+    printf("\n%-*s ", TITLE_W, "compile \xc2\xb5s");
     _Bool first = 1;
     for (int d = 0; d < ND; d++) {
         if (!(be_mask & (1 << disp_idx[d]))) { continue; }
