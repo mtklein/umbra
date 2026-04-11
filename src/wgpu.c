@@ -1,4 +1,5 @@
 #include "assume.h"
+#include "fingerprint.h"
 #include "spirv.h"
 #include "uniform_ring.h"
 #include <stdio.h>
@@ -14,20 +15,19 @@ struct umbra_backend *umbra_backend_wgpu(void) { return 0; }
 
 #include <wgpu.h>
 
-// TODO: checksums instead of shadow?
-
 // ---------------------------------------------------------------------------
 //  Buffer cache / copyback / free pool.
 // ---------------------------------------------------------------------------
 
 struct wgpu_buf_cache_entry {
-    WGPUBuffer  buf;
-    void       *host;
-    void       *shadow;   // last-uploaded snapshot; skip re-upload if unchanged
-    uint64_t    size;
-    _Bool       writable;
-    _Bool       copy_tracked;
-    _Bool       uploaded; int :8, :32;
+    WGPUBuffer   buf;
+    void        *host;
+    fingerprint  fp;      // hash of last-uploaded data; skip re-upload if unchanged
+    uint64_t     size;
+    size_t       fp_bytes;  // byte count fp was computed over (0 = invalid)
+    _Bool        writable;
+    _Bool        copy_tracked;
+    _Bool        uploaded; int :8, :32;
 };
 
 struct wgpu_free_buf {
@@ -238,12 +238,13 @@ static int cache_buf(struct wgpu_backend *be, void *host, size_t bytes,
                 // dispatches (e.g. tiled clears).
                 if (ce->uploaded && !ce->writable) {
                     // Already verified/uploaded this batch; skip.
-                } else if (!ce->shadow || memcmp(ce->shadow, host, bytes)) {
-                    queue_write_aligned(be, ce->buf, host, bytes);
-                    if (!ce->shadow) { ce->shadow = malloc(bytes); }
-                    memcpy(ce->shadow, host, bytes);
-                    ce->uploaded = 1;
                 } else {
+                    fingerprint fp = fingerprint_hash(host, bytes);
+                    if (!ce->fp_bytes || !fingerprint_eq(ce->fp, fp)) {
+                        queue_write_aligned(be, ce->buf, host, bytes);
+                        ce->fp       = fp;
+                        ce->fp_bytes = bytes;
+                    }
                     ce->uploaded = 1;
                 }
             }
@@ -287,11 +288,9 @@ fill:
     ce->uploaded = 0;
     if (host && bytes) {
         queue_write_aligned(be, ce->buf, host, bytes);
-        ce->uploaded = 1;
-        if (bytes <= 1024 * 1024) {
-            ce->shadow = malloc(bytes);
-            memcpy(ce->shadow, host, bytes);
-        }
+        ce->uploaded  = 1;
+        ce->fp        = fingerprint_hash(host, bytes);
+        ce->fp_bytes  = bytes;
     }
     if ((rw & BUF_WRITTEN) && host && bytes) {
         batch_track_copy(be, host, ce->buf, bytes);
@@ -347,8 +346,8 @@ static void wgpu_submit_cmdbuf(struct wgpu_backend *be) {
     be->batch_enc = NULL;
 
     // Bulk-upload all ring data accumulated since the last submit.
-    // Ring alloc copies into shadow; one QueueWriteBuffer per chunk replaces
-    // the N per-dispatch uploads that were here before.
+    // Ring alloc copies into the chunk's shadow buffer; one QueueWriteBuffer
+    // per chunk replaces the N per-dispatch uploads that were here before.
     {
         struct uniform_ring *ring = &be->uni_pool.rings[be->uni_pool.cur];
         for (int i = 0; i < ring->n; i++) {
@@ -410,16 +409,15 @@ static void wgpu_flush(struct umbra_backend *base) {
     }
     be->batch_n_copies = 0;
 
-    // Cache entries persist across flushes so shadows can skip re-upload for
-    // unchanged data (e.g. font atlases).  Reset per-batch flags, and clear
-    // shadows for writable entries: the GPU has modified their data, so the
-    // shadow no longer reflects what's on the GPU buffer.
+    // Cache entries persist across flushes so fingerprints can skip re-upload
+    // for unchanged data (e.g. font atlases).  Reset per-batch flags, and
+    // invalidate fingerprints for writable entries: the GPU has modified their
+    // data, so the fingerprint no longer reflects what's on the GPU buffer.
     for (int i = 0; i < be->batch_cache_n; i++) {
         be->batch_cache[i].copy_tracked = 0;
         be->batch_cache[i].uploaded     = 0;
         if (be->batch_cache[i].writable) {
-            free(be->batch_cache[i].shadow);
-            be->batch_cache[i].shadow = NULL;
+            be->batch_cache[i].fp_bytes = 0;
         }
     }
 
@@ -554,7 +552,7 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
         if (buf[i].ptr && buf[i].sz) {
             uint8_t const rw = p->buf_rw[i];
             if (!(rw & BUF_WRITTEN) && !buf[i].row_bytes) {
-                // Ring alloc copies data into shadow; bulk-uploaded at submit.
+                // Ring alloc copies data into chunk buffer; bulk-uploaded at submit.
                 struct uniform_ring_loc loc =
                     uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, buf[i].sz);
                 struct wgpu_ring_chunk *chunk = loc.handle;
@@ -744,7 +742,6 @@ static void wgpu_free(struct umbra_backend *base) {
     uniform_ring_pool_free(&be->uni_pool);
     for (int i = 0; i < be->batch_cache_n; i++) {
         wgpuBufferRelease(be->batch_cache[i].buf);
-        free(be->batch_cache[i].shadow);
     }
     for (int i = 0; i < be->free_bufs_n; i++) {
         wgpuBufferRelease(be->free_bufs[i].buf);  // TODO: not covered by tests?

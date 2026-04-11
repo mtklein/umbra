@@ -5,6 +5,7 @@ build $out/stb_image_write.o:   compile tools/stb_image_write.c
 
 build $out/src/uniforms.o:       compile   src/uniforms.c
 build $out/src/uniform_ring.o:   compile   src/uniform_ring.c
+build $out/src/fingerprint.o:    compile   src/fingerprint.c
 build $out/src/hash.o:           compile   src/hash.c
 build $out/src/op.o:             compile   src/op.c
 build $out/src/builder.o:        compile   src/builder.c
@@ -25,6 +26,7 @@ build $out/src/wgpu.o:           compile   src/wgpu.c
 build $out/src/draw.o:           compile   src/draw.c
 build $out/tests/test.o:         compile   tests/test.c
 build $out/tests/bb_test.o:      compile   tests/bb_test.c
+build $out/tests/fingerprint_test.o: compile tests/fingerprint_test.c
 build $out/tests/hash_test.o:    compile   tests/hash_test.c
 build $out/tests/uniform_ring_test.o: compile tests/uniform_ring_test.c
 build $out/tests/ra_test.o:      compile   tests/ra_test.c
@@ -44,9 +46,9 @@ build $out/slides/overview.o:    compile   slides/overview.c
 build $out/tests/asm_arm64_test.o: compile tests/asm_arm64_test.c
 build $out/tests/asm_x86_test.o:   compile tests/asm_x86_test.c
 
-build $out/test:      link $out/tests/test.o $out/tests/bb_test.o $out/tests/hash_test.o $out/tests/uniform_ring_test.o $out/tests/ra_test.o $out/tests/draw_test.o $out/tests/asm_arm64_test.o $out/tests/asm_x86_test.o $out/tests/golden_test.o $out/src/builder.o $out/src/op.o $out/src/basic_block.o $out/src/hash.o $out/src/uniforms.o $out/src/uniform_ring.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/jit_arm64.o $out/src/jit_x86.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/spirv.o $out/src/vulkan.o $out/src/wgpu.o $out/src/draw.o $out/stb_truetype.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/anim.o $out/slides/overview.o
+build $out/test:      link $out/tests/test.o $out/tests/bb_test.o $out/tests/fingerprint_test.o $out/tests/hash_test.o $out/tests/uniform_ring_test.o $out/tests/ra_test.o $out/tests/draw_test.o $out/tests/asm_arm64_test.o $out/tests/asm_x86_test.o $out/tests/golden_test.o $out/src/builder.o $out/src/op.o $out/src/basic_block.o $out/src/fingerprint.o $out/src/hash.o $out/src/uniforms.o $out/src/uniform_ring.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/jit_arm64.o $out/src/jit_x86.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/spirv.o $out/src/vulkan.o $out/src/wgpu.o $out/src/draw.o $out/stb_truetype.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/anim.o $out/slides/overview.o
     ldflags = $ldflags -lm
-build $out/bench:     link $out/tools/bench.o           $out/src/builder.o $out/src/op.o $out/src/basic_block.o $out/src/hash.o $out/src/uniforms.o $out/src/uniform_ring.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/jit_arm64.o $out/src/jit_x86.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/spirv.o $out/src/vulkan.o $out/src/wgpu.o $out/src/draw.o $out/stb_truetype.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/anim.o $out/slides/overview.o
-build $out/dump:      link $out/tools/dump.o            $out/src/builder.o $out/src/op.o $out/src/basic_block.o $out/src/hash.o $out/src/uniforms.o $out/src/uniform_ring.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/jit_arm64.o $out/src/jit_x86.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/spirv.o $out/src/vulkan.o $out/src/wgpu.o $out/src/draw.o $out/stb_truetype.o $out/stb_image_write.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/anim.o $out/slides/overview.o
+build $out/bench:     link $out/tools/bench.o           $out/src/builder.o $out/src/op.o $out/src/basic_block.o $out/src/fingerprint.o $out/src/hash.o $out/src/uniforms.o $out/src/uniform_ring.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/jit_arm64.o $out/src/jit_x86.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/spirv.o $out/src/vulkan.o $out/src/wgpu.o $out/src/draw.o $out/stb_truetype.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/anim.o $out/slides/overview.o
+build $out/dump:      link $out/tools/dump.o            $out/src/builder.o $out/src/op.o $out/src/basic_block.o $out/src/fingerprint.o $out/src/hash.o $out/src/uniforms.o $out/src/uniform_ring.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/jit_arm64.o $out/src/jit_x86.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/spirv.o $out/src/vulkan.o $out/src/wgpu.o $out/src/draw.o $out/stb_truetype.o $out/stb_image_write.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/anim.o $out/slides/overview.o
 
 build $out/test.log:             run  $out/test
