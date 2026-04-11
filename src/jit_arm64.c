@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
-#include <pthread.h>
 #include <unistd.h>
 
 _Static_assert(sizeof(struct umbra_buf) == 24, "");

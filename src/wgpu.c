@@ -625,24 +625,13 @@ static void wgpu_free(struct umbra_backend *base) {
     free(be);
 }
 
-static void wgpu_queue_fn(struct umbra_program *p, int l, int t, int r, int b,
-                          struct umbra_buf buf[]) {
-    wgpu_program_queue(p, l, t, r, b, buf);
-}
-static void wgpu_dump_fn(struct umbra_program const *p, FILE *f) {
-    wgpu_program_dump(p, f);
-}
-static void wgpu_free_fn(struct umbra_program *p) {
-    wgpu_program_free(p);
-}
-
 static struct umbra_program *wgpu_compile_fn(struct umbra_backend *be,
                                               struct umbra_basic_block const *bb) {
     struct umbra_program *p = wgpu_compile(be, bb);
     if (p) {
-        p->queue   = wgpu_queue_fn;
-        p->dump    = wgpu_dump_fn;
-        p->free    = wgpu_free_fn;
+        p->queue   = wgpu_program_queue;
+        p->dump    = wgpu_program_dump;
+        p->free    = wgpu_program_free;
         p->backend = be;
     }
     return p;

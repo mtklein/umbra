@@ -43,12 +43,10 @@ struct umbra_metal {
     char     *src;
     struct deref_info *deref;
     uint8_t  *buf_rw;
-    double compile_secs;
     int    max_ptr;
     int    total_bufs;
     int    tg_size;
     int    n_deref;
-    int    simd_width, :32;
 };
 
 typedef struct {
@@ -1034,14 +1032,9 @@ static struct umbra_metal* umbra_metal(
         }
 
         NSString *source = [NSString stringWithUTF8String:src];
-        struct timespec t0, t1;
-        clock_gettime(CLOCK_MONOTONIC, &t0);
         library = [device newLibraryWithSource:source
                                        options:opts
                                          error:&error];
-        clock_gettime(CLOCK_MONOTONIC, &t1);
-        double compile_secs = (double)(t1.tv_sec - t0.tv_sec)
-                            + (double)(t1.tv_nsec - t0.tv_nsec) * 1e-9;
         if (!library) {
             NSLog(@"Metal compile error: %@", error);
             goto fail;
@@ -1056,8 +1049,6 @@ static struct umbra_metal* umbra_metal(
             struct umbra_metal *m = calloc(1, sizeof *m);
             m->pipeline      = (__bridge_retained void*)pso;
             m->tg_size       = (int)pso.maxTotalThreadsPerThreadgroup;
-            m->simd_width    = (int)pso.threadExecutionWidth;
-            m->compile_secs  = compile_secs;
             m->src           = src;
             m->max_ptr       = max_ptr;
             m->total_bufs    = total_bufs;

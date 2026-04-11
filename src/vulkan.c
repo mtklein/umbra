@@ -75,8 +75,6 @@ static uint32_t find_host_memory(VkPhysicalDevice phys) {
     return 0;
 }
 
-// deref_info is in spirv.h, shared with the wgpu backend.
-
 // ---------------------------------------------------------------------------
 //  Program.
 // ---------------------------------------------------------------------------
