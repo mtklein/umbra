@@ -1,4 +1,5 @@
 #include "basic_block.h"
+#include "gpu_buf_cache.h"
 #include "uniform_ring.h"
 
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -19,27 +20,6 @@ struct umbra_backend *umbra_backend_metal(void) { return 0; }
 
 typedef struct umbra_basic_block BB;
 
-struct buf_cache_entry {
-    void   *mtl;     // retained id<MTLBuffer>
-    void   *host;
-    size_t  size;
-    _Bool   writable, nocopy, uploaded; int :8, :32;
-};
-
-struct free_buf {
-    void  *mtl;      // retained id<MTLBuffer>
-    size_t size;
-};
-
-struct copyback {
-    void *host;
-    void *mtlbuf;
-    size_t bytes;
-};
-
-struct deref_info { int buf_idx, src_buf, off; };
-enum { BUF_READ = 1, BUF_WRITTEN = 2 };
-
 enum { METAL_N_FRAMES = 2 };
 
 struct metal_backend {
@@ -51,16 +31,10 @@ struct metal_backend {
                             // open on batch_cmdbuf for the entire batch;
                             // ended in metal_submit_cmdbuf right before commit
     void *frame_committed[METAL_N_FRAMES];  // last committed cmdbuf per frame, or NULL
-    struct copyback        *batch_copy;
-    int                     batch_ncopy, batch_copy_cap;
-    struct buf_cache_entry *batch_cache;
-    int                     batch_cache_n, batch_cache_cap;
-    struct free_buf        *free_bufs;
-    int                     free_bufs_n, free_bufs_cap;
+    struct gpu_buf_cache cache;
     struct uniform_ring_pool uni_pool;
     double gpu_time_accum;
     int    total_dispatches; int :32;
-    size_t total_upload_bytes;
 };
 
 struct umbra_metal {
@@ -1001,6 +975,7 @@ static void umbra_metal_backend_free(struct metal_backend *be) {
     if (be) {
         uniform_ring_pool_free(&be->uni_pool);
         @autoreleasepool {
+            gpu_buf_cache_free(&be->cache);
             if (be->device) {
                 (void)(__bridge_transfer id)be->device;
             }
@@ -1008,14 +983,6 @@ static void umbra_metal_backend_free(struct metal_backend *be) {
                 (void)(__bridge_transfer id)be->queue;
             }
         }
-        @autoreleasepool {
-            for (int i = 0; i < be->free_bufs_n; i++) {
-                (void)(__bridge_transfer id)be->free_bufs[i].mtl;
-            }
-        }
-        free(be->free_bufs);
-        free(be->batch_copy);
-        free(be->batch_cache);
         free(be);
     }
 }
@@ -1113,98 +1080,38 @@ static struct umbra_metal* umbra_metal(
     return result;
 }
 
-static void batch_add_copy(
-    struct metal_backend *be,
-    void *host, void *raw_ptr, size_t bytes
-) {
-    if (be->batch_ncopy >= be->batch_copy_cap) {
-        be->batch_copy_cap = be->batch_copy_cap
-            ? 2 * be->batch_copy_cap : 64;
-        be->batch_copy = realloc(
-            be->batch_copy,
-            (size_t)be->batch_copy_cap
-                * sizeof(struct copyback));
-    }
-    be->batch_copy[be->batch_ncopy++] =
-        (struct copyback){host, raw_ptr, bytes};
+static gpu_buf metal_cache_alloc(size_t size, void *ctx) {
+    struct metal_backend *be = ctx;
+    id<MTLDevice> device = (__bridge id<MTLDevice>)be->device;
+    size_t alloc_size = size ? size : 1;
+    id<MTLBuffer> buf = [device newBufferWithLength:(NSUInteger)alloc_size
+                                            options:MTLResourceStorageModeShared];
+    return (gpu_buf){.ptr = (__bridge_retained void *)buf, .size = alloc_size};
 }
 
-// Returns an index into be->batch_cache.  rw is the BUF_READ|BUF_WRITTEN
-// mask for this buffer: copyback is only tracked when BUF_WRITTEN is set.
-// Upload always happens because the shader may only write a sub-rect,
-// leaving the rest of the GPU buffer needing the host data.  Nocopy entries
-// alias host memory and need neither upload nor copyback.
-static int cache_buf(struct metal_backend *be, void *host, size_t bytes,
-                     uint8_t rw) {
-    for (int i = 0; i < be->batch_cache_n; i++) {
-        struct buf_cache_entry *ce = &be->batch_cache[i];
-        if (ce->host == host && ce->size >= bytes) {
-            if (!ce->nocopy && !ce->uploaded && host && bytes) {
-                id<MTLBuffer> tmp = (__bridge id<MTLBuffer>)ce->mtl;
-                __builtin_memcpy(tmp.contents, host, bytes);
-                be->total_upload_bytes += bytes;
-                ce->uploaded = 1;
-            }
-            return i;
-        }
-    }
+static void metal_cache_upload(gpu_buf buf, void const *host, size_t bytes, void *ctx) {
+    (void)ctx;
+    id<MTLBuffer> mtl = (__bridge id<MTLBuffer>)buf.ptr;
+    __builtin_memcpy(mtl.contents, host, bytes);
+}
 
-    if (be->batch_cache_n >= be->batch_cache_cap) {
-        be->batch_cache_cap = be->batch_cache_cap ? 2 * be->batch_cache_cap : 16;
-        be->batch_cache = realloc(be->batch_cache,
-            (size_t)be->batch_cache_cap * sizeof *be->batch_cache);
-    }
-    int idx = be->batch_cache_n++;
-    struct buf_cache_entry *ce = &be->batch_cache[idx];
-    *ce = (struct buf_cache_entry){0};
-
-    // Try zero-copy host import for page-aligned pointers.
+static gpu_buf metal_cache_import(void *host, size_t bytes, void *ctx) {
+    struct metal_backend *be = ctx;
     size_t page = (size_t)getpagesize();
-    if (host && ((uintptr_t)host % page) == 0) {
-        size_t import_sz = (bytes + page - 1) & ~(page - 1);
-        id<MTLDevice> device = (__bridge id<MTLDevice>)be->device;
-        id<MTLBuffer> buf = [device newBufferWithBytesNoCopy:host
-                                                      length:(NSUInteger)import_sz
-                                                     options:MTLResourceStorageModeShared
-                                                 deallocator:nil];
-        if (buf) {
-            ce->mtl      = (__bridge_retained void*)buf;
-            ce->host     = host;
-            ce->size     = bytes;
-            ce->writable = rw & BUF_WRITTEN;
-            ce->nocopy   = 1;
-            return idx;
-        }
-    }
+    if (!host || ((uintptr_t)host % page) != 0) { return (gpu_buf){0}; }
+    size_t import_sz = (bytes + page - 1) & ~(page - 1);
+    id<MTLDevice> device = (__bridge id<MTLDevice>)be->device;
+    id<MTLBuffer> buf = [device newBufferWithBytesNoCopy:host
+                                                  length:(NSUInteger)import_sz
+                                                 options:MTLResourceStorageModeShared
+                                             deallocator:nil];
+    if (!buf) { return (gpu_buf){0}; }
+    return (gpu_buf){.ptr = (__bridge_retained void *)buf, .size = bytes};
+}
 
-    // Try to reuse a buffer from the free pool.
-    id<MTLBuffer> tmp = nil;
-    size_t alloc_size = bytes ? bytes : 1;
-    for (int i = 0; i < be->free_bufs_n; i++) {
-        if (be->free_bufs[i].size >= alloc_size) {
-            tmp = (__bridge_transfer id<MTLBuffer>)be->free_bufs[i].mtl;
-            be->free_bufs[i] = be->free_bufs[--be->free_bufs_n];
-            break;
-        }
-    }
-    if (!tmp) {
-        id<MTLDevice> device = (__bridge id<MTLDevice>)be->device;
-        tmp = [device newBufferWithLength:(NSUInteger)alloc_size
-                                  options:MTLResourceStorageModeShared];
-    }
-    if (host && bytes) {
-        __builtin_memcpy(tmp.contents, host, bytes);
-        be->total_upload_bytes += bytes;
-    }
-    ce->mtl      = (__bridge_retained void*)tmp;
-    ce->host     = host;
-    ce->size     = bytes;
-    ce->writable = rw & BUF_WRITTEN;
-    ce->uploaded = 1;
-    if ((rw & BUF_WRITTEN) && host && bytes) {
-        batch_add_copy(be, host, ce->mtl, bytes);
-    }
-    return idx;
+static void metal_cache_release(gpu_buf buf, void *ctx) {
+    (void)ctx;
+    (void)(__bridge_transfer id<MTLBuffer>)buf.ptr;
 }
 
 static void encode_dispatch(
@@ -1248,8 +1155,8 @@ static void encode_dispatch(
                 bind_handle[i] = loc.handle;
                 bind_offset[i] = loc.offset;
             } else {
-                int idx = cache_buf(be, buf[i].ptr, buf[i].sz, rw);
-                bind_handle[i] = be->batch_cache[idx].mtl;
+                int idx = gpu_buf_cache_get(&be->cache, buf[i].ptr, buf[i].sz, rw);
+                bind_handle[i] = be->cache.entry[idx].buf.ptr;
             }
         }
     }
@@ -1262,8 +1169,8 @@ static void encode_dispatch(
         __builtin_memcpy(&dsz,     (char*)base + m->deref[d].off + 8,  sizeof dsz);
         __builtin_memcpy(&drb,     (char*)base + m->deref[d].off + 16, sizeof drb);
         int const bi  = m->deref[d].buf_idx;
-        int const idx = cache_buf(be, derived, dsz, m->buf_rw[bi]);
-        bind_handle[bi] = be->batch_cache[idx].mtl;
+        int const idx = gpu_buf_cache_get(&be->cache, derived, dsz, m->buf_rw[bi]);
+        bind_handle[bi] = be->cache.entry[idx].buf.ptr;
         szs_data[bi] = (uint32_t)dsz;
         rbs_data[bi] = (uint32_t)drb;
     }
@@ -1377,35 +1284,14 @@ static void umbra_metal_flush(struct metal_backend *be) {
     metal_submit_cmdbuf(be);
     uniform_ring_pool_drain_all(&be->uni_pool);
     @autoreleasepool {
-        for (int i = 0; i < be->batch_ncopy; i++) {
-            struct copyback *c =
-                &be->batch_copy[i];
-            id<MTLBuffer> mtlbuf =
-                (__bridge id<MTLBuffer>)c->mtlbuf;
-            __builtin_memcpy(
-                c->host,
-                mtlbuf.contents,
-                (size_t)c->bytes);
+        for (int i = 0; i < be->cache.n; i++) {
+            struct gpu_cache_entry *ce = &be->cache.entry[i];
+            if (!ce->copy_tracked || ce->nocopy || !ce->host) { continue; }
+            size_t bytes = ce->fp_bytes ? ce->fp_bytes : ce->buf.size;
+            id<MTLBuffer> mtlbuf = (__bridge id<MTLBuffer>)ce->buf.ptr;
+            __builtin_memcpy(ce->host, mtlbuf.contents, bytes);
         }
-        be->batch_ncopy = 0;
-
-        int need = be->free_bufs_n + be->batch_cache_n;
-        if (need > be->free_bufs_cap) {
-            be->free_bufs_cap = need;
-            be->free_bufs = realloc(be->free_bufs,
-                (size_t)be->free_bufs_cap * sizeof *be->free_bufs);
-        }
-        for (int i = 0; i < be->batch_cache_n; i++) {
-            if (be->batch_cache[i].nocopy) {
-                (void)(__bridge_transfer id<MTLBuffer>)be->batch_cache[i].mtl;
-            } else {
-                be->free_bufs[be->free_bufs_n++] = (struct free_buf){
-                    .mtl  = be->batch_cache[i].mtl,
-                    .size = be->batch_cache[i].size,
-                };
-            }
-        }
-        be->batch_cache_n = 0;
+        gpu_buf_cache_end_batch(&be->cache);
     }
 }
 
@@ -1457,7 +1343,7 @@ static struct umbra_backend_stats stats_metal(struct umbra_backend const *be) {
         .gpu_sec         = mbe->gpu_time_accum,
         .uniform_ring_rotations = mbe->uni_pool.rotations,
         .dispatches      = mbe->total_dispatches,
-        .upload_bytes    = mbe->total_upload_bytes,
+        .upload_bytes    = mbe->cache.upload_bytes,
     };
 }
 struct umbra_backend *umbra_backend_metal(void) {
@@ -1468,6 +1354,11 @@ struct umbra_backend *umbra_backend_metal(void) {
             .flush          = flush_be_metal,
             .free           = free_be_metal,
             .stats          = stats_metal,
+        };
+        mbe->cache = (struct gpu_buf_cache){
+            .ops = {metal_cache_alloc, metal_cache_upload, metal_cache_import,
+                    metal_cache_release},
+            .ctx = mbe,
         };
         return &mbe->base;
     }
