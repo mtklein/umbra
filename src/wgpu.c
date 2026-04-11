@@ -220,11 +220,10 @@ static int cache_buf(struct wgpu_backend *be, void *host, size_t bytes,
         struct wgpu_buf_cache_entry *ce = &be->batch_cache[i];
         if (ce->host == host && ce->size >= bytes) {
             if (host && bytes) {
-                // For non-writable entries, skip re-upload within a batch once
-                // we've verified or uploaded the data.  Writable entries must
-                // always re-check because the host may modify data between
-                // dispatches (e.g. tiled clears).
-                if (ce->uploaded && !ce->writable) {
+                // Once verified or uploaded this batch, skip.  The backend
+                // owns writable buffers until flush completes, so host data
+                // is stable within a batch for all buffers.
+                if (ce->uploaded) {
                     // Already verified/uploaded this batch; skip.
                 } else {
                     fingerprint fp = fingerprint_hash(host, bytes);

@@ -440,20 +440,21 @@ static void run_tiled_writable_sync(struct umbra_backend *be) {
         {.ptr=data, .sz=buf_sz, .row_bytes=BW * sizeof(float)},
     };
 
-    // Three frames to catch cross-frame staleness.
+    // Three frames to catch cross-frame staleness.  The backend owns
+    // writable buffers until flush, so we flush between tiles.
     for (int frame = 0; frame < 3; frame++) {
         // Sentinel simulates stale accumulation from a prior frame.
         float sentinel = (float)(frame + 2) * 10.0f;
         for (int i = 0; i < BW * BH; i++) { data[i] = sentinel; }
 
-        // Tile 1: clear top half, queue.
+        // Tile 1: clear top half, queue, flush.
         __builtin_memset(data, 0, half_sz);
         p->queue(p, 0, 0, BW, BH / 2, bufs);
+        be->flush(be);
 
-        // Tile 2: clear bottom half, queue.
+        // Tile 2: clear bottom half, queue, flush.
         __builtin_memset((char *)data + half_sz, 0, half_sz);
         p->queue(p, 0, BH / 2, BW, BH, bufs);
-
         be->flush(be);
 
         // Every element should be exactly 1.0f (0.0 + 1.0).
