@@ -131,24 +131,32 @@ static int const disp_idx[ND] = {2, 3, 4, 1, 0};
 static char const *const disp_name[ND] = {"metal", "vulkan", "wgpu", "jit", "interp"};
 static _Bool const disp_gpu[ND] = {1, 1, 1, 0, 0};
 
-static void print_header(char const *label, int be_mask, _Bool first_row) {
+// Column layout.  GPU columns have val + cpu sub-fields; CPU-only just val.
+// × is 2 bytes (UTF-8) / 1 display column, so we add 1 to printf widths for
+// strings containing it.
+enum { VAL_W = 10, CPU_W = 4, CPUONLY_W = 10 };
+
+static int col_w(int d) { return disp_gpu[d] ? VAL_W + CPU_W : CPUONLY_W; }
+
+static void print_header(char const *label, int be_mask) {
     printf("%-30s", label);
     for (int d = 0; d < ND; d++) {
         if (!(be_mask & (1 << disp_idx[d]))) { continue; }
-        if (first_row) {
-            if (disp_gpu[d]) {
-                char hdr[32];
-                sprintf(hdr, "%s cpu%%", disp_name[d]);
-                printf("  %-11s", hdr);
-            } else {
-                printf("  %-11s", disp_name[d]);
-            }
+        if (disp_gpu[d]) {
+            printf("%*s %*s", VAL_W, disp_name[d], CPU_W - 1, "cpu");
         } else {
-            printf("  %-11s", disp_name[d]);
+            printf("%*s", col_w(d), disp_name[d]);
         }
     }
     printf("\n");
 }
+
+// Print a value cell.  `has_mul` means the string contains a 2-byte ×.
+static void pcell_val(int width, char const *s, _Bool has_mul) {
+    printf("%*s", width + (has_mul ? 1 : 0), s);
+}
+static void pcell_cpu(int pct) { printf(" %2d%%", pct); }
+static void pcell_cpu_blank(void) { printf("%*s", CPU_W, ""); }
 
 // Returns 1 if any adjacent pair violates the expected ranking.
 static _Bool print_row(char const *title, double ns_px[5], double gpu[5],
@@ -166,31 +174,33 @@ static _Bool print_row(char const *title, double ns_px[5], double gpu[5],
         int bi = disp_idx[d];
         if (!(be_mask & (1 << bi))) { continue; }
         if (ns_px[bi] < 0) {
-            printf("  %-11s", "-");
+            printf("%*s", col_w(d), "-");
             continue;
         }
-        char tmp[32];
+        int pct = (disp_gpu[d] && gpu[bi] >= 0 && ns_px[bi] > 0)
+                ? 100 - (int)(gpu[bi] / ns_px[bi] * 100 + 0.5)
+                : -1;
         if (d == base) {
-            // Leftmost: raw ns/px.
-            if (disp_gpu[d] && gpu[bi] >= 0 && ns_px[bi] > 0) {
-                int pct = 100 - (int)(gpu[bi] / ns_px[bi] * 100 + 0.5);
-                if (first_row) { sprintf(tmp, "%.2f ns/px %d%%", ns_px[bi], pct); }
-                else           { sprintf(tmp, "%.2f %d%%",       ns_px[bi], pct); }
-            } else {
-                if (first_row) { sprintf(tmp, "%.2f ns/px", ns_px[bi]); }
-                else           { sprintf(tmp, "%.2f",       ns_px[bi]); }
+            char tmp[32];
+            if (first_row) { sprintf(tmp, "%.2f ns/px", ns_px[bi]); }
+            else           { sprintf(tmp, "%.2f",       ns_px[bi]); }
+            pcell_val(VAL_W, tmp, 0);
+            if (disp_gpu[d]) {
+                if (pct >= 0) { pcell_cpu(pct); }
+                else          { pcell_cpu_blank(); }
             }
         } else {
-            // Multiplier of the base.
+            char tmp[32];
             double mul = base >= 0 ? ns_px[bi] / ns_px[disp_idx[base]] : 0;
-            if (disp_gpu[d] && gpu[bi] >= 0 && ns_px[bi] > 0) {
-                int pct = 100 - (int)(gpu[bi] / ns_px[bi] * 100 + 0.5);
-                sprintf(tmp, "%.1f\xc3\x97 %d%%", mul, pct);
+            sprintf(tmp, "%.1f\xc3\x97", mul);
+            if (disp_gpu[d]) {
+                pcell_val(VAL_W, tmp, 1);
+                if (pct >= 0) { pcell_cpu(pct); }
+                else          { pcell_cpu_blank(); }
             } else {
-                sprintf(tmp, "%.1f\xc3\x97", mul);
+                pcell_val(CPUONLY_W, tmp, 1);
             }
         }
-        printf("  %-11s", tmp);
     }
 
     // Anomaly: each adjacent pair left→right should be non-decreasing.
@@ -250,7 +260,7 @@ int main(int argc, char *argv[]) {
 
     _Bool any_anomaly = 0;
 
-    print_header("", be_mask, 1);
+    print_header("", be_mask);
     _Bool first_row = 1;
 
     for (int si = 0; si < ns; si++) {
@@ -328,7 +338,7 @@ int main(int argc, char *argv[]) {
     // Compile-time benchmarks.
     if (!match || strstr("compile", match)) {
         printf("\n");
-        print_header("compile", be_mask, 0);
+        print_header("compile", be_mask);
         _Bool first_compile = 1;
 
         for (int si = 0; si < ns; si++) {
@@ -390,7 +400,6 @@ int main(int argc, char *argv[]) {
                 us_call[bi] = best / (double)iters * 1e6;
             }
             printf("%-30s", s->title);
-            // Find leftmost (fastest) backend with data as the base.
             int cbase = -1;
             for (int d = 0; d < ND; d++) {
                 int bi = disp_idx[d];
@@ -402,20 +411,25 @@ int main(int argc, char *argv[]) {
             for (int d = 0; d < ND; d++) {
                 int bi = disp_idx[d];
                 if (!(be_mask & (1 << bi))) { continue; }
+                int w = col_w(d);
                 if (us_call[bi] < 0) {
-                    printf("  %-11s", "-");
+                    printf("%*s", w, "-");
                 } else if (d == cbase) {
                     char tmp[32];
-                    if (first_compile) { sprintf(tmp, "%.1f \xc2\xb5s", us_call[bi]); }
-                    else               { sprintf(tmp, "%.1f",           us_call[bi]); }
-                    printf("  %-11s", tmp);
+                    if (first_compile) {
+                        sprintf(tmp, "%.1f \xc2\xb5s", us_call[bi]);
+                        pcell_val(w, tmp, 0);
+                    } else {
+                        sprintf(tmp, "%.1f", us_call[bi]);
+                        printf("%*s", w, tmp);
+                    }
                 } else {
                     double mul = cbase >= 0
                                ? us_call[bi] / us_call[disp_idx[cbase]]
                                : 0;
                     char tmp[32];
                     sprintf(tmp, "%.1f\xc3\x97", mul);
-                    printf("  %-11s", tmp);
+                    pcell_val(w, tmp, 1);
                 }
             }
             printf("\n");
