@@ -1127,15 +1127,13 @@ static void batch_add_copy(
         (struct copyback){host, raw_ptr, bytes};
 }
 
-// Returns an index into be->batch_cache. The entry is valid until
-// umbra_metal_flush. Lookups reuse any existing entry for the same host
-// pointer; non-nocopy cache hits re-snapshot host data to pick up mutations
-// (e.g. tiled clears of a writable winding buffer between tiles). Nocopy
-// entries alias host memory directly and need no sync. Copyback for
-// non-nocopy writable buffers is tracked exactly once, at entry creation
-// time.
+// Returns an index into be->batch_cache.  rw is the BUF_READ|BUF_WRITTEN
+// mask for this buffer: copyback is only tracked when BUF_WRITTEN is set.
+// Upload always happens because the shader may only write a sub-rect,
+// leaving the rest of the GPU buffer needing the host data.  Nocopy entries
+// alias host memory and need neither upload nor copyback.
 static int cache_buf(struct metal_backend *be, void *host, size_t bytes,
-                     _Bool read_only) {
+                     uint8_t rw) {
     for (int i = 0; i < be->batch_cache_n; i++) {
         struct buf_cache_entry *ce = &be->batch_cache[i];
         if (ce->host == host && ce->size >= bytes) {
@@ -1169,7 +1167,7 @@ static int cache_buf(struct metal_backend *be, void *host, size_t bytes,
             ce->mtl      = (__bridge_retained void*)buf;
             ce->host     = host;
             ce->size     = bytes;
-            ce->writable = !read_only;
+            ce->writable = rw & BUF_WRITTEN;
             ce->nocopy   = 1;
             return idx;
         }
@@ -1196,8 +1194,8 @@ static int cache_buf(struct metal_backend *be, void *host, size_t bytes,
     ce->mtl      = (__bridge_retained void*)tmp;
     ce->host     = host;
     ce->size     = bytes;
-    ce->writable = !read_only;
-    if (!read_only && host && bytes) {
+    ce->writable = rw & BUF_WRITTEN;
+    if ((rw & BUF_WRITTEN) && host && bytes) {
         batch_add_copy(be, host, ce->mtl, bytes);
     }
     return idx;
@@ -1237,14 +1235,14 @@ static void encode_dispatch(
 
     for (int i = 0; i <= m->max_ptr; i++) {
         if (buf[i].ptr && buf[i].sz) {
-            _Bool const ro = !(m->buf_rw[i] & BUF_WRITTEN);
-            if (ro && !buf[i].row_bytes) {
+            uint8_t const rw = m->buf_rw[i];
+            if (!(rw & BUF_WRITTEN) && !buf[i].row_bytes) {
                 struct uniform_ring_loc loc =
                     uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, buf[i].sz);
                 bind_handle[i] = loc.handle;
                 bind_offset[i] = loc.offset;
             } else {
-                int idx = cache_buf(be, buf[i].ptr, buf[i].sz, ro);
+                int idx = cache_buf(be, buf[i].ptr, buf[i].sz, rw);
                 bind_handle[i] = be->batch_cache[idx].mtl;
             }
         }
@@ -1257,9 +1255,8 @@ static void encode_dispatch(
         __builtin_memcpy(&derived, (char*)base + m->deref[d].off,      sizeof derived);
         __builtin_memcpy(&dsz,     (char*)base + m->deref[d].off + 8,  sizeof dsz);
         __builtin_memcpy(&drb,     (char*)base + m->deref[d].off + 16, sizeof drb);
-        int   const bi  = m->deref[d].buf_idx;
-        _Bool const ro  = !(m->buf_rw[bi] & BUF_WRITTEN);
-        int   const idx = cache_buf(be, derived, dsz, ro);
+        int const bi  = m->deref[d].buf_idx;
+        int const idx = cache_buf(be, derived, dsz, m->buf_rw[bi]);
         bind_handle[bi] = be->batch_cache[idx].mtl;
         szs_data[bi] = (uint32_t)dsz;
         rbs_data[bi] = (uint32_t)drb;
