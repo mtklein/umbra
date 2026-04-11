@@ -126,79 +126,55 @@ static struct umbra_fmt parse_fmt(char const *s) {
 
 // Display order: M(metal), V(vulkan), W(wgpu), J(jit), I(interp).
 // Expected ranking: fastest to slowest, left to right.
-enum { ND = 5 };
+enum { ND = 5, TITLE_W = 35 };
 static int const disp_idx[ND] = {2, 3, 4, 1, 0};
 static char const *const disp_name[ND] = {"metal", "vulkan", "wgpu", "jit", "interp"};
 static _Bool const disp_gpu[ND] = {1, 1, 1, 0, 0};
 
-// Column layout.  GPU columns have val + cpu sub-fields; CPU-only just val.
-// × is 2 bytes (UTF-8) / 1 display column, so we add 1 to printf widths for
-// strings containing it.
-enum { VAL_W = 10, CPU_W = 4, CPUONLY_W = 10 };
+// Column widths: GPU columns hold value + cpu%, CPU-only hold just value.
+// Widths chosen so header labels fit and columns align between sections.
+static int const col_val[ND] = {8, 8, 8, 7, 9};
+static int const col_cpu[ND] = {5, 5, 5, 0, 0};
 
-static int col_w(int d) { return disp_gpu[d] ? VAL_W + CPU_W : CPUONLY_W; }
-
-static void print_header(char const *label, int be_mask) {
-    printf("%-30s", label);
+static void print_ns_header(int be_mask) {
+    printf("%-*s", TITLE_W, "ns/px");
     for (int d = 0; d < ND; d++) {
         if (!(be_mask & (1 << disp_idx[d]))) { continue; }
         if (disp_gpu[d]) {
-            printf("%*s %*s", VAL_W, disp_name[d], CPU_W - 1, "cpu");
+            printf("%*s%*s", col_val[d], disp_name[d], col_cpu[d], "cpu%");
         } else {
-            printf("%*s", col_w(d), disp_name[d]);
+            printf("%*s", col_val[d], disp_name[d]);
         }
     }
     printf("\n");
 }
 
-// Print a value cell.  `has_mul` means the string contains a 2-byte ×.
-static void pcell_val(int width, char const *s, _Bool has_mul) {
-    printf("%*s", width + (has_mul ? 1 : 0), s);
-}
-static void pcell_cpu(int pct) { printf(" %2d%%", pct); }
-static void pcell_cpu_blank(void) { printf("%*s", CPU_W, ""); }
-
-// Returns 1 if any adjacent pair violates the expected ranking.
-static _Bool print_row(char const *title, double ns_px[5], double gpu[5],
-                       int be_mask, _Bool first_row) {
-    printf("%-30s", title);
-
-    // The leftmost (fastest-expected) backend with data is the base.
-    int base = -1;
+static void print_compile_header(int be_mask) {
+    printf("\n%-*s", TITLE_W, "compile \xc2\xb5s");
     for (int d = 0; d < ND; d++) {
-        int bi = disp_idx[d];
-        if ((be_mask & (1 << bi)) && ns_px[bi] >= 0) { base = d; break; }
+        if (!(be_mask & (1 << disp_idx[d]))) { continue; }
+        printf("%*s", col_val[d] + col_cpu[d], disp_name[d]);
     }
+    printf("\n");
+}
 
+static _Bool print_row(char const *title, double ns_px[5], double gpu[5],
+                       int be_mask) {
+    printf("%-*s", TITLE_W, title);
     for (int d = 0; d < ND; d++) {
         int bi = disp_idx[d];
         if (!(be_mask & (1 << bi))) { continue; }
         if (ns_px[bi] < 0) {
-            printf("%*s", col_w(d), "-");
+            printf("%*s", col_val[d] + col_cpu[d], "-");
             continue;
         }
-        int pct = (disp_gpu[d] && gpu[bi] >= 0 && ns_px[bi] > 0)
-                ? 100 - (int)(gpu[bi] / ns_px[bi] * 100 + 0.5)
-                : -1;
-        if (d == base) {
-            char tmp[32];
-            if (first_row) { sprintf(tmp, "%.2f ns/px", ns_px[bi]); }
-            else           { sprintf(tmp, "%.2f",       ns_px[bi]); }
-            pcell_val(VAL_W, tmp, 0);
-            if (disp_gpu[d]) {
-                if (pct >= 0) { pcell_cpu(pct); }
-                else          { pcell_cpu_blank(); }
-            }
-        } else {
-            char tmp[32];
-            double mul = base >= 0 ? ns_px[bi] / ns_px[disp_idx[base]] : 0;
-            sprintf(tmp, "%.1f\xc3\x97", mul);
-            if (disp_gpu[d]) {
-                pcell_val(VAL_W, tmp, 1);
-                if (pct >= 0) { pcell_cpu(pct); }
-                else          { pcell_cpu_blank(); }
+        printf("%*.2f", col_val[d], ns_px[bi]);
+        if (disp_gpu[d]) {
+            if (gpu[bi] >= 0 && ns_px[bi] > 0) {
+                int pct = 100 - (int)(gpu[bi] / ns_px[bi] * 100 + 0.5);
+                printf("%*d", col_cpu[d], pct);
             } else {
-                pcell_val(CPUONLY_W, tmp, 1);
+                printf("%*s", col_cpu[d], "");
             }
         }
     }
@@ -260,8 +236,7 @@ int main(int argc, char *argv[]) {
 
     _Bool any_anomaly = 0;
 
-    print_header("", be_mask);
-    _Bool first_row = 1;
+    print_ns_header(be_mask);
 
     for (int si = 0; si < ns; si++) {
         struct slide *s = slide_get(si);
@@ -281,8 +256,7 @@ int main(int argc, char *argv[]) {
             ns_px[bi] = bench(slide_draw, &sctx, bes[bi], W, H, samples, target_secs,
                               &gpu[bi]);
         }
-        any_anomaly |= print_row(s->title, ns_px, gpu, be_mask, first_row);
-        first_row = 0;
+        any_anomaly |= print_row(s->title, ns_px, gpu, be_mask);
         free(buf);
     }
 
@@ -323,9 +297,7 @@ int main(int argc, char *argv[]) {
             ns_px[bi] = bench(prog_draw, &pctx, bes[bi], W, H, samples, target_secs,
                               &gpu[bi]);
         }
-        any_anomaly |= print_row("Slug Accumulator (1 curve)", ns_px, gpu,
-                                 be_mask, first_row);
-        first_row = 0;
+        any_anomaly |= print_row("Slug Accumulator (1 curve)", ns_px, gpu, be_mask);
 
         for (int bi = 0; bi < nb; bi++) {
             if (progs[bi]) { progs[bi]->free(progs[bi]); }
@@ -337,9 +309,7 @@ int main(int argc, char *argv[]) {
 
     // Compile-time benchmarks.
     if (!match || strstr("compile", match)) {
-        printf("\n");
-        print_header("compile", be_mask);
-        _Bool first_compile = 1;
+        print_compile_header(be_mask);
 
         for (int si = 0; si < ns; si++) {
             struct slide *s = slide_get(si);
@@ -399,41 +369,17 @@ int main(int argc, char *argv[]) {
                 }
                 us_call[bi] = best / (double)iters * 1e6;
             }
-            printf("%-30s", s->title);
-            int cbase = -1;
-            for (int d = 0; d < ND; d++) {
-                int bi = disp_idx[d];
-                if ((be_mask & (1 << bi)) && us_call[bi] >= 0) {
-                    cbase = d;
-                    break;
-                }
-            }
+            printf("%-*s", TITLE_W, s->title);
             for (int d = 0; d < ND; d++) {
                 int bi = disp_idx[d];
                 if (!(be_mask & (1 << bi))) { continue; }
-                int w = col_w(d);
                 if (us_call[bi] < 0) {
-                    printf("%*s", w, "-");
-                } else if (d == cbase) {
-                    char tmp[32];
-                    if (first_compile) {
-                        sprintf(tmp, "%.1f \xc2\xb5s", us_call[bi]);
-                        pcell_val(w, tmp, 0);
-                    } else {
-                        sprintf(tmp, "%.1f", us_call[bi]);
-                        printf("%*s", w, tmp);
-                    }
+                    printf("%*s", col_val[d] + col_cpu[d], "-");
                 } else {
-                    double mul = cbase >= 0
-                               ? us_call[bi] / us_call[disp_idx[cbase]]
-                               : 0;
-                    char tmp[32];
-                    sprintf(tmp, "%.1f\xc3\x97", mul);
-                    pcell_val(w, tmp, 1);
+                    printf("%*.1f", col_val[d] + col_cpu[d], us_call[bi]);
                 }
             }
             printf("\n");
-            first_compile = 0;
         }
     }
 
