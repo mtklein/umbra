@@ -217,7 +217,7 @@ static void queue_write_aligned(struct wgpu_backend *be, WGPUBuffer buf,
 }
 
 static int cache_buf(struct wgpu_backend *be, void *host, size_t bytes,
-                     _Bool read_only) {
+                     uint8_t rw) {
     for (int i = 0; i < be->batch_cache_n; i++) {
         struct wgpu_buf_cache_entry *ce = &be->batch_cache[i];
         if (ce->host == host && ce->size >= bytes) {
@@ -260,7 +260,7 @@ static int cache_buf(struct wgpu_backend *be, void *host, size_t bytes,
     ce->size = alloc_size;
 fill:
     ce->host     = host;
-    ce->writable = !read_only;
+    ce->writable = rw & BUF_WRITTEN;
     if (host && bytes) {
         queue_write_aligned(be, ce->buf, host, bytes);
         if (bytes <= 1024 * 1024) {
@@ -268,7 +268,7 @@ fill:
             memcpy(ce->shadow, host, bytes);
         }
     }
-    if (!read_only && host && bytes) {
+    if ((rw & BUF_WRITTEN) && host && bytes) {
         batch_track_copy(be, host, ce->buf, bytes);
     }
     return idx;
@@ -513,8 +513,8 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
 
     for (int i = 0; i <= p->max_ptr; i++) {
         if (buf[i].ptr && buf[i].sz) {
-            _Bool const ro = !(p->buf_rw[i] & BUF_WRITTEN);
-            if (ro && !buf[i].row_bytes) {
+            uint8_t const rw = p->buf_rw[i];
+            if (!(rw & BUF_WRITTEN) && !buf[i].row_bytes) {
                 struct uniform_ring_loc loc =
                     uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, buf[i].sz);
                 struct wgpu_ring_chunk *chunk = loc.handle;
@@ -540,7 +540,7 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
             } else {
                 uint64_t sz = buf[i].sz;
                 if (sz < 4) { sz = 4; }
-                int idx = cache_buf(be, buf[i].ptr, buf[i].sz, ro);
+                int idx = cache_buf(be, buf[i].ptr, buf[i].sz, rw);
                 bind_buf [i] = be->batch_cache[idx].buf;
                 bind_size[i] = be->batch_cache[idx].size;
             }
@@ -567,8 +567,7 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
         memcpy(&drb,     base + p->deref[d].off + 16, sizeof drb);
         int bi = p->deref[d].buf_idx;
 
-        _Bool const ro = !(p->buf_rw[bi] & BUF_WRITTEN);
-        int idx = cache_buf(be, derived, dsz, ro);
+        int idx = cache_buf(be, derived, dsz, p->buf_rw[bi]);
         bind_buf [bi] = be->batch_cache[idx].buf;
         bind_size[bi] = be->batch_cache[idx].size;
 
