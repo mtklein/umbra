@@ -7,8 +7,8 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
         struct gpu_cache_entry *ce = &c->entry[i];
         if (ce->host == host && ce->buf.size >= bytes) {
             if (host && bytes) {
-                if (ce->uploaded) {
-                    // Already verified/uploaded this batch; skip.
+                if (ce->uploaded && ce->writable) {
+                    // Umbra owns writable buffers; ignore the possibility they changed.
                 } else {
                     fingerprint fp = fingerprint_hash(host, bytes);
                     if (!ce->fp_bytes || !fingerprint_eq(ce->fp, fp)) {

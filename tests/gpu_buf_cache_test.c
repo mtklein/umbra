@@ -143,6 +143,29 @@ TEST(test_gpu_buf_cache_multiple_buffers) {
     gpu_buf_cache_free(&c);
 }
 
+TEST(test_gpu_buf_cache_read_modified_within_batch) {
+    struct mock_ctx m = {0};
+    struct gpu_buf_cache c = make_cache(&m);
+
+    char data[64];
+    memset(data, 0x42, sizeof data);
+
+    // First get: allocate + upload.
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ);
+    m.uploads == 1 here;
+    memcmp(c.entry[0].buf.ptr, data, sizeof data) == 0 here;
+
+    // User modifies the buffer (e.g. updates uniforms) between queue() calls.
+    data[0] = 0x7F;
+
+    // Second get within the same batch must notice the change and re-upload.
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ);
+    m.uploads == 2 here;
+    memcmp(c.entry[0].buf.ptr, data, sizeof data) == 0 here;
+
+    gpu_buf_cache_free(&c);
+}
+
 TEST(test_gpu_buf_cache_upload_bytes_tracked) {
     struct mock_ctx m = {0};
     struct gpu_buf_cache c = make_cache(&m);
