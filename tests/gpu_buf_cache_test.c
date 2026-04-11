@@ -3,7 +3,7 @@
 #include <string.h>
 
 struct mock_ctx {
-    int allocs, uploads, imports, releases;
+    int allocs, uploads, downloads, imports, releases;
 };
 
 static gpu_buf mock_alloc(size_t size, void *ctx) {
@@ -14,6 +14,11 @@ static gpu_buf mock_alloc(size_t size, void *ctx) {
 static void mock_upload(gpu_buf buf, void const *host, size_t bytes, void *ctx) {
     ((struct mock_ctx *)ctx)->uploads++;
     memcpy(buf.ptr, host, bytes);
+}
+
+static void mock_download(gpu_buf buf, void *host, size_t bytes, void *ctx) {
+    ((struct mock_ctx *)ctx)->downloads++;
+    memcpy(host, buf.ptr, bytes);
 }
 
 static gpu_buf mock_import(void *host, size_t bytes, void *ctx) {
@@ -29,7 +34,7 @@ static void mock_release(gpu_buf buf, void *ctx) {
 
 static struct gpu_buf_cache make_cache(struct mock_ctx *m) {
     return (struct gpu_buf_cache){
-        .ops = {mock_alloc, mock_upload, mock_import, mock_release},
+        .ops = {mock_alloc, mock_upload, mock_download, mock_import, mock_release},
         .ctx = m,
     };
 }
@@ -179,7 +184,7 @@ static void mock_release_nofree(gpu_buf buf, void *ctx) {
 TEST(test_gpu_buf_cache_import_nocopy) {
     struct mock_ctx m = {0};
     struct gpu_buf_cache c = {
-        .ops = {mock_alloc, mock_upload, mock_import_ok, mock_release_nofree},
+        .ops = {mock_alloc, mock_upload, mock_download, mock_import_ok, mock_release_nofree},
         .ctx = &m,
     };
 
@@ -207,7 +212,7 @@ TEST(test_gpu_buf_cache_import_nocopy) {
 TEST(test_gpu_buf_cache_import_nocopy_writable) {
     struct mock_ctx m = {0};
     struct gpu_buf_cache c = {
-        .ops = {mock_alloc, mock_upload, mock_import_ok, mock_release_nofree},
+        .ops = {mock_alloc, mock_upload, mock_download, mock_import_ok, mock_release_nofree},
         .ctx = &m,
     };
 
@@ -220,6 +225,32 @@ TEST(test_gpu_buf_cache_import_nocopy_writable) {
     c.entry[0].nocopy       here;
     c.entry[0].copy_tracked here;
     c.entry[0].writable     here;
+
+    gpu_buf_cache_free(&c);
+}
+
+TEST(test_gpu_buf_cache_copyback) {
+    struct mock_ctx m = {0};
+    struct gpu_buf_cache c = make_cache(&m);
+
+    char data[64];
+    memset(data, 0x42, sizeof data);
+
+    // Read-only buffer: copyback should skip it.
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ);
+    gpu_buf_cache_copyback(&c);
+    m.downloads == 0 here;
+
+    // Writable buffer: copyback should download.
+    char dst[64] = {0};
+    gpu_buf_cache_get(&c, dst, sizeof dst, BUF_WRITTEN);
+
+    // Simulate GPU writing to the buffer.
+    memset(c.entry[1].buf.ptr, 0xAB, sizeof dst);
+
+    gpu_buf_cache_copyback(&c);
+    m.downloads == 1 here;
+    (unsigned char)dst[0] == 0xAB here;
 
     gpu_buf_cache_free(&c);
 }

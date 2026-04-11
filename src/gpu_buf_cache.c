@@ -70,6 +70,16 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
     return idx;
 }
 
+void gpu_buf_cache_copyback(struct gpu_buf_cache *c) {
+    for (int i = 0; i < c->n; i++) {
+        struct gpu_cache_entry *ce = &c->entry[i];
+        if (ce->copy_tracked && !ce->nocopy && ce->host) {
+            size_t bytes = ce->fp_bytes ? ce->fp_bytes : ce->buf.size;
+            c->ops.download(ce->buf, ce->host, bytes, c->ctx);
+        }
+    }
+}
+
 void gpu_buf_cache_end_batch(struct gpu_buf_cache *c) {
     for (int i = 0; i < c->n; i++) {
         c->entry[i].copy_tracked = 0;

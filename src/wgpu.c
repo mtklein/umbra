@@ -191,6 +191,31 @@ static void wgpu_cache_upload(gpu_buf buf, void const *data, size_t bytes,
     }
 }
 
+static void wgpu_cache_download(gpu_buf buf, void *host, size_t bytes, void *ctx) {
+    struct wgpu_backend *be = ctx;
+    size_t aligned_sz = (bytes + 3) & ~(size_t)3;
+    WGPUBuffer staging = wgpuDeviceCreateBuffer(be->device, &(WGPUBufferDescriptor){
+        .usage = WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst,
+        .size  = aligned_sz,
+    });
+    WGPUCommandEncoder enc = wgpuDeviceCreateCommandEncoder(be->device, NULL);
+    wgpuCommandEncoderCopyBufferToBuffer(enc, buf.ptr, 0, staging, 0, aligned_sz);
+    WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(enc, NULL);
+    wgpuCommandEncoderRelease(enc);
+
+    WGPUSubmissionIndex si = wgpuQueueSubmitForIndex(be->queue, 1, &cmd);
+    wgpuCommandBufferRelease(cmd);
+    wgpuDevicePoll(be->device, 1, &si);
+
+    wgpuBufferMapAsync(staging, WGPUMapMode_Read, 0, aligned_sz,
+        (WGPUBufferMapCallbackInfo){.callback = map_cb});
+    wgpuDevicePoll(be->device, 1, NULL);
+    void const *mapped = wgpuBufferGetConstMappedRange(staging, 0, aligned_sz);
+    if (mapped) { memcpy(host, mapped, bytes); }
+    wgpuBufferUnmap(staging);
+    wgpuBufferRelease(staging);
+}
+
 static void wgpu_cache_release(gpu_buf buf, void *ctx) {
     (void)ctx;
     wgpuBufferRelease(buf.ptr);
@@ -268,35 +293,7 @@ static void wgpu_flush(struct umbra_backend *base) {
 
     wgpu_submit_cmdbuf(be);
     uniform_ring_pool_drain_all(&be->uni_pool);
-
-    // Copyback: writable cache entries with copy_tracked need GPU→host read.
-    for (int i = 0; i < be->cache.n; i++) {
-        struct gpu_cache_entry *ce = &be->cache.entry[i];
-        if (!ce->copy_tracked || ce->nocopy || !ce->host) { continue; }
-        size_t bytes = ce->fp_bytes ? ce->fp_bytes : ce->buf.size;
-        size_t aligned_sz = (bytes + 3) & ~(size_t)3;
-        WGPUBuffer staging = wgpuDeviceCreateBuffer(be->device, &(WGPUBufferDescriptor){
-            .usage = WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst,
-            .size  = aligned_sz,
-        });
-        WGPUCommandEncoder enc = wgpuDeviceCreateCommandEncoder(be->device, NULL);
-        wgpuCommandEncoderCopyBufferToBuffer(enc, ce->buf.ptr, 0, staging, 0, aligned_sz);
-        WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(enc, NULL);
-        wgpuCommandEncoderRelease(enc);
-
-        WGPUSubmissionIndex si = wgpuQueueSubmitForIndex(be->queue, 1, &cmd);
-        wgpuCommandBufferRelease(cmd);
-        wgpuDevicePoll(be->device, 1, &si);
-
-        wgpuBufferMapAsync(staging, WGPUMapMode_Read, 0, aligned_sz,
-            (WGPUBufferMapCallbackInfo){.callback = map_cb});
-        wgpuDevicePoll(be->device, 1, NULL);
-        void const *mapped = wgpuBufferGetConstMappedRange(staging, 0, aligned_sz);
-        if (mapped) { memcpy(ce->host, mapped, bytes); }
-        wgpuBufferUnmap(staging);
-        wgpuBufferRelease(staging);
-    }
-
+    gpu_buf_cache_copyback (&be->cache);
     gpu_buf_cache_end_batch(&be->cache);
 
     // Invalidate cached bind group — it references batch cache buffers.
@@ -712,7 +709,8 @@ struct umbra_backend *umbra_backend_wgpu(void) {
     });
     be->ts_period = (double)wgpuQueueGetTimestampPeriod(queue) * 1e-9;
     be->cache = (struct gpu_buf_cache){
-        .ops = {wgpu_cache_alloc, wgpu_cache_upload, NULL, wgpu_cache_release},
+        .ops = {wgpu_cache_alloc, wgpu_cache_upload, wgpu_cache_download,
+                NULL, wgpu_cache_release},
         .ctx = be,
     };
     be->base = (struct umbra_backend){

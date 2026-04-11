@@ -216,6 +216,12 @@ static void vk_cache_upload(gpu_buf buf, void const *host, size_t bytes, void *c
     memcpy(h->mapped, host, bytes);
 }
 
+static void vk_cache_download(gpu_buf buf, void *host, size_t bytes, void *ctx) {
+    (void)ctx;
+    struct vk_buf_handle *h = buf.ptr;
+    memcpy(host, h->mapped, bytes);
+}
+
 static gpu_buf vk_cache_import(void *host, size_t bytes, void *ctx) {
     struct vk_backend *v = ctx;
     VkDeviceSize align = v->host_import_align;
@@ -608,15 +614,7 @@ static void vk_flush(struct umbra_backend *be) {
 
     vk_submit_cmdbuf(v);
     uniform_ring_pool_drain_all(&v->uni_pool);
-
-    for (int i = 0; i < v->cache.n; i++) {
-        struct gpu_cache_entry *ce = &v->cache.entry[i];
-        if (!ce->copy_tracked || ce->nocopy || !ce->host) { continue; }
-        struct vk_buf_handle *h = ce->buf.ptr;
-        size_t bytes = ce->fp_bytes ? ce->fp_bytes : ce->buf.size;
-        memcpy(ce->host, h->mapped, bytes);
-    }
-
+    gpu_buf_cache_copyback (&v->cache);
     gpu_buf_cache_end_batch(&v->cache);
 }
 
@@ -810,7 +808,8 @@ struct umbra_backend *umbra_backend_vulkan(void) {
     v->ts_pool             = ts_pool;
     v->timestamp_period    = (double)props.limits.timestampPeriod;
     v->cache = (struct gpu_buf_cache){
-        .ops = {vk_cache_alloc, vk_cache_upload, vk_cache_import, vk_cache_release},
+        .ops = {vk_cache_alloc, vk_cache_upload, vk_cache_download,
+                vk_cache_import, vk_cache_release},
         .ctx = v,
     };
     v->uni_pool = (struct uniform_ring_pool){

@@ -1086,6 +1086,12 @@ static void metal_cache_upload(gpu_buf buf, void const *host, size_t bytes, void
     __builtin_memcpy(mtl.contents, host, bytes);
 }
 
+static void metal_cache_download(gpu_buf buf, void *host, size_t bytes, void *ctx) {
+    (void)ctx;
+    id<MTLBuffer> mtl = (__bridge id<MTLBuffer>)buf.ptr;
+    __builtin_memcpy(host, mtl.contents, bytes);
+}
+
 static gpu_buf metal_cache_import(void *host, size_t bytes, void *ctx) {
     struct metal_backend *be = ctx;
     size_t page = (size_t)getpagesize();
@@ -1275,13 +1281,7 @@ static void umbra_metal_flush(struct metal_backend *be) {
     metal_submit_cmdbuf(be);
     uniform_ring_pool_drain_all(&be->uni_pool);
     @autoreleasepool {
-        for (int i = 0; i < be->cache.n; i++) {
-            struct gpu_cache_entry *ce = &be->cache.entry[i];
-            if (!ce->copy_tracked || ce->nocopy || !ce->host) { continue; }
-            size_t bytes = ce->fp_bytes ? ce->fp_bytes : ce->buf.size;
-            id<MTLBuffer> mtlbuf = (__bridge id<MTLBuffer>)ce->buf.ptr;
-            __builtin_memcpy(ce->host, mtlbuf.contents, bytes);
-        }
+        gpu_buf_cache_copyback (&be->cache);
         gpu_buf_cache_end_batch(&be->cache);
     }
 }
@@ -1347,8 +1347,8 @@ struct umbra_backend *umbra_backend_metal(void) {
             .stats          = stats_metal,
         };
         mbe->cache = (struct gpu_buf_cache){
-            .ops = {metal_cache_alloc, metal_cache_upload, metal_cache_import,
-                    metal_cache_release},
+            .ops = {metal_cache_alloc, metal_cache_upload, metal_cache_download,
+                    metal_cache_import, metal_cache_release},
             .ctx = mbe,
         };
         return &mbe->base;
