@@ -126,34 +126,33 @@ static struct umbra_fmt parse_fmt(char const *s) {
 
 // Display order: M(metal), V(vulkan), W(wgpu), J(jit), I(interp).
 // Expected ranking: fastest to slowest, left to right.
-enum { ND = 5, TITLE_W = 35 };
+enum { ND = 5, TITLE_W = 36, VAL_W = 7, CPU_W = 5, GAP = 2 };
 static int const disp_idx[ND] = {2, 3, 4, 1, 0};
 static char const *const disp_name[ND] = {"metal", "vulkan", "wgpu", "jit", "interp"};
 static _Bool const disp_gpu[ND] = {1, 1, 1, 0, 0};
 
-// Column widths: GPU columns hold value + cpu%, CPU-only hold just value.
-// Widths chosen so header labels fit and columns align between sections.
-static int const col_val[ND] = {8, 8, 8, 7, 9};
-static int const col_cpu[ND] = {5, 5, 5, 0, 0};
-
 static void print_ns_header(int be_mask) {
     printf("%-*s", TITLE_W, "ns/px");
+    _Bool first = 1;
     for (int d = 0; d < ND; d++) {
         if (!(be_mask & (1 << disp_idx[d]))) { continue; }
-        if (disp_gpu[d]) {
-            printf("%*s%*s", col_val[d], disp_name[d], col_cpu[d], "cpu%");
-        } else {
-            printf("%*s", col_val[d], disp_name[d]);
-        }
+        if (!first) { printf("%*s", GAP, ""); }
+        first = 0;
+        if (disp_gpu[d]) { printf("%*s%*s", VAL_W, disp_name[d], CPU_W, "cpu%"); }
+        else             { printf("%*s", VAL_W, disp_name[d]); }
     }
     printf("\n");
 }
 
 static void print_compile_header(int be_mask) {
     printf("\n%-*s", TITLE_W, "compile \xc2\xb5s");
+    _Bool first = 1;
     for (int d = 0; d < ND; d++) {
         if (!(be_mask & (1 << disp_idx[d]))) { continue; }
-        printf("%*s", col_val[d] + col_cpu[d], disp_name[d]);
+        if (!first) { printf("%*s", GAP, ""); }
+        first = 0;
+        if (disp_gpu[d]) { printf("%*s%*s", VAL_W, disp_name[d], CPU_W, ""); }
+        else             { printf("%*s", VAL_W, disp_name[d]); }
     }
     printf("\n");
 }
@@ -161,25 +160,27 @@ static void print_compile_header(int be_mask) {
 static _Bool print_row(char const *title, double ns_px[5], double gpu[5],
                        int be_mask) {
     printf("%-*s", TITLE_W, title);
+    _Bool first = 1;
     for (int d = 0; d < ND; d++) {
         int bi = disp_idx[d];
         if (!(be_mask & (1 << bi))) { continue; }
+        if (!first) { printf("%*s", GAP, ""); }
+        first = 0;
         if (ns_px[bi] < 0) {
-            printf("%*s", col_val[d] + col_cpu[d], "-");
+            printf("%*s", VAL_W + (disp_gpu[d] ? CPU_W : 0), "-");
             continue;
         }
-        printf("%*.2f", col_val[d], ns_px[bi]);
+        printf("%*.2f", VAL_W, ns_px[bi]);
         if (disp_gpu[d]) {
             if (gpu[bi] >= 0 && ns_px[bi] > 0) {
                 int pct = 100 - (int)(gpu[bi] / ns_px[bi] * 100 + 0.5);
-                printf("%*d", col_cpu[d], pct);
+                printf("%*d", CPU_W, pct);
             } else {
-                printf("%*s", col_cpu[d], "");
+                printf("%*s", CPU_W, "");
             }
         }
     }
 
-    // Anomaly: each adjacent pair left→right should be non-decreasing.
     _Bool anomaly = 0;
     for (int d = 0; d + 1 < ND; d++) {
         int a = disp_idx[d], b = disp_idx[d + 1];
@@ -370,13 +371,18 @@ int main(int argc, char *argv[]) {
                 us_call[bi] = best / (double)iters * 1e6;
             }
             printf("%-*s", TITLE_W, s->title);
+            _Bool first = 1;
             for (int d = 0; d < ND; d++) {
                 int bi = disp_idx[d];
                 if (!(be_mask & (1 << bi))) { continue; }
+                if (!first) { printf("%*s", GAP, ""); }
+                first = 0;
                 if (us_call[bi] < 0) {
-                    printf("%*s", col_val[d] + col_cpu[d], "-");
+                    printf("%*s", VAL_W + (disp_gpu[d] ? CPU_W : 0), "-");
+                } else if (disp_gpu[d]) {
+                    printf("%*.1f%*s", VAL_W, us_call[bi], CPU_W, "");
                 } else {
-                    printf("%*.1f", col_val[d] + col_cpu[d], us_call[bi]);
+                    printf("%*.1f", VAL_W, us_call[bi]);
                 }
             }
             printf("\n");
