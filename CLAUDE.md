@@ -36,6 +36,11 @@ related assignments of the same type, with one shared type declaration:
              quux = fn(inst.w);
     float const not_int = ...;
 
+Strive to write code that is clear without comments.  If you're thinking of
+adding a comment to clarify, first see if refactoring or better identifiers can
+make it clear.  Reserve comments only for important context that cannot be
+expressed through code.  Never use comments for organization or decoration.
+
 Use East `const`, and use it liberally, especially to distinguish variables
 that name a value like `double const start_time = now()` from locals that are
 locations to hold a updating value like `double elapsed = 0; elapsed += ...`.
