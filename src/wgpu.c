@@ -30,11 +30,6 @@ struct wgpu_buf_cache_entry {
     _Bool        uploaded; int :8, :32;
 };
 
-struct wgpu_free_buf {
-    WGPUBuffer buf;
-    uint64_t   size;
-};
-
 struct wgpu_copyback {
     void     *host;
     WGPUBuffer buf;
@@ -63,8 +58,6 @@ struct wgpu_backend {
 
     struct wgpu_buf_cache_entry *batch_cache;
     int                          batch_cache_n, batch_cache_cap;
-    struct wgpu_free_buf        *free_bufs;
-    int                          free_bufs_n, free_bufs_cap;
     struct wgpu_copyback        *batch_copies;
     int                          batch_n_copies, batch_copies_cap;
 
@@ -261,22 +254,12 @@ static int cache_buf(struct wgpu_backend *be, void *host, size_t bytes,
     *ce = (struct wgpu_buf_cache_entry){0};
 
     uint64_t alloc_size = bytes ? (bytes + 3) & ~(uint64_t)3 : 4;
-    // Reuse from free pool (currently unused with persistent cache).
-    for (int i = 0; i < be->free_bufs_n; i++) {
-        if (be->free_bufs[i].size >= alloc_size) {
-            ce->buf  = be->free_bufs[i].buf;
-            ce->size = be->free_bufs[i].size;
-            be->free_bufs[i] = be->free_bufs[--be->free_bufs_n];
-            goto fill;
-        }
-    }
     ce->buf = wgpuDeviceCreateBuffer(be->device, &(WGPUBufferDescriptor){
         .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst
                | WGPUBufferUsage_CopySrc,
         .size  = alloc_size,
     });
     ce->size = alloc_size;
-fill:
     ce->host     = host;
     ce->writable = rw & BUF_WRITTEN;
     ce->uploaded = 0;
@@ -729,9 +712,6 @@ static void wgpu_free(struct umbra_backend *base) {
     for (int i = 0; i < be->batch_cache_n; i++) {
         wgpuBufferRelease(be->batch_cache[i].buf);
     }
-    for (int i = 0; i < be->free_bufs_n; i++) {
-        wgpuBufferRelease(be->free_bufs[i].buf);
-    }
     wgpuQuerySetRelease(be->ts_query);
     wgpuBufferRelease(be->ts_resolve);
     wgpuBufferRelease(be->ts_staging);
@@ -739,7 +719,6 @@ static void wgpu_free(struct umbra_backend *base) {
     wgpuDeviceRelease(be->device);
     wgpuAdapterRelease(be->adapter);
     wgpuInstanceRelease(be->instance);
-    free(be->free_bufs);
     free(be->batch_copies);
     free(be->batch_cache);
     free(be);
