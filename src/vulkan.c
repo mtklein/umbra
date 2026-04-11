@@ -17,20 +17,10 @@ struct umbra_backend *umbra_backend_vulkan(void) { return 0; }
 //  Backend state.
 // ---------------------------------------------------------------------------
 
-struct buf_cache_entry {
+struct vk_buf_handle {
     VkBuffer       buf;
     VkDeviceMemory mem;
     void          *mapped;
-    void          *host;
-    VkDeviceSize   size;
-    _Bool          nocopy, writable; int :16, :32;
-};
-
-struct free_vk_buf {
-    VkBuffer       buf;
-    VkDeviceMemory mem;
-    void          *mapped;
-    VkDeviceSize   size;
 };
 
 enum { VK_N_FRAMES = 2 };
@@ -53,14 +43,8 @@ struct vk_backend {
     VkQueryPool           ts_pool;                         // 2 timestamps per frame
     double                timestamp_period;                // ns per tick
     double                gpu_time_accum;
-    struct copyback      *batch_copies;
-    int                   batch_n_copies, batch_copies_cap;
-    struct buf_cache_entry *batch_cache;
-    int                     batch_cache_n, batch_cache_cap;
-    struct free_vk_buf     *free_bufs;
-    int                     free_bufs_n, free_bufs_cap;
+    struct gpu_buf_cache  cache;
     struct uniform_ring_pool uni_pool;
-    size_t                total_upload_bytes;
     int                   total_dispatches;
     _Bool                 batch_has_dispatch; int :24;
 };
@@ -92,16 +76,6 @@ static uint32_t find_host_memory(VkPhysicalDevice phys) {
 }
 
 // deref_info is in spirv.h, shared with the wgpu backend.
-
-// ---------------------------------------------------------------------------
-//  Copyback tracking.
-// ---------------------------------------------------------------------------
-
-struct copyback {
-    void *host;
-    void *mapped;
-    size_t bytes;
-};
 
 // ---------------------------------------------------------------------------
 //  Program.
@@ -224,14 +198,71 @@ static void begin_batch(struct vk_backend *be) {
     be->batch_has_dispatch = 0;
 }
 
-static void batch_track_copy(struct vk_backend *be, void *host, void *mapped, size_t bytes) {
-    if (be->batch_n_copies >= be->batch_copies_cap) {
-        be->batch_copies_cap = be->batch_copies_cap ? 2 * be->batch_copies_cap : 64;
-        be->batch_copies = realloc(be->batch_copies, (size_t)be->batch_copies_cap * sizeof *be->batch_copies);
-    }
-    be->batch_copies[be->batch_n_copies++] = (struct copyback){host, mapped, bytes};
+// ---------------------------------------------------------------------------
+//  gpu_buf_cache ops for vulkan.
+// ---------------------------------------------------------------------------
+
+static gpu_buf vk_cache_alloc(size_t size, void *ctx) {
+    struct vk_backend *v = ctx;
+    VkDeviceSize sz = size ? (VkDeviceSize)size : 4;
+    struct vk_buf_handle *h = malloc(sizeof *h);
+    h->buf = create_buffer(v->device, sz);
+    h->mem = alloc_and_bind(v->device, h->buf, v->mem_type_host);
+    vkMapMemory(v->device, h->mem, 0, sz, 0, &h->mapped);
+    return (gpu_buf){.ptr = h, .size = (size_t)sz};
 }
 
+static void vk_cache_upload(gpu_buf buf, void const *host, size_t bytes, void *ctx) {
+    (void)ctx;
+    struct vk_buf_handle *h = buf.ptr;
+    memcpy(h->mapped, host, bytes);
+}
+
+static gpu_buf vk_cache_import(void *host, size_t bytes, void *ctx) {
+    struct vk_backend *v = ctx;
+    VkDeviceSize align = v->host_import_align;
+    if (!align || !host || ((uintptr_t)host % align) != 0) { return (gpu_buf){0}; }
+    VkDeviceSize sz = (VkDeviceSize)bytes;
+    if (sz < 4) { sz = 4; }
+    VkDeviceSize import_sz = (sz + align - 1) & ~(align - 1);
+    VkBuffer buf_vk = create_buffer(v->device, import_sz);
+    VkMemoryRequirements req;
+    vkGetBufferMemoryRequirements(v->device, buf_vk, &req);
+    VkImportMemoryHostPointerInfoEXT imp = {
+        .sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_HOST_POINTER_INFO_EXT,
+        .handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT,
+        .pHostPointer = host,
+    };
+    VkMemoryAllocateInfo ai = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .pNext = &imp,
+        .allocationSize = import_sz > req.size ? import_sz : req.size,
+        .memoryTypeIndex = v->mem_type_host_import,
+    };
+    VkDeviceMemory mem = VK_NULL_HANDLE;
+    if (vkAllocateMemory(v->device, &ai, 0, &mem) == VK_SUCCESS &&
+        vkBindBufferMemory(v->device, buf_vk, mem, 0) == VK_SUCCESS) {
+        struct vk_buf_handle *h = malloc(sizeof *h);
+        h->buf    = buf_vk;
+        h->mem    = mem;
+        h->mapped = host;
+        return (gpu_buf){.ptr = h, .size = bytes};
+    }
+    // Import failed — fall back.
+    if (mem) { vkFreeMemory(v->device, mem, 0); }
+    vkDestroyBuffer(v->device, buf_vk, 0);
+    return (gpu_buf){0};
+}
+
+static void vk_cache_release(gpu_buf buf, void *ctx) {
+    struct vk_backend *v = ctx;
+    struct vk_buf_handle *h = buf.ptr;
+    if (h) {
+        vkDestroyBuffer(v->device, h->buf, 0);
+        vkFreeMemory(v->device, h->mem, 0);
+        free(h);
+    }
+}
 
 // ---------------------------------------------------------------------------
 //  Program implementation.
@@ -239,86 +270,6 @@ static void batch_track_copy(struct vk_backend *be, void *host, void *mapped, si
 
 static void vk_flush(struct umbra_backend *be);
 static void vk_submit_cmdbuf(struct vk_backend *be);
-
-// Returns an index into be->batch_cache.  rw is the BUF_READ|BUF_WRITTEN
-// mask: copyback is only tracked when BUF_WRITTEN is set.
-static int cache_buf(struct vk_backend *be, void *host, size_t bytes,
-                     VkDeviceSize sz, uint8_t rw) {
-    for (int i = 0; i < be->batch_cache_n; i++) {
-        struct buf_cache_entry *ce = &be->batch_cache[i];
-        if (ce->host == host && ce->size >= sz) {
-            return i;
-        }
-    }
-
-    if (be->batch_cache_n >= be->batch_cache_cap) {
-        be->batch_cache_cap = be->batch_cache_cap ? 2 * be->batch_cache_cap : 16;
-        be->batch_cache = realloc(be->batch_cache,
-            (size_t)be->batch_cache_cap * sizeof *be->batch_cache);
-    }
-    int idx = be->batch_cache_n++;
-    struct buf_cache_entry *ce = &be->batch_cache[idx];
-    *ce = (struct buf_cache_entry){0};
-
-    // Try zero-copy host import for page-aligned pointers.
-    VkDeviceSize align = be->host_import_align;
-    if (align && host && ((uintptr_t)host % align) == 0) {
-        VkDeviceSize import_sz = (sz + align - 1) & ~(align - 1);
-        VkBuffer buf = create_buffer(be->device, import_sz);
-        VkMemoryRequirements req;
-        vkGetBufferMemoryRequirements(be->device, buf, &req);
-        VkImportMemoryHostPointerInfoEXT imp = {
-            .sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_HOST_POINTER_INFO_EXT,
-            .handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT,
-            .pHostPointer = host,
-        };
-        VkMemoryAllocateInfo ai = {
-            .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-            .pNext = &imp,
-            .allocationSize = import_sz > req.size ? import_sz : req.size,
-            .memoryTypeIndex = be->mem_type_host_import,
-        };
-        VkDeviceMemory mem = VK_NULL_HANDLE;
-        if (vkAllocateMemory(be->device, &ai, 0, &mem) == VK_SUCCESS &&
-            vkBindBufferMemory(be->device, buf, mem, 0) == VK_SUCCESS) {
-            ce->buf      = buf;
-            ce->mem      = mem;
-            ce->size     = import_sz;
-            ce->mapped   = host;
-            ce->host     = host;
-            ce->nocopy   = 1;
-            ce->writable = rw & BUF_WRITTEN;
-            return idx;
-        }
-        // Import failed — fall back.
-        if (mem) { vkFreeMemory(be->device, mem, 0); }
-        vkDestroyBuffer(be->device, buf, 0);
-    }
-
-    // Try to reuse a buffer from the free pool.
-    for (int i = 0; i < be->free_bufs_n; i++) {
-        if (be->free_bufs[i].size >= sz) {
-            ce->buf    = be->free_bufs[i].buf;
-            ce->mem    = be->free_bufs[i].mem;
-            ce->mapped = be->free_bufs[i].mapped;
-            ce->size   = be->free_bufs[i].size;
-            be->free_bufs[i] = be->free_bufs[--be->free_bufs_n];
-            goto fill;
-        }
-    }
-    ce->buf      = create_buffer(be->device, sz);
-    ce->mem      = alloc_and_bind(be->device, ce->buf, be->mem_type_host);
-    ce->size     = sz;
-    vkMapMemory(be->device, ce->mem, 0, sz, 0, &ce->mapped);
-fill:
-    ce->host     = host;
-    ce->writable = rw & BUF_WRITTEN;
-    if (bytes) { memcpy(ce->mapped, host, bytes); be->total_upload_bytes += bytes; }
-    if ((rw & BUF_WRITTEN) && host && bytes) {
-        batch_track_copy(be, host, ce->mapped, bytes);
-    }
-    return idx;
-}
 
 static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b,
                               struct umbra_buf buf[]) {
@@ -334,8 +285,8 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
     // For each binding we need a (VkBuffer, offset, range) triple. Read-only
     // flat top-level buffers go through the per-batch uniform ring; everything
-    // else (writable, row-structured, deref'd) goes through cache_buf so the
-    // writable->readonly handoff path is preserved.
+    // else (writable, row-structured, deref'd) goes through the shared cache
+    // so the writable->readonly handoff path is preserved.
     VkBuffer     bind_buffer[32];
     VkDeviceSize bind_offset[32];
     VkDeviceSize bind_range [32];
@@ -357,10 +308,9 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
                 bind_offset[i] = (VkDeviceSize)loc.offset;
                 bind_range [i] = (VkDeviceSize)buf[i].sz;
             } else {
-                VkDeviceSize sz = (VkDeviceSize)buf[i].sz;
-                if (sz < 4) { sz = 4; }
-                int idx = cache_buf(be, buf[i].ptr, buf[i].sz, sz, rw);
-                bind_buffer[i] = be->batch_cache[idx].buf;
+                int idx = gpu_buf_cache_get(&be->cache, buf[i].ptr, buf[i].sz, rw);
+                struct vk_buf_handle *bh = be->cache.entry[idx].buf.ptr;
+                bind_buffer[i] = bh->buf;
                 bind_range [i] = VK_WHOLE_SIZE;
             }
         }
@@ -385,10 +335,9 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
         memcpy(&drb,     base + vp->deref[d].off + 16, sizeof drb);
         int bi = vp->deref[d].buf_idx;
 
-        VkDeviceSize sz = (VkDeviceSize)dsz;
-        if (sz < 4) { sz = 4; }
-        int idx = cache_buf(be, derived, dsz, sz, vp->buf_rw[bi]);
-        bind_buffer[bi] = be->batch_cache[idx].buf;
+        int idx = gpu_buf_cache_get(&be->cache, derived, dsz, vp->buf_rw[bi]);
+        struct vk_buf_handle *bh = be->cache.entry[idx].buf.ptr;
+        bind_buffer[bi] = bh->buf;
         bind_range [bi] = VK_WHOLE_SIZE;
 
         push_data[3 + bi] = (uint32_t)dsz;
@@ -397,8 +346,9 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
     for (int i = 0; i < n; i++) {
         if (bind_buffer[i] == VK_NULL_HANDLE) {
-            int idx = cache_buf(be, 0, 0, 4, 0);
-            bind_buffer[i] = be->batch_cache[idx].buf;
+            int idx = gpu_buf_cache_get(&be->cache, 0, 0, 0);
+            struct vk_buf_handle *bh = be->cache.entry[idx].buf.ptr;
+            bind_buffer[i] = bh->buf;
             bind_range [i] = VK_WHOLE_SIZE;
         }
     }
@@ -631,8 +581,7 @@ static void vk_wait_frame(int frame, void *ctx) {
 // Backpressure release: submit the current frame's cmdbuf without waiting,
 // stash it in frame_committed[cur], then rotate the pool. Pool calls
 // vk_wait_frame on the new cur (only blocks if its prior cmdbuf is still
-// running) and resets that ring. Writebacks and cache_buf entries stay
-// live across rotation.
+// running) and resets that ring. Cache entries stay live across rotation.
 static void vk_submit_cmdbuf(struct vk_backend *v) {
     if (!v->batch_cmd) { return; }
 
@@ -662,39 +611,15 @@ static void vk_flush(struct umbra_backend *be) {
     vk_submit_cmdbuf(v);
     uniform_ring_pool_drain_all(&v->uni_pool);
 
-    for (int i = 0; i < v->batch_n_copies; i++) {
-        memcpy(v->batch_copies[i].host, v->batch_copies[i].mapped, v->batch_copies[i].bytes);
+    for (int i = 0; i < v->cache.n; i++) {
+        struct gpu_cache_entry *ce = &v->cache.entry[i];
+        if (!ce->copy_tracked || ce->nocopy || !ce->host) { continue; }
+        struct vk_buf_handle *h = ce->buf.ptr;
+        size_t bytes = ce->fp_bytes ? ce->fp_bytes : ce->buf.size;
+        memcpy(ce->host, h->mapped, bytes);
     }
 
-    {
-        int recyclable = 0;
-        for (int i = 0; i < v->batch_cache_n; i++) {
-            if (!v->batch_cache[i].nocopy) { recyclable++; }
-        }
-        int need = v->free_bufs_n + recyclable;
-        if (need > v->free_bufs_cap) {
-            v->free_bufs_cap = need;
-            v->free_bufs = realloc(v->free_bufs,
-                (size_t)v->free_bufs_cap * sizeof *v->free_bufs);
-        }
-        for (int i = 0; i < v->batch_cache_n; i++) {
-            struct buf_cache_entry *ce = &v->batch_cache[i];
-            if (ce->nocopy) {
-                vkFreeMemory  (v->device, ce->mem, 0);
-                vkDestroyBuffer(v->device, ce->buf, 0);
-            } else {
-                v->free_bufs[v->free_bufs_n++] = (struct free_vk_buf){
-                    .buf    = ce->buf,
-                    .mem    = ce->mem,
-                    .mapped = ce->mapped,
-                    .size   = ce->size,
-                };
-            }
-        }
-    }
-
-    v->batch_n_copies = 0;
-    v->batch_cache_n  = 0;
+    gpu_buf_cache_end_batch(&v->cache);
 }
 
 static struct umbra_backend_stats vk_stats(struct umbra_backend const *be) {
@@ -703,7 +628,7 @@ static struct umbra_backend_stats vk_stats(struct umbra_backend const *be) {
         .gpu_sec        = v->gpu_time_accum,
         .uniform_ring_rotations = v->uni_pool.rotations,
         .dispatches     = v->total_dispatches,
-        .upload_bytes   = v->total_upload_bytes,
+        .upload_bytes   = v->cache.upload_bytes,
     };
 }
 
@@ -714,17 +639,11 @@ static void vk_free(struct umbra_backend *be) {
     for (int i = 0; i < VK_N_FRAMES; i++) {
         vkDestroyFence(v->device, v->frame_fences[i], 0);
     }
-    for (int i = 0; i < v->free_bufs_n; i++) {
-        vkFreeMemory  (v->device, v->free_bufs[i].mem, 0);
-        vkDestroyBuffer(v->device, v->free_bufs[i].buf, 0);
-    }
+    gpu_buf_cache_free(&v->cache);
     if (v->ts_pool) { vkDestroyQueryPool(v->device, v->ts_pool, 0); }
     vkDestroyCommandPool(v->device, v->cmd_pool, 0);
     vkDestroyDevice(v->device, 0);
     vkDestroyInstance(v->instance, 0);
-    free(v->free_bufs);
-    free(v->batch_copies);
-    free(v->batch_cache);
     free(v);
 }
 
@@ -892,6 +811,10 @@ struct umbra_backend *umbra_backend_vulkan(void) {
     v->get_host_props      = get_host_props;
     v->ts_pool             = ts_pool;
     v->timestamp_period    = (double)props.limits.timestampPeriod;
+    v->cache = (struct gpu_buf_cache){
+        .ops = {vk_cache_alloc, vk_cache_upload, vk_cache_import, vk_cache_release},
+        .ctx = v,
+    };
     v->uni_pool = (struct uniform_ring_pool){
         .n         =VK_N_FRAMES,
         .high_water=VK_RING_HIGH_WATER,
