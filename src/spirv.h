@@ -1,10 +1,9 @@
 #pragma once
 #include "basic_block.h"
+#include "gpu_buf_cache.h"
 #include <stdint.h>
 
 enum { SPIRV_WG_SIZE = 64 };
-
-struct deref_info { int buf_idx, src_buf, off; };
 
 enum {
     SPIRV_FLOAT_CONTROLS   = 1,
@@ -12,8 +11,6 @@ enum {
     SPIRV_PUSH_VIA_SSBO    = 4,  // Emit push data as an SSBO instead of PushConstant.
     SPIRV_NO_16BIT_TYPES   = 8,  // Use f16 storage instead of u16 (for naga/wgpu).
 };
-
-enum { BUF_READ = 1, BUF_WRITTEN = 2 };
 
 uint32_t *build_spirv(struct umbra_basic_block const *bb,
                       int flags,

@@ -1,5 +1,5 @@
 #include "assume.h"
-#include "fingerprint.h"
+#include "gpu_buf_cache.h"
 #include "spirv.h"
 #include "uniform_ring.h"
 #include <stdio.h>
@@ -14,27 +14,6 @@ struct umbra_backend *umbra_backend_wgpu(void) { return 0; }
 #else
 
 #include <wgpu.h>
-
-// ---------------------------------------------------------------------------
-//  Buffer cache / copyback / free pool.
-// ---------------------------------------------------------------------------
-
-struct wgpu_buf_cache_entry {
-    WGPUBuffer   buf;
-    void        *host;
-    fingerprint  fp;      // hash of last-uploaded data; skip re-upload if unchanged
-    uint64_t     size;
-    size_t       fp_bytes;  // byte count fp was computed over (0 = invalid)
-    _Bool        writable;
-    _Bool        copy_tracked;
-    _Bool        uploaded; int :8, :32;
-};
-
-struct wgpu_copyback {
-    void     *host;
-    WGPUBuffer buf;
-    size_t     bytes;
-};
 
 // ---------------------------------------------------------------------------
 //  Backend and program structs.
@@ -56,10 +35,7 @@ struct wgpu_backend {
     WGPUSubmissionIndex       frame_submitted[WGPU_N_FRAMES];
     _Bool                     frame_has_work [WGPU_N_FRAMES]; int :16, :32;
 
-    struct wgpu_buf_cache_entry *batch_cache;
-    int                          batch_cache_n, batch_cache_cap;
-    struct wgpu_copyback        *batch_copies;
-    int                          batch_n_copies, batch_copies_cap;
+    struct gpu_buf_cache          cache;
 
     // Bind group cache: reuse across dispatches when data bindings don't change.
     WGPUBindGroup             cached_bg;
@@ -183,96 +159,41 @@ static void begin_batch(struct wgpu_backend *be) {
     be->batch_has_dispatch = 0;
 }
 
-static void batch_track_copy(struct wgpu_backend *be,
-                             void *host, WGPUBuffer buf, size_t bytes) {
-    if (be->batch_n_copies >= be->batch_copies_cap) {
-        be->batch_copies_cap = be->batch_copies_cap ? 2 * be->batch_copies_cap : 64;
-        be->batch_copies = realloc(be->batch_copies,
-            (size_t)be->batch_copies_cap * sizeof *be->batch_copies);
-    }
-    be->batch_copies[be->batch_n_copies++] =
-        (struct wgpu_copyback){host, buf, bytes};
-}
-
 // ---------------------------------------------------------------------------
-//  Buffer cache.
+//  gpu_buf_cache ops for wgpu.
 // ---------------------------------------------------------------------------
 
-// WebGPU requires buffer writes to be 4-byte aligned.
-static void queue_write_aligned(struct wgpu_backend *be, WGPUBuffer buf,
-                                void const *data, size_t bytes) {
-    size_t aligned = (bytes + 3) & ~(size_t)3;
-    if (aligned == bytes) {
-        wgpuQueueWriteBuffer(be->queue, buf, 0, data, bytes);
-    } else {
-        // Pad to 4-byte alignment with zeros on the stack.
-        char tmp[4] = {0};
-        __builtin_memcpy(tmp, (char const *)data + (bytes & ~(size_t)3), bytes & 3);
-        wgpuQueueWriteBuffer(be->queue, buf, 0, data, bytes & ~(size_t)3);
-        wgpuQueueWriteBuffer(be->queue, buf, bytes & ~(size_t)3, tmp, 4);
-    }
-    be->total_upload_bytes += bytes;
-}
-
-static int cache_buf(struct wgpu_backend *be, void *host, size_t bytes,
-                     uint8_t rw) {
-    for (int i = 0; i < be->batch_cache_n; i++) {
-        struct wgpu_buf_cache_entry *ce = &be->batch_cache[i];
-        if (ce->host == host && ce->size >= bytes) {
-            if (host && bytes) {
-                // Once verified or uploaded this batch, skip.  The backend
-                // owns writable buffers until flush completes, so host data
-                // is stable within a batch for all buffers.
-                if (ce->uploaded) {
-                    // Already verified/uploaded this batch; skip.
-                } else {
-                    fingerprint fp = fingerprint_hash(host, bytes);
-                    if (!ce->fp_bytes || !fingerprint_eq(ce->fp, fp)) {
-                        queue_write_aligned(be, ce->buf, host, bytes);
-                        ce->fp       = fp;
-                        ce->fp_bytes = bytes;
-                    }
-                    ce->uploaded = 1;
-                }
-            }
-            if ((rw & BUF_WRITTEN) && !ce->copy_tracked && host && bytes) {
-                batch_track_copy(be, host, ce->buf, bytes);
-                ce->copy_tracked = 1;
-            }
-            return i;
-        }
-    }
-
-    if (be->batch_cache_n >= be->batch_cache_cap) {
-        be->batch_cache_cap = be->batch_cache_cap ? 2 * be->batch_cache_cap : 16;
-        be->batch_cache = realloc(be->batch_cache,
-            (size_t)be->batch_cache_cap * sizeof *be->batch_cache);
-    }
-    int idx = be->batch_cache_n++;
-    struct wgpu_buf_cache_entry *ce = &be->batch_cache[idx];
-    *ce = (struct wgpu_buf_cache_entry){0};
-
-    uint64_t alloc_size = bytes ? (bytes + 3) & ~(uint64_t)3 : 4;
-    ce->buf = wgpuDeviceCreateBuffer(be->device, &(WGPUBufferDescriptor){
+static gpu_buf wgpu_cache_alloc(size_t size, void *ctx) {
+    struct wgpu_backend *be = ctx;
+    uint64_t alloc_size = (size + 3) & ~(uint64_t)3;
+    if (alloc_size < 4) { alloc_size = 4; }
+    WGPUBuffer buf = wgpuDeviceCreateBuffer(be->device, &(WGPUBufferDescriptor){
         .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst
                | WGPUBufferUsage_CopySrc,
         .size  = alloc_size,
     });
-    ce->size = alloc_size;
-    ce->host     = host;
-    ce->writable = rw & BUF_WRITTEN;
-    ce->uploaded = 0;
-    if (host && bytes) {
-        queue_write_aligned(be, ce->buf, host, bytes);
-        ce->uploaded  = 1;
-        ce->fp        = fingerprint_hash(host, bytes);
-        ce->fp_bytes  = bytes;
+    return (gpu_buf){.ptr = buf, .size = (size_t)alloc_size};
+}
+
+// WebGPU requires buffer writes to be 4-byte aligned.
+static void wgpu_cache_upload(gpu_buf buf, void const *data, size_t bytes,
+                              void *ctx) {
+    struct wgpu_backend *be = ctx;
+    WGPUBuffer wbuf = buf.ptr;
+    size_t aligned = (bytes + 3) & ~(size_t)3;
+    if (aligned == bytes) {
+        wgpuQueueWriteBuffer(be->queue, wbuf, 0, data, bytes);
+    } else {
+        char tmp[4] = {0};
+        __builtin_memcpy(tmp, (char const *)data + (bytes & ~(size_t)3), bytes & 3);
+        wgpuQueueWriteBuffer(be->queue, wbuf, 0, data, bytes & ~(size_t)3);
+        wgpuQueueWriteBuffer(be->queue, wbuf, bytes & ~(size_t)3, tmp, 4);
     }
-    if ((rw & BUF_WRITTEN) && host && bytes) {
-        batch_track_copy(be, host, ce->buf, bytes);
-        ce->copy_tracked = 1;
-    }
-    return idx;
+}
+
+static void wgpu_cache_release(gpu_buf buf, void *ctx) {
+    (void)ctx;
+    wgpuBufferRelease(buf.ptr);
 }
 
 // ---------------------------------------------------------------------------
@@ -348,17 +269,18 @@ static void wgpu_flush(struct umbra_backend *base) {
     wgpu_submit_cmdbuf(be);
     uniform_ring_pool_drain_all(&be->uni_pool);
 
-    // Copyback: for each writable buffer, read data back from GPU.
-    for (int i = 0; i < be->batch_n_copies; i++) {
-        struct wgpu_copyback *c = &be->batch_copies[i];
-        // Create a staging buffer, copy, map, read back.
-        size_t aligned_sz = (c->bytes + 3) & ~(size_t)3;
+    // Copyback: writable cache entries with copy_tracked need GPU→host read.
+    for (int i = 0; i < be->cache.n; i++) {
+        struct gpu_cache_entry *ce = &be->cache.entry[i];
+        if (!ce->copy_tracked || ce->nocopy || !ce->host) { continue; }
+        size_t bytes = ce->fp_bytes ? ce->fp_bytes : ce->buf.size;
+        size_t aligned_sz = (bytes + 3) & ~(size_t)3;
         WGPUBuffer staging = wgpuDeviceCreateBuffer(be->device, &(WGPUBufferDescriptor){
             .usage = WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst,
             .size  = aligned_sz,
         });
         WGPUCommandEncoder enc = wgpuDeviceCreateCommandEncoder(be->device, NULL);
-        wgpuCommandEncoderCopyBufferToBuffer(enc, c->buf, 0, staging, 0, aligned_sz);
+        wgpuCommandEncoderCopyBufferToBuffer(enc, ce->buf.ptr, 0, staging, 0, aligned_sz);
         WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(enc, NULL);
         wgpuCommandEncoderRelease(enc);
 
@@ -366,32 +288,16 @@ static void wgpu_flush(struct umbra_backend *base) {
         wgpuCommandBufferRelease(cmd);
         wgpuDevicePoll(be->device, 1, &si);
 
-        // Map the staging buffer synchronously.
         wgpuBufferMapAsync(staging, WGPUMapMode_Read, 0, aligned_sz,
-            (WGPUBufferMapCallbackInfo){
-                .callback = map_cb,
-            });
+            (WGPUBufferMapCallbackInfo){.callback = map_cb});
         wgpuDevicePoll(be->device, 1, NULL);
         void const *mapped = wgpuBufferGetConstMappedRange(staging, 0, aligned_sz);
-        if (mapped) {
-            memcpy(c->host, mapped, c->bytes);
-        }
+        if (mapped) { memcpy(ce->host, mapped, bytes); }
         wgpuBufferUnmap(staging);
         wgpuBufferRelease(staging);
     }
-    be->batch_n_copies = 0;
 
-    // Cache entries persist across flushes so fingerprints can skip re-upload
-    // for unchanged data (e.g. font atlases).  Reset per-batch flags, and
-    // invalidate fingerprints for writable entries: the GPU has modified their
-    // data, so the fingerprint no longer reflects what's on the GPU buffer.
-    for (int i = 0; i < be->batch_cache_n; i++) {
-        be->batch_cache[i].copy_tracked = 0;
-        be->batch_cache[i].uploaded     = 0;
-        if (be->batch_cache[i].writable) {
-            be->batch_cache[i].fp_bytes = 0;
-        }
-    }
+    gpu_buf_cache_end_batch(&be->cache);
 
     // Invalidate cached bind group — it references batch cache buffers.
     if (be->cached_bg) {
@@ -530,9 +436,9 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
                 bind_offset[i] = loc.offset;
                 bind_size  [i] = (buf[i].sz + 3) & ~(size_t)3;
             } else {
-                int idx = cache_buf(be, buf[i].ptr, buf[i].sz, rw);
-                bind_buf [i] = be->batch_cache[idx].buf;
-                bind_size[i] = be->batch_cache[idx].size;
+                int idx = gpu_buf_cache_get(&be->cache, buf[i].ptr, buf[i].sz, rw);
+                bind_buf [i] = be->cache.entry[idx].buf.ptr;
+                bind_size[i] = be->cache.entry[idx].buf.size;
             }
         }
     }
@@ -557,9 +463,9 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
         memcpy(&drb,     base + p->deref[d].off + 16, sizeof drb);
         int bi = p->deref[d].buf_idx;
 
-        int idx = cache_buf(be, derived, dsz, p->buf_rw[bi]);
-        bind_buf [bi] = be->batch_cache[idx].buf;
-        bind_size[bi] = be->batch_cache[idx].size;
+        int idx = gpu_buf_cache_get(&be->cache, derived, dsz, p->buf_rw[bi]);
+        bind_buf [bi] = be->cache.entry[idx].buf.ptr;
+        bind_size[bi] = be->cache.entry[idx].buf.size;
 
         push_data[3 + bi] = (uint32_t)dsz;
         push_data[3 + p->total_bufs + bi] = (uint32_t)drb;
@@ -568,9 +474,9 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
     // Fill unbound slots with dummy buffers.
     for (int i = 0; i < n; i++) {
         if (!bind_buf[i]) {
-            int idx = cache_buf(be, 0, 0, 1);
-            bind_buf [i] = be->batch_cache[idx].buf;
-            bind_size[i] = be->batch_cache[idx].size;
+            int idx = gpu_buf_cache_get(&be->cache, 0, 0, BUF_READ);
+            bind_buf [i] = be->cache.entry[idx].buf.ptr;
+            bind_size[i] = be->cache.entry[idx].buf.size;
         }
     }
 
@@ -700,7 +606,7 @@ static struct umbra_backend_stats wgpu_stats(struct umbra_backend const *be) {
         .gpu_sec         = wbe->gpu_time_accum,
         .uniform_ring_rotations = wbe->uni_pool.rotations,
         .dispatches      = wbe->total_dispatches,
-        .upload_bytes    = wbe->total_upload_bytes,
+        .upload_bytes    = wbe->cache.upload_bytes + wbe->total_upload_bytes,
     };
 }
 
@@ -708,9 +614,7 @@ static void wgpu_free(struct umbra_backend *base) {
     wgpu_flush(base);
     struct wgpu_backend *be = (struct wgpu_backend *)base;
     uniform_ring_pool_free(&be->uni_pool);
-    for (int i = 0; i < be->batch_cache_n; i++) {
-        wgpuBufferRelease(be->batch_cache[i].buf);
-    }
+    gpu_buf_cache_free(&be->cache);
     wgpuQuerySetRelease(be->ts_query);
     wgpuBufferRelease(be->ts_resolve);
     wgpuBufferRelease(be->ts_staging);
@@ -718,8 +622,6 @@ static void wgpu_free(struct umbra_backend *base) {
     wgpuDeviceRelease(be->device);
     wgpuAdapterRelease(be->adapter);
     wgpuInstanceRelease(be->instance);
-    free(be->batch_copies);
-    free(be->batch_cache);
     free(be);
 }
 
@@ -820,6 +722,10 @@ struct umbra_backend *umbra_backend_wgpu(void) {
         .size  = WGPU_N_FRAMES * TS_RESOLVE_ALIGN,
     });
     be->ts_period = (double)wgpuQueueGetTimestampPeriod(queue) * 1e-9;
+    be->cache = (struct gpu_buf_cache){
+        .ops = {wgpu_cache_alloc, wgpu_cache_upload, NULL, wgpu_cache_release},
+        .ctx = be,
+    };
     be->base = (struct umbra_backend){
         .compile        = wgpu_compile_fn,
         .flush          = wgpu_flush,
