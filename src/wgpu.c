@@ -67,6 +67,7 @@ struct wgpu_program {
 
     struct deref_info *deref;
     uint8_t          *buf_rw;
+    uint8_t          *buf_shift;
 
     uint32_t *spirv;
     int       spirv_words, :32;
@@ -361,6 +362,7 @@ static struct umbra_program *wgpu_compile(struct umbra_backend *base,
     p->push_words  = sr.push_words;
     p->deref       = sr.deref;
     p->buf_rw      = sr.buf_rw;
+    p->buf_shift   = sr.buf_shift;
     p->spirv       = sr.spirv;
     p->spirv_words = sr.spirv_words;
     return &p->base;
@@ -413,7 +415,7 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
     push_data[1] = (uint32_t)l;
     push_data[2] = (uint32_t)t;
     for (int i = 0; i <= p->max_ptr; i++) {
-        push_data[3 + i] = (uint32_t)buf[i].sz;
+        push_data[3 + i] = (uint32_t)(buf[i].sz >> p->buf_shift[i]);
         push_data[3 + p->total_bufs + i] = (uint32_t)buf[i].row_bytes;
     }
 
@@ -431,7 +433,7 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
         bind_buf [bi] = be->cache.entry[idx].buf.ptr;
         bind_size[bi] = be->cache.entry[idx].buf.size;
 
-        push_data[3 + bi] = (uint32_t)dsz;
+        push_data[3 + bi] = (uint32_t)(dsz >> p->buf_shift[bi]);
         push_data[3 + p->total_bufs + bi] = (uint32_t)drb;
     }
 
@@ -551,6 +553,7 @@ static void wgpu_program_free(struct umbra_program *prog) {
     free(p->spirv);
     free(p->deref);
     free(p->buf_rw);
+    free(p->buf_shift);
     free(p);
 }
 

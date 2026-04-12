@@ -14,6 +14,7 @@ struct spirv_result {
     uint32_t         *spirv;
     struct deref_info *deref;
     uint8_t          *buf_rw;
+    uint8_t          *buf_shift;
     int               spirv_words;
     int               max_ptr;
     int               total_bufs;

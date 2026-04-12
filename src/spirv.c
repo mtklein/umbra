@@ -543,32 +543,17 @@ static uint32_t compute_addr(SpvBuilder *b, uint32_t x, uint32_t y,
     return spv_binop(b, SpvOpIAdd, b->t_u32, row_off, x);
 }
 
-// Compute safe gather index: clamp to [0, count-1], return 0 for OOB.
-// buf_szs[buf_idx] is at push offset 3 + buf_idx.
-// elem_bytes = 4 for u32, 2 for u16.
+// buf_limit[buf_idx] (element count) is at push offset 3 + buf_idx.
 // Returns (clamped_index, oob_mask) where oob_mask is 0xFFFFFFFF for in-bounds, 0 for OOB.
 static void gather_safe(SpvBuilder *b, uint32_t ix_val, int buf_idx,
-                         uint32_t elem_shift,
                          uint32_t *out_idx, uint32_t *out_mask) {
-    uint32_t const sz_off = spv_const_u32(b, (uint32_t)(3 + buf_idx));
-    uint32_t const sz     = load_meta_u32(b, sz_off);
-    uint32_t const count  = spv_binop(b, SpvOpShiftRightLogical, b->t_u32, sz, elem_shift);
+    uint32_t const limit_off = spv_const_u32(b, (uint32_t)(3 + buf_idx));
+    uint32_t const limit     = load_meta_u32(b, limit_off);
 
-    // max_idx = max(count-1, 0)
-    uint32_t const count_minus_1 = spv_binop(b, SpvOpISub, b->t_u32, count, b->c_1);
-    // clamp: UMin(UMax(ix, 0), max_idx) — but ix is uint so UMax(ix,0)=ix
-    // Actually we need to handle negative indices (signed). Use SMax then UMin.
-    // Use GLSL.std.450 UMin and SMax:
-    // clamped = UMin(ix, count_minus_1)  — this clamps the upper bound
-    uint32_t const clamped = spv_glsl_2(b, b->t_u32, 38 /*UMin*/, ix_val, count_minus_1);
+    uint32_t const limit_minus_1 = spv_binop(b, SpvOpISub, b->t_u32, limit, b->c_1);
+    uint32_t const clamped = spv_glsl_2(b, b->t_u32, 38 /*UMin*/, ix_val, limit_minus_1);
 
-    // OOB check: ix >= 0 && ix < count  (signed comparison for < 0)
-    // in_bounds = (ix >=s 0) && (ix <u count)
-    uint32_t const ge_zero   = spv_binop(b, SpvOpSGreaterThanEqual, b->t_bool, ix_val,
-                                         b->c_0);
-    uint32_t const lt_count  = spv_binop(b, SpvOpULessThan, b->t_bool, ix_val, count);
-    uint32_t const in_bounds = spv_binop(b, SpvOpLogicalAnd, b->t_bool, ge_zero, lt_count);
-    // mask = in_bounds ? 0xFFFFFFFF : 0
+    uint32_t const in_bounds = spv_binop(b, SpvOpULessThan, b->t_bool, ix_val, limit);
     *out_mask = spv_select(b, b->t_u32, in_bounds, b->c_allones, b->c_0);
     *out_idx = clamped;
 }
@@ -660,15 +645,19 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
         }
     }
 
-    // --- Scan for per-buffer read/written access. ---
-    uint8_t *buf_rw = calloc((size_t)(total_bufs + 1), sizeof *buf_rw);
+    // --- Scan for per-buffer read/written access and element shift. ---
+    uint8_t *buf_rw    = calloc((size_t)(total_bufs + 1), sizeof *buf_rw);
+    uint8_t *buf_shift = calloc((size_t)(total_bufs + 1), sizeof *buf_shift);
     for (int i = 0; i < bb->insts; i++) {
         if (!op_has_ptr(bb->inst[i].op)) { continue; }
         int p = bb->inst[i].ptr.deref ? deref_buf[bb->inst[i].ptr.ix]
                                       : bb->inst[i].ptr.bits;
         buf_rw[p] |= op_is_store(bb->inst[i].op) ? BUF_WRITTEN : BUF_READ;
+        if (bb->inst[i].op == op_gather_16) { buf_shift[p] = 1; }
+        else                                { buf_shift[p] = 2; }
     }
-    result.buf_rw = buf_rw;
+    result.buf_rw    = buf_rw;
+    result.buf_shift = buf_shift;
 
     // Push constant layout: w, x0, y0, buf_szs[total_bufs], buf_rbs[total_bufs].
     // User uniforms (buf[0]) go through the per-batch uniform ring as a
@@ -1189,7 +1178,7 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                     int p = resolve_ptr(&B, inst);
                     uint32_t ix_val = as_u32(&B, get_val(&B, inst->x), xid);
                     uint32_t safe_idx, mask;
-                    gather_safe(&B, ix_val, p, B.c_2, &safe_idx, &mask);
+                    gather_safe(&B, ix_val, p, &safe_idx, &mask);
                     uint32_t raw = load_ssbo_u32(&B, p, safe_idx);
                     B.val[i] = spv_binop(&B, SpvOpBitwiseAnd, B.t_u32, raw, mask);
                 } break;
@@ -1198,7 +1187,7 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                     int p = resolve_ptr(&B, inst);
                     uint32_t ix_val = as_u32(&B, get_val(&B, inst->x), xid);
                     uint32_t safe_idx, mask;
-                    gather_safe(&B, ix_val, p, B.c_1, &safe_idx, &mask);
+                    gather_safe(&B, ix_val, p, &safe_idx, &mask);
                     uint32_t raw = load_ssbo_u16(&B, p, safe_idx);
                     B.val[i] = spv_binop(&B, SpvOpBitwiseAnd, B.t_u32, raw, mask);
                 } break;
@@ -1212,8 +1201,8 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                     uint32_t lo_u = spv_bitcast(&B, B.t_u32, lo_i);
                     uint32_t hi_u = spv_binop(&B, SpvOpIAdd, B.t_u32, lo_u, B.c_1);
                     uint32_t lo_safe, lo_mask, hi_safe, hi_mask;
-                    gather_safe(&B, lo_u, p, B.c_2, &lo_safe, &lo_mask);
-                    gather_safe(&B, hi_u, p, B.c_2, &hi_safe, &hi_mask);
+                    gather_safe(&B, lo_u, p, &lo_safe, &lo_mask);
+                    gather_safe(&B, hi_u, p, &hi_safe, &hi_mask);
                     uint32_t lo_raw = load_ssbo_u32(&B, p, lo_safe);
                     uint32_t hi_raw = load_ssbo_u32(&B, p, hi_safe);
                     uint32_t lo_v = spv_binop(&B, SpvOpBitwiseAnd, B.t_u32, lo_raw, lo_mask);
@@ -1277,9 +1266,9 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
 
                 case op_load_16x4_planar: {
                     int p = resolve_ptr(&B, inst);
-                    uint32_t sz_off = spv_const_u32(&B, (uint32_t)(3 + p));
-                    uint32_t sz = load_meta_u32(&B, sz_off);
-                    uint32_t ps_f16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, sz, B.c_3);
+                    uint32_t lim_off = spv_const_u32(&B, (uint32_t)(3 + p));
+                    uint32_t lim = load_meta_u32(&B, lim_off);
+                    uint32_t ps_f16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, lim, B.c_1);
 
                     uint32_t rb_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
                     uint32_t rb = load_meta_u32(&B, rb_off);
@@ -1340,9 +1329,9 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
 
                 case op_store_16x4_planar: {
                     int p = resolve_ptr(&B, inst);
-                    uint32_t sz_off = spv_const_u32(&B, (uint32_t)(3 + p));
-                    uint32_t sz = load_meta_u32(&B, sz_off);
-                    uint32_t ps_f16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, sz, B.c_3);
+                    uint32_t lim_off = spv_const_u32(&B, (uint32_t)(3 + p));
+                    uint32_t lim = load_meta_u32(&B, lim_off);
+                    uint32_t ps_f16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, lim, B.c_1);
 
                     uint32_t rb_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
                     uint32_t rb = load_meta_u32(&B, rb_off);
