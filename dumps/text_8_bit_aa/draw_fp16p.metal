@@ -5,34 +5,34 @@ using namespace metal;
 kernel void umbra_entry(
     constant uint &w [[buffer(3)]],
     constant uint *buf_limit [[buffer(4)]],
-    constant uint *buf_row_bytes [[buffer(5)]],
+    constant uint *buf_stride [[buffer(5)]],
     constant uint &x0 [[buffer(6)]],
     constant uint &y0 [[buffer(7)]],
-    device uchar *p0 [[buffer(0)]],
-    device uchar *p1 [[buffer(1)]],
-    device uchar *p2 [[buffer(2)]],
+    device uint *p0 [[buffer(0)]],
+    device ushort *p1 [[buffer(1)]],
+    device ushort *p2 [[buffer(2)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
     if (pos.x >= w) return;
     uint x = x0 + pos.x;
     uint y = y0 + pos.y;
     uint v0 = 0u;
-    uint v1 = ((device const uint*)p0)[0];
-    uint v2 = ((device const uint*)p0)[1];
-    uint v3 = ((device const uint*)p0)[2];
-    uint v4 = ((device const uint*)p0)[3];
+    uint v1 = p0[0];
+    uint v2 = p0[1];
+    uint v3 = p0[2];
+    uint v4 = p0[3];
     uint v6 = 998277249u;
     uint v7 = 1065353216u;
     float v8 = as_type<float>(v7) - as_type<float>(v4);
-    uint v9 = (uint)((device ushort*)(p2 + y * buf_row_bytes[2]))[x];
+    uint v9 = (uint)p2[y * buf_stride[2] + x];
     uint v10 = (uint)(int)(short)(ushort)v9;
     float v11 = (float)(int)v10;
     float v12 = v11 * as_type<float>(998277249u);
-    device uchar *row13 = p1 + y * buf_row_bytes[1]; uint ps13 = buf_limit[1];
-    uint v13 = (uint)((device ushort*)row13)[x];
-    uint v13_1 = (uint)((device ushort*)(row13+ps13))[x];
-    uint v13_2 = (uint)((device ushort*)(row13+2*ps13))[x];
-    uint v13_3 = (uint)((device ushort*)(row13+3*ps13))[x];
+    uint _row13 = y * buf_stride[1]; uint _ps13 = buf_limit[1];
+    uint v13 = (uint)p1[_row13 + x];
+    uint v13_1 = (uint)p1[_row13 + x + _ps13];
+    uint v13_2 = (uint)p1[_row13 + x + 2*_ps13];
+    uint v13_3 = (uint)p1[_row13 + x + 3*_ps13];
     float v14 = (float)as_type<half>((ushort)v13);
     float v15 = fma(v14, v8, as_type<float>(v1));
     float v16 = v15 - v14;
@@ -53,8 +53,6 @@ kernel void umbra_entry(
     float v31 = v30 - v29;
     float v32 = fma(v12, v31, v29);
     uint v33 = (uint)as_type<ushort>((half)v32);
-    {
-        device uchar *row = p1 + y * buf_row_bytes[1]; uint ps = buf_limit[1];
-        ((device ushort*)row)[x] = ushort(v18); ((device ushort*)(row+ps))[x] = ushort(v28); ((device ushort*)(row+2*ps))[x] = ushort(v33); ((device ushort*)(row+3*ps))[x] = ushort(v23);
-    }
+    { uint _row = y * buf_stride[1]; uint _ps = buf_limit[1];
+      p1[_row + x] = ushort(v18); p1[_row + x + _ps] = ushort(v28); p1[_row + x + 2*_ps] = ushort(v33); p1[_row + x + 3*_ps] = ushort(v23); }
 }

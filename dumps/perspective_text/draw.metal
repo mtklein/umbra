@@ -5,33 +5,33 @@ using namespace metal;
 kernel void umbra_entry(
     constant uint &w [[buffer(3)]],
     constant uint *buf_limit [[buffer(4)]],
-    constant uint *buf_row_bytes [[buffer(5)]],
+    constant uint *buf_stride [[buffer(5)]],
     constant uint &x0 [[buffer(6)]],
     constant uint &y0 [[buffer(7)]],
-    device uchar *p0 [[buffer(0)]],
-    device uchar *p1 [[buffer(1)]],
-    device uchar *p2 [[buffer(2)]],
+    device uint *p0 [[buffer(0)]],
+    device ushort *p1 [[buffer(1)]],
+    device ushort *p2 [[buffer(2)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
     if (pos.x >= w) return;
     uint x = x0 + pos.x;
     uint y = y0 + pos.y;
     uint v0 = 0u;
-    uint v1 = ((device const uint*)p0)[0];
-    uint v2 = ((device const uint*)p0)[1];
-    uint v3 = ((device const uint*)p0)[2];
-    uint v4 = ((device const uint*)p0)[3];
-    uint v6 = ((device const uint*)p0)[4];
-    uint v7 = ((device const uint*)p0)[5];
-    uint v8 = ((device const uint*)p0)[6];
-    uint v9 = ((device const uint*)p0)[7];
-    uint v10 = ((device const uint*)p0)[8];
-    uint v11 = ((device const uint*)p0)[9];
-    uint v12 = ((device const uint*)p0)[10];
-    uint v13 = ((device const uint*)p0)[11];
-    uint v14 = ((device const uint*)p0)[12];
-    uint v15 = ((device const uint*)p0)[13];
-    uint v16 = ((device const uint*)p0)[14];
+    uint v1 = p0[0];
+    uint v2 = p0[1];
+    uint v3 = p0[2];
+    uint v4 = p0[3];
+    uint v6 = p0[4];
+    uint v7 = p0[5];
+    uint v8 = p0[6];
+    uint v9 = p0[7];
+    uint v10 = p0[8];
+    uint v11 = p0[9];
+    uint v12 = p0[10];
+    uint v13 = p0[11];
+    uint v14 = p0[12];
+    uint v15 = p0[13];
+    uint v16 = p0[14];
     uint v17 = 1065353216u;
     float v18 = as_type<float>(v15) - as_type<float>(1065353216u);
     float v19 = as_type<float>(v16) - as_type<float>(1065353216u);
@@ -68,16 +68,16 @@ kernel void umbra_entry(
     uint v50 = (uint)(int)floor(v49);
     uint v51 = v50 * v20;
     uint v52 = v47 + v51;
-    uint v53 = 0; if (v52 < buf_limit[2]) { v53 = (uint)((device ushort*)p2)[v52]; }
+    uint v53 = 0; if (v52 < buf_limit[2]) { v53 = (uint)p2[v52]; }
     uint v54 = (uint)(int)(short)(ushort)v53;
     float v55 = (float)(int)v54;
     float v56 = v55 * as_type<float>(998277249u);
     uint v57 = select(v0, as_type<uint>(v56), v44 != 0u);
-    device ushort *hp58 = (device ushort*)(p1 + y * buf_row_bytes[1]) + x*4;
-    uint v58 = (uint)hp58[0];
-    uint v58_1 = (uint)hp58[1];
-    uint v58_2 = (uint)hp58[2];
-    uint v58_3 = (uint)hp58[3];
+    uint _base58 = y * buf_stride[1] + x*4;
+    uint v58 = (uint)p1[_base58];
+    uint v58_1 = (uint)p1[_base58+1];
+    uint v58_2 = (uint)p1[_base58+2];
+    uint v58_3 = (uint)p1[_base58+3];
     float v59 = (float)as_type<half>((ushort)v58);
     float v60 = fma(v59, v22, as_type<float>(v1));
     float v61 = v60 - v59;
@@ -98,8 +98,6 @@ kernel void umbra_entry(
     float v76 = v75 - v74;
     float v77 = fma(as_type<float>(v57), v76, v74);
     uint v78 = (uint)as_type<ushort>((half)v77);
-    {
-        device ushort *hp = (device ushort*)(p1 + y * buf_row_bytes[1]) + x*4;
-        hp[0] = ushort(v63); hp[1] = ushort(v73); hp[2] = ushort(v78); hp[3] = ushort(v68);
-    }
+    { uint _base = y * buf_stride[1] + x*4;
+      p1[_base] = ushort(v63); p1[_base+1] = ushort(v73); p1[_base+2] = ushort(v78); p1[_base+3] = ushort(v68); }
 }
