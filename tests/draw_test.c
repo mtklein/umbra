@@ -1018,6 +1018,43 @@ TEST(test_linear_stops) {
     cleanup_draw(&B);
 }
 
+TEST(test_linear_stops_fp16_planar) {
+    float colors_planar[3 * 4] = {1,0,0, 0,1,0, 0,0,1, 1,1,1};
+    float pos[3] = {0.0f, 0.5f, 1.0f};
+
+    struct umbra_draw_layout lay;
+    struct draw_backends B =
+        make_draw(umbra_draw_build(umbra_shader_linear_stops, NULL,
+                                   umbra_blend_src, umbra_fmt_fp16_planar, &lay), lay);
+
+    size_t const sh = B.lay.shader;
+    size_t const colors_off = (sh + 16 + 7) & ~(size_t)7;
+    size_t const pos_off    = (colors_off + 24 + 7) & ~(size_t)7;
+
+    enum { W = 5 };
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint16_t dst[W * 4];
+        __builtin_memset(dst, 0, sizeof dst);
+        float params[4] = {0.25f, 0, 0, 3};
+        umbra_uniforms_fill_f32(B.lay.uniforms, sh, params, 4);
+        umbra_uniforms_fill_ptr(B.lay.uniforms, colors_off,
+                                (struct umbra_buf){.ptr=colors_planar, .sz=sizeof colors_planar});
+        umbra_uniforms_fill_ptr(B.lay.uniforms, pos_off,
+                                (struct umbra_buf){.ptr=pos, .sz=sizeof pos});
+        if (run_draw(&B, bi, W, 1, (struct umbra_buf[]){
+                {.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
+                {.ptr=dst, .sz=sizeof dst, .row_bytes=W * 2},
+            })) {
+            dst[0*W+0] == 0x3c00 here;
+            dst[0*W+1] == 0x3800 here;
+            dst[0*W+2] == 0x0000 here;
+            dst[1*W+2] == 0x3c00 here;
+            dst[2*W+4] == 0x3c00 here;
+        }
+    }
+    cleanup_draw(&B);
+}
+
 static umbra_shader_fn ss_inner_;
 static int             ss_n_;
 static umbra_color ss_shader_(struct umbra_builder *builder, struct umbra_uniforms_layout *u, umbra_val32 x, umbra_val32 y) {
