@@ -6,7 +6,8 @@
 #include <stdint.h>
 
 static umbra_val32 pack_unorm(struct umbra_builder *b, umbra_val32 ch, umbra_val32 scale) {
-    umbra_val32 zero = umbra_imm_f32(b, 0.0f), one = umbra_imm_f32(b, 1.0f);
+    umbra_val32 const zero = umbra_imm_f32(b, 0.0f),
+                       one = umbra_imm_f32(b, 1.0f);
     return umbra_round_i32(b, umbra_mul_f32(b,
         umbra_min_f32(b, umbra_max_f32(b, ch, zero), one), scale));
 }
@@ -100,7 +101,7 @@ void umbra_store_fp16_planar(struct umbra_builder *b, umbra_ptr16 dst, umbra_col
                                     umbra_f16_from_f32(b, c.b), umbra_f16_from_f32(b, c.a));
 }
 
-// Generic wrappers for struct umbra_fmt function pointers (type-erased ptr).
+// STYLE: every line below exceeds 100 columns.
 static umbra_color load_8888_(struct umbra_builder *b, int p) { return umbra_load_8888(b, (umbra_ptr32){.ix=p}); }
 static umbra_color load_565_(struct umbra_builder *b, int p) { return umbra_load_565(b, (umbra_ptr16){.ix=p}); }
 static umbra_color load_1010102_(struct umbra_builder *b, int p) { return umbra_load_1010102(b, (umbra_ptr32){.ix=p}); }

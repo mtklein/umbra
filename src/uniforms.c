@@ -4,13 +4,13 @@
 
 size_t umbra_uniforms_reserve_f32(struct umbra_uniforms_layout *u, int n) {
     u->size = (u->size + 3) & ~(size_t)3;
-    size_t h = u->size;
+    size_t const h = u->size;
     u->size += (size_t)n * 4;
     return h;
 }
 size_t umbra_uniforms_reserve_ptr(struct umbra_uniforms_layout *u) {
     u->size = (u->size + 7) & ~(size_t)7;
-    size_t h = u->size;
+    size_t const h = u->size;
     u->size += 24;
     return h;
 }

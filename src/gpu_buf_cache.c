@@ -6,21 +6,17 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
     for (int i = 0; i < c->n; i++) {
         struct gpu_cache_entry *ce = &c->entry[i];
         if (ce->host == host && ce->buf.size >= bytes) {
-            if (host && bytes) {
-                if (ce->nocopy) {
-                    // Zero-copy: GPU reads host memory directly, nothing to upload.
-                } else if (ce->uploaded && ce->writable) {
-                    // Umbra owns writable buffers; ignore the possibility they changed.
-                } else {
-                    fingerprint fp = fingerprint_hash(host, bytes);
-                    if (!ce->fp_bytes || !fingerprint_eq(ce->fp, fp)) {
-                        c->ops.upload(ce->buf, host, bytes, c->ctx);
-                        c->upload_bytes += bytes;
-                        ce->fp       = fp;
-                        ce->fp_bytes = bytes;
-                    }
-                    ce->uploaded = 1;
+            if (host && bytes
+                    && !ce->nocopy              // Zero-copy: GPU reads host directly.
+                    && !(ce->uploaded && ce->writable)) {  // Umbra owns writable bufs.
+                fingerprint const fp = fingerprint_hash(host, bytes);
+                if (!ce->fp_bytes || !fingerprint_eq(ce->fp, fp)) {
+                    c->ops.upload(ce->buf, host, bytes, c->ctx);
+                    c->upload_bytes += bytes;
+                    ce->fp       = fp;
+                    ce->fp_bytes = bytes;
                 }
+                ce->uploaded = 1;
             }
             if ((rw & BUF_WRITTEN) && !ce->copy_tracked && host && bytes) {
                 ce->copy_tracked = 1;
@@ -34,7 +30,7 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
         c->cap = c->cap ? 2 * c->cap : 16;
         c->entry = realloc(c->entry, (size_t)c->cap * sizeof *c->entry);
     }
-    int idx = c->n++;
+    int const idx = c->n++;
     struct gpu_cache_entry *ce = &c->entry[idx];
     *ce = (struct gpu_cache_entry){0};
 
@@ -53,7 +49,7 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
     }
 
     // Allocate and upload.
-    size_t alloc_size = bytes ? bytes : 4;
+    size_t const alloc_size = bytes ? bytes : 4;
     ce->buf = c->ops.alloc(alloc_size, c->ctx);
     ce->host     = host;
     ce->writable = rw & BUF_WRITTEN;
@@ -74,7 +70,7 @@ void gpu_buf_cache_copyback(struct gpu_buf_cache *c) {
     for (int i = 0; i < c->n; i++) {
         struct gpu_cache_entry *ce = &c->entry[i];
         if (ce->copy_tracked && !ce->nocopy && ce->host) {
-            size_t bytes = ce->fp_bytes ? ce->fp_bytes : ce->buf.size;
+            size_t const bytes = ce->fp_bytes ? ce->fp_bytes : ce->buf.size;
             c->ops.download(ce->buf, ce->host, bytes, c->ctx);
         }
     }
