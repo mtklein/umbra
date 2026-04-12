@@ -4155,3 +4155,62 @@ TEST(test_loop_pre_and_post) {
     }
     cleanup(&B);
 }
+
+TEST(test_loop_sel_gather) {
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 n = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
+    umbra_val32 t = umbra_load_32(b, (umbra_ptr32){.ix = 1});
+
+    umbra_var vr = umbra_var_alloc(b);
+
+    umbra_val32 i = umbra_loop(b, n);
+    umbra_val32 i1 = umbra_add_i32(b, i, umbra_imm_i32(b, 1));
+
+    umbra_val32 lo = umbra_gather_32(b, (umbra_ptr32){.ix = 2}, i);
+    umbra_val32 hi = umbra_gather_32(b, (umbra_ptr32){.ix = 2}, i1);
+    umbra_val32 in_seg = umbra_and_32(b, umbra_le_f32(b, lo, t),
+                                         umbra_le_f32(b, t, hi));
+
+    umbra_val32 c0 = umbra_gather_32(b, (umbra_ptr32){.ix = 3}, i);
+    umbra_val32 c1 = umbra_gather_32(b, (umbra_ptr32){.ix = 3}, i1);
+
+    umbra_val32 frac = umbra_div_f32(b, umbra_sub_f32(b, t, lo),
+                                        umbra_sub_f32(b, hi, lo));
+    umbra_val32 lerped = umbra_add_f32(b, c0,
+                             umbra_mul_f32(b, umbra_sub_f32(b, c1, c0), frac));
+
+    umbra_store_var(b, vr, umbra_sel_32(b, in_seg, lerped, umbra_load_var(b, vr)));
+    umbra_loop_end(b);
+
+    umbra_store_32(b, (umbra_ptr32){.ix = 4}, umbra_load_var(b, vr));
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        int32_t uni[1] = {2};
+
+        float t_data[4];
+        float v0 = 0.0f, v1 = 0.25f, v2 = 0.75f, v3 = 1.0f;
+        __builtin_memcpy(t_data + 0, &v0, 4);
+        __builtin_memcpy(t_data + 1, &v1, 4);
+        __builtin_memcpy(t_data + 2, &v2, 4);
+        __builtin_memcpy(t_data + 3, &v3, 4);
+
+        float pos[3] = {0.0f, 0.5f, 1.0f};
+        float colors[3] = {1.0f, 0.0f, 0.0f};
+        float out[4] = {-1, -1, -1, -1};
+        if (run(&B, bi, 4, 1, (struct umbra_buf[]){
+                {.ptr = uni,    .sz = sizeof uni},
+                {.ptr = t_data, .sz = sizeof t_data, .row_bytes = sizeof t_data},
+                {.ptr = pos,    .sz = sizeof pos},
+                {.ptr = colors, .sz = sizeof colors},
+                {.ptr = out,    .sz = sizeof out, .row_bytes = sizeof out},
+            })) {
+            equiv(out[0], 1.0f) here;
+            equiv(out[1], 0.5f) here;
+            equiv(out[2], 0.0f) here;
+            equiv(out[3], 0.0f) here;
+        }
+    }
+    cleanup(&B);
+}
