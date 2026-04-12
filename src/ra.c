@@ -96,25 +96,6 @@ struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const 
             ra->slot[i].last_use = n;
         }
     }
-    // TODO: when pre-loop values outnumber available registers, the RA evicts
-    // some via Belady and spills them.  The spilled values should be fillable
-    // via ra_ensure on subsequent iterations, but currently the JIT crashes
-    // under that pressure (e.g. gradient+draw pipeline with ~15 live values
-    // and 14 ARM64 register pairs).  The simpler case where they fit works.
-    if (bb->loop_begin >= 0) {
-        for (int i = bb->preamble; i < bb->loop_begin; i++) {
-            if (ra->slot[i].last_use >= bb->loop_begin
-                    && ra->slot[i].last_use <= bb->loop_end) {
-                ra->slot[i].last_use = bb->loop_end;
-                for (int c = 0; c < 4; c++) {
-                    if (ra->slot[i].chan_last_use[c] >= bb->loop_begin
-                            && ra->slot[i].chan_last_use[c] <= bb->loop_end) {
-                        ra->slot[i].chan_last_use[c] = bb->loop_end;
-                    }
-                }
-            }
-        }
-    }
 
     ra->inst = bb->inst;
     ra->insts = n;
@@ -157,16 +138,34 @@ void ra_end_loop(struct ra *ra, int *sl) {
         int8_t const target = ra->loop_reg[i];
         if (target < 0) { continue; }
         if (ra->slot[i].reg == target) { continue; }
+        int const occ = ra->owner[(int)target];
+        if (occ >= 0 && occ != i) {
+            ra->slot[occ].reg = -1;
+            ra->owner[(int)target] = -1;
+        }
         if (sl[i] >= 0) {
             ra->cfg.fill(target, sl[i], ra->cfg.ctx);
         } else if (can_remat(ra, i)) {
             ra->cfg.remat(target, i, ra->cfg.ctx);
         }
+        ra->slot[i].reg = target;
+        ra->owner[(int)target] = i;
     }
 }
 
-void ra_spill_live_before(struct ra *ra, int *sl, int *ns, int before) {
-    (void)ra; (void)sl; (void)ns; (void)before;
+void ra_evict_live_before(struct ra *ra, int *sl, int *ns, int before) {
+    for (int v = 0; v < before; v++) {
+        int8_t const r = ra->slot[v].reg;
+        if (r < 0) { continue; }
+        if (ra->slot[v].last_use <= before) { continue; }
+        if (!can_remat(ra, v) && sl[v] < 0) {
+            sl[v] = (*ns)++;
+        }
+        if (sl[v] >= 0) {
+            ra->cfg.spill(r, sl[v], ra->cfg.ctx);
+        }
+        ra_free_reg(ra, v);
+    }
 }
 
 void ra_free_chan(struct ra *ra, val operand, int i) {
