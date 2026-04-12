@@ -138,11 +138,18 @@ void ra_end_loop(struct ra *ra, int *sl) {
         int8_t const target = ra->loop_reg[i];
         if (target < 0) { continue; }
         if (ra->slot[i].reg == target) { continue; }
+        int const occ = ra->owner[(int)target];
+        if (occ >= 0 && occ != i) {
+            ra->slot[occ].reg = -1;
+            ra->owner[(int)target] = -1;
+        }
         if (sl[i] >= 0) {
             ra->cfg.fill(target, sl[i], ra->cfg.ctx);
         } else if (can_remat(ra, i)) {
             ra->cfg.remat(target, i, ra->cfg.ctx);
         }
+        ra->slot[i].reg = target;
+        ra->owner[(int)target] = i;
     }
 }
 
