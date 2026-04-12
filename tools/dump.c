@@ -2,8 +2,14 @@
 #include "../slides/slide.h"
 #include "../slides/slug.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+#include "../third_party/stb/stb_image_write.h"
+#pragma clang diagnostic pop
 
 // Write to path~ then rename for atomicity — avoids half-written dumps
 // visible in git diff when building in the same worktree.
@@ -129,24 +135,111 @@ static void slugify(char const *title, char *out, size_t sz) {
     out[n] = '\0';
 }
 
+enum { RW = 128, RH = 96 };
+
+static struct umbra_program *fill_prog;
+static struct umbra_uniforms_layout fill_uni;
+static void *fill_uniforms;
+
+static void build_fill(struct umbra_backend *interp) {
+    struct umbra_builder *b = umbra_builder();
+    fill_uni = (struct umbra_uniforms_layout){0};
+    size_t off = umbra_uniforms_reserve_f32(&fill_uni, 4);
+    umbra_color c = {
+        umbra_uniform_32(b, (umbra_ptr32){0}, off),
+        umbra_uniform_32(b, (umbra_ptr32){0}, off + 4),
+        umbra_uniform_32(b, (umbra_ptr32){0}, off + 8),
+        umbra_uniform_32(b, (umbra_ptr32){0}, off + 12),
+    };
+    umbra_fmt_fp16_planar.store(b, 1, c);
+    fill_uniforms = umbra_uniforms_alloc(&fill_uni);
+    struct umbra_basic_block *bb = umbra_basic_block(b);
+    umbra_builder_free(b);
+    fill_prog = interp->compile(interp, bb);
+    umbra_basic_block_free(bb);
+}
+
+static void fill_bg(struct slide *s, void *dst) {
+    float hc[4] = {
+        (float)( s->bg        & 0xffu) / 255.0f,
+        (float)((s->bg >>  8) & 0xffu) / 255.0f,
+        (float)((s->bg >> 16) & 0xffu) / 255.0f,
+        (float)((s->bg >> 24) & 0xffu) / 255.0f,
+    };
+    umbra_uniforms_fill_f32(fill_uniforms, 0, hc, 4);
+    size_t const rb = (size_t)RW * umbra_fmt_fp16_planar.bpp;
+    struct umbra_buf buf[2] = {
+        {.ptr = fill_uniforms, .sz = fill_uni.size},
+        {.ptr = dst, .sz = rb * RH * 4, .row_bytes = rb},
+    };
+    fill_prog->queue(fill_prog, 0, 0, RW, RH, buf);
+}
+
+static void fp16p_to_float(float *out, void const *pixbuf) {
+    __fp16 const *src = pixbuf;
+    int const ps = RW * RH;
+    for (int i = 0; i < ps; i++) {
+        out[4 * i + 0] = (float)src[i];
+        out[4 * i + 1] = (float)src[i + ps];
+        out[4 * i + 2] = (float)src[i + 2 * ps];
+        out[4 * i + 3] = (float)src[i + 3 * ps];
+    }
+}
+
+static void render_hdr(char const *dir, int slide_idx, struct umbra_backend *be,
+                       struct umbra_backend *interp, char const *name) {
+    struct slide *s = slide_get(slide_idx);
+    size_t const pixbuf_sz = (size_t)RW * RH * umbra_fmt_fp16_planar.bpp * 4;
+    void *pixbuf = calloc(1, pixbuf_sz);
+
+    fill_bg(s, pixbuf);
+    interp->flush(interp);
+
+    s->prepare(s, be, umbra_fmt_fp16_planar);
+    s->draw(s, 0, 0, 0, RW, RH, pixbuf);
+    be->flush(be);
+
+    float *fdata = malloc((size_t)(RW * RH) * 4 * sizeof(float));
+    fp16p_to_float(fdata, pixbuf);
+    free(pixbuf);
+
+    char p[256];
+    snprintf(p, sizeof p, "%s/render_%s.hdr", dir, name);
+    stbi_write_hdr(p, RW, RH, 4, fdata);
+    free(fdata);
+}
+
 int main(void) {
     dump_builder("dumps", "srcover", build_srcover());
 
-    slides_init(64, 48);
+    slides_init(RW, RH);
+
+    struct umbra_backend *interp = umbra_backend_interp();
+    struct umbra_backend *jit    = umbra_backend_jit();
+    build_fill(interp);
 
     for (int i = 0; i < slide_count(); i++) {
         struct slide *s = slide_get(i);
         if (!s->get_builder) { continue; }
-        struct umbra_builder *b = s->get_builder(s, umbra_fmt_fp16);
-        if (!b) { continue; }
         char dir[128];
         slugify(s->title, dir, sizeof dir);
         mkdir(dir, 0755);
-        dump_builder(dir, "draw", b);
+        struct umbra_builder *b = s->get_builder(s, umbra_fmt_fp16);
+        if (b) { dump_builder(dir, "draw", b); }
+        struct umbra_builder *bp = s->get_builder(s, umbra_fmt_fp16_planar);
+        if (bp) { dump_builder(dir, "draw_fp16p", bp); }
+
+        render_hdr(dir, i, interp, interp, "interp");
+        if (jit) { render_hdr(dir, i, jit, interp, "jit"); }
     }
 
     dump_builder("dumps", "slug_acc", slug_build_acc(NULL));
 
     slides_cleanup();
+
+    fill_prog->free(fill_prog);
+    free(fill_uniforms);
+    if (jit) { jit->free(jit); }
+    interp->free(interp);
     return 0;
 }

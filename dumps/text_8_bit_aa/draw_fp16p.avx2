@@ -1,0 +1,254 @@
+Iterations:        100
+Instructions:      6000
+Total Cycles:      1182
+Total uOps:        6800
+
+Dispatch Width:    6
+uOps Per Cycle:    5.75
+IPC:               5.08
+Block RThroughput: 11.3
+
+
+Cycles with backend pressure increase [ 44.59% ]
+Throughput Bottlenecks: 
+  Resource Pressure       [ 24.45% ]
+  - Zn4ALU1  [ 2.28% ]
+  - Zn4FP1  [ 0.08% ]
+  - Zn4FP2  [ 19.97% ]
+  - Zn4FP3  [ 19.88% ]
+  - Zn4FP45  [ 1.78% ]
+  - Zn4FPSt  [ 3.64% ]
+  - Zn4LSU  [ 0.51% ]
+  - Zn4Load  [ 0.08% ]
+  Data Dependencies:      [ 44.59% ]
+  - Register Dependencies [ 44.59% ]
+  - Memory Dependencies   [ 0.00% ]
+
+Critical sequence based on the simulation:
+
+              Instruction                                 Dependency Information
+        0.    movq	%rcx, %r11
+        1.    movq	%r14, %rax
+        2.    imulq	%r15, %rax
+        3.    addq	%rax, %r11
+        4.    vmovdqu	(%r11,%r10,2), %xmm7
+        5.    vpmovsxwd	%xmm7, %ymm7
+        6.    vcvtdq2ps	%ymm7, %ymm7
+        7.    vmulps	675(%rip), %ymm7, %ymm7
+        8.    movq	24(%rdx), %r11
+ +----< 9.    movq	40(%rdx), %rax
+ +----> 10.   imulq	%r14, %rax                        ## REGISTER dependency:  %rax
+ +----> 11.   addq	%rax, %r11                        ## REGISTER dependency:  %rax
+ |      12.   movq	%r11, %r11
+ |      13.   movq	32(%rdx), %rax
+ |      14.   shrq	$2, %rax
+ +----> 15.   vmovdqu	(%r11,%r10,2), %xmm8              ## REGISTER dependency:  %r11
+ |      16.   addq	%rax, %r11
+ |      17.   vmovdqu	(%r11,%r10,2), %xmm9
+ |      18.   addq	%rax, %r11
+ |      19.   vmovdqu	(%r11,%r10,2), %xmm10
+ |      20.   addq	%rax, %r11
+ |      21.   vmovdqu	(%r11,%r10,2), %xmm11
+ +----> 22.   vcvtph2ps	%xmm8, %ymm12                     ## REGISTER dependency:  %xmm8
+ |      23.   vmovaps	%ymm1, %ymm13
+ |      24.   vfmadd231ps	%ymm6, %ymm12, %ymm13
+ +----> 25.   vsubps	%ymm12, %ymm13, %ymm13            ## REGISTER dependency:  %ymm12
+ +----> 26.   vfmadd231ps	%ymm13, %ymm7, %ymm12     ## REGISTER dependency:  %ymm13
+ +----> 27.   vcvtps2ph	$4, %ymm12, %xmm12                ## REGISTER dependency:  %ymm12
+ +----> 28.   vcvtph2ps	%xmm11, %ymm13                    ## RESOURCE interference:  Zn4FP3 [ probability: 20% ]
+ |      29.   vmovaps	%ymm4, %ymm11
+ |      30.   vfmadd231ps	%ymm6, %ymm13, %ymm11
+ +----> 31.   vsubps	%ymm13, %ymm11, %ymm11            ## REGISTER dependency:  %ymm13
+ +----> 32.   vfmadd231ps	%ymm11, %ymm7, %ymm13     ## REGISTER dependency:  %ymm11
+ +----> 33.   vcvtps2ph	$4, %ymm13, %xmm13                ## REGISTER dependency:  %ymm13
+ +----> 34.   vcvtph2ps	%xmm9, %ymm11                     ## RESOURCE interference:  Zn4FP2 [ probability: 12% ]
+ |      35.   vmovaps	%ymm2, %ymm9
+ |      36.   vfmadd231ps	%ymm6, %ymm11, %ymm9
+ +----> 37.   vsubps	%ymm11, %ymm9, %ymm9              ## REGISTER dependency:  %ymm11
+ +----> 38.   vfmadd231ps	%ymm9, %ymm7, %ymm11      ## REGISTER dependency:  %ymm9
+ +----> 39.   vcvtps2ph	$4, %ymm11, %xmm11                ## REGISTER dependency:  %ymm11
+ |      40.   vcvtph2ps	%xmm10, %ymm9
+ |      41.   vmovaps	%ymm3, %ymm10
+ |      42.   vfmadd231ps	%ymm6, %ymm9, %ymm10
+ +----> 43.   vsubps	%ymm9, %ymm10, %ymm10             ## RESOURCE interference:  Zn4FP2 [ probability: 12% ]
+ +----> 44.   vfmadd231ps	%ymm10, %ymm7, %ymm9      ## REGISTER dependency:  %ymm10
+ +----> 45.   vcvtps2ph	$4, %ymm9, %xmm9                  ## REGISTER dependency:  %ymm9
+ |      46.   movq	24(%rdx), %r11
+ |      47.   movq	40(%rdx), %rax
+ |      48.   imulq	%r14, %rax
+ |      49.   addq	%rax, %r11
+ |      50.   movq	%r11, %r11
+ |      51.   movq	32(%rdx), %rax
+ |      52.   shrq	$2, %rax
+ |      53.   vmovdqu	%xmm12, (%r11,%r10,2)
+ |      54.   addq	%rax, %r11
+ |      55.   vmovdqu	%xmm11, (%r11,%r10,2)
+ |      56.   addq	%rax, %r11
+ +----> 57.   vmovdqu	%xmm9, (%r11,%r10,2)              ## REGISTER dependency:  %xmm9
+        58.   addq	%rax, %r11
+        59.   vmovdqu	%xmm13, (%r11,%r10,2)
+
+
+Instruction Info:
+[1]: #uOps
+[2]: Latency
+[3]: RThroughput
+[4]: MayLoad
+[5]: MayStore
+[6]: HasSideEffects (U)
+
+[1]    [2]    [3]    [4]    [5]    [6]    Instructions:
+ 1      0     0.17                        movq	%rcx, %r11
+ 1      0     0.17                        movq	%r14, %rax
+ 1      3     1.00                        imulq	%r15, %rax
+ 1      1     0.25                        addq	%rax, %r11
+ 1      8     0.50    *                   vmovdqu	(%r11,%r10,2), %xmm7
+ 1      2     0.50                        vpmovsxwd	%xmm7, %ymm7
+ 1      3     0.50                        vcvtdq2ps	%ymm7, %ymm7
+ 1      10    0.50    *                   vmulps	675(%rip), %ymm7, %ymm7
+ 1      5     0.33    *                   movq	24(%rdx), %r11
+ 1      5     0.33    *                   movq	40(%rdx), %rax
+ 1      3     1.00                        imulq	%r14, %rax
+ 1      1     0.25                        addq	%rax, %r11
+ 1      0     0.17                        movq	%r11, %r11
+ 1      5     0.33    *                   movq	32(%rdx), %rax
+ 1      1     0.50                        shrq	$2, %rax
+ 1      8     0.50    *                   vmovdqu	(%r11,%r10,2), %xmm8
+ 1      1     0.25                        addq	%rax, %r11
+ 1      8     0.50    *                   vmovdqu	(%r11,%r10,2), %xmm9
+ 1      1     0.25                        addq	%rax, %r11
+ 1      8     0.50    *                   vmovdqu	(%r11,%r10,2), %xmm10
+ 1      1     0.25                        addq	%rax, %r11
+ 1      8     0.50    *                   vmovdqu	(%r11,%r10,2), %xmm11
+ 2      4     1.00                        vcvtph2ps	%xmm8, %ymm12
+ 1      0     0.17                        vmovaps	%ymm1, %ymm13
+ 1      4     0.50                        vfmadd231ps	%ymm6, %ymm12, %ymm13
+ 1      3     0.50                        vsubps	%ymm12, %ymm13, %ymm13
+ 1      4     0.50                        vfmadd231ps	%ymm13, %ymm7, %ymm12
+ 2      6     1.00                        vcvtps2ph	$4, %ymm12, %xmm12
+ 2      4     1.00                        vcvtph2ps	%xmm11, %ymm13
+ 1      0     0.17                        vmovaps	%ymm4, %ymm11
+ 1      4     0.50                        vfmadd231ps	%ymm6, %ymm13, %ymm11
+ 1      3     0.50                        vsubps	%ymm13, %ymm11, %ymm11
+ 1      4     0.50                        vfmadd231ps	%ymm11, %ymm7, %ymm13
+ 2      6     1.00                        vcvtps2ph	$4, %ymm13, %xmm13
+ 2      4     1.00                        vcvtph2ps	%xmm9, %ymm11
+ 1      0     0.17                        vmovaps	%ymm2, %ymm9
+ 1      4     0.50                        vfmadd231ps	%ymm6, %ymm11, %ymm9
+ 1      3     0.50                        vsubps	%ymm11, %ymm9, %ymm9
+ 1      4     0.50                        vfmadd231ps	%ymm9, %ymm7, %ymm11
+ 2      6     1.00                        vcvtps2ph	$4, %ymm11, %xmm11
+ 2      4     1.00                        vcvtph2ps	%xmm10, %ymm9
+ 1      0     0.17                        vmovaps	%ymm3, %ymm10
+ 1      4     0.50                        vfmadd231ps	%ymm6, %ymm9, %ymm10
+ 1      3     0.50                        vsubps	%ymm9, %ymm10, %ymm10
+ 1      4     0.50                        vfmadd231ps	%ymm10, %ymm7, %ymm9
+ 2      6     1.00                        vcvtps2ph	$4, %ymm9, %xmm9
+ 1      5     0.33    *                   movq	24(%rdx), %r11
+ 1      5     0.33    *                   movq	40(%rdx), %rax
+ 1      3     1.00                        imulq	%r14, %rax
+ 1      1     0.25                        addq	%rax, %r11
+ 1      0     0.17                        movq	%r11, %r11
+ 1      5     0.33    *                   movq	32(%rdx), %rax
+ 1      1     0.50                        shrq	$2, %rax
+ 1      1     1.00           *            vmovdqu	%xmm12, (%r11,%r10,2)
+ 1      1     0.25                        addq	%rax, %r11
+ 1      1     1.00           *            vmovdqu	%xmm11, (%r11,%r10,2)
+ 1      1     0.25                        addq	%rax, %r11
+ 1      1     1.00           *            vmovdqu	%xmm9, (%r11,%r10,2)
+ 1      1     0.25                        addq	%rax, %r11
+ 1      1     1.00           *            vmovdqu	%xmm13, (%r11,%r10,2)
+
+
+Resources:
+[0]   - Zn4AGU0
+[1]   - Zn4AGU1
+[2]   - Zn4AGU2
+[3]   - Zn4ALU0
+[4]   - Zn4ALU1
+[5]   - Zn4ALU2
+[6]   - Zn4ALU3
+[7]   - Zn4BRU1
+[8]   - Zn4FP0
+[9]   - Zn4FP1
+[10]  - Zn4FP2
+[11]  - Zn4FP3
+[12.0] - Zn4FP45
+[12.1] - Zn4FP45
+[13]  - Zn4FPSt
+[14.0] - Zn4LSU
+[14.1] - Zn4LSU
+[14.2] - Zn4LSU
+[15.0] - Zn4Load
+[15.1] - Zn4Load
+[15.2] - Zn4Load
+[16.0] - Zn4Store
+[16.1] - Zn4Store
+
+
+Resource pressure per iteration:
+[0]    [1]    [2]    [3]    [4]    [5]    [6]    [7]    [8]    [9]    [10]   [11]   [12.0] [12.1] [13]   [14.0] [14.1] [14.2] [15.0] [15.1] [15.2] [16.0] [16.1] 
+2.00   2.00   2.00   3.33   3.99   3.34   3.34    -     4.98   5.00   10.55  10.47  5.00   5.00   4.00   5.33   5.33   5.34   4.00   4.00   4.00   2.00   2.00   
+
+Resource pressure by instruction:
+[0]    [1]    [2]    [3]    [4]    [5]    [6]    [7]    [8]    [9]    [10]   [11]   [12.0] [12.1] [13]   [14.0] [14.1] [14.2] [15.0] [15.1] [15.2] [16.0] [16.1] Instructions:
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     movq	%rcx, %r11
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     movq	%r14, %rax
+ -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     imulq	%r15, %rax
+ -      -      -     0.66    -      -     0.34    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     addq	%rax, %r11
+ -      -      -      -      -      -      -      -      -      -      -      -     0.58   0.42    -     0.37   0.21   0.42   0.27    -     0.73    -      -     vmovdqu	(%r11,%r10,2), %xmm7
+ -      -      -      -      -      -      -      -      -     0.98   0.02    -      -      -      -      -      -      -      -      -      -      -      -     vpmovsxwd	%xmm7, %ymm7
+ -      -      -      -      -      -      -      -      -      -     0.48   0.52    -      -      -      -      -      -      -      -      -      -      -     vcvtdq2ps	%ymm7, %ymm7
+ -      -      -      -      -      -      -      -     0.49   0.51    -      -     0.68   0.32    -     0.45   0.17   0.38   0.72   0.01   0.27    -      -     vmulps	675(%rip), %ymm7, %ymm7
+ -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     0.55   0.28   0.17   0.39   0.55   0.06    -      -     movq	24(%rdx), %r11
+ -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.17   0.50   0.45   0.06   0.49    -      -     movq	40(%rdx), %rax
+ -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     imulq	%r14, %rax
+ -      -      -     0.01   0.23   0.18   0.58    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     addq	%rax, %r11
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     movq	%r11, %r11
+1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.44   0.35   0.21   0.02   0.93   0.05    -      -     movq	32(%rdx), %rax
+ -      -      -      -     0.30   0.70    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     shrq	$2, %rax
+ -      -      -      -      -      -      -      -      -      -      -      -     0.73   0.27    -     0.38   0.23   0.39    -     0.61   0.39    -      -     vmovdqu	(%r11,%r10,2), %xmm8
+ -      -      -     0.33   0.13   0.53   0.01    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     addq	%rax, %r11
+ -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.68    -     0.46   0.22   0.32   1.00    -      -      -      -     vmovdqu	(%r11,%r10,2), %xmm9
+ -      -      -     0.33   0.33   0.01   0.33    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     addq	%rax, %r11
+ -      -      -      -      -      -      -      -      -      -      -      -     0.78   0.22    -     0.22   0.37   0.41   0.05    -     0.95    -      -     vmovdqu	(%r11,%r10,2), %xmm10
+ -      -      -     0.34    -     0.33   0.33    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     addq	%rax, %r11
+ -      -      -      -      -      -      -      -      -      -      -      -      -     1.00    -     0.11   0.55   0.34   0.10   0.45   0.45    -      -     vmovdqu	(%r11,%r10,2), %xmm11
+ -      -      -      -      -      -      -      -      -      -     0.86   1.14    -      -      -      -      -      -      -      -      -      -      -     vcvtph2ps	%xmm8, %ymm12
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vmovaps	%ymm1, %ymm13
+ -      -      -      -      -      -      -      -     0.49   0.51    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm6, %ymm12, %ymm13
+ -      -      -      -      -      -      -      -      -      -     0.54   0.46    -      -      -      -      -      -      -      -      -      -      -     vsubps	%ymm12, %ymm13, %ymm13
+ -      -      -      -      -      -      -      -     0.75   0.25    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm13, %ymm7, %ymm12
+ -      -      -      -      -      -      -      -      -      -     1.02   0.98    -      -      -      -      -      -      -      -      -      -      -     vcvtps2ph	$4, %ymm12, %xmm12
+ -      -      -      -      -      -      -      -      -      -     1.22   0.78    -      -      -      -      -      -      -      -      -      -      -     vcvtph2ps	%xmm11, %ymm13
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vmovaps	%ymm4, %ymm11
+ -      -      -      -      -      -      -      -     0.72   0.28    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm6, %ymm13, %ymm11
+ -      -      -      -      -      -      -      -      -      -     0.56   0.44    -      -      -      -      -      -      -      -      -      -      -     vsubps	%ymm13, %ymm11, %ymm11
+ -      -      -      -      -      -      -      -     0.48   0.52    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm11, %ymm7, %ymm13
+ -      -      -      -      -      -      -      -      -      -     0.60   1.40    -      -      -      -      -      -      -      -      -      -      -     vcvtps2ph	$4, %ymm13, %xmm13
+ -      -      -      -      -      -      -      -      -      -     0.68   1.32    -      -      -      -      -      -      -      -      -      -      -     vcvtph2ps	%xmm9, %ymm11
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vmovaps	%ymm2, %ymm9
+ -      -      -      -      -      -      -      -     0.56   0.44    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm6, %ymm11, %ymm9
+ -      -      -      -      -      -      -      -      -      -     0.38   0.62    -      -      -      -      -      -      -      -      -      -      -     vsubps	%ymm11, %ymm9, %ymm9
+ -      -      -      -      -      -      -      -     0.21   0.79    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm9, %ymm7, %ymm11
+ -      -      -      -      -      -      -      -      -      -     1.36   0.64    -      -      -      -      -      -      -      -      -      -      -     vcvtps2ph	$4, %ymm11, %xmm11
+ -      -      -      -      -      -      -      -      -      -     1.30   0.70    -      -      -      -      -      -      -      -      -      -      -     vcvtph2ps	%xmm10, %ymm9
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vmovaps	%ymm3, %ymm10
+ -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm6, %ymm9, %ymm10
+ -      -      -      -      -      -      -      -      -      -     0.57   0.43    -      -      -      -      -      -      -      -      -      -      -     vsubps	%ymm9, %ymm10, %ymm10
+ -      -      -      -      -      -      -      -     0.78   0.22    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm10, %ymm7, %ymm9
+ -      -      -      -      -      -      -      -      -      -     0.96   1.04    -      -      -      -      -      -      -      -      -      -      -     vcvtps2ph	$4, %ymm9, %xmm9
+ -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     0.22   0.40   0.38    -     1.00    -      -      -     movq	24(%rdx), %r11
+ -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -     0.40   0.38   0.22   1.00    -      -      -      -     movq	40(%rdx), %rax
+ -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     imulq	%r14, %rax
+ -      -      -     0.33    -      -     0.67    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     addq	%rax, %r11
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     movq	%r11, %r11
+1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.21   0.50   0.29    -     0.39   0.61    -      -     movq	32(%rdx), %rax
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     shrq	$2, %rax
+ -      -      -      -      -      -      -      -      -      -      -      -     0.70   0.30   1.00   0.17   0.55   0.28    -      -      -      -     1.00   vmovdqu	%xmm12, (%r11,%r10,2)
+ -      -      -     0.34    -     0.33   0.33    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     addq	%rax, %r11
+ -      -      -      -      -      -      -      -      -      -      -      -     0.04   0.96   1.00   0.35   0.33   0.32    -      -      -     1.00    -     vmovdqu	%xmm11, (%r11,%r10,2)
+ -      -      -     0.41    -     0.25   0.34    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     addq	%rax, %r11
+ -      -      -      -      -      -      -      -      -      -      -      -     0.81   0.19   1.00   0.28   0.37   0.35    -      -      -      -     1.00   vmovdqu	%xmm9, (%r11,%r10,2)
+ -      -      -     0.58    -     0.01   0.41    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     addq	%rax, %r11
+ -      -      -      -      -      -      -      -      -      -      -      -     0.36   0.64   1.00   0.39   0.25   0.36    -      -      -     1.00    -     vmovdqu	%xmm13, (%r11,%r10,2)

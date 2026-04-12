@@ -1,0 +1,19 @@
+  v0   = imm_32          0x0
+  v1   = x              
+  v2   = y              
+  v3   = f32_from_i32    v1
+  v4   = f32_from_i32    v2
+  v5   = uniform_32      p0 byte0
+  v6   = uniform_32      p0 byte4
+  v7   = uniform_32      p0 byte8
+  v8   = uniform_32      p0 byte12
+  v9   = load_16x4_planar p1
+  v10  = f32_from_f16    v9
+  v11  = f32_from_f16    v9
+  v12  = f32_from_f16    v9
+  v13  = f32_from_f16    v9
+  v14  = f16_from_f32    v5
+  v15  = f16_from_f32    v6
+  v16  = f16_from_f32    v7
+  v17  = f16_from_f32    v8
+      store_16x4_planar p1 v14 v15 v16 v17
