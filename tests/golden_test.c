@@ -132,15 +132,7 @@ static void test_slide_golden(int slide_idx, struct umbra_fmt fmt, int fi) {
                 }
             }
         }
-        // TODO: wgpu uses fast-math sqrt (naga emits bare sqrt(), not
-        //       precise::sqrt()).  1-ULP differences at fp16 precision.
-        int tol = 0;
-        if (bi == 4
-                && __builtin_strcmp(s->title, "Radial Gradient (2-stop)") == 0
-                && (fmt.bpp == 8 || fmt.planes == 4)) {
-            tol = 1;
-        }
-        if (worst > tol) {
+        if (worst > 0) {
             dprintf(2,
                 "slide %d \"%s\" %s fmt=%s: "
                 "%d/%d bytes differ, worst delta=%d at byte %d\n",
@@ -149,7 +141,7 @@ static void test_slide_golden(int slide_idx, struct umbra_fmt fmt, int fi) {
                 mismatches, (int)pixbuf_sz,
                 worst, worst_off);
         }
-        worst <= tol here;
+        worst == 0 here;
     }
 
     free(pbuf_ref);

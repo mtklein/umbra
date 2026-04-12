@@ -149,7 +149,8 @@ enum {
     GLSLstd450FAbs  = 4,
     GLSLstd450Floor = 8,
     GLSLstd450Ceil  = 9,
-    GLSLstd450Sqrt  = 31,
+    GLSLstd450Sqrt         = 31,
+    GLSLstd450InverseSqrt  = 32,
     GLSLstd450FMin  = 37,
     GLSLstd450FMax  = 40,
     GLSLstd450FMix  = 46,
@@ -1425,10 +1426,63 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                                             as_f32(&B, get_val(&B, inst->x), xid),
                                             as_f32(&B, get_val(&B, inst->y), yid));
                     break;
-                case op_sqrt_f32:
-                    B.val[i] = spv_glsl_1(&B, B.t_f32, GLSLstd450Sqrt,
-                                            as_f32(&B, get_val(&B, inst->x), xid));
-                    break;
+                case op_sqrt_f32: {
+                    uint32_t const xf = as_f32(&B, get_val(&B, inst->x), xid);
+                    if (flags & SPIRV_FLOAT_CONTROLS) {
+                        B.val[i] = spv_glsl_1(&B, B.t_f32, GLSLstd450Sqrt, xf);
+                    } else {
+                        uint32_t const c_23   = spv_const_u32(&B, 23);
+                        uint32_t const c_127  = spv_const_u32(&B, 127);
+                        uint32_t const c_neg2 = spv_const_u32(&B, 0xfffffffeu);
+                        uint32_t const c_mant = spv_const_u32(&B, 0x007fffff);
+                        uint32_t const c_half = spv_const_f32(&B, 0.5f);
+
+                        uint32_t const xi = spv_bitcast(&B, B.t_u32, xf);
+                        uint32_t const raw_exp = spv_binop(&B, SpvOpShiftRightLogical,
+                                                            B.t_u32, xi, c_23);
+                        uint32_t const ex = spv_binop(&B, SpvOpISub, B.t_u32,
+                                                       raw_exp, c_127);
+                        uint32_t const ex_even = spv_binop(&B, SpvOpBitwiseAnd,
+                                                            B.t_u32, ex, c_neg2);
+                        uint32_t const half_ex_i = spv_binop(&B, SpvOpShiftRightArithmetic,
+                                     B.t_i32,
+                                     spv_bitcast(&B, B.t_i32, ex_even),
+                                     B.c_1);
+                        uint32_t const half_ex = spv_bitcast(&B, B.t_u32, half_ex_i);
+
+                        uint32_t const ex_odd = spv_binop(&B, SpvOpBitwiseAnd,
+                                                           B.t_u32, ex, B.c_1);
+                        uint32_t const norm_exp = spv_binop(&B, SpvOpShiftLeftLogical,
+                                     B.t_u32,
+                                     spv_binop(&B, SpvOpIAdd, B.t_u32, c_127, ex_odd),
+                                     c_23);
+                        uint32_t const norm_bits = spv_binop(&B, SpvOpBitwiseOr, B.t_u32,
+                                     spv_binop(&B, SpvOpBitwiseAnd, B.t_u32, xi, c_mant),
+                                     norm_exp);
+                        uint32_t const xn = spv_bitcast(&B, B.t_f32, norm_bits);
+
+                        uint32_t const yn = spv_glsl_1(&B, B.t_f32,
+                                                        GLSLstd450InverseSqrt, xn);
+                        uint32_t sn = spv_binop(&B, SpvOpFMul, B.t_f32, xn, yn);
+
+                        uint32_t const neg_sn = spv_unop(&B, SpvOpFNegate, B.t_f32, sn);
+                        uint32_t const rn = spv_glsl_3(&B, B.t_f32, GLSLstd450Fma,
+                                                        neg_sn, sn, xn);
+                        uint32_t const hy = spv_binop(&B, SpvOpFMul, B.t_f32, yn, c_half);
+                        sn = spv_glsl_3(&B, B.t_f32, GLSLstd450Fma, rn, hy, sn);
+
+                        uint32_t const sn_bits = spv_bitcast(&B, B.t_u32, sn);
+                        uint32_t const shift = spv_binop(&B, SpvOpShiftLeftLogical,
+                                                          B.t_u32, half_ex, c_23);
+                        uint32_t const res_bits = spv_binop(&B, SpvOpIAdd, B.t_u32,
+                                                             sn_bits, shift);
+                        uint32_t const res = spv_bitcast(&B, B.t_f32, res_bits);
+
+                        uint32_t const eq0 = spv_binop(&B, SpvOpFOrdEqual,
+                                                        B.t_bool, xf, B.c_0f);
+                        B.val[i] = spv_select(&B, B.t_f32, eq0, B.c_0f, res);
+                    }
+                } break;
                 case op_abs_f32:
                     B.val[i] = spv_glsl_1(&B, B.t_f32, GLSLstd450FAbs,
                                             as_f32(&B, get_val(&B, inst->x), xid));
