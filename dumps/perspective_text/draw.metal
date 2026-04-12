@@ -2,20 +2,18 @@
 using namespace metal;
 
 
+struct meta { uint w, x0, y0, limit0, limit1, limit2, stride0, stride1, stride2; };
+
 kernel void umbra_entry(
-    constant uint &w [[buffer(3)]],
-    constant uint *buf_limit [[buffer(4)]],
-    constant uint *buf_stride [[buffer(5)]],
-    constant uint &x0 [[buffer(6)]],
-    constant uint &y0 [[buffer(7)]],
+    constant meta &m [[buffer(3)]],
     device uint *p0 [[buffer(0)]],
     device ushort *p1 [[buffer(1)]],
     device ushort *p2 [[buffer(2)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
-    if (pos.x >= w) return;
-    uint x = x0 + pos.x;
-    uint y = y0 + pos.y;
+    if (pos.x >= m.w) return;
+    uint x = m.x0 + pos.x;
+    uint y = m.y0 + pos.y;
     uint v0 = 0u;
     uint v1 = p0[0];
     uint v2 = p0[1];
@@ -38,9 +36,9 @@ kernel void umbra_entry(
     uint v20 = (uint)(int)floor(as_type<float>(v15));
     uint v21 = 998277249u;
     float v22 = as_type<float>(v17) - as_type<float>(v4);
-    uint v23 = x0 + pos.x;
+    uint v23 = m.x0 + pos.x;
     float v24 = (float)(int)v23;
-    uint v25 = y0 + pos.y;
+    uint v25 = m.y0 + pos.y;
     float v26 = (float)(int)v25;
     float v27 = v26 * as_type<float>(v13);
     float v28 = fma(v24, as_type<float>(v12), v27);
@@ -68,12 +66,12 @@ kernel void umbra_entry(
     uint v50 = (uint)(int)floor(v49);
     uint v51 = v50 * v20;
     uint v52 = v47 + v51;
-    uint v53 = 0; if (v52 < buf_limit[2]) { v53 = (uint)p2[v52]; }
+    uint v53 = 0; if (v52 < m.limit2) { v53 = (uint)p2[v52]; }
     uint v54 = (uint)(int)(short)(ushort)v53;
     float v55 = (float)(int)v54;
     float v56 = v55 * as_type<float>(998277249u);
     uint v57 = select(v0, as_type<uint>(v56), v44 != 0u);
-    uint _base58 = y * buf_stride[1] + x*4;
+    uint _base58 = y * m.stride1 + x*4;
     uint v58 = (uint)p1[_base58];
     uint v58_1 = (uint)p1[_base58+1];
     uint v58_2 = (uint)p1[_base58+2];
@@ -98,6 +96,6 @@ kernel void umbra_entry(
     float v76 = v75 - v74;
     float v77 = fma(as_type<float>(v57), v76, v74);
     uint v78 = (uint)as_type<ushort>((half)v77);
-    { uint _base = y * buf_stride[1] + x*4;
+    { uint _base = y * m.stride1 + x*4;
       p1[_base] = ushort(v63); p1[_base+1] = ushort(v73); p1[_base+2] = ushort(v78); p1[_base+3] = ushort(v68); }
 }

@@ -2,20 +2,18 @@
 using namespace metal;
 
 
+struct meta { uint w, x0, y0, limit0, limit1, limit2, stride0, stride1, stride2; };
+
 kernel void umbra_entry(
-    constant uint &w [[buffer(3)]],
-    constant uint *buf_limit [[buffer(4)]],
-    constant uint *buf_stride [[buffer(5)]],
-    constant uint &x0 [[buffer(6)]],
-    constant uint &y0 [[buffer(7)]],
+    constant meta &m [[buffer(3)]],
     device uint *p0 [[buffer(0)]],
     device ushort *p1 [[buffer(1)]],
     device ushort *p2 [[buffer(2)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
-    if (pos.x >= w) return;
-    uint x = x0 + pos.x;
-    uint y = y0 + pos.y;
+    if (pos.x >= m.w) return;
+    uint x = m.x0 + pos.x;
+    uint y = m.y0 + pos.y;
     uint v0 = 0u;
     uint v1 = p0[0];
     uint v2 = p0[1];
@@ -24,11 +22,11 @@ kernel void umbra_entry(
     uint v6 = 998277249u;
     uint v7 = 1065353216u;
     float v8 = as_type<float>(v7) - as_type<float>(v4);
-    uint v9 = (uint)p2[y * buf_stride[2] + x];
+    uint v9 = (uint)p2[y * m.stride2 + x];
     uint v10 = (uint)(int)(short)(ushort)v9;
     float v11 = (float)(int)v10;
     float v12 = v11 * as_type<float>(998277249u);
-    uint _base13 = y * buf_stride[1] + x*4;
+    uint _base13 = y * m.stride1 + x*4;
     uint v13 = (uint)p1[_base13];
     uint v13_1 = (uint)p1[_base13+1];
     uint v13_2 = (uint)p1[_base13+2];
@@ -53,6 +51,6 @@ kernel void umbra_entry(
     float v31 = v30 - v29;
     float v32 = fma(v12, v31, v29);
     uint v33 = (uint)as_type<ushort>((half)v32);
-    { uint _base = y * buf_stride[1] + x*4;
+    { uint _base = y * m.stride1 + x*4;
       p1[_base] = ushort(v18); p1[_base+1] = ushort(v28); p1[_base+2] = ushort(v33); p1[_base+3] = ushort(v23); }
 }

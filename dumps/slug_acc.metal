@@ -2,20 +2,18 @@
 using namespace metal;
 
 
+struct meta { uint w, x0, y0, limit0, limit1, limit2, stride0, stride1, stride2; };
+
 kernel void umbra_entry(
-    constant uint &w [[buffer(3)]],
-    constant uint *buf_limit [[buffer(4)]],
-    constant uint *buf_stride [[buffer(5)]],
-    constant uint &x0 [[buffer(6)]],
-    constant uint &y0 [[buffer(7)]],
+    constant meta &m [[buffer(3)]],
     device uint *p0 [[buffer(0)]],
     device uint *p1 [[buffer(1)]],
     device uint *p2 [[buffer(2)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
-    if (pos.x >= w) return;
-    uint x = x0 + pos.x;
-    uint y = y0 + pos.y;
+    if (pos.x >= m.w) return;
+    uint x = m.x0 + pos.x;
+    uint y = m.y0 + pos.y;
     uint v0 = 0u;
     uint v2 = p0[0];
     uint v3 = p0[1];
@@ -34,26 +32,26 @@ kernel void umbra_entry(
     uint v16 = p0[18];
     uint v17 = 6u;
     uint v18 = v16 * 6u;
-    uint v19 = 0; if (v18 < buf_limit[2]) { v19 = p2[v18]; }
+    uint v19 = 0; if (v18 < m.limit2) { v19 = p2[v18]; }
     uint v20 = 1u;
     uint v21 = v18 + 1u;
-    uint v22 = 0; if (v21 < buf_limit[2]) { v22 = p2[v21]; }
+    uint v22 = 0; if (v21 < m.limit2) { v22 = p2[v21]; }
     uint v23 = 2u;
     uint v24 = v18 + 2u;
-    uint v25 = 0; if (v24 < buf_limit[2]) { v25 = p2[v24]; }
+    uint v25 = 0; if (v24 < m.limit2) { v25 = p2[v24]; }
     uint v26 = 3u;
     uint v27 = v18 + 3u;
-    uint v28 = 0; if (v27 < buf_limit[2]) { v28 = p2[v27]; }
+    uint v28 = 0; if (v27 < m.limit2) { v28 = p2[v27]; }
     uint v29 = 4u;
     uint v30 = v18 + 4u;
-    uint v31 = 0; if (v30 < buf_limit[2]) { v31 = p2[v30]; }
+    uint v31 = 0; if (v30 < m.limit2) { v31 = p2[v30]; }
     uint v32 = 5u;
     uint v33 = v18 + 5u;
-    uint v34 = 0; if (v33 < buf_limit[2]) { v34 = p2[v33]; }
+    uint v34 = 0; if (v33 < m.limit2) { v34 = p2[v33]; }
     uint v35 = 3212836864u;
-    uint v36 = x0 + pos.x;
+    uint v36 = m.x0 + pos.x;
     float v37 = (float)(int)v36;
-    uint v38 = y0 + pos.y;
+    uint v38 = m.y0 + pos.y;
     float v39 = (float)(int)v38;
     float v40 = v39 * as_type<float>(v9);
     float v41 = fma(v37, as_type<float>(v8), v40);
@@ -140,7 +138,7 @@ kernel void umbra_entry(
     uint v122 = select(v0, v109, v121 != 0u);
     float v123 = as_type<float>(v122) + as_type<float>(v117);
     uint v124 = select(v0, as_type<uint>(v123), v59 != 0u);
-    uint v125 = p1[y * buf_stride[1] + x];
+    uint v125 = p1[y * m.stride1 + x];
     float v126 = as_type<float>(v124) + as_type<float>(v125);
-    p1[y * buf_stride[1] + x] = as_type<uint>(v126);
+    p1[y * m.stride1 + x] = as_type<uint>(v126);
 }
