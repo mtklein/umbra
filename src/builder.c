@@ -431,14 +431,20 @@ umbra_val32 umbra_le_u32(builder *b, umbra_val32 x, umbra_val32 y) {
 umbra_val32 umbra_loop(builder *b, umbra_val32 n) {
     assume(!b->has_loop);
     assume(b->inst[n.id].uniform);
-    b->has_loop = 1;
-    return push32(b, op_loop_begin, VX(n));
+    b->has_loop   = 1;
+    b->loop_trip  = n;
+    b->loop_var   = umbra_var_alloc(b);
+    push(b, op_loop_begin, VX(n), .imm = b->loop_var.id);
+    return umbra_load_var(b, b->loop_var);
 }
 
 void umbra_loop_end(builder *b) {
     assume(b->has_loop && !b->loop_closed);
     b->loop_closed = 1;
-    push(b, op_loop_end);
+    umbra_val32 cur  = umbra_load_var(b, b->loop_var);
+    umbra_val32 next = umbra_add_i32(b, cur, umbra_imm_i32(b, 1));
+    umbra_store_var(b, b->loop_var, next);
+    push(b, op_loop_end, VX(b->loop_trip), .imm = b->loop_var.id);
 }
 
 umbra_var umbra_var_alloc(builder *b) {

@@ -35,6 +35,8 @@ struct umbra_builder {
     struct hash     ht;
     int             n_vars;
     _Bool           has_loop, loop_closed, pad_b_[2];
+    umbra_val32     loop_trip;
+    umbra_var       loop_var;
 };
 
 struct umbra_basic_block {

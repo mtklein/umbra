@@ -263,7 +263,8 @@ static struct interp_program* interp_program(struct umbra_basic_block const *bb)
                 p->inst[loop_begin_sw_n].y = n - loop_begin_sw_n;
                 emit(.tag = op_loop_end,
                      .x = loop_begin_sw_n - n,
-                     .y = p->inst[loop_begin_sw_n].x + (loop_begin_sw_n - n));
+                     .y = p->inst[loop_begin_sw_n].x + (loop_begin_sw_n - n),
+                     .z = inst->imm);
                 break;
             case op_load_var:  emit(.tag = op_load_var,  .x = inst->imm); break;
             case op_store_var: emit(.tag = op_store_var, .x = Y, .y = inst->imm); break;
@@ -958,16 +959,13 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                         int const skip = ip->y;
                         ip += skip;
                         v  += skip;
-                    } else {
-                        v->i32 = (I32){0};
                     }
                 } NEXT;
                 CASE(op_loop_end) {
-                    int const back = ip->x;
-                    int const i_cur  = v[back].i32[0];
+                    int const back   = ip->x;
                     int const n_trip = v[ip->y].i32[0];
-                    if (i_cur + 1 < n_trip) {
-                        v[back].i32 = (I32){0} + (i_cur + 1);
+                    int const i_next = vars[ip->z].i32[0];
+                    if (i_next < n_trip) {
                         ip += back;
                         v  += back;
                     }

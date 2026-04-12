@@ -947,7 +947,7 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
     spv_word(&B.types, push_sc);
     spv_word(&B.types, B.t_u32);
 
-    if (bb->n_vars > 0 || bb->loop_begin >= 0) {
+    if (bb->n_vars > 0) {
         B.t_ptr_func_u32 = spv_id(&B);
         spv_op(&B.types, SpvOpTypePointer, 4);
         spv_word(&B.types, B.t_ptr_func_u32);
@@ -1069,15 +1069,7 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
         spv_op(&B.func, SpvOpLabel, 2);
         spv_word(&B.func, label_entry);
 
-        // Function-scoped variables for loop induction and user variables.
-        uint32_t v_loop_i = 0;
-        if (bb->loop_begin >= 0) {
-            v_loop_i = spv_id(&B);
-            spv_op(&B.func, SpvOpVariable, 4);
-            spv_word(&B.func, B.t_ptr_func_u32);
-            spv_word(&B.func, v_loop_i);
-            spv_word(&B.func, SpvStorageClassFunction);
-        }
+        // Function-scoped variables (including loop induction variable).
         if (bb->n_vars > 0) {
             v_vars = calloc((size_t)bb->n_vars, sizeof *v_vars);
             for (int vi = 0; vi < bb->n_vars; vi++) {
@@ -1824,8 +1816,6 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                 } break;
 
                 case op_loop_begin: {
-                    spv_store(&B, v_loop_i, B.c_0);
-
                     uint32_t label_header   = spv_id(&B);
                     uint32_t label_loop     = spv_id(&B);
                     uint32_t label_continue = spv_id(&B);
@@ -1842,8 +1832,7 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                     spv_word(&B.func, label_continue);
                     spv_word(&B.func, 0);
 
-                    uint32_t cur_i = spv_load(&B, B.t_u32, v_loop_i);
-                    B.val[i] = cur_i;
+                    uint32_t cur_i = spv_load(&B, B.t_u32, v_vars[inst->imm]);
                     uint32_t trip = as_u32(&B, get_val(&B, inst->x), xid);
                     uint32_t cond = spv_binop(&B, SpvOpULessThan, B.t_bool, cur_i, trip);
                     spv_op(&B.func, SpvOpBranchConditional, 4);
@@ -1869,10 +1858,6 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
 
                     spv_op(&B.func, SpvOpLabel, 2);
                     spv_word(&B.func, label_continue);
-
-                    uint32_t cur_i = spv_load(&B, B.t_u32, v_loop_i);
-                    uint32_t next_i = spv_binop(&B, SpvOpIAdd, B.t_u32, cur_i, B.c_1);
-                    spv_store(&B, v_loop_i, next_i);
 
                     spv_op(&B.func, SpvOpBranch, 2);
                     spv_word(&B.func, label_header);

@@ -790,8 +790,8 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                 break;
 
             case op_loop_begin:
-                emit(b, "%sfor (uint v%d = 0; v%d < %s; v%d++) {\n",
-                     pad, i, i, vx, i);
+                emit(b, "%swhile (var%d < %s) {\n",
+                     pad, inst->imm, vx);
                 break;
             case op_loop_end:
                 emit(b, "%s}\n", pad);
