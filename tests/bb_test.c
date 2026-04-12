@@ -3962,9 +3962,15 @@ TEST(test_stats_safe) {
     }
 }
 
+#if defined(__aarch64__)
+    #define LOOP_JIT umbra_backend_jit(),
+#else
+    #define LOOP_JIT
+#endif
 #define LOOP_BACKENDS                                                                    \
     struct umbra_backend *loop_bes_[] = {                                                 \
         umbra_backend_interp(),                                                           \
+        LOOP_JIT                                                                          \
         umbra_backend_metal(),                                                            \
         umbra_backend_vulkan(),                                                           \
         umbra_backend_wgpu(),                                                             \

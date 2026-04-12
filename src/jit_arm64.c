@@ -211,17 +211,20 @@ struct jit_ctx {
     Buf                            *c;
     struct umbra_basic_block const *bb;
     struct pool                     pool;
+    int                             n_vars, loop_top, loop_br_skip, pad_jc_;
 };
 
 static void arm64_spill(int reg, int slot, void *ctx) {
-    Buf *c = ((struct jit_ctx *)ctx)->c;
-    put(c, STR_qi(lo(reg), XS, 2*slot));
-    put(c, STR_qi(hi(reg), XS, 2*slot+1));
+    struct jit_ctx *j = ctx;
+    int const off = 2 * (slot + j->n_vars);
+    put(j->c, STR_qi(lo(reg), XS, off));
+    put(j->c, STR_qi(hi(reg), XS, off + 1));
 }
 static void arm64_fill(int reg, int slot, void *ctx) {
-    Buf *c = ((struct jit_ctx *)ctx)->c;
-    put(c, LDR_qi(lo(reg), XS, 2*slot));
-    put(c, LDR_qi(hi(reg), XS, 2*slot+1));
+    struct jit_ctx *j = ctx;
+    int const off = 2 * (slot + j->n_vars);
+    put(j->c, LDR_qi(lo(reg), XS, off));
+    put(j->c, LDR_qi(hi(reg), XS, off + 1));
 }
 static void arm64_pool_load(Buf *c, struct pool *p, int d, uint32_t v) {
     if (movi_4s(c, d, v)) {
@@ -282,7 +285,7 @@ struct jit_program *jit_program(struct jit_backend *be,
         .cap       = (int)((buf_size - pg) / 4),
         .mmap_size = buf_size,
     };
-    struct jit_ctx jc = {.c = &c, .bb = bb, .pool = {0}};
+    struct jit_ctx jc = {.c = &c, .bb = bb, .pool = {0}, .n_vars = bb->n_vars};
     struct ra     *ra = ra_create_arm64(bb, &jc);
 
     put(&c, STP_pre(29, 30, 31, -2));
@@ -326,6 +329,15 @@ struct jit_program *jit_program(struct jit_backend *be,
     int const br_tail = c.words;
     put(&c, Bcond(0xb, 0));
 
+    if (bb->n_vars > 0) {
+        int8_t zr = ra_alloc(ra, sl, &ns);
+        put(&c, EOR_16b(lo(zr), lo(zr), lo(zr)));
+        for (int vi = 0; vi < bb->n_vars; vi++) {
+            put(&c, STP_qi(lo(zr), lo(zr), XS, 2 * vi));
+        }
+        ra_return_reg(ra, zr);
+    }
+
     int const loop_body_start = c.words;
     emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
 
@@ -347,6 +359,14 @@ struct jit_program *jit_program(struct jit_backend *be,
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
 
     emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
+    if (bb->n_vars > 0) {
+        int8_t zr = ra_alloc(ra, sl, &ns);
+        put(&c, EOR_16b(lo(zr), lo(zr), lo(zr)));
+        for (int vi = 0; vi < bb->n_vars; vi++) {
+            put(&c, STP_qi(lo(zr), lo(zr), XS, 2 * vi));
+        }
+        ra_return_reg(ra, zr);
+    }
     emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 1, deref_gpr, deref_rb_gpr, &jc);
 
     put(&c, ADD_xi(XCOL, XCOL, 1));
@@ -378,8 +398,8 @@ struct jit_program *jit_program(struct jit_backend *be,
     put(&c, LDP_post(29, 30, 31, 2));
     put(&c, RET());
 
-    if (ns > 0) {
-        c.word[stack_patch] = SUB_xi(31, 31, ns * 32);
+    if (ns + bb->n_vars > 0) {
+        c.word[stack_patch] = SUB_xi(31, 31, (ns + bb->n_vars) * 32);
     }
     c.word[stack_patch + 1] = ADD_xi(XS, 31, 0);
     while (c.words & 3) {
@@ -1125,10 +1145,44 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
-        case op_loop_begin:
-        case op_loop_end:
-        case op_load_var:
-        case op_store_var: __builtin_trap();
+        case op_load_var: {
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            int const off = 2 * inst->imm;
+            put(c, LDR_qi(lo(s.rd), XS, off));
+            if (!scalar) { put(c, LDR_qi(hi(s.rd), XS, off + 1)); }
+        } break;
+
+        case op_store_var: {
+            int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
+            int const off = 2 * inst->imm;
+            put(c, STR_qi(lo(ry), XS, off));
+            if (!scalar) { put(c, STR_qi(hi(ry), XS, off + 1)); }
+            ra_free_chan(ra, inst->y, i);
+        } break;
+
+        case op_loop_begin: {
+            int8_t rx = ra_ensure(ra, sl, ns, inst->x.id);
+            put(c, UMOV_ws(XT, lo(rx)));
+            ra_free_chan(ra, inst->x, i);
+            put(c, SUBS_xi(31, XT, 0));
+            jc->loop_br_skip = c->words;
+            put(c, Bcond(0xd, 0));
+            jc->loop_top = c->words;
+        } break;
+
+        case op_loop_end: {
+            int8_t rx = ra_ensure(ra, sl, ns, inst->x.id);
+            int const off = 2 * inst->imm;
+            put(c, UMOV_ws(XT, lo(rx)));
+            ra_free_chan(ra, inst->x, i);
+            int8_t tmp = ra_alloc(ra, sl, ns);
+            put(c, LDR_qi(lo(tmp), XS, off));
+            put(c, UMOV_ws(XM, lo(tmp)));
+            ra_return_reg(ra, tmp);
+            put(c, CMP_xr(XM, XT));
+            put(c, Bcond(0xb, jc->loop_top - c->words));
+            c->word[jc->loop_br_skip] = Bcond(0xd, c->words - jc->loop_br_skip);
+        } break;
         }
     }
 #undef lu
