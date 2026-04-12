@@ -13,9 +13,13 @@ void   umbra_basic_block_dump(struct umbra_basic_block const*, FILE*);
 
 struct umbra_backend_stats {
     double gpu_sec;
+    double encode_sec;
+    double submit_sec;
     size_t upload_bytes;
-    int    uniform_ring_rotations, dispatches;
     size_t pad_;
+    int    uniform_ring_rotations;
+    int    dispatches;
+    int    submits, :32;
 };
 
 struct umbra_backend {

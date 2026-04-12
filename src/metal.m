@@ -20,6 +20,12 @@ struct umbra_backend *umbra_backend_metal(void) { return 0; }
 
 typedef struct umbra_basic_block BB;
 
+static double now(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
+}
+
 enum { METAL_N_FRAMES = 2 };
 
 struct metal_backend {
@@ -34,7 +40,10 @@ struct metal_backend {
     struct gpu_buf_cache cache;
     struct uniform_ring_pool uni_pool;
     double gpu_time_accum;
-    int    total_dispatches; int :32;
+    double encode_time_accum;
+    double submit_time_accum;
+    int    total_dispatches;
+    int    total_submits;
 };
 
 struct metal_program {
@@ -1236,15 +1245,6 @@ static void metal_program_queue(
             be->batch_cmdbuf =
                 (__bridge_retained void*)[queue commandBuffer];
         }
-        // One MTLDispatchTypeSerial compute encoder for the entire batch:
-        // matches what MoltenVK does for consecutive vkCmdDispatch calls.
-        // Serial dispatch type guarantees that dispatch N+1 starts after
-        // dispatch N completes within the encoder, and Metal's hazard
-        // tracking on the plain commandBuffer (NOT
-        // commandBufferWithUnretainedReferences) propagates writes between
-        // dispatches. So no MTLFence chain or per-dispatch encoder churn
-        // is needed; per-dispatch CPU overhead drops to setBuffer +
-        // dispatchThreads.
         if (!be->batch_enc) {
             id<MTLCommandBuffer> cmdbuf =
                 (__bridge id<MTLCommandBuffer>)be->batch_cmdbuf;
@@ -1253,11 +1253,9 @@ static void metal_program_queue(
         }
         id<MTLComputeCommandEncoder> enc =
             (__bridge id<MTLComputeCommandEncoder>)be->batch_enc;
+        double const t0 = now();
         encode_dispatch(p, l, t, r, b, buf, enc);
-    }
-
-    if (uniform_ring_pool_should_rotate(&be->uni_pool)) {
-        metal_submit_cmdbuf(be);
+        be->encode_time_accum += now() - t0;
     }
 }
 
@@ -1269,6 +1267,7 @@ static void metal_program_queue(
 // keeps binding the same writable MTLBuffers.
 static void metal_submit_cmdbuf(struct metal_backend *be) {
     if (!be->batch_cmdbuf) { return; }
+    double const t0 = now();
     @autoreleasepool {
         if (be->batch_enc) {
             id<MTLComputeCommandEncoder> enc =
@@ -1280,6 +1279,8 @@ static void metal_submit_cmdbuf(struct metal_backend *be) {
             (__bridge id<MTLCommandBuffer>)be->batch_cmdbuf;
         [cmdbuf commit];
     }
+    be->submit_time_accum += now() - t0;
+    be->total_submits++;
     be->frame_committed[be->uni_pool.cur] = be->batch_cmdbuf;
     be->batch_cmdbuf                      = NULL;
     uniform_ring_pool_rotate(&be->uni_pool);
@@ -1340,10 +1341,13 @@ static void free_be_metal(struct umbra_backend *be) {
 static struct umbra_backend_stats stats_metal(struct umbra_backend const *be) {
     struct metal_backend const *mbe = (struct metal_backend const*)be;
     return (struct umbra_backend_stats){
-        .gpu_sec         = mbe->gpu_time_accum,
+        .gpu_sec                = mbe->gpu_time_accum,
+        .encode_sec             = mbe->encode_time_accum,
+        .submit_sec             = mbe->submit_time_accum,
         .uniform_ring_rotations = mbe->uni_pool.rotations,
-        .dispatches      = mbe->total_dispatches,
-        .upload_bytes    = mbe->cache.upload_bytes,
+        .dispatches             = mbe->total_dispatches,
+        .submits                = mbe->total_submits,
+        .upload_bytes           = mbe->cache.upload_bytes,
     };
 }
 struct umbra_backend *umbra_backend_metal(void) {

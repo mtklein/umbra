@@ -61,7 +61,7 @@ static void prog_draw(void *vctx) {
 //    commits.
 static double bench(draw_fn draw, void *ctx, struct umbra_backend *be,
                     int w, int h, int samples, double target_secs,
-                    double *out_gpu_ns_px) {
+                    double *out_gpu_ns_px, struct umbra_backend_stats *out_stats) {
     int    iters   = 1;
     double t_pilot = 0;
     for (int p = 0; p < 20; p++) {
@@ -80,14 +80,28 @@ static double bench(draw_fn draw, void *ctx, struct umbra_backend *be,
     double       best           = 0;
     double       best_gpu       = 0;
     double       total_elapsed  = 0;
+    struct umbra_backend_stats best_stats = {0};
     for (int k = 0; k < samples; k++) {
-        double const gpu0  = be->stats(be).gpu_sec;
+        struct umbra_backend_stats const s0 = be->stats(be);
         double const start = now();
         for (int it = 0; it < iters; it++) { draw(ctx); }
         be->flush(be);
-        double const dt     = now() - start;
-        double const gpu_dt = be->stats(be).gpu_sec - gpu0;
-        if (k == 0 || dt < best)         { best     = dt; }
+        double const dt = now() - start;
+        struct umbra_backend_stats const s1 = be->stats(be);
+        double const gpu_dt = s1.gpu_sec - s0.gpu_sec;
+        if (k == 0 || dt < best) {
+            best = dt;
+            best_stats = (struct umbra_backend_stats){
+                .gpu_sec    = gpu_dt,
+                .encode_sec = s1.encode_sec - s0.encode_sec,
+                .submit_sec = s1.submit_sec - s0.submit_sec,
+                .dispatches = s1.dispatches - s0.dispatches,
+                .submits    = s1.submits    - s0.submits,
+                .upload_bytes = s1.upload_bytes - s0.upload_bytes,
+                .uniform_ring_rotations = s1.uniform_ring_rotations
+                                        - s0.uniform_ring_rotations,
+            };
+        }
         if (k == 0 || gpu_dt < best_gpu) { best_gpu = gpu_dt; }
         total_elapsed += dt;
         if (total_elapsed >= wall_budget) { break; }
@@ -96,6 +110,7 @@ static double bench(draw_fn draw, void *ctx, struct umbra_backend *be,
     if (out_gpu_ns_px) {
         *out_gpu_ns_px = best_gpu > 0 ? best_gpu / px * 1e9 : -1;
     }
+    if (out_stats) { *out_stats = best_stats; }
     return best / px * 1e9;
 }
 
@@ -202,9 +217,11 @@ int main(int argc, char *argv[]) {
     int              samples   = 5;
     int              target_ms = 15;
     char const      *match     = NULL;
+    _Bool            verbose   = 0;
 
     for (int i = 1; i < argc; i++) {
         if (streq(argv[i], "--help") || streq(argv[i], "-h")) { usage(); return 0; }
+        else if (streq(argv[i], "--verbose") || streq(argv[i], "-v")) { verbose = 1; }
         else if (streq(argv[i], "--fmt")     && i+1 < argc) { fmt = parse_fmt(argv[++i]); }
         else if (streq(argv[i], "--backend") && i+1 < argc) {
             char const *b = argv[++i];
@@ -250,14 +267,28 @@ int main(int argc, char *argv[]) {
 
         double ns_px[5] = {-1, -1, -1, -1, -1};
         double gpu[5]   = {-1, -1, -1, -1, -1};
+        struct umbra_backend_stats bstats[5] = {{0}};
         for (int bi = 0; bi < nb; bi++) {
             if (!(be_mask & (1 << bi)) || !bes[bi]) { continue; }
             s->prepare(s, bes[bi], fmt);
             struct slide_draw_ctx sctx = {.s=s, .buf=buf, .frame=0, .w=W, .h=H};
             ns_px[bi] = bench(slide_draw, &sctx, bes[bi], W, H, samples, target_secs,
-                              &gpu[bi]);
+                              &gpu[bi], &bstats[bi]);
         }
         any_anomaly |= print_row(s->title, ns_px, gpu, be_mask);
+        if (verbose) {
+            for (int d = 0; d < ND; d++) {
+                int bi = disp_idx[d];
+                if (!(be_mask & (1 << bi)) || ns_px[bi] < 0) { continue; }
+                struct umbra_backend_stats const *st = &bstats[bi];
+                fprintf(stderr, "  %s: %d dispatches, %d submits,"
+                                " encode %.3fms, submit %.3fms,"
+                                " gpu %.3fms, upload %zuB\n",
+                        disp_name[d], st->dispatches, st->submits,
+                        st->encode_sec * 1e3, st->submit_sec * 1e3,
+                        st->gpu_sec * 1e3, st->upload_bytes);
+            }
+        }
         free(buf);
     }
 
@@ -296,7 +327,7 @@ int main(int argc, char *argv[]) {
             if (!(be_mask & (1 << bi)) || !progs[bi]) { continue; }
             struct prog_draw_ctx pctx = {.p=progs[bi], .bufs=abuf, .w=W, .h=H};
             ns_px[bi] = bench(prog_draw, &pctx, bes[bi], W, H, samples, target_secs,
-                              &gpu[bi]);
+                              &gpu[bi], NULL);
         }
         any_anomaly |= print_row("Slug Accumulator (1 curve)", ns_px, gpu, be_mask);
 
