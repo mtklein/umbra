@@ -19,7 +19,7 @@ mediocrity or the status quo.  Push the boundary of what is possible.
 
 Contributing
 ------------
-Never amend commits.
+Don't amend commits that have been pushed to origin.
 
 Before each commit, align your work with the style guidelines below, and run
 `ninja` twice, once to make sure everything works, then again that `ninja` is a
