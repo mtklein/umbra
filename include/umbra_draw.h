@@ -27,6 +27,8 @@ void        umbra_store_fp16      (struct umbra_builder*, umbra_ptr64, umbra_col
 umbra_color umbra_load_fp16_planar(struct umbra_builder*, umbra_ptr16);
 void        umbra_store_fp16_planar(struct umbra_builder*, umbra_ptr16, umbra_color);
 
+// TODO: we need to allow threading through user state to at least shader and coverage
+//       so that it's not always just some preprogrammed demo data!
 typedef umbra_color (*umbra_shader_fn)(struct umbra_builder*, struct umbra_uniforms_layout*,
                                        umbra_val32 x, umbra_val32 y);
 typedef umbra_val32 (*umbra_coverage_fn)(struct umbra_builder*, struct umbra_uniforms_layout*,
