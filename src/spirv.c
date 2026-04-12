@@ -529,17 +529,11 @@ static void store_ssbo_u16(SpvBuilder *b, int buf_idx, uint32_t elem_idx, uint32
 }
 
 // Compute linear address for row-structured buffer:
-//   addr = y * (row_bytes/stride) + x
-// Where stride = 4 for u32, 2 for u16.
-static uint32_t compute_addr(SpvBuilder *b, uint32_t x, uint32_t y,
-                              int buf_idx, uint32_t stride_shift) {
-    // buf_rbs[buf_idx] is at push offset 3 + total_bufs + buf_idx
-    uint32_t const rb_off = spv_const_u32(b, (uint32_t)(3 + b->total_bufs + buf_idx));
-    uint32_t const rb     = load_meta_u32(b, rb_off);
-    // row_bytes >> stride_shift = number of elements per row
-    uint32_t const elems_per_row = spv_binop(b, SpvOpShiftRightLogical, b->t_u32,
-                                             rb, stride_shift);
-    uint32_t const row_off = spv_binop(b, SpvOpIMul, b->t_u32, y, elems_per_row);
+//   addr = y * buf_stride[buf_idx] + x
+static uint32_t compute_addr(SpvBuilder *b, uint32_t x, uint32_t y, int buf_idx) {
+    uint32_t const stride_off = spv_const_u32(b, (uint32_t)(3 + b->total_bufs + buf_idx));
+    uint32_t const stride     = load_meta_u32(b, stride_off);
+    uint32_t const row_off    = spv_binop(b, SpvOpIMul, b->t_u32, y, stride);
     return spv_binop(b, SpvOpIAdd, b->t_u32, row_off, x);
 }
 
@@ -646,8 +640,9 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
     }
 
     // --- Scan for per-buffer read/written access and element shift. ---
-    uint8_t *buf_rw    = calloc((size_t)(total_bufs + 1), sizeof *buf_rw);
-    uint8_t *buf_shift = calloc((size_t)(total_bufs + 1), sizeof *buf_shift);
+    uint8_t *buf_rw        = calloc((size_t)(total_bufs + 1), sizeof *buf_rw);
+    uint8_t *buf_shift     = calloc((size_t)(total_bufs + 1), sizeof *buf_shift);
+    uint8_t *buf_row_shift = calloc((size_t)(total_bufs + 1), sizeof *buf_row_shift);
     for (int i = 0; i < bb->insts; i++) {
         if (!op_has_ptr(bb->inst[i].op)) { continue; }
         int p = bb->inst[i].ptr.deref ? deref_buf[bb->inst[i].ptr.ix]
@@ -655,11 +650,14 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
         buf_rw[p] |= op_is_store(bb->inst[i].op) ? BUF_WRITTEN : BUF_READ;
         if      (bb->inst[i].op == op_gather_16)        { buf_shift[p] = 1; }
         else if (bb->inst[i].op == op_load_16x4_planar
-              || bb->inst[i].op == op_store_16x4_planar) { buf_shift[p] = 3; }
-        else                                             { buf_shift[p] = 2; }
+              || bb->inst[i].op == op_store_16x4_planar) { buf_shift[p] = 3; buf_row_shift[p] = 1; }
+        else if (bb->inst[i].op == op_load_16
+              || bb->inst[i].op == op_store_16)          { buf_shift[p] = 1; buf_row_shift[p] = 1; }
+        else                                             { buf_shift[p] = 2; buf_row_shift[p] = 2; }
     }
-    result.buf_rw    = buf_rw;
-    result.buf_shift = buf_shift;
+    result.buf_rw        = buf_rw;
+    result.buf_shift     = buf_shift;
+    result.buf_row_shift = buf_row_shift;
 
     // Push constant layout: w, x0, y0, buf_szs[total_bufs], buf_rbs[total_bufs].
     // User uniforms (buf[0]) go through the per-batch uniform ring as a
@@ -1150,26 +1148,26 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
 
                 case op_load_32: {
                     int p = resolve_ptr(&B, inst);
-                    uint32_t addr = compute_addr(&B, x_coord, y_coord, p, B.c_2);
+                    uint32_t addr = compute_addr(&B, x_coord, y_coord, p);
                     B.val[i] = load_ssbo_u32(&B, p, addr);
                 } break;
 
                 case op_store_32: {
                     int p = resolve_ptr(&B, inst);
-                    uint32_t addr = compute_addr(&B, x_coord, y_coord, p, B.c_2);
+                    uint32_t addr = compute_addr(&B, x_coord, y_coord, p);
                     uint32_t v = as_u32(&B, get_val(&B, inst->y), yid);
                     store_ssbo_u32(&B, p, addr, v);
                 } break;
 
                 case op_load_16: {
                     int p = resolve_ptr(&B, inst);
-                    uint32_t addr16 = compute_addr(&B, x_coord, y_coord, p, B.c_1);
+                    uint32_t addr16 = compute_addr(&B, x_coord, y_coord, p);
                     B.val[i] = load_ssbo_u16(&B, p, addr16);
                 } break;
 
                 case op_store_16: {
                     int p = resolve_ptr(&B, inst);
-                    uint32_t addr16 = compute_addr(&B, x_coord, y_coord, p, B.c_1);
+                    uint32_t addr16 = compute_addr(&B, x_coord, y_coord, p);
                     uint32_t v = B.is_f[yid] ? spv_f32_to_f16(&B, get_val(&B, inst->y))
                                              : as_u32(&B, get_val(&B, inst->y), yid);
                     store_ssbo_u16(&B, p, addr16, v);
@@ -1216,7 +1214,7 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
 
                 case op_load_8x4: {
                     int p = resolve_ptr(&B, inst);
-                    uint32_t addr = compute_addr(&B, x_coord, y_coord, p, B.c_2);
+                    uint32_t addr = compute_addr(&B, x_coord, y_coord, p);
                     uint32_t px = load_ssbo_u32(&B, p, addr);
                     uint32_t c_0xFF = spv_const_u32(&B, 0xFFu);
                     B.val[i]   = spv_binop(&B, SpvOpBitwiseAnd, B.t_u32, px, c_0xFF);
@@ -1229,7 +1227,7 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                 } break;
                 case op_store_8x4: {
                     int p = resolve_ptr(&B, inst);
-                    uint32_t addr = compute_addr(&B, x_coord, y_coord, p, B.c_2);
+                    uint32_t addr = compute_addr(&B, x_coord, y_coord, p);
                     uint32_t r  = as_u32(&B, get_val(&B, inst->x), xid);
                     uint32_t g  = as_u32(&B, get_val(&B, inst->y), yid);
                     uint32_t b_ = as_u32(&B, get_val(&B, inst->z), get_id(inst->z));
@@ -1245,13 +1243,10 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                 } break;
 
                 case op_load_16x4: {
-                    // Load 4 consecutive u16 values (8 bytes = 2 u32 words).
                     int p = resolve_ptr(&B, inst);
-                    uint32_t rb_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
-                    uint32_t rb = load_meta_u32(&B, rb_off);
-                    uint32_t elems_per_row = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32,
-                                                        rb, B.c_2);
-                    uint32_t row_off = spv_binop(&B, SpvOpIMul, B.t_u32, y_coord, elems_per_row);
+                    uint32_t stride_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
+                    uint32_t stride = load_meta_u32(&B, stride_off);
+                    uint32_t row_off = spv_binop(&B, SpvOpIMul, B.t_u32, y_coord, stride);
                     uint32_t x_off = spv_binop(&B, SpvOpIMul, B.t_u32, x_coord, B.c_2);
                     uint32_t base = spv_binop(&B, SpvOpIAdd, B.t_u32, row_off, x_off);
 
@@ -1271,11 +1266,9 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                     uint32_t lim_off = spv_const_u32(&B, (uint32_t)(3 + p));
                     uint32_t ps_f16 = load_meta_u32(&B, lim_off);
 
-                    uint32_t rb_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
-                    uint32_t rb = load_meta_u32(&B, rb_off);
-
-                    uint32_t rb_f16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, rb, B.c_1);
-                    uint32_t addr = spv_binop(&B, SpvOpIMul, B.t_u32, y_coord, rb_f16);
+                    uint32_t stride_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
+                    uint32_t stride = load_meta_u32(&B, stride_off);
+                    uint32_t addr = spv_binop(&B, SpvOpIMul, B.t_u32, y_coord, stride);
                     addr = spv_binop(&B, SpvOpIAdd, B.t_u32, addr, x_coord);
 
                     for (int ch = 0; ch < 4; ch++) {
@@ -1301,11 +1294,9 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
 
                 case op_store_16x4: {
                     int p = resolve_ptr(&B, inst);
-                    uint32_t rb_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
-                    uint32_t rb = load_meta_u32(&B, rb_off);
-                    uint32_t elems_per_row = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32,
-                                                        rb, B.c_2);
-                    uint32_t row_off = spv_binop(&B, SpvOpIMul, B.t_u32, y_coord, elems_per_row);
+                    uint32_t stride_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
+                    uint32_t stride = load_meta_u32(&B, stride_off);
+                    uint32_t row_off = spv_binop(&B, SpvOpIMul, B.t_u32, y_coord, stride);
                     uint32_t x_off = spv_binop(&B, SpvOpIMul, B.t_u32, x_coord, B.c_2);
                     uint32_t base = spv_binop(&B, SpvOpIAdd, B.t_u32, row_off, x_off);
 
@@ -1333,10 +1324,9 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                     uint32_t lim_off = spv_const_u32(&B, (uint32_t)(3 + p));
                     uint32_t ps_f16 = load_meta_u32(&B, lim_off);
 
-                    uint32_t rb_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
-                    uint32_t rb = load_meta_u32(&B, rb_off);
-                    uint32_t rb_f16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, rb, B.c_1);
-                    uint32_t addr = spv_binop(&B, SpvOpIMul, B.t_u32, y_coord, rb_f16);
+                    uint32_t stride_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
+                    uint32_t stride = load_meta_u32(&B, stride_off);
+                    uint32_t addr = spv_binop(&B, SpvOpIMul, B.t_u32, y_coord, stride);
                     addr = spv_binop(&B, SpvOpIAdd, B.t_u32, addr, x_coord);
 
                     val channels[4] = { inst->x, inst->y, inst->z, inst->w };

@@ -5,7 +5,7 @@ using namespace metal;
 kernel void umbra_entry(
     constant uint &w [[buffer(2)]],
     constant uint *buf_limit [[buffer(3)]],
-    constant uint *buf_rbs [[buffer(4)]],
+    constant uint *buf_row_bytes [[buffer(4)]],
     constant uint &x0 [[buffer(5)]],
     constant uint &y0 [[buffer(6)]],
     device uchar *p0 [[buffer(0)]],
@@ -53,7 +53,7 @@ kernel void umbra_entry(
     float v35 = fma(v28, v15, as_type<float>(v7));
     uint v36 = (uint)as_type<ushort>((half)v35);
     {
-        device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_limit[1];
+        device uchar *row = p1 + y * buf_row_bytes[1]; uint ps = buf_limit[1];
         ((device ushort*)row)[x] = ushort(v30); ((device ushort*)(row+ps))[x] = ushort(v34); ((device ushort*)(row+2*ps))[x] = ushort(v36); ((device ushort*)(row+3*ps))[x] = ushort(v32);
     }
 }

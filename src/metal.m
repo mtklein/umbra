@@ -156,7 +156,7 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
                      "%suint v%d = ((device uint*)"
-                     "(p%d + y * buf_rbs[%d]))[x];\n",
+                     "(p%d + y * buf_row_bytes[%d]))[x];\n",
                      pad, i, p, p);
             } break;
             case op_gather_uniform_32:
@@ -165,9 +165,9 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
                      "%suint v%d = 0;"
-                     " if ((uint)(int)%s < buf_limit[%d])"
+                     " if (%s < buf_limit[%d])"
                      " { v%d = ((device uint*)p%d)"
-                     "[(int)%s]; }\n",
+                     "[%s]; }\n",
                      pad, i, vx, p,
                      i, p, vx);
             } break;
@@ -202,7 +202,7 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
                      "%s((device uint*)"
-                     "(p%d + y * buf_rbs[%d]))"
+                     "(p%d + y * buf_row_bytes[%d]))"
                      "[x] = %s;\n",
                      pad, p, p,
                      uv(_uy, vy, yid, is_f));
@@ -212,7 +212,7 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
                      "%sdevice ushort *hp%d = (device ushort*)"
-                     "(p%d + y * buf_rbs[%d]) + x*4;\n"
+                     "(p%d + y * buf_row_bytes[%d]) + x*4;\n"
                      "%suint v%d = (uint)hp%d[0];\n"
                      "%suint v%d_1 = (uint)hp%d[1];\n"
                      "%suint v%d_2 = (uint)hp%d[2];\n"
@@ -227,7 +227,7 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                 int p = inst->ptr.deref
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
-                     "%sdevice uchar *row%d = p%d + y * buf_rbs[%d];"
+                     "%sdevice uchar *row%d = p%d + y * buf_row_bytes[%d];"
                      " uint ps%d = buf_limit[%d];\n"
                      "%suint v%d = (uint)((device ushort*)row%d)[x];\n"
                      "%suint v%d_1 = (uint)((device ushort*)(row%d+ps%d))[x];\n"
@@ -245,7 +245,7 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                 emit(b,
                      "%s{\n"
                      "%s    device ushort *hp = (device ushort*)"
-                     "(p%d + y * buf_rbs[%d]) + x*4;\n"
+                     "(p%d + y * buf_row_bytes[%d]) + x*4;\n"
                      "%s    hp[0] = ushort(%s); hp[1] = ushort(%s);"
                      " hp[2] = ushort(%s); hp[3] = ushort(%s);\n"
                      "%s}\n",
@@ -263,7 +263,7 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
                      "%s{\n"
-                     "%s    device uchar *row = p%d + y * buf_rbs[%d];"
+                     "%s    device uchar *row = p%d + y * buf_row_bytes[%d];"
                      " uint ps = buf_limit[%d];\n"
                      "%s    ((device ushort*)row)[x] = ushort(%s);"
                      " ((device ushort*)(row+ps))[x] = ushort(%s);"
@@ -285,7 +285,7 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
                      "%suint px%d = ((device uint*)"
-                     "(p%d + y * buf_rbs[%d]))[x];\n"
+                     "(p%d + y * buf_row_bytes[%d]))[x];\n"
                      "%suint v%d = px%d & 0xFFu;\n"
                      "%suint v%d_1 = (px%d >> 8u) & 0xFFu;\n"
                      "%suint v%d_2 = (px%d >> 16u) & 0xFFu;\n"
@@ -300,7 +300,7 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                 int p = inst->ptr.deref
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
-                     "%s((device uint*)(p%d + y * buf_rbs[%d]))[x] ="
+                     "%s((device uint*)(p%d + y * buf_row_bytes[%d]))[x] ="
                      " (%s & 0xFFu) | ((%s & 0xFFu) << 8u)"
                      " | ((%s & 0xFFu) << 16u) | (%s << 24u);\n",
                      pad, p, p,
@@ -316,7 +316,7 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                 emit(b,
                      "%suint v%d = (uint)"
                      "((device ushort*)"
-                     "(p%d + y * buf_rbs[%d]))[x];\n",
+                     "(p%d + y * buf_row_bytes[%d]))[x];\n",
                      pad, i, p, p);
             } break;
             case op_gather_16: {
@@ -324,9 +324,9 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
                      "%suint v%d = 0;"
-                     " if ((uint)(int)%s < buf_limit[%d])"
+                     " if (%s < buf_limit[%d])"
                      " { v%d = (uint)((device ushort*)p%d)"
-                     "[(int)%s]; }\n",
+                     "[%s]; }\n",
                      pad, i, vx, p,
                      i, p, vx);
             } break;
@@ -335,7 +335,7 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
                      "%s((device ushort*)"
-                     "(p%d + y * buf_rbs[%d]))"
+                     "(p%d + y * buf_row_bytes[%d]))"
                      "[x] = (ushort)%s;\n",
                      pad, p, p,
                      uv(_uy, vy, yid, is_f));
@@ -849,7 +849,7 @@ static char* build_source(BB const *bb,
     emit(&b,
          "    constant uint &w [[buffer(%d)]]"
          ",\n    constant uint *buf_limit [[buffer(%d)]]"
-         ",\n    constant uint *buf_rbs [[buffer(%d)]]"
+         ",\n    constant uint *buf_row_bytes [[buffer(%d)]]"
          ",\n    constant uint &x0 [[buffer(%d)]]"
          ",\n    constant uint &y0 [[buffer(%d)]]",
          total_bufs + 0,
@@ -1019,8 +1019,10 @@ static struct metal_program* metal_program(
             int bi = bb->inst[i].ptr.deref ? deref_buf[bb->inst[i].ptr.ix]
                                            : bb->inst[i].ptr.bits;
             buf_rw[bi] |= op_is_store(bb->inst[i].op) ? BUF_WRITTEN : BUF_READ;
-            if (bb->inst[i].op == op_gather_16) { buf_shift[bi] = 1; }
-            else                                { buf_shift[bi] = 2; }
+            if (bb->inst[i].op == op_gather_16
+             || bb->inst[i].op == op_load_16
+             || bb->inst[i].op == op_store_16) { buf_shift[bi] = 1; }
+            else                               { buf_shift[bi] = 2; }
         }
 
         NSError *error = nil;

@@ -68,6 +68,7 @@ struct wgpu_program {
     struct deref_info *deref;
     uint8_t          *buf_rw;
     uint8_t          *buf_shift;
+    uint8_t          *buf_row_shift;
 
     uint32_t *spirv;
     int       spirv_words, :32;
@@ -361,8 +362,9 @@ static struct umbra_program *wgpu_compile(struct umbra_backend *base,
     p->n_deref     = sr.n_deref;
     p->push_words  = sr.push_words;
     p->deref       = sr.deref;
-    p->buf_rw      = sr.buf_rw;
-    p->buf_shift   = sr.buf_shift;
+    p->buf_rw        = sr.buf_rw;
+    p->buf_shift     = sr.buf_shift;
+    p->buf_row_shift = sr.buf_row_shift;
     p->spirv       = sr.spirv;
     p->spirv_words = sr.spirv_words;
     return &p->base;
@@ -416,7 +418,7 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
     push_data[2] = (uint32_t)t;
     for (int i = 0; i <= p->max_ptr; i++) {
         push_data[3 + i] = (uint32_t)(buf[i].sz >> p->buf_shift[i]);
-        push_data[3 + p->total_bufs + i] = (uint32_t)buf[i].row_bytes;
+        push_data[3 + p->total_bufs + i] = (uint32_t)(buf[i].row_bytes >> p->buf_row_shift[i]);
     }
 
     // Resolve derefs.
@@ -434,7 +436,7 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
         bind_size[bi] = be->cache.entry[idx].buf.size;
 
         push_data[3 + bi] = (uint32_t)(dsz >> p->buf_shift[bi]);
-        push_data[3 + p->total_bufs + bi] = (uint32_t)drb;
+        push_data[3 + p->total_bufs + bi] = (uint32_t)(drb >> p->buf_row_shift[bi]);
     }
 
     // Fill unbound slots with dummy buffers.
@@ -554,6 +556,7 @@ static void wgpu_program_free(struct umbra_program *prog) {
     free(p->deref);
     free(p->buf_rw);
     free(p->buf_shift);
+    free(p->buf_row_shift);
     free(p);
 }
 

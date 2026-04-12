@@ -5,7 +5,7 @@ using namespace metal;
 kernel void umbra_entry(
     constant uint &w [[buffer(3)]],
     constant uint *buf_limit [[buffer(4)]],
-    constant uint *buf_rbs [[buffer(5)]],
+    constant uint *buf_row_bytes [[buffer(5)]],
     constant uint &x0 [[buffer(6)]],
     constant uint &y0 [[buffer(7)]],
     device uchar *p0 [[buffer(0)]],
@@ -34,22 +34,22 @@ kernel void umbra_entry(
     uint v16 = ((device const uint*)p0)[18];
     uint v17 = 6u;
     uint v18 = v16 * 6u;
-    uint v19 = 0; if ((uint)(int)v18 < buf_limit[2]) { v19 = ((device uint*)p2)[(int)v18]; }
+    uint v19 = 0; if (v18 < buf_limit[2]) { v19 = ((device uint*)p2)[v18]; }
     uint v20 = 1u;
     uint v21 = v18 + 1u;
-    uint v22 = 0; if ((uint)(int)v21 < buf_limit[2]) { v22 = ((device uint*)p2)[(int)v21]; }
+    uint v22 = 0; if (v21 < buf_limit[2]) { v22 = ((device uint*)p2)[v21]; }
     uint v23 = 2u;
     uint v24 = v18 + 2u;
-    uint v25 = 0; if ((uint)(int)v24 < buf_limit[2]) { v25 = ((device uint*)p2)[(int)v24]; }
+    uint v25 = 0; if (v24 < buf_limit[2]) { v25 = ((device uint*)p2)[v24]; }
     uint v26 = 3u;
     uint v27 = v18 + 3u;
-    uint v28 = 0; if ((uint)(int)v27 < buf_limit[2]) { v28 = ((device uint*)p2)[(int)v27]; }
+    uint v28 = 0; if (v27 < buf_limit[2]) { v28 = ((device uint*)p2)[v27]; }
     uint v29 = 4u;
     uint v30 = v18 + 4u;
-    uint v31 = 0; if ((uint)(int)v30 < buf_limit[2]) { v31 = ((device uint*)p2)[(int)v30]; }
+    uint v31 = 0; if (v30 < buf_limit[2]) { v31 = ((device uint*)p2)[v30]; }
     uint v32 = 5u;
     uint v33 = v18 + 5u;
-    uint v34 = 0; if ((uint)(int)v33 < buf_limit[2]) { v34 = ((device uint*)p2)[(int)v33]; }
+    uint v34 = 0; if (v33 < buf_limit[2]) { v34 = ((device uint*)p2)[v33]; }
     uint v35 = 3212836864u;
     uint v36 = x0 + pos.x;
     float v37 = (float)(int)v36;
@@ -140,7 +140,7 @@ kernel void umbra_entry(
     uint v122 = select(v0, v109, v121 != 0u);
     float v123 = as_type<float>(v122) + as_type<float>(v117);
     uint v124 = select(v0, as_type<uint>(v123), v59 != 0u);
-    uint v125 = ((device uint*)(p1 + y * buf_rbs[1]))[x];
+    uint v125 = ((device uint*)(p1 + y * buf_row_bytes[1]))[x];
     float v126 = as_type<float>(v124) + as_type<float>(v125);
-    ((device uint*)(p1 + y * buf_rbs[1]))[x] = as_type<uint>(v126);
+    ((device uint*)(p1 + y * buf_row_bytes[1]))[x] = as_type<uint>(v126);
 }

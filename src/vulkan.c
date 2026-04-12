@@ -89,6 +89,7 @@ struct vk_program {
     struct deref_info *deref;
     uint8_t          *buf_rw;
     uint8_t          *buf_shift;
+    uint8_t          *buf_row_shift;
 
     uint32_t *spirv;
     int       spirv_words, :32;
@@ -302,7 +303,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
     for (int i = 0; i <= vp->max_ptr; i++) {
         push_data[3 + i] = (uint32_t)(buf[i].sz >> vp->buf_shift[i]);
-        push_data[3 + vp->total_bufs + i] = (uint32_t)buf[i].row_bytes;
+        push_data[3 + vp->total_bufs + i] = (uint32_t)(buf[i].row_bytes >> vp->buf_row_shift[i]);
     }
 
     for (int d = 0; d < vp->n_deref; d++) {
@@ -320,7 +321,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
         bind_range [bi] = VK_WHOLE_SIZE;
 
         push_data[3 + bi] = (uint32_t)(dsz >> vp->buf_shift[bi]);
-        push_data[3 + vp->total_bufs + bi] = (uint32_t)drb;
+        push_data[3 + vp->total_bufs + bi] = (uint32_t)(drb >> vp->buf_row_shift[bi]);
     }
 
     for (int i = 0; i < n; i++) {
@@ -436,6 +437,7 @@ static void vk_program_free(struct umbra_program *p) {
     free(vp->deref);
     free(vp->buf_rw);
     free(vp->buf_shift);
+    free(vp->buf_row_shift);
     free(vp->spirv);
     free(vp);
 }
@@ -532,8 +534,9 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
     p->n_deref     = sr.n_deref;
     p->push_words  = sr.push_words;
     p->deref       = sr.deref;
-    p->buf_rw      = sr.buf_rw;
-    p->buf_shift   = sr.buf_shift;
+    p->buf_rw        = sr.buf_rw;
+    p->buf_shift     = sr.buf_shift;
+    p->buf_row_shift = sr.buf_row_shift;
     p->spirv       = sr.spirv;
     p->spirv_words = sr.spirv_words;
 

@@ -5,7 +5,7 @@ using namespace metal;
 kernel void umbra_entry(
     constant uint &w [[buffer(3)]],
     constant uint *buf_limit [[buffer(4)]],
-    constant uint *buf_rbs [[buffer(5)]],
+    constant uint *buf_row_bytes [[buffer(5)]],
     constant uint &x0 [[buffer(6)]],
     constant uint &y0 [[buffer(7)]],
     device uchar *p0 [[buffer(0)]],
@@ -24,11 +24,11 @@ kernel void umbra_entry(
     uint v6 = 998277249u;
     uint v7 = 1065353216u;
     float v8 = as_type<float>(v7) - as_type<float>(v4);
-    uint v9 = (uint)((device ushort*)(p2 + y * buf_rbs[2]))[x];
+    uint v9 = (uint)((device ushort*)(p2 + y * buf_row_bytes[2]))[x];
     uint v10 = (uint)(int)(short)(ushort)v9;
     float v11 = (float)(int)v10;
     float v12 = v11 * as_type<float>(998277249u);
-    device ushort *hp13 = (device ushort*)(p1 + y * buf_rbs[1]) + x*4;
+    device ushort *hp13 = (device ushort*)(p1 + y * buf_row_bytes[1]) + x*4;
     uint v13 = (uint)hp13[0];
     uint v13_1 = (uint)hp13[1];
     uint v13_2 = (uint)hp13[2];
@@ -54,7 +54,7 @@ kernel void umbra_entry(
     float v32 = fma(v12, v31, v29);
     uint v33 = (uint)as_type<ushort>((half)v32);
     {
-        device ushort *hp = (device ushort*)(p1 + y * buf_rbs[1]) + x*4;
+        device ushort *hp = (device ushort*)(p1 + y * buf_row_bytes[1]) + x*4;
         hp[0] = ushort(v18); hp[1] = ushort(v28); hp[2] = ushort(v33); hp[3] = ushort(v23);
     }
 }
