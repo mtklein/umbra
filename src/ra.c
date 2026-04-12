@@ -96,6 +96,11 @@ struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const 
             ra->slot[i].last_use = n;
         }
     }
+    // TODO: when pre-loop values outnumber available registers, the RA evicts
+    // some via Belady and spills them.  The spilled values should be fillable
+    // via ra_ensure on subsequent iterations, but currently the JIT crashes
+    // under that pressure (e.g. gradient+draw pipeline with ~15 live values
+    // and 14 ARM64 register pairs).  The simpler case where they fit works.
     if (bb->loop_begin >= 0) {
         for (int i = bb->preamble; i < bb->loop_begin; i++) {
             if (ra->slot[i].last_use >= bb->loop_begin
