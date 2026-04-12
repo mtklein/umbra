@@ -73,7 +73,7 @@ static val push_(builder *b, struct bb_inst inst) {
 
     int const id = b->insts++;
     b->inst[id] = inst;
-    if (!op_is_store(inst.op)) {
+    if (!op_is_store(inst.op) && inst.op != op_load_var) {
         hash_insert(&b->ht, h, id);
     }
     return (val){.id = id};
@@ -426,4 +426,29 @@ umbra_val32 umbra_lt_u32(builder *b, umbra_val32 x, umbra_val32 y) {
 }
 umbra_val32 umbra_le_u32(builder *b, umbra_val32 x, umbra_val32 y) {
     return math(b, op_le_u32, VX(x), VY(y)).v32;
+}
+
+umbra_val32 umbra_loop(builder *b, umbra_val32 n) {
+    assume(!b->has_loop);
+    assume(b->inst[n.id].uniform);
+    b->has_loop = 1;
+    return push32(b, op_loop_begin, VX(n));
+}
+
+void umbra_loop_end(builder *b) {
+    assume(b->has_loop && !b->loop_closed);
+    b->loop_closed = 1;
+    push(b, op_loop_end);
+}
+
+umbra_var umbra_var_alloc(builder *b) {
+    return (umbra_var){.id = b->n_vars++};
+}
+
+umbra_val32 umbra_load_var(builder *b, umbra_var v) {
+    return push32(b, op_load_var, .imm = v.id);
+}
+
+void umbra_store_var(builder *b, umbra_var var, umbra_val32 x) {
+    push(b, op_store_var, VY(x), .imm = var.id);
 }

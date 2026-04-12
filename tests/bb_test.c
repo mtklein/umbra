@@ -3961,3 +3961,119 @@ TEST(test_stats_safe) {
         if (be[i]) { be[i]->free(be[i]); }
     }
 }
+
+TEST(test_loop_accumulate) {
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_var acc = umbra_var_alloc(b);
+    umbra_val32 n = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
+
+    umbra_val32 i = umbra_loop(b, n);
+    umbra_val32 cur = umbra_load_var(b, acc);
+    umbra_store_var(b, acc, umbra_add_i32(b, cur, umbra_imm_i32(b, 1)));
+    umbra_loop_end(b);
+
+    umbra_val32 result = umbra_load_var(b, acc);
+    umbra_store_32(b, (umbra_ptr32){.ix = 1}, result);
+    (void)i;
+
+    struct umbra_basic_block *bb = umbra_basic_block(b);
+    umbra_builder_free(b);
+
+    struct umbra_backend *be = umbra_backend_interp();
+    struct umbra_program *p = be->compile(be, bb);
+    umbra_basic_block_free(bb);
+
+    int32_t uni[1] = {10};
+    int32_t out[4] = {0};
+    struct umbra_buf buf[] = {
+        {.ptr = uni, .sz = sizeof uni},
+        {.ptr = out, .sz = sizeof out, .row_bytes = sizeof out},
+    };
+    p->queue(p, 0, 0, 4, 1, buf);
+    be->flush(be);
+
+    out[0] == 10 here;
+    out[1] == 10 here;
+    out[2] == 10 here;
+    out[3] == 10 here;
+
+    p->free(p);
+    be->free(be);
+}
+
+TEST(test_loop_zero_trip) {
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_var acc = umbra_var_alloc(b);
+    umbra_store_var(b, acc, umbra_imm_i32(b, 42));
+
+    umbra_val32 n = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
+    umbra_val32 i = umbra_loop(b, n);
+    umbra_store_var(b, acc, umbra_imm_i32(b, 99));
+    umbra_loop_end(b);
+    (void)i;
+
+    umbra_store_32(b, (umbra_ptr32){.ix = 1}, umbra_load_var(b, acc));
+
+    struct umbra_basic_block *bb = umbra_basic_block(b);
+    umbra_builder_free(b);
+
+    struct umbra_backend *be = umbra_backend_interp();
+    struct umbra_program *p = be->compile(be, bb);
+    umbra_basic_block_free(bb);
+
+    int32_t uni[1] = {0};
+    int32_t out[2] = {0};
+    struct umbra_buf buf[] = {
+        {.ptr = uni, .sz = sizeof uni},
+        {.ptr = out, .sz = sizeof out, .row_bytes = sizeof out},
+    };
+    p->queue(p, 0, 0, 2, 1, buf);
+    be->flush(be);
+
+    out[0] == 42 here;
+    out[1] == 42 here;
+
+    p->free(p);
+    be->free(be);
+}
+
+TEST(test_loop_gather_sum) {
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_var acc = umbra_var_alloc(b);
+    umbra_val32 n = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
+
+    umbra_val32 i = umbra_loop(b, n);
+    umbra_val32 elem = umbra_gather_32(b, (umbra_ptr32){.ix = 1}, i);
+    umbra_val32 cur = umbra_load_var(b, acc);
+    umbra_store_var(b, acc, umbra_add_f32(b, cur, elem));
+    umbra_loop_end(b);
+
+    umbra_store_32(b, (umbra_ptr32){.ix = 2}, umbra_load_var(b, acc));
+
+    struct umbra_basic_block *bb = umbra_basic_block(b);
+    umbra_builder_free(b);
+
+    struct umbra_backend *be = umbra_backend_interp();
+    struct umbra_program *p = be->compile(be, bb);
+    umbra_basic_block_free(bb);
+
+    int32_t uni[1] = {4};
+    float data[4] = {1.0f, 2.0f, 3.0f, 4.0f};
+    float out[2] = {0};
+    struct umbra_buf buf[] = {
+        {.ptr = uni,  .sz = sizeof uni},
+        {.ptr = data, .sz = sizeof data},
+        {.ptr = out,  .sz = sizeof out, .row_bytes = sizeof out},
+    };
+    p->queue(p, 0, 0, 2, 1, buf);
+    be->flush(be);
+
+    out[0] == 10.0f here;
+    out[1] == 10.0f here;
+
+    p->free(p);
+    be->free(be);
+}

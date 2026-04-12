@@ -789,6 +789,10 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                      uv(_uy, vy, yid, is_f));
                 break;
 
+            case op_loop_begin:
+            case op_loop_end:
+            case op_load_var:
+            case op_store_var: __builtin_trap();
         }
 
         if (op_is_store(inst->op) && i+1 < hi) {

@@ -33,9 +33,13 @@ struct umbra_builder {
     struct bb_inst *inst;
     int             insts, cap;
     struct hash     ht;
+    int             n_vars;
+    _Bool           has_loop, loop_closed, pad_b_[2];
 };
 
 struct umbra_basic_block {
     struct bb_inst *inst;
     int             insts, preamble;
+    int             loop_begin, loop_end;
+    int             n_vars, pad_bb_;
 };

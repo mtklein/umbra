@@ -176,8 +176,9 @@ struct interp_program {
     struct umbra_program base;
     struct sw_inst *inst;
     ival           *v;
+    ival           *vars;
     struct umbra_buf      *buf;
-    int             preamble, nptr, n_deref, pad_;
+    int             preamble, nptr, n_deref, n_vars;
 };
 
 static struct interp_program* interp_program(struct umbra_basic_block const *bb) {
@@ -221,6 +222,7 @@ static struct interp_program* interp_program(struct umbra_basic_block const *bb)
     }
 
     int n = 0;
+    int loop_begin_sw_n = -1;
 #define emit(...) p->inst[n] = (struct sw_inst){ __VA_ARGS__ }
 #define RESOLVE_PTR(inst) ((inst)->ptr.deref ? deref_slot[(inst)->ptr.ix] : (inst)->ptr.bits)
     for (int pass = 0; pass < 2; pass++) {
@@ -252,6 +254,19 @@ static struct interp_program* interp_program(struct umbra_basic_block const *bb)
 
             case op_store_16: emit(.tag = op_store_16, .ptr = RESOLVE_PTR(inst), .x = Y); break;
             case op_store_32: emit(.tag = op_store_32, .ptr = RESOLVE_PTR(inst), .x = Y); break;
+
+            case op_loop_begin:
+                emit(.tag = op_loop_begin, .x = X, .y = 0);
+                loop_begin_sw_n = n;
+                break;
+            case op_loop_end:
+                p->inst[loop_begin_sw_n].y = n - loop_begin_sw_n;
+                emit(.tag = op_loop_end,
+                     .x = loop_begin_sw_n - n,
+                     .y = p->inst[loop_begin_sw_n].x + (loop_begin_sw_n - n));
+                break;
+            case op_load_var:  emit(.tag = op_load_var,  .x = inst->imm); break;
+            case op_store_var: emit(.tag = op_store_var, .x = Y, .y = inst->imm); break;
 
             case op_load_16x4:
                 emit(.tag = op_load_16x4, .ptr = RESOLVE_PTR(inst));
@@ -470,6 +485,8 @@ static struct interp_program* interp_program(struct umbra_basic_block const *bb)
 
     free(deref_slot);
     free(id);
+    p->n_vars = bb->n_vars;
+    p->vars   = bb->n_vars ? calloc((size_t)bb->n_vars, sizeof *p->vars) : NULL;
     return p;
 }
 
@@ -481,6 +498,8 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
 
     int const      P   = p->preamble;
     struct umbra_buf     *buf = p->buf;
+    ival                 *vars = p->vars;
+    int const             n_vars = p->n_vars;
 
     for (int row = t; row < b; row++) {
         for (int col = l; col < r; col += K) {
@@ -488,6 +507,8 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
             int const              n   = r;
             struct sw_inst const  *ip  = p->inst + (col == l ? 0 : P);
             ival                  *v   = p->v    + (col == l ? 0 : P);
+
+            for (int vi = 0; vi < n_vars; vi++) { vars[vi] = (ival){0}; }
 
             ival acc = {0};
 #define F32_IMM union { int i; float f; } const u = {.i = ip->y}; F32 const imm = (F32){0} + u.f
@@ -513,6 +534,8 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 [op_gather_16] = &&L_op_gather_16, [op_gather_32] = &&L_op_gather_32,
                 [op_sample_32] = &&L_op_sample_32,
                 [op_deref_ptr] = &&L_op_deref_ptr,
+                [op_loop_begin] = &&L_op_loop_begin, [op_loop_end] = &&L_op_loop_end,
+                [op_load_var] = &&L_op_load_var, [op_store_var] = &&L_op_store_var,
                 [op_f32_from_f16] = &&L_op_f32_from_f16, [op_f16_from_f32] = &&L_op_f16_from_f32,
                 [op_i32_from_s16] = &&L_op_i32_from_s16, [op_i32_from_u16] = &&L_op_i32_from_u16, [op_i16_from_i32] = &&L_op_i16_from_i32,
                 [op_f32_from_i32] = &&L_op_f32_from_i32, [op_i32_from_f32] = &&L_op_i32_from_f32,
@@ -929,6 +952,29 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     buf[ip->y].row_bytes = drb;
                 } NEXT;
 
+                CASE(op_loop_begin) {
+                    int const n_trip = v[ip->x].i32[0];
+                    if (n_trip <= 0) {
+                        int const skip = ip->y;
+                        ip += skip;
+                        v  += skip;
+                    } else {
+                        v->i32 = (I32){0};
+                    }
+                } NEXT;
+                CASE(op_loop_end) {
+                    int const back = ip->x;
+                    int const i_cur  = v[back].i32[0];
+                    int const n_trip = v[ip->y].i32[0];
+                    if (i_cur + 1 < n_trip) {
+                        v[back].i32 = (I32){0} + (i_cur + 1);
+                        ip += back;
+                        v  += back;
+                    }
+                } NEXT;
+                CASE(op_load_var)  v->i32 = vars[ip->x].i32; NEXT;
+                CASE(op_store_var) vars[ip->y] = v[ip->x]; NEXT;
+
                 CASE(op_f32_from_f16) { U16 h; __builtin_memcpy(&h, &v[ip->x], sizeof h); v->f32 = f16_to_f32(h); } NEXT;
                 CASE(op_f16_from_f32) { U16 const h = f32_to_f16(v[ip->x].f32); v->u32 = (U32){0}; __builtin_memcpy(v, &h, sizeof h); } NEXT;
                 CASE(op_i32_from_s16) {
@@ -1175,6 +1221,7 @@ static void interp_program_free(struct interp_program *p) {
         free(p->buf);
         free(p->inst);
         free(p->v);
+        free(p->vars);
         free(p);
     }
 }

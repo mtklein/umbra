@@ -57,6 +57,7 @@ typedef struct { int id:30; unsigned chan:2; } umbra_val32;
 typedef struct { int ix:31, deref:1; } umbra_ptr16;
 typedef struct { int ix:31, deref:1; } umbra_ptr32;
 typedef struct { int ix:31, deref:1; } umbra_ptr64;
+typedef struct { int id; } umbra_var;
 
 umbra_ptr16 umbra_deref_ptr16(struct umbra_builder*, umbra_ptr32 buf, size_t off);
 umbra_ptr32 umbra_deref_ptr32(struct umbra_builder*, umbra_ptr32 buf, size_t off);
@@ -143,3 +144,10 @@ umbra_val32 umbra_lt_s32(struct umbra_builder*, umbra_val32, umbra_val32);
 umbra_val32 umbra_le_s32(struct umbra_builder*, umbra_val32, umbra_val32);
 umbra_val32 umbra_lt_u32(struct umbra_builder*, umbra_val32, umbra_val32);
 umbra_val32 umbra_le_u32(struct umbra_builder*, umbra_val32, umbra_val32);
+
+umbra_val32 umbra_loop    (struct umbra_builder*, umbra_val32 n);
+void        umbra_loop_end(struct umbra_builder*);
+
+umbra_var   umbra_var_alloc(struct umbra_builder*);
+umbra_val32 umbra_load_var (struct umbra_builder*, umbra_var);
+void        umbra_store_var(struct umbra_builder*, umbra_var, umbra_val32 x);

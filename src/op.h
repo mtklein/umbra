@@ -35,7 +35,11 @@ enum {
     X(sel_32,                               0)                                             \
     X(load_16,                              OP_PTR|OP_VARYING)                             \
     X(store_16,                             OP_STORE|OP_PTR|OP_VARYING)                    \
-    X(gather_16,                            OP_PTR)
+    X(gather_16,                            OP_PTR)                                        \
+    X(loop_begin,                           0)                                             \
+    X(loop_end,                             0)                                             \
+    X(load_var,                             OP_VARYING)                                    \
+    X(store_var,                            OP_STORE|OP_VARYING)
 
 // Ops that get register variants in the interpreter.
 #define BINARY_OPS(X)                                                                      \

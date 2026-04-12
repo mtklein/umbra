@@ -1124,6 +1124,11 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, w2);
             }
         } break;
+
+        case op_loop_begin:
+        case op_loop_end:
+        case op_load_var:
+        case op_store_var: __builtin_trap();
         }
     }
 #undef lu

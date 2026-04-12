@@ -132,11 +132,15 @@ static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int preambl
 
 
 struct umbra_basic_block* umbra_basic_block(struct umbra_builder *b) {
+    assume(!b->has_loop || b->loop_closed);
+
     int const n = b->insts;
 
     int live = 0;
     for (int i = n; i-- > 0;) {
-        if (op_is_store(b->inst[i].op)) {
+        if (op_is_store(b->inst[i].op)
+                || b->inst[i].op == op_loop_begin
+                || b->inst[i].op == op_loop_end) {
             b->inst[i].live = 1;
         }
         if (b->inst[i].live) {
@@ -158,6 +162,14 @@ struct umbra_basic_block* umbra_basic_block(struct umbra_builder *b) {
                           || b->inst[b->inst[i].z.id].varying
                           || b->inst[b->inst[i].w.id].varying;
     }
+    if (b->has_loop) {
+        _Bool in_loop = 0;
+        for (int i = 0; i < n; i++) {
+            if (b->inst[i].op == op_loop_begin) { in_loop = 1; }
+            if (in_loop) { b->inst[i].varying = 1; }
+            if (b->inst[i].op == op_loop_end)   { in_loop = 0; }
+        }
+    }
 
     struct bb_inst *out = malloc((size_t)live * sizeof *out);
     int preamble = 0;
@@ -168,7 +180,17 @@ struct umbra_basic_block* umbra_basic_block(struct umbra_builder *b) {
         }
     }
 
-    schedule(b->inst, n, out, preamble, live);
+    if (b->has_loop) {
+        int j = preamble;
+        for (int i = 0; i < n; i++) {
+            if (b->inst[i].live && b->inst[i].varying) {
+                b->inst[i].final_id = j;
+                out[j++] = b->inst[i];
+            }
+        }
+    } else {
+        schedule(b->inst, n, out, preamble, live);
+    }
 
     for (int i = 0; i < live; i++) {
         out[i].x = (val){.id = b->inst[out[i].x.id].final_id, .chan = out[i].x.chan};
@@ -184,6 +206,15 @@ struct umbra_basic_block* umbra_basic_block(struct umbra_builder *b) {
     result->inst     = out;
     result->insts    = live;
     result->preamble = preamble;
+    result->n_vars   = b->n_vars;
+    result->loop_begin = -1;
+    result->loop_end   = -1;
+    if (b->has_loop) {
+        for (int i = 0; i < live; i++) {
+            if (out[i].op == op_loop_begin) { result->loop_begin = i; }
+            if (out[i].op == op_loop_end)   { result->loop_end   = i; }
+        }
+    }
     return result;
 }
 
@@ -199,10 +230,16 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         struct bb_inst const *ip = &inst[i];
         enum op const         op = ip->op;
 
+        if (op == op_loop_end) {
+            fprintf(f, "      loop_end\n");
+            continue;
+        }
         if (op_is_store(op)) {
             if (op == op_store_8x4 || op == op_store_16x4 || op == op_store_16x4_planar) {
                 fprintf(f, "      %-15s p%d v%d v%d v%d v%d\n", op_name(op), ip->ptr.bits,
                         ip->x.id, ip->y.id, ip->z.id, ip->w.id);
+            } else if (op == op_store_var) {
+                fprintf(f, "      %-15s var%d v%d\n", op_name(op), ip->imm, ip->y.id);
             } else {
                 fprintf(f, "      %-15s p%d v%d\n", op_name(op), ip->ptr.bits, ip->y.id);
             }
@@ -226,10 +263,14 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_load_16x4_planar:
         case op_load_8x4: fprintf(f, " p%d", ip->ptr.bits); break;
         case op_deref_ptr: fprintf(f, " p%d byte%d", ip->ptr.bits, ip->imm); break;
+        case op_loop_begin: fprintf(f, " v%d", ip->x.id); break;
+        case op_load_var: fprintf(f, " var%d", ip->imm); break;
         case op_x:
         case op_y:
+        case op_loop_end:
         case op_store_16:
         case op_store_32:
+        case op_store_var:
         case op_store_16x4:
         case op_store_16x4_planar:
         case op_store_8x4: break;

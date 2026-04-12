@@ -1789,6 +1789,11 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                     uint32_t r = spv_binop(&B, SpvOpSLessThanEqual, B.t_bool, sx, sy);
                     B.val[i] = spv_select(&B, B.t_u32, r, B.c_allones, B.c_0);
                 } break;
+
+                case op_loop_begin:
+                case op_loop_end:
+                case op_load_var:
+                case op_store_var: __builtin_trap();
             }
         }
 
