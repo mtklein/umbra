@@ -1213,6 +1213,7 @@ static void encode_dispatch(
     [enc setBytes:&x032 length:sizeof x032 atIndex:(NSUInteger)(p->total_bufs + 3)];
     [enc setBytes:&y032 length:sizeof y032 atIndex:(NSUInteger)(p->total_bufs + 4)];
 
+    // TODO: try hardcoded (64,1,1) threadgroup — simpler, matches SPIR-V path.
     int const tg_size = p->tg_size;
     MTLSize grid =
         MTLSizeMake((NSUInteger)w, (NSUInteger)h, 1);
