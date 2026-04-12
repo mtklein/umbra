@@ -114,13 +114,6 @@ static void test_slide_golden(int slide_idx, struct umbra_fmt fmt, int fi) {
 
     for (int bi = 1; bi < NUM_BACKENDS; bi++) {
         if (!bes[bi]) { continue; }
-    #if defined(__x86_64__)
-        // TODO: Rosetta x86 JIT + fp16_planar + loop stops mismatch
-        if (0 == strcmp("Linear Gradient (loop stops)", slide_get(slide_idx)->title)
-                && bi == 1
-                && fmt.bpp == 2
-                && fmt.planes == 4) { continue; }
-    #endif
         __builtin_memset(pbuf_tst, 0, pixbuf_sz);
         render_slide(slide_idx, bes[bi], fmt, fi, pbuf_tst);
         bes[bi]->flush(bes[bi]);

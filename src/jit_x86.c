@@ -637,9 +637,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             {
                 int const sz_off = p.bits * (int)sizeof(struct umbra_buf)
                                  + (int)__builtin_offsetof(struct umbra_buf, sz);
+                int const stride = scalar ? (int)XM : (int)RAX;
                 mov_rr(c, R11, base);
-                mov_load(c, RBX, XBUF, sz_off);
-                shr_ri(c, RBX, 2);
+                mov_load(c, stride, XBUF, sz_off);
+                shr_ri(c, stride, 2);
                 if (scalar) {
                     // Plane 0 (R): MOVZX eax, word [R11 + XI*2]; VMOVD xmm, eax
                     {
@@ -654,9 +655,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     vmovd_from_gpr(c, s0.rd, RAX);
 
                     // Plane 1 (G): advance R11 by plane_stride
-                    rex_w(c, RBX, R11);
+                    rex_w(c, stride, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
                     {
                         uint8_t rex = 0x40;
                         if (XI >= 8)   { rex |= 0x02; }
@@ -669,9 +670,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     vmovd_from_gpr(c, r1, RAX);
 
                     // Plane 2 (B): advance R11 by plane_stride
-                    rex_w(c, RBX, R11);
+                    rex_w(c, stride, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
                     {
                         uint8_t rex = 0x40;
                         if (XI >= 8)   { rex |= 0x02; }
@@ -684,9 +685,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     vmovd_from_gpr(c, r2, RAX);
 
                     // Plane 3 (A): advance R11 by plane_stride
-                    rex_w(c, RBX, R11);
+                    rex_w(c, stride, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
                     {
                         uint8_t rex = 0x40;
                         if (XI >= 8)   { rex |= 0x02; }
@@ -702,21 +703,21 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     vmov_load(c, 0, s0.rd, R11, XI, 2, 0);
 
                     // Plane 1 (G): advance R11 by plane_stride
-                    rex_w(c, RBX, R11);
+                    rex_w(c, stride, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
                     vmov_load(c, 0, r1, R11, XI, 2, 0);
 
                     // Plane 2 (B): advance R11 by plane_stride
-                    rex_w(c, RBX, R11);
+                    rex_w(c, stride, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
                     vmov_load(c, 0, r2, R11, XI, 2, 0);
 
                     // Plane 3 (A): advance R11 by plane_stride
-                    rex_w(c, RBX, R11);
+                    rex_w(c, stride, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
                     vmov_load(c, 0, r3, R11, XI, 2, 0);
                 }
                 last_ptr = -1;
@@ -783,9 +784,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             {
                 int const sz_off = p.bits * (int)sizeof(struct umbra_buf)
                                  + (int)__builtin_offsetof(struct umbra_buf, sz);
+                int const stride = scalar ? (int)XM : (int)RAX;
                 mov_rr(c, R11, base);
-                mov_load(c, RBX, XBUF, sz_off);
-                shr_ri(c, RBX, 2);
+                mov_load(c, stride, XBUF, sz_off);
+                shr_ri(c, stride, 2);
                 if (scalar) {
                     // Plane 0 (R): VMOVD eax, rr; MOV word [R11+XI*2], ax
                     vmovd_to_gpr(c, RAX, rr);
@@ -801,9 +803,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     }
 
                     // Plane 1 (G): advance R11 by plane_stride
-                    rex_w(c, RBX, R11);
+                    rex_w(c, stride, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
                     vmovd_to_gpr(c, RAX, rg);
                     {
                         emit1(c, 0x66);
@@ -817,9 +819,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     }
 
                     // Plane 2 (B): advance R11 by plane_stride
-                    rex_w(c, RBX, R11);
+                    rex_w(c, stride, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
                     vmovd_to_gpr(c, RAX, rb_);
                     {
                         emit1(c, 0x66);
@@ -833,9 +835,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     }
 
                     // Plane 3 (A): advance R11 by plane_stride
-                    rex_w(c, RBX, R11);
+                    rex_w(c, stride, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
                     vmovd_to_gpr(c, RAX, ra_v);
                     {
                         emit1(c, 0x66);
@@ -852,21 +854,21 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                     vmov_store(c, 0, rr, R11, XI, 2, 0);
 
                     // Plane 1 (G): advance R11 by plane_stride
-                    rex_w(c, RBX, R11);
+                    rex_w(c, stride, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
                     vmov_store(c, 0, rg, R11, XI, 2, 0);
 
                     // Plane 2 (B): advance R11 by plane_stride
-                    rex_w(c, RBX, R11);
+                    rex_w(c, stride, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
                     vmov_store(c, 0, rb_, R11, XI, 2, 0);
 
                     // Plane 3 (A): advance R11 by plane_stride
-                    rex_w(c, RBX, R11);
+                    rex_w(c, stride, R11);
                     emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((RBX & 7) << 3) | (R11 & 7)));
+                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
                     vmov_store(c, 0, ra_v, R11, XI, 2, 0);
                 }
                 last_ptr = -1;
