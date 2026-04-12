@@ -653,8 +653,10 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
         int p = bb->inst[i].ptr.deref ? deref_buf[bb->inst[i].ptr.ix]
                                       : bb->inst[i].ptr.bits;
         buf_rw[p] |= op_is_store(bb->inst[i].op) ? BUF_WRITTEN : BUF_READ;
-        if (bb->inst[i].op == op_gather_16) { buf_shift[p] = 1; }
-        else                                { buf_shift[p] = 2; }
+        if      (bb->inst[i].op == op_gather_16)        { buf_shift[p] = 1; }
+        else if (bb->inst[i].op == op_load_16x4_planar
+              || bb->inst[i].op == op_store_16x4_planar) { buf_shift[p] = 3; }
+        else                                             { buf_shift[p] = 2; }
     }
     result.buf_rw    = buf_rw;
     result.buf_shift = buf_shift;
@@ -1267,8 +1269,7 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                 case op_load_16x4_planar: {
                     int p = resolve_ptr(&B, inst);
                     uint32_t lim_off = spv_const_u32(&B, (uint32_t)(3 + p));
-                    uint32_t lim = load_meta_u32(&B, lim_off);
-                    uint32_t ps_f16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, lim, B.c_1);
+                    uint32_t ps_f16 = load_meta_u32(&B, lim_off);
 
                     uint32_t rb_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
                     uint32_t rb = load_meta_u32(&B, rb_off);
@@ -1330,8 +1331,7 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                 case op_store_16x4_planar: {
                     int p = resolve_ptr(&B, inst);
                     uint32_t lim_off = spv_const_u32(&B, (uint32_t)(3 + p));
-                    uint32_t lim = load_meta_u32(&B, lim_off);
-                    uint32_t ps_f16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, lim, B.c_1);
+                    uint32_t ps_f16 = load_meta_u32(&B, lim_off);
 
                     uint32_t rb_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
                     uint32_t rb = load_meta_u32(&B, rb_off);
