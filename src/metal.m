@@ -790,9 +790,19 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                 break;
 
             case op_loop_begin:
+                emit(b, "%sfor (uint v%d = 0; v%d < %s; v%d++) {\n",
+                     pad, i, i, vx, i);
+                break;
             case op_loop_end:
+                emit(b, "%s}\n", pad);
+                break;
             case op_load_var:
-            case op_store_var: __builtin_trap();
+                emit(b, "%suint v%d = var%d;\n", pad, i, inst->imm);
+                break;
+            case op_store_var:
+                emit(b, "%svar%d = %s;\n",
+                     pad, inst->imm, uv(_uy, vy, yid, is_f));
+                break;
         }
 
         if (op_is_store(inst->op) && i+1 < hi) {
@@ -885,6 +895,9 @@ static char* build_source(BB const *bb,
          "    if (pos.x >= w) return;\n"
          "    uint x = x0 + pos.x;\n"
          "    uint y = y0 + pos.y;\n");
+    for (int i = 0; i < bb->n_vars; i++) {
+        emit(&b, "    uint var%d = 0;\n", i);
+    }
 
     _Bool *is_f = calloc((size_t)(bb->insts + 1), 1);
     emit_ops(&b, bb, deref_buf, is_f, 0, bb->insts, "    ");
