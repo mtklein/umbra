@@ -12,10 +12,11 @@ struct overview_state {
     struct slide base;
 
     int                   w, h, cw, ch;
-    int                   n_real, pad_;
+    int                   n_real, :32;
     uint32_t             *fb, *tmp;
     struct umbra_backend *be;
-    struct umbra_fmt       fmt;
+    struct umbra_fmt       fmt, out_fmt;
+    struct umbra_program *cvt;
 };
 
 static void draw_digit(uint32_t *fb, int stride, int ox, int oy, int digit, uint32_t color) {
@@ -102,22 +103,37 @@ static void overview_init(struct slide *s, int w, int h) {
 
 static void overview_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
     struct overview_state *st = (struct overview_state *)s;
-    st->be = be;
-    st->fmt = umbra_fmt_8888;
-    (void)fmt;
+    st->be      = be;
+    st->fmt     = umbra_fmt_8888;
+    st->out_fmt = fmt;
     render_thumbnails(st);
+
+    if (st->cvt) { st->cvt->free(st->cvt); }
+    struct umbra_builder *b = umbra_builder();
+    umbra_color c = umbra_fmt_8888.load(b, 0);
+    fmt.store(b, 1, c);
+    struct umbra_basic_block *bb = umbra_basic_block(b);
+    umbra_builder_free(b);
+    st->cvt = be->compile(be, bb);
+    umbra_basic_block_free(bb);
 }
 
 static void overview_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
     struct overview_state *st = (struct overview_state *)s;
-    (void)s; (void)frame; (void)l; (void)r;
-    size_t off = (size_t)t * (size_t)st->w * 4;
-    size_t len = (size_t)(b - t) * (size_t)st->w * 4;
-    __builtin_memcpy((char*)buf + off, (char*)st->fb + off, len);
+    (void)frame; (void)l; (void)r;
+    size_t const rb_in  = (size_t)st->w * 4;
+    size_t const rb_out = (size_t)st->w * st->out_fmt.bpp;
+    size_t const plane  = (size_t)st->w * (size_t)st->h * st->out_fmt.bpp;
+    size_t const sz_out = plane * (size_t)st->out_fmt.planes;
+    st->cvt->queue(st->cvt, 0, t, st->w, b, (struct umbra_buf[]){
+        {.ptr = st->fb, .sz = (size_t)(st->w * st->h) * 4, .row_bytes = rb_in},
+        {.ptr = buf,    .sz = sz_out,                       .row_bytes = rb_out},
+    });
 }
 
 static void overview_free(struct slide *s) {
     struct overview_state *st = (struct overview_state *)s;
+    if (st->cvt) { st->cvt->free(st->cvt); }
     free(st->fb);
     free(st->tmp);
     free(st);
