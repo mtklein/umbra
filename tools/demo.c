@@ -36,10 +36,6 @@ static struct umbra_fmt const *fmt_enums[] = {
     &umbra_fmt_fp16_planar, &umbra_fmt_1010102,
 };
 
-static struct umbra_fmt const *readback_fmt(int fmt) {
-    (void)fmt;
-    return &umbra_fmt_fp16;
-}
 
 struct pipe {
     struct umbra_program          *program;
@@ -86,7 +82,7 @@ static void build_readback(int fmt) {
     free_pipe(&readback_pipe);
     struct umbra_builder *builder = umbra_builder();
     umbra_color c = fmt_enums[fmt]->load(builder, 1);
-    readback_fmt(fmt)->store(builder, 2, c);
+    umbra_fmt_fp16.store(builder, 2, c);
     readback_pipe.out_ptr = 2;
     finish_pipe(&readback_pipe, builder, (struct umbra_uniforms_layout){0});
 }
@@ -412,7 +408,7 @@ int main(void) {
 
         uint8_t *rows = (uint8_t *)tex_pixels;
         if (plane_gap) {
-            int const rb_bpp = (int)readback_fmt(cur_fmt)->bpp;
+            int const rb_bpp = (int)umbra_fmt_fp16.bpp;
             size_t const full_sz = (size_t)W * (size_t)H * bpp * (size_t)planes;
             for (int y = 0; y < H; y++) {
                 int      op = readback_pipe.out_ptr;
@@ -429,7 +425,7 @@ int main(void) {
         } else {
             for (int y = 0; y < H; y++) {
                 void *src = (void *)((uint8_t *)pixbuf + (size_t)y * (size_t)W * bpp);
-                readback_row(rows + y * tex_pitch, (int)readback_fmt(cur_fmt)->bpp,
+                readback_row(rows + y * tex_pitch, (int)umbra_fmt_fp16.bpp,
                              src, W, row_sz, plane_gap);
             }
         }
