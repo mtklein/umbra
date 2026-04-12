@@ -134,7 +134,6 @@ enum {
     SpvOpFOrdGreaterThan      = 186,
     SpvOpFOrdLessThanEqual    = 188,
     SpvOpFOrdGreaterThanEqual = 190,
-    SpvOpPhi                  = 245,
     SpvOpLoopMerge            = 246,
     SpvOpLabel                = 248,
     SpvOpBranch               = 249,
