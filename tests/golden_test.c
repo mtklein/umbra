@@ -113,7 +113,8 @@ static void test_slide_golden(int slide_idx, struct umbra_fmt fmt, int fi) {
 
     for (int bi = 1; bi < NUM_BACKENDS; bi++) {
         if (!bes[bi]) { continue; }
-        // TODO: x86 JIT + fp16_planar + loop stops
+        // TODO: fp16_planar + loop stops wrong when W >= K (vector path);
+        //       affects interpreter and JIT on x86 (K=32) and WASM (K=64)
         if (bi == 1 && fmt.bpp == 2 && fmt.planes == 4) { continue; }
         __builtin_memset(pbuf_tst, 0, pixbuf_sz);
         render_slide(slide_idx, bes[bi], fmt, fi, pbuf_tst);
