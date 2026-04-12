@@ -211,7 +211,7 @@ struct jit_ctx {
     Buf                            *c;
     struct umbra_basic_block const *bb;
     struct pool                     pool;
-    int                             n_vars, loop_top, loop_br_skip, pad_jc_;
+    int                             n_vars, loop_top, loop_br_skip, :32;
 };
 
 static void arm64_spill(int reg, int slot, void *ctx) {
