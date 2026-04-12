@@ -267,7 +267,12 @@ int main(void) {
         return 1;
     }
 
-    SDL_Renderer *renderer = SDL_CreateRenderer(window, NULL);
+    SDL_PropertiesID rprops = SDL_CreateProperties();
+    SDL_SetPointerProperty(rprops, SDL_PROP_RENDERER_CREATE_WINDOW_POINTER, window);
+    SDL_SetNumberProperty(rprops, SDL_PROP_RENDERER_CREATE_OUTPUT_COLORSPACE_NUMBER,
+                          SDL_COLORSPACE_SRGB_LINEAR);
+    SDL_Renderer *renderer = SDL_CreateRendererWithProperties(rprops);
+    SDL_DestroyProperties(rprops);
     if (!renderer) {
         SDL_Log("SDL_CreateRenderer failed: %s", SDL_GetError());
         return 1;
