@@ -103,16 +103,31 @@ void text_cov_free(struct text_cov *tc) {
     tc->data = NULL;
 }
 
+static struct text_cov shared_bitmap_, shared_sdf_;
+
+void text_shared_init(int w, int h, float font_size) {
+    shared_bitmap_ = text_rasterize(w, h, font_size, 0);
+    shared_sdf_    = text_rasterize(w, h, font_size, 1);
+}
+void text_shared_cleanup(void) {
+    text_cov_free(&shared_bitmap_);
+    text_cov_free(&shared_sdf_);
+}
+struct text_cov *text_shared_bitmap(void) { return &shared_bitmap_; }
+struct text_cov *text_shared_sdf   (void) { return &shared_sdf_; }
+
 struct text_state {
     struct slide base;
 
     struct text_cov *tc;
-    float            color[4];
     int              w, h;
+    int              is_sdf, :32;
 
-    umbra_shader_fn    shader;
-    umbra_coverage_fn  coverage;
-    umbra_blend_fn     blend;
+    struct umbra_shader_solid shader;
+    union {
+        struct umbra_coverage_bitmap bitmap;
+        struct umbra_coverage_sdf    sdf;
+    } cov;
 
     struct umbra_fmt            fmt;
     struct umbra_draw_layout   lay;
@@ -132,8 +147,8 @@ static void text_prepare(struct slide *s, struct umbra_backend *be, struct umbra
         st->fmt = fmt;
         umbra_basic_block_free(st->bb);
         free(st->lay.uniforms);
-        struct umbra_builder *b = umbra_draw_build(st->shader, st->coverage, st->blend, fmt,
-                                                    &st->lay);
+        struct umbra_builder *b = umbra_draw_build(&st->shader.base, &st->cov.bitmap.base,
+                                                    umbra_blend_srcover, fmt, &st->lay);
         st->bb = umbra_basic_block(b);
         umbra_builder_free(b);
     }
@@ -144,9 +159,13 @@ static void text_prepare(struct slide *s, struct umbra_backend *be, struct umbra
 static void text_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
     struct text_state *st = (struct text_state *)s;
     (void)frame;
-    umbra_uniforms_fill_f32(st->lay.uniforms, st->lay.shader, st->color, 4);
-    umbra_uniforms_fill_ptr(st->lay.uniforms, st->lay.coverage,
-                  (struct umbra_buf){.ptr=st->tc->data, .sz=(size_t)(st->w * st->h * 2), .row_bytes=(size_t)st->w * 2});
+    struct umbra_buf bmp = {
+        .ptr      = st->tc->data,
+        .sz       = (size_t)(st->w * st->h * 2),
+        .row_bytes = (size_t)st->w * 2,
+    };
+    st->cov.bitmap.bmp = bmp;
+    umbra_draw_fill(&st->lay, &st->shader.base, &st->cov.bitmap.base);
     size_t    pb = st->fmt.bpp;
     size_t plane_sz = (size_t)st->w * (size_t)st->h * pb;
     size_t rb = (size_t)st->w * pb;
@@ -159,7 +178,8 @@ static void text_draw(struct slide *s, int frame, int l, int t, int r, int b, vo
 
 static struct umbra_builder *text_get_builder(struct slide *s, struct umbra_fmt fmt) {
     struct text_state *st = (struct text_state *)s;
-    return umbra_draw_build(st->shader, st->coverage, st->blend, fmt, NULL);
+    return umbra_draw_build(&st->shader.base, &st->cov.bitmap.base,
+                            umbra_blend_srcover, fmt, NULL);
 }
 
 static void text_free(struct slide *s) {
@@ -172,14 +192,13 @@ static void text_free(struct slide *s) {
 
 SLIDE(slide_text_bitmap) {
     struct text_state *st = calloc(1, sizeof *st);
-    st->tc = ctx->bitmap_cov;
-    st->shader = umbra_shader_solid;
-    st->coverage = umbra_coverage_bitmap;
-    st->blend = umbra_blend_srcover;
-    st->color[0] = 1.0f; st->color[1] = 1.0f; st->color[2] = 1.0f; st->color[3] = 1.0f;
+    st->tc     = text_shared_bitmap();
+    st->is_sdf = 0;
+    st->shader = umbra_shader_solid((float[]){1.0f, 1.0f, 1.0f, 1.0f});
+    st->cov.bitmap = umbra_coverage_bitmap((struct umbra_buf){0});
     st->base = (struct slide){
         .title = "Text (8-bit AA)",
-        .bg = 0xff1a1a2e,
+        .bg = {0.18f, 0.1f, 0.1f, 1},
         .init = text_init,
         .prepare = text_prepare,
         .draw = text_draw,
@@ -191,14 +210,13 @@ SLIDE(slide_text_bitmap) {
 
 SLIDE(slide_text_sdf) {
     struct text_state *st = calloc(1, sizeof *st);
-    st->tc = ctx->sdf_cov;
-    st->shader = umbra_shader_solid;
-    st->coverage = umbra_coverage_sdf;
-    st->blend = umbra_blend_srcover;
-    st->color[0] = 0.2f; st->color[1] = 0.8f; st->color[2] = 1.0f; st->color[3] = 1.0f;
+    st->tc     = text_shared_sdf();
+    st->is_sdf = 1;
+    st->shader = umbra_shader_solid((float[]){0.2f, 0.8f, 1.0f, 1.0f});
+    st->cov.sdf = umbra_coverage_sdf((struct umbra_buf){0});
     st->base = (struct slide){
         .title = "Text (SDF)",
-        .bg = 0xff1a1a2e,
+        .bg = {0.18f, 0.1f, 0.1f, 1},
         .init = text_init,
         .prepare = text_prepare,
         .draw = text_draw,

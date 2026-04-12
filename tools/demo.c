@@ -182,14 +182,9 @@ static void update_title(SDL_Window *w, struct slide *s, int bi, int fi, double 
     SDL_SetWindowTitle(w, title);
 }
 
-static void fill_bg_row(void *dst, int n, uint32_t bg, size_t row_sz, size_t plane_gap) {
-    float hc[4] = {
-        (float)(bg & 0xffu) / 255.0f,
-        (float)((bg >> 8) & 0xffu) / 255.0f,
-        (float)((bg >> 16) & 0xffu) / 255.0f,
-        (float)((bg >> 24) & 0xffu) / 255.0f,
-    };
-    umbra_uniforms_fill_f32(fill_pipe.uniforms, 0, hc, 4);
+static void fill_bg_row(void *dst, int n, float const bg[4], size_t row_sz,
+                        size_t plane_gap) {
+    umbra_uniforms_fill_f32(fill_pipe.uniforms, 0, bg, 4);
     int      ps = plane_gap ? 3 : 0;
     struct umbra_buf buf[5];
     buf[0] = (struct umbra_buf){.ptr=fill_pipe.uniforms, .sz=fill_pipe.uni.size};
@@ -354,13 +349,7 @@ int main(void) {
         size_t row_sz = (size_t)W * (size_t)bpp;
 
         if (plane_gap) {
-            float hc[4] = {
-                (float)(s->bg & 0xffu) / 255.0f,
-                (float)((s->bg >> 8) & 0xffu) / 255.0f,
-                (float)((s->bg >> 16) & 0xffu) / 255.0f,
-                (float)((s->bg >> 24) & 0xffu) / 255.0f,
-            };
-            umbra_uniforms_fill_f32(fill_pipe.uniforms, 0, hc, 4);
+            umbra_uniforms_fill_f32(fill_pipe.uniforms, 0, s->bg, 4);
             size_t const full_sz = (size_t)W * (size_t)H * bpp * (size_t)planes;
             struct umbra_buf fb[] = {
                 {.ptr = fill_pipe.uniforms, .sz = fill_pipe.uni.size},

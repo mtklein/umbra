@@ -6,6 +6,7 @@ struct swatch_state {
 
     int w, h;
 
+    struct umbra_shader_solid  shader;
     struct umbra_fmt           fmt;
     struct umbra_draw_layout   lay;
     struct umbra_basic_block  *bb;
@@ -24,7 +25,7 @@ static void swatch_prepare(struct slide *s, struct umbra_backend *be, struct umb
         st->fmt = fmt;
         umbra_basic_block_free(st->bb);
         free(st->lay.uniforms);
-        struct umbra_builder *b = umbra_draw_build(umbra_shader_solid, NULL, NULL, fmt,
+        struct umbra_builder *b = umbra_draw_build(&st->shader.base, NULL, NULL, fmt,
                                                     &st->lay);
         st->bb = umbra_basic_block(b);
         umbra_builder_free(b);
@@ -72,7 +73,8 @@ static void swatch_draw(struct slide *s, int frame, int l, int t, int r, int b, 
         int const xr = x1 < r ? x1 : r;
         if (xr <= xl) { continue; }
 
-        umbra_uniforms_fill_f32(st->lay.uniforms, st->lay.shader, swatches[i], 4);
+        __builtin_memcpy(st->shader.color, swatches[i], sizeof st->shader.color);
+        umbra_draw_fill(&st->lay, &st->shader.base, NULL);
         struct umbra_buf ubuf[] = {
             {.ptr = st->lay.uniforms, .sz = st->lay.uni.size},
             {.ptr = buf, .sz = sz, .row_bytes = rb},
@@ -90,11 +92,11 @@ static void swatch_free(struct slide *s) {
 }
 
 SLIDE(slide_swatch) {
-    (void)ctx;
     struct swatch_state *st = calloc(1, sizeof *st);
+    st->shader = umbra_shader_solid((float[]){0, 0, 0, 1});
     st->base = (struct slide){
         .title   = "Color Swatches",
-        .bg      = 0xff000000,
+        .bg      = {0, 0, 0, 1},
         .init    = swatch_init,
         .prepare = swatch_prepare,
         .draw    = swatch_draw,

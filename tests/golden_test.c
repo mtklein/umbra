@@ -78,13 +78,7 @@ static void free_pipes(void) {
 
 static void fill_bg_for_slide(int fi, struct umbra_fmt fmt, int slide_idx, void *dst) {
     struct slide *s = slide_get(slide_idx);
-    float hc[4] = {
-        (float)( s->bg        & 0xffu) / 255.0f,
-        (float)((s->bg >>  8) & 0xffu) / 255.0f,
-        (float)((s->bg >> 16) & 0xffu) / 255.0f,
-        (float)((s->bg >> 24) & 0xffu) / 255.0f,
-    };
-    umbra_uniforms_fill_f32(fills[fi].uniforms, 0, hc, 4);
+    umbra_uniforms_fill_f32(fills[fi].uniforms, 0, s->bg, 4);
     size_t const rb = (size_t)W * fmt.bpp;
     struct umbra_buf buf[2] = {
         {.ptr=fills[fi].uniforms, .sz=fills[fi].uni.size},
@@ -168,9 +162,18 @@ TEST(test_slug_rect) {
         be->compile(be, abb);
     umbra_basic_block_free(abb);
 
+    float color[4] = {1,1,1,1};
+    float wind_buf[W * H];
+    __builtin_memset(wind_buf, 0, sizeof wind_buf);
+
+    struct umbra_shader_solid shader = umbra_shader_solid(color);
+    struct umbra_coverage_wind cov = umbra_coverage_wind(
+        (struct umbra_buf){.ptr=wind_buf, .sz=sizeof wind_buf,
+                           .row_bytes=(size_t)W * sizeof(float)});
+
     struct umbra_draw_layout lay;
     struct umbra_builder *bld = umbra_draw_build(
-        umbra_shader_solid, umbra_coverage_wind,
+        &shader.base, &cov.base,
         umbra_blend_srcover, umbra_fmt_8888,
         &lay);
     struct umbra_basic_block *bb =
@@ -188,10 +191,6 @@ TEST(test_slug_rect) {
     float mat[11] = {
         1,0,0, 0,1,0, 0,0,1, 60,40,
     };
-    float color[4] = {1,1,1,1};
-
-    float wind_buf[W * H];
-    __builtin_memset(wind_buf, 0, sizeof wind_buf);
     umbra_uniforms_fill_f32(alay.uniforms, alay.mat, mat, 11);
     umbra_uniforms_fill_ptr(alay.uniforms, alay.curves_off,
         (struct umbra_buf){.ptr=rect, .sz=sizeof rect});
@@ -208,9 +207,7 @@ TEST(test_slug_rect) {
     }
     be->flush(be);
 
-    umbra_uniforms_fill_f32(lay.uniforms, lay.shader, color, 4);
-    umbra_uniforms_fill_ptr(lay.uniforms, lay.coverage,
-        (struct umbra_buf){.ptr=wind_buf, .sz=sizeof wind_buf, .row_bytes=(size_t)W * sizeof(float)});
+    umbra_draw_fill(&lay, &shader.base, &cov.base);
     struct umbra_buf buf[] = {
         (struct umbra_buf){.ptr=lay.uniforms, .sz=lay.uni.size},
         {.ptr=pixels, .sz=sizeof pixels, .row_bytes=W * 4},
@@ -243,10 +240,19 @@ TEST(test_perspective_text) {
     struct umbra_backend *be =
         umbra_backend_interp();
 
+    float mat[11] = {
+        1,0,0, 0,1,0, 0,0,1,
+        (float)BW, (float)BH,
+    };
+    float color[4] = {1,1,1,1};
+
+    struct umbra_shader_solid shader = umbra_shader_solid(color);
+    struct umbra_coverage_bitmap_matrix cov = umbra_coverage_bitmap_matrix(mat,
+        (struct umbra_buf){.ptr=bmp, .sz=sizeof bmp});
+
     struct umbra_draw_layout lay;
     struct umbra_builder *bld = umbra_draw_build(
-        umbra_shader_solid,
-        umbra_coverage_bitmap_matrix,
+        &shader.base, &cov.base,
         umbra_blend_srcover, umbra_fmt_8888,
         &lay);
     struct umbra_basic_block *bb =
@@ -261,16 +267,7 @@ TEST(test_perspective_text) {
         pixels[i] = 0xff000000;
     }
 
-    float mat[11] = {
-        1,0,0, 0,1,0, 0,0,1,
-        (float)BW, (float)BH,
-    };
-    float color[4] = {1,1,1,1};
-
-    umbra_uniforms_fill_f32(lay.uniforms, lay.shader, color, 4);
-    umbra_uniforms_fill_f32(lay.uniforms, lay.coverage, mat, 11);
-    umbra_uniforms_fill_ptr(lay.uniforms, (lay.coverage + 44 + 7) & ~(size_t)7,
-        (struct umbra_buf){.ptr=bmp, .sz=sizeof bmp});
+    umbra_draw_fill(&lay, &shader.base, &cov.base);
     struct umbra_buf buf[] = {
         (struct umbra_buf){.ptr=lay.uniforms, .sz=lay.uni.size},
         {.ptr=pixels, .sz=sizeof pixels},
@@ -285,10 +282,18 @@ TEST(test_perspective_text) {
 
     struct text_cov tc = text_rasterize(W, H, 24.0f, 0);
 
+    float mat2[11];
+    slide_perspective_matrix(mat2, 1.0f,
+        W, H, tc.w, tc.h);
+    float hc2[4] = {1,0.8f,0.2f,1};
+
+    struct umbra_shader_solid shader2 = umbra_shader_solid(hc2);
+    struct umbra_coverage_bitmap_matrix cov2 = umbra_coverage_bitmap_matrix(mat2,
+        (struct umbra_buf){.ptr=tc.data, .sz=(size_t)(W * H * 2)});
+
     struct umbra_draw_layout lay2;
     bld = umbra_draw_build(
-        umbra_shader_solid,
-        umbra_coverage_bitmap_matrix,
+        &shader2.base, &cov2.base,
         umbra_blend_srcover, umbra_fmt_8888,
         &lay2);
     bb = umbra_basic_block(bld);
@@ -300,15 +305,8 @@ TEST(test_perspective_text) {
     for (int i = 0; i < W * H; i++) {
         px2[i] = 0xff0a0a1e;
     }
-    float mat2[11];
-    slide_perspective_matrix(mat2, 1.0f,
-        W, H, tc.w, tc.h);
-    float hc2[4] = {1,0.8f,0.2f,1};
     {
-        umbra_uniforms_fill_f32(lay2.uniforms, lay2.shader, hc2, 4);
-        umbra_uniforms_fill_f32(lay2.uniforms, lay2.coverage, mat2, 11);
-        umbra_uniforms_fill_ptr(lay2.uniforms, (lay2.coverage + 44 + 7) & ~(size_t)7,
-            (struct umbra_buf){.ptr=tc.data, .sz=(size_t)(W * H * 2)});
+        umbra_draw_fill(&lay2, &shader2.base, &cov2.base);
         struct umbra_buf b2[] = {
             (struct umbra_buf){.ptr=lay2.uniforms, .sz=lay2.uni.size},
             {.ptr=px2, .sz=(size_t)(W * H * 4), .row_bytes=W * 4},

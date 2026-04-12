@@ -7,12 +7,12 @@ struct solid_state {
 
     float rx, ry, vx, vy;
     float rect_w, rect_h;
-    float color[4];
     int   w, h;
+    int   has_cov, :32;
 
-    umbra_shader_fn    shader;
-    umbra_coverage_fn  coverage;
-    umbra_blend_fn     blend;
+    struct umbra_shader_solid    shader;
+    struct umbra_coverage_rect   cov;
+    umbra_blend_fn               blend;
 
     struct umbra_fmt            fmt;
     struct umbra_draw_layout   lay;
@@ -48,8 +48,9 @@ static void solid_prepare(struct slide *s, struct umbra_backend *be, struct umbr
         st->fmt = fmt;
         umbra_basic_block_free(st->bb);
         free(st->lay.uniforms);
-        struct umbra_builder *b = umbra_draw_build(st->shader, st->coverage, st->blend, fmt,
-                                                    &st->lay);
+        struct umbra_builder *b = umbra_draw_build(&st->shader.base,
+                                                    st->has_cov ? &st->cov.base : NULL,
+                                                    st->blend, fmt, &st->lay);
         st->bb = umbra_basic_block(b);
         umbra_builder_free(b);
     }
@@ -61,9 +62,13 @@ static void solid_draw(struct slide *s, int frame, int l, int t, int r, int b, v
     struct solid_state *st = (struct solid_state *)s;
     float rx = bounce(st->rx, st->vx, frame, (float)st->w - st->rect_w);
     float ry = bounce(st->ry, st->vy, frame, (float)st->h - st->rect_h);
-    float rect[4] = { rx, ry, rx + st->rect_w, ry + st->rect_h };
-    umbra_uniforms_fill_f32(st->lay.uniforms, st->lay.shader, st->color, 4);
-    if (st->coverage) { umbra_uniforms_fill_f32(st->lay.uniforms, st->lay.coverage, rect, 4); }
+    if (st->has_cov) {
+        st->cov.rect[0] = rx;
+        st->cov.rect[1] = ry;
+        st->cov.rect[2] = rx + st->rect_w;
+        st->cov.rect[3] = ry + st->rect_h;
+    }
+    umbra_draw_fill(&st->lay, &st->shader.base, st->has_cov ? &st->cov.base : NULL);
     size_t pb = st->fmt.bpp;
     size_t plane_sz = (size_t)st->w * (size_t)st->h * pb;
     size_t rb = (size_t)st->w * pb;
@@ -76,7 +81,8 @@ static void solid_draw(struct slide *s, int frame, int l, int t, int r, int b, v
 
 static struct umbra_builder *solid_get_builder(struct slide *s, struct umbra_fmt fmt) {
     struct solid_state *st = (struct solid_state *)s;
-    return umbra_draw_build(st->shader, st->coverage, st->blend, fmt, NULL);
+    return umbra_draw_build(&st->shader.base, st->has_cov ? &st->cov.base : NULL,
+                            st->blend, fmt, NULL);
 }
 
 static void solid_free(struct slide *s) {
@@ -87,16 +93,16 @@ static void solid_free(struct slide *s) {
     free(st);
 }
 
-static struct slide *make_solid(char const *title, uint32_t bg, float const color[4],
-                                umbra_coverage_fn coverage, umbra_blend_fn blend) {
+static struct slide *make_solid(char const *title, float const bg[4], float const color[4],
+                                _Bool has_cov, umbra_blend_fn blend) {
     struct solid_state *st = calloc(1, sizeof *st);
-    st->shader = umbra_shader_solid;
-    st->coverage = coverage;
-    st->blend = blend;
-    for (int i = 0; i < 4; i++) { st->color[i] = color[i]; }
+    st->shader  = umbra_shader_solid(color);
+    st->has_cov = has_cov;
+    if (has_cov) { st->cov = umbra_coverage_rect((float[]){0, 0, 0, 0}); }
+    st->blend   = blend;
     st->base = (struct slide){
         .title = title,
-        .bg = bg,
+        .bg = {bg[0], bg[1], bg[2], bg[3]},
         .init = solid_init,
         .prepare = solid_prepare,
         .draw = solid_draw,
@@ -107,43 +113,42 @@ static struct slide *make_solid(char const *title, uint32_t bg, float const colo
 }
 
 SLIDE(slide_solid_src) {
-    (void)ctx;
-    return make_solid("Solid Fill (src)", 0xff202020,
+    return make_solid("Solid Fill (src)", (float[]){0.125f, 0.125f, 0.125f, 1},
                       (float[]){0.0f, 0.6f, 1.0f, 1.0f},
-                      umbra_coverage_rect, umbra_blend_src);
+                      1, umbra_blend_src);
 }
 
 SLIDE(slide_solid_srcover) {
-    (void)ctx;
-    return make_solid("Source Over (srcover)", 0xff00ff00,
+
+    return make_solid("Source Over (srcover)", (float[]){0, 1, 0, 1},
                       (float[]){0.45f, 0.0f, 0.0f, 0.5f},
-                      umbra_coverage_rect, umbra_blend_srcover);
+                      1, umbra_blend_srcover);
 }
 
 SLIDE(slide_solid_dstover) {
-    (void)ctx;
-    return make_solid("Destination Over (dstover)", 0xc0008000,
+
+    return make_solid("Destination Over (dstover)", (float[]){0, 0.5f, 0, 0.75f},
                       (float[]){0.0f, 0.0f, 0.9f, 0.9f},
-                      umbra_coverage_rect, umbra_blend_dstover);
+                      1, umbra_blend_dstover);
 }
 
 SLIDE(slide_solid_multiply) {
-    (void)ctx;
-    return make_solid("Multiply Blend", 0xff804020,
+
+    return make_solid("Multiply Blend", (float[]){0.125f, 0.25f, 0.5f, 1},
                       (float[]){1.0f, 0.5f, 0.0f, 1.0f},
-                      umbra_coverage_rect, umbra_blend_multiply);
+                      1, umbra_blend_multiply);
 }
 
 SLIDE(slide_solid_full_cov) {
-    (void)ctx;
-    return make_solid("Full Coverage (no rect clip)", 0xffffffff,
+
+    return make_solid("Full Coverage (no rect clip)", (float[]){1, 1, 1, 1},
                       (float[]){0.15f, 0.0f, 0.3f, 0.3f},
-                      NULL, umbra_blend_srcover);
+                      0, umbra_blend_srcover);
 }
 
 SLIDE(slide_solid_no_blend) {
-    (void)ctx;
-    return make_solid("No Blend (direct paint)", 0xff000000,
+
+    return make_solid("No Blend (direct paint)", (float[]){0, 0, 0, 1},
                       (float[]){0.9f, 0.4f, 0.1f, 1.0f},
-                      umbra_coverage_rect, NULL);
+                      1, NULL);
 }

@@ -7,6 +7,7 @@ struct anim_state {
 
     int   w, h;
 
+    struct umbra_shader_solid  shader;
     struct umbra_fmt           fmt;
     struct umbra_draw_layout   lay;
     struct umbra_basic_block  *bb;
@@ -25,7 +26,7 @@ static void anim_prepare(struct slide *s, struct umbra_backend *be, struct umbra
         st->fmt = fmt;
         umbra_basic_block_free(st->bb);
         free(st->lay.uniforms);
-        struct umbra_builder *b = umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
+        struct umbra_builder *b = umbra_draw_build(&st->shader.base, NULL, umbra_blend_src,
                                                     fmt, &st->lay);
         st->bb = umbra_basic_block(b);
         umbra_builder_free(b);
@@ -37,13 +38,11 @@ static void anim_prepare(struct slide *s, struct umbra_backend *be, struct umbra
 static void anim_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
     struct anim_state *st = (struct anim_state *)s;
     float ft = (float)frame * 0.016f;
-    float color[4] = {
-        0.5f + 0.5f * sinf(ft),
-        0.5f + 0.5f * sinf(ft + 2.094f),
-        0.5f + 0.5f * sinf(ft + 4.189f),
-        1.0f,
-    };
-    umbra_uniforms_fill_f32(st->lay.uniforms, st->lay.shader, color, 4);
+    st->shader.color[0] = 0.5f + 0.5f * sinf(ft);
+    st->shader.color[1] = 0.5f + 0.5f * sinf(ft + 2.094f);
+    st->shader.color[2] = 0.5f + 0.5f * sinf(ft + 4.189f);
+    st->shader.color[3] = 1.0f;
+    umbra_draw_fill(&st->lay, &st->shader.base, NULL);
     size_t pb = st->fmt.bpp;
     size_t plane_sz = (size_t)st->w * (size_t)st->h * pb;
     size_t rb = (size_t)st->w * pb;
@@ -55,8 +54,8 @@ static void anim_draw(struct slide *s, int frame, int l, int t, int r, int b, vo
 }
 
 static struct umbra_builder *anim_get_builder(struct slide *s, struct umbra_fmt fmt) {
-    (void)s;
-    return umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src, fmt, NULL);
+    struct anim_state *st = (struct anim_state *)s;
+    return umbra_draw_build(&st->shader.base, NULL, umbra_blend_src, fmt, NULL);
 }
 
 static void anim_free(struct slide *s) {
@@ -68,11 +67,11 @@ static void anim_free(struct slide *s) {
 }
 
 SLIDE(slide_anim_t) {
-    (void)ctx;
     struct anim_state *st = calloc(1, sizeof *st);
+    st->shader = umbra_shader_solid((float[]){0, 0, 0, 1});
     st->base = (struct slide){
         .title = "Animated (t in uniforms)",
-        .bg = 0xff000000,
+        .bg = {0, 0, 0, 1},
         .init = anim_init,
         .prepare = anim_prepare,
         .draw = anim_draw,

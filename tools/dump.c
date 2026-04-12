@@ -160,13 +160,7 @@ static void build_fill(struct umbra_backend *interp) {
 }
 
 static void fill_bg(struct slide *s, void *dst) {
-    float hc[4] = {
-        (float)( s->bg        & 0xffu) / 255.0f,
-        (float)((s->bg >>  8) & 0xffu) / 255.0f,
-        (float)((s->bg >> 16) & 0xffu) / 255.0f,
-        (float)((s->bg >> 24) & 0xffu) / 255.0f,
-    };
-    umbra_uniforms_fill_f32(fill_uniforms, 0, hc, 4);
+    umbra_uniforms_fill_f32(fill_uniforms, 0, s->bg, 4);
     size_t const rb = (size_t)RW * umbra_fmt_fp16_planar.bpp;
     struct umbra_buf buf[2] = {
         {.ptr = fill_uniforms, .sz = fill_uni.size},

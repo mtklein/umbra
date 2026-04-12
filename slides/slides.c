@@ -1,6 +1,5 @@
 #include "slide.h"
 #include "text.h"
-#include "slug.h"
 #include <math.h>
 #include <stdlib.h>
 
@@ -22,17 +21,9 @@ void slide_perspective_matrix(float out[11], float t, int sw, int sh, int bw, in
     out[9] = (float)bw; out[10] = (float)bh;
 }
 
-enum { LUT_N = 64, MAX_SLIDES = 32 };
+enum { MAX_SLIDES = 32 };
 
-struct slide *make_overview(struct slide_ctx const *);
-
-static struct text_cov    bitmap_cov, sdf_cov;
-static struct slug_curves slug;
-static float              linear_lut[LUT_N * 4];
-static float              radial_lut[LUT_N * 4];
-static float              linear_stops_planar[6 * 4];
-static float              linear_stops_pos[6];
-static struct slide_ctx   ctx;
+struct slide *make_overview(void);
 
 static slide_factory_fn registry[MAX_SLIDES];
 static int              registry_count;
@@ -49,28 +40,6 @@ void slide_register(slide_factory_fn factory) {
 int           slide_count(void) { return count; }
 struct slide *slide_get(int i)  { return all[i]; }
 
-static void build_luts(void) {
-    float const linear_colors[][4] = {
-        {1.2f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.8f, 0.0f, 1.0f}, {0.0f, 1.2f, 0.0f, 1.0f},
-        {0.0f, 0.8f, 1.2f, 1.0f}, {0.0f, 0.0f, 1.2f, 1.0f}, {0.8f, 0.0f, 1.0f, 1.0f},
-    };
-    umbra_gradient_lut_even(linear_lut, LUT_N, 6, linear_colors);
-    for (int i = 0; i < 6; i++) {
-        for (int c = 0; c < 4; c++) {
-            linear_stops_planar[c * 6 + i] = linear_colors[i][c];
-        }
-        linear_stops_pos[i] = (float)i / 5.0f;
-    }
-
-    float const radial_stops[][4] = {
-        {1.5f, 1.5f, 1.2f, 1.0f},
-        {1.2f, 0.8f, 0.0f, 1.0f},
-        {0.8f, 0.0f, 0.2f, 1.0f},
-        {0.05f, 0.0f, 0.15f, 1.0f},
-    };
-    umbra_gradient_lut_even(radial_lut, LUT_N, 4, radial_stops);
-}
-
 static void add_slide(struct slide *s, int w, int h) {
     all[count] = s;
     if (s->init) { s->init(s, w, h); }
@@ -78,35 +47,19 @@ static void add_slide(struct slide *s, int w, int h) {
 }
 
 void slides_init(int w, int h) {
-    float font = (float)h * 0.15f;
-    bitmap_cov = text_rasterize(w, h, font, 0);
-    sdf_cov    = text_rasterize(w, h, font, 1);
-    slug       = slug_extract("Slug", (float)h * 0.3125f);
-    build_luts();
-
-    ctx.bitmap_cov = &bitmap_cov;
-    ctx.sdf_cov    = &sdf_cov;
-    ctx.slug       = &slug;
-    ctx.linear_lut       = linear_lut;
-    ctx.radial_lut       = radial_lut;
-    ctx.lut_n            = LUT_N;
-    ctx.linear_stops     = linear_stops_planar;
-    ctx.linear_stops_pos = linear_stops_pos;
-    ctx.linear_n_stops   = 6;
+    text_shared_init(w, h, (float)h * 0.15f);
 
     count = 0;
     for (int i = 0; i < registry_count; i++) {
-        add_slide(registry[i](&ctx), w, h);
+        add_slide(registry[i](), w, h);
     }
-    add_slide(make_overview(&ctx), w, h);
+    add_slide(make_overview(), w, h);
 }
 
 void slides_cleanup(void) {
     for (int i = 0; i < count; i++) {
         if (all[i]->free) { all[i]->free(all[i]); }
     }
-    text_cov_free(&bitmap_cov);
-    text_cov_free(&sdf_cov);
-    slug_free(&slug);
+    text_shared_cleanup();
     count = 0;
 }

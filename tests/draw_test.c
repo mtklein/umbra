@@ -27,8 +27,9 @@ static void cleanup_draw(struct draw_backends *B) {
 }
 
 TEST(test_solid_src) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 1});
     struct umbra_draw_layout lay;
-    struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
+    struct draw_backends B = make_draw(umbra_draw_build(&shader.base, NULL, umbra_blend_src,
                                                  umbra_fmt_8888, &lay),
                                 lay);
 
@@ -39,8 +40,7 @@ TEST(test_solid_src) {
             0xFFFFFFFF,
             0xFFFFFFFF,
         };
-        float     color[4] = {1, 0, 0, 1};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -58,15 +58,15 @@ TEST(test_solid_src) {
 }
 
 TEST(test_solid_src_n1) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){0, 0, 1, 1});
     struct umbra_draw_layout lay;
-    struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
+    struct draw_backends B = make_draw(umbra_draw_build(&shader.base, NULL, umbra_blend_src,
                                                  umbra_fmt_8888, &lay),
                                 lay);
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[1] = {0xFFFFFFFF};
-        float     color[4] = {0, 0, 1, 1};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 1, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -82,16 +82,16 @@ TEST(test_solid_src_n1) {
 }
 
 TEST(test_solid_src_n9) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){0, 1, 0, 1});
     struct umbra_draw_layout lay;
-    struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
+    struct draw_backends B = make_draw(umbra_draw_build(&shader.base, NULL, umbra_blend_src,
                                                  umbra_fmt_8888, &lay),
                                 lay);
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[9];
         __builtin_memset(dst, 0xFF, sizeof dst);
-        float     color[4] = {0, 1, 0, 1};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 9, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -107,16 +107,16 @@ TEST(test_solid_src_n9) {
 }
 
 TEST(test_solid_src_n16) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 1, 1, 1});
     struct umbra_draw_layout lay;
-    struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
+    struct draw_backends B = make_draw(umbra_draw_build(&shader.base, NULL, umbra_blend_src,
                                                  umbra_fmt_8888, &lay),
                                 lay);
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[16];
         __builtin_memset(dst, 0, sizeof dst);
-        float     color[4] = {1, 1, 1, 1};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 16, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -129,16 +129,16 @@ TEST(test_solid_src_n16) {
 }
 
 TEST(test_srcover_8888) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){0, 0.5f, 0, 0.5f});
     struct umbra_draw_layout lay;
     struct draw_backends     B =
-        make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_srcover,
+        make_draw(umbra_draw_build(&shader.base, NULL, umbra_blend_srcover,
                                    umbra_fmt_8888, &lay),
                   lay);
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0xFFFFFFFF, 0xFFFFFFFF};
-        float     color[4] = {0, 0.5f, 0, 0.5f};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 2, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -160,16 +160,16 @@ TEST(test_srcover_8888) {
 }
 
 TEST(test_dstover_8888) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 1});
     struct umbra_draw_layout lay;
     struct draw_backends     B =
-        make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_dstover,
+        make_draw(umbra_draw_build(&shader.base, NULL, umbra_blend_dstover,
                                    umbra_fmt_8888, &lay),
                   lay);
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0xFFFFFFFF, 0xFFFFFFFF};
-        float     color[4] = {1, 0, 0, 1};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 2, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -182,16 +182,16 @@ TEST(test_dstover_8888) {
 }
 
 TEST(test_dstover_transparent) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 1});
     struct umbra_draw_layout lay;
     struct draw_backends     B =
-        make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_dstover,
+        make_draw(umbra_draw_build(&shader.base, NULL, umbra_blend_dstover,
                                    umbra_fmt_8888, &lay),
                   lay);
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0, 0};
-        float     color[4] = {1, 0, 0, 1};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 2, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -207,16 +207,16 @@ TEST(test_dstover_transparent) {
 }
 
 TEST(test_multiply_8888) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 1, 1, 1});
     struct umbra_draw_layout lay;
     struct draw_backends     B =
-        make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_multiply,
+        make_draw(umbra_draw_build(&shader.base, NULL, umbra_blend_multiply,
                                    umbra_fmt_8888, &lay),
                   lay);
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0xFF804020, 0xFF804020};
-        float     color[4] = {1, 1, 1, 1};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 2, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -238,16 +238,16 @@ TEST(test_multiply_8888) {
 }
 
 TEST(test_solid_src_fp16) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){0.25f, 0.5f, 0.75f, 1});
     struct umbra_draw_layout lay;
-    struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
+    struct draw_backends B = make_draw(umbra_draw_build(&shader.base, NULL, umbra_blend_src,
                                                  umbra_fmt_fp16, &lay),
                                 lay);
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __fp16 dst[4 * 3];
         __builtin_memset(dst, 0, sizeof dst);
-        float     color[4] = {0.25f, 0.5f, 0.75f, 1};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 3, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -265,9 +265,10 @@ TEST(test_solid_src_fp16) {
 }
 
 TEST(test_srcover_fp16) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){0, 0.5f, 0, 0.5f});
     struct umbra_draw_layout lay;
     struct draw_backends     B =
-        make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_srcover,
+        make_draw(umbra_draw_build(&shader.base, NULL, umbra_blend_srcover,
                                    umbra_fmt_fp16, &lay),
                   lay);
 
@@ -279,8 +280,7 @@ TEST(test_srcover_fp16) {
             dst[i * 4 + 2] = 1;
             dst[i * 4 + 3] = 1;
         }
-        float     color[4] = {0, 0.5f, 0, 0.5f};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 2, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -302,8 +302,10 @@ TEST(test_srcover_fp16) {
 }
 
 TEST(test_coverage_rect) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 1});
+    struct umbra_coverage_rect cov = umbra_coverage_rect((float[]){2.0f, 0.0f, 5.0f, 1.0f});
     struct umbra_draw_layout lay;
-    struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
+    struct draw_backends B = make_draw(umbra_draw_build(&shader.base, &cov.base,
                                                  umbra_blend_srcover,
                                                  umbra_fmt_8888, &lay),
                                 lay);
@@ -311,10 +313,7 @@ TEST(test_coverage_rect) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[8];
         __builtin_memset(dst, 0, sizeof dst);
-        float     color[4] = {1, 0, 0, 1};
-        float     rect[4] = {2.0f, 0.0f, 5.0f, 1.0f};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.coverage, rect, 4);
+        umbra_draw_fill(&B.lay, &shader.base, &cov.base);
         if (run_draw(&B, bi, 8, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -334,8 +333,10 @@ TEST(test_coverage_rect) {
 }
 
 TEST(test_coverage_rect_scalar) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 1});
+    struct umbra_coverage_rect cov = umbra_coverage_rect((float[]){1.0f, 0.0f, 3.0f, 1.0f});
     struct umbra_draw_layout lay;
-    struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
+    struct draw_backends B = make_draw(umbra_draw_build(&shader.base, &cov.base,
                                                  umbra_blend_srcover,
                                                  umbra_fmt_8888, &lay),
                                 lay);
@@ -343,10 +344,7 @@ TEST(test_coverage_rect_scalar) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[4];
         __builtin_memset(dst, 0, sizeof dst);
-        float     color[4] = {1, 0, 0, 1};
-        float     rect[4] = {1.0f, 0.0f, 3.0f, 1.0f};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.coverage, rect, 4);
+        umbra_draw_fill(&B.lay, &shader.base, &cov.base);
         if (run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -364,8 +362,10 @@ TEST(test_coverage_rect_scalar) {
 }
 
 TEST(test_coverage_rect_n9) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){0, 1, 0, 1});
+    struct umbra_coverage_rect cov = umbra_coverage_rect((float[]){3.0f, 0.0f, 7.0f, 1.0f});
     struct umbra_draw_layout lay;
-    struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
+    struct draw_backends B = make_draw(umbra_draw_build(&shader.base, &cov.base,
                                                  umbra_blend_srcover,
                                                  umbra_fmt_8888, &lay),
                                 lay);
@@ -373,10 +373,7 @@ TEST(test_coverage_rect_n9) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[9];
         __builtin_memset(dst, 0, sizeof dst);
-        float     color[4] = {0, 1, 0, 1};
-        float     rect[4] = {3.0f, 0.0f, 7.0f, 1.0f};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.coverage, rect, 4);
+        umbra_draw_fill(&B.lay, &shader.base, &cov.base);
         if (run_draw(&B, bi, 9, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -395,8 +392,10 @@ TEST(test_coverage_rect_n9) {
 }
 
 TEST(test_coverage_rect_offset) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){0, 1, 0, 1});
+    struct umbra_coverage_rect cov = umbra_coverage_rect((float[]){1.0f, 0.0f, 3.0f, 10.0f});
     struct umbra_draw_layout lay;
-    struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
+    struct draw_backends B = make_draw(umbra_draw_build(&shader.base, &cov.base,
                                                  umbra_blend_src,
                                                  umbra_fmt_8888, &lay),
                                 lay);
@@ -404,10 +403,7 @@ TEST(test_coverage_rect_offset) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[4];
         __builtin_memset(dst, 0, sizeof dst);
-        float color[4] = {0, 1, 0, 1};
-        float rect[4] = {1.0f, 0.0f, 3.0f, 10.0f};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.coverage, rect, 4);
+        umbra_draw_fill(&B.lay, &shader.base, &cov.base);
         if (run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -423,8 +419,10 @@ TEST(test_coverage_rect_offset) {
 }
 
 TEST(test_coverage_rect_outside_y) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 1, 1, 1});
+    struct umbra_coverage_rect cov = umbra_coverage_rect((float[]){0.0f, 5.0f, 10.0f, 10.0f});
     struct umbra_draw_layout lay;
-    struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
+    struct draw_backends B = make_draw(umbra_draw_build(&shader.base, &cov.base,
                                                  umbra_blend_srcover,
                                                  umbra_fmt_8888, &lay),
                                 lay);
@@ -436,10 +434,7 @@ TEST(test_coverage_rect_outside_y) {
             0x12345678,
             0x12345678,
         };
-        float     color[4] = {1, 1, 1, 1};
-        float     rect[4] = {0.0f, 5.0f, 10.0f, 10.0f};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.coverage, rect, 4);
+        umbra_draw_fill(&B.lay, &shader.base, &cov.base);
         if (run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -464,6 +459,7 @@ TEST(test_no_shader) {
             0xFFFFFFFF,
             0xFFFFFFFF,
         };
+        umbra_draw_fill(&B.lay, NULL, NULL);
         if (run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -476,15 +472,15 @@ TEST(test_no_shader) {
 }
 
 TEST(test_no_blend) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 1, 1});
     struct umbra_draw_layout lay;
-    struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, NULL,
+    struct draw_backends B = make_draw(umbra_draw_build(&shader.base, NULL, NULL,
                                                  umbra_fmt_8888, &lay),
                                 lay);
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0, 0};
-        float     color[4] = {1, 0, 1, 1};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 2, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -501,26 +497,48 @@ TEST(test_no_blend) {
     cleanup_draw(&B);
 }
 
-static umbra_color gradient_shader(struct umbra_builder *builder, struct umbra_uniforms_layout *u, umbra_val32 x, umbra_val32 y) {
+struct test_gradient_shader {
+    struct umbra_shader base;
+    float  params[2];
+    size_t off_;
+};
+
+static umbra_color test_gradient_build(struct umbra_shader *s, struct umbra_builder *builder,
+                                       struct umbra_uniforms_layout *u,
+                                       umbra_val32 x, umbra_val32 y) {
+    struct test_gradient_shader *self = (struct test_gradient_shader *)s;
     (void)y;
-    size_t fi = umbra_uniforms_reserve_f32(u, 2);
-    umbra_val32 w = umbra_uniform_32(builder, (umbra_ptr32){0}, fi);
-    umbra_val32 a = umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 4);
+    self->off_ = umbra_uniforms_reserve_f32(u, 2);
+    umbra_val32 w = umbra_uniform_32(builder, (umbra_ptr32){0}, self->off_);
+    umbra_val32 a = umbra_uniform_32(builder, (umbra_ptr32){0}, self->off_ + 4);
     umbra_val32 t = umbra_div_f32(builder, x, w);
     umbra_val32 zero = umbra_imm_i32(builder, 0);
     return (umbra_color){t, zero, zero, a};
 }
 
+static void test_gradient_fill(struct umbra_shader const *s, void *uniforms) {
+    struct test_gradient_shader const *self = (struct test_gradient_shader const *)s;
+    umbra_uniforms_fill_f32(uniforms, self->off_, self->params, 2);
+}
+
+static struct test_gradient_shader make_test_gradient(float const params[2]) {
+    struct test_gradient_shader s = {
+        .base = {.build = test_gradient_build, .fill = test_gradient_fill},
+    };
+    __builtin_memcpy(s.params, params, 8);
+    return s;
+}
+
 TEST(test_gradient_shader) {
+    struct test_gradient_shader shader = make_test_gradient((float[]){4.0f, 1.0f});
     struct umbra_draw_layout lay;
-    struct draw_backends B = make_draw(umbra_draw_build(gradient_shader, NULL, umbra_blend_src,
+    struct draw_backends B = make_draw(umbra_draw_build(&shader.base, NULL, umbra_blend_src,
                                                  umbra_fmt_8888, &lay),
                                 lay);
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[4] = {0};
-        float     params[2] = {4.0f, 1.0f};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, params, 2);
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -537,16 +555,16 @@ TEST(test_gradient_shader) {
 }
 
 TEST(test_multiply_half_alpha) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 0.5f});
     struct umbra_draw_layout lay;
     struct draw_backends     B =
-        make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_multiply,
+        make_draw(umbra_draw_build(&shader.base, NULL, umbra_blend_multiply,
                                    umbra_fmt_8888, &lay),
                   lay);
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0x80FF0000, 0x80FF0000};
-        float     color[4] = {1, 0, 0, 0.5f};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 2, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -568,17 +586,17 @@ TEST(test_multiply_half_alpha) {
 }
 
 TEST(test_srcover_8888_n9) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 0.5f});
     struct umbra_draw_layout lay;
     struct draw_backends     B =
-        make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_srcover,
+        make_draw(umbra_draw_build(&shader.base, NULL, umbra_blend_srcover,
                                    umbra_fmt_8888, &lay),
                   lay);
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[9];
         __builtin_memset(dst, 0, sizeof dst);
-        float     color[4] = {1, 0, 0, 0.5f};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 9, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -596,8 +614,10 @@ TEST(test_srcover_8888_n9) {
 }
 
 TEST(test_full_pipeline) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 1});
+    struct umbra_coverage_rect cov = umbra_coverage_rect((float[]){2.0f, 0.0f, 7.0f, 1.0f});
     struct umbra_draw_layout lay;
-    struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
+    struct draw_backends B = make_draw(umbra_draw_build(&shader.base, &cov.base,
                                                  umbra_blend_srcover,
                                                  umbra_fmt_8888, &lay),
                                 lay);
@@ -605,10 +625,7 @@ TEST(test_full_pipeline) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[9];
         __builtin_memset(dst, 0, sizeof dst);
-        float     color[4] = {1, 0, 0, 1};
-        float     rect[4] = {2.0f, 0.0f, 7.0f, 1.0f};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.coverage, rect, 4);
+        umbra_draw_fill(&B.lay, &shader.base, &cov.base);
         if (run_draw(&B, bi, 9, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -634,16 +651,16 @@ TEST(test_full_pipeline) {
 }
 
 TEST(test_solid_src_fp16_n9) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){0.125f, 0.25f, 0.5f, 1});
     struct umbra_draw_layout lay;
-    struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
+    struct draw_backends B = make_draw(umbra_draw_build(&shader.base, NULL, umbra_blend_src,
                                                  umbra_fmt_fp16, &lay),
                                 lay);
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __fp16 dst[4 * 9];
         __builtin_memset(dst, 0, sizeof dst);
-        float     color[4] = {0.125f, 0.25f, 0.5f, 1};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 9, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -661,8 +678,10 @@ TEST(test_solid_src_fp16_n9) {
 }
 
 TEST(test_coverage_rect_white_dst) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 1});
+    struct umbra_coverage_rect cov = umbra_coverage_rect((float[]){0, 0, 0, 0});
     struct umbra_draw_layout lay;
-    struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_rect,
+    struct draw_backends B = make_draw(umbra_draw_build(&shader.base, &cov.base,
                                                  umbra_blend_srcover,
                                                  umbra_fmt_8888, &lay),
                                 lay);
@@ -683,15 +702,9 @@ TEST(test_coverage_rect_white_dst) {
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             uint32_t dst[24];
             __builtin_memset(dst, 0xFF, (size_t)rc.n * 4);
-            float color[4] = {1, 0, 0, 1};
-            float rect[4] = {
-                rc.x0,
-                0.0f,
-                rc.x1,
-                1.0f,
-            };
-            umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
-            umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.coverage, rect, 4);
+            __builtin_memcpy(shader.color, (float[]){1, 0, 0, 1}, 16);
+            __builtin_memcpy(cov.rect, (float[]){rc.x0, 0.0f, rc.x1, 1.0f}, 16);
+            umbra_draw_fill(&B.lay, &shader.base, &cov.base);
             if (run_draw(&B, bi, rc.n, 1,
                           (struct umbra_buf[]){
                               (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -712,8 +725,12 @@ TEST(test_coverage_rect_white_dst) {
 }
 
 TEST(test_coverage_bitmap) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 1, 1, 1});
+    uint16_t cov_data[8] = {0, 128, 255, 0, 0, 0, 0, 0};
+    struct umbra_coverage_bitmap cov =
+        umbra_coverage_bitmap((struct umbra_buf){.ptr=cov_data, .sz=sizeof cov_data});
     struct umbra_draw_layout lay;
-    struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_bitmap,
+    struct draw_backends B = make_draw(umbra_draw_build(&shader.base, &cov.base,
                                                  umbra_blend_srcover,
                                                  umbra_fmt_8888, &lay),
                                 lay);
@@ -721,10 +738,7 @@ TEST(test_coverage_bitmap) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[8];
         __builtin_memset(dst, 0, sizeof dst);
-        float     color[4] = {1, 1, 1, 1};
-        uint16_t  cov[8] = {0, 128, 255, 0, 0, 0, 0, 0};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
-        umbra_uniforms_fill_ptr(B.lay.uniforms, B.lay.coverage, (struct umbra_buf){.ptr=cov, .sz=sizeof cov});
+        umbra_draw_fill(&B.lay, &shader.base, &cov.base);
         if (run_draw(&B, bi, 8, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -740,8 +754,12 @@ TEST(test_coverage_bitmap) {
 }
 
 TEST(test_coverage_sdf) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 1, 1, 1});
+    uint16_t cov_data[8] = {0, 100, 128, 200, 255, 0, 0, 0};
+    struct umbra_coverage_sdf cov =
+        umbra_coverage_sdf((struct umbra_buf){.ptr=cov_data, .sz=sizeof cov_data});
     struct umbra_draw_layout lay;
-    struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_sdf,
+    struct draw_backends B = make_draw(umbra_draw_build(&shader.base, &cov.base,
                                                  umbra_blend_srcover,
                                                  umbra_fmt_8888, &lay),
                                 lay);
@@ -749,10 +767,7 @@ TEST(test_coverage_sdf) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[8];
         __builtin_memset(dst, 0, sizeof dst);
-        float     color[4] = {1, 1, 1, 1};
-        uint16_t  cov[8] = {0, 100, 128, 200, 255, 0, 0, 0};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
-        umbra_uniforms_fill_ptr(B.lay.uniforms, B.lay.coverage, (struct umbra_buf){.ptr=cov, .sz=sizeof cov});
+        umbra_draw_fill(&B.lay, &shader.base, &cov.base);
         if (run_draw(&B, bi, 8, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -766,24 +781,21 @@ TEST(test_coverage_sdf) {
 }
 
 TEST(test_coverage_bitmap_matrix) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 1, 1, 1});
+    uint16_t bmp[8] = {0, 0, 255, 0, 0, 0, 0, 0};
+    float    mat[11] = {1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1};
+    struct umbra_coverage_bitmap_matrix cov =
+        umbra_coverage_bitmap_matrix(mat, (struct umbra_buf){.ptr=bmp, .sz=sizeof bmp});
     struct umbra_draw_layout lay;
     struct draw_backends     B =
-        make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_bitmap_matrix,
+        make_draw(umbra_draw_build(&shader.base, &cov.base,
                                    umbra_blend_srcover, umbra_fmt_8888, &lay),
                   lay);
 
-    size_t ptr_off = (B.lay.coverage + 11 * 4 + 7) & ~(size_t)7;
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[8];
         __builtin_memset(dst, 0, sizeof dst);
-        float    color[4] = {1, 1, 1, 1};
-        uint16_t bmp[8] = {0, 0, 255, 0, 0, 0, 0, 0};
-        float    mat[11] = {
-            1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1,
-        };
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.coverage, mat, 11);
-        umbra_uniforms_fill_ptr(B.lay.uniforms, ptr_off, (struct umbra_buf){.ptr=bmp, .sz=sizeof bmp});
+        umbra_draw_fill(&B.lay, &shader.base, &cov.base);
         if (run_draw(&B, bi, 8, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -798,24 +810,21 @@ TEST(test_coverage_bitmap_matrix) {
 }
 
 TEST(test_coverage_bitmap_matrix_oob) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 1, 1, 1});
+    uint16_t bmp[4] = {255, 0, 0, 0};
+    float    mat[11] = {1, 0, 0, 0, 1, 0, 0.001f, 0, 1, 2, 2};
+    struct umbra_coverage_bitmap_matrix cov =
+        umbra_coverage_bitmap_matrix(mat, (struct umbra_buf){.ptr=bmp, .sz=sizeof bmp});
     struct umbra_draw_layout lay;
     struct draw_backends     B =
-        make_draw(umbra_draw_build(umbra_shader_solid, umbra_coverage_bitmap_matrix,
+        make_draw(umbra_draw_build(&shader.base, &cov.base,
                                    umbra_blend_srcover, umbra_fmt_8888, &lay),
                   lay);
 
-    size_t ptr_off = (B.lay.coverage + 11 * 4 + 7) & ~(size_t)7;
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[8];
         __builtin_memset(dst, 0, sizeof dst);
-        float    color[4] = {1, 1, 1, 1};
-        uint16_t bmp[4] = {255, 0, 0, 0};
-        float    mat[11] = {
-            1, 0, 0, 0, 1, 0, 0.001f, 0, 1, 2, 2,
-        };
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.coverage, mat, 11);
-        umbra_uniforms_fill_ptr(B.lay.uniforms, ptr_off, (struct umbra_buf){.ptr=bmp, .sz=sizeof bmp});
+        umbra_draw_fill(&B.lay, &shader.base, &cov.base);
         if (run_draw(&B, bi, 8, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -828,18 +837,18 @@ TEST(test_coverage_bitmap_matrix_oob) {
 }
 
 TEST(test_linear_2) {
+    struct umbra_shader_linear_2 shader =
+        umbra_shader_linear_2((float[]){0.25f, 0, 0},
+                              (float[]){1, 0, 0, 1, 0, 0, 1, 1});
     struct umbra_draw_layout lay;
     struct draw_backends     B =
-        make_draw(umbra_draw_build(umbra_shader_linear_2, NULL, umbra_blend_src,
+        make_draw(umbra_draw_build(&shader.base, NULL, umbra_blend_src,
                                    umbra_fmt_8888, &lay),
                   lay);
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[4] = {0};
-        float     colors[8] = {1, 0, 0, 1, 0, 0, 1, 1};
-        float     params[3] = {0.25f, 0, 0};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, params, 3);
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader + 12, colors, 8);
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -856,18 +865,18 @@ TEST(test_linear_2) {
 }
 
 TEST(test_radial_2) {
+    struct umbra_shader_radial_2 shader =
+        umbra_shader_radial_2((float[]){0, 0, 0.1f},
+                              (float[]){1, 1, 1, 1, 0, 0, 0, 1});
     struct umbra_draw_layout lay;
     struct draw_backends     B =
-        make_draw(umbra_draw_build(umbra_shader_radial_2, NULL, umbra_blend_src,
+        make_draw(umbra_draw_build(&shader.base, NULL, umbra_blend_src,
                                    umbra_fmt_8888, &lay),
                   lay);
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[1] = {0};
-        float     colors[8] = {1, 1, 1, 1, 0, 0, 0, 1};
-        float     params[3] = {0, 0, 0.1f};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, params, 3);
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader + 12, colors, 8);
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 1, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -889,18 +898,18 @@ TEST(test_linear_grad) {
     float lut[256 * 4];
     umbra_gradient_lut_even(lut, 256, 3, stop_colors);
 
+    struct umbra_shader_linear_grad shader =
+        umbra_shader_linear_grad((float[]){0.125f, 0, 0, 256},
+                                 (struct umbra_buf){.ptr=lut, .sz=sizeof lut});
     struct umbra_draw_layout lay;
     struct draw_backends     B =
-        make_draw(umbra_draw_build(umbra_shader_linear_grad, NULL, umbra_blend_src,
+        make_draw(umbra_draw_build(&shader.base, NULL, umbra_blend_src,
                                    umbra_fmt_8888, &lay),
                   lay);
 
-    size_t lut_off = (B.lay.shader + 16 + 7) & ~(size_t)7;
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[8] = {0};
-        float     params[4] = {0.125f, 0, 0, 256};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, params, 4);
-        umbra_uniforms_fill_ptr(B.lay.uniforms, lut_off, (struct umbra_buf){.ptr=lut, .sz=sizeof lut});
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 8, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -924,18 +933,18 @@ TEST(test_radial_grad) {
     float lut[64 * 4];
     umbra_gradient_lut_even(lut, 64, 4, stop_colors);
 
+    struct umbra_shader_radial_grad shader =
+        umbra_shader_radial_grad((float[]){0, 0, 0.1f, 64},
+                                 (struct umbra_buf){.ptr=lut, .sz=sizeof lut});
     struct umbra_draw_layout lay;
     struct draw_backends     B =
-        make_draw(umbra_draw_build(umbra_shader_radial_grad, NULL, umbra_blend_src,
+        make_draw(umbra_draw_build(&shader.base, NULL, umbra_blend_src,
                                    umbra_fmt_8888, &lay),
                   lay);
 
-    size_t lut_off = (B.lay.shader + 16 + 7) & ~(size_t)7;
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[1] = {0};
-        float     params[4] = {0, 0, 0.1f, 64};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, params, 4);
-        umbra_uniforms_fill_ptr(B.lay.uniforms, lut_off, (struct umbra_buf){.ptr=lut, .sz=sizeof lut});
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 1, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -958,18 +967,18 @@ TEST(test_gradient_lut_nonuniform) {
     float lut[64 * 4];
     umbra_gradient_lut(lut, 64, 3, positions, stop_colors);
 
+    struct umbra_shader_linear_grad shader =
+        umbra_shader_linear_grad((float[]){0.125f, 0, 0, 64},
+                                 (struct umbra_buf){.ptr=lut, .sz=sizeof lut});
     struct umbra_draw_layout lay;
     struct draw_backends     B =
-        make_draw(umbra_draw_build(umbra_shader_linear_grad, NULL, umbra_blend_src,
+        make_draw(umbra_draw_build(&shader.base, NULL, umbra_blend_src,
                                    umbra_fmt_8888, &lay),
                   lay);
 
-    size_t lut_off = (B.lay.shader + 16 + 7) & ~(size_t)7;
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[8] = {0};
-        float     params[4] = {0.125f, 0, 0, 64};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, params, 4);
-        umbra_uniforms_fill_ptr(B.lay.uniforms, lut_off, (struct umbra_buf){.ptr=lut, .sz=sizeof lut});
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 8, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -987,23 +996,18 @@ TEST(test_linear_stops) {
     float colors_planar[3 * 4] = {1,0,0, 0,1,0, 0,0,1, 1,1,1};
     float pos[3] = {0.0f, 0.5f, 1.0f};
 
+    struct umbra_shader_linear_stops shader =
+        umbra_shader_linear_stops((float[]){0.25f, 0, 0, 3},
+                                  (struct umbra_buf){.ptr=colors_planar, .sz=sizeof colors_planar},
+                                  (struct umbra_buf){.ptr=pos, .sz=sizeof pos});
     struct umbra_draw_layout lay;
     struct draw_backends B =
-        make_draw(umbra_draw_build(umbra_shader_linear_stops, NULL,
+        make_draw(umbra_draw_build(&shader.base, NULL,
                                    umbra_blend_src, umbra_fmt_8888, &lay), lay);
-
-    size_t const sh = B.lay.shader;
-    size_t const colors_off = (sh + 16 + 7) & ~(size_t)7;
-    size_t const pos_off    = (colors_off + 24 + 7) & ~(size_t)7;
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[5] = {0};
-        float params[4] = {0.25f, 0, 0, 3};
-        umbra_uniforms_fill_f32(B.lay.uniforms, sh, params, 4);
-        umbra_uniforms_fill_ptr(B.lay.uniforms, colors_off,
-                                (struct umbra_buf){.ptr=colors_planar, .sz=sizeof colors_planar});
-        umbra_uniforms_fill_ptr(B.lay.uniforms, pos_off,
-                                (struct umbra_buf){.ptr=pos, .sz=sizeof pos});
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 5, 1, (struct umbra_buf[]){
                 {.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
                 {.ptr=dst, .sz=sizeof dst, .row_bytes=sizeof dst},
@@ -1022,25 +1026,20 @@ TEST(test_linear_stops_fp16_planar) {
     float colors_planar[3 * 4] = {1,0,0, 0,1,0, 0,0,1, 1,1,1};
     float pos[3] = {0.0f, 0.5f, 1.0f};
 
+    struct umbra_shader_linear_stops shader =
+        umbra_shader_linear_stops((float[]){0.125f, 0, 0, 3},
+                                  (struct umbra_buf){.ptr=colors_planar, .sz=sizeof colors_planar},
+                                  (struct umbra_buf){.ptr=pos, .sz=sizeof pos});
     struct umbra_draw_layout lay;
     struct draw_backends B =
-        make_draw(umbra_draw_build(umbra_shader_linear_stops, NULL,
+        make_draw(umbra_draw_build(&shader.base, NULL,
                                    NULL, umbra_fmt_fp16_planar, &lay), lay);
-
-    size_t const sh = B.lay.shader;
-    size_t const colors_off = (sh + 16 + 7) & ~(size_t)7;
-    size_t const pos_off    = (colors_off + 24 + 7) & ~(size_t)7;
 
     enum { W = 8, HP = 1 };
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint16_t dst[W * HP * 4];
         __builtin_memset(dst, 0, sizeof dst);
-        float params[4] = {0.125f, 0, 0, 3};
-        umbra_uniforms_fill_f32(B.lay.uniforms, sh, params, 4);
-        umbra_uniforms_fill_ptr(B.lay.uniforms, colors_off,
-                                (struct umbra_buf){.ptr=colors_planar, .sz=sizeof colors_planar});
-        umbra_uniforms_fill_ptr(B.lay.uniforms, pos_off,
-                                (struct umbra_buf){.ptr=pos, .sz=sizeof pos});
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
         size_t const plane = (size_t)(W * HP) * 2;
         if (run_draw(&B, bi, W, HP, (struct umbra_buf[]){
                 {.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -1055,25 +1054,17 @@ TEST(test_linear_stops_fp16_planar) {
     cleanup_draw(&B);
 }
 
-static umbra_shader_fn ss_inner_;
-static int             ss_n_;
-static umbra_color ss_shader_(struct umbra_builder *builder, struct umbra_uniforms_layout *u, umbra_val32 x, umbra_val32 y) {
-    (void)u;
-    return umbra_supersample(builder, u, x, y, ss_inner_, ss_n_);
-}
-
 TEST(test_supersample) {
-    ss_inner_ = umbra_shader_solid;
-    ss_n_ = 4;
+    struct umbra_shader_solid inner = umbra_shader_solid((float[]){1, 0, 0, 1});
+    struct umbra_shader_supersample shader = umbra_shader_supersample(&inner.base, 4);
     struct umbra_draw_layout lay;
-    struct draw_backends B = make_draw(umbra_draw_build(ss_shader_, NULL, umbra_blend_src,
+    struct draw_backends B = make_draw(umbra_draw_build(&shader.base, NULL, umbra_blend_src,
                                                  umbra_fmt_8888, &lay),
                                 lay);
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[4] = {0};
-        float     color[4] = {1, 0, 0, 1};
-        umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
                           (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
@@ -1097,9 +1088,9 @@ TEST(test_page_aligned_buffer) {
 #if defined(__wasm__)
     return;
 #else
-    // Test Metal zero-copy path (page-aligned) and copy path (offset by 4).
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){0, 1, 0, 1});
     struct umbra_draw_layout lay;
-    struct draw_backends B = make_draw(umbra_draw_build(umbra_shader_solid, NULL, umbra_blend_src,
+    struct draw_backends B = make_draw(umbra_draw_build(&shader.base, NULL, umbra_blend_src,
                                                  umbra_fmt_8888, &lay),
                                 lay);
     enum { N = 64 };
@@ -1113,8 +1104,7 @@ TEST(test_page_aligned_buffer) {
     uint32_t *offset = (uint32_t *)((char *)page + 4);
 #pragma clang diagnostic pop
 
-    float     color[4] = {0, 1, 0, 1};
-    umbra_uniforms_fill_f32(B.lay.uniforms, B.lay.shader, color, 4);
+    umbra_draw_fill(&B.lay, &shader.base, NULL);
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(aligned, 0, N * 4);
@@ -1205,22 +1195,21 @@ TEST(test_fp16_planar_round_trip) {
 }
 
 TEST(test_solid_src_565) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 1});
     struct umbra_draw_layout lay;
-    struct umbra_builder *b = umbra_draw_build(umbra_shader_solid, NULL,
+    struct umbra_builder *b = umbra_draw_build(&shader.base, NULL,
                                                 umbra_blend_src, umbra_fmt_565, &lay);
     struct umbra_basic_block *bb = umbra_basic_block(b);
     umbra_builder_free(b);
     struct test_backends B = test_backends_make(bb);
     umbra_basic_block_free(bb);
-    float red[4] = {1, 0, 0, 1};
-    umbra_uniforms_fill_f32(lay.uniforms, lay.shader, red, 4);
+    umbra_draw_fill(&lay, &shader.base, NULL);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint16_t dst[4] = {0};
         if (!test_backends_run(&B, bi, 4, 1, (struct umbra_buf[]){
             {.ptr=lay.uniforms, .sz=lay.uni.size},
             {.ptr=dst, .sz=sizeof dst},
         })) { continue; }
-        // 565 red = R=31, G=0, B=0 → 0xF800
         for (int i = 0; i < 4; i++) { dst[i] == 0xF800 here; }
     }
     test_backends_free(&B);
@@ -1228,22 +1217,21 @@ TEST(test_solid_src_565) {
 }
 
 TEST(test_solid_src_1010102) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){0, 1, 0, 1});
     struct umbra_draw_layout lay;
-    struct umbra_builder *b = umbra_draw_build(umbra_shader_solid, NULL,
+    struct umbra_builder *b = umbra_draw_build(&shader.base, NULL,
                                                 umbra_blend_src, umbra_fmt_1010102, &lay);
     struct umbra_basic_block *bb = umbra_basic_block(b);
     umbra_builder_free(b);
     struct test_backends B = test_backends_make(bb);
     umbra_basic_block_free(bb);
-    float green[4] = {0, 1, 0, 1};
-    umbra_uniforms_fill_f32(lay.uniforms, lay.shader, green, 4);
+    umbra_draw_fill(&lay, &shader.base, NULL);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[4] = {0};
         if (!test_backends_run(&B, bi, 4, 1, (struct umbra_buf[]){
             {.ptr=lay.uniforms, .sz=lay.uni.size},
             {.ptr=dst, .sz=sizeof dst},
         })) { continue; }
-        // 1010102 green = R=0, G=1023, B=0, A=3 → (1023<<10)|(3<<30)
         uint32_t expect = (1023u << 10) | (3u << 30);
         for (int i = 0; i < 4; i++) { dst[i] == expect here; }
     }
@@ -1252,15 +1240,15 @@ TEST(test_solid_src_1010102) {
 }
 
 TEST(test_solid_src_fp16_planar) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){0, 0, 1, 1});
     struct umbra_draw_layout lay;
-    struct umbra_builder *b = umbra_draw_build(umbra_shader_solid, NULL,
+    struct umbra_builder *b = umbra_draw_build(&shader.base, NULL,
                                                 umbra_blend_src, umbra_fmt_fp16_planar, &lay);
     struct umbra_basic_block *bb = umbra_basic_block(b);
     umbra_builder_free(b);
     struct test_backends B = test_backends_make(bb);
     umbra_basic_block_free(bb);
-    float blue[4] = {0, 0, 1, 1};
-    umbra_uniforms_fill_f32(lay.uniforms, lay.shader, blue, 4);
+    umbra_draw_fill(&lay, &shader.base, NULL);
     enum { WFP = 4 };
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __fp16 dst[WFP * 4];
@@ -1270,13 +1258,12 @@ TEST(test_solid_src_fp16_planar) {
             {.ptr=dst, .sz=sizeof dst, .row_bytes=WFP*2},
         })) { continue; }
         for (int i = 0; i < WFP; i++) {
-            equiv((float)dst[i + WFP*0], 0.0f) here;  // R
-            equiv((float)dst[i + WFP*1], 0.0f) here;  // G
-            equiv((float)dst[i + WFP*2], 1.0f) here;  // B
-            equiv((float)dst[i + WFP*3], 1.0f) here;  // A
+            equiv((float)dst[i + WFP*0], 0.0f) here;
+            equiv((float)dst[i + WFP*1], 0.0f) here;
+            equiv((float)dst[i + WFP*2], 1.0f) here;
+            equiv((float)dst[i + WFP*3], 1.0f) here;
         }
     }
     test_backends_free(&B);
     free(lay.uniforms);
 }
-

@@ -70,8 +70,15 @@ static void render_thumbnails(struct overview_state *st) {
         }
 
         struct slide *sub = slide_get(idx);
+        float const *c = sub->bg;
+        int ri = (int)(c[0] * 255.0f + 0.5f),
+            gi = (int)(c[1] * 255.0f + 0.5f),
+            bi = (int)(c[2] * 255.0f + 0.5f),
+            ai = (int)(c[3] * 255.0f + 0.5f);
+        uint32_t bg32 = (uint32_t)ri | ((uint32_t)gi << 8)
+                       | ((uint32_t)bi << 16) | ((uint32_t)ai << 24);
         for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) { st->tmp[y * w + x] = sub->bg; }
+            for (int x = 0; x < w; x++) { st->tmp[y * w + x] = bg32; }
         }
         if (sub->prepare) { sub->prepare(sub, st->be, st->fmt); }
         sub->draw(sub, 0, 0, 0, w, h, st->tmp);
@@ -139,15 +146,14 @@ static void overview_free(struct slide *s) {
     free(st);
 }
 
-struct slide *make_overview(struct slide_ctx const *);
+struct slide *make_overview(void);
 
-struct slide *make_overview(struct slide_ctx const *ctx) {
-    (void)ctx;
+struct slide *make_overview(void) {
     struct overview_state *st = calloc(1, sizeof *st);
     st->fmt = umbra_fmt_8888;
     st->base = (struct slide){
         .title = "Overview",
-        .bg = 0xff101010,
+        .bg = {0.06f, 0.06f, 0.06f, 1},
         .init = overview_init,
         .prepare = overview_prepare,
         .draw = overview_draw,
