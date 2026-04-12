@@ -997,7 +997,7 @@ TEST(test_linear_stops) {
     size_t const pos_off    = (colors_off + 24 + 7) & ~(size_t)7;
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-        if (bi == 1) { continue; }
+        if (bi == 1) { continue; } // TODO: JIT RA doesn't preserve pre-loop values across loop back-edge
         uint32_t dst[5] = {0};
         float params[4] = {0.25f, 0, 0, 3};
         umbra_uniforms_fill_f32(B.lay.uniforms, sh, params, 4);
