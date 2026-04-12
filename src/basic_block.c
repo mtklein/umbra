@@ -9,8 +9,8 @@ struct sched {
     int last_use, n_deps, n_users, user_off, ready_idx;
 };
 
-static _Bool is_body(struct bb_inst const *inst) {
-    return inst->live && inst->varying;
+static _Bool is_body(struct bb_inst const *inst, int i, int lo, int hi) {
+    return inst->live && inst->varying && i >= lo && i < hi;
 }
 
 static int sched_score(struct bb_inst const *in, struct sched const *meta, int c, int live) {
@@ -27,17 +27,18 @@ static int sched_score(struct bb_inst const *in, struct sched const *meta, int c
     return (kills - defines)*live - last_use;
 }
 
-static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int preamble, int live) {
+static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int at, int live,
+                     int region_lo, int region_hi) {
     struct sched *meta = calloc((size_t)(n + 1), sizeof *meta);
 
     for (int i = 0; i < n; i++) {
         meta[i].last_use = -1;
-        if (is_body(in + i)) {
+        if (is_body(in + i, i, region_lo, region_hi)) {
             int const deps[] = {in[i].x.id, in[i].y.id, in[i].z.id, in[i].w.id};
             for (int k = 0; k < 4; k++) {
                 int const d = deps[k];
                 meta[d].last_use = i;
-                if (is_body(in + d)) {
+                if (is_body(in + d, d, region_lo, region_hi)) {
                     meta[i].n_deps++;
                     meta[d].n_users++;
                 }
@@ -54,10 +55,10 @@ static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int preambl
     int *ready = buf + meta[n].user_off;
 
     for (int i = 0; i < n; i++) {
-        if (is_body(in + i)) {
+        if (is_body(in + i, i, region_lo, region_hi)) {
             int const deps[] = {in[i].x.id, in[i].y.id, in[i].z.id, in[i].w.id};
             for (int k = 0; k < 4; k++) {
-                if (is_body(in + deps[k])) {
+                if (is_body(in + deps[k], deps[k], region_lo, region_hi)) {
                     int const d = deps[k];
                     users[meta[d].user_off + meta[d].n_users++] = i;
                 }
@@ -67,7 +68,7 @@ static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int preambl
 
     int nready = 0;
     for (int i = 0; i < n; i++) {
-        if (is_body(in + i) && meta[i].n_deps == 0) {
+        if (is_body(in + i, i, region_lo, region_hi) && meta[i].n_deps == 0) {
             ready[nready++] = i;
         }
     }
@@ -76,7 +77,7 @@ static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int preambl
         meta[ready[i]].ready_idx = i;
     }
 
-    int j = preamble;
+    int j = at;
     int prev_scheduled = -1;
     while (nready > 0) {
         int pick = -1;
@@ -181,16 +182,32 @@ struct umbra_basic_block* umbra_basic_block(struct umbra_builder *b) {
     }
 
     if (b->has_loop) {
-        // TODO: loop-aware scheduling
-        int j = preamble;
+        int lb = -1, le = -1;
         for (int i = 0; i < n; i++) {
-            if (b->inst[i].live && b->inst[i].varying) {
-                b->inst[i].final_id = j;
-                out[j++] = b->inst[i];
-            }
+            if (b->inst[i].op == op_loop_begin) { lb = i; }
+            if (b->inst[i].op == op_loop_end)   { le = i; }
         }
+
+        int j = preamble;
+        schedule(b->inst, n, out, j, live, 0, lb);
+        for (int i = 0; i < n; i++) {
+            if (b->inst[i].live && b->inst[i].varying && i < lb) { j++; }
+        }
+
+        b->inst[lb].final_id = j;
+        out[j++] = b->inst[lb];
+
+        schedule(b->inst, n, out, j, live, lb + 1, le);
+        for (int i = lb + 1; i < le; i++) {
+            if (b->inst[i].live && b->inst[i].varying) { j++; }
+        }
+
+        b->inst[le].final_id = j;
+        out[j++] = b->inst[le];
+
+        schedule(b->inst, n, out, j, live, le + 1, n);
     } else {
-        schedule(b->inst, n, out, preamble, live);
+        schedule(b->inst, n, out, preamble, live, 0, n);
     }
 
     for (int i = 0; i < live; i++) {

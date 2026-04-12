@@ -4116,3 +4116,42 @@ TEST(test_loop_init_then_accumulate) {
     }
     cleanup(&B);
 }
+
+TEST(test_loop_pre_and_post) {
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 px = umbra_load_32(b, (umbra_ptr32){0});
+    umbra_val32 base = umbra_mul_f32(b, px, umbra_imm_f32(b, 0.5f));
+
+    umbra_var acc = umbra_var_alloc(b);
+    umbra_store_var(b, acc, base);
+
+    umbra_val32 n = umbra_uniform_32(b, (umbra_ptr32){.ix = 1}, 0);
+    umbra_val32 i = umbra_loop(b, n);
+    umbra_val32 cur = umbra_load_var(b, acc);
+    umbra_val32 elem = umbra_gather_32(b, (umbra_ptr32){.ix = 2}, i);
+    umbra_store_var(b, acc, umbra_add_f32(b, cur, elem));
+    umbra_loop_end(b);
+
+    umbra_val32 result = umbra_load_var(b, acc);
+    umbra_val32 doubled = umbra_mul_f32(b, result, umbra_imm_f32(b, 2.0f));
+    umbra_store_32(b, (umbra_ptr32){.ix = 3}, doubled);
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        float px_data[2] = {10.0f, 20.0f};
+        int32_t uni[1] = {3};
+        float data[3] = {1.0f, 2.0f, 3.0f};
+        float out[2] = {0};
+        if (run(&B, bi, 2, 1, (struct umbra_buf[]){
+                {.ptr = px_data, .sz = sizeof px_data, .row_bytes = sizeof px_data},
+                {.ptr = uni,     .sz = sizeof uni},
+                {.ptr = data,    .sz = sizeof data},
+                {.ptr = out,     .sz = sizeof out, .row_bytes = sizeof out},
+            })) {
+            out[0] == 22.0f here;
+            out[1] == 32.0f here;
+        }
+    }
+    cleanup(&B);
+}
