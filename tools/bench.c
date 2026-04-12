@@ -281,12 +281,13 @@ int main(int argc, char *argv[]) {
                 int bi = disp_idx[d];
                 if (!(be_mask & (1 << bi)) || ns_px[bi] < 0) { continue; }
                 struct umbra_backend_stats const *st = &bstats[bi];
-                fprintf(stderr, "  %s: %d dispatches, %d submits,"
-                                " encode %.3fms, submit %.3fms,"
-                                " gpu %.3fms, upload %zuB\n",
-                        disp_name[d], st->dispatches, st->submits,
-                        st->encode_sec * 1e3, st->submit_sec * 1e3,
-                        st->gpu_sec * 1e3, st->upload_bytes);
+                double const us_per = st->dispatches
+                    ? st->gpu_sec / st->dispatches * 1e6 : 0;
+                fprintf(stderr, "  %s: %d dispatches,"
+                                " %.0f us/dispatch,"
+                                " gpu %.3fms\n",
+                        disp_name[d], st->dispatches,
+                        us_per, st->gpu_sec * 1e3);
             }
         }
         free(buf);
