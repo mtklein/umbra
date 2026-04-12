@@ -225,10 +225,12 @@ int main(int argc, char *argv[]) {
         else if (streq(argv[i], "--fmt")     && i+1 < argc) { fmt = parse_fmt(argv[++i]); }
         else if (streq(argv[i], "--backend") && i+1 < argc) {
             char const *b = argv[++i];
-            be_mask = streq(b, "interp") ? 1  : streq(b, "jit")    ? 2 :
+            int bit = streq(b, "interp") ? 1  : streq(b, "jit")    ? 2 :
                       streq(b, "metal")  ? 4  : streq(b, "vulkan") ? 8 :
                       streq(b, "wgpu")   ? 16 : 0;
-            if (!be_mask) { fprintf(stderr, "unknown backend: %s\n", b); usage(); return 1; }
+            if (!bit) { fprintf(stderr, "unknown backend: %s\n", b); usage(); return 1; }
+            if (be_mask == 0x1f) { be_mask = 0; }
+            be_mask |= bit;
         }
         else if (streq(argv[i], "--match")     && i+1 < argc) { match = argv[++i]; }
         else if (streq(argv[i], "--samples")   && i+1 < argc) { samples = atoi(argv[++i]); }
