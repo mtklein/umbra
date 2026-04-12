@@ -215,16 +215,17 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                 int p = inst->ptr.deref
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
-                     "%suint _base%d = y * m.stride%d + x*4;\n"
-                     "%suint v%d = (uint)p%d[_base%d];\n"
-                     "%suint v%d_1 = (uint)p%d[_base%d+1];\n"
-                     "%suint v%d_2 = (uint)p%d[_base%d+2];\n"
-                     "%suint v%d_3 = (uint)p%d[_base%d+3];\n",
-                     pad, i, p,
-                     pad, i, p, i,
-                     pad, i, p, i,
-                     pad, i, p, i,
-                     pad, i, p, i);
+                     "%sulong _px%d = p%d"
+                     "[y * m.stride%d + x];\n"
+                     "%suint v%d = (uint)(_px%d) & 0xFFFFu;\n"
+                     "%suint v%d_1 = (uint)(_px%d >> 16) & 0xFFFFu;\n"
+                     "%suint v%d_2 = (uint)(_px%d >> 32) & 0xFFFFu;\n"
+                     "%suint v%d_3 = (uint)(_px%d >> 48);\n",
+                     pad, i, p, p,
+                     pad, i, i,
+                     pad, i, i,
+                     pad, i, i,
+                     pad, i, i);
             } break;
             case op_load_16x4_planar: {
                 int p = inst->ptr.deref
@@ -246,16 +247,16 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                 int p = inst->ptr.deref
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
-                     "%s{ uint _base = y * m.stride%d + x*4;\n"
-                     "%s  p%d[_base] = ushort(%s);"
-                     " p%d[_base+1] = ushort(%s);"
-                     " p%d[_base+2] = ushort(%s);"
-                     " p%d[_base+3] = ushort(%s); }\n",
-                     pad, p,
-                     pad, p, uv(_ux, vx, xid, is_f),
-                     p, uv(_uy, vy, yid, is_f),
-                     p, uv(_uz, vz, zid, is_f),
-                     p, uv(_uw, vw, wid, is_f));
+                     "%sp%d[y * m.stride%d + x] ="
+                     " (ulong)(%s & 0xFFFFu)"
+                     " | ((ulong)(%s & 0xFFFFu) << 16)"
+                     " | ((ulong)(%s & 0xFFFFu) << 32)"
+                     " | ((ulong)(%s) << 48);\n",
+                     pad, p, p,
+                     uv(_ux, vx, xid, is_f),
+                     uv(_uy, vy, yid, is_f),
+                     uv(_uz, vz, zid, is_f),
+                     uv(_uw, vw, wid, is_f));
             } break;
             case op_store_16x4_planar: {
                 int p = inst->ptr.deref
@@ -840,12 +841,12 @@ static char* build_source(BB const *bb,
                                       : bb->inst[i].ptr.bits;
         if (bb->inst[i].op == op_load_16x4_planar
          || bb->inst[i].op == op_store_16x4_planar) { buf_shift[bi] = 3; buf_row_shift[bi] = 1; }
+        else if (bb->inst[i].op == op_load_16x4
+              || bb->inst[i].op == op_store_16x4) { buf_shift[bi] = 3; buf_row_shift[bi] = 3; }
         else if (bb->inst[i].op == op_gather_16
               || bb->inst[i].op == op_load_16
-              || bb->inst[i].op == op_store_16
-              || bb->inst[i].op == op_load_16x4
-              || bb->inst[i].op == op_store_16x4) { buf_shift[bi] = 1; buf_row_shift[bi] = 1; }
-        else                                       { buf_shift[bi] = 2; buf_row_shift[bi] = 2; }
+              || bb->inst[i].op == op_store_16) { buf_shift[bi] = 1; buf_row_shift[bi] = 1; }
+        else                                    { buf_shift[bi] = 2; buf_row_shift[bi] = 2; }
     }
 
     SrcBuf b = {0};
@@ -870,7 +871,8 @@ static char* build_source(BB const *bb,
          "    constant meta &m [[buffer(%d)]]",
          total_bufs);
     for (int p = 0; p <= max_ptr; p++) {
-        char const *type = buf_shift[p] == 2 ? "uint" : "ushort";
+        char const *type = buf_row_shift[p] == 3 ? "ulong"
+                         : buf_shift[p]     == 2 ? "uint" : "ushort";
         emit(&b,
              ",\n    device %s *p%d"
              " [[buffer(%d)]]",
@@ -879,7 +881,8 @@ static char* build_source(BB const *bb,
     for (int i = 0; i < bb->insts; i++) {
         if (bb->inst[i].op == op_deref_ptr) {
             int db = deref_buf[i];
-            char const *type = buf_shift[db] == 2 ? "uint" : "ushort";
+            char const *type = buf_row_shift[db] == 3 ? "ulong"
+                             : buf_shift[db]     == 2 ? "uint" : "ushort";
             emit(&b,
                  ",\n    device %s *p%d"
                  " [[buffer(%d)]]",
