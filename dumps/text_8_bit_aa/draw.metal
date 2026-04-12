@@ -7,7 +7,7 @@ struct meta { uint w, x0, y0, limit0, limit1, limit2, stride0, stride1, stride2;
 kernel void umbra_entry(
     constant meta &m [[buffer(3)]],
     device uint *p0 [[buffer(0)]],
-    device ulong *p1 [[buffer(1)]],
+    device half4 *p1 [[buffer(1)]],
     device ushort *p2 [[buffer(2)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
@@ -26,11 +26,11 @@ kernel void umbra_entry(
     uint v10 = (uint)(int)(short)(ushort)v9;
     float v11 = (float)(int)v10;
     float v12 = v11 * as_type<float>(998277249u);
-    ulong _px13 = p1[y * m.stride1 + x];
-    uint v13 = (uint)(_px13) & 0xFFFFu;
-    uint v13_1 = (uint)(_px13 >> 16) & 0xFFFFu;
-    uint v13_2 = (uint)(_px13 >> 32) & 0xFFFFu;
-    uint v13_3 = (uint)(_px13 >> 48);
+    half4 _px13 = p1[y * m.stride1 + x];
+    uint v13 = (uint)as_type<ushort>(_px13.x);
+    uint v13_1 = (uint)as_type<ushort>(_px13.y);
+    uint v13_2 = (uint)as_type<ushort>(_px13.z);
+    uint v13_3 = (uint)as_type<ushort>(_px13.w);
     float v14 = (float)as_type<half>((ushort)v13);
     float v15 = fma(v14, v8, as_type<float>(v1));
     float v16 = v15 - v14;
@@ -51,5 +51,5 @@ kernel void umbra_entry(
     float v31 = v30 - v29;
     float v32 = fma(v12, v31, v29);
     uint v33 = (uint)as_type<ushort>((half)v32);
-    p1[y * m.stride1 + x] = (ulong)(v18 & 0xFFFFu) | ((ulong)(v28 & 0xFFFFu) << 16) | ((ulong)(v33 & 0xFFFFu) << 32) | ((ulong)(v23) << 48);
+    p1[y * m.stride1 + x] = half4(as_type<half>((ushort)v18), as_type<half>((ushort)v28), as_type<half>((ushort)v33), as_type<half>((ushort)v23));
 }

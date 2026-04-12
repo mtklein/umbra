@@ -7,7 +7,7 @@ struct meta { uint w, x0, y0, limit0, limit1, stride0, stride1; };
 kernel void umbra_entry(
     constant meta &m [[buffer(2)]],
     device uint *p0 [[buffer(0)]],
-    device ulong *p1 [[buffer(1)]],
+    device half4 *p1 [[buffer(1)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
     if (pos.x >= m.w) return;
@@ -22,5 +22,5 @@ kernel void umbra_entry(
     uint v6 = (uint)as_type<ushort>((half)as_type<float>(v2));
     uint v7 = (uint)as_type<ushort>((half)as_type<float>(v3));
     uint v8 = (uint)as_type<ushort>((half)as_type<float>(v4));
-    p1[y * m.stride1 + x] = (ulong)(v5 & 0xFFFFu) | ((ulong)(v6 & 0xFFFFu) << 16) | ((ulong)(v7 & 0xFFFFu) << 32) | ((ulong)(v8) << 48);
+    p1[y * m.stride1 + x] = half4(as_type<half>((ushort)v5), as_type<half>((ushort)v6), as_type<half>((ushort)v7), as_type<half>((ushort)v8));
 }

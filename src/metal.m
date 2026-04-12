@@ -215,12 +215,12 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                 int p = inst->ptr.deref
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
-                     "%sulong _px%d = p%d"
+                     "%shalf4 _px%d = p%d"
                      "[y * m.stride%d + x];\n"
-                     "%suint v%d = (uint)(_px%d) & 0xFFFFu;\n"
-                     "%suint v%d_1 = (uint)(_px%d >> 16) & 0xFFFFu;\n"
-                     "%suint v%d_2 = (uint)(_px%d >> 32) & 0xFFFFu;\n"
-                     "%suint v%d_3 = (uint)(_px%d >> 48);\n",
+                     "%suint v%d = (uint)as_type<ushort>(_px%d.x);\n"
+                     "%suint v%d_1 = (uint)as_type<ushort>(_px%d.y);\n"
+                     "%suint v%d_2 = (uint)as_type<ushort>(_px%d.z);\n"
+                     "%suint v%d_3 = (uint)as_type<ushort>(_px%d.w);\n",
                      pad, i, p, p,
                      pad, i, i,
                      pad, i, i,
@@ -248,10 +248,10 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
                      "%sp%d[y * m.stride%d + x] ="
-                     " (ulong)(%s & 0xFFFFu)"
-                     " | ((ulong)(%s & 0xFFFFu) << 16)"
-                     " | ((ulong)(%s & 0xFFFFu) << 32)"
-                     " | ((ulong)(%s) << 48);\n",
+                     " half4(as_type<half>((ushort)%s),"
+                     " as_type<half>((ushort)%s),"
+                     " as_type<half>((ushort)%s),"
+                     " as_type<half>((ushort)%s));\n",
                      pad, p, p,
                      uv(_ux, vx, xid, is_f),
                      uv(_uy, vy, yid, is_f),
@@ -871,7 +871,7 @@ static char* build_source(BB const *bb,
          "    constant meta &m [[buffer(%d)]]",
          total_bufs);
     for (int p = 0; p <= max_ptr; p++) {
-        char const *type = buf_row_shift[p] == 3 ? "ulong"
+        char const *type = buf_row_shift[p] == 3 ? "half4"
                          : buf_shift[p]     == 2 ? "uint" : "ushort";
         emit(&b,
              ",\n    device %s *p%d"
@@ -881,7 +881,7 @@ static char* build_source(BB const *bb,
     for (int i = 0; i < bb->insts; i++) {
         if (bb->inst[i].op == op_deref_ptr) {
             int db = deref_buf[i];
-            char const *type = buf_row_shift[db] == 3 ? "ulong"
+            char const *type = buf_row_shift[db] == 3 ? "half4"
                              : buf_shift[db]     == 2 ? "uint" : "ushort";
             emit(&b,
                  ",\n    device %s *p%d"
