@@ -331,10 +331,10 @@ static umbra_color walk_stops_(struct umbra_builder *b, umbra_val32 t,
         umbra_val32 cb = lerp_f(b, b0, b1, frac);
         umbra_val32 ca = lerp_f(b, a0, a1, frac);
 
-        umbra_cond_store_var(b, vr, in_seg, cr);
-        umbra_cond_store_var(b, vg, in_seg, cg);
-        umbra_cond_store_var(b, vb, in_seg, cb);
-        umbra_cond_store_var(b, va, in_seg, ca);
+        umbra_store_var(b, vr, umbra_sel_32(b, in_seg, cr, umbra_load_var(b, vr)));
+        umbra_store_var(b, vg, umbra_sel_32(b, in_seg, cg, umbra_load_var(b, vg)));
+        umbra_store_var(b, vb, umbra_sel_32(b, in_seg, cb, umbra_load_var(b, vb)));
+        umbra_store_var(b, va, umbra_sel_32(b, in_seg, ca, umbra_load_var(b, va)));
     } umbra_loop_end(b);
 
     return (umbra_color){

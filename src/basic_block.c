@@ -258,11 +258,6 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
                         ip->x.id, ip->y.id, ip->z.id, ip->w.id);
             } else if (op == op_store_var) {
                 fprintf(f, "      %-15s var%d v%d\n", op_name(op), ip->imm, ip->y.id);
-            } else if (op == op_cond_store_var) {
-                fprintf(f, "      %-15s var%d v%d v%d\n", op_name(op),
-                        ip->imm, ip->x.id, ip->y.id);
-            } else if (op == op_inc_var) {
-                fprintf(f, "      %-15s var%d\n", op_name(op), ip->imm);
             } else {
                 fprintf(f, "      %-15s p%d v%d\n", op_name(op), ip->ptr.bits, ip->y.id);
             }
@@ -294,8 +289,6 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_store_16:
         case op_store_32:
         case op_store_var:
-        case op_cond_store_var:
-        case op_inc_var:
         case op_store_16x4:
         case op_store_16x4_planar:
         case op_store_8x4: break;

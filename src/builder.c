@@ -51,12 +51,6 @@ static val push_(builder *b, struct bb_inst inst) {
         } else if (op == op_store_var) {
             inst.uniform = 0;
             b->var_uniform[inst.imm] = b->inst[inst.y.id].uniform;
-        } else if (op == op_cond_store_var) {
-            inst.uniform = 0;
-            b->var_uniform[inst.imm] = 0;
-        } else if (op == op_inc_var) {
-            inst.uniform = 0;
-            b->var_uniform[inst.imm] = 0;
         } else if (op_is_varying(op)
                    || op == op_gather_32
                    || op == op_gather_16
@@ -472,9 +466,4 @@ umbra_val32 umbra_load_var(builder *b, umbra_var v) {
 
 void umbra_store_var(builder *b, umbra_var var, umbra_val32 x) {
     push(b, op_store_var, VY(x), .imm = var.id);
-}
-
-void umbra_cond_store_var(builder *b, umbra_var var,
-                          umbra_val32 mask, umbra_val32 x) {
-    push(b, op_cond_store_var, VX(mask), VY(x), .imm = var.id);
 }
