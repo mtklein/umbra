@@ -1363,6 +1363,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t rx = ra_ensure(ra, sl, ns, inst->x.id);
             vmovd_to_gpr(c, R11, rx);
             ra_free_chan(ra, inst->x, i);
+            ra_spill_live_before(ra, sl, ns, i);
             cmp_ri(c, R11, 0);
             jc->loop_br_skip = jcc(c, 0x0e);
             jc->loop_top = (int)c->size;

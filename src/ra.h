@@ -31,6 +31,7 @@ int8_t ra_ensure_chan(struct ra *ra, int *sl, int *ns, int val, int chan);
 int8_t ra_claim(struct ra *ra, int old_val, int new_val);
 void   ra_begin_loop(struct ra *ra);
 void   ra_end_loop(struct ra *ra, int *sl);
+void   ra_spill_live_before(struct ra *ra, int *sl, int *ns, int before);
 
 // Accessors.
 int8_t ra_reg(struct ra const *ra, int val);

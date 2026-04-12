@@ -1164,6 +1164,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t rx = ra_ensure(ra, sl, ns, inst->x.id);
             put(c, UMOV_ws(XT, lo(rx)));
             ra_free_chan(ra, inst->x, i);
+            ra_spill_live_before(ra, sl, ns, i);
             put(c, SUBS_xi(31, XT, 0));
             jc->loop_br_skip = c->words;
             put(c, Bcond(0xd, 0));

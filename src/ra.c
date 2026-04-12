@@ -96,6 +96,20 @@ struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const 
             ra->slot[i].last_use = n;
         }
     }
+    if (bb->loop_begin >= 0) {
+        for (int i = bb->preamble; i < bb->loop_begin; i++) {
+            if (ra->slot[i].last_use >= bb->loop_begin
+                    && ra->slot[i].last_use <= bb->loop_end) {
+                ra->slot[i].last_use = bb->loop_end;
+                for (int c = 0; c < 4; c++) {
+                    if (ra->slot[i].chan_last_use[c] >= bb->loop_begin
+                            && ra->slot[i].chan_last_use[c] <= bb->loop_end) {
+                        ra->slot[i].chan_last_use[c] = bb->loop_end;
+                    }
+                }
+            }
+        }
+    }
 
     ra->inst = bb->inst;
     ra->insts = n;
@@ -144,6 +158,10 @@ void ra_end_loop(struct ra *ra, int *sl) {
             ra->cfg.remat(target, i, ra->cfg.ctx);
         }
     }
+}
+
+void ra_spill_live_before(struct ra *ra, int *sl, int *ns, int before) {
+    (void)ra; (void)sl; (void)ns; (void)before;
 }
 
 void ra_free_chan(struct ra *ra, val operand, int i) {
