@@ -203,23 +203,23 @@ typedef struct {
     uint32_t next_id;
 
     // Well-known type IDs.
-    uint32_t t_void, t_bool, t_u32, t_i32, t_f32, t_f16, t_u16;
+    uint32_t t_void, t_bool, t_u32, t_i32, t_f32, t_f16;
     uint32_t t_uvec3;
     uint32_t t_fvec2;
     uint32_t t_fn_void;
     uint32_t t_ptr_input_uvec3;
     uint32_t t_ptr_ssbo_u32;
-    uint32_t t_ptr_ssbo_u16;
+    uint32_t t_ptr_ssbo_f16;
     uint32_t t_ptr_push_u32;
     uint32_t t_rta_u32;             // RuntimeArray of u32
-    uint32_t t_rta_u16;             // RuntimeArray of u16
+    uint32_t t_rta_f16;             // RuntimeArray of f16
     uint32_t t_struct_rta_u32;      // struct { RuntimeArray<u32> }
-    uint32_t t_struct_rta_u16;      // struct { RuntimeArray<u16> }
+    uint32_t t_struct_rta_f16;      // struct { RuntimeArray<f16> }
     uint32_t t_ptr_ssbo_struct;     // pointer to struct { RuntimeArray<u32> }
-    uint32_t t_ptr_ssbo_struct_u16; // pointer to struct { RuntimeArray<u16> }
+    uint32_t t_ptr_ssbo_struct_f16; // pointer to struct { RuntimeArray<f16> }
 
     // GLSL.std.450 import.
-    uint32_t ext_glsl;
+    uint32_t ext_glsl, :32;
 
     // Global variable IDs.
     uint32_t *v_ssbo;      // one per buffer (total_bufs)
@@ -253,8 +253,7 @@ typedef struct {
 
     // Per-buffer flag: true if the buffer needs 16-bit typed access.
     _Bool *buf_is_16;
-    int    has_16;
-    _Bool  emit_16; int :24;
+    int    has_16, :32;
 
     // Constant deduplication cache.
     struct { uint32_t type, value, id; } *const_cache;
@@ -502,17 +501,12 @@ static void store_ssbo_u32(SpvBuilder *b, int buf_idx, uint32_t elem_idx, uint32
 }
 
 // Load u16 from SSBO[buf_idx] at element_index, zero-extended to u32.
-// When emit_16, the buffer is RuntimeArray<u16> and we use OpUConvert.
-// Otherwise, it's RuntimeArray<f16> and we bitcast f16→f32→u32.
+// Buffer is RuntimeArray<f16>; smuggle integer bits through f16 storage
+// via PackHalf2x16 to recover the raw 16-bit pattern as u32.
 static uint32_t load_ssbo_u16(SpvBuilder *b, int buf_idx, uint32_t elem_idx) {
-    uint32_t const ptr = spv_access_chain_2(b, b->t_ptr_ssbo_u16,
+    uint32_t const ptr = spv_access_chain_2(b, b->t_ptr_ssbo_f16,
                                             b->v_ssbo[buf_idx],
                                             b->c_0, elem_idx);
-    if (b->emit_16) {
-        uint32_t const raw = spv_load(b, b->t_u16, ptr);
-        return spv_unop(b, SpvOpUConvert, b->t_u32, raw);
-    }
-    // Load f16, convert to f32, pack back to u32 with raw bits via PackHalf2x16.
     uint32_t const h = spv_load(b, b->t_f16, ptr);
     uint32_t const f = spv_unop(b, SpvOpFConvert, b->t_f32, h);
     uint32_t const v2 = spv_composite_construct_2(b, b->t_fvec2, f, b->c_0f);
@@ -520,16 +514,11 @@ static uint32_t load_ssbo_u16(SpvBuilder *b, int buf_idx, uint32_t elem_idx) {
 }
 
 // Store u16 to SSBO[buf_idx] at element_index, truncating from u32.
+// Smuggle integer bits through f16 storage via UnpackHalf2x16.
 static void store_ssbo_u16(SpvBuilder *b, int buf_idx, uint32_t elem_idx, uint32_t value) {
-    uint32_t const ptr = spv_access_chain_2(b, b->t_ptr_ssbo_u16,
+    uint32_t const ptr = spv_access_chain_2(b, b->t_ptr_ssbo_f16,
                                             b->v_ssbo[buf_idx],
                                             b->c_0, elem_idx);
-    if (b->emit_16) {
-        uint32_t const val16 = spv_unop(b, SpvOpUConvert, b->t_u16, value);
-        spv_store(b, ptr, val16);
-        return;
-    }
-    // Reinterpret the low 16 bits of value as f16 via UnpackHalf2x16→FConvert.
     uint32_t const v2 = spv_glsl_1(b, b->t_fvec2, 62 /*UnpackHalf2x16*/, value);
     uint32_t const f  = spv_composite_extract(b, b->t_f32, v2, 0);
     uint32_t const h  = spv_unop(b, SpvOpFConvert, b->t_f16, f);
@@ -581,27 +570,14 @@ static void gather_safe(SpvBuilder *b, uint32_t ix_val, int buf_idx,
     *out_idx = clamped;
 }
 
-// fp16 <-> fp32 conversion.
-// When emit_16 is true, uses native OpFConvert (Float16 capability).
-// When emit_16 is false, uses GLSL.std.450 UnpackHalf2x16/PackHalf2x16.
+// fp16 ↔ fp32 bit-level conversion for integer 16-bit values held as u32.
+// Uses GLSL.std.450 UnpackHalf2x16/PackHalf2x16 to reinterpret bits.
 static uint32_t spv_f16_to_f32(SpvBuilder *b, uint32_t u32_val) {
-    if (b->emit_16) {
-        uint32_t const u16_val = spv_unop(b, SpvOpUConvert, b->t_u16, u32_val);
-        uint32_t const h       = spv_bitcast(b, b->t_f16, u16_val);
-        return spv_unop(b, SpvOpFConvert, b->t_f32, h);
-    }
-    // UnpackHalf2x16(u32_val) → vec2<f32>, take component 0.
     uint32_t const v2 = spv_glsl_1(b, b->t_fvec2, 62 /*UnpackHalf2x16*/, u32_val);
     return spv_composite_extract(b, b->t_f32, v2, 0);
 }
 
 static uint32_t spv_f32_to_f16(SpvBuilder *b, uint32_t f32_val) {
-    if (b->emit_16) {
-        uint32_t const h   = spv_unop(b, SpvOpFConvert, b->t_f16, f32_val);
-        uint32_t const u16 = spv_bitcast(b, b->t_u16, h);
-        return spv_unop(b, SpvOpUConvert, b->t_u32, u16);
-    }
-    // PackHalf2x16(vec2(f32_val, 0.0)) → u32 with fp16 in low 16 bits.
     uint32_t const v2 = spv_composite_construct_2(b, b->t_fvec2, f32_val, b->c_0f);
     return spv_glsl_1(b, b->t_u32, 58 /*PackHalf2x16*/, v2);
 }
@@ -703,10 +679,7 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
     spv_op(&B.caps, SpvOpCapability, 2);
     spv_word(&B.caps, SpvCapabilityShader);
 
-    _Bool const emit_16 = !(flags & SPIRV_NO_16BIT_TYPES)
-                        && (B.has_16 || (flags & SPIRV_ALWAYS_16BIT));
-    B.emit_16 = emit_16;
-    if (B.has_16 || (flags & SPIRV_ALWAYS_16BIT)) {
+    if (B.has_16) {
         spv_op(&B.caps, SpvOpCapability, 2);
         spv_word(&B.caps, SpvCapabilityFloat16);
     }
@@ -812,15 +785,7 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
     spv_word(&B.types, B.t_f32);
     spv_word(&B.types, 32);
 
-    if (emit_16) {
-        B.t_u16 = spv_id(&B);
-        spv_op(&B.types, SpvOpTypeInt, 4);
-        spv_word(&B.types, B.t_u16);
-        spv_word(&B.types, 16);
-        spv_word(&B.types, 0); // unsigned
-    }
-
-    if (B.has_16 || (flags & SPIRV_ALWAYS_16BIT)) {
+    if (B.has_16) {
         B.t_f16 = spv_id(&B);
         spv_op(&B.types, SpvOpTypeFloat, 3);
         spv_word(&B.types, B.t_f16);
@@ -895,48 +860,43 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
     spv_word(&B.types, SpvStorageClassStorageBuffer);
     spv_word(&B.types, B.t_u32);
 
-    // 16-bit storage types.  When emit_16 is true, use native u16 element
-    // type.  When false (wgpu/naga path), use f16 as the element type
-    // since naga supports f16 via ShaderF16 but not u16.
     if (B.has_16) {
-        uint32_t t_elem_16 = emit_16 ? B.t_u16 : B.t_f16;
-
-        B.t_rta_u16 = spv_id(&B);
+        B.t_rta_f16 = spv_id(&B);
         spv_op(&B.types, SpvOpTypeRuntimeArray, 3);
-        spv_word(&B.types, B.t_rta_u16);
-        spv_word(&B.types, t_elem_16);
+        spv_word(&B.types, B.t_rta_f16);
+        spv_word(&B.types, B.t_f16);
 
         spv_op(&B.decor, SpvOpDecorate, 4);
-        spv_word(&B.decor, B.t_rta_u16);
+        spv_word(&B.decor, B.t_rta_f16);
         spv_word(&B.decor, SpvDecorationArrayStride);
         spv_word(&B.decor, 2);
 
-        B.t_struct_rta_u16 = spv_id(&B);
+        B.t_struct_rta_f16 = spv_id(&B);
         spv_op(&B.types, SpvOpTypeStruct, 3);
-        spv_word(&B.types, B.t_struct_rta_u16);
-        spv_word(&B.types, B.t_rta_u16);
+        spv_word(&B.types, B.t_struct_rta_f16);
+        spv_word(&B.types, B.t_rta_f16);
 
         spv_op(&B.decor, SpvOpDecorate, 3);
-        spv_word(&B.decor, B.t_struct_rta_u16);
+        spv_word(&B.decor, B.t_struct_rta_f16);
         spv_word(&B.decor, SpvDecorationBlock);
 
         spv_op(&B.decor, SpvOpMemberDecorate, 5);
-        spv_word(&B.decor, B.t_struct_rta_u16);
+        spv_word(&B.decor, B.t_struct_rta_f16);
         spv_word(&B.decor, 0);
         spv_word(&B.decor, SpvDecorationOffset);
         spv_word(&B.decor, 0);
 
-        B.t_ptr_ssbo_struct_u16 = spv_id(&B);
+        B.t_ptr_ssbo_struct_f16 = spv_id(&B);
         spv_op(&B.types, SpvOpTypePointer, 4);
-        spv_word(&B.types, B.t_ptr_ssbo_struct_u16);
+        spv_word(&B.types, B.t_ptr_ssbo_struct_f16);
         spv_word(&B.types, SpvStorageClassStorageBuffer);
-        spv_word(&B.types, B.t_struct_rta_u16);
+        spv_word(&B.types, B.t_struct_rta_f16);
 
-        B.t_ptr_ssbo_u16 = spv_id(&B);
+        B.t_ptr_ssbo_f16 = spv_id(&B);
         spv_op(&B.types, SpvOpTypePointer, 4);
-        spv_word(&B.types, B.t_ptr_ssbo_u16);
+        spv_word(&B.types, B.t_ptr_ssbo_f16);
         spv_word(&B.types, SpvStorageClassStorageBuffer);
-        spv_word(&B.types, t_elem_16);
+        spv_word(&B.types, B.t_f16);
     }
 
     // Push constant block: struct { uint data[push_words]; }
@@ -1012,7 +972,7 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
     B.v_ssbo = calloc((size_t)total_bufs, sizeof *B.v_ssbo);
     for (int i = 0; i < total_bufs; i++) {
         B.v_ssbo[i] = spv_id(&B);
-        uint32_t ptr_type = B.buf_is_16[i] ? B.t_ptr_ssbo_struct_u16
+        uint32_t ptr_type = B.buf_is_16[i] ? B.t_ptr_ssbo_struct_f16
                                           : B.t_ptr_ssbo_struct;
         spv_op(&B.globals, SpvOpVariable, 4);
         spv_word(&B.globals, ptr_type);
@@ -1193,7 +1153,8 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                 case op_store_16: {
                     int p = resolve_ptr(&B, inst);
                     uint32_t addr16 = compute_addr(&B, x_coord, y_coord, p, B.c_1);
-                    uint32_t v = as_u32(&B, get_val(&B, inst->y), yid);
+                    uint32_t v = B.is_f[yid] ? spv_f32_to_f16(&B, get_val(&B, inst->y))
+                                             : as_u32(&B, get_val(&B, inst->y), yid);
                     store_ssbo_u16(&B, p, addr16, v);
                 } break;
 
@@ -1292,30 +1253,34 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                     int p = resolve_ptr(&B, inst);
                     uint32_t sz_off = spv_const_u32(&B, (uint32_t)(3 + p));
                     uint32_t sz = load_meta_u32(&B, sz_off);
-                    uint32_t ps_u16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, sz, B.c_3);
+                    uint32_t ps_f16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, sz, B.c_3);
 
                     uint32_t rb_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
                     uint32_t rb = load_meta_u32(&B, rb_off);
 
-                    uint32_t rb_u16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, rb, B.c_1);
-                    uint32_t addr16 = spv_binop(&B, SpvOpIMul, B.t_u32, y_coord, rb_u16);
-                    addr16 = spv_binop(&B, SpvOpIAdd, B.t_u32, addr16, x_coord);
+                    uint32_t rb_f16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, rb, B.c_1);
+                    uint32_t addr = spv_binop(&B, SpvOpIMul, B.t_u32, y_coord, rb_f16);
+                    addr = spv_binop(&B, SpvOpIAdd, B.t_u32, addr, x_coord);
 
                     for (int ch = 0; ch < 4; ch++) {
                         uint32_t ch_id = ch == 0 ? B.c_0
                                        : ch == 1 ? B.c_1
                                        : ch == 2 ? B.c_2
                                        :           B.c_3;
-                        uint32_t plane_off = spv_binop(&B, SpvOpIMul, B.t_u32, ch_id, ps_u16);
-                        uint32_t final_addr = spv_binop(&B, SpvOpIAdd, B.t_u32, addr16, plane_off);
-                        uint32_t h_val = load_ssbo_u16(&B, p, final_addr);
+                        uint32_t plane_off = spv_binop(&B, SpvOpIMul, B.t_u32, ch_id, ps_f16);
+                        uint32_t final_addr = spv_binop(&B, SpvOpIAdd, B.t_u32, addr, plane_off);
+                        uint32_t ptr = spv_access_chain_2(&B, B.t_ptr_ssbo_f16,
+                                                          B.v_ssbo[p], B.c_0, final_addr);
+                        uint32_t h = spv_load(&B, B.t_f16, ptr);
+                        uint32_t f32_val = spv_unop(&B, SpvOpFConvert, B.t_f32, h);
                         switch (ch) {
-                            case 0: B.val[i]   = h_val; break;
-                            case 1: B.val_1[i] = h_val; break;
-                            case 2: B.val_2[i] = h_val; break;
-                            case 3: B.val_3[i] = h_val; break;
+                            case 0: B.val[i]   = f32_val; break;
+                            case 1: B.val_1[i] = f32_val; break;
+                            case 2: B.val_2[i] = f32_val; break;
+                            case 3: B.val_3[i] = f32_val; break;
                         }
                     }
+                    B.is_f[i] = 1;
                 } break;
 
                 case op_store_16x4: {
@@ -1328,10 +1293,14 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                     uint32_t x_off = spv_binop(&B, SpvOpIMul, B.t_u32, x_coord, B.c_2);
                     uint32_t base = spv_binop(&B, SpvOpIAdd, B.t_u32, row_off, x_off);
 
-                    uint32_t h0 = as_u32(&B, get_val(&B, inst->x), xid);
-                    uint32_t h1 = as_u32(&B, get_val(&B, inst->y), yid);
-                    uint32_t h2 = as_u32(&B, get_val(&B, inst->z), get_id(inst->z));
-                    uint32_t h3 = as_u32(&B, get_val(&B, inst->w), get_id(inst->w));
+                    uint32_t h0 = B.is_f[xid]             ? spv_f32_to_f16(&B, get_val(&B, inst->x))
+                                                           : as_u32(&B, get_val(&B, inst->x), xid);
+                    uint32_t h1 = B.is_f[yid]             ? spv_f32_to_f16(&B, get_val(&B, inst->y))
+                                                           : as_u32(&B, get_val(&B, inst->y), yid);
+                    uint32_t h2 = B.is_f[get_id(inst->z)] ? spv_f32_to_f16(&B, get_val(&B, inst->z))
+                                                           : as_u32(&B, get_val(&B, inst->z), get_id(inst->z));
+                    uint32_t h3 = B.is_f[get_id(inst->w)] ? spv_f32_to_f16(&B, get_val(&B, inst->w))
+                                                           : as_u32(&B, get_val(&B, inst->w), get_id(inst->w));
 
                     uint32_t h1_shifted = spv_binop(&B, SpvOpShiftLeftLogical, B.t_u32, h1, B.c_16);
                     uint32_t w0 = spv_binop(&B, SpvOpBitwiseOr, B.t_u32, h0, h1_shifted);
@@ -1347,13 +1316,13 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                     int p = resolve_ptr(&B, inst);
                     uint32_t sz_off = spv_const_u32(&B, (uint32_t)(3 + p));
                     uint32_t sz = load_meta_u32(&B, sz_off);
-                    uint32_t ps_u16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, sz, B.c_3);
+                    uint32_t ps_f16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, sz, B.c_3);
 
                     uint32_t rb_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
                     uint32_t rb = load_meta_u32(&B, rb_off);
-                    uint32_t rb_u16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, rb, B.c_1);
-                    uint32_t addr16 = spv_binop(&B, SpvOpIMul, B.t_u32, y_coord, rb_u16);
-                    addr16 = spv_binop(&B, SpvOpIAdd, B.t_u32, addr16, x_coord);
+                    uint32_t rb_f16 = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32, rb, B.c_1);
+                    uint32_t addr = spv_binop(&B, SpvOpIMul, B.t_u32, y_coord, rb_f16);
+                    addr = spv_binop(&B, SpvOpIAdd, B.t_u32, addr, x_coord);
 
                     val channels[4] = { inst->x, inst->y, inst->z, inst->w };
                     int channel_ids[4] = { xid, yid, get_id(inst->z), get_id(inst->w) };
@@ -1363,23 +1332,31 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                                        : ch == 1 ? B.c_1
                                        : ch == 2 ? B.c_2
                                        :           B.c_3;
-                        uint32_t plane_off = spv_binop(&B, SpvOpIMul, B.t_u32, ch_id, ps_u16);
-                        uint32_t final_addr = spv_binop(&B, SpvOpIAdd, B.t_u32, addr16, plane_off);
+                        uint32_t plane_off = spv_binop(&B, SpvOpIMul, B.t_u32, ch_id, ps_f16);
+                        uint32_t final_addr = spv_binop(&B, SpvOpIAdd, B.t_u32, addr, plane_off);
 
-                        uint32_t h_val = as_u32(&B, get_val(&B, channels[ch]),
-                                                    channel_ids[ch]);
-                        store_ssbo_u16(&B, p, final_addr, h_val);
+                        uint32_t f32_val = as_f32(&B, get_val(&B, channels[ch]),
+                                                       channel_ids[ch]);
+                        uint32_t h = spv_unop(&B, SpvOpFConvert, B.t_f16, f32_val);
+                        uint32_t ptr = spv_access_chain_2(&B, B.t_ptr_ssbo_f16,
+                                                          B.v_ssbo[p], B.c_0, final_addr);
+                        spv_store(&B, ptr, h);
                     }
                 } break;
 
                 case op_f32_from_f16: {
-                    uint32_t h = as_u32(&B, get_val(&B, inst->x), xid);
-                    B.val[i] = spv_f16_to_f32(&B, h);
+                    if (B.is_f[xid]) {
+                        B.val[i] = get_val(&B, inst->x);
+                    } else {
+                        uint32_t h = as_u32(&B, get_val(&B, inst->x), xid);
+                        B.val[i] = spv_f16_to_f32(&B, h);
+                    }
+                    B.is_f[i] = 1;
                 } break;
 
                 case op_f16_from_f32: {
-                    uint32_t f = as_f32(&B, get_val(&B, inst->x), xid);
-                    B.val[i] = spv_f32_to_f16(&B, f);
+                    B.val[i] = as_f32(&B, get_val(&B, inst->x), xid);
+                    B.is_f[i] = 1;
                 } break;
 
                 case op_i32_from_s16: {

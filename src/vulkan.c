@@ -424,7 +424,7 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
     struct vk_backend *vbe = (struct vk_backend *)be;
 
     struct spirv_result const sr =
-        build_spirv(bb, SPIRV_FLOAT_CONTROLS | SPIRV_ALWAYS_16BIT);
+        build_spirv(bb, SPIRV_FLOAT_CONTROLS);
     if (!sr.spirv) { return 0; }
 
     int n_desc = sr.total_bufs;

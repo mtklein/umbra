@@ -289,7 +289,7 @@ static struct umbra_program *wgpu_compile(struct umbra_backend *base,
 
     wgpu_had_error = 0;
     struct spirv_result const sr =
-        build_spirv(bb, SPIRV_PUSH_VIA_SSBO | SPIRV_NO_16BIT_TYPES);
+        build_spirv(bb, SPIRV_PUSH_VIA_SSBO);
     if (!sr.spirv) { return 0; }
 
     WGPUShaderSourceSPIRV spirv_src = {

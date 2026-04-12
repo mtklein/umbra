@@ -6,10 +6,8 @@
 enum { SPIRV_WG_SIZE = 64 };
 
 enum {
-    SPIRV_FLOAT_CONTROLS   = 1,
-    SPIRV_ALWAYS_16BIT     = 2,
-    SPIRV_PUSH_VIA_SSBO    = 4,
-    SPIRV_NO_16BIT_TYPES   = 8,
+    SPIRV_FLOAT_CONTROLS = 1,
+    SPIRV_PUSH_VIA_SSBO  = 4,
 };
 
 struct spirv_result {
