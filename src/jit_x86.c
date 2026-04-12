@@ -100,13 +100,16 @@ struct jit_ctx {
     Buf                            *c;
     struct umbra_basic_block const *bb;
     struct pool                     pool;
+    int                             n_vars, loop_top, loop_br_skip, :32;
 };
 
 static void x86_spill(int reg, int slot, void *ctx) {
-    vspill(((struct jit_ctx *)ctx)->c, reg, slot);
+    struct jit_ctx *j = ctx;
+    vspill(j->c, reg, slot + j->n_vars);
 }
 static void x86_fill(int reg, int slot, void *ctx) {
-    vfill(((struct jit_ctx *)ctx)->c, reg, slot);
+    struct jit_ctx *j = ctx;
+    vfill(j->c, reg, slot + j->n_vars);
 }
 
 static void pool_broadcast(Buf *c, struct pool *p, int d, uint32_t v) {
@@ -275,7 +278,7 @@ struct jit_program *jit_program(struct jit_backend *be,
     int *deref_rb_gpr = calloc((size_t)bb->insts, sizeof(int));
 
     Buf            c = {0};
-    struct jit_ctx jc = {.c = &c, .bb = bb, .pool = {0}};
+    struct jit_ctx jc = {.c = &c, .bb = bb, .pool = {0}, .n_vars = bb->n_vars};
     struct ra     *ra = ra_create_x86(bb, &jc);
 
     push_r(&c, XM);
@@ -315,6 +318,15 @@ struct jit_program *jit_program(struct jit_backend *be,
     cmp_ri(&c, R11, 8);
     int const br_tail = jcc(&c, 0x0c);
 
+    if (bb->n_vars > 0) {
+        int8_t zr = ra_alloc(ra, sl, &ns);
+        vpxor(&c, 1, zr, zr, zr);
+        for (int vi = 0; vi < bb->n_vars; vi++) {
+            vspill(&c, zr, vi);
+        }
+        ra_return_reg(ra, zr);
+    }
+
     int const loop_body_start = (int)c.size;
     emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
 
@@ -339,6 +351,14 @@ struct jit_program *jit_program(struct jit_backend *be,
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
 
     emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
+    if (bb->n_vars > 0) {
+        int8_t zr = ra_alloc(ra, sl, &ns);
+        vpxor(&c, 1, zr, zr, zr);
+        for (int vi = 0; vi < bb->n_vars; vi++) {
+            vspill(&c, zr, vi);
+        }
+        ra_return_reg(ra, zr);
+    }
     emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 1, deref_gpr, deref_rb_gpr, &jc);
 
     add_ri(&c, XI, 1);
@@ -360,8 +380,11 @@ struct jit_program *jit_program(struct jit_backend *be,
         __builtin_memcpy(c.byte + br_more_rows, &rel, 4);
     }
 
-    if (ns > 0) {
-        add_ri(&c, RSP, ns * 32);
+    {
+        int const total = ns + bb->n_vars;
+        if (total > 0) {
+            add_ri(&c, RSP, total * 32);
+        }
     }
     pop_r(&c, RBX);
     pop_r(&c, R15);
@@ -371,13 +394,16 @@ struct jit_program *jit_program(struct jit_backend *be,
     vzeroupper(&c);
     ret(&c);
 
-    if (ns > 0) {
-        int pos = stack_patch;
-        c.byte[pos++] = 0x48;
-        c.byte[pos++] = 0x81;
-        c.byte[pos++] = (uint8_t)(0xc0 | (5 << 3) | (RSP & 7));
-        int32_t const sz = ns * 32;
-        __builtin_memcpy(c.byte + pos, &sz, 4);
+    {
+        int const total = ns + bb->n_vars;
+        if (total > 0) {
+            int pos = stack_patch;
+            c.byte[pos++] = 0x48;
+            c.byte[pos++] = 0x81;
+            c.byte[pos++] = (uint8_t)(0xc0 | (5 << 3) | (RSP & 7));
+            int32_t const sz = total * 32;
+            __builtin_memcpy(c.byte + pos, &sz, 4);
+        }
     }
 
     int const pool_start = (int)c.size;
@@ -1322,10 +1348,40 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             emit_alu_reg(c, inst->op, s.rd, s.rx, 0, 0, inst->imm, -1, -1);
         } break;
 
-        case op_loop_begin:
-        case op_loop_end:
-        case op_load_var:
-        case op_store_var: __builtin_trap();
+        case op_load_var: {
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            vfill(c, s.rd, inst->imm);
+        } break;
+
+        case op_store_var: {
+            int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
+            vspill(c, ry, inst->imm);
+            ra_free_chan(ra, inst->y, i);
+        } break;
+
+        case op_loop_begin: {
+            int8_t rx = ra_ensure(ra, sl, ns, inst->x.id);
+            vmovd_to_gpr(c, R11, rx);
+            ra_free_chan(ra, inst->x, i);
+            cmp_ri(c, R11, 0);
+            jc->loop_br_skip = jcc(c, 0x0e);
+            jc->loop_top = (int)c->size;
+        } break;
+
+        case op_loop_end: {
+            int8_t rx = ra_ensure(ra, sl, ns, inst->x.id);
+            vmovd_to_gpr(c, R11, rx);
+            ra_free_chan(ra, inst->x, i);
+            int8_t tmp = ra_alloc(ra, sl, ns);
+            vfill(c, tmp, inst->imm);
+            vmovd_to_gpr(c, XM, tmp);
+            ra_return_reg(ra, tmp);
+            cmp_rr(c, XM, R11);
+            int const br = jcc(c, 0x0c);
+            int32_t const rel = (int32_t)(jc->loop_top - (br + 4));
+            __builtin_memcpy(c->byte + br, &rel, 4);
+            patch_jcc(c, jc->loop_br_skip);
+        } break;
 
         }
     }

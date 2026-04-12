@@ -3962,7 +3962,7 @@ TEST(test_stats_safe) {
     }
 }
 
-#if defined(__aarch64__)
+#if defined(__aarch64__) || defined(__AVX2__)
     #define LOOP_JIT umbra_backend_jit(),
 #else
     #define LOOP_JIT
