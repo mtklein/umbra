@@ -1,18 +1,10 @@
 #include <metal_stdlib>
 using namespace metal;
 
-int safe_ix(int ix, uint bytes, int elem) {
-    int count = (int)(bytes / (uint)elem);
-    return clamp(ix, 0, max(count-1, 0));
-}
-uint oob_mask(int ix, uint bytes, int elem) {
-    int count = (int)(bytes / (uint)elem);
-    return (ix >= 0 && ix < count) ? ~0u : 0u;
-}
 
 kernel void umbra_entry(
     constant uint &w [[buffer(3)]],
-    constant uint *buf_szs [[buffer(4)]],
+    constant uint *buf_limit [[buffer(4)]],
     constant uint *buf_rbs [[buffer(5)]],
     constant uint &x0 [[buffer(6)]],
     constant uint &y0 [[buffer(7)]],
@@ -48,30 +40,30 @@ kernel void umbra_entry(
     float v22 = min(v9, v21);
     float _si23 = floor(v22);
     float _fr23 = v22 - _si23;
-    float _lo23 = as_type<float>(((device uint*)p2)[safe_ix((int)_si23,buf_szs[2],4)] & oob_mask((int)_si23,buf_szs[2],4));
-    float _hi23 = as_type<float>(((device uint*)p2)[safe_ix((int)_si23+1,buf_szs[2],4)] & oob_mask((int)_si23+1,buf_szs[2],4));
-    float v23 = _lo23 + (_hi23 - _lo23) * _fr23;
+    uint _lo23 = 0; if ((uint)(int)_si23 < buf_limit[2]) { _lo23 = ((device uint*)p2)[(int)_si23]; }
+    uint _hi23 = 0; if ((uint)((int)_si23+1) < buf_limit[2]) { _hi23 = ((device uint*)p2)[(int)_si23+1]; }
+    float v23 = as_type<float>(_lo23) + (as_type<float>(_hi23) - as_type<float>(_lo23)) * _fr23;
     uint v24 = (uint)as_type<ushort>((half)v23);
     float v25 = v22 + v11;
     float _si26 = floor(v25);
     float _fr26 = v25 - _si26;
-    float _lo26 = as_type<float>(((device uint*)p2)[safe_ix((int)_si26,buf_szs[2],4)] & oob_mask((int)_si26,buf_szs[2],4));
-    float _hi26 = as_type<float>(((device uint*)p2)[safe_ix((int)_si26+1,buf_szs[2],4)] & oob_mask((int)_si26+1,buf_szs[2],4));
-    float v26 = _lo26 + (_hi26 - _lo26) * _fr26;
+    uint _lo26 = 0; if ((uint)(int)_si26 < buf_limit[2]) { _lo26 = ((device uint*)p2)[(int)_si26]; }
+    uint _hi26 = 0; if ((uint)((int)_si26+1) < buf_limit[2]) { _hi26 = ((device uint*)p2)[(int)_si26+1]; }
+    float v26 = as_type<float>(_lo26) + (as_type<float>(_hi26) - as_type<float>(_lo26)) * _fr26;
     uint v27 = (uint)as_type<ushort>((half)v26);
     float v28 = as_type<float>(v6) + v22;
     float _si29 = floor(v28);
     float _fr29 = v28 - _si29;
-    float _lo29 = as_type<float>(((device uint*)p2)[safe_ix((int)_si29,buf_szs[2],4)] & oob_mask((int)_si29,buf_szs[2],4));
-    float _hi29 = as_type<float>(((device uint*)p2)[safe_ix((int)_si29+1,buf_szs[2],4)] & oob_mask((int)_si29+1,buf_szs[2],4));
-    float v29 = _lo29 + (_hi29 - _lo29) * _fr29;
+    uint _lo29 = 0; if ((uint)(int)_si29 < buf_limit[2]) { _lo29 = ((device uint*)p2)[(int)_si29]; }
+    uint _hi29 = 0; if ((uint)((int)_si29+1) < buf_limit[2]) { _hi29 = ((device uint*)p2)[(int)_si29+1]; }
+    float v29 = as_type<float>(_lo29) + (as_type<float>(_hi29) - as_type<float>(_lo29)) * _fr29;
     uint v30 = (uint)as_type<ushort>((half)v29);
     float v31 = v22 + v10;
     float _si32 = floor(v31);
     float _fr32 = v31 - _si32;
-    float _lo32 = as_type<float>(((device uint*)p2)[safe_ix((int)_si32,buf_szs[2],4)] & oob_mask((int)_si32,buf_szs[2],4));
-    float _hi32 = as_type<float>(((device uint*)p2)[safe_ix((int)_si32+1,buf_szs[2],4)] & oob_mask((int)_si32+1,buf_szs[2],4));
-    float v32 = _lo32 + (_hi32 - _lo32) * _fr32;
+    uint _lo32 = 0; if ((uint)(int)_si32 < buf_limit[2]) { _lo32 = ((device uint*)p2)[(int)_si32]; }
+    uint _hi32 = 0; if ((uint)((int)_si32+1) < buf_limit[2]) { _hi32 = ((device uint*)p2)[(int)_si32+1]; }
+    float v32 = as_type<float>(_lo32) + (as_type<float>(_hi32) - as_type<float>(_lo32)) * _fr32;
     uint v33 = (uint)as_type<ushort>((half)v32);
     {
         device ushort *hp = (device ushort*)(p1 + y * buf_rbs[1]) + x*4;

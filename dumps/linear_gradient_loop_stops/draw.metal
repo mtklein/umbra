@@ -1,18 +1,10 @@
 #include <metal_stdlib>
 using namespace metal;
 
-int safe_ix(int ix, uint bytes, int elem) {
-    int count = (int)(bytes / (uint)elem);
-    return clamp(ix, 0, max(count-1, 0));
-}
-uint oob_mask(int ix, uint bytes, int elem) {
-    int count = (int)(bytes / (uint)elem);
-    return (ix >= 0 && ix < count) ? ~0u : 0u;
-}
 
 kernel void umbra_entry(
     constant uint &w [[buffer(4)]],
-    constant uint *buf_szs [[buffer(5)]],
+    constant uint *buf_limit [[buffer(5)]],
     constant uint *buf_rbs [[buffer(6)]],
     constant uint &x0 [[buffer(7)]],
     constant uint &y0 [[buffer(8)]],
@@ -53,18 +45,18 @@ kernel void umbra_entry(
     while (var4 < v10) {
     uint v23 = var4;
     uint v24 = v23 + 1u;
-    uint v25 = ((device uint*)p3)[safe_ix((int)v24,buf_szs[3],4)] & oob_mask((int)v24,buf_szs[3],4);
+    uint v25 = 0; if ((uint)(int)v24 < buf_limit[3]) { v25 = ((device uint*)p3)[(int)v24]; }
     uint v26 = v21 <= as_type<float>(v25) ? 0xffffffffu : 0u;
     uint v27 = v12 + v24;
-    uint v28 = ((device uint*)p2)[safe_ix((int)v27,buf_szs[2],4)] & oob_mask((int)v27,buf_szs[2],4);
+    uint v28 = 0; if ((uint)(int)v27 < buf_limit[2]) { v28 = ((device uint*)p2)[(int)v27]; }
     uint v29 = v8 + v24;
-    uint v30 = ((device uint*)p2)[safe_ix((int)v29,buf_szs[2],4)] & oob_mask((int)v29,buf_szs[2],4);
+    uint v30 = 0; if ((uint)(int)v29 < buf_limit[2]) { v30 = ((device uint*)p2)[(int)v29]; }
     uint v31 = v11 + v24;
-    uint v32 = ((device uint*)p2)[safe_ix((int)v31,buf_szs[2],4)] & oob_mask((int)v31,buf_szs[2],4);
+    uint v32 = 0; if ((uint)(int)v31 < buf_limit[2]) { v32 = ((device uint*)p2)[(int)v31]; }
     uint v33 = v12 + v23;
-    uint v34 = ((device uint*)p2)[safe_ix((int)v33,buf_szs[2],4)] & oob_mask((int)v33,buf_szs[2],4);
+    uint v34 = 0; if ((uint)(int)v33 < buf_limit[2]) { v34 = ((device uint*)p2)[(int)v33]; }
     float v35 = as_type<float>(v28) - as_type<float>(v34);
-    uint v36 = ((device uint*)p3)[safe_ix((int)v23,buf_szs[3],4)] & oob_mask((int)v23,buf_szs[3],4);
+    uint v36 = 0; if ((uint)(int)v23 < buf_limit[3]) { v36 = ((device uint*)p3)[(int)v23]; }
     uint v37 = as_type<float>(v36) <= v21 ? 0xffffffffu : 0u;
     uint v38 = v37 & v26;
     float v39 = as_type<float>(v25) - as_type<float>(v36);
@@ -72,15 +64,15 @@ kernel void umbra_entry(
     float v41 = v40 / v39;
     float v42 = fma(v41, v35, as_type<float>(v34));
     uint v43 = v8 + v23;
-    uint v44 = ((device uint*)p2)[safe_ix((int)v43,buf_szs[2],4)] & oob_mask((int)v43,buf_szs[2],4);
+    uint v44 = 0; if ((uint)(int)v43 < buf_limit[2]) { v44 = ((device uint*)p2)[(int)v43]; }
     float v45 = as_type<float>(v30) - as_type<float>(v44);
     float v46 = fma(v41, v45, as_type<float>(v44));
     uint v47 = v11 + v23;
-    uint v48 = ((device uint*)p2)[safe_ix((int)v47,buf_szs[2],4)] & oob_mask((int)v47,buf_szs[2],4);
+    uint v48 = 0; if ((uint)(int)v47 < buf_limit[2]) { v48 = ((device uint*)p2)[(int)v47]; }
     float v49 = as_type<float>(v32) - as_type<float>(v48);
     float v50 = fma(v41, v49, as_type<float>(v48));
-    uint v51 = ((device uint*)p2)[safe_ix((int)v24,buf_szs[2],4)] & oob_mask((int)v24,buf_szs[2],4);
-    uint v52 = ((device uint*)p2)[safe_ix((int)v23,buf_szs[2],4)] & oob_mask((int)v23,buf_szs[2],4);
+    uint v51 = 0; if ((uint)(int)v24 < buf_limit[2]) { v51 = ((device uint*)p2)[(int)v24]; }
+    uint v52 = 0; if ((uint)(int)v23 < buf_limit[2]) { v52 = ((device uint*)p2)[(int)v23]; }
     float v53 = as_type<float>(v51) - as_type<float>(v52);
     float v54 = fma(v41, v53, as_type<float>(v52));
     uint v55 = var0;

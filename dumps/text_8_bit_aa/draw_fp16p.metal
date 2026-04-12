@@ -1,18 +1,10 @@
 #include <metal_stdlib>
 using namespace metal;
 
-int safe_ix(int ix, uint bytes, int elem) {
-    int count = (int)(bytes / (uint)elem);
-    return clamp(ix, 0, max(count-1, 0));
-}
-uint oob_mask(int ix, uint bytes, int elem) {
-    int count = (int)(bytes / (uint)elem);
-    return (ix >= 0 && ix < count) ? ~0u : 0u;
-}
 
 kernel void umbra_entry(
     constant uint &w [[buffer(3)]],
-    constant uint *buf_szs [[buffer(4)]],
+    constant uint *buf_limit [[buffer(4)]],
     constant uint *buf_rbs [[buffer(5)]],
     constant uint &x0 [[buffer(6)]],
     constant uint &y0 [[buffer(7)]],
@@ -36,7 +28,7 @@ kernel void umbra_entry(
     uint v10 = (uint)(int)(short)(ushort)v9;
     float v11 = (float)(int)v10;
     float v12 = v11 * as_type<float>(998277249u);
-    device uchar *row13 = p1 + y * buf_rbs[1]; uint ps13 = buf_szs[1]/4;
+    device uchar *row13 = p1 + y * buf_rbs[1]; uint ps13 = buf_limit[1];
     uint v13 = (uint)((device ushort*)row13)[x];
     uint v13_1 = (uint)((device ushort*)(row13+ps13))[x];
     uint v13_2 = (uint)((device ushort*)(row13+2*ps13))[x];
@@ -62,7 +54,7 @@ kernel void umbra_entry(
     float v32 = fma(v12, v31, v29);
     uint v33 = (uint)as_type<ushort>((half)v32);
     {
-        device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_szs[1]/4;
+        device uchar *row = p1 + y * buf_rbs[1]; uint ps = buf_limit[1];
         ((device ushort*)row)[x] = ushort(v18); ((device ushort*)(row+ps))[x] = ushort(v28); ((device ushort*)(row+2*ps))[x] = ushort(v33); ((device ushort*)(row+3*ps))[x] = ushort(v23);
     }
 }

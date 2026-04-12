@@ -1,18 +1,10 @@
 #include <metal_stdlib>
 using namespace metal;
 
-int safe_ix(int ix, uint bytes, int elem) {
-    int count = (int)(bytes / (uint)elem);
-    return clamp(ix, 0, max(count-1, 0));
-}
-uint oob_mask(int ix, uint bytes, int elem) {
-    int count = (int)(bytes / (uint)elem);
-    return (ix >= 0 && ix < count) ? ~0u : 0u;
-}
 
 kernel void umbra_entry(
     constant uint &w [[buffer(3)]],
-    constant uint *buf_szs [[buffer(4)]],
+    constant uint *buf_limit [[buffer(4)]],
     constant uint *buf_rbs [[buffer(5)]],
     constant uint &x0 [[buffer(6)]],
     constant uint &y0 [[buffer(7)]],

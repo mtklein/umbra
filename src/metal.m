@@ -43,6 +43,7 @@ struct metal_program {
     char     *src;
     struct deref_info *deref;
     uint8_t  *buf_rw;
+    uint8_t  *buf_shift;
     int    max_ptr;
     int    total_bufs;
     int    tg_size;
@@ -163,14 +164,12 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                 int p = inst->ptr.deref
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
-                     "%suint v%d = "
-                     "((device uint*)p%d)"
-                     "[safe_ix((int)%s,"
-                     "buf_szs[%d],4)]"
-                     " & oob_mask((int)%s,"
-                     "buf_szs[%d],4);\n",
-                     pad, i, p, vx, p,
-                     vx, p);
+                     "%suint v%d = 0;"
+                     " if ((uint)(int)%s < buf_limit[%d])"
+                     " { v%d = ((device uint*)p%d)"
+                     "[(int)%s]; }\n",
+                     pad, i, vx, p,
+                     i, p, vx);
             } break;
             case op_sample_32: {
                 int p = inst->ptr.deref
@@ -181,17 +180,21 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                      pad, i, fv(_fx, vx, xid, is_f),
                      pad, i, fv(_fx, vx, xid, is_f), i);
                 emit(b,
-                     "%sfloat _lo%d = as_type<float>(((device uint*)p%d)"
-                     "[safe_ix((int)_si%d,buf_szs[%d],4)]"
-                     " & oob_mask((int)_si%d,buf_szs[%d],4));\n",
-                     pad, i, p, i, p, i, p);
+                     "%suint _lo%d = 0;"
+                     " if ((uint)(int)_si%d < buf_limit[%d])"
+                     " { _lo%d = ((device uint*)p%d)"
+                     "[(int)_si%d]; }\n",
+                     pad, i, i, p, i, p, i);
                 emit(b,
-                     "%sfloat _hi%d = as_type<float>(((device uint*)p%d)"
-                     "[safe_ix((int)_si%d+1,buf_szs[%d],4)]"
-                     " & oob_mask((int)_si%d+1,buf_szs[%d],4));\n",
-                     pad, i, p, i, p, i, p);
+                     "%suint _hi%d = 0;"
+                     " if ((uint)((int)_si%d+1) < buf_limit[%d])"
+                     " { _hi%d = ((device uint*)p%d)"
+                     "[(int)_si%d+1]; }\n",
+                     pad, i, i, p, i, p, i);
                 emit(b,
-                     "%sfloat v%d = _lo%d + (_hi%d - _lo%d) * _fr%d;\n",
+                     "%sfloat v%d = as_type<float>(_lo%d)"
+                     " + (as_type<float>(_hi%d)"
+                     " - as_type<float>(_lo%d)) * _fr%d;\n",
                      pad, i, i, i, i, i);
             } break;
             case op_store_32: {
@@ -225,7 +228,7 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
                      "%sdevice uchar *row%d = p%d + y * buf_rbs[%d];"
-                     " uint ps%d = buf_szs[%d]/4;\n"
+                     " uint ps%d = buf_limit[%d];\n"
                      "%suint v%d = (uint)((device ushort*)row%d)[x];\n"
                      "%suint v%d_1 = (uint)((device ushort*)(row%d+ps%d))[x];\n"
                      "%suint v%d_2 = (uint)((device ushort*)(row%d+2*ps%d))[x];\n"
@@ -261,7 +264,7 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                 emit(b,
                      "%s{\n"
                      "%s    device uchar *row = p%d + y * buf_rbs[%d];"
-                     " uint ps = buf_szs[%d]/4;\n"
+                     " uint ps = buf_limit[%d];\n"
                      "%s    ((device ushort*)row)[x] = ushort(%s);"
                      " ((device ushort*)(row+ps))[x] = ushort(%s);"
                      " ((device ushort*)(row+2*ps))[x] = ushort(%s);"
@@ -320,14 +323,12 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                 int p = inst->ptr.deref
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
-                     "%suint v%d = (uint)"
-                     "((device ushort*)p%d)"
-                     "[safe_ix((int)%s,"
-                     "buf_szs[%d],2)]"
-                     " & oob_mask((int)%s,"
-                     "buf_szs[%d],2);\n",
-                     pad, i, p, vx, p,
-                     vx, p);
+                     "%suint v%d = 0;"
+                     " if ((uint)(int)%s < buf_limit[%d])"
+                     " { v%d = (uint)((device ushort*)p%d)"
+                     "[(int)%s]; }\n",
+                     pad, i, vx, p,
+                     i, p, vx);
             } break;
             case op_store_16: {
                 int p = inst->ptr.deref
@@ -842,29 +843,12 @@ static char* build_source(BB const *bb,
          "#include <metal_stdlib>\n"
          "using namespace metal;\n\n");
 
-    emit(&b,
-         "int safe_ix"
-         "(int ix, uint bytes, int elem) {\n");
-    emit(&b,
-         "    int count = (int)"
-         "(bytes / (uint)elem);\n");
-    emit(&b,
-         "    return clamp(ix, 0,"
-         " max(count-1, 0));\n}\n");
-    emit(&b,
-         "uint oob_mask"
-         "(int ix, uint bytes, int elem) {\n");
-    emit(&b,
-         "    int count = (int)"
-         "(bytes / (uint)elem);\n");
-    emit(&b,
-         "    return (ix >= 0 && ix < count)"
-         " ? ~0u : 0u;\n}\n\n");
+    emit(&b, "\n");
 
     emit(&b, "kernel void umbra_entry(\n");
     emit(&b,
          "    constant uint &w [[buffer(%d)]]"
-         ",\n    constant uint *buf_szs [[buffer(%d)]]"
+         ",\n    constant uint *buf_limit [[buffer(%d)]]"
          ",\n    constant uint *buf_rbs [[buffer(%d)]]"
          ",\n    constant uint &x0 [[buffer(%d)]]"
          ",\n    constant uint &y0 [[buffer(%d)]]",
@@ -1028,12 +1012,15 @@ static struct metal_program* metal_program(
             }
         }
 
-        uint8_t *buf_rw = calloc((size_t)(total_bufs + 1), sizeof *buf_rw);
+        uint8_t *buf_rw    = calloc((size_t)(total_bufs + 1), sizeof *buf_rw);
+        uint8_t *buf_shift = calloc((size_t)(total_bufs + 1), sizeof *buf_shift);
         for (int i = 0; i < bb->insts; i++) {
             if (!op_has_ptr(bb->inst[i].op)) { continue; }
             int bi = bb->inst[i].ptr.deref ? deref_buf[bb->inst[i].ptr.ix]
                                            : bb->inst[i].ptr.bits;
             buf_rw[bi] |= op_is_store(bb->inst[i].op) ? BUF_WRITTEN : BUF_READ;
+            if (bb->inst[i].op == op_gather_16) { buf_shift[bi] = 1; }
+            else                                { buf_shift[bi] = 2; }
         }
 
         NSError *error = nil;
@@ -1072,6 +1059,7 @@ static struct metal_program* metal_program(
             p->deref         = di;
             p->n_deref       = n_deref;
             p->buf_rw        = buf_rw;
+            p->buf_shift     = buf_shift;
 
             free(deref_buf);
             result = p;
@@ -1082,6 +1070,7 @@ static struct metal_program* metal_program(
         free(deref_buf);
         free(di);
         free(buf_rw);
+        free(buf_shift);
         free(src);
     out:;
     }
@@ -1146,7 +1135,7 @@ static void encode_dispatch(
     uint32_t rbs_data[33] = {0};
     for (int i = 0; i <= p->max_ptr; i++) {
         if (buf[i].ptr && buf[i].sz) {
-            szs_data[i] = (uint32_t)buf[i].sz;
+            szs_data[i] = (uint32_t)(buf[i].sz >> p->buf_shift[i]);
         }
         rbs_data[i]  = (uint32_t)buf[i].row_bytes;
     }
@@ -1185,7 +1174,7 @@ static void encode_dispatch(
         int const bi  = p->deref[d].buf_idx;
         int const idx = gpu_buf_cache_get(&be->cache, derived, dsz, p->buf_rw[bi]);
         bind_handle[bi] = be->cache.entry[idx].buf.ptr;
-        szs_data[bi] = (uint32_t)dsz;
+        szs_data[bi] = (uint32_t)(dsz >> p->buf_shift[bi]);
         rbs_data[bi] = (uint32_t)drb;
     }
 
@@ -1311,6 +1300,7 @@ static void metal_program_free(struct metal_program *p) {
     }
     free(p->deref);
     free(p->buf_rw);
+    free(p->buf_shift);
     free(p->src);
     free(p);
 }

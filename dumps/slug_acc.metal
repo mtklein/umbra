@@ -1,18 +1,10 @@
 #include <metal_stdlib>
 using namespace metal;
 
-int safe_ix(int ix, uint bytes, int elem) {
-    int count = (int)(bytes / (uint)elem);
-    return clamp(ix, 0, max(count-1, 0));
-}
-uint oob_mask(int ix, uint bytes, int elem) {
-    int count = (int)(bytes / (uint)elem);
-    return (ix >= 0 && ix < count) ? ~0u : 0u;
-}
 
 kernel void umbra_entry(
     constant uint &w [[buffer(3)]],
-    constant uint *buf_szs [[buffer(4)]],
+    constant uint *buf_limit [[buffer(4)]],
     constant uint *buf_rbs [[buffer(5)]],
     constant uint &x0 [[buffer(6)]],
     constant uint &y0 [[buffer(7)]],
@@ -42,22 +34,22 @@ kernel void umbra_entry(
     uint v16 = ((device const uint*)p0)[18];
     uint v17 = 6u;
     uint v18 = v16 * 6u;
-    uint v19 = ((device uint*)p2)[safe_ix((int)v18,buf_szs[2],4)] & oob_mask((int)v18,buf_szs[2],4);
+    uint v19 = 0; if ((uint)(int)v18 < buf_limit[2]) { v19 = ((device uint*)p2)[(int)v18]; }
     uint v20 = 1u;
     uint v21 = v18 + 1u;
-    uint v22 = ((device uint*)p2)[safe_ix((int)v21,buf_szs[2],4)] & oob_mask((int)v21,buf_szs[2],4);
+    uint v22 = 0; if ((uint)(int)v21 < buf_limit[2]) { v22 = ((device uint*)p2)[(int)v21]; }
     uint v23 = 2u;
     uint v24 = v18 + 2u;
-    uint v25 = ((device uint*)p2)[safe_ix((int)v24,buf_szs[2],4)] & oob_mask((int)v24,buf_szs[2],4);
+    uint v25 = 0; if ((uint)(int)v24 < buf_limit[2]) { v25 = ((device uint*)p2)[(int)v24]; }
     uint v26 = 3u;
     uint v27 = v18 + 3u;
-    uint v28 = ((device uint*)p2)[safe_ix((int)v27,buf_szs[2],4)] & oob_mask((int)v27,buf_szs[2],4);
+    uint v28 = 0; if ((uint)(int)v27 < buf_limit[2]) { v28 = ((device uint*)p2)[(int)v27]; }
     uint v29 = 4u;
     uint v30 = v18 + 4u;
-    uint v31 = ((device uint*)p2)[safe_ix((int)v30,buf_szs[2],4)] & oob_mask((int)v30,buf_szs[2],4);
+    uint v31 = 0; if ((uint)(int)v30 < buf_limit[2]) { v31 = ((device uint*)p2)[(int)v30]; }
     uint v32 = 5u;
     uint v33 = v18 + 5u;
-    uint v34 = ((device uint*)p2)[safe_ix((int)v33,buf_szs[2],4)] & oob_mask((int)v33,buf_szs[2],4);
+    uint v34 = 0; if ((uint)(int)v33 < buf_limit[2]) { v34 = ((device uint*)p2)[(int)v33]; }
     uint v35 = 3212836864u;
     uint v36 = x0 + pos.x;
     float v37 = (float)(int)v36;
