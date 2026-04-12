@@ -66,6 +66,7 @@ void uniform_ring_pool_rotate(struct uniform_ring_pool *p) {
 void uniform_ring_pool_drain_all(struct uniform_ring_pool *p) {
     for (int i = 0; i < p->n; i++) {
         p->wait_frame(i, p->ctx);
-        uniform_ring_free(&p->rings[i]);
+        uniform_ring_reset(&p->rings[i]);
     }
+    p->cur = 0;
 }

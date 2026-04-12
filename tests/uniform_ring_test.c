@@ -353,14 +353,14 @@ TEST(uniform_ring_pool_drain_all_releases_chunks) {
     be.n_destroy == 0 here;
 
     uniform_ring_pool_drain_all(&p);
-    be.n_destroy == 3 here;
+    be.n_destroy == 0 here;
 
-    // Ring is still usable after drain — next alloc creates a fresh chunk.
+    // Ring retains chunks after drain — next alloc reuses them.
     uniform_ring_pool_alloc(&p, &payload, sizeof payload);
-    be.n_create == 4 here;
+    be.n_create == 3 here;
 
     uniform_ring_pool_free(&p);
-    be.n_destroy == 4 here;
+    be.n_destroy == 3 here;
 }
 
 TEST(uniform_ring_used_tracks_high_water) {
