@@ -40,15 +40,17 @@ static SDL_PixelFormat sdl_pixel_format(int fmt) {
     switch (fmt) {
     case FMT_FP16:
     case FMT_FP16_PLANAR: return SDL_PIXELFORMAT_RGBA64_FLOAT;
+    case FMT_1010102:     return SDL_PIXELFORMAT_ABGR2101010;
+    case FMT_565:         return SDL_PIXELFORMAT_RGBA64_FLOAT;
     default:              return SDL_PIXELFORMAT_RGBA32;
     }
 }
 
 static struct umbra_fmt const *readback_fmt(int fmt) {
     switch (fmt) {
-    case FMT_FP16:
-    case FMT_FP16_PLANAR: return &umbra_fmt_fp16;
-    default:              return &umbra_fmt_8888;
+    case FMT_8888:    return &umbra_fmt_8888;
+    case FMT_1010102: return &umbra_fmt_1010102;
+    default:          return &umbra_fmt_fp16;
     }
 }
 
