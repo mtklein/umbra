@@ -1,8 +1,8 @@
 #pragma once
 
 struct hash {
-    unsigned vals, slots;
-    void    *data;
+    int   vals, slots;
+    void *data;
 };
 
 void  hash_insert(struct hash *, unsigned hash, int val);

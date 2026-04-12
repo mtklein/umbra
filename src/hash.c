@@ -5,10 +5,10 @@
 static void just_insert(struct hash *h, unsigned hash, int val) {
     unsigned *hptr = h->data;
     int      *vptr = (int*)(hptr + h->slots);
-    unsigned  const mask = h->slots - 1;
+    unsigned  const mask = (unsigned)h->slots - 1;
 
-    unsigned i;
-    for (i = hash & mask; hptr[i]; i = (i+1) & mask);
+    unsigned i = hash & mask;
+    while (hptr[i]) { i = (i+1) & mask; }
     hptr[i] = hash;
     vptr[i] = val;
 }
@@ -16,12 +16,12 @@ static void just_insert(struct hash *h, unsigned hash, int val) {
 void hash_insert(struct hash *h, unsigned user, int val) {
     if (h->vals/3 >= h->slots/4) {
         struct hash grown = {.vals=h->vals, .slots=h->slots ? 2*h->slots : 2};
-        grown.data = calloc(grown.slots, sizeof(unsigned) + sizeof(int));
+        grown.data = calloc((size_t)grown.slots, sizeof(unsigned) + sizeof(int));
 
         if (h->vals) {
             unsigned const *hptr = h->data;
             int      const *vptr = (int const*)(hptr + h->slots);
-            for (unsigned i = 0; i < h->slots; i++) {
+            for (int i = 0; i < h->slots; i++) {
                 if (hptr[i]) {
                     just_insert(&grown, hptr[i], vptr[i]);
                 }
@@ -39,7 +39,7 @@ _Bool hash_lookup(struct hash h, unsigned user, _Bool (*match)(int, void *), voi
         unsigned const *hptr = h.data;
         int      const *vptr = (int const*)(hptr + h.slots);
         unsigned const  hash = user ? user : 1;
-        unsigned const  mask = h.slots - 1;
+        unsigned const  mask = (unsigned)h.slots - 1;
         for (unsigned i = hash & mask; hptr[i]; i = (i+1) & mask) {
             if (hptr[i] == hash && match(vptr[i], ctx)) { return 1; }
         }
