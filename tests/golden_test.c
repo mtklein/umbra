@@ -10,8 +10,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-
-
 enum { W = 128, H = 96 };
 
 static char const *backend_name[NUM_BACKENDS] = {
@@ -20,34 +18,41 @@ static char const *backend_name[NUM_BACKENDS] = {
 
 static struct umbra_backend *bes[NUM_BACKENDS];
 
-struct pipe {
+struct fill_pipe {
     struct umbra_program         *prog;
     struct umbra_uniforms_layout  uni;
     void                         *uniforms;
 };
 
-static struct pipe fill_pipe;
+static struct fill_pipe fills[5];
 
-static void build_fill(void) {
-    struct umbra_builder   *builder = umbra_builder();
+static void build_fill(int fi, struct umbra_fmt fmt) {
+    struct umbra_builder *builder = umbra_builder();
     struct umbra_uniforms_layout u = {0};
-    size_t fi = umbra_uniforms_reserve_f32(&u, 4);
+    size_t off = umbra_uniforms_reserve_f32(&u, 4);
     umbra_color c = {
-        umbra_uniform_32(builder, (umbra_ptr32){0}, fi),
-        umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 4),
-        umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 8),
-        umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 12),
+        umbra_uniform_32(builder, (umbra_ptr32){0}, off),
+        umbra_uniform_32(builder, (umbra_ptr32){0}, off + 4),
+        umbra_uniform_32(builder, (umbra_ptr32){0}, off + 8),
+        umbra_uniform_32(builder, (umbra_ptr32){0}, off + 12),
     };
-    umbra_store_8888(builder, (umbra_ptr32){.ix=1}, c);
-    fill_pipe.uni = u;
-    fill_pipe.uniforms = umbra_uniforms_alloc(&u);
-    struct umbra_basic_block *opt =
-        umbra_basic_block(builder);
+    fmt.store(builder, 1, c);
+    fills[fi].uni = u;
+    fills[fi].uniforms = umbra_uniforms_alloc(&u);
+    struct umbra_basic_block *bb = umbra_basic_block(builder);
     umbra_builder_free(builder);
-    fill_pipe.prog =
-        bes[0]->compile(bes[0], opt);
-    umbra_basic_block_free(opt);
+    fills[fi].prog = bes[0]->compile(bes[0], bb);
+    umbra_basic_block_free(bb);
 }
+
+static struct umbra_fmt const *all_fmts[] = {
+    &umbra_fmt_8888,
+    &umbra_fmt_565,
+    &umbra_fmt_1010102,
+    &umbra_fmt_fp16,
+    &umbra_fmt_fp16_planar,
+};
+enum { N_FMTS = (int)(sizeof all_fmts / sizeof *all_fmts) };
 
 static void build_pipes(void) {
     bes[0] = umbra_backend_interp();
@@ -55,92 +60,94 @@ static void build_pipes(void) {
     bes[2] = umbra_backend_metal();
     bes[3] = umbra_backend_vulkan();
     bes[4] = umbra_backend_wgpu();
-    build_fill();
+    for (int fi = 0; fi < N_FMTS; fi++) {
+        build_fill(fi, *all_fmts[fi]);
+    }
 }
 
 static void free_pipes(void) {
-    fill_pipe.prog->free(fill_pipe.prog);
-    free(fill_pipe.uniforms);
+    for (int fi = 0; fi < N_FMTS; fi++) {
+        fills[fi].prog->free(fills[fi].prog);
+        free(fills[fi].uniforms);
+    }
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         if (bes[bi]) { bes[bi]->free(bes[bi]); }
     }
 }
 
-static void fill_bg(void *dst, uint32_t bg) {
+static void fill_bg_for_slide(int fi, struct umbra_fmt fmt, int slide_idx, void *dst) {
+    struct slide *s = slide_get(slide_idx);
     float hc[4] = {
-        (float)( bg        & 0xffu) / 255.0f,
-        (float)((bg >>  8) & 0xffu) / 255.0f,
-        (float)((bg >> 16) & 0xffu) / 255.0f,
-        (float)((bg >> 24) & 0xffu) / 255.0f,
+        (float)( s->bg        & 0xffu) / 255.0f,
+        (float)((s->bg >>  8) & 0xffu) / 255.0f,
+        (float)((s->bg >> 16) & 0xffu) / 255.0f,
+        (float)((s->bg >> 24) & 0xffu) / 255.0f,
     };
-    umbra_uniforms_fill_f32(fill_pipe.uniforms, 0, hc, 4);
+    umbra_uniforms_fill_f32(fills[fi].uniforms, 0, hc, 4);
+    size_t const rb = (size_t)W * fmt.bpp;
     struct umbra_buf buf[2] = {
-        (struct umbra_buf){.ptr=fill_pipe.uniforms, .sz=fill_pipe.uni.size},
-        {.ptr=dst, .sz=(size_t)(W * H * 4), .row_bytes=(size_t)W * 4},
+        {.ptr=fills[fi].uniforms, .sz=fills[fi].uni.size},
+        {.ptr=dst, .sz=rb * H * (size_t)fmt.planes, .row_bytes=rb},
     };
-    fill_pipe.prog->queue(fill_pipe.prog, 0, 0, W, H, buf);
+    fills[fi].prog->queue(fills[fi].prog, 0, 0, W, H, buf);
 }
 
-
-static void render_slide(
-        int slide_idx,
-        struct umbra_backend *be,
-        void *pixbuf) {
+static void render_slide(int slide_idx, struct umbra_backend *be,
+                         struct umbra_fmt fmt, int fi, void *pixbuf) {
     struct slide *s = slide_get(slide_idx);
-
-    fill_bg(pixbuf, s->bg);
-    s->prepare(s, be, umbra_fmt_8888);
+    fill_bg_for_slide(fi, fmt, slide_idx, pixbuf);
+    s->prepare(s, be, fmt);
     s->draw(s, 0, 0, 0, W, H, pixbuf);
 }
 
-static void test_slide_golden(int slide_idx) {
+static void test_slide_golden(int slide_idx, struct umbra_fmt fmt, int fi) {
     struct slide *s = slide_get(slide_idx);
 
-    size_t pixbuf_sz = (size_t)(W * H * 4);
+    size_t const rb = (size_t)W * fmt.bpp;
+    size_t const pixbuf_sz = rb * H * (size_t)fmt.planes;
     void *pbuf_ref = malloc(pixbuf_sz);
     void *pbuf_tst = malloc(pixbuf_sz);
 
-    render_slide(slide_idx, bes[0], pbuf_ref);
+    render_slide(slide_idx, bes[0], fmt, fi, pbuf_ref);
     bes[0]->flush(bes[0]);
 
     for (int bi = 1; bi < NUM_BACKENDS; bi++) {
         if (!bes[bi]) { continue; }
         __builtin_memset(pbuf_tst, 0, pixbuf_sz);
-        render_slide(slide_idx, bes[bi], pbuf_tst);
+        render_slide(slide_idx, bes[bi], fmt, fi, pbuf_tst);
         bes[bi]->flush(bes[bi]);
 
         int mismatches = 0;
         int worst = 0;
-        int worst_px = -1;
+        int worst_off = -1;
         uint8_t const *r = pbuf_ref, *t = pbuf_tst;
-        for (int i = 0; i < W * H; i++) {
-            uint32_t rp, tp;
-            __builtin_memcpy(&rp, r+i*4, 4);
-            __builtin_memcpy(&tp, t+i*4, 4);
-            if (rp != tp) {
+        for (size_t j = 0; j < pixbuf_sz; j++) {
+            if (r[j] != t[j]) {
                 mismatches++;
-                for (int ch = 0; ch < 4; ch++) {
-                    int d = (int)((rp>>(ch*8))&0xFF) - (int)((tp>>(ch*8))&0xFF);
-                    if (d<0) d=-d;
-                    if (d>worst) { worst=d; worst_px=i; }
+                int d = (int)r[j] - (int)t[j];
+                if (d < 0) { d = -d; }
+                if (d > worst) {
+                    worst = d;
+                    worst_off = (int)j;
                 }
             }
         }
+        // TODO: sqrt precision — wgpu uses fast-math sqrt, gcc's JIT sqrt
+        //       may differ from gcc's interpreter sqrtf.  Both produce 1-ULP
+        //       differences visible only at fp16 precision.
         int tol = 0;
+        if (__builtin_strcmp(s->title, "Radial Gradient (2-stop)") == 0
+                && (fmt.bpp == 8 || fmt.planes == 4)) {
+            tol = 1;
+        }
         if (worst > tol) {
-            uint32_t rp, tp;
-            __builtin_memcpy(&rp, r+worst_px*4, 4);
-            __builtin_memcpy(&tp, t+worst_px*4, 4);
             dprintf(2,
-                "slide %d \"%s\" %s: "
-                "%d/%d pixels differ, "
-                "worst delta=%d at (%d,%d) "
-                "ref=%08x tst=%08x\n",
+                "slide %d \"%s\" %s fmt=%s: "
+                "%d/%d bytes differ, worst delta=%d at byte %d\n",
                 slide_idx + 1, s->title,
-                backend_name[bi],
-                mismatches, W * H,
-                worst, worst_px % W, worst_px / W,
-                rp, tp);
+                backend_name[bi], fmt.name,
+                mismatches, (int)pixbuf_sz,
+                worst, worst_off);
         }
         worst <= tol here;
     }
@@ -333,23 +340,15 @@ TEST(test_perspective_text) {
 TEST(test_golden_slides) {
     build_pipes();
     slides_init(W, H);
-    for (int si = 0; si < slide_count() - 1; si++) {
-        test_slide_golden(si);
+    for (int fi = 0; fi < N_FMTS; fi++) {
+        for (int si = 0; si < slide_count() - 1; si++) {
+            test_slide_golden(si, *all_fmts[fi], fi);
+        }
     }
     slides_cleanup();
     free_pipes();
 }
 
-// Smoke test for the GPU backends' uniform_ring backpressure path.
-// Queues enough byte-distinct uniforms to push ring usage past the
-// 64 KiB high water mark a few times within one batch, exercising the
-// rotate / drain / reset cycle, and asserts both that (a) the last
-// dispatch's color landed in the destination pixel and (b) the
-// backend's rotation counter actually advanced — proving the rotate
-// path fired and wasn't silently disabled. The bench is still the
-// canonical regression for the original silent-cmdbuf-corruption
-// failure mode (that requires very large N which becomes flaky under
-// parallel ninja test execution).
 static void run_long_batch_no_oom(struct umbra_backend *be) {
     if (be) {
         struct umbra_builder *bld = umbra_builder();
@@ -375,8 +374,6 @@ static void run_long_batch_no_oom(struct umbra_backend *be) {
             {.ptr=color, .sz=sizeof color},
             {.ptr=&pixel, .sz=sizeof pixel, .row_bytes=sizeof pixel},
         };
-        // 12 000 × 16-byte uniforms = ~192 KiB of ring traffic, ~3 backpressure
-        // events at the 64 KiB high water mark.
         int const N = 12000;
         for (int i = 0; i < N; i++) {
             color[0] = (float)((i & 0xff) / 255.0f);
@@ -409,14 +406,9 @@ TEST(test_wgpu_long_batch_no_oom) {
     run_long_batch_no_oom(umbra_backend_wgpu());
 }
 
-// Regression test for tiled writable buffer sync. Simulates the slug slide's
-// tiling pattern: a writable buffer is cleared per-tile on the host between
-// queue() calls within a single flush. Without proper sync, GPU backends can
-// see stale data from a prior frame in the second tile's rows.
 static void run_tiled_writable_sync(struct umbra_backend *be) {
     if (!be) { return; }
 
-    // Build: load f32 from buf[0], add 1.0, store back.
     struct umbra_builder *b = umbra_builder();
     umbra_val32 v   = umbra_load_32(b, (umbra_ptr32){.ix=0});
     umbra_val32 one = umbra_imm_f32(b, 1.0f);
@@ -428,7 +420,6 @@ static void run_tiled_writable_sync(struct umbra_backend *be) {
     umbra_basic_block_free(bb);
     p != 0 here;
 
-    // Page-aligned buffer exercises Metal/Vulkan zero-copy host import.
     enum { BW = 128, BH = 128 };
     size_t buf_sz  = BW * BH * sizeof(float),
            half_sz = buf_sz / 2;
@@ -440,24 +431,18 @@ static void run_tiled_writable_sync(struct umbra_backend *be) {
         {.ptr=data, .sz=buf_sz, .row_bytes=BW * sizeof(float)},
     };
 
-    // Three frames to catch cross-frame staleness.  The backend owns
-    // writable buffers until flush, so we flush between tiles.
     for (int frame = 0; frame < 3; frame++) {
-        // Sentinel simulates stale accumulation from a prior frame.
         float sentinel = (float)(frame + 2) * 10.0f;
         for (int i = 0; i < BW * BH; i++) { data[i] = sentinel; }
 
-        // Tile 1: clear top half, queue, flush.
         __builtin_memset(data, 0, half_sz);
         p->queue(p, 0, 0, BW, BH / 2, bufs);
         be->flush(be);
 
-        // Tile 2: clear bottom half, queue, flush.
         __builtin_memset((char *)data + half_sz, 0, half_sz);
         p->queue(p, 0, BH / 2, BW, BH, bufs);
         be->flush(be);
 
-        // Every element should be exactly 1.0f (0.0 + 1.0).
         for (int i = 0; i < BW * BH; i++) {
             data[i] == 1.0f here;
         }
@@ -480,13 +465,10 @@ TEST(test_wgpu_tiled_writable_sync) {
     run_tiled_writable_sync(umbra_backend_wgpu());
 }
 
-// Exercise wgpu paths not covered by golden/stress tests:
-// dump and unaligned uniform ring upload.
 TEST(test_wgpu_misc) {
     struct umbra_backend *be = umbra_backend_wgpu();
     if (!be) { return; }
 
-    // Simple shader: paint one pixel with uniform color.
     struct umbra_builder *bld = umbra_builder();
     umbra_color c = {
         umbra_uniform_32(bld, (umbra_ptr32){0}, 0),
@@ -502,12 +484,10 @@ TEST(test_wgpu_misc) {
     umbra_basic_block_free(bb);
     p != 0 here;
 
-    // Exercise dump.
     FILE *devnull = fopen("/dev/null", "w");
     p->dump(p, devnull);
     fclose(devnull);
 
-    // sz=7 triggers the unaligned uniform write path (not a multiple of 4).
     float uniform_data[2] = {1.0f, 0.0f};
     uint32_t pixel = 0;
     struct umbra_buf bufs[] = {
@@ -517,8 +497,8 @@ TEST(test_wgpu_misc) {
     p->queue(p, 0, 0, 1, 1, bufs);
     be->flush(be);
 
-    (pixel & 0xff)   == 0xff here;  // red = 1.0
-    (pixel >> 24)    == 0xff here;  // alpha = 1.0
+    (pixel & 0xff)   == 0xff here;
+    (pixel >> 24)    == 0xff here;
 
     p->free(p);
     be->free(be);
