@@ -191,7 +191,7 @@ struct umbra_basic_block* umbra_basic_block(struct umbra_builder *b) {
         int j = preamble;
         schedule(b->inst, n, out, j, live, 0, lb);
         for (int i = 0; i < n; i++) {
-            if (b->inst[i].live && b->inst[i].varying && i < lb) { j++; }
+            if (is_body(b->inst + i) && i < lb) { j++; }
         }
 
         b->inst[lb].final_id = j;
@@ -199,7 +199,7 @@ struct umbra_basic_block* umbra_basic_block(struct umbra_builder *b) {
 
         schedule(b->inst, n, out, j, live, lb + 1, le);
         for (int i = lb + 1; i < le; i++) {
-            if (b->inst[i].live && b->inst[i].varying) { j++; }
+            if (is_body(b->inst + i)) { j++; }
         }
 
         b->inst[le].final_id = j;
