@@ -36,6 +36,22 @@ static struct umbra_fmt const *fmt_enums[] = {
     &umbra_fmt_fp16_planar, &umbra_fmt_1010102,
 };
 
+static SDL_PixelFormat sdl_pixel_format(int fmt) {
+    switch (fmt) {
+    case FMT_FP16:
+    case FMT_FP16_PLANAR: return SDL_PIXELFORMAT_RGBA64_FLOAT;
+    default:              return SDL_PIXELFORMAT_RGBA32;
+    }
+}
+
+static struct umbra_fmt const *readback_fmt(int fmt) {
+    switch (fmt) {
+    case FMT_FP16:
+    case FMT_FP16_PLANAR: return &umbra_fmt_fp16;
+    default:              return &umbra_fmt_8888;
+    }
+}
+
 struct pipe {
     struct umbra_program          *program;
     struct umbra_uniforms_layout   uni;
@@ -81,7 +97,7 @@ static void build_readback(int fmt) {
     free_pipe(&readback_pipe);
     struct umbra_builder *builder = umbra_builder();
     umbra_color c = fmt_enums[fmt]->load(builder, 1);
-    umbra_fmt_8888.store(builder, 2, c);
+    readback_fmt(fmt)->store(builder, 2, c);
     readback_pipe.out_ptr = 2;
     finish_pipe(&readback_pipe, builder, (struct umbra_uniforms_layout){0});
 }
@@ -199,7 +215,8 @@ static void fill_bg_row(void *dst, int n, uint32_t bg, size_t row_sz, size_t pla
     fill_pipe.program->queue(fill_pipe.program, 0, 0, n, 1, buf);
 }
 
-static void readback_row(uint32_t *dst, void *src, int n, size_t src_sz, size_t plane_gap) {
+static void readback_row(void *dst, int dst_bpp, void *src, int n,
+                         size_t src_sz, size_t plane_gap) {
     int      ps = plane_gap ? 3 : 0;
     int      op = readback_pipe.out_ptr;
     struct umbra_buf buf[6];
@@ -208,7 +225,7 @@ static void readback_row(uint32_t *dst, void *src, int n, size_t src_sz, size_t 
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (struct umbra_buf){.ptr=(char *)src + (size_t)(i + 1) * plane_gap, .sz=src_sz};
     }
-    buf[op] = (struct umbra_buf){.ptr=dst, .sz=(size_t)(n * 4)};
+    buf[op] = (struct umbra_buf){.ptr=dst, .sz=(size_t)(n * dst_bpp)};
     readback_pipe.program->queue(readback_pipe.program, 0, 0, n, 1, buf);
 }
 
@@ -257,13 +274,6 @@ int main(void) {
         return 1;
     }
 
-    SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32,
-                                                   SDL_TEXTUREACCESS_STREAMING, W, H);
-    if (!texture) {
-        SDL_Log("SDL_CreateTexture failed: %s", SDL_GetError());
-        return 1;
-    }
-
     slides_init(W, H);
 
     max_threads = SDL_GetNumLogicalCPUCores();
@@ -285,6 +295,13 @@ int main(void) {
     int cur_fmt = FMT_FP16;
     cur_backend = pick_backend(1);
     build_slide_fmt(slide_get(cur_slide), cur_fmt);
+
+    SDL_Texture *texture = SDL_CreateTexture(renderer, sdl_pixel_format(cur_fmt),
+                                             SDL_TEXTUREACCESS_STREAMING, W, H);
+    if (!texture) {
+        SDL_Log("SDL_CreateTexture failed: %s", SDL_GetError());
+        return 1;
+    }
 
     uint64_t fps_start = SDL_GetPerformanceCounter();
     int      fps_frames = 0;
@@ -317,6 +334,9 @@ int main(void) {
                     build_slide_fmt(slide_get(cur_slide), cur_fmt);
                     cur_backend = pick_backend(cur_backend);
                     rebuild_xtra(cur_backend);
+                    SDL_DestroyTexture(texture);
+                    texture = SDL_CreateTexture(renderer, sdl_pixel_format(cur_fmt),
+                                               SDL_TEXTUREACCESS_STREAMING, W, H);
                 } else if (ev.key.key == SDLK_COMMA) {
                     if (n_threads > 1) { n_threads--; rebuild_xtra(cur_backend); }
                 } else if (ev.key.key == SDLK_PERIOD) {
@@ -386,7 +406,8 @@ int main(void) {
         uint8_t *rows = (uint8_t *)tex_pixels;
         for (int y = 0; y < H; y++) {
             void *src = (void *)((uint8_t *)pixbuf + (size_t)y * (size_t)W * bpp);
-            readback_row((uint32_t *)(rows + y * tex_pitch), src, W, row_sz, plane_gap);
+            readback_row(rows + y * tex_pitch, (int)readback_fmt(cur_fmt)->bpp,
+                         src, W, row_sz, plane_gap);
         }
 
         if (want_dump) {
