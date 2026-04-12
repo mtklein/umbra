@@ -28,23 +28,12 @@ kernel void umbra_entry(
     uint v2 = ((device const uint*)p0)[1];
     uint v3 = ((device const uint*)p0)[2];
     uint v4 = ((device const uint*)p0)[3];
-    uint v5 = 1132396544u;
-    uint v6 = 1065353216u;
-    float v7 = max(as_type<float>(v1), as_type<float>(0u));
-    float v8 = min(v7, as_type<float>(1065353216u));
-    float v9 = v8 * as_type<float>(1132396544u);
-    uint v10 = (uint)(int)rint(v9);
-    float v11 = max(as_type<float>(v2), as_type<float>(0u));
-    float v12 = min(v11, as_type<float>(1065353216u));
-    float v13 = v12 * as_type<float>(1132396544u);
-    uint v14 = (uint)(int)rint(v13);
-    float v15 = max(as_type<float>(v3), as_type<float>(0u));
-    float v16 = min(v15, as_type<float>(1065353216u));
-    float v17 = v16 * as_type<float>(1132396544u);
-    uint v18 = (uint)(int)rint(v17);
-    float v19 = max(as_type<float>(v4), as_type<float>(0u));
-    float v20 = min(v19, as_type<float>(1065353216u));
-    float v21 = v20 * as_type<float>(1132396544u);
-    uint v22 = (uint)(int)rint(v21);
-    ((device uint*)(p1 + y * buf_rbs[1]))[x] = (v10 & 0xFFu) | ((v14 & 0xFFu) << 8u) | ((v18 & 0xFFu) << 16u) | (v22 << 24u);
+    uint v5 = (uint)as_type<ushort>((half)as_type<float>(v1));
+    uint v6 = (uint)as_type<ushort>((half)as_type<float>(v2));
+    uint v7 = (uint)as_type<ushort>((half)as_type<float>(v3));
+    uint v8 = (uint)as_type<ushort>((half)as_type<float>(v4));
+    {
+        device ushort *hp = (device ushort*)(p1 + y * buf_rbs[1]) + x*4;
+        hp[0] = ushort(v5); hp[1] = ushort(v6); hp[2] = ushort(v7); hp[3] = ushort(v8);
+    }
 }

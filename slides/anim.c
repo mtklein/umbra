@@ -70,7 +70,6 @@ static void anim_free(struct slide *s) {
 SLIDE(slide_anim_t) {
     (void)ctx;
     struct anim_state *st = calloc(1, sizeof *st);
-    st->fmt = umbra_fmt_8888;
     st->base = (struct slide){
         .title = "Animated (t in uniforms)",
         .bg = 0xff000000,

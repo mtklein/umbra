@@ -197,7 +197,7 @@ static _Bool print_row(char const *title, double ns_px[5], double gpu[5],
 
 int main(int argc, char *argv[]) {
     int              W         = 4096;
-    struct umbra_fmt fmt       = umbra_fmt_8888;
+    struct umbra_fmt fmt       = umbra_fmt_fp16;
     int              be_mask   = 0x1f;
     int              samples   = 5;
     int              target_ms = 15;

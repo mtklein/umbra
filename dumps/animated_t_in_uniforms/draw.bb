@@ -3,22 +3,8 @@
   v2   = uniform_32      p0 byte4
   v3   = uniform_32      p0 byte8
   v4   = uniform_32      p0 byte12
-  v5   = imm_32          0x437f0000
-  v6   = imm_32          0x3f800000
-  v7   = max_f32_imm     v1 0x0
-  v8   = min_f32_imm     v7 0x3f800000 (a.k.a. v6)
-  v9   = mul_f32_imm     v8 0x437f0000 (a.k.a. v5)
-  v10  = round_i32       v9
-  v11  = max_f32_imm     v2 0x0
-  v12  = min_f32_imm     v11 0x3f800000 (a.k.a. v6)
-  v13  = mul_f32_imm     v12 0x437f0000 (a.k.a. v5)
-  v14  = round_i32       v13
-  v15  = max_f32_imm     v3 0x0
-  v16  = min_f32_imm     v15 0x3f800000 (a.k.a. v6)
-  v17  = mul_f32_imm     v16 0x437f0000 (a.k.a. v5)
-  v18  = round_i32       v17
-  v19  = max_f32_imm     v4 0x0
-  v20  = min_f32_imm     v19 0x3f800000 (a.k.a. v6)
-  v21  = mul_f32_imm     v20 0x437f0000 (a.k.a. v5)
-  v22  = round_i32       v21
-      store_8x4       p1 v10 v14 v18 v22
+  v5   = f16_from_f32    v1
+  v6   = f16_from_f32    v2
+  v7   = f16_from_f32    v3
+  v8   = f16_from_f32    v4
+      store_16x4      p1 v5 v6 v7 v8

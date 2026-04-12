@@ -88,13 +88,11 @@ static void solid_free(struct slide *s) {
 }
 
 static struct slide *make_solid(char const *title, uint32_t bg, float const color[4],
-                                umbra_coverage_fn coverage, umbra_blend_fn blend,
-                                struct umbra_fmt fmt) {
+                                umbra_coverage_fn coverage, umbra_blend_fn blend) {
     struct solid_state *st = calloc(1, sizeof *st);
     st->shader = umbra_shader_solid;
     st->coverage = coverage;
     st->blend = blend;
-    st->fmt = fmt;
     for (int i = 0; i < 4; i++) { st->color[i] = color[i]; }
     st->base = (struct slide){
         .title = title,
@@ -112,40 +110,40 @@ SLIDE(slide_solid_src) {
     (void)ctx;
     return make_solid("Solid Fill (src)", 0xff202020,
                       (float[]){0.0f, 0.6f, 1.0f, 1.0f},
-                      umbra_coverage_rect, umbra_blend_src, umbra_fmt_8888);
+                      umbra_coverage_rect, umbra_blend_src);
 }
 
 SLIDE(slide_solid_srcover) {
     (void)ctx;
     return make_solid("Source Over (srcover)", 0xff00ff00,
                       (float[]){0.45f, 0.0f, 0.0f, 0.5f},
-                      umbra_coverage_rect, umbra_blend_srcover, umbra_fmt_8888);
+                      umbra_coverage_rect, umbra_blend_srcover);
 }
 
 SLIDE(slide_solid_dstover) {
     (void)ctx;
     return make_solid("Destination Over (dstover)", 0xc0008000,
                       (float[]){0.0f, 0.0f, 0.9f, 0.9f},
-                      umbra_coverage_rect, umbra_blend_dstover, umbra_fmt_8888);
+                      umbra_coverage_rect, umbra_blend_dstover);
 }
 
 SLIDE(slide_solid_multiply) {
     (void)ctx;
     return make_solid("Multiply Blend", 0xff804020,
                       (float[]){1.0f, 0.5f, 0.0f, 1.0f},
-                      umbra_coverage_rect, umbra_blend_multiply, umbra_fmt_8888);
+                      umbra_coverage_rect, umbra_blend_multiply);
 }
 
 SLIDE(slide_solid_full_cov) {
     (void)ctx;
     return make_solid("Full Coverage (no rect clip)", 0xffffffff,
                       (float[]){0.15f, 0.0f, 0.3f, 0.3f},
-                      NULL, umbra_blend_srcover, umbra_fmt_8888);
+                      NULL, umbra_blend_srcover);
 }
 
 SLIDE(slide_solid_no_blend) {
     (void)ctx;
     return make_solid("No Blend (direct paint)", 0xff000000,
                       (float[]){0.9f, 0.4f, 0.1f, 1.0f},
-                      umbra_coverage_rect, NULL, umbra_fmt_8888);
+                      umbra_coverage_rect, NULL);
 }

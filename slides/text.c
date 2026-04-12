@@ -176,7 +176,6 @@ SLIDE(slide_text_bitmap) {
     st->shader = umbra_shader_solid;
     st->coverage = umbra_coverage_bitmap;
     st->blend = umbra_blend_srcover;
-    st->fmt = umbra_fmt_8888;
     st->color[0] = 1.0f; st->color[1] = 1.0f; st->color[2] = 1.0f; st->color[3] = 1.0f;
     st->base = (struct slide){
         .title = "Text (8-bit AA)",
@@ -196,7 +195,6 @@ SLIDE(slide_text_sdf) {
     st->shader = umbra_shader_solid;
     st->coverage = umbra_coverage_sdf;
     st->blend = umbra_blend_srcover;
-    st->fmt = umbra_fmt_8888;
     st->color[0] = 0.2f; st->color[1] = 0.8f; st->color[2] = 1.0f; st->color[3] = 1.0f;
     st->base = (struct slide){
         .title = "Text (SDF)",

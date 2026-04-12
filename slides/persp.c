@@ -79,7 +79,6 @@ SLIDE(slide_persp) {
     st->shader = umbra_shader_solid;
     st->coverage = umbra_coverage_bitmap_matrix;
     st->blend = umbra_blend_srcover;
-    st->fmt = umbra_fmt_8888;
     st->color[0] = 1.0f; st->color[1] = 0.8f; st->color[2] = 0.2f; st->color[3] = 1.0f;
     st->base = (struct slide){
         .title = "Perspective Text",
