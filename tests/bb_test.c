@@ -2144,6 +2144,31 @@ TEST(test_load_next_16) {
     cleanup(&B);
 }
 
+TEST(test_load_store_16_all_bits) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_val16            v = umbra_load_16(b, (umbra_ptr16){0});
+    umbra_store_16(b, (umbra_ptr16){.ix=1}, v);
+    struct test_backends B = make(b);
+
+    enum { N = 65536 };
+    uint16_t *src = malloc(N * sizeof *src),
+             *dst = malloc(N * sizeof *dst);
+    for (int i = 0; i < N; i++) { src[i] = (uint16_t)i; }
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        __builtin_memset(dst, 0, N * sizeof *dst);
+        if (run(&B, bi, N, 1, (struct umbra_buf[]){
+            {.ptr=src, .sz=N*2},
+            {.ptr=dst, .sz=N*2},
+        })) {
+            for (int i = 0; i < N; i++) { dst[i] == src[i] here; }
+        }
+    }
+    free(src);
+    free(dst);
+    cleanup(&B);
+}
+
 TEST(test_load_store_8x4) {
     struct umbra_builder *b = umbra_builder();
     umbra_val32 r, g, bl, a;
