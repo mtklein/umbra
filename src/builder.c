@@ -50,7 +50,7 @@ static val push_(builder *b, struct bb_inst inst) {
             inst.uniform = b->var_uniform[inst.imm];
         } else if (op == op_store_var) {
             inst.uniform = 0;
-            b->var_uniform[inst.imm] &= b->inst[inst.y.id].uniform;
+            b->var_uniform[inst.imm] = b->inst[inst.y.id].uniform;
         } else if (op_is_varying(op)
                    || op == op_gather_32
                    || op == op_gather_16
