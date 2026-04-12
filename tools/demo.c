@@ -27,12 +27,13 @@ enum {
     FMT_8888,
     FMT_565,
     FMT_FP16,
+    FMT_FP16_PLANAR,
     FMT_1010102,
     NUM_FMTS,
 };
 static struct umbra_fmt const *fmt_enums[] = {
     &umbra_fmt_8888, &umbra_fmt_565, &umbra_fmt_fp16,
-    &umbra_fmt_1010102,
+    &umbra_fmt_fp16_planar, &umbra_fmt_1010102,
 };
 
 struct pipe {
@@ -281,7 +282,7 @@ int main(void) {
     void *pixbuf = malloc(W * H * 8);
 
     int cur_slide = slide_count() - 1;
-    int cur_fmt = FMT_8888;
+    int cur_fmt = FMT_FP16;
     cur_backend = pick_backend(1);
     build_slide_fmt(slide_get(cur_slide), cur_fmt);
 
@@ -340,8 +341,9 @@ int main(void) {
         struct slide *s = slide_get(cur_slide);
 
         size_t bpp = fmt_enums[cur_fmt]->bpp;
+        int    planes = fmt_enums[cur_fmt]->planes;
         size_t row_bytes = (size_t)W * bpp;
-        size_t plane_gap = 0;
+        size_t plane_gap = planes > 1 ? (size_t)W * (size_t)H * bpp : 0;
         size_t row_sz = (size_t)W * (size_t)bpp;
 
         for (int y = 0; y < H; y++) {
