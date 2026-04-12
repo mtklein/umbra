@@ -283,11 +283,11 @@ int main(int argc, char *argv[]) {
                 struct umbra_backend_stats const *st = &bstats[bi];
                 double const us_per = st->dispatches
                     ? st->gpu_sec / st->dispatches * 1e6 : 0;
-                fprintf(stderr, "  %s: %d dispatches,"
-                                " %.0f us/dispatch,"
-                                " gpu %.3fms\n",
-                        disp_name[d], st->dispatches,
-                        us_per, st->gpu_sec * 1e3);
+                fprintf(stderr, "  %s: %.3fms gpu"
+                                " \xc3\xb7 %d dispatches"
+                                " = %.0f \xc2\xb5s/dispatch\n",
+                        disp_name[d], st->gpu_sec * 1e3,
+                        st->dispatches, us_per);
             }
         }
         free(buf);
