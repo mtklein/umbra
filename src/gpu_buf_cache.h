@@ -21,7 +21,7 @@ struct gpu_buf_ops {
 struct gpu_cache_entry {
     gpu_buf      buf;
     void        *host;
-    size_t       fp_bytes;
+    size_t       hashed_size;
     fingerprint  fp;
     _Bool        writable, copy_tracked, uploaded, nocopy;
     int          :32;

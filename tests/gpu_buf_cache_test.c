@@ -104,7 +104,7 @@ TEST(test_gpu_buf_cache_writable_invalidates_fp) {
     // End batch: writable entries get fp invalidated.
     gpu_buf_cache_end_batch(&c);
     !c.entry[0].copy_tracked here;
-    c.entry[0].fp_bytes == 0 here;
+    c.entry[0].hashed_size == 0 here;
 
     // Next get must re-upload (fp invalid even though data unchanged).
     gpu_buf_cache_get(&c, data, sizeof data, BUF_WRITTEN);
