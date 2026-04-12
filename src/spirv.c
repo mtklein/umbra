@@ -1851,6 +1851,21 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                     spv_store(&B, v_vars[inst->imm],
                               as_u32(&B, get_val(&B, inst->y), yid));
                     break;
+                case op_cond_store_var: {
+                    uint32_t cur  = spv_load(&B, B.t_u32, v_vars[inst->imm]);
+                    uint32_t cond = spv_binop(&B, SpvOpINotEqual, B.t_bool,
+                                              as_u32(&B, get_val(&B, inst->x), xid),
+                                              B.c_0);
+                    uint32_t val  = spv_select(&B, B.t_u32, cond,
+                                               as_u32(&B, get_val(&B, inst->y), yid),
+                                               cur);
+                    spv_store(&B, v_vars[inst->imm], val);
+                } break;
+                case op_inc_var: {
+                    uint32_t cur  = spv_load(&B, B.t_u32, v_vars[inst->imm]);
+                    uint32_t next = spv_binop(&B, SpvOpIAdd, B.t_u32, cur, B.c_1);
+                    spv_store(&B, v_vars[inst->imm], next);
+                } break;
             }
         }
 

@@ -268,6 +268,12 @@ static struct interp_program* interp_program(struct umbra_basic_block const *bb)
                 break;
             case op_load_var:  emit(.tag = op_load_var,  .x = inst->imm); break;
             case op_store_var: emit(.tag = op_store_var, .x = Y, .y = inst->imm); break;
+            case op_cond_store_var:
+                emit(.tag = op_cond_store_var, .x = X, .y = Y, .z = inst->imm);
+                break;
+            case op_inc_var:
+                emit(.tag = op_inc_var, .x = inst->imm);
+                break;
 
             case op_load_16x4:
                 emit(.tag = op_load_16x4, .ptr = RESOLVE_PTR(inst));
@@ -536,7 +542,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 [op_sample_32] = &&L_op_sample_32,
                 [op_deref_ptr] = &&L_op_deref_ptr,
                 [op_loop_begin] = &&L_op_loop_begin, [op_loop_end] = &&L_op_loop_end,
-                [op_load_var] = &&L_op_load_var, [op_store_var] = &&L_op_store_var,
+                [op_load_var] = &&L_op_load_var, [op_store_var] = &&L_op_store_var, [op_cond_store_var] = &&L_op_cond_store_var, [op_inc_var] = &&L_op_inc_var,
                 [op_f32_from_f16] = &&L_op_f32_from_f16, [op_f16_from_f32] = &&L_op_f16_from_f32,
                 [op_i32_from_s16] = &&L_op_i32_from_s16, [op_i32_from_u16] = &&L_op_i32_from_u16, [op_i16_from_i32] = &&L_op_i16_from_i32,
                 [op_f32_from_i32] = &&L_op_f32_from_i32, [op_i32_from_f32] = &&L_op_i32_from_f32,
@@ -972,6 +978,11 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 } NEXT;
                 CASE(op_load_var)  v->i32 = vars[ip->x].i32; NEXT;
                 CASE(op_store_var) vars[ip->y] = v[ip->x]; NEXT;
+                CASE(op_cond_store_var)
+                    vars[ip->z].i32 = (v[ip->y].i32 &  v[ip->x].i32)
+                                    | (vars[ip->z].i32 & ~v[ip->x].i32);
+                NEXT;
+                CASE(op_inc_var) vars[ip->x].i32 += 1; NEXT;
 
                 CASE(op_f32_from_f16) { U16 h; __builtin_memcpy(&h, &v[ip->x], sizeof h); v->f32 = f16_to_f32(h); } NEXT;
                 CASE(op_f16_from_f32) { U16 const h = f32_to_f16(v[ip->x].f32); v->u32 = (U32){0}; __builtin_memcpy(v, &h, sizeof h); } NEXT;

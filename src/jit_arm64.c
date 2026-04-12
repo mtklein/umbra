@@ -1160,6 +1160,39 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             ra_free_chan(ra, inst->y, i);
         } break;
 
+        case op_cond_store_var: {
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            int8_t rx = ra_ensure(ra, sl, ns, inst->x.id);
+            int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
+            int const off = 2 * inst->imm;
+            put(c, LDR_qi(lo(s.rd), XS, off));
+            put(c, BIT_16b(lo(s.rd), lo(ry), lo(rx)));
+            put(c, STR_qi(lo(s.rd), XS, off));
+            if (!scalar) {
+                put(c, LDR_qi(hi(s.rd), XS, off + 1));
+                put(c, BIT_16b(hi(s.rd), hi(ry), hi(rx)));
+                put(c, STR_qi(hi(s.rd), XS, off + 1));
+            }
+            ra_free_chan(ra, inst->x, i);
+            ra_free_chan(ra, inst->y, i);
+        } break;
+
+        case op_inc_var: {
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            int8_t one = ra_alloc(ra, sl, ns);
+            int const off = 2 * inst->imm;
+            put(c, MOVI_4s(lo(one), 1, 0));
+            put(c, LDR_qi(lo(s.rd), XS, off));
+            put(c, ADD_4s(lo(s.rd), lo(s.rd), lo(one)));
+            put(c, STR_qi(lo(s.rd), XS, off));
+            if (!scalar) {
+                put(c, LDR_qi(hi(s.rd), XS, off + 1));
+                put(c, ADD_4s(hi(s.rd), hi(s.rd), lo(one)));
+                put(c, STR_qi(hi(s.rd), XS, off + 1));
+            }
+            ra_return_reg(ra, one);
+        } break;
+
         case op_loop_begin: {
             int8_t rx = ra_ensure(ra, sl, ns, inst->x.id);
             put(c, UMOV_ws(XT, lo(rx)));

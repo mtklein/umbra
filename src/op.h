@@ -39,7 +39,9 @@ enum {
     X(loop_begin,                           0)                                             \
     X(loop_end,                             0)                                             \
     X(load_var,                             OP_VARYING)                                    \
-    X(store_var,                            OP_STORE|OP_VARYING)
+    X(store_var,                            OP_STORE|OP_VARYING)                           \
+    X(cond_store_var,                       OP_STORE|OP_VARYING)                           \
+    X(inc_var,                              OP_STORE|OP_VARYING)
 
 // Ops that get register variants in the interpreter.
 #define BINARY_OPS(X)                                                                      \

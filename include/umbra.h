@@ -156,4 +156,6 @@ void        umbra_loop_end(struct umbra_builder*);
 
 umbra_var   umbra_var_alloc(struct umbra_builder*);
 umbra_val32 umbra_load_var (struct umbra_builder*, umbra_var);
-void        umbra_store_var(struct umbra_builder*, umbra_var, umbra_val32 x);
+void        umbra_store_var     (struct umbra_builder*, umbra_var, umbra_val32 x);
+void        umbra_cond_store_var(struct umbra_builder*, umbra_var,
+                                 umbra_val32 mask, umbra_val32 x);

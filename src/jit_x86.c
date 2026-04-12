@@ -1361,6 +1361,30 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             ra_free_chan(ra, inst->y, i);
         } break;
 
+        case op_cond_store_var: {
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            int8_t rx = ra_ensure(ra, sl, ns, inst->x.id);
+            int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
+            vfill(c, s.rd, inst->imm);
+            vpblendvb(c, 1, s.rd, s.rd, ry, rx);
+            vspill(c, s.rd, inst->imm);
+            ra_free_chan(ra, inst->x, i);
+            ra_free_chan(ra, inst->y, i);
+        } break;
+
+        // TODO: x86 masked store for cond_store_var
+        // TODO: inc_var is not yet emitted — when enabled, debug the loop counter issue.
+        case op_inc_var: {
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            int8_t one = ra_alloc(ra, sl, ns);
+            vfill(c, s.rd, inst->imm);
+            vpcmpeqd(c, one, one, one);
+            vpsrld_i(c, one, one, 31);
+            vpaddd(c, s.rd, s.rd, one);
+            vspill(c, s.rd, inst->imm);
+            ra_return_reg(ra, one);
+        } break;
+
         case op_loop_begin: {
             int8_t rx = ra_ensure(ra, sl, ns, inst->x.id);
             vmovd_to_gpr(c, R11, rx);

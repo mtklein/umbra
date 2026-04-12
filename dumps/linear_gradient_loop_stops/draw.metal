@@ -61,46 +61,38 @@ kernel void umbra_entry(
     float v40 = v21 - as_type<float>(v36);
     float v41 = v40 / v39;
     float v42 = fma(v41, v35, as_type<float>(v34));
-    uint v43 = v8 + v23;
-    uint v44 = p2[min(v43, m.limit2 - 1u)] & ((v43 < m.limit2) ? ~0u : 0u);
-    float v45 = as_type<float>(v30) - as_type<float>(v44);
-    float v46 = fma(v41, v45, as_type<float>(v44));
-    uint v47 = v11 + v23;
-    uint v48 = p2[min(v47, m.limit2 - 1u)] & ((v47 < m.limit2) ? ~0u : 0u);
-    float v49 = as_type<float>(v32) - as_type<float>(v48);
-    float v50 = fma(v41, v49, as_type<float>(v48));
-    uint v51 = p2[min(v24, m.limit2 - 1u)] & ((v24 < m.limit2) ? ~0u : 0u);
-    uint v52 = p2[min(v23, m.limit2 - 1u)] & ((v23 < m.limit2) ? ~0u : 0u);
-    float v53 = as_type<float>(v51) - as_type<float>(v52);
-    float v54 = fma(v41, v53, as_type<float>(v52));
-    uint v55 = var0;
-    uint v56 = select(v55, as_type<uint>(v54), v38 != 0u);
-    var0 = v56;
+    var3 = (v38 != 0u) ? as_type<uint>(v42) : var3;
 
-    uint v58 = var1;
-    uint v59 = select(v58, as_type<uint>(v46), v38 != 0u);
-    var1 = v59;
+    uint v44 = v8 + v23;
+    uint v45 = p2[min(v44, m.limit2 - 1u)] & ((v44 < m.limit2) ? ~0u : 0u);
+    float v46 = as_type<float>(v30) - as_type<float>(v45);
+    float v47 = fma(v41, v46, as_type<float>(v45));
+    var1 = (v38 != 0u) ? as_type<uint>(v47) : var1;
 
-    uint v61 = var2;
-    uint v62 = select(v61, as_type<uint>(v50), v38 != 0u);
-    var2 = v62;
+    uint v49 = v11 + v23;
+    uint v50 = p2[min(v49, m.limit2 - 1u)] & ((v49 < m.limit2) ? ~0u : 0u);
+    float v51 = as_type<float>(v32) - as_type<float>(v50);
+    float v52 = fma(v41, v51, as_type<float>(v50));
+    var2 = (v38 != 0u) ? as_type<uint>(v52) : var2;
 
-    uint v64 = var3;
-    uint v65 = select(v64, as_type<uint>(v42), v38 != 0u);
-    var3 = v65;
+    uint v54 = p2[min(v24, m.limit2 - 1u)] & ((v24 < m.limit2) ? ~0u : 0u);
+    uint v55 = p2[min(v23, m.limit2 - 1u)] & ((v23 < m.limit2) ? ~0u : 0u);
+    float v56 = as_type<float>(v54) - as_type<float>(v55);
+    float v57 = fma(v41, v56, as_type<float>(v55));
+    var0 = (v38 != 0u) ? as_type<uint>(v57) : var0;
 
-    uint v67 = var4;
-    uint v68 = v67 + 1u;
-    var4 = v68;
+    uint v59 = var4;
+    uint v60 = v59 + 1u;
+    var4 = v60;
 
     }
-    uint v71 = var0;
-    uint v72 = (uint)as_type<ushort>((half)as_type<float>(v71));
-    uint v73 = var1;
-    uint v74 = (uint)as_type<ushort>((half)as_type<float>(v73));
-    uint v75 = var2;
-    uint v76 = (uint)as_type<ushort>((half)as_type<float>(v75));
-    uint v77 = var3;
-    uint v78 = (uint)as_type<ushort>((half)as_type<float>(v77));
-    p1[y * m.stride1 + x] = half4(as_type<half>((ushort)v72), as_type<half>((ushort)v74), as_type<half>((ushort)v76), as_type<half>((ushort)v78));
+    uint v63 = var0;
+    uint v64 = (uint)as_type<ushort>((half)as_type<float>(v63));
+    uint v65 = var1;
+    uint v66 = (uint)as_type<ushort>((half)as_type<float>(v65));
+    uint v67 = var2;
+    uint v68 = (uint)as_type<ushort>((half)as_type<float>(v67));
+    uint v69 = var3;
+    uint v70 = (uint)as_type<ushort>((half)as_type<float>(v69));
+    p1[y * m.stride1 + x] = half4(as_type<half>((ushort)v64), as_type<half>((ushort)v66), as_type<half>((ushort)v68), as_type<half>((ushort)v70));
 }

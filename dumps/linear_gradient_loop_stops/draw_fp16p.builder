@@ -62,29 +62,21 @@
   v61  = sub_f32         v51 v49
   v62  = mul_f32         v37 v61
   v63  = fma_f32         v37 v61 v49
-  v64  = load_var        var0
-  v65  = sel_32          v34 v54 v64
-      store_var       var0 v65
-  v67  = load_var        var1
-  v68  = sel_32          v34 v57 v67
-      store_var       var1 v68
-  v70  = load_var        var2
-  v71  = sel_32          v34 v60 v70
-      store_var       var2 v71
-  v73  = load_var        var3
-  v74  = sel_32          v34 v63 v73
-      store_var       var3 v74
-  v76  = load_var        var4
-  v77  = add_i32         v21 v76
-  v78  = add_i32_imm     v76 0x1 (a.k.a. v21)
-      store_var       var4 v78
+      cond_store_var  var0 v34 v54
+      cond_store_var  var1 v34 v57
+      cond_store_var  var2 v34 v60
+      cond_store_var  var3 v34 v63
+  v68  = load_var        var4
+  v69  = add_i32         v21 v68
+  v70  = add_i32_imm     v68 0x1 (a.k.a. v21)
+      store_var       var4 v70
       loop_end
-  v81  = load_var        var0
-  v82  = load_var        var1
-  v83  = load_var        var2
-  v84  = load_var        var3
-  v85  = f16_from_f32    v81
-  v86  = f16_from_f32    v82
-  v87  = f16_from_f32    v83
-  v88  = f16_from_f32    v84
-      store_16x4_planar p1 v85 v86 v87 v88
+  v73  = load_var        var0
+  v74  = load_var        var1
+  v75  = load_var        var2
+  v76  = load_var        var3
+  v77  = f16_from_f32    v73
+  v78  = f16_from_f32    v74
+  v79  = f16_from_f32    v75
+  v80  = f16_from_f32    v76
+      store_16x4_planar p1 v77 v78 v79 v80

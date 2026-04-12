@@ -800,6 +800,16 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                 emit(b, "%svar%d = %s;\n",
                      pad, inst->imm, uv(_uy, vy, yid, is_f));
                 break;
+            case op_cond_store_var:
+                emit(b, "%svar%d = (%s != 0u) ? %s : var%d;\n",
+                     pad, inst->imm,
+                     uv(_ux, vx, xid, is_f),
+                     uv(_uy, vy, yid, is_f),
+                     inst->imm);
+                break;
+            case op_inc_var:
+                emit(b, "%svar%d++;\n", pad, inst->imm);
+                break;
         }
 
         if (op_is_store(inst->op) && i+1 < hi) {
