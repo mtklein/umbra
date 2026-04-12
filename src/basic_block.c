@@ -181,6 +181,7 @@ struct umbra_basic_block* umbra_basic_block(struct umbra_builder *b) {
     }
 
     if (b->has_loop) {
+        // TODO: loop-aware scheduling
         int j = preamble;
         for (int i = 0; i < n; i++) {
             if (b->inst[i].live && b->inst[i].varying) {
