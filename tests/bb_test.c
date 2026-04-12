@@ -1027,24 +1027,24 @@ TEST(test_store_8x4) {
 TEST(test_srcover) {
     struct umbra_builder *builder = build_srcover();
     struct test_backends   B = make(builder);
-    float const           tol = 0;
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-        uint32_t src_px[] = {
-            0x80402010u,
-            0x80402010u,
-            0x80402010u,
-        };
+        uint32_t src_px[] = { 0x80402010u, 0x80402010u, 0x80402010u };
         __fp16 dst_r[] = {0.5, 0.5, 0.5}, dst_g[] = {0.5, 0.5, 0.5},
                dst_b[] = {0.5, 0.5, 0.5}, dst_a[] = {0.5, 0.5, 0.5};
         if (run(&B, bi, 3, 1,
                  (struct umbra_buf[]){
-                     {.ptr=src_px, .sz=3 * 4},
-                     {.ptr=dst_r, .sz=3 * 2},
-                     {.ptr=dst_g, .sz=3 * 2},
-                     {.ptr=dst_b, .sz=3 * 2},
-                     {.ptr=dst_a, .sz=3 * 2},
+                     {.ptr=src_px, .sz=sizeof src_px},
+                     {.ptr=dst_r, .sz=sizeof dst_r},
+                     {.ptr=dst_g, .sz=sizeof dst_g},
+                     {.ptr=dst_b, .sz=sizeof dst_b},
+                     {.ptr=dst_a, .sz=sizeof dst_a},
                  })) {
-            (float)dst_r[0] > 0.28f - tol && (float)dst_r[0] < 0.34f + tol here;
+            for (int i = 0; i < 3; i++) {
+                equiv((float)dst_r[i], 0x1.3f4p-2f) here;
+                equiv((float)dst_g[i], 0x1.7f8p-2f) here;
+                equiv((float)dst_b[i], 0.5f)         here;
+                equiv((float)dst_a[i], 0x1.808p-1f)  here;
+            }
         }
     }
     cleanup(&B);
