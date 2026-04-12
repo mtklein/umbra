@@ -1,4 +1,5 @@
 #include "assume.h"
+#include "dispatch_overlap.h"
 #include "gpu_buf_cache.h"
 #include "spirv.h"
 #include "uniform_ring.h"
@@ -27,6 +28,8 @@ struct wgpu_backend {
     WGPUCommandEncoder        batch_enc;
     WGPUComputePassEncoder    batch_pass;
     _Bool                     batch_has_dispatch; int :24, :32;
+
+    struct dispatch_overlap    overlap;
 
     WGPUSubmissionIndex       frame_submitted[WGPU_N_FRAMES];
     _Bool                     frame_has_work [WGPU_N_FRAMES]; int :16, :32;
@@ -145,6 +148,7 @@ static void begin_batch(struct wgpu_backend *be) {
     be->batch_enc  = wgpuDeviceCreateCommandEncoder(be->device, NULL);
     be->batch_pass = begin_pass(be, 1);
     be->batch_has_dispatch = 0;
+    dispatch_overlap_reset(&be->overlap);
 }
 
 static gpu_buf wgpu_cache_alloc(size_t size, void *ctx) {
@@ -264,6 +268,7 @@ static void wgpu_submit_cmdbuf(struct wgpu_backend *be) {
     wgpuCommandBufferRelease(cmd);
     be->frame_has_work[cur] = 1;
     be->batch_has_dispatch  = 0;
+    dispatch_overlap_reset(&be->overlap);
 
     uniform_ring_pool_rotate(&be->uni_pool);
 }
@@ -496,11 +501,24 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
         memcpy(be->cached_bg_sz,   bind_size,   (size_t)n * sizeof bind_size[0]);
     }
 
-    // Barrier: end/begin compute pass between dispatches.
+    // Barrier: end/begin compute pass only when this dispatch touches a buffer
+    // region that was written by a previous dispatch in this pass.  Dispatches
+    // to non-overlapping rects of the same buffer (e.g. color swatches) can
+    // safely share a pass, avoiding wgpu's expensive pass-boundary overhead.
+    _Bool needs_barrier = 0;
     if (be->batch_has_dispatch) {
+        for (int i = 0; i < n && !needs_barrier; i++) {
+            if (p->buf_rw[i]) {
+                needs_barrier = dispatch_overlap_check(&be->overlap, bind_buf[i],
+                                                       l, t, r, b);
+            }
+        }
+    }
+    if (needs_barrier) {
         wgpuComputePassEncoderEnd(be->batch_pass);
         wgpuComputePassEncoderRelease(be->batch_pass);
         be->batch_pass = begin_pass(be, 0);
+        dispatch_overlap_reset(&be->overlap);
     }
 
     uint32_t dyn_offsets[2] = {
@@ -516,6 +534,12 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
     be->total_dispatches++;
 
     be->batch_has_dispatch = 1;
+
+    for (int i = 0; i < n; i++) {
+        if (p->buf_rw[i] & BUF_WRITTEN) {
+            dispatch_overlap_record(&be->overlap, bind_buf[i], l, t, r, b);
+        }
+    }
 
     if (uniform_ring_pool_should_rotate(&be->uni_pool)) {
         wgpu_submit_cmdbuf(be);

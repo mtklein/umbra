@@ -1,4 +1,5 @@
 #include "assume.h"
+#include "dispatch_overlap.h"
 #include "spirv.h"
 #include "uniform_ring.h"
 #include <stdlib.h>
@@ -43,6 +44,7 @@ struct vk_backend {
     struct uniform_ring_pool uni_pool;
     int                   total_dispatches;
     _Bool                 batch_has_dispatch; int :24;
+    struct dispatch_overlap overlap;
 };
 
 static int find_compute_queue(VkPhysicalDevice phys) {
@@ -173,6 +175,7 @@ static void begin_batch(struct vk_backend *be) {
                             be->ts_pool, base);
     }
     be->batch_has_dispatch = 0;
+    dispatch_overlap_reset(&be->overlap);
 }
 
 static gpu_buf vk_cache_alloc(size_t size, void *ctx) {
@@ -356,7 +359,16 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     vkCmdPushConstants(be->batch_cmd, vp->pipe_layout, VK_SHADER_STAGE_COMPUTE_BIT,
                        0, (uint32_t)(vp->push_words * (int)sizeof(uint32_t)), push_data);
 
+    _Bool needs_barrier = 0;
     if (be->batch_has_dispatch) {
+        for (int i = 0; i < n && !needs_barrier; i++) {
+            if (vp->buf_rw[i]) {
+                needs_barrier = dispatch_overlap_check(&be->overlap, bind_buffer[i],
+                                                       l, t, r, b);
+            }
+        }
+    }
+    if (needs_barrier) {
         VkMemoryBarrier mb = {
             .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
             .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
@@ -366,11 +378,18 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             0, 1, &mb, 0, NULL, 0, NULL);
+        dispatch_overlap_reset(&be->overlap);
     }
     be->batch_has_dispatch = 1;
     uint32_t gx = ((uint32_t)w + SPIRV_WG_SIZE - 1) / SPIRV_WG_SIZE;
     vkCmdDispatch(be->batch_cmd, gx, (uint32_t)h, 1);
     be->total_dispatches++;
+
+    for (int i = 0; i < n; i++) {
+        if (vp->buf_rw[i] & BUF_WRITTEN) {
+            dispatch_overlap_record(&be->overlap, bind_buffer[i], l, t, r, b);
+        }
+    }
 
     if (uniform_ring_pool_should_rotate(&be->uni_pool)) {
         vk_submit_cmdbuf(be);
@@ -568,6 +587,7 @@ static void vk_submit_cmdbuf(struct vk_backend *v) {
     v->frame_committed[v->uni_pool.cur] = v->batch_cmd;
     v->batch_cmd                        = VK_NULL_HANDLE;
     v->batch_has_dispatch               = 0;
+    dispatch_overlap_reset(&v->overlap);
 
     uniform_ring_pool_rotate(&v->uni_pool);
 }
