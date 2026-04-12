@@ -2,7 +2,6 @@
 #include <pthread.h>
 #include <stdlib.h>
 
-
 struct work_item {
     void (*fn)(void *);
     void  *ctx;
@@ -20,7 +19,7 @@ struct thread_pool {
 
 static _Bool pop(struct thread_pool *p, struct work_item *out) {
     pthread_mutex_lock(&p->mu);
-    while (p->top == 0 && !p->quit) {
+    while (p->top == 0 && p->quit == 0) {
         pthread_cond_wait(&p->cv, &p->mu);
     }
     _Bool const got = p->top > 0;
@@ -30,9 +29,9 @@ static _Bool pop(struct thread_pool *p, struct work_item *out) {
 }
 
 static _Bool try_pop(struct thread_pool *p, struct work_item *out) {
-    _Bool got = 0;
     pthread_mutex_lock(&p->mu);
-    if (p->top > 0) { *out = p->stack[--p->top]; got = 1; }
+    _Bool const got = p->top > 0;
+    if (got) { *out = p->stack[--p->top]; }
     pthread_mutex_unlock(&p->mu);
     return got;
 }

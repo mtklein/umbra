@@ -7,17 +7,20 @@ enum { SPIRV_WG_SIZE = 64 };
 
 enum {
     SPIRV_FLOAT_CONTROLS   = 1,
-    SPIRV_ALWAYS_16BIT     = 2,  // Always emit Float16 cap + 16-bit types.
-    SPIRV_PUSH_VIA_SSBO    = 4,  // Emit push data as an SSBO instead of PushConstant.
-    SPIRV_NO_16BIT_TYPES   = 8,  // Use f16 storage instead of u16 (for naga/wgpu).
+    SPIRV_ALWAYS_16BIT     = 2,
+    SPIRV_PUSH_VIA_SSBO    = 4,
+    SPIRV_NO_16BIT_TYPES   = 8,
 };
 
-uint32_t *build_spirv(struct umbra_basic_block const *bb,
-                      int flags,
-                      int *out_spirv_words,
-                      int *out_max_ptr,
-                      int *out_total_bufs,
-                      int *out_n_deref,
-                      struct deref_info **out_deref,
-                      int *out_push_words,
-                      uint8_t **out_buf_rw);
+struct spirv_result {
+    uint32_t         *spirv;
+    struct deref_info *deref;
+    uint8_t          *buf_rw;
+    int               spirv_words;
+    int               max_ptr;
+    int               total_bufs;
+    int               n_deref;
+    int               push_words, :32;
+};
+
+struct spirv_result build_spirv(struct umbra_basic_block const *bb, int flags);

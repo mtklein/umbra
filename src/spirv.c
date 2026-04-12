@@ -622,15 +622,9 @@ static _Bool produces_float(enum op op) {
 }
 
 // Build the full SPIR-V binary for a basic block.
-uint32_t *build_spirv(struct umbra_basic_block const *bb,
-                              int flags,
-                              int *out_spirv_words,
-                              int *out_max_ptr,
-                              int *out_total_bufs,
-                              int *out_n_deref,
-                              struct deref_info **out_deref,
-                              int *out_push_words,
-                              uint8_t **out_buf_rw) {
+struct spirv_result build_spirv(struct umbra_basic_block const *bb,
+                               int flags) {
+    struct spirv_result result = {0};
     SpvBuilder B;
     memset(&B, 0, sizeof B);
     B.next_id = 1; // 0 is reserved
@@ -644,7 +638,7 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
             }
         }
     }
-    *out_max_ptr = max_ptr;
+    result.max_ptr = max_ptr;
 
     int *deref_buf = calloc((size_t)(bb->insts + 1), sizeof *deref_buf);
     B.deref_buf = deref_buf;
@@ -656,8 +650,8 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
     }
     int const total_bufs = next_buf;
     int const n_deref    = total_bufs - max_ptr - 1;
-    *out_total_bufs = total_bufs;
-    *out_n_deref = n_deref;
+    result.total_bufs = total_bufs;
+    result.n_deref = n_deref;
     B.total_bufs = total_bufs;
 
     struct deref_info *di = calloc((size_t)(n_deref ? n_deref : 1), sizeof *di);
@@ -672,7 +666,7 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
             }
         }
     }
-    *out_deref = di;
+    result.deref = di;
 
     // --- Scan for 16-bit buffer access. ---
     B.buf_is_16 = calloc((size_t)(total_bufs + 1), sizeof *B.buf_is_16);
@@ -695,14 +689,14 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
                                       : bb->inst[i].ptr.bits;
         buf_rw[p] |= op_is_store(bb->inst[i].op) ? BUF_WRITTEN : BUF_READ;
     }
-    *out_buf_rw = buf_rw;
+    result.buf_rw = buf_rw;
 
     // Push constant layout: w, x0, y0, buf_szs[total_bufs], buf_rbs[total_bufs].
     // User uniforms (buf[0]) go through the per-batch uniform ring as a
     // storage buffer at descriptor binding 0; only this small backend-side
     // metadata rides in push constants.
     int push_words = 3 + 2 * total_bufs;
-    *out_push_words = push_words;
+    result.push_words = push_words;
     B.push_words = push_words;
 
     // --- Capabilities ---
@@ -1819,7 +1813,7 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
 
     #undef COPY_SECTION
 
-    *out_spirv_words = total_words;
+    result.spirv_words = total_words;
 
     // Free temporary buffers.
     free(B.caps.word);
@@ -1842,5 +1836,6 @@ uint32_t *build_spirv(struct umbra_basic_block const *bb,
     free(B.const_cache);
     free(deref_buf);
 
-    return spirv;
+    result.spirv = spirv;
+    return result;
 }

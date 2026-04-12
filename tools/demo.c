@@ -30,7 +30,7 @@ enum {
     FMT_1010102,
     NUM_FMTS,
 };
-static struct umbra_fmt const * const fmt_enums[] = {
+static struct umbra_fmt const *fmt_enums[] = {
     &umbra_fmt_8888, &umbra_fmt_565, &umbra_fmt_fp16,
     &umbra_fmt_1010102,
 };

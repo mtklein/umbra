@@ -288,27 +288,22 @@ static struct umbra_program *wgpu_compile(struct umbra_backend *base,
     struct wgpu_backend *be = (struct wgpu_backend *)base;
 
     wgpu_had_error = 0;
-    int spirv_words = 0, max_ptr = -1, total_bufs = 0, n_deref = 0, push_words = 0;
-    struct deref_info *deref = 0;
-    uint8_t *buf_rw = 0;
-    uint32_t *spirv = build_spirv(bb, SPIRV_PUSH_VIA_SSBO | SPIRV_NO_16BIT_TYPES,
-                                   &spirv_words, &max_ptr, &total_bufs,
-                                   &n_deref, &deref, &push_words, &buf_rw);
-    if (!spirv) { return 0; }
+    struct spirv_result const sr =
+        build_spirv(bb, SPIRV_PUSH_VIA_SSBO | SPIRV_NO_16BIT_TYPES);
+    if (!sr.spirv) { return 0; }
 
     WGPUShaderSourceSPIRV spirv_src = {
         .chain    = {.sType = WGPUSType_ShaderSourceSPIRV},
-        .codeSize = (uint32_t)spirv_words,
-        .code     = spirv,
+        .codeSize = (uint32_t)sr.spirv_words,
+        .code     = sr.spirv,
     };
     WGPUShaderModule shader = wgpuDeviceCreateShaderModule(be->device,
         &(WGPUShaderModuleDescriptor){
             .nextInChain = &spirv_src.chain,
         });
-    if (!shader) { free(spirv); free(deref); return 0; }
+    if (!shader) { free(sr.spirv); free(sr.deref); return 0; }
 
-    // Bind group layout: one storage buffer per data slot + one for push data.
-    int n_desc = total_bufs + 1;
+    int n_desc = sr.total_bufs + 1;
     WGPUBindGroupLayoutEntry *entries =
         calloc((size_t)n_desc, sizeof *entries);
     // Binding 0 (user uniforms) and the last binding (push data) use dynamic
@@ -350,7 +345,7 @@ static struct umbra_program *wgpu_compile(struct umbra_backend *base,
         wgpuPipelineLayoutRelease(pipe_layout);
         wgpuBindGroupLayoutRelease(bg_layout);
         wgpuShaderModuleRelease(shader);
-        free(spirv); free(deref);
+        free(sr.spirv); free(sr.deref);
         return 0;
     }
 
@@ -360,14 +355,14 @@ static struct umbra_program *wgpu_compile(struct umbra_backend *base,
     p->bg_layout   = bg_layout;
     p->pipe_layout = pipe_layout;
     p->pipeline    = pipeline;
-    p->max_ptr     = max_ptr;
-    p->total_bufs  = total_bufs;
-    p->n_deref     = n_deref;
-    p->push_words  = push_words;
-    p->deref       = deref;
-    p->buf_rw      = buf_rw;
-    p->spirv       = spirv;
-    p->spirv_words = spirv_words;
+    p->max_ptr     = sr.max_ptr;
+    p->total_bufs  = sr.total_bufs;
+    p->n_deref     = sr.n_deref;
+    p->push_words  = sr.push_words;
+    p->deref       = sr.deref;
+    p->buf_rw      = sr.buf_rw;
+    p->spirv       = sr.spirv;
+    p->spirv_words = sr.spirv_words;
     return &p->base;
 }
 

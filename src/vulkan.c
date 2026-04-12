@@ -423,23 +423,19 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
                                          struct umbra_basic_block const *bb) {
     struct vk_backend *vbe = (struct vk_backend *)be;
 
-    int spirv_words = 0, max_ptr = -1, total_bufs = 0, n_deref = 0, push_words = 0;
-    struct deref_info *deref = 0;
-    uint8_t *buf_rw = 0;
-    uint32_t *spirv = build_spirv(bb, SPIRV_FLOAT_CONTROLS | SPIRV_ALWAYS_16BIT,
-                                   &spirv_words, &max_ptr, &total_bufs,
-                                   &n_deref, &deref, &push_words, &buf_rw);
-    if (!spirv) { return 0; }
+    struct spirv_result const sr =
+        build_spirv(bb, SPIRV_FLOAT_CONTROLS | SPIRV_ALWAYS_16BIT);
+    if (!sr.spirv) { return 0; }
 
-    int n_desc = total_bufs;
+    int n_desc = sr.total_bufs;
 
     // Create shader module.
     VkShaderModule shader;
     {
         VkShaderModuleCreateInfo ci = {
             .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-            .codeSize = (size_t)spirv_words * sizeof(uint32_t),
-            .pCode = spirv,
+            .codeSize = (size_t)sr.spirv_words * sizeof(uint32_t),
+            .pCode = sr.spirv,
         };
         VkResult rc = vkCreateShaderModule(vbe->device, &ci, 0, &shader);
         assume(rc == VK_SUCCESS);
@@ -471,7 +467,7 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
     VkPushConstantRange pcr = {
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
         .offset = 0,
-        .size = (uint32_t)(push_words * (int)sizeof(uint32_t)),
+        .size = (uint32_t)(sr.push_words * (int)sizeof(uint32_t)),
     };
 
     // Pipeline layout.
@@ -510,14 +506,14 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
     p->ds_layout   = ds_layout;
     p->pipe_layout = pipe_layout;
     p->pipeline    = pipeline;
-    p->max_ptr     = max_ptr;
-    p->total_bufs  = total_bufs;
-    p->n_deref     = n_deref;
-    p->push_words    = push_words;
-    p->deref       = deref;
-    p->buf_rw      = buf_rw;
-    p->spirv       = spirv;
-    p->spirv_words = spirv_words;
+    p->max_ptr     = sr.max_ptr;
+    p->total_bufs  = sr.total_bufs;
+    p->n_deref     = sr.n_deref;
+    p->push_words  = sr.push_words;
+    p->deref       = sr.deref;
+    p->buf_rw      = sr.buf_rw;
+    p->spirv       = sr.spirv;
+    p->spirv_words = sr.spirv_words;
 
     p->base.queue   = vk_program_queue;
     p->base.dump    = vk_program_dump;
