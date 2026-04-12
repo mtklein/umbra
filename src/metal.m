@@ -52,10 +52,10 @@ struct metal_program {
 typedef struct {
     char  *text;
     size_t size, cap;
-} Buf;
+} SrcBuf;
 
 __attribute__((format(printf, 2, 3)))
-static void emit(Buf *b, char const *fmt, ...) {
+static void emit(SrcBuf *b, char const *fmt, ...) {
     va_list ap;
     for (;;) {
         va_start(ap, fmt);
@@ -100,7 +100,7 @@ static char const *uv(char *tmp, char const *vn,
     return tmp;
 }
 
-static void emit_ops(Buf *b, BB const *bb,
+static void emit_ops(SrcBuf *b, BB const *bb,
                      int const *deref_buf,
                      _Bool *is_f,
                      int lo, int hi,
@@ -822,7 +822,7 @@ static char* build_source(BB const *bb,
     int total_bufs = next_buf;
     *out_total_bufs = total_bufs;
 
-    Buf b = {0};
+    SrcBuf b = {0};
 
     emit(&b,
          "#include <metal_stdlib>\n"

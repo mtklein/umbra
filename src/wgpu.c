@@ -15,10 +15,6 @@ struct umbra_backend *umbra_backend_wgpu(void) { return 0; }
 
 #include <wgpu.h>
 
-// ---------------------------------------------------------------------------
-//  Backend and program structs.
-// ---------------------------------------------------------------------------
-
 enum { WGPU_N_FRAMES = 2, WGPU_RING_HIGH_WATER = 64 * 1024, TS_RESOLVE_ALIGN = 256 };
 
 struct wgpu_backend {
@@ -76,10 +72,6 @@ struct wgpu_program {
     int       spirv_words, :32;
 };
 
-// ---------------------------------------------------------------------------
-//  Uniform ring callbacks.
-// ---------------------------------------------------------------------------
-
 struct wgpu_ring_chunk {
     WGPUBuffer buf;
     void      *mapped;
@@ -110,10 +102,6 @@ static void wgpu_ring_free_chunk(void *handle, void *ctx) {
     free(chunk->mapped);
     free(chunk);
 }
-
-// ---------------------------------------------------------------------------
-//  Batch helpers.
-// ---------------------------------------------------------------------------
 
 static void wgpu_submit_cmdbuf(struct wgpu_backend *be);
 
@@ -158,10 +146,6 @@ static void begin_batch(struct wgpu_backend *be) {
     be->batch_pass = begin_pass(be, 1);
     be->batch_has_dispatch = 0;
 }
-
-// ---------------------------------------------------------------------------
-//  gpu_buf_cache ops for wgpu.
-// ---------------------------------------------------------------------------
 
 static gpu_buf wgpu_cache_alloc(size_t size, void *ctx) {
     struct wgpu_backend *be = ctx;
@@ -220,10 +204,6 @@ static void wgpu_cache_release(gpu_buf buf, void *ctx) {
     (void)ctx;
     wgpuBufferRelease(buf.ptr);
 }
-
-// ---------------------------------------------------------------------------
-//  Submit and flush.
-// ---------------------------------------------------------------------------
 
 static void wgpu_wait_frame(int frame, void *ctx) {
     struct wgpu_backend *be = ctx;
@@ -302,10 +282,6 @@ static void wgpu_flush(struct umbra_backend *base) {
         be->cached_bg = NULL;
     }
 }
-
-// ---------------------------------------------------------------------------
-//  Program: compile.
-// ---------------------------------------------------------------------------
 
 static struct umbra_program *wgpu_compile(struct umbra_backend *base,
                                           struct umbra_basic_block const *bb) {
@@ -394,10 +370,6 @@ static struct umbra_program *wgpu_compile(struct umbra_backend *base,
     p->spirv_words = spirv_words;
     return &p->base;
 }
-
-// ---------------------------------------------------------------------------
-//  Program: queue dispatch.
-// ---------------------------------------------------------------------------
 
 static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
                                int r, int b, struct umbra_buf buf[]) {
@@ -555,10 +527,6 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
     }
 }
 
-// ---------------------------------------------------------------------------
-//  Program: dump and free.
-// ---------------------------------------------------------------------------
-
 static void wgpu_program_dump(struct umbra_program const *prog, FILE *f) {
     struct wgpu_program const *p = (struct wgpu_program const *)prog;
     char tmp[] = "/tmp/umbra_spirv_XXXXXX";
@@ -592,10 +560,6 @@ static void wgpu_program_free(struct umbra_program *prog) {
     free(p->buf_rw);
     free(p);
 }
-
-// ---------------------------------------------------------------------------
-//  Backend: creation and destruction.
-// ---------------------------------------------------------------------------
 
 static struct umbra_backend_stats wgpu_stats(struct umbra_backend const *be) {
     struct wgpu_backend const *wbe = (struct wgpu_backend const *)be;

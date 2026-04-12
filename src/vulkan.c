@@ -13,10 +13,6 @@ struct umbra_backend *umbra_backend_vulkan(void) { return 0; }
 
 #include <vulkan/vulkan.h>
 
-// ---------------------------------------------------------------------------
-//  Backend state.
-// ---------------------------------------------------------------------------
-
 struct vk_buf_handle {
     VkBuffer       buf;
     VkDeviceMemory mem;
@@ -75,10 +71,6 @@ static uint32_t find_host_memory(VkPhysicalDevice phys) {
     return 0;
 }
 
-// ---------------------------------------------------------------------------
-//  Program.
-// ---------------------------------------------------------------------------
-
 struct vk_program {
     struct umbra_program base;
     struct vk_backend *be;
@@ -98,10 +90,6 @@ struct vk_program {
     uint32_t *spirv;
     int       spirv_words, :32;
 };
-
-// ---------------------------------------------------------------------------
-//  Vulkan resource creation helpers.
-// ---------------------------------------------------------------------------
 
 static VkBuffer create_buffer(VkDevice device, VkDeviceSize size) {
     VkBufferCreateInfo ci = {
@@ -131,11 +119,6 @@ static VkDeviceMemory alloc_and_bind(VkDevice device, VkBuffer buf, uint32_t mem
     assume(rc == VK_SUCCESS);
     return mem;
 }
-
-
-// ---------------------------------------------------------------------------
-//  Uniform ring chunk lifecycle.
-// ---------------------------------------------------------------------------
 
 enum { VK_RING_HIGH_WATER = 64 * 1024 };
 
@@ -169,10 +152,6 @@ static void vk_ring_free_chunk(void *handle, void *ctx) {
     free(chunk);
 }
 
-// ---------------------------------------------------------------------------
-//  Batch helpers.
-// ---------------------------------------------------------------------------
-
 static void begin_batch(struct vk_backend *be) {
     if (be->batch_cmd) { return; }
     VkCommandBufferAllocateInfo ai = {
@@ -195,10 +174,6 @@ static void begin_batch(struct vk_backend *be) {
     }
     be->batch_has_dispatch = 0;
 }
-
-// ---------------------------------------------------------------------------
-//  gpu_buf_cache ops for vulkan.
-// ---------------------------------------------------------------------------
 
 static gpu_buf vk_cache_alloc(size_t size, void *ctx) {
     struct vk_backend *v = ctx;
@@ -267,10 +242,6 @@ static void vk_cache_release(gpu_buf buf, void *ctx) {
         free(h);
     }
 }
-
-// ---------------------------------------------------------------------------
-//  Program implementation.
-// ---------------------------------------------------------------------------
 
 static void vk_flush(struct umbra_backend *be);
 static void vk_submit_cmdbuf(struct vk_backend *be);
@@ -554,10 +525,6 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
     p->base.backend = be;
     return &p->base;
 }
-
-// ---------------------------------------------------------------------------
-//  Backend lifecycle.
-// ---------------------------------------------------------------------------
 
 // uniform_ring_pool wait_frame callback: wait for the frame's in-flight
 // cmdbuf to retire, free it, and reset its fence. The pool resets the

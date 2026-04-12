@@ -1,5 +1,5 @@
 #include "ra.h"
-#include <assert.h>
+#include "assume.h"
 #include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -59,7 +59,7 @@ void ra_set_chan_reg(struct ra *ra, int val, int chan, int8_t r) {
 
 struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const *cfg) {
     int const  n  = bb->insts;
-    assert(cfg->nregs <= 32);
+    assume(cfg->nregs <= 32);
     struct ra *ra = malloc(sizeof *ra);
     ra->cfg        = *cfg;
     ra->slot       = malloc((size_t)n            * sizeof *ra->slot);
