@@ -3962,230 +3962,157 @@ TEST(test_stats_safe) {
     }
 }
 
-#if defined(__aarch64__) || defined(__AVX2__)
-    #define LOOP_JIT umbra_backend_jit(),
-#else
-    #define LOOP_JIT
-#endif
-#define LOOP_BACKENDS                                                                    \
-    struct umbra_backend *loop_bes_[] = {                                                 \
-        umbra_backend_interp(),                                                           \
-        LOOP_JIT                                                                          \
-        umbra_backend_metal(),                                                            \
-        umbra_backend_vulkan(),                                                           \
-        umbra_backend_wgpu(),                                                             \
-    };                                                                                    \
-    int const loop_nbe_ = (int)(sizeof loop_bes_ / sizeof *loop_bes_)
-
-#define LOOP_RUN(bb, w, h, buf, out_ptr, out_sz)                                          \
-    for (int bi_ = 0; bi_ < loop_nbe_; bi_++) {                                           \
-        if (!loop_bes_[bi_]) { continue; }                                                \
-        struct umbra_program *p_ = loop_bes_[bi_]->compile(loop_bes_[bi_], bb);           \
-        if (!p_) { continue; }                                                            \
-        __builtin_memset(out_ptr, 0, out_sz);                                             \
-        p_->queue(p_, 0, 0, w, h, buf);                                                  \
-        loop_bes_[bi_]->flush(loop_bes_[bi_]);                                            \
-        p_->free(p_);
-
-#define LOOP_END                                                                          \
-    }                                                                                     \
-    for (int bi_ = 0; bi_ < loop_nbe_; bi_++) {                                           \
-        if (loop_bes_[bi_]) { loop_bes_[bi_]->free(loop_bes_[bi_]); }                     \
-    }
-
 TEST(test_loop_accumulate) {
     struct umbra_builder *b = umbra_builder();
-
     umbra_var acc = umbra_var_alloc(b);
     umbra_val32 n = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
-
     umbra_val32 i = umbra_loop(b, n);
-    umbra_val32 cur = umbra_load_var(b, acc);
-    umbra_store_var(b, acc, umbra_add_i32(b, cur, umbra_imm_i32(b, 1)));
-    umbra_loop_end(b);
-
-    umbra_val32 result = umbra_load_var(b, acc);
-    umbra_store_32(b, (umbra_ptr32){.ix = 1}, result);
     (void)i;
-
-    struct umbra_basic_block *bb = umbra_basic_block(b);
-    umbra_builder_free(b);
-
-    LOOP_BACKENDS;
-    int32_t uni[1] = {10};
-    int32_t out[4] = {0};
-    struct umbra_buf buf[] = {
-        {.ptr = uni, .sz = sizeof uni},
-        {.ptr = out, .sz = sizeof out, .row_bytes = sizeof out},
-    };
-    LOOP_RUN(bb, 4, 1, buf, out, sizeof out)
-        out[0] == 10 here;
-        out[1] == 10 here;
-        out[2] == 10 here;
-        out[3] == 10 here;
-    LOOP_END
-    umbra_basic_block_free(bb);
+    umbra_store_var(b, acc, umbra_add_i32(b, umbra_load_var(b, acc), umbra_imm_i32(b, 1)));
+    umbra_loop_end(b);
+    umbra_store_32(b, (umbra_ptr32){.ix = 1}, umbra_load_var(b, acc));
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        int32_t uni[1] = {10};
+        int32_t out[4] = {0};
+        if (run(&B, bi, 4, 1, (struct umbra_buf[]){
+                {.ptr = uni, .sz = sizeof uni},
+                {.ptr = out, .sz = sizeof out, .row_bytes = sizeof out},
+            })) {
+            out[0] == 10 here;
+            out[1] == 10 here;
+            out[2] == 10 here;
+            out[3] == 10 here;
+        }
+    }
+    cleanup(&B);
 }
 
 TEST(test_loop_zero_trip) {
     struct umbra_builder *b = umbra_builder();
-
     umbra_var acc = umbra_var_alloc(b);
     umbra_store_var(b, acc, umbra_imm_i32(b, 42));
-
     umbra_val32 n = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
     umbra_val32 i = umbra_loop(b, n);
+    (void)i;
     umbra_store_var(b, acc, umbra_imm_i32(b, 99));
     umbra_loop_end(b);
-    (void)i;
-
     umbra_store_32(b, (umbra_ptr32){.ix = 1}, umbra_load_var(b, acc));
-
-    struct umbra_basic_block *bb = umbra_basic_block(b);
-    umbra_builder_free(b);
-
-    LOOP_BACKENDS;
-    int32_t uni[1] = {0};
-    int32_t out[2] = {0};
-    struct umbra_buf buf[] = {
-        {.ptr = uni, .sz = sizeof uni},
-        {.ptr = out, .sz = sizeof out, .row_bytes = sizeof out},
-    };
-    LOOP_RUN(bb, 2, 1, buf, out, sizeof out)
-        out[0] == 42 here;
-        out[1] == 42 here;
-    LOOP_END
-    umbra_basic_block_free(bb);
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        int32_t uni[1] = {0};
+        int32_t out[2] = {0};
+        if (run(&B, bi, 2, 1, (struct umbra_buf[]){
+                {.ptr = uni, .sz = sizeof uni},
+                {.ptr = out, .sz = sizeof out, .row_bytes = sizeof out},
+            })) {
+            out[0] == 42 here;
+            out[1] == 42 here;
+        }
+    }
+    cleanup(&B);
 }
 
 TEST(test_loop_gather_sum) {
     struct umbra_builder *b = umbra_builder();
-
     umbra_var acc = umbra_var_alloc(b);
     umbra_val32 n = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
-
     umbra_val32 i = umbra_loop(b, n);
-    umbra_val32 elem = umbra_gather_32(b, (umbra_ptr32){.ix = 1}, i);
-    umbra_val32 cur = umbra_load_var(b, acc);
-    umbra_store_var(b, acc, umbra_add_f32(b, cur, elem));
+    umbra_store_var(b, acc, umbra_add_f32(b, umbra_load_var(b, acc),
+                                          umbra_gather_32(b, (umbra_ptr32){.ix = 1}, i)));
     umbra_loop_end(b);
-
     umbra_store_32(b, (umbra_ptr32){.ix = 2}, umbra_load_var(b, acc));
-
-    struct umbra_basic_block *bb = umbra_basic_block(b);
-    umbra_builder_free(b);
-
-    LOOP_BACKENDS;
-    int32_t uni[1] = {4};
-    float data[4] = {1.0f, 2.0f, 3.0f, 4.0f};
-    float out[2] = {0};
-    struct umbra_buf buf[] = {
-        {.ptr = uni,  .sz = sizeof uni},
-        {.ptr = data, .sz = sizeof data},
-        {.ptr = out,  .sz = sizeof out, .row_bytes = sizeof out},
-    };
-    LOOP_RUN(bb, 2, 1, buf, out, sizeof out)
-        out[0] == 10.0f here;
-        out[1] == 10.0f here;
-    LOOP_END
-    umbra_basic_block_free(bb);
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        int32_t uni[1] = {4};
+        float data[4] = {1.0f, 2.0f, 3.0f, 4.0f};
+        float out[2] = {0};
+        if (run(&B, bi, 2, 1, (struct umbra_buf[]){
+                {.ptr = uni,  .sz = sizeof uni},
+                {.ptr = data, .sz = sizeof data},
+                {.ptr = out,  .sz = sizeof out, .row_bytes = sizeof out},
+            })) {
+            out[0] == 10.0f here;
+            out[1] == 10.0f here;
+        }
+    }
+    cleanup(&B);
 }
 
 TEST(test_loop_induction_value) {
     struct umbra_builder *b = umbra_builder();
-
     umbra_var acc = umbra_var_alloc(b);
     umbra_val32 n = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
-
     umbra_val32 i = umbra_loop(b, n);
-    umbra_val32 cur = umbra_load_var(b, acc);
-    umbra_store_var(b, acc, umbra_add_i32(b, cur, i));
+    umbra_store_var(b, acc, umbra_add_i32(b, umbra_load_var(b, acc), i));
     umbra_loop_end(b);
-
     umbra_store_32(b, (umbra_ptr32){.ix = 1}, umbra_load_var(b, acc));
-
-    struct umbra_basic_block *bb = umbra_basic_block(b);
-    umbra_builder_free(b);
-
-    LOOP_BACKENDS;
-    int32_t uni[1] = {5};
-    int32_t out[2] = {0};
-    struct umbra_buf buf[] = {
-        {.ptr = uni, .sz = sizeof uni},
-        {.ptr = out, .sz = sizeof out, .row_bytes = sizeof out},
-    };
-    LOOP_RUN(bb, 2, 1, buf, out, sizeof out)
-        out[0] == 10 here;
-        out[1] == 10 here;
-    LOOP_END
-    umbra_basic_block_free(bb);
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        int32_t uni[1] = {5};
+        int32_t out[2] = {0};
+        if (run(&B, bi, 2, 1, (struct umbra_buf[]){
+                {.ptr = uni, .sz = sizeof uni},
+                {.ptr = out, .sz = sizeof out, .row_bytes = sizeof out},
+            })) {
+            out[0] == 10 here;
+            out[1] == 10 here;
+        }
+    }
+    cleanup(&B);
 }
 
 TEST(test_loop_multi_var) {
     struct umbra_builder *b = umbra_builder();
-
     umbra_var sum = umbra_var_alloc(b);
     umbra_var count = umbra_var_alloc(b);
     umbra_val32 n = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
-
     umbra_val32 i = umbra_loop(b, n);
     (void)i;
     umbra_val32 s = umbra_load_var(b, sum);
     umbra_val32 c = umbra_load_var(b, count);
-    umbra_val32 elem = umbra_gather_32(b, (umbra_ptr32){.ix = 1}, c);
-    umbra_store_var(b, sum, umbra_add_f32(b, s, elem));
+    umbra_store_var(b, sum, umbra_add_f32(b, s, umbra_gather_32(b, (umbra_ptr32){.ix = 1}, c)));
     umbra_store_var(b, count, umbra_add_i32(b, c, umbra_imm_i32(b, 1)));
     umbra_loop_end(b);
-
     umbra_store_32(b, (umbra_ptr32){.ix = 2}, umbra_load_var(b, sum));
-
-    struct umbra_basic_block *bb = umbra_basic_block(b);
-    umbra_builder_free(b);
-
-    LOOP_BACKENDS;
-    int32_t uni[1] = {3};
-    float data[4] = {10.0f, 20.0f, 30.0f, 0.0f};
-    float out[2] = {0};
-    struct umbra_buf buf[] = {
-        {.ptr = uni,  .sz = sizeof uni},
-        {.ptr = data, .sz = sizeof data},
-        {.ptr = out,  .sz = sizeof out, .row_bytes = sizeof out},
-    };
-    LOOP_RUN(bb, 2, 1, buf, out, sizeof out)
-        out[0] == 60.0f here;
-        out[1] == 60.0f here;
-    LOOP_END
-    umbra_basic_block_free(bb);
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        int32_t uni[1] = {3};
+        float data[4] = {10.0f, 20.0f, 30.0f, 0.0f};
+        float out[2] = {0};
+        if (run(&B, bi, 2, 1, (struct umbra_buf[]){
+                {.ptr = uni,  .sz = sizeof uni},
+                {.ptr = data, .sz = sizeof data},
+                {.ptr = out,  .sz = sizeof out, .row_bytes = sizeof out},
+            })) {
+            out[0] == 60.0f here;
+            out[1] == 60.0f here;
+        }
+    }
+    cleanup(&B);
 }
 
 TEST(test_loop_init_then_accumulate) {
     struct umbra_builder *b = umbra_builder();
-
     umbra_var acc = umbra_var_alloc(b);
     umbra_store_var(b, acc, umbra_imm_i32(b, 100));
-
     umbra_val32 n = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
     umbra_val32 i = umbra_loop(b, n);
     (void)i;
-    umbra_val32 cur = umbra_load_var(b, acc);
-    umbra_store_var(b, acc, umbra_add_i32(b, cur, umbra_imm_i32(b, 1)));
+    umbra_store_var(b, acc, umbra_add_i32(b, umbra_load_var(b, acc), umbra_imm_i32(b, 1)));
     umbra_loop_end(b);
-
     umbra_store_32(b, (umbra_ptr32){.ix = 1}, umbra_load_var(b, acc));
-
-    struct umbra_basic_block *bb = umbra_basic_block(b);
-    umbra_builder_free(b);
-
-    LOOP_BACKENDS;
-    int32_t uni[1] = {5};
-    int32_t out[2] = {0};
-    struct umbra_buf buf[] = {
-        {.ptr = uni, .sz = sizeof uni},
-        {.ptr = out, .sz = sizeof out, .row_bytes = sizeof out},
-    };
-    LOOP_RUN(bb, 2, 1, buf, out, sizeof out)
-        out[0] == 105 here;
-        out[1] == 105 here;
-    LOOP_END
-    umbra_basic_block_free(bb);
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        int32_t uni[1] = {5};
+        int32_t out[2] = {0};
+        if (run(&B, bi, 2, 1, (struct umbra_buf[]){
+                {.ptr = uni, .sz = sizeof uni},
+                {.ptr = out, .sz = sizeof out, .row_bytes = sizeof out},
+            })) {
+            out[0] == 105 here;
+            out[1] == 105 here;
+        }
+    }
+    cleanup(&B);
 }
