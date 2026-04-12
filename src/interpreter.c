@@ -81,6 +81,24 @@ static F32 vec_max(F32 a, F32 b) {
 }
 #endif
 
+#if defined(__ARM_FEATURE_FMA) || defined(__FMA__)
+static F32 vec_fma(F32 x, F32 y, F32 z) {
+#ifdef __clang__
+    return z + x * y;
+#else
+    for (int i = 0; i < K; i++) { z[i] = __builtin_fmaf(x[i], y[i], z[i]); }
+    return z;
+#endif
+}
+static F32 vec_fms(F32 x, F32 y, F32 z) {
+#ifdef __clang__
+    return z - x * y;
+#else
+    for (int i = 0; i < K; i++) { z[i] = __builtin_fmaf(-x[i], y[i], z[i]); }
+    return z;
+#endif
+}
+#endif
 
 #if !defined(__wasm__)
 typedef __fp16 F16 __attribute__((vector_size(K * 2)));
@@ -952,8 +970,8 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 CASE(op_ceil_i32)  v->i32 = cast(I32, vec_ceil(v[ip->x].f32));  NEXT;
 
 #if defined(__ARM_FEATURE_FMA) || defined(__FMA__)
-                CASE(op_fma_f32) v->f32 = v[ip->z].f32 + v[ip->x].f32 * v[ip->y].f32; NEXT;
-                CASE(op_fms_f32) v->f32 = v[ip->z].f32 - v[ip->x].f32 * v[ip->y].f32; NEXT;
+                CASE(op_fma_f32) v->f32 = vec_fma(v[ip->x].f32, v[ip->y].f32, v[ip->z].f32); NEXT;
+                CASE(op_fms_f32) v->f32 = vec_fms(v[ip->x].f32, v[ip->y].f32, v[ip->z].f32); NEXT;
 #else
                 CASE(op_fma_f32) {
                     F64 const x = cast(F64, v[ip->x].f32), y = cast(F64, v[ip->y].f32), z = cast(F64, v[ip->z].f32);
@@ -1123,8 +1141,8 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
 
                 // fma/fms register variants.
 #if defined(__ARM_FEATURE_FMA) || defined(__FMA__)
-#define FMA_OP(xv,yv,zv) ((zv) + (xv) * (yv))
-#define FMS_OP(xv,yv,zv) ((zv) - (xv) * (yv))
+#define FMA_OP(xv,yv,zv) vec_fma((xv), (yv), (zv))
+#define FMS_OP(xv,yv,zv) vec_fms((xv), (yv), (zv))
 #else
                 // F64 intermediate for precision on non-FMA platforms.
                 // (uses the existing F64 typedef from the non-variant fma cases)

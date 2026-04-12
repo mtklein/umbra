@@ -132,19 +132,12 @@ static void test_slide_golden(int slide_idx, struct umbra_fmt fmt, int fi) {
                 }
             }
         }
-        // TODO: sqrt precision — wgpu uses fast-math sqrt, gcc's JIT sqrt
-        //       may differ from gcc's interpreter sqrtf.  Both produce 1-ULP
-        //       differences visible only at fp16 precision.
-        _Bool const sqrt_slide = __builtin_strcmp(s->title, "Radial Gradient (2-stop)") == 0;
-        _Bool const wgpu_or_gcc = bi == 4
-#ifdef __GNUC__
-#ifndef __clang__
-                                || 1
-#endif
-#endif
-                                ;
+        // TODO: wgpu uses fast-math sqrt (naga emits bare sqrt(), not
+        //       precise::sqrt()).  1-ULP differences at fp16 precision.
         int tol = 0;
-        if (sqrt_slide && wgpu_or_gcc && (fmt.bpp == 8 || fmt.planes == 4)) {
+        if (bi == 4
+                && __builtin_strcmp(s->title, "Radial Gradient (2-stop)") == 0
+                && (fmt.bpp == 8 || fmt.planes == 4)) {
             tol = 1;
         }
         if (worst > tol) {
