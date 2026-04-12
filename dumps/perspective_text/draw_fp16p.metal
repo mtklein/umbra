@@ -66,7 +66,7 @@ kernel void umbra_entry(
     uint v50 = (uint)(int)floor(v49);
     uint v51 = v50 * v20;
     uint v52 = v47 + v51;
-    uint v53 = 0; if (v52 < m.limit2) { v53 = (uint)p2[v52]; }
+    uint v53 = (uint)p2[min(v52, m.limit2 - 1u)] & ((v52 < m.limit2) ? ~0u : 0u);
     uint v54 = (uint)(int)(short)(ushort)v53;
     float v55 = (float)(int)v54;
     float v56 = v55 * as_type<float>(998277249u);

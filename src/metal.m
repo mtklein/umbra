@@ -172,11 +172,12 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                 int p = inst->ptr.deref
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
-                     "%suint v%d = 0;"
-                     " if (%s < m.limit%d)"
-                     " { v%d = p%d[%s]; }\n",
-                     pad, i, vx, p,
-                     i, p, vx);
+                     "%suint v%d = p%d"
+                     "[min(%s, m.limit%d - 1u)]"
+                     " & ((%s < m.limit%d)"
+                     " ? ~0u : 0u);\n",
+                     pad, i, p,
+                     vx, p, vx, p);
             } break;
             case op_sample_32: {
                 int p = inst->ptr.deref
@@ -187,15 +188,17 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                      pad, i, fv(_fx, vx, xid, is_f),
                      pad, i, fv(_fx, vx, xid, is_f), i);
                 emit(b,
-                     "%suint _lo%d = 0;"
-                     " if ((uint)(int)_si%d < m.limit%d)"
-                     " { _lo%d = p%d[(int)_si%d]; }\n",
-                     pad, i, i, p, i, p, i);
+                     "%suint _lo%d = p%d"
+                     "[min((uint)(int)_si%d, m.limit%d - 1u)]"
+                     " & (((uint)(int)_si%d < m.limit%d)"
+                     " ? ~0u : 0u);\n",
+                     pad, i, p, i, p, i, p);
                 emit(b,
-                     "%suint _hi%d = 0;"
-                     " if ((uint)((int)_si%d+1) < m.limit%d)"
-                     " { _hi%d = p%d[(int)_si%d+1]; }\n",
-                     pad, i, i, p, i, p, i);
+                     "%suint _hi%d = p%d"
+                     "[min((uint)((int)_si%d+1), m.limit%d - 1u)]"
+                     " & (((uint)((int)_si%d+1) < m.limit%d)"
+                     " ? ~0u : 0u);\n",
+                     pad, i, p, i, p, i, p);
                 emit(b,
                      "%sfloat v%d = as_type<float>(_lo%d)"
                      " + (as_type<float>(_hi%d)"
@@ -317,11 +320,12 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                 int p = inst->ptr.deref
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
-                     "%suint v%d = 0;"
-                     " if (%s < m.limit%d)"
-                     " { v%d = (uint)p%d[%s]; }\n",
-                     pad, i, vx, p,
-                     i, p, vx);
+                     "%suint v%d = (uint)p%d"
+                     "[min(%s, m.limit%d - 1u)]"
+                     " & ((%s < m.limit%d)"
+                     " ? ~0u : 0u);\n",
+                     pad, i, p,
+                     vx, p, vx, p);
             } break;
             case op_store_16: {
                 int p = inst->ptr.deref

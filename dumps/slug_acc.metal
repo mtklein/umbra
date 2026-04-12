@@ -32,22 +32,22 @@ kernel void umbra_entry(
     uint v16 = p0[18];
     uint v17 = 6u;
     uint v18 = v16 * 6u;
-    uint v19 = 0; if (v18 < m.limit2) { v19 = p2[v18]; }
+    uint v19 = p2[min(v18, m.limit2 - 1u)] & ((v18 < m.limit2) ? ~0u : 0u);
     uint v20 = 1u;
     uint v21 = v18 + 1u;
-    uint v22 = 0; if (v21 < m.limit2) { v22 = p2[v21]; }
+    uint v22 = p2[min(v21, m.limit2 - 1u)] & ((v21 < m.limit2) ? ~0u : 0u);
     uint v23 = 2u;
     uint v24 = v18 + 2u;
-    uint v25 = 0; if (v24 < m.limit2) { v25 = p2[v24]; }
+    uint v25 = p2[min(v24, m.limit2 - 1u)] & ((v24 < m.limit2) ? ~0u : 0u);
     uint v26 = 3u;
     uint v27 = v18 + 3u;
-    uint v28 = 0; if (v27 < m.limit2) { v28 = p2[v27]; }
+    uint v28 = p2[min(v27, m.limit2 - 1u)] & ((v27 < m.limit2) ? ~0u : 0u);
     uint v29 = 4u;
     uint v30 = v18 + 4u;
-    uint v31 = 0; if (v30 < m.limit2) { v31 = p2[v30]; }
+    uint v31 = p2[min(v30, m.limit2 - 1u)] & ((v30 < m.limit2) ? ~0u : 0u);
     uint v32 = 5u;
     uint v33 = v18 + 5u;
-    uint v34 = 0; if (v33 < m.limit2) { v34 = p2[v33]; }
+    uint v34 = p2[min(v33, m.limit2 - 1u)] & ((v33 < m.limit2) ? ~0u : 0u);
     uint v35 = 3212836864u;
     uint v36 = m.x0 + pos.x;
     float v37 = (float)(int)v36;

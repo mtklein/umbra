@@ -43,18 +43,18 @@ kernel void umbra_entry(
     while (var4 < v10) {
     uint v23 = var4;
     uint v24 = v23 + 1u;
-    uint v25 = 0; if (v24 < m.limit3) { v25 = p3[v24]; }
+    uint v25 = p3[min(v24, m.limit3 - 1u)] & ((v24 < m.limit3) ? ~0u : 0u);
     uint v26 = v21 <= as_type<float>(v25) ? 0xffffffffu : 0u;
     uint v27 = v12 + v24;
-    uint v28 = 0; if (v27 < m.limit2) { v28 = p2[v27]; }
+    uint v28 = p2[min(v27, m.limit2 - 1u)] & ((v27 < m.limit2) ? ~0u : 0u);
     uint v29 = v8 + v24;
-    uint v30 = 0; if (v29 < m.limit2) { v30 = p2[v29]; }
+    uint v30 = p2[min(v29, m.limit2 - 1u)] & ((v29 < m.limit2) ? ~0u : 0u);
     uint v31 = v11 + v24;
-    uint v32 = 0; if (v31 < m.limit2) { v32 = p2[v31]; }
+    uint v32 = p2[min(v31, m.limit2 - 1u)] & ((v31 < m.limit2) ? ~0u : 0u);
     uint v33 = v12 + v23;
-    uint v34 = 0; if (v33 < m.limit2) { v34 = p2[v33]; }
+    uint v34 = p2[min(v33, m.limit2 - 1u)] & ((v33 < m.limit2) ? ~0u : 0u);
     float v35 = as_type<float>(v28) - as_type<float>(v34);
-    uint v36 = 0; if (v23 < m.limit3) { v36 = p3[v23]; }
+    uint v36 = p3[min(v23, m.limit3 - 1u)] & ((v23 < m.limit3) ? ~0u : 0u);
     uint v37 = as_type<float>(v36) <= v21 ? 0xffffffffu : 0u;
     uint v38 = v37 & v26;
     float v39 = as_type<float>(v25) - as_type<float>(v36);
@@ -62,15 +62,15 @@ kernel void umbra_entry(
     float v41 = v40 / v39;
     float v42 = fma(v41, v35, as_type<float>(v34));
     uint v43 = v8 + v23;
-    uint v44 = 0; if (v43 < m.limit2) { v44 = p2[v43]; }
+    uint v44 = p2[min(v43, m.limit2 - 1u)] & ((v43 < m.limit2) ? ~0u : 0u);
     float v45 = as_type<float>(v30) - as_type<float>(v44);
     float v46 = fma(v41, v45, as_type<float>(v44));
     uint v47 = v11 + v23;
-    uint v48 = 0; if (v47 < m.limit2) { v48 = p2[v47]; }
+    uint v48 = p2[min(v47, m.limit2 - 1u)] & ((v47 < m.limit2) ? ~0u : 0u);
     float v49 = as_type<float>(v32) - as_type<float>(v48);
     float v50 = fma(v41, v49, as_type<float>(v48));
-    uint v51 = 0; if (v24 < m.limit2) { v51 = p2[v24]; }
-    uint v52 = 0; if (v23 < m.limit2) { v52 = p2[v23]; }
+    uint v51 = p2[min(v24, m.limit2 - 1u)] & ((v24 < m.limit2) ? ~0u : 0u);
+    uint v52 = p2[min(v23, m.limit2 - 1u)] & ((v23 < m.limit2) ? ~0u : 0u);
     float v53 = as_type<float>(v51) - as_type<float>(v52);
     float v54 = fma(v41, v53, as_type<float>(v52));
     uint v55 = var0;
