@@ -308,6 +308,68 @@ umbra_color umbra_shader_radial_2(struct umbra_builder *builder, struct umbra_un
     size_t const ci = umbra_uniforms_reserve_f32(u, 8);
     return lerp_2stop_(builder, radial_t_(builder, fi, x, y), ci);
 }
+static umbra_color walk_stops_(struct umbra_builder *b, umbra_val32 t,
+                               size_t fi, umbra_ptr32 colors, umbra_ptr32 pos) {
+    umbra_val32 const n_i = umbra_i32_from_f32(b, umbra_uniform_32(b, (umbra_ptr32){0}, fi + 12));
+    umbra_val32 const n_segs = umbra_sub_i32(b, n_i, umbra_imm_i32(b, 1));
+    umbra_val32 const n2 = umbra_add_i32(b, n_i, n_i);
+    umbra_val32 const n3 = umbra_add_i32(b, n2, n_i);
+
+    umbra_var vr = umbra_var_alloc(b),
+              vg = umbra_var_alloc(b),
+              vb = umbra_var_alloc(b),
+              va = umbra_var_alloc(b);
+
+    umbra_val32 i = umbra_loop(b, n_segs); {
+        umbra_val32 i1 = umbra_add_i32(b, i, umbra_imm_i32(b, 1));
+
+        umbra_val32 p0 = umbra_gather_32(b, pos, i);
+        umbra_val32 p1 = umbra_gather_32(b, pos, i1);
+        umbra_val32 in_seg = umbra_and_32(b, umbra_le_f32(b, p0, t),
+                                             umbra_le_f32(b, t, p1));
+
+        umbra_val32 frac = umbra_div_f32(b, umbra_sub_f32(b, t, p0),
+                                            umbra_sub_f32(b, p1, p0));
+
+        umbra_val32 r0 = umbra_gather_32(b, colors, i);
+        umbra_val32 r1 = umbra_gather_32(b, colors, i1);
+        umbra_val32 g0 = umbra_gather_32(b, colors, umbra_add_i32(b, i,  n_i));
+        umbra_val32 g1 = umbra_gather_32(b, colors, umbra_add_i32(b, i1, n_i));
+        umbra_val32 b0 = umbra_gather_32(b, colors, umbra_add_i32(b, i,  n2));
+        umbra_val32 b1 = umbra_gather_32(b, colors, umbra_add_i32(b, i1, n2));
+        umbra_val32 a0 = umbra_gather_32(b, colors, umbra_add_i32(b, i,  n3));
+        umbra_val32 a1 = umbra_gather_32(b, colors, umbra_add_i32(b, i1, n3));
+
+        umbra_val32 cr = lerp_f(b, r0, r1, frac);
+        umbra_val32 cg = lerp_f(b, g0, g1, frac);
+        umbra_val32 cb = lerp_f(b, b0, b1, frac);
+        umbra_val32 ca = lerp_f(b, a0, a1, frac);
+
+        umbra_store_var(b, vr, umbra_sel_32(b, in_seg, cr, umbra_load_var(b, vr)));
+        umbra_store_var(b, vg, umbra_sel_32(b, in_seg, cg, umbra_load_var(b, vg)));
+        umbra_store_var(b, vb, umbra_sel_32(b, in_seg, cb, umbra_load_var(b, vb)));
+        umbra_store_var(b, va, umbra_sel_32(b, in_seg, ca, umbra_load_var(b, va)));
+    } umbra_loop_end(b);
+
+    return (umbra_color){
+        umbra_load_var(b, vr),
+        umbra_load_var(b, vg),
+        umbra_load_var(b, vb),
+        umbra_load_var(b, va),
+    };
+}
+
+umbra_color umbra_shader_linear_stops(struct umbra_builder *builder,
+                                      struct umbra_uniforms_layout *u,
+                                      umbra_val32 x, umbra_val32 y) {
+    size_t const fi        = umbra_uniforms_reserve_f32(u, 4);
+    size_t const colors_off = umbra_uniforms_reserve_ptr(u);
+    size_t const pos_off    = umbra_uniforms_reserve_ptr(u);
+    umbra_ptr32 const colors = umbra_deref_ptr32(builder, (umbra_ptr32){0}, colors_off);
+    umbra_ptr32 const pos    = umbra_deref_ptr32(builder, (umbra_ptr32){0}, pos_off);
+    return walk_stops_(builder, linear_t_(builder, fi, x, y), fi, colors, pos);
+}
+
 umbra_color umbra_shader_linear_grad(struct umbra_builder *builder, struct umbra_uniforms_layout *u, umbra_val32 x, umbra_val32 y) {
     size_t const fi = umbra_uniforms_reserve_f32(u, 4);
     size_t    const lut_off = umbra_uniforms_reserve_ptr(u);

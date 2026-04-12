@@ -48,8 +48,9 @@ struct umbra_builder* umbra_draw_build(umbra_shader_fn shader, umbra_coverage_fn
 umbra_color umbra_shader_solid      (struct umbra_builder*, struct umbra_uniforms_layout*, umbra_val32 x, umbra_val32 y);
 umbra_color umbra_shader_linear_2   (struct umbra_builder*, struct umbra_uniforms_layout*, umbra_val32 x, umbra_val32 y);
 umbra_color umbra_shader_radial_2   (struct umbra_builder*, struct umbra_uniforms_layout*, umbra_val32 x, umbra_val32 y);
-umbra_color umbra_shader_linear_grad(struct umbra_builder*, struct umbra_uniforms_layout*, umbra_val32 x, umbra_val32 y);
-umbra_color umbra_shader_radial_grad(struct umbra_builder*, struct umbra_uniforms_layout*, umbra_val32 x, umbra_val32 y);
+umbra_color umbra_shader_linear_grad (struct umbra_builder*, struct umbra_uniforms_layout*, umbra_val32 x, umbra_val32 y);
+umbra_color umbra_shader_radial_grad (struct umbra_builder*, struct umbra_uniforms_layout*, umbra_val32 x, umbra_val32 y);
+umbra_color umbra_shader_linear_stops(struct umbra_builder*, struct umbra_uniforms_layout*, umbra_val32 x, umbra_val32 y);
 
 umbra_color umbra_supersample(struct umbra_builder*, struct umbra_uniforms_layout*,
                               umbra_val32 x, umbra_val32 y,

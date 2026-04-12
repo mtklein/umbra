@@ -983,6 +983,42 @@ TEST(test_gradient_lut_nonuniform) {
 }
 
 
+TEST(test_linear_stops) {
+    float colors_planar[3 * 4] = {1,0,0, 0,1,0, 0,0,1, 1,1,1};
+    float pos[3] = {0.0f, 0.5f, 1.0f};
+
+    struct umbra_draw_layout lay;
+    struct draw_backends B =
+        make_draw(umbra_draw_build(umbra_shader_linear_stops, NULL,
+                                   umbra_blend_src, umbra_fmt_8888, &lay), lay);
+
+    size_t const sh = B.lay.shader;
+    size_t const colors_off = (sh + 16 + 7) & ~(size_t)7;
+    size_t const pos_off    = (colors_off + 24 + 7) & ~(size_t)7;
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        if (bi == 1) { continue; }
+        uint32_t dst[5] = {0};
+        float params[4] = {0.25f, 0, 0, 3};
+        umbra_uniforms_fill_f32(B.lay.uniforms, sh, params, 4);
+        umbra_uniforms_fill_ptr(B.lay.uniforms, colors_off,
+                                (struct umbra_buf){.ptr=colors_planar, .sz=sizeof colors_planar});
+        umbra_uniforms_fill_ptr(B.lay.uniforms, pos_off,
+                                (struct umbra_buf){.ptr=pos, .sz=sizeof pos});
+        if (run_draw(&B, bi, 5, 1, (struct umbra_buf[]){
+                {.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
+                {.ptr=dst, .sz=sizeof dst, .row_bytes=sizeof dst},
+            })) {
+            dst[0] == 0xff0000ffu here;
+            dst[1] == 0xff008080u here;
+            dst[2] == 0xff00ff00u here;
+            dst[3] == 0xff808000u here;
+            dst[4] == 0xffff0000u here;
+        }
+    }
+    cleanup_draw(&B);
+}
+
 static umbra_shader_fn ss_inner_;
 static int             ss_n_;
 static umbra_color ss_shader_(struct umbra_builder *builder, struct umbra_uniforms_layout *u, umbra_val32 x, umbra_val32 y) {
