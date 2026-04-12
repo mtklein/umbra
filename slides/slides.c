@@ -30,6 +30,8 @@ static struct text_cov    bitmap_cov, sdf_cov;
 static struct slug_curves slug;
 static float              linear_lut[LUT_N * 4];
 static float              radial_lut[LUT_N * 4];
+static float              linear_stops_planar[6 * 4];
+static float              linear_stops_pos[6];
 static struct slide_ctx   ctx;
 
 static slide_factory_fn registry[MAX_SLIDES];
@@ -48,11 +50,17 @@ int           slide_count(void) { return count; }
 struct slide *slide_get(int i)  { return all[i]; }
 
 static void build_luts(void) {
-    float const linear_stops[][4] = {
+    float const linear_colors[][4] = {
         {1.2f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.8f, 0.0f, 1.0f}, {0.0f, 1.2f, 0.0f, 1.0f},
         {0.0f, 0.8f, 1.2f, 1.0f}, {0.0f, 0.0f, 1.2f, 1.0f}, {0.8f, 0.0f, 1.0f, 1.0f},
     };
-    umbra_gradient_lut_even(linear_lut, LUT_N, 6, linear_stops);
+    umbra_gradient_lut_even(linear_lut, LUT_N, 6, linear_colors);
+    for (int i = 0; i < 6; i++) {
+        for (int c = 0; c < 4; c++) {
+            linear_stops_planar[c * 6 + i] = linear_colors[i][c];
+        }
+        linear_stops_pos[i] = (float)i / 5.0f;
+    }
 
     float const radial_stops[][4] = {
         {1.5f, 1.5f, 1.2f, 1.0f},
@@ -79,9 +87,12 @@ void slides_init(int w, int h) {
     ctx.bitmap_cov = &bitmap_cov;
     ctx.sdf_cov    = &sdf_cov;
     ctx.slug       = &slug;
-    ctx.linear_lut = linear_lut;
-    ctx.radial_lut = radial_lut;
-    ctx.lut_n      = LUT_N;
+    ctx.linear_lut       = linear_lut;
+    ctx.radial_lut       = radial_lut;
+    ctx.lut_n            = LUT_N;
+    ctx.linear_stops     = linear_stops_planar;
+    ctx.linear_stops_pos = linear_stops_pos;
+    ctx.linear_n_stops   = 6;
 
     count = 0;
     for (int i = 0; i < registry_count; i++) {

@@ -24,7 +24,9 @@ struct slide_ctx {
     struct slug_curves *slug;
     float              *linear_lut;
     float              *radial_lut;
-    int                 lut_n, :32;
+    float              *linear_stops;
+    float              *linear_stops_pos;
+    int                 lut_n, linear_n_stops;
 };
 
 typedef struct slide *(*slide_factory_fn)(struct slide_ctx const *);
