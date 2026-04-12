@@ -103,7 +103,8 @@ static void overview_init(struct slide *s, int w, int h) {
 static void overview_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
     struct overview_state *st = (struct overview_state *)s;
     st->be = be;
-    st->fmt = fmt;
+    st->fmt = umbra_fmt_8888;
+    (void)fmt;
     render_thumbnails(st);
 }
 
