@@ -9,8 +9,8 @@ struct sched {
     int last_use, n_deps, n_users, user_off, ready_idx;
 };
 
-static _Bool is_body(struct bb_inst const *inst, int i, int lo, int hi) {
-    return inst->live && inst->varying && i >= lo && i < hi;
+static _Bool is_body(struct bb_inst const *inst) {
+    return inst->live && inst->varying;
 }
 
 static int sched_score(struct bb_inst const *in, struct sched const *meta, int c, int live) {
@@ -33,12 +33,12 @@ static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int at, int
 
     for (int i = 0; i < n; i++) {
         meta[i].last_use = -1;
-        if (is_body(in + i, i, region_lo, region_hi)) {
+        if (is_body(in + i) && i >= region_lo && i < region_hi) {
             int const deps[] = {in[i].x.id, in[i].y.id, in[i].z.id, in[i].w.id};
             for (int k = 0; k < 4; k++) {
                 int const d = deps[k];
                 meta[d].last_use = i;
-                if (is_body(in + d, d, region_lo, region_hi)) {
+                if (is_body(in + d) && d >= region_lo && d < region_hi) {
                     meta[i].n_deps++;
                     meta[d].n_users++;
                 }
@@ -55,10 +55,10 @@ static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int at, int
     int *ready = buf + meta[n].user_off;
 
     for (int i = 0; i < n; i++) {
-        if (is_body(in + i, i, region_lo, region_hi)) {
+        if (is_body(in + i) && i >= region_lo && i < region_hi) {
             int const deps[] = {in[i].x.id, in[i].y.id, in[i].z.id, in[i].w.id};
             for (int k = 0; k < 4; k++) {
-                if (is_body(in + deps[k], deps[k], region_lo, region_hi)) {
+                if (is_body(in + deps[k]) && deps[k] >= region_lo && deps[k] < region_hi) {
                     int const d = deps[k];
                     users[meta[d].user_off + meta[d].n_users++] = i;
                 }
@@ -68,7 +68,7 @@ static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int at, int
 
     int nready = 0;
     for (int i = 0; i < n; i++) {
-        if (is_body(in + i, i, region_lo, region_hi) && meta[i].n_deps == 0) {
+        if (is_body(in + i) && i >= region_lo && i < region_hi && meta[i].n_deps == 0) {
             ready[nready++] = i;
         }
     }
