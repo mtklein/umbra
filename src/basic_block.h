@@ -31,6 +31,7 @@ struct bb_inst {
 
 struct umbra_builder {
     struct bb_inst *inst;
+    _Bool          *var_uniform;
     int             insts, cap;
     struct hash     ht;
     int             n_vars;

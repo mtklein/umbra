@@ -46,6 +46,11 @@ static val push_(builder *b, struct bb_inst inst) {
         enum op const op = inst.op;
         if (op == op_imm_32 || op == op_uniform_32 || op == op_deref_ptr) {
             inst.uniform = 1;
+        } else if (op == op_load_var) {
+            inst.uniform = b->var_uniform[inst.imm];
+        } else if (op == op_store_var) {
+            inst.uniform = 0;
+            b->var_uniform[inst.imm] &= b->inst[inst.y.id].uniform;
         } else if (op_is_varying(op)
                    || op == op_gather_32
                    || op == op_gather_16
@@ -100,6 +105,7 @@ void umbra_builder_free(builder *b) {
     if (b) {
         free(b->inst);
         free(b->ht.data);
+        free(b->var_uniform);
         free(b);
     }
 }
@@ -448,7 +454,10 @@ void umbra_loop_end(builder *b) {
 }
 
 umbra_var umbra_var_alloc(builder *b) {
-    return (umbra_var){.id = b->n_vars++};
+    int const id = b->n_vars++;
+    b->var_uniform = realloc(b->var_uniform, (size_t)b->n_vars * sizeof *b->var_uniform);
+    b->var_uniform[id] = 1;
+    return (umbra_var){.id = id};
 }
 
 umbra_val32 umbra_load_var(builder *b, umbra_var v) {
