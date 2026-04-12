@@ -134,6 +134,8 @@ enum {
     SpvOpFOrdGreaterThan      = 186,
     SpvOpFOrdLessThanEqual    = 188,
     SpvOpFOrdGreaterThanEqual = 190,
+    SpvOpPhi                  = 245,
+    SpvOpLoopMerge            = 246,
     SpvOpLabel                = 248,
     SpvOpBranch               = 249,
     SpvOpBranchConditional    = 250,
@@ -220,7 +222,8 @@ typedef struct {
     uint32_t t_ptr_ssbo_struct_f16; // pointer to struct { RuntimeArray<f16> }
 
     // GLSL.std.450 import.
-    uint32_t ext_glsl, :32;
+    uint32_t ext_glsl;
+    uint32_t t_ptr_func_u32;       // pointer to u32 in Function storage
 
     // Global variable IDs.
     uint32_t *v_ssbo;      // one per buffer (total_bufs)
@@ -945,6 +948,14 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
     spv_word(&B.types, push_sc);
     spv_word(&B.types, B.t_u32);
 
+    if (bb->n_vars > 0 || bb->loop_begin >= 0) {
+        B.t_ptr_func_u32 = spv_id(&B);
+        spv_op(&B.types, SpvOpTypePointer, 4);
+        spv_word(&B.types, B.t_ptr_func_u32);
+        spv_word(&B.types, SpvStorageClassFunction);
+        spv_word(&B.types, B.t_u32);
+    }
+
     // --- Constants ---
     B.c_0 = spv_const_u32(&B, 0);
     B.c_1 = spv_const_u32(&B, 1);
@@ -1009,6 +1020,8 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
         spv_word(&B.decor, (uint32_t)total_bufs);
     }
 
+    uint32_t *v_vars = NULL;
+
     // --- Entry point ---
     // OpEntryPoint GLCompute %main "main" %gl_GlobalInvocationID
     // In SPIR-V 1.0, only Input/Output variables go in the interface list.
@@ -1056,6 +1069,27 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
         uint32_t label_entry = spv_id(&B);
         spv_op(&B.func, SpvOpLabel, 2);
         spv_word(&B.func, label_entry);
+
+        // Function-scoped variables for loop induction and user variables.
+        uint32_t v_loop_i = 0;
+        if (bb->loop_begin >= 0) {
+            v_loop_i = spv_id(&B);
+            spv_op(&B.func, SpvOpVariable, 4);
+            spv_word(&B.func, B.t_ptr_func_u32);
+            spv_word(&B.func, v_loop_i);
+            spv_word(&B.func, SpvStorageClassFunction);
+        }
+        if (bb->n_vars > 0) {
+            v_vars = calloc((size_t)bb->n_vars, sizeof *v_vars);
+            for (int vi = 0; vi < bb->n_vars; vi++) {
+                v_vars[vi] = spv_id(&B);
+                spv_op(&B.func, SpvOpVariable, 5);
+                spv_word(&B.func, B.t_ptr_func_u32);
+                spv_word(&B.func, v_vars[vi]);
+                spv_word(&B.func, SpvStorageClassFunction);
+                spv_word(&B.func, B.c_0);
+            }
+        }
 
         // Load gl_GlobalInvocationID.
         uint32_t gid = spv_load(&B, B.t_uvec3, B.v_global_id);
@@ -1790,10 +1824,70 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                     B.val[i] = spv_select(&B, B.t_u32, r, B.c_allones, B.c_0);
                 } break;
 
-                case op_loop_begin:
-                case op_loop_end:
+                case op_loop_begin: {
+                    spv_store(&B, v_loop_i, B.c_0);
+
+                    uint32_t label_header   = spv_id(&B);
+                    uint32_t label_loop     = spv_id(&B);
+                    uint32_t label_continue = spv_id(&B);
+                    uint32_t label_merge    = spv_id(&B);
+
+                    spv_op(&B.func, SpvOpBranch, 2);
+                    spv_word(&B.func, label_header);
+
+                    spv_op(&B.func, SpvOpLabel, 2);
+                    spv_word(&B.func, label_header);
+
+                    spv_op(&B.func, SpvOpLoopMerge, 4);
+                    spv_word(&B.func, label_merge);
+                    spv_word(&B.func, label_continue);
+                    spv_word(&B.func, 0);
+
+                    uint32_t cur_i = spv_load(&B, B.t_u32, v_loop_i);
+                    B.val[i] = cur_i;
+                    uint32_t trip = as_u32(&B, get_val(&B, inst->x), xid);
+                    uint32_t cond = spv_binop(&B, SpvOpULessThan, B.t_bool, cur_i, trip);
+                    spv_op(&B.func, SpvOpBranchConditional, 4);
+                    spv_word(&B.func, cond);
+                    spv_word(&B.func, label_loop);
+                    spv_word(&B.func, label_merge);
+
+                    spv_op(&B.func, SpvOpLabel, 2);
+                    spv_word(&B.func, label_loop);
+
+                    B.val_1[i] = label_continue;
+                    B.val_2[i] = label_merge;
+                    B.val_3[i] = label_header;
+                } break;
+                case op_loop_end: {
+                    int lb = bb->loop_begin;
+                    uint32_t label_continue = B.val_1[lb];
+                    uint32_t label_merge    = B.val_2[lb];
+                    uint32_t label_header   = B.val_3[lb];
+
+                    spv_op(&B.func, SpvOpBranch, 2);
+                    spv_word(&B.func, label_continue);
+
+                    spv_op(&B.func, SpvOpLabel, 2);
+                    spv_word(&B.func, label_continue);
+
+                    uint32_t cur_i = spv_load(&B, B.t_u32, v_loop_i);
+                    uint32_t next_i = spv_binop(&B, SpvOpIAdd, B.t_u32, cur_i, B.c_1);
+                    spv_store(&B, v_loop_i, next_i);
+
+                    spv_op(&B.func, SpvOpBranch, 2);
+                    spv_word(&B.func, label_header);
+
+                    spv_op(&B.func, SpvOpLabel, 2);
+                    spv_word(&B.func, label_merge);
+                } break;
                 case op_load_var:
-                case op_store_var: __builtin_trap();
+                    B.val[i] = spv_load(&B, B.t_u32, v_vars[inst->imm]);
+                    break;
+                case op_store_var:
+                    spv_store(&B, v_vars[inst->imm],
+                              as_u32(&B, get_val(&B, inst->y), yid));
+                    break;
             }
         }
 
@@ -1870,6 +1964,7 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
     free(B.is_f);
     free(B.buf_is_16);
     free(B.const_cache);
+    free(v_vars);
     free(deref_buf);
 
     result.spirv = spirv;

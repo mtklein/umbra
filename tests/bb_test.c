@@ -3966,6 +3966,8 @@ TEST(test_stats_safe) {
     struct umbra_backend *loop_bes_[] = {                                                 \
         umbra_backend_interp(),                                                           \
         umbra_backend_metal(),                                                            \
+        umbra_backend_vulkan(),                                                           \
+        umbra_backend_wgpu(),                                                             \
     };                                                                                    \
     int const loop_nbe_ = (int)(sizeof loop_bes_ / sizeof *loop_bes_)
 
