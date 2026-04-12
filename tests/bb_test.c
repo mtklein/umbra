@@ -3962,27 +3962,28 @@ TEST(test_stats_safe) {
     }
 }
 
-static void loop_test(struct umbra_basic_block *bb,
-                      int w, int h,
-                      struct umbra_buf buf[],
-                      int nbufs) {
-    struct umbra_backend *backends[] = {
-        umbra_backend_interp(),
-        umbra_backend_metal(),
-    };
-    for (int i = 0; i < (int)(sizeof backends / sizeof *backends); i++) {
-        if (backends[i]) {
-            struct umbra_program *p = backends[i]->compile(backends[i], bb);
-            if (p) {
-                p->queue(p, 0, 0, w, h, buf);
-                backends[i]->flush(backends[i]);
-                p->free(p);
-            }
-            backends[i]->free(backends[i]);
-        }
+#define LOOP_BACKENDS                                                                    \
+    struct umbra_backend *loop_bes_[] = {                                                 \
+        umbra_backend_interp(),                                                           \
+        umbra_backend_metal(),                                                            \
+    };                                                                                    \
+    int const loop_nbe_ = (int)(sizeof loop_bes_ / sizeof *loop_bes_)
+
+#define LOOP_RUN(bb, w, h, buf, out_ptr, out_sz)                                          \
+    for (int bi_ = 0; bi_ < loop_nbe_; bi_++) {                                           \
+        if (!loop_bes_[bi_]) { continue; }                                                \
+        struct umbra_program *p_ = loop_bes_[bi_]->compile(loop_bes_[bi_], bb);           \
+        if (!p_) { continue; }                                                            \
+        __builtin_memset(out_ptr, 0, out_sz);                                             \
+        p_->queue(p_, 0, 0, w, h, buf);                                                  \
+        loop_bes_[bi_]->flush(loop_bes_[bi_]);                                            \
+        p_->free(p_);
+
+#define LOOP_END                                                                          \
+    }                                                                                     \
+    for (int bi_ = 0; bi_ < loop_nbe_; bi_++) {                                           \
+        if (loop_bes_[bi_]) { loop_bes_[bi_]->free(loop_bes_[bi_]); }                     \
     }
-    (void)nbufs;
-}
 
 TEST(test_loop_accumulate) {
     struct umbra_builder *b = umbra_builder();
@@ -4002,19 +4003,20 @@ TEST(test_loop_accumulate) {
     struct umbra_basic_block *bb = umbra_basic_block(b);
     umbra_builder_free(b);
 
+    LOOP_BACKENDS;
     int32_t uni[1] = {10};
     int32_t out[4] = {0};
     struct umbra_buf buf[] = {
         {.ptr = uni, .sz = sizeof uni},
         {.ptr = out, .sz = sizeof out, .row_bytes = sizeof out},
     };
-    loop_test(bb, 4, 1, buf, 2);
+    LOOP_RUN(bb, 4, 1, buf, out, sizeof out)
+        out[0] == 10 here;
+        out[1] == 10 here;
+        out[2] == 10 here;
+        out[3] == 10 here;
+    LOOP_END
     umbra_basic_block_free(bb);
-
-    out[0] == 10 here;
-    out[1] == 10 here;
-    out[2] == 10 here;
-    out[3] == 10 here;
 }
 
 TEST(test_loop_zero_trip) {
@@ -4034,17 +4036,18 @@ TEST(test_loop_zero_trip) {
     struct umbra_basic_block *bb = umbra_basic_block(b);
     umbra_builder_free(b);
 
+    LOOP_BACKENDS;
     int32_t uni[1] = {0};
     int32_t out[2] = {0};
     struct umbra_buf buf[] = {
         {.ptr = uni, .sz = sizeof uni},
         {.ptr = out, .sz = sizeof out, .row_bytes = sizeof out},
     };
-    loop_test(bb, 2, 1, buf, 2);
+    LOOP_RUN(bb, 2, 1, buf, out, sizeof out)
+        out[0] == 42 here;
+        out[1] == 42 here;
+    LOOP_END
     umbra_basic_block_free(bb);
-
-    out[0] == 42 here;
-    out[1] == 42 here;
 }
 
 TEST(test_loop_gather_sum) {
@@ -4064,6 +4067,7 @@ TEST(test_loop_gather_sum) {
     struct umbra_basic_block *bb = umbra_basic_block(b);
     umbra_builder_free(b);
 
+    LOOP_BACKENDS;
     int32_t uni[1] = {4};
     float data[4] = {1.0f, 2.0f, 3.0f, 4.0f};
     float out[2] = {0};
@@ -4072,9 +4076,9 @@ TEST(test_loop_gather_sum) {
         {.ptr = data, .sz = sizeof data},
         {.ptr = out,  .sz = sizeof out, .row_bytes = sizeof out},
     };
-    loop_test(bb, 2, 1, buf, 3);
+    LOOP_RUN(bb, 2, 1, buf, out, sizeof out)
+        out[0] == 10.0f here;
+        out[1] == 10.0f here;
+    LOOP_END
     umbra_basic_block_free(bb);
-
-    out[0] == 10.0f here;
-    out[1] == 10.0f here;
 }
