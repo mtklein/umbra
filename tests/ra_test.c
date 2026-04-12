@@ -26,6 +26,9 @@ static struct umbra_basic_block *make_bb(int n, int pre) {
     bb->inst = calloc((size_t)n, sizeof *bb->inst);
     bb->insts = n;
     bb->preamble = pre;
+    bb->loop_begin = -1;
+    bb->loop_end   = -1;
+    bb->n_vars     = 0;
 
     bb->inst[0].op = op_imm_32;
     bb->inst[0].imm = 42;
@@ -714,6 +717,46 @@ TEST(test_sparse_pool_eviction) {
     r3 == 4 here;
     ra_reg(ra, 1) == -1 here;
     sl[1] >= 0 here;
+
+    ra_destroy(ra);
+    free_bb(bb);
+}
+
+TEST(test_evict_live_before_loop) {
+    static int8_t const pool[] = {0, 1, 2};
+
+    struct umbra_basic_block *bb = make_bb(8, 1);
+    bb->loop_begin = 4;
+    bb->loop_end   = 7;
+    bb->inst[5].x = (val){.id = 2};
+    bb->inst[5].y = (val){.id = 3};
+
+    struct ra_config cfg = {
+        .pool    = pool,
+        .nregs   = 3,
+        .max_reg = 3,
+        .spill   = test_spill,
+        .fill    = test_fill,
+    };
+    int sl[8];
+    __builtin_memset(sl, -1, sizeof sl);
+    int ns = 0;
+    struct ra *ra = ra_create(bb, &cfg);
+
+    struct ra_step s1 = ra_step_alloc(ra, sl, &ns, 1);
+    struct ra_step s2 = ra_step_alu(ra, sl, &ns, &bb->inst[2], 2, 0);
+    struct ra_step s3 = ra_step_alu(ra, sl, &ns, &bb->inst[3], 3, 0);
+    (void)s1; (void)s2; (void)s3;
+
+    ra_reg(ra, 2) >= 0 here;
+    ra_reg(ra, 3) >= 0 here;
+
+    reset_records();
+    ra_evict_live_before(ra, sl, &ns, 4);
+
+    ra_reg(ra, 2) == -1 here;
+    sl[2] >= 0 here;
+    nspills >= 1 here;
 
     ra_destroy(ra);
     free_bb(bb);

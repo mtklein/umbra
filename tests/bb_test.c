@@ -4210,3 +4210,63 @@ TEST(test_loop_sel_gather) {
     }
     cleanup(&B);
 }
+
+TEST(test_loop_high_register_pressure) {
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 n = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
+    umbra_val32 px = umbra_load_32(b, (umbra_ptr32){.ix = 1});
+
+    umbra_val32 a = umbra_mul_f32(b, px, umbra_imm_f32(b, 1.0f));
+    umbra_val32 c = umbra_mul_f32(b, px, umbra_imm_f32(b, 3.0f));
+    umbra_val32 d = umbra_mul_f32(b, px, umbra_imm_f32(b, 4.0f));
+    umbra_val32 e = umbra_mul_f32(b, px, umbra_imm_f32(b, 5.0f));
+    umbra_val32 f = umbra_mul_f32(b, px, umbra_imm_f32(b, 6.0f));
+    umbra_val32 g = umbra_mul_f32(b, px, umbra_imm_f32(b, 7.0f));
+    umbra_val32 h = umbra_mul_f32(b, px, umbra_imm_f32(b, 8.0f));
+    umbra_val32 j = umbra_mul_f32(b, px, umbra_imm_f32(b, 9.0f));
+    umbra_val32 k = umbra_mul_f32(b, px, umbra_imm_f32(b, 10.0f));
+    umbra_val32 l = umbra_mul_f32(b, px, umbra_imm_f32(b, 11.0f));
+    umbra_val32 m = umbra_mul_f32(b, px, umbra_imm_f32(b, 12.0f));
+    umbra_val32 o = umbra_mul_f32(b, px, umbra_imm_f32(b, 13.0f));
+    umbra_val32 p = umbra_mul_f32(b, px, umbra_imm_f32(b, 14.0f));
+    umbra_val32 q = umbra_mul_f32(b, px, umbra_imm_f32(b, 15.0f));
+
+    umbra_var acc = umbra_var_alloc(b);
+    umbra_loop(b, n); {
+        umbra_val32 cur = umbra_load_var(b, acc);
+        umbra_val32 sum = umbra_add_f32(b, a, c);
+        sum = umbra_add_f32(b, sum, d);
+        sum = umbra_add_f32(b, sum, e);
+        sum = umbra_add_f32(b, sum, f);
+        sum = umbra_add_f32(b, sum, g);
+        sum = umbra_add_f32(b, sum, h);
+        sum = umbra_add_f32(b, sum, j);
+        sum = umbra_add_f32(b, sum, k);
+        sum = umbra_add_f32(b, sum, l);
+        sum = umbra_add_f32(b, sum, m);
+        sum = umbra_add_f32(b, sum, o);
+        sum = umbra_add_f32(b, sum, p);
+        sum = umbra_add_f32(b, sum, q);
+        umbra_store_var(b, acc, umbra_add_f32(b, cur, sum));
+    } umbra_loop_end(b);
+
+    umbra_store_32(b, (umbra_ptr32){.ix = 2}, umbra_load_var(b, acc));
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        int32_t uni[1] = {3};
+        float px_data[2] = {1.0f, 2.0f};
+        float out[2] = {0};
+        if (run(&B, bi, 2, 1, (struct umbra_buf[]){
+                {.ptr = uni,     .sz = sizeof uni},
+                {.ptr = px_data, .sz = sizeof px_data, .row_bytes = sizeof px_data},
+                {.ptr = out,     .sz = sizeof out,     .row_bytes = sizeof out},
+            })) {
+            float const s = 1+3+4+5+6+7+8+9+10+11+12+13+14+15;
+            equiv(out[0], s * 3.0f) here;
+            equiv(out[1], s * 6.0f) here;
+        }
+    }
+    cleanup(&B);
+}
