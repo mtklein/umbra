@@ -8,6 +8,7 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 enum { W = 128, H = 96 };
@@ -115,7 +116,10 @@ static void test_slide_golden(int slide_idx, struct umbra_fmt fmt, int fi) {
         if (!bes[bi]) { continue; }
     #if defined(__x86_64__)
         // TODO: Rosetta x86 JIT + fp16_planar + loop stops mismatch
-        if (bi == 1 && fmt.bpp == 2 && fmt.planes == 4) { continue; }
+        if (0 == strcmp("Linear Gradient (loop stops)", slide_get(slide_idx)->title)
+                && bi == 1
+                && fmt.bpp == 2
+                && fmt.planes == 4) { continue; }
     #endif
         __builtin_memset(pbuf_tst, 0, pixbuf_sz);
         render_slide(slide_idx, bes[bi], fmt, fi, pbuf_tst);
