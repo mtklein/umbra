@@ -34,10 +34,10 @@ rule profmerge
     command = $llvm/llvm-profdata merge -sparse $$(for d in $dir; do echo $$d/*.profraw; done) -o $out
 
 rule cov_report
-    command = $llvm/llvm-cov report --show-branch-summary --instr-profile=$in $objects src/ include/ > $out
+    command = $llvm/llvm-cov report --show-branch-summary --instr-profile=$in $objects src/ include/ > $out 2>/dev/null
 
 rule cov_show
-    command = rm -rf $dir && $llvm/llvm-cov show --show-branches=count --instr-profile=$in $objects --format=html --output-dir=$dir src/ include/ && echo "Coverage report: file://$$(pwd)/$dir/index.html" > $out
+    command = rm -rf $dir && $llvm/llvm-cov show --show-branches=count --instr-profile=$in $objects --format=html --output-dir=$dir src/ include/ 2>/dev/null && echo "Coverage report: file://$$(pwd)/$dir/index.html" > $out
 
 subninja build/host.ninja
 subninja build/lto.ninja
