@@ -2,7 +2,7 @@
 using namespace metal;
 
 
-struct meta { uint w, x0, y0, limit0, limit1, limit2, stride0, stride1, stride2; };
+struct meta { uint w, x0, y0, count0, count1, count2, stride0, stride1, stride2; };
 
 kernel void umbra_entry(
     constant meta &m [[buffer(3)]],
@@ -32,22 +32,22 @@ kernel void umbra_entry(
     uint v16 = p0[16];
     uint v17 = 6u;
     uint v18 = v16 * 6u;
-    uint v19 = p2[min(v18, m.limit2 - 1u)] & ((v18 < m.limit2) ? ~0u : 0u);
+    uint v19 = p2[min(v18, m.count2 - 1u)] & ((v18 < m.count2) ? ~0u : 0u);
     uint v20 = 1u;
     uint v21 = v18 + 1u;
-    uint v22 = p2[min(v21, m.limit2 - 1u)] & ((v21 < m.limit2) ? ~0u : 0u);
+    uint v22 = p2[min(v21, m.count2 - 1u)] & ((v21 < m.count2) ? ~0u : 0u);
     uint v23 = 2u;
     uint v24 = v18 + 2u;
-    uint v25 = p2[min(v24, m.limit2 - 1u)] & ((v24 < m.limit2) ? ~0u : 0u);
+    uint v25 = p2[min(v24, m.count2 - 1u)] & ((v24 < m.count2) ? ~0u : 0u);
     uint v26 = 3u;
     uint v27 = v18 + 3u;
-    uint v28 = p2[min(v27, m.limit2 - 1u)] & ((v27 < m.limit2) ? ~0u : 0u);
+    uint v28 = p2[min(v27, m.count2 - 1u)] & ((v27 < m.count2) ? ~0u : 0u);
     uint v29 = 4u;
     uint v30 = v18 + 4u;
-    uint v31 = p2[min(v30, m.limit2 - 1u)] & ((v30 < m.limit2) ? ~0u : 0u);
+    uint v31 = p2[min(v30, m.count2 - 1u)] & ((v30 < m.count2) ? ~0u : 0u);
     uint v32 = 5u;
     uint v33 = v18 + 5u;
-    uint v34 = p2[min(v33, m.limit2 - 1u)] & ((v33 < m.limit2) ? ~0u : 0u);
+    uint v34 = p2[min(v33, m.count2 - 1u)] & ((v33 < m.count2) ? ~0u : 0u);
     uint v35 = 3212836864u;
     uint v36 = m.x0 + pos.x;
     float v37 = (float)(int)v36;

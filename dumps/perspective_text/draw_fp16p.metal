@@ -2,7 +2,7 @@
 using namespace metal;
 
 
-struct meta { uint w, x0, y0, limit0, limit1, limit2, stride0, stride1, stride2; };
+struct meta { uint w, x0, y0, count0, count1, count2, stride0, stride1, stride2; };
 
 kernel void umbra_entry(
     constant meta &m [[buffer(3)]],
@@ -66,12 +66,12 @@ kernel void umbra_entry(
     uint v50 = (uint)(int)floor(v49);
     uint v51 = v50 * v20;
     uint v52 = v47 + v51;
-    uint v53 = (uint)p2[min(v52, m.limit2 - 1u)] & ((v52 < m.limit2) ? ~0u : 0u);
+    uint v53 = (uint)p2[min(v52, m.count2 - 1u)] & ((v52 < m.count2) ? ~0u : 0u);
     uint v54 = (uint)(int)(short)(ushort)v53;
     float v55 = (float)(int)v54;
     float v56 = v55 * as_type<float>(998277249u);
     uint v57 = select(v0, as_type<uint>(v56), v44 != 0u);
-    uint _row58 = y * m.stride1; uint _ps58 = m.limit1 / 4;
+    uint _row58 = y * m.stride1; uint _ps58 = m.count1 / 4;
     uint v58 = (uint)p1[_row58 + x];
     uint v58_1 = (uint)p1[_row58 + x + _ps58];
     uint v58_2 = (uint)p1[_row58 + x + 2*_ps58];
@@ -96,6 +96,6 @@ kernel void umbra_entry(
     float v76 = v75 - v74;
     float v77 = fma(as_type<float>(v57), v76, v74);
     uint v78 = (uint)as_type<ushort>((half)v77);
-    { uint _row = y * m.stride1; uint _ps = m.limit1 / 4;
+    { uint _row = y * m.stride1; uint _ps = m.count1 / 4;
       p1[_row + x] = ushort(v63); p1[_row + x + _ps] = ushort(v73); p1[_row + x + 2*_ps] = ushort(v78); p1[_row + x + 3*_ps] = ushort(v68); }
 }

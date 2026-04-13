@@ -2,7 +2,7 @@
 using namespace metal;
 
 
-struct meta { uint w, x0, y0, limit0, limit1, limit2, stride0, stride1, stride2; };
+struct meta { uint w, x0, y0, count0, count1, count2, stride0, stride1, stride2; };
 
 kernel void umbra_entry(
     constant meta &m [[buffer(3)]],
@@ -26,7 +26,7 @@ kernel void umbra_entry(
     uint v10 = (uint)(int)(short)(ushort)v9;
     float v11 = (float)(int)v10;
     float v12 = v11 * as_type<float>(998277249u);
-    uint _row13 = y * m.stride1; uint _ps13 = m.limit1 / 4;
+    uint _row13 = y * m.stride1; uint _ps13 = m.count1 / 4;
     uint v13 = (uint)p1[_row13 + x];
     uint v13_1 = (uint)p1[_row13 + x + _ps13];
     uint v13_2 = (uint)p1[_row13 + x + 2*_ps13];
@@ -51,6 +51,6 @@ kernel void umbra_entry(
     float v31 = v30 - v29;
     float v32 = fma(v12, v31, v29);
     uint v33 = (uint)as_type<ushort>((half)v32);
-    { uint _row = y * m.stride1; uint _ps = m.limit1 / 4;
+    { uint _row = y * m.stride1; uint _ps = m.count1 / 4;
       p1[_row + x] = ushort(v18); p1[_row + x + _ps] = ushort(v28); p1[_row + x + 2*_ps] = ushort(v33); p1[_row + x + 3*_ps] = ushort(v23); }
 }

@@ -2,7 +2,7 @@
 using namespace metal;
 
 
-struct meta { uint w, x0, y0, limit0, limit1, limit2, limit3, limit4, stride0, stride1, stride2, stride3, stride4; };
+struct meta { uint w, x0, y0, count0, count1, count2, count3, count4, stride0, stride1, stride2, stride3, stride4; };
 
 kernel void umbra_entry(
     constant meta &m [[buffer(5)]],

@@ -2,7 +2,7 @@
 using namespace metal;
 
 
-struct meta { uint w, x0, y0, limit0, limit1, limit2, stride0, stride1, stride2; };
+struct meta { uint w, x0, y0, count0, count1, count2, stride0, stride1, stride2; };
 
 kernel void umbra_entry(
     constant meta &m [[buffer(3)]],
@@ -38,29 +38,29 @@ kernel void umbra_entry(
     float v22 = min(v9, v21);
     float _si23 = floor(v22);
     float _fr23 = v22 - _si23;
-    uint _lo23 = p2[min((uint)(int)_si23, m.limit2 - 1u)] & (((uint)(int)_si23 < m.limit2) ? ~0u : 0u);
-    uint _hi23 = p2[min((uint)((int)_si23+1), m.limit2 - 1u)] & (((uint)((int)_si23+1) < m.limit2) ? ~0u : 0u);
+    uint _lo23 = p2[min((uint)(int)_si23, m.count2 - 1u)] & (((uint)(int)_si23 < m.count2) ? ~0u : 0u);
+    uint _hi23 = p2[min((uint)((int)_si23+1), m.count2 - 1u)] & (((uint)((int)_si23+1) < m.count2) ? ~0u : 0u);
     float v23 = as_type<float>(_lo23) + (as_type<float>(_hi23) - as_type<float>(_lo23)) * _fr23;
     uint v24 = (uint)as_type<ushort>((half)v23);
     float v25 = v22 + v11;
     float _si26 = floor(v25);
     float _fr26 = v25 - _si26;
-    uint _lo26 = p2[min((uint)(int)_si26, m.limit2 - 1u)] & (((uint)(int)_si26 < m.limit2) ? ~0u : 0u);
-    uint _hi26 = p2[min((uint)((int)_si26+1), m.limit2 - 1u)] & (((uint)((int)_si26+1) < m.limit2) ? ~0u : 0u);
+    uint _lo26 = p2[min((uint)(int)_si26, m.count2 - 1u)] & (((uint)(int)_si26 < m.count2) ? ~0u : 0u);
+    uint _hi26 = p2[min((uint)((int)_si26+1), m.count2 - 1u)] & (((uint)((int)_si26+1) < m.count2) ? ~0u : 0u);
     float v26 = as_type<float>(_lo26) + (as_type<float>(_hi26) - as_type<float>(_lo26)) * _fr26;
     uint v27 = (uint)as_type<ushort>((half)v26);
     float v28 = as_type<float>(v6) + v22;
     float _si29 = floor(v28);
     float _fr29 = v28 - _si29;
-    uint _lo29 = p2[min((uint)(int)_si29, m.limit2 - 1u)] & (((uint)(int)_si29 < m.limit2) ? ~0u : 0u);
-    uint _hi29 = p2[min((uint)((int)_si29+1), m.limit2 - 1u)] & (((uint)((int)_si29+1) < m.limit2) ? ~0u : 0u);
+    uint _lo29 = p2[min((uint)(int)_si29, m.count2 - 1u)] & (((uint)(int)_si29 < m.count2) ? ~0u : 0u);
+    uint _hi29 = p2[min((uint)((int)_si29+1), m.count2 - 1u)] & (((uint)((int)_si29+1) < m.count2) ? ~0u : 0u);
     float v29 = as_type<float>(_lo29) + (as_type<float>(_hi29) - as_type<float>(_lo29)) * _fr29;
     uint v30 = (uint)as_type<ushort>((half)v29);
     float v31 = v22 + v10;
     float _si32 = floor(v31);
     float _fr32 = v31 - _si32;
-    uint _lo32 = p2[min((uint)(int)_si32, m.limit2 - 1u)] & (((uint)(int)_si32 < m.limit2) ? ~0u : 0u);
-    uint _hi32 = p2[min((uint)((int)_si32+1), m.limit2 - 1u)] & (((uint)((int)_si32+1) < m.limit2) ? ~0u : 0u);
+    uint _lo32 = p2[min((uint)(int)_si32, m.count2 - 1u)] & (((uint)(int)_si32 < m.count2) ? ~0u : 0u);
+    uint _hi32 = p2[min((uint)((int)_si32+1), m.count2 - 1u)] & (((uint)((int)_si32+1) < m.count2) ? ~0u : 0u);
     float v32 = as_type<float>(_lo32) + (as_type<float>(_hi32) - as_type<float>(_lo32)) * _fr32;
     uint v33 = (uint)as_type<ushort>((half)v32);
     p1[y * m.stride1 + x] = half4(as_type<half>((ushort)v24), as_type<half>((ushort)v30), as_type<half>((ushort)v33), as_type<half>((ushort)v27));

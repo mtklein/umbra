@@ -172,8 +172,8 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
                      "%suint v%d = p%d"
-                     "[min(%s, m.limit%d - 1u)]"
-                     " & ((%s < m.limit%d)"
+                     "[min(%s, m.count%d - 1u)]"
+                     " & ((%s < m.count%d)"
                      " ? ~0u : 0u);\n",
                      pad, i, p,
                      vx, p, vx, p);
@@ -188,14 +188,14 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                      pad, i, fv(_fx, vx, xid, is_f), i);
                 emit(b,
                      "%suint _lo%d = p%d"
-                     "[min((uint)(int)_si%d, m.limit%d - 1u)]"
-                     " & (((uint)(int)_si%d < m.limit%d)"
+                     "[min((uint)(int)_si%d, m.count%d - 1u)]"
+                     " & (((uint)(int)_si%d < m.count%d)"
                      " ? ~0u : 0u);\n",
                      pad, i, p, i, p, i, p);
                 emit(b,
                      "%suint _hi%d = p%d"
-                     "[min((uint)((int)_si%d+1), m.limit%d - 1u)]"
-                     " & (((uint)((int)_si%d+1) < m.limit%d)"
+                     "[min((uint)((int)_si%d+1), m.count%d - 1u)]"
+                     " & (((uint)((int)_si%d+1) < m.count%d)"
                      " ? ~0u : 0u);\n",
                      pad, i, p, i, p, i, p);
                 emit(b,
@@ -234,7 +234,7 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
                      "%suint _row%d = y * m.stride%d;"
-                     " uint _ps%d = m.limit%d / 4;\n"
+                     " uint _ps%d = m.count%d / 4;\n"
                      "%suint v%d = (uint)p%d[_row%d + x];\n"
                      "%suint v%d_1 = (uint)p%d[_row%d + x + _ps%d];\n"
                      "%suint v%d_2 = (uint)p%d[_row%d + x + 2*_ps%d];\n"
@@ -265,7 +265,7 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
                      "%s{ uint _row = y * m.stride%d;"
-                     " uint _ps = m.limit%d / 4;\n"
+                     " uint _ps = m.count%d / 4;\n"
                      "%s  p%d[_row + x] = ushort(%s);"
                      " p%d[_row + x + _ps] = ushort(%s);"
                      " p%d[_row + x + 2*_ps] = ushort(%s);"
@@ -320,8 +320,8 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
                      "%suint v%d = (uint)p%d"
-                     "[min(%s, m.limit%d - 1u)]"
-                     " & ((%s < m.limit%d)"
+                     "[min(%s, m.count%d - 1u)]"
+                     " & ((%s < m.count%d)"
                      " ? ~0u : 0u);\n",
                      pad, i, p,
                      vx, p, vx, p);
@@ -858,10 +858,9 @@ static char* build_source(BB const *bb,
 
     emit(&b, "\n");
 
-    // TODO: rename limit->count in shader code; harmonize buf_szs/buf_limit->buf_count across backends.
     emit(&b, "struct meta { uint w, x0, y0");
     for (int i = 0; i < total_bufs; i++) {
-        emit(&b, ", limit%d", i);
+        emit(&b, ", count%d", i);
     }
     for (int i = 0; i < total_bufs; i++) {
         emit(&b, ", stride%d", i);
