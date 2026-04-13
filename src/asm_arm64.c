@@ -96,9 +96,15 @@ static uint32_t stp_ldp_qi(uint32_t base, int t1, int t2, int n, int imm7) {
     return base | ((uint32_t)(imm7 & 0x7f) << 15) | ((uint32_t)t2 << 10)
                | ((uint32_t)n << 5) | (uint32_t)t1;
 }
-uint32_t STP_qi_pre(int t1, int t2, int n, int imm7) { return stp_ldp_qi(0xad800000u, t1, t2, n, imm7); }
-uint32_t STP_qi(int t1, int t2, int n, int imm7)     { return stp_ldp_qi(0xad000000u, t1, t2, n, imm7); }
-uint32_t LDP_qi(int t1, int t2, int n, int imm7)     { return stp_ldp_qi(0xad400000u, t1, t2, n, imm7); }
+uint32_t STP_qi_pre(int t1, int t2, int n, int imm7) {
+    return stp_ldp_qi(0xad800000u, t1, t2, n, imm7);
+}
+uint32_t STP_qi(int t1, int t2, int n, int imm7) {
+    return stp_ldp_qi(0xad000000u, t1, t2, n, imm7);
+}
+uint32_t LDP_qi(int t1, int t2, int n, int imm7) {
+    return stp_ldp_qi(0xad400000u, t1, t2, n, imm7);
+}
 
 uint32_t LDR_q_literal(int d) { return 0x9c000000u | (uint32_t)d; }
 

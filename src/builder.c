@@ -166,30 +166,47 @@ static void x4_16(val px, umbra_val16 *r, umbra_val16 *g, umbra_val16 *b, umbra_
     *r = val_make(id, 0).v16; *g = val_make(id, 1).v16;
     *b = val_make(id, 2).v16; *a = val_make(id, 3).v16;
 }
-void umbra_load_8x4(builder *b, umbra_ptr32 src, umbra_val32 *r, umbra_val32 *g, umbra_val32 *bl, umbra_val32 *a) {
+void umbra_load_8x4(builder *b, umbra_ptr32 src,
+                    umbra_val32 *r, umbra_val32 *g, umbra_val32 *bl, umbra_val32 *a) {
     x4_32(push(b, op_load_8x4, .ptr = {.p32 = src}), r, g, bl, a);
 }
-void umbra_store_8x4(builder *b, umbra_ptr32 dst, umbra_val32 r, umbra_val32 g, umbra_val32 bl, umbra_val32 a) {
+void umbra_store_8x4(builder *b, umbra_ptr32 dst,
+                     umbra_val32 r, umbra_val32 g, umbra_val32 bl, umbra_val32 a) {
     push(b, op_store_8x4, VX(r), VY(g), VZ(bl), VW(a), .ptr = {.p32 = dst});
 }
-void umbra_load_16x4(builder *b, umbra_ptr64 src, umbra_val16 *r, umbra_val16 *g, umbra_val16 *bl, umbra_val16 *a) {
+void umbra_load_16x4(builder *b, umbra_ptr64 src,
+                     umbra_val16 *r, umbra_val16 *g, umbra_val16 *bl, umbra_val16 *a) {
     x4_16(push(b, op_load_16x4, .ptr = {.p64 = src}), r, g, bl, a);
 }
-void umbra_store_16x4(builder *b, umbra_ptr64 dst, umbra_val16 r, umbra_val16 g, umbra_val16 bl, umbra_val16 a) {
+void umbra_store_16x4(builder *b, umbra_ptr64 dst,
+                      umbra_val16 r, umbra_val16 g, umbra_val16 bl, umbra_val16 a) {
     push(b, op_store_16x4, VX(r), VY(g), VZ(bl), VW(a), .ptr = {.p64 = dst});
 }
-void umbra_load_16x4_planar(builder *b, umbra_ptr16 src, umbra_val16 *r, umbra_val16 *g, umbra_val16 *bl, umbra_val16 *a) {
+void umbra_load_16x4_planar(builder *b, umbra_ptr16 src,
+                            umbra_val16 *r, umbra_val16 *g, umbra_val16 *bl, umbra_val16 *a) {
     x4_16(push(b, op_load_16x4_planar, .ptr = {.p16 = src}), r, g, bl, a);
 }
-void umbra_store_16x4_planar(builder *b, umbra_ptr16 dst, umbra_val16 r, umbra_val16 g, umbra_val16 bl, umbra_val16 a) {
+void umbra_store_16x4_planar(builder *b, umbra_ptr16 dst,
+                             umbra_val16 r, umbra_val16 g, umbra_val16 bl, umbra_val16 a) {
     push(b, op_store_16x4_planar, VX(r), VY(g), VZ(bl), VW(a), .ptr = {.p16 = dst});
 }
-umbra_val32 umbra_i32_from_s16(builder *b, umbra_val16 x) { return push32(b, op_i32_from_s16, VX(x)); }
-umbra_val32 umbra_i32_from_u16(builder *b, umbra_val16 x) { return push32(b, op_i32_from_u16, VX(x)); }
-umbra_val16 umbra_i16_from_i32(builder *b, umbra_val32 x) { return push16(b, op_i16_from_i32, VX(x)); }
 
-umbra_val32 umbra_f32_from_f16(builder *b, umbra_val16 x) { return push32(b, op_f32_from_f16, VX(x)); }
-umbra_val16 umbra_f16_from_f32(builder *b, umbra_val32 x) { return push16(b, op_f16_from_f32, VX(x)); }
+umbra_val32 umbra_i32_from_s16(builder *b, umbra_val16 x) {
+    return push32(b, op_i32_from_s16, VX(x));
+}
+umbra_val32 umbra_i32_from_u16(builder *b, umbra_val16 x) {
+    return push32(b, op_i32_from_u16, VX(x));
+}
+umbra_val16 umbra_i16_from_i32(builder *b, umbra_val32 x) {
+    return push16(b, op_i16_from_i32, VX(x));
+}
+
+umbra_val32 umbra_f32_from_f16(builder *b, umbra_val16 x) {
+    return push32(b, op_f32_from_f16, VX(x));
+}
+umbra_val16 umbra_f16_from_f32(builder *b, umbra_val32 x) {
+    return push16(b, op_f16_from_f32, VX(x));
+}
 
 static _Bool is_imm32(builder *b, int id, int v) {
     return b->inst[id].op == op_imm_32 && b->inst[id].imm == v;
@@ -384,8 +401,12 @@ umbra_val32 umbra_sel_32(builder *b, umbra_val32 c, umbra_val32 t, umbra_val32 f
     return math(b, op_sel_32, VX(c), VY(t), VZ(fv)).v32;
 }
 
-umbra_val32 umbra_f32_from_i32(builder *b, umbra_val32 x) { return math(b, op_f32_from_i32, VX(x)).v32; }
-umbra_val32 umbra_i32_from_f32(builder *b, umbra_val32 x) { return math(b, op_i32_from_f32, VX(x)).v32; }
+umbra_val32 umbra_f32_from_i32(builder *b, umbra_val32 x) {
+    return math(b, op_f32_from_i32, VX(x)).v32;
+}
+umbra_val32 umbra_i32_from_f32(builder *b, umbra_val32 x) {
+    return math(b, op_i32_from_f32, VX(x)).v32;
+}
 
 umbra_val32 umbra_eq_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     sort(&x, &y);
