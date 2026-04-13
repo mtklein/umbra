@@ -793,6 +793,12 @@ static void emit_ops(SrcBuf *b, BB const *bb,
             case op_loop_end:
                 emit(b, "%s}\n", pad);
                 break;
+            case op_if_begin:
+                emit(b, "%sif (%s != 0u) {\n", pad, uv(_ux, vx, xid, is_f));
+                break;
+            case op_if_end:
+                emit(b, "%s}\n", pad);
+                break;
             case op_load_var:
                 emit(b, "%suint v%d = var%d;\n", pad, i, inst->imm);
                 break;

@@ -1154,6 +1154,11 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
             ra_free_chan(ra, inst->y, i);
         } break;
 
+        case op_if_begin: {
+            ra_free_chan(ra, inst->x, i);
+        } break;
+        case op_if_end: break;
+
         case op_loop_begin: {
             int8_t rx = ra_ensure(ra, sl, ns, inst->x.id);
             put(c, UMOV_ws(XT, lo(rx)));

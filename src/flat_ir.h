@@ -38,6 +38,7 @@ struct umbra_builder {
     _Bool           has_loop, loop_closed, pad_b_[2];
     umbra_val32     loop_trip;
     umbra_var       loop_var;
+    int             if_depth, pad_ifd_;
 };
 
 struct umbra_flat_ir {

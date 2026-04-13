@@ -274,6 +274,12 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *bb) {
                      .y = p->inst[loop_begin_sw_n].x + (loop_begin_sw_n - n),
                      .z = inst->imm);
                 break;
+            case op_if_begin:
+                emit(.tag = op_if_begin, .x = X, .y = 0);
+                break;
+            case op_if_end:
+                emit(.tag = op_if_end);
+                break;
             case op_load_var:  emit(.tag = op_load_var,  .x = inst->imm); break;
             case op_store_var: emit(.tag = op_store_var, .x = Y, .y = inst->imm); break;
 
@@ -544,6 +550,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 [op_sample_32] = &&L_op_sample_32,
                 [op_deref_ptr] = &&L_op_deref_ptr,
                 [op_loop_begin] = &&L_op_loop_begin, [op_loop_end] = &&L_op_loop_end,
+                [op_if_begin] = &&L_op_if_begin, [op_if_end] = &&L_op_if_end,
                 [op_load_var] = &&L_op_load_var, [op_store_var] = &&L_op_store_var,
                 [op_f32_from_f16] = &&L_op_f32_from_f16, [op_f16_from_f32] = &&L_op_f16_from_f32,
                 [op_i32_from_s16] = &&L_op_i32_from_s16, [op_i32_from_u16] = &&L_op_i32_from_u16, [op_i16_from_i32] = &&L_op_i16_from_i32,
@@ -974,6 +981,8 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                         v  += back;
                     }
                 } NEXT;
+                CASE(op_if_begin) {} NEXT;
+                CASE(op_if_end)   {} NEXT;
                 CASE(op_load_var)  v->i32 = vars[ip->x].i32; NEXT;
                 CASE(op_store_var) vars[ip->y] = v[ip->x]; NEXT;
 

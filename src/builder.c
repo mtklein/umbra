@@ -78,7 +78,8 @@ static val push_(builder *b, struct ir_inst inst) {
 
     int const id = b->insts++;
     b->inst[id] = inst;
-    if (!op_is_store(inst.op) && inst.op != op_load_var) {
+    if (!op_is_store(inst.op) && inst.op != op_load_var
+            && inst.op != op_if_begin && inst.op != op_if_end) {
         hash_insert(&b->ht, h, id);
     }
     return (val){.id = id};
@@ -486,4 +487,15 @@ umbra_val32 umbra_load_var(builder *b, umbra_var v) {
 
 void umbra_store_var(builder *b, umbra_var var, umbra_val32 x) {
     push(b, op_store_var, VY(x), .imm = var.id);
+}
+
+void umbra_if(builder *b, umbra_val32 cond) {
+    push(b, op_if_begin, VX(cond));
+    b->if_depth++;
+}
+
+void umbra_endif(builder *b) {
+    assume(b->if_depth > 0);
+    b->if_depth--;
+    push(b, op_if_end);
 }

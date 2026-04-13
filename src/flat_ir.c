@@ -161,16 +161,20 @@ static void schedule(struct ir_inst *in, int n, struct ir_inst *out, int at, int
     free(buf);
 }
 
+static _Bool is_cf(enum op op) {
+    return op == op_loop_begin || op == op_loop_end
+        || op == op_if_begin   || op == op_if_end;
+}
+
 struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
     assume(!b->has_loop || b->loop_closed);
+    assume(b->if_depth == 0);
 
     int const n = b->insts;
 
     int live = 0;
     for (int i = n; i-- > 0;) {
-        if (op_is_store(b->inst[i].op)
-                || b->inst[i].op == op_loop_begin
-                || b->inst[i].op == op_loop_end) {
+        if (op_is_store(b->inst[i].op) || is_cf(b->inst[i].op)) {
             b->inst[i].live = 1;
         }
         if (b->inst[i].live) {
@@ -192,12 +196,12 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
                           || b->inst[b->inst[i].z.id].varying
                           || b->inst[b->inst[i].w.id].varying;
     }
-    if (b->has_loop) {
-        _Bool in_loop = 0;
+    {
+        int depth = 0;
         for (int i = 0; i < n; i++) {
-            if (b->inst[i].op == op_loop_begin) { in_loop = 1; }
-            if (in_loop) { b->inst[i].varying = 1; }
-            if (b->inst[i].op == op_loop_end)   { in_loop = 0; }
+            if (b->inst[i].op == op_loop_begin || b->inst[i].op == op_if_begin) { depth++; }
+            if (depth > 0) { b->inst[i].varying = 1; }
+            if (b->inst[i].op == op_loop_end || b->inst[i].op == op_if_end) { depth--; }
         }
     }
 
@@ -210,34 +214,28 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
         }
     }
 
-    if (b->has_loop) {
-        int lb = -1, le = -1;
-        for (int i = 0; i < n; i++) {
-            if (b->inst[i].op == op_loop_begin) { lb = i; }
-            if (b->inst[i].op == op_loop_end)   { le = i; }
+    int *cf = malloc((size_t)n * sizeof *cf);
+    int n_cf = 0;
+    for (int i = 0; i < n; i++) {
+        if (b->inst[i].live && b->inst[i].varying && is_cf(b->inst[i].op)) {
+            cf[n_cf++] = i;
         }
+    }
 
-        int j = preamble;
-        schedule(b->inst, n, out, j, live, 0, lb);
-        for (int i = 0; i < n; i++) {
-            if (is_body(b->inst + i) && i < lb) { j++; }
-        }
-
-        b->inst[lb].final_id = j;
-        out[j++] = b->inst[lb];
-
-        schedule(b->inst, n, out, j, live, lb + 1, le);
-        for (int i = lb + 1; i < le; i++) {
+    int j = preamble;
+    int region_lo = 0;
+    for (int ci = 0; ci < n_cf; ci++) {
+        schedule(b->inst, n, out, j, live, region_lo, cf[ci]);
+        for (int i = region_lo; i < cf[ci]; i++) {
             if (is_body(b->inst + i)) { j++; }
         }
-
-        b->inst[le].final_id = j;
-        out[j++] = b->inst[le];
-
-        schedule(b->inst, n, out, j, live, le + 1, n);
-    } else {
-        schedule(b->inst, n, out, preamble, live, 0, n);
+        b->inst[cf[ci]].final_id = j;
+        out[j++] = b->inst[cf[ci]];
+        region_lo = cf[ci] + 1;
     }
+    schedule(b->inst, n, out, j, live, region_lo, n);
+
+    free(cf);
 
     for (int i = 0; i < live; i++) {
         out[i].x = (val){.id = b->inst[out[i].x.id].final_id, .chan = out[i].x.chan};
@@ -256,10 +254,17 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
     result->n_vars   = b->n_vars;
     result->loop_begin = -1;
     result->loop_end   = -1;
-    if (b->has_loop) {
+    {
+        int if_stack[16];
+        int if_sp = 0;
         for (int i = 0; i < live; i++) {
             if (out[i].op == op_loop_begin) { result->loop_begin = i; }
             if (out[i].op == op_loop_end)   { result->loop_end   = i; }
+            if (out[i].op == op_if_begin)   { if_stack[if_sp++] = i; }
+            if (out[i].op == op_if_end) {
+                int ib = if_stack[--if_sp];
+                out[i].imm = ib;
+            }
         }
     }
     return result;
@@ -279,6 +284,10 @@ static void dump_insts(struct ir_inst const *inst, int insts, FILE *f) {
 
         if (op == op_loop_end) {
             fprintf(f, "      loop_end\n");
+            continue;
+        }
+        if (op == op_if_end) {
+            fprintf(f, "      if_end\n");
             continue;
         }
         if (op_is_store(op)) {
@@ -311,10 +320,12 @@ static void dump_insts(struct ir_inst const *inst, int insts, FILE *f) {
         case op_load_8x4: fprintf(f, " p%d", ip->ptr.bits); break;
         case op_deref_ptr: fprintf(f, " p%d [%d]", ip->ptr.bits, ip->imm); break;
         case op_loop_begin: fprintf(f, " v%d", ip->x.id); break;
+        case op_if_begin: fprintf(f, " v%d", ip->x.id); break;
         case op_load_var: fprintf(f, " var%d", ip->imm); break;
         case op_x:
         case op_y:
         case op_loop_end:
+        case op_if_end:
         case op_store_16:
         case op_store_32:
         case op_store_var:

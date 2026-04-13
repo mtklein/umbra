@@ -38,6 +38,8 @@ enum {
     X(gather_16,                            OP_PTR)                                        \
     X(loop_begin,                           0)                                             \
     X(loop_end,                             0)                                             \
+    X(if_begin,                             0)                                             \
+    X(if_end,                               0)                                             \
     X(load_var,                             OP_VARYING)                                    \
     X(store_var,                            OP_STORE|OP_VARYING)
 

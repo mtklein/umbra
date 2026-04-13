@@ -151,6 +151,9 @@ umbra_val32 umbra_le_u32(struct umbra_builder*, umbra_val32, umbra_val32);
 umbra_val32 umbra_loop    (struct umbra_builder*, umbra_val32 n);
 void        umbra_loop_end(struct umbra_builder*);
 
+void        umbra_if   (struct umbra_builder*, umbra_val32 cond);
+void        umbra_endif(struct umbra_builder*);
+
 umbra_var   umbra_var_alloc(struct umbra_builder*);
 umbra_val32 umbra_load_var (struct umbra_builder*, umbra_var);
 void        umbra_store_var(struct umbra_builder*, umbra_var, umbra_val32 x);

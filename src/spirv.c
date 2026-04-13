@@ -130,6 +130,7 @@ enum {
     SpvOpFOrdGreaterThan      = 186,
     SpvOpFOrdLessThanEqual    = 188,
     SpvOpFOrdGreaterThanEqual = 190,
+    SpvOpSelectionMerge       = 247,
     SpvOpLoopMerge            = 246,
     SpvOpLabel                = 248,
     SpvOpBranch               = 249,
@@ -1895,6 +1896,30 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
                     spv_op(&B.func, SpvOpBranch, 2);
                     spv_word(&B.func, label_header);
 
+                    spv_op(&B.func, SpvOpLabel, 2);
+                    spv_word(&B.func, label_merge);
+                } break;
+                case op_if_begin: {
+                    uint32_t label_then  = spv_id(&B);
+                    uint32_t label_merge = spv_id(&B);
+                    uint32_t cond_u32  = as_u32(&B, get_val(&B, inst->x), xid);
+                    uint32_t cond_bool = spv_binop(&B, SpvOpINotEqual, B.t_bool,
+                                                   cond_u32, B.c_0);
+                    spv_op(&B.func, SpvOpSelectionMerge, 3);
+                    spv_word(&B.func, label_merge);
+                    spv_word(&B.func, 0);
+                    spv_op(&B.func, SpvOpBranchConditional, 4);
+                    spv_word(&B.func, cond_bool);
+                    spv_word(&B.func, label_then);
+                    spv_word(&B.func, label_merge);
+                    spv_op(&B.func, SpvOpLabel, 2);
+                    spv_word(&B.func, label_then);
+                    B.val_1[i] = label_merge;
+                } break;
+                case op_if_end: {
+                    uint32_t label_merge = B.val_1[inst->imm];
+                    spv_op(&B.func, SpvOpBranch, 2);
+                    spv_word(&B.func, label_merge);
                     spv_op(&B.func, SpvOpLabel, 2);
                     spv_word(&B.func, label_merge);
                 } break;
