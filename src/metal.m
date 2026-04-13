@@ -33,12 +33,6 @@ struct metal_backend {
     void *device;
     void *queue;
     void *batch_cmdbuf;     // currently-encoding cmdbuf for uni_pool.cur, or NULL
-    // TODO: Instruments shows Metal coalesces compatible encoders automatically,
-    // so keeping batch_enc open across queue() calls adds complexity for no benefit.
-    // Simplify: create+end the encoder within each queue() call and remove batch_enc.
-    // The lazy-creation in metal_program_queue() and endEncoding in metal_submit_cmdbuf()
-    // both collapse.  Verify with bench --verbose that µs/dispatch is unchanged.
-    void *batch_enc;
     void *frame_committed[METAL_N_FRAMES];  // last committed cmdbuf per frame, or NULL
     struct gpu_buf_cache cache;
     struct uniform_ring_pool uni_pool;
@@ -1252,17 +1246,14 @@ static void metal_program_queue(
             be->batch_cmdbuf =
                 (__bridge_retained void*)[queue commandBuffer];
         }
-        if (!be->batch_enc) {
-            id<MTLCommandBuffer> cmdbuf =
-                (__bridge id<MTLCommandBuffer>)be->batch_cmdbuf;
-            be->batch_enc = (__bridge_retained void*)
-                [cmdbuf computeCommandEncoderWithDispatchType:MTLDispatchTypeSerial];
-        }
+        id<MTLCommandBuffer> cmdbuf =
+            (__bridge id<MTLCommandBuffer>)be->batch_cmdbuf;
         id<MTLComputeCommandEncoder> enc =
-            (__bridge id<MTLComputeCommandEncoder>)be->batch_enc;
+            [cmdbuf computeCommandEncoderWithDispatchType:MTLDispatchTypeSerial];
         double const t0 = now();
         encode_dispatch(p, l, t, r, b, buf, enc);
         be->encode_time_accum += now() - t0;
+        [enc endEncoding];
     }
 }
 
@@ -1276,12 +1267,6 @@ static void metal_submit_cmdbuf(struct metal_backend *be) {
     if (!be->batch_cmdbuf) { return; }
     double const t0 = now();
     @autoreleasepool {
-        if (be->batch_enc) {
-            id<MTLComputeCommandEncoder> enc =
-                (__bridge_transfer id<MTLComputeCommandEncoder>)be->batch_enc;
-            be->batch_enc = NULL;
-            [enc endEncoding];
-        }
         id<MTLCommandBuffer> cmdbuf =
             (__bridge id<MTLCommandBuffer>)be->batch_cmdbuf;
         [cmdbuf commit];
