@@ -753,6 +753,34 @@ TEST(test_coverage_bitmap) {
     cleanup_draw(&B);
 }
 
+TEST(test_coverage_bitmap_565) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 1});
+    uint16_t cov_data[16];
+    for (int i = 0; i < 16; i++) { cov_data[i] = 255; }
+    struct umbra_coverage_bitmap cov =
+        umbra_coverage_bitmap((struct umbra_buf){.ptr=cov_data, .sz=sizeof cov_data});
+    struct umbra_draw_layout lay;
+    struct draw_backends B = make_draw(umbra_draw_build(&shader.base, &cov.base,
+                                                 umbra_blend_srcover,
+                                                 umbra_fmt_565, &lay),
+                                lay);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint16_t dst[16];
+        __builtin_memset(dst, 0, sizeof dst);
+        umbra_draw_fill(&B.lay, &shader.base, &cov.base);
+        if (run_draw(&B, bi, 16, 1,
+                      (struct umbra_buf[]){
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
+                          {.ptr=dst, .sz=sizeof dst, .row_bytes=sizeof dst},
+                      })) {
+            for (int i = 0; i < 16; i++) {
+                dst[i] == 0xF800u here;
+            }
+        }
+    }
+    cleanup_draw(&B);
+}
+
 TEST(test_coverage_sdf) {
     struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 1, 1, 1});
     uint16_t cov_data[8] = {0, 100, 128, 200, 255, 0, 0, 0};
