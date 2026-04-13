@@ -1267,3 +1267,31 @@ TEST(test_solid_src_fp16_planar) {
     test_backends_free(&B);
     free(lay.uniforms);
 }
+
+TEST(test_srcover_fp16_planar) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){0, 0.5f, 0, 0.5f});
+    struct umbra_draw_layout lay;
+    struct draw_backends B =
+        make_draw(umbra_draw_build(&shader.base, NULL, umbra_blend_srcover,
+                                   umbra_fmt_fp16_planar, &lay), lay);
+    enum { W = 16 };
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        __fp16 dst[W * 4];
+        for (int i = 0; i < W * 4; i++) {
+            dst[i] = (__fp16)1.0f;
+        }
+        umbra_draw_fill(&B.lay, &shader.base, NULL);
+        if (run_draw(&B, bi, W, 1, (struct umbra_buf[]){
+                (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
+                {.ptr=dst, .sz=sizeof dst, .row_bytes=W * 2},
+            })) {
+            for (int i = 0; i < W; i++) {
+                equiv((float)dst[i + W*0], 0.5f)  here;
+                equiv((float)dst[i + W*1], 1.0f)  here;
+                equiv((float)dst[i + W*2], 0.5f)  here;
+                equiv((float)dst[i + W*3], 1.0f)  here;
+            }
+        }
+    }
+    cleanup_draw(&B);
+}
