@@ -56,10 +56,12 @@ static void solid_prepare(struct slide *s, struct umbra_backend *be, struct umbr
     }
     if (st->prog) { st->prog->free(st->prog); }
     st->prog = be->compile(be, st->bb);
+    slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
 static void solid_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
     struct solid_state *st = (struct solid_state *)s;
+    slide_bg_draw(s->bg, l, t, r, b, buf);
     float rx = bounce(st->rx, st->vx, frame, (float)st->w - st->rect_w);
     float ry = bounce(st->ry, st->vy, frame, (float)st->h - st->rect_h);
     if (st->has_cov) {

@@ -19,33 +19,6 @@ static char const *backend_name[NUM_BACKENDS] = {
 
 static struct umbra_backend *bes[NUM_BACKENDS];
 
-struct fill_pipe {
-    struct umbra_program         *prog;
-    struct umbra_uniforms_layout  uni; int :32;
-    void                         *uniforms;
-};
-
-static struct fill_pipe fills[5];
-
-static void build_fill(int fi, struct umbra_fmt fmt) {
-    struct umbra_builder *builder = umbra_builder();
-    struct umbra_uniforms_layout u = {0};
-    int off = umbra_uniforms_reserve_f32(&u, 4);
-    umbra_color c = {
-        umbra_uniform_32(builder, (umbra_ptr32){0}, off),
-        umbra_uniform_32(builder, (umbra_ptr32){0}, off + 1),
-        umbra_uniform_32(builder, (umbra_ptr32){0}, off + 2),
-        umbra_uniform_32(builder, (umbra_ptr32){0}, off + 3),
-    };
-    fmt.store(builder, 1, c);
-    fills[fi].uni = u;
-    fills[fi].uniforms = umbra_uniforms_alloc(&u);
-    struct umbra_basic_block *bb = umbra_basic_block(builder);
-    umbra_builder_free(builder);
-    fills[fi].prog = bes[0]->compile(bes[0], bb);
-    umbra_basic_block_free(bb);
-}
-
 static struct umbra_fmt const *all_fmts[] = {
     &umbra_fmt_8888,
     &umbra_fmt_565,
@@ -61,40 +34,22 @@ static void build_pipes(void) {
     bes[2] = umbra_backend_metal();
     bes[3] = umbra_backend_vulkan();
     bes[4] = umbra_backend_wgpu();
-    for (int fi = 0; fi < N_FMTS; fi++) {
-        build_fill(fi, *all_fmts[fi]);
-    }
 }
 
 static void free_pipes(void) {
-    for (int fi = 0; fi < N_FMTS; fi++) {
-        fills[fi].prog->free(fills[fi].prog);
-        free(fills[fi].uniforms);
-    }
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         if (bes[bi]) { bes[bi]->free(bes[bi]); }
     }
 }
 
-static void fill_bg_for_slide(int fi, struct umbra_fmt fmt, int slide_idx, void *dst) {
-    struct slide *s = slide_get(slide_idx);
-    umbra_uniforms_fill_f32(fills[fi].uniforms, 0, s->bg, 4);
-    struct umbra_buf buf[2] = {
-        {.ptr=fills[fi].uniforms, .count=fills[fi].uni.slots},
-        {.ptr=dst, .count=W * H * fmt.planes, .stride=W},
-    };
-    fills[fi].prog->queue(fills[fi].prog, 0, 0, W, H, buf);
-}
-
 static void render_slide(int slide_idx, struct umbra_backend *be,
-                         struct umbra_fmt fmt, int fi, void *pixbuf) {
+                         struct umbra_fmt fmt, void *pixbuf) {
     struct slide *s = slide_get(slide_idx);
-    fill_bg_for_slide(fi, fmt, slide_idx, pixbuf);
     s->prepare(s, be, fmt);
     s->draw(s, 0, 0, 0, W, H, pixbuf);
 }
 
-static void test_slide_golden(int slide_idx, struct umbra_fmt fmt, int fi) {
+static void test_slide_golden(int slide_idx, struct umbra_fmt fmt) {
     struct slide *s = slide_get(slide_idx);
 
     size_t const rb = (size_t)W * fmt.bpp;
@@ -103,8 +58,8 @@ static void test_slide_golden(int slide_idx, struct umbra_fmt fmt, int fi) {
     void *pbuf[NUM_BACKENDS] = {0};
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         if (!bes[bi]) { continue; }
-        pbuf[bi] = malloc(pixbuf_sz);
-        render_slide(slide_idx, bes[bi], fmt, fi, pbuf[bi]);
+        pbuf[bi] = calloc(1, pixbuf_sz);
+        render_slide(slide_idx, bes[bi], fmt, pbuf[bi]);
         bes[bi]->flush(bes[bi]);
     }
 
@@ -337,7 +292,7 @@ TEST(test_golden_slides) {
     slides_init(W, H);
     for (int fi = 0; fi < N_FMTS; fi++) {
         for (int si = 0; si < slide_count() - 1; si++) {
-            test_slide_golden(si, *all_fmts[fi], fi);
+            test_slide_golden(si, *all_fmts[fi]);
         }
     }
     slides_cleanup();

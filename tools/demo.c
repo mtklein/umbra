@@ -43,7 +43,7 @@ struct pipe {
     int                            out_ptr, pad_;
 };
 
-static struct pipe fill_pipe, readback_pipe, hdr_pipe;
+static struct pipe readback_pipe, hdr_pipe;
 
 static void free_pipe(struct pipe *p) {
     if (p->program) { p->program->free(p->program); }
@@ -61,21 +61,6 @@ static void finish_pipe(struct pipe *p, struct umbra_builder *builder,
     umbra_builder_free(builder);
     p->program = pipe_be->compile(pipe_be, bb);
     umbra_basic_block_free(bb);
-}
-
-static void build_fill(int fmt) {
-    free_pipe(&fill_pipe);
-    struct umbra_builder    *builder = umbra_builder();
-    struct umbra_uniforms_layout   u = {0};
-    int fi = umbra_uniforms_reserve_f32(&u, 4);
-    umbra_color c = {
-        umbra_uniform_32(builder, (umbra_ptr32){0}, fi),
-        umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 1),
-        umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 2),
-        umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 3),
-    };
-    fmt_enums[fmt]->store(builder, 1, c);
-    finish_pipe(&fill_pipe, builder, u);
 }
 
 static void build_readback(int fmt) {
@@ -97,13 +82,11 @@ static void build_hdr(int fmt) {
 }
 
 static void build_pipes(int fmt) {
-    build_fill(fmt);
     build_readback(fmt);
     build_hdr(fmt);
 }
 
 static void free_pipes(void) {
-    free_pipe(&fill_pipe);
     free_pipe(&readback_pipe);
     free_pipe(&hdr_pipe);
 }
@@ -180,19 +163,6 @@ static void update_title(SDL_Window *w, struct slide *s, int bi, int fi, double 
         SDL_snprintf(title + n, sizeof title - (size_t)n, "  %dx%d", tc, tr);
     }
     SDL_SetWindowTitle(w, title);
-}
-
-static void fill_bg_row(void *dst, int n, float const bg[4], size_t plane_gap) {
-    umbra_uniforms_fill_f32(fill_pipe.uniforms, 0, bg, 4);
-    int      ps = plane_gap ? 3 : 0;
-    struct umbra_buf buf[5];
-    buf[0] = (struct umbra_buf){.ptr=fill_pipe.uniforms, .count=fill_pipe.uni.slots};
-    buf[1] = (struct umbra_buf){.ptr=dst, .count=n};
-    for (int i = 0; i < ps; i++) {
-        buf[2 + i] = (struct umbra_buf){.ptr=(char *)dst + (size_t)(i + 1) * plane_gap,
-                                         .count=n};
-    }
-    fill_pipe.program->queue(fill_pipe.program, 0, 0, n, 1, buf);
 }
 
 static void readback_row(void *dst, void *src, int n, size_t plane_gap) {
@@ -346,22 +316,7 @@ int main(void) {
 
         size_t bpp = fmt_enums[cur_fmt]->bpp;
         int    planes = fmt_enums[cur_fmt]->planes;
-        size_t row_bytes = (size_t)W * bpp;
         size_t plane_gap = planes > 1 ? (size_t)W * (size_t)H * bpp : 0;
-
-        if (plane_gap) {
-            umbra_uniforms_fill_f32(fill_pipe.uniforms, 0, s->bg, 4);
-            struct umbra_buf fb[] = {
-                {.ptr = fill_pipe.uniforms, .count = fill_pipe.uni.slots},
-                {.ptr = pixbuf, .count = W * H * planes, .stride = W},
-            };
-            fill_pipe.program->queue(fill_pipe.program, 0, 0, W, H, fb);
-        } else {
-            for (int y = 0; y < H; y++) {
-                void *row = (void *)((uint8_t *)pixbuf + (size_t)y * row_bytes);
-                fill_bg_row(row, W, s->bg, plane_gap);
-            }
-        }
 
         if (s->prepare) { s->prepare(s, bes[cur_backend], *fmt_enums[cur_fmt]); }
 

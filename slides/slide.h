@@ -33,3 +33,7 @@ void          slides_init        (int w, int h);
 void          slides_cleanup     (void);
 
 void slide_perspective_matrix(struct umbra_matrix *out, float t, int sw, int sh, int bw, int bh);
+
+void slide_bg_prepare(struct umbra_backend *be, struct umbra_fmt fmt, int w, int h);
+void slide_bg_draw   (float const bg[4], int l, int t, int r, int b, void *buf);
+void slide_bg_cleanup(void);

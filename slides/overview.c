@@ -70,16 +70,6 @@ static void render_thumbnails(struct overview_state *st) {
         }
 
         struct slide *sub = slide_get(idx);
-        float const *c = sub->bg;
-        int ri = (int)(c[0] * 255.0f + 0.5f),
-            gi = (int)(c[1] * 255.0f + 0.5f),
-            bi = (int)(c[2] * 255.0f + 0.5f),
-            ai = (int)(c[3] * 255.0f + 0.5f);
-        uint32_t bg32 = (uint32_t)ri | ((uint32_t)gi << 8)
-                       | ((uint32_t)bi << 16) | ((uint32_t)ai << 24);
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) { st->tmp[y * w + x] = bg32; }
-        }
         if (sub->prepare) { sub->prepare(sub, st->be, st->fmt); }
         sub->draw(sub, 0, 0, 0, w, h, st->tmp);
         st->be->flush(st->be);

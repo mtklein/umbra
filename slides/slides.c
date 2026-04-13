@@ -63,5 +63,47 @@ void slides_cleanup(void) {
         if (all[i]->free) { all[i]->free(all[i]); }
     }
     text_shared_cleanup();
+    slide_bg_cleanup();
     count = 0;
+}
+
+static struct umbra_basic_block *bg_bb;
+static struct umbra_program     *bg_prog;
+static struct umbra_draw_layout  bg_lay;
+static struct umbra_fmt          bg_fmt;
+static int                       bg_w, bg_h;
+
+void slide_bg_prepare(struct umbra_backend *be, struct umbra_fmt fmt, int w, int h) {
+    if (bg_fmt.name != fmt.name || !bg_bb || bg_w != w || bg_h != h) {
+        umbra_basic_block_free(bg_bb);
+        free(bg_lay.uniforms);
+        bg_fmt = fmt;
+        bg_w   = w;
+        bg_h   = h;
+        struct umbra_shader_solid shader = umbra_shader_solid((float[]){0,0,0,0});
+        struct umbra_builder *b = umbra_draw_build(&shader.base, NULL, NULL, fmt, &bg_lay);
+        bg_bb = umbra_basic_block(b);
+        umbra_builder_free(b);
+    }
+    if (bg_prog) { bg_prog->free(bg_prog); }
+    bg_prog = be->compile(be, bg_bb);
+}
+
+void slide_bg_draw(float const bg[4], int l, int t, int r, int b, void *buf) {
+    struct umbra_shader_solid shader = umbra_shader_solid(bg);
+    umbra_draw_fill(&bg_lay, &shader.base, NULL);
+    struct umbra_buf ubuf[] = {
+        {.ptr=bg_lay.uniforms, .count=bg_lay.uni.slots},
+        {.ptr=buf, .count=bg_w * bg_h * bg_fmt.planes, .stride=bg_w},
+    };
+    bg_prog->queue(bg_prog, l, t, r, b, ubuf);
+}
+
+void slide_bg_cleanup(void) {
+    if (bg_prog) { bg_prog->free(bg_prog); bg_prog = NULL; }
+    umbra_basic_block_free(bg_bb); bg_bb = NULL;
+    free(bg_lay.uniforms);
+    bg_lay = (struct umbra_draw_layout){0};
+    bg_fmt = (struct umbra_fmt){0};
+    bg_w = bg_h = 0;
 }

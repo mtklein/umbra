@@ -363,10 +363,12 @@ static void slug_prepare(struct slide *s, struct umbra_backend *be, struct umbra
     st->acc_prog = be->compile(be, st->acc_bb);
     if (st->draw_prog) { st->draw_prog->free(st->draw_prog); }
     st->draw_prog = be->compile(be, st->draw_bb);
+    slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
 static void slug_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
     struct slug_state           *st = (struct slug_state *)s;
+    slide_bg_draw(s->bg, l, t, r, b, buf);
     struct umbra_program *acc = st->acc_prog;
     int w = st->w, h = st->h;
 
