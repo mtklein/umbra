@@ -17,7 +17,8 @@ static _Bool is_body(struct bb_inst const *inst) {
 // tested (negated scores, constant/random/hash scores, inverted pressure, disabled chaining,
 // reversed scan, swapped multipliers, etc.).  All backends passed every permutation:
 //   interp 0, jit 0, metal 0, vulkan 0, wgpu 0.
-static int sched_score(struct bb_inst const *in, struct sched const *meta, int c, int live) {
+static int sched_score(struct bb_inst const *in, struct sched const *meta,
+                       int const *users, int c, int live) {
     int kills = 0;
     int const deps[] = {in[c].x.id, in[c].y.id, in[c].z.id, in[c].w.id};
     for (int k = 0; k < 4; k++) {
@@ -26,9 +27,16 @@ static int sched_score(struct bb_inst const *in, struct sched const *meta, int c
     }
     int const defines = op_is_store(in[c].op) ? 0 : 1;
     int const last_use = meta[c].last_use < 0 ? live : meta[c].last_use;
-    // Prefer instructions that decrease register pressure.  (kills-defines)
-    // Break ties in favor of instructions that die soon.    (last_use)
-    return (kills - defines)*live - last_use;
+
+    int enables = 0;
+    for (int u = meta[c].user_off; u < meta[c].user_off + meta[c].n_users; u++) {
+        enables += meta[users[u]].n_deps == 1;
+    }
+
+    // Prefer instructions that unblock downstream work.  (enables)
+    // Then those that decrease register pressure.         (kills-defines)
+    // Break ties in favor of instructions that die soon.  (last_use)
+    return (kills - defines + enables)*live - last_use;
 }
 
 static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int at, int live,
@@ -115,10 +123,10 @@ static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int at, int
         }
         // No chain: pick the best-scoring ready instruction.
         if (pick < 0) {
-            int best_score = sched_score(in, meta, ready[0], live);
+            int best_score = sched_score(in, meta, users, ready[0], live);
             pick = 0;
             for (int r = 1; r < nready; r++) {
-                int const s = sched_score(in, meta, ready[r], live);
+                int const s = sched_score(in, meta, users, ready[r], live);
                 if (best_score < s) {
                     best_score = s;
                     pick = r;
