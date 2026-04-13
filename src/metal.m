@@ -33,9 +33,12 @@ struct metal_backend {
     void *device;
     void *queue;
     void *batch_cmdbuf;     // currently-encoding cmdbuf for uni_pool.cur, or NULL
-    void *batch_enc;        // single MTLDispatchTypeSerial compute encoder
-                            // open on batch_cmdbuf for the entire batch;
-                            // ended in metal_submit_cmdbuf right before commit
+    // TODO: Instruments shows Metal coalesces compatible encoders automatically,
+    // so keeping batch_enc open across queue() calls adds complexity for no benefit.
+    // Simplify: create+end the encoder within each queue() call and remove batch_enc.
+    // The lazy-creation in metal_program_queue() and endEncoding in metal_submit_cmdbuf()
+    // both collapse.  Verify with bench --verbose that µs/dispatch is unchanged.
+    void *batch_enc;
     void *frame_committed[METAL_N_FRAMES];  // last committed cmdbuf per frame, or NULL
     struct gpu_buf_cache cache;
     struct uniform_ring_pool uni_pool;
