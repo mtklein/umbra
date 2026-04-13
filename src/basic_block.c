@@ -43,6 +43,16 @@ static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int at, int
                     meta[d].n_users++;
                 }
             }
+            if (in[i].op == op_store_var) {
+                for (int j = region_lo; j < i; j++) {
+                    if (in[j].op == op_load_var && in[j].imm == in[i].imm
+                            && is_body(in + j)) {
+                        meta[i].n_deps++;
+                        meta[j].n_users++;
+                        meta[j].last_use = i;
+                    }
+                }
+            }
         }
     }
 
@@ -61,6 +71,14 @@ static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int at, int
                 if (is_body(in + deps[k]) && deps[k] >= region_lo && deps[k] < region_hi) {
                     int const d = deps[k];
                     users[meta[d].user_off + meta[d].n_users++] = i;
+                }
+            }
+            if (in[i].op == op_store_var) {
+                for (int j = region_lo; j < i; j++) {
+                    if (in[j].op == op_load_var && in[j].imm == in[i].imm
+                            && is_body(in + j)) {
+                        users[meta[j].user_off + meta[j].n_users++] = i;
+                    }
                 }
             }
         }
