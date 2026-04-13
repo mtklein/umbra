@@ -4270,3 +4270,37 @@ TEST(test_loop_high_register_pressure) {
     }
     cleanup(&B);
 }
+
+TEST(test_loop_var_war_hazard) {
+    // Regression: store_var must not be scheduled before load_var of the same
+    // variable.  The loop index is loaded twice (once for the gather address,
+    // once for the increment) and the store of the incremented value must wait
+    // for both loads.
+    struct umbra_builder *b = umbra_builder();
+    umbra_var idx = umbra_var_alloc(b);
+    umbra_var acc = umbra_var_alloc(b);
+    umbra_val32 n = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
+    umbra_loop(b, n); {
+        umbra_val32 i  = umbra_load_var(b, idx);
+        umbra_val32 a  = umbra_load_var(b, acc);
+        umbra_val32 v  = umbra_gather_32(b, (umbra_ptr32){.ix = 1}, i);
+        umbra_store_var(b, acc, umbra_add_f32(b, a, v));
+        umbra_store_var(b, idx, umbra_add_i32(b, i, umbra_imm_i32(b, 1)));
+    } umbra_loop_end(b);
+    umbra_store_32(b, (umbra_ptr32){.ix = 2}, umbra_load_var(b, acc));
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        int32_t uni[1] = {4};
+        float data[4] = {1.0f, 2.0f, 4.0f, 8.0f};
+        float out[1] = {0};
+        if (run(&B, bi, 1, 1, (struct umbra_buf[]){
+                {.ptr = uni,  .sz = sizeof uni},
+                {.ptr = data, .sz = sizeof data},
+                {.ptr = out,  .sz = sizeof out, .row_bytes = sizeof out},
+            })) {
+            out[0] == 15.0f here;
+        }
+    }
+    cleanup(&B);
+}
