@@ -13,6 +13,13 @@ static _Bool is_body(struct bb_inst const *inst) {
     return inst->live && inst->varying;
 }
 
+// TODO: survey backend fragility by permuting sched_score() and schedule().
+// Small changes here (e.g. flipping tie-break sign, shuffling ready list, tweaking kills-defines
+// weighting, reordering regions) should not break correctness in any backend.  Any backend that
+// breaks is relying on scheduling order rather than honoring the dependency graph.  The JITs
+// (jit_arm64.c, jit_x86.c) are the most likely suspects given their tight register constraints,
+// but interp, Metal, Vulkan, and wgpu should all be checked too.  Goal: a tally of how many
+// permutations break each backend, to prioritize hardening work.
 static int sched_score(struct bb_inst const *in, struct sched const *meta, int c, int live) {
     int kills = 0;
     int const deps[] = {in[c].x.id, in[c].y.id, in[c].z.id, in[c].w.id};
