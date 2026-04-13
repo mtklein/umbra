@@ -368,8 +368,7 @@ struct umbra_builder *slug_build_acc_loop(struct slug_acc_loop_layout *lay) {
             umbra_le_f32(b, z, gy),
             umbra_lt_f32(b, gy, bh)));
 
-    umbra_val32 count = umbra_i32_from_f32(b,
-        umbra_uniform_32(b, (umbra_ptr32){0}, ni));
+    umbra_val32 count = umbra_uniform_32(b, (umbra_ptr32){0}, ni);
     umbra_var wind = umbra_var_alloc(b);
 
     umbra_val32 j = umbra_loop(b, count); {
