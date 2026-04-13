@@ -634,6 +634,14 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 CASE(op_imm_32) v->i32 = (I32){0} + ip->x; NEXT;
                 CASE(op_join) {
                     v->i32 = v[ip->x].i32;
+#if __has_feature(address_sanitizer)
+                    {
+                        I32 ja, jb;
+                        __builtin_memcpy(&ja, &v[ip->x].i32, sizeof ja);
+                        __builtin_memcpy(&jb, &v[ip->y].i32, sizeof jb);
+                        for (int jk = 0; jk < K; jk++) { assume(ja[jk] == jb[jk]); }
+                    }
+#endif
                 } NEXT;
                 CASE(op_x) {
                     I32 seq;

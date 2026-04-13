@@ -182,9 +182,7 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
         if (b->inst[i].live) {
             live++;
             b->inst[b->inst[i].x.id].live = 1;
-            if (b->inst[i].op != op_join) {
-                b->inst[b->inst[i].y.id].live = 1;
-            }
+            b->inst[b->inst[i].y.id].live = 1;
             b->inst[b->inst[i].z.id].live = 1;
             b->inst[b->inst[i].w.id].live = 1;
             if (b->inst[i].ptr.deref) {
