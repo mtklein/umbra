@@ -237,13 +237,9 @@ static void grad_stops_free(struct slide *s) {
     free(st);
 }
 
-// TODO: Vulkan draws this faster than Metal (~102 vs ~131 µs/dispatch).  Our MSL
-// emits sel_32 as select(), a non-branching bitwise cmov that always evaluates both
-// operands.  MoltenVK's spirv-cross emits ?: ternary with the "next" color gather
-// inlined in the true branch, letting the GPU skip the load+fma when out of range
-// (~80% of iterations for 6 stops).  Hacking in that MSL brings Metal to ~97 µs.
-// Fix: emit sel_32 as an if-block or ternary-with-inlined-operands in metal.m's
-// emit_ops(), so channel-specific loads only execute when the condition is true.
+// Fixed: was ~131 µs Metal vs ~102 µs Vulkan.  Now ~62 and ~66 respectively,
+// thanks to umbra_if() wrapping the gathers+lerps so GPU backends can branch-skip
+// them when the pixel isn't in the current gradient segment.
 SLIDE(slide_gradient_linear_stops) {
     static float const colors[][4] = {
         {1.2f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.8f, 0.0f, 1.0f}, {0.0f, 1.2f, 0.0f, 1.0f},

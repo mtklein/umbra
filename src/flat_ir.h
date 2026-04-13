@@ -45,5 +45,5 @@ struct umbra_flat_ir {
     struct ir_inst *inst;
     int             insts, preamble;
     int             loop_begin, loop_end;
-    int             n_vars, pad_bb_;
+    int             n_vars, pad_ir_;
 };
