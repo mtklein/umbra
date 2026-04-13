@@ -99,47 +99,53 @@ static void test_slide_golden(int slide_idx, struct umbra_fmt fmt, int fi) {
 
     size_t const rb = (size_t)W * fmt.bpp;
     size_t const pixbuf_sz = rb * H * (size_t)fmt.planes;
-    void *pbuf_ref = malloc(pixbuf_sz);
-    void *pbuf_tst = malloc(pixbuf_sz);
 
-    render_slide(slide_idx, bes[0], fmt, fi, pbuf_ref);
-    bes[0]->flush(bes[0]);
-
-    for (int bi = 1; bi < NUM_BACKENDS; bi++) {
+    void *pbuf[NUM_BACKENDS] = {0};
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         if (!bes[bi]) { continue; }
-        __builtin_memset(pbuf_tst, 0, pixbuf_sz);
-        render_slide(slide_idx, bes[bi], fmt, fi, pbuf_tst);
+        pbuf[bi] = malloc(pixbuf_sz);
+        render_slide(slide_idx, bes[bi], fmt, fi, pbuf[bi]);
         bes[bi]->flush(bes[bi]);
-
-        int mismatches = 0;
-        int worst = 0;
-        int worst_off = -1;
-        uint8_t const *r = pbuf_ref, *t = pbuf_tst;
-        for (size_t j = 0; j < pixbuf_sz; j++) {
-            if (r[j] != t[j]) {
-                mismatches++;
-                int d = (int)r[j] - (int)t[j];
-                if (d < 0) { d = -d; }
-                if (d > worst) {
-                    worst = d;
-                    worst_off = (int)j;
-                }
-            }
-        }
-        if (worst > 0) {
-            dprintf(2,
-                "slide %d \"%s\" %s fmt=%s: "
-                "%d/%d bytes differ, worst delta=%d at byte %d\n",
-                slide_idx + 1, s->title,
-                backend_name[bi], fmt.name,
-                mismatches, (int)pixbuf_sz,
-                worst, worst_off);
-        }
-        worst == 0 here;
     }
 
-    free(pbuf_ref);
-    free(pbuf_tst);
+    _Bool ok = 1;
+    for (int i = 0; i < NUM_BACKENDS; i++) {
+        if (!pbuf[i]) { continue; }
+        for (int j = i + 1; j < NUM_BACKENDS; j++) {
+            if (!pbuf[j]) { continue; }
+
+            int mismatches = 0;
+            int worst = 0;
+            int worst_off = -1;
+            uint8_t const *a = pbuf[i], *b = pbuf[j];
+            for (size_t k = 0; k < pixbuf_sz; k++) {
+                if (a[k] != b[k]) {
+                    mismatches++;
+                    int d = (int)a[k] - (int)b[k];
+                    if (d < 0) { d = -d; }
+                    if (d > worst) {
+                        worst = d;
+                        worst_off = (int)k;
+                    }
+                }
+            }
+            if (worst > 0) {
+                dprintf(2,
+                    "slide %d \"%s\" %s vs %s fmt=%s: "
+                    "%d/%d bytes differ, worst delta=%d at byte %d\n",
+                    slide_idx + 1, s->title,
+                    backend_name[i], backend_name[j], fmt.name,
+                    mismatches, (int)pixbuf_sz,
+                    worst, worst_off);
+                ok = 0;
+            }
+        }
+    }
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        free(pbuf[bi]);
+    }
+    ok here;
 }
 
 TEST(test_slug_rect) {
