@@ -1,6 +1,8 @@
 #include "test.h"
 #include <string.h>
 
+_Bool test_debug;
+
 enum { TEST_CAP = 4096 };
 
 static test_fn    registry[TEST_CAP];

@@ -4392,7 +4392,9 @@ TEST(test_join_add_f32_imm) {
         umbra_add_f32(b, umbra_load_32(b, (umbra_ptr32){0}), umbra_imm_f32(b, 1.0f)));
     struct test_backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-        if (bi == 2 && B.p[bi] && B.p[bi]->dump) { B.p[bi]->dump(B.p[bi], stderr); }
+        if (test_debug && bi == 2 && B.p[bi] && B.p[bi]->dump) {
+            B.p[bi]->dump(B.p[bi], stderr);
+        }
         float v[8] = {0};
         if (run(&B, bi, 8, 1, (struct umbra_buf[]){{.ptr=v, .count=8, .stride=8}})) {
             equiv(v[0], 1.0f) here;
