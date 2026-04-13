@@ -17,6 +17,7 @@ enum {
     X(x,                                    OP_VARYING)                                    \
     X(y,                                    OP_VARYING)                                    \
     X(imm_32,                               0)                                             \
+    X(join,                                 0)                                             \
     X(uniform_32,                           OP_PTR)                                        \
     X(load_32,                              OP_PTR|OP_VARYING)                             \
     X(load_16x4,                            OP_PTR|OP_VARYING)                             \

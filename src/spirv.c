@@ -1196,6 +1196,10 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
                 case op_imm_32:
                     B.val[i] = spv_const_u32(&B, (uint32_t)inst->imm);
                     break;
+                case op_join:
+                    B.val[i] = B.val[inst->x.id];
+                    B.is_f[i] = B.is_f[inst->x.id];
+                    break;
 
                 case op_deref_ptr:
                     // Deref is handled on the host side. Nothing to emit in shader.

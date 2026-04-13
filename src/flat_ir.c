@@ -172,6 +172,8 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
 
     int const n = b->insts;
 
+    for (int i = 0; i < n; i++) { b->inst[i].final_id = 0; }
+
     int live = 0;
     for (int i = n; i-- > 0;) {
         if (op_is_store(b->inst[i].op) || is_cf(b->inst[i].op)) {
@@ -180,7 +182,9 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
         if (b->inst[i].live) {
             live++;
             b->inst[b->inst[i].x.id].live = 1;
-            b->inst[b->inst[i].y.id].live = 1;
+            if (b->inst[i].op != op_join) {
+                b->inst[b->inst[i].y.id].live = 1;
+            }
             b->inst[b->inst[i].z.id].live = 1;
             b->inst[b->inst[i].w.id].live = 1;
             if (b->inst[i].ptr.deref) {
@@ -306,6 +310,7 @@ static void dump_insts(struct ir_inst const *inst, int insts, FILE *f) {
 
         switch (op) {
         case op_imm_32: fprintf(f, " 0x%x", (uint32_t)ip->imm); break;
+        case op_join: fprintf(f, " v%d v%d", ip->x.id, ip->y.id); break;
         case op_uniform_32:
             fprintf(f, " p%d [%d]", ip->ptr.bits, ip->imm);
             break;

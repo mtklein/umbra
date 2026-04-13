@@ -239,6 +239,7 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *bb) {
             case op_x:      emit(.tag = op_x);      break;
             case op_y:      emit(.tag = op_y);      break;
             case op_imm_32: emit(.tag = op_imm_32, .x = inst->imm); break;
+            case op_join: emit(.tag = op_join, .x = X, .y = Y); break;
 
             case op_deref_ptr:
                 emit(.tag = op_deref_ptr, .ptr = inst->ptr.bits,
@@ -551,6 +552,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 [op_gather_uniform_32] = &&L_op_gather_uniform_32,
                 [op_gather_16] = &&L_op_gather_16, [op_gather_32] = &&L_op_gather_32,
                 [op_sample_32] = &&L_op_sample_32,
+                [op_join] = &&L_op_join,
                 [op_deref_ptr] = &&L_op_deref_ptr,
                 [op_loop_begin] = &&L_op_loop_begin, [op_loop_end] = &&L_op_loop_end,
                 [op_if_begin] = &&L_op_if_begin, [op_if_end] = &&L_op_if_end,
@@ -630,6 +632,9 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
             for (;;) { switch (ip->tag) {
 #endif
                 CASE(op_imm_32) v->i32 = (I32){0} + ip->x; NEXT;
+                CASE(op_join) {
+                    v->i32 = v[ip->x].i32;
+                } NEXT;
                 CASE(op_x) {
                     I32 seq;
                     __builtin_memcpy(&seq, iota, sizeof seq);
