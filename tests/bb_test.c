@@ -1027,11 +1027,15 @@ TEST(test_store_8x4) {
 TEST(test_srcover) {
     struct umbra_builder *builder = build_srcover();
     struct test_backends   B = make(builder);
+    enum { N = 16 };
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-        uint32_t src_px[] = { 0x80402010u, 0x80402010u, 0x80402010u };
-        __fp16 dst_r[] = {0.5, 0.5, 0.5}, dst_g[] = {0.5, 0.5, 0.5},
-               dst_b[] = {0.5, 0.5, 0.5}, dst_a[] = {0.5, 0.5, 0.5};
-        if (run(&B, bi, 3, 1,
+        uint32_t src_px[N];
+        __fp16 dst_r[N], dst_g[N], dst_b[N], dst_a[N];
+        for (int i = 0; i < N; i++) {
+            src_px[i] = 0x80402010u;
+            dst_r[i] = dst_g[i] = dst_b[i] = dst_a[i] = (__fp16)0.5f;
+        }
+        if (run(&B, bi, N, 1,
                  (struct umbra_buf[]){
                      {.ptr=src_px, .sz=sizeof src_px},
                      {.ptr=dst_r, .sz=sizeof dst_r},
@@ -1039,7 +1043,7 @@ TEST(test_srcover) {
                      {.ptr=dst_b, .sz=sizeof dst_b},
                      {.ptr=dst_a, .sz=sizeof dst_a},
                  })) {
-            for (int i = 0; i < 3; i++) {
+            for (int i = 0; i < N; i++) {
                 equiv((float)dst_r[i], 0x1.3f4p-2f) here;
                 equiv((float)dst_g[i], 0x1.7f8p-2f) here;
                 equiv((float)dst_b[i], 0.5f)         here;

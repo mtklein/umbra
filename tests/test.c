@@ -1,13 +1,17 @@
 #include "test.h"
+#include <string.h>
 
 enum { TEST_CAP = 4096 };
 
-static test_fn registry[TEST_CAP];
-static int     test_count;
+static test_fn    registry[TEST_CAP];
+static char const *names[TEST_CAP];
+static int         test_count;
 
-void test_register(test_fn fn) {
+void test_register(test_fn fn, char const *name) {
     if (test_count < TEST_CAP) {
-        registry[test_count++] = fn;
+        registry[test_count] = fn;
+        names[test_count] = name;
+        test_count++;
     }
 }
 
@@ -59,9 +63,19 @@ void test_backends_free(struct test_backends *B) {
     }
 }
 
-int main(void) {
+int main(int argc, char *argv[]) {
+    char const *match = NULL;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--match") == 0 && i + 1 < argc) {
+            match = argv[++i];
+        } else {
+            match = argv[i];
+        }
+    }
     for (int i = 0; i < test_count; i++) {
-        registry[i]();
+        if (!match || strstr(names[i], match)) {
+            registry[i]();
+        }
     }
     return 0;
 }

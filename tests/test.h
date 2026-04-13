@@ -5,14 +5,14 @@
 int dprintf(int, char const[], ...);
 
 typedef void (*test_fn)(void);
-void test_register(test_fn fn);
+void test_register(test_fn fn, char const *name);
 
 #define TEST(NAME)                                                                \
     static void NAME(void);                                                       \
     _Pragma("clang diagnostic push")                                              \
     _Pragma("clang diagnostic ignored \"-Wglobal-constructors\"")                 \
     __attribute__((constructor)) static void test_ctor_##NAME(void) {             \
-        test_register(NAME);                                                      \
+        test_register(NAME, #NAME);                                               \
     }                                                                             \
     _Pragma("clang diagnostic pop")                                               \
     static void NAME(void)
