@@ -53,7 +53,8 @@ static void free_pipe(struct pipe *p) {
 
 static struct umbra_backend *pipe_be;
 
-static void finish_pipe(struct pipe *p, struct umbra_builder *builder, struct umbra_uniforms_layout uni) {
+static void finish_pipe(struct pipe *p, struct umbra_builder *builder,
+                        struct umbra_uniforms_layout uni) {
     p->uni = uni;
     p->uniforms = umbra_uniforms_alloc(&uni);
     struct umbra_basic_block *bb = umbra_basic_block(builder);
