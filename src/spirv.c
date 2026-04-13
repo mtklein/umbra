@@ -649,7 +649,6 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
     result.buf_shift     = buf_shift;
     result.buf_row_shift = buf_row_shift;
 
-    // TODO: rename buf_szs->buf_count, buf_rbs->buf_stride throughout SPIR-V and comments.
     // Push constant layout: w, x0, y0, buf_count[total_bufs], buf_stride[total_bufs].
     // User uniforms (buf[0]) go through the per-batch uniform ring as a
     // storage buffer at descriptor binding 0; only this small backend-side
