@@ -189,8 +189,11 @@ int main(void) {
         render_hdr(dir, i, be);
     }
 
-    dump_builder("dumps", "slug_acc",      slug_build_acc(NULL));
-    dump_builder("dumps", "slug_acc_loop", slug_build_acc_loop(NULL));
+    dump_builder("dumps/slug_two_pass", "acc", slug_build_acc(NULL));
+    {
+        mkdir("dumps/slug", 0755);
+        dump_builder("dumps/slug", "draw", slug_build(NULL));
+    }
 
     slides_cleanup();
     be->free(be);
