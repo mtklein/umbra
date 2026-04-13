@@ -1243,19 +1243,6 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                     B.val[i] = spv_binop(&B, SpvOpBitwiseAnd, B.t_u32, raw, mask);
                 } break;
 
-                case op_gather_uniform_32_if: {
-                    int p = resolve_ptr(&B, inst);
-                    uint32_t ix_val = as_u32(&B, get_val(&B, inst->x), xid);
-                    uint32_t safe_idx, mask;
-                    gather_safe(&B, ix_val, p, &safe_idx, &mask);
-                    uint32_t raw = load_ssbo_u32(&B, p, safe_idx);
-                    uint32_t gathered = spv_binop(&B, SpvOpBitwiseAnd, B.t_u32, raw, mask);
-                    uint32_t cond_val = get_val(&B, inst->y);
-                    uint32_t cond_bool = spv_binop(&B, SpvOpINotEqual, B.t_bool,
-                                                   as_u32(&B, cond_val, yid), B.c_0);
-                    B.val[i] = spv_select(&B, B.t_u32, cond_bool, gathered, B.c_0);
-                } break;
-
                 case op_gather_16: {
                     int p = resolve_ptr(&B, inst);
                     uint32_t ix_val = as_u32(&B, get_val(&B, inst->x), xid);

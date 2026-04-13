@@ -986,17 +986,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             }
         } break;
 
-        case op_gather_uniform_32:
-        case op_gather_uniform_32_if: {
+        case op_gather_uniform_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
-            int8_t         ry = inst->op == op_gather_uniform_32_if
-                              ? ra_ensure(ra, sl, ns, inst->y.id) : -1;
             ptr            p = inst->ptr;
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
             vmovd_to_gpr(c, RAX, rx);
             ra_free_chan(ra, inst->x, i);
-            if (ry >= 0) { ra_free_chan(ra, inst->y, i); }
             load_count_x86(c, p);
             vpxor(c, scalar ? 0 : 1, s.rd, s.rd, s.rd);
             cmp_rr(c, RAX, XM);
@@ -1006,9 +1002,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 vbroadcastss(c, s.rd, s.rd);
             }
             patch_jcc(c, skip);
-            if (ry >= 0) {
-                vpand(c, scalar ? 0 : 1, s.rd, s.rd, ry);
-            }
         } break;
 
         case op_gather_32: {

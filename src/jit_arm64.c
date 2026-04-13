@@ -537,14 +537,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             put(c, ORR_16b(hi(s.rd), lo(s.rd), lo(s.rd)));
         } break;
 
-        case op_gather_uniform_32:
-        case op_gather_uniform_32_if: {
+        case op_gather_uniform_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
-            int8_t         ry = inst->op == op_gather_uniform_32_if
-                              ? ra_ensure(ra, sl, ns, inst->y.id) : -1;
             ra_free_chan(ra, inst->x, i);
-            if (ry >= 0) { ra_free_chan(ra, inst->y, i); }
             ptr p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
             load_count(c, p);
@@ -557,10 +553,6 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             put(c, LDR_wr(XT, XP, XT));
             put(c, DUP_4s_w(lo(s.rd), XT));
             if (!scalar) { put(c, ORR_16b(hi(s.rd), lo(s.rd), lo(s.rd))); }
-            if (ry >= 0) {
-                put(c, AND_16b(lo(s.rd), lo(s.rd), lo(ry)));
-                if (!scalar) { put(c, AND_16b(hi(s.rd), hi(s.rd), hi(ry))); }
-            }
         } break;
 
         case op_gather_32: {

@@ -181,18 +181,6 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                      pad, i, p,
                      vx, p, vx, p);
             } break;
-            case op_gather_uniform_32_if: {
-                int p = inst->ptr.deref
-                    ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
-                emit(b,
-                     "%suint v%d = (%s != 0u)"
-                     " ? p%d[min(%s, m.count%d - 1u)]"
-                     " & ((%s < m.count%d) ? ~0u : 0u)"
-                     " : 0u;\n",
-                     pad, i,
-                     uv(_uy, vy, yid, is_f),
-                     p, vx, p, vx, p);
-            } break;
             case op_sample_32: {
                 int p = inst->ptr.deref
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
