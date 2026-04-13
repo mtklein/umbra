@@ -6,7 +6,7 @@ struct meta { uint w, x0, y0, count0, count1, count2, count3, count4, stride0, s
 
 kernel void umbra_entry(
     constant meta &m [[buffer(5)]],
-    device uint *p0 [[buffer(0)]],
+    device const uint *p0 [[buffer(0)]],
     device ushort *p1 [[buffer(1)]],
     device ushort *p2 [[buffer(2)]],
     device ushort *p3 [[buffer(3)]],

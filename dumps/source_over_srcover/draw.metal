@@ -6,7 +6,7 @@ struct meta { uint w, x0, y0, count0, count1, stride0, stride1; };
 
 kernel void umbra_entry(
     constant meta &m [[buffer(2)]],
-    device uint *p0 [[buffer(0)]],
+    device const uint *p0 [[buffer(0)]],
     device half4 *p1 [[buffer(1)]],
     uint2 pos [[thread_position_in_grid]]
 ) {

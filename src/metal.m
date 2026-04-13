@@ -836,11 +836,13 @@ static char* build_source(BB const *bb,
 
     uint8_t *buf_shift     = calloc((size_t)(total_bufs + 1), sizeof *buf_shift);
     uint8_t *buf_row_shift = calloc((size_t)(total_bufs + 1), sizeof *buf_row_shift);
+    _Bool   *buf_written   = calloc((size_t)(total_bufs + 1), sizeof *buf_written);
     *out_buf_shift = buf_shift;
     for (int i = 0; i < bb->insts; i++) {
         if (!op_has_ptr(bb->inst[i].op)) { continue; }
         int bi = bb->inst[i].ptr.deref ? deref_buf[bb->inst[i].ptr.ix]
                                       : bb->inst[i].ptr.bits;
+        if (op_is_store(bb->inst[i].op)) { buf_written[bi] = 1; }
         if (bb->inst[i].op == op_load_16x4_planar
          || bb->inst[i].op == op_store_16x4_planar) { buf_shift[bi] = 1; buf_row_shift[bi] = 1; }
         else if (bb->inst[i].op == op_load_16x4
@@ -875,20 +877,22 @@ static char* build_source(BB const *bb,
     for (int p = 0; p <= max_ptr; p++) {
         char const *type = buf_row_shift[p] == 3 ? "half4"
                          : buf_shift[p]     == 2 ? "uint" : "ushort";
+        char const *qual = buf_written[p] ? "device" : "device const";
         emit(&b,
-             ",\n    device %s *p%d"
+             ",\n    %s %s *p%d"
              " [[buffer(%d)]]",
-             type, p, p);
+             qual, type, p, p);
     }
     for (int i = 0; i < bb->insts; i++) {
         if (bb->inst[i].op == op_deref_ptr) {
             int db = deref_buf[i];
             char const *type = buf_row_shift[db] == 3 ? "half4"
                              : buf_shift[db]     == 2 ? "uint" : "ushort";
+            char const *qual = buf_written[db] ? "device" : "device const";
             emit(&b,
-                 ",\n    device %s *p%d"
+                 ",\n    %s %s *p%d"
                  " [[buffer(%d)]]",
-                 type, db, db);
+                 qual, type, db, db);
         }
     }
     emit(&b,
@@ -908,6 +912,7 @@ static char* build_source(BB const *bb,
 
     free(is_f);
     free(buf_row_shift);
+    free(buf_written);
 
     char *src = malloc(b.size + 1);
     __builtin_memcpy(src, b.text, b.size);
