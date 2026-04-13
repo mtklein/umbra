@@ -399,7 +399,8 @@ static void slug_draw(struct slide *s, int frame, int l, int t, int r, int b, vo
     };
     umbra_draw_fill(&st->draw_lay, &st->shader.base, &st->cov.base);
     struct umbra_buf rbuf[2];
-    rbuf[0] = (struct umbra_buf){.ptr=st->draw_lay.uniforms, .count=(int)(st->draw_lay.uni.size / 4)};
+    rbuf[0] = (struct umbra_buf){.ptr = st->draw_lay.uniforms,
+                                 .count = (int)(st->draw_lay.uni.size / 4)};
     rbuf[1] = (struct umbra_buf){.ptr=buf, .count=w * h * st->fmt.planes, .stride=w};
     st->draw_prog->queue(st->draw_prog, l, t, r, b, rbuf);
 }
