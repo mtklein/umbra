@@ -916,8 +916,10 @@ static char* build_source(BB const *bb,
     __builtin_memcpy(inst, bb->inst, (size_t)n * sizeof *inst);
     for (int i = 0; i < n; i++) {
         if (inst[i].op == op_join) {
-            if (inst[inst[i].y.id].op == op_add_f32_imm) {
+            int const yid = inst[i].y.id;
+            if (inst[yid].op == op_add_f32_imm) {
                 inst[i].x = (val){0};
+                inst[yid].y = (val){0};
             } else {
                 inst[i].y = (val){0};
             }
@@ -933,7 +935,7 @@ static char* build_source(BB const *bb,
         }
         if (use[i] == 0) { continue; }
         use[ip->x.id]++;
-        if (ip->op != op_add_f32_imm) { use[ip->y.id]++; }
+        use[ip->y.id]++;
         use[ip->z.id]++;
         use[ip->w.id]++;
         if (ip->ptr.deref) { use[ip->ptr.ix]++; }
