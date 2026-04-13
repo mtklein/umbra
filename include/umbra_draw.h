@@ -10,8 +10,7 @@ struct umbra_matrix {
 };
 
 struct umbra_bitmap {
-    struct umbra_buf        buf;
-    struct umbra_fmt const *fmt;
+    struct umbra_buf buf;
     int w, h;
 };
 
