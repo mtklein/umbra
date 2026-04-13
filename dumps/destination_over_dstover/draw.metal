@@ -46,7 +46,7 @@ kernel void umbra_entry(
     uint v26 = v24 <  as_type<float>(v8) ? 0xffffffffu : 0u;
     uint v27 = v25 & v26;
     uint v28 = v22 & v27;
-    uint v29 = select(v0, v9, v28 != 0u);
+    uint v29 = (v28 != 0u) ? v9 : v0;
     float v30 = fma(as_type<float>(v29), v15, v11);
     uint v31 = (uint)as_type<ushort>((half)v30);
     float v32 = fma(as_type<float>(v29), v17, v12);

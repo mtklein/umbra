@@ -692,20 +692,18 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                 if (yf && zf) {
                     is_f[i] = 1;
                     emit(b, "%sfloat v%d ="
-                            " select(%s, %s,"
-                            " %s != 0u);\n",
+                            " (%s != 0u) ? %s : %s;\n",
                          pad, i,
-                         fv(_fz, vz, zid, is_f),
+                         uv(_ux, vx, xid, is_f),
                          fv(_fy, vy, yid, is_f),
-                         uv(_ux, vx, xid, is_f));
+                         fv(_fz, vz, zid, is_f));
                 } else {
                     emit(b, "%suint v%d ="
-                            " select(%s, %s,"
-                            " %s != 0u);\n",
+                            " (%s != 0u) ? %s : %s;\n",
                          pad, i,
-                         uv(_uz, vz, zid, is_f),
+                         uv(_ux, vx, xid, is_f),
                          uv(_uy, vy, yid, is_f),
-                         uv(_ux, vx, xid, is_f));
+                         uv(_uz, vz, zid, is_f));
                 }
             } break;
 

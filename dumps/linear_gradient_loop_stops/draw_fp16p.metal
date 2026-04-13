@@ -70,15 +70,15 @@ kernel void umbra_entry(
     float v49 = as_type<float>(v31) - as_type<float>(v48);
     float v50 = fma(v34, v49, as_type<float>(v48));
     uint v51 = var1;
-    uint v52 = select(v51, as_type<uint>(v42), v29 != 0u);
+    uint v52 = (v29 != 0u) ? as_type<uint>(v42) : v51;
     var1 = v52;
 
     uint v54 = var2;
-    uint v55 = select(v54, as_type<uint>(v46), v29 != 0u);
+    uint v55 = (v29 != 0u) ? as_type<uint>(v46) : v54;
     var2 = v55;
 
     uint v57 = var3;
-    uint v58 = select(v57, as_type<uint>(v50), v29 != 0u);
+    uint v58 = (v29 != 0u) ? as_type<uint>(v50) : v57;
     var3 = v58;
 
     uint v60 = var4;
@@ -90,7 +90,7 @@ kernel void umbra_entry(
     float v65 = as_type<float>(v63) - as_type<float>(v64);
     float v66 = fma(v34, v65, as_type<float>(v64));
     uint v67 = var0;
-    uint v68 = select(v67, as_type<uint>(v66), v29 != 0u);
+    uint v68 = (v29 != 0u) ? as_type<uint>(v66) : v67;
     var0 = v68;
 
     }
