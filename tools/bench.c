@@ -129,11 +129,11 @@ static void usage(void) {
 }
 
 static struct umbra_fmt parse_fmt(char const *s) {
-    if (streq(s, "8888"))        return umbra_fmt_8888;
-    if (streq(s, "565"))         return umbra_fmt_565;
-    if (streq(s, "1010102"))     return umbra_fmt_1010102;
-    if (streq(s, "fp16"))        return umbra_fmt_fp16;
-    if (streq(s, "fp16_planar")) return umbra_fmt_fp16_planar;
+    if (streq(s, "8888"))        { return umbra_fmt_8888; }
+    if (streq(s, "565"))         { return umbra_fmt_565; }
+    if (streq(s, "1010102"))     { return umbra_fmt_1010102; }
+    if (streq(s, "fp16"))        { return umbra_fmt_fp16; }
+    if (streq(s, "fp16_planar")) { return umbra_fmt_fp16_planar; }
     fprintf(stderr, "unknown format: %s\n", s);
     usage();
     exit(1);
