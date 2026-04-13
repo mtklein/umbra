@@ -879,7 +879,7 @@ static char* build_source(BB const *bb,
                          : buf_shift[p]     == 2 ? "uint" : "ushort";
         char const *qual = buf_written[p] ? "device" : "device const";
         emit(&b,
-             ",\n    %s %s *p%d"
+             ",\n    %s %s * __restrict p%d"
              " [[buffer(%d)]]",
              qual, type, p, p);
     }
@@ -890,7 +890,7 @@ static char* build_source(BB const *bb,
                              : buf_shift[db]     == 2 ? "uint" : "ushort";
             char const *qual = buf_written[db] ? "device" : "device const";
             emit(&b,
-                 ",\n    %s %s *p%d"
+                 ",\n    %s %s * __restrict p%d"
                  " [[buffer(%d)]]",
                  qual, type, db, db);
         }

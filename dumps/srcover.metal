@@ -6,11 +6,11 @@ struct meta { uint w, x0, y0, count0, count1, count2, count3, count4, stride0, s
 
 kernel void umbra_entry(
     constant meta &m [[buffer(5)]],
-    device const uint *p0 [[buffer(0)]],
-    device ushort *p1 [[buffer(1)]],
-    device ushort *p2 [[buffer(2)]],
-    device ushort *p3 [[buffer(3)]],
-    device ushort *p4 [[buffer(4)]],
+    device const uint * __restrict p0 [[buffer(0)]],
+    device ushort * __restrict p1 [[buffer(1)]],
+    device ushort * __restrict p2 [[buffer(2)]],
+    device ushort * __restrict p3 [[buffer(3)]],
+    device ushort * __restrict p4 [[buffer(4)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
     if (pos.x >= m.w) return;
