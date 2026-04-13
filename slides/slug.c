@@ -570,10 +570,7 @@ static void slug_draw(struct slide *s, int frame, int l, int t, int r, int b, vo
         {.ptr=st->wind_buf, .count=w * h, .stride=w},
     };
     for (int j = 0; j < st->slug.count; j++) {
-        float jf;
-        int32_t j32 = j;
-        __builtin_memcpy(&jf, &j32, 4);
-        umbra_uniforms_fill_f32(st->acc_lay.uniforms, st->acc_lay.loop_off, &jf, 1);
+        umbra_uniforms_fill_i32(st->acc_lay.uniforms, st->acc_lay.loop_off, &j, 1);
         acc->queue(acc, l, t, r, b, abuf);
     }
 
@@ -689,10 +686,8 @@ static void slug_loop_draw(struct slide *s, int frame, int l, int t, int r, int 
     umbra_uniforms_fill_f32(st->acc_lay.uniforms, st->acc_lay.wh, wh, 2);
     umbra_uniforms_fill_ptr(st->acc_lay.uniforms, st->acc_lay.curves_off,
                   (struct umbra_buf){.ptr=st->slug.data, .count=st->slug.count * 6});
-    float count_f;
-    int32_t count_i = st->slug.count;
-    __builtin_memcpy(&count_f, &count_i, 4);
-    umbra_uniforms_fill_f32(st->acc_lay.uniforms, st->acc_lay.count_off, &count_f, 1);
+    umbra_uniforms_fill_i32(st->acc_lay.uniforms, st->acc_lay.count_off,
+                            &st->slug.count, 1);
     struct umbra_buf abuf[] = {
         (struct umbra_buf){.ptr=st->acc_lay.uniforms, .count=st->acc_lay.uni.slots},
         {.ptr=st->wind_buf, .count=w * h, .stride=w},

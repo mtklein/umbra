@@ -54,6 +54,7 @@ int    umbra_uniforms_reserve_ptr(struct umbra_uniforms_layout*);
 
 void*  umbra_uniforms_alloc(struct umbra_uniforms_layout const*);
 void   umbra_uniforms_fill_f32(void *uniforms, int slot, float const*, int n);
+void   umbra_uniforms_fill_i32(void *uniforms, int slot, int const*, int n);
 void   umbra_uniforms_fill_ptr(void *uniforms, int slot, struct umbra_buf);
 
 typedef struct { int id:30; unsigned chan:2; } umbra_val16;

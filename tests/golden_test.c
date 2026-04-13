@@ -159,10 +159,7 @@ TEST(test_slug_rect) {
         {.ptr=wind_buf, .count=sizeof wind_buf / 4, .stride=W},
     };
     for (int j = 0; j < 4; j++) {
-        float jf;
-        int32_t j32 = j;
-        __builtin_memcpy(&jf, &j32, 4);
-        umbra_uniforms_fill_f32(alay.uniforms, alay.loop_off, &jf, 1);
+        umbra_uniforms_fill_i32(alay.uniforms, alay.loop_off, &j, 1);
         acc->queue(acc, 0, 0, W, H, abuf);
     }
     be->flush(be);

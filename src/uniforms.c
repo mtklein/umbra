@@ -21,6 +21,9 @@ void* umbra_uniforms_alloc(struct umbra_uniforms_layout const *u) {
 void umbra_uniforms_fill_f32(void *data, int slot, float const *v, int n) {
     __builtin_memcpy((uint32_t*)data + slot, v, (size_t)n * 4);
 }
+void umbra_uniforms_fill_i32(void *data, int slot, int const *v, int n) {
+    __builtin_memcpy((uint32_t*)data + slot, v, (size_t)n * 4);
+}
 void umbra_uniforms_fill_ptr(void *data, int slot, struct umbra_buf b) {
     uint32_t *p = (uint32_t*)data + slot;
     __builtin_memset(p, 0, 16);
