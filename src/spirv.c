@@ -1132,7 +1132,7 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
 
                 case op_uniform_32: {
                     int p = resolve_ptr(&B, inst);
-                    uint32_t slot_id = spv_const_u32(&B, (uint32_t)(inst->imm / 4));
+                    uint32_t slot_id = spv_const_u32(&B, (uint32_t)inst->imm);
                     B.val[i] = load_ssbo_u32(&B, p, slot_id);
                 } break;
 

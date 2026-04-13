@@ -71,7 +71,7 @@ static void swatch_draw(struct slide *s, int frame, int l, int t, int r, int b, 
         __builtin_memcpy(st->shader.color, swatches[i], sizeof st->shader.color);
         umbra_draw_fill(&st->lay, &st->shader.base, NULL);
         struct umbra_buf ubuf[] = {
-            {.ptr = st->lay.uniforms, .count = (int)(st->lay.uni.size / 4)},
+            {.ptr = st->lay.uniforms, .count = st->lay.uni.slots},
             {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
         };
         st->prog->queue(st->prog, xl, yt, xr, yb, ubuf);

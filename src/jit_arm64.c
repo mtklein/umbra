@@ -472,15 +472,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             dc++;
             deref_gpr[i]    = gpr;
             deref_rb_gpr[i] = rb_gpr;
-            int base = XP;
-            if (inst->imm != 0) {
-                load_imm_w(c, XT, (uint32_t)inst->imm);
-                put(c, ADD_xr(XT, XP, XT));
-                base = XT;
-            }
-            put(c, LDR_xi(gpr, base, 0));
+            put(c, LDR_xi(gpr, XP, inst->imm / 2));
             if (rb_gpr) {
-                put(c, LDR_wi(rb_gpr, base, 3));
+                put(c, LDR_wi(rb_gpr, XP, inst->imm + 3));
             }
         } break;
 
@@ -538,9 +532,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             ptr            p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
-            load_imm_w(c, XT, (uint32_t)inst->imm);
-            put(c, ADD_xr(XT, XP, XT));
-            put(c, LDR_si(lo(s.rd), XT, 0));
+            put(c, LDR_si(lo(s.rd), XP, inst->imm));
             put(c, DUP_4s_lane(lo(s.rd), lo(s.rd), 0));
             put(c, ORR_16b(hi(s.rd), lo(s.rd), lo(s.rd)));
         } break;

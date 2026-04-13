@@ -3,11 +3,11 @@
   v2   = y              
   v3   = f32_from_i32    v1
   v4   = f32_from_i32    v2
-  v5   = uniform_32      p0 byte0
-  v6   = uniform_32      p0 byte4
-  v7   = uniform_32      p0 byte8
-  v8   = uniform_32      p0 byte12
-  v9   = deref_ptr       p0 byte16
+  v5   = uniform_32      p0 [0]
+  v6   = uniform_32      p0 [1]
+  v7   = uniform_32      p0 [2]
+  v8   = uniform_32      p0 [3]
+  v9   = deref_ptr       p0 [4]
   v10  = load_16         p-2147483639
   v11  = i32_from_s16    v10
   v12  = imm_32          0x3b808081

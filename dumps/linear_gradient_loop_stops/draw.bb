@@ -1,11 +1,11 @@
   v0   = imm_32          0x0
-  v1   = deref_ptr       p0 byte16
-  v2   = deref_ptr       p0 byte32
-  v3   = uniform_32      p0 byte0
-  v4   = uniform_32      p0 byte4
-  v5   = uniform_32      p0 byte8
+  v1   = deref_ptr       p0 [4]
+  v2   = deref_ptr       p0 [8]
+  v3   = uniform_32      p0 [0]
+  v4   = uniform_32      p0 [1]
+  v5   = uniform_32      p0 [2]
   v6   = imm_32          0x3f800000
-  v7   = uniform_32      p0 byte12
+  v7   = uniform_32      p0 [3]
   v8   = i32_from_f32    v7
   v9   = imm_32          0x1
   v10  = sub_i32_imm     v8 0x1 (a.k.a. v9)

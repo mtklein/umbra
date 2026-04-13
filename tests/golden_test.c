@@ -21,7 +21,7 @@ static struct umbra_backend *bes[NUM_BACKENDS];
 
 struct fill_pipe {
     struct umbra_program         *prog;
-    struct umbra_uniforms_layout  uni;
+    struct umbra_uniforms_layout  uni; int :32;
     void                         *uniforms;
 };
 
@@ -30,12 +30,12 @@ static struct fill_pipe fills[5];
 static void build_fill(int fi, struct umbra_fmt fmt) {
     struct umbra_builder *builder = umbra_builder();
     struct umbra_uniforms_layout u = {0};
-    size_t off = umbra_uniforms_reserve_f32(&u, 4);
+    int off = umbra_uniforms_reserve_f32(&u, 4);
     umbra_color c = {
         umbra_uniform_32(builder, (umbra_ptr32){0}, off),
-        umbra_uniform_32(builder, (umbra_ptr32){0}, off + 4),
-        umbra_uniform_32(builder, (umbra_ptr32){0}, off + 8),
-        umbra_uniform_32(builder, (umbra_ptr32){0}, off + 12),
+        umbra_uniform_32(builder, (umbra_ptr32){0}, off + 1),
+        umbra_uniform_32(builder, (umbra_ptr32){0}, off + 2),
+        umbra_uniform_32(builder, (umbra_ptr32){0}, off + 3),
     };
     fmt.store(builder, 1, c);
     fills[fi].uni = u;
@@ -80,7 +80,7 @@ static void fill_bg_for_slide(int fi, struct umbra_fmt fmt, int slide_idx, void 
     struct slide *s = slide_get(slide_idx);
     umbra_uniforms_fill_f32(fills[fi].uniforms, 0, s->bg, 4);
     struct umbra_buf buf[2] = {
-        {.ptr=fills[fi].uniforms, .count=(int)(fills[fi].uni.size / 4)},
+        {.ptr=fills[fi].uniforms, .count=fills[fi].uni.slots},
         {.ptr=dst, .count=W * H * fmt.planes, .stride=W},
     };
     fills[fi].prog->queue(fills[fi].prog, 0, 0, W, H, buf);
@@ -194,7 +194,7 @@ TEST(test_slug_rect) {
     umbra_uniforms_fill_ptr(alay.uniforms, alay.curves_off,
         (struct umbra_buf){.ptr=rect, .count=sizeof rect / 4});
     struct umbra_buf abuf[] = {
-        (struct umbra_buf){.ptr=alay.uniforms, .count=(int)(alay.uni.size / 4)},
+        (struct umbra_buf){.ptr=alay.uniforms, .count=alay.uni.slots},
         {.ptr=wind_buf, .count=sizeof wind_buf / 4, .stride=W},
     };
     for (int j = 0; j < 4; j++) {
@@ -208,7 +208,7 @@ TEST(test_slug_rect) {
 
     umbra_draw_fill(&lay, &shader.base, &cov.base);
     struct umbra_buf buf[] = {
-        (struct umbra_buf){.ptr=lay.uniforms, .count=(int)(lay.uni.size / 4)},
+        (struct umbra_buf){.ptr=lay.uniforms, .count=lay.uni.slots},
         {.ptr=pixels, .count=W * H, .stride=W},
     };
     interp->queue(interp, 0, 0, W, H, buf);
@@ -268,7 +268,7 @@ TEST(test_perspective_text) {
 
     umbra_draw_fill(&lay, &shader.base, &cov.base);
     struct umbra_buf buf[] = {
-        (struct umbra_buf){.ptr=lay.uniforms, .count=(int)(lay.uni.size / 4)},
+        (struct umbra_buf){.ptr=lay.uniforms, .count=lay.uni.slots},
         {.ptr=pixels, .count=BW},
     };
     interp->queue(interp, 0, 0, BW, 1, buf);
@@ -307,7 +307,7 @@ TEST(test_perspective_text) {
     {
         umbra_draw_fill(&lay2, &shader2.base, &cov2.base);
         struct umbra_buf b2[] = {
-            (struct umbra_buf){.ptr=lay2.uniforms, .count=(int)(lay2.uni.size / 4)},
+            (struct umbra_buf){.ptr=lay2.uniforms, .count=lay2.uni.slots},
             {.ptr=px2, .count=W * H, .stride=W},
         };
         interp->queue(interp, 0, 0, W, H, b2);
@@ -343,9 +343,9 @@ static void run_long_batch_no_oom(struct umbra_backend *be) {
         struct umbra_builder *bld = umbra_builder();
         umbra_color c = {
             umbra_uniform_32(bld, (umbra_ptr32){0}, 0),
-            umbra_uniform_32(bld, (umbra_ptr32){0}, 4),
-            umbra_uniform_32(bld, (umbra_ptr32){0}, 8),
-            umbra_uniform_32(bld, (umbra_ptr32){0}, 12),
+            umbra_uniform_32(bld, (umbra_ptr32){0}, 1),
+            umbra_uniform_32(bld, (umbra_ptr32){0}, 2),
+            umbra_uniform_32(bld, (umbra_ptr32){0}, 3),
         };
         umbra_store_8888(bld, (umbra_ptr32){.ix=1}, c);
         struct umbra_basic_block *bb = umbra_basic_block(bld);

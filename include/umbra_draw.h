@@ -42,7 +42,7 @@ struct umbra_coverage {
 typedef umbra_color (*umbra_blend_fn)(struct umbra_builder*, umbra_color src, umbra_color dst);
 
 struct umbra_draw_layout {
-    struct umbra_uniforms_layout uni;
+    struct umbra_uniforms_layout uni; int :32;
     void                        *uniforms;
 };
 
@@ -56,21 +56,21 @@ void umbra_draw_fill(struct umbra_draw_layout const*,
 struct umbra_shader_solid {
     struct umbra_shader base;
     float  color[4];
-    size_t off_;
+    int off_, :32;
 };
 struct umbra_shader_solid umbra_shader_solid(float const color[4]);
 
 struct umbra_shader_linear_2 {
     struct umbra_shader base;
     float  grad[3], color[8]; int :32;
-    size_t fi_, ci_;
+    int fi_, ci_;
 };
 struct umbra_shader_linear_2 umbra_shader_linear_2(float const grad[3], float const color[8]);
 
 struct umbra_shader_radial_2 {
     struct umbra_shader base;
     float  grad[3], color[8]; int :32;
-    size_t fi_, ci_;
+    int fi_, ci_;
 };
 struct umbra_shader_radial_2 umbra_shader_radial_2(float const grad[3], float const color[8]);
 
@@ -78,7 +78,7 @@ struct umbra_shader_linear_grad {
     struct umbra_shader base;
     float          grad[4];
     struct umbra_buf lut;
-    size_t fi_, lut_off_;
+    int fi_, lut_off_;
 };
 struct umbra_shader_linear_grad umbra_shader_linear_grad(float const grad[4], struct umbra_buf lut);
 
@@ -86,7 +86,7 @@ struct umbra_shader_radial_grad {
     struct umbra_shader base;
     float          grad[4];
     struct umbra_buf lut;
-    size_t fi_, lut_off_;
+    int fi_, lut_off_;
 };
 struct umbra_shader_radial_grad umbra_shader_radial_grad(float const grad[4], struct umbra_buf lut);
 
@@ -94,7 +94,7 @@ struct umbra_shader_linear_stops {
     struct umbra_shader base;
     float          grad[4];
     struct umbra_buf colors, pos;
-    size_t fi_, colors_off_, pos_off_;
+    int fi_, colors_off_, pos_off_, :32;
 };
 struct umbra_shader_linear_stops umbra_shader_linear_stops(float const grad[4],
                                                            struct umbra_buf colors,
@@ -110,21 +110,21 @@ struct umbra_shader_supersample umbra_shader_supersample(struct umbra_shader *in
 struct umbra_coverage_rect {
     struct umbra_coverage base;
     float  rect[4];
-    size_t off_;
+    int off_, :32;
 };
 struct umbra_coverage_rect umbra_coverage_rect(float const rect[4]);
 
 struct umbra_coverage_bitmap {
     struct umbra_coverage base;
     struct umbra_buf bmp;
-    size_t bmp_off_;
+    int bmp_off_, :32;
 };
 struct umbra_coverage_bitmap umbra_coverage_bitmap(struct umbra_buf bmp);
 
 struct umbra_coverage_sdf {
     struct umbra_coverage base;
     struct umbra_buf bmp;
-    size_t bmp_off_;
+    int bmp_off_, :32;
 };
 struct umbra_coverage_sdf umbra_coverage_sdf(struct umbra_buf bmp);
 
@@ -132,7 +132,7 @@ struct umbra_coverage_bitmap_matrix {
     struct umbra_coverage base;
     float          mat[11]; int :32;
     struct umbra_buf bmp;
-    size_t fi_, bmp_off_;
+    int fi_, bmp_off_;
 };
 struct umbra_coverage_bitmap_matrix umbra_coverage_bitmap_matrix(float const mat[11],
                                                                  struct umbra_buf bmp);
@@ -140,7 +140,7 @@ struct umbra_coverage_bitmap_matrix umbra_coverage_bitmap_matrix(float const mat
 struct umbra_coverage_wind {
     struct umbra_coverage base;
     struct umbra_buf wind;
-    size_t off_;
+    int off_, :32;
 };
 struct umbra_coverage_wind umbra_coverage_wind(struct umbra_buf wind);
 

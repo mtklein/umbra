@@ -44,7 +44,7 @@ static void anim_draw(struct slide *s, int frame, int l, int t, int r, int b, vo
     st->shader.color[3] = 1.0f;
     umbra_draw_fill(&st->lay, &st->shader.base, NULL);
     struct umbra_buf ubuf[] = {
-        {.ptr=st->lay.uniforms, .count=(int)(st->lay.uni.size / 4)},
+        {.ptr=st->lay.uniforms, .count=st->lay.uni.slots},
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
     };
     st->prog->queue(st->prog, l, t, r, b, ubuf);

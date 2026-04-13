@@ -42,7 +42,7 @@ TEST(test_solid_src) {
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=4},
                       })) {
             for (int i = 0; i < 4; i++) {
@@ -68,7 +68,7 @@ TEST(test_solid_src_n1) {
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 1, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=1},
                       })) {
             (dst[0] & 0xFF) == 0x00 here;
@@ -93,7 +93,7 @@ TEST(test_solid_src_n9) {
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 9, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=9},
                       })) {
             for (int i = 0; i < 9; i++) {
@@ -118,7 +118,7 @@ TEST(test_solid_src_n16) {
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 16, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=16},
                       })) {
             for (int i = 0; i < 16; i++) { dst[i] == 0xFFFFFFFF here; }
@@ -140,7 +140,7 @@ TEST(test_srcover_8888) {
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 2, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=2},
                       })) {
             for (int i = 0; i < 2; i++) {
@@ -171,7 +171,7 @@ TEST(test_dstover_8888) {
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 2, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=2},
                       })) {
             for (int i = 0; i < 2; i++) { dst[i] == 0xFFFFFFFF here; }
@@ -193,7 +193,7 @@ TEST(test_dstover_transparent) {
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 2, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=2},
                       })) {
             for (int i = 0; i < 2; i++) {
@@ -218,7 +218,7 @@ TEST(test_multiply_8888) {
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 2, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=2},
                       })) {
             for (int i = 0; i < 2; i++) {
@@ -249,7 +249,7 @@ TEST(test_solid_src_fp16) {
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 3, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=3},
                       })) {
             for (int i = 0; i < 3; i++) {
@@ -282,7 +282,7 @@ TEST(test_srcover_fp16) {
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 2, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=2},
                       })) {
             for (int i = 0; i < 2; i++) {
@@ -315,7 +315,7 @@ TEST(test_coverage_rect) {
         umbra_draw_fill(&B.lay, &shader.base, &cov.base);
         if (run_draw(&B, bi, 8, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=8},
                       })) {
             for (int i = 0; i < 8; i++) {
@@ -346,7 +346,7 @@ TEST(test_coverage_rect_scalar) {
         umbra_draw_fill(&B.lay, &shader.base, &cov.base);
         if (run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=4},
                       })) {
             dst[0] == 0 here;
@@ -375,7 +375,7 @@ TEST(test_coverage_rect_n9) {
         umbra_draw_fill(&B.lay, &shader.base, &cov.base);
         if (run_draw(&B, bi, 9, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=9},
                       })) {
             for (int i = 0; i < 9; i++) {
@@ -405,7 +405,7 @@ TEST(test_coverage_rect_offset) {
         umbra_draw_fill(&B.lay, &shader.base, &cov.base);
         if (run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=4},
                       })) {
             dst[0] == 0 here;
@@ -436,7 +436,7 @@ TEST(test_coverage_rect_outside_y) {
         umbra_draw_fill(&B.lay, &shader.base, &cov.base);
         if (run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=4},
                       })) {
             for (int i = 0; i < 4; i++) { dst[i] == 0x12345678 here; }
@@ -461,7 +461,7 @@ TEST(test_no_shader) {
         umbra_draw_fill(&B.lay, NULL, NULL);
         if (run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=4},
                       })) {
             for (int i = 0; i < 4; i++) { dst[i] == 0 here; }
@@ -482,7 +482,7 @@ TEST(test_no_blend) {
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 2, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=2},
                       })) {
             for (int i = 0; i < 2; i++) {
@@ -499,7 +499,7 @@ TEST(test_no_blend) {
 struct test_gradient_shader {
     struct umbra_shader base;
     float  params[2];
-    size_t off_;
+    int off_, :32;
 };
 
 static umbra_color test_gradient_build(struct umbra_shader *s, struct umbra_builder *builder,
@@ -509,7 +509,7 @@ static umbra_color test_gradient_build(struct umbra_shader *s, struct umbra_buil
     (void)y;
     self->off_ = umbra_uniforms_reserve_f32(u, 2);
     umbra_val32 w = umbra_uniform_32(builder, (umbra_ptr32){0}, self->off_);
-    umbra_val32 a = umbra_uniform_32(builder, (umbra_ptr32){0}, self->off_ + 4);
+    umbra_val32 a = umbra_uniform_32(builder, (umbra_ptr32){0}, self->off_ + 1);
     umbra_val32 t = umbra_div_f32(builder, x, w);
     umbra_val32 zero = umbra_imm_i32(builder, 0);
     return (umbra_color){t, zero, zero, a};
@@ -540,7 +540,7 @@ TEST(test_gradient_shader) {
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=4},
                       })) {
             int r0 = (int)(dst[0] & 0xFF);
@@ -566,7 +566,7 @@ TEST(test_multiply_half_alpha) {
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 2, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=2},
                       })) {
             for (int i = 0; i < 2; i++) {
@@ -598,7 +598,7 @@ TEST(test_srcover_8888_n9) {
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 9, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=9},
                       })) {
             for (int i = 0; i < 9; i++) {
@@ -627,7 +627,7 @@ TEST(test_full_pipeline) {
         umbra_draw_fill(&B.lay, &shader.base, &cov.base);
         if (run_draw(&B, bi, 9, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=9},
                       })) {
             for (int i = 0; i < 9; i++) {
@@ -662,7 +662,7 @@ TEST(test_solid_src_fp16_n9) {
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 9, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=9},
                       })) {
             for (int i = 0; i < 9; i++) {
@@ -706,7 +706,7 @@ TEST(test_coverage_rect_white_dst) {
             umbra_draw_fill(&B.lay, &shader.base, &cov.base);
             if (run_draw(&B, bi, rc.n, 1,
                           (struct umbra_buf[]){
-                              (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                              (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                               {.ptr=dst, .count=rc.n},
                           })) {
                 for (int i = 0; i < rc.n; i++) {
@@ -740,7 +740,7 @@ TEST(test_coverage_bitmap) {
         umbra_draw_fill(&B.lay, &shader.base, &cov.base);
         if (run_draw(&B, bi, 8, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=8},
                       })) {
             dst[0] == 0 here;
@@ -769,7 +769,7 @@ TEST(test_coverage_bitmap_565) {
         umbra_draw_fill(&B.lay, &shader.base, &cov.base);
         if (run_draw(&B, bi, 16, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=16, .stride=16},
                       })) {
             for (int i = 0; i < 16; i++) {
@@ -797,7 +797,7 @@ TEST(test_coverage_sdf) {
         umbra_draw_fill(&B.lay, &shader.base, &cov.base);
         if (run_draw(&B, bi, 8, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=8},
                       })) {
             dst[0] == 0 here;
@@ -825,7 +825,7 @@ TEST(test_coverage_bitmap_matrix) {
         umbra_draw_fill(&B.lay, &shader.base, &cov.base);
         if (run_draw(&B, bi, 8, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=8},
                       })) {
             dst[0] == 0 here;
@@ -853,7 +853,7 @@ TEST(test_coverage_bitmap_matrix_565) {
         umbra_draw_fill(&B.lay, &shader.base, &cov.base);
         if (run_draw(&B, bi, 16, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=16, .stride=16},
                       })) {
             for (int i = 0; i < 16; i++) {
@@ -882,7 +882,7 @@ TEST(test_coverage_bitmap_matrix_oob) {
         umbra_draw_fill(&B.lay, &shader.base, &cov.base);
         if (run_draw(&B, bi, 8, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=8},
                       })) {
             (dst[0] & 0xff) == 0xFF here;
@@ -906,7 +906,7 @@ TEST(test_linear_2) {
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=4},
                       })) {
             (dst[0] & 0xff) == 0xFF here;
@@ -934,7 +934,7 @@ TEST(test_radial_2) {
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 1, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=1},
                       })) {
             (dst[0] & 0xff) == 0xFF here;
@@ -967,7 +967,7 @@ TEST(test_linear_grad) {
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 8, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=8},
                       })) {
             (dst[0] & 0xff) == 0xFF here;
@@ -1002,7 +1002,7 @@ TEST(test_radial_grad) {
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 1, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=1},
                       })) {
             (dst[0] & 0xff) == 0xFF here;
@@ -1036,7 +1036,7 @@ TEST(test_gradient_lut_nonuniform) {
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 8, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=8},
                       })) {
             (dst[0] & 0xff) == 0xFF here;
@@ -1063,7 +1063,7 @@ TEST(test_linear_stops) {
         uint32_t dst[5] = {0};
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 5, 1, (struct umbra_buf[]){
-                {.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                {.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                 {.ptr=dst, .count=5, .stride=5},
             })) {
             dst[0] == 0xff0000ffu here;
@@ -1095,7 +1095,7 @@ TEST(test_linear_stops_fp16_planar) {
         __builtin_memset(dst, 0, sizeof dst);
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, W, HP, (struct umbra_buf[]){
-                {.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                {.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                 {.ptr=dst, .count=W * HP * 4, .stride=W},
             })) {
             dst[0*W+0] == 0x3c00 here;
@@ -1120,7 +1120,7 @@ TEST(test_supersample) {
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, 4, 1,
                       (struct umbra_buf[]){
-                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                           {.ptr=dst, .count=4},
                       })) {
             for (int i = 0; i < 4; i++) {
@@ -1162,14 +1162,14 @@ TEST(test_page_aligned_buffer) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(aligned, 0, N * 4);
         if (run_draw(&B, bi, N, 1, (struct umbra_buf[]){
-            (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+            (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
             {.ptr=aligned, .count=N},
         })) {
             for (int i = 0; i < N; i++) { aligned[i] == 0xFF00FF00u here; }
 
             __builtin_memset(offset, 0, N * 4);
             if (run_draw(&B, bi, N, 1, (struct umbra_buf[]){
-                (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                 {.ptr=offset, .count=N},
             })) {
                 for (int i = 0; i < N; i++) { offset[i] == 0xFF00FF00u here; }
@@ -1260,7 +1260,7 @@ TEST(test_solid_src_565) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint16_t dst[4] = {0};
         if (!test_backends_run(&B, bi, 4, 1, (struct umbra_buf[]){
-            {.ptr=lay.uniforms, .count=(int)(lay.uni.size / 4)},
+            {.ptr=lay.uniforms, .count=lay.uni.slots},
             {.ptr=dst, .count=4},
         })) { continue; }
         for (int i = 0; i < 4; i++) { dst[i] == 0xF800 here; }
@@ -1282,7 +1282,7 @@ TEST(test_solid_src_1010102) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[4] = {0};
         if (!test_backends_run(&B, bi, 4, 1, (struct umbra_buf[]){
-            {.ptr=lay.uniforms, .count=(int)(lay.uni.size / 4)},
+            {.ptr=lay.uniforms, .count=lay.uni.slots},
             {.ptr=dst, .count=4},
         })) { continue; }
         uint32_t expect = (1023u << 10) | (3u << 30);
@@ -1307,7 +1307,7 @@ TEST(test_solid_src_fp16_planar) {
         __fp16 dst[WFP * 4];
         __builtin_memset(dst, 0, sizeof dst);
         if (!test_backends_run(&B, bi, WFP, 1, (struct umbra_buf[]){
-            {.ptr=lay.uniforms, .count=(int)(lay.uni.size / 4)},
+            {.ptr=lay.uniforms, .count=lay.uni.slots},
             {.ptr=dst, .count=WFP * 4, .stride=WFP},
         })) { continue; }
         for (int i = 0; i < WFP; i++) {
@@ -1335,7 +1335,7 @@ TEST(test_srcover_fp16_planar) {
         }
         umbra_draw_fill(&B.lay, &shader.base, NULL);
         if (run_draw(&B, bi, W, 1, (struct umbra_buf[]){
-                (struct umbra_buf){.ptr=B.lay.uniforms, .count=(int)(B.lay.uni.size / 4)},
+                (struct umbra_buf){.ptr=B.lay.uniforms, .count=B.lay.uni.slots},
                 {.ptr=dst, .count=W * 4, .stride=W},
             })) {
             for (int i = 0; i < W; i++) {

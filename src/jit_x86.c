@@ -470,10 +470,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int gpr    = deref_gprs[dc];
             int rb_reg = rb_gprs[dc];
             dc++;
-            mov_load(c, gpr, base, inst->imm);
+            mov_load(c, gpr, base, inst->imm * 4);
             deref_gpr[i] = gpr;
             if (rb_reg) {
-                mov_load32(c, rb_reg, base, inst->imm + 12);
+                mov_load32(c, rb_reg, base, inst->imm * 4 + 12);
                 deref_rb_gpr[i] = rb_reg;
             }
         } break;
@@ -963,7 +963,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             ptr            p = inst->ptr;
             int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
             {
-                int     disp = inst->imm;
+                int     disp = inst->imm * 4;
                 uint8_t R = (uint8_t)(~s.rd >> 3) & 1;
                 uint8_t B = (uint8_t)(~base >> 3) & 1;
                 emit1(c, 0xc4);

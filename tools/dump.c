@@ -144,12 +144,12 @@ static void *fill_uniforms;
 static void build_fill(struct umbra_backend *interp) {
     struct umbra_builder *b = umbra_builder();
     fill_uni = (struct umbra_uniforms_layout){0};
-    size_t off = umbra_uniforms_reserve_f32(&fill_uni, 4);
+    int off = umbra_uniforms_reserve_f32(&fill_uni, 4);
     umbra_color c = {
         umbra_uniform_32(b, (umbra_ptr32){0}, off),
-        umbra_uniform_32(b, (umbra_ptr32){0}, off + 4),
-        umbra_uniform_32(b, (umbra_ptr32){0}, off + 8),
-        umbra_uniform_32(b, (umbra_ptr32){0}, off + 12),
+        umbra_uniform_32(b, (umbra_ptr32){0}, off + 1),
+        umbra_uniform_32(b, (umbra_ptr32){0}, off + 2),
+        umbra_uniform_32(b, (umbra_ptr32){0}, off + 3),
     };
     umbra_fmt_fp16_planar.store(b, 1, c);
     fill_uniforms = umbra_uniforms_alloc(&fill_uni);
@@ -162,7 +162,7 @@ static void build_fill(struct umbra_backend *interp) {
 static void fill_bg(struct slide *s, void *dst) {
     umbra_uniforms_fill_f32(fill_uniforms, 0, s->bg, 4);
     struct umbra_buf buf[2] = {
-        {.ptr = fill_uniforms, .count = (int)(fill_uni.size / 4)},
+        {.ptr = fill_uniforms, .count = fill_uni.slots},
         {.ptr = dst, .count = RW * RH * 4, .stride = RW},
     };
     fill_prog->queue(fill_prog, 0, 0, RW, RH, buf);

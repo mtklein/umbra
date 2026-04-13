@@ -286,7 +286,7 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         switch (op) {
         case op_imm_32: fprintf(f, " 0x%x", (uint32_t)ip->imm); break;
         case op_uniform_32:
-            fprintf(f, " p%d byte%d", ip->ptr.bits, ip->imm);
+            fprintf(f, " p%d [%d]", ip->ptr.bits, ip->imm);
             break;
         case op_gather_uniform_32:
         case op_gather_32:
@@ -297,7 +297,7 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_load_16x4:
         case op_load_16x4_planar:
         case op_load_8x4: fprintf(f, " p%d", ip->ptr.bits); break;
-        case op_deref_ptr: fprintf(f, " p%d byte%d", ip->ptr.bits, ip->imm); break;
+        case op_deref_ptr: fprintf(f, " p%d [%d]", ip->ptr.bits, ip->imm); break;
         case op_loop_begin: fprintf(f, " v%d", ip->x.id); break;
         case op_load_var: fprintf(f, " var%d", ip->imm); break;
         case op_x:

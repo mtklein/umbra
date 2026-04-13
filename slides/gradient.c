@@ -62,7 +62,7 @@ static void grad_2stop_draw(struct slide *s, int frame, int l, int t, int r, int
     (void)frame;
     umbra_draw_fill(&st->lay, &st->shader.linear.base, NULL);
     struct umbra_buf ubuf[] = {
-        {.ptr=st->lay.uniforms, .count=(int)(st->lay.uni.size / 4)},
+        {.ptr=st->lay.uniforms, .count=st->lay.uni.slots},
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
     };
     st->prog->queue(st->prog, l, t, r, b, ubuf);
@@ -107,7 +107,7 @@ static void grad_lut_draw(struct slide *s, int frame, int l, int t, int r, int b
     (void)frame;
     umbra_draw_fill(&st->lay, &st->shader.linear.base, NULL);
     struct umbra_buf ubuf[] = {
-        {.ptr=st->lay.uniforms, .count=(int)(st->lay.uni.size / 4)},
+        {.ptr=st->lay.uniforms, .count=st->lay.uni.slots},
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
     };
     st->prog->queue(st->prog, l, t, r, b, ubuf);
@@ -216,7 +216,7 @@ static void grad_stops_draw(struct slide *s, int frame, int l, int t, int r, int
     (void)frame;
     umbra_draw_fill(&st->lay, &st->shader.base, NULL);
     struct umbra_buf ubuf[] = {
-        {.ptr = st->lay.uniforms, .count = (int)(st->lay.uni.size / 4)},
+        {.ptr = st->lay.uniforms, .count = st->lay.uni.slots},
         {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
     };
     st->prog->queue(st->prog, l, t, r, b, ubuf);

@@ -1539,7 +1539,7 @@ TEST(test_gather_deref_large) {
     struct umbra_builder *b = umbra_builder();
     umbra_val32            idx = umbra_load_32(b, (umbra_ptr32){0});
     struct umbra_uniforms_layout *u   = calloc(1, sizeof(struct umbra_uniforms_layout));
-    size_t                off = umbra_uniforms_reserve_ptr(u);
+    int                   off = umbra_uniforms_reserve_ptr(u);
     umbra_ptr16           src = umbra_deref_ptr16(b, (umbra_ptr32){.ix=1}, off);
     umbra_val32            val = umbra_i32_from_s16(b, umbra_gather_16(b, src, idx));
     umbra_store_32(b, (umbra_ptr32){.ix=2}, val);
@@ -2252,7 +2252,7 @@ TEST(test_load_stride_neq_w) {
     // load using the linear loop counter.  When rs != w, this is wrong.
     struct umbra_builder *b = umbra_builder();
     struct umbra_uniforms_layout *u  = calloc(1, sizeof(struct umbra_uniforms_layout));
-    size_t                 ri = umbra_uniforms_reserve_f32(u, 1);
+    int                    ri = umbra_uniforms_reserve_f32(u, 1);
     free(u);
     umbra_val32 x = umbra_x(b);
     umbra_val32 y = umbra_y(b);
@@ -3624,7 +3624,7 @@ TEST(test_two_buffers_different_row_bytes) {
 TEST(test_deref_row_bytes_l_gt_0) {
     struct umbra_builder *b = umbra_builder();
     struct umbra_uniforms_layout *u   = calloc(1, sizeof(struct umbra_uniforms_layout));
-    size_t                off = umbra_uniforms_reserve_ptr(u);
+    int                   off = umbra_uniforms_reserve_ptr(u);
     free(u);
     umbra_ptr32           src = umbra_deref_ptr32(b, (umbra_ptr32){.ix=1}, off);
     umbra_val32            v   = umbra_load_32(b, src);
@@ -3671,7 +3671,7 @@ TEST(test_deref_row_bytes_l_gt_0) {
 TEST(test_deref_16bit_row_bytes_l_gt_0) {
     struct umbra_builder *b = umbra_builder();
     struct umbra_uniforms_layout *u   = calloc(1, sizeof(struct umbra_uniforms_layout));
-    size_t                off = umbra_uniforms_reserve_ptr(u);
+    int                   off = umbra_uniforms_reserve_ptr(u);
     free(u);
     umbra_ptr16           src = umbra_deref_ptr16(b, (umbra_ptr32){.ix=1}, off);
     umbra_val32            v   = umbra_f32_from_f16(b, umbra_load_16(b, src));
@@ -3721,9 +3721,9 @@ TEST(test_deref_third_uses_else_branch) {
     enum { W = 8, H = 3 };
     struct umbra_builder         *b = umbra_builder();
     struct umbra_uniforms_layout  uni = {0};
-    size_t off1 = umbra_uniforms_reserve_ptr(&uni);
-    size_t off2 = umbra_uniforms_reserve_ptr(&uni);
-    size_t off3 = umbra_uniforms_reserve_ptr(&uni);
+    int off1 = umbra_uniforms_reserve_ptr(&uni);
+    int off2 = umbra_uniforms_reserve_ptr(&uni);
+    int off3 = umbra_uniforms_reserve_ptr(&uni);
     umbra_ptr32 d1  = umbra_deref_ptr32(b, (umbra_ptr32){0}, off1);
     umbra_ptr32 d2  = umbra_deref_ptr32(b, (umbra_ptr32){0}, off2);
     umbra_ptr32 d3  = umbra_deref_ptr32(b, (umbra_ptr32){0}, off3);
@@ -3750,7 +3750,7 @@ TEST(test_deref_third_uses_else_branch) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
         if (run(&B, bi, W, H, (struct umbra_buf[]){
-                {.ptr=uniforms, .count=(int)(uni.size / 4)},
+                {.ptr=uniforms, .count=uni.slots},
                 {.ptr=dst, .count=sizeof dst / 4, .stride=W}})) {
             for (int y = 0; y < H; y++) {
                 for (int x = 0; x < W; x++) {

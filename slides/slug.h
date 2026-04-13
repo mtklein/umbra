@@ -9,9 +9,9 @@ struct slug_curves {
 };
 
 struct slug_acc_layout {
-    struct umbra_uniforms_layout  uni;
+    struct umbra_uniforms_layout  uni; int :32;
     void                         *uniforms;
-    size_t mat, curves_off, loop_off;
+    int mat, curves_off, loop_off, :32;
 };
 
 struct slug_curves    slug_extract  (char const *text, float font_size);

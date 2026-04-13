@@ -122,12 +122,12 @@ umbra_val32 umbra_imm_f32(builder *b, float v) {
     return umbra_imm_i32(b, u.i);
 }
 
-umbra_ptr16 umbra_deref_ptr16(builder *b, umbra_ptr32 buf, size_t off) {
-    val const v = push(b, op_deref_ptr, .ptr = {.p32 = buf}, .imm = (int)off);
+umbra_ptr16 umbra_deref_ptr16(builder *b, umbra_ptr32 buf, int slot) {
+    val const v = push(b, op_deref_ptr, .ptr = {.p32 = buf}, .imm = slot);
     return (umbra_ptr16){.ix = v.id, .deref = -1};
 }
-umbra_ptr32 umbra_deref_ptr32(builder *b, umbra_ptr32 buf, size_t off) {
-    val const v = push(b, op_deref_ptr, .ptr = {.p32 = buf}, .imm = (int)off);
+umbra_ptr32 umbra_deref_ptr32(builder *b, umbra_ptr32 buf, int slot) {
+    val const v = push(b, op_deref_ptr, .ptr = {.p32 = buf}, .imm = slot);
     return (umbra_ptr32){.ix = v.id, .deref = -1};
 }
 
@@ -140,8 +140,8 @@ umbra_val32 umbra_load_32(builder *b, umbra_ptr32 src) {
 umbra_val16 umbra_load_16(builder *b, umbra_ptr16 src) {
     return push16(b, op_load_16, .ptr = {.p16 = src});
 }
-umbra_val32 umbra_uniform_32(builder *b, umbra_ptr32 src, size_t off) {
-    return push32(b, op_uniform_32, .imm = (int)off, .ptr = {.p32 = src});
+umbra_val32 umbra_uniform_32(builder *b, umbra_ptr32 src, int slot) {
+    return push32(b, op_uniform_32, .imm = slot, .ptr = {.p32 = src});
 }
 umbra_val32 umbra_gather_32(builder *b, umbra_ptr32 src, umbra_val32 ix) {
     enum op const op = b->inst[ix.id].uniform ? op_gather_uniform_32 : op_gather_32;

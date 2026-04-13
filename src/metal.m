@@ -156,7 +156,7 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
                      "%suint v%d = p%d[%d];\n",
-                     pad, i, p, inst->imm / 4);
+                     pad, i, p, inst->imm);
             } break;
             case op_load_32: {
                 int p = inst->ptr.deref
@@ -1182,12 +1182,13 @@ static void encode_dispatch(
     }
 
     for (int d = 0; d < p->n_deref; d++) {
-        void *base = buf[p->deref[d].src_buf].ptr;
+        uint32_t const *uni = (uint32_t const*)buf[p->deref[d].src_buf].ptr;
+        int const       slot = p->deref[d].off;
         void *derived;
         int   dcount, dstride;
-        __builtin_memcpy(&derived, (char*)base + p->deref[d].off,      sizeof derived);
-        __builtin_memcpy(&dcount,  (char*)base + p->deref[d].off + 8,  sizeof dcount);
-        __builtin_memcpy(&dstride, (char*)base + p->deref[d].off + 12, sizeof dstride);
+        __builtin_memcpy(&derived, uni + slot,     sizeof derived);
+        __builtin_memcpy(&dcount,  uni + slot + 2, sizeof dcount);
+        __builtin_memcpy(&dstride, uni + slot + 3, sizeof dstride);
         int const bi    = p->deref[d].buf_idx;
         size_t const db = (size_t)dcount << p->buf_shift[bi];
         int const idx   = gpu_buf_cache_get(&be->cache, derived, db, p->buf_rw[bi]);

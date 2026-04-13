@@ -48,13 +48,13 @@ struct umbra_program {
     _Bool                 threadsafe, pad_[7];
 };
 
-struct umbra_uniforms_layout { size_t size; };
-size_t umbra_uniforms_reserve_f32(struct umbra_uniforms_layout*, int n);
-size_t umbra_uniforms_reserve_ptr(struct umbra_uniforms_layout*);
+struct umbra_uniforms_layout { int slots; };
+int    umbra_uniforms_reserve_f32(struct umbra_uniforms_layout*, int n);
+int    umbra_uniforms_reserve_ptr(struct umbra_uniforms_layout*);
 
 void*  umbra_uniforms_alloc(struct umbra_uniforms_layout const*);
-void   umbra_uniforms_fill_f32(void *uniforms, size_t off, float const*, int n);
-void   umbra_uniforms_fill_ptr(void *uniforms, size_t off, struct umbra_buf);
+void   umbra_uniforms_fill_f32(void *uniforms, int slot, float const*, int n);
+void   umbra_uniforms_fill_ptr(void *uniforms, int slot, struct umbra_buf);
 
 typedef struct { int id:30; unsigned chan:2; } umbra_val16;
 typedef struct { int id:30; unsigned chan:2; } umbra_val32;
@@ -63,9 +63,9 @@ typedef struct { int ix:31, deref:1; } umbra_ptr32;
 typedef struct { int ix:31, deref:1; } umbra_ptr64;
 typedef struct { int id; } umbra_var;
 
-umbra_ptr16 umbra_deref_ptr16(struct umbra_builder*, umbra_ptr32 buf, size_t off);
-umbra_ptr32 umbra_deref_ptr32(struct umbra_builder*, umbra_ptr32 buf, size_t off);
-umbra_val32 umbra_uniform_32(struct umbra_builder*, umbra_ptr32, size_t off);
+umbra_ptr16 umbra_deref_ptr16(struct umbra_builder*, umbra_ptr32 buf, int slot);
+umbra_ptr32 umbra_deref_ptr32(struct umbra_builder*, umbra_ptr32 buf, int slot);
+umbra_val32 umbra_uniform_32(struct umbra_builder*, umbra_ptr32, int slot);
 
 umbra_val32 umbra_x(struct umbra_builder*);
 umbra_val32 umbra_y(struct umbra_builder*);

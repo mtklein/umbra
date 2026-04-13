@@ -48,7 +48,7 @@ static void persp_draw(struct slide *s, int frame, int l, int t, int r, int b, v
     };
     umbra_draw_fill(&st->lay, &st->shader.base, &st->cov.base);
     struct umbra_buf ubuf[] = {
-        {.ptr=st->lay.uniforms, .count=(int)(st->lay.uni.size / 4)},
+        {.ptr=st->lay.uniforms, .count=st->lay.uni.slots},
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
     };
     st->prog->queue(st->prog, l, t, r, b, ubuf);

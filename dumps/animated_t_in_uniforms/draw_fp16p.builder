@@ -3,10 +3,10 @@
   v2   = y              
   v3   = f32_from_i32    v1
   v4   = f32_from_i32    v2
-  v5   = uniform_32      p0 byte0
-  v6   = uniform_32      p0 byte4
-  v7   = uniform_32      p0 byte8
-  v8   = uniform_32      p0 byte12
+  v5   = uniform_32      p0 [0]
+  v6   = uniform_32      p0 [1]
+  v7   = uniform_32      p0 [2]
+  v8   = uniform_32      p0 [3]
   v9   = load_16x4_planar p1
   v10  = f32_from_f16    v9
   v11  = f32_from_f16    v9

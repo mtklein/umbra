@@ -1,10 +1,10 @@
   v0   = imm_32          0x0
-  v1   = deref_ptr       p0 byte16
-  v2   = uniform_32      p0 byte0
-  v3   = uniform_32      p0 byte4
-  v4   = uniform_32      p0 byte8
+  v1   = deref_ptr       p0 [4]
+  v2   = uniform_32      p0 [0]
+  v3   = uniform_32      p0 [1]
+  v4   = uniform_32      p0 [2]
   v5   = imm_32          0x3f800000
-  v6   = uniform_32      p0 byte12
+  v6   = uniform_32      p0 [3]
   v7   = sub_f32_imm     v6 0x3f800000 (a.k.a. v5)
   v8   = imm_32          0x40000000
   v9   = sub_f32_imm     v6 0x40000000 (a.k.a. v8)

@@ -143,21 +143,21 @@ struct umbra_builder *slug_build_acc(struct slug_acc_layout *lay) {
     struct umbra_builder *b = umbra_builder();
 
     struct umbra_uniforms_layout u = {0};
-    size_t fi  = umbra_uniforms_reserve_f32(&u, 11);
-    size_t co  = umbra_uniforms_reserve_ptr(&u);
+    int fi = umbra_uniforms_reserve_f32(&u, 11);
+    int co = umbra_uniforms_reserve_ptr(&u);
     umbra_ptr32 curves = umbra_deref_ptr32(b,
         (umbra_ptr32){0}, co);
-    size_t    ji = umbra_uniforms_reserve_f32(&u, 1);
+    int ji = umbra_uniforms_reserve_f32(&u, 1);
 
     umbra_val32 xf = umbra_f32_from_i32(b, umbra_x(b));
     umbra_val32 yf = umbra_f32_from_i32(b, umbra_y(b));
 
     umbra_val32 m[9];
     for (int i = 0; i < 9; i++) {
-        m[i] = umbra_uniform_32(b, (umbra_ptr32){0}, fi + (size_t)i * 4);
+        m[i] = umbra_uniform_32(b, (umbra_ptr32){0}, fi + i);
     }
-    umbra_val32 bw = umbra_uniform_32(b, (umbra_ptr32){0}, fi + 36);
-    umbra_val32 bh = umbra_uniform_32(b, (umbra_ptr32){0}, fi + 40);
+    umbra_val32 bw = umbra_uniform_32(b, (umbra_ptr32){0}, fi + 9);
+    umbra_val32 bh = umbra_uniform_32(b, (umbra_ptr32){0}, fi + 10);
 
     umbra_val32 pw = umbra_add_f32(b,
         umbra_add_f32(b,
@@ -381,7 +381,7 @@ static void slug_draw(struct slide *s, int frame, int l, int t, int r, int b, vo
     umbra_uniforms_fill_ptr(st->acc_lay.uniforms, st->acc_lay.curves_off,
                   (struct umbra_buf){.ptr=st->slug.data, .count=st->slug.count * 6});
     struct umbra_buf abuf[] = {
-        (struct umbra_buf){.ptr=st->acc_lay.uniforms, .count=(int)(st->acc_lay.uni.size / 4)},
+        (struct umbra_buf){.ptr=st->acc_lay.uniforms, .count=st->acc_lay.uni.slots},
         {.ptr=st->wind_buf, .count=w * h, .stride=w},
     };
     for (int j = 0; j < st->slug.count; j++) {
@@ -400,7 +400,7 @@ static void slug_draw(struct slide *s, int frame, int l, int t, int r, int b, vo
     umbra_draw_fill(&st->draw_lay, &st->shader.base, &st->cov.base);
     struct umbra_buf rbuf[2];
     rbuf[0] = (struct umbra_buf){.ptr = st->draw_lay.uniforms,
-                                 .count = (int)(st->draw_lay.uni.size / 4)};
+                                 .count = st->draw_lay.uni.slots};
     rbuf[1] = (struct umbra_buf){.ptr=buf, .count=w * h * st->fmt.planes, .stride=w};
     st->draw_prog->queue(st->draw_prog, l, t, r, b, rbuf);
 }

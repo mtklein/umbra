@@ -38,7 +38,7 @@ static struct umbra_fmt const *fmt_enums[] = {
 
 struct pipe {
     struct umbra_program          *program;
-    struct umbra_uniforms_layout   uni;
+    struct umbra_uniforms_layout   uni; int :32;
     void                          *uniforms;
     int                            out_ptr, pad_;
 };
@@ -67,12 +67,12 @@ static void build_fill(int fmt) {
     free_pipe(&fill_pipe);
     struct umbra_builder    *builder = umbra_builder();
     struct umbra_uniforms_layout   u = {0};
-    size_t fi = umbra_uniforms_reserve_f32(&u, 4);
+    int fi = umbra_uniforms_reserve_f32(&u, 4);
     umbra_color c = {
         umbra_uniform_32(builder, (umbra_ptr32){0}, fi),
-        umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 4),
-        umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 8),
-        umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 12),
+        umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 1),
+        umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 2),
+        umbra_uniform_32(builder, (umbra_ptr32){0}, fi + 3),
     };
     fmt_enums[fmt]->store(builder, 1, c);
     finish_pipe(&fill_pipe, builder, u);
@@ -186,7 +186,7 @@ static void fill_bg_row(void *dst, int n, float const bg[4], size_t plane_gap) {
     umbra_uniforms_fill_f32(fill_pipe.uniforms, 0, bg, 4);
     int      ps = plane_gap ? 3 : 0;
     struct umbra_buf buf[5];
-    buf[0] = (struct umbra_buf){.ptr=fill_pipe.uniforms, .count=(int)(fill_pipe.uni.size / 4)};
+    buf[0] = (struct umbra_buf){.ptr=fill_pipe.uniforms, .count=fill_pipe.uni.slots};
     buf[1] = (struct umbra_buf){.ptr=dst, .count=n};
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (struct umbra_buf){.ptr=(char *)dst + (size_t)(i + 1) * plane_gap,
@@ -200,7 +200,7 @@ static void readback_row(void *dst, void *src, int n, size_t plane_gap) {
     int      op = readback_pipe.out_ptr;
     struct umbra_buf buf[6];
     buf[0] = (struct umbra_buf){.ptr=readback_pipe.uniforms,
-                                 .count=(int)(readback_pipe.uni.size / 4)};
+                                 .count=readback_pipe.uni.slots};
     buf[1] = (struct umbra_buf){.ptr=src, .count=n};
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (struct umbra_buf){.ptr=(char *)src + (size_t)(i + 1) * plane_gap,
@@ -214,7 +214,7 @@ static void to_hdr_row(__fp16 *dst, void *src, int n, size_t plane_gap) {
     int      ps = plane_gap ? 3 : 0;
     int      op = hdr_pipe.out_ptr;
     struct umbra_buf buf[6];
-    buf[0] = (struct umbra_buf){.ptr=hdr_pipe.uniforms, .count=(int)(hdr_pipe.uni.size / 4)};
+    buf[0] = (struct umbra_buf){.ptr=hdr_pipe.uniforms, .count=hdr_pipe.uni.slots};
     buf[1] = (struct umbra_buf){.ptr=src, .count=n};
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (struct umbra_buf){.ptr=(char *)src + (size_t)(i + 1) * plane_gap,
@@ -352,7 +352,7 @@ int main(void) {
         if (plane_gap) {
             umbra_uniforms_fill_f32(fill_pipe.uniforms, 0, s->bg, 4);
             struct umbra_buf fb[] = {
-                {.ptr = fill_pipe.uniforms, .count = (int)(fill_pipe.uni.size / 4)},
+                {.ptr = fill_pipe.uniforms, .count = fill_pipe.uni.slots},
                 {.ptr = pixbuf, .count = W * H * planes, .stride = W},
             };
             fill_pipe.program->queue(fill_pipe.program, 0, 0, W, H, fb);
@@ -401,7 +401,7 @@ int main(void) {
                 int      op = readback_pipe.out_ptr;
                 struct umbra_buf rb[3];
                 rb[0] = (struct umbra_buf){.ptr = readback_pipe.uniforms,
-                                           .count = (int)(readback_pipe.uni.size / 4)};
+                                           .count = readback_pipe.uni.slots};
                 rb[1] = (struct umbra_buf){.ptr = pixbuf,
                                            .count = W * H * planes,
                                            .stride = W};
@@ -423,7 +423,7 @@ int main(void) {
                     int      op = hdr_pipe.out_ptr;
                     struct umbra_buf hb[3];
                     hb[0] = (struct umbra_buf){.ptr = hdr_pipe.uniforms,
-                                               .count = (int)(hdr_pipe.uni.size / 4)};
+                                               .count = hdr_pipe.uni.slots};
                     hb[1] = (struct umbra_buf){.ptr = pixbuf,
                                                .count = W * H * planes,
                                                .stride = W};

@@ -627,11 +627,9 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 } NEXT;
                 CASE(op_y) v->i32 = (I32){0} + row; NEXT;
 
-                // TODO: convert uniform access to typed pointer (uint32_t or uint64_t) and int slot
                 CASE(op_uniform_32) {
                     assume(buf[ip->ptr].stride == 0);
-                    int32_t uni;
-                    __builtin_memcpy(&uni, (char const*)buf[ip->ptr].ptr + ip->x, sizeof uni);
+                    int32_t uni = ((int32_t const*)buf[ip->ptr].ptr)[ip->x];
                     v->i32 = (I32){0} + uni;
                 } NEXT;
 
@@ -947,14 +945,13 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     v->f32 = lo_v + (hi_v - lo_v) * frac;
                 } NEXT;
 
-                // TODO: convert deref uniform access to typed pointer and int slot
                 CASE(op_deref_ptr) {
-                    char *base = (char*)((uint32_t*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride);
+                    uint32_t const *uni = (uint32_t const*)buf[ip->ptr].ptr;
                     void *derived;
                     int   dcount, dstride;
-                    __builtin_memcpy(&derived, base + ip->x,      sizeof derived);
-                    __builtin_memcpy(&dcount,  base + ip->x + 8,  sizeof dcount);
-                    __builtin_memcpy(&dstride, base + ip->x + 12, sizeof dstride);
+                    __builtin_memcpy(&derived, uni + ip->x,     sizeof derived);
+                    __builtin_memcpy(&dcount,  uni + ip->x + 2, sizeof dcount);
+                    __builtin_memcpy(&dstride, uni + ip->x + 3, sizeof dstride);
                     buf[ip->y].ptr    = derived;
                     buf[ip->y].count  = dcount;
                     buf[ip->y].stride = dstride;
