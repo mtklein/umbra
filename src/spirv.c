@@ -194,25 +194,28 @@ typedef struct {
 
     // Well-known type IDs.
     uint32_t t_void, t_bool, t_u32, t_i32, t_f32, t_f16;
+    uint32_t t_uvec2;
     uint32_t t_uvec3;
     uint32_t t_fvec2;
     uint32_t t_fn_void;
     uint32_t t_ptr_input_uvec3;
     uint32_t t_ptr_ssbo_u32;
+    uint32_t t_ptr_ssbo_uvec2;
     uint32_t t_ptr_ssbo_f16;
     uint32_t t_ptr_push_u32;
-    uint32_t t_rta_u32;             // RuntimeArray of u32
+    uint32_t t_rta_u32;              // RuntimeArray of u32
+    uint32_t t_rta_uvec2;           // RuntimeArray of uvec2
     uint32_t t_rta_f16;             // RuntimeArray of f16
     uint32_t t_struct_rta_u32;      // struct { RuntimeArray<u32> }
+    uint32_t t_struct_rta_uvec2;    // struct { RuntimeArray<uvec2> }
     uint32_t t_struct_rta_f16;      // struct { RuntimeArray<f16> }
-    uint32_t t_ptr_ssbo_struct;     // pointer to struct { RuntimeArray<u32> }
+    uint32_t t_ptr_ssbo_struct;      // pointer to struct { RuntimeArray<u32> }
+    uint32_t t_ptr_ssbo_struct_uvec2;
     uint32_t t_ptr_ssbo_struct_f16; // pointer to struct { RuntimeArray<f16> }
 
-    // GLSL.std.450 import.
     uint32_t ext_glsl;
-    uint32_t t_ptr_func_u32;       // pointer to u32 in Function storage
+    uint32_t t_ptr_func_u32; int :32;
 
-    // Global variable IDs.
     uint32_t *v_ssbo;      // one per buffer (total_bufs)
     uint32_t v_global_id;  // gl_GlobalInvocationID
     uint32_t v_push;       // push constant block variable
@@ -244,7 +247,8 @@ typedef struct {
 
     // Per-buffer flag: true if the buffer needs 16-bit typed access.
     _Bool *buf_is_16;
-    int    has_16, :32;
+    _Bool *buf_is_16x4;
+    int    has_16, has_16x4;
 
     // Constant deduplication cache.
     struct { uint32_t type, value, id; } *const_cache;
@@ -491,6 +495,20 @@ static void store_ssbo_u32(SpvBuilder *b, int buf_idx, uint32_t elem_idx, uint32
     spv_store(b, ptr, value);
 }
 
+static uint32_t load_ssbo_uvec2(SpvBuilder *b, int buf_idx, uint32_t elem_idx) {
+    uint32_t const ptr = spv_access_chain_2(b, b->t_ptr_ssbo_uvec2,
+                                            b->v_ssbo[buf_idx],
+                                            b->c_0, elem_idx);
+    return spv_load(b, b->t_uvec2, ptr);
+}
+
+static void store_ssbo_uvec2(SpvBuilder *b, int buf_idx, uint32_t elem_idx, uint32_t value) {
+    uint32_t const ptr = spv_access_chain_2(b, b->t_ptr_ssbo_uvec2,
+                                            b->v_ssbo[buf_idx],
+                                            b->c_0, elem_idx);
+    spv_store(b, ptr, value);
+}
+
 // Load u16 from SSBO[buf_idx] at element_index, zero-extended to u32.
 // Buffer is RuntimeArray<f16>; smuggle integer bits through f16 storage
 // via PackHalf2x16 to recover the raw 16-bit pattern as u32.
@@ -614,16 +632,22 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
     }
     result.deref = di;
 
-    // --- Scan for 16-bit buffer access. ---
-    B.buf_is_16 = calloc((size_t)(total_bufs + 1), sizeof *B.buf_is_16);
+    B.buf_is_16   = calloc((size_t)(total_bufs + 1), sizeof *B.buf_is_16);
+    B.buf_is_16x4 = calloc((size_t)(total_bufs + 1), sizeof *B.buf_is_16x4);
     for (int i = 0; i < bb->insts; i++) {
         enum op op = bb->inst[i].op;
+        int p = op_has_ptr(op)
+            ? (bb->inst[i].ptr.deref ? deref_buf[bb->inst[i].ptr.ix]
+                                     : bb->inst[i].ptr.bits)
+            : -1;
         if (op == op_load_16 || op == op_store_16 || op == op_gather_16
          || op == op_load_16x4_planar || op == op_store_16x4_planar) {
-            int p = bb->inst[i].ptr.deref ? deref_buf[bb->inst[i].ptr.ix]
-                                         : bb->inst[i].ptr.bits;
             B.buf_is_16[p] = 1;
             B.has_16 = 1;
+        }
+        if (op == op_load_16x4 || op == op_store_16x4) {
+            B.buf_is_16x4[p] = 1;
+            B.has_16x4 = 1;
         }
     }
 
@@ -774,6 +798,12 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
         spv_word(&B.types, 16);
     }
 
+    B.t_uvec2 = spv_id(&B);
+    spv_op(&B.types, SpvOpTypeVector, 4);
+    spv_word(&B.types, B.t_uvec2);
+    spv_word(&B.types, B.t_u32);
+    spv_word(&B.types, 2);
+
     B.t_uvec3 = spv_id(&B);
     spv_op(&B.types, SpvOpTypeVector, 4);
     spv_word(&B.types, B.t_uvec3);
@@ -841,6 +871,45 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
     spv_word(&B.types, B.t_ptr_ssbo_u32);
     spv_word(&B.types, SpvStorageClassStorageBuffer);
     spv_word(&B.types, B.t_u32);
+
+    if (B.has_16x4) {
+        B.t_rta_uvec2 = spv_id(&B);
+        spv_op(&B.types, SpvOpTypeRuntimeArray, 3);
+        spv_word(&B.types, B.t_rta_uvec2);
+        spv_word(&B.types, B.t_uvec2);
+
+        spv_op(&B.decor, SpvOpDecorate, 4);
+        spv_word(&B.decor, B.t_rta_uvec2);
+        spv_word(&B.decor, SpvDecorationArrayStride);
+        spv_word(&B.decor, 8);
+
+        B.t_struct_rta_uvec2 = spv_id(&B);
+        spv_op(&B.types, SpvOpTypeStruct, 3);
+        spv_word(&B.types, B.t_struct_rta_uvec2);
+        spv_word(&B.types, B.t_rta_uvec2);
+
+        spv_op(&B.decor, SpvOpDecorate, 3);
+        spv_word(&B.decor, B.t_struct_rta_uvec2);
+        spv_word(&B.decor, SpvDecorationBlock);
+
+        spv_op(&B.decor, SpvOpMemberDecorate, 5);
+        spv_word(&B.decor, B.t_struct_rta_uvec2);
+        spv_word(&B.decor, 0);
+        spv_word(&B.decor, SpvDecorationOffset);
+        spv_word(&B.decor, 0);
+
+        B.t_ptr_ssbo_struct_uvec2 = spv_id(&B);
+        spv_op(&B.types, SpvOpTypePointer, 4);
+        spv_word(&B.types, B.t_ptr_ssbo_struct_uvec2);
+        spv_word(&B.types, SpvStorageClassStorageBuffer);
+        spv_word(&B.types, B.t_struct_rta_uvec2);
+
+        B.t_ptr_ssbo_uvec2 = spv_id(&B);
+        spv_op(&B.types, SpvOpTypePointer, 4);
+        spv_word(&B.types, B.t_ptr_ssbo_uvec2);
+        spv_word(&B.types, SpvStorageClassStorageBuffer);
+        spv_word(&B.types, B.t_uvec2);
+    }
 
     if (B.has_16) {
         B.t_rta_f16 = spv_id(&B);
@@ -962,8 +1031,9 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
     B.v_ssbo = calloc((size_t)total_bufs, sizeof *B.v_ssbo);
     for (int i = 0; i < total_bufs; i++) {
         B.v_ssbo[i] = spv_id(&B);
-        uint32_t ptr_type = B.buf_is_16[i] ? B.t_ptr_ssbo_struct_f16
-                                          : B.t_ptr_ssbo_struct;
+        uint32_t ptr_type = B.buf_is_16[i]   ? B.t_ptr_ssbo_struct_f16
+                          : B.buf_is_16x4[i] ? B.t_ptr_ssbo_struct_uvec2
+                          :                     B.t_ptr_ssbo_struct;
         spv_op(&B.globals, SpvOpVariable, 4);
         spv_word(&B.globals, ptr_type);
         spv_word(&B.globals, B.v_ssbo[i]);
@@ -1232,19 +1302,12 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                     store_ssbo_u32(&B, p, addr, px);
                 } break;
 
-                // TODO: consider u64 SSBO element type so stride/count work directly in pixel units.
                 case op_load_16x4: {
                     int p = resolve_ptr(&B, inst);
-                    uint32_t stride_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
-                    uint32_t stride = load_meta_u32(&B, stride_off);
-                    stride = spv_binop(&B, SpvOpIMul, B.t_u32, stride, B.c_2);
-                    uint32_t row_off = spv_binop(&B, SpvOpIMul, B.t_u32, y_coord, stride);
-                    uint32_t x_off = spv_binop(&B, SpvOpIMul, B.t_u32, x_coord, B.c_2);
-                    uint32_t base = spv_binop(&B, SpvOpIAdd, B.t_u32, row_off, x_off);
-
-                    uint32_t w0 = load_ssbo_u32(&B, p, base);
-                    uint32_t base1 = spv_binop(&B, SpvOpIAdd, B.t_u32, base, B.c_1);
-                    uint32_t w1 = load_ssbo_u32(&B, p, base1);
+                    uint32_t addr = compute_addr(&B, x_coord, y_coord, p);
+                    uint32_t px = load_ssbo_uvec2(&B, p, addr);
+                    uint32_t w0 = spv_composite_extract(&B, B.t_u32, px, 0);
+                    uint32_t w1 = spv_composite_extract(&B, B.t_u32, px, 1);
 
                     uint32_t c_0xFFFF = spv_const_u32(&B, 0xFFFFu);
                     B.val[i]   = spv_binop(&B, SpvOpBitwiseAnd, B.t_u32, w0, c_0xFFFF);
@@ -1286,15 +1349,9 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                     B.is_f[i] = 1;
                 } break;
 
-                // TODO: consider u64 SSBO element type so stride/count work directly in pixel units.
                 case op_store_16x4: {
                     int p = resolve_ptr(&B, inst);
-                    uint32_t stride_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
-                    uint32_t stride = load_meta_u32(&B, stride_off);
-                    stride = spv_binop(&B, SpvOpIMul, B.t_u32, stride, B.c_2);
-                    uint32_t row_off = spv_binop(&B, SpvOpIMul, B.t_u32, y_coord, stride);
-                    uint32_t x_off = spv_binop(&B, SpvOpIMul, B.t_u32, x_coord, B.c_2);
-                    uint32_t base = spv_binop(&B, SpvOpIAdd, B.t_u32, row_off, x_off);
+                    uint32_t addr = compute_addr(&B, x_coord, y_coord, p);
 
                     uint32_t h0 = B.is_f[xid]             ? spv_f32_to_f16(&B, get_val(&B, inst->x))
                                                            : as_u32(&B, get_val(&B, inst->x), xid);
@@ -1310,9 +1367,8 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                     uint32_t h3_shifted = spv_binop(&B, SpvOpShiftLeftLogical, B.t_u32, h3, B.c_16);
                     uint32_t w1 = spv_binop(&B, SpvOpBitwiseOr, B.t_u32, h2, h3_shifted);
 
-                    store_ssbo_u32(&B, p, base, w0);
-                    uint32_t base1 = spv_binop(&B, SpvOpIAdd, B.t_u32, base, B.c_1);
-                    store_ssbo_u32(&B, p, base1, w1);
+                    uint32_t px = spv_composite_construct_2(&B, B.t_uvec2, w0, w1);
+                    store_ssbo_uvec2(&B, p, addr, px);
                 } break;
 
                 case op_store_16x4_planar: {
@@ -1924,6 +1980,7 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
     free(B.val_3);
     free(B.is_f);
     free(B.buf_is_16);
+    free(B.buf_is_16x4);
     free(B.const_cache);
     free(v_vars);
     free(deref_buf);
