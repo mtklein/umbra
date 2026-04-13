@@ -315,13 +315,13 @@ int main(int argc, char *argv[]) {
         mat[10] = sc.h;
         umbra_uniforms_fill_f32(al.uniforms, al.mat, mat, 11);
         umbra_uniforms_fill_ptr(al.uniforms, al.curves_off,
-                      (struct umbra_buf){.ptr=sc.data, .sz=(size_t)(sc.count * 6 * 4)});
+                      (struct umbra_buf){.ptr=sc.data, .count=sc.count * 6});
         float j0;
         { int32_t z = 0; __builtin_memcpy(&j0, &z, 4); }
         umbra_uniforms_fill_f32(al.uniforms, al.loop_off, &j0, 1);
         struct umbra_buf abuf[] = {
-            (struct umbra_buf){.ptr=al.uniforms, .sz=al.uni.size},
-            {.ptr=wind, .sz=(size_t)(W * H * 4)},
+            (struct umbra_buf){.ptr=al.uniforms, .count=(int)(al.uni.size / 4)},
+            {.ptr=wind, .count=W * H},
         };
 
         double ns_px[5] = {-1, -1, -1, -1, -1};

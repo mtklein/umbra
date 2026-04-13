@@ -161,10 +161,9 @@ static void build_fill(struct umbra_backend *interp) {
 
 static void fill_bg(struct slide *s, void *dst) {
     umbra_uniforms_fill_f32(fill_uniforms, 0, s->bg, 4);
-    size_t const rb = (size_t)RW * umbra_fmt_fp16_planar.bpp;
     struct umbra_buf buf[2] = {
-        {.ptr = fill_uniforms, .sz = fill_uni.size},
-        {.ptr = dst, .sz = rb * RH * 4, .row_bytes = rb},
+        {.ptr = fill_uniforms, .count = (int)(fill_uni.size / 4)},
+        {.ptr = dst, .count = RW * RH * 4, .stride = RW},
     };
     fill_prog->queue(fill_prog, 0, 0, RW, RH, buf);
 }

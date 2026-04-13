@@ -134,6 +134,9 @@ uint32_t LSR_xi(int d, int n, int shift) {
 uint32_t LDR_xi(int d, int n, int imm) {
     return 0xf9400000u | ((uint32_t)imm << 10) | ((uint32_t)n << 5) | (uint32_t)d;
 }
+uint32_t LDR_wi(int d, int n, int imm) {
+    return 0xb9400000u | ((uint32_t)imm << 10) | ((uint32_t)n << 5) | (uint32_t)d;
+}
 uint32_t LDRH_wi(int d, int n, int imm) {
     return 0x79400000u | ((uint32_t)imm << 10) | ((uint32_t)n << 5) | (uint32_t)d;
 }

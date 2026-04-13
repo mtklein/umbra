@@ -11,7 +11,7 @@ size_t umbra_uniforms_reserve_f32(struct umbra_uniforms_layout *u, int n) {
 size_t umbra_uniforms_reserve_ptr(struct umbra_uniforms_layout *u) {
     u->size = (u->size + 7) & ~(size_t)7;
     size_t const h = u->size;
-    u->size += 24;
+    u->size += 16;
     return h;
 }
 
@@ -25,8 +25,8 @@ void umbra_uniforms_fill_f32(void *data, size_t h, float const *v, int n) {
 }
 void umbra_uniforms_fill_ptr(void *data, size_t h, struct umbra_buf b) {
     char *p = (char*)data + h;
-    __builtin_memset(p, 0, 24);
-    __builtin_memcpy(p,      &b.ptr,       sizeof b.ptr);
-    __builtin_memcpy(p + 8,  &b.sz,        sizeof b.sz);
-    __builtin_memcpy(p + 16, &b.row_bytes, sizeof b.row_bytes);
+    __builtin_memset(p, 0, 16);
+    __builtin_memcpy(p,      &b.ptr,    sizeof b.ptr);
+    __builtin_memcpy(p + 8,  &b.count,  sizeof b.count);
+    __builtin_memcpy(p + 12, &b.stride, sizeof b.stride);
 }

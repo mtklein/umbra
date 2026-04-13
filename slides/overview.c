@@ -128,13 +128,11 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
 static void overview_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
     struct overview_state *st = (struct overview_state *)s;
     (void)frame; (void)l; (void)r;
-    size_t const rb_in  = (size_t)st->w * 4;
-    size_t const rb_out = (size_t)st->w * st->out_fmt.bpp;
-    size_t const plane  = (size_t)st->w * (size_t)st->h * st->out_fmt.bpp;
-    size_t const sz_out = plane * (size_t)st->out_fmt.planes;
-    st->cvt->queue(st->cvt, 0, t, st->w, b, (struct umbra_buf[]){
-        {.ptr = st->fb, .sz = (size_t)(st->w * st->h) * 4, .row_bytes = rb_in},
-        {.ptr = buf,    .sz = sz_out,                       .row_bytes = rb_out},
+    int const w = st->w,
+              h = st->h;
+    st->cvt->queue(st->cvt, 0, t, w, b, (struct umbra_buf[]){
+        {.ptr = st->fb, .count = w * h,                       .stride = w},
+        {.ptr = buf,    .count = w * h * st->out_fmt.planes,  .stride = w},
     });
 }
 

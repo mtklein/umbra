@@ -68,7 +68,6 @@ struct wgpu_program {
     struct deref_info *deref;
     uint8_t          *buf_rw;
     uint8_t          *buf_shift;
-    uint8_t          *buf_row_shift;
 
     uint32_t *spirv;
     int       spirv_words, :32;
@@ -363,8 +362,8 @@ static struct umbra_program *wgpu_compile(struct umbra_backend *base,
     p->push_words  = sr.push_words;
     p->deref       = sr.deref;
     p->buf_rw        = sr.buf_rw;
-    p->buf_shift     = sr.buf_shift;
-    p->buf_row_shift = sr.buf_row_shift;
+    p->buf_shift = sr.buf_shift;
+    free(sr.buf_row_shift);
     p->spirv       = sr.spirv;
     p->spirv_words = sr.spirv_words;
     return &p->base;
@@ -393,18 +392,19 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
     }
 
     for (int i = 0; i <= p->max_ptr; i++) {
-        if (buf[i].ptr && buf[i].sz) {
+        if (buf[i].ptr && buf[i].count) {
+            size_t const bytes = (size_t)buf[i].count << p->buf_shift[i];
             uint8_t const rw = p->buf_rw[i];
-            if (!(rw & BUF_WRITTEN) && !buf[i].row_bytes) {
+            if (!(rw & BUF_WRITTEN) && !buf[i].stride) {
                 // Ring alloc copies data into chunk buffer; bulk-uploaded at submit.
                 struct uniform_ring_loc loc =
-                    uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, buf[i].sz);
+                    uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, bytes);
                 struct wgpu_ring_chunk *chunk = loc.handle;
                 bind_buf   [i] = chunk->buf;
                 bind_offset[i] = loc.offset;
-                bind_size  [i] = (buf[i].sz + 3) & ~(size_t)3;
+                bind_size  [i] = (bytes + 3) & ~(size_t)3;
             } else {
-                int idx = gpu_buf_cache_get(&be->cache, buf[i].ptr, buf[i].sz, rw);
+                int idx = gpu_buf_cache_get(&be->cache, buf[i].ptr, bytes, rw);
                 bind_buf [i] = be->cache.entry[idx].buf.ptr;
                 bind_size[i] = be->cache.entry[idx].buf.size;
             }
@@ -417,26 +417,27 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
     push_data[1] = (uint32_t)l;
     push_data[2] = (uint32_t)t;
     for (int i = 0; i <= p->max_ptr; i++) {
-        push_data[3 + i] = (uint32_t)(buf[i].sz >> p->buf_shift[i]);
-        push_data[3 + p->total_bufs + i] = (uint32_t)(buf[i].row_bytes >> p->buf_row_shift[i]);
+        push_data[3 + i]                    = (uint32_t)buf[i].count;
+        push_data[3 + p->total_bufs + i] = (uint32_t)buf[i].stride;
     }
 
     // Resolve derefs.
     for (int d = 0; d < p->n_deref; d++) {
         char *base = (char *)buf[p->deref[d].src_buf].ptr;
-        void  *derived;
-        size_t dsz, drb;
+        void *derived;
+        int   dcount, dstride;
         memcpy(&derived, base + p->deref[d].off,      sizeof derived);
-        memcpy(&dsz,     base + p->deref[d].off + 8,  sizeof dsz);
-        memcpy(&drb,     base + p->deref[d].off + 16, sizeof drb);
+        memcpy(&dcount,  base + p->deref[d].off + 8,  sizeof dcount);
+        memcpy(&dstride, base + p->deref[d].off + 12, sizeof dstride);
         int bi = p->deref[d].buf_idx;
 
-        int idx = gpu_buf_cache_get(&be->cache, derived, dsz, p->buf_rw[bi]);
+        size_t const db = (size_t)dcount << p->buf_shift[bi];
+        int idx = gpu_buf_cache_get(&be->cache, derived, db, p->buf_rw[bi]);
         bind_buf [bi] = be->cache.entry[idx].buf.ptr;
         bind_size[bi] = be->cache.entry[idx].buf.size;
 
-        push_data[3 + bi] = (uint32_t)(dsz >> p->buf_shift[bi]);
-        push_data[3 + p->total_bufs + bi] = (uint32_t)(drb >> p->buf_row_shift[bi]);
+        push_data[3 + bi]                    = (uint32_t)dcount;
+        push_data[3 + p->total_bufs + bi] = (uint32_t)dstride;
     }
 
     // Fill unbound slots with dummy buffers.
@@ -556,7 +557,6 @@ static void wgpu_program_free(struct umbra_program *prog) {
     free(p->deref);
     free(p->buf_rw);
     free(p->buf_shift);
-    free(p->buf_row_shift);
     free(p);
 }
 

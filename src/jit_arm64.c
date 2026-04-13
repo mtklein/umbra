@@ -10,10 +10,10 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-_Static_assert(sizeof(struct umbra_buf) == 24, "");
-_Static_assert(offsetof(struct umbra_buf, ptr)       ==  0, "");
-_Static_assert(offsetof(struct umbra_buf, sz)        ==  8, "");
-_Static_assert(offsetof(struct umbra_buf, row_bytes) == 16, "");
+_Static_assert(sizeof(struct umbra_buf) == 16, "");
+_Static_assert(offsetof(struct umbra_buf, ptr)    ==  0, "");
+_Static_assert(offsetof(struct umbra_buf, count)  ==  8, "");
+_Static_assert(offsetof(struct umbra_buf, stride) == 12, "");
 
 struct pool_ref {
     int data_off, code_pos;
@@ -70,44 +70,49 @@ enum {
 };
 #define XI XCOL
 
-static void load_ptr(Buf *c, int p, int *last_ptr) {
+static void load_ptr(Buf *c, int p, int *last_ptr, int elem_shift) {
     if (*last_ptr != p) {
         *last_ptr = p;
-        int const disp_ptr = p * (int)sizeof(struct umbra_buf),
-                  disp_rb  = p * (int)sizeof(struct umbra_buf)
-                                 + (int)__builtin_offsetof(struct umbra_buf, row_bytes);
+        int const disp_ptr    = p * (int)sizeof(struct umbra_buf),
+                  disp_stride = p * (int)sizeof(struct umbra_buf)
+                                + (int)__builtin_offsetof(struct umbra_buf, stride);
         put(c, LDR_xi(XP, XBUF, disp_ptr / 8));
-        put(c, LDR_xi(XT, XBUF, disp_rb  / 8));
+        put(c, LDR_wi(XT, XBUF, disp_stride / 4));
+        if (elem_shift) {
+            put(c, LSL_xi(XT, XT, elem_shift));
+        }
         put(c, MADD_x(XP, XY, XT, XP));
     }
 }
 
 static void resolve_ptr(Buf *c, ptr p, int *last_ptr, int const *deref_gpr,
-                        int const *deref_rb_gpr) {
+                        int const *deref_rb_gpr, int elem_shift) {
     if (p.deref) {
         *last_ptr = -1;
         int const gpr = deref_gpr[p.ix],
                   rbg = deref_rb_gpr[p.ix];
         if (rbg > 0) {
-            put(c, MADD_x(XP, XY, rbg, gpr));
+            if (elem_shift) {
+                put(c, LSL_xi(XT, rbg, elem_shift));
+                put(c, MADD_x(XP, XY, XT, gpr));
+            } else {
+                put(c, MADD_x(XP, XY, rbg, gpr));
+            }
         } else {
             put(c, ADD_xi(XP, gpr, 0));
         }
     } else {
-        load_ptr(c, p.bits, last_ptr);
+        load_ptr(c, p.bits, last_ptr, elem_shift);
     }
 }
 
-static void load_count(Buf *c, ptr p, int elem_shift) {
+static void load_count(Buf *c, ptr p) {
     if (p.deref) {
         put(c, MOVZ_x_lsl16(XM, 0x7fff));
     } else {
         int const disp = p.bits * (int)sizeof(struct umbra_buf)
-                              + (int)__builtin_offsetof(struct umbra_buf, sz);
-        put(c, LDR_xi(XM, XBUF, disp / 8));
-        if (elem_shift) {
-            put(c, LSR_wi(XM, XM, elem_shift));
-        }
+                              + (int)__builtin_offsetof(struct umbra_buf, count);
+        put(c, LDR_wi(XM, XBUF, disp / 4));
     }
 }
 
@@ -462,7 +467,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 
         switch (inst->op) {
         case op_deref_ptr: {
-            load_ptr(c, inst->ptr.bits, &last_ptr);
+            load_ptr(c, inst->ptr.bits, &last_ptr, 2);
             int gpr    = 3 + dc;
             int rb_gpr = dc < 2 ? 6 + dc : 0;
             dc++;
@@ -474,11 +479,9 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 put(c, ADD_xr(XT, XP, XT));
                 base = XT;
             }
-            // LDR gpr, [base] -- deref pointer
             put(c, LDR_xi(gpr, base, 0));
-            // LDR rb_gpr, [base, #16] -- deref row_bytes
             if (rb_gpr) {
-                put(c, LDR_xi(rb_gpr, base, 2));
+                put(c, LDR_wi(rb_gpr, base, 3));
             }
         } break;
 
@@ -507,7 +510,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_load_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             ptr            p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
             if (scalar) {
                 put(c, LDR_sx(lo(s.rd), XP, XI));
             } else {
@@ -520,7 +523,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_load_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             ptr            p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 1);
             if (scalar) {
                 put(c, LDRH_wr(XT, XP, XI));
                 put(c, DUP_4s_w(lo(s.rd), XT));
@@ -535,7 +538,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_uniform_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             ptr            p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
             load_imm_w(c, XT, (uint32_t)inst->imm);
             put(c, ADD_xr(XT, XP, XT));
             put(c, LDR_si(lo(s.rd), XT, 0));
@@ -548,8 +551,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
             ra_free_chan(ra, inst->x, i);
             ptr p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            load_count(c, p, 2);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
+            load_count(c, p);
             put(c, UMOV_ws(XT, lo(rx)));
             put(c, MOVI_4s(lo(s.rd), 0, 0));
             if (!scalar) { put(c, ORR_16b(hi(s.rd), lo(s.rd), lo(s.rd))); }
@@ -566,8 +569,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
             ra_free_chan(ra, inst->x, i);
             ptr p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            load_count(c, p, 2);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
+            load_count(c, p);
             if (scalar) {
                 put(c, MOVI_4s(lo(s.rd), 0, 0));
                 put(c, UMOV_ws(XT, lo(rx)));
@@ -602,8 +605,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t hi_r  = ra_alloc(ra, sl, ns);
             int8_t frac  = ra_alloc(ra, sl, ns);
             ptr    p     = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            load_count(c, p, 2);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
+            load_count(c, p);
             if (scalar) {
                 put(c, FRINTM_4s(lo(hi_r), lo(rx)));
                 put(c, FSUB_4s(lo(frac), lo(rx), lo(hi_r)));
@@ -679,8 +682,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
             ra_free_chan(ra, inst->x, i);
             ptr p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            load_count(c, p, 1);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 1);
+            load_count(c, p);
             if (scalar) {
                 put(c, MOVI_4s(lo(s.rd), 0, 0));
                 put(c, UMOV_ws(XT, lo(rx)));
@@ -719,7 +722,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_store_32: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
             ptr    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
             if (scalar) {
                 put(c, STR_sx(lo(ry), XP, XI));
             } else {
@@ -732,7 +735,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
 
         case op_load_16x4: {
             ptr    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 3);
             struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
             int8_t r1 = ra_alloc(ra, sl, ns);
             int8_t r2 = ra_alloc(ra, sl, ns);
@@ -770,13 +773,13 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t r2 = ra_alloc(ra, sl, ns);
             int8_t r3 = ra_alloc(ra, sl, ns);
             ptr    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 1);
             int8_t px = ra_alloc(ra, sl, ns);
             {
-                int const sz_off = p.bits * (int)sizeof(struct umbra_buf)
-                                 + (int)__builtin_offsetof(struct umbra_buf, sz);
-                put(c, LDR_xi(XT, XBUF, sz_off / 8));
-                put(c, LSR_xi(XT, XT, 2));
+                int const count_off = p.bits * (int)sizeof(struct umbra_buf)
+                                    + (int)__builtin_offsetof(struct umbra_buf, count);
+                put(c, LDR_wi(XT, XBUF, count_off / 4));
+                put(c, LSR_xi(XT, XT, 1));
             }
             if (scalar) {
                 put(c, LDR_hx(lo(s0.rd), XP, XI));
@@ -814,7 +817,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t rb_  = ra_ensure_chan(ra, sl, ns, inst->z.id, (int)inst->z.chan);
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, inst->w.id, (int)inst->w.chan);
             ptr    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 3);
             if (scalar) {
                 int8_t px = ra_alloc(ra, sl, ns);
                 int8_t t  = ra_alloc(ra, sl, ns);
@@ -854,12 +857,12 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t rb_  = ra_ensure_chan(ra, sl, ns, inst->z.id, (int)inst->z.chan);
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, inst->w.id, (int)inst->w.chan);
             ptr    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 1);
             {
-                int const sz_off = p.bits * (int)sizeof(struct umbra_buf)
-                                 + (int)__builtin_offsetof(struct umbra_buf, sz);
-                put(c, LDR_xi(XT, XBUF, sz_off / 8));
-                put(c, LSR_xi(XT, XT, 2));
+                int const count_off = p.bits * (int)sizeof(struct umbra_buf)
+                                    + (int)__builtin_offsetof(struct umbra_buf, count);
+                put(c, LDR_wi(XT, XBUF, count_off / 4));
+                put(c, LSR_xi(XT, XT, 1));
             }
             if (scalar) {
                 put(c, STR_hx(lo(rr), XP, XI));
@@ -897,7 +900,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t r2 = ra_alloc(ra, sl, ns);
             int8_t r3 = ra_alloc(ra, sl, ns);
             ptr    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
             if (scalar) {
                 int8_t px   = ra_alloc(ra, sl, ns);
                 int8_t mask = ra_alloc(ra, sl, ns);
@@ -938,7 +941,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t rb_  = ra_ensure_chan(ra, sl, ns, inst->z.id, (int)inst->z.chan);
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, inst->w.id, (int)inst->w.chan);
             ptr    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
             if (scalar) {
                 int8_t px = ra_alloc(ra, sl, ns);
                 int8_t t  = ra_alloc(ra, sl, ns);
@@ -971,7 +974,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_store_16: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
             ptr    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 1);
             if (scalar) {
                 put(c, STR_hx(lo(ry), XP, XI));
             } else {

@@ -34,12 +34,10 @@ struct umbra_backend* umbra_backend_metal (void);
 struct umbra_backend* umbra_backend_vulkan(void);
 struct umbra_backend* umbra_backend_wgpu  (void);
 
-// TODO: replace        sz with int count  in element units?
-// TODO: replace row_bytes with int stride in element units?
 struct umbra_buf {
-    void   *ptr;
-    size_t  sz;
-    size_t  row_bytes;
+    void *ptr;
+    int   count;
+    int   stride;
 };
 
 struct umbra_program {

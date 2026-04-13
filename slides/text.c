@@ -159,19 +159,15 @@ static void text_prepare(struct slide *s, struct umbra_backend *be, struct umbra
 static void text_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
     struct text_state *st = (struct text_state *)s;
     (void)frame;
-    struct umbra_buf bmp = {
-        .ptr      = st->tc->data,
-        .sz       = (size_t)(st->w * st->h * 2),
-        .row_bytes = (size_t)st->w * 2,
+    st->cov.bitmap.bmp = (struct umbra_buf){
+        .ptr   = st->tc->data,
+        .count = st->w * st->h,
+        .stride = st->w,
     };
-    st->cov.bitmap.bmp = bmp;
     umbra_draw_fill(&st->lay, &st->shader.base, &st->cov.bitmap.base);
-    size_t    pb = st->fmt.bpp;
-    size_t plane_sz = (size_t)st->w * (size_t)st->h * pb;
-    size_t rb = (size_t)st->w * pb;
     struct umbra_buf ubuf[] = {
-        {.ptr=st->lay.uniforms, .sz=st->lay.uni.size},
-        {.ptr=buf, .sz=plane_sz * (size_t)st->fmt.planes, .row_bytes=rb},
+        {.ptr=st->lay.uniforms, .count=(int)(st->lay.uni.size / 4)},
+        {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
     };
     st->prog->queue(st->prog, l, t, r, b, ubuf);
 }

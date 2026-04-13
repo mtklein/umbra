@@ -35,7 +35,7 @@ kernel void umbra_entry(
     uint v19 = v17 & v18;
     uint v20 = v14 & v19;
     uint v21 = select(v0, v9, v20 != 0u);
-    uint _row22 = y * m.stride1; uint _ps22 = m.limit1;
+    uint _row22 = y * m.stride1; uint _ps22 = m.limit1 / 4;
     uint v22 = (uint)p1[_row22 + x];
     uint v22_1 = (uint)p1[_row22 + x + _ps22];
     uint v22_2 = (uint)p1[_row22 + x + 2*_ps22];
@@ -61,6 +61,6 @@ kernel void umbra_entry(
     float v41 = v40 - v39;
     float v42 = fma(as_type<float>(v21), v41, v39);
     uint v43 = (uint)as_type<ushort>((half)v42);
-    { uint _row = y * m.stride1; uint _ps = m.limit1;
+    { uint _row = y * m.stride1; uint _ps = m.limit1 / 4;
       p1[_row + x] = ushort(v29); p1[_row + x + _ps] = ushort(v38); p1[_row + x + 2*_ps] = ushort(v43); p1[_row + x + 3*_ps] = ushort(v33); }
 }

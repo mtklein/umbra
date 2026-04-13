@@ -15,10 +15,10 @@ typedef struct asm_x86 Buf;
 #include <sys/mman.h>
 #include <unistd.h>
 
-_Static_assert(sizeof(struct umbra_buf) == 24, "");
-_Static_assert(offsetof(struct umbra_buf, ptr)       ==  0, "");
-_Static_assert(offsetof(struct umbra_buf, sz)        ==  8, "");
-_Static_assert(offsetof(struct umbra_buf, row_bytes) == 16, "");
+_Static_assert(sizeof(struct umbra_buf) == 16, "");
+_Static_assert(offsetof(struct umbra_buf, ptr)    ==  0, "");
+_Static_assert(offsetof(struct umbra_buf, count)  ==  8, "");
+_Static_assert(offsetof(struct umbra_buf, stride) == 12, "");
 
 struct pool_ref {
     int data_off, code_pos, extra;
@@ -64,25 +64,25 @@ static void patch_jcc(Buf *c, int fixup) {
     __builtin_memcpy(c->byte + fixup, &rel, 4);
 }
 
-static void load_count_x86(Buf *c, ptr p, int elem_shift) {
+static void load_count_x86(Buf *c, ptr p) {
     if (p.deref) {
         mov_ri(c, XM, 0x7fffffff);
     } else {
-        mov_load(c, XM, XBUF, p.bits * (int)sizeof(struct umbra_buf)
-                 + (int)__builtin_offsetof(struct umbra_buf, sz));
-        if (elem_shift) {
-            shr_ri(c, XM, (uint8_t)elem_shift);
-        }
+        mov_load32(c, XM, XBUF, p.bits * (int)sizeof(struct umbra_buf)
+                   + (int)__builtin_offsetof(struct umbra_buf, count));
     }
 }
-static int load_ptr_x86(Buf *c, ptr p, int *last_ptr) {
+static int load_ptr_x86(Buf *c, ptr p, int *last_ptr, int elem_shift) {
     if (*last_ptr != p.bits) {
         *last_ptr = p.bits;
         mov_load(c, R11, XBUF,
                  p.bits * (int)sizeof(struct umbra_buf));
-        mov_load(c, RAX, XBUF,
-                 p.bits * (int)sizeof(struct umbra_buf)
-                 + (int)__builtin_offsetof(struct umbra_buf, row_bytes));
+        mov_load32(c, RAX, XBUF,
+                   p.bits * (int)sizeof(struct umbra_buf)
+                   + (int)__builtin_offsetof(struct umbra_buf, stride));
+        if (elem_shift) {
+            shl_ri(c, RAX, (uint8_t)elem_shift);
+        }
         rex_w(c, RAX, XY);
         emit1(c, 0x0f); emit1(c, 0xaf);
         emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (XY & 7)));
@@ -247,16 +247,19 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                      int *deref_rb_gpr, struct jit_ctx *jc);
 
 static int resolve_ptr_x86(Buf *c, ptr p, int *last_ptr, int const *deref_gpr,
-                           int const *deref_rb_gpr) {
+                           int const *deref_rb_gpr, int elem_shift) {
     if (p.deref) {
         int const gpr = deref_gpr[p.ix],
                   rb  = deref_rb_gpr[p.ix];
         if (rb > 0) {
             mov_rr(c, R11, gpr);
-            mov_rr(c, RAX, XY);
-            rex_w(c, RAX, rb);
+            mov_rr(c, RAX, rb);
+            if (elem_shift) {
+                shl_ri(c, RAX, (uint8_t)elem_shift);
+            }
+            rex_w(c, RAX, XY);
             emit1(c, 0x0f); emit1(c, 0xaf);
-            emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (rb & 7)));
+            emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (XY & 7)));
             rex_w(c, RAX, R11);
             emit1(c, 0x01);
             emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (R11 & 7)));
@@ -264,7 +267,7 @@ static int resolve_ptr_x86(Buf *c, ptr p, int *last_ptr, int const *deref_gpr,
         }
         return gpr;
     }
-    return load_ptr_x86(c, p, last_ptr);
+    return load_ptr_x86(c, p, last_ptr, elem_shift);
 }
 
 struct jit_program *jit_program(struct jit_backend *be,
@@ -463,14 +466,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         struct bb_inst const *inst = &bb->inst[i];
         switch (inst->op) {
         case op_deref_ptr: {
-            int base   = load_ptr_x86(c, inst->ptr, &last_ptr);
+            int base   = load_ptr_x86(c, inst->ptr, &last_ptr, 2);
             int gpr    = deref_gprs[dc];
             int rb_reg = rb_gprs[dc];
             dc++;
             mov_load(c, gpr, base, inst->imm);
             deref_gpr[i] = gpr;
             if (rb_reg) {
-                mov_load(c, rb_reg, base, inst->imm + 16);
+                mov_load32(c, rb_reg, base, inst->imm + 12);
                 deref_rb_gpr[i] = rb_reg;
             }
         } break;
@@ -499,7 +502,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_load_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             ptr            p = inst->ptr;
-            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
             if (scalar) {
                 vmovd_load(c, s.rd, base, XI, 4, 0);
             } else {
@@ -510,7 +513,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_load_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             ptr            p = inst->ptr;
-            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 1);
             if (scalar) {
                 // MOVZX eax, word [base + R10*2]
                 {
@@ -533,7 +536,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_store_32: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
             ptr    p = inst->ptr;
-            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
             if (scalar) {
                 vmovd_store(c, ry, base, XI, 4, 0);
             } else {
@@ -548,7 +551,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t r2 = ra_alloc(ra, sl, ns);
             int8_t r3 = ra_alloc(ra, sl, ns);
             ptr    p = inst->ptr;
-            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 3);
 
             int8_t px = ra_alloc(ra, sl, ns);
             int8_t t0 = ra_alloc(ra, sl, ns);
@@ -628,19 +631,19 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t r2 = ra_alloc(ra, sl, ns);
             int8_t r3 = ra_alloc(ra, sl, ns);
             ptr    p = inst->ptr;
-            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 1);
 
             int8_t px = ra_alloc(ra, sl, ns);
             int8_t t0 = ra_alloc(ra, sl, ns);
             int8_t t1 = ra_alloc(ra, sl, ns);
 
             {
-                int const sz_off = p.bits * (int)sizeof(struct umbra_buf)
-                                 + (int)__builtin_offsetof(struct umbra_buf, sz);
+                int const count_off = p.bits * (int)sizeof(struct umbra_buf)
+                                   + (int)__builtin_offsetof(struct umbra_buf, count);
                 int const stride = scalar ? (int)XM : (int)RAX;
                 mov_rr(c, R11, base);
-                mov_load(c, stride, XBUF, sz_off);
-                shr_ri(c, stride, 2);
+                mov_load32(c, stride, XBUF, count_off);
+                shr_ri(c, stride, 1);
                 if (scalar) {
                     // Plane 0 (R): MOVZX eax, word [R11 + XI*2]; VMOVD xmm, eax
                     {
@@ -737,7 +740,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t rb_  = ra_ensure_chan(ra, sl, ns, inst->z.id, (int)inst->z.chan);
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, inst->w.id, (int)inst->w.chan);
             ptr    p = inst->ptr;
-            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 3);
             int8_t scale = ra_alloc(ra, sl, ns);
             int8_t px    = ra_alloc(ra, sl, ns);
             int8_t t     = ra_alloc(ra, sl, ns);
@@ -780,14 +783,14 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t rb_  = ra_ensure_chan(ra, sl, ns, inst->z.id, (int)inst->z.chan);
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, inst->w.id, (int)inst->w.chan);
             ptr    p = inst->ptr;
-            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 1);
             {
-                int const sz_off = p.bits * (int)sizeof(struct umbra_buf)
-                                 + (int)__builtin_offsetof(struct umbra_buf, sz);
+                int const count_off = p.bits * (int)sizeof(struct umbra_buf)
+                                   + (int)__builtin_offsetof(struct umbra_buf, count);
                 int const stride = scalar ? (int)XM : (int)RAX;
                 mov_rr(c, R11, base);
-                mov_load(c, stride, XBUF, sz_off);
-                shr_ri(c, stride, 2);
+                mov_load32(c, stride, XBUF, count_off);
+                shr_ri(c, stride, 1);
                 if (scalar) {
                     // Plane 0 (R): VMOVD eax, rr; MOV word [R11+XI*2], ax
                     vmovd_to_gpr(c, RAX, rr);
@@ -885,7 +888,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t r2 = ra_alloc(ra, sl, ns);
             int8_t r3 = ra_alloc(ra, sl, ns);
             ptr    p = inst->ptr;
-            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
             int8_t px   = ra_alloc(ra, sl, ns);
             int8_t mask = ra_alloc(ra, sl, ns);
             broadcast_imm32(c, mask, 0xFF);
@@ -911,7 +914,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             int8_t rb_  = ra_ensure_chan(ra, sl, ns, inst->z.id, (int)inst->z.chan);
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, inst->w.id, (int)inst->w.chan);
             ptr    p = inst->ptr;
-            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
             int8_t px = ra_alloc(ra, sl, ns);
             int8_t t  = ra_alloc(ra, sl, ns);
             int L = scalar ? 0 : 1;
@@ -934,7 +937,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_store_16: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
             ptr    p = inst->ptr;
-            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int    base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 1);
             if (scalar) {
                 // VMOVD eax, xmm
                 vmovd_to_gpr(c, RAX, ry);
@@ -958,7 +961,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
         case op_uniform_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             ptr            p = inst->ptr;
-            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
             {
                 int     disp = inst->imm;
                 uint8_t R = (uint8_t)(~s.rd >> 3) & 1;
@@ -986,10 +989,10 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
             ptr            p = inst->ptr;
-            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
             vmovd_to_gpr(c, RAX, rx);
             ra_free_chan(ra, inst->x, i);
-            load_count_x86(c, p, 2);
+            load_count_x86(c, p);
             vpxor(c, scalar ? 0 : 1, s.rd, s.rd, s.rd);
             cmp_rr(c, RAX, XM);
             int skip = jcc(c, 0x03);
@@ -1004,11 +1007,11 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
             ptr            p = inst->ptr;
-            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
             if (scalar) {
                 vmovd_to_gpr(c, RAX, rx);
                 ra_free_chan(ra, inst->x, i);
-                load_count_x86(c, p, 2);
+                load_count_x86(c, p);
                 vpxor(c, 0, s.rd, s.rd, s.rd);
                 cmp_rr(c, RAX, XM);
                 int skip = jcc(c, 0x03);
@@ -1017,7 +1020,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             } else {
                 int8_t mask = ra_alloc(ra, sl, ns);
                 int8_t cnt = ra_alloc(ra, sl, ns);
-                load_count_x86(c, p, 2);
+                load_count_x86(c, p);
                 // Build in-bounds mask: (ix >= 0) AND (ix < count)
                 vpxor(c, 1, mask, mask, mask);
                 vpcmpgtd(c, mask, mask, rx);          // mask = (0 > ix) = neg lanes
@@ -1039,7 +1042,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
             ptr            p = inst->ptr;
-            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
+            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
             int8_t frac_r = ra_alloc(ra, sl, ns);
             int8_t hi_r   = ra_alloc(ra, sl, ns);
             if (scalar) {
@@ -1048,7 +1051,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 vsubps(c, frac_r, rx, hi_r);                // frac_r = ix - floor
                 vcvttps2dq(c, hi_r, hi_r);                  // hi_r = int(floor)
                 ra_free_chan(ra, inst->x, i);
-                load_count_x86(c, p, 2);
+                load_count_x86(c, p);
                 // gather lo
                 vmovd_to_gpr(c, RAX, hi_r);   // vmovd eax, lo_i
                 vpxor(c, 0, s.rd, s.rd, s.rd);
@@ -1074,7 +1077,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
                 vsubps(c, frac_r, rx, hi_r);                // frac_r = ix - floor
                 vcvttps2dq(c, int_ix, hi_r);                // int_ix = int(floor)
                 ra_free_chan(ra, inst->x, i);
-                load_count_x86(c, p, 2);
+                load_count_x86(c, p);
                 // Load broadcast(count) once into cnt, keep it alive for both gathers.
                 // Use hi_r as temp for comparison results (it's free until the hi gather).
                 int8_t mask = ra_alloc(ra, sl, ns);
@@ -1116,8 +1119,8 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
             ptr            p = inst->ptr;
-            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr);
-            load_count_x86(c, p, 1);
+            int            base = resolve_ptr_x86(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 1);
+            load_count_x86(c, p);
             if (scalar) {
                 vmovd_to_gpr(c, RAX, rx);
                 ra_free_chan(ra, inst->x, i);

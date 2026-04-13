@@ -29,7 +29,7 @@ kernel void umbra_entry(
     uint v13 = 1065353216u;
     uint v14 = 1073741824u;
     uint v15 = 931135488u;
-    uint v16 = p0[18];
+    uint v16 = p0[16];
     uint v17 = 6u;
     uint v18 = v16 * 6u;
     uint v19 = p2[min(v18, m.limit2 - 1u)] & ((v18 < m.limit2) ? ~0u : 0u);

@@ -4,7 +4,7 @@
   v3   = f32_from_i32    v1
   v4   = f32_from_i32    v2
   v5   = deref_ptr       p0 byte16
-  v6   = deref_ptr       p0 byte40
+  v6   = deref_ptr       p0 byte32
   v7   = uniform_32      p0 byte0
   v8   = uniform_32      p0 byte4
   v9   = uniform_32      p0 byte8

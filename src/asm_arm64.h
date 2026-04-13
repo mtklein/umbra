@@ -45,6 +45,7 @@ uint32_t LDR_qi(int d, int n, int imm);
 uint32_t STR_qi(int d, int n, int imm);
 uint32_t LDR_si(int d, int n, int imm);
 uint32_t LDR_xi(int d, int n, int imm);
+uint32_t LDR_wi(int d, int n, int imm);
 uint32_t LDRH_wi(int d, int n, int imm);
 uint32_t LDRH_wr(int d, int n, int m);
 uint32_t LDR_wr(int d, int n, int m);

@@ -153,6 +153,17 @@ void shr_ri(Buf *b, int r, uint8_t imm) {
         emit1(b, imm);
     }
 }
+void shl_ri(Buf *b, int r, uint8_t imm) {
+    rex_w(b, 0, r);
+    if (imm == 1) {
+        emit1(b, 0xd1);
+        emit1(b, (uint8_t)(0xc0 | (4 << 3) | (r & 7)));
+    } else {
+        emit1(b, 0xc1);
+        emit1(b, (uint8_t)(0xc0 | (4 << 3) | (r & 7)));
+        emit1(b, imm);
+    }
+}
 void mov_ri(Buf *b, int d, int32_t imm) {
     rex_w(b, 0, d);
     emit1(b, 0xc7);
@@ -164,8 +175,10 @@ void mov_rr(Buf *b, int d, int s) {
     emit1(b, 0x89);
     emit1(b, (uint8_t)(0xc0 | ((s & 7) << 3) | (d & 7)));
 }
-void mov_load(Buf *b, int d, int base, int disp) {
-    rex_w(b, d, base);
+static void mov_load_(Buf *b, int d, int base, int disp, _Bool wide) {
+    uint8_t rex = (uint8_t)(0x40 | ((d >> 3) << 2) | (base >> 3));
+    if (wide) { rex |= 0x08; }
+    if (rex != 0x40 || wide) { emit1(b, rex); }
     emit1(b, 0x8b);
     if (disp == 0 && (base & 7) != 5) {
         emit1(b, (uint8_t)(((d & 7) << 3) | (base & 7)));
@@ -179,6 +192,12 @@ void mov_load(Buf *b, int d, int base, int disp) {
         if ((base & 7) == 4) { emit1(b, 0x24); }
         emit4(b, (uint32_t)disp);
     }
+}
+void mov_load(Buf *b, int d, int base, int disp) {
+    mov_load_(b, d, base, disp, 1);
+}
+void mov_load32(Buf *b, int d, int base, int disp) {
+    mov_load_(b, d, base, disp, 0);
 }
 int jcc(Buf *b, uint8_t cc) {
     emit1(b, 0x0f);

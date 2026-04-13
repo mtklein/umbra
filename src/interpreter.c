@@ -620,16 +620,16 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 } NEXT;
                 CASE(op_y) v->i32 = (I32){0} + row; NEXT;
 
+                // TODO: convert uniform access to typed pointer (uint32_t or uint64_t) and int slot
                 CASE(op_uniform_32) {
-                    assume(buf[ip->ptr].row_bytes == 0);
+                    assume(buf[ip->ptr].stride == 0);
                     int32_t uni;
                     __builtin_memcpy(&uni, (char const*)buf[ip->ptr].ptr + ip->x, sizeof uni);
                     v->i32 = (I32){0} + uni;
                 } NEXT;
 
                 CASE(op_load_16) {
-                    void const     *base = (char*)buf[ip->ptr].ptr + (size_t)row * buf[ip->ptr].row_bytes;
-                    uint16_t const *src = (uint16_t const*)base;
+                    uint16_t const *src = (uint16_t const*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
                     int const       i = end - K;
                     int const       rem = n - i;
                     if (rem >= K) {
@@ -647,8 +647,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     }
                 } NEXT;
                 CASE(op_load_32) {
-                    void const    *base = (char*)buf[ip->ptr].ptr + (size_t)row * buf[ip->ptr].row_bytes;
-                    int32_t const *src = (int32_t const*)base;
+                    int32_t const *src = (int32_t const*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
                     int const      i = end - K;
                     int const      rem = n - i;
                     if (rem >= K) {
@@ -663,8 +662,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     }
                 } NEXT;
                 CASE(op_store_16) {
-                    void     *base = (char*)buf[ip->ptr].ptr + (size_t)row * buf[ip->ptr].row_bytes;
-                    uint16_t *dst = (uint16_t*)base;
+                    uint16_t *dst = (uint16_t*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
                     int const i = end - K;
                     int const rem = n - i;
                     if (rem >= K) {
@@ -678,8 +676,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     }
                 } NEXT;
                 CASE(op_store_32) {
-                    void    *base = (char*)buf[ip->ptr].ptr + (size_t)row * buf[ip->ptr].row_bytes;
-                    int32_t *dst = (int32_t*)base;
+                    int32_t *dst = (int32_t*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
                     int const i = end - K;
                     int const rem = n - i;
                     if (rem >= K) {
@@ -694,13 +691,13 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 } NEXT;
 
                 CASE(op_load_16x4) {
-                    char const *src = (char const*)buf[ip->ptr].ptr + (size_t)row * buf[ip->ptr].row_bytes;
+                    uint64_t const *src = (uint64_t const*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
                     int const i = end - K;
                     int const rem = n - i;
                     U16 hr, hg, hb, ha;
                     if (rem >= K) {
                         U64 px;
-                        __builtin_memcpy(&px, src + i * 8, sizeof px);
+                        __builtin_memcpy(&px, src + i, sizeof px);
                         U64 const mask16 = (U64){0} + 0xFFFFULL;
                         hr = cast(U16,  px        & mask16);
                         hg = cast(U16, (px >> 16) & mask16);
@@ -714,7 +711,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                         __builtin_memset(ta, 0, sizeof ta);
                         for (int ll = 0; ll < rem; ll++) {
                             uint16_t h[4];
-                            __builtin_memcpy(h, src + (i + ll) * 8, 8);
+                            __builtin_memcpy(h, src + i + ll, 8);
                             tr[ll] = h[0]; tg[ll] = h[1]; tb[ll] = h[2]; ta[ll] = h[3];
                         }
                         __builtin_memcpy(&hr, tr, sizeof hr);
@@ -729,16 +726,16 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     ip += 3; v += 3;
                 } NEXT;
                 CASE(op_load_16x4_planar) {
-                    char const *src = (char const*)buf[ip->ptr].ptr + (size_t)row * buf[ip->ptr].row_bytes;
-                    size_t const ps = buf[ip->ptr].sz / 4;
+                    uint16_t const *src = (uint16_t const*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
+                    int const ps = buf[ip->ptr].count / 4;
                     int const i = end - K;
                     int const rem = n - i;
                     U16 hr = {0}, hg = {0}, hb = {0}, ha = {0};
                     if (rem >= K) {
-                        __builtin_memcpy(&hr, src           + i * 2, sizeof hr);
-                        __builtin_memcpy(&hg, src + ps      + i * 2, sizeof hg);
-                        __builtin_memcpy(&hb, src + ps * 2  + i * 2, sizeof hb);
-                        __builtin_memcpy(&ha, src + ps * 3  + i * 2, sizeof ha);
+                        __builtin_memcpy(&hr, src           + i, sizeof hr);
+                        __builtin_memcpy(&hg, src + ps      + i, sizeof hg);
+                        __builtin_memcpy(&hb, src + ps * 2  + i, sizeof hb);
+                        __builtin_memcpy(&ha, src + ps * 3  + i, sizeof ha);
                     } else {
                         uint16_t tr[K], tg[K], tb[K], ta[K];
                         __builtin_memset(tr, 0, sizeof tr);
@@ -747,10 +744,10 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                         __builtin_memset(ta, 0, sizeof ta);
                         for (int ll = 0; ll < rem; ll++) {
                             uint16_t tmp;
-                            __builtin_memcpy(&tmp, src           + (i + ll) * 2, 2); tr[ll] = tmp;
-                            __builtin_memcpy(&tmp, src + ps      + (i + ll) * 2, 2); tg[ll] = tmp;
-                            __builtin_memcpy(&tmp, src + ps * 2  + (i + ll) * 2, 2); tb[ll] = tmp;
-                            __builtin_memcpy(&tmp, src + ps * 3  + (i + ll) * 2, 2); ta[ll] = tmp;
+                            __builtin_memcpy(&tmp, src           + i + ll, 2); tr[ll] = tmp;
+                            __builtin_memcpy(&tmp, src + ps      + i + ll, 2); tg[ll] = tmp;
+                            __builtin_memcpy(&tmp, src + ps * 2  + i + ll, 2); tb[ll] = tmp;
+                            __builtin_memcpy(&tmp, src + ps * 3  + i + ll, 2); ta[ll] = tmp;
                         }
                         __builtin_memcpy(&hr, tr, sizeof hr);
                         __builtin_memcpy(&hg, tg, sizeof hg);
@@ -764,7 +761,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     ip += 3; v += 3;
                 } NEXT;
                 CASE(op_store_16x4) {
-                    char *dst = (char*)buf[ip->ptr].ptr + (size_t)row * buf[ip->ptr].row_bytes;
+                    uint64_t *dst = (uint64_t*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
                     int const i = end - K;
                     int const rem = n - i;
                     U16 hr, hg, hb, ha;
@@ -777,7 +774,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                                      | cast(U64, hg) << 16
                                      | cast(U64, hb) << 32
                                      | cast(U64, ha) << 48;
-                        __builtin_memcpy(dst + i * 8, &px, sizeof px);
+                        __builtin_memcpy(dst + i, &px, sizeof px);
                     } else {
                         uint16_t tr[K], tg[K], tb[K], ta[K];
                         __builtin_memcpy(tr, &hr, sizeof tr);
@@ -786,13 +783,13 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                         __builtin_memcpy(ta, &ha, sizeof ta);
                         for (int ll = 0; ll < rem; ll++) {
                             uint16_t h[4] = {tr[ll], tg[ll], tb[ll], ta[ll]};
-                            __builtin_memcpy(dst + (i + ll) * 8, h, 8);
+                            __builtin_memcpy(dst + i + ll, h, 8);
                         }
                     }
                 } NEXT;
                 CASE(op_store_16x4_planar) {
-                    char *dst = (char*)buf[ip->ptr].ptr + (size_t)row * buf[ip->ptr].row_bytes;
-                    size_t const ps = buf[ip->ptr].sz / 4;
+                    uint16_t *dst = (uint16_t*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
+                    int const ps = buf[ip->ptr].count / 4;
                     int const i = end - K;
                     int const rem = n - i;
                     U16 hr, hg, hb, ha;
@@ -801,10 +798,10 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     __builtin_memcpy(&hb, &v[ip->z], sizeof hb);
                     __builtin_memcpy(&ha, &v[ip->w], sizeof ha);
                     if (rem >= K) {
-                        __builtin_memcpy(dst           + i * 2, &hr, sizeof hr);
-                        __builtin_memcpy(dst + ps      + i * 2, &hg, sizeof hg);
-                        __builtin_memcpy(dst + ps * 2  + i * 2, &hb, sizeof hb);
-                        __builtin_memcpy(dst + ps * 3  + i * 2, &ha, sizeof ha);
+                        __builtin_memcpy(dst           + i, &hr, sizeof hr);
+                        __builtin_memcpy(dst + ps      + i, &hg, sizeof hg);
+                        __builtin_memcpy(dst + ps * 2  + i, &hb, sizeof hb);
+                        __builtin_memcpy(dst + ps * 3  + i, &ha, sizeof ha);
                     } else {
                         uint16_t tr[K], tg[K], tb[K], ta[K];
                         __builtin_memcpy(tr, &hr, sizeof tr);
@@ -812,22 +809,22 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                         __builtin_memcpy(tb, &hb, sizeof tb);
                         __builtin_memcpy(ta, &ha, sizeof ta);
                         for (int ll = 0; ll < rem; ll++) {
-                            __builtin_memcpy(dst           + (i + ll) * 2, &tr[ll], 2);
-                            __builtin_memcpy(dst + ps      + (i + ll) * 2, &tg[ll], 2);
-                            __builtin_memcpy(dst + ps * 2  + (i + ll) * 2, &tb[ll], 2);
-                            __builtin_memcpy(dst + ps * 3  + (i + ll) * 2, &ta[ll], 2);
+                            __builtin_memcpy(dst           + i + ll, &tr[ll], 2);
+                            __builtin_memcpy(dst + ps      + i + ll, &tg[ll], 2);
+                            __builtin_memcpy(dst + ps * 2  + i + ll, &tb[ll], 2);
+                            __builtin_memcpy(dst + ps * 3  + i + ll, &ta[ll], 2);
                         }
                     }
                 } NEXT;
 
                 CASE(op_load_8x4) {
-                    char const *src = (char const*)buf[ip->ptr].ptr + (size_t)row * buf[ip->ptr].row_bytes;
+                    uint32_t const *src = (uint32_t const*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
                     int const i = end - K;
                     int const rem = n - i;
                     U32 const mask8 = (U32){0} + 0xFFu;
                     if (rem >= K) {
                         U32 px;
-                        __builtin_memcpy(&px, src + i * 4, sizeof px);
+                        __builtin_memcpy(&px, src + i, sizeof px);
                         v[0].u32 =  px        & mask8;
                         v[1].u32 = (px >>  8) & mask8;
                         v[2].u32 = (px >> 16) & mask8;
@@ -839,9 +836,10 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                         __builtin_memset(tb, 0, sizeof tb);
                         __builtin_memset(ta, 0, sizeof ta);
                         for (int ll = 0; ll < rem; ll++) {
-                            uint8_t ch[4];
-                            __builtin_memcpy(ch, src + (i + ll) * 4, 4);
-                            tr[ll] = ch[0]; tg[ll] = ch[1]; tb[ll] = ch[2]; ta[ll] = ch[3];
+                            uint32_t px;
+                            __builtin_memcpy(&px, src + i + ll, 4);
+                            tr[ll] = px & 0xFF; tg[ll] = (px>>8) & 0xFF;
+                            tb[ll] = (px>>16) & 0xFF; ta[ll] = px>>24;
                         }
                         __builtin_memcpy(&v[0].u32, tr, sizeof v[0].u32);
                         __builtin_memcpy(&v[1].u32, tg, sizeof v[1].u32);
@@ -851,7 +849,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     ip += 3; v += 3;
                 } NEXT;
                 CASE(op_store_8x4) {
-                    char *dst = (char*)buf[ip->ptr].ptr + (size_t)row * buf[ip->ptr].row_bytes;
+                    uint32_t *dst = (uint32_t*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
                     int const i = end - K;
                     int const rem = n - i;
                     U32 const mask8 = (U32){0} + 0xFFu;
@@ -860,28 +858,29 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                                  | ((v[ip->z].u32 & mask8) << 16)
                                  | ((v[ip->w].u32 & mask8) << 24);
                     if (rem >= K) {
-                        __builtin_memcpy(dst + i * 4, &px, sizeof px);
+                        __builtin_memcpy(dst + i, &px, sizeof px);
                     } else {
                         uint32_t tmp[K];
                         __builtin_memcpy(tmp, &px, sizeof tmp);
                         for (int ll = 0; ll < rem; ll++) {
-                            __builtin_memcpy(dst + (i + ll) * 4, &tmp[ll], 4);
+                            __builtin_memcpy(dst + i + ll, &tmp[ll], 4);
                         }
                     }
                 } NEXT;
 
                 CASE(op_gather_uniform_32) {
                     int const ix = v[ip->x].i32[0];
-                    int const count = (int)(buf[ip->ptr].sz / 4);
+                    int const count = buf[ip->ptr].count;
                     if (ix < 0 || ix >= count) { v->i32 = (I32){0}; break; }
                     int32_t gval;
-                    __builtin_memcpy(&gval, (char const*)buf[ip->ptr].ptr + 4 * ix, 4);
+                    int32_t const *ptr = (int32_t const*)buf[ip->ptr].ptr;
+                    __builtin_memcpy(&gval, ptr + ix, 4);
                     v->i32 = (I32){0} + gval;
                 } NEXT;
                 CASE(op_gather_16) {
-                    int const count = (int)(buf[ip->ptr].sz / 2);
+                    int const count = buf[ip->ptr].count;
                     int const rem = n - (end - K);
-                    char const *ptr = (char const*)buf[ip->ptr].ptr;
+                    uint16_t const *ptr = (uint16_t const*)buf[ip->ptr].ptr;
                     int32_t ix[K];
                     __builtin_memcpy(ix, &v[ip->x].i32, sizeof ix);
                     uint16_t tmp[K];
@@ -889,16 +888,16 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     int const lim = rem < K ? rem : K;
                     for (int ll = 0; ll < lim; ll++) {
                         if (ix[ll] >= 0 && ix[ll] < count) {
-                            __builtin_memcpy(&tmp[ll], ptr + 2 * ix[ll], 2);
+                            __builtin_memcpy(&tmp[ll], ptr + ix[ll], 2);
                         }
                     }
                     v->u32 = (U32){0};
                     __builtin_memcpy(v, tmp, sizeof tmp);
                 } NEXT;
                 CASE(op_gather_32) {
-                    int const count = (int)(buf[ip->ptr].sz / 4);
+                    int const count = buf[ip->ptr].count;
                     int const rem = n - (end - K);
-                    char const *ptr = (char const*)buf[ip->ptr].ptr;
+                    int32_t const *ptr = (int32_t const*)buf[ip->ptr].ptr;
                     int32_t ix[K];
                     __builtin_memcpy(ix, &v[ip->x].i32, sizeof ix);
                     int32_t tmp[K];
@@ -906,7 +905,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     int const lim = rem < K ? rem : K;
                     for (int ll = 0; ll < lim; ll++) {
                         if (ix[ll] >= 0 && ix[ll] < count) {
-                            __builtin_memcpy(&tmp[ll], ptr + 4 * ix[ll], 4);
+                            __builtin_memcpy(&tmp[ll], ptr + ix[ll], 4);
                         }
                     }
                     __builtin_memcpy(&v->i32, tmp, sizeof v->i32);
@@ -914,9 +913,9 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 CASE(op_sample_32) {
                     F32 const ix_f = v[ip->x].f32;
                     F32 const fl   = vec_floor(ix_f);
-                    int const count = (int)(buf[ip->ptr].sz / 4);
+                    int const count = buf[ip->ptr].count;
                     int const rem = n - (end - K);
-                    char const *ptr = (char const*)buf[ip->ptr].ptr;
+                    float const *ptr = (float const*)buf[ip->ptr].ptr;
                     int32_t fl_i[K];
                     { I32 const fl_int = cast(I32, fl);
                       __builtin_memcpy(fl_i, &fl_int, sizeof fl_i); }
@@ -928,10 +927,10 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                         int const li = fl_i[ll];
                         int const hi_ix = li + 1;
                         if (li >= 0 && li < count) {
-                            __builtin_memcpy(&lo[ll], ptr + 4*li, 4);
+                            __builtin_memcpy(&lo[ll], ptr + li, 4);
                         }
                         if (hi_ix >= 0 && hi_ix < count) {
-                            __builtin_memcpy(&hi[ll], ptr + 4*hi_ix, 4);
+                            __builtin_memcpy(&hi[ll], ptr + hi_ix, 4);
                         }
                     }
                     F32 lo_v, hi_v, frac;
@@ -941,16 +940,17 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     v->f32 = lo_v + (hi_v - lo_v) * frac;
                 } NEXT;
 
+                // TODO: convert deref uniform access to typed pointer and int slot
                 CASE(op_deref_ptr) {
-                    char *base = (char*)buf[ip->ptr].ptr + (size_t)row * buf[ip->ptr].row_bytes;
-                    void  *derived;
-                    size_t dsz, drb;
+                    char *base = (char*)((uint32_t*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride);
+                    void *derived;
+                    int   dcount, dstride;
                     __builtin_memcpy(&derived, base + ip->x,      sizeof derived);
-                    __builtin_memcpy(&dsz,     base + ip->x + 8,  sizeof dsz);
-                    __builtin_memcpy(&drb,     base + ip->x + 16, sizeof drb);
-                    buf[ip->y].ptr       = derived;
-                    buf[ip->y].sz        = dsz;
-                    buf[ip->y].row_bytes = drb;
+                    __builtin_memcpy(&dcount,  base + ip->x + 8,  sizeof dcount);
+                    __builtin_memcpy(&dstride, base + ip->x + 12, sizeof dstride);
+                    buf[ip->y].ptr    = derived;
+                    buf[ip->y].count  = dcount;
+                    buf[ip->y].stride = dstride;
                 } NEXT;
 
                 CASE(op_loop_begin) {

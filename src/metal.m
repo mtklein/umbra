@@ -53,7 +53,6 @@ struct metal_program {
     struct deref_info *deref;
     uint8_t  *buf_rw;
     uint8_t  *buf_shift;
-    uint8_t  *buf_row_shift;
     int    max_ptr;
     int    total_bufs;
     int    n_deref;
@@ -235,7 +234,7 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
                      "%suint _row%d = y * m.stride%d;"
-                     " uint _ps%d = m.limit%d;\n"
+                     " uint _ps%d = m.limit%d / 4;\n"
                      "%suint v%d = (uint)p%d[_row%d + x];\n"
                      "%suint v%d_1 = (uint)p%d[_row%d + x + _ps%d];\n"
                      "%suint v%d_2 = (uint)p%d[_row%d + x + 2*_ps%d];\n"
@@ -266,7 +265,7 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                     ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
                 emit(b,
                      "%s{ uint _row = y * m.stride%d;"
-                     " uint _ps = m.limit%d;\n"
+                     " uint _ps = m.limit%d / 4;\n"
                      "%s  p%d[_row + x] = ushort(%s);"
                      " p%d[_row + x + _ps] = ushort(%s);"
                      " p%d[_row + x + 2*_ps] = ushort(%s);"
@@ -812,8 +811,7 @@ static char* build_source(BB const *bb,
                            int *out_max_ptr,
                            int *out_total_bufs,
                            int *out_deref_buf,
-                           uint8_t **out_buf_shift,
-                           uint8_t **out_buf_row_shift) {
+                           uint8_t **out_buf_shift) {
     int max_ptr = -1;
     for (int i = 0; i < bb->insts; i++) {
         if (op_has_ptr(bb->inst[i].op)
@@ -837,14 +835,13 @@ static char* build_source(BB const *bb,
 
     uint8_t *buf_shift     = calloc((size_t)(total_bufs + 1), sizeof *buf_shift);
     uint8_t *buf_row_shift = calloc((size_t)(total_bufs + 1), sizeof *buf_row_shift);
-    *out_buf_shift     = buf_shift;
-    *out_buf_row_shift = buf_row_shift;
+    *out_buf_shift = buf_shift;
     for (int i = 0; i < bb->insts; i++) {
         if (!op_has_ptr(bb->inst[i].op)) { continue; }
         int bi = bb->inst[i].ptr.deref ? deref_buf[bb->inst[i].ptr.ix]
                                       : bb->inst[i].ptr.bits;
         if (bb->inst[i].op == op_load_16x4_planar
-         || bb->inst[i].op == op_store_16x4_planar) { buf_shift[bi] = 3; buf_row_shift[bi] = 1; }
+         || bb->inst[i].op == op_store_16x4_planar) { buf_shift[bi] = 1; buf_row_shift[bi] = 1; }
         else if (bb->inst[i].op == op_load_16x4
               || bb->inst[i].op == op_store_16x4) { buf_shift[bi] = 3; buf_row_shift[bi] = 3; }
         else if (bb->inst[i].op == op_gather_16
@@ -861,6 +858,7 @@ static char* build_source(BB const *bb,
 
     emit(&b, "\n");
 
+    // TODO: rename limit->count in shader code; harmonize buf_szs/buf_limit->buf_count across backends.
     emit(&b, "struct meta { uint w, x0, y0");
     for (int i = 0; i < total_bufs; i++) {
         emit(&b, ", limit%d", i);
@@ -909,6 +907,7 @@ static char* build_source(BB const *bb,
     emit(&b, "}\n");
 
     free(is_f);
+    free(buf_row_shift);
 
     char *src = malloc(b.size + 1);
     __builtin_memcpy(src, b.text, b.size);
@@ -1017,9 +1016,9 @@ static struct metal_program* metal_program(
 
         int *deref_buf = calloc((size_t)bb->insts, sizeof *deref_buf);
         int  max_ptr = -1, total_bufs = 0;
-        uint8_t *buf_shift = NULL, *buf_row_shift = NULL;
+        uint8_t *buf_shift = NULL;
         char *src = build_source(bb, &max_ptr, &total_bufs, deref_buf,
-                                 &buf_shift, &buf_row_shift);
+                                 &buf_shift);
 
         int n_deref = total_bufs - max_ptr - 1;
         struct deref_info *di = calloc((size_t)(n_deref ? n_deref : 1), sizeof *di);
@@ -1079,7 +1078,6 @@ static struct metal_program* metal_program(
             p->n_deref       = n_deref;
             p->buf_rw        = buf_rw;
             p->buf_shift     = buf_shift;
-            p->buf_row_shift = buf_row_shift;
 
             free(deref_buf);
             result = p;
@@ -1091,7 +1089,6 @@ static struct metal_program* metal_program(
         free(di);
         free(buf_rw);
         free(buf_shift);
-        free(buf_row_shift);
         free(src);
     out:;
     }
@@ -1152,13 +1149,13 @@ static void encode_dispatch(
     [enc setComputePipelineState:pso];
 
     int tb = p->total_bufs;
-    uint32_t szs_data[33] = {0};
-    uint32_t rbs_data[33] = {0};
+    uint32_t buf_count[33] = {0};
+    uint32_t buf_stride[33] = {0};
     for (int i = 0; i <= p->max_ptr; i++) {
-        if (buf[i].ptr && buf[i].sz) {
-            szs_data[i] = (uint32_t)(buf[i].sz >> p->buf_shift[i]);
+        if (buf[i].ptr && buf[i].count) {
+            buf_count[i] = (uint32_t)buf[i].count;
         }
-        rbs_data[i]  = (uint32_t)(buf[i].row_bytes >> p->buf_row_shift[i]);
+        buf_stride[i] = (uint32_t)buf[i].stride;
     }
 
     // For each top-level / deref'd binding we need an MTLBuffer + offset.
@@ -1171,15 +1168,16 @@ static void encode_dispatch(
     for (int i = 0; i < tb; i++) { bind_handle[i] = 0; bind_offset[i] = 0; }
 
     for (int i = 0; i <= p->max_ptr; i++) {
-        if (buf[i].ptr && buf[i].sz) {
+        if (buf[i].ptr && buf[i].count) {
+            size_t const bytes = (size_t)buf[i].count << p->buf_shift[i];
             uint8_t const rw = p->buf_rw[i];
-            if (!(rw & BUF_WRITTEN) && !buf[i].row_bytes) {
+            if (!(rw & BUF_WRITTEN) && !buf[i].stride) {
                 struct uniform_ring_loc loc =
-                    uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, buf[i].sz);
+                    uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, bytes);
                 bind_handle[i] = loc.handle;
                 bind_offset[i] = loc.offset;
             } else {
-                int idx = gpu_buf_cache_get(&be->cache, buf[i].ptr, buf[i].sz, rw);
+                int idx = gpu_buf_cache_get(&be->cache, buf[i].ptr, bytes, rw);
                 bind_handle[i] = be->cache.entry[idx].buf.ptr;
             }
         }
@@ -1187,16 +1185,17 @@ static void encode_dispatch(
 
     for (int d = 0; d < p->n_deref; d++) {
         void *base = buf[p->deref[d].src_buf].ptr;
-        void  *derived;
-        size_t dsz, drb;
+        void *derived;
+        int   dcount, dstride;
         __builtin_memcpy(&derived, (char*)base + p->deref[d].off,      sizeof derived);
-        __builtin_memcpy(&dsz,     (char*)base + p->deref[d].off + 8,  sizeof dsz);
-        __builtin_memcpy(&drb,     (char*)base + p->deref[d].off + 16, sizeof drb);
-        int const bi  = p->deref[d].buf_idx;
-        int const idx = gpu_buf_cache_get(&be->cache, derived, dsz, p->buf_rw[bi]);
+        __builtin_memcpy(&dcount,  (char*)base + p->deref[d].off + 8,  sizeof dcount);
+        __builtin_memcpy(&dstride, (char*)base + p->deref[d].off + 12, sizeof dstride);
+        int const bi    = p->deref[d].buf_idx;
+        size_t const db = (size_t)dcount << p->buf_shift[bi];
+        int const idx   = gpu_buf_cache_get(&be->cache, derived, db, p->buf_rw[bi]);
         bind_handle[bi] = be->cache.entry[idx].buf.ptr;
-        szs_data[bi] = (uint32_t)(dsz >> p->buf_shift[bi]);
-        rbs_data[bi] = (uint32_t)(drb >> p->buf_row_shift[bi]);
+        buf_count[bi]    = (uint32_t)dcount;
+        buf_stride[bi]    = (uint32_t)dstride;
     }
 
     for (int i = 0; i < tb; i++) {
@@ -1207,14 +1206,14 @@ static void encode_dispatch(
         }
     }
 
-    // Pack all per-dispatch metadata into one struct: {w, x0, y0, limits[], strides[]}.
+    // Pack all per-dispatch metadata into one struct: {w, x0, y0, count[], stride[]}.
     // Single setBytes call, single buffer binding — matches MoltenVK's pattern.
     uint32_t meta[67] = {0};
     meta[0] = (uint32_t)w;
     meta[1] = (uint32_t)x0;
     meta[2] = (uint32_t)y0;
-    __builtin_memcpy(meta + 3,      szs_data, (size_t)tb * sizeof(uint32_t));
-    __builtin_memcpy(meta + 3 + tb, rbs_data, (size_t)tb * sizeof(uint32_t));
+    __builtin_memcpy(meta + 3,      buf_count, (size_t)tb * sizeof(uint32_t));
+    __builtin_memcpy(meta + 3 + tb, buf_stride, (size_t)tb * sizeof(uint32_t));
     size_t const meta_bytes = (size_t)(3 + 2 * tb) * sizeof(uint32_t);
     [enc setBytes:meta length:meta_bytes atIndex:(NSUInteger)p->total_bufs];
 
@@ -1301,7 +1300,6 @@ static void metal_program_free(struct metal_program *p) {
     free(p->deref);
     free(p->buf_rw);
     free(p->buf_shift);
-    free(p->buf_row_shift);
     free(p->src);
     free(p);
 }

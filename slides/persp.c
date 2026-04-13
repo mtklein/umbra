@@ -43,16 +43,13 @@ static void persp_draw(struct slide *s, int frame, int l, int t, int r, int b, v
     slide_perspective_matrix(st->cov.mat, (float)frame * 0.016f, st->w, st->h,
                              st->bitmap->w, st->bitmap->h);
     st->cov.bmp = (struct umbra_buf){
-        .ptr = st->bitmap->data,
-        .sz  = (size_t)(st->bitmap->w * st->bitmap->h * 2),
+        .ptr   = st->bitmap->data,
+        .count = st->bitmap->w * st->bitmap->h,
     };
     umbra_draw_fill(&st->lay, &st->shader.base, &st->cov.base);
-    size_t    pb = st->fmt.bpp;
-    size_t plane_sz = (size_t)st->w * (size_t)st->h * pb;
-    size_t rb = (size_t)st->w * pb;
     struct umbra_buf ubuf[] = {
-        {.ptr=st->lay.uniforms, .sz=st->lay.uni.size},
-        {.ptr=buf, .sz=plane_sz * (size_t)st->fmt.planes, .row_bytes=rb},
+        {.ptr=st->lay.uniforms, .count=(int)(st->lay.uni.size / 4)},
+        {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
     };
     st->prog->queue(st->prog, l, t, r, b, ubuf);
 }

@@ -39,7 +39,7 @@
   v38  = lt_f32          v30 v16
   v39  = and_32          v37 v38
   v40  = and_32          v36 v39
-  v41  = uniform_32      p0 byte72
+  v41  = uniform_32      p0 byte64
   v42  = imm_32          0x6
   v43  = mul_i32         v41 v42
   v44  = mul_i32_imm     v41 0x6 (a.k.a. v42)

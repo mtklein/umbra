@@ -63,6 +63,6 @@ kernel void umbra_entry(
     uint _hi32 = p2[min((uint)((int)_si32+1), m.limit2 - 1u)] & (((uint)((int)_si32+1) < m.limit2) ? ~0u : 0u);
     float v32 = as_type<float>(_lo32) + (as_type<float>(_hi32) - as_type<float>(_lo32)) * _fr32;
     uint v33 = (uint)as_type<ushort>((half)v32);
-    { uint _row = y * m.stride1; uint _ps = m.limit1;
+    { uint _row = y * m.stride1; uint _ps = m.limit1 / 4;
       p1[_row + x] = ushort(v24); p1[_row + x + _ps] = ushort(v30); p1[_row + x + 2*_ps] = ushort(v33); p1[_row + x + 3*_ps] = ushort(v27); }
 }

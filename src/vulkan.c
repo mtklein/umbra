@@ -99,7 +99,6 @@ struct vk_program {
     struct deref_info *deref;
     uint8_t          *buf_rw;
     uint8_t          *buf_shift;
-    uint8_t          *buf_row_shift;
 
     uint32_t *spirv;
     int       spirv_words, :32;
@@ -289,17 +288,18 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     }
 
     for (int i = 0; i <= vp->max_ptr; i++) {
-        if (buf[i].ptr && buf[i].sz) {
+        if (buf[i].ptr && buf[i].count) {
+            size_t const bytes = (size_t)buf[i].count << vp->buf_shift[i];
             uint8_t const rw = vp->buf_rw[i];
-            if (!(rw & BUF_WRITTEN) && !buf[i].row_bytes) {
+            if (!(rw & BUF_WRITTEN) && !buf[i].stride) {
                 struct uniform_ring_loc loc =
-                    uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, buf[i].sz);
+                    uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, bytes);
                 struct vk_ring_chunk *chunk = loc.handle;
                 bind_buffer[i] = chunk->buf;
                 bind_offset[i] = (VkDeviceSize)loc.offset;
-                bind_range [i] = (VkDeviceSize)buf[i].sz;
+                bind_range [i] = (VkDeviceSize)bytes;
             } else {
-                int idx = gpu_buf_cache_get(&be->cache, buf[i].ptr, buf[i].sz, rw);
+                int idx = gpu_buf_cache_get(&be->cache, buf[i].ptr, bytes, rw);
                 struct vk_buf_handle *bh = be->cache.entry[idx].buf.ptr;
                 bind_buffer[i] = bh->buf;
                 bind_range [i] = VK_WHOLE_SIZE;
@@ -313,26 +313,27 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     push_data[2] = (uint32_t)t;
 
     for (int i = 0; i <= vp->max_ptr; i++) {
-        push_data[3 + i] = (uint32_t)(buf[i].sz >> vp->buf_shift[i]);
-        push_data[3 + vp->total_bufs + i] = (uint32_t)(buf[i].row_bytes >> vp->buf_row_shift[i]);
+        push_data[3 + i]                    = (uint32_t)buf[i].count;
+        push_data[3 + vp->total_bufs + i] = (uint32_t)buf[i].stride;
     }
 
     for (int d = 0; d < vp->n_deref; d++) {
         char *base = (char *)buf[vp->deref[d].src_buf].ptr;
-        void  *derived;
-        size_t dsz, drb;
+        void *derived;
+        int   dcount, dstride;
         memcpy(&derived, base + vp->deref[d].off,      sizeof derived);
-        memcpy(&dsz,     base + vp->deref[d].off + 8,  sizeof dsz);
-        memcpy(&drb,     base + vp->deref[d].off + 16, sizeof drb);
+        memcpy(&dcount,  base + vp->deref[d].off + 8,  sizeof dcount);
+        memcpy(&dstride, base + vp->deref[d].off + 12, sizeof dstride);
         int bi = vp->deref[d].buf_idx;
 
-        int idx = gpu_buf_cache_get(&be->cache, derived, dsz, vp->buf_rw[bi]);
+        size_t const db = (size_t)dcount << vp->buf_shift[bi];
+        int idx = gpu_buf_cache_get(&be->cache, derived, db, vp->buf_rw[bi]);
         struct vk_buf_handle *bh = be->cache.entry[idx].buf.ptr;
         bind_buffer[bi] = bh->buf;
         bind_range [bi] = VK_WHOLE_SIZE;
 
-        push_data[3 + bi] = (uint32_t)(dsz >> vp->buf_shift[bi]);
-        push_data[3 + vp->total_bufs + bi] = (uint32_t)(drb >> vp->buf_row_shift[bi]);
+        push_data[3 + bi]                    = (uint32_t)dcount;
+        push_data[3 + vp->total_bufs + bi] = (uint32_t)dstride;
     }
 
     for (int i = 0; i < n; i++) {
@@ -449,7 +450,6 @@ static void vk_program_free(struct umbra_program *p) {
     free(vp->deref);
     free(vp->buf_rw);
     free(vp->buf_shift);
-    free(vp->buf_row_shift);
     free(vp->spirv);
     free(vp);
 }
@@ -547,8 +547,8 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
     p->push_words  = sr.push_words;
     p->deref       = sr.deref;
     p->buf_rw        = sr.buf_rw;
-    p->buf_shift     = sr.buf_shift;
-    p->buf_row_shift = sr.buf_row_shift;
+    p->buf_shift = sr.buf_shift;
+    free(sr.buf_row_shift);
     p->spirv       = sr.spirv;
     p->spirv_words = sr.spirv_words;
 

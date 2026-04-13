@@ -1,6 +1,6 @@
   v0   = imm_32          0x0
   v1   = deref_ptr       p0 byte16
-  v2   = deref_ptr       p0 byte40
+  v2   = deref_ptr       p0 byte32
   v3   = uniform_32      p0 byte0
   v4   = uniform_32      p0 byte4
   v5   = uniform_32      p0 byte8

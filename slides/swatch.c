@@ -54,11 +54,6 @@ static void swatch_draw(struct slide *s, int frame, int l, int t, int r, int b, 
     int const cw = st->w / COLS,
               ch = st->h / ROWS;
 
-    size_t const pb       = st->fmt.bpp;
-    size_t const rb       = (size_t)st->w * pb;
-    size_t const plane_sz = (size_t)st->w * (size_t)st->h * pb;
-    size_t const sz       = plane_sz * (size_t)st->fmt.planes;
-
     for (int i = 0; i < N; i++) {
         int const col = i % COLS,
                   row = i / COLS;
@@ -76,8 +71,8 @@ static void swatch_draw(struct slide *s, int frame, int l, int t, int r, int b, 
         __builtin_memcpy(st->shader.color, swatches[i], sizeof st->shader.color);
         umbra_draw_fill(&st->lay, &st->shader.base, NULL);
         struct umbra_buf ubuf[] = {
-            {.ptr = st->lay.uniforms, .sz = st->lay.uni.size},
-            {.ptr = buf, .sz = sz, .row_bytes = rb},
+            {.ptr = st->lay.uniforms, .count = (int)(st->lay.uni.size / 4)},
+            {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
         };
         st->prog->queue(st->prog, xl, yt, xr, yb, ubuf);
     }

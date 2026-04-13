@@ -102,6 +102,6 @@ kernel void umbra_entry(
     uint v76 = (uint)as_type<ushort>((half)as_type<float>(v75));
     uint v77 = var3;
     uint v78 = (uint)as_type<ushort>((half)as_type<float>(v77));
-    { uint _row = y * m.stride1; uint _ps = m.limit1;
+    { uint _row = y * m.stride1; uint _ps = m.limit1 / 4;
       p1[_row + x] = ushort(v72); p1[_row + x + _ps] = ushort(v74); p1[_row + x + 2*_ps] = ushort(v76); p1[_row + x + 3*_ps] = ushort(v78); }
 }

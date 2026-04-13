@@ -1,52 +1,53 @@
 Iterations:        100
-Instructions:      1800
-Total Cycles:      656
-Total uOps:        1800
+Instructions:      1900
+Total Cycles:      644
+Total uOps:        1900
 
 Dispatch Width:    6
-uOps Per Cycle:    2.74
-IPC:               2.74
+uOps Per Cycle:    2.95
+IPC:               2.95
 Block RThroughput: 5.5
 
 
-Cycles with backend pressure increase [ 92.68% ]
+Cycles with backend pressure increase [ 91.46% ]
 Throughput Bottlenecks: 
-  Resource Pressure       [ 71.04% ]
-  - CyUnitIS  [ 44.66% ]
-  - CyUnitLS  [ 56.10% ]
-  Data Dependencies:      [ 57.77% ]
-  - Register Dependencies [ 57.77% ]
+  Resource Pressure       [ 83.85% ]
+  - CyUnitIS  [ 60.40% ]
+  - CyUnitLS  [ 59.94% ]
+  Data Dependencies:      [ 42.55% ]
+  - Register Dependencies [ 42.55% ]
   - Memory Dependencies   [ 0.00% ]
 
 Critical sequence based on the simulation:
 
               Instruction                                 Dependency Information
- +----< 7.    str	d6, [x13]
+ +----< 4.    ldr	w10, [x2, #24]
  |
  |    < loop carried > 
  |
- +----> 0.    ldr	x8, [x2, #24]                     ## RESOURCE interference:  CyUnitLS [ probability: 19% ]
- +----> 1.    ldr	x10, [x2, #40]                    ## RESOURCE interference:  CyUnitLS [ probability: 57% ]
- |      2.    madd	x8, x14, x10, x8
- +----> 3.    ldr	x10, [x2, #32]                    ## RESOURCE interference:  CyUnitLS [ probability: 61% ]
- +----> 4.    lsr	x10, x10, #2                      ## REGISTER dependency:  x10
- |      5.    lsl	x13, x9, #1
- |      6.    add	x13, x8, x13
- |      7.    str	d6, [x13]
- |      8.    str	d7, [x13, #8]
- +----> 9.    add	x13, x13, x10                     ## REGISTER dependency:  x10
- +----> 10.   str	d16, [x13]                        ## REGISTER dependency:  x13
- |      11.   str	d17, [x13, #8]
- |      12.   add	x13, x13, x10
- +----> 13.   str	d18, [x13]                        ## RESOURCE interference:  CyUnitLS [ probability: 60% ]
- |      14.   str	d19, [x13, #8]
- |      15.   add	x13, x13, x10
- +----> 16.   str	d20, [x13]                        ## RESOURCE interference:  CyUnitLS [ probability: 39% ]
- |      17.   str	d21, [x13, #8]
+ +----> 0.    ldr	x8, [x2, #16]                     ## RESOURCE interference:  CyUnitLS [ probability: 41% ]
+ +----> 1.    ldr	w10, [x2, #28]                    ## RESOURCE interference:  CyUnitLS [ probability: 42% ]
+ |      2.    lsl	x10, x10, #1
+ |      3.    madd	x8, x14, x10, x8
+ +----> 4.    ldr	w10, [x2, #24]                    ## RESOURCE interference:  CyUnitLS [ probability: 56% ]
+ +----> 5.    lsr	x10, x10, #1                      ## REGISTER dependency:  w10
+ +----> 6.    lsl	x13, x9, #1                       ## RESOURCE interference:  CyUnitIS [ probability: 14% ]
+ +----> 7.    add	x13, x8, x13                      ## REGISTER dependency:  x13
+ +----> 8.    str	d6, [x13]                         ## REGISTER dependency:  x13
+ |      9.    str	d7, [x13, #8]
+ |      10.   add	x13, x13, x10
+ +----> 11.   str	d16, [x13]                        ## RESOURCE interference:  CyUnitLS [ probability: 57% ]
+ |      12.   str	d17, [x13, #8]
+ |      13.   add	x13, x13, x10
+ +----> 14.   str	d18, [x13]                        ## RESOURCE interference:  CyUnitLS [ probability: 43% ]
+ |      15.   str	d19, [x13, #8]
+ |      16.   add	x13, x13, x10
+ |      17.   str	d20, [x13]
+ |      18.   str	d21, [x13, #8]
  |
  |    < loop carried > 
  |
- +----> 3.    ldr	x10, [x2, #32]                    ## RESOURCE interference:  CyUnitLS [ probability: 39% ]
+ +----> 4.    ldr	w10, [x2, #24]                    ## RESOURCE interference:  CyUnitLS [ probability: 26% ]
 
 
 Instruction Info:
@@ -58,11 +59,12 @@ Instruction Info:
 [6]: HasSideEffects (U)
 
 [1]    [2]    [3]    [4]    [5]    [6]    Instructions:
- 1      4     0.50    *                   ldr	x8, [x2, #24]
- 1      4     0.50    *                   ldr	x10, [x2, #40]
+ 1      4     0.50    *                   ldr	x8, [x2, #16]
+ 1      4     0.50    *                   ldr	w10, [x2, #28]
+ 1      1     0.50                        lsl	x10, x10, #1
  1      5     1.00                        madd	x8, x14, x10, x8
- 1      4     0.50    *                   ldr	x10, [x2, #32]
- 1      1     0.50                        lsr	x10, x10, #2
+ 1      4     0.50    *                   ldr	w10, [x2, #24]
+ 1      1     0.50                        lsr	x10, x10, #1
  1      1     0.50                        lsl	x13, x9, #1
  1      2     1.00                        add	x13, x8, x13
  1      4     0.50           *            str	d6, [x13]
@@ -106,25 +108,26 @@ Resources:
 
 Resource pressure per iteration:
 [0.0]  [0.1]  [1]    [2.0]  [2.1]  [3.0]  [3.1]  [3.2]  [3.3]  [4]    [5]    [6.0]  [6.1]  [7]    [8.0]  [8.1]  [9.0]  [9.1]  [9.2]  [10]   [11]   [12.0] [12.1] 
-0.50   0.50   1.00    -      -     2.76   2.75   2.75   2.74    -     1.00   4.82   5.18    -     5.50   5.50    -      -      -      -      -      -      -     
+0.50   0.50   1.00    -      -     3.26   2.73   3.28   2.73    -     1.00   5.51   5.49    -     5.50   5.50    -      -      -      -      -      -      -     
 
 Resource pressure by instruction:
 [0.0]  [0.1]  [1]    [2.0]  [2.1]  [3.0]  [3.1]  [3.2]  [3.3]  [4]    [5]    [6.0]  [6.1]  [7]    [8.0]  [8.1]  [9.0]  [9.1]  [9.2]  [10]   [11]   [12.0] [12.1] Instructions:
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldr	x8, [x2, #24]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldr	x10, [x2, #40]
-0.50   0.50   1.00    -      -     0.23   0.27   0.26   0.24    -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     madd	x8, x14, x10, x8
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldr	x10, [x2, #32]
- -      -      -      -      -     0.26   0.25   0.25   0.24    -      -     0.95   0.05    -      -      -      -      -      -      -      -      -      -     lsr	x10, x10, #2
- -      -      -      -      -     0.25   0.23   0.24   0.28    -      -     0.59   0.41    -      -      -      -      -      -      -      -      -      -     lsl	x13, x9, #1
- -      -      -      -      -     0.48   0.48   0.50   0.54    -      -     1.18   0.82    -      -      -      -      -      -      -      -      -      -     add	x13, x8, x13
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     str	d6, [x13]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     str	d7, [x13, #8]
- -      -      -      -      -     0.52   0.54   0.46   0.48    -      -     0.82   1.18    -      -      -      -      -      -      -      -      -      -     add	x13, x13, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.49   0.51    -      -      -      -      -      -      -     str	d16, [x13]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.51   0.49    -      -      -      -      -      -      -     str	d17, [x13, #8]
- -      -      -      -      -     0.48   0.52   0.54   0.46    -      -     0.82   1.18    -      -      -      -      -      -      -      -      -      -     add	x13, x13, x10
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldr	x8, [x2, #16]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldr	w10, [x2, #28]
+ -      -      -      -      -     0.02   0.41   0.15   0.42    -      -     0.47   0.53    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #1
+0.50   0.50   1.00    -      -     0.29   0.28   0.16   0.27    -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     madd	x8, x14, x10, x8
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldr	w10, [x2, #24]
+ -      -      -      -      -     0.14   0.28   0.14   0.44    -      -     0.51   0.49    -      -      -      -      -      -      -      -      -      -     lsr	x10, x10, #1
+ -      -      -      -      -     0.29   0.30   0.27   0.14    -      -     0.49   0.51    -      -      -      -      -      -      -      -      -      -     lsl	x13, x9, #1
+ -      -      -      -      -     0.02   0.56   0.56   0.86    -      -     1.06   0.94    -      -      -      -      -      -      -      -      -      -     add	x13, x8, x13
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.48   0.52    -      -      -      -      -      -      -     str	d6, [x13]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.52   0.48    -      -      -      -      -      -      -     str	d7, [x13, #8]
+ -      -      -      -      -     0.54   0.28   0.90   0.28    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x13, x13, x10
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.48   0.52    -      -      -      -      -      -      -     str	d16, [x13]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.52   0.48    -      -      -      -      -      -      -     str	d17, [x13, #8]
+ -      -      -      -      -     1.12   0.32   0.26   0.30    -      -     1.02   0.98    -      -      -      -      -      -      -      -      -      -     add	x13, x13, x10
  -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.49   0.51    -      -      -      -      -      -      -     str	d18, [x13]
  -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.51   0.49    -      -      -      -      -      -      -     str	d19, [x13, #8]
- -      -      -      -      -     0.54   0.46   0.50   0.50    -      -     0.46   1.54    -      -      -      -      -      -      -      -      -      -     add	x13, x13, x10
+ -      -      -      -      -     0.84   0.30   0.84   0.02    -      -     0.96   1.04    -      -      -      -      -      -      -      -      -      -     add	x13, x13, x10
  -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.49   0.51    -      -      -      -      -      -      -     str	d20, [x13]
  -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.51   0.49    -      -      -      -      -      -      -     str	d21, [x13, #8]

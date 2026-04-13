@@ -79,10 +79,9 @@ static void free_pipes(void) {
 static void fill_bg_for_slide(int fi, struct umbra_fmt fmt, int slide_idx, void *dst) {
     struct slide *s = slide_get(slide_idx);
     umbra_uniforms_fill_f32(fills[fi].uniforms, 0, s->bg, 4);
-    size_t const rb = (size_t)W * fmt.bpp;
     struct umbra_buf buf[2] = {
-        {.ptr=fills[fi].uniforms, .sz=fills[fi].uni.size},
-        {.ptr=dst, .sz=rb * H * (size_t)fmt.planes, .row_bytes=rb},
+        {.ptr=fills[fi].uniforms, .count=(int)(fills[fi].uni.size / 4)},
+        {.ptr=dst, .count=W * H * fmt.planes, .stride=W},
     };
     fills[fi].prog->queue(fills[fi].prog, 0, 0, W, H, buf);
 }
@@ -168,8 +167,8 @@ TEST(test_slug_rect) {
 
     struct umbra_shader_solid shader = umbra_shader_solid(color);
     struct umbra_coverage_wind cov = umbra_coverage_wind(
-        (struct umbra_buf){.ptr=wind_buf, .sz=sizeof wind_buf,
-                           .row_bytes=(size_t)W * sizeof(float)});
+        (struct umbra_buf){.ptr=wind_buf, .count=sizeof wind_buf / 4,
+                           .stride=W});
 
     struct umbra_draw_layout lay;
     struct umbra_builder *bld = umbra_draw_build(
@@ -193,10 +192,10 @@ TEST(test_slug_rect) {
     };
     umbra_uniforms_fill_f32(alay.uniforms, alay.mat, mat, 11);
     umbra_uniforms_fill_ptr(alay.uniforms, alay.curves_off,
-        (struct umbra_buf){.ptr=rect, .sz=sizeof rect});
+        (struct umbra_buf){.ptr=rect, .count=sizeof rect / 4});
     struct umbra_buf abuf[] = {
-        (struct umbra_buf){.ptr=alay.uniforms, .sz=alay.uni.size},
-        {.ptr=wind_buf, .sz=sizeof wind_buf, .row_bytes=W * sizeof(float)},
+        (struct umbra_buf){.ptr=alay.uniforms, .count=(int)(alay.uni.size / 4)},
+        {.ptr=wind_buf, .count=sizeof wind_buf / 4, .stride=W},
     };
     for (int j = 0; j < 4; j++) {
         float jf;
@@ -209,8 +208,8 @@ TEST(test_slug_rect) {
 
     umbra_draw_fill(&lay, &shader.base, &cov.base);
     struct umbra_buf buf[] = {
-        (struct umbra_buf){.ptr=lay.uniforms, .sz=lay.uni.size},
-        {.ptr=pixels, .sz=sizeof pixels, .row_bytes=W * 4},
+        (struct umbra_buf){.ptr=lay.uniforms, .count=(int)(lay.uni.size / 4)},
+        {.ptr=pixels, .count=W * H, .stride=W},
     };
     interp->queue(interp, 0, 0, W, H, buf);
     be->flush(be);
@@ -248,7 +247,7 @@ TEST(test_perspective_text) {
 
     struct umbra_shader_solid shader = umbra_shader_solid(color);
     struct umbra_coverage_bitmap_matrix cov = umbra_coverage_bitmap_matrix(mat,
-        (struct umbra_buf){.ptr=bmp, .sz=sizeof bmp});
+        (struct umbra_buf){.ptr=bmp, .count=BW * BH});
 
     struct umbra_draw_layout lay;
     struct umbra_builder *bld = umbra_draw_build(
@@ -269,8 +268,8 @@ TEST(test_perspective_text) {
 
     umbra_draw_fill(&lay, &shader.base, &cov.base);
     struct umbra_buf buf[] = {
-        (struct umbra_buf){.ptr=lay.uniforms, .sz=lay.uni.size},
-        {.ptr=pixels, .sz=sizeof pixels},
+        (struct umbra_buf){.ptr=lay.uniforms, .count=(int)(lay.uni.size / 4)},
+        {.ptr=pixels, .count=BW},
     };
     interp->queue(interp, 0, 0, BW, 1, buf);
     be->flush(be);
@@ -289,7 +288,7 @@ TEST(test_perspective_text) {
 
     struct umbra_shader_solid shader2 = umbra_shader_solid(hc2);
     struct umbra_coverage_bitmap_matrix cov2 = umbra_coverage_bitmap_matrix(mat2,
-        (struct umbra_buf){.ptr=tc.data, .sz=(size_t)(W * H * 2)});
+        (struct umbra_buf){.ptr=tc.data, .count=W * H});
 
     struct umbra_draw_layout lay2;
     bld = umbra_draw_build(
@@ -308,8 +307,8 @@ TEST(test_perspective_text) {
     {
         umbra_draw_fill(&lay2, &shader2.base, &cov2.base);
         struct umbra_buf b2[] = {
-            (struct umbra_buf){.ptr=lay2.uniforms, .sz=lay2.uni.size},
-            {.ptr=px2, .sz=(size_t)(W * H * 4), .row_bytes=W * 4},
+            (struct umbra_buf){.ptr=lay2.uniforms, .count=(int)(lay2.uni.size / 4)},
+            {.ptr=px2, .count=W * H, .stride=W},
         };
         interp->queue(interp, 0, 0, W, H, b2);
         be->flush(be);
@@ -362,8 +361,8 @@ static void run_long_batch_no_oom(struct umbra_backend *be) {
         float    color[4] = {0, 0, 0, 1};
         uint32_t pixel    = 0;
         struct umbra_buf bufs[] = {
-            {.ptr=color, .sz=sizeof color},
-            {.ptr=&pixel, .sz=sizeof pixel, .row_bytes=sizeof pixel},
+            {.ptr=color, .count=sizeof color / 4},
+            {.ptr=&pixel, .count=1, .stride=1},
         };
         int const N = 12000;
         for (int i = 0; i < N; i++) {
@@ -419,7 +418,7 @@ static void run_tiled_writable_sync(struct umbra_backend *be) {
     data != NULL here;
 
     struct umbra_buf bufs[] = {
-        {.ptr=data, .sz=buf_sz, .row_bytes=BW * sizeof(float)},
+        {.ptr=data, .count=BW * BH, .stride=BW},
     };
 
     for (int frame = 0; frame < 3; frame++) {
@@ -482,8 +481,8 @@ TEST(test_wgpu_misc) {
     float uniform_data[2] = {1.0f, 0.0f};
     uint32_t pixel = 0;
     struct umbra_buf bufs[] = {
-        {.ptr=uniform_data, .sz=7},
-        {.ptr=&pixel, .sz=sizeof pixel, .row_bytes=sizeof pixel},
+        {.ptr=uniform_data, .count=7 / 4},
+        {.ptr=&pixel, .count=1, .stride=1},
     };
     p->queue(p, 0, 0, 1, 1, bufs);
     be->flush(be);

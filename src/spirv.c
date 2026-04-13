@@ -232,7 +232,7 @@ typedef struct {
     // Metadata push constant layout (no user uniforms — those go through the
     // uniform ring as a storage buffer at binding 0):
     //   [0] = w, [1] = x0, [2] = y0,
-    //   [3..3+total_bufs-1] = buf_szs, [3+total_bufs..3+2*total_bufs-1] = buf_rbs
+    //   [3..3+total_bufs-1] = buf_count, [3+total_bufs..3+2*total_bufs-1] = buf_stride
     int total_bufs;
     int push_words;
 
@@ -478,8 +478,8 @@ static int resolve_ptr(SpvBuilder *b, struct bb_inst const *inst) {
 }
 
 // Load a metadata word from the push constant block at a given word offset.
-// The push block carries only backend-side metadata (w, x0, y0, buf_szs,
-// buf_rbs); user uniforms ride in storage buffer binding 0 via the ring.
+// The push block carries only backend-side metadata (w, x0, y0, buf_count,
+// buf_stride); user uniforms ride in storage buffer binding 0 via the ring.
 // Push layout is struct { uint data[N]; }, so we need two indices:
 // member 0, then array element.
 static uint32_t load_meta_u32(SpvBuilder *b, uint32_t offset_id) {
@@ -537,7 +537,7 @@ static uint32_t compute_addr(SpvBuilder *b, uint32_t x, uint32_t y, int buf_idx)
     return spv_binop(b, SpvOpIAdd, b->t_u32, row_off, x);
 }
 
-// buf_limit[buf_idx] (element count) is at push offset 3 + buf_idx.
+// buf_count[buf_idx] (element count) is at push offset 3 + buf_idx.
 // Returns (clamped_index, oob_mask) where oob_mask is 0xFFFFFFFF for in-bounds, 0 for OOB.
 static void gather_safe(SpvBuilder *b, uint32_t ix_val, int buf_idx,
                          uint32_t *out_idx, uint32_t *out_mask) {
@@ -650,7 +650,9 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
         buf_rw[p] |= op_is_store(bb->inst[i].op) ? BUF_WRITTEN : BUF_READ;
         if      (bb->inst[i].op == op_gather_16)        { buf_shift[p] = 1; }
         else if (bb->inst[i].op == op_load_16x4_planar
-              || bb->inst[i].op == op_store_16x4_planar) { buf_shift[p] = 3; buf_row_shift[p] = 1; }
+              || bb->inst[i].op == op_store_16x4_planar) { buf_shift[p] = 1; buf_row_shift[p] = 1; }
+        else if (bb->inst[i].op == op_load_16x4
+              || bb->inst[i].op == op_store_16x4)        { buf_shift[p] = 3; buf_row_shift[p] = 3; }
         else if (bb->inst[i].op == op_load_16
               || bb->inst[i].op == op_store_16)          { buf_shift[p] = 1; buf_row_shift[p] = 1; }
         else                                             { buf_shift[p] = 2; buf_row_shift[p] = 2; }
@@ -659,7 +661,8 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
     result.buf_shift     = buf_shift;
     result.buf_row_shift = buf_row_shift;
 
-    // Push constant layout: w, x0, y0, buf_szs[total_bufs], buf_rbs[total_bufs].
+    // TODO: rename buf_szs->buf_count, buf_rbs->buf_stride throughout SPIR-V and comments.
+    // Push constant layout: w, x0, y0, buf_count[total_bufs], buf_stride[total_bufs].
     // User uniforms (buf[0]) go through the per-batch uniform ring as a
     // storage buffer at descriptor binding 0; only this small backend-side
     // metadata rides in push constants.
@@ -1242,10 +1245,12 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                     store_ssbo_u32(&B, p, addr, px);
                 } break;
 
+                // TODO: consider u64 SSBO element type so stride/count work directly in pixel units.
                 case op_load_16x4: {
                     int p = resolve_ptr(&B, inst);
                     uint32_t stride_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
                     uint32_t stride = load_meta_u32(&B, stride_off);
+                    stride = spv_binop(&B, SpvOpIMul, B.t_u32, stride, B.c_2);
                     uint32_t row_off = spv_binop(&B, SpvOpIMul, B.t_u32, y_coord, stride);
                     uint32_t x_off = spv_binop(&B, SpvOpIMul, B.t_u32, x_coord, B.c_2);
                     uint32_t base = spv_binop(&B, SpvOpIAdd, B.t_u32, row_off, x_off);
@@ -1264,7 +1269,9 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                 case op_load_16x4_planar: {
                     int p = resolve_ptr(&B, inst);
                     uint32_t lim_off = spv_const_u32(&B, (uint32_t)(3 + p));
-                    uint32_t ps_f16 = load_meta_u32(&B, lim_off);
+                    uint32_t total  = load_meta_u32(&B, lim_off);
+                    uint32_t c4     = spv_const_u32(&B, 4);
+                    uint32_t ps_f16 = spv_binop(&B, SpvOpUDiv, B.t_u32, total, c4);
 
                     uint32_t stride_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
                     uint32_t stride = load_meta_u32(&B, stride_off);
@@ -1292,10 +1299,12 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                     B.is_f[i] = 1;
                 } break;
 
+                // TODO: consider u64 SSBO element type so stride/count work directly in pixel units.
                 case op_store_16x4: {
                     int p = resolve_ptr(&B, inst);
                     uint32_t stride_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
                     uint32_t stride = load_meta_u32(&B, stride_off);
+                    stride = spv_binop(&B, SpvOpIMul, B.t_u32, stride, B.c_2);
                     uint32_t row_off = spv_binop(&B, SpvOpIMul, B.t_u32, y_coord, stride);
                     uint32_t x_off = spv_binop(&B, SpvOpIMul, B.t_u32, x_coord, B.c_2);
                     uint32_t base = spv_binop(&B, SpvOpIAdd, B.t_u32, row_off, x_off);
@@ -1322,7 +1331,9 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
                 case op_store_16x4_planar: {
                     int p = resolve_ptr(&B, inst);
                     uint32_t lim_off = spv_const_u32(&B, (uint32_t)(3 + p));
-                    uint32_t ps_f16 = load_meta_u32(&B, lim_off);
+                    uint32_t total  = load_meta_u32(&B, lim_off);
+                    uint32_t c4     = spv_const_u32(&B, 4);
+                    uint32_t ps_f16 = spv_binop(&B, SpvOpUDiv, B.t_u32, total, c4);
 
                     uint32_t stride_off = spv_const_u32(&B, (uint32_t)(3 + B.total_bufs + p));
                     uint32_t stride = load_meta_u32(&B, stride_off);

@@ -1,41 +1,43 @@
 Iterations:        100
-Instructions:      1400
-Total Cycles:      412
-Total uOps:        1400
+Instructions:      1500
+Total Cycles:      413
+Total uOps:        1500
 
 Dispatch Width:    6
-uOps Per Cycle:    3.40
-IPC:               3.40
+uOps Per Cycle:    3.63
+IPC:               3.63
 Block RThroughput: 4.0
 
 
-Cycles with backend pressure increase [ 28.40% ]
+Cycles with backend pressure increase [ 42.37% ]
 Throughput Bottlenecks: 
-  Resource Pressure       [ 25.97% ]
-  - Zn4ALU1  [ 0.49% ]
-  - Zn4FPSt  [ 25.97% ]
-  - Zn4LSU  [ 1.94% ]
-  Data Dependencies:      [ 28.40% ]
-  - Register Dependencies [ 28.40% ]
+  Resource Pressure       [ 39.71% ]
+  - Zn4ALU1  [ 1.69% ]
+  - Zn4ALU2  [ 0.24% ]
+  - Zn4FPSt  [ 39.47% ]
+  - Zn4LSU  [ 1.69% ]
+  Data Dependencies:      [ 42.37% ]
+  - Register Dependencies [ 42.37% ]
   - Memory Dependencies   [ 0.00% ]
 
 Critical sequence based on the simulation:
 
               Instruction                                 Dependency Information
-        0.    movq	24(%rdx), %r11
- +----< 1.    movq	40(%rdx), %rax
- +----> 2.    imulq	%r14, %rax                        ## REGISTER dependency:  %rax
- +----> 3.    addq	%rax, %r11                        ## REGISTER dependency:  %rax
- |      4.    movq	%r11, %r11
- |      5.    movq	32(%rdx), %rax
- |      6.    shrq	$2, %rax
- +----> 7.    vmovdqu	%xmm1, (%r11,%r10,2)              ## REGISTER dependency:  %r11
-        8.    addq	%rax, %r11
-        9.    vmovdqu	%xmm2, (%r11,%r10,2)
-        10.   addq	%rax, %r11
-        11.   vmovdqu	%xmm3, (%r11,%r10,2)
-        12.   addq	%rax, %r11
-        13.   vmovdqu	%xmm4, (%r11,%r10,2)
+        0.    movq	16(%rdx), %r11
+ +----< 1.    movl	28(%rdx), %eax
+ +----> 2.    shlq	%rax                              ## REGISTER dependency:  %eax
+ +----> 3.    imulq	%r14, %rax                        ## REGISTER dependency:  %rax
+ +----> 4.    addq	%rax, %r11                        ## REGISTER dependency:  %rax
+ |      5.    movq	%r11, %r11
+ |      6.    movl	24(%rdx), %eax
+ |      7.    shrq	%rax
+ +----> 8.    vmovdqu	%xmm1, (%r11,%r10,2)              ## REGISTER dependency:  %r11
+        9.    addq	%rax, %r11
+        10.   vmovdqu	%xmm2, (%r11,%r10,2)
+        11.   addq	%rax, %r11
+        12.   vmovdqu	%xmm3, (%r11,%r10,2)
+        13.   addq	%rax, %r11
+        14.   vmovdqu	%xmm4, (%r11,%r10,2)
 
 
 Instruction Info:
@@ -47,13 +49,14 @@ Instruction Info:
 [6]: HasSideEffects (U)
 
 [1]    [2]    [3]    [4]    [5]    [6]    Instructions:
- 1      5     0.33    *                   movq	24(%rdx), %r11
- 1      5     0.33    *                   movq	40(%rdx), %rax
+ 1      5     0.33    *                   movq	16(%rdx), %r11
+ 1      5     0.33    *                   movl	28(%rdx), %eax
+ 1      1     0.50                        shlq	%rax
  1      3     1.00                        imulq	%r14, %rax
  1      1     0.25                        addq	%rax, %r11
  1      0     0.17                        movq	%r11, %r11
- 1      5     0.33    *                   movq	32(%rdx), %rax
- 1      1     0.50                        shrq	$2, %rax
+ 1      5     0.33    *                   movl	24(%rdx), %eax
+ 1      1     0.50                        shrq	%rax
  1      1     1.00           *            vmovdqu	%xmm1, (%r11,%r10,2)
  1      1     0.25                        addq	%rax, %r11
  1      1     1.00           *            vmovdqu	%xmm2, (%r11,%r10,2)
@@ -91,21 +94,22 @@ Resources:
 
 Resource pressure per iteration:
 [0]    [1]    [2]    [3]    [4]    [5]    [6]    [7]    [8]    [9]    [10]   [11]   [12.0] [12.1] [13]   [14.0] [14.1] [14.2] [15.0] [15.1] [15.2] [16.0] [16.1] 
-1.00   1.00   1.00   1.46   1.61   1.46   1.47    -      -      -      -      -     2.00   2.00   4.00   2.33   2.33   2.34   1.00   1.00   1.00   2.00   2.00   
+1.00   1.00   1.00   1.67   1.82   1.83   1.68    -      -      -      -      -     2.00   2.00   4.00   2.33   2.33   2.34   1.00   1.00   1.00   2.00   2.00   
 
 Resource pressure by instruction:
 [0]    [1]    [2]    [3]    [4]    [5]    [6]    [7]    [8]    [9]    [10]   [11]   [12.0] [12.1] [13]   [14.0] [14.1] [14.2] [15.0] [15.1] [15.2] [16.0] [16.1] Instructions:
- -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     0.31   0.32   0.37    -      -     1.00    -      -     movq	24(%rdx), %r11
- -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.37   0.31    -     1.00    -      -      -     movq	40(%rdx), %rax
+ -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.32   0.36    -      -     1.00    -      -     movq	16(%rdx), %r11
+ -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.36   0.32    -     1.00    -      -      -     movl	28(%rdx), %eax
+ -      -      -      -     0.59   0.41    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     shlq	%rax
  -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     imulq	%r14, %rax
- -      -      -     0.51    -     0.35   0.14    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     addq	%rax, %r11
+ -      -      -     0.31   0.03   0.23   0.43    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     addq	%rax, %r11
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     movq	%r11, %r11
-1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.32   0.33   1.00    -      -      -      -     movq	32(%rdx), %rax
- -      -      -      -     0.22   0.78    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     shrq	$2, %rax
- -      -      -      -      -      -      -      -      -      -      -      -      -     1.00   1.00   0.34   0.34   0.32    -      -      -      -     1.00   vmovdqu	%xmm1, (%r11,%r10,2)
- -      -      -     0.07   0.39   0.09   0.45    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     addq	%rax, %r11
- -      -      -      -      -      -      -      -      -      -      -      -     1.00    -     1.00   0.32   0.35   0.33    -      -      -     1.00    -     vmovdqu	%xmm2, (%r11,%r10,2)
- -      -      -     0.81    -     0.10   0.09    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     addq	%rax, %r11
- -      -      -      -      -      -      -      -      -      -      -      -      -     1.00   1.00   0.33   0.32   0.35    -      -      -      -     1.00   vmovdqu	%xmm3, (%r11,%r10,2)
- -      -      -     0.07    -     0.14   0.79    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     addq	%rax, %r11
- -      -      -      -      -      -      -      -      -      -      -      -     1.00    -     1.00   0.36   0.31   0.33    -      -      -     1.00    -     vmovdqu	%xmm4, (%r11,%r10,2)
+1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.36   0.32   0.32   1.00    -      -      -      -     movl	24(%rdx), %eax
+ -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     shrq	%rax
+ -      -      -      -      -      -      -      -      -      -      -      -      -     1.00   1.00   0.33   0.33   0.34    -      -      -      -     1.00   vmovdqu	%xmm1, (%r11,%r10,2)
+ -      -      -     0.37   0.11   0.18   0.34    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     addq	%rax, %r11
+ -      -      -      -      -      -      -      -      -      -      -      -     1.00    -     1.00   0.33   0.34   0.33    -      -      -     1.00    -     vmovdqu	%xmm2, (%r11,%r10,2)
+ -      -      -     0.55   0.06   0.01   0.38    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     addq	%rax, %r11
+ -      -      -      -      -      -      -      -      -      -      -      -      -     1.00   1.00   0.34   0.33   0.33    -      -      -      -     1.00   vmovdqu	%xmm3, (%r11,%r10,2)
+ -      -      -     0.44   0.03    -     0.53    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     addq	%rax, %r11
+ -      -      -      -      -      -      -      -      -      -      -      -     1.00    -     1.00   0.33   0.33   0.34    -      -      -     1.00    -     vmovdqu	%xmm4, (%r11,%r10,2)
