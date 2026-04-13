@@ -143,7 +143,8 @@ struct umbra_builder *slug_build_acc(struct slug_acc_layout *lay) {
     struct umbra_builder *b = umbra_builder();
 
     struct umbra_uniforms_layout u = {0};
-    int fi = umbra_uniforms_reserve_f32(&u, 11);
+    int fi  = umbra_uniforms_reserve_f32(&u, 9);
+    int whi = umbra_uniforms_reserve_f32(&u, 2);
     int co = umbra_uniforms_reserve_ptr(&u);
     umbra_ptr32 curves = umbra_deref_ptr32(b,
         (umbra_ptr32){0}, co);
@@ -156,8 +157,8 @@ struct umbra_builder *slug_build_acc(struct slug_acc_layout *lay) {
     for (int i = 0; i < 9; i++) {
         m[i] = umbra_uniform_32(b, (umbra_ptr32){0}, fi + i);
     }
-    umbra_val32 bw = umbra_uniform_32(b, (umbra_ptr32){0}, fi + 9);
-    umbra_val32 bh = umbra_uniform_32(b, (umbra_ptr32){0}, fi + 10);
+    umbra_val32 bw = umbra_uniform_32(b, (umbra_ptr32){0}, whi);
+    umbra_val32 bh = umbra_uniform_32(b, (umbra_ptr32){0}, whi + 1);
 
     umbra_val32 pw = umbra_add_f32(b,
         umbra_add_f32(b,
@@ -307,6 +308,7 @@ struct umbra_builder *slug_build_acc(struct slug_acc_layout *lay) {
 
     if (lay) {
         lay->mat        = fi;
+        lay->wh         = whi;
         lay->curves_off = co;
         lay->loop_off   = ji;
         lay->uni        = u;
@@ -372,12 +374,12 @@ static void slug_draw(struct slide *s, int frame, int l, int t, int r, int b, vo
     __builtin_memset((char *)st->wind_buf + (size_t)t * wind_row, 0,
                      (size_t)(b - t) * wind_row);
 
-    float mat[11];
-    slide_perspective_matrix(mat, (float)frame * 0.016f, w, h,
+    struct umbra_matrix mat;
+    slide_perspective_matrix(&mat, (float)frame * 0.016f, w, h,
                              (int)st->slug.w, (int)st->slug.h);
-    mat[9]  = st->slug.w;
-    mat[10] = st->slug.h;
-    umbra_uniforms_fill_f32(st->acc_lay.uniforms, st->acc_lay.mat, mat, 11);
+    umbra_uniforms_fill_f32(st->acc_lay.uniforms, st->acc_lay.mat, &mat.sx, 9);
+    float const wh[2] = {st->slug.w, st->slug.h};
+    umbra_uniforms_fill_f32(st->acc_lay.uniforms, st->acc_lay.wh, wh, 2);
     umbra_uniforms_fill_ptr(st->acc_lay.uniforms, st->acc_lay.curves_off,
                   (struct umbra_buf){.ptr=st->slug.data, .count=st->slug.count * 6});
     struct umbra_buf abuf[] = {

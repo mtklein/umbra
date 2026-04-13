@@ -309,11 +309,11 @@ int main(int argc, char *argv[]) {
         umbra_basic_block_free(bb);
 
         float *wind = calloc((size_t)(W * H), 4);
-        float  mat[11] = {0};
-        slide_perspective_matrix(mat, 0.0f, W, H, (int)sc.w, (int)sc.h);
-        mat[9] = sc.w;
-        mat[10] = sc.h;
-        umbra_uniforms_fill_f32(al.uniforms, al.mat, mat, 11);
+        struct umbra_matrix mat;
+        slide_perspective_matrix(&mat, 0.0f, W, H, (int)sc.w, (int)sc.h);
+        umbra_uniforms_fill_f32(al.uniforms, al.mat, &mat.sx, 9);
+        float const wh[2] = {sc.w, sc.h};
+        umbra_uniforms_fill_f32(al.uniforms, al.wh, wh, 2);
         umbra_uniforms_fill_ptr(al.uniforms, al.curves_off,
                       (struct umbra_buf){.ptr=sc.data, .count=sc.count * 6});
         float j0;

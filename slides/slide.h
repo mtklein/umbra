@@ -32,4 +32,4 @@ struct slide *slide_get          (int i);
 void          slides_init        (int w, int h);
 void          slides_cleanup     (void);
 
-void slide_perspective_matrix(float out[11], float t, int sw, int sh, int bw, int bh);
+void slide_perspective_matrix(struct umbra_matrix *out, float t, int sw, int sh, int bw, int bh);

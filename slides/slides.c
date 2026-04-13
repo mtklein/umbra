@@ -3,7 +3,8 @@
 #include <math.h>
 #include <stdlib.h>
 
-void slide_perspective_matrix(float out[11], float t, int sw, int sh, int bw, int bh) {
+void slide_perspective_matrix(struct umbra_matrix *out, float t,
+                              int sw, int sh, int bw, int bh) {
     float cx = (float)sw * 0.5f;
     float cy = (float)sh * 0.5f;
     float bx = (float)bw * 0.5f;
@@ -13,12 +14,13 @@ void slide_perspective_matrix(float out[11], float t, int sw, int sh, int bw, in
     float sc    = 1.0f + 0.2f * sinf(t * 0.5f);
     float ca = cosf(angle), sa = sinf(angle);
     float w0 = 1.0f - tilt * cx;
-    out[0] = ca * sc;     out[1] = sa * sc;
-    out[2] = -cx*ca*sc - cy*sa*sc + bx*w0;
-    out[3] = -sa * sc;    out[4] = ca * sc;
-    out[5] = cx*sa*sc - cy*ca*sc + by*w0;
-    out[6] = tilt;  out[7] = 0.0f;  out[8] = w0;
-    out[9] = (float)bw; out[10] = (float)bh;
+    *out = (struct umbra_matrix){
+        .sx = ca * sc,  .kx = sa * sc,
+        .tx = -cx*ca*sc - cy*sa*sc + bx*w0,
+        .ky = -sa * sc, .sy = ca * sc,
+        .ty = cx*sa*sc - cy*ca*sc + by*w0,
+        .p0 = tilt, .p1 = 0.0f, .p2 = w0,
+    };
 }
 
 enum { MAX_SLIDES = 32 };

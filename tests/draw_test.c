@@ -810,9 +810,9 @@ TEST(test_coverage_sdf) {
 TEST(test_coverage_bitmap_matrix) {
     struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 1, 1, 1});
     uint16_t bmp[8] = {0, 0, 255, 0, 0, 0, 0, 0};
-    float    mat[11] = {1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1};
-    struct umbra_coverage_bitmap_matrix cov =
-        umbra_coverage_bitmap_matrix(mat, (struct umbra_buf){.ptr=bmp, .count=8});
+    struct umbra_coverage_bitmap_matrix cov = umbra_coverage_bitmap_matrix(
+        (struct umbra_matrix){1, 0, 0, 0, 1, 0, 0, 0, 1},
+        (struct umbra_bitmap){.buf={.ptr=bmp, .count=8}, .w=8, .h=1});
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(&shader.base, &cov.base,
@@ -840,9 +840,9 @@ TEST(test_coverage_bitmap_matrix_565) {
     struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 1});
     uint16_t bmp[16];
     for (int i = 0; i < 16; i++) { bmp[i] = 255; }
-    float mat[11] = {1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 1};
-    struct umbra_coverage_bitmap_matrix cov =
-        umbra_coverage_bitmap_matrix(mat, (struct umbra_buf){.ptr=bmp, .count=16});
+    struct umbra_coverage_bitmap_matrix cov = umbra_coverage_bitmap_matrix(
+        (struct umbra_matrix){1, 0, 0, 0, 1, 0, 0, 0, 1},
+        (struct umbra_bitmap){.buf={.ptr=bmp, .count=16}, .w=16, .h=1});
     struct umbra_draw_layout lay;
     struct draw_backends B =
         make_draw(umbra_draw_build(&shader.base, &cov.base,
@@ -867,9 +867,9 @@ TEST(test_coverage_bitmap_matrix_565) {
 TEST(test_coverage_bitmap_matrix_oob) {
     struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 1, 1, 1});
     uint16_t bmp[4] = {255, 0, 0, 0};
-    float    mat[11] = {1, 0, 0, 0, 1, 0, 0.001f, 0, 1, 2, 2};
-    struct umbra_coverage_bitmap_matrix cov =
-        umbra_coverage_bitmap_matrix(mat, (struct umbra_buf){.ptr=bmp, .count=4});
+    struct umbra_coverage_bitmap_matrix cov = umbra_coverage_bitmap_matrix(
+        (struct umbra_matrix){1, 0, 0, 0, 1, 0, 0.001f, 0, 1},
+        (struct umbra_bitmap){.buf={.ptr=bmp, .count=4}, .w=2, .h=2});
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_build(&shader.base, &cov.base,

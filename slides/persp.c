@@ -40,11 +40,12 @@ static void persp_prepare(struct slide *s, struct umbra_backend *be, struct umbr
 
 static void persp_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
     struct persp_state *st = (struct persp_state *)s;
-    slide_perspective_matrix(st->cov.mat, (float)frame * 0.016f, st->w, st->h,
+    slide_perspective_matrix(&st->cov.mat, (float)frame * 0.016f, st->w, st->h,
                              st->bitmap->w, st->bitmap->h);
-    st->cov.bmp = (struct umbra_buf){
-        .ptr   = st->bitmap->data,
-        .count = st->bitmap->w * st->bitmap->h,
+    st->cov.bmp = (struct umbra_bitmap){
+        .buf = {.ptr = st->bitmap->data, .count = st->bitmap->w * st->bitmap->h},
+        .w   = st->bitmap->w,
+        .h   = st->bitmap->h,
     };
     umbra_draw_fill(&st->lay, &st->shader.base, &st->cov.base);
     struct umbra_buf ubuf[] = {
@@ -71,7 +72,7 @@ SLIDE(slide_persp) {
     struct persp_state *st = calloc(1, sizeof *st);
     st->bitmap = text_shared_bitmap();
     st->shader = umbra_shader_solid((float[]){1.0f, 0.8f, 0.2f, 1.0f});
-    st->cov    = umbra_coverage_bitmap_matrix((float[11]){0}, (struct umbra_buf){0});
+    st->cov    = umbra_coverage_bitmap_matrix((struct umbra_matrix){0}, (struct umbra_bitmap){0});
     st->base = (struct slide){
         .title = "Perspective Text",
         .bg = {0.12f, 0.04f, 0.04f, 1},

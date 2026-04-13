@@ -11,7 +11,7 @@ struct slug_curves {
 struct slug_acc_layout {
     struct umbra_uniforms_layout  uni; int :32;
     void                         *uniforms;
-    int mat, curves_off, loop_off, :32;
+    int mat, wh, curves_off, loop_off;
 };
 
 struct slug_curves    slug_extract  (char const *text, float font_size);

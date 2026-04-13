@@ -712,17 +712,18 @@ static umbra_val32 bitmap_matrix_build_(struct umbra_coverage *s, struct umbra_b
 static void bitmap_matrix_fill_(struct umbra_coverage const *s, void *uniforms) {
     struct umbra_coverage_bitmap_matrix const *self =
         (struct umbra_coverage_bitmap_matrix const *)s;
-    umbra_uniforms_fill_f32(uniforms, self->fi_, self->mat, 11);
-    umbra_uniforms_fill_ptr(uniforms, self->bmp_off_, self->bmp);
+    umbra_uniforms_fill_f32(uniforms, self->fi_, &self->mat.sx, 9);
+    float const wh[2] = {(float)self->bmp.w, (float)self->bmp.h};
+    umbra_uniforms_fill_f32(uniforms, self->fi_ + 9, wh, 2);
+    umbra_uniforms_fill_ptr(uniforms, self->bmp_off_, self->bmp.buf);
 }
-struct umbra_coverage_bitmap_matrix umbra_coverage_bitmap_matrix(float const mat[11],
-                                                                 struct umbra_buf bmp) {
-    struct umbra_coverage_bitmap_matrix c = {
+struct umbra_coverage_bitmap_matrix umbra_coverage_bitmap_matrix(struct umbra_matrix mat,
+                                                                 struct umbra_bitmap bmp) {
+    return (struct umbra_coverage_bitmap_matrix){
         .base = {.build = bitmap_matrix_build_, .fill = bitmap_matrix_fill_},
+        .mat = mat,
         .bmp = bmp,
     };
-    __builtin_memcpy(c.mat, mat, 44);
-    return c;
 }
 
 umbra_color umbra_blend_src(struct umbra_builder *builder, umbra_color src, umbra_color dst) {

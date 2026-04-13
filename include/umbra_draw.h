@@ -3,6 +3,18 @@
 
 typedef struct { umbra_val32 r, g, b, a; } umbra_color;
 
+struct umbra_matrix {
+    float sx, kx, tx,
+          ky, sy, ty,
+          p0, p1, p2;
+};
+
+struct umbra_bitmap {
+    struct umbra_buf        buf;
+    struct umbra_fmt const *fmt;
+    int w, h;
+};
+
 struct umbra_fmt {
     char const *name;
     size_t      bpp;
@@ -128,17 +140,14 @@ struct umbra_coverage_sdf {
 };
 struct umbra_coverage_sdf umbra_coverage_sdf(struct umbra_buf bmp);
 
-// TODO: mat is a 3x3 perspective matrix (9 floats) with bitmap width and height
-// tacked on as mat[9] and mat[10].  Those should come from bmp.count and
-// bmp.stride (or a separate w/h pair), reducing mat to float[9].
 struct umbra_coverage_bitmap_matrix {
     struct umbra_coverage base;
-    float          mat[11]; int :32;
-    struct umbra_buf bmp;
+    struct umbra_matrix mat; int :32;
+    struct umbra_bitmap bmp;
     int fi_, bmp_off_;
 };
-struct umbra_coverage_bitmap_matrix umbra_coverage_bitmap_matrix(float const mat[11],
-                                                                 struct umbra_buf bmp);
+struct umbra_coverage_bitmap_matrix umbra_coverage_bitmap_matrix(struct umbra_matrix,
+                                                                 struct umbra_bitmap);
 
 struct umbra_coverage_wind {
     struct umbra_coverage base;

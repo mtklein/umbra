@@ -187,10 +187,10 @@ TEST(test_slug_rect) {
         pixels[i] = 0xff000000;
     }
 
-    float mat[11] = {
-        1,0,0, 0,1,0, 0,0,1, 60,40,
-    };
-    umbra_uniforms_fill_f32(alay.uniforms, alay.mat, mat, 11);
+    struct umbra_matrix mat = {1,0,0, 0,1,0, 0,0,1};
+    umbra_uniforms_fill_f32(alay.uniforms, alay.mat, &mat.sx, 9);
+    float const slug_wh[2] = {60, 40};
+    umbra_uniforms_fill_f32(alay.uniforms, alay.wh, slug_wh, 2);
     umbra_uniforms_fill_ptr(alay.uniforms, alay.curves_off,
         (struct umbra_buf){.ptr=rect, .count=sizeof rect / 4});
     struct umbra_buf abuf[] = {
@@ -239,15 +239,12 @@ TEST(test_perspective_text) {
     struct umbra_backend *be =
         umbra_backend_interp();
 
-    float mat[11] = {
-        1,0,0, 0,1,0, 0,0,1,
-        (float)BW, (float)BH,
-    };
     float color[4] = {1,1,1,1};
 
     struct umbra_shader_solid shader = umbra_shader_solid(color);
-    struct umbra_coverage_bitmap_matrix cov = umbra_coverage_bitmap_matrix(mat,
-        (struct umbra_buf){.ptr=bmp, .count=BW * BH});
+    struct umbra_coverage_bitmap_matrix cov = umbra_coverage_bitmap_matrix(
+        (struct umbra_matrix){1,0,0, 0,1,0, 0,0,1},
+        (struct umbra_bitmap){.buf={.ptr=bmp, .count=BW * BH}, .w=BW, .h=BH});
 
     struct umbra_draw_layout lay;
     struct umbra_builder *bld = umbra_draw_build(
@@ -281,14 +278,17 @@ TEST(test_perspective_text) {
 
     struct text_cov tc = text_rasterize(W, H, 24.0f, 0);
 
-    float mat2[11];
-    slide_perspective_matrix(mat2, 1.0f,
-        W, H, tc.w, tc.h);
+    struct umbra_matrix mat2;
+    slide_perspective_matrix(&mat2, 1.0f, W, H, tc.w, tc.h);
     float hc2[4] = {1,0.8f,0.2f,1};
 
     struct umbra_shader_solid shader2 = umbra_shader_solid(hc2);
     struct umbra_coverage_bitmap_matrix cov2 = umbra_coverage_bitmap_matrix(mat2,
-        (struct umbra_buf){.ptr=tc.data, .count=W * H});
+        (struct umbra_bitmap){
+            .buf = {.ptr=tc.data, .count=tc.w * tc.h},
+            .w   = tc.w,
+            .h   = tc.h,
+        });
 
     struct umbra_draw_layout lay2;
     bld = umbra_draw_build(
