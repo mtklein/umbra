@@ -2,10 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-// ---------------------------------------------------------------------------
-//  SPIR-V constants.
-// ---------------------------------------------------------------------------
-
 enum {
     SpvMagic           = 0x07230203,
     SpvVersion         = 0x00010000, // SPIR-V 1.0
@@ -159,10 +155,6 @@ enum {
 
 };
 
-// ---------------------------------------------------------------------------
-//  SPIR-V binary buffer.
-// ---------------------------------------------------------------------------
-
 typedef struct {
     uint32_t *word;
     int       words, cap;
@@ -181,10 +173,6 @@ static void spv_word(Spv *s, uint32_t w) {
 static void spv_op(Spv *s, int opcode, int word_count) {
     spv_word(s, (uint32_t)((word_count << 16) | (opcode & 0xFFFF)));
 }
-
-// ---------------------------------------------------------------------------
-//  SPIR-V codegen.
-// ---------------------------------------------------------------------------
 
 // We build SPIR-V in multiple sections that get concatenated at the end:
 //   capabilities, extensions, ext_import, memory_model, entry_point,

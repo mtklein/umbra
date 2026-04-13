@@ -4,8 +4,6 @@
 
 typedef struct asm_x86 Buf;
 
-// ---- byte buffer ----
-
 void emit1(Buf *b, uint8_t v) {
     if (b->size == b->cap) {
         b->cap = b->cap ? 2 * b->cap : 4096;
@@ -19,10 +17,6 @@ void emit4(Buf *b, uint32_t v) {
     emit1(b, (uint8_t)(v >> 16));
     emit1(b, (uint8_t)(v >> 24));
 }
-
-// ---- VEX encoding ----
-// pp: 0=none,1=66,2=F3,3=F2  mm: 1=0F,2=0F38,3=0F3A  L: 0=128,1=256
-// d=ModRM.reg  v=VEX.vvvv(NDS)  s=ModRM.rm
 
 void vex(Buf *b, int pp, int mm, int W, int L, int d, int v, int s, uint8_t op) {
     int const R = ~d >> 3,
@@ -101,7 +95,6 @@ void vmov_store(Buf *b, int L, int reg, int base, int index, int scale, int disp
     vex_mem(b, 2, 1, 0, L, reg, 0, 0x7f, base, index, scale, disp);
 }
 
-// ---- GPR instructions ----
 void rex_w(Buf *b, int r, int b_) {
     emit1(b, (uint8_t)(0x48 | ((r >> 3) << 2) | (b_ >> 3)));
 }
@@ -220,7 +213,6 @@ void vzeroupper(Buf *b) {
 }
 void nop(Buf *b) { emit1(b, 0x90); }
 
-// ---- Spill: VMOVDQU [RSP+slot*32], ymm or VMOVDQU ymm, [RSP+slot*32] ----
 void vspill(Buf *b, int reg, int slot) {
     int const disp = slot * 32,
               R    = ~reg >> 3;
@@ -260,8 +252,6 @@ void vfill(Buf *b, int reg, int slot) {
     }
 }
 
-// ---- AVX2 instruction helpers ----
-
 void vmovaps(Buf *b, int d, int s) { vex_rr(b, 0, 1, 1, 0x28, d, s); }
 void vpxor(Buf *b, int L, int d, int v, int s) { vex_rrr(b, 1, 1, L, 0xef, d, v, s); }
 void vbroadcastss(Buf *b, int d, int s) { vex_rrr(b, 1, 2, 1, 0x18, d, 0, s); }
@@ -288,7 +278,6 @@ void broadcast_imm32(Buf *b, int d, uint32_t v) {
     }
 }
 
-// ---- F32 arithmetic (YMM, L=1) ----
 void vaddps(Buf *b, int d, int v, int s) { vex_rrr(b, 0, 1, 1, 0x58, d, v, s); }
 void vsubps(Buf *b, int d, int v, int s) { vex_rrr(b, 0, 1, 1, 0x5c, d, v, s); }
 void vmulps(Buf *b, int d, int v, int s) { vex_rrr(b, 0, 1, 1, 0x59, d, v, s); }
@@ -320,7 +309,6 @@ void vcvtps2ph(Buf *b, int d, int s, uint8_t rnd) {
     emit1(b, rnd);
 }
 
-// ---- I32 arithmetic (YMM, L=1) ----
 void vpaddd(Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 1, 0xfe, d, v, s); }
 void vpsubd(Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 1, 0xfa, d, v, s); }
 void vpmulld(Buf *b, int d, int v, int s) { vex_rrr(b, 1, 2, 1, 0x40, d, v, s); }
@@ -337,7 +325,6 @@ void vpsrad_i(Buf *b, int d, int s, uint8_t imm) {
     vex_shift(b, 1, 1, 1, 0x72, 4, d, s, imm);
 }
 
-// ---- Bitwise (YMM) ----
 void vpand(Buf *b, int L, int d, int v, int s) { vex_rrr(b, 1, 1, L, 0xdb, d, v, s); }
 void vpor(Buf *b, int L, int d, int v, int s) { vex_rrr(b, 1, 1, L, 0xeb, d, v, s); }
 void vpxor_3(Buf *b, int L, int d, int v, int s) { vex_rrr(b, 1, 1, L, 0xef, d, v, s); }
@@ -346,12 +333,9 @@ void vpblendvb(Buf *b, int L, int d, int z, int y, int x) {
     emit1(b, (uint8_t)(x << 4));
 }
 
-// ---- I32 compare ----
 void vpcmpeqd(Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 1, 0x76, d, v, s); }
 void vpcmpgtd(Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 1, 0x66, d, v, s); }
 
-// ---- I16 arithmetic (XMM, L=0) ----
-// ---- Widening/narrowing ----
 void vpmovsxwd(Buf *b, int d, int s) { vex_rr(b, 1, 2, 1, 0x23, d, s); }
 void vpmovzxwd(Buf *b, int d, int s) { vex_rr(b, 1, 2, 1, 0x33, d, s); }
 
