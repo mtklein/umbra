@@ -772,7 +772,6 @@ umbra_color umbra_blend_multiply(struct umbra_builder *builder, umbra_color src,
     return (umbra_color){r, g, b, a};
 }
 
-
 void umbra_gradient_lut_even(float *out, int lut_n, int n_stops, float const colors[][4]) {
     for (int i = 0; i < lut_n; i++) {
         float const t = (float)i / (float)(lut_n - 1);

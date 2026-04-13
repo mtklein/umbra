@@ -1006,7 +1006,6 @@ static void metal_backend_free(struct metal_backend *be) {
     }
 }
 
-
 static struct metal_program* metal_program(
     struct metal_backend *be, BB const *bb
 ) {

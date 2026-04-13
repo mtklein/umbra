@@ -264,7 +264,6 @@ static struct ra *ra_create_arm64(struct umbra_basic_block const *bb, struct jit
     return ra_create(bb, &cfg);
 }
 
-
 static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
                      int *deref_rb_gpr, struct jit_ctx *jc);

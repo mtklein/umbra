@@ -1,6 +1,5 @@
 #pragma once
 
-
 struct thread_pool* thread_pool(int threads);
 void   thread_pool_free(struct thread_pool*);
 

@@ -36,7 +36,6 @@ static struct umbra_fmt const *fmt_enums[] = {
     &umbra_fmt_fp16_planar, &umbra_fmt_1010102,
 };
 
-
 struct pipe {
     struct umbra_program          *program;
     struct umbra_uniforms_layout   uni;

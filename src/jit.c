@@ -13,7 +13,6 @@ struct umbra_backend* umbra_backend_jit(void) {
 #include <stdlib.h>
 #include <sys/mman.h>
 
-
 struct cache_entry { void *mem; size_t size; };
 
 struct jit_backend {

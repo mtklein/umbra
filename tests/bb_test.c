@@ -35,7 +35,6 @@ static struct umbra_builder *build_srcover(void) {
     return b;
 }
 
-
 static struct test_backends make(struct umbra_builder *builder) {
     struct umbra_basic_block *bb = umbra_basic_block(builder);
     umbra_builder_free(builder);
@@ -2007,7 +2006,6 @@ TEST(test_movi_patterns) {
         cleanup(&B);
     }
 }
-
 
 TEST(test_uni_16) {
     {

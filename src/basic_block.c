@@ -149,7 +149,6 @@ static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int at, int
     free(buf);
 }
 
-
 struct umbra_basic_block* umbra_basic_block(struct umbra_builder *b) {
     assume(!b->has_loop || b->loop_closed);
 

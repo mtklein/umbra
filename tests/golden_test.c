@@ -326,7 +326,6 @@ TEST(test_perspective_text) {
     text_cov_free(&tc);
 }
 
-
 TEST(test_golden_slides) {
     build_pipes();
     slides_init(W, H);

@@ -7,7 +7,6 @@ struct draw_backends {
     struct umbra_draw_layout lay;
 };
 
-
 static struct draw_backends make_draw(struct umbra_builder *builder, struct umbra_draw_layout lay) {
     struct umbra_basic_block *bb = umbra_basic_block(builder);
     umbra_builder_free(builder);
@@ -1046,7 +1045,6 @@ TEST(test_gradient_lut_nonuniform) {
     }
     cleanup_draw(&B);
 }
-
 
 TEST(test_linear_stops) {
     float colors_planar[3 * 4] = {1,0,0, 0,1,0, 0,0,1, 1,1,1};

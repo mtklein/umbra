@@ -131,7 +131,6 @@ umbra_ptr32 umbra_deref_ptr32(builder *b, umbra_ptr32 buf, size_t off) {
     return (umbra_ptr32){.ix = v.id, .deref = -1};
 }
 
-
 umbra_val16 umbra_gather_16(builder *b, umbra_ptr16 src, umbra_val32 ix) {
     return push16(b, op_gather_16, VX(ix), .ptr = {.p16 = src});
 }

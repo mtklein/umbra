@@ -574,7 +574,6 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 [op_le_s32_imm] = &&L_op_le_s32_imm,
                 [SW_DONE] = &&L_SW_DONE,
 
-
 #define BINARY_LABELS(name, ...) \
                 [op_r_##name##_mm] = &&L_op_r_##name##_mm, \
                 [op_r_##name##_rm] = &&L_op_r_##name##_rm, \
@@ -1064,8 +1063,6 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 CASE(op_lt_s32_imm)  { I32_IMM; v->i32 = (I32)(v[ip->x].i32 <  imm); } NEXT;
                 CASE(op_le_s32_imm)  { I32_IMM; v->i32 = (I32)(v[ip->x].i32 <= imm); } NEXT;
 #undef I32_IMM
-
-
 
                 // Binary acc variants: r_mm (start), r_rm (continue), m_rm (end).
 #define BIN3(name, dst, OP, x_t, y_t)                                                  \
