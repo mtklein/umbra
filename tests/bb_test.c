@@ -4296,3 +4296,37 @@ TEST(test_loop_var_war_hazard) {
     }
     cleanup(&B);
 }
+
+TEST(test_deref_ptr_r11_invalidation) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_ptr16 deref = umbra_deref_ptr16(b, (umbra_ptr32){0}, 0);
+    umbra_val32 cov   = umbra_f32_from_i32(b, umbra_i32_from_s16(b, umbra_load_16(b, deref)));
+    umbra_val32 r, g, bl, a;
+    umbra_load_8x4(b, (umbra_ptr32){.ix = 1}, &r, &g, &bl, &a);
+    umbra_val32 c255 = umbra_imm_f32(b, 255.0f);
+    umbra_store_8x4(b, (umbra_ptr32){.ix = 1},
+                    umbra_round_i32(b, umbra_min_f32(b,
+                        umbra_add_f32(b, umbra_f32_from_i32(b, r), cov), c255)),
+                    umbra_round_i32(b, umbra_min_f32(b,
+                        umbra_add_f32(b, umbra_f32_from_i32(b, g), cov), c255)),
+                    umbra_round_i32(b, umbra_min_f32(b,
+                        umbra_add_f32(b, umbra_f32_from_i32(b, bl), cov), c255)),
+                    umbra_round_i32(b, umbra_min_f32(b,
+                        umbra_add_f32(b, umbra_f32_from_i32(b, a), cov), c255)));
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        int16_t cov_data[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+        uint32_t dst_data[8] = {0};
+        dst_data[0] = 0x01020304u;
+        struct umbra_buf cov_buf = {.ptr = cov_data, .count = 8, .stride = 8};
+        if (run(&B, bi, 8, 1,
+                 (struct umbra_buf[]){
+                     {.ptr = &cov_buf, .count = 4},
+                     {.ptr = dst_data, .count = 8, .stride = 8},
+                 })) {
+            dst_data[0] == 0x01020304u here;
+        }
+    }
+    cleanup(&B);
+}

@@ -252,6 +252,7 @@ static int resolve_ptr_x86(Buf *c, ptr p, int *last_ptr, int const *deref_gpr,
         int const gpr = deref_gpr[p.ix],
                   rb  = deref_rb_gpr[p.ix];
         if (rb > 0) {
+            *last_ptr = -1;
             mov_rr(c, R11, gpr);
             mov_rr(c, RAX, rb);
             if (elem_shift) {
