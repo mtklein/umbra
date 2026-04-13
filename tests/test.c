@@ -1,3 +1,6 @@
+// TODO: move test.c into tools/ where all the other main() functions live (demo, dump, bench).
+// The test registration (test_register, test_run) and test_backends helpers would stay in tests/,
+// but main() and the filter/run logic starting at line ~66 could move to tools/test.c.
 #include "test.h"
 #include <string.h>
 
