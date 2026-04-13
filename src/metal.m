@@ -1308,11 +1308,16 @@ static void metal_program_dump(
     }
 }
 
-static void run_metal(struct umbra_program *prog, int l, int t, int r, int b, struct umbra_buf buf[]) {
+static void run_metal(struct umbra_program *prog,
+                      int l, int t, int r, int b, struct umbra_buf buf[]) {
     metal_program_queue((struct metal_program*)prog, l, t, r, b, buf);
 }
-static void dump_metal(struct umbra_program const *prog, FILE *f) { metal_program_dump((struct metal_program const*)prog, f); }
-static void free_metal(struct umbra_program *prog) { metal_program_free((struct metal_program*)prog); }
+static void dump_metal(struct umbra_program const *prog, FILE *f) {
+    metal_program_dump((struct metal_program const*)prog, f);
+}
+static void free_metal(struct umbra_program *prog) {
+    metal_program_free((struct metal_program*)prog);
+}
 static struct umbra_program *compile_metal(struct umbra_backend           *be,
                                            BB const *bb) {
     struct metal_program *p = metal_program((struct metal_backend*)be, bb);
