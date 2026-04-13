@@ -189,7 +189,8 @@ static struct interp_program* interp_program(struct umbra_basic_block const *bb)
     int num_slots = 1; // +1 for SW_DONE sentinel
     for (int i = 0; i < bb->insts; i++) {
         enum op const op = bb->inst[i].op;
-        if (op == op_load_16x4 || op == op_load_16x4_planar || op == op_load_8x4) { num_slots += 4; }
+        if (op == op_load_16x4 || op == op_load_16x4_planar
+                || op == op_load_8x4)                                              { num_slots += 4; }
         else                    { num_slots += 1; }
     }
     p->inst = malloc((size_t)num_slots * sizeof *p->inst);
@@ -240,17 +241,24 @@ static struct interp_program* interp_program(struct umbra_basic_block const *bb)
             case op_imm_32: emit(.tag = op_imm_32, .x = inst->imm); break;
 
             case op_deref_ptr:
-                emit(.tag = op_deref_ptr, .ptr = inst->ptr.bits, .x = inst->imm, .y = deref_slot[i]);
+                emit(.tag = op_deref_ptr, .ptr = inst->ptr.bits,
+                     .x = inst->imm, .y = deref_slot[i]);
                 break;
 
-            case op_uniform_32: emit(.tag = op_uniform_32, .ptr = RESOLVE_PTR(inst), .x = inst->imm); break;
+            case op_uniform_32:
+                emit(.tag = op_uniform_32, .ptr = RESOLVE_PTR(inst), .x = inst->imm);
+                break;
 
             case op_load_16: emit(.tag = op_load_16, .ptr = RESOLVE_PTR(inst)); break;
             case op_load_32: emit(.tag = op_load_32, .ptr = RESOLVE_PTR(inst)); break;
-            case op_gather_16:         emit(.tag = op_gather_16,         .ptr = RESOLVE_PTR(inst), .x = X); break;
-            case op_gather_uniform_32: emit(.tag = op_gather_uniform_32, .ptr = RESOLVE_PTR(inst), .x = X); break;
-            case op_gather_32:         emit(.tag = op_gather_32,         .ptr = RESOLVE_PTR(inst), .x = X); break;
-            case op_sample_32:         emit(.tag = op_sample_32,         .ptr = RESOLVE_PTR(inst), .x = X); break;
+            case op_gather_16:         emit(.tag = op_gather_16,
+                                            .ptr = RESOLVE_PTR(inst), .x = X); break;
+            case op_gather_uniform_32: emit(.tag = op_gather_uniform_32,
+                                            .ptr = RESOLVE_PTR(inst), .x = X); break;
+            case op_gather_32:         emit(.tag = op_gather_32,
+                                            .ptr = RESOLVE_PTR(inst), .x = X); break;
+            case op_sample_32:         emit(.tag = op_sample_32,
+                                            .ptr = RESOLVE_PTR(inst), .x = X); break;
 
             case op_store_16: emit(.tag = op_store_16, .ptr = RESOLVE_PTR(inst), .x = Y); break;
             case op_store_32: emit(.tag = op_store_32, .ptr = RESOLVE_PTR(inst), .x = Y); break;
