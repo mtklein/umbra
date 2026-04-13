@@ -4330,3 +4330,29 @@ TEST(test_deref_ptr_r11_invalidation) {
     }
     cleanup(&B);
 }
+
+TEST(test_if_basic) {
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_var v = umbra_var_alloc(b);
+    umbra_val32 n = umbra_imm_i32(b, 3);
+    umbra_val32 i = umbra_loop(b, n); {
+        umbra_val32 cond = umbra_eq_i32(b, i, umbra_imm_i32(b, 1));
+        umbra_if(b, cond); {
+            umbra_store_var(b, v, i);
+        } umbra_endif(b);
+    } umbra_loop_end(b);
+
+    umbra_store_32(b, (umbra_ptr32){0}, umbra_load_var(b, v));
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint32_t dst[8] = {0};
+        if (run(&B, bi, 8, 1, (struct umbra_buf[]){
+                {.ptr = dst, .count = 8, .stride = 8},
+            })) {
+            dst[0] == 1 here;
+        }
+    }
+    cleanup(&B);
+}

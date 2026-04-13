@@ -515,6 +515,8 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
     struct umbra_buf     *buf = p->buf;
     ival                 *vars = p->vars;
     int const             n_vars = p->n_vars;
+    I32                   if_mask_stack[8];
+    int                   if_depth = 0;
 
     for (int row = t; row < b; row++) {
         for (int col = l; col < r; col += K) {
@@ -524,6 +526,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
             ival                  *v   = p->v    + (col == l ? 0 : P);
 
             for (int vi = 0; vi < n_vars; vi++) { vars[vi] = (ival){0}; }
+            if_depth = 0;
 
             ival acc = {0};
 #define F32_IMM union { int i; float f; } const u = {.i = ip->y}; F32 const imm = (F32){0} + u.f
@@ -981,10 +984,25 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                         v  += back;
                     }
                 } NEXT;
-                CASE(op_if_begin) {} NEXT;
-                CASE(op_if_end)   {} NEXT;
+                CASE(op_if_begin) {
+                    I32 cond;
+                    __builtin_memcpy(&cond, &v[ip->x].i32, sizeof cond);
+                    if (if_depth > 0) { cond &= if_mask_stack[if_depth - 1]; }
+                    if_mask_stack[if_depth++] = cond;
+                } NEXT;
+                CASE(op_if_end) {
+                    if_depth--;
+                } NEXT;
                 CASE(op_load_var)  v->i32 = vars[ip->x].i32; NEXT;
-                CASE(op_store_var) vars[ip->y] = v[ip->x]; NEXT;
+                CASE(op_store_var) {
+                    if (if_depth > 0) {
+                        I32 const mask = if_mask_stack[if_depth - 1];
+                        vars[ip->y].i32 = (v[ip->x].i32 & mask)
+                                        | (vars[ip->y].i32 & ~mask);
+                    } else {
+                        vars[ip->y] = v[ip->x];
+                    }
+                } NEXT;
 
                 CASE(op_f32_from_f16) { U16 h; __builtin_memcpy(&h, &v[ip->x], sizeof h); v->f32 = f16_to_f32(h); } NEXT;
                 CASE(op_f16_from_f32) { U16 const h = f32_to_f16(v[ip->x].f32); v->u32 = (U32){0}; __builtin_memcpy(v, &h, sizeof h); } NEXT;

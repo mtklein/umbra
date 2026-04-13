@@ -100,7 +100,9 @@ struct jit_ctx {
     Buf                            *c;
     struct umbra_flat_ir const *bb;
     struct pool                     pool;
-    int                             n_vars, loop_top, loop_br_skip, :32;
+    int                             n_vars, loop_top, loop_br_skip;
+    int                             if_depth;
+    int8_t                          if_mask_reg[8];
 };
 
 static void x86_spill(int reg, int slot, void *ctx) {
@@ -1361,14 +1363,27 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
 
         case op_store_var: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
-            vspill(c, ry, inst->imm);
+            if (jc->if_depth > 0) {
+                int8_t rm = jc->if_mask_reg[jc->if_depth - 1];
+                int8_t tmp = ra_alloc(ra, sl, ns);
+                vfill(c, tmp, inst->imm);
+                vpblendvb(c, scalar ? 0 : 1, tmp, tmp, ry, rm);
+                vspill(c, tmp, inst->imm);
+                ra_return_reg(ra, tmp);
+            } else {
+                vspill(c, ry, inst->imm);
+            }
             ra_free_chan(ra, inst->y, i);
         } break;
 
         case op_if_begin: {
-            ra_free_chan(ra, inst->x, i);
+            int8_t rx = ra_ensure(ra, sl, ns, inst->x.id);
+            jc->if_mask_reg[jc->if_depth++] = rx;
         } break;
-        case op_if_end: break;
+        case op_if_end: {
+            int8_t rm = jc->if_mask_reg[--jc->if_depth];
+            ra_return_reg(ra, rm);
+        } break;
 
         case op_loop_begin: {
             int8_t rx = ra_ensure(ra, sl, ns, inst->x.id);

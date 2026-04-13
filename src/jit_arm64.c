@@ -216,7 +216,9 @@ struct jit_ctx {
     Buf                            *c;
     struct umbra_flat_ir const *bb;
     struct pool                     pool;
-    int                             n_vars, loop_top, loop_br_skip, :32;
+    int                             n_vars, loop_top, loop_br_skip;
+    int                             if_depth;
+    int8_t                          if_mask_reg[8];
 };
 
 static void arm64_spill(int reg, int slot, void *ctx) {
@@ -1148,16 +1150,33 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
 
         case op_store_var: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
-            int const off = 2 * inst->imm;
-            put(c, STR_qi(lo(ry), XS, off));
-            if (!scalar) { put(c, STR_qi(hi(ry), XS, off + 1)); }
+            if (jc->if_depth > 0) {
+                int8_t rm = jc->if_mask_reg[jc->if_depth - 1];
+                int8_t tmp = ra_alloc(ra, sl, ns);
+                int const off = 2 * inst->imm;
+                put(c, LDR_qi(lo(tmp), XS, off));
+                if (!scalar) { put(c, LDR_qi(hi(tmp), XS, off + 1)); }
+                put(c, BIT_16b(lo(tmp), lo(ry), lo(rm)));
+                if (!scalar) { put(c, BIT_16b(hi(tmp), hi(ry), hi(rm))); }
+                put(c, STR_qi(lo(tmp), XS, off));
+                if (!scalar) { put(c, STR_qi(hi(tmp), XS, off + 1)); }
+                ra_return_reg(ra, tmp);
+            } else {
+                int const off = 2 * inst->imm;
+                put(c, STR_qi(lo(ry), XS, off));
+                if (!scalar) { put(c, STR_qi(hi(ry), XS, off + 1)); }
+            }
             ra_free_chan(ra, inst->y, i);
         } break;
 
         case op_if_begin: {
-            ra_free_chan(ra, inst->x, i);
+            int8_t rx = ra_ensure(ra, sl, ns, inst->x.id);
+            jc->if_mask_reg[jc->if_depth++] = rx;
         } break;
-        case op_if_end: break;
+        case op_if_end: {
+            int8_t rm = jc->if_mask_reg[--jc->if_depth];
+            ra_return_reg(ra, rm);
+        } break;
 
         case op_loop_begin: {
             int8_t rx = ra_ensure(ra, sl, ns, inst->x.id);
