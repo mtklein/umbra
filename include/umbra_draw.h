@@ -128,6 +128,9 @@ struct umbra_coverage_sdf {
 };
 struct umbra_coverage_sdf umbra_coverage_sdf(struct umbra_buf bmp);
 
+// TODO: mat is a 3x3 perspective matrix (9 floats) with bitmap width and height
+// tacked on as mat[9] and mat[10].  Those should come from bmp.count and
+// bmp.stride (or a separate w/h pair), reducing mat to float[9].
 struct umbra_coverage_bitmap_matrix {
     struct umbra_coverage base;
     float          mat[11]; int :32;
