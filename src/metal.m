@@ -109,7 +109,7 @@ static char const *uv(char *tmp, char const *vn,
 
 static void emit_ops(SrcBuf *b, BB const *bb,
                      int const *deref_buf,
-                     _Bool *is_f, int const *use,
+                     _Bool *is_f, bool const *live,
                      int lo, int hi, char const *pad) {
     for (int i = lo; i < hi; i++) {
         is_f[i] = produces_float(bb->inst[i].op);
@@ -121,7 +121,7 @@ static void emit_ops(SrcBuf *b, BB const *bb,
            : (void)snprintf(buf, sizeof buf, "v%d", (vid)), buf)
 
     for (int i = lo; i < hi; i++) {
-        if (use[i] == 0) { continue; }
+        if (!live[i]) { continue; }
         struct ir_inst const *inst = &bb->inst[i];
         int xid = inst->x.id, yid = inst->y.id,
             zid = inst->z.id, wid = inst->w.id;
@@ -915,40 +915,45 @@ static char* build_source(BB const *bb,
     struct ir_inst *inst = malloc((size_t)n * sizeof *inst);
     __builtin_memcpy(inst, bb->inst, (size_t)n * sizeof *inst);
     for (int i = 0; i < n; i++) {
-        if (inst[i].op == op_join) {
-            int const yid = inst[i].y.id;
-            if (inst[yid].op == op_add_f32_imm) {
-                inst[i].x = (val){0};
-                inst[yid].y = (val){0};
+        struct ir_inst *ip = inst+i;
+        if (ip->op == op_join) {
+            struct ir_inst *y = inst + ip->y.id;
+            if ((1) && y->op == op_add_f32_imm) {
+                ip->x = (val){0};  // We want the _imm variant.
+                y->y  = (val){0};  // These old op_foo_imm ops hold a reference to the imm too.
+                                   // TODO: remove that when we're using join() for all of them.
             } else {
-                inst[i].y = (val){0};
+                ip->y = (val){0};
             }
         }
     }
 
-    int *use = calloc((size_t)(n + 1), sizeof *use);
+    _Bool *live = calloc((size_t)(n + 1), sizeof *live);
     for (int i = n; i-- > 0;) {
         struct ir_inst const *ip = &inst[i];
         if (op_is_store(ip->op) || ip->op == op_loop_begin || ip->op == op_loop_end
                                 || ip->op == op_if_begin   || ip->op == op_if_end) {
-            use[i]++;
+            live[i] = 1;
         }
-        if (use[i] == 0) { continue; }
-        use[ip->x.id]++;
-        use[ip->y.id]++;
-        use[ip->z.id]++;
-        use[ip->w.id]++;
-        if (ip->ptr.deref) { use[ip->ptr.ix]++; }
+        if (live[i]) {
+            live[ip->x.id] = 1;
+            live[ip->y.id] = 1;
+            live[ip->z.id] = 1;
+            live[ip->w.id] = 1;
+            if (ip->ptr.deref) {
+                live[ip->ptr.ix] = 1;
+            }
+        }
     }
 
     struct umbra_flat_ir resolved = *bb;
     resolved.inst = inst;
 
     _Bool *is_f = calloc((size_t)(n + 1), 1);
-    emit_ops(&b, &resolved, deref_buf, is_f, use, 0, n, "    ");
+    emit_ops(&b, &resolved, deref_buf, is_f, live, 0, n, "    ");
     emit(&b, "}\n");
 
-    free(use);
+    free(live);
     free(inst);
     free(is_f);
     free(buf_row_shift);
