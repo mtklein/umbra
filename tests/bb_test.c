@@ -4385,6 +4385,3 @@ TEST(test_if_varying) {
     }
     cleanup(&B);
 }
-
-// TODO: test_join once try_imm emits joins.  The xsan interpreter asserts x==y at
-// runtime, so all existing _imm tests will verify join correctness automatically.

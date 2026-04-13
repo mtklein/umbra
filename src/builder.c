@@ -115,7 +115,6 @@ umbra_val32 umbra_x(builder *b) { return push32(b, op_x); }
 umbra_val32 umbra_y(builder *b) { return push32(b, op_y); }
 
 umbra_val32 umbra_imm_i32(builder *b, int bits) { return push32(b, op_imm_32, .imm = bits); }
-static val join_(builder *b, val x, val y) { return push(b, op_join, .x = x, .y = y); }
 umbra_val32 umbra_imm_f32(builder *b, float v) {
     union {
         float f;
@@ -261,7 +260,7 @@ umbra_val32 umbra_add_f32(builder *b, umbra_val32 x, umbra_val32 y) {
         val const other = imm_id == (int)x.id ? (val){.v32 = y} : (val){.v32 = x};
         val const f = push(b, op_add_f32_imm, VX(other), VY(val_make(imm_id, 0)),
                            .imm = b->inst[imm_id].imm);
-        return join_(b, d, f).v32;
+        return push(b, op_join, .x = d, .y = f).v32;
     }
     return d.v32;
 }

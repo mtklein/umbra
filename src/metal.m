@@ -109,9 +109,8 @@ static char const *uv(char *tmp, char const *vn,
 
 static void emit_ops(SrcBuf *b, BB const *bb,
                      int const *deref_buf,
-                     _Bool *is_f,
-                     int lo, int hi,
-                     char const *pad) {
+                     _Bool *is_f, int const *use,
+                     int lo, int hi, char const *pad) {
     for (int i = lo; i < hi; i++) {
         is_f[i] = produces_float(bb->inst[i].op);
     }
@@ -122,6 +121,7 @@ static void emit_ops(SrcBuf *b, BB const *bb,
            : (void)snprintf(buf, sizeof buf, "v%d", (vid)), buf)
 
     for (int i = lo; i < hi; i++) {
+        if (use[i] == 0) { continue; }
         struct ir_inst const *inst = &bb->inst[i];
         int xid = inst->x.id, yid = inst->y.id,
             zid = inst->z.id, wid = inst->w.id;
@@ -146,8 +146,7 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                      pad, i, (uint32_t)inst->imm);
                 break;
             case op_join: {
-                int chosen = xid;
-                if (bb->inst[yid].op == op_add_f32_imm) { chosen = yid; }
+                int const chosen = xid ? xid : yid;
                 is_f[i] = is_f[chosen];
                 emit(b, "%s#define v%d v%d\n", pad, i, chosen);
             } break;
@@ -912,10 +911,43 @@ static char* build_source(BB const *bb,
         emit(&b, "    uint var%d = 0;\n", i);
     }
 
-    _Bool *is_f = calloc((size_t)(bb->insts + 1), 1);
-    emit_ops(&b, bb, deref_buf, is_f, 0, bb->insts, "    ");
+    int const n = bb->insts;
+    struct ir_inst *inst = malloc((size_t)n * sizeof *inst);
+    __builtin_memcpy(inst, bb->inst, (size_t)n * sizeof *inst);
+    for (int i = 0; i < n; i++) {
+        if (inst[i].op == op_join) {
+            if (inst[inst[i].y.id].op == op_add_f32_imm) {
+                inst[i].x = (val){0};
+            } else {
+                inst[i].y = (val){0};
+            }
+        }
+    }
+
+    int *use = calloc((size_t)(n + 1), sizeof *use);
+    for (int i = n; i-- > 0;) {
+        struct ir_inst const *ip = &inst[i];
+        if (op_is_store(ip->op) || ip->op == op_loop_begin || ip->op == op_loop_end
+                                || ip->op == op_if_begin   || ip->op == op_if_end) {
+            use[i]++;
+        }
+        if (use[i] == 0) { continue; }
+        use[ip->x.id]++;
+        use[ip->y.id]++;
+        use[ip->z.id]++;
+        use[ip->w.id]++;
+        if (ip->ptr.deref) { use[ip->ptr.ix]++; }
+    }
+
+    struct umbra_flat_ir resolved = *bb;
+    resolved.inst = inst;
+
+    _Bool *is_f = calloc((size_t)(n + 1), 1);
+    emit_ops(&b, &resolved, deref_buf, is_f, use, 0, n, "    ");
     emit(&b, "}\n");
 
+    free(use);
+    free(inst);
     free(is_f);
     free(buf_row_shift);
     free(buf_written);
