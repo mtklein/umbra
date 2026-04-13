@@ -933,7 +933,7 @@ static char* build_source(BB const *bb,
         }
         if (use[i] == 0) { continue; }
         use[ip->x.id]++;
-        use[ip->y.id]++;
+        if (ip->op != op_add_f32_imm) { use[ip->y.id]++; }
         use[ip->z.id]++;
         use[ip->w.id]++;
         if (ip->ptr.deref) { use[ip->ptr.ix]++; }
