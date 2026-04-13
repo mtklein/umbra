@@ -250,7 +250,7 @@ int main(void) {
 
     int cur_slide = slide_count() - 1;
     int cur_fmt = FMT_FP16;
-    cur_backend = pick_backend(1);
+    cur_backend = pick_backend(2);
     build_slide_fmt(slide_get(cur_slide), cur_fmt);
 
     SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA64_FLOAT,
