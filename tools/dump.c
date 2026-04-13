@@ -137,37 +137,6 @@ static void slugify(char const *title, char *out, size_t sz) {
 
 enum { RW = 128, RH = 96 };
 
-static struct umbra_program *fill_prog;
-static struct umbra_uniforms_layout fill_uni;
-static void *fill_uniforms;
-
-static void build_fill(struct umbra_backend *interp) {
-    struct umbra_builder *b = umbra_builder();
-    fill_uni = (struct umbra_uniforms_layout){0};
-    int off = umbra_uniforms_reserve_f32(&fill_uni, 4);
-    umbra_color c = {
-        umbra_uniform_32(b, (umbra_ptr32){0}, off),
-        umbra_uniform_32(b, (umbra_ptr32){0}, off + 1),
-        umbra_uniform_32(b, (umbra_ptr32){0}, off + 2),
-        umbra_uniform_32(b, (umbra_ptr32){0}, off + 3),
-    };
-    umbra_fmt_fp16_planar.store(b, 1, c);
-    fill_uniforms = umbra_uniforms_alloc(&fill_uni);
-    struct umbra_flat_ir *bb = umbra_flat_ir(b);
-    umbra_builder_free(b);
-    fill_prog = interp->compile(interp, bb);
-    umbra_flat_ir_free(bb);
-}
-
-static void fill_bg(struct slide *s, void *dst) {
-    umbra_uniforms_fill_f32(fill_uniforms, 0, s->bg, 4);
-    struct umbra_buf buf[2] = {
-        {.ptr = fill_uniforms, .count = fill_uni.slots},
-        {.ptr = dst, .count = RW * RH * 4, .stride = RW},
-    };
-    fill_prog->queue(fill_prog, 0, 0, RW, RH, buf);
-}
-
 static void fp16p_to_float(float *out, void const *pixbuf) {
     __fp16 const *src = pixbuf;
     int const ps = RW * RH;
@@ -179,14 +148,10 @@ static void fp16p_to_float(float *out, void const *pixbuf) {
     }
 }
 
-static void render_hdr(char const *dir, int slide_idx, struct umbra_backend *be,
-                       struct umbra_backend *interp, char const *name) {
+static void render_hdr(char const *dir, int slide_idx, struct umbra_backend *be) {
     struct slide *s = slide_get(slide_idx);
     size_t const pixbuf_sz = (size_t)RW * RH * umbra_fmt_fp16_planar.bpp * 4;
     void *pixbuf = calloc(1, pixbuf_sz);
-
-    fill_bg(s, pixbuf);
-    interp->flush(interp);
 
     s->prepare(s, be, umbra_fmt_fp16_planar);
     s->draw(s, 0, 0, 0, RW, RH, pixbuf);
@@ -197,7 +162,7 @@ static void render_hdr(char const *dir, int slide_idx, struct umbra_backend *be,
     free(pixbuf);
 
     char p[256];
-    snprintf(p, sizeof p, "%s/render_%s.hdr", dir, name);
+    snprintf(p, sizeof p, "%s/render.hdr", dir);
     stbi_write_hdr(p, RW, RH, 4, fdata);
     free(fdata);
 }
@@ -207,9 +172,8 @@ int main(void) {
 
     slides_init(RW, RH);
 
-    struct umbra_backend *interp = umbra_backend_interp();
-    struct umbra_backend *jit    = umbra_backend_jit();
-    build_fill(interp);
+    struct umbra_backend *be = umbra_backend_jit();
+    if (!be) { be = umbra_backend_interp(); }
 
     for (int i = 0; i < slide_count(); i++) {
         struct slide *s = slide_get(i);
@@ -222,17 +186,12 @@ int main(void) {
         struct umbra_builder *bp = s->get_builder(s, umbra_fmt_fp16_planar);
         if (bp) { dump_builder(dir, "draw_fp16p", bp); }
 
-        render_hdr(dir, i, interp, interp, "interp");
-        if (jit) { render_hdr(dir, i, jit, interp, "jit"); }
+        render_hdr(dir, i, be);
     }
 
     dump_builder("dumps", "slug_acc", slug_build_acc(NULL));
 
     slides_cleanup();
-
-    fill_prog->free(fill_prog);
-    free(fill_uniforms);
-    if (jit) { jit->free(jit); }
-    interp->free(interp);
+    be->free(be);
     return 0;
 }
