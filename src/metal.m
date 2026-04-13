@@ -56,8 +56,8 @@ struct metal_program {
     uint8_t  *buf_row_shift;
     int    max_ptr;
     int    total_bufs;
-    int    tg_size;
     int    n_deref;
+    int    :32;
 };
 
 typedef struct {
@@ -1072,7 +1072,6 @@ static struct metal_program* metal_program(
         {
             struct metal_program *p = calloc(1, sizeof *p);
             p->pipeline      = (__bridge_retained void*)pso;
-            p->tg_size       = (int)pso.maxTotalThreadsPerThreadgroup;
             p->src           = src;
             p->max_ptr       = max_ptr;
             p->total_bufs    = total_bufs;
@@ -1219,20 +1218,8 @@ static void encode_dispatch(
     size_t const meta_bytes = (size_t)(3 + 2 * tb) * sizeof(uint32_t);
     [enc setBytes:meta length:meta_bytes atIndex:(NSUInteger)p->total_bufs];
 
-    // TODO: try hardcoded (64,1,1) threadgroup — simpler, matches SPIR-V path.
-    int const tg_size = p->tg_size;
-    MTLSize grid =
-        MTLSizeMake((NSUInteger)w, (NSUInteger)h, 1);
-    int gx = 1, gy = 1;
-    for (int x = 1; x * x <= tg_size; x++) {
-        if (tg_size % x != 0) { continue; }
-        int y = tg_size / x;
-        if (x <= w && y <= h) { gx = x; gy = y; }
-        if (y <= w && x <= h) { gx = y; gy = x; }
-    }
-    MTLSize group =
-        MTLSizeMake((NSUInteger)gx,
-                    (NSUInteger)gy, 1);
+    MTLSize grid  = MTLSizeMake((NSUInteger)w, (NSUInteger)h, 1);
+    MTLSize group = MTLSizeMake(64, 1, 1);
     [enc dispatchThreads:grid
        threadsPerThreadgroup:group];
     be->total_dispatches++;
