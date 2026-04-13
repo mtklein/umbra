@@ -23,6 +23,7 @@ enum {
     X(load_16x4_planar,                     OP_PTR|OP_VARYING)                             \
     X(load_8x4,                             OP_PTR|OP_VARYING)                             \
     X(gather_uniform_32,                    OP_PTR)                                        \
+    X(gather_uniform_32_if,                 OP_PTR)                                        \
     X(gather_32,                            OP_PTR)                                        \
     X(sample_32,                            OP_PTR)                                        \
     X(store_32,                             OP_STORE|OP_PTR|OP_VARYING)                    \

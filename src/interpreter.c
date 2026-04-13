@@ -255,6 +255,8 @@ static struct interp_program* interp_program(struct umbra_basic_block const *bb)
                                             .ptr = RESOLVE_PTR(inst), .x = X); break;
             case op_gather_uniform_32: emit(.tag = op_gather_uniform_32,
                                             .ptr = RESOLVE_PTR(inst), .x = X); break;
+            case op_gather_uniform_32_if: emit(.tag = op_gather_uniform_32_if,
+                                            .ptr = RESOLVE_PTR(inst), .x = X, .y = Y); break;
             case op_gather_32:         emit(.tag = op_gather_32,
                                             .ptr = RESOLVE_PTR(inst), .x = X); break;
             case op_sample_32:         emit(.tag = op_sample_32,
@@ -540,6 +542,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 [op_store_16x4_planar] = &&L_op_store_16x4_planar,
                 [op_load_8x4] = &&L_op_load_8x4, [op_store_8x4] = &&L_op_store_8x4,
                 [op_gather_uniform_32] = &&L_op_gather_uniform_32,
+                [op_gather_uniform_32_if] = &&L_op_gather_uniform_32_if,
                 [op_gather_16] = &&L_op_gather_16, [op_gather_32] = &&L_op_gather_32,
                 [op_sample_32] = &&L_op_sample_32,
                 [op_deref_ptr] = &&L_op_deref_ptr,
@@ -881,6 +884,20 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     int32_t const *ptr = (int32_t const*)buf[ip->ptr].ptr;
                     __builtin_memcpy(&gval, ptr + ix, 4);
                     v->i32 = (I32){0} + gval;
+                } NEXT;
+                CASE(op_gather_uniform_32_if) {
+                    int const ix = v[ip->x].i32[0];
+                    int const count = buf[ip->ptr].count;
+                    I32 result = {0};
+                    if (ix >= 0 && ix < count) {
+                        int32_t gval;
+                        int32_t const *ptr = (int32_t const*)buf[ip->ptr].ptr;
+                        __builtin_memcpy(&gval, ptr + ix, 4);
+                        result = (I32){0} + gval;
+                    }
+                    I32 cond;
+                    __builtin_memcpy(&cond, &v[ip->y].i32, sizeof cond);
+                    v->i32 = result & cond;
                 } NEXT;
                 CASE(op_gather_16) {
                     int const count = buf[ip->ptr].count;

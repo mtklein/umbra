@@ -147,6 +147,9 @@ umbra_val32 umbra_gather_32(builder *b, umbra_ptr32 src, umbra_val32 ix) {
     enum op const op = b->inst[ix.id].uniform ? op_gather_uniform_32 : op_gather_32;
     return push32(b, op, VX(ix), .ptr = {.p32 = src});
 }
+umbra_val32 umbra_gather_32_if(builder *b, umbra_ptr32 src, umbra_val32 ix, umbra_val32 cond) {
+    return push32(b, op_gather_uniform_32_if, VX(ix), VY(cond), .ptr = {.p32 = src});
+}
 umbra_val32 umbra_sample_32(builder *b, umbra_ptr32 src, umbra_val32 ix) {
     return push32(b, op_sample_32, VX(ix), .ptr = {.p32 = src});
 }

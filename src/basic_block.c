@@ -304,6 +304,8 @@ static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
         case op_gather_32:
         case op_gather_16:
         case op_sample_32: fprintf(f, " p%d v%d", ip->ptr.bits, ip->x.id); break;
+        case op_gather_uniform_32_if:
+            fprintf(f, " p%d v%d v%d", ip->ptr.bits, ip->x.id, ip->y.id); break;
         case op_load_16:
         case op_load_32:
         case op_load_16x4:
