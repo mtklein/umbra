@@ -246,6 +246,9 @@ static void grad_stops_free(struct slide *s) {
     free(st);
 }
 
+// TODO: Vulkan draws this faster than Metal.  We've isolated this down to the
+// shader dispatch speed itself, and think that the likely remaining gap has to
+// do with scheduling memory loads and stores.
 SLIDE(slide_gradient_linear_stops) {
     static float const colors[][4] = {
         {1.2f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.8f, 0.0f, 1.0f}, {0.0f, 1.2f, 0.0f, 1.0f},
