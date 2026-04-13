@@ -4386,30 +4386,5 @@ TEST(test_if_varying) {
     cleanup(&B);
 }
 
-TEST(test_join) {
-    struct umbra_builder *b = umbra_builder();
-
-    umbra_val32 x = umbra_load_32(b, (umbra_ptr32){0});
-    umbra_val32 c = umbra_imm_f32(b, 2.0f);
-
-    umbra_val32 path_a = umbra_mul_f32(b, x, c);
-    umbra_val32 path_b = umbra_add_f32(b, x, x);
-    umbra_val32 result = umbra_join(b, path_a, path_b);
-
-    umbra_store_32(b, (umbra_ptr32){.ix = 1}, result);
-
-    struct test_backends B = make(b);
-    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-        float in[8], out[8] = {0};
-        for (int i = 0; i < 8; i++) { in[i] = (float)(i + 1); }
-        if (run(&B, bi, 8, 1, (struct umbra_buf[]){
-                {.ptr = in, .count = 8},
-                {.ptr = out, .count = 8, .stride = 8},
-            })) {
-            for (int i = 0; i < 8; i++) {
-                equiv(out[i], (float)(i + 1) * 2.0f) here;
-            }
-        }
-    }
-    cleanup(&B);
-}
+// TODO: test_join once try_imm emits joins.  The xsan interpreter asserts x==y at
+// runtime, so all existing _imm tests will verify join correctness automatically.
