@@ -2,7 +2,7 @@
 #include <math.h>
 #include <stdlib.h>
 
-struct solid_state {
+struct solid_slide {
     struct slide base;
 
     float rx, ry, vx, vy;
@@ -21,7 +21,7 @@ struct solid_state {
 };
 
 static void solid_init(struct slide *s, int w, int h) {
-    struct solid_state *st = (struct solid_state *)s;
+    struct solid_slide *st = (struct solid_slide *)s;
     st->w = w;
     st->h = h;
     st->rect_w = (float)w * 5.0f / 16.0f;
@@ -43,7 +43,7 @@ static float bounce(float p0, float v, int frame, float range) {
 }
 
 static void solid_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
-    struct solid_state *st = (struct solid_state *)s;
+    struct solid_slide *st = (struct solid_slide *)s;
     if (st->fmt.name != fmt.name || !st->bb) {
         st->fmt = fmt;
         umbra_flat_ir_free(st->bb);
@@ -60,7 +60,7 @@ static void solid_prepare(struct slide *s, struct umbra_backend *be, struct umbr
 }
 
 static void solid_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
-    struct solid_state *st = (struct solid_state *)s;
+    struct solid_slide *st = (struct solid_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
     float rx = bounce(st->rx, st->vx, frame, (float)st->w - st->rect_w);
     float ry = bounce(st->ry, st->vy, frame, (float)st->h - st->rect_h);
@@ -79,13 +79,13 @@ static void solid_draw(struct slide *s, int frame, int l, int t, int r, int b, v
 }
 
 static struct umbra_builder *solid_get_builder(struct slide *s, struct umbra_fmt fmt) {
-    struct solid_state *st = (struct solid_state *)s;
+    struct solid_slide *st = (struct solid_slide *)s;
     return umbra_draw_build(&st->shader.base, st->has_cov ? &st->cov.base : NULL,
                             st->blend, fmt, NULL);
 }
 
 static void solid_free(struct slide *s) {
-    struct solid_state *st = (struct solid_state *)s;
+    struct solid_slide *st = (struct solid_slide *)s;
     if (st->prog) { st->prog->free(st->prog); }
     umbra_flat_ir_free(st->bb);
     free(st->lay.uniforms);
@@ -94,7 +94,7 @@ static void solid_free(struct slide *s) {
 
 static struct slide *make_solid(char const *title, float const bg[4], float const color[4],
                                 _Bool has_cov, umbra_blend_fn blend) {
-    struct solid_state *st = calloc(1, sizeof *st);
+    struct solid_slide *st = calloc(1, sizeof *st);
     st->shader  = umbra_shader_solid(color);
     st->has_cov = has_cov;
     if (has_cov) { st->cov = umbra_coverage_rect((float[]){0, 0, 0, 0}); }

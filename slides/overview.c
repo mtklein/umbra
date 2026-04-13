@@ -8,7 +8,7 @@ static uint8_t const font3x5[10][5] = {
     {7, 4, 7, 1, 7}, {7, 4, 7, 5, 7}, {7, 1, 1, 1, 1}, {7, 5, 7, 5, 7}, {7, 5, 7, 1, 7},
 };
 
-struct overview_state {
+struct overview_slide {
     struct slide base;
 
     int                   w, h, cw, ch;
@@ -51,7 +51,7 @@ static void draw_xbox(uint32_t *fb, int stride, int x0, int y0, int cw, int ch,
     }
 }
 
-static void render_thumbnails(struct overview_state *st) {
+static void render_thumbnails(struct overview_slide *st) {
     int w = st->w, h = st->h;
     for (int idx = 0; idx < ROWS * COLS; idx++) {
         int col = idx % COLS;
@@ -88,7 +88,7 @@ static void render_thumbnails(struct overview_state *st) {
 }
 
 static void overview_init(struct slide *s, int w, int h) {
-    struct overview_state *st = (struct overview_state *)s;
+    struct overview_slide *st = (struct overview_slide *)s;
     st->w = w;
     st->h = h;
     st->cw = w / COLS;
@@ -99,7 +99,7 @@ static void overview_init(struct slide *s, int w, int h) {
 }
 
 static void overview_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
-    struct overview_state *st = (struct overview_state *)s;
+    struct overview_slide *st = (struct overview_slide *)s;
     st->be      = be;
     st->fmt     = umbra_fmt_8888;
     st->out_fmt = fmt;
@@ -116,7 +116,7 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
 }
 
 static void overview_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
-    struct overview_state *st = (struct overview_state *)s;
+    struct overview_slide *st = (struct overview_slide *)s;
     (void)frame; (void)l; (void)r;
     int const w = st->w,
               h = st->h;
@@ -127,7 +127,7 @@ static void overview_draw(struct slide *s, int frame, int l, int t, int r, int b
 }
 
 static void overview_free(struct slide *s) {
-    struct overview_state *st = (struct overview_state *)s;
+    struct overview_slide *st = (struct overview_slide *)s;
     if (st->cvt) { st->cvt->free(st->cvt); }
     free(st->fb);
     free(st->tmp);
@@ -137,7 +137,7 @@ static void overview_free(struct slide *s) {
 struct slide *make_overview(void);
 
 struct slide *make_overview(void) {
-    struct overview_state *st = calloc(1, sizeof *st);
+    struct overview_slide *st = calloc(1, sizeof *st);
     st->fmt = umbra_fmt_8888;
     st->base = (struct slide){
         .title = "Overview",

@@ -499,7 +499,7 @@ struct umbra_builder *slug_build(struct slug_layout *lay) {
     return b;
 }
 
-struct slug_two_pass_state {
+struct slug_two_pass_slide {
     struct slide base;
 
     struct slug_curves        slug;
@@ -518,7 +518,7 @@ struct slug_two_pass_state {
 };
 
 static void slug_two_pass_init(struct slide *s, int w, int h) {
-    struct slug_two_pass_state *st = (struct slug_two_pass_state *)s;
+    struct slug_two_pass_slide *st = (struct slug_two_pass_slide *)s;
     st->w = w;
     st->h = h;
     st->slug = slug_extract("Slug", (float)h * 0.3125f);
@@ -530,7 +530,7 @@ static void slug_two_pass_init(struct slide *s, int w, int h) {
 }
 
 static void slug_two_pass_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
-    struct slug_two_pass_state *st = (struct slug_two_pass_state *)s;
+    struct slug_two_pass_slide *st = (struct slug_two_pass_slide *)s;
     if (st->fmt.name != fmt.name || !st->draw_bb) {
         st->fmt = fmt;
         umbra_flat_ir_free(st->draw_bb);
@@ -548,7 +548,7 @@ static void slug_two_pass_prepare(struct slide *s, struct umbra_backend *be, str
 }
 
 static void slug_two_pass_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
-    struct slug_two_pass_state           *st = (struct slug_two_pass_state *)s;
+    struct slug_two_pass_slide           *st = (struct slug_two_pass_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
     struct umbra_program *acc = st->acc_prog;
     int w = st->w, h = st->h;
@@ -588,12 +588,12 @@ static void slug_two_pass_draw(struct slide *s, int frame, int l, int t, int r, 
 }
 
 static struct umbra_builder *slug_two_pass_get_builder(struct slide *s, struct umbra_fmt fmt) {
-    struct slug_two_pass_state *st = (struct slug_two_pass_state *)s;
+    struct slug_two_pass_slide *st = (struct slug_two_pass_slide *)s;
     return umbra_draw_build(&st->shader.base, &st->cov.base, umbra_blend_srcover, fmt, NULL);
 }
 
 static void slug_two_pass_free(struct slide *s) {
-    struct slug_two_pass_state *st = (struct slug_two_pass_state *)s;
+    struct slug_two_pass_slide *st = (struct slug_two_pass_slide *)s;
     slug_free(&st->slug);
     free(st->wind_buf);
     if (st->acc_prog) { st->acc_prog->free(st->acc_prog); st->acc_prog = 0; }
@@ -606,7 +606,7 @@ static void slug_two_pass_free(struct slide *s) {
 }
 
 SLIDE(slide_slug_wind) {
-    struct slug_two_pass_state *st = calloc(1, sizeof *st);
+    struct slug_two_pass_slide *st = calloc(1, sizeof *st);
     st->shader = umbra_shader_solid((float[]){0.2f, 1.0f, 0.6f, 1.0f});
     st->cov    = umbra_coverage_wind((struct umbra_buf){0});
     st->base = (struct slide){
@@ -621,7 +621,7 @@ SLIDE(slide_slug_wind) {
     return &st->base;
 }
 
-struct slug_state {
+struct slug_slide {
     struct slide base;
 
     struct slug_curves            slug;
@@ -640,7 +640,7 @@ struct slug_state {
 };
 
 static void slug_init(struct slide *s, int w, int h) {
-    struct slug_state *st = (struct slug_state *)s;
+    struct slug_slide *st = (struct slug_slide *)s;
     st->w = w;
     st->h = h;
     st->slug = slug_extract("Slug", (float)h * 0.3125f);
@@ -652,7 +652,7 @@ static void slug_init(struct slide *s, int w, int h) {
 }
 
 static void slug_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
-    struct slug_state *st = (struct slug_state *)s;
+    struct slug_slide *st = (struct slug_slide *)s;
     if (st->fmt.name != fmt.name || !st->draw_bb) {
         st->fmt = fmt;
         umbra_flat_ir_free(st->draw_bb);
@@ -670,7 +670,7 @@ static void slug_prepare(struct slide *s, struct umbra_backend *be, struct umbra
 }
 
 static void slug_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
-    struct slug_state *st = (struct slug_state *)s;
+    struct slug_slide *st = (struct slug_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
     int w = st->w, h = st->h;
 
@@ -708,7 +708,7 @@ static void slug_draw(struct slide *s, int frame, int l, int t, int r, int b, vo
 }
 
 static void slug_free_slide(struct slide *s) {
-    struct slug_state *st = (struct slug_state *)s;
+    struct slug_slide *st = (struct slug_slide *)s;
     slug_free(&st->slug);
     free(st->wind_buf);
     if (st->acc_prog) { st->acc_prog->free(st->acc_prog); }
@@ -721,7 +721,7 @@ static void slug_free_slide(struct slide *s) {
 }
 
 SLIDE(slide_slug_wind_loop) {
-    struct slug_state *st = calloc(1, sizeof *st);
+    struct slug_slide *st = calloc(1, sizeof *st);
     st->shader = umbra_shader_solid((float[]){0.2f, 1.0f, 0.6f, 1.0f});
     st->cov    = umbra_coverage_wind((struct umbra_buf){0});
     st->base = (struct slide){

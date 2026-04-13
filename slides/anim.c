@@ -2,7 +2,7 @@
 #include <math.h>
 #include <stdlib.h>
 
-struct anim_state {
+struct anim_slide {
     struct slide base;
 
     int   w, h;
@@ -15,13 +15,13 @@ struct anim_state {
 };
 
 static void anim_init(struct slide *s, int w, int h) {
-    struct anim_state *st = (struct anim_state *)s;
+    struct anim_slide *st = (struct anim_slide *)s;
     st->w = w;
     st->h = h;
 }
 
 static void anim_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
-    struct anim_state *st = (struct anim_state *)s;
+    struct anim_slide *st = (struct anim_slide *)s;
     if (st->fmt.name != fmt.name || !st->bb) {
         st->fmt = fmt;
         umbra_flat_ir_free(st->bb);
@@ -36,7 +36,7 @@ static void anim_prepare(struct slide *s, struct umbra_backend *be, struct umbra
 }
 
 static void anim_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
-    struct anim_state *st = (struct anim_state *)s;
+    struct anim_slide *st = (struct anim_slide *)s;
     float ft = (float)frame * 0.016f;
     st->shader.color[0] = 0.5f + 0.5f * sinf(ft);
     st->shader.color[1] = 0.5f + 0.5f * sinf(ft + 2.094f);
@@ -51,12 +51,12 @@ static void anim_draw(struct slide *s, int frame, int l, int t, int r, int b, vo
 }
 
 static struct umbra_builder *anim_get_builder(struct slide *s, struct umbra_fmt fmt) {
-    struct anim_state *st = (struct anim_state *)s;
+    struct anim_slide *st = (struct anim_slide *)s;
     return umbra_draw_build(&st->shader.base, NULL, umbra_blend_src, fmt, NULL);
 }
 
 static void anim_free(struct slide *s) {
-    struct anim_state *st = (struct anim_state *)s;
+    struct anim_slide *st = (struct anim_slide *)s;
     if (st->prog) { st->prog->free(st->prog); }
     umbra_flat_ir_free(st->bb);
     free(st->lay.uniforms);
@@ -64,7 +64,7 @@ static void anim_free(struct slide *s) {
 }
 
 SLIDE(slide_anim_t) {
-    struct anim_state *st = calloc(1, sizeof *st);
+    struct anim_slide *st = calloc(1, sizeof *st);
     st->shader = umbra_shader_solid((float[]){0, 0, 0, 1});
     st->base = (struct slide){
         .title = "Animated (t in uniforms)",

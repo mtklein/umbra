@@ -116,7 +116,7 @@ void text_shared_cleanup(void) {
 struct text_cov *text_shared_bitmap(void) { return &shared_bitmap_; }
 struct text_cov *text_shared_sdf   (void) { return &shared_sdf_; }
 
-struct text_state {
+struct text_slide {
     struct slide base;
 
     struct text_cov *tc;
@@ -136,13 +136,13 @@ struct text_state {
 };
 
 static void text_init(struct slide *s, int w, int h) {
-    struct text_state *st = (struct text_state *)s;
+    struct text_slide *st = (struct text_slide *)s;
     st->w = w;
     st->h = h;
 }
 
 static void text_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
-    struct text_state *st = (struct text_state *)s;
+    struct text_slide *st = (struct text_slide *)s;
     if (st->fmt.name != fmt.name || !st->bb) {
         st->fmt = fmt;
         umbra_flat_ir_free(st->bb);
@@ -158,7 +158,7 @@ static void text_prepare(struct slide *s, struct umbra_backend *be, struct umbra
 }
 
 static void text_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
-    struct text_state *st = (struct text_state *)s;
+    struct text_slide *st = (struct text_slide *)s;
     (void)frame;
     slide_bg_draw(s->bg, l, t, r, b, buf);
     st->cov.bitmap.bmp = (struct umbra_buf){
@@ -175,13 +175,13 @@ static void text_draw(struct slide *s, int frame, int l, int t, int r, int b, vo
 }
 
 static struct umbra_builder *text_get_builder(struct slide *s, struct umbra_fmt fmt) {
-    struct text_state *st = (struct text_state *)s;
+    struct text_slide *st = (struct text_slide *)s;
     return umbra_draw_build(&st->shader.base, &st->cov.bitmap.base,
                             umbra_blend_srcover, fmt, NULL);
 }
 
 static void text_free(struct slide *s) {
-    struct text_state *st = (struct text_state *)s;
+    struct text_slide *st = (struct text_slide *)s;
     if (st->prog) { st->prog->free(st->prog); }
     umbra_flat_ir_free(st->bb);
     free(st->lay.uniforms);
@@ -189,7 +189,7 @@ static void text_free(struct slide *s) {
 }
 
 SLIDE(slide_text_bitmap) {
-    struct text_state *st = calloc(1, sizeof *st);
+    struct text_slide *st = calloc(1, sizeof *st);
     st->tc     = text_shared_bitmap();
     st->is_sdf = 0;
     st->shader = umbra_shader_solid((float[]){1.0f, 1.0f, 1.0f, 1.0f});
@@ -207,7 +207,7 @@ SLIDE(slide_text_bitmap) {
 }
 
 SLIDE(slide_text_sdf) {
-    struct text_state *st = calloc(1, sizeof *st);
+    struct text_slide *st = calloc(1, sizeof *st);
     st->tc     = text_shared_sdf();
     st->is_sdf = 1;
     st->shader = umbra_shader_solid((float[]){0.2f, 0.8f, 1.0f, 1.0f});

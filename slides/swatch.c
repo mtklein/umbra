@@ -1,7 +1,7 @@
 #include "slide.h"
 #include <stdlib.h>
 
-struct swatch_state {
+struct swatch_slide {
     struct slide base;
 
     int w, h;
@@ -14,13 +14,13 @@ struct swatch_state {
 };
 
 static void swatch_init(struct slide *s, int w, int h) {
-    struct swatch_state *st = (struct swatch_state *)s;
+    struct swatch_slide *st = (struct swatch_slide *)s;
     st->w = w;
     st->h = h;
 }
 
 static void swatch_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
-    struct swatch_state *st = (struct swatch_state *)s;
+    struct swatch_slide *st = (struct swatch_slide *)s;
     if (st->fmt.name != fmt.name || !st->bb) {
         st->fmt = fmt;
         umbra_flat_ir_free(st->bb);
@@ -35,7 +35,7 @@ static void swatch_prepare(struct slide *s, struct umbra_backend *be, struct umb
 }
 
 static void swatch_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
-    struct swatch_state *st = (struct swatch_state *)s;
+    struct swatch_slide *st = (struct swatch_slide *)s;
     (void)frame;
 
     static float const swatches[][4] = {
@@ -79,7 +79,7 @@ static void swatch_draw(struct slide *s, int frame, int l, int t, int r, int b, 
 }
 
 static void swatch_free(struct slide *s) {
-    struct swatch_state *st = (struct swatch_state *)s;
+    struct swatch_slide *st = (struct swatch_slide *)s;
     if (st->prog) { st->prog->free(st->prog); }
     umbra_flat_ir_free(st->bb);
     free(st->lay.uniforms);
@@ -87,7 +87,7 @@ static void swatch_free(struct slide *s) {
 }
 
 SLIDE(slide_swatch) {
-    struct swatch_state *st = calloc(1, sizeof *st);
+    struct swatch_slide *st = calloc(1, sizeof *st);
     st->shader = umbra_shader_solid((float[]){0, 0, 0, 1});
     st->base = (struct slide){
         .title   = "Color Swatches",

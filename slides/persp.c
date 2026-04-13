@@ -2,7 +2,7 @@
 #include "text.h"
 #include <stdlib.h>
 
-struct persp_state {
+struct persp_slide {
     struct slide base;
 
     struct text_cov *bitmap;
@@ -18,13 +18,13 @@ struct persp_state {
 };
 
 static void persp_init(struct slide *s, int w, int h) {
-    struct persp_state *st = (struct persp_state *)s;
+    struct persp_slide *st = (struct persp_slide *)s;
     st->w = w;
     st->h = h;
 }
 
 static void persp_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
-    struct persp_state *st = (struct persp_state *)s;
+    struct persp_slide *st = (struct persp_slide *)s;
     if (st->fmt.name != fmt.name || !st->bb) {
         st->fmt = fmt;
         umbra_flat_ir_free(st->bb);
@@ -40,7 +40,7 @@ static void persp_prepare(struct slide *s, struct umbra_backend *be, struct umbr
 }
 
 static void persp_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
-    struct persp_state *st = (struct persp_state *)s;
+    struct persp_slide *st = (struct persp_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
     slide_perspective_matrix(&st->cov.mat, (float)frame * 0.016f, st->w, st->h,
                              st->bitmap->w, st->bitmap->h);
@@ -58,12 +58,12 @@ static void persp_draw(struct slide *s, int frame, int l, int t, int r, int b, v
 }
 
 static struct umbra_builder *persp_get_builder(struct slide *s, struct umbra_fmt fmt) {
-    struct persp_state *st = (struct persp_state *)s;
+    struct persp_slide *st = (struct persp_slide *)s;
     return umbra_draw_build(&st->shader.base, &st->cov.base, umbra_blend_srcover, fmt, NULL);
 }
 
 static void persp_free(struct slide *s) {
-    struct persp_state *st = (struct persp_state *)s;
+    struct persp_slide *st = (struct persp_slide *)s;
     if (st->prog) { st->prog->free(st->prog); }
     umbra_flat_ir_free(st->bb);
     free(st->lay.uniforms);
@@ -71,7 +71,7 @@ static void persp_free(struct slide *s) {
 }
 
 SLIDE(slide_persp) {
-    struct persp_state *st = calloc(1, sizeof *st);
+    struct persp_slide *st = calloc(1, sizeof *st);
     st->bitmap = text_shared_bitmap();
     st->shader = umbra_shader_solid((float[]){1.0f, 0.8f, 0.2f, 1.0f});
     st->cov    = umbra_coverage_bitmap_matrix((struct umbra_matrix){0}, (struct umbra_bitmap){0});
