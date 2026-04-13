@@ -4385,3 +4385,17 @@ TEST(test_if_varying) {
     }
     cleanup(&B);
 }
+
+TEST(test_join_add_f32_imm) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_store_32(b, (umbra_ptr32){0},
+        umbra_add_f32(b, umbra_load_32(b, (umbra_ptr32){0}), umbra_imm_f32(b, 1.0f)));
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        float v[8] = {0};
+        if (run(&B, bi, 8, 1, (struct umbra_buf[]){{.ptr=v, .count=8, .stride=8}})) {
+            equiv(v[0], 1.0f) here;
+        }
+    }
+    cleanup(&B);
+}
