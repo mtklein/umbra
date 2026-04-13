@@ -6,6 +6,7 @@ int dprintf(int, char const[], ...);
 
 typedef void (*test_fn)(void);
 void test_register(test_fn fn, char const *name);
+void test_run     (char const *match);
 
 #define TEST(NAME)                                                                \
     static void NAME(void);                                                       \

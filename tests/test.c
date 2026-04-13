@@ -1,6 +1,3 @@
-// TODO: move test.c into tools/ where all the other main() functions live (demo, dump, bench).
-// The test registration (test_register, test_run) and test_backends helpers would stay in tests/,
-// but main() and the filter/run logic starting at line ~66 could move to tools/test.c.
 #include "test.h"
 #include <string.h>
 
@@ -15,6 +12,14 @@ void test_register(test_fn fn, char const *name) {
         registry[test_count] = fn;
         names[test_count] = name;
         test_count++;
+    }
+}
+
+void test_run(char const *match) {
+    for (int i = 0; i < test_count; i++) {
+        if (!match || strstr(names[i], match)) {
+            registry[i]();
+        }
     }
 }
 
@@ -64,21 +69,4 @@ void test_backends_free(struct test_backends *B) {
         if (B->p[i]) { B->p[i]->free(B->p[i]); }
         if (B->be[i]) { B->be[i]->free(B->be[i]); }
     }
-}
-
-int main(int argc, char *argv[]) {
-    char const *match = NULL;
-    for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--match") == 0 && i + 1 < argc) {
-            match = argv[++i];
-        } else {
-            match = argv[i];
-        }
-    }
-    for (int i = 0; i < test_count; i++) {
-        if (!match || strstr(names[i], match)) {
-            registry[i]();
-        }
-    }
-    return 0;
 }
