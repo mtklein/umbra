@@ -7,9 +7,9 @@ struct umbra_builder* umbra_builder(void);
 void   umbra_builder_free(struct umbra_builder*);
 void   umbra_builder_dump(struct umbra_builder const*, FILE*);
 
-struct umbra_basic_block* umbra_basic_block(struct umbra_builder*);
-void   umbra_basic_block_free(struct umbra_basic_block*);
-void   umbra_basic_block_dump(struct umbra_basic_block const*, FILE*);
+struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder*);
+void   umbra_flat_ir_free(struct umbra_flat_ir*);
+void   umbra_flat_ir_dump(struct umbra_flat_ir const*, FILE*);
 
 struct umbra_backend_stats {
     double gpu_sec;
@@ -23,7 +23,7 @@ struct umbra_backend_stats {
 };
 
 struct umbra_backend {
-    struct umbra_program* (*compile)(struct umbra_backend*, struct umbra_basic_block const*);
+    struct umbra_program* (*compile)(struct umbra_backend*, struct umbra_flat_ir const*);
     void                  (*flush  )(struct umbra_backend*);
     void                  (*free   )(struct umbra_backend*);
     struct umbra_backend_stats (*stats)(struct umbra_backend const*);

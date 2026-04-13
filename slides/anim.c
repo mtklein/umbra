@@ -10,7 +10,7 @@ struct anim_state {
     struct umbra_shader_solid  shader;
     struct umbra_fmt           fmt;
     struct umbra_draw_layout   lay;
-    struct umbra_basic_block  *bb;
+    struct umbra_flat_ir  *bb;
     struct umbra_program      *prog;
 };
 
@@ -24,11 +24,11 @@ static void anim_prepare(struct slide *s, struct umbra_backend *be, struct umbra
     struct anim_state *st = (struct anim_state *)s;
     if (st->fmt.name != fmt.name || !st->bb) {
         st->fmt = fmt;
-        umbra_basic_block_free(st->bb);
+        umbra_flat_ir_free(st->bb);
         free(st->lay.uniforms);
         struct umbra_builder *b = umbra_draw_build(&st->shader.base, NULL, umbra_blend_src,
                                                     fmt, &st->lay);
-        st->bb = umbra_basic_block(b);
+        st->bb = umbra_flat_ir(b);
         umbra_builder_free(b);
     }
     if (st->prog) { st->prog->free(st->prog); }
@@ -58,7 +58,7 @@ static struct umbra_builder *anim_get_builder(struct slide *s, struct umbra_fmt 
 static void anim_free(struct slide *s) {
     struct anim_state *st = (struct anim_state *)s;
     if (st->prog) { st->prog->free(st->prog); }
-    umbra_basic_block_free(st->bb);
+    umbra_flat_ir_free(st->bb);
     free(st->lay.uniforms);
     free(st);
 }

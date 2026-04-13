@@ -1,6 +1,6 @@
 #include "../include/umbra.h"
 #include "assume.h"
-#include "basic_block.h"
+#include "flat_ir.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,7 +9,7 @@ struct sched {
     int last_use, n_deps, n_users, user_off, ready_idx;
 };
 
-static _Bool is_body(struct bb_inst const *inst) {
+static _Bool is_body(struct ir_inst const *inst) {
     return inst->live && inst->varying;
 }
 
@@ -17,7 +17,7 @@ static _Bool is_body(struct bb_inst const *inst) {
 // tested (negated scores, constant/random/hash scores, inverted pressure, disabled chaining,
 // reversed scan, swapped multipliers, etc.).  All backends passed every permutation:
 //   interp 0, jit 0, metal 0, vulkan 0, wgpu 0.
-static int sched_score(struct bb_inst const *in, struct sched const *meta,
+static int sched_score(struct ir_inst const *in, struct sched const *meta,
                        int const *users, int c, int live) {
     int kills = 0;
     int const deps[] = {in[c].x.id, in[c].y.id, in[c].z.id, in[c].w.id};
@@ -39,7 +39,7 @@ static int sched_score(struct bb_inst const *in, struct sched const *meta,
     return (kills - defines + enables)*live - last_use;
 }
 
-static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int at, int live,
+static void schedule(struct ir_inst *in, int n, struct ir_inst *out, int at, int live,
                      int region_lo, int region_hi) {
     struct sched *meta = calloc((size_t)(n + 1), sizeof *meta);
 
@@ -161,7 +161,7 @@ static void schedule(struct bb_inst *in, int n, struct bb_inst *out, int at, int
     free(buf);
 }
 
-struct umbra_basic_block* umbra_basic_block(struct umbra_builder *b) {
+struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
     assume(!b->has_loop || b->loop_closed);
 
     int const n = b->insts;
@@ -201,7 +201,7 @@ struct umbra_basic_block* umbra_basic_block(struct umbra_builder *b) {
         }
     }
 
-    struct bb_inst *out = malloc((size_t)live * sizeof *out);
+    struct ir_inst *out = malloc((size_t)live * sizeof *out);
     int preamble = 0;
     for (int i = 0; i < n; i++) {
         if (b->inst[i].live && !b->inst[i].varying && !op_is_store(b->inst[i].op)) {
@@ -249,7 +249,7 @@ struct umbra_basic_block* umbra_basic_block(struct umbra_builder *b) {
         }
     }
 
-    struct umbra_basic_block *result = malloc(sizeof *result);
+    struct umbra_flat_ir *result = malloc(sizeof *result);
     result->inst     = out;
     result->insts    = live;
     result->preamble = preamble;
@@ -265,16 +265,16 @@ struct umbra_basic_block* umbra_basic_block(struct umbra_builder *b) {
     return result;
 }
 
-void umbra_basic_block_free(struct umbra_basic_block *bb) {
+void umbra_flat_ir_free(struct umbra_flat_ir *bb) {
     if (bb) {
         free(bb->inst);
         free(bb);
     }
 }
 
-static void dump_insts(struct bb_inst const *inst, int insts, FILE *f) {
+static void dump_insts(struct ir_inst const *inst, int insts, FILE *f) {
     for (int i = 0; i < insts; i++) {
-        struct bb_inst const *ip = &inst[i];
+        struct ir_inst const *ip = &inst[i];
         enum op const         op = ip->op;
 
         if (op == op_loop_end) {
@@ -399,6 +399,6 @@ void umbra_builder_dump(struct umbra_builder const *b, FILE *f) {
     dump_insts(b->inst, b->insts, f);
 }
 
-void umbra_basic_block_dump(struct umbra_basic_block const *bb, FILE *f) {
+void umbra_flat_ir_dump(struct umbra_flat_ir const *bb, FILE *f) {
     dump_insts(bb->inst, bb->insts, f);
 }

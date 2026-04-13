@@ -25,7 +25,7 @@ struct ra {
     int                  *owner;      // max_reg entries (val owning physical reg, -1 if free)
     int8_t               *pool_inv;   // max_reg entries (reg id -> pool bit, or -1)
     int8_t               *loop_reg;   // preamble entries (snapshot of slot[i].reg at loop top)
-    struct bb_inst const *inst;
+    struct ir_inst const *inst;
     struct ra_config      cfg;
     uint32_t              pool_mask;  // (1 << nregs) - 1
     uint32_t              free_set;   // bit i set => cfg.pool[i] is free
@@ -57,7 +57,7 @@ void ra_set_chan_reg(struct ra *ra, int val, int chan, int8_t r) {
     ra->slot[val].chan_reg[chan] = r;
 }
 
-struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const *cfg) {
+struct ra* ra_create(struct umbra_flat_ir const *bb, struct ra_config const *cfg) {
     int const  n  = bb->insts;
     assume(cfg->nregs <= 32);
     struct ra *ra = malloc(sizeof *ra);
@@ -79,7 +79,7 @@ struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const 
                                        : (((uint32_t)1 << cfg->nregs) - 1);
 
     for (int i = 0; i < n; i++) {
-        struct bb_inst const *inst = &bb->inst[i];
+        struct ir_inst const *inst = &bb->inst[i];
         ra->slot[inst->x.id].last_use                          = i;
         ra->slot[inst->x.id].chan_last_use[(int)inst->x.chan]  = i;
         if (!cfg->ignore_imm_y || !op_is_fused_imm(inst->op)) {
@@ -290,7 +290,7 @@ struct ra_step ra_step_alloc(struct ra *ra, int *sl, int *ns, int i) {
     return s;
 }
 
-struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct bb_inst const *inst,
+struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct ir_inst const *inst,
                              int i) {
     struct ra_step s = step0();
     ra->pinned_set = 0;
@@ -323,7 +323,7 @@ struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct bb_inst con
     return s;
 }
 
-struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const *inst,
+struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct ir_inst const *inst,
                            int i, int nscratch) {
     struct ra_slot const *slot = ra->slot;
     struct ra_step s = step0();

@@ -113,14 +113,14 @@ TEST(test_slug_rect) {
 
     struct slug_acc_layout alay;
     struct umbra_builder *ab = slug_build_acc(&alay);
-    struct umbra_basic_block *abb =
-        umbra_basic_block(ab);
+    struct umbra_flat_ir *abb =
+        umbra_flat_ir(ab);
     umbra_builder_free(ab);
     struct umbra_backend *be =
         umbra_backend_interp();
     struct umbra_program *acc =
         be->compile(be, abb);
-    umbra_basic_block_free(abb);
+    umbra_flat_ir_free(abb);
 
     float color[4] = {1,1,1,1};
     float wind_buf[W * H];
@@ -136,12 +136,12 @@ TEST(test_slug_rect) {
         &shader.base, &cov.base,
         umbra_blend_srcover, umbra_fmt_8888,
         &lay);
-    struct umbra_basic_block *bb =
-        umbra_basic_block(bld);
+    struct umbra_flat_ir *bb =
+        umbra_flat_ir(bld);
     umbra_builder_free(bld);
     struct umbra_program *interp =
         be->compile(be, bb);
-    umbra_basic_block_free(bb);
+    umbra_flat_ir_free(bb);
 
     uint32_t pixels[W * H];
     for (int i = 0; i < W * H; i++) {
@@ -212,12 +212,12 @@ TEST(test_perspective_text) {
         &shader.base, &cov.base,
         umbra_blend_srcover, umbra_fmt_8888,
         &lay);
-    struct umbra_basic_block *bb =
-        umbra_basic_block(bld);
+    struct umbra_flat_ir *bb =
+        umbra_flat_ir(bld);
     umbra_builder_free(bld);
     struct umbra_program *interp =
         be->compile(be, bb);
-    umbra_basic_block_free(bb);
+    umbra_flat_ir_free(bb);
 
     uint32_t pixels[BW];
     for (int i = 0; i < BW; i++) {
@@ -256,10 +256,10 @@ TEST(test_perspective_text) {
         &shader2.base, &cov2.base,
         umbra_blend_srcover, umbra_fmt_8888,
         &lay2);
-    bb = umbra_basic_block(bld);
+    bb = umbra_flat_ir(bld);
     umbra_builder_free(bld);
     interp = be->compile(be, bb);
-    umbra_basic_block_free(bb);
+    umbra_flat_ir_free(bb);
 
     uint32_t px2[W * H];
     for (int i = 0; i < W * H; i++) {
@@ -309,11 +309,11 @@ static void run_long_batch_no_oom(struct umbra_backend *be) {
             umbra_uniform_32(bld, (umbra_ptr32){0}, 3),
         };
         umbra_store_8888(bld, (umbra_ptr32){.ix=1}, c);
-        struct umbra_basic_block *bb = umbra_basic_block(bld);
+        struct umbra_flat_ir *bb = umbra_flat_ir(bld);
         umbra_builder_free(bld);
 
         struct umbra_program *p = be->compile(be, bb);
-        umbra_basic_block_free(bb);
+        umbra_flat_ir_free(bb);
         p != 0 here;
 
         int rotations_before = be->stats(be).uniform_ring_rotations;
@@ -363,11 +363,11 @@ static void run_tiled_writable_sync(struct umbra_backend *be) {
     umbra_val32 v   = umbra_load_32(b, (umbra_ptr32){.ix=0});
     umbra_val32 one = umbra_imm_f32(b, 1.0f);
     umbra_store_32(b, (umbra_ptr32){.ix=0}, umbra_add_f32(b, v, one));
-    struct umbra_basic_block *bb = umbra_basic_block(b);
+    struct umbra_flat_ir *bb = umbra_flat_ir(b);
     umbra_builder_free(b);
 
     struct umbra_program *p = be->compile(be, bb);
-    umbra_basic_block_free(bb);
+    umbra_flat_ir_free(bb);
     p != 0 here;
 
     enum { BW = 128, BH = 128 };
@@ -427,11 +427,11 @@ TEST(test_wgpu_misc) {
         umbra_imm_f32(bld, 1.0f),
     };
     umbra_store_8888(bld, (umbra_ptr32){.ix=1}, c);
-    struct umbra_basic_block *bb = umbra_basic_block(bld);
+    struct umbra_flat_ir *bb = umbra_flat_ir(bld);
     umbra_builder_free(bld);
 
     struct umbra_program *p = be->compile(be, bb);
-    umbra_basic_block_free(bb);
+    umbra_flat_ir_free(bb);
     p != 0 here;
 
     FILE *devnull = fopen("/dev/null", "w");

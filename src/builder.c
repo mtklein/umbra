@@ -1,6 +1,6 @@
 #include "../include/umbra.h"
 #include "assume.h"
-#include "basic_block.h"
+#include "flat_ir.h"
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -15,7 +15,7 @@ static uint32_t mul_overflow(uint32_t x, uint32_t y) {
     return x;
 }
 
-static uint32_t bb_inst_hash(struct bb_inst const *inst) {
+static uint32_t ir_inst_hash(struct ir_inst const *inst) {
     uint32_t h = (uint32_t)inst->op;
     h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->x.bits);
     h = mul_overflow(0x9e3779b9, h ^ (uint32_t)inst->y.bits);
@@ -28,8 +28,8 @@ static uint32_t bb_inst_hash(struct bb_inst const *inst) {
 }
 
 struct dedup_ctx {
-    struct bb_inst const *probe;
-    struct bb_inst const *insts;
+    struct ir_inst const *probe;
+    struct ir_inst const *insts;
     int                   hit, pad_;
 };
 static _Bool dedup_match(int id, void *ctx) {
@@ -41,7 +41,7 @@ static _Bool dedup_match(int id, void *ctx) {
     return 0;
 }
 
-static val push_(builder *b, struct bb_inst inst) {
+static val push_(builder *b, struct ir_inst inst) {
     {
         enum op const op = inst.op;
         if (op == op_imm_32 || op == op_uniform_32 || op == op_deref_ptr) {
@@ -64,7 +64,7 @@ static val push_(builder *b, struct bb_inst inst) {
         }
     }
 
-    uint32_t const h = bb_inst_hash(&inst);
+    uint32_t const h = ir_inst_hash(&inst);
 
     struct dedup_ctx ctx = {.probe = &inst, .insts = b->inst};
     if (hash_lookup(b->ht, h, dedup_match, &ctx)) {
@@ -83,7 +83,7 @@ static val push_(builder *b, struct bb_inst inst) {
     }
     return (val){.id = id};
 }
-#define push(b, ...) push_(b, (struct bb_inst){.op = __VA_ARGS__})
+#define push(b, ...) push_(b, (struct ir_inst){.op = __VA_ARGS__})
 #define push32(b, ...) push(b, __VA_ARGS__).v32
 #define push16(b, ...) push(b, __VA_ARGS__).v16
 #define VX(v) .x = (val){.id = (v).id, .chan = (v).chan}
@@ -214,7 +214,7 @@ static _Bool is_imm32(builder *b, int id, int v) {
 
 static _Bool is_imm(builder *b, int id) { return b->inst[id].op == op_imm_32; }
 
-static val math_(builder *b, struct bb_inst inst) {
+static val math_(builder *b, struct ir_inst inst) {
     if (is_imm(b, inst.x.id) && is_imm(b, inst.y.id) && is_imm(b, inst.z.id)) {
         int const result = op_eval(inst.op, b->inst[inst.x.id].imm,
                                             b->inst[inst.y.id].imm,
@@ -224,7 +224,7 @@ static val math_(builder *b, struct bb_inst inst) {
     }
     return push_(b, inst);
 }
-#define math(b, ...) math_(b, (struct bb_inst){.op = __VA_ARGS__})
+#define math(b, ...) math_(b, (struct ir_inst){.op = __VA_ARGS__})
 
 static val try_imm(builder *b, val d, enum op fused, val x, val y) {
     int const imm_id = is_imm(b, x.id) ? x.id : is_imm(b, y.id) ? y.id : -1;

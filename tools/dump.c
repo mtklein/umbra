@@ -63,12 +63,12 @@ static struct umbra_builder *build_srcover(void) {
 #define JIT_EXT "avx2"
 #endif
 
-static void dump_bb(char const *dir, char const *name, struct umbra_basic_block *bb) {
+static void dump_bb(char const *dir, char const *name, struct umbra_flat_ir *bb) {
     char p[128];
     {
-        snprintf(p, sizeof p, "%s/%s.bb", dir, name);
+        snprintf(p, sizeof p, "%s/%s.ir", dir, name);
         FILE *f = atomic_open(p);
-        umbra_basic_block_dump(bb, f);
+        umbra_flat_ir_dump(bb, f);
         atomic_close(f, p);
     }
 
@@ -113,10 +113,10 @@ static void dump_builder(char const *dir, char const *name, struct umbra_builder
     umbra_builder_dump(b, f);
     atomic_close(f, p);
 
-    struct umbra_basic_block *bb = umbra_basic_block(b);
+    struct umbra_flat_ir *bb = umbra_flat_ir(b);
     umbra_builder_free(b);
     dump_bb(dir, name, bb);
-    umbra_basic_block_free(bb);
+    umbra_flat_ir_free(bb);
 }
 
 static void slugify(char const *title, char *out, size_t sz) {
@@ -153,10 +153,10 @@ static void build_fill(struct umbra_backend *interp) {
     };
     umbra_fmt_fp16_planar.store(b, 1, c);
     fill_uniforms = umbra_uniforms_alloc(&fill_uni);
-    struct umbra_basic_block *bb = umbra_basic_block(b);
+    struct umbra_flat_ir *bb = umbra_flat_ir(b);
     umbra_builder_free(b);
     fill_prog = interp->compile(interp, bb);
-    umbra_basic_block_free(bb);
+    umbra_flat_ir_free(bb);
 }
 
 static void fill_bg(struct slide *s, void *dst) {

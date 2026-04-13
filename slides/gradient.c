@@ -14,7 +14,7 @@ struct grad_2stop_state {
 
     struct umbra_fmt            fmt;
     struct umbra_draw_layout   lay;
-    struct umbra_basic_block  *bb;
+    struct umbra_flat_ir  *bb;
     struct umbra_program      *prog;
 };
 
@@ -32,7 +32,7 @@ struct grad_lut_state {
 
     struct umbra_fmt            fmt;
     struct umbra_draw_layout   lay;
-    struct umbra_basic_block  *bb;
+    struct umbra_flat_ir  *bb;
     struct umbra_program      *prog;
 };
 
@@ -46,11 +46,11 @@ static void grad_2stop_prepare(struct slide *s, struct umbra_backend *be, struct
     struct grad_2stop_state *st = (struct grad_2stop_state *)s;
     if (st->fmt.name != fmt.name || !st->bb) {
         st->fmt = fmt;
-        umbra_basic_block_free(st->bb);
+        umbra_flat_ir_free(st->bb);
         free(st->lay.uniforms);
         struct umbra_builder *b = umbra_draw_build(&st->shader.linear.base, NULL, NULL, fmt,
                                                     &st->lay);
-        st->bb = umbra_basic_block(b);
+        st->bb = umbra_flat_ir(b);
         umbra_builder_free(b);
     }
     if (st->prog) { st->prog->free(st->prog); }
@@ -76,7 +76,7 @@ static struct umbra_builder *grad_2stop_get_builder(struct slide *s, struct umbr
 static void grad_2stop_free(struct slide *s) {
     struct grad_2stop_state *st = (struct grad_2stop_state *)s;
     if (st->prog) { st->prog->free(st->prog); }
-    umbra_basic_block_free(st->bb);
+    umbra_flat_ir_free(st->bb);
     free(st->lay.uniforms);
     free(st);
 }
@@ -91,11 +91,11 @@ static void grad_lut_prepare(struct slide *s, struct umbra_backend *be, struct u
     struct grad_lut_state *st = (struct grad_lut_state *)s;
     if (st->fmt.name != fmt.name || !st->bb) {
         st->fmt = fmt;
-        umbra_basic_block_free(st->bb);
+        umbra_flat_ir_free(st->bb);
         free(st->lay.uniforms);
         struct umbra_builder *b = umbra_draw_build(&st->shader.linear.base, NULL, NULL, fmt,
                                                     &st->lay);
-        st->bb = umbra_basic_block(b);
+        st->bb = umbra_flat_ir(b);
         umbra_builder_free(b);
     }
     if (st->prog) { st->prog->free(st->prog); }
@@ -121,7 +121,7 @@ static struct umbra_builder *grad_lut_get_builder(struct slide *s, struct umbra_
 static void grad_lut_free(struct slide *s) {
     struct grad_lut_state *st = (struct grad_lut_state *)s;
     if (st->prog) { st->prog->free(st->prog); }
-    umbra_basic_block_free(st->bb);
+    umbra_flat_ir_free(st->bb);
     free(st->lay.uniforms);
     free(st->lut_data);
     free(st);
@@ -187,7 +187,7 @@ struct grad_stops_state {
 
     struct umbra_fmt            fmt;
     struct umbra_draw_layout   lay;
-    struct umbra_basic_block  *bb;
+    struct umbra_flat_ir  *bb;
     struct umbra_program      *prog;
 };
 
@@ -201,10 +201,10 @@ static void grad_stops_prepare(struct slide *s, struct umbra_backend *be, struct
     struct grad_stops_state *st = (struct grad_stops_state *)s;
     if (st->fmt.name != fmt.name || !st->bb) {
         st->fmt = fmt;
-        umbra_basic_block_free(st->bb);
+        umbra_flat_ir_free(st->bb);
         free(st->lay.uniforms);
         struct umbra_builder *b = umbra_draw_build(&st->shader.base, NULL, NULL, fmt, &st->lay);
-        st->bb = umbra_basic_block(b);
+        st->bb = umbra_flat_ir(b);
         umbra_builder_free(b);
     }
     if (st->prog) { st->prog->free(st->prog); }
@@ -230,7 +230,7 @@ static struct umbra_builder *grad_stops_get_builder(struct slide *s, struct umbr
 static void grad_stops_free(struct slide *s) {
     struct grad_stops_state *st = (struct grad_stops_state *)s;
     if (st->prog) { st->prog->free(st->prog); }
-    umbra_basic_block_free(st->bb);
+    umbra_flat_ir_free(st->bb);
     free(st->lay.uniforms);
     free(st->colors_data);
     free(st->pos_data);

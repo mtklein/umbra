@@ -325,14 +325,14 @@ struct slug_state {
     int                       w, h;
     float                    *wind_buf;
     struct slug_acc_layout    acc_lay;
-    struct umbra_basic_block *acc_bb;
+    struct umbra_flat_ir *acc_bb;
     struct umbra_program     *acc_prog;
 
     struct umbra_shader_solid   shader;
     struct umbra_coverage_wind  cov;
     struct umbra_fmt            fmt;
     struct umbra_draw_layout    draw_lay;
-    struct umbra_basic_block   *draw_bb;
+    struct umbra_flat_ir   *draw_bb;
     struct umbra_program       *draw_prog;
 };
 
@@ -344,7 +344,7 @@ static void slug_init(struct slide *s, int w, int h) {
     st->wind_buf = malloc((size_t)w * (size_t)h * sizeof(float));
 
     struct umbra_builder *b = slug_build_acc(&st->acc_lay);
-    st->acc_bb = umbra_basic_block(b);
+    st->acc_bb = umbra_flat_ir(b);
     umbra_builder_free(b);
 }
 
@@ -352,11 +352,11 @@ static void slug_prepare(struct slide *s, struct umbra_backend *be, struct umbra
     struct slug_state *st = (struct slug_state *)s;
     if (st->fmt.name != fmt.name || !st->draw_bb) {
         st->fmt = fmt;
-        umbra_basic_block_free(st->draw_bb);
+        umbra_flat_ir_free(st->draw_bb);
         free(st->draw_lay.uniforms);
         struct umbra_builder *b = umbra_draw_build(&st->shader.base, &st->cov.base,
                                                     umbra_blend_srcover, fmt, &st->draw_lay);
-        st->draw_bb = umbra_basic_block(b);
+        st->draw_bb = umbra_flat_ir(b);
         umbra_builder_free(b);
     }
     if (st->acc_prog) { st->acc_prog->free(st->acc_prog); }
@@ -419,10 +419,10 @@ static void slug_slide_free(struct slide *s) {
     slug_free(&st->slug);
     free(st->wind_buf);
     if (st->acc_prog) { st->acc_prog->free(st->acc_prog); st->acc_prog = 0; }
-    umbra_basic_block_free(st->acc_bb);
+    umbra_flat_ir_free(st->acc_bb);
     free(st->acc_lay.uniforms);
     if (st->draw_prog) { st->draw_prog->free(st->draw_prog); }
-    umbra_basic_block_free(st->draw_bb);
+    umbra_flat_ir_free(st->draw_bb);
     free(st->draw_lay.uniforms);
     free(st);
 }

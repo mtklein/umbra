@@ -16,7 +16,7 @@ struct solid_state {
 
     struct umbra_fmt            fmt;
     struct umbra_draw_layout   lay;
-    struct umbra_basic_block      *bb;
+    struct umbra_flat_ir      *bb;
     struct umbra_program          *prog;
 };
 
@@ -46,12 +46,12 @@ static void solid_prepare(struct slide *s, struct umbra_backend *be, struct umbr
     struct solid_state *st = (struct solid_state *)s;
     if (st->fmt.name != fmt.name || !st->bb) {
         st->fmt = fmt;
-        umbra_basic_block_free(st->bb);
+        umbra_flat_ir_free(st->bb);
         free(st->lay.uniforms);
         struct umbra_builder *b = umbra_draw_build(&st->shader.base,
                                                     st->has_cov ? &st->cov.base : NULL,
                                                     st->blend, fmt, &st->lay);
-        st->bb = umbra_basic_block(b);
+        st->bb = umbra_flat_ir(b);
         umbra_builder_free(b);
     }
     if (st->prog) { st->prog->free(st->prog); }
@@ -87,7 +87,7 @@ static struct umbra_builder *solid_get_builder(struct slide *s, struct umbra_fmt
 static void solid_free(struct slide *s) {
     struct solid_state *st = (struct solid_state *)s;
     if (st->prog) { st->prog->free(st->prog); }
-    umbra_basic_block_free(st->bb);
+    umbra_flat_ir_free(st->bb);
     free(st->lay.uniforms);
     free(st);
 }

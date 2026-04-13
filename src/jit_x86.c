@@ -98,7 +98,7 @@ static int8_t const ra_pool_x86[] = {0, 1, 2,  3,  4,  5,  6,  7,
 
 struct jit_ctx {
     Buf                            *c;
-    struct umbra_basic_block const *bb;
+    struct umbra_flat_ir const *bb;
     struct pool                     pool;
     int                             n_vars, loop_top, loop_br_skip, :32;
 };
@@ -137,7 +137,7 @@ static void x86_remat(int reg, int val, void *ctx) {
     pool_broadcast(j->c, &j->pool, reg, (uint32_t)j->bb->inst[val].imm);
 }
 
-static struct ra *ra_create_x86(struct umbra_basic_block const *bb, struct jit_ctx *jc) {
+static struct ra *ra_create_x86(struct umbra_flat_ir const *bb, struct jit_ctx *jc) {
     struct ra_config cfg = {
         .pool = ra_pool_x86,
         .nregs = 16,
@@ -242,7 +242,7 @@ static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm
     }
 }
 
-static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int to,
+static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
                      int *deref_rb_gpr, struct jit_ctx *jc);
 
@@ -272,7 +272,7 @@ static int resolve_ptr_x86(Buf *c, ptr p, int *last_ptr, int const *deref_gpr,
 }
 
 struct jit_program *jit_program(struct jit_backend *be,
-                                           struct umbra_basic_block const *bb) {
+                                           struct umbra_flat_ir const *bb) {
     int *sl = malloc((size_t)bb->insts * sizeof(int));
     for (int i = 0; i < bb->insts; i++) {
         sl[i] = -1;
@@ -455,7 +455,7 @@ struct jit_program *jit_program(struct jit_backend *be,
     return j;
 }
 
-static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int to,
+static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
                      int *deref_rb_gpr, struct jit_ctx *jc) {
     int       last_ptr = -1;
@@ -464,7 +464,7 @@ static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int t
     int const rb_gprs[]    = {R15, RBX, 0};
 
     for (int i = from; i < to; i++) {
-        struct bb_inst const *inst = &bb->inst[i];
+        struct ir_inst const *inst = &bb->inst[i];
         switch (inst->op) {
         case op_deref_ptr: {
             int base   = load_ptr_x86(c, inst->ptr, &last_ptr, 2);

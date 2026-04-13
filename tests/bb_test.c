@@ -36,10 +36,10 @@ static struct umbra_builder *build_srcover(void) {
 }
 
 static struct test_backends make(struct umbra_builder *builder) {
-    struct umbra_basic_block *bb = umbra_basic_block(builder);
+    struct umbra_flat_ir *bb = umbra_flat_ir(builder);
     umbra_builder_free(builder);
     struct test_backends B = test_backends_make(bb);
-    umbra_basic_block_free(bb);
+    umbra_flat_ir_free(bb);
     return B;
 }
 static _Bool run(struct test_backends *B, int b, int w, int h, struct umbra_buf buf[]) {
@@ -2047,10 +2047,10 @@ TEST(test_dump) {
         umbra_store_32(b, (umbra_ptr32){.ix=2}, s);
         umbra_builder_dump(b, f);
 
-        struct umbra_basic_block *bb = umbra_basic_block(b);
+        struct umbra_flat_ir *bb = umbra_flat_ir(b);
         umbra_builder_free(b);
-        umbra_basic_block_dump(bb, f);
-        umbra_basic_block_free(bb);
+        umbra_flat_ir_dump(bb, f);
+        umbra_flat_ir_free(bb);
         fclose(f);
     }
 }
@@ -2321,7 +2321,7 @@ TEST(test_jit_xs_init) {
 TEST(test_program_threadsafe) {
     struct umbra_builder *b = umbra_builder();
     umbra_store_32(b, (umbra_ptr32){0}, umbra_x(b));
-    struct umbra_basic_block *bb = umbra_basic_block(b);
+    struct umbra_flat_ir *bb = umbra_flat_ir(b);
     umbra_builder_free(b);
 
     struct umbra_backend *interp = umbra_backend_interp();
@@ -2346,7 +2346,7 @@ TEST(test_program_threadsafe) {
         metal->free(metal);
     }
 
-    umbra_basic_block_free(bb);
+    umbra_flat_ir_free(bb);
 }
 
 TEST(test_program_null_guards) {
@@ -2356,10 +2356,10 @@ TEST(test_program_null_guards) {
 
     struct umbra_builder *b = umbra_builder();
     umbra_store_32(b, (umbra_ptr32){0}, umbra_load_32(b, (umbra_ptr32){0}));
-    struct umbra_basic_block *bb = umbra_basic_block(b);
+    struct umbra_flat_ir *bb = umbra_flat_ir(b);
     umbra_builder_free(b);
     struct umbra_program *p = be->compile(be, bb);
-    umbra_basic_block_free(bb);
+    umbra_flat_ir_free(bb);
 
     // dump on interpreter (no dump fn)
     if (p->dump) { p->dump(p, stdout); }
@@ -3848,7 +3848,7 @@ TEST(test_jit_code_buffer_overflow) {
         umbra_load_8x4(b, p, &r, &g, &bl, &a);
         umbra_store_8x4(b, p, r, g, bl, a);
     }
-    struct umbra_basic_block *bb = umbra_basic_block(b);
+    struct umbra_flat_ir *bb = umbra_flat_ir(b);
     umbra_builder_free(b);
 
     struct umbra_backend *be = umbra_backend_jit();
@@ -3863,7 +3863,7 @@ TEST(test_jit_code_buffer_overflow) {
       prog->free(prog); }
     be->free(be);
 
-    umbra_basic_block_free(bb);
+    umbra_flat_ir_free(bb);
 }
 
 // Cover const-fold true-branches in op_eval comparisons and min.
@@ -3935,7 +3935,7 @@ TEST(test_stats_safe) {
     // Also safe after compile+flush with no queued work.
     struct umbra_builder *b = umbra_builder();
     umbra_store_32(b, (umbra_ptr32){0}, umbra_x(b));
-    struct umbra_basic_block *bb = umbra_basic_block(b);
+    struct umbra_flat_ir *bb = umbra_flat_ir(b);
     umbra_builder_free(b);
 
     for (int i = 0; i < NUM_BACKENDS; i++) {
@@ -3948,7 +3948,7 @@ TEST(test_stats_safe) {
         }
     }
 
-    umbra_basic_block_free(bb);
+    umbra_flat_ir_free(bb);
     for (int i = 0; i < NUM_BACKENDS; i++) {
         if (be[i]) { be[i]->free(be[i]); }
     }

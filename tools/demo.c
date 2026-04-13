@@ -57,10 +57,10 @@ static void finish_pipe(struct pipe *p, struct umbra_builder *builder,
                         struct umbra_uniforms_layout uni) {
     p->uni = uni;
     p->uniforms = umbra_uniforms_alloc(&uni);
-    struct umbra_basic_block *bb = umbra_basic_block(builder);
+    struct umbra_flat_ir *bb = umbra_flat_ir(builder);
     umbra_builder_free(builder);
     p->program = pipe_be->compile(pipe_be, bb);
-    umbra_basic_block_free(bb);
+    umbra_flat_ir_free(bb);
 }
 
 static void build_readback(int fmt) {
@@ -94,7 +94,7 @@ static void free_pipes(void) {
 static int                    max_threads;
 static int                    n_threads = 1;
 static struct umbra_program **xtra_progs;
-static struct umbra_basic_block *saved_bb;
+static struct umbra_flat_ir *saved_bb;
 
 static void free_xtra(void) {
     for (int t = 1; t < max_threads; t++) {
@@ -126,10 +126,10 @@ static void build_slide_fmt(struct slide *s, int fmt) {
     if (bes[cur_backend]) {
         s->prepare(s, bes[cur_backend], *fmt_enums[fmt]);
     }
-    umbra_basic_block_free(saved_bb);
+    umbra_flat_ir_free(saved_bb);
     if (s->get_builder) {
         struct umbra_builder *b = s->get_builder(s, *fmt_enums[fmt]);
-        saved_bb = umbra_basic_block(b);
+        saved_bb = umbra_flat_ir(b);
         umbra_builder_free(b);
     } else {
         saved_bb = NULL;
@@ -423,7 +423,7 @@ int main(void) {
     thread_pool_free(pool);
     free_xtra();
     free(xtra_progs);
-    umbra_basic_block_free(saved_bb);
+    umbra_flat_ir_free(saved_bb);
     free_pipes();
     slides_cleanup();
     for (int i = 0; i < NUM_BACKENDS; i++) { if (bes[i]) { bes[i]->free(bes[i]); } }

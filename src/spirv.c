@@ -465,7 +465,7 @@ static uint32_t get_val(SpvBuilder *b, val v) {
 static int get_id(val v) { return v.id; }
 
 // Resolve a pointer index: if negative, it's a deref reference.
-static int resolve_ptr(SpvBuilder *b, struct bb_inst const *inst) {
+static int resolve_ptr(SpvBuilder *b, struct ir_inst const *inst) {
     return inst->ptr.deref ? b->deref_buf[inst->ptr.ix] : inst->ptr.bits;
 }
 
@@ -586,7 +586,7 @@ static _Bool produces_float(enum op op) {
 }
 
 // Build the full SPIR-V binary for a basic block.
-struct spirv_result build_spirv(struct umbra_basic_block const *bb,
+struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
                                int flags) {
     struct spirv_result result = {0};
     SpvBuilder B;
@@ -1179,7 +1179,7 @@ struct spirv_result build_spirv(struct umbra_basic_block const *bb,
 
         // --- Emit instructions. ---
         for (int i = 0; i < bb->insts; i++) {
-            struct bb_inst const *inst = &bb->inst[i];
+            struct ir_inst const *inst = &bb->inst[i];
 
             int xid = get_id(inst->x);
             int yid = get_id(inst->y);

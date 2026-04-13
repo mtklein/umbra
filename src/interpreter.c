@@ -1,5 +1,5 @@
 #include "assume.h"
-#include "basic_block.h"
+#include "flat_ir.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -181,7 +181,7 @@ struct interp_program {
     int             preamble, nptr, n_deref, n_vars;
 };
 
-static struct interp_program* interp_program(struct umbra_basic_block const *bb) {
+static struct interp_program* interp_program(struct umbra_flat_ir const *bb) {
     int *id = calloc((size_t)bb->insts, sizeof *id);
 
     struct interp_program *p = malloc(sizeof *p);
@@ -230,7 +230,7 @@ static struct interp_program* interp_program(struct umbra_basic_block const *bb)
         int const lo = pass ? bb->preamble : 0, hi = pass ? bb->insts : bb->preamble;
         if (pass) { p->preamble = n; }
         for (int i = lo; i < hi; i++) {
-            struct bb_inst const *inst = &bb->inst[i];
+            struct ir_inst const *inst = &bb->inst[i];
             int const X = id[inst->x.id] + (int)inst->x.chan - n;
             int const Y = id[inst->y.id] + (int)inst->y.chan - n;
             int const Z = id[inst->z.id] + (int)inst->z.chan - n;
@@ -1231,7 +1231,7 @@ static void run_interp(struct umbra_program *prog, int l, int t, int r, int b, s
 }
 static void free_interp(struct umbra_program *prog) { interp_program_free((struct interp_program*)prog); }
 static struct umbra_program *compile_interp(struct umbra_backend           *be,
-                                            struct umbra_basic_block const *bb) {
+                                            struct umbra_flat_ir const *bb) {
     struct interp_program *p = interp_program(bb);
     p->base = (struct umbra_program){
         .queue      = run_interp,

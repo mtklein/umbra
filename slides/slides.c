@@ -67,7 +67,7 @@ void slides_cleanup(void) {
     count = 0;
 }
 
-static struct umbra_basic_block *bg_bb;
+static struct umbra_flat_ir *bg_bb;
 static struct umbra_program     *bg_prog;
 static struct umbra_draw_layout  bg_lay;
 static struct umbra_fmt          bg_fmt;
@@ -75,14 +75,14 @@ static int                       bg_w, bg_h;
 
 void slide_bg_prepare(struct umbra_backend *be, struct umbra_fmt fmt, int w, int h) {
     if (bg_fmt.name != fmt.name || !bg_bb || bg_w != w || bg_h != h) {
-        umbra_basic_block_free(bg_bb);
+        umbra_flat_ir_free(bg_bb);
         free(bg_lay.uniforms);
         bg_fmt = fmt;
         bg_w   = w;
         bg_h   = h;
         struct umbra_shader_solid shader = umbra_shader_solid((float[]){0,0,0,0});
         struct umbra_builder *b = umbra_draw_build(&shader.base, NULL, NULL, fmt, &bg_lay);
-        bg_bb = umbra_basic_block(b);
+        bg_bb = umbra_flat_ir(b);
         umbra_builder_free(b);
     }
     if (bg_prog) { bg_prog->free(bg_prog); }
@@ -101,7 +101,7 @@ void slide_bg_draw(float const bg[4], int l, int t, int r, int b, void *buf) {
 
 void slide_bg_cleanup(void) {
     if (bg_prog) { bg_prog->free(bg_prog); bg_prog = NULL; }
-    umbra_basic_block_free(bg_bb); bg_bb = NULL;
+    umbra_flat_ir_free(bg_bb); bg_bb = NULL;
     free(bg_lay.uniforms);
     bg_lay = (struct umbra_draw_layout){0};
     bg_fmt = (struct umbra_fmt){0};

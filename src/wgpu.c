@@ -285,7 +285,7 @@ static void wgpu_flush(struct umbra_backend *base) {
 }
 
 static struct umbra_program *wgpu_compile(struct umbra_backend *base,
-                                          struct umbra_basic_block const *bb) {
+                                          struct umbra_flat_ir const *bb) {
     struct wgpu_backend *be = (struct wgpu_backend *)base;
 
     wgpu_had_error = 0;
@@ -587,7 +587,7 @@ static void wgpu_free(struct umbra_backend *base) {
 }
 
 static struct umbra_program *wgpu_compile_fn(struct umbra_backend *be,
-                                              struct umbra_basic_block const *bb) {
+                                              struct umbra_flat_ir const *bb) {
     struct umbra_program *p = wgpu_compile(be, bb);
     if (p) {
         p->queue   = wgpu_program_queue;

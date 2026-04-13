@@ -18,7 +18,7 @@ typedef union {
     struct { int ix : 31, deref : 1; };
 } ptr;
 
-struct bb_inst {
+struct ir_inst {
     enum op op;
     val     x, y, z, w;
     ptr     ptr;
@@ -30,7 +30,7 @@ struct bb_inst {
 };
 
 struct umbra_builder {
-    struct bb_inst *inst;
+    struct ir_inst *inst;
     _Bool          *var_uniform;
     int             insts, cap;
     struct hash     ht;
@@ -40,8 +40,8 @@ struct umbra_builder {
     umbra_var       loop_var;
 };
 
-struct umbra_basic_block {
-    struct bb_inst *inst;
+struct umbra_flat_ir {
+    struct ir_inst *inst;
     int             insts, preamble;
     int             loop_begin, loop_end;
     int             n_vars, pad_bb_;

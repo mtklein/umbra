@@ -1,4 +1,4 @@
-#include "basic_block.h"
+#include "flat_ir.h"
 #include "gpu_buf_cache.h"
 #include "uniform_ring.h"
 
@@ -18,7 +18,7 @@ struct umbra_backend *umbra_backend_metal(void) { return 0; }
 #include <time.h>
 #include <unistd.h>
 
-typedef struct umbra_basic_block BB;
+typedef struct umbra_flat_ir BB;
 
 static double now(void) {
     struct timespec ts;
@@ -128,7 +128,7 @@ static void emit_ops(SrcBuf *b, BB const *bb,
            : (void)snprintf(buf, sizeof buf, "v%d", (vid)), buf)
 
     for (int i = lo; i < hi; i++) {
-        struct bb_inst const *inst = &bb->inst[i];
+        struct ir_inst const *inst = &bb->inst[i];
         int xid = inst->x.id, yid = inst->y.id,
             zid = inst->z.id, wid = inst->w.id;
         VNAME(vx, xid, (int)inst->x.chan);

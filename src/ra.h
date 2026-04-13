@@ -1,5 +1,5 @@
 #pragma once
-#include "basic_block.h"
+#include "flat_ir.h"
 #include <stdint.h>
 
 typedef void (*ra_spill_fn)(int reg, int slot, void *ctx);
@@ -18,7 +18,7 @@ struct ra_config {
 // Opaque register allocator.
 struct ra;
 
-struct ra* ra_create(struct umbra_basic_block const *bb, struct ra_config const *cfg);
+struct ra* ra_create(struct umbra_flat_ir const *bb, struct ra_config const *cfg);
 void       ra_destroy(struct ra *ra);
 void       ra_reset_pool(struct ra *ra);
 
@@ -55,11 +55,11 @@ struct ra_step {
 struct ra_step ra_step_alloc(struct ra *ra, int *sl, int *ns, int i);
 
 // Unary conversion: ensure x, claim rd if x dead, else alloc rd.
-struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct bb_inst const *inst,
+struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct ir_inst const *inst,
                              int i);
 
 // Full ALU: ensure x/y/z, dead analysis, claim/alloc rd,
 // alloc scratch if needed, free dead inputs.
 // FMA accumulator targeting and sel mask claiming are handled internally.
-struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct bb_inst const *inst,
+struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct ir_inst const *inst,
                            int i, int nscratch);

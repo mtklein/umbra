@@ -9,7 +9,7 @@ struct swatch_state {
     struct umbra_shader_solid  shader;
     struct umbra_fmt           fmt;
     struct umbra_draw_layout   lay;
-    struct umbra_basic_block  *bb;
+    struct umbra_flat_ir  *bb;
     struct umbra_program      *prog;
 };
 
@@ -23,11 +23,11 @@ static void swatch_prepare(struct slide *s, struct umbra_backend *be, struct umb
     struct swatch_state *st = (struct swatch_state *)s;
     if (st->fmt.name != fmt.name || !st->bb) {
         st->fmt = fmt;
-        umbra_basic_block_free(st->bb);
+        umbra_flat_ir_free(st->bb);
         free(st->lay.uniforms);
         struct umbra_builder *b = umbra_draw_build(&st->shader.base, NULL, NULL, fmt,
                                                     &st->lay);
-        st->bb = umbra_basic_block(b);
+        st->bb = umbra_flat_ir(b);
         umbra_builder_free(b);
     }
     if (st->prog) { st->prog->free(st->prog); }
@@ -81,7 +81,7 @@ static void swatch_draw(struct slide *s, int frame, int l, int t, int r, int b, 
 static void swatch_free(struct slide *s) {
     struct swatch_state *st = (struct swatch_state *)s;
     if (st->prog) { st->prog->free(st->prog); }
-    umbra_basic_block_free(st->bb);
+    umbra_flat_ir_free(st->bb);
     free(st->lay.uniforms);
     free(st);
 }

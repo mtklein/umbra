@@ -456,7 +456,7 @@ static void vk_program_free(struct umbra_program *p) {
 }
 
 static struct umbra_program *vk_compile(struct umbra_backend *be,
-                                         struct umbra_basic_block const *bb) {
+                                         struct umbra_flat_ir const *bb) {
     struct vk_backend *vbe = (struct vk_backend *)be;
 
     struct spirv_result const sr =

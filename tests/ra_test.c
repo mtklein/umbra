@@ -1,5 +1,5 @@
 #include "../src/ra.h"
-#include "../src/basic_block.h"
+#include "../src/flat_ir.h"
 #include "test.h"
 #include <stdlib.h>
 #include <string.h>
@@ -21,8 +21,8 @@ static void test_fill(int reg, int slot, void *ctx) {
 
 static void reset_records(void) { nspills = nfills = 0; }
 
-static struct umbra_basic_block *make_bb(int n, int pre) {
-    struct umbra_basic_block *bb = malloc(sizeof *bb);
+static struct umbra_flat_ir *make_bb(int n, int pre) {
+    struct umbra_flat_ir *bb = malloc(sizeof *bb);
     bb->inst = calloc((size_t)n, sizeof *bb->inst);
     bb->insts = n;
     bb->preamble = pre;
@@ -41,7 +41,7 @@ static struct umbra_basic_block *make_bb(int n, int pre) {
     return bb;
 }
 
-static void free_bb(struct umbra_basic_block *bb) {
+static void free_bb(struct umbra_flat_ir *bb) {
     free(bb->inst);
     free(bb);
 }
@@ -57,7 +57,7 @@ TEST(test_basic_alloc_free) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_basic_block *bb = make_bb(3, 0);
+    struct umbra_flat_ir *bb = make_bb(3, 0);
     struct ra                *ra = ra_create(bb, &cfg);
     int                       sl[3] = {-1, -1, -1};
     int                       ns = 0;
@@ -94,7 +94,7 @@ TEST(test_eviction_belady) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_basic_block *bb = make_bb(5, 0);
+    struct umbra_flat_ir *bb = make_bb(5, 0);
     struct ra                *ra = ra_create(bb, &cfg);
     int                       sl[5] = {-1, -1, -1, -1, -1};
     int                       ns = 0;
@@ -132,7 +132,7 @@ TEST(test_dead_value_evicted_first) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_basic_block *bb = make_bb(5, 0);
+    struct umbra_flat_ir *bb = make_bb(5, 0);
     struct ra                *ra = ra_create(bb, &cfg);
     int                       sl[5] = {-1, -1, -1, -1, -1};
     int                       ns = 0;
@@ -167,7 +167,7 @@ TEST(test_ensure_and_fill) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_basic_block *bb = make_bb(5, 0);
+    struct umbra_flat_ir *bb = make_bb(5, 0);
     struct ra                *ra = ra_create(bb, &cfg);
     int                       sl[5] = {-1, -1, -1, -1, -1};
     int                       ns = 0;
@@ -211,7 +211,7 @@ TEST(test_claim) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_basic_block *bb = make_bb(4, 0);
+    struct umbra_flat_ir *bb = make_bb(4, 0);
     struct ra                *ra = ra_create(bb, &cfg);
     int                       sl[4] = {-1, -1, -1, -1};
     int                       ns = 0;
@@ -242,7 +242,7 @@ TEST(test_last_use_preamble) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_basic_block *bb = make_bb(4, 2);
+    struct umbra_flat_ir *bb = make_bb(4, 2);
     struct ra                *ra = ra_create(bb, &cfg);
 
     ra_last_use(ra, 0) == 4 here;
@@ -265,7 +265,7 @@ TEST(test_many_values_stress) {
         .ctx = 0,
     };
     int                       n = 20;
-    struct umbra_basic_block *bb = make_bb(n, 0);
+    struct umbra_flat_ir *bb = make_bb(n, 0);
     struct ra                *ra = ra_create(bb, &cfg);
     int                      *sl = calloc((size_t)n, sizeof *sl);
     for (int i = 0; i < n; i++) { sl[i] = -1; }
@@ -307,7 +307,7 @@ TEST(test_step_alloc) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_basic_block *bb = make_bb(3, 0);
+    struct umbra_flat_ir *bb = make_bb(3, 0);
     struct ra                *ra = ra_create(bb, &cfg);
     int                       sl[3] = {-1, -1, -1};
     int                       ns = 0;
@@ -338,7 +338,7 @@ TEST(test_step_unary) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_basic_block *bb = malloc(sizeof *bb);
+    struct umbra_flat_ir *bb = malloc(sizeof *bb);
     bb->inst = calloc(2, sizeof *bb->inst);
     bb->insts = 2;
     bb->preamble = 0;
@@ -381,7 +381,7 @@ TEST(test_step_unary_alive) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_basic_block *bb = malloc(sizeof *bb);
+    struct umbra_flat_ir *bb = malloc(sizeof *bb);
     bb->inst = calloc(3, sizeof *bb->inst);
     bb->insts = 3;
     bb->preamble = 0;
@@ -439,7 +439,7 @@ TEST(test_step_unary_pins_inputs_and_dest) {
     //   inst[1] = imm_32 (stand-in for the runtime input to be subtracted)
     //   inst[2] = imm_32 (filler so all 3 regs are occupied)
     //   inst[3] = sub_f32_imm inst[1] (with .y.id = 0 referencing the imm)
-    struct umbra_basic_block *bb = malloc(sizeof *bb);
+    struct umbra_flat_ir *bb = malloc(sizeof *bb);
     bb->inst = calloc(4, sizeof *bb->inst);
     bb->insts = 4;
     bb->preamble = 0;
@@ -509,7 +509,7 @@ TEST(test_step_alu) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_basic_block *bb = malloc(sizeof *bb);
+    struct umbra_flat_ir *bb = malloc(sizeof *bb);
     bb->inst = calloc(3, sizeof *bb->inst);
     bb->insts = 3;
     bb->preamble = 0;
@@ -570,7 +570,7 @@ TEST(test_step_alu_scratch_does_not_evict_dest) {
     // 4 vals: three imms occupy the pool, then a shr_u32 (op that
     // takes nscratch=1 in jit.c) consumes val 0 (so it can claim its
     // register) and reads val 1 (which gets pinned).
-    struct umbra_basic_block *bb = malloc(sizeof *bb);
+    struct umbra_flat_ir *bb = malloc(sizeof *bb);
     bb->inst = calloc(4, sizeof *bb->inst);
     bb->insts = 4;
     bb->preamble = 0;
@@ -636,7 +636,7 @@ TEST(test_step_alu_scratch) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_basic_block *bb = malloc(sizeof *bb);
+    struct umbra_flat_ir *bb = malloc(sizeof *bb);
     bb->inst = calloc(3, sizeof *bb->inst);
     bb->insts = 3;
     bb->preamble = 0;
@@ -688,7 +688,7 @@ TEST(test_sparse_pool_eviction) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_basic_block *bb = make_bb(4, 0);
+    struct umbra_flat_ir *bb = make_bb(4, 0);
     struct ra                *ra = ra_create(bb, &cfg);
     int                       sl[4] = {-1, -1, -1, -1};
     int                       ns = 0;
@@ -725,7 +725,7 @@ TEST(test_sparse_pool_eviction) {
 TEST(test_evict_live_before_loop) {
     static int8_t const pool[] = {0, 1, 2};
 
-    struct umbra_basic_block *bb = make_bb(8, 1);
+    struct umbra_flat_ir *bb = make_bb(8, 1);
     bb->loop_begin = 4;
     bb->loop_end   = 7;
     bb->inst[5].x = (val){.id = 2};

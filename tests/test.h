@@ -31,7 +31,7 @@ struct test_backends {
     struct umbra_program *p[NUM_BACKENDS];
 };
 
-struct test_backends test_backends_make(struct umbra_basic_block const *bb);
+struct test_backends test_backends_make(struct umbra_flat_ir const *bb);
 _Bool                test_backends_run (struct test_backends *B, int bi, int r, int b,
                                         struct umbra_buf buf[]);
 void                 test_backends_free(struct test_backends *B);

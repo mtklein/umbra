@@ -299,14 +299,14 @@ int main(int argc, char *argv[]) {
         struct slug_curves       sc  = slug_extract("Slug", (float)H * 0.3125f);
         struct slug_acc_layout   al;
         struct umbra_builder    *bld = slug_build_acc(&al);
-        struct umbra_basic_block *bb = umbra_basic_block(bld);
+        struct umbra_flat_ir *bb = umbra_flat_ir(bld);
         umbra_builder_free(bld);
 
         struct umbra_program *progs[5];
         for (int bi = 0; bi < nb; bi++) {
             progs[bi] = bes[bi] ? bes[bi]->compile(bes[bi], bb) : NULL;
         }
-        umbra_basic_block_free(bb);
+        umbra_flat_ir_free(bb);
 
         float *wind = calloc((size_t)(W * H), 4);
         struct umbra_matrix mat;
@@ -359,11 +359,11 @@ int main(int argc, char *argv[]) {
                 {
                     struct umbra_builder *b = s->get_builder(s, fmt);
                     if (!b) { continue; }
-                    struct umbra_basic_block *bb2 = umbra_basic_block(b);
+                    struct umbra_flat_ir *bb2 = umbra_flat_ir(b);
                     umbra_builder_free(b);
                     struct umbra_program *p = bes[bi]->compile(bes[bi], bb2);
                     p->free(p);
-                    umbra_basic_block_free(bb2);
+                    umbra_flat_ir_free(bb2);
                 }
 
                 int    iters   = 1;
@@ -372,11 +372,11 @@ int main(int argc, char *argv[]) {
                     double const start = now();
                     for (int it = 0; it < iters; it++) {
                         struct umbra_builder *b = s->get_builder(s, fmt);
-                        struct umbra_basic_block *bb2 = umbra_basic_block(b);
+                        struct umbra_flat_ir *bb2 = umbra_flat_ir(b);
                         umbra_builder_free(b);
                         struct umbra_program *p = bes[bi]->compile(bes[bi], bb2);
                         p->free(p);
-                        umbra_basic_block_free(bb2);
+                        umbra_flat_ir_free(bb2);
                     }
                     t_pilot = now() - start;
                     if (t_pilot >= target_secs / 2) { break; }
@@ -391,11 +391,11 @@ int main(int argc, char *argv[]) {
                     double const start = now();
                     for (int it = 0; it < iters; it++) {
                         struct umbra_builder *b = s->get_builder(s, fmt);
-                        struct umbra_basic_block *bb2 = umbra_basic_block(b);
+                        struct umbra_flat_ir *bb2 = umbra_flat_ir(b);
                         umbra_builder_free(b);
                         struct umbra_program *p = bes[bi]->compile(bes[bi], bb2);
                         p->free(p);
-                        umbra_basic_block_free(bb2);
+                        umbra_flat_ir_free(bb2);
                     }
                     double const dt = now() - start;
                     if (k == 0 || dt < best) { best = dt; }

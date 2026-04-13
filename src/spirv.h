@@ -1,5 +1,5 @@
 #pragma once
-#include "basic_block.h"
+#include "flat_ir.h"
 #include "gpu_buf_cache.h"
 #include <stdint.h>
 
@@ -23,4 +23,4 @@ struct spirv_result {
     int               push_words, :32;
 };
 
-struct spirv_result build_spirv(struct umbra_basic_block const *bb, int flags);
+struct spirv_result build_spirv(struct umbra_flat_ir const *bb, int flags);

@@ -214,7 +214,7 @@ static int8_t const ra_pool[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13};
 
 struct jit_ctx {
     Buf                            *c;
-    struct umbra_basic_block const *bb;
+    struct umbra_flat_ir const *bb;
     struct pool                     pool;
     int                             n_vars, loop_top, loop_br_skip, :32;
 };
@@ -251,7 +251,7 @@ static void arm64_remat(int reg, int val, void *ctx) {
     put(j->c, ORR_16b(hi(reg), lo(reg), lo(reg)));
 }
 
-static struct ra *ra_create_arm64(struct umbra_basic_block const *bb, struct jit_ctx *jc) {
+static struct ra *ra_create_arm64(struct umbra_flat_ir const *bb, struct jit_ctx *jc) {
     struct ra_config cfg = {
         .pool = ra_pool,
         .nregs = 14,
@@ -264,12 +264,12 @@ static struct ra *ra_create_arm64(struct umbra_basic_block const *bb, struct jit
     return ra_create(bb, &cfg);
 }
 
-static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int to,
+static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
                      int *deref_rb_gpr, struct jit_ctx *jc);
 
 struct jit_program *jit_program(struct jit_backend *be,
-                                           struct umbra_basic_block const *bb) {
+                                           struct umbra_flat_ir const *bb) {
 
     int *sl = malloc((size_t)bb->insts * sizeof(int));
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
@@ -455,14 +455,14 @@ struct jit_program *jit_program(struct jit_backend *be,
     return j;
 }
 
-static void emit_ops(Buf *c, struct umbra_basic_block const *bb, int from, int to,
+static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
                      int *deref_rb_gpr, struct jit_ctx *jc) {
     int last_ptr = -1;
     int dc = 0;
 
     for (int i = from; i < to; i++) {
-        struct bb_inst const *inst = &bb->inst[i];
+        struct ir_inst const *inst = &bb->inst[i];
 
         switch (inst->op) {
         case op_deref_ptr: {

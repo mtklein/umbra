@@ -1,6 +1,6 @@
 #include "../include/umbra_draw.h"
 #include "assume.h"
-#include "basic_block.h"
+#include "flat_ir.h"
 #include <math.h>
 #include <stdlib.h>
 #include <stdint.h>

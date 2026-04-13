@@ -1,5 +1,5 @@
 #pragma once
-#include "basic_block.h"
+#include "flat_ir.h"
 #include <stdio.h>
 
 struct jit_backend;
@@ -13,6 +13,6 @@ struct jit_program {
     void (*entry)(int, int, int, int, struct umbra_buf*);
     int loop_start, loop_end;
 };
-struct jit_program* jit_program(struct jit_backend*, struct umbra_basic_block const*);
+struct jit_program* jit_program(struct jit_backend*, struct umbra_flat_ir const*);
 void   jit_program_run (struct jit_program*, int,int,int,int, struct umbra_buf[]);
 void   jit_program_dump(struct jit_program const*, FILE*);
