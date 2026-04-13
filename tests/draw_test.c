@@ -837,6 +837,34 @@ TEST(test_coverage_bitmap_matrix) {
     cleanup_draw(&B);
 }
 
+TEST(test_coverage_bitmap_matrix_565) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 1});
+    uint16_t bmp[16];
+    for (int i = 0; i < 16; i++) { bmp[i] = 255; }
+    float mat[11] = {1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 1};
+    struct umbra_coverage_bitmap_matrix cov =
+        umbra_coverage_bitmap_matrix(mat, (struct umbra_buf){.ptr=bmp, .sz=sizeof bmp});
+    struct umbra_draw_layout lay;
+    struct draw_backends B =
+        make_draw(umbra_draw_build(&shader.base, &cov.base,
+                                   umbra_blend_srcover, umbra_fmt_565, &lay), lay);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint16_t dst[16];
+        __builtin_memset(dst, 0, sizeof dst);
+        umbra_draw_fill(&B.lay, &shader.base, &cov.base);
+        if (run_draw(&B, bi, 16, 1,
+                      (struct umbra_buf[]){
+                          (struct umbra_buf){.ptr=B.lay.uniforms, .sz=B.lay.uni.size},
+                          {.ptr=dst, .sz=sizeof dst, .row_bytes=sizeof dst},
+                      })) {
+            for (int i = 0; i < 16; i++) {
+                dst[i] == 0xF800u here;
+            }
+        }
+    }
+    cleanup_draw(&B);
+}
+
 TEST(test_coverage_bitmap_matrix_oob) {
     struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 1, 1, 1});
     uint16_t bmp[4] = {255, 0, 0, 0};
