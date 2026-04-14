@@ -301,6 +301,14 @@ struct umbra_flat_ir *umbra_flat_ir_resolve(struct umbra_flat_ir const *bb,
         }
     }
 
+    for (int i = 0; i < n; i++) {
+        struct ir_inst *ip = inst + i;
+        while (inst[ip->x.id].op == op_join) { ip->x.id = inst[ip->x.id].x.id; }
+        while (inst[ip->y.id].op == op_join) { ip->y.id = inst[ip->y.id].x.id; }
+        while (inst[ip->z.id].op == op_join) { ip->z.id = inst[ip->z.id].x.id; }
+        while (inst[ip->w.id].op == op_join) { ip->w.id = inst[ip->w.id].x.id; }
+    }
+
     _Bool *live = calloc((size_t)(n + 1), sizeof *live);
     for (int i = n; i-- > 0;) {
         struct ir_inst const *ip = &inst[i];
@@ -342,6 +350,9 @@ struct umbra_flat_ir *umbra_flat_ir_resolve(struct umbra_flat_ir const *bb,
         out[j].w = remap_val(inst[i].w, remap);
         if (inst[i].ptr.deref) {
             out[j].ptr.ix = remap[inst[i].ptr.ix];
+        }
+        if (inst[i].op == op_if_end) {
+            out[j].imm = remap[inst[i].imm];
         }
         j++;
     }

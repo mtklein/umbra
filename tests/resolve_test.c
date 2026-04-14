@@ -55,21 +55,22 @@ TEST(resolve_with_loop) {
     umbra_flat_ir_free(bb);
 }
 
-TEST(resolve_dce_kills_dead_join_side) {
+TEST(resolve_eliminates_joins) {
     struct umbra_builder *b = umbra_builder();
-    umbra_val32 x = umbra_imm_f32(b, 1.0f);
-    umbra_val32 y = umbra_add_f32(b, x, x);
-    umbra_store_32(b, (umbra_ptr32){0}, y);
+    umbra_val32 v = umbra_gather_32(b, (umbra_ptr32){0}, umbra_x(b));
+    umbra_val32 r = umbra_add_f32(b, v, umbra_imm_f32(b, 2.0f));
+    umbra_store_32(b, (umbra_ptr32){.ix = 1}, r);
     struct umbra_flat_ir *bb = umbra_flat_ir(b);
     umbra_builder_free(b);
 
-    int const orig_count = bb->insts;
+    _Bool has_join = 0;
+    for (int i = 0; i < bb->insts; i++) {
+        if (bb->inst[i].op == op_join) { has_join = 1; }
+    }
+    has_join here;
 
     struct umbra_flat_ir *keep_x = umbra_flat_ir_resolve(bb, JOIN_KEEP_X);
     struct umbra_flat_ir *prefer = umbra_flat_ir_resolve(bb, JOIN_PREFER_IMM);
-
-    keep_x->insts <= orig_count here;
-    prefer->insts <= orig_count here;
 
     for (int i = 0; i < keep_x->insts; i++) {
         keep_x->inst[i].op != op_join here;
