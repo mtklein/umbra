@@ -450,54 +450,38 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *bb) {
 
             int const tag = s->tag;
 
-#define TRY_BINARY(name, ...) \
-            if (tag == op_##name) { \
-                if      ( out_r &&  x_r) { s->tag = op_r_##name##_rm; } \
-                else if (!out_r &&  x_r) { s->tag = op_m_##name##_rm; } \
-                else if ( out_r       )  { s->tag = op_r_##name##_mm; } \
-            } else
-            BINARY_OPS(TRY_BINARY)
-#undef TRY_BINARY
+            static struct { int out_r_in_r, out_m_in_r, out_r; } const upgrade[] = {
+#define BV(name,...) [op_##name] = {op_r_##name##_rm, op_m_##name##_rm, op_r_##name##_mm},
+                BINARY_OPS(BV)
+#undef BV
+                [op_sel_32] = {op_r_sel_32_rm, op_m_sel_32_rm, op_r_sel_32_mm},
+#define UV(name,...) [op_##name] = {op_r_##name##_r, op_m_##name##_r, 0},
+                UNARY_OPS(UV)
+                IMM_OPS(UV)
+#undef UV
+            };
 
-#define TRY_UNARY(name, ...) \
-            if (tag == op_##name) { \
-                if      ( out_r &&  x_r) { s->tag = op_r_##name##_r; } \
-                else if (!out_r &&  x_r) { s->tag = op_m_##name##_r; } \
-            } else
-            UNARY_OPS(TRY_UNARY)
-#undef TRY_UNARY
-
-#define TRY_IMM(name, ...) \
-            if (tag == op_##name) { \
-                if      ( out_r &&  x_r) { s->tag = op_r_##name##_r; } \
-                else if (!out_r &&  x_r) { s->tag = op_m_##name##_r; } \
-            } else
-            IMM_OPS(TRY_IMM)
-#undef TRY_IMM
-
+            if (tag < (int)(sizeof upgrade / sizeof *upgrade) && upgrade[tag].out_r_in_r) {
+                if      ( out_r && x_r)                  { s->tag = upgrade[tag].out_r_in_r; }
+                else if (!out_r && x_r)                  { s->tag = upgrade[tag].out_m_in_r; }
+                else if ( out_r && upgrade[tag].out_r)    { s->tag = upgrade[tag].out_r; }
+            }
 #if defined(__ARM_FEATURE_FMA) || defined(__FMA__)
-            if (tag == op_fma_f32) {
+            else if (tag == op_fma_f32) {
                 if      ( out_r &&  z_r) { s->tag = op_r_fma_f32_mmr; }
                 else if (!out_r &&  z_r) { s->tag = op_m_fma_f32_mmr; }
                 else if ( out_r && !z_r) { s->tag = op_r_fma_f32_mmm; }
-            } else
-            if (tag == op_fms_f32) {
+            } else if (tag == op_fms_f32) {
                 if      ( out_r &&  z_r) { s->tag = op_r_fms_f32_mmr; }
                 else if (!out_r &&  z_r) { s->tag = op_m_fms_f32_mmr; }
                 else if ( out_r && !z_r) { s->tag = op_r_fms_f32_mmm; }
-            } else
+            }
 #endif
-            if (tag == op_sel_32) {
-                if      ( out_r &&  x_r) { s->tag = op_r_sel_32_rm; }
-                else if (!out_r &&  x_r) { s->tag = op_m_sel_32_rm; }
-                else if ( out_r && !x_r) { s->tag = op_r_sel_32_mm; }
-            } else
-            if (out_r && (tag == op_imm_32 || tag == op_x || tag == op_y)) {
+            else if (out_r && (tag == op_imm_32 || tag == op_x || tag == op_y)) {
                      if (tag == op_imm_32) { s->tag = op_r_imm_32; }
                 else if (tag == op_x)      { s->tag = op_r_x; }
                 else if (tag == op_y)      { s->tag = op_r_y; }
-            } else
-            { /* not an upgradable op */ }
+            }
 
             prev_r = (s->tag != tag) ? out_r : 0;
         }
@@ -1262,6 +1246,11 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
         }
     }
 }
+#undef F32_IMM
+#undef DISPATCH
+#undef CASE
+#undef NEXT
+#undef DONE
 
 static void interp_program_free(struct interp_program *p) {
     if (p) {
