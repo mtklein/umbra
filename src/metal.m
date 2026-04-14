@@ -1,3 +1,6 @@
+// TODO: Slug two-pass is ~2.5 ns/px on Metal vs ~3.0 on MoltenVK, but single-dispatch Slug
+// is ~1.6 ns/px on both (1025 vs 1009 µs/dispatch).  Eliminating dead imm_32 constants via
+// join() didn't help.
 #include "flat_ir.h"
 #include "gpu_buf_cache.h"
 #include "uniform_ring.h"
