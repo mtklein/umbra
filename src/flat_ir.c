@@ -6,7 +6,11 @@
 #include <stdlib.h>
 
 struct sched {
-    int last_use, n_deps, n_users, user_off, ready_idx;
+    int last_use,  // Latest op that reads this op's result, or -1 if unused/external.
+        n_deps,    // Unscheduled ops this op still waits on.  Ready to schedule at 0.
+        n_users,   // Ops that read this op's result.  Decremented as users are scheduled.
+        user_off,  // Start index into the users[] array for this op's user list.
+        ready_idx; // This op's position in the ready[] worklist, kept in sync on removal.
 };
 
 static _Bool is_body(struct ir_inst const *inst) {
