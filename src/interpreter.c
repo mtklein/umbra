@@ -263,8 +263,6 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *bb) {
                                             .ptr = RESOLVE_PTR(inst), .x = X); break;
             case op_gather_32:         emit(.tag = op_gather_32,
                                             .ptr = RESOLVE_PTR(inst), .x = X); break;
-            case op_sample_32:         emit(.tag = op_sample_32,
-                                            .ptr = RESOLVE_PTR(inst), .x = X); break;
 
             case op_store_16: emit(.tag = op_store_16, .ptr = RESOLVE_PTR(inst), .x = Y); break;
             case op_store_32: emit(.tag = op_store_32, .ptr = RESOLVE_PTR(inst), .x = Y); break;
@@ -543,7 +541,6 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 [op_load_8x4] = &&L_op_load_8x4, [op_store_8x4] = &&L_op_store_8x4,
                 [op_gather_uniform_32] = &&L_op_gather_uniform_32,
                 [op_gather_16] = &&L_op_gather_16, [op_gather_32] = &&L_op_gather_32,
-                [op_sample_32] = &&L_op_sample_32,
                 [op_join] = &&L_op_join,
                 [op_deref_ptr] = &&L_op_deref_ptr,
                 [op_loop_begin] = &&L_op_loop_begin, [op_loop_end] = &&L_op_loop_end,
@@ -929,36 +926,6 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     }
                     __builtin_memcpy(&v->i32, tmp, sizeof v->i32);
                 } NEXT;
-                CASE(op_sample_32) {
-                    F32 const ix_f = v[ip->x].f32;
-                    F32 const fl   = vec_floor(ix_f);
-                    int const count = buf[ip->ptr].count;
-                    int const rem = n - (end - K);
-                    float const *ptr = (float const*)buf[ip->ptr].ptr;
-                    int32_t fl_i[K];
-                    { I32 const fl_int = cast(I32, fl);
-                      __builtin_memcpy(fl_i, &fl_int, sizeof fl_i); }
-                    float lo[K], hi[K];
-                    __builtin_memset(lo, 0, sizeof lo);
-                    __builtin_memset(hi, 0, sizeof hi);
-                    int const lim = rem < K ? rem : K;
-                    for (int ll = 0; ll < lim; ll++) {
-                        int const li = fl_i[ll];
-                        int const hi_ix = li + 1;
-                        if (li >= 0 && li < count) {
-                            __builtin_memcpy(&lo[ll], ptr + li, 4);
-                        }
-                        if (hi_ix >= 0 && hi_ix < count) {
-                            __builtin_memcpy(&hi[ll], ptr + hi_ix, 4);
-                        }
-                    }
-                    F32 lo_v, hi_v, frac;
-                    __builtin_memcpy(&lo_v, lo, sizeof lo_v);
-                    __builtin_memcpy(&hi_v, hi, sizeof hi_v);
-                    frac = ix_f - fl;
-                    v->f32 = lo_v + (hi_v - lo_v) * frac;
-                } NEXT;
-
                 CASE(op_deref_ptr) {
                     uint32_t const *uni = (uint32_t const*)buf[ip->ptr].ptr;
                     void *derived;

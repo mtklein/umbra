@@ -90,8 +90,7 @@ static _Bool produces_float(enum op op) {
         || op == op_mul_f32_imm || op == op_div_f32_imm
         || op == op_min_f32_imm || op == op_max_f32_imm
         || op == op_f32_from_i32
-        || op == op_f32_from_f16
-        || op == op_sample_32;
+        || op == op_f32_from_f16;
 }
 
 static char const *fv(char *tmp, char const *vn,
@@ -174,32 +173,6 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                      " ? ~0u : 0u);\n",
                      pad, i, p,
                      vx, p, vx, p);
-            } break;
-            case op_sample_32: {
-                int p = inst->ptr.deref
-                    ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
-                emit(b,
-                     "%sfloat _si%d = floor(%s);\n"
-                     "%sfloat _fr%d = %s - _si%d;\n",
-                     pad, i, fv(_fx, vx, xid, is_f),
-                     pad, i, fv(_fx, vx, xid, is_f), i);
-                emit(b,
-                     "%suint _lo%d = p%d"
-                     "[min((uint)(int)_si%d, m.count%d - 1u)]"
-                     " & (((uint)(int)_si%d < m.count%d)"
-                     " ? ~0u : 0u);\n",
-                     pad, i, p, i, p, i, p);
-                emit(b,
-                     "%suint _hi%d = p%d"
-                     "[min((uint)((int)_si%d+1), m.count%d - 1u)]"
-                     " & (((uint)((int)_si%d+1) < m.count%d)"
-                     " ? ~0u : 0u);\n",
-                     pad, i, p, i, p, i, p);
-                emit(b,
-                     "%sfloat v%d = as_type<float>(_lo%d)"
-                     " + (as_type<float>(_hi%d)"
-                     " - as_type<float>(_lo%d)) * _fr%d;\n",
-                     pad, i, i, i, i, i);
             } break;
             case op_store_32: {
                 int p = inst->ptr.deref

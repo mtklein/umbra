@@ -582,8 +582,7 @@ static _Bool produces_float(enum op op) {
         || op == op_mul_f32_imm || op == op_div_f32_imm
         || op == op_min_f32_imm || op == op_max_f32_imm
         || op == op_f32_from_i32
-        || op == op_f32_from_f16
-        || op == op_sample_32;
+        || op == op_f32_from_f16;
 }
 
 // Build the full SPIR-V binary for a basic block.
@@ -1256,26 +1255,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
                     gather_safe(&B, ix_val, p, &safe_idx, &mask);
                     uint32_t raw = load_ssbo_u16(&B, p, safe_idx);
                     B.val[i] = spv_binop(&B, SpvOpBitwiseAnd, B.t_u32, raw, mask);
-                } break;
-
-                case op_sample_32: {
-                    int p = resolve_ptr(&B, inst);
-                    uint32_t ix_f = as_f32(&B, get_val(&B, inst->x), xid);
-                    uint32_t fl = spv_glsl_1(&B, B.t_f32, GLSLstd450Floor, ix_f);
-                    uint32_t frac = spv_binop(&B, SpvOpFSub, B.t_f32, ix_f, fl);
-                    uint32_t lo_i = spv_unop(&B, SpvOpConvertFToS, B.t_i32, fl);
-                    uint32_t lo_u = spv_bitcast(&B, B.t_u32, lo_i);
-                    uint32_t hi_u = spv_binop(&B, SpvOpIAdd, B.t_u32, lo_u, B.c_1);
-                    uint32_t lo_safe, lo_mask, hi_safe, hi_mask;
-                    gather_safe(&B, lo_u, p, &lo_safe, &lo_mask);
-                    gather_safe(&B, hi_u, p, &hi_safe, &hi_mask);
-                    uint32_t lo_raw = load_ssbo_u32(&B, p, lo_safe);
-                    uint32_t hi_raw = load_ssbo_u32(&B, p, hi_safe);
-                    uint32_t lo_v = spv_binop(&B, SpvOpBitwiseAnd, B.t_u32, lo_raw, lo_mask);
-                    uint32_t hi_v = spv_binop(&B, SpvOpBitwiseAnd, B.t_u32, hi_raw, hi_mask);
-                    uint32_t lo_f = spv_bitcast(&B, B.t_f32, lo_v);
-                    uint32_t hi_f = spv_bitcast(&B, B.t_f32, hi_v);
-                    B.val[i] = spv_glsl_3(&B, B.t_f32, GLSLstd450FMix, lo_f, hi_f, frac);
                 } break;
 
                 case op_load_8x4: {
