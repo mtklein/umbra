@@ -29,7 +29,7 @@ static int sched_score(struct ir_inst const *in, struct sched const *meta,
                                                      : op_values(in[c].op);
 
         int const decrease_in_reg_pressure = dead_regs - born_regs;
-        score += decrease_in_reg_pressure * reg_pressure;
+        score += decrease_in_reg_pressure * reg_pressure * reg_pressure;
     }
 
     {
@@ -38,8 +38,6 @@ static int sched_score(struct ir_inst const *in, struct sched const *meta,
             readied_ops += meta[users[u]].n_deps == 1/*i.e. this op*/;
         }
 
-        // Readying is almost always a good thing.  Scaling by reg_pressure makes
-        // readying one op heuristically worth the same as killing one register.
         score += readied_ops * reg_pressure;
     }
 
