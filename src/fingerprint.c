@@ -1,6 +1,10 @@
 #include "fingerprint.h"
 #include <string.h>
 
+_Bool fingerprint_eq(fingerprint a, fingerprint b) {
+    return a.lo == b.lo && a.hi == b.hi;
+}
+
 // 128-bit fingerprint for establishing buffer identity with very high
 // probability (~2^-128 collision rate).  Speed is critical: we're replacing
 // memcmp + memcpy of a full shadow buffer, so we must be faster than reading
