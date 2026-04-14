@@ -1,7 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include "../include/umbra_draw.h"
 #include "../slides/slide.h"
-#include "../slides/slug.h"
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -246,15 +245,31 @@ int main(void) {
         char dir[128];
         slugify(s->title, dir, sizeof dir);
         mkdir(dir, 0755);
-        if (s->get_builder) {
-            struct umbra_builder *b = s->get_builder(s, umbra_fmt_fp16);
-            if (b) { dump_builder(&db, dir, b); }
+
+        struct umbra_builder *builders[8];
+        char const           *names[8];
+        int nb = 0;
+        if (s->get_builders) {
+            nb = s->get_builders(s, umbra_fmt_fp16, builders, names, 8);
+        } else if (s->get_builder) {
+            builders[0] = s->get_builder(s, umbra_fmt_fp16);
+            names[0]    = NULL;
+            nb          = builders[0] ? 1 : 0;
         }
+        for (int j = 0; j < nb; j++) {
+            if (!builders[j]) { continue; }
+            if (names[j]) {
+                char sub[256];
+                snprintf(sub, sizeof sub, "%s/%s", dir, names[j]);
+                mkdir(sub, 0755);
+                dump_builder(&db, sub, builders[j]);
+            } else {
+                dump_builder(&db, dir, builders[j]);
+            }
+        }
+
         render_hdr(dir, i, be);
     }
-
-    mkdir("dumps/slug_two_pass", 0755);
-    dump_builder(&db, "dumps/slug_two_pass", slug_build_acc(NULL));
 
     slides_cleanup();
     be->free(be);
