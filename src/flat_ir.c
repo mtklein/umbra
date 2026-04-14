@@ -13,30 +13,26 @@ static _Bool is_body(struct ir_inst const *inst) {
     return inst->live && inst->varying;
 }
 
-// Scheduling fragility survey (2026-04-13): 27 permutations of sched_score() and schedule()
-// tested (negated scores, constant/random/hash scores, inverted pressure, disabled chaining,
-// reversed scan, swapped multipliers, etc.).  All backends passed every permutation:
-//   interp 0, jit 0, metal 0, vulkan 0, wgpu 0.
 static int sched_score(struct ir_inst const *in, struct sched const *meta,
-                       int const *users, int c, int live) {
+                       int const *users, int c, int live, int prev) {
     int kills = 0;
     int const deps[] = {in[c].x.id, in[c].y.id, in[c].z.id, in[c].w.id};
     for (int k = 0; k < 4; k++) {
-        int const d = deps[k];
-        kills += meta[d].last_use == c;
+        kills += meta[deps[k]].last_use == c;
     }
     int const defines = op_is_store(in[c].op) ? 0 : 1;
-    int const last_use = meta[c].last_use < 0 ? live : meta[c].last_use;
 
     int enables = 0;
     for (int u = meta[c].user_off; u < meta[c].user_off + meta[c].n_users; u++) {
         enables += meta[users[u]].n_deps == 1;
     }
 
-    // Prefer instructions that unblock downstream work.  (enables)
-    // Then those that decrease register pressure.         (kills-defines)
-    // Break ties in favor of instructions that die soon.  (last_use)
-    return (kills - defines + enables)*live - last_use;
+    int const chain = (prev >= 0 && (in[c].x.id == prev || in[c].y.id == prev
+                                  || in[c].z.id == prev || in[c].w.id == prev));
+
+    return (kills - defines + enables) * live
+         - (meta[c].last_use < 0 ? live : meta[c].last_use)
+         + chain;
 }
 
 static void schedule(struct ir_inst *in, int n, struct ir_inst *out, int at, int live,
@@ -102,40 +98,22 @@ static void schedule(struct ir_inst *in, int n, struct ir_inst *out, int at, int
             ready[nready++] = i;
         }
     }
-
     for (int i = 0; i < nready; i++) {
         meta[ready[i]].ready_idx = i;
     }
 
-    int j = at;
-    int prev_scheduled = -1;
+    int j = at, prev = -1;
     while (nready > 0) {
-        int pick = -1;
-        // Prefer chaining: pick any ready user of the previously scheduled instruction.
-        if (prev_scheduled >= 0) {
-            for (int u = meta[prev_scheduled].user_off;
-                     u < meta[prev_scheduled].user_off + meta[prev_scheduled].n_users; u++) {
-                if (meta[users[u]].n_deps == 0) {
-                    pick = meta[users[u]].ready_idx;
-                    break;
-                }
+        int best_score = sched_score(in, meta, users, ready[0], live, prev);
+        int pick = 0;
+        for (int r = 1; r < nready; r++) {
+            int const s = sched_score(in, meta, users, ready[r], live, prev);
+            if (s > best_score) {
+                best_score = s;
+                pick = r;
             }
         }
-        // No chain: pick the best-scoring ready instruction.
-        if (pick < 0) {
-            int best_score = sched_score(in, meta, users, ready[0], live);
-            pick = 0;
-            for (int r = 1; r < nready; r++) {
-                int const s = sched_score(in, meta, users, ready[r], live);
-                if (best_score < s) {
-                    best_score = s;
-                    pick = r;
-                }
-            }
-        }
-        assume(pick >= 0);
 
-        // Remove ready[pick], maintaining ready_idx bookkeeping.
         int const id = ready[pick];
         {
             int const last = --nready;
@@ -147,7 +125,7 @@ static void schedule(struct ir_inst *in, int n, struct ir_inst *out, int at, int
 
         in[id].final_id = j;
         out[j++] = in[id];
-        prev_scheduled = id;
+        prev = id;
 
         for (int u = meta[id].user_off; u < meta[id].user_off + meta[id].n_users; u++) {
             if (--meta[users[u]].n_deps == 0) {

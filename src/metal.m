@@ -1,6 +1,3 @@
-// TODO: Slug (one-pass) is 1025 µs/dispatch on Metal vs 1010 on MoltenVK.  The gap is entirely
-// shader codegen: dropping in MoltenVK's MSL via UMBRA_METAL_OVERRIDE closes it completely.
-// Compare dumps/slug_one_pass/0/metal.msl vs dumps/slug_one_pass/0/vulkan.msl.
 #include "flat_ir.h"
 #include "gpu_buf_cache.h"
 #include "uniform_ring.h"
@@ -1297,7 +1294,9 @@ static void encode_dispatch(
     }
 
     MTLSize grid  = MTLSizeMake((NSUInteger)w, (NSUInteger)h, 1);
-    MTLSize group = MTLSizeMake(64, 1, 1);
+    char const *tg = getenv("UMBRA_METAL_THREADGROUP");
+    int tg_size = tg ? atoi(tg) : 64;
+    MTLSize group = MTLSizeMake((NSUInteger)tg_size, 1, 1);
     [enc dispatchThreads:grid
        threadsPerThreadgroup:group];
     be->total_dispatches++;

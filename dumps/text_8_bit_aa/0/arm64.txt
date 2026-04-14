@@ -1,23 +1,23 @@
 Iterations:        100
-Instructions:      10200
-Total Cycles:      3435
-Total uOps:        12200
+Instructions:      9400
+Total Cycles:      3337
+Total uOps:        11400
 
 Dispatch Width:    6
-uOps Per Cycle:    3.55
-IPC:               2.97
-Block RThroughput: 30.0
+uOps Per Cycle:    3.42
+IPC:               2.82
+Block RThroughput: 28.7
 
 
-Cycles with backend pressure increase [ 85.53% ]
+Cycles with backend pressure increase [ 86.81% ]
 Throughput Bottlenecks: 
-  Resource Pressure       [ 58.69% ]
-  - CyUnitIS  [ 0.03% ]
-  - CyUnitLS  [ 6.20% ]
-  - CyUnitV  [ 58.05% ]
-  - CyUnitVM  [ 2.45% ]
-  Data Dependencies:      [ 59.74% ]
-  - Register Dependencies [ 59.74% ]
+  Resource Pressure       [ 62.06% ]
+  - CyUnitIS  [ 0.78% ]
+  - CyUnitLS  [ 4.14% ]
+  - CyUnitV  [ 61.64% ]
+  - CyUnitVM  [ 2.67% ]
+  Data Dependencies:      [ 46.69% ]
+  - Register Dependencies [ 46.69% ]
   - Memory Dependencies   [ 0.00% ]
 
 Critical sequence based on the simulation:
@@ -35,100 +35,88 @@ Critical sequence based on the simulation:
  |      9.    mov.16b	v30, v2
  |      10.   mov.16b	v8, v3
  |      11.   add	x10, x10, #32
- +----> 12.   ld4.4h	{ v0, v1, v2, v3 }, [x10]         ## RESOURCE interference:  CyUnitV [ probability: 65% ]
- +----> 13.   mov.16b	v27, v0                           ## REGISTER dependency:  D0_D1_D2_D3
+ +----> 12.   ld4.4h	{ v0, v1, v2, v3 }, [x10]         ## RESOURCE interference:  CyUnitV [ probability: 54% ]
+ |      13.   mov.16b	v27, v0
  |      14.   mov.16b	v29, v1
  |      15.   mov.16b	v31, v2
- |      16.   mov.16b	v9, v3
- |      17.   fcvtl	v10.4s, v26.4h
- +----> 18.   fcvtl	v11.4s, v27.4h                    ## REGISTER dependency:  q27
- |      19.   mov.16b	v12, v6
- |      20.   fmla.4s	v12, v10, v24
- |      21.   mov.16b	v13, v7
- +----> 22.   fmla.4s	v13, v11, v25                     ## REGISTER dependency:  q11
- |      23.   fsub.4s	v12, v12, v10
- |      24.   fsub.4s	v13, v13, v11
- +----> 25.   fcvtl	v14.4s, v8.4h                     ## RESOURCE interference:  CyUnitV [ probability: 16% ]
- |      26.   fcvtl	v15.4s, v9.4h
- |      27.   mov.16b	v8, v20
- +----> 28.   fmla.4s	v8, v14, v24                      ## REGISTER dependency:  q14
- |      29.   mov.16b	v9, v21
- +----> 30.   fmla.4s	v9, v15, v25                      ## RESOURCE interference:  CyUnitV [ probability: 34% ]
- |      31.   fsub.4s	v8, v8, v14
- |      32.   fsub.4s	v9, v9, v15
- |      33.   lsl	x10, x6, #1
- |      34.   madd	x8, x14, x10, x3
- |      35.   lsl	x10, x9, #1
- |      36.   add	x10, x8, x10
- |      37.   ldr	d4, [x10]
- |      38.   ldr	d5, [x10, #8]
- |      39.   sshll.4s	v4, v4, #0
- +----> 40.   sshll.4s	v5, v5, #0                        ## RESOURCE interference:  CyUnitV [ probability: 17% ]
- |      41.   str	q6, [x15]
- |      42.   str	q7, [x15, #16]
- |      43.   movi.4s	v6, #0
- |      44.   mov.16b	v7, v6
- +----> 45.   scvtf.4s	v4, v4                            ## RESOURCE interference:  CyUnitV [ probability: 32% ]
- |      46.   scvtf.4s	v5, v5
- +----> 47.   fmul.4s	v4, v22, v4                       ## REGISTER dependency:  q4
- |      48.   fmul.4s	v5, v23, v5
- |      49.   fmla.4s	v10, v4, v12
- |      50.   fmla.4s	v11, v5, v13
- |      51.   fcvtn	v10.4h, v10.4s
- |      52.   fcvtn	v11.4h, v11.4s
- |      53.   fmla.4s	v14, v4, v8
- |      54.   fmla.4s	v15, v5, v9
- |      55.   fcvtn	v14.4h, v14.4s
- |      56.   fcvtn	v15.4h, v15.4s
- +----> 57.   fcvtl	v8.4s, v28.4h                     ## RESOURCE interference:  CyUnitV [ probability: 18% ]
- +----> 58.   fcvtl	v9.4s, v29.4h                     ## RESOURCE interference:  CyUnitV [ probability: 69% ]
- |      59.   mov.16b	v28, v16
- |      60.   fmla.4s	v28, v8, v24
- +----> 61.   mov.16b	v29, v17                          ## RESOURCE interference:  CyUnitV [ probability: 62% ]
- |      62.   fmla.4s	v29, v9, v25
- |      63.   fsub.4s	v28, v28, v8
- |      64.   fsub.4s	v29, v29, v9
- |      65.   fmla.4s	v8, v4, v28
- |      66.   fmla.4s	v9, v5, v29
- |      67.   fcvtn	v8.4h, v8.4s
- |      68.   fcvtn	v9.4h, v9.4s
- +----> 69.   fcvtl	v28.4s, v30.4h                    ## RESOURCE interference:  CyUnitV [ probability: 62% ]
- +----> 70.   fcvtl	v29.4s, v31.4h                    ## RESOURCE interference:  CyUnitV [ probability: 83% ]
- +----> 71.   mov.16b	v30, v18                          ## RESOURCE interference:  CyUnitV [ probability: 97% ]
- |      72.   fmla.4s	v30, v28, v24
- +----> 73.   mov.16b	v31, v19                          ## RESOURCE interference:  CyUnitV [ probability: 84% ]
- |      74.   fmla.4s	v31, v29, v25
- |      75.   fsub.4s	v30, v30, v28
- |      76.   fsub.4s	v31, v31, v29
- |      77.   fmla.4s	v28, v4, v30
- |      78.   fmla.4s	v29, v5, v31
- |      79.   fcvtn	v28.4h, v28.4s
- |      80.   fcvtn	v29.4h, v29.4s
- |      81.   ldr	x8, [x2, #16]
- |      82.   ldr	w10, [x2, #28]
- |      83.   lsl	x10, x10, #3
- |      84.   madd	x8, x14, x10, x8
- |      85.   mov.16b	v0, v10
- |      86.   mov.16b	v1, v8
- |      87.   mov.16b	v2, v28
- |      88.   mov.16b	v3, v14
- |      89.   lsl	x10, x9, #3
- |      90.   add	x10, x8, x10
- |      91.   st4.4h	{ v0, v1, v2, v3 }, [x10]
- |      92.   mov.16b	v0, v11
- |      93.   mov.16b	v1, v9
- |      94.   mov.16b	v2, v29
- |      95.   mov.16b	v3, v15
- |      96.   add	x10, x10, #32
- |      97.   st4.4h	{ v0, v1, v2, v3 }, [x10]
- +----> 98.   movi.4s	v4, #0                            ## RESOURCE interference:  CyUnitV [ probability: 82% ]
- +----> 99.   mov.16b	v5, v4                            ## REGISTER dependency:  q4
- |      100.  ldr	q6, [x15]
- |      101.  ldr	q7, [x15, #16]
- |
- |    < loop carried > 
- |
- +----> 21.   mov.16b	v13, v7                           ## RESOURCE interference:  CyUnitV [ probability: 51% ]
+ +----> 16.   mov.16b	v9, v3                            ## REGISTER dependency:  D0_D1_D2_D3
+ |      17.   fcvtl	v10.4s, v8.4h
+ +----> 18.   fcvtl	v11.4s, v9.4h                     ## REGISTER dependency:  q9
+ |      19.   mov.16b	v8, v20
+ |      20.   fmla.4s	v8, v10, v24
+ |      21.   mov.16b	v9, v21
+ +----> 22.   fmla.4s	v9, v11, v25                      ## REGISTER dependency:  q11
+ |      23.   lsl	x10, x6, #1
+ |      24.   madd	x8, x14, x10, x3
+ |      25.   lsl	x10, x9, #1
+ |      26.   add	x10, x8, x10
+ |      27.   ldr	d12, [x10]
+ |      28.   ldr	d13, [x10, #8]
+ |      29.   sshll.4s	v12, v12, #0
+ |      30.   sshll.4s	v13, v13, #0
+ |      31.   scvtf.4s	v12, v12
+ |      32.   scvtf.4s	v13, v13
+ |      33.   fmul.4s	v12, v22, v12
+ |      34.   fmul.4s	v13, v23, v13
+ |      35.   fsub.4s	v8, v8, v10
+ |      36.   fsub.4s	v9, v9, v11
+ |      37.   fmla.4s	v10, v12, v8
+ |      38.   fmla.4s	v11, v13, v9
+ |      39.   fcvtn	v10.4h, v10.4s
+ |      40.   fcvtn	v11.4h, v11.4s
+ +----> 41.   fcvtl	v8.4s, v26.4h                     ## RESOURCE interference:  CyUnitV [ probability: 61% ]
+ +----> 42.   fcvtl	v9.4s, v27.4h                     ## RESOURCE interference:  CyUnitV [ probability: 70% ]
+ |      43.   mov.16b	v14, v6
+ |      44.   fmla.4s	v14, v8, v24
+ |      45.   mov.16b	v15, v7
+ +----> 46.   fmla.4s	v15, v9, v25                      ## REGISTER dependency:  q9
+ |      47.   fsub.4s	v14, v14, v8
+ |      48.   fsub.4s	v15, v15, v9
+ |      49.   fmla.4s	v8, v12, v14
+ |      50.   fmla.4s	v9, v13, v15
+ +----> 51.   fcvtl	v14.4s, v28.4h                    ## RESOURCE interference:  CyUnitV [ probability: 27% ]
+ +----> 52.   fcvtl	v15.4s, v29.4h                    ## RESOURCE interference:  CyUnitV [ probability: 73% ]
+ +----> 53.   mov.16b	v28, v16                          ## RESOURCE interference:  CyUnitV [ probability: 55% ]
+ |      54.   fmla.4s	v28, v14, v24
+ +----> 55.   mov.16b	v29, v17                          ## RESOURCE interference:  CyUnitV [ probability: 63% ]
+ |      56.   fmla.4s	v29, v15, v25
+ |      57.   fsub.4s	v28, v28, v14
+ |      58.   fsub.4s	v29, v29, v15
+ |      59.   fmla.4s	v14, v12, v28
+ |      60.   fmla.4s	v15, v13, v29
+ +----> 61.   fcvtl	v28.4s, v30.4h                    ## RESOURCE interference:  CyUnitV [ probability: 73% ]
+ +----> 62.   fcvtl	v29.4s, v31.4h                    ## RESOURCE interference:  CyUnitV [ probability: 99% ]
+ +----> 63.   mov.16b	v30, v18                          ## RESOURCE interference:  CyUnitV [ probability: 99% ]
+ |      64.   fmla.4s	v30, v28, v24
+ +----> 65.   mov.16b	v31, v19                          ## RESOURCE interference:  CyUnitV [ probability: 82% ]
+        66.   fmla.4s	v31, v29, v25
+        67.   fsub.4s	v30, v30, v28
+        68.   fsub.4s	v31, v31, v29
+        69.   fmla.4s	v28, v12, v30
+        70.   fmla.4s	v29, v13, v31
+        71.   fcvtn	v28.4h, v28.4s
+        72.   fcvtn	v29.4h, v29.4s
+        73.   fcvtn	v14.4h, v14.4s
+        74.   fcvtn	v15.4h, v15.4s
+        75.   fcvtn	v8.4h, v8.4s
+        76.   fcvtn	v9.4h, v9.4s
+        77.   ldr	x8, [x2, #16]
+        78.   ldr	w10, [x2, #28]
+        79.   lsl	x10, x10, #3
+        80.   madd	x8, x14, x10, x8
+        81.   mov.16b	v0, v8
+        82.   mov.16b	v1, v14
+        83.   mov.16b	v2, v28
+        84.   mov.16b	v3, v10
+        85.   lsl	x10, x9, #3
+        86.   add	x10, x8, x10
+        87.   st4.4h	{ v0, v1, v2, v3 }, [x10]
+        88.   mov.16b	v0, v9
+        89.   mov.16b	v1, v15
+        90.   mov.16b	v2, v29
+        91.   mov.16b	v3, v11
+        92.   add	x10, x10, #32
+        93.   st4.4h	{ v0, v1, v2, v3 }, [x10]
 
 
 Instruction Info:
@@ -157,58 +145,50 @@ Instruction Info:
  1      2     0.33                        mov.16b	v29, v1
  1      2     0.33                        mov.16b	v31, v2
  1      2     0.33                        mov.16b	v9, v3
- 1      2     0.33                        fcvtl	v10.4s, v26.4h
- 1      2     0.33                        fcvtl	v11.4s, v27.4h
- 1      2     0.33                        mov.16b	v12, v6
- 1      8     0.50                        fmla.4s	v12, v10, v24
- 1      2     0.33                        mov.16b	v13, v7
- 1      8     0.50                        fmla.4s	v13, v11, v25
- 1      4     0.33                        fsub.4s	v12, v12, v10
- 1      4     0.33                        fsub.4s	v13, v13, v11
- 1      2     0.33                        fcvtl	v14.4s, v8.4h
- 1      2     0.33                        fcvtl	v15.4s, v9.4h
+ 1      2     0.33                        fcvtl	v10.4s, v8.4h
+ 1      2     0.33                        fcvtl	v11.4s, v9.4h
  1      2     0.33                        mov.16b	v8, v20
- 1      8     0.50                        fmla.4s	v8, v14, v24
+ 1      8     0.50                        fmla.4s	v8, v10, v24
  1      2     0.33                        mov.16b	v9, v21
- 1      8     0.50                        fmla.4s	v9, v15, v25
- 1      4     0.33                        fsub.4s	v8, v8, v14
- 1      4     0.33                        fsub.4s	v9, v9, v15
+ 1      8     0.50                        fmla.4s	v9, v11, v25
  1      1     0.50                        lsl	x10, x6, #1
  1      5     1.00                        madd	x8, x14, x10, x3
  1      1     0.50                        lsl	x10, x9, #1
  1      2     1.00                        add	x10, x8, x10
- 1      4     0.50    *                   ldr	d4, [x10]
- 1      4     0.50    *                   ldr	d5, [x10, #8]
- 1      2     0.33                        sshll.4s	v4, v4, #0
- 1      2     0.33                        sshll.4s	v5, v5, #0
- 1      4     0.50           *            str	q6, [x15]
- 1      4     0.50           *            str	q7, [x15, #16]
- 1      2     0.33                        movi.4s	v6, #0
- 1      2     0.33                        mov.16b	v7, v6
- 1      2     0.33                        scvtf.4s	v4, v4
- 1      2     0.33                        scvtf.4s	v5, v5
- 1      2     0.33                        fmul.4s	v4, v22, v4
- 1      2     0.33                        fmul.4s	v5, v23, v5
- 1      8     0.50                        fmla.4s	v10, v4, v12
- 1      8     0.50                        fmla.4s	v11, v5, v13
+ 1      4     0.50    *                   ldr	d12, [x10]
+ 1      4     0.50    *                   ldr	d13, [x10, #8]
+ 1      2     0.33                        sshll.4s	v12, v12, #0
+ 1      2     0.33                        sshll.4s	v13, v13, #0
+ 1      2     0.33                        scvtf.4s	v12, v12
+ 1      2     0.33                        scvtf.4s	v13, v13
+ 1      2     0.33                        fmul.4s	v12, v22, v12
+ 1      2     0.33                        fmul.4s	v13, v23, v13
+ 1      4     0.33                        fsub.4s	v8, v8, v10
+ 1      4     0.33                        fsub.4s	v9, v9, v11
+ 1      8     0.50                        fmla.4s	v10, v12, v8
+ 1      8     0.50                        fmla.4s	v11, v13, v9
  1      2     0.33                        fcvtn	v10.4h, v10.4s
  1      2     0.33                        fcvtn	v11.4h, v11.4s
- 1      8     0.50                        fmla.4s	v14, v4, v8
- 1      8     0.50                        fmla.4s	v15, v5, v9
- 1      2     0.33                        fcvtn	v14.4h, v14.4s
- 1      2     0.33                        fcvtn	v15.4h, v15.4s
- 1      2     0.33                        fcvtl	v8.4s, v28.4h
- 1      2     0.33                        fcvtl	v9.4s, v29.4h
+ 1      2     0.33                        fcvtl	v8.4s, v26.4h
+ 1      2     0.33                        fcvtl	v9.4s, v27.4h
+ 1      2     0.33                        mov.16b	v14, v6
+ 1      8     0.50                        fmla.4s	v14, v8, v24
+ 1      2     0.33                        mov.16b	v15, v7
+ 1      8     0.50                        fmla.4s	v15, v9, v25
+ 1      4     0.33                        fsub.4s	v14, v14, v8
+ 1      4     0.33                        fsub.4s	v15, v15, v9
+ 1      8     0.50                        fmla.4s	v8, v12, v14
+ 1      8     0.50                        fmla.4s	v9, v13, v15
+ 1      2     0.33                        fcvtl	v14.4s, v28.4h
+ 1      2     0.33                        fcvtl	v15.4s, v29.4h
  1      2     0.33                        mov.16b	v28, v16
- 1      8     0.50                        fmla.4s	v28, v8, v24
+ 1      8     0.50                        fmla.4s	v28, v14, v24
  1      2     0.33                        mov.16b	v29, v17
- 1      8     0.50                        fmla.4s	v29, v9, v25
- 1      4     0.33                        fsub.4s	v28, v28, v8
- 1      4     0.33                        fsub.4s	v29, v29, v9
- 1      8     0.50                        fmla.4s	v8, v4, v28
- 1      8     0.50                        fmla.4s	v9, v5, v29
- 1      2     0.33                        fcvtn	v8.4h, v8.4s
- 1      2     0.33                        fcvtn	v9.4h, v9.4s
+ 1      8     0.50                        fmla.4s	v29, v15, v25
+ 1      4     0.33                        fsub.4s	v28, v28, v14
+ 1      4     0.33                        fsub.4s	v29, v29, v15
+ 1      8     0.50                        fmla.4s	v14, v12, v28
+ 1      8     0.50                        fmla.4s	v15, v13, v29
  1      2     0.33                        fcvtl	v28.4s, v30.4h
  1      2     0.33                        fcvtl	v29.4s, v31.4h
  1      2     0.33                        mov.16b	v30, v18
@@ -217,31 +197,31 @@ Instruction Info:
  1      8     0.50                        fmla.4s	v31, v29, v25
  1      4     0.33                        fsub.4s	v30, v30, v28
  1      4     0.33                        fsub.4s	v31, v31, v29
- 1      8     0.50                        fmla.4s	v28, v4, v30
- 1      8     0.50                        fmla.4s	v29, v5, v31
+ 1      8     0.50                        fmla.4s	v28, v12, v30
+ 1      8     0.50                        fmla.4s	v29, v13, v31
  1      2     0.33                        fcvtn	v28.4h, v28.4s
  1      2     0.33                        fcvtn	v29.4h, v29.4s
+ 1      2     0.33                        fcvtn	v14.4h, v14.4s
+ 1      2     0.33                        fcvtn	v15.4h, v15.4s
+ 1      2     0.33                        fcvtn	v8.4h, v8.4s
+ 1      2     0.33                        fcvtn	v9.4h, v9.4s
  1      4     0.50    *                   ldr	x8, [x2, #16]
  1      4     0.50    *                   ldr	w10, [x2, #28]
  1      1     0.50                        lsl	x10, x10, #3
  1      5     1.00                        madd	x8, x14, x10, x8
- 1      2     0.33                        mov.16b	v0, v10
- 1      2     0.33                        mov.16b	v1, v8
+ 1      2     0.33                        mov.16b	v0, v8
+ 1      2     0.33                        mov.16b	v1, v14
  1      2     0.33                        mov.16b	v2, v28
- 1      2     0.33                        mov.16b	v3, v14
+ 1      2     0.33                        mov.16b	v3, v10
  1      1     0.50                        lsl	x10, x9, #3
  1      2     1.00                        add	x10, x8, x10
  6      8     1.33           *            st4.4h	{ v0, v1, v2, v3 }, [x10]
- 1      2     0.33                        mov.16b	v0, v11
- 1      2     0.33                        mov.16b	v1, v9
+ 1      2     0.33                        mov.16b	v0, v9
+ 1      2     0.33                        mov.16b	v1, v15
  1      2     0.33                        mov.16b	v2, v29
- 1      2     0.33                        mov.16b	v3, v15
+ 1      2     0.33                        mov.16b	v3, v11
  1      1     0.25                        add	x10, x10, #32
  6      8     1.33           *            st4.4h	{ v0, v1, v2, v3 }, [x10]
- 1      2     0.33                        movi.4s	v4, #0
- 1      2     0.33                        mov.16b	v5, v4
- 1      4     0.50    *                   ldr	q6, [x15]
- 1      4     0.50    *                   ldr	q7, [x15, #16]
 
 
 Resources:
@@ -272,109 +252,101 @@ Resources:
 
 Resource pressure per iteration:
 [0.0]  [0.1]  [1]    [2.0]  [2.1]  [3.0]  [3.1]  [3.2]  [3.3]  [4]    [5]    [6.0]  [6.1]  [7]    [8.0]  [8.1]  [9.0]  [9.1]  [9.2]  [10]   [11]   [12.0] [12.1] 
-1.50   1.50   3.00    -      -     4.45   4.49   3.88   4.18    -     3.00   6.16   5.84    -     9.14   8.86   29.81  29.85  30.34   -      -     8.00   8.00   
+1.50   1.50   3.00    -      -     4.23   4.28   4.25   4.24    -     3.00   5.99   6.01    -     6.92   7.08   28.45  28.84  28.71   -      -     8.00   8.00   
 
 Resource pressure by instruction:
 [0.0]  [0.1]  [1]    [2.0]  [2.1]  [3.0]  [3.1]  [3.2]  [3.3]  [4]    [5]    [6.0]  [6.1]  [7]    [8.0]  [8.1]  [9.0]  [9.1]  [9.2]  [10]   [11]   [12.0] [12.1] Instructions:
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.65    -      -      -      -      -      -      -     ldr	x8, [x2, #16]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.65   0.35    -      -      -      -      -      -      -     ldr	w10, [x2, #28]
- -      -      -      -      -      -     0.34   0.32   0.34    -      -     0.34   0.66    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #3
-0.50   0.50   1.00    -      -     0.18   0.64   0.01   0.17    -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     madd	x8, x14, x10, x8
- -      -      -      -      -     0.15   0.49    -     0.36    -      -     0.49   0.51    -      -      -      -      -      -      -      -      -      -     lsl	x10, x9, #3
- -      -      -      -      -     0.62   0.94   0.08   0.36    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.70   1.30   1.84   0.76   1.40    -      -      -      -     ld4.4h	{ v0, v1, v2, v3 }, [x10]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.62   0.18   0.20    -      -      -      -     mov.16b	v26, v0
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.19   0.49   0.32    -      -      -      -     mov.16b	v28, v1
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.36   0.32    -      -      -      -     mov.16b	v30, v2
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.18   0.46   0.36    -      -      -      -     mov.16b	v8, v3
- -      -      -      -      -     0.50    -     0.50    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     add	x10, x10, #32
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.30   0.70   0.12   1.36   2.52    -      -      -      -     ld4.4h	{ v0, v1, v2, v3 }, [x10]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.51   0.16    -      -      -      -     mov.16b	v27, v0
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.48   0.33   0.19    -      -      -      -     mov.16b	v29, v1
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.31   0.35   0.34    -      -      -      -     mov.16b	v31, v2
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.20   0.32   0.48    -      -      -      -     mov.16b	v9, v3
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.34   0.32    -      -      -      -     fcvtl	v10.4s, v26.4h
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.43   0.50   0.07    -      -      -      -     fcvtl	v11.4s, v27.4h
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.18   0.49    -      -      -      -     mov.16b	v12, v6
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.21   0.30   0.49    -      -      -     1.00   fmla.4s	v12, v10, v24
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.19   0.35   0.46    -      -      -      -     mov.16b	v13, v7
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.49   0.31   0.20    -      -     0.52   0.48   fmla.4s	v13, v11, v25
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.36   0.32    -      -      -      -     fsub.4s	v12, v12, v10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.20   0.33   0.47    -      -      -      -     fsub.4s	v13, v13, v11
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.30   0.22   0.48    -      -      -      -     fcvtl	v14.4s, v8.4h
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.49   0.17    -      -      -      -     fcvtl	v15.4s, v9.4h
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.07   0.74   0.19    -      -      -      -     mov.16b	v8, v20
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.30   0.35   0.35    -      -     0.48   0.52   fmla.4s	v8, v14, v24
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.46   0.21   0.33    -      -      -      -     mov.16b	v9, v21
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.18   0.32    -      -     1.00    -     fmla.4s	v9, v15, v25
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.19   0.49   0.32    -      -      -      -     fsub.4s	v8, v8, v14
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.32   0.33    -      -      -      -     fsub.4s	v9, v9, v15
- -      -      -      -      -     0.50   0.01   0.49    -      -      -     0.49   0.51    -      -      -      -      -      -      -      -      -      -     lsl	x10, x6, #1
-0.50   0.50   1.00    -      -     0.19   0.03   0.47   0.31    -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     madd	x8, x14, x10, x3
- -      -      -      -      -      -     0.49    -     0.51    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x9, #1
- -      -      -      -      -      -     1.00    -     1.00    -      -     1.02   0.98    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.36   0.64    -      -      -      -      -      -      -     ldr	d4, [x10]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.65   0.35    -      -      -      -      -      -      -     ldr	d5, [x10, #8]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.21   0.47    -      -      -      -     sshll.4s	v4, v4, #0
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.18   0.46   0.36    -      -      -      -     sshll.4s	v5, v5, #0
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.66    -      -      -      -      -      -      -     str	q6, [x15]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.79   0.21    -      -      -      -      -      -      -     str	q7, [x15, #16]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.21   0.20   0.59    -      -      -      -     movi.4s	v6, #0
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.48   0.20    -      -      -      -     mov.16b	v7, v6
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.17   0.34   0.49    -      -      -      -     scvtf.4s	v4, v4
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.62   0.05    -      -      -      -     scvtf.4s	v5, v5
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.17   0.49   0.34    -      -      -      -     fmul.4s	v4, v22, v4
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.61   0.05   0.34    -      -      -      -     fmul.4s	v5, v23, v5
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.36   0.47   0.17    -      -     0.31   0.69   fmla.4s	v10, v4, v12
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.47   0.33   0.20    -      -     0.50   0.50   fmla.4s	v11, v5, v13
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.19   0.49   0.32    -      -      -      -     fcvtn	v10.4h, v10.4s
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.36   0.33   0.31    -      -      -      -     fcvtn	v11.4h, v11.4s
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.19   0.48    -      -     0.61   0.39   fmla.4s	v14, v4, v8
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.62   0.19   0.19    -      -     0.70   0.30   fmla.4s	v15, v5, v9
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.22   0.46   0.32    -      -      -      -     fcvtn	v14.4h, v14.4s
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.46   0.19    -      -      -      -     fcvtn	v15.4h, v15.4s
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.47   0.20   0.33    -      -      -      -     fcvtl	v8.4s, v28.4h
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.19   0.49   0.32    -      -      -      -     fcvtl	v9.4s, v29.4h
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.21   0.47    -      -      -      -     mov.16b	v28, v16
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.20   0.47    -      -     0.03   0.97   fmla.4s	v28, v8, v24
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.46   0.37   0.17    -      -      -      -     mov.16b	v29, v17
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.18   0.48    -      -     0.69   0.31   fmla.4s	v29, v9, v25
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.07   0.60   0.33    -      -      -      -     fsub.4s	v28, v28, v8
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.73   0.05   0.22    -      -      -      -     fsub.4s	v29, v29, v9
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.30   0.37    -      -      -     1.00   fmla.4s	v8, v4, v28
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.47   0.20   0.33    -      -     1.00    -     fmla.4s	v9, v5, v29
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.52   0.30   0.18    -      -      -      -     fcvtn	v8.4h, v8.4s
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.21   0.32   0.47    -      -      -      -     fcvtn	v9.4h, v9.4s
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.05   0.50   0.45    -      -      -      -     fcvtl	v28.4s, v30.4h
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.19   0.43   0.38    -      -      -      -     fcvtl	v29.4s, v31.4h
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.44   0.39   0.17    -      -      -      -     mov.16b	v30, v18
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.20   0.46   0.34    -      -     0.18   0.82   fmla.4s	v30, v28, v24
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.18   0.32    -      -      -      -     mov.16b	v31, v19
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.31   0.48   0.21    -      -     0.98   0.02   fmla.4s	v31, v29, v25
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.46   0.20    -      -      -      -     fsub.4s	v30, v30, v28
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.48   0.04   0.48    -      -      -      -     fsub.4s	v31, v31, v29
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.36   0.32    -      -      -     1.00   fmla.4s	v28, v4, v30
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.46   0.47   0.07    -      -     1.00    -     fmla.4s	v29, v5, v31
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.37   0.32   0.31    -      -      -      -     fcvtn	v28.4h, v28.4s
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.49   0.03   0.48    -      -      -      -     fcvtn	v29.4h, v29.4s
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.49   0.51    -      -      -      -      -      -      -     ldr	x8, [x2, #16]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.51   0.49    -      -      -      -      -      -      -     ldr	w10, [x2, #28]
- -      -      -      -      -      -     0.50    -     0.50    -      -     0.51   0.49    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #3
-0.50   0.50   1.00    -      -     0.35    -     0.50   0.15    -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     madd	x8, x14, x10, x8
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -     mov.16b	v0, v10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.34   0.31    -      -      -      -     mov.16b	v1, v8
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.46   0.19    -      -      -      -     mov.16b	v2, v28
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.21   0.15   0.64    -      -      -      -     mov.16b	v3, v14
- -      -      -      -      -     0.50    -     0.50    -      -      -     0.49   0.51    -      -      -      -      -      -      -      -      -      -     lsl	x10, x9, #3
- -      -      -      -      -     1.28   0.04   0.68    -      -      -     1.32   0.68    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.70   1.30   1.40   1.88   0.72    -      -      -      -     st4.4h	{ v0, v1, v2, v3 }, [x10]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.21   0.63   0.16    -      -      -      -     mov.16b	v0, v11
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.18   0.47   0.35    -      -      -      -     mov.16b	v1, v9
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.48   0.04   0.48    -      -      -      -     mov.16b	v2, v29
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.47   0.18   0.35    -      -      -      -     mov.16b	v3, v15
- -      -      -      -      -     0.18   0.01   0.33   0.48    -      -      -      -      -      -      -      -      -      -      -      -      -      -     add	x10, x10, #32
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.30   0.70   1.32   0.68   2.00    -      -      -      -     st4.4h	{ v0, v1, v2, v3 }, [x10]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.46   0.19   0.35    -      -      -      -     movi.4s	v4, #0
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.47   0.23   0.30    -      -      -      -     mov.16b	v5, v4
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.36   0.64    -      -      -      -      -      -      -     ldr	q6, [x15]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.64   0.36    -      -      -      -      -      -      -     ldr	q7, [x15, #16]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.25   0.75    -      -      -      -      -      -      -     ldr	x8, [x2, #16]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.67   0.33    -      -      -      -      -      -      -     ldr	w10, [x2, #28]
+ -      -      -      -      -     0.26   0.23   0.28   0.23    -      -     0.48   0.52    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #3
+0.50   0.50   1.00    -      -     0.25   0.26   0.23   0.26    -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     madd	x8, x14, x10, x8
+ -      -      -      -      -     0.26   0.23   0.26   0.25    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x9, #3
+ -      -      -      -      -     0.54   0.48   0.52   0.46    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.66   1.34   0.72   1.76   1.52    -      -      -      -     ld4.4h	{ v0, v1, v2, v3 }, [x10]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.43   0.29   0.28    -      -      -      -     mov.16b	v26, v0
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.44   0.38   0.18    -      -      -      -     mov.16b	v28, v1
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.38   0.26   0.36    -      -      -      -     mov.16b	v30, v2
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.28   0.35   0.37    -      -      -      -     mov.16b	v8, v3
+ -      -      -      -      -     0.26   0.22   0.26   0.26    -      -      -      -      -      -      -      -      -      -      -      -      -      -     add	x10, x10, #32
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.32   0.68   1.44   1.48   1.08    -      -      -      -     ld4.4h	{ v0, v1, v2, v3 }, [x10]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.37   0.27   0.36    -      -      -      -     mov.16b	v27, v0
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.38   0.18   0.44    -      -      -      -     mov.16b	v29, v1
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.45   0.27   0.28    -      -      -      -     mov.16b	v31, v2
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.52   0.39   0.09    -      -      -      -     mov.16b	v9, v3
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.28   0.44   0.28    -      -      -      -     fcvtl	v10.4s, v8.4h
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.52   0.29   0.19    -      -      -      -     fcvtl	v11.4s, v9.4h
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.37   0.36   0.27    -      -      -      -     mov.16b	v8, v20
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.46   0.36   0.18    -      -      -     1.00   fmla.4s	v8, v10, v24
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.46   0.19   0.35    -      -      -      -     mov.16b	v9, v21
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.26   0.28   0.46    -      -     0.98   0.02   fmla.4s	v9, v11, v25
+ -      -      -      -      -     0.25   0.23   0.27   0.25    -      -     0.47   0.53    -      -      -      -      -      -      -      -      -      -     lsl	x10, x6, #1
+0.50   0.50   1.00    -      -     0.27   0.25   0.25   0.23    -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     madd	x8, x14, x10, x3
+ -      -      -      -      -     0.23   0.25   0.26   0.26    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x9, #1
+ -      -      -      -      -     0.48   0.54   0.48   0.50    -      -     1.00   1.00    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.47   0.53    -      -      -      -      -      -      -     ldr	d12, [x10]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.54   0.46    -      -      -      -      -      -      -     ldr	d13, [x10, #8]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.64   0.27   0.09    -      -      -      -     sshll.4s	v12, v12, #0
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.29   0.19   0.52    -      -      -      -     sshll.4s	v13, v13, #0
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.54   0.27   0.19    -      -      -      -     scvtf.4s	v12, v12
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.27   0.37   0.36    -      -      -      -     scvtf.4s	v13, v13
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.17   0.38   0.45    -      -      -      -     fmul.4s	v12, v22, v12
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.28   0.35   0.37    -      -      -      -     fmul.4s	v13, v23, v13
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.38   0.35   0.27    -      -      -      -     fsub.4s	v8, v8, v10
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.35   0.30    -      -      -      -     fsub.4s	v9, v9, v11
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.38   0.27    -      -     0.20   0.80   fmla.4s	v10, v12, v8
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.28   0.27   0.45    -      -     0.63   0.37   fmla.4s	v11, v13, v9
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.68   0.12   0.20    -      -      -      -     fcvtn	v10.4h, v10.4s
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.29   0.18   0.53    -      -      -      -     fcvtn	v11.4h, v11.4s
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.46   0.19   0.35    -      -      -      -     fcvtl	v8.4s, v26.4h
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.46   0.35   0.19    -      -      -      -     fcvtl	v9.4s, v27.4h
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.27   0.37   0.36    -      -      -      -     mov.16b	v14, v6
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.38   0.27   0.35    -      -     0.02   0.98   fmla.4s	v14, v8, v24
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.55   0.17   0.28    -      -      -      -     mov.16b	v15, v7
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.27   0.10   0.63    -      -     1.00    -     fmla.4s	v15, v9, v25
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.09   0.30   0.61    -      -      -      -     fsub.4s	v14, v14, v8
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.18   0.63   0.19    -      -      -      -     fsub.4s	v15, v15, v9
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.19   0.27   0.54    -      -     0.02   0.98   fmla.4s	v8, v12, v14
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.54   0.36   0.10    -      -     1.00    -     fmla.4s	v9, v13, v15
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.45   0.27   0.28    -      -      -      -     fcvtl	v14.4s, v28.4h
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.54   0.19   0.27    -      -      -      -     fcvtl	v15.4s, v29.4h
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.18   0.19   0.63    -      -      -      -     mov.16b	v28, v16
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.27   0.46   0.27    -      -     0.26   0.74   fmla.4s	v28, v14, v24
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.18   0.35   0.47    -      -      -      -     mov.16b	v29, v17
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.46   0.45   0.09    -      -     0.64   0.36   fmla.4s	v29, v15, v25
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.19   0.45   0.36    -      -      -      -     fsub.4s	v28, v28, v14
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.27   0.28   0.45    -      -      -      -     fsub.4s	v29, v29, v15
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.10   0.43   0.47    -      -      -     1.00   fmla.4s	v14, v12, v28
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.52   0.36   0.12    -      -     1.00    -     fmla.4s	v15, v13, v29
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.54   0.37   0.09    -      -      -      -     fcvtl	v28.4s, v30.4h
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.45   0.17   0.38    -      -      -      -     fcvtl	v29.4s, v31.4h
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.45   0.38   0.17    -      -      -      -     mov.16b	v30, v18
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.53   0.09   0.38    -      -     0.53   0.47   fmla.4s	v30, v28, v24
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.21   0.34   0.45    -      -      -      -     mov.16b	v31, v19
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.28   0.37   0.35    -      -     0.72   0.28   fmla.4s	v31, v29, v25
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.38   0.27   0.35    -      -      -      -     fsub.4s	v30, v30, v28
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.27   0.28   0.45    -      -      -      -     fsub.4s	v31, v31, v29
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.27   0.38   0.35    -      -      -     1.00   fmla.4s	v28, v12, v30
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.28   0.45   0.27    -      -     1.00    -     fmla.4s	v29, v13, v31
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.18   0.36   0.46    -      -      -      -     fcvtn	v28.4h, v28.4s
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.18   0.36   0.46    -      -      -      -     fcvtn	v29.4h, v29.4s
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.18   0.29   0.53    -      -      -      -     fcvtn	v14.4h, v14.4s
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.28   0.44   0.28    -      -      -      -     fcvtn	v15.4h, v15.4s
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.53   0.20   0.27    -      -      -      -     fcvtn	v8.4h, v8.4s
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.18   0.56   0.26    -      -      -      -     fcvtn	v9.4h, v9.4s
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.25   0.75    -      -      -      -      -      -      -     ldr	x8, [x2, #16]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.74   0.26    -      -      -      -      -      -      -     ldr	w10, [x2, #28]
+ -      -      -      -      -     0.27   0.24   0.26   0.23    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #3
+0.50   0.50   1.00    -      -     0.24   0.26   0.23   0.27    -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     madd	x8, x14, x10, x8
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.37   0.44   0.19    -      -      -      -     mov.16b	v0, v8
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.18   0.28   0.54    -      -      -      -     mov.16b	v1, v14
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.19   0.36   0.45    -      -      -      -     mov.16b	v2, v28
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.26   0.38   0.36    -      -      -      -     mov.16b	v3, v10
+ -      -      -      -      -     0.23   0.27   0.24   0.26    -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x9, #3
+ -      -      -      -      -     0.46   0.54   0.48   0.52    -      -     1.04   0.96    -      -      -      -      -      -      -      -      -      -     add	x10, x8, x10
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.52   1.48   0.80   1.72   1.48    -      -      -      -     st4.4h	{ v0, v1, v2, v3 }, [x10]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.20   0.45   0.35    -      -      -      -     mov.16b	v0, v9
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.38   0.34   0.28    -      -      -      -     mov.16b	v1, v15
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.27   0.27   0.46    -      -      -      -     mov.16b	v2, v29
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.38   0.26   0.36    -      -      -      -     mov.16b	v3, v11
+ -      -      -      -      -     0.23   0.28   0.23   0.26    -      -      -      -      -      -      -      -      -      -      -      -      -      -     add	x10, x10, #32
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.50   0.50   1.40   1.56   1.04    -      -      -      -     st4.4h	{ v0, v1, v2, v3 }, [x10]
