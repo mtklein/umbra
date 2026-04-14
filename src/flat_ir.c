@@ -281,6 +281,85 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
     return result;
 }
 
+static val remap_val(val v, int const *remap) {
+    return (val){.id = remap[v.id], .chan = v.chan};
+}
+
+struct umbra_flat_ir *umbra_flat_ir_resolve(struct umbra_flat_ir const *bb,
+                                            enum join_policy jp) {
+    int const n = bb->insts;
+    struct ir_inst *inst = malloc((size_t)n * sizeof *inst);
+    __builtin_memcpy(inst, bb->inst, (size_t)n * sizeof *inst);
+
+    for (int i = 0; i < n; i++) {
+        struct ir_inst *ip = inst + i;
+        if (ip->op == op_join) {
+            if (jp == JOIN_PREFER_IMM && op_is_fused_imm(inst[ip->y.id].op)) {
+                ip->x = ip->y;
+            }
+            ip->y = (val){0};
+        }
+    }
+
+    _Bool *live = calloc((size_t)(n + 1), sizeof *live);
+    for (int i = n; i-- > 0;) {
+        struct ir_inst const *ip = &inst[i];
+        if (op_is_store(ip->op) || ip->op == op_loop_begin || ip->op == op_loop_end
+                                || ip->op == op_if_begin   || ip->op == op_if_end) {
+            live[i] = 1;
+        }
+        if (live[i]) {
+            live[ip->x.id] = 1;
+            live[ip->y.id] = 1;
+            live[ip->z.id] = 1;
+            live[ip->w.id] = 1;
+            if (ip->ptr.deref) {
+                live[ip->ptr.ix] = 1;
+            }
+        }
+    }
+
+    int *remap = calloc((size_t)(n + 1), sizeof *remap);
+    int live_count = 0,
+        new_preamble = 0;
+    for (int i = 0; i < n; i++) {
+        if (i == bb->preamble) {
+            new_preamble = live_count;
+        }
+        if (live[i]) {
+            remap[i] = live_count++;
+        }
+    }
+
+    struct ir_inst *out = malloc((size_t)live_count * sizeof *out);
+    int j = 0;
+    for (int i = 0; i < n; i++) {
+        if (!live[i]) { continue; }
+        out[j]   = inst[i];
+        out[j].x = remap_val(inst[i].x, remap);
+        out[j].y = remap_val(inst[i].y, remap);
+        out[j].z = remap_val(inst[i].z, remap);
+        out[j].w = remap_val(inst[i].w, remap);
+        if (inst[i].ptr.deref) {
+            out[j].ptr.ix = remap[inst[i].ptr.ix];
+        }
+        j++;
+    }
+
+    struct umbra_flat_ir *result = calloc(1, sizeof *result);
+    result->inst       = out;
+    result->insts      = live_count;
+    result->n_vars     = bb->n_vars;
+    result->preamble   = new_preamble;
+    result->loop_begin = bb->loop_begin >= 0 ? remap[bb->loop_begin] : -1;
+    result->loop_end   = bb->loop_end   >= 0 ? remap[bb->loop_end]   : -1;
+
+    free(remap);
+    free(live);
+    free(inst);
+    return result;
+}
+
 void umbra_flat_ir_free(struct umbra_flat_ir *bb) {
     if (bb) {
         free(bb->inst);

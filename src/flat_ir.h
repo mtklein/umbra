@@ -47,3 +47,7 @@ struct umbra_flat_ir {
     int             loop_begin, loop_end;
     int             n_vars, pad_ir_;
 };
+
+enum join_policy { JOIN_KEEP_X, JOIN_PREFER_IMM };
+
+struct umbra_flat_ir *umbra_flat_ir_resolve(struct umbra_flat_ir const*, enum join_policy);
