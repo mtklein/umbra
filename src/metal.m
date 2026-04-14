@@ -109,7 +109,7 @@ static char const *uv(char *tmp, char const *vn,
 
 static void emit_ops(SrcBuf *b, BB const *bb,
                      int const *deref_buf,
-                     _Bool *is_f, _Bool const *live,
+                     _Bool *is_f,
                      int lo, int hi, char const *pad) {
     for (int i = lo; i < hi; i++) {
         is_f[i] = produces_float(bb->inst[i].op);
@@ -121,7 +121,6 @@ static void emit_ops(SrcBuf *b, BB const *bb,
            : (void)snprintf(buf, sizeof buf, "v%d", (vid)), buf)
 
     for (int i = lo; i < hi; i++) {
-        if (!live[i]) { continue; }
         struct ir_inst const *inst = &bb->inst[i];
         int xid = inst->x.id, yid = inst->y.id,
             zid = inst->z.id, wid = inst->w.id;
@@ -909,54 +908,15 @@ static char* build_source(BB const *bb,
         emit(&b, "    uint var%d = 0;\n", i);
     }
 
-    // TODO: from here up until bb = &resolved is a chunk that's mostly shared
-    // by the backends, but with different logic inside if (ip->op == op_join).
-    // Can we extract a module here that does this with a hook letting each
-    // backend make its own join decisions?
-    // TODO: this extracted module could compact and renumber the new flat_ir rather
-    // than leaving dead instructions and a live array, making the work downstream less
-    // error prone.
+    struct umbra_flat_ir *resolved = umbra_flat_ir_resolve(bb, JOIN_PREFER_IMM);
+    bb = resolved;
+
     int const n = bb->insts;
-    struct ir_inst *inst = malloc((size_t)n * sizeof *inst);
-    __builtin_memcpy(inst, bb->inst, (size_t)n * sizeof *inst);
-    for (int i = 0; i < n; i++) {
-        struct ir_inst *ip = inst+i;
-        if (ip->op == op_join) {
-            if (op_is_fused_imm(inst[ip->y.id].op)) {
-                ip->x = ip->y;  // We want the _imm variant.
-            }
-            ip->y = (val){0};
-        }
-    }
-
-    _Bool *live = calloc((size_t)(n + 1), sizeof *live);
-    for (int i = n; i-- > 0;) {
-        struct ir_inst const *ip = &inst[i];
-        if (op_is_store(ip->op) || ip->op == op_loop_begin || ip->op == op_loop_end
-                                || ip->op == op_if_begin   || ip->op == op_if_end) {
-            live[i] = 1;
-        }
-        if (live[i]) {
-            live[ip->x.id] = 1;
-            live[ip->y.id] = 1;
-            live[ip->z.id] = 1;
-            live[ip->w.id] = 1;
-            if (ip->ptr.deref) {
-                live[ip->ptr.ix] = 1;
-            }
-        }
-    }
-
-    struct umbra_flat_ir resolved = *bb;
-    resolved.inst = inst;
-    bb = &resolved;
-
     _Bool *is_f = calloc((size_t)(n + 1), 1);
-    emit_ops(&b, bb, deref_buf, is_f, live, 0, n, "    ");
+    emit_ops(&b, bb, deref_buf, is_f, 0, n, "    ");
     emit(&b, "}\n");
 
-    free(live);
-    free(inst);
+    umbra_flat_ir_free(resolved);
     free(is_f);
     free(buf_row_shift);
     free(buf_written);
