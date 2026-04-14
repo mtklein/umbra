@@ -916,13 +916,10 @@ static char* build_source(BB const *bb,
     for (int i = 0; i < n; i++) {
         struct ir_inst *ip = inst+i;
         if (ip->op == op_join) {
-            struct ir_inst *y = inst + ip->y.id;
-            if (op_is_fused_imm(y->op)) {
+            if (op_is_fused_imm(inst[ip->y.id].op)) {
                 ip->x = ip->y;  // We want the _imm variant.
-                ip->y = (val){0};
-            } else {
-                ip->y = (val){0};
             }
+            ip->y = (val){0};
         }
     }
 
