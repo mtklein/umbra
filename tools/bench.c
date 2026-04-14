@@ -117,10 +117,18 @@ static double bench(draw_fn draw, void *ctx, struct umbra_backend *be,
     return best / px * 1e9;
 }
 
-static struct umbra_builder *get_first_builder(struct slide *s, struct umbra_fmt fmt) {
-    struct umbra_builder *b = NULL;
-    if (s->get_builders && s->get_builders(s, fmt, &b, 1) > 0) { return b; }
-    return NULL;
+static void compile_all_builders(struct slide *s, struct umbra_fmt fmt,
+                                 struct umbra_backend *be) {
+    struct umbra_builder *builders[8];
+    int nb = s->get_builders ? s->get_builders(s, fmt, builders, 8) : 0;
+    for (int j = 0; j < nb; j++) {
+        if (!builders[j]) { continue; }
+        struct umbra_flat_ir *bb = umbra_flat_ir(builders[j]);
+        umbra_builder_free(builders[j]);
+        struct umbra_program *p = be->compile(be, bb);
+        p->free(p);
+        umbra_flat_ir_free(bb);
+    }
 }
 
 static _Bool streq(char const *a, char const *b) { return strcmp(a, b) == 0; }
@@ -365,27 +373,14 @@ int main(int argc, char *argv[]) {
             double us_call[5] = {-1, -1, -1, -1, -1};
             for (int bi = 0; bi < nb; bi++) {
                 if (!(be_mask & (1 << bi)) || !bes[bi]) { continue; }
-                {
-                    struct umbra_builder *b = get_first_builder(s, fmt);
-                    if (!b) { continue; }
-                    struct umbra_flat_ir *bb2 = umbra_flat_ir(b);
-                    umbra_builder_free(b);
-                    struct umbra_program *p = bes[bi]->compile(bes[bi], bb2);
-                    p->free(p);
-                    umbra_flat_ir_free(bb2);
-                }
+                compile_all_builders(s, fmt, bes[bi]);
 
                 int    iters   = 1;
                 double t_pilot = 0;
                 for (int pi = 0; pi < 20; pi++) {
                     double const start = now();
                     for (int it = 0; it < iters; it++) {
-                        struct umbra_builder *b = get_first_builder(s, fmt);
-                        struct umbra_flat_ir *bb2 = umbra_flat_ir(b);
-                        umbra_builder_free(b);
-                        struct umbra_program *p = bes[bi]->compile(bes[bi], bb2);
-                        p->free(p);
-                        umbra_flat_ir_free(bb2);
+                        compile_all_builders(s, fmt, bes[bi]);
                     }
                     t_pilot = now() - start;
                     if (t_pilot >= target_secs / 2) { break; }
@@ -399,12 +394,7 @@ int main(int argc, char *argv[]) {
                 for (int k = 0; k < samples; k++) {
                     double const start = now();
                     for (int it = 0; it < iters; it++) {
-                        struct umbra_builder *b = get_first_builder(s, fmt);
-                        struct umbra_flat_ir *bb2 = umbra_flat_ir(b);
-                        umbra_builder_free(b);
-                        struct umbra_program *p = bes[bi]->compile(bes[bi], bb2);
-                        p->free(p);
-                        umbra_flat_ir_free(bb2);
+                        compile_all_builders(s, fmt, bes[bi]);
                     }
                     double const dt = now() - start;
                     if (k == 0 || dt < best) { best = dt; }
