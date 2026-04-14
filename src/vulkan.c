@@ -250,11 +250,9 @@ static gpu_buf vk_cache_import(void *host, size_t bytes, void *ctx) {
 static void vk_cache_release(gpu_buf buf, void *ctx) {
     struct vk_backend *v = ctx;
     struct vk_buf_handle *h = buf.ptr;
-    if (h) {
-        vkDestroyBuffer(v->device, h->buf, 0);
-        vkFreeMemory(v->device, h->mem, 0);
-        free(h);
-    }
+    vkDestroyBuffer(v->device, h->buf, 0);
+    vkFreeMemory(v->device, h->mem, 0);
+    free(h);
 }
 
 static void vk_flush(struct umbra_backend *be);
@@ -461,7 +459,6 @@ static struct umbra_program *vk_compile(struct umbra_backend *be,
 
     struct spirv_result const sr =
         build_spirv(bb, SPIRV_FLOAT_CONTROLS);
-    if (!sr.spirv) { return 0; }
 
     int n_desc = sr.total_bufs;
 

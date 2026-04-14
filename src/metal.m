@@ -1000,19 +1000,13 @@ static struct metal_backend* metal_backend_create(void) {
 }
 
 static void metal_backend_free(struct metal_backend *be) {
-    if (be) {
-        uniform_ring_pool_free(&be->uni_pool);
-        @autoreleasepool {
-            gpu_buf_cache_free(&be->cache);
-            if (be->device) {
-                (void)(__bridge_transfer id)be->device;
-            }
-            if (be->queue) {
-                (void)(__bridge_transfer id)be->queue;
-            }
-        }
-        free(be);
+    uniform_ring_pool_free(&be->uni_pool);
+    @autoreleasepool {
+        gpu_buf_cache_free(&be->cache);
+        (void)(__bridge_transfer id)be->device;
+        (void)(__bridge_transfer id)be->queue;
     }
+    free(be);
 }
 
 static struct metal_program* metal_program(

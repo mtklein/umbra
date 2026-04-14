@@ -222,9 +222,9 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *bb) {
         }
     }
 
-    struct umbra_flat_ir *resolved = NULL;
 #if !__has_feature(address_sanitizer)
-    bb = resolved = umbra_flat_ir_resolve(bb, JOIN_KEEP_X);
+    struct umbra_flat_ir *resolved = umbra_flat_ir_resolve(bb, JOIN_KEEP_X);
+    bb = resolved;
 #endif
 
     int n = 0;
@@ -493,7 +493,9 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *bb) {
 
     free(deref_slot);
     free(id);
+#if !__has_feature(address_sanitizer)
     umbra_flat_ir_free(resolved);
+#endif
 
     return p;
 }
@@ -1253,13 +1255,11 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
 #undef DONE
 
 static void interp_program_free(struct interp_program *p) {
-    if (p) {
-        free(p->buf);
-        free(p->inst);
-        free(p->v);
-        free(p->vars);
-        free(p);
-    }
+    free(p->buf);
+    free(p->inst);
+    free(p->v);
+    free(p->vars);
+    free(p);
 }
 
 static void run_interp(struct umbra_program *prog, int l, int t, int r, int b, struct umbra_buf buf[]) {

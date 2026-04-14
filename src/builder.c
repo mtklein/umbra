@@ -103,12 +103,10 @@ builder* umbra_builder(void) {
 }
 
 void umbra_builder_free(builder *b) {
-    if (b) {
-        free(b->inst);
-        free(b->ht.data);
-        free(b->var_uniform);
-        free(b);
-    }
+    free(b->inst);
+    free(b->ht.data);
+    free(b->var_uniform);
+    free(b);
 }
 
 umbra_val32 umbra_x(builder *b) { return push32(b, op_x); }
