@@ -1067,6 +1067,38 @@ static struct metal_program* metal_program(
         char *src = build_source(bb, &max_ptr, &total_bufs, deref_buf,
                                  &buf_shift);
 
+        char const *override = getenv("UMBRA_METAL_OVERRIDE");
+        if (override) {
+            int want_insts = 0;
+            char const *path = strchr(override, ':');
+            if (path) {
+                want_insts = atoi(override);
+                path++;
+            } else {
+                path = override;
+            }
+            if (!want_insts || want_insts == bb->insts) {
+                FILE *of = fopen(path, "r");
+                if (of) {
+                    fseek(of, 0, SEEK_END);
+                    long sz = ftell(of);
+                    fseek(of, 0, SEEK_SET);
+                    free(src);
+                    src = malloc((size_t)sz + 1);
+                    fread(src, 1, (size_t)sz, of);
+                    src[sz] = '\0';
+                    fclose(of);
+                    fprintf(stderr, "UMBRA_METAL_OVERRIDE: replaced %d-inst program with %s\n",
+                            bb->insts, path);
+                } else {
+                    fprintf(stderr, "UMBRA_METAL_OVERRIDE: could not open %s\n", path);
+                }
+            } else {
+                fprintf(stderr, "UMBRA_METAL_OVERRIDE: skipping %d-inst program (want %d)\n",
+                        bb->insts, want_insts);
+            }
+        }
+
         int n_deref = total_bufs - max_ptr - 1;
         struct deref_info *di = calloc((size_t)(n_deref ? n_deref : 1), sizeof *di);
         {
