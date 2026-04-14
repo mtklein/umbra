@@ -1021,13 +1021,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
             arm64_pool_load(c, &jc->pool, lo(s.rd), (uint32_t)inst->imm);
             put(c, ORR_16b(hi(s.rd), lo(s.rd), lo(s.rd)));
         } break;
-        case op_join: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
-            if (lo(s.rd) != lo(s.rx)) {
-                put(c, ORR_16b(lo(s.rd), lo(s.rx), lo(s.rx)));
-                if (!scalar) { put(c, ORR_16b(hi(s.rd), hi(s.rx), hi(s.rx))); }
-            }
-        } break;
+        case op_join: __builtin_unreachable();
 
         case op_add_f32:
         case op_sub_f32:

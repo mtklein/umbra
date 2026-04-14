@@ -144,10 +144,7 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                 emit(b, "%suint v%d = %uu;\n",
                      pad, i, (uint32_t)inst->imm);
                 break;
-            case op_join:
-                is_f[i] = is_f[xid];
-                emit(b, "%s#define v%d v%d\n", pad, i, xid);
-                break;
+            case op_join: __builtin_unreachable();
 
             case op_deref_ptr: break;
 

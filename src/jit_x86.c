@@ -1211,10 +1211,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             pool_broadcast(c, &jc->pool, s.rd, (uint32_t)inst->imm);
         } break;
-        case op_join: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
-            if (s.rd != s.rx) { vmovaps(c, s.rd, s.rx); }
-        } break;
+        case op_join: __builtin_unreachable();
 
         case op_lt_s32_imm: {
             struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
