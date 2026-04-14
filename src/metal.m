@@ -877,7 +877,7 @@ static char* build_source(BB const *bb,
     }
     emit(&b, "; };\n\n");
 
-    emit(&b, "kernel void umbra_entry(\n");
+    emit(&b, "kernel void main0(\n");
     emit(&b,
          "    constant meta &m [[buffer(0)]]");
     for (int p = 0; p <= max_ptr; p++) {
@@ -1110,7 +1110,7 @@ static struct metal_program* metal_program(
             goto fail;
         }
 
-        func = [library newFunctionWithName:@"umbra_entry"];
+        func = [library newFunctionWithName:@"main0"];
         if (!func) { goto fail; }
         pso = [device newComputePipelineStateWithFunction:func error:&error];
         if (!pso) { goto fail; }

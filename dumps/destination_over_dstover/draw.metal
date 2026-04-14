@@ -4,7 +4,7 @@ using namespace metal;
 
 struct meta { uint w, x0, y0, count0, count1, stride0, stride1; };
 
-kernel void umbra_entry(
+kernel void main0(
     constant meta &m [[buffer(0)]],
     device const uint * __restrict p0 [[buffer(1)]],
     device half4 * __restrict p1 [[buffer(2)]],
