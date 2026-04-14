@@ -909,6 +909,13 @@ static char* build_source(BB const *bb,
         emit(&b, "    uint var%d = 0;\n", i);
     }
 
+    // TODO: from here up until bb = &resolved is a chunk that's mostly shared
+    // by the backends, but with different logic inside if (ip->op == op_join).
+    // Can we extract a module here that does this with a hook letting each
+    // backend make its own join decisions?
+    // TODO: this extracted module could compact and renumber the new flat_ir rather
+    // than leaving dead instructions and a live array, making the work downstream less
+    // error prone.
     int const n = bb->insts;
     struct ir_inst *inst = malloc((size_t)n * sizeof *inst);
     __builtin_memcpy(inst, bb->inst, (size_t)n * sizeof *inst);
