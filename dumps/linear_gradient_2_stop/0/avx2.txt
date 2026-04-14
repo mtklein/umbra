@@ -13,20 +13,20 @@ Cycles with backend pressure increase [ 91.25% ]
 Throughput Bottlenecks: 
   Resource Pressure       [ 60.07% ]
   - Zn4FP0  [ 15.16% ]
-  - Zn4FP1  [ 35.61% ]
-  - Zn4FP2  [ 29.94% ]
-  - Zn4FP3  [ 15.34% ]
-  - Zn4FP45  [ 9.30% ]
+  - Zn4FP1  [ 35.67% ]
+  - Zn4FP2  [ 30.01% ]
+  - Zn4FP3  [ 15.40% ]
+  - Zn4FP45  [ 9.24% ]
   - Zn4FPSt  [ 12.38% ]
   - Zn4LSU  [ 0.18% ]
-  Data Dependencies:      [ 91.13% ]
-  - Register Dependencies [ 91.13% ]
+  Data Dependencies:      [ 91.07% ]
+  - Register Dependencies [ 91.07% ]
   - Memory Dependencies   [ 0.00% ]
 
 Critical sequence based on the simulation:
 
               Instruction                                 Dependency Information
- +----< 18.   vfmadd231ps	%ymm9, %ymm13, %ymm15
+ +----< 17.   vfmadd231ps	%ymm9, %ymm13, %ymm15
  |
  |    < loop carried > 
  |
@@ -44,12 +44,12 @@ Critical sequence based on the simulation:
  +----> 11.   vminps	572(%rip), %ymm13, %ymm13         ## REGISTER dependency:  %ymm13
  |      12.   vmovaps	%ymm7, %ymm12
  +----> 13.   vfmadd231ps	%ymm11, %ymm13, %ymm12    ## REGISTER dependency:  %ymm13
- |      14.   vcvtps2ph	$4, %ymm12, %xmm12
- |      15.   vmovaps	%ymm4, %ymm14
- +----> 16.   vfmadd231ps	%ymm8, %ymm13, %ymm14     ## RESOURCE interference:  Zn4FP0 [ probability: 48% ]
- |      17.   vmovaps	%ymm5, %ymm15
- +----> 18.   vfmadd231ps	%ymm9, %ymm13, %ymm15     ## RESOURCE interference:  Zn4FP0 [ probability: 49% ]
- +----> 19.   vfmadd132ps	%ymm10, %ymm6, %ymm13     ## RESOURCE interference:  Zn4FP0 [ probability: 97% ]
+ |      14.   vmovaps	%ymm4, %ymm14
+ +----> 15.   vfmadd231ps	%ymm8, %ymm13, %ymm14     ## RESOURCE interference:  Zn4FP0 [ probability: 48% ]
+ |      16.   vmovaps	%ymm5, %ymm15
+ +----> 17.   vfmadd231ps	%ymm9, %ymm13, %ymm15     ## RESOURCE interference:  Zn4FP0 [ probability: 49% ]
+ +----> 18.   vfmadd132ps	%ymm10, %ymm6, %ymm13     ## RESOURCE interference:  Zn4FP0 [ probability: 97% ]
+ |      19.   vcvtps2ph	$4, %ymm12, %xmm12
  +----> 20.   vcvtps2ph	$4, %ymm13, %xmm13                ## REGISTER dependency:  %ymm13
  +----> 21.   vcvtps2ph	$4, %ymm15, %xmm15                ## RESOURCE interference:  Zn4FP2 [ probability: 47% ]
  |      22.   vcvtps2ph	$4, %ymm14, %xmm14
@@ -106,12 +106,12 @@ Instruction Info:
  1      9     0.50    *                   vminps	572(%rip), %ymm13, %ymm13
  1      0     0.17                        vmovaps	%ymm7, %ymm12
  1      4     0.50                        vfmadd231ps	%ymm11, %ymm13, %ymm12
- 2      6     1.00                        vcvtps2ph	$4, %ymm12, %xmm12
  1      0     0.17                        vmovaps	%ymm4, %ymm14
  1      4     0.50                        vfmadd231ps	%ymm8, %ymm13, %ymm14
  1      0     0.17                        vmovaps	%ymm5, %ymm15
  1      4     0.50                        vfmadd231ps	%ymm9, %ymm13, %ymm15
  1      4     0.50                        vfmadd132ps	%ymm10, %ymm6, %ymm13
+ 2      6     1.00                        vcvtps2ph	$4, %ymm12, %xmm12
  2      6     1.00                        vcvtps2ph	$4, %ymm13, %xmm13
  2      6     1.00                        vcvtps2ph	$4, %ymm15, %xmm15
  2      6     1.00                        vcvtps2ph	$4, %ymm14, %xmm14
@@ -187,12 +187,12 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -     0.97   0.03    -      -     0.50   0.50    -     0.34   0.32   0.34   0.32   0.34   0.34    -      -     vminps	572(%rip), %ymm13, %ymm13
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vmovaps	%ymm7, %ymm12
  -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm11, %ymm13, %ymm12
- -      -      -      -      -      -      -      -      -      -     0.94   1.06    -      -      -      -      -      -      -      -      -      -      -     vcvtps2ph	$4, %ymm12, %xmm12
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vmovaps	%ymm4, %ymm14
  -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm8, %ymm13, %ymm14
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vmovaps	%ymm5, %ymm15
  -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm9, %ymm13, %ymm15
  -      -      -      -      -      -      -      -     0.49   0.51    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd132ps	%ymm10, %ymm6, %ymm13
+ -      -      -      -      -      -      -      -      -      -     0.94   1.06    -      -      -      -      -      -      -      -      -      -      -     vcvtps2ph	$4, %ymm12, %xmm12
  -      -      -      -      -      -      -      -      -      -     1.90   0.10    -      -      -      -      -      -      -      -      -      -      -     vcvtps2ph	$4, %ymm13, %xmm13
  -      -      -      -      -      -      -      -      -      -     0.08   1.92    -      -      -      -      -      -      -      -      -      -      -     vcvtps2ph	$4, %ymm15, %xmm15
  -      -      -      -      -      -      -      -      -      -     1.04   0.96    -      -      -      -      -      -      -      -      -      -      -     vcvtps2ph	$4, %ymm14, %xmm14

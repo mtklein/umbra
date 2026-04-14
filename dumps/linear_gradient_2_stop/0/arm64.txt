@@ -13,7 +13,7 @@ Cycles with backend pressure increase [ 87.44% ]
 Throughput Bottlenecks: 
   Resource Pressure       [ 68.90% ]
   - CyUnitLS  [ 31.86% ]
-  - CyUnitV  [ 59.30% ]
+  - CyUnitV  [ 59.34% ]
   - CyUnitVM  [ 10.33% ]
   Data Dependencies:      [ 54.57% ]
   - Register Dependencies [ 54.57% ]
@@ -22,7 +22,7 @@ Throughput Bottlenecks:
 Critical sequence based on the simulation:
 
               Instruction                                 Dependency Information
- +----< 46.   str	q18, [x15, #64]
+ +----< 44.   str	q18, [x15, #64]
  |
  |    < loop carried > 
  |
@@ -64,26 +64,26 @@ Critical sequence based on the simulation:
  |      35.   fmla.4s	v6, v4, v12
  |      36.   mov.16b	v7, v29
  +----> 37.   fmla.4s	v7, v5, v13                       ## REGISTER dependency:  q5
- |      38.   fcvtn	v6.4h, v6.4s
- |      39.   fcvtn	v7.4h, v7.4s
- |      40.   str	q16, [x15, #32]
- |      41.   str	q17, [x15, #48]
- |      42.   mov.16b	v16, v22
- +----> 43.   fmla.4s	v16, v4, v30                      ## RESOURCE interference:  CyUnitV [ probability: 24% ]
- |      44.   mov.16b	v17, v23
- +----> 45.   fmla.4s	v17, v5, v31                      ## RESOURCE interference:  CyUnitVM [ probability: 24% ]
- |      46.   str	q18, [x15, #64]
- |      47.   str	q19, [x15, #80]
- |      48.   mov.16b	v18, v24
- +----> 49.   fmla.4s	v18, v4, v8                       ## RESOURCE interference:  CyUnitV [ probability: 74% ]
- |      50.   mov.16b	v19, v25
- +----> 51.   fmla.4s	v19, v5, v9                       ## RESOURCE interference:  CyUnitV [ probability: 74% ]
- |      52.   mov.16b	v20, v26
- +----> 53.   fmla.4s	v20, v4, v10                      ## RESOURCE interference:  CyUnitV [ probability: 74% ]
- |      54.   mov.16b	v4, v20
- |      55.   mov.16b	v21, v27
- +----> 56.   fmla.4s	v21, v5, v11                      ## RESOURCE interference:  CyUnitV [ probability: 74% ]
- +----> 57.   mov.16b	v5, v21                           ## REGISTER dependency:  q21
+ |      38.   str	q16, [x15, #32]
+ |      39.   str	q17, [x15, #48]
+ |      40.   mov.16b	v16, v22
+ +----> 41.   fmla.4s	v16, v4, v30                      ## RESOURCE interference:  CyUnitV [ probability: 24% ]
+ |      42.   mov.16b	v17, v23
+ +----> 43.   fmla.4s	v17, v5, v31                      ## RESOURCE interference:  CyUnitVM [ probability: 24% ]
+ |      44.   str	q18, [x15, #64]
+ |      45.   str	q19, [x15, #80]
+ |      46.   mov.16b	v18, v24
+ +----> 47.   fmla.4s	v18, v4, v8                       ## RESOURCE interference:  CyUnitV [ probability: 74% ]
+ |      48.   mov.16b	v19, v25
+ +----> 49.   fmla.4s	v19, v5, v9                       ## RESOURCE interference:  CyUnitV [ probability: 74% ]
+ |      50.   mov.16b	v20, v26
+ +----> 51.   fmla.4s	v20, v4, v10                      ## RESOURCE interference:  CyUnitV [ probability: 74% ]
+ |      52.   mov.16b	v4, v20
+ |      53.   mov.16b	v21, v27
+ +----> 54.   fmla.4s	v21, v5, v11                      ## RESOURCE interference:  CyUnitV [ probability: 74% ]
+ +----> 55.   mov.16b	v5, v21                           ## REGISTER dependency:  q21
+ |      56.   fcvtn	v6.4h, v6.4s
+ |      57.   fcvtn	v7.4h, v7.4s
  |      58.   fcvtn	v4.4h, v4.4s
  +----> 59.   fcvtn	v5.4h, v5.4s                      ## REGISTER dependency:  q5
  |      60.   fcvtn	v18.4h, v18.4s
@@ -170,8 +170,6 @@ Instruction Info:
  1      8     0.50                        fmla.4s	v6, v4, v12
  1      2     0.33                        mov.16b	v7, v29
  1      8     0.50                        fmla.4s	v7, v5, v13
- 1      2     0.33                        fcvtn	v6.4h, v6.4s
- 1      2     0.33                        fcvtn	v7.4h, v7.4s
  1      4     0.50           *            str	q16, [x15, #32]
  1      4     0.50           *            str	q17, [x15, #48]
  1      2     0.33                        mov.16b	v16, v22
@@ -190,6 +188,8 @@ Instruction Info:
  1      2     0.33                        mov.16b	v21, v27
  1      8     0.50                        fmla.4s	v21, v5, v11
  1      2     0.33                        mov.16b	v5, v21
+ 1      2     0.33                        fcvtn	v6.4h, v6.4s
+ 1      2     0.33                        fcvtn	v7.4h, v7.4s
  1      2     0.33                        fcvtn	v4.4h, v4.4s
  1      2     0.33                        fcvtn	v5.4h, v5.4s
  1      2     0.33                        fcvtn	v18.4h, v18.4s
@@ -295,8 +295,6 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.32   0.35    -      -     0.01   0.99   fmla.4s	v6, v4, v12
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.33   0.33    -      -      -      -     mov.16b	v7, v29
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.33   0.33    -      -     0.25   0.75   fmla.4s	v7, v5, v13
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.33   0.33    -      -      -      -     fcvtn	v6.4h, v6.4s
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.35   0.32    -      -      -      -     fcvtn	v7.4h, v7.4s
  -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.98   0.02    -      -      -      -      -      -      -     str	q16, [x15, #32]
  -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.02   0.98    -      -      -      -      -      -      -     str	q17, [x15, #48]
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.32   0.35    -      -      -      -     mov.16b	v16, v22
@@ -315,6 +313,8 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.34   0.34    -      -      -      -     mov.16b	v21, v27
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.34   0.33    -      -     0.99   0.01   fmla.4s	v21, v5, v11
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.35   0.32    -      -      -      -     mov.16b	v5, v21
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.33   0.33    -      -      -      -     fcvtn	v6.4h, v6.4s
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.35   0.32    -      -      -      -     fcvtn	v7.4h, v7.4s
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.33   0.34    -      -      -      -     fcvtn	v4.4h, v4.4s
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.35   0.32    -      -      -      -     fcvtn	v5.4h, v5.4s
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.34   0.34    -      -      -      -     fcvtn	v18.4h, v18.4s

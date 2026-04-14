@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// TODO: dead_regs double-counts when the same value appears in multiple operand slots
 struct sched {
     int last_use[4], // Per-channel: latest instruction that reads this value, or -1.
         n_deps,      // Unscheduled instructions this one still waits on.  Ready at 0.
@@ -22,7 +21,13 @@ static int sched_score(struct ir_inst const *in, struct sched const *meta,
         val const deps[] = {in[c].x, in[c].y, in[c].z, in[c].w};
         int dead_regs = 0;
         for (int k = 0; k < 4; k++) {
-            dead_regs += meta[deps[k].id].last_use[deps[k].chan] == c;
+            _Bool first = 1;
+            for (int j = 0; j < k; j++) {
+                if (deps[j].bits == deps[k].bits) { first = 0; }
+            }
+            if (first) {
+                dead_regs += meta[deps[k].id].last_use[deps[k].chan] == c;
+            }
         }
 
         int const born_regs = op_is_store(in[c].op) ? 0
