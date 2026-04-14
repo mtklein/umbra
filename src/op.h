@@ -86,5 +86,6 @@ _Bool       op_is_store    (enum op);
 _Bool       op_has_ptr     (enum op);
 _Bool       op_is_varying  (enum op);
 _Bool       op_is_fused_imm(enum op);
+int         op_values      (enum op);
 char const* op_name        (enum op);
 int         op_eval        (enum op, int, int, int, int);

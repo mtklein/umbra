@@ -5,13 +5,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// TODO: this needs refinement to account for ops that produce multi-channel results
+// TODO: dead_regs double-counts when the same value appears in multiple operand slots
 struct sched {
-    int last_use,  // Latest op that reads this op's result, or -1 if unused/external.
-        n_deps,    // Unscheduled ops this op still waits on.  Ready to schedule at 0.
-        n_users,   // Ops that read this op's result.  Decremented as users are scheduled.
-        user_off,  // Start index into the users[] array for this op's user list.
-        ready_idx; // This op's position in the ready[] worklist, kept in sync on removal.
+    int last_use[4], // Per-channel: latest instruction that reads this value, or -1.
+        n_deps,      // Unscheduled instructions this one still waits on.  Ready at 0.
+        n_users,     // Instructions that read this one's values.  Decremented as scheduled.
+        user_off,    // Start index into the users[] array for this instruction's user list.
+        ready_idx;   // This instruction's position in the ready[] worklist.
 };
 
 static int sched_score(struct ir_inst const *in, struct sched const *meta,
@@ -19,17 +19,15 @@ static int sched_score(struct ir_inst const *in, struct sched const *meta,
     int score = 0;
 
     {
-        int const deps[] = {in[c].x.id, in[c].y.id, in[c].z.id, in[c].w.id};
+        val const deps[] = {in[c].x, in[c].y, in[c].z, in[c].w};
         int dead_regs = 0;
         for (int k = 0; k < 4; k++) {
-            // TODO: track multi-channel ops' channel deaths individually
-            dead_regs += meta[deps[k]].last_use == c;
+            dead_regs += meta[deps[k].id].last_use[deps[k].chan] == c;
         }
 
         int const born_regs = op_is_store(in[c].op) ? 0
-                                                    : 1;  // TODO: channel aware, 1-4
+                                                     : op_values(in[c].op);
 
-        // Decreasing register pressure is valuable, especially when already high.
         int const decrease_in_reg_pressure = dead_regs - born_regs;
         score += decrease_in_reg_pressure * reg_pressure;
     }
@@ -46,10 +44,13 @@ static int sched_score(struct ir_inst const *in, struct sched const *meta,
     }
 
     {
-        // Among candidates with equal pressure and readying, prefer the one that dies soonest.
-        // last_use < 0 means no in-region user was found (result flows out of the region),
-        // so we penalize by reg_pressure, treating it as if it dies last.
-        score -= meta[c].last_use >= 0 ? meta[c].last_use : reg_pressure;
+        int max_last_use = meta[c].last_use[0];
+        for (int ch = 1; ch < op_values(in[c].op); ch++) {
+            if (meta[c].last_use[ch] > max_last_use) {
+                max_last_use = meta[c].last_use[ch];
+            }
+        }
+        score -= max_last_use >= 0 ? max_last_use : reg_pressure;
     }
 
     {
@@ -73,12 +74,14 @@ static void schedule(struct ir_inst *in, int n, struct ir_inst *out, int at, int
     struct sched *meta = calloc((size_t)(n + 1), sizeof *meta);
 
     for (int i = 0; i < n; i++) {
-        meta[i].last_use = -1;
+        for (int ch = 0; ch < 4; ch++) {
+            meta[i].last_use[ch] = -1;
+        }
         if (is_body(in + i) && i >= region_lo && i < region_hi) {
-            int const deps[] = {in[i].x.id, in[i].y.id, in[i].z.id, in[i].w.id};
+            val const deps[] = {in[i].x, in[i].y, in[i].z, in[i].w};
             for (int k = 0; k < 4; k++) {
-                int const d = deps[k];
-                meta[d].last_use = i;
+                int const d = deps[k].id;
+                meta[d].last_use[deps[k].chan] = i;
                 if (is_body(in + d) && d >= region_lo && d < region_hi) {
                     meta[i].n_deps++;
                     meta[d].n_users++;
@@ -90,7 +93,7 @@ static void schedule(struct ir_inst *in, int n, struct ir_inst *out, int at, int
                             && is_body(in + j)) {
                         meta[i].n_deps++;
                         meta[j].n_users++;
-                        meta[j].last_use = i;
+                        meta[j].last_use[0] = i;
                     }
                 }
             }

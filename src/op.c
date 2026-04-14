@@ -20,6 +20,15 @@ _Bool op_has_ptr     (enum op op) { return !!(op_flags[op] & OP_PTR); }
 _Bool op_is_varying  (enum op op) { return !!(op_flags[op] & OP_VARYING); }
 _Bool op_is_fused_imm(enum op op) { return !!(op_flags[op] & OP_FUSED_IMM); }
 
+int op_values(enum op op) {
+    switch ((int)op) {
+    case op_load_8x4:
+    case op_load_16x4:
+    case op_load_16x4_planar: return 4;
+    default:                  return 1;
+    }
+}
+
 char const* op_name(enum op op) {
     static char const *names[] = {
 #define OP_NAME(name, ...) [op_##name] = #name,
