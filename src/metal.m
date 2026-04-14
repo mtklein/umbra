@@ -1300,9 +1300,12 @@ static void encode_dispatch(
         }
     }
 
+    static int tg_size = 0;
+    if (!tg_size) {
+        char const *tg = getenv("UMBRA_METAL_THREADGROUP");
+        tg_size = tg ? atoi(tg) : 64;
+    }
     MTLSize grid  = MTLSizeMake((NSUInteger)w, (NSUInteger)h, 1);
-    char const *tg = getenv("UMBRA_METAL_THREADGROUP");
-    int tg_size = tg ? atoi(tg) : 64;
     MTLSize group = MTLSizeMake((NSUInteger)tg_size, 1, 1);
     [enc dispatchThreads:grid
        threadsPerThreadgroup:group];
