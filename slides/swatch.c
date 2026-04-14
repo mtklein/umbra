@@ -78,6 +78,14 @@ static void swatch_draw(struct slide *s, int frame, int l, int t, int r, int b, 
     }
 }
 
+static int swatch_get_builders(struct slide *s, struct umbra_fmt fmt,
+                               struct umbra_builder **out, int max) {
+    if (max < 1) { return 0; }
+    struct swatch_slide *st = (struct swatch_slide *)s;
+    out[0] = umbra_draw_build(&st->shader.base, NULL, NULL, fmt, NULL);
+    return out[0] ? 1 : 0;
+}
+
 static void swatch_free(struct slide *s) {
     struct swatch_slide *st = (struct swatch_slide *)s;
     if (st->prog) { st->prog->free(st->prog); }
@@ -95,7 +103,8 @@ SLIDE(slide_swatch) {
         .init    = swatch_init,
         .prepare = swatch_prepare,
         .draw    = swatch_draw,
-        .free    = swatch_free,
+        .free         = swatch_free,
+        .get_builders = swatch_get_builders,
     };
     return &st->base;
 }

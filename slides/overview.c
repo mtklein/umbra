@@ -126,6 +126,17 @@ static void overview_draw(struct slide *s, int frame, int l, int t, int r, int b
     });
 }
 
+static int overview_get_builders(struct slide *s, struct umbra_fmt fmt,
+                                 struct umbra_builder **out, int max) {
+    (void)s;
+    if (max < 1) { return 0; }
+    struct umbra_builder *b = umbra_builder();
+    umbra_color c = umbra_fmt_8888.load(b, 0);
+    fmt.store(b, 1, c);
+    out[0] = b;
+    return 1;
+}
+
 static void overview_free(struct slide *s) {
     struct overview_slide *st = (struct overview_slide *)s;
     if (st->cvt) { st->cvt->free(st->cvt); }
@@ -145,7 +156,8 @@ struct slide *make_overview(void) {
         .init = overview_init,
         .prepare = overview_prepare,
         .draw = overview_draw,
-        .free = overview_free,
+        .free         = overview_free,
+        .get_builders = overview_get_builders,
     };
     return &st->base;
 }

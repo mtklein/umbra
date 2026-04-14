@@ -1,0 +1,39 @@
+#include <metal_stdlib>
+using namespace metal;
+
+
+struct meta { uint w, x0, y0, count0, count1, stride0, stride1; };
+
+kernel void main0(
+    constant meta &m [[buffer(0)]],
+    device const uint * __restrict p0 [[buffer(1)]],
+    device half4 * __restrict p1 [[buffer(2)]],
+    uint2 pos [[thread_position_in_grid]]
+) {
+    if (pos.x >= m.w) return;
+    uint x = m.x0 + pos.x;
+    uint y = m.y0 + pos.y;
+    uint v0 = 0u;
+    uint px2 = p0[y * m.stride0 + x];
+    uint v2 = px2 & 0xFFu;
+    uint v2_1 = (px2 >> 8u) & 0xFFu;
+    uint v2_2 = (px2 >> 16u) & 0xFFu;
+    uint v2_3 = px2 >> 24u;
+    float v3 = (float)(int)v2;
+    float v5 = (float)(int)v2_3;
+    float v7 = v3 * as_type<float>(998277249u);
+    #define v8 v7
+    uint v9 = (uint)as_type<ushort>((half)v8);
+    float v10 = (float)(int)v2_1;
+    float v12 = v10 * as_type<float>(998277249u);
+    #define v13 v12
+    uint v14 = (uint)as_type<ushort>((half)v13);
+    float v15 = (float)(int)v2_2;
+    float v17 = v15 * as_type<float>(998277249u);
+    #define v18 v17
+    uint v19 = (uint)as_type<ushort>((half)v18);
+    float v20 = v5 * as_type<float>(998277249u);
+    #define v21 v20
+    uint v22 = (uint)as_type<ushort>((half)v21);
+    p1[y * m.stride1 + x] = half4(as_type<half>((ushort)v9), as_type<half>((ushort)v14), as_type<half>((ushort)v19), as_type<half>((ushort)v22));
+}
