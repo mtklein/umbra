@@ -14,8 +14,6 @@
 #include "../third_party/stb/stb_image_write.h"
 #pragma clang diagnostic pop
 
-// Write to path~ then rename for atomicity — avoids half-written dumps
-// visible in git diff when building in the same worktree.
 static FILE* atomic_open(char const *path) {
     char tmp[256];
     snprintf(tmp, sizeof tmp, "%s~", path);
@@ -81,7 +79,7 @@ static void clear_dir(char const *path) {
     closedir(d);
 }
 
-static void grab_mvk_msl(char const *dir, char const *name) {
+static void grab_mvk_msl(char const *dir) {
     DIR *d = opendir(mvk_dump_dir);
     if (!d) { return; }
     struct dirent *e;
@@ -90,7 +88,7 @@ static void grab_mvk_msl(char const *dir, char const *name) {
         if (n > 6 && strcmp(e->d_name + n - 6, ".metal") == 0) {
             char src[1280], dst[256];
             snprintf(src, sizeof src, "%s/%s", mvk_dump_dir, e->d_name);
-            snprintf(dst, sizeof dst, "%s/%s.msl", dir, name);
+            snprintf(dst, sizeof dst, "%s/vulkan.msl", dir);
             FILE *in  = fopen(src, "r");
             FILE *out = atomic_open(dst);
             if (in && out) {
@@ -119,11 +117,11 @@ static struct dump_backends dump_backends_init(void) {
     struct dump_backends db = {.vulkan_idx = -1};
     int i = 0;
 #ifdef JIT_EXT
-    db.be[i] = umbra_backend_jit();    db.ext[i] = JIT_EXT; i++;
+    db.be[i] = umbra_backend_jit();    db.ext[i] = JIT_EXT ".txt"; i++;
 #endif
-    db.be[i] = umbra_backend_metal();  db.ext[i] = "metal";  i++;
-    db.be[i] = umbra_backend_vulkan(); db.ext[i] = "vulkan"; db.vulkan_idx = i; i++;
-    db.be[i] = umbra_backend_wgpu();   db.ext[i] = "wgpu";   i++;
+    db.be[i] = umbra_backend_metal();  db.ext[i] = "metal.msl";    i++;
+    db.be[i] = umbra_backend_vulkan(); db.ext[i] = "vulkan.spirv"; db.vulkan_idx = i; i++;
+    db.be[i] = umbra_backend_wgpu();   db.ext[i] = "wgpu.spirv";   i++;
     db.n = i;
     return db;
 }
@@ -135,10 +133,10 @@ static void dump_backends_free(struct dump_backends *db) {
 }
 
 static void dump_bb(struct dump_backends *db,
-                    char const *dir, char const *name, struct umbra_flat_ir *bb) {
+                    char const *dir, struct umbra_flat_ir *bb) {
     char p[256];
     {
-        snprintf(p, sizeof p, "%s/%s.ir", dir, name);
+        snprintf(p, sizeof p, "%s/ir.txt", dir);
         FILE *f = atomic_open(p);
         umbra_flat_ir_dump(bb, f);
         atomic_close(f, p);
@@ -154,29 +152,29 @@ static void dump_bb(struct dump_backends *db,
         struct umbra_program *prog = db->be[i]->compile(db->be[i], bb);
         if (!prog) { continue; }
 
-        snprintf(p, sizeof p, "%s/%s.%s", dir, name, db->ext[i]);
+        snprintf(p, sizeof p, "%s/%s", dir, db->ext[i]);
         FILE *f = atomic_open(p);
         if (prog->dump) { prog->dump(prog, f); }
         atomic_close(f, p);
         prog->free(prog);
 
         if (i == db->vulkan_idx) {
-            grab_mvk_msl(dir, name);
+            grab_mvk_msl(dir);
         }
     }
 }
 
 static void dump_builder(struct dump_backends *db,
-                         char const *dir, char const *name, struct umbra_builder *b) {
+                         char const *dir, struct umbra_builder *b) {
     char p[256];
-    snprintf(p, sizeof p, "%s/%s.builder", dir, name);
+    snprintf(p, sizeof p, "%s/builder.txt", dir);
     FILE *f = atomic_open(p);
     umbra_builder_dump(b, f);
     atomic_close(f, p);
 
     struct umbra_flat_ir *bb = umbra_flat_ir(b);
     umbra_builder_free(b);
-    dump_bb(db, dir, name, bb);
+    dump_bb(db, dir, bb);
     umbra_flat_ir_free(bb);
 }
 
@@ -234,7 +232,8 @@ int main(void) {
 
     struct dump_backends db = dump_backends_init();
 
-    dump_builder(&db, "dumps", "srcover", build_srcover());
+    mkdir("dumps/srcover", 0755);
+    dump_builder(&db, "dumps/srcover", build_srcover());
 
     slides_init(RW, RH);
 
@@ -248,17 +247,16 @@ int main(void) {
         slugify(s->title, dir, sizeof dir);
         mkdir(dir, 0755);
         struct umbra_builder *b = s->get_builder(s, umbra_fmt_fp16);
-        if (b) { dump_builder(&db, dir, "draw", b); }
-        struct umbra_builder *bp = s->get_builder(s, umbra_fmt_fp16_planar);
-        if (bp) { dump_builder(&db, dir, "draw_fp16p", bp); }
+        if (b) { dump_builder(&db, dir, b); }
 
         render_hdr(dir, i, be);
     }
 
-    dump_builder(&db, "dumps/slug_two_pass", "acc", slug_build_acc(NULL));
+    mkdir("dumps/slug_two_pass", 0755);
+    dump_builder(&db, "dumps/slug_two_pass", slug_build_acc(NULL));
     {
         mkdir("dumps/slug_one_pass", 0755);
-        dump_builder(&db, "dumps/slug_one_pass", "draw", slug_build(NULL));
+        dump_builder(&db, "dumps/slug_one_pass", slug_build(NULL));
     }
 
     slides_cleanup();
