@@ -88,17 +88,19 @@ static void grab_mvk_msl(char const *dir) {
             char src[1280], dst[256];
             snprintf(src, sizeof src, "%s/%s", mvk_dump_dir, e->d_name);
             snprintf(dst, sizeof dst, "%s/vulkan.msl", dir);
-            FILE *in  = fopen(src, "r");
-            FILE *out = atomic_open(dst);
-            if (in && out) {
-                char buf[4096];
-                size_t r;
-                while ((r = fread(buf, 1, sizeof buf, in)) > 0) {
-                    fwrite(buf, 1, r, out);
+            FILE *in = fopen(src, "r");
+            if (in) {
+                FILE *out = atomic_open(dst);
+                if (out) {
+                    char buf[4096];
+                    size_t r;
+                    while ((r = fread(buf, 1, sizeof buf, in)) > 0) {
+                        fwrite(buf, 1, r, out);
+                    }
+                    atomic_close(out, dst);
                 }
+                fclose(in);
             }
-            if (in) { fclose(in); }
-            if (out) { atomic_close(out, dst); }
             break;
         }
     }

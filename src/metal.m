@@ -1,6 +1,6 @@
-// TODO: Slug two-pass is ~2.5 ns/px on Metal vs ~3.0 on MoltenVK, but single-dispatch Slug
-// is ~1.6 ns/px on both (1025 vs 1009 µs/dispatch).  Eliminating dead imm_32 constants via
-// join() didn't help.
+// TODO: Slug (one-pass) is 1025 µs/dispatch on Metal vs 1010 on MoltenVK.  The gap is entirely
+// shader codegen: dropping in MoltenVK's MSL via UMBRA_METAL_OVERRIDE closes it completely.
+// Compare dumps/slug_one_pass/0/metal.msl vs dumps/slug_one_pass/0/vulkan.msl.
 #include "flat_ir.h"
 #include "gpu_buf_cache.h"
 #include "uniform_ring.h"
