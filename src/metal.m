@@ -948,9 +948,10 @@ static char* build_source(BB const *bb,
 
     struct umbra_flat_ir resolved = *bb;
     resolved.inst = inst;
+    bb = &resolved;
 
     _Bool *is_f = calloc((size_t)(n + 1), 1);
-    emit_ops(&b, &resolved, deref_buf, is_f, live, 0, n, "    ");
+    emit_ops(&b, bb, deref_buf, is_f, live, 0, n, "    ");
     emit(&b, "}\n");
 
     free(live);

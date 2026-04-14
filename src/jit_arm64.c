@@ -268,10 +268,51 @@ static struct ra *ra_create_arm64(struct umbra_flat_ir const *bb, struct jit_ctx
 
 static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
-                     int *deref_rb_gpr, struct jit_ctx *jc);
+                     int *deref_rb_gpr, struct jit_ctx *jc, _Bool const *live);
 
 struct jit_program *jit_program(struct jit_backend *be,
                                            struct umbra_flat_ir const *bb) {
+    int const n = bb->insts;
+
+    struct ir_inst *inst = malloc((size_t)n * sizeof *inst);
+    __builtin_memcpy(inst, bb->inst, (size_t)n * sizeof *inst);
+    for (int i = 0; i < n; i++) {
+        struct ir_inst *ip = inst+i;
+        if (ip->op == op_join) {
+            // ARM64 always picks .x (constant already in register).
+            ip->y = (val){0};
+        }
+    }
+
+    _Bool *live = calloc((size_t)(n + 1), sizeof *live);
+    for (int i = n; i-- > 0;) {
+        struct ir_inst const *ip = &inst[i];
+        if (op_is_store(ip->op) || ip->op == op_loop_begin || ip->op == op_loop_end
+                                || ip->op == op_if_begin   || ip->op == op_if_end) {
+            live[i] = 1;
+        }
+        if (live[i]) {
+            live[ip->x.id] = 1;
+            live[ip->y.id] = 1;
+            live[ip->z.id] = 1;
+            live[ip->w.id] = 1;
+            if (ip->ptr.deref) {
+                live[ip->ptr.ix] = 1;
+            }
+        }
+    }
+    // RA computes last_use from all instructions; zero dead operands so it doesn't
+    // see stale references that would prevent registers from being freed on time.
+    for (int i = 0; i < n; i++) {
+        if (!live[i]) {
+            inst[i].x = inst[i].y = inst[i].z = inst[i].w = (val){0};
+            inst[i].ptr = (ptr){0};
+        }
+    }
+
+    struct umbra_flat_ir resolved = *bb;
+    resolved.inst = inst;
+    bb = &resolved;
 
     int *sl = malloc((size_t)bb->insts * sizeof(int));
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
@@ -315,7 +356,8 @@ struct jit_program *jit_program(struct jit_backend *be,
     put(&c, ADD_xi(XY, 3, 0));        // XY = b (temp)
     put(&c, ADD_xi(XBUF, 4, 0));      // XBUF = buf
 
-    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
+    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0,
+             deref_gpr, deref_rb_gpr, &jc, live);
 
     ra_begin_loop(ra);
 
@@ -345,7 +387,8 @@ struct jit_program *jit_program(struct jit_backend *be,
     }
 
     int const loop_body_start = c.words;
-    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
+    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0,
+             deref_gpr, deref_rb_gpr, &jc, live);
 
     ra_end_loop(ra, sl);
 
@@ -364,7 +407,8 @@ struct jit_program *jit_program(struct jit_backend *be,
     ra_reset_pool(ra);
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
 
-    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
+    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0,
+             deref_gpr, deref_rb_gpr, &jc, live);
     if (bb->n_vars > 0) {
         int8_t zr = ra_alloc(ra, sl, &ns);
         put(&c, EOR_16b(lo(zr), lo(zr), lo(zr)));
@@ -373,7 +417,8 @@ struct jit_program *jit_program(struct jit_backend *be,
         }
         ra_return_reg(ra, zr);
     }
-    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 1, deref_gpr, deref_rb_gpr, &jc);
+    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 1,
+             deref_gpr, deref_rb_gpr, &jc, live);
 
     put(&c, ADD_xi(XCOL, XCOL, 1));
     put(&c, B(tail_top - c.words));
@@ -428,6 +473,8 @@ struct jit_program *jit_program(struct jit_backend *be,
     pool_free(&jc.pool);
 
     ra_destroy(ra);
+    free(live);
+    free(inst);
     free(sl);
     free(deref_gpr);
     free(deref_rb_gpr);
@@ -459,11 +506,12 @@ struct jit_program *jit_program(struct jit_backend *be,
 
 static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
-                     int *deref_rb_gpr, struct jit_ctx *jc) {
+                     int *deref_rb_gpr, struct jit_ctx *jc, _Bool const *live) {
     int last_ptr = -1;
     int dc = 0;
 
     for (int i = from; i < to; i++) {
+        if (!live[i]) { continue; }
         struct ir_inst const *inst = &bb->inst[i];
 
         switch (inst->op) {
@@ -1015,12 +1063,10 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
             put(c, ORR_16b(hi(s.rd), lo(s.rd), lo(s.rd)));
         } break;
         case op_join: {
-            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x.id);
-            ra_free_chan(ra, inst->x, i);
-            if (lo(s.rd) != lo(rx)) {
-                put(c, ORR_16b(lo(s.rd), lo(rx), lo(rx)));
-                if (!scalar) { put(c, ORR_16b(hi(s.rd), hi(rx), hi(rx))); }
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
+            if (lo(s.rd) != lo(s.rx)) {
+                put(c, ORR_16b(lo(s.rd), lo(s.rx), lo(s.rx)));
+                if (!scalar) { put(c, ORR_16b(hi(s.rd), hi(s.rx), hi(s.rx))); }
             }
         } break;
 
