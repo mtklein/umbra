@@ -261,7 +261,7 @@ int8_t ra_claim(struct ra *ra, int old_val, int new_val) {
 // ra_alloc / ra_ensure can't pick it. A val whose slot[].reg is -1
 // (chan-only or not yet materialized) has nothing to pin in the main
 // pool, matching the old "owner[r]==pinned_val never matched" no-op.
-static inline void pin_val(struct ra *ra, int val) {
+static void pin_val(struct ra *ra, int val) {
     int8_t const r = ra->slot[val].reg;
     if (r >= 0) {
         int8_t const bit = ra->pool_inv[(int)r];
