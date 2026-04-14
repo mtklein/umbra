@@ -4386,6 +4386,36 @@ TEST(test_if_varying) {
     cleanup(&B);
 }
 
+TEST(test_if_nested) {
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 x = umbra_x(b);
+    umbra_var v = umbra_var_alloc(b);
+
+    umbra_if(b, umbra_lt_s32(b, x, umbra_imm_i32(b, 6))); {
+        umbra_if(b, umbra_lt_s32(b, x, umbra_imm_i32(b, 3))); {
+            umbra_store_var(b, v, umbra_imm_i32(b, 2));
+        } umbra_endif(b);
+    } umbra_endif(b);
+
+    umbra_store_32(b, (umbra_ptr32){0}, umbra_load_var(b, v));
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint32_t dst[8] = {0};
+        if (run(&B, bi, 8, 1, (struct umbra_buf[]){
+                {.ptr = dst, .count = 8, .stride = 8},
+            })) {
+            dst[0] == 2 here;
+            dst[2] == 2 here;
+            dst[3] == 0 here;
+            dst[5] == 0 here;
+            dst[6] == 0 here;
+        }
+    }
+    cleanup(&B);
+}
+
 TEST(test_join_add_f32_imm) {
     struct umbra_builder *b = umbra_builder();
     umbra_store_32(b, (umbra_ptr32){0},
