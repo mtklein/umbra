@@ -54,9 +54,9 @@ kernel void umbra_entry(
     uint v37 = v35 & v36;
     uint v38 = v37 & v30;
     while (var1 < v16) {
-    uint v41 = var1;
-    uint v43 = v41 * 6u;
-    #define v44 v43
+    uint v40 = var1;
+    uint v41 = v40 * 6u;
+    #define v44 v41
     uint v45 = p2[min(v44, m.count2 - 1u)] & ((v44 < m.count2) ? ~0u : 0u);
     float v46 = as_type<float>(v45) - v34;
     uint v49 = v44 + 2u;
@@ -78,81 +78,81 @@ kernel void umbra_entry(
     #define v74 v73
     uint v75 = p2[min(v74, m.count2 - 1u)] & ((v74 < m.count2) ? ~0u : 0u);
     float v76 = as_type<float>(v75) - v27;
-    uint v79 = var1;
-    uint v81 = v79 + 1u;
-    #define v82 v81
-    var1 = v82;
+    float v77 = v63 * as_type<float>(1073741824u);
+    #define v78 v77
+    float v79 = v52 * as_type<float>(1073741824u);
+    #define v80 v79
+    float v81 = v46 - v80;
+    float v82 = v70 + v81;
+    uint v85 = var1;
+    uint v87 = v44 + 1u;
+    #define v88 v87
+    uint v89 = p2[min(v88, m.count2 - 1u)] & ((v88 < m.count2) ? ~0u : 0u);
+    float v90 = as_type<float>(v89) - v27;
+    float v91 = v90 - v78;
+    float v92 = v76 + v91;
+    float v93 = fabs(v92);
+    uint v94 = as_type<float>(v15) <  v93 ? 0xffffffffu : 0u;
+    uint v95 = (v94 != 0u) ? as_type<uint>(v92) : v13;
+    float v96 = as_type<float>(v13) / as_type<float>(v95);
+    float v97 = v90 - v63;
+    float v98 = v97 * v97;
+    float v99 = fma(-v90, v92, v98);
+    uint v100 = as_type<float>(v0) <= v99 ? 0xffffffffu : 0u;
+    uint v101 = v100 & v94;
+    float v102 = max(v99, as_type<float>(0u));
+    #define v104 v102
+    float v105 = precise::sqrt(v104);
+    float v106 = v97 - v105;
+    float v107 = v96 * v106;
+    float v108 = v97 + v105;
+    float v109 = v96 * v108;
+    uint v110 = as_type<float>(v0) <= v109 ? 0xffffffffu : 0u;
+    float v111 = fma(v109, v82, v57);
+    float v112 = fma(v109, v111, v46);
+    uint v113 = as_type<float>(v0) <  v112 ? 0xffffffffu : 0u;
+    float v114 = v92 * v109;
+    float v115 = v114 - v97;
+    uint v116 = as_type<float>(v0) <  v115 ? 0xffffffffu : 0u;
+    float v117 = fabs(v97);
+    uint v118 = as_type<float>(v15) <  v117 ? 0xffffffffu : 0u;
+    uint v119 = v115 <  as_type<float>(0u) ? 0xffffffffu : 0u;
+    #define v121 v119
+    uint v122 = 3212836864u;
+    uint v123 = (v121 != 0u) ? v122 : v0;
+    uint v124 = (v116 != 0u) ? v13 : v123;
+    uint v125 = v85 + 1u;
+    #define v126 v125
+    var1 = v126;
 
-    uint v84 = v44 + 1u;
-    #define v85 v84
-    uint v86 = p2[min(v85, m.count2 - 1u)] & ((v85 < m.count2) ? ~0u : 0u);
-    float v87 = as_type<float>(v86) - v27;
-    float v88 = v87 - v63;
-    float v89 = v88 * v88;
-    float v90 = v63 * as_type<float>(1073741824u);
-    #define v91 v90
-    float v92 = v87 - v91;
-    float v93 = v76 + v92;
-    float v94 = fma(-v87, v93, v89);
-    uint v95 = as_type<float>(v0) <= v94 ? 0xffffffffu : 0u;
-    float v96 = max(v94, as_type<float>(0u));
-    #define v98 v96
-    float v99 = precise::sqrt(v98);
-    float v100 = v88 - v99;
-    float v101 = fabs(v93);
-    uint v102 = as_type<float>(v15) <  v101 ? 0xffffffffu : 0u;
-    uint v103 = (v102 != 0u) ? as_type<uint>(v93) : v13;
-    float v104 = as_type<float>(v13) / as_type<float>(v103);
-    float v105 = v104 * v100;
-    float v106 = v88 + v99;
-    float v107 = v104 * v106;
-    uint v108 = as_type<float>(v0) <= v107 ? 0xffffffffu : 0u;
-    float v109 = v93 * v107;
-    float v110 = v109 - v88;
-    uint v111 = as_type<float>(v0) <  v110 ? 0xffffffffu : 0u;
-    uint v112 = v95 & v102;
-    float v113 = fabs(v88);
-    uint v114 = as_type<float>(v15) <  v113 ? 0xffffffffu : 0u;
-    float v115 = v52 * as_type<float>(1073741824u);
-    #define v116 v115
-    float v117 = v46 - v116;
-    float v118 = v70 + v117;
-    float v119 = fma(v107, v118, v57);
-    float v120 = fma(v107, v119, v46);
-    uint v121 = as_type<float>(v0) <  v120 ? 0xffffffffu : 0u;
-    uint v122 = v110 <  as_type<float>(0u) ? 0xffffffffu : 0u;
-    #define v124 v122
-    uint v125 = 3212836864u;
-    uint v126 = (v124 != 0u) ? v125 : v0;
-    uint v127 = (v111 != 0u) ? v13 : v126;
-    float v129 = v88 * as_type<float>(1073741824u);
+    float v129 = v97 * as_type<float>(1073741824u);
     #define v130 v129
-    uint v131 = (v114 != 0u) ? as_type<uint>(v130) : v13;
-    float v132 = v87 / as_type<float>(v131);
-    float v133 = (v102 != 0u) ? v105 : v132;
+    uint v131 = (v118 != 0u) ? as_type<uint>(v130) : v13;
+    float v132 = v90 / as_type<float>(v131);
+    float v133 = (v94 != 0u) ? v107 : v132;
     uint v134 = as_type<float>(v0) <= v133 ? 0xffffffffu : 0u;
-    float v135 = v93 * v133;
-    float v136 = v135 - v88;
+    float v135 = v92 * v133;
+    float v136 = v135 - v97;
     uint v137 = as_type<float>(v0) <  v136 ? 0xffffffffu : 0u;
-    float v138 = fma(v133, v118, v57);
+    float v138 = fma(v133, v82, v57);
     float v139 = fma(v133, v138, v46);
     uint v140 = as_type<float>(v0) <  v139 ? 0xffffffffu : 0u;
     uint v141 = v136 <  as_type<float>(0u) ? 0xffffffffu : 0u;
     #define v143 v141
-    uint v144 = (v143 != 0u) ? v125 : v0;
+    uint v144 = (v143 != 0u) ? v122 : v0;
     uint v145 = (v137 != 0u) ? v13 : v144;
     uint v146 = v133 <  as_type<float>(1065353216u) ? 0xffffffffu : 0u;
     #define v148 v146
     uint v149 = v134 & v148;
-    uint v150 = v95 & v149;
+    uint v150 = v100 & v149;
     uint v151 = v150 & v140;
     uint v152 = (v151 != 0u) ? v145 : v0;
-    uint v154 = v107 <  as_type<float>(1065353216u) ? 0xffffffffu : 0u;
+    uint v154 = v109 <  as_type<float>(1065353216u) ? 0xffffffffu : 0u;
     #define v155 v154
-    uint v156 = v108 & v155;
-    uint v157 = v112 & v156;
-    uint v158 = v157 & v121;
-    uint v159 = (v158 != 0u) ? v127 : v0;
+    uint v156 = v110 & v155;
+    uint v157 = v101 & v156;
+    uint v158 = v157 & v113;
+    uint v159 = (v158 != 0u) ? v124 : v0;
     float v160 = as_type<float>(v152) + as_type<float>(v159);
     uint v161 = (v38 != 0u) ? as_type<uint>(v160) : v0;
     uint v162 = var0;

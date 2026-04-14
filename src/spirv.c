@@ -601,7 +601,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
             if ((1) && op_is_fused_imm(y->op)) {
                 ip->x = ip->y;  // SPIR-V prefers _imm (typed float constant).
                 ip->y = (val){0};
-                y->y  = (val){0};
             } else {
                 ip->y = (val){0};
             }

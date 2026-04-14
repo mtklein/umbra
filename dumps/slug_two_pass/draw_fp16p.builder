@@ -12,7 +12,7 @@
   v11  = abs_f32         v10
   v12  = imm_32          0x3f800000
   v13  = min_f32         v11 v12
-  v14  = min_f32_imm     v11 0x3f800000 (a.k.a. v12)
+  v14  = min_f32_imm     v11 0x3f800000
   v15  = join            v13 v14
   v16  = load_16x4_planar p1
   v17  = f32_from_f16    v16

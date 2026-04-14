@@ -45,14 +45,14 @@
   v44  = max_f32_imm     v29 0x0
   v45  = join            v43 v44
   v46  = sub_f32         v19 v42
-  v47  = sub_f32_imm     v19 0x3f800000 (a.k.a. v42)
+  v47  = sub_f32_imm     v19 0x3f800000
   v48  = join            v46 v47
   v49  = min_f32         v45 v48
   v50  = max_f32         v0 v34
   v51  = max_f32_imm     v34 0x0
   v52  = join            v50 v51
   v53  = sub_f32         v20 v42
-  v54  = sub_f32_imm     v20 0x3f800000 (a.k.a. v42)
+  v54  = sub_f32_imm     v20 0x3f800000
   v55  = join            v53 v54
   v56  = min_f32         v52 v55
   v57  = floor_i32       v49
@@ -65,7 +65,7 @@
   v64  = imm_32          0x3b808081
   v65  = f32_from_i32    v63
   v66  = mul_f32         v64 v65
-  v67  = mul_f32_imm     v65 0x3b808081 (a.k.a. v64)
+  v67  = mul_f32_imm     v65 0x3b808081
   v68  = join            v66 v67
   v69  = sel_32          v41 v68 v0
   v70  = load_16x4       p1

@@ -231,7 +231,7 @@ static val try_imm(builder *b, val d, enum op fused, val x, val y) {
     int const imm_id = is_imm(b, x.id) ? x.id : is_imm(b, y.id) ? y.id : -1;
     if (imm_id >= 0) {
         val const other = imm_id == x.id ? y : x;
-        return push(b, fused, VX(other), VY(val_make(imm_id, 0)), .imm = b->inst[imm_id].imm);
+        return push(b, fused, VX(other), .imm = b->inst[imm_id].imm);
     }
     return d;
 }
@@ -247,7 +247,7 @@ static val try_join_imm(builder *b, val d, enum op fused, val x, val y) {
 
 static val join_imm_y(builder *b, val d, enum op fused, val x, val y) {
     if (!is_imm(b, d.id) && is_imm(b, y.id)) {
-        val const f = push(b, fused, VX(x), VY(y), .imm = b->inst[y.id].imm);
+        val const f = push(b, fused, VX(x), .imm = b->inst[y.id].imm);
         return push(b, op_join, .x = d, .y = f);
     }
     return d;

@@ -15,7 +15,7 @@
   v14  = join            v12 v13
   v15  = imm_32          0x3f800000
   v16  = min_f32         v14 v15
-  v17  = min_f32_imm     v14 0x3f800000 (a.k.a. v15)
+  v17  = min_f32_imm     v14 0x3f800000
   v18  = join            v16 v17
   v19  = uniform_32      p0 [3]
   v20  = uniform_32      p0 [4]

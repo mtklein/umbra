@@ -13,7 +13,7 @@
   v12  = imm_32          0x3b808081
   v13  = f32_from_i32    v11
   v14  = mul_f32         v12 v13
-  v15  = mul_f32_imm     v13 0x3b808081 (a.k.a. v12)
+  v15  = mul_f32_imm     v13 0x3b808081
   v16  = join            v14 v15
   v17  = load_16x4_planar p1
   v18  = f32_from_f16    v17

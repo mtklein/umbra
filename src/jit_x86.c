@@ -286,7 +286,6 @@ struct jit_program *jit_program(struct jit_backend *be,
             if ((1) && op_is_fused_imm(y->op)) {
                 ip->x = ip->y;  // x86 wants the _imm variant (memory operand).
                 ip->y = (val){0};
-                y->y  = (val){0};
             } else {
                 ip->y = (val){0};
             }

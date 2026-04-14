@@ -20,20 +20,20 @@
   v19  = join            v17 v18
   v20  = imm_32          0x3f800000
   v21  = min_f32         v19 v20
-  v22  = min_f32_imm     v19 0x3f800000 (a.k.a. v20)
+  v22  = min_f32_imm     v19 0x3f800000
   v23  = join            v21 v22
   v24  = uniform_32      p0 [3]
   v25  = i32_from_f32    v24
   v26  = imm_32          0x1
   v27  = sub_i32         v25 v26
-  v28  = sub_i32_imm     v25 0x1 (a.k.a. v26)
+  v28  = sub_i32_imm     v25 0x1
   v29  = join            v27 v28
   v30  = add_i32         v25 v25
   v31  = add_i32         v25 v30
   v32  = loop_begin      v29
   v33  = load_var        var4
   v34  = add_i32         v26 v33
-  v35  = add_i32_imm     v33 0x1 (a.k.a. v26)
+  v35  = add_i32_imm     v33 0x1
   v36  = join            v34 v35
   v37  = gather_uniform_32 p-2147483642 v33
   v38  = gather_uniform_32 p-2147483642 v36
@@ -77,7 +77,7 @@
       if_end
   v77  = load_var        var4
   v78  = add_i32         v26 v77
-  v79  = add_i32_imm     v77 0x1 (a.k.a. v26)
+  v79  = add_i32_imm     v77 0x1
   v80  = join            v78 v79
       store_var       var4 v80
       loop_end

@@ -46,22 +46,22 @@ kernel void umbra_entry(
     #define v30 v29
     while (var4 < v12) {
     uint v32 = var4;
-    uint v34 = v32 + 1u;
-    #define v35 v34
-    uint v36 = p3[min(v35, m.count3 - 1u)] & ((v35 < m.count3) ? ~0u : 0u);
-    uint v37 = v30 <= as_type<float>(v36) ? 0xffffffffu : 0u;
-    uint v38 = p3[min(v32, m.count3 - 1u)] & ((v32 < m.count3) ? ~0u : 0u);
-    uint v39 = as_type<float>(v38) <= v30 ? 0xffffffffu : 0u;
-    uint v40 = v39 & v37;
+    uint v34 = p3[min(v32, m.count3 - 1u)] & ((v32 < m.count3) ? ~0u : 0u);
+    uint v35 = as_type<float>(v34) <= v30 ? 0xffffffffu : 0u;
+    uint v36 = v32 + 1u;
+    #define v37 v36
+    uint v38 = p3[min(v37, m.count3 - 1u)] & ((v37 < m.count3) ? ~0u : 0u);
+    uint v39 = v30 <= as_type<float>(v38) ? 0xffffffffu : 0u;
+    uint v40 = v35 & v39;
     if (v40 != 0u) {
-    uint v42 = v14 + v35;
+    uint v42 = v14 + v37;
     uint v43 = p2[min(v42, m.count2 - 1u)] & ((v42 < m.count2) ? ~0u : 0u);
-    float v44 = as_type<float>(v36) - as_type<float>(v38);
-    float v45 = v30 - as_type<float>(v38);
+    float v44 = as_type<float>(v38) - as_type<float>(v34);
+    float v45 = v30 - as_type<float>(v34);
     float v46 = v45 / v44;
-    uint v47 = v8 + v35;
+    uint v47 = v8 + v37;
     uint v48 = p2[min(v47, m.count2 - 1u)] & ((v47 < m.count2) ? ~0u : 0u);
-    uint v49 = v13 + v35;
+    uint v49 = v13 + v37;
     uint v50 = p2[min(v49, m.count2 - 1u)] & ((v49 < m.count2) ? ~0u : 0u);
     uint v51 = v14 + v32;
     uint v52 = p2[min(v51, m.count2 - 1u)] & ((v51 < m.count2) ? ~0u : 0u);
@@ -81,7 +81,7 @@ kernel void umbra_entry(
     float v64 = fma(v46, v63, as_type<float>(v62));
     var2 = as_type<uint>(v64);
 
-    uint v66 = p2[min(v35, m.count2 - 1u)] & ((v35 < m.count2) ? ~0u : 0u);
+    uint v66 = p2[min(v37, m.count2 - 1u)] & ((v37 < m.count2) ? ~0u : 0u);
     uint v67 = p2[min(v32, m.count2 - 1u)] & ((v32 < m.count2) ? ~0u : 0u);
     float v68 = as_type<float>(v66) - as_type<float>(v67);
     float v69 = fma(v46, v68, as_type<float>(v67));
