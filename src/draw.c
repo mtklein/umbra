@@ -2,6 +2,7 @@
 #include "assume.h"
 #include "flat_ir.h"
 #include <math.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 static umbra_val32 sample(struct umbra_builder *b, umbra_ptr32 src, umbra_val32 ix) {
@@ -13,7 +14,6 @@ static umbra_val32 sample(struct umbra_builder *b, umbra_ptr32 src, umbra_val32 
     umbra_val32 diff = umbra_sub_f32(b, hi, lo);
     return umbra_add_f32(b, lo, umbra_mul_f32(b, diff, frac));
 }
-#include <stdint.h>
 
 static umbra_val32 pack_unorm(struct umbra_builder *b, umbra_val32 ch, umbra_val32 scale) {
     umbra_val32 const zero = umbra_imm_f32(b, 0.0f),
