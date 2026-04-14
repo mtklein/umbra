@@ -17,4 +17,5 @@ Perform code review of all unpushed commits.
      Write missing tests and commit them.
    - **Reproducible performance changes** — if the diff touches hot paths, note
      whether a bench comparison was done and what the results were.
-4. Run `ninja` twice: once to verify everything works, once to confirm no-op.
+4. Run `git grep TODO:` and surface the full list of outstanding TODOs.
+5. Run `ninja` twice: once to verify everything works, once to confirm no-op.
