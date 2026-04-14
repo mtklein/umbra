@@ -255,8 +255,6 @@ int main(void) {
 
     mkdir("dumps/slug_two_pass", 0755);
     dump_builder(&db, "dumps/slug_two_pass", slug_build_acc(NULL));
-    mkdir("dumps/slug_one_pass", 0755);
-    dump_builder(&db, "dumps/slug_one_pass", slug_build(NULL));
 
     slides_cleanup();
     be->free(be);

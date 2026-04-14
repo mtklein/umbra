@@ -720,6 +720,12 @@ static void slug_free_slide(struct slide *s) {
     free(st);
 }
 
+static struct umbra_builder *slug_one_pass_get_builder(struct slide *s, struct umbra_fmt fmt) {
+    (void)s;
+    (void)fmt;
+    return slug_build(NULL);
+}
+
 SLIDE(slide_slug_wind_loop) {
     struct slug_slide *st = calloc(1, sizeof *st);
     st->shader = umbra_shader_solid((float[]){0.2f, 1.0f, 0.6f, 1.0f});
@@ -731,6 +737,7 @@ SLIDE(slide_slug_wind_loop) {
         .prepare = slug_prepare,
         .draw = slug_draw,
         .free = slug_free_slide,
+        .get_builder = slug_one_pass_get_builder,
     };
     return &st->base;
 }
