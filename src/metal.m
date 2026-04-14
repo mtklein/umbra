@@ -917,7 +917,7 @@ static char* build_source(BB const *bb,
         struct ir_inst *ip = inst+i;
         if (ip->op == op_join) {
             struct ir_inst *y = inst + ip->y.id;
-            if ((1) && op_is_fused_imm(y->op)) {
+            if (op_is_fused_imm(y->op)) {
                 ip->x = ip->y;  // We want the _imm variant.
                 ip->y = (val){0};
             } else {

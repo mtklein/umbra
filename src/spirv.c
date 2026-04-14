@@ -598,7 +598,7 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
         struct ir_inst *ip = resolved_inst+i;
         if (ip->op == op_join) {
             struct ir_inst *y = resolved_inst + ip->y.id;
-            if ((1) && op_is_fused_imm(y->op)) {
+            if (op_is_fused_imm(y->op)) {
                 ip->x = ip->y;  // SPIR-V prefers _imm (typed float constant).
                 ip->y = (val){0};
             } else {

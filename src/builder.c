@@ -227,19 +227,12 @@ static val math_(builder *b, struct ir_inst inst) {
 }
 #define math(b, ...) math_(b, (struct ir_inst){.op = __VA_ARGS__})
 
-static val try_imm(builder *b, val d, enum op fused, val x, val y) {
+static val try_join_imm(builder *b, val d, enum op fused, val x, val y) {
+    if (is_imm(b, d.id)) { return d; }
     int const imm_id = is_imm(b, x.id) ? x.id : is_imm(b, y.id) ? y.id : -1;
     if (imm_id >= 0) {
         val const other = imm_id == x.id ? y : x;
-        return push(b, fused, VX(other), .imm = b->inst[imm_id].imm);
-    }
-    return d;
-}
-
-static val try_join_imm(builder *b, val d, enum op fused, val x, val y) {
-    if (is_imm(b, d.id)) { return d; }
-    val const f = try_imm(b, d, fused, x, y);
-    if (f.id != d.id) {
+        val const f = push(b, fused, VX(other), .imm = b->inst[imm_id].imm);
         return push(b, op_join, .x = d, .y = f);
     }
     return d;
