@@ -597,7 +597,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
     memset(&B, 0, sizeof B);
     B.next_id = 1; // 0 is reserved
 
-    // --- Analyze the BB to find buffer usage. ---
     int max_ptr = -1;
     for (int i = 0; i < bb->insts; i++) {
         if (op_has_ptr(bb->inst[i].op) && bb->inst[i].ptr.bits >= 0) {
@@ -655,7 +654,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
         }
     }
 
-    // --- Scan for per-buffer read/written access and element shift. ---
     uint8_t *buf_rw        = calloc((size_t)(total_bufs + 1), sizeof *buf_rw);
     uint8_t *buf_shift     = calloc((size_t)(total_bufs + 1), sizeof *buf_shift);
     uint8_t *buf_row_shift = calloc((size_t)(total_bufs + 1), sizeof *buf_row_shift);
@@ -685,7 +683,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
     result.push_words = push_words;
     B.push_words = push_words;
 
-    // --- Capabilities ---
     spv_op(&B.caps, SpvOpCapability, 2);
     spv_word(&B.caps, SpvCapabilityShader);
 
@@ -747,7 +744,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
         }
     }
 
-    // --- Extension import (GLSL.std.450) ---
     B.ext_glsl = spv_id(&B);
     {
         char const name[] = "GLSL.std.450";
@@ -764,12 +760,10 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
         }
     }
 
-    // --- Memory model ---
     spv_op(&B.mem_model, SpvOpMemoryModel, 3);
     spv_word(&B.mem_model, SpvAddressingModelLogical);
     spv_word(&B.mem_model, SpvMemoryModelGLSL450);
 
-    // --- Types ---
     B.t_void = spv_id(&B);
     spv_op(&B.types, SpvOpTypeVoid, 2);
     spv_word(&B.types, B.t_void);
@@ -1007,7 +1001,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
         spv_word(&B.types, B.t_u32);
     }
 
-    // --- Constants ---
     B.c_0 = spv_const_u32(&B, 0);
     B.c_1 = spv_const_u32(&B, 1);
     B.c_2 = spv_const_u32(&B, 2);
@@ -1017,7 +1010,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
     B.c_0f = spv_const_f32(&B, 0.0f);
     B.c_allones = spv_const_u32(&B, 0xFFFFFFFFu);
 
-    // --- Global variables ---
 
     // gl_GlobalInvocationID
     B.v_global_id = spv_id(&B);
@@ -1074,7 +1066,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
 
     uint32_t *v_vars = NULL;
 
-    // --- Entry point ---
     // OpEntryPoint GLCompute %main "main" %gl_GlobalInvocationID
     // In SPIR-V 1.0, only Input/Output variables go in the interface list.
     {
@@ -1094,7 +1085,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
         }
         spv_word(&B.entry, B.v_global_id);
 
-        // --- Execution mode ---
         spv_op(&B.exec_mode, SpvOpExecutionMode, 6);
         spv_word(&B.exec_mode, fn_main);
         spv_word(&B.exec_mode, SpvExecutionModeLocalSize);
@@ -1109,7 +1099,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
             spv_word(&B.exec_mode, 32); // float32
         }
 
-        // --- Function body ---
         // OpFunction
         spv_op(&B.func, SpvOpFunction, 5);
         spv_word(&B.func, B.t_void);
@@ -1169,7 +1158,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
         uint32_t x_coord = spv_binop(&B, SpvOpIAdd, B.t_u32, x0, gid_x);
         uint32_t y_coord = spv_binop(&B, SpvOpIAdd, B.t_u32, y0, gid_y);
 
-        // --- Allocate per-instruction result arrays. ---
         B.val   = calloc((size_t)(bb->insts + 1), sizeof *B.val);
         B.val_1 = calloc((size_t)(bb->insts + 1), sizeof *B.val_1);
         B.val_2 = calloc((size_t)(bb->insts + 1), sizeof *B.val_2);
@@ -1181,7 +1169,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
             B.is_f[i] = produces_float(bb->inst[i].op);
         }
 
-        // --- Emit instructions. ---
         for (int i = 0; i < bb->insts; i++) {
             struct ir_inst const *inst = &bb->inst[i];
 
@@ -1438,7 +1425,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
                     B.val[i] = spv_bitcast(&B, B.t_u32, sv);
                 } break;
 
-                // --- Arithmetic float ops ---
                 case op_add_f32:
                     B.val[i] = spv_binop(&B, SpvOpFAdd, B.t_f32,
                                           as_f32(&B, get_val(&B, inst->x), xid),
@@ -1575,7 +1561,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
                                             as_f32(&B, get_val(&B, inst->z), get_id(inst->z)));
                 } break;
 
-                // --- Integer arithmetic ---
                 case op_add_i32:
                     B.val[i] = spv_binop(&B, SpvOpIAdd, B.t_u32,
                                           as_u32(&B, get_val(&B, inst->x), xid),
@@ -1642,7 +1627,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
                     }
                 } break;
 
-                // --- Float comparisons (return 0xFFFFFFFF or 0) ---
                 case op_eq_f32: {
                     uint32_t r = spv_binop(&B, SpvOpFOrdEqual, B.t_bool,
                                             as_f32(&B, get_val(&B, inst->x), xid),
@@ -1662,7 +1646,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
                     B.val[i] = spv_select(&B, B.t_u32, r, B.c_allones, B.c_0);
                 } break;
 
-                // --- Integer comparisons ---
                 case op_eq_i32: {
                     uint32_t r = spv_binop(&B, SpvOpIEqual, B.t_bool,
                                             as_u32(&B, get_val(&B, inst->x), xid),
@@ -1694,7 +1677,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
                     B.val[i] = spv_select(&B, B.t_u32, r, B.c_allones, B.c_0);
                 } break;
 
-                // --- Immediate ops ---
                 case op_shl_i32_imm:
                     B.val[i] = spv_binop(&B, SpvOpShiftLeftLogical, B.t_u32,
                                           as_u32(&B, get_val(&B, inst->x), xid),
@@ -1789,7 +1771,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
                                           spv_const_u32(&B, (uint32_t)inst->imm));
                     break;
 
-                // --- Immediate comparisons ---
                 case op_eq_f32_imm: {
                     float fval;
                     memcpy(&fval, &inst->imm, sizeof fval);
@@ -1928,7 +1909,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
         spv_op(&B.func, SpvOpFunctionEnd, 1);
     }
 
-    // --- Concatenate all sections into final SPIR-V binary. ---
     int total_words = 5 // header
         + B.caps.words
         + B.exts.words
