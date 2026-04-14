@@ -4416,6 +4416,28 @@ TEST(test_if_nested) {
     cleanup(&B);
 }
 
+TEST(test_many_constants) {
+    float const constants[] = {
+        1.0f, 1.1f, 1.2f, 1.3f, 1.4f, 1.5f, 1.6f, 1.7f, 1.8f, 1.9f,
+        2.0f, 2.1f, 2.2f, 2.3f, 2.4f, 2.5f, 2.6f, 2.7f, 2.8f, 2.9f,
+    };
+    struct umbra_builder *b = umbra_builder();
+    umbra_val32 x = umbra_f32_from_i32(b, umbra_x(b));
+    for (int i = 0; i < 20; i++) {
+        x = umbra_add_f32(b, x, umbra_imm_f32(b, constants[i]));
+    }
+    umbra_store_32(b, (umbra_ptr32){0}, x);
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        float dst[8] = {0};
+        if (run(&B, bi, 8, 1, (struct umbra_buf[]){{.ptr=dst, .count=8, .stride=8}})) {
+            equiv(dst[0], 39.0f) here;
+            equiv(dst[1], 40.0f) here;
+        }
+    }
+    cleanup(&B);
+}
+
 TEST(test_join_add_f32_imm) {
     struct umbra_builder *b = umbra_builder();
     umbra_store_32(b, (umbra_ptr32){0},
