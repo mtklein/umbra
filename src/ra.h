@@ -11,7 +11,7 @@ struct ra_config {
     ra_spill_fn   spill;
     ra_fill_fn    fill;
     ra_remat_fn   remat;
-    int           nregs, max_reg, ignore_imm_y, :32;
+    int           nregs, max_reg;
     void         *ctx;
 };
 

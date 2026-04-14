@@ -147,7 +147,6 @@ static struct ra *ra_create_x86(struct umbra_flat_ir const *bb, struct jit_ctx *
         .spill = x86_spill,
         .fill = x86_fill,
         .remat = x86_remat,
-        .ignore_imm_y = 1,
         .ctx = jc,
     };
     return ra_create(bb, &cfg);
