@@ -246,7 +246,7 @@ static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm
 
 static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
-                     int *deref_rb_gpr, struct jit_ctx *jc);
+                     int *deref_rb_gpr, struct jit_ctx *jc, _Bool const *live);
 
 static int resolve_ptr_x86(Buf *c, ptr p, int *last_ptr, int const *deref_gpr,
                            int const *deref_rb_gpr, int elem_shift) {
@@ -275,6 +275,54 @@ static int resolve_ptr_x86(Buf *c, ptr p, int *last_ptr, int const *deref_gpr,
 
 struct jit_program *jit_program(struct jit_backend *be,
                                            struct umbra_flat_ir const *bb) {
+    int const n = bb->insts;
+
+    struct ir_inst *inst = malloc((size_t)n * sizeof *inst);
+    __builtin_memcpy(inst, bb->inst, (size_t)n * sizeof *inst);
+    for (int i = 0; i < n; i++) {
+        struct ir_inst *ip = inst+i;
+        if (ip->op == op_join) {
+            struct ir_inst *y = inst + ip->y.id;
+            if ((1) && y->op == op_add_f32_imm) {
+                ip->x = ip->y;  // x86 wants the _imm variant (memory operand).
+                ip->y = (val){0};
+                y->y  = (val){0};
+            } else {
+                ip->y = (val){0};
+            }
+        }
+    }
+
+    _Bool *live = calloc((size_t)(n + 1), sizeof *live);
+    for (int i = n; i-- > 0;) {
+        struct ir_inst const *ip = &inst[i];
+        if (op_is_store(ip->op) || ip->op == op_loop_begin || ip->op == op_loop_end
+                                || ip->op == op_if_begin   || ip->op == op_if_end) {
+            live[i] = 1;
+        }
+        if (live[i]) {
+            live[ip->x.id] = 1;
+            live[ip->y.id] = 1;
+            live[ip->z.id] = 1;
+            live[ip->w.id] = 1;
+            if (ip->ptr.deref) {
+                live[ip->ptr.ix] = 1;
+            }
+        }
+    }
+    // RA computes last_use from all instructions; zero dead operands so it doesn't
+    // see stale references that would prevent registers from being freed on time.
+    for (int i = 0; i < n; i++) {
+        if (!live[i]) {
+            inst[i].x = inst[i].y = inst[i].z = inst[i].w = (val){0};
+            inst[i].ptr = (ptr){0};
+        }
+    }
+
+    struct umbra_flat_ir resolved = *bb;
+    resolved.inst = inst;
+    bb = &resolved;
+
     int *sl = malloc((size_t)bb->insts * sizeof(int));
     for (int i = 0; i < bb->insts; i++) {
         sl[i] = -1;
@@ -303,7 +351,7 @@ struct jit_program *jit_program(struct jit_backend *be,
     mov_rr(&c, XH_X86, RCX);         // XH_X86 = b
     mov_rr(&c, XBUF, R8);            // XBUF(RDX) = buf
 
-    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
+    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc, live);
 
     ra_begin_loop(ra);
 
@@ -334,7 +382,7 @@ struct jit_program *jit_program(struct jit_backend *be,
     }
 
     int const loop_body_start = (int)c.size;
-    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
+    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc, live);
 
     ra_end_loop(ra, sl);
 
@@ -356,7 +404,7 @@ struct jit_program *jit_program(struct jit_backend *be,
     ra_reset_pool(ra);
     for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
 
-    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
+    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc, live);
     if (bb->n_vars > 0) {
         int8_t zr = ra_alloc(ra, sl, &ns);
         vpxor(&c, 1, zr, zr, zr);
@@ -365,7 +413,7 @@ struct jit_program *jit_program(struct jit_backend *be,
         }
         ra_return_reg(ra, zr);
     }
-    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 1, deref_gpr, deref_rb_gpr, &jc);
+    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 1, deref_gpr, deref_rb_gpr, &jc, live);
 
     add_ri(&c, XI, 1);
     {
@@ -425,6 +473,8 @@ struct jit_program *jit_program(struct jit_backend *be,
     pool_free(&jc.pool);
 
     ra_destroy(ra);
+    free(live);
+    free(inst);
     free(sl);
     free(deref_gpr);
     free(deref_rb_gpr);
@@ -459,13 +509,14 @@ struct jit_program *jit_program(struct jit_backend *be,
 
 static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
-                     int *deref_rb_gpr, struct jit_ctx *jc) {
+                     int *deref_rb_gpr, struct jit_ctx *jc, _Bool const *live) {
     int       last_ptr = -1;
     int       dc = 0;
     int const deref_gprs[] = {RCX, R8, R9};
     int const rb_gprs[]    = {R15, RBX, 0};
 
     for (int i = from; i < to; i++) {
+        if (!live[i]) { continue; }
         struct ir_inst const *inst = &bb->inst[i];
         switch (inst->op) {
         case op_deref_ptr: {
@@ -1209,10 +1260,8 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
             pool_broadcast(c, &jc->pool, s.rd, (uint32_t)inst->imm);
         } break;
         case op_join: {
-            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int8_t rx = ra_ensure(ra, sl, ns, inst->x.id);
-            ra_free_chan(ra, inst->x, i);
-            if (s.rd != rx) { vmovaps(c, s.rd, rx); }
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
+            if (s.rd != s.rx) { vmovaps(c, s.rd, s.rx); }
         } break;
 
         case op_lt_s32_imm: {
