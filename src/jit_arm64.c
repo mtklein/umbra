@@ -305,8 +305,7 @@ struct jit_program *jit_program(struct jit_backend *be,
     // see stale references that would prevent registers from being freed on time.
     for (int i = 0; i < n; i++) {
         if (!live[i]) {
-            inst[i].x = inst[i].y = inst[i].z = inst[i].w = (val){0};
-            inst[i].ptr = (ptr){0};
+            __builtin_memset(&inst[i], 0, sizeof inst[i]);
         }
     }
 
