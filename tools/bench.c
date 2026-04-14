@@ -117,6 +117,12 @@ static double bench(draw_fn draw, void *ctx, struct umbra_backend *be,
     return best / px * 1e9;
 }
 
+static struct umbra_builder *get_first_builder(struct slide *s, struct umbra_fmt fmt) {
+    struct umbra_builder *b = NULL;
+    if (s->get_builders && s->get_builders(s, fmt, &b, 1) > 0) { return b; }
+    return NULL;
+}
+
 static _Bool streq(char const *a, char const *b) { return strcmp(a, b) == 0; }
 
 static void usage(void) {
@@ -351,7 +357,7 @@ int main(int argc, char *argv[]) {
 
         for (int si = 0; si < ns; si++) {
             struct slide *s = slide_get(si);
-            if (!s->get_builder) { continue; }
+            if (!s->get_builders) { continue; }
             if (match && !strstr(s->title, match) && !strstr("compile", match)) {
                 continue;
             }
@@ -360,7 +366,7 @@ int main(int argc, char *argv[]) {
             for (int bi = 0; bi < nb; bi++) {
                 if (!(be_mask & (1 << bi)) || !bes[bi]) { continue; }
                 {
-                    struct umbra_builder *b = s->get_builder(s, fmt);
+                    struct umbra_builder *b = get_first_builder(s, fmt);
                     if (!b) { continue; }
                     struct umbra_flat_ir *bb2 = umbra_flat_ir(b);
                     umbra_builder_free(b);
@@ -374,7 +380,7 @@ int main(int argc, char *argv[]) {
                 for (int pi = 0; pi < 20; pi++) {
                     double const start = now();
                     for (int it = 0; it < iters; it++) {
-                        struct umbra_builder *b = s->get_builder(s, fmt);
+                        struct umbra_builder *b = get_first_builder(s, fmt);
                         struct umbra_flat_ir *bb2 = umbra_flat_ir(b);
                         umbra_builder_free(b);
                         struct umbra_program *p = bes[bi]->compile(bes[bi], bb2);
@@ -393,7 +399,7 @@ int main(int argc, char *argv[]) {
                 for (int k = 0; k < samples; k++) {
                     double const start = now();
                     for (int it = 0; it < iters; it++) {
-                        struct umbra_builder *b = s->get_builder(s, fmt);
+                        struct umbra_builder *b = get_first_builder(s, fmt);
                         struct umbra_flat_ir *bb2 = umbra_flat_ir(b);
                         umbra_builder_free(b);
                         struct umbra_program *p = bes[bi]->compile(bes[bi], bb2);

@@ -174,10 +174,13 @@ static void text_draw(struct slide *s, int frame, int l, int t, int r, int b, vo
     st->prog->queue(st->prog, l, t, r, b, ubuf);
 }
 
-static struct umbra_builder *text_get_builder(struct slide *s, struct umbra_fmt fmt) {
+static int text_get_builders(struct slide *s, struct umbra_fmt fmt,
+                             struct umbra_builder **out, int max) {
+    if (max < 1) { return 0; }
     struct text_slide *st = (struct text_slide *)s;
-    return umbra_draw_build(&st->shader.base, &st->cov.bitmap.base,
-                            umbra_blend_srcover, fmt, NULL);
+    out[0] = umbra_draw_build(&st->shader.base, &st->cov.bitmap.base,
+                              umbra_blend_srcover, fmt, NULL);
+    return out[0] ? 1 : 0;
 }
 
 static void text_free(struct slide *s) {
@@ -201,7 +204,7 @@ SLIDE(slide_text_bitmap) {
         .prepare = text_prepare,
         .draw = text_draw,
         .free = text_free,
-        .get_builder = text_get_builder,
+        .get_builders = text_get_builders,
     };
     return &st->base;
 }
@@ -219,7 +222,7 @@ SLIDE(slide_text_sdf) {
         .prepare = text_prepare,
         .draw = text_draw,
         .free = text_free,
-        .get_builder = text_get_builder,
+        .get_builders = text_get_builders,
     };
     return &st->base;
 }

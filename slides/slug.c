@@ -588,14 +588,11 @@ static void slug_two_pass_draw(struct slide *s, int frame, int l, int t, int r, 
 }
 
 static int slug_two_pass_get_builders(struct slide *s, struct umbra_fmt fmt,
-                                      struct umbra_builder **out, char const **names, int max) {
-    (void)fmt;
+                                      struct umbra_builder **out, int max) {
     if (max < 2) { return 0; }
-    out[0]   = slug_build_acc(NULL);
-    names[0] = "acc";
+    out[0] = slug_build_acc(NULL);
     struct slug_two_pass_slide *st = (struct slug_two_pass_slide *)s;
-    out[1]   = umbra_draw_build(&st->shader.base, &st->cov.base, umbra_blend_srcover, fmt, NULL);
-    names[1] = "draw";
+    out[1] = umbra_draw_build(&st->shader.base, &st->cov.base, umbra_blend_srcover, fmt, NULL);
     return 2;
 }
 
@@ -727,10 +724,13 @@ static void slug_free_slide(struct slide *s) {
     free(st);
 }
 
-static struct umbra_builder *slug_one_pass_get_builder(struct slide *s, struct umbra_fmt fmt) {
+static int slug_one_pass_get_builders(struct slide *s, struct umbra_fmt fmt,
+                                      struct umbra_builder **out, int max) {
     (void)s;
     (void)fmt;
-    return slug_build(NULL);
+    if (max < 1) { return 0; }
+    out[0] = slug_build(NULL);
+    return out[0] ? 1 : 0;
 }
 
 SLIDE(slide_slug_wind_loop) {
@@ -744,7 +744,7 @@ SLIDE(slide_slug_wind_loop) {
         .prepare = slug_prepare,
         .draw = slug_draw,
         .free = slug_free_slide,
-        .get_builder = slug_one_pass_get_builder,
+        .get_builders = slug_one_pass_get_builders,
     };
     return &st->base;
 }

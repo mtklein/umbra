@@ -50,9 +50,12 @@ static void anim_draw(struct slide *s, int frame, int l, int t, int r, int b, vo
     st->prog->queue(st->prog, l, t, r, b, ubuf);
 }
 
-static struct umbra_builder *anim_get_builder(struct slide *s, struct umbra_fmt fmt) {
+static int anim_get_builders(struct slide *s, struct umbra_fmt fmt,
+                             struct umbra_builder **out, int max) {
+    if (max < 1) { return 0; }
     struct anim_slide *st = (struct anim_slide *)s;
-    return umbra_draw_build(&st->shader.base, NULL, umbra_blend_src, fmt, NULL);
+    out[0] = umbra_draw_build(&st->shader.base, NULL, umbra_blend_src, fmt, NULL);
+    return out[0] ? 1 : 0;
 }
 
 static void anim_free(struct slide *s) {
@@ -73,7 +76,7 @@ SLIDE(slide_anim_t) {
         .prepare = anim_prepare,
         .draw = anim_draw,
         .free = anim_free,
-        .get_builder = anim_get_builder,
+        .get_builders = anim_get_builders,
     };
     return &st->base;
 }

@@ -68,9 +68,12 @@ static void grad_2stop_draw(struct slide *s, int frame, int l, int t, int r, int
     st->prog->queue(st->prog, l, t, r, b, ubuf);
 }
 
-static struct umbra_builder *grad_2stop_get_builder(struct slide *s, struct umbra_fmt fmt) {
+static int grad_2stop_get_builders(struct slide *s, struct umbra_fmt fmt,
+                                   struct umbra_builder **out, int max) {
+    if (max < 1) { return 0; }
     struct grad_2stop_slide *st = (struct grad_2stop_slide *)s;
-    return umbra_draw_build(&st->shader.linear.base, NULL, NULL, fmt, NULL);
+    out[0] = umbra_draw_build(&st->shader.linear.base, NULL, NULL, fmt, NULL);
+    return out[0] ? 1 : 0;
 }
 
 static void grad_2stop_free(struct slide *s) {
@@ -113,9 +116,12 @@ static void grad_lut_draw(struct slide *s, int frame, int l, int t, int r, int b
     st->prog->queue(st->prog, l, t, r, b, ubuf);
 }
 
-static struct umbra_builder *grad_lut_get_builder(struct slide *s, struct umbra_fmt fmt) {
+static int grad_lut_get_builders(struct slide *s, struct umbra_fmt fmt,
+                                 struct umbra_builder **out, int max) {
+    if (max < 1) { return 0; }
     struct grad_lut_slide *st = (struct grad_lut_slide *)s;
-    return umbra_draw_build(&st->shader.linear.base, NULL, NULL, fmt, NULL);
+    out[0] = umbra_draw_build(&st->shader.linear.base, NULL, NULL, fmt, NULL);
+    return out[0] ? 1 : 0;
 }
 
 static void grad_lut_free(struct slide *s) {
@@ -140,7 +146,7 @@ static struct slide *make_grad_2stop(char const *title, float const bg[4], _Bool
         .prepare = grad_2stop_prepare,
         .draw = grad_2stop_draw,
         .free = grad_2stop_free,
-        .get_builder = grad_2stop_get_builder,
+        .get_builders = grad_2stop_get_builders,
     };
     return &st->base;
 }
@@ -160,7 +166,7 @@ static struct slide *make_grad_lut(char const *title, float const bg[4], _Bool i
         .prepare = grad_lut_prepare,
         .draw = grad_lut_draw,
         .free = grad_lut_free,
-        .get_builder = grad_lut_get_builder,
+        .get_builders = grad_lut_get_builders,
     };
     return &st->base;
 }
@@ -227,9 +233,12 @@ static void grad_stops_draw(struct slide *s, int frame, int l, int t, int r, int
     st->prog->queue(st->prog, l, t, r, b, ubuf);
 }
 
-static struct umbra_builder *grad_stops_get_builder(struct slide *s, struct umbra_fmt fmt) {
+static int grad_stops_get_builders(struct slide *s, struct umbra_fmt fmt,
+                                   struct umbra_builder **out, int max) {
+    if (max < 1) { return 0; }
     struct grad_stops_slide *st = (struct grad_stops_slide *)s;
-    return umbra_draw_build(&st->shader.linear.base, NULL, NULL, fmt, NULL);
+    out[0] = umbra_draw_build(&st->shader.linear.base, NULL, NULL, fmt, NULL);
+    return out[0] ? 1 : 0;
 }
 
 static void grad_stops_free(struct slide *s) {
@@ -273,7 +282,7 @@ SLIDE(slide_gradient_linear_stops) {
         .prepare     = grad_stops_prepare,
         .draw        = grad_stops_draw,
         .free        = grad_stops_free,
-        .get_builder = grad_stops_get_builder,
+        .get_builders = grad_stops_get_builders,
     };
     return &st->base;
 }
@@ -307,7 +316,7 @@ SLIDE(slide_gradient_radial_stops) {
         .prepare     = grad_stops_prepare,
         .draw        = grad_stops_draw,
         .free        = grad_stops_free,
-        .get_builder = grad_stops_get_builder,
+        .get_builders = grad_stops_get_builders,
     };
     return &st->base;
 }

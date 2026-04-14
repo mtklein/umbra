@@ -57,9 +57,12 @@ static void persp_draw(struct slide *s, int frame, int l, int t, int r, int b, v
     st->prog->queue(st->prog, l, t, r, b, ubuf);
 }
 
-static struct umbra_builder *persp_get_builder(struct slide *s, struct umbra_fmt fmt) {
+static int persp_get_builders(struct slide *s, struct umbra_fmt fmt,
+                              struct umbra_builder **out, int max) {
+    if (max < 1) { return 0; }
     struct persp_slide *st = (struct persp_slide *)s;
-    return umbra_draw_build(&st->shader.base, &st->cov.base, umbra_blend_srcover, fmt, NULL);
+    out[0] = umbra_draw_build(&st->shader.base, &st->cov.base, umbra_blend_srcover, fmt, NULL);
+    return out[0] ? 1 : 0;
 }
 
 static void persp_free(struct slide *s) {
@@ -82,7 +85,7 @@ SLIDE(slide_persp) {
         .prepare = persp_prepare,
         .draw = persp_draw,
         .free = persp_free,
-        .get_builder = persp_get_builder,
+        .get_builders = persp_get_builders,
     };
     return &st->base;
 }

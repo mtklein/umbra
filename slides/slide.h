@@ -11,9 +11,8 @@ struct slide {
     void (*draw)   (struct slide*, int frame, int l, int t, int r, int b, void *buf);
     void (*free)   (struct slide*);
 
-    struct umbra_builder *(*get_builder)(struct slide*, struct umbra_fmt);
     int (*get_builders)(struct slide*, struct umbra_fmt,
-                        struct umbra_builder **out, char const **names, int max);
+                        struct umbra_builder **out, int max);
 };
 
 typedef struct slide *(*slide_factory_fn)(void);

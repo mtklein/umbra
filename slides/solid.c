@@ -78,10 +78,13 @@ static void solid_draw(struct slide *s, int frame, int l, int t, int r, int b, v
     st->prog->queue(st->prog, l, t, r, b, ubuf);
 }
 
-static struct umbra_builder *solid_get_builder(struct slide *s, struct umbra_fmt fmt) {
+static int solid_get_builders(struct slide *s, struct umbra_fmt fmt,
+                              struct umbra_builder **out, int max) {
+    if (max < 1) { return 0; }
     struct solid_slide *st = (struct solid_slide *)s;
-    return umbra_draw_build(&st->shader.base, st->has_cov ? &st->cov.base : NULL,
-                            st->blend, fmt, NULL);
+    out[0] = umbra_draw_build(&st->shader.base, st->has_cov ? &st->cov.base : NULL,
+                              st->blend, fmt, NULL);
+    return out[0] ? 1 : 0;
 }
 
 static void solid_free(struct slide *s) {
@@ -106,7 +109,7 @@ static struct slide *make_solid(char const *title, float const bg[4], float cons
         .prepare = solid_prepare,
         .draw = solid_draw,
         .free = solid_free,
-        .get_builder = solid_get_builder,
+        .get_builders = solid_get_builders,
     };
     return &st->base;
 }

@@ -127,12 +127,15 @@ static void build_slide_fmt(struct slide *s, int fmt) {
         s->prepare(s, bes[cur_backend], *fmt_enums[fmt]);
     }
     umbra_flat_ir_free(saved_bb);
-    if (s->get_builder) {
-        struct umbra_builder *b = s->get_builder(s, *fmt_enums[fmt]);
-        saved_bb = umbra_flat_ir(b);
-        umbra_builder_free(b);
-    } else {
-        saved_bb = NULL;
+    {
+        struct umbra_builder *b = NULL;
+        if (s->get_builders) { s->get_builders(s, *fmt_enums[fmt], &b, 1); }
+        if (b) {
+            saved_bb = umbra_flat_ir(b);
+            umbra_builder_free(b);
+        } else {
+            saved_bb = NULL;
+        }
     }
     build_pipes(fmt);
 }

@@ -232,7 +232,8 @@ int main(void) {
     struct dump_backends db = dump_backends_init();
 
     mkdir("dumps/srcover", 0755);
-    dump_builder(&db, "dumps/srcover", build_srcover());
+    mkdir("dumps/srcover/0", 0755);
+    dump_builder(&db, "dumps/srcover/0", build_srcover());
 
     slides_init(RW, RH);
 
@@ -247,25 +248,15 @@ int main(void) {
         mkdir(dir, 0755);
 
         struct umbra_builder *builders[8];
-        char const           *names[8];
-        int nb = 0;
-        if (s->get_builders) {
-            nb = s->get_builders(s, umbra_fmt_fp16, builders, names, 8);
-        } else if (s->get_builder) {
-            builders[0] = s->get_builder(s, umbra_fmt_fp16);
-            names[0]    = NULL;
-            nb          = builders[0] ? 1 : 0;
-        }
+        int nb = s->get_builders
+               ? s->get_builders(s, umbra_fmt_fp16, builders, 8)
+               : 0;
         for (int j = 0; j < nb; j++) {
             if (!builders[j]) { continue; }
-            if (names[j]) {
-                char sub[256];
-                snprintf(sub, sizeof sub, "%s/%s", dir, names[j]);
-                mkdir(sub, 0755);
-                dump_builder(&db, sub, builders[j]);
-            } else {
-                dump_builder(&db, dir, builders[j]);
-            }
+            char sub[256];
+            snprintf(sub, sizeof sub, "%s/%d", dir, j);
+            mkdir(sub, 0755);
+            dump_builder(&db, sub, builders[j]);
         }
 
         render_hdr(dir, i, be);
