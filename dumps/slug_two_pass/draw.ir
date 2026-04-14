@@ -15,19 +15,21 @@
   v14  = sub_f32         v13 v12
   v15  = load_32         p-2147483643
   v16  = abs_f32         v15
-  v17  = min_f32_imm     v16 0x3f800000 (a.k.a. v6)
-  v18  = fma_f32         v17 v11 v9
-  v19  = f16_from_f32    v18
-  v20  = fma_f32         v17 v14 v12
+  v17  = min_f32         v16 v6
+  v18  = min_f32_imm     v16 0x3f800000 (a.k.a. v6)
+  v19  = join            v17 v18
+  v20  = fma_f32         v19 v11 v9
   v21  = f16_from_f32    v20
-  v22  = f32_from_f16    v8
-  v23  = fma_f32         v22 v7 v2
-  v24  = sub_f32         v23 v22
-  v25  = fma_f32         v17 v24 v22
-  v26  = f16_from_f32    v25
-  v27  = f32_from_f16    v8
-  v28  = fma_f32         v27 v7 v3
-  v29  = sub_f32         v28 v27
-  v30  = fma_f32         v17 v29 v27
-  v31  = f16_from_f32    v30
-      store_16x4      p1 v19 v26 v31 v21
+  v22  = fma_f32         v19 v14 v12
+  v23  = f16_from_f32    v22
+  v24  = f32_from_f16    v8
+  v25  = fma_f32         v24 v7 v2
+  v26  = sub_f32         v25 v24
+  v27  = fma_f32         v19 v26 v24
+  v28  = f16_from_f32    v27
+  v29  = f32_from_f16    v8
+  v30  = fma_f32         v29 v7 v3
+  v31  = sub_f32         v30 v29
+  v32  = fma_f32         v19 v31 v29
+  v33  = f16_from_f32    v32
+      store_16x4      p1 v21 v28 v33 v23

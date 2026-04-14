@@ -25,14 +25,18 @@
   v24  = fma_f32         v19 v19 v23
   v25  = sqrt_f32        v24
   v26  = mul_f32         v3 v25
-  v27  = max_f32_imm     v26 0x0
-  v28  = min_f32_imm     v27 0x3f800000 (a.k.a. v4)
-  v29  = fma_f32         v28 v13 v5
-  v30  = f16_from_f32    v29
-  v31  = fma_f32         v28 v16 v8
-  v32  = f16_from_f32    v31
-  v33  = fma_f32         v28 v14 v6
+  v27  = max_f32         v0 v26
+  v28  = max_f32_imm     v26 0x0
+  v29  = join            v27 v28
+  v30  = min_f32         v29 v4
+  v31  = min_f32_imm     v29 0x3f800000 (a.k.a. v4)
+  v32  = join            v30 v31
+  v33  = fma_f32         v32 v13 v5
   v34  = f16_from_f32    v33
-  v35  = fma_f32         v28 v15 v7
+  v35  = fma_f32         v32 v16 v8
   v36  = f16_from_f32    v35
-      store_16x4_planar p1 v30 v34 v36 v32
+  v37  = fma_f32         v32 v14 v6
+  v38  = f16_from_f32    v37
+  v39  = fma_f32         v32 v15 v7
+  v40  = f16_from_f32    v39
+      store_16x4_planar p1 v34 v38 v40 v36

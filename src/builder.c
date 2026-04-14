@@ -236,6 +236,15 @@ static val try_imm(builder *b, val d, enum op fused, val x, val y) {
     return d;
 }
 
+static val try_join_imm(builder *b, val d, enum op fused, val x, val y) {
+    if (is_imm(b, d.id)) { return d; }
+    val const f = try_imm(b, d, fused, x, y);
+    if (f.id != d.id) {
+        return push(b, op_join, .x = d, .y = f);
+    }
+    return d;
+}
+
 static void sort(umbra_val32 *a, umbra_val32 *b) {
     if ((val){.v32 = *b}.bits < (val){.v32 = *a}.bits) {
         umbra_val32 const t = *a;
@@ -253,16 +262,8 @@ umbra_val32 umbra_add_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     if (b->inst[y.id].op == op_mul_f32) {
         return math(b, op_fma_f32, .x = b->inst[y.id].x, .y = b->inst[y.id].y, VZ(x)).v32;
     }
-    val const d = math(b, op_add_f32, VX(x), VY(y));
-    if (is_imm(b, d.id)) { return d.v32; }
-    int const imm_id = is_imm(b, x.id) ? x.id : is_imm(b, y.id) ? y.id : -1;
-    if (imm_id >= 0) {
-        val const other = imm_id == (int)x.id ? (val){.v32 = y} : (val){.v32 = x};
-        val const f = push(b, op_add_f32_imm, VX(other), VY(val_make(imm_id, 0)),
-                           .imm = b->inst[imm_id].imm);
-        return push(b, op_join, .x = d, .y = f).v32;
-    }
-    return d.v32;
+    return try_join_imm(b, math(b, op_add_f32, VX(x), VY(y)), op_add_f32_imm, (val){.v32 = x},
+                        (val){.v32 = y}).v32;
 }
 
 umbra_val32 umbra_sub_f32(builder *b, umbra_val32 x, umbra_val32 y) {
@@ -281,7 +282,7 @@ umbra_val32 umbra_mul_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     sort(&x, &y);
     if (is_imm32(b, x.id, 0x3f800000)) { return y; }
     if (is_imm32(b, y.id, 0x3f800000)) { return x; }
-    return try_imm(b, math(b, op_mul_f32, VX(x), VY(y)), op_mul_f32_imm, (val){.v32 = x},
+    return try_join_imm(b, math(b, op_mul_f32, VX(x), VY(y)), op_mul_f32_imm, (val){.v32 = x},
                    (val){.v32 = y}).v32;
 }
 
@@ -296,13 +297,13 @@ umbra_val32 umbra_div_f32(builder *b, umbra_val32 x, umbra_val32 y) {
 
 umbra_val32 umbra_min_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     sort(&x, &y);
-    return try_imm(b, math(b, op_min_f32, VX(x), VY(y)), op_min_f32_imm, (val){.v32 = x},
+    return try_join_imm(b, math(b, op_min_f32, VX(x), VY(y)), op_min_f32_imm, (val){.v32 = x},
                    (val){.v32 = y}).v32;
 }
 
 umbra_val32 umbra_max_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     sort(&x, &y);
-    return try_imm(b, math(b, op_max_f32, VX(x), VY(y)), op_max_f32_imm, (val){.v32 = x},
+    return try_join_imm(b, math(b, op_max_f32, VX(x), VY(y)), op_max_f32_imm, (val){.v32 = x},
                    (val){.v32 = y}).v32;
 }
 
@@ -317,7 +318,7 @@ umbra_val32 umbra_ceil_i32(builder *b, umbra_val32 x) { return math(b, op_ceil_i
 umbra_val32 umbra_add_i32(builder *b, umbra_val32 x, umbra_val32 y) {
     sort(&x, &y);
     if (is_imm32(b, x.id, 0)) { return y; }
-    return try_imm(b, math(b, op_add_i32, VX(x), VY(y)), op_add_i32_imm, (val){.v32 = x},
+    return try_join_imm(b, math(b, op_add_i32, VX(x), VY(y)), op_add_i32_imm, (val){.v32 = x},
                    (val){.v32 = y}).v32;
 }
 
@@ -344,7 +345,7 @@ umbra_val32 umbra_mul_i32(builder *b, umbra_val32 x, umbra_val32 y) {
         int const shift = __builtin_ctz((unsigned)b->inst[y.id].imm);
         return umbra_shl_i32(b, x, umbra_imm_i32(b, shift));
     }
-    return try_imm(b, math(b, op_mul_i32, VX(x), VY(y)), op_mul_i32_imm, (val){.v32 = x},
+    return try_join_imm(b, math(b, op_mul_i32, VX(x), VY(y)), op_mul_i32_imm, (val){.v32 = x},
                    (val){.v32 = y}).v32;
 }
 
@@ -393,14 +394,14 @@ umbra_val32 umbra_or_32(builder *b, umbra_val32 x, umbra_val32 y) {
     if (is_imm32(b, x.id, 0)) { return y; }
     if (is_imm32(b, x.id, -1)) { return x; }
     if (is_imm32(b, y.id, -1)) { return y; }
-    return try_imm(b, math(b, op_or_32, VX(x), VY(y)), op_or_32_imm, (val){.v32 = x},
+    return try_join_imm(b, math(b, op_or_32, VX(x), VY(y)), op_or_32_imm, (val){.v32 = x},
                    (val){.v32 = y}).v32;
 }
 umbra_val32 umbra_xor_32(builder *b, umbra_val32 x, umbra_val32 y) {
     sort(&x, &y);
     if (x.id == y.id) { return umbra_imm_i32(b, 0); }
     if (is_imm32(b, x.id, 0)) { return y; }
-    return try_imm(b, math(b, op_xor_32, VX(x), VY(y)), op_xor_32_imm, (val){.v32 = x},
+    return try_join_imm(b, math(b, op_xor_32, VX(x), VY(y)), op_xor_32_imm, (val){.v32 = x},
                    (val){.v32 = y}).v32;
 }
 umbra_val32 umbra_sel_32(builder *b, umbra_val32 c, umbra_val32 t, umbra_val32 fv) {
@@ -419,7 +420,7 @@ umbra_val32 umbra_i32_from_f32(builder *b, umbra_val32 x) {
 
 umbra_val32 umbra_eq_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     sort(&x, &y);
-    return try_imm(b, math(b, op_eq_f32, VX(x), VY(y)), op_eq_f32_imm, (val){.v32 = x},
+    return try_join_imm(b, math(b, op_eq_f32, VX(x), VY(y)), op_eq_f32_imm, (val){.v32 = x},
                    (val){.v32 = y}).v32;
 }
 umbra_val32 umbra_lt_f32(builder *b, umbra_val32 x, umbra_val32 y) {
@@ -439,7 +440,7 @@ umbra_val32 umbra_le_f32(builder *b, umbra_val32 x, umbra_val32 y) {
 umbra_val32 umbra_eq_i32(builder *b, umbra_val32 x, umbra_val32 y) {
     sort(&x, &y);
     if (x.id == y.id) { return umbra_imm_i32(b, -1); }
-    return try_imm(b, math(b, op_eq_i32, VX(x), VY(y)), op_eq_i32_imm, (val){.v32 = x},
+    return try_join_imm(b, math(b, op_eq_i32, VX(x), VY(y)), op_eq_i32_imm, (val){.v32 = x},
                    (val){.v32 = y}).v32;
 }
 umbra_val32 umbra_lt_s32(builder *b, umbra_val32 x, umbra_val32 y) {

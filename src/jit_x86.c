@@ -283,7 +283,7 @@ struct jit_program *jit_program(struct jit_backend *be,
         struct ir_inst *ip = inst+i;
         if (ip->op == op_join) {
             struct ir_inst *y = inst + ip->y.id;
-            if ((1) && y->op == op_add_f32_imm) {
+            if ((1) && op_is_fused_imm(y->op)) {
                 ip->x = ip->y;  // x86 wants the _imm variant (memory operand).
                 ip->y = (val){0};
                 y->y  = (val){0};

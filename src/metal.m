@@ -917,7 +917,7 @@ static char* build_source(BB const *bb,
         struct ir_inst *ip = inst+i;
         if (ip->op == op_join) {
             struct ir_inst *y = inst + ip->y.id;
-            if ((1) && y->op == op_add_f32_imm) {
+            if ((1) && op_is_fused_imm(y->op)) {
                 ip->x = ip->y;  // We want the _imm variant.
                 ip->y = (val){0};
                 y->y  = (val){0};  // These old op_foo_imm ops hold a reference to the imm too.

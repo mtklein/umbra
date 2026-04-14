@@ -17,7 +17,6 @@ kernel void umbra_entry(
     uint v1 = p0[0];
     uint v2 = p0[1];
     uint v3 = p0[2];
-    uint v4 = 1065353216u;
     uint v5 = p0[3];
     uint v6 = p0[4];
     uint v7 = p0[5];
@@ -40,16 +39,18 @@ kernel void umbra_entry(
     float v24 = fma(v19, v19, v23);
     float v25 = precise::sqrt(v24);
     float v26 = as_type<float>(v3) * v25;
-    float v27 = max(v26, as_type<float>(0u));
-    float v28 = min(v27, as_type<float>(1065353216u));
-    float v29 = fma(v28, v13, as_type<float>(v5));
-    uint v30 = (uint)as_type<ushort>((half)v29);
-    float v31 = fma(v28, v16, as_type<float>(v8));
-    uint v32 = (uint)as_type<ushort>((half)v31);
-    float v33 = fma(v28, v14, as_type<float>(v6));
+    float v28 = max(v26, as_type<float>(0u));
+    #define v29 v28
+    float v31 = min(v29, as_type<float>(1065353216u));
+    #define v32 v31
+    float v33 = fma(v32, v13, as_type<float>(v5));
     uint v34 = (uint)as_type<ushort>((half)v33);
-    float v35 = fma(v28, v15, as_type<float>(v7));
+    float v35 = fma(v32, v16, as_type<float>(v8));
     uint v36 = (uint)as_type<ushort>((half)v35);
+    float v37 = fma(v32, v14, as_type<float>(v6));
+    uint v38 = (uint)as_type<ushort>((half)v37);
+    float v39 = fma(v32, v15, as_type<float>(v7));
+    uint v40 = (uint)as_type<ushort>((half)v39);
     { uint _row = y * m.stride1; uint _ps = m.count1 / 4;
-      p1[_row + x] = ushort(v30); p1[_row + x + _ps] = ushort(v34); p1[_row + x + 2*_ps] = ushort(v36); p1[_row + x + 3*_ps] = ushort(v32); }
+      p1[_row + x] = ushort(v34); p1[_row + x + _ps] = ushort(v38); p1[_row + x + 2*_ps] = ushort(v40); p1[_row + x + 3*_ps] = ushort(v36); }
 }
