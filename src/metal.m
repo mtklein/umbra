@@ -877,6 +877,11 @@ static char* build_source(BB const *bb,
     }
     emit(&b, "; };\n\n");
 
+    // TODO: use Vulkan's buffer binding order (buffer(0)=meta, data at buffer(1+))
+    // so we can drop in an MVK-translated shader directly for A/B testing.
+    // Currently Metal puts data at buffer(0..max_ptr) and meta at buffer(total_bufs),
+    // while Vulkan/MoltenVK puts push constants at buffer(0) and data at buffer(1+).
+    // Also need to update encode_dispatch() setBuffer/setBytes atIndex values to match.
     emit(&b, "kernel void umbra_entry(\n");
     emit(&b,
          "    constant meta &m [[buffer(%d)]]",
