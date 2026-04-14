@@ -1922,7 +1922,7 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
                     B.val_1[i] = label_merge;
                 } break;
                 case op_if_end: {
-                    uint32_t label_merge = B.val_1[inst->imm];
+                    uint32_t label_merge = B.val_1[inst->x.id];
                     spv_op(&B.func, SpvOpBranch, 2);
                     spv_word(&B.func, label_merge);
                     spv_op(&B.func, SpvOpLabel, 2);

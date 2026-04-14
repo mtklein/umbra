@@ -274,7 +274,7 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
             if (out[i].op == op_if_begin)   { if_stack[if_sp++] = i; }
             if (out[i].op == op_if_end) {
                 int ib = if_stack[--if_sp];
-                out[i].imm = ib;
+                out[i].x = (val){.id = ib};
             }
         }
     }
@@ -350,9 +350,6 @@ struct umbra_flat_ir *umbra_flat_ir_resolve(struct umbra_flat_ir const *bb,
         out[j].w = remap_val(inst[i].w, remap);
         if (inst[i].ptr.deref) {
             out[j].ptr.ix = remap[inst[i].ptr.ix];
-        }
-        if (inst[i].op == op_if_end) {
-            out[j].imm = remap[inst[i].imm];
         }
         j++;
     }
