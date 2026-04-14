@@ -113,49 +113,53 @@ kernel void umbra_entry(
     uint v112 = v95 & v102;
     float v113 = fabs(v88);
     uint v114 = as_type<float>(v15) <  v113 ? 0xffffffffu : 0u;
-    uint v115 = v107 <  as_type<float>(1065353216u) ? 0xffffffffu : 0u;
-    uint v116 = v108 & v115;
-    uint v117 = v112 & v116;
-    float v118 = v52 * as_type<float>(1073741824u);
-    #define v119 v118
-    float v120 = v46 - v119;
-    float v121 = v70 + v120;
-    float v122 = fma(v107, v121, v57);
-    float v123 = fma(v107, v122, v46);
-    uint v124 = as_type<float>(v0) <  v123 ? 0xffffffffu : 0u;
-    uint v125 = v117 & v124;
-    uint v126 = v110 <  as_type<float>(0u) ? 0xffffffffu : 0u;
-    uint v127 = 3212836864u;
-    uint v128 = (v126 != 0u) ? v127 : v0;
-    uint v129 = (v111 != 0u) ? v13 : v128;
-    uint v130 = (v125 != 0u) ? v129 : v0;
-    float v131 = v88 * as_type<float>(1073741824u);
-    #define v133 v131
-    uint v134 = (v114 != 0u) ? as_type<uint>(v133) : v13;
-    float v135 = v87 / as_type<float>(v134);
-    float v136 = (v102 != 0u) ? v105 : v135;
-    uint v137 = as_type<float>(v0) <= v136 ? 0xffffffffu : 0u;
-    float v138 = v93 * v136;
-    float v139 = v138 - v88;
+    float v115 = v52 * as_type<float>(1073741824u);
+    #define v116 v115
+    float v117 = v46 - v116;
+    float v118 = v70 + v117;
+    float v119 = fma(v107, v118, v57);
+    float v120 = fma(v107, v119, v46);
+    uint v121 = as_type<float>(v0) <  v120 ? 0xffffffffu : 0u;
+    uint v122 = v110 <  as_type<float>(0u) ? 0xffffffffu : 0u;
+    #define v124 v122
+    uint v125 = 3212836864u;
+    uint v126 = (v124 != 0u) ? v125 : v0;
+    uint v127 = (v111 != 0u) ? v13 : v126;
+    float v129 = v88 * as_type<float>(1073741824u);
+    #define v130 v129
+    uint v131 = (v114 != 0u) ? as_type<uint>(v130) : v13;
+    float v132 = v87 / as_type<float>(v131);
+    float v133 = (v102 != 0u) ? v105 : v132;
+    uint v134 = as_type<float>(v0) <= v133 ? 0xffffffffu : 0u;
+    float v135 = v93 * v133;
+    float v136 = v135 - v88;
+    uint v137 = as_type<float>(v0) <  v136 ? 0xffffffffu : 0u;
+    float v138 = fma(v133, v118, v57);
+    float v139 = fma(v133, v138, v46);
     uint v140 = as_type<float>(v0) <  v139 ? 0xffffffffu : 0u;
-    uint v141 = v139 <  as_type<float>(0u) ? 0xffffffffu : 0u;
-    uint v142 = (v141 != 0u) ? v127 : v0;
-    uint v143 = (v140 != 0u) ? v13 : v142;
-    uint v144 = v136 <  as_type<float>(1065353216u) ? 0xffffffffu : 0u;
-    uint v145 = v137 & v144;
-    uint v146 = v95 & v145;
-    float v147 = fma(v136, v121, v57);
-    float v148 = fma(v136, v147, v46);
-    uint v149 = as_type<float>(v0) <  v148 ? 0xffffffffu : 0u;
-    uint v150 = v146 & v149;
-    uint v151 = (v150 != 0u) ? v143 : v0;
-    float v152 = as_type<float>(v151) + as_type<float>(v130);
-    uint v153 = (v38 != 0u) ? as_type<uint>(v152) : v0;
-    uint v154 = var0;
-    float v155 = as_type<float>(v153) + as_type<float>(v154);
-    var0 = as_type<uint>(v155);
+    uint v141 = v136 <  as_type<float>(0u) ? 0xffffffffu : 0u;
+    #define v143 v141
+    uint v144 = (v143 != 0u) ? v125 : v0;
+    uint v145 = (v137 != 0u) ? v13 : v144;
+    uint v146 = v133 <  as_type<float>(1065353216u) ? 0xffffffffu : 0u;
+    #define v148 v146
+    uint v149 = v134 & v148;
+    uint v150 = v95 & v149;
+    uint v151 = v150 & v140;
+    uint v152 = (v151 != 0u) ? v145 : v0;
+    uint v154 = v107 <  as_type<float>(1065353216u) ? 0xffffffffu : 0u;
+    #define v155 v154
+    uint v156 = v108 & v155;
+    uint v157 = v112 & v156;
+    uint v158 = v157 & v121;
+    uint v159 = (v158 != 0u) ? v127 : v0;
+    float v160 = as_type<float>(v152) + as_type<float>(v159);
+    uint v161 = (v38 != 0u) ? as_type<uint>(v160) : v0;
+    uint v162 = var0;
+    float v163 = as_type<float>(v161) + as_type<float>(v162);
+    var0 = as_type<uint>(v163);
 
     }
-    uint v158 = var0;
-    p1[y * m.stride1 + x] = v158;
+    uint v166 = var0;
+    p1[y * m.stride1 + x] = v166;
 }

@@ -18,53 +18,53 @@ kernel void umbra_entry(
     uint v2 = p0[0];
     uint v3 = p0[1];
     uint v4 = p0[2];
-    uint v5 = 1065353216u;
     uint v6 = p0[3];
-    float v7 = as_type<float>(v6) - as_type<float>(1065353216u);
-    uint v8 = 1073741824u;
-    float v9 = as_type<float>(v6) - as_type<float>(1073741824u);
-    float v10 = as_type<float>(v6) + as_type<float>(v6);
-    float v11 = as_type<float>(v6) + v10;
-    uint v12 = m.x0 + pos.x;
-    float v13 = (float)(int)v12;
-    uint v14 = m.y0 + pos.y;
-    float v15 = (float)(int)v14;
-    float v16 = v15 * as_type<float>(v3);
-    float v17 = fma(v13, as_type<float>(v2), v16);
-    float v18 = as_type<float>(v4) + v17;
-    float v20 = max(v18, as_type<float>(0u));
-    #define v21 v20
-    float v23 = min(v21, as_type<float>(1065353216u));
-    #define v24 v23
-    float v25 = v24 * v7;
-    float v26 = min(v9, v25);
-    float _si27 = floor(v26);
-    float _fr27 = v26 - _si27;
-    uint _lo27 = p2[min((uint)(int)_si27, m.count2 - 1u)] & (((uint)(int)_si27 < m.count2) ? ~0u : 0u);
-    uint _hi27 = p2[min((uint)((int)_si27+1), m.count2 - 1u)] & (((uint)((int)_si27+1) < m.count2) ? ~0u : 0u);
-    float v27 = as_type<float>(_lo27) + (as_type<float>(_hi27) - as_type<float>(_lo27)) * _fr27;
-    uint v28 = (uint)as_type<ushort>((half)v27);
-    float v29 = v26 + v11;
-    float _si30 = floor(v29);
-    float _fr30 = v29 - _si30;
-    uint _lo30 = p2[min((uint)(int)_si30, m.count2 - 1u)] & (((uint)(int)_si30 < m.count2) ? ~0u : 0u);
-    uint _hi30 = p2[min((uint)((int)_si30+1), m.count2 - 1u)] & (((uint)((int)_si30+1) < m.count2) ? ~0u : 0u);
-    float v30 = as_type<float>(_lo30) + (as_type<float>(_hi30) - as_type<float>(_lo30)) * _fr30;
-    uint v31 = (uint)as_type<ushort>((half)v30);
-    float v32 = as_type<float>(v6) + v26;
-    float _si33 = floor(v32);
-    float _fr33 = v32 - _si33;
-    uint _lo33 = p2[min((uint)(int)_si33, m.count2 - 1u)] & (((uint)(int)_si33 < m.count2) ? ~0u : 0u);
-    uint _hi33 = p2[min((uint)((int)_si33+1), m.count2 - 1u)] & (((uint)((int)_si33+1) < m.count2) ? ~0u : 0u);
-    float v33 = as_type<float>(_lo33) + (as_type<float>(_hi33) - as_type<float>(_lo33)) * _fr33;
-    uint v34 = (uint)as_type<ushort>((half)v33);
-    float v35 = v26 + v10;
-    float _si36 = floor(v35);
-    float _fr36 = v35 - _si36;
-    uint _lo36 = p2[min((uint)(int)_si36, m.count2 - 1u)] & (((uint)(int)_si36 < m.count2) ? ~0u : 0u);
-    uint _hi36 = p2[min((uint)((int)_si36+1), m.count2 - 1u)] & (((uint)((int)_si36+1) < m.count2) ? ~0u : 0u);
-    float v36 = as_type<float>(_lo36) + (as_type<float>(_hi36) - as_type<float>(_lo36)) * _fr36;
-    uint v37 = (uint)as_type<ushort>((half)v36);
+    float v8 = as_type<float>(v6) - as_type<float>(1065353216u);
+    #define v9 v8
+    float v12 = as_type<float>(v6) - as_type<float>(1073741824u);
+    #define v13 v12
+    float v14 = as_type<float>(v6) + as_type<float>(v6);
+    float v15 = as_type<float>(v6) + v14;
+    uint v16 = m.x0 + pos.x;
+    float v17 = (float)(int)v16;
+    uint v18 = m.y0 + pos.y;
+    float v19 = (float)(int)v18;
+    float v20 = v19 * as_type<float>(v3);
+    float v21 = fma(v17, as_type<float>(v2), v20);
+    float v22 = as_type<float>(v4) + v21;
+    float v24 = max(v22, as_type<float>(0u));
+    #define v25 v24
+    float v27 = min(v25, as_type<float>(1065353216u));
+    #define v28 v27
+    float v29 = v28 * v9;
+    float v30 = min(v13, v29);
+    float _si31 = floor(v30);
+    float _fr31 = v30 - _si31;
+    uint _lo31 = p2[min((uint)(int)_si31, m.count2 - 1u)] & (((uint)(int)_si31 < m.count2) ? ~0u : 0u);
+    uint _hi31 = p2[min((uint)((int)_si31+1), m.count2 - 1u)] & (((uint)((int)_si31+1) < m.count2) ? ~0u : 0u);
+    float v31 = as_type<float>(_lo31) + (as_type<float>(_hi31) - as_type<float>(_lo31)) * _fr31;
+    uint v32 = (uint)as_type<ushort>((half)v31);
+    float v33 = v30 + v15;
+    float _si34 = floor(v33);
+    float _fr34 = v33 - _si34;
+    uint _lo34 = p2[min((uint)(int)_si34, m.count2 - 1u)] & (((uint)(int)_si34 < m.count2) ? ~0u : 0u);
+    uint _hi34 = p2[min((uint)((int)_si34+1), m.count2 - 1u)] & (((uint)((int)_si34+1) < m.count2) ? ~0u : 0u);
+    float v34 = as_type<float>(_lo34) + (as_type<float>(_hi34) - as_type<float>(_lo34)) * _fr34;
+    uint v35 = (uint)as_type<ushort>((half)v34);
+    float v36 = as_type<float>(v6) + v30;
+    float _si37 = floor(v36);
+    float _fr37 = v36 - _si37;
+    uint _lo37 = p2[min((uint)(int)_si37, m.count2 - 1u)] & (((uint)(int)_si37 < m.count2) ? ~0u : 0u);
+    uint _hi37 = p2[min((uint)((int)_si37+1), m.count2 - 1u)] & (((uint)((int)_si37+1) < m.count2) ? ~0u : 0u);
+    float v37 = as_type<float>(_lo37) + (as_type<float>(_hi37) - as_type<float>(_lo37)) * _fr37;
+    uint v38 = (uint)as_type<ushort>((half)v37);
+    float v39 = v30 + v14;
+    float _si40 = floor(v39);
+    float _fr40 = v39 - _si40;
+    uint _lo40 = p2[min((uint)(int)_si40, m.count2 - 1u)] & (((uint)(int)_si40 < m.count2) ? ~0u : 0u);
+    uint _hi40 = p2[min((uint)((int)_si40+1), m.count2 - 1u)] & (((uint)((int)_si40+1) < m.count2) ? ~0u : 0u);
+    float v40 = as_type<float>(_lo40) + (as_type<float>(_hi40) - as_type<float>(_lo40)) * _fr40;
+    uint v41 = (uint)as_type<ushort>((half)v40);
     { uint _row = y * m.stride1; uint _ps = m.count1 / 4;
-      p1[_row + x] = ushort(v28); p1[_row + x + _ps] = ushort(v34); p1[_row + x + 2*_ps] = ushort(v37); p1[_row + x + 3*_ps] = ushort(v31); }
+      p1[_row + x] = ushort(v32); p1[_row + x + _ps] = ushort(v38); p1[_row + x + 2*_ps] = ushort(v41); p1[_row + x + 3*_ps] = ushort(v35); }
 }

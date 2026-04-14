@@ -60,6 +60,9 @@ int op_eval(enum op op, int xb, int yb, int zb, int wb) {
     case op_add_i32: r.i = x.i + y.i; return r.i;
     case op_sub_i32: r.i = x.i - y.i; return r.i;
     case op_mul_i32: r.i = x.i * y.i; return r.i;
+    case op_shl_i32: r.u = x.u << y.u; return r.i;
+    case op_shr_u32: r.u = x.u >> y.u; return r.i;
+    case op_shr_s32: r.i = x.i >> y.i; return r.i;
     case op_and_32:  r.i = x.i & y.i; return r.i;
     case op_or_32:   r.i = x.i | y.i; return r.i;
     case op_xor_32:  r.i = x.i ^ y.i; return r.i;
