@@ -75,8 +75,7 @@ struct ra* ra_create(struct umbra_flat_ir const *bb, struct ra_config const *cfg
     }
     for (int i = 0; i < cfg->max_reg; i++) { ra->owner[i] = -1; ra->pool_inv[i] = -1; }
     for (int i = 0; i < cfg->nregs;   i++) { ra->pool_inv[cfg->pool[i]] = (int8_t)i; }
-    ra->pool_mask = (cfg->nregs == 32) ? ~(uint32_t)0
-                                       : (((uint32_t)1 << cfg->nregs) - 1);
+    ra->pool_mask = ~0u >> (32 - cfg->nregs);
 
     for (int i = 0; i < n; i++) {
         struct ir_inst const *inst = &bb->inst[i];
