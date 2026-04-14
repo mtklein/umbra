@@ -590,6 +590,46 @@ static _Bool produces_float(enum op op) {
 struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
                                int flags) {
     struct spirv_result result = {0};
+
+    int const n = bb->insts;
+    struct ir_inst *resolved_inst = malloc((size_t)n * sizeof *resolved_inst);
+    __builtin_memcpy(resolved_inst, bb->inst, (size_t)n * sizeof *resolved_inst);
+    for (int i = 0; i < n; i++) {
+        struct ir_inst *ip = resolved_inst+i;
+        if (ip->op == op_join) {
+            struct ir_inst *y = resolved_inst + ip->y.id;
+            if ((1) && y->op == op_add_f32_imm) {
+                ip->x = ip->y;  // SPIR-V prefers _imm (typed float constant).
+                ip->y = (val){0};
+                y->y  = (val){0};
+            } else {
+                ip->y = (val){0};
+            }
+        }
+    }
+
+    _Bool *live = calloc((size_t)(n + 1), sizeof *live);
+    for (int i = n; i-- > 0;) {
+        struct ir_inst const *ip = &resolved_inst[i];
+        if (op_is_store(ip->op) || ip->op == op_loop_begin || ip->op == op_loop_end
+                                || ip->op == op_if_begin   || ip->op == op_if_end) {
+            live[i] = 1;
+        }
+        if (live[i]) {
+            live[ip->x.id] = 1;
+            live[ip->y.id] = 1;
+            live[ip->z.id] = 1;
+            live[ip->w.id] = 1;
+            if (ip->ptr.deref) {
+                live[ip->ptr.ix] = 1;
+            }
+        }
+    }
+
+    struct umbra_flat_ir resolved = *bb;
+    resolved.inst = resolved_inst;
+    bb = &resolved;
+
     SpvBuilder B;
     memset(&B, 0, sizeof B);
     B.next_id = 1; // 0 is reserved
@@ -1180,6 +1220,7 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
 
         // --- Emit instructions. ---
         for (int i = 0; i < bb->insts; i++) {
+            if (!live[i]) { continue; }
             struct ir_inst const *inst = &bb->inst[i];
 
             int xid = get_id(inst->x);
@@ -2013,6 +2054,9 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
     free(B.const_cache);
     free(v_vars);
     free(deref_buf);
+
+    free(live);
+    free(resolved_inst);
 
     result.spirv = spirv;
     return result;
