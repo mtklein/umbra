@@ -121,8 +121,7 @@ static int8_t const pair_hi[] = { 5,  7, 17, 19, 21, 23, 25, 27, 29, 31,  9, 11,
 static int lo(int r) { return pair_lo[r]; }
 static int hi(int r) { return pair_hi[r]; }
 
-static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm,
-                         int scratch) {
+static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int scratch) {
     switch ((int)op) {
     case op_add_f32: put(c, FADD_4s(d, x, y)); break;
     case op_sub_f32: put(c, FSUB_4s(d, x, y)); break;
@@ -204,9 +203,6 @@ static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm
             put(c, BIT_16b(d, y, x));
         }
         break;
-    case op_shl_i32_imm: put(c, SHL_4s_imm(d, x, imm)); break;
-    case op_shr_u32_imm: put(c, USHR_4s_imm(d, x, imm)); break;
-    case op_shr_s32_imm: put(c, SSHR_4s_imm(d, x, imm)); break;
     }
 }
 
@@ -1063,91 +1059,18 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
             int nscratch = (inst->op == op_shr_u32 || inst->op == op_shr_s32) ? 1 : 0;
             struct ra_step s = ra_step_alu(ra, sl, ns, inst, i, nscratch);
             int sc_lo = s.scratch >= 0 ? lo(s.scratch) : -1;
-            emit_alu_reg(c, inst->op, lo(s.rd), lo(s.rx), lo(s.ry), lo(s.rz),
-                         inst->imm, sc_lo);
+            emit_alu_reg(c, inst->op, lo(s.rd), lo(s.rx), lo(s.ry), lo(s.rz), sc_lo);
             if (!scalar) {
                 int sc_hi = s.scratch >= 0 ? hi(s.scratch) : -1;
-                emit_alu_reg(c, inst->op, hi(s.rd), hi(s.rx), hi(s.ry), hi(s.rz),
-                             inst->imm, sc_hi);
+                emit_alu_reg(c, inst->op, hi(s.rd), hi(s.rx), hi(s.ry), hi(s.rz), sc_hi);
             }
             if (s.scratch >= 0) { ra_return_reg(ra, s.scratch); }
         } break;
 
-        case op_shl_i32_imm:
-        case op_shr_u32_imm:
-        case op_shr_s32_imm: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
-            emit_alu_reg(c, inst->op, lo(s.rd), lo(s.rx), 0, 0, inst->imm, -1);
-            if (!scalar) {
-                emit_alu_reg(c, inst->op, hi(s.rd), hi(s.rx), 0, 0, inst->imm, -1);
-            }
-        } break;
-
-        case op_and_32_imm:
-        case op_add_f32_imm:
-        case op_sub_f32_imm:
-        case op_mul_f32_imm:
-        case op_div_f32_imm:
-        case op_min_f32_imm:
-        case op_max_f32_imm:
-        case op_add_i32_imm:
-        case op_sub_i32_imm:
-        case op_mul_i32_imm:
-        case op_or_32_imm:
-        case op_xor_32_imm:
-        case op_eq_f32_imm:
-        case op_lt_f32_imm:
-        case op_le_f32_imm:
-        case op_eq_i32_imm:
-        case op_lt_s32_imm:
-        case op_le_s32_imm: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
-            int8_t ir = ra_ensure(ra, sl, ns, inst->y.id);
-            ra_free_chan(ra, inst->y, i);
-            enum op o = inst->op;
-            uint32_t w =
-                o == op_add_f32_imm ? FADD_4s(lo(s.rd), lo(s.rx), lo(ir))  :
-                o == op_sub_f32_imm ? FSUB_4s(lo(s.rd), lo(s.rx), lo(ir))  :
-                o == op_mul_f32_imm ? FMUL_4s(lo(s.rd), lo(s.rx), lo(ir))  :
-                o == op_div_f32_imm ? FDIV_4s(lo(s.rd), lo(s.rx), lo(ir))  :
-                o == op_min_f32_imm ? FMINNM_4s(lo(s.rd), lo(s.rx), lo(ir)):
-                o == op_max_f32_imm ? FMAXNM_4s(lo(s.rd), lo(s.rx), lo(ir)):
-                o == op_add_i32_imm ? ADD_4s(lo(s.rd), lo(s.rx), lo(ir))   :
-                o == op_sub_i32_imm ? SUB_4s(lo(s.rd), lo(s.rx), lo(ir))   :
-                o == op_mul_i32_imm ? MUL_4s(lo(s.rd), lo(s.rx), lo(ir))   :
-                o == op_and_32_imm  ? AND_16b(lo(s.rd), lo(s.rx), lo(ir))  :
-                o == op_or_32_imm   ? ORR_16b(lo(s.rd), lo(s.rx), lo(ir))  :
-                o == op_xor_32_imm  ? EOR_16b(lo(s.rd), lo(s.rx), lo(ir))  :
-                o == op_eq_f32_imm  ? FCMEQ_4s(lo(s.rd), lo(ir), lo(s.rx)) :
-                o == op_lt_f32_imm  ? FCMGT_4s(lo(s.rd), lo(ir), lo(s.rx)) :
-                o == op_le_f32_imm  ? FCMGE_4s(lo(s.rd), lo(ir), lo(s.rx)) :
-                o == op_eq_i32_imm  ? CMEQ_4s(lo(s.rd), lo(ir), lo(s.rx))  :
-                o == op_lt_s32_imm  ? CMGT_4s(lo(s.rd), lo(ir), lo(s.rx))  :
-                                      CMGE_4s(lo(s.rd), lo(ir), lo(s.rx));
-            put(c, w);
-            if (!scalar) {
-                uint32_t w2 =
-                    o == op_add_f32_imm ? FADD_4s(hi(s.rd), hi(s.rx), hi(ir))  :
-                    o == op_sub_f32_imm ? FSUB_4s(hi(s.rd), hi(s.rx), hi(ir))  :
-                    o == op_mul_f32_imm ? FMUL_4s(hi(s.rd), hi(s.rx), hi(ir))  :
-                    o == op_div_f32_imm ? FDIV_4s(hi(s.rd), hi(s.rx), hi(ir))  :
-                    o == op_min_f32_imm ? FMINNM_4s(hi(s.rd), hi(s.rx), hi(ir)):
-                    o == op_max_f32_imm ? FMAXNM_4s(hi(s.rd), hi(s.rx), hi(ir)):
-                    o == op_add_i32_imm ? ADD_4s(hi(s.rd), hi(s.rx), hi(ir))   :
-                    o == op_sub_i32_imm ? SUB_4s(hi(s.rd), hi(s.rx), hi(ir))   :
-                    o == op_mul_i32_imm ? MUL_4s(hi(s.rd), hi(s.rx), hi(ir))   :
-                    o == op_and_32_imm  ? AND_16b(hi(s.rd), hi(s.rx), hi(ir))  :
-                    o == op_or_32_imm   ? ORR_16b(hi(s.rd), hi(s.rx), hi(ir))  :
-                    o == op_xor_32_imm  ? EOR_16b(hi(s.rd), hi(s.rx), hi(ir))  :
-                    o == op_eq_f32_imm  ? FCMEQ_4s(hi(s.rd), hi(ir), hi(s.rx)) :
-                    o == op_lt_f32_imm  ? FCMGT_4s(hi(s.rd), hi(ir), hi(s.rx)) :
-                    o == op_le_f32_imm  ? FCMGE_4s(hi(s.rd), hi(ir), hi(s.rx)) :
-                    o == op_eq_i32_imm  ? CMEQ_4s(hi(s.rd), hi(ir), hi(s.rx))  :
-                    o == op_lt_s32_imm  ? CMGT_4s(hi(s.rd), hi(ir), hi(s.rx))  :
-                                          CMGE_4s(hi(s.rd), hi(ir), hi(s.rx));
-                put(c, w2);
-            }
-        } break;
+        #define IMM_UNREACHABLE(name, flags) case op_##name:
+        IMM_OPS(IMM_UNREACHABLE)
+        #undef IMM_UNREACHABLE
+            __builtin_unreachable();
 
         case op_load_var: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
