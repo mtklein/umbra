@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// TODO: this needs refinement to account for ops that produce multi-channel results
 struct sched {
     int last_use,  // Latest op that reads this op's result, or -1 if unused/external.
         n_deps,    // Unscheduled ops this op still waits on.  Ready to schedule at 0.
@@ -13,30 +14,58 @@ struct sched {
         ready_idx; // This op's position in the ready[] worklist, kept in sync on removal.
 };
 
-static _Bool is_body(struct ir_inst const *inst) {
-    return inst->live && inst->varying;
+static int sched_score(struct ir_inst const *in, struct sched const *meta,
+                       int const *users, int c, int reg_pressure, int prev) {
+    int score = 0;
+
+    {
+        int const deps[] = {in[c].x.id, in[c].y.id, in[c].z.id, in[c].w.id};
+        int dead_regs = 0;
+        for (int k = 0; k < 4; k++) {
+            // TODO: track multi-channel ops' channel deaths individually
+            dead_regs += meta[deps[k]].last_use == c;
+        }
+
+        int const born_regs = op_is_store(in[c].op) ? 0
+                                                    : 1;  // TODO: channel aware, 1-4
+
+        // Decreasing register pressure is valuable, especially when already high.
+        int const decrease_in_reg_pressure = dead_regs - born_regs;
+        score += decrease_in_reg_pressure * reg_pressure;
+    }
+
+    {
+        int readied_ops = 0;
+        for (int u = meta[c].user_off; u < meta[c].user_off + meta[c].n_users; u++) {
+            readied_ops += meta[users[u]].n_deps == 1/*i.e. this op*/;
+        }
+
+        // Readying is almost always a good thing.  Scaling by reg_pressure makes
+        // readying one op heuristically worth the same as killing one register.
+        score += readied_ops * reg_pressure;
+    }
+
+    {
+        // Among candidates with equal pressure and readying, prefer the one that dies soonest.
+        // last_use < 0 means no in-region user was found (result flows out of the region),
+        // so we penalize by reg_pressure, treating it as if it dies last.
+        score -= meta[c].last_use >= 0 ? meta[c].last_use : reg_pressure;
+    }
+
+    {
+        // A small tie-breaking bonus to preserving the original program order.
+        int const chaining_bonus = prev >= 0 && (in[c].x.id == prev ||
+                                                 in[c].y.id == prev ||
+                                                 in[c].z.id == prev ||
+                                                 in[c].w.id == prev);
+        score += chaining_bonus;
+    }
+
+    return score;
 }
 
-static int sched_score(struct ir_inst const *in, struct sched const *meta,
-                       int const *users, int c, int live, int prev) {
-    int kills = 0;
-    int const deps[] = {in[c].x.id, in[c].y.id, in[c].z.id, in[c].w.id};
-    for (int k = 0; k < 4; k++) {
-        kills += meta[deps[k]].last_use == c;
-    }
-    int const defines = op_is_store(in[c].op) ? 0 : 1;
-
-    int enables = 0;
-    for (int u = meta[c].user_off; u < meta[c].user_off + meta[c].n_users; u++) {
-        enables += meta[users[u]].n_deps == 1;
-    }
-
-    int const chain = (prev >= 0 && (in[c].x.id == prev || in[c].y.id == prev
-                                  || in[c].z.id == prev || in[c].w.id == prev));
-
-    return (kills - defines + enables) * live
-         - (meta[c].last_use < 0 ? live : meta[c].last_use)
-         + chain;
+static _Bool is_body(struct ir_inst const *inst) {
+    return inst->live && inst->varying;
 }
 
 static void schedule(struct ir_inst *in, int n, struct ir_inst *out, int at, int live,
