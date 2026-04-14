@@ -725,8 +725,7 @@ SLIDE(slide_slug_wind_loop) {
     st->shader = umbra_shader_solid((float[]){0.2f, 1.0f, 0.6f, 1.0f});
     st->cov    = umbra_coverage_wind((struct umbra_buf){0});
     st->base = (struct slide){
-        // TODO: rename to "Slug (one-pass)" so --match one-pass / two-pass can isolate each.
-        .title = "Slug",
+        .title = "Slug (one-pass)",
         .bg = {0.12f, 0.04f, 0.04f, 1},
         .init = slug_init,
         .prepare = slug_prepare,

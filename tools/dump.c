@@ -191,8 +191,8 @@ int main(void) {
 
     dump_builder("dumps/slug_two_pass", "acc", slug_build_acc(NULL));
     {
-        mkdir("dumps/slug", 0755);
-        dump_builder("dumps/slug", "draw", slug_build(NULL));
+        mkdir("dumps/slug_one_pass", 0755);
+        dump_builder("dumps/slug_one_pass", "draw", slug_build(NULL));
     }
 
     slides_cleanup();
