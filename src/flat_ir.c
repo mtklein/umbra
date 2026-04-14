@@ -172,9 +172,6 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
 
     int const n = b->insts;
 
-    // TODO: ugly.  why isn't this already 0?
-    for (int i = 0; i < n; i++) { b->inst[i].final_id = 0; }
-
     int live = 0;
     for (int i = n; i-- > 0;) {
         if (op_is_store(b->inst[i].op) || is_cf(b->inst[i].op)) {
