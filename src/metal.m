@@ -877,15 +877,9 @@ static char* build_source(BB const *bb,
     }
     emit(&b, "; };\n\n");
 
-    // TODO: use Vulkan's buffer binding order (buffer(0)=meta, data at buffer(1+))
-    // so we can drop in an MVK-translated shader directly for A/B testing.
-    // Currently Metal puts data at buffer(0..max_ptr) and meta at buffer(total_bufs),
-    // while Vulkan/MoltenVK puts push constants at buffer(0) and data at buffer(1+).
-    // Also need to update encode_dispatch() setBuffer/setBytes atIndex values to match.
     emit(&b, "kernel void umbra_entry(\n");
     emit(&b,
-         "    constant meta &m [[buffer(%d)]]",
-         total_bufs);
+         "    constant meta &m [[buffer(0)]]");
     for (int p = 0; p <= max_ptr; p++) {
         char const *type = buf_row_shift[p] == 3 ? "half4"
                          : buf_shift[p]     == 2 ? "uint" : "ushort";
@@ -893,7 +887,7 @@ static char* build_source(BB const *bb,
         emit(&b,
              ",\n    %s %s * __restrict p%d"
              " [[buffer(%d)]]",
-             qual, type, p, p);
+             qual, type, p, p + 1);
     }
     for (int i = 0; i < bb->insts; i++) {
         if (bb->inst[i].op == op_deref_ptr) {
@@ -904,7 +898,7 @@ static char* build_source(BB const *bb,
             emit(&b,
                  ",\n    %s %s * __restrict p%d"
                  " [[buffer(%d)]]",
-                 qual, type, db, db);
+                 qual, type, db, db + 1);
         }
     }
     emit(&b,
@@ -1252,16 +1246,7 @@ static void encode_dispatch(
         buf_stride[bi]    = (uint32_t)dstride;
     }
 
-    for (int i = 0; i < tb; i++) {
-        if (bind_handle[i]) {
-            [enc setBuffer:(__bridge id<MTLBuffer>)bind_handle[i]
-                    offset:(NSUInteger)bind_offset[i]
-                   atIndex:(NSUInteger)i];
-        }
-    }
-
-    // Pack all per-dispatch metadata into one struct: {w, x0, y0, count[], stride[]}.
-    // Single setBytes call, single buffer binding — matches MoltenVK's pattern.
+    // Meta at buffer(0), data buffers at buffer(1+) — matches MoltenVK's layout.
     uint32_t meta[67] = {0};
     meta[0] = (uint32_t)w;
     meta[1] = (uint32_t)x0;
@@ -1269,7 +1254,15 @@ static void encode_dispatch(
     __builtin_memcpy(meta + 3,      buf_count, (size_t)tb * sizeof(uint32_t));
     __builtin_memcpy(meta + 3 + tb, buf_stride, (size_t)tb * sizeof(uint32_t));
     size_t const meta_bytes = (size_t)(3 + 2 * tb) * sizeof(uint32_t);
-    [enc setBytes:meta length:meta_bytes atIndex:(NSUInteger)p->total_bufs];
+    [enc setBytes:meta length:meta_bytes atIndex:0];
+
+    for (int i = 0; i < tb; i++) {
+        if (bind_handle[i]) {
+            [enc setBuffer:(__bridge id<MTLBuffer>)bind_handle[i]
+                    offset:(NSUInteger)bind_offset[i]
+                   atIndex:(NSUInteger)(i + 1)];
+        }
+    }
 
     MTLSize grid  = MTLSizeMake((NSUInteger)w, (NSUInteger)h, 1);
     MTLSize group = MTLSizeMake(64, 1, 1);

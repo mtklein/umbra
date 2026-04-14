@@ -5,9 +5,9 @@ using namespace metal;
 struct meta { uint w, x0, y0, count0, count1, stride0, stride1; };
 
 kernel void umbra_entry(
-    constant meta &m [[buffer(2)]],
-    device const uint * __restrict p0 [[buffer(0)]],
-    device ushort * __restrict p1 [[buffer(1)]],
+    constant meta &m [[buffer(0)]],
+    device const uint * __restrict p0 [[buffer(1)]],
+    device ushort * __restrict p1 [[buffer(2)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
     if (pos.x >= m.w) return;
