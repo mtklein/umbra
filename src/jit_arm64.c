@@ -1145,7 +1145,6 @@ void jit_program_run(struct jit_program *j, int l, int t, int r, int b, struct u
     j->entry(l, t, r, b, buf);
 }
 void jit_program_dump(struct jit_program const *j, FILE *f) {
-    if (j->loop_start >= j->loop_end) { return; }
 
     uint32_t const *words = (uint32_t const*)j->code;
 

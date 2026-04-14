@@ -1463,7 +1463,6 @@ static _Bool x86_disasm(uint8_t const *code, size_t n, char const *spath,
 }
 
 void jit_program_dump(struct jit_program const *j, FILE *f) {
-    if (j->loop_start >= j->loop_end) { return; }
 
     uint8_t const *code = (uint8_t const*)j->code;
     size_t const   n    = (size_t)(j->loop_end - j->loop_start);
