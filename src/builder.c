@@ -147,15 +147,6 @@ umbra_val32 umbra_gather_32(builder *b, umbra_ptr32 src, umbra_val32 ix) {
     enum op const op = b->inst[ix.id].uniform ? op_gather_uniform_32 : op_gather_32;
     return push32(b, op, VX(ix), .ptr = {.p32 = src});
 }
-umbra_val32 umbra_sample_32(builder *b, umbra_ptr32 src, umbra_val32 ix) {
-    umbra_val32 fl   = umbra_floor_i32(b, ix);
-    umbra_val32 frac = umbra_sub_f32(b, ix, umbra_floor_f32(b, ix));
-    umbra_val32 one  = umbra_imm_i32(b, 1);
-    umbra_val32 lo   = umbra_gather_32(b, src, fl);
-    umbra_val32 hi   = umbra_gather_32(b, src, umbra_add_i32(b, fl, one));
-    umbra_val32 diff = umbra_sub_f32(b, hi, lo);
-    return umbra_add_f32(b, lo, umbra_mul_f32(b, diff, frac));
-}
 void umbra_store_32(builder *b, umbra_ptr32 dst, umbra_val32 v) {
     push(b, op_store_32, VY(v), .ptr = {.p32 = dst});
 }

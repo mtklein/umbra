@@ -1312,40 +1312,6 @@ TEST(test_gather_clamp) {
     }
 }
 
-TEST(test_sample_32) {
-    struct umbra_builder *b = umbra_builder();
-    umbra_val32 ix = umbra_load_32(b, (umbra_ptr32){0});
-    umbra_val32 fx = umbra_f32_from_i32(b, ix);
-    // Scale: fractional index = fx * 0.5
-    umbra_val32 half = umbra_imm_f32(b, 0.5f);
-    umbra_val32 frac_ix = umbra_mul_f32(b, fx, half);
-    umbra_val32 v = umbra_sample_32(b, (umbra_ptr32){.ix=1}, frac_ix);
-    umbra_store_32(b, (umbra_ptr32){.ix=2}, v);
-    struct test_backends B = make(b);
-    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-        // indices 0..3 → fractional indices 0.0, 0.5, 1.0, 1.5
-        int32_t indices[4] = {0, 1, 2, 3};
-        float   lut[4]     = {10.0f, 20.0f, 30.0f, 40.0f};
-        float   dst[4]     = {0};
-        if (run(&B, bi, 4, 1,
-                 (struct umbra_buf[]){
-                     {.ptr=indices, .count=sizeof indices / 4},
-                     {.ptr=lut,     .count=sizeof lut / 4},
-                     {.ptr=dst,     .count=sizeof dst / 4},
-                 })) {
-            // ix=0.0 → lut[0] = 10.0
-            equiv(dst[0], 10.0f) here;
-            // ix=0.5 → lerp(lut[0], lut[1], 0.5) = 15.0
-            equiv(dst[1], 15.0f) here;
-            // ix=1.0 → lut[1] = 20.0
-            equiv(dst[2], 20.0f) here;
-            // ix=1.5 → lerp(lut[1], lut[2], 0.5) = 25.0
-            equiv(dst[3], 25.0f) here;
-        }
-    }
-    cleanup(&B);
-}
-
 TEST(test_gather_clamp_zero_sz) {
     // gather_uniform with negative index → clamped to 0.
     struct umbra_builder *b = umbra_builder();

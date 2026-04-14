@@ -3,6 +3,16 @@
 #include "flat_ir.h"
 #include <math.h>
 #include <stdlib.h>
+
+static umbra_val32 sample(struct umbra_builder *b, umbra_ptr32 src, umbra_val32 ix) {
+    umbra_val32 fl   = umbra_floor_i32(b, ix);
+    umbra_val32 frac = umbra_sub_f32(b, ix, umbra_floor_f32(b, ix));
+    umbra_val32 one  = umbra_imm_i32(b, 1);
+    umbra_val32 lo   = umbra_gather_32(b, src, fl);
+    umbra_val32 hi   = umbra_gather_32(b, src, umbra_add_i32(b, fl, one));
+    umbra_val32 diff = umbra_sub_f32(b, hi, lo);
+    return umbra_add_f32(b, lo, umbra_mul_f32(b, diff, frac));
+}
 #include <stdint.h>
 
 static umbra_val32 pack_unorm(struct umbra_builder *b, umbra_val32 ch, umbra_val32 scale) {
@@ -286,10 +296,10 @@ static umbra_color sample_lut_(struct umbra_builder *builder, umbra_val32 t_f32,
     umbra_val32 const N2_f = umbra_add_f32(builder, N_f, N_f);
     umbra_val32 const N3_f = umbra_add_f32(builder, N2_f, N_f);
     return (umbra_color){
-        umbra_sample_32(builder, lut, frac_idx),
-        umbra_sample_32(builder, lut, umbra_add_f32(builder, frac_idx, N_f)),
-        umbra_sample_32(builder, lut, umbra_add_f32(builder, frac_idx, N2_f)),
-        umbra_sample_32(builder, lut, umbra_add_f32(builder, frac_idx, N3_f)),
+        sample(builder, lut, frac_idx),
+        sample(builder, lut, umbra_add_f32(builder, frac_idx, N_f)),
+        sample(builder, lut, umbra_add_f32(builder, frac_idx, N2_f)),
+        sample(builder, lut, umbra_add_f32(builder, frac_idx, N3_f)),
     };
 }
 
