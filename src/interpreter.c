@@ -222,6 +222,36 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *bb) {
         }
     }
 
+    _Bool *live = NULL;
+#if !__has_feature(address_sanitizer)
+    if (bb->insts > 0) {
+        size_t const ninsts = (size_t)bb->insts;
+        struct ir_inst *ir = malloc(ninsts * sizeof *ir);
+        __builtin_memcpy(ir, bb->inst, ninsts * sizeof *ir);
+        for (int i = 0; i < bb->insts; i++) {
+            if (ir[i].op == op_join) {
+                ir[i].y = (val){0};
+            }
+        }
+        live = calloc(ninsts, sizeof *live);
+        for (int i = bb->insts; i-- > 0;) {
+            struct ir_inst const *ip = &ir[i];
+            if (op_is_store(ip->op) || ip->op == op_loop_begin || ip->op == op_loop_end
+                                    || ip->op == op_if_begin   || ip->op == op_if_end) {
+                live[i] = 1;
+            }
+            if (live[i]) {
+                live[ip->x.id] = 1;
+                live[ip->y.id] = 1;
+                live[ip->z.id] = 1;
+                live[ip->w.id] = 1;
+                if (ip->ptr.deref) { live[ip->ptr.ix] = 1; }
+            }
+        }
+        free(ir);
+    }
+#endif
+
     int n = 0;
     int loop_begin_sw_n = -1;
 #define emit(...) p->inst[n] = (struct sw_inst){ __VA_ARGS__ }
@@ -230,6 +260,7 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *bb) {
         int const lo = pass ? bb->preamble : 0, hi = pass ? bb->insts : bb->preamble;
         if (pass) { p->preamble = n; }
         for (int i = lo; i < hi; i++) {
+            if (live && !live[i]) { continue; }
             struct ir_inst const *inst = &bb->inst[i];
             int const X = id[inst->x.id] + (int)inst->x.chan - n;
             int const Y = id[inst->y.id] + (int)inst->y.chan - n;
@@ -239,7 +270,13 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *bb) {
             case op_x:      emit(.tag = op_x);      break;
             case op_y:      emit(.tag = op_y);      break;
             case op_imm_32: emit(.tag = op_imm_32, .x = inst->imm); break;
-            case op_join: emit(.tag = op_join, .x = X, .y = Y); break;
+            case op_join:
+                if (live) {
+                    id[i] = id[inst->x.id] + (int)inst->x.chan;
+                    continue;
+                }
+                emit(.tag = op_join, .x = X, .y = Y);
+                break;
 
             case op_deref_ptr:
                 emit(.tag = op_deref_ptr, .ptr = inst->ptr.bits,
@@ -499,6 +536,7 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *bb) {
         free(lu);
     }
 
+    free(live);
     free(deref_slot);
     free(id);
     p->n_vars = bb->n_vars;
@@ -632,7 +670,6 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
             for (;;) { switch (ip->tag) {
 #endif
                 CASE(op_imm_32) v->i32 = (I32){0} + ip->x; NEXT;
-                // TODO: DCE dead join sides in non-xsan builds.
                 CASE(op_join) {
                     v->i32 = v[ip->x].i32;
 #if __has_feature(address_sanitizer)
