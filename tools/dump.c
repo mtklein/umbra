@@ -221,8 +221,10 @@ static void render_hdr(char const *dir, int slide_idx, struct umbra_backend *be)
     fp16p_to_float(fdata, pixbuf);
     free(pixbuf);
 
-    char p[256];
-    snprintf(p, sizeof p, "%s/render.hdr", dir);
+    char const *base = strrchr(dir, '/');
+    base = base ? base + 1 : dir;
+    char p[512];
+    snprintf(p, sizeof p, "%s/%s.hdr", dir, base);
     stbi_write_hdr(p, RW, RH, 4, fdata);
     free(fdata);
 }
