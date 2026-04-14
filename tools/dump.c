@@ -242,22 +242,21 @@ int main(void) {
 
     for (int i = 0; i < slide_count(); i++) {
         struct slide *s = slide_get(i);
-        if (!s->get_builder) { continue; }
+        if (!s->draw) { continue; }
         char dir[128];
         slugify(s->title, dir, sizeof dir);
         mkdir(dir, 0755);
-        struct umbra_builder *b = s->get_builder(s, umbra_fmt_fp16);
-        if (b) { dump_builder(&db, dir, b); }
-
+        if (s->get_builder) {
+            struct umbra_builder *b = s->get_builder(s, umbra_fmt_fp16);
+            if (b) { dump_builder(&db, dir, b); }
+        }
         render_hdr(dir, i, be);
     }
 
     mkdir("dumps/slug_two_pass", 0755);
     dump_builder(&db, "dumps/slug_two_pass", slug_build_acc(NULL));
-    {
-        mkdir("dumps/slug_one_pass", 0755);
-        dump_builder(&db, "dumps/slug_one_pass", slug_build(NULL));
-    }
+    mkdir("dumps/slug_one_pass", 0755);
+    dump_builder(&db, "dumps/slug_one_pass", slug_build(NULL));
 
     slides_cleanup();
     be->free(be);
