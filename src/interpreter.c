@@ -632,6 +632,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
             for (;;) { switch (ip->tag) {
 #endif
                 CASE(op_imm_32) v->i32 = (I32){0} + ip->x; NEXT;
+                // TODO: DCE dead join sides in non-xsan builds.
                 CASE(op_join) {
                     v->i32 = v[ip->x].i32;
 #if __has_feature(address_sanitizer)
