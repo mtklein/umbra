@@ -62,6 +62,9 @@ static void prog_draw(void *vctx) {
 static double bench(draw_fn draw, void *ctx, struct umbra_backend *be,
                     int w, int h, int samples, double target_secs,
                     double *out_gpu_ns_px, struct umbra_backend_stats *out_stats) {
+    draw(ctx);
+    be->flush(be);
+
     int    iters   = 1;
     double t_pilot = 0;
     for (int p = 0; p < 20; p++) {
