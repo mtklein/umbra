@@ -109,7 +109,7 @@ static char const *uv(char *tmp, char const *vn,
 
 static void emit_ops(SrcBuf *b, BB const *bb,
                      int const *deref_buf,
-                     _Bool *is_f, bool const *live,
+                     _Bool *is_f, _Bool const *live,
                      int lo, int hi, char const *pad) {
     for (int i = lo; i < hi; i++) {
         is_f[i] = produces_float(bb->inst[i].op);
