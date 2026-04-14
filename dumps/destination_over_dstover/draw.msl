@@ -1,0 +1,44 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct _13
+{
+    uint _m0[1];
+};
+
+struct _17
+{
+    uint2 _m0[1];
+};
+
+struct _22
+{
+    uint _m0[7];
+};
+
+kernel void main0(constant _22& _36 [[buffer(0)]], device _13& _34 [[buffer(1)]], device _17& _35 [[buffer(2)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    if (!(gl_GlobalInvocationID.x >= _36._m0[0u]))
+    {
+        uint _51 = _36._m0[1u] + gl_GlobalInvocationID.x;
+        uint _52 = _36._m0[2u] + gl_GlobalInvocationID.y;
+        uint _76 = (_52 * _36._m0[6u]) + _51;
+        float2 _86 = float2(as_type<half2>(_35._m0[_76].x & 65535u));
+        float _87 = _86.x;
+        float2 _88 = float2(as_type<half2>(_35._m0[_76].y >> 16u));
+        float _89 = _88.x;
+        float _91 = as_type<float>(1065353216u) - _89;
+        float _99 = float(int(_51));
+        float _108 = float(int(_52));
+        uint _118 = (((((as_type<float>(_34._m0[4u]) <= _99) ? 4294967295u : 0u) & ((_99 < as_type<float>(_34._m0[6u])) ? 4294967295u : 0u)) & (((as_type<float>(_34._m0[5u]) <= _108) ? 4294967295u : 0u) & ((_108 < as_type<float>(_34._m0[7u])) ? 4294967295u : 0u))) != 0u) ? 1065353216u : 0u;
+        float2 _123 = float2(as_type<half2>(_35._m0[_76].x >> 16u));
+        float _124 = _123.x;
+        float2 _130 = float2(as_type<half2>(_35._m0[_76].y & 65535u));
+        float _131 = _130.x;
+        _35._m0[(_52 * _36._m0[6u]) + _51] = uint2(as_type<uint>(half2(float2(fma(as_type<float>(_118), fma(as_type<float>(_34._m0[0u]), _91, _87) - _87, _87), 0.0))) | (as_type<uint>(half2(float2(fma(as_type<float>(_118), fma(as_type<float>(_34._m0[1u]), _91, _124) - _124, _124), 0.0))) << 16u), as_type<uint>(half2(float2(fma(as_type<float>(_118), fma(as_type<float>(_34._m0[2u]), _91, _131) - _131, _131), 0.0))) | (as_type<uint>(half2(float2(fma(as_type<float>(_118), fma(as_type<float>(_34._m0[3u]), _91, _89) - _89, _89), 0.0))) << 16u));
+        return;
+    }
+}
+

@@ -1,0 +1,56 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct _14
+{
+    uint _m0[1];
+};
+
+struct _18
+{
+    half _m0[1];
+};
+
+struct _23
+{
+    uint _m0[7];
+};
+
+kernel void main0(constant _23& _37 [[buffer(0)]], device _14& _35 [[buffer(1)]], device _18& _36 [[buffer(2)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    if (!(gl_GlobalInvocationID.x >= _37._m0[0u]))
+    {
+        uint _52 = _37._m0[1u] + gl_GlobalInvocationID.x;
+        uint _53 = _37._m0[2u] + gl_GlobalInvocationID.y;
+        uint _57 = _35._m0[1u];
+        uint _59 = _35._m0[2u];
+        uint _61 = _35._m0[3u];
+        uint _64 = _35._m0[4u];
+        uint _67 = _35._m0[5u];
+        uint _70 = _35._m0[6u];
+        uint _72 = _35._m0[7u];
+        uint _76 = _37._m0[4u] / 4u;
+        uint _80 = (_53 * _37._m0[6u]) + _52;
+        float _85 = float(_36._m0[_80 + (0u * _76)]);
+        half _89 = _36._m0[_80 + (1u * _76)];
+        float _90 = float(_89);
+        half _94 = _36._m0[_80 + (2u * _76)];
+        float _95 = float(_94);
+        half _99 = _36._m0[_80 + (3u * _76)];
+        float _100 = float(_99);
+        float _102 = as_type<float>(1065353216u) - _100;
+        float _110 = float(int(_52));
+        float _119 = float(int(_53));
+        uint _129 = (((((as_type<float>(_64) <= _110) ? 4294967295u : 0u) & ((_110 < as_type<float>(_70)) ? 4294967295u : 0u)) & (((as_type<float>(_67) <= _119) ? 4294967295u : 0u) & ((_119 < as_type<float>(_72)) ? 4294967295u : 0u))) != 0u) ? 1065353216u : 0u;
+        uint _146 = _37._m0[4u] / 4u;
+        uint _150 = (_53 * _37._m0[6u]) + _52;
+        _36._m0[_150 + (0u * _146)] = half(fma(as_type<float>(_129), fma(as_type<float>(_35._m0[0u]), _102, _85) - _85, _85));
+        _36._m0[_150 + (1u * _146)] = half(fma(as_type<float>(_129), fma(as_type<float>(_57), _102, _90) - _90, _90));
+        _36._m0[_150 + (2u * _146)] = half(fma(as_type<float>(_129), fma(as_type<float>(_59), _102, _95) - _95, _95));
+        _36._m0[_150 + (3u * _146)] = half(fma(as_type<float>(_129), fma(as_type<float>(_61), _102, _100) - _100, _100));
+        return;
+    }
+}
+

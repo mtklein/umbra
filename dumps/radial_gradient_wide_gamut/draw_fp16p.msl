@@ -1,0 +1,65 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct _14
+{
+    uint _m0[1];
+};
+
+struct _18
+{
+    half _m0[1];
+};
+
+struct _23
+{
+    uint _m0[9];
+};
+
+kernel void main0(constant _23& _38 [[buffer(0)]], device _14& _35 [[buffer(1)]], device _18& _36 [[buffer(2)]], device _14& _37 [[buffer(3)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    if (!(gl_GlobalInvocationID.x >= _38._m0[0u]))
+    {
+        uint _53 = _38._m0[1u] + gl_GlobalInvocationID.x;
+        uint _54 = _38._m0[2u] + gl_GlobalInvocationID.y;
+        uint _56 = _35._m0[0u];
+        uint _58 = _35._m0[1u];
+        uint _60 = _35._m0[2u];
+        uint _62 = _35._m0[3u];
+        float _71 = as_type<float>(_62) + as_type<float>(_62);
+        float _77 = float(int(_53)) - as_type<float>(_56);
+        float _81 = float(int(_54)) - as_type<float>(_58);
+        float _90 = fast::min(as_type<float>(_62) - 2.0, fast::min(fast::max(as_type<float>(_60) * precise::sqrt(fma(_77, _77, _81 * _81)), 0.0), 1.0) * (as_type<float>(_62) - 1.0));
+        float _91 = floor(_90);
+        uint _94 = uint(int(_91));
+        uint _95 = _94 + 1u;
+        float _118 = _90 + (as_type<float>(_62) + _71);
+        float _119 = floor(_118);
+        uint _122 = uint(int(_119));
+        uint _123 = _122 + 1u;
+        uint _137 = _37._m0[min(_122, (_38._m0[5u] - 1u))];
+        uint _139 = _37._m0[min(_123, (_38._m0[5u] - 1u))];
+        float _146 = as_type<float>(_62) + _90;
+        float _147 = floor(_146);
+        uint _150 = uint(int(_147));
+        uint _151 = _150 + 1u;
+        uint _165 = _37._m0[min(_150, (_38._m0[5u] - 1u))];
+        uint _167 = _37._m0[min(_151, (_38._m0[5u] - 1u))];
+        float _173 = _90 + _71;
+        float _174 = floor(_173);
+        uint _177 = uint(int(_174));
+        uint _178 = _177 + 1u;
+        uint _192 = _37._m0[min(_177, (_38._m0[5u] - 1u))];
+        uint _194 = _37._m0[min(_178, (_38._m0[5u] - 1u))];
+        uint _203 = _38._m0[4u] / 4u;
+        uint _208 = (_54 * _38._m0[7u]) + _53;
+        _36._m0[_208 + (0u * _203)] = half(mix(as_type<float>(_37._m0[min(_94, (_38._m0[5u] - 1u))] & ((_94 < _38._m0[5u]) ? 4294967295u : 0u)), as_type<float>(_37._m0[min(_95, (_38._m0[5u] - 1u))] & ((_95 < _38._m0[5u]) ? 4294967295u : 0u)), _90 - _91));
+        _36._m0[_208 + (1u * _203)] = half(mix(as_type<float>(_165 & ((_150 < _38._m0[5u]) ? 4294967295u : 0u)), as_type<float>(_167 & ((_151 < _38._m0[5u]) ? 4294967295u : 0u)), _146 - _147));
+        _36._m0[_208 + (2u * _203)] = half(mix(as_type<float>(_192 & ((_177 < _38._m0[5u]) ? 4294967295u : 0u)), as_type<float>(_194 & ((_178 < _38._m0[5u]) ? 4294967295u : 0u)), _173 - _174));
+        _36._m0[_208 + (3u * _203)] = half(mix(as_type<float>(_137 & ((_122 < _38._m0[5u]) ? 4294967295u : 0u)), as_type<float>(_139 & ((_123 < _38._m0[5u]) ? 4294967295u : 0u)), _118 - _119));
+        return;
+    }
+}
+

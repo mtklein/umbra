@@ -1,10 +1,13 @@
+#define _POSIX_C_SOURCE 200809L
 #include "../include/umbra_draw.h"
 #include "../slides/slide.h"
 #include "../slides/slug.h"
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Weverything"
@@ -63,8 +66,77 @@ static struct umbra_builder *build_srcover(void) {
 #define JIT_EXT "avx2"
 #endif
 
-static void dump_bb(char const *dir, char const *name, struct umbra_flat_ir *bb) {
-    char p[128];
+static char const *mvk_dump_dir = "/tmp/umbra_mvk_dump";
+
+static void clear_dir(char const *path) {
+    DIR *d = opendir(path);
+    if (!d) { return; }
+    struct dirent *e;
+    while ((e = readdir(d))) {
+        if (e->d_name[0] == '.') { continue; }
+        char fp[1280];
+        snprintf(fp, sizeof fp, "%s/%s", path, e->d_name);
+        unlink(fp);
+    }
+    closedir(d);
+}
+
+static void grab_mvk_msl(char const *dir, char const *name) {
+    DIR *d = opendir(mvk_dump_dir);
+    if (!d) { return; }
+    struct dirent *e;
+    while ((e = readdir(d))) {
+        size_t n = strlen(e->d_name);
+        if (n > 6 && strcmp(e->d_name + n - 6, ".metal") == 0) {
+            char src[1280], dst[256];
+            snprintf(src, sizeof src, "%s/%s", mvk_dump_dir, e->d_name);
+            snprintf(dst, sizeof dst, "%s/%s.msl", dir, name);
+            FILE *in  = fopen(src, "r");
+            FILE *out = atomic_open(dst);
+            if (in && out) {
+                char buf[4096];
+                size_t r;
+                while ((r = fread(buf, 1, sizeof buf, in)) > 0) {
+                    fwrite(buf, 1, r, out);
+                }
+            }
+            if (in) { fclose(in); }
+            if (out) { atomic_close(out, dst); }
+            break;
+        }
+    }
+    closedir(d);
+}
+
+struct dump_backends {
+    struct umbra_backend *be[4];
+    char const           *ext[4];
+    int                   n;
+    int                   vulkan_idx;
+};
+
+static struct dump_backends dump_backends_init(void) {
+    struct dump_backends db = {.vulkan_idx = -1};
+    int i = 0;
+#ifdef JIT_EXT
+    db.be[i] = umbra_backend_jit();    db.ext[i] = JIT_EXT; i++;
+#endif
+    db.be[i] = umbra_backend_metal();  db.ext[i] = "metal";  i++;
+    db.be[i] = umbra_backend_vulkan(); db.ext[i] = "vulkan"; db.vulkan_idx = i; i++;
+    db.be[i] = umbra_backend_wgpu();   db.ext[i] = "wgpu";   i++;
+    db.n = i;
+    return db;
+}
+
+static void dump_backends_free(struct dump_backends *db) {
+    for (int i = 0; i < db->n; i++) {
+        if (db->be[i]) { db->be[i]->free(db->be[i]); }
+    }
+}
+
+static void dump_bb(struct dump_backends *db,
+                    char const *dir, char const *name, struct umbra_flat_ir *bb) {
+    char p[256];
     {
         snprintf(p, sizeof p, "%s/%s.ir", dir, name);
         FILE *f = atomic_open(p);
@@ -72,42 +144,31 @@ static void dump_bb(char const *dir, char const *name, struct umbra_flat_ir *bb)
         atomic_close(f, p);
     }
 
-    struct umbra_backend *bes[] = {
-#ifdef JIT_EXT
-        umbra_backend_jit(),
-#endif
-        umbra_backend_metal(),
-        umbra_backend_vulkan(),
-        umbra_backend_wgpu(),
-    };
-    int nb = (int)(sizeof bes / sizeof bes[0]);
-    struct umbra_program *progs[sizeof bes / sizeof bes[0]];
-    for (int i = 0; i < nb; i++) {
-        progs[i] = bes[i] ? bes[i]->compile(bes[i], bb) : NULL;
-    }
-    char const *exts[] = {
-#ifdef JIT_EXT
-        JIT_EXT,
-#endif
-        "metal",
-        "vulkan",
-        "wgpu",
-    };
-    for (int i = 0; i < nb; i++) {
-        if (!progs[i]) { continue; }
-        snprintf(p, sizeof p, "%s/%s.%s", dir, name, exts[i]);
+    for (int i = 0; i < db->n; i++) {
+        if (!db->be[i]) { continue; }
+
+        if (i == db->vulkan_idx) {
+            clear_dir(mvk_dump_dir);
+        }
+
+        struct umbra_program *prog = db->be[i]->compile(db->be[i], bb);
+        if (!prog) { continue; }
+
+        snprintf(p, sizeof p, "%s/%s.%s", dir, name, db->ext[i]);
         FILE *f = atomic_open(p);
-        if (progs[i]->dump) { progs[i]->dump(progs[i], f); }
+        if (prog->dump) { prog->dump(prog, f); }
         atomic_close(f, p);
-        progs[i]->free(progs[i]);
-    }
-    for (int i = 0; i < (int)(sizeof bes / sizeof bes[0]); i++) {
-        if (bes[i]) { bes[i]->free(bes[i]); }
+        prog->free(prog);
+
+        if (i == db->vulkan_idx) {
+            grab_mvk_msl(dir, name);
+        }
     }
 }
 
-static void dump_builder(char const *dir, char const *name, struct umbra_builder *b) {
-    char p[128];
+static void dump_builder(struct dump_backends *db,
+                         char const *dir, char const *name, struct umbra_builder *b) {
+    char p[256];
     snprintf(p, sizeof p, "%s/%s.builder", dir, name);
     FILE *f = atomic_open(p);
     umbra_builder_dump(b, f);
@@ -115,7 +176,7 @@ static void dump_builder(char const *dir, char const *name, struct umbra_builder
 
     struct umbra_flat_ir *bb = umbra_flat_ir(b);
     umbra_builder_free(b);
-    dump_bb(dir, name, bb);
+    dump_bb(db, dir, name, bb);
     umbra_flat_ir_free(bb);
 }
 
@@ -168,7 +229,12 @@ static void render_hdr(char const *dir, int slide_idx, struct umbra_backend *be)
 }
 
 int main(void) {
-    dump_builder("dumps", "srcover", build_srcover());
+    setenv("MVK_CONFIG_SHADER_DUMP_DIR", mvk_dump_dir, 1);
+    mkdir(mvk_dump_dir, 0755);
+
+    struct dump_backends db = dump_backends_init();
+
+    dump_builder(&db, "dumps", "srcover", build_srcover());
 
     slides_init(RW, RH);
 
@@ -182,20 +248,21 @@ int main(void) {
         slugify(s->title, dir, sizeof dir);
         mkdir(dir, 0755);
         struct umbra_builder *b = s->get_builder(s, umbra_fmt_fp16);
-        if (b) { dump_builder(dir, "draw", b); }
+        if (b) { dump_builder(&db, dir, "draw", b); }
         struct umbra_builder *bp = s->get_builder(s, umbra_fmt_fp16_planar);
-        if (bp) { dump_builder(dir, "draw_fp16p", bp); }
+        if (bp) { dump_builder(&db, dir, "draw_fp16p", bp); }
 
         render_hdr(dir, i, be);
     }
 
-    dump_builder("dumps/slug_two_pass", "acc", slug_build_acc(NULL));
+    dump_builder(&db, "dumps/slug_two_pass", "acc", slug_build_acc(NULL));
     {
         mkdir("dumps/slug_one_pass", 0755);
-        dump_builder("dumps/slug_one_pass", "draw", slug_build(NULL));
+        dump_builder(&db, "dumps/slug_one_pass", "draw", slug_build(NULL));
     }
 
     slides_cleanup();
     be->free(be);
+    dump_backends_free(&db);
     return 0;
 }
