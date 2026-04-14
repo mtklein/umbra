@@ -145,11 +145,10 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                 emit(b, "%suint v%d = %uu;\n",
                      pad, i, (uint32_t)inst->imm);
                 break;
-            case op_join: {
-                int const chosen = xid ? xid : yid;
-                is_f[i] = is_f[chosen];
-                emit(b, "%s#define v%d v%d\n", pad, i, chosen);
-            } break;
+            case op_join:
+                is_f[i] = is_f[xid];
+                emit(b, "%s#define v%d v%d\n", pad, i, xid);
+                break;
 
             case op_deref_ptr: break;
 
@@ -919,7 +918,8 @@ static char* build_source(BB const *bb,
         if (ip->op == op_join) {
             struct ir_inst *y = inst + ip->y.id;
             if ((1) && y->op == op_add_f32_imm) {
-                ip->x = (val){0};  // We want the _imm variant.
+                ip->x = ip->y;  // We want the _imm variant.
+                ip->y = (val){0};
                 y->y  = (val){0};  // These old op_foo_imm ops hold a reference to the imm too.
                                    // TODO: remove that when we're using join() for all of them.
             } else {
