@@ -1563,7 +1563,7 @@ TEST(test_gather_deref_large) {
     int32_t indices[4] = {0, 100, 32800, N - 1};
     int32_t dst[4] = {0};
 
-    uint64_t uni_[2] = {0};
+    uint32_t uni_[4] = {0};
     char    *uni = (char *)uni_;
     {
         struct umbra_buf deref = {.ptr=data, .count=N};
@@ -3643,7 +3643,7 @@ TEST(test_deref_row_bytes_l_gt_0) {
     for (int i = 0; i < S * TH; i++) { src_px[i] = i; }
     int32_t dst_px[S * TH];
 
-    uint64_t uni_[4] = {0};
+    uint32_t uni_[8] = {0};
     char    *uni = (char *)uni_;
     {
         struct umbra_buf deref = {.ptr=src_px, .count=S * TH, .stride=S};
@@ -3694,7 +3694,7 @@ TEST(test_deref_16bit_row_bytes_l_gt_0) {
     }
     float dst_px[S * TH];
 
-    uint64_t uni_[2] = {0};
+    uint32_t uni_[4] = {0};
     char    *uni = (char *)uni_;
     {
         struct umbra_buf deref = {.ptr=src_px, .count=S * TH, .stride=S};
