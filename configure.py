@@ -10,6 +10,10 @@ fresh clone builds without needing to run configure.py.
 import glob
 import os
 
+# Ensure subsequent relative paths and globs resolve from the project root,
+# not wherever the user ran `python3 configure.py` from.
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
 
 # ----- Source inventory ------------------------------------------------------
 #
@@ -402,8 +406,6 @@ def write(path, content):
 
 
 def main():
-    root = os.path.dirname(os.path.abspath(__file__))
-    os.chdir(root)
     for path, content in FILES.items():
         write(path, content)
 
