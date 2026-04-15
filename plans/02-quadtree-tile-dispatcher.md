@@ -36,6 +36,12 @@ Current state
 - `umbra_coverage_rect`, `umbra_coverage_bitmap`, `umbra_coverage_sdf`,
   `umbra_coverage_bitmap_matrix`, `umbra_coverage_wind` already exist.
 - `src/dispatch_overlap.c` tracks write ordering; it does not select tiles.
+- Plan 01 landed `struct interval_program`.  Output is the last
+  `umbra_store_32` to `(umbra_ptr32){.ix=0}` (SINK); uniforms come in
+  as `float const *uniform` indexed by slot on `(umbra_ptr32){.ix=1}`
+  (UNIFORM).  Op coverage is narrow — currently only what plan 01's tests
+  exercise.  Adding ops as we encounter them in real coverage pipelines
+  is part of plan 02's work.
 
 Design sketch
 -------------
@@ -45,35 +51,46 @@ New files: `src/tile_cover.h`, `src/tile_cover.c`.
 Public entry:
 
     struct tile_cover_programs {
-        struct umbra_program *full;     // shader + coverage + blend  (boundary tiles)
-        struct umbra_program *solid;    // shader + blend, α assumed 1 (interior tiles)
-        struct umbra_flat_ir  *coverage_ir;  // coverage-only IR, for interval eval
-        int coverage_value_id;          // which value in coverage_ir is α
+        struct umbra_program     *full;      // shader + coverage + blend  (boundary)
+        struct umbra_program     *solid;     // shader + blend, α assumed 1 (interior)
+        struct interval_program  *coverage;  // coverage-only, output via SINK store
+        // uniforms passed alongside dispatch()
     };
 
     void tile_cover_dispatch(struct tile_cover_programs const *p,
                              int l, int t, int r, int b,
                              struct umbra_buf buf[],
-                             int min_tile);   // stop subdividing below this
+                             float const *uniform,  // for coverage's interval eval
+                             int min_tile);         // stop subdividing below this
 
 Algorithm (straight from iv2d_cover, adapted):
 
     recurse(l, t, r, b):
-        iv alpha = interval_eval(coverage_ir, x=[l,r], y=[t,b], ...)
-        if alpha.hi <= 0:
-            return                          # fully outside
-        if alpha.lo >= 1:
-            solid.queue(l, t, r, b, buf)    # fully inside, skip coverage
-            return
-        w = r-l; h = b-t
-        if w <= min_tile && h <= min_tile:
-            full.queue(l, t, r, b, buf)     # boundary tile; per-pixel eval
-            return
-        mx = (l+r)>>1; my = (t+b)>>1
-        recurse(l, t, mx, my)
-        recurse(mx, t, r, my)
-        recurse(l, my, mx, b)
-        recurse(mx, my, r, b)
+        interval alpha = interval_program_run(p->coverage,
+                                              (interval){l, r},
+                                              (interval){t, b},
+                                              uniform);
+        if (alpha.hi <= 0.0f) { return; }              // fully outside
+        if (alpha.lo >= 1.0f) {
+            solid->queue(p->solid, l, t, r, b, buf);   // interior, skip coverage
+            return;
+        }
+        int const w = r - l, h = b - t;
+        if (w <= min_tile && h <= min_tile) {
+            full->queue(p->full, l, t, r, b, buf);     // boundary; per-pixel eval
+            return;
+        }
+        int const mx = (l+r)/2, my = (t+b)/2;
+        recurse(l,  t,  mx, my);
+        recurse(mx, t,  r,  my);
+        recurse(l,  my, mx, b );
+        recurse(mx, my, r,  b );
+
+The coverage IR must store α to `(umbra_ptr32){.ix=0}` (SINK) and read
+any uniforms from `(umbra_ptr32){.ix=1}` (UNIFORM) — that's the protocol
+`interval_program()` enforces.  `umbra_draw_build` needs to emit the
+coverage sub-IR with those pointers, separate from the shader/blend IR
+which uses its own buffer slots.
 
 Integration with `umbra_draw`:
 
@@ -88,8 +105,22 @@ Tile floor:
 
 - `min_tile == 1` mirrors iv2d's pixel-level behavior.
 - `min_tile == K` (the SIMD lane count) might be a better default — below K,
-  the boundary cost isn't really saved.
+  the boundary cost isn't really saved.  K varies by backend (8 on ARM64
+  JIT, 32 on most CPU, 64 on wasm), so make it backend-queryable or just
+  pick a fixed sensible floor like 16.
 - Leave it as an argument; measure.
+
+interval_program_run cost
+-------------------------
+
+The quadtree visits at most 4 × (log2(max(w,h) / min_tile)) * (pixels / K)
+tiles per dispatch — for a 1024² dispatch with `min_tile=8`, that's up to
+~16k interval_program_run calls per frame.  At 1 μs each (the plan-01
+aspiration) that's 16 ms — a real budget.  At ~200 ns each, 3 ms — fine.
+Before committing to the full dispatcher, bench the real cost of
+`interval_program_run` on a circle-SDF coverage.  If it's significantly
+above ~200 ns, optimize the loop (fewer allocations, tighter op dispatch)
+before plumbing it into draw.c.
 
 Files touched
 -------------
@@ -151,6 +182,26 @@ Open questions
   runtime (since we already know α is in `[lo, hi]`)? Likely yes — use a
   specialized "α is linear in x,y within this tile" pipeline when hi - lo is
   small. Defer to a follow-up plan.
+
+Expected op additions to interval.c
+-----------------------------------
+
+Plan 01 pruned `interval.c` to only the ops its tests exercise.  Real
+coverage pipelines will hit more, and each one returns NULL from
+`interval_program()` until supported.  The list we'll likely need:
+
+- `op_sel_32` for masked coverage (e.g. coverage composed with a clip).
+- `op_eq_f32`, `op_le_f32` for compare-based coverage (wind rule's sign
+  checks, polygon edge tests).
+- `op_and_32` / `op_or_32` / `op_xor_32` on tri-valued mask intervals for
+  mask composition.
+- Possibly `op_f32_from_i32` / `op_i32_from_f32` for x/y coord conversions.
+- `op_gather_*` is the hard one — bitmap coverage does gathers, and their
+  bound is the full range of the bitmap unless we can prove the index is
+  always in-bounds of a known sub-region.  Likely land as "bail to MAXIMAL"
+  first, so bitmap coverages just take the full-pipeline path.
+
+Add these as we hit them while porting slides, one at a time with tests.
 
 Non-goals
 ---------

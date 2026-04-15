@@ -377,9 +377,16 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct ir_inst const
         s.rd = ra_claim(ra, inst->y.id, i);
         y_dead = 0;
     } else if (sqa && x_dead) {
+        // TODO: uncovered.  Fires when square_add/sub's squared operand dies
+        // but the accumulator is still live.  Current tests all have both
+        // sides die at the op (simple store-and-go pipelines).  A test with
+        // y-live usage would exercise this; mirrors the same-shape gap on
+        // fma/fms/sel_32 below.
         s.rd = ra_claim(ra, inst->x.id, i);
         x_dead = 0;
     } else if (sqa && !y_dead) {
+        // TODO: uncovered.  Fires when both operands are live; dest must be
+        // a fresh register.  Same testing gap as sqa && x_dead above.
         s.rd = ra_alloc(ra, sl, ns);
         ra->slot[i].reg = s.rd;
         ra->owner[(int)s.rd] = i;
