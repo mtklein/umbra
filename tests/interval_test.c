@@ -214,6 +214,8 @@ TEST(interval_uniform_exact) {
 
 TEST(interval_fma) {
     // umbra_add_f32(mul(x,y), z) is auto-fused to op_fma_f32 by the builder.
+    // (Must be distinct operands — mul(v, v) would fold to op_square_f32
+    // and then op_square_add_f32, exercising a different helper.)
     struct umbra_builder *b = umbra_builder();
     umbra_store_32(b, SINK, umbra_add_f32(b, umbra_mul_f32(b, umbra_x(b), umbra_y(b)),
                                              umbra_imm_f32(b, 7.0f)));
@@ -226,13 +228,30 @@ TEST(interval_fma) {
     interval_program_free(p);
 }
 
-// Prove interval_fma is single-rounded like hardware fmaf, not two-rounded
-// mul+add.  Pick a where a*a isn't exactly representable (1 + 2^-22 squared
-// is 1 + 2^-21 + 2^-44; the 2^-44 bit is below f32 mantissa precision and
-// gets dropped by a separate rounding).  Then add -(rounded a*a): two-op
-// math gives 0 (the rounding error is already gone); fused fma preserves
-// it and returns ~2^-44.
-TEST(interval_fma_single_rounding) {
+TEST(interval_fms) {
+    // umbra_sub_f32(z, mul(x, y)) is auto-fused to op_fms_f32 by the builder.
+    // (Must be distinct operands so mul doesn't fold to op_square_f32.)
+    struct umbra_builder *b = umbra_builder();
+    umbra_store_32(b, SINK, umbra_sub_f32(b, umbra_imm_f32(b, 10.0f),
+                                             umbra_mul_f32(b, umbra_x(b), umbra_y(b))));
+
+    struct interval_program *p = interval_program_and_free(b);
+    // x*y in [3, 8]; 10 - [3, 8] = [2, 7]
+    interval_equiv(interval_program_run(p, (interval){1,2}, (interval){3,4}, NULL),
+                   (interval){2, 7}) here;
+
+    interval_program_free(p);
+}
+
+// Prove the fused-square-add path is single-rounded, not two-rounded.  The
+// builder rewrites mul(x, x) to op_square_f32 and add(square(x), z) to
+// op_square_add_f32 — so this test now exercises interval_square_add, not
+// interval_fma.  Pick a where a*a isn't exactly representable (1 + 2^-22
+// squared is 1 + 2^-21 + 2^-44; the 2^-44 bit is below f32 mantissa
+// precision and gets dropped by a separate rounding).  Then add
+// -(rounded a*a): two-op math gives 0 (the rounding error is already
+// gone); fused preserves it and returns ~2^-44.
+TEST(interval_square_add_single_rounding) {
     float const a        = 1.0f + ldexpf(1.0f, -22);
     float const aa_round = a * a;
 
@@ -251,9 +270,9 @@ TEST(interval_fma_single_rounding) {
     interval_program_free(p);
 }
 
-// Same idea for fms_f32(x, y, z) = z - x*y.  sub(1, mul(x, x)) fuses to
-// op_fms_f32 in the builder.
-TEST(interval_fms_single_rounding) {
+// Same idea for op_square_sub_f32: sub(1, mul(x, x)) → sub(1, square(x)) →
+// square_sub(x, 1) = 1 - x*x with single rounding.
+TEST(interval_square_sub_single_rounding) {
     float const a = 1.0f + ldexpf(1.0f, -22);
 
     struct umbra_builder *b = umbra_builder();
