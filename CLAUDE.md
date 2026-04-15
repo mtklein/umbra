@@ -71,7 +71,7 @@ to something rather than floating alone:
     struct foo* foo(int *bar, int const*);
 
 Keep headers especially tidy, with minimal #includes and only inline functions
-when absolutely necessary, e.g. when using a macro like __LINE__.
+when absolutely necessary, e.g. when using a macro like `__LINE__`.
 
 Don't shorten public type names for enums, or for large struct or union types
 that are meant to be handled by reference, but do use typedef for small value
