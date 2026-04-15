@@ -4,8 +4,10 @@
 
 // interval_program interprets umbra_flat_ir as a program of [lo,hi] intervals.
 //
-// The IR can read uniforms from (umbra_ptr32){.ix=1},
-// and it must store its result to (umbra_ptr32){.ix=0}.
+// The IR can read uniforms from (umbra_ptr32){.ix=0},
+// and it must store its result to (umbra_ptr32){.ix=1}.
+// This matches umbra_draw_build's layout so a coverage authored against the
+// public API can be lifted into an interval_program without pointer rewriting.
 
 typedef struct {
     float lo, hi;

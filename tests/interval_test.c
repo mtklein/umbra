@@ -13,10 +13,10 @@ static _Bool interval_contains(interval outer, float x) {
     return outer.lo <= x && x <= outer.hi;
 }
 
-// interval_program_run() returns the last umbra_store_32() to this pointer.
-static umbra_ptr32 const SINK    = {.ix = 0};
 // interval_program_run()'s float const *uniform array is read via this pointer.
-static umbra_ptr32 const UNIFORM = {.ix = 1};
+static umbra_ptr32 const UNIFORM = {.ix = 0};
+// interval_program_run() returns the last umbra_store_32() to this pointer.
+static umbra_ptr32 const SINK    = {.ix = 1};
 
 static struct interval_program *interval_program_and_free(struct umbra_builder *b) {
     struct umbra_flat_ir *ir = umbra_flat_ir(b);

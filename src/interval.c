@@ -181,12 +181,14 @@ static interval interval_lt(interval a, interval b) {
     return MAYBE;
 }
 
-// Convention: uniforms are read from umbra_ptr32{.ix=1}, and the output is
-// umbra_store_32()'d to umbra_ptr32{.ix=0}.  Using distinct pointers for
-// inputs and outputs keeps them obvious at a glance.
+// Convention: uniforms are read from umbra_ptr32{.ix=0}, and the output is
+// umbra_store_32()'d to umbra_ptr32{.ix=1}.  These match umbra_draw_build's
+// own layout — buf[0] is the uniforms buffer, buf[1] is where draw writes
+// pixels — so a coverage authored against the umbra_draw API can be lifted
+// directly into an interval_program without pointer rewriting.
 enum {
-    SINK_PTR_BITS    = 0,
-    UNIFORM_PTR_BITS = 1,
+    UNIFORM_PTR_BITS = 0,
+    SINK_PTR_BITS    = 1,
 };
 
 // Every op this pass knows how to bound.  Any IR op not in this set, any

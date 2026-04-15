@@ -30,8 +30,8 @@ static double now(void) {
 
 static struct umbra_flat_ir* build_circle_ir(void) {
     struct umbra_builder *b  = umbra_builder();
-    umbra_ptr32 const sink    = {.ix = 0},
-                      uniform = {.ix = 1};
+    umbra_ptr32 const uniform = {.ix = 0},
+                      sink    = {.ix = 1};
     umbra_val32 const x  = umbra_x(b),
                       y  = umbra_y(b),
                       cx = umbra_uniform_32(b, uniform, 0),
