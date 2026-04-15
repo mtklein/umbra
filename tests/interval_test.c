@@ -90,9 +90,15 @@ TEST(interval_abs_fully_neg) {
     interval_equiv(eval_x(umbra_abs_f32, (interval){-5.0f,-2.0f}),
                    (interval){2,5}) here;
 }
-TEST(interval_sqrt_clamp) {
-    interval_equiv(eval_x(umbra_sqrt_f32, (interval){-1.0f,4.0f}),
-                   (interval){0,2}) here;
+TEST(interval_sqrt_nonneg) {
+    // Non-negative input: monotone endpoint application.
+    interval_equiv(eval_x(umbra_sqrt_f32, (interval){0.25f, 4.0f}),
+                   (interval){0.5f, 2.0f}) here;
+}
+TEST(interval_sqrt_negative_poisons) {
+    // Negative input: sqrtf(-x) returns NaN which propagates, making the
+    // interval non-finite so interval_is_finite() reports it.
+    !interval_is_finite(eval_x(umbra_sqrt_f32, (interval){-1.0f, 4.0f})) here;
 }
 TEST(interval_floor) {
     interval_equiv(eval_x(umbra_floor_f32, (interval){1.7f,3.2f}),

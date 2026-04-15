@@ -87,25 +87,13 @@ static interval interval_square(interval a) {
     if (a.hi <= 0.0f) { return (interval){hh, ll}; }
     return (interval){0.0f, ll > hh ? ll : hh};
 }
-// sqrt over a straddle-zero interval is ambiguous: sqrtf() is undefined on
-// negative inputs (returns NaN), but formal IA doesn't represent "partially
-// defined" cleanly.  We're currently on policy 3: clamp to the domain.  This
-// is the right call today because interval_mul(x, x) overestimates on
-// straddle-zero ranges, so `sqrt(x*x + y*y)` can dip just below zero from
-// rounding slop even when the true value is >= 0 — the clamp rescues us.
-// Trade-off: if a pipeline actually feeds sqrt a genuinely-negative value at
-// some pixels, we silently lie by dropping the NaN.
-//
-// Now that op_square_f32 has landed and interval_square gives a tight bound,
-// the straddle-zero over-estimate that motivated this clamp is gone on the
-// x*x + y*y path.  We could move to policy 4 (drop the clamp, let sqrtf(-x)'s
-// NaN propagate via interval_monotone) as a follow-up: NaN is contagious
-// whereas MAXIMAL's ±INF can be "un-poisoned" by a downstream min/max/clamp.
-static interval interval_sqrt(interval a) {
-    float const lo = a.lo > 0.0f ? a.lo : 0.0f,
-                hi = a.hi > 0.0f ? a.hi : 0.0f;
-    return (interval){sqrtf(lo), sqrtf(hi)};
-}
+// sqrt is monotone on its domain; genuinely-negative inputs produce NaN via
+// sqrtf and poison the interval, which interval_is_finite() catches.  We
+// used to clamp the input to [0, ∞) because interval_mul(x, x) could dip
+// slightly negative from rounding slop on `x*x + y*y` — interval_square
+// kills that source, so the clamp is no longer pulling weight.  NaN
+// propagation is safer than clamping anyway: NaN is contagious, whereas a
+// ±INF from MAXIMAL can be "un-poisoned" by a downstream min/max/clamp.
 static interval interval_monotone(interval a, float (*f)(float)) {
     return (interval){f(a.lo), f(a.hi)};
 }
@@ -280,7 +268,7 @@ interval interval_program_run(struct interval_program *p,
             case op_square_add_f32: r = interval_square_add(arg(p,in->x), arg(p,in->y)); break;
             case op_square_sub_f32: r = interval_square_sub(arg(p,in->x), arg(p,in->y)); break;
 
-            case op_sqrt_f32:   r = interval_sqrt    (arg(p,in->x));         break;
+            case op_sqrt_f32:   r = interval_monotone(arg(p,in->x), sqrtf);  break;
             case op_abs_f32:    r = interval_abs     (arg(p,in->x));         break;
             case op_square_f32: r = interval_square  (arg(p,in->x));         break;
             case op_floor_f32:  r = interval_monotone(arg(p,in->x), floorf); break;
