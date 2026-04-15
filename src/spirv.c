@@ -575,9 +575,10 @@ static _Bool produces_float(enum op op) {
     return op == op_add_f32     || op == op_sub_f32
         || op == op_mul_f32     || op == op_div_f32
         || op == op_min_f32     || op == op_max_f32
-        || op == op_sqrt_f32    || op == op_abs_f32
+        || op == op_sqrt_f32    || op == op_abs_f32    || op == op_square_f32
         || op == op_round_f32   || op == op_floor_f32  || op == op_ceil_f32
         || op == op_fma_f32     || op == op_fms_f32
+        || op == op_square_add_f32 || op == op_square_sub_f32
         || op == op_add_f32_imm || op == op_sub_f32_imm
         || op == op_mul_f32_imm || op == op_div_f32_imm
         || op == op_min_f32_imm || op == op_max_f32_imm
@@ -1516,6 +1517,10 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
                     B.val[i] = spv_glsl_1(&B, B.t_f32, GLSLstd450FAbs,
                                             as_f32(&B, get_val(&B, inst->x), xid));
                     break;
+                case op_square_f32: {
+                    uint32_t xf = as_f32(&B, get_val(&B, inst->x), xid);
+                    B.val[i] = spv_binop(&B, SpvOpFMul, B.t_f32, xf, xf);
+                } break;
                 case op_round_f32:
                     B.val[i] = spv_glsl_1(&B, B.t_f32, GLSLstd450RoundEven,
                                             as_f32(&B, get_val(&B, inst->x), xid));
@@ -1559,6 +1564,19 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
                                             neg_x,
                                             as_f32(&B, get_val(&B, inst->y), yid),
                                             as_f32(&B, get_val(&B, inst->z), get_id(inst->z)));
+                } break;
+                case op_square_add_f32: {
+                    uint32_t xf = as_f32(&B, get_val(&B, inst->x), xid);
+                    B.val[i] = spv_glsl_3(&B, B.t_f32, GLSLstd450Fma,
+                                            xf, xf,
+                                            as_f32(&B, get_val(&B, inst->y), yid));
+                } break;
+                case op_square_sub_f32: {
+                    uint32_t xf = as_f32(&B, get_val(&B, inst->x), xid);
+                    uint32_t neg_x = spv_unop(&B, SpvOpFNegate, B.t_f32, xf);
+                    B.val[i] = spv_glsl_3(&B, B.t_f32, GLSLstd450Fma,
+                                            neg_x, xf,
+                                            as_f32(&B, get_val(&B, inst->y), yid));
                 } break;
 
                 case op_add_i32:

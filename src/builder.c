@@ -259,6 +259,12 @@ umbra_val32 umbra_add_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     if (b->inst[y.id].op == op_mul_f32) {
         return math(b, op_fma_f32, .x = b->inst[y.id].x, .y = b->inst[y.id].y, VZ(x)).v32;
     }
+    if (b->inst[x.id].op == op_square_f32) {
+        return math(b, op_square_add_f32, .x = b->inst[x.id].x, VY(y)).v32;
+    }
+    if (b->inst[y.id].op == op_square_f32) {
+        return math(b, op_square_add_f32, .x = b->inst[y.id].x, VY(x)).v32;
+    }
     return try_join_imm(b, math(b, op_add_f32, VX(x), VY(y)), op_add_f32_imm, (val){.v32 = x},
                         (val){.v32 = y}).v32;
 }
@@ -268,6 +274,9 @@ umbra_val32 umbra_sub_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     if (b->inst[y.id].op == op_mul_f32) {
         return math(b, op_fms_f32, .x = b->inst[y.id].x, .y = b->inst[y.id].y, VZ(x)).v32;
     }
+    if (b->inst[y.id].op == op_square_f32) {
+        return math(b, op_square_sub_f32, .x = b->inst[y.id].x, VY(x)).v32;
+    }
     return join_imm_y(b, math(b, op_sub_f32, VX(x), VY(y)), op_sub_f32_imm,
                       (val){.v32 = x}, (val){.v32 = y}).v32;
 }
@@ -276,6 +285,9 @@ umbra_val32 umbra_mul_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     sort(&x, &y);
     if (is_imm32(b, x.id, 0x3f800000)) { return y; }
     if (is_imm32(b, y.id, 0x3f800000)) { return x; }
+    if ((val){.v32 = x}.bits == (val){.v32 = y}.bits) {
+        return math(b, op_square_f32, VX(x)).v32;
+    }
     return try_join_imm(b, math(b, op_mul_f32, VX(x), VY(y)), op_mul_f32_imm, (val){.v32 = x},
                    (val){.v32 = y}).v32;
 }

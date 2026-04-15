@@ -550,6 +550,94 @@ TEST(test_fma_f32) {
 // a*y + (-round(a*a)) returns 0 under two-op math and ~2^-44 under fma;
 // a backend that lowered op_fma_f32 to mul+add would zero out.  Same
 // pattern as interval_fma_single_rounding in interval_test.c.
+// mul(X, X) auto-rewrites to op_square_f32 in the builder.  Sanity-check the
+// result matches x*x across every backend.
+TEST(test_square_f32) {
+    struct umbra_builder *builder = umbra_builder();
+    umbra_val32 x = umbra_load_32(builder, (umbra_ptr32){0}),
+                r = umbra_mul_f32(builder, x, x);
+    umbra_store_32(builder, (umbra_ptr32){.ix=1}, r);
+    struct test_backends B = make(builder);
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        float a[] = {-3.0f, 0.0f, 1.5f, 4.0f}, z[4] = {0};
+        if (run(&B, bi, 4, 1,
+                 (struct umbra_buf[]){
+                     {.ptr=a, .count=count(a)},
+                     {.ptr=z, .count=count(z)},
+                 })) {
+            equiv(z[0], 9.0f)  here;
+            equiv(z[1], 0.0f)  here;
+            equiv(z[2], 2.25f) here;
+            equiv(z[3], 16.0f) here;
+        }
+    }
+    cleanup(&B);
+}
+
+// add(mul(X, X), w) auto-rewrites to op_square_add_f32.  Same single-rounding
+// pattern as test_fma_f32_single_rounding but exercising the new op.
+TEST(test_square_add_f32_single_rounding) {
+    struct umbra_builder *builder = umbra_builder();
+    umbra_val32 x = umbra_load_32(builder, (umbra_ptr32){0}),
+                w = umbra_load_32(builder, (umbra_ptr32){.ix=1}),
+                m = umbra_mul_f32(builder, x, x),
+                r = umbra_add_f32(builder, m, w);
+    umbra_store_32(builder, (umbra_ptr32){.ix=2}, r);
+    struct test_backends B = make(builder);
+
+    float const a = 1.0f + ldexpf(1.0f, -22);
+    float const aa_round = a * a;
+    float const expected = fmaf(a, a, -aa_round);
+
+    !equiv(expected, 0.0f) here;
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        float ax[] = {a}, aw[] = {-aa_round}, z[1] = {0};
+        if (run(&B, bi, 1, 1,
+                 (struct umbra_buf[]){
+                     {.ptr=ax, .count=1},
+                     {.ptr=aw, .count=1},
+                     {.ptr=z,  .count=1},
+                 })) {
+            equiv(z[0], expected) here;
+        }
+    }
+    cleanup(&B);
+}
+
+// sub(w, mul(X, X)) auto-rewrites to op_square_sub_f32.
+TEST(test_square_sub_f32_single_rounding) {
+    struct umbra_builder *builder = umbra_builder();
+    umbra_val32 x = umbra_load_32(builder, (umbra_ptr32){0}),
+                w = umbra_load_32(builder, (umbra_ptr32){.ix=1}),
+                m = umbra_mul_f32(builder, x, x),
+                r = umbra_sub_f32(builder, w, m);
+    umbra_store_32(builder, (umbra_ptr32){.ix=2}, r);
+    struct test_backends B = make(builder);
+
+    float const a = 1.0f + ldexpf(1.0f, -22);
+    float const expected = fmaf(-a, a, 1.0f);    // single-rounded 1 - a*a
+
+    // Sequence point between a*a and the subtraction prevents -ffp-contract=on
+    // from fusing the two-op C-side computation into an fma.
+    float const aa = a * a;
+    !equiv(expected, 1.0f - aa) here;
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        float ax[] = {a}, aw[] = {1.0f}, z[1] = {0};
+        if (run(&B, bi, 1, 1,
+                 (struct umbra_buf[]){
+                     {.ptr=ax, .count=1},
+                     {.ptr=aw, .count=1},
+                     {.ptr=z,  .count=1},
+                 })) {
+            equiv(z[0], expected) here;
+        }
+    }
+    cleanup(&B);
+}
+
 TEST(test_fma_f32_single_rounding) {
     struct umbra_builder *builder = umbra_builder();
     umbra_val32 x = umbra_load_32(builder, (umbra_ptr32){0}),

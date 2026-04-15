@@ -83,9 +83,10 @@ static _Bool produces_float(enum op op) {
     return op == op_add_f32     || op == op_sub_f32
         || op == op_mul_f32     || op == op_div_f32
         || op == op_min_f32     || op == op_max_f32
-        || op == op_sqrt_f32    || op == op_abs_f32
+        || op == op_sqrt_f32    || op == op_abs_f32     || op == op_square_f32
         || op == op_round_f32   || op == op_floor_f32  || op == op_ceil_f32
         || op == op_fma_f32     || op == op_fms_f32
+        || op == op_square_add_f32 || op == op_square_sub_f32
         || op == op_add_f32_imm || op == op_sub_f32_imm
         || op == op_mul_f32_imm || op == op_div_f32_imm
         || op == op_min_f32_imm || op == op_max_f32_imm
@@ -544,6 +545,12 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                      pad, i,
                      fv(_fx, vx, xid, is_f));
                 break;
+            case op_square_f32: {
+                char const *s = fv(_fx, vx, xid, is_f);
+                emit(b, "%sfloat v%d ="
+                        " %s * %s;\n",
+                     pad, i, s, s);
+            } break;
             case op_round_f32:
                 emit(b, "%sfloat v%d ="
                         " rint(%s);\n",
@@ -596,6 +603,20 @@ static void emit_ops(SrcBuf *b, BB const *bb,
                      fv(_fy, vy, yid, is_f),
                      fv(_fz, vz, zid, is_f));
                 break;
+            case op_square_add_f32: {
+                char const *xs = fv(_fx, vx, xid, is_f);
+                emit(b, "%sfloat v%d ="
+                        " fma(%s, %s, %s);\n",
+                     pad, i, xs, xs,
+                     fv(_fy, vy, yid, is_f));
+            } break;
+            case op_square_sub_f32: {
+                char const *xs = fv(_fx, vx, xid, is_f);
+                emit(b, "%sfloat v%d ="
+                        " fma(-%s, %s, %s);\n",
+                     pad, i, xs, xs,
+                     fv(_fy, vy, yid, is_f));
+            } break;
 
             case op_add_i32:
                 emit(b, "%suint v%d = %s + %s;\n",

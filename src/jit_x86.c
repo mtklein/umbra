@@ -164,6 +164,7 @@ static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm
     case op_min_f32: vminps(c, d, x, y); break;
     case op_max_f32: vmaxps(c, d, x, y); break;
     case op_sqrt_f32: vsqrtps(c, d, x); break;
+    case op_square_f32: vmulps(c, d, x, x); break;
     case op_round_f32: vroundps(c, d, x, 0); break;
     case op_floor_f32: vroundps(c, d, x, 1); break;
     case op_ceil_f32: vroundps(c, d, x, 2); break;
@@ -198,6 +199,28 @@ static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm
         } else {
             vmovaps(c, d, z);
             vfnmadd231ps(c, d, x, y);
+        }
+        break;
+    case op_square_add_f32:
+        // d = x*x + y.
+        if (d == x) {
+            vfmadd132ps(c, d, y, x);
+        } else if (d == y) {
+            vfmadd231ps(c, d, x, x);
+        } else {
+            vmovaps(c, d, y);
+            vfmadd231ps(c, d, x, x);
+        }
+        break;
+    case op_square_sub_f32:
+        // d = y - x*x.
+        if (d == x) {
+            vfnmadd132ps(c, d, y, x);
+        } else if (d == y) {
+            vfnmadd231ps(c, d, x, x);
+        } else {
+            vmovaps(c, d, y);
+            vfnmadd231ps(c, d, x, x);
         }
         break;
 
@@ -1238,6 +1261,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
         case op_min_f32:
         case op_max_f32:
         case op_sqrt_f32:
+        case op_square_f32:
         case op_round_f32:
         case op_floor_f32:
         case op_ceil_f32:
@@ -1246,6 +1270,8 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
         case op_ceil_i32:
         case op_fma_f32:
         case op_fms_f32:
+        case op_square_add_f32:
+        case op_square_sub_f32:
         case op_add_i32:
         case op_sub_i32:
         case op_mul_i32:

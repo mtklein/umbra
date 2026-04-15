@@ -56,12 +56,6 @@ static interval interval_mul(interval a, interval b) {
 // down and hi up (e.g. FE_DOWNWARD / FE_UPWARD, or nextafter fallback).
 // Unlikely to bite us at dispatch-pruning scale, but worth tracking.
 
-// TODO: iv2d had a dedicated SQR op exactly because interval_mul(x, x) loses
-// the x == y correlation: for x in [-a, a] it returns [-a², a²] instead of the
-// tight [0, max(xl², xh²)].  We should add op_sqr_f32 (or teach interval_mul
-// to special-case equal operands via val.id comparison) and have the builder
-// rewrite mul(v, v) → sqr(v).  Follow up soon — this is the biggest source of
-// slop for SDFs like x*x + y*y.
 static interval interval_div(interval a, interval b) {
     if (b.lo <= 0.0f && 0.0f <= b.hi) {
         return MAXIMAL;
@@ -83,6 +77,16 @@ static interval interval_abs(interval a) {
     float const m = -a.lo > a.hi ? -a.lo : a.hi;
     return (interval){0.0f, m};
 }
+// Tight bound for x*x.  The whole reason op_square_f32 exists: interval_mul
+// treats x*x as two independent copies of x and loses the correlation, giving
+// [-a², a²] for x ∈ [-a, a] instead of the tight [0, max(xl², xh²)].
+static interval interval_square(interval a) {
+    float const ll = a.lo * a.lo,
+                hh = a.hi * a.hi;
+    if (a.lo >= 0.0f) { return (interval){ll, hh}; }
+    if (a.hi <= 0.0f) { return (interval){hh, ll}; }
+    return (interval){0.0f, ll > hh ? ll : hh};
+}
 // sqrt over a straddle-zero interval is ambiguous: sqrtf() is undefined on
 // negative inputs (returns NaN), but formal IA doesn't represent "partially
 // defined" cleanly.  We're currently on policy 3: clamp to the domain.  This
@@ -92,15 +96,11 @@ static interval interval_abs(interval a) {
 // Trade-off: if a pipeline actually feeds sqrt a genuinely-negative value at
 // some pixels, we silently lie by dropping the NaN.
 //
-// Once op_sqr_f32 lands and kills the straddle-zero over-estimate, we may
-// prefer policy 4: drop the check entirely, treat negatives as UB, and just
-// interval_monotone(a, sqrtf).  Since sqrtf(-x) returns NaN, the result is a
-// NaN-ful interval — nominally similar to policy 2 (maximal/unusable) with
-// callers detecting via interval_is_finite(), but actually safer: NaN is
-// contagious (any arithmetic op with NaN yields NaN), whereas MAXIMAL's
-// ±INF can be "un-poisoned" by a downstream min/max/clamp that happens to
-// constrain it to a bounded range.  Corrupt-in corrupt-out is the stronger
-// invariant.
+// Now that op_square_f32 has landed and interval_square gives a tight bound,
+// the straddle-zero over-estimate that motivated this clamp is gone on the
+// x*x + y*y path.  We could move to policy 4 (drop the clamp, let sqrtf(-x)'s
+// NaN propagate via interval_monotone) as a follow-up: NaN is contagious
+// whereas MAXIMAL's ±INF can be "un-poisoned" by a downstream min/max/clamp.
 static interval interval_sqrt(interval a) {
     float const lo = a.lo > 0.0f ? a.lo : 0.0f,
                 hi = a.hi > 0.0f ? a.hi : 0.0f;
@@ -140,6 +140,32 @@ static interval interval_fms(interval x, interval y, interval z) {
     return (interval){fmin4(lo_ll, lo_lh, lo_hl, lo_hh),
                       fmax4(hi_ll, hi_lh, hi_hl, hi_hh)};
 }
+// square_add_f32(x, y) = x*x + y with a single rounding — matches fmaf(x,x,y).
+// Uses the tight x*x logic: for fixed y, the function's minimum in x is at
+// x=0 (if 0 lies in x's interval) or at the |x|-smaller endpoint.
+static interval interval_square_add(interval x, interval y) {
+    float const ll_lo = fmaf(x.lo, x.lo, y.lo),
+                hh_lo = fmaf(x.hi, x.hi, y.lo);
+    float const ll_hi = fmaf(x.lo, x.lo, y.hi),
+                hh_hi = fmaf(x.hi, x.hi, y.hi);
+    float       lo    = ll_lo < hh_lo ? ll_lo : hh_lo;
+    float const hi    = ll_hi > hh_hi ? ll_hi : hh_hi;
+    // x straddles 0 → min of x*x is 0, attained at x=0; fmaf(0,0,y.lo) = y.lo.
+    if (x.lo <= 0.0f && 0.0f <= x.hi) { lo = y.lo; }
+    return (interval){lo, hi};
+}
+// square_sub_f32(x, y) = y - x*x with a single rounding — matches fmaf(-x,x,y).
+static interval interval_square_sub(interval x, interval y) {
+    float const ll_lo = fmaf(-x.lo, x.lo, y.lo),
+                hh_lo = fmaf(-x.hi, x.hi, y.lo);
+    float const ll_hi = fmaf(-x.lo, x.lo, y.hi),
+                hh_hi = fmaf(-x.hi, x.hi, y.hi);
+    float const lo    = ll_lo < hh_lo ? ll_lo : hh_lo;
+    float       hi    = ll_hi > hh_hi ? ll_hi : hh_hi;
+    // x straddles 0 → max of y - x*x is y (at x=0); fmaf(0,0,y.hi) = y.hi.
+    if (x.lo <= 0.0f && 0.0f <= x.hi) { hi = y.hi; }
+    return (interval){lo, hi};
+}
 
 // Tri-valued compare result: {0,0} (definitely false), {1,1} (definitely
 // true), or {0,1} (maybe).
@@ -168,6 +194,7 @@ static _Bool op_supported(struct ir_inst const *in) {
 
         case op_add_f32: case op_sub_f32: case op_mul_f32: case op_div_f32:
         case op_min_f32: case op_max_f32: case op_fma_f32: case op_fms_f32:
+        case op_square_f32: case op_square_add_f32: case op_square_sub_f32:
         case op_sqrt_f32: case op_abs_f32:
         case op_floor_f32: case op_ceil_f32:
 
@@ -250,10 +277,14 @@ interval interval_program_run(struct interval_program *p,
             case op_fma_f32: r = interval_fma(arg(p,in->x), arg(p,in->y), arg(p,in->z)); break;
             case op_fms_f32: r = interval_fms(arg(p,in->x), arg(p,in->y), arg(p,in->z)); break;
 
-            case op_sqrt_f32:  r = interval_sqrt    (arg(p,in->x));         break;
-            case op_abs_f32:   r = interval_abs     (arg(p,in->x));         break;
-            case op_floor_f32: r = interval_monotone(arg(p,in->x), floorf); break;
-            case op_ceil_f32:  r = interval_monotone(arg(p,in->x), ceilf);  break;
+            case op_square_add_f32: r = interval_square_add(arg(p,in->x), arg(p,in->y)); break;
+            case op_square_sub_f32: r = interval_square_sub(arg(p,in->x), arg(p,in->y)); break;
+
+            case op_sqrt_f32:   r = interval_sqrt    (arg(p,in->x));         break;
+            case op_abs_f32:    r = interval_abs     (arg(p,in->x));         break;
+            case op_square_f32: r = interval_square  (arg(p,in->x));         break;
+            case op_floor_f32:  r = interval_monotone(arg(p,in->x), floorf); break;
+            case op_ceil_f32:   r = interval_monotone(arg(p,in->x), ceilf);  break;
 
             case op_lt_f32: r = interval_lt(arg(p,in->x), arg(p,in->y)); break;
 

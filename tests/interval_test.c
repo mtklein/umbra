@@ -103,6 +103,58 @@ TEST(interval_ceil) {
                    (interval){2,4}) here;
 }
 
+// interval_square's tight straddle-zero bound is the whole point of op_square_f32.
+// Without it (via plain interval_mul(x, x)) the decorrelated result would be
+// [-1, 1] instead of [0, 1] for x in [-1, 1].
+TEST(interval_square) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_store_32(b, SINK, umbra_mul_f32(b, umbra_x(b), umbra_x(b)));  // rewrites to square
+
+    struct interval_program *p = interval_program_and_free(b);
+
+    // Straddle zero: tight bound starts at 0 (not -a²).
+    interval_equiv(interval_program_run(p, (interval){-1, 1},  (interval){0,0}, NULL),
+                   (interval){0, 1}) here;
+    interval_equiv(interval_program_run(p, (interval){-3, 2},  (interval){0,0}, NULL),
+                   (interval){0, 9}) here;
+    // Fully non-negative: endpoints squared in order.
+    interval_equiv(interval_program_run(p, (interval){2, 5},   (interval){0,0}, NULL),
+                   (interval){4, 25}) here;
+    // Fully non-positive: endpoints squared with order reversed.
+    interval_equiv(interval_program_run(p, (interval){-5, -2}, (interval){0,0}, NULL),
+                   (interval){4, 25}) here;
+
+    interval_program_free(p);
+}
+
+// x*x + y*y SDF base: the fused square_add path should produce a tight bound
+// that's strictly positive when |x| > 0 on the entire box, where plain
+// interval_mul(X,X)+interval_mul(Y,Y) would include 0 (and couldn't prove the
+// expression is nonzero).
+TEST(interval_square_sum_tight) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_val32 const X  = umbra_x(b),
+                      Y  = umbra_y(b),
+                      xx = umbra_mul_f32(b, X, X),
+                      yy = umbra_mul_f32(b, Y, Y),
+                      r  = umbra_add_f32(b, xx, yy);
+    umbra_store_32(b, SINK, r);
+
+    struct interval_program *p = interval_program_and_free(b);
+
+    // x in [2, 3] (fully positive) and y straddles 0.
+    // x² ∈ [4, 9]; y² ∈ [0, 1]; sum ∈ [4, 10].  Tight.
+    interval_equiv(interval_program_run(p, (interval){2, 3}, (interval){-1, 1}, NULL),
+                   (interval){4, 10}) here;
+
+    // Both straddle 0: sum ≥ 0, so lo bound must be 0 (not negative).
+    interval const out = interval_program_run(p, (interval){-1, 1}, (interval){-1, 1}, NULL);
+    out.lo >= 0.0f here;
+    out.hi <= 2.0f here;
+
+    interval_program_free(p);
+}
+
 TEST(interval_min) {
     struct umbra_builder *b = umbra_builder();
     umbra_store_32(b, SINK, umbra_min_f32(b, umbra_x(b), umbra_y(b)));

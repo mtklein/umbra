@@ -131,6 +131,7 @@ static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int scr
     case op_max_f32: put(c, FMAXNM_4s(d, x, y)); break;
     case op_sqrt_f32: put(c, FSQRT_4s(d, x)); break;
     case op_abs_f32: put(c, FABS_4s(d, x)); break;
+    case op_square_f32: put(c, FMUL_4s(d, x, x)); break;
     case op_round_f32: put(c, FRINTN_4s(d, x)); break;
     case op_floor_f32: put(c, FRINTM_4s(d, x)); break;
     case op_ceil_f32: put(c, FRINTP_4s(d, x)); break;
@@ -158,6 +159,32 @@ static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int scr
         } else {
             put(c, ORR_16b(scratch, z, z));
             put(c, FMLS_4s(scratch, x, y));
+            put(c, ORR_16b(d, scratch, scratch));
+        }
+        break;
+    case op_square_add_f32:
+        // d = x*x + y: reuse FMLA on y (the accumulator side).
+        if (d == y) {
+            put(c, FMLA_4s(d, x, x));
+        } else if (d != x) {
+            put(c, ORR_16b(d, y, y));
+            put(c, FMLA_4s(d, x, x));
+        } else {
+            put(c, ORR_16b(scratch, y, y));
+            put(c, FMLA_4s(scratch, x, x));
+            put(c, ORR_16b(d, scratch, scratch));
+        }
+        break;
+    case op_square_sub_f32:
+        // d = y - x*x: FMLS subtracts x*x from the accumulator.
+        if (d == y) {
+            put(c, FMLS_4s(d, x, x));
+        } else if (d != x) {
+            put(c, ORR_16b(d, y, y));
+            put(c, FMLS_4s(d, x, x));
+        } else {
+            put(c, ORR_16b(scratch, y, y));
+            put(c, FMLS_4s(scratch, x, x));
             put(c, ORR_16b(d, scratch, scratch));
         }
         break;
@@ -949,6 +976,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
         case op_max_f32:
         case op_sqrt_f32:
         case op_abs_f32:
+        case op_square_f32:
         case op_round_f32:
         case op_floor_f32:
         case op_ceil_f32:
@@ -957,6 +985,8 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
         case op_ceil_i32:
         case op_fma_f32:
         case op_fms_f32:
+        case op_square_add_f32:
+        case op_square_sub_f32:
         case op_add_i32:
         case op_sub_i32:
         case op_mul_i32:

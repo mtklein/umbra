@@ -357,6 +357,7 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *bb) {
             case op_max_f32:
             case op_sqrt_f32:
             case op_abs_f32:
+            case op_square_f32:
             case op_round_f32:
             case op_floor_f32:
             case op_ceil_f32:
@@ -365,6 +366,8 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *bb) {
             case op_ceil_i32:
             case op_fma_f32:
             case op_fms_f32:
+            case op_square_add_f32:
+            case op_square_sub_f32:
             case op_add_i32:
             case op_sub_i32:
             case op_mul_i32:
@@ -554,12 +557,15 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 [op_mul_f32] = &&L_op_mul_f32, [op_div_f32] = &&L_op_div_f32,
                 [op_min_f32] = &&L_op_min_f32, [op_max_f32] = &&L_op_max_f32,
                 [op_sqrt_f32] = &&L_op_sqrt_f32, [op_abs_f32] = &&L_op_abs_f32,
+                [op_square_f32] = &&L_op_square_f32,
 
                 [op_round_f32] = &&L_op_round_f32, [op_floor_f32] = &&L_op_floor_f32,
                 [op_ceil_f32] = &&L_op_ceil_f32,
                 [op_round_i32] = &&L_op_round_i32, [op_floor_i32] = &&L_op_floor_i32,
                 [op_ceil_i32] = &&L_op_ceil_i32,
                 [op_fma_f32] = &&L_op_fma_f32, [op_fms_f32] = &&L_op_fms_f32,
+                [op_square_add_f32] = &&L_op_square_add_f32,
+                [op_square_sub_f32] = &&L_op_square_sub_f32,
                 [op_add_i32] = &&L_op_add_i32, [op_sub_i32] = &&L_op_sub_i32,
                 [op_mul_i32] = &&L_op_mul_i32,
                 [op_shl_i32] = &&L_op_shl_i32, [op_shr_u32] = &&L_op_shr_u32,
@@ -999,8 +1005,9 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 CASE(op_div_f32) v->f32 = v[ip->x].f32 / v[ip->y].f32; NEXT;
                 CASE(op_min_f32) v->f32 = vec_min(v[ip->x].f32, v[ip->y].f32); NEXT;
                 CASE(op_max_f32) v->f32 = vec_max(v[ip->x].f32, v[ip->y].f32); NEXT;
-                CASE(op_sqrt_f32) v->f32 = vec_sqrt(v[ip->x].f32); NEXT;
-                CASE(op_abs_f32) v->f32 = vec_abs(v[ip->x].f32); NEXT;
+                CASE(op_sqrt_f32)   v->f32 = vec_sqrt(v[ip->x].f32); NEXT;
+                CASE(op_abs_f32)    v->f32 = vec_abs (v[ip->x].f32); NEXT;
+                CASE(op_square_f32) v->f32 = v[ip->x].f32 * v[ip->x].f32; NEXT;
                 CASE(op_round_f32) v->f32 = vec_round(v[ip->x].f32); NEXT;
                 CASE(op_floor_f32) v->f32 = vec_floor(v[ip->x].f32); NEXT;
                 CASE(op_ceil_f32)  v->f32 = vec_ceil(v[ip->x].f32);  NEXT;
@@ -1011,6 +1018,8 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
 #if defined(__ARM_FEATURE_FMA) || defined(__FMA__)
                 CASE(op_fma_f32) v->f32 = vec_fma(v[ip->x].f32, v[ip->y].f32, v[ip->z].f32); NEXT;
                 CASE(op_fms_f32) v->f32 = vec_fma(-v[ip->x].f32, v[ip->y].f32, v[ip->z].f32); NEXT;
+                CASE(op_square_add_f32) v->f32 = vec_fma( v[ip->x].f32, v[ip->x].f32, v[ip->y].f32); NEXT;
+                CASE(op_square_sub_f32) v->f32 = vec_fma(-v[ip->x].f32, v[ip->x].f32, v[ip->y].f32); NEXT;
 #else
                 CASE(op_fma_f32) {
                     F64 const x = cast(F64, v[ip->x].f32), y = cast(F64, v[ip->y].f32), z = cast(F64, v[ip->z].f32);
@@ -1019,6 +1028,14 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 CASE(op_fms_f32) {
                     F64 const x = cast(F64, v[ip->x].f32), y = cast(F64, v[ip->y].f32), z = cast(F64, v[ip->z].f32);
                     v->f32 = cast(F32, z - x * y);
+                } NEXT;
+                CASE(op_square_add_f32) {
+                    F64 const x = cast(F64, v[ip->x].f32), y = cast(F64, v[ip->y].f32);
+                    v->f32 = cast(F32, x * x + y);
+                } NEXT;
+                CASE(op_square_sub_f32) {
+                    F64 const x = cast(F64, v[ip->x].f32), y = cast(F64, v[ip->y].f32);
+                    v->f32 = cast(F32, y - x * x);
                 } NEXT;
 #endif
 
@@ -1114,6 +1131,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 CASE(op_m_##name##_r) v->dst  = EXPR; NEXT;
                 UN2(sqrt_f32,     f32, vec_sqrt(acc.f32))
                 UN2(abs_f32,      f32, vec_abs(acc.f32))
+                UN2(square_f32,   f32, acc.f32 * acc.f32)
                 UN2(round_f32,    f32, vec_round(acc.f32))
                 UN2(floor_f32,    f32, vec_floor(acc.f32))
                 UN2(ceil_f32,     f32, vec_ceil(acc.f32))

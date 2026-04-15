@@ -353,9 +353,12 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct ir_inst const
     if (inst->z.bits == inst->x.bits) { z_dead = 0; }
     if (inst->z.bits == inst->y.bits) { z_dead = 0; }
 
-    enum op const op = inst->op;
+    enum op const op  = inst->op;
     _Bool const   fma = op == op_fma_f32 || op == op_fms_f32;
-    _Bool const   destructive = fma || op == op_sel_32;
+    // square_add/sub(x, y) = x*x + y (or y - x*x): y is the accumulator,
+    // so its RA treatment mirrors z in fma.  x plays the role of fma's x and y.
+    _Bool const   sqa = op == op_square_add_f32 || op == op_square_sub_f32;
+    _Bool const   destructive = fma || sqa || op == op_sel_32;
 
     if (fma && z_dead) {
         s.rd = ra_claim(ra, inst->z.id, i);
@@ -367,6 +370,16 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct ir_inst const
         s.rd = ra_claim(ra, inst->y.id, i);
         y_dead = 0;
     } else if (fma && !z_dead) {
+        s.rd = ra_alloc(ra, sl, ns);
+        ra->slot[i].reg = s.rd;
+        ra->owner[(int)s.rd] = i;
+    } else if (sqa && y_dead) {
+        s.rd = ra_claim(ra, inst->y.id, i);
+        y_dead = 0;
+    } else if (sqa && x_dead) {
+        s.rd = ra_claim(ra, inst->x.id, i);
+        x_dead = 0;
+    } else if (sqa && !y_dead) {
         s.rd = ra_alloc(ra, sl, ns);
         ra->slot[i].reg = s.rd;
         ra->owner[(int)s.rd] = i;
