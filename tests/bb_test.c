@@ -2504,7 +2504,8 @@ TEST(test_cmp_unsigned_signed) {
         int32_t d12[4]={0}, d22[4]={0}, d32[4]={0};
         if (run(&B, bi, 4, 1, (struct umbra_buf[]){
             {.ptr=sa2, .count=count(sa2)}, {.ptr=sc2, .count=count(sc2)},
-            {.ptr=d12, .count=count(d12)}, {.ptr=d22, .count=count(d22)}, {.ptr=d32, .count=count(d32)},
+            {.ptr=d12, .count=count(d12)}, {.ptr=d22, .count=count(d22)},
+            {.ptr=d32, .count=count(d32)},
         })) {
             d12[0] == 1 here; d12[1] == 1 here; d12[2] == 1 here; d12[3] == 0 here;
             d22[0] == 0 here; d22[1] == 0 here; d22[2] == 0 here; d22[3] == 0 here;

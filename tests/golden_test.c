@@ -129,7 +129,7 @@ TEST(test_slug_rect) {
 
     struct umbra_shader_solid shader = umbra_shader_solid(color);
     struct umbra_coverage_wind cov = umbra_coverage_wind(
-        (struct umbra_buf){.ptr=wind_buf, .count=sizeof wind_buf / 4,
+        (struct umbra_buf){.ptr=wind_buf, .count=count(wind_buf),
                            .stride=W});
 
     struct umbra_draw_layout lay;
@@ -154,10 +154,10 @@ TEST(test_slug_rect) {
     float const slug_wh[2] = {60, 40};
     umbra_uniforms_fill_f32(alay.uniforms, alay.wh, slug_wh, 2);
     umbra_uniforms_fill_ptr(alay.uniforms, alay.curves_off,
-        (struct umbra_buf){.ptr=rect, .count=sizeof rect / 4});
+        (struct umbra_buf){.ptr=rect, .count=count(rect)});
     struct umbra_buf abuf[] = {
         (struct umbra_buf){.ptr=alay.uniforms, .count=alay.uni.slots},
-        {.ptr=wind_buf, .count=sizeof wind_buf / 4, .stride=W},
+        {.ptr=wind_buf, .count=count(wind_buf), .stride=W},
     };
     for (int j = 0; j < 4; j++) {
         umbra_uniforms_fill_i32(alay.uniforms, alay.loop_off, &j, 1);
@@ -319,7 +319,7 @@ static void run_long_batch_no_oom(struct umbra_backend *be) {
         float    color[4] = {0, 0, 0, 1};
         uint32_t pixel    = 0;
         struct umbra_buf bufs[] = {
-            {.ptr=color, .count=sizeof color / 4},
+            {.ptr=color, .count=count(color)},
             {.ptr=&pixel, .count=1, .stride=1},
         };
         int const N = 12000;
