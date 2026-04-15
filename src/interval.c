@@ -283,10 +283,9 @@ interval interval_program_run(struct interval_program *p,
                 // store_32 produces no value; r stays MAXIMAL.
                 break;
 
-            default:
-                // interval_program() should have returned NULL before we
-                // reached an unsupported op.
-                __builtin_unreachable();
+            // interval_program() should have returned NULL before we
+            // reached an unsupported op.
+            default: __builtin_unreachable();
         }
         p->v[i] = r;
     }
