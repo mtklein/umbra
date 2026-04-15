@@ -35,6 +35,11 @@ slides to prune through and richer coverage shapes to exercise.  Plan
 function for interval.c's op set (`sel_32`, compares, `gather`), so
 plans 04 and 05 are also the on-ramp for completing that surface.
 
+See also: [notes-coverage-vs-sdf.md](notes-coverage-vs-sdf.md), an
+open architectural note on whether our coverage-interval dispatcher
+is the right shape vs. iv2d's sdf-interval approach.  Not a plan; a
+captured discussion to re-read when drafting plans 04 and 05.
+
 What "absorbing iv2d's key ideas" means here
 --------------------------------------------
 
