@@ -7,7 +7,7 @@ When you're about to start working, explicitly write out your expectations
 about the work's impact on correctness, performance, code quality.  Then when
 you are done, compare the actual results with your written expectations.
 
-Make strong claims only with string proof, but take time for research to gather
+Make strong claims only with strong proof, but take time for research to gather
 that proof.  Identify any unproven statements clearly as your best guess, your
 perception of conventional best practice, etc.
 
@@ -50,8 +50,8 @@ comment to clarify, first see if refactoring or better identifiers can make it
 clear.  Reserve comments only for important context that cannot be expressed
 through code.  Never use comments for organization or decoration.
 
-Use East `const`, and use it liberally, especially to distinguish variables
-that name a value like `double const start_time = now()` from locals that are
+Use East `const`, and use it liberally, especially to distinguish locals that
+name a value like `double const start_time = now()` from locals that are
 locations to hold a updating value like `double elapsed = 0; elapsed += ...`.
 
 But use const pointers only in the extremely unusual situations where it helps
