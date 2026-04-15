@@ -1473,15 +1473,18 @@ TEST(test_draw_compile_interval_coverage) {
 }
 
 TEST(test_draw_queue_adaptive_matches_flat) {
-    // Adaptive quadtree dispatch should produce pixel-identical output to
-    // flat-dispatching partial_coverage over the same rect.  The soft-edge
-    // coverage makes interior / boundary / empty tiles coexist at r = 16
-    // on a 64×32 canvas, so the recursion actually prunes and all three
-    // leaf types get exercised.
+    // Adaptive quadtree dispatch must produce pixel-identical output to
+    // flat-dispatching partial_coverage over the same rect.  Canvas 2048×32
+    // is chosen so the root tile (2048 wide > QUEUE_MIN_TILE) actually
+    // splits, and the soft edge at r = 1000 places all three leaf types in
+    // the tree:
+    //   - x ∈ [0, 999]      → α bound [0, 0]  (empty, pruned)
+    //   - x ∈ [512, 1023]   → α bound [0, 1]  (straddles, partial at leaf)
+    //   - x ∈ [1024, 2047]  → α bound [1, 1]  (solid, full_coverage)
     struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 1});
     struct soft_edge_cov      cov    = {
         .base = {.build = soft_edge_build, .fill = soft_edge_fill},
-        .r    = 16.0f,
+        .r    = 1000.0f,
     };
 
     struct umbra_backend *be = umbra_backend_interp();
@@ -1491,7 +1494,7 @@ TEST(test_draw_queue_adaptive_matches_flat) {
     d->coverage != NULL here;
     umbra_draw_fill(&lay, &shader.base, &cov.base);
 
-    int const W = 64, H = 32;
+    int const W = 2048, H = 32;
     uint32_t *adaptive = calloc((size_t)(W * H), 4);
     uint32_t *flat     = calloc((size_t)(W * H), 4);
 
@@ -1512,13 +1515,49 @@ TEST(test_draw_queue_adaptive_matches_flat) {
     for (int i = 0; i < W * H; i++) {
         adaptive[i] == flat[i] here;
     }
-    // Sanity: both buffers actually got written.  Left half (x < 17) is
-    // untouched, right half (x >= 17) is red.
-    adaptive[0]      == 0          here;
-    adaptive[W - 1]  != 0          here;
+    // Sanity: empty region stayed 0, solid region got written.
+    adaptive[0]      == 0 here;
+    adaptive[W - 1]  != 0 here;
 
     free(adaptive);
     free(flat);
+    umbra_draw_free(d);
+    free(lay.uniforms);
+    be->free(be);
+}
+
+TEST(test_draw_queue_flat_fallback) {
+    // When the coverage IR isn't interval-expressible, umbra_draw_queue
+    // should fall through to a single flat partial_coverage dispatch.
+    // umbra_coverage_rect's le/lt/and/sel ops aren't supported by interval.c
+    // today, so rect coverage exercises the fallback path.
+    struct umbra_shader_solid  shader = umbra_shader_solid((float[]){1, 0, 0, 1});
+    struct umbra_coverage_rect cov    = umbra_coverage_rect((float[]){2.0f, 0.0f, 5.0f, 1.0f});
+
+    struct umbra_backend *be = umbra_backend_interp();
+    struct umbra_draw_layout lay;
+    struct umbra_draw *d = umbra_draw(be, &shader.base, &cov.base,
+                                      umbra_blend_srcover, umbra_fmt_8888, &lay);
+    d->coverage == NULL here;
+
+    umbra_draw_fill(&lay, &shader.base, &cov.base);
+    uint32_t dst[8] = {0};
+    struct umbra_buf buf[] = {
+        {.ptr = lay.uniforms, .count = lay.uni.slots},
+        {.ptr = dst,          .count = 8},
+    };
+    umbra_draw_queue(d, 0, 0, 8, 1, buf);
+    be->flush(be);
+
+    for (int i = 0; i < 8; i++) {
+        if (i >= 2 && i < 5) {
+            (dst[i] & 0xFF)         == 0xFF here;
+            ((dst[i] >> 24) & 0xFF) == 0xFF here;
+        } else {
+            dst[i] == 0 here;
+        }
+    }
+
     umbra_draw_free(d);
     free(lay.uniforms);
     be->free(be);
