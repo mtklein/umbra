@@ -1,4 +1,5 @@
 #include "../include/umbra_draw.h"
+#include "../src/count.h"
 #include "test.h"
 #include <stdint.h>
 
@@ -694,7 +695,7 @@ TEST(test_coverage_rect_white_dst) {
         {16, 4.0f, 12.0f},
         {24, 4.0f, 20.0f},
     };
-    int ncases = (int)(sizeof cases / sizeof cases[0]);
+    int ncases = count(cases);
 
     for (int ci = 0; ci < ncases; ci++) {
         rect_case rc = cases[ci];

@@ -3,6 +3,7 @@
 #include "../slides/slug.h"
 #include "../include/umbra.h"
 #include "../include/umbra_draw.h"
+#include "../src/count.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -269,7 +270,7 @@ int main(int argc, char *argv[]) {
         umbra_backend_metal(),  umbra_backend_vulkan(),
         umbra_backend_wgpu(),
     };
-    int const nb = (int)(sizeof bes / sizeof *bes);
+    int const nb = count(bes);
 
     _Bool any_anomaly = 0;
 

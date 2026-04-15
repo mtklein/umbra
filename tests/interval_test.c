@@ -1,6 +1,7 @@
 #include "../include/umbra.h"
 #include "../src/flat_ir.h"
 #include "../src/interval.h"
+#include "../src/count.h"
 #include "test.h"
 #include <math.h>
 #include <stdlib.h>
@@ -280,10 +281,7 @@ TEST(interval_circle_sdf_contains_samples) {
         { 0.5f, 1.5f, 0.5f, 1.5f},
         {-1.5f, 0.0f, 0.25f, 0.75f},
     };
-    // TODO: add src/len.h with #define len(arr) (int)(sizeof(arr) / sizeof(0[arr])),
-    // which would let this (and ~a dozen similar sites in src/, tests/, tools/, slides/)
-    // drop the sizeof/sizeof/(int)cast boilerplate in favor of `bi < len(boxes)`.
-    for (int bi = 0; bi < (int)(sizeof boxes / sizeof *boxes); bi++) {
+    for (int bi = 0; bi < count(boxes); bi++) {
         interval const X = {boxes[bi].xlo, boxes[bi].xhi},
                        Y = {boxes[bi].ylo, boxes[bi].yhi};
         interval const bound = interval_program_run(p, X, Y, r, 1);

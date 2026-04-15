@@ -5,6 +5,7 @@
 #include "../slides/slide.h"
 #include "../slides/text.h"
 #include "../slides/slug.h"
+#include "../src/count.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -26,7 +27,7 @@ static struct umbra_fmt const *all_fmts[] = {
     &umbra_fmt_fp16,
     &umbra_fmt_fp16_planar,
 };
-enum { N_FMTS = (int)(sizeof all_fmts / sizeof *all_fmts) };
+enum { N_FMTS = count(all_fmts) };
 
 static void build_pipes(void) {
     bes[0] = umbra_backend_interp();

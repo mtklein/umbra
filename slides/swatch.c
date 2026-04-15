@@ -1,4 +1,5 @@
 #include "slide.h"
+#include "../src/count.h"
 #include <stdlib.h>
 
 struct swatch_slide {
@@ -50,7 +51,7 @@ static void swatch_draw(struct slide *s, int frame, int l, int t, int r, int b, 
         {1.0f, 1.0f, 0.0f, 1.0f},
         {1.0f, 0.0f, 1.0f, 1.0f},
     };
-    enum { N = (int)(sizeof swatches / sizeof *swatches), COLS = 5, ROWS = 2 };
+    enum { N = count(swatches), COLS = 5, ROWS = 2 };
     int const cw = st->w / COLS,
               ch = st->h / ROWS;
 

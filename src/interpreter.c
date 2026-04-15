@@ -1,5 +1,6 @@
 #include "assume.h"
 #include "flat_ir.h"
+#include "count.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -25,7 +26,7 @@ static int const iota[] = {
     32,33,34,35, 36,37,38,39, 40,41,42,43, 44,45,46,47,
     48,49,50,51, 52,53,54,55, 56,57,58,59, 60,61,62,63,
 };
-_Static_assert(sizeof iota / sizeof *iota >= K, "");
+_Static_assert(count(iota) >= K, "");
 
 typedef int32_t  I32 __attribute__((vector_size(K * 4)));
 typedef uint32_t U32 __attribute__((vector_size(K * 4)));
@@ -459,7 +460,7 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *bb) {
 #undef UV
             };
 
-            if (tag < (int)(sizeof upgrade / sizeof *upgrade) && upgrade[tag].out_r_in_r) {
+            if (tag < count(upgrade) && upgrade[tag].out_r_in_r) {
                 if      ( out_r && x_r)                  { s->tag = upgrade[tag].out_r_in_r; }
                 else if (!out_r && x_r)                  { s->tag = upgrade[tag].out_m_in_r; }
                 else if ( out_r && upgrade[tag].out_r)    { s->tag = upgrade[tag].out_r; }

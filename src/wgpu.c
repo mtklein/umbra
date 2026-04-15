@@ -1,5 +1,6 @@
 #include "assume.h"
 #include "gpu_buf_cache.h"
+#include "count.h"
 #include "spirv.h"
 #include "uniform_ring.h"
 #include <stdio.h>
@@ -605,7 +606,7 @@ struct umbra_backend *umbra_backend_wgpu(void) {
     };
     WGPUInstance instance = wgpuCreateInstance(&(WGPUInstanceDescriptor){
         .nextInChain         = &instance_extras.chain,
-        .requiredFeatureCount = sizeof inst_feats / sizeof inst_feats[0],
+        .requiredFeatureCount = (size_t)count(inst_feats),
         .requiredFeatures     = inst_feats,
     });
     if (!instance) { return 0; }
@@ -631,7 +632,7 @@ struct umbra_backend *umbra_backend_wgpu(void) {
         WGPUFeatureName_ShaderF16,
         WGPUFeatureName_TimestampQuery,
     };
-    int n_features = (int)(sizeof features / sizeof features[0]);
+    int n_features = count(features);
     WGPUDevice dev = NULL;
     WGPUDeviceDescriptor dev_desc    = WGPU_DEVICE_DESCRIPTOR_INIT;
     dev_desc.requiredFeatureCount     = (size_t)n_features;

@@ -1,5 +1,6 @@
 #include "assume.h"
 #include "dispatch_overlap.h"
+#include "count.h"
 #include "spirv.h"
 #include "uniform_ring.h"
 #include <stdlib.h>
@@ -708,7 +709,7 @@ struct umbra_backend *umbra_backend_vulkan(void) {
             .pNext = &f16,
             .queueCreateInfoCount = 1,
             .pQueueCreateInfos = &qci,
-            .enabledExtensionCount = sizeof exts / sizeof *exts,
+            .enabledExtensionCount = (uint32_t)count(exts),
             .ppEnabledExtensionNames = exts,
         };
         if (vkCreateDevice(phys, &dci, 0, &device) != VK_SUCCESS) {
