@@ -53,8 +53,9 @@ static struct umbra_flat_ir* build_circle_ir(void) {
 
 struct sample { interval x, y; };
 
-// sink absorbs results so the compiler can't drop the run() call.
-static float sink_absorb = 0;
+// Volatile sink: every write is observable, so the compiler can't drop the
+// run() calls that feed it.
+static volatile float sink_absorb;
 static void time_samples(char const *label, struct interval_program *p,
                          float const *uniform, struct sample const *s, int n,
                          double target_secs, int samples) {
@@ -138,7 +139,6 @@ int main(void) {
     time_samples("far",  p, uniform, far,  8, 0.05, 7);
     time_samples("edge", p, uniform, edge, 8, 0.05, 7);
     time_samples("tiny", p, uniform, tiny, 8, 0.05, 7);
-    printf("  sink   %g (ignore)\n", (double)sink_absorb);
 
     interval_program_free(p);
     return 0;
