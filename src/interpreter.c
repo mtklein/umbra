@@ -1018,8 +1018,10 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
 #if defined(__ARM_FEATURE_FMA) || defined(__FMA__)
                 CASE(op_fma_f32) v->f32 = vec_fma(v[ip->x].f32, v[ip->y].f32, v[ip->z].f32); NEXT;
                 CASE(op_fms_f32) v->f32 = vec_fma(-v[ip->x].f32, v[ip->y].f32, v[ip->z].f32); NEXT;
-                CASE(op_square_add_f32) v->f32 = vec_fma( v[ip->x].f32, v[ip->x].f32, v[ip->y].f32); NEXT;
-                CASE(op_square_sub_f32) v->f32 = vec_fma(-v[ip->x].f32, v[ip->x].f32, v[ip->y].f32); NEXT;
+                CASE(op_square_add_f32) v->f32 = vec_fma(v[ip->x].f32, v[ip->x].f32,
+                                                         v[ip->y].f32); NEXT;
+                CASE(op_square_sub_f32) v->f32 = vec_fma(-v[ip->x].f32, v[ip->x].f32,
+                                                         v[ip->y].f32); NEXT;
 #else
                 CASE(op_fma_f32) {
                     F64 const x = cast(F64, v[ip->x].f32), y = cast(F64, v[ip->y].f32), z = cast(F64, v[ip->z].f32);
