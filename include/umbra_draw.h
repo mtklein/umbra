@@ -84,9 +84,13 @@ umbra_draw_compile(struct umbra_backend*,
                    struct umbra_draw_layout*);
 void umbra_draw_programs_free(struct umbra_draw_programs*);
 
-// Dispatch the bundle.  Currently always flat-dispatches `partial_coverage`;
-// plan 02 step 2 adds interval-pruned quadtree descent when `coverage` is
-// non-NULL.
+// Dispatch the bundle over rect [l, t, r, b).  If the bundle has an
+// `interval_program`, descends a quadtree — skipping tiles where the α bound
+// is <= 0, running `full_coverage` on tiles where the α bound is >= 1,
+// running `partial_coverage` only on tiles that straddle the boundary down
+// to a minimum-size floor.  If `coverage` is NULL (coverage IR wasn't
+// expressible as intervals), falls back to a single flat `partial_coverage`
+// dispatch.
 void umbra_draw_queue(struct umbra_draw_programs const*,
                       int l, int t, int r, int b, struct umbra_buf[]);
 

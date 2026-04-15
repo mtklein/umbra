@@ -324,9 +324,57 @@ void umbra_draw_programs_free(struct umbra_draw_programs *p) {
     *p = (struct umbra_draw_programs){0};
 }
 
+// Tile floor for the quadtree recursion: below this size the interval bound
+// savings stop paying for the interval_program_run overhead.  Roughly matches
+// the widest backend lane count (x86 AVX2 K=8 ×2 per-op for f32, ARM64 K=8,
+// Metal/Vulkan subgroups are 32 but dispatch gracefully down), with some
+// headroom so a 16-pixel-wide boundary tile runs partial in one go.
+//
+// Plan 02 left this as a tunable; hard-coded for now and revisited after we
+// bench the circle slide.
+enum { QUEUE_MIN_TILE = 16 };
+
+static void queue_recurse(struct umbra_draw_programs const *p,
+                          int l, int t, int r, int b,
+                          struct umbra_buf buf[], float const *uniform) {
+    if (l >= r || t >= b) { return; }
+
+    // op_x / op_y yield integer pixel coordinates in [l, r-1] × [t, b-1] —
+    // closed on both ends because the coverage evaluates at every pixel the
+    // tile dispatches.  Passing the tight bound keeps the α interval as
+    // narrow as possible, which matters for thin-boundary tiles near the 0/1
+    // thresholds where an extra-wide bound would miss a prune.
+    interval const alpha = interval_program_run(p->coverage,
+                                                (interval){(float)l, (float)(r - 1)},
+                                                (interval){(float)t, (float)(b - 1)},
+                                                uniform);
+    if (alpha.hi <= 0.0f) { return; }
+    if (alpha.lo >= 1.0f) {
+        p->full_coverage->queue(p->full_coverage, l, t, r, b, buf);
+        return;
+    }
+
+    int const w = r - l, h = b - t;
+    if (w <= QUEUE_MIN_TILE && h <= QUEUE_MIN_TILE) {
+        p->partial_coverage->queue(p->partial_coverage, l, t, r, b, buf);
+        return;
+    }
+    int const mx = (l + r) / 2,
+              my = (t + b) / 2;
+    queue_recurse(p, l,  t,  mx, my, buf, uniform);
+    queue_recurse(p, mx, t,  r,  my, buf, uniform);
+    queue_recurse(p, l,  my, mx, b,  buf, uniform);
+    queue_recurse(p, mx, my, r,  b,  buf, uniform);
+}
+
 void umbra_draw_queue(struct umbra_draw_programs const *p,
                       int l, int t, int r, int b, struct umbra_buf buf[]) {
-    p->partial_coverage->queue(p->partial_coverage, l, t, r, b, buf);
+    if (!p->coverage) {
+        p->partial_coverage->queue(p->partial_coverage, l, t, r, b, buf);
+        return;
+    }
+    float const *uniform = (float const *)buf[0].ptr + p->uniform_offset;
+    queue_recurse(p, l, t, r, b, buf, uniform);
 }
 
 static umbra_val32 clamp01(struct umbra_builder *builder, umbra_val32 t) {

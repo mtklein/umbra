@@ -1472,3 +1472,56 @@ TEST(test_draw_compile_interval_coverage) {
     free(lay.uniforms);
     be->free(be);
 }
+
+TEST(test_draw_queue_adaptive_matches_flat) {
+    // Adaptive quadtree dispatch should produce pixel-identical output to
+    // flat-dispatching partial_coverage over the same rect.  The soft-edge
+    // coverage makes interior / boundary / empty tiles coexist at r = 16
+    // on a 64×32 canvas, so the recursion actually prunes and all three
+    // leaf types get exercised.
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 1});
+    struct soft_edge_cov      cov    = {
+        .base = {.build = soft_edge_build, .fill = soft_edge_fill},
+        .r    = 16.0f,
+    };
+
+    struct umbra_backend *be = umbra_backend_interp();
+    struct umbra_draw_layout   lay;
+    struct umbra_draw_programs pr = umbra_draw_compile(be, &shader.base, &cov.base,
+                                                       umbra_blend_srcover, umbra_fmt_8888,
+                                                       &lay);
+    pr.coverage != NULL here;
+    umbra_draw_fill(&lay, &shader.base, &cov.base);
+
+    int const W = 64, H = 32;
+    uint32_t *adaptive = calloc((size_t)(W * H), 4);
+    uint32_t *flat     = calloc((size_t)(W * H), 4);
+
+    struct umbra_buf adaptive_buf[] = {
+        {.ptr = lay.uniforms, .count = lay.uni.slots},
+        {.ptr = adaptive,     .count = W * H, .stride = W},
+    };
+    struct umbra_buf flat_buf[] = {
+        {.ptr = lay.uniforms, .count = lay.uni.slots},
+        {.ptr = flat,         .count = W * H, .stride = W},
+    };
+
+    umbra_draw_queue(&pr, 0, 0, W, H, adaptive_buf);
+    be->flush(be);
+    pr.partial_coverage->queue(pr.partial_coverage, 0, 0, W, H, flat_buf);
+    be->flush(be);
+
+    for (int i = 0; i < W * H; i++) {
+        adaptive[i] == flat[i] here;
+    }
+    // Sanity: both buffers actually got written.  Left half (x < 17) is
+    // untouched, right half (x >= 17) is red.
+    adaptive[0]      == 0          here;
+    adaptive[W - 1]  != 0          here;
+
+    free(adaptive);
+    free(flat);
+    umbra_draw_programs_free(&pr);
+    free(lay.uniforms);
+    be->free(be);
+}
