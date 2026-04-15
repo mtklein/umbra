@@ -247,8 +247,8 @@ void umbra_draw_fill(struct umbra_draw_layout const *layout,
 // coverage.  It keeps interval.c narrow — every op it accepts has principled
 // interval semantics, rather than needing a "this conversion is identity here
 // because we happen to know the input is a pixel coordinate" case.
-static struct interval_program*
-build_coverage_interval(struct umbra_coverage *coverage, int *out_slots) {
+static struct interval_program* build_coverage_interval(struct umbra_coverage *coverage,
+                                                        int *out_slots) {
     struct umbra_builder *b = umbra_builder();
     umbra_val32 const x = umbra_x(b),
                       y = umbra_y(b);
@@ -293,11 +293,10 @@ build_coverage_interval(struct umbra_coverage *coverage, int *out_slots) {
 // reserves the same slots in the same order regardless of what runs after it.
 // A future shader that violates this would desync full's slot offsets from
 // partial's.  Covered by assume() below.
-struct umbra_draw*
-umbra_draw(struct umbra_backend *be,
-           struct umbra_shader *shader, struct umbra_coverage *coverage,
-           umbra_blend_fn blend, struct umbra_fmt fmt,
-           struct umbra_draw_layout *layout) {
+struct umbra_draw* umbra_draw(struct umbra_backend *be,
+                              struct umbra_shader *shader, struct umbra_coverage *coverage,
+                              umbra_blend_fn blend, struct umbra_fmt fmt,
+                              struct umbra_draw_layout *layout) {
     struct umbra_draw *d = calloc(1, sizeof *d);
     int coverage_slots = 0;
 
@@ -359,7 +358,7 @@ void umbra_draw_free(struct umbra_draw *d) {
 // regressing anything.
 enum { QUEUE_MIN_TILE = 512 };
 
-static void queue_recurse(struct umbra_draw const *p,
+static void queue_recurse(struct umbra_draw const *d,
                           int l, int t, int r, int b,
                           struct umbra_buf buf[], float const *uniform) {
     if (l >= r || t >= b) { return; }
@@ -369,27 +368,27 @@ static void queue_recurse(struct umbra_draw const *p,
     // tile dispatches.  Passing the tight bound keeps the α interval as
     // narrow as possible, which matters for thin-boundary tiles near the 0/1
     // thresholds where an extra-wide bound would miss a prune.
-    interval const alpha = interval_program_run(p->coverage,
+    interval const alpha = interval_program_run(d->coverage,
                                                 (interval){(float)l, (float)(r - 1)},
                                                 (interval){(float)t, (float)(b - 1)},
                                                 uniform);
     if (alpha.hi <= 0.0f) { return; }
     if (alpha.lo >= 1.0f) {
-        p->full_coverage->queue(p->full_coverage, l, t, r, b, buf);
+        d->full_coverage->queue(d->full_coverage, l, t, r, b, buf);
         return;
     }
 
     int const w = r - l, h = b - t;
     if (w <= QUEUE_MIN_TILE && h <= QUEUE_MIN_TILE) {
-        p->partial_coverage->queue(p->partial_coverage, l, t, r, b, buf);
+        d->partial_coverage->queue(d->partial_coverage, l, t, r, b, buf);
         return;
     }
     int const mx = (l + r) / 2,
               my = (t + b) / 2;
-    queue_recurse(p, l,  t,  mx, my, buf, uniform);
-    queue_recurse(p, mx, t,  r,  my, buf, uniform);
-    queue_recurse(p, l,  my, mx, b,  buf, uniform);
-    queue_recurse(p, mx, my, r,  b,  buf, uniform);
+    queue_recurse(d, l,  t,  mx, my, buf, uniform);
+    queue_recurse(d, mx, t,  r,  my, buf, uniform);
+    queue_recurse(d, l,  my, mx, b,  buf, uniform);
+    queue_recurse(d, mx, my, r,  b,  buf, uniform);
 }
 
 void umbra_draw_queue(struct umbra_draw const *d,
