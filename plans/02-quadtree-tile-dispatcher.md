@@ -1,7 +1,7 @@
 02 — Quadtree tile dispatcher
 =============================
 
-Status: not started
+Status: complete — see Retrospective below.
 Depends on: 01
 Pairs well with: 04, 05
 
@@ -210,3 +210,191 @@ Non-goals
   backends.
 - No change to the coverage contract.
 - No interaction with loops/ifs in coverage (01 will bail on those for now).
+
+
+Retrospective
+-------------
+
+Landed across thirteen commits in April 2026.  Design drifted substantially
+from the sketch during implementation — the dispatcher lives somewhere
+different than planned, and the public API took a different shape.
+
+### What we built vs what was sketched
+
+**File layout.**  Sketch: new `src/tile_cover.{h,c}` owning a
+`tile_cover_programs` type and `tile_cover_dispatch` recursion.  Landed:
+everything lives in `src/draw.c`, which already composes shader + coverage
++ blend.  The compiled bundle is `struct umbra_draw` (opaque in the public
+header, full definition in a new `src/draw.h` for tests), the recursion
+is a static `queue_recurse` in draw.c, and there's no separate tile_cover
+module.  Reasoning (from mid-flight discussion): draw.c is where pipeline
+composition already happens, and the recursion is ~25 lines that don't
+need their own TU.  Matches CLAUDE.md's "don't create helpers / abstractions
+for one-time operations."
+
+**API shape.**  Sketch: a new `_tile` entry point next to `umbra_draw_build`,
+opt-in, so slides choose.  Landed: one API for everyone.
+`umbra_draw(be, shader, coverage, blend, fmt, layout)` returns a
+`struct umbra_draw*` holding the three-program bundle.  If the coverage IR
+intervalizes, the bundle gets an `interval_program`; otherwise it stays
+NULL.  `umbra_draw_queue(d, l, t, r, b, buf)` branches internally: quadtree
+when `d->coverage` is non-NULL, single flat dispatch otherwise.  Callers
+don't need to know whether their coverage is interval-expressible.  This
+emerged from a question in review and is strictly simpler for slides.
+
+The old `umbra_draw_build` (returns `umbra_builder*`) was renamed to
+`umbra_draw_builder` to free the name; the new constructor is just
+`umbra_draw()` per CLAUDE.md's convention that a type's constructor takes
+its bare name and the return type forward-declares the opaque type.
+
+**Uniforms alignment invariant.**  Not in the sketch.  Calling
+`coverage->build` twice (once for the interval IR, once inside the partial
+program build) means `self->off_` gets overwritten on the second call.  We
+rely on the partial call running *last* so `self->off_ = shader_slots`
+survives into dispatch and `coverage->fill` writes coverage uniforms where
+the partial program expects them.  The interval IR uses its own
+zero-based slot frame; `d->uniform_offset` records the delta so
+`interval_program_run` gets a correctly-shifted pointer into the shared
+uniforms buffer.  Covered by a design-notes comment block and an
+`assume()`.  Relies on shader->build being coverage-oblivious — a
+reasonable invariant but one a future shader could trip over silently.
+
+**Interval pointer convention swap.**  Not in the sketch; forced by
+aligning with umbra_draw.  Plan 01 had interval.c reading uniforms from
+`.ix=1` and storing output to `.ix=0`.  umbra_draw does the opposite.
+Swapping interval.c's convention (UNIFORM=0, SINK=1) lets a coverage
+authored against umbra_draw lift into an interval_program without pointer
+rewriting.  One-line code change plus comment updates.  Worth the
+disruption; the alternative was a translation pass on every coverage IR.
+
+**`f32_from_i32` design detour.**  The sketch's "Expected op additions"
+list called out `f32_from_i32` as likely-needed.  First landed it as an
+identity in interval.c ("same domain in interval land").  Review pushback:
+"storage type and op type aren't the same thing; calling it identity
+elides that it's a real runtime conversion."  Walked it back.  Better
+approach: build the coverage-only IR without wrapping x/y in the
+conversion at all.  Coverages thread x/y through type-erased float ops,
+so dropping the conversion is transparent at the IR level, and interval.c
+stays narrow — every op it accepts has principled interval semantics.
+Recorded in commits `58b3fbe4` + `fffdf0f1` so the reasoning is legible.
+
+**Interior / boundary branches.**  Sketch pseudocode ran flat if
+α ∈ [0,1].  Landed with three branches: skip if α.hi ≤ 0, dispatch
+full_coverage (shader + blend, no coverage multiply) if α.lo ≥ 1,
+dispatch partial_coverage (full pipeline) otherwise.  The "full" program
+is just `umbra_draw_build(shader, NULL, blend, ...)` — reuses the
+existing coverage=NULL path rather than a hand-derived "solid" variant.
+Answer to the sketch's open question: yes, draw.c derives it.
+
+**Tight interval bounds at tile edges.**  Sketch pseudocode passed
+`(interval){l, r}`.  Landed `(interval){l, r-1}` since op_x yields
+integer coords in the closed range `[l, r-1]`.  Matters for thin-boundary
+tiles near the 0/1 thresholds where an extra-wide bound misses a prune.
+
+**MIN_TILE chosen by sweep.**  Sketch flagged it as "pick K or 16;
+measure."  We swept MIN_TILE ∈ {4..99999} across interp/jit/metal/vulkan/
+wgpu on the circle slide and landed 512 — the smallest value where every
+backend beats its flat baseline.  Per-backend optima are ~32× apart
+(CPU: 16–32, GPU: 512–1024); 512 leaves ~10% CPU throughput on the table
+in exchange for not regressing GPU.  TODO in the code for principled
+per-backend `dispatch_granularity` querying.
+
+### Side yields
+
+- `tools/bench_interval.c` — gating micro-bench for interval_program_run.
+  Built to answer the plan's "bench before committing" instruction.
+  Kept in-tree for regression checking as we grow interval.c.  Used the
+  `volatile` pattern for the sink (cleaner than a static+final-print).
+- `interval.c` learned `mul_f32_imm`, `min_f32_imm`, `max_f32_imm` —
+  the clamp idiom every real coverage uses.  Separate commit with
+  regression tests.
+- Renaming pass: `umbra_draw_build` → `umbra_draw_builder`, reclaiming
+  `umbra_draw` for the constructor.  Widespread (every slide + several
+  tests) but mechanical.
+
+### Performance
+
+Circle slide (4096×480, circle covering ~1% of canvas):
+
+    backend   flat ns/px   adaptive@512   speedup
+      metal       0.05          0.03        1.7×
+     vulkan       0.06          0.04        1.5×
+       wgpu       0.07          0.06        1.2×
+        jit       0.86          0.20        4.3×
+     interp       2.48          0.47        5.3×
+
+Interpreter overhead on the interval path measured separately (plan 02
+step 0): ~19 ns/call on arm64, ~46 ns/call on x86_64h via Rosetta, for
+a 20-op circle SDF.  Far under the plan's ~200 ns budget — the
+interpreter is not the bottleneck.  At MIN_TILE=512 on a 4096×480
+canvas the dispatcher makes ~40 `interval_program_run` calls per
+frame, negligible against the pixel work.
+
+Per-backend MIN_TILE optima (for future tuning):
+
+    backend   optimum MIN_TILE   ns/px there
+     interp         32              0.37
+        jit         16–32           0.16
+      metal        256–1024         0.03
+     vulkan        256–1024         0.04
+       wgpu         1024            0.05
+
+### What didn't land
+
+- Per-backend `min_tile`: captured as a TODO in draw.c.  The 32× spread
+  between CPU-optimal and GPU-optimal is real and there's probably a
+  principled way to derive it from backend parameters (subgroup size,
+  per-dispatch latency).  Next plan.
+- Slide migrations beyond circle: only circle is on the new API.  Every
+  other slide still flat-dispatches.  TODO in draw.c.
+- New interval ops (sel_32, le_f32, gather, mask composition, integer
+  conversions) — the sketch's "Expected op additions" list.  Deferred
+  until a real slide forces each one.
+- dispatch_overlap interaction — not re-verified.  The cap (64 writes)
+  could overflow on a deep enough quadtree, degrading to conservative
+  barriers.  Works by construction (non-overlapping tiles) for typical
+  slide sizes; revisit if it bites.
+
+### LOC
+
+Plan: ~300 lines in tile_cover.c, smallish draw.c addition.  Actual:
+~170 lines added to draw.c, 17 lines src/draw.h, 26 lines added to
+the public header, ~100 lines new tests, ~145 lines bench_interval
+tool, plus ~20 lines interval.c for new ops and convention swap.
+Bigger than planned but spread thinner — no single new TU got close to
+300 lines.
+
+### Lessons
+
+1. **One API beats two.**  "Everyone gets the bundle, dispatch branches
+   internally" is strictly simpler for callers than "opt into the
+   dispatcher by calling a different function."  Worth reaching for this
+   shape earlier in plan drafts.
+
+2. **Keep the interval interpreter narrow.**  When a coverage's IR
+   contains an op interval.c doesn't support, the right first move is
+   usually to ask "can we avoid emitting that op?" rather than "can
+   interval.c accept it?"  The `f32_from_i32` detour cost a round-trip
+   we'd have saved by asking this up front.
+
+3. **Bench before optimizing.**  The plan explicitly said "bench before
+   committing to the dispatcher" and it paid off — we found we were 10×
+   under the interpreter budget and saved ourselves from preemptive
+   work on the hot path.
+
+4. **Per-backend performance tuning is a real thing.**  The 32× spread
+   between CPU-optimal and GPU-optimal MIN_TILE is a design signal,
+   not noise.  A single compromise value can be the right move (it was
+   here) but future performance work should plan for per-backend knobs.
+
+5. **"Constructor name is the type" reads better.**  CLAUDE.md's
+   convention (`umbra_draw()` returns `struct umbra_draw*`, no separate
+   forward decl) landed noticeably cleaner than `umbra_draw_programs`
+   / `umbra_draw_compile` / `umbra_draw_programs_free`.  Apply the
+   convention deliberately in future public APIs.
+
+6. **Slide migration is a natural forcing function for op support.**
+   The plan's "add interval ops as slides hit them" guidance proved
+   exactly right: circle's coverage forced `mul/min/max _f32_imm`;
+   other slides will force `sel_32`, compare ops, etc.  Plan future
+   work by slide migration rather than by op list.
