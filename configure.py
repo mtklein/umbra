@@ -226,21 +226,28 @@ def render_project_ninja():
 PROJECT_NINJA = render_project_ninja()
 
 
-HOST_NINJA = r"""out     = $builddir/host
+# ----- Demo target (host + xsan share an identical block) -------------------
+
+DEMO_LDFLAGS = '-framework Metal -framework Foundation -L/opt/homebrew/lib -lSDL3 -lMoltenVK -lwgpu_native'
+
+
+def render_demo_block():
+    return (compile_line('tools/demo.c')
+            + compile_line('tools/work_group.c')
+            + f'build $out/demo: link {link_objs("tools/demo.c", "tools/work_group.c", "tools/stb_image_write.c")}\n'
+            + f'    ldflags = {DEMO_LDFLAGS}\n')
+
+
+DEMO_BLOCK = render_demo_block()
+
+
+HOST_NINJA = f"""out     = $builddir/host
 cc      = $clang
 ldflags = -framework Metal -framework Foundation -L/opt/homebrew/lib -lMoltenVK -lwgpu_native
 
 include build/project.ninja
 
-
-build $out/tools/demo.o: compile tools/demo.c
-    cflags = -I/opt/homebrew/include -Wno-cast-align
-build $out/tools/work_group.o: compile tools/work_group.c
-build $out/demo:   link $out/tools/demo.o $out/tools/work_group.o $out/src/builder.o $out/src/flat_ir.o $out/src/op.o $out/src/fingerprint.o $out/src/dispatch_overlap.o $out/src/gpu_buf_cache.o $out/src/hash.o $out/src/uniforms.o $out/src/uniform_ring.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/jit_arm64.o $out/src/jit_x86.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/spirv.o $out/src/vulkan.o $out/src/wgpu.o $out/src/draw.o $out/tools/stb_truetype.o $out/tools/stb_image_write.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/anim.o $out/slides/overview.o $out/slides/swatch.o $out/slides/circle.o
-    ldflags = -framework Metal -framework Foundation -L/opt/homebrew/lib -lSDL3 -lMoltenVK -lwgpu_native
-
-
-"""
+{DEMO_BLOCK}"""
 
 
 LTO_NINJA = r"""out     = $builddir/lto
@@ -306,7 +313,7 @@ include build/project.ninja
 """
 
 
-XSAN_NINJA_PREFIX = r"""cov = -fprofile-instr-generate -fcoverage-mapping
+XSAN_NINJA_PREFIX = f"""cov = -fprofile-instr-generate -fcoverage-mapping
 
 out     = $builddir/xsan
 cc      = $clang -fsanitize=address,integer,undefined -fno-sanitize-recover=all $cov
@@ -314,12 +321,7 @@ exec    = env UBSAN_OPTIONS=print_stacktrace=1 LLVM_PROFILE_FILE=$builddir/xsan/
 ldflags = -framework Metal -framework Foundation -L/opt/homebrew/lib -lMoltenVK -lwgpu_native $cov
 include build/project.ninja
 
-build $out/tools/demo.o: compile tools/demo.c
-    cflags = -I/opt/homebrew/include -Wno-cast-align
-build $out/tools/work_group.o: compile tools/work_group.c
-build $out/demo:   link $out/tools/demo.o $out/tools/work_group.o $out/src/builder.o $out/src/flat_ir.o $out/src/op.o $out/src/fingerprint.o $out/src/dispatch_overlap.o $out/src/gpu_buf_cache.o $out/src/hash.o $out/src/uniforms.o $out/src/uniform_ring.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/jit_arm64.o $out/src/jit_x86.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/spirv.o $out/src/vulkan.o $out/src/wgpu.o $out/src/draw.o $out/tools/stb_truetype.o $out/tools/stb_image_write.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/anim.o $out/slides/overview.o $out/slides/swatch.o $out/slides/circle.o
-    ldflags = -framework Metal -framework Foundation -L/opt/homebrew/lib -lSDL3 -lMoltenVK -lwgpu_native
-
+{DEMO_BLOCK}
 """
 XSAN_NINJA_SUFFIX = r"""
 x86 = $builddir/x86_64h_xsan
