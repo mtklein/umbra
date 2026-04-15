@@ -48,3 +48,20 @@ subninja build/x86_64h.ninja
 subninja build/x86_64h_xsan.ninja
 subninja build/gcc.ninja
 subninja build/size.ninja
+
+rule configure
+    command = python3 configure.py
+    description = configure
+    generator = 1
+
+build build.ninja $
+      build/project.ninja $
+      build/host.ninja $
+      build/lto.ninja $
+      build/xsan.ninja $
+      build/wasm.ninja $
+      build/x86_64.ninja $
+      build/x86_64h.ninja $
+      build/x86_64h_xsan.ninja $
+      build/gcc.ninja $
+      build/size.ninja: configure | configure.py
