@@ -266,6 +266,14 @@ build_coverage_interval(struct umbra_coverage *coverage, int *out_slots) {
     return p;
 }
 
+// TODO: migrate the remaining slides to umbra_draw() / umbra_draw_queue().
+// Only circle_coverage is on the new API today; every other slide still goes
+// through umbra_draw_builder → be->compile → prog->queue and thus dispatches
+// flat regardless of whether its coverage is interval-expressible.  Each
+// migration is a small, mechanical slide change and will also exercise more
+// of interval.c's op support — expect to add ops (sel_32, le_f32, gather,
+// etc.) as real coverages hit them.
+
 // Design notes — three builds off one (shader, coverage, blend) triple:
 //
 //   1. Coverage-only IR first, for interval_program.  coverage->build fires
