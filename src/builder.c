@@ -300,12 +300,15 @@ umbra_val32 umbra_div_f32(builder *b, umbra_val32 x, umbra_val32 y) {
 
 umbra_val32 umbra_min_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     sort(&x, &y);
+    // TODO: fold min_f32(v, v) → v.  Legal across the entire f32 domain:
+    // min(NaN, NaN) = NaN, min(±inf, ±inf) = ±inf, min(x, x) = x for finite x.
     return try_join_imm(b, math(b, op_min_f32, VX(x), VY(y)), op_min_f32_imm, (val){.v32 = x},
                    (val){.v32 = y}).v32;
 }
 
 umbra_val32 umbra_max_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     sort(&x, &y);
+    // TODO: fold max_f32(v, v) → v.  Same reasoning as min_f32 above.
     return try_join_imm(b, math(b, op_max_f32, VX(x), VY(y)), op_max_f32_imm, (val){.v32 = x},
                    (val){.v32 = y}).v32;
 }
@@ -412,6 +415,11 @@ umbra_val32 umbra_eq_f32(builder *b, umbra_val32 x, umbra_val32 y) {
                    (val){.v32 = y}).v32;
 }
 umbra_val32 umbra_lt_f32(builder *b, umbra_val32 x, umbra_val32 y) {
+    // TODO: fold lt_f32(v, v) → imm(0).  Legal across the entire f32 domain:
+    // IEEE `<` is false whenever either operand is NaN, and x < x is false
+    // for every non-NaN x.  Note le_f32(v, v) is NOT similarly foldable:
+    // NaN ≤ NaN is false but finite x ≤ x is true, so no single constant
+    // covers both cases.
     return join_imm_y(b, math(b, op_lt_f32, VX(x), VY(y)), op_lt_f32_imm,
                       (val){.v32 = x}, (val){.v32 = y}).v32;
 }
