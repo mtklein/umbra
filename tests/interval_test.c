@@ -246,7 +246,7 @@ TEST(interval_circle_sdf_inside) {
     float const r[] = {1.0f};
     interval const out = interval_program_run(p, (interval){-0.25f, 0.25f},
                                                  (interval){-0.25f, 0.25f}, r, 1);
-    (out.hi < 0.0f) here;
+    out.hi < 0.0f here;
     interval_contains(out, -0.875f) here;   // tightest sample at (0.25,0.25): 0.125-1 = -0.875
     interval_program_free(p);
 }
@@ -255,7 +255,7 @@ TEST(interval_circle_sdf_outside) {
     struct interval_program *p = circle_sdf_make();
     float const r[] = {1.0f};
     interval const out = interval_program_run(p, (interval){2, 3}, (interval){2, 3}, r, 1);
-    (out.lo > 0.0f) here;
+    out.lo > 0.0f here;
     interval_contains(out, 7.0f) here;      // tightest at (2,2): 8-1 = 7
     interval_program_free(p);
 }
@@ -265,7 +265,7 @@ TEST(interval_circle_sdf_straddle) {
     float const r[] = {1.0f};
     interval const out = interval_program_run(p, (interval){0.5f, 1.5f},
                                                  (interval){-0.25f, 0.25f}, r, 1);
-    (out.lo < 0.0f && out.hi > 0.0f) here;
+    out.lo < 0.0f && out.hi > 0.0f here;
     interval_program_free(p);
 }
 
@@ -308,11 +308,11 @@ TEST(interval_run_is_resettable) {
     float const r[] = {1.0f};
 
     interval const far  = interval_program_run(p, (interval){10, 11}, (interval){10, 11}, r, 1);
-    (far.lo > 0.0f) here;
+    far.lo > 0.0f here;
 
     interval const near = interval_program_run(p, (interval){-0.1f, 0.1f},
                                                   (interval){-0.1f, 0.1f}, r, 1);
-    (near.hi < 0.0f) here;
+    near.hi < 0.0f here;
 
     interval_program_free(p);
 }
