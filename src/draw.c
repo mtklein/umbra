@@ -1,5 +1,6 @@
 #include "../include/umbra_draw.h"
 #include "assume.h"
+#include "draw.h"
 #include "flat_ir.h"
 #include "interval.h"
 #include <math.h>
@@ -284,44 +285,45 @@ build_coverage_interval(struct umbra_coverage *coverage, int *out_slots) {
 // reserves the same slots in the same order regardless of what runs after it.
 // A future shader that violates this would desync full's slot offsets from
 // partial's.  Covered by assume() below.
-struct umbra_draw_programs
-umbra_draw_compile(struct umbra_backend *be,
-                   struct umbra_shader *shader, struct umbra_coverage *coverage,
-                   umbra_blend_fn blend, struct umbra_fmt fmt,
-                   struct umbra_draw_layout *layout) {
-    struct umbra_draw_programs out = {0};
+struct umbra_draw*
+umbra_draw(struct umbra_backend *be,
+           struct umbra_shader *shader, struct umbra_coverage *coverage,
+           umbra_blend_fn blend, struct umbra_fmt fmt,
+           struct umbra_draw_layout *layout) {
+    struct umbra_draw *d = calloc(1, sizeof *d);
     int coverage_slots = 0;
 
     if (coverage) {
-        out.coverage = build_coverage_interval(coverage, &coverage_slots);
+        d->coverage = build_coverage_interval(coverage, &coverage_slots);
     }
 
     struct umbra_builder *pb = umbra_draw_builder(shader, coverage, blend, fmt, layout);
     struct umbra_flat_ir *pir = umbra_flat_ir(pb);
     umbra_builder_free(pb);
-    out.partial_coverage = be->compile(be, pir);
+    d->partial_coverage = be->compile(be, pir);
     umbra_flat_ir_free(pir);
 
     struct umbra_builder *fb = umbra_draw_builder(shader, NULL, blend, fmt, NULL);
     struct umbra_flat_ir *fir = umbra_flat_ir(fb);
     umbra_builder_free(fb);
-    out.full_coverage = be->compile(be, fir);
+    d->full_coverage = be->compile(be, fir);
     umbra_flat_ir_free(fir);
 
     // Partial reserved shader's S slots + coverage's C slots; coverage-only
     // reserved just C.  Shader slot count is thus total minus C, and coverage
     // uniforms in the partial's buffer start at offset S.
     assume(layout->uni.slots >= coverage_slots);
-    out.uniform_offset = layout->uni.slots - coverage_slots;
+    d->uniform_offset = layout->uni.slots - coverage_slots;
 
-    return out;
+    return d;
 }
 
-void umbra_draw_programs_free(struct umbra_draw_programs *p) {
-    if (p->partial_coverage) { p->partial_coverage->free(p->partial_coverage); }
-    if (p->full_coverage   ) { p->full_coverage   ->free(p->full_coverage   ); }
-    interval_program_free(p->coverage);
-    *p = (struct umbra_draw_programs){0};
+void umbra_draw_free(struct umbra_draw *d) {
+    if (!d) { return; }
+    if (d->partial_coverage) { d->partial_coverage->free(d->partial_coverage); }
+    if (d->full_coverage   ) { d->full_coverage   ->free(d->full_coverage   ); }
+    interval_program_free(d->coverage);
+    free(d);
 }
 
 // Tile floor for the quadtree recursion: below this size the interval bound
@@ -334,7 +336,7 @@ void umbra_draw_programs_free(struct umbra_draw_programs *p) {
 // bench the circle slide.
 enum { QUEUE_MIN_TILE = 16 };
 
-static void queue_recurse(struct umbra_draw_programs const *p,
+static void queue_recurse(struct umbra_draw const *p,
                           int l, int t, int r, int b,
                           struct umbra_buf buf[], float const *uniform) {
     if (l >= r || t >= b) { return; }
@@ -367,14 +369,14 @@ static void queue_recurse(struct umbra_draw_programs const *p,
     queue_recurse(p, mx, my, r,  b,  buf, uniform);
 }
 
-void umbra_draw_queue(struct umbra_draw_programs const *p,
+void umbra_draw_queue(struct umbra_draw const *d,
                       int l, int t, int r, int b, struct umbra_buf buf[]) {
-    if (!p->coverage) {
-        p->partial_coverage->queue(p->partial_coverage, l, t, r, b, buf);
+    if (!d->coverage) {
+        d->partial_coverage->queue(d->partial_coverage, l, t, r, b, buf);
         return;
     }
-    float const *uniform = (float const *)buf[0].ptr + p->uniform_offset;
-    queue_recurse(p, l, t, r, b, buf, uniform);
+    float const *uniform = (float const *)buf[0].ptr + d->uniform_offset;
+    queue_recurse(d, l, t, r, b, buf, uniform);
 }
 
 static umbra_val32 clamp01(struct umbra_builder *builder, umbra_val32 t) {

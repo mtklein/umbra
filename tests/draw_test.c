@@ -1,5 +1,6 @@
 #include "../include/umbra_draw.h"
 #include "../src/count.h"
+#include "../src/draw.h"
 #include "../src/interval.h"
 #include "test.h"
 #include <stdint.h>
@@ -1351,10 +1352,10 @@ TEST(test_srcover_fp16_planar) {
     cleanup_draw(&B);
 }
 
-// umbra_draw_compile bundles shader+coverage+blend into {partial, full,
-// optional interval}.  Tests: both umbra_programs compile and dispatch
-// correctly, and pr.coverage is present/absent according to whether the
-// coverage's ops are interval-supportable.
+// umbra_draw() bundles shader+coverage+blend into {partial, full, optional
+// interval}.  Tests: both umbra_programs compile and dispatch correctly, and
+// d->coverage is present/absent according to whether the coverage's ops are
+// interval-supportable.
 
 // Minimal interval-friendly coverage that emits α = clamp(x - r, 0, 1) for a
 // uniform-supplied r (a 1-D gradient).  Uses only sub/min/max/imm — all in
@@ -1393,16 +1394,15 @@ TEST(test_draw_compile_rect) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         if (!bes[bi]) { continue; }
 
-        struct umbra_draw_layout   lay;
-        struct umbra_draw_programs pr = umbra_draw_compile(bes[bi], &shader.base, &cov.base,
-                                                           umbra_blend_srcover, umbra_fmt_8888,
-                                                           &lay);
-        pr.partial_coverage != NULL here;
-        pr.full_coverage    != NULL here;
+        struct umbra_draw_layout lay;
+        struct umbra_draw *d = umbra_draw(bes[bi], &shader.base, &cov.base,
+                                          umbra_blend_srcover, umbra_fmt_8888, &lay);
+        d->partial_coverage != NULL here;
+        d->full_coverage    != NULL here;
         // rect coverage uses le/lt/and/sel — not in interval.c's supported set.
-        pr.coverage         == NULL here;
+        d->coverage         == NULL here;
         // Solid shader reserves 4 slots; rect's coverage uniforms come next.
-        pr.uniform_offset   == 4 here;
+        d->uniform_offset   == 4 here;
 
         umbra_draw_fill(&lay, &shader.base, &cov.base);
         uint32_t dst[8] = {0};
@@ -1412,7 +1412,7 @@ TEST(test_draw_compile_rect) {
         };
 
         // Partial: rect masks the fill to [2, 5).
-        pr.partial_coverage->queue(pr.partial_coverage, 0, 0, 8, 1, buf);
+        d->partial_coverage->queue(d->partial_coverage, 0, 0, 8, 1, buf);
         bes[bi]->flush(bes[bi]);
         for (int i = 0; i < 8; i++) {
             if (i >= 2 && i < 5) {
@@ -1425,14 +1425,14 @@ TEST(test_draw_compile_rect) {
 
         // Full: α = 1 everywhere → every pixel red.
         for (int i = 0; i < 8; i++) { dst[i] = 0; }
-        pr.full_coverage->queue(pr.full_coverage, 0, 0, 8, 1, buf);
+        d->full_coverage->queue(d->full_coverage, 0, 0, 8, 1, buf);
         bes[bi]->flush(bes[bi]);
         for (int i = 0; i < 8; i++) {
             (dst[i] & 0xFF)         == 0xFF here;
             ((dst[i] >> 24) & 0xFF) == 0xFF here;
         }
 
-        umbra_draw_programs_free(&pr);
+        umbra_draw_free(d);
         free(lay.uniforms);
     }
 
@@ -1450,25 +1450,24 @@ TEST(test_draw_compile_interval_coverage) {
 
     struct umbra_backend *be = umbra_backend_interp();
 
-    struct umbra_draw_layout   lay;
-    struct umbra_draw_programs pr = umbra_draw_compile(be, &shader.base, &cov.base,
-                                                       umbra_blend_srcover, umbra_fmt_8888,
-                                                       &lay);
-    pr.partial_coverage != NULL here;
-    pr.full_coverage    != NULL here;
-    pr.coverage         != NULL here;
-    pr.uniform_offset   == 4 here;
+    struct umbra_draw_layout lay;
+    struct umbra_draw *d = umbra_draw(be, &shader.base, &cov.base,
+                                      umbra_blend_srcover, umbra_fmt_8888, &lay);
+    d->partial_coverage != NULL here;
+    d->full_coverage    != NULL here;
+    d->coverage         != NULL here;
+    d->uniform_offset   == 4 here;
 
     // Sanity-check that the interval program bounds α sensibly for a tile
     // crossing the soft edge: x ∈ [0, 10], r = 3 → α = clamp(x-3, 0, 1) ∈ [0, 1].
-    interval const alpha = interval_program_run(pr.coverage,
+    interval const alpha = interval_program_run(d->coverage,
                                                 (interval){0.0f, 10.0f},
                                                 (interval){0.0f,  1.0f},
-                                                (float const*)lay.uniforms + pr.uniform_offset);
+                                                (float const*)lay.uniforms + d->uniform_offset);
     alpha.lo == 0.0f here;
     alpha.hi == 1.0f here;
 
-    umbra_draw_programs_free(&pr);
+    umbra_draw_free(d);
     free(lay.uniforms);
     be->free(be);
 }
@@ -1486,11 +1485,10 @@ TEST(test_draw_queue_adaptive_matches_flat) {
     };
 
     struct umbra_backend *be = umbra_backend_interp();
-    struct umbra_draw_layout   lay;
-    struct umbra_draw_programs pr = umbra_draw_compile(be, &shader.base, &cov.base,
-                                                       umbra_blend_srcover, umbra_fmt_8888,
-                                                       &lay);
-    pr.coverage != NULL here;
+    struct umbra_draw_layout lay;
+    struct umbra_draw *d = umbra_draw(be, &shader.base, &cov.base,
+                                      umbra_blend_srcover, umbra_fmt_8888, &lay);
+    d->coverage != NULL here;
     umbra_draw_fill(&lay, &shader.base, &cov.base);
 
     int const W = 64, H = 32;
@@ -1506,9 +1504,9 @@ TEST(test_draw_queue_adaptive_matches_flat) {
         {.ptr = flat,         .count = W * H, .stride = W},
     };
 
-    umbra_draw_queue(&pr, 0, 0, W, H, adaptive_buf);
+    umbra_draw_queue(d, 0, 0, W, H, adaptive_buf);
     be->flush(be);
-    pr.partial_coverage->queue(pr.partial_coverage, 0, 0, W, H, flat_buf);
+    d->partial_coverage->queue(d->partial_coverage, 0, 0, W, H, flat_buf);
     be->flush(be);
 
     for (int i = 0; i < W * H; i++) {
@@ -1521,7 +1519,7 @@ TEST(test_draw_queue_adaptive_matches_flat) {
 
     free(adaptive);
     free(flat);
-    umbra_draw_programs_free(&pr);
+    umbra_draw_free(d);
     free(lay.uniforms);
     be->free(be);
 }

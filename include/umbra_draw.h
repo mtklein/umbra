@@ -64,34 +64,23 @@ void umbra_draw_fill(struct umbra_draw_layout const*,
                      struct umbra_shader const*,
                      struct umbra_coverage const*);
 
-// Compiled bundle for adaptive dispatch: one program with coverage multiplied
-// in (boundary pixels), one without (interior, α == 1), plus an optional
-// interval_program over the coverage alone for tile pruning.  coverage is
-// NULL when the coverage IR contains an op interval.c cannot yet bound — the
-// caller simply falls back to flat dispatch on `partial_coverage` in that case.
-struct umbra_draw_programs {
-    struct umbra_program    *partial_coverage;
-    struct umbra_program    *full_coverage;
-    struct interval_program *coverage;
-    int                      uniform_offset;  // slot in buf[0] where coverage uniforms start
-    int                      pad_;
-};
+// Compiled draw bundle: one program with coverage multiplied in (boundary
+// pixels), one without (interior, α == 1), and an optional interval_program
+// over the coverage alone for tile pruning.  The interval side is omitted
+// when the coverage IR contains an op interval.c cannot yet bound — in that
+// case umbra_draw_queue falls back to a single flat partial-coverage dispatch.
+struct umbra_draw* umbra_draw(struct umbra_backend*,
+                              struct umbra_shader*, struct umbra_coverage*,
+                              umbra_blend_fn, struct umbra_fmt,
+                              struct umbra_draw_layout*);
+void               umbra_draw_free(struct umbra_draw*);
 
-struct umbra_draw_programs
-umbra_draw_compile(struct umbra_backend*,
-                   struct umbra_shader*, struct umbra_coverage*,
-                   umbra_blend_fn, struct umbra_fmt,
-                   struct umbra_draw_layout*);
-void umbra_draw_programs_free(struct umbra_draw_programs*);
-
-// Dispatch the bundle over rect [l, t, r, b).  If the bundle has an
-// `interval_program`, descends a quadtree — skipping tiles where the α bound
-// is <= 0, running `full_coverage` on tiles where the α bound is >= 1,
-// running `partial_coverage` only on tiles that straddle the boundary down
-// to a minimum-size floor.  If `coverage` is NULL (coverage IR wasn't
-// expressible as intervals), falls back to a single flat `partial_coverage`
-// dispatch.
-void umbra_draw_queue(struct umbra_draw_programs const*,
+// Dispatch the bundle over rect [l, t, r, b).  If the draw has an
+// interval_program, descends a quadtree — skipping tiles where the α bound
+// is <= 0, running the full-coverage program on tiles where the α bound is
+// >= 1, running the partial-coverage program only on tiles that straddle the
+// boundary down to a minimum-size floor.  Otherwise, a single flat dispatch.
+void umbra_draw_queue(struct umbra_draw const*,
                       int l, int t, int r, int b, struct umbra_buf[]);
 
 struct umbra_shader_solid {
