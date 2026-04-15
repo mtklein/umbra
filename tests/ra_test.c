@@ -547,6 +547,103 @@ TEST(test_step_alu) {
     free(bb);
 }
 
+TEST(test_step_alu_square_add_x_dies_y_lives) {
+    // square_add_f32(x, y) = x*x + y.  y is the accumulator (plays z's
+    // role from fma).  When x dies at the op but y is still live past it,
+    // the dest should claim x's register (destructive fold into x).
+    static int8_t const pool[] = {5, 6, 7, 8};
+    struct ra_config    cfg = {
+        .pool = pool, .nregs = 4, .max_reg = 10,
+        .spill = test_spill, .fill = test_fill, .ctx = 0,
+    };
+    struct umbra_flat_ir *bb = malloc(sizeof *bb);
+    bb->inst = calloc(3, sizeof *bb->inst);
+    bb->insts = 3;
+    bb->preamble = 0;
+
+    bb->inst[0].op  = op_imm_32;
+    bb->inst[0].imm = 1;
+    bb->inst[1].op  = op_imm_32;
+    bb->inst[1].imm = 2;
+    bb->inst[2].op  = op_square_add_f32;
+    bb->inst[2].x   = (val){0};
+    bb->inst[2].y   = (val){.id = 1};
+
+    struct ra *ra = ra_create(bb, &cfg);
+    int        sl[3] = {-1, -1, -1};
+    int        ns = 0;
+    reset_records();
+
+    int8_t r0 = ra_alloc(ra, sl, &ns); ra_assign(ra, 0, r0);
+    int8_t r1 = ra_alloc(ra, sl, &ns); ra_assign(ra, 1, r1);
+
+    // x (val 0) dies at the op; y (val 1) lives past.
+    ra_set_last_use(ra, 0, 2);
+    ra_set_last_use(ra, 1, 5);
+
+    struct ra_step s = ra_step_alu(ra, sl, &ns, &bb->inst[2], 2, 0);
+    s.rx == r0 here;
+    s.ry == r1 here;
+    s.rd == r0 here;           // claimed x's register
+    ra_reg(ra, 2) == r0 here;
+    ra_reg(ra, 1) == r1 here;  // y still in place
+    nspills == 0 here;
+
+    ra_destroy(ra);
+    free(bb->inst);
+    free(bb);
+}
+
+TEST(test_step_alu_square_add_both_live) {
+    // Both operands of square_add_f32 live past the op — no operand
+    // register is free to reclaim, so the dest falls back to a fresh
+    // allocation.
+    static int8_t const pool[] = {5, 6, 7, 8};
+    struct ra_config    cfg = {
+        .pool = pool, .nregs = 4, .max_reg = 10,
+        .spill = test_spill, .fill = test_fill, .ctx = 0,
+    };
+    struct umbra_flat_ir *bb = malloc(sizeof *bb);
+    bb->inst = calloc(3, sizeof *bb->inst);
+    bb->insts = 3;
+    bb->preamble = 0;
+
+    bb->inst[0].op  = op_imm_32;
+    bb->inst[0].imm = 1;
+    bb->inst[1].op  = op_imm_32;
+    bb->inst[1].imm = 2;
+    bb->inst[2].op  = op_square_sub_f32;   // exercise the sub sibling too
+    bb->inst[2].x   = (val){0};
+    bb->inst[2].y   = (val){.id = 1};
+
+    struct ra *ra = ra_create(bb, &cfg);
+    int        sl[3] = {-1, -1, -1};
+    int        ns = 0;
+    reset_records();
+
+    int8_t r0 = ra_alloc(ra, sl, &ns); ra_assign(ra, 0, r0);
+    int8_t r1 = ra_alloc(ra, sl, &ns); ra_assign(ra, 1, r1);
+
+    // Both x and y live past the op.
+    ra_set_last_use(ra, 0, 5);
+    ra_set_last_use(ra, 1, 5);
+
+    struct ra_step s = ra_step_alu(ra, sl, &ns, &bb->inst[2], 2, 0);
+    s.rx == r0 here;
+    s.ry == r1 here;
+    s.rd >= 0 here;
+    s.rd != r0 here;
+    s.rd != r1 here;
+    ra_reg(ra, 0) == r0 here;  // both operands retained
+    ra_reg(ra, 1) == r1 here;
+    ra_reg(ra, 2) == s.rd here;
+    nspills == 0 here;
+
+    ra_destroy(ra);
+    free(bb->inst);
+    free(bb);
+}
+
 TEST(test_step_alu_scratch_does_not_evict_dest) {
     // Regression: ra_step_alu used to leave the freshly-claimed dest
     // unpinned. With every pool register in use, a subsequent scratch
