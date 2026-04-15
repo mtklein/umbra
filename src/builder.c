@@ -300,8 +300,9 @@ umbra_val32 umbra_div_f32(builder *b, umbra_val32 x, umbra_val32 y) {
 
 umbra_val32 umbra_min_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     sort(&x, &y);
-    // TODO: fold min_f32(v, v) → v.  Legal across the entire f32 domain:
-    // min(NaN, NaN) = NaN, min(±inf, ±inf) = ±inf, min(x, x) = x for finite x.
+    // min(v, v) = v — legal across the entire f32 domain: min(NaN, NaN) = NaN,
+    // min(±inf, ±inf) = ±inf, min(finite, finite) = v.
+    if ((val){.v32 = x}.bits == (val){.v32 = y}.bits) { return x; }
     return try_join_imm(b, math(b, op_min_f32, VX(x), VY(y)), op_min_f32_imm, (val){.v32 = x},
                    (val){.v32 = y}).v32;
 }
