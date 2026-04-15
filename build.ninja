@@ -1,7 +1,8 @@
 builddir = out
 
 sysroot = /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
-clang   = /opt/homebrew/opt/llvm/bin/clang -fcolor-diagnostics
+llvm    = /opt/homebrew/opt/llvm/bin
+clang   = $llvm/clang -fcolor-diagnostics
 warn    = -Weverything $
           -Wno-declaration-after-statement $
           -Wno-disabled-macro-expansion $
@@ -27,8 +28,6 @@ rule link
 
 rule run
     command = perl -e 'alarm 30; exec @ARGV' $exec ./$in $args > $out
-
-llvm = /opt/homebrew/opt/llvm/bin
 
 rule profmerge
     command = $llvm/llvm-profdata merge -sparse $$(for d in $dir; do echo $$d/*.profraw; done) -o $out
