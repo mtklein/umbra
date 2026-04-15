@@ -1027,6 +1027,13 @@ TEST(test_min_f32_self_fold) {
     umbra_builder_free(b);
 }
 
+TEST(test_max_f32_self_fold) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_val32 const     x = umbra_load_32(b, (umbra_ptr32){0});
+    val_eq(umbra_max_f32(b, x, x), x) here;
+    umbra_builder_free(b);
+}
+
 TEST(test_late_imm_identity) {
     struct umbra_builder *b = umbra_builder();
     umbra_val32            x = umbra_load_32(b, (umbra_ptr32){0});

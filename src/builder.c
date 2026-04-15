@@ -309,7 +309,8 @@ umbra_val32 umbra_min_f32(builder *b, umbra_val32 x, umbra_val32 y) {
 
 umbra_val32 umbra_max_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     sort(&x, &y);
-    // TODO: fold max_f32(v, v) → v.  Same reasoning as min_f32 above.
+    // max(v, v) = v — same reasoning as min_f32 above.
+    if ((val){.v32 = x}.bits == (val){.v32 = y}.bits) { return x; }
     return try_join_imm(b, math(b, op_max_f32, VX(x), VY(y)), op_max_f32_imm, (val){.v32 = x},
                    (val){.v32 = y}).v32;
 }
