@@ -221,7 +221,7 @@ static interval arg(struct interval_program const *p, val v) {
 
 interval interval_program_run(struct interval_program *p,
                               interval x, interval y,
-                              float const *uniform, int uniforms) {
+                              float const *uniform) {
     interval last_store = MAXIMAL;
 
     for (int i = 0; i < p->insts; i++) {
@@ -238,10 +238,7 @@ interval interval_program_run(struct interval_program *p,
                 r = interval_exact(u.f);
             } break;
 
-            case op_uniform_32:
-                r = (0 <= in->imm && in->imm < uniforms) ? interval_exact(uniform[in->imm])
-                                                         : MAXIMAL;
-                break;
+            case op_uniform_32: r = interval_exact(uniform[in->imm]); break;
 
             case op_add_f32: r = interval_add(arg(p,in->x), arg(p,in->y)); break;
             case op_sub_f32: r = interval_sub(arg(p,in->x), arg(p,in->y)); break;

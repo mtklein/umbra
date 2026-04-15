@@ -36,7 +36,7 @@ static interval eval_x_imm(umbra_val32 (*op)(struct umbra_builder*, umbra_val32,
 
     struct interval_program *p = interval_program_and_free(b);
     p != NULL here;
-    interval const r = interval_program_run(p, x, (interval){0,0}, NULL, 0);
+    interval const r = interval_program_run(p, x, (interval){0,0}, NULL);
 
     interval_program_free(p);
     return r;
@@ -55,7 +55,7 @@ TEST(interval_mul_signed) {
     umbra_store_32(b, SINK, umbra_mul_f32(b, umbra_x(b), umbra_y(b)));
 
     struct interval_program *p = interval_program_and_free(b);
-    interval const r = interval_program_run(p, (interval){-1,2}, (interval){-3,4}, NULL, 0);
+    interval const r = interval_program_run(p, (interval){-1,2}, (interval){-3,4}, NULL);
     interval_equiv(r, (interval){-6, 8}) here;
 
     interval_program_free(p);
@@ -76,7 +76,7 @@ static interval eval_x(umbra_val32 (*op)(struct umbra_builder*, umbra_val32), in
     umbra_store_32(b, SINK, op(b, umbra_x(b)));
 
     struct interval_program *p = interval_program_and_free(b);
-    interval const r = interval_program_run(p, x, (interval){0,0}, NULL, 0);
+    interval const r = interval_program_run(p, x, (interval){0,0}, NULL);
 
     interval_program_free(p);
     return r;
@@ -108,7 +108,7 @@ TEST(interval_min) {
     umbra_store_32(b, SINK, umbra_min_f32(b, umbra_x(b), umbra_y(b)));
 
     struct interval_program *p = interval_program_and_free(b);
-    interval_equiv(interval_program_run(p, (interval){-1,3}, (interval){0,5}, NULL, 0),
+    interval_equiv(interval_program_run(p, (interval){-1,3}, (interval){0,5}, NULL),
                    (interval){-1,3}) here;
 
     interval_program_free(p);
@@ -119,7 +119,7 @@ TEST(interval_max) {
     umbra_store_32(b, SINK, umbra_max_f32(b, umbra_x(b), umbra_y(b)));
 
     struct interval_program *p = interval_program_and_free(b);
-    interval_equiv(interval_program_run(p, (interval){-1,3}, (interval){0,5}, NULL, 0),
+    interval_equiv(interval_program_run(p, (interval){-1,3}, (interval){0,5}, NULL),
                    (interval){0,5}) here;
 
     interval_program_free(p);
@@ -130,11 +130,11 @@ TEST(interval_compare_tri_valued) {
     umbra_store_32(b, SINK, umbra_lt_f32(b, umbra_x(b), umbra_imm_f32(b, 0.0f)));
 
     struct interval_program *p = interval_program_and_free(b);
-    interval_equiv(interval_program_run(p, (interval){ 1, 2}, (interval){0,0}, NULL, 0),
+    interval_equiv(interval_program_run(p, (interval){ 1, 2}, (interval){0,0}, NULL),
                    (interval){0, 0}) here;
-    interval_equiv(interval_program_run(p, (interval){-2,-1}, (interval){0,0}, NULL, 0),
+    interval_equiv(interval_program_run(p, (interval){-2,-1}, (interval){0,0}, NULL),
                    (interval){1, 1}) here;
-    interval_equiv(interval_program_run(p, (interval){-1, 1}, (interval){0,0}, NULL, 0),
+    interval_equiv(interval_program_run(p, (interval){-1, 1}, (interval){0,0}, NULL),
                    (interval){0, 1}) here;
 
     interval_program_free(p);
@@ -148,13 +148,8 @@ TEST(interval_uniform_exact) {
 
     struct interval_program *p = interval_program_and_free(b);
     float const u[] = {0,0,0,0,0,0,0, 2.5f};
-    interval_equiv(interval_program_run(p, (interval){0, 2}, (interval){0,0}, u, 8),
+    interval_equiv(interval_program_run(p, (interval){0, 2}, (interval){0,0}, u),
                    (interval){2.5f, 4.5f}) here;
-
-    // TODO: I'm not sure if we want this to be defined behavior or just leave it untested
-    // Passing fewer uniforms than needed → the uniform read becomes maximal,
-    // which propagates to the output.
-    !interval_is_finite(interval_program_run(p, (interval){0, 2}, (interval){0,0}, NULL, 0)) here;
 
     interval_program_free(p);
 }
@@ -167,7 +162,7 @@ TEST(interval_fma) {
 
     struct interval_program *p = interval_program_and_free(b);
     // x*y in [3, 8], + 7 → [10, 15]
-    interval_equiv(interval_program_run(p, (interval){1,2}, (interval){3,4}, NULL, 0),
+    interval_equiv(interval_program_run(p, (interval){1,2}, (interval){3,4}, NULL),
                    (interval){10, 15}) here;
 
     interval_program_free(p);
@@ -192,7 +187,7 @@ TEST(interval_fma_single_rounding) {
 
     // Sanity: the test only distinguishes fused vs two-op if they disagree.
     !equiv(expected, 0.0f) here;
-    interval_equiv(interval_program_run(p, (interval){a, a}, (interval){0,0}, NULL, 0),
+    interval_equiv(interval_program_run(p, (interval){a, a}, (interval){0,0}, NULL),
                    (interval){expected, expected}) here;
 
     interval_program_free(p);
@@ -216,7 +211,7 @@ TEST(interval_fms_single_rounding) {
     // trying to contrast with — contraction is a within-expression transform.
     float const aa = a * a;
     !equiv(expected, 1.0f - aa) here;
-    interval_equiv(interval_program_run(p, (interval){a, a}, (interval){0,0}, NULL, 0),
+    interval_equiv(interval_program_run(p, (interval){a, a}, (interval){0,0}, NULL),
                    (interval){expected, expected}) here;
 
     interval_program_free(p);
@@ -246,7 +241,7 @@ TEST(interval_circle_sdf_inside) {
     struct interval_program *p = circle_sdf_make();
     float const r[] = {1.0f};
     interval const out = interval_program_run(p, (interval){-0.25f, 0.25f},
-                                                 (interval){-0.25f, 0.25f}, r, 1);
+                                                 (interval){-0.25f, 0.25f}, r);
     out.hi < 0.0f here;
     interval_contains(out, -0.875f) here;   // tightest sample at (0.25,0.25): 0.125-1 = -0.875
     interval_program_free(p);
@@ -255,7 +250,7 @@ TEST(interval_circle_sdf_inside) {
 TEST(interval_circle_sdf_outside) {
     struct interval_program *p = circle_sdf_make();
     float const r[] = {1.0f};
-    interval const out = interval_program_run(p, (interval){2, 3}, (interval){2, 3}, r, 1);
+    interval const out = interval_program_run(p, (interval){2, 3}, (interval){2, 3}, r);
     out.lo > 0.0f here;
     interval_contains(out, 7.0f) here;      // tightest at (2,2): 8-1 = 7
     interval_program_free(p);
@@ -265,7 +260,7 @@ TEST(interval_circle_sdf_straddle) {
     struct interval_program *p = circle_sdf_make();
     float const r[] = {1.0f};
     interval const out = interval_program_run(p, (interval){0.5f, 1.5f},
-                                                 (interval){-0.25f, 0.25f}, r, 1);
+                                                 (interval){-0.25f, 0.25f}, r);
     out.lo < 0.0f && out.hi > 0.0f here;
     interval_program_free(p);
 }
@@ -284,7 +279,7 @@ TEST(interval_circle_sdf_contains_samples) {
     for (int bi = 0; bi < count(boxes); bi++) {
         interval const X = {boxes[bi].xlo, boxes[bi].xhi},
                        Y = {boxes[bi].ylo, boxes[bi].yhi};
-        interval const bound = interval_program_run(p, X, Y, r, 1);
+        interval const bound = interval_program_run(p, X, Y, r);
         interval_is_finite(bound) here;
         enum { N = 8 };
         for (int i = 0; i <= N; i++) {
@@ -305,11 +300,11 @@ TEST(interval_run_is_resettable) {
     struct interval_program *p = circle_sdf_make();
     float const r[] = {1.0f};
 
-    interval const far  = interval_program_run(p, (interval){10, 11}, (interval){10, 11}, r, 1);
+    interval const far  = interval_program_run(p, (interval){10, 11}, (interval){10, 11}, r);
     far.lo > 0.0f here;
 
     interval const near = interval_program_run(p, (interval){-0.1f, 0.1f},
-                                                  (interval){-0.1f, 0.1f}, r, 1);
+                                                  (interval){-0.1f, 0.1f}, r);
     near.hi < 0.0f here;
 
     interval_program_free(p);

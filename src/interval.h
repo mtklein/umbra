@@ -19,4 +19,4 @@ struct interval_program* interval_program(struct umbra_flat_ir const*);
 void   interval_program_free(struct interval_program*);
 
 interval interval_program_run(struct interval_program*, interval x, interval y
-                                                      , float const *uniform, int uniforms);
+                                                      , float const *uniform);
