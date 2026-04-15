@@ -2870,7 +2870,7 @@ TEST(test_binary_m_rr) {
             u.f = 1.f;  d[3][0] == u.i here;
             // add(102,102)=204, sub(202,202)=0, mul(302,302)=91204
             d[6][0] == 204 here;
-            (d[7][0] == 0)   here;
+            d[7][0] == 0 here;
             d[8][0] == 302*302 here;
             // xor(x,x) = 0 for any x
             d[14][0] == 0 here;
@@ -3181,10 +3181,10 @@ TEST(test_binary_r_mm) {
         bufs[1] = (struct umbra_buf){.ptr=sc, .count=4};
         for (int i = 2; i < 15; i++) { bufs[i] = (struct umbra_buf){.ptr=d[i], .count=4}; }
         if (run(&B, bi, 4, 1, bufs)) {
-            (d[3][0] == 4)  here;  // sub(6,2)=4
-            d[4][0] == 12 here;  // mul(6,2)=12
-            (d[5][0] == 3)  here;  // div(6,2)=3
-            (d[7][0] == 5)  here;  // sub(6,2)+1=5
+            d[3][0]  == 4       here;  // sub(6,2)=4
+            d[4][0]  == 12      here;  // mul(6,2)=12
+            d[5][0]  == 3       here;  // div(6,2)=3
+            d[7][0]  == 5       here;  // sub(6,2)+1=5
             d[10][0] == (6^2)+1 here;
         }
     }
@@ -3427,11 +3427,11 @@ TEST(test_const_eval) {
             struct umbra_buf bufs[15];
             for (int i = 0; i < 15; i++) { bufs[i] = (struct umbra_buf){.ptr=d[i], .count=4}; }
             if (run(&B, bi, 4, 1, bufs)) {
-                (d[0][0]  == 7)    here;   // 10-3
-                (d[1][0]  == 30)   here;   // 10*3
-                (d[7][0]  == 9)    here;   // 10^3
-                (d[8][0]  == 10)   here;   // sel(-1, 10, 3) = 10
-                (d[9][0]  == 0)    here;   // eq(10,3)=0
+                d[0][0]  == 7    here;   // 10-3
+                d[1][0]  == 30   here;   // 10*3
+                d[7][0]  == 9    here;   // 10^3
+                d[8][0]  == 10   here;   // sel(-1, 10, 3) = 10
+                d[9][0]  == 0    here;   // eq(10,3)=0
                 d[14][0] == 0xf5 here;   // sel(5, 0xff, 0xf0) folds via const_eval
             }
         }
