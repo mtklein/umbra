@@ -5,13 +5,69 @@ Runs implicitly via the `configure` rule in build.ninja whenever this script
 is newer than any generated file; invoke directly to regenerate without
 building.  The generated files are checked in alongside this script — a
 fresh clone builds without needing to run configure.py.
-
-First pass: emits byte-identical output to the hand-maintained ninja files
-so `git diff` is the regression oracle for subsequent refactors.
 """
 
+import glob
 import os
 
+
+# ----- Source inventory ------------------------------------------------------
+#
+# Globbed from the tree, alphabetical within each bucket.  `metal_stub.c` is
+# special: it's never compiled directly in `project.ninja`, only via gcc.ninja's
+# compile_m-rule override, so it's excluded from the main src glob.
+
+SRC    = sorted(p for p in glob.glob('src/*.c') if p != 'src/metal_stub.c') \
+       + sorted(glob.glob('src/*.m'))
+TESTS  = sorted(glob.glob('tests/*.c'))
+SLIDES = sorted(glob.glob('slides/*.c'))
+
+# Tools are listed individually because each one is an entry point for a
+# distinct link target (or, in the case of stb_* and work_group, an extra
+# .o pulled into one or more targets).
+
+CFLAGS = {
+    'src/vulkan.c':            '-isystem /opt/homebrew/Cellar/molten-vk/1.4.1/libexec/include',
+    'src/wgpu.c':              '-isystem /opt/homebrew/include',
+    'tests/golden_test.c':     '-Wno-cast-align',
+    'tools/stb_truetype.c':    '-Wno-everything -fno-sanitize=all',
+    'tools/stb_image_write.c': '-Wno-everything -fno-sanitize=all',
+    'tools/demo.c':            '-I/opt/homebrew/include -Wno-cast-align',
+}
+
+
+# ----- Helpers ---------------------------------------------------------------
+
+def obj(src):
+    """src/foo.c → $out/src/foo.o"""
+    return '$out/' + src[:src.rfind('.')] + '.o'
+
+
+def compile_line(src):
+    """Emit a `build $out/X.o: compile X.c` block, with optional cflags."""
+    rule = 'compile_m' if src.endswith('.m') else 'compile'
+    line = f'build {obj(src)}: {rule} {src}\n'
+    if src in CFLAGS:
+        line += f'    cflags = {CFLAGS[src]}\n'
+    return line
+
+
+def link_objs(entry, *extras):
+    """Return space-joined .o paths for a link target.
+
+    Order: entry tool .o → tests (if any) → src → stb_truetype → extras → slides.
+    """
+    objs = [obj(entry)]
+    if entry == 'tools/test.c':
+        objs += [obj(s) for s in TESTS]
+    objs += [obj(s) for s in SRC]
+    objs += [obj('tools/stb_truetype.c')]
+    objs += [obj(s) for s in extras]
+    objs += [obj(s) for s in SLIDES]
+    return ' '.join(objs)
+
+
+# ----- Generated file contents ----------------------------------------------
 
 BUILD_NINJA = r"""builddir = out
 
@@ -83,71 +139,33 @@ build build.ninja $
 """
 
 
-PROJECT_NINJA = r"""build $out/stb_truetype.o:       compile tools/stb_truetype.c
-    cflags = -Wno-everything -fno-sanitize=all
-build $out/stb_image_write.o:   compile tools/stb_image_write.c
-    cflags = -Wno-everything -fno-sanitize=all
+def render_project_ninja():
+    parts = []
+    # stb tool sources (with their cflag overrides).
+    for s in ['tools/stb_truetype.c', 'tools/stb_image_write.c']:
+        parts.append(compile_line(s))
+    parts.append('\n')
+    # Main source, tests, tools, slides.
+    for s in SRC:
+        parts.append(compile_line(s))
+    for s in TESTS:
+        parts.append(compile_line(s))
+    for s in ['tools/test.c', 'tools/bench.c', 'tools/dump.c']:
+        parts.append(compile_line(s))
+    for s in SLIDES:
+        parts.append(compile_line(s))
+    parts.append('\n')
+    # Link targets.
+    parts.append(f'build $out/test:  link {link_objs("tools/test.c")}\n')
+    parts.append( '    ldflags = $ldflags -lm\n')
+    parts.append(f'build $out/bench: link {link_objs("tools/bench.c")}\n')
+    parts.append(f'build $out/dump:  link {link_objs("tools/dump.c", "tools/stb_image_write.c")}\n')
+    parts.append('\n')
+    parts.append('build $out/test.log: run $out/test\n')
+    return ''.join(parts)
 
-build $out/src/uniforms.o:       compile   src/uniforms.c
-build $out/src/uniform_ring.o:   compile   src/uniform_ring.c
-build $out/src/fingerprint.o:    compile   src/fingerprint.c
-build $out/src/dispatch_overlap.o: compile src/dispatch_overlap.c
-build $out/src/gpu_buf_cache.o: compile   src/gpu_buf_cache.c
-build $out/src/hash.o:           compile   src/hash.c
-build $out/src/op.o:             compile   src/op.c
-build $out/src/builder.o:        compile   src/builder.c
-build $out/src/flat_ir.o:    compile   src/flat_ir.c
-build $out/src/interval.o:       compile   src/interval.c
-build $out/src/ra.o:             compile   src/ra.c
-build $out/src/interpreter.o:  compile   src/interpreter.c
-build $out/src/jit.o:            compile   src/jit.c
-build $out/src/jit_arm64.o:      compile   src/jit_arm64.c
-build $out/src/jit_x86.o:        compile   src/jit_x86.c
-build $out/src/asm_arm64.o:      compile   src/asm_arm64.c
-build $out/src/asm_x86.o:        compile   src/asm_x86.c
-build $out/src/metal.o:          compile_m src/metal.m
-build $out/src/spirv.o:          compile   src/spirv.c
-build $out/src/vulkan.o:         compile   src/vulkan.c
-    cflags = -isystem /opt/homebrew/Cellar/molten-vk/1.4.1/libexec/include
-build $out/src/wgpu.o:           compile   src/wgpu.c
-    cflags = -isystem /opt/homebrew/include
-build $out/src/draw.o:           compile   src/draw.c
-build $out/tests/test.o:         compile   tests/test.c
-build $out/tests/bb_test.o:      compile   tests/bb_test.c
-build $out/tests/fingerprint_test.o:    compile tests/fingerprint_test.c
-build $out/tests/gpu_buf_cache_test.o: compile tests/gpu_buf_cache_test.c
-build $out/tests/hash_test.o:    compile   tests/hash_test.c
-build $out/tests/uniform_ring_test.o: compile tests/uniform_ring_test.c
-build $out/tests/ra_test.o:      compile   tests/ra_test.c
-build $out/tests/draw_test.o:    compile   tests/draw_test.c
-build $out/tests/golden_test.o:  compile   tests/golden_test.c
-    cflags = -Wno-cast-align
-build $out/tools/test.o:         compile   tools/test.c
-build $out/tools/bench.o:        compile   tools/bench.c
-build $out/tools/dump.o:         compile   tools/dump.c
-build $out/slides/slides.o:      compile   slides/slides.c
-build $out/slides/solid.o:       compile   slides/solid.c
-build $out/slides/text.o:        compile   slides/text.c
-build $out/slides/persp.o:       compile   slides/persp.c
-build $out/slides/gradient.o:    compile   slides/gradient.c
-build $out/slides/slug.o:        compile   slides/slug.c
-build $out/slides/anim.o:        compile   slides/anim.c
-build $out/slides/overview.o:    compile   slides/overview.c
-build $out/slides/swatch.o:     compile   slides/swatch.c
-build $out/slides/circle.o:     compile   slides/circle.c
-build $out/tests/dispatch_overlap_test.o: compile tests/dispatch_overlap_test.c
-build $out/tests/asm_arm64_test.o: compile tests/asm_arm64_test.c
-build $out/tests/asm_x86_test.o:   compile tests/asm_x86_test.c
-build $out/tests/resolve_test.o:   compile tests/resolve_test.c
-build $out/tests/interval_test.o:  compile tests/interval_test.c
 
-build $out/test:      link $out/tools/test.o $out/tests/test.o $out/tests/bb_test.o $out/tests/fingerprint_test.o $out/tests/gpu_buf_cache_test.o $out/tests/dispatch_overlap_test.o $out/tests/hash_test.o $out/tests/uniform_ring_test.o $out/tests/ra_test.o $out/tests/draw_test.o $out/tests/asm_arm64_test.o $out/tests/asm_x86_test.o $out/tests/golden_test.o $out/tests/resolve_test.o $out/tests/interval_test.o $out/src/builder.o $out/src/op.o $out/src/flat_ir.o $out/src/interval.o $out/src/fingerprint.o $out/src/dispatch_overlap.o $out/src/gpu_buf_cache.o $out/src/hash.o $out/src/uniforms.o $out/src/uniform_ring.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/jit_arm64.o $out/src/jit_x86.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/spirv.o $out/src/vulkan.o $out/src/wgpu.o $out/src/draw.o $out/stb_truetype.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/anim.o $out/slides/overview.o $out/slides/swatch.o $out/slides/circle.o
-    ldflags = $ldflags -lm
-build $out/bench:     link $out/tools/bench.o           $out/src/builder.o $out/src/op.o $out/src/flat_ir.o $out/src/interval.o $out/src/fingerprint.o $out/src/dispatch_overlap.o $out/src/gpu_buf_cache.o $out/src/hash.o $out/src/uniforms.o $out/src/uniform_ring.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/jit_arm64.o $out/src/jit_x86.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/spirv.o $out/src/vulkan.o $out/src/wgpu.o $out/src/draw.o $out/stb_truetype.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/anim.o $out/slides/overview.o $out/slides/swatch.o $out/slides/circle.o
-build $out/dump:      link $out/tools/dump.o            $out/src/builder.o $out/src/op.o $out/src/flat_ir.o $out/src/interval.o $out/src/fingerprint.o $out/src/dispatch_overlap.o $out/src/gpu_buf_cache.o $out/src/hash.o $out/src/uniforms.o $out/src/uniform_ring.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/jit_arm64.o $out/src/jit_x86.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/spirv.o $out/src/vulkan.o $out/src/wgpu.o $out/src/draw.o $out/stb_truetype.o $out/stb_image_write.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/anim.o $out/slides/overview.o $out/slides/swatch.o $out/slides/circle.o
-
-build $out/test.log:             run  $out/test
-"""
+PROJECT_NINJA = render_project_ninja()
 
 
 HOST_NINJA = r"""out     = $builddir/host
@@ -160,7 +178,7 @@ include build/project.ninja
 build $out/tools/demo.o: compile tools/demo.c
     cflags = -I/opt/homebrew/include -Wno-cast-align
 build $out/tools/work_group.o: compile tools/work_group.c
-build $out/demo:   link $out/tools/demo.o $out/tools/work_group.o $out/src/builder.o $out/src/flat_ir.o $out/src/op.o $out/src/fingerprint.o $out/src/dispatch_overlap.o $out/src/gpu_buf_cache.o $out/src/hash.o $out/src/uniforms.o $out/src/uniform_ring.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/jit_arm64.o $out/src/jit_x86.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/spirv.o $out/src/vulkan.o $out/src/wgpu.o $out/src/draw.o $out/stb_truetype.o $out/stb_image_write.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/anim.o $out/slides/overview.o $out/slides/swatch.o $out/slides/circle.o
+build $out/demo:   link $out/tools/demo.o $out/tools/work_group.o $out/src/builder.o $out/src/flat_ir.o $out/src/op.o $out/src/fingerprint.o $out/src/dispatch_overlap.o $out/src/gpu_buf_cache.o $out/src/hash.o $out/src/uniforms.o $out/src/uniform_ring.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/jit_arm64.o $out/src/jit_x86.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/spirv.o $out/src/vulkan.o $out/src/wgpu.o $out/src/draw.o $out/tools/stb_truetype.o $out/tools/stb_image_write.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/anim.o $out/slides/overview.o $out/slides/swatch.o $out/slides/circle.o
     ldflags = -framework Metal -framework Foundation -L/opt/homebrew/lib -lSDL3 -lMoltenVK -lwgpu_native
 
 
@@ -231,7 +249,7 @@ include build/project.ninja
 
 
 # xsan's dump.log output list and x86_64h_xsan's avx2 variant are the big
-# bespoke pieces — left in exact form for now.
+# bespoke pieces — left in exact form for now (step B in the refactor plan).
 XSAN_NINJA = r"""cov = -fprofile-instr-generate -fcoverage-mapping
 
 out     = $builddir/xsan
@@ -243,7 +261,7 @@ include build/project.ninja
 build $out/tools/demo.o: compile tools/demo.c
     cflags = -I/opt/homebrew/include -Wno-cast-align
 build $out/tools/work_group.o: compile tools/work_group.c
-build $out/demo:   link $out/tools/demo.o $out/tools/work_group.o $out/src/builder.o $out/src/flat_ir.o $out/src/op.o $out/src/fingerprint.o $out/src/dispatch_overlap.o $out/src/gpu_buf_cache.o $out/src/hash.o $out/src/uniforms.o $out/src/uniform_ring.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/jit_arm64.o $out/src/jit_x86.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/spirv.o $out/src/vulkan.o $out/src/wgpu.o $out/src/draw.o $out/stb_truetype.o $out/stb_image_write.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/anim.o $out/slides/overview.o $out/slides/swatch.o $out/slides/circle.o
+build $out/demo:   link $out/tools/demo.o $out/tools/work_group.o $out/src/builder.o $out/src/flat_ir.o $out/src/op.o $out/src/fingerprint.o $out/src/dispatch_overlap.o $out/src/gpu_buf_cache.o $out/src/hash.o $out/src/uniforms.o $out/src/uniform_ring.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/jit_arm64.o $out/src/jit_x86.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/spirv.o $out/src/vulkan.o $out/src/wgpu.o $out/src/draw.o $out/tools/stb_truetype.o $out/tools/stb_image_write.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/anim.o $out/slides/overview.o $out/slides/swatch.o $out/slides/circle.o
     ldflags = -framework Metal -framework Foundation -L/opt/homebrew/lib -lSDL3 -lMoltenVK -lwgpu_native
 
 build $out/dump.log | $
