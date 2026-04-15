@@ -15,9 +15,7 @@ import os
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 
-# ----- Source inventory ------------------------------------------------------
-#
-# Globbed from the tree, alphabetical within each bucket.  `metal_stub.c` is
+# Source inventory, globbed from the tree and alphabetized.  `metal_stub.c` is
 # special: it's never compiled directly in `project.ninja`, only via gcc.ninja's
 # compile_m-rule override, so it's excluded from the main src glob.
 
@@ -39,8 +37,6 @@ CFLAGS = {
     'tools/demo.c':            '-I/opt/homebrew/include -Wno-cast-align',
 }
 
-
-# ----- Helpers ---------------------------------------------------------------
 
 def obj(src):
     """src/foo.c → $out/src/foo.o"""
@@ -70,8 +66,6 @@ def link_objs(entry, *extras):
     objs += [obj(s) for s in SLIDES]
     return ' '.join(objs)
 
-
-# ----- Generated file contents ----------------------------------------------
 
 BUILD_NINJA = r"""builddir = out
 
@@ -142,8 +136,6 @@ build build.ninja $
 """
 
 
-# ----- Dump registry --------------------------------------------------------
-#
 # Each entry is `(name, count)`: `tools/dump.c` emits `count` pipelines for
 # slide `name` into `dumps/{name}/{0..count-1}/{arm64|ir|builder|metal.msl|
 # vulkan.spirv|vulkan.msl}.txt` (xsan) and `dumps/{name}/{i}/avx2.txt`
@@ -230,9 +222,8 @@ def render_project_ninja():
 PROJECT_NINJA = render_project_ninja()
 
 
-# ----- Demo target (host + xsan share an identical block) -------------------
-
-DEMO_LDFLAGS = '-framework Metal -framework Foundation -L/opt/homebrew/lib -lSDL3 -lMoltenVK -lwgpu_native'
+# Demo target — host and xsan emit an identical block, so factor it out.
+DEMO_LDFLAGS ='-framework Metal -framework Foundation -L/opt/homebrew/lib -lSDL3 -lMoltenVK -lwgpu_native'
 
 
 def render_demo_block():
