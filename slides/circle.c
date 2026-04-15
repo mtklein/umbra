@@ -1,8 +1,8 @@
 // Circle-coverage slide.  A smooth-edge circle SDF as a coverage trait, paired
 // with a solid shader and srcover blend.  The coverage math is deliberately
-// interval-program-friendly (square, square_add, sqrt, clamp), so plan 02's
-// quadtree dispatcher will have a first-class customer to plug into once it
-// lands — no changes to this slide needed at that point.
+// interval-program-friendly (square, square_add, sqrt, clamp), so umbra_draw()
+// can build an interval_program for it and umbra_draw_queue() prunes the dispatch
+// down to a boundary ring plus a solid interior (plan 02).
 #include "slide.h"
 #include <math.h>
 #include <stdlib.h>
