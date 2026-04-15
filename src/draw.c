@@ -326,15 +326,30 @@ void umbra_draw_free(struct umbra_draw *d) {
     free(d);
 }
 
-// Tile floor for the quadtree recursion: below this size the interval bound
-// savings stop paying for the interval_program_run overhead.  Roughly matches
-// the widest backend lane count (x86 AVX2 K=8 ×2 per-op for f32, ARM64 K=8,
-// Metal/Vulkan subgroups are 32 but dispatch gracefully down), with some
-// headroom so a 16-pixel-wide boundary tile runs partial in one go.
+// Tile floor for the quadtree recursion.  One compromise value across all
+// backends: on a 4096×480 circle covering ~1% of canvas, MIN_TILE=512 is the
+// smallest value where every backend (interp, jit, metal, vulkan, wgpu) beats
+// its own flat-dispatch baseline:
 //
-// Plan 02 left this as a tunable; hard-coded for now and revisited after we
-// bench the circle slide.
-enum { QUEUE_MIN_TILE = 16 };
+//   backend   flat ns/px   adaptive@512 ns/px   speedup
+//     metal       0.05            0.03            1.7×
+//    vulkan       0.06            0.04            1.5×
+//      wgpu       0.07            0.06            1.2×
+//       jit       0.86            0.20            4.3×
+//    interp       2.48            0.47            5.3×
+//
+// The per-backend optima are quite different (CPU prefers ~16–32, GPU
+// prefers ~512–1024), so 512 leaves ~10% CPU throughput on the table in
+// exchange for not punishing GPU.  See TODO below.
+//
+// TODO: query per-backend parameters (subgroup size, per-dispatch latency,
+// typical command-buffer cost) and pick MIN_TILE per backend rather than
+// this one global compromise.  The spread between CPU-optimal (~32) and
+// GPU-optimal (~1024) is ~32× — a principled "dispatch_granularity" value
+// on struct umbra_backend, set by each backend at init, would recover the
+// missing ~5× on CPU and another ~2× on the fastest GPU paths without
+// regressing anything.
+enum { QUEUE_MIN_TILE = 512 };
 
 static void queue_recurse(struct umbra_draw const *p,
                           int l, int t, int r, int b,
