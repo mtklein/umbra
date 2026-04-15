@@ -50,11 +50,85 @@ static interval interval_mul(interval a, interval b) {
                 hh = a.hi * b.hi;
     return (interval){fmin4(ll, lh, hl, hh), fmax4(ll, lh, hl, hh)};
 }
-// TODO: strict interval rounding.  Every f32 op above uses round-to-nearest,
-// which can shrink endpoints by up to ~0.5 ulp per op and is technically
-// unsound for rigorous bound proofs.  A correct implementation would round lo
-// down and hi up (e.g. FE_DOWNWARD / FE_UPWARD, or nextafter fallback).
-// Unlikely to bite us at dispatch-pruning scale, but worth tracking.
+// TODO: strict interval rounding.
+//
+// Every f32 op above uses round-to-nearest, which can shrink endpoints by up
+// to ~0.5 ulp per op and is technically unsound for rigorous bound proofs.
+// A correct implementation rounds lo toward -∞ and hi toward +∞ so the
+// computed interval always envelops the true real-valued one.  Unlikely to
+// bite us at dispatch-pruning scale, but here's how we'd land it when it
+// becomes worthwhile — written with an eye toward eventually compiling
+// interval_program to the GPU backends.
+//
+// APPROACHES CONSIDERED:
+//
+// A. fesetround(FE_DOWNWARD / FE_UPWARD).  Global rounding-mode switch.
+//    Portable (C99), precise.  Unsuitable because:
+//    - global mutable state → thread-unsafe without care
+//    - compilers aggressively reorder across fesetround unless
+//      `#pragma STDC FENV_ACCESS ON` is respected (most ignore it)
+//    - GPU shader cores have fixed round-to-nearest; no runtime switch
+//    - wasm has no portable fesetround
+//
+// B. nextafterf outward inflation (RECOMMENDED).  After each rounded op,
+//    bump lo toward -∞ and hi toward +∞ by one ulp.  Over-conservative
+//    by 1 ulp per op (true answer may have been exact), but:
+//    - portable across CPU/GPU/wasm with no global state
+//    - works in shaders as a few bit-twiddle ops on the float's u32
+//      representation (bits+1 moves up, bits-1 moves down, with sign and
+//      ±INF special-cased)
+//    - accumulated slop over ~20 ops in a typical SDF is ~20 ulps, still
+//      invisible at dispatch scale
+//    - libm's nextafterf is slow; we'd want a bit-manipulation fast path
+//      (~5 instructions vs libm's ~20 with special-case branches)
+//
+// C. AVX-512 per-op rounding-mode encoding.  Encoded in the instruction
+//    itself (VRNDSCALEPS, VFMA with rm-bits).  Not applicable — our
+//    x86 target is AVX2.  ARM Neon has no equivalent.
+//
+// D. SPV_KHR_shader_float_controls + FP rounding mode decoration.
+//    Would handle SPIRV (Vulkan, wgpu).  Metal has no equivalent — it
+//    would need approach B anyway.  Not worth half-coverage.
+//
+// E. F64 intermediate + final F32 cast.  Exact within F64, one rounding.
+//    Rejected: GPU F64 support is patchy (not required in Vulkan/Metal),
+//    and doubles memory traffic on CPU.
+//
+// PLAN (when we pick this up):
+//
+// 1. Add `static float next_down(float)` / `next_up(float)` bit-twiddle
+//    helpers in interval.c.  Special cases: NaN → NaN, +∞ → +∞ (for
+//    next_up), -∞ → -∞ (for next_down), 0 → ±FLT_TRUE_MIN.
+//
+// 2. Wrap the rounding-sensitive helpers (interval_add, interval_sub,
+//    interval_mul, interval_div, interval_sqrt path, interval_fma,
+//    interval_fms, interval_square, interval_square_add, interval_square_sub)
+//    with outward inflation: `return (interval){next_down(lo), next_up(hi)};`
+//    Skip helpers that don't introduce rounding: interval_abs,
+//    interval_min/max (selection only), interval_lt (mask output),
+//    interval_monotone(floor/ceil) on integer-valued ops.
+//
+// 3. Test: beef up interval_circle_sdf_contains_samples with a wider grid
+//    (currently 9×9 per box; bump to e.g. 64×64) and/or add a targeted
+//    test that constructs a case where round-to-nearest shrinks the
+//    interval below a truth sample, proving the slop and the fix.
+//
+// 4. For GPU: when we add a compile_to_gpu path for interval_program, the
+//    shader emission uses approach B directly — emit each op followed by
+//    the 2-line `bits ± 1` next_down/next_up gadgets.  No runtime rounding
+//    mode required; works on every API (Metal/Vulkan/wgpu) with the same
+//    code shape.
+//
+// COMPLICATIONS TO HANDLE:
+//
+// - Preserve NaN propagation.  next_up(NaN) must be NaN (libm does this;
+//    our bit-twiddle path needs to check isnan first).
+// - Don't inflate past ±∞.  next_up(+INF) = +INF, not FLT_MAX.
+// - Subnormals are fine with bit-twiddle but 2-3× slower on some CPUs;
+//    for dispatcher-level scale it doesn't matter.
+// - Backends don't need changes until we actually run interval_program on
+//    the GPU — this pass still executes on CPU today.  The research is
+//    for making sure the CPU-side choice doesn't box us in later.
 
 static interval interval_div(interval a, interval b) {
     if (b.lo <= 0.0f && 0.0f <= b.hi) {
