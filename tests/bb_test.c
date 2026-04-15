@@ -517,6 +517,13 @@ TEST(test_imm) {
     }
 }
 
+// TODO: this test uses integer-valued inputs where x*y + w is exactly
+// representable, so it can't distinguish a genuinely-fused single-rounded
+// fmaf from a two-rounded mul+add.  See tests/interval_test.c's
+// interval_fma_single_rounding for the pattern: pick a where a*a rounds in
+// f32 (e.g. 1 + 2^-22) and subtract off the rounded product — the result is
+// 0 under two-op and ~2^-44 under true fma.  Adding that here would catch a
+// backend that lowers op_fma_f32 to mul+add and silently drifts.
 TEST(test_fma_f32) {
     struct umbra_builder *builder = umbra_builder();
     umbra_val32 x = umbra_load_32(builder, (umbra_ptr32){0}),

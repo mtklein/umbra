@@ -55,14 +55,17 @@ Entry point (first cut):
     struct iv_eval_result umbra_flat_ir_eval_interval(
         struct umbra_flat_ir const *ir,
         iv x, iv y,                 // rect ranges
-        iv const *uniforms, int nu, // uniform values (point intervals for constants)
+        iv const *uniforms, int nu, // uniform values (exact intervals for constants)
         iv *scratch);               // caller-provided scratch[ir->insts], or NULL to alloc
 
 Per-op rules:
 
 - `imm_*`                → `iv{imm, imm}`
 - `x`, `y`               → caller-supplied intervals
-- `uniform_*`            → caller-supplied point interval
+- `uniform_*`            → caller-supplied exact interval
+                           (convention: uniforms read from `umbra_ptr32{.ix=1}`;
+                           other pointers → constructor returns NULL. The
+                           output sink is `umbra_ptr32{.ix=0}`.)
 - `add_f32`              → `{a.lo + b.lo, a.hi + b.hi}`
 - `sub_f32`              → `{a.lo - b.hi, a.hi - b.lo}`
 - `mul_f32`              → min and max of `{a.lo*b.lo, a.lo*b.hi, a.hi*b.lo, a.hi*b.hi}`
@@ -110,7 +113,7 @@ End-to-end tests:
 
 - build `f(x,y) = x*x + y*y - r*r` (unit disc SDF, `r` uniform)
 - eval over boxes fully inside, fully outside, straddling — check tight conservative
-- for a few pipelines in `dumps/`, check that the interval bound envelopes the K-lane
+- for a few pipelines in `dumps/`, check that the interval bound contains the K-lane
   interpreter's observed min/max across the same rect (sample many points)
 
 Per CLAUDE.md "here-style" asserts throughout.
@@ -118,7 +121,7 @@ Per CLAUDE.md "here-style" asserts throughout.
 Expectations
 ------------
 
-Correctness: bound is always conservative (envelopes the true output range);
+Correctness: bound is always conservative (contains the true output range);
 tight on affine/monotonic paths; loose but safe on pathological cases.
 
 Performance: CPU scalar eval of a typical 20-op shader should take under 1 μs.
