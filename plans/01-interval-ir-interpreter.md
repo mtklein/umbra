@@ -1,7 +1,7 @@
 01 — Interval IR interpreter
 ============================
 
-Status: not started
+Status: complete — see Retrospective below.
 Depends on: nothing
 Unlocks: 02, 03, 05; tightens 04
 
@@ -150,3 +150,134 @@ Non-goals
 - No JIT codegen. That is (03), and only if measurements demand it.
 - No change to `interpreter.c`'s K-lane path.
 - No change to public API.
+
+
+Retrospective
+-------------
+
+Landed across several commits in April 2026.  The design shifted meaningfully
+from the sketch above during review — worth noting for future plans.
+
+### What we built vs what was sketched
+
+**Type names.**  `iv` became `interval`, `iv_eval_*` became
+`interval_program_*`, `iv_point` became `interval_exact`.  Terser names read
+fine in isolation but the long forms hold up better in prose and stack well
+with `interval_is_finite`, `interval_program_run`, etc.
+
+**Lifecycle.**  The sketched `struct iv_eval_result` with a caller-provided
+scratch buffer was replaced with an `umbra_builder`-style encapsulation:
+`struct interval_program *interval_program(ir)` → `interval_program_run(p,
+x, y, uniforms)` → `interval_program_free(p)`.  The constructor memcpys the
+`ir_inst` array so the caller can free the flat IR (and its builder) as soon
+as construction returns.  This mirrors how the rest of umbra manages
+lifetimes.  Plan 02's tile dispatcher should reuse a single `interval_program`
+across many tiles, amortizing the per-run allocation.
+
+**Construction vs run separation.**  The sketched `bailed` flag on the run
+result became a NULL return from the constructor.  The constructor vets the
+whole IR up-front (unsupported ops, wrong SINK / UNIFORM pointers, missing
+sink store all return NULL), and run() can then assume a well-formed
+program.  This keeps `run()` hot and branch-free in the common case.
+
+**Sink / uniform convention.**  Not in the sketch: output goes to
+`umbra_store_32(b, umbra_ptr32{.ix=0}, …)`; uniforms are read from
+`umbra_uniform_32(b, umbra_ptr32{.ix=1}, slot)`.  Enforced at construction.
+Distinct pointers for inputs and outputs make pipelines obvious at a glance
+and make the "no sink store" failure mode explicit.
+
+**Uniform shape.**  The sketch passed uniforms as intervals (`iv const*`);
+we landed with `float const *uniform` — exact point values, no count.
+Matches backend convention (unchecked indexed load), so short arrays are UB
+and caught by asan.  Uniforms are exact at dispatch time anyway; there's no
+case where passing a range makes sense.
+
+**Output exposure.**  Landed with the sketch's preferred answer: run()
+returns the interval of the last `umbra_store_32` to SINK.
+
+**Op coverage is narrower than sketched.**  We started with the sketch's
+full list, then pruned every op not exercised by tests during review ("if
+it's untested it's dead code").  Current support: `x`, `y`, `join`,
+`imm_32`, `uniform_32`, `store_32`; f32 `add/sub/mul/div/min/max/fma/fms/
+sqrt/abs/floor/ceil`; `lt_f32`; and the four `_imm` variants that actually
+fire (`add/sub/div/lt`).  Integer arithmetic, bitops, int compares, loads,
+gathers, variables, loops, ifs, sel, compare pairs other than `lt` — all
+make the constructor return NULL.  We'll add them back as plan 02 and beyond
+need them.
+
+**`op_square_f32` specialization.**  Not in the sketch; added during review
+when `interval_mul(x, x)` slop on circle SDFs came up.  Expanded to a full
+family: `op_square_f32`, `op_square_add_f32` (`x*x + y` fused), `op_square_
+sub_f32` (`y - x*x` fused), plumbed through every backend and with builder
+rewrites for `mul(v, v) → square(v)` and `add(square(v), z) → square_add`.
+Single biggest bound-quality win; not discovering it in the plan cost a
+later round-trip.
+
+**`sqrt` policy changed mid-flight.**  Sketch said "clamp lo to 0".  We
+landed that initially, then switched to `interval_monotone(x, sqrtf)` (let
+NaN propagate) once `interval_square` eliminated the straddle-zero-from-
+rounding-slop case that the clamp was defending against.  NaN propagation
+is contagious and correctly triggers `!interval_is_finite(out)`, which is
+what callers want.
+
+**fma/fms fused at interval level.**  Sketch said "compose add/sub with mul
+rules".  We landed with genuinely single-rounded `fmaf` at (4 or 8) corner
+combinations, matching backend behavior bit-exactly.  Added
+`test_fma_f32_single_rounding` (and `test_square_*_single_rounding`) to
+prove every backend emits real fused-multiply, not two-op mul+add.
+
+**Strict interval rounding: considered and rejected.**  The sketch didn't
+raise it; we researched it after shipping and decided against.  Round-to-
+nearest is unsound in principle (0.5-ulp-per-op slop) but:
+  - slow to fix (outward-rounding `nextafter` per op),
+  - inflates exact answers that round-to-nearest got right,
+  - worst: inflates intervals that touch zero exactly, so
+    `interval_square([-1, 1]) = [0, 1]` becomes `[-ε, 1]` → breaks sqrt
+    (NaN), flips tri-valued `lt(_, imm(0))` from "definitely ≥ 0" to
+    "maybe".  Actively worse for dispatch pruning, the whole point.
+The rationale is recorded in `src/interval.c` next to the ops it would
+affect.
+
+### Side yields
+
+- `src/count.h` with `#define count(arr) (int)(sizeof(arr) / sizeof(0[arr]))`,
+  plus a sweep across src/, tests/, tools/, slides/ replacing the
+  `sizeof X / sizeof *X` boilerplate.  Landed during plan 01 work because
+  the pattern kept appearing in new tests.
+- Three legal self-fold peepholes (`min_f32(v, v) → v`, `max_f32(v, v) → v`,
+  `lt_f32(v, v) → imm(0)`) — found while auditing what other correlation
+  patterns `interval_square` might be missing.
+
+### LOC
+
+Plan: ~300 src, ~200 test.  Actual: ~320 lines in interval.c + 30 in
+interval.h + ~370 in interval_test.c, plus the square-op plumbing across
+the builder / interpreter / two JITs / metal / spirv (~200 lines), plus
+test coverage for square ops in bb_test.c (~90 lines).  Significantly more
+than planned, all in the square detour — which was worth it.
+
+### Lessons
+
+1. **Encapsulate with a type when you can.**  The caller-provided-scratch
+   API in the sketch was less principled than the umbra_builder pattern.
+   Future plans that propose an API should first ask "does this shape
+   match the rest of the project?"
+
+2. **Construction-time vetting.**  Separating "can we handle this IR?"
+   from "handle it" simplifies the hot path.  This pattern could apply to
+   other passes.
+
+3. **Consider correlation explicitly when designing interval math.**
+   The `x*x` slop was a foreseeable issue and the fix (specialized op)
+   was a well-known technique in prior art (iv2d's SQR).  Plan drafts
+   should include a "where does the interval bound lose precision" pass
+   before locking scope.
+
+4. **Strict rounding isn't universally better.**  For sound-proof-style
+   use cases it's required; for dispatch pruning it's harmful.  Note the
+   use case when making precision/rigor tradeoffs.
+
+5. **Pruning is part of the work.**  Landing with tested code only, then
+   adding ops as needed by callers, kept interval.c small and coverage
+   100% on functions.  Would recommend for similar "implement many rules"
+   passes.
