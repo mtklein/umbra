@@ -16,6 +16,7 @@
 
 #define _POSIX_C_SOURCE 200809L
 #include "../include/umbra.h"
+#include "../src/count.h"
 #include "../src/flat_ir.h"
 #include "../src/interval.h"
 #include <stdio.h>
@@ -57,15 +58,16 @@ struct sample { interval x, y; };
 // run() calls that feed it.
 static volatile float sink_absorb;
 static void time_samples(char const *label, struct interval_program *p,
-                         float const *uniform, struct sample const *s, int n,
-                         double target_secs, int samples) {
+                         float const *uniform,
+                         struct sample const *xy, int xys,
+                         double target_secs, int trials) {
     // Pilot: grow iters until one round takes ~target_secs/2.
     int    iters   = 16;
     double t_pilot = 0;
     for (int pi = 0; pi < 30; pi++) {
         double const start = now();
         for (int it = 0; it < iters; it++) {
-            struct sample const sa = s[it & (n-1)];
+            struct sample const sa = xy[it & (xys - 1)];
             interval const out = interval_program_run(p, sa.x, sa.y, uniform);
             sink_absorb += out.lo + out.hi;
         }
@@ -77,10 +79,10 @@ static void time_samples(char const *label, struct interval_program *p,
     if (cal > iters) { iters = cal; }
 
     double best = 0;
-    for (int k = 0; k < samples; k++) {
+    for (int k = 0; k < trials; k++) {
         double const start = now();
         for (int it = 0; it < iters; it++) {
-            struct sample const sa = s[it & (n-1)];
+            struct sample const sa = xy[it & (xys - 1)];
             interval const out = interval_program_run(p, sa.x, sa.y, uniform);
             sink_absorb += out.lo + out.hi;
         }
@@ -136,9 +138,9 @@ int main(void) {
     };
 
     printf("circle-SDF coverage: %d IR insts\n", insts);
-    time_samples("far",  p, uniform, far,  8, 0.05, 7);
-    time_samples("edge", p, uniform, edge, 8, 0.05, 7);
-    time_samples("tiny", p, uniform, tiny, 8, 0.05, 7);
+    time_samples("far",  p, uniform, far,  count(far),  0.05, 7);
+    time_samples("edge", p, uniform, edge, count(edge), 0.05, 7);
+    time_samples("tiny", p, uniform, tiny, count(tiny), 0.05, 7);
 
     interval_program_free(p);
     return 0;
