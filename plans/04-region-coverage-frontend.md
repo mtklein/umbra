@@ -11,7 +11,7 @@ Goal
 A small umbra front-end for writing implicit 2D shapes the way iv2d does:
 as a symbolic function `f(x, y)` whose sign determines inside/outside. The
 front-end compiles that description into an `umbra_coverage` instance that
-flows through the normal `umbra_draw_build` path.
+flows through the normal `umbra_draw()` path.
 
 This is the "user writes `y - (x*x + y*y - r*r)` and gets a disc rendered"
 ergonomics from iv2d, ported directly.
@@ -24,7 +24,17 @@ right seam — `struct umbra_coverage` — and four concrete coverages living
 at that seam (`_rect`, `_bitmap`, `_sdf`, `_bitmap_matrix`, `_wind`). An
 iv2d-style region becomes a fifth instance rather than a whole new subsystem.
 
-Paired with (02), a region-authored coverage gets adaptive dispatch for free.
+Paired with (02), a region-authored coverage gets adaptive dispatch for
+free — `umbra_draw()` already tries to build an `interval_program` for any
+coverage, and the quadtree turns on automatically when it succeeds.  The
+forcing function cuts both ways: regions that use only interval.c's
+current op set (`add/sub/mul/div/min/max/fma/sqrt/abs/floor/ceil`, `lt`,
+the matching `_imm` variants, `join`) get the quadtree; regions that reach
+for `sel_32`, compare ops other than `lt`, or `gather` fall back to flat
+dispatch.  Per plan 02's retrospective, each new slide porting effort is
+expected to surface an interval-op-support gap; adding the missing op is
+part of the work.
+
 Paired with (05), it gets analytic sub-pixel α for free. Without either, it
 still gives iv2d-style authoring on top of umbra's existing per-pixel path.
 
@@ -73,6 +83,12 @@ The caller writes:
 Inside `umbra_coverage_region.build` we call `eval(...)` to get the signed
 value, then convert to α via (05) — linear-clip for the MVP, interval-fraction
 later.
+
+Conventions inherited from plan 02's `umbra_draw` integration: the region's
+uniforms (any uniform it reserves via `u`) must read from
+`(umbra_ptr32){.ix=0}` so the coverage-only IR that `umbra_draw()` builds
+passes interval.c's acceptance check (UNIFORM=.ix=0, SINK=.ix=1).  All
+existing umbra ops already follow this; new region helpers should too.
 
 For iv2d's compositional operators:
 

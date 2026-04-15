@@ -9,9 +9,15 @@ Goal
 ----
 
 Make iv2d's "α = the fraction of the output interval that is negative" a
-reusable helper — both as a CPU-side rect-level decision (used by 02 to
-classify tiles) and as a JIT-time builder helper (used by 04 to convert a
-signed f into α without a separate quality mechanism).
+reusable helper, primarily as a JIT-time builder helper used by 04 to
+convert a signed f into α without a separate quality mechanism.
+
+Plan 02 landed with an implicit rect-level use of this formula already:
+`queue_recurse` makes a tri-valued prune decision (`α.hi ≤ 0` → skip,
+`α.lo ≥ 1` → full, else → split or partial).  That's the tri-valued
+short-circuit of the formula below, inlined for dispatch.  Plan 05 is
+about the *continuous* middle case — the pixel-level α that a boundary
+tile emits when it can't subdivide further.
 
 Why
 ---
@@ -39,17 +45,21 @@ Current state
 Design sketch
 -------------
 
-Two usages, one formula, separate call sites.
+One formula, two call sites.
 
-Rect-level (CPU), used by (02):
+Rect-level (CPU) usage is already present inline in `src/draw.c`'s
+`queue_recurse` (plan 02).  If plan 05 wants a factored helper:
 
-    static inline float iv_alpha(iv f) {
-        if (f.hi <= 0) return 1;
-        if (f.lo >= 0) return 0;
+    static inline float interval_alpha(interval f) {
+        if (f.hi <= 0) { return 1; }
+        if (f.lo >= 0) { return 0; }
         return -f.lo / (f.hi - f.lo);
     }
 
-Pixel-level (JIT), used by (04):
+…either living in `src/interval.c` or staying inline in draw.c depending
+on how plan 04 wants to use it.
+
+Pixel-level (JIT), the main addition of this plan, used by (04):
 
     umbra_val32 umbra_interval_alpha(struct umbra_builder *b,
                                      umbra_val32 lo, umbra_val32 hi);
@@ -126,6 +136,12 @@ Open questions
   to treat the SDF as exact and add an opt-in correction coefficient.
 - Non-Lipschitz inputs (sharp-corner SDFs with unbounded gradient near the
   corner) will mis-estimate. Worth documenting, not worth solving here.
+- `umbra_interval_alpha` emits ops that the `interval_program` pass then
+  sees (since it's inside the draw pipeline).  The sketched op sequence
+  uses `sub`, `div`, `sel_32`, compares, `min`, `max` — interval.c
+  currently accepts everything except `sel_32` and the non-`lt` compares.
+  Plan 05 will force those onto interval.c's supported list, which per
+  plan 02's retrospective is expected and fine.
 
 Non-goals
 ---------

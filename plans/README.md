@@ -26,6 +26,15 @@ Natural path of work: 01 first, then 04 and 05 to get an end-to-end iv2d-style
 pipeline running on umbra's substrate without adaptive dispatch, then 02 to
 turn on the performance story, then 03 only if measurements justify it.
 
+Actual path so far: 01 then 02, because plan 01's `interval_program`
+landed with just enough op support for a proof-of-concept circle slide
+that made sense to wire straight into the tile dispatcher.  Plans 04
+and 05 remain the natural next step — they give the quadtree more
+slides to prune through and richer coverage shapes to exercise.  Plan
+02's retrospective found that each new slide migration is a forcing
+function for interval.c's op set (`sel_32`, compares, `gather`), so
+plans 04 and 05 are also the on-ramp for completing that surface.
+
 What "absorbing iv2d's key ideas" means here
 --------------------------------------------
 

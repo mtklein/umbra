@@ -1,9 +1,20 @@
 03 — Pair-lane interval JIT
 ===========================
 
-Status: not started, speculative
-Depends on: 01 (semantic reference), 02 (consumer of fast interval eval)
-Gate: measured evidence that scalar interval eval from (01) is a real bottleneck.
+Status: not started, speculative.
+Depends on: 01 (semantic reference), 02 (consumer of fast interval eval).
+Gate: measured evidence that scalar interval eval from (01) is a real
+bottleneck.
+
+Plan 02 landed with measured interval overhead at ~19 ns/call on native
+arm64 and ~46 ns/call on x86_64h (a 20-op circle SDF; see
+`tools/bench_interval.c`).  At QUEUE_MIN_TILE=512 on a 4096×480 canvas the
+dispatcher makes ~40 `interval_program_run` calls per frame, on the order
+of 1 µs total.  Nowhere near a bottleneck.  A pair-lane JIT would speed
+this up 5–20× per the hypothesis below, saving us <1 µs per frame at the
+currently measured workloads.  Do not start this plan until a real
+scenario (deep quadtrees, per-pixel interval math, or densely-nested
+regions) produces a profile where interval eval is the clear hot spot.
 
 Goal
 ----
@@ -69,9 +80,10 @@ landing and someone has a concrete profile pointing at a specific op.
 Files touched (variant A)
 -------------------------
 
-- new: `include/umbra_iv.h` — parallel builder API
-- new: `src/iv_builder.c` — thin wrapper that emits the op sequences
-- new: `tests/iv_jit_test.c`
+- new: `include/umbra_interval.h` — parallel builder API (follow plan 01's
+  `interval_*` naming, not the `iv_*` shorthand used in earlier drafts)
+- new: `src/interval_builder.c` — thin wrapper that emits the op sequences
+- new: `tests/interval_jit_test.c`
 
 Files touched (variant B, if we ever do it)
 -------------------------------------------
@@ -113,6 +125,12 @@ Open questions
 - Can we reuse channels (`val.chan`) to hold `hi` implicitly, or do we need
   explicit paired IDs? Easier to start explicit and compact later.
 - Loop/if interval analysis remains out of scope here; that lives in (01).
+- Per plan 02's "keep interval.c narrow" lesson: a pair-lane JIT
+  replicates interval.c's op set in codegen form.  Whatever op-support
+  gaps interval.c has *today* (sel_32, compares, gather, integer ops)
+  propagate here.  Plan 03 should not grow the op set — it should make
+  what interval.c already supports run faster.  Expanding op coverage
+  lives in plan 04's slide-porting work.
 
 Non-goals
 ---------
