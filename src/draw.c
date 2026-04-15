@@ -238,16 +238,22 @@ void umbra_draw_fill(struct umbra_draw_layout const *layout,
 // local slots [0, C).  Also records how many slots the coverage claimed so
 // the caller can later align this IR's slot frame with the partial program's
 // superset buffer.
+//
+// Note: we hand coverage->build raw op_x / op_y, NOT the f32_from_i32-wrapped
+// versions umbra_draw_build would produce.  The coverage threads its x/y
+// argument through float ops (sub_f32, mul_f32, etc.), all of which are type-
+// erased at the IR level, so dropping the conversion is transparent to the
+// coverage.  It keeps interval.c narrow — every op it accepts has principled
+// interval semantics, rather than needing a "this conversion is identity here
+// because we happen to know the input is a pixel coordinate" case.
 static struct interval_program*
 build_coverage_interval(struct umbra_coverage *coverage, int *out_slots) {
     struct umbra_builder *b = umbra_builder();
-    umbra_val32 const x  = umbra_x(b),
-                      y  = umbra_y(b),
-                      xf = umbra_f32_from_i32(b, x),
-                      yf = umbra_f32_from_i32(b, y);
+    umbra_val32 const x = umbra_x(b),
+                      y = umbra_y(b);
 
     struct umbra_uniforms_layout uni = {0};
-    umbra_val32 const cov = coverage->build(coverage, b, &uni, xf, yf);
+    umbra_val32 const cov = coverage->build(coverage, b, &uni, x, y);
     umbra_store_32(b, (umbra_ptr32){.ix = 1}, cov);
 
     struct umbra_flat_ir *ir = umbra_flat_ir(b);

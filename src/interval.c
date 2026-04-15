@@ -205,7 +205,6 @@ static _Bool op_supported(struct ir_inst const *in) {
         case op_square_f32: case op_square_add_f32: case op_square_sub_f32:
         case op_sqrt_f32: case op_abs_f32:
         case op_floor_f32: case op_ceil_f32:
-        case op_f32_from_i32:
 
         case op_lt_f32:
 
@@ -296,11 +295,6 @@ interval interval_program_run(struct interval_program *p,
             case op_square_f32: r = interval_square  (arg(p,in->x));         break;
             case op_floor_f32:  r = interval_monotone(arg(p,in->x), floorf); break;
             case op_ceil_f32:   r = interval_monotone(arg(p,in->x), ceilf);  break;
-
-            // Pixel coordinates enter as integers (op_x, op_y) and are
-            // converted by the draw pipeline.  The value domain is the same
-            // either way, so this is identity in interval land.
-            case op_f32_from_i32: r = arg(p, in->x); break;
 
             case op_lt_f32: r = interval_lt(arg(p,in->x), arg(p,in->y)); break;
 
