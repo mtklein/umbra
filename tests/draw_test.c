@@ -1,5 +1,6 @@
 #include "../include/umbra_draw.h"
 #include "../src/count.h"
+#include "../src/interval.h"
 #include "test.h"
 #include <stdint.h>
 
@@ -1348,4 +1349,126 @@ TEST(test_srcover_fp16_planar) {
         }
     }
     cleanup_draw(&B);
+}
+
+// umbra_draw_compile bundles shader+coverage+blend into {partial, full,
+// optional interval}.  Tests: both umbra_programs compile and dispatch
+// correctly, and pr.coverage is present/absent according to whether the
+// coverage's ops are interval-supportable.
+
+// Minimal interval-friendly coverage that emits α = clamp(x - r, 0, 1) for a
+// uniform-supplied r (a 1-D gradient).  Uses only sub/min/max/imm — all in
+// interval.c's op_supported set — so interval_program() should accept it.
+struct soft_edge_cov {
+    struct umbra_coverage base;
+    float r;
+    int   off_;
+};
+static umbra_val32 soft_edge_build(struct umbra_coverage *s, struct umbra_builder *b,
+                                    struct umbra_uniforms_layout *u,
+                                    umbra_val32 x, umbra_val32 y) {
+    struct soft_edge_cov *self = (struct soft_edge_cov *)s;
+    (void)y;
+    self->off_ = umbra_uniforms_reserve_f32(u, 1);
+    umbra_val32 const r = umbra_uniform_32(b, (umbra_ptr32){0}, self->off_);
+    return umbra_min_f32(b, umbra_imm_f32(b, 1.0f),
+             umbra_max_f32(b, umbra_imm_f32(b, 0.0f),
+                              umbra_sub_f32(b, x, r)));
+}
+static void soft_edge_fill(struct umbra_coverage const *s, void *uniforms) {
+    struct soft_edge_cov const *self = (struct soft_edge_cov const *)s;
+    umbra_uniforms_fill_f32(uniforms, self->off_, &self->r, 1);
+}
+
+TEST(test_draw_compile_rect) {
+    struct umbra_shader_solid  shader = umbra_shader_solid((float[]){1, 0, 0, 1});
+    struct umbra_coverage_rect cov    = umbra_coverage_rect((float[]){2.0f, 0.0f, 5.0f, 1.0f});
+
+    struct umbra_backend *bes[NUM_BACKENDS] = {
+        umbra_backend_interp(), umbra_backend_jit(),
+        umbra_backend_metal(),  umbra_backend_vulkan(),
+        umbra_backend_wgpu(),
+    };
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        if (!bes[bi]) { continue; }
+
+        struct umbra_draw_layout   lay;
+        struct umbra_draw_programs pr = umbra_draw_compile(bes[bi], &shader.base, &cov.base,
+                                                           umbra_blend_srcover, umbra_fmt_8888,
+                                                           &lay);
+        pr.partial_coverage != NULL here;
+        pr.full_coverage    != NULL here;
+        // rect coverage uses le/lt/and/sel — not in interval.c's supported set.
+        pr.coverage         == NULL here;
+        // Solid shader reserves 4 slots; rect's coverage uniforms come next.
+        pr.uniform_offset   == 4 here;
+
+        umbra_draw_fill(&lay, &shader.base, &cov.base);
+        uint32_t dst[8] = {0};
+        struct umbra_buf buf[] = {
+            {.ptr = lay.uniforms, .count = lay.uni.slots},
+            {.ptr = dst,          .count = 8},
+        };
+
+        // Partial: rect masks the fill to [2, 5).
+        pr.partial_coverage->queue(pr.partial_coverage, 0, 0, 8, 1, buf);
+        bes[bi]->flush(bes[bi]);
+        for (int i = 0; i < 8; i++) {
+            if (i >= 2 && i < 5) {
+                (dst[i] & 0xFF)         == 0xFF here;
+                ((dst[i] >> 24) & 0xFF) == 0xFF here;
+            } else {
+                dst[i] == 0 here;
+            }
+        }
+
+        // Full: α = 1 everywhere → every pixel red.
+        for (int i = 0; i < 8; i++) { dst[i] = 0; }
+        pr.full_coverage->queue(pr.full_coverage, 0, 0, 8, 1, buf);
+        bes[bi]->flush(bes[bi]);
+        for (int i = 0; i < 8; i++) {
+            (dst[i] & 0xFF)         == 0xFF here;
+            ((dst[i] >> 24) & 0xFF) == 0xFF here;
+        }
+
+        umbra_draw_programs_free(&pr);
+        free(lay.uniforms);
+    }
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        if (bes[bi]) { bes[bi]->free(bes[bi]); }
+    }
+}
+
+TEST(test_draw_compile_interval_coverage) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 1});
+    struct soft_edge_cov      cov    = {
+        .base = {.build = soft_edge_build, .fill = soft_edge_fill},
+        .r    = 3.0f,
+    };
+
+    struct umbra_backend *be = umbra_backend_interp();
+
+    struct umbra_draw_layout   lay;
+    struct umbra_draw_programs pr = umbra_draw_compile(be, &shader.base, &cov.base,
+                                                       umbra_blend_srcover, umbra_fmt_8888,
+                                                       &lay);
+    pr.partial_coverage != NULL here;
+    pr.full_coverage    != NULL here;
+    pr.coverage         != NULL here;
+    pr.uniform_offset   == 4 here;
+
+    // Sanity-check that the interval program bounds α sensibly for a tile
+    // crossing the soft edge: x ∈ [0, 10], r = 3 → α = clamp(x-3, 0, 1) ∈ [0, 1].
+    interval const alpha = interval_program_run(pr.coverage,
+                                                (interval){0.0f, 10.0f},
+                                                (interval){0.0f,  1.0f},
+                                                (float const*)lay.uniforms + pr.uniform_offset);
+    alpha.lo == 0.0f here;
+    alpha.hi == 1.0f here;
+
+    umbra_draw_programs_free(&pr);
+    free(lay.uniforms);
+    be->free(be);
 }

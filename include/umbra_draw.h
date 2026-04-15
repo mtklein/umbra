@@ -64,6 +64,32 @@ void umbra_draw_fill(struct umbra_draw_layout const*,
                      struct umbra_shader const*,
                      struct umbra_coverage const*);
 
+// Compiled bundle for adaptive dispatch: one program with coverage multiplied
+// in (boundary pixels), one without (interior, α == 1), plus an optional
+// interval_program over the coverage alone for tile pruning.  coverage is
+// NULL when the coverage IR contains an op interval.c cannot yet bound — the
+// caller simply falls back to flat dispatch on `partial_coverage` in that case.
+struct umbra_draw_programs {
+    struct umbra_program    *partial_coverage;
+    struct umbra_program    *full_coverage;
+    struct interval_program *coverage;
+    int                      uniform_offset;  // slot in buf[0] where coverage uniforms start
+    int                      pad_;
+};
+
+struct umbra_draw_programs
+umbra_draw_compile(struct umbra_backend*,
+                   struct umbra_shader*, struct umbra_coverage*,
+                   umbra_blend_fn, struct umbra_fmt,
+                   struct umbra_draw_layout*);
+void umbra_draw_programs_free(struct umbra_draw_programs*);
+
+// Dispatch the bundle.  Currently always flat-dispatches `partial_coverage`;
+// plan 02 step 2 adds interval-pruned quadtree descent when `coverage` is
+// non-NULL.
+void umbra_draw_queue(struct umbra_draw_programs const*,
+                      int l, int t, int r, int b, struct umbra_buf[]);
+
 struct umbra_shader_solid {
     struct umbra_shader base;
     float  color[4];

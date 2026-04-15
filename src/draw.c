@@ -1,6 +1,7 @@
 #include "../include/umbra_draw.h"
 #include "assume.h"
 #include "flat_ir.h"
+#include "interval.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -231,6 +232,95 @@ void umbra_draw_fill(struct umbra_draw_layout const *layout,
                      struct umbra_coverage const *coverage) {
     if (shader)   { shader->fill(shader, layout->uniforms); }
     if (coverage) { coverage->fill(coverage, layout->uniforms); }
+}
+
+// Build a coverage-only IR on a fresh uni — i.e. coverage uniforms land at
+// local slots [0, C).  Also records how many slots the coverage claimed so
+// the caller can later align this IR's slot frame with the partial program's
+// superset buffer.
+static struct interval_program*
+build_coverage_interval(struct umbra_coverage *coverage, int *out_slots) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_val32 const x  = umbra_x(b),
+                      y  = umbra_y(b),
+                      xf = umbra_f32_from_i32(b, x),
+                      yf = umbra_f32_from_i32(b, y);
+
+    struct umbra_uniforms_layout uni = {0};
+    umbra_val32 const cov = coverage->build(coverage, b, &uni, xf, yf);
+    umbra_store_32(b, (umbra_ptr32){.ix = 1}, cov);
+
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
+    umbra_builder_free(b);
+    struct interval_program *p = interval_program(ir);
+    umbra_flat_ir_free(ir);
+
+    *out_slots = uni.slots;
+    return p;
+}
+
+// Design notes — three builds off one (shader, coverage, blend) triple:
+//
+//   1. Coverage-only IR first, for interval_program.  coverage->build fires
+//      against a fresh uni so self->off_ transiently lands at 0.
+//   2. Partial program: full shader + coverage + blend pipeline.  This call
+//      re-invokes coverage->build with uni.slots == shader's S, so the final
+//      value of self->off_ is S — where partial's IR will read coverage
+//      uniforms, and where coverage->fill writes them at dispatch time.
+//   3. Full program: shader + blend only, coverage == NULL.  No uniforms
+//      reserved beyond the shader's, so the partial's superset buffer still
+//      satisfies it (it reads a prefix).
+//
+// The order matters.  Whichever coverage->build call runs LAST is the one
+// whose self->off_ survives into dispatch; the partial call must be last of
+// the two to keep dispatch-time uniforms aligned with the partial program.
+// Invariant we rely on throughout: shader->build is coverage-oblivious — it
+// reserves the same slots in the same order regardless of what runs after it.
+// A future shader that violates this would desync full's slot offsets from
+// partial's.  Covered by assume() below.
+struct umbra_draw_programs
+umbra_draw_compile(struct umbra_backend *be,
+                   struct umbra_shader *shader, struct umbra_coverage *coverage,
+                   umbra_blend_fn blend, struct umbra_fmt fmt,
+                   struct umbra_draw_layout *layout) {
+    struct umbra_draw_programs out = {0};
+    int coverage_slots = 0;
+
+    if (coverage) {
+        out.coverage = build_coverage_interval(coverage, &coverage_slots);
+    }
+
+    struct umbra_builder *pb = umbra_draw_build(shader, coverage, blend, fmt, layout);
+    struct umbra_flat_ir *pir = umbra_flat_ir(pb);
+    umbra_builder_free(pb);
+    out.partial_coverage = be->compile(be, pir);
+    umbra_flat_ir_free(pir);
+
+    struct umbra_builder *fb = umbra_draw_build(shader, NULL, blend, fmt, NULL);
+    struct umbra_flat_ir *fir = umbra_flat_ir(fb);
+    umbra_builder_free(fb);
+    out.full_coverage = be->compile(be, fir);
+    umbra_flat_ir_free(fir);
+
+    // Partial reserved shader's S slots + coverage's C slots; coverage-only
+    // reserved just C.  Shader slot count is thus total minus C, and coverage
+    // uniforms in the partial's buffer start at offset S.
+    assume(layout->uni.slots >= coverage_slots);
+    out.uniform_offset = layout->uni.slots - coverage_slots;
+
+    return out;
+}
+
+void umbra_draw_programs_free(struct umbra_draw_programs *p) {
+    if (p->partial_coverage) { p->partial_coverage->free(p->partial_coverage); }
+    if (p->full_coverage   ) { p->full_coverage   ->free(p->full_coverage   ); }
+    interval_program_free(p->coverage);
+    *p = (struct umbra_draw_programs){0};
+}
+
+void umbra_draw_queue(struct umbra_draw_programs const *p,
+                      int l, int t, int r, int b, struct umbra_buf buf[]) {
+    p->partial_coverage->queue(p->partial_coverage, l, t, r, b, buf);
 }
 
 static umbra_val32 clamp01(struct umbra_builder *builder, umbra_val32 t) {
