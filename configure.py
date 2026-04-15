@@ -139,6 +139,64 @@ build build.ninja $
 """
 
 
+# ----- Dump registry --------------------------------------------------------
+#
+# Each entry is `(name, count)`: `tools/dump.c` emits `count` pipelines for
+# slide `name` into `dumps/{name}/{0..count-1}/{arm64|ir|builder|metal.msl|
+# vulkan.spirv|vulkan.msl}.txt` (xsan) and `dumps/{name}/{i}/avx2.txt`
+# (x86_64h_xsan).  Order here drives the order in the generated `build ... |`
+# output lists.
+
+DUMPS = [
+    ('srcover',                         1),
+    ('solid_fill_src',                  1),
+    ('source_over_srcover',             1),
+    ('destination_over_dstover',        1),
+    ('multiply_blend',                  1),
+    ('full_coverage_no_rect_clip',      1),
+    ('no_blend_direct_paint',           1),
+    ('text_8_bit_aa',                   1),
+    ('text_sdf',                        1),
+    ('perspective_text',                1),
+    ('linear_gradient_2_stop',          1),
+    ('radial_gradient_2_stop',          1),
+    ('linear_gradient_wide_gamut',      1),
+    ('radial_gradient_wide_gamut',      1),
+    ('linear_gradient_loop_stops',      1),
+    ('radial_gradient_loop_stops',      1),
+    ('slug_two_pass',                   2),
+    ('slug_one_pass',                   1),
+    ('animated_t_in_uniforms',          1),
+    ('color_swatches',                  1),
+    ('circle_coverage_interval_ready',  1),
+    ('overview',                        1),
+]
+
+
+def dump_paths(suffixes):
+    """Yield 'dumps/{name}/{i}/{suffix}' for every (name, i, suffix) triple."""
+    for name, count in DUMPS:
+        for i in range(count):
+            for suf in suffixes:
+                yield f'dumps/{name}/{i}/{suf}'
+
+
+def dump_outputs_block(suffixes):
+    """Emit the `build $out/dump.log | $\n     path $\n     ...: run $out/dump`
+    block from the current DUMPS registry, in dump.c order."""
+    paths = list(dump_paths(suffixes))
+    lines = ['build $out/dump.log | $\n']
+    for p in paths[:-1]:
+        lines.append(f'      {p} $\n')
+    lines.append(f'      {paths[-1]}: run $out/dump\n')
+    return ''.join(lines)
+
+
+XSAN_DUMP_SUFFIXES    = ['arm64.txt', 'ir.txt', 'builder.txt',
+                         'metal.msl', 'vulkan.spirv', 'vulkan.msl']
+X86_DUMP_SUFFIXES     = ['avx2.txt']
+
+
 def render_project_ninja():
     parts = []
     # stb tool sources (with their cflag overrides).
@@ -248,9 +306,7 @@ include build/project.ninja
 """
 
 
-# xsan's dump.log output list and x86_64h_xsan's avx2 variant are the big
-# bespoke pieces — left in exact form for now (step B in the refactor plan).
-XSAN_NINJA = r"""cov = -fprofile-instr-generate -fcoverage-mapping
+XSAN_NINJA_PREFIX = r"""cov = -fprofile-instr-generate -fcoverage-mapping
 
 out     = $builddir/xsan
 cc      = $clang -fsanitize=address,integer,undefined -fno-sanitize-recover=all $cov
@@ -264,146 +320,8 @@ build $out/tools/work_group.o: compile tools/work_group.c
 build $out/demo:   link $out/tools/demo.o $out/tools/work_group.o $out/src/builder.o $out/src/flat_ir.o $out/src/op.o $out/src/fingerprint.o $out/src/dispatch_overlap.o $out/src/gpu_buf_cache.o $out/src/hash.o $out/src/uniforms.o $out/src/uniform_ring.o $out/src/ra.o $out/src/interpreter.o $out/src/jit.o $out/src/jit_arm64.o $out/src/jit_x86.o $out/src/asm_arm64.o $out/src/asm_x86.o $out/src/metal.o $out/src/spirv.o $out/src/vulkan.o $out/src/wgpu.o $out/src/draw.o $out/tools/stb_truetype.o $out/tools/stb_image_write.o $out/slides/slides.o $out/slides/solid.o $out/slides/text.o $out/slides/persp.o $out/slides/gradient.o $out/slides/slug.o $out/slides/anim.o $out/slides/overview.o $out/slides/swatch.o $out/slides/circle.o
     ldflags = -framework Metal -framework Foundation -L/opt/homebrew/lib -lSDL3 -lMoltenVK -lwgpu_native
 
-build $out/dump.log | $
-      dumps/srcover/0/arm64.txt $
-      dumps/srcover/0/ir.txt $
-      dumps/srcover/0/builder.txt $
-      dumps/srcover/0/metal.msl $
-      dumps/srcover/0/vulkan.spirv $
-      dumps/srcover/0/vulkan.msl $
-      dumps/solid_fill_src/0/arm64.txt $
-      dumps/solid_fill_src/0/ir.txt $
-      dumps/solid_fill_src/0/builder.txt $
-      dumps/solid_fill_src/0/metal.msl $
-      dumps/solid_fill_src/0/vulkan.spirv $
-      dumps/solid_fill_src/0/vulkan.msl $
-      dumps/source_over_srcover/0/arm64.txt $
-      dumps/source_over_srcover/0/ir.txt $
-      dumps/source_over_srcover/0/builder.txt $
-      dumps/source_over_srcover/0/metal.msl $
-      dumps/source_over_srcover/0/vulkan.spirv $
-      dumps/source_over_srcover/0/vulkan.msl $
-      dumps/destination_over_dstover/0/arm64.txt $
-      dumps/destination_over_dstover/0/ir.txt $
-      dumps/destination_over_dstover/0/builder.txt $
-      dumps/destination_over_dstover/0/metal.msl $
-      dumps/destination_over_dstover/0/vulkan.spirv $
-      dumps/destination_over_dstover/0/vulkan.msl $
-      dumps/multiply_blend/0/arm64.txt $
-      dumps/multiply_blend/0/ir.txt $
-      dumps/multiply_blend/0/builder.txt $
-      dumps/multiply_blend/0/metal.msl $
-      dumps/multiply_blend/0/vulkan.spirv $
-      dumps/multiply_blend/0/vulkan.msl $
-      dumps/full_coverage_no_rect_clip/0/arm64.txt $
-      dumps/full_coverage_no_rect_clip/0/ir.txt $
-      dumps/full_coverage_no_rect_clip/0/builder.txt $
-      dumps/full_coverage_no_rect_clip/0/metal.msl $
-      dumps/full_coverage_no_rect_clip/0/vulkan.spirv $
-      dumps/full_coverage_no_rect_clip/0/vulkan.msl $
-      dumps/no_blend_direct_paint/0/arm64.txt $
-      dumps/no_blend_direct_paint/0/ir.txt $
-      dumps/no_blend_direct_paint/0/builder.txt $
-      dumps/no_blend_direct_paint/0/metal.msl $
-      dumps/no_blend_direct_paint/0/vulkan.spirv $
-      dumps/no_blend_direct_paint/0/vulkan.msl $
-      dumps/text_8_bit_aa/0/arm64.txt $
-      dumps/text_8_bit_aa/0/ir.txt $
-      dumps/text_8_bit_aa/0/builder.txt $
-      dumps/text_8_bit_aa/0/metal.msl $
-      dumps/text_8_bit_aa/0/vulkan.spirv $
-      dumps/text_8_bit_aa/0/vulkan.msl $
-      dumps/text_sdf/0/arm64.txt $
-      dumps/text_sdf/0/ir.txt $
-      dumps/text_sdf/0/builder.txt $
-      dumps/text_sdf/0/metal.msl $
-      dumps/text_sdf/0/vulkan.spirv $
-      dumps/text_sdf/0/vulkan.msl $
-      dumps/perspective_text/0/arm64.txt $
-      dumps/perspective_text/0/ir.txt $
-      dumps/perspective_text/0/builder.txt $
-      dumps/perspective_text/0/metal.msl $
-      dumps/perspective_text/0/vulkan.spirv $
-      dumps/perspective_text/0/vulkan.msl $
-      dumps/linear_gradient_2_stop/0/arm64.txt $
-      dumps/linear_gradient_2_stop/0/ir.txt $
-      dumps/linear_gradient_2_stop/0/builder.txt $
-      dumps/linear_gradient_2_stop/0/metal.msl $
-      dumps/linear_gradient_2_stop/0/vulkan.spirv $
-      dumps/linear_gradient_2_stop/0/vulkan.msl $
-      dumps/radial_gradient_2_stop/0/arm64.txt $
-      dumps/radial_gradient_2_stop/0/ir.txt $
-      dumps/radial_gradient_2_stop/0/builder.txt $
-      dumps/radial_gradient_2_stop/0/metal.msl $
-      dumps/radial_gradient_2_stop/0/vulkan.spirv $
-      dumps/radial_gradient_2_stop/0/vulkan.msl $
-      dumps/linear_gradient_wide_gamut/0/arm64.txt $
-      dumps/linear_gradient_wide_gamut/0/ir.txt $
-      dumps/linear_gradient_wide_gamut/0/builder.txt $
-      dumps/linear_gradient_wide_gamut/0/metal.msl $
-      dumps/linear_gradient_wide_gamut/0/vulkan.spirv $
-      dumps/linear_gradient_wide_gamut/0/vulkan.msl $
-      dumps/radial_gradient_wide_gamut/0/arm64.txt $
-      dumps/radial_gradient_wide_gamut/0/ir.txt $
-      dumps/radial_gradient_wide_gamut/0/builder.txt $
-      dumps/radial_gradient_wide_gamut/0/metal.msl $
-      dumps/radial_gradient_wide_gamut/0/vulkan.spirv $
-      dumps/radial_gradient_wide_gamut/0/vulkan.msl $
-      dumps/linear_gradient_loop_stops/0/arm64.txt $
-      dumps/linear_gradient_loop_stops/0/ir.txt $
-      dumps/linear_gradient_loop_stops/0/builder.txt $
-      dumps/linear_gradient_loop_stops/0/metal.msl $
-      dumps/linear_gradient_loop_stops/0/vulkan.spirv $
-      dumps/linear_gradient_loop_stops/0/vulkan.msl $
-      dumps/radial_gradient_loop_stops/0/arm64.txt $
-      dumps/radial_gradient_loop_stops/0/ir.txt $
-      dumps/radial_gradient_loop_stops/0/builder.txt $
-      dumps/radial_gradient_loop_stops/0/metal.msl $
-      dumps/radial_gradient_loop_stops/0/vulkan.spirv $
-      dumps/radial_gradient_loop_stops/0/vulkan.msl $
-      dumps/slug_two_pass/0/arm64.txt $
-      dumps/slug_two_pass/0/ir.txt $
-      dumps/slug_two_pass/0/builder.txt $
-      dumps/slug_two_pass/0/metal.msl $
-      dumps/slug_two_pass/0/vulkan.spirv $
-      dumps/slug_two_pass/0/vulkan.msl $
-      dumps/slug_two_pass/1/arm64.txt $
-      dumps/slug_two_pass/1/ir.txt $
-      dumps/slug_two_pass/1/builder.txt $
-      dumps/slug_two_pass/1/metal.msl $
-      dumps/slug_two_pass/1/vulkan.spirv $
-      dumps/slug_two_pass/1/vulkan.msl $
-      dumps/slug_one_pass/0/arm64.txt $
-      dumps/slug_one_pass/0/ir.txt $
-      dumps/slug_one_pass/0/builder.txt $
-      dumps/slug_one_pass/0/metal.msl $
-      dumps/slug_one_pass/0/vulkan.spirv $
-      dumps/slug_one_pass/0/vulkan.msl $
-      dumps/animated_t_in_uniforms/0/arm64.txt $
-      dumps/animated_t_in_uniforms/0/ir.txt $
-      dumps/animated_t_in_uniforms/0/builder.txt $
-      dumps/animated_t_in_uniforms/0/metal.msl $
-      dumps/animated_t_in_uniforms/0/vulkan.spirv $
-      dumps/animated_t_in_uniforms/0/vulkan.msl $
-      dumps/color_swatches/0/arm64.txt $
-      dumps/color_swatches/0/ir.txt $
-      dumps/color_swatches/0/builder.txt $
-      dumps/color_swatches/0/metal.msl $
-      dumps/color_swatches/0/vulkan.spirv $
-      dumps/color_swatches/0/vulkan.msl $
-      dumps/circle_coverage_interval_ready/0/arm64.txt $
-      dumps/circle_coverage_interval_ready/0/ir.txt $
-      dumps/circle_coverage_interval_ready/0/builder.txt $
-      dumps/circle_coverage_interval_ready/0/metal.msl $
-      dumps/circle_coverage_interval_ready/0/vulkan.spirv $
-      dumps/circle_coverage_interval_ready/0/vulkan.msl $
-      dumps/overview/0/arm64.txt $
-      dumps/overview/0/ir.txt $
-      dumps/overview/0/builder.txt $
-      dumps/overview/0/metal.msl $
-      dumps/overview/0/vulkan.spirv $
-      dumps/overview/0/vulkan.msl: run $out/dump
-
+"""
+XSAN_NINJA_SUFFIX = r"""
 x86 = $builddir/x86_64h_xsan
 
 build $out/coverage.profdata: profmerge | $
@@ -436,7 +354,7 @@ build $out/report.txt: cov_show $out/coverage.profdata | $
 """
 
 
-X86_64H_XSAN_NINJA = r"""cov = -fprofile-instr-generate -fcoverage-mapping
+X86_64H_XSAN_NINJA_PREFIX = r"""cov = -fprofile-instr-generate -fcoverage-mapping
 
 out     = $builddir/x86_64h_xsan
 cc      = $clang -momit-leaf-frame-pointer -target x86_64-apple-macos13 -isysroot $sysroot $
@@ -447,31 +365,13 @@ exec    = env UBSAN_OPTIONS=print_stacktrace=1 LLVM_PROFILE_FILE=$builddir/x86_6
 ldflags = -framework Metal -framework Foundation $cov -Wl,-w
 include build/project.ninja
 
-build $out/dump.log | $
-      dumps/srcover/0/avx2.txt $
-      dumps/solid_fill_src/0/avx2.txt $
-      dumps/source_over_srcover/0/avx2.txt $
-      dumps/destination_over_dstover/0/avx2.txt $
-      dumps/multiply_blend/0/avx2.txt $
-      dumps/full_coverage_no_rect_clip/0/avx2.txt $
-      dumps/no_blend_direct_paint/0/avx2.txt $
-      dumps/text_8_bit_aa/0/avx2.txt $
-      dumps/text_sdf/0/avx2.txt $
-      dumps/perspective_text/0/avx2.txt $
-      dumps/linear_gradient_2_stop/0/avx2.txt $
-      dumps/radial_gradient_2_stop/0/avx2.txt $
-      dumps/linear_gradient_wide_gamut/0/avx2.txt $
-      dumps/radial_gradient_wide_gamut/0/avx2.txt $
-      dumps/linear_gradient_loop_stops/0/avx2.txt $
-      dumps/radial_gradient_loop_stops/0/avx2.txt $
-      dumps/slug_two_pass/0/avx2.txt $
-      dumps/slug_two_pass/1/avx2.txt $
-      dumps/slug_one_pass/0/avx2.txt $
-      dumps/animated_t_in_uniforms/0/avx2.txt $
-      dumps/color_swatches/0/avx2.txt $
-      dumps/overview/0/avx2.txt $
-      dumps/circle_coverage_interval_ready/0/avx2.txt: run $out/dump
 """
+
+XSAN_NINJA         = (XSAN_NINJA_PREFIX
+                      + dump_outputs_block(XSAN_DUMP_SUFFIXES)
+                      + XSAN_NINJA_SUFFIX)
+X86_64H_XSAN_NINJA = (X86_64H_XSAN_NINJA_PREFIX
+                      + dump_outputs_block(X86_DUMP_SUFFIXES))
 
 
 FILES = {
