@@ -207,7 +207,9 @@ static _Bool op_supported(struct ir_inst const *in) {
         case op_lt_f32:
 
         case op_add_f32_imm: case op_sub_f32_imm:
-        case op_div_f32_imm: case op_lt_f32_imm:
+        case op_mul_f32_imm: case op_div_f32_imm:
+        case op_min_f32_imm: case op_max_f32_imm:
+        case op_lt_f32_imm:
             return 1;
         case op_uniform_32: return in->ptr.bits == UNIFORM_PTR_BITS;
         case op_store_32:   return in->ptr.bits == SINK_PTR_BITS;
@@ -297,7 +299,10 @@ interval interval_program_run(struct interval_program *p,
             // f32 _imm ops: x-side is a value, y-side is an f32 immediate.
             case op_add_f32_imm:
             case op_sub_f32_imm:
+            case op_mul_f32_imm:
             case op_div_f32_imm:
+            case op_min_f32_imm:
+            case op_max_f32_imm:
             case op_lt_f32_imm: {
                 union { int i; float f; } const u = {.i = in->imm};
                 interval const a = arg(p,in->x),
@@ -305,7 +310,10 @@ interval interval_program_run(struct interval_program *p,
                 switch ((int)in->op) {
                     case op_add_f32_imm: r = interval_add(a, b); break;
                     case op_sub_f32_imm: r = interval_sub(a, b); break;
+                    case op_mul_f32_imm: r = interval_mul(a, b); break;
                     case op_div_f32_imm: r = interval_div(a, b); break;
+                    case op_min_f32_imm: r = interval_min(a, b); break;
+                    case op_max_f32_imm: r = interval_max(a, b); break;
                     case op_lt_f32_imm:  r = interval_lt (a, b); break;
                     default: __builtin_unreachable();
                 }

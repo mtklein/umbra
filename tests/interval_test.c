@@ -183,6 +183,22 @@ TEST(interval_max) {
     interval_program_free(p);
 }
 
+TEST(interval_mul_imm) {
+    interval_equiv(eval_x_imm(umbra_mul_f32, (interval){-1.0f, 2.0f}, 3.0f),
+                   (interval){-3.0f, 6.0f}) here;
+    interval_equiv(eval_x_imm(umbra_mul_f32, (interval){-1.0f, 2.0f}, -3.0f),
+                   (interval){-6.0f, 3.0f}) here;
+}
+
+TEST(interval_min_max_imm) {
+    // Clamping [−1, 3] to [0, 1] via max then min — both fuse through the
+    // builder's _imm path because one operand is a literal.
+    interval_equiv(eval_x_imm(umbra_max_f32, (interval){-1.0f, 3.0f}, 0.0f),
+                   (interval){0.0f, 3.0f}) here;
+    interval_equiv(eval_x_imm(umbra_min_f32, (interval){-1.0f, 3.0f}, 1.0f),
+                   (interval){-1.0f, 1.0f}) here;
+}
+
 TEST(interval_compare_tri_valued) {
     struct umbra_builder *b = umbra_builder();
     umbra_store_32(b, SINK, umbra_lt_f32(b, umbra_x(b), umbra_imm_f32(b, 0.0f)));
