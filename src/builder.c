@@ -417,11 +417,12 @@ umbra_val32 umbra_eq_f32(builder *b, umbra_val32 x, umbra_val32 y) {
                    (val){.v32 = y}).v32;
 }
 umbra_val32 umbra_lt_f32(builder *b, umbra_val32 x, umbra_val32 y) {
-    // TODO: fold lt_f32(v, v) → imm(0).  Legal across the entire f32 domain:
-    // IEEE `<` is false whenever either operand is NaN, and x < x is false
-    // for every non-NaN x.  Note le_f32(v, v) is NOT similarly foldable:
-    // NaN ≤ NaN is false but finite x ≤ x is true, so no single constant
-    // covers both cases.
+    // lt(v, v) = 0 — legal across the entire f32 domain: IEEE `<` is false
+    // whenever either operand is NaN, and x < x is false for every non-NaN x,
+    // so 0 (all-bits-clear false mask) covers both.  Note le_f32(v, v) is
+    // NOT similarly foldable: NaN ≤ NaN is false but finite x ≤ x is true,
+    // so no single constant covers both cases.
+    if ((val){.v32 = x}.bits == (val){.v32 = y}.bits) { return umbra_imm_i32(b, 0); }
     return join_imm_y(b, math(b, op_lt_f32, VX(x), VY(y)), op_lt_f32_imm,
                       (val){.v32 = x}, (val){.v32 = y}).v32;
 }
