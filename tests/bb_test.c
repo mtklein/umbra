@@ -1,6 +1,7 @@
 #include "test.h"
 #include "../include/umbra.h"
 #include "../src/count.h"
+#include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -518,13 +519,6 @@ TEST(test_imm) {
     }
 }
 
-// TODO: this test uses integer-valued inputs where x*y + w is exactly
-// representable, so it can't distinguish a genuinely-fused single-rounded
-// fmaf from a two-rounded mul+add.  See tests/interval_test.c's
-// interval_fma_single_rounding for the pattern: pick a where a*a rounds in
-// f32 (e.g. 1 + 2^-22) and subtract off the rounded product — the result is
-// 0 under two-op and ~2^-44 under true fma.  Adding that here would catch a
-// backend that lowers op_fma_f32 to mul+add and silently drifts.
 TEST(test_fma_f32) {
     struct umbra_builder *builder = umbra_builder();
     umbra_val32 x = umbra_load_32(builder, (umbra_ptr32){0}),
@@ -545,6 +539,43 @@ TEST(test_fma_f32) {
                  })) {
             equiv(z[0], 18) here;
             equiv(z[1], 35) here;
+        }
+    }
+    cleanup(&B);
+}
+
+// Prove each backend emits a genuinely-fused single-rounded fmaf for
+// op_fma_f32, not a two-rounded mul+add.  With a = 1 + 2^-22, a*a exact =
+// 1 + 2^-21 + 2^-44 but f32 rounds the 2^-44 bit away to 1 + 2^-21.  So
+// a*y + (-round(a*a)) returns 0 under two-op math and ~2^-44 under fma;
+// a backend that lowered op_fma_f32 to mul+add would zero out.  Same
+// pattern as interval_fma_single_rounding in interval_test.c.
+TEST(test_fma_f32_single_rounding) {
+    struct umbra_builder *builder = umbra_builder();
+    umbra_val32 x = umbra_load_32(builder, (umbra_ptr32){0}),
+              y = umbra_load_32(builder, (umbra_ptr32){.ix=1}),
+              w = umbra_load_32(builder, (umbra_ptr32){.ix=2}),
+              m = umbra_mul_f32(builder, x, y), r = umbra_add_f32(builder, m, w);
+    umbra_store_32(builder, (umbra_ptr32){.ix=3}, r);
+    struct test_backends B = make(builder);
+
+    float const a = 1.0f + ldexpf(1.0f, -22);
+    float const aa_round = a * a;
+    float const expected = fmaf(a, a, -aa_round);
+
+    // Sanity: picking this test up means fused and two-op disagree here.
+    !equiv(expected, 0.0f) here;
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        float ax[] = {a}, ay[] = {a}, aw[] = {-aa_round}, z[1] = {0};
+        if (run(&B, bi, 1, 1,
+                 (struct umbra_buf[]){
+                     {.ptr=ax, .count=1},
+                     {.ptr=ay, .count=1},
+                     {.ptr=aw, .count=1},
+                     {.ptr=z,  .count=1},
+                 })) {
+            equiv(z[0], expected) here;
         }
     }
     cleanup(&B);
