@@ -35,10 +35,20 @@ slides to prune through and richer coverage shapes to exercise.  Plan
 function for interval.c's op set (`sel_32`, compares, `gather`), so
 plans 04 and 05 are also the on-ramp for completing that surface.
 
-See also: [notes-coverage-vs-sdf.md](notes-coverage-vs-sdf.md), an
-open architectural note on whether our coverage-interval dispatcher
-is the right shape vs. iv2d's sdf-interval approach.  Not a plan; a
-captured discussion to re-read when drafting plans 04 and 05.
+See also two open architectural notes — captured discussions to
+re-read when drafting future plans.  Not plans themselves:
+
+  - [notes-coverage-vs-sdf.md](notes-coverage-vs-sdf.md) —
+    whether our coverage-interval dispatcher is the right shape
+    vs. iv2d's sdf-interval approach.  Interacts with plans 04, 05.
+  - [notes-on-device-dispatch.md](notes-on-device-dispatch.md) —
+    whether the quadtree recursion should run on the CPU (as it
+    does now) or inside the GPU dispatch itself.  Interacts with
+    plans 03, 04 and with the coverage-vs-sdf note above.
+
+The two notes are independent axes but they multiply: on-device
+dispatch is dramatically easier under an SDF-first architecture
+than under our current coverage-first one.
 
 What "absorbing iv2d's key ideas" means here
 --------------------------------------------

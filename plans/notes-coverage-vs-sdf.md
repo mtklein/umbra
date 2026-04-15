@@ -2,6 +2,7 @@ Coverage-interval vs SDF-interval: an open architectural question
 ==================================================================
 
 Status: open; recording the discussion, not resolving it.
+Interacts with: notes-on-device-dispatch.md.
 
 What got us here
 ----------------
@@ -190,4 +191,6 @@ the arguments.  Worth re-reading when:
   - drafting plan 04's Expectations block,
   - deciding whether plan 05 is still a plan or just implementation
     inside 04,
-  - seeing a real workload profile that points one way or the other.
+  - seeing a real workload profile that points one way or the other,
+  - weighing on-device dispatch (see notes-on-device-dispatch.md) —
+    that architecture amplifies the SDF-first argument considerably.
