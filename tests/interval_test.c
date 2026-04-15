@@ -18,7 +18,7 @@ static umbra_ptr32 const UNIFORM = {.ix = 0};
 // interval_program_run() returns the last umbra_store_32() to this pointer.
 static umbra_ptr32 const SINK    = {.ix = 1};
 
-static struct interval_program *interval_program_and_free(struct umbra_builder *b) {
+static struct interval_program* interval_program_and_free(struct umbra_builder *b) {
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     ir != NULL here;
     umbra_builder_free(b);
@@ -315,7 +315,7 @@ TEST(interval_square_sub_single_rounding) {
 //   - box fully inside  → interval strictly < 0
 //   - box fully outside → interval strictly > 0
 //   - box straddles     → interval straddles 0
-static struct interval_program *circle_sdf_make(void) {
+static struct interval_program* circle_sdf_make(void) {
     struct umbra_builder *b = umbra_builder();
     umbra_val32 const X  = umbra_x(b),
                       Y  = umbra_y(b),

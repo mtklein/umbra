@@ -36,7 +36,7 @@ static _Bool try_pop(struct thread_pool *p, struct work_item *out) {
     return got;
 }
 
-static void *worker(void *arg) {
+static void* worker(void *arg) {
     struct thread_pool *p = arg;
     for (;;) {
         struct work_item w;

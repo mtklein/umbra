@@ -6,7 +6,7 @@
 
 #if !defined(__APPLE__) || defined(__wasm__)
 
-struct umbra_backend *umbra_backend_metal(void) { return 0; }
+struct umbra_backend* umbra_backend_metal(void) { return 0; }
 
 #else
 
@@ -1348,7 +1348,7 @@ static void dump_metal(struct umbra_program const *prog, FILE *f) {
 static void free_metal(struct umbra_program *prog) {
     metal_program_free((struct metal_program*)prog);
 }
-static struct umbra_program *compile_metal(struct umbra_backend           *be,
+static struct umbra_program* compile_metal(struct umbra_backend           *be,
                                            BB const *bb) {
     struct metal_program *p = metal_program((struct metal_backend*)be, bb);
     p->base = (struct umbra_program){
@@ -1377,7 +1377,7 @@ static struct umbra_backend_stats stats_metal(struct umbra_backend const *be) {
         .upload_bytes           = mbe->cache.upload_bytes,
     };
 }
-struct umbra_backend *umbra_backend_metal(void) {
+struct umbra_backend* umbra_backend_metal(void) {
     struct metal_backend *mbe = metal_backend_create();
     if (mbe) {
         mbe->base = (struct umbra_backend){

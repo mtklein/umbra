@@ -9,7 +9,7 @@
 
 #if !defined(__APPLE__) || !defined(__aarch64__) || defined(__wasm__)
 
-struct umbra_backend *umbra_backend_vulkan(void) { return 0; }
+struct umbra_backend* umbra_backend_vulkan(void) { return 0; }
 
 #else
 
@@ -454,7 +454,7 @@ static void vk_program_free(struct umbra_program *p) {
     free(vp);
 }
 
-static struct umbra_program *vk_compile(struct umbra_backend *be,
+static struct umbra_program* vk_compile(struct umbra_backend *be,
                                          struct umbra_flat_ir const *bb) {
     struct vk_backend *vbe = (struct vk_backend *)be;
 
@@ -649,7 +649,7 @@ static void vk_free(struct umbra_backend *be) {
     free(v);
 }
 
-struct umbra_backend *umbra_backend_vulkan(void) {
+struct umbra_backend* umbra_backend_vulkan(void) {
     VkInstance instance;
     {
         VkApplicationInfo app = {

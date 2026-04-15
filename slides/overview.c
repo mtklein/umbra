@@ -145,9 +145,9 @@ static void overview_free(struct slide *s) {
     free(st);
 }
 
-struct slide *make_overview(void);
+struct slide* make_overview(void);
 
-struct slide *make_overview(void) {
+struct slide* make_overview(void) {
     struct overview_slide *st = calloc(1, sizeof *st);
     st->fmt = umbra_fmt_8888;
     st->base = (struct slide){

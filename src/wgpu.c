@@ -10,7 +10,7 @@
 
 #if !defined(__APPLE__) || !defined(__aarch64__) || defined(__wasm__)
 
-struct umbra_backend *umbra_backend_wgpu(void) { return 0; }
+struct umbra_backend* umbra_backend_wgpu(void) { return 0; }
 
 #else
 
@@ -285,7 +285,7 @@ static void wgpu_flush(struct umbra_backend *base) {
     }
 }
 
-static struct umbra_program *wgpu_compile(struct umbra_backend *base,
+static struct umbra_program* wgpu_compile(struct umbra_backend *base,
                                           struct umbra_flat_ir const *bb) {
     struct wgpu_backend *be = (struct wgpu_backend *)base;
 
@@ -586,7 +586,7 @@ static void wgpu_free(struct umbra_backend *base) {
     free(be);
 }
 
-static struct umbra_program *wgpu_compile_fn(struct umbra_backend *be,
+static struct umbra_program* wgpu_compile_fn(struct umbra_backend *be,
                                               struct umbra_flat_ir const *bb) {
     struct umbra_program *p = wgpu_compile(be, bb);
     p->queue   = wgpu_program_queue;
@@ -596,7 +596,7 @@ static struct umbra_program *wgpu_compile_fn(struct umbra_backend *be,
     return p;
 }
 
-struct umbra_backend *umbra_backend_wgpu(void) {
+struct umbra_backend* umbra_backend_wgpu(void) {
     WGPUInstanceFeatureName inst_feats[] = {
         WGPUInstanceFeatureName_ShaderSourceSPIRV,
     };

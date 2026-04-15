@@ -113,8 +113,8 @@ void text_shared_cleanup(void) {
     text_cov_free(&shared_bitmap_);
     text_cov_free(&shared_sdf_);
 }
-struct text_cov *text_shared_bitmap(void) { return &shared_bitmap_; }
-struct text_cov *text_shared_sdf   (void) { return &shared_sdf_; }
+struct text_cov* text_shared_bitmap(void) { return &shared_bitmap_; }
+struct text_cov* text_shared_sdf   (void) { return &shared_sdf_; }
 
 struct text_slide {
     struct slide base;

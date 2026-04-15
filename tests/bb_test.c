@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-static struct umbra_builder *build_srcover(void) {
+static struct umbra_builder* build_srcover(void) {
     struct umbra_builder *b = umbra_builder();
 
     umbra_val32 px = umbra_load_32(b, (umbra_ptr32){0}), mask = umbra_imm_i32(b, 0xFF);

@@ -276,7 +276,7 @@ static void arm64_remat(int reg, int val, void *ctx) {
     put(j->c, ORR_16b(hi(reg), lo(reg), lo(reg)));
 }
 
-static struct ra *ra_create_arm64(struct umbra_flat_ir const *bb, struct jit_ctx *jc) {
+static struct ra* ra_create_arm64(struct umbra_flat_ir const *bb, struct jit_ctx *jc) {
     struct ra_config cfg = {
         .pool = ra_pool,
         .nregs = 14,
@@ -293,7 +293,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
                      int *deref_rb_gpr, struct jit_ctx *jc);
 
-struct jit_program *jit_program(struct jit_backend *be,
+struct jit_program* jit_program(struct jit_backend *be,
                                            struct umbra_flat_ir const *bb) {
     struct umbra_flat_ir *resolved = umbra_flat_ir_resolve(bb, JOIN_KEEP_X);
     bb = resolved;

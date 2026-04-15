@@ -1254,7 +1254,7 @@ static void run_interp(struct umbra_program *prog, int l, int t, int r, int b, s
     interp_program_run((struct interp_program*)prog, l, t, r, b, buf);
 }
 static void free_interp(struct umbra_program *prog) { interp_program_free((struct interp_program*)prog); }
-static struct umbra_program *compile_interp(struct umbra_backend           *be,
+static struct umbra_program* compile_interp(struct umbra_backend           *be,
                                             struct umbra_flat_ir const *bb) {
     struct interp_program *p = interp_program(bb);
     p->base = (struct umbra_program){
@@ -1272,7 +1272,7 @@ static struct umbra_backend_stats stats_zero(struct umbra_backend const *be) {
     (void)be;
     return (struct umbra_backend_stats){0};
 }
-struct umbra_backend *umbra_backend_interp(void) {
+struct umbra_backend* umbra_backend_interp(void) {
     struct umbra_backend *be = malloc(sizeof *be);
     *be = (struct umbra_backend){
         .compile = compile_interp,

@@ -25,7 +25,7 @@ void slide_perspective_matrix(struct umbra_matrix *out, float t,
 
 enum { MAX_SLIDES = 32 };
 
-struct slide *make_overview(void);
+struct slide* make_overview(void);
 
 static slide_factory_fn registry[MAX_SLIDES];
 static int              registry_count;
@@ -40,7 +40,7 @@ void slide_register(slide_factory_fn factory) {
 }
 
 int           slide_count(void) { return count; }
-struct slide *slide_get(int i)  { return all[i]; }
+struct slide* slide_get(int i)  { return all[i]; }
 
 static void add_slide(struct slide *s, int w, int h) {
     all[count] = s;

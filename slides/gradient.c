@@ -133,7 +133,7 @@ static void grad_lut_free(struct slide *s) {
     free(st);
 }
 
-static struct slide *make_grad_2stop(char const *title, float const bg[4], _Bool is_radial,
+static struct slide* make_grad_2stop(char const *title, float const bg[4], _Bool is_radial,
                                      float const color[8], float const grad[3]) {
     struct grad_2stop_slide *st = calloc(1, sizeof *st);
     st->is_radial = is_radial;
@@ -151,7 +151,7 @@ static struct slide *make_grad_2stop(char const *title, float const bg[4], _Bool
     return &st->base;
 }
 
-static struct slide *make_grad_lut(char const *title, float const bg[4], _Bool is_radial,
+static struct slide* make_grad_lut(char const *title, float const bg[4], _Bool is_radial,
                                    float const grad[4], float *lut, int lut_n) {
     struct grad_lut_slide *st = calloc(1, sizeof *st);
     st->is_radial = is_radial;

@@ -139,7 +139,7 @@ void slug_free(struct slug_curves *sc) {
     *sc = (struct slug_curves){0};
 }
 
-struct umbra_builder *slug_build_acc(struct slug_acc_layout *lay) {
+struct umbra_builder* slug_build_acc(struct slug_acc_layout *lay) {
     struct umbra_builder *b = umbra_builder();
 
     struct umbra_uniforms_layout u = {0};
@@ -318,7 +318,7 @@ struct umbra_builder *slug_build_acc(struct slug_acc_layout *lay) {
     return b;
 }
 
-struct umbra_builder *slug_build(struct slug_layout *lay) {
+struct umbra_builder* slug_build(struct slug_layout *lay) {
     struct umbra_builder *b = umbra_builder();
 
     struct umbra_uniforms_layout u = {0};

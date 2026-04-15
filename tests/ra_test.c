@@ -21,7 +21,7 @@ static void test_fill(int reg, int slot, void *ctx) {
 
 static void reset_records(void) { nspills = nfills = 0; }
 
-static struct umbra_flat_ir *make_bb(int n, int pre) {
+static struct umbra_flat_ir* make_bb(int n, int pre) {
     struct umbra_flat_ir *bb = malloc(sizeof *bb);
     bb->inst = calloc((size_t)n, sizeof *bb->inst);
     bb->insts = n;

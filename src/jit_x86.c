@@ -139,7 +139,7 @@ static void x86_remat(int reg, int val, void *ctx) {
     pool_broadcast(j->c, &j->pool, reg, (uint32_t)j->bb->inst[val].imm);
 }
 
-static struct ra *ra_create_x86(struct umbra_flat_ir const *bb, struct jit_ctx *jc) {
+static struct ra* ra_create_x86(struct umbra_flat_ir const *bb, struct jit_ctx *jc) {
     struct ra_config cfg = {
         .pool = ra_pool_x86,
         .nregs = 16,
@@ -295,7 +295,7 @@ static int resolve_ptr_x86(Buf *c, ptr p, int *last_ptr, int const *deref_gpr,
     return load_ptr_x86(c, p, last_ptr, elem_shift);
 }
 
-struct jit_program *jit_program(struct jit_backend *be,
+struct jit_program* jit_program(struct jit_backend *be,
                                            struct umbra_flat_ir const *bb) {
     struct umbra_flat_ir *resolved = umbra_flat_ir_resolve(bb, JOIN_PREFER_IMM);
     bb = resolved;
