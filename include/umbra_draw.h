@@ -57,7 +57,7 @@ struct umbra_draw_layout {
     void                        *uniforms;
 };
 
-struct umbra_builder* umbra_draw_build(struct umbra_shader*, struct umbra_coverage*,
+struct umbra_builder* umbra_draw_builder(struct umbra_shader*, struct umbra_coverage*,
                                        umbra_blend_fn, struct umbra_fmt,
                                        struct umbra_draw_layout*);
 void umbra_draw_fill(struct umbra_draw_layout const*,

@@ -133,7 +133,7 @@ TEST(test_slug_rect) {
                            .stride=W});
 
     struct umbra_draw_layout lay;
-    struct umbra_builder *bld = umbra_draw_build(
+    struct umbra_builder *bld = umbra_draw_builder(
         &shader.base, &cov.base,
         umbra_blend_srcover, umbra_fmt_8888,
         &lay);
@@ -206,7 +206,7 @@ TEST(test_perspective_text) {
         (struct umbra_bitmap){.buf={.ptr=bmp, .count=BW * BH}, .w=BW, .h=BH});
 
     struct umbra_draw_layout lay;
-    struct umbra_builder *bld = umbra_draw_build(
+    struct umbra_builder *bld = umbra_draw_builder(
         &shader.base, &cov.base,
         umbra_blend_srcover, umbra_fmt_8888,
         &lay);
@@ -250,7 +250,7 @@ TEST(test_perspective_text) {
         });
 
     struct umbra_draw_layout lay2;
-    bld = umbra_draw_build(
+    bld = umbra_draw_builder(
         &shader2.base, &cov2.base,
         umbra_blend_srcover, umbra_fmt_8888,
         &lay2);

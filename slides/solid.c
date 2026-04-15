@@ -48,7 +48,7 @@ static void solid_prepare(struct slide *s, struct umbra_backend *be, struct umbr
         st->fmt = fmt;
         umbra_flat_ir_free(st->bb);
         free(st->lay.uniforms);
-        struct umbra_builder *b = umbra_draw_build(&st->shader.base,
+        struct umbra_builder *b = umbra_draw_builder(&st->shader.base,
                                                     st->has_cov ? &st->cov.base : NULL,
                                                     st->blend, fmt, &st->lay);
         st->bb = umbra_flat_ir(b);
@@ -82,7 +82,7 @@ static int solid_get_builders(struct slide *s, struct umbra_fmt fmt,
                               struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
     struct solid_slide *st = (struct solid_slide *)s;
-    out[0] = umbra_draw_build(&st->shader.base, st->has_cov ? &st->cov.base : NULL,
+    out[0] = umbra_draw_builder(&st->shader.base, st->has_cov ? &st->cov.base : NULL,
                               st->blend, fmt, NULL);
     return out[0] ? 1 : 0;
 }

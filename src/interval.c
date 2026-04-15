@@ -182,7 +182,7 @@ static interval interval_lt(interval a, interval b) {
 }
 
 // Convention: uniforms are read from umbra_ptr32{.ix=0}, and the output is
-// umbra_store_32()'d to umbra_ptr32{.ix=1}.  These match umbra_draw_build's
+// umbra_store_32()'d to umbra_ptr32{.ix=1}.  These match umbra_draw_builder's
 // own layout — buf[0] is the uniforms buffer, buf[1] is where draw writes
 // pixels — so a coverage authored against the umbra_draw API can be lifted
 // directly into an interval_program without pointer rewriting.

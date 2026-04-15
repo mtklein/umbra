@@ -26,7 +26,7 @@ static void swatch_prepare(struct slide *s, struct umbra_backend *be, struct umb
         st->fmt = fmt;
         umbra_flat_ir_free(st->bb);
         free(st->lay.uniforms);
-        struct umbra_builder *b = umbra_draw_build(&st->shader.base, NULL, NULL, fmt,
+        struct umbra_builder *b = umbra_draw_builder(&st->shader.base, NULL, NULL, fmt,
                                                     &st->lay);
         st->bb = umbra_flat_ir(b);
         umbra_builder_free(b);
@@ -83,7 +83,7 @@ static int swatch_get_builders(struct slide *s, struct umbra_fmt fmt,
                                struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
     struct swatch_slide *st = (struct swatch_slide *)s;
-    out[0] = umbra_draw_build(&st->shader.base, NULL, NULL, fmt, NULL);
+    out[0] = umbra_draw_builder(&st->shader.base, NULL, NULL, fmt, NULL);
     return out[0] ? 1 : 0;
 }
 

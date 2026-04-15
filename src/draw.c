@@ -159,7 +159,7 @@ struct umbra_fmt const umbra_fmt_fp16_planar = {
     .name="fp16_planar", .bpp=2, .planes=4, .load=load_fp16p_, .store=store_fp16p_,
 };
 
-struct umbra_builder *umbra_draw_build(struct umbra_shader *shader, struct umbra_coverage *coverage,
+struct umbra_builder *umbra_draw_builder(struct umbra_shader *shader, struct umbra_coverage *coverage,
                                        umbra_blend_fn blend, struct umbra_fmt fmt,
                                        struct umbra_draw_layout *layout) {
     struct umbra_builder  *builder = umbra_builder();
@@ -240,7 +240,7 @@ void umbra_draw_fill(struct umbra_draw_layout const *layout,
 // superset buffer.
 //
 // Note: we hand coverage->build raw op_x / op_y, NOT the f32_from_i32-wrapped
-// versions umbra_draw_build would produce.  The coverage threads its x/y
+// versions umbra_draw_builder would produce.  The coverage threads its x/y
 // argument through float ops (sub_f32, mul_f32, etc.), all of which are type-
 // erased at the IR level, so dropping the conversion is transparent to the
 // coverage.  It keeps interval.c narrow — every op it accepts has principled
@@ -296,13 +296,13 @@ umbra_draw_compile(struct umbra_backend *be,
         out.coverage = build_coverage_interval(coverage, &coverage_slots);
     }
 
-    struct umbra_builder *pb = umbra_draw_build(shader, coverage, blend, fmt, layout);
+    struct umbra_builder *pb = umbra_draw_builder(shader, coverage, blend, fmt, layout);
     struct umbra_flat_ir *pir = umbra_flat_ir(pb);
     umbra_builder_free(pb);
     out.partial_coverage = be->compile(be, pir);
     umbra_flat_ir_free(pir);
 
-    struct umbra_builder *fb = umbra_draw_build(shader, NULL, blend, fmt, NULL);
+    struct umbra_builder *fb = umbra_draw_builder(shader, NULL, blend, fmt, NULL);
     struct umbra_flat_ir *fir = umbra_flat_ir(fb);
     umbra_builder_free(fb);
     out.full_coverage = be->compile(be, fir);

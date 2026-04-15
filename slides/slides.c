@@ -81,7 +81,7 @@ void slide_bg_prepare(struct umbra_backend *be, struct umbra_fmt fmt, int w, int
         bg_w   = w;
         bg_h   = h;
         struct umbra_shader_solid shader = umbra_shader_solid((float[]){0,0,0,0});
-        struct umbra_builder *b = umbra_draw_build(&shader.base, NULL, NULL, fmt, &bg_lay);
+        struct umbra_builder *b = umbra_draw_builder(&shader.base, NULL, NULL, fmt, &bg_lay);
         bg_bb = umbra_flat_ir(b);
         umbra_builder_free(b);
     }

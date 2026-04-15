@@ -22,7 +22,7 @@ static umbra_val32 circle_build_(struct umbra_coverage *s, struct umbra_builder 
     umbra_val32 const cx = umbra_uniform_32(b, (umbra_ptr32){0}, self->off_),
                       cy = umbra_uniform_32(b, (umbra_ptr32){0}, self->off_ + 1),
                       r  = umbra_uniform_32(b, (umbra_ptr32){0}, self->off_ + 2);
-    // x, y arrive as f32 from umbra_draw_build's f32_from_i32 conversion.
+    // x, y arrive as f32 from umbra_draw_builder's f32_from_i32 conversion.
     umbra_val32 const dx = umbra_sub_f32(b, x, cx),
                       dy = umbra_sub_f32(b, y, cy),
                       // mul(v, v) folds to square; add(square, square) folds to square_add.
@@ -80,7 +80,7 @@ static void circle_prepare(struct slide *s, struct umbra_backend *be, struct umb
         st->fmt = fmt;
         umbra_flat_ir_free(st->bb);
         free(st->lay.uniforms);
-        struct umbra_builder *b = umbra_draw_build(&st->shader.base, &st->cov.base,
+        struct umbra_builder *b = umbra_draw_builder(&st->shader.base, &st->cov.base,
                                                    umbra_blend_srcover, fmt, &st->lay);
         st->bb = umbra_flat_ir(b);
         umbra_builder_free(b);
@@ -111,7 +111,7 @@ static int circle_get_builders(struct slide *s, struct umbra_fmt fmt,
                                struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
     struct circle_slide *st = (struct circle_slide *)s;
-    out[0] = umbra_draw_build(&st->shader.base, &st->cov.base,
+    out[0] = umbra_draw_builder(&st->shader.base, &st->cov.base,
                               umbra_blend_srcover, fmt, NULL);
     return out[0] ? 1 : 0;
 }

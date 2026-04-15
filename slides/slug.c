@@ -535,7 +535,7 @@ static void slug_two_pass_prepare(struct slide *s, struct umbra_backend *be, str
         st->fmt = fmt;
         umbra_flat_ir_free(st->draw_bb);
         free(st->draw_lay.uniforms);
-        struct umbra_builder *b = umbra_draw_build(&st->shader.base, &st->cov.base,
+        struct umbra_builder *b = umbra_draw_builder(&st->shader.base, &st->cov.base,
                                                     umbra_blend_srcover, fmt, &st->draw_lay);
         st->draw_bb = umbra_flat_ir(b);
         umbra_builder_free(b);
@@ -592,7 +592,7 @@ static int slug_two_pass_get_builders(struct slide *s, struct umbra_fmt fmt,
     if (max < 2) { return 0; }
     out[0] = slug_build_acc(NULL);
     struct slug_two_pass_slide *st = (struct slug_two_pass_slide *)s;
-    out[1] = umbra_draw_build(&st->shader.base, &st->cov.base, umbra_blend_srcover, fmt, NULL);
+    out[1] = umbra_draw_builder(&st->shader.base, &st->cov.base, umbra_blend_srcover, fmt, NULL);
     return 2;
 }
 
@@ -661,7 +661,7 @@ static void slug_prepare(struct slide *s, struct umbra_backend *be, struct umbra
         st->fmt = fmt;
         umbra_flat_ir_free(st->draw_bb);
         free(st->draw_lay.uniforms);
-        struct umbra_builder *b = umbra_draw_build(&st->shader.base, &st->cov.base,
+        struct umbra_builder *b = umbra_draw_builder(&st->shader.base, &st->cov.base,
                                                     umbra_blend_srcover, fmt, &st->draw_lay);
         st->draw_bb = umbra_flat_ir(b);
         umbra_builder_free(b);
