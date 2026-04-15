@@ -199,6 +199,22 @@ TEST(interval_min_max_imm) {
                    (interval){-1.0f, 1.0f}) here;
 }
 
+TEST(interval_f32_from_i32_identity) {
+    // umbra_draw_build wraps x/y in f32_from_i32 before handing them to
+    // coverage->build; the interval analysis treats that conversion as
+    // identity since the pixel-coordinate interval is the same in either
+    // representation.
+    struct umbra_builder *b = umbra_builder();
+    umbra_store_32(b, SINK, umbra_f32_from_i32(b, umbra_x(b)));
+
+    struct interval_program *p = interval_program_and_free(b);
+    p != NULL here;
+    interval_equiv(interval_program_run(p, (interval){3, 7}, (interval){0,0}, NULL),
+                   (interval){3, 7}) here;
+
+    interval_program_free(p);
+}
+
 TEST(interval_compare_tri_valued) {
     struct umbra_builder *b = umbra_builder();
     umbra_store_32(b, SINK, umbra_lt_f32(b, umbra_x(b), umbra_imm_f32(b, 0.0f)));
