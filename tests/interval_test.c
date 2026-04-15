@@ -349,6 +349,12 @@ TEST(interval_free_null_is_noop) {
     interval_program_free(NULL);
 }
 
+// Empty IR (no stores → everything DCE'd to insts=0) → constructor returns
+// NULL via the has_sink_store check, not via op_supported.
+TEST(interval_program_null_on_empty_ir) {
+    interval_program_and_free(umbra_builder()) == NULL here;
+}
+
 TEST(interval_is_finite_basics) {
     interval_is_finite((interval){-1, 1}) here;
     interval_is_finite((interval){0, 0})  here;
