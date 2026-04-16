@@ -99,7 +99,6 @@ void umbra_sdf_dispatch_fill(struct umbra_draw_layout const*,
                          struct umbra_shader const*);
 void umbra_sdf_dispatch_free(struct umbra_sdf_dispatch*);
 
-
 struct umbra_shader_solid {
     struct umbra_shader base;
     float  color[4];
