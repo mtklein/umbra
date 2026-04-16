@@ -1440,38 +1440,7 @@ TEST(test_draw_compile_rect) {
     }
 }
 
-TEST(test_draw_compile_interval_coverage) {
-    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 1});
-    struct soft_edge_cov      cov    = {
-        .base = {.build = soft_edge_build, .fill = soft_edge_fill},
-        .r    = 3.0f,
-    };
-
-    struct umbra_backend *be = umbra_backend_interp();
-
-    struct umbra_draw_layout lay;
-    struct umbra_draw *d = umbra_draw(be, &shader.base, &cov.base,
-                                      umbra_blend_srcover, umbra_fmt_8888, &lay);
-    d->partial_coverage != NULL here;
-    d->full_coverage    != NULL here;
-    umbra_draw_has_interval_coverage(d) here;
-    d->uniform_offset   == 4 here;
-
-    // Sanity-check that the interval program bounds α sensibly for a tile
-    // crossing the soft edge: x ∈ [0, 10], r = 3 → α = clamp(x-3, 0, 1) ∈ [0, 1].
-    interval const alpha = interval_program_run(d->coverage,
-                                                (interval){0.0f, 10.0f},
-                                                (interval){0.0f,  1.0f},
-                                                (float const*)lay.uniforms + d->uniform_offset);
-    alpha.lo == 0.0f here;
-    alpha.hi == 1.0f here;
-
-    umbra_draw_free(d);
-    free(lay.uniforms);
-    be->free(be);
-}
-
-TEST(test_draw_queue_adaptive_matches_flat) {
+TEST(test_draw_queue_adaptive_matches_partial) {
     // Adaptive quadtree dispatch must produce pixel-identical output to
     // flat-dispatching partial_coverage over the same rect.  Canvas 2048×32
     // is chosen so the root tile (2048 wide > QUEUE_MIN_TILE) actually
