@@ -33,7 +33,6 @@ extern void  objc_autoreleasePoolPop(void*);
 // passing arguments through variadics (which uses a different ABI on arm64
 // and crashes at runtime).
 //
-typedef id     (*msg_fn)  (id, SEL);
 extern id      msg       (id, SEL)                                     __asm__("_objc_msgSend");
 extern double  msg_f64   (id, SEL)                                     __asm__("_objc_msgSend");
 extern id      msg_s     (id, SEL, char const*)                        __asm__("_objc_msgSend");
