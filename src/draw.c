@@ -4,8 +4,7 @@
 #include "interval.h"
 
 struct umbra_draw {
-    struct umbra_program    *partial_coverage;
-    struct umbra_program    *full_coverage;
+    struct umbra_program    *program;
     struct interval_program *coverage;
     int                      uniform_offset;
     int                      pad_;
@@ -244,18 +243,6 @@ void umbra_draw_fill(struct umbra_draw_layout const *layout,
     if (coverage) { coverage->fill(coverage, layout->uniforms); }
 }
 
-// Build a coverage-only IR on a fresh uni — i.e. coverage uniforms land at
-// local slots [0, C).  Also records how many slots the coverage claimed so
-// the caller can later align this IR's slot frame with the partial program's
-// superset buffer.
-//
-// Note: we hand coverage->build raw op_x / op_y, NOT the f32_from_i32-wrapped
-// versions umbra_draw_builder would produce.  The coverage threads its x/y
-// argument through float ops (sub_f32, mul_f32, etc.), all of which are type-
-// erased at the IR level, so dropping the conversion is transparent to the
-// coverage.  It keeps interval.c narrow — every op it accepts has principled
-// interval semantics, rather than needing a "this conversion is identity here
-// because we happen to know the input is a pixel coordinate" case.
 static struct interval_program* build_coverage_interval(struct umbra_coverage *coverage,
                                                         int *out_slots) {
     struct umbra_builder *b = umbra_builder();
@@ -275,30 +262,6 @@ static struct interval_program* build_coverage_interval(struct umbra_coverage *c
     return p;
 }
 
-// All slides with coverage are now on umbra_draw() / umbra_draw_queue().
-// Slides without coverage (anim, gradient, slides, swatch) remain on the
-// old umbra_draw_builder path — migrating them would compile two identical
-// programs with no coverage to intervalize.
-
-// Design notes — three builds off one (shader, coverage, blend) triple:
-//
-//   1. Coverage-only IR first, for interval_program.  coverage->build fires
-//      against a fresh uni so self->off_ transiently lands at 0.
-//   2. Partial program: full shader + coverage + blend pipeline.  This call
-//      re-invokes coverage->build with uni.slots == shader's S, so the final
-//      value of self->off_ is S — where partial's IR will read coverage
-//      uniforms, and where coverage->fill writes them at dispatch time.
-//   3. Full program: shader + blend only, coverage == NULL.  No uniforms
-//      reserved beyond the shader's, so the partial's superset buffer still
-//      satisfies it (it reads a prefix).
-//
-// The order matters.  Whichever coverage->build call runs LAST is the one
-// whose self->off_ survives into dispatch; the partial call must be last of
-// the two to keep dispatch-time uniforms aligned with the partial program.
-// Invariant we rely on throughout: shader->build is coverage-oblivious — it
-// reserves the same slots in the same order regardless of what runs after it.
-// A future shader that violates this would desync full's slot offsets from
-// partial's.  Covered by assume() below.
 struct umbra_draw* umbra_draw(struct umbra_backend *be,
                               struct umbra_shader *shader, struct umbra_coverage *coverage,
                               umbra_blend_fn blend, struct umbra_fmt fmt,
@@ -310,21 +273,12 @@ struct umbra_draw* umbra_draw(struct umbra_backend *be,
         d->coverage = build_coverage_interval(coverage, &coverage_slots);
     }
 
-    struct umbra_builder *pb = umbra_draw_builder(shader, coverage, blend, fmt, layout);
-    struct umbra_flat_ir *pir = umbra_flat_ir(pb);
-    umbra_builder_free(pb);
-    d->partial_coverage = be->compile(be, pir);
-    umbra_flat_ir_free(pir);
+    struct umbra_builder *b = umbra_draw_builder(shader, coverage, blend, fmt, layout);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
+    umbra_builder_free(b);
+    d->program = be->compile(be, ir);
+    umbra_flat_ir_free(ir);
 
-    struct umbra_builder *fb = umbra_draw_builder(shader, NULL, blend, fmt, NULL);
-    struct umbra_flat_ir *fir = umbra_flat_ir(fb);
-    umbra_builder_free(fb);
-    d->full_coverage = be->compile(be, fir);
-    umbra_flat_ir_free(fir);
-
-    // Partial reserved shader's S slots + coverage's C slots; coverage-only
-    // reserved just C.  Shader slot count is thus total minus C, and coverage
-    // uniforms in the partial's buffer start at offset S.
     assume(layout->uni.slots >= coverage_slots);
     d->uniform_offset = layout->uni.slots - coverage_slots;
 
@@ -333,8 +287,7 @@ struct umbra_draw* umbra_draw(struct umbra_backend *be,
 
 void umbra_draw_free(struct umbra_draw *d) {
     if (!d) { return; }
-    if (d->partial_coverage) { d->partial_coverage->free(d->partial_coverage); }
-    if (d->full_coverage   ) { d->full_coverage   ->free(d->full_coverage   ); }
+    if (d->program) { d->program->free(d->program); }
     interval_program_free(d->coverage);
     free(d);
 }
@@ -367,40 +320,30 @@ enum { QUEUE_MIN_TILE = 512 };
 static void queue_recurse(struct umbra_draw const *d,
                           int l, int t, int r, int b,
                           struct umbra_buf buf[], float const *uniform) {
-    if (l >= r || t >= b) { return; }
+    assume (l < r && t < b);
 
-    // op_x / op_y yield integer pixel coordinates in [l, r-1] × [t, b-1] —
-    // closed on both ends because the coverage evaluates at every pixel the
-    // tile dispatches.  Passing the tight bound keeps the α interval as
-    // narrow as possible, which matters for thin-boundary tiles near the 0/1
-    // thresholds where an extra-wide bound would miss a prune.
-    interval const alpha = interval_program_run(d->coverage,
-                                                (interval){(float)l, (float)(r - 1)},
-                                                (interval){(float)t, (float)(b - 1)},
-                                                uniform);
-    if (alpha.hi <= 0.0f) { return; }
-    if (alpha.lo >= 1.0f) {
-        d->full_coverage->queue(d->full_coverage, l, t, r, b, buf);
-        return;
+    interval const coverage = interval_program_run(d->coverage,
+                                                   (interval){(float)l, (float)(r - 1)},
+                                                   (interval){(float)t, (float)(b - 1)},
+                                                   uniform);
+    if (coverage.hi > 0) {
+        if (coverage.lo >= 1 || (r-l <= QUEUE_MIN_TILE && b-t <= QUEUE_MIN_TILE)) {
+            d->program->queue(d->program, l, t, r, b, buf);
+            return;
+        }
+        int const mx = (l + r) / 2,
+                  my = (t + b) / 2;
+        queue_recurse(d, l,  t,  mx, my, buf, uniform);
+        queue_recurse(d, mx, t,  r,  my, buf, uniform);
+        queue_recurse(d, l,  my, mx, b,  buf, uniform);
+        queue_recurse(d, mx, my, r,  b,  buf, uniform);
     }
-
-    int const w = r - l, h = b - t;
-    if (w <= QUEUE_MIN_TILE && h <= QUEUE_MIN_TILE) {
-        d->partial_coverage->queue(d->partial_coverage, l, t, r, b, buf);
-        return;
-    }
-    int const mx = (l + r) / 2,
-              my = (t + b) / 2;
-    queue_recurse(d, l,  t,  mx, my, buf, uniform);
-    queue_recurse(d, mx, t,  r,  my, buf, uniform);
-    queue_recurse(d, l,  my, mx, b,  buf, uniform);
-    queue_recurse(d, mx, my, r,  b,  buf, uniform);
 }
 
 void umbra_draw_queue(struct umbra_draw const *d,
                       int l, int t, int r, int b, struct umbra_buf buf[]) {
     if (!d->coverage) {
-        d->partial_coverage->queue(d->partial_coverage, l, t, r, b, buf);
+        d->program->queue(d->program, l, t, r, b, buf);
         return;
     }
     float const *uniform = (float const *)buf[0].ptr + d->uniform_offset;
