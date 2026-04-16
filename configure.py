@@ -155,6 +155,9 @@ DUMPS = [
     ('sdf_difference',                  1),
     ('sdf_ring_shell',                  1),
     ('sdf_rounded_rect',                1),
+    ('sdf_capsule',                     1),
+    ('sdf_halfplane',                   1),
+    ('sdf_hexagon_n_gon',               1),
     ('overview',                        1),
 ]
 
