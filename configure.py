@@ -189,7 +189,7 @@ def render_project_ninja():
         parts.append(compile_line(s))
     for s in TESTS:
         parts.append(compile_line(s))
-    for s in ['tools/test.c', 'tools/bench.c', 'tools/dump.c', 'tools/bench_interval.c']:
+    for s in ['tools/test.c', 'tools/bench.c', 'tools/dump.c']:
         parts.append(compile_line(s))
     for s in SLIDES:
         parts.append(compile_line(s))
@@ -199,7 +199,6 @@ def render_project_ninja():
     parts.append( '    ldflags = $ldflags -lm\n')
     parts.append(f'build $out/bench: link {link_objs("tools/bench.c")}\n')
     parts.append(f'build $out/dump:  link {link_objs("tools/dump.c", "tools/stb_image_write.c")}\n')
-    parts.append(f'build $out/bench_interval: link {link_objs("tools/bench_interval.c")}\n')
     parts.append('\n')
     for s in range(TEST_SHARDS):
         parts.append(f'build $out/test_{s}.log: run $out/test\n')
