@@ -1,24 +1,16 @@
-// Micro-benchmark for interval_program_run.  Plan 02's tile dispatcher
-// calls this once per tile on the descent, so its per-call cost (and per-op
-// cost) sets the floor on how fine-grained we can subdivide before the
-// overhead eats the savings.  Target per the plan: ~200 ns / call on a ~14-op
-// circle-SDF coverage (that's about 14 ns / op).
+// Micro-benchmark comparing two approaches to interval evaluation:
 //
-// Builds a circle-SDF coverage IR mirroring slides/circle.c's circle_build_,
-// wraps it in an interval_program, then times interval_program_run over a
-// representative spread of (x,y) intervals:
+//   1. interval.h  — scalar CPU interpreter (interval_program_run)
+//   2. interval_builder.h — compiled program via the regular backends
 //
-//   - "far":   large intervals that straddle the circle entirely
-//   - "edge":  medium intervals at the boundary (the common case during
-//              tile descent)
-//   - "tiny":  leaf-sized intervals (near-point evaluation — the dispatcher's
-//              min_tile regime)
+// Both evaluate the same circle-SDF interval math on the same inputs.
 
 #define _POSIX_C_SOURCE 200809L
 #include "../include/umbra.h"
 #include "../src/count.h"
 #include "../src/flat_ir.h"
 #include "../src/interval.h"
+#include "../src/interval_builder.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -52,16 +44,44 @@ static struct umbra_flat_ir* build_circle_ir(void) {
     return ir;
 }
 
+// Build the same circle SDF using interval_builder.h.
+// Uniforms: 0=cx, 1=cy, 2=r, 3=x.lo, 4=x.hi, 5=y.lo, 6=y.hi
+// Stores result.lo to ptr 1, result.hi to ptr 2.
+static struct umbra_flat_ir* build_circle_interval_ir(int *out_insts) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_ptr32 const u = {.ix = 0};
+
+    umbra_interval const cx = umbra_interval_uniform(b, u, 0),
+                         cy = umbra_interval_uniform(b, u, 1),
+                         r  = umbra_interval_uniform(b, u, 2),
+                         x  = {umbra_uniform_32(b, u, 3), umbra_uniform_32(b, u, 4)},
+                         y  = {umbra_uniform_32(b, u, 5), umbra_uniform_32(b, u, 6)};
+
+    umbra_interval const dx = umbra_interval_sub_f32(b, x, cx),
+                         dy = umbra_interval_sub_f32(b, y, cy),
+                         d2 = umbra_interval_add_f32(b,
+                                  umbra_interval_mul_f32(b, dx, dx),
+                                  umbra_interval_mul_f32(b, dy, dy)),
+                         d  = umbra_interval_sqrt_f32(b, d2),
+                         f  = umbra_interval_sub_f32(b, d, r);
+
+    umbra_store_32(b, (umbra_ptr32){.ix = 1}, f.lo);
+    umbra_store_32(b, (umbra_ptr32){.ix = 2}, f.hi);
+
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
+    umbra_builder_free(b);
+    *out_insts = ir->insts;
+    return ir;
+}
+
 struct sample { interval x, y; };
 
-// Volatile sink: every write is observable, so the compiler can't drop the
-// run() calls that feed it.
 static volatile float sink_absorb;
-static void time_samples(char const *label, struct interval_program *p,
-                         float const *uniform,
-                         struct sample const *xy, int xys,
-                         double target_secs, int trials) {
-    // Pilot: grow iters until one round takes ~target_secs/2.
+
+static void time_interp(char const *label, struct interval_program *p,
+                        float const *uniform,
+                        struct sample const *xy, int xys,
+                        double target_secs, int trials) {
     int    iters   = 16;
     double t_pilot = 0;
     for (int pi = 0; pi < 30; pi++) {
@@ -89,33 +109,62 @@ static void time_samples(char const *label, struct interval_program *p,
         double const dt = now() - start;
         if (k == 0 || dt < best) { best = dt; }
     }
-    double const ns_call = best / (double)iters * 1e9;
-    printf("  %-8s %.1f ns/call\n", label, ns_call);
+    printf("  %-8s %6.1f ns/call\n", label, best / (double)iters * 1e9);
+}
+
+static void time_compiled(char const *label, struct umbra_program *prog,
+                          float const *base_uniform,
+                          struct sample const *xy, int xys,
+                          double target_secs, int trials) {
+    int    iters   = 16;
+    double t_pilot = 0;
+    for (int pi = 0; pi < 30; pi++) {
+        double const start = now();
+        for (int it = 0; it < iters; it++) {
+            struct sample const sa = xy[it & (xys - 1)];
+            float uniforms[7] = {base_uniform[0], base_uniform[1], base_uniform[2],
+                                 sa.x.lo, sa.x.hi, sa.y.lo, sa.y.hi};
+            float lo_out = 0, hi_out = 0;
+            struct umbra_buf buf[] = {
+                {.ptr = uniforms, .count = 7},
+                {.ptr = &lo_out,  .count = 1},
+                {.ptr = &hi_out,  .count = 1},
+            };
+            prog->queue(prog, 0, 0, 1, 1, buf);
+            sink_absorb += lo_out + hi_out;
+        }
+        t_pilot = now() - start;
+        if (t_pilot >= target_secs / 2) { break; }
+        iters *= 2;
+    }
+    int const cal = (int)((double)iters * target_secs / t_pilot);
+    if (cal > iters) { iters = cal; }
+
+    double best = 0;
+    for (int k = 0; k < trials; k++) {
+        double const start = now();
+        for (int it = 0; it < iters; it++) {
+            struct sample const sa = xy[it & (xys - 1)];
+            float uniforms[7] = {base_uniform[0], base_uniform[1], base_uniform[2],
+                                 sa.x.lo, sa.x.hi, sa.y.lo, sa.y.hi};
+            float lo_out = 0, hi_out = 0;
+            struct umbra_buf buf[] = {
+                {.ptr = uniforms, .count = 7},
+                {.ptr = &lo_out,  .count = 1},
+                {.ptr = &hi_out,  .count = 1},
+            };
+            prog->queue(prog, 0, 0, 1, 1, buf);
+            sink_absorb += lo_out + hi_out;
+        }
+        double const dt = now() - start;
+        if (k == 0 || dt < best) { best = dt; }
+    }
+    printf("  %-8s %6.1f ns/call\n", label, best / (double)iters * 1e9);
 }
 
 int main(void) {
-    struct umbra_flat_ir    *ir  = build_circle_ir();
-    struct interval_program *p   = interval_program(ir);
-    if (!p) {
-        fprintf(stderr, "interval_program() rejected the circle IR\n");
-        return 1;
-    }
-    int const insts = ir->insts;
-    umbra_flat_ir_free(ir);
-
     float const uniform[3] = {512.0f, 240.0f, 180.0f};
 
-    // Power-of-two sample counts so `it & (n-1)` suffices.
-    struct sample far[8] = {
-        {{   0, 1024}, {  0,  480}},
-        {{ 128, 1152}, { 64,  544}},
-        {{ 256, 1280}, {128,  608}},
-        {{ 384, 1408}, {192,  672}},
-        {{-256,  768}, {  0,  480}},
-        {{ 512, 1536}, {  0,  480}},
-        {{   0, 2048}, {-240, 720}},
-        {{ 128, 1152}, {-64,  544}},
-    };
     struct sample edge[8] = {
         {{ 300,  400}, {  60,  160}},
         {{ 620,  720}, {  60,  160}},
@@ -126,22 +175,43 @@ int main(void) {
         {{ 500,  524}, {  58,   74}},
         {{ 500,  524}, { 406,  422}},
     };
-    struct sample tiny[8] = {
-        {{ 512.0f, 513.0f}, { 240.0f, 241.0f}},
-        {{ 400.0f, 401.0f}, { 120.0f, 121.0f}},
-        {{ 332.0f, 333.0f}, { 240.0f, 241.0f}},
-        {{ 100.0f, 101.0f}, { 100.0f, 101.0f}},
-        {{ 700.0f, 701.0f}, { 300.0f, 301.0f}},
-        {{ 692.0f, 693.0f}, { 240.0f, 241.0f}},
-        {{ 512.0f, 513.0f}, {  60.0f,  61.0f}},
-        {{ 512.0f, 513.0f}, { 420.0f, 421.0f}},
-    };
 
-    printf("circle-SDF coverage: %d IR insts\n", insts);
-    time_samples("far",  p, uniform, far,  count(far),  0.05, 7);
-    time_samples("edge", p, uniform, edge, count(edge), 0.05, 7);
-    time_samples("tiny", p, uniform, tiny, count(tiny), 0.05, 7);
+    // --- interval.h (scalar CPU interpreter) ---
+    {
+        struct umbra_flat_ir *ir = build_circle_ir();
+        struct interval_program *p = interval_program(ir);
+        if (!p) {
+            fprintf(stderr, "interval_program() rejected the circle IR\n");
+            return 1;
+        }
+        printf("interval.h (scalar interpreter, %d IR insts)\n", ir->insts);
+        umbra_flat_ir_free(ir);
+        time_interp("edge", p, uniform, edge, count(edge), 0.05, 7);
+        interval_program_free(p);
+    }
 
-    interval_program_free(p);
+    // --- interval_builder.h (compiled via backends) ---
+    {
+        int insts = 0;
+        struct umbra_flat_ir *ir = build_circle_interval_ir(&insts);
+        printf("\ninterval_builder.h (compiled, %d IR insts)\n", insts);
+
+        struct umbra_backend *bes[] = {
+            umbra_backend_interp(),
+            umbra_backend_jit(),
+        };
+        char const *names[] = {"interp", "jit"};
+
+        for (int bi = 0; bi < count(bes); bi++) {
+            if (!bes[bi]) { continue; }
+            struct umbra_program *prog = bes[bi]->compile(bes[bi], ir);
+            printf("  %s:\n", names[bi]);
+            time_compiled("edge", prog, uniform, edge, count(edge), 0.05, 7);
+            prog->free(prog);
+            bes[bi]->free(bes[bi]);
+        }
+        umbra_flat_ir_free(ir);
+    }
+
     return 0;
 }
