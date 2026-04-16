@@ -1,8 +1,15 @@
 #include "../include/umbra_draw.h"
 #include "assume.h"
-#include "draw.h"
 #include "flat_ir.h"
 #include "interval.h"
+
+struct umbra_draw {
+    struct umbra_program    *partial_coverage;
+    struct umbra_program    *full_coverage;
+    struct interval_program *coverage;
+    int                      uniform_offset;
+    int                      pad_;
+};
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>

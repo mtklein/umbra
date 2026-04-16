@@ -1,7 +1,5 @@
 #include "../include/umbra_draw.h"
 #include "../src/count.h"
-#include "../src/draw.h"
-#include "../src/interval.h"
 #include "test.h"
 #include <stdint.h>
 
@@ -1352,9 +1350,10 @@ TEST(test_srcover_fp16_planar) {
     cleanup_draw(&B);
 }
 
-TEST(test_draw_compile_rect) {
+TEST(test_draw_queue_rect) {
     struct umbra_shader_solid  shader = umbra_shader_solid((float[]){1, 0, 0, 1});
-    struct umbra_coverage_rect cov    = umbra_coverage_rect((float[]){2.0f, 0.0f, 5.0f, 1.0f});
+    struct umbra_coverage_rect cov    =
+        umbra_coverage_rect((float[]){2.0f, 0.0f, 5.0f, 1.0f});
 
     struct umbra_backend *bes[NUM_BACKENDS] = {
         umbra_backend_interp(), umbra_backend_jit(),
@@ -1366,18 +1365,19 @@ TEST(test_draw_compile_rect) {
         if (!bes[bi]) { continue; }
 
         struct umbra_draw_layout lay;
-        struct umbra_draw *d = umbra_draw(bes[bi], &shader.base, &cov.base,
-                                          umbra_blend_srcover, umbra_fmt_8888, &lay);
+        struct umbra_draw *d = umbra_draw(bes[bi], &shader.base,
+                                          &cov.base,
+                                          umbra_blend_srcover,
+                                          umbra_fmt_8888, &lay);
         umbra_draw_fill(&lay, &shader.base, &cov.base);
         uint32_t dst[8] = {0};
         struct umbra_buf buf[] = {
             {.ptr = lay.uniforms, .count = lay.uni.slots},
             {.ptr = dst,          .count = 8},
         };
-
-        // Partial: rect masks the fill to [2, 5).
-        d->partial_coverage->queue(d->partial_coverage, 0, 0, 8, 1, buf);
+        umbra_draw_queue(d, 0, 0, 8, 1, buf);
         bes[bi]->flush(bes[bi]);
+
         for (int i = 0; i < 8; i++) {
             if (i >= 2 && i < 5) {
                 (dst[i] & 0xFF)         == 0xFF here;
@@ -1385,15 +1385,6 @@ TEST(test_draw_compile_rect) {
             } else {
                 dst[i] == 0 here;
             }
-        }
-
-        // Full: α = 1 everywhere → every pixel red.
-        for (int i = 0; i < 8; i++) { dst[i] = 0; }
-        d->full_coverage->queue(d->full_coverage, 0, 0, 8, 1, buf);
-        bes[bi]->flush(bes[bi]);
-        for (int i = 0; i < 8; i++) {
-            (dst[i] & 0xFF)         == 0xFF here;
-            ((dst[i] >> 24) & 0xFF) == 0xFF here;
         }
 
         umbra_draw_free(d);
