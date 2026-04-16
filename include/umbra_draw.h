@@ -182,6 +182,13 @@ struct umbra_coverage_rect {
 };
 struct umbra_coverage_rect umbra_coverage_rect(float const rect[4]);
 
+struct umbra_sdf_rect {
+    struct umbra_sdf base;
+    float  rect[4];
+    int off_, :32;
+};
+struct umbra_sdf_rect umbra_sdf_rect(float const rect[4]);
+
 struct umbra_coverage_bitmap {
     struct umbra_coverage base;
     struct umbra_buf bmp;

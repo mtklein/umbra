@@ -8,15 +8,16 @@ struct solid_slide {
     float rx, ry, vx, vy;
     float rect_w, rect_h;
     int   w, h;
-    int   has_cov, :32;
+    int   has_sdf, :32;
 
     struct umbra_shader_solid    shader;
-    struct umbra_coverage_rect   cov;
+    struct umbra_sdf_rect        sdf;
     umbra_blend_fn               blend;
 
-    struct umbra_fmt           fmt;
-    struct umbra_draw_layout  lay;
-    struct umbra_draw        *draw;
+    struct umbra_fmt          fmt;
+    struct umbra_draw_layout lay;
+    struct umbra_quadtree   *qt;
+    struct umbra_program    *prog;
 };
 
 static void solid_init(struct slide *s, int w, int h) {
@@ -31,9 +32,6 @@ static void solid_init(struct slide *s, int w, int h) {
     st->vy = 1.1f;
 }
 
-// Triangle-wave bounce: position oscillates in [0, range] starting at the
-// init-time offset, advancing |v| pixels per frame. Equivalent to the prior
-// stateful integrate-and-bounce but expressed as a closed form of `frame`.
 static float bounce(float p0, float v, int frame, float range) {
     float p = fmodf(p0 + (float)frame * v, 2.0f * range);
     if (p < 0.0f) { p += 2.0f * range; }
@@ -44,56 +42,76 @@ static float bounce(float p0, float v, int frame, float range) {
 static void solid_prepare(struct slide *s, struct umbra_backend *be,
                           struct umbra_fmt fmt) {
     struct solid_slide *st = (struct solid_slide *)s;
-    umbra_draw_free(st->draw);
+    umbra_quadtree_free(st->qt);  st->qt   = NULL;
+    if (st->prog) { st->prog->free(st->prog); st->prog = NULL; }
     free(st->lay.uniforms);
-    st->fmt  = fmt;
-    st->draw = umbra_draw(be, &st->shader.base,
-                          st->has_cov ? &st->cov.base : NULL,
-                          st->blend, fmt, &st->lay);
+    st->fmt = fmt;
+    if (st->has_sdf) {
+        st->qt = umbra_quadtree(be, &st->sdf.base, &st->shader.base,
+                                st->blend, fmt, &st->lay);
+    } else {
+        struct umbra_builder *b = umbra_draw_builder(&st->shader.base, NULL,
+                                                     st->blend, fmt, &st->lay);
+        struct umbra_flat_ir *ir = umbra_flat_ir(b);
+        umbra_builder_free(b);
+        st->prog = be->compile(be, ir);
+        umbra_flat_ir_free(ir);
+    }
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
 static void solid_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
     struct solid_slide *st = (struct solid_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
-    float rx = bounce(st->rx, st->vx, frame, (float)st->w - st->rect_w);
-    float ry = bounce(st->ry, st->vy, frame, (float)st->h - st->rect_h);
-    if (st->has_cov) {
-        st->cov.rect[0] = rx;
-        st->cov.rect[1] = ry;
-        st->cov.rect[2] = rx + st->rect_w;
-        st->cov.rect[3] = ry + st->rect_h;
+    if (st->has_sdf) {
+        float rx = bounce(st->rx, st->vx, frame, (float)st->w - st->rect_w);
+        float ry = bounce(st->ry, st->vy, frame, (float)st->h - st->rect_h);
+        st->sdf.rect[0] = rx;
+        st->sdf.rect[1] = ry;
+        st->sdf.rect[2] = rx + st->rect_w;
+        st->sdf.rect[3] = ry + st->rect_h;
+        umbra_quadtree_fill(&st->lay, &st->sdf.base, &st->shader.base);
+    } else {
+        umbra_draw_fill(&st->lay, &st->shader.base, NULL);
     }
-    umbra_draw_fill(&st->lay, &st->shader.base, st->has_cov ? &st->cov.base : NULL);
     struct umbra_buf ubuf[] = {
         {.ptr=st->lay.uniforms, .count=st->lay.uni.slots},
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
     };
-    umbra_draw_queue(st->draw, l, t, r, b, ubuf);
+    if (st->qt) {
+        umbra_quadtree_queue(st->qt, l, t, r, b, ubuf);
+    } else {
+        st->prog->queue(st->prog, l, t, r, b, ubuf);
+    }
 }
 
 static int solid_get_builders(struct slide *s, struct umbra_fmt fmt,
                               struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
     struct solid_slide *st = (struct solid_slide *)s;
-    out[0] = umbra_draw_builder(&st->shader.base, st->has_cov ? &st->cov.base : NULL,
-                              st->blend, fmt, NULL);
+    if (st->has_sdf) {
+        struct umbra_coverage_sdf_adapter adapter = umbra_coverage_from_sdf(&st->sdf.base);
+        out[0] = umbra_draw_builder(&st->shader.base, &adapter.base, st->blend, fmt, NULL);
+    } else {
+        out[0] = umbra_draw_builder(&st->shader.base, NULL, st->blend, fmt, NULL);
+    }
     return out[0] ? 1 : 0;
 }
 
 static void solid_free(struct slide *s) {
     struct solid_slide *st = (struct solid_slide *)s;
-    umbra_draw_free(st->draw);
+    umbra_quadtree_free(st->qt);
+    if (st->prog) { st->prog->free(st->prog); }
     free(st->lay.uniforms);
     free(st);
 }
 
 static struct slide* make_solid(char const *title, float const bg[4], float const color[4],
-                                _Bool has_cov, umbra_blend_fn blend) {
+                                _Bool has_sdf, umbra_blend_fn blend) {
     struct solid_slide *st = calloc(1, sizeof *st);
     st->shader  = umbra_shader_solid(color);
-    st->has_cov = has_cov;
-    if (has_cov) { st->cov = umbra_coverage_rect((float[]){0, 0, 0, 0}); }
+    st->has_sdf = has_sdf;
+    if (has_sdf) { st->sdf = umbra_sdf_rect((float[]){0, 0, 0, 0}); }
     st->blend   = blend;
     st->base = (struct slide){
         .title = title,
