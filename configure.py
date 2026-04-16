@@ -150,6 +150,11 @@ DUMPS = [
     ('animated_t_in_uniforms',          1),
     ('color_swatches',                  1),
     ('circle_coverage_interval_ready',  1),
+    ('sdf_union',                       1),
+    ('sdf_intersection',                1),
+    ('sdf_difference',                  1),
+    ('sdf_ring_shell',                  1),
+    ('sdf_rounded_rect',                1),
     ('overview',                        1),
 ]
 

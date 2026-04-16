@@ -1,0 +1,44 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct _13
+{
+    uint _m0[1];
+};
+
+struct _17
+{
+    uint2 _m0[1];
+};
+
+struct _22
+{
+    uint _m0[7];
+};
+
+kernel void main0(constant _22& _36 [[buffer(0)]], device _13& _34 [[buffer(1)]], device _17& _35 [[buffer(2)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    if (!(gl_GlobalInvocationID.x >= _36._m0[0u]))
+    {
+        uint _51 = _36._m0[1u] + gl_GlobalInvocationID.x;
+        uint _52 = _36._m0[2u] + gl_GlobalInvocationID.y;
+        float _83 = as_type<float>(1065353216u) - as_type<float>(_34._m0[8u]);
+        float _95 = fast::max(abs((float(int(_52)) + 0.5) - as_type<float>(_34._m0[1u])) - (as_type<float>(_34._m0[3u]) - as_type<float>(_34._m0[4u])), 0.0);
+        float _100 = fast::max(abs((float(int(_51)) + 0.5) - as_type<float>(_34._m0[0u])) - (as_type<float>(_34._m0[2u]) - as_type<float>(_34._m0[4u])), 0.0);
+        float _110 = fast::min(fast::max(as_type<float>(0u) - (precise::sqrt(fma(_100, _100, _95 * _95)) - as_type<float>(_34._m0[4u])), 0.0), 1.0);
+        uint _114 = (_52 * _36._m0[6u]) + _51;
+        float2 _124 = float2(as_type<half2>(_35._m0[_114].x & 65535u));
+        float _125 = _124.x;
+        float2 _130 = float2(as_type<half2>(_35._m0[_114].x >> 16u));
+        float _131 = _130.x;
+        float2 _136 = float2(as_type<half2>(_35._m0[_114].y & 65535u));
+        float _137 = _136.x;
+        float2 _142 = float2(as_type<half2>(_35._m0[_114].y >> 16u));
+        float _143 = _142.x;
+        _35._m0[(_52 * _36._m0[6u]) + _51] = uint2(as_type<uint>(half2(float2(fma(_110, fma(_125, _83, as_type<float>(_34._m0[5u])) - _125, _125), 0.0))) | (as_type<uint>(half2(float2(fma(_110, fma(_131, _83, as_type<float>(_34._m0[6u])) - _131, _131), 0.0))) << 16u), as_type<uint>(half2(float2(fma(_110, fma(_137, _83, as_type<float>(_34._m0[7u])) - _137, _137), 0.0))) | (as_type<uint>(half2(float2(fma(_110, fma(_143, _83, as_type<float>(_34._m0[8u])) - _143, _143), 0.0))) << 16u));
+        return;
+    }
+}
+
