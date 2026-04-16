@@ -38,6 +38,9 @@ CFLAGS = {
 }
 
 
+TEST_SHARDS = 3
+
+
 def obj(src):
     """src/foo.c → $out/src/foo.o"""
     return '$out/' + src[:src.rfind('.')] + '.o'
@@ -209,7 +212,9 @@ def render_project_ninja():
     parts.append(f'build $out/dump:  link {link_objs("tools/dump.c", "tools/stb_image_write.c")}\n')
     parts.append(f'build $out/bench_interval: link {link_objs("tools/bench_interval.c")}\n')
     parts.append('\n')
-    parts.append('build $out/test.log: run $out/test\n')
+    for s in range(TEST_SHARDS):
+        parts.append(f'build $out/test_{s}.log: run $out/test\n')
+        parts.append(f'    args = --shards {TEST_SHARDS} --shard {s}\n')
     return ''.join(parts)
 
 
@@ -281,13 +286,16 @@ include build/project.ninja
 
 {DEMO_BLOCK}
 """
-XSAN_NINJA_SUFFIX = r"""
+def render_xsan_suffix():
+    test_deps = ''
+    for s in range(TEST_SHARDS):
+        test_deps += f'      $out/test_{s}.log $\n'
+        test_deps += f'      $x86/test_{s}.log $\n'
+    return f"""
 x86 = $builddir/x86_xsan
 
 build $out/coverage.profdata: profmerge | $
-      $out/test.log $
-      $out/dump.log $
-      $x86/test.log $
+{test_deps}      $out/dump.log $
       $x86/dump.log
     dir = $out $x86
 
@@ -312,6 +320,8 @@ build $out/report.txt: cov_show $out/coverage.profdata | $
               -object=$x86/dump
     dir = $out/report
 """
+
+XSAN_NINJA_SUFFIX = render_xsan_suffix()
 
 
 X86_XSAN_NINJA_PREFIX = r"""cov = -fprofile-instr-generate -fcoverage-mapping
