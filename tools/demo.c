@@ -217,7 +217,8 @@ int main(void) {
         return 1;
     }
 
-    SDL_Window *window = SDL_CreateWindow("umbra demo", W, H, SDL_WINDOW_RESIZABLE);
+    SDL_Window *window = SDL_CreateWindow("umbra demo", W, H,
+                                         SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
     if (!window) {
         SDL_Log("SDL_CreateWindow failed: %s", SDL_GetError());
         return 1;
@@ -234,6 +235,7 @@ int main(void) {
         return 1;
     }
 
+    SDL_GetWindowSizeInPixels(window, &W, &H);
     slides_init(W, H);
 
     max_threads = SDL_GetNumLogicalCPUCores();
