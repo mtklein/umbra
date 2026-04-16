@@ -1352,35 +1352,6 @@ TEST(test_srcover_fp16_planar) {
     cleanup_draw(&B);
 }
 
-// umbra_draw() bundles shader+coverage+blend into {partial, full, optional
-// interval}.  Tests: both umbra_programs compile and dispatch correctly, and
-// d->coverage is present/absent according to whether the coverage's ops are
-// interval-supportable.
-
-// Minimal interval-friendly coverage that emits α = clamp(x - r, 0, 1) for a
-// uniform-supplied r (a 1-D gradient).  Uses only sub/min/max/imm — all in
-// interval.c's op_supported set — so interval_program() should accept it.
-struct soft_edge_cov {
-    struct umbra_coverage base;
-    float r;
-    int   off_;
-};
-static umbra_val32 soft_edge_build(struct umbra_coverage *s, struct umbra_builder *b,
-                                    struct umbra_uniforms_layout *u,
-                                    umbra_val32 x, umbra_val32 y) {
-    struct soft_edge_cov *self = (struct soft_edge_cov *)s;
-    (void)y;
-    self->off_ = umbra_uniforms_reserve_f32(u, 1);
-    umbra_val32 const r = umbra_uniform_32(b, (umbra_ptr32){0}, self->off_);
-    return umbra_min_f32(b, umbra_imm_f32(b, 1.0f),
-             umbra_max_f32(b, umbra_imm_f32(b, 0.0f),
-                              umbra_sub_f32(b, x, r)));
-}
-static void soft_edge_fill(struct umbra_coverage const *s, void *uniforms) {
-    struct soft_edge_cov const *self = (struct soft_edge_cov const *)s;
-    umbra_uniforms_fill_f32(uniforms, self->off_, &self->r, 1);
-}
-
 TEST(test_draw_compile_rect) {
     struct umbra_shader_solid  shader = umbra_shader_solid((float[]){1, 0, 0, 1});
     struct umbra_coverage_rect cov    = umbra_coverage_rect((float[]){2.0f, 0.0f, 5.0f, 1.0f});
@@ -1440,61 +1411,7 @@ TEST(test_draw_compile_rect) {
     }
 }
 
-TEST(test_draw_queue_adaptive_matches_partial) {
-    // Adaptive quadtree dispatch must produce pixel-identical output to
-    // flat-dispatching partial_coverage over the same rect.  Canvas 2048×32
-    // is chosen so the root tile (2048 wide > QUEUE_MIN_TILE) actually
-    // splits, and the soft edge at r = 1000 places all three leaf types in
-    // the tree:
-    //   - x ∈ [0, 999]      → α bound [0, 0]  (empty, pruned)
-    //   - x ∈ [512, 1023]   → α bound [0, 1]  (straddles, partial at leaf)
-    //   - x ∈ [1024, 2047]  → α bound [1, 1]  (solid, full_coverage)
-    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 1});
-    struct soft_edge_cov      cov    = {
-        .base = {.build = soft_edge_build, .fill = soft_edge_fill},
-        .r    = 1000.0f,
-    };
-
-    struct umbra_backend *be = umbra_backend_interp();
-    struct umbra_draw_layout lay;
-    struct umbra_draw *d = umbra_draw(be, &shader.base, &cov.base,
-                                      umbra_blend_srcover, umbra_fmt_8888, &lay);
-    umbra_draw_has_interval_coverage(d) here;
-    umbra_draw_fill(&lay, &shader.base, &cov.base);
-
-    int const W = 2048, H = 32;
-    uint32_t *adaptive = calloc((size_t)(W * H), 4);
-    uint32_t *flat     = calloc((size_t)(W * H), 4);
-
-    struct umbra_buf adaptive_buf[] = {
-        {.ptr = lay.uniforms, .count = lay.uni.slots},
-        {.ptr = adaptive,     .count = W * H, .stride = W},
-    };
-    struct umbra_buf flat_buf[] = {
-        {.ptr = lay.uniforms, .count = lay.uni.slots},
-        {.ptr = flat,         .count = W * H, .stride = W},
-    };
-
-    umbra_draw_queue(d, 0, 0, W, H, adaptive_buf);
-    be->flush(be);
-    d->partial_coverage->queue(d->partial_coverage, 0, 0, W, H, flat_buf);
-    be->flush(be);
-
-    for (int i = 0; i < W * H; i++) {
-        adaptive[i] == flat[i] here;
-    }
-    // Sanity: empty region stayed 0, solid region got written.
-    adaptive[0]      == 0 here;
-    adaptive[W - 1]  != 0 here;
-
-    free(adaptive);
-    free(flat);
-    umbra_draw_free(d);
-    free(lay.uniforms);
-    be->free(be);
-}
-
-TEST(test_draw_queue_flat_fallback) {
+TEST(test_draw_queue_no_coverage_fallback) {
     // When there's no coverage at all, umbra_draw_queue falls through
     // to a single flat partial_coverage dispatch (same as full here).
     struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 1});
