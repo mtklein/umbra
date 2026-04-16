@@ -13,6 +13,8 @@ perception of conventional best practice, etc.
 
 The user has final say on all decisions, especially policy and design.
 
+Never push to origin without the user's explicit permission.
+
 Contributing
 ------------
 Don't amend any commit that has already been pushed to origin.
