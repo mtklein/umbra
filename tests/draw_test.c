@@ -1494,3 +1494,61 @@ TEST(test_sdf_dispatch_tiling) {
     free(lay_tiled.uniforms);
     be->free(be);
 }
+
+TEST(test_metal_loop_gather) {
+    // Sum of a[i] for i=0..2 via loop + deref_ptr + gather.
+    // a = {10, 20, 30}, expected sum = 60.
+    struct umbra_uniforms_layout uni = {0};
+    int const ptr_off = umbra_uniforms_reserve_ptr(&uni);
+    int const n_off   = umbra_uniforms_reserve_f32(&uni, 1);
+
+    struct umbra_builder *b = umbra_builder();
+    umbra_ptr32 const u    = {.ix = 0};
+    umbra_ptr32 const data = umbra_deref_ptr32(b, u, ptr_off);
+    umbra_val32 const n    = umbra_uniform_32(b, u, n_off);
+
+    umbra_var sum = umbra_var_alloc(b);
+    umbra_store_var(b, sum, umbra_imm_f32(b, 0.0f));
+
+    umbra_val32 const j = umbra_loop(b, n); {
+        umbra_val32 const val = umbra_gather_32(b, data, j);
+        umbra_store_var(b, sum, umbra_add_f32(b, umbra_load_var(b, sum), val));
+    } umbra_loop_end(b);
+
+    umbra_store_32(b, (umbra_ptr32){.ix = 1}, umbra_load_var(b, sum));
+
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
+    umbra_builder_free(b);
+
+    float arr[] = {10, 20, 30};
+    void *uniforms = umbra_uniforms_alloc(&uni);
+    umbra_uniforms_fill_ptr(uniforms, ptr_off, (struct umbra_buf){.ptr = arr, .count = 3});
+    int const count = 3;
+    umbra_uniforms_fill_i32(uniforms, n_off, &count, 1);
+
+    struct umbra_backend *bes[NUM_BACKENDS] = {
+        umbra_backend_interp(), umbra_backend_jit(),
+        umbra_backend_metal(),  umbra_backend_vulkan(),
+        umbra_backend_wgpu(),
+    };
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        if (!bes[bi]) { continue; }
+        struct umbra_program *prog = bes[bi]->compile(bes[bi], ir);
+        float out = 0;
+        struct umbra_buf buf[] = {
+            {.ptr = uniforms, .count = uni.slots},
+            {.ptr = &out,     .count = 1},
+        };
+        prog->queue(prog, 0, 0, 1, 1, buf);
+        bes[bi]->flush(bes[bi]);
+        equiv(out, 60.0f) here;
+        prog->free(prog);
+    }
+
+    umbra_flat_ir_free(ir);
+    free(uniforms);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        if (bes[bi]) { bes[bi]->free(bes[bi]); }
+    }
+}
