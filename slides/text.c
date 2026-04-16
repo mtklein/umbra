@@ -129,9 +129,9 @@ struct text_slide {
         struct umbra_coverage_sdf    sdf;
     } cov;
 
-    struct umbra_fmt          fmt;
-    struct umbra_draw_layout lay;
-    struct umbra_draw       *draw;
+    struct umbra_fmt            fmt;
+    struct umbra_draw_layout   lay;
+    struct umbra_program      *prog;
 };
 
 static void text_init(struct slide *s, int w, int h) {
@@ -143,11 +143,15 @@ static void text_init(struct slide *s, int w, int h) {
 static void text_prepare(struct slide *s, struct umbra_backend *be,
                          struct umbra_fmt fmt) {
     struct text_slide *st = (struct text_slide *)s;
-    umbra_draw_free(st->draw);
+    if (st->prog) { st->prog->free(st->prog); }
     free(st->lay.uniforms);
-    st->fmt  = fmt;
-    st->draw = umbra_draw(be, &st->shader.base, &st->cov.bitmap.base,
-                          umbra_blend_srcover, fmt, &st->lay);
+    st->fmt = fmt;
+    struct umbra_builder *b = umbra_draw_builder(&st->shader.base, &st->cov.bitmap.base,
+                                                 umbra_blend_srcover, fmt, &st->lay);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
+    umbra_builder_free(b);
+    st->prog = be->compile(be, ir);
+    umbra_flat_ir_free(ir);
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
@@ -165,7 +169,7 @@ static void text_draw(struct slide *s, int frame, int l, int t, int r, int b, vo
         {.ptr=st->lay.uniforms, .count=st->lay.uni.slots},
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
     };
-    umbra_draw_queue(st->draw, l, t, r, b, ubuf);
+    st->prog->queue(st->prog, l, t, r, b, ubuf);
 }
 
 static int text_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -173,13 +177,13 @@ static int text_get_builders(struct slide *s, struct umbra_fmt fmt,
     if (max < 1) { return 0; }
     struct text_slide *st = (struct text_slide *)s;
     out[0] = umbra_draw_builder(&st->shader.base, &st->cov.bitmap.base,
-                              umbra_blend_srcover, fmt, NULL);
+                                umbra_blend_srcover, fmt, NULL);
     return out[0] ? 1 : 0;
 }
 
 static void text_free(struct slide *s) {
     struct text_slide *st = (struct text_slide *)s;
-    umbra_draw_free(st->draw);
+    if (st->prog) { st->prog->free(st->prog); }
     free(st->lay.uniforms);
     free(st);
 }

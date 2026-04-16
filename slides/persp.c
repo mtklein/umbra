@@ -11,9 +11,9 @@ struct persp_slide {
     struct umbra_shader_solid            shader;
     struct umbra_coverage_bitmap_matrix  cov;
 
-    struct umbra_fmt          fmt;
-    struct umbra_draw_layout lay;
-    struct umbra_draw       *draw;
+    struct umbra_fmt            fmt;
+    struct umbra_draw_layout   lay;
+    struct umbra_program      *prog;
 };
 
 static void persp_init(struct slide *s, int w, int h) {
@@ -25,11 +25,15 @@ static void persp_init(struct slide *s, int w, int h) {
 static void persp_prepare(struct slide *s, struct umbra_backend *be,
                           struct umbra_fmt fmt) {
     struct persp_slide *st = (struct persp_slide *)s;
-    umbra_draw_free(st->draw);
+    if (st->prog) { st->prog->free(st->prog); }
     free(st->lay.uniforms);
-    st->fmt  = fmt;
-    st->draw = umbra_draw(be, &st->shader.base, &st->cov.base,
-                          umbra_blend_srcover, fmt, &st->lay);
+    st->fmt = fmt;
+    struct umbra_builder *b = umbra_draw_builder(&st->shader.base, &st->cov.base,
+                                                 umbra_blend_srcover, fmt, &st->lay);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
+    umbra_builder_free(b);
+    st->prog = be->compile(be, ir);
+    umbra_flat_ir_free(ir);
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
@@ -48,7 +52,7 @@ static void persp_draw(struct slide *s, int frame, int l, int t, int r, int b, v
         {.ptr=st->lay.uniforms, .count=st->lay.uni.slots},
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
     };
-    umbra_draw_queue(st->draw, l, t, r, b, ubuf);
+    st->prog->queue(st->prog, l, t, r, b, ubuf);
 }
 
 static int persp_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -61,7 +65,7 @@ static int persp_get_builders(struct slide *s, struct umbra_fmt fmt,
 
 static void persp_free(struct slide *s) {
     struct persp_slide *st = (struct persp_slide *)s;
-    umbra_draw_free(st->draw);
+    if (st->prog) { st->prog->free(st->prog); }
     free(st->lay.uniforms);
     free(st);
 }

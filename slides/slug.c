@@ -511,9 +511,9 @@ struct slug_two_pass_slide {
 
     struct umbra_shader_solid   shader;
     struct umbra_coverage_wind  cov;
-    struct umbra_fmt          fmt;
-    struct umbra_draw_layout draw_lay;
-    struct umbra_draw       *draw;
+    struct umbra_fmt            fmt;
+    struct umbra_draw_layout   draw_lay;
+    struct umbra_program      *draw_prog;
 };
 
 static void slug_two_pass_init(struct slide *s, int w, int h) {
@@ -534,11 +534,17 @@ static void slug_two_pass_prepare(struct slide *s,
     struct slug_two_pass_slide *st = (struct slug_two_pass_slide *)s;
     if (st->acc_prog) { st->acc_prog->free(st->acc_prog); }
     st->acc_prog = be->compile(be, st->acc_bb);
-    umbra_draw_free(st->draw);
+    if (st->draw_prog) { st->draw_prog->free(st->draw_prog); }
     free(st->draw_lay.uniforms);
-    st->fmt  = fmt;
-    st->draw = umbra_draw(be, &st->shader.base, &st->cov.base,
-                          umbra_blend_srcover, fmt, &st->draw_lay);
+    st->fmt = fmt;
+    {
+        struct umbra_builder *b = umbra_draw_builder(&st->shader.base, &st->cov.base,
+                                                     umbra_blend_srcover, fmt, &st->draw_lay);
+        struct umbra_flat_ir *ir = umbra_flat_ir(b);
+        umbra_builder_free(b);
+        st->draw_prog = be->compile(be, ir);
+        umbra_flat_ir_free(ir);
+    }
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
@@ -579,7 +585,7 @@ static void slug_two_pass_draw(struct slide *s, int frame, int l, int t, int r, 
     rbuf[0] = (struct umbra_buf){.ptr = st->draw_lay.uniforms,
                                  .count = st->draw_lay.uni.slots};
     rbuf[1] = (struct umbra_buf){.ptr=buf, .count=w * h * st->fmt.planes, .stride=w};
-    umbra_draw_queue(st->draw, l, t, r, b, rbuf);
+    st->draw_prog->queue(st->draw_prog, l, t, r, b, rbuf);
 }
 
 static int slug_two_pass_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -598,7 +604,7 @@ static void slug_two_pass_free(struct slide *s) {
     if (st->acc_prog) { st->acc_prog->free(st->acc_prog); st->acc_prog = 0; }
     umbra_flat_ir_free(st->acc_bb);
     free(st->acc_lay.uniforms);
-    umbra_draw_free(st->draw);
+    if (st->draw_prog) { st->draw_prog->free(st->draw_prog); }
     free(st->draw_lay.uniforms);
     free(st);
 }
@@ -633,7 +639,7 @@ struct slug_slide {
     struct umbra_coverage_wind    cov;
     struct umbra_fmt              fmt;
     struct umbra_draw_layout     draw_lay;
-    struct umbra_draw           *draw;
+    struct umbra_program        *draw_prog;
 };
 
 static void slug_init(struct slide *s, int w, int h) {
@@ -653,11 +659,17 @@ static void slug_prepare(struct slide *s, struct umbra_backend *be,
     struct slug_slide *st = (struct slug_slide *)s;
     if (st->acc_prog) { st->acc_prog->free(st->acc_prog); }
     st->acc_prog = be->compile(be, st->acc_bb);
-    umbra_draw_free(st->draw);
+    if (st->draw_prog) { st->draw_prog->free(st->draw_prog); }
     free(st->draw_lay.uniforms);
-    st->fmt  = fmt;
-    st->draw = umbra_draw(be, &st->shader.base, &st->cov.base,
-                          umbra_blend_srcover, fmt, &st->draw_lay);
+    st->fmt = fmt;
+    {
+        struct umbra_builder *b = umbra_draw_builder(&st->shader.base, &st->cov.base,
+                                                     umbra_blend_srcover, fmt, &st->draw_lay);
+        struct umbra_flat_ir *ir = umbra_flat_ir(b);
+        umbra_builder_free(b);
+        st->draw_prog = be->compile(be, ir);
+        umbra_flat_ir_free(ir);
+    }
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
@@ -696,7 +708,7 @@ static void slug_draw(struct slide *s, int frame, int l, int t, int r, int b, vo
     rbuf[0] = (struct umbra_buf){.ptr = st->draw_lay.uniforms,
                                  .count = st->draw_lay.uni.slots};
     rbuf[1] = (struct umbra_buf){.ptr=buf, .count=w * h * st->fmt.planes, .stride=w};
-    umbra_draw_queue(st->draw, l, t, r, b, rbuf);
+    st->draw_prog->queue(st->draw_prog, l, t, r, b, rbuf);
 }
 
 static void slug_free_slide(struct slide *s) {
@@ -706,7 +718,7 @@ static void slug_free_slide(struct slide *s) {
     if (st->acc_prog) { st->acc_prog->free(st->acc_prog); }
     umbra_flat_ir_free(st->acc_bb);
     free(st->acc_lay.uniforms);
-    umbra_draw_free(st->draw);
+    if (st->draw_prog) { st->draw_prog->free(st->draw_prog); }
     free(st->draw_lay.uniforms);
     free(st);
 }
