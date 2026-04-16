@@ -210,7 +210,7 @@ static void tile_fn(void *arg) {
 }
 
 int main(void) {
-    enum { W = 1024, H = 768 };
+    int W = 1024, H = 768;
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
@@ -249,7 +249,7 @@ int main(void) {
     pipe_be = umbra_backend_jit();
     if (!pipe_be) { pipe_be = umbra_backend_interp(); }
 
-    void *pixbuf = malloc(W * H * 8);
+    void *pixbuf = malloc((size_t)W * (size_t)H * 8);
 
     int cur_slide = slide_count() - 1;
     int cur_fmt = FMT_FP16;
@@ -279,6 +279,20 @@ int main(void) {
         while (SDL_PollEvent(&ev)) {
             if (ev.type == SDL_EVENT_QUIT) {
                 running = 0;
+            } else if (ev.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
+                W = ev.window.data1;
+                H = ev.window.data2;
+                if (W < 1) { W = 1; }
+                if (H < 1) { H = 1; }
+                slides_cleanup();
+                slides_init(W, H);
+                free(pixbuf);
+                pixbuf = malloc((size_t)W * (size_t)H * 8);
+                SDL_DestroyTexture(texture);
+                texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA64_FLOAT,
+                                            SDL_TEXTUREACCESS_STREAMING, W, H);
+                build_slide_fmt(slide_get(cur_slide), cur_fmt);
+                rebuild_xtra(cur_backend);
             } else if (ev.type == SDL_EVENT_KEY_DOWN) {
                 int next = cur_slide;
                 if (ev.key.key == SDLK_RIGHT || ev.key.key == SDLK_SPACE) {
