@@ -129,10 +129,9 @@ struct text_slide {
         struct umbra_coverage_sdf    sdf;
     } cov;
 
-    struct umbra_fmt            fmt;
-    struct umbra_draw_layout   lay;
-    struct umbra_flat_ir  *bb;
-    struct umbra_program      *prog;
+    struct umbra_fmt          fmt;
+    struct umbra_draw_layout lay;
+    struct umbra_draw       *draw;
 };
 
 static void text_init(struct slide *s, int w, int h) {
@@ -141,19 +140,14 @@ static void text_init(struct slide *s, int w, int h) {
     st->h = h;
 }
 
-static void text_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
+static void text_prepare(struct slide *s, struct umbra_backend *be,
+                         struct umbra_fmt fmt) {
     struct text_slide *st = (struct text_slide *)s;
-    if (st->fmt.name != fmt.name || !st->bb) {
-        st->fmt = fmt;
-        umbra_flat_ir_free(st->bb);
-        free(st->lay.uniforms);
-        struct umbra_builder *b = umbra_draw_builder(&st->shader.base, &st->cov.bitmap.base,
-                                                    umbra_blend_srcover, fmt, &st->lay);
-        st->bb = umbra_flat_ir(b);
-        umbra_builder_free(b);
-    }
-    if (st->prog) { st->prog->free(st->prog); }
-    st->prog = be->compile(be, st->bb);
+    umbra_draw_free(st->draw);
+    free(st->lay.uniforms);
+    st->fmt  = fmt;
+    st->draw = umbra_draw(be, &st->shader.base, &st->cov.bitmap.base,
+                          umbra_blend_srcover, fmt, &st->lay);
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
@@ -171,7 +165,7 @@ static void text_draw(struct slide *s, int frame, int l, int t, int r, int b, vo
         {.ptr=st->lay.uniforms, .count=st->lay.uni.slots},
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
     };
-    st->prog->queue(st->prog, l, t, r, b, ubuf);
+    umbra_draw_queue(st->draw, l, t, r, b, ubuf);
 }
 
 static int text_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -185,8 +179,7 @@ static int text_get_builders(struct slide *s, struct umbra_fmt fmt,
 
 static void text_free(struct slide *s) {
     struct text_slide *st = (struct text_slide *)s;
-    if (st->prog) { st->prog->free(st->prog); }
-    umbra_flat_ir_free(st->bb);
+    umbra_draw_free(st->draw);
     free(st->lay.uniforms);
     free(st);
 }
