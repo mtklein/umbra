@@ -2,6 +2,10 @@
 
 static _Bool exact(umbra_interval a) { return a.lo.id == a.hi.id; }
 
+umbra_interval umbra_interval_exact(umbra_val32 v) {
+    return (umbra_interval){v, v};
+}
+
 umbra_interval umbra_interval_add_f32(struct umbra_builder *b,
                                       umbra_interval a, umbra_interval c) {
     if (exact(a) && exact(c)) {

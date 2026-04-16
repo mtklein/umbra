@@ -20,9 +20,6 @@ typedef void* id;
 typedef void* SEL;
 typedef unsigned long NSUInteger;
 typedef struct { NSUInteger width, height, depth; } MTLSize;
-static inline MTLSize MTLSizeMake(NSUInteger w, NSUInteger h, NSUInteger d) {
-    return (MTLSize){w, h, d};
-}
 extern void* MTLCreateSystemDefaultDevice(void);
 extern void* objc_autoreleasePoolPush(void);
 extern void  objc_autoreleasePoolPop(void*);
@@ -1288,8 +1285,8 @@ static void encode_dispatch(
         char const *tg = getenv("UMBRA_METAL_THREADGROUP");
         tg_size = tg ? atoi(tg) : 64;
     }
-    MTLSize grid  = MTLSizeMake((NSUInteger)w, (NSUInteger)h, 1);
-    MTLSize group = MTLSizeMake((NSUInteger)tg_size, 1, 1);
+    MTLSize grid  = {(NSUInteger)w, (NSUInteger)h, 1};
+    MTLSize group = {(NSUInteger)tg_size, 1, 1};
     msg_v_ss(enc, sel("dispatchThreads:threadsPerThreadgroup:"), grid, group);
     be->total_dispatches++;
 }
