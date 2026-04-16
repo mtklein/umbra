@@ -112,7 +112,7 @@ void vpextrd(struct asm_x86 *b, int gpr, int xmm, uint8_t imm);
 void vextracti128(struct asm_x86 *b, int d, int s, uint8_t imm);
 
 void vmovd_from_gpr(struct asm_x86 *b, int xmm, int gpr);
-void vmovd_to_gpr  (struct asm_x86 *b, int gpr, int xmm);
+void vmovd_to_gpr(struct asm_x86 *b, int gpr, int xmm);
 void vmovd_load (struct asm_x86 *b, int reg, int base, int index, int scale, int disp);
 void vmovd_store(struct asm_x86 *b, int reg, int base, int index, int scale, int disp);
 void vmovq_load (struct asm_x86 *b, int reg, int base, int index, int scale, int disp);

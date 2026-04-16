@@ -1025,7 +1025,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 CASE(op_min_f32) v->f32 = vec_min(v[ip->x].f32, v[ip->y].f32); NEXT;
                 CASE(op_max_f32) v->f32 = vec_max(v[ip->x].f32, v[ip->y].f32); NEXT;
                 CASE(op_sqrt_f32)   v->f32 = vec_sqrt(v[ip->x].f32); NEXT;
-                CASE(op_abs_f32)    v->f32 = vec_abs (v[ip->x].f32); NEXT;
+                CASE(op_abs_f32)    v->f32 = vec_abs(v[ip->x].f32); NEXT;
                 CASE(op_square_f32) v->f32 = v[ip->x].f32 * v[ip->x].f32; NEXT;
                 CASE(op_round_f32) v->f32 = vec_round(v[ip->x].f32); NEXT;
                 CASE(op_floor_f32) v->f32 = vec_floor(v[ip->x].f32); NEXT;

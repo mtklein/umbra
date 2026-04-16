@@ -47,7 +47,7 @@ int op_eval(enum op op, int xb, int yb, int zb, int wb) {
         y = {yb},
         z = {zb},
         w = {wb},
-        r = { 0};
+        r = {0};
     (void)w;
 
     switch ((int)op) {

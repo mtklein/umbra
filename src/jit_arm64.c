@@ -1087,7 +1087,6 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
         } break;
         }
     }
-#undef lu
 }
 
 #if __clang__
@@ -1097,7 +1096,6 @@ void jit_program_run(struct jit_program *j, int l, int t, int r, int b, struct u
     j->entry(l, t, r, b, buf);
 }
 void jit_program_dump(struct jit_program const *j, FILE *f) {
-
     uint32_t const *words = (uint32_t const*)j->code;
 
     char tmp[]      = "/tmp/umbra_mca_XXXXXX.s";

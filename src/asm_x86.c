@@ -348,7 +348,7 @@ void vextracti128(Buf *b, int d, int s, uint8_t imm) {
 // VMOVD xmm, r32: VEX.128.66.0F.W0 6E /r
 void vmovd_from_gpr(Buf *b, int xmm, int gpr) { vex(b, 1, 1, 0, 0, xmm, 0, gpr, 0x6e); }
 // VMOVD r32, xmm: VEX.128.66.0F.W0 7E /r
-void vmovd_to_gpr  (Buf *b, int gpr, int xmm) { vex(b, 1, 1, 0, 0, xmm, 0, gpr, 0x7e); }
+void vmovd_to_gpr(Buf *b, int gpr, int xmm) { vex(b, 1, 1, 0, 0, xmm, 0, gpr, 0x7e); }
 void vmovd_load(Buf *b, int r, int base, int idx, int scale, int disp) {
     vex_mem(b, 1, 1, 0, 0, r, 0, 0x6e, base, idx, scale, disp);
 }
