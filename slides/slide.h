@@ -29,7 +29,7 @@ void slide_register(slide_factory_fn factory);
     static struct slide* NAME(void)
 
 int           slide_count        (void);
-struct slide *slide_get          (int i);
+struct slide* slide_get          (int i);
 void          slides_init        (int w, int h);
 void          slides_cleanup     (void);
 
