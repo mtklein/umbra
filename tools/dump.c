@@ -195,7 +195,7 @@ static void slugify(char const *title, char *out, size_t sz) {
     out[n] = '\0';
 }
 
-enum { RW = 200, RH = 150 };
+enum { RW = 1024, RH = 768 };
 
 static void fp16p_to_float(float *out, void const *pixbuf) {
     __fp16 const *src = pixbuf;

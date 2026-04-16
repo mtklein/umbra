@@ -210,14 +210,14 @@ static void tile_fn(void *arg) {
 }
 
 int main(void) {
-    enum { W = 800, H = 600 };
+    enum { W = 1024, H = 768 };
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return 1;
     }
 
-    SDL_Window *window = SDL_CreateWindow("umbra demo", W, H, 0);
+    SDL_Window *window = SDL_CreateWindow("umbra demo", W, H, SDL_WINDOW_RESIZABLE);
     if (!window) {
         SDL_Log("SDL_CreateWindow failed: %s", SDL_GetError());
         return 1;
