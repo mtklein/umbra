@@ -134,35 +134,30 @@ SLIDE(slide_solid_src) {
 }
 
 SLIDE(slide_solid_srcover) {
-
     return make_solid("Source Over (srcover)", (float[]){0, 1, 0, 1},
                       (float[]){0.45f, 0.0f, 0.0f, 0.5f},
                       1, umbra_blend_srcover);
 }
 
 SLIDE(slide_solid_dstover) {
-
     return make_solid("Destination Over (dstover)", (float[]){0, 0.5f, 0, 0.75f},
                       (float[]){0.0f, 0.0f, 0.9f, 0.9f},
                       1, umbra_blend_dstover);
 }
 
 SLIDE(slide_solid_multiply) {
-
     return make_solid("Multiply Blend", (float[]){0.125f, 0.25f, 0.5f, 1},
                       (float[]){1.0f, 0.5f, 0.0f, 1.0f},
                       1, umbra_blend_multiply);
 }
 
 SLIDE(slide_solid_full_cov) {
-
     return make_solid("Full Coverage (no rect clip)", (float[]){1, 1, 1, 1},
                       (float[]){0.15f, 0.0f, 0.3f, 0.3f},
                       0, umbra_blend_srcover);
 }
 
 SLIDE(slide_solid_no_blend) {
-
     return make_solid("No Blend (direct paint)", (float[]){0, 0, 0, 1},
                       (float[]){0.9f, 0.4f, 0.1f, 1.0f},
                       1, NULL);
