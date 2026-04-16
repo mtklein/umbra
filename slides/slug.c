@@ -602,7 +602,7 @@ static void slug_two_pass_free(struct slide *s) {
     struct slug_two_pass_slide *st = (struct slug_two_pass_slide *)s;
     slug_free(&st->slug);
     free(st->wind_buf);
-    if (st->acc_prog) { st->acc_prog->free(st->acc_prog); st->acc_prog = 0; }
+    if (st->acc_prog) { st->acc_prog->free(st->acc_prog); }
     umbra_flat_ir_free(st->acc_bb);
     free(st->acc_lay.uniforms);
     if (st->draw_prog) { st->draw_prog->free(st->draw_prog); }
