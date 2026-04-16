@@ -400,6 +400,10 @@ void umbra_draw_queue(struct umbra_draw const *d,
     queue_recurse(d, l, t, r, b, buf, uniform);
 }
 
+_Bool umbra_draw_has_interval_coverage(struct umbra_draw const *d) {
+    return d->coverage != NULL;
+}
+
 static umbra_val32 clamp01(struct umbra_builder *builder, umbra_val32 t) {
     return umbra_min_f32(builder, umbra_max_f32(builder, t, umbra_imm_f32(builder, 0.0f)),
                          umbra_imm_f32(builder, 1.0f));

@@ -83,6 +83,8 @@ void               umbra_draw_free(struct umbra_draw*);
 void umbra_draw_queue(struct umbra_draw const*,
                       int l, int t, int r, int b, struct umbra_buf[]);
 
+_Bool umbra_draw_has_interval_coverage(struct umbra_draw const*);
+
 struct umbra_shader_solid {
     struct umbra_shader base;
     float  color[4];

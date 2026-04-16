@@ -1399,7 +1399,7 @@ TEST(test_draw_compile_rect) {
                                           umbra_blend_srcover, umbra_fmt_8888, &lay);
         d->partial_coverage != NULL here;
         d->full_coverage    != NULL here;
-        d->coverage         != NULL here;
+        umbra_draw_has_interval_coverage(d) here;
         // Solid shader reserves 4 slots; rect's coverage uniforms come next.
         d->uniform_offset   == 4 here;
 
@@ -1454,7 +1454,7 @@ TEST(test_draw_compile_interval_coverage) {
                                       umbra_blend_srcover, umbra_fmt_8888, &lay);
     d->partial_coverage != NULL here;
     d->full_coverage    != NULL here;
-    d->coverage         != NULL here;
+    umbra_draw_has_interval_coverage(d) here;
     d->uniform_offset   == 4 here;
 
     // Sanity-check that the interval program bounds α sensibly for a tile
@@ -1490,7 +1490,7 @@ TEST(test_draw_queue_adaptive_matches_flat) {
     struct umbra_draw_layout lay;
     struct umbra_draw *d = umbra_draw(be, &shader.base, &cov.base,
                                       umbra_blend_srcover, umbra_fmt_8888, &lay);
-    d->coverage != NULL here;
+    umbra_draw_has_interval_coverage(d) here;
     umbra_draw_fill(&lay, &shader.base, &cov.base);
 
     int const W = 2048, H = 32;
@@ -1534,7 +1534,7 @@ TEST(test_draw_queue_flat_fallback) {
     struct umbra_draw_layout lay;
     struct umbra_draw *d = umbra_draw(be, &shader.base, NULL,
                                       umbra_blend_srcover, umbra_fmt_8888, &lay);
-    d->coverage == NULL here;
+    !umbra_draw_has_interval_coverage(d) here;
 
     umbra_draw_fill(&lay, &shader.base, NULL);
     uint32_t dst[8] = {0};
