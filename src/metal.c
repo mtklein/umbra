@@ -1141,7 +1141,13 @@ static struct metal_program* metal_program(
             be->device, sel("newLibraryWithSource:options:error:"),
             source, opts, &error);
         if (!library) {
-            fprintf(stderr, "Metal compile error\n");
+            if (error) {
+                id desc = msg(error, sel("localizedDescription"));
+                char const *utf8 = (char const *)msg(desc, sel("UTF8String"));
+                fprintf(stderr, "Metal compile error: %s\n", utf8 ? utf8 : "(no details)");
+            } else {
+                fprintf(stderr, "Metal compile error (no error object)\n");
+            }
             goto fail;
         }
 
@@ -1390,6 +1396,7 @@ static void free_metal(struct umbra_program *prog) {
 static struct umbra_program* compile_metal(struct umbra_backend           *be,
                                            BB const *bb) {
     struct metal_program *p = metal_program((struct metal_backend*)be, bb);
+    if (!p) { return NULL; }
     p->base = (struct umbra_program){
         .queue   = run_metal,
         .dump    = dump_metal,

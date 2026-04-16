@@ -293,6 +293,7 @@ struct umbra_sdf_dispatch* umbra_sdf_dispatch(struct umbra_backend *be,
     umbra_builder_free(db);
     struct umbra_program *draw = be->compile(be, dir);
     umbra_flat_ir_free(dir);
+    if (!draw) { return NULL; }
 
     // Build the bounds program using sdf->build with tile-extent intervals.
     // x() and y() are tile indices.  SDF uniforms at offset 0 (matching the
@@ -342,6 +343,7 @@ struct umbra_sdf_dispatch* umbra_sdf_dispatch(struct umbra_backend *be,
 
 void umbra_sdf_dispatch_queue(struct umbra_sdf_dispatch const *d,
                               int l, int t, int r, int b, struct umbra_buf buf[]) {
+    if (!d) { return; }
     int const w  = r - l,
               h  = b - t,
               xt = (w + QUEUE_MIN_TILE - 1) / QUEUE_MIN_TILE,
