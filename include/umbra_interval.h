@@ -3,78 +3,13 @@
 
 typedef struct { umbra_val32 lo, hi; } umbra_interval;
 
-static inline umbra_interval umbra_interval_exact(struct umbra_builder *b, float v) {
-    umbra_val32 const val = umbra_imm_f32(b, v);
-    return (umbra_interval){val, val};
-}
-
-static inline umbra_interval umbra_interval_uniform(struct umbra_builder *b,
-                                                    umbra_ptr32 ptr, int slot) {
-    umbra_val32 const val = umbra_uniform_32(b, ptr, slot);
-    return (umbra_interval){val, val};
-}
-
-static inline umbra_interval umbra_interval_add_f32(struct umbra_builder *b,
-                                                    umbra_interval a, umbra_interval c) {
-    return (umbra_interval){umbra_add_f32(b, a.lo, c.lo),
-                            umbra_add_f32(b, a.hi, c.hi)};
-}
-
-static inline umbra_interval umbra_interval_sub_f32(struct umbra_builder *b,
-                                                    umbra_interval a, umbra_interval c) {
-    return (umbra_interval){umbra_sub_f32(b, a.lo, c.hi),
-                            umbra_sub_f32(b, a.hi, c.lo)};
-}
-
-static inline umbra_interval umbra_interval_min_f32(struct umbra_builder *b,
-                                                    umbra_interval a, umbra_interval c) {
-    return (umbra_interval){umbra_min_f32(b, a.lo, c.lo),
-                            umbra_min_f32(b, a.hi, c.hi)};
-}
-
-static inline umbra_interval umbra_interval_max_f32(struct umbra_builder *b,
-                                                    umbra_interval a, umbra_interval c) {
-    return (umbra_interval){umbra_max_f32(b, a.lo, c.lo),
-                            umbra_max_f32(b, a.hi, c.hi)};
-}
-
-static inline umbra_interval umbra_interval_sqrt_f32(struct umbra_builder *b,
-                                                     umbra_interval a) {
-    return (umbra_interval){umbra_sqrt_f32(b, a.lo),
-                            umbra_sqrt_f32(b, a.hi)};
-}
-
-static inline umbra_interval umbra_interval_mul_f32(struct umbra_builder *b,
-                                                    umbra_interval a, umbra_interval c) {
-    if (a.lo.id == c.lo.id && a.hi.id == c.hi.id) {
-        umbra_val32 const ll = umbra_mul_f32(b, a.lo, a.lo),
-                          hh = umbra_mul_f32(b, a.hi, a.hi);
-        return (umbra_interval){umbra_imm_f32(b, 0.0f),
-                                umbra_max_f32(b, ll, hh)};
-    }
-    umbra_val32 const ll = umbra_mul_f32(b, a.lo, c.lo),
-                      lh = umbra_mul_f32(b, a.lo, c.hi),
-                      hl = umbra_mul_f32(b, a.hi, c.lo),
-                      hh = umbra_mul_f32(b, a.hi, c.hi);
-    return (umbra_interval){
-        umbra_min_f32(b, umbra_min_f32(b, ll, lh), umbra_min_f32(b, hl, hh)),
-        umbra_max_f32(b, umbra_max_f32(b, ll, lh), umbra_max_f32(b, hl, hh)),
-    };
-}
-
-static inline umbra_interval umbra_interval_div_f32(struct umbra_builder *b,
-                                                    umbra_interval a, umbra_interval c) {
-    umbra_interval const recip = {umbra_div_f32(b, umbra_imm_f32(b, 1.0f), c.hi),
-                                  umbra_div_f32(b, umbra_imm_f32(b, 1.0f), c.lo)};
-    return umbra_interval_mul_f32(b, a, recip);
-}
-
-// Conservative: always [0, max(|lo|, |hi|)].  Tight when the interval
-// straddles zero (the common case for SDF abs); loose but correct when
-// entirely positive or negative.
-static inline umbra_interval umbra_interval_abs_f32(struct umbra_builder *b,
-                                                    umbra_interval a) {
-    umbra_val32 const zero   = umbra_imm_f32(b, 0.0f),
-                      neg_lo = umbra_sub_f32(b, zero, a.lo);
-    return (umbra_interval){zero, umbra_max_f32(b, neg_lo, a.hi)};
-}
+umbra_interval umbra_interval_exact    (struct umbra_builder*, float v);
+umbra_interval umbra_interval_uniform  (struct umbra_builder*, umbra_ptr32, int slot);
+umbra_interval umbra_interval_add_f32  (struct umbra_builder*, umbra_interval, umbra_interval);
+umbra_interval umbra_interval_sub_f32  (struct umbra_builder*, umbra_interval, umbra_interval);
+umbra_interval umbra_interval_mul_f32  (struct umbra_builder*, umbra_interval, umbra_interval);
+umbra_interval umbra_interval_div_f32  (struct umbra_builder*, umbra_interval, umbra_interval);
+umbra_interval umbra_interval_min_f32  (struct umbra_builder*, umbra_interval, umbra_interval);
+umbra_interval umbra_interval_max_f32  (struct umbra_builder*, umbra_interval, umbra_interval);
+umbra_interval umbra_interval_sqrt_f32 (struct umbra_builder*, umbra_interval);
+umbra_interval umbra_interval_abs_f32  (struct umbra_builder*, umbra_interval);
