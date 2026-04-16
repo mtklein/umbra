@@ -22,5 +22,5 @@ struct slug_layout {
 
 struct slug_curves    slug_extract  (char const *text, float font_size);
 void                  slug_free     (struct slug_curves *sc);
-struct umbra_builder *slug_build_acc     (struct slug_acc_layout *lay);
-struct umbra_builder *slug_build(struct slug_layout *lay);
+struct umbra_builder* slug_build_acc     (struct slug_acc_layout *lay);
+struct umbra_builder* slug_build(struct slug_layout *lay);

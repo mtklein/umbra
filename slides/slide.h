@@ -19,14 +19,14 @@ typedef struct slide *(*slide_factory_fn)(void);
 void slide_register(slide_factory_fn factory);
 
 #define SLIDE(NAME)                                                              \
-    static struct slide *NAME(void);                                            \
+    static struct slide* NAME(void);                                            \
     _Pragma("clang diagnostic push")                                             \
     _Pragma("clang diagnostic ignored \"-Wglobal-constructors\"")                \
     __attribute__((constructor)) static void slide_ctor_##NAME(void) {           \
         slide_register(NAME);                                                    \
     }                                                                            \
     _Pragma("clang diagnostic pop")                                              \
-    static struct slide *NAME(void)
+    static struct slide* NAME(void)
 
 int           slide_count        (void);
 struct slide *slide_get          (int i);
