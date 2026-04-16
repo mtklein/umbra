@@ -269,6 +269,7 @@ int main(void) {
     double   fps = 0.0;
 
     _Bool want_dump = 0;
+    _Bool vsync = 0;
 
     update_title(window, slide_get(cur_slide), cur_backend, cur_fmt, fps, n_threads);
 
@@ -298,6 +299,9 @@ int main(void) {
                     if (n_threads > 1) { n_threads--; rebuild_xtra(cur_backend); }
                 } else if (ev.key.key == SDLK_PERIOD) {
                     if (n_threads < max_threads) { n_threads++; rebuild_xtra(cur_backend); }
+                } else if (ev.key.key == SDLK_V) {
+                    vsync = !vsync;
+                    SDL_SetRenderVSync(renderer, vsync ? 1 : 0);
                 } else if (ev.key.key == SDLK_S) {
                     want_dump = 1;
                 } else if (ev.key.key == SDLK_ESCAPE) {
