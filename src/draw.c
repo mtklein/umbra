@@ -278,10 +278,11 @@ struct umbra_draw* umbra_draw(struct umbra_backend *be,
 }
 
 void umbra_draw_free(struct umbra_draw *d) {
-    if (!d) { return; }
-    if (d->program) { d->program->free(d->program); }
-    interval_program_free(d->coverage);
-    free(d);
+    if (d) {
+        d->program->free(d->program);
+        interval_program_free(d->coverage);
+        free(d);
+    }
 }
 
 // Tile floor for the quadtree recursion.  One compromise value across all
