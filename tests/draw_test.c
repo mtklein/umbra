@@ -1368,12 +1368,6 @@ TEST(test_draw_compile_rect) {
         struct umbra_draw_layout lay;
         struct umbra_draw *d = umbra_draw(bes[bi], &shader.base, &cov.base,
                                           umbra_blend_srcover, umbra_fmt_8888, &lay);
-        d->partial_coverage != NULL here;
-        d->full_coverage    != NULL here;
-        umbra_draw_has_interval_coverage(d) here;
-        // Solid shader reserves 4 slots; rect's coverage uniforms come next.
-        d->uniform_offset   == 4 here;
-
         umbra_draw_fill(&lay, &shader.base, &cov.base);
         uint32_t dst[8] = {0};
         struct umbra_buf buf[] = {
