@@ -73,7 +73,8 @@ struct umbra_draw* umbra_draw(struct umbra_backend*,
                               struct umbra_shader*, struct umbra_coverage*,
                               umbra_blend_fn, struct umbra_fmt,
                               struct umbra_draw_layout*);
-void               umbra_draw_free(struct umbra_draw*);
+_Bool umbra_draw_has_interval_coverage(struct umbra_draw const*);
+void  umbra_draw_free(struct umbra_draw*);
 
 // Dispatch the bundle over rect [l, t, r, b).  If the draw has an
 // interval_program, descends a quadtree — skipping tiles where the α bound
@@ -83,7 +84,6 @@ void               umbra_draw_free(struct umbra_draw*);
 void umbra_draw_queue(struct umbra_draw const*,
                       int l, int t, int r, int b, struct umbra_buf[]);
 
-_Bool umbra_draw_has_interval_coverage(struct umbra_draw const*);
 
 struct umbra_shader_solid {
     struct umbra_shader base;
