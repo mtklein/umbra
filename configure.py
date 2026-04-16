@@ -114,7 +114,6 @@ subninja build/x86_64.ninja
 subninja build/x86_64h.ninja
 subninja build/x86_64h_xsan.ninja
 subninja build/gcc.ninja
-subninja build/size.ninja
 
 rule configure
     command = python3 configure.py
@@ -129,8 +128,7 @@ build build.ninja $
       build/x86_64.ninja $
       build/x86_64h.ninja $
       build/x86_64h_xsan.ninja $
-      build/gcc.ninja $
-      build/size.ninja: configure | configure.py
+      build/gcc.ninja: configure | configure.py
 """
 
 
@@ -282,23 +280,6 @@ include build/project.ninja
 """
 
 
-SIZE_NINJA = r"""out     = $builddir/size
-cc      = $clang -Oz -g0 -fno-asynchronous-unwind-tables -fno-unwind-tables -ffunction-sections -fdata-sections
-ldflags = -framework Metal -framework Foundation -L/opt/homebrew/lib -lMoltenVK -lwgpu_native -dead_strip -Wl,-x,-S
-
-rule compile
-    command = $cc -std=c11 -Werror $warn $cflags -MD -MF $out.d -c $in -o $out
-    depfile = $out.d
-    deps    = gcc
-
-rule compile_m
-    command = $cc -fobjc-arc -Werror $warn -MD -MF $out.d -c $in -o $out
-    depfile = $out.d
-    deps    = gcc
-
-include build/project.ninja
-"""
-
 
 XSAN_NINJA_PREFIX = f"""cov = -fprofile-instr-generate -fcoverage-mapping
 
@@ -373,7 +354,6 @@ FILES = {
     'build/x86_64h.ninja':       X86_64H_NINJA,
     'build/x86_64h_xsan.ninja':  X86_64H_XSAN_NINJA,
     'build/gcc.ninja':           GCC_NINJA,
-    'build/size.ninja':          SIZE_NINJA,
 }
 
 
