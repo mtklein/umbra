@@ -44,7 +44,7 @@ struct vk_backend {
     VkDeviceSize          host_import_align;
     VkCommandBuffer       batch_cmd;                       // currently-encoding cmdbuf, or NULL
     VkCommandBuffer       frame_committed[VK_N_FRAMES];    // last committed cmdbuf per frame
-    VkFence               frame_fences   [VK_N_FRAMES];  // signals when frame_committed[i] is done
+    VkFence               frame_fences[VK_N_FRAMES];     // signals when frame_committed[i] is done
     VkQueryPool           ts_pool;                         // 2 timestamps per frame
     double                timestamp_period;                // ns per tick
     double                gpu_time_accum;
@@ -153,8 +153,8 @@ static struct uniform_ring_chunk vk_ring_new_chunk(size_t min_bytes, void *ctx) 
     return (struct uniform_ring_chunk){
         .handle=chunk,
         .mapped=mapped,
-        .cap   =cap,
-        .used  =0,
+        .cap=cap,
+        .used=0,
     };
 }
 
@@ -546,7 +546,7 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
     p->n_deref     = sr.n_deref;
     p->push_words  = sr.push_words;
     p->deref       = sr.deref;
-    p->buf_rw        = sr.buf_rw;
+    p->buf_rw    = sr.buf_rw;
     p->buf_shift = sr.buf_shift;
     free(sr.buf_row_shift);
     p->spirv       = sr.spirv;
@@ -820,16 +820,16 @@ struct umbra_backend* umbra_backend_vulkan(void) {
         .ctx = v,
     };
     v->uni_pool = (struct uniform_ring_pool){
-        .n         =VK_N_FRAMES,
+        .n=VK_N_FRAMES,
         .high_water=VK_RING_HIGH_WATER,
-        .ctx       =v,
+        .ctx=v,
         .wait_frame=vk_wait_frame,
     };
     for (int i = 0; i < VK_N_FRAMES; i++) {
         v->uni_pool.rings[i] = (struct uniform_ring){
-            .align     =ssbo_align,
-            .ctx       =v,
-            .new_chunk =vk_ring_new_chunk,
+            .align=ssbo_align,
+            .ctx=v,
+            .new_chunk=vk_ring_new_chunk,
             .free_chunk=vk_ring_free_chunk,
         };
         VkFenceCreateInfo fi = { .sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
