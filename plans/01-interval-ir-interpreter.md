@@ -199,11 +199,12 @@ returns the interval of the last `umbra_store_32` to SINK.
 full list, then pruned every op not exercised by tests during review ("if
 it's untested it's dead code").  Current support: `x`, `y`, `join`,
 `imm_32`, `uniform_32`, `store_32`; f32 `add/sub/mul/div/min/max/fma/fms/
-sqrt/abs/floor/ceil`; `lt_f32`; and the four `_imm` variants that actually
-fire (`add/sub/div/lt`).  Integer arithmetic, bitops, int compares, loads,
-gathers, variables, loops, ifs, sel, compare pairs other than `lt` — all
-make the constructor return NULL.  We'll add them back as plan 02 and beyond
-need them.
+sqrt/abs/floor/ceil`; `lt_f32`, `le_f32`; `and_32`, `sel_32`; and the
+`_imm` variants `add/sub/mul/div/min/max/lt/le`.  The `le_f32`/`and_32`/
+`sel_32` ops were added later to support rect coverage intervalization.
+Integer arithmetic, other bitops, int compares, loads, gathers, variables,
+loops, ifs — all still make the constructor return NULL.  Added as real
+coverages force them.
 
 **`op_square_f32` specialization.**  Not in the sketch; added during review
 when `interval_mul(x, x)` slop on circle SDFs came up.  Expanded to a full

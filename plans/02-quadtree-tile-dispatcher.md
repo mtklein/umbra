@@ -224,9 +224,9 @@ different than planned, and the public API took a different shape.
 **File layout.**  Sketch: new `src/tile_cover.{h,c}` owning a
 `tile_cover_programs` type and `tile_cover_dispatch` recursion.  Landed:
 everything lives in `src/draw.c`, which already composes shader + coverage
-+ blend.  The compiled bundle is `struct umbra_draw` (opaque in the public
-header, full definition in a new `src/draw.h` for tests), the recursion
-is a static `queue_recurse` in draw.c, and there's no separate tile_cover
++ blend.  The compiled bundle is `struct umbra_draw` (fully opaque — the
+struct definition is in draw.c, no internal header), the recursion is a
+static `queue_recurse` in draw.c, and there's no separate tile_cover
 module.  Reasoning (from mid-flight discussion): draw.c is where pipeline
 composition already happens, and the recursion is ~25 lines that don't
 need their own TU.  Matches CLAUDE.md's "don't create helpers / abstractions
@@ -235,9 +235,10 @@ for one-time operations."
 **API shape.**  Sketch: a new `_tile` entry point next to `umbra_draw_build`,
 opt-in, so slides choose.  Landed: one API for everyone.
 `umbra_draw(be, shader, coverage, blend, fmt, layout)` returns a
-`struct umbra_draw*` holding the three-program bundle.  If the coverage IR
-intervalizes, the bundle gets an `interval_program`; otherwise it stays
-NULL.  `umbra_draw_queue(d, l, t, r, b, buf)` branches internally: quadtree
+`struct umbra_draw*` holding one compiled program and an optional
+`interval_program`.  If the coverage IR intervalizes, the bundle gets
+the interval_program; otherwise it stays NULL.
+`umbra_draw_queue(d, l, t, r, b, buf)` branches internally: quadtree
 when `d->coverage` is non-NULL, single flat dispatch otherwise.  Callers
 don't need to know whether their coverage is interval-expressible.  This
 emerged from a question in review and is strictly simpler for slides.
@@ -247,17 +248,11 @@ The old `umbra_draw_build` (returns `umbra_builder*`) was renamed to
 `umbra_draw()` per CLAUDE.md's convention that a type's constructor takes
 its bare name and the return type forward-declares the opaque type.
 
-**Uniforms alignment invariant.**  Not in the sketch.  Calling
-`coverage->build` twice (once for the interval IR, once inside the partial
-program build) means `self->off_` gets overwritten on the second call.  We
-rely on the partial call running *last* so `self->off_ = shader_slots`
-survives into dispatch and `coverage->fill` writes coverage uniforms where
-the partial program expects them.  The interval IR uses its own
-zero-based slot frame; `d->uniform_offset` records the delta so
-`interval_program_run` gets a correctly-shifted pointer into the shared
-uniforms buffer.  Covered by a design-notes comment block and an
-`assume()`.  Relies on shader->build being coverage-oblivious — a
-reasonable invariant but one a future shader could trip over silently.
+**Uniforms layout.**  Not in the sketch.  `umbra_draw_builder` builds
+coverage before shader, so coverage uniforms land at offset 0 in the
+buffer.  `build_coverage_interval` independently builds a coverage-only
+IR that also starts at offset 0.  Both agree without any offset
+arithmetic — `interval_program_run` reads directly from `buf[0].ptr`.
 
 **Interval pointer convention swap.**  Not in the sketch; forced by
 aligning with umbra_draw.  Plan 01 had interval.c reading uniforms from
@@ -278,13 +273,17 @@ so dropping the conversion is transparent at the IR level, and interval.c
 stays narrow — every op it accepts has principled interval semantics.
 Recorded in commits `58b3fbe4` + `fffdf0f1` so the reasoning is legible.
 
-**Interior / boundary branches.**  Sketch pseudocode ran flat if
-α ∈ [0,1].  Landed with three branches: skip if α.hi ≤ 0, dispatch
-full_coverage (shader + blend, no coverage multiply) if α.lo ≥ 1,
-dispatch partial_coverage (full pipeline) otherwise.  The "full" program
-is just `umbra_draw_build(shader, NULL, blend, ...)` — reuses the
-existing coverage=NULL path rather than a hand-derived "solid" variant.
-Answer to the sketch's open question: yes, draw.c derives it.
+**Interior / boundary branches.**  Sketch pseudocode had separate
+interior (skip coverage) and boundary (full pipeline) programs.
+Initially landed with two compiled programs: `full_coverage` (shader +
+blend, no coverage multiply) and `partial_coverage` (full pipeline).
+Later removed the `full_coverage` program after benchmarking showed the
+coverage computation (rect check, circle SDF) is cheap enough that
+skipping it in fully-inside tiles saves nothing measurable.  The
+quadtree's value is entirely in pruning empty tiles (coverage.hi <= 0),
+not in the interior/boundary split.  Now a single program handles both
+cases.  The dispatch has two stops: skip (coverage.hi <= 0) and render
+(coverage.lo >= 1 or tile is at the minimum-size floor).
 
 **Tight interval bounds at tile edges.**  Sketch pseudocode passed
 `(interval){l, r}`.  Landed `(interval){l, r-1}` since op_x yields
@@ -345,24 +344,40 @@ Per-backend MIN_TILE optima (for future tuning):
   between CPU-optimal and GPU-optimal is real and there's probably a
   principled way to derive it from backend parameters (subgroup size,
   per-dispatch latency).  Next plan.
-- Slide migrations beyond circle: only circle is on the new API.  Every
-  other slide still flat-dispatches.  TODO in draw.c.
-- New interval ops (sel_32, le_f32, gather, mask composition, integer
-  conversions) — the sketch's "Expected op additions" list.  Deferred
-  until a real slide forces each one.
 - dispatch_overlap interaction — not re-verified.  The cap (64 writes)
   could overflow on a deep enough quadtree, degrading to conservative
   barriers.  Works by construction (non-overlapping tiles) for typical
   slide sizes; revisit if it bites.
 
+### What landed later
+
+- **Slide migrations.**  All coverage slides (solid, text, persp, slug)
+  migrated to `umbra_draw()` / `umbra_draw_queue()`.  Slides without
+  coverage (anim, gradient, slides, swatch) remain on the old
+  `umbra_draw_builder` path — migrating them would compile identical
+  programs with no coverage to intervalize.
+- **Interval ops `le_f32`, `and_32`, `sel_32`** (plus `le_f32_imm`).
+  Forced by rect coverage: `sel(le(l,x) & lt(x,r) & le(t,y) & lt(y,b),
+  1, 0)`.  With these supported, solid-fill slides get quadtree dispatch
+  (3–4× speedup on CPU backends).
+- **`full_coverage` program removed.**  Benchmarking showed no
+  measurable benefit from the interior/boundary program split.
+  `struct umbra_draw` now holds one program, not two, halving
+  `umbra_draw()` compile cost.  `partial_coverage` renamed to `program`.
+- **`src/draw.h` deleted.**  `struct umbra_draw` is fully opaque — its
+  definition lives in `draw.c`.  Tests use the public API only.
+- **Coverage uniforms at offset 0.**  `umbra_draw_builder` builds
+  coverage before shader, so both the interval program and the compiled
+  program agree that coverage uniforms start at offset 0.  Eliminated
+  `uniform_offset` and the `out_slots` bookkeeping.
+
 ### LOC
 
-Plan: ~300 lines in tile_cover.c, smallish draw.c addition.  Actual:
-~170 lines added to draw.c, 17 lines src/draw.h, 26 lines added to
-the public header, ~100 lines new tests, ~145 lines bench_interval
-tool, plus ~20 lines interval.c for new ops and convention swap.
-Bigger than planned but spread thinner — no single new TU got close to
-300 lines.
+Plan: ~300 lines in tile_cover.c, smallish draw.c addition.  After
+follow-up simplifications (removing full_coverage, draw.h, uniform_offset),
+draw.c's dispatcher contribution is ~60 lines.  No internal header.
+~145 lines bench_interval tool, ~100 lines tests, ~40 lines interval.c
+for new ops.  Much smaller than planned.
 
 ### Lessons
 
@@ -396,5 +411,12 @@ Bigger than planned but spread thinner — no single new TU got close to
 6. **Slide migration is a natural forcing function for op support.**
    The plan's "add interval ops as slides hit them" guidance proved
    exactly right: circle's coverage forced `mul/min/max _f32_imm`;
-   other slides will force `sel_32`, compare ops, etc.  Plan future
+   rect coverage forced `le_f32`, `and_32`, `sel_32`.  Plan future
    work by slide migration rather than by op list.
+
+7. **Measure before assuming a fast path helps.**  The full/partial
+   program split looked like an obvious win (skip coverage math on
+   interior tiles), but benchmarking showed zero measurable benefit —
+   coverage functions are cheap relative to shader+blend work.
+   Removing the split halved compile cost and simplified the code.
+   Bench first, complexity second.
