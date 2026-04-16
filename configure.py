@@ -108,7 +108,6 @@ rule cov_show
     command = rm -rf $dir && $llvm/llvm-cov show --show-branches=count --instr-profile=$in $objects --format=html --output-dir=$dir src/ include/ 2>/dev/null && echo "Coverage report: file://$$(pwd)/$dir/index.html" > $out
 
 subninja build/host.ninja
-subninja build/lto.ninja
 subninja build/xsan.ninja
 subninja build/wasm.ninja
 subninja build/x86_64.ninja
@@ -125,7 +124,6 @@ rule configure
 build build.ninja $
       build/project.ninja $
       build/host.ninja $
-      build/lto.ninja $
       build/xsan.ninja $
       build/wasm.ninja $
       build/x86_64.ninja $
@@ -244,12 +242,6 @@ include build/project.ninja
 
 {DEMO_BLOCK}"""
 
-
-LTO_NINJA = r"""out     = $builddir/lto
-cc      = $clang -flto
-ldflags = -framework Metal -framework Foundation -L/opt/homebrew/lib -lMoltenVK -lwgpu_native
-include build/project.ninja
-"""
 
 
 WASM_NINJA = r"""out  = $builddir/wasm
@@ -375,7 +367,6 @@ FILES = {
     'build.ninja':               BUILD_NINJA,
     'build/project.ninja':       PROJECT_NINJA,
     'build/host.ninja':          HOST_NINJA,
-    'build/lto.ninja':           LTO_NINJA,
     'build/xsan.ninja':          XSAN_NINJA,
     'build/wasm.ninja':          WASM_NINJA,
     'build/x86_64.ninja':        X86_64_NINJA,
