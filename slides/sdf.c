@@ -1,8 +1,3 @@
-// SDF shape and CSG slides.  Each demonstrates an SDF primitive or combinator
-// using umbra_interval_* helpers and umbra_sdf_dispatch.
-//
-// Animation follows iv2d's convention: an orbit point rotates around a center.
-//
 // TODO: adapt iv2d's SDF text rendering as a follow-up.
 
 #include "slide.h"
@@ -10,8 +5,6 @@
 #include "../include/umbra_interval.h"
 #include <math.h>
 #include <stdlib.h>
-
-// --- Shared animation: orbit a point around a center ---
 
 struct orbit {
     float cx, cy, ox, oy, r_center, r_orbit;
@@ -27,8 +20,6 @@ static void orbit_update(struct orbit *o, float t, int w, int h) {
     o->oy = o->cy + dist * sinf(t);
 }
 
-// --- Circle SDF (reusable, separate from the circle slide) ---
-
 static umbra_interval circle_sdf(struct umbra_builder *b,
                                  umbra_interval x, umbra_interval y,
                                  umbra_interval cx, umbra_interval cy,
@@ -41,8 +32,6 @@ static umbra_interval circle_sdf(struct umbra_builder *b,
                          d  = umbra_interval_sqrt_f32(b, d2);
     return umbra_interval_sub_f32(b, d, r);
 }
-
-// --- Two-circle SDF base (shared by union/intersection/difference) ---
 
 struct two_circle_sdf {
     struct umbra_sdf base;
@@ -207,8 +196,6 @@ SLIDE(slide_sdf_difference) {
                     (float[]){0.4f, 0.2f, 0.8f, 1}, CSG_DIFFERENCE);
 }
 
-// --- Ring (shell of a circle): abs(circle) - width ---
-
 struct ring_sdf {
     struct umbra_sdf base;
     struct orbit     orbit;
@@ -250,8 +237,6 @@ SLIDE(slide_sdf_ring) {
     };
     return &st->base;
 }
-
-// --- Rounded rect: max(|x-cx|-hw, |y-cy|-hh) - r ---
 
 struct rounded_rect_sdf {
     struct umbra_sdf base;
@@ -375,8 +360,6 @@ SLIDE(slide_sdf_rounded_rect) {
     return &st->base;
 }
 
-// --- Capsule: line segment with radius ---
-
 struct capsule_sdf {
     struct umbra_sdf base;
     struct orbit     orbit;
@@ -446,8 +429,6 @@ SLIDE(slide_sdf_capsule) {
     return &st->base;
 }
 
-// --- Halfplane: nx*x + ny*y - d ---
-
 struct halfplane_sdf {
     struct umbra_sdf base;
     struct orbit     orbit;
@@ -498,7 +479,6 @@ SLIDE(slide_sdf_halfplane) {
     return &st->base;
 }
 
-// --- SDF Text: analytic distance to glyph outlines ---
 // TODO: use the actual quadratic Bezier distance (P0, P1, P2) instead of
 // the line-segment approximation (P0, P2).  The control point P1 is already
 // in the curve data at offsets k+2, k+3 — just not used yet.  The exact
@@ -704,8 +684,6 @@ SLIDE(slide_sdf_text) {
     };
     return &st->base;
 }
-
-// --- N-gon: intersection of N halfplanes (hexagon) ---
 
 #define NGON_SIDES 6
 
