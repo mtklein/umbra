@@ -234,7 +234,7 @@ TEST(interval_le_tri_valued) {
 }
 
 TEST(interval_and_sel_rect_coverage) {
-    // Mimics umbra_coverage_rect: α = sel(le(l,x) & lt(x,r), 1, 0)
+    // Mimics umbra_coverage_rect: cov = sel(le(l,x) & lt(x,r), 1, 0)
     // with uniform l=2, r=5 and x varying.
     struct umbra_builder *b = umbra_builder();
     umbra_val32 const x = umbra_x(b);
@@ -250,16 +250,16 @@ TEST(interval_and_sel_rect_coverage) {
     p != NULL here;
     float const u[] = {2.0f, 5.0f};
 
-    // x fully inside [2, 5) → α = [1, 1]
+    // x fully inside [2, 5) → cov = [1, 1]
     interval_equiv(interval_program_run(p, (interval){3, 4}, (interval){0,0}, u),
                    (interval){1, 1}) here;
-    // x fully outside (below) → α = [0, 0]
+    // x fully outside (below) → cov = [0, 0]
     interval_equiv(interval_program_run(p, (interval){0, 1}, (interval){0,0}, u),
                    (interval){0, 0}) here;
-    // x fully outside (above) → α = [0, 0]
+    // x fully outside (above) → cov = [0, 0]
     interval_equiv(interval_program_run(p, (interval){6, 8}, (interval){0,0}, u),
                    (interval){0, 0}) here;
-    // x straddles left edge → α = [0, 1]
+    // x straddles left edge → cov = [0, 1]
     interval_equiv(interval_program_run(p, (interval){1, 3}, (interval){0,0}, u),
                    (interval){0, 1}) here;
 
