@@ -240,19 +240,19 @@ void umbra_draw_fill(struct umbra_draw_layout const *layout,
 static umbra_val32 sdf_as_coverage_build_(struct umbra_coverage *s, struct umbra_builder *b,
                                           struct umbra_uniforms_layout *u,
                                           umbra_val32 x, umbra_val32 y) {
-    struct umbra_coverage_sdf_adapter *self = (struct umbra_coverage_sdf_adapter *)s;
+    struct umbra_sdf_coverage *self = (struct umbra_sdf_coverage *)s;
     umbra_val32 const f = self->sdf->build(self->sdf, b, u, x, y);
     return umbra_min_f32(b, umbra_imm_f32(b, 1.0f),
                          umbra_max_f32(b, umbra_imm_f32(b, 0.0f),
                                        umbra_sub_f32(b, umbra_imm_f32(b, 0.0f), f)));
 }
 static void sdf_as_coverage_fill_(struct umbra_coverage const *s, void *uniforms) {
-    struct umbra_coverage_sdf_adapter const *self =
-        (struct umbra_coverage_sdf_adapter const *)s;
+    struct umbra_sdf_coverage const *self =
+        (struct umbra_sdf_coverage const *)s;
     self->sdf->fill(self->sdf, uniforms);
 }
-struct umbra_coverage_sdf_adapter umbra_coverage_from_sdf(struct umbra_sdf *sdf) {
-    return (struct umbra_coverage_sdf_adapter){
+struct umbra_sdf_coverage umbra_sdf_coverage(struct umbra_sdf *sdf) {
+    return (struct umbra_sdf_coverage){
         .base = {.build = sdf_as_coverage_build_, .fill = sdf_as_coverage_fill_},
         .sdf  = sdf,
     };
@@ -287,9 +287,9 @@ struct umbra_quadtree* umbra_quadtree(struct umbra_backend *be,
                                       struct umbra_fmt fmt,
                                       struct umbra_draw_layout *layout) {
     struct interval_program *ip = build_sdf_interval(sdf);
-    if (!ip) { return NULL; }
+    assume(ip);
 
-    struct umbra_coverage_sdf_adapter adapter = umbra_coverage_from_sdf(sdf);
+    struct umbra_sdf_coverage adapter = umbra_sdf_coverage(sdf);
     struct umbra_builder *b = umbra_draw_builder(shader, &adapter.base, blend, fmt, layout);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);

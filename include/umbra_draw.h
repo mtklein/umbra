@@ -50,17 +50,18 @@ struct umbra_coverage {
     void        (*fill )(struct umbra_coverage const*, void *uniforms);
 };
 
+// Signed distance function: build returns f(x,y) where f < 0 is inside.
 struct umbra_sdf {
     umbra_val32 (*build)(struct umbra_sdf*, struct umbra_builder*,
                          struct umbra_uniforms_layout*, umbra_val32 x, umbra_val32 y);
     void        (*fill )(struct umbra_sdf const*, void *uniforms);
 };
 
-struct umbra_coverage_sdf_adapter {
+struct umbra_sdf_coverage {
     struct umbra_coverage base;
     struct umbra_sdf    *sdf;
 };
-struct umbra_coverage_sdf_adapter umbra_coverage_from_sdf(struct umbra_sdf*);
+struct umbra_sdf_coverage umbra_sdf_coverage(struct umbra_sdf*);
 
 typedef umbra_color (*umbra_blend_fn)(struct umbra_builder*, umbra_color src, umbra_color dst);
 
@@ -76,9 +77,7 @@ void umbra_draw_fill(struct umbra_draw_layout const*,
                      struct umbra_shader const*,
                      struct umbra_coverage const*);
 
-// Quadtree-dispatched draw driven by an SDF.  The SDF produces both an
-// interval_program (for tile pruning) and a coverage adapter (for the
-// compiled program).  Returns NULL if the SDF can't be intervalized.
+// Quadtree-dispatched draw driven by an SDF.
 struct umbra_quadtree* umbra_quadtree(struct umbra_backend*,
                                       struct umbra_sdf*,
                                       struct umbra_shader*,
@@ -162,6 +161,7 @@ struct umbra_coverage_rect {
     float  rect[4];
     int off_, :32;
 };
+// TODO: change rect interfaces from float[4] to float l, float t, float r, float b.
 struct umbra_coverage_rect umbra_coverage_rect(float const rect[4]);
 
 struct umbra_sdf_rect {

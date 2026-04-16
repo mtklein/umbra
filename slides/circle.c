@@ -98,7 +98,7 @@ static int circle_get_builders(struct slide *s, struct umbra_fmt fmt,
                                struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
     struct circle_slide *st = (struct circle_slide *)s;
-    struct umbra_coverage_sdf_adapter adapter = umbra_coverage_from_sdf(&st->sdf.base);
+    struct umbra_sdf_coverage adapter = umbra_sdf_coverage(&st->sdf.base);
     out[0] = umbra_draw_builder(&st->shader.base, &adapter.base,
                                 umbra_blend_srcover, fmt, NULL);
     return out[0] ? 1 : 0;

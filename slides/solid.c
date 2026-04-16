@@ -90,7 +90,7 @@ static int solid_get_builders(struct slide *s, struct umbra_fmt fmt,
     if (max < 1) { return 0; }
     struct solid_slide *st = (struct solid_slide *)s;
     if (st->has_sdf) {
-        struct umbra_coverage_sdf_adapter adapter = umbra_coverage_from_sdf(&st->sdf.base);
+        struct umbra_sdf_coverage adapter = umbra_sdf_coverage(&st->sdf.base);
         out[0] = umbra_draw_builder(&st->shader.base, &adapter.base, st->blend, fmt, NULL);
     } else {
         out[0] = umbra_draw_builder(&st->shader.base, NULL, st->blend, fmt, NULL);
