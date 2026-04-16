@@ -226,3 +226,72 @@ TEST(interval_exact_stays_exact) {
     iv_equiv(eval_exact_unary(umbra_interval_abs_f32, -7), (iv){7, 7}) here;
     iv_equiv(eval_exact_unary(umbra_interval_abs_f32, 4), (iv){4, 4}) here;
 }
+
+TEST(interval_loop) {
+    // Compute max(a[i]*x - b[i]) over i=0..2 with x as an interval.
+    // Data: a={1, -1, 0.5}, b={2, 1, 3}, stored interleaved as [a0,b0,a1,b1,a2,b2].
+    // For x=[0,4]: i=0: [0-2, 4-2]=[−2,2], i=1: [−4-1, 0-1]=[−5,−1], i=2: [0-3, 2-3]=[−3,−1]
+    // max = [−2, 2].
+
+    // Build the uniform layout first, then the program using the same slots.
+    struct umbra_uniforms_layout uni = {0};
+    int const ptr_off = umbra_uniforms_reserve_ptr(&uni);
+    int const n_off   = umbra_uniforms_reserve_f32(&uni, 1);
+    int const x_off   = umbra_uniforms_reserve_f32(&uni, 2);
+
+    struct umbra_builder *bld = umbra_builder();
+    umbra_ptr32 const u = {.ix = 0};
+    umbra_ptr32 const data = umbra_deref_ptr32(bld, u, ptr_off);
+    umbra_val32 const n    = umbra_uniform_32(bld, u, n_off);
+    umbra_interval const x = {umbra_uniform_32(bld, u, x_off),
+                              umbra_uniform_32(bld, u, x_off + 1)};
+
+    umbra_var lo_var = umbra_var_alloc(bld);
+    umbra_var hi_var = umbra_var_alloc(bld);
+    umbra_store_var(bld, lo_var, umbra_imm_f32(bld, -1e9f));
+    umbra_store_var(bld, hi_var, umbra_imm_f32(bld, -1e9f));
+
+    umbra_val32 const j = umbra_loop(bld, n); {
+        umbra_val32 const idx = umbra_mul_i32(bld, j, umbra_imm_i32(bld, 2));
+        umbra_interval const a = umbra_interval_exact(umbra_gather_32(bld, data, idx));
+        umbra_interval const b_iv = umbra_interval_exact(
+            umbra_gather_32(bld, data, umbra_add_i32(bld, idx, umbra_imm_i32(bld, 1))));
+        umbra_interval const val = umbra_interval_sub_f32(bld,
+                                       umbra_interval_mul_f32(bld, a, x), b_iv);
+        umbra_store_var(bld, lo_var, umbra_max_f32(bld, umbra_load_var(bld, lo_var), val.lo));
+        umbra_store_var(bld, hi_var, umbra_max_f32(bld, umbra_load_var(bld, hi_var), val.hi));
+    } umbra_loop_end(bld);
+
+    umbra_store_32(bld, (umbra_ptr32){.ix = 1}, umbra_load_var(bld, lo_var));
+    umbra_store_32(bld, (umbra_ptr32){.ix = 2}, umbra_load_var(bld, hi_var));
+
+    struct umbra_flat_ir *ir = umbra_flat_ir(bld);
+    umbra_builder_free(bld);
+    struct umbra_backend *be = umbra_backend_interp();
+    struct umbra_program *prog = be->compile(be, ir);
+    umbra_flat_ir_free(ir);
+
+    float ab[] = {1, 2, -1, 1, 0.5f, 3};
+    void *uniforms = umbra_uniforms_alloc(&uni);
+    umbra_uniforms_fill_ptr(uniforms, ptr_off, (struct umbra_buf){.ptr = ab, .count = 6});
+    int const count = 3;
+    umbra_uniforms_fill_i32(uniforms, n_off, &count, 1);
+    float const xvals[2] = {0.0f, 4.0f};
+    umbra_uniforms_fill_f32(uniforms, x_off, xvals, 2);
+
+    float lo_out = 0, hi_out = 0;
+    struct umbra_buf buf[] = {
+        {.ptr = uniforms, .count = uni.slots},
+        {.ptr = &lo_out,  .count = 1},
+        {.ptr = &hi_out,  .count = 1},
+    };
+    prog->queue(prog, 0, 0, 1, 1, buf);
+    be->flush(be);
+
+    equiv(lo_out, -2.0f) here;
+    equiv(hi_out,  2.0f) here;
+
+    free(uniforms);
+    prog->free(prog);
+    be->free(be);
+}
