@@ -67,11 +67,11 @@ void slides_cleanup(void) {
     count = 0;
 }
 
-static struct umbra_flat_ir *bg_bb;
-static struct umbra_program     *bg_prog;
-static struct umbra_draw_layout  bg_lay;
-static struct umbra_fmt          bg_fmt;
-static int                       bg_w, bg_h;
+static struct umbra_flat_ir    *bg_bb;
+static struct umbra_program    *bg_prog;
+static struct umbra_draw_layout bg_lay;
+static struct umbra_fmt         bg_fmt;
+static int                      bg_w, bg_h;
 
 void slide_bg_prepare(struct umbra_backend *be, struct umbra_fmt fmt, int w, int h) {
     if (bg_fmt.name != fmt.name || !bg_bb || bg_w != w || bg_h != h) {
