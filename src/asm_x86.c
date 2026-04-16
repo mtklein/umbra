@@ -34,21 +34,17 @@ void vex(Buf *b, int pp, int mm, int W, int L, int d, int v, int s, uint8_t op) 
     emit1(b, (uint8_t)(0xc0 | ((d & 7) << 3) | (s & 7)));
 }
 
-// 3-operand: op ymm/xmm d, v, s
 void vex_rrr(Buf *b, int pp, int mm, int L, uint8_t op, int d, int v, int s) {
     vex(b, pp, mm, 0, L, d, v, s, op);
 }
-// 2-operand: op ymm/xmm d, s  (vvvv unused = 0 -> encoded as 1111)
 static void vex_rr(Buf *b, int pp, int mm, int L, uint8_t op, int d, int s) {
     vex(b, pp, mm, 0, L, d, 0, s, op);
 }
-// shift-by-immediate: ModRM.reg=ext, VEX.vvvv=d(dest), ModRM.rm=s(src), +imm8
 static void vex_shift(Buf *b, int pp, int mm, int L, uint8_t op, int ext, int d, int s,
                       uint8_t imm) {
     vex(b, pp, mm, 0, L, ext, d, s, op);
     emit1(b, imm);
 }
-// VEX memory operands: [base + index*scale + disp]
 void vex_mem(Buf *b, int pp, int mm, int W, int L, int reg, int v, uint8_t op, int base,
              int index, int scale, int disp) {
     int const R = ~reg   >> 3,
@@ -86,11 +82,9 @@ int vex_rip(Buf *b, int pp, int mm, int W, int L, int reg, int v, uint8_t op) {
     return pos;
 }
 
-// Load: VMOVDQU ymm, [base+index*scale+disp]
 void vmov_load(Buf *b, int L, int reg, int base, int index, int scale, int disp) {
     vex_mem(b, 2, 1, 0, L, reg, 0, 0x6f, base, index, scale, disp);
 }
-// Store: VMOVDQU [base+index*scale+disp], ymm
 void vmov_store(Buf *b, int L, int reg, int base, int index, int scale, int disp) {
     vex_mem(b, 2, 1, 0, L, reg, 0, 0x7f, base, index, scale, disp);
 }

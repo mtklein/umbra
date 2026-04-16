@@ -56,7 +56,6 @@ uint32_t CMP_wr(int n, int m);
 
 uint32_t W(uint32_t insn);
 
-// float 4S
 uint32_t FADD_4s(int d, int n, int m);
 uint32_t FSUB_4s(int d, int n, int m);
 uint32_t FMUL_4s(int d, int n, int m);
@@ -80,7 +79,6 @@ uint32_t FCMEQ_4s(int d, int n, int m);
 uint32_t FCMGT_4s(int d, int n, int m);
 uint32_t FCMGE_4s(int d, int n, int m);
 
-// int 4S
 uint32_t ADD_4s(int d, int n, int m);
 uint32_t SUB_4s(int d, int n, int m);
 uint32_t MUL_4s(int d, int n, int m);
@@ -93,7 +91,6 @@ uint32_t CMGE_4s(int d, int n, int m);
 uint32_t CMHI_4s(int d, int n, int m);
 uint32_t CMHS_4s(int d, int n, int m);
 
-// bitwise 16B
 uint32_t AND_16b(int d, int n, int m);
 uint32_t ORR_16b(int d, int n, int m);
 uint32_t EOR_16b(int d, int n, int m);
@@ -101,7 +98,6 @@ uint32_t BSL_16b(int d, int n, int m);
 uint32_t BIT_16b(int d, int n, int m);
 uint32_t BIF_16b(int d, int n, int m);
 
-// conversions
 uint32_t FCVTN_4h(int d, int n);
 uint32_t FCVTL_4s(int d, int n);
 uint32_t XTN_4h(int d, int n);

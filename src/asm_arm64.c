@@ -179,7 +179,6 @@ uint32_t W(uint32_t insn) { return insn | 0x40000000u; }
 
 // Encoding constants for macro-generated NEON functions.
 enum {
-    // float 4S
     FADD_4s_ = 0x4e20d400u,
     FSUB_4s_ = 0x4ea0d400u,
     FMUL_4s_ = 0x6e20dc00u,
@@ -203,7 +202,6 @@ enum {
     FCMGT_4s_ = 0x6ea0e400u,
     FCMGE_4s_ = 0x6e20e400u,
 
-    // int 4S
     ADD_4s_ = 0x4ea08400u,
     SUB_4s_ = 0x6ea08400u,
     MUL_4s_ = 0x4ea09c00u,
@@ -216,7 +214,6 @@ enum {
     CMHI_4s_ = 0x6ea03400u,
     CMHS_4s_ = 0x6ea03c00u,
 
-    // bitwise 16B
     AND_16b_ = 0x4e201c00u,
     ORR_16b_ = 0x4ea01c00u,
     EOR_16b_ = 0x6e201c00u,
@@ -224,7 +221,6 @@ enum {
     BIT_16b_ = 0x6ea01c00u,
     BIF_16b_ = 0x6ee01c00u,
 
-    // conversions
     FCVTN_4h_ = 0x0e216800u,
     FCVTL_4s_ = 0x0e217800u,
     XTN_4h_ = 0x0e612800u,
