@@ -1411,9 +1411,9 @@ static umbra_interval test_circle_build_(struct umbra_sdf *s, struct umbra_build
                                          umbra_interval x, umbra_interval y) {
     struct test_circle_sdf *self = (struct test_circle_sdf *)s;
     self->off_ = umbra_uniforms_reserve_f32(u, 3);
-    umbra_interval const cx = umbra_interval_uniform(b, (umbra_ptr32){0}, self->off_),
-                         cy = umbra_interval_uniform(b, (umbra_ptr32){0}, self->off_ + 1),
-                         r  = umbra_interval_uniform(b, (umbra_ptr32){0}, self->off_ + 2);
+    umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->off_)),
+                         cy = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->off_ + 1)),
+                         r  = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->off_ + 2));
     umbra_interval const dx = umbra_interval_sub_f32(b, x, cx),
                          dy = umbra_interval_sub_f32(b, y, cy),
                          d2 = umbra_interval_add_f32(b,

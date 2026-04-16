@@ -775,10 +775,10 @@ static umbra_interval sdf_rect_build_(struct umbra_sdf *s, struct umbra_builder 
                                       umbra_interval x, umbra_interval y) {
     struct umbra_sdf_rect *self = (struct umbra_sdf_rect *)s;
     self->off_ = umbra_uniforms_reserve_f32(u, 4);
-    umbra_interval const l  = umbra_interval_uniform(b, (umbra_ptr32){0}, self->off_),
-                         t  = umbra_interval_uniform(b, (umbra_ptr32){0}, self->off_ + 1),
-                         r  = umbra_interval_uniform(b, (umbra_ptr32){0}, self->off_ + 2),
-                         bo = umbra_interval_uniform(b, (umbra_ptr32){0}, self->off_ + 3);
+    umbra_interval const l  = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->off_)),
+                         t  = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->off_ + 1)),
+                         r  = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->off_ + 2)),
+                         bo = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->off_ + 3));
     return umbra_interval_max_f32(b, umbra_interval_max_f32(b, umbra_interval_sub_f32(b, l, x),
                                                                umbra_interval_sub_f32(b, x, r)),
                                     umbra_interval_max_f32(b, umbra_interval_sub_f32(b, t, y),

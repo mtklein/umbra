@@ -5,8 +5,9 @@ typedef struct {
     umbra_val32 lo, hi;
 } umbra_interval;
 
-umbra_interval umbra_interval_exact   (struct umbra_builder*, float v);
-umbra_interval umbra_interval_uniform (struct umbra_builder*, umbra_ptr32, int slot);
+static inline umbra_interval umbra_interval_exact(umbra_val32 v) {
+    return (umbra_interval){v, v};
+}
 umbra_interval umbra_interval_add_f32 (struct umbra_builder*, umbra_interval, umbra_interval);
 umbra_interval umbra_interval_sub_f32 (struct umbra_builder*, umbra_interval, umbra_interval);
 umbra_interval umbra_interval_mul_f32 (struct umbra_builder*, umbra_interval, umbra_interval);
