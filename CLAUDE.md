@@ -66,11 +66,16 @@ pointers and const together to be for pointer-to-const:
     int const *const p = &x;   // Confusing, avoid this unless really helpful for clarity.
     int       *const p = ...;  // Avoid this especially, looks too much like int const *p.
 
-Generally keep a pointer's `*` attached to a variable name, but attach it to a
-function's return type rather than its name, and always keep the `*` attached
-to something rather than floating alone:
+Pointer `*` placement has two rules and they differ:
 
-    struct foo* foo(int *bar, int const*);
+  - Variables and parameters: `*` on the name.    `int *p`, `char const *s`
+  - Function return types:    `*` on the type.    `struct foo* foo(...)`, `char const* name(...)`
+
+Never write `struct foo *foo(` — that puts `*` on the name for a return type.
+Never write `int* p` — that puts `*` on the type for a variable.
+Never leave `*` floating alone with spaces on both sides.
+
+    struct foo* foo(int *bar, int const*);    // return type * on type, params * on name
 
 Keep headers especially tidy, with minimal #includes and only inline functions
 when absolutely necessary, e.g. when using a macro like `__LINE__`.
