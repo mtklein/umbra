@@ -1016,16 +1016,16 @@ static struct metal_backend* metal_backend_create(void) {
         be->device = (void*)retain(device);
         be->queue  = (void*)queue;
         be->uni_pool = (struct uniform_ring_pool){
-            .n         =METAL_N_FRAMES,
+            .n=METAL_N_FRAMES,
             .high_water=METAL_RING_HIGH_WATER,
-            .ctx       =be,
+            .ctx=be,
             .wait_frame=metal_wait_frame,
         };
         for (int i = 0; i < METAL_N_FRAMES; i++) {
             be->uni_pool.rings[i] = (struct uniform_ring){
-                .align     =16,
-                .ctx       =be,
-                .new_chunk =metal_ring_new_chunk,
+                .align=16,
+                .ctx=be,
+                .new_chunk=metal_ring_new_chunk,
                 .free_chunk=metal_ring_free_chunk,
             };
         }
