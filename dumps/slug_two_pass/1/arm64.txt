@@ -28,8 +28,8 @@ Critical sequence based on the simulation:
  +----> 4.    ldp	q26, q27, [x10]                   ## REGISTER dependency:  x10
  +----> 5.    fabs.4s	v26, v26                          ## REGISTER dependency:  q26
  +----> 6.    fabs.4s	v27, v27                          ## RESOURCE interference:  CyUnitV [ probability: 99% ]
- |      7.    fminnm.4s	v26, v26, v22
- |      8.    fminnm.4s	v27, v27, v23
+ |      7.    fminnm.4s	v26, v26, v6
+ |      8.    fminnm.4s	v27, v27, v7
  |      9.    ldr	x8, [x2, #16]
  |      10.   ldr	w10, [x2, #28]
  |      11.   lsl	x10, x10, #3
@@ -49,9 +49,9 @@ Critical sequence based on the simulation:
  |      25.   mov.16b	v11, v3
  +----> 26.   fcvtl	v12.4s, v28.4h                    ## RESOURCE interference:  CyUnitV [ probability: 97% ]
  |      27.   fcvtl	v13.4s, v29.4h
- |      28.   mov.16b	v14, v6
+ |      28.   mov.16b	v14, v16
  +----> 29.   fmla.4s	v14, v12, v24                     ## REGISTER dependency:  q12
- |      30.   mov.16b	v15, v7
+ |      30.   mov.16b	v15, v17
  +----> 31.   fmla.4s	v15, v13, v25                     ## RESOURCE interference:  CyUnitV [ probability: 92% ]
  |      32.   fsub.4s	v14, v14, v12
  |      33.   fsub.4s	v15, v15, v13
@@ -59,9 +59,9 @@ Critical sequence based on the simulation:
  |      35.   fmla.4s	v13, v27, v15
  +----> 36.   fcvtl	v14.4s, v30.4h                    ## RESOURCE interference:  CyUnitV [ probability: 92% ]
  +----> 37.   fcvtl	v15.4s, v31.4h                    ## RESOURCE interference:  CyUnitV [ probability: 98% ]
- |      38.   mov.16b	v30, v16
+ |      38.   mov.16b	v30, v18
  |      39.   fmla.4s	v30, v14, v24
- |      40.   mov.16b	v31, v17
+ |      40.   mov.16b	v31, v19
  |      41.   fmla.4s	v31, v15, v25
  |      42.   fsub.4s	v30, v30, v14
  |      43.   fsub.4s	v31, v31, v15
@@ -69,9 +69,9 @@ Critical sequence based on the simulation:
  |      45.   fmla.4s	v15, v27, v31
  +----> 46.   fcvtl	v30.4s, v8.4h                     ## RESOURCE interference:  CyUnitV [ probability: 98% ]
  +----> 47.   fcvtl	v31.4s, v9.4h                     ## RESOURCE interference:  CyUnitV [ probability: 100% ]
- |      48.   mov.16b	v8, v18
+ |      48.   mov.16b	v8, v20
  |      49.   fmla.4s	v8, v30, v24
- |      50.   mov.16b	v9, v19
+ |      50.   mov.16b	v9, v21
  |      51.   fmla.4s	v9, v31, v25
  |      52.   fsub.4s	v8, v8, v30
  |      53.   fsub.4s	v9, v9, v31
@@ -79,9 +79,9 @@ Critical sequence based on the simulation:
  |      55.   fmla.4s	v31, v27, v9
  +----> 56.   fcvtl	v8.4s, v10.4h                     ## RESOURCE interference:  CyUnitV [ probability: 99% ]
  +----> 57.   fcvtl	v9.4s, v11.4h                     ## RESOURCE interference:  CyUnitV [ probability: 100% ]
- +----> 58.   mov.16b	v10, v20                          ## RESOURCE interference:  CyUnitV [ probability: 95% ]
+ +----> 58.   mov.16b	v10, v22                          ## RESOURCE interference:  CyUnitV [ probability: 95% ]
  |      59.   fmla.4s	v10, v8, v24
- +----> 60.   mov.16b	v11, v21                          ## RESOURCE interference:  CyUnitV [ probability: 95% ]
+ +----> 60.   mov.16b	v11, v23                          ## RESOURCE interference:  CyUnitV [ probability: 95% ]
         61.   fmla.4s	v11, v9, v25
         62.   fsub.4s	v10, v10, v8
         63.   fsub.4s	v11, v11, v9
@@ -126,8 +126,8 @@ Instruction Info:
  2      4     0.50    *                   ldp	q26, q27, [x10]
  1      2     0.33                        fabs.4s	v26, v26
  1      2     0.33                        fabs.4s	v27, v27
- 1      3     0.33                        fminnm.4s	v26, v26, v22
- 1      3     0.33                        fminnm.4s	v27, v27, v23
+ 1      3     0.33                        fminnm.4s	v26, v26, v6
+ 1      3     0.33                        fminnm.4s	v27, v27, v7
  1      4     0.50    *                   ldr	x8, [x2, #16]
  1      4     0.50    *                   ldr	w10, [x2, #28]
  1      1     0.50                        lsl	x10, x10, #3
@@ -147,9 +147,9 @@ Instruction Info:
  1      2     0.33                        mov.16b	v11, v3
  1      2     0.33                        fcvtl	v12.4s, v28.4h
  1      2     0.33                        fcvtl	v13.4s, v29.4h
- 1      2     0.33                        mov.16b	v14, v6
+ 1      2     0.33                        mov.16b	v14, v16
  1      8     0.50                        fmla.4s	v14, v12, v24
- 1      2     0.33                        mov.16b	v15, v7
+ 1      2     0.33                        mov.16b	v15, v17
  1      8     0.50                        fmla.4s	v15, v13, v25
  1      4     0.33                        fsub.4s	v14, v14, v12
  1      4     0.33                        fsub.4s	v15, v15, v13
@@ -157,9 +157,9 @@ Instruction Info:
  1      8     0.50                        fmla.4s	v13, v27, v15
  1      2     0.33                        fcvtl	v14.4s, v30.4h
  1      2     0.33                        fcvtl	v15.4s, v31.4h
- 1      2     0.33                        mov.16b	v30, v16
+ 1      2     0.33                        mov.16b	v30, v18
  1      8     0.50                        fmla.4s	v30, v14, v24
- 1      2     0.33                        mov.16b	v31, v17
+ 1      2     0.33                        mov.16b	v31, v19
  1      8     0.50                        fmla.4s	v31, v15, v25
  1      4     0.33                        fsub.4s	v30, v30, v14
  1      4     0.33                        fsub.4s	v31, v31, v15
@@ -167,9 +167,9 @@ Instruction Info:
  1      8     0.50                        fmla.4s	v15, v27, v31
  1      2     0.33                        fcvtl	v30.4s, v8.4h
  1      2     0.33                        fcvtl	v31.4s, v9.4h
- 1      2     0.33                        mov.16b	v8, v18
+ 1      2     0.33                        mov.16b	v8, v20
  1      8     0.50                        fmla.4s	v8, v30, v24
- 1      2     0.33                        mov.16b	v9, v19
+ 1      2     0.33                        mov.16b	v9, v21
  1      8     0.50                        fmla.4s	v9, v31, v25
  1      4     0.33                        fsub.4s	v8, v8, v30
  1      4     0.33                        fsub.4s	v9, v9, v31
@@ -177,9 +177,9 @@ Instruction Info:
  1      8     0.50                        fmla.4s	v31, v27, v9
  1      2     0.33                        fcvtl	v8.4s, v10.4h
  1      2     0.33                        fcvtl	v9.4s, v11.4h
- 1      2     0.33                        mov.16b	v10, v20
+ 1      2     0.33                        mov.16b	v10, v22
  1      8     0.50                        fmla.4s	v10, v8, v24
- 1      2     0.33                        mov.16b	v11, v21
+ 1      2     0.33                        mov.16b	v11, v23
  1      8     0.50                        fmla.4s	v11, v9, v25
  1      4     0.33                        fsub.4s	v10, v10, v8
  1      4     0.33                        fsub.4s	v11, v11, v9
@@ -247,8 +247,8 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldp	q26, q27, [x10]
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.33   0.34    -      -      -      -     fabs.4s	v26, v26
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.36   0.31    -      -      -      -     fabs.4s	v27, v27
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.35   0.31    -      -      -      -     fminnm.4s	v26, v26, v22
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.33   0.35    -      -      -      -     fminnm.4s	v27, v27, v23
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.35   0.31    -      -      -      -     fminnm.4s	v26, v26, v6
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.33   0.35    -      -      -      -     fminnm.4s	v27, v27, v7
  -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldr	x8, [x2, #16]
  -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldr	w10, [x2, #28]
  -      -      -      -      -      -      -     0.03   0.97    -      -     0.97   0.03    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #3
@@ -268,9 +268,9 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.34   0.33    -      -      -      -     mov.16b	v11, v3
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.34   0.33    -      -      -      -     fcvtl	v12.4s, v28.4h
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.34   0.33    -      -      -      -     fcvtl	v13.4s, v29.4h
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.30   0.37    -      -      -      -     mov.16b	v14, v6
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.30   0.37    -      -      -      -     mov.16b	v14, v16
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.34   0.34    -      -      -     1.00   fmla.4s	v14, v12, v24
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.35   0.31    -      -      -      -     mov.16b	v15, v7
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.35   0.31    -      -      -      -     mov.16b	v15, v17
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.35   0.32    -      -     0.99   0.01   fmla.4s	v15, v13, v25
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.31   0.36    -      -      -      -     fsub.4s	v14, v14, v12
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.33   0.33    -      -      -      -     fsub.4s	v15, v15, v13
@@ -278,9 +278,9 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.32   0.35    -      -     0.99   0.01   fmla.4s	v13, v27, v15
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.36   0.32    -      -      -      -     fcvtl	v14.4s, v30.4h
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.33   0.32    -      -      -      -     fcvtl	v15.4s, v31.4h
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.35   0.31    -      -      -      -     mov.16b	v30, v16
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.35   0.31    -      -      -      -     mov.16b	v30, v18
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.33   0.34    -      -     0.01   0.99   fmla.4s	v30, v14, v24
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.35   0.31    -      -      -      -     mov.16b	v31, v17
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.35   0.31    -      -      -      -     mov.16b	v31, v19
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.34   0.31    -      -     1.00    -     fmla.4s	v31, v15, v25
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.35   0.31    -      -      -      -     fsub.4s	v30, v30, v14
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.32   0.34    -      -      -      -     fsub.4s	v31, v31, v15
@@ -288,9 +288,9 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.31   0.34   0.35    -      -     1.00    -     fmla.4s	v15, v27, v31
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.33   0.34    -      -      -      -     fcvtl	v30.4s, v8.4h
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.32   0.36    -      -      -      -     fcvtl	v31.4s, v9.4h
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.35   0.31    -      -      -      -     mov.16b	v8, v18
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.35   0.31    -      -      -      -     mov.16b	v8, v20
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.34   0.32    -      -      -     1.00   fmla.4s	v8, v30, v24
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.35   0.31    -      -      -      -     mov.16b	v9, v19
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.35   0.31    -      -      -      -     mov.16b	v9, v21
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.33   0.33    -      -     1.00    -     fmla.4s	v9, v31, v25
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.36   0.32    -      -      -      -     fsub.4s	v8, v8, v30
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.34   0.31    -      -      -      -     fsub.4s	v9, v9, v31
@@ -298,9 +298,9 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.33   0.34    -      -     1.00    -     fmla.4s	v31, v27, v9
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.32   0.34    -      -      -      -     fcvtl	v8.4s, v10.4h
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.32   0.36    -      -      -      -     fcvtl	v9.4s, v11.4h
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.34   0.33    -      -      -      -     mov.16b	v10, v20
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.34   0.33    -      -      -      -     mov.16b	v10, v22
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.33   0.35    -      -      -     1.00   fmla.4s	v10, v8, v24
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.36   0.32    -      -      -      -     mov.16b	v11, v21
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.36   0.32    -      -      -      -     mov.16b	v11, v23
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.34   0.31    -      -     1.00    -     fmla.4s	v11, v9, v25
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.35   0.31    -      -      -      -     fsub.4s	v10, v10, v8
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.32   0.35    -      -      -      -     fsub.4s	v11, v11, v9

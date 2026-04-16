@@ -6,8 +6,6 @@
 struct umbra_draw {
     struct umbra_program    *program;
     struct interval_program *coverage;
-    int                      uniform_offset;
-    int                      pad_;
 };
 #include <math.h>
 #include <stdint.h>
@@ -179,6 +177,11 @@ struct umbra_builder* umbra_draw_builder(struct umbra_shader *shader,
 
     struct umbra_uniforms_layout uni = {0};
 
+    umbra_val32 cov = {0};
+    if (coverage) {
+        cov = coverage->build(coverage, builder, &uni, xf, yf);
+    }
+
     umbra_color src = {
         umbra_imm_f32(builder, 0.0f),
         umbra_imm_f32(builder, 0.0f),
@@ -187,11 +190,6 @@ struct umbra_builder* umbra_draw_builder(struct umbra_shader *shader,
     };
     if (shader) {
         src = shader->build(shader, builder, &uni, xf, yf);
-    }
-
-    umbra_val32 cov = {0};
-    if (coverage) {
-        cov = coverage->build(coverage, builder, &uni, xf, yf);
     }
 
     umbra_color dst = {
@@ -243,8 +241,7 @@ void umbra_draw_fill(struct umbra_draw_layout const *layout,
     if (coverage) { coverage->fill(coverage, layout->uniforms); }
 }
 
-static struct interval_program* build_coverage_interval(struct umbra_coverage *coverage,
-                                                        int *out_slots) {
+static struct interval_program* build_coverage_interval(struct umbra_coverage *coverage) {
     struct umbra_builder *b = umbra_builder();
     umbra_val32 const x = umbra_x(b),
                       y = umbra_y(b);
@@ -258,7 +255,6 @@ static struct interval_program* build_coverage_interval(struct umbra_coverage *c
     struct interval_program *p = interval_program(ir);
     umbra_flat_ir_free(ir);
 
-    *out_slots = uni.slots;
     return p;
 }
 
@@ -267,10 +263,9 @@ struct umbra_draw* umbra_draw(struct umbra_backend *be,
                               umbra_blend_fn blend, struct umbra_fmt fmt,
                               struct umbra_draw_layout *layout) {
     struct umbra_draw *d = calloc(1, sizeof *d);
-    int coverage_slots = 0;
 
     if (coverage) {
-        d->coverage = build_coverage_interval(coverage, &coverage_slots);
+        d->coverage = build_coverage_interval(coverage);
     }
 
     struct umbra_builder *b = umbra_draw_builder(shader, coverage, blend, fmt, layout);
@@ -278,9 +273,6 @@ struct umbra_draw* umbra_draw(struct umbra_backend *be,
     umbra_builder_free(b);
     d->program = be->compile(be, ir);
     umbra_flat_ir_free(ir);
-
-    assume(layout->uni.slots >= coverage_slots);
-    d->uniform_offset = layout->uni.slots - coverage_slots;
 
     return d;
 }
@@ -346,8 +338,7 @@ void umbra_draw_queue(struct umbra_draw const *d,
         d->program->queue(d->program, l, t, r, b, buf);
         return;
     }
-    float const *uniform = (float const *)buf[0].ptr + d->uniform_offset;
-    queue_recurse(d, l, t, r, b, buf, uniform);
+    queue_recurse(d, l, t, r, b, buf, buf[0].ptr);
 }
 
 _Bool umbra_draw_has_interval_coverage(struct umbra_draw const *d) {
