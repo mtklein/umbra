@@ -1350,7 +1350,7 @@ TEST(test_srcover_fp16_planar) {
     cleanup_draw(&B);
 }
 
-TEST(test_quadtree_sdf_rect) {
+TEST(test_sdf_dispatch_rect) {
     struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 1});
     struct umbra_sdf_rect     sdf   = umbra_sdf_rect((float[]){1.0f, 1.0f, 7.0f, 3.0f});
 
@@ -1364,19 +1364,19 @@ TEST(test_quadtree_sdf_rect) {
         if (!bes[bi]) { continue; }
 
         struct umbra_draw_layout lay;
-        struct umbra_quadtree *qt = umbra_quadtree(bes[bi], &sdf.base,
-                                                   (struct umbra_quadtree_config){.hard_edge = 1},
+        struct umbra_sdf_dispatch *qt = umbra_sdf_dispatch(bes[bi], &sdf.base,
+                                                   (struct umbra_sdf_dispatch_config){.hard_edge = 1},
                                                    &shader.base, umbra_blend_srcover,
                                                    umbra_fmt_8888, &lay);
         qt != NULL here;
-        umbra_quadtree_fill(&lay, &sdf.base, &shader.base);
+        umbra_sdf_dispatch_fill(&lay, &sdf.base, &shader.base);
         uint32_t dst[8 * 4];
         __builtin_memset(dst, 0, sizeof dst);
         struct umbra_buf buf[] = {
             {.ptr = lay.uniforms, .count = lay.uni.slots},
             {.ptr = dst,          .count = 8 * 4, .stride = 8},
         };
-        umbra_quadtree_queue(qt, 0, 0, 8, 4, buf);
+        umbra_sdf_dispatch_queue(qt, 0, 0, 8, 4, buf);
         bes[bi]->flush(bes[bi]);
 
         for (int y = 0; y < 4; y++) {
@@ -1392,7 +1392,7 @@ TEST(test_quadtree_sdf_rect) {
             }
         }
 
-        umbra_quadtree_free(qt);
+        umbra_sdf_dispatch_free(qt);
         free(lay.uniforms);
     }
 

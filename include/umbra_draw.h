@@ -78,24 +78,24 @@ void umbra_draw_fill(struct umbra_draw_layout const*,
                      struct umbra_shader const*,
                      struct umbra_coverage const*);
 
-struct umbra_quadtree_config {
+struct umbra_sdf_dispatch_config {
     _Bool hard_edge;
 };
 
-// Quadtree-dispatched draw driven by an SDF.
-struct umbra_quadtree* umbra_quadtree(struct umbra_backend*,
+// SDF-driven draw with interval-based tile dispatch.
+struct umbra_sdf_dispatch* umbra_sdf_dispatch(struct umbra_backend*,
                                       struct umbra_sdf*,
-                                      struct umbra_quadtree_config,
+                                      struct umbra_sdf_dispatch_config,
                                       struct umbra_shader*,
                                       umbra_blend_fn,
                                       struct umbra_fmt,
                                       struct umbra_draw_layout*);
-void umbra_quadtree_queue(struct umbra_quadtree const*,
+void umbra_sdf_dispatch_queue(struct umbra_sdf_dispatch const*,
                           int l, int t, int r, int b, struct umbra_buf[]);
-void umbra_quadtree_fill(struct umbra_draw_layout const*,
+void umbra_sdf_dispatch_fill(struct umbra_draw_layout const*,
                          struct umbra_sdf const*,
                          struct umbra_shader const*);
-void umbra_quadtree_free(struct umbra_quadtree*);
+void umbra_sdf_dispatch_free(struct umbra_sdf_dispatch*);
 
 
 struct umbra_shader_solid {

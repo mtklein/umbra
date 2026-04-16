@@ -284,14 +284,14 @@ static struct interval_program* build_sdf_interval(struct umbra_sdf *sdf) {
     return p;
 }
 
-struct umbra_quadtree {
+struct umbra_sdf_dispatch {
     struct umbra_program    *program;
     struct interval_program *interval;
 };
 
-struct umbra_quadtree* umbra_quadtree(struct umbra_backend *be,
+struct umbra_sdf_dispatch* umbra_sdf_dispatch(struct umbra_backend *be,
                                       struct umbra_sdf *sdf,
-                                      struct umbra_quadtree_config cfg,
+                                      struct umbra_sdf_dispatch_config cfg,
                                       struct umbra_shader *shader,
                                       umbra_blend_fn blend,
                                       struct umbra_fmt fmt,
@@ -306,7 +306,7 @@ struct umbra_quadtree* umbra_quadtree(struct umbra_backend *be,
     struct umbra_program *prog = be->compile(be, ir);
     umbra_flat_ir_free(ir);
 
-    struct umbra_quadtree *qt = calloc(1, sizeof *qt);
+    struct umbra_sdf_dispatch *qt = calloc(1, sizeof *qt);
     qt->program  = prog;
     qt->interval = ip;
     return qt;
@@ -316,7 +316,7 @@ struct umbra_quadtree* umbra_quadtree(struct umbra_backend *be,
 // compromise.  CPU-optimal is ~16-32, GPU-optimal is ~512-1024.
 enum { QUEUE_MIN_TILE = 512 };
 
-static void quadtree_recurse(struct umbra_quadtree const *qt,
+static void dispatch_recurse(struct umbra_sdf_dispatch const *qt,
                         int l, int t, int r, int b,
                         struct umbra_buf buf[], float const *uniform) {
     assume(l < r && t < b);
@@ -332,26 +332,26 @@ static void quadtree_recurse(struct umbra_quadtree const *qt,
         }
         int const mx = (l + r) / 2,
                   my = (t + b) / 2;
-        quadtree_recurse(qt, l,  t,  mx, my, buf, uniform);
-        quadtree_recurse(qt, mx, t,  r,  my, buf, uniform);
-        quadtree_recurse(qt, l,  my, mx, b,  buf, uniform);
-        quadtree_recurse(qt, mx, my, r,  b,  buf, uniform);
+        dispatch_recurse(qt, l,  t,  mx, my, buf, uniform);
+        dispatch_recurse(qt, mx, t,  r,  my, buf, uniform);
+        dispatch_recurse(qt, l,  my, mx, b,  buf, uniform);
+        dispatch_recurse(qt, mx, my, r,  b,  buf, uniform);
     }
 }
 
-void umbra_quadtree_queue(struct umbra_quadtree const *qt,
+void umbra_sdf_dispatch_queue(struct umbra_sdf_dispatch const *qt,
                           int l, int t, int r, int b, struct umbra_buf buf[]) {
-    quadtree_recurse(qt, l, t, r, b, buf, buf[0].ptr);
+    dispatch_recurse(qt, l, t, r, b, buf, buf[0].ptr);
 }
 
-void umbra_quadtree_fill(struct umbra_draw_layout const *layout,
+void umbra_sdf_dispatch_fill(struct umbra_draw_layout const *layout,
                          struct umbra_sdf const *sdf,
                          struct umbra_shader const *shader) {
     if (sdf)    { sdf->fill(sdf, layout->uniforms); }
     if (shader) { shader->fill(shader, layout->uniforms); }
 }
 
-void umbra_quadtree_free(struct umbra_quadtree *qt) {
+void umbra_sdf_dispatch_free(struct umbra_sdf_dispatch *qt) {
     if (qt) {
         qt->program->free(qt->program);
         interval_program_free(qt->interval);

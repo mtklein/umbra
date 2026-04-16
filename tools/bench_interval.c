@@ -1,4 +1,4 @@
-// Micro-benchmark for interval_program_run.  Plan 02's quadtree dispatcher
+// Micro-benchmark for interval_program_run.  Plan 02's tile dispatcher
 // calls this once per tile on the descent, so its per-call cost (and per-op
 // cost) sets the floor on how fine-grained we can subdivide before the
 // overhead eats the savings.  Target per the plan: ~200 ns / call on a ~14-op
@@ -10,7 +10,7 @@
 //
 //   - "far":   large intervals that straddle the circle entirely
 //   - "edge":  medium intervals at the boundary (the common case during
-//              quadtree descent)
+//              tile descent)
 //   - "tiny":  leaf-sized intervals (near-point evaluation — the dispatcher's
 //              min_tile regime)
 

@@ -16,7 +16,7 @@ struct solid_slide {
 
     struct umbra_fmt          fmt;
     struct umbra_draw_layout lay;
-    struct umbra_quadtree   *qt;
+    struct umbra_sdf_dispatch   *qt;
     struct umbra_program    *prog;
 };
 
@@ -42,13 +42,13 @@ static float bounce(float p0, float v, int frame, float range) {
 static void solid_prepare(struct slide *s, struct umbra_backend *be,
                           struct umbra_fmt fmt) {
     struct solid_slide *st = (struct solid_slide *)s;
-    umbra_quadtree_free(st->qt);  st->qt   = NULL;
+    umbra_sdf_dispatch_free(st->qt);  st->qt   = NULL;
     if (st->prog) { st->prog->free(st->prog); st->prog = NULL; }
     free(st->lay.uniforms);
     st->fmt = fmt;
     if (st->has_sdf) {
-        st->qt = umbra_quadtree(be, &st->sdf.base,
-                                (struct umbra_quadtree_config){.hard_edge = 1},
+        st->qt = umbra_sdf_dispatch(be, &st->sdf.base,
+                                (struct umbra_sdf_dispatch_config){.hard_edge = 1},
                                 &st->shader.base, st->blend, fmt, &st->lay);
     } else {
         struct umbra_builder *b = umbra_draw_builder(&st->shader.base, NULL,
@@ -71,7 +71,7 @@ static void solid_draw(struct slide *s, int frame, int l, int t, int r, int b, v
         st->sdf.rect[1] = ry;
         st->sdf.rect[2] = rx + st->rect_w;
         st->sdf.rect[3] = ry + st->rect_h;
-        umbra_quadtree_fill(&st->lay, &st->sdf.base, &st->shader.base);
+        umbra_sdf_dispatch_fill(&st->lay, &st->sdf.base, &st->shader.base);
     } else {
         umbra_draw_fill(&st->lay, &st->shader.base, NULL);
     }
@@ -80,7 +80,7 @@ static void solid_draw(struct slide *s, int frame, int l, int t, int r, int b, v
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
     };
     if (st->qt) {
-        umbra_quadtree_queue(st->qt, l, t, r, b, ubuf);
+        umbra_sdf_dispatch_queue(st->qt, l, t, r, b, ubuf);
     } else {
         st->prog->queue(st->prog, l, t, r, b, ubuf);
     }
@@ -101,7 +101,7 @@ static int solid_get_builders(struct slide *s, struct umbra_fmt fmt,
 
 static void solid_free(struct slide *s) {
     struct solid_slide *st = (struct solid_slide *)s;
-    umbra_quadtree_free(st->qt);
+    umbra_sdf_dispatch_free(st->qt);
     if (st->prog) { st->prog->free(st->prog); }
     free(st->lay.uniforms);
     free(st);
