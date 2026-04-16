@@ -281,6 +281,7 @@ int main(void) {
 
     // Tile grids: cover a 1024x480 area with tiles of decreasing size.
     struct { int xt, yt; float tile_w, tile_h; } grids[] = {
+        {  1,   1, 1024, 480},
         {  2,   2, 512, 240},
         {  4,   4, 256, 120},
         {  8,   8, 128,  60},
