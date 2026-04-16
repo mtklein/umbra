@@ -1,7 +1,6 @@
 #include "../include/umbra_draw.h"
 #include "assume.h"
 #include "flat_ir.h"
-#include "interval.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -266,96 +265,131 @@ struct umbra_sdf_coverage umbra_sdf_coverage(struct umbra_sdf *sdf, _Bool hard_e
     };
 }
 
-static struct interval_program* build_sdf_interval(struct umbra_sdf *sdf) {
-    struct umbra_builder *b = umbra_builder();
-    umbra_val32 const half = umbra_imm_f32(b, 0.5f);
-    umbra_val32 const x = umbra_add_f32(b, umbra_x(b), half),
-                      y = umbra_add_f32(b, umbra_y(b), half);
-
-    struct umbra_uniforms_layout uni = {0};
-    umbra_val32 const f = sdf->build(sdf, b, &uni, x, y);
-    umbra_store_32(b, (umbra_ptr32){.ix = 1}, f);
-
-    struct umbra_flat_ir *ir = umbra_flat_ir(b);
-    umbra_builder_free(b);
-    struct interval_program *p = interval_program(ir);
-    umbra_flat_ir_free(ir);
-
-    return p;
-}
-
 struct umbra_sdf_dispatch {
-    struct umbra_program    *program;
-    struct interval_program *interval;
+    struct umbra_program *draw;
+    struct umbra_program *bounds;
+    struct umbra_backend *bounds_be;
+    int                   grid_slot;
+    int                   draw_slots;
 };
-
-struct umbra_sdf_dispatch* umbra_sdf_dispatch(struct umbra_backend *be,
-                                      struct umbra_sdf *sdf,
-                                      struct umbra_sdf_dispatch_config cfg,
-                                      struct umbra_shader *shader,
-                                      umbra_blend_fn blend,
-                                      struct umbra_fmt fmt,
-                                      struct umbra_draw_layout *layout) {
-    struct interval_program *ip = build_sdf_interval(sdf);
-    assume(ip);
-
-    struct umbra_sdf_coverage adapter = umbra_sdf_coverage(sdf, cfg.hard_edge);
-    struct umbra_builder *b = umbra_draw_builder(shader, &adapter.base, blend, fmt, layout);
-    struct umbra_flat_ir *ir = umbra_flat_ir(b);
-    umbra_builder_free(b);
-    struct umbra_program *prog = be->compile(be, ir);
-    umbra_flat_ir_free(ir);
-
-    struct umbra_sdf_dispatch *qt = calloc(1, sizeof *qt);
-    qt->program  = prog;
-    qt->interval = ip;
-    return qt;
-}
 
 // TODO: query per-backend dispatch_granularity instead of this one global
 // compromise.  CPU-optimal is ~16-32, GPU-optimal is ~512-1024.
 enum { QUEUE_MIN_TILE = 512 };
 
-static void dispatch_recurse(struct umbra_sdf_dispatch const *qt,
-                        int l, int t, int r, int b,
-                        struct umbra_buf buf[], float const *uniform) {
-    assume(l < r && t < b);
+struct umbra_sdf_dispatch* umbra_sdf_dispatch(struct umbra_backend *be,
+                                              struct umbra_sdf *sdf,
+                                              struct umbra_sdf_dispatch_config cfg,
+                                              struct umbra_shader *shader,
+                                              umbra_blend_fn blend,
+                                              struct umbra_fmt fmt,
+                                              struct umbra_draw_layout *layout) {
+    // Build the draw program (shader + SDF coverage + blend).
+    struct umbra_sdf_coverage adapter = umbra_sdf_coverage(sdf, cfg.hard_edge);
+    struct umbra_builder *db = umbra_draw_builder(shader, &adapter.base, blend, fmt, layout);
+    struct umbra_flat_ir *dir = umbra_flat_ir(db);
+    umbra_builder_free(db);
+    struct umbra_program *draw = be->compile(be, dir);
+    umbra_flat_ir_free(dir);
 
-    interval const sdf = interval_program_run(qt->interval,
-                                              (interval){(float)l, (float)(r - 1)},
-                                              (interval){(float)t, (float)(b - 1)},
-                                              uniform);
-    if (sdf.lo < 0) {
-        if (sdf.hi <= -1 || (r-l <= QUEUE_MIN_TILE && b-t <= QUEUE_MIN_TILE)) {
-            qt->program->queue(qt->program, l, t, r, b, buf);
-            return;
-        }
-        int const mx = (l + r) / 2,
-                  my = (t + b) / 2;
-        dispatch_recurse(qt, l,  t,  mx, my, buf, uniform);
-        dispatch_recurse(qt, mx, t,  r,  my, buf, uniform);
-        dispatch_recurse(qt, l,  my, mx, b,  buf, uniform);
-        dispatch_recurse(qt, mx, my, r,  b,  buf, uniform);
-    }
+    // Build the bounds program using sdf->ibuild.
+    // x() and y() are tile indices.  SDF uniforms at offset 0 (matching the
+    // draw program), then base_x, base_y, tile_w, tile_h appended after
+    // all draw uniforms.
+    int const grid_slot = layout->uni.slots;
+
+    struct umbra_builder *bb = umbra_builder();
+    umbra_ptr32 const u = {.ix = 0};
+
+    // ibuild reserves the SDF's uniforms at offset 0.
+    struct umbra_uniforms_layout buni = {0};
+    umbra_val32 const base_x = umbra_uniform_32(bb, u, grid_slot),
+                      base_y = umbra_uniform_32(bb, u, grid_slot + 1),
+                      tile_w = umbra_uniform_32(bb, u, grid_slot + 2),
+                      tile_h = umbra_uniform_32(bb, u, grid_slot + 3);
+    umbra_val32 const xf = umbra_f32_from_i32(bb, umbra_x(bb)),
+                      yf = umbra_f32_from_i32(bb, umbra_y(bb));
+    umbra_interval const x = {umbra_add_f32(bb, base_x, umbra_mul_f32(bb, xf, tile_w)),
+                              umbra_add_f32(bb, base_x,
+                                  umbra_mul_f32(bb, umbra_add_f32(bb, xf,
+                                      umbra_imm_f32(bb, 1.0f)), tile_w))},
+                         y = {umbra_add_f32(bb, base_y, umbra_mul_f32(bb, yf, tile_h)),
+                              umbra_add_f32(bb, base_y,
+                                  umbra_mul_f32(bb, umbra_add_f32(bb, yf,
+                                      umbra_imm_f32(bb, 1.0f)), tile_h))};
+
+    umbra_interval const f = sdf->ibuild(sdf, bb, &buni, x, y);
+
+    umbra_store_32(bb, (umbra_ptr32){.ix = 1}, f.lo);
+
+    struct umbra_flat_ir *bir = umbra_flat_ir(bb);
+    umbra_builder_free(bb);
+    struct umbra_backend *bounds_be = umbra_backend_jit();
+    if (!bounds_be) { bounds_be = umbra_backend_interp(); }
+    struct umbra_program *bounds = bounds_be->compile(bounds_be, bir);
+    umbra_flat_ir_free(bir);
+
+    struct umbra_sdf_dispatch *d = calloc(1, sizeof *d);
+    d->draw       = draw;
+    d->bounds     = bounds;
+    d->bounds_be  = bounds_be;
+    d->grid_slot  = grid_slot;
+    d->draw_slots = layout->uni.slots;
+    return d;
 }
 
-void umbra_sdf_dispatch_queue(struct umbra_sdf_dispatch const *qt,
-                          int l, int t, int r, int b, struct umbra_buf buf[]) {
-    dispatch_recurse(qt, l, t, r, b, buf, buf[0].ptr);
+void umbra_sdf_dispatch_queue(struct umbra_sdf_dispatch const *d,
+                              int l, int t, int r, int b, struct umbra_buf buf[]) {
+    int const w  = r - l,
+              h  = b - t,
+              xt = (w + QUEUE_MIN_TILE - 1) / QUEUE_MIN_TILE,
+              yt = (h + QUEUE_MIN_TILE - 1) / QUEUE_MIN_TILE;
+    int const tiles = xt * yt;
+
+    int const bounds_slots = d->grid_slot + 4;
+    float *bounds_uni = malloc((size_t)bounds_slots * sizeof(float));
+    __builtin_memcpy(bounds_uni, buf[0].ptr, (size_t)d->draw_slots * sizeof(float));
+    bounds_uni[d->grid_slot]     = (float)l;
+    bounds_uni[d->grid_slot + 1] = (float)t;
+    bounds_uni[d->grid_slot + 2] = (float)QUEUE_MIN_TILE;
+    bounds_uni[d->grid_slot + 3] = (float)QUEUE_MIN_TILE;
+
+    float *lo = calloc((size_t)tiles, sizeof(float));
+    struct umbra_buf bounds_buf[] = {
+        {.ptr = bounds_uni, .count = bounds_slots},
+        {.ptr = lo,         .count = tiles, .stride = xt},
+    };
+    d->bounds->queue(d->bounds, 0, 0, xt, yt, bounds_buf);
+
+    for (int ty = 0; ty < yt; ty++) {
+        for (int tx = 0; tx < xt; tx++) {
+            if (lo[ty * xt + tx] < 0) {
+                int const tl = l + tx * QUEUE_MIN_TILE,
+                          tt = t + ty * QUEUE_MIN_TILE,
+                          tr = tl + QUEUE_MIN_TILE < r ? tl + QUEUE_MIN_TILE : r,
+                          tb = tt + QUEUE_MIN_TILE < b ? tt + QUEUE_MIN_TILE : b;
+                d->draw->queue(d->draw, tl, tt, tr, tb, buf);
+            }
+        }
+    }
+
+    free(lo);
+    free(bounds_uni);
 }
 
 void umbra_sdf_dispatch_fill(struct umbra_draw_layout const *layout,
-                         struct umbra_sdf const *sdf,
-                         struct umbra_shader const *shader) {
+                             struct umbra_sdf const *sdf,
+                             struct umbra_shader const *shader) {
     if (sdf)    { sdf->fill(sdf, layout->uniforms); }
     if (shader) { shader->fill(shader, layout->uniforms); }
 }
 
-void umbra_sdf_dispatch_free(struct umbra_sdf_dispatch *qt) {
-    if (qt) {
-        qt->program->free(qt->program);
-        interval_program_free(qt->interval);
-        free(qt);
+void umbra_sdf_dispatch_free(struct umbra_sdf_dispatch *d) {
+    if (d) {
+        d->draw->free(d->draw);
+        d->bounds->free(d->bounds);
+        d->bounds_be->free(d->bounds_be);
+        free(d);
     }
 }
 

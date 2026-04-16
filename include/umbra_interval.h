@@ -46,6 +46,12 @@ static inline umbra_interval umbra_interval_sqrt_f32(struct umbra_builder *b,
 
 static inline umbra_interval umbra_interval_mul_f32(struct umbra_builder *b,
                                                     umbra_interval a, umbra_interval c) {
+    if (a.lo.id == c.lo.id && a.hi.id == c.hi.id) {
+        umbra_val32 const ll = umbra_mul_f32(b, a.lo, a.lo),
+                          hh = umbra_mul_f32(b, a.hi, a.hi);
+        return (umbra_interval){umbra_imm_f32(b, 0.0f),
+                                umbra_max_f32(b, ll, hh)};
+    }
     umbra_val32 const ll = umbra_mul_f32(b, a.lo, c.lo),
                       lh = umbra_mul_f32(b, a.lo, c.hi),
                       hl = umbra_mul_f32(b, a.hi, c.lo),
