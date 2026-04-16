@@ -52,13 +52,11 @@ struct umbra_coverage {
 };
 
 // Signed distance function: build returns f(x,y) where f < 0 is inside.
-// ibuild returns the interval bound of f over [x.lo,x.hi] x [y.lo,y.hi].
+// For point evaluation, pass exact intervals (lo == hi).
 struct umbra_sdf {
-    umbra_val32    (*build )(struct umbra_sdf*, struct umbra_builder*,
-                             struct umbra_uniforms_layout*, umbra_val32 x, umbra_val32 y);
-    umbra_interval (*ibuild)(struct umbra_sdf*, struct umbra_builder*,
-                             struct umbra_uniforms_layout*, umbra_interval x, umbra_interval y);
-    void           (*fill  )(struct umbra_sdf const*, void *uniforms);
+    umbra_interval (*build)(struct umbra_sdf*, struct umbra_builder*,
+                            struct umbra_uniforms_layout*, umbra_interval x, umbra_interval y);
+    void           (*fill )(struct umbra_sdf const*, void *uniforms);
 };
 
 struct umbra_sdf_coverage {

@@ -241,9 +241,11 @@ static umbra_val32 sdf_as_coverage_build_(struct umbra_coverage *s, struct umbra
                                           umbra_val32 x, umbra_val32 y) {
     struct umbra_sdf_coverage *self = (struct umbra_sdf_coverage *)s;
     umbra_val32 const half = umbra_imm_f32(b, 0.5f);
+    umbra_val32 const xc = umbra_add_f32(b, x, half),
+                      yc = umbra_add_f32(b, y, half);
     umbra_val32 const f = self->sdf->build(self->sdf, b, u,
-                                           umbra_add_f32(b, x, half),
-                                           umbra_add_f32(b, y, half));
+                                           (umbra_interval){xc, xc},
+                                           (umbra_interval){yc, yc}).lo;
     if (self->hard_edge) {
         return umbra_sel_32(b, umbra_lt_f32(b, f, umbra_imm_f32(b, 0.0f)),
                             umbra_imm_f32(b, 1.0f), umbra_imm_f32(b, 0.0f));
@@ -292,7 +294,7 @@ struct umbra_sdf_dispatch* umbra_sdf_dispatch(struct umbra_backend *be,
     struct umbra_program *draw = be->compile(be, dir);
     umbra_flat_ir_free(dir);
 
-    // Build the bounds program using sdf->ibuild.
+    // Build the bounds program using sdf->build with tile-extent intervals.
     // x() and y() are tile indices.  SDF uniforms at offset 0 (matching the
     // draw program), then base_x, base_y, tile_w, tile_h appended after
     // all draw uniforms.
@@ -301,7 +303,7 @@ struct umbra_sdf_dispatch* umbra_sdf_dispatch(struct umbra_backend *be,
     struct umbra_builder *bb = umbra_builder();
     umbra_ptr32 const u = {.ix = 0};
 
-    // ibuild reserves the SDF's uniforms at offset 0.
+    // sdf->build reserves the SDF's uniforms at offset 0.
     struct umbra_uniforms_layout buni = {0};
     umbra_val32 const base_x = umbra_uniform_32(bb, u, grid_slot),
                       base_y = umbra_uniform_32(bb, u, grid_slot + 1),
@@ -318,7 +320,7 @@ struct umbra_sdf_dispatch* umbra_sdf_dispatch(struct umbra_backend *be,
                                   umbra_mul_f32(bb, umbra_add_f32(bb, yf,
                                       umbra_imm_f32(bb, 1.0f)), tile_h))};
 
-    umbra_interval const f = sdf->ibuild(sdf, bb, &buni, x, y);
+    umbra_interval const f = sdf->build(sdf, bb, &buni, x, y);
 
     umbra_store_32(bb, (umbra_ptr32){.ix = 1}, f.lo);
 
@@ -768,23 +770,9 @@ struct umbra_coverage_rect umbra_coverage_rect(float const rect[4]) {
     return c;
 }
 
-static umbra_val32 sdf_rect_build_(struct umbra_sdf *s, struct umbra_builder *b,
-                                   struct umbra_uniforms_layout *u,
-                                   umbra_val32 x, umbra_val32 y) {
-    struct umbra_sdf_rect *self = (struct umbra_sdf_rect *)s;
-    self->off_ = umbra_uniforms_reserve_f32(u, 4);
-    umbra_val32 const l = umbra_uniform_32(b, (umbra_ptr32){0}, self->off_);
-    umbra_val32 const t = umbra_uniform_32(b, (umbra_ptr32){0}, self->off_ + 1);
-    umbra_val32 const r = umbra_uniform_32(b, (umbra_ptr32){0}, self->off_ + 2);
-    umbra_val32 const bo = umbra_uniform_32(b, (umbra_ptr32){0}, self->off_ + 3);
-    return umbra_max_f32(b, umbra_max_f32(b, umbra_sub_f32(b, l, x),
-                                             umbra_sub_f32(b, x, r)),
-                            umbra_max_f32(b, umbra_sub_f32(b, t, y),
-                                             umbra_sub_f32(b, y, bo)));
-}
-static umbra_interval sdf_rect_ibuild_(struct umbra_sdf *s, struct umbra_builder *b,
-                                       struct umbra_uniforms_layout *u,
-                                       umbra_interval x, umbra_interval y) {
+static umbra_interval sdf_rect_build_(struct umbra_sdf *s, struct umbra_builder *b,
+                                      struct umbra_uniforms_layout *u,
+                                      umbra_interval x, umbra_interval y) {
     struct umbra_sdf_rect *self = (struct umbra_sdf_rect *)s;
     self->off_ = umbra_uniforms_reserve_f32(u, 4);
     umbra_interval const l  = umbra_interval_uniform(b, (umbra_ptr32){0}, self->off_),
@@ -802,9 +790,7 @@ static void sdf_rect_fill_(struct umbra_sdf const *s, void *uniforms) {
 }
 struct umbra_sdf_rect umbra_sdf_rect(float const rect[4]) {
     struct umbra_sdf_rect c = {
-        .base = {.build  = sdf_rect_build_,
-                 .ibuild = sdf_rect_ibuild_,
-                 .fill   = sdf_rect_fill_},
+        .base = {.build = sdf_rect_build_, .fill = sdf_rect_fill_},
     };
     __builtin_memcpy(c.rect, rect, 16);
     return c;
