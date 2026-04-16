@@ -22,60 +22,71 @@ Order and dependencies
     04 region coverage front-end         (independent, nicer with 02)
     05 interval-fraction alpha           (needs 01; pairs with 04)
 
-Natural path of work: 01 first, then 04 and 05 to get an end-to-end iv2d-style
-pipeline running on umbra's substrate without adaptive dispatch, then 02 to
-turn on the performance story, then 03 only if measurements justify it.
+Current state
+-------------
 
-Actual path so far: 01 then 02, then a pivot to SDF-first dispatch.
-Plan 01's `interval_program` landed with just enough op support for a
-proof-of-concept circle slide that made sense to wire straight into
-the tile dispatcher.  After plan 02 landed and all slides were tested,
-benchmarking showed that only SDF-like coverages (circle, rect) benefit
-from interval analysis — bitmap, winding, and texture coverages produce
-trivial [0,1] bounds with no pruning value.  This resolved the
-coverage-vs-SDF architectural question (see notes below) in favor of
-SDFs.  `struct umbra_draw` was replaced by `struct umbra_sdf` (a
-signed-distance trait) and `struct umbra_quadtree` (quadtree dispatch
-driven by an SDF's interval_program).  Non-SDF slides reverted to
-direct `prog->queue`.  Plans 04 and 05 are largely subsumed — the SDF
-trait and its coverage adapter are the natural home for region authoring
-(plan 04) and interval-fraction AA (plan 05).
+Plans 01 and 02 landed and then evolved substantially.  The original
+scalar interval interpreter (plan 01) and recursive quadtree dispatcher
+(plan 02) have both been replaced.
 
-See also two architectural notes — the coverage-vs-SDF question is
-now resolved; on-device dispatch remains open:
+**SDFs are the first-class shape type.**  `struct umbra_sdf` has one
+`build` callback that takes `umbra_interval` arguments and returns
+`umbra_interval`.  Exact intervals (lo == hi) give point evaluation;
+wide intervals give conservative bounds.  The `umbra_interval_*`
+helpers in `src/interval.c` emit standard builder ops — no new IR,
+no JIT changes, no backend changes.  This is plan 03's variant A
+realized: interval math compiled through the existing backends.
+
+**Dispatch is a flat grid, not a quadtree.**  `umbra_sdf_dispatch`
+compiles a bounds program from the SDF's `build` at construction time,
+dispatches it over a tile grid in one call, then dispatches the draw
+program only into tiles where `lo < 0`.  The bounds program runs on
+a CPU backend (JIT preferred).  The recursive quadtree and the scalar
+interval interpreter (`src/interval.h`) are both gone.
+
+**Non-SDF coverages use direct dispatch.**  Bitmap, winding, and
+texture coverages go through `umbra_draw_builder` → `be->compile` →
+`prog->queue`.  No tiling, no interval math — they never benefited.
+
+**The coverage adapter bridges SDF to the draw pipeline.**
+`umbra_sdf_coverage` wraps an SDF as an `umbra_coverage` by calling
+`build` with exact pixel-center intervals and converting `f` to
+coverage via hard edge or soft edge.
+
+**Plans 03, 04, 05 are largely subsumed.**  Plan 03's interval math
+runs on all backends via `umbra_interval_*` (no dedicated JIT needed).
+Plan 04's region authoring is just writing an `umbra_sdf` with the
+interval helpers.  Plan 05's interval-fraction AA (`-lo/(hi-lo)`)
+slots into the coverage adapter as a quality option.
+
+What's next
+-----------
+
+  - **Per-pixel interval-fraction coverage.**  Call `sdf->build`
+    with pixel-extent intervals in the coverage adapter, compute
+    `-lo/(hi-lo)` as coverage.  This gives principled AA at boundary
+    pixels.  Needs the two-program interior/boundary split to avoid
+    the extra work on fully-inside tiles.
+
+  - **Horizontal tile coalescing.**  Merge adjacent covered tiles
+    into a single `draw->queue()` call to reduce per-dispatch
+    overhead.  TODO in draw.c.
+
+  - **On-device dispatch.**  The flat grid approach and the compiled
+    interval math are both naturally GPU-friendly.  See
+    notes-on-device-dispatch.md.
+
+See also two architectural notes:
 
   - [notes-coverage-vs-sdf.md](notes-coverage-vs-sdf.md) —
-    **resolved**: we went SDF-first.  The "charitable future" won.
+    **resolved**: we went SDF-first.
   - [notes-on-device-dispatch.md](notes-on-device-dispatch.md) —
-    whether the quadtree recursion should run on the CPU (as it
-    does now) or inside the GPU dispatch itself.  Interacts with
-    plans 03, 04 and with the coverage-vs-sdf note above.
-
-The two notes are independent axes but they multiply: on-device
-dispatch is dramatically easier under an SDF-first architecture
-than under our current coverage-first one.
-
-What "absorbing iv2d's key ideas" means here
---------------------------------------------
-
-In descending order of leverage:
-
-  1. Interval arithmetic as a *second interpretation* of the existing IR —
-     every pipeline becomes a bounds estimator for free. Plan 01.
-  2. Adaptive tile dispatch driven by those bounds — per-pixel work only on
-     boundary tiles. Plan 02.
-  3. A small builder-style API for writing implicit shapes, feeding the
-     existing `umbra_coverage` trait. Plan 04.
-  4. Interval-fraction α as a cheap, principled sub-pixel coverage estimate.
-     Plan 05.
-  5. If and only if measurements demand it: pair-lane interval math in the
-     JIT so interval evaluation scales with the K-lane substrate. Plan 03.
+    open; the flat grid + compiled intervals make this more
+    approachable than the old quadtree + scalar interpreter.
 
 Non-goals
 ---------
 
 - No wholesale port of iv2d's code. iv2d's VM and value array are strictly
   weaker than umbra's IR + CSE + JIT; we lift ideas, not files.
-- No new public types like `iv32` in umbra's public headers. Intervals stay
-  an IR-level concern.
 - No new backends. All ideas ride umbra's existing interp/jit/metal/vulkan/wgpu.

@@ -1,8 +1,16 @@
-On-device quadtree dispatch: a sibling architectural question
-==============================================================
+On-device tile dispatch: a sibling architectural question
+==========================================================
 
 Status: open; recording the discussion, not resolving it.
-Interacts with: notes-coverage-vs-sdf.md.
+Interacts with: notes-coverage-vs-sdf.md (resolved: SDF-first).
+
+Update: the recursive quadtree has been replaced by a flat tile grid.
+The bounds program is compiled from the SDF's `build` callback using
+`umbra_interval_*` helpers — the same ops that run on all backends.
+This makes on-device dispatch much more approachable: the bounds
+program is already a regular `umbra_program`, it just needs to run
+on the GPU backend instead of a CPU backend, with results read back
+(or used directly in an indirect dispatch).
 
 What's the idea
 ---------------

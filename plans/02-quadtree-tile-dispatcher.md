@@ -351,39 +351,32 @@ Per-backend MIN_TILE optima (for future tuning):
 
 ### What landed later
 
-- **`struct umbra_draw` replaced by `struct umbra_quadtree`.**
-  Benchmarking showed only SDF-like coverages benefit from interval
-  analysis — bitmap, winding, and texture coverages produce trivial
-  [0,1] bounds with no pruning value.  `struct umbra_draw` (general
-  coverage → optional interval_program) was replaced by
-  `struct umbra_quadtree` (takes `struct umbra_sdf*`, always builds
-  interval_program, always does quadtree dispatch).  Non-SDF slides
-  (text, persp, slug) reverted to direct `prog->queue`.
-- **`struct umbra_sdf`** — new first-class signed-distance trait.
-  `build` returns `f(x,y)` (negative inside, positive outside).
-  `umbra_coverage_from_sdf` adapter converts to coverage via
-  `clamp(-f, 0, 1)`.  `umbra_sdf_rect` is the first concrete
-  subtype — replaces `umbra_coverage_rect` for quadtree-dispatched
-  slides.
-- **SDF-based dispatch thresholds.**  Quadtree skips when `sdf.lo >= 0`
-  (fully outside), stops subdividing when `sdf.hi <= -1` (fully inside
-  past the 1-pixel ramp).  This is tighter than the old coverage-based
-  thresholds.
-- **Interval ops `le_f32`, `and_32`, `sel_32`** added for rect
-  coverage intervalization.  The SDF rect (`max(l-x, x-r, t-y, y-b)`)
-  uses only `max`/`sub` which were already supported.
-- **`full_coverage` program removed.**  Benchmarking showed no
-  measurable benefit from the interior/boundary program split.
-- **Coverage uniforms at offset 0.**  `umbra_draw_builder` builds
-  coverage before shader.  Eliminated `uniform_offset` bookkeeping.
+- **`struct umbra_sdf`** — first-class signed-distance trait with a
+  single `build` callback taking `umbra_interval` arguments.  Exact
+  intervals give point evaluation; wide intervals give bounds.  SDFs
+  write their math once using `umbra_interval_*` helpers and it works
+  for both.
+- **`struct umbra_sdf_dispatch`** replaced `struct umbra_draw` and
+  then `struct umbra_quadtree`.  Non-SDF slides reverted to direct
+  `prog->queue`.
+- **Flat grid dispatch replaced recursive quadtree.**  The bounds
+  program is compiled from the SDF's `build` via the standard
+  backends (JIT preferred).  All tile bounds are evaluated in one
+  dispatch, then the draw program is dispatched only into tiles
+  where `lo < 0`.  No scalar interval interpreter, no recursion.
+- **Scalar interval interpreter removed.**  `src/interval.h` and
+  `src/interval.c` (the plan 01 deliverable) replaced entirely by
+  `include/umbra_interval.h` and `src/interval.c` (compiled interval
+  math using existing builder ops).  Plan 03's variant A realized
+  without touching any JIT or backend code.
+- **Pixel-center evaluation.**  SDFs evaluate at `(x+0.5, y+0.5)` —
+  the standard rasterization convention (D3D, OpenGL, Skia).
 
 ### LOC
 
-Plan: ~300 lines in tile_cover.c, smallish draw.c addition.  After
-follow-up simplifications (removing full_coverage, draw.h, uniform_offset),
-draw.c's dispatcher contribution is ~60 lines.  No internal header.
-~145 lines bench_interval tool, ~100 lines tests, ~40 lines interval.c
-for new ops.  Much smaller than planned.
+The dispatcher is ~80 lines in draw.c.  `src/interval.c` is ~90 lines
+of interval builder helpers.  `include/umbra_interval.h` is declarations
+only.
 
 ### Lessons
 
@@ -426,3 +419,14 @@ for new ops.  Much smaller than planned.
    coverage functions are cheap relative to shader+blend work.
    Removing the split halved compile cost and simplified the code.
    Bench first, complexity second.
+
+8. **A flat grid beats a quadtree when you can evaluate bounds in
+   parallel.**  The compiled interval math runs on the JIT at
+   0.1 ns/tile at scale — fast enough that a single dispatch over
+   the full tile grid replaces serial recursive subdivision.  Simpler
+   code, no recursion, and naturally GPU-portable.
+
+9. **One callback beats two.**  The `build`/`ibuild` split on
+   `struct umbra_sdf` was eliminated by adding exact-stays-exact
+   peepholes to the interval helpers.  SDFs now write their math
+   once and it works for both point and interval evaluation.
