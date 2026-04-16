@@ -15,12 +15,7 @@ import os
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 
-# Source inventory, globbed from the tree and alphabetized.  `metal_stub.c` is
-# special: it's never compiled directly in `project.ninja`, only via gcc.ninja's
-# compile_m-rule override, so it's excluded from the main src glob.
-
-SRC    = sorted(p for p in glob.glob('src/*.c') if p != 'src/metal_stub.c') \
-       + sorted(glob.glob('src/*.m'))
+SRC    = sorted(glob.glob('src/*.c'))
 TESTS  = sorted(glob.glob('tests/*.c'))
 SLIDES = sorted(glob.glob('slides/*.c'))
 
@@ -48,8 +43,7 @@ def obj(src):
 
 def compile_line(src):
     """Emit a `build $out/X.o: compile X.c` block, with optional cflags."""
-    rule = 'compile_m' if src.endswith('.m') else 'compile'
-    line = f'build {obj(src)}: {rule} {src}\n'
+    line = f'build {obj(src)}: compile {src}\n'
     if src in CFLAGS:
         line += f'    cflags = {CFLAGS[src]}\n'
     return line
@@ -86,11 +80,6 @@ warn    = -Weverything $
 
 rule compile
     command = $cc -g -O1 -std=c11 -Werror $warn $cflags -MD -MF $out.d -c $in -o $out
-    depfile = $out.d
-    deps    = gcc
-
-rule compile_m
-    command = $cc -g -O1 -fobjc-arc -Werror $warn -MD -MF $out.d -c $in -o $out
     depfile = $out.d
     deps    = gcc
 
@@ -264,13 +253,7 @@ include build/project.ninja
 GCC_NINJA = r"""out     = $builddir/gcc
 cc      = /opt/homebrew/bin/gcc-15
 warn    = -Wall -Wextra -Wpedantic -Wno-unknown-pragmas
-ldflags = -lm -L/opt/homebrew/lib -lMoltenVK -lwgpu_native
-
-rule compile_m
-    command = $cc -g -O1 -std=c11 -Werror $warn -MD -MF $out.d -c src/metal_stub.c -o $out
-    depfile = $out.d
-    deps    = gcc
-
+ldflags = -lm -lobjc -framework Metal -framework Foundation -L/opt/homebrew/lib -lMoltenVK -lwgpu_native
 include build/project.ninja
 """
 

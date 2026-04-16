@@ -2,21 +2,72 @@
 #include "gpu_buf_cache.h"
 #include "uniform_ring.h"
 
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-
 #if !defined(__APPLE__) || defined(__wasm__)
 
 struct umbra_backend* umbra_backend_metal(void) { return 0; }
 
 #else
 
-#import <Metal/Metal.h>
 #include <stdarg.h>
+#include <string.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
+
+typedef void* id;
+typedef void* SEL;
+typedef unsigned long NSUInteger;
+typedef struct { NSUInteger width, height, depth; } MTLSize;
+static inline MTLSize MTLSizeMake(NSUInteger w, NSUInteger h, NSUInteger d) {
+    return (MTLSize){w, h, d};
+}
+extern void* MTLCreateSystemDefaultDevice(void);
+extern void* objc_autoreleasePoolPush(void);
+extern void  objc_autoreleasePoolPop(void*);
+// Typed declarations of objc_msgSend, one per distinct calling convention
+// used in this file.  __asm__ labels alias them all to _objc_msgSend so the
+// linker sees one symbol.  This avoids casting through incompatible function
+// pointers (which GCC 15 warns about and can't be suppressed), and it avoids
+// passing arguments through variadics (which uses a different ABI on arm64
+// and crashes at runtime).
+//
+// clang-format off
+typedef id     (*msg_fn)  (id, SEL);
+extern id      msg       (id, SEL)                                     __asm__("_objc_msgSend");
+extern double  msg_f64   (id, SEL)                                     __asm__("_objc_msgSend");
+extern id      msg_s     (id, SEL, char const*)                        __asm__("_objc_msgSend");
+extern id      msg_u     (id, SEL, NSUInteger)                         __asm__("_objc_msgSend");
+extern id      msg_uu    (id, SEL, NSUInteger, NSUInteger)             __asm__("_objc_msgSend");
+extern id      msg_p     (id, SEL, id)                                 __asm__("_objc_msgSend");
+extern id      msg_pp    (id, SEL, id, id*)                            __asm__("_objc_msgSend");
+extern id      msg_ppp   (id, SEL, id, id, id*)                        __asm__("_objc_msgSend");
+extern id      msg_vuup  (id, SEL, void*, NSUInteger, NSUInteger, id)  __asm__("_objc_msgSend");
+extern int     msg_sel   (id, SEL, SEL)                                __asm__("_objc_msgSend");
+extern void    msg_v_p   (id, SEL, id)                                 __asm__("_objc_msgSend");
+extern void    msg_v_i   (id, SEL, int)                                __asm__("_objc_msgSend");
+extern void    msg_v_u   (id, SEL, NSUInteger)                         __asm__("_objc_msgSend");
+extern void    msg_v_vuu (id, SEL, void*, NSUInteger, NSUInteger)      __asm__("_objc_msgSend");
+extern void    msg_v_puu (id, SEL, id, NSUInteger, NSUInteger)         __asm__("_objc_msgSend");
+extern void    msg_v_ss  (id, SEL, MTLSize, MTLSize)                   __asm__("_objc_msgSend");
+// clang-format on
+
+extern void* objc_getClass(char const*);
+extern void* sel_registerName(char const*);
+
+enum {
+    MTLResourceStorageModeShared = 0,
+    MTLDispatchTypeSerial        = 0,
+};
+
+static SEL sel(char const *name) { return sel_registerName(name); }
+static void  release (void *obj) { (void)msg(obj, sel("release")); }
+static id    retain  (id obj)   { return msg(obj, sel("retain")); }
+static void* contents(void *buf){ return msg(buf, sel("contents")); }
+static id nsstr(char const *s) {
+    return msg_s((id)objc_getClass("NSString"), sel("stringWithUTF8String:"), s);
+}
 
 typedef struct umbra_flat_ir BB;
 
@@ -923,84 +974,77 @@ enum { METAL_RING_HIGH_WATER = 64 * 1024 };
 
 static struct uniform_ring_chunk metal_ring_new_chunk(size_t min_bytes, void *ctx) {
     struct metal_backend *be = ctx;
-    @autoreleasepool {
-        id<MTLDevice> device = (__bridge id<MTLDevice>)be->device;
-        size_t cap = min_bytes > METAL_RING_HIGH_WATER ? min_bytes : METAL_RING_HIGH_WATER;
-        id<MTLBuffer> buf = [device newBufferWithLength:(NSUInteger)cap
-                                                options:MTLResourceStorageModeShared];
-        return (struct uniform_ring_chunk){
-            .handle=(__bridge_retained void*)buf,
-            .mapped=buf.contents,
-            .cap   =cap,
-            .used  =0,
-        };
-    }
+    void *pool = objc_autoreleasePoolPush();
+    size_t cap = min_bytes > METAL_RING_HIGH_WATER ? min_bytes : METAL_RING_HIGH_WATER;
+    id buf = msg_uu(
+        be->device, sel("newBufferWithLength:options:"),
+        (NSUInteger)cap, (NSUInteger)MTLResourceStorageModeShared);
+    struct uniform_ring_chunk chunk = {
+        .handle=(void*)buf,
+        .mapped=contents(buf),
+        .cap   =cap,
+        .used  =0,
+    };
+    objc_autoreleasePoolPop(pool);
+    return chunk;
 }
 
 static void metal_ring_free_chunk(void *handle, void *ctx) {
     (void)ctx;
-    @autoreleasepool {
-        (void)(__bridge_transfer id<MTLBuffer>)handle;
-    }
+    release(handle);
 }
 
-// uniform_ring_pool wait_frame callback. Releases any in-flight cmdbuf
-// stashed in frame_committed[frame] and waits for it to retire. The pool
-// itself resets the ring after this returns.
 static void metal_wait_frame(int frame, void *ctx) {
     struct metal_backend *be = ctx;
     if (be->frame_committed[frame]) {
-        @autoreleasepool {
-            id<MTLCommandBuffer> prior =
-                (__bridge_transfer id<MTLCommandBuffer>)be->frame_committed[frame];
-            be->frame_committed[frame] = NULL;
-            [prior waitUntilCompleted];
-            be->gpu_time_accum += prior.GPUEndTime - prior.GPUStartTime;
-        }
+        id prior = (id)be->frame_committed[frame];
+        be->frame_committed[frame] = NULL;
+        (void)msg(prior, sel("waitUntilCompleted"));
+        be->gpu_time_accum +=
+            msg_f64(prior, sel("GPUEndTime"))
+          - msg_f64(prior, sel("GPUStartTime"));
+        release(prior);
     }
 }
 
 static struct metal_backend* metal_backend_create(void) {
-    @autoreleasepool {
-        id<MTLDevice> device =
-            MTLCreateSystemDefaultDevice();
-        id<MTLCommandQueue> queue = device
-            ? [device newCommandQueue] : nil;
-        if (device && queue) {
-            struct metal_backend *be =
-                calloc(1, sizeof *be);
-            be->device =
-                (__bridge_retained void*)device;
-            be->queue =
-                (__bridge_retained void*)queue;
-            be->uni_pool = (struct uniform_ring_pool){
-                .n         =METAL_N_FRAMES,
-                .high_water=METAL_RING_HIGH_WATER,
+    void *pool = objc_autoreleasePoolPush();
+    id device = (id)MTLCreateSystemDefaultDevice();
+    id queue = device
+        ? msg(device, sel("newCommandQueue"))
+        : (id)0;
+    struct metal_backend *be = 0;
+    if (device && queue) {
+        be = calloc(1, sizeof *be);
+        be->device = (void*)retain(device);
+        be->queue  = (void*)queue;
+        be->uni_pool = (struct uniform_ring_pool){
+            .n         =METAL_N_FRAMES,
+            .high_water=METAL_RING_HIGH_WATER,
+            .ctx       =be,
+            .wait_frame=metal_wait_frame,
+        };
+        for (int i = 0; i < METAL_N_FRAMES; i++) {
+            be->uni_pool.rings[i] = (struct uniform_ring){
+                .align     =16,
                 .ctx       =be,
-                .wait_frame=metal_wait_frame,
+                .new_chunk =metal_ring_new_chunk,
+                .free_chunk=metal_ring_free_chunk,
             };
-            for (int i = 0; i < METAL_N_FRAMES; i++) {
-                be->uni_pool.rings[i] = (struct uniform_ring){
-                    .align     =16,
-                    .ctx       =be,
-                    .new_chunk =metal_ring_new_chunk,
-                    .free_chunk=metal_ring_free_chunk,
-                };
-            }
-            return be;
         }
-        return 0;
     }
+    objc_autoreleasePoolPop(pool);
+    return be;
 }
 
 static void metal_backend_free(struct metal_backend *be) {
     if (be) {
         uniform_ring_pool_free(&be->uni_pool);
-        @autoreleasepool {
-            gpu_buf_cache_free(&be->cache);
-            (void)(__bridge_transfer id)be->device;
-            (void)(__bridge_transfer id)be->queue;
-        }
+        void *pool = objc_autoreleasePoolPush();
+        gpu_buf_cache_free(&be->cache);
+        release(be->device);
+        release(be->queue);
+        objc_autoreleasePoolPop(pool);
         free(be);
     }
 }
@@ -1009,9 +1053,8 @@ static struct metal_program* metal_program(
     struct metal_backend *be, BB const *bb
 ) {
     struct metal_program *result = 0;
-    @autoreleasepool {
-        id<MTLDevice> device = (__bridge id<MTLDevice>)be->device;
-
+    void *pool = objc_autoreleasePoolPush();
+    {
         int *deref_buf = calloc((size_t)bb->insts, sizeof *deref_buf);
         int  max_ptr = -1, total_bufs = 0;
         uint8_t *buf_shift = NULL;
@@ -1072,35 +1115,40 @@ static struct metal_program* metal_program(
             buf_rw[bi] |= op_is_store(bb->inst[i].op) ? BUF_WRITTEN : BUF_READ;
         }
 
-        NSError *error = nil;
-        id<MTLLibrary> library = nil;
-        id<MTLFunction> func = nil;
-        id<MTLComputePipelineState> pso = nil;
+        id error = 0;
+        id library = 0;
+        id func = 0;
+        id pso = 0;
 
-        MTLCompileOptions *opts = [MTLCompileOptions new];
-        if (@available(macOS 15.0, *)) {
-            opts.mathMode = MTLMathModeSafe;
+        id opts = msg(
+            (id)objc_getClass("MTLCompileOptions"), sel("new"));
+        if (msg_sel(
+                opts, sel("respondsToSelector:"), sel("setMathMode:"))) {
+            (void)msg_v_u(opts, sel("setMathMode:"), 2);
         } else {
-            opts.fastMathEnabled = NO;
+            (void)msg_v_i(opts, sel("setFastMathEnabled:"), 0);
         }
 
-        NSString *source = [NSString stringWithUTF8String:src];
-        library = [device newLibraryWithSource:source
-                                       options:opts
-                                         error:&error];
+        id source = nsstr(src);
+        library = msg_ppp(
+            be->device, sel("newLibraryWithSource:options:error:"),
+            source, opts, &error);
         if (!library) {
-            NSLog(@"Metal compile error: %@", error);
+            fprintf(stderr, "Metal compile error\n");
             goto fail;
         }
 
-        func = [library newFunctionWithName:@"main0"];
+        func = msg_p(
+            library, sel("newFunctionWithName:"), nsstr("main0"));
         if (!func) { goto fail; }
-        pso = [device newComputePipelineStateWithFunction:func error:&error];
+        pso = msg_pp(
+            be->device, sel("newComputePipelineStateWithFunction:error:"),
+            func, &error);
         if (!pso) { goto fail; }
 
         {
             struct metal_program *p = calloc(1, sizeof *p);
-            p->pipeline      = (__bridge_retained void*)pso;
+            p->pipeline      = (void*)pso;
             p->src           = src;
             p->max_ptr       = max_ptr;
             p->total_bufs    = total_bufs;
@@ -1122,28 +1170,27 @@ static struct metal_program* metal_program(
         free(src);
     out:;
     }
+    objc_autoreleasePoolPop(pool);
     return result;
 }
 
 static gpu_buf metal_cache_alloc(size_t size, void *ctx) {
     struct metal_backend *be = ctx;
-    id<MTLDevice> device = (__bridge id<MTLDevice>)be->device;
     size_t alloc_size = size ? size : 1;
-    id<MTLBuffer> buf = [device newBufferWithLength:(NSUInteger)alloc_size
-                                            options:MTLResourceStorageModeShared];
-    return (gpu_buf){.ptr = (__bridge_retained void *)buf, .size = alloc_size};
+    id buf = msg_uu(
+        be->device, sel("newBufferWithLength:options:"),
+        (NSUInteger)alloc_size, (NSUInteger)MTLResourceStorageModeShared);
+    return (gpu_buf){.ptr = (void*)buf, .size = alloc_size};
 }
 
 static void metal_cache_upload(gpu_buf buf, void const *host, size_t bytes, void *ctx) {
     (void)ctx;
-    id<MTLBuffer> mtl = (__bridge id<MTLBuffer>)buf.ptr;
-    __builtin_memcpy(mtl.contents, host, bytes);
+    __builtin_memcpy(contents(buf.ptr), host, bytes);
 }
 
 static void metal_cache_download(gpu_buf buf, void *host, size_t bytes, void *ctx) {
     (void)ctx;
-    id<MTLBuffer> mtl = (__bridge id<MTLBuffer>)buf.ptr;
-    __builtin_memcpy(host, mtl.contents, bytes);
+    __builtin_memcpy(host, contents(buf.ptr), bytes);
 }
 
 static gpu_buf metal_cache_import(void *host, size_t bytes, void *ctx) {
@@ -1151,32 +1198,28 @@ static gpu_buf metal_cache_import(void *host, size_t bytes, void *ctx) {
     size_t page = (size_t)getpagesize();
     if (!host || ((uintptr_t)host % page) != 0) { return (gpu_buf){0}; }
     size_t import_sz = (bytes + page - 1) & ~(page - 1);
-    id<MTLDevice> device = (__bridge id<MTLDevice>)be->device;
-    id<MTLBuffer> buf = [device newBufferWithBytesNoCopy:host
-                                                  length:(NSUInteger)import_sz
-                                                 options:MTLResourceStorageModeShared
-                                             deallocator:nil];
+    id buf = msg_vuup(
+        be->device, sel("newBufferWithBytesNoCopy:length:options:deallocator:"),
+        host, (NSUInteger)import_sz, (NSUInteger)MTLResourceStorageModeShared, (id)0);
     if (!buf) { return (gpu_buf){0}; }
-    return (gpu_buf){.ptr = (__bridge_retained void *)buf, .size = bytes};
+    return (gpu_buf){.ptr = (void*)buf, .size = bytes};
 }
 
 static void metal_cache_release(gpu_buf buf, void *ctx) {
     (void)ctx;
-    (void)(__bridge_transfer id<MTLBuffer>)buf.ptr;
+    release(buf.ptr);
 }
 
 static void encode_dispatch(
     struct metal_program *p,
     int l, int t, int r, int b,
     struct umbra_buf buf[],
-    id<MTLComputeCommandEncoder> enc
+    void *enc
 ) {
     int w = r - l, h = b - t, x0 = l, y0 = t;
     struct metal_backend *be = (struct metal_backend*)p->base.backend;
 
-    id<MTLComputePipelineState> pso =
-        (__bridge id<MTLComputePipelineState>)p->pipeline;
-    [enc setComputePipelineState:pso];
+    (void)msg_v_p(enc, sel("setComputePipelineState:"), (id)p->pipeline);
 
     int tb = p->total_bufs;
     uint32_t buf_count[33] = {0};
@@ -1188,11 +1231,6 @@ static void encode_dispatch(
         buf_stride[i] = (uint32_t)buf[i].stride;
     }
 
-    // For each top-level / deref'd binding we need an MTLBuffer + offset.
-    // Read-only flat buffers go through the per-batch uniform ring (bump-
-    // allocated into a chunk MTLBuffer, no growth in the cmdbuf inline area).
-    // Everything else (writable, row-structured, deref'd) goes through
-    // cache_buf so the writable->readonly handoff path is preserved.
     void   *bind_handle[32];
     size_t  bind_offset[32];
     for (int i = 0; i < tb; i++) { bind_handle[i] = 0; bind_offset[i] = 0; }
@@ -1229,7 +1267,6 @@ static void encode_dispatch(
         buf_stride[bi]    = (uint32_t)dstride;
     }
 
-    // Meta at buffer(0), data buffers at buffer(1+) — matches MoltenVK's layout.
     uint32_t meta[67] = {0};
     meta[0] = (uint32_t)w;
     meta[1] = (uint32_t)x0;
@@ -1237,13 +1274,15 @@ static void encode_dispatch(
     __builtin_memcpy(meta + 3,      buf_count, (size_t)tb * sizeof(uint32_t));
     __builtin_memcpy(meta + 3 + tb, buf_stride, (size_t)tb * sizeof(uint32_t));
     size_t const meta_bytes = (size_t)(3 + 2 * tb) * sizeof(uint32_t);
-    [enc setBytes:meta length:meta_bytes atIndex:0];
+    (void)msg_v_vuu(
+        enc, sel("setBytes:length:atIndex:"),
+        meta, (NSUInteger)meta_bytes, (NSUInteger)0);
 
     for (int i = 0; i < tb; i++) {
         if (bind_handle[i]) {
-            [enc setBuffer:(__bridge id<MTLBuffer>)bind_handle[i]
-                    offset:(NSUInteger)bind_offset[i]
-                   atIndex:(NSUInteger)(i + 1)];
+            (void)msg_v_puu(
+                enc, sel("setBuffer:offset:atIndex:"),
+                (id)bind_handle[i], (NSUInteger)bind_offset[i], (NSUInteger)(i + 1));
         }
     }
 
@@ -1254,8 +1293,7 @@ static void encode_dispatch(
     }
     MTLSize grid  = MTLSizeMake((NSUInteger)w, (NSUInteger)h, 1);
     MTLSize group = MTLSizeMake((NSUInteger)tg_size, 1, 1);
-    [enc dispatchThreads:grid
-       threadsPerThreadgroup:group];
+    msg_v_ss(enc, sel("dispatchThreads:threadsPerThreadgroup:"), grid, group);
     be->total_dispatches++;
 }
 
@@ -1269,38 +1307,32 @@ static void metal_program_queue(
 
     struct metal_backend *be = (struct metal_backend*)p->base.backend;
 
-    @autoreleasepool {
+    void *pool = objc_autoreleasePoolPush();
+    {
         if (!be->batch_cmdbuf) {
-            id<MTLCommandQueue> queue =
-                (__bridge id<MTLCommandQueue>)be->queue;
-            be->batch_cmdbuf =
-                (__bridge_retained void*)[queue commandBuffer];
+            be->batch_cmdbuf = (void*)retain(msg(
+                be->queue, sel("commandBuffer")));
         }
-        id<MTLCommandBuffer> cmdbuf =
-            (__bridge id<MTLCommandBuffer>)be->batch_cmdbuf;
-        id<MTLComputeCommandEncoder> enc =
-            [cmdbuf computeCommandEncoderWithDispatchType:MTLDispatchTypeSerial];
+        id enc = msg_u(
+            (id)be->batch_cmdbuf,
+            sel("computeCommandEncoderWithDispatchType:"),
+            (NSUInteger)MTLDispatchTypeSerial);
         double const t0 = now();
         encode_dispatch(p, l, t, r, b, buf, enc);
         be->encode_time_accum += now() - t0;
-        [enc endEncoding];
+        (void)msg(enc, sel("endEncoding"));
     }
+    objc_autoreleasePoolPop(pool);
 }
 
-// Backpressure release: commit the current frame's cmdbuf without blocking,
-// stash it in frame_committed[cur], then rotate the pool. Pool calls
-// metal_wait_frame on the new cur (waiting only if its prior cmdbuf from
-// the previous cycle is still in flight) and resets that ring. Writebacks
-// and cache_buf entries stay live across rotation so the next sub-batch
-// keeps binding the same writable MTLBuffers.
 static void metal_submit_cmdbuf(struct metal_backend *be) {
     if (!be->batch_cmdbuf) { return; }
     double const t0 = now();
-    @autoreleasepool {
-        id<MTLCommandBuffer> cmdbuf =
-            (__bridge id<MTLCommandBuffer>)be->batch_cmdbuf;
-        [cmdbuf commit];
+    void *pool = objc_autoreleasePoolPush();
+    {
+        (void)msg((id)be->batch_cmdbuf, sel("commit"));
     }
+    objc_autoreleasePoolPop(pool);
     be->submit_time_accum += now() - t0;
     be->total_submits++;
     be->frame_committed[be->uni_pool.cur] = be->batch_cmdbuf;
@@ -1311,17 +1343,17 @@ static void metal_submit_cmdbuf(struct metal_backend *be) {
 static void metal_flush(struct metal_backend *be) {
     metal_submit_cmdbuf(be);
     uniform_ring_pool_drain_all(&be->uni_pool);
-    @autoreleasepool {
+    void *pool = objc_autoreleasePoolPush();
+    {
         gpu_buf_cache_copyback (&be->cache);
         gpu_buf_cache_end_batch(&be->cache);
     }
+    objc_autoreleasePoolPop(pool);
 }
 
 static void metal_program_free(struct metal_program *p) {
-    @autoreleasepool {
-        if (p->pipeline) {
-            (void)(__bridge_transfer id)p->pipeline;
-        }
+    if (p->pipeline) {
+        release(p->pipeline);
     }
     free(p->deref);
     free(p->buf_rw);
