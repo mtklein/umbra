@@ -56,6 +56,12 @@ struct umbra_sdf {
     void        (*fill )(struct umbra_sdf const*, void *uniforms);
 };
 
+struct umbra_coverage_sdf_adapter {
+    struct umbra_coverage base;
+    struct umbra_sdf    *sdf;
+};
+struct umbra_coverage_sdf_adapter umbra_coverage_from_sdf(struct umbra_sdf*);
+
 typedef umbra_color (*umbra_blend_fn)(struct umbra_builder*, umbra_color src, umbra_color dst);
 
 struct umbra_draw_layout {
