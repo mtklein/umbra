@@ -1,10 +1,10 @@
 cov = -fprofile-instr-generate -fcoverage-mapping
 
-out     = $builddir/x86_64h_xsan
+out     = $builddir/x86_xsan
 cc      = $clang -momit-leaf-frame-pointer -target x86_64-apple-macos13 -isysroot $sysroot $
                  -march=x86-64-v3 -mno-vzeroupper $
                  -fsanitize=address,integer,undefined -fno-sanitize-recover=all $cov
-exec    = env UBSAN_OPTIONS=print_stacktrace=1 LLVM_PROFILE_FILE=$builddir/x86_64h_xsan/%p.profraw $
+exec    = env UBSAN_OPTIONS=print_stacktrace=1 LLVM_PROFILE_FILE=$builddir/x86_xsan/%p.profraw $
               arch -x86_64
 ldflags = -framework Metal -framework Foundation $cov -Wl,-w
 include build/project.ninja

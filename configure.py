@@ -110,9 +110,8 @@ rule cov_show
 subninja build/host.ninja
 subninja build/xsan.ninja
 subninja build/wasm.ninja
-subninja build/x86_64.ninja
-subninja build/x86_64h.ninja
-subninja build/x86_64h_xsan.ninja
+subninja build/x86.ninja
+subninja build/x86_xsan.ninja
 subninja build/gcc.ninja
 
 rule configure
@@ -125,9 +124,8 @@ build build.ninja $
       build/host.ninja $
       build/xsan.ninja $
       build/wasm.ninja $
-      build/x86_64.ninja $
-      build/x86_64h.ninja $
-      build/x86_64h_xsan.ninja $
+      build/x86.ninja $
+      build/x86_xsan.ninja $
       build/gcc.ninja: configure | configure.py
 """
 
@@ -135,7 +133,7 @@ build build.ninja $
 # Each entry is `(name, count)`: `tools/dump.c` emits `count` pipelines for
 # slide `name` into `dumps/{name}/{0..count-1}/{arm64|ir|builder|metal.msl|
 # vulkan.spirv|vulkan.msl}.txt` (xsan) and `dumps/{name}/{i}/avx2.txt`
-# (x86_64h_xsan).  Order here drives the order in the generated `build ... |`
+# (x86_xsan).  Order here drives the order in the generated `build ... |`
 # output lists.
 
 DUMPS = [
@@ -250,19 +248,11 @@ include build/project.ninja
 """
 
 
-X86_64_NINJA = r"""out     = $builddir/x86_64
-cc      = $clang -momit-leaf-frame-pointer -target x86_64-apple-macos13 -isysroot $sysroot
-ldflags = -framework Metal -framework Foundation
-include build/project.ninja
-"""
-
-
-X86_64H_NINJA = r"""out     = $builddir/x86_64h
+X86_NINJA = r"""out     = $builddir/x86
 cc      = $clang -momit-leaf-frame-pointer -target x86_64-apple-macos13 -isysroot $sysroot $
                  -march=x86-64-v3 -mno-vzeroupper
 ldflags = -framework Metal -framework Foundation
 include build/project.ninja
-
 """
 
 
@@ -292,7 +282,7 @@ include build/project.ninja
 {DEMO_BLOCK}
 """
 XSAN_NINJA_SUFFIX = r"""
-x86 = $builddir/x86_64h_xsan
+x86 = $builddir/x86_xsan
 
 build $out/coverage.profdata: profmerge | $
       $out/test.log $
@@ -324,24 +314,24 @@ build $out/report.txt: cov_show $out/coverage.profdata | $
 """
 
 
-X86_64H_XSAN_NINJA_PREFIX = r"""cov = -fprofile-instr-generate -fcoverage-mapping
+X86_XSAN_NINJA_PREFIX = r"""cov = -fprofile-instr-generate -fcoverage-mapping
 
-out     = $builddir/x86_64h_xsan
+out     = $builddir/x86_xsan
 cc      = $clang -momit-leaf-frame-pointer -target x86_64-apple-macos13 -isysroot $sysroot $
                  -march=x86-64-v3 -mno-vzeroupper $
                  -fsanitize=address,integer,undefined -fno-sanitize-recover=all $cov
-exec    = env UBSAN_OPTIONS=print_stacktrace=1 LLVM_PROFILE_FILE=$builddir/x86_64h_xsan/%p.profraw $
+exec    = env UBSAN_OPTIONS=print_stacktrace=1 LLVM_PROFILE_FILE=$builddir/x86_xsan/%p.profraw $
               arch -x86_64
 ldflags = -framework Metal -framework Foundation $cov -Wl,-w
 include build/project.ninja
 
 """
 
-XSAN_NINJA         = (XSAN_NINJA_PREFIX
-                      + dump_outputs_block(XSAN_DUMP_SUFFIXES)
-                      + XSAN_NINJA_SUFFIX)
-X86_64H_XSAN_NINJA = (X86_64H_XSAN_NINJA_PREFIX
-                      + dump_outputs_block(X86_DUMP_SUFFIXES))
+XSAN_NINJA      = (XSAN_NINJA_PREFIX
+                   + dump_outputs_block(XSAN_DUMP_SUFFIXES)
+                   + XSAN_NINJA_SUFFIX)
+X86_XSAN_NINJA  = (X86_XSAN_NINJA_PREFIX
+                   + dump_outputs_block(X86_DUMP_SUFFIXES))
 
 
 FILES = {
@@ -350,9 +340,8 @@ FILES = {
     'build/host.ninja':          HOST_NINJA,
     'build/xsan.ninja':          XSAN_NINJA,
     'build/wasm.ninja':          WASM_NINJA,
-    'build/x86_64.ninja':        X86_64_NINJA,
-    'build/x86_64h.ninja':       X86_64H_NINJA,
-    'build/x86_64h_xsan.ninja':  X86_64H_XSAN_NINJA,
+    'build/x86.ninja':            X86_NINJA,
+    'build/x86_xsan.ninja':      X86_XSAN_NINJA,
     'build/gcc.ninja':           GCC_NINJA,
 }
 
