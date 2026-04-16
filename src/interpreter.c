@@ -1278,18 +1278,16 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
 #define FMA_OP(xv,yv,zv) cast(F32, cast(F64,(xv)) * cast(F64,(yv)) + cast(F64,(zv)))
 #define FMS_OP(xv,yv,zv) cast(F32, cast(F64,(zv)) - cast(F64,(xv)) * cast(F64,(yv)))
 #endif
-                CASE(op_r_fma_f32_mmm) acc.f32 = FMA_OP(v[ip->x].f32, v[ip->y].f32, v[ip->z].f32);
-                                       NEXT;
-                CASE(op_r_fma_f32_mmr) acc.f32 = FMA_OP(v[ip->x].f32, v[ip->y].f32, acc.f32);
-                                       NEXT;
-                CASE(op_m_fma_f32_mmr) v->f32  = FMA_OP(v[ip->x].f32, v[ip->y].f32, acc.f32);
-                                       NEXT;
-                CASE(op_r_fms_f32_mmm) acc.f32 = FMS_OP(v[ip->x].f32, v[ip->y].f32, v[ip->z].f32);
-                                       NEXT;
-                CASE(op_r_fms_f32_mmr) acc.f32 = FMS_OP(v[ip->x].f32, v[ip->y].f32, acc.f32);
-                                       NEXT;
-                CASE(op_m_fms_f32_mmr) v->f32  = FMS_OP(v[ip->x].f32, v[ip->y].f32, acc.f32);
-                                       NEXT;
+                CASE(op_r_fma_f32_mmm) {
+                    acc.f32 = FMA_OP(v[ip->x].f32, v[ip->y].f32, v[ip->z].f32);
+                } NEXT;
+                CASE(op_r_fma_f32_mmr) acc.f32 = FMA_OP(v[ip->x].f32, v[ip->y].f32, acc.f32); NEXT;
+                CASE(op_m_fma_f32_mmr) v->f32  = FMA_OP(v[ip->x].f32, v[ip->y].f32, acc.f32); NEXT;
+                CASE(op_r_fms_f32_mmm) {
+                    acc.f32 = FMS_OP(v[ip->x].f32, v[ip->y].f32, v[ip->z].f32);
+                } NEXT;
+                CASE(op_r_fms_f32_mmr) acc.f32 = FMS_OP(v[ip->x].f32, v[ip->y].f32, acc.f32); NEXT;
+                CASE(op_m_fms_f32_mmr) v->f32  = FMS_OP(v[ip->x].f32, v[ip->y].f32, acc.f32); NEXT;
 #undef FMA_OP
 #undef FMS_OP
 
