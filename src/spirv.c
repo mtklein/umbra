@@ -144,15 +144,15 @@ enum {
     GLSLstd450Round = 1,
     GLSLstd450RoundEven = 2,
     GLSLstd450Trunc = 3,
-    GLSLstd450FAbs  = 4,
+    GLSLstd450FAbs = 4,
     GLSLstd450Floor = 8,
-    GLSLstd450Ceil  = 9,
-    GLSLstd450Sqrt         = 31,
-    GLSLstd450InverseSqrt  = 32,
-    GLSLstd450FMin  = 37,
-    GLSLstd450FMax  = 40,
-    GLSLstd450FMix  = 46,
-    GLSLstd450Fma   = 50,
+    GLSLstd450Ceil = 9,
+    GLSLstd450Sqrt = 31,
+    GLSLstd450InverseSqrt = 32,
+    GLSLstd450FMin = 37,
+    GLSLstd450FMax = 40,
+    GLSLstd450FMix = 46,
+    GLSLstd450Fma = 50,
 
 };
 

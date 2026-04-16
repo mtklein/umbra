@@ -56,8 +56,8 @@ static void dump_jit(struct umbra_program const *prog, FILE *f) {
 }
 
 static void free_jit(struct umbra_program *prog) {
-    struct jit_program *j  = (struct jit_program*)prog;
-    struct jit_backend       *be = (struct jit_backend*)      prog->backend;
+    struct jit_program *j = (struct jit_program*)prog;
+    struct jit_backend *be = (struct jit_backend*)prog->backend;
     release_code_buf(be, j->code, j->code_size);
     free(j);
 }

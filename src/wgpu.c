@@ -361,7 +361,7 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
     p->n_deref     = sr.n_deref;
     p->push_words  = sr.push_words;
     p->deref       = sr.deref;
-    p->buf_rw        = sr.buf_rw;
+    p->buf_rw    = sr.buf_rw;
     p->buf_shift = sr.buf_shift;
     free(sr.buf_row_shift);
     p->spirv       = sr.spirv;

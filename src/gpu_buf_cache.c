@@ -13,7 +13,7 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
                 if (!ce->hashed_size || !fingerprint_eq(ce->fp, fp)) {
                     c->ops.upload(ce->buf, host, bytes, c->ctx);
                     c->upload_bytes += bytes;
-                    ce->fp       = fp;
+                    ce->fp          = fp;
                     ce->hashed_size = bytes;
                 }
                 ce->uploaded = 1;
@@ -56,7 +56,7 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
     if (host && bytes) {
         c->ops.upload(ce->buf, host, bytes, c->ctx);
         c->upload_bytes += bytes;
-        ce->fp       = fingerprint_hash(host, bytes);
+        ce->fp          = fingerprint_hash(host, bytes);
         ce->hashed_size = bytes;
         ce->uploaded = 1;
     }
