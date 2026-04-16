@@ -1350,10 +1350,9 @@ TEST(test_srcover_fp16_planar) {
     cleanup_draw(&B);
 }
 
-TEST(test_draw_queue_rect) {
-    struct umbra_shader_solid  shader = umbra_shader_solid((float[]){1, 0, 0, 1});
-    struct umbra_coverage_rect cov    =
-        umbra_coverage_rect((float[]){2.0f, 0.0f, 5.0f, 1.0f});
+TEST(test_quadtree_sdf_rect) {
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 1});
+    struct umbra_sdf_rect     sdf   = umbra_sdf_rect((float[]){1.0f, 1.0f, 7.0f, 3.0f});
 
     struct umbra_backend *bes[NUM_BACKENDS] = {
         umbra_backend_interp(), umbra_backend_jit(),
@@ -1365,63 +1364,38 @@ TEST(test_draw_queue_rect) {
         if (!bes[bi]) { continue; }
 
         struct umbra_draw_layout lay;
-        struct umbra_draw *d = umbra_draw(bes[bi], &shader.base,
-                                          &cov.base,
-                                          umbra_blend_srcover,
-                                          umbra_fmt_8888, &lay);
-        umbra_draw_fill(&lay, &shader.base, &cov.base);
-        uint32_t dst[8] = {0};
+        struct umbra_quadtree *qt = umbra_quadtree(bes[bi], &sdf.base, &shader.base,
+                                                   umbra_blend_srcover,
+                                                   umbra_fmt_8888, &lay);
+        qt != NULL here;
+        umbra_quadtree_fill(&lay, &sdf.base, &shader.base);
+        uint32_t dst[8 * 4];
+        __builtin_memset(dst, 0, sizeof dst);
         struct umbra_buf buf[] = {
             {.ptr = lay.uniforms, .count = lay.uni.slots},
-            {.ptr = dst,          .count = 8},
+            {.ptr = dst,          .count = 8 * 4, .stride = 8},
         };
-        umbra_draw_queue(d, 0, 0, 8, 1, buf);
+        umbra_quadtree_queue(qt, 0, 0, 8, 4, buf);
         bes[bi]->flush(bes[bi]);
 
-        for (int i = 0; i < 8; i++) {
-            if (i >= 2 && i < 5) {
-                (dst[i] & 0xFF)         == 0xFF here;
-                ((dst[i] >> 24) & 0xFF) == 0xFF here;
-            } else {
-                dst[i] == 0 here;
+        for (int y = 0; y < 4; y++) {
+            for (int x = 0; x < 8; x++) {
+                uint32_t const px = dst[y * 8 + x];
+                if (x >= 3 && x <= 5 && y == 2) {
+                    (px & 0xFF)         == 0xFF here;
+                    ((px >> 24) & 0xFF) == 0xFF here;
+                }
+                if (x == 0 || x == 7 || y == 0 || y == 3) {
+                    px == 0 here;
+                }
             }
         }
 
-        umbra_draw_free(d);
+        umbra_quadtree_free(qt);
         free(lay.uniforms);
     }
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         if (bes[bi]) { bes[bi]->free(bes[bi]); }
     }
-}
-
-TEST(test_draw_queue_no_coverage_fallback) {
-    // When there's no coverage at all, umbra_draw_queue falls through
-    // to a single flat partial_coverage dispatch (same as full here).
-    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 1});
-
-    struct umbra_backend *be = umbra_backend_interp();
-    struct umbra_draw_layout lay;
-    struct umbra_draw *d = umbra_draw(be, &shader.base, NULL,
-                                      umbra_blend_srcover, umbra_fmt_8888, &lay);
-    !umbra_draw_has_interval_coverage(d) here;
-
-    umbra_draw_fill(&lay, &shader.base, NULL);
-    uint32_t dst[8] = {0};
-    struct umbra_buf buf[] = {
-        {.ptr = lay.uniforms, .count = lay.uni.slots},
-        {.ptr = dst,          .count = 8},
-    };
-    umbra_draw_queue(d, 0, 0, 8, 1, buf);
-    be->flush(be);
-
-    for (int i = 0; i < 8; i++) {
-        (dst[i] & 0xFF)         == 0xFF here;
-        ((dst[i] >> 24) & 0xFF) == 0xFF here;
-    }
-
-    umbra_draw_free(d);
-    free(lay.uniforms);
-    be->free(be);
 }

@@ -3,10 +3,6 @@
 #include "flat_ir.h"
 #include "interval.h"
 
-struct umbra_draw {
-    struct umbra_program    *program;
-    struct interval_program *coverage;
-};
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -279,111 +275,6 @@ static struct interval_program* build_sdf_interval(struct umbra_sdf *sdf) {
     return p;
 }
 
-static struct interval_program* build_coverage_interval(struct umbra_coverage *coverage) {
-    struct umbra_builder *b = umbra_builder();
-    umbra_val32 const x = umbra_x(b),
-                      y = umbra_y(b);
-
-    struct umbra_uniforms_layout uni = {0};
-    umbra_val32 const cov = coverage->build(coverage, b, &uni, x, y);
-    umbra_store_32(b, (umbra_ptr32){.ix = 1}, cov);
-
-    struct umbra_flat_ir *ir = umbra_flat_ir(b);
-    umbra_builder_free(b);
-    struct interval_program *p = interval_program(ir);
-    umbra_flat_ir_free(ir);
-
-    return p;
-}
-
-struct umbra_draw* umbra_draw(struct umbra_backend *be,
-                              struct umbra_shader *shader, struct umbra_coverage *coverage,
-                              umbra_blend_fn blend, struct umbra_fmt fmt,
-                              struct umbra_draw_layout *layout) {
-    struct umbra_draw *d = calloc(1, sizeof *d);
-
-    if (coverage) {
-        d->coverage = build_coverage_interval(coverage);
-    }
-
-    struct umbra_builder *b = umbra_draw_builder(shader, coverage, blend, fmt, layout);
-    struct umbra_flat_ir *ir = umbra_flat_ir(b);
-    umbra_builder_free(b);
-    d->program = be->compile(be, ir);
-    umbra_flat_ir_free(ir);
-
-    return d;
-}
-
-void umbra_draw_free(struct umbra_draw *d) {
-    if (d) {
-        d->program->free(d->program);
-        interval_program_free(d->coverage);
-        free(d);
-    }
-}
-
-// Tile floor for the quadtree recursion.  One compromise value across all
-// backends: on a 4096×480 circle covering ~1% of canvas, MIN_TILE=512 is the
-// smallest value where every backend (interp, jit, metal, vulkan, wgpu) beats
-// its own flat-dispatch baseline:
-//
-//   backend   flat ns/px   adaptive@512 ns/px   speedup
-//     metal       0.05            0.03            1.7×
-//    vulkan       0.06            0.04            1.5×
-//      wgpu       0.07            0.06            1.2×
-//       jit       0.86            0.20            4.3×
-//    interp       2.48            0.47            5.3×
-//
-// The per-backend optima are quite different (CPU prefers ~16–32, GPU
-// prefers ~512–1024), so 512 leaves ~10% CPU throughput on the table in
-// exchange for not punishing GPU.  See TODO below.
-//
-// TODO: query per-backend parameters (subgroup size, per-dispatch latency,
-// typical command-buffer cost) and pick MIN_TILE per backend rather than
-// this one global compromise.  The spread between CPU-optimal (~32) and
-// GPU-optimal (~1024) is ~32× — a principled "dispatch_granularity" value
-// on struct umbra_backend, set by each backend at init, would recover the
-// missing ~5× on CPU and another ~2× on the fastest GPU paths without
-// regressing anything.
-enum { QUEUE_MIN_TILE = 512 };
-
-static void queue_recurse(struct umbra_draw const *d,
-                          int l, int t, int r, int b,
-                          struct umbra_buf buf[], float const *uniform) {
-    assume (l < r && t < b);
-
-    interval const coverage = interval_program_run(d->coverage,
-                                                   (interval){(float)l, (float)(r - 1)},
-                                                   (interval){(float)t, (float)(b - 1)},
-                                                   uniform);
-    if (coverage.hi > 0) {
-        if (coverage.lo >= 1 || (r-l <= QUEUE_MIN_TILE && b-t <= QUEUE_MIN_TILE)) {
-            d->program->queue(d->program, l, t, r, b, buf);
-            return;
-        }
-        int const mx = (l + r) / 2,
-                  my = (t + b) / 2;
-        queue_recurse(d, l,  t,  mx, my, buf, uniform);
-        queue_recurse(d, mx, t,  r,  my, buf, uniform);
-        queue_recurse(d, l,  my, mx, b,  buf, uniform);
-        queue_recurse(d, mx, my, r,  b,  buf, uniform);
-    }
-}
-
-void umbra_draw_queue(struct umbra_draw const *d,
-                      int l, int t, int r, int b, struct umbra_buf buf[]) {
-    if (!d->coverage) {
-        d->program->queue(d->program, l, t, r, b, buf);
-        return;
-    }
-    queue_recurse(d, l, t, r, b, buf, buf[0].ptr);
-}
-
-_Bool umbra_draw_has_interval_coverage(struct umbra_draw const *d) {
-    return d->coverage != NULL;
-}
-
 struct umbra_quadtree {
     struct umbra_program    *program;
     struct interval_program *interval;
@@ -410,6 +301,10 @@ struct umbra_quadtree* umbra_quadtree(struct umbra_backend *be,
     qt->interval = ip;
     return qt;
 }
+
+// TODO: query per-backend dispatch_granularity instead of this one global
+// compromise.  CPU-optimal is ~16-32, GPU-optimal is ~512-1024.
+enum { QUEUE_MIN_TILE = 512 };
 
 static void qt_recurse(struct umbra_quadtree const *qt,
                         int l, int t, int r, int b,

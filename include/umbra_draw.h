@@ -76,24 +76,6 @@ void umbra_draw_fill(struct umbra_draw_layout const*,
                      struct umbra_shader const*,
                      struct umbra_coverage const*);
 
-// Compiled draw bundle: a program and an optional interval_program for
-// quadtree tile pruning.  The interval side is omitted when the coverage
-// IR contains an op interval.c cannot yet bound — umbra_draw_queue then
-// falls back to a single flat dispatch.
-struct umbra_draw* umbra_draw(struct umbra_backend*,
-                              struct umbra_shader*, struct umbra_coverage*,
-                              umbra_blend_fn, struct umbra_fmt,
-                              struct umbra_draw_layout*);
-_Bool umbra_draw_has_interval_coverage(struct umbra_draw const*);
-void  umbra_draw_free(struct umbra_draw*);
-
-// Dispatch the bundle over rect [l, t, r, b).  If the draw has an
-// interval_program, descends a quadtree — skipping tiles whose coverage
-// bound is <= 0 and stopping subdivision once coverage is >= 1 or the
-// tile reaches a minimum-size floor.  Otherwise, a single flat dispatch.
-void umbra_draw_queue(struct umbra_draw const*,
-                      int l, int t, int r, int b, struct umbra_buf[]);
-
 // Quadtree-dispatched draw driven by an SDF.  The SDF produces both an
 // interval_program (for tile pruning) and a coverage adapter (for the
 // compiled program).  Returns NULL if the SDF can't be intervalized.
