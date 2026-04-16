@@ -180,6 +180,30 @@ static interval interval_lt(interval a, interval b) {
     if (a.lo >= b.hi) { return EXACT_0; }
     return MAYBE;
 }
+static interval interval_le(interval a, interval b) {
+    if (a.hi <= b.lo) { return EXACT_1; }
+    if (a.lo >  b.hi) { return EXACT_0; }
+    return MAYBE;
+}
+
+// Tri-valued mask logic.  Masks are {0,0} (false), {1,1} (true), or
+// {0,1} (maybe).  AND is false if either is false, true if both are
+// true, maybe otherwise.
+static interval interval_mask_and(interval a, interval b) {
+    if (a.hi == 0.0f || b.hi == 0.0f) { return EXACT_0; }
+    if (a.lo == 1.0f && b.lo == 1.0f) { return EXACT_1; }
+    return MAYBE;
+}
+
+// Tri-valued select: if mask is definitely true → t; definitely false
+// → f; maybe → union of t and f (conservative).
+static interval interval_sel(interval mask, interval t, interval f) {
+    if (mask.lo == 1.0f) { return t; }
+    if (mask.hi == 0.0f) { return f; }
+    float const lo = t.lo < f.lo ? t.lo : f.lo;
+    float const hi = t.hi > f.hi ? t.hi : f.hi;
+    return (interval){lo, hi};
+}
 
 // Convention: uniforms are read from umbra_ptr32{.ix=0}, and the output is
 // umbra_store_32()'d to umbra_ptr32{.ix=1}.  These match umbra_draw_builder's
@@ -206,12 +230,14 @@ static _Bool op_supported(struct ir_inst const *in) {
         case op_sqrt_f32: case op_abs_f32:
         case op_floor_f32: case op_ceil_f32:
 
-        case op_lt_f32:
+        case op_lt_f32: case op_le_f32:
+        case op_and_32:
+        case op_sel_32:
 
         case op_add_f32_imm: case op_sub_f32_imm:
         case op_mul_f32_imm: case op_div_f32_imm:
         case op_min_f32_imm: case op_max_f32_imm:
-        case op_lt_f32_imm:
+        case op_lt_f32_imm: case op_le_f32_imm:
             return 1;
         case op_uniform_32: return in->ptr.bits == UNIFORM_PTR_BITS;
         case op_store_32:   return in->ptr.bits == SINK_PTR_BITS;
@@ -297,6 +323,13 @@ interval interval_program_run(struct interval_program *p,
             case op_ceil_f32:   r = interval_monotone(arg(p,in->x), ceilf);  break;
 
             case op_lt_f32: r = interval_lt(arg(p,in->x), arg(p,in->y)); break;
+            case op_le_f32: r = interval_le(arg(p,in->x), arg(p,in->y)); break;
+
+            case op_and_32: r = interval_mask_and(arg(p,in->x), arg(p,in->y)); break;
+
+            case op_sel_32:
+                r = interval_sel(arg(p,in->x), arg(p,in->y), arg(p,in->z));
+                break;
 
             // f32 _imm ops: x-side is a value, y-side is an f32 immediate.
             case op_add_f32_imm:
@@ -305,7 +338,8 @@ interval interval_program_run(struct interval_program *p,
             case op_div_f32_imm:
             case op_min_f32_imm:
             case op_max_f32_imm:
-            case op_lt_f32_imm: {
+            case op_lt_f32_imm:
+            case op_le_f32_imm: {
                 union { int i; float f; } const u = {.i = in->imm};
                 interval const a = arg(p,in->x),
                                b = interval_exact(u.f);
@@ -317,6 +351,7 @@ interval interval_program_run(struct interval_program *p,
                     case op_min_f32_imm: r = interval_min(a, b); break;
                     case op_max_f32_imm: r = interval_max(a, b); break;
                     case op_lt_f32_imm:  r = interval_lt (a, b); break;
+                    case op_le_f32_imm:  r = interval_le (a, b); break;
                     default: __builtin_unreachable();
                 }
             } break;

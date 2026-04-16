@@ -1399,8 +1399,7 @@ TEST(test_draw_compile_rect) {
                                           umbra_blend_srcover, umbra_fmt_8888, &lay);
         d->partial_coverage != NULL here;
         d->full_coverage    != NULL here;
-        // rect coverage uses le/lt/and/sel — not in interval.c's supported set.
-        d->coverage         == NULL here;
+        d->coverage         != NULL here;
         // Solid shader reserves 4 slots; rect's coverage uniforms come next.
         d->uniform_offset   == 4 here;
 
@@ -1527,20 +1526,17 @@ TEST(test_draw_queue_adaptive_matches_flat) {
 }
 
 TEST(test_draw_queue_flat_fallback) {
-    // When the coverage IR isn't interval-expressible, umbra_draw_queue
-    // should fall through to a single flat partial_coverage dispatch.
-    // umbra_coverage_rect's le/lt/and/sel ops aren't supported by interval.c
-    // today, so rect coverage exercises the fallback path.
-    struct umbra_shader_solid  shader = umbra_shader_solid((float[]){1, 0, 0, 1});
-    struct umbra_coverage_rect cov    = umbra_coverage_rect((float[]){2.0f, 0.0f, 5.0f, 1.0f});
+    // When there's no coverage at all, umbra_draw_queue falls through
+    // to a single flat partial_coverage dispatch (same as full here).
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 1});
 
     struct umbra_backend *be = umbra_backend_interp();
     struct umbra_draw_layout lay;
-    struct umbra_draw *d = umbra_draw(be, &shader.base, &cov.base,
+    struct umbra_draw *d = umbra_draw(be, &shader.base, NULL,
                                       umbra_blend_srcover, umbra_fmt_8888, &lay);
     d->coverage == NULL here;
 
-    umbra_draw_fill(&lay, &shader.base, &cov.base);
+    umbra_draw_fill(&lay, &shader.base, NULL);
     uint32_t dst[8] = {0};
     struct umbra_buf buf[] = {
         {.ptr = lay.uniforms, .count = lay.uni.slots},
@@ -1550,12 +1546,8 @@ TEST(test_draw_queue_flat_fallback) {
     be->flush(be);
 
     for (int i = 0; i < 8; i++) {
-        if (i >= 2 && i < 5) {
-            (dst[i] & 0xFF)         == 0xFF here;
-            ((dst[i] >> 24) & 0xFF) == 0xFF here;
-        } else {
-            dst[i] == 0 here;
-        }
+        (dst[i] & 0xFF)         == 0xFF here;
+        ((dst[i] >> 24) & 0xFF) == 0xFF here;
     }
 
     umbra_draw_free(d);

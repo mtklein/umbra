@@ -214,6 +214,58 @@ TEST(interval_compare_tri_valued) {
     interval_program_free(p);
 }
 
+TEST(interval_le_tri_valued) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_store_32(b, SINK, umbra_le_f32(b, umbra_x(b), umbra_imm_f32(b, 0.0f)));
+
+    struct interval_program *p = interval_program_and_free(b);
+    interval_equiv(interval_program_run(p, (interval){-2,-1}, (interval){0,0}, NULL),
+                   (interval){1, 1}) here;
+    interval_equiv(interval_program_run(p, (interval){ 1, 2}, (interval){0,0}, NULL),
+                   (interval){0, 0}) here;
+    // x = [0, 0] → le(0, 0) is true
+    interval_equiv(interval_program_run(p, (interval){ 0, 0}, (interval){0,0}, NULL),
+                   (interval){1, 1}) here;
+    // x = [-1, 1] → maybe
+    interval_equiv(interval_program_run(p, (interval){-1, 1}, (interval){0,0}, NULL),
+                   (interval){0, 1}) here;
+
+    interval_program_free(p);
+}
+
+TEST(interval_and_sel_rect_coverage) {
+    // Mimics umbra_coverage_rect: α = sel(le(l,x) & lt(x,r), 1, 0)
+    // with uniform l=2, r=5 and x varying.
+    struct umbra_builder *b = umbra_builder();
+    umbra_val32 const x = umbra_x(b);
+    umbra_val32 const l = umbra_uniform_32(b, UNIFORM, 0);
+    umbra_val32 const r = umbra_uniform_32(b, UNIFORM, 1);
+    umbra_val32 const inside = umbra_and_32(b,
+        umbra_le_f32(b, l, x), umbra_lt_f32(b, x, r));
+    umbra_store_32(b, SINK,
+        umbra_sel_32(b, inside, umbra_imm_f32(b, 1.0f),
+                                umbra_imm_f32(b, 0.0f)));
+
+    struct interval_program *p = interval_program_and_free(b);
+    p != NULL here;
+    float const u[] = {2.0f, 5.0f};
+
+    // x fully inside [2, 5) → α = [1, 1]
+    interval_equiv(interval_program_run(p, (interval){3, 4}, (interval){0,0}, u),
+                   (interval){1, 1}) here;
+    // x fully outside (below) → α = [0, 0]
+    interval_equiv(interval_program_run(p, (interval){0, 1}, (interval){0,0}, u),
+                   (interval){0, 0}) here;
+    // x fully outside (above) → α = [0, 0]
+    interval_equiv(interval_program_run(p, (interval){6, 8}, (interval){0,0}, u),
+                   (interval){0, 0}) here;
+    // x straddles left edge → α = [0, 1]
+    interval_equiv(interval_program_run(p, (interval){1, 3}, (interval){0,0}, u),
+                   (interval){0, 1}) here;
+
+    interval_program_free(p);
+}
+
 TEST(interval_uniform_exact) {
     // f(x) = x + u, u a uniform (exact value) at slot 7.
     struct umbra_builder *b = umbra_builder();
