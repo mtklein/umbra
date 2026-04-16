@@ -156,7 +156,7 @@ struct slide* make_overview(void) {
         .init = overview_init,
         .prepare = overview_prepare,
         .draw = overview_draw,
-        .free         = overview_free,
+        .free = overview_free,
         .get_builders = overview_get_builders,
     };
     return &st->base;

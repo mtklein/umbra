@@ -104,7 +104,7 @@ SLIDE(slide_swatch) {
         .init    = swatch_init,
         .prepare = swatch_prepare,
         .draw    = swatch_draw,
-        .free         = swatch_free,
+        .free = swatch_free,
         .get_builders = swatch_get_builders,
     };
     return &st->base;

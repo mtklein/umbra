@@ -162,9 +162,9 @@ static void text_draw(struct slide *s, int frame, int l, int t, int r, int b, vo
     (void)frame;
     slide_bg_draw(s->bg, l, t, r, b, buf);
     st->cov.bitmap.bmp = (struct umbra_buf){
-        .ptr   = st->tc->data,
-        .count = st->w * st->h,
-        .stride = st->w,
+        .ptr=st->tc->data,
+        .count=st->w * st->h,
+        .stride=st->w,
     };
     umbra_draw_fill(&st->lay, &st->shader.base, &st->cov.bitmap.base);
     struct umbra_buf ubuf[] = {

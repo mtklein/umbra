@@ -156,7 +156,7 @@ static struct slide* make_grad_lut(char const *title, float const bg[4], _Bool i
     struct grad_lut_slide *st = calloc(1, sizeof *st);
     st->is_radial = is_radial;
     st->lut_data = lut;
-    struct umbra_buf lut_buf = {.ptr = lut, .count = lut_n * 4};
+    struct umbra_buf lut_buf = {.ptr=lut, .count=lut_n * 4};
     if (is_radial) { st->shader.radial = umbra_shader_radial_grad(grad, lut_buf); }
     else           { st->shader.linear = umbra_shader_linear_grad(grad, lut_buf); }
     st->base = (struct slide){
@@ -227,8 +227,8 @@ static void grad_stops_draw(struct slide *s, int frame, int l, int t, int r, int
     (void)frame;
     umbra_draw_fill(&st->lay, &st->shader.linear.base, NULL);
     struct umbra_buf ubuf[] = {
-        {.ptr = st->lay.uniforms, .count = st->lay.uni.slots},
-        {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
+        {.ptr=st->lay.uniforms, .count=st->lay.uni.slots},
+        {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
     };
     st->prog->queue(st->prog, l, t, r, b, ubuf);
 }
@@ -273,8 +273,8 @@ SLIDE(slide_gradient_linear_stops) {
     st->pos_data    = pos;
     st->shader.linear = umbra_shader_linear_stops(
         (float[]){1.0f / 640.0f, 0.0f, 0.0f, (float)N},
-        (struct umbra_buf){.ptr = planar, .count = N * 4},
-        (struct umbra_buf){.ptr = pos,    .count = N});
+        (struct umbra_buf){.ptr=planar, .count=N * 4},
+        (struct umbra_buf){.ptr=pos,    .count=N});
     st->base = (struct slide){
         .title       = "Linear Gradient (loop stops)",
         .bg          = {0, 0, 0, 1},
@@ -307,8 +307,8 @@ SLIDE(slide_gradient_radial_stops) {
     st->pos_data    = pos;
     st->shader.radial = umbra_shader_radial_stops(
         (float[]){320.0f, 240.0f, 1.0f / 280.0f, (float)N},
-        (struct umbra_buf){.ptr = planar, .count = N * 4},
-        (struct umbra_buf){.ptr = pos,    .count = N});
+        (struct umbra_buf){.ptr=planar, .count=N * 4},
+        (struct umbra_buf){.ptr=pos,    .count=N});
     st->base = (struct slide){
         .title       = "Radial Gradient (loop stops)",
         .bg          = {0, 0, 0, 1},
