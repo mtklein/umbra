@@ -50,6 +50,12 @@ struct umbra_coverage {
     void        (*fill )(struct umbra_coverage const*, void *uniforms);
 };
 
+struct umbra_sdf {
+    umbra_val32 (*build)(struct umbra_sdf*, struct umbra_builder*,
+                         struct umbra_uniforms_layout*, umbra_val32 x, umbra_val32 y);
+    void        (*fill )(struct umbra_sdf const*, void *uniforms);
+};
+
 typedef umbra_color (*umbra_blend_fn)(struct umbra_builder*, umbra_color src, umbra_color dst);
 
 struct umbra_draw_layout {
@@ -81,6 +87,22 @@ void  umbra_draw_free(struct umbra_draw*);
 // tile reaches a minimum-size floor.  Otherwise, a single flat dispatch.
 void umbra_draw_queue(struct umbra_draw const*,
                       int l, int t, int r, int b, struct umbra_buf[]);
+
+// Quadtree-dispatched draw driven by an SDF.  The SDF produces both an
+// interval_program (for tile pruning) and a coverage adapter (for the
+// compiled program).  Returns NULL if the SDF can't be intervalized.
+struct umbra_quadtree* umbra_quadtree(struct umbra_backend*,
+                                      struct umbra_sdf*,
+                                      struct umbra_shader*,
+                                      umbra_blend_fn,
+                                      struct umbra_fmt,
+                                      struct umbra_draw_layout*);
+void umbra_quadtree_queue(struct umbra_quadtree const*,
+                          int l, int t, int r, int b, struct umbra_buf[]);
+void umbra_quadtree_fill(struct umbra_draw_layout const*,
+                         struct umbra_sdf const*,
+                         struct umbra_shader const*);
+void umbra_quadtree_free(struct umbra_quadtree*);
 
 
 struct umbra_shader_solid {

@@ -241,6 +241,41 @@ void umbra_draw_fill(struct umbra_draw_layout const *layout,
     if (coverage) { coverage->fill(coverage, layout->uniforms); }
 }
 
+struct sdf_as_coverage {
+    struct umbra_coverage base;
+    struct umbra_sdf    *sdf;
+};
+static umbra_val32 sdf_as_coverage_build_(struct umbra_coverage *s, struct umbra_builder *b,
+                                          struct umbra_uniforms_layout *u,
+                                          umbra_val32 x, umbra_val32 y) {
+    struct sdf_as_coverage *self = (struct sdf_as_coverage *)s;
+    umbra_val32 const f = self->sdf->build(self->sdf, b, u, x, y);
+    return umbra_min_f32(b, umbra_imm_f32(b, 1.0f),
+                         umbra_max_f32(b, umbra_imm_f32(b, 0.0f),
+                                       umbra_sub_f32(b, umbra_imm_f32(b, 0.0f), f)));
+}
+static void sdf_as_coverage_fill_(struct umbra_coverage const *s, void *uniforms) {
+    struct sdf_as_coverage const *self = (struct sdf_as_coverage const *)s;
+    self->sdf->fill(self->sdf, uniforms);
+}
+
+static struct interval_program* build_sdf_interval(struct umbra_sdf *sdf) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_val32 const x = umbra_x(b),
+                      y = umbra_y(b);
+
+    struct umbra_uniforms_layout uni = {0};
+    umbra_val32 const f = sdf->build(sdf, b, &uni, x, y);
+    umbra_store_32(b, (umbra_ptr32){.ix = 1}, f);
+
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
+    umbra_builder_free(b);
+    struct interval_program *p = interval_program(ir);
+    umbra_flat_ir_free(ir);
+
+    return p;
+}
+
 static struct interval_program* build_coverage_interval(struct umbra_coverage *coverage) {
     struct umbra_builder *b = umbra_builder();
     umbra_val32 const x = umbra_x(b),
@@ -344,6 +379,79 @@ void umbra_draw_queue(struct umbra_draw const *d,
 
 _Bool umbra_draw_has_interval_coverage(struct umbra_draw const *d) {
     return d->coverage != NULL;
+}
+
+struct umbra_quadtree {
+    struct umbra_program    *program;
+    struct interval_program *interval;
+};
+
+struct umbra_quadtree* umbra_quadtree(struct umbra_backend *be,
+                                      struct umbra_sdf *sdf,
+                                      struct umbra_shader *shader,
+                                      umbra_blend_fn blend,
+                                      struct umbra_fmt fmt,
+                                      struct umbra_draw_layout *layout) {
+    struct interval_program *ip = build_sdf_interval(sdf);
+    if (!ip) { return NULL; }
+
+    struct sdf_as_coverage adapter = {
+        .base = {.build = sdf_as_coverage_build_, .fill = sdf_as_coverage_fill_},
+        .sdf  = sdf,
+    };
+    struct umbra_builder *b = umbra_draw_builder(shader, &adapter.base, blend, fmt, layout);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
+    umbra_builder_free(b);
+    struct umbra_program *prog = be->compile(be, ir);
+    umbra_flat_ir_free(ir);
+
+    struct umbra_quadtree *qt = calloc(1, sizeof *qt);
+    qt->program  = prog;
+    qt->interval = ip;
+    return qt;
+}
+
+static void qt_recurse(struct umbra_quadtree const *qt,
+                        int l, int t, int r, int b,
+                        struct umbra_buf buf[], float const *uniform) {
+    assume(l < r && t < b);
+
+    interval const sdf = interval_program_run(qt->interval,
+                                              (interval){(float)l, (float)(r - 1)},
+                                              (interval){(float)t, (float)(b - 1)},
+                                              uniform);
+    if (sdf.lo < 0) {
+        if (sdf.hi <= -1 || (r-l <= QUEUE_MIN_TILE && b-t <= QUEUE_MIN_TILE)) {
+            qt->program->queue(qt->program, l, t, r, b, buf);
+            return;
+        }
+        int const mx = (l + r) / 2,
+                  my = (t + b) / 2;
+        qt_recurse(qt, l,  t,  mx, my, buf, uniform);
+        qt_recurse(qt, mx, t,  r,  my, buf, uniform);
+        qt_recurse(qt, l,  my, mx, b,  buf, uniform);
+        qt_recurse(qt, mx, my, r,  b,  buf, uniform);
+    }
+}
+
+void umbra_quadtree_queue(struct umbra_quadtree const *qt,
+                          int l, int t, int r, int b, struct umbra_buf buf[]) {
+    qt_recurse(qt, l, t, r, b, buf, buf[0].ptr);
+}
+
+void umbra_quadtree_fill(struct umbra_draw_layout const *layout,
+                         struct umbra_sdf const *sdf,
+                         struct umbra_shader const *shader) {
+    if (sdf)    { sdf->fill(sdf, layout->uniforms); }
+    if (shader) { shader->fill(shader, layout->uniforms); }
+}
+
+void umbra_quadtree_free(struct umbra_quadtree *qt) {
+    if (qt) {
+        qt->program->free(qt->program);
+        interval_program_free(qt->interval);
+        free(qt);
+    }
 }
 
 static umbra_val32 clamp01(struct umbra_builder *builder, umbra_val32 t) {
