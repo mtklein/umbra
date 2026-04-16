@@ -499,6 +499,16 @@ SLIDE(slide_sdf_halfplane) {
 }
 
 // --- SDF Text: analytic distance to glyph outlines ---
+// TODO: use the actual quadratic Bezier distance (P0, P1, P2) instead of
+// the line-segment approximation (P0, P2).  The control point P1 is already
+// in the curve data at offsets k+2, k+3 — just not used yet.  The exact
+// distance to a quadratic Bezier requires solving a cubic for the closest
+// parameter t, which is more ops per curve but would give smooth outlines
+// and enable proper filled rendering with winding-number sign.
+//
+// TODO: add an SDF stroke wrapper (abs(sdf) - width) that can be toggled
+// on any SDF slide, like iv2d's 's' key.  This converts fills to outlines
+// and outlines to double-stroked outlines.
 
 struct sdf_text_sdf {
     struct umbra_sdf    base;
