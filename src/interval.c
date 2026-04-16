@@ -2,6 +2,13 @@
 
 static _Bool exact(umbra_interval a) { return a.lo.id == a.hi.id; }
 
+// TODO: use umbra_interval_exact() to build the {r, r} returns in the exact
+// peepholes below, and in umbra_interval_uniform().  Currently each writes
+// (umbra_interval){r, r} or {val, val} inline.  Calling umbra_interval_exact()
+// would require passing the float value rather than the umbra_val32, so this
+// may need a new helper like umbra_interval_from_val32(umbra_val32 v) that
+// returns (umbra_interval){v, v}.
+
 umbra_interval umbra_interval_exact(struct umbra_builder *b, float v) {
     umbra_val32 const val = umbra_imm_f32(b, v);
     return (umbra_interval){val, val};
