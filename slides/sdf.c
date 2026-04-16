@@ -6,6 +6,7 @@
 // TODO: adapt iv2d's SDF text rendering as a follow-up.
 
 #include "slide.h"
+#include "slug.h"
 #include "../include/umbra_interval.h"
 #include <math.h>
 #include <stdlib.h>
@@ -493,6 +494,203 @@ SLIDE(slide_sdf_halfplane) {
         .draw = csg_draw,
         .free = csg_free,
         .get_builders = csg_get_builders,
+    };
+    return &st->base;
+}
+
+// --- SDF Text: analytic distance to glyph outlines ---
+
+struct sdf_text_sdf {
+    struct umbra_sdf    base;
+    struct slug_curves  curves;
+    float               scale_x, scale_y, off_x, off_y;
+    int                 ptr_off_, n_off_;
+    int                 w_, h_;
+};
+
+static umbra_interval sdf_text_build_(struct umbra_sdf *s, struct umbra_builder *b,
+                                      struct umbra_uniforms_layout *u,
+                                      umbra_interval x, umbra_interval y) {
+    struct sdf_text_sdf *self = (struct sdf_text_sdf *)s;
+    self->ptr_off_ = umbra_uniforms_reserve_ptr(u);
+    self->n_off_   = umbra_uniforms_reserve_f32(u, 5);
+    umbra_ptr32 const data = umbra_deref_ptr32(b, (umbra_ptr32){0}, self->ptr_off_);
+    umbra_val32 const n    = umbra_uniform_32(b, (umbra_ptr32){0}, self->n_off_);
+
+    umbra_interval const sx = umbra_interval_exact(
+                                  umbra_uniform_32(b, (umbra_ptr32){0}, self->n_off_ + 1)),
+                         sy = umbra_interval_exact(
+                                  umbra_uniform_32(b, (umbra_ptr32){0}, self->n_off_ + 2)),
+                         ox = umbra_interval_exact(
+                                  umbra_uniform_32(b, (umbra_ptr32){0}, self->n_off_ + 3)),
+                         oy = umbra_interval_exact(
+                                  umbra_uniform_32(b, (umbra_ptr32){0}, self->n_off_ + 4));
+
+    umbra_interval const gx = umbra_interval_add_f32(b, umbra_interval_mul_f32(b, x, sx), ox),
+                         gy = umbra_interval_add_f32(b, umbra_interval_mul_f32(b, y, sy), oy);
+
+    umbra_imm_f32(b, 0);
+    umbra_imm_f32(b, 1);
+    umbra_imm_f32(b, 1.5f);
+    umbra_imm_i32(b, 1);
+    umbra_imm_i32(b, 4);
+    umbra_imm_i32(b, 5);
+    umbra_imm_i32(b, 6);
+
+    umbra_var lo_var = umbra_var_alloc(b);
+    umbra_var hi_var = umbra_var_alloc(b);
+    umbra_store_var(b, lo_var, umbra_imm_f32(b, 1e9f));
+    umbra_store_var(b, hi_var, umbra_imm_f32(b, 1e9f));
+
+    umbra_val32 const j = umbra_loop(b, n); {
+        umbra_val32 const k = umbra_mul_i32(b, j, umbra_imm_i32(b, 6));
+        umbra_val32 const p0x_v = umbra_gather_32(b, data, k),
+                          p0y_v = umbra_gather_32(b, data,
+                                      umbra_add_i32(b, k, umbra_imm_i32(b, 1))),
+                          p2x_v = umbra_gather_32(b, data,
+                                      umbra_add_i32(b, k, umbra_imm_i32(b, 4))),
+                          p2y_v = umbra_gather_32(b, data,
+                                      umbra_add_i32(b, k, umbra_imm_i32(b, 5)));
+
+        umbra_val32 const dx_v = umbra_sub_f32(b, p2x_v, p0x_v),
+                          dy_v = umbra_sub_f32(b, p2y_v, p0y_v);
+
+        umbra_val32 const dot_dd_v = umbra_add_f32(b,
+                                         umbra_mul_f32(b, dx_v, dx_v),
+                                         umbra_mul_f32(b, dy_v, dy_v));
+
+        umbra_interval const p0x = umbra_interval_exact(p0x_v),
+                             p0y = umbra_interval_exact(p0y_v),
+                             dx  = umbra_interval_exact(dx_v),
+                             dy  = umbra_interval_exact(dy_v),
+                             dd  = umbra_interval_exact(dot_dd_v);
+
+        umbra_interval const px = umbra_interval_sub_f32(b, gx, p0x),
+                             py = umbra_interval_sub_f32(b, gy, p0y);
+        umbra_interval const dot_pd = umbra_interval_add_f32(b,
+                                          umbra_interval_mul_f32(b, px, dx),
+                                          umbra_interval_mul_f32(b, py, dy));
+        umbra_interval const zero = umbra_interval_exact(umbra_imm_f32(b, 0)),
+                             one  = umbra_interval_exact(umbra_imm_f32(b, 1));
+        umbra_interval const t = umbra_interval_min_f32(b, one,
+                                     umbra_interval_max_f32(b, zero,
+                                         umbra_interval_div_f32(b, dot_pd, dd)));
+
+        umbra_interval const cx = umbra_interval_add_f32(b, p0x,
+                                      umbra_interval_mul_f32(b, t, dx)),
+                             cy = umbra_interval_add_f32(b, p0y,
+                                      umbra_interval_mul_f32(b, t, dy));
+        umbra_interval const ex = umbra_interval_sub_f32(b, gx, cx),
+                             ey = umbra_interval_sub_f32(b, gy, cy);
+        umbra_interval const d2 = umbra_interval_add_f32(b,
+                                      umbra_interval_mul_f32(b, ex, ex),
+                                      umbra_interval_mul_f32(b, ey, ey));
+        umbra_interval const dist = umbra_interval_sqrt_f32(b, d2);
+
+        umbra_store_var(b, lo_var, umbra_min_f32(b, umbra_load_var(b, lo_var), dist.lo));
+        umbra_store_var(b, hi_var, umbra_min_f32(b, umbra_load_var(b, hi_var), dist.hi));
+    } umbra_loop_end(b);
+
+    umbra_interval const min_dist = {umbra_load_var(b, lo_var), umbra_load_var(b, hi_var)};
+    return umbra_interval_sub_f32(b, min_dist, umbra_interval_exact(umbra_imm_f32(b, 1.5f)));
+}
+
+static void sdf_text_fill_(struct umbra_sdf const *s, void *uniforms) {
+    struct sdf_text_sdf const *self = (struct sdf_text_sdf const *)s;
+    umbra_uniforms_fill_ptr(uniforms, self->ptr_off_,
+                            (struct umbra_buf){.ptr = self->curves.data,
+                                               .count = self->curves.count * 6});
+    umbra_uniforms_fill_i32(uniforms, self->n_off_, &self->curves.count, 1);
+    float const vals[4] = {self->scale_x, self->scale_y, self->off_x, self->off_y};
+    umbra_uniforms_fill_f32(uniforms, self->n_off_ + 1, vals, 4);
+}
+
+struct sdf_text_slide {
+    struct slide base;
+    int w, h;
+
+    struct umbra_shader_solid shader;
+    struct sdf_text_sdf       sdf;
+
+    struct umbra_fmt          fmt;
+    struct umbra_draw_layout  lay;
+    struct umbra_sdf_dispatch *disp;
+};
+
+static void sdf_text_init(struct slide *s, int w, int h) {
+    struct sdf_text_slide *st = (struct sdf_text_slide *)s;
+    st->w = w;
+    st->h = h;
+    st->sdf.curves = slug_extract("Hamburgefons", (float)h * 0.4f);
+
+    float const gw = st->sdf.curves.w,
+                gh = st->sdf.curves.h;
+    float const sx = gw / (float)w,
+                sy = gh / (float)h;
+    float const scale = sx > sy ? sx : sy;
+    float const pad_x = ((float)w * scale - gw) * 0.5f,
+                pad_y = ((float)h * scale - gh) * 0.5f;
+    st->sdf.scale_x = scale;
+    st->sdf.scale_y = scale;
+    st->sdf.off_x   = -pad_x;
+    st->sdf.off_y   = -pad_y;
+    st->sdf.w_ = w;
+    st->sdf.h_ = h;
+}
+
+static void sdf_text_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
+    struct sdf_text_slide *st = (struct sdf_text_slide *)s;
+    umbra_sdf_dispatch_free(st->disp);
+    free(st->lay.uniforms);
+    st->fmt  = fmt;
+    st->disp = umbra_sdf_dispatch(be, &st->sdf.base,
+                                  (struct umbra_sdf_dispatch_config){.hard_edge = 0},
+                                  &st->shader.base, umbra_blend_srcover, fmt, &st->lay);
+    slide_bg_prepare(be, fmt, st->w, st->h);
+}
+
+static void sdf_text_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
+    (void)secs;
+    struct sdf_text_slide *st = (struct sdf_text_slide *)s;
+    slide_bg_draw(s->bg, l, t, r, b, buf);
+    umbra_sdf_dispatch_fill(&st->lay, &st->sdf.base, &st->shader.base);
+    struct umbra_buf ubuf[] = {
+        {.ptr = st->lay.uniforms, .count = st->lay.uni.slots},
+        {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
+    };
+    umbra_sdf_dispatch_queue(st->disp, l, t, r, b, ubuf);
+}
+
+static int sdf_text_get_builders(struct slide *s, struct umbra_fmt fmt,
+                                 struct umbra_builder **out, int max) {
+    if (max < 1) { return 0; }
+    struct sdf_text_slide *st = (struct sdf_text_slide *)s;
+    struct umbra_sdf_coverage adapter = umbra_sdf_coverage(&st->sdf.base, 0);
+    out[0] = umbra_draw_builder(&st->shader.base, &adapter.base,
+                                umbra_blend_srcover, fmt, NULL);
+    return out[0] ? 1 : 0;
+}
+
+static void sdf_text_free(struct slide *s) {
+    struct sdf_text_slide *st = (struct sdf_text_slide *)s;
+    umbra_sdf_dispatch_free(st->disp);
+    free(st->lay.uniforms);
+    slug_free(&st->sdf.curves);
+    free(st);
+}
+
+SLIDE(slide_sdf_text) {
+    struct sdf_text_slide *st = calloc(1, sizeof *st);
+    st->shader = umbra_shader_solid((float[]){0.95f, 0.9f, 0.8f, 1});
+    st->sdf.base = (struct umbra_sdf){.build = sdf_text_build_, .fill = sdf_text_fill_};
+    st->base = (struct slide){
+        .title = "SDF Text (analytic)",
+        .bg = {0.08f, 0.10f, 0.14f, 1},
+        .init = sdf_text_init,
+        .prepare = sdf_text_prepare,
+        .draw = sdf_text_draw,
+        .free = sdf_text_free,
+        .get_builders = sdf_text_get_builders,
     };
     return &st->base;
 }

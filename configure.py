@@ -158,6 +158,7 @@ DUMPS = [
     ('sdf_capsule',                     1),
     ('sdf_halfplane',                   1),
     ('sdf_hexagon_n_gon',               1),
+    ('sdf_text_analytic',               1),
     ('overview',                        1),
 ]
 
