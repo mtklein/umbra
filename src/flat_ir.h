@@ -52,4 +52,7 @@ struct umbra_flat_ir {
 
 enum join_policy { JOIN_KEEP_X, JOIN_PREFER_IMM };
 
+// TODO: return a distinct struct umbra_resolved_ir from resolve so the type
+// system prevents mixing pre- and post-resolve IR.  The Metal deref_buf bug
+// (fixed in the resolve-first refactor) was caused by exactly this confusion.
 struct umbra_flat_ir* umbra_flat_ir_resolve(struct umbra_flat_ir const*, enum join_policy);
