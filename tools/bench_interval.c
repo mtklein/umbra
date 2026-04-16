@@ -38,10 +38,8 @@ static struct umbra_flat_ir* build_circle_ir(void) {
                       d2 = umbra_add_f32(b, umbra_mul_f32(b, dx, dx),
                                             umbra_mul_f32(b, dy, dy)),
                       d  = umbra_sqrt_f32(b, d2),
-                      a  = umbra_min_f32(b, umbra_imm_f32(b, 1.0f),
-                               umbra_max_f32(b, umbra_imm_f32(b, 0.0f),
-                                                umbra_sub_f32(b, r, d)));
-    umbra_store_32(b, sink, a);
+                      f  = umbra_sub_f32(b, d, r);
+    umbra_store_32(b, sink, f);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
     return ir;
@@ -199,8 +197,87 @@ static void time_compiled_tiled(char const *label,
     free(hi_out);
 }
 
+static _Bool equiv(float a, float b) {
+    union { float f; int i; } ua = {a}, ub = {b};
+    return ua.i == ub.i;
+}
+
+static int verify(float const *uniform) {
+    int const xt = 4, yt = 4;
+    float const tile_w = 256, tile_h = 120;
+
+    // Scalar reference.
+    struct umbra_flat_ir *sir = build_circle_ir();
+    struct interval_program *sp = interval_program(sir);
+    umbra_flat_ir_free(sir);
+    if (!sp) { fprintf(stderr, "interval_program() failed\n"); return 1; }
+
+    float ref_lo[16], ref_hi[16];
+    for (int ty = 0; ty < yt; ty++) {
+        for (int tx = 0; tx < xt; tx++) {
+            float const xl = (float)tx * tile_w,
+                        xh = xl + tile_w,
+                        yl = (float)ty * tile_h,
+                        yh = yl + tile_h;
+            interval const out = interval_program_run(sp,
+                (interval){xl, xh}, (interval){yl, yh}, uniform);
+            ref_lo[ty * xt + tx] = out.lo;
+            ref_hi[ty * xt + tx] = out.hi;
+        }
+    }
+    interval_program_free(sp);
+
+    // Compiled paths.
+    int insts = 0;
+    struct umbra_flat_ir *cir = build_circle_interval_ir(&insts);
+    (void)insts;
+
+    struct umbra_backend *bes[] = {
+        umbra_backend_interp(),
+        umbra_backend_jit(),
+    };
+    char const *names[] = {"interp", "jit"};
+    int ok = 1;
+
+    for (int bi = 0; bi < count(bes); bi++) {
+        if (!bes[bi]) { continue; }
+        struct umbra_program *prog = bes[bi]->compile(bes[bi], cir);
+
+        float uniforms[7] = {uniform[0], uniform[1], uniform[2],
+                             0, 0, tile_w, tile_h};
+        float lo[16] = {0}, hi[16] = {0};
+        struct umbra_buf buf[] = {
+            {.ptr = uniforms, .count = 7},
+            {.ptr = lo,       .count = 16, .stride = xt},
+            {.ptr = hi,       .count = 16, .stride = xt},
+        };
+        prog->queue(prog, 0, 0, xt, yt, buf);
+        bes[bi]->flush(bes[bi]);
+
+        for (int i = 0; i < xt * yt; i++) {
+            if (!equiv(lo[i], ref_lo[i]) || !equiv(hi[i], ref_hi[i])) {
+                fprintf(stderr, "MISMATCH %s tile %d: "
+                        "scalar [%.6f, %.6f] vs compiled [%.6f, %.6f]\n",
+                        names[bi], i,
+                        (double)ref_lo[i], (double)ref_hi[i],
+                        (double)lo[i],     (double)hi[i]);
+                ok = 0;
+            }
+        }
+
+        prog->free(prog);
+        bes[bi]->free(bes[bi]);
+    }
+    umbra_flat_ir_free(cir);
+
+    if (ok) { printf("verify: all paths agree on 4x4 grid\n\n"); }
+    return ok ? 0 : 1;
+}
+
 int main(void) {
     float const uniform[3] = {512.0f, 240.0f, 180.0f};
+
+    { int const rc = verify(uniform); if (rc) { return rc; } }
 
     // Tile grids: cover a 1024x480 area with tiles of decreasing size.
     struct { int xt, yt; float tile_w, tile_h; } grids[] = {
