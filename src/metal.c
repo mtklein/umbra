@@ -947,12 +947,25 @@ static char* build_source(BB const *bb,
     struct umbra_flat_ir *resolved = umbra_flat_ir_resolve(bb, JOIN_PREFER_IMM);
     bb = resolved;
 
+    // Rebuild deref_buf from the resolved IR — resolve renumbers instructions,
+    // so pre-resolve deref_buf indices are stale.
+    int *resolved_deref = calloc((size_t)bb->insts, sizeof *resolved_deref);
+    {
+        int nb = max_ptr + 1;
+        for (int i = 0; i < bb->insts; i++) {
+            if (bb->inst[i].op == op_deref_ptr) {
+                resolved_deref[i] = nb++;
+            }
+        }
+    }
+
     int const n = bb->insts;
     _Bool *is_f = calloc((size_t)(n + 1), 1);
-    emit_ops(&b, bb, deref_buf, is_f, 0, n, "    ");
+    emit_ops(&b, bb, resolved_deref, is_f, 0, n, "    ");
     emit(&b, "}\n");
 
     umbra_flat_ir_free(resolved);
+    free(resolved_deref);
     free(is_f);
     free(buf_row_shift);
     free(buf_written);

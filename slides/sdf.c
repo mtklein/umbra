@@ -504,39 +504,47 @@ SLIDE(slide_sdf_halfplane) {
 struct ngon_sdf {
     struct umbra_sdf base;
     float cx, cy, r, angle;
-    int   off_, pad_;
+    float *hp_data;
+    int   ptr_off_, n_off_;
 };
 
 static umbra_interval ngon_build_(struct umbra_sdf *s, struct umbra_builder *b,
                                   struct umbra_uniforms_layout *u,
                                   umbra_interval x, umbra_interval y) {
     struct ngon_sdf *self = (struct ngon_sdf *)s;
-    self->off_ = umbra_uniforms_reserve_f32(u, 3 * NGON_SIDES);
+    self->ptr_off_ = umbra_uniforms_reserve_ptr(u);
+    self->n_off_   = umbra_uniforms_reserve_f32(u, 1);
+    umbra_ptr32 const data = umbra_deref_ptr32(b, (umbra_ptr32){0}, self->ptr_off_);
+    umbra_val32 const n    = umbra_uniform_32(b, (umbra_ptr32){0}, self->n_off_);
 
-    // TODO: if interval programs support loops, this could use umbra_loop
-    // instead of unrolling, allowing variable N.  Currently NGON_SIDES is
-    // fixed at compile time and the loop is fully unrolled into the IR.
-    umbra_interval result = umbra_interval_exact(umbra_imm_f32(b, -1e9f));
-    for (int i = 0; i < NGON_SIDES; i++) {
-        umbra_interval const nx = umbra_interval_exact(
-                                      umbra_uniform_32(b, (umbra_ptr32){0}, self->off_ + i * 3)),
+    umbra_var lo_var = umbra_var_alloc(b);
+    umbra_var hi_var = umbra_var_alloc(b);
+    umbra_store_var(b, lo_var, umbra_imm_f32(b, -1e9f));
+    umbra_store_var(b, hi_var, umbra_imm_f32(b, -1e9f));
+
+    umbra_val32 const j = umbra_loop(b, n); {
+        umbra_val32 const idx = umbra_mul_i32(b, j, umbra_imm_i32(b, 3));
+        umbra_interval const nx = umbra_interval_exact(umbra_gather_32(b, data, idx)),
                              ny = umbra_interval_exact(
-                                      umbra_uniform_32(b, (umbra_ptr32){0}, self->off_ + i * 3 + 1)),
+                                 umbra_gather_32(b, data,
+                                     umbra_add_i32(b, idx, umbra_imm_i32(b, 1)))),
                              d  = umbra_interval_exact(
-                                      umbra_uniform_32(b, (umbra_ptr32){0}, self->off_ + i * 3 + 2));
+                                 umbra_gather_32(b, data,
+                                     umbra_add_i32(b, idx, umbra_imm_i32(b, 2))));
         umbra_interval const hp = umbra_interval_sub_f32(b,
                                       umbra_interval_add_f32(b,
                                           umbra_interval_mul_f32(b, nx, x),
                                           umbra_interval_mul_f32(b, ny, y)),
                                       d);
-        result = umbra_interval_max_f32(b, result, hp);
-    }
-    return result;
+        umbra_store_var(b, lo_var, umbra_max_f32(b, umbra_load_var(b, lo_var), hp.lo));
+        umbra_store_var(b, hi_var, umbra_max_f32(b, umbra_load_var(b, hi_var), hp.hi));
+    } umbra_loop_end(b);
+
+    return (umbra_interval){umbra_load_var(b, lo_var), umbra_load_var(b, hi_var)};
 }
 
 static void ngon_fill_(struct umbra_sdf const *s, void *uniforms) {
     struct ngon_sdf const *self = (struct ngon_sdf const *)s;
-    float vals[3 * NGON_SIDES];
     for (int i = 0; i < NGON_SIDES; i++) {
         float const a = self->angle + (float)i * (2.0f * 3.14159265f / NGON_SIDES);
         float const vx = self->cx + self->r * cosf(a),
@@ -549,11 +557,14 @@ static void ngon_fill_(struct umbra_sdf const *s, void *uniforms) {
         float const len = sqrtf(ex * ex + ey * ey);
         float const nx = len > 0 ? ey / len : 0,
                     ny = len > 0 ? -ex / len : 1;
-        vals[i * 3]     = nx;
-        vals[i * 3 + 1] = ny;
-        vals[i * 3 + 2] = nx * vx + ny * vy;
+        self->hp_data[i * 3]     = nx;
+        self->hp_data[i * 3 + 1] = ny;
+        self->hp_data[i * 3 + 2] = nx * vx + ny * vy;
     }
-    umbra_uniforms_fill_f32(uniforms, self->off_, vals, 3 * NGON_SIDES);
+    int const n = NGON_SIDES;
+    umbra_uniforms_fill_ptr(uniforms, self->ptr_off_,
+                            (struct umbra_buf){.ptr = self->hp_data, .count = 3 * NGON_SIDES});
+    umbra_uniforms_fill_i32(uniforms, self->n_off_, &n, 1);
 }
 
 struct ngon_slide {
@@ -614,12 +625,14 @@ static void ngon_free(struct slide *s) {
     struct ngon_slide *st = (struct ngon_slide *)s;
     umbra_sdf_dispatch_free(st->disp);
     free(st->lay.uniforms);
+    free(st->sdf.hp_data);
     free(st);
 }
 
 SLIDE(slide_sdf_ngon) {
     struct ngon_slide *st = calloc(1, sizeof *st);
     st->shader = umbra_shader_solid((float[]){0.8f, 0.8f, 0.2f, 1});
+    st->sdf.hp_data = malloc(3 * NGON_SIDES * sizeof(float));
     st->sdf.base = (struct umbra_sdf){.build = ngon_build_, .fill = ngon_fill_};
     st->base = (struct slide){
         .title = "SDF Hexagon (n-gon)",
