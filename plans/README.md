@@ -26,24 +26,26 @@ Natural path of work: 01 first, then 04 and 05 to get an end-to-end iv2d-style
 pipeline running on umbra's substrate without adaptive dispatch, then 02 to
 turn on the performance story, then 03 only if measurements justify it.
 
-Actual path so far: 01 then 02.  Plan 01's `interval_program` landed
-with just enough op support for a proof-of-concept circle slide that
-made sense to wire straight into the tile dispatcher.  After plan 02
-landed, all coverage slides (solid, text, persp, slug) were migrated
-to the new `umbra_draw()` / `umbra_draw_queue()` API.  Rect coverage
-forced `le_f32`, `and_32`, `sel_32` into interval.c, giving solid-fill
-slides quadtree dispatch (3–4× speedup on CPU backends).  Text, persp,
-and slug use gathers/loops that interval.c can't bound, so they fall
-back to flat dispatch through the same API.  Plans 04 and 05 remain
-the natural next step — they give the quadtree richer coverage shapes
-to exercise.
+Actual path so far: 01 then 02, then a pivot to SDF-first dispatch.
+Plan 01's `interval_program` landed with just enough op support for a
+proof-of-concept circle slide that made sense to wire straight into
+the tile dispatcher.  After plan 02 landed and all slides were tested,
+benchmarking showed that only SDF-like coverages (circle, rect) benefit
+from interval analysis — bitmap, winding, and texture coverages produce
+trivial [0,1] bounds with no pruning value.  This resolved the
+coverage-vs-SDF architectural question (see notes below) in favor of
+SDFs.  `struct umbra_draw` was replaced by `struct umbra_sdf` (a
+signed-distance trait) and `struct umbra_quadtree` (quadtree dispatch
+driven by an SDF's interval_program).  Non-SDF slides reverted to
+direct `prog->queue`.  Plans 04 and 05 are largely subsumed — the SDF
+trait and its coverage adapter are the natural home for region authoring
+(plan 04) and interval-fraction AA (plan 05).
 
-See also two open architectural notes — captured discussions to
-re-read when drafting future plans.  Not plans themselves:
+See also two architectural notes — the coverage-vs-SDF question is
+now resolved; on-device dispatch remains open:
 
   - [notes-coverage-vs-sdf.md](notes-coverage-vs-sdf.md) —
-    whether our coverage-interval dispatcher is the right shape
-    vs. iv2d's sdf-interval approach.  Interacts with plans 04, 05.
+    **resolved**: we went SDF-first.  The "charitable future" won.
   - [notes-on-device-dispatch.md](notes-on-device-dispatch.md) —
     whether the quadtree recursion should run on the CPU (as it
     does now) or inside the GPU dispatch itself.  Interacts with

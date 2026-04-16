@@ -351,25 +351,31 @@ Per-backend MIN_TILE optima (for future tuning):
 
 ### What landed later
 
-- **Slide migrations.**  All coverage slides (solid, text, persp, slug)
-  migrated to `umbra_draw()` / `umbra_draw_queue()`.  Slides without
-  coverage (anim, gradient, slides, swatch) remain on the old
-  `umbra_draw_builder` path — migrating them would compile identical
-  programs with no coverage to intervalize.
-- **Interval ops `le_f32`, `and_32`, `sel_32`** (plus `le_f32_imm`).
-  Forced by rect coverage: `sel(le(l,x) & lt(x,r) & le(t,y) & lt(y,b),
-  1, 0)`.  With these supported, solid-fill slides get quadtree dispatch
-  (3–4× speedup on CPU backends).
+- **`struct umbra_draw` replaced by `struct umbra_quadtree`.**
+  Benchmarking showed only SDF-like coverages benefit from interval
+  analysis — bitmap, winding, and texture coverages produce trivial
+  [0,1] bounds with no pruning value.  `struct umbra_draw` (general
+  coverage → optional interval_program) was replaced by
+  `struct umbra_quadtree` (takes `struct umbra_sdf*`, always builds
+  interval_program, always does quadtree dispatch).  Non-SDF slides
+  (text, persp, slug) reverted to direct `prog->queue`.
+- **`struct umbra_sdf`** — new first-class signed-distance trait.
+  `build` returns `f(x,y)` (negative inside, positive outside).
+  `umbra_coverage_from_sdf` adapter converts to coverage via
+  `clamp(-f, 0, 1)`.  `umbra_sdf_rect` is the first concrete
+  subtype — replaces `umbra_coverage_rect` for quadtree-dispatched
+  slides.
+- **SDF-based dispatch thresholds.**  Quadtree skips when `sdf.lo >= 0`
+  (fully outside), stops subdividing when `sdf.hi <= -1` (fully inside
+  past the 1-pixel ramp).  This is tighter than the old coverage-based
+  thresholds.
+- **Interval ops `le_f32`, `and_32`, `sel_32`** added for rect
+  coverage intervalization.  The SDF rect (`max(l-x, x-r, t-y, y-b)`)
+  uses only `max`/`sub` which were already supported.
 - **`full_coverage` program removed.**  Benchmarking showed no
   measurable benefit from the interior/boundary program split.
-  `struct umbra_draw` now holds one program, not two, halving
-  `umbra_draw()` compile cost.  `partial_coverage` renamed to `program`.
-- **`src/draw.h` deleted.**  `struct umbra_draw` is fully opaque — its
-  definition lives in `draw.c`.  Tests use the public API only.
 - **Coverage uniforms at offset 0.**  `umbra_draw_builder` builds
-  coverage before shader, so both the interval program and the compiled
-  program agree that coverage uniforms start at offset 0.  Eliminated
-  `uniform_offset` and the `out_slots` bookkeeping.
+  coverage before shader.  Eliminated `uniform_offset` bookkeeping.
 
 ### LOC
 

@@ -1,7 +1,7 @@
 Coverage-interval vs SDF-interval: an open architectural question
 ==================================================================
 
-Status: open; recording the discussion, not resolving it.
+Status: resolved — we went SDF-first.  See "Resolution" at the end.
 Interacts with: notes-on-device-dispatch.md.
 
 What got us here
@@ -180,17 +180,26 @@ Open items to revisit
   thin adapter going the other direction.  Not catastrophic, but
   worth thinking through before commitment grows.
 
-What this note is and isn't
----------------------------
+Resolution
+----------
 
-This isn't a plan; there's no action to take directly from it.
-It's recording the architectural tension so that future work on
-plans 04 / 05 / 06 can reference back to it instead of re-deriving
-the arguments.  Worth re-reading when:
+Resolved in favor of SDF-first (the "charitable future").
 
-  - drafting plan 04's Expectations block,
-  - deciding whether plan 05 is still a plan or just implementation
-    inside 04,
-  - seeing a real workload profile that points one way or the other,
-  - weighing on-device dispatch (see notes-on-device-dispatch.md) —
-    that architecture amplifies the SDF-first argument considerably.
+After benchmarking all coverage types, only SDF-like coverages (circle,
+rect) produced useful interval bounds.  Bitmap, winding, and texture
+coverages always returned [0,1] — the quadtree could never prune them.
+This made the "more general" coverage-interval approach strictly
+overhead for the non-SDF cases.
+
+`struct umbra_draw` (general coverage → optional interval_program) was
+replaced by `struct umbra_sdf` (signed-distance trait) and
+`struct umbra_quadtree` (SDF-driven quadtree dispatch).  Non-SDF
+coverages use flat dispatch via `umbra_draw_builder` → `prog->queue`.
+
+The `umbra_coverage_from_sdf` adapter converts `f → clamp(-f, 0, 1)`,
+giving the SDF a 1-pixel soft edge.  Plan 05's interval-fraction
+formula (`-lo/(hi-lo)`) slots in here for better AA quality.
+
+Plans 04 and 05 are largely subsumed: `struct umbra_sdf` is the
+region-authoring API (plan 04's goal), and the SDF→coverage adapter
+is where interval-fraction AA lives (plan 05's goal).
