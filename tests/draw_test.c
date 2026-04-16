@@ -1400,3 +1400,97 @@ TEST(test_sdf_dispatch_rect) {
         if (bes[bi]) { bes[bi]->free(bes[bi]); }
     }
 }
+
+struct test_circle_sdf {
+    struct umbra_sdf base;
+    float cx, cy, r, pad_;
+    int   off_, pad__;
+};
+static umbra_interval test_circle_build_(struct umbra_sdf *s, struct umbra_builder *b,
+                                         struct umbra_uniforms_layout *u,
+                                         umbra_interval x, umbra_interval y) {
+    struct test_circle_sdf *self = (struct test_circle_sdf *)s;
+    self->off_ = umbra_uniforms_reserve_f32(u, 3);
+    umbra_interval const cx = umbra_interval_uniform(b, (umbra_ptr32){0}, self->off_),
+                         cy = umbra_interval_uniform(b, (umbra_ptr32){0}, self->off_ + 1),
+                         r  = umbra_interval_uniform(b, (umbra_ptr32){0}, self->off_ + 2);
+    umbra_interval const dx = umbra_interval_sub_f32(b, x, cx),
+                         dy = umbra_interval_sub_f32(b, y, cy),
+                         d2 = umbra_interval_add_f32(b,
+                                  umbra_interval_mul_f32(b, dx, dx),
+                                  umbra_interval_mul_f32(b, dy, dy)),
+                         d  = umbra_interval_sqrt_f32(b, d2);
+    return umbra_interval_sub_f32(b, d, r);
+}
+static void test_circle_fill_(struct umbra_sdf const *s, void *uniforms) {
+    struct test_circle_sdf const *self = (struct test_circle_sdf const *)s;
+    float const vals[3] = {self->cx, self->cy, self->r};
+    umbra_uniforms_fill_f32(uniforms, self->off_, vals, 3);
+}
+
+TEST(test_sdf_dispatch_tiling) {
+    // Canvas larger than QUEUE_MIN_TILE (512) so the grid has multiple tiles.
+    // Circle at (512, 384) r=180 covers ~4 of ~6 tiles on 1024x768 with 512px tiles.
+    enum { W = 1024, H = 768 };
+
+    struct test_circle_sdf sdf = {
+        .base = {.build = test_circle_build_, .fill = test_circle_fill_},
+        .cx = 512, .cy = 384, .r = 180,
+    };
+    struct umbra_shader_solid shader = umbra_shader_solid((float[]){1, 0, 0, 1});
+
+    struct umbra_backend *be = umbra_backend_jit();
+    if (!be) { be = umbra_backend_interp(); }
+
+    // Tiled dispatch.
+    struct umbra_draw_layout lay_tiled;
+    struct umbra_sdf_dispatch *disp = umbra_sdf_dispatch(be, &sdf.base,
+        (struct umbra_sdf_dispatch_config){.hard_edge = 1},
+        &shader.base, umbra_blend_srcover, umbra_fmt_8888, &lay_tiled);
+    disp != NULL here;
+
+    // Flat reference: same shader+coverage, no tiling.
+    struct umbra_sdf_coverage adapter = umbra_sdf_coverage(&sdf.base, 1);
+    struct umbra_draw_layout lay_flat;
+    struct umbra_builder *fb = umbra_draw_builder(&shader.base, &adapter.base,
+                                                  umbra_blend_srcover, umbra_fmt_8888, &lay_flat);
+    struct umbra_flat_ir *fir = umbra_flat_ir(fb);
+    umbra_builder_free(fb);
+    struct umbra_program *flat = be->compile(be, fir);
+    umbra_flat_ir_free(fir);
+
+    uint32_t *tiled_buf = calloc(W * H, sizeof(uint32_t));
+    uint32_t *flat_buf  = calloc(W * H, sizeof(uint32_t));
+
+    umbra_sdf_dispatch_fill(&lay_tiled, &sdf.base, &shader.base);
+    umbra_draw_fill(&lay_flat, &shader.base, &adapter.base);
+
+    struct umbra_buf tiled_ubuf[] = {
+        {.ptr = lay_tiled.uniforms, .count = lay_tiled.uni.slots},
+        {.ptr = tiled_buf,          .count = W * H, .stride = W},
+    };
+    umbra_sdf_dispatch_queue(disp, 0, 0, W, H, tiled_ubuf);
+
+    struct umbra_buf flat_ubuf[] = {
+        {.ptr = lay_flat.uniforms, .count = lay_flat.uni.slots},
+        {.ptr = flat_buf,          .count = W * H, .stride = W},
+    };
+    flat->queue(flat, 0, 0, W, H, flat_ubuf);
+
+    be->flush(be);
+
+    // Every pixel must match.
+    int mismatches = 0;
+    for (int i = 0; i < W * H; i++) {
+        if (tiled_buf[i] != flat_buf[i]) { mismatches++; }
+    }
+    mismatches == 0 here;
+
+    free(flat_buf);
+    free(tiled_buf);
+    flat->free(flat);
+    free(lay_flat.uniforms);
+    umbra_sdf_dispatch_free(disp);
+    free(lay_tiled.uniforms);
+    be->free(be);
+}

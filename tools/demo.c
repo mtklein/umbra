@@ -210,7 +210,7 @@ static void tile_fn(void *arg) {
 }
 
 int main(void) {
-    enum { W = 640, H = 480 };
+    enum { W = 800, H = 600 };
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
