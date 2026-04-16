@@ -1,9 +1,5 @@
-// Circle SDF slide.  A smooth-edge circle as an umbra_sdf trait, paired with
-// a solid shader and srcover blend.  The SDF math is deliberately interval-
-// program-friendly (square, square_add, sqrt, sub), so umbra_sdf_dispatch() can
-// build an interval_program and prune the dispatch down to a boundary ring
-// plus a solid interior.
 #include "slide.h"
+#include "../include/umbra_interval.h"
 #include <math.h>
 #include <stdlib.h>
 
@@ -28,6 +24,23 @@ static umbra_val32 circle_build_(struct umbra_sdf *s, struct umbra_builder *b,
                                             umbra_mul_f32(b, dy, dy)),
                       d  = umbra_sqrt_f32(b, d2);
     return umbra_sub_f32(b, d, r);
+}
+static umbra_interval circle_ibuild_(struct umbra_sdf *s, struct umbra_builder *b,
+                                     struct umbra_uniforms_layout *u,
+                                     umbra_interval x, umbra_interval y) {
+    struct circle_sdf *self = (struct circle_sdf *)s;
+    self->off_ = umbra_uniforms_reserve_f32(u, 3);
+
+    umbra_interval const cx = umbra_interval_uniform(b, (umbra_ptr32){0}, self->off_),
+                         cy = umbra_interval_uniform(b, (umbra_ptr32){0}, self->off_ + 1),
+                         r  = umbra_interval_uniform(b, (umbra_ptr32){0}, self->off_ + 2);
+    umbra_interval const dx = umbra_interval_sub_f32(b, x, cx),
+                         dy = umbra_interval_sub_f32(b, y, cy),
+                         d2 = umbra_interval_add_f32(b,
+                                  umbra_interval_mul_f32(b, dx, dx),
+                                  umbra_interval_mul_f32(b, dy, dy)),
+                         d  = umbra_interval_sqrt_f32(b, d2);
+    return umbra_interval_sub_f32(b, d, r);
 }
 static void circle_fill_(struct umbra_sdf const *s, void *uniforms) {
     struct circle_sdf const *self = (struct circle_sdf const *)s;
@@ -116,7 +129,7 @@ SLIDE(slide_circle_coverage) {
     struct circle_slide *st = calloc(1, sizeof *st);
     st->shader = umbra_shader_solid((float[]){0.95f, 0.45f, 0.10f, 1.0f});
     st->sdf = (struct circle_sdf){
-        .base = {.build = circle_build_, .fill = circle_fill_},
+        .base = {.build = circle_build_, .ibuild = circle_ibuild_, .fill = circle_fill_},
     };
     st->base = (struct slide){
         .title = "Circle Coverage (interval-ready)",

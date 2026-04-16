@@ -1,5 +1,5 @@
 #pragma once
-#include "../include/umbra.h"
+#include "umbra.h"
 
 typedef struct { umbra_val32 lo, hi; } umbra_interval;
 

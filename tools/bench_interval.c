@@ -12,7 +12,7 @@
 #include "../src/count.h"
 #include "../src/flat_ir.h"
 #include "../src/interval.h"
-#include "../src/interval_builder.h"
+#include "../include/umbra_interval.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
