@@ -361,6 +361,7 @@ void umbra_sdf_dispatch_queue(struct umbra_sdf_dispatch const *d,
     };
     d->bounds->queue(d->bounds, 0, 0, xt, yt, bounds_buf);
 
+    // TODO: coalesce horizontally adjacent covered tiles into one draw->queue() call.
     for (int ty = 0; ty < yt; ty++) {
         for (int tx = 0; tx < xt; tx++) {
             if (lo[ty * xt + tx] < 0) {
