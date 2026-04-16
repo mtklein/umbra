@@ -847,11 +847,16 @@ static void emit_ops(SrcBuf *b, BB const *bb,
     }
 }
 
-static char* build_source(BB const *bb,
+static char* build_source(BB const *orig_bb,
                            int *out_max_ptr,
                            int *out_total_bufs,
                            int *out_deref_buf,
-                           uint8_t **out_buf_shift) {
+                           uint8_t **out_buf_shift,
+                           struct umbra_flat_ir **out_resolved) {
+    struct umbra_flat_ir *resolved = umbra_flat_ir_resolve(orig_bb, JOIN_PREFER_IMM);
+    BB const *bb = resolved;
+    *out_resolved = resolved;
+
     int max_ptr = -1;
     for (int i = 0; i < bb->insts; i++) {
         if (op_has_ptr(bb->inst[i].op)
@@ -944,28 +949,11 @@ static char* build_source(BB const *bb,
         emit(&b, "    uint var%d = 0;\n", i);
     }
 
-    struct umbra_flat_ir *resolved = umbra_flat_ir_resolve(bb, JOIN_PREFER_IMM);
-    bb = resolved;
-
-    // Rebuild deref_buf from the resolved IR — resolve renumbers instructions,
-    // so pre-resolve deref_buf indices are stale.
-    int *resolved_deref = calloc((size_t)bb->insts, sizeof *resolved_deref);
-    {
-        int nb = max_ptr + 1;
-        for (int i = 0; i < bb->insts; i++) {
-            if (bb->inst[i].op == op_deref_ptr) {
-                resolved_deref[i] = nb++;
-            }
-        }
-    }
-
     int const n = bb->insts;
     _Bool *is_f = calloc((size_t)(n + 1), 1);
-    emit_ops(&b, bb, resolved_deref, is_f, 0, n, "    ");
+    emit_ops(&b, bb, deref_buf, is_f, 0, n, "    ");
     emit(&b, "}\n");
 
-    umbra_flat_ir_free(resolved);
-    free(resolved_deref);
     free(is_f);
     free(buf_row_shift);
     free(buf_written);
@@ -1065,8 +1053,10 @@ static struct metal_program* metal_program(
         int *deref_buf = calloc((size_t)bb->insts, sizeof *deref_buf);
         int  max_ptr = -1, total_bufs = 0;
         uint8_t *buf_shift = NULL;
+        struct umbra_flat_ir *resolved = NULL;
         char *src = build_source(bb, &max_ptr, &total_bufs, deref_buf,
-                                 &buf_shift);
+                                 &buf_shift, &resolved);
+        bb = resolved;
 
         char const *override = getenv("UMBRA_METAL_OVERRIDE");
         if (override) {
@@ -1171,12 +1161,14 @@ static struct metal_program* metal_program(
             p->buf_shift     = buf_shift;
 
             free(deref_buf);
+            umbra_flat_ir_free(resolved);
             result = p;
             goto out;
         }
 
     fail:
         free(deref_buf);
+        umbra_flat_ir_free(resolved);
         free(di);
         free(buf_rw);
         free(buf_shift);
