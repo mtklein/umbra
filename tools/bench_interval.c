@@ -3,7 +3,9 @@
 //   1. interval.h  — scalar CPU interpreter (interval_program_run)
 //   2. interval_builder.h — compiled program via the regular backends
 //
-// Both evaluate the same circle-SDF interval math on the same inputs.
+// Both evaluate the same circle-SDF interval math.  The tiled version
+// dispatches an xt*yt grid of tiles in a single prog->queue call,
+// amortizing per-dispatch overhead.
 
 #define _POSIX_C_SOURCE 200809L
 #include "../include/umbra.h"
@@ -21,6 +23,7 @@ static double now(void) {
     return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
 }
 
+// Scalar interval program for the circle SDF (used by interval.h path).
 static struct umbra_flat_ir* build_circle_ir(void) {
     struct umbra_builder *b  = umbra_builder();
     umbra_ptr32 const uniform = {.ix = 0},
@@ -44,8 +47,9 @@ static struct umbra_flat_ir* build_circle_ir(void) {
     return ir;
 }
 
-// Build the same circle SDF using interval_builder.h.
-// Uniforms: 0=cx, 1=cy, 2=r, 3=x.lo, 4=x.hi, 5=y.lo, 6=y.hi
+// Compiled interval program for the circle SDF.
+// Uniforms: 0=cx, 1=cy, 2=r, 3=base_x, 4=base_y, 5=tile_w, 6=tile_h
+// x() and y() are tile indices.  Each pixel computes one tile's bounds.
 // Stores result.lo to ptr 1, result.hi to ptr 2.
 static struct umbra_flat_ir* build_circle_interval_ir(int *out_insts) {
     struct umbra_builder *b = umbra_builder();
@@ -53,9 +57,22 @@ static struct umbra_flat_ir* build_circle_interval_ir(int *out_insts) {
 
     umbra_interval const cx = umbra_interval_uniform(b, u, 0),
                          cy = umbra_interval_uniform(b, u, 1),
-                         r  = umbra_interval_uniform(b, u, 2),
-                         x  = {umbra_uniform_32(b, u, 3), umbra_uniform_32(b, u, 4)},
-                         y  = {umbra_uniform_32(b, u, 5), umbra_uniform_32(b, u, 6)};
+                         r  = umbra_interval_uniform(b, u, 2);
+
+    umbra_val32 const base_x = umbra_uniform_32(b, u, 3),
+                      base_y = umbra_uniform_32(b, u, 4),
+                      tile_w = umbra_uniform_32(b, u, 5),
+                      tile_h = umbra_uniform_32(b, u, 6);
+
+    umbra_val32 const xf = umbra_f32_from_i32(b, umbra_x(b)),
+                      yf = umbra_f32_from_i32(b, umbra_y(b));
+    umbra_val32 const x_lo = umbra_add_f32(b, base_x, umbra_mul_f32(b, xf, tile_w)),
+                      y_lo = umbra_add_f32(b, base_y, umbra_mul_f32(b, yf, tile_h)),
+                      x_hi = umbra_add_f32(b, x_lo, tile_w),
+                      y_hi = umbra_add_f32(b, y_lo, tile_h);
+
+    umbra_interval const x = {x_lo, x_hi},
+                         y = {y_lo, y_hi};
 
     umbra_interval const dx = umbra_interval_sub_f32(b, x, cx),
                          dy = umbra_interval_sub_f32(b, y, cy),
@@ -74,22 +91,32 @@ static struct umbra_flat_ir* build_circle_interval_ir(int *out_insts) {
     return ir;
 }
 
-struct sample { interval x, y; };
-
 static volatile float sink_absorb;
 
-static void time_interp(char const *label, struct interval_program *p,
-                        float const *uniform,
-                        struct sample const *xy, int xys,
-                        double target_secs, int trials) {
-    int    iters   = 16;
+static void time_scalar_tiled(char const *label,
+                              struct interval_program *p,
+                              float const *uniform,
+                              float base_x, float base_y,
+                              float tile_w, float tile_h,
+                              int xt, int yt,
+                              double target_secs, int trials) {
+    int const tiles = xt * yt;
+    int iters = 1;
     double t_pilot = 0;
     for (int pi = 0; pi < 30; pi++) {
         double const start = now();
         for (int it = 0; it < iters; it++) {
-            struct sample const sa = xy[it & (xys - 1)];
-            interval const out = interval_program_run(p, sa.x, sa.y, uniform);
-            sink_absorb += out.lo + out.hi;
+            for (int ty = 0; ty < yt; ty++) {
+                for (int tx = 0; tx < xt; tx++) {
+                    float const xl = base_x + (float)tx * tile_w,
+                                xh = xl + tile_w,
+                                yl = base_y + (float)ty * tile_h,
+                                yh = yl + tile_h;
+                    interval const out = interval_program_run(p,
+                        (interval){xl, xh}, (interval){yl, yh}, uniform);
+                    sink_absorb += out.lo + out.hi;
+                }
+            }
         }
         t_pilot = now() - start;
         if (t_pilot >= target_secs / 2) { break; }
@@ -102,36 +129,51 @@ static void time_interp(char const *label, struct interval_program *p,
     for (int k = 0; k < trials; k++) {
         double const start = now();
         for (int it = 0; it < iters; it++) {
-            struct sample const sa = xy[it & (xys - 1)];
-            interval const out = interval_program_run(p, sa.x, sa.y, uniform);
-            sink_absorb += out.lo + out.hi;
+            for (int ty = 0; ty < yt; ty++) {
+                for (int tx = 0; tx < xt; tx++) {
+                    float const xl = base_x + (float)tx * tile_w,
+                                xh = xl + tile_w,
+                                yl = base_y + (float)ty * tile_h,
+                                yh = yl + tile_h;
+                    interval const out = interval_program_run(p,
+                        (interval){xl, xh}, (interval){yl, yh}, uniform);
+                    sink_absorb += out.lo + out.hi;
+                }
+            }
         }
         double const dt = now() - start;
         if (k == 0 || dt < best) { best = dt; }
     }
-    printf("  %-8s %6.1f ns/call\n", label, best / (double)iters * 1e9);
+    double const ns_tile = best / (double)(iters * tiles) * 1e9;
+    printf("  %-12s %6.1f ns/tile  (%d tiles, %dx%d)\n", label, ns_tile, tiles, xt, yt);
 }
 
-static void time_compiled(char const *label, struct umbra_program *prog,
-                          float const *base_uniform,
-                          struct sample const *xy, int xys,
-                          double target_secs, int trials) {
-    int    iters   = 16;
+static void time_compiled_tiled(char const *label,
+                                struct umbra_program *prog,
+                                struct umbra_backend *be,
+                                float const *base_uniform,
+                                float base_x, float base_y,
+                                float tile_w, float tile_h,
+                                int xt, int yt,
+                                double target_secs, int trials) {
+    int const tiles = xt * yt;
+    float uniforms[7] = {base_uniform[0], base_uniform[1], base_uniform[2],
+                         base_x, base_y, tile_w, tile_h};
+    float *lo_out = calloc((size_t)(xt * yt), sizeof(float));
+    float *hi_out = calloc((size_t)(xt * yt), sizeof(float));
+    struct umbra_buf buf[] = {
+        {.ptr = uniforms, .count = 7},
+        {.ptr = lo_out,   .count = xt * yt, .stride = xt},
+        {.ptr = hi_out,   .count = xt * yt, .stride = xt},
+    };
+
+    int iters = 1;
     double t_pilot = 0;
     for (int pi = 0; pi < 30; pi++) {
         double const start = now();
         for (int it = 0; it < iters; it++) {
-            struct sample const sa = xy[it & (xys - 1)];
-            float uniforms[7] = {base_uniform[0], base_uniform[1], base_uniform[2],
-                                 sa.x.lo, sa.x.hi, sa.y.lo, sa.y.hi};
-            float lo_out = 0, hi_out = 0;
-            struct umbra_buf buf[] = {
-                {.ptr = uniforms, .count = 7},
-                {.ptr = &lo_out,  .count = 1},
-                {.ptr = &hi_out,  .count = 1},
-            };
-            prog->queue(prog, 0, 0, 1, 1, buf);
-            sink_absorb += lo_out + hi_out;
+            prog->queue(prog, 0, 0, xt, yt, buf);
+            be->flush(be);
         }
         t_pilot = now() - start;
         if (t_pilot >= target_secs / 2) { break; }
@@ -144,36 +186,29 @@ static void time_compiled(char const *label, struct umbra_program *prog,
     for (int k = 0; k < trials; k++) {
         double const start = now();
         for (int it = 0; it < iters; it++) {
-            struct sample const sa = xy[it & (xys - 1)];
-            float uniforms[7] = {base_uniform[0], base_uniform[1], base_uniform[2],
-                                 sa.x.lo, sa.x.hi, sa.y.lo, sa.y.hi};
-            float lo_out = 0, hi_out = 0;
-            struct umbra_buf buf[] = {
-                {.ptr = uniforms, .count = 7},
-                {.ptr = &lo_out,  .count = 1},
-                {.ptr = &hi_out,  .count = 1},
-            };
-            prog->queue(prog, 0, 0, 1, 1, buf);
-            sink_absorb += lo_out + hi_out;
+            prog->queue(prog, 0, 0, xt, yt, buf);
+            be->flush(be);
         }
         double const dt = now() - start;
         if (k == 0 || dt < best) { best = dt; }
     }
-    printf("  %-8s %6.1f ns/call\n", label, best / (double)iters * 1e9);
+    double const ns_tile = best / (double)(iters * tiles) * 1e9;
+    printf("  %-12s %6.1f ns/tile  (%d tiles, %dx%d)\n", label, ns_tile, tiles, xt, yt);
+
+    free(lo_out);
+    free(hi_out);
 }
 
 int main(void) {
     float const uniform[3] = {512.0f, 240.0f, 180.0f};
 
-    struct sample edge[8] = {
-        {{ 300,  400}, {  60,  160}},
-        {{ 620,  720}, {  60,  160}},
-        {{ 460,  560}, { -80,   20}},
-        {{ 460,  560}, { 400,  500}},
-        {{ 332,  348}, { 230,  250}},
-        {{ 676,  692}, { 230,  250}},
-        {{ 500,  524}, {  58,   74}},
-        {{ 500,  524}, { 406,  422}},
+    // Tile grids: cover a 1024x480 area with tiles of decreasing size.
+    struct { int xt, yt; float tile_w, tile_h; } grids[] = {
+        {  2,   2, 512, 240},
+        {  4,   4, 256, 120},
+        {  8,   8, 128,  60},
+        { 16,  16,  64,  30},
+        { 32,  32,  32,  15},
     };
 
     // --- interval.h (scalar CPU interpreter) ---
@@ -186,7 +221,13 @@ int main(void) {
         }
         printf("interval.h (scalar interpreter, %d IR insts)\n", ir->insts);
         umbra_flat_ir_free(ir);
-        time_interp("edge", p, uniform, edge, count(edge), 0.05, 7);
+        for (int gi = 0; gi < count(grids); gi++) {
+            char label[32];
+            snprintf(label, sizeof label, "%dx%d", grids[gi].xt, grids[gi].yt);
+            time_scalar_tiled(label, p, uniform,
+                              0, 0, grids[gi].tile_w, grids[gi].tile_h,
+                              grids[gi].xt, grids[gi].yt, 0.05, 7);
+        }
         interval_program_free(p);
     }
 
@@ -206,7 +247,13 @@ int main(void) {
             if (!bes[bi]) { continue; }
             struct umbra_program *prog = bes[bi]->compile(bes[bi], ir);
             printf("  %s:\n", names[bi]);
-            time_compiled("edge", prog, uniform, edge, count(edge), 0.05, 7);
+            for (int gi = 0; gi < count(grids); gi++) {
+                char label[32];
+                snprintf(label, sizeof label, "%dx%d", grids[gi].xt, grids[gi].yt);
+                time_compiled_tiled(label, prog, bes[bi], uniform,
+                                   0, 0, grids[gi].tile_w, grids[gi].tile_h,
+                                   grids[gi].xt, grids[gi].yt, 0.05, 7);
+            }
             prog->free(prog);
             bes[bi]->free(bes[bi]);
         }
