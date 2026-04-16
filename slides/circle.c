@@ -57,8 +57,8 @@ static void circle_init(struct slide *s, int w, int h) {
     st->vy  = 1.3f;
 }
 
-static float bounce(float p0, float v, int frame, float range) {
-    float p = fmodf(p0 + (float)frame * v, 2.0f * range);
+static float bounce(float p0, float v, double secs, float range) {
+    float p = fmodf(p0 + (float)secs * v, 2.0f * range);
     if (p < 0.0f) { p += 2.0f * range; }
     if (p > range) { p = 2.0f * range - p; }
     return p;
@@ -75,13 +75,14 @@ static void circle_prepare(struct slide *s, struct umbra_backend *be, struct umb
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
-static void circle_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
+static void circle_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct circle_slide *st = (struct circle_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
 
+    double const ticks = secs * 60.0;
     float const pad = st->r + 2.0f;
-    st->sdf.cx = pad + bounce(st->cx0 - pad, st->vx, frame, (float)st->w - 2.0f*pad);
-    st->sdf.cy = pad + bounce(st->cy0 - pad, st->vy, frame, (float)st->h - 2.0f*pad);
+    st->sdf.cx = pad + bounce(st->cx0 - pad, st->vx, ticks, (float)st->w - 2.0f*pad);
+    st->sdf.cy = pad + bounce(st->cy0 - pad, st->vy, ticks, (float)st->h - 2.0f*pad);
     st->sdf.r  = st->r;
 
     umbra_sdf_dispatch_fill(&st->lay, &st->sdf.base, &st->shader.base);

@@ -35,9 +35,9 @@ static void anim_prepare(struct slide *s, struct umbra_backend *be, struct umbra
     st->prog = be->compile(be, st->bb);
 }
 
-static void anim_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
+static void anim_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct anim_slide *st = (struct anim_slide *)s;
-    float ft = (float)frame * 0.016f;
+    float ft = (float)secs;
     st->shader.color[0] = 0.5f + 0.5f * sinf(ft);
     st->shader.color[1] = 0.5f + 0.5f * sinf(ft + 2.094f);
     st->shader.color[2] = 0.5f + 0.5f * sinf(ft + 4.189f);

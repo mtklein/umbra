@@ -138,10 +138,10 @@ static void csg_prepare(struct slide *s, struct umbra_backend *be, struct umbra_
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
-static void csg_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
+static void csg_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct csg_slide *st = (struct csg_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
-    orbit_update(&st->sdf.orbit, (float)frame * 0.02f, st->w, st->h);
+    orbit_update(&st->sdf.orbit, (float)secs, st->w, st->h);
     umbra_sdf_dispatch_fill(&st->lay, &st->sdf.base, &st->shader.base);
     struct umbra_buf ubuf[] = {
         {.ptr = st->lay.uniforms, .count = st->lay.uni.slots},
@@ -321,14 +321,12 @@ static void rounded_rect_prepare(struct slide *s, struct umbra_backend *be,
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
-static void rounded_rect_draw(struct slide *s, int frame, int l, int t, int r, int b,
+static void rounded_rect_draw(struct slide *s, double secs, int l, int t, int r, int b,
                                void *buf) {
     struct rounded_rect_slide *st = (struct rounded_rect_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
 
-    float const period = 200.0f;
-    float const anim = sinf((float)frame * 0.03f) * 0.5f + 0.5f;
-    (void)period;
+    float const anim = sinf((float)secs) * 0.5f + 0.5f;
     st->sdf.cx = (float)st->w * 0.5f;
     st->sdf.cy = (float)st->h * 0.5f;
     st->sdf.hw = (float)(st->w < st->h ? st->w : st->h) * (0.15f + 0.1f * anim);

@@ -21,12 +21,13 @@ typedef void (*draw_fn)(void *ctx);
 struct slide_draw_ctx {
     struct slide *s;
     void         *buf;
-    int           frame;
-    int           w, h, :32;
+    double        secs;
+    int           w, h;
 };
 static void slide_draw(void *vctx) {
     struct slide_draw_ctx *c = vctx;
-    c->s->draw(c->s, c->frame++, 0, 0, c->w, c->h, c->buf);
+    c->s->draw(c->s, c->secs, 0, 0, c->w, c->h, c->buf);
+    c->secs += 1.0 / 60.0;
 }
 
 struct prog_draw_ctx {
@@ -291,7 +292,7 @@ int main(int argc, char *argv[]) {
         for (int bi = 0; bi < nb; bi++) {
             if (!(be_mask & (1 << bi)) || !bes[bi]) { continue; }
             s->prepare(s, bes[bi], fmt);
-            struct slide_draw_ctx sctx = {.s=s, .buf=buf, .frame=0, .w=W, .h=H};
+            struct slide_draw_ctx sctx = {.s=s, .buf=buf, .secs=0.0, .w=W, .h=H};
             ns_px[bi] = bench(slide_draw, &sctx, bes[bi], W, H, samples, target_secs,
                               &gpu[bi], &bstats[bi]);
         }

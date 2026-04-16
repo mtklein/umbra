@@ -71,7 +71,7 @@ static void render_thumbnails(struct overview_slide *st) {
 
         struct slide *sub = slide_get(idx);
         if (sub->prepare) { sub->prepare(sub, st->be, st->fmt); }
-        sub->draw(sub, 0, 0, 0, w, h, st->tmp);
+        sub->draw(sub, 0.0, 0, 0, w, h, st->tmp);
         st->be->flush(st->be);
 
         for (int cy = 0; cy < st->ch; cy++) {
@@ -115,9 +115,9 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
     umbra_flat_ir_free(bb);
 }
 
-static void overview_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
+static void overview_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct overview_slide *st = (struct overview_slide *)s;
-    (void)frame; (void)l; (void)r;
+    (void)secs; (void)l; (void)r;
     int const w = st->w,
               h = st->h;
     st->cvt->queue(st->cvt, 0, t, w, b, (struct umbra_buf[]){

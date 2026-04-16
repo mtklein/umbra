@@ -35,9 +35,9 @@ static void swatch_prepare(struct slide *s, struct umbra_backend *be, struct umb
     st->prog = be->compile(be, st->bb);
 }
 
-static void swatch_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
+static void swatch_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct swatch_slide *st = (struct swatch_slide *)s;
-    (void)frame;
+    (void)secs;
 
     static float const swatches[][4] = {
         {1.0f, 0.0f, 0.0f, 1.0f},

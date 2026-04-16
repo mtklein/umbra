@@ -214,7 +214,7 @@ static void render_hdr(char const *dir, int slide_idx, struct umbra_backend *be)
     void *pixbuf = calloc(1, pixbuf_sz);
 
     s->prepare(s, be, umbra_fmt_fp16_planar);
-    s->draw(s, 0, 0, 0, RW, RH, pixbuf);
+    s->draw(s, 0.0, 0, 0, RW, RH, pixbuf);
     be->flush(be);
 
     float *fdata = malloc((size_t)(RW * RH) * 4 * sizeof(float));

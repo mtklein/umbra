@@ -548,7 +548,8 @@ static void slug_two_pass_prepare(struct slide *s,
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
-static void slug_two_pass_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
+static void slug_two_pass_draw(struct slide *s, double secs, int l, int t, int r, int b,
+                               void *buf) {
     struct slug_two_pass_slide           *st = (struct slug_two_pass_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
     struct umbra_program *acc = st->acc_prog;
@@ -559,7 +560,7 @@ static void slug_two_pass_draw(struct slide *s, int frame, int l, int t, int r, 
                      (size_t)(b - t) * wind_row);
 
     struct umbra_matrix mat;
-    slide_perspective_matrix(&mat, (float)frame * 0.016f, w, h,
+    slide_perspective_matrix(&mat, (float)secs, w, h,
                              (int)st->slug.w, (int)st->slug.h);
     umbra_uniforms_fill_f32(st->acc_lay.uniforms, st->acc_lay.mat, &mat.sx, 9);
     float const wh[2] = {st->slug.w, st->slug.h};
@@ -673,7 +674,7 @@ static void slug_prepare(struct slide *s, struct umbra_backend *be,
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
-static void slug_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
+static void slug_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct slug_slide *st = (struct slug_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
     int w = st->w, h = st->h;
@@ -683,7 +684,7 @@ static void slug_draw(struct slide *s, int frame, int l, int t, int r, int b, vo
                      (size_t)(b - t) * wind_row);
 
     struct umbra_matrix mat;
-    slide_perspective_matrix(&mat, (float)frame * 0.016f, w, h,
+    slide_perspective_matrix(&mat, (float)secs, w, h,
                              (int)st->slug.w, (int)st->slug.h);
     umbra_uniforms_fill_f32(st->acc_lay.uniforms, st->acc_lay.mat, &mat.sx, 9);
     float const wh[2] = {st->slug.w, st->slug.h};

@@ -57,9 +57,9 @@ static void grad_2stop_prepare(struct slide *s, struct umbra_backend *be, struct
     st->prog = be->compile(be, st->bb);
 }
 
-static void grad_2stop_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
+static void grad_2stop_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct grad_2stop_slide *st = (struct grad_2stop_slide *)s;
-    (void)frame;
+    (void)secs;
     umbra_draw_fill(&st->lay, &st->shader.linear.base, NULL);
     struct umbra_buf ubuf[] = {
         {.ptr=st->lay.uniforms, .count=st->lay.uni.slots},
@@ -105,9 +105,9 @@ static void grad_lut_prepare(struct slide *s, struct umbra_backend *be, struct u
     st->prog = be->compile(be, st->bb);
 }
 
-static void grad_lut_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
+static void grad_lut_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct grad_lut_slide *st = (struct grad_lut_slide *)s;
-    (void)frame;
+    (void)secs;
     umbra_draw_fill(&st->lay, &st->shader.linear.base, NULL);
     struct umbra_buf ubuf[] = {
         {.ptr=st->lay.uniforms, .count=st->lay.uni.slots},
@@ -222,9 +222,9 @@ static void grad_stops_prepare(struct slide *s, struct umbra_backend *be, struct
     st->prog = be->compile(be, st->bb);
 }
 
-static void grad_stops_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
+static void grad_stops_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct grad_stops_slide *st = (struct grad_stops_slide *)s;
-    (void)frame;
+    (void)secs;
     umbra_draw_fill(&st->lay, &st->shader.linear.base, NULL);
     struct umbra_buf ubuf[] = {
         {.ptr=st->lay.uniforms, .count=st->lay.uni.slots},

@@ -8,7 +8,7 @@ struct slide {
 
     void (*init)   (struct slide*, int w, int h);
     void (*prepare)(struct slide*, struct umbra_backend*, struct umbra_fmt);
-    void (*draw)   (struct slide*, int frame, int l, int t, int r, int b, void *buf);
+    void (*draw)   (struct slide*, double secs, int l, int t, int r, int b, void *buf);
     void (*free)   (struct slide*);
 
     int (*get_builders)(struct slide*, struct umbra_fmt,

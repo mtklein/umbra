@@ -37,10 +37,10 @@ static void persp_prepare(struct slide *s, struct umbra_backend *be,
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
-static void persp_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
+static void persp_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct persp_slide *st = (struct persp_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
-    slide_perspective_matrix(&st->cov.mat, (float)frame * 0.016f, st->w, st->h,
+    slide_perspective_matrix(&st->cov.mat, (float)secs, st->w, st->h,
                              st->bitmap->w, st->bitmap->h);
     st->cov.bmp = (struct umbra_bitmap){
         .buf = {.ptr = st->bitmap->data, .count = st->bitmap->w * st->bitmap->h},

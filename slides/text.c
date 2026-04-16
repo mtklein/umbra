@@ -155,9 +155,9 @@ static void text_prepare(struct slide *s, struct umbra_backend *be,
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
-static void text_draw(struct slide *s, int frame, int l, int t, int r, int b, void *buf) {
+static void text_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct text_slide *st = (struct text_slide *)s;
-    (void)frame;
+    (void)secs;
     slide_bg_draw(s->bg, l, t, r, b, buf);
     st->cov.bitmap.bmp = (struct umbra_buf){
         .ptr=st->tc->data,
