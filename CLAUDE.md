@@ -33,6 +33,12 @@ Use // TODO in the code to track bugs or anything else that needs a follow up.
 
 Style
 -----
+Every line you write or modify must conform to this guide.  Do not skim this
+section.  Do not treat it as advisory.  Read back every line you write and
+verify it against these rules before including it in a diff.  Style violations
+that reach a commit are bugs — they cost a round-trip to find and fix, and
+each one erodes trust that the guide is being followed at all.
+
 Indent with 4 spaces, wrap to 100 columns, and always use {}.  Almost always
 begin a new line after {, even for short expressions, except prefer to align
 parallel constructs vertically.  It's nice to vertically align consecutive
