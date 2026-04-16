@@ -241,7 +241,14 @@ static umbra_val32 sdf_as_coverage_build_(struct umbra_coverage *s, struct umbra
                                           struct umbra_uniforms_layout *u,
                                           umbra_val32 x, umbra_val32 y) {
     struct umbra_sdf_coverage *self = (struct umbra_sdf_coverage *)s;
-    umbra_val32 const f = self->sdf->build(self->sdf, b, u, x, y);
+    umbra_val32 const half = umbra_imm_f32(b, 0.5f);
+    umbra_val32 const f = self->sdf->build(self->sdf, b, u,
+                                           umbra_add_f32(b, x, half),
+                                           umbra_add_f32(b, y, half));
+    if (self->hard_edge) {
+        return umbra_sel_32(b, umbra_lt_f32(b, f, umbra_imm_f32(b, 0.0f)),
+                            umbra_imm_f32(b, 1.0f), umbra_imm_f32(b, 0.0f));
+    }
     return umbra_min_f32(b, umbra_imm_f32(b, 1.0f),
                          umbra_max_f32(b, umbra_imm_f32(b, 0.0f),
                                        umbra_sub_f32(b, umbra_imm_f32(b, 0.0f), f)));
@@ -251,17 +258,19 @@ static void sdf_as_coverage_fill_(struct umbra_coverage const *s, void *uniforms
         (struct umbra_sdf_coverage const *)s;
     self->sdf->fill(self->sdf, uniforms);
 }
-struct umbra_sdf_coverage umbra_sdf_coverage(struct umbra_sdf *sdf) {
+struct umbra_sdf_coverage umbra_sdf_coverage(struct umbra_sdf *sdf, _Bool hard_edge) {
     return (struct umbra_sdf_coverage){
-        .base = {.build = sdf_as_coverage_build_, .fill = sdf_as_coverage_fill_},
-        .sdf  = sdf,
+        .base      = {.build = sdf_as_coverage_build_, .fill = sdf_as_coverage_fill_},
+        .sdf       = sdf,
+        .hard_edge = hard_edge,
     };
 }
 
 static struct interval_program* build_sdf_interval(struct umbra_sdf *sdf) {
     struct umbra_builder *b = umbra_builder();
-    umbra_val32 const x = umbra_x(b),
-                      y = umbra_y(b);
+    umbra_val32 const half = umbra_imm_f32(b, 0.5f);
+    umbra_val32 const x = umbra_add_f32(b, umbra_x(b), half),
+                      y = umbra_add_f32(b, umbra_y(b), half);
 
     struct umbra_uniforms_layout uni = {0};
     umbra_val32 const f = sdf->build(sdf, b, &uni, x, y);
@@ -282,6 +291,7 @@ struct umbra_quadtree {
 
 struct umbra_quadtree* umbra_quadtree(struct umbra_backend *be,
                                       struct umbra_sdf *sdf,
+                                      struct umbra_quadtree_config cfg,
                                       struct umbra_shader *shader,
                                       umbra_blend_fn blend,
                                       struct umbra_fmt fmt,
@@ -289,7 +299,7 @@ struct umbra_quadtree* umbra_quadtree(struct umbra_backend *be,
     struct interval_program *ip = build_sdf_interval(sdf);
     assume(ip);
 
-    struct umbra_sdf_coverage adapter = umbra_sdf_coverage(sdf);
+    struct umbra_sdf_coverage adapter = umbra_sdf_coverage(sdf, cfg.hard_edge);
     struct umbra_builder *b = umbra_draw_builder(shader, &adapter.base, blend, fmt, layout);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);

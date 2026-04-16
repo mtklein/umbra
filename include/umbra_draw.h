@@ -60,8 +60,9 @@ struct umbra_sdf {
 struct umbra_sdf_coverage {
     struct umbra_coverage base;
     struct umbra_sdf    *sdf;
+    int                  hard_edge, :32;
 };
-struct umbra_sdf_coverage umbra_sdf_coverage(struct umbra_sdf*);
+struct umbra_sdf_coverage umbra_sdf_coverage(struct umbra_sdf*, _Bool hard_edge);
 
 typedef umbra_color (*umbra_blend_fn)(struct umbra_builder*, umbra_color src, umbra_color dst);
 
@@ -77,9 +78,14 @@ void umbra_draw_fill(struct umbra_draw_layout const*,
                      struct umbra_shader const*,
                      struct umbra_coverage const*);
 
+struct umbra_quadtree_config {
+    _Bool hard_edge;
+};
+
 // Quadtree-dispatched draw driven by an SDF.
 struct umbra_quadtree* umbra_quadtree(struct umbra_backend*,
                                       struct umbra_sdf*,
+                                      struct umbra_quadtree_config,
                                       struct umbra_shader*,
                                       umbra_blend_fn,
                                       struct umbra_fmt,

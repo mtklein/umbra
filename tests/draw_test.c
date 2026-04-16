@@ -1364,8 +1364,9 @@ TEST(test_quadtree_sdf_rect) {
         if (!bes[bi]) { continue; }
 
         struct umbra_draw_layout lay;
-        struct umbra_quadtree *qt = umbra_quadtree(bes[bi], &sdf.base, &shader.base,
-                                                   umbra_blend_srcover,
+        struct umbra_quadtree *qt = umbra_quadtree(bes[bi], &sdf.base,
+                                                   (struct umbra_quadtree_config){.hard_edge = 1},
+                                                   &shader.base, umbra_blend_srcover,
                                                    umbra_fmt_8888, &lay);
         qt != NULL here;
         umbra_quadtree_fill(&lay, &sdf.base, &shader.base);

@@ -47,8 +47,9 @@ static void solid_prepare(struct slide *s, struct umbra_backend *be,
     free(st->lay.uniforms);
     st->fmt = fmt;
     if (st->has_sdf) {
-        st->qt = umbra_quadtree(be, &st->sdf.base, &st->shader.base,
-                                st->blend, fmt, &st->lay);
+        st->qt = umbra_quadtree(be, &st->sdf.base,
+                                (struct umbra_quadtree_config){.hard_edge = 1},
+                                &st->shader.base, st->blend, fmt, &st->lay);
     } else {
         struct umbra_builder *b = umbra_draw_builder(&st->shader.base, NULL,
                                                      st->blend, fmt, &st->lay);
@@ -90,7 +91,7 @@ static int solid_get_builders(struct slide *s, struct umbra_fmt fmt,
     if (max < 1) { return 0; }
     struct solid_slide *st = (struct solid_slide *)s;
     if (st->has_sdf) {
-        struct umbra_sdf_coverage adapter = umbra_sdf_coverage(&st->sdf.base);
+        struct umbra_sdf_coverage adapter = umbra_sdf_coverage(&st->sdf.base, 1);
         out[0] = umbra_draw_builder(&st->shader.base, &adapter.base, st->blend, fmt, NULL);
     } else {
         out[0] = umbra_draw_builder(&st->shader.base, NULL, st->blend, fmt, NULL);
