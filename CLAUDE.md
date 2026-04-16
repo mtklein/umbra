@@ -17,7 +17,7 @@ Never push to origin without the user's explicit permission.
 
 Contributing
 ------------
-Don't amend any commit that has already been pushed to origin.
+Never amend commits.  Always create new commits.
 
 Before each commit run `ninja` twice, once to make sure all modes build and all
 tests pass, the second to make see that `ninja` is a no-op, checking that our
