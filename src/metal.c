@@ -142,13 +142,13 @@ static _Bool produces_float(enum op op) {
         || op == op_f32_from_f16;
 }
 
-static char const *fv(char *tmp, char const *vn,
+static char const* fv(char *tmp, char const *vn,
                       int id, _Bool const *is_f) {
     if (is_f[id]) { return vn; }
     snprintf(tmp, 40, "as_type<float>(%s)", vn);
     return tmp;
 }
-static char const *uv(char *tmp, char const *vn,
+static char const* uv(char *tmp, char const *vn,
                       int id, _Bool const *is_f) {
     if (!is_f[id]) { return vn; }
     snprintf(tmp, 40, "as_type<uint>(%s)", vn);
