@@ -81,6 +81,10 @@ umbra_interval umbra_interval_sqrt_f32(struct umbra_builder *b, umbra_interval a
                             umbra_sqrt_f32(b, a.hi)};
 }
 
+// TODO: tight abs for non-straddling intervals.  Currently always returns
+// [0, max(|lo|, |hi|)], which is correct but loose when the interval is
+// entirely positive or entirely negative.  Tightening requires runtime
+// branching (sel on sign of lo/hi) since we can't know signs at build time.
 umbra_interval umbra_interval_abs_f32(struct umbra_builder *b, umbra_interval a) {
     if (exact(a)) {
         return umbra_interval_exact(umbra_abs_f32(b, a.lo));
