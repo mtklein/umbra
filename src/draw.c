@@ -160,9 +160,11 @@ struct umbra_fmt const umbra_fmt_fp16_planar = {
     .name="fp16_planar", .bpp=2, .planes=4, .load=load_fp16p_, .store=store_fp16p_,
 };
 
-struct umbra_builder* umbra_draw_builder(struct umbra_shader *shader, struct umbra_coverage *coverage,
-                                       umbra_blend_fn blend, struct umbra_fmt fmt,
-                                       struct umbra_draw_layout *layout) {
+struct umbra_builder* umbra_draw_builder(struct umbra_shader *shader,
+                                         struct umbra_coverage *coverage,
+                                         umbra_blend_fn blend,
+                                         struct umbra_fmt fmt,
+                                         struct umbra_draw_layout *layout) {
     struct umbra_builder  *builder = umbra_builder();
     umbra_val32 const x = umbra_x(builder);
     umbra_val32 const y = umbra_y(builder);

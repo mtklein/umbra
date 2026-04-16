@@ -1331,9 +1331,11 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
                     uint32_t h1 = B.is_f[yid]             ? spv_f32_to_f16(&B, get_val(&B, inst->y))
                                                            : as_u32(&B, get_val(&B, inst->y), yid);
                     uint32_t h2 = B.is_f[get_id(inst->z)] ? spv_f32_to_f16(&B, get_val(&B, inst->z))
-                                                           : as_u32(&B, get_val(&B, inst->z), get_id(inst->z));
+                                                           : as_u32(&B, get_val(&B, inst->z),
+                                                                    get_id(inst->z));
                     uint32_t h3 = B.is_f[get_id(inst->w)] ? spv_f32_to_f16(&B, get_val(&B, inst->w))
-                                                           : as_u32(&B, get_val(&B, inst->w), get_id(inst->w));
+                                                           : as_u32(&B, get_val(&B, inst->w),
+                                                                    get_id(inst->w));
 
                     uint32_t h1_shifted = spv_binop(&B, SpvOpShiftLeftLogical, B.t_u32, h1, B.c_16);
                     uint32_t w0 = spv_binop(&B, SpvOpBitwiseOr, B.t_u32, h0, h1_shifted);
@@ -1398,7 +1400,8 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
                     uint32_t shifted = spv_binop(&B, SpvOpShiftLeftLogical, B.t_u32, v, B.c_16);
                     // Use signed shift right.
                     uint32_t signed_val = spv_bitcast(&B, B.t_i32, shifted);
-                    uint32_t sext = spv_binop(&B, SpvOpShiftRightArithmetic, B.t_i32, signed_val, B.c_16);
+                    uint32_t sext =
+                        spv_binop(&B, SpvOpShiftRightArithmetic, B.t_i32, signed_val, B.c_16);
                     B.val[i] = spv_bitcast(&B, B.t_u32, sext);
                 } break;
 

@@ -44,7 +44,7 @@ struct vk_backend {
     VkDeviceSize          host_import_align;
     VkCommandBuffer       batch_cmd;                       // currently-encoding cmdbuf, or NULL
     VkCommandBuffer       frame_committed[VK_N_FRAMES];    // last committed cmdbuf per frame
-    VkFence               frame_fences   [VK_N_FRAMES];    // signals when frame_committed[i] is done
+    VkFence               frame_fences   [VK_N_FRAMES];  // signals when frame_committed[i] is done
     VkQueryPool           ts_pool;                         // 2 timestamps per frame
     double                timestamp_period;                // ns per tick
     double                gpu_time_accum;
@@ -476,7 +476,8 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
     }
 
     // Descriptor set layout: one storage buffer per non-push buffer slot.
-    VkDescriptorSetLayoutBinding *bindings = calloc((size_t)(n_desc ? n_desc : 1), sizeof *bindings);
+    VkDescriptorSetLayoutBinding *bindings =
+        calloc((size_t)(n_desc ? n_desc : 1), sizeof *bindings);
     for (int i = 0; i < n_desc; i++) {
         bindings[i] = (VkDescriptorSetLayoutBinding){
             .binding = (uint32_t)i,

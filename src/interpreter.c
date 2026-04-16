@@ -552,7 +552,9 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 [op_if_begin] = &&L_op_if_begin, [op_if_end] = &&L_op_if_end,
                 [op_load_var] = &&L_op_load_var, [op_store_var] = &&L_op_store_var,
                 [op_f32_from_f16] = &&L_op_f32_from_f16, [op_f16_from_f32] = &&L_op_f16_from_f32,
-                [op_i32_from_s16] = &&L_op_i32_from_s16, [op_i32_from_u16] = &&L_op_i32_from_u16, [op_i16_from_i32] = &&L_op_i16_from_i32,
+                [op_i32_from_s16] = &&L_op_i32_from_s16,
+                [op_i32_from_u16] = &&L_op_i32_from_u16,
+                [op_i16_from_i32] = &&L_op_i16_from_i32,
                 [op_f32_from_i32] = &&L_op_f32_from_i32, [op_i32_from_f32] = &&L_op_i32_from_f32,
                 [op_add_f32] = &&L_op_add_f32, [op_sub_f32] = &&L_op_sub_f32,
                 [op_mul_f32] = &&L_op_mul_f32, [op_div_f32] = &&L_op_div_f32,
@@ -573,8 +575,10 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 [op_shr_s32] = &&L_op_shr_s32,
                 [op_and_32] = &&L_op_and_32, [op_or_32] = &&L_op_or_32, [op_xor_32] = &&L_op_xor_32,
                 [op_sel_32] = &&L_op_sel_32,
-                [op_eq_f32] = &&L_op_eq_f32, [op_lt_f32] = &&L_op_lt_f32, [op_le_f32] = &&L_op_le_f32,
-                [op_eq_i32] = &&L_op_eq_i32, [op_lt_s32] = &&L_op_lt_s32, [op_le_s32] = &&L_op_le_s32,
+                [op_eq_f32] = &&L_op_eq_f32, [op_lt_f32] = &&L_op_lt_f32,
+                [op_le_f32] = &&L_op_le_f32,
+                [op_eq_i32] = &&L_op_eq_i32, [op_lt_s32] = &&L_op_lt_s32,
+                [op_le_s32] = &&L_op_le_s32,
                 [op_lt_u32] = &&L_op_lt_u32, [op_le_u32] = &&L_op_le_u32,
                 [op_shl_i32_imm] = &&L_op_shl_i32_imm, [op_shr_u32_imm] = &&L_op_shr_u32_imm,
                 [op_shr_s32_imm] = &&L_op_shr_s32_imm,
@@ -653,7 +657,8 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 } NEXT;
 
                 CASE(op_load_16) {
-                    uint16_t const *src = (uint16_t const*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
+                    uint16_t const *src =
+                        (uint16_t const*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
                     int const       i = end - K;
                     int const       rem = n - i;
                     if (rem >= K) {
@@ -671,7 +676,8 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     }
                 } NEXT;
                 CASE(op_load_32) {
-                    int32_t const *src = (int32_t const*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
+                    int32_t const *src =
+                        (int32_t const*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
                     int const      i = end - K;
                     int const      rem = n - i;
                     if (rem >= K) {
@@ -715,7 +721,8 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 } NEXT;
 
                 CASE(op_load_16x4) {
-                    uint64_t const *src = (uint64_t const*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
+                    uint64_t const *src =
+                        (uint64_t const*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
                     int const i = end - K;
                     int const rem = n - i;
                     U16 hr, hg, hb, ha;
@@ -750,7 +757,8 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     ip += 3; v += 3;
                 } NEXT;
                 CASE(op_load_16x4_planar) {
-                    uint16_t const *src = (uint16_t const*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
+                    uint16_t const *src =
+                        (uint16_t const*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
                     int const ps = buf[ip->ptr].count / 4;
                     int const i = end - K;
                     int const rem = n - i;
@@ -842,7 +850,8 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 } NEXT;
 
                 CASE(op_load_8x4) {
-                    uint32_t const *src = (uint32_t const*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
+                    uint32_t const *src =
+                        (uint32_t const*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
                     int const i = end - K;
                     int const rem = n - i;
                     U32 const mask8 = (U32){0} + 0xFFu;
@@ -983,14 +992,23 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     }
                 } NEXT;
 
-                CASE(op_f32_from_f16) { U16 h; __builtin_memcpy(&h, &v[ip->x], sizeof h); v->f32 = f16_to_f32(h); } NEXT;
-                CASE(op_f16_from_f32) { U16 const h = f32_to_f16(v[ip->x].f32); v->u32 = (U32){0}; __builtin_memcpy(v, &h, sizeof h); } NEXT;
+                CASE(op_f32_from_f16) {
+                    U16 h; __builtin_memcpy(&h, &v[ip->x], sizeof h);
+                    v->f32 = f16_to_f32(h);
+                } NEXT;
+                CASE(op_f16_from_f32) {
+                    U16 const h = f32_to_f16(v[ip->x].f32);
+                    v->u32 = (U32){0}; __builtin_memcpy(v, &h, sizeof h);
+                } NEXT;
                 CASE(op_i32_from_s16) {
                     U16 tmp; __builtin_memcpy(&tmp, &v[ip->x], sizeof tmp);
                     S16 stmp; __builtin_memcpy(&stmp, &tmp, sizeof tmp);
                     v->i32 = cast(I32, stmp);
                 } NEXT;
-                CASE(op_i32_from_u16) { U16 tmp; __builtin_memcpy(&tmp, &v[ip->x], sizeof tmp); v->u32 = cast(U32, tmp); } NEXT;
+                CASE(op_i32_from_u16) {
+                    U16 tmp; __builtin_memcpy(&tmp, &v[ip->x], sizeof tmp);
+                    v->u32 = cast(U32, tmp);
+                } NEXT;
                 CASE(op_i16_from_i32) {
                     U16 tmp = cast(U16, v[ip->x].u32);
                     v->u32 = (U32){0};
@@ -1025,11 +1043,15 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                                                          v[ip->y].f32); NEXT;
 #else
                 CASE(op_fma_f32) {
-                    F64 const x = cast(F64, v[ip->x].f32), y = cast(F64, v[ip->y].f32), z = cast(F64, v[ip->z].f32);
+                    F64 const x = cast(F64, v[ip->x].f32),
+                              y = cast(F64, v[ip->y].f32),
+                              z = cast(F64, v[ip->z].f32);
                     v->f32 = cast(F32, x * y + z);
                 } NEXT;
                 CASE(op_fms_f32) {
-                    F64 const x = cast(F64, v[ip->x].f32), y = cast(F64, v[ip->y].f32), z = cast(F64, v[ip->z].f32);
+                    F64 const x = cast(F64, v[ip->x].f32),
+                              y = cast(F64, v[ip->y].f32),
+                              z = cast(F64, v[ip->z].f32);
                     v->f32 = cast(F32, z - x * y);
                 } NEXT;
                 CASE(op_square_add_f32) {
@@ -1051,7 +1073,8 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 CASE(op_and_32)  v->i32 = v[ip->x].i32 & v[ip->y].i32;  NEXT;
                 CASE(op_or_32)   v->i32 = v[ip->x].i32 | v[ip->y].i32;  NEXT;
                 CASE(op_xor_32)  v->i32 = v[ip->x].i32 ^ v[ip->y].i32;  NEXT;
-                CASE(op_sel_32)  v->i32 = (v[ip->x].i32 & v[ip->y].i32) | (~v[ip->x].i32 & v[ip->z].i32); NEXT;
+                CASE(op_sel_32)  v->i32 = (v[ip->x].i32 & v[ip->y].i32)
+                                        | (~v[ip->x].i32 & v[ip->z].i32); NEXT;
 
                 CASE(op_eq_f32) v->i32 = (I32)(v[ip->x].f32 == v[ip->y].f32); NEXT;
                 CASE(op_lt_f32) v->i32 = (I32)(v[ip->x].f32 <  v[ip->y].f32); NEXT;
@@ -1062,12 +1085,24 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 CASE(op_lt_u32) v->i32 = (I32)(v[ip->x].u32 <  v[ip->y].u32); NEXT;
                 CASE(op_le_u32) v->i32 = (I32)(v[ip->x].u32 <= v[ip->y].u32); NEXT;
 
-                CASE(op_shl_i32_imm) { I32 const sh = (I32){0} + ip->y; v->i32 = v[ip->x].i32 << sh; } NEXT;
-                CASE(op_shr_u32_imm) { U32 const sh = (U32){0} + (uint32_t)ip->y; v->u32 = v[ip->x].u32 >> sh; } NEXT;
-                CASE(op_shr_s32_imm) { I32 const sh = (I32){0} + ip->y; v->i32 = v[ip->x].i32 >> sh; } NEXT;
-                CASE(op_and_32_imm)  { U32 const m = (U32){0} + (uint32_t)ip->y; v->u32 = v[ip->x].u32 & m; } NEXT;
-                CASE(op_or_32_imm)   { U32 const m = (U32){0} + (uint32_t)ip->y; v->u32 = v[ip->x].u32 | m; } NEXT;
-                CASE(op_xor_32_imm)  { U32 const m = (U32){0} + (uint32_t)ip->y; v->u32 = v[ip->x].u32 ^ m; } NEXT;
+                CASE(op_shl_i32_imm) {
+                    I32 const sh = (I32){0} + ip->y; v->i32 = v[ip->x].i32 << sh;
+                } NEXT;
+                CASE(op_shr_u32_imm) {
+                    U32 const sh = (U32){0} + (uint32_t)ip->y; v->u32 = v[ip->x].u32 >> sh;
+                } NEXT;
+                CASE(op_shr_s32_imm) {
+                    I32 const sh = (I32){0} + ip->y; v->i32 = v[ip->x].i32 >> sh;
+                } NEXT;
+                CASE(op_and_32_imm)  {
+                    U32 const m = (U32){0} + (uint32_t)ip->y; v->u32 = v[ip->x].u32 & m;
+                } NEXT;
+                CASE(op_or_32_imm)   {
+                    U32 const m = (U32){0} + (uint32_t)ip->y; v->u32 = v[ip->x].u32 | m;
+                } NEXT;
+                CASE(op_xor_32_imm)  {
+                    U32 const m = (U32){0} + (uint32_t)ip->y; v->u32 = v[ip->x].u32 ^ m;
+                } NEXT;
 
                 CASE(op_add_f32_imm) { F32_IMM; v->f32 = v[ip->x].f32 + imm; } NEXT;
                 CASE(op_sub_f32_imm) { F32_IMM; v->f32 = v[ip->x].f32 - imm; } NEXT;
@@ -1144,24 +1179,60 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 UN2(f32_from_i32, f32, cast(F32, acc.i32))
                 UN2(i32_from_f32, i32, cast(I32, acc.f32))
 #undef UN2
-                CASE(op_r_f32_from_f16_r) { U16 h; __builtin_memcpy(&h, &acc, sizeof h); acc.f32 = f16_to_f32(h); } NEXT;
-                CASE(op_m_f32_from_f16_r) { U16 h; __builtin_memcpy(&h, &acc, sizeof h); v->f32 = f16_to_f32(h); } NEXT;
-                CASE(op_r_f16_from_f32_r) { U16 const h = f32_to_f16(acc.f32); acc.u32 = (U32){0}; __builtin_memcpy(&acc, &h, sizeof h); } NEXT;
-                CASE(op_m_f16_from_f32_r) { U16 const h = f32_to_f16(acc.f32); v->u32 = (U32){0}; __builtin_memcpy(v, &h, sizeof h); } NEXT;
-                CASE(op_r_i32_from_s16_r) { U16 u; __builtin_memcpy(&u, &acc, sizeof u); S16 s; __builtin_memcpy(&s, &u, sizeof u); acc.i32 = cast(I32, s); } NEXT;
-                CASE(op_m_i32_from_s16_r) { U16 u; __builtin_memcpy(&u, &acc, sizeof u); S16 s; __builtin_memcpy(&s, &u, sizeof u); v->i32 = cast(I32, s); } NEXT;
-                CASE(op_r_i32_from_u16_r) { U16 u; __builtin_memcpy(&u, &acc, sizeof u); acc.u32 = cast(U32, u); } NEXT;
-                CASE(op_m_i32_from_u16_r) { U16 u; __builtin_memcpy(&u, &acc, sizeof u); v->u32 = cast(U32, u); } NEXT;
-                CASE(op_r_i16_from_i32_r) { U16 u = cast(U16, acc.u32); acc.u32 = (U32){0}; __builtin_memcpy(&acc, &u, sizeof u); } NEXT;
-                CASE(op_m_i16_from_i32_r) { U16 u = cast(U16, acc.u32); v->u32 = (U32){0}; __builtin_memcpy(v, &u, sizeof u); } NEXT;
+                CASE(op_r_f32_from_f16_r) {
+                    U16 h; __builtin_memcpy(&h, &acc, sizeof h);
+                    acc.f32 = f16_to_f32(h);
+                } NEXT;
+                CASE(op_m_f32_from_f16_r) {
+                    U16 h; __builtin_memcpy(&h, &acc, sizeof h);
+                    v->f32 = f16_to_f32(h);
+                } NEXT;
+                CASE(op_r_f16_from_f32_r) {
+                    U16 const h = f32_to_f16(acc.f32);
+                    acc.u32 = (U32){0}; __builtin_memcpy(&acc, &h, sizeof h);
+                } NEXT;
+                CASE(op_m_f16_from_f32_r) {
+                    U16 const h = f32_to_f16(acc.f32);
+                    v->u32 = (U32){0}; __builtin_memcpy(v, &h, sizeof h);
+                } NEXT;
+                CASE(op_r_i32_from_s16_r) {
+                    U16 u; __builtin_memcpy(&u, &acc, sizeof u);
+                    S16 s; __builtin_memcpy(&s, &u, sizeof u);
+                    acc.i32 = cast(I32, s);
+                } NEXT;
+                CASE(op_m_i32_from_s16_r) {
+                    U16 u; __builtin_memcpy(&u, &acc, sizeof u);
+                    S16 s; __builtin_memcpy(&s, &u, sizeof u);
+                    v->i32 = cast(I32, s);
+                } NEXT;
+                CASE(op_r_i32_from_u16_r) {
+                    U16 u; __builtin_memcpy(&u, &acc, sizeof u);
+                    acc.u32 = cast(U32, u);
+                } NEXT;
+                CASE(op_m_i32_from_u16_r) {
+                    U16 u; __builtin_memcpy(&u, &acc, sizeof u);
+                    v->u32 = cast(U32, u);
+                } NEXT;
+                CASE(op_r_i16_from_i32_r) {
+                    U16 u = cast(U16, acc.u32);
+                    acc.u32 = (U32){0}; __builtin_memcpy(&acc, &u, sizeof u);
+                } NEXT;
+                CASE(op_m_i16_from_i32_r) {
+                    U16 u = cast(U16, acc.u32);
+                    v->u32 = (U32){0}; __builtin_memcpy(v, &u, sizeof u);
+                } NEXT;
 
                 // Imm acc variants: r_r (continue), m_r (end).
 #define IMM2_I(name, dst, EXPR)                                                             \
                 CASE(op_r_##name##_r) { I32 const imm = (I32){0} + ip->y; acc.dst = EXPR; } NEXT; \
                 CASE(op_m_##name##_r) { I32 const imm = (I32){0} + ip->y; v->dst  = EXPR; } NEXT;
-#define IMM2_U(name, dst, EXPR)                                                                        \
-                CASE(op_r_##name##_r) { U32 const imm = (U32){0} + (uint32_t)ip->y; acc.dst = EXPR; } NEXT; \
-                CASE(op_m_##name##_r) { U32 const imm = (U32){0} + (uint32_t)ip->y; v->dst  = EXPR; } NEXT;
+#define IMM2_U(name, dst, EXPR)                                                              \
+                CASE(op_r_##name##_r) {                                                      \
+                    U32 const imm = (U32){0} + (uint32_t)ip->y; acc.dst = EXPR;              \
+                } NEXT;                                                                      \
+                CASE(op_m_##name##_r) {                                                      \
+                    U32 const imm = (U32){0} + (uint32_t)ip->y; v->dst  = EXPR;              \
+                } NEXT;
 #define IMM2_F(name, dst, EXPR)                                             \
                 CASE(op_r_##name##_r) { F32_IMM; acc.dst = EXPR; } NEXT;   \
                 CASE(op_m_##name##_r) { F32_IMM; v->dst  = EXPR; } NEXT;
@@ -1207,12 +1278,18 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
 #define FMA_OP(xv,yv,zv) cast(F32, cast(F64,(xv)) * cast(F64,(yv)) + cast(F64,(zv)))
 #define FMS_OP(xv,yv,zv) cast(F32, cast(F64,(zv)) - cast(F64,(xv)) * cast(F64,(yv)))
 #endif
-                CASE(op_r_fma_f32_mmm) acc.f32 = FMA_OP(v[ip->x].f32, v[ip->y].f32, v[ip->z].f32); NEXT;
-                CASE(op_r_fma_f32_mmr) acc.f32 = FMA_OP(v[ip->x].f32, v[ip->y].f32, acc.f32);       NEXT;
-                CASE(op_m_fma_f32_mmr) v->f32  = FMA_OP(v[ip->x].f32, v[ip->y].f32, acc.f32);       NEXT;
-                CASE(op_r_fms_f32_mmm) acc.f32 = FMS_OP(v[ip->x].f32, v[ip->y].f32, v[ip->z].f32); NEXT;
-                CASE(op_r_fms_f32_mmr) acc.f32 = FMS_OP(v[ip->x].f32, v[ip->y].f32, acc.f32);       NEXT;
-                CASE(op_m_fms_f32_mmr) v->f32  = FMS_OP(v[ip->x].f32, v[ip->y].f32, acc.f32);       NEXT;
+                CASE(op_r_fma_f32_mmm) acc.f32 = FMA_OP(v[ip->x].f32, v[ip->y].f32, v[ip->z].f32);
+                                       NEXT;
+                CASE(op_r_fma_f32_mmr) acc.f32 = FMA_OP(v[ip->x].f32, v[ip->y].f32, acc.f32);
+                                       NEXT;
+                CASE(op_m_fma_f32_mmr) v->f32  = FMA_OP(v[ip->x].f32, v[ip->y].f32, acc.f32);
+                                       NEXT;
+                CASE(op_r_fms_f32_mmm) acc.f32 = FMS_OP(v[ip->x].f32, v[ip->y].f32, v[ip->z].f32);
+                                       NEXT;
+                CASE(op_r_fms_f32_mmr) acc.f32 = FMS_OP(v[ip->x].f32, v[ip->y].f32, acc.f32);
+                                       NEXT;
+                CASE(op_m_fms_f32_mmr) v->f32  = FMS_OP(v[ip->x].f32, v[ip->y].f32, acc.f32);
+                                       NEXT;
 #undef FMA_OP
 #undef FMS_OP
 
@@ -1251,10 +1328,13 @@ static void interp_program_free(struct interp_program *p) {
     }
 }
 
-static void run_interp(struct umbra_program *prog, int l, int t, int r, int b, struct umbra_buf buf[]) {
+static void run_interp(struct umbra_program *prog,
+                       int l, int t, int r, int b, struct umbra_buf buf[]) {
     interp_program_run((struct interp_program*)prog, l, t, r, b, buf);
 }
-static void free_interp(struct umbra_program *prog) { interp_program_free((struct interp_program*)prog); }
+static void free_interp(struct umbra_program *prog) {
+    interp_program_free((struct interp_program*)prog);
+}
 static struct umbra_program* compile_interp(struct umbra_backend           *be,
                                             struct umbra_flat_ir const *bb) {
     struct interp_program *p = interp_program(bb);

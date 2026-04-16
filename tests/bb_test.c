@@ -3163,14 +3163,22 @@ TEST(test_binary_r_mm) {
     umbra_store_32(b, (umbra_ptr32){.ix=5}, umbra_i32_from_f32(b, umbra_div_f32(b, fa, fc)));
     // Integer: pin a and c, then barrier, then ops.
     umbra_store_32(b, (umbra_ptr32){.ix=6}, umbra_add_i32(b, a, c));
-    umbra_store_32(b, (umbra_ptr32){.ix=7}, umbra_add_i32(b, umbra_sub_i32(b, a, c), umbra_imm_i32(b, 1)));
-    umbra_store_32(b, (umbra_ptr32){.ix=8}, umbra_add_i32(b, umbra_mul_i32(b, a, c), umbra_imm_i32(b, 1)));
-    umbra_store_32(b, (umbra_ptr32){.ix=9}, umbra_add_i32(b, umbra_or_32(b, a, c), umbra_imm_i32(b, 1)));
-    umbra_store_32(b, (umbra_ptr32){.ix=10}, umbra_add_i32(b, umbra_xor_32(b, a, c), umbra_imm_i32(b, 1)));
-    umbra_store_32(b, (umbra_ptr32){.ix=11}, umbra_add_i32(b, umbra_and_32(b, a, c), umbra_imm_i32(b, 1)));
-    umbra_store_32(b, (umbra_ptr32){.ix=12}, umbra_add_i32(b, umbra_shl_i32(b, a, c), umbra_imm_i32(b, 1)));
-    umbra_store_32(b, (umbra_ptr32){.ix=13}, umbra_add_i32(b, umbra_shr_u32(b, a, c), umbra_imm_i32(b, 1)));
-    umbra_store_32(b, (umbra_ptr32){.ix=14}, umbra_add_i32(b, umbra_shr_s32(b, a, c), umbra_imm_i32(b, 1)));
+    umbra_store_32(b, (umbra_ptr32){.ix=7},
+                   umbra_add_i32(b, umbra_sub_i32(b, a, c), umbra_imm_i32(b, 1)));
+    umbra_store_32(b, (umbra_ptr32){.ix=8},
+                   umbra_add_i32(b, umbra_mul_i32(b, a, c), umbra_imm_i32(b, 1)));
+    umbra_store_32(b, (umbra_ptr32){.ix=9},
+                   umbra_add_i32(b, umbra_or_32(b, a, c), umbra_imm_i32(b, 1)));
+    umbra_store_32(b, (umbra_ptr32){.ix=10},
+                   umbra_add_i32(b, umbra_xor_32(b, a, c), umbra_imm_i32(b, 1)));
+    umbra_store_32(b, (umbra_ptr32){.ix=11},
+                   umbra_add_i32(b, umbra_and_32(b, a, c), umbra_imm_i32(b, 1)));
+    umbra_store_32(b, (umbra_ptr32){.ix=12},
+                   umbra_add_i32(b, umbra_shl_i32(b, a, c), umbra_imm_i32(b, 1)));
+    umbra_store_32(b, (umbra_ptr32){.ix=13},
+                   umbra_add_i32(b, umbra_shr_u32(b, a, c), umbra_imm_i32(b, 1)));
+    umbra_store_32(b, (umbra_ptr32){.ix=14},
+                   umbra_add_i32(b, umbra_shr_s32(b, a, c), umbra_imm_i32(b, 1)));
     struct test_backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         int32_t sa[] = {6,6,6,6}, sc[] = {2,2,2,2};
@@ -3306,7 +3314,8 @@ TEST(test_ra_chan_unary) {
     umbra_val32 bf = umbra_f32_from_f16(b, bl);
     umbra_val32 af = umbra_f32_from_f16(b, a);
     umbra_store_32(b, (umbra_ptr32){.ix=1}, umbra_i32_from_f32(b, umbra_abs_f32(b, gf)));
-    umbra_store_32(b, (umbra_ptr32){.ix=2}, umbra_i32_from_f32(b, umbra_sub_f32(b, umbra_imm_f32(b, 0), bf)));
+    umbra_store_32(b, (umbra_ptr32){.ix=2},
+                   umbra_i32_from_f32(b, umbra_sub_f32(b, umbra_imm_f32(b, 0), bf)));
     umbra_store_32(b, (umbra_ptr32){.ix=3}, umbra_i32_from_f32(b, umbra_abs_f32(b, af)));
     struct test_backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
@@ -3449,7 +3458,8 @@ TEST(test_acc_coverage) {
         umbra_val32 fx = umbra_f32_from_i32(b, x);
         // Each sub has a different imm to avoid dedup.
         umbra_val32 p0 = umbra_sub_f32(b, fx, umbra_imm_f32(b, 1));
-        umbra_store_32(b, (umbra_ptr32){.ix=1}, umbra_i32_from_f32(b, umbra_sub_f32(b, umbra_imm_f32(b, 0), p0)));
+        umbra_store_32(b, (umbra_ptr32){.ix=1},
+                       umbra_i32_from_f32(b, umbra_sub_f32(b, umbra_imm_f32(b, 0), p0)));
         umbra_val32 p1 = umbra_sub_f32(b, fx, umbra_imm_f32(b, 2));
         umbra_store_32(b, (umbra_ptr32){.ix=2}, umbra_i32_from_f32(b, umbra_round_f32(b, p1)));
         umbra_val32 p2 = umbra_sub_f32(b, fx, umbra_imm_f32(b, 3));
@@ -3500,49 +3510,59 @@ TEST(test_acc_coverage) {
         // Each in its own builder to avoid dedup across chains.
 #define ACC_IMM_TEST_I(op, k, expected) { \
         struct umbra_builder *b = umbra_builder(); \
-        umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0}), c = umbra_load_32(b, (umbra_ptr32){.ix=1}); \
-        umbra_store_32(b, (umbra_ptr32){.ix=2}, op(b, umbra_sub_i32(b, a, c), umbra_imm_i32(b, k))); \
+        umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0}), \
+                    c = umbra_load_32(b, (umbra_ptr32){.ix=1}); \
+        umbra_store_32(b, (umbra_ptr32){.ix=2}, \
+                       op(b, umbra_sub_i32(b, a, c), umbra_imm_i32(b, k))); \
         struct test_backends B = make(b); \
         for (int bi = 0; bi < NUM_BACKENDS; bi++) { \
             int32_t sa[]={10}, sc[]={3}, d[]={0}; \
-            if (run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.count=1},{.ptr=sc,.count=1},{.ptr=d,.count=1}})) { \
+            struct umbra_buf bs[] = {{.ptr=sa,.count=1},{.ptr=sc,.count=1},{.ptr=d,.count=1}}; \
+            if (run(&B, bi, 1, 1, bs)) { \
                 d[0] == expected here; \
             } \
         } cleanup(&B); }
 #define ACC_IMM_TEST_F(op, k, expected) { \
         struct umbra_builder *b = umbra_builder(); \
-        umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0}), c = umbra_load_32(b, (umbra_ptr32){.ix=1}); \
+        umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0}), \
+                    c = umbra_load_32(b, (umbra_ptr32){.ix=1}); \
         umbra_val32 fa = umbra_f32_from_i32(b, a), fc = umbra_f32_from_i32(b, c); \
         umbra_store_32(b, (umbra_ptr32){.ix=2}, umbra_i32_from_f32(b, \
             op(b, umbra_sub_f32(b, fa, fc), umbra_imm_f32(b, k)))); \
         struct test_backends B = make(b); \
         for (int bi = 0; bi < NUM_BACKENDS; bi++) { \
             int32_t sa[]={10}, sc[]={3}, d[]={0}; \
-            if (run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.count=1},{.ptr=sc,.count=1},{.ptr=d,.count=1}})) { \
+            struct umbra_buf bs[] = {{.ptr=sa,.count=1},{.ptr=sc,.count=1},{.ptr=d,.count=1}}; \
+            if (run(&B, bi, 1, 1, bs)) { \
                 d[0] == expected here; \
             } \
         } cleanup(&B); }
 #define ACC_IMM_TEST_CMP_I(op, k, expected) { \
         struct umbra_builder *b = umbra_builder(); \
-        umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0}), c = umbra_load_32(b, (umbra_ptr32){.ix=1}); \
-        umbra_store_32(b, (umbra_ptr32){.ix=2}, op(b, umbra_sub_i32(b, a, c), umbra_imm_i32(b, k))); \
+        umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0}), \
+                    c = umbra_load_32(b, (umbra_ptr32){.ix=1}); \
+        umbra_store_32(b, (umbra_ptr32){.ix=2}, \
+                       op(b, umbra_sub_i32(b, a, c), umbra_imm_i32(b, k))); \
         struct test_backends B = make(b); \
         for (int bi = 0; bi < NUM_BACKENDS; bi++) { \
             int32_t sa[]={10}, sc[]={3}, d[]={0}; \
-            if (run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.count=1},{.ptr=sc,.count=1},{.ptr=d,.count=1}})) { \
+            struct umbra_buf bs[] = {{.ptr=sa,.count=1},{.ptr=sc,.count=1},{.ptr=d,.count=1}}; \
+            if (run(&B, bi, 1, 1, bs)) { \
                 d[0] == expected here; \
             } \
         } cleanup(&B); }
 #define ACC_IMM_TEST_CMP_F(op, k, expected) { \
         struct umbra_builder *b = umbra_builder(); \
-        umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0}), c = umbra_load_32(b, (umbra_ptr32){.ix=1}); \
+        umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0}), \
+                    c = umbra_load_32(b, (umbra_ptr32){.ix=1}); \
         umbra_val32 fa = umbra_f32_from_i32(b, a), fc = umbra_f32_from_i32(b, c); \
         umbra_store_32(b, (umbra_ptr32){.ix=2}, \
             op(b, umbra_sub_f32(b, fa, fc), umbra_imm_f32(b, k))); \
         struct test_backends B = make(b); \
         for (int bi = 0; bi < NUM_BACKENDS; bi++) { \
             int32_t sa[]={10}, sc[]={3}, d[]={0}; \
-            if (run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.count=1},{.ptr=sc,.count=1},{.ptr=d,.count=1}})) { \
+            struct umbra_buf bs[] = {{.ptr=sa,.count=1},{.ptr=sc,.count=1},{.ptr=d,.count=1}}; \
+            if (run(&B, bi, 1, 1, bs)) { \
                 d[0] == expected here; \
             } \
         } cleanup(&B); }
@@ -3571,13 +3591,15 @@ TEST(test_acc_coverage_extra) {
     // - UN2 for round_f32, floor_f32, ceil_f32
 #define ACC_UNARY_F(unary, k, expected) { \
         struct umbra_builder *b = umbra_builder(); \
-        umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0}), c = umbra_load_32(b, (umbra_ptr32){.ix=1}); \
+        umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0}), \
+                    c = umbra_load_32(b, (umbra_ptr32){.ix=1}); \
         umbra_val32 s = umbra_sub_f32(b, umbra_f32_from_i32(b, a), umbra_f32_from_i32(b, c)); \
         umbra_store_32(b, (umbra_ptr32){.ix=2}, umbra_i32_from_f32(b, unary(b, s))); \
         struct test_backends B = make(b); \
         for (int bi = 0; bi < NUM_BACKENDS; bi++) { \
             int32_t sa[]={10}, sc[]={k}, d[]={0}; \
-            if (run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.count=1},{.ptr=sc,.count=1},{.ptr=d,.count=1}})) { \
+            struct umbra_buf bs[] = {{.ptr=sa,.count=1},{.ptr=sc,.count=1},{.ptr=d,.count=1}}; \
+            if (run(&B, bi, 1, 1, bs)) { \
                 d[0] == expected here; \
             } \
         } cleanup(&B); }
@@ -3589,14 +3611,16 @@ TEST(test_acc_coverage_extra) {
     // CMP m_rm: sub→acc, then eq_f32(acc, mem)→store.
     {
         struct umbra_builder *b = umbra_builder();
-        umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0}), c = umbra_load_32(b, (umbra_ptr32){.ix=1});
+        umbra_val32 a = umbra_load_32(b, (umbra_ptr32){0}),
+                    c = umbra_load_32(b, (umbra_ptr32){.ix=1});
         umbra_val32 fa = umbra_f32_from_i32(b, a), fc = umbra_f32_from_i32(b, c);
         umbra_val32 s = umbra_sub_f32(b, fa, umbra_imm_f32(b, 1));
         umbra_store_32(b, (umbra_ptr32){.ix=2}, umbra_eq_f32(b, s, fc));
         struct test_backends B = make(b);
         for (int bi = 0; bi < NUM_BACKENDS; bi++) {
             int32_t sa[]={4}, sc[]={3}, d[]={0};
-            if (run(&B, bi, 1, 1, (struct umbra_buf[]){{.ptr=sa,.count=1},{.ptr=sc,.count=1},{.ptr=d,.count=1}})) {
+            struct umbra_buf bs[] = {{.ptr=sa,.count=1},{.ptr=sc,.count=1},{.ptr=d,.count=1}};
+            if (run(&B, bi, 1, 1, bs)) {
                 d[0] == -1 here;  // 4-1=3.0 == 3.0 → true
             }
         }
