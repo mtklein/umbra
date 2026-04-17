@@ -14,12 +14,12 @@ static umbra_interval circle_build(struct umbra_sdf *s, struct umbra_builder *b,
                                     int buf_index,
                                     umbra_interval x, umbra_interval y) {
     struct circle_sdf *self = (struct circle_sdf *)s;
-    (void)buf_index;
     self->circle_off = umbra_uniforms_reserve_f32(u, 3);
 
-    umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->circle_off)),
-                         cy = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->circle_off + 1)),
-                         r  = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->circle_off + 2));
+    umbra_ptr32 const u_ptr = {.ix = buf_index};
+    umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circle_off)),
+                         cy = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circle_off + 1)),
+                         r  = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circle_off + 2));
     umbra_interval const dx = umbra_interval_sub_f32(b, x, cx),
                          dy = umbra_interval_sub_f32(b, y, cy),
                          d2 = umbra_interval_add_f32(b,

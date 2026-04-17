@@ -530,10 +530,10 @@ static umbra_color_val32 test_gradient_build(struct umbra_shader *s, struct umbr
                                        umbra_val32 x, umbra_val32 y) {
     struct test_gradient_shader *self = (struct test_gradient_shader *)s;
     (void)y;
-    (void)buf_index;
     self->params_off = umbra_uniforms_reserve_f32(u, 2);
-    umbra_val32 w = umbra_uniform_32(builder, (umbra_ptr32){0}, self->params_off);
-    umbra_val32 a = umbra_uniform_32(builder, (umbra_ptr32){0}, self->params_off + 1);
+    umbra_ptr32 const u_ptr = {.ix = buf_index};
+    umbra_val32 w = umbra_uniform_32(builder, u_ptr, self->params_off);
+    umbra_val32 a = umbra_uniform_32(builder, u_ptr, self->params_off + 1);
     umbra_val32 t = umbra_div_f32(builder, x, w);
     umbra_val32 zero = umbra_imm_i32(builder, 0);
     return (umbra_color_val32){t, zero, zero, a};
@@ -1469,11 +1469,11 @@ static umbra_interval test_circle_build(struct umbra_sdf *s, struct umbra_builde
                                          int buf_index,
                                          umbra_interval x, umbra_interval y) {
     struct test_circle_sdf *self = (struct test_circle_sdf *)s;
-    (void)buf_index;
     self->circle_off = umbra_uniforms_reserve_f32(u, 3);
-    umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->circle_off)),
-                         cy = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->circle_off + 1)),
-                         r  = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->circle_off + 2));
+    umbra_ptr32 const u_ptr = {.ix = buf_index};
+    umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circle_off)),
+                         cy = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circle_off + 1)),
+                         r  = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circle_off + 2));
     umbra_interval const dx = umbra_interval_sub_f32(b, x, cx),
                          dy = umbra_interval_sub_f32(b, y, cy),
                          d2 = umbra_interval_add_f32(b,
