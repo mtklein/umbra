@@ -314,7 +314,7 @@ static int resolve_ptr_x86(Buf *c, ptr p, int *last_ptr, int const *deref_gpr,
 
 struct jit_program* jit_program(struct jit_backend *be,
                                            struct umbra_flat_ir const *ir) {
-    struct umbra_flat_ir *resolved = umbra_flat_ir_resolve(ir, JOIN_PREFER_IMM);
+    struct umbra_flat_ir *resolved = flat_ir_resolve(ir, JOIN_PREFER_IMM);
     ir = resolved;
 
     int *sl = malloc((size_t)ir->insts * sizeof(int));

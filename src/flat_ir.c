@@ -291,7 +291,7 @@ static val remap_val(val v, int const *remap) {
     return (val){.id = remap[v.id], .chan = v.chan};
 }
 
-struct umbra_flat_ir* umbra_flat_ir_resolve(struct umbra_flat_ir const *ir,
+struct umbra_flat_ir* flat_ir_resolve(struct umbra_flat_ir const *ir,
                                             enum join_policy jp) {
     int const n = ir->insts;
     struct ir_inst *inst = malloc((size_t)n * sizeof *inst);

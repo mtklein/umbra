@@ -52,5 +52,4 @@ struct umbra_flat_ir {
 
 enum join_policy { JOIN_KEEP_X, JOIN_PREFER_IMM };
 
-// TODO: rename flat_ir_resolve()
-struct umbra_flat_ir* umbra_flat_ir_resolve(struct umbra_flat_ir const*, enum join_policy);
+struct umbra_flat_ir* flat_ir_resolve(struct umbra_flat_ir const*, enum join_policy);

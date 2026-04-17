@@ -591,7 +591,7 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                                int flags) {
     struct spirv_result result = {0};
 
-    struct umbra_flat_ir *resolved = umbra_flat_ir_resolve(ir, JOIN_PREFER_IMM);
+    struct umbra_flat_ir *resolved = flat_ir_resolve(ir, JOIN_PREFER_IMM);
     ir = resolved;
 
     SpvBuilder B;

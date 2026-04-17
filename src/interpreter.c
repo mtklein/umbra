@@ -226,7 +226,7 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
 
     struct umbra_flat_ir *resolved = NULL;
 #if !__has_feature(address_sanitizer)
-    ir = resolved = umbra_flat_ir_resolve(ir, JOIN_KEEP_X);
+    ir = resolved = flat_ir_resolve(ir, JOIN_KEEP_X);
 #endif
 
     int n = 0;

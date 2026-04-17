@@ -8,7 +8,7 @@ TEST(resolve_simple_no_joins) {
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
-    struct umbra_flat_ir *r = umbra_flat_ir_resolve(ir, JOIN_PREFER_IMM);
+    struct umbra_flat_ir *r = flat_ir_resolve(ir, JOIN_PREFER_IMM);
     r->insts == ir->insts here;
     r->preamble == ir->preamble here;
     r->loop_begin == -1 here;
@@ -36,7 +36,7 @@ TEST(resolve_with_loop) {
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
-    struct umbra_flat_ir *r = umbra_flat_ir_resolve(ir, JOIN_PREFER_IMM);
+    struct umbra_flat_ir *r = flat_ir_resolve(ir, JOIN_PREFER_IMM);
     r->loop_begin >= 0 here;
     r->loop_end > r->loop_begin here;
     r->preamble <= r->loop_begin here;
@@ -69,8 +69,8 @@ TEST(resolve_eliminates_joins) {
     }
     has_join here;
 
-    struct umbra_flat_ir *keep_x = umbra_flat_ir_resolve(ir, JOIN_KEEP_X);
-    struct umbra_flat_ir *prefer = umbra_flat_ir_resolve(ir, JOIN_PREFER_IMM);
+    struct umbra_flat_ir *keep_x = flat_ir_resolve(ir, JOIN_KEEP_X);
+    struct umbra_flat_ir *prefer = flat_ir_resolve(ir, JOIN_PREFER_IMM);
 
     for (int i = 0; i < keep_x->insts; i++) {
         keep_x->inst[i].op != op_join here;
@@ -93,7 +93,7 @@ TEST(resolve_compaction_renumbers) {
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
-    struct umbra_flat_ir *r = umbra_flat_ir_resolve(ir, JOIN_KEEP_X);
+    struct umbra_flat_ir *r = flat_ir_resolve(ir, JOIN_KEEP_X);
 
     r->insts <= ir->insts here;
 
@@ -116,7 +116,7 @@ TEST(resolve_preserves_channels) {
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
-    struct umbra_flat_ir *r = umbra_flat_ir_resolve(ir, JOIN_PREFER_IMM);
+    struct umbra_flat_ir *r = flat_ir_resolve(ir, JOIN_PREFER_IMM);
 
     for (int i = 0; i < r->insts; i++) {
         r->inst[i].x.chan == ir->inst[i].x.chan here;
@@ -137,7 +137,7 @@ TEST(resolve_preserves_ptr) {
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
-    struct umbra_flat_ir *r = umbra_flat_ir_resolve(ir, JOIN_PREFER_IMM);
+    struct umbra_flat_ir *r = flat_ir_resolve(ir, JOIN_PREFER_IMM);
 
     _Bool found_deref = 0;
     for (int i = 0; i < r->insts; i++) {

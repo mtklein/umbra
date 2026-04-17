@@ -853,7 +853,7 @@ static char* build_source(IR const *orig_ir,
                            int *out_deref_buf,
                            uint8_t **out_buf_shift,
                            struct umbra_flat_ir **out_resolved) {
-    struct umbra_flat_ir *resolved = umbra_flat_ir_resolve(orig_ir, JOIN_PREFER_IMM);
+    struct umbra_flat_ir *resolved = flat_ir_resolve(orig_ir, JOIN_PREFER_IMM);
     IR const *ir = resolved;
     *out_resolved = resolved;
 

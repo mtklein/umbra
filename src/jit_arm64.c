@@ -295,7 +295,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
 
 struct jit_program* jit_program(struct jit_backend *be,
                                            struct umbra_flat_ir const *ir) {
-    struct umbra_flat_ir *resolved = umbra_flat_ir_resolve(ir, JOIN_KEEP_X);
+    struct umbra_flat_ir *resolved = flat_ir_resolve(ir, JOIN_KEEP_X);
     ir = resolved;
 
     int *sl = malloc((size_t)ir->insts * sizeof(int));
