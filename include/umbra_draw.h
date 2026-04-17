@@ -16,7 +16,6 @@ typedef struct {
     float x, y;
 } umbra_point;
 
-// TODO: any more useful as union { struct { float l,t,r,b; } struct { point lt,rb } } ?
 typedef struct {
     float l, t, r, b;
 } umbra_rect;
