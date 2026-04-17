@@ -48,14 +48,13 @@ void              umbra_store_fp16       (struct umbra_builder*, umbra_ptr64, um
 umbra_color_val32 umbra_load_fp16_planar (struct umbra_builder*, umbra_ptr16);
 void              umbra_store_fp16_planar(struct umbra_builder*, umbra_ptr16, umbra_color_val32);
 
-// TODO: uniforms_slots -> uniforms?
 struct umbra_shader {
     umbra_color_val32 (*build)(struct umbra_shader*,
                                struct umbra_builder*,
                                umbra_ptr32 uniforms,
                                umbra_val32 x, umbra_val32 y);
-    void (*free)(struct umbra_shader*);
-    int  uniforms_slots, :32;
+    void             (*free)(struct umbra_shader*);
+    struct umbra_buf   uniforms;
 };
 void             umbra_shader_free    (struct umbra_shader*);
 struct umbra_buf umbra_shader_uniforms(struct umbra_shader const*);
@@ -65,8 +64,8 @@ struct umbra_coverage {
                          struct umbra_builder*,
                          umbra_ptr32 uniforms,
                          umbra_val32 x, umbra_val32 y);
-    void (*free)(struct umbra_coverage*);
-    int  uniforms_slots, :32;
+    void             (*free)(struct umbra_coverage*);
+    struct umbra_buf   uniforms;
 };
 void             umbra_coverage_free    (struct umbra_coverage*);
 struct umbra_buf umbra_coverage_uniforms(struct umbra_coverage const*);
@@ -77,11 +76,22 @@ struct umbra_sdf {
                             struct umbra_builder*,
                             umbra_ptr32 uniforms,
                             umbra_interval x, umbra_interval y);
-    void (*free)(struct umbra_sdf*);
-    int  uniforms_slots, :32;
+    void             (*free)(struct umbra_sdf*);
+    struct umbra_buf   uniforms;
 };
 void             umbra_sdf_free    (struct umbra_sdf*);
 struct umbra_buf umbra_sdf_uniforms(struct umbra_sdf const*);
+
+// Slot count of a concrete effect's uniforms region — everything after the
+// base vtable field.  Constructors set `.base.uniforms = {.count = UMBRA_UNIFORMS_COUNT(self)}`
+// and the uniforms accessor computes `.ptr` from `self + sizeof(base)` at call
+// time (so by-value copies of the effect struct keep working).
+//
+// Effects that forward uniforms to a wrapped effect (like umbra_shader_supersample
+// or umbra_sdf_coverage) set `.base.uniforms = wrapped_effect_uniforms()` with a
+// pre-resolved ptr; the accessor returns that directly.
+#define UMBRA_UNIFORMS_COUNT(self) \
+    ((int)((sizeof *(self) - sizeof((self)->base)) / 4))
 
 // TODO: bool hard_edge -> int quality
 

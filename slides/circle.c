@@ -108,11 +108,8 @@ static void circle_free(struct slide *s) {
 SLIDE(slide_circle_coverage) {
     struct circle_slide *st = calloc(1, sizeof *st);
     st->shader = umbra_shader_solid((umbra_color){0.95f, 0.45f, 0.10f, 1.0f});
-    st->sdf = (struct circle_sdf){
-        .base = {.build          = circle_build,
-                 .uniforms_slots = (int)((sizeof(struct circle_sdf)
-                                         - sizeof(struct umbra_sdf)) / 4)},
-    };
+    st->sdf = (struct circle_sdf){.base = {.build = circle_build}};
+    st->sdf.base.uniforms = (struct umbra_buf){.count = UMBRA_UNIFORMS_COUNT(&st->sdf)};
     st->base = (struct slide){
         .title = "Circle Coverage (interval-ready)",
         .bg = {0.08f, 0.10f, 0.14f, 1.0f},

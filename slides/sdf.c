@@ -172,10 +172,10 @@ static struct slide* make_csg(char const *title, float const bg[4], float const 
     umbra_color const c = {color[0], color[1], color[2], color[3]};
     st->shader  = umbra_shader_solid(c);
     st->sdf.base = (struct umbra_sdf){
-        .build          = build,
-        .uniforms_slots = (int)((sizeof(struct two_circle_sdf)
-                                - sizeof(struct umbra_sdf)) / 4),
+        .build          = build
     };
+
+    st->sdf.base.uniforms = (struct umbra_buf){.count = UMBRA_UNIFORMS_COUNT(&st->sdf)};
     st->base = (struct slide){
         .title = title,
         .bg = {bg[0], bg[1], bg[2], bg[3]},
@@ -282,9 +282,10 @@ SLIDE(slide_sdf_ring) {
     struct ring_slide *st = calloc(1, sizeof *st);
     st->shader = umbra_shader_solid((umbra_color){1.0f, 0.6f, 0.1f, 1});
     st->sdf.base = (struct umbra_sdf){
-        .build          = ring_build,
-        .uniforms_slots = (int)((sizeof(struct ring_sdf) - sizeof(struct umbra_sdf)) / 4),
+        .build          = ring_build
     };
+
+    st->sdf.base.uniforms = (struct umbra_buf){.count = UMBRA_UNIFORMS_COUNT(&st->sdf)};
     st->base = (struct slide){
         .title = "SDF Ring (shell)",
         .bg = {0.08f, 0.10f, 0.14f, 1},
@@ -399,10 +400,10 @@ SLIDE(slide_sdf_rounded_rect) {
     struct rounded_rect_slide *st = calloc(1, sizeof *st);
     st->shader = umbra_shader_solid((umbra_color){0.1f, 0.5f, 0.9f, 1});
     st->sdf.base = (struct umbra_sdf){
-        .build          = rounded_rect_build,
-        .uniforms_slots = (int)((sizeof(struct rounded_rect_sdf)
-                                - sizeof(struct umbra_sdf)) / 4),
+        .build          = rounded_rect_build
     };
+
+    st->sdf.base.uniforms = (struct umbra_buf){.count = UMBRA_UNIFORMS_COUNT(&st->sdf)};
     st->base = (struct slide){
         .title = "SDF Rounded Rect",
         .bg = {0.08f, 0.10f, 0.14f, 1},
@@ -522,9 +523,10 @@ SLIDE(slide_sdf_capsule) {
     struct capsule_slide *st = calloc(1, sizeof *st);
     st->shader = umbra_shader_solid((umbra_color){0.9f, 0.3f, 0.6f, 1});
     st->sdf.base = (struct umbra_sdf){
-        .build          = capsule_build,
-        .uniforms_slots = (int)((sizeof(struct capsule_sdf) - sizeof(struct umbra_sdf)) / 4),
+        .build          = capsule_build
     };
+
+    st->sdf.base.uniforms = (struct umbra_buf){.count = UMBRA_UNIFORMS_COUNT(&st->sdf)};
     st->base = (struct slide){
         .title = "SDF Capsule",
         .bg = {0.08f, 0.10f, 0.14f, 1},
@@ -623,9 +625,10 @@ SLIDE(slide_sdf_halfplane) {
     struct halfplane_slide *st = calloc(1, sizeof *st);
     st->shader = umbra_shader_solid((umbra_color){0.3f, 0.7f, 0.9f, 1});
     st->sdf.base = (struct umbra_sdf){
-        .build          = halfplane_build,
-        .uniforms_slots = (int)((sizeof(struct halfplane_sdf) - sizeof(struct umbra_sdf)) / 4),
+        .build          = halfplane_build
     };
+
+    st->sdf.base.uniforms = (struct umbra_buf){.count = UMBRA_UNIFORMS_COUNT(&st->sdf)};
     st->base = (struct slide){
         .title = "SDF Halfplane",
         .bg = {0.08f, 0.10f, 0.14f, 1},
@@ -820,9 +823,10 @@ SLIDE(slide_sdf_text) {
     struct sdf_text_slide *st = calloc(1, sizeof *st);
     st->shader = umbra_shader_solid((umbra_color){0.95f, 0.9f, 0.8f, 1});
     st->sdf.base = (struct umbra_sdf){
-        .build          = sdf_text_build,
-        .uniforms_slots = (int)((sizeof(struct sdf_text_sdf) - sizeof(struct umbra_sdf)) / 4),
+        .build          = sdf_text_build
     };
+
+    st->sdf.base.uniforms = (struct umbra_buf){.count = UMBRA_UNIFORMS_COUNT(&st->sdf)};
     st->base = (struct slide){
         .title = "SDF Text (analytic)",
         .bg = {0.08f, 0.10f, 0.14f, 1},
@@ -962,9 +966,10 @@ SLIDE(slide_sdf_ngon) {
     st->shader = umbra_shader_solid((umbra_color){0.8f, 0.8f, 0.2f, 1});
     st->hp_data = malloc(3 * NGON_SIDES * sizeof(float));
     st->sdf.base = (struct umbra_sdf){
-        .build          = ngon_build,
-        .uniforms_slots = (int)((sizeof(struct ngon_sdf) - sizeof(struct umbra_sdf)) / 4),
+        .build          = ngon_build
     };
+
+    st->sdf.base.uniforms = (struct umbra_buf){.count = UMBRA_UNIFORMS_COUNT(&st->sdf)};
     st->base = (struct slide){
         .title = "SDF Hexagon (n-gon)",
         .bg = {0.08f, 0.10f, 0.14f, 1},
