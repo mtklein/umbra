@@ -209,24 +209,64 @@ builder return or a separate out-param).
   old coincidence patterns in slides and confirm they now trivially
   handle per-frame updates.
 
+## Natural struct layout, end to end
+
+The IR is built per-target (each ninja config builds its own `src/`
+from scratch, then the backend consumes that config's IR), so there's
+no need to force a cross-target "canonical" uniform layout.  We can let
+effect uniforms be plain C structs with natural alignment and padding,
+and read them via `offsetof` everywhere.
+
+Implications:
+
+- Each effect's buf is just a pointer to the concrete struct.  Its size
+  is `sizeof(struct effect)`.  Its fields live at `offsetof(effect,
+  field)` — same on CPU and on the GPU side (backends compute GPU
+  byte offsets from the same `offsetof`).
+- `struct umbra_buf` fields inside an effect struct (LUTs, stop buffers,
+  bitmap handles) use natural alignment: `{void* ptr; int count; int
+  stride;}` is 16 bytes on 64-bit with ptr at 0, count at 8, stride at
+  12; 12 bytes on 32-bit with ptr at 0, count at 4, stride at 8.  The
+  IR references each field at its `offsetof` — no hardcoded slot-2 dance.
+- Today's `umbra_uniforms_fill_ptr` bakes in a 64-bit layout even on
+  32-bit targets (padding out to 16 bytes).  That contract goes away
+  when `fill_ptr` goes away; the effect struct's `struct umbra_buf
+  lut;` field is written with a plain struct assignment, and the IR
+  references `offsetof(struct effect, lut.ptr)` etc.
+- Change IR slot addressing from "slot index" (unit of 4 bytes) to
+  "byte offset" — or keep slot but understand a slot is always `byte_off
+  / 4` where `byte_off = offsetof(...)`.  Either works; byte-offset is
+  the cleaner story since it generalizes to future non-u32 fields
+  without a special case.
+
+Effect types that today have hand-packed layouts can just be C structs:
+
+    struct shader_solid           { umbra_color color; };
+    struct shader_gradient_linear_two_stops {
+        umbra_point p0, p1;
+        umbra_color c0, c1;
+    };
+    struct coverage_rect          { umbra_rect rect; };
+    struct coverage_bitmap_matrix { struct umbra_matrix mat;
+                                    struct umbra_bitmap bmp; };
+    // etc.
+
+All the offset fields (`color_off`, `coeffs_off`, ...) disappear; their
+job is now `offsetof`.  The vtable shrinks to `build` + `free`.
+
 ## Risks to watch
 
 - **Descriptor-limit**: GPU backends cap at 32 bindings.  A complex draw
   (shader + coverage + blend + multiple LUTs) must stay under.  Current
   `max_ptr <= 32` assertion already enforces this; the change is that
   effect uniforms now consume a binding slot each instead of sharing one.
-- **Deref path**: effect structs containing `struct umbra_buf` fields
-  (LUTs, stop positions, bitmap handles) need their ptr channel to still
-  drive the existing deref machinery.  This means `struct umbra_buf` inside
-  the effect struct must match the exact 16-byte layout the ptr-load IR
-  expects (`ptr, count, stride` at offsets 0, 8, 12).  Spot-check.
-- **Alignment**: `struct shader_solid` as a `umbra_buf` of 4 floats is
-  easy; `struct coverage_bitmap_matrix` with a `struct umbra_matrix` +
-  embedded `struct umbra_bitmap` may have padding between fields that
-  break the contiguous-uniform assumption.  Either add explicit padding
-  to the struct, or move the ptr-like fields to separate bufs (cleaner —
-  the matrix is 11 floats, the bitmap handle is a separate 16-byte
-  `umbra_buf`).
+- **GPU backend layout parity**: the backend runs on the host when
+  generating shader code, so `offsetof` is host-native.  For GPU memory
+  layouts (std430 or equivalent), the backend needs to emit loads at
+  the same byte offsets the host would see.  This is already the
+  arrangement today — backends already decode `struct umbra_buf` out of
+  a CPU-written blob.  We just widen the scope: every field at its
+  `offsetof`, no slot math.
 - **Uniform ring overhead**: N small allocations vs. 1 big one.  If
   profiling shows this matters, add a per-dispatch coalescing step that
   concatenates all small uniforms into one ring chunk and emits multiple
