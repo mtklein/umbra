@@ -417,6 +417,27 @@ void umbra_sdf_draw_queue(struct umbra_sdf_draw const *d,
     d->bounds->queue(d->bounds, 0, 0, xt, yt, bounds_buf);
 
     // TODO: coalesce horizontally adjacent covered tiles into one draw->queue() call.
+
+    // TODO: once we have a better handle on the ideal tile shapes (QUEUE_MIN_TILE
+    // is currently a global compromise), try compiling per-tile SDF draw programs
+    // so the IR can fold in l/t/r/b as constants rather than reading them as
+    // uniforms each dispatch.  The SDF's build() currently has no compile-time
+    // knowledge of tile bounds — they arrive through the queue() args consumed
+    // by umbra_x()/umbra_y() at runtime.  Per-tile specialization would let e.g.
+    // axis-aligned SDFs fold the half-plane clips away entirely, and generally
+    // shrink the per-pixel work near tile edges.
+    //
+    // Cost: we'd build-and-cache N (or N*M) variants of the draw program instead
+    // of one.  Worth it if tile count is small and per-pixel savings are large.
+    // The existing umbra_builder dedup/CSE handles most of the redundancy across
+    // variants; the compile path is the dominating unknown.
+    //
+    // Metal function constants (MTLFunctionConstantValues) are a plausible
+    // vehicle here: one source shader with bounds declared as function
+    // constants, specialized per-tile at pipeline creation.  Would let the
+    // Metal backend share source across tile variants instead of generating
+    // N separate MSL strings.  Check whether the Vulkan SPIR-V backend wants
+    // the analogous specialization-constant path.
     for (int ty = 0; ty < yt; ty++) {
         for (int tx = 0; tx < xt; tx++) {
             if (lo[ty * xt + tx] < 0) {
