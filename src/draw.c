@@ -878,26 +878,26 @@ struct umbra_coverage_sdf umbra_coverage_sdf(struct umbra_buf bmp) {
     };
 }
 
-static umbra_val32 wind_build(struct umbra_coverage *s, struct umbra_builder *builder,
+static umbra_val32 winding_build(struct umbra_coverage *s, struct umbra_builder *builder,
                                struct umbra_uniforms_layout *u,
                                umbra_val32 x, umbra_val32 y) {
-    struct umbra_coverage_wind *self = (struct umbra_coverage_wind *)s;
+    struct umbra_coverage_winding *self = (struct umbra_coverage_winding *)s;
     (void)x;
     (void)y;
-    self->wind_off = umbra_uniforms_reserve_ptr(u);
-    umbra_ptr32 const w = umbra_deref_ptr32(builder, (umbra_ptr32){0}, self->wind_off);
+    self->winding_off = umbra_uniforms_reserve_ptr(u);
+    umbra_ptr32 const w = umbra_deref_ptr32(builder, (umbra_ptr32){0}, self->winding_off);
     umbra_val32 const raw = umbra_load_32(builder, w);
     return umbra_min_f32(builder, umbra_abs_f32(builder, raw),
                          umbra_imm_f32(builder, 1.0f));
 }
-static void wind_fill(struct umbra_coverage const *s, void *uniforms) {
-    struct umbra_coverage_wind const *self = (struct umbra_coverage_wind const *)s;
-    umbra_uniforms_fill_ptr(uniforms, self->wind_off, self->wind);
+static void winding_fill(struct umbra_coverage const *s, void *uniforms) {
+    struct umbra_coverage_winding const *self = (struct umbra_coverage_winding const *)s;
+    umbra_uniforms_fill_ptr(uniforms, self->winding_off, self->winding);
 }
-struct umbra_coverage_wind umbra_coverage_wind(struct umbra_buf wind) {
-    return (struct umbra_coverage_wind){
-        .base = {.build = wind_build, .fill = wind_fill},
-        .wind = wind,
+struct umbra_coverage_winding umbra_coverage_winding(struct umbra_buf wind) {
+    return (struct umbra_coverage_winding){
+        .base = {.build = winding_build, .fill = winding_fill},
+        .winding = wind,
     };
 }
 

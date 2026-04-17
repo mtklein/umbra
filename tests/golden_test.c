@@ -128,7 +128,7 @@ TEST(test_slug_rect) {
     __builtin_memset(wind_buf, 0, sizeof wind_buf);
 
     struct umbra_shader_solid shader = umbra_shader_solid(color);
-    struct umbra_coverage_wind cov = umbra_coverage_wind(
+    struct umbra_coverage_winding cov = umbra_coverage_winding(
         (struct umbra_buf){.ptr=wind_buf, .count=count(wind_buf),
                            .stride=W});
 

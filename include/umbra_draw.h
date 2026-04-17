@@ -259,13 +259,12 @@ struct umbra_coverage_bitmap_matrix {
 };
 struct umbra_coverage_bitmap_matrix umbra_coverage_bitmap_matrix(struct umbra_matrix,
                                                                  struct umbra_bitmap);
-// TODO: needs a better name I think.
-struct umbra_coverage_wind {
+struct umbra_coverage_winding {
     struct umbra_coverage base;
-    struct umbra_buf wind;
-    int wind_off, :32;
+    struct umbra_buf winding;
+    int winding_off, :32;
 };
-struct umbra_coverage_wind umbra_coverage_wind(struct umbra_buf wind);
+struct umbra_coverage_winding umbra_coverage_winding(struct umbra_buf winding);
 
 void umbra_gradient_lut_even(float *out, int lut_n, int n_stops, umbra_color const *colors);
 void umbra_gradient_lut(float *out, int lut_n, int n_stops, float const positions[],

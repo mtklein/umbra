@@ -415,7 +415,7 @@ struct slug_two_pass_slide {
     struct umbra_program     *acc_prog;
 
     struct umbra_shader_solid   shader;
-    struct umbra_coverage_wind  cov;
+    struct umbra_coverage_winding  cov;
     struct umbra_fmt            fmt;
     struct umbra_draw_layout   draw_lay;
     struct umbra_program      *draw_prog;
@@ -481,7 +481,7 @@ static void slug_two_pass_draw(struct slide *s, double secs, int l, int t, int r
         acc->queue(acc, l, t, r, b, abuf);
     }
 
-    st->cov.wind = (struct umbra_buf){
+    st->cov.winding = (struct umbra_buf){
         .ptr    = st->wind_buf,
         .count  = w * h,
         .stride = w,
@@ -518,7 +518,7 @@ static void slug_two_pass_free(struct slide *s) {
 SLIDE(slide_slug_wind) {
     struct slug_two_pass_slide *st = calloc(1, sizeof *st);
     st->shader = umbra_shader_solid((umbra_color){0.2f, 1.0f, 0.6f, 1.0f});
-    st->cov    = umbra_coverage_wind((struct umbra_buf){0});
+    st->cov    = umbra_coverage_winding((struct umbra_buf){0});
     st->base = (struct slide){
         .title = "Slug (two-pass)",
         .bg = {0.12f, 0.04f, 0.04f, 1},
@@ -542,7 +542,7 @@ struct slug_slide {
     struct umbra_program         *acc_prog;
 
     struct umbra_shader_solid     shader;
-    struct umbra_coverage_wind    cov;
+    struct umbra_coverage_winding    cov;
     struct umbra_fmt              fmt;
     struct umbra_draw_layout     draw_lay;
     struct umbra_program        *draw_prog;
@@ -604,7 +604,7 @@ static void slug_draw(struct slide *s, double secs, int l, int t, int r, int b, 
     };
     st->acc_prog->queue(st->acc_prog, l, t, r, b, abuf);
 
-    st->cov.wind = (struct umbra_buf){
+    st->cov.winding = (struct umbra_buf){
         .ptr    = st->wind_buf,
         .count  = w * h,
         .stride = w,
@@ -641,7 +641,7 @@ static int slug_one_pass_get_builders(struct slide *s, struct umbra_fmt fmt,
 SLIDE(slide_slug_wind_loop) {
     struct slug_slide *st = calloc(1, sizeof *st);
     st->shader = umbra_shader_solid((umbra_color){0.2f, 1.0f, 0.6f, 1.0f});
-    st->cov    = umbra_coverage_wind((struct umbra_buf){0});
+    st->cov    = umbra_coverage_winding((struct umbra_buf){0});
     st->base = (struct slide){
         .title = "Slug (one-pass)",
         .bg = {0.12f, 0.04f, 0.04f, 1},
