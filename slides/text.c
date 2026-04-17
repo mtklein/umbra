@@ -123,11 +123,8 @@ struct text_slide {
     int              w, h;
     int              is_sdf, :32;
 
-    struct umbra_shader_solid shader;
-    union {
-        struct umbra_coverage_bitmap bitmap;
-        struct umbra_coverage_sdf    sdf;
-    } cov;
+    struct umbra_shader       *shader;
+    struct umbra_coverage     *cov;
 
     struct umbra_fmt            fmt;
     struct umbra_draw_layout   lay;
@@ -145,8 +142,15 @@ static void text_prepare(struct slide *s, struct umbra_backend *be,
     struct text_slide *st = (struct text_slide *)s;
     if (st->prog) { st->prog->free(st->prog); }
     free(st->lay.uniforms);
+    umbra_coverage_free(st->cov);
+    struct umbra_buf bmp = {
+        .ptr    = st->tc->data,
+        .count  = st->w * st->h,
+        .stride = st->w,
+    };
+    st->cov = st->is_sdf ? umbra_coverage_sdf(bmp) : umbra_coverage_bitmap(bmp);
     st->fmt = fmt;
-    struct umbra_builder *b = umbra_draw_builder(&st->cov.bitmap.base, &st->shader.base,
+    struct umbra_builder *b = umbra_draw_builder(st->cov, st->shader,
                                                  umbra_blend_srcover, fmt, &st->lay);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
@@ -159,12 +163,7 @@ static void text_draw(struct slide *s, double secs, int l, int t, int r, int b, 
     struct text_slide *st = (struct text_slide *)s;
     (void)secs;
     slide_bg_draw(s->bg, l, t, r, b, buf);
-    st->cov.bitmap.bmp = (struct umbra_buf){
-        .ptr=st->tc->data,
-        .count=st->w * st->h,
-        .stride=st->w,
-    };
-    umbra_draw_fill(&st->lay, &st->cov.bitmap.base, &st->shader.base);
+    umbra_draw_fill(&st->lay, st->cov, st->shader);
     struct umbra_buf ubuf[] = {
         {.ptr=st->lay.uniforms, .count=st->lay.uni.slots},
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
@@ -176,7 +175,7 @@ static int text_get_builders(struct slide *s, struct umbra_fmt fmt,
                              struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
     struct text_slide *st = (struct text_slide *)s;
-    out[0] = umbra_draw_builder(&st->cov.bitmap.base, &st->shader.base,
+    out[0] = umbra_draw_builder(st->cov, st->shader,
                                 umbra_blend_srcover, fmt, NULL);
     return out[0] ? 1 : 0;
 }
@@ -185,6 +184,8 @@ static void text_free(struct slide *s) {
     struct text_slide *st = (struct text_slide *)s;
     if (st->prog) { st->prog->free(st->prog); }
     free(st->lay.uniforms);
+    umbra_shader_free  (st->shader);
+    umbra_coverage_free(st->cov);
     free(st);
 }
 
@@ -193,7 +194,7 @@ SLIDE(slide_text_bitmap) {
     st->tc     = text_shared_bitmap();
     st->is_sdf = 0;
     st->shader = umbra_shader_solid((umbra_color){1.0f, 1.0f, 1.0f, 1.0f});
-    st->cov.bitmap = umbra_coverage_bitmap((struct umbra_buf){0});
+    st->cov    = umbra_coverage_bitmap((struct umbra_buf){0});
     st->base = (struct slide){
         .title = "Text (8-bit AA)",
         .bg = {0.18f, 0.1f, 0.1f, 1},
@@ -211,7 +212,7 @@ SLIDE(slide_text_sdf) {
     st->tc     = text_shared_sdf();
     st->is_sdf = 1;
     st->shader = umbra_shader_solid((umbra_color){0.2f, 0.8f, 1.0f, 1.0f});
-    st->cov.sdf = umbra_coverage_sdf((struct umbra_buf){0});
+    st->cov    = umbra_coverage_sdf((struct umbra_buf){0});
     st->base = (struct slide){
         .title = "Text (SDF)",
         .bg = {0.18f, 0.1f, 0.1f, 1},

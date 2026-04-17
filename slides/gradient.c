@@ -7,10 +7,7 @@ struct grad_2stop_slide {
     int   w, h;
     int   is_radial, :32;
 
-    union {
-        struct umbra_shader_gradient_linear_two_stops linear;
-        struct umbra_shader_gradient_radial_two_stops radial;
-    } shader;
+    struct umbra_shader        *shader;
 
     struct umbra_fmt            fmt;
     struct umbra_draw_layout   lay;
@@ -25,10 +22,7 @@ struct grad_lut_slide {
     int    is_radial, :32;
     float *lut_data;
 
-    union {
-        struct umbra_shader_gradient_linear_lut linear;
-        struct umbra_shader_gradient_radial_lut radial;
-    } shader;
+    struct umbra_shader        *shader;
 
     struct umbra_fmt            fmt;
     struct umbra_draw_layout   lay;
@@ -48,7 +42,7 @@ static void grad_2stop_prepare(struct slide *s, struct umbra_backend *be, struct
         st->fmt = fmt;
         umbra_flat_ir_free(st->ir);
         free(st->lay.uniforms);
-        struct umbra_builder *b = umbra_draw_builder(NULL, &st->shader.linear.base, NULL, fmt,
+        struct umbra_builder *b = umbra_draw_builder(NULL, st->shader, NULL, fmt,
                                                     &st->lay);
         st->ir = umbra_flat_ir(b);
         umbra_builder_free(b);
@@ -60,7 +54,7 @@ static void grad_2stop_prepare(struct slide *s, struct umbra_backend *be, struct
 static void grad_2stop_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct grad_2stop_slide *st = (struct grad_2stop_slide *)s;
     (void)secs;
-    umbra_draw_fill(&st->lay, NULL, &st->shader.linear.base);
+    umbra_draw_fill(&st->lay, NULL, st->shader);
     struct umbra_buf ubuf[] = {
         {.ptr=st->lay.uniforms, .count=st->lay.uni.slots},
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
@@ -72,7 +66,7 @@ static int grad_2stop_get_builders(struct slide *s, struct umbra_fmt fmt,
                                    struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
     struct grad_2stop_slide *st = (struct grad_2stop_slide *)s;
-    out[0] = umbra_draw_builder(NULL, &st->shader.linear.base, NULL, fmt, NULL);
+    out[0] = umbra_draw_builder(NULL, st->shader, NULL, fmt, NULL);
     return out[0] ? 1 : 0;
 }
 
@@ -81,6 +75,7 @@ static void grad_2stop_free(struct slide *s) {
     if (st->prog) { st->prog->free(st->prog); }
     umbra_flat_ir_free(st->ir);
     free(st->lay.uniforms);
+    umbra_shader_free(st->shader);
     free(st);
 }
 
@@ -96,7 +91,7 @@ static void grad_lut_prepare(struct slide *s, struct umbra_backend *be, struct u
         st->fmt = fmt;
         umbra_flat_ir_free(st->ir);
         free(st->lay.uniforms);
-        struct umbra_builder *b = umbra_draw_builder(NULL, &st->shader.linear.base, NULL, fmt,
+        struct umbra_builder *b = umbra_draw_builder(NULL, st->shader, NULL, fmt,
                                                     &st->lay);
         st->ir = umbra_flat_ir(b);
         umbra_builder_free(b);
@@ -108,7 +103,7 @@ static void grad_lut_prepare(struct slide *s, struct umbra_backend *be, struct u
 static void grad_lut_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct grad_lut_slide *st = (struct grad_lut_slide *)s;
     (void)secs;
-    umbra_draw_fill(&st->lay, NULL, &st->shader.linear.base);
+    umbra_draw_fill(&st->lay, NULL, st->shader);
     struct umbra_buf ubuf[] = {
         {.ptr=st->lay.uniforms, .count=st->lay.uni.slots},
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
@@ -120,7 +115,7 @@ static int grad_lut_get_builders(struct slide *s, struct umbra_fmt fmt,
                                  struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
     struct grad_lut_slide *st = (struct grad_lut_slide *)s;
-    out[0] = umbra_draw_builder(NULL, &st->shader.linear.base, NULL, fmt, NULL);
+    out[0] = umbra_draw_builder(NULL, st->shader, NULL, fmt, NULL);
     return out[0] ? 1 : 0;
 }
 
@@ -129,6 +124,7 @@ static void grad_lut_free(struct slide *s) {
     if (st->prog) { st->prog->free(st->prog); }
     umbra_flat_ir_free(st->ir);
     free(st->lay.uniforms);
+    umbra_shader_free(st->shader);
     free(st->lut_data);
     free(st);
 }
@@ -136,7 +132,7 @@ static void grad_lut_free(struct slide *s) {
 SLIDE(slide_gradient_linear_2) {
     struct grad_2stop_slide *st = calloc(1, sizeof *st);
     st->is_radial = 0;
-    st->shader.linear = umbra_shader_gradient_linear_two_stops((umbra_point){0, 0}, (umbra_point){640, 0},
+    st->shader = umbra_shader_gradient_linear_two_stops((umbra_point){0, 0}, (umbra_point){640, 0},
                                               (umbra_color){1.0f, 0.4f, 0.0f, 1.0f},
                                               (umbra_color){0.0f, 0.3f, 1.0f, 1.0f});
     st->base = (struct slide){
@@ -154,7 +150,7 @@ SLIDE(slide_gradient_linear_2) {
 SLIDE(slide_gradient_radial_2) {
     struct grad_2stop_slide *st = calloc(1, sizeof *st);
     st->is_radial = 1;
-    st->shader.radial = umbra_shader_gradient_radial_two_stops((umbra_point){320, 240}, 300.0f,
+    st->shader = umbra_shader_gradient_radial_two_stops((umbra_point){320, 240}, 300.0f,
                                               (umbra_color){1.0f, 1.0f, 0.9f, 1.0f},
                                               (umbra_color){0.05f, 0.0f, 0.15f, 1.0f});
     st->base = (struct slide){
@@ -176,10 +172,7 @@ struct grad_stops_slide {
     int    is_radial, :32;
     float *colors_data, *pos_data;
 
-    union {
-        struct umbra_shader_gradient_linear linear;
-        struct umbra_shader_gradient_radial radial;
-    } shader;
+    struct umbra_shader        *shader;
 
     struct umbra_fmt            fmt;
     struct umbra_draw_layout   lay;
@@ -199,7 +192,7 @@ static void grad_stops_prepare(struct slide *s, struct umbra_backend *be, struct
         st->fmt = fmt;
         umbra_flat_ir_free(st->ir);
         free(st->lay.uniforms);
-        struct umbra_builder *b = umbra_draw_builder(NULL, &st->shader.linear.base, NULL, fmt,
+        struct umbra_builder *b = umbra_draw_builder(NULL, st->shader, NULL, fmt,
                                                     &st->lay);
         st->ir = umbra_flat_ir(b);
         umbra_builder_free(b);
@@ -211,7 +204,7 @@ static void grad_stops_prepare(struct slide *s, struct umbra_backend *be, struct
 static void grad_stops_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct grad_stops_slide *st = (struct grad_stops_slide *)s;
     (void)secs;
-    umbra_draw_fill(&st->lay, NULL, &st->shader.linear.base);
+    umbra_draw_fill(&st->lay, NULL, st->shader);
     struct umbra_buf ubuf[] = {
         {.ptr=st->lay.uniforms, .count=st->lay.uni.slots},
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
@@ -223,7 +216,7 @@ static int grad_stops_get_builders(struct slide *s, struct umbra_fmt fmt,
                                    struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
     struct grad_stops_slide *st = (struct grad_stops_slide *)s;
-    out[0] = umbra_draw_builder(NULL, &st->shader.linear.base, NULL, fmt, NULL);
+    out[0] = umbra_draw_builder(NULL, st->shader, NULL, fmt, NULL);
     return out[0] ? 1 : 0;
 }
 
@@ -232,6 +225,7 @@ static void grad_stops_free(struct slide *s) {
     if (st->prog) { st->prog->free(st->prog); }
     umbra_flat_ir_free(st->ir);
     free(st->lay.uniforms);
+    umbra_shader_free(st->shader);
     free(st->colors_data);
     free(st->pos_data);
     free(st);
@@ -257,7 +251,7 @@ SLIDE(slide_gradient_linear_stops) {
     struct grad_stops_slide *st = calloc(1, sizeof *st);
     st->colors_data = planar;
     st->pos_data    = pos;
-    st->shader.linear = umbra_shader_gradient_linear(
+    st->shader = umbra_shader_gradient_linear(
         (umbra_point){0, 0}, (umbra_point){640, 0},
         (struct umbra_buf){.ptr=planar, .count=N * 4},
         (struct umbra_buf){.ptr=pos,    .count=N});
@@ -291,7 +285,7 @@ SLIDE(slide_gradient_radial_stops) {
     st->is_radial   = 1;
     st->colors_data = planar;
     st->pos_data    = pos;
-    st->shader.radial = umbra_shader_gradient_radial(
+    st->shader = umbra_shader_gradient_radial(
         (umbra_point){320, 240}, 280.0f,
         (struct umbra_buf){.ptr=planar, .count=N * 4},
         (struct umbra_buf){.ptr=pos,    .count=N});
@@ -318,7 +312,7 @@ SLIDE(slide_gradient_linear_wide) {
     struct grad_lut_slide *st = calloc(1, sizeof *st);
     st->is_radial     = 0;
     st->lut_data      = lut;
-    st->shader.linear = umbra_shader_gradient_linear_lut((umbra_point){0, 0}, (umbra_point){640, 0},
+    st->shader = umbra_shader_gradient_linear_lut((umbra_point){0, 0}, (umbra_point){640, 0},
                                                  (struct umbra_buf){.ptr=lut, .count=LUT_N * 4});
     st->base = (struct slide){
         .title        = "Linear Gradient (wide gamut)",
@@ -343,7 +337,7 @@ SLIDE(slide_gradient_radial_wide) {
     struct grad_lut_slide *st = calloc(1, sizeof *st);
     st->is_radial     = 1;
     st->lut_data      = lut;
-    st->shader.radial = umbra_shader_gradient_radial_lut((umbra_point){320, 240}, 280.0f,
+    st->shader = umbra_shader_gradient_radial_lut((umbra_point){320, 240}, 280.0f,
                                                  (struct umbra_buf){.ptr=lut, .count=LUT_N * 4});
     st->base = (struct slide){
         .title        = "Radial Gradient (wide gamut)",

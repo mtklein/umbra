@@ -38,7 +38,7 @@ struct circle_slide {
     float cx0, cy0, vx, vy, r;
     int   w, h, pad;
 
-    struct umbra_shader_solid shader;
+    struct umbra_shader      *shader;
     struct circle_sdf         sdf;
 
     struct umbra_fmt          fmt;
@@ -71,7 +71,7 @@ static void circle_prepare(struct slide *s, struct umbra_backend *be, struct umb
     st->fmt = fmt;
     st->qt  = umbra_sdf_draw(be, &st->sdf.base,
                              (struct umbra_sdf_draw_config){.hard_edge = 0},
-                             &st->shader.base, umbra_blend_srcover, fmt, &st->lay);
+                             st->shader, umbra_blend_srcover, fmt, &st->lay);
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
@@ -85,7 +85,7 @@ static void circle_draw(struct slide *s, double secs, int l, int t, int r, int b
     st->sdf.cy = pad + bounce(st->cy0 - pad, st->vy, ticks, (float)st->h - 2.0f*pad);
     st->sdf.r  = st->r;
 
-    umbra_sdf_draw_fill(&st->lay, &st->sdf.base, &st->shader.base);
+    umbra_sdf_draw_fill(&st->lay, &st->sdf.base, st->shader);
     struct umbra_buf ubuf[] = {
         {.ptr=st->lay.uniforms, .count=st->lay.uni.slots},
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
@@ -97,9 +97,10 @@ static int circle_get_builders(struct slide *s, struct umbra_fmt fmt,
                                struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
     struct circle_slide *st = (struct circle_slide *)s;
-    struct umbra_sdf_coverage adapter = umbra_sdf_coverage(&st->sdf.base, 0);
-    out[0] = umbra_draw_builder(&adapter.base, &st->shader.base,
+    struct umbra_coverage *adapter = umbra_sdf_coverage(&st->sdf.base, 0);
+    out[0] = umbra_draw_builder(adapter, st->shader,
                                 umbra_blend_srcover, fmt, NULL);
+    umbra_coverage_free(adapter);
     return out[0] ? 1 : 0;
 }
 
@@ -107,6 +108,7 @@ static void circle_free(struct slide *s) {
     struct circle_slide *st = (struct circle_slide *)s;
     umbra_sdf_draw_free(st->qt);
     free(st->lay.uniforms);
+    umbra_shader_free(st->shader);
     free(st);
 }
 

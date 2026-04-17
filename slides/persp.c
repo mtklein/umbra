@@ -8,12 +8,12 @@ struct persp_slide {
     struct text_cov *bitmap;
     int              w, h;
 
-    struct umbra_shader_solid            shader;
-    struct umbra_coverage_bitmap_matrix  cov;
+    struct umbra_shader        *shader;
+    struct umbra_coverage      *cov;
 
     struct umbra_fmt            fmt;
-    struct umbra_draw_layout   lay;
-    struct umbra_program      *prog;
+    struct umbra_draw_layout    lay;
+    struct umbra_program       *prog;
 };
 
 static void persp_init(struct slide *s, int w, int h) {
@@ -27,8 +27,15 @@ static void persp_prepare(struct slide *s, struct umbra_backend *be,
     struct persp_slide *st = (struct persp_slide *)s;
     if (st->prog) { st->prog->free(st->prog); }
     free(st->lay.uniforms);
+    umbra_coverage_free(st->cov);
+    struct umbra_bitmap bmp = {
+        .buf = {.ptr = st->bitmap->data, .count = st->bitmap->w * st->bitmap->h},
+        .w   = st->bitmap->w,
+        .h   = st->bitmap->h,
+    };
+    st->cov = umbra_coverage_bitmap_matrix((struct umbra_matrix){0}, bmp);
     st->fmt = fmt;
-    struct umbra_builder *b = umbra_draw_builder(&st->cov.base, &st->shader.base,
+    struct umbra_builder *b = umbra_draw_builder(st->cov, st->shader,
                                                  umbra_blend_srcover, fmt, &st->lay);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
@@ -40,14 +47,21 @@ static void persp_prepare(struct slide *s, struct umbra_backend *be,
 static void persp_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct persp_slide *st = (struct persp_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
-    slide_perspective_matrix(&st->cov.mat, (float)secs, st->w, st->h,
+    struct umbra_matrix mat;
+    slide_perspective_matrix(&mat, (float)secs, st->w, st->h,
                              st->bitmap->w, st->bitmap->h);
-    st->cov.bmp = (struct umbra_bitmap){
+    struct umbra_bitmap bmp = {
         .buf = {.ptr = st->bitmap->data, .count = st->bitmap->w * st->bitmap->h},
         .w   = st->bitmap->w,
         .h   = st->bitmap->h,
     };
-    umbra_draw_fill(&st->lay, &st->cov.base, &st->shader.base);
+    umbra_coverage_free(st->cov);
+    st->cov = umbra_coverage_bitmap_matrix(mat, bmp);
+    // Populate the cov's offsets by re-running the builder (passing NULL
+    // layout so the existing uniforms allocation isn't reallocated).
+    umbra_builder_free(umbra_draw_builder(st->cov, st->shader,
+                                          umbra_blend_srcover, st->fmt, NULL));
+    umbra_draw_fill(&st->lay, st->cov, st->shader);
     struct umbra_buf ubuf[] = {
         {.ptr=st->lay.uniforms, .count=st->lay.uni.slots},
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
@@ -59,7 +73,7 @@ static int persp_get_builders(struct slide *s, struct umbra_fmt fmt,
                               struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
     struct persp_slide *st = (struct persp_slide *)s;
-    out[0] = umbra_draw_builder(&st->cov.base, &st->shader.base, umbra_blend_srcover, fmt, NULL);
+    out[0] = umbra_draw_builder(st->cov, st->shader, umbra_blend_srcover, fmt, NULL);
     return out[0] ? 1 : 0;
 }
 
@@ -67,6 +81,8 @@ static void persp_free(struct slide *s) {
     struct persp_slide *st = (struct persp_slide *)s;
     if (st->prog) { st->prog->free(st->prog); }
     free(st->lay.uniforms);
+    umbra_shader_free  (st->shader);
+    umbra_coverage_free(st->cov);
     free(st);
 }
 

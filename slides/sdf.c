@@ -56,7 +56,7 @@ struct csg_slide {
     enum csg_op op;
     int pad;
 
-    struct umbra_shader_solid shader;
+    struct umbra_shader      *shader;
     struct two_circle_sdf     sdf;
 
     struct umbra_fmt          fmt;
@@ -133,7 +133,7 @@ static void csg_prepare(struct slide *s, struct umbra_backend *be, struct umbra_
     st->fmt  = fmt;
     st->disp = umbra_sdf_draw(be, &st->sdf.base,
                                   (struct umbra_sdf_draw_config){.hard_edge = 0},
-                                  &st->shader.base, umbra_blend_srcover, fmt, &st->lay);
+                                  st->shader, umbra_blend_srcover, fmt, &st->lay);
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
@@ -141,7 +141,7 @@ static void csg_draw(struct slide *s, double secs, int l, int t, int r, int b, v
     struct csg_slide *st = (struct csg_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
     orbit_update(&st->sdf.orbit, (float)secs, st->w, st->h);
-    umbra_sdf_draw_fill(&st->lay, &st->sdf.base, &st->shader.base);
+    umbra_sdf_draw_fill(&st->lay, &st->sdf.base, st->shader);
     struct umbra_buf ubuf[] = {
         {.ptr = st->lay.uniforms, .count = st->lay.uni.slots},
         {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
@@ -153,9 +153,10 @@ static int csg_get_builders(struct slide *s, struct umbra_fmt fmt,
                             struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
     struct csg_slide *st = (struct csg_slide *)s;
-    struct umbra_sdf_coverage adapter = umbra_sdf_coverage(&st->sdf.base, 0);
-    out[0] = umbra_draw_builder(&adapter.base, &st->shader.base,
+    struct umbra_coverage *adapter = umbra_sdf_coverage(&st->sdf.base, 0);
+    out[0] = umbra_draw_builder(adapter, st->shader,
                                 umbra_blend_srcover, fmt, NULL);
+    umbra_coverage_free(adapter);
     return out[0] ? 1 : 0;
 }
 
@@ -163,6 +164,7 @@ static void csg_free(struct slide *s) {
     struct csg_slide *st = (struct csg_slide *)s;
     umbra_sdf_draw_free(st->disp);
     free(st->lay.uniforms);
+    umbra_shader_free(st->shader);
     free(st);
 }
 
@@ -291,7 +293,7 @@ struct rounded_rect_slide {
     struct slide base;
     int w, h;
 
-    struct umbra_shader_solid shader;
+    struct umbra_shader      *shader;
     struct rounded_rect_sdf   sdf;
 
     struct umbra_fmt          fmt;
@@ -313,7 +315,7 @@ static void rounded_rect_prepare(struct slide *s, struct umbra_backend *be,
     st->fmt  = fmt;
     st->disp = umbra_sdf_draw(be, &st->sdf.base,
                                   (struct umbra_sdf_draw_config){.hard_edge = 0},
-                                  &st->shader.base, umbra_blend_srcover, fmt, &st->lay);
+                                  st->shader, umbra_blend_srcover, fmt, &st->lay);
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
@@ -329,7 +331,7 @@ static void rounded_rect_draw(struct slide *s, double secs, int l, int t, int r,
     st->sdf.hh = (float)(st->w < st->h ? st->w : st->h) * (0.10f + 0.08f * anim);
     st->sdf.r  = (float)(st->w < st->h ? st->w : st->h) * 0.04f;
 
-    umbra_sdf_draw_fill(&st->lay, &st->sdf.base, &st->shader.base);
+    umbra_sdf_draw_fill(&st->lay, &st->sdf.base, st->shader);
     struct umbra_buf ubuf[] = {
         {.ptr = st->lay.uniforms, .count = st->lay.uni.slots},
         {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
@@ -341,9 +343,10 @@ static int rounded_rect_get_builders(struct slide *s, struct umbra_fmt fmt,
                                      struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
     struct rounded_rect_slide *st = (struct rounded_rect_slide *)s;
-    struct umbra_sdf_coverage adapter = umbra_sdf_coverage(&st->sdf.base, 0);
-    out[0] = umbra_draw_builder(&adapter.base, &st->shader.base,
+    struct umbra_coverage *adapter = umbra_sdf_coverage(&st->sdf.base, 0);
+    out[0] = umbra_draw_builder(adapter, st->shader,
                                 umbra_blend_srcover, fmt, NULL);
+    umbra_coverage_free(adapter);
     return out[0] ? 1 : 0;
 }
 
@@ -351,6 +354,7 @@ static void rounded_rect_free(struct slide *s) {
     struct rounded_rect_slide *st = (struct rounded_rect_slide *)s;
     umbra_sdf_draw_free(st->disp);
     free(st->lay.uniforms);
+    umbra_shader_free(st->shader);
     free(st);
 }
 
@@ -609,7 +613,7 @@ struct sdf_text_slide {
     struct slide base;
     int w, h;
 
-    struct umbra_shader_solid shader;
+    struct umbra_shader      *shader;
     struct sdf_text_sdf       sdf;
 
     struct umbra_fmt          fmt;
@@ -645,7 +649,7 @@ static void sdf_text_prepare(struct slide *s, struct umbra_backend *be, struct u
     st->fmt  = fmt;
     st->disp = umbra_sdf_draw(be, &st->sdf.base,
                                   (struct umbra_sdf_draw_config){.hard_edge = 0},
-                                  &st->shader.base, umbra_blend_srcover, fmt, &st->lay);
+                                  st->shader, umbra_blend_srcover, fmt, &st->lay);
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
@@ -653,7 +657,7 @@ static void sdf_text_draw(struct slide *s, double secs, int l, int t, int r, int
     (void)secs;
     struct sdf_text_slide *st = (struct sdf_text_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
-    umbra_sdf_draw_fill(&st->lay, &st->sdf.base, &st->shader.base);
+    umbra_sdf_draw_fill(&st->lay, &st->sdf.base, st->shader);
     struct umbra_buf ubuf[] = {
         {.ptr = st->lay.uniforms, .count = st->lay.uni.slots},
         {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
@@ -665,9 +669,10 @@ static int sdf_text_get_builders(struct slide *s, struct umbra_fmt fmt,
                                  struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
     struct sdf_text_slide *st = (struct sdf_text_slide *)s;
-    struct umbra_sdf_coverage adapter = umbra_sdf_coverage(&st->sdf.base, 0);
-    out[0] = umbra_draw_builder(&adapter.base, &st->shader.base,
+    struct umbra_coverage *adapter = umbra_sdf_coverage(&st->sdf.base, 0);
+    out[0] = umbra_draw_builder(adapter, st->shader,
                                 umbra_blend_srcover, fmt, NULL);
+    umbra_coverage_free(adapter);
     return out[0] ? 1 : 0;
 }
 
@@ -676,6 +681,7 @@ static void sdf_text_free(struct slide *s) {
     umbra_sdf_draw_free(st->disp);
     free(st->lay.uniforms);
     slug_free(&st->sdf.curves);
+    umbra_shader_free(st->shader);
     free(st);
 }
 
@@ -767,7 +773,7 @@ struct ngon_slide {
     struct slide base;
     int w, h;
 
-    struct umbra_shader_solid shader;
+    struct umbra_shader      *shader;
     struct ngon_sdf           sdf;
 
     struct umbra_fmt          fmt;
@@ -788,7 +794,7 @@ static void ngon_prepare(struct slide *s, struct umbra_backend *be, struct umbra
     st->fmt  = fmt;
     st->disp = umbra_sdf_draw(be, &st->sdf.base,
                                   (struct umbra_sdf_draw_config){.hard_edge = 0},
-                                  &st->shader.base, umbra_blend_srcover, fmt, &st->lay);
+                                  st->shader, umbra_blend_srcover, fmt, &st->lay);
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
@@ -799,7 +805,7 @@ static void ngon_draw(struct slide *s, double secs, int l, int t, int r, int b, 
     st->sdf.cy    = (float)st->h * 0.5f;
     st->sdf.r     = (float)(st->w < st->h ? st->w : st->h) * 0.3f;
     st->sdf.angle = (float)secs;
-    umbra_sdf_draw_fill(&st->lay, &st->sdf.base, &st->shader.base);
+    umbra_sdf_draw_fill(&st->lay, &st->sdf.base, st->shader);
     struct umbra_buf ubuf[] = {
         {.ptr = st->lay.uniforms, .count = st->lay.uni.slots},
         {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
@@ -811,9 +817,10 @@ static int ngon_get_builders(struct slide *s, struct umbra_fmt fmt,
                              struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
     struct ngon_slide *st = (struct ngon_slide *)s;
-    struct umbra_sdf_coverage adapter = umbra_sdf_coverage(&st->sdf.base, 0);
-    out[0] = umbra_draw_builder(&adapter.base, &st->shader.base,
+    struct umbra_coverage *adapter = umbra_sdf_coverage(&st->sdf.base, 0);
+    out[0] = umbra_draw_builder(adapter, st->shader,
                                 umbra_blend_srcover, fmt, NULL);
+    umbra_coverage_free(adapter);
     return out[0] ? 1 : 0;
 }
 
@@ -822,6 +829,7 @@ static void ngon_free(struct slide *s) {
     umbra_sdf_draw_free(st->disp);
     free(st->lay.uniforms);
     free(st->sdf.hp_data);
+    umbra_shader_free(st->shader);
     free(st);
 }
 

@@ -127,14 +127,14 @@ TEST(test_slug_rect) {
     float wind_buf[W * H];
     __builtin_memset(wind_buf, 0, sizeof wind_buf);
 
-    struct umbra_shader_solid shader = umbra_shader_solid(color);
-    struct umbra_coverage_winding cov = umbra_coverage_winding(
+    struct umbra_shader *shader = umbra_shader_solid(color);
+    struct umbra_coverage *cov = umbra_coverage_winding(
         (struct umbra_buf){.ptr=wind_buf, .count=count(wind_buf),
                            .stride=W});
 
     struct umbra_draw_layout lay;
     struct umbra_builder *bld = umbra_draw_builder(
-        &cov.base, &shader.base,
+        cov, shader,
         umbra_blend_srcover, umbra_fmt_8888,
         &lay);
     struct umbra_flat_ir *ir =
@@ -165,7 +165,7 @@ TEST(test_slug_rect) {
     }
     be->flush(be);
 
-    umbra_draw_fill(&lay, &cov.base, &shader.base);
+    umbra_draw_fill(&lay, cov, shader);
     struct umbra_buf buf[] = {
         (struct umbra_buf){.ptr=lay.uniforms, .count=lay.uni.slots},
         {.ptr=pixels, .count=W * H, .stride=W},
@@ -187,6 +187,8 @@ TEST(test_slug_rect) {
     acc->free(acc);
     interp->free(interp);
     be->free(be);
+    umbra_shader_free  (shader);
+    umbra_coverage_free(cov);
 }
 
 TEST(test_perspective_text) {
@@ -200,14 +202,14 @@ TEST(test_perspective_text) {
 
     umbra_color color = {1,1,1,1};
 
-    struct umbra_shader_solid shader = umbra_shader_solid(color);
-    struct umbra_coverage_bitmap_matrix cov = umbra_coverage_bitmap_matrix(
+    struct umbra_shader *shader = umbra_shader_solid(color);
+    struct umbra_coverage *cov = umbra_coverage_bitmap_matrix(
         (struct umbra_matrix){1,0,0, 0,1,0, 0,0,1},
         (struct umbra_bitmap){.buf={.ptr=bmp, .count=BW * BH}, .w=BW, .h=BH});
 
     struct umbra_draw_layout lay;
     struct umbra_builder *bld = umbra_draw_builder(
-        &cov.base, &shader.base,
+        cov, shader,
         umbra_blend_srcover, umbra_fmt_8888,
         &lay);
     struct umbra_flat_ir *ir =
@@ -222,7 +224,7 @@ TEST(test_perspective_text) {
         pixels[i] = 0xff000000;
     }
 
-    umbra_draw_fill(&lay, &cov.base, &shader.base);
+    umbra_draw_fill(&lay, cov, shader);
     struct umbra_buf buf[] = {
         (struct umbra_buf){.ptr=lay.uniforms, .count=lay.uni.slots},
         {.ptr=pixels, .count=BW},
@@ -241,8 +243,8 @@ TEST(test_perspective_text) {
     slide_perspective_matrix(&mat2, 1.0f, W, H, tc.w, tc.h);
     umbra_color hc2 = {1,0.8f,0.2f,1};
 
-    struct umbra_shader_solid shader2 = umbra_shader_solid(hc2);
-    struct umbra_coverage_bitmap_matrix cov2 = umbra_coverage_bitmap_matrix(mat2,
+    struct umbra_shader *shader2 = umbra_shader_solid(hc2);
+    struct umbra_coverage *cov2 = umbra_coverage_bitmap_matrix(mat2,
         (struct umbra_bitmap){
             .buf = {.ptr=tc.data, .count=tc.w * tc.h},
             .w   = tc.w,
@@ -251,7 +253,7 @@ TEST(test_perspective_text) {
 
     struct umbra_draw_layout lay2;
     bld = umbra_draw_builder(
-        &cov2.base, &shader2.base,
+        cov2, shader2,
         umbra_blend_srcover, umbra_fmt_8888,
         &lay2);
     ir = umbra_flat_ir(bld);
@@ -264,7 +266,7 @@ TEST(test_perspective_text) {
         px2[i] = 0xff0a0a1e;
     }
     {
-        umbra_draw_fill(&lay2, &cov2.base, &shader2.base);
+        umbra_draw_fill(&lay2, cov2, shader2);
         struct umbra_buf b2[] = {
             (struct umbra_buf){.ptr=lay2.uniforms, .count=lay2.uni.slots},
             {.ptr=px2, .count=W * H, .stride=W},
@@ -283,6 +285,10 @@ TEST(test_perspective_text) {
     interp->free(interp);
     be->free(be);
     text_cov_free(&tc);
+    umbra_shader_free  (shader);
+    umbra_coverage_free(cov);
+    umbra_shader_free  (shader2);
+    umbra_coverage_free(cov2);
 }
 
 TEST(test_golden_slides) {

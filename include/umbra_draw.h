@@ -58,15 +58,13 @@ void              umbra_store_fp16       (struct umbra_builder*, umbra_ptr64, um
 umbra_color_val32 umbra_load_fp16_planar (struct umbra_builder*, umbra_ptr16);
 void              umbra_store_fp16_planar(struct umbra_builder*, umbra_ptr16, umbra_color_val32);
 
-// TODO: move shader/coverage/sdf over to our full polymorphim pattern with opaque types,
-//       free() hooks, etc.
-
 struct umbra_shader {
     umbra_color_val32 (*build)(struct umbra_shader*,
                                struct umbra_builder*,
                                struct umbra_uniforms_layout*,
                                umbra_val32 x, umbra_val32 y);
     void (*fill)(struct umbra_shader const*, void *uniforms);
+    void (*free)(struct umbra_shader*);
 };
 
 struct umbra_coverage {
@@ -75,6 +73,7 @@ struct umbra_coverage {
                          struct umbra_uniforms_layout*,
                          umbra_val32 x, umbra_val32 y);
     void (*fill)(struct umbra_coverage const*, void *uniforms);
+    void (*free)(struct umbra_coverage*);
 };
 
 // Signed distance function returning f(x,y) where f < 0 means inside.
@@ -84,16 +83,16 @@ struct umbra_sdf {
                             struct umbra_uniforms_layout*,
                             umbra_interval x, umbra_interval y);
     void (*fill)(struct umbra_sdf const*, void *uniforms);
+    void (*free)(struct umbra_sdf*);
 };
+
+void umbra_shader_free  (struct umbra_shader*);
+void umbra_coverage_free(struct umbra_coverage*);
+void umbra_sdf_free     (struct umbra_sdf*);
 
 // TODO: bool hard_edge -> int quality
 
-struct umbra_sdf_coverage {
-    struct umbra_coverage base;
-    struct umbra_sdf     *sdf;
-    int                   hard_edge, :32;
-};
-struct umbra_sdf_coverage umbra_sdf_coverage(struct umbra_sdf*, _Bool hard_edge);
+struct umbra_coverage* umbra_sdf_coverage(struct umbra_sdf*, _Bool hard_edge);
 
 typedef umbra_color_val32 (*umbra_blend_fn)(struct umbra_builder*,
                                             umbra_color_val32 src, umbra_color_val32 dst);
@@ -148,121 +147,40 @@ void umbra_sdf_draw_free(struct umbra_sdf_draw*);
 //       feeding _lut" pattern, which is the wrong shape: even spacing is a property the shader
 //       can exploit, not something that motivates preprocessing.
 
-struct umbra_shader_solid {
-    struct umbra_shader base;
-    umbra_color color;
-    int color_off, :32;
-};
-struct umbra_shader_solid umbra_shader_solid(umbra_color color);
+struct umbra_shader* umbra_shader_solid(umbra_color color);
 
-struct umbra_shader_gradient_linear_two_stops {
-    struct umbra_shader base;
-    umbra_point p0, p1;
-    umbra_color c0, c1;
-    int coeffs_off, colors_off;
-};
-struct umbra_shader_gradient_linear_two_stops umbra_shader_gradient_linear_two_stops(
+struct umbra_shader* umbra_shader_gradient_linear_two_stops(
     umbra_point p0, umbra_point p1, umbra_color c0, umbra_color c1);
 
-struct umbra_shader_gradient_radial_two_stops {
-    struct umbra_shader base;
-    umbra_point center;
-    float       radius; int :32;
-    umbra_color c0, c1;
-    int coeffs_off, colors_off;
-};
-struct umbra_shader_gradient_radial_two_stops umbra_shader_gradient_radial_two_stops(
+struct umbra_shader* umbra_shader_gradient_radial_two_stops(
     umbra_point center, float radius, umbra_color c0, umbra_color c1);
 
-struct umbra_shader_gradient_linear_lut {
-    struct umbra_shader base;
-    umbra_point p0, p1;
-    struct umbra_buf lut;
-    int coeffs_off, lut_off;
-};
-struct umbra_shader_gradient_linear_lut umbra_shader_gradient_linear_lut(
+struct umbra_shader* umbra_shader_gradient_linear_lut(
     umbra_point p0, umbra_point p1, struct umbra_buf lut);
 
-struct umbra_shader_gradient_radial_lut {
-    struct umbra_shader base;
-    umbra_point center;
-    float       radius; int :32;
-    struct umbra_buf lut;
-    int coeffs_off, lut_off;
-};
-struct umbra_shader_gradient_radial_lut umbra_shader_gradient_radial_lut(
+struct umbra_shader* umbra_shader_gradient_radial_lut(
     umbra_point center, float radius, struct umbra_buf lut);
 
-struct umbra_shader_gradient_linear {
-    struct umbra_shader base;
-    umbra_point p0, p1;
-    struct umbra_buf colors, pos;
-    int coeffs_off, colors_off, pos_off, :32;
-};
-struct umbra_shader_gradient_linear umbra_shader_gradient_linear(umbra_point p0, umbra_point p1,
-                                                           struct umbra_buf colors,
-                                                           struct umbra_buf pos);
+struct umbra_shader* umbra_shader_gradient_linear(umbra_point p0, umbra_point p1,
+                                                  struct umbra_buf colors,
+                                                  struct umbra_buf pos);
 
-struct umbra_shader_gradient_radial {
-    struct umbra_shader base;
-    umbra_point center;
-    float       radius; int :32;
-    struct umbra_buf colors, pos;
-    int coeffs_off, colors_off, pos_off, :32;
-};
-struct umbra_shader_gradient_radial umbra_shader_gradient_radial(umbra_point center, float radius,
-                                                           struct umbra_buf colors,
-                                                           struct umbra_buf pos);
+struct umbra_shader* umbra_shader_gradient_radial(umbra_point center, float radius,
+                                                  struct umbra_buf colors,
+                                                  struct umbra_buf pos);
 
-struct umbra_shader_supersample {
-    struct umbra_shader base;
-    struct umbra_shader *inner;
-    int samples, :32;
-};
-struct umbra_shader_supersample umbra_shader_supersample(struct umbra_shader *inner, int samples);
+struct umbra_shader* umbra_shader_supersample(struct umbra_shader *inner, int samples);
 
-struct umbra_coverage_rect {
-    struct umbra_coverage base;
-    umbra_rect rect;
-    int rect_off, :32;
-};
-struct umbra_coverage_rect umbra_coverage_rect(umbra_rect);
+struct umbra_coverage* umbra_coverage_rect(umbra_rect);
 
-struct umbra_sdf_rect {
-    struct umbra_sdf base;
-    umbra_rect rect;
-    int rect_off, :32;
-};
-struct umbra_sdf_rect umbra_sdf_rect(umbra_rect);
+struct umbra_sdf* umbra_sdf_rect(umbra_rect);
 
-struct umbra_coverage_bitmap {
-    struct umbra_coverage base;
-    struct umbra_buf bmp;
-    int bmp_off, :32;
-};
-struct umbra_coverage_bitmap umbra_coverage_bitmap(struct umbra_buf bmp);
+struct umbra_coverage* umbra_coverage_bitmap(struct umbra_buf bmp);
 
-struct umbra_coverage_sdf {
-    struct umbra_coverage base;
-    struct umbra_buf bmp;
-    int bmp_off, :32;
-};
-struct umbra_coverage_sdf umbra_coverage_sdf(struct umbra_buf bmp);
+struct umbra_coverage* umbra_coverage_sdf(struct umbra_buf bmp);
 
-struct umbra_coverage_bitmap_matrix {
-    struct umbra_coverage base;
-    struct umbra_matrix mat; int :32;
-    struct umbra_bitmap bmp;
-    int mat_off, bmp_off;
-};
-struct umbra_coverage_bitmap_matrix umbra_coverage_bitmap_matrix(struct umbra_matrix,
-                                                                 struct umbra_bitmap);
-struct umbra_coverage_winding {
-    struct umbra_coverage base;
-    struct umbra_buf winding;
-    int winding_off, :32;
-};
-struct umbra_coverage_winding umbra_coverage_winding(struct umbra_buf winding);
+struct umbra_coverage* umbra_coverage_bitmap_matrix(struct umbra_matrix, struct umbra_bitmap);
+struct umbra_coverage* umbra_coverage_winding(struct umbra_buf winding);
 
 void umbra_gradient_lut_even(float *out, int lut_n, int n_stops, umbra_color const *colors);
 void umbra_gradient_lut(float *out, int lut_n, int n_stops, float const positions[],
