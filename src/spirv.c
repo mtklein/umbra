@@ -1107,7 +1107,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
         spv_word(&B.func, 0); // None function control
         spv_word(&B.func, B.t_fn_void);
 
-        // Entry label.
         uint32_t label_entry = spv_id(&B);
         spv_op(&B.func, SpvOpLabel, 2);
         spv_word(&B.func, label_entry);
@@ -1945,7 +1944,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     uint32_t *spirv = malloc((size_t)total_words * sizeof(uint32_t));
     int off = 0;
 
-    // Header.
     spirv[off++] = SpvMagic;
     spirv[off++] = SpvVersion;
     spirv[off++] = SpvGenerator;

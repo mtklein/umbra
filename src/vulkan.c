@@ -516,7 +516,6 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
         vkCreatePipelineLayout(vbe->device, &ci, 0, &pipe_layout);
     }
 
-    // Compute pipeline.
     VkPipeline pipeline;
     {
         VkComputePipelineCreateInfo ci = {
