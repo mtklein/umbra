@@ -288,6 +288,18 @@ struct umbra_sdf_draw {
     struct umbra_backend *bounds_be;
 };
 
+// TODO: add a second `covered` program alongside `draw` for tiles where the
+// SDF is entirely inside the shape.  SDF convention is f<0 inside, so:
+//   bounds.hi < 0 -> tile fully covered -> dispatch `covered` (shader+blend at cov=1)
+//   bounds.lo < 0 -> some chance of coverage -> dispatch `draw` (current behavior)
+//   else          -> skip tile
+// `covered` would be built like `draw` but without the SDF coverage adapter,
+// skipping per-pixel SDF evaluation entirely.  Prerequisites:
+//   - bounds program must also emit f.hi; currently only f.lo is stored
+//     (see BOUNDS_DST_IX and umbra_store_32 in umbra_sdf_draw below).
+//   - bounds_buf grows a second float* output; allocate/free in _queue.
+//   - tile loop in umbra_sdf_draw_queue branches on hi<0 vs lo<0.
+
 // TODO: query per-backend dispatch_granularity instead of this one global
 // compromise.  CPU-optimal is ~16-32, GPU-optimal is ~512-1024.
 enum { QUEUE_MIN_TILE = 512 };
