@@ -8,7 +8,6 @@ struct solid_slide {
     float rx, ry, vx, vy;
     float rect_w, rect_h;
     int   w, h;
-    int   has_sdf, :32;
 
     struct umbra_shader     *shader;
     struct umbra_sdf        *sdf;
@@ -44,7 +43,7 @@ static void solid_prepare(struct slide *s, struct umbra_backend *be,
     umbra_sdf_draw_free(st->qt);  st->qt   = NULL;
     if (st->prog) { umbra_program_free(st->prog); st->prog = NULL; }
     st->fmt = fmt;
-    if (st->has_sdf) {
+    if (st->sdf) {
         st->qt = umbra_sdf_draw(be, st->sdf,
                                 (struct umbra_sdf_draw_config){.hard_edge = 1},
                                 st->shader, st->blend, fmt);
@@ -61,7 +60,7 @@ static void solid_prepare(struct slide *s, struct umbra_backend *be,
 static void solid_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct solid_slide *st = (struct solid_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
-    if (st->has_sdf) {
+    if (st->sdf) {
         double const ticks = secs * 60.0;
         float rx = bounce(st->rx, st->vx, ticks, (float)st->w - st->rect_w);
         float ry = bounce(st->ry, st->vy, ticks, (float)st->h - st->rect_h);
@@ -70,7 +69,7 @@ static void solid_draw(struct slide *s, double secs, int l, int t, int r, int b,
     }
     struct umbra_buf ubuf[] = {
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
-        st->has_sdf ? st->sdf->uniforms : (struct umbra_buf){0},
+        st->sdf ? st->sdf->uniforms : (struct umbra_buf){0},
         st->shader->uniforms,
     };
     if (st->qt) {
@@ -84,7 +83,7 @@ static int solid_get_builders(struct slide *s, struct umbra_fmt fmt,
                               struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
     struct solid_slide *st = (struct solid_slide *)s;
-    if (st->has_sdf) {
+    if (st->sdf) {
         struct umbra_coverage *adapter = umbra_sdf_coverage(st->sdf, 1);
         out[0] = umbra_draw_builder(adapter, st->shader, st->blend, fmt);
         umbra_coverage_free(adapter);
@@ -108,7 +107,6 @@ static struct slide* make_solid(char const *title, float const bg[4], float cons
     struct solid_slide *st = calloc(1, sizeof *st);
     umbra_color const c = {color[0], color[1], color[2], color[3]};
     st->shader  = umbra_shader_solid(c);
-    st->has_sdf = has_sdf;
     if (has_sdf) { st->sdf = umbra_sdf_rect((umbra_rect){0, 0, 0, 0}); }
     st->blend   = blend;
     st->base = (struct slide){
