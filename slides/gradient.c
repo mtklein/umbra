@@ -133,26 +133,6 @@ static void grad_lut_free(struct slide *s) {
     free(st);
 }
 
-static struct slide* make_grad_lut(char const *title, float const bg[4], _Bool is_radial,
-                                   float const grad[4], float *lut, int lut_n) {
-    struct grad_lut_slide *st = calloc(1, sizeof *st);
-    st->is_radial = is_radial;
-    st->lut_data = lut;
-    struct umbra_buf lut_buf = {.ptr=lut, .count=lut_n * 4};
-    if (is_radial) { st->shader.radial = umbra_shader_radial_grad(grad, lut_buf); }
-    else           { st->shader.linear = umbra_shader_linear_grad(grad, lut_buf); }
-    st->base = (struct slide){
-        .title = title,
-        .bg = {bg[0], bg[1], bg[2], bg[3]},
-        .init = grad_lut_init,
-        .prepare = grad_lut_prepare,
-        .draw = grad_lut_draw,
-        .free = grad_lut_free,
-        .get_builders = grad_lut_get_builders,
-    };
-    return &st->base;
-}
-
 SLIDE(slide_gradient_linear_2) {
     struct grad_2stop_slide *st = calloc(1, sizeof *st);
     st->is_radial = 0;
@@ -335,9 +315,21 @@ SLIDE(slide_gradient_linear_wide) {
     enum { LUT_N = 64 };
     float *lut = malloc(LUT_N * 4 * sizeof(float));
     umbra_gradient_lut_even(lut, LUT_N, 6, colors);
-    return make_grad_lut("Linear Gradient (wide gamut)", (float[]){0,0,0,1}, 0,
-                         (float[]){1.0f / 640.0f, 0.0f, 0.0f, (float)LUT_N},
-                         lut, LUT_N);
+    struct grad_lut_slide *st = calloc(1, sizeof *st);
+    st->is_radial     = 0;
+    st->lut_data      = lut;
+    st->shader.linear = umbra_shader_linear_grad((umbra_point){0, 0}, (umbra_point){640, 0},
+                                                 (struct umbra_buf){.ptr=lut, .count=LUT_N * 4});
+    st->base = (struct slide){
+        .title        = "Linear Gradient (wide gamut)",
+        .bg           = {0, 0, 0, 1},
+        .init         = grad_lut_init,
+        .prepare      = grad_lut_prepare,
+        .draw         = grad_lut_draw,
+        .free         = grad_lut_free,
+        .get_builders = grad_lut_get_builders,
+    };
+    return &st->base;
 }
 
 SLIDE(slide_gradient_radial_wide) {
@@ -348,7 +340,19 @@ SLIDE(slide_gradient_radial_wide) {
     enum { LUT_N = 64 };
     float *lut = malloc(LUT_N * 4 * sizeof(float));
     umbra_gradient_lut_even(lut, LUT_N, 4, colors);
-    return make_grad_lut("Radial Gradient (wide gamut)", (float[]){0,0,0,1}, 1,
-                         (float[]){320.0f, 240.0f, 1.0f / 280.0f, (float)LUT_N},
-                         lut, LUT_N);
+    struct grad_lut_slide *st = calloc(1, sizeof *st);
+    st->is_radial     = 1;
+    st->lut_data      = lut;
+    st->shader.radial = umbra_shader_radial_grad((umbra_point){320, 240}, 280.0f,
+                                                 (struct umbra_buf){.ptr=lut, .count=LUT_N * 4});
+    st->base = (struct slide){
+        .title        = "Radial Gradient (wide gamut)",
+        .bg           = {0, 0, 0, 1},
+        .init         = grad_lut_init,
+        .prepare      = grad_lut_prepare,
+        .draw         = grad_lut_draw,
+        .free         = grad_lut_free,
+        .get_builders = grad_lut_get_builders,
+    };
+    return &st->base;
 }

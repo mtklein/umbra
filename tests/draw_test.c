@@ -955,7 +955,7 @@ TEST(test_linear_grad) {
     umbra_gradient_lut_even(lut, 256, 3, stop_colors);
 
     struct umbra_shader_linear_grad shader =
-        umbra_shader_linear_grad((float[]){0.125f, 0, 0, 256},
+        umbra_shader_linear_grad((umbra_point){0, 0}, (umbra_point){8, 0},
                                  (struct umbra_buf){.ptr=lut, .count=256 * 4});
     struct umbra_draw_layout lay;
     struct draw_backends     B =
@@ -990,7 +990,7 @@ TEST(test_radial_grad) {
     umbra_gradient_lut_even(lut, 64, 4, stop_colors);
 
     struct umbra_shader_radial_grad shader =
-        umbra_shader_radial_grad((float[]){0, 0, 0.1f, 64},
+        umbra_shader_radial_grad((umbra_point){0, 0}, 10.0f,
                                  (struct umbra_buf){.ptr=lut, .count=64 * 4});
     struct umbra_draw_layout lay;
     struct draw_backends     B =
@@ -1024,7 +1024,7 @@ TEST(test_gradient_lut_nonuniform) {
     umbra_gradient_lut(lut, 64, 3, positions, stop_colors);
 
     struct umbra_shader_linear_grad shader =
-        umbra_shader_linear_grad((float[]){0.125f, 0, 0, 64},
+        umbra_shader_linear_grad((umbra_point){0, 0}, (umbra_point){8, 0},
                                  (struct umbra_buf){.ptr=lut, .count=64 * 4});
     struct umbra_draw_layout lay;
     struct draw_backends     B =

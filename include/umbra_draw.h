@@ -176,19 +176,22 @@ struct umbra_shader_radial_2 umbra_shader_radial_2(umbra_point center, float rad
 
 struct umbra_shader_linear_grad {
     struct umbra_shader base;
-    float          grad[4];
+    umbra_point p0, p1;
     struct umbra_buf lut;
     int fi_, lut_off_;
 };
-struct umbra_shader_linear_grad umbra_shader_linear_grad(float const grad[4], struct umbra_buf lut);
+struct umbra_shader_linear_grad umbra_shader_linear_grad(umbra_point p0, umbra_point p1,
+                                                         struct umbra_buf lut);
 
 struct umbra_shader_radial_grad {
     struct umbra_shader base;
-    float          grad[4];
+    umbra_point center;
+    float       radius; int :32;
     struct umbra_buf lut;
     int fi_, lut_off_;
 };
-struct umbra_shader_radial_grad umbra_shader_radial_grad(float const grad[4], struct umbra_buf lut);
+struct umbra_shader_radial_grad umbra_shader_radial_grad(umbra_point center, float radius,
+                                                         struct umbra_buf lut);
 
 struct umbra_shader_linear_stops {
     struct umbra_shader base;
