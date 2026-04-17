@@ -13,13 +13,12 @@ struct circle_sdf {
     ((int)((__builtin_offsetof(__typeof__(*self), field) - sizeof(self->base)) / 4))
 
 static umbra_interval circle_build(struct umbra_sdf *s, struct umbra_builder *b,
-                                    int buf_index,
+                                    umbra_ptr32 uniforms,
                                     umbra_interval x, umbra_interval y) {
     struct circle_sdf *self = (struct circle_sdf *)s;
-    umbra_ptr32 const u_ptr = {.ix = buf_index};
-    umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(cx))),
-                         cy = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(cy))),
-                         r  = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(r)));
+    umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, uniforms, SLOT(cx))),
+                         cy = umbra_interval_exact(umbra_uniform_32(b, uniforms, SLOT(cy))),
+                         r  = umbra_interval_exact(umbra_uniform_32(b, uniforms, SLOT(r)));
     umbra_interval const dx = umbra_interval_sub_f32(b, x, cx),
                          dy = umbra_interval_sub_f32(b, y, cy),
                          d2 = umbra_interval_add_f32(b,

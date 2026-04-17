@@ -48,10 +48,11 @@ void              umbra_store_fp16       (struct umbra_builder*, umbra_ptr64, um
 umbra_color_val32 umbra_load_fp16_planar (struct umbra_builder*, umbra_ptr16);
 void              umbra_store_fp16_planar(struct umbra_builder*, umbra_ptr16, umbra_color_val32);
 
+// TODO: uniforms_slots -> uniforms?
 struct umbra_shader {
     umbra_color_val32 (*build)(struct umbra_shader*,
                                struct umbra_builder*,
-                               int buf_index,
+                               umbra_ptr32 uniforms,
                                umbra_val32 x, umbra_val32 y);
     void (*free)(struct umbra_shader*);
     int  uniforms_slots, :32;
@@ -62,7 +63,7 @@ struct umbra_buf umbra_shader_uniforms(struct umbra_shader const*);
 struct umbra_coverage {
     umbra_val32 (*build)(struct umbra_coverage*,
                          struct umbra_builder*,
-                         int buf_index,
+                         umbra_ptr32 uniforms,
                          umbra_val32 x, umbra_val32 y);
     void (*free)(struct umbra_coverage*);
     int  uniforms_slots, :32;
@@ -74,7 +75,7 @@ struct umbra_buf umbra_coverage_uniforms(struct umbra_coverage const*);
 struct umbra_sdf {
     umbra_interval (*build)(struct umbra_sdf*,
                             struct umbra_builder*,
-                            int buf_index,
+                            umbra_ptr32 uniforms,
                             umbra_interval x, umbra_interval y);
     void (*free)(struct umbra_sdf*);
     int  uniforms_slots, :32;
