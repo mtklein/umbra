@@ -268,6 +268,18 @@ static void pin_val(struct ra *ra, int val) {
     }
 }
 
+// Free a per-channel register if its last use has expired.
+static void free_chan_if_dead(struct ra *ra, val op, int i) {
+    struct ra_slot *slot = &ra->slot[op.id];
+    if (op.chan && op.id < i && slot->chan_last_use[(int)op.chan] <= i) {
+        int8_t const reg = slot->chan_reg[(int)op.chan];
+        if (reg >= 0) {
+            ra_return_reg(ra, reg);
+            slot->chan_reg[(int)op.chan] = -1;
+        }
+    }
+}
+
 static struct ra_step step0(void) {
     return (struct ra_step){
         .rd = -1,
@@ -430,17 +442,9 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct ir_inst const
     if (z_dead) { ra_free_reg(ra, inst->z.id); }
 
     // Free channel registers whose per-channel last use has expired.
-#define FREE_CHAN_RA(op) do {                                                            \
-    struct ra_slot *s_ = &ra->slot[(op).id];                                        \
-    if ((op).chan && (op).id < i && s_->chan_last_use[(int)(op).chan] <= i) {      \
-        int8_t r_ = s_->chan_reg[(int)(op).chan];                                        \
-        if (r_ >= 0) { ra_return_reg(ra, r_); s_->chan_reg[(int)(op).chan] = -1; }      \
-    }                                                                                    \
-} while(0)
-    FREE_CHAN_RA(inst->x);
-    FREE_CHAN_RA(inst->y);
-    FREE_CHAN_RA(inst->z);
-#undef FREE_CHAN_RA
+    free_chan_if_dead(ra, inst->x, i);
+    free_chan_if_dead(ra, inst->y, i);
+    free_chan_if_dead(ra, inst->z, i);
 
     return s;
 }
