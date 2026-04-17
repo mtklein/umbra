@@ -1972,7 +1972,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
 
     result.spirv_words = total_words;
 
-    // Free temporary buffers.
     free(B.caps.word);
     free(B.exts.word);
     free(B.ext_import.word);

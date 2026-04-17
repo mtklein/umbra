@@ -678,7 +678,6 @@ struct umbra_backend* umbra_backend_wgpu(void) {
         .stats          = wgpu_stats,
     };
 
-    // Initialize uniform ring pool.
     be->uni_pool = (struct uniform_ring_pool){
         .n          = WGPU_N_FRAMES,
         .high_water = WGPU_RING_HIGH_WATER,

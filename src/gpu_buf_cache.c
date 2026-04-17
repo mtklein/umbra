@@ -48,7 +48,6 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
         }
     }
 
-    // Allocate and upload.
     size_t const alloc_size = bytes ? bytes : 4;
     ce->buf = c->ops.alloc(alloc_size, c->ctx);
     ce->host     = host;
