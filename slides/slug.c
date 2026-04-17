@@ -119,6 +119,30 @@ void slug_free(struct slug_curves *sc) {
 // Uniform layout: buf[0] holds a `struct slug_acc_uniforms` or
 // `struct slug_uniforms`; dst at buf[1].
 
+// TODO: this rasterizer is wrong at some animation steps and/or at large canvas
+// sizes.  Observed by resizing the demo window: small sizes showed rare pixel
+// flicker (easy to dismiss as noise); large sizes clearly mis-render slug past
+// the animation step we capture in dumps/.  Every backend (interp, jit, metal,
+// vulkan, wgpu) shows the same wrongness, and both the one-pass loop variant
+// (slug_build below) and the two-pass accumulator (this function) agree — so
+// it's not a backend issue, it's the shared winding-contribution algorithm.
+//
+// Candidates to investigate:
+//   - quadratic root conditioning when a is small but is_quad is still true
+//     (the ep=1/65536 threshold may be too tight or too loose for the scaled
+//     coordinates at large canvases).
+//   - division by pw (perspective divide) when pw is near zero or negative,
+//     which can happen off-screen at large matrix tilt angles.
+//   - the half-open [z, o) interval for t1/t2 combined with the >0 test on x1/x2
+//     can drop or double-count curves that pass exactly through the scanline
+//     start.
+//   - direction (dy1/dy2) sign picked at the exact root sometimes differs from
+//     the actual curve-crossing sign, giving cancelling winding contributions
+//     that shouldn't cancel.
+//
+// Both slug_build_acc and slug_build below duplicate this math — fix them
+// together (or factor into a shared emit helper before fixing).
+
 #define UNI_SLOT(type, field) \
     ((int)(__builtin_offsetof(type, field) / 4))
 
