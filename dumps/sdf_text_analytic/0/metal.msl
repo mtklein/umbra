@@ -2,13 +2,14 @@
 using namespace metal;
 
 
-struct meta { uint w, x0, y0, count0, count1, count2, stride0, stride1, stride2; };
+struct meta { uint w, x0, y0, count0, count1, count2, count3, stride0, stride1, stride2, stride3; };
 
 kernel void main0(
     constant meta &m [[buffer(0)]],
-    device const uint * __restrict p0 [[buffer(1)]],
-    device half4 * __restrict p1 [[buffer(2)]],
+    device half4 * __restrict p0 [[buffer(1)]],
+    device const uint * __restrict p1 [[buffer(2)]],
     device const uint * __restrict p2 [[buffer(3)]],
+    device const uint * __restrict p3 [[buffer(4)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
     if (pos.x >= m.w) return;
@@ -18,17 +19,17 @@ kernel void main0(
     uint var1 = 0;
     uint var2 = 0;
     uint v0 = 0u;
-    uint v2 = p0[4];
-    uint v3 = p0[5];
-    uint v4 = p0[6];
-    uint v5 = p0[7];
-    uint v6 = p0[8];
+    uint v2 = p1[4];
+    uint v3 = p1[0];
+    uint v4 = p1[1];
+    uint v5 = p1[2];
+    uint v6 = p1[3];
     uint v7 = 1065353216u;
     uint v8 = 1315859240u;
-    uint v9 = p0[9];
-    uint v10 = p0[10];
-    uint v11 = p0[11];
-    uint v12 = p0[12];
+    uint v9 = p2[0];
+    uint v10 = p2[1];
+    uint v11 = p2[2];
+    uint v12 = p2[3];
     float v13 = as_type<float>(v7) - as_type<float>(v12);
     var1 = v8;
 
@@ -47,16 +48,16 @@ kernel void main0(
     uint v26 = var2;
     uint v27 = v25 * 6u;
     uint v28 = v27 + 5u;
-    uint v29 = p2[min(v28, m.count2 - 1u)] & ((v28 < m.count2) ? ~0u : 0u);
+    uint v29 = p3[min(v28, m.count3 - 1u)] & ((v28 < m.count3) ? ~0u : 0u);
     uint v30 = v27 + 4u;
-    uint v31 = p2[min(v30, m.count2 - 1u)] & ((v30 < m.count2) ? ~0u : 0u);
-    uint v32 = p2[min(v27, m.count2 - 1u)] & ((v27 < m.count2) ? ~0u : 0u);
+    uint v31 = p3[min(v30, m.count3 - 1u)] & ((v30 < m.count3) ? ~0u : 0u);
+    uint v32 = p3[min(v27, m.count3 - 1u)] & ((v27 < m.count3) ? ~0u : 0u);
     float v33 = as_type<float>(v31) - as_type<float>(v32);
     uint v34 = v26 + 1u;
     var2 = v34;
 
     uint v36 = v27 + 1u;
-    uint v37 = p2[min(v36, m.count2 - 1u)] & ((v36 < m.count2) ? ~0u : 0u);
+    uint v37 = p3[min(v36, m.count3 - 1u)] & ((v36 < m.count3) ? ~0u : 0u);
     float v38 = as_type<float>(v29) - as_type<float>(v37);
     float v39 = v38 * v38;
     float v40 = fma(v33, v33, v39);
@@ -88,7 +89,7 @@ kernel void main0(
     float v64 = as_type<float>(v0) - v63;
     float v65 = max(v64, as_type<float>(0u));
     float v66 = min(v65, as_type<float>(1065353216u));
-    half4 _px67 = p1[y * m.stride1 + x];
+    half4 _px67 = p0[y * m.stride0 + x];
     uint v67 = (uint)as_type<ushort>(_px67.x);
     uint v67_1 = (uint)as_type<ushort>(_px67.y);
     uint v67_2 = (uint)as_type<ushort>(_px67.z);
@@ -113,5 +114,5 @@ kernel void main0(
     uint v85 = (uint)as_type<ushort>((half)v79);
     uint v86 = (uint)as_type<ushort>((half)v75);
     uint v87 = (uint)as_type<ushort>((half)v71);
-    p1[y * m.stride1 + x] = half4(as_type<half>((ushort)v87), as_type<half>((ushort)v86), as_type<half>((ushort)v85), as_type<half>((ushort)v84));
+    p0[y * m.stride0 + x] = half4(as_type<half>((ushort)v87), as_type<half>((ushort)v86), as_type<half>((ushort)v85), as_type<half>((ushort)v84));
 }

@@ -8,19 +8,23 @@ struct slug_curves {
     float  w, h;
 };
 
-struct slug_acc_layout {
-    struct umbra_uniforms_layout  uni; int :32;
-    void                         *uniforms;
-    int mat, wh, curves_off, loop_off;
+struct slug_acc_uniforms {
+    struct umbra_matrix mat; int :32;
+    float               bw, bh;
+    struct umbra_buf    curves;
+    float               j;
+    int                 :32;
 };
 
-struct slug_layout {
-    struct umbra_uniforms_layout  uni; int :32;
-    void                         *uniforms;
-    int mat, wh, curves_off, count_off;
+struct slug_uniforms {
+    struct umbra_matrix mat; int :32;
+    float               bw, bh;
+    struct umbra_buf    curves;
+    float               n_curves;
+    int                 :32;
 };
 
 struct slug_curves    slug_extract  (char const *text, float font_size);
 void                  slug_free     (struct slug_curves *sc);
-struct umbra_builder* slug_build_acc     (struct slug_acc_layout *lay);
-struct umbra_builder* slug_build(struct slug_layout *lay);
+struct umbra_builder* slug_build_acc(void);
+struct umbra_builder* slug_build    (void);

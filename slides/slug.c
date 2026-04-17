@@ -116,26 +116,29 @@ void slug_free(struct slug_curves *sc) {
     *sc = (struct slug_curves){0};
 }
 
-struct umbra_builder* slug_build_acc(struct slug_acc_layout *lay) {
+// Uniform layout: buf[0] holds a `struct slug_acc_uniforms` or
+// `struct slug_uniforms`; dst at buf[1].
+
+#define UNI_SLOT(type, field) \
+    ((int)(__builtin_offsetof(type, field) / 4))
+
+struct umbra_builder* slug_build_acc(void) {
     struct umbra_builder *b = umbra_builder();
 
-    struct umbra_uniforms_layout u = {0};
-    int fi  = umbra_uniforms_reserve_f32(&u, 9);
-    int whi = umbra_uniforms_reserve_f32(&u, 2);
-    int co = umbra_uniforms_reserve_ptr(&u);
-    umbra_ptr32 curves = umbra_deref_ptr32(b,
-        (umbra_ptr32){0}, co);
-    int ji = umbra_uniforms_reserve_f32(&u, 1);
+    umbra_ptr32 const u = {.ix = 0};
+    umbra_ptr32 curves = umbra_deref_ptr32(b, u,
+                                UNI_SLOT(struct slug_acc_uniforms, curves));
 
     umbra_val32 xf = umbra_f32_from_i32(b, umbra_x(b));
     umbra_val32 yf = umbra_f32_from_i32(b, umbra_y(b));
 
     umbra_val32 m[9];
     for (int i = 0; i < 9; i++) {
-        m[i] = umbra_uniform_32(b, (umbra_ptr32){0}, fi + i);
+        m[i] = umbra_uniform_32(b, u,
+                                 UNI_SLOT(struct slug_acc_uniforms, mat) + i);
     }
-    umbra_val32 bw = umbra_uniform_32(b, (umbra_ptr32){0}, whi);
-    umbra_val32 bh = umbra_uniform_32(b, (umbra_ptr32){0}, whi + 1);
+    umbra_val32 bw = umbra_uniform_32(b, u, UNI_SLOT(struct slug_acc_uniforms, bw));
+    umbra_val32 bh = umbra_uniform_32(b, u, UNI_SLOT(struct slug_acc_uniforms, bh));
 
     umbra_val32 pw = umbra_add_f32(b,
         umbra_add_f32(b,
@@ -167,7 +170,7 @@ struct umbra_builder* slug_build_acc(struct slug_acc_layout *lay) {
             umbra_le_f32(b, z, gy),
             umbra_lt_f32(b, gy, bh)));
 
-    umbra_val32 j = umbra_uniform_32(b, (umbra_ptr32){0}, ji);
+    umbra_val32 j = umbra_uniform_32(b, u, UNI_SLOT(struct slug_acc_uniforms, j));
     umbra_val32 k = umbra_mul_i32(b, j, umbra_imm_i32(b, 6));
 
     umbra_val32 p0x = umbra_gather_32(b, curves, k),
@@ -247,37 +250,26 @@ struct umbra_builder* slug_build_acc(struct slug_acc_layout *lay) {
     acc = umbra_add_f32(b, acc, dw);
     umbra_store_32(b, (umbra_ptr32){.ix=1}, acc);
 
-    if (lay) {
-        lay->mat        = fi;
-        lay->wh         = whi;
-        lay->curves_off = co;
-        lay->loop_off   = ji;
-        lay->uni        = u;
-        lay->uniforms   = umbra_uniforms_alloc(&u);
-    }
-
     return b;
 }
 
-struct umbra_builder* slug_build(struct slug_layout *lay) {
+struct umbra_builder* slug_build(void) {
     struct umbra_builder *b = umbra_builder();
 
-    struct umbra_uniforms_layout u = {0};
-    int fi  = umbra_uniforms_reserve_f32(&u, 9);
-    int whi = umbra_uniforms_reserve_f32(&u, 2);
-    int co  = umbra_uniforms_reserve_ptr(&u);
-    umbra_ptr32 curves = umbra_deref_ptr32(b, (umbra_ptr32){0}, co);
-    int ni  = umbra_uniforms_reserve_f32(&u, 1);
+    umbra_ptr32 const u = {.ix = 0};
+    umbra_ptr32 curves = umbra_deref_ptr32(b, u,
+                                UNI_SLOT(struct slug_uniforms, curves));
 
     umbra_val32 xf = umbra_f32_from_i32(b, umbra_x(b));
     umbra_val32 yf = umbra_f32_from_i32(b, umbra_y(b));
 
     umbra_val32 m[9];
     for (int i = 0; i < 9; i++) {
-        m[i] = umbra_uniform_32(b, (umbra_ptr32){0}, fi + i);
+        m[i] = umbra_uniform_32(b, u,
+                                 UNI_SLOT(struct slug_uniforms, mat) + i);
     }
-    umbra_val32 bw = umbra_uniform_32(b, (umbra_ptr32){0}, whi);
-    umbra_val32 bh = umbra_uniform_32(b, (umbra_ptr32){0}, whi + 1);
+    umbra_val32 bw = umbra_uniform_32(b, u, UNI_SLOT(struct slug_uniforms, bw));
+    umbra_val32 bh = umbra_uniform_32(b, u, UNI_SLOT(struct slug_uniforms, bh));
 
     umbra_val32 pw = umbra_add_f32(b,
         umbra_add_f32(b,
@@ -309,7 +301,7 @@ struct umbra_builder* slug_build(struct slug_layout *lay) {
             umbra_le_f32(b, z, gy),
             umbra_lt_f32(b, gy, bh)));
 
-    umbra_val32 count = umbra_uniform_32(b, (umbra_ptr32){0}, ni);
+    umbra_val32 count = umbra_uniform_32(b, u, UNI_SLOT(struct slug_uniforms, n_curves));
     struct umbra_var32 wind = umbra_var32(b);
 
     umbra_val32 j = umbra_loop(b, count); {
@@ -392,15 +384,6 @@ struct umbra_builder* slug_build(struct slug_layout *lay) {
 
     umbra_store_32(b, (umbra_ptr32){.ix=1}, umbra_load_var32(b, wind));
 
-    if (lay) {
-        lay->mat        = fi;
-        lay->wh         = whi;
-        lay->curves_off = co;
-        lay->count_off  = ni;
-        lay->uni        = u;
-        lay->uniforms   = umbra_uniforms_alloc(&u);
-    }
-
     return b;
 }
 
@@ -410,15 +393,13 @@ struct slug_two_pass_slide {
     struct slug_curves        slug;
     int                       w, h;
     float                    *wind_buf;
-    struct slug_acc_layout    acc_lay;
-    struct umbra_flat_ir *acc_ir;
+    struct umbra_flat_ir     *acc_ir;
     struct umbra_program     *acc_prog;
 
-    struct umbra_shader        *shader;
-    struct umbra_coverage      *cov;
-    struct umbra_fmt            fmt;
-    struct umbra_draw_layout   draw_lay;
-    struct umbra_program      *draw_prog;
+    struct umbra_shader      *shader;
+    struct umbra_coverage    *cov;
+    struct umbra_fmt          fmt;
+    struct umbra_program     *draw_prog;
 };
 
 static void slug_two_pass_init(struct slide *s, int w, int h) {
@@ -428,7 +409,7 @@ static void slug_two_pass_init(struct slide *s, int w, int h) {
     st->slug = slug_extract("Slug", (float)h * 0.3125f);
     st->wind_buf = malloc((size_t)w * (size_t)h * sizeof(float));
 
-    struct umbra_builder *b = slug_build_acc(&st->acc_lay);
+    struct umbra_builder *b = slug_build_acc();
     st->acc_ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 }
@@ -440,7 +421,6 @@ static void slug_two_pass_prepare(struct slide *s,
     if (st->acc_prog) { st->acc_prog->free(st->acc_prog); }
     st->acc_prog = be->compile(be, st->acc_ir);
     if (st->draw_prog) { st->draw_prog->free(st->draw_prog); }
-    free(st->draw_lay.uniforms);
     umbra_coverage_free(st->cov);
     st->cov = umbra_coverage_winding((struct umbra_buf){
         .ptr = st->wind_buf, .count = st->w * st->h, .stride = st->w,
@@ -448,7 +428,7 @@ static void slug_two_pass_prepare(struct slide *s,
     st->fmt = fmt;
     {
         struct umbra_builder *b = umbra_draw_builder(st->cov, st->shader,
-                                                     umbra_blend_srcover, fmt, &st->draw_lay);
+                                                     umbra_blend_srcover, fmt);
         struct umbra_flat_ir *ir = umbra_flat_ir(b);
         umbra_builder_free(b);
         st->draw_prog = be->compile(be, ir);
@@ -468,37 +448,36 @@ static void slug_two_pass_draw(struct slide *s, double secs, int l, int t, int r
     __builtin_memset((char *)st->wind_buf + (size_t)t * wind_row, 0,
                      (size_t)(b - t) * wind_row);
 
-    struct umbra_matrix mat;
-    slide_perspective_matrix(&mat, (float)secs, w, h,
+    struct slug_acc_uniforms au = {0};
+    slide_perspective_matrix(&au.mat, (float)secs, w, h,
                              (int)st->slug.w, (int)st->slug.h);
-    umbra_uniforms_fill_f32(st->acc_lay.uniforms, st->acc_lay.mat, &mat.sx, 9);
-    float const wh[2] = {st->slug.w, st->slug.h};
-    umbra_uniforms_fill_f32(st->acc_lay.uniforms, st->acc_lay.wh, wh, 2);
-    umbra_uniforms_fill_ptr(st->acc_lay.uniforms, st->acc_lay.curves_off,
-                  (struct umbra_buf){.ptr=st->slug.data, .count=st->slug.count * 6});
+    au.bw     = st->slug.w;
+    au.bh     = st->slug.h;
+    au.curves = (struct umbra_buf){.ptr=st->slug.data, .count=st->slug.count * 6};
+
     struct umbra_buf abuf[] = {
-        (struct umbra_buf){.ptr=st->acc_lay.uniforms, .count=st->acc_lay.uni.slots},
+        {.ptr=&au, .count=(int)(sizeof au / 4)},
         {.ptr=st->wind_buf, .count=w * h, .stride=w},
     };
     for (int j = 0; j < st->slug.count; j++) {
-        umbra_uniforms_fill_i32(st->acc_lay.uniforms, st->acc_lay.loop_off, &j, 1);
+        __builtin_memcpy(&au.j, &j, 4);
         acc->queue(acc, l, t, r, b, abuf);
     }
 
-    umbra_draw_fill(&st->draw_lay, st->cov, st->shader);
-    struct umbra_buf rbuf[2];
-    rbuf[0] = (struct umbra_buf){.ptr = st->draw_lay.uniforms,
-                                 .count = st->draw_lay.uni.slots};
-    rbuf[1] = (struct umbra_buf){.ptr=buf, .count=w * h * st->fmt.planes, .stride=w};
+    struct umbra_buf rbuf[] = {
+        {.ptr=buf, .count=w * h * st->fmt.planes, .stride=w},
+        umbra_coverage_uniforms(st->cov),
+        umbra_shader_uniforms(st->shader),
+    };
     st->draw_prog->queue(st->draw_prog, l, t, r, b, rbuf);
 }
 
 static int slug_two_pass_get_builders(struct slide *s, struct umbra_fmt fmt,
                                       struct umbra_builder **out, int max) {
     if (max < 2) { return 0; }
-    out[0] = slug_build_acc(NULL);
+    out[0] = slug_build_acc();
     struct slug_two_pass_slide *st = (struct slug_two_pass_slide *)s;
-    out[1] = umbra_draw_builder(st->cov, st->shader, umbra_blend_srcover, fmt, NULL);
+    out[1] = umbra_draw_builder(st->cov, st->shader, umbra_blend_srcover, fmt);
     return 2;
 }
 
@@ -508,9 +487,7 @@ static void slug_two_pass_free(struct slide *s) {
     free(st->wind_buf);
     if (st->acc_prog) { st->acc_prog->free(st->acc_prog); }
     umbra_flat_ir_free(st->acc_ir);
-    free(st->acc_lay.uniforms);
     if (st->draw_prog) { st->draw_prog->free(st->draw_prog); }
-    free(st->draw_lay.uniforms);
     umbra_shader_free  (st->shader);
     umbra_coverage_free(st->cov);
     free(st);
@@ -538,15 +515,13 @@ struct slug_slide {
     struct slug_curves            slug;
     int                           w, h;
     float                        *wind_buf;
-    struct slug_layout   acc_lay;
     struct umbra_flat_ir         *acc_ir;
     struct umbra_program         *acc_prog;
 
     struct umbra_shader          *shader;
     struct umbra_coverage        *cov;
     struct umbra_fmt              fmt;
-    struct umbra_draw_layout     draw_lay;
-    struct umbra_program        *draw_prog;
+    struct umbra_program         *draw_prog;
 };
 
 static void slug_init(struct slide *s, int w, int h) {
@@ -556,7 +531,7 @@ static void slug_init(struct slide *s, int w, int h) {
     st->slug = slug_extract("Slug", (float)h * 0.3125f);
     st->wind_buf = malloc((size_t)w * (size_t)h * sizeof(float));
 
-    struct umbra_builder *b = slug_build(&st->acc_lay);
+    struct umbra_builder *b = slug_build();
     st->acc_ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 }
@@ -567,7 +542,6 @@ static void slug_prepare(struct slide *s, struct umbra_backend *be,
     if (st->acc_prog) { st->acc_prog->free(st->acc_prog); }
     st->acc_prog = be->compile(be, st->acc_ir);
     if (st->draw_prog) { st->draw_prog->free(st->draw_prog); }
-    free(st->draw_lay.uniforms);
     umbra_coverage_free(st->cov);
     st->cov = umbra_coverage_winding((struct umbra_buf){
         .ptr = st->wind_buf, .count = st->w * st->h, .stride = st->w,
@@ -575,7 +549,7 @@ static void slug_prepare(struct slide *s, struct umbra_backend *be,
     st->fmt = fmt;
     {
         struct umbra_builder *b = umbra_draw_builder(st->cov, st->shader,
-                                                     umbra_blend_srcover, fmt, &st->draw_lay);
+                                                     umbra_blend_srcover, fmt);
         struct umbra_flat_ir *ir = umbra_flat_ir(b);
         umbra_builder_free(b);
         st->draw_prog = be->compile(be, ir);
@@ -593,27 +567,28 @@ static void slug_draw(struct slide *s, double secs, int l, int t, int r, int b, 
     __builtin_memset((char *)st->wind_buf + (size_t)t * wind_row, 0,
                      (size_t)(b - t) * wind_row);
 
-    struct umbra_matrix mat;
-    slide_perspective_matrix(&mat, (float)secs, w, h,
+    struct slug_uniforms au = {0};
+    slide_perspective_matrix(&au.mat, (float)secs, w, h,
                              (int)st->slug.w, (int)st->slug.h);
-    umbra_uniforms_fill_f32(st->acc_lay.uniforms, st->acc_lay.mat, &mat.sx, 9);
-    float const wh[2] = {st->slug.w, st->slug.h};
-    umbra_uniforms_fill_f32(st->acc_lay.uniforms, st->acc_lay.wh, wh, 2);
-    umbra_uniforms_fill_ptr(st->acc_lay.uniforms, st->acc_lay.curves_off,
-                  (struct umbra_buf){.ptr=st->slug.data, .count=st->slug.count * 6});
-    umbra_uniforms_fill_i32(st->acc_lay.uniforms, st->acc_lay.count_off,
-                            &st->slug.count, 1);
+    au.bw       = st->slug.w;
+    au.bh       = st->slug.h;
+    au.curves   = (struct umbra_buf){.ptr=st->slug.data, .count=st->slug.count * 6};
+    {
+        int const n = st->slug.count;
+        __builtin_memcpy(&au.n_curves, &n, 4);
+    }
+
     struct umbra_buf abuf[] = {
-        (struct umbra_buf){.ptr=st->acc_lay.uniforms, .count=st->acc_lay.uni.slots},
+        {.ptr=&au, .count=(int)(sizeof au / 4)},
         {.ptr=st->wind_buf, .count=w * h, .stride=w},
     };
     st->acc_prog->queue(st->acc_prog, l, t, r, b, abuf);
 
-    umbra_draw_fill(&st->draw_lay, st->cov, st->shader);
-    struct umbra_buf rbuf[2];
-    rbuf[0] = (struct umbra_buf){.ptr = st->draw_lay.uniforms,
-                                 .count = st->draw_lay.uni.slots};
-    rbuf[1] = (struct umbra_buf){.ptr=buf, .count=w * h * st->fmt.planes, .stride=w};
+    struct umbra_buf rbuf[] = {
+        {.ptr=buf, .count=w * h * st->fmt.planes, .stride=w},
+        umbra_coverage_uniforms(st->cov),
+        umbra_shader_uniforms(st->shader),
+    };
     st->draw_prog->queue(st->draw_prog, l, t, r, b, rbuf);
 }
 
@@ -623,9 +598,7 @@ static void slug_free_slide(struct slide *s) {
     free(st->wind_buf);
     if (st->acc_prog) { st->acc_prog->free(st->acc_prog); }
     umbra_flat_ir_free(st->acc_ir);
-    free(st->acc_lay.uniforms);
     if (st->draw_prog) { st->draw_prog->free(st->draw_prog); }
-    free(st->draw_lay.uniforms);
     umbra_shader_free  (st->shader);
     umbra_coverage_free(st->cov);
     free(st);
@@ -636,7 +609,7 @@ static int slug_one_pass_get_builders(struct slide *s, struct umbra_fmt fmt,
     (void)s;
     (void)fmt;
     if (max < 1) { return 0; }
-    out[0] = slug_build(NULL);
+    out[0] = slug_build();
     return out[0] ? 1 : 0;
 }
 

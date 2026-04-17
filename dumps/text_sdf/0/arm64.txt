@@ -40,8 +40,8 @@ Critical sequence based on the simulation:
  +----> 17.   fmaxnm.4s	v9, v5, v9                        ## REGISTER dependency:  q9
  |      18.   fminnm.4s	v8, v20, v8
  |      19.   fminnm.4s	v9, v21, v9
- |      20.   ldr	x8, [x2, #16]
- |      21.   ldr	w10, [x2, #28]
+ |      20.   ldr	x8, [x2]
+ |      21.   ldr	w10, [x2, #12]
  |      22.   lsl	x10, x10, #3
  |      23.   madd	x8, x14, x10, x8
  |      24.   lsl	x10, x9, #3
@@ -122,7 +122,7 @@ Critical sequence based on the simulation:
  |      99.   st4.4h	{ v0, v1, v2, v3 }, [x10]
  +----> 100.  movi.4s	v4, #0                            ## RESOURCE interference:  CyUnitV [ probability: 99% ]
  |      101.  mov.16b	v5, v4
- |      102.  ldr	q6, #848
+ |      102.  ldr	q6, #864
  |      103.  mov.16b	v7, v6
  +----> 104.  fmov.4s	v16, #0.43750000                  ## RESOURCE interference:  CyUnitV [ probability: 100% ]
  |      105.  mov.16b	v17, v16
@@ -159,8 +159,8 @@ Instruction Info:
  1      3     0.33                        fmaxnm.4s	v9, v5, v9
  1      3     0.33                        fminnm.4s	v8, v20, v8
  1      3     0.33                        fminnm.4s	v9, v21, v9
- 1      4     0.50    *                   ldr	x8, [x2, #16]
- 1      4     0.50    *                   ldr	w10, [x2, #28]
+ 1      4     0.50    *                   ldr	x8, [x2]
+ 1      4     0.50    *                   ldr	w10, [x2, #12]
  1      1     0.50                        lsl	x10, x10, #3
  1      5     1.00                        madd	x8, x14, x10, x8
  1      1     0.50                        lsl	x10, x9, #3
@@ -241,7 +241,7 @@ Instruction Info:
  6      8     1.33           *            st4.4h	{ v0, v1, v2, v3 }, [x10]
  1      2     0.33                        movi.4s	v4, #0
  1      2     0.33                        mov.16b	v5, v4
- 1      4     0.50    *                   ldr	q6, #848
+ 1      4     0.50    *                   ldr	q6, #864
  1      2     0.33                        mov.16b	v7, v6
  1      2     0.33                        fmov.4s	v16, #0.43750000
  1      2     0.33                        mov.16b	v17, v16
@@ -301,8 +301,8 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.34   0.33    -      -      -      -     fmaxnm.4s	v9, v5, v9
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.34   0.33    -      -      -      -     fminnm.4s	v8, v20, v8
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.34   0.33    -      -      -      -     fminnm.4s	v9, v21, v9
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldr	x8, [x2, #16]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldr	w10, [x2, #28]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldr	x8, [x2]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldr	w10, [x2, #12]
  -      -      -      -      -      -      -     1.00    -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #3
 1.00    -     1.00    -      -      -     1.00    -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     madd	x8, x14, x10, x8
  -      -      -      -      -     1.00    -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -     lsl	x10, x9, #3
@@ -383,7 +383,7 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -      -      -      -      -      -     1.00   1.00   1.36   1.32   1.32    -      -      -      -     st4.4h	{ v0, v1, v2, v3 }, [x10]
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.33   0.34    -      -      -      -     movi.4s	v4, #0
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.33   0.34    -      -      -      -     mov.16b	v5, v4
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldr	q6, #848
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -      -      -      -      -      -      -     ldr	q6, #864
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.33   0.34    -      -      -      -     mov.16b	v7, v6
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.33   0.34    -      -      -      -     fmov.4s	v16, #0.43750000
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.33   0.33    -      -      -      -     mov.16b	v17, v16

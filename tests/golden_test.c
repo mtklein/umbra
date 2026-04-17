@@ -112,8 +112,7 @@ TEST(test_slug_rect) {
         55, 5, 30, 5,  5, 5,
     };
 
-    struct slug_acc_layout alay;
-    struct umbra_builder *ab = slug_build_acc(&alay);
+    struct umbra_builder *ab = slug_build_acc();
     struct umbra_flat_ir *air =
         umbra_flat_ir(ab);
     umbra_builder_free(ab);
@@ -132,11 +131,9 @@ TEST(test_slug_rect) {
         (struct umbra_buf){.ptr=wind_buf, .count=count(wind_buf),
                            .stride=W});
 
-    struct umbra_draw_layout lay;
     struct umbra_builder *bld = umbra_draw_builder(
         cov, shader,
-        umbra_blend_srcover, umbra_fmt_8888,
-        &lay);
+        umbra_blend_srcover, umbra_fmt_8888);
     struct umbra_flat_ir *ir =
         umbra_flat_ir(bld);
     umbra_builder_free(bld);
@@ -149,26 +146,25 @@ TEST(test_slug_rect) {
         pixels[i] = 0xff000000;
     }
 
-    struct umbra_matrix mat = {1,0,0, 0,1,0, 0,0,1};
-    umbra_uniforms_fill_f32(alay.uniforms, alay.mat, &mat.sx, 9);
-    float const slug_wh[2] = {60, 40};
-    umbra_uniforms_fill_f32(alay.uniforms, alay.wh, slug_wh, 2);
-    umbra_uniforms_fill_ptr(alay.uniforms, alay.curves_off,
-        (struct umbra_buf){.ptr=rect, .count=count(rect)});
+    struct slug_acc_uniforms au = {
+        .mat    = {1,0,0, 0,1,0, 0,0,1},
+        .bw     = 60, .bh = 40,
+        .curves = {.ptr=rect, .count=count(rect)},
+    };
     struct umbra_buf abuf[] = {
-        (struct umbra_buf){.ptr=alay.uniforms, .count=alay.uni.slots},
+        {.ptr=&au, .count=(int)(sizeof au / 4)},
         {.ptr=wind_buf, .count=count(wind_buf), .stride=W},
     };
     for (int j = 0; j < 4; j++) {
-        umbra_uniforms_fill_i32(alay.uniforms, alay.loop_off, &j, 1);
+        __builtin_memcpy(&au.j, &j, 4);
         acc->queue(acc, 0, 0, W, H, abuf);
     }
     be->flush(be);
 
-    umbra_draw_fill(&lay, cov, shader);
     struct umbra_buf buf[] = {
-        (struct umbra_buf){.ptr=lay.uniforms, .count=lay.uni.slots},
         {.ptr=pixels, .count=W * H, .stride=W},
+        umbra_coverage_uniforms(cov),
+        umbra_shader_uniforms(shader),
     };
     interp->queue(interp, 0, 0, W, H, buf);
     be->flush(be);
@@ -182,8 +178,6 @@ TEST(test_slug_rect) {
     pixels[38*W + 30] == bg here;
     pixels[20*W + 70] == bg here;
 
-    free(lay.uniforms);
-    free(alay.uniforms);
     acc->free(acc);
     interp->free(interp);
     be->free(be);
@@ -207,11 +201,9 @@ TEST(test_perspective_text) {
         (struct umbra_matrix){1,0,0, 0,1,0, 0,0,1},
         (struct umbra_bitmap){.buf={.ptr=bmp, .count=BW * BH}, .w=BW, .h=BH});
 
-    struct umbra_draw_layout lay;
     struct umbra_builder *bld = umbra_draw_builder(
         cov, shader,
-        umbra_blend_srcover, umbra_fmt_8888,
-        &lay);
+        umbra_blend_srcover, umbra_fmt_8888);
     struct umbra_flat_ir *ir =
         umbra_flat_ir(bld);
     umbra_builder_free(bld);
@@ -224,10 +216,10 @@ TEST(test_perspective_text) {
         pixels[i] = 0xff000000;
     }
 
-    umbra_draw_fill(&lay, cov, shader);
     struct umbra_buf buf[] = {
-        (struct umbra_buf){.ptr=lay.uniforms, .count=lay.uni.slots},
         {.ptr=pixels, .count=BW},
+        umbra_coverage_uniforms(cov),
+        umbra_shader_uniforms(shader),
     };
     interp->queue(interp, 0, 0, BW, 1, buf);
     be->flush(be);
@@ -251,11 +243,9 @@ TEST(test_perspective_text) {
             .h   = tc.h,
         });
 
-    struct umbra_draw_layout lay2;
     bld = umbra_draw_builder(
         cov2, shader2,
-        umbra_blend_srcover, umbra_fmt_8888,
-        &lay2);
+        umbra_blend_srcover, umbra_fmt_8888);
     ir = umbra_flat_ir(bld);
     umbra_builder_free(bld);
     interp = be->compile(be, ir);
@@ -266,10 +256,10 @@ TEST(test_perspective_text) {
         px2[i] = 0xff0a0a1e;
     }
     {
-        umbra_draw_fill(&lay2, cov2, shader2);
         struct umbra_buf b2[] = {
-            (struct umbra_buf){.ptr=lay2.uniforms, .count=lay2.uni.slots},
             {.ptr=px2, .count=W * H, .stride=W},
+            umbra_coverage_uniforms(cov2),
+            umbra_shader_uniforms(shader2),
         };
         interp->queue(interp, 0, 0, W, H, b2);
         be->flush(be);
@@ -280,8 +270,6 @@ TEST(test_perspective_text) {
     }
     changed > 0 here;
 
-    free(lay.uniforms);
-    free(lay2.uniforms);
     interp->free(interp);
     be->free(be);
     text_cov_free(&tc);

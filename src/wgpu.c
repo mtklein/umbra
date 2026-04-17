@@ -423,13 +423,13 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
 
     // Resolve derefs.
     for (int d = 0; d < p->n_deref; d++) {
-        uint32_t const *uni = (uint32_t const*)buf[p->deref[d].src_buf].ptr;
-        int const       slot = p->deref[d].off;
-        void *derived;
-        int   dcount, dstride;
-        memcpy(&derived, uni + slot,     sizeof derived);
-        memcpy(&dcount,  uni + slot + 2, sizeof dcount);
-        memcpy(&dstride, uni + slot + 3, sizeof dstride);
+        char const *uni = (char const*)buf[p->deref[d].src_buf].ptr
+                                + p->deref[d].off * 4;
+        struct umbra_buf src;
+        memcpy(&src, uni, sizeof src);
+        void *derived  = src.ptr;
+        int   dcount   = src.count;
+        int   dstride  = src.stride;
         int bi = p->deref[d].buf_idx;
 
         size_t const db = (size_t)dcount << p->buf_shift[bi];

@@ -317,13 +317,13 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     }
 
     for (int d = 0; d < vp->n_deref; d++) {
-        uint32_t const *uni = (uint32_t const*)buf[vp->deref[d].src_buf].ptr;
-        int const       slot = vp->deref[d].off;
-        void *derived;
-        int   dcount, dstride;
-        memcpy(&derived, uni + slot,     sizeof derived);
-        memcpy(&dcount,  uni + slot + 2, sizeof dcount);
-        memcpy(&dstride, uni + slot + 3, sizeof dstride);
+        char const *uni = (char const*)buf[vp->deref[d].src_buf].ptr
+                                + vp->deref[d].off * 4;
+        struct umbra_buf src;
+        memcpy(&src, uni, sizeof src);
+        void *derived  = src.ptr;
+        int   dcount   = src.count;
+        int   dstride  = src.stride;
         int bi = vp->deref[d].buf_idx;
 
         size_t const db = (size_t)dcount << vp->buf_shift[bi];

@@ -32,7 +32,7 @@ Critical sequence based on the simulation:
  |
  |      0.    vmovd	%r10d, %xmm12
  |      1.    vbroadcastss	%xmm12, %ymm12
- |      2.    vpaddd	560(%rip), %ymm12, %ymm12
+ |      2.    vpaddd	559(%rip), %ymm12, %ymm12
  |      3.    vcvtdq2ps	%ymm12, %ymm12
  |      4.    vmovd	%r14d, %xmm13
  |      5.    vbroadcastss	%xmm13, %ymm13
@@ -40,8 +40,8 @@ Critical sequence based on the simulation:
  |      7.    vmulps	%ymm2, %ymm13, %ymm13
  |      8.    vfmadd231ps	%ymm1, %ymm12, %ymm13
  |      9.    vaddps	%ymm3, %ymm13, %ymm13
- +----> 10.   vmaxps	549(%rip), %ymm13, %ymm13         ## RESOURCE interference:  Zn4FP0 [ probability: 48% ]
- +----> 11.   vminps	572(%rip), %ymm13, %ymm13         ## REGISTER dependency:  %ymm13
+ +----> 10.   vmaxps	548(%rip), %ymm13, %ymm13         ## RESOURCE interference:  Zn4FP0 [ probability: 48% ]
+ +----> 11.   vminps	571(%rip), %ymm13, %ymm13         ## REGISTER dependency:  %ymm13
  |      12.   vmovaps	%ymm7, %ymm12
  +----> 13.   vfmadd231ps	%ymm11, %ymm13, %ymm12    ## REGISTER dependency:  %ymm13
  |      14.   vmovaps	%ymm4, %ymm14
@@ -53,8 +53,8 @@ Critical sequence based on the simulation:
  +----> 20.   vcvtps2ph	$4, %ymm13, %xmm13                ## REGISTER dependency:  %ymm13
  +----> 21.   vcvtps2ph	$4, %ymm15, %xmm15                ## RESOURCE interference:  Zn4FP2 [ probability: 47% ]
  |      22.   vcvtps2ph	$4, %ymm14, %xmm14
- |      23.   movq	16(%rdx), %r11
- |      24.   movl	28(%rdx), %eax
+ |      23.   movq	(%rdx), %r11
+ |      24.   movl	12(%rdx), %eax
  |      25.   shlq	$3, %rax
  |      26.   imulq	%r14, %rax
  |      27.   addq	%rax, %r11
@@ -94,7 +94,7 @@ Instruction Info:
 [1]    [2]    [3]    [4]    [5]    [6]    Instructions:
  1      1     1.00                        vmovd	%r10d, %xmm12
  1      2     1.00                        vbroadcastss	%xmm12, %ymm12
- 1      8     0.50    *                   vpaddd	560(%rip), %ymm12, %ymm12
+ 1      8     0.50    *                   vpaddd	559(%rip), %ymm12, %ymm12
  1      3     0.50                        vcvtdq2ps	%ymm12, %ymm12
  1      1     1.00                        vmovd	%r14d, %xmm13
  1      2     1.00                        vbroadcastss	%xmm13, %ymm13
@@ -102,8 +102,8 @@ Instruction Info:
  1      3     0.50                        vmulps	%ymm2, %ymm13, %ymm13
  1      4     0.50                        vfmadd231ps	%ymm1, %ymm12, %ymm13
  1      3     0.50                        vaddps	%ymm3, %ymm13, %ymm13
- 1      9     0.50    *                   vmaxps	549(%rip), %ymm13, %ymm13
- 1      9     0.50    *                   vminps	572(%rip), %ymm13, %ymm13
+ 1      9     0.50    *                   vmaxps	548(%rip), %ymm13, %ymm13
+ 1      9     0.50    *                   vminps	571(%rip), %ymm13, %ymm13
  1      0     0.17                        vmovaps	%ymm7, %ymm12
  1      4     0.50                        vfmadd231ps	%ymm11, %ymm13, %ymm12
  1      0     0.17                        vmovaps	%ymm4, %ymm14
@@ -115,8 +115,8 @@ Instruction Info:
  2      6     1.00                        vcvtps2ph	$4, %ymm13, %xmm13
  2      6     1.00                        vcvtps2ph	$4, %ymm15, %xmm15
  2      6     1.00                        vcvtps2ph	$4, %ymm14, %xmm14
- 1      5     0.33    *                   movq	16(%rdx), %r11
- 1      5     0.33    *                   movl	28(%rdx), %eax
+ 1      5     0.33    *                   movq	(%rdx), %r11
+ 1      5     0.33    *                   movl	12(%rdx), %eax
  1      1     0.50                        shlq	$3, %rax
  1      3     1.00                        imulq	%r14, %rax
  1      1     0.25                        addq	%rax, %r11
@@ -175,7 +175,7 @@ Resource pressure by instruction:
 [0]    [1]    [2]    [3]    [4]    [5]    [6]    [7]    [8]    [9]    [10]   [11]   [12.0] [12.1] [13]   [14.0] [14.1] [14.2] [15.0] [15.1] [15.2] [16.0] [16.1] Instructions:
  -      -      -      -      -      -      -      -      -      -      -      -     1.00   1.00    -      -      -      -      -      -      -      -      -     vmovd	%r10d, %xmm12
  -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -     vbroadcastss	%xmm12, %ymm12
- -      -      -      -      -      -      -      -     0.47    -     0.04   0.49   0.49   0.51    -     0.33   0.32   0.35   0.34   0.32   0.34    -      -     vpaddd	560(%rip), %ymm12, %ymm12
+ -      -      -      -      -      -      -      -     0.47    -     0.04   0.49   0.49   0.51    -     0.33   0.32   0.35   0.34   0.32   0.34    -      -     vpaddd	559(%rip), %ymm12, %ymm12
  -      -      -      -      -      -      -      -      -      -     0.47   0.53    -      -      -      -      -      -      -      -      -      -      -     vcvtdq2ps	%ymm12, %ymm12
  -      -      -      -      -      -      -      -      -      -      -      -     0.96   1.04    -      -      -      -      -      -      -      -      -     vmovd	%r14d, %xmm13
  -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -     vbroadcastss	%xmm13, %ymm13
@@ -183,8 +183,8 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -     0.53   0.47    -      -      -      -      -      -      -      -      -      -      -      -      -     vmulps	%ymm2, %ymm13, %ymm13
  -      -      -      -      -      -      -      -     0.98   0.02    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm1, %ymm12, %ymm13
  -      -      -      -      -      -      -      -      -      -     0.04   0.96    -      -      -      -      -      -      -      -      -      -      -     vaddps	%ymm3, %ymm13, %ymm13
- -      -      -      -      -      -      -      -     1.00    -      -      -     0.51   0.49    -     0.33   0.34   0.33   0.34   0.33   0.33    -      -     vmaxps	549(%rip), %ymm13, %ymm13
- -      -      -      -      -      -      -      -     0.97   0.03    -      -     0.50   0.50    -     0.34   0.32   0.34   0.32   0.34   0.34    -      -     vminps	572(%rip), %ymm13, %ymm13
+ -      -      -      -      -      -      -      -     1.00    -      -      -     0.51   0.49    -     0.33   0.34   0.33   0.34   0.33   0.33    -      -     vmaxps	548(%rip), %ymm13, %ymm13
+ -      -      -      -      -      -      -      -     0.97   0.03    -      -     0.50   0.50    -     0.34   0.32   0.34   0.32   0.34   0.34    -      -     vminps	571(%rip), %ymm13, %ymm13
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vmovaps	%ymm7, %ymm12
  -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm11, %ymm13, %ymm12
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vmovaps	%ymm4, %ymm14
@@ -196,8 +196,8 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -      -     1.90   0.10    -      -      -      -      -      -      -      -      -      -      -     vcvtps2ph	$4, %ymm13, %xmm13
  -      -      -      -      -      -      -      -      -      -     0.08   1.92    -      -      -      -      -      -      -      -      -      -      -     vcvtps2ph	$4, %ymm15, %xmm15
  -      -      -      -      -      -      -      -      -      -     1.04   0.96    -      -      -      -      -      -      -      -      -      -      -     vcvtps2ph	$4, %ymm14, %xmm14
-0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.36   0.32   0.31   0.35   0.34    -      -     movq	16(%rdx), %r11
-0.33   0.34   0.33    -      -      -      -      -      -      -      -      -      -      -      -     0.36   0.31   0.33   0.35   0.34   0.31    -      -     movl	28(%rdx), %eax
+0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.36   0.32   0.31   0.35   0.34    -      -     movq	(%rdx), %r11
+0.33   0.34   0.33    -      -      -      -      -      -      -      -      -      -      -      -     0.36   0.31   0.33   0.35   0.34   0.31    -      -     movl	12(%rdx), %eax
  -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     shlq	$3, %rax
  -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     imulq	%r14, %rax
  -      -      -     0.50    -      -     0.50    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     addq	%rax, %r11

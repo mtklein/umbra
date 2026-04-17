@@ -37,26 +37,20 @@ static struct umbra_fmt const *fmt_enums[] = {
 };
 
 struct pipe {
-    struct umbra_program          *program;
-    struct umbra_uniforms_layout   uni; int :32;
-    void                          *uniforms;
-    int                            out_ptr, pad;
+    struct umbra_program *program;
+    int                   out_ptr, :32;
 };
 
 static struct pipe readback_pipe, hdr_pipe;
 
 static void free_pipe(struct pipe *p) {
     if (p->program) { p->program->free(p->program); }
-    free(p->uniforms);
     *p = (struct pipe){0};
 }
 
 static struct umbra_backend *pipe_be;
 
-static void finish_pipe(struct pipe *p, struct umbra_builder *builder,
-                        struct umbra_uniforms_layout uni) {
-    p->uni = uni;
-    p->uniforms = umbra_uniforms_alloc(&uni);
+static void finish_pipe(struct pipe *p, struct umbra_builder *builder) {
     struct umbra_flat_ir *ir = umbra_flat_ir(builder);
     umbra_builder_free(builder);
     p->program = pipe_be->compile(pipe_be, ir);
@@ -69,7 +63,7 @@ static void build_readback(int fmt) {
     umbra_color_val32 c = fmt_enums[fmt]->load(builder, 1);
     umbra_fmt_fp16.store(builder, 2, c);
     readback_pipe.out_ptr = 2;
-    finish_pipe(&readback_pipe, builder, (struct umbra_uniforms_layout){0});
+    finish_pipe(&readback_pipe, builder);
 }
 
 static void build_hdr(int fmt) {
@@ -78,7 +72,7 @@ static void build_hdr(int fmt) {
     umbra_color_val32 c = fmt_enums[fmt]->load(builder, 1);
     hdr_pipe.out_ptr = 2;
     umbra_fmt_fp16.store(builder, 2, c);
-    finish_pipe(&hdr_pipe, builder, (struct umbra_uniforms_layout){0});
+    finish_pipe(&hdr_pipe, builder);
 }
 
 static void build_pipes(int fmt) {
@@ -171,9 +165,7 @@ static void update_title(SDL_Window *w, struct slide *s, int bi, int fi, double 
 static void readback_row(void *dst, void *src, int n, size_t plane_gap) {
     int      ps = plane_gap ? 3 : 0;
     int      op = readback_pipe.out_ptr;
-    struct umbra_buf buf[6];
-    buf[0] = (struct umbra_buf){.ptr=readback_pipe.uniforms,
-                                 .count=readback_pipe.uni.slots};
+    struct umbra_buf buf[6] = {0};
     buf[1] = (struct umbra_buf){.ptr=src, .count=n};
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (struct umbra_buf){.ptr=(char *)src + (size_t)(i + 1) * plane_gap,
@@ -186,8 +178,7 @@ static void readback_row(void *dst, void *src, int n, size_t plane_gap) {
 static void to_hdr_row(__fp16 *dst, void *src, int n, size_t plane_gap) {
     int      ps = plane_gap ? 3 : 0;
     int      op = hdr_pipe.out_ptr;
-    struct umbra_buf buf[6];
-    buf[0] = (struct umbra_buf){.ptr=hdr_pipe.uniforms, .count=hdr_pipe.uni.slots};
+    struct umbra_buf buf[6] = {0};
     buf[1] = (struct umbra_buf){.ptr=src, .count=n};
     for (int i = 0; i < ps; i++) {
         buf[2 + i] = (struct umbra_buf){.ptr=(char *)src + (size_t)(i + 1) * plane_gap,
@@ -380,9 +371,7 @@ int main(void) {
         if (plane_gap) {
             for (int y = 0; y < H; y++) {
                 int      op = readback_pipe.out_ptr;
-                struct umbra_buf rb[3];
-                rb[0] = (struct umbra_buf){.ptr = readback_pipe.uniforms,
-                                           .count = readback_pipe.uni.slots};
+                struct umbra_buf rb[3] = {0};
                 rb[1] = (struct umbra_buf){.ptr = pixbuf,
                                            .count = W * H * planes,
                                            .stride = W};
@@ -402,9 +391,7 @@ int main(void) {
             if (plane_gap) {
                 for (int y = 0; y < H; y++) {
                     int      op = hdr_pipe.out_ptr;
-                    struct umbra_buf hb[3];
-                    hb[0] = (struct umbra_buf){.ptr = hdr_pipe.uniforms,
-                                               .count = hdr_pipe.uni.slots};
+                    struct umbra_buf hb[3] = {0};
                     hb[1] = (struct umbra_buf){.ptr = pixbuf,
                                                .count = W * H * planes,
                                                .stride = W};

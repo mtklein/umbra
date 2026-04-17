@@ -15,18 +15,18 @@
 #include <math.h>
 #include <stdlib.h>
 
-struct orbit {
-    float cx, cy, ox, oy, r_center, r_orbit;
-};
+#define SLOT(field) \
+    ((int)((__builtin_offsetof(__typeof__(*self), field) - sizeof(self->base)) / 4))
 
-static void orbit_update(struct orbit *o, float t, int w, int h) {
-    o->cx = (float)w * 0.5f;
-    o->cy = (float)h * 0.5f;
-    o->r_center = (float)(w < h ? w : h) * 0.18f;
-    o->r_orbit  = (float)(w < h ? w : h) * 0.12f;
+static void orbit_compute(float *cx, float *cy, float *ox, float *oy,
+                           float *r_center, float *r_orbit, float t, int w, int h) {
+    *cx = (float)w * 0.5f;
+    *cy = (float)h * 0.5f;
+    *r_center = (float)(w < h ? w : h) * 0.18f;
+    *r_orbit  = (float)(w < h ? w : h) * 0.12f;
     float const dist = (float)(w < h ? w : h) * 0.22f;
-    o->ox = o->cx + dist * cosf(t);
-    o->oy = o->cy + dist * sinf(t);
+    *ox = *cx + dist * cosf(t);
+    *oy = *cy + dist * sinf(t);
 }
 
 static umbra_interval circle_sdf(struct umbra_builder *b,
@@ -44,8 +44,7 @@ static umbra_interval circle_sdf(struct umbra_builder *b,
 
 struct two_circle_sdf {
     struct umbra_sdf base;
-    struct orbit     orbit;
-    int              circles_off, pad;
+    float            cx1, cy1, r1, cx2, cy2, r2;
 };
 
 enum csg_op { CSG_UNION, CSG_INTERSECT, CSG_DIFFERENCE };
@@ -60,70 +59,59 @@ struct csg_slide {
     struct two_circle_sdf     sdf;
 
     struct umbra_fmt          fmt;
-    struct umbra_draw_layout  lay;
-    struct umbra_sdf_draw *disp;
+    struct umbra_sdf_draw    *disp;
 };
 
+static void two_circle_gather(struct umbra_builder *b, int buf_index,
+                               struct two_circle_sdf *self,
+                               umbra_interval x, umbra_interval y,
+                               umbra_interval *a, umbra_interval *c) {
+    umbra_ptr32 const u_ptr = {.ix = buf_index};
+    umbra_interval const cx1 = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(cx1))),
+                         cy1 = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(cy1))),
+                         r1  = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(r1))),
+                         cx2 = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(cx2))),
+                         cy2 = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(cy2))),
+                         r2  = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(r2)));
+    *a = circle_sdf(b, x, y, cx1, cy1, r1);
+    *c = circle_sdf(b, x, y, cx2, cy2, r2);
+}
+
 static umbra_interval csg_union_build(struct umbra_sdf *s, struct umbra_builder *b,
-                                       struct umbra_uniforms_layout *u,
                                        int buf_index,
                                        umbra_interval x, umbra_interval y) {
     struct two_circle_sdf *self = (struct two_circle_sdf *)s;
-    self->circles_off = umbra_uniforms_reserve_f32(u, 6);
-    umbra_ptr32 const u_ptr = {.ix = buf_index};
-    umbra_interval const cx1 = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circles_off)),
-                         cy1 = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circles_off + 1)),
-                         r1  = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circles_off + 2)),
-                         cx2 = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circles_off + 3)),
-                         cy2 = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circles_off + 4)),
-                         r2  = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circles_off + 5));
-    umbra_interval const a = circle_sdf(b, x, y, cx1, cy1, r1),
-                         c = circle_sdf(b, x, y, cx2, cy2, r2);
+    umbra_interval a, c;
+    two_circle_gather(b, buf_index, self, x, y, &a, &c);
     return umbra_interval_min_f32(b, a, c);
 }
 
 static umbra_interval csg_intersect_build(struct umbra_sdf *s, struct umbra_builder *b,
-                                           struct umbra_uniforms_layout *u,
                                            int buf_index,
                                            umbra_interval x, umbra_interval y) {
     struct two_circle_sdf *self = (struct two_circle_sdf *)s;
-    self->circles_off = umbra_uniforms_reserve_f32(u, 6);
-    umbra_ptr32 const u_ptr = {.ix = buf_index};
-    umbra_interval const cx1 = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circles_off)),
-                         cy1 = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circles_off + 1)),
-                         r1  = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circles_off + 2)),
-                         cx2 = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circles_off + 3)),
-                         cy2 = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circles_off + 4)),
-                         r2  = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circles_off + 5));
-    umbra_interval const a = circle_sdf(b, x, y, cx1, cy1, r1),
-                         c = circle_sdf(b, x, y, cx2, cy2, r2);
+    umbra_interval a, c;
+    two_circle_gather(b, buf_index, self, x, y, &a, &c);
     return umbra_interval_max_f32(b, a, c);
 }
 
 static umbra_interval csg_difference_build(struct umbra_sdf *s, struct umbra_builder *b,
-                                            struct umbra_uniforms_layout *u,
                                             int buf_index,
                                             umbra_interval x, umbra_interval y) {
     struct two_circle_sdf *self = (struct two_circle_sdf *)s;
-    self->circles_off = umbra_uniforms_reserve_f32(u, 6);
-    umbra_ptr32 const u_ptr = {.ix = buf_index};
-    umbra_interval const cx1 = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circles_off)),
-                         cy1 = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circles_off + 1)),
-                         r1  = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circles_off + 2)),
-                         cx2 = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circles_off + 3)),
-                         cy2 = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circles_off + 4)),
-                         r2  = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->circles_off + 5));
-    umbra_interval const a = circle_sdf(b, x, y, cx1, cy1, r1),
-                         c = circle_sdf(b, x, y, cx2, cy2, r2);
-    umbra_interval const neg_c = umbra_interval_sub_f32(b, umbra_interval_exact(umbra_imm_f32(b, 0)), c);
+    umbra_interval a, c;
+    two_circle_gather(b, buf_index, self, x, y, &a, &c);
+    umbra_interval const neg_c = umbra_interval_sub_f32(b,
+                                     umbra_interval_exact(umbra_imm_f32(b, 0)), c);
     return umbra_interval_max_f32(b, a, neg_c);
 }
 
-static void two_circle_fill(struct umbra_sdf const *s, void *uniforms) {
-    struct two_circle_sdf const *self = (struct two_circle_sdf const *)s;
-    float const vals[6] = {self->orbit.cx, self->orbit.cy, self->orbit.r_center,
-                           self->orbit.ox, self->orbit.oy, self->orbit.r_orbit};
-    umbra_uniforms_fill_f32(uniforms, self->circles_off, vals, 6);
+static void two_circle_orbit(struct two_circle_sdf *self, float t, int w, int h) {
+    float ox, oy, r_orbit;
+    orbit_compute(&self->cx1, &self->cy1, &ox, &oy, &self->r1, &r_orbit, t, w, h);
+    self->cx2 = ox;
+    self->cy2 = oy;
+    self->r2  = r_orbit;
 }
 
 static void csg_init(struct slide *s, int w, int h) {
@@ -135,22 +123,21 @@ static void csg_init(struct slide *s, int w, int h) {
 static void csg_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
     struct csg_slide *st = (struct csg_slide *)s;
     umbra_sdf_draw_free(st->disp);
-    free(st->lay.uniforms);
     st->fmt  = fmt;
     st->disp = umbra_sdf_draw(be, &st->sdf.base,
                                   (struct umbra_sdf_draw_config){.hard_edge = 0},
-                                  st->shader, umbra_blend_srcover, fmt, &st->lay);
+                                  st->shader, umbra_blend_srcover, fmt);
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
 static void csg_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct csg_slide *st = (struct csg_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
-    orbit_update(&st->sdf.orbit, (float)secs, st->w, st->h);
-    umbra_sdf_draw_fill(&st->lay, &st->sdf.base, st->shader);
+    two_circle_orbit(&st->sdf, (float)secs, st->w, st->h);
     struct umbra_buf ubuf[] = {
-        {.ptr = st->lay.uniforms, .count = st->lay.uni.slots},
         {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
+        umbra_sdf_uniforms(&st->sdf.base),
+        umbra_shader_uniforms(st->shader),
     };
     umbra_sdf_draw_queue(st->disp, l, t, r, b, ubuf);
 }
@@ -161,7 +148,7 @@ static int csg_get_builders(struct slide *s, struct umbra_fmt fmt,
     struct csg_slide *st = (struct csg_slide *)s;
     struct umbra_coverage *adapter = umbra_sdf_coverage(&st->sdf.base, 0);
     out[0] = umbra_draw_builder(adapter, st->shader,
-                                umbra_blend_srcover, fmt, NULL);
+                                umbra_blend_srcover, fmt);
     umbra_coverage_free(adapter);
     return out[0] ? 1 : 0;
 }
@@ -169,15 +156,13 @@ static int csg_get_builders(struct slide *s, struct umbra_fmt fmt,
 static void csg_free(struct slide *s) {
     struct csg_slide *st = (struct csg_slide *)s;
     umbra_sdf_draw_free(st->disp);
-    free(st->lay.uniforms);
     umbra_shader_free(st->shader);
     free(st);
 }
 
 static struct slide* make_csg(char const *title, float const bg[4], float const color[4],
                               enum csg_op op) {
-    umbra_interval (*build)(struct umbra_sdf*, struct umbra_builder*,
-                            struct umbra_uniforms_layout*, int,
+    umbra_interval (*build)(struct umbra_sdf*, struct umbra_builder*, int,
                             umbra_interval, umbra_interval) = NULL;
     if (op == CSG_UNION)      { build = csg_union_build; }
     if (op == CSG_INTERSECT)  { build = csg_intersect_build; }
@@ -187,7 +172,11 @@ static struct slide* make_csg(char const *title, float const bg[4], float const 
     st->op      = op;
     umbra_color const c = {color[0], color[1], color[2], color[3]};
     st->shader  = umbra_shader_solid(c);
-    st->sdf.base = (struct umbra_sdf){.build = build, .fill = two_circle_fill};
+    st->sdf.base = (struct umbra_sdf){
+        .build          = build,
+        .uniforms_slots = (int)((sizeof(struct two_circle_sdf)
+                                - sizeof(struct umbra_sdf)) / 4),
+    };
     st->base = (struct slide){
         .title = title,
         .bg = {bg[0], bg[1], bg[2], bg[3]},
@@ -217,66 +206,115 @@ SLIDE(slide_sdf_difference) {
 
 struct ring_sdf {
     struct umbra_sdf base;
-    struct orbit     orbit;
-    int              ring_off, pad;
+    float            cx, cy, r, w;
 };
 
 static umbra_interval ring_build(struct umbra_sdf *s, struct umbra_builder *b,
-                                  struct umbra_uniforms_layout *u,
                                   int buf_index,
                                   umbra_interval x, umbra_interval y) {
     struct ring_sdf *self = (struct ring_sdf *)s;
-    self->ring_off = umbra_uniforms_reserve_f32(u, 4);
     umbra_ptr32 const u_ptr = {.ix = buf_index};
-    umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->ring_off)),
-                         cy = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->ring_off + 1)),
-                         r  = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->ring_off + 2)),
-                         w  = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->ring_off + 3));
+    umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(cx))),
+                         cy = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(cy))),
+                         r  = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(r))),
+                         w  = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(w)));
     return umbra_interval_sub_f32(b, umbra_interval_abs_f32(b, circle_sdf(b, x, y, cx, cy, r)), w);
 }
 
-static void ring_fill(struct umbra_sdf const *s, void *uniforms) {
-    struct ring_sdf const *self = (struct ring_sdf const *)s;
-    float const vals[4] = {self->orbit.cx, self->orbit.cy,
-                           self->orbit.r_center, self->orbit.r_center * 0.15f};
-    umbra_uniforms_fill_f32(uniforms, self->ring_off, vals, 4);
+struct ring_slide {
+    struct slide base;
+    int w, h;
+
+    struct umbra_shader      *shader;
+    struct ring_sdf           sdf;
+
+    struct umbra_fmt          fmt;
+    struct umbra_sdf_draw    *disp;
+};
+
+static void ring_init(struct slide *s, int w, int h) {
+    struct ring_slide *st = (struct ring_slide *)s;
+    st->w = w;
+    st->h = h;
+}
+
+static void ring_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
+    struct ring_slide *st = (struct ring_slide *)s;
+    umbra_sdf_draw_free(st->disp);
+    st->fmt  = fmt;
+    st->disp = umbra_sdf_draw(be, &st->sdf.base,
+                                  (struct umbra_sdf_draw_config){.hard_edge = 0},
+                                  st->shader, umbra_blend_srcover, fmt);
+    slide_bg_prepare(be, fmt, st->w, st->h);
+}
+
+static void ring_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
+    struct ring_slide *st = (struct ring_slide *)s;
+    slide_bg_draw(s->bg, l, t, r, b, buf);
+    float ox, oy, r_orbit;
+    orbit_compute(&st->sdf.cx, &st->sdf.cy, &ox, &oy, &st->sdf.r, &r_orbit,
+                   (float)secs, st->w, st->h);
+    st->sdf.w = st->sdf.r * 0.15f;
+    struct umbra_buf ubuf[] = {
+        {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
+        umbra_sdf_uniforms(&st->sdf.base),
+        umbra_shader_uniforms(st->shader),
+    };
+    umbra_sdf_draw_queue(st->disp, l, t, r, b, ubuf);
+}
+
+static int ring_get_builders(struct slide *s, struct umbra_fmt fmt,
+                             struct umbra_builder **out, int max) {
+    if (max < 1) { return 0; }
+    struct ring_slide *st = (struct ring_slide *)s;
+    struct umbra_coverage *adapter = umbra_sdf_coverage(&st->sdf.base, 0);
+    out[0] = umbra_draw_builder(adapter, st->shader, umbra_blend_srcover, fmt);
+    umbra_coverage_free(adapter);
+    return out[0] ? 1 : 0;
+}
+
+static void ring_free(struct slide *s) {
+    struct ring_slide *st = (struct ring_slide *)s;
+    umbra_sdf_draw_free(st->disp);
+    umbra_shader_free(st->shader);
+    free(st);
 }
 
 SLIDE(slide_sdf_ring) {
-    struct csg_slide *st = calloc(1, sizeof *st);
+    struct ring_slide *st = calloc(1, sizeof *st);
     st->shader = umbra_shader_solid((umbra_color){1.0f, 0.6f, 0.1f, 1});
-    struct ring_sdf *ring = (struct ring_sdf *)&st->sdf;
-    ring->base = (struct umbra_sdf){.build = ring_build, .fill = ring_fill};
+    st->sdf.base = (struct umbra_sdf){
+        .build          = ring_build,
+        .uniforms_slots = (int)((sizeof(struct ring_sdf) - sizeof(struct umbra_sdf)) / 4),
+    };
     st->base = (struct slide){
         .title = "SDF Ring (shell)",
         .bg = {0.08f, 0.10f, 0.14f, 1},
-        .init = csg_init,
-        .prepare = csg_prepare,
-        .draw = csg_draw,
-        .free = csg_free,
-        .get_builders = csg_get_builders,
+        .init = ring_init,
+        .prepare = ring_prepare,
+        .draw = ring_draw,
+        .free = ring_free,
+        .get_builders = ring_get_builders,
     };
     return &st->base;
 }
 
 struct rounded_rect_sdf {
     struct umbra_sdf base;
-    float cx, cy, hw, hh, r;
-    int   rrect_off;
+    float            cx, cy, hw, hh, r;
+    int              :32;
 };
 
 static umbra_interval rounded_rect_build(struct umbra_sdf *s, struct umbra_builder *b,
-                                          struct umbra_uniforms_layout *u,
                                           int buf_index,
                                           umbra_interval x, umbra_interval y) {
     struct rounded_rect_sdf *self = (struct rounded_rect_sdf *)s;
-    self->rrect_off = umbra_uniforms_reserve_f32(u, 5);
     umbra_ptr32 const u_ptr = {.ix = buf_index};
-    umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->rrect_off)),
-                         cy = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->rrect_off + 1)),
-                         hw = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->rrect_off + 2)),
-                         hh = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->rrect_off + 3)),
-                         r  = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->rrect_off + 4));
+    umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(cx))),
+                         cy = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(cy))),
+                         hw = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(hw))),
+                         hh = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(hh))),
+                         r  = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(r)));
     umbra_interval const zero = umbra_interval_exact(umbra_imm_f32(b, 0));
     umbra_interval const dx = umbra_interval_max_f32(b, zero,
                                   umbra_interval_sub_f32(b,
@@ -294,12 +332,6 @@ static umbra_interval rounded_rect_build(struct umbra_sdf *s, struct umbra_build
     return umbra_interval_sub_f32(b, umbra_interval_sqrt_f32(b, d2), r);
 }
 
-static void rounded_rect_fill(struct umbra_sdf const *s, void *uniforms) {
-    struct rounded_rect_sdf const *self = (struct rounded_rect_sdf const *)s;
-    float const vals[5] = {self->cx, self->cy, self->hw, self->hh, self->r};
-    umbra_uniforms_fill_f32(uniforms, self->rrect_off, vals, 5);
-}
-
 struct rounded_rect_slide {
     struct slide base;
     int w, h;
@@ -308,8 +340,7 @@ struct rounded_rect_slide {
     struct rounded_rect_sdf   sdf;
 
     struct umbra_fmt          fmt;
-    struct umbra_draw_layout  lay;
-    struct umbra_sdf_draw *disp;
+    struct umbra_sdf_draw    *disp;
 };
 
 static void rounded_rect_init(struct slide *s, int w, int h) {
@@ -322,11 +353,10 @@ static void rounded_rect_prepare(struct slide *s, struct umbra_backend *be,
                                  struct umbra_fmt fmt) {
     struct rounded_rect_slide *st = (struct rounded_rect_slide *)s;
     umbra_sdf_draw_free(st->disp);
-    free(st->lay.uniforms);
     st->fmt  = fmt;
     st->disp = umbra_sdf_draw(be, &st->sdf.base,
                                   (struct umbra_sdf_draw_config){.hard_edge = 0},
-                                  st->shader, umbra_blend_srcover, fmt, &st->lay);
+                                  st->shader, umbra_blend_srcover, fmt);
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
@@ -342,10 +372,10 @@ static void rounded_rect_draw(struct slide *s, double secs, int l, int t, int r,
     st->sdf.hh = (float)(st->w < st->h ? st->w : st->h) * (0.10f + 0.08f * anim);
     st->sdf.r  = (float)(st->w < st->h ? st->w : st->h) * 0.04f;
 
-    umbra_sdf_draw_fill(&st->lay, &st->sdf.base, st->shader);
     struct umbra_buf ubuf[] = {
-        {.ptr = st->lay.uniforms, .count = st->lay.uni.slots},
         {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
+        umbra_sdf_uniforms(&st->sdf.base),
+        umbra_shader_uniforms(st->shader),
     };
     umbra_sdf_draw_queue(st->disp, l, t, r, b, ubuf);
 }
@@ -356,7 +386,7 @@ static int rounded_rect_get_builders(struct slide *s, struct umbra_fmt fmt,
     struct rounded_rect_slide *st = (struct rounded_rect_slide *)s;
     struct umbra_coverage *adapter = umbra_sdf_coverage(&st->sdf.base, 0);
     out[0] = umbra_draw_builder(adapter, st->shader,
-                                umbra_blend_srcover, fmt, NULL);
+                                umbra_blend_srcover, fmt);
     umbra_coverage_free(adapter);
     return out[0] ? 1 : 0;
 }
@@ -364,7 +394,6 @@ static int rounded_rect_get_builders(struct slide *s, struct umbra_fmt fmt,
 static void rounded_rect_free(struct slide *s) {
     struct rounded_rect_slide *st = (struct rounded_rect_slide *)s;
     umbra_sdf_draw_free(st->disp);
-    free(st->lay.uniforms);
     umbra_shader_free(st->shader);
     free(st);
 }
@@ -372,7 +401,11 @@ static void rounded_rect_free(struct slide *s) {
 SLIDE(slide_sdf_rounded_rect) {
     struct rounded_rect_slide *st = calloc(1, sizeof *st);
     st->shader = umbra_shader_solid((umbra_color){0.1f, 0.5f, 0.9f, 1});
-    st->sdf.base = (struct umbra_sdf){.build = rounded_rect_build, .fill = rounded_rect_fill};
+    st->sdf.base = (struct umbra_sdf){
+        .build          = rounded_rect_build,
+        .uniforms_slots = (int)((sizeof(struct rounded_rect_sdf)
+                                - sizeof(struct umbra_sdf)) / 4),
+    };
     st->base = (struct slide){
         .title = "SDF Rounded Rect",
         .bg = {0.08f, 0.10f, 0.14f, 1},
@@ -387,22 +420,20 @@ SLIDE(slide_sdf_rounded_rect) {
 
 struct capsule_sdf {
     struct umbra_sdf base;
-    struct orbit     orbit;
-    int              capsule_off, pad;
+    float            p0x, p0y, p1x, p1y, rad;
+    int              :32;
 };
 
 static umbra_interval capsule_build(struct umbra_sdf *s, struct umbra_builder *b,
-                                     struct umbra_uniforms_layout *u,
                                      int buf_index,
                                      umbra_interval x, umbra_interval y) {
     struct capsule_sdf *self = (struct capsule_sdf *)s;
-    self->capsule_off = umbra_uniforms_reserve_f32(u, 5);
     umbra_ptr32 const u_ptr = {.ix = buf_index};
-    umbra_interval const p0x = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->capsule_off)),
-                         p0y = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->capsule_off + 1)),
-                         p1x = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->capsule_off + 2)),
-                         p1y = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->capsule_off + 3)),
-                         rad = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->capsule_off + 4));
+    umbra_interval const p0x = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(p0x))),
+                         p0y = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(p0y))),
+                         p1x = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(p1x))),
+                         p1y = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(p1y))),
+                         rad = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(rad)));
 
     umbra_interval const dx = umbra_interval_sub_f32(b, p1x, p0x),
                          dy = umbra_interval_sub_f32(b, p1y, p0y);
@@ -431,47 +462,99 @@ static umbra_interval capsule_build(struct umbra_sdf *s, struct umbra_builder *b
     return umbra_interval_sub_f32(b, umbra_interval_sqrt_f32(b, d2), rad);
 }
 
-static void capsule_fill(struct umbra_sdf const *s, void *uniforms) {
-    struct capsule_sdf const *self = (struct capsule_sdf const *)s;
-    float const r = self->orbit.r_center * 0.15f;
-    float const vals[5] = {self->orbit.cx, self->orbit.cy,
-                           self->orbit.ox, self->orbit.oy, r};
-    umbra_uniforms_fill_f32(uniforms, self->capsule_off, vals, 5);
+struct capsule_slide {
+    struct slide base;
+    int w, h;
+
+    struct umbra_shader      *shader;
+    struct capsule_sdf        sdf;
+
+    struct umbra_fmt          fmt;
+    struct umbra_sdf_draw    *disp;
+};
+
+static void capsule_init(struct slide *s, int w, int h) {
+    struct capsule_slide *st = (struct capsule_slide *)s;
+    st->w = w;
+    st->h = h;
+}
+
+static void capsule_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
+    struct capsule_slide *st = (struct capsule_slide *)s;
+    umbra_sdf_draw_free(st->disp);
+    st->fmt  = fmt;
+    st->disp = umbra_sdf_draw(be, &st->sdf.base,
+                                  (struct umbra_sdf_draw_config){.hard_edge = 0},
+                                  st->shader, umbra_blend_srcover, fmt);
+    slide_bg_prepare(be, fmt, st->w, st->h);
+}
+
+static void capsule_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
+    struct capsule_slide *st = (struct capsule_slide *)s;
+    slide_bg_draw(s->bg, l, t, r, b, buf);
+    float cx, cy, ox, oy, r_center, r_orbit;
+    orbit_compute(&cx, &cy, &ox, &oy, &r_center, &r_orbit, (float)secs, st->w, st->h);
+    st->sdf.p0x = cx; st->sdf.p0y = cy;
+    st->sdf.p1x = ox; st->sdf.p1y = oy;
+    st->sdf.rad = r_center * 0.15f;
+    struct umbra_buf ubuf[] = {
+        {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
+        umbra_sdf_uniforms(&st->sdf.base),
+        umbra_shader_uniforms(st->shader),
+    };
+    umbra_sdf_draw_queue(st->disp, l, t, r, b, ubuf);
+}
+
+static int capsule_get_builders(struct slide *s, struct umbra_fmt fmt,
+                                struct umbra_builder **out, int max) {
+    if (max < 1) { return 0; }
+    struct capsule_slide *st = (struct capsule_slide *)s;
+    struct umbra_coverage *adapter = umbra_sdf_coverage(&st->sdf.base, 0);
+    out[0] = umbra_draw_builder(adapter, st->shader, umbra_blend_srcover, fmt);
+    umbra_coverage_free(adapter);
+    return out[0] ? 1 : 0;
+}
+
+static void capsule_free(struct slide *s) {
+    struct capsule_slide *st = (struct capsule_slide *)s;
+    umbra_sdf_draw_free(st->disp);
+    umbra_shader_free(st->shader);
+    free(st);
 }
 
 SLIDE(slide_sdf_capsule) {
-    struct csg_slide *st = calloc(1, sizeof *st);
+    struct capsule_slide *st = calloc(1, sizeof *st);
     st->shader = umbra_shader_solid((umbra_color){0.9f, 0.3f, 0.6f, 1});
-    struct capsule_sdf *cap = (struct capsule_sdf *)&st->sdf;
-    cap->base = (struct umbra_sdf){.build = capsule_build, .fill = capsule_fill};
+    st->sdf.base = (struct umbra_sdf){
+        .build          = capsule_build,
+        .uniforms_slots = (int)((sizeof(struct capsule_sdf) - sizeof(struct umbra_sdf)) / 4),
+    };
     st->base = (struct slide){
         .title = "SDF Capsule",
         .bg = {0.08f, 0.10f, 0.14f, 1},
-        .init = csg_init,
-        .prepare = csg_prepare,
-        .draw = csg_draw,
-        .free = csg_free,
-        .get_builders = csg_get_builders,
+        .init = capsule_init,
+        .prepare = capsule_prepare,
+        .draw = capsule_draw,
+        .free = capsule_free,
+        .get_builders = capsule_get_builders,
     };
     return &st->base;
 }
 
 struct halfplane_sdf {
     struct umbra_sdf base;
-    struct orbit     orbit;
-    int              halfplane_off, pad;
+    float            nx, ny, d;
+    int              :32;
 };
 
 static umbra_interval halfplane_build(struct umbra_sdf *s, struct umbra_builder *b,
-                                       struct umbra_uniforms_layout *u,
                                        int buf_index,
                                        umbra_interval x, umbra_interval y) {
     struct halfplane_sdf *self = (struct halfplane_sdf *)s;
-    self->halfplane_off = umbra_uniforms_reserve_f32(u, 3);
     umbra_ptr32 const u_ptr = {.ix = buf_index};
-    umbra_interval const nx = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->halfplane_off)),
-                         ny = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->halfplane_off + 1)),
-                         d  = umbra_interval_exact(umbra_uniform_32(b, u_ptr, self->halfplane_off + 2));
+    umbra_interval const nx = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(nx))),
+                         ny = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(ny))),
+                         d  = umbra_interval_exact(umbra_uniform_32(b, u_ptr, SLOT(d)));
     return umbra_interval_sub_f32(b,
                umbra_interval_add_f32(b,
                    umbra_interval_mul_f32(b, nx, x),
@@ -479,31 +562,83 @@ static umbra_interval halfplane_build(struct umbra_sdf *s, struct umbra_builder 
                d);
 }
 
-static void halfplane_fill(struct umbra_sdf const *s, void *uniforms) {
-    struct halfplane_sdf const *self = (struct halfplane_sdf const *)s;
-    float const dx = self->orbit.ox - self->orbit.cx,
-                dy = self->orbit.oy - self->orbit.cy;
+struct halfplane_slide {
+    struct slide base;
+    int w, h;
+
+    struct umbra_shader      *shader;
+    struct halfplane_sdf      sdf;
+
+    struct umbra_fmt          fmt;
+    struct umbra_sdf_draw    *disp;
+};
+
+static void halfplane_init(struct slide *s, int w, int h) {
+    struct halfplane_slide *st = (struct halfplane_slide *)s;
+    st->w = w;
+    st->h = h;
+}
+
+static void halfplane_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
+    struct halfplane_slide *st = (struct halfplane_slide *)s;
+    umbra_sdf_draw_free(st->disp);
+    st->fmt  = fmt;
+    st->disp = umbra_sdf_draw(be, &st->sdf.base,
+                                  (struct umbra_sdf_draw_config){.hard_edge = 0},
+                                  st->shader, umbra_blend_srcover, fmt);
+    slide_bg_prepare(be, fmt, st->w, st->h);
+}
+
+static void halfplane_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
+    struct halfplane_slide *st = (struct halfplane_slide *)s;
+    slide_bg_draw(s->bg, l, t, r, b, buf);
+    float cx, cy, ox, oy, r_center, r_orbit;
+    orbit_compute(&cx, &cy, &ox, &oy, &r_center, &r_orbit, (float)secs, st->w, st->h);
+    float const dx = ox - cx, dy = oy - cy;
     float const len = sqrtf(dx * dx + dy * dy);
-    float const nx = len > 0 ? dy / len : 0,
-                ny = len > 0 ? -dx / len : 1;
-    float const d = nx * self->orbit.cx + ny * self->orbit.cy;
-    float const vals[3] = {nx, ny, d};
-    umbra_uniforms_fill_f32(uniforms, self->halfplane_off, vals, 3);
+    st->sdf.nx = len > 0 ? dy / len : 0;
+    st->sdf.ny = len > 0 ? -dx / len : 1;
+    st->sdf.d  = st->sdf.nx * cx + st->sdf.ny * cy;
+    struct umbra_buf ubuf[] = {
+        {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
+        umbra_sdf_uniforms(&st->sdf.base),
+        umbra_shader_uniforms(st->shader),
+    };
+    umbra_sdf_draw_queue(st->disp, l, t, r, b, ubuf);
+}
+
+static int halfplane_get_builders(struct slide *s, struct umbra_fmt fmt,
+                                  struct umbra_builder **out, int max) {
+    if (max < 1) { return 0; }
+    struct halfplane_slide *st = (struct halfplane_slide *)s;
+    struct umbra_coverage *adapter = umbra_sdf_coverage(&st->sdf.base, 0);
+    out[0] = umbra_draw_builder(adapter, st->shader, umbra_blend_srcover, fmt);
+    umbra_coverage_free(adapter);
+    return out[0] ? 1 : 0;
+}
+
+static void halfplane_free(struct slide *s) {
+    struct halfplane_slide *st = (struct halfplane_slide *)s;
+    umbra_sdf_draw_free(st->disp);
+    umbra_shader_free(st->shader);
+    free(st);
 }
 
 SLIDE(slide_sdf_halfplane) {
-    struct csg_slide *st = calloc(1, sizeof *st);
+    struct halfplane_slide *st = calloc(1, sizeof *st);
     st->shader = umbra_shader_solid((umbra_color){0.3f, 0.7f, 0.9f, 1});
-    struct halfplane_sdf *hp = (struct halfplane_sdf *)&st->sdf;
-    hp->base = (struct umbra_sdf){.build = halfplane_build, .fill = halfplane_fill};
+    st->sdf.base = (struct umbra_sdf){
+        .build          = halfplane_build,
+        .uniforms_slots = (int)((sizeof(struct halfplane_sdf) - sizeof(struct umbra_sdf)) / 4),
+    };
     st->base = (struct slide){
         .title = "SDF Halfplane",
         .bg = {0.08f, 0.10f, 0.14f, 1},
-        .init = csg_init,
-        .prepare = csg_prepare,
-        .draw = csg_draw,
-        .free = csg_free,
-        .get_builders = csg_get_builders,
+        .init = halfplane_init,
+        .prepare = halfplane_prepare,
+        .draw = halfplane_draw,
+        .free = halfplane_free,
+        .get_builders = halfplane_get_builders,
     };
     return &st->base;
 }
@@ -520,32 +655,28 @@ SLIDE(slide_sdf_halfplane) {
 // and outlines to double-stroked outlines.
 
 struct sdf_text_sdf {
-    struct umbra_sdf    base;
-    struct slug_curves  curves;
-    float               scale_x, scale_y, off_x, off_y;
-    int                 curves_off, params_off;
-    int                 w, h;
+    struct umbra_sdf base;
+    float            scale_x, scale_y, off_x, off_y;
+    int              n_curves, :32;
+    struct umbra_buf curves;
 };
 
 static umbra_interval sdf_text_build(struct umbra_sdf *s, struct umbra_builder *b,
-                                      struct umbra_uniforms_layout *u,
                                       int buf_index,
                                       umbra_interval x, umbra_interval y) {
     struct sdf_text_sdf *self = (struct sdf_text_sdf *)s;
-    self->curves_off = umbra_uniforms_reserve_ptr(u);
-    self->params_off = umbra_uniforms_reserve_f32(u, 5);
     umbra_ptr32 const u_ptr = {.ix = buf_index};
-    umbra_ptr32 const data = umbra_deref_ptr32(b, u_ptr, self->curves_off);
-    umbra_val32 const n    = umbra_uniform_32(b, u_ptr, self->params_off);
+    umbra_ptr32 const data = umbra_deref_ptr32(b, u_ptr, SLOT(curves));
+    umbra_val32 const n    = umbra_uniform_32(b, u_ptr, SLOT(n_curves));
 
     umbra_interval const sx = umbra_interval_exact(
-                                  umbra_uniform_32(b, u_ptr, self->params_off + 1)),
+                                  umbra_uniform_32(b, u_ptr, SLOT(scale_x))),
                          sy = umbra_interval_exact(
-                                  umbra_uniform_32(b, u_ptr, self->params_off + 2)),
+                                  umbra_uniform_32(b, u_ptr, SLOT(scale_y))),
                          ox = umbra_interval_exact(
-                                  umbra_uniform_32(b, u_ptr, self->params_off + 3)),
+                                  umbra_uniform_32(b, u_ptr, SLOT(off_x))),
                          oy = umbra_interval_exact(
-                                  umbra_uniform_32(b, u_ptr, self->params_off + 4));
+                                  umbra_uniform_32(b, u_ptr, SLOT(off_y)));
 
     umbra_interval const gx = umbra_interval_add_f32(b, umbra_interval_mul_f32(b, x, sx), ox),
                          gy = umbra_interval_add_f32(b, umbra_interval_mul_f32(b, y, sy), oy);
@@ -616,36 +747,26 @@ static umbra_interval sdf_text_build(struct umbra_sdf *s, struct umbra_builder *
     return umbra_interval_sub_f32(b, min_dist, umbra_interval_exact(umbra_imm_f32(b, 1.5f)));
 }
 
-static void sdf_text_fill(struct umbra_sdf const *s, void *uniforms) {
-    struct sdf_text_sdf const *self = (struct sdf_text_sdf const *)s;
-    umbra_uniforms_fill_ptr(uniforms, self->curves_off,
-                            (struct umbra_buf){.ptr = self->curves.data,
-                                               .count = self->curves.count * 6});
-    umbra_uniforms_fill_i32(uniforms, self->params_off, &self->curves.count, 1);
-    float const vals[4] = {self->scale_x, self->scale_y, self->off_x, self->off_y};
-    umbra_uniforms_fill_f32(uniforms, self->params_off + 1, vals, 4);
-}
-
 struct sdf_text_slide {
     struct slide base;
     int w, h;
 
+    struct slug_curves        slug;
     struct umbra_shader      *shader;
     struct sdf_text_sdf       sdf;
 
     struct umbra_fmt          fmt;
-    struct umbra_draw_layout  lay;
-    struct umbra_sdf_draw *disp;
+    struct umbra_sdf_draw    *disp;
 };
 
 static void sdf_text_init(struct slide *s, int w, int h) {
     struct sdf_text_slide *st = (struct sdf_text_slide *)s;
     st->w = w;
     st->h = h;
-    st->sdf.curves = slug_extract("Hamburgefons", (float)h * 0.4f);
+    st->slug = slug_extract("Hamburgefons", (float)h * 0.4f);
 
-    float const gw = st->sdf.curves.w,
-                gh = st->sdf.curves.h;
+    float const gw = st->slug.w,
+                gh = st->slug.h;
     float const sx = gw / (float)w,
                 sy = gh / (float)h;
     float const scale = sx > sy ? sx : sy;
@@ -655,18 +776,18 @@ static void sdf_text_init(struct slide *s, int w, int h) {
     st->sdf.scale_y = scale;
     st->sdf.off_x   = -pad_x;
     st->sdf.off_y   = -pad_y;
-    st->sdf.w = w;
-    st->sdf.h = h;
+    st->sdf.n_curves = st->slug.count;
+    st->sdf.curves   = (struct umbra_buf){.ptr = st->slug.data,
+                                           .count = st->slug.count * 6};
 }
 
 static void sdf_text_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
     struct sdf_text_slide *st = (struct sdf_text_slide *)s;
     umbra_sdf_draw_free(st->disp);
-    free(st->lay.uniforms);
     st->fmt  = fmt;
     st->disp = umbra_sdf_draw(be, &st->sdf.base,
                                   (struct umbra_sdf_draw_config){.hard_edge = 0},
-                                  st->shader, umbra_blend_srcover, fmt, &st->lay);
+                                  st->shader, umbra_blend_srcover, fmt);
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
@@ -674,10 +795,10 @@ static void sdf_text_draw(struct slide *s, double secs, int l, int t, int r, int
     (void)secs;
     struct sdf_text_slide *st = (struct sdf_text_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
-    umbra_sdf_draw_fill(&st->lay, &st->sdf.base, st->shader);
     struct umbra_buf ubuf[] = {
-        {.ptr = st->lay.uniforms, .count = st->lay.uni.slots},
         {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
+        umbra_sdf_uniforms(&st->sdf.base),
+        umbra_shader_uniforms(st->shader),
     };
     umbra_sdf_draw_queue(st->disp, l, t, r, b, ubuf);
 }
@@ -688,7 +809,7 @@ static int sdf_text_get_builders(struct slide *s, struct umbra_fmt fmt,
     struct sdf_text_slide *st = (struct sdf_text_slide *)s;
     struct umbra_coverage *adapter = umbra_sdf_coverage(&st->sdf.base, 0);
     out[0] = umbra_draw_builder(adapter, st->shader,
-                                umbra_blend_srcover, fmt, NULL);
+                                umbra_blend_srcover, fmt);
     umbra_coverage_free(adapter);
     return out[0] ? 1 : 0;
 }
@@ -696,8 +817,7 @@ static int sdf_text_get_builders(struct slide *s, struct umbra_fmt fmt,
 static void sdf_text_free(struct slide *s) {
     struct sdf_text_slide *st = (struct sdf_text_slide *)s;
     umbra_sdf_draw_free(st->disp);
-    free(st->lay.uniforms);
-    slug_free(&st->sdf.curves);
+    slug_free(&st->slug);
     umbra_shader_free(st->shader);
     free(st);
 }
@@ -705,7 +825,10 @@ static void sdf_text_free(struct slide *s) {
 SLIDE(slide_sdf_text) {
     struct sdf_text_slide *st = calloc(1, sizeof *st);
     st->shader = umbra_shader_solid((umbra_color){0.95f, 0.9f, 0.8f, 1});
-    st->sdf.base = (struct umbra_sdf){.build = sdf_text_build, .fill = sdf_text_fill};
+    st->sdf.base = (struct umbra_sdf){
+        .build          = sdf_text_build,
+        .uniforms_slots = (int)((sizeof(struct sdf_text_sdf) - sizeof(struct umbra_sdf)) / 4),
+    };
     st->base = (struct slide){
         .title = "SDF Text (analytic)",
         .bg = {0.08f, 0.10f, 0.14f, 1},
@@ -722,21 +845,17 @@ SLIDE(slide_sdf_text) {
 
 struct ngon_sdf {
     struct umbra_sdf base;
-    float cx, cy, r, angle;
-    float *hp_data;
-    int   hp_off, count_off;
+    int              n_sides, :32;
+    struct umbra_buf hp;
 };
 
 static umbra_interval ngon_build(struct umbra_sdf *s, struct umbra_builder *b,
-                                  struct umbra_uniforms_layout *u,
                                   int buf_index,
                                   umbra_interval x, umbra_interval y) {
     struct ngon_sdf *self = (struct ngon_sdf *)s;
-    self->hp_off    = umbra_uniforms_reserve_ptr(u);
-    self->count_off = umbra_uniforms_reserve_f32(u, 1);
     umbra_ptr32 const u_ptr = {.ix = buf_index};
-    umbra_ptr32 const data = umbra_deref_ptr32(b, u_ptr, self->hp_off);
-    umbra_val32 const n    = umbra_uniform_32(b, u_ptr, self->count_off);
+    umbra_ptr32 const data = umbra_deref_ptr32(b, u_ptr, SLOT(hp));
+    umbra_val32 const n    = umbra_uniform_32(b, u_ptr, SLOT(n_sides));
 
     struct umbra_var32 lo_var = umbra_var32(b);
     struct umbra_var32 hi_var = umbra_var32(b);
@@ -764,40 +883,17 @@ static umbra_interval ngon_build(struct umbra_sdf *s, struct umbra_builder *b,
     return (umbra_interval){umbra_load_var32(b, lo_var), umbra_load_var32(b, hi_var)};
 }
 
-static void ngon_fill(struct umbra_sdf const *s, void *uniforms) {
-    struct ngon_sdf const *self = (struct ngon_sdf const *)s;
-    for (int i = 0; i < NGON_SIDES; i++) {
-        float const a = self->angle + (float)i * (2.0f * 3.14159265f / NGON_SIDES);
-        float const vx = self->cx + self->r * cosf(a),
-                    vy = self->cy + self->r * sinf(a);
-        float const a2 = self->angle + (float)(i + 1) * (2.0f * 3.14159265f / NGON_SIDES);
-        float const wx = self->cx + self->r * cosf(a2),
-                    wy = self->cy + self->r * sinf(a2);
-        float const ex = wx - vx,
-                    ey = wy - vy;
-        float const len = sqrtf(ex * ex + ey * ey);
-        float const nx = len > 0 ? ey / len : 0,
-                    ny = len > 0 ? -ex / len : 1;
-        self->hp_data[i * 3]     = nx;
-        self->hp_data[i * 3 + 1] = ny;
-        self->hp_data[i * 3 + 2] = nx * vx + ny * vy;
-    }
-    int const n = NGON_SIDES;
-    umbra_uniforms_fill_ptr(uniforms, self->hp_off,
-                            (struct umbra_buf){.ptr = self->hp_data, .count = 3 * NGON_SIDES});
-    umbra_uniforms_fill_i32(uniforms, self->count_off, &n, 1);
-}
-
 struct ngon_slide {
     struct slide base;
     int w, h;
+    float cx, cy, r, angle;
+    float *hp_data;
 
     struct umbra_shader      *shader;
     struct ngon_sdf           sdf;
 
     struct umbra_fmt          fmt;
-    struct umbra_draw_layout  lay;
-    struct umbra_sdf_draw *disp;
+    struct umbra_sdf_draw    *disp;
 };
 
 static void ngon_init(struct slide *s, int w, int h) {
@@ -809,25 +905,42 @@ static void ngon_init(struct slide *s, int w, int h) {
 static void ngon_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
     struct ngon_slide *st = (struct ngon_slide *)s;
     umbra_sdf_draw_free(st->disp);
-    free(st->lay.uniforms);
     st->fmt  = fmt;
     st->disp = umbra_sdf_draw(be, &st->sdf.base,
                                   (struct umbra_sdf_draw_config){.hard_edge = 0},
-                                  st->shader, umbra_blend_srcover, fmt, &st->lay);
+                                  st->shader, umbra_blend_srcover, fmt);
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
 static void ngon_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct ngon_slide *st = (struct ngon_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
-    st->sdf.cx    = (float)st->w * 0.5f;
-    st->sdf.cy    = (float)st->h * 0.5f;
-    st->sdf.r     = (float)(st->w < st->h ? st->w : st->h) * 0.3f;
-    st->sdf.angle = (float)secs;
-    umbra_sdf_draw_fill(&st->lay, &st->sdf.base, st->shader);
+    st->cx    = (float)st->w * 0.5f;
+    st->cy    = (float)st->h * 0.5f;
+    st->r     = (float)(st->w < st->h ? st->w : st->h) * 0.3f;
+    st->angle = (float)secs;
+    for (int i = 0; i < NGON_SIDES; i++) {
+        float const a = st->angle + (float)i * (2.0f * 3.14159265f / NGON_SIDES);
+        float const vx = st->cx + st->r * cosf(a),
+                    vy = st->cy + st->r * sinf(a);
+        float const a2 = st->angle + (float)(i + 1) * (2.0f * 3.14159265f / NGON_SIDES);
+        float const wx = st->cx + st->r * cosf(a2),
+                    wy = st->cy + st->r * sinf(a2);
+        float const ex = wx - vx,
+                    ey = wy - vy;
+        float const len = sqrtf(ex * ex + ey * ey);
+        float const nx = len > 0 ? ey / len : 0,
+                    ny = len > 0 ? -ex / len : 1;
+        st->hp_data[i * 3]     = nx;
+        st->hp_data[i * 3 + 1] = ny;
+        st->hp_data[i * 3 + 2] = nx * vx + ny * vy;
+    }
+    st->sdf.n_sides = NGON_SIDES;
+    st->sdf.hp      = (struct umbra_buf){.ptr = st->hp_data, .count = 3 * NGON_SIDES};
     struct umbra_buf ubuf[] = {
-        {.ptr = st->lay.uniforms, .count = st->lay.uni.slots},
         {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
+        umbra_sdf_uniforms(&st->sdf.base),
+        umbra_shader_uniforms(st->shader),
     };
     umbra_sdf_draw_queue(st->disp, l, t, r, b, ubuf);
 }
@@ -838,7 +951,7 @@ static int ngon_get_builders(struct slide *s, struct umbra_fmt fmt,
     struct ngon_slide *st = (struct ngon_slide *)s;
     struct umbra_coverage *adapter = umbra_sdf_coverage(&st->sdf.base, 0);
     out[0] = umbra_draw_builder(adapter, st->shader,
-                                umbra_blend_srcover, fmt, NULL);
+                                umbra_blend_srcover, fmt);
     umbra_coverage_free(adapter);
     return out[0] ? 1 : 0;
 }
@@ -846,8 +959,7 @@ static int ngon_get_builders(struct slide *s, struct umbra_fmt fmt,
 static void ngon_free(struct slide *s) {
     struct ngon_slide *st = (struct ngon_slide *)s;
     umbra_sdf_draw_free(st->disp);
-    free(st->lay.uniforms);
-    free(st->sdf.hp_data);
+    free(st->hp_data);
     umbra_shader_free(st->shader);
     free(st);
 }
@@ -855,8 +967,11 @@ static void ngon_free(struct slide *s) {
 SLIDE(slide_sdf_ngon) {
     struct ngon_slide *st = calloc(1, sizeof *st);
     st->shader = umbra_shader_solid((umbra_color){0.8f, 0.8f, 0.2f, 1});
-    st->sdf.hp_data = malloc(3 * NGON_SIDES * sizeof(float));
-    st->sdf.base = (struct umbra_sdf){.build = ngon_build, .fill = ngon_fill};
+    st->hp_data = malloc(3 * NGON_SIDES * sizeof(float));
+    st->sdf.base = (struct umbra_sdf){
+        .build          = ngon_build,
+        .uniforms_slots = (int)((sizeof(struct ngon_sdf) - sizeof(struct umbra_sdf)) / 4),
+    };
     st->base = (struct slide){
         .title = "SDF Hexagon (n-gon)",
         .bg = {0.08f, 0.10f, 0.14f, 1},

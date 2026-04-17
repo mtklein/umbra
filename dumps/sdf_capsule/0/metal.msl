@@ -2,32 +2,33 @@
 using namespace metal;
 
 
-struct meta { uint w, x0, y0, count0, count1, stride0, stride1; };
+struct meta { uint w, x0, y0, count0, count1, count2, stride0, stride1, stride2; };
 
 kernel void main0(
     constant meta &m [[buffer(0)]],
-    device const uint * __restrict p0 [[buffer(1)]],
-    device half4 * __restrict p1 [[buffer(2)]],
+    device half4 * __restrict p0 [[buffer(1)]],
+    device const uint * __restrict p1 [[buffer(2)]],
+    device const uint * __restrict p2 [[buffer(3)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
     if (pos.x >= m.w) return;
     uint x = m.x0 + pos.x;
     uint y = m.y0 + pos.y;
     uint v0 = 0u;
-    uint v1 = p0[0];
-    uint v2 = p0[1];
-    uint v3 = p0[2];
-    uint v4 = p0[3];
-    uint v5 = p0[4];
+    uint v1 = p1[0];
+    uint v2 = p1[1];
+    uint v3 = p1[2];
+    uint v4 = p1[3];
+    uint v5 = p1[4];
     float v6 = as_type<float>(v3) - as_type<float>(v1);
     float v7 = as_type<float>(v4) - as_type<float>(v2);
     float v8 = v7 * v7;
     float v9 = fma(v6, v6, v8);
     uint v10 = 1065353216u;
-    uint v11 = p0[5];
-    uint v12 = p0[6];
-    uint v13 = p0[7];
-    uint v14 = p0[8];
+    uint v11 = p2[0];
+    uint v12 = p2[1];
+    uint v13 = p2[2];
+    uint v14 = p2[3];
     float v15 = as_type<float>(v10) - as_type<float>(v14);
     uint v16 = m.x0 + pos.x;
     float v17 = (float)(int)v16;
@@ -53,7 +54,7 @@ kernel void main0(
     float v37 = as_type<float>(v0) - v36;
     float v38 = max(v37, as_type<float>(0u));
     float v39 = min(v38, as_type<float>(1065353216u));
-    half4 _px40 = p1[y * m.stride1 + x];
+    half4 _px40 = p0[y * m.stride0 + x];
     uint v40 = (uint)as_type<ushort>(_px40.x);
     uint v40_1 = (uint)as_type<ushort>(_px40.y);
     uint v40_2 = (uint)as_type<ushort>(_px40.z);
@@ -78,5 +79,5 @@ kernel void main0(
     uint v58 = (uint)as_type<ushort>((half)v52);
     uint v59 = (uint)as_type<ushort>((half)v48);
     uint v60 = (uint)as_type<ushort>((half)v44);
-    p1[y * m.stride1 + x] = half4(as_type<half>((ushort)v60), as_type<half>((ushort)v59), as_type<half>((ushort)v58), as_type<half>((ushort)v57));
+    p0[y * m.stride0 + x] = half4(as_type<half>((ushort)v60), as_type<half>((ushort)v59), as_type<half>((ushort)v58), as_type<half>((ushort)v57));
 }

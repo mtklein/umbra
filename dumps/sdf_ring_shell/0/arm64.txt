@@ -28,9 +28,9 @@ Critical sequence based on the simulation:
  |
  |      0.    dup.4s	v12, w9
  |      1.    mov.16b	v13, v12
- +----> 2.    ldr	q14, #1048                        ## RESOURCE interference:  CyUnitLS [ probability: 99% ]
+ +----> 2.    ldr	q14, #1064                        ## RESOURCE interference:  CyUnitLS [ probability: 99% ]
  |      3.    add.4s	v12, v12, v14
- +----> 4.    ldr	q14, #1064                        ## RESOURCE interference:  CyUnitLS [ probability: 100% ]
+ +----> 4.    ldr	q14, #1080                        ## RESOURCE interference:  CyUnitLS [ probability: 100% ]
  |      5.    add.4s	v13, v13, v14
  |      6.    scvtf.4s	v12, v12
  |      7.    scvtf.4s	v13, v13
@@ -64,8 +64,8 @@ Critical sequence based on the simulation:
  |      35.   fmaxnm.4s	v15, v5, v15
  |      36.   fminnm.4s	v14, v24, v14
  |      37.   fminnm.4s	v15, v25, v15
- |      38.   ldr	x8, [x2, #16]
- |      39.   ldr	w10, [x2, #28]
+ |      38.   ldr	x8, [x2]
+ |      39.   ldr	w10, [x2, #12]
  |      40.   lsl	x10, x10, #3
  |      41.   madd	x8, x14, x10, x8
  |      42.   str	q16, [x15]
@@ -181,9 +181,9 @@ Instruction Info:
 [1]    [2]    [3]    [4]    [5]    [6]    Instructions:
  2      7     0.50                        dup.4s	v12, w9
  1      2     0.33                        mov.16b	v13, v12
- 1      4     0.50    *                   ldr	q14, #1048
- 1      2     0.33                        add.4s	v12, v12, v14
  1      4     0.50    *                   ldr	q14, #1064
+ 1      2     0.33                        add.4s	v12, v12, v14
+ 1      4     0.50    *                   ldr	q14, #1080
  1      2     0.33                        add.4s	v13, v13, v14
  1      2     0.33                        scvtf.4s	v12, v12
  1      2     0.33                        scvtf.4s	v13, v13
@@ -217,8 +217,8 @@ Instruction Info:
  1      3     0.33                        fmaxnm.4s	v15, v5, v15
  1      3     0.33                        fminnm.4s	v14, v24, v14
  1      3     0.33                        fminnm.4s	v15, v25, v15
- 1      4     0.50    *                   ldr	x8, [x2, #16]
- 1      4     0.50    *                   ldr	w10, [x2, #28]
+ 1      4     0.50    *                   ldr	x8, [x2]
+ 1      4     0.50    *                   ldr	w10, [x2, #12]
  1      1     0.50                        lsl	x10, x10, #3
  1      5     1.00                        madd	x8, x14, x10, x8
  1      4     0.50           *            str	q16, [x15]
@@ -353,9 +353,9 @@ Resource pressure by instruction:
 [0.0]  [0.1]  [1]    [2.0]  [2.1]  [3.0]  [3.1]  [3.2]  [3.3]  [4]    [5]    [6.0]  [6.1]  [7]    [8.0]  [8.1]  [9.0]  [9.1]  [9.2]  [10]   [11]   [12.0] [12.1] Instructions:
  -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.66   0.33   0.33   0.34    -      -      -      -     dup.4s	v12, w9
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.36   0.32   0.32    -      -      -      -     mov.16b	v13, v12
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.65    -      -      -      -      -      -      -     ldr	q14, #1048
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.35   0.65    -      -      -      -      -      -      -     ldr	q14, #1064
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.32   0.36    -      -      -      -     add.4s	v12, v12, v14
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.65   0.35    -      -      -      -      -      -      -     ldr	q14, #1064
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.65   0.35    -      -      -      -      -      -      -     ldr	q14, #1080
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.33   0.35    -      -      -      -     add.4s	v13, v13, v14
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.36   0.30    -      -      -      -     scvtf.4s	v12, v12
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.30   0.35   0.35    -      -      -      -     scvtf.4s	v13, v13
@@ -389,8 +389,8 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.34   0.32    -      -      -      -     fmaxnm.4s	v15, v5, v15
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.32   0.35   0.33    -      -      -      -     fminnm.4s	v14, v24, v14
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.33   0.33    -      -      -      -     fminnm.4s	v15, v25, v15
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.66    -      -      -      -      -      -      -     ldr	x8, [x2, #16]
- -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.66   0.34    -      -      -      -      -      -      -     ldr	w10, [x2, #28]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.66    -      -      -      -      -      -      -     ldr	x8, [x2]
+ -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.66   0.34    -      -      -      -      -      -      -     ldr	w10, [x2, #12]
  -      -      -      -      -      -      -     1.00    -      -      -     0.50   0.50    -      -      -      -      -      -      -      -      -      -     lsl	x10, x10, #3
 0.50   0.50   1.00    -      -      -     1.00    -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     madd	x8, x14, x10, x8
  -      -      -      -      -      -      -      -      -      -      -      -      -      -     0.67   0.33    -      -      -      -      -      -      -     str	q16, [x15]

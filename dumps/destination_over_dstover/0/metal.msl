@@ -2,27 +2,28 @@
 using namespace metal;
 
 
-struct meta { uint w, x0, y0, count0, count1, stride0, stride1; };
+struct meta { uint w, x0, y0, count0, count1, count2, stride0, stride1, stride2; };
 
 kernel void main0(
     constant meta &m [[buffer(0)]],
-    device const uint * __restrict p0 [[buffer(1)]],
-    device half4 * __restrict p1 [[buffer(2)]],
+    device half4 * __restrict p0 [[buffer(1)]],
+    device const uint * __restrict p1 [[buffer(2)]],
+    device const uint * __restrict p2 [[buffer(3)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
     if (pos.x >= m.w) return;
     uint x = m.x0 + pos.x;
     uint y = m.y0 + pos.y;
     uint v0 = 0u;
-    uint v1 = p0[0];
-    uint v2 = p0[1];
-    uint v3 = p0[2];
-    uint v4 = p0[3];
+    uint v1 = p1[0];
+    uint v2 = p1[1];
+    uint v3 = p1[2];
+    uint v4 = p1[3];
     uint v5 = 1065353216u;
-    uint v6 = p0[4];
-    uint v7 = p0[5];
-    uint v8 = p0[6];
-    uint v9 = p0[7];
+    uint v6 = p2[0];
+    uint v7 = p2[1];
+    uint v8 = p2[2];
+    uint v9 = p2[3];
     uint v10 = m.x0 + pos.x;
     float v11 = (float)(int)v10;
     float v12 = v11 + as_type<float>(1056964608u);
@@ -38,7 +39,7 @@ kernel void main0(
     float v22 = max(v21, v18);
     uint v23 = v22 <  as_type<float>(0u) ? 0xffffffffu : 0u;
     uint v24 = (v23 != 0u) ? v5 : v0;
-    half4 _px25 = p1[y * m.stride1 + x];
+    half4 _px25 = p0[y * m.stride0 + x];
     uint v25 = (uint)as_type<ushort>(_px25.x);
     uint v25_1 = (uint)as_type<ushort>(_px25.y);
     uint v25_2 = (uint)as_type<ushort>(_px25.z);
@@ -64,5 +65,5 @@ kernel void main0(
     uint v44 = (uint)as_type<ushort>((half)v40);
     uint v45 = (uint)as_type<ushort>((half)v36);
     uint v46 = (uint)as_type<ushort>((half)v32);
-    p1[y * m.stride1 + x] = half4(as_type<half>((ushort)v46), as_type<half>((ushort)v45), as_type<half>((ushort)v44), as_type<half>((ushort)v43));
+    p0[y * m.stride0 + x] = half4(as_type<half>((ushort)v46), as_type<half>((ushort)v45), as_type<half>((ushort)v44), as_type<half>((ushort)v43));
 }

@@ -944,15 +944,10 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     __builtin_memcpy(&v->i32, tmp, sizeof v->i32);
                 } NEXT;
                 CASE(op_deref_ptr) {
-                    uint32_t const *uni = (uint32_t const*)buf[ip->ptr].ptr;
-                    void *derived;
-                    int   dcount, dstride;
-                    __builtin_memcpy(&derived, uni + ip->x,     sizeof derived);
-                    __builtin_memcpy(&dcount,  uni + ip->x + 2, sizeof dcount);
-                    __builtin_memcpy(&dstride, uni + ip->x + 3, sizeof dstride);
-                    buf[ip->y].ptr    = derived;
-                    buf[ip->y].count  = dcount;
-                    buf[ip->y].stride = dstride;
+                    char const *uni = (char const*)buf[ip->ptr].ptr + ip->x * 4;
+                    struct umbra_buf src;
+                    __builtin_memcpy(&src, uni, sizeof src);
+                    buf[ip->y] = src;
                 } NEXT;
 
                 CASE(op_loop_begin) {

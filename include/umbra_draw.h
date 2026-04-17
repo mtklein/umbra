@@ -2,16 +2,6 @@
 #include "umbra.h"
 #include "umbra_interval.h"
 
-// TODO: rethink how effects like coverage/shader/sdf and systems that use them
-// communicate their uniforms.  can we radically simplify by having them told
-// what niform buffer index to use as part of the request to fill out the
-// builder, and then later have them provide a umbra_buf pointing directly into
-// their own managed memory?  things would probably trend towards one
-// destination buffer at ix=0, and then a bunch of little uniform buffers at
-// 1,2.., one for each effect in the system.  key signs of a good refactor are
-// fewer types like umbra_uniforms_layout and umbra_draw_layout needed, ideally
-// no calls to fill at all (rather, buffers just point to the uniforms directly).
-
 typedef struct {
     float x, y;
 } umbra_point;
@@ -65,36 +55,36 @@ void              umbra_store_fp16_planar(struct umbra_builder*, umbra_ptr16, um
 struct umbra_shader {
     umbra_color_val32 (*build)(struct umbra_shader*,
                                struct umbra_builder*,
-                               struct umbra_uniforms_layout*,
                                int buf_index,
                                umbra_val32 x, umbra_val32 y);
-    void (*fill)(struct umbra_shader const*, void *uniforms);
     void (*free)(struct umbra_shader*);
+    int  uniforms_slots, :32;
 };
-void umbra_shader_free(struct umbra_shader*);
+void             umbra_shader_free    (struct umbra_shader*);
+struct umbra_buf umbra_shader_uniforms(struct umbra_shader const*);
 
 struct umbra_coverage {
     umbra_val32 (*build)(struct umbra_coverage*,
                          struct umbra_builder*,
-                         struct umbra_uniforms_layout*,
                          int buf_index,
                          umbra_val32 x, umbra_val32 y);
-    void (*fill)(struct umbra_coverage const*, void *uniforms);
     void (*free)(struct umbra_coverage*);
+    int  uniforms_slots, :32;
 };
-void umbra_coverage_free(struct umbra_coverage*);
+void             umbra_coverage_free    (struct umbra_coverage*);
+struct umbra_buf umbra_coverage_uniforms(struct umbra_coverage const*);
 
 // Signed distance function returning f(x,y) where f < 0 means inside.
 struct umbra_sdf {
     umbra_interval (*build)(struct umbra_sdf*,
                             struct umbra_builder*,
-                            struct umbra_uniforms_layout*,
                             int buf_index,
                             umbra_interval x, umbra_interval y);
-    void (*fill)(struct umbra_sdf const*, void *uniforms);
     void (*free)(struct umbra_sdf*);
+    int  uniforms_slots, :32;
 };
-void umbra_sdf_free(struct umbra_sdf*);
+void             umbra_sdf_free    (struct umbra_sdf*);
+struct umbra_buf umbra_sdf_uniforms(struct umbra_sdf const*);
 
 // TODO: bool hard_edge -> int quality
 
@@ -112,20 +102,10 @@ umbra_color_val32 umbra_blend_multiply(struct umbra_builder*,
                                        umbra_color_val32 src, umbra_color_val32 dst);
 
 
-struct umbra_draw_layout {
-    struct umbra_uniforms_layout uni; int :32;
-    void                        *uniforms;
-};
-
 struct umbra_builder* umbra_draw_builder(struct umbra_coverage*,
                                          struct umbra_shader*,
                                          umbra_blend_fn,
-                                         struct umbra_fmt,
-                                         struct umbra_draw_layout*);
-
-void umbra_draw_fill(struct umbra_draw_layout const*,
-                     struct umbra_coverage const*,
-                     struct umbra_shader const*);
+                                         struct umbra_fmt);
 
 struct umbra_sdf_draw_config {
     _Bool hard_edge;
@@ -136,13 +116,9 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend*,
                                       struct umbra_sdf_draw_config,
                                       struct umbra_shader*,
                                       umbra_blend_fn,
-                                      struct umbra_fmt,
-                                      struct umbra_draw_layout*);
+                                      struct umbra_fmt);
 void umbra_sdf_draw_queue(struct umbra_sdf_draw const*,
                               int l, int t, int r, int b, struct umbra_buf[]);
-void umbra_sdf_draw_fill(struct umbra_draw_layout const*,
-                             struct umbra_sdf const*,
-                             struct umbra_shader const*);
 void umbra_sdf_draw_free(struct umbra_sdf_draw*);
 
 // TODO: add umbra_shader_gradient_{linear,radial}_evenly_spaced_stops specializations

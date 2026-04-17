@@ -1257,13 +1257,13 @@ static void encode_dispatch(
     }
 
     for (int d = 0; d < p->n_deref; d++) {
-        uint32_t const *uni = (uint32_t const*)buf[p->deref[d].src_buf].ptr;
-        int const       slot = p->deref[d].off;
-        void *derived;
-        int   dcount, dstride;
-        __builtin_memcpy(&derived, uni + slot,     sizeof derived);
-        __builtin_memcpy(&dcount,  uni + slot + 2, sizeof dcount);
-        __builtin_memcpy(&dstride, uni + slot + 3, sizeof dstride);
+        char const *uni = (char const*)buf[p->deref[d].src_buf].ptr
+                                + p->deref[d].off * 4;
+        struct umbra_buf src;
+        __builtin_memcpy(&src, uni, sizeof src);
+        void *derived  = src.ptr;
+        int   dcount   = src.count;
+        int   dstride  = src.stride;
         int const bi    = p->deref[d].buf_idx;
         size_t const db = (size_t)dcount << p->buf_shift[bi];
         int const idx   = gpu_buf_cache_get(&be->cache, derived, db, p->buf_rw[bi]);

@@ -316,8 +316,7 @@ int main(int argc, char *argv[]) {
 
     if (!match || strstr("slug accumulator (1 curve)", match)) {
         struct slug_curves       sc  = slug_extract("Slug", (float)H * 0.3125f);
-        struct slug_acc_layout   al;
-        struct umbra_builder    *bld = slug_build_acc(&al);
+        struct umbra_builder    *bld = slug_build_acc();
         struct umbra_flat_ir *ir = umbra_flat_ir(bld);
         umbra_builder_free(bld);
 
@@ -328,18 +327,14 @@ int main(int argc, char *argv[]) {
         umbra_flat_ir_free(ir);
 
         float *wind = calloc((size_t)(W * H), 4);
-        struct umbra_matrix mat;
-        slide_perspective_matrix(&mat, 0.0f, W, H, (int)sc.w, (int)sc.h);
-        umbra_uniforms_fill_f32(al.uniforms, al.mat, &mat.sx, 9);
-        float const wh[2] = {sc.w, sc.h};
-        umbra_uniforms_fill_f32(al.uniforms, al.wh, wh, 2);
-        umbra_uniforms_fill_ptr(al.uniforms, al.curves_off,
-                      (struct umbra_buf){.ptr=sc.data, .count=sc.count * 6});
-        float j0;
-        { int32_t z = 0; __builtin_memcpy(&j0, &z, 4); }
-        umbra_uniforms_fill_f32(al.uniforms, al.loop_off, &j0, 1);
+        struct slug_acc_uniforms au = {0};
+        slide_perspective_matrix(&au.mat, 0.0f, W, H, (int)sc.w, (int)sc.h);
+        au.bw     = sc.w;
+        au.bh     = sc.h;
+        au.curves = (struct umbra_buf){.ptr=sc.data, .count=sc.count * 6};
+        { int32_t z = 0; __builtin_memcpy(&au.j, &z, 4); }
         struct umbra_buf abuf[] = {
-            (struct umbra_buf){.ptr=al.uniforms, .count=al.uni.slots},
+            {.ptr=&au, .count=(int)(sizeof au / 4)},
             {.ptr=wind, .count=W * H},
         };
 
@@ -357,7 +352,6 @@ int main(int argc, char *argv[]) {
             if (progs[bi]) { progs[bi]->free(progs[bi]); }
         }
         free(wind);
-        free(al.uniforms);
         slug_free(&sc);
     }
 

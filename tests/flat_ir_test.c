@@ -1652,12 +1652,9 @@ TEST(test_shift_imm) {
 TEST(test_gather_deref_large) {
     struct umbra_builder *b = umbra_builder();
     umbra_val32            idx = umbra_load_32(b, (umbra_ptr32){0});
-    struct umbra_uniforms_layout *u   = calloc(1, sizeof(struct umbra_uniforms_layout));
-    int                   off = umbra_uniforms_reserve_ptr(u);
-    umbra_ptr16           src = umbra_deref_ptr16(b, (umbra_ptr32){.ix=1}, off);
+    umbra_ptr16           src = umbra_deref_ptr16(b, (umbra_ptr32){.ix=1}, 0);
     umbra_val32            val = umbra_i32_from_s16(b, umbra_gather_16(b, src, idx));
     umbra_store_32(b, (umbra_ptr32){.ix=2}, val);
-    free(u);
     struct test_backends B = make(b);
 
     enum { N = 33000 };
@@ -1672,19 +1669,14 @@ TEST(test_gather_deref_large) {
     int32_t indices[4] = {0, 100, 32800, N - 1};
     int32_t dst[4] = {0};
 
-    uint32_t uni_[4] = {0};
-    char    *uni = (char *)uni_;
-    {
-        struct umbra_buf deref = {.ptr=data, .count=N};
-        umbra_uniforms_fill_ptr(uni, off, deref);
-    }
+    struct umbra_buf deref = {.ptr=data, .count=N};
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
         if (run(&B, bi, 4, 1,
                  (struct umbra_buf[]){
                      {.ptr=indices, .count=count(indices)},
-                     {.ptr=uni, .count=count(uni_)},
+                     {.ptr=&deref, .count=(int)(sizeof deref / 4)},
                      {.ptr=dst, .count=count(dst)},
                  })) {
             dst[0] == 10 here;
@@ -2365,9 +2357,7 @@ TEST(test_load_stride_neq_w) {
     // Regression: add(mul(y, rs_uniform), x) was optimized to a contiguous
     // load using the linear loop counter.  When rs != w, this is wrong.
     struct umbra_builder *b = umbra_builder();
-    struct umbra_uniforms_layout *u  = calloc(1, sizeof(struct umbra_uniforms_layout));
-    int                    ri = umbra_uniforms_reserve_f32(u, 1);
-    free(u);
+    int const ri = 0;
     umbra_val32 x = umbra_x(b);
     umbra_val32 y = umbra_y(b);
     umbra_val32 rs = umbra_uniform_32(b, (umbra_ptr32){0}, ri);
@@ -3762,10 +3752,7 @@ TEST(test_two_buffers_different_row_bytes) {
 
 TEST(test_deref_row_bytes_l_gt_0) {
     struct umbra_builder *b = umbra_builder();
-    struct umbra_uniforms_layout *u   = calloc(1, sizeof(struct umbra_uniforms_layout));
-    int                   off = umbra_uniforms_reserve_ptr(u);
-    free(u);
-    umbra_ptr32           src = umbra_deref_ptr32(b, (umbra_ptr32){.ix=1}, off);
+    umbra_ptr32           src = umbra_deref_ptr32(b, (umbra_ptr32){.ix=1}, 0);
     umbra_val32            v   = umbra_load_32(b, src);
     umbra_val32            one = umbra_imm_i32(b, 1);
     umbra_store_32(b, (umbra_ptr32){.ix=2}, umbra_add_i32(b, v, one));
@@ -3776,19 +3763,14 @@ TEST(test_deref_row_bytes_l_gt_0) {
     for (int i = 0; i < S * TH; i++) { src_px[i] = i; }
     int32_t dst_px[S * TH];
 
-    uint32_t uni_[8] = {0};
-    char    *uni = (char *)uni_;
-    {
-        struct umbra_buf deref = {.ptr=src_px, .count=S * TH, .stride=S};
-        umbra_uniforms_fill_ptr(uni, off, deref);
-    }
+    struct umbra_buf deref = {.ptr=src_px, .count=S * TH, .stride=S};
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst_px, 0, sizeof dst_px);
         if (!B.p[bi]) { continue; }
         B.p[bi]->queue(B.p[bi], L, T, R, BT,
                             (struct umbra_buf[]){{0},
-                                          {.ptr=uni, .count=count(uni_)},
+                                          {.ptr=&deref, .count=(int)(sizeof deref / 4)},
                                           {.ptr=dst_px, .count=count(dst_px), .stride=S}});
         B.be[bi]->flush(B.be[bi]);
         for (int row = T; row < BT; row++) {
@@ -3809,10 +3791,7 @@ TEST(test_deref_row_bytes_l_gt_0) {
 
 TEST(test_deref_16bit_row_bytes_l_gt_0) {
     struct umbra_builder *b = umbra_builder();
-    struct umbra_uniforms_layout *u   = calloc(1, sizeof(struct umbra_uniforms_layout));
-    int                   off = umbra_uniforms_reserve_ptr(u);
-    free(u);
-    umbra_ptr16           src = umbra_deref_ptr16(b, (umbra_ptr32){.ix=1}, off);
+    umbra_ptr16           src = umbra_deref_ptr16(b, (umbra_ptr32){.ix=1}, 0);
     umbra_val32            v   = umbra_f32_from_f16(b, umbra_load_16(b, src));
     umbra_val32            one = umbra_imm_f32(b, 1.0f);
     umbra_store_32(b, (umbra_ptr32){.ix=2}, umbra_add_f32(b, v, one));
@@ -3827,19 +3806,14 @@ TEST(test_deref_16bit_row_bytes_l_gt_0) {
     }
     float dst_px[S * TH];
 
-    uint32_t uni_[4] = {0};
-    char    *uni = (char *)uni_;
-    {
-        struct umbra_buf deref = {.ptr=src_px, .count=S * TH, .stride=S};
-        umbra_uniforms_fill_ptr(uni, off, deref);
-    }
+    struct umbra_buf deref = {.ptr=src_px, .count=S * TH, .stride=S};
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst_px, 0, sizeof dst_px);
         if (!B.p[bi]) { continue; }
         B.p[bi]->queue(B.p[bi], L, T, R, BT,
                             (struct umbra_buf[]){{0},
-                                          {.ptr=uni, .count=count(uni_)},
+                                          {.ptr=&deref, .count=(int)(sizeof deref / 4)},
                                           {.ptr=dst_px, .count=count(dst_px), .stride=S}});
         B.be[bi]->flush(B.be[bi]);
         for (int row = T; row < BT; row++) {
@@ -3859,10 +3833,12 @@ TEST(test_deref_16bit_row_bytes_l_gt_0) {
 TEST(test_deref_third_uses_else_branch) {
     enum { W = 8, H = 3 };
     struct umbra_builder         *b = umbra_builder();
-    struct umbra_uniforms_layout  uni = {0};
-    int off1 = umbra_uniforms_reserve_ptr(&uni);
-    int off2 = umbra_uniforms_reserve_ptr(&uni);
-    int off3 = umbra_uniforms_reserve_ptr(&uni);
+    struct {
+        struct umbra_buf a, b, c;
+    } uni = {0};
+    int const off1 = (int)(__builtin_offsetof(__typeof__(uni), a) / 4),
+              off2 = (int)(__builtin_offsetof(__typeof__(uni), b) / 4),
+              off3 = (int)(__builtin_offsetof(__typeof__(uni), c) / 4);
     umbra_ptr32 d1  = umbra_deref_ptr32(b, (umbra_ptr32){0}, off1);
     umbra_ptr32 d2  = umbra_deref_ptr32(b, (umbra_ptr32){0}, off2);
     umbra_ptr32 d3  = umbra_deref_ptr32(b, (umbra_ptr32){0}, off3);
@@ -3873,23 +3849,19 @@ TEST(test_deref_third_uses_else_branch) {
     umbra_store_32(b, (umbra_ptr32){.ix=1}, sum);
     struct test_backends B = make(b);
 
-    void   *uniforms = umbra_uniforms_alloc(&uni);
     int32_t bufA[W * H], bufB[W * H], bufC[W];
     for (int i = 0; i < W * H; i++) { bufA[i] = i;       bufB[i] = i * 10; }
     for (int i = 0; i < W;     i++) { bufC[i] = 1000 + i; }
-    umbra_uniforms_fill_ptr(uniforms, off1,
-        (struct umbra_buf){.ptr=bufA, .count=count(bufA), .stride=W});
-    umbra_uniforms_fill_ptr(uniforms, off2,
-        (struct umbra_buf){.ptr=bufB, .count=count(bufB), .stride=W});
+    uni.a = (struct umbra_buf){.ptr=bufA, .count=count(bufA), .stride=W};
+    uni.b = (struct umbra_buf){.ptr=bufB, .count=count(bufB), .stride=W};
     // bufC is flat (row_bytes==0): broadcast the same row to every y.
-    umbra_uniforms_fill_ptr(uniforms, off3,
-        (struct umbra_buf){.ptr=bufC, .count=count(bufC)});
+    uni.c = (struct umbra_buf){.ptr=bufC, .count=count(bufC)};
 
     int32_t dst[W * H];
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
         if (run(&B, bi, W, H, (struct umbra_buf[]){
-                {.ptr=uniforms, .count=uni.slots},
+                {.ptr=&uni, .count=(int)(sizeof uni / 4)},
                 {.ptr=dst, .count=count(dst), .stride=W}})) {
             for (int y = 0; y < H; y++) {
                 for (int x = 0; x < W; x++) {
@@ -3899,7 +3871,6 @@ TEST(test_deref_third_uses_else_branch) {
             }
         }
     }
-    free(uniforms);
     cleanup(&B);
 }
 

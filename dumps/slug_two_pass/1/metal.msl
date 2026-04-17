@@ -2,13 +2,14 @@
 using namespace metal;
 
 
-struct meta { uint w, x0, y0, count0, count1, count2, stride0, stride1, stride2; };
+struct meta { uint w, x0, y0, count0, count1, count2, count3, stride0, stride1, stride2, stride3; };
 
 kernel void main0(
     constant meta &m [[buffer(0)]],
-    device const uint * __restrict p0 [[buffer(1)]],
-    device half4 * __restrict p1 [[buffer(2)]],
+    device half4 * __restrict p0 [[buffer(1)]],
+    device const uint * __restrict p1 [[buffer(2)]],
     device const uint * __restrict p2 [[buffer(3)]],
+    device const uint * __restrict p3 [[buffer(4)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
     if (pos.x >= m.w) return;
@@ -16,15 +17,15 @@ kernel void main0(
     uint y = m.y0 + pos.y;
     uint v0 = 0u;
     uint v2 = 1065353216u;
-    uint v3 = p0[4];
-    uint v4 = p0[5];
-    uint v5 = p0[6];
-    uint v6 = p0[7];
+    uint v3 = p2[0];
+    uint v4 = p2[1];
+    uint v5 = p2[2];
+    uint v6 = p2[3];
     float v7 = as_type<float>(v2) - as_type<float>(v6);
-    uint v8 = p2[y * m.stride2 + x];
+    uint v8 = p3[y * m.stride3 + x];
     float v9 = fabs(as_type<float>(v8));
     float v10 = min(v9, as_type<float>(1065353216u));
-    half4 _px11 = p1[y * m.stride1 + x];
+    half4 _px11 = p0[y * m.stride0 + x];
     uint v11 = (uint)as_type<ushort>(_px11.x);
     uint v11_1 = (uint)as_type<ushort>(_px11.y);
     uint v11_2 = (uint)as_type<ushort>(_px11.z);
@@ -49,5 +50,5 @@ kernel void main0(
     uint v29 = (uint)as_type<ushort>((half)v23);
     uint v30 = (uint)as_type<ushort>((half)v19);
     uint v31 = (uint)as_type<ushort>((half)v15);
-    p1[y * m.stride1 + x] = half4(as_type<half>((ushort)v31), as_type<half>((ushort)v30), as_type<half>((ushort)v29), as_type<half>((ushort)v28));
+    p0[y * m.stride0 + x] = half4(as_type<half>((ushort)v31), as_type<half>((ushort)v30), as_type<half>((ushort)v29), as_type<half>((ushort)v28));
 }

@@ -233,11 +233,16 @@ TEST(interval_loop) {
     // For x=[0,4]: i=0: [0-2, 4-2]=[−2,2], i=1: [−4-1, 0-1]=[−5,−1], i=2: [0-3, 2-3]=[−3,−1]
     // max = [−2, 2].
 
-    // Build the uniform layout first, then the program using the same slots.
-    struct umbra_uniforms_layout uni = {0};
-    int const ptr_off = umbra_uniforms_reserve_ptr(&uni);
-    int const n_off   = umbra_uniforms_reserve_f32(&uni, 1);
-    int const x_off   = umbra_uniforms_reserve_f32(&uni, 2);
+    // Fixed uniform layout: struct with {data: umbra_buf, n: float, x: float[2]}.
+    struct uni {
+        struct umbra_buf data;
+        float            n;
+        int              :32;
+        float            x[2];
+    };
+    int const ptr_off = (int)(__builtin_offsetof(struct uni, data) / 4),
+              n_off   = (int)(__builtin_offsetof(struct uni, n)    / 4),
+              x_off   = (int)(__builtin_offsetof(struct uni, x)    / 4);
 
     struct umbra_builder *bld = umbra_builder();
     umbra_ptr32 const u = {.ix = 0};
@@ -272,18 +277,17 @@ TEST(interval_loop) {
     umbra_flat_ir_free(ir);
 
     float ab[] = {1, 2, -1, 1, 0.5f, 3};
-    void *uniforms = umbra_uniforms_alloc(&uni);
-    umbra_uniforms_fill_ptr(uniforms, ptr_off, (struct umbra_buf){.ptr = ab, .count = 6});
-    int const count = 3;
-    umbra_uniforms_fill_i32(uniforms, n_off, &count, 1);
-    float const xvals[2] = {0.0f, 4.0f};
-    umbra_uniforms_fill_f32(uniforms, x_off, xvals, 2);
+    struct uni uniforms = {
+        .data = (struct umbra_buf){.ptr = ab, .count = 6},
+        .x    = {0.0f, 4.0f},
+    };
+    { int const count = 3; __builtin_memcpy(&uniforms.n, &count, 4); }
 
     float lo_out = 0, hi_out = 0;
     struct umbra_buf buf[] = {
-        {.ptr = uniforms, .count = uni.slots},
-        {.ptr = &lo_out,  .count = 1},
-        {.ptr = &hi_out,  .count = 1},
+        {.ptr = &uniforms, .count = (int)(sizeof uniforms / 4)},
+        {.ptr = &lo_out,   .count = 1},
+        {.ptr = &hi_out,   .count = 1},
     };
     prog->queue(prog, 0, 0, 1, 1, buf);
     be->flush(be);
@@ -291,7 +295,6 @@ TEST(interval_loop) {
     equiv(lo_out, -2.0f) here;
     equiv(hi_out,  2.0f) here;
 
-    free(uniforms);
     prog->free(prog);
     be->free(be);
 }

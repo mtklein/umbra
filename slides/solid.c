@@ -15,7 +15,6 @@ struct solid_slide {
     umbra_blend_fn           blend;
 
     struct umbra_fmt          fmt;
-    struct umbra_draw_layout  lay;
     struct umbra_sdf_draw    *qt;
     struct umbra_program     *prog;
 };
@@ -44,15 +43,13 @@ static void solid_prepare(struct slide *s, struct umbra_backend *be,
     struct solid_slide *st = (struct solid_slide *)s;
     umbra_sdf_draw_free(st->qt);  st->qt   = NULL;
     if (st->prog) { st->prog->free(st->prog); st->prog = NULL; }
-    free(st->lay.uniforms);
     st->fmt = fmt;
     if (st->has_sdf) {
         st->qt = umbra_sdf_draw(be, st->sdf,
                                 (struct umbra_sdf_draw_config){.hard_edge = 1},
-                                st->shader, st->blend, fmt, &st->lay);
+                                st->shader, st->blend, fmt);
     } else {
-        struct umbra_builder *b = umbra_draw_builder(NULL, st->shader,
-                                                     st->blend, fmt, &st->lay);
+        struct umbra_builder *b = umbra_draw_builder(NULL, st->shader, st->blend, fmt);
         struct umbra_flat_ir *ir = umbra_flat_ir(b);
         umbra_builder_free(b);
         st->prog = be->compile(be, ir);
@@ -70,19 +67,11 @@ static void solid_draw(struct slide *s, double secs, int l, int t, int r, int b,
         float ry = bounce(st->ry, st->vy, ticks, (float)st->h - st->rect_h);
         umbra_sdf_free(st->sdf);
         st->sdf = umbra_sdf_rect((umbra_rect){rx, ry, rx + st->rect_w, ry + st->rect_h});
-        // Populate the sdf's offsets to match the compiled program's layout
-        // (throwaway builder; passing NULL layout avoids reallocating uniforms).
-        struct umbra_coverage *adapter = umbra_sdf_coverage(st->sdf, 1);
-        umbra_builder_free(umbra_draw_builder(adapter, st->shader,
-                                              st->blend, st->fmt, NULL));
-        umbra_coverage_free(adapter);
-        umbra_sdf_draw_fill(&st->lay, st->sdf, st->shader);
-    } else {
-        umbra_draw_fill(&st->lay, NULL, st->shader);
     }
     struct umbra_buf ubuf[] = {
-        {.ptr=st->lay.uniforms, .count=st->lay.uni.slots},
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
+        st->has_sdf ? umbra_sdf_uniforms(st->sdf) : (struct umbra_buf){0},
+        umbra_shader_uniforms(st->shader),
     };
     if (st->qt) {
         umbra_sdf_draw_queue(st->qt, l, t, r, b, ubuf);
@@ -97,10 +86,10 @@ static int solid_get_builders(struct slide *s, struct umbra_fmt fmt,
     struct solid_slide *st = (struct solid_slide *)s;
     if (st->has_sdf) {
         struct umbra_coverage *adapter = umbra_sdf_coverage(st->sdf, 1);
-        out[0] = umbra_draw_builder(adapter, st->shader, st->blend, fmt, NULL);
+        out[0] = umbra_draw_builder(adapter, st->shader, st->blend, fmt);
         umbra_coverage_free(adapter);
     } else {
-        out[0] = umbra_draw_builder(NULL, st->shader, st->blend, fmt, NULL);
+        out[0] = umbra_draw_builder(NULL, st->shader, st->blend, fmt);
     }
     return out[0] ? 1 : 0;
 }
@@ -109,7 +98,6 @@ static void solid_free(struct slide *s) {
     struct solid_slide *st = (struct solid_slide *)s;
     umbra_sdf_draw_free(st->qt);
     if (st->prog) { st->prog->free(st->prog); }
-    free(st->lay.uniforms);
     umbra_shader_free(st->shader);
     umbra_sdf_free   (st->sdf);
     free(st);
