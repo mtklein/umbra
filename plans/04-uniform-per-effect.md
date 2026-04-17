@@ -276,6 +276,18 @@ job is now `offsetof`.  The vtable shrinks to `build` + `free`.
   concatenates all small uniforms into one ring chunk and emits multiple
   bindings into it at known offsets.
 
+## JIT guidance
+
+GPR-touching code stays boring/general.  Spend specialization budget
+only on vector<->memory traffic and vector ALU throughput; everything
+else (including the per-effect ptr chase through `buf[idx]`) just uses
+the uniform path, even if each effect's uniforms pay two extra loads
+at dispatch entry.  That cost washes out against the actual pixel
+work.
+
+Both JITs already treat all buffer indices uniformly via `load_ptr` /
+`load_count` — no `.ix == 0` fast path to remove.  Good.
+
 ## Non-goals / out of scope
 
 - Rewriting the effect types themselves.  We keep the `build()`
