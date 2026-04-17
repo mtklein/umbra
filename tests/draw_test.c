@@ -503,7 +503,7 @@ struct test_gradient_shader {
     int off_, :32;
 };
 
-static umbra_color test_gradient_build(struct umbra_shader *s, struct umbra_builder *builder,
+static umbra_color_val32 test_gradient_build(struct umbra_shader *s, struct umbra_builder *builder,
                                        struct umbra_uniforms_layout *u,
                                        umbra_val32 x, umbra_val32 y) {
     struct test_gradient_shader *self = (struct test_gradient_shader *)s;
@@ -513,7 +513,7 @@ static umbra_color test_gradient_build(struct umbra_shader *s, struct umbra_buil
     umbra_val32 a = umbra_uniform_32(builder, (umbra_ptr32){0}, self->off_ + 1);
     umbra_val32 t = umbra_div_f32(builder, x, w);
     umbra_val32 zero = umbra_imm_i32(builder, 0);
-    return (umbra_color){t, zero, zero, a};
+    return (umbra_color_val32){t, zero, zero, a};
 }
 
 static void test_gradient_fill(struct umbra_shader const *s, void *uniforms) {
@@ -1184,7 +1184,7 @@ TEST(test_page_aligned_buffer) {
 
 TEST(test_565_round_trip) {
     struct umbra_builder *b = umbra_builder();
-    umbra_color c = umbra_load_565(b, (umbra_ptr16){0});
+    umbra_color_val32 c = umbra_load_565(b, (umbra_ptr16){0});
     umbra_store_565(b, (umbra_ptr16){.ix=1}, c);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
@@ -1205,7 +1205,7 @@ TEST(test_565_round_trip) {
 
 TEST(test_1010102_round_trip) {
     struct umbra_builder *b = umbra_builder();
-    umbra_color c = umbra_load_1010102(b, (umbra_ptr32){0});
+    umbra_color_val32 c = umbra_load_1010102(b, (umbra_ptr32){0});
     umbra_store_1010102(b, (umbra_ptr32){.ix=1}, c);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
@@ -1228,7 +1228,7 @@ TEST(test_1010102_round_trip) {
 
 TEST(test_fp16_planar_round_trip) {
     struct umbra_builder *b = umbra_builder();
-    umbra_color c = umbra_load_fp16_planar(b, (umbra_ptr16){0});
+    umbra_color_val32 c = umbra_load_fp16_planar(b, (umbra_ptr16){0});
     umbra_store_fp16_planar(b, (umbra_ptr16){.ix=1}, c);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);

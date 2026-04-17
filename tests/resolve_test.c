@@ -111,7 +111,7 @@ TEST(resolve_compaction_renumbers) {
 
 TEST(resolve_preserves_channels) {
     struct umbra_builder *b = umbra_builder();
-    umbra_color c = umbra_fmt_fp16.load(b, 0);
+    umbra_color_val32 c = umbra_fmt_fp16.load(b, 0);
     umbra_fmt_fp16.store(b, 1, c);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);

@@ -300,7 +300,7 @@ TEST(test_golden_slides) {
 static void run_long_batch_no_oom(struct umbra_backend *be) {
     if (be) {
         struct umbra_builder *bld = umbra_builder();
-        umbra_color c = {
+        umbra_color_val32 c = {
             umbra_uniform_32(bld, (umbra_ptr32){0}, 0),
             umbra_uniform_32(bld, (umbra_ptr32){0}, 1),
             umbra_uniform_32(bld, (umbra_ptr32){0}, 2),
@@ -418,7 +418,7 @@ TEST(test_wgpu_misc) {
     if (!be) { return; }
 
     struct umbra_builder *bld = umbra_builder();
-    umbra_color c = {
+    umbra_color_val32 c = {
         umbra_uniform_32(bld, (umbra_ptr32){0}, 0),
         umbra_imm_f32(bld, 0.0f),
         umbra_imm_f32(bld, 0.0f),

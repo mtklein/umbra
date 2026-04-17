@@ -2,16 +2,9 @@
 #include "umbra.h"
 #include "umbra_interval.h"
 
-// TODO: we need types for both CPU-side parameters like struct { float r,g,b,a; }
-//       and the umbra_val equivalent struct { float umbra_val32 r,g,b,a; }
-//       and a naming convention that makes it clear which is which while highlingting
-//       the connection between the two.  one convention I have liked in the past is
-//       all lowercase for scalar types struct umbra_color { float r,g,ba; } but to use
-//       a capital letter for vectory types struct umbra_Color { umbra_val32 r,g,b,a; }.
-
 typedef struct {
     umbra_val32 r, g, b, a;
-} umbra_color;
+} umbra_color_val32;
 
 struct umbra_matrix {
     float sx, kx, tx,
@@ -28,8 +21,8 @@ struct umbra_fmt {
     char const *name;
     size_t      bpp;
     int         planes, :32;
-    umbra_color (*load) (struct umbra_builder*, int ptr_ix);
-    void        (*store)(struct umbra_builder*, int ptr_ix, umbra_color);
+    umbra_color_val32 (*load) (struct umbra_builder*, int ptr_ix);
+    void              (*store)(struct umbra_builder*, int ptr_ix, umbra_color_val32);
 };
 extern struct umbra_fmt const umbra_fmt_8888,
                               umbra_fmt_565,
@@ -37,16 +30,16 @@ extern struct umbra_fmt const umbra_fmt_8888,
                               umbra_fmt_fp16,
                               umbra_fmt_fp16_planar;
 
-umbra_color umbra_load_8888        (struct umbra_builder*, umbra_ptr32);
-void        umbra_store_8888       (struct umbra_builder*, umbra_ptr32, umbra_color);
-umbra_color umbra_load_565         (struct umbra_builder*, umbra_ptr16);
-void        umbra_store_565        (struct umbra_builder*, umbra_ptr16, umbra_color);
-umbra_color umbra_load_1010102     (struct umbra_builder*, umbra_ptr32);
-void        umbra_store_1010102    (struct umbra_builder*, umbra_ptr32, umbra_color);
-umbra_color umbra_load_fp16        (struct umbra_builder*, umbra_ptr64);
-void        umbra_store_fp16       (struct umbra_builder*, umbra_ptr64, umbra_color);
-umbra_color umbra_load_fp16_planar (struct umbra_builder*, umbra_ptr16);
-void        umbra_store_fp16_planar(struct umbra_builder*, umbra_ptr16, umbra_color);
+umbra_color_val32 umbra_load_8888        (struct umbra_builder*, umbra_ptr32);
+void              umbra_store_8888       (struct umbra_builder*, umbra_ptr32, umbra_color_val32);
+umbra_color_val32 umbra_load_565         (struct umbra_builder*, umbra_ptr16);
+void              umbra_store_565        (struct umbra_builder*, umbra_ptr16, umbra_color_val32);
+umbra_color_val32 umbra_load_1010102     (struct umbra_builder*, umbra_ptr32);
+void              umbra_store_1010102    (struct umbra_builder*, umbra_ptr32, umbra_color_val32);
+umbra_color_val32 umbra_load_fp16        (struct umbra_builder*, umbra_ptr64);
+void              umbra_store_fp16       (struct umbra_builder*, umbra_ptr64, umbra_color_val32);
+umbra_color_val32 umbra_load_fp16_planar (struct umbra_builder*, umbra_ptr16);
+void              umbra_store_fp16_planar(struct umbra_builder*, umbra_ptr16, umbra_color_val32);
 
 // TODO: maybe umbra_builder really should fold in umbra_uniforms_layout?
 //       they seem to go together more often than not.
@@ -55,10 +48,10 @@ void        umbra_store_fp16_planar(struct umbra_builder*, umbra_ptr16, umbra_co
 //       free() hooks, etc.
 
 struct umbra_shader {
-    umbra_color (*build)(struct umbra_shader*,
-                         struct umbra_builder*,
-                         struct umbra_uniforms_layout*,
-                         umbra_val32 x, umbra_val32 y);
+    umbra_color_val32 (*build)(struct umbra_shader*,
+                               struct umbra_builder*,
+                               struct umbra_uniforms_layout*,
+                               umbra_val32 x, umbra_val32 y);
     void (*fill)(struct umbra_shader const*, void *uniforms);
 };
 
@@ -88,11 +81,16 @@ struct umbra_sdf_coverage {
 };
 struct umbra_sdf_coverage umbra_sdf_coverage(struct umbra_sdf*, _Bool hard_edge);
 
-typedef umbra_color (*umbra_blend_fn)(struct umbra_builder*, umbra_color src, umbra_color dst);
-umbra_color umbra_blend_src     (struct umbra_builder*, umbra_color src, umbra_color dst);
-umbra_color umbra_blend_srcover (struct umbra_builder*, umbra_color src, umbra_color dst);
-umbra_color umbra_blend_dstover (struct umbra_builder*, umbra_color src, umbra_color dst);
-umbra_color umbra_blend_multiply(struct umbra_builder*, umbra_color src, umbra_color dst);
+typedef umbra_color_val32 (*umbra_blend_fn)(struct umbra_builder*,
+                                            umbra_color_val32 src, umbra_color_val32 dst);
+umbra_color_val32 umbra_blend_src     (struct umbra_builder*,
+                                       umbra_color_val32 src, umbra_color_val32 dst);
+umbra_color_val32 umbra_blend_srcover (struct umbra_builder*,
+                                       umbra_color_val32 src, umbra_color_val32 dst);
+umbra_color_val32 umbra_blend_dstover (struct umbra_builder*,
+                                       umbra_color_val32 src, umbra_color_val32 dst);
+umbra_color_val32 umbra_blend_multiply(struct umbra_builder*,
+                                       umbra_color_val32 src, umbra_color_val32 dst);
 
 
 // TODO: gather the uniforms / layout types and methods together and explain them better
