@@ -14,6 +14,10 @@ typedef struct {
     float l, t, r, b;
 } umbra_rect;
 
+typedef struct {
+    float x, y;
+} umbra_point;
+
 struct umbra_matrix {
     float sx, kx, tx,
           ky, sy, ty,
