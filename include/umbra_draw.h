@@ -3,20 +3,16 @@
 #include "umbra_interval.h"
 
 typedef struct {
-    umbra_val32 r, g, b, a;
-} umbra_color_val32;
+    float x, y;
+} umbra_point;
 
-typedef struct {
-    float r, g, b, a;
-} umbra_color;
-
+// TODO: any more useful as union { struct { float l,t,r,b; } struct { point lt,rb } } ?
 typedef struct {
     float l, t, r, b;
 } umbra_rect;
 
-typedef struct {
-    float x, y;
-} umbra_point;
+typedef struct { float       r, g, b, a; } umbra_color;
+typedef struct { umbra_val32 r, g, b, a; } umbra_color_val32;
 
 struct umbra_matrix {
     float sx, kx, tx,
