@@ -124,24 +124,24 @@ void umbra_draw_fill(struct umbra_draw_layout const*,
                      struct umbra_shader const*,
                      struct umbra_coverage const*);
 
-struct umbra_sdf_dispatch_config {
+struct umbra_sdf_draw_config {
     _Bool hard_edge;
 };
 
 // TODO: rename umbra_sdf_draw and umbra_sdf_draw_foo()
-struct umbra_sdf_dispatch* umbra_sdf_dispatch(struct umbra_backend*,
+struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend*,
                                               struct umbra_sdf *coverage,
-                                              struct umbra_sdf_dispatch_config,
+                                              struct umbra_sdf_draw_config,
                                               struct umbra_shader*,
                                               umbra_blend_fn,
                                               struct umbra_fmt,
                                               struct umbra_draw_layout*);
-void umbra_sdf_dispatch_queue(struct umbra_sdf_dispatch const*,
+void umbra_sdf_draw_queue(struct umbra_sdf_draw const*,
                               int l, int t, int r, int b, struct umbra_buf[]);
-void umbra_sdf_dispatch_fill(struct umbra_draw_layout const*,
+void umbra_sdf_draw_fill(struct umbra_draw_layout const*,
                              struct umbra_sdf const*,
                              struct umbra_shader const*);
-void umbra_sdf_dispatch_free(struct umbra_sdf_dispatch*);
+void umbra_sdf_draw_free(struct umbra_sdf_draw*);
 
 // TODO: add umbra_shader_gradient_{linear,radial}_evenly_spaced_stops specializations
 //       that share the general case's colors-buffer layout but skip the per-pixel stop

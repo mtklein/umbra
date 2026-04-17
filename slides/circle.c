@@ -43,7 +43,7 @@ struct circle_slide {
 
     struct umbra_fmt          fmt;
     struct umbra_draw_layout  lay;
-    struct umbra_sdf_dispatch    *qt;
+    struct umbra_sdf_draw    *qt;
 };
 
 static void circle_init(struct slide *s, int w, int h) {
@@ -66,11 +66,11 @@ static float bounce(float p0, float v, double secs, float range) {
 
 static void circle_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
     struct circle_slide *st = (struct circle_slide *)s;
-    umbra_sdf_dispatch_free(st->qt);
+    umbra_sdf_draw_free(st->qt);
     free(st->lay.uniforms);
     st->fmt = fmt;
-    st->qt  = umbra_sdf_dispatch(be, &st->sdf.base,
-                             (struct umbra_sdf_dispatch_config){.hard_edge = 0},
+    st->qt  = umbra_sdf_draw(be, &st->sdf.base,
+                             (struct umbra_sdf_draw_config){.hard_edge = 0},
                              &st->shader.base, umbra_blend_srcover, fmt, &st->lay);
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
@@ -85,12 +85,12 @@ static void circle_draw(struct slide *s, double secs, int l, int t, int r, int b
     st->sdf.cy = pad + bounce(st->cy0 - pad, st->vy, ticks, (float)st->h - 2.0f*pad);
     st->sdf.r  = st->r;
 
-    umbra_sdf_dispatch_fill(&st->lay, &st->sdf.base, &st->shader.base);
+    umbra_sdf_draw_fill(&st->lay, &st->sdf.base, &st->shader.base);
     struct umbra_buf ubuf[] = {
         {.ptr=st->lay.uniforms, .count=st->lay.uni.slots},
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
     };
-    umbra_sdf_dispatch_queue(st->qt, l, t, r, b, ubuf);
+    umbra_sdf_draw_queue(st->qt, l, t, r, b, ubuf);
 }
 
 static int circle_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -105,7 +105,7 @@ static int circle_get_builders(struct slide *s, struct umbra_fmt fmt,
 
 static void circle_free(struct slide *s) {
     struct circle_slide *st = (struct circle_slide *)s;
-    umbra_sdf_dispatch_free(st->qt);
+    umbra_sdf_draw_free(st->qt);
     free(st->lay.uniforms);
     free(st);
 }

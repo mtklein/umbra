@@ -1364,19 +1364,19 @@ TEST(test_sdf_dispatch_rect) {
         if (!bes[bi]) { continue; }
 
         struct umbra_draw_layout lay;
-        struct umbra_sdf_dispatch *qt = umbra_sdf_dispatch(bes[bi], &sdf.base,
-                                                   (struct umbra_sdf_dispatch_config){.hard_edge = 1},
+        struct umbra_sdf_draw *qt = umbra_sdf_draw(bes[bi], &sdf.base,
+                                                   (struct umbra_sdf_draw_config){.hard_edge = 1},
                                                    &shader.base, umbra_blend_srcover,
                                                    umbra_fmt_8888, &lay);
         qt != NULL here;
-        umbra_sdf_dispatch_fill(&lay, &sdf.base, &shader.base);
+        umbra_sdf_draw_fill(&lay, &sdf.base, &shader.base);
         uint32_t dst[8 * 4];
         __builtin_memset(dst, 0, sizeof dst);
         struct umbra_buf buf[] = {
             {.ptr = lay.uniforms, .count = lay.uni.slots},
             {.ptr = dst,          .count = 8 * 4, .stride = 8},
         };
-        umbra_sdf_dispatch_queue(qt, 0, 0, 8, 4, buf);
+        umbra_sdf_draw_queue(qt, 0, 0, 8, 4, buf);
         bes[bi]->flush(bes[bi]);
 
         for (int y = 0; y < 4; y++) {
@@ -1392,7 +1392,7 @@ TEST(test_sdf_dispatch_rect) {
             }
         }
 
-        umbra_sdf_dispatch_free(qt);
+        umbra_sdf_draw_free(qt);
         free(lay.uniforms);
     }
 
@@ -1444,8 +1444,8 @@ TEST(test_sdf_dispatch_tiling) {
 
     // Tiled dispatch.
     struct umbra_draw_layout lay_tiled;
-    struct umbra_sdf_dispatch *disp = umbra_sdf_dispatch(be, &sdf.base,
-        (struct umbra_sdf_dispatch_config){.hard_edge = 1},
+    struct umbra_sdf_draw *disp = umbra_sdf_draw(be, &sdf.base,
+        (struct umbra_sdf_draw_config){.hard_edge = 1},
         &shader.base, umbra_blend_srcover, umbra_fmt_8888, &lay_tiled);
     disp != NULL here;
 
@@ -1462,14 +1462,14 @@ TEST(test_sdf_dispatch_tiling) {
     uint32_t *tiled_buf = calloc(W * H, sizeof(uint32_t));
     uint32_t *flat_buf  = calloc(W * H, sizeof(uint32_t));
 
-    umbra_sdf_dispatch_fill(&lay_tiled, &sdf.base, &shader.base);
+    umbra_sdf_draw_fill(&lay_tiled, &sdf.base, &shader.base);
     umbra_draw_fill(&lay_flat, &shader.base, &adapter.base);
 
     struct umbra_buf tiled_ubuf[] = {
         {.ptr = lay_tiled.uniforms, .count = lay_tiled.uni.slots},
         {.ptr = tiled_buf,          .count = W * H, .stride = W},
     };
-    umbra_sdf_dispatch_queue(disp, 0, 0, W, H, tiled_ubuf);
+    umbra_sdf_draw_queue(disp, 0, 0, W, H, tiled_ubuf);
 
     struct umbra_buf flat_ubuf[] = {
         {.ptr = lay_flat.uniforms, .count = lay_flat.uni.slots},
@@ -1490,7 +1490,7 @@ TEST(test_sdf_dispatch_tiling) {
     free(tiled_buf);
     flat->free(flat);
     free(lay_flat.uniforms);
-    umbra_sdf_dispatch_free(disp);
+    umbra_sdf_draw_free(disp);
     free(lay_tiled.uniforms);
     be->free(be);
 }

@@ -267,7 +267,7 @@ struct umbra_sdf_coverage umbra_sdf_coverage(struct umbra_sdf *sdf, _Bool hard_e
     };
 }
 
-struct umbra_sdf_dispatch {
+struct umbra_sdf_draw {
     struct umbra_program *draw;
     struct umbra_program *bounds;
     struct umbra_backend *bounds_be;
@@ -279,9 +279,9 @@ struct umbra_sdf_dispatch {
 // compromise.  CPU-optimal is ~16-32, GPU-optimal is ~512-1024.
 enum { QUEUE_MIN_TILE = 512 };
 
-struct umbra_sdf_dispatch* umbra_sdf_dispatch(struct umbra_backend *be,
+struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
                                               struct umbra_sdf *sdf,
-                                              struct umbra_sdf_dispatch_config cfg,
+                                              struct umbra_sdf_draw_config cfg,
                                               struct umbra_shader *shader,
                                               umbra_blend_fn blend,
                                               struct umbra_fmt fmt,
@@ -332,7 +332,7 @@ struct umbra_sdf_dispatch* umbra_sdf_dispatch(struct umbra_backend *be,
     struct umbra_program *bounds = bounds_be->compile(bounds_be, bir);
     umbra_flat_ir_free(bir);
 
-    struct umbra_sdf_dispatch *d = calloc(1, sizeof *d);
+    struct umbra_sdf_draw *d = calloc(1, sizeof *d);
     d->draw       = draw;
     d->bounds     = bounds;
     d->bounds_be  = bounds_be;
@@ -341,7 +341,7 @@ struct umbra_sdf_dispatch* umbra_sdf_dispatch(struct umbra_backend *be,
     return d;
 }
 
-void umbra_sdf_dispatch_queue(struct umbra_sdf_dispatch const *d,
+void umbra_sdf_draw_queue(struct umbra_sdf_draw const *d,
                               int l, int t, int r, int b, struct umbra_buf buf[]) {
     if (!d) { return; }
     int const w  = r - l,
@@ -382,14 +382,14 @@ void umbra_sdf_dispatch_queue(struct umbra_sdf_dispatch const *d,
     free(bounds_uni);
 }
 
-void umbra_sdf_dispatch_fill(struct umbra_draw_layout const *layout,
+void umbra_sdf_draw_fill(struct umbra_draw_layout const *layout,
                              struct umbra_sdf const *sdf,
                              struct umbra_shader const *shader) {
     if (sdf)    { sdf->fill(sdf, layout->uniforms); }
     if (shader) { shader->fill(shader, layout->uniforms); }
 }
 
-void umbra_sdf_dispatch_free(struct umbra_sdf_dispatch *d) {
+void umbra_sdf_draw_free(struct umbra_sdf_draw *d) {
     if (d) {
         d->draw->free(d->draw);
         d->bounds->free(d->bounds);

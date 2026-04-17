@@ -16,7 +16,7 @@ struct solid_slide {
 
     struct umbra_fmt          fmt;
     struct umbra_draw_layout lay;
-    struct umbra_sdf_dispatch   *qt;
+    struct umbra_sdf_draw   *qt;
     struct umbra_program    *prog;
 };
 
@@ -42,13 +42,13 @@ static float bounce(float p0, float v, double secs, float range) {
 static void solid_prepare(struct slide *s, struct umbra_backend *be,
                           struct umbra_fmt fmt) {
     struct solid_slide *st = (struct solid_slide *)s;
-    umbra_sdf_dispatch_free(st->qt);  st->qt   = NULL;
+    umbra_sdf_draw_free(st->qt);  st->qt   = NULL;
     if (st->prog) { st->prog->free(st->prog); st->prog = NULL; }
     free(st->lay.uniforms);
     st->fmt = fmt;
     if (st->has_sdf) {
-        st->qt = umbra_sdf_dispatch(be, &st->sdf.base,
-                                (struct umbra_sdf_dispatch_config){.hard_edge = 1},
+        st->qt = umbra_sdf_draw(be, &st->sdf.base,
+                                (struct umbra_sdf_draw_config){.hard_edge = 1},
                                 &st->shader.base, st->blend, fmt, &st->lay);
     } else {
         struct umbra_builder *b = umbra_draw_builder(&st->shader.base, NULL,
@@ -69,7 +69,7 @@ static void solid_draw(struct slide *s, double secs, int l, int t, int r, int b,
         float rx = bounce(st->rx, st->vx, ticks, (float)st->w - st->rect_w);
         float ry = bounce(st->ry, st->vy, ticks, (float)st->h - st->rect_h);
         st->sdf.rect = (umbra_rect){rx, ry, rx + st->rect_w, ry + st->rect_h};
-        umbra_sdf_dispatch_fill(&st->lay, &st->sdf.base, &st->shader.base);
+        umbra_sdf_draw_fill(&st->lay, &st->sdf.base, &st->shader.base);
     } else {
         umbra_draw_fill(&st->lay, &st->shader.base, NULL);
     }
@@ -78,7 +78,7 @@ static void solid_draw(struct slide *s, double secs, int l, int t, int r, int b,
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
     };
     if (st->qt) {
-        umbra_sdf_dispatch_queue(st->qt, l, t, r, b, ubuf);
+        umbra_sdf_draw_queue(st->qt, l, t, r, b, ubuf);
     } else {
         st->prog->queue(st->prog, l, t, r, b, ubuf);
     }
@@ -99,7 +99,7 @@ static int solid_get_builders(struct slide *s, struct umbra_fmt fmt,
 
 static void solid_free(struct slide *s) {
     struct solid_slide *st = (struct solid_slide *)s;
-    umbra_sdf_dispatch_free(st->qt);
+    umbra_sdf_draw_free(st->qt);
     if (st->prog) { st->prog->free(st->prog); }
     free(st->lay.uniforms);
     free(st);
