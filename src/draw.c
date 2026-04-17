@@ -667,20 +667,27 @@ static umbra_color_val32 linear_stops_build_(struct umbra_shader *s, struct umbr
 }
 static void linear_stops_fill_(struct umbra_shader const *s, void *uniforms) {
     struct umbra_shader_linear_stops const *self = (struct umbra_shader_linear_stops const *)s;
-    umbra_uniforms_fill_f32(uniforms, self->fi_, self->grad, 4);
+    float const dx = self->p1.x - self->p0.x,
+                dy = self->p1.y - self->p0.y,
+                L2 = dx*dx + dy*dy,
+                a  = dx / L2,
+                b  = dy / L2,
+                c  = -(a * self->p0.x + b * self->p0.y),
+                 N = (float)self->pos.count;
+    float const grad[4] = {a, b, c, N};
+    umbra_uniforms_fill_f32(uniforms, self->fi_, grad, 4);
     umbra_uniforms_fill_ptr(uniforms, self->colors_off_, self->colors);
     umbra_uniforms_fill_ptr(uniforms, self->pos_off_, self->pos);
 }
-struct umbra_shader_linear_stops umbra_shader_linear_stops(float const grad[4],
+struct umbra_shader_linear_stops umbra_shader_linear_stops(umbra_point p0, umbra_point p1,
                                                            struct umbra_buf colors,
                                                            struct umbra_buf pos) {
-    struct umbra_shader_linear_stops s = {
-        .base = {.build = linear_stops_build_, .fill = linear_stops_fill_},
+    return (struct umbra_shader_linear_stops){
+        .base   = {.build = linear_stops_build_, .fill = linear_stops_fill_},
+        .p0     = p0, .p1 = p1,
         .colors = colors,
-        .pos = pos,
+        .pos    = pos,
     };
-    __builtin_memcpy(s.grad, grad, 16);
-    return s;
 }
 
 static umbra_color_val32 radial_stops_build_(struct umbra_shader *s, struct umbra_builder *builder,
@@ -696,20 +703,22 @@ static umbra_color_val32 radial_stops_build_(struct umbra_shader *s, struct umbr
 }
 static void radial_stops_fill_(struct umbra_shader const *s, void *uniforms) {
     struct umbra_shader_radial_stops const *self = (struct umbra_shader_radial_stops const *)s;
-    umbra_uniforms_fill_f32(uniforms, self->fi_, self->grad, 4);
+    float const N = (float)self->pos.count;
+    float const grad[4] = {self->center.x, self->center.y, 1.0f / self->radius, N};
+    umbra_uniforms_fill_f32(uniforms, self->fi_, grad, 4);
     umbra_uniforms_fill_ptr(uniforms, self->colors_off_, self->colors);
     umbra_uniforms_fill_ptr(uniforms, self->pos_off_, self->pos);
 }
-struct umbra_shader_radial_stops umbra_shader_radial_stops(float const grad[4],
+struct umbra_shader_radial_stops umbra_shader_radial_stops(umbra_point center, float radius,
                                                            struct umbra_buf colors,
                                                            struct umbra_buf pos) {
-    struct umbra_shader_radial_stops s = {
-        .base = {.build = radial_stops_build_, .fill = radial_stops_fill_},
+    return (struct umbra_shader_radial_stops){
+        .base   = {.build = radial_stops_build_, .fill = radial_stops_fill_},
+        .center = center,
+        .radius = radius,
         .colors = colors,
-        .pos = pos,
+        .pos    = pos,
     };
-    __builtin_memcpy(s.grad, grad, 16);
-    return s;
 }
 
 static umbra_color_val32 supersample_build_(struct umbra_shader *s, struct umbra_builder *builder,

@@ -1052,7 +1052,7 @@ TEST(test_linear_stops) {
     float pos[3] = {0.0f, 0.5f, 1.0f};
 
     struct umbra_shader_linear_stops shader =
-        umbra_shader_linear_stops((float[]){0.25f, 0, 0, 3},
+        umbra_shader_linear_stops((umbra_point){0, 0}, (umbra_point){4, 0},
                                   (struct umbra_buf){.ptr=colors_planar, .count=12},
                                   (struct umbra_buf){.ptr=pos, .count=3});
     struct umbra_draw_layout lay;
@@ -1082,7 +1082,7 @@ TEST(test_linear_stops_fp16_planar) {
     float pos[3] = {0.0f, 0.5f, 1.0f};
 
     struct umbra_shader_linear_stops shader =
-        umbra_shader_linear_stops((float[]){0.125f, 0, 0, 3},
+        umbra_shader_linear_stops((umbra_point){0, 0}, (umbra_point){8, 0},
                                   (struct umbra_buf){.ptr=colors_planar, .count=12},
                                   (struct umbra_buf){.ptr=pos, .count=3});
     struct umbra_draw_layout lay;

@@ -258,7 +258,7 @@ SLIDE(slide_gradient_linear_stops) {
     st->colors_data = planar;
     st->pos_data    = pos;
     st->shader.linear = umbra_shader_linear_stops(
-        (float[]){1.0f / 640.0f, 0.0f, 0.0f, (float)N},
+        (umbra_point){0, 0}, (umbra_point){640, 0},
         (struct umbra_buf){.ptr=planar, .count=N * 4},
         (struct umbra_buf){.ptr=pos,    .count=N});
     st->base = (struct slide){
@@ -292,7 +292,7 @@ SLIDE(slide_gradient_radial_stops) {
     st->colors_data = planar;
     st->pos_data    = pos;
     st->shader.radial = umbra_shader_radial_stops(
-        (float[]){320.0f, 240.0f, 1.0f / 280.0f, (float)N},
+        (umbra_point){320, 240}, 280.0f,
         (struct umbra_buf){.ptr=planar, .count=N * 4},
         (struct umbra_buf){.ptr=pos,    .count=N});
     st->base = (struct slide){
