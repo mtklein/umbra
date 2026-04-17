@@ -66,6 +66,7 @@ struct umbra_shader {
     umbra_color_val32 (*build)(struct umbra_shader*,
                                struct umbra_builder*,
                                struct umbra_uniforms_layout*,
+                               int buf_index,
                                umbra_val32 x, umbra_val32 y);
     void (*fill)(struct umbra_shader const*, void *uniforms);
     void (*free)(struct umbra_shader*);
@@ -76,6 +77,7 @@ struct umbra_coverage {
     umbra_val32 (*build)(struct umbra_coverage*,
                          struct umbra_builder*,
                          struct umbra_uniforms_layout*,
+                         int buf_index,
                          umbra_val32 x, umbra_val32 y);
     void (*fill)(struct umbra_coverage const*, void *uniforms);
     void (*free)(struct umbra_coverage*);
@@ -87,6 +89,7 @@ struct umbra_sdf {
     umbra_interval (*build)(struct umbra_sdf*,
                             struct umbra_builder*,
                             struct umbra_uniforms_layout*,
+                            int buf_index,
                             umbra_interval x, umbra_interval y);
     void (*fill)(struct umbra_sdf const*, void *uniforms);
     void (*free)(struct umbra_sdf*);

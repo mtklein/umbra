@@ -11,8 +11,10 @@ struct circle_sdf {
 
 static umbra_interval circle_build(struct umbra_sdf *s, struct umbra_builder *b,
                                     struct umbra_uniforms_layout *u,
+                                    int buf_index,
                                     umbra_interval x, umbra_interval y) {
     struct circle_sdf *self = (struct circle_sdf *)s;
+    (void)buf_index;
     self->circle_off = umbra_uniforms_reserve_f32(u, 3);
 
     umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->circle_off)),

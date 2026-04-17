@@ -66,8 +66,10 @@ struct csg_slide {
 
 static umbra_interval csg_union_build(struct umbra_sdf *s, struct umbra_builder *b,
                                        struct umbra_uniforms_layout *u,
+                                       int buf_index,
                                        umbra_interval x, umbra_interval y) {
     struct two_circle_sdf *self = (struct two_circle_sdf *)s;
+    (void)buf_index;
     self->circles_off = umbra_uniforms_reserve_f32(u, 6);
     umbra_interval const cx1 = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->circles_off)),
                          cy1 = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->circles_off + 1)),
@@ -82,8 +84,10 @@ static umbra_interval csg_union_build(struct umbra_sdf *s, struct umbra_builder 
 
 static umbra_interval csg_intersect_build(struct umbra_sdf *s, struct umbra_builder *b,
                                            struct umbra_uniforms_layout *u,
+                                           int buf_index,
                                            umbra_interval x, umbra_interval y) {
     struct two_circle_sdf *self = (struct two_circle_sdf *)s;
+    (void)buf_index;
     self->circles_off = umbra_uniforms_reserve_f32(u, 6);
     umbra_interval const cx1 = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->circles_off)),
                          cy1 = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->circles_off + 1)),
@@ -98,8 +102,10 @@ static umbra_interval csg_intersect_build(struct umbra_sdf *s, struct umbra_buil
 
 static umbra_interval csg_difference_build(struct umbra_sdf *s, struct umbra_builder *b,
                                             struct umbra_uniforms_layout *u,
+                                            int buf_index,
                                             umbra_interval x, umbra_interval y) {
     struct two_circle_sdf *self = (struct two_circle_sdf *)s;
+    (void)buf_index;
     self->circles_off = umbra_uniforms_reserve_f32(u, 6);
     umbra_interval const cx1 = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->circles_off)),
                          cy1 = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->circles_off + 1)),
@@ -171,7 +177,8 @@ static void csg_free(struct slide *s) {
 static struct slide* make_csg(char const *title, float const bg[4], float const color[4],
                               enum csg_op op) {
     umbra_interval (*build)(struct umbra_sdf*, struct umbra_builder*,
-                            struct umbra_uniforms_layout*, umbra_interval, umbra_interval) = NULL;
+                            struct umbra_uniforms_layout*, int,
+                            umbra_interval, umbra_interval) = NULL;
     if (op == CSG_UNION)      { build = csg_union_build; }
     if (op == CSG_INTERSECT)  { build = csg_intersect_build; }
     if (op == CSG_DIFFERENCE) { build = csg_difference_build; }
@@ -216,8 +223,10 @@ struct ring_sdf {
 
 static umbra_interval ring_build(struct umbra_sdf *s, struct umbra_builder *b,
                                   struct umbra_uniforms_layout *u,
+                                  int buf_index,
                                   umbra_interval x, umbra_interval y) {
     struct ring_sdf *self = (struct ring_sdf *)s;
+    (void)buf_index;
     self->ring_off = umbra_uniforms_reserve_f32(u, 4);
     umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->ring_off)),
                          cy = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->ring_off + 1)),
@@ -258,8 +267,10 @@ struct rounded_rect_sdf {
 
 static umbra_interval rounded_rect_build(struct umbra_sdf *s, struct umbra_builder *b,
                                           struct umbra_uniforms_layout *u,
+                                          int buf_index,
                                           umbra_interval x, umbra_interval y) {
     struct rounded_rect_sdf *self = (struct rounded_rect_sdf *)s;
+    (void)buf_index;
     self->rrect_off = umbra_uniforms_reserve_f32(u, 5);
     umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->rrect_off)),
                          cy = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->rrect_off + 1)),
@@ -382,8 +393,10 @@ struct capsule_sdf {
 
 static umbra_interval capsule_build(struct umbra_sdf *s, struct umbra_builder *b,
                                      struct umbra_uniforms_layout *u,
+                                     int buf_index,
                                      umbra_interval x, umbra_interval y) {
     struct capsule_sdf *self = (struct capsule_sdf *)s;
+    (void)buf_index;
     self->capsule_off = umbra_uniforms_reserve_f32(u, 5);
     umbra_interval const p0x = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->capsule_off)),
                          p0y = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->capsule_off + 1)),
@@ -451,8 +464,10 @@ struct halfplane_sdf {
 
 static umbra_interval halfplane_build(struct umbra_sdf *s, struct umbra_builder *b,
                                        struct umbra_uniforms_layout *u,
+                                       int buf_index,
                                        umbra_interval x, umbra_interval y) {
     struct halfplane_sdf *self = (struct halfplane_sdf *)s;
+    (void)buf_index;
     self->halfplane_off = umbra_uniforms_reserve_f32(u, 3);
     umbra_interval const nx = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->halfplane_off)),
                          ny = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->halfplane_off + 1)),
@@ -514,8 +529,10 @@ struct sdf_text_sdf {
 
 static umbra_interval sdf_text_build(struct umbra_sdf *s, struct umbra_builder *b,
                                       struct umbra_uniforms_layout *u,
+                                      int buf_index,
                                       umbra_interval x, umbra_interval y) {
     struct sdf_text_sdf *self = (struct sdf_text_sdf *)s;
+    (void)buf_index;
     self->curves_off = umbra_uniforms_reserve_ptr(u);
     self->params_off = umbra_uniforms_reserve_f32(u, 5);
     umbra_ptr32 const data = umbra_deref_ptr32(b, (umbra_ptr32){0}, self->curves_off);
@@ -712,8 +729,10 @@ struct ngon_sdf {
 
 static umbra_interval ngon_build(struct umbra_sdf *s, struct umbra_builder *b,
                                   struct umbra_uniforms_layout *u,
+                                  int buf_index,
                                   umbra_interval x, umbra_interval y) {
     struct ngon_sdf *self = (struct ngon_sdf *)s;
+    (void)buf_index;
     self->hp_off    = umbra_uniforms_reserve_ptr(u);
     self->count_off = umbra_uniforms_reserve_f32(u, 1);
     umbra_ptr32 const data = umbra_deref_ptr32(b, (umbra_ptr32){0}, self->hp_off);

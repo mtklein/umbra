@@ -526,9 +526,11 @@ struct test_gradient_shader {
 
 static umbra_color_val32 test_gradient_build(struct umbra_shader *s, struct umbra_builder *builder,
                                        struct umbra_uniforms_layout *u,
+                                       int buf_index,
                                        umbra_val32 x, umbra_val32 y) {
     struct test_gradient_shader *self = (struct test_gradient_shader *)s;
     (void)y;
+    (void)buf_index;
     self->params_off = umbra_uniforms_reserve_f32(u, 2);
     umbra_val32 w = umbra_uniform_32(builder, (umbra_ptr32){0}, self->params_off);
     umbra_val32 a = umbra_uniform_32(builder, (umbra_ptr32){0}, self->params_off + 1);
@@ -1464,8 +1466,10 @@ struct test_circle_sdf {
 };
 static umbra_interval test_circle_build(struct umbra_sdf *s, struct umbra_builder *b,
                                          struct umbra_uniforms_layout *u,
+                                         int buf_index,
                                          umbra_interval x, umbra_interval y) {
     struct test_circle_sdf *self = (struct test_circle_sdf *)s;
+    (void)buf_index;
     self->circle_off = umbra_uniforms_reserve_f32(u, 3);
     umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->circle_off)),
                          cy = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->circle_off + 1)),
