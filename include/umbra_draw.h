@@ -10,6 +10,10 @@ typedef struct {
     float r, g, b, a;
 } umbra_color;
 
+typedef struct {
+    float l, t, r, b;
+} umbra_rect;
+
 struct umbra_matrix {
     float sx, kx, tx,
           ky, sy, ty,
@@ -207,18 +211,17 @@ struct umbra_shader_supersample umbra_shader_supersample(struct umbra_shader *in
 
 struct umbra_coverage_rect {
     struct umbra_coverage base;
-    float  rect[4];  // float ltrb
+    umbra_rect rect;
     int off_, :32;
 };
-// TODO: change rect interfaces from float[4] to float l, float t, float r, float b.
-struct umbra_coverage_rect umbra_coverage_rect(float const rect[4]);
+struct umbra_coverage_rect umbra_coverage_rect(umbra_rect);
 
 struct umbra_sdf_rect {
     struct umbra_sdf base;
-    float  rect[4];
+    umbra_rect rect;
     int off_, :32;
 };
-struct umbra_sdf_rect umbra_sdf_rect(float const rect[4]);
+struct umbra_sdf_rect umbra_sdf_rect(umbra_rect);
 
 struct umbra_coverage_bitmap {
     struct umbra_coverage base;

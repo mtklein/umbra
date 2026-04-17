@@ -68,10 +68,7 @@ static void solid_draw(struct slide *s, double secs, int l, int t, int r, int b,
         double const ticks = secs * 60.0;
         float rx = bounce(st->rx, st->vx, ticks, (float)st->w - st->rect_w);
         float ry = bounce(st->ry, st->vy, ticks, (float)st->h - st->rect_h);
-        st->sdf.rect[0] = rx;
-        st->sdf.rect[1] = ry;
-        st->sdf.rect[2] = rx + st->rect_w;
-        st->sdf.rect[3] = ry + st->rect_h;
+        st->sdf.rect = (umbra_rect){rx, ry, rx + st->rect_w, ry + st->rect_h};
         umbra_sdf_dispatch_fill(&st->lay, &st->sdf.base, &st->shader.base);
     } else {
         umbra_draw_fill(&st->lay, &st->shader.base, NULL);
@@ -114,7 +111,7 @@ static struct slide* make_solid(char const *title, float const bg[4], float cons
     umbra_color const c = {color[0], color[1], color[2], color[3]};
     st->shader  = umbra_shader_solid(c);
     st->has_sdf = has_sdf;
-    if (has_sdf) { st->sdf = umbra_sdf_rect((float[]){0, 0, 0, 0}); }
+    if (has_sdf) { st->sdf = umbra_sdf_rect((umbra_rect){0, 0, 0, 0}); }
     st->blend   = blend;
     st->base = (struct slide){
         .title = title,

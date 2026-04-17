@@ -762,14 +762,13 @@ static umbra_val32 rect_build_(struct umbra_coverage *s, struct umbra_builder *b
 }
 static void rect_fill_(struct umbra_coverage const *s, void *uniforms) {
     struct umbra_coverage_rect const *self = (struct umbra_coverage_rect const *)s;
-    umbra_uniforms_fill_f32(uniforms, self->off_, self->rect, 4);
+    umbra_uniforms_fill_f32(uniforms, self->off_, &self->rect.l, 4);
 }
-struct umbra_coverage_rect umbra_coverage_rect(float const rect[4]) {
-    struct umbra_coverage_rect c = {
+struct umbra_coverage_rect umbra_coverage_rect(umbra_rect rect) {
+    return (struct umbra_coverage_rect){
         .base = {.build = rect_build_, .fill = rect_fill_},
+        .rect = rect,
     };
-    __builtin_memcpy(c.rect, rect, 16);
-    return c;
 }
 
 static umbra_interval sdf_rect_build_(struct umbra_sdf *s, struct umbra_builder *b,
@@ -788,14 +787,13 @@ static umbra_interval sdf_rect_build_(struct umbra_sdf *s, struct umbra_builder 
 }
 static void sdf_rect_fill_(struct umbra_sdf const *s, void *uniforms) {
     struct umbra_sdf_rect const *self = (struct umbra_sdf_rect const *)s;
-    umbra_uniforms_fill_f32(uniforms, self->off_, self->rect, 4);
+    umbra_uniforms_fill_f32(uniforms, self->off_, &self->rect.l, 4);
 }
-struct umbra_sdf_rect umbra_sdf_rect(float const rect[4]) {
-    struct umbra_sdf_rect c = {
+struct umbra_sdf_rect umbra_sdf_rect(umbra_rect rect) {
+    return (struct umbra_sdf_rect){
         .base = {.build = sdf_rect_build_, .fill = sdf_rect_fill_},
+        .rect = rect,
     };
-    __builtin_memcpy(c.rect, rect, 16);
-    return c;
 }
 
 static umbra_val32 bitmap_build_(struct umbra_coverage *s, struct umbra_builder *builder,

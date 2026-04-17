@@ -303,7 +303,7 @@ TEST(test_srcover_fp16) {
 
 TEST(test_coverage_rect) {
     struct umbra_shader_solid shader = umbra_shader_solid((umbra_color){1, 0, 0, 1});
-    struct umbra_coverage_rect cov = umbra_coverage_rect((float[]){2.0f, 0.0f, 5.0f, 1.0f});
+    struct umbra_coverage_rect cov = umbra_coverage_rect((umbra_rect){2.0f, 0.0f, 5.0f, 1.0f});
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_builder(&shader.base, &cov.base,
                                                  umbra_blend_srcover,
@@ -334,7 +334,7 @@ TEST(test_coverage_rect) {
 
 TEST(test_coverage_rect_scalar) {
     struct umbra_shader_solid shader = umbra_shader_solid((umbra_color){1, 0, 0, 1});
-    struct umbra_coverage_rect cov = umbra_coverage_rect((float[]){1.0f, 0.0f, 3.0f, 1.0f});
+    struct umbra_coverage_rect cov = umbra_coverage_rect((umbra_rect){1.0f, 0.0f, 3.0f, 1.0f});
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_builder(&shader.base, &cov.base,
                                                  umbra_blend_srcover,
@@ -363,7 +363,7 @@ TEST(test_coverage_rect_scalar) {
 
 TEST(test_coverage_rect_n9) {
     struct umbra_shader_solid shader = umbra_shader_solid((umbra_color){0, 1, 0, 1});
-    struct umbra_coverage_rect cov = umbra_coverage_rect((float[]){3.0f, 0.0f, 7.0f, 1.0f});
+    struct umbra_coverage_rect cov = umbra_coverage_rect((umbra_rect){3.0f, 0.0f, 7.0f, 1.0f});
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_builder(&shader.base, &cov.base,
                                                  umbra_blend_srcover,
@@ -393,7 +393,7 @@ TEST(test_coverage_rect_n9) {
 
 TEST(test_coverage_rect_offset) {
     struct umbra_shader_solid shader = umbra_shader_solid((umbra_color){0, 1, 0, 1});
-    struct umbra_coverage_rect cov = umbra_coverage_rect((float[]){1.0f, 0.0f, 3.0f, 10.0f});
+    struct umbra_coverage_rect cov = umbra_coverage_rect((umbra_rect){1.0f, 0.0f, 3.0f, 10.0f});
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_builder(&shader.base, &cov.base,
                                                  umbra_blend_src,
@@ -420,7 +420,7 @@ TEST(test_coverage_rect_offset) {
 
 TEST(test_coverage_rect_outside_y) {
     struct umbra_shader_solid shader = umbra_shader_solid((umbra_color){1, 1, 1, 1});
-    struct umbra_coverage_rect cov = umbra_coverage_rect((float[]){0.0f, 5.0f, 10.0f, 10.0f});
+    struct umbra_coverage_rect cov = umbra_coverage_rect((umbra_rect){0.0f, 5.0f, 10.0f, 10.0f});
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_builder(&shader.base, &cov.base,
                                                  umbra_blend_srcover,
@@ -615,7 +615,7 @@ TEST(test_srcover_8888_n9) {
 
 TEST(test_full_pipeline) {
     struct umbra_shader_solid shader = umbra_shader_solid((umbra_color){1, 0, 0, 1});
-    struct umbra_coverage_rect cov = umbra_coverage_rect((float[]){2.0f, 0.0f, 7.0f, 1.0f});
+    struct umbra_coverage_rect cov = umbra_coverage_rect((umbra_rect){2.0f, 0.0f, 7.0f, 1.0f});
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_builder(&shader.base, &cov.base,
                                                  umbra_blend_srcover,
@@ -679,7 +679,7 @@ TEST(test_solid_src_fp16_n9) {
 
 TEST(test_coverage_rect_white_dst) {
     struct umbra_shader_solid shader = umbra_shader_solid((umbra_color){1, 0, 0, 1});
-    struct umbra_coverage_rect cov = umbra_coverage_rect((float[]){0, 0, 0, 0});
+    struct umbra_coverage_rect cov = umbra_coverage_rect((umbra_rect){0, 0, 0, 0});
     struct umbra_draw_layout lay;
     struct draw_backends B = make_draw(umbra_draw_builder(&shader.base, &cov.base,
                                                  umbra_blend_srcover,
@@ -703,7 +703,7 @@ TEST(test_coverage_rect_white_dst) {
             uint32_t dst[24];
             __builtin_memset(dst, 0xFF, (size_t)rc.n * 4);
             shader.color = (umbra_color){1, 0, 0, 1};
-            __builtin_memcpy(cov.rect, (float[]){rc.x0, 0.0f, rc.x1, 1.0f}, 16);
+            cov.rect = (umbra_rect){rc.x0, 0.0f, rc.x1, 1.0f};
             umbra_draw_fill(&B.lay, &shader.base, &cov.base);
             if (run_draw(&B, bi, rc.n, 1,
                           (struct umbra_buf[]){
@@ -1352,7 +1352,7 @@ TEST(test_srcover_fp16_planar) {
 
 TEST(test_sdf_dispatch_rect) {
     struct umbra_shader_solid shader = umbra_shader_solid((umbra_color){1, 0, 0, 1});
-    struct umbra_sdf_rect     sdf   = umbra_sdf_rect((float[]){1.0f, 1.0f, 7.0f, 3.0f});
+    struct umbra_sdf_rect     sdf   = umbra_sdf_rect((umbra_rect){1.0f, 1.0f, 7.0f, 3.0f});
 
     struct umbra_backend *bes[NUM_BACKENDS] = {
         umbra_backend_interp(), umbra_backend_jit(),
