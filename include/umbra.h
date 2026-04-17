@@ -23,10 +23,10 @@ struct umbra_backend_stats {
 };
 
 struct umbra_backend {
-    struct umbra_program* (*compile)(struct umbra_backend*, struct umbra_flat_ir const*);
-    void                  (*flush  )(struct umbra_backend*);
-    void                  (*free   )(struct umbra_backend*);
-    struct umbra_backend_stats (*stats)(struct umbra_backend const*);
+    struct umbra_program*      (*compile)(struct umbra_backend*, struct umbra_flat_ir const*);
+    void                       (*flush  )(struct umbra_backend*);
+    void                       (*free   )(struct umbra_backend*);
+    struct umbra_backend_stats (*stats  )(struct umbra_backend const*);
 };
 struct umbra_backend* umbra_backend_interp(void);
 struct umbra_backend* umbra_backend_jit   (void);
@@ -59,9 +59,12 @@ void   umbra_uniforms_fill_ptr(void *uniforms, int slot, struct umbra_buf);
 
 typedef struct { int id:30; unsigned chan:2; } umbra_val16;
 typedef struct { int id:30; unsigned chan:2; } umbra_val32;
+
 typedef struct { int ix:31, deref:1; } umbra_ptr16;
 typedef struct { int ix:31, deref:1; } umbra_ptr32;
 typedef struct { int ix:31, deref:1; } umbra_ptr64;
+
+// TODO: rename this umbra_var32 and update methods to include var32 in the name
 typedef struct { int id; } umbra_var;
 
 umbra_ptr16 umbra_deref_ptr16(struct umbra_builder*, umbra_ptr32 buf, int slot);
@@ -148,12 +151,14 @@ umbra_val32 umbra_le_s32(struct umbra_builder*, umbra_val32, umbra_val32);
 umbra_val32 umbra_lt_u32(struct umbra_builder*, umbra_val32, umbra_val32);
 umbra_val32 umbra_le_u32(struct umbra_builder*, umbra_val32, umbra_val32);
 
-umbra_val32 umbra_loop    (struct umbra_builder*, umbra_val32 n);
+// TODO: renames: umbra_loop, umbra_end_loop, umbra_if, umbra_end_if
+umbra_val32 umbra_loop    (struct umbra_builder*, umbra_val32 uniform_loop_count);
 void        umbra_loop_end(struct umbra_builder*);
 
 void        umbra_if   (struct umbra_builder*, umbra_val32 cond);
 void        umbra_endif(struct umbra_builder*);
 
+// TODO: rename umbra_alloc_var32, umbra_load_var32, umbra_store_var32
 umbra_var   umbra_var_alloc(struct umbra_builder*);
 umbra_val32 umbra_load_var (struct umbra_builder*, umbra_var);
-void        umbra_store_var(struct umbra_builder*, umbra_var, umbra_val32 x);
+void        umbra_store_var(struct umbra_builder*, umbra_var, umbra_val32);
