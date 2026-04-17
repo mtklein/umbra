@@ -431,10 +431,10 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct ir_inst const
 
     // Free channel registers whose per-channel last use has expired.
 #define FREE_CHAN_RA(op) do {                                                            \
-    struct ra_slot *s_ = &ra->slot[(op).id];                                        \
-    if ((op).chan && (op).id < i && s_->chan_last_use[(int)(op).chan] <= i) {      \
-        int8_t r_ = s_->chan_reg[(int)(op).chan];                                        \
-        if (r_ >= 0) { ra_return_reg(ra, r_); s_->chan_reg[(int)(op).chan] = -1; }      \
+    struct ra_slot *rs = &ra->slot[(op).id];                                             \
+    if ((op).chan && (op).id < i && rs->chan_last_use[(int)(op).chan] <= i) {            \
+        int8_t reg = rs->chan_reg[(int)(op).chan];                                       \
+        if (reg >= 0) { ra_return_reg(ra, reg); rs->chan_reg[(int)(op).chan] = -1; }     \
     }                                                                                    \
 } while(0)
     FREE_CHAN_RA(inst->x);

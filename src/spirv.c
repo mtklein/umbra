@@ -1263,10 +1263,10 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                     uint32_t addr = compute_addr(&B, x_coord, y_coord, p);
                     uint32_t r  = as_u32(&B, get_val(&B, inst->x), xid);
                     uint32_t g  = as_u32(&B, get_val(&B, inst->y), yid);
-                    uint32_t b_ = as_u32(&B, get_val(&B, inst->z), get_id(inst->z));
+                    uint32_t b  = as_u32(&B, get_val(&B, inst->z), get_id(inst->z));
                     uint32_t a  = as_u32(&B, get_val(&B, inst->w), get_id(inst->w));
                     uint32_t g_sh = spv_binop(&B, SpvOpShiftLeftLogical, B.t_u32, g, B.c_8);
-                    uint32_t b_sh = spv_binop(&B, SpvOpShiftLeftLogical, B.t_u32, b_, B.c_16);
+                    uint32_t b_sh = spv_binop(&B, SpvOpShiftLeftLogical, B.t_u32, b, B.c_16);
                     uint32_t c_24 = spv_const_u32(&B, 24);
                     uint32_t a_sh = spv_binop(&B, SpvOpShiftLeftLogical, B.t_u32, a, c_24);
                     uint32_t rg  = spv_binop(&B, SpvOpBitwiseOr, B.t_u32, r, g_sh);

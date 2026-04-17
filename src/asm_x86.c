@@ -89,8 +89,8 @@ void vmov_store(Buf *b, int L, int reg, int base, int index, int scale, int disp
     vex_mem(b, 2, 1, 0, L, reg, 0, 0x7f, base, index, scale, disp);
 }
 
-void rex_w(Buf *b, int r, int b_) {
-    emit1(b, (uint8_t)(0x48 | ((r >> 3) << 2) | (b_ >> 3)));
+void rex_w(Buf *b, int r, int breg) {
+    emit1(b, (uint8_t)(0x48 | ((r >> 3) << 2) | (breg >> 3)));
 }
 void push_r(Buf *b, int r) {
     if (r >= 8) { emit1(b, 0x41); }

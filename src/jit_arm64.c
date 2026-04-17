@@ -759,7 +759,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
         case op_store_16x4: {
             int8_t rr   = ra_ensure_chan(ra, sl, ns, inst->x.id, (int)inst->x.chan);
             int8_t rg   = ra_ensure_chan(ra, sl, ns, inst->y.id, (int)inst->y.chan);
-            int8_t rb_  = ra_ensure_chan(ra, sl, ns, inst->z.id, (int)inst->z.chan);
+            int8_t rb  = ra_ensure_chan(ra, sl, ns, inst->z.id, (int)inst->z.chan);
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, inst->w.id, (int)inst->w.chan);
             ptr    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 3);
@@ -768,7 +768,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 int8_t t  = ra_alloc(ra, sl, ns);
                 int8_t z  = ra_alloc(ra, sl, ns);
                 put(c, ZIP1_8h(lo(t), lo(rr), lo(rg)));
-                put(c, ZIP1_8h(lo(px), lo(rb_), lo(ra_v)));
+                put(c, ZIP1_8h(lo(px), lo(rb), lo(ra_v)));
                 put(c, ZIP1_4s(lo(z), lo(t), lo(px)));
                 put(c, LSL_xi(XT, XI, 3));
                 put(c, ADD_xr(XT, XP, XT));
@@ -779,14 +779,14 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             } else {
                 put(c, ORR_16b(0, lo(rr),   lo(rr)));
                 put(c, ORR_16b(1, lo(rg),   lo(rg)));
-                put(c, ORR_16b(2, lo(rb_),  lo(rb_)));
+                put(c, ORR_16b(2, lo(rb),  lo(rb)));
                 put(c, ORR_16b(3, lo(ra_v), lo(ra_v)));
                 put(c, LSL_xi(XT, XI, 3));
                 put(c, ADD_xr(XT, XP, XT));
                 put(c, ST4_4h(0, XT));
                 put(c, ORR_16b(0, hi(rr),   hi(rr)));
                 put(c, ORR_16b(1, hi(rg),   hi(rg)));
-                put(c, ORR_16b(2, hi(rb_),  hi(rb_)));
+                put(c, ORR_16b(2, hi(rb),  hi(rb)));
                 put(c, ORR_16b(3, hi(ra_v), hi(ra_v)));
                 put(c, ADD_xi(XT, XT, 32));
                 put(c, ST4_4h(0, XT));
@@ -799,7 +799,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
         case op_store_16x4_planar: {
             int8_t rr   = ra_ensure_chan(ra, sl, ns, inst->x.id, (int)inst->x.chan);
             int8_t rg   = ra_ensure_chan(ra, sl, ns, inst->y.id, (int)inst->y.chan);
-            int8_t rb_  = ra_ensure_chan(ra, sl, ns, inst->z.id, (int)inst->z.chan);
+            int8_t rb  = ra_ensure_chan(ra, sl, ns, inst->z.id, (int)inst->z.chan);
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, inst->w.id, (int)inst->w.chan);
             ptr    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 1);
@@ -814,7 +814,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 put(c, ADD_xr(XP, XP, XT));
                 put(c, STR_hx(lo(rg), XP, XI));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, STR_hx(lo(rb_), XP, XI));
+                put(c, STR_hx(lo(rb), XP, XI));
                 put(c, ADD_xr(XP, XP, XT));
                 put(c, STR_hx(lo(ra_v), XP, XI));
             } else {
@@ -826,8 +826,8 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 put(c, STR_di(lo(rg), XM, 0));
                 put(c, STR_di(hi(rg), XM, 1));
                 put(c, ADD_xr(XM, XM, XT));
-                put(c, STR_di(lo(rb_), XM, 0));
-                put(c, STR_di(hi(rb_), XM, 1));
+                put(c, STR_di(lo(rb), XM, 0));
+                put(c, STR_di(hi(rb), XM, 1));
                 put(c, ADD_xr(XM, XM, XT));
                 put(c, STR_di(lo(ra_v), XM, 0));
                 put(c, STR_di(hi(ra_v), XM, 1));
@@ -883,7 +883,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
         case op_store_8x4: {
             int8_t rr   = ra_ensure_chan(ra, sl, ns, inst->x.id, (int)inst->x.chan);
             int8_t rg   = ra_ensure_chan(ra, sl, ns, inst->y.id, (int)inst->y.chan);
-            int8_t rb_  = ra_ensure_chan(ra, sl, ns, inst->z.id, (int)inst->z.chan);
+            int8_t rb  = ra_ensure_chan(ra, sl, ns, inst->z.id, (int)inst->z.chan);
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, inst->w.id, (int)inst->w.chan);
             ptr    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
@@ -891,7 +891,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 int8_t px = ra_alloc(ra, sl, ns);
                 int8_t t  = ra_alloc(ra, sl, ns);
                 put(c, SHL_4s_imm(lo(t), lo(rg), 8));    put(c, ORR_16b(lo(px), lo(rr), lo(t)));
-                put(c, SHL_4s_imm(lo(t), lo(rb_), 16));  put(c, ORR_16b(lo(px), lo(px), lo(t)));
+                put(c, SHL_4s_imm(lo(t), lo(rb), 16));  put(c, ORR_16b(lo(px), lo(px), lo(t)));
                 put(c, SHL_4s_imm(lo(t), lo(ra_v), 24)); put(c, ORR_16b(lo(px), lo(px), lo(t)));
                 put(c, STR_sx(lo(px), XP, XI));
                 ra_return_reg(ra, t);
@@ -902,7 +902,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 put(c, XTN_8b(0, 0));
                 put(c, XTN_4h(1, lo(rg)));   put(c, W(XTN_4h(1, hi(rg))));
                 put(c, XTN_8b(1, 1));
-                put(c, XTN_4h(2, lo(rb_)));  put(c, W(XTN_4h(2, hi(rb_))));
+                put(c, XTN_4h(2, lo(rb)));  put(c, W(XTN_4h(2, hi(rb))));
                 put(c, XTN_8b(2, 2));
                 put(c, XTN_4h(3, lo(ra_v))); put(c, W(XTN_4h(3, hi(ra_v))));
                 put(c, XTN_8b(3, 3));

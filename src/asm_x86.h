@@ -19,7 +19,7 @@ int  vex_rip(struct asm_x86 *b, int pp, int mm, int W, int L, int reg, int v, ui
 void vmov_load(struct asm_x86 *b, int L, int reg, int base, int index, int scale, int disp);
 void vmov_store(struct asm_x86 *b, int L, int reg, int base, int index, int scale, int disp);
 
-void rex_w(struct asm_x86 *b, int r, int b_);
+void rex_w(struct asm_x86 *b, int r, int breg);
 void push_r(struct asm_x86 *b, int r);
 void pop_r(struct asm_x86 *b, int r);
 void add_ri(struct asm_x86 *b, int d, int32_t imm);
