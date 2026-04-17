@@ -498,14 +498,12 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
     }
     free(bindings);
 
-    // Push constant range.
     VkPushConstantRange pcr = {
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
         .offset = 0,
         .size = (uint32_t)(sr.push_words * (int)sizeof(uint32_t)),
     };
 
-    // Pipeline layout.
     VkPipelineLayout pipe_layout;
     {
         VkPipelineLayoutCreateInfo ci = {
