@@ -377,7 +377,6 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
 
     int n = p->total_bufs;
 
-    // Resolve bindings.
     WGPUBuffer bind_buf   [32];
     uint64_t   bind_offset[32];
     uint64_t   bind_size  [32];
@@ -408,7 +407,6 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
         }
     }
 
-    // Push constant data.
     uint32_t push_data[67] = {0};
     push_data[0] = (uint32_t)w;
     push_data[1] = (uint32_t)l;
@@ -418,7 +416,6 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
         push_data[3 + p->total_bufs + i] = (uint32_t)buf[i].stride;
     }
 
-    // Resolve derefs.
     for (int d = 0; d < p->n_deref; d++) {
         char const *uni = (char const*)buf[p->deref[d].src_buf].ptr
                                 + p->deref[d].off * 4;
