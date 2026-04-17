@@ -118,7 +118,7 @@ struct umbra_sdf_draw_config {
 };
 
 struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend*,
-                                      struct umbra_sdf *coverage,
+                                      struct umbra_sdf*,
                                       struct umbra_sdf_draw_config,
                                       struct umbra_shader*,
                                       umbra_blend_fn,
