@@ -1,5 +1,3 @@
-// TODO: adapt iv2d's SDF text rendering as a follow-up.
-
 // TODO: add a "butt" slide recreating the smiling anthropomorphic butt from
 // https://mtklein.github.io/butts/.  The original is an SVG with a bean-shaped
 // body (single cubic path), stick-figure arms and legs (polylines), a curved
