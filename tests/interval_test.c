@@ -246,10 +246,10 @@ TEST(interval_loop) {
     umbra_interval const x = {umbra_uniform_32(bld, u, x_off),
                               umbra_uniform_32(bld, u, x_off + 1)};
 
-    umbra_var lo_var = umbra_var_alloc(bld);
-    umbra_var hi_var = umbra_var_alloc(bld);
-    umbra_store_var(bld, lo_var, umbra_imm_f32(bld, -1e9f));
-    umbra_store_var(bld, hi_var, umbra_imm_f32(bld, -1e9f));
+    struct umbra_var32 lo_var = umbra_var32(bld);
+    struct umbra_var32 hi_var = umbra_var32(bld);
+    umbra_store_var32(bld, lo_var, umbra_imm_f32(bld, -1e9f));
+    umbra_store_var32(bld, hi_var, umbra_imm_f32(bld, -1e9f));
 
     umbra_val32 const j = umbra_loop(bld, n); {
         umbra_val32 const idx = umbra_mul_i32(bld, j, umbra_imm_i32(bld, 2));
@@ -258,12 +258,12 @@ TEST(interval_loop) {
             umbra_gather_32(bld, data, umbra_add_i32(bld, idx, umbra_imm_i32(bld, 1))));
         umbra_interval const val = umbra_interval_sub_f32(bld,
                                        umbra_interval_mul_f32(bld, a, x), b_iv);
-        umbra_store_var(bld, lo_var, umbra_max_f32(bld, umbra_load_var(bld, lo_var), val.lo));
-        umbra_store_var(bld, hi_var, umbra_max_f32(bld, umbra_load_var(bld, hi_var), val.hi));
-    } umbra_loop_end(bld);
+        umbra_store_var32(bld, lo_var, umbra_max_f32(bld, umbra_load_var32(bld, lo_var), val.lo));
+        umbra_store_var32(bld, hi_var, umbra_max_f32(bld, umbra_load_var32(bld, hi_var), val.hi));
+    } umbra_end_loop(bld);
 
-    umbra_store_32(bld, (umbra_ptr32){.ix = 1}, umbra_load_var(bld, lo_var));
-    umbra_store_32(bld, (umbra_ptr32){.ix = 2}, umbra_load_var(bld, hi_var));
+    umbra_store_32(bld, (umbra_ptr32){.ix = 1}, umbra_load_var32(bld, lo_var));
+    umbra_store_32(bld, (umbra_ptr32){.ix = 2}, umbra_load_var32(bld, hi_var));
 
     struct umbra_flat_ir *ir = umbra_flat_ir(bld);
     umbra_builder_free(bld);

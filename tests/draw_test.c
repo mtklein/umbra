@@ -1507,15 +1507,15 @@ TEST(test_metal_loop_gather) {
     umbra_ptr32 const data = umbra_deref_ptr32(b, u, ptr_off);
     umbra_val32 const n    = umbra_uniform_32(b, u, n_off);
 
-    umbra_var sum = umbra_var_alloc(b);
-    umbra_store_var(b, sum, umbra_imm_f32(b, 0.0f));
+    struct umbra_var32 sum = umbra_var32(b);
+    umbra_store_var32(b, sum, umbra_imm_f32(b, 0.0f));
 
     umbra_val32 const j = umbra_loop(b, n); {
         umbra_val32 const val = umbra_gather_32(b, data, j);
-        umbra_store_var(b, sum, umbra_add_f32(b, umbra_load_var(b, sum), val));
-    } umbra_loop_end(b);
+        umbra_store_var32(b, sum, umbra_add_f32(b, umbra_load_var32(b, sum), val));
+    } umbra_end_loop(b);
 
-    umbra_store_32(b, (umbra_ptr32){.ix = 1}, umbra_load_var(b, sum));
+    umbra_store_32(b, (umbra_ptr32){.ix = 1}, umbra_load_var32(b, sum));
 
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);

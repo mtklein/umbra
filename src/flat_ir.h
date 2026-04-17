@@ -30,15 +30,15 @@ struct ir_inst {
 };
 
 struct umbra_builder {
-    struct ir_inst *inst;
-    _Bool          *var_uniform;
-    int             insts, cap;
-    struct hash     ht;
-    int             n_vars;
-    _Bool           has_loop, loop_closed, pad0[2];
-    umbra_val32     loop_trip;
-    umbra_var       loop_var;
-    int             if_depth, pad1;
+    struct ir_inst    *inst;
+    _Bool             *var_uniform;
+    int                insts, cap;
+    struct hash        ht;
+    int                n_vars;
+    _Bool              has_loop, loop_closed, pad0[2];
+    umbra_val32        loop_trip;
+    struct umbra_var32 loop_var;
+    int                if_depth, pad1;
 };
 
 struct umbra_flat_ir {

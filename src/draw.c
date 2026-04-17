@@ -476,10 +476,10 @@ static umbra_color_val32 walk_stops(struct umbra_builder *b, umbra_val32 t,
     umbra_val32 const n2 = umbra_add_i32(b, n_i, n_i);
     umbra_val32 const n3 = umbra_add_i32(b, n2, n_i);
 
-    umbra_var vr = umbra_var_alloc(b),
-              vg = umbra_var_alloc(b),
-              vb = umbra_var_alloc(b),
-              va = umbra_var_alloc(b);
+    struct umbra_var32 vr = umbra_var32(b),
+                       vg = umbra_var32(b),
+                       vb = umbra_var32(b),
+                       va = umbra_var32(b);
 
     umbra_val32 i = umbra_loop(b, n_segs); {
         umbra_val32 i1 = umbra_add_i32(b, i, umbra_imm_i32(b, 1));
@@ -502,18 +502,18 @@ static umbra_color_val32 walk_stops(struct umbra_builder *b, umbra_val32 t,
             umbra_val32 a0 = umbra_gather_32(b, colors, umbra_add_i32(b, i,  n3));
             umbra_val32 a1 = umbra_gather_32(b, colors, umbra_add_i32(b, i1, n3));
 
-            umbra_store_var(b, vr, lerp_f(b, r0, r1, frac));
-            umbra_store_var(b, vg, lerp_f(b, g0, g1, frac));
-            umbra_store_var(b, vb, lerp_f(b, b0, b1, frac));
-            umbra_store_var(b, va, lerp_f(b, a0, a1, frac));
-        } umbra_endif(b);
-    } umbra_loop_end(b);
+            umbra_store_var32(b, vr, lerp_f(b, r0, r1, frac));
+            umbra_store_var32(b, vg, lerp_f(b, g0, g1, frac));
+            umbra_store_var32(b, vb, lerp_f(b, b0, b1, frac));
+            umbra_store_var32(b, va, lerp_f(b, a0, a1, frac));
+        } umbra_end_if(b);
+    } umbra_end_loop(b);
 
     return (umbra_color_val32){
-        umbra_load_var(b, vr),
-        umbra_load_var(b, vg),
-        umbra_load_var(b, vb),
-        umbra_load_var(b, va),
+        umbra_load_var32(b, vr),
+        umbra_load_var32(b, vg),
+        umbra_load_var32(b, vb),
+        umbra_load_var32(b, va),
     };
 }
 

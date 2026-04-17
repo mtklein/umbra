@@ -310,7 +310,7 @@ struct umbra_builder* slug_build(struct slug_layout *lay) {
             umbra_lt_f32(b, gy, bh)));
 
     umbra_val32 count = umbra_uniform_32(b, (umbra_ptr32){0}, ni);
-    umbra_var wind = umbra_var_alloc(b);
+    struct umbra_var32 wind = umbra_var32(b);
 
     umbra_val32 j = umbra_loop(b, count); {
         umbra_val32 k = umbra_mul_i32(b, j, umbra_imm_i32(b, 6));
@@ -387,10 +387,10 @@ struct umbra_builder* slug_build(struct slug_layout *lay) {
 
         umbra_val32 dw = umbra_sel_32(b, in, umbra_add_f32(b, w1, w2), z);
 
-        umbra_store_var(b, wind, umbra_add_f32(b, umbra_load_var(b, wind), dw));
-    } umbra_loop_end(b);
+        umbra_store_var32(b, wind, umbra_add_f32(b, umbra_load_var32(b, wind), dw));
+    } umbra_end_loop(b);
 
-    umbra_store_32(b, (umbra_ptr32){.ix=1}, umbra_load_var(b, wind));
+    umbra_store_32(b, (umbra_ptr32){.ix=1}, umbra_load_var32(b, wind));
 
     if (lay) {
         lay->mat        = fi;

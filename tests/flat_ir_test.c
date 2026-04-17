@@ -4095,12 +4095,12 @@ TEST(test_stats_safe) {
 
 TEST(test_loop_accumulate) {
     struct umbra_builder *b = umbra_builder();
-    umbra_var acc = umbra_var_alloc(b);
+    struct umbra_var32 acc = umbra_var32(b);
     umbra_val32 n = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
     umbra_loop(b, n); {
-        umbra_store_var(b, acc, umbra_add_i32(b, umbra_load_var(b, acc), umbra_imm_i32(b, 1)));
-    } umbra_loop_end(b);
-    umbra_store_32(b, (umbra_ptr32){.ix = 1}, umbra_load_var(b, acc));
+        umbra_store_var32(b, acc, umbra_add_i32(b, umbra_load_var32(b, acc), umbra_imm_i32(b, 1)));
+    } umbra_end_loop(b);
+    umbra_store_32(b, (umbra_ptr32){.ix = 1}, umbra_load_var32(b, acc));
     struct test_backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         int32_t uni[1] = {10};
@@ -4120,13 +4120,13 @@ TEST(test_loop_accumulate) {
 
 TEST(test_loop_zero_trip) {
     struct umbra_builder *b = umbra_builder();
-    umbra_var acc = umbra_var_alloc(b);
-    umbra_store_var(b, acc, umbra_imm_i32(b, 42));
+    struct umbra_var32 acc = umbra_var32(b);
+    umbra_store_var32(b, acc, umbra_imm_i32(b, 42));
     umbra_val32 n = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
     umbra_loop(b, n); {
-        umbra_store_var(b, acc, umbra_imm_i32(b, 99));
-    } umbra_loop_end(b);
-    umbra_store_32(b, (umbra_ptr32){.ix = 1}, umbra_load_var(b, acc));
+        umbra_store_var32(b, acc, umbra_imm_i32(b, 99));
+    } umbra_end_loop(b);
+    umbra_store_32(b, (umbra_ptr32){.ix = 1}, umbra_load_var32(b, acc));
     struct test_backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         int32_t uni[1] = {0};
@@ -4144,13 +4144,13 @@ TEST(test_loop_zero_trip) {
 
 TEST(test_loop_gather_sum) {
     struct umbra_builder *b = umbra_builder();
-    umbra_var acc = umbra_var_alloc(b);
+    struct umbra_var32 acc = umbra_var32(b);
     umbra_val32 n = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
     umbra_val32 i = umbra_loop(b, n); {
-        umbra_store_var(b, acc, umbra_add_f32(b, umbra_load_var(b, acc),
+        umbra_store_var32(b, acc, umbra_add_f32(b, umbra_load_var32(b, acc),
                                               umbra_gather_32(b, (umbra_ptr32){.ix = 1}, i)));
-    } umbra_loop_end(b);
-    umbra_store_32(b, (umbra_ptr32){.ix = 2}, umbra_load_var(b, acc));
+    } umbra_end_loop(b);
+    umbra_store_32(b, (umbra_ptr32){.ix = 2}, umbra_load_var32(b, acc));
     struct test_backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         int32_t uni[1] = {4};
@@ -4170,12 +4170,12 @@ TEST(test_loop_gather_sum) {
 
 TEST(test_loop_induction_value) {
     struct umbra_builder *b = umbra_builder();
-    umbra_var acc = umbra_var_alloc(b);
+    struct umbra_var32 acc = umbra_var32(b);
     umbra_val32 n = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
     umbra_val32 i = umbra_loop(b, n); {
-        umbra_store_var(b, acc, umbra_add_i32(b, umbra_load_var(b, acc), i));
-    } umbra_loop_end(b);
-    umbra_store_32(b, (umbra_ptr32){.ix = 1}, umbra_load_var(b, acc));
+        umbra_store_var32(b, acc, umbra_add_i32(b, umbra_load_var32(b, acc), i));
+    } umbra_end_loop(b);
+    umbra_store_32(b, (umbra_ptr32){.ix = 1}, umbra_load_var32(b, acc));
     struct test_backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         int32_t uni[1] = {5};
@@ -4193,16 +4193,16 @@ TEST(test_loop_induction_value) {
 
 TEST(test_loop_multi_var) {
     struct umbra_builder *b = umbra_builder();
-    umbra_var sum = umbra_var_alloc(b);
-    umbra_var count = umbra_var_alloc(b);
+    struct umbra_var32 sum = umbra_var32(b);
+    struct umbra_var32 count = umbra_var32(b);
     umbra_val32 n = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
     umbra_loop(b, n); {
-        umbra_val32 s = umbra_load_var(b, sum);
-        umbra_val32 c = umbra_load_var(b, count);
-        umbra_store_var(b, sum, umbra_add_f32(b, s, umbra_gather_32(b, (umbra_ptr32){.ix = 1}, c)));
-        umbra_store_var(b, count, umbra_add_i32(b, c, umbra_imm_i32(b, 1)));
-    } umbra_loop_end(b);
-    umbra_store_32(b, (umbra_ptr32){.ix = 2}, umbra_load_var(b, sum));
+        umbra_val32 s = umbra_load_var32(b, sum);
+        umbra_val32 c = umbra_load_var32(b, count);
+        umbra_store_var32(b, sum, umbra_add_f32(b, s, umbra_gather_32(b, (umbra_ptr32){.ix = 1}, c)));
+        umbra_store_var32(b, count, umbra_add_i32(b, c, umbra_imm_i32(b, 1)));
+    } umbra_end_loop(b);
+    umbra_store_32(b, (umbra_ptr32){.ix = 2}, umbra_load_var32(b, sum));
     struct test_backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         int32_t uni[1] = {3};
@@ -4222,13 +4222,13 @@ TEST(test_loop_multi_var) {
 
 TEST(test_loop_init_then_accumulate) {
     struct umbra_builder *b = umbra_builder();
-    umbra_var acc = umbra_var_alloc(b);
-    umbra_store_var(b, acc, umbra_imm_i32(b, 100));
+    struct umbra_var32 acc = umbra_var32(b);
+    umbra_store_var32(b, acc, umbra_imm_i32(b, 100));
     umbra_val32 n = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
     umbra_loop(b, n); {
-        umbra_store_var(b, acc, umbra_add_i32(b, umbra_load_var(b, acc), umbra_imm_i32(b, 1)));
-    } umbra_loop_end(b);
-    umbra_store_32(b, (umbra_ptr32){.ix = 1}, umbra_load_var(b, acc));
+        umbra_store_var32(b, acc, umbra_add_i32(b, umbra_load_var32(b, acc), umbra_imm_i32(b, 1)));
+    } umbra_end_loop(b);
+    umbra_store_32(b, (umbra_ptr32){.ix = 1}, umbra_load_var32(b, acc));
     struct test_backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         int32_t uni[1] = {5};
@@ -4250,17 +4250,17 @@ TEST(test_loop_pre_and_post) {
     umbra_val32 px = umbra_load_32(b, (umbra_ptr32){0});
     umbra_val32 base = umbra_mul_f32(b, px, umbra_imm_f32(b, 0.5f));
 
-    umbra_var acc = umbra_var_alloc(b);
-    umbra_store_var(b, acc, base);
+    struct umbra_var32 acc = umbra_var32(b);
+    umbra_store_var32(b, acc, base);
 
     umbra_val32 n = umbra_uniform_32(b, (umbra_ptr32){.ix = 1}, 0);
     umbra_val32 i = umbra_loop(b, n); {
-        umbra_val32 cur = umbra_load_var(b, acc);
+        umbra_val32 cur = umbra_load_var32(b, acc);
         umbra_val32 elem = umbra_gather_32(b, (umbra_ptr32){.ix = 2}, i);
-        umbra_store_var(b, acc, umbra_add_f32(b, cur, elem));
-    } umbra_loop_end(b);
+        umbra_store_var32(b, acc, umbra_add_f32(b, cur, elem));
+    } umbra_end_loop(b);
 
-    umbra_val32 result = umbra_load_var(b, acc);
+    umbra_val32 result = umbra_load_var32(b, acc);
     umbra_val32 doubled = umbra_mul_f32(b, result, umbra_imm_f32(b, 2.0f));
     umbra_store_32(b, (umbra_ptr32){.ix = 3}, doubled);
 
@@ -4289,7 +4289,7 @@ TEST(test_loop_sel_gather) {
     umbra_val32 n = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
     umbra_val32 t = umbra_load_32(b, (umbra_ptr32){.ix = 1});
 
-    umbra_var vr = umbra_var_alloc(b);
+    struct umbra_var32 vr = umbra_var32(b);
 
     umbra_val32 i = umbra_loop(b, n); {
         umbra_val32 i1 = umbra_add_i32(b, i, umbra_imm_i32(b, 1));
@@ -4307,10 +4307,10 @@ TEST(test_loop_sel_gather) {
         umbra_val32 lerped = umbra_add_f32(b, c0,
                                  umbra_mul_f32(b, umbra_sub_f32(b, c1, c0), frac));
 
-        umbra_store_var(b, vr, umbra_sel_32(b, in_seg, lerped, umbra_load_var(b, vr)));
-    } umbra_loop_end(b);
+        umbra_store_var32(b, vr, umbra_sel_32(b, in_seg, lerped, umbra_load_var32(b, vr)));
+    } umbra_end_loop(b);
 
-    umbra_store_32(b, (umbra_ptr32){.ix = 4}, umbra_load_var(b, vr));
+    umbra_store_32(b, (umbra_ptr32){.ix = 4}, umbra_load_var32(b, vr));
 
     struct test_backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
@@ -4363,9 +4363,9 @@ TEST(test_loop_high_register_pressure) {
     umbra_val32 p = umbra_mul_f32(b, px, umbra_imm_f32(b, 14.0f));
     umbra_val32 q = umbra_mul_f32(b, px, umbra_imm_f32(b, 15.0f));
 
-    umbra_var acc = umbra_var_alloc(b);
+    struct umbra_var32 acc = umbra_var32(b);
     umbra_loop(b, n); {
-        umbra_val32 cur = umbra_load_var(b, acc);
+        umbra_val32 cur = umbra_load_var32(b, acc);
         umbra_val32 sum = umbra_add_f32(b, a, c);
         sum = umbra_add_f32(b, sum, d);
         sum = umbra_add_f32(b, sum, e);
@@ -4379,10 +4379,10 @@ TEST(test_loop_high_register_pressure) {
         sum = umbra_add_f32(b, sum, o);
         sum = umbra_add_f32(b, sum, p);
         sum = umbra_add_f32(b, sum, q);
-        umbra_store_var(b, acc, umbra_add_f32(b, cur, sum));
-    } umbra_loop_end(b);
+        umbra_store_var32(b, acc, umbra_add_f32(b, cur, sum));
+    } umbra_end_loop(b);
 
-    umbra_store_32(b, (umbra_ptr32){.ix = 2}, umbra_load_var(b, acc));
+    umbra_store_32(b, (umbra_ptr32){.ix = 2}, umbra_load_var32(b, acc));
 
     struct test_backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
@@ -4408,17 +4408,17 @@ TEST(test_loop_var_war_hazard) {
     // once for the increment) and the store of the incremented value must wait
     // for both loads.
     struct umbra_builder *b = umbra_builder();
-    umbra_var idx = umbra_var_alloc(b);
-    umbra_var acc = umbra_var_alloc(b);
+    struct umbra_var32 idx = umbra_var32(b);
+    struct umbra_var32 acc = umbra_var32(b);
     umbra_val32 n = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
     umbra_loop(b, n); {
-        umbra_val32 i  = umbra_load_var(b, idx);
-        umbra_val32 a  = umbra_load_var(b, acc);
+        umbra_val32 i  = umbra_load_var32(b, idx);
+        umbra_val32 a  = umbra_load_var32(b, acc);
         umbra_val32 v  = umbra_gather_32(b, (umbra_ptr32){.ix = 1}, i);
-        umbra_store_var(b, acc, umbra_add_f32(b, a, v));
-        umbra_store_var(b, idx, umbra_add_i32(b, i, umbra_imm_i32(b, 1)));
-    } umbra_loop_end(b);
-    umbra_store_32(b, (umbra_ptr32){.ix = 2}, umbra_load_var(b, acc));
+        umbra_store_var32(b, acc, umbra_add_f32(b, a, v));
+        umbra_store_var32(b, idx, umbra_add_i32(b, i, umbra_imm_i32(b, 1)));
+    } umbra_end_loop(b);
+    umbra_store_32(b, (umbra_ptr32){.ix = 2}, umbra_load_var32(b, acc));
 
     struct test_backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
@@ -4473,16 +4473,16 @@ TEST(test_deref_ptr_r11_invalidation) {
 TEST(test_if_basic) {
     struct umbra_builder *b = umbra_builder();
 
-    umbra_var v = umbra_var_alloc(b);
+    struct umbra_var32 v = umbra_var32(b);
     umbra_val32 n = umbra_imm_i32(b, 3);
     umbra_val32 i = umbra_loop(b, n); {
         umbra_val32 cond = umbra_eq_i32(b, i, umbra_imm_i32(b, 1));
         umbra_if(b, cond); {
-            umbra_store_var(b, v, i);
-        } umbra_endif(b);
-    } umbra_loop_end(b);
+            umbra_store_var32(b, v, i);
+        } umbra_end_if(b);
+    } umbra_end_loop(b);
 
-    umbra_store_32(b, (umbra_ptr32){0}, umbra_load_var(b, v));
+    umbra_store_32(b, (umbra_ptr32){0}, umbra_load_var32(b, v));
 
     struct test_backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
@@ -4503,11 +4503,11 @@ TEST(test_if_varying) {
     umbra_val32 cond = umbra_lt_s32(b, x, umbra_imm_i32(b, 4));
     umbra_val32 val  = umbra_imm_i32(b, 99);
 
-    umbra_var v = umbra_var_alloc(b);
+    struct umbra_var32 v = umbra_var32(b);
     umbra_if(b, cond); {
-        umbra_store_var(b, v, val);
-    } umbra_endif(b);
-    umbra_val32 result = umbra_load_var(b, v);
+        umbra_store_var32(b, v, val);
+    } umbra_end_if(b);
+    umbra_val32 result = umbra_load_var32(b, v);
     umbra_store_32(b, (umbra_ptr32){0}, result);
 
     struct test_backends B = make(b);
@@ -4529,15 +4529,15 @@ TEST(test_if_nested) {
     struct umbra_builder *b = umbra_builder();
 
     umbra_val32 x = umbra_x(b);
-    umbra_var v = umbra_var_alloc(b);
+    struct umbra_var32 v = umbra_var32(b);
 
     umbra_if(b, umbra_lt_s32(b, x, umbra_imm_i32(b, 6))); {
         umbra_if(b, umbra_lt_s32(b, x, umbra_imm_i32(b, 3))); {
-            umbra_store_var(b, v, umbra_imm_i32(b, 2));
-        } umbra_endif(b);
-    } umbra_endif(b);
+            umbra_store_var32(b, v, umbra_imm_i32(b, 2));
+        } umbra_end_if(b);
+    } umbra_end_if(b);
 
-    umbra_store_32(b, (umbra_ptr32){0}, umbra_load_var(b, v));
+    umbra_store_32(b, (umbra_ptr32){0}, umbra_load_var32(b, v));
 
     struct test_backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {

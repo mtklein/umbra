@@ -26,13 +26,13 @@ TEST(resolve_simple_no_joins) {
 
 TEST(resolve_with_loop) {
     struct umbra_builder *b = umbra_builder();
-    umbra_var acc = umbra_var_alloc(b);
+    struct umbra_var32 acc = umbra_var32(b);
     umbra_val32 trip = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
     umbra_val32 j = umbra_loop(b, trip); {
-        umbra_val32 prev = umbra_load_var(b, acc);
-        umbra_store_var(b, acc, umbra_add_i32(b, prev, j));
-    } umbra_loop_end(b);
-    umbra_store_32(b, (umbra_ptr32){.ix = 1}, umbra_load_var(b, acc));
+        umbra_val32 prev = umbra_load_var32(b, acc);
+        umbra_store_var32(b, acc, umbra_add_i32(b, prev, j));
+    } umbra_end_loop(b);
+    umbra_store_32(b, (umbra_ptr32){.ix = 1}, umbra_load_var32(b, acc));
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
