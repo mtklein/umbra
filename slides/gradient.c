@@ -8,8 +8,8 @@ struct grad_2stop_slide {
     int   is_radial, :32;
 
     union {
-        struct umbra_shader_linear_2 linear;
-        struct umbra_shader_radial_2 radial;
+        struct umbra_shader_gradient_linear_two_stops linear;
+        struct umbra_shader_gradient_radial_two_stops radial;
     } shader;
 
     struct umbra_fmt            fmt;
@@ -26,8 +26,8 @@ struct grad_lut_slide {
     float *lut_data;
 
     union {
-        struct umbra_shader_linear_grad linear;
-        struct umbra_shader_radial_grad radial;
+        struct umbra_shader_gradient_linear_lut linear;
+        struct umbra_shader_gradient_radial_lut radial;
     } shader;
 
     struct umbra_fmt            fmt;
@@ -136,7 +136,7 @@ static void grad_lut_free(struct slide *s) {
 SLIDE(slide_gradient_linear_2) {
     struct grad_2stop_slide *st = calloc(1, sizeof *st);
     st->is_radial = 0;
-    st->shader.linear = umbra_shader_linear_2((umbra_point){0, 0}, (umbra_point){640, 0},
+    st->shader.linear = umbra_shader_gradient_linear_two_stops((umbra_point){0, 0}, (umbra_point){640, 0},
                                               (umbra_color){1.0f, 0.4f, 0.0f, 1.0f},
                                               (umbra_color){0.0f, 0.3f, 1.0f, 1.0f});
     st->base = (struct slide){
@@ -154,7 +154,7 @@ SLIDE(slide_gradient_linear_2) {
 SLIDE(slide_gradient_radial_2) {
     struct grad_2stop_slide *st = calloc(1, sizeof *st);
     st->is_radial = 1;
-    st->shader.radial = umbra_shader_radial_2((umbra_point){320, 240}, 300.0f,
+    st->shader.radial = umbra_shader_gradient_radial_two_stops((umbra_point){320, 240}, 300.0f,
                                               (umbra_color){1.0f, 1.0f, 0.9f, 1.0f},
                                               (umbra_color){0.05f, 0.0f, 0.15f, 1.0f});
     st->base = (struct slide){
@@ -177,8 +177,8 @@ struct grad_stops_slide {
     float *colors_data, *pos_data;
 
     union {
-        struct umbra_shader_linear_stops linear;
-        struct umbra_shader_radial_stops radial;
+        struct umbra_shader_gradient_linear linear;
+        struct umbra_shader_gradient_radial radial;
     } shader;
 
     struct umbra_fmt            fmt;
@@ -257,7 +257,7 @@ SLIDE(slide_gradient_linear_stops) {
     struct grad_stops_slide *st = calloc(1, sizeof *st);
     st->colors_data = planar;
     st->pos_data    = pos;
-    st->shader.linear = umbra_shader_linear_stops(
+    st->shader.linear = umbra_shader_gradient_linear(
         (umbra_point){0, 0}, (umbra_point){640, 0},
         (struct umbra_buf){.ptr=planar, .count=N * 4},
         (struct umbra_buf){.ptr=pos,    .count=N});
@@ -291,7 +291,7 @@ SLIDE(slide_gradient_radial_stops) {
     st->is_radial   = 1;
     st->colors_data = planar;
     st->pos_data    = pos;
-    st->shader.radial = umbra_shader_radial_stops(
+    st->shader.radial = umbra_shader_gradient_radial(
         (umbra_point){320, 240}, 280.0f,
         (struct umbra_buf){.ptr=planar, .count=N * 4},
         (struct umbra_buf){.ptr=pos,    .count=N});
@@ -318,7 +318,7 @@ SLIDE(slide_gradient_linear_wide) {
     struct grad_lut_slide *st = calloc(1, sizeof *st);
     st->is_radial     = 0;
     st->lut_data      = lut;
-    st->shader.linear = umbra_shader_linear_grad((umbra_point){0, 0}, (umbra_point){640, 0},
+    st->shader.linear = umbra_shader_gradient_linear_lut((umbra_point){0, 0}, (umbra_point){640, 0},
                                                  (struct umbra_buf){.ptr=lut, .count=LUT_N * 4});
     st->base = (struct slide){
         .title        = "Linear Gradient (wide gamut)",
@@ -343,7 +343,7 @@ SLIDE(slide_gradient_radial_wide) {
     struct grad_lut_slide *st = calloc(1, sizeof *st);
     st->is_radial     = 1;
     st->lut_data      = lut;
-    st->shader.radial = umbra_shader_radial_grad((umbra_point){320, 240}, 280.0f,
+    st->shader.radial = umbra_shader_gradient_radial_lut((umbra_point){320, 240}, 280.0f,
                                                  (struct umbra_buf){.ptr=lut, .count=LUT_N * 4});
     st->base = (struct slide){
         .title        = "Radial Gradient (wide gamut)",

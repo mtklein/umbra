@@ -139,10 +139,15 @@ void umbra_sdf_dispatch_fill(struct umbra_draw_layout const*,
 void umbra_sdf_dispatch_free(struct umbra_sdf_dispatch*);
 
 // TODO: no good reason for any of the trailing underscores, rename off_ -> off and similar
-//       for all these types.  color -> rgba, split any color[8] into two color inputs,
-//       grad[3] / grad[4] parameters are unclear.  rename shaders using luts to have _lut
-//       in their names.  gradient shader names in general all need a fresh rethink so that
-//       they make sense as an ensemble, with names clarifying their differences.
+//       for all these types.
+
+// TODO: add umbra_shader_gradient_{linear,radial}_evenly_spaced_stops specializations
+//       that share the general case's colors-buffer layout but skip the per-pixel stop
+//       search: with uniform spacing, the bracketing segment is just idx = floor(t*(N-1)),
+//       so the shader can gather the two neighboring colors directly.  No LUT, no pos
+//       buffer, no runtime loop.  Would replace today's "evenly-spaced via umbra_gradient_lut_even
+//       feeding _lut" pattern, which is the wrong shape: even spacing is a property the shader
+//       can exploit, not something that motivates preprocessing.
 
 struct umbra_shader_solid {
     struct umbra_shader base;
@@ -151,62 +156,62 @@ struct umbra_shader_solid {
 };
 struct umbra_shader_solid umbra_shader_solid(umbra_color color);
 
-struct umbra_shader_linear_2 {
+struct umbra_shader_gradient_linear_two_stops {
     struct umbra_shader base;
     umbra_point p0, p1;
     umbra_color c0, c1;
     int fi_, ci_;  // TODO: fi and ci are unclear names, all throughout
 };
-struct umbra_shader_linear_2 umbra_shader_linear_2(umbra_point p0, umbra_point p1,
+struct umbra_shader_gradient_linear_two_stops umbra_shader_gradient_linear_two_stops(umbra_point p0, umbra_point p1,
                                                    umbra_color c0, umbra_color c1);
 
-struct umbra_shader_radial_2 {
+struct umbra_shader_gradient_radial_two_stops {
     struct umbra_shader base;
     umbra_point center;
     float       radius; int :32;
     umbra_color c0, c1;
     int fi_, ci_;
 };
-struct umbra_shader_radial_2 umbra_shader_radial_2(umbra_point center, float radius,
+struct umbra_shader_gradient_radial_two_stops umbra_shader_gradient_radial_two_stops(umbra_point center, float radius,
                                                    umbra_color c0, umbra_color c1);
 
-struct umbra_shader_linear_grad {
+struct umbra_shader_gradient_linear_lut {
     struct umbra_shader base;
     umbra_point p0, p1;
     struct umbra_buf lut;
     int fi_, lut_off_;
 };
-struct umbra_shader_linear_grad umbra_shader_linear_grad(umbra_point p0, umbra_point p1,
+struct umbra_shader_gradient_linear_lut umbra_shader_gradient_linear_lut(umbra_point p0, umbra_point p1,
                                                          struct umbra_buf lut);
 
-struct umbra_shader_radial_grad {
+struct umbra_shader_gradient_radial_lut {
     struct umbra_shader base;
     umbra_point center;
     float       radius; int :32;
     struct umbra_buf lut;
     int fi_, lut_off_;
 };
-struct umbra_shader_radial_grad umbra_shader_radial_grad(umbra_point center, float radius,
+struct umbra_shader_gradient_radial_lut umbra_shader_gradient_radial_lut(umbra_point center, float radius,
                                                          struct umbra_buf lut);
 
-struct umbra_shader_linear_stops {
+struct umbra_shader_gradient_linear {
     struct umbra_shader base;
     umbra_point p0, p1;
     struct umbra_buf colors, pos;
     int fi_, colors_off_, pos_off_, :32;
 };
-struct umbra_shader_linear_stops umbra_shader_linear_stops(umbra_point p0, umbra_point p1,
+struct umbra_shader_gradient_linear umbra_shader_gradient_linear(umbra_point p0, umbra_point p1,
                                                            struct umbra_buf colors,
                                                            struct umbra_buf pos);
 
-struct umbra_shader_radial_stops {
+struct umbra_shader_gradient_radial {
     struct umbra_shader base;
     umbra_point center;
     float       radius; int :32;
     struct umbra_buf colors, pos;
     int fi_, colors_off_, pos_off_, :32;
 };
-struct umbra_shader_radial_stops umbra_shader_radial_stops(umbra_point center, float radius,
+struct umbra_shader_gradient_radial umbra_shader_gradient_radial(umbra_point center, float radius,
                                                            struct umbra_buf colors,
                                                            struct umbra_buf pos);
 

@@ -542,16 +542,16 @@ struct umbra_shader_solid umbra_shader_solid(umbra_color color) {
     return s;
 }
 
-static umbra_color_val32 linear_2_build_(struct umbra_shader *s, struct umbra_builder *builder,
+static umbra_color_val32 linear_two_stops_build_(struct umbra_shader *s, struct umbra_builder *builder,
                                    struct umbra_uniforms_layout *u,
                                    umbra_val32 x, umbra_val32 y) {
-    struct umbra_shader_linear_2 *self = (struct umbra_shader_linear_2 *)s;
+    struct umbra_shader_gradient_linear_two_stops *self = (struct umbra_shader_gradient_linear_two_stops *)s;
     self->fi_ = umbra_uniforms_reserve_f32(u, 3);
     self->ci_ = umbra_uniforms_reserve_f32(u, 8);
     return lerp_2stop_(builder, linear_t_(builder, self->fi_, x, y), self->ci_);
 }
-static void linear_2_fill_(struct umbra_shader const *s, void *uniforms) {
-    struct umbra_shader_linear_2 const *self = (struct umbra_shader_linear_2 const *)s;
+static void linear_two_stops_fill_(struct umbra_shader const *s, void *uniforms) {
+    struct umbra_shader_gradient_linear_two_stops const *self = (struct umbra_shader_gradient_linear_two_stops const *)s;
     float const dx = self->p1.x - self->p0.x,
                 dy = self->p1.y - self->p0.y,
                 L2 = dx*dx + dy*dy,
@@ -563,51 +563,51 @@ static void linear_2_fill_(struct umbra_shader const *s, void *uniforms) {
     umbra_uniforms_fill_f32(uniforms, self->ci_,     &self->c0.r, 4);
     umbra_uniforms_fill_f32(uniforms, self->ci_ + 4, &self->c1.r, 4);
 }
-struct umbra_shader_linear_2 umbra_shader_linear_2(umbra_point p0, umbra_point p1,
+struct umbra_shader_gradient_linear_two_stops umbra_shader_gradient_linear_two_stops(umbra_point p0, umbra_point p1,
                                                    umbra_color c0, umbra_color c1) {
-    return (struct umbra_shader_linear_2){
-        .base = {.build = linear_2_build_, .fill = linear_2_fill_},
+    return (struct umbra_shader_gradient_linear_two_stops){
+        .base = {.build = linear_two_stops_build_, .fill = linear_two_stops_fill_},
         .p0   = p0, .p1 = p1,
         .c0   = c0, .c1 = c1,
     };
 }
 
-static umbra_color_val32 radial_2_build_(struct umbra_shader *s, struct umbra_builder *builder,
+static umbra_color_val32 radial_two_stops_build_(struct umbra_shader *s, struct umbra_builder *builder,
                                    struct umbra_uniforms_layout *u,
                                    umbra_val32 x, umbra_val32 y) {
-    struct umbra_shader_radial_2 *self = (struct umbra_shader_radial_2 *)s;
+    struct umbra_shader_gradient_radial_two_stops *self = (struct umbra_shader_gradient_radial_two_stops *)s;
     self->fi_ = umbra_uniforms_reserve_f32(u, 3);
     self->ci_ = umbra_uniforms_reserve_f32(u, 8);
     return lerp_2stop_(builder, radial_t_(builder, self->fi_, x, y), self->ci_);
 }
-static void radial_2_fill_(struct umbra_shader const *s, void *uniforms) {
-    struct umbra_shader_radial_2 const *self = (struct umbra_shader_radial_2 const *)s;
+static void radial_two_stops_fill_(struct umbra_shader const *s, void *uniforms) {
+    struct umbra_shader_gradient_radial_two_stops const *self = (struct umbra_shader_gradient_radial_two_stops const *)s;
     float const grad[3] = {self->center.x, self->center.y, 1.0f / self->radius};
     umbra_uniforms_fill_f32(uniforms, self->fi_,     grad,         3);
     umbra_uniforms_fill_f32(uniforms, self->ci_,     &self->c0.r, 4);
     umbra_uniforms_fill_f32(uniforms, self->ci_ + 4, &self->c1.r, 4);
 }
-struct umbra_shader_radial_2 umbra_shader_radial_2(umbra_point center, float radius,
+struct umbra_shader_gradient_radial_two_stops umbra_shader_gradient_radial_two_stops(umbra_point center, float radius,
                                                    umbra_color c0, umbra_color c1) {
-    return (struct umbra_shader_radial_2){
-        .base   = {.build = radial_2_build_, .fill = radial_2_fill_},
+    return (struct umbra_shader_gradient_radial_two_stops){
+        .base   = {.build = radial_two_stops_build_, .fill = radial_two_stops_fill_},
         .center = center,
         .radius = radius,
         .c0     = c0, .c1 = c1,
     };
 }
 
-static umbra_color_val32 linear_grad_build_(struct umbra_shader *s, struct umbra_builder *builder,
+static umbra_color_val32 linear_lut_build_(struct umbra_shader *s, struct umbra_builder *builder,
                                       struct umbra_uniforms_layout *u,
                                       umbra_val32 x, umbra_val32 y) {
-    struct umbra_shader_linear_grad *self = (struct umbra_shader_linear_grad *)s;
+    struct umbra_shader_gradient_linear_lut *self = (struct umbra_shader_gradient_linear_lut *)s;
     self->fi_ = umbra_uniforms_reserve_f32(u, 4);
     self->lut_off_ = umbra_uniforms_reserve_ptr(u);
     umbra_ptr32 const lut = umbra_deref_ptr32(builder, (umbra_ptr32){0}, self->lut_off_);
     return sample_lut_(builder, linear_t_(builder, self->fi_, x, y), self->fi_, lut);
 }
-static void linear_grad_fill_(struct umbra_shader const *s, void *uniforms) {
-    struct umbra_shader_linear_grad const *self = (struct umbra_shader_linear_grad const *)s;
+static void linear_lut_fill_(struct umbra_shader const *s, void *uniforms) {
+    struct umbra_shader_gradient_linear_lut const *self = (struct umbra_shader_gradient_linear_lut const *)s;
     float const dx = self->p1.x - self->p0.x,
                 dy = self->p1.y - self->p0.y,
                 L2 = dx*dx + dy*dy,
@@ -619,45 +619,45 @@ static void linear_grad_fill_(struct umbra_shader const *s, void *uniforms) {
     umbra_uniforms_fill_f32(uniforms, self->fi_, grad, 4);
     umbra_uniforms_fill_ptr(uniforms, self->lut_off_, self->lut);
 }
-struct umbra_shader_linear_grad umbra_shader_linear_grad(umbra_point p0, umbra_point p1,
+struct umbra_shader_gradient_linear_lut umbra_shader_gradient_linear_lut(umbra_point p0, umbra_point p1,
                                                          struct umbra_buf lut) {
-    return (struct umbra_shader_linear_grad){
-        .base = {.build = linear_grad_build_, .fill = linear_grad_fill_},
+    return (struct umbra_shader_gradient_linear_lut){
+        .base = {.build = linear_lut_build_, .fill = linear_lut_fill_},
         .p0   = p0, .p1 = p1,
         .lut  = lut,
     };
 }
 
-static umbra_color_val32 radial_grad_build_(struct umbra_shader *s, struct umbra_builder *builder,
+static umbra_color_val32 radial_lut_build_(struct umbra_shader *s, struct umbra_builder *builder,
                                       struct umbra_uniforms_layout *u,
                                       umbra_val32 x, umbra_val32 y) {
-    struct umbra_shader_radial_grad *self = (struct umbra_shader_radial_grad *)s;
+    struct umbra_shader_gradient_radial_lut *self = (struct umbra_shader_gradient_radial_lut *)s;
     self->fi_ = umbra_uniforms_reserve_f32(u, 4);
     self->lut_off_ = umbra_uniforms_reserve_ptr(u);
     umbra_ptr32 const lut = umbra_deref_ptr32(builder, (umbra_ptr32){0}, self->lut_off_);
     return sample_lut_(builder, radial_t_(builder, self->fi_, x, y), self->fi_, lut);
 }
-static void radial_grad_fill_(struct umbra_shader const *s, void *uniforms) {
-    struct umbra_shader_radial_grad const *self = (struct umbra_shader_radial_grad const *)s;
+static void radial_lut_fill_(struct umbra_shader const *s, void *uniforms) {
+    struct umbra_shader_gradient_radial_lut const *self = (struct umbra_shader_gradient_radial_lut const *)s;
     float const N = (float)(self->lut.count / 4);
     float const grad[4] = {self->center.x, self->center.y, 1.0f / self->radius, N};
     umbra_uniforms_fill_f32(uniforms, self->fi_, grad, 4);
     umbra_uniforms_fill_ptr(uniforms, self->lut_off_, self->lut);
 }
-struct umbra_shader_radial_grad umbra_shader_radial_grad(umbra_point center, float radius,
+struct umbra_shader_gradient_radial_lut umbra_shader_gradient_radial_lut(umbra_point center, float radius,
                                                          struct umbra_buf lut) {
-    return (struct umbra_shader_radial_grad){
-        .base   = {.build = radial_grad_build_, .fill = radial_grad_fill_},
+    return (struct umbra_shader_gradient_radial_lut){
+        .base   = {.build = radial_lut_build_, .fill = radial_lut_fill_},
         .center = center,
         .radius = radius,
         .lut    = lut,
     };
 }
 
-static umbra_color_val32 linear_stops_build_(struct umbra_shader *s, struct umbra_builder *builder,
+static umbra_color_val32 linear_build_(struct umbra_shader *s, struct umbra_builder *builder,
                                        struct umbra_uniforms_layout *u,
                                        umbra_val32 x, umbra_val32 y) {
-    struct umbra_shader_linear_stops *self = (struct umbra_shader_linear_stops *)s;
+    struct umbra_shader_gradient_linear *self = (struct umbra_shader_gradient_linear *)s;
     self->fi_ = umbra_uniforms_reserve_f32(u, 4);
     self->colors_off_ = umbra_uniforms_reserve_ptr(u);
     self->pos_off_ = umbra_uniforms_reserve_ptr(u);
@@ -665,8 +665,8 @@ static umbra_color_val32 linear_stops_build_(struct umbra_shader *s, struct umbr
     umbra_ptr32 const pos    = umbra_deref_ptr32(builder, (umbra_ptr32){0}, self->pos_off_);
     return walk_stops_(builder, linear_t_(builder, self->fi_, x, y), self->fi_, colors, pos);
 }
-static void linear_stops_fill_(struct umbra_shader const *s, void *uniforms) {
-    struct umbra_shader_linear_stops const *self = (struct umbra_shader_linear_stops const *)s;
+static void linear_fill_(struct umbra_shader const *s, void *uniforms) {
+    struct umbra_shader_gradient_linear const *self = (struct umbra_shader_gradient_linear const *)s;
     float const dx = self->p1.x - self->p0.x,
                 dy = self->p1.y - self->p0.y,
                 L2 = dx*dx + dy*dy,
@@ -679,21 +679,21 @@ static void linear_stops_fill_(struct umbra_shader const *s, void *uniforms) {
     umbra_uniforms_fill_ptr(uniforms, self->colors_off_, self->colors);
     umbra_uniforms_fill_ptr(uniforms, self->pos_off_, self->pos);
 }
-struct umbra_shader_linear_stops umbra_shader_linear_stops(umbra_point p0, umbra_point p1,
+struct umbra_shader_gradient_linear umbra_shader_gradient_linear(umbra_point p0, umbra_point p1,
                                                            struct umbra_buf colors,
                                                            struct umbra_buf pos) {
-    return (struct umbra_shader_linear_stops){
-        .base   = {.build = linear_stops_build_, .fill = linear_stops_fill_},
+    return (struct umbra_shader_gradient_linear){
+        .base   = {.build = linear_build_, .fill = linear_fill_},
         .p0     = p0, .p1 = p1,
         .colors = colors,
         .pos    = pos,
     };
 }
 
-static umbra_color_val32 radial_stops_build_(struct umbra_shader *s, struct umbra_builder *builder,
+static umbra_color_val32 radial_build_(struct umbra_shader *s, struct umbra_builder *builder,
                                        struct umbra_uniforms_layout *u,
                                        umbra_val32 x, umbra_val32 y) {
-    struct umbra_shader_radial_stops *self = (struct umbra_shader_radial_stops *)s;
+    struct umbra_shader_gradient_radial *self = (struct umbra_shader_gradient_radial *)s;
     self->fi_ = umbra_uniforms_reserve_f32(u, 4);
     self->colors_off_ = umbra_uniforms_reserve_ptr(u);
     self->pos_off_ = umbra_uniforms_reserve_ptr(u);
@@ -701,19 +701,19 @@ static umbra_color_val32 radial_stops_build_(struct umbra_shader *s, struct umbr
     umbra_ptr32 const pos    = umbra_deref_ptr32(builder, (umbra_ptr32){0}, self->pos_off_);
     return walk_stops_(builder, radial_t_(builder, self->fi_, x, y), self->fi_, colors, pos);
 }
-static void radial_stops_fill_(struct umbra_shader const *s, void *uniforms) {
-    struct umbra_shader_radial_stops const *self = (struct umbra_shader_radial_stops const *)s;
+static void radial_fill_(struct umbra_shader const *s, void *uniforms) {
+    struct umbra_shader_gradient_radial const *self = (struct umbra_shader_gradient_radial const *)s;
     float const N = (float)self->pos.count;
     float const grad[4] = {self->center.x, self->center.y, 1.0f / self->radius, N};
     umbra_uniforms_fill_f32(uniforms, self->fi_, grad, 4);
     umbra_uniforms_fill_ptr(uniforms, self->colors_off_, self->colors);
     umbra_uniforms_fill_ptr(uniforms, self->pos_off_, self->pos);
 }
-struct umbra_shader_radial_stops umbra_shader_radial_stops(umbra_point center, float radius,
+struct umbra_shader_gradient_radial umbra_shader_gradient_radial(umbra_point center, float radius,
                                                            struct umbra_buf colors,
                                                            struct umbra_buf pos) {
-    return (struct umbra_shader_radial_stops){
-        .base   = {.build = radial_stops_build_, .fill = radial_stops_fill_},
+    return (struct umbra_shader_gradient_radial){
+        .base   = {.build = radial_build_, .fill = radial_fill_},
         .center = center,
         .radius = radius,
         .colors = colors,
