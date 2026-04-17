@@ -232,12 +232,16 @@ Implications:
   32-bit targets (padding out to 16 bytes).  That contract goes away
   when `fill_ptr` goes away; the effect struct's `struct umbra_buf
   lut;` field is written with a plain struct assignment, and the IR
-  references `offsetof(struct effect, lut.ptr)` etc.
-- Change IR slot addressing from "slot index" (unit of 4 bytes) to
-  "byte offset" — or keep slot but understand a slot is always `byte_off
-  / 4` where `byte_off = offsetof(...)`.  Either works; byte-offset is
-  the cleaner story since it generalizes to future non-u32 fields
-  without a special case.
+  references each sub-field at its `offsetof` within the effect.
+- Keep the IR's 4-byte slot indexing.  Every uniform field in today's
+  effect types is 4-byte aligned, so `slot = offsetof(struct, field) / 4`
+  always divides evenly, and the op encoding stays unchanged.  The one
+  place the IR currently hardcodes an internal layout is the deref
+  read of `struct umbra_buf` (today: slot+0 for ptr, slot+2 for count,
+  slot+3 for stride — the 64-bit layout).  That becomes slot+
+  `offsetof(struct umbra_buf, count)/4` etc., which on 32-bit targets
+  differs from today's.  Localized change in the IR emitter for
+  `op_deref_ptr` and the backend decoders that match it.
 
 Effect types that today have hand-packed layouts can just be C structs:
 
