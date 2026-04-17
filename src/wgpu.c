@@ -513,7 +513,6 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
     wgpuComputePassEncoderDispatchWorkgroups(be->batch_pass, gx, (uint32_t)h, 1);
     be->total_dispatches++;
 
-
     if (uniform_ring_pool_should_rotate(&be->uni_pool)) {
         wgpu_submit_cmdbuf(be);
     }

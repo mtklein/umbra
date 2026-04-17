@@ -107,7 +107,6 @@ umbra_color_val32 umbra_blend_dstover (struct umbra_builder*,
 umbra_color_val32 umbra_blend_multiply(struct umbra_builder*,
                                        umbra_color_val32 src, umbra_color_val32 dst);
 
-
 struct umbra_builder* umbra_draw_builder(struct umbra_coverage*,
                                          struct umbra_shader*,
                                          umbra_blend_fn,
