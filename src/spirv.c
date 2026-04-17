@@ -951,12 +951,12 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
 
     // Push constant block: struct { uint data[push_words]; }
     // We model it as struct { uint[push_words] }.
-    uint32_t t_arr_push = spv_id(&B);
-    uint32_t c_push_len = spv_const_u32(&B, (uint32_t)push_words);
+    uint32_t t_arr_push   = spv_id(&B);
+    uint32_t c_push_count = spv_const_u32(&B, (uint32_t)push_words);
     spv_op(&B.types, SpvOpTypeArray, 4);
     spv_word(&B.types, t_arr_push);
     spv_word(&B.types, B.t_u32);
-    spv_word(&B.types, c_push_len);
+    spv_word(&B.types, c_push_count);
 
     // Decorate array stride.
     spv_op(&B.decor, SpvOpDecorate, 4);
