@@ -192,7 +192,7 @@ SLIDE(slide_text_bitmap) {
     struct text_slide *st = calloc(1, sizeof *st);
     st->tc     = text_shared_bitmap();
     st->is_sdf = 0;
-    st->shader = umbra_shader_solid((float[]){1.0f, 1.0f, 1.0f, 1.0f});
+    st->shader = umbra_shader_solid((umbra_color){1.0f, 1.0f, 1.0f, 1.0f});
     st->cov.bitmap = umbra_coverage_bitmap((struct umbra_buf){0});
     st->base = (struct slide){
         .title = "Text (8-bit AA)",
@@ -210,7 +210,7 @@ SLIDE(slide_text_sdf) {
     struct text_slide *st = calloc(1, sizeof *st);
     st->tc     = text_shared_sdf();
     st->is_sdf = 1;
-    st->shader = umbra_shader_solid((float[]){0.2f, 0.8f, 1.0f, 1.0f});
+    st->shader = umbra_shader_solid((umbra_color){0.2f, 0.8f, 1.0f, 1.0f});
     st->cov.sdf = umbra_coverage_sdf((struct umbra_buf){0});
     st->base = (struct slide){
         .title = "Text (SDF)",

@@ -532,13 +532,13 @@ static umbra_color_val32 solid_build_(struct umbra_shader *s, struct umbra_build
 }
 static void solid_fill_(struct umbra_shader const *s, void *uniforms) {
     struct umbra_shader_solid const *self = (struct umbra_shader_solid const *)s;
-    umbra_uniforms_fill_f32(uniforms, self->off_, self->color, 4);
+    umbra_uniforms_fill_f32(uniforms, self->off_, &self->color.r, 4);
 }
-struct umbra_shader_solid umbra_shader_solid(float const color[4]) {
+struct umbra_shader_solid umbra_shader_solid(umbra_color color) {
     struct umbra_shader_solid s = {
-        .base = {.build = solid_build_, .fill = solid_fill_},
+        .base  = {.build = solid_build_, .fill = solid_fill_},
+        .color = color,
     };
-    __builtin_memcpy(s.color, color, 16);
     return s;
 }
 
@@ -1000,7 +1000,7 @@ umbra_color_val32 umbra_blend_multiply(struct umbra_builder *builder, umbra_colo
     return (umbra_color_val32){r, g, b, a};
 }
 
-void umbra_gradient_lut_even(float *out, int lut_n, int n_stops, float const colors[][4]) {
+void umbra_gradient_lut_even(float *out, int lut_n, int n_stops, umbra_color const *colors) {
     for (int i = 0; i < lut_n; i++) {
         float const t = (float)i / (float)(lut_n - 1);
         float const seg = t * (float)(n_stops - 1);
@@ -1009,14 +1009,15 @@ void umbra_gradient_lut_even(float *out, int lut_n, int n_stops, float const col
             idx = n_stops - 2;
         }
         float const f = seg - (float)idx;
-        for (int ch = 0; ch < 4; ch++) {
-            out[ch * lut_n + i] = colors[idx][ch] * (1 - f) + colors[idx + 1][ch] * f;
-        }
+        out[0 * lut_n + i] = colors[idx].r * (1 - f) + colors[idx + 1].r * f;
+        out[1 * lut_n + i] = colors[idx].g * (1 - f) + colors[idx + 1].g * f;
+        out[2 * lut_n + i] = colors[idx].b * (1 - f) + colors[idx + 1].b * f;
+        out[3 * lut_n + i] = colors[idx].a * (1 - f) + colors[idx + 1].a * f;
     }
 }
 
 void umbra_gradient_lut(float *out, int lut_n, int n_stops, float const positions[],
-                        float const colors[][4]) {
+                        umbra_color const *colors) {
     for (int i = 0; i < lut_n; i++) {
         float const t = (float)i / (float)(lut_n - 1);
         int   seg = 0;
@@ -1035,8 +1036,9 @@ void umbra_gradient_lut(float *out, int lut_n, int n_stops, float const position
             if (f < 0) { f = 0; }
             if (f > 1) { f = 1; }
         }
-        for (int ch = 0; ch < 4; ch++) {
-            out[ch * lut_n + i] = colors[seg][ch] * (1 - f) + colors[seg + 1][ch] * f;
-        }
+        out[0 * lut_n + i] = colors[seg].r * (1 - f) + colors[seg + 1].r * f;
+        out[1 * lut_n + i] = colors[seg].g * (1 - f) + colors[seg + 1].g * f;
+        out[2 * lut_n + i] = colors[seg].b * (1 - f) + colors[seg + 1].b * f;
+        out[3 * lut_n + i] = colors[seg].a * (1 - f) + colors[seg + 1].a * f;
     }
 }

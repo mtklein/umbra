@@ -255,7 +255,7 @@ static void grad_stops_free(struct slide *s) {
 // thanks to umbra_if() wrapping the gathers+lerps so GPU backends can branch-skip
 // them when the pixel isn't in the current gradient segment.
 SLIDE(slide_gradient_linear_stops) {
-    static float const colors[][4] = {
+    static umbra_color const colors[] = {
         {1.2f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.8f, 0.0f, 1.0f}, {0.0f, 1.2f, 0.0f, 1.0f},
         {0.0f, 0.8f, 1.2f, 1.0f}, {0.0f, 0.0f, 1.2f, 1.0f}, {0.8f, 0.0f, 1.0f, 1.0f},
     };
@@ -264,7 +264,7 @@ SLIDE(slide_gradient_linear_stops) {
     float *pos    = malloc(N * sizeof(float));
     for (int i = 0; i < N; i++) {
         for (int c = 0; c < 4; c++) {
-            planar[c * N + i] = colors[i][c];
+            planar[c * N + i] = (&colors[i].r)[c];
         }
         pos[i] = (float)i / (float)(N - 1);
     }
@@ -288,7 +288,7 @@ SLIDE(slide_gradient_linear_stops) {
 }
 
 SLIDE(slide_gradient_radial_stops) {
-    static float const colors[][4] = {
+    static umbra_color const colors[] = {
         {1.5f, 1.5f, 1.2f, 1.0f}, {1.2f, 0.8f, 0.0f, 1.0f},
         {0.8f, 0.0f, 0.2f, 1.0f}, {0.05f, 0.0f, 0.15f, 1.0f},
     };
@@ -297,7 +297,7 @@ SLIDE(slide_gradient_radial_stops) {
     float *pos    = malloc(N * sizeof(float));
     for (int i = 0; i < N; i++) {
         for (int c = 0; c < 4; c++) {
-            planar[c * N + i] = colors[i][c];
+            planar[c * N + i] = (&colors[i].r)[c];
         }
         pos[i] = (float)i / (float)(N - 1);
     }
@@ -322,7 +322,7 @@ SLIDE(slide_gradient_radial_stops) {
 }
 
 SLIDE(slide_gradient_linear_wide) {
-    static float const colors[][4] = {
+    static umbra_color const colors[] = {
         {1.2f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.8f, 0.0f, 1.0f}, {0.0f, 1.2f, 0.0f, 1.0f},
         {0.0f, 0.8f, 1.2f, 1.0f}, {0.0f, 0.0f, 1.2f, 1.0f}, {0.8f, 0.0f, 1.0f, 1.0f},
     };
@@ -335,7 +335,7 @@ SLIDE(slide_gradient_linear_wide) {
 }
 
 SLIDE(slide_gradient_radial_wide) {
-    static float const colors[][4] = {
+    static umbra_color const colors[] = {
         {1.5f, 1.5f, 1.2f, 1.0f}, {1.2f, 0.8f, 0.0f, 1.0f},
         {0.8f, 0.0f, 0.2f, 1.0f}, {0.05f, 0.0f, 0.15f, 1.0f},
     };

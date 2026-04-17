@@ -517,7 +517,7 @@ static void slug_two_pass_free(struct slide *s) {
 
 SLIDE(slide_slug_wind) {
     struct slug_two_pass_slide *st = calloc(1, sizeof *st);
-    st->shader = umbra_shader_solid((float[]){0.2f, 1.0f, 0.6f, 1.0f});
+    st->shader = umbra_shader_solid((umbra_color){0.2f, 1.0f, 0.6f, 1.0f});
     st->cov    = umbra_coverage_wind((struct umbra_buf){0});
     st->base = (struct slide){
         .title = "Slug (two-pass)",
@@ -640,7 +640,7 @@ static int slug_one_pass_get_builders(struct slide *s, struct umbra_fmt fmt,
 
 SLIDE(slide_slug_wind_loop) {
     struct slug_slide *st = calloc(1, sizeof *st);
-    st->shader = umbra_shader_solid((float[]){0.2f, 1.0f, 0.6f, 1.0f});
+    st->shader = umbra_shader_solid((umbra_color){0.2f, 1.0f, 0.6f, 1.0f});
     st->cov    = umbra_coverage_wind((struct umbra_buf){0});
     st->base = (struct slide){
         .title = "Slug (one-pass)",

@@ -123,7 +123,7 @@ TEST(test_slug_rect) {
         be->compile(be, air);
     umbra_flat_ir_free(air);
 
-    float color[4] = {1,1,1,1};
+    umbra_color color = {1,1,1,1};
     float wind_buf[W * H];
     __builtin_memset(wind_buf, 0, sizeof wind_buf);
 
@@ -198,7 +198,7 @@ TEST(test_perspective_text) {
     struct umbra_backend *be =
         umbra_backend_interp();
 
-    float color[4] = {1,1,1,1};
+    umbra_color color = {1,1,1,1};
 
     struct umbra_shader_solid shader = umbra_shader_solid(color);
     struct umbra_coverage_bitmap_matrix cov = umbra_coverage_bitmap_matrix(
@@ -239,7 +239,7 @@ TEST(test_perspective_text) {
 
     struct umbra_matrix mat2;
     slide_perspective_matrix(&mat2, 1.0f, W, H, tc.w, tc.h);
-    float hc2[4] = {1,0.8f,0.2f,1};
+    umbra_color hc2 = {1,0.8f,0.2f,1};
 
     struct umbra_shader_solid shader2 = umbra_shader_solid(hc2);
     struct umbra_coverage_bitmap_matrix cov2 = umbra_coverage_bitmap_matrix(mat2,

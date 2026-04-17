@@ -38,10 +38,10 @@ static void anim_prepare(struct slide *s, struct umbra_backend *be, struct umbra
 static void anim_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct anim_slide *st = (struct anim_slide *)s;
     float ft = (float)secs;
-    st->shader.color[0] = 0.5f + 0.5f * sinf(ft);
-    st->shader.color[1] = 0.5f + 0.5f * sinf(ft + 2.094f);
-    st->shader.color[2] = 0.5f + 0.5f * sinf(ft + 4.189f);
-    st->shader.color[3] = 1.0f;
+    st->shader.color.r = 0.5f + 0.5f * sinf(ft);
+    st->shader.color.g = 0.5f + 0.5f * sinf(ft + 2.094f);
+    st->shader.color.b = 0.5f + 0.5f * sinf(ft + 4.189f);
+    st->shader.color.a = 1.0f;
     umbra_draw_fill(&st->lay, &st->shader.base, NULL);
     struct umbra_buf ubuf[] = {
         {.ptr=st->lay.uniforms, .count=st->lay.uni.slots},
@@ -68,7 +68,7 @@ static void anim_free(struct slide *s) {
 
 SLIDE(slide_anim_t) {
     struct anim_slide *st = calloc(1, sizeof *st);
-    st->shader = umbra_shader_solid((float[]){0, 0, 0, 1});
+    st->shader = umbra_shader_solid((umbra_color){0, 0, 0, 1});
     st->base = (struct slide){
         .title = "Animated (t in uniforms)",
         .bg = {0, 0, 0, 1},

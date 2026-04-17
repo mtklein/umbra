@@ -6,6 +6,10 @@ typedef struct {
     umbra_val32 r, g, b, a;
 } umbra_color_val32;
 
+typedef struct {
+    float r, g, b, a;
+} umbra_color;
+
 struct umbra_matrix {
     float sx, kx, tx,
           ky, sy, ty,
@@ -138,10 +142,10 @@ void umbra_sdf_dispatch_free(struct umbra_sdf_dispatch*);
 
 struct umbra_shader_solid {
     struct umbra_shader base;
-    float  color[4];
+    umbra_color color;
     int off_, :32;
 };
-struct umbra_shader_solid umbra_shader_solid(float const color[4]);
+struct umbra_shader_solid umbra_shader_solid(umbra_color color);
 
 struct umbra_shader_linear_2 {
     struct umbra_shader base;
@@ -246,6 +250,6 @@ struct umbra_coverage_wind {
 };
 struct umbra_coverage_wind umbra_coverage_wind(struct umbra_buf wind);
 
-void umbra_gradient_lut_even(float *out, int lut_n, int n_stops, float const colors[][4]);
+void umbra_gradient_lut_even(float *out, int lut_n, int n_stops, umbra_color const *colors);
 void umbra_gradient_lut(float *out, int lut_n, int n_stops, float const positions[],
-                        float const colors[][4]);
+                        umbra_color const *colors);

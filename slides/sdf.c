@@ -176,7 +176,8 @@ static struct slide* make_csg(char const *title, float const bg[4], float const 
 
     struct csg_slide *st = calloc(1, sizeof *st);
     st->op      = op;
-    st->shader  = umbra_shader_solid(color);
+    umbra_color const c = {color[0], color[1], color[2], color[3]};
+    st->shader  = umbra_shader_solid(c);
     st->sdf.base = (struct umbra_sdf){.build = build, .fill = two_circle_fill_};
     st->base = (struct slide){
         .title = title,
@@ -232,7 +233,7 @@ static void ring_fill_(struct umbra_sdf const *s, void *uniforms) {
 
 SLIDE(slide_sdf_ring) {
     struct csg_slide *st = calloc(1, sizeof *st);
-    st->shader = umbra_shader_solid((float[]){1.0f, 0.6f, 0.1f, 1});
+    st->shader = umbra_shader_solid((umbra_color){1.0f, 0.6f, 0.1f, 1});
     struct ring_sdf *ring = (struct ring_sdf *)&st->sdf;
     ring->base = (struct umbra_sdf){.build = ring_build_, .fill = ring_fill_};
     st->base = (struct slide){
@@ -355,7 +356,7 @@ static void rounded_rect_free(struct slide *s) {
 
 SLIDE(slide_sdf_rounded_rect) {
     struct rounded_rect_slide *st = calloc(1, sizeof *st);
-    st->shader = umbra_shader_solid((float[]){0.1f, 0.5f, 0.9f, 1});
+    st->shader = umbra_shader_solid((umbra_color){0.1f, 0.5f, 0.9f, 1});
     st->sdf.base = (struct umbra_sdf){.build = rounded_rect_build_, .fill = rounded_rect_fill_};
     st->base = (struct slide){
         .title = "SDF Rounded Rect",
@@ -423,7 +424,7 @@ static void capsule_fill_(struct umbra_sdf const *s, void *uniforms) {
 
 SLIDE(slide_sdf_capsule) {
     struct csg_slide *st = calloc(1, sizeof *st);
-    st->shader = umbra_shader_solid((float[]){0.9f, 0.3f, 0.6f, 1});
+    st->shader = umbra_shader_solid((umbra_color){0.9f, 0.3f, 0.6f, 1});
     struct capsule_sdf *cap = (struct capsule_sdf *)&st->sdf;
     cap->base = (struct umbra_sdf){.build = capsule_build_, .fill = capsule_fill_};
     st->base = (struct slide){
@@ -473,7 +474,7 @@ static void halfplane_fill_(struct umbra_sdf const *s, void *uniforms) {
 
 SLIDE(slide_sdf_halfplane) {
     struct csg_slide *st = calloc(1, sizeof *st);
-    st->shader = umbra_shader_solid((float[]){0.3f, 0.7f, 0.9f, 1});
+    st->shader = umbra_shader_solid((umbra_color){0.3f, 0.7f, 0.9f, 1});
     struct halfplane_sdf *hp = (struct halfplane_sdf *)&st->sdf;
     hp->base = (struct umbra_sdf){.build = halfplane_build_, .fill = halfplane_fill_};
     st->base = (struct slide){
@@ -680,7 +681,7 @@ static void sdf_text_free(struct slide *s) {
 
 SLIDE(slide_sdf_text) {
     struct sdf_text_slide *st = calloc(1, sizeof *st);
-    st->shader = umbra_shader_solid((float[]){0.95f, 0.9f, 0.8f, 1});
+    st->shader = umbra_shader_solid((umbra_color){0.95f, 0.9f, 0.8f, 1});
     st->sdf.base = (struct umbra_sdf){.build = sdf_text_build_, .fill = sdf_text_fill_};
     st->base = (struct slide){
         .title = "SDF Text (analytic)",
@@ -826,7 +827,7 @@ static void ngon_free(struct slide *s) {
 
 SLIDE(slide_sdf_ngon) {
     struct ngon_slide *st = calloc(1, sizeof *st);
-    st->shader = umbra_shader_solid((float[]){0.8f, 0.8f, 0.2f, 1});
+    st->shader = umbra_shader_solid((umbra_color){0.8f, 0.8f, 0.2f, 1});
     st->sdf.hp_data = malloc(3 * NGON_SIDES * sizeof(float));
     st->sdf.base = (struct umbra_sdf){.build = ngon_build_, .fill = ngon_fill_};
     st->base = (struct slide){

@@ -73,7 +73,7 @@ static void persp_free(struct slide *s) {
 SLIDE(slide_persp) {
     struct persp_slide *st = calloc(1, sizeof *st);
     st->bitmap = text_shared_bitmap();
-    st->shader = umbra_shader_solid((float[]){1.0f, 0.8f, 0.2f, 1.0f});
+    st->shader = umbra_shader_solid((umbra_color){1.0f, 0.8f, 0.2f, 1.0f});
     st->cov    = umbra_coverage_bitmap_matrix((struct umbra_matrix){0}, (struct umbra_bitmap){0});
     st->base = (struct slide){
         .title = "Perspective Text",

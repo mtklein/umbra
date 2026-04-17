@@ -39,7 +39,7 @@ static void swatch_draw(struct slide *s, double secs, int l, int t, int r, int b
     struct swatch_slide *st = (struct swatch_slide *)s;
     (void)secs;
 
-    static float const swatches[][4] = {
+    static umbra_color const swatches[] = {
         {1.0f, 0.0f, 0.0f, 1.0f},
         {0.0f, 1.0f, 0.0f, 1.0f},
         {0.0f, 0.0f, 1.0f, 1.0f},
@@ -69,7 +69,7 @@ static void swatch_draw(struct slide *s, double secs, int l, int t, int r, int b
         int const xr = x1 < r ? x1 : r;
         if (xr <= xl) { continue; }
 
-        __builtin_memcpy(st->shader.color, swatches[i], sizeof st->shader.color);
+        st->shader.color = swatches[i];
         umbra_draw_fill(&st->lay, &st->shader.base, NULL);
         struct umbra_buf ubuf[] = {
             {.ptr = st->lay.uniforms, .count = st->lay.uni.slots},
@@ -97,7 +97,7 @@ static void swatch_free(struct slide *s) {
 
 SLIDE(slide_swatch) {
     struct swatch_slide *st = calloc(1, sizeof *st);
-    st->shader = umbra_shader_solid((float[]){0, 0, 0, 1});
+    st->shader = umbra_shader_solid((umbra_color){0, 0, 0, 1});
     st->base = (struct slide){
         .title   = "Color Swatches",
         .bg      = {0, 0, 0, 1},

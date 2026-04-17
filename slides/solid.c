@@ -111,7 +111,8 @@ static void solid_free(struct slide *s) {
 static struct slide* make_solid(char const *title, float const bg[4], float const color[4],
                                 _Bool has_sdf, umbra_blend_fn blend) {
     struct solid_slide *st = calloc(1, sizeof *st);
-    st->shader  = umbra_shader_solid(color);
+    umbra_color const c = {color[0], color[1], color[2], color[3]};
+    st->shader  = umbra_shader_solid(c);
     st->has_sdf = has_sdf;
     if (has_sdf) { st->sdf = umbra_sdf_rect((float[]){0, 0, 0, 0}); }
     st->blend   = blend;
