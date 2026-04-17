@@ -103,18 +103,18 @@ void text_cov_free(struct text_cov *tc) {
     tc->data = NULL;
 }
 
-static struct text_cov shared_bitmap_, shared_sdf_;
+static struct text_cov shared_bitmap, shared_sdf;
 
 void text_shared_init(int w, int h, float font_size) {
-    shared_bitmap_ = text_rasterize(w, h, font_size, 0);
-    shared_sdf_    = text_rasterize(w, h, font_size, 1);
+    shared_bitmap = text_rasterize(w, h, font_size, 0);
+    shared_sdf    = text_rasterize(w, h, font_size, 1);
 }
 void text_shared_cleanup(void) {
-    text_cov_free(&shared_bitmap_);
-    text_cov_free(&shared_sdf_);
+    text_cov_free(&shared_bitmap);
+    text_cov_free(&shared_sdf);
 }
-struct text_cov* text_shared_bitmap(void) { return &shared_bitmap_; }
-struct text_cov* text_shared_sdf   (void) { return &shared_sdf_; }
+struct text_cov* text_shared_bitmap(void) { return &shared_bitmap; }
+struct text_cov* text_shared_sdf   (void) { return &shared_sdf; }
 
 struct text_slide {
     struct slide base;
