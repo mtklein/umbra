@@ -56,8 +56,7 @@ struct umbra_shader {
     void             (*free)(struct umbra_shader*);
     struct umbra_buf   uniforms;
 };
-void             umbra_shader_free    (struct umbra_shader*);
-struct umbra_buf umbra_shader_uniforms(struct umbra_shader const*);
+void umbra_shader_free(struct umbra_shader*);
 
 struct umbra_coverage {
     umbra_val32 (*build)(struct umbra_coverage*,
@@ -67,8 +66,7 @@ struct umbra_coverage {
     void             (*free)(struct umbra_coverage*);
     struct umbra_buf   uniforms;
 };
-void             umbra_coverage_free    (struct umbra_coverage*);
-struct umbra_buf umbra_coverage_uniforms(struct umbra_coverage const*);
+void umbra_coverage_free(struct umbra_coverage*);
 
 // Signed distance function returning f(x,y) where f < 0 means inside.
 struct umbra_sdf {
@@ -79,8 +77,7 @@ struct umbra_sdf {
     void             (*free)(struct umbra_sdf*);
     struct umbra_buf   uniforms;
 };
-void             umbra_sdf_free    (struct umbra_sdf*);
-struct umbra_buf umbra_sdf_uniforms(struct umbra_sdf const*);
+void umbra_sdf_free(struct umbra_sdf*);
 
 // Compute the umbra_buf for a concrete effect whose base vtable is at offset 0.
 // The data starts right after the base and runs to the end of the struct.

@@ -163,8 +163,8 @@ TEST(test_slug_rect) {
 
     struct umbra_buf buf[] = {
         {.ptr=pixels, .count=W * H, .stride=W},
-        umbra_coverage_uniforms(cov),
-        umbra_shader_uniforms(shader),
+        cov->uniforms,
+        shader->uniforms,
     };
     interp->queue(interp, 0, 0, W, H, buf);
     be->flush(be);
@@ -218,8 +218,8 @@ TEST(test_perspective_text) {
 
     struct umbra_buf buf[] = {
         {.ptr=pixels, .count=BW},
-        umbra_coverage_uniforms(cov),
-        umbra_shader_uniforms(shader),
+        cov->uniforms,
+        shader->uniforms,
     };
     interp->queue(interp, 0, 0, BW, 1, buf);
     be->flush(be);
@@ -258,8 +258,8 @@ TEST(test_perspective_text) {
     {
         struct umbra_buf b2[] = {
             {.ptr=px2, .count=W * H, .stride=W},
-            umbra_coverage_uniforms(cov2),
-            umbra_shader_uniforms(shader2),
+            cov2->uniforms,
+            shader2->uniforms,
         };
         interp->queue(interp, 0, 0, W, H, b2);
         be->flush(be);

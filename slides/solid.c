@@ -70,8 +70,8 @@ static void solid_draw(struct slide *s, double secs, int l, int t, int r, int b,
     }
     struct umbra_buf ubuf[] = {
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
-        st->has_sdf ? umbra_sdf_uniforms(st->sdf) : (struct umbra_buf){0},
-        umbra_shader_uniforms(st->shader),
+        st->has_sdf ? st->sdf->uniforms : (struct umbra_buf){0},
+        st->shader->uniforms,
     };
     if (st->qt) {
         umbra_sdf_draw_queue(st->qt, l, t, r, b, ubuf);

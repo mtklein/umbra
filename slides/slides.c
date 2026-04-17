@@ -96,7 +96,7 @@ void slide_bg_draw(float const bg[4], int l, int t, int r, int b, void *buf) {
     struct umbra_buf ubuf[] = {
         {.ptr=buf, .count=bg_w * bg_h * bg_fmt.planes, .stride=bg_w},
         {0},
-        umbra_shader_uniforms(bg_shader),
+        bg_shader->uniforms,
     };
     bg_prog->queue(bg_prog, l, t, r, b, ubuf);
 }

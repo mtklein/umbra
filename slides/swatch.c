@@ -71,7 +71,7 @@ static void swatch_draw(struct slide *s, double secs, int l, int t, int r, int b
         struct umbra_buf ubuf[] = {
             {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
             {0},
-            umbra_shader_uniforms(st->shader),
+            st->shader->uniforms,
         };
         st->prog->queue(st->prog, xl, yt, xr, yb, ubuf);
     }

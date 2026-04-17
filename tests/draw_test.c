@@ -22,10 +22,10 @@ static void cleanup_draw(struct draw_backends *B) {
 }
 
 static struct umbra_buf cov_u(struct umbra_coverage const *c) {
-    return c ? umbra_coverage_uniforms(c) : (struct umbra_buf){0};
+    return c ? c->uniforms : (struct umbra_buf){0};
 }
 static struct umbra_buf sh_u(struct umbra_shader const *s) {
-    return s ? umbra_shader_uniforms(s) : (struct umbra_buf){0};
+    return s ? s->uniforms : (struct umbra_buf){0};
 }
 
 TEST(test_solid_src) {
@@ -1416,8 +1416,8 @@ TEST(test_sdf_dispatch_rect) {
         __builtin_memset(dst, 0, sizeof dst);
         struct umbra_buf buf[] = {
             {.ptr = dst, .count = 8 * 4, .stride = 8},
-            umbra_sdf_uniforms(sdf),
-            umbra_shader_uniforms(shader),
+            sdf->uniforms,
+            shader->uniforms,
         };
         umbra_sdf_draw_queue(qt, 0, 0, 8, 4, buf);
         bes[bi]->flush(bes[bi]);
@@ -1504,15 +1504,15 @@ TEST(test_sdf_dispatch_tiling) {
 
     struct umbra_buf tiled_ubuf[] = {
         {.ptr = tiled_buf, .count = W * H, .stride = W},
-        umbra_sdf_uniforms(&sdf.base),
-        umbra_shader_uniforms(shader),
+        sdf.base.uniforms,
+        shader->uniforms,
     };
     umbra_sdf_draw_queue(disp, 0, 0, W, H, tiled_ubuf);
 
     struct umbra_buf flat_ubuf[] = {
         {.ptr = flat_buf, .count = W * H, .stride = W},
-        umbra_coverage_uniforms(adapter),
-        umbra_shader_uniforms(shader),
+        adapter->uniforms,
+        shader->uniforms,
     };
     flat->queue(flat, 0, 0, W, H, flat_ubuf);
 

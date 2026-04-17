@@ -135,8 +135,8 @@ static void csg_draw(struct slide *s, double secs, int l, int t, int r, int b, v
     two_circle_orbit(&st->sdf, (float)secs, st->w, st->h);
     struct umbra_buf ubuf[] = {
         {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
-        umbra_sdf_uniforms(&st->sdf.base),
-        umbra_shader_uniforms(st->shader),
+        st->sdf.base.uniforms,
+        st->shader->uniforms,
     };
     umbra_sdf_draw_queue(st->disp, l, t, r, b, ubuf);
 }
@@ -255,8 +255,8 @@ static void ring_draw(struct slide *s, double secs, int l, int t, int r, int b, 
     st->sdf.w = st->sdf.r * 0.15f;
     struct umbra_buf ubuf[] = {
         {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
-        umbra_sdf_uniforms(&st->sdf.base),
-        umbra_shader_uniforms(st->shader),
+        st->sdf.base.uniforms,
+        st->shader->uniforms,
     };
     umbra_sdf_draw_queue(st->disp, l, t, r, b, ubuf);
 }
@@ -372,8 +372,8 @@ static void rounded_rect_draw(struct slide *s, double secs, int l, int t, int r,
 
     struct umbra_buf ubuf[] = {
         {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
-        umbra_sdf_uniforms(&st->sdf.base),
-        umbra_shader_uniforms(st->shader),
+        st->sdf.base.uniforms,
+        st->shader->uniforms,
     };
     umbra_sdf_draw_queue(st->disp, l, t, r, b, ubuf);
 }
@@ -496,8 +496,8 @@ static void capsule_draw(struct slide *s, double secs, int l, int t, int r, int 
     st->sdf.rad = r_center * 0.15f;
     struct umbra_buf ubuf[] = {
         {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
-        umbra_sdf_uniforms(&st->sdf.base),
-        umbra_shader_uniforms(st->shader),
+        st->sdf.base.uniforms,
+        st->shader->uniforms,
     };
     umbra_sdf_draw_queue(st->disp, l, t, r, b, ubuf);
 }
@@ -598,8 +598,8 @@ static void halfplane_draw(struct slide *s, double secs, int l, int t, int r, in
     st->sdf.d  = st->sdf.nx * cx + st->sdf.ny * cy;
     struct umbra_buf ubuf[] = {
         {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
-        umbra_sdf_uniforms(&st->sdf.base),
-        umbra_shader_uniforms(st->shader),
+        st->sdf.base.uniforms,
+        st->shader->uniforms,
     };
     umbra_sdf_draw_queue(st->disp, l, t, r, b, ubuf);
 }
@@ -794,8 +794,8 @@ static void sdf_text_draw(struct slide *s, double secs, int l, int t, int r, int
     slide_bg_draw(s->bg, l, t, r, b, buf);
     struct umbra_buf ubuf[] = {
         {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
-        umbra_sdf_uniforms(&st->sdf.base),
-        umbra_shader_uniforms(st->shader),
+        st->sdf.base.uniforms,
+        st->shader->uniforms,
     };
     umbra_sdf_draw_queue(st->disp, l, t, r, b, ubuf);
 }
@@ -936,8 +936,8 @@ static void ngon_draw(struct slide *s, double secs, int l, int t, int r, int b, 
     st->sdf.hp      = (struct umbra_buf){.ptr = st->hp_data, .count = 3 * NGON_SIDES};
     struct umbra_buf ubuf[] = {
         {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
-        umbra_sdf_uniforms(&st->sdf.base),
-        umbra_shader_uniforms(st->shader),
+        st->sdf.base.uniforms,
+        st->shader->uniforms,
     };
     umbra_sdf_draw_queue(st->disp, l, t, r, b, ubuf);
 }

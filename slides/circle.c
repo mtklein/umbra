@@ -81,8 +81,8 @@ static void circle_draw(struct slide *s, double secs, int l, int t, int r, int b
 
     struct umbra_buf ubuf[] = {
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
-        umbra_sdf_uniforms(&st->sdf.base),
-        umbra_shader_uniforms(st->shader),
+        st->sdf.base.uniforms,
+        st->shader->uniforms,
     };
     umbra_sdf_draw_queue(st->qt, l, t, r, b, ubuf);
 }

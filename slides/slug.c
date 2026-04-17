@@ -490,8 +490,8 @@ static void slug_two_pass_draw(struct slide *s, double secs, int l, int t, int r
 
     struct umbra_buf rbuf[] = {
         {.ptr=buf, .count=w * h * st->fmt.planes, .stride=w},
-        umbra_coverage_uniforms(st->cov),
-        umbra_shader_uniforms(st->shader),
+        st->cov->uniforms,
+        st->shader->uniforms,
     };
     st->draw_prog->queue(st->draw_prog, l, t, r, b, rbuf);
 }
@@ -610,8 +610,8 @@ static void slug_draw(struct slide *s, double secs, int l, int t, int r, int b, 
 
     struct umbra_buf rbuf[] = {
         {.ptr=buf, .count=w * h * st->fmt.planes, .stride=w},
-        umbra_coverage_uniforms(st->cov),
-        umbra_shader_uniforms(st->shader),
+        st->cov->uniforms,
+        st->shader->uniforms,
     };
     st->draw_prog->queue(st->draw_prog, l, t, r, b, rbuf);
 }

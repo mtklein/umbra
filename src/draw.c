@@ -265,7 +265,7 @@ struct umbra_coverage* umbra_sdf_coverage(struct umbra_sdf *sdf, _Bool hard_edge
     *s = (struct sdf_coverage){
         .base      = {.build    = sdf_as_coverage_build,
                       .free     = sdf_as_coverage_free,
-                      .uniforms = umbra_sdf_uniforms(sdf)},
+                      .uniforms = sdf->uniforms},
         .sdf       = sdf,
         .hard_edge = hard_edge,
     };
@@ -281,10 +281,6 @@ void umbra_coverage_free(struct umbra_coverage *c) {
 void umbra_sdf_free(struct umbra_sdf *s) {
     if (s && s->free) { s->free(s); }
 }
-
-struct umbra_buf umbra_shader_uniforms  (struct umbra_shader   const *s) { return s->uniforms; }
-struct umbra_buf umbra_coverage_uniforms(struct umbra_coverage const *c) { return c->uniforms; }
-struct umbra_buf umbra_sdf_uniforms     (struct umbra_sdf      const *s) { return s->uniforms; }
 
 struct umbra_sdf_draw {
     struct umbra_program *draw;
@@ -851,7 +847,7 @@ struct umbra_shader* umbra_shader_supersample(struct umbra_shader *inner, int sa
     *s = (struct shader_supersample){
         .base    = {.build    = supersample_build,
                     .free     = supersample_free,
-                    .uniforms = umbra_shader_uniforms(inner)},
+                    .uniforms = inner->uniforms},
         .inner   = inner,
         .samples = samples,
     };

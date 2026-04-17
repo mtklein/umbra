@@ -57,8 +57,8 @@ static void persp_draw(struct slide *s, double secs, int l, int t, int r, int b,
     st->cov = umbra_coverage_bitmap_matrix(mat, bmp);
     struct umbra_buf ubuf[] = {
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
-        umbra_coverage_uniforms(st->cov),
-        umbra_shader_uniforms(st->shader),
+        st->cov->uniforms,
+        st->shader->uniforms,
     };
     st->prog->queue(st->prog, l, t, r, b, ubuf);
 }
