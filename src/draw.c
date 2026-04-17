@@ -729,15 +729,15 @@ static umbra_color_val32 supersample_build(struct umbra_shader *s, struct umbra_
         {-0.375f, -0.125f}, {0.125f, -0.375f}, {0.375f, 0.125f}, {-0.125f, 0.375f},
         {-0.250f, 0.375f},  {0.250f, -0.250f}, {0.375f, 0.250f}, {-0.375f, -0.250f},
     };
-    int n = self->n;
-    if (n < 1) { n = 1; }
-    if (n > 8) { n = 8; }
+    int samples = self->samples;
+    if (samples < 1) { samples = 1; }
+    if (samples > 8) { samples = 8; }
 
     int         const saved = u->slots;
     umbra_color_val32 sum = self->inner->build(self->inner, builder, u, x, y);
     int         const after = u->slots;
 
-    for (int i = 1; i < n; i++) {
+    for (int i = 1; i < samples; i++) {
         struct umbra_uniforms_layout scratch = {.slots = saved};
         umbra_val32 const sx = umbra_add_f32(builder, x,
                                               umbra_imm_f32(builder, jitter[i - 1][0]));
@@ -751,7 +751,7 @@ static umbra_color_val32 supersample_build(struct umbra_shader *s, struct umbra_
         sum.a = umbra_add_f32(builder, sum.a, c.a);
     }
 
-    umbra_val32 const inv = umbra_imm_f32(builder, 1.0f / (float)n);
+    umbra_val32 const inv = umbra_imm_f32(builder, 1.0f / (float)samples);
     return (umbra_color_val32){
         umbra_mul_f32(builder, sum.r, inv),
         umbra_mul_f32(builder, sum.g, inv),
@@ -763,11 +763,11 @@ static void supersample_fill(struct umbra_shader const *s, void *uniforms) {
     struct umbra_shader_supersample const *self = (struct umbra_shader_supersample const *)s;
     self->inner->fill(self->inner, uniforms);
 }
-struct umbra_shader_supersample umbra_shader_supersample(struct umbra_shader *inner, int n) {
+struct umbra_shader_supersample umbra_shader_supersample(struct umbra_shader *inner, int samples) {
     return (struct umbra_shader_supersample){
-        .base = {.build = supersample_build, .fill = supersample_fill},
-        .inner = inner,
-        .n = n,
+        .base    = {.build = supersample_build, .fill = supersample_fill},
+        .inner   = inner,
+        .samples = samples,
     };
 }
 

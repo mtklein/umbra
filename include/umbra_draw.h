@@ -215,13 +215,12 @@ struct umbra_shader_gradient_radial umbra_shader_gradient_radial(umbra_point cen
                                                            struct umbra_buf colors,
                                                            struct umbra_buf pos);
 
-  // TODO: n -> samples
 struct umbra_shader_supersample {
     struct umbra_shader base;
     struct umbra_shader *inner;
-    int n, :32;
+    int samples, :32;
 };
-struct umbra_shader_supersample umbra_shader_supersample(struct umbra_shader *inner, int n);
+struct umbra_shader_supersample umbra_shader_supersample(struct umbra_shader *inner, int samples);
 
 struct umbra_coverage_rect {
     struct umbra_coverage base;
