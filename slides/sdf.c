@@ -641,10 +641,19 @@ SLIDE(slide_sdf_halfplane) {
 
 // TODO: use the actual quadratic Bezier distance (P0, P1, P2) instead of
 // the line-segment approximation (P0, P2).  The control point P1 is already
-// in the curve data at offsets k+2, k+3 — just not used yet.  The exact
-// distance to a quadratic Bezier requires solving a cubic for the closest
-// parameter t, which is more ops per curve but would give smooth outlines
-// and enable proper filled rendering with winding-number sign.
+// in the curve data at offsets k+2, k+3 — just not used yet.
+//
+// Distance to a quadratic Bezier requires solving a cubic for the nearest
+// parameter t.  Since umbra has no cbrt (and no trig), the closed-form
+// Cardano path is out; use 3–5 Newton iterations on
+// f(t) = (B(t) - p) · B'(t) seeded from the best of t ∈ {0, 0.5, 1} and
+// clamped to [0,1] after each step.  Sub-pixel accuracy in ~3 iters.
+//
+// For proper filled rendering add winding-number sign alongside the
+// distance: for each curve solve B(t).y = gy (quadratic in t, one sqrt),
+// check each root in [0,1], XOR a parity var when B(root).x > gx.  Final
+// signed distance = sel(parity, -|dist|, +|dist|).  Bounds path returns
+// the conservative {-|dist|.hi, +|dist|.hi} when inputs are non-exact.
 //
 // TODO: add an SDF stroke wrapper (abs(sdf) - width) that can be toggled
 // on any SDF slide, like iv2d's 's' key.  This converts fills to outlines
