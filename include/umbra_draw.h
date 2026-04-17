@@ -157,17 +157,22 @@ struct umbra_shader_solid umbra_shader_solid(umbra_color color);
 
 struct umbra_shader_linear_2 {
     struct umbra_shader base;
-    float  grad[3], color[8]; int :32;
+    umbra_point p0, p1;
+    umbra_color c0, c1;
     int fi_, ci_;  // TODO: fi and ci are unclear names, all throughout
 };
-struct umbra_shader_linear_2 umbra_shader_linear_2(float const grad[3], float const color[8]);
+struct umbra_shader_linear_2 umbra_shader_linear_2(umbra_point p0, umbra_point p1,
+                                                   umbra_color c0, umbra_color c1);
 
 struct umbra_shader_radial_2 {
     struct umbra_shader base;
-    float  grad[3], color[8]; int :32;
+    umbra_point center;
+    float       radius; int :32;
+    umbra_color c0, c1;
     int fi_, ci_;
 };
-struct umbra_shader_radial_2 umbra_shader_radial_2(float const grad[3], float const color[8]);
+struct umbra_shader_radial_2 umbra_shader_radial_2(umbra_point center, float radius,
+                                                   umbra_color c0, umbra_color c1);
 
 struct umbra_shader_linear_grad {
     struct umbra_shader base;

@@ -552,16 +552,24 @@ static umbra_color_val32 linear_2_build_(struct umbra_shader *s, struct umbra_bu
 }
 static void linear_2_fill_(struct umbra_shader const *s, void *uniforms) {
     struct umbra_shader_linear_2 const *self = (struct umbra_shader_linear_2 const *)s;
-    umbra_uniforms_fill_f32(uniforms, self->fi_, self->grad, 3);
-    umbra_uniforms_fill_f32(uniforms, self->ci_, self->color, 8);
+    float const dx = self->p1.x - self->p0.x,
+                dy = self->p1.y - self->p0.y,
+                L2 = dx*dx + dy*dy,
+                a  = dx / L2,
+                b  = dy / L2,
+                c  = -(a * self->p0.x + b * self->p0.y);
+    float const grad[3] = {a, b, c};
+    umbra_uniforms_fill_f32(uniforms, self->fi_,     grad,         3);
+    umbra_uniforms_fill_f32(uniforms, self->ci_,     &self->c0.r, 4);
+    umbra_uniforms_fill_f32(uniforms, self->ci_ + 4, &self->c1.r, 4);
 }
-struct umbra_shader_linear_2 umbra_shader_linear_2(float const grad[3], float const color[8]) {
-    struct umbra_shader_linear_2 s = {
+struct umbra_shader_linear_2 umbra_shader_linear_2(umbra_point p0, umbra_point p1,
+                                                   umbra_color c0, umbra_color c1) {
+    return (struct umbra_shader_linear_2){
         .base = {.build = linear_2_build_, .fill = linear_2_fill_},
+        .p0   = p0, .p1 = p1,
+        .c0   = c0, .c1 = c1,
     };
-    __builtin_memcpy(s.grad, grad, 12);
-    __builtin_memcpy(s.color, color, 32);
-    return s;
 }
 
 static umbra_color_val32 radial_2_build_(struct umbra_shader *s, struct umbra_builder *builder,
@@ -574,16 +582,19 @@ static umbra_color_val32 radial_2_build_(struct umbra_shader *s, struct umbra_bu
 }
 static void radial_2_fill_(struct umbra_shader const *s, void *uniforms) {
     struct umbra_shader_radial_2 const *self = (struct umbra_shader_radial_2 const *)s;
-    umbra_uniforms_fill_f32(uniforms, self->fi_, self->grad, 3);
-    umbra_uniforms_fill_f32(uniforms, self->ci_, self->color, 8);
+    float const grad[3] = {self->center.x, self->center.y, 1.0f / self->radius};
+    umbra_uniforms_fill_f32(uniforms, self->fi_,     grad,         3);
+    umbra_uniforms_fill_f32(uniforms, self->ci_,     &self->c0.r, 4);
+    umbra_uniforms_fill_f32(uniforms, self->ci_ + 4, &self->c1.r, 4);
 }
-struct umbra_shader_radial_2 umbra_shader_radial_2(float const grad[3], float const color[8]) {
-    struct umbra_shader_radial_2 s = {
-        .base = {.build = radial_2_build_, .fill = radial_2_fill_},
+struct umbra_shader_radial_2 umbra_shader_radial_2(umbra_point center, float radius,
+                                                   umbra_color c0, umbra_color c1) {
+    return (struct umbra_shader_radial_2){
+        .base   = {.build = radial_2_build_, .fill = radial_2_fill_},
+        .center = center,
+        .radius = radius,
+        .c0     = c0, .c1 = c1,
     };
-    __builtin_memcpy(s.grad, grad, 12);
-    __builtin_memcpy(s.color, color, 32);
-    return s;
 }
 
 static umbra_color_val32 linear_grad_build_(struct umbra_shader *s, struct umbra_builder *builder,

@@ -894,8 +894,8 @@ TEST(test_coverage_bitmap_matrix_oob) {
 
 TEST(test_linear_2) {
     struct umbra_shader_linear_2 shader =
-        umbra_shader_linear_2((float[]){0.25f, 0, 0},
-                              (float[]){1, 0, 0, 1, 0, 0, 1, 1});
+        umbra_shader_linear_2((umbra_point){0, 0}, (umbra_point){4, 0},
+                              (umbra_color){1, 0, 0, 1}, (umbra_color){0, 0, 1, 1});
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_builder(&shader.base, NULL, umbra_blend_src,
@@ -922,8 +922,8 @@ TEST(test_linear_2) {
 
 TEST(test_radial_2) {
     struct umbra_shader_radial_2 shader =
-        umbra_shader_radial_2((float[]){0, 0, 0.1f},
-                              (float[]){1, 1, 1, 1, 0, 0, 0, 1});
+        umbra_shader_radial_2((umbra_point){0, 0}, 10.0f,
+                              (umbra_color){1, 1, 1, 1}, (umbra_color){0, 0, 0, 1});
     struct umbra_draw_layout lay;
     struct draw_backends     B =
         make_draw(umbra_draw_builder(&shader.base, NULL, umbra_blend_src,

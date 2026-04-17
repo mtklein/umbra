@@ -133,24 +133,6 @@ static void grad_lut_free(struct slide *s) {
     free(st);
 }
 
-static struct slide* make_grad_2stop(char const *title, float const bg[4], _Bool is_radial,
-                                     float const color[8], float const grad[3]) {
-    struct grad_2stop_slide *st = calloc(1, sizeof *st);
-    st->is_radial = is_radial;
-    if (is_radial) { st->shader.radial = umbra_shader_radial_2(grad, color); }
-    else           { st->shader.linear = umbra_shader_linear_2(grad, color); }
-    st->base = (struct slide){
-        .title = title,
-        .bg = {bg[0], bg[1], bg[2], bg[3]},
-        .init = grad_2stop_init,
-        .prepare = grad_2stop_prepare,
-        .draw = grad_2stop_draw,
-        .free = grad_2stop_free,
-        .get_builders = grad_2stop_get_builders,
-    };
-    return &st->base;
-}
-
 static struct slide* make_grad_lut(char const *title, float const bg[4], _Bool is_radial,
                                    float const grad[4], float *lut, int lut_n) {
     struct grad_lut_slide *st = calloc(1, sizeof *st);
@@ -172,15 +154,39 @@ static struct slide* make_grad_lut(char const *title, float const bg[4], _Bool i
 }
 
 SLIDE(slide_gradient_linear_2) {
-    return make_grad_2stop("Linear Gradient (2-stop)", (float[]){0,0,0,1}, 0,
-                           (float[]){1.0f, 0.4f, 0.0f, 1.0f, 0.0f, 0.3f, 1.0f, 1.0f},
-                           (float[]){1.0f / 640.0f, 0.0f, 0.0f});
+    struct grad_2stop_slide *st = calloc(1, sizeof *st);
+    st->is_radial = 0;
+    st->shader.linear = umbra_shader_linear_2((umbra_point){0, 0}, (umbra_point){640, 0},
+                                              (umbra_color){1.0f, 0.4f, 0.0f, 1.0f},
+                                              (umbra_color){0.0f, 0.3f, 1.0f, 1.0f});
+    st->base = (struct slide){
+        .title        = "Linear Gradient (2-stop)",
+        .bg           = {0, 0, 0, 1},
+        .init         = grad_2stop_init,
+        .prepare      = grad_2stop_prepare,
+        .draw         = grad_2stop_draw,
+        .free         = grad_2stop_free,
+        .get_builders = grad_2stop_get_builders,
+    };
+    return &st->base;
 }
 
 SLIDE(slide_gradient_radial_2) {
-    return make_grad_2stop("Radial Gradient (2-stop)", (float[]){0,0,0,1}, 1,
-                           (float[]){1.0f, 1.0f, 0.9f, 1.0f, 0.05f, 0.0f, 0.15f, 1.0f},
-                           (float[]){320.0f, 240.0f, 1.0f / 300.0f});
+    struct grad_2stop_slide *st = calloc(1, sizeof *st);
+    st->is_radial = 1;
+    st->shader.radial = umbra_shader_radial_2((umbra_point){320, 240}, 300.0f,
+                                              (umbra_color){1.0f, 1.0f, 0.9f, 1.0f},
+                                              (umbra_color){0.05f, 0.0f, 0.15f, 1.0f});
+    st->base = (struct slide){
+        .title        = "Radial Gradient (2-stop)",
+        .bg           = {0, 0, 0, 1},
+        .init         = grad_2stop_init,
+        .prepare      = grad_2stop_prepare,
+        .draw         = grad_2stop_draw,
+        .free         = grad_2stop_free,
+        .get_builders = grad_2stop_get_builders,
+    };
+    return &st->base;
 }
 
 struct grad_stops_slide {
