@@ -154,7 +154,7 @@ static int csg_get_builders(struct slide *s, struct umbra_fmt fmt,
     if (max < 1) { return 0; }
     struct csg_slide *st = (struct csg_slide *)s;
     struct umbra_sdf_coverage adapter = umbra_sdf_coverage(&st->sdf.base, 0);
-    out[0] = umbra_draw_builder(&st->shader.base, &adapter.base,
+    out[0] = umbra_draw_builder(&adapter.base, &st->shader.base,
                                 umbra_blend_srcover, fmt, NULL);
     return out[0] ? 1 : 0;
 }
@@ -342,7 +342,7 @@ static int rounded_rect_get_builders(struct slide *s, struct umbra_fmt fmt,
     if (max < 1) { return 0; }
     struct rounded_rect_slide *st = (struct rounded_rect_slide *)s;
     struct umbra_sdf_coverage adapter = umbra_sdf_coverage(&st->sdf.base, 0);
-    out[0] = umbra_draw_builder(&st->shader.base, &adapter.base,
+    out[0] = umbra_draw_builder(&adapter.base, &st->shader.base,
                                 umbra_blend_srcover, fmt, NULL);
     return out[0] ? 1 : 0;
 }
@@ -666,7 +666,7 @@ static int sdf_text_get_builders(struct slide *s, struct umbra_fmt fmt,
     if (max < 1) { return 0; }
     struct sdf_text_slide *st = (struct sdf_text_slide *)s;
     struct umbra_sdf_coverage adapter = umbra_sdf_coverage(&st->sdf.base, 0);
-    out[0] = umbra_draw_builder(&st->shader.base, &adapter.base,
+    out[0] = umbra_draw_builder(&adapter.base, &st->shader.base,
                                 umbra_blend_srcover, fmt, NULL);
     return out[0] ? 1 : 0;
 }
@@ -812,7 +812,7 @@ static int ngon_get_builders(struct slide *s, struct umbra_fmt fmt,
     if (max < 1) { return 0; }
     struct ngon_slide *st = (struct ngon_slide *)s;
     struct umbra_sdf_coverage adapter = umbra_sdf_coverage(&st->sdf.base, 0);
-    out[0] = umbra_draw_builder(&st->shader.base, &adapter.base,
+    out[0] = umbra_draw_builder(&adapter.base, &st->shader.base,
                                 umbra_blend_srcover, fmt, NULL);
     return out[0] ? 1 : 0;
 }

@@ -146,7 +146,7 @@ static void text_prepare(struct slide *s, struct umbra_backend *be,
     if (st->prog) { st->prog->free(st->prog); }
     free(st->lay.uniforms);
     st->fmt = fmt;
-    struct umbra_builder *b = umbra_draw_builder(&st->shader.base, &st->cov.bitmap.base,
+    struct umbra_builder *b = umbra_draw_builder(&st->cov.bitmap.base, &st->shader.base,
                                                  umbra_blend_srcover, fmt, &st->lay);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
@@ -164,7 +164,7 @@ static void text_draw(struct slide *s, double secs, int l, int t, int r, int b, 
         .count=st->w * st->h,
         .stride=st->w,
     };
-    umbra_draw_fill(&st->lay, &st->shader.base, &st->cov.bitmap.base);
+    umbra_draw_fill(&st->lay, &st->cov.bitmap.base, &st->shader.base);
     struct umbra_buf ubuf[] = {
         {.ptr=st->lay.uniforms, .count=st->lay.uni.slots},
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
@@ -176,7 +176,7 @@ static int text_get_builders(struct slide *s, struct umbra_fmt fmt,
                              struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
     struct text_slide *st = (struct text_slide *)s;
-    out[0] = umbra_draw_builder(&st->shader.base, &st->cov.bitmap.base,
+    out[0] = umbra_draw_builder(&st->cov.bitmap.base, &st->shader.base,
                                 umbra_blend_srcover, fmt, NULL);
     return out[0] ? 1 : 0;
 }

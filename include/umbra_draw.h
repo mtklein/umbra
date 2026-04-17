@@ -113,16 +113,15 @@ struct umbra_draw_layout {
     void                        *uniforms;
 };
 
-// TODO: reorder to pass coverage first
-struct umbra_builder* umbra_draw_builder(struct umbra_shader*,
-                                         struct umbra_coverage*,
+struct umbra_builder* umbra_draw_builder(struct umbra_coverage*,
+                                         struct umbra_shader*,
                                          umbra_blend_fn,
                                          struct umbra_fmt,
                                          struct umbra_draw_layout*);
 
 void umbra_draw_fill(struct umbra_draw_layout const*,
-                     struct umbra_shader const*,
-                     struct umbra_coverage const*);
+                     struct umbra_coverage const*,
+                     struct umbra_shader const*);
 
 struct umbra_sdf_draw_config {
     _Bool hard_edge;

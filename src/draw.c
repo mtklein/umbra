@@ -159,8 +159,8 @@ struct umbra_fmt const umbra_fmt_fp16_planar = {
     .name="fp16_planar", .bpp=2, .planes=4, .load=load_fp16p, .store=store_fp16p,
 };
 
-struct umbra_builder* umbra_draw_builder(struct umbra_shader *shader,
-                                         struct umbra_coverage *coverage,
+struct umbra_builder* umbra_draw_builder(struct umbra_coverage *coverage,
+                                         struct umbra_shader *shader,
                                          umbra_blend_fn blend,
                                          struct umbra_fmt fmt,
                                          struct umbra_draw_layout *layout) {
@@ -230,8 +230,8 @@ struct umbra_builder* umbra_draw_builder(struct umbra_shader *shader,
 }
 
 void umbra_draw_fill(struct umbra_draw_layout const *layout,
-                     struct umbra_shader const *shader,
-                     struct umbra_coverage const *coverage) {
+                     struct umbra_coverage const *coverage,
+                     struct umbra_shader const *shader) {
     if (shader)   { shader->fill(shader, layout->uniforms); }
     if (coverage) { coverage->fill(coverage, layout->uniforms); }
 }
@@ -288,7 +288,7 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
                                               struct umbra_draw_layout *layout) {
     // Build the draw program (shader + SDF coverage + blend).
     struct umbra_sdf_coverage adapter = umbra_sdf_coverage(sdf, cfg.hard_edge);
-    struct umbra_builder *db = umbra_draw_builder(shader, &adapter.base, blend, fmt, layout);
+    struct umbra_builder *db = umbra_draw_builder(&adapter.base, shader, blend, fmt, layout);
     struct umbra_flat_ir *dir = umbra_flat_ir(db);
     umbra_builder_free(db);
     struct umbra_program *draw = be->compile(be, dir);

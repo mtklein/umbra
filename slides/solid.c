@@ -51,7 +51,7 @@ static void solid_prepare(struct slide *s, struct umbra_backend *be,
                                 (struct umbra_sdf_draw_config){.hard_edge = 1},
                                 &st->shader.base, st->blend, fmt, &st->lay);
     } else {
-        struct umbra_builder *b = umbra_draw_builder(&st->shader.base, NULL,
+        struct umbra_builder *b = umbra_draw_builder(NULL, &st->shader.base,
                                                      st->blend, fmt, &st->lay);
         struct umbra_flat_ir *ir = umbra_flat_ir(b);
         umbra_builder_free(b);
@@ -71,7 +71,7 @@ static void solid_draw(struct slide *s, double secs, int l, int t, int r, int b,
         st->sdf.rect = (umbra_rect){rx, ry, rx + st->rect_w, ry + st->rect_h};
         umbra_sdf_draw_fill(&st->lay, &st->sdf.base, &st->shader.base);
     } else {
-        umbra_draw_fill(&st->lay, &st->shader.base, NULL);
+        umbra_draw_fill(&st->lay, NULL, &st->shader.base);
     }
     struct umbra_buf ubuf[] = {
         {.ptr=st->lay.uniforms, .count=st->lay.uni.slots},
@@ -90,9 +90,9 @@ static int solid_get_builders(struct slide *s, struct umbra_fmt fmt,
     struct solid_slide *st = (struct solid_slide *)s;
     if (st->has_sdf) {
         struct umbra_sdf_coverage adapter = umbra_sdf_coverage(&st->sdf.base, 1);
-        out[0] = umbra_draw_builder(&st->shader.base, &adapter.base, st->blend, fmt, NULL);
+        out[0] = umbra_draw_builder(&adapter.base, &st->shader.base, st->blend, fmt, NULL);
     } else {
-        out[0] = umbra_draw_builder(&st->shader.base, NULL, st->blend, fmt, NULL);
+        out[0] = umbra_draw_builder(NULL, &st->shader.base, st->blend, fmt, NULL);
     }
     return out[0] ? 1 : 0;
 }

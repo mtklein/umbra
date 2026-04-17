@@ -134,7 +134,7 @@ TEST(test_slug_rect) {
 
     struct umbra_draw_layout lay;
     struct umbra_builder *bld = umbra_draw_builder(
-        &shader.base, &cov.base,
+        &cov.base, &shader.base,
         umbra_blend_srcover, umbra_fmt_8888,
         &lay);
     struct umbra_flat_ir *ir =
@@ -165,7 +165,7 @@ TEST(test_slug_rect) {
     }
     be->flush(be);
 
-    umbra_draw_fill(&lay, &shader.base, &cov.base);
+    umbra_draw_fill(&lay, &cov.base, &shader.base);
     struct umbra_buf buf[] = {
         (struct umbra_buf){.ptr=lay.uniforms, .count=lay.uni.slots},
         {.ptr=pixels, .count=W * H, .stride=W},
@@ -207,7 +207,7 @@ TEST(test_perspective_text) {
 
     struct umbra_draw_layout lay;
     struct umbra_builder *bld = umbra_draw_builder(
-        &shader.base, &cov.base,
+        &cov.base, &shader.base,
         umbra_blend_srcover, umbra_fmt_8888,
         &lay);
     struct umbra_flat_ir *ir =
@@ -222,7 +222,7 @@ TEST(test_perspective_text) {
         pixels[i] = 0xff000000;
     }
 
-    umbra_draw_fill(&lay, &shader.base, &cov.base);
+    umbra_draw_fill(&lay, &cov.base, &shader.base);
     struct umbra_buf buf[] = {
         (struct umbra_buf){.ptr=lay.uniforms, .count=lay.uni.slots},
         {.ptr=pixels, .count=BW},
@@ -251,7 +251,7 @@ TEST(test_perspective_text) {
 
     struct umbra_draw_layout lay2;
     bld = umbra_draw_builder(
-        &shader2.base, &cov2.base,
+        &cov2.base, &shader2.base,
         umbra_blend_srcover, umbra_fmt_8888,
         &lay2);
     ir = umbra_flat_ir(bld);
@@ -264,7 +264,7 @@ TEST(test_perspective_text) {
         px2[i] = 0xff0a0a1e;
     }
     {
-        umbra_draw_fill(&lay2, &shader2.base, &cov2.base);
+        umbra_draw_fill(&lay2, &cov2.base, &shader2.base);
         struct umbra_buf b2[] = {
             (struct umbra_buf){.ptr=lay2.uniforms, .count=lay2.uni.slots},
             {.ptr=px2, .count=W * H, .stride=W},
