@@ -103,13 +103,11 @@ TEST(interval_sqrt) {
 }
 
 TEST(interval_abs) {
-    iv const straddle = eval_unary(umbra_interval_abs_f32, (iv){-3,5});
-    straddle.lo == 0.0f here;
-    straddle.hi >= 5.0f here;
-
-    iv const positive = eval_unary(umbra_interval_abs_f32, (iv){2,7});
-    positive.lo == 0.0f here;
-    positive.hi >= 7.0f here;
+    iv_equiv(eval_unary(umbra_interval_abs_f32, (iv){-3, 5}), (iv){0, 5}) here;
+    iv_equiv(eval_unary(umbra_interval_abs_f32, (iv){ 2, 7}), (iv){2, 7}) here;
+    iv_equiv(eval_unary(umbra_interval_abs_f32, (iv){-7,-2}), (iv){2, 7}) here;
+    iv_equiv(eval_unary(umbra_interval_abs_f32, (iv){ 0, 5}), (iv){0, 5}) here;
+    iv_equiv(eval_unary(umbra_interval_abs_f32, (iv){-5, 0}), (iv){0, 5}) here;
 }
 
 TEST(interval_div) {
