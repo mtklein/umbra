@@ -27,7 +27,6 @@ struct wgpu_backend {
 
     WGPUCommandEncoder        batch_enc;
     WGPUComputePassEncoder    batch_pass;
-    _Bool                     batch_has_dispatch; int :24, :32;
 
     WGPUSubmissionIndex       frame_submitted[WGPU_N_FRAMES];
     _Bool                     frame_has_work [WGPU_N_FRAMES]; int :16, :32;
@@ -146,7 +145,6 @@ static void begin_batch(struct wgpu_backend *be) {
     if (be->batch_enc) { return; }
     be->batch_enc  = wgpuDeviceCreateCommandEncoder(be->device, NULL);
     be->batch_pass = begin_pass(be, 1);
-    be->batch_has_dispatch = 0;
 }
 
 static gpu_buf wgpu_cache_alloc(size_t size, void *ctx) {
@@ -265,7 +263,6 @@ static void wgpu_submit_cmdbuf(struct wgpu_backend *be) {
         wgpuQueueSubmitForIndex(be->queue, 1, &cmd);
     wgpuCommandBufferRelease(cmd);
     be->frame_has_work[cur] = 1;
-    be->batch_has_dispatch  = 0;
 
     uniform_ring_pool_rotate(&be->uni_pool);
 }
@@ -519,7 +516,6 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
     wgpuComputePassEncoderDispatchWorkgroups(be->batch_pass, gx, (uint32_t)h, 1);
     be->total_dispatches++;
 
-    be->batch_has_dispatch = 1;
 
     if (uniform_ring_pool_should_rotate(&be->uni_pool)) {
         wgpu_submit_cmdbuf(be);
