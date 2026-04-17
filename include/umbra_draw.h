@@ -58,6 +58,10 @@ void              umbra_store_fp16       (struct umbra_builder*, umbra_ptr64, um
 umbra_color_val32 umbra_load_fp16_planar (struct umbra_builder*, umbra_ptr16);
 void              umbra_store_fp16_planar(struct umbra_builder*, umbra_ptr16, umbra_color_val32);
 
+// TODO: this pattern of adding a freestanding `void type_free(type*)` function
+// for polymorphic types is growing on me. Let's try applying it to all our
+// other polymorphic types too.
+
 struct umbra_shader {
     umbra_color_val32 (*build)(struct umbra_shader*,
                                struct umbra_builder*,
@@ -66,6 +70,7 @@ struct umbra_shader {
     void (*fill)(struct umbra_shader const*, void *uniforms);
     void (*free)(struct umbra_shader*);
 };
+void umbra_shader_free(struct umbra_shader*);
 
 struct umbra_coverage {
     umbra_val32 (*build)(struct umbra_coverage*,
@@ -75,6 +80,7 @@ struct umbra_coverage {
     void (*fill)(struct umbra_coverage const*, void *uniforms);
     void (*free)(struct umbra_coverage*);
 };
+void umbra_coverage_free(struct umbra_coverage*);
 
 // Signed distance function returning f(x,y) where f < 0 means inside.
 struct umbra_sdf {
@@ -85,10 +91,7 @@ struct umbra_sdf {
     void (*fill)(struct umbra_sdf const*, void *uniforms);
     void (*free)(struct umbra_sdf*);
 };
-
-void umbra_shader_free  (struct umbra_shader*);
-void umbra_coverage_free(struct umbra_coverage*);
-void umbra_sdf_free     (struct umbra_sdf*);
+void umbra_sdf_free(struct umbra_sdf*);
 
 // TODO: bool hard_edge -> int quality
 
