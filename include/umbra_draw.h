@@ -2,6 +2,16 @@
 #include "umbra.h"
 #include "umbra_interval.h"
 
+// TODO: rethink how effects like coverage/shader/sdf and systems that use them
+// communicate their uniforms.  can we radically simplify by having them told
+// what niform buffer index to use as part of the request to fill out the
+// builder, and then later have them provide a umbra_buf pointing directly into
+// their own managed memory?  things would probably trend towards one
+// destination buffer at ix=0, and then a bunch of little uniform buffers at
+// 1,2.., one for each effect in the system.  key signs of a good refactor are
+// fewer types like umbra_uniforms_layout and umbra_draw_layout needed, ideally
+// no calls to fill at all (rather, buffers just point to the uniforms directly).
+
 typedef struct {
     float x, y;
 } umbra_point;
@@ -48,9 +58,6 @@ umbra_color_val32 umbra_load_fp16        (struct umbra_builder*, umbra_ptr64);
 void              umbra_store_fp16       (struct umbra_builder*, umbra_ptr64, umbra_color_val32);
 umbra_color_val32 umbra_load_fp16_planar (struct umbra_builder*, umbra_ptr16);
 void              umbra_store_fp16_planar(struct umbra_builder*, umbra_ptr16, umbra_color_val32);
-
-// TODO: maybe umbra_builder really should fold in umbra_uniforms_layout?
-//       they seem to go together more often than not.
 
 // TODO: move shader/coverage/sdf over to our full polymorphim pattern with opaque types,
 //       free() hooks, etc.
@@ -101,8 +108,6 @@ umbra_color_val32 umbra_blend_multiply(struct umbra_builder*,
                                        umbra_color_val32 src, umbra_color_val32 dst);
 
 
-// TODO: gather the uniforms / layout types and methods together and explain them better
-// TODO: maybe we need some better names for the fill() methods... something like update_uniforms?
 struct umbra_draw_layout {
     struct umbra_uniforms_layout uni; int :32;
     void                        *uniforms;
