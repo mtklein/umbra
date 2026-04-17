@@ -128,14 +128,13 @@ struct umbra_sdf_draw_config {
     _Bool hard_edge;
 };
 
-// TODO: rename umbra_sdf_draw and umbra_sdf_draw_foo()
 struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend*,
-                                              struct umbra_sdf *coverage,
-                                              struct umbra_sdf_draw_config,
-                                              struct umbra_shader*,
-                                              umbra_blend_fn,
-                                              struct umbra_fmt,
-                                              struct umbra_draw_layout*);
+                                      struct umbra_sdf *coverage,
+                                      struct umbra_sdf_draw_config,
+                                      struct umbra_shader*,
+                                      umbra_blend_fn,
+                                      struct umbra_fmt,
+                                      struct umbra_draw_layout*);
 void umbra_sdf_draw_queue(struct umbra_sdf_draw const*,
                               int l, int t, int r, int b, struct umbra_buf[]);
 void umbra_sdf_draw_fill(struct umbra_draw_layout const*,
