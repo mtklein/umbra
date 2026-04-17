@@ -40,7 +40,7 @@ struct pipe {
     struct umbra_program          *program;
     struct umbra_uniforms_layout   uni; int :32;
     void                          *uniforms;
-    int                            out_ptr, pad_;
+    int                            out_ptr, pad;
 };
 
 static struct pipe readback_pipe, hdr_pipe;

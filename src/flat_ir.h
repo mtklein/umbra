@@ -25,7 +25,7 @@ struct ir_inst {
     int     imm;
 
     // Bookkeeping metadata, doesn't need to be hashed.
-    _Bool live, uniform, varying, pad_;
+    _Bool live, uniform, varying, pad;
     int   final_id;
 };
 
@@ -35,10 +35,10 @@ struct umbra_builder {
     int             insts, cap;
     struct hash     ht;
     int             n_vars;
-    _Bool           has_loop, loop_closed, pad_b_[2];
+    _Bool           has_loop, loop_closed, pad0[2];
     umbra_val32     loop_trip;
     umbra_var       loop_var;
-    int             if_depth, pad_ifd_;
+    int             if_depth, pad1;
 };
 
 struct umbra_flat_ir {
@@ -47,7 +47,7 @@ struct umbra_flat_ir {
                     preamble;   // Fence: inst[0..preamble) are uniform, [preamble..insts) vary.
     int             loop_begin, // Instruction index of op_loop_begin, or -1 if no loop.
                     loop_end;   // Instruction index of op_loop_end,   or -1 if no loop.
-    int             n_vars, pad_ir_;
+    int             n_vars, pad;
 };
 
 enum join_policy { JOIN_KEEP_X, JOIN_PREFER_IMM };

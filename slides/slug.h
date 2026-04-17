@@ -4,7 +4,7 @@
 struct slug_curves {
     float *data;
     int    count;
-    int    pad_;
+    int    pad;
     float  w, h;
 };
 

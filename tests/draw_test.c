@@ -1406,7 +1406,7 @@ struct test_circle_sdf {
     float cx, cy, r, pad0;
     int   circle_off, pad1;
 };
-static umbra_interval test_circle_build_(struct umbra_sdf *s, struct umbra_builder *b,
+static umbra_interval test_circle_build(struct umbra_sdf *s, struct umbra_builder *b,
                                          struct umbra_uniforms_layout *u,
                                          umbra_interval x, umbra_interval y) {
     struct test_circle_sdf *self = (struct test_circle_sdf *)s;
@@ -1422,7 +1422,7 @@ static umbra_interval test_circle_build_(struct umbra_sdf *s, struct umbra_build
                          d  = umbra_interval_sqrt_f32(b, d2);
     return umbra_interval_sub_f32(b, d, r);
 }
-static void test_circle_fill_(struct umbra_sdf const *s, void *uniforms) {
+static void test_circle_fill(struct umbra_sdf const *s, void *uniforms) {
     struct test_circle_sdf const *self = (struct test_circle_sdf const *)s;
     float const vals[3] = {self->cx, self->cy, self->r};
     umbra_uniforms_fill_f32(uniforms, self->circle_off, vals, 3);
@@ -1434,7 +1434,7 @@ TEST(test_sdf_dispatch_tiling) {
     enum { W = 1024, H = 768 };
 
     struct test_circle_sdf sdf = {
-        .base = {.build = test_circle_build_, .fill = test_circle_fill_},
+        .base = {.build = test_circle_build, .fill = test_circle_fill},
         .cx = 512, .cy = 384, .r = 180,
     };
     struct umbra_shader_solid shader = umbra_shader_solid((umbra_color){1, 0, 0, 1});

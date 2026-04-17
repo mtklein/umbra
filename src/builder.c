@@ -30,7 +30,7 @@ static uint32_t ir_inst_hash(struct ir_inst const *inst) {
 struct dedup_ctx {
     struct ir_inst const *probe;
     struct ir_inst const *insts;
-    int                   hit, pad_;
+    int                   hit, pad;
 };
 static _Bool dedup_match(int id, void *ctx) {
     struct dedup_ctx *c = ctx;

@@ -16,7 +16,7 @@ struct umbra_backend_stats {
     double encode_sec;
     double submit_sec;
     size_t upload_bytes;
-    size_t pad_;
+    size_t pad;
     int    uniform_ring_rotations;
     int    dispatches;
     int    submits, :32;
@@ -45,7 +45,7 @@ struct umbra_program {
     void (*dump )(struct umbra_program const*, FILE*);
     void (*free )(struct umbra_program*);
     struct umbra_backend *backend;
-    _Bool                 threadsafe, pad_[7];
+    _Bool                 threadsafe, pad[7];
 };
 
 struct umbra_uniforms_layout { int slots; };
