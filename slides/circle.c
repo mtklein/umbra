@@ -5,19 +5,19 @@
 
 struct circle_sdf {
     struct umbra_sdf base;
-    float cx, cy, r, pad_;
-    int   off_, pad__;
+    float cx, cy, r, pad0;
+    int   circle_off, pad1;
 };
 
 static umbra_interval circle_build_(struct umbra_sdf *s, struct umbra_builder *b,
                                     struct umbra_uniforms_layout *u,
                                     umbra_interval x, umbra_interval y) {
     struct circle_sdf *self = (struct circle_sdf *)s;
-    self->off_ = umbra_uniforms_reserve_f32(u, 3);
+    self->circle_off = umbra_uniforms_reserve_f32(u, 3);
 
-    umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->off_)),
-                         cy = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->off_ + 1)),
-                         r  = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->off_ + 2));
+    umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->circle_off)),
+                         cy = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->circle_off + 1)),
+                         r  = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->circle_off + 2));
     umbra_interval const dx = umbra_interval_sub_f32(b, x, cx),
                          dy = umbra_interval_sub_f32(b, y, cy),
                          d2 = umbra_interval_add_f32(b,
@@ -29,14 +29,14 @@ static umbra_interval circle_build_(struct umbra_sdf *s, struct umbra_builder *b
 static void circle_fill_(struct umbra_sdf const *s, void *uniforms) {
     struct circle_sdf const *self = (struct circle_sdf const *)s;
     float const vals[3] = {self->cx, self->cy, self->r};
-    umbra_uniforms_fill_f32(uniforms, self->off_, vals, 3);
+    umbra_uniforms_fill_f32(uniforms, self->circle_off, vals, 3);
 }
 
 struct circle_slide {
     struct slide base;
 
     float cx0, cy0, vx, vy, r;
-    int   w, h, pad_;
+    int   w, h, pad;
 
     struct umbra_shader_solid shader;
     struct circle_sdf         sdf;

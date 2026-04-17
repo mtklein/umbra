@@ -500,7 +500,7 @@ TEST(test_no_blend) {
 struct test_gradient_shader {
     struct umbra_shader base;
     float  params[2];
-    int off_, :32;
+    int params_off, :32;
 };
 
 static umbra_color_val32 test_gradient_build(struct umbra_shader *s, struct umbra_builder *builder,
@@ -508,9 +508,9 @@ static umbra_color_val32 test_gradient_build(struct umbra_shader *s, struct umbr
                                        umbra_val32 x, umbra_val32 y) {
     struct test_gradient_shader *self = (struct test_gradient_shader *)s;
     (void)y;
-    self->off_ = umbra_uniforms_reserve_f32(u, 2);
-    umbra_val32 w = umbra_uniform_32(builder, (umbra_ptr32){0}, self->off_);
-    umbra_val32 a = umbra_uniform_32(builder, (umbra_ptr32){0}, self->off_ + 1);
+    self->params_off = umbra_uniforms_reserve_f32(u, 2);
+    umbra_val32 w = umbra_uniform_32(builder, (umbra_ptr32){0}, self->params_off);
+    umbra_val32 a = umbra_uniform_32(builder, (umbra_ptr32){0}, self->params_off + 1);
     umbra_val32 t = umbra_div_f32(builder, x, w);
     umbra_val32 zero = umbra_imm_i32(builder, 0);
     return (umbra_color_val32){t, zero, zero, a};
@@ -518,7 +518,7 @@ static umbra_color_val32 test_gradient_build(struct umbra_shader *s, struct umbr
 
 static void test_gradient_fill(struct umbra_shader const *s, void *uniforms) {
     struct test_gradient_shader const *self = (struct test_gradient_shader const *)s;
-    umbra_uniforms_fill_f32(uniforms, self->off_, self->params, 2);
+    umbra_uniforms_fill_f32(uniforms, self->params_off, self->params, 2);
 }
 
 static struct test_gradient_shader make_test_gradient(float const params[2]) {
@@ -1403,17 +1403,17 @@ TEST(test_sdf_dispatch_rect) {
 
 struct test_circle_sdf {
     struct umbra_sdf base;
-    float cx, cy, r, pad_;
-    int   off_, pad__;
+    float cx, cy, r, pad0;
+    int   circle_off, pad1;
 };
 static umbra_interval test_circle_build_(struct umbra_sdf *s, struct umbra_builder *b,
                                          struct umbra_uniforms_layout *u,
                                          umbra_interval x, umbra_interval y) {
     struct test_circle_sdf *self = (struct test_circle_sdf *)s;
-    self->off_ = umbra_uniforms_reserve_f32(u, 3);
-    umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->off_)),
-                         cy = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->off_ + 1)),
-                         r  = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->off_ + 2));
+    self->circle_off = umbra_uniforms_reserve_f32(u, 3);
+    umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->circle_off)),
+                         cy = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->circle_off + 1)),
+                         r  = umbra_interval_exact(umbra_uniform_32(b, (umbra_ptr32){0}, self->circle_off + 2));
     umbra_interval const dx = umbra_interval_sub_f32(b, x, cx),
                          dy = umbra_interval_sub_f32(b, y, cy),
                          d2 = umbra_interval_add_f32(b,
@@ -1425,7 +1425,7 @@ static umbra_interval test_circle_build_(struct umbra_sdf *s, struct umbra_build
 static void test_circle_fill_(struct umbra_sdf const *s, void *uniforms) {
     struct test_circle_sdf const *self = (struct test_circle_sdf const *)s;
     float const vals[3] = {self->cx, self->cy, self->r};
-    umbra_uniforms_fill_f32(uniforms, self->off_, vals, 3);
+    umbra_uniforms_fill_f32(uniforms, self->circle_off, vals, 3);
 }
 
 TEST(test_sdf_dispatch_tiling) {
