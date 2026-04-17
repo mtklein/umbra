@@ -152,6 +152,23 @@ static struct ra* ra_create_x86(struct umbra_flat_ir const *ir, struct jit_ctx *
     return ra_create(ir, &cfg);
 }
 
+// Extract one 16-bit channel from two 128-bit lanes of interleaved u16 pixels,
+// shuffling via the VPSHUFB mask at `off` and landing 8 contiguous u16 in `dst`.
+// Inputs: `t0` and `t1` hold pixels 0-3 and 4-7; `px` is scratch; both `t0` and
+// `px` are clobbered.
+static void deinterleave_channel(Buf *c, struct jit_ctx *jc,
+                                 int8_t dst, int8_t t0, int8_t t1, int8_t px, int off) {
+    int ref = vex_rip(c, 1, 2, 0, 1, dst, t0, 0x00);
+    pool_ref_at(&jc->pool, off, ref, 0);
+    vextracti128(c, px, dst, 1);
+    vex_rrr(c, 1, 1, 0, 0x62, dst, dst, px);
+    ref = vex_rip(c, 1, 2, 0, 1, px, t1, 0x00);
+    pool_ref_at(&jc->pool, off, ref, 0);
+    vextracti128(c, t0, px, 1);
+    vex_rrr(c, 1, 1, 0, 0x62, px, px, t0);
+    vex_rrr(c, 1, 1, 0, 0x6c, dst, dst, px);
+}
+
 static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm,
                          int scratch, int scratch2) {
     switch ((int)op) {
@@ -620,30 +637,14 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
 
                 vmov_load(c, 1, t1, base, XI, 8, 32);  // pixels 4-7
 
-#define DEINTERLEAVE(dst, off)                                                  \
-                {                                                               \
-                    int ref = vex_rip(c, 1, 2, 0, 1, dst, t0, 0x00);           \
-                    pool_ref_at(&jc->pool, off, ref, 0);                        \
-                }                                                               \
-                vextracti128(c, px, dst, 1);                                    \
-                vex_rrr(c, 1, 1, 0, 0x62, dst, dst, px);                       \
-                {                                                               \
-                    int ref = vex_rip(c, 1, 2, 0, 1, px, t1, 0x00);            \
-                    pool_ref_at(&jc->pool, off, ref, 0);                        \
-                }                                                               \
-                vextracti128(c, t0, px, 1);                                     \
-                vex_rrr(c, 1, 1, 0, 0x62, px, px, t0);                         \
-                vex_rrr(c, 1, 1, 0, 0x6c, dst, dst, px)
-
                 vmov_load(c, 1, t0, base, XI, 8, 0);
-                DEINTERLEAVE(s0.rd, off_r);
+                deinterleave_channel(c, jc, s0.rd, t0, t1, px, off_r);
                 vmov_load(c, 1, t0, base, XI, 8, 0);
-                DEINTERLEAVE(r1, off_g);
+                deinterleave_channel(c, jc, r1, t0, t1, px, off_g);
                 vmov_load(c, 1, t0, base, XI, 8, 0);
-                DEINTERLEAVE(r2, off_b);
+                deinterleave_channel(c, jc, r2, t0, t1, px, off_b);
                 vmov_load(c, 1, t0, base, XI, 8, 0);
-                DEINTERLEAVE(r3, off_a);
-#undef DEINTERLEAVE
+                deinterleave_channel(c, jc, r3, t0, t1, px, off_a);
             }
 
             ra_return_reg(ra, t1);
