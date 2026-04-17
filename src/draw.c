@@ -282,34 +282,9 @@ void umbra_sdf_free(struct umbra_sdf *s) {
     if (s && s->free) { s->free(s); }
 }
 
-// Return the effect's uniforms buffer.  If .ptr was set at construction
-// (forwarding wrappers like supersample / sdf_as_coverage), return it as-is.
-// Otherwise compute it from self + sizeof(base) so by-value copies of the
-// concrete struct stay self-describing.
-struct umbra_buf umbra_shader_uniforms(struct umbra_shader const *s) {
-    if (s->uniforms.ptr) { return s->uniforms; }
-    return (struct umbra_buf){
-        .ptr    = (char *)(uintptr_t)s + sizeof *s,
-        .count  = s->uniforms.count,
-        .stride = s->uniforms.stride,
-    };
-}
-struct umbra_buf umbra_coverage_uniforms(struct umbra_coverage const *c) {
-    if (c->uniforms.ptr) { return c->uniforms; }
-    return (struct umbra_buf){
-        .ptr    = (char *)(uintptr_t)c + sizeof *c,
-        .count  = c->uniforms.count,
-        .stride = c->uniforms.stride,
-    };
-}
-struct umbra_buf umbra_sdf_uniforms(struct umbra_sdf const *s) {
-    if (s->uniforms.ptr) { return s->uniforms; }
-    return (struct umbra_buf){
-        .ptr    = (char *)(uintptr_t)s + sizeof *s,
-        .count  = s->uniforms.count,
-        .stride = s->uniforms.stride,
-    };
-}
+struct umbra_buf umbra_shader_uniforms  (struct umbra_shader   const *s) { return s->uniforms; }
+struct umbra_buf umbra_coverage_uniforms(struct umbra_coverage const *c) { return c->uniforms; }
+struct umbra_buf umbra_sdf_uniforms     (struct umbra_sdf      const *s) { return s->uniforms; }
 
 struct umbra_sdf_draw {
     struct umbra_program *draw;
@@ -584,7 +559,7 @@ struct umbra_shader* umbra_shader_solid(umbra_color color) {
     *s = (struct shader_solid){
         .base  = {.build          = solid_build,
                   .free           = solid_free,
-                  .uniforms = {.count = UMBRA_UNIFORMS_COUNT(s)}},
+                  .uniforms = UMBRA_UNIFORMS_OF(s)},
         .color = color,
     };
     return &s->base;
@@ -639,7 +614,7 @@ struct umbra_shader* umbra_shader_gradient_linear_two_stops(umbra_point p0, umbr
     *s = (struct shader_gradient_linear_two_stops){
         .base = {.build          = linear_two_stops_build,
                  .free           = linear_two_stops_free,
-                 .uniforms = {.count = UMBRA_UNIFORMS_COUNT(s)}},
+                 .uniforms = UMBRA_UNIFORMS_OF(s)},
         .a = a, .b = b, .c = c,
         .c0 = c0, .c1 = c1,
     };
@@ -684,7 +659,7 @@ struct umbra_shader* umbra_shader_gradient_radial_two_stops(umbra_point center, 
     *s = (struct shader_gradient_radial_two_stops){
         .base   = {.build          = radial_two_stops_build,
                    .free           = radial_two_stops_free,
-                   .uniforms = {.count = UMBRA_UNIFORMS_COUNT(s)}},
+                   .uniforms = UMBRA_UNIFORMS_OF(s)},
         .cx = center.x, .cy = center.y, .inv_r = 1.0f / radius,
         .c0 = c0, .c1 = c1,
     };
@@ -717,7 +692,7 @@ struct umbra_shader* umbra_shader_gradient_linear_lut(umbra_point p0, umbra_poin
     *s = (struct shader_gradient_linear_lut){
         .base = {.build          = linear_lut_build,
                  .free           = linear_lut_free,
-                 .uniforms = {.count = UMBRA_UNIFORMS_COUNT(s)}},
+                 .uniforms = UMBRA_UNIFORMS_OF(s)},
         .a = a, .b = b, .c = c,
         .N = (float)(lut.count / 4),
         .lut = lut,
@@ -749,7 +724,7 @@ struct umbra_shader* umbra_shader_gradient_radial_lut(umbra_point center, float 
     *s = (struct shader_gradient_radial_lut){
         .base   = {.build          = radial_lut_build,
                    .free           = radial_lut_free,
-                   .uniforms = {.count = UMBRA_UNIFORMS_COUNT(s)}},
+                   .uniforms = UMBRA_UNIFORMS_OF(s)},
         .cx = center.x, .cy = center.y, .inv_r = 1.0f / radius,
         .N = (float)(lut.count / 4),
         .lut = lut,
@@ -784,7 +759,7 @@ struct umbra_shader* umbra_shader_gradient_linear(umbra_point p0, umbra_point p1
     *s = (struct shader_gradient_linear){
         .base   = {.build          = linear_build,
                    .free           = linear_free,
-                   .uniforms = {.count = UMBRA_UNIFORMS_COUNT(s)}},
+                   .uniforms = UMBRA_UNIFORMS_OF(s)},
         .a = a, .b = b, .c = c,
         .N = (float)pos.count,
         .colors = colors,
@@ -818,7 +793,7 @@ struct umbra_shader* umbra_shader_gradient_radial(umbra_point center, float radi
     *s = (struct shader_gradient_radial){
         .base   = {.build          = radial_build,
                    .free           = radial_free,
-                   .uniforms = {.count = UMBRA_UNIFORMS_COUNT(s)}},
+                   .uniforms = UMBRA_UNIFORMS_OF(s)},
         .cx = center.x, .cy = center.y, .inv_r = 1.0f / radius,
         .N = (float)pos.count,
         .colors = colors,
@@ -912,7 +887,7 @@ struct umbra_coverage* umbra_coverage_rect(umbra_rect rect) {
     *c = (struct coverage_rect){
         .base = {.build          = rect_build,
                  .free           = rect_free,
-                 .uniforms = {.count = UMBRA_UNIFORMS_COUNT(c)}},
+                 .uniforms = UMBRA_UNIFORMS_OF(c)},
         .rect = rect,
     };
     return &c->base;
@@ -947,7 +922,7 @@ struct umbra_sdf* umbra_sdf_rect(umbra_rect rect) {
     *s = (struct sdf_rect){
         .base = {.build          = sdf_rect_build,
                  .free           = sdf_rect_free,
-                 .uniforms = {.count = UMBRA_UNIFORMS_COUNT(s)}},
+                 .uniforms = UMBRA_UNIFORMS_OF(s)},
         .rect = rect,
     };
     return &s->base;
@@ -977,7 +952,7 @@ struct umbra_coverage* umbra_coverage_bitmap(struct umbra_buf bmp) {
     *c = (struct coverage_bitmap){
         .base = {.build          = bitmap_build,
                  .free           = bitmap_free,
-                 .uniforms = {.count = UMBRA_UNIFORMS_COUNT(c)}},
+                 .uniforms = UMBRA_UNIFORMS_OF(c)},
         .bmp  = bmp,
     };
     return &c->base;
@@ -1014,7 +989,7 @@ struct umbra_coverage* umbra_coverage_sdf(struct umbra_buf bmp) {
     *c = (struct coverage_sdf){
         .base = {.build          = cov_sdf_build,
                  .free           = cov_sdf_free,
-                 .uniforms = {.count = UMBRA_UNIFORMS_COUNT(c)}},
+                 .uniforms = UMBRA_UNIFORMS_OF(c)},
         .bmp  = bmp,
     };
     return &c->base;
@@ -1044,7 +1019,7 @@ struct umbra_coverage* umbra_coverage_winding(struct umbra_buf wind) {
     *c = (struct coverage_winding){
         .base    = {.build          = winding_build,
                     .free           = winding_free,
-                    .uniforms = {.count = UMBRA_UNIFORMS_COUNT(c)}},
+                    .uniforms = UMBRA_UNIFORMS_OF(c)},
         .winding = wind,
     };
     return &c->base;
@@ -1126,7 +1101,7 @@ struct umbra_coverage* umbra_coverage_bitmap_matrix(struct umbra_matrix mat,
     *c = (struct coverage_bitmap_matrix){
         .base = {.build          = bitmap_matrix_build,
                  .free           = bitmap_matrix_free,
-                 .uniforms = {.count = UMBRA_UNIFORMS_COUNT(c)}},
+                 .uniforms = UMBRA_UNIFORMS_OF(c)},
         .mat  = mat,
         .bmp  = bmp,
     };

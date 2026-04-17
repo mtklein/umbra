@@ -175,7 +175,7 @@ static struct slide* make_csg(char const *title, float const bg[4], float const 
         .build          = build
     };
 
-    st->sdf.base.uniforms = (struct umbra_buf){.count = UMBRA_UNIFORMS_COUNT(&st->sdf)};
+    st->sdf.base.uniforms = UMBRA_UNIFORMS_OF(&st->sdf);
     st->base = (struct slide){
         .title = title,
         .bg = {bg[0], bg[1], bg[2], bg[3]},
@@ -285,7 +285,7 @@ SLIDE(slide_sdf_ring) {
         .build          = ring_build
     };
 
-    st->sdf.base.uniforms = (struct umbra_buf){.count = UMBRA_UNIFORMS_COUNT(&st->sdf)};
+    st->sdf.base.uniforms = UMBRA_UNIFORMS_OF(&st->sdf);
     st->base = (struct slide){
         .title = "SDF Ring (shell)",
         .bg = {0.08f, 0.10f, 0.14f, 1},
@@ -403,7 +403,7 @@ SLIDE(slide_sdf_rounded_rect) {
         .build          = rounded_rect_build
     };
 
-    st->sdf.base.uniforms = (struct umbra_buf){.count = UMBRA_UNIFORMS_COUNT(&st->sdf)};
+    st->sdf.base.uniforms = UMBRA_UNIFORMS_OF(&st->sdf);
     st->base = (struct slide){
         .title = "SDF Rounded Rect",
         .bg = {0.08f, 0.10f, 0.14f, 1},
@@ -526,7 +526,7 @@ SLIDE(slide_sdf_capsule) {
         .build          = capsule_build
     };
 
-    st->sdf.base.uniforms = (struct umbra_buf){.count = UMBRA_UNIFORMS_COUNT(&st->sdf)};
+    st->sdf.base.uniforms = UMBRA_UNIFORMS_OF(&st->sdf);
     st->base = (struct slide){
         .title = "SDF Capsule",
         .bg = {0.08f, 0.10f, 0.14f, 1},
@@ -628,7 +628,7 @@ SLIDE(slide_sdf_halfplane) {
         .build          = halfplane_build
     };
 
-    st->sdf.base.uniforms = (struct umbra_buf){.count = UMBRA_UNIFORMS_COUNT(&st->sdf)};
+    st->sdf.base.uniforms = UMBRA_UNIFORMS_OF(&st->sdf);
     st->base = (struct slide){
         .title = "SDF Halfplane",
         .bg = {0.08f, 0.10f, 0.14f, 1},
@@ -826,7 +826,7 @@ SLIDE(slide_sdf_text) {
         .build          = sdf_text_build
     };
 
-    st->sdf.base.uniforms = (struct umbra_buf){.count = UMBRA_UNIFORMS_COUNT(&st->sdf)};
+    st->sdf.base.uniforms = UMBRA_UNIFORMS_OF(&st->sdf);
     st->base = (struct slide){
         .title = "SDF Text (analytic)",
         .bg = {0.08f, 0.10f, 0.14f, 1},
@@ -969,7 +969,7 @@ SLIDE(slide_sdf_ngon) {
         .build          = ngon_build
     };
 
-    st->sdf.base.uniforms = (struct umbra_buf){.count = UMBRA_UNIFORMS_COUNT(&st->sdf)};
+    st->sdf.base.uniforms = UMBRA_UNIFORMS_OF(&st->sdf);
     st->base = (struct slide){
         .title = "SDF Hexagon (n-gon)",
         .bg = {0.08f, 0.10f, 0.14f, 1},

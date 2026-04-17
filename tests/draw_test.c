@@ -541,17 +541,12 @@ static umbra_color_val32 test_gradient_build(struct umbra_shader *s, struct umbr
     return (umbra_color_val32){t, zero, zero, a};
 }
 
-static struct test_gradient_shader make_test_gradient(float const params[2]) {
-    struct test_gradient_shader s = {
-        .base = {.build = test_gradient_build},
-    };
-    s.base.uniforms = (struct umbra_buf){.count = UMBRA_UNIFORMS_COUNT(&s)};
-    __builtin_memcpy(s.params, params, 8);
-    return s;
-}
-
 TEST(test_gradient_shader) {
-    struct test_gradient_shader shader = make_test_gradient((float[]){4.0f, 1.0f});
+    struct test_gradient_shader shader = {
+        .base   = {.build = test_gradient_build},
+        .params = {4.0f, 1.0f},
+    };
+    shader.base.uniforms = UMBRA_UNIFORMS_OF(&shader);
     struct draw_backends B = make_draw(umbra_draw_builder(NULL, &shader.base, umbra_blend_src,
                                                  umbra_fmt_8888));
 
@@ -1483,7 +1478,7 @@ TEST(test_sdf_dispatch_tiling) {
         .base = {.build = test_circle_build},
         .cx = 512, .cy = 384, .r = 180,
     };
-    sdf.base.uniforms = (struct umbra_buf){.count = UMBRA_UNIFORMS_COUNT(&sdf)};
+    sdf.base.uniforms = UMBRA_UNIFORMS_OF(&sdf);
     struct umbra_shader *shader = umbra_shader_solid((umbra_color){1, 0, 0, 1});
 
     struct umbra_backend *be = umbra_backend_jit();

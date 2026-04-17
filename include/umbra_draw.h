@@ -82,16 +82,18 @@ struct umbra_sdf {
 void             umbra_sdf_free    (struct umbra_sdf*);
 struct umbra_buf umbra_sdf_uniforms(struct umbra_sdf const*);
 
-// Slot count of a concrete effect's uniforms region — everything after the
-// base vtable field.  Constructors set `.base.uniforms = {.count = UMBRA_UNIFORMS_COUNT(self)}`
-// and the uniforms accessor computes `.ptr` from `self + sizeof(base)` at call
-// time (so by-value copies of the effect struct keep working).
-//
-// Effects that forward uniforms to a wrapped effect (like umbra_shader_supersample
-// or umbra_sdf_coverage) set `.base.uniforms = wrapped_effect_uniforms()` with a
-// pre-resolved ptr; the accessor returns that directly.
-#define UMBRA_UNIFORMS_COUNT(self) \
-    ((int)((sizeof *(self) - sizeof((self)->base)) / 4))
+// Compute the umbra_buf for a concrete effect whose base vtable is at offset 0.
+// The data starts right after the base and runs to the end of the struct.
+// `self` is a pointer to the concrete effect.  Use at construction time to set
+// `.base.uniforms`.  The effect must stay put after construction — no move, no
+// by-value copy — since `.ptr` is an absolute address.  Forwarding wrappers
+// (umbra_shader_supersample, umbra_sdf_coverage) set `.uniforms` to the wrapped
+// effect's resolved uniforms buf instead.
+#define UMBRA_UNIFORMS_OF(self)                                                 \
+    ((struct umbra_buf){                                                        \
+        .ptr   = (char*)(self) + sizeof((self)->base),                          \
+        .count = (int)((sizeof *(self) - sizeof((self)->base)) / 4),            \
+    })
 
 // TODO: bool hard_edge -> int quality
 
