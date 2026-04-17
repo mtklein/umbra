@@ -282,10 +282,10 @@ void umbra_sdf_free(struct umbra_sdf *s) {
     if (s && s->free) { s->free(s); }
 }
 
+// Forward decl for use in umbra_shader_uniforms's polymorphic dispatch below;
+// sdf_as_coverage_build is already defined above.
 static umbra_color_val32 supersample_build(struct umbra_shader*, struct umbra_builder*,
-                                            int, umbra_val32, umbra_val32);
-static umbra_val32 sdf_as_coverage_build(struct umbra_coverage*, struct umbra_builder*,
-                                          int, umbra_val32, umbra_val32);
+                                           int, umbra_val32, umbra_val32);
 
 struct shader_supersample {
     struct umbra_shader  base;
