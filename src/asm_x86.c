@@ -321,11 +321,27 @@ void vpsrad_i(Buf *b, int d, int s, uint8_t imm) {
 
 void vpand(Buf *b, int L, int d, int v, int s) { vex_rrr(b, 1, 1, L, 0xdb, d, v, s); }
 void vpor(Buf *b, int L, int d, int v, int s) { vex_rrr(b, 1, 1, L, 0xeb, d, v, s); }
+void vpandn(Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 1, 0xdf, d, v, s); }
 void vpxor_3(Buf *b, int L, int d, int v, int s) { vex_rrr(b, 1, 1, L, 0xef, d, v, s); }
 void vpblendvb(Buf *b, int L, int d, int z, int y, int x) {
     vex_rrr(b, 1, 3, L, 0x4c, d, z, y);
     emit1(b, (uint8_t)(x << 4));
 }
+
+void vpminsd(Buf *b, int d, int v, int s) { vex_rrr(b, 1, 2, 1, 0x3b, d, v, s); }
+void vpmaxsd(Buf *b, int d, int v, int s) { vex_rrr(b, 1, 2, 1, 0x3f, d, v, s); }
+
+void vpunpckldq (Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 0, 0x62, d, v, s); }
+void vpunpcklqdq(Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 0, 0x6c, d, v, s); }
+void vpunpcklwd (Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 0, 0x61, d, v, s); }
+void vpunpckhwd (Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 0, 0x69, d, v, s); }
+void vpunpckhdq (Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 0, 0x6a, d, v, s); }
+void vpackusdw  (Buf *b, int d, int v, int s) { vex_rrr(b, 1, 2, 0, 0x2b, d, v, s); }
+
+int vbroadcastss_rip(Buf *b, int d)        { return vex_rip(b, 1, 2, 0, 1, d, 0, 0x18); }
+int vpshufb_rip     (Buf *b, int d, int v) { return vex_rip(b, 1, 2, 0, 1, d, v, 0x00); }
+int vpaddd_rip      (Buf *b, int d, int v) { return vex_rip(b, 1, 1, 0, 1, d, v, 0xfe); }
+int vandps_rip      (Buf *b, int d, int v) { return vex_rip(b, 0, 1, 0, 1, d, v, 0x54); }
 
 void vpcmpeqd(Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 1, 0x76, d, v, s); }
 void vpcmpgtd(Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 1, 0x66, d, v, s); }

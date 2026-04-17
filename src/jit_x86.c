@@ -129,7 +129,7 @@ static void pool_broadcast(Buf *c, struct pool *p, int d, uint32_t v) {
         vpslld_i(c, d, d, (uint8_t)shl);
     } else {
         int const off = pool_add(p, &v, 4),
-                  pos = vex_rip(c, 1, 2, 0, 1, d, 0, 0x18);
+                  pos = vbroadcastss_rip(c, d);
         pool_ref_at(p, off, pos, 0);
     }
 }
@@ -158,15 +158,15 @@ static struct ra* ra_create_x86(struct umbra_flat_ir const *ir, struct jit_ctx *
 // `px` are clobbered.
 static void deinterleave_channel(Buf *c, struct jit_ctx *jc,
                                  int8_t dst, int8_t t0, int8_t t1, int8_t px, int off) {
-    int ref = vex_rip(c, 1, 2, 0, 1, dst, t0, 0x00);
+    int ref = vpshufb_rip(c, dst, t0);
     pool_ref_at(&jc->pool, off, ref, 0);
     vextracti128(c, px, dst, 1);
-    vex_rrr(c, 1, 1, 0, 0x62, dst, dst, px);
-    ref = vex_rip(c, 1, 2, 0, 1, px, t1, 0x00);
+    vpunpckldq(c, dst, dst, px);
+    ref = vpshufb_rip(c, px, t1);
     pool_ref_at(&jc->pool, off, ref, 0);
     vextracti128(c, t0, px, 1);
-    vex_rrr(c, 1, 1, 0, 0x62, px, px, t0);
-    vex_rrr(c, 1, 1, 0, 0x6c, dst, dst, px);
+    vpunpckldq(c, px, px, t0);
+    vpunpcklqdq(c, dst, dst, px);
 }
 
 static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm,
@@ -268,13 +268,13 @@ static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm
         vpxor_3(c, 1, d, d, scratch);
         break;
     case op_lt_u32:
-        vex_rrr(c, 1, 2, 1, 0x3b, scratch2, x, y);
+        vpminsd(c, scratch2, x, y);
         vpcmpeqd(c, d, y, scratch2);
         vpcmpeqd(c, scratch, scratch, scratch);
         vpxor_3(c, 1, d, d, scratch);
         break;
     case op_le_u32:
-        vex_rrr(c, 1, 2, 1, 0x3f, scratch, x, y);
+        vpmaxsd(c, scratch, x, y);
         vpcmpeqd(c, d, y, scratch);
         break;
     case op_shl_i32_imm: vpslld_i(c, d, x, (uint8_t)imm); break;
@@ -531,7 +531,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 vbroadcastss(c, s.rd, s.rd);
                 uint32_t iota8[8] = {0, 1, 2, 3, 4, 5, 6, 7};
                 int      off = pool_add(&jc->pool, iota8, 32);
-                int      pos = vex_rip(c, 1, 1, 0, 1, s.rd, s.rd, 0xfe);
+                int      pos = vpaddd_rip(c, s.rd, s.rd);
                 pool_ref_at(&jc->pool, off, pos, 0);
             }
         } break;
@@ -777,24 +777,24 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             int8_t z     = ra_alloc(ra, sl, ns);
             if (scalar) {
                 // Pack 4 u16 channels into 64 bits via word interleave.
-                vex_rrr(c, 1, 1, 0, 0x61, px, rr, rg);     // VPUNPCKLWD [R,G,?,?...]
-                vex_rrr(c, 1, 1, 0, 0x61, t, rb_, ra_v);   // VPUNPCKLWD [B,A,?,?...]
-                vex_rrr(c, 1, 1, 0, 0x62, z, px, t);       // VPUNPCKLDQ [R,G,B,A,?,?...]
+                vpunpcklwd(c, px, rr, rg);     // [R,G,?,?...]
+                vpunpcklwd(c, t, rb_, ra_v);   // [B,A,?,?...]
+                vpunpckldq(c, z, px, t);       // [R,G,B,A,?,?...]
                 vmovq_store(c, z, base, XI, 8, 0);
             } else {
                 // Inputs are 8 x u16 in XMM.
                 // Interleave to pixel order. Process low 4 then high 4 pixels.
-                vex_rrr(c, 1, 1, 0, 0x61, scale, rr, rg);
-                vex_rrr(c, 1, 1, 0, 0x61, px, rb_, ra_v);
-                vex_rrr(c, 1, 1, 0, 0x62, t, scale, px);
-                vex_rrr(c, 1, 1, 0, 0x6a, z, scale, px);
+                vpunpcklwd(c, scale, rr, rg);
+                vpunpcklwd(c, px, rb_, ra_v);
+                vpunpckldq(c, t, scale, px);
+                vpunpckhdq(c, z, scale, px);
                 vex(c, 1, 3, 0, 1, t, t, z, 0x38); emit1(c, 1);
                 vmov_store(c, 1, t, base, XI, 8, 0);
                 // High 4:
-                vex_rrr(c, 1, 1, 0, 0x69, scale, rr, rg);
-                vex_rrr(c, 1, 1, 0, 0x69, px, rb_, ra_v);
-                vex_rrr(c, 1, 1, 0, 0x62, t, scale, px);
-                vex_rrr(c, 1, 1, 0, 0x6a, z, scale, px);
+                vpunpckhwd(c, scale, rr, rg);
+                vpunpckhwd(c, px, rb_, ra_v);
+                vpunpckldq(c, t, scale, px);
+                vpunpckhdq(c, z, scale, px);
                 vex(c, 1, 3, 0, 1, t, t, z, 0x38); emit1(c, 1);
                 vmov_store(c, 1, t, base, XI, 8, 32);
             }
@@ -1058,7 +1058,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 vbroadcastss(c, cnt, cnt);             // cnt = broadcast(count)
                 vpcmpgtd(c, cnt, cnt, rx);             // cnt = (count > ix)
                 // in_bounds = NOT(neg) AND (count > ix) = VPANDN(neg, count>ix)
-                vex_rrr(c, 1, 1, 1, 0xDF, mask, mask, cnt); // mask = NOT(mask) AND cnt
+                vpandn(c, mask, mask, cnt);                 // mask = NOT(mask) AND cnt
                 // Pre-zero dst, gather only in-bounds lanes
                 vpxor(c, 1, s.rd, s.rd, s.rd);
                 vpgatherdd(c, s.rd, base, rx, 4, mask);
@@ -1149,7 +1149,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             } else {
                 int8_t tmp = ra_alloc(ra, sl, ns);
                 vextracti128(c, tmp, s.rx, 1);
-                vex_rrr(c, 1, 2, 0, 0x2b, s.rd, s.rx, tmp);
+                vpackusdw(c, s.rd, s.rx, tmp);
                 ra_return_reg(ra, tmp);
             }
         } break;
@@ -1252,7 +1252,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             uint32_t       mask[8] = {0x7fffffffu, 0x7fffffffu, 0x7fffffffu, 0x7fffffffu,
                                       0x7fffffffu, 0x7fffffffu, 0x7fffffffu, 0x7fffffffu};
             int            off = pool_add(&jc->pool, mask, 32);
-            int            pos = vex_rip(c, 0, 1, 0, 1, s.rd, s.rx, 0x54);
+            int            pos = vandps_rip(c, s.rd, s.rx);
             pool_ref_at(&jc->pool, off, pos, 0);
         } break;
         case op_add_f32:

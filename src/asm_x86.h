@@ -99,8 +99,24 @@ void vpsrad_i(struct asm_x86 *b, int d, int s, uint8_t imm);
 
 void vpand(struct asm_x86 *b, int L, int d, int v, int s);
 void vpor(struct asm_x86 *b, int L, int d, int v, int s);
+void vpandn(struct asm_x86 *b, int d, int v, int s);
 void vpxor_3(struct asm_x86 *b, int L, int d, int v, int s);
 void vpblendvb(struct asm_x86 *b, int L, int d, int z, int y, int x);
+
+void vpminsd(struct asm_x86 *b, int d, int v, int s);
+void vpmaxsd(struct asm_x86 *b, int d, int v, int s);
+
+void vpunpckldq (struct asm_x86 *b, int d, int v, int s);
+void vpunpcklqdq(struct asm_x86 *b, int d, int v, int s);
+void vpunpcklwd (struct asm_x86 *b, int d, int v, int s);
+void vpunpckhwd (struct asm_x86 *b, int d, int v, int s);
+void vpunpckhdq (struct asm_x86 *b, int d, int v, int s);
+void vpackusdw  (struct asm_x86 *b, int d, int v, int s);
+
+int vbroadcastss_rip(struct asm_x86 *b, int d);
+int vpshufb_rip     (struct asm_x86 *b, int d, int v);
+int vpaddd_rip      (struct asm_x86 *b, int d, int v);
+int vandps_rip      (struct asm_x86 *b, int d, int v);
 
 void vpcmpeqd(struct asm_x86 *b, int d, int v, int s);
 void vpcmpgtd(struct asm_x86 *b, int d, int v, int s);

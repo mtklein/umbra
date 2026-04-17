@@ -498,6 +498,105 @@ TEST(test_vex_2byte_vs_3byte) {
     free(b.byte);
 }
 
+TEST(test_avx_unpack_pack) {
+    struct asm_x86 b = {0};
+
+    // vpunpckldq xmm2, xmm3, xmm4 => c5 e1 62 d4
+    vpunpckldq(&b, 2, 3, 4);
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE1, 0x62, 0xD4}) here;
+    reset(&b);
+
+    // vpunpcklqdq xmm2, xmm3, xmm4 => c5 e1 6c d4
+    vpunpcklqdq(&b, 2, 3, 4);
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE1, 0x6C, 0xD4}) here;
+    reset(&b);
+
+    // vpunpcklwd xmm2, xmm3, xmm4 => c5 e1 61 d4
+    vpunpcklwd(&b, 2, 3, 4);
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE1, 0x61, 0xD4}) here;
+    reset(&b);
+
+    // vpunpckhwd xmm2, xmm3, xmm4 => c5 e1 69 d4
+    vpunpckhwd(&b, 2, 3, 4);
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE1, 0x69, 0xD4}) here;
+    reset(&b);
+
+    // vpunpckhdq xmm2, xmm3, xmm4 => c5 e1 6a d4
+    vpunpckhdq(&b, 2, 3, 4);
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE1, 0x6A, 0xD4}) here;
+    reset(&b);
+
+    // vpackusdw xmm2, xmm3, xmm4 => c4 e2 61 2b d4 (mm=2 forces 3-byte VEX)
+    vpackusdw(&b, 2, 3, 4);
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x61, 0x2B, 0xD4}) here;
+    reset(&b);
+
+    // vpunpckldq xmm10, xmm9, xmm8 => c4 41 31 62 d0 (high regs force 3-byte VEX)
+    vpunpckldq(&b, 10, 9, 8);
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0x41, 0x31, 0x62, 0xD0}) here;
+    free(b.byte);
+}
+
+TEST(test_avx_minmax_andn) {
+    struct asm_x86 b = {0};
+
+    // vpminsd ymm2, ymm3, ymm4 => c4 e2 65 3b d4
+    vpminsd(&b, 2, 3, 4);
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0x3B, 0xD4}) here;
+    reset(&b);
+
+    // vpmaxsd ymm2, ymm3, ymm4 => c4 e2 65 3f d4
+    vpmaxsd(&b, 2, 3, 4);
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0x3F, 0xD4}) here;
+    reset(&b);
+
+    // vpandn ymm2, ymm3, ymm4 => c5 e5 df d4
+    vpandn(&b, 2, 3, 4);
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE5, 0xDF, 0xD4}) here;
+    reset(&b);
+
+    // vpandn ymm10, ymm9, ymm8 => c4 41 35 df d0 (high regs force 3-byte VEX)
+    vpandn(&b, 10, 9, 8);
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0x41, 0x35, 0xDF, 0xD0}) here;
+    free(b.byte);
+}
+
+TEST(test_avx_rip) {
+    struct asm_x86 b = {0};
+
+    // vbroadcastss ymm2, [rip+0] => c4 e2 7d 18 15 00 00 00 00
+    int pos = vbroadcastss_rip(&b, 2);
+    pos == 5 here;
+    bytes_eq(&b, 9, (uint8_t[]){0xC4, 0xE2, 0x7D, 0x18, 0x15, 0x00, 0x00, 0x00, 0x00}) here;
+    reset(&b);
+
+    // vpshufb ymm2, ymm3, [rip+0] => c4 e2 65 00 15 00 00 00 00
+    pos = vpshufb_rip(&b, 2, 3);
+    pos == 5 here;
+    bytes_eq(&b, 9, (uint8_t[]){0xC4, 0xE2, 0x65, 0x00, 0x15, 0x00, 0x00, 0x00, 0x00}) here;
+    reset(&b);
+
+    // vpaddd ymm2, ymm2, [rip+0] => c4 e1 6d fe 15 00 00 00 00
+    pos = vpaddd_rip(&b, 2, 2);
+    pos == 5 here;
+    bytes_eq(&b, 9, (uint8_t[]){0xC4, 0xE1, 0x6D, 0xFE, 0x15, 0x00, 0x00, 0x00, 0x00}) here;
+    reset(&b);
+
+    // vandps ymm2, ymm3, [rip+0] => c4 e1 64 54 15 00 00 00 00
+    pos = vandps_rip(&b, 2, 3);
+    pos == 5 here;
+    bytes_eq(&b, 9, (uint8_t[]){0xC4, 0xE1, 0x64, 0x54, 0x15, 0x00, 0x00, 0x00, 0x00}) here;
+    reset(&b);
+
+    // High reg in dst: vbroadcastss ymm10, [rip+0]
+    // R = ~10>>3 & 1 = 0. byte1 = (0<<7)|(1<<6)|(1<<5)|2 = 0x62.
+    // byte2 unchanged: 0x7D. ModRM = ((10&7)<<3)|5 = 0x15.
+    pos = vbroadcastss_rip(&b, 10);
+    pos == 5 here;
+    bytes_eq(&b, 9, (uint8_t[]){0xC4, 0x62, 0x7D, 0x18, 0x15, 0x00, 0x00, 0x00, 0x00}) here;
+    free(b.byte);
+}
+
 TEST(test_vmovd_vmovq_vpsrldq) {
     struct asm_x86 b = {0};
 
