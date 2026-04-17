@@ -201,6 +201,20 @@ TEST(test_ldrh_wi) {
     LDRH_wi(3, 4, 0) == 0x79400083 here;
 }
 
+TEST(test_ldr_hi) {
+    // LDR h0, [x1, #4] (imm=2, scaled by 2)
+    LDR_hi(0, 1, 2) == 0x7D400820 here;
+    // LDR h3, [x4, #0]
+    LDR_hi(3, 4, 0) == 0x7D400083 here;
+}
+
+TEST(test_ldr_wi) {
+    // LDR w0, [x1, #8] (imm=2, scaled by 4)
+    LDR_wi(0, 1, 2) == 0xB9400820 here;
+    // LDR w3, [x4, #0]
+    LDR_wi(3, 4, 0) == 0xB9400083 here;
+}
+
 TEST(test_ldrh_wr) {
     // LDRH w3, [x4, x5, LSL #1]
     LDRH_wr(3, 4, 5) == 0x78657883 here;
