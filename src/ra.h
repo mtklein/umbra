@@ -15,14 +15,11 @@ struct ra_config {
     void         *ctx;
 };
 
-// Opaque register allocator.
 struct ra;
-
 struct ra* ra_create(struct umbra_flat_ir const *ir, struct ra_config const *cfg);
 void       ra_destroy(struct ra *ra);
 void       ra_reset_pool(struct ra *ra);
 
-// Core operations.
 void   ra_free_chan(struct ra *ra, val operand, int i);
 void   ra_free_reg(struct ra *ra, int val);
 int8_t ra_alloc(struct ra *ra, int *sl, int *ns);
@@ -33,13 +30,11 @@ void   ra_begin_loop(struct ra *ra);
 void   ra_end_loop(struct ra *ra, int *sl);
 void   ra_evict_live_before(struct ra *ra, int *sl, int *ns, int before);
 
-// Accessors.
 int8_t ra_reg(struct ra const *ra, int val);
 int8_t ra_chan_reg(struct ra const *ra, int val, int chan);
 int    ra_last_use(struct ra const *ra, int val);
 int    ra_chan_last_use(struct ra const *ra, int val, int chan);
 
-// Mutation helpers.
 void ra_set_last_use(struct ra *ra, int val, int lu);
 void ra_return_reg(struct ra *ra, int8_t r);
 void ra_assign(struct ra *ra, int val, int8_t r);
