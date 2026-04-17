@@ -24,7 +24,7 @@ static void persp_init(struct slide *s, int w, int h) {
 static void persp_prepare(struct slide *s, struct umbra_backend *be,
                           struct umbra_fmt fmt) {
     struct persp_slide *st = (struct persp_slide *)s;
-    if (st->prog) { st->prog->free(st->prog); }
+    umbra_program_free(st->prog);
     umbra_coverage_free(st->cov);
     struct umbra_bitmap bmp = {
         .buf = {.ptr = st->bitmap->data, .count = st->bitmap->w * st->bitmap->h},
@@ -73,7 +73,7 @@ static int persp_get_builders(struct slide *s, struct umbra_fmt fmt,
 
 static void persp_free(struct slide *s) {
     struct persp_slide *st = (struct persp_slide *)s;
-    if (st->prog) { st->prog->free(st->prog); }
+    umbra_program_free(st->prog);
     umbra_shader_free  (st->shader);
     umbra_coverage_free(st->cov);
     free(st);

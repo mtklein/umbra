@@ -418,9 +418,9 @@ static void slug_two_pass_prepare(struct slide *s,
                                   struct umbra_backend *be,
                                   struct umbra_fmt fmt) {
     struct slug_two_pass_slide *st = (struct slug_two_pass_slide *)s;
-    if (st->acc_prog) { st->acc_prog->free(st->acc_prog); }
+    umbra_program_free(st->acc_prog);
     st->acc_prog = be->compile(be, st->acc_ir);
-    if (st->draw_prog) { st->draw_prog->free(st->draw_prog); }
+    umbra_program_free(st->draw_prog);
     umbra_coverage_free(st->cov);
     st->cov = umbra_coverage_winding((struct umbra_buf){
         .ptr = st->wind_buf, .count = st->w * st->h, .stride = st->w,
@@ -485,9 +485,9 @@ static void slug_two_pass_free(struct slide *s) {
     struct slug_two_pass_slide *st = (struct slug_two_pass_slide *)s;
     slug_free(&st->slug);
     free(st->wind_buf);
-    if (st->acc_prog) { st->acc_prog->free(st->acc_prog); }
+    umbra_program_free(st->acc_prog);
     umbra_flat_ir_free(st->acc_ir);
-    if (st->draw_prog) { st->draw_prog->free(st->draw_prog); }
+    umbra_program_free(st->draw_prog);
     umbra_shader_free  (st->shader);
     umbra_coverage_free(st->cov);
     free(st);
@@ -539,9 +539,9 @@ static void slug_init(struct slide *s, int w, int h) {
 static void slug_prepare(struct slide *s, struct umbra_backend *be,
                          struct umbra_fmt fmt) {
     struct slug_slide *st = (struct slug_slide *)s;
-    if (st->acc_prog) { st->acc_prog->free(st->acc_prog); }
+    umbra_program_free(st->acc_prog);
     st->acc_prog = be->compile(be, st->acc_ir);
-    if (st->draw_prog) { st->draw_prog->free(st->draw_prog); }
+    umbra_program_free(st->draw_prog);
     umbra_coverage_free(st->cov);
     st->cov = umbra_coverage_winding((struct umbra_buf){
         .ptr = st->wind_buf, .count = st->w * st->h, .stride = st->w,
@@ -596,9 +596,9 @@ static void slug_free_slide(struct slide *s) {
     struct slug_slide *st = (struct slug_slide *)s;
     slug_free(&st->slug);
     free(st->wind_buf);
-    if (st->acc_prog) { st->acc_prog->free(st->acc_prog); }
+    umbra_program_free(st->acc_prog);
     umbra_flat_ir_free(st->acc_ir);
-    if (st->draw_prog) { st->draw_prog->free(st->draw_prog); }
+    umbra_program_free(st->draw_prog);
     umbra_shader_free  (st->shader);
     umbra_coverage_free(st->cov);
     free(st);

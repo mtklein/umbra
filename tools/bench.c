@@ -128,7 +128,7 @@ static void compile_all_builders(struct slide *s, struct umbra_fmt fmt,
         struct umbra_flat_ir *ir = umbra_flat_ir(builders[j]);
         umbra_builder_free(builders[j]);
         struct umbra_program *p = be->compile(be, ir);
-        p->free(p);
+        umbra_program_free(p);
         umbra_flat_ir_free(ir);
     }
 }
@@ -349,7 +349,7 @@ int main(int argc, char *argv[]) {
         any_anomaly |= print_row("Slug Accumulator (1 curve)", ns_px, gpu, be_mask);
 
         for (int bi = 0; bi < nb; bi++) {
-            if (progs[bi]) { progs[bi]->free(progs[bi]); }
+            umbra_program_free(progs[bi]);
         }
         free(wind);
         slug_free(&sc);
@@ -420,7 +420,7 @@ int main(int argc, char *argv[]) {
 
     slides_cleanup();
     for (int bi = 0; bi < nb; bi++) {
-        if (bes[bi]) { bes[bi]->free(bes[bi]); }
+        umbra_backend_free(bes[bi]);
     }
     return any_anomaly ? 1 : 0;
 }

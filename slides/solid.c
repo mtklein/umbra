@@ -42,7 +42,7 @@ static void solid_prepare(struct slide *s, struct umbra_backend *be,
                           struct umbra_fmt fmt) {
     struct solid_slide *st = (struct solid_slide *)s;
     umbra_sdf_draw_free(st->qt);  st->qt   = NULL;
-    if (st->prog) { st->prog->free(st->prog); st->prog = NULL; }
+    if (st->prog) { umbra_program_free(st->prog); st->prog = NULL; }
     st->fmt = fmt;
     if (st->has_sdf) {
         st->qt = umbra_sdf_draw(be, st->sdf,
@@ -97,7 +97,7 @@ static int solid_get_builders(struct slide *s, struct umbra_fmt fmt,
 static void solid_free(struct slide *s) {
     struct solid_slide *st = (struct solid_slide *)s;
     umbra_sdf_draw_free(st->qt);
-    if (st->prog) { st->prog->free(st->prog); }
+    umbra_program_free(st->prog);
     umbra_shader_free(st->shader);
     umbra_sdf_free   (st->sdf);
     free(st);

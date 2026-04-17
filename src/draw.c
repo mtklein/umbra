@@ -455,9 +455,9 @@ void umbra_sdf_draw_queue(struct umbra_sdf_draw const *d,
 
 void umbra_sdf_draw_free(struct umbra_sdf_draw *d) {
     if (d) {
-        d->draw->free(d->draw);
-        d->bounds->free(d->bounds);
-        d->bounds_be->free(d->bounds_be);
+        umbra_program_free(d->draw);
+        umbra_program_free(d->bounds);
+        umbra_backend_free(d->bounds_be);
         free(d);
     }
 }

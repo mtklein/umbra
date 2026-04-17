@@ -495,3 +495,10 @@ void umbra_end_if(builder *b) {
     b->if_depth--;
     push(b, op_if_end);
 }
+
+void umbra_backend_free(struct umbra_backend *b) {
+    if (b) { b->free(b); }
+}
+void umbra_program_free(struct umbra_program *p) {
+    if (p) { p->free(p); }
+}

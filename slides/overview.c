@@ -105,7 +105,7 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
     st->out_fmt = fmt;
     render_thumbnails(st);
 
-    if (st->cvt) { st->cvt->free(st->cvt); }
+    umbra_program_free(st->cvt);
     struct umbra_builder *b = umbra_builder();
     umbra_color_val32 c = umbra_fmt_8888.load(b, 0);
     fmt.store(b, 1, c);
@@ -139,7 +139,7 @@ static int overview_get_builders(struct slide *s, struct umbra_fmt fmt,
 
 static void overview_free(struct slide *s) {
     struct overview_slide *st = (struct overview_slide *)s;
-    if (st->cvt) { st->cvt->free(st->cvt); }
+    umbra_program_free(st->cvt);
     free(st->fb);
     free(st->tmp);
     free(st);

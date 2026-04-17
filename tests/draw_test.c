@@ -1446,7 +1446,7 @@ TEST(test_sdf_dispatch_rect) {
     }
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-        if (bes[bi]) { bes[bi]->free(bes[bi]); }
+        umbra_backend_free(bes[bi]);
     }
     umbra_shader_free(shader);
     umbra_sdf_free(sdf);
@@ -1536,9 +1536,9 @@ TEST(test_sdf_dispatch_tiling) {
 
     free(flat_buf);
     free(tiled_buf);
-    flat->free(flat);
+    umbra_program_free(flat);
     umbra_sdf_draw_free(disp);
-    be->free(be);
+    umbra_backend_free(be);
     umbra_shader_free(shader);
     umbra_coverage_free(adapter);
 }
@@ -1595,11 +1595,11 @@ TEST(test_metal_loop_gather) {
         prog->queue(prog, 0, 0, 1, 1, buf);
         bes[bi]->flush(bes[bi]);
         equiv(out, 60.0f) here;
-        prog->free(prog);
+        umbra_program_free(prog);
     }
 
     umbra_flat_ir_free(ir);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-        if (bes[bi]) { bes[bi]->free(bes[bi]); }
+        umbra_backend_free(bes[bi]);
     }
 }

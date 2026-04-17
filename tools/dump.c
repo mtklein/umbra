@@ -129,7 +129,7 @@ static struct dump_backends dump_backends_init(void) {
 
 static void dump_backends_free(struct dump_backends *db) {
     for (int i = 0; i < db->n; i++) {
-        if (db->be[i]) { db->be[i]->free(db->be[i]); }
+        umbra_backend_free(db->be[i]);
     }
 }
 
@@ -157,7 +157,7 @@ static void dump_ir(struct dump_backends *db,
         FILE *f = atomic_open(p);
         if (prog->dump) { prog->dump(prog, f); }
         atomic_close(f, p);
-        prog->free(prog);
+        umbra_program_free(prog);
 
         if (i == db->vulkan_idx) {
             grab_mvk_msl(dir);
@@ -267,7 +267,7 @@ int main(void) {
     }
 
     slides_cleanup();
-    be->free(be);
+    umbra_backend_free(be);
     dump_backends_free(&db);
     return 0;
 }

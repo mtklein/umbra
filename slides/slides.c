@@ -85,7 +85,7 @@ void slide_bg_prepare(struct umbra_backend *be, struct umbra_fmt fmt, int w, int
         bg_ir = umbra_flat_ir(b);
         umbra_builder_free(b);
     }
-    if (bg_prog) { bg_prog->free(bg_prog); }
+    umbra_program_free(bg_prog);
     bg_prog = be->compile(be, bg_ir);
 }
 
@@ -102,7 +102,7 @@ void slide_bg_draw(float const bg[4], int l, int t, int r, int b, void *buf) {
 }
 
 void slide_bg_cleanup(void) {
-    if (bg_prog) { bg_prog->free(bg_prog); bg_prog = NULL; }
+    if (bg_prog) { umbra_program_free(bg_prog); bg_prog = NULL; }
     umbra_flat_ir_free(bg_ir); bg_ir = NULL;
     umbra_shader_free(bg_shader); bg_shader = NULL;
     bg_fmt = (struct umbra_fmt){0};

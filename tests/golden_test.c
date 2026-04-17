@@ -39,7 +39,7 @@ static void build_pipes(void) {
 
 static void free_pipes(void) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-        if (bes[bi]) { bes[bi]->free(bes[bi]); }
+        umbra_backend_free(bes[bi]);
     }
 }
 
@@ -178,9 +178,9 @@ TEST(test_slug_rect) {
     pixels[38*W + 30] == bg here;
     pixels[20*W + 70] == bg here;
 
-    acc->free(acc);
-    interp->free(interp);
-    be->free(be);
+    umbra_program_free(acc);
+    umbra_program_free(interp);
+    umbra_backend_free(be);
     umbra_shader_free  (shader);
     umbra_coverage_free(cov);
 }
@@ -227,7 +227,7 @@ TEST(test_perspective_text) {
     pixels[8] == 0xffffffff here;
     pixels[0] == 0xff000000 here;
 
-    interp->free(interp);
+    umbra_program_free(interp);
 
     struct text_cov tc = text_rasterize(W, H, 24.0f, 0);
 
@@ -270,8 +270,8 @@ TEST(test_perspective_text) {
     }
     changed > 0 here;
 
-    interp->free(interp);
-    be->free(be);
+    umbra_program_free(interp);
+    umbra_backend_free(be);
     text_cov_free(&tc);
     umbra_shader_free  (shader);
     umbra_coverage_free(cov);
@@ -331,8 +331,8 @@ static void run_long_batch_no_oom(struct umbra_backend *be) {
         st.uniform_ring_rotations > rotations_before here;
         st.gpu_sec > 0.0 here;
 
-        p->free(p);
-        be->free(be);
+        umbra_program_free(p);
+        umbra_backend_free(be);
     }
 }
 
@@ -391,8 +391,8 @@ static void run_tiled_writable_sync(struct umbra_backend *be) {
     }
 
     free(data);
-    p->free(p);
-    be->free(be);
+    umbra_program_free(p);
+    umbra_backend_free(be);
 }
 
 TEST(test_metal_tiled_writable_sync) {
@@ -442,8 +442,8 @@ TEST(test_wgpu_misc) {
     (pixel & 0xff)   == 0xff here;
     (pixel >> 24)    == 0xff here;
 
-    p->free(p);
-    be->free(be);
+    umbra_program_free(p);
+    umbra_backend_free(be);
 }
 
 #endif /* !__wasm__ */

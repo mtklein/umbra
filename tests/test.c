@@ -67,7 +67,7 @@ _Bool test_backends_run(struct test_backends *B, int bi, int r, int b,
 
 void test_backends_free(struct test_backends *B) {
     for (int i = 0; i < NUM_BACKENDS; i++) {
-        if (B->p[i]) { B->p[i]->free(B->p[i]); }
-        if (B->be[i]) { B->be[i]->free(B->be[i]); }
+        umbra_program_free(B->p[i]);
+        umbra_backend_free(B->be[i]);
     }
 }

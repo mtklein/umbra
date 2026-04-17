@@ -2431,23 +2431,23 @@ TEST(test_program_threadsafe) {
     struct umbra_backend *interp = umbra_backend_interp();
     { struct umbra_program *p = interp->compile(interp, ir);
       p->threadsafe == 1 here;
-      p->free(p); }
-    interp->free(interp);
+      umbra_program_free(p); }
+    umbra_backend_free(interp);
 
     struct umbra_backend *jit = umbra_backend_jit();
     if (jit) {
         struct umbra_program *p = jit->compile(jit, ir);
         p->threadsafe == 1 here;
-        p->free(p);
-        jit->free(jit);
+        umbra_program_free(p);
+        umbra_backend_free(jit);
     }
 
     struct umbra_backend *metal = umbra_backend_metal();
     if (metal) {
         struct umbra_program *p = metal->compile(metal, ir);
         p->threadsafe == 0 here;
-        p->free(p);
-        metal->free(metal);
+        umbra_program_free(p);
+        umbra_backend_free(metal);
     }
 
     umbra_flat_ir_free(ir);
@@ -2473,8 +2473,8 @@ TEST(test_program_null_guards) {
     p->queue(p, 0, 0, 0, 1, (struct umbra_buf[]){{.ptr=buf, .count=1}});
     p->queue(p, 0, 0, 1, 0, (struct umbra_buf[]){{.ptr=buf, .count=1}});
 
-    p->free(p);
-    be->free(be);
+    umbra_program_free(p);
+    umbra_backend_free(be);
 }
 
 // Regression test: register variant chains must not cross the preamble/body boundary.
@@ -3964,14 +3964,14 @@ TEST(test_jit_code_buffer_overflow) {
     struct umbra_backend *be = umbra_backend_jit();
     if (be) {
         struct umbra_program *prog = be->compile(be, ir);
-        prog->free(prog);
-        be->free(be);
+        umbra_program_free(prog);
+        umbra_backend_free(be);
     }
 
     be = umbra_backend_interp();
     { struct umbra_program *prog = be->compile(be, ir);
-      prog->free(prog); }
-    be->free(be);
+      umbra_program_free(prog); }
+    umbra_backend_free(be);
 
     umbra_flat_ir_free(ir);
 }
@@ -4054,13 +4054,13 @@ TEST(test_stats_safe) {
             be[i]->flush(be[i]);
             struct umbra_backend_stats st = be[i]->stats(be[i]);
             st.dispatches == 0 here;
-            p->free(p);
+            umbra_program_free(p);
         }
     }
 
     umbra_flat_ir_free(ir);
     for (int i = 0; i < NUM_BACKENDS; i++) {
-        if (be[i]) { be[i]->free(be[i]); }
+        umbra_backend_free(be[i]);
     }
 }
 

@@ -44,7 +44,7 @@ struct pipe {
 static struct pipe readback_pipe, hdr_pipe;
 
 static void free_pipe(struct pipe *p) {
-    if (p->program) { p->program->free(p->program); }
+    umbra_program_free(p->program);
     *p = (struct pipe){0};
 }
 
@@ -92,7 +92,7 @@ static struct umbra_flat_ir *saved_ir;
 
 static void free_xtra(void) {
     for (int t = 1; t < max_threads; t++) {
-        if (xtra_progs[t]) { xtra_progs[t]->free(xtra_progs[t]); }
+        umbra_program_free(xtra_progs[t]);
         xtra_progs[t] = NULL;
     }
 }
@@ -438,8 +438,8 @@ int main(void) {
     umbra_flat_ir_free(saved_ir);
     free_pipes();
     slides_cleanup();
-    for (int i = 0; i < NUM_BACKENDS; i++) { if (bes[i]) { bes[i]->free(bes[i]); } }
-    pipe_be->free(pipe_be);
+    for (int i = 0; i < NUM_BACKENDS; i++) { umbra_backend_free(bes[i]); }
+    umbra_backend_free(pipe_be);
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);

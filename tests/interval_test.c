@@ -37,8 +37,8 @@ static iv eval_binary(umbra_interval (*op)(struct umbra_builder*,
     };
     prog->queue(prog, 0, 0, 1, 1, buf);
     be->flush(be);
-    prog->free(prog);
-    be->free(be);
+    umbra_program_free(prog);
+    umbra_backend_free(be);
     return (iv){lo_out, hi_out};
 }
 
@@ -66,8 +66,8 @@ static iv eval_unary(umbra_interval (*op)(struct umbra_builder*, umbra_interval)
     };
     prog->queue(prog, 0, 0, 1, 1, buf);
     be->flush(be);
-    prog->free(prog);
-    be->free(be);
+    umbra_program_free(prog);
+    umbra_backend_free(be);
     return (iv){lo_out, hi_out};
 }
 
@@ -142,8 +142,8 @@ static iv eval_square(iv a) {
     };
     prog->queue(prog, 0, 0, 1, 1, buf);
     be->flush(be);
-    prog->free(prog);
-    be->free(be);
+    umbra_program_free(prog);
+    umbra_backend_free(be);
     return (iv){lo_out, hi_out};
 }
 
@@ -180,8 +180,8 @@ static iv eval_exact_binary(umbra_interval (*op)(struct umbra_builder*,
     };
     prog->queue(prog, 0, 0, 1, 1, buf);
     be->flush(be);
-    prog->free(prog);
-    be->free(be);
+    umbra_program_free(prog);
+    umbra_backend_free(be);
     return (iv){lo_out, hi_out};
 }
 
@@ -209,8 +209,8 @@ static iv eval_exact_unary(umbra_interval (*op)(struct umbra_builder*, umbra_int
     };
     prog->queue(prog, 0, 0, 1, 1, buf);
     be->flush(be);
-    prog->free(prog);
-    be->free(be);
+    umbra_program_free(prog);
+    umbra_backend_free(be);
     return (iv){lo_out, hi_out};
 }
 
@@ -295,6 +295,6 @@ TEST(interval_loop) {
     equiv(lo_out, -2.0f) here;
     equiv(hi_out,  2.0f) here;
 
-    prog->free(prog);
-    be->free(be);
+    umbra_program_free(prog);
+    umbra_backend_free(be);
 }

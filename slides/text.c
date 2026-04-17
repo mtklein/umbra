@@ -139,7 +139,7 @@ static void text_init(struct slide *s, int w, int h) {
 static void text_prepare(struct slide *s, struct umbra_backend *be,
                          struct umbra_fmt fmt) {
     struct text_slide *st = (struct text_slide *)s;
-    if (st->prog) { st->prog->free(st->prog); }
+    umbra_program_free(st->prog);
     umbra_coverage_free(st->cov);
     struct umbra_buf bmp = {
         .ptr    = st->tc->data,
@@ -180,7 +180,7 @@ static int text_get_builders(struct slide *s, struct umbra_fmt fmt,
 
 static void text_free(struct slide *s) {
     struct text_slide *st = (struct text_slide *)s;
-    if (st->prog) { st->prog->free(st->prog); }
+    umbra_program_free(st->prog);
     umbra_shader_free  (st->shader);
     umbra_coverage_free(st->cov);
     free(st);

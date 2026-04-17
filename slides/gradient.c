@@ -29,7 +29,7 @@ static void grad_prepare(struct slide *s, struct umbra_backend *be, struct umbra
         st->ir = umbra_flat_ir(b);
         umbra_builder_free(b);
     }
-    if (st->prog) { st->prog->free(st->prog); }
+    umbra_program_free(st->prog);
     st->prog = be->compile(be, st->ir);
 }
 
@@ -54,7 +54,7 @@ static int grad_get_builders(struct slide *s, struct umbra_fmt fmt,
 
 static void grad_free(struct slide *s) {
     struct grad_slide *st = (struct grad_slide *)s;
-    if (st->prog) { st->prog->free(st->prog); }
+    umbra_program_free(st->prog);
     umbra_flat_ir_free(st->ir);
     umbra_shader_free(st->shader);
     free(st->colors_data);

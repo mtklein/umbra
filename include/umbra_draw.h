@@ -48,10 +48,6 @@ void              umbra_store_fp16       (struct umbra_builder*, umbra_ptr64, um
 umbra_color_val32 umbra_load_fp16_planar (struct umbra_builder*, umbra_ptr16);
 void              umbra_store_fp16_planar(struct umbra_builder*, umbra_ptr16, umbra_color_val32);
 
-// TODO: this pattern of adding a freestanding `void type_free(type*)` function
-// for polymorphic types is growing on me. Let's try applying it to all our
-// other polymorphic types too.
-
 struct umbra_shader {
     umbra_color_val32 (*build)(struct umbra_shader*,
                                struct umbra_builder*,
