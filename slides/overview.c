@@ -109,10 +109,10 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
     struct umbra_builder *b = umbra_builder();
     umbra_color c = umbra_fmt_8888.load(b, 0);
     fmt.store(b, 1, c);
-    struct umbra_flat_ir *bb = umbra_flat_ir(b);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
-    st->cvt = be->compile(be, bb);
-    umbra_flat_ir_free(bb);
+    st->cvt = be->compile(be, ir);
+    umbra_flat_ir_free(ir);
 }
 
 static void overview_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {

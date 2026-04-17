@@ -125,11 +125,11 @@ static void compile_all_builders(struct slide *s, struct umbra_fmt fmt,
     int nb = s->get_builders ? s->get_builders(s, fmt, builders, 8) : 0;
     for (int j = 0; j < nb; j++) {
         if (!builders[j]) { continue; }
-        struct umbra_flat_ir *bb = umbra_flat_ir(builders[j]);
+        struct umbra_flat_ir *ir = umbra_flat_ir(builders[j]);
         umbra_builder_free(builders[j]);
-        struct umbra_program *p = be->compile(be, bb);
+        struct umbra_program *p = be->compile(be, ir);
         p->free(p);
-        umbra_flat_ir_free(bb);
+        umbra_flat_ir_free(ir);
     }
 }
 
@@ -318,14 +318,14 @@ int main(int argc, char *argv[]) {
         struct slug_curves       sc  = slug_extract("Slug", (float)H * 0.3125f);
         struct slug_acc_layout   al;
         struct umbra_builder    *bld = slug_build_acc(&al);
-        struct umbra_flat_ir *bb = umbra_flat_ir(bld);
+        struct umbra_flat_ir *ir = umbra_flat_ir(bld);
         umbra_builder_free(bld);
 
         struct umbra_program *progs[5];
         for (int bi = 0; bi < nb; bi++) {
-            progs[bi] = bes[bi] ? bes[bi]->compile(bes[bi], bb) : NULL;
+            progs[bi] = bes[bi] ? bes[bi]->compile(bes[bi], ir) : NULL;
         }
-        umbra_flat_ir_free(bb);
+        umbra_flat_ir_free(ir);
 
         float *wind = calloc((size_t)(W * H), 4);
         struct umbra_matrix mat;

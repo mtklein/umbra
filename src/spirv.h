@@ -23,4 +23,4 @@ struct spirv_result {
     int               push_words, :32;
 };
 
-struct spirv_result build_spirv(struct umbra_flat_ir const *bb, int flags);
+struct spirv_result build_spirv(struct umbra_flat_ir const *ir, int flags);

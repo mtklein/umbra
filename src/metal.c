@@ -63,7 +63,7 @@ static id nsstr(char const *s) {
     return msg_s((id)objc_getClass("NSString"), sel("stringWithUTF8String:"), s);
 }
 
-typedef struct umbra_flat_ir BB;
+typedef struct umbra_flat_ir IR;
 
 static double now(void) {
     struct timespec ts;
@@ -152,12 +152,12 @@ static char const* uv(char *tmp, char const *vn,
     return tmp;
 }
 
-static void emit_ops(SrcBuf *b, BB const *bb,
+static void emit_ops(SrcBuf *b, IR const *ir,
                      int const *deref_buf,
                      _Bool *is_f,
                      int lo, int hi, char const *pad) {
     for (int i = lo; i < hi; i++) {
-        is_f[i] = produces_float(bb->inst[i].op);
+        is_f[i] = produces_float(ir->inst[i].op);
     }
 
     char vx[16], vy[16], vz[16], vw[16];
@@ -166,7 +166,7 @@ static void emit_ops(SrcBuf *b, BB const *bb,
            : (void)snprintf(buf, sizeof buf, "v%d", (vid)), buf)
 
     for (int i = lo; i < hi; i++) {
-        struct ir_inst const *inst = &bb->inst[i];
+        struct ir_inst const *inst = &ir->inst[i];
         int xid = inst->x.id, yid = inst->y.id,
             zid = inst->z.id, wid = inst->w.id;
         VNAME(vx, xid, (int)inst->x.chan);
@@ -847,22 +847,22 @@ static void emit_ops(SrcBuf *b, BB const *bb,
     }
 }
 
-static char* build_source(BB const *orig_bb,
+static char* build_source(IR const *orig_ir,
                            int *out_max_ptr,
                            int *out_total_bufs,
                            int *out_deref_buf,
                            uint8_t **out_buf_shift,
                            struct umbra_flat_ir **out_resolved) {
-    struct umbra_flat_ir *resolved = umbra_flat_ir_resolve(orig_bb, JOIN_PREFER_IMM);
-    BB const *bb = resolved;
+    struct umbra_flat_ir *resolved = umbra_flat_ir_resolve(orig_ir, JOIN_PREFER_IMM);
+    IR const *ir = resolved;
     *out_resolved = resolved;
 
     int max_ptr = -1;
-    for (int i = 0; i < bb->insts; i++) {
-        if (op_has_ptr(bb->inst[i].op)
-                && bb->inst[i].ptr.bits >= 0) {
-            if (bb->inst[i].ptr.bits > max_ptr) {
-                max_ptr = bb->inst[i].ptr.bits;
+    for (int i = 0; i < ir->insts; i++) {
+        if (op_has_ptr(ir->inst[i].op)
+                && ir->inst[i].ptr.bits >= 0) {
+            if (ir->inst[i].ptr.bits > max_ptr) {
+                max_ptr = ir->inst[i].ptr.bits;
             }
         }
     }
@@ -870,8 +870,8 @@ static char* build_source(BB const *orig_bb,
 
     int *deref_buf = out_deref_buf;
     int next_buf = max_ptr + 1;
-    for (int i = 0; i < bb->insts; i++) {
-        if (bb->inst[i].op == op_deref_ptr) {
+    for (int i = 0; i < ir->insts; i++) {
+        if (ir->inst[i].op == op_deref_ptr) {
             deref_buf[i] = next_buf++;
         }
     }
@@ -882,18 +882,18 @@ static char* build_source(BB const *orig_bb,
     uint8_t *buf_row_shift = calloc((size_t)(total_bufs + 1), sizeof *buf_row_shift);
     _Bool   *buf_written   = calloc((size_t)(total_bufs + 1), sizeof *buf_written);
     *out_buf_shift = buf_shift;
-    for (int i = 0; i < bb->insts; i++) {
-        if (!op_has_ptr(bb->inst[i].op)) { continue; }
-        int bi = bb->inst[i].ptr.deref ? deref_buf[bb->inst[i].ptr.ix]
-                                      : bb->inst[i].ptr.bits;
-        if (op_is_store(bb->inst[i].op)) { buf_written[bi] = 1; }
-        if (bb->inst[i].op == op_load_16x4_planar
-         || bb->inst[i].op == op_store_16x4_planar) { buf_shift[bi] = 1; buf_row_shift[bi] = 1; }
-        else if (bb->inst[i].op == op_load_16x4
-              || bb->inst[i].op == op_store_16x4) { buf_shift[bi] = 3; buf_row_shift[bi] = 3; }
-        else if (bb->inst[i].op == op_gather_16
-              || bb->inst[i].op == op_load_16
-              || bb->inst[i].op == op_store_16) { buf_shift[bi] = 1; buf_row_shift[bi] = 1; }
+    for (int i = 0; i < ir->insts; i++) {
+        if (!op_has_ptr(ir->inst[i].op)) { continue; }
+        int bi = ir->inst[i].ptr.deref ? deref_buf[ir->inst[i].ptr.ix]
+                                      : ir->inst[i].ptr.bits;
+        if (op_is_store(ir->inst[i].op)) { buf_written[bi] = 1; }
+        if (ir->inst[i].op == op_load_16x4_planar
+         || ir->inst[i].op == op_store_16x4_planar) { buf_shift[bi] = 1; buf_row_shift[bi] = 1; }
+        else if (ir->inst[i].op == op_load_16x4
+              || ir->inst[i].op == op_store_16x4) { buf_shift[bi] = 3; buf_row_shift[bi] = 3; }
+        else if (ir->inst[i].op == op_gather_16
+              || ir->inst[i].op == op_load_16
+              || ir->inst[i].op == op_store_16) { buf_shift[bi] = 1; buf_row_shift[bi] = 1; }
         else                                    { buf_shift[bi] = 2; buf_row_shift[bi] = 2; }
     }
 
@@ -926,8 +926,8 @@ static char* build_source(BB const *orig_bb,
              " [[buffer(%d)]]",
              qual, type, p, p + 1);
     }
-    for (int i = 0; i < bb->insts; i++) {
-        if (bb->inst[i].op == op_deref_ptr) {
+    for (int i = 0; i < ir->insts; i++) {
+        if (ir->inst[i].op == op_deref_ptr) {
             int db = deref_buf[i];
             char const *type = buf_row_shift[db] == 3 ? "half4"
                              : buf_shift[db]     == 2 ? "uint" : "ushort";
@@ -945,13 +945,13 @@ static char* build_source(BB const *orig_bb,
          "    if (pos.x >= m.w) return;\n"
          "    uint x = m.x0 + pos.x;\n"
          "    uint y = m.y0 + pos.y;\n");
-    for (int i = 0; i < bb->n_vars; i++) {
+    for (int i = 0; i < ir->n_vars; i++) {
         emit(&b, "    uint var%d = 0;\n", i);
     }
 
-    int const n = bb->insts;
+    int const n = ir->insts;
     _Bool *is_f = calloc((size_t)(n + 1), 1);
-    emit_ops(&b, bb, deref_buf, is_f, 0, n, "    ");
+    emit_ops(&b, ir, deref_buf, is_f, 0, n, "    ");
     emit(&b, "}\n");
 
     free(is_f);
@@ -1045,18 +1045,18 @@ static void metal_backend_free(struct metal_backend *be) {
 }
 
 static struct metal_program* metal_program(
-    struct metal_backend *be, BB const *bb
+    struct metal_backend *be, IR const *ir
 ) {
     struct metal_program *result = 0;
     void *pool = objc_autoreleasePoolPush();
     {
-        int *deref_buf = calloc((size_t)bb->insts, sizeof *deref_buf);
+        int *deref_buf = calloc((size_t)ir->insts, sizeof *deref_buf);
         int  max_ptr = -1, total_bufs = 0;
         uint8_t *buf_shift = NULL;
         struct umbra_flat_ir *resolved = NULL;
-        char *src = build_source(bb, &max_ptr, &total_bufs, deref_buf,
+        char *src = build_source(ir, &max_ptr, &total_bufs, deref_buf,
                                  &buf_shift, &resolved);
-        bb = resolved;
+        ir = resolved;
 
         char const *override = getenv("UMBRA_METAL_OVERRIDE");
         if (override) {
@@ -1068,7 +1068,7 @@ static struct metal_program* metal_program(
             } else {
                 path = override;
             }
-            if (!want_insts || want_insts == bb->insts) {
+            if (!want_insts || want_insts == ir->insts) {
                 FILE *of = fopen(path, "r");
                 if (of) {
                     fseek(of, 0, SEEK_END);
@@ -1080,13 +1080,13 @@ static struct metal_program* metal_program(
                     src[sz] = '\0';
                     fclose(of);
                     fprintf(stderr, "UMBRA_METAL_OVERRIDE: replaced %d-inst program with %s\n",
-                            bb->insts, path);
+                            ir->insts, path);
                 } else {
                     fprintf(stderr, "UMBRA_METAL_OVERRIDE: could not open %s\n", path);
                 }
             } else {
                 fprintf(stderr, "UMBRA_METAL_OVERRIDE: skipping %d-inst program (want %d)\n",
-                        bb->insts, want_insts);
+                        ir->insts, want_insts);
             }
         }
 
@@ -1094,22 +1094,22 @@ static struct metal_program* metal_program(
         struct deref_info *di = calloc((size_t)(n_deref ? n_deref : 1), sizeof *di);
         {
             int d = 0;
-            for (int i = 0; i < bb->insts; i++) {
-                if (bb->inst[i].op == op_deref_ptr) {
+            for (int i = 0; i < ir->insts; i++) {
+                if (ir->inst[i].op == op_deref_ptr) {
                     di[d].buf_idx  = deref_buf[i];
-                    di[d].src_buf  = bb->inst[i].ptr.bits;
-                    di[d].off = bb->inst[i].imm;
+                    di[d].src_buf  = ir->inst[i].ptr.bits;
+                    di[d].off = ir->inst[i].imm;
                     d++;
                 }
             }
         }
 
         uint8_t *buf_rw = calloc((size_t)(total_bufs + 1), sizeof *buf_rw);
-        for (int i = 0; i < bb->insts; i++) {
-            if (!op_has_ptr(bb->inst[i].op)) { continue; }
-            int bi = bb->inst[i].ptr.deref ? deref_buf[bb->inst[i].ptr.ix]
-                                           : bb->inst[i].ptr.bits;
-            buf_rw[bi] |= op_is_store(bb->inst[i].op) ? BUF_WRITTEN : BUF_READ;
+        for (int i = 0; i < ir->insts; i++) {
+            if (!op_has_ptr(ir->inst[i].op)) { continue; }
+            int bi = ir->inst[i].ptr.deref ? deref_buf[ir->inst[i].ptr.ix]
+                                           : ir->inst[i].ptr.bits;
+            buf_rw[bi] |= op_is_store(ir->inst[i].op) ? BUF_WRITTEN : BUF_READ;
         }
 
         id error = 0;
@@ -1386,8 +1386,8 @@ static void free_metal(struct umbra_program *prog) {
     metal_program_free((struct metal_program*)prog);
 }
 static struct umbra_program* compile_metal(struct umbra_backend           *be,
-                                           BB const *bb) {
-    struct metal_program *p = metal_program((struct metal_backend*)be, bb);
+                                           IR const *ir) {
+    struct metal_program *p = metal_program((struct metal_backend*)be, ir);
     if (!p) { return NULL; }
     p->base = (struct umbra_program){
         .queue   = run_metal,

@@ -21,29 +21,29 @@ static void test_fill(int reg, int slot, void *ctx) {
 
 static void reset_records(void) { nspills = nfills = 0; }
 
-static struct umbra_flat_ir* make_bb(int n, int pre) {
-    struct umbra_flat_ir *bb = malloc(sizeof *bb);
-    bb->inst = calloc((size_t)n, sizeof *bb->inst);
-    bb->insts = n;
-    bb->preamble = pre;
-    bb->loop_begin = -1;
-    bb->loop_end   = -1;
-    bb->n_vars     = 0;
+static struct umbra_flat_ir* make_ir(int n, int pre) {
+    struct umbra_flat_ir *ir = malloc(sizeof *ir);
+    ir->inst = calloc((size_t)n, sizeof *ir->inst);
+    ir->insts = n;
+    ir->preamble = pre;
+    ir->loop_begin = -1;
+    ir->loop_end   = -1;
+    ir->n_vars     = 0;
 
-    bb->inst[0].op = op_imm_32;
-    bb->inst[0].imm = 42;
+    ir->inst[0].op = op_imm_32;
+    ir->inst[0].imm = 42;
 
     for (int i = 1; i < n; i++) {
-        bb->inst[i].op = op_add_i32;
-        bb->inst[i].x = (val){.id = i - 1};
-        bb->inst[i].y = (val){0};
+        ir->inst[i].op = op_add_i32;
+        ir->inst[i].x = (val){.id = i - 1};
+        ir->inst[i].y = (val){0};
     }
-    return bb;
+    return ir;
 }
 
-static void free_bb(struct umbra_flat_ir *bb) {
-    free(bb->inst);
-    free(bb);
+static void free_ir(struct umbra_flat_ir *ir) {
+    free(ir->inst);
+    free(ir);
 }
 
 TEST(test_basic_alloc_free) {
@@ -57,8 +57,8 @@ TEST(test_basic_alloc_free) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_flat_ir *bb = make_bb(3, 0);
-    struct ra                *ra = ra_create(bb, &cfg);
+    struct umbra_flat_ir *ir = make_ir(3, 0);
+    struct ra                *ra = ra_create(ir, &cfg);
     int                       sl[3] = {-1, -1, -1};
     int                       ns = 0;
     reset_records();
@@ -80,7 +80,7 @@ TEST(test_basic_alloc_free) {
     nspills == 0 here;
 
     ra_destroy(ra);
-    free_bb(bb);
+    free_ir(ir);
 }
 
 TEST(test_eviction_belady) {
@@ -94,8 +94,8 @@ TEST(test_eviction_belady) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_flat_ir *bb = make_bb(5, 0);
-    struct ra                *ra = ra_create(bb, &cfg);
+    struct umbra_flat_ir *ir = make_ir(5, 0);
+    struct ra                *ra = ra_create(ir, &cfg);
     int                       sl[5] = {-1, -1, -1, -1, -1};
     int                       ns = 0;
     reset_records();
@@ -117,7 +117,7 @@ TEST(test_eviction_belady) {
     sl[0] >= 0 here;
 
     ra_destroy(ra);
-    free_bb(bb);
+    free_ir(ir);
 }
 
 TEST(test_dead_value_evicted_first) {
@@ -132,8 +132,8 @@ TEST(test_dead_value_evicted_first) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_flat_ir *bb = make_bb(5, 0);
-    struct ra                *ra = ra_create(bb, &cfg);
+    struct umbra_flat_ir *ir = make_ir(5, 0);
+    struct ra                *ra = ra_create(ir, &cfg);
     int                       sl[5] = {-1, -1, -1, -1, -1};
     int                       ns = 0;
     reset_records();
@@ -153,7 +153,7 @@ TEST(test_dead_value_evicted_first) {
     ra_reg(ra, 1) == r1 here;
 
     ra_destroy(ra);
-    free_bb(bb);
+    free_ir(ir);
 }
 
 TEST(test_ensure_and_fill) {
@@ -167,8 +167,8 @@ TEST(test_ensure_and_fill) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_flat_ir *bb = make_bb(5, 0);
-    struct ra                *ra = ra_create(bb, &cfg);
+    struct umbra_flat_ir *ir = make_ir(5, 0);
+    struct ra                *ra = ra_create(ir, &cfg);
     int                       sl[5] = {-1, -1, -1, -1, -1};
     int                       ns = 0;
     reset_records();
@@ -197,7 +197,7 @@ TEST(test_ensure_and_fill) {
     nfills == 1 here;
 
     ra_destroy(ra);
-    free_bb(bb);
+    free_ir(ir);
 }
 
 TEST(test_claim) {
@@ -211,8 +211,8 @@ TEST(test_claim) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_flat_ir *bb = make_bb(4, 0);
-    struct ra                *ra = ra_create(bb, &cfg);
+    struct umbra_flat_ir *ir = make_ir(4, 0);
+    struct ra                *ra = ra_create(ir, &cfg);
     int                       sl[4] = {-1, -1, -1, -1};
     int                       ns = 0;
     reset_records();
@@ -227,7 +227,7 @@ TEST(test_claim) {
     nspills == 0 here;
 
     ra_destroy(ra);
-    free_bb(bb);
+    free_ir(ir);
 }
 
 TEST(test_last_use_preamble) {
@@ -242,14 +242,14 @@ TEST(test_last_use_preamble) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_flat_ir *bb = make_bb(4, 2);
-    struct ra                *ra = ra_create(bb, &cfg);
+    struct umbra_flat_ir *ir = make_ir(4, 2);
+    struct ra                *ra = ra_create(ir, &cfg);
 
     ra_last_use(ra, 0) == 4 here;
     ra_last_use(ra, 1) == 4 here;
 
     ra_destroy(ra);
-    free_bb(bb);
+    free_ir(ir);
 }
 
 TEST(test_many_values_stress) {
@@ -265,8 +265,8 @@ TEST(test_many_values_stress) {
         .ctx = 0,
     };
     int                       n = 20;
-    struct umbra_flat_ir *bb = make_bb(n, 0);
-    struct ra                *ra = ra_create(bb, &cfg);
+    struct umbra_flat_ir *ir = make_ir(n, 0);
+    struct ra                *ra = ra_create(ir, &cfg);
     int                      *sl = calloc((size_t)n, sizeof *sl);
     for (int i = 0; i < n; i++) { sl[i] = -1; }
     int ns = 0;
@@ -293,7 +293,7 @@ TEST(test_many_values_stress) {
 
     ra_destroy(ra);
     free(sl);
-    free_bb(bb);
+    free_ir(ir);
 }
 
 TEST(test_step_alloc) {
@@ -307,8 +307,8 @@ TEST(test_step_alloc) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_flat_ir *bb = make_bb(3, 0);
-    struct ra                *ra = ra_create(bb, &cfg);
+    struct umbra_flat_ir *ir = make_ir(3, 0);
+    struct ra                *ra = ra_create(ir, &cfg);
     int                       sl[3] = {-1, -1, -1};
     int                       ns = 0;
     reset_records();
@@ -324,7 +324,7 @@ TEST(test_step_alloc) {
     nspills == 0 here;
 
     ra_destroy(ra);
-    free_bb(bb);
+    free_ir(ir);
 }
 
 TEST(test_step_unary) {
@@ -338,17 +338,17 @@ TEST(test_step_unary) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_flat_ir *bb = malloc(sizeof *bb);
-    bb->inst = calloc(2, sizeof *bb->inst);
-    bb->insts = 2;
-    bb->preamble = 0;
+    struct umbra_flat_ir *ir = malloc(sizeof *ir);
+    ir->inst = calloc(2, sizeof *ir->inst);
+    ir->insts = 2;
+    ir->preamble = 0;
 
-    bb->inst[0].op = op_imm_32;
-    bb->inst[0].imm = 42;
-    bb->inst[1].op = op_f32_from_i32;
-    bb->inst[1].x = (val){0};
+    ir->inst[0].op = op_imm_32;
+    ir->inst[0].imm = 42;
+    ir->inst[1].op = op_f32_from_i32;
+    ir->inst[1].x = (val){0};
 
-    struct ra *ra = ra_create(bb, &cfg);
+    struct ra *ra = ra_create(ir, &cfg);
     int        sl[2] = {-1, -1};
     int        ns = 0;
     reset_records();
@@ -358,7 +358,7 @@ TEST(test_step_unary) {
 
     // x dead at inst 1: claim x's register
     ra_set_last_use(ra, 0, 1);
-    struct ra_step s = ra_step_unary(ra, sl, &ns, &bb->inst[1], 1);
+    struct ra_step s = ra_step_unary(ra, sl, &ns, &ir->inst[1], 1);
     s.rx == r0 here;
     s.rd == r0 here;
     ra_reg(ra, 1) == s.rd here;
@@ -366,8 +366,8 @@ TEST(test_step_unary) {
     nspills == 0 here;
 
     ra_destroy(ra);
-    free(bb->inst);
-    free(bb);
+    free(ir->inst);
+    free(ir);
 }
 
 TEST(test_step_unary_alive) {
@@ -381,20 +381,20 @@ TEST(test_step_unary_alive) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_flat_ir *bb = malloc(sizeof *bb);
-    bb->inst = calloc(3, sizeof *bb->inst);
-    bb->insts = 3;
-    bb->preamble = 0;
+    struct umbra_flat_ir *ir = malloc(sizeof *ir);
+    ir->inst = calloc(3, sizeof *ir->inst);
+    ir->insts = 3;
+    ir->preamble = 0;
 
-    bb->inst[0].op = op_imm_32;
-    bb->inst[0].imm = 42;
-    bb->inst[1].op = op_f32_from_i32;
-    bb->inst[1].x = (val){0};
-    bb->inst[2].op = op_add_i32;
-    bb->inst[2].x = (val){0};
-    bb->inst[2].y = (val){0};
+    ir->inst[0].op = op_imm_32;
+    ir->inst[0].imm = 42;
+    ir->inst[1].op = op_f32_from_i32;
+    ir->inst[1].x = (val){0};
+    ir->inst[2].op = op_add_i32;
+    ir->inst[2].x = (val){0};
+    ir->inst[2].y = (val){0};
 
-    struct ra *ra = ra_create(bb, &cfg);
+    struct ra *ra = ra_create(ir, &cfg);
     int        sl[3] = {-1, -1, -1};
     int        ns = 0;
     reset_records();
@@ -404,15 +404,15 @@ TEST(test_step_unary_alive) {
 
     // x still alive: rd must differ
     ra_set_last_use(ra, 0, 2);
-    struct ra_step s = ra_step_unary(ra, sl, &ns, &bb->inst[1], 1);
+    struct ra_step s = ra_step_unary(ra, sl, &ns, &ir->inst[1], 1);
     s.rx == r0 here;
     s.rd != r0 here;
     ra_reg(ra, 0) == r0 here;
     ra_reg(ra, 1) == s.rd here;
 
     ra_destroy(ra);
-    free(bb->inst);
-    free(bb);
+    free(ir->inst);
+    free(ir);
 }
 
 TEST(test_step_unary_pins_inputs_and_dest) {
@@ -439,22 +439,22 @@ TEST(test_step_unary_pins_inputs_and_dest) {
     //   inst[1] = imm_32 (stand-in for the runtime input to be subtracted)
     //   inst[2] = imm_32 (filler so all 3 regs are occupied)
     //   inst[3] = sub_f32_imm inst[1] (with .y.id = 0 referencing the imm)
-    struct umbra_flat_ir *bb = malloc(sizeof *bb);
-    bb->inst = calloc(4, sizeof *bb->inst);
-    bb->insts = 4;
-    bb->preamble = 0;
+    struct umbra_flat_ir *ir = malloc(sizeof *ir);
+    ir->inst = calloc(4, sizeof *ir->inst);
+    ir->insts = 4;
+    ir->preamble = 0;
 
-    bb->inst[0].op = op_imm_32;
-    bb->inst[0].imm = 0x3f800000;  // 1.0f
-    bb->inst[1].op = op_imm_32;
-    bb->inst[1].imm = 0x45800000;  // 4096.0f
-    bb->inst[2].op = op_imm_32;
-    bb->inst[2].imm = 0;
-    bb->inst[3].op = op_sub_f32_imm;
-    bb->inst[3].x = (val){.id = 1};
-    bb->inst[3].y = (val){.id = 0};
+    ir->inst[0].op = op_imm_32;
+    ir->inst[0].imm = 0x3f800000;  // 1.0f
+    ir->inst[1].op = op_imm_32;
+    ir->inst[1].imm = 0x45800000;  // 4096.0f
+    ir->inst[2].op = op_imm_32;
+    ir->inst[2].imm = 0;
+    ir->inst[3].op = op_sub_f32_imm;
+    ir->inst[3].x = (val){.id = 1};
+    ir->inst[3].y = (val){.id = 0};
 
-    struct ra *ra = ra_create(bb, &cfg);
+    struct ra *ra = ra_create(ir, &cfg);
     int        sl[4] = {-1, -1, -1, -1};
     int        ns = 0;
     reset_records();
@@ -465,7 +465,7 @@ TEST(test_step_unary_pins_inputs_and_dest) {
     // fix, ra_step_unary's rd alloc evicts inst[0] (its lu is highest);
     // then the subsequent ra_ensure(inst[0]) allocates again and the only
     // remaining unpinned candidate is the freshly-allocated rd, which gets
-    // evicted, collapsing rd onto the same register as ir.
+    // evicted, collapsing rd onto the same register as imm_reg.
     ra_set_last_use(ra, 0, 5);
     ra_set_last_use(ra, 1, 4);
     ra_set_last_use(ra, 2, 4);
@@ -475,7 +475,7 @@ TEST(test_step_unary_pins_inputs_and_dest) {
     int8_t r1 = ra_alloc(ra, sl, &ns); ra_assign(ra, 1, r1);
     int8_t r2 = ra_alloc(ra, sl, &ns); ra_assign(ra, 2, r2);
 
-    struct ra_step s = ra_step_unary(ra, sl, &ns, &bb->inst[3], 3);
+    struct ra_step s = ra_step_unary(ra, sl, &ns, &ir->inst[3], 3);
 
     // Sanity: rx is the input register; rd is the new dest register.
     s.rx == r1 here;
@@ -486,16 +486,16 @@ TEST(test_step_unary_pins_inputs_and_dest) {
 
     // The crux: simulate the JIT _imm body's ra_ensure(inst->y.id) call.
     // Neither s.rx nor s.rd may collapse onto the returned register —
-    // otherwise the FSUB rd, rx, ir would overwrite or self-cancel.
-    int8_t ir = ra_ensure(ra, sl, &ns, 0);
-    ir != s.rx here;
-    ir != s.rd here;
+    // otherwise the FSUB rd, rx, imm_reg would overwrite or self-cancel.
+    int8_t imm_reg = ra_ensure(ra, sl, &ns, 0);
+    imm_reg != s.rx here;
+    imm_reg != s.rd here;
     ra_reg(ra, 1) == r1 here;
     ra_reg(ra, 3) == s.rd here;
 
     ra_destroy(ra);
-    free(bb->inst);
-    free(bb);
+    free(ir->inst);
+    free(ir);
 }
 
 TEST(test_step_alu) {
@@ -509,20 +509,20 @@ TEST(test_step_alu) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_flat_ir *bb = malloc(sizeof *bb);
-    bb->inst = calloc(3, sizeof *bb->inst);
-    bb->insts = 3;
-    bb->preamble = 0;
+    struct umbra_flat_ir *ir = malloc(sizeof *ir);
+    ir->inst = calloc(3, sizeof *ir->inst);
+    ir->insts = 3;
+    ir->preamble = 0;
 
-    bb->inst[0].op = op_imm_32;
-    bb->inst[0].imm = 1;
-    bb->inst[1].op = op_imm_32;
-    bb->inst[1].imm = 2;
-    bb->inst[2].op = op_add_i32;
-    bb->inst[2].x = (val){0};
-    bb->inst[2].y = (val){.id = 1};
+    ir->inst[0].op = op_imm_32;
+    ir->inst[0].imm = 1;
+    ir->inst[1].op = op_imm_32;
+    ir->inst[1].imm = 2;
+    ir->inst[2].op = op_add_i32;
+    ir->inst[2].x = (val){0};
+    ir->inst[2].y = (val){.id = 1};
 
-    struct ra *ra = ra_create(bb, &cfg);
+    struct ra *ra = ra_create(ir, &cfg);
     int        sl[3] = {-1, -1, -1};
     int        ns = 0;
     reset_records();
@@ -535,7 +535,7 @@ TEST(test_step_alu) {
     // both dead: rd claims one
     ra_set_last_use(ra, 0, 2);
     ra_set_last_use(ra, 1, 2);
-    struct ra_step s = ra_step_alu(ra, sl, &ns, &bb->inst[2], 2, 0);
+    struct ra_step s = ra_step_alu(ra, sl, &ns, &ir->inst[2], 2, 0);
     s.rx == r0 here;
     s.ry == r1 here;
     s.rd >= 0 here;
@@ -543,8 +543,8 @@ TEST(test_step_alu) {
     s.scratch < 0 here;
 
     ra_destroy(ra);
-    free(bb->inst);
-    free(bb);
+    free(ir->inst);
+    free(ir);
 }
 
 TEST(test_step_alu_square_add_x_dies_y_lives) {
@@ -556,20 +556,20 @@ TEST(test_step_alu_square_add_x_dies_y_lives) {
         .pool = pool, .nregs = 4, .max_reg = 10,
         .spill = test_spill, .fill = test_fill, .ctx = 0,
     };
-    struct umbra_flat_ir *bb = malloc(sizeof *bb);
-    bb->inst = calloc(3, sizeof *bb->inst);
-    bb->insts = 3;
-    bb->preamble = 0;
+    struct umbra_flat_ir *ir = malloc(sizeof *ir);
+    ir->inst = calloc(3, sizeof *ir->inst);
+    ir->insts = 3;
+    ir->preamble = 0;
 
-    bb->inst[0].op  = op_imm_32;
-    bb->inst[0].imm = 1;
-    bb->inst[1].op  = op_imm_32;
-    bb->inst[1].imm = 2;
-    bb->inst[2].op  = op_square_add_f32;
-    bb->inst[2].x   = (val){0};
-    bb->inst[2].y   = (val){.id = 1};
+    ir->inst[0].op  = op_imm_32;
+    ir->inst[0].imm = 1;
+    ir->inst[1].op  = op_imm_32;
+    ir->inst[1].imm = 2;
+    ir->inst[2].op  = op_square_add_f32;
+    ir->inst[2].x   = (val){0};
+    ir->inst[2].y   = (val){.id = 1};
 
-    struct ra *ra = ra_create(bb, &cfg);
+    struct ra *ra = ra_create(ir, &cfg);
     int        sl[3] = {-1, -1, -1};
     int        ns = 0;
     reset_records();
@@ -581,7 +581,7 @@ TEST(test_step_alu_square_add_x_dies_y_lives) {
     ra_set_last_use(ra, 0, 2);
     ra_set_last_use(ra, 1, 5);
 
-    struct ra_step s = ra_step_alu(ra, sl, &ns, &bb->inst[2], 2, 0);
+    struct ra_step s = ra_step_alu(ra, sl, &ns, &ir->inst[2], 2, 0);
     s.rx == r0 here;
     s.ry == r1 here;
     s.rd == r0 here;           // claimed x's register
@@ -590,8 +590,8 @@ TEST(test_step_alu_square_add_x_dies_y_lives) {
     nspills == 0 here;
 
     ra_destroy(ra);
-    free(bb->inst);
-    free(bb);
+    free(ir->inst);
+    free(ir);
 }
 
 TEST(test_step_alu_square_add_both_live) {
@@ -603,20 +603,20 @@ TEST(test_step_alu_square_add_both_live) {
         .pool = pool, .nregs = 4, .max_reg = 10,
         .spill = test_spill, .fill = test_fill, .ctx = 0,
     };
-    struct umbra_flat_ir *bb = malloc(sizeof *bb);
-    bb->inst = calloc(3, sizeof *bb->inst);
-    bb->insts = 3;
-    bb->preamble = 0;
+    struct umbra_flat_ir *ir = malloc(sizeof *ir);
+    ir->inst = calloc(3, sizeof *ir->inst);
+    ir->insts = 3;
+    ir->preamble = 0;
 
-    bb->inst[0].op  = op_imm_32;
-    bb->inst[0].imm = 1;
-    bb->inst[1].op  = op_imm_32;
-    bb->inst[1].imm = 2;
-    bb->inst[2].op  = op_square_sub_f32;   // exercise the sub sibling too
-    bb->inst[2].x   = (val){0};
-    bb->inst[2].y   = (val){.id = 1};
+    ir->inst[0].op  = op_imm_32;
+    ir->inst[0].imm = 1;
+    ir->inst[1].op  = op_imm_32;
+    ir->inst[1].imm = 2;
+    ir->inst[2].op  = op_square_sub_f32;   // exercise the sub sibling too
+    ir->inst[2].x   = (val){0};
+    ir->inst[2].y   = (val){.id = 1};
 
-    struct ra *ra = ra_create(bb, &cfg);
+    struct ra *ra = ra_create(ir, &cfg);
     int        sl[3] = {-1, -1, -1};
     int        ns = 0;
     reset_records();
@@ -628,7 +628,7 @@ TEST(test_step_alu_square_add_both_live) {
     ra_set_last_use(ra, 0, 5);
     ra_set_last_use(ra, 1, 5);
 
-    struct ra_step s = ra_step_alu(ra, sl, &ns, &bb->inst[2], 2, 0);
+    struct ra_step s = ra_step_alu(ra, sl, &ns, &ir->inst[2], 2, 0);
     s.rx == r0 here;
     s.ry == r1 here;
     s.rd >= 0 here;
@@ -640,8 +640,8 @@ TEST(test_step_alu_square_add_both_live) {
     nspills == 0 here;
 
     ra_destroy(ra);
-    free(bb->inst);
-    free(bb);
+    free(ir->inst);
+    free(ir);
 }
 
 TEST(test_step_alu_scratch_does_not_evict_dest) {
@@ -667,22 +667,22 @@ TEST(test_step_alu_scratch_does_not_evict_dest) {
     // 4 vals: three imms occupy the pool, then a shr_u32 (op that
     // takes nscratch=1 in jit.c) consumes val 0 (so it can claim its
     // register) and reads val 1 (which gets pinned).
-    struct umbra_flat_ir *bb = malloc(sizeof *bb);
-    bb->inst = calloc(4, sizeof *bb->inst);
-    bb->insts = 4;
-    bb->preamble = 0;
+    struct umbra_flat_ir *ir = malloc(sizeof *ir);
+    ir->inst = calloc(4, sizeof *ir->inst);
+    ir->insts = 4;
+    ir->preamble = 0;
 
-    bb->inst[0].op = op_imm_32;
-    bb->inst[0].imm = 16;
-    bb->inst[1].op = op_imm_32;
-    bb->inst[1].imm = 1;
-    bb->inst[2].op = op_imm_32;
-    bb->inst[2].imm = 0;
-    bb->inst[3].op = op_shr_u32;
-    bb->inst[3].x = (val){.id = 0};
-    bb->inst[3].y = (val){.id = 1};
+    ir->inst[0].op = op_imm_32;
+    ir->inst[0].imm = 16;
+    ir->inst[1].op = op_imm_32;
+    ir->inst[1].imm = 1;
+    ir->inst[2].op = op_imm_32;
+    ir->inst[2].imm = 0;
+    ir->inst[3].op = op_shr_u32;
+    ir->inst[3].x = (val){.id = 0};
+    ir->inst[3].y = (val){.id = 1};
 
-    struct ra *ra = ra_create(bb, &cfg);
+    struct ra *ra = ra_create(ir, &cfg);
     int        sl[4] = {-1, -1, -1, -1};
     int        ns = 0;
     reset_records();
@@ -704,7 +704,7 @@ TEST(test_step_alu_scratch_does_not_evict_dest) {
     ra_set_last_use(ra, 2, 4);
     ra_set_last_use(ra, 3, 6);
 
-    struct ra_step s = ra_step_alu(ra, sl, &ns, &bb->inst[3], 3, 1);
+    struct ra_step s = ra_step_alu(ra, sl, &ns, &ir->inst[3], 3, 1);
 
     s.rd >= 0 here;
     s.scratch >= 0 here;
@@ -718,8 +718,8 @@ TEST(test_step_alu_scratch_does_not_evict_dest) {
     ra_reg(ra, 1) == r1 here;
 
     ra_destroy(ra);
-    free(bb->inst);
-    free(bb);
+    free(ir->inst);
+    free(ir);
 }
 
 TEST(test_step_alu_scratch) {
@@ -733,20 +733,20 @@ TEST(test_step_alu_scratch) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_flat_ir *bb = malloc(sizeof *bb);
-    bb->inst = calloc(3, sizeof *bb->inst);
-    bb->insts = 3;
-    bb->preamble = 0;
+    struct umbra_flat_ir *ir = malloc(sizeof *ir);
+    ir->inst = calloc(3, sizeof *ir->inst);
+    ir->insts = 3;
+    ir->preamble = 0;
 
-    bb->inst[0].op = op_imm_32;
-    bb->inst[0].imm = 1;
-    bb->inst[1].op = op_imm_32;
-    bb->inst[1].imm = 2;
-    bb->inst[2].op = op_add_i32;
-    bb->inst[2].x = (val){0};
-    bb->inst[2].y = (val){.id = 1};
+    ir->inst[0].op = op_imm_32;
+    ir->inst[0].imm = 1;
+    ir->inst[1].op = op_imm_32;
+    ir->inst[1].imm = 2;
+    ir->inst[2].op = op_add_i32;
+    ir->inst[2].x = (val){0};
+    ir->inst[2].y = (val){.id = 1};
 
-    struct ra *ra = ra_create(bb, &cfg);
+    struct ra *ra = ra_create(ir, &cfg);
     int        sl[3] = {-1, -1, -1};
     int        ns = 0;
     reset_records();
@@ -758,7 +758,7 @@ TEST(test_step_alu_scratch) {
 
     ra_set_last_use(ra, 0, 2);
     ra_set_last_use(ra, 1, 2);
-    struct ra_step s = ra_step_alu(ra, sl, &ns, &bb->inst[2], 2, 1);
+    struct ra_step s = ra_step_alu(ra, sl, &ns, &ir->inst[2], 2, 1);
     s.rd >= 0 here;
     s.scratch >= 0 here;
     s.scratch != s.rd here;
@@ -766,8 +766,8 @@ TEST(test_step_alu_scratch) {
     s.scratch != s.ry here;
 
     ra_destroy(ra);
-    free(bb->inst);
-    free(bb);
+    free(ir->inst);
+    free(ir);
 }
 
 TEST(test_sparse_pool_eviction) {
@@ -785,8 +785,8 @@ TEST(test_sparse_pool_eviction) {
         .fill = test_fill,
         .ctx = 0,
     };
-    struct umbra_flat_ir *bb = make_bb(4, 0);
-    struct ra                *ra = ra_create(bb, &cfg);
+    struct umbra_flat_ir *ir = make_ir(4, 0);
+    struct ra                *ra = ra_create(ir, &cfg);
     int                       sl[4] = {-1, -1, -1, -1};
     int                       ns = 0;
     reset_records();
@@ -816,17 +816,17 @@ TEST(test_sparse_pool_eviction) {
     sl[1] >= 0 here;
 
     ra_destroy(ra);
-    free_bb(bb);
+    free_ir(ir);
 }
 
 TEST(test_evict_live_before_loop) {
     static int8_t const pool[] = {0, 1, 2};
 
-    struct umbra_flat_ir *bb = make_bb(8, 1);
-    bb->loop_begin = 4;
-    bb->loop_end   = 7;
-    bb->inst[5].x = (val){.id = 2};
-    bb->inst[5].y = (val){.id = 3};
+    struct umbra_flat_ir *ir = make_ir(8, 1);
+    ir->loop_begin = 4;
+    ir->loop_end   = 7;
+    ir->inst[5].x = (val){.id = 2};
+    ir->inst[5].y = (val){.id = 3};
 
     struct ra_config cfg = {
         .pool    = pool,
@@ -838,11 +838,11 @@ TEST(test_evict_live_before_loop) {
     int sl[8];
     __builtin_memset(sl, -1, sizeof sl);
     int ns = 0;
-    struct ra *ra = ra_create(bb, &cfg);
+    struct ra *ra = ra_create(ir, &cfg);
 
     struct ra_step s1 = ra_step_alloc(ra, sl, &ns, 1);
-    struct ra_step s2 = ra_step_alu(ra, sl, &ns, &bb->inst[2], 2, 0);
-    struct ra_step s3 = ra_step_alu(ra, sl, &ns, &bb->inst[3], 3, 0);
+    struct ra_step s2 = ra_step_alu(ra, sl, &ns, &ir->inst[2], 2, 0);
+    struct ra_step s3 = ra_step_alu(ra, sl, &ns, &ir->inst[3], 3, 0);
     (void)s1; (void)s2; (void)s3;
 
     ra_reg(ra, 2) >= 0 here;
@@ -856,6 +856,6 @@ TEST(test_evict_live_before_loop) {
     nspills >= 1 here;
 
     ra_destroy(ra);
-    free_bb(bb);
+    free_ir(ir);
 }
 

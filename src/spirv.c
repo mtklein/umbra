@@ -233,9 +233,9 @@ typedef struct {
     uint32_t c_0f;  // float 0.0
     uint32_t c_allones;  // 0xFFFFFFFF
 
-    // Per-BB-instruction result IDs. Some instructions produce multiple results
+    // Per-IR-instruction result IDs. Some instructions produce multiple results
     // (e.g. load_16x4 produces 4 channels).
-    uint32_t *val;        // val[i] = SPIR-V ID for bb_inst i (channel 0)
+    uint32_t *val;        // val[i] = SPIR-V ID for ir_inst i (channel 0)
     uint32_t *val_1;      // channel 1 for 16x4 loads
     uint32_t *val_2;      // channel 2
     uint32_t *val_3;      // channel 3
@@ -243,7 +243,7 @@ typedef struct {
     // Track which values are float type (vs uint).
     _Bool *is_f;
 
-    // Map from bb_inst index -> deref buffer index.
+    // Map from ir_inst index -> deref buffer index.
     int *deref_buf;
 
     // Per-buffer flag: true if the buffer needs 16-bit typed access.
@@ -450,7 +450,7 @@ static uint32_t as_f32(SpvBuilder *b, uint32_t val, int inst_id) {
     return val;
 }
 
-// Get the SPIR-V result ID for a bb_inst operand, handling channel extraction.
+// Get the SPIR-V result ID for an ir_inst operand, handling channel extraction.
 static uint32_t get_val(SpvBuilder *b, val v) {
     int const id = v.id,
               ch = (int)v.chan;
@@ -586,33 +586,33 @@ static _Bool produces_float(enum op op) {
         || op == op_f32_from_f16;
 }
 
-// Build the full SPIR-V binary for a basic block.
-struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
+// Build the full SPIR-V binary for a flat IR.
+struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                                int flags) {
     struct spirv_result result = {0};
 
-    struct umbra_flat_ir *resolved = umbra_flat_ir_resolve(bb, JOIN_PREFER_IMM);
-    bb = resolved;
+    struct umbra_flat_ir *resolved = umbra_flat_ir_resolve(ir, JOIN_PREFER_IMM);
+    ir = resolved;
 
     SpvBuilder B;
     memset(&B, 0, sizeof B);
     B.next_id = 1; // 0 is reserved
 
     int max_ptr = -1;
-    for (int i = 0; i < bb->insts; i++) {
-        if (op_has_ptr(bb->inst[i].op) && bb->inst[i].ptr.bits >= 0) {
-            if (bb->inst[i].ptr.bits > max_ptr) {
-                max_ptr = bb->inst[i].ptr.bits;
+    for (int i = 0; i < ir->insts; i++) {
+        if (op_has_ptr(ir->inst[i].op) && ir->inst[i].ptr.bits >= 0) {
+            if (ir->inst[i].ptr.bits > max_ptr) {
+                max_ptr = ir->inst[i].ptr.bits;
             }
         }
     }
     result.max_ptr = max_ptr;
 
-    int *deref_buf = calloc((size_t)(bb->insts + 1), sizeof *deref_buf);
+    int *deref_buf = calloc((size_t)(ir->insts + 1), sizeof *deref_buf);
     B.deref_buf = deref_buf;
     int next_buf = max_ptr + 1;
-    for (int i = 0; i < bb->insts; i++) {
-        if (bb->inst[i].op == op_deref_ptr) {
+    for (int i = 0; i < ir->insts; i++) {
+        if (ir->inst[i].op == op_deref_ptr) {
             deref_buf[i] = next_buf++;
         }
     }
@@ -625,11 +625,11 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
     struct deref_info *di = calloc((size_t)(n_deref ? n_deref : 1), sizeof *di);
     {
         int d = 0;
-        for (int i = 0; i < bb->insts; i++) {
-            if (bb->inst[i].op == op_deref_ptr) {
+        for (int i = 0; i < ir->insts; i++) {
+            if (ir->inst[i].op == op_deref_ptr) {
                 di[d].buf_idx  = deref_buf[i];
-                di[d].src_buf  = bb->inst[i].ptr.bits;
-                di[d].off = bb->inst[i].imm;
+                di[d].src_buf  = ir->inst[i].ptr.bits;
+                di[d].off = ir->inst[i].imm;
                 d++;
             }
         }
@@ -638,11 +638,11 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
 
     B.buf_is_16   = calloc((size_t)(total_bufs + 1), sizeof *B.buf_is_16);
     B.buf_is_16x4 = calloc((size_t)(total_bufs + 1), sizeof *B.buf_is_16x4);
-    for (int i = 0; i < bb->insts; i++) {
-        enum op op = bb->inst[i].op;
+    for (int i = 0; i < ir->insts; i++) {
+        enum op op = ir->inst[i].op;
         int p = op_has_ptr(op)
-            ? (bb->inst[i].ptr.deref ? deref_buf[bb->inst[i].ptr.ix]
-                                     : bb->inst[i].ptr.bits)
+            ? (ir->inst[i].ptr.deref ? deref_buf[ir->inst[i].ptr.ix]
+                                     : ir->inst[i].ptr.bits)
             : -1;
         if (op == op_load_16 || op == op_store_16 || op == op_gather_16
          || op == op_load_16x4_planar || op == op_store_16x4_planar) {
@@ -658,18 +658,18 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
     uint8_t *buf_rw        = calloc((size_t)(total_bufs + 1), sizeof *buf_rw);
     uint8_t *buf_shift     = calloc((size_t)(total_bufs + 1), sizeof *buf_shift);
     uint8_t *buf_row_shift = calloc((size_t)(total_bufs + 1), sizeof *buf_row_shift);
-    for (int i = 0; i < bb->insts; i++) {
-        if (!op_has_ptr(bb->inst[i].op)) { continue; }
-        int p = bb->inst[i].ptr.deref ? deref_buf[bb->inst[i].ptr.ix]
-                                      : bb->inst[i].ptr.bits;
-        buf_rw[p] |= op_is_store(bb->inst[i].op) ? BUF_WRITTEN : BUF_READ;
-        if      (bb->inst[i].op == op_gather_16)        { buf_shift[p] = 1; }
-        else if (bb->inst[i].op == op_load_16x4_planar
-              || bb->inst[i].op == op_store_16x4_planar) { buf_shift[p] = 1; buf_row_shift[p] = 1; }
-        else if (bb->inst[i].op == op_load_16x4
-              || bb->inst[i].op == op_store_16x4)        { buf_shift[p] = 3; buf_row_shift[p] = 3; }
-        else if (bb->inst[i].op == op_load_16
-              || bb->inst[i].op == op_store_16)          { buf_shift[p] = 1; buf_row_shift[p] = 1; }
+    for (int i = 0; i < ir->insts; i++) {
+        if (!op_has_ptr(ir->inst[i].op)) { continue; }
+        int p = ir->inst[i].ptr.deref ? deref_buf[ir->inst[i].ptr.ix]
+                                      : ir->inst[i].ptr.bits;
+        buf_rw[p] |= op_is_store(ir->inst[i].op) ? BUF_WRITTEN : BUF_READ;
+        if      (ir->inst[i].op == op_gather_16)        { buf_shift[p] = 1; }
+        else if (ir->inst[i].op == op_load_16x4_planar
+              || ir->inst[i].op == op_store_16x4_planar) { buf_shift[p] = 1; buf_row_shift[p] = 1; }
+        else if (ir->inst[i].op == op_load_16x4
+              || ir->inst[i].op == op_store_16x4)        { buf_shift[p] = 3; buf_row_shift[p] = 3; }
+        else if (ir->inst[i].op == op_load_16
+              || ir->inst[i].op == op_store_16)          { buf_shift[p] = 1; buf_row_shift[p] = 1; }
         else                                             { buf_shift[p] = 2; buf_row_shift[p] = 2; }
     }
     result.buf_rw        = buf_rw;
@@ -994,7 +994,7 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
     spv_word(&B.types, push_sc);
     spv_word(&B.types, B.t_u32);
 
-    if (bb->n_vars > 0) {
+    if (ir->n_vars > 0) {
         B.t_ptr_func_u32 = spv_id(&B);
         spv_op(&B.types, SpvOpTypePointer, 4);
         spv_word(&B.types, B.t_ptr_func_u32);
@@ -1113,9 +1113,9 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
         spv_word(&B.func, label_entry);
 
         // Function-scoped variables (including loop induction variable).
-        if (bb->n_vars > 0) {
-            v_vars = calloc((size_t)bb->n_vars, sizeof *v_vars);
-            for (int vi = 0; vi < bb->n_vars; vi++) {
+        if (ir->n_vars > 0) {
+            v_vars = calloc((size_t)ir->n_vars, sizeof *v_vars);
+            for (int vi = 0; vi < ir->n_vars; vi++) {
                 v_vars[vi] = spv_id(&B);
                 spv_op(&B.func, SpvOpVariable, 5);
                 spv_word(&B.func, B.t_ptr_func_u32);
@@ -1159,19 +1159,19 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
         uint32_t x_coord = spv_binop(&B, SpvOpIAdd, B.t_u32, x0, gid_x);
         uint32_t y_coord = spv_binop(&B, SpvOpIAdd, B.t_u32, y0, gid_y);
 
-        B.val   = calloc((size_t)(bb->insts + 1), sizeof *B.val);
-        B.val_1 = calloc((size_t)(bb->insts + 1), sizeof *B.val_1);
-        B.val_2 = calloc((size_t)(bb->insts + 1), sizeof *B.val_2);
-        B.val_3 = calloc((size_t)(bb->insts + 1), sizeof *B.val_3);
-        B.is_f  = calloc((size_t)(bb->insts + 1), sizeof *B.is_f);
+        B.val   = calloc((size_t)(ir->insts + 1), sizeof *B.val);
+        B.val_1 = calloc((size_t)(ir->insts + 1), sizeof *B.val_1);
+        B.val_2 = calloc((size_t)(ir->insts + 1), sizeof *B.val_2);
+        B.val_3 = calloc((size_t)(ir->insts + 1), sizeof *B.val_3);
+        B.is_f  = calloc((size_t)(ir->insts + 1), sizeof *B.is_f);
 
         // Mark float-producing ops.
-        for (int i = 0; i < bb->insts; i++) {
-            B.is_f[i] = produces_float(bb->inst[i].op);
+        for (int i = 0; i < ir->insts; i++) {
+            B.is_f[i] = produces_float(ir->inst[i].op);
         }
 
-        for (int i = 0; i < bb->insts; i++) {
-            struct ir_inst const *inst = &bb->inst[i];
+        for (int i = 0; i < ir->insts; i++) {
+            struct ir_inst const *inst = &ir->inst[i];
 
             int xid = get_id(inst->x);
             int yid = get_id(inst->y);
@@ -1868,7 +1868,7 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *bb,
                     B.val_3[i] = label_header;
                 } break;
                 case op_loop_end: {
-                    int lb = bb->loop_begin;
+                    int lb = ir->loop_begin;
                     uint32_t label_continue = B.val_1[lb];
                     uint32_t label_merge    = B.val_2[lb];
                     uint32_t label_header   = B.val_3[lb];

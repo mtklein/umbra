@@ -182,13 +182,13 @@ struct interp_program {
     int             preamble, nptr, n_deref, n_vars;
 };
 
-static struct interp_program* interp_program(struct umbra_flat_ir const *bb) {
-    int *id = calloc((size_t)bb->insts, sizeof *id);
+static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
+    int *id = calloc((size_t)ir->insts, sizeof *id);
 
     struct interp_program *p = malloc(sizeof *p);
     int num_slots = 1;
-    for (int i = 0; i < bb->insts; i++) {
-        enum op const op = bb->inst[i].op;
+    for (int i = 0; i < ir->insts; i++) {
+        enum op const op = ir->inst[i].op;
         if (op == op_load_16x4 || op == op_load_16x4_planar || op == op_load_8x4) {
             num_slots += 4;
         } else {
@@ -200,12 +200,12 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *bb) {
 
     int max_ptr = -1;
     int n_deref = 0;
-    for (int i = 0; i < bb->insts; i++) {
-        if (op_has_ptr(bb->inst[i].op) && bb->inst[i].ptr.bits >= 0
-                                       && max_ptr < bb->inst[i].ptr.bits) {
-            max_ptr = bb->inst[i].ptr.bits;
+    for (int i = 0; i < ir->insts; i++) {
+        if (op_has_ptr(ir->inst[i].op) && ir->inst[i].ptr.bits >= 0
+                                       && max_ptr < ir->inst[i].ptr.bits) {
+            max_ptr = ir->inst[i].ptr.bits;
         }
-        if (bb->inst[i].op == op_deref_ptr) {
+        if (ir->inst[i].op == op_deref_ptr) {
             n_deref++;
         }
     }
@@ -214,11 +214,11 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *bb) {
     int const total_ptrs = p->nptr + n_deref;
     p->buf = calloc((size_t)total_ptrs, sizeof *p->buf);
 
-    int *deref_slot = calloc((size_t)bb->insts, sizeof *deref_slot);
+    int *deref_slot = calloc((size_t)ir->insts, sizeof *deref_slot);
     {
         int di = 0;
-        for (int i = 0; i < bb->insts; i++) {
-            if (bb->inst[i].op == op_deref_ptr) {
+        for (int i = 0; i < ir->insts; i++) {
+            if (ir->inst[i].op == op_deref_ptr) {
                 deref_slot[i] = p->nptr + di++;
             }
         }
@@ -226,7 +226,7 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *bb) {
 
     struct umbra_flat_ir *resolved = NULL;
 #if !__has_feature(address_sanitizer)
-    bb = resolved = umbra_flat_ir_resolve(bb, JOIN_KEEP_X);
+    ir = resolved = umbra_flat_ir_resolve(ir, JOIN_KEEP_X);
 #endif
 
     int n = 0;
@@ -234,10 +234,10 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *bb) {
 #define emit(...) p->inst[n] = (struct sw_inst){ __VA_ARGS__ }
 #define RESOLVE_PTR(inst) ((inst)->ptr.deref ? deref_slot[(inst)->ptr.ix] : (inst)->ptr.bits)
     for (int pass = 0; pass < 2; pass++) {
-        int const lo = pass ? bb->preamble : 0, hi = pass ? bb->insts : bb->preamble;
+        int const lo = pass ? ir->preamble : 0, hi = pass ? ir->insts : ir->preamble;
         if (pass) { p->preamble = n; }
         for (int i = lo; i < hi; i++) {
-            struct ir_inst const *inst = &bb->inst[i];
+            struct ir_inst const *inst = &ir->inst[i];
             int const X = id[inst->x.id] + (int)inst->x.chan - n;
             int const Y = id[inst->y.id] + (int)inst->y.chan - n;
             int const Z = id[inst->z.id] + (int)inst->z.chan - n;
@@ -491,8 +491,8 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *bb) {
         free(lu);
     }
 
-    p->n_vars = bb->n_vars;
-    p->vars   = bb->n_vars ? calloc((size_t)bb->n_vars, sizeof *p->vars) : NULL;
+    p->n_vars = ir->n_vars;
+    p->vars   = ir->n_vars ? calloc((size_t)ir->n_vars, sizeof *p->vars) : NULL;
 
     free(deref_slot);
     free(id);
@@ -1334,8 +1334,8 @@ static void free_interp(struct umbra_program *prog) {
     interp_program_free((struct interp_program*)prog);
 }
 static struct umbra_program* compile_interp(struct umbra_backend           *be,
-                                            struct umbra_flat_ir const *bb) {
-    struct interp_program *p = interp_program(bb);
+                                            struct umbra_flat_ir const *ir) {
+    struct interp_program *p = interp_program(ir);
     p->base = (struct umbra_program){
         .queue      = run_interp,
         .dump       = 0,

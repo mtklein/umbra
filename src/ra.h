@@ -18,7 +18,7 @@ struct ra_config {
 // Opaque register allocator.
 struct ra;
 
-struct ra* ra_create(struct umbra_flat_ir const *bb, struct ra_config const *cfg);
+struct ra* ra_create(struct umbra_flat_ir const *ir, struct ra_config const *cfg);
 void       ra_destroy(struct ra *ra);
 void       ra_reset_pool(struct ra *ra);
 

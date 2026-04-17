@@ -5,23 +5,23 @@
 TEST(resolve_simple_no_joins) {
     struct umbra_builder *b = umbra_builder();
     umbra_store_32(b, (umbra_ptr32){0}, umbra_imm_i32(b, 42));
-    struct umbra_flat_ir *bb = umbra_flat_ir(b);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
-    struct umbra_flat_ir *r = umbra_flat_ir_resolve(bb, JOIN_PREFER_IMM);
-    r->insts == bb->insts here;
-    r->preamble == bb->preamble here;
+    struct umbra_flat_ir *r = umbra_flat_ir_resolve(ir, JOIN_PREFER_IMM);
+    r->insts == ir->insts here;
+    r->preamble == ir->preamble here;
     r->loop_begin == -1 here;
     r->loop_end == -1 here;
 
     for (int i = 0; i < r->insts; i++) {
-        r->inst[i].op == bb->inst[i].op here;
-        r->inst[i].x.id == bb->inst[i].x.id here;
-        r->inst[i].y.id == bb->inst[i].y.id here;
+        r->inst[i].op == ir->inst[i].op here;
+        r->inst[i].x.id == ir->inst[i].x.id here;
+        r->inst[i].y.id == ir->inst[i].y.id here;
     }
 
     umbra_flat_ir_free(r);
-    umbra_flat_ir_free(bb);
+    umbra_flat_ir_free(ir);
 }
 
 TEST(resolve_with_loop) {
@@ -33,10 +33,10 @@ TEST(resolve_with_loop) {
         umbra_store_var(b, acc, umbra_add_i32(b, prev, j));
     } umbra_loop_end(b);
     umbra_store_32(b, (umbra_ptr32){.ix = 1}, umbra_load_var(b, acc));
-    struct umbra_flat_ir *bb = umbra_flat_ir(b);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
-    struct umbra_flat_ir *r = umbra_flat_ir_resolve(bb, JOIN_PREFER_IMM);
+    struct umbra_flat_ir *r = umbra_flat_ir_resolve(ir, JOIN_PREFER_IMM);
     r->loop_begin >= 0 here;
     r->loop_end > r->loop_begin here;
     r->preamble <= r->loop_begin here;
@@ -52,7 +52,7 @@ TEST(resolve_with_loop) {
     }
 
     umbra_flat_ir_free(r);
-    umbra_flat_ir_free(bb);
+    umbra_flat_ir_free(ir);
 }
 
 TEST(resolve_eliminates_joins) {
@@ -60,17 +60,17 @@ TEST(resolve_eliminates_joins) {
     umbra_val32 v = umbra_gather_32(b, (umbra_ptr32){0}, umbra_x(b));
     umbra_val32 r = umbra_add_f32(b, v, umbra_imm_f32(b, 2.0f));
     umbra_store_32(b, (umbra_ptr32){.ix = 1}, r);
-    struct umbra_flat_ir *bb = umbra_flat_ir(b);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
     _Bool has_join = 0;
-    for (int i = 0; i < bb->insts; i++) {
-        if (bb->inst[i].op == op_join) { has_join = 1; }
+    for (int i = 0; i < ir->insts; i++) {
+        if (ir->inst[i].op == op_join) { has_join = 1; }
     }
     has_join here;
 
-    struct umbra_flat_ir *keep_x = umbra_flat_ir_resolve(bb, JOIN_KEEP_X);
-    struct umbra_flat_ir *prefer = umbra_flat_ir_resolve(bb, JOIN_PREFER_IMM);
+    struct umbra_flat_ir *keep_x = umbra_flat_ir_resolve(ir, JOIN_KEEP_X);
+    struct umbra_flat_ir *prefer = umbra_flat_ir_resolve(ir, JOIN_PREFER_IMM);
 
     for (int i = 0; i < keep_x->insts; i++) {
         keep_x->inst[i].op != op_join here;
@@ -81,7 +81,7 @@ TEST(resolve_eliminates_joins) {
 
     umbra_flat_ir_free(keep_x);
     umbra_flat_ir_free(prefer);
-    umbra_flat_ir_free(bb);
+    umbra_flat_ir_free(ir);
 }
 
 TEST(resolve_compaction_renumbers) {
@@ -90,12 +90,12 @@ TEST(resolve_compaction_renumbers) {
     umbra_val32 unused = umbra_imm_i32(b, 99);
     (void)unused;
     umbra_store_32(b, (umbra_ptr32){0}, a);
-    struct umbra_flat_ir *bb = umbra_flat_ir(b);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
-    struct umbra_flat_ir *r = umbra_flat_ir_resolve(bb, JOIN_KEEP_X);
+    struct umbra_flat_ir *r = umbra_flat_ir_resolve(ir, JOIN_KEEP_X);
 
-    r->insts <= bb->insts here;
+    r->insts <= ir->insts here;
 
     for (int i = 0; i < r->insts; i++) {
         r->inst[i].x.id < r->insts here;
@@ -106,27 +106,27 @@ TEST(resolve_compaction_renumbers) {
     }
 
     umbra_flat_ir_free(r);
-    umbra_flat_ir_free(bb);
+    umbra_flat_ir_free(ir);
 }
 
 TEST(resolve_preserves_channels) {
     struct umbra_builder *b = umbra_builder();
     umbra_color c = umbra_fmt_fp16.load(b, 0);
     umbra_fmt_fp16.store(b, 1, c);
-    struct umbra_flat_ir *bb = umbra_flat_ir(b);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
-    struct umbra_flat_ir *r = umbra_flat_ir_resolve(bb, JOIN_PREFER_IMM);
+    struct umbra_flat_ir *r = umbra_flat_ir_resolve(ir, JOIN_PREFER_IMM);
 
     for (int i = 0; i < r->insts; i++) {
-        r->inst[i].x.chan == bb->inst[i].x.chan here;
-        r->inst[i].y.chan == bb->inst[i].y.chan here;
-        r->inst[i].z.chan == bb->inst[i].z.chan here;
-        r->inst[i].w.chan == bb->inst[i].w.chan here;
+        r->inst[i].x.chan == ir->inst[i].x.chan here;
+        r->inst[i].y.chan == ir->inst[i].y.chan here;
+        r->inst[i].z.chan == ir->inst[i].z.chan here;
+        r->inst[i].w.chan == ir->inst[i].w.chan here;
     }
 
     umbra_flat_ir_free(r);
-    umbra_flat_ir_free(bb);
+    umbra_flat_ir_free(ir);
 }
 
 TEST(resolve_preserves_ptr) {
@@ -134,10 +134,10 @@ TEST(resolve_preserves_ptr) {
     umbra_ptr32 derived = umbra_deref_ptr32(b, (umbra_ptr32){0}, 0);
     umbra_val32 v = umbra_gather_32(b, derived, umbra_x(b));
     umbra_store_32(b, (umbra_ptr32){.ix = 1}, v);
-    struct umbra_flat_ir *bb = umbra_flat_ir(b);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
-    struct umbra_flat_ir *r = umbra_flat_ir_resolve(bb, JOIN_PREFER_IMM);
+    struct umbra_flat_ir *r = umbra_flat_ir_resolve(ir, JOIN_PREFER_IMM);
 
     _Bool found_deref = 0;
     for (int i = 0; i < r->insts; i++) {
@@ -154,5 +154,5 @@ TEST(resolve_preserves_ptr) {
     found_deref here;
 
     umbra_flat_ir_free(r);
-    umbra_flat_ir_free(bb);
+    umbra_flat_ir_free(ir);
 }

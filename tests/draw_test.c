@@ -9,13 +9,13 @@ struct draw_backends {
 };
 
 static struct draw_backends make_draw(struct umbra_builder *builder, struct umbra_draw_layout lay) {
-    struct umbra_flat_ir *bb = umbra_flat_ir(builder);
+    struct umbra_flat_ir *ir = umbra_flat_ir(builder);
     umbra_builder_free(builder);
     struct draw_backends B = {
-        test_backends_make(bb),
+        test_backends_make(ir),
         lay,
     };
-    umbra_flat_ir_free(bb);
+    umbra_flat_ir_free(ir);
     return B;
 }
 static _Bool run_draw(struct draw_backends *B, int b, int w, int h, struct umbra_buf buf[]) {
@@ -1186,10 +1186,10 @@ TEST(test_565_round_trip) {
     struct umbra_builder *b = umbra_builder();
     umbra_color c = umbra_load_565(b, (umbra_ptr16){0});
     umbra_store_565(b, (umbra_ptr16){.ix=1}, c);
-    struct umbra_flat_ir *bb = umbra_flat_ir(b);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
-    struct test_backends B = test_backends_make(bb);
-    umbra_flat_ir_free(bb);
+    struct test_backends B = test_backends_make(ir);
+    umbra_flat_ir_free(ir);
     enum { W565 = 35 };
     uint16_t src[W565], dst[W565];
     for (int i = 0; i < W565; i++) { src[i] = (uint16_t)(0x1234u + (unsigned)i * 0x1111u); }
@@ -1207,10 +1207,10 @@ TEST(test_1010102_round_trip) {
     struct umbra_builder *b = umbra_builder();
     umbra_color c = umbra_load_1010102(b, (umbra_ptr32){0});
     umbra_store_1010102(b, (umbra_ptr32){.ix=1}, c);
-    struct umbra_flat_ir *bb = umbra_flat_ir(b);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
-    struct test_backends B = test_backends_make(bb);
-    umbra_flat_ir_free(bb);
+    struct test_backends B = test_backends_make(ir);
+    umbra_flat_ir_free(ir);
     uint32_t src[7], dst[7];
     for (int i = 0; i < 7; i++) {
         src[i] = ((unsigned)i * 73u) | ((unsigned)i * 37u << 10)
@@ -1230,10 +1230,10 @@ TEST(test_fp16_planar_round_trip) {
     struct umbra_builder *b = umbra_builder();
     umbra_color c = umbra_load_fp16_planar(b, (umbra_ptr16){0});
     umbra_store_fp16_planar(b, (umbra_ptr16){.ix=1}, c);
-    struct umbra_flat_ir *bb = umbra_flat_ir(b);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
-    struct test_backends B = test_backends_make(bb);
-    umbra_flat_ir_free(bb);
+    struct test_backends B = test_backends_make(ir);
+    umbra_flat_ir_free(ir);
     enum { WP = 8 };
     __fp16 src[WP * 4], dst[WP * 4];
     for (int i = 0; i < WP * 4; i++) { src[i] = (__fp16)(1.0f + (float)i * 0.1f); }
@@ -1253,10 +1253,10 @@ TEST(test_solid_src_565) {
     struct umbra_draw_layout lay;
     struct umbra_builder *b = umbra_draw_builder(&shader.base, NULL,
                                                 umbra_blend_src, umbra_fmt_565, &lay);
-    struct umbra_flat_ir *bb = umbra_flat_ir(b);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
-    struct test_backends B = test_backends_make(bb);
-    umbra_flat_ir_free(bb);
+    struct test_backends B = test_backends_make(ir);
+    umbra_flat_ir_free(ir);
     umbra_draw_fill(&lay, &shader.base, NULL);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint16_t dst[4] = {0};
@@ -1275,10 +1275,10 @@ TEST(test_solid_src_1010102) {
     struct umbra_draw_layout lay;
     struct umbra_builder *b = umbra_draw_builder(&shader.base, NULL,
                                                 umbra_blend_src, umbra_fmt_1010102, &lay);
-    struct umbra_flat_ir *bb = umbra_flat_ir(b);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
-    struct test_backends B = test_backends_make(bb);
-    umbra_flat_ir_free(bb);
+    struct test_backends B = test_backends_make(ir);
+    umbra_flat_ir_free(ir);
     umbra_draw_fill(&lay, &shader.base, NULL);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[4] = {0};
@@ -1298,10 +1298,10 @@ TEST(test_solid_src_fp16_planar) {
     struct umbra_draw_layout lay;
     struct umbra_builder *b = umbra_draw_builder(&shader.base, NULL,
                                                 umbra_blend_src, umbra_fmt_fp16_planar, &lay);
-    struct umbra_flat_ir *bb = umbra_flat_ir(b);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
-    struct test_backends B = test_backends_make(bb);
-    umbra_flat_ir_free(bb);
+    struct test_backends B = test_backends_make(ir);
+    umbra_flat_ir_free(ir);
     umbra_draw_fill(&lay, &shader.base, NULL);
     enum { WFP = 4 };
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {

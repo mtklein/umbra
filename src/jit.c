@@ -63,8 +63,8 @@ static void free_jit(struct umbra_program *prog) {
 }
 
 static struct umbra_program* compile_jit(struct umbra_backend           *be,
-                                         struct umbra_flat_ir const *bb) {
-    struct jit_program *j = jit_program((struct jit_backend*)be, bb);
+                                         struct umbra_flat_ir const *ir) {
+    struct jit_program *j = jit_program((struct jit_backend*)be, ir);
     j->base = (struct umbra_program){
         .queue      = run_jit,
         .dump       = dump_jit,

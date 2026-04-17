@@ -291,11 +291,11 @@ static val remap_val(val v, int const *remap) {
     return (val){.id = remap[v.id], .chan = v.chan};
 }
 
-struct umbra_flat_ir* umbra_flat_ir_resolve(struct umbra_flat_ir const *bb,
+struct umbra_flat_ir* umbra_flat_ir_resolve(struct umbra_flat_ir const *ir,
                                             enum join_policy jp) {
-    int const n = bb->insts;
+    int const n = ir->insts;
     struct ir_inst *inst = malloc((size_t)n * sizeof *inst);
-    __builtin_memcpy(inst, bb->inst, (size_t)n * sizeof *inst);
+    __builtin_memcpy(inst, ir->inst, (size_t)n * sizeof *inst);
 
     for (int i = 0; i < n; i++) {
         struct ir_inst *ip = inst + i;
@@ -341,7 +341,7 @@ struct umbra_flat_ir* umbra_flat_ir_resolve(struct umbra_flat_ir const *bb,
     int live_count = 0,
         new_preamble = 0;
     for (int i = 0; i < n; i++) {
-        if (i == bb->preamble) {
+        if (i == ir->preamble) {
             new_preamble = live_count;
         }
         if (live[i]) {
@@ -367,10 +367,10 @@ struct umbra_flat_ir* umbra_flat_ir_resolve(struct umbra_flat_ir const *bb,
     struct umbra_flat_ir *result = calloc(1, sizeof *result);
     result->inst       = out;
     result->insts      = live_count;
-    result->n_vars     = bb->n_vars;
+    result->n_vars     = ir->n_vars;
     result->preamble   = new_preamble;
-    result->loop_begin = bb->loop_begin >= 0 ? remap[bb->loop_begin] : -1;
-    result->loop_end   = bb->loop_end   >= 0 ? remap[bb->loop_end]   : -1;
+    result->loop_begin = ir->loop_begin >= 0 ? remap[ir->loop_begin] : -1;
+    result->loop_end   = ir->loop_end   >= 0 ? remap[ir->loop_end]   : -1;
 
     free(remap);
     free(live);
@@ -378,10 +378,10 @@ struct umbra_flat_ir* umbra_flat_ir_resolve(struct umbra_flat_ir const *bb,
     return result;
 }
 
-void umbra_flat_ir_free(struct umbra_flat_ir *bb) {
-    if (bb) {
-        free(bb->inst);
-        free(bb);
+void umbra_flat_ir_free(struct umbra_flat_ir *ir) {
+    if (ir) {
+        free(ir->inst);
+        free(ir);
     }
 }
 
@@ -521,6 +521,6 @@ void umbra_builder_dump(struct umbra_builder const *b, FILE *f) {
     dump_insts(b->inst, b->insts, f);
 }
 
-void umbra_flat_ir_dump(struct umbra_flat_ir const *bb, FILE *f) {
-    dump_insts(bb->inst, bb->insts, f);
+void umbra_flat_ir_dump(struct umbra_flat_ir const *ir, FILE *f) {
+    dump_insts(ir->inst, ir->insts, f);
 }

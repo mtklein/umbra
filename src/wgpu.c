@@ -286,12 +286,12 @@ static void wgpu_flush(struct umbra_backend *base) {
 }
 
 static struct umbra_program* wgpu_compile(struct umbra_backend *base,
-                                          struct umbra_flat_ir const *bb) {
+                                          struct umbra_flat_ir const *ir) {
     struct wgpu_backend *be = (struct wgpu_backend *)base;
 
     wgpu_had_error = 0;
     struct spirv_result const sr =
-        build_spirv(bb, SPIRV_PUSH_VIA_SSBO);
+        build_spirv(ir, SPIRV_PUSH_VIA_SSBO);
 
     WGPUShaderSourceSPIRV spirv_src = {
         .chain    = {.sType = WGPUSType_ShaderSourceSPIRV},
@@ -587,8 +587,8 @@ static void wgpu_free(struct umbra_backend *base) {
 }
 
 static struct umbra_program* wgpu_compile_fn(struct umbra_backend *be,
-                                              struct umbra_flat_ir const *bb) {
-    struct umbra_program *p = wgpu_compile(be, bb);
+                                              struct umbra_flat_ir const *ir) {
+    struct umbra_program *p = wgpu_compile(be, ir);
     p->queue   = wgpu_program_queue;
     p->dump    = wgpu_program_dump;
     p->free    = wgpu_program_free;

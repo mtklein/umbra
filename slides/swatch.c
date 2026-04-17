@@ -10,7 +10,7 @@ struct swatch_slide {
     struct umbra_shader_solid  shader;
     struct umbra_fmt           fmt;
     struct umbra_draw_layout   lay;
-    struct umbra_flat_ir  *bb;
+    struct umbra_flat_ir  *ir;
     struct umbra_program      *prog;
 };
 
@@ -22,17 +22,17 @@ static void swatch_init(struct slide *s, int w, int h) {
 
 static void swatch_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
     struct swatch_slide *st = (struct swatch_slide *)s;
-    if (st->fmt.name != fmt.name || !st->bb) {
+    if (st->fmt.name != fmt.name || !st->ir) {
         st->fmt = fmt;
-        umbra_flat_ir_free(st->bb);
+        umbra_flat_ir_free(st->ir);
         free(st->lay.uniforms);
         struct umbra_builder *b = umbra_draw_builder(&st->shader.base, NULL, NULL, fmt,
                                                     &st->lay);
-        st->bb = umbra_flat_ir(b);
+        st->ir = umbra_flat_ir(b);
         umbra_builder_free(b);
     }
     if (st->prog) { st->prog->free(st->prog); }
-    st->prog = be->compile(be, st->bb);
+    st->prog = be->compile(be, st->ir);
 }
 
 static void swatch_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
@@ -90,7 +90,7 @@ static int swatch_get_builders(struct slide *s, struct umbra_fmt fmt,
 static void swatch_free(struct slide *s) {
     struct swatch_slide *st = (struct swatch_slide *)s;
     if (st->prog) { st->prog->free(st->prog); }
-    umbra_flat_ir_free(st->bb);
+    umbra_flat_ir_free(st->ir);
     free(st->lay.uniforms);
     free(st);
 }

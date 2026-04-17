@@ -133,13 +133,13 @@ static void dump_backends_free(struct dump_backends *db) {
     }
 }
 
-static void dump_bb(struct dump_backends *db,
-                    char const *dir, struct umbra_flat_ir *bb) {
+static void dump_ir(struct dump_backends *db,
+                    char const *dir, struct umbra_flat_ir *ir) {
     char p[256];
     {
         snprintf(p, sizeof p, "%s/ir.txt", dir);
         FILE *f = atomic_open(p);
-        umbra_flat_ir_dump(bb, f);
+        umbra_flat_ir_dump(ir, f);
         atomic_close(f, p);
     }
 
@@ -150,7 +150,7 @@ static void dump_bb(struct dump_backends *db,
             clear_dir(mvk_dump_dir);
         }
 
-        struct umbra_program *prog = db->be[i]->compile(db->be[i], bb);
+        struct umbra_program *prog = db->be[i]->compile(db->be[i], ir);
         if (!prog) { continue; }
 
         snprintf(p, sizeof p, "%s/%s", dir, db->ext[i]);
@@ -173,10 +173,10 @@ static void dump_builder(struct dump_backends *db,
     umbra_builder_dump(b, f);
     atomic_close(f, p);
 
-    struct umbra_flat_ir *bb = umbra_flat_ir(b);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
-    dump_bb(db, dir, bb);
-    umbra_flat_ir_free(bb);
+    dump_ir(db, dir, ir);
+    umbra_flat_ir_free(ir);
 }
 
 static void slugify(char const *title, char *out, size_t sz) {

@@ -98,7 +98,7 @@ static int8_t const ra_pool_x86[] = {0, 1, 2,  3,  4,  5,  6,  7,
 
 struct jit_ctx {
     Buf                            *c;
-    struct umbra_flat_ir const *bb;
+    struct umbra_flat_ir const *ir;
     struct pool                     pool;
     int                             n_vars, loop_top, loop_br_skip;
     int                             if_depth;
@@ -136,10 +136,10 @@ static void pool_broadcast(Buf *c, struct pool *p, int d, uint32_t v) {
 
 static void x86_remat(int reg, int val, void *ctx) {
     struct jit_ctx *j = ctx;
-    pool_broadcast(j->c, &j->pool, reg, (uint32_t)j->bb->inst[val].imm);
+    pool_broadcast(j->c, &j->pool, reg, (uint32_t)j->ir->inst[val].imm);
 }
 
-static struct ra* ra_create_x86(struct umbra_flat_ir const *bb, struct jit_ctx *jc) {
+static struct ra* ra_create_x86(struct umbra_flat_ir const *ir, struct jit_ctx *jc) {
     struct ra_config cfg = {
         .pool = ra_pool_x86,
         .nregs = 16,
@@ -149,7 +149,7 @@ static struct ra* ra_create_x86(struct umbra_flat_ir const *bb, struct jit_ctx *
         .remat = x86_remat,
         .ctx = jc,
     };
-    return ra_create(bb, &cfg);
+    return ra_create(ir, &cfg);
 }
 
 static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm,
@@ -266,7 +266,7 @@ static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm
     }
 }
 
-static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
+static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
                      int *deref_rb_gpr, struct jit_ctx *jc);
 
@@ -296,21 +296,21 @@ static int resolve_ptr_x86(Buf *c, ptr p, int *last_ptr, int const *deref_gpr,
 }
 
 struct jit_program* jit_program(struct jit_backend *be,
-                                           struct umbra_flat_ir const *bb) {
-    struct umbra_flat_ir *resolved = umbra_flat_ir_resolve(bb, JOIN_PREFER_IMM);
-    bb = resolved;
+                                           struct umbra_flat_ir const *ir) {
+    struct umbra_flat_ir *resolved = umbra_flat_ir_resolve(ir, JOIN_PREFER_IMM);
+    ir = resolved;
 
-    int *sl = malloc((size_t)bb->insts * sizeof(int));
-    for (int i = 0; i < bb->insts; i++) {
+    int *sl = malloc((size_t)ir->insts * sizeof(int));
+    for (int i = 0; i < ir->insts; i++) {
         sl[i] = -1;
     }
     int  ns = 0;
-    int *deref_gpr    = calloc((size_t)bb->insts, sizeof(int));
-    int *deref_rb_gpr = calloc((size_t)bb->insts, sizeof(int));
+    int *deref_gpr    = calloc((size_t)ir->insts, sizeof(int));
+    int *deref_rb_gpr = calloc((size_t)ir->insts, sizeof(int));
 
     Buf            c = {0};
-    struct jit_ctx jc = {.c = &c, .bb = bb, .pool = {0}, .n_vars = bb->n_vars};
-    struct ra     *ra = ra_create_x86(bb, &jc);
+    struct jit_ctx jc = {.c = &c, .ir = ir, .pool = {0}, .n_vars = ir->n_vars};
+    struct ra     *ra = ra_create_x86(ir, &jc);
 
     push_r(&c, XM);
     push_r(&c, XY);
@@ -328,7 +328,7 @@ struct jit_program* jit_program(struct jit_backend *be,
     mov_rr(&c, XH_X86, RCX);         // XH_X86 = b
     mov_rr(&c, XBUF, R8);            // XBUF(RDX) = buf
 
-    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
+    emit_ops(&c, ir, 0, ir->preamble, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
 
     ra_begin_loop(ra);
 
@@ -349,17 +349,17 @@ struct jit_program* jit_program(struct jit_backend *be,
     cmp_ri(&c, R11, 8);
     int const br_tail = jcc(&c, 0x0c);
 
-    if (bb->n_vars > 0) {
+    if (ir->n_vars > 0) {
         int8_t zr = ra_alloc(ra, sl, &ns);
         vpxor(&c, 1, zr, zr, zr);
-        for (int vi = 0; vi < bb->n_vars; vi++) {
+        for (int vi = 0; vi < ir->n_vars; vi++) {
             vspill(&c, zr, vi);
         }
         ra_return_reg(ra, zr);
     }
 
     int const loop_body_start = (int)c.size;
-    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
+    emit_ops(&c, ir, ir->preamble, ir->insts, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
 
     ra_end_loop(ra, sl);
 
@@ -379,18 +379,18 @@ struct jit_program* jit_program(struct jit_backend *be,
     int const br_row_done = jcc(&c, 0x0d);     // JGE row_done
 
     ra_reset_pool(ra);
-    for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
+    for (int i = 0; i < ir->insts; i++) { sl[i] = -1; }
 
-    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
-    if (bb->n_vars > 0) {
+    emit_ops(&c, ir, 0, ir->preamble, sl, &ns, ra, 0, deref_gpr, deref_rb_gpr, &jc);
+    if (ir->n_vars > 0) {
         int8_t zr = ra_alloc(ra, sl, &ns);
         vpxor(&c, 1, zr, zr, zr);
-        for (int vi = 0; vi < bb->n_vars; vi++) {
+        for (int vi = 0; vi < ir->n_vars; vi++) {
             vspill(&c, zr, vi);
         }
         ra_return_reg(ra, zr);
     }
-    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 1, deref_gpr, deref_rb_gpr, &jc);
+    emit_ops(&c, ir, ir->preamble, ir->insts, sl, &ns, ra, 1, deref_gpr, deref_rb_gpr, &jc);
 
     add_ri(&c, XI, 1);
     {
@@ -412,7 +412,7 @@ struct jit_program* jit_program(struct jit_backend *be,
     }
 
     {
-        int const total = ns + bb->n_vars;
+        int const total = ns + ir->n_vars;
         if (total > 0) {
             add_ri(&c, RSP, total * 32);
         }
@@ -426,7 +426,7 @@ struct jit_program* jit_program(struct jit_backend *be,
     ret(&c);
 
     {
-        int const total = ns + bb->n_vars;
+        int const total = ns + ir->n_vars;
         if (total > 0) {
             int pos = stack_patch;
             c.byte[pos++] = 0x48;
@@ -483,7 +483,7 @@ struct jit_program* jit_program(struct jit_backend *be,
     return j;
 }
 
-static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
+static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
                      int *deref_rb_gpr, struct jit_ctx *jc) {
     int       last_ptr = -1;
@@ -492,7 +492,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
     int const rb_gprs[]    = {R15, RBX, 0};
 
     for (int i = from; i < to; i++) {
-        struct ir_inst const *inst = &bb->inst[i];
+        struct ir_inst const *inst = &ir->inst[i];
         switch (inst->op) {
         case op_deref_ptr: {
             int base   = load_ptr_x86(c, inst->ptr, &last_ptr, 2);

@@ -38,10 +38,10 @@ static struct umbra_builder* build_srcover(void) {
 }
 
 static struct test_backends make(struct umbra_builder *builder) {
-    struct umbra_flat_ir *bb = umbra_flat_ir(builder);
+    struct umbra_flat_ir *ir = umbra_flat_ir(builder);
     umbra_builder_free(builder);
-    struct test_backends B = test_backends_make(bb);
-    umbra_flat_ir_free(bb);
+    struct test_backends B = test_backends_make(ir);
+    umbra_flat_ir_free(ir);
     return B;
 }
 static _Bool run(struct test_backends *B, int b, int w, int h, struct umbra_buf buf[]) {
@@ -2161,10 +2161,10 @@ TEST(test_dump) {
         umbra_store_32(b, (umbra_ptr32){.ix=2}, s);
         umbra_builder_dump(b, f);
 
-        struct umbra_flat_ir *bb = umbra_flat_ir(b);
+        struct umbra_flat_ir *ir = umbra_flat_ir(b);
         umbra_builder_free(b);
-        umbra_flat_ir_dump(bb, f);
-        umbra_flat_ir_free(bb);
+        umbra_flat_ir_dump(ir, f);
+        umbra_flat_ir_free(ir);
         fclose(f);
     }
 }
@@ -2435,18 +2435,18 @@ TEST(test_jit_xs_init) {
 TEST(test_program_threadsafe) {
     struct umbra_builder *b = umbra_builder();
     umbra_store_32(b, (umbra_ptr32){0}, umbra_x(b));
-    struct umbra_flat_ir *bb = umbra_flat_ir(b);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
     struct umbra_backend *interp = umbra_backend_interp();
-    { struct umbra_program *p = interp->compile(interp, bb);
+    { struct umbra_program *p = interp->compile(interp, ir);
       p->threadsafe == 1 here;
       p->free(p); }
     interp->free(interp);
 
     struct umbra_backend *jit = umbra_backend_jit();
     if (jit) {
-        struct umbra_program *p = jit->compile(jit, bb);
+        struct umbra_program *p = jit->compile(jit, ir);
         p->threadsafe == 1 here;
         p->free(p);
         jit->free(jit);
@@ -2454,13 +2454,13 @@ TEST(test_program_threadsafe) {
 
     struct umbra_backend *metal = umbra_backend_metal();
     if (metal) {
-        struct umbra_program *p = metal->compile(metal, bb);
+        struct umbra_program *p = metal->compile(metal, ir);
         p->threadsafe == 0 here;
         p->free(p);
         metal->free(metal);
     }
 
-    umbra_flat_ir_free(bb);
+    umbra_flat_ir_free(ir);
 }
 
 TEST(test_program_null_guards) {
@@ -2470,10 +2470,10 @@ TEST(test_program_null_guards) {
 
     struct umbra_builder *b = umbra_builder();
     umbra_store_32(b, (umbra_ptr32){0}, umbra_load_32(b, (umbra_ptr32){0}));
-    struct umbra_flat_ir *bb = umbra_flat_ir(b);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
-    struct umbra_program *p = be->compile(be, bb);
-    umbra_flat_ir_free(bb);
+    struct umbra_program *p = be->compile(be, ir);
+    umbra_flat_ir_free(ir);
 
     // dump on interpreter (no dump fn)
     if (p->dump) { p->dump(p, stdout); }
@@ -3145,7 +3145,7 @@ TEST(test_imm_regvar) {
 }
 
 // Exercise r_*_mm for binary ops: both from memory, result→acc→chain.
-// The BB optimizer schedules loads near consumers. To get _mm we need both
+// The IR optimizer schedules loads near consumers. To get _mm we need both
 // operands pinned early (via a use/store) then a barrier store between them
 // and the target op so prev_r is false.
 TEST(test_binary_r_mm) {
@@ -3852,7 +3852,7 @@ TEST(test_deref_16bit_row_bytes_l_gt_0) {
     cleanup(&B);
 }
 
-// Three derefs in one BB exercise the rb_gpr=0 branch in the JIT pointer
+// Three derefs in one IR exercise the rb_gpr=0 branch in the JIT pointer
 // resolver: only the first two derefs get a row_bytes register, so the third
 // deref's per-pixel pointer is just a copy of the deref'd base. The flat
 // source buffer makes this safe — every (x,y) reads bufC[x] regardless of y.
@@ -3987,22 +3987,22 @@ TEST(test_jit_code_buffer_overflow) {
         umbra_load_8x4(b, p, &r, &g, &bl, &a);
         umbra_store_8x4(b, p, r, g, bl, a);
     }
-    struct umbra_flat_ir *bb = umbra_flat_ir(b);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
     struct umbra_backend *be = umbra_backend_jit();
     if (be) {
-        struct umbra_program *prog = be->compile(be, bb);
+        struct umbra_program *prog = be->compile(be, ir);
         prog->free(prog);
         be->free(be);
     }
 
     be = umbra_backend_interp();
-    { struct umbra_program *prog = be->compile(be, bb);
+    { struct umbra_program *prog = be->compile(be, ir);
       prog->free(prog); }
     be->free(be);
 
-    umbra_flat_ir_free(bb);
+    umbra_flat_ir_free(ir);
 }
 
 // Cover const-fold true-branches in op_eval comparisons and min.
@@ -4074,12 +4074,12 @@ TEST(test_stats_safe) {
     // Also safe after compile+flush with no queued work.
     struct umbra_builder *b = umbra_builder();
     umbra_store_32(b, (umbra_ptr32){0}, umbra_x(b));
-    struct umbra_flat_ir *bb = umbra_flat_ir(b);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
     for (int i = 0; i < NUM_BACKENDS; i++) {
         if (be[i]) {
-            struct umbra_program *p = be[i]->compile(be[i], bb);
+            struct umbra_program *p = be[i]->compile(be[i], ir);
             be[i]->flush(be[i]);
             struct umbra_backend_stats st = be[i]->stats(be[i]);
             st.dispatches == 0 here;
@@ -4087,7 +4087,7 @@ TEST(test_stats_safe) {
         }
     }
 
-    umbra_flat_ir_free(bb);
+    umbra_flat_ir_free(ir);
     for (int i = 0; i < NUM_BACKENDS; i++) {
         if (be[i]) { be[i]->free(be[i]); }
     }

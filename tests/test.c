@@ -32,7 +32,7 @@ _Bool val_lt(umbra_val32 a, umbra_val32 b) {
     return a.id < b.id || (a.id == b.id && a.chan < b.chan);
 }
 
-struct test_backends test_backends_make(struct umbra_flat_ir const *bb) {
+struct test_backends test_backends_make(struct umbra_flat_ir const *ir) {
     struct test_backends B;
     B.be[0] = umbra_backend_interp();
     B.be[1] = umbra_backend_jit();
@@ -40,7 +40,7 @@ struct test_backends test_backends_make(struct umbra_flat_ir const *bb) {
     B.be[3] = umbra_backend_vulkan();
     B.be[4] = umbra_backend_wgpu();
     for (int i = 0; i < NUM_BACKENDS; i++) {
-        B.p[i] = B.be[i] ? B.be[i]->compile(B.be[i], bb) : NULL;
+        B.p[i] = B.be[i] ? B.be[i]->compile(B.be[i], ir) : NULL;
     }
     B.p[0] != 0 here;
 #if defined(__aarch64__) || defined(__AVX2__)

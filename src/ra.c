@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-// Per-instruction state. Indexed by val (a bb_inst id).
+// Per-instruction state. Indexed by val (an ir_inst id).
 struct ra_slot {
     int    last_use;
     int    chan_last_use[4];
@@ -21,7 +21,7 @@ struct ra_slot {
 // the cap of 32 below leaves headroom while keeping each bitmap in a
 // single word.
 struct ra {
-    struct ra_slot       *slot;       // n entries (one per bb_inst)
+    struct ra_slot       *slot;       // n entries (one per ir_inst)
     int                  *owner;      // max_reg entries (val owning physical reg, -1 if free)
     int8_t               *pool_inv;   // max_reg entries (reg id -> pool bit, or -1)
     int8_t               *loop_reg;   // preamble entries (snapshot of slot[i].reg at loop top)
@@ -57,8 +57,8 @@ void ra_set_chan_reg(struct ra *ra, int val, int chan, int8_t r) {
     ra->slot[val].chan_reg[chan] = r;
 }
 
-struct ra* ra_create(struct umbra_flat_ir const *bb, struct ra_config const *cfg) {
-    int const  n  = bb->insts;
+struct ra* ra_create(struct umbra_flat_ir const *ir, struct ra_config const *cfg) {
+    int const  n  = ir->insts;
     assume(cfg->nregs <= 32);
     struct ra *ra = malloc(sizeof *ra);
     ra->cfg        = *cfg;
@@ -78,7 +78,7 @@ struct ra* ra_create(struct umbra_flat_ir const *bb, struct ra_config const *cfg
     ra->pool_mask = ~0u >> (32 - cfg->nregs);
 
     for (int i = 0; i < n; i++) {
-        struct ir_inst const *inst = &bb->inst[i];
+        struct ir_inst const *inst = &ir->inst[i];
         ra->slot[inst->x.id].last_use                          = i;
         ra->slot[inst->x.id].chan_last_use[(int)inst->x.chan]  = i;
         ra->slot[inst->y.id].last_use                          = i;
@@ -88,16 +88,16 @@ struct ra* ra_create(struct umbra_flat_ir const *bb, struct ra_config const *cfg
         ra->slot[inst->w.id].last_use                          = i;
         ra->slot[inst->w.id].chan_last_use[(int)inst->w.chan]  = i;
     }
-    for (int i = 0; i < bb->preamble; i++) {
-        if (ra->slot[i].last_use >= bb->preamble) {
+    for (int i = 0; i < ir->preamble; i++) {
+        if (ra->slot[i].last_use >= ir->preamble) {
             ra->slot[i].last_use = n;
         }
     }
 
-    ra->inst = bb->inst;
+    ra->inst = ir->inst;
     ra->insts = n;
-    ra->preamble = bb->preamble;
-    ra->loop_reg = malloc((size_t)bb->preamble * sizeof *ra->loop_reg);
+    ra->preamble = ir->preamble;
+    ra->loop_reg = malloc((size_t)ir->preamble * sizeof *ra->loop_reg);
 
     ra->free_set   = ra->pool_mask;
     ra->pinned_set = 0;

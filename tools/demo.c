@@ -57,10 +57,10 @@ static void finish_pipe(struct pipe *p, struct umbra_builder *builder,
                         struct umbra_uniforms_layout uni) {
     p->uni = uni;
     p->uniforms = umbra_uniforms_alloc(&uni);
-    struct umbra_flat_ir *bb = umbra_flat_ir(builder);
+    struct umbra_flat_ir *ir = umbra_flat_ir(builder);
     umbra_builder_free(builder);
-    p->program = pipe_be->compile(pipe_be, bb);
-    umbra_flat_ir_free(bb);
+    p->program = pipe_be->compile(pipe_be, ir);
+    umbra_flat_ir_free(ir);
 }
 
 static void build_readback(int fmt) {
@@ -94,7 +94,7 @@ static void free_pipes(void) {
 static int                    max_threads;
 static int                    n_threads = 1;
 static struct umbra_program **xtra_progs;
-static struct umbra_flat_ir *saved_bb;
+static struct umbra_flat_ir *saved_ir;
 
 static void free_xtra(void) {
     for (int t = 1; t < max_threads; t++) {
@@ -105,9 +105,9 @@ static void free_xtra(void) {
 
 static void rebuild_xtra(int backend) {
     free_xtra();
-    if (!saved_bb || n_threads <= 1 || !bes[backend]) { return; }
+    if (!saved_ir || n_threads <= 1 || !bes[backend]) { return; }
     for (int t = 1; t < n_threads; t++) {
-        xtra_progs[t] = bes[backend]->compile(bes[backend], saved_bb);
+        xtra_progs[t] = bes[backend]->compile(bes[backend], saved_ir);
     }
 }
 
@@ -126,15 +126,15 @@ static void build_slide_fmt(struct slide *s, int fmt) {
     if (bes[cur_backend]) {
         s->prepare(s, bes[cur_backend], *fmt_enums[fmt]);
     }
-    umbra_flat_ir_free(saved_bb);
+    umbra_flat_ir_free(saved_ir);
     {
         struct umbra_builder *b = NULL;
         if (s->get_builders) { s->get_builders(s, *fmt_enums[fmt], &b, 1); }
         if (b) {
-            saved_bb = umbra_flat_ir(b);
+            saved_ir = umbra_flat_ir(b);
             umbra_builder_free(b);
         } else {
-            saved_bb = NULL;
+            saved_ir = NULL;
         }
     }
     build_pipes(fmt);
@@ -345,7 +345,7 @@ int main(void) {
 
         {
             int nt = n_threads;
-            if (!saved_bb && nt > 1) { nt = 1; }
+            if (!saved_ir && nt > 1) { nt = 1; }
             int sh = (H + nt - 1) / nt;
 
             uint64_t const freq = SDL_GetPerformanceFrequency();
@@ -448,7 +448,7 @@ int main(void) {
     thread_pool_free(pool);
     free_xtra();
     free(xtra_progs);
-    umbra_flat_ir_free(saved_bb);
+    umbra_flat_ir_free(saved_ir);
     free_pipes();
     slides_cleanup();
     for (int i = 0; i < NUM_BACKENDS; i++) { if (bes[i]) { bes[i]->free(bes[i]); } }

@@ -411,7 +411,7 @@ struct slug_two_pass_slide {
     int                       w, h;
     float                    *wind_buf;
     struct slug_acc_layout    acc_lay;
-    struct umbra_flat_ir *acc_bb;
+    struct umbra_flat_ir *acc_ir;
     struct umbra_program     *acc_prog;
 
     struct umbra_shader_solid   shader;
@@ -429,7 +429,7 @@ static void slug_two_pass_init(struct slide *s, int w, int h) {
     st->wind_buf = malloc((size_t)w * (size_t)h * sizeof(float));
 
     struct umbra_builder *b = slug_build_acc(&st->acc_lay);
-    st->acc_bb = umbra_flat_ir(b);
+    st->acc_ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 }
 
@@ -438,7 +438,7 @@ static void slug_two_pass_prepare(struct slide *s,
                                   struct umbra_fmt fmt) {
     struct slug_two_pass_slide *st = (struct slug_two_pass_slide *)s;
     if (st->acc_prog) { st->acc_prog->free(st->acc_prog); }
-    st->acc_prog = be->compile(be, st->acc_bb);
+    st->acc_prog = be->compile(be, st->acc_ir);
     if (st->draw_prog) { st->draw_prog->free(st->draw_prog); }
     free(st->draw_lay.uniforms);
     st->fmt = fmt;
@@ -508,7 +508,7 @@ static void slug_two_pass_free(struct slide *s) {
     slug_free(&st->slug);
     free(st->wind_buf);
     if (st->acc_prog) { st->acc_prog->free(st->acc_prog); }
-    umbra_flat_ir_free(st->acc_bb);
+    umbra_flat_ir_free(st->acc_ir);
     free(st->acc_lay.uniforms);
     if (st->draw_prog) { st->draw_prog->free(st->draw_prog); }
     free(st->draw_lay.uniforms);
@@ -538,7 +538,7 @@ struct slug_slide {
     int                           w, h;
     float                        *wind_buf;
     struct slug_layout   acc_lay;
-    struct umbra_flat_ir         *acc_bb;
+    struct umbra_flat_ir         *acc_ir;
     struct umbra_program         *acc_prog;
 
     struct umbra_shader_solid     shader;
@@ -556,7 +556,7 @@ static void slug_init(struct slide *s, int w, int h) {
     st->wind_buf = malloc((size_t)w * (size_t)h * sizeof(float));
 
     struct umbra_builder *b = slug_build(&st->acc_lay);
-    st->acc_bb = umbra_flat_ir(b);
+    st->acc_ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 }
 
@@ -564,7 +564,7 @@ static void slug_prepare(struct slide *s, struct umbra_backend *be,
                          struct umbra_fmt fmt) {
     struct slug_slide *st = (struct slug_slide *)s;
     if (st->acc_prog) { st->acc_prog->free(st->acc_prog); }
-    st->acc_prog = be->compile(be, st->acc_bb);
+    st->acc_prog = be->compile(be, st->acc_ir);
     if (st->draw_prog) { st->draw_prog->free(st->draw_prog); }
     free(st->draw_lay.uniforms);
     st->fmt = fmt;
@@ -622,7 +622,7 @@ static void slug_free_slide(struct slide *s) {
     slug_free(&st->slug);
     free(st->wind_buf);
     if (st->acc_prog) { st->acc_prog->free(st->acc_prog); }
-    umbra_flat_ir_free(st->acc_bb);
+    umbra_flat_ir_free(st->acc_ir);
     free(st->acc_lay.uniforms);
     if (st->draw_prog) { st->draw_prog->free(st->draw_prog); }
     free(st->draw_lay.uniforms);

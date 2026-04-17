@@ -455,11 +455,11 @@ static void vk_program_free(struct umbra_program *p) {
 }
 
 static struct umbra_program* vk_compile(struct umbra_backend *be,
-                                         struct umbra_flat_ir const *bb) {
+                                         struct umbra_flat_ir const *ir) {
     struct vk_backend *vbe = (struct vk_backend *)be;
 
     struct spirv_result const sr =
-        build_spirv(bb, SPIRV_FLOAT_CONTROLS);
+        build_spirv(ir, SPIRV_FLOAT_CONTROLS);
 
     int n_desc = sr.total_bufs;
 

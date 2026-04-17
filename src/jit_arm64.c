@@ -237,7 +237,7 @@ static int8_t const ra_pool[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13};
 
 struct jit_ctx {
     Buf                            *c;
-    struct umbra_flat_ir const *bb;
+    struct umbra_flat_ir const *ir;
     struct pool                     pool;
     int                             n_vars, loop_top, loop_br_skip;
     int                             if_depth;
@@ -272,11 +272,11 @@ static void arm64_pool_load_wide(Buf *c, struct pool *p, int d, void const *data
 }
 static void arm64_remat(int reg, int val, void *ctx) {
     struct jit_ctx *j = ctx;
-    arm64_pool_load(j->c, &j->pool, lo(reg), (uint32_t)j->bb->inst[val].imm);
+    arm64_pool_load(j->c, &j->pool, lo(reg), (uint32_t)j->ir->inst[val].imm);
     put(j->c, ORR_16b(hi(reg), lo(reg), lo(reg)));
 }
 
-static struct ra* ra_create_arm64(struct umbra_flat_ir const *bb, struct jit_ctx *jc) {
+static struct ra* ra_create_arm64(struct umbra_flat_ir const *ir, struct jit_ctx *jc) {
     struct ra_config cfg = {
         .pool = ra_pool,
         .nregs = 14,
@@ -286,26 +286,26 @@ static struct ra* ra_create_arm64(struct umbra_flat_ir const *bb, struct jit_ctx
         .remat = arm64_remat,
         .ctx = jc,
     };
-    return ra_create(bb, &cfg);
+    return ra_create(ir, &cfg);
 }
 
-static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
+static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
                      int *deref_rb_gpr, struct jit_ctx *jc);
 
 struct jit_program* jit_program(struct jit_backend *be,
-                                           struct umbra_flat_ir const *bb) {
-    struct umbra_flat_ir *resolved = umbra_flat_ir_resolve(bb, JOIN_KEEP_X);
-    bb = resolved;
+                                           struct umbra_flat_ir const *ir) {
+    struct umbra_flat_ir *resolved = umbra_flat_ir_resolve(ir, JOIN_KEEP_X);
+    ir = resolved;
 
-    int *sl = malloc((size_t)bb->insts * sizeof(int));
-    for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
+    int *sl = malloc((size_t)ir->insts * sizeof(int));
+    for (int i = 0; i < ir->insts; i++) { sl[i] = -1; }
     int  ns = 0;
-    int *deref_gpr    = calloc((size_t)bb->insts, sizeof(int));
-    int *deref_rb_gpr = calloc((size_t)bb->insts, sizeof(int));
+    int *deref_gpr    = calloc((size_t)ir->insts, sizeof(int));
+    int *deref_rb_gpr = calloc((size_t)ir->insts, sizeof(int));
 
     size_t const pg  = 16384,
-                 est = (size_t)(bb->insts * 40 + 256);
+                 est = (size_t)(ir->insts * 40 + 256);
     void  *buf_mem;
     size_t buf_size;
     acquire_code_buf(be, &buf_mem, &buf_size, est + pg);
@@ -316,8 +316,8 @@ struct jit_program* jit_program(struct jit_backend *be,
         .cap       = (int)((buf_size - pg) / 4),
         .mmap_size = buf_size,
     };
-    struct jit_ctx jc = {.c = &c, .bb = bb, .pool = {0}, .n_vars = bb->n_vars};
-    struct ra     *ra = ra_create_arm64(bb, &jc);
+    struct jit_ctx jc = {.c = &c, .ir = ir, .pool = {0}, .n_vars = ir->n_vars};
+    struct ra     *ra = ra_create_arm64(ir, &jc);
 
     put(&c, STP_pre(29, 30, 31, -2));
     put(&c, ADD_xi(29, 31, 0));
@@ -340,7 +340,7 @@ struct jit_program* jit_program(struct jit_backend *be,
     put(&c, ADD_xi(XY, 3, 0));        // XY = b (temp)
     put(&c, ADD_xi(XBUF, 4, 0));      // XBUF = buf
 
-    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0,
+    emit_ops(&c, ir, 0, ir->preamble, sl, &ns, ra, 0,
              deref_gpr, deref_rb_gpr, &jc);
 
     ra_begin_loop(ra);
@@ -361,17 +361,17 @@ struct jit_program* jit_program(struct jit_backend *be,
     int const br_tail = c.words;
     put(&c, Bcond(0xb, 0));
 
-    if (bb->n_vars > 0) {
+    if (ir->n_vars > 0) {
         int8_t zr = ra_alloc(ra, sl, &ns);
         put(&c, EOR_16b(lo(zr), lo(zr), lo(zr)));
-        for (int vi = 0; vi < bb->n_vars; vi++) {
+        for (int vi = 0; vi < ir->n_vars; vi++) {
             put(&c, STP_qi(lo(zr), lo(zr), XS, 2 * vi));
         }
         ra_return_reg(ra, zr);
     }
 
     int const loop_body_start = c.words;
-    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 0,
+    emit_ops(&c, ir, ir->preamble, ir->insts, sl, &ns, ra, 0,
              deref_gpr, deref_rb_gpr, &jc);
 
     ra_end_loop(ra, sl);
@@ -389,19 +389,19 @@ struct jit_program* jit_program(struct jit_backend *be,
     put(&c, Bcond(0xa, 0));  // B.GE row_done
 
     ra_reset_pool(ra);
-    for (int i = 0; i < bb->insts; i++) { sl[i] = -1; }
+    for (int i = 0; i < ir->insts; i++) { sl[i] = -1; }
 
-    emit_ops(&c, bb, 0, bb->preamble, sl, &ns, ra, 0,
+    emit_ops(&c, ir, 0, ir->preamble, sl, &ns, ra, 0,
              deref_gpr, deref_rb_gpr, &jc);
-    if (bb->n_vars > 0) {
+    if (ir->n_vars > 0) {
         int8_t zr = ra_alloc(ra, sl, &ns);
         put(&c, EOR_16b(lo(zr), lo(zr), lo(zr)));
-        for (int vi = 0; vi < bb->n_vars; vi++) {
+        for (int vi = 0; vi < ir->n_vars; vi++) {
             put(&c, STP_qi(lo(zr), lo(zr), XS, 2 * vi));
         }
         ra_return_reg(ra, zr);
     }
-    emit_ops(&c, bb, bb->preamble, bb->insts, sl, &ns, ra, 1,
+    emit_ops(&c, ir, ir->preamble, ir->insts, sl, &ns, ra, 1,
              deref_gpr, deref_rb_gpr, &jc);
 
     put(&c, ADD_xi(XCOL, XCOL, 1));
@@ -433,8 +433,8 @@ struct jit_program* jit_program(struct jit_backend *be,
     put(&c, LDP_post(29, 30, 31, 2));
     put(&c, RET());
 
-    if (ns + bb->n_vars > 0) {
-        c.word[stack_patch] = SUB_xi(31, 31, (ns + bb->n_vars) * 32);
+    if (ns + ir->n_vars > 0) {
+        c.word[stack_patch] = SUB_xi(31, 31, (ns + ir->n_vars) * 32);
     }
     c.word[stack_patch + 1] = ADD_xi(XS, 31, 0);
     while (c.words & 3) {
@@ -487,14 +487,14 @@ struct jit_program* jit_program(struct jit_backend *be,
     return j;
 }
 
-static void emit_ops(Buf *c, struct umbra_flat_ir const *bb, int from, int to,
+static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                      int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
                      int *deref_rb_gpr, struct jit_ctx *jc) {
     int last_ptr = -1;
     int dc = 0;
 
     for (int i = from; i < to; i++) {
-        struct ir_inst const *inst = &bb->inst[i];
+        struct ir_inst const *inst = &ir->inst[i];
 
         switch (inst->op) {
         case op_deref_ptr: {
