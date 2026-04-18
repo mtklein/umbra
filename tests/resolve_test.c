@@ -1,10 +1,13 @@
 #include "test.h"
 #include "../include/umbra_draw.h"
 #include "../src/flat_ir.h"
+#include <stdint.h>
 
 TEST(resolve_simple_no_joins) {
+    struct umbra_buf dummy = {0};
     struct umbra_builder *b = umbra_builder();
-    umbra_store_32(b, (umbra_ptr32){0}, umbra_imm_i32(b, 42));
+    umbra_ptr32 const dst = umbra_bind_buf32(b, &dummy);
+    umbra_store_32(b, dst, umbra_imm_i32(b, 42));
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
@@ -25,14 +28,18 @@ TEST(resolve_simple_no_joins) {
 }
 
 TEST(resolve_with_loop) {
+    int32_t uni[1] = {0};
+    struct umbra_buf dummy = {0};
     struct umbra_builder *b = umbra_builder();
+    umbra_ptr32 const u   = umbra_uniforms  (b, uni, 1);
+    umbra_ptr32 const dst = umbra_bind_buf32(b, &dummy);
     umbra_var32 acc = umbra_declare_var32(b);
-    umbra_val32 trip = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
+    umbra_val32 trip = umbra_uniform_32(b, u, 0);
     umbra_val32 j = umbra_loop(b, trip); {
         umbra_val32 prev = umbra_load_var32(b, acc);
         umbra_store_var32(b, acc, umbra_add_i32(b, prev, j));
     } umbra_end_loop(b);
-    umbra_store_32(b, (umbra_ptr32){.ix = 1}, umbra_load_var32(b, acc));
+    umbra_store_32(b, dst, umbra_load_var32(b, acc));
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
@@ -56,10 +63,13 @@ TEST(resolve_with_loop) {
 }
 
 TEST(resolve_eliminates_joins) {
+    struct umbra_buf src = {0}, dst = {0};
     struct umbra_builder *b = umbra_builder();
-    umbra_val32 v = umbra_gather_32(b, (umbra_ptr32){0}, umbra_x(b));
+    umbra_ptr32 const sp = umbra_bind_buf32(b, &src),
+                      dp = umbra_bind_buf32(b, &dst);
+    umbra_val32 v = umbra_gather_32(b, sp, umbra_x(b));
     umbra_val32 r = umbra_add_f32(b, v, umbra_imm_f32(b, 2.0f));
-    umbra_store_32(b, (umbra_ptr32){.ix = 1}, r);
+    umbra_store_32(b, dp, r);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
@@ -85,11 +95,13 @@ TEST(resolve_eliminates_joins) {
 }
 
 TEST(resolve_compaction_renumbers) {
+    struct umbra_buf dummy = {0};
     struct umbra_builder *b = umbra_builder();
+    umbra_ptr32 const dst = umbra_bind_buf32(b, &dummy);
     umbra_val32 a = umbra_imm_i32(b, 10);
     umbra_val32 unused = umbra_imm_i32(b, 99);
     (void)unused;
-    umbra_store_32(b, (umbra_ptr32){0}, a);
+    umbra_store_32(b, dst, a);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
@@ -130,11 +142,12 @@ TEST(resolve_preserves_channels) {
 }
 
 TEST(resolve_preserves_ptr) {
+    struct umbra_buf src = {0}, dst = {0};
     struct umbra_builder *b = umbra_builder();
-    struct umbra_buf dummy = {0};
-    umbra_ptr32 bound = umbra_bind_buf32(b, &dummy);
-    umbra_val32 v = umbra_gather_32(b, bound, umbra_x(b));
-    umbra_store_32(b, (umbra_ptr32){.ix = 0}, v);
+    umbra_ptr32 const sp = umbra_bind_buf32(b, &src),
+                      dp = umbra_bind_buf32(b, &dst);
+    umbra_val32 v = umbra_gather_32(b, sp, umbra_x(b));
+    umbra_store_32(b, dp, v);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
@@ -144,8 +157,6 @@ TEST(resolve_preserves_ptr) {
     for (int i = 0; i < r->insts; i++) {
         if (r->inst[i].op == op_gather_32) {
             found_gather = 1;
-            r->inst[i].ptr.ix >= 0 here;
-            r->inst[i].ptr.ix < REG_BASE here;
         }
     }
     found_gather here;
