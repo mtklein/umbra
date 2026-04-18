@@ -169,8 +169,8 @@ Critical sequence based on the simulation:
  |      140.  vaddps	%ymm7, %ymm13, %ymm7
  |      141.  vmovdqu	544(%rsp), %ymm0
  |      142.  vpblendvb	%ymm0, %ymm7, %ymm9, %ymm0
- |      143.  movq	16(%rdx), %r11
- +----> 144.  movl	28(%rdx), %eax                    ## RESOURCE interference:  Zn4LSU [ probability: 2% ]
+ |      143.  movq	32(%rdx), %r11
+ +----> 144.  movl	44(%rdx), %eax                    ## RESOURCE interference:  Zn4LSU [ probability: 2% ]
  +----> 145.  shlq	$2, %rax                          ## REGISTER dependency:  %eax
  +----> 146.  imulq	%r14, %rax                        ## REGISTER dependency:  %rax
  +----> 147.  addq	%rax, %r11                        ## REGISTER dependency:  %rax
@@ -351,8 +351,8 @@ Instruction Info:
  1      3     0.50                        vaddps	%ymm7, %ymm13, %ymm7
  1      8     0.50    *                   vmovdqu	544(%rsp), %ymm0
  1      1     0.50                        vpblendvb	%ymm0, %ymm7, %ymm9, %ymm0
- 1      5     0.33    *                   movq	16(%rdx), %r11
- 1      5     0.33    *                   movl	28(%rdx), %eax
+ 1      5     0.33    *                   movq	32(%rdx), %r11
+ 1      5     0.33    *                   movl	44(%rdx), %eax
  1      1     0.50                        shlq	$2, %rax
  1      3     1.00                        imulq	%r14, %rax
  1      1     0.25                        addq	%rax, %r11
@@ -552,8 +552,8 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     vaddps	%ymm7, %ymm13, %ymm7
  -      -      -      -      -      -      -      -      -      -      -      -     0.49   0.51    -     0.35   0.32   0.33   0.97   0.01   0.02    -      -     vmovdqu	544(%rsp), %ymm0
  -      -      -      -      -      -      -      -     0.98    -      -     0.02    -      -      -      -      -      -      -      -      -      -      -     vpblendvb	%ymm0, %ymm7, %ymm9, %ymm0
-0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.34   0.32   0.01   0.03   0.96    -      -     movq	16(%rdx), %r11
-0.33   0.34   0.33    -      -      -      -      -      -      -      -      -      -      -      -     0.36   0.32   0.32   0.04   0.95   0.01    -      -     movl	28(%rdx), %eax
+0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -     0.34   0.34   0.32   0.01   0.03   0.96    -      -     movq	32(%rdx), %r11
+0.33   0.34   0.33    -      -      -      -      -      -      -      -      -      -      -      -     0.36   0.32   0.32   0.04   0.95   0.01    -      -     movl	44(%rdx), %eax
  -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     shlq	$2, %rax
  -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     imulq	%r14, %rax
  -      -      -     0.50    -      -     0.50    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     addq	%rax, %r11

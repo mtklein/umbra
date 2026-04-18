@@ -114,7 +114,19 @@ TEST(test_slug_rect) {
     };
 
     struct umbra_buf curves_buf = {.ptr=rect, .count=count(rect)};
-    struct umbra_builder *ab = slug_build_acc(&curves_buf);
+
+    umbra_color color = {1,1,1,1};
+    float wind_buf[W * H];
+    __builtin_memset(wind_buf, 0, sizeof wind_buf);
+
+    struct umbra_buf wind_uniform = {.ptr=wind_buf, .count=count(wind_buf), .stride=W};
+
+    struct slug_acc_uniforms au = {
+        .mat    = {1,0,0, 0,1,0, 0,0,1},
+        .bw     = 60, .bh = 40,
+    };
+
+    struct umbra_builder *ab = slug_build_acc(&curves_buf, &au, &wind_uniform);
     struct umbra_flat_ir *air =
         umbra_flat_ir(ab);
     umbra_builder_free(ab);
@@ -123,12 +135,6 @@ TEST(test_slug_rect) {
     struct umbra_program *acc =
         be->compile(be, air);
     umbra_flat_ir_free(air);
-
-    umbra_color color = {1,1,1,1};
-    float wind_buf[W * H];
-    __builtin_memset(wind_buf, 0, sizeof wind_buf);
-
-    struct umbra_buf wind_uniform = {.ptr=wind_buf, .count=count(wind_buf), .stride=W};
 
     struct umbra_builder *bld = umbra_draw_builder(
         coverage_winding,       &wind_uniform,
@@ -147,17 +153,9 @@ TEST(test_slug_rect) {
         pixels[i] = 0xff000000;
     }
 
-    struct slug_acc_uniforms au = {
-        .mat    = {1,0,0, 0,1,0, 0,0,1},
-        .bw     = 60, .bh = 40,
-    };
-    struct umbra_buf abuf[] = {
-        {.ptr=&au, .count=(int)(sizeof au / 4)},
-        {.ptr=wind_buf, .count=count(wind_buf), .stride=W},
-    };
     for (int j = 0; j < 4; j++) {
         __builtin_memcpy(&au.j, &j, 4);
-        acc->queue(acc, 0, 0, W, H, abuf);
+        acc->queue(acc, 0, 0, W, H, (struct umbra_buf[]){{0}});
     }
     be->flush(be);
 

@@ -7,8 +7,8 @@ struct meta { uint w, x0, y0, count0, count1, count2, stride0, stride1, stride2;
 kernel void main0(
     constant meta &m [[buffer(0)]],
     device const uint * __restrict p0 [[buffer(1)]],
-    device uint * __restrict p1 [[buffer(2)]],
-    device const uint * __restrict p2 [[buffer(3)]],
+    device const uint * __restrict p1 [[buffer(2)]],
+    device uint * __restrict p2 [[buffer(3)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
     if (pos.x >= m.w) return;
@@ -58,17 +58,17 @@ kernel void main0(
     uint v39 = v38 * 6u;
     uint v40 = v39 + 5u;
     uint v41 = v39 + 2u;
-    uint v42 = p2[min(v41, m.count2 - 1u)] & ((v41 < m.count2) ? ~0u : 0u);
+    uint v42 = p1[min(v41, m.count1 - 1u)] & ((v41 < m.count1) ? ~0u : 0u);
     float v43 = as_type<float>(v42) - v30;
     uint v44 = v39 + 3u;
-    uint v45 = p2[min(v44, m.count2 - 1u)] & ((v44 < m.count2) ? ~0u : 0u);
+    uint v45 = p1[min(v44, m.count1 - 1u)] & ((v44 < m.count1) ? ~0u : 0u);
     float v46 = as_type<float>(v45) - v25;
     uint v47 = v39 + 4u;
-    uint v48 = p2[min(v47, m.count2 - 1u)] & ((v47 < m.count2) ? ~0u : 0u);
+    uint v48 = p1[min(v47, m.count1 - 1u)] & ((v47 < m.count1) ? ~0u : 0u);
     float v49 = as_type<float>(v48) - v30;
-    uint v50 = p2[min(v40, m.count2 - 1u)] & ((v40 < m.count2) ? ~0u : 0u);
+    uint v50 = p1[min(v40, m.count1 - 1u)] & ((v40 < m.count1) ? ~0u : 0u);
     float v51 = as_type<float>(v50) - v25;
-    uint v52 = p2[min(v39, m.count2 - 1u)] & ((v39 < m.count2) ? ~0u : 0u);
+    uint v52 = p1[min(v39, m.count1 - 1u)] & ((v39 < m.count1) ? ~0u : 0u);
     float v53 = as_type<float>(v52) - v30;
     float v54 = v43 - v53;
     float v55 = v54 * as_type<float>(1073741824u);
@@ -77,7 +77,7 @@ kernel void main0(
     var1 = v57;
 
     uint v59 = v39 + 1u;
-    uint v60 = p2[min(v59, m.count2 - 1u)] & ((v59 < m.count2) ? ~0u : 0u);
+    uint v60 = p1[min(v59, m.count1 - 1u)] & ((v59 < m.count1) ? ~0u : 0u);
     float v61 = as_type<float>(v60) - v25;
     float v62 = v61 - v46;
     float v63 = fabs(v62);
@@ -145,5 +145,5 @@ kernel void main0(
 
     }
     uint v126 = var0;
-    p1[y * m.stride1 + x] = v126;
+    p2[y * m.stride2 + x] = v126;
 }

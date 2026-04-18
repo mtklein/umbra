@@ -317,7 +317,15 @@ int main(int argc, char *argv[]) {
     if (!match || strstr("slug accumulator (1 curve)", match)) {
         struct slug_curves       sc  = slug_extract("Slug", (float)H * 0.3125f);
         struct umbra_buf         curves_buf = {.ptr=sc.data, .count=sc.count * 6};
-        struct umbra_builder    *bld = slug_build_acc(&curves_buf);
+        float *wind = calloc((size_t)(W * H), 4);
+        struct umbra_buf wind_buf = {.ptr=wind, .count=W * H};
+        struct slug_acc_uniforms au = {0};
+        slide_perspective_matrix(&au.mat, 0.0f, W, H, (int)sc.w, (int)sc.h);
+        au.bw     = sc.w;
+        au.bh     = sc.h;
+        { int32_t z = 0; __builtin_memcpy(&au.j, &z, 4); }
+
+        struct umbra_builder    *bld = slug_build_acc(&curves_buf, &au, &wind_buf);
         struct umbra_flat_ir *ir = umbra_flat_ir(bld);
         umbra_builder_free(bld);
 
@@ -327,16 +335,7 @@ int main(int argc, char *argv[]) {
         }
         umbra_flat_ir_free(ir);
 
-        float *wind = calloc((size_t)(W * H), 4);
-        struct slug_acc_uniforms au = {0};
-        slide_perspective_matrix(&au.mat, 0.0f, W, H, (int)sc.w, (int)sc.h);
-        au.bw     = sc.w;
-        au.bh     = sc.h;
-        { int32_t z = 0; __builtin_memcpy(&au.j, &z, 4); }
-        struct umbra_buf abuf[] = {
-            {.ptr=&au, .count=(int)(sizeof au / 4)},
-            {.ptr=wind, .count=W * H},
-        };
+        struct umbra_buf abuf[] = {{0}};
 
         double ns_px[5] = {-1, -1, -1, -1, -1};
         double gpu[5]   = {-1, -1, -1, -1, -1};

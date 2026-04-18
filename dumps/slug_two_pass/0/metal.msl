@@ -7,8 +7,8 @@ struct meta { uint w, x0, y0, count0, count1, count2, stride0, stride1, stride2;
 kernel void main0(
     constant meta &m [[buffer(0)]],
     device const uint * __restrict p0 [[buffer(1)]],
-    device uint * __restrict p1 [[buffer(2)]],
-    device const uint * __restrict p2 [[buffer(3)]],
+    device const uint * __restrict p1 [[buffer(2)]],
+    device uint * __restrict p2 [[buffer(3)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
     if (pos.x >= m.w) return;
@@ -30,17 +30,17 @@ kernel void main0(
     uint v13 = 931135488u;
     uint v14 = p0[12];
     uint v15 = v14 * 6u;
-    uint v16 = p2[min(v15, m.count2 - 1u)] & ((v15 < m.count2) ? ~0u : 0u);
+    uint v16 = p1[min(v15, m.count1 - 1u)] & ((v15 < m.count1) ? ~0u : 0u);
     uint v17 = v15 + 1u;
-    uint v18 = p2[min(v17, m.count2 - 1u)] & ((v17 < m.count2) ? ~0u : 0u);
+    uint v18 = p1[min(v17, m.count1 - 1u)] & ((v17 < m.count1) ? ~0u : 0u);
     uint v19 = v15 + 2u;
-    uint v20 = p2[min(v19, m.count2 - 1u)] & ((v19 < m.count2) ? ~0u : 0u);
+    uint v20 = p1[min(v19, m.count1 - 1u)] & ((v19 < m.count1) ? ~0u : 0u);
     uint v21 = v15 + 3u;
-    uint v22 = p2[min(v21, m.count2 - 1u)] & ((v21 < m.count2) ? ~0u : 0u);
+    uint v22 = p1[min(v21, m.count1 - 1u)] & ((v21 < m.count1) ? ~0u : 0u);
     uint v23 = v15 + 4u;
-    uint v24 = p2[min(v23, m.count2 - 1u)] & ((v23 < m.count2) ? ~0u : 0u);
+    uint v24 = p1[min(v23, m.count1 - 1u)] & ((v23 < m.count1) ? ~0u : 0u);
     uint v25 = v15 + 5u;
-    uint v26 = p2[min(v25, m.count2 - 1u)] & ((v25 < m.count2) ? ~0u : 0u);
+    uint v26 = p1[min(v25, m.count1 - 1u)] & ((v25 < m.count1) ? ~0u : 0u);
     uint v27 = 3212836864u;
     uint v28 = m.x0 + pos.x;
     float v29 = (float)(int)v28;
@@ -131,7 +131,7 @@ kernel void main0(
     uint v114 = (v113 != 0u) ? v93 : v0;
     float v115 = as_type<float>(v114) + as_type<float>(v109);
     uint v116 = (v58 != 0u) ? as_type<uint>(v115) : v0;
-    uint v117 = p1[y * m.stride1 + x];
+    uint v117 = p2[y * m.stride2 + x];
     float v118 = as_type<float>(v116) + as_type<float>(v117);
-    p1[y * m.stride1 + x] = as_type<uint>(v118);
+    p2[y * m.stride2 + x] = as_type<uint>(v118);
 }
