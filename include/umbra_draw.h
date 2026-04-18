@@ -241,12 +241,17 @@ umbra_interval umbra_sdf_rect(void *ctx, struct umbra_builder*,
 // returned wrapper is freed via umbra_sdf_free().
 struct umbra_sdf* umbra_sdf_wrap(umbra_sdf fn, void *ctx);
 
-struct umbra_coverage* umbra_coverage_bitmap(struct umbra_buf bmp);
-
-struct umbra_coverage* umbra_coverage_sdf(struct umbra_buf bmp);
+// Flat coverage samplers: caller owns a struct umbra_buf and passes &buf as
+// coverage_ctx.  Mutating *buf between queue() calls is reflected on next
+// dispatch (the ptr/count/stride live in the caller's storage).
+umbra_val32 umbra_coverage_bitmap (void *ctx, struct umbra_builder*,
+                                    umbra_val32 x, umbra_val32 y);
+umbra_val32 umbra_coverage_sdf    (void *ctx, struct umbra_builder*,
+                                    umbra_val32 x, umbra_val32 y);
+umbra_val32 umbra_coverage_winding(void *ctx, struct umbra_builder*,
+                                    umbra_val32 x, umbra_val32 y);
 
 struct umbra_coverage* umbra_coverage_bitmap_matrix(struct umbra_matrix, struct umbra_bitmap);
-struct umbra_coverage* umbra_coverage_winding(struct umbra_buf winding);
 
 void umbra_gradient_lut_even(float *out, int lut_n, int n_stops, umbra_color const *colors);
 void umbra_gradient_lut(float *out, int lut_n, int n_stops, float const positions[],

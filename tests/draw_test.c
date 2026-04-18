@@ -827,8 +827,8 @@ TEST(test_coverage_bitmap) {
     umbra_color color = {1, 1, 1, 1};
     struct umbra_shader *shader = umbra_shader_wrap(umbra_shader_solid, &color);
     uint16_t cov_data[8] = {0, 128, 255, 0, 0, 0, 0, 0};
-    struct umbra_coverage *cov =
-        umbra_coverage_bitmap((struct umbra_buf){.ptr=cov_data, .count=8});
+    struct umbra_buf buf = {.ptr=cov_data, .count=8};
+    struct umbra_coverage *cov = umbra_coverage_wrap(umbra_coverage_bitmap, &buf);
     struct draw_backends B = make_draw(umbra_draw_builder(cov, shader,
                                                  umbra_blend_srcover,
                                                  umbra_fmt_8888));
@@ -860,8 +860,8 @@ TEST(test_coverage_bitmap_565) {
     struct umbra_shader *shader = umbra_shader_wrap(umbra_shader_solid, &color);
     uint16_t cov_data[16];
     for (int i = 0; i < 16; i++) { cov_data[i] = 255; }
-    struct umbra_coverage *cov =
-        umbra_coverage_bitmap((struct umbra_buf){.ptr=cov_data, .count=16});
+    struct umbra_buf buf = {.ptr=cov_data, .count=16};
+    struct umbra_coverage *cov = umbra_coverage_wrap(umbra_coverage_bitmap, &buf);
     struct draw_backends B = make_draw(umbra_draw_builder(cov, shader,
                                                  umbra_blend_srcover,
                                                  umbra_fmt_565));
@@ -890,8 +890,8 @@ TEST(test_coverage_sdf) {
     umbra_color color = {1, 1, 1, 1};
     struct umbra_shader *shader = umbra_shader_wrap(umbra_shader_solid, &color);
     uint16_t cov_data[8] = {0, 100, 128, 200, 255, 0, 0, 0};
-    struct umbra_coverage *cov =
-        umbra_coverage_sdf((struct umbra_buf){.ptr=cov_data, .count=8});
+    struct umbra_buf buf = {.ptr=cov_data, .count=8};
+    struct umbra_coverage *cov = umbra_coverage_wrap(umbra_coverage_sdf, &buf);
     struct draw_backends B = make_draw(umbra_draw_builder(cov, shader,
                                                  umbra_blend_srcover,
                                                  umbra_fmt_8888));

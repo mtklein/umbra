@@ -1006,101 +1006,43 @@ struct umbra_sdf* umbra_sdf_wrap(umbra_sdf fn, void *ctx) {
     return &w->base;
 }
 
-struct coverage_bitmap {
-    struct umbra_coverage base;
-    struct umbra_buf      bmp;
-};
-
-static umbra_val32 bitmap_build(struct umbra_coverage *s, struct umbra_builder *builder,
-                                 umbra_ptr32 uniforms,
-                                 umbra_val32 x, umbra_val32 y) {
-    struct coverage_bitmap *self = (struct coverage_bitmap *)s;
-    (void)x;
-    (void)y;
-    umbra_ptr16 const bmp = umbra_deref_ptr16(builder, uniforms,
-                                              SLOT(bmp));
-    umbra_val32 const val = umbra_i32_from_s16(builder, umbra_load_16(builder, bmp));
-    umbra_val32 const inv255 = umbra_imm_f32(builder, 1.0f / 255.0f);
-    return umbra_mul_f32(builder, umbra_f32_from_i32(builder, val), inv255);
-}
-static void bitmap_free(struct umbra_coverage *s) { free(s); }
-
-struct umbra_coverage* umbra_coverage_bitmap(struct umbra_buf bmp) {
-    struct coverage_bitmap *c = malloc(sizeof *c);
-    *c = (struct coverage_bitmap){
-        .base = {.build          = bitmap_build,
-                 .free           = bitmap_free,
-                 .uniforms = UMBRA_UNIFORMS_OF(c)},
-        .bmp  = bmp,
-    };
-    return &c->base;
+umbra_val32 umbra_coverage_bitmap(void *ctx, struct umbra_builder *b,
+                                   umbra_val32 x, umbra_val32 y) {
+    struct umbra_buf const *self = ctx;
+    (void)x; (void)y;
+    umbra_ptr32 const u = umbra_uniforms(b, self, sizeof *self / 4);
+    umbra_ptr16 const bmp = umbra_deref_ptr16(b, u, 0);
+    umbra_val32 const val = umbra_i32_from_s16(b, umbra_load_16(b, bmp));
+    umbra_val32 const inv255 = umbra_imm_f32(b, 1.0f / 255.0f);
+    return umbra_mul_f32(b, umbra_f32_from_i32(b, val), inv255);
 }
 
-struct coverage_sdf {
-    struct umbra_coverage base;
-    struct umbra_buf      bmp;
-};
-
-static umbra_val32 cov_sdf_build(struct umbra_coverage *s, struct umbra_builder *builder,
-                                  umbra_ptr32 uniforms,
-                                  umbra_val32 x, umbra_val32 y) {
-    struct coverage_sdf *self = (struct coverage_sdf *)s;
-    (void)x;
-    (void)y;
-    umbra_ptr16 const bmp = umbra_deref_ptr16(builder, uniforms,
-                                              SLOT(bmp));
-    umbra_val32 const raw = umbra_i32_from_s16(builder, umbra_load_16(builder, bmp));
-    umbra_val32 const inv255 = umbra_imm_f32(builder, 1.0f / 255.0f);
-    umbra_val32 const dist = umbra_mul_f32(builder, umbra_f32_from_i32(builder, raw), inv255);
-    umbra_val32 const lo = umbra_imm_f32(builder, 0.4375f);
-    umbra_val32 const scale = umbra_imm_f32(builder, 8.0f);
-    umbra_val32 const shifted = umbra_sub_f32(builder, dist, lo);
-    umbra_val32 const scaled = umbra_mul_f32(builder, shifted, scale);
-    umbra_val32 const zero = umbra_imm_f32(builder, 0.0f);
-    umbra_val32 const one = umbra_imm_f32(builder, 1.0f);
-    return umbra_min_f32(builder, umbra_max_f32(builder, scaled, zero), one);
-}
-static void cov_sdf_free(struct umbra_coverage *s) { free(s); }
-
-struct umbra_coverage* umbra_coverage_sdf(struct umbra_buf bmp) {
-    struct coverage_sdf *c = malloc(sizeof *c);
-    *c = (struct coverage_sdf){
-        .base = {.build          = cov_sdf_build,
-                 .free           = cov_sdf_free,
-                 .uniforms = UMBRA_UNIFORMS_OF(c)},
-        .bmp  = bmp,
-    };
-    return &c->base;
+umbra_val32 umbra_coverage_sdf(void *ctx, struct umbra_builder *b,
+                                umbra_val32 x, umbra_val32 y) {
+    struct umbra_buf const *self = ctx;
+    (void)x; (void)y;
+    umbra_ptr32 const u = umbra_uniforms(b, self, sizeof *self / 4);
+    umbra_ptr16 const bmp = umbra_deref_ptr16(b, u, 0);
+    umbra_val32 const raw = umbra_i32_from_s16(b, umbra_load_16(b, bmp));
+    umbra_val32 const inv255 = umbra_imm_f32(b, 1.0f / 255.0f);
+    umbra_val32 const dist = umbra_mul_f32(b, umbra_f32_from_i32(b, raw), inv255);
+    umbra_val32 const lo = umbra_imm_f32(b, 0.4375f);
+    umbra_val32 const scale = umbra_imm_f32(b, 8.0f);
+    umbra_val32 const shifted = umbra_sub_f32(b, dist, lo);
+    umbra_val32 const scaled = umbra_mul_f32(b, shifted, scale);
+    umbra_val32 const zero = umbra_imm_f32(b, 0.0f);
+    umbra_val32 const one = umbra_imm_f32(b, 1.0f);
+    return umbra_min_f32(b, umbra_max_f32(b, scaled, zero), one);
 }
 
-struct coverage_winding {
-    struct umbra_coverage base;
-    struct umbra_buf      winding;
-};
-
-static umbra_val32 winding_build(struct umbra_coverage *s, struct umbra_builder *builder,
-                               umbra_ptr32 uniforms,
-                               umbra_val32 x, umbra_val32 y) {
-    struct coverage_winding *self = (struct coverage_winding *)s;
-    (void)x;
-    (void)y;
-    umbra_ptr32 const w = umbra_deref_ptr32(builder, uniforms,
-                                            SLOT(winding));
-    umbra_val32 const raw = umbra_load_32(builder, w);
-    return umbra_min_f32(builder, umbra_abs_f32(builder, raw),
-                         umbra_imm_f32(builder, 1.0f));
-}
-static void winding_free(struct umbra_coverage *s) { free(s); }
-
-struct umbra_coverage* umbra_coverage_winding(struct umbra_buf wind) {
-    struct coverage_winding *c = malloc(sizeof *c);
-    *c = (struct coverage_winding){
-        .base    = {.build          = winding_build,
-                    .free           = winding_free,
-                    .uniforms = UMBRA_UNIFORMS_OF(c)},
-        .winding = wind,
-    };
-    return &c->base;
+umbra_val32 umbra_coverage_winding(void *ctx, struct umbra_builder *b,
+                                    umbra_val32 x, umbra_val32 y) {
+    struct umbra_buf const *self = ctx;
+    (void)x; (void)y;
+    umbra_ptr32 const u = umbra_uniforms(b, self, sizeof *self / 4);
+    umbra_ptr32 const w = umbra_deref_ptr32(b, u, 0);
+    umbra_val32 const raw = umbra_load_32(b, w);
+    return umbra_min_f32(b, umbra_abs_f32(b, raw), umbra_imm_f32(b, 1.0f));
 }
 
 struct coverage_bitmap_matrix {
