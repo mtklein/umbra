@@ -208,11 +208,20 @@ umbra_val32 umbra_coverage_from_sdf(void *ctx, struct umbra_builder *b,
                                        umbra_sub_f32(b, umbra_imm_f32(b, 0.0f), f)));
 }
 
+struct grid_params {
+    float base_x, base_y, tile_w, tile_h;
+};
+
 struct umbra_sdf_draw {
     struct umbra_coverage_from_sdf cov_state;
     struct umbra_program          *draw;
     struct umbra_program          *bounds;
     struct umbra_backend          *bounds_be;
+    float                         *lo;
+    struct grid_params             grid;
+    int                            lo_cap;
+    int                            :32;
+    struct umbra_buf               lo_buf;
 };
 
 // TODO: add a second `covered` program alongside `draw` for tiles where the
@@ -222,23 +231,13 @@ struct umbra_sdf_draw {
 //   else          -> skip tile
 // `covered` would be built like `draw` but without the SDF coverage adapter,
 // skipping per-pixel SDF evaluation entirely.  Prerequisites:
-//   - bounds program must also emit f.hi; currently only f.lo is stored
-//     (see BOUNDS_DST_IX and umbra_store_32 in umbra_sdf_draw below).
+//   - bounds program must also emit f.hi; currently only f.lo is stored.
 //   - bounds_buf grows a second float* output; allocate/free in _queue.
 //   - tile loop in umbra_sdf_draw_queue branches on hi<0 vs lo<0.
 
 // TODO: query per-backend dispatch_granularity instead of this one global
 // compromise.  CPU-optimal is ~16-32, GPU-optimal is ~512-1024.
 enum { QUEUE_MIN_TILE = 512 };
-
-// Bounds program buf layout:
-//   buf[0] = tile-lo output
-//   buf[1] = grid params (base_x, base_y, tile_w, tile_h)
-enum { BOUNDS_DST_IX = 0, BOUNDS_GRID_IX = 1 };
-
-struct grid_params {
-    float base_x, base_y, tile_w, tile_h;
-};
 
 struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
                                       umbra_sdf sdf_fn, void *sdf_ctx,
@@ -268,7 +267,9 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
     // Build the bounds program: evaluate the sdf over tile-extent intervals.
     // x() and y() are tile indices.
     struct umbra_builder *bb = umbra_builder();
-    umbra_ptr32 const g = {.ix = BOUNDS_GRID_IX};
+    umbra_ptr32 const g   = umbra_uniforms   (bb, &d->grid,
+                                              (int)(sizeof d->grid / 4));
+    umbra_ptr32 const dst = umbra_bind_buf32 (bb, &d->lo_buf);
     umbra_val32 const base_x = umbra_uniform_32(bb, g, 0),
                       base_y = umbra_uniform_32(bb, g, 1),
                       tile_w = umbra_uniform_32(bb, g, 2),
@@ -286,7 +287,7 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
 
     umbra_interval const f = sdf_fn(sdf_ctx, bb, x, y);
 
-    umbra_store_32(bb, (umbra_ptr32){.ix = BOUNDS_DST_IX}, f.lo);
+    umbra_store_32(bb, dst, f.lo);
 
     struct umbra_flat_ir *bir = umbra_flat_ir(bb);
     umbra_builder_free(bb);
@@ -299,8 +300,8 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
     return d;
 }
 
-void umbra_sdf_draw_queue(struct umbra_sdf_draw const *d,
-                              int l, int t, int r, int b, struct umbra_buf buf[]) {
+void umbra_sdf_draw_queue(struct umbra_sdf_draw *d,
+                          int l, int t, int r, int b, struct umbra_buf buf[]) {
     if (!d) { return; }
     int const w  = r - l,
               h  = b - t,
@@ -308,18 +309,20 @@ void umbra_sdf_draw_queue(struct umbra_sdf_draw const *d,
               yt = (h + QUEUE_MIN_TILE - 1) / QUEUE_MIN_TILE;
     int const tiles = xt * yt;
 
-    struct grid_params grid = {
+    d->grid = (struct grid_params){
         .base_x = (float)l,
         .base_y = (float)t,
         .tile_w = (float)QUEUE_MIN_TILE,
         .tile_h = (float)QUEUE_MIN_TILE,
     };
-    float *lo = calloc((size_t)tiles, sizeof(float));
-    struct umbra_buf bounds_buf[] = {
-        {.ptr = lo,    .count = tiles,                 .stride = xt},
-        {.ptr = &grid, .count = (int)(sizeof grid / 4)},
-    };
-    d->bounds->queue(d->bounds, 0, 0, xt, yt, bounds_buf);
+    if (tiles > d->lo_cap) {
+        d->lo = realloc(d->lo, (size_t)tiles * sizeof(float));
+        d->lo_cap = tiles;
+    }
+    __builtin_memset(d->lo, 0, (size_t)tiles * sizeof(float));
+    d->lo_buf = (struct umbra_buf){.ptr = d->lo, .count = tiles, .stride = xt};
+    d->bounds->queue(d->bounds, 0, 0, xt, yt, (struct umbra_buf[]){{0}});
+    float *lo = d->lo;
 
     // TODO: coalesce horizontally adjacent covered tiles into one draw->queue() call.
 
@@ -354,8 +357,6 @@ void umbra_sdf_draw_queue(struct umbra_sdf_draw const *d,
             }
         }
     }
-
-    free(lo);
 }
 
 void umbra_sdf_draw_free(struct umbra_sdf_draw *d) {
@@ -363,6 +364,7 @@ void umbra_sdf_draw_free(struct umbra_sdf_draw *d) {
         umbra_program_free(d->draw);
         umbra_program_free(d->bounds);
         umbra_backend_free(d->bounds_be);
+        free(d->lo);
         free(d);
     }
 }
