@@ -457,11 +457,23 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
         bind_size  [i] = 0;
     }
 
+    // TODO: migrate callers off hand-rolled (umbra_ptr*){.ix=N} slots to
+    // umbra_uniforms() / umbra_bind_buf*() so we can drop the stride==0
+    // fallback below and route purely on registration intent.
+    _Bool pinned    [32] = {0};
+    _Bool registered[32] = {0};
+    for (int k = 0; k < p->n_reg; k++) {
+        registered[p->reg[k].ix] = 1;
+        if (!p->reg[k].buf) { pinned[p->reg[k].ix] = 1; }
+    }
+
     for (int i = 0; i <= p->max_ptr; i++) {
         if (buf[i].ptr && buf[i].count) {
             size_t const bytes = (size_t)buf[i].count << p->buf_shift[i];
             uint8_t const rw = p->buf_rw[i];
-            if (!(rw & BUF_WRITTEN) && !buf[i].stride) {
+            _Bool const route_ring = pinned[i]
+                                  || (!registered[i] && !buf[i].stride);
+            if (!(rw & BUF_WRITTEN) && route_ring) {
                 // Ring alloc copies data into chunk buffer; bulk-uploaded at submit.
                 struct uniform_ring_loc loc =
                     uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, bytes);

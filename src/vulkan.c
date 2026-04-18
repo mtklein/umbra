@@ -295,11 +295,23 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
         bind_range [i] = 0;
     }
 
+    // TODO: migrate callers off hand-rolled (umbra_ptr*){.ix=N} slots to
+    // umbra_uniforms() / umbra_bind_buf*() so we can drop the stride==0
+    // fallback below and route purely on registration intent.
+    _Bool pinned    [32] = {0};
+    _Bool registered[32] = {0};
+    for (int k = 0; k < vp->n_reg; k++) {
+        registered[vp->reg[k].ix] = 1;
+        if (!vp->reg[k].buf) { pinned[vp->reg[k].ix] = 1; }
+    }
+
     for (int i = 0; i <= vp->max_ptr; i++) {
         if (buf[i].ptr && buf[i].count) {
             size_t const bytes = (size_t)buf[i].count << vp->buf_shift[i];
             uint8_t const rw = vp->buf_rw[i];
-            if (!(rw & BUF_WRITTEN) && !buf[i].stride) {
+            _Bool const route_ring = pinned[i]
+                                  || (!registered[i] && !buf[i].stride);
+            if (!(rw & BUF_WRITTEN) && route_ring) {
                 struct uniform_ring_loc loc =
                     uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, bytes);
                 struct vk_ring_chunk *chunk = loc.handle;

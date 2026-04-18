@@ -155,6 +155,11 @@ void slug_free(struct slug_curves *sc) {
 #define UNI_SLOT(type, field) \
     ((int)(__builtin_offsetof(type, field) / 4))
 
+// TODO: slot 0 bundles small control uniforms (mat, bw, bh, j) with large data
+// that would prefer the gpu_buf_cache path.  Split the small pinned uniforms
+// into a separate umbra_uniforms() registration so the backend can route the
+// small + fixed-size struct through the ring while letting larger, mutable
+// bufs take the cache path.  slug_build below has the same issue.
 struct umbra_builder* slug_build_acc(struct umbra_buf const *curves_buf) {
     struct umbra_builder *b = umbra_builder();
 
