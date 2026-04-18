@@ -2453,6 +2453,31 @@ TEST(test_program_threadsafe) {
     umbra_flat_ir_free(ir);
 }
 
+TEST(test_umbra_uniforms_interp) {
+    uint32_t u[4] = {42, 100, 200, 300};
+
+    struct umbra_builder *b = umbra_builder();
+    umbra_ptr32 const reg = umbra_uniforms(b, u, 4);
+    umbra_store_32(b, (umbra_ptr32){0}, umbra_uniform_32(b, reg, 2));
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
+    umbra_builder_free(b);
+
+    struct umbra_backend *be = umbra_backend_interp();
+    struct umbra_program *p  = be->compile(be, ir);
+
+    int32_t dst[1] = {0};
+    p->queue(p, 0, 0, 1, 1, (struct umbra_buf[]){{.ptr=dst, .count=1}});
+    dst[0] == 200 here;
+
+    u[2] = 999;
+    p->queue(p, 0, 0, 1, 1, (struct umbra_buf[]){{.ptr=dst, .count=1}});
+    dst[0] == 999 here;
+
+    umbra_program_free(p);
+    umbra_flat_ir_free(ir);
+    umbra_backend_free(be);
+}
+
 TEST(test_program_null_guards) {
 
     struct umbra_backend *be = umbra_backend_interp();

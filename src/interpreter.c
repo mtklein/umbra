@@ -179,8 +179,12 @@ struct interp_program {
     ival           *v;
     ival           *vars;
     struct umbra_buf      *buf;
-    int             preamble, nptr, n_deref, n_vars;
+    int             preamble, caller_nptr, n_reg, n_deref;
+    int             n_vars, pad;
+    struct umbra_uniform_reg *reg;
 };
+
+#define REG_BASE (1 << 24)
 
 static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
     int *id = calloc((size_t)ir->insts, sizeof *id);
@@ -201,25 +205,36 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
     int max_ptr = -1;
     int n_deref = 0;
     for (int i = 0; i < ir->insts; i++) {
-        if (op_has_ptr(ir->inst[i].op) && ir->inst[i].ptr.bits >= 0
-                                       && max_ptr < ir->inst[i].ptr.bits) {
-            max_ptr = ir->inst[i].ptr.bits;
+        enum op const op = ir->inst[i].op;
+        if (op_has_ptr(op) && !ir->inst[i].ptr.deref
+                           && ir->inst[i].ptr.ix >= 0
+                           && ir->inst[i].ptr.ix < REG_BASE
+                           && max_ptr < ir->inst[i].ptr.ix) {
+            max_ptr = ir->inst[i].ptr.ix;
         }
-        if (ir->inst[i].op == op_deref_ptr) {
+        if (op == op_deref_ptr) {
             n_deref++;
         }
     }
-    p->nptr = max_ptr + 1;
-    p->n_deref = n_deref;
-    int const total_ptrs = p->nptr + n_deref;
+    p->caller_nptr = max_ptr + 1;
+    p->n_reg       = ir->n_uniforms;
+    p->n_deref     = n_deref;
+    int const total_ptrs = p->caller_nptr + p->n_reg + n_deref;
     p->buf = calloc((size_t)total_ptrs, sizeof *p->buf);
+    if (p->n_reg) {
+        size_t const sz = (size_t)p->n_reg * sizeof *p->reg;
+        p->reg = malloc(sz);
+        __builtin_memcpy(p->reg, ir->uniforms, sz);
+    } else {
+        p->reg = NULL;
+    }
 
     int *deref_slot = calloc((size_t)ir->insts, sizeof *deref_slot);
     {
         int di = 0;
         for (int i = 0; i < ir->insts; i++) {
             if (ir->inst[i].op == op_deref_ptr) {
-                deref_slot[i] = p->nptr + di++;
+                deref_slot[i] = p->caller_nptr + p->n_reg + di++;
             }
         }
     }
@@ -232,7 +247,11 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
     int n = 0;
     int loop_begin_sw_n = -1;
 #define emit(...) p->inst[n] = (struct sw_inst){ __VA_ARGS__ }
-#define RESOLVE_PTR(inst) ((inst)->ptr.deref ? deref_slot[(inst)->ptr.ix] : (inst)->ptr.bits)
+#define RESOLVE_PTR(inst) ((inst)->ptr.deref                                  \
+        ? deref_slot[(inst)->ptr.ix]                                          \
+        : ((inst)->ptr.ix >= REG_BASE                                         \
+            ? p->caller_nptr + ((inst)->ptr.ix - REG_BASE)                    \
+            : (inst)->ptr.bits))
     for (int pass = 0; pass < 2; pass++) {
         int const lo = pass ? ir->preamble : 0, hi = pass ? ir->insts : ir->preamble;
         if (pass) { p->preamble = n; }
@@ -249,7 +268,7 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
             case op_join:   emit(.tag = op_join, .x = X, .y = Y); break;
 
             case op_deref_ptr:
-                emit(.tag = op_deref_ptr, .ptr = inst->ptr.bits,
+                emit(.tag = op_deref_ptr, .ptr = RESOLVE_PTR(inst),
                      .x = inst->imm, .y = deref_slot[i]);
                 break;
 
@@ -503,9 +522,17 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
 
 static void interp_program_run(struct interp_program *p, int l, int t, int r, int b,
                                     struct umbra_buf caller_buf[]) {
-    int const nall = p->nptr + p->n_deref;
-    for (int i = 0; i < p->nptr; i++) { p->buf[i] = caller_buf[i]; }
-    for (int i = p->nptr; i < nall; i++) { p->buf[i] = (struct umbra_buf){0}; }
+    int const nall = p->caller_nptr + p->n_reg + p->n_deref;
+    for (int i = 0; i < p->caller_nptr; i++) { p->buf[i] = caller_buf[i]; }
+    for (int i = 0; i < p->n_reg; i++) {
+        p->buf[p->caller_nptr + i] = (struct umbra_buf){
+            .ptr   = (void*)(uintptr_t)p->reg[i].ptr,
+            .count = p->reg[i].slots,
+        };
+    }
+    for (int i = p->caller_nptr + p->n_reg; i < nall; i++) {
+        p->buf[i] = (struct umbra_buf){0};
+    }
 
     int const      P   = p->preamble;
     struct umbra_buf     *buf = p->buf;
@@ -1317,6 +1344,7 @@ static void interp_program_free(struct interp_program *p) {
         free(p->inst);
         free(p->v);
         free(p->vars);
+        free(p->reg);
         free(p);
     }
 }
