@@ -808,6 +808,41 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     spv_word(&B.decor, SpvDecorationArrayStride);
     spv_word(&B.decor, 4);
 
+    // TODO: use uniform buffers for small read-only bindings.
+    //
+    // Today every binding is StorageBuffer SC with a RuntimeArray, because
+    // that's the only way to carry a dispatch-time-sized array.  But small
+    // read-only bindings (the umbra_uniforms sugar path, where slots is
+    // known at IR build time) could be uniform-buffer bindings instead, and
+    // WebGPU's max_dynamic_uniform_buffers_per_pipeline_layout (default 8)
+    // is roomier than max_dynamic_storage_buffers (default 4).  That's what
+    // triggered the all-or-nothing dyn_uniforms fallback in src/wgpu.c.
+    //
+    // Classification rule at SPIR-V build time, using ir->uniforms[]:
+    //   reg in ir->uniforms with reg.buf == NULL
+    //      → umbra_uniforms sugar, slots = reg.storage.count is fixed
+    //      → emit Uniform SC with a bounded array[slots]
+    //   anything else (bind_buf, caller-provided bufs, cache-path)
+    //      → keep StorageBuffer SC + RuntimeArray as today
+    //
+    // Also flip the push-via-SSBO block to Uniform SC -- its size
+    // (push_words) is known at build time.
+    //
+    // Non-obvious gotcha: std140 uniform layout pads u32 array members to
+    // 16 bytes each.  Opt into SPV_EXT_scalar_block_layout (decorate the
+    // uniform block) so arrays stay tightly packed and match our
+    // (offset*4)-byte addressing.
+    //
+    // Backend knock-on work:
+    //   src/wgpu.c: .type = Uniform in the bind group layout entry for
+    //     those bindings; add Uniform usage flag to ring chunks; check
+    //     minUniformBufferOffsetAlignment (default 256) against the ring
+    //     alloc .align or use two ring pools.
+    //   src/vulkan.c: matching VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; buffer
+    //     usage flag.
+    //   src/metal.c: its own shader path, mirror the classification for
+    //     parity if it simplifies argument-buffer layout.
+
     // struct { RuntimeArray<u32> } — one per buffer
     B.t_struct_rta_u32 = spv_id(&B);
     spv_op(&B.types, SpvOpTypeStruct, 3);
