@@ -103,8 +103,6 @@ umbra_val32 umbra_coverage_from_sdf(void *ctx, struct umbra_builder*,
                                      umbra_val32 x, umbra_val32 y);
 
 // TODO: move gradient shaders out into slides/gradient.c
-// TODO: name all these gradient ctx parameters after the expected type,
-//       e.g. void *ctx -> void *umbra_gradient_linear for umbra_gradient_linear().
 
 // A gradient is (x,y) -> t -> color.  umbra_gradient_coords is the first leg,
 // a first-class effect in the same shape as umbra_shader / umbra_coverage /
@@ -121,7 +119,8 @@ struct umbra_gradient_linear {
     int   :32;
 };
 struct umbra_gradient_linear umbra_gradient_linear_from(umbra_point p0, umbra_point p1);
-umbra_val32 umbra_gradient_linear(void *ctx, struct umbra_builder*, umbra_point_val32 xy);
+umbra_val32 umbra_gradient_linear(void *umbra_gradient_linear, struct umbra_builder*,
+                                   umbra_point_val32 xy);
 
 // Radial gradient: t = |xy - center| / radius, clamped.  Fill via
 // umbra_gradient_radial_from().
@@ -130,7 +129,8 @@ struct umbra_gradient_radial {
     int   :32;
 };
 struct umbra_gradient_radial umbra_gradient_radial_from(umbra_point center, float radius);
-umbra_val32 umbra_gradient_radial(void *ctx, struct umbra_builder*, umbra_point_val32 xy);
+umbra_val32 umbra_gradient_radial(void *umbra_gradient_radial, struct umbra_builder*,
+                                   umbra_point_val32 xy);
 
 // Gradient colorizer shaders.  Each state struct holds the coords (fn, ctx)
 // it invokes to map xy to t, plus the data (colors / lut / positions) needed
@@ -143,7 +143,8 @@ struct umbra_shader_gradient_two_stops {
     void                  *coords_ctx;
     umbra_color            c0, c1;
 };
-umbra_color_val32 umbra_shader_gradient_two_stops(void *ctx, struct umbra_builder*,
+umbra_color_val32 umbra_shader_gradient_two_stops(void *umbra_shader_gradient_two_stops,
+                                                   struct umbra_builder*,
                                                    umbra_val32 x, umbra_val32 y);
 
 struct umbra_shader_gradient_lut {
@@ -153,7 +154,8 @@ struct umbra_shader_gradient_lut {
     int                    :32;
     struct umbra_buf       lut;
 };
-umbra_color_val32 umbra_shader_gradient_lut(void *ctx, struct umbra_builder*,
+umbra_color_val32 umbra_shader_gradient_lut(void *umbra_shader_gradient_lut,
+                                             struct umbra_builder*,
                                              umbra_val32 x, umbra_val32 y);
 
 struct umbra_shader_gradient_evenly_spaced_stops {
@@ -164,7 +166,8 @@ struct umbra_shader_gradient_evenly_spaced_stops {
     struct umbra_buf       colors;
 };
 umbra_color_val32 umbra_shader_gradient_evenly_spaced_stops(
-    void *ctx, struct umbra_builder*, umbra_val32 x, umbra_val32 y);
+    void *umbra_shader_gradient_evenly_spaced_stops, struct umbra_builder*,
+    umbra_val32 x, umbra_val32 y);
 
 struct umbra_shader_gradient {
     umbra_gradient_coords *coords_fn;
