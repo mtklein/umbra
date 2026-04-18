@@ -111,12 +111,10 @@ void umbra_builder_free(builder *b) {
     }
 }
 
-// Registered uniform ixes live above the normal dispatch-slot range.  Composer
-// APIs (umbra_draw_builder, etc.) reserve ptr.ix slots 0..N-1 for caller-
-// provided bufs at queue time; umbra_uniforms() assigns ixes starting at
-// REG_BASE so backends can cheaply distinguish the two.
-#define REG_BASE (1 << 24)
-
+// Composer APIs (umbra_draw_builder, etc.) reserve ptr.ix slots 0..N-1 for
+// caller-provided bufs at queue time; umbra_uniforms() assigns ixes starting
+// at REG_BASE so flat_ir_bind_uniforms() can cheaply distinguish the two
+// when remapping.
 umbra_ptr32 umbra_uniforms(builder *b, void const *slot, int slots) {
     assume(((uintptr_t)slot & 3u) == 0);
     assume(slots >= 0);
