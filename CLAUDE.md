@@ -125,3 +125,78 @@ avoid "len".
 
 Use `here` with no parens for test asserts: `x == 3 here;`, never
 `(x == 3) here;`.  Use assume() in non-test code.
+
+Project structure
+-----------------
+Umbra is a small CPU+GPU pipeline JIT.  A `umbra_builder` composes ops into an
+IR; `umbra_flat_ir` is the linearized form; `umbra_backend` compiles the IR
+into a `umbra_program` whose `queue(l,t,r,b,buf[])` dispatches a rect of work
+against caller-bound buffers.
+
+  - `include/` — public API (`umbra.h`, `umbra_draw.h`).  `umbra_` prefix is
+    reserved for public API; internal code in `src/` must not use it.
+  - `src/` — builder, ops (`op.h`), basic blocks, RA, backends.
+  - `src/{interp,jit,metal,vulkan,wgpu,spirv}.c` — the five backends.  JIT
+    splits into `jit.c` (shared) + `jit_arm64.c` + `jit_x86.c`.  SPIR-V
+    generation is shared between `vulkan.c` and `wgpu.c` via `spirv.c`.
+  - `src/gpu_buf_cache.{h,c}` and `src/uniform_ring.{h,c}` — shared GPU infra.
+  - `tests/`, `tools/`, `slides/`, `dumps/`.  `dumps/` holds golden shader
+    dumps; commit updates to dumps in the same commit as the code change.
+
+All five backends must produce bit-exact identical output for the same IR.
+A shader that works on one backend but not another is a backend bug, not a
+reason to reject the shader.
+
+Performance expectations
+------------------------
+On Apple Silicon we run all our GPU backends on the same Metal device:
+
+  - `metal` is our hand-written Metal backend.
+  - `vulkan` runs through MoltenVK, which translates Vulkan → Metal.
+  - `wgpu` runs through wgpu-native, which also targets Metal on macOS.
+  - (`interp` and `jit` are CPU-only.)
+
+Because MoltenVK and wgpu-native both sit on top of Metal, `metal` should
+always be at least as fast as `vulkan` and `wgpu`.  Anything those libraries
+do, we can do directly — and without their translation overhead.  If `metal`
+is slower or uses more CPU than `vulkan` or `wgpu` on a given slide, that is
+a bug in our Metal backend, not a property of Metal.  Do not accept "Metal is
+just more expensive here" as an explanation.
+
+Debugging and profiling
+-----------------------
+Confirm you are working on the right problem before optimizing.  Hypothesis-
+driven changes that produce no measurable improvement are a signal you have
+the wrong model of the hot path — stop and profile before trying the next
+fix.  Running out of ideas is not proof; say "I'm stuck" and gather data.
+
+Tools for gathering that data:
+
+  - `out/host/bench --backend <name> --match <substr>` — our benchmark
+    harness.  Use `--target-ms 1000 --samples 1` to hold the workload open
+    long enough for sampling.
+  - `sample <pid> <seconds> -mayDie -file <out>` — macOS call-tree profiler.
+    The main-thread call graph near the top of the output usually answers
+    "where is CPU actually going?" in one read.
+  - `lldb` — for stepping through a failing test or inspecting state at a
+    crash.  Prefer it over printf-debugging.
+  - `dumps/` — regenerate with the right tool and diff against golden files
+    to compare backends' shader output.
+
+When a dependency's behavior is load-bearing to an optimization you are
+considering, read its source.  Clone MoltenVK, wgpu-native, or SPIRV-Cross
+locally and grep for the specific function or API path you care about.  Do
+not guess from API names, blog posts, or prior knowledge — the actual code
+is the only ground truth.  If you catch yourself writing "I believe library
+X does Y", stop and verify.
+
+Move slowly and pedantically when debugging.  Before claiming a cause:
+
+  1. State the hypothesis and what measurement would confirm or refute it.
+  2. Take the measurement.
+  3. Compare result to hypothesis.  If they disagree, the hypothesis was
+     wrong — do not rationalize.  Write down what the data actually says.
+
+Revert speculative changes that did not produce the expected improvement
+before moving on, so the tree stays clean and the next measurement is not
+confounded.
