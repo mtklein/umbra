@@ -10,6 +10,7 @@ struct blend_slide {
     int   w, h;
 
     umbra_color              color;
+    umbra_rect               rect;
     struct umbra_shader     *shader;
     struct umbra_sdf        *sdf;
     umbra_blend_fn           blend;
@@ -54,8 +55,7 @@ static void blend_draw(struct slide *s, double secs, int l, int t, int r, int b,
     double const ticks = secs * 60.0;
     float const rx = bounce(st->rx, st->vx, ticks, (float)st->w - st->rect_w),
                 ry = bounce(st->ry, st->vy, ticks, (float)st->h - st->rect_h);
-    umbra_sdf_free(st->sdf);
-    st->sdf = umbra_sdf_rect((umbra_rect){rx, ry, rx + st->rect_w, ry + st->rect_h});
+    st->rect = (umbra_rect){rx, ry, rx + st->rect_w, ry + st->rect_h};
     struct umbra_buf ubuf[] = {
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
         st->sdf->uniforms,
@@ -86,8 +86,9 @@ static struct slide* make_blend(char const *title, float const bg[4], float cons
                                 umbra_blend_fn blend) {
     struct blend_slide *st = calloc(1, sizeof *st);
     st->color  = (umbra_color){color[0], color[1], color[2], color[3]};
+    st->rect   = (umbra_rect){0, 0, 0, 0};
     st->shader = umbra_shader_wrap(umbra_shader_solid, &st->color);
-    st->sdf    = umbra_sdf_rect((umbra_rect){0, 0, 0, 0});
+    st->sdf    = umbra_sdf_wrap(umbra_sdf_rect, &st->rect);
     st->blend  = blend;
     st->base = (struct slide){
         .title = title,

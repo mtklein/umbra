@@ -963,39 +963,47 @@ struct umbra_coverage* umbra_coverage_wrap(umbra_coverage fn, void *ctx) {
     return &w->base;
 }
 
-struct sdf_rect {
-    struct umbra_sdf base;
-    umbra_rect       rect;
-};
-
-static umbra_interval sdf_rect_build(struct umbra_sdf *s, struct umbra_builder *b,
-                                      umbra_ptr32 uniforms,
-                                      umbra_interval x, umbra_interval y) {
-    struct sdf_rect *self = (struct sdf_rect *)s;
-    umbra_interval const l  = umbra_interval_exact(
-                                 umbra_uniform_32(b, uniforms, SLOT(rect.l))),
-                         t  = umbra_interval_exact(
-                                 umbra_uniform_32(b, uniforms, SLOT(rect.t))),
-                         r  = umbra_interval_exact(
-                                 umbra_uniform_32(b, uniforms, SLOT(rect.r))),
-                         bo = umbra_interval_exact(
-                                 umbra_uniform_32(b, uniforms, SLOT(rect.b)));
+umbra_interval umbra_sdf_rect(void *ctx, struct umbra_builder *b,
+                              umbra_interval x, umbra_interval y) {
+    umbra_rect const *self = ctx;
+    umbra_ptr32 const u = umbra_uniforms(b, self, sizeof *self / 4);
+    umbra_interval const l  = umbra_interval_exact(umbra_uniform_32(b, u, 0)),
+                         t  = umbra_interval_exact(umbra_uniform_32(b, u, 1)),
+                         r  = umbra_interval_exact(umbra_uniform_32(b, u, 2)),
+                         bo = umbra_interval_exact(umbra_uniform_32(b, u, 3));
     return umbra_interval_max_f32(b, umbra_interval_max_f32(b, umbra_interval_sub_f32(b, l, x),
                                                                umbra_interval_sub_f32(b, x, r)),
                                     umbra_interval_max_f32(b, umbra_interval_sub_f32(b, t, y),
                                                               umbra_interval_sub_f32(b, y, bo)));
 }
-static void sdf_rect_free(struct umbra_sdf *s) { free(s); }
 
-struct umbra_sdf* umbra_sdf_rect(umbra_rect rect) {
-    struct sdf_rect *s = malloc(sizeof *s);
-    *s = (struct sdf_rect){
-        .base = {.build          = sdf_rect_build,
-                 .free           = sdf_rect_free,
-                 .uniforms = UMBRA_UNIFORMS_OF(s)},
-        .rect = rect,
+// Bridge: wrap a flat sdf fn into a struct umbra_sdf* for old-middleware
+// composers (umbra_sdf_draw, umbra_sdf_coverage) until they migrate.  Same
+// shape as umbra_shader_wrap / umbra_coverage_wrap.
+struct sdf_wrap {
+    struct umbra_sdf  base;
+    umbra_sdf         fn;
+    void             *ctx;
+};
+static umbra_interval sdf_wrap_build(struct umbra_sdf *s, struct umbra_builder *b,
+                                      umbra_ptr32 uniforms,
+                                      umbra_interval x, umbra_interval y) {
+    struct sdf_wrap *self = (struct sdf_wrap *)s;
+    (void)uniforms;
+    return self->fn(self->ctx, b, x, y);
+}
+static void sdf_wrap_free(struct umbra_sdf *s) { free(s); }
+
+struct umbra_sdf* umbra_sdf_wrap(umbra_sdf fn, void *ctx) {
+    struct sdf_wrap *w = malloc(sizeof *w);
+    *w = (struct sdf_wrap){
+        .base = {.build    = sdf_wrap_build,
+                 .free     = sdf_wrap_free,
+                 .uniforms = (struct umbra_buf){0}},
+        .fn   = fn,
+        .ctx  = ctx,
     };
-    return &s->base;
+    return &w->base;
 }
 
 struct coverage_bitmap {

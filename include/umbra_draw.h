@@ -128,6 +128,8 @@ typedef umbra_color_val32 (*umbra_shader)  (void *ctx, struct umbra_builder*,
                                             umbra_val32 x, umbra_val32 y);
 typedef umbra_val32       (*umbra_coverage)(void *ctx, struct umbra_builder*,
                                             umbra_val32 x, umbra_val32 y);
+typedef umbra_interval    (*umbra_sdf)     (void *ctx, struct umbra_builder*,
+                                            umbra_interval x, umbra_interval y);
 typedef umbra_color_val32 (*umbra_blend)   (void *ctx, struct umbra_builder*,
                                             umbra_color_val32 src,
                                             umbra_color_val32 dst);
@@ -228,7 +230,16 @@ umbra_val32 umbra_coverage_rect(void *ctx, struct umbra_builder*,
 // the returned wrapper is freed via umbra_coverage_free().
 struct umbra_coverage* umbra_coverage_wrap(umbra_coverage fn, void *ctx);
 
-struct umbra_sdf* umbra_sdf_rect(umbra_rect);
+// Flat SDF: caller owns an umbra_rect; pass &rect as the sdf_ctx (or wrap via
+// umbra_sdf_wrap for old-middleware composers).  Mutation between queue() calls
+// is reflected on next dispatch.
+umbra_interval umbra_sdf_rect(void *ctx, struct umbra_builder*,
+                              umbra_interval x, umbra_interval y);
+
+// Wrap any flat sdf (fn, ctx) into a struct umbra_sdf* for composers that
+// haven't migrated yet.  Caller retains ownership of ctx storage until the
+// returned wrapper is freed via umbra_sdf_free().
+struct umbra_sdf* umbra_sdf_wrap(umbra_sdf fn, void *ctx);
 
 struct umbra_coverage* umbra_coverage_bitmap(struct umbra_buf bmp);
 

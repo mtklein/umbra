@@ -1596,7 +1596,8 @@ TEST(test_srcover_fp16_planar) {
 TEST(test_sdf_dispatch_rect) {
     umbra_color color = {1, 0, 0, 1};
     struct umbra_shader *shader = umbra_shader_wrap(umbra_shader_solid, &color);
-    struct umbra_sdf *sdf = umbra_sdf_rect((umbra_rect){1.0f, 1.0f, 7.0f, 3.0f});
+    umbra_rect rect = {1.0f, 1.0f, 7.0f, 3.0f};
+    struct umbra_sdf *sdf = umbra_sdf_wrap(umbra_sdf_rect, &rect);
 
     struct umbra_backend *bes[NUM_BACKENDS] = {
         umbra_backend_interp(), umbra_backend_jit(),
