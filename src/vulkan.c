@@ -94,12 +94,10 @@ struct vk_program {
 
     int max_ptr;
     int total_bufs;
-    int n_deref;
-    int push_words;
+    int push_words, pad;
     int caller_nptr, n_reg;
     struct umbra_uniform_reg *reg;
 
-    struct deref_info *deref;
     uint8_t          *buf_rw;
     uint8_t          *buf_shift;
 
@@ -327,26 +325,6 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
         push_data[3 + vp->total_bufs + i] = (uint32_t)buf[i].stride;
     }
 
-    for (int d = 0; d < vp->n_deref; d++) {
-        char const *uni = (char const*)buf[vp->deref[d].src_buf].ptr
-                                + vp->deref[d].off * 4;
-        struct umbra_buf src;
-        memcpy(&src, uni, sizeof src);
-        void *derived  = src.ptr;
-        int   dcount   = src.count;
-        int   dstride  = src.stride;
-        int bi = vp->deref[d].buf_idx;
-
-        size_t const db = (size_t)dcount << vp->buf_shift[bi];
-        int idx = gpu_buf_cache_get(&be->cache, derived, db, vp->buf_rw[bi]);
-        struct vk_buf_handle *bh = be->cache.entry[idx].buf.ptr;
-        bind_buffer[bi] = bh->buf;
-        bind_range [bi] = VK_WHOLE_SIZE;
-
-        push_data[3 + bi]                    = (uint32_t)dcount;
-        push_data[3 + vp->total_bufs + bi] = (uint32_t)dstride;
-    }
-
     for (int i = 0; i < n; i++) {
         if (bind_buffer[i] == VK_NULL_HANDLE) {
             int idx = gpu_buf_cache_get(&be->cache, 0, 0, 0);
@@ -458,7 +436,6 @@ static void vk_program_free(struct umbra_program *p) {
     vkDestroyPipelineLayout(be->device, vp->pipe_layout, 0);
     vkDestroyDescriptorSetLayout(be->device, vp->ds_layout, 0);
     vkDestroyShaderModule(be->device, vp->shader, 0);
-    free(vp->deref);
     free(vp->buf_rw);
     free(vp->buf_shift);
     free(vp->reg);
@@ -552,9 +529,7 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
     p->pipeline    = pipeline;
     p->max_ptr     = sr.max_ptr;
     p->total_bufs  = sr.total_bufs;
-    p->n_deref     = sr.n_deref;
     p->push_words  = sr.push_words;
-    p->deref       = sr.deref;
     p->buf_rw    = sr.buf_rw;
     p->buf_shift = sr.buf_shift;
     free(sr.buf_row_shift);

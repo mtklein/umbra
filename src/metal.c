@@ -93,13 +93,11 @@ struct metal_program {
     struct umbra_program base;
     void *pipeline;
     char     *src;
-    struct deref_info *deref;
     uint8_t  *buf_rw;
     uint8_t  *buf_shift;
     int    max_ptr;
     int    total_bufs;
-    int    n_deref;
-    int    caller_nptr, n_reg, :32;
+    int    caller_nptr, n_reg;
     struct umbra_uniform_reg *reg;
 };
 
@@ -155,7 +153,6 @@ static char const* uv(char *tmp, char const *vn,
 }
 
 static void emit_ops(SrcBuf *b, IR const *ir,
-                     int const *deref_buf,
                      _Bool *is_f,
                      int lo, int hi, char const *pad) {
     for (int i = lo; i < hi; i++) {
@@ -193,18 +190,14 @@ static void emit_ops(SrcBuf *b, IR const *ir,
                 break;
             case op_join: __builtin_unreachable();
 
-            case op_deref_ptr: break;
-
             case op_uniform_32: {
-                int p = inst->ptr.deref
-                    ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
+                int p = inst->ptr.bits;
                 emit(b,
                      "%suint v%d = p%d[%d];\n",
                      pad, i, p, inst->imm);
             } break;
             case op_load_32: {
-                int p = inst->ptr.deref
-                    ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
+                int p = inst->ptr.bits;
                 emit(b,
                      "%suint v%d = p%d"
                      "[y * m.stride%d + x];\n",
@@ -212,8 +205,7 @@ static void emit_ops(SrcBuf *b, IR const *ir,
             } break;
             case op_gather_uniform_32:
             case op_gather_32: {
-                int p = inst->ptr.deref
-                    ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
+                int p = inst->ptr.bits;
                 emit(b,
                      "%suint v%d = p%d"
                      "[min(%s, m.count%d - 1u)]"
@@ -223,8 +215,7 @@ static void emit_ops(SrcBuf *b, IR const *ir,
                      vx, p, vx, p);
             } break;
             case op_store_32: {
-                int p = inst->ptr.deref
-                    ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
+                int p = inst->ptr.bits;
                 emit(b,
                      "%sp%d[y * m.stride%d + x]"
                      " = %s;\n",
@@ -232,8 +223,7 @@ static void emit_ops(SrcBuf *b, IR const *ir,
                      uv(_uy, vy, yid, is_f));
             } break;
             case op_load_16x4: {
-                int p = inst->ptr.deref
-                    ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
+                int p = inst->ptr.bits;
                 emit(b,
                      "%shalf4 _px%d = p%d"
                      "[y * m.stride%d + x];\n"
@@ -248,8 +238,7 @@ static void emit_ops(SrcBuf *b, IR const *ir,
                      pad, i, i);
             } break;
             case op_load_16x4_planar: {
-                int p = inst->ptr.deref
-                    ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
+                int p = inst->ptr.bits;
                 emit(b,
                      "%suint _row%d = y * m.stride%d;"
                      " uint _ps%d = m.count%d / 4;\n"
@@ -264,8 +253,7 @@ static void emit_ops(SrcBuf *b, IR const *ir,
                      pad, i, p, i, i);
             } break;
             case op_store_16x4: {
-                int p = inst->ptr.deref
-                    ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
+                int p = inst->ptr.bits;
                 emit(b,
                      "%sp%d[y * m.stride%d + x] ="
                      " half4(as_type<half>((ushort)%s),"
@@ -279,8 +267,7 @@ static void emit_ops(SrcBuf *b, IR const *ir,
                      uv(_uw, vw, wid, is_f));
             } break;
             case op_store_16x4_planar: {
-                int p = inst->ptr.deref
-                    ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
+                int p = inst->ptr.bits;
                 emit(b,
                      "%s{ uint _row = y * m.stride%d;"
                      " uint _ps = m.count%d / 4;\n"
@@ -296,8 +283,7 @@ static void emit_ops(SrcBuf *b, IR const *ir,
             } break;
 
             case op_load_8x4: {
-                int p = inst->ptr.deref
-                    ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
+                int p = inst->ptr.bits;
                 emit(b,
                      "%suint px%d = p%d"
                      "[y * m.stride%d + x];\n"
@@ -312,8 +298,7 @@ static void emit_ops(SrcBuf *b, IR const *ir,
                      pad, i, i);
             } break;
             case op_store_8x4: {
-                int p = inst->ptr.deref
-                    ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
+                int p = inst->ptr.bits;
                 emit(b,
                      "%sp%d[y * m.stride%d + x] ="
                      " (%s & 0xFFu) | ((%s & 0xFFu) << 8u)"
@@ -326,16 +311,14 @@ static void emit_ops(SrcBuf *b, IR const *ir,
             } break;
 
             case op_load_16: {
-                int p = inst->ptr.deref
-                    ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
+                int p = inst->ptr.bits;
                 emit(b,
                      "%suint v%d = (uint)"
                      "p%d[y * m.stride%d + x];\n",
                      pad, i, p, p);
             } break;
             case op_gather_16: {
-                int p = inst->ptr.deref
-                    ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
+                int p = inst->ptr.bits;
                 emit(b,
                      "%suint v%d = (uint)p%d"
                      "[min(%s, m.count%d - 1u)]"
@@ -345,8 +328,7 @@ static void emit_ops(SrcBuf *b, IR const *ir,
                      vx, p, vx, p);
             } break;
             case op_store_16: {
-                int p = inst->ptr.deref
-                    ? deref_buf[inst->ptr.ix] : inst->ptr.bits;
+                int p = inst->ptr.bits;
                 emit(b,
                      "%sp%d[y * m.stride%d + x]"
                      " = (ushort)%s;\n",
@@ -852,7 +834,6 @@ static void emit_ops(SrcBuf *b, IR const *ir,
 static char* build_source(IR const *orig_ir,
                            int *out_max_ptr,
                            int *out_total_bufs,
-                           int *out_deref_buf,
                            uint8_t **out_buf_shift,
                            struct umbra_flat_ir **out_resolved) {
     struct umbra_flat_ir *resolved = flat_ir_resolve(orig_ir, JOIN_PREFER_IMM);
@@ -870,14 +851,7 @@ static char* build_source(IR const *orig_ir,
     }
     *out_max_ptr = max_ptr;
 
-    int *deref_buf = out_deref_buf;
-    int next_buf = max_ptr + 1;
-    for (int i = 0; i < ir->insts; i++) {
-        if (ir->inst[i].op == op_deref_ptr) {
-            deref_buf[i] = next_buf++;
-        }
-    }
-    int total_bufs = next_buf;
+    int total_bufs = max_ptr + 1;
     *out_total_bufs = total_bufs;
 
     uint8_t *buf_shift     = calloc((size_t)(total_bufs + 1), sizeof *buf_shift);
@@ -886,8 +860,7 @@ static char* build_source(IR const *orig_ir,
     *out_buf_shift = buf_shift;
     for (int i = 0; i < ir->insts; i++) {
         if (!op_has_ptr(ir->inst[i].op)) { continue; }
-        int bi = ir->inst[i].ptr.deref ? deref_buf[ir->inst[i].ptr.ix]
-                                      : ir->inst[i].ptr.bits;
+        int bi = ir->inst[i].ptr.bits;
         if (op_is_store(ir->inst[i].op)) { buf_written[bi] = 1; }
         if (ir->inst[i].op == op_load_16x4_planar
          || ir->inst[i].op == op_store_16x4_planar) { buf_shift[bi] = 1; buf_row_shift[bi] = 1; }
@@ -928,18 +901,6 @@ static char* build_source(IR const *orig_ir,
              " [[buffer(%d)]]",
              qual, type, p, p + 1);
     }
-    for (int i = 0; i < ir->insts; i++) {
-        if (ir->inst[i].op == op_deref_ptr) {
-            int db = deref_buf[i];
-            char const *type = buf_row_shift[db] == 3 ? "half4"
-                             : buf_shift[db]     == 2 ? "uint" : "ushort";
-            char const *qual = buf_written[db] ? "device" : "device const";
-            emit(&b,
-                 ",\n    %s %s * __restrict p%d"
-                 " [[buffer(%d)]]",
-                 qual, type, db, db + 1);
-        }
-    }
     emit(&b,
          ",\n    uint2 pos"
          " [[thread_position_in_grid]]\n) {\n");
@@ -953,7 +914,7 @@ static char* build_source(IR const *orig_ir,
 
     int const n = ir->insts;
     _Bool *is_f = calloc((size_t)(n + 1), 1);
-    emit_ops(&b, ir, deref_buf, is_f, 0, n, "    ");
+    emit_ops(&b, ir, is_f, 0, n, "    ");
     emit(&b, "}\n");
 
     free(is_f);
@@ -1052,11 +1013,10 @@ static struct metal_program* metal_program(
     struct metal_program *result = 0;
     void *pool = objc_autoreleasePoolPush();
     {
-        int *deref_buf = calloc((size_t)ir->insts, sizeof *deref_buf);
         int  max_ptr = -1, total_bufs = 0;
         uint8_t *buf_shift = NULL;
         struct umbra_flat_ir *resolved = NULL;
-        char *src = build_source(ir, &max_ptr, &total_bufs, deref_buf,
+        char *src = build_source(ir, &max_ptr, &total_bufs,
                                  &buf_shift, &resolved);
         ir = resolved;
 
@@ -1092,25 +1052,10 @@ static struct metal_program* metal_program(
             }
         }
 
-        int n_deref = total_bufs - max_ptr - 1;
-        struct deref_info *di = calloc((size_t)(n_deref ? n_deref : 1), sizeof *di);
-        {
-            int d = 0;
-            for (int i = 0; i < ir->insts; i++) {
-                if (ir->inst[i].op == op_deref_ptr) {
-                    di[d].buf_idx  = deref_buf[i];
-                    di[d].src_buf  = ir->inst[i].ptr.bits;
-                    di[d].off = ir->inst[i].imm;
-                    d++;
-                }
-            }
-        }
-
         uint8_t *buf_rw = calloc((size_t)(total_bufs + 1), sizeof *buf_rw);
         for (int i = 0; i < ir->insts; i++) {
             if (!op_has_ptr(ir->inst[i].op)) { continue; }
-            int bi = ir->inst[i].ptr.deref ? deref_buf[ir->inst[i].ptr.ix]
-                                           : ir->inst[i].ptr.bits;
+            int bi = ir->inst[i].ptr.bits;
             buf_rw[bi] |= op_is_store(ir->inst[i].op) ? BUF_WRITTEN : BUF_READ;
         }
 
@@ -1157,8 +1102,6 @@ static struct metal_program* metal_program(
             p->src           = src;
             p->max_ptr       = max_ptr;
             p->total_bufs    = total_bufs;
-            p->deref         = di;
-            p->n_deref       = n_deref;
             p->buf_rw        = buf_rw;
             p->buf_shift     = buf_shift;
             p->n_reg         = ir->n_uniforms;
@@ -1169,16 +1112,13 @@ static struct metal_program* metal_program(
                 __builtin_memcpy(p->reg, ir->uniforms, sz);
             }
 
-            free(deref_buf);
             umbra_flat_ir_free(resolved);
             result = p;
             goto out;
         }
 
     fail:
-        free(deref_buf);
         umbra_flat_ir_free(resolved);
-        free(di);
         free(buf_rw);
         free(buf_shift);
         free(src);
@@ -1263,22 +1203,6 @@ static void encode_dispatch(
                 bind_handle[i] = be->cache.entry[idx].buf.ptr;
             }
         }
-    }
-
-    for (int d = 0; d < p->n_deref; d++) {
-        char const *uni = (char const*)buf[p->deref[d].src_buf].ptr
-                                + p->deref[d].off * 4;
-        struct umbra_buf src;
-        __builtin_memcpy(&src, uni, sizeof src);
-        void *derived  = src.ptr;
-        int   dcount   = src.count;
-        int   dstride  = src.stride;
-        int const bi    = p->deref[d].buf_idx;
-        size_t const db = (size_t)dcount << p->buf_shift[bi];
-        int const idx   = gpu_buf_cache_get(&be->cache, derived, db, p->buf_rw[bi]);
-        bind_handle[bi] = be->cache.entry[idx].buf.ptr;
-        buf_count[bi]    = (uint32_t)dcount;
-        buf_stride[bi]    = (uint32_t)dstride;
     }
 
     uint32_t meta[67] = {0};
@@ -1378,7 +1302,6 @@ static void metal_program_free(struct metal_program *p) {
     if (p->pipeline) {
         release(p->pipeline);
     }
-    free(p->deref);
     free(p->buf_rw);
     free(p->buf_shift);
     free(p->reg);

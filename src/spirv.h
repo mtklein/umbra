@@ -12,15 +12,13 @@ enum {
 
 struct spirv_result {
     uint32_t         *spirv;
-    struct deref_info *deref;
     uint8_t          *buf_rw;
     uint8_t          *buf_shift;
     uint8_t          *buf_row_shift;
     int               spirv_words;
     int               max_ptr;
     int               total_bufs;
-    int               n_deref;
-    int               push_words, :32;
+    int               push_words;
 };
 
 struct spirv_result build_spirv(struct umbra_flat_ir const *ir, int flags);

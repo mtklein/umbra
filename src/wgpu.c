@@ -91,12 +91,10 @@ struct wgpu_program {
 
     int max_ptr;
     int total_bufs;
-    int n_deref;
-    int push_words;
+    int push_words, pad;
     int caller_nptr, n_reg;
     struct umbra_uniform_reg *reg;
 
-    struct deref_info *deref;
     uint8_t          *buf_rw;
     uint8_t          *buf_shift;
 
@@ -330,7 +328,7 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
         &(WGPUShaderModuleDescriptor){
             .nextInChain = &spirv_src.chain,
         });
-    if (!shader) { free(sr.spirv); free(sr.deref); return 0; }
+    if (!shader) { free(sr.spirv); return 0; }
 
     int n_desc = sr.total_bufs + 1;
     WGPUBindGroupLayoutEntry *entries =
@@ -374,7 +372,7 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
         wgpuPipelineLayoutRelease(pipe_layout);
         wgpuBindGroupLayoutRelease(bg_layout);
         wgpuShaderModuleRelease(shader);
-        free(sr.spirv); free(sr.deref);
+        free(sr.spirv);
         return 0;
     }
 
@@ -386,9 +384,7 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
     p->pipeline    = pipeline;
     p->max_ptr     = sr.max_ptr;
     p->total_bufs  = sr.total_bufs;
-    p->n_deref     = sr.n_deref;
     p->push_words  = sr.push_words;
-    p->deref       = sr.deref;
     p->buf_rw    = sr.buf_rw;
     p->buf_shift = sr.buf_shift;
     free(sr.buf_row_shift);
@@ -463,25 +459,6 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
     for (int i = 0; i <= p->max_ptr; i++) {
         push_data[3 + i]                    = (uint32_t)buf[i].count;
         push_data[3 + p->total_bufs + i] = (uint32_t)buf[i].stride;
-    }
-
-    for (int d = 0; d < p->n_deref; d++) {
-        char const *uni = (char const*)buf[p->deref[d].src_buf].ptr
-                                + p->deref[d].off * 4;
-        struct umbra_buf src;
-        memcpy(&src, uni, sizeof src);
-        void *derived  = src.ptr;
-        int   dcount   = src.count;
-        int   dstride  = src.stride;
-        int bi = p->deref[d].buf_idx;
-
-        size_t const db = (size_t)dcount << p->buf_shift[bi];
-        int idx = gpu_buf_cache_get(&be->cache, derived, db, p->buf_rw[bi]);
-        bind_buf [bi] = be->cache.entry[idx].buf.ptr;
-        bind_size[bi] = be->cache.entry[idx].buf.size;
-
-        push_data[3 + bi]                    = (uint32_t)dcount;
-        push_data[3 + p->total_bufs + bi] = (uint32_t)dstride;
     }
 
     // Fill unbound slots with dummy buffers.
@@ -596,7 +573,6 @@ static void wgpu_program_free(struct umbra_program *prog) {
     wgpuBindGroupLayoutRelease(p->bg_layout);
     wgpuShaderModuleRelease(p->shader);
     free(p->spirv);
-    free(p->deref);
     free(p->buf_rw);
     free(p->buf_shift);
     free(p->reg);

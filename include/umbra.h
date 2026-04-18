@@ -52,20 +52,10 @@ void umbra_program_free(struct umbra_program*);
 typedef struct { int id:30; unsigned chan:2; } umbra_val16;
 typedef struct { int id:30; unsigned chan:2; } umbra_val32;
 
-// TODO: explore what it'd take to remove the deref feature
-
-// Pointer handles.  `ix` indexes into the caller's buf[] at dispatch time;
-// `deref` marks pointers returned by umbra_deref_ptr16/32 as one-level
-// indirections, resolved per-backend at code gen.
-typedef struct { int ix:31, deref:1; } umbra_ptr16;
-typedef struct { int ix:31, deref:1; } umbra_ptr32;
-typedef struct { int ix:31, deref:1; } umbra_ptr64;
-
-// Read a pointer value out of a uniform slot, giving a new ptr handle that
-// addresses the memory it points at.  Used to reach through struct umbra_buf
-// fields like .ptr (e.g. coverage_bitmap's 8-bit glyph mask).
-umbra_ptr16 umbra_deref_ptr16(struct umbra_builder*, umbra_ptr32 buf, int slot);
-umbra_ptr32 umbra_deref_ptr32(struct umbra_builder*, umbra_ptr32 buf, int slot);
+// Pointer handles.  `ix` indexes into the caller's buf[] at dispatch time.
+typedef struct { int ix; } umbra_ptr16;
+typedef struct { int ix; } umbra_ptr32;
+typedef struct { int ix; } umbra_ptr64;
 
 // Register a span of uniform data, returning a ptr handle for use with
 // umbra_uniform_32() and/or umbra_gather_32().  The uniforms are not retained

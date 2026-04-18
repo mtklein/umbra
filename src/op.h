@@ -29,7 +29,6 @@ enum {
     X(store_16x4,                           OP_STORE|OP_PTR|OP_VARYING)                    \
     X(store_16x4_planar,                    OP_STORE|OP_PTR|OP_VARYING)                    \
     X(store_8x4,                            OP_STORE|OP_PTR|OP_VARYING)                    \
-    X(deref_ptr,                            OP_PTR)                                        \
     X(fma_f32,                              0)                                             \
     X(fms_f32,                              0)                                             \
     X(square_add_f32,                       0)                                             \

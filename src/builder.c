@@ -44,7 +44,7 @@ static _Bool dedup_match(int id, void *ctx) {
 static val push_(builder *b, struct ir_inst inst) {
     {
         enum op const op = inst.op;
-        if (op == op_imm_32 || op == op_uniform_32 || op == op_deref_ptr) {
+        if (op == op_imm_32 || op == op_uniform_32) {
             inst.uniform = 1;
         } else if (op == op_load_var) {
             inst.uniform = b->var_uniform[inst.imm];
@@ -162,15 +162,6 @@ umbra_val32 umbra_imm_f32(builder *b, float v) {
         int   i;
     } const u = {.f = v};
     return umbra_imm_i32(b, u.i);
-}
-
-umbra_ptr16 umbra_deref_ptr16(builder *b, umbra_ptr32 buf, int slot) {
-    val const v = push(b, op_deref_ptr, .ptr = {.p32 = buf}, .imm = slot);
-    return (umbra_ptr16){.ix = v.id, .deref = -1};
-}
-umbra_ptr32 umbra_deref_ptr32(builder *b, umbra_ptr32 buf, int slot) {
-    val const v = push(b, op_deref_ptr, .ptr = {.p32 = buf}, .imm = slot);
-    return (umbra_ptr32){.ix = v.id, .deref = -1};
 }
 
 umbra_val16 umbra_gather_16(builder *b, umbra_ptr16 src, umbra_val32 ix) {

@@ -243,9 +243,6 @@ typedef struct {
     // Track which values are float type (vs uint).
     _Bool *is_f;
 
-    // Map from ir_inst index -> deref buffer index.
-    int *deref_buf;
-
     // Per-buffer flag: true if the buffer needs 16-bit typed access.
     _Bool *buf_is_16;
     _Bool *buf_is_16x4;
@@ -465,9 +462,9 @@ static uint32_t get_val(SpvBuilder *b, val v) {
 
 static int get_id(val v) { return v.id; }
 
-// Resolve a pointer index: if negative, it's a deref reference.
 static int resolve_ptr(SpvBuilder *b, struct ir_inst const *inst) {
-    return inst->ptr.deref ? b->deref_buf[inst->ptr.ix] : inst->ptr.bits;
+    (void)b;
+    return inst->ptr.bits;
 }
 
 // Load a metadata word from the push constant block at a given word offset.
@@ -608,42 +605,15 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     }
     result.max_ptr = max_ptr;
 
-    int *deref_buf = calloc((size_t)(ir->insts + 1), sizeof *deref_buf);
-    B.deref_buf = deref_buf;
-    int next_buf = max_ptr + 1;
-    for (int i = 0; i < ir->insts; i++) {
-        if (ir->inst[i].op == op_deref_ptr) {
-            deref_buf[i] = next_buf++;
-        }
-    }
-    int const total_bufs = next_buf;
-    int const n_deref    = total_bufs - max_ptr - 1;
+    int const total_bufs = max_ptr + 1;
     result.total_bufs = total_bufs;
-    result.n_deref = n_deref;
     B.total_bufs = total_bufs;
-
-    struct deref_info *di = calloc((size_t)(n_deref ? n_deref : 1), sizeof *di);
-    {
-        int d = 0;
-        for (int i = 0; i < ir->insts; i++) {
-            if (ir->inst[i].op == op_deref_ptr) {
-                di[d].buf_idx  = deref_buf[i];
-                di[d].src_buf  = ir->inst[i].ptr.bits;
-                di[d].off = ir->inst[i].imm;
-                d++;
-            }
-        }
-    }
-    result.deref = di;
 
     B.buf_is_16   = calloc((size_t)(total_bufs + 1), sizeof *B.buf_is_16);
     B.buf_is_16x4 = calloc((size_t)(total_bufs + 1), sizeof *B.buf_is_16x4);
     for (int i = 0; i < ir->insts; i++) {
         enum op op = ir->inst[i].op;
-        int p = op_has_ptr(op)
-            ? (ir->inst[i].ptr.deref ? deref_buf[ir->inst[i].ptr.ix]
-                                     : ir->inst[i].ptr.bits)
-            : -1;
+        int p = op_has_ptr(op) ? ir->inst[i].ptr.bits : -1;
         if (op == op_load_16 || op == op_store_16 || op == op_gather_16
          || op == op_load_16x4_planar || op == op_store_16x4_planar) {
             B.buf_is_16[p] = 1;
@@ -660,8 +630,7 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     uint8_t *buf_row_shift = calloc((size_t)(total_bufs + 1), sizeof *buf_row_shift);
     for (int i = 0; i < ir->insts; i++) {
         if (!op_has_ptr(ir->inst[i].op)) { continue; }
-        int p = ir->inst[i].ptr.deref ? deref_buf[ir->inst[i].ptr.ix]
-                                      : ir->inst[i].ptr.bits;
+        int p = ir->inst[i].ptr.bits;
         buf_rw[p] |= op_is_store(ir->inst[i].op) ? BUF_WRITTEN : BUF_READ;
         if      (ir->inst[i].op == op_gather_16)        { buf_shift[p] = 1; }
         else if (ir->inst[i].op == op_load_16x4_planar
@@ -1187,10 +1156,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                     B.val[i] = spv_const_u32(&B, (uint32_t)inst->imm);
                     break;
                 case op_join: __builtin_unreachable();
-
-                case op_deref_ptr:
-                    // Deref is handled on the host side. Nothing to emit in shader.
-                    break;
 
                 case op_uniform_32: {
                     int p = resolve_ptr(&B, inst);
@@ -1990,7 +1955,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     free(B.buf_is_16x4);
     free(B.const_cache);
     free(v_vars);
-    free(deref_buf);
 
     umbra_flat_ir_free(resolved);
 

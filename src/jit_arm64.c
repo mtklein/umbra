@@ -85,35 +85,14 @@ static void load_ptr(Buf *c, int p, int *last_ptr, int elem_shift) {
     }
 }
 
-static void resolve_ptr(Buf *c, ptr p, int *last_ptr, int const *deref_gpr,
-                        int const *deref_rb_gpr, int elem_shift) {
-    if (p.deref) {
-        *last_ptr = -1;
-        int const gpr = deref_gpr[p.ix],
-                  rbg = deref_rb_gpr[p.ix];
-        if (rbg > 0) {
-            if (elem_shift) {
-                put(c, LSL_xi(XT, rbg, elem_shift));
-                put(c, MADD_x(XP, XY, XT, gpr));
-            } else {
-                put(c, MADD_x(XP, XY, rbg, gpr));
-            }
-        } else {
-            put(c, ADD_xi(XP, gpr, 0));
-        }
-    } else {
-        load_ptr(c, p.bits, last_ptr, elem_shift);
-    }
+static void resolve_ptr(Buf *c, ptr p, int *last_ptr, int elem_shift) {
+    load_ptr(c, p.bits, last_ptr, elem_shift);
 }
 
 static void load_count(Buf *c, ptr p) {
-    if (p.deref) {
-        put(c, MOVZ_x_lsl16(XM, 0x7fff));
-    } else {
-        int const disp = p.bits * (int)sizeof(struct umbra_buf)
-                              + (int)__builtin_offsetof(struct umbra_buf, count);
-        put(c, LDR_wi(XM, XBUF, disp / 4));
-    }
+    int const disp = p.bits * (int)sizeof(struct umbra_buf)
+                          + (int)__builtin_offsetof(struct umbra_buf, count);
+    put(c, LDR_wi(XM, XBUF, disp / 4));
 }
 
 static int8_t const pair_lo[] = { 4,  6, 16, 18, 20, 22, 24, 26, 28, 30,  8, 10, 12, 14};
@@ -290,8 +269,8 @@ static struct ra* ra_create_arm64(struct umbra_flat_ir const *ir, struct jit_ctx
 }
 
 static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
-                     int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
-                     int *deref_rb_gpr, struct jit_ctx *jc);
+                     int *sl, int *ns, struct ra *ra, _Bool scalar,
+                     struct jit_ctx *jc);
 
 struct jit_program* jit_program(struct jit_backend *be,
                                            struct umbra_flat_ir const *ir) {
@@ -301,8 +280,6 @@ struct jit_program* jit_program(struct jit_backend *be,
     int *sl = malloc((size_t)ir->insts * sizeof(int));
     for (int i = 0; i < ir->insts; i++) { sl[i] = -1; }
     int  ns = 0;
-    int *deref_gpr    = calloc((size_t)ir->insts, sizeof(int));
-    int *deref_rb_gpr = calloc((size_t)ir->insts, sizeof(int));
 
     size_t const pg  = 16384,
                  est = (size_t)(ir->insts * 40 + 256);
@@ -341,7 +318,7 @@ struct jit_program* jit_program(struct jit_backend *be,
     put(&c, ADD_xi(XBUF, 4, 0));      // XBUF = buf
 
     emit_ops(&c, ir, 0, ir->preamble, sl, &ns, ra, 0,
-             deref_gpr, deref_rb_gpr, &jc);
+             &jc);
 
     ra_begin_loop(ra);
 
@@ -372,7 +349,7 @@ struct jit_program* jit_program(struct jit_backend *be,
 
     int const loop_body_start = c.words;
     emit_ops(&c, ir, ir->preamble, ir->insts, sl, &ns, ra, 0,
-             deref_gpr, deref_rb_gpr, &jc);
+             &jc);
 
     ra_end_loop(ra, sl);
 
@@ -392,7 +369,7 @@ struct jit_program* jit_program(struct jit_backend *be,
     for (int i = 0; i < ir->insts; i++) { sl[i] = -1; }
 
     emit_ops(&c, ir, 0, ir->preamble, sl, &ns, ra, 0,
-             deref_gpr, deref_rb_gpr, &jc);
+             &jc);
     if (ir->n_vars > 0) {
         int8_t zr = ra_alloc(ra, sl, &ns);
         put(&c, EOR_16b(lo(zr), lo(zr), lo(zr)));
@@ -402,7 +379,7 @@ struct jit_program* jit_program(struct jit_backend *be,
         ra_return_reg(ra, zr);
     }
     emit_ops(&c, ir, ir->preamble, ir->insts, sl, &ns, ra, 1,
-             deref_gpr, deref_rb_gpr, &jc);
+             &jc);
 
     put(&c, ADD_xi(XCOL, XCOL, 1));
     put(&c, B(tail_top - c.words));
@@ -468,8 +445,6 @@ struct jit_program* jit_program(struct jit_backend *be,
     ra_destroy(ra);
     umbra_flat_ir_free(resolved);
     free(sl);
-    free(deref_gpr);
-    free(deref_rb_gpr);
 
     size_t const code_sz = (size_t)c.words * 4,
                  alloc   = (code_sz + pg - 1) & ~(pg - 1);
@@ -496,28 +471,14 @@ struct jit_program* jit_program(struct jit_backend *be,
 }
 
 static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
-                     int *sl, int *ns, struct ra *ra, _Bool scalar, int *deref_gpr,
-                     int *deref_rb_gpr, struct jit_ctx *jc) {
+                     int *sl, int *ns, struct ra *ra, _Bool scalar,
+                     struct jit_ctx *jc) {
     int last_ptr = -1;
-    int dc = 0;
 
     for (int i = from; i < to; i++) {
         struct ir_inst const *inst = &ir->inst[i];
 
         switch (inst->op) {
-        case op_deref_ptr: {
-            load_ptr(c, inst->ptr.bits, &last_ptr, 2);
-            int gpr    = 3 + dc;
-            int rb_gpr = dc < 2 ? 6 + dc : 0;
-            dc++;
-            deref_gpr[i]    = gpr;
-            deref_rb_gpr[i] = rb_gpr;
-            put(c, LDR_xi(gpr, XP, inst->imm / 2));
-            if (rb_gpr) {
-                put(c, LDR_wi(rb_gpr, XP, inst->imm + 3));
-            }
-        } break;
-
         case op_x: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             put(c, DUP_4s_w(lo(s.rd), XCOL));
@@ -543,7 +504,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
         case op_load_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             ptr            p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
+            resolve_ptr(c, p, &last_ptr, 2);
             if (scalar) {
                 put(c, LDR_sx(lo(s.rd), XP, XI));
             } else {
@@ -556,7 +517,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
         case op_load_16: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             ptr            p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 1);
+            resolve_ptr(c, p, &last_ptr, 1);
             if (scalar) {
                 put(c, LDRH_wr(XT, XP, XI));
                 put(c, DUP_4s_w(lo(s.rd), XT));
@@ -571,7 +532,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
         case op_uniform_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             ptr            p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
+            resolve_ptr(c, p, &last_ptr, 2);
             put(c, LDR_si(lo(s.rd), XP, inst->imm));
             put(c, DUP_4s_lane(lo(s.rd), lo(s.rd), 0));
             put(c, ORR_16b(hi(s.rd), lo(s.rd), lo(s.rd)));
@@ -582,7 +543,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
             ra_free_chan(ra, inst->x, i);
             ptr p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
+            resolve_ptr(c, p, &last_ptr, 2);
             load_count(c, p);
             put(c, UMOV_ws(XT, lo(rx)));
             put(c, MOVI_4s(lo(s.rd), 0, 0));
@@ -600,7 +561,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
             ra_free_chan(ra, inst->x, i);
             ptr p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
+            resolve_ptr(c, p, &last_ptr, 2);
             load_count(c, p);
             if (scalar) {
                 put(c, MOVI_4s(lo(s.rd), 0, 0));
@@ -635,7 +596,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
             ra_free_chan(ra, inst->x, i);
             ptr p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 1);
+            resolve_ptr(c, p, &last_ptr, 1);
             load_count(c, p);
             if (scalar) {
                 put(c, MOVI_4s(lo(s.rd), 0, 0));
@@ -675,7 +636,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
         case op_store_32: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
             ptr    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
+            resolve_ptr(c, p, &last_ptr, 2);
             if (scalar) {
                 put(c, STR_sx(lo(ry), XP, XI));
             } else {
@@ -688,7 +649,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
 
         case op_load_16x4: {
             ptr    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 3);
+            resolve_ptr(c, p, &last_ptr, 3);
             struct ra_step s0 = ra_step_alloc(ra, sl, ns, i);
             int8_t r1 = ra_alloc(ra, sl, ns);
             int8_t r2 = ra_alloc(ra, sl, ns);
@@ -726,7 +687,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             int8_t r2 = ra_alloc(ra, sl, ns);
             int8_t r3 = ra_alloc(ra, sl, ns);
             ptr    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 1);
+            resolve_ptr(c, p, &last_ptr, 1);
             int8_t px = ra_alloc(ra, sl, ns);
             {
                 int const count_off = p.bits * (int)sizeof(struct umbra_buf)
@@ -770,7 +731,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             int8_t rb  = ra_ensure_chan(ra, sl, ns, inst->z.id, (int)inst->z.chan);
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, inst->w.id, (int)inst->w.chan);
             ptr    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 3);
+            resolve_ptr(c, p, &last_ptr, 3);
             if (scalar) {
                 int8_t px = ra_alloc(ra, sl, ns);
                 int8_t t  = ra_alloc(ra, sl, ns);
@@ -810,7 +771,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             int8_t rb  = ra_ensure_chan(ra, sl, ns, inst->z.id, (int)inst->z.chan);
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, inst->w.id, (int)inst->w.chan);
             ptr    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 1);
+            resolve_ptr(c, p, &last_ptr, 1);
             {
                 int const count_off = p.bits * (int)sizeof(struct umbra_buf)
                                     + (int)__builtin_offsetof(struct umbra_buf, count);
@@ -853,7 +814,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             int8_t r2 = ra_alloc(ra, sl, ns);
             int8_t r3 = ra_alloc(ra, sl, ns);
             ptr    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
+            resolve_ptr(c, p, &last_ptr, 2);
             if (scalar) {
                 int8_t px   = ra_alloc(ra, sl, ns);
                 int8_t mask = ra_alloc(ra, sl, ns);
@@ -894,7 +855,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             int8_t rb  = ra_ensure_chan(ra, sl, ns, inst->z.id, (int)inst->z.chan);
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, inst->w.id, (int)inst->w.chan);
             ptr    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 2);
+            resolve_ptr(c, p, &last_ptr, 2);
             if (scalar) {
                 int8_t px = ra_alloc(ra, sl, ns);
                 int8_t t  = ra_alloc(ra, sl, ns);
@@ -927,7 +888,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
         case op_store_16: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
             ptr    p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, deref_gpr, deref_rb_gpr, 1);
+            resolve_ptr(c, p, &last_ptr, 1);
             if (scalar) {
                 put(c, STR_hx(lo(ry), XP, XI));
             } else {

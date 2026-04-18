@@ -192,7 +192,7 @@ static void flat_ir_bind_uniforms(struct umbra_flat_ir *ir) {
     int caller_nptr = 0;
     for (int i = 0; i < ir->insts; i++) {
         ptr const p = ir->inst[i].ptr;
-        if (op_has_ptr(ir->inst[i].op) && !p.deref && p.ix >= 0 && p.ix < REG_BASE
+        if (op_has_ptr(ir->inst[i].op) && p.ix >= 0 && p.ix < REG_BASE
                                        && p.ix >= caller_nptr) {
             caller_nptr = p.ix + 1;
         }
@@ -202,7 +202,7 @@ static void flat_ir_bind_uniforms(struct umbra_flat_ir *ir) {
     }
     for (int i = 0; i < ir->insts; i++) {
         ptr p = ir->inst[i].ptr;
-        if (op_has_ptr(ir->inst[i].op) && !p.deref && p.ix >= REG_BASE) {
+        if (op_has_ptr(ir->inst[i].op) && p.ix >= REG_BASE) {
             int const k = p.ix - REG_BASE;
             ir->inst[i].ptr.ix = ir->uniforms[k].ix;
         }
@@ -226,9 +226,6 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
             b->inst[b->inst[i].y.id].live = 1;
             b->inst[b->inst[i].z.id].live = 1;
             b->inst[b->inst[i].w.id].live = 1;
-            if (b->inst[i].ptr.deref) {
-                b->inst[b->inst[i].ptr.ix].live = 1;
-            }
         }
     }
 
@@ -285,9 +282,6 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
         out[i].y = (val){.id = b->inst[out[i].y.id].final_id, .chan = out[i].y.chan};
         out[i].z = (val){.id = b->inst[out[i].z.id].final_id, .chan = out[i].z.chan};
         out[i].w = (val){.id = b->inst[out[i].w.id].final_id, .chan = out[i].w.chan};
-        if (out[i].ptr.deref) {
-            out[i].ptr = (ptr){.ix = b->inst[out[i].ptr.ix].final_id, .deref = -1};
-        }
     }
 
     struct umbra_flat_ir *result = calloc(1, sizeof *result);
@@ -364,9 +358,6 @@ struct umbra_flat_ir* flat_ir_resolve(struct umbra_flat_ir const *ir,
             live[ip->y.id] = 1;
             live[ip->z.id] = 1;
             live[ip->w.id] = 1;
-            if (ip->ptr.deref) {
-                live[ip->ptr.ix] = 1;
-            }
         }
     }
 
@@ -391,9 +382,6 @@ struct umbra_flat_ir* flat_ir_resolve(struct umbra_flat_ir const *ir,
         out[j].y = remap_val(inst[i].y, remap);
         out[j].z = remap_val(inst[i].z, remap);
         out[j].w = remap_val(inst[i].w, remap);
-        if (inst[i].ptr.deref) {
-            out[j].ptr.ix = remap[inst[i].ptr.ix];
-        }
         j++;
     }
 
@@ -466,7 +454,6 @@ static void dump_insts(struct ir_inst const *inst, int insts, FILE *f) {
         case op_load_16x4:
         case op_load_16x4_planar:
         case op_load_8x4: fprintf(f, " p%d", ip->ptr.bits); break;
-        case op_deref_ptr: fprintf(f, " p%d [%d]", ip->ptr.bits, ip->imm); break;
         case op_loop_begin: fprintf(f, " v%d", ip->x.id); break;
         case op_if_begin: fprintf(f, " v%d", ip->x.id); break;
         case op_load_var: fprintf(f, " var%d", ip->imm); break;
