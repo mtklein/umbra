@@ -50,80 +50,10 @@ void              umbra_store_fp16       (struct umbra_builder*, umbra_ptr64, um
 umbra_color_val32 umbra_load_fp16_planar (struct umbra_builder*, umbra_ptr16);
 void              umbra_store_fp16_planar(struct umbra_builder*, umbra_ptr16, umbra_color_val32);
 
-struct umbra_shader {
-    umbra_color_val32 (*build)(struct umbra_shader*,
-                               struct umbra_builder*,
-                               umbra_ptr32 uniforms,
-                               umbra_val32 x, umbra_val32 y);
-    void             (*free)(struct umbra_shader*);
-    struct umbra_buf   uniforms;
-};
-void umbra_shader_free(struct umbra_shader*);
-
-struct umbra_coverage {
-    umbra_val32 (*build)(struct umbra_coverage*,
-                         struct umbra_builder*,
-                         umbra_ptr32 uniforms,
-                         umbra_val32 x, umbra_val32 y);
-    void             (*free)(struct umbra_coverage*);
-    struct umbra_buf   uniforms;
-};
-void umbra_coverage_free(struct umbra_coverage*);
-
-// Signed distance function returning f(x,y) where f < 0 means inside.
-struct umbra_sdf {
-    umbra_interval (*build)(struct umbra_sdf*,
-                            struct umbra_builder*,
-                            umbra_ptr32 uniforms,
-                            umbra_interval x, umbra_interval y);
-    void             (*free)(struct umbra_sdf*);
-    struct umbra_buf   uniforms;
-};
-void umbra_sdf_free(struct umbra_sdf*);
-
-// Compute the umbra_buf for a concrete effect whose base vtable is at offset 0.
-// The data starts right after the base and runs to the end of the struct.
-// `self` is a pointer to the concrete effect.  Use at construction time to set
-// `.base.uniforms`.  The effect must stay put after construction — no move, no
-// by-value copy — since `.ptr` is an absolute address.  Forwarding wrappers
-// (umbra_shader_supersample, umbra_sdf_coverage) set `.uniforms` to the wrapped
-// effect's resolved uniforms buf instead.
-#define UMBRA_UNIFORMS_OF(self)                                                 \
-    ((struct umbra_buf){                                                        \
-        .ptr   = (char*)(self) + sizeof((self)->base),                          \
-        .count = (int)((sizeof *(self) - sizeof((self)->base)) / 4),            \
-    })
-
-// TODO: bool hard_edge -> int quality
-
-struct umbra_coverage* umbra_sdf_coverage(struct umbra_sdf*, _Bool hard_edge);
-
-// Blend fns take void *ctx for the flat-effect convention.  Built-in blends
-// are stateless and ignore it; old callers of umbra_draw_builder still pass
-// them by name -- the old middleware just threads NULL as ctx through to
-// the underlying blend call.
-typedef umbra_color_val32 (*umbra_blend_fn)(void *ctx, struct umbra_builder*,
-                                            umbra_color_val32 src, umbra_color_val32 dst);
-umbra_color_val32 umbra_blend_src     (void *ctx, struct umbra_builder*,
-                                       umbra_color_val32 src, umbra_color_val32 dst);
-umbra_color_val32 umbra_blend_srcover (void *ctx, struct umbra_builder*,
-                                       umbra_color_val32 src, umbra_color_val32 dst);
-umbra_color_val32 umbra_blend_dstover (void *ctx, struct umbra_builder*,
-                                       umbra_color_val32 src, umbra_color_val32 dst);
-umbra_color_val32 umbra_blend_multiply(void *ctx, struct umbra_builder*,
-                                       umbra_color_val32 src, umbra_color_val32 dst);
-
-struct umbra_builder* umbra_draw_builder(struct umbra_coverage*,
-                                         struct umbra_shader*,
-                                         umbra_blend_fn,
-                                         struct umbra_fmt);
-
-// New middleware: flat effect fn pointers that take a caller-owned context
-// pointer as first arg, register their uniforms via umbra_uniforms(), and
-// compose via umbra_draw_builder2().  The old struct-based path above stays
-// in place; effects migrate over one at a time.  These typedefs live in the
-// ordinary-identifier namespace, coexistent with `struct umbra_shader` etc.
-// in the tag namespace.
+// Flat effect fn pointers.  Each takes a caller-owned context pointer as first
+// arg and emits IR to compute its output; effects register any live uniforms
+// via umbra_uniforms() so the program captures host pointers, and the caller
+// retains ownership of that storage until the program is freed.
 typedef umbra_color_val32 (*umbra_shader)  (void *ctx, struct umbra_builder*,
                                             umbra_val32 x, umbra_val32 y);
 typedef umbra_val32       (*umbra_coverage)(void *ctx, struct umbra_builder*,
@@ -134,7 +64,20 @@ typedef umbra_color_val32 (*umbra_blend)   (void *ctx, struct umbra_builder*,
                                             umbra_color_val32 src,
                                             umbra_color_val32 dst);
 
-struct umbra_builder* umbra_draw_builder2(
+umbra_color_val32 umbra_blend_src     (void *ctx, struct umbra_builder*,
+                                       umbra_color_val32 src, umbra_color_val32 dst);
+umbra_color_val32 umbra_blend_srcover (void *ctx, struct umbra_builder*,
+                                       umbra_color_val32 src, umbra_color_val32 dst);
+umbra_color_val32 umbra_blend_dstover (void *ctx, struct umbra_builder*,
+                                       umbra_color_val32 src, umbra_color_val32 dst);
+umbra_color_val32 umbra_blend_multiply(void *ctx, struct umbra_builder*,
+                                       umbra_color_val32 src, umbra_color_val32 dst);
+
+// Compose a (coverage, shader, blend) triple into an IR builder that stores
+// into the dst pointer at ptr.ix = 0.  Any of the three may be NULL to skip
+// that stage.  Each non-NULL pair (fn, ctx) is passed through to the emitted
+// IR; the caller retains ownership of each ctx.
+struct umbra_builder* umbra_draw_builder(
     umbra_coverage coverage_fn, void *coverage_ctx,
     umbra_shader   shader_fn,   void *shader_ctx,
     umbra_blend    blend_fn,    void *blend_ctx,
@@ -145,26 +88,31 @@ struct umbra_sdf_draw_config {
 };
 
 struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend*,
-                                      struct umbra_sdf*,
+                                      umbra_sdf sdf_fn,    void *sdf_ctx,
                                       struct umbra_sdf_draw_config,
-                                      struct umbra_shader*,
-                                      umbra_blend_fn,
+                                      umbra_shader shader_fn, void *shader_ctx,
+                                      umbra_blend blend_fn,   void *blend_ctx,
                                       struct umbra_fmt);
 void umbra_sdf_draw_queue(struct umbra_sdf_draw const*,
                               int l, int t, int r, int b, struct umbra_buf[]);
 void umbra_sdf_draw_free(struct umbra_sdf_draw*);
 
-// Flat shader: caller owns an umbra_color; pass &color as the shader_ctx to
-// umbra_draw_builder2 (or wrap via umbra_shader_wrap for old-middleware
-// composers).  Mutating *color between queue() calls is reflected on next
-// dispatch.
+// Flat shader: caller owns an umbra_color; pass &color as shader_ctx.
+// Mutating *color between queue() calls is reflected on next dispatch.
 umbra_color_val32 umbra_shader_solid(void *ctx, struct umbra_builder*,
                                      umbra_val32 x, umbra_val32 y);
 
-// Wrap any flat shader (fn, ctx) into a struct umbra_shader* for composers
-// that haven't migrated yet.  Caller retains ownership of ctx storage until
-// the returned wrapper is freed via umbra_shader_free().
-struct umbra_shader* umbra_shader_wrap(umbra_shader fn, void *ctx);
+// Flat coverage: caller owns a struct umbra_coverage_from_sdf holding the
+// underlying sdf (fn + ctx) plus a hard_edge flag.  hard_edge = 1 gives a
+// binary mask (cov = sdf < 0 ? 1 : 0); hard_edge = 0 clamps -sdf into [0, 1]
+// for a 1px AA ramp.  sdf_fn / sdf_ctx / hard_edge are baked at IR-emit time.
+struct umbra_coverage_from_sdf {
+    umbra_sdf  sdf_fn;
+    void      *sdf_ctx;
+    int        hard_edge, :32;
+};
+umbra_val32 umbra_coverage_from_sdf(void *ctx, struct umbra_builder*,
+                                     umbra_val32 x, umbra_val32 y);
 
 // A gradient is (x,y) -> t -> color.  umbra_gradient_coords is the first leg,
 // a first-class effect in the same shape as umbra_shader / umbra_coverage /
@@ -250,27 +198,15 @@ struct umbra_supersample {
 umbra_color_val32 umbra_shader_supersample(void *ctx, struct umbra_builder*,
                                             umbra_val32 x, umbra_val32 y);
 
-// Flat coverage: caller owns an umbra_rect; pass &rect as coverage_ctx to
-// umbra_draw_builder2 (or wrap via umbra_coverage_wrap for old-middleware
-// composers).  Mutation between queue() calls is reflected on next dispatch.
+// Flat coverage: caller owns an umbra_rect; pass &rect as coverage_ctx.
+// Mutation between queue() calls is reflected on next dispatch.
 umbra_val32 umbra_coverage_rect(void *ctx, struct umbra_builder*,
                                  umbra_val32 x, umbra_val32 y);
 
-// Wrap any flat coverage (fn, ctx) into a struct umbra_coverage* for composers
-// that haven't migrated yet.  Caller retains ownership of ctx storage until
-// the returned wrapper is freed via umbra_coverage_free().
-struct umbra_coverage* umbra_coverage_wrap(umbra_coverage fn, void *ctx);
-
-// Flat SDF: caller owns an umbra_rect; pass &rect as the sdf_ctx (or wrap via
-// umbra_sdf_wrap for old-middleware composers).  Mutation between queue() calls
-// is reflected on next dispatch.
+// Flat SDF: caller owns an umbra_rect; pass &rect as sdf_ctx.  Mutation
+// between queue() calls is reflected on next dispatch.
 umbra_interval umbra_sdf_rect(void *ctx, struct umbra_builder*,
                               umbra_interval x, umbra_interval y);
-
-// Wrap any flat sdf (fn, ctx) into a struct umbra_sdf* for composers that
-// haven't migrated yet.  Caller retains ownership of ctx storage until the
-// returned wrapper is freed via umbra_sdf_free().
-struct umbra_sdf* umbra_sdf_wrap(umbra_sdf fn, void *ctx);
 
 // Flat coverage samplers: caller owns a struct umbra_buf and passes &buf as
 // coverage_ctx.  Mutating *buf between queue() calls is reflected on next

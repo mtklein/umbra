@@ -36,7 +36,7 @@ static void grad_prepare(struct slide *s, struct umbra_backend *be, struct umbra
     if (st->fmt.name != fmt.name || !st->ir) {
         st->fmt = fmt;
         umbra_flat_ir_free(st->ir);
-        struct umbra_builder *b = umbra_draw_builder2(
+        struct umbra_builder *b = umbra_draw_builder(
             NULL, NULL,
             st->shader_fn, st->shader_ctx,
             NULL, NULL,
@@ -61,7 +61,7 @@ static int grad_get_builders(struct slide *s, struct umbra_fmt fmt,
                              struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
     struct grad_slide *st = (struct grad_slide *)s;
-    out[0] = umbra_draw_builder2(
+    out[0] = umbra_draw_builder(
         NULL, NULL,
         st->shader_fn, st->shader_ctx,
         NULL, NULL,

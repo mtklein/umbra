@@ -422,8 +422,6 @@ struct slug_two_pass_slide {
 
     umbra_color               color;
     struct umbra_buf          wind_uniform;
-    struct umbra_shader      *shader;
-    struct umbra_coverage    *cov;
     struct umbra_fmt          fmt;
     struct umbra_program     *draw_prog;
 };
@@ -452,8 +450,11 @@ static void slug_two_pass_prepare(struct slide *s,
     };
     st->fmt = fmt;
     {
-        struct umbra_builder *b = umbra_draw_builder(st->cov, st->shader,
-                                                     umbra_blend_srcover, fmt);
+        struct umbra_builder *b = umbra_draw_builder(
+            umbra_coverage_winding, &st->wind_uniform,
+            umbra_shader_solid,     &st->color,
+            umbra_blend_srcover,    NULL,
+            fmt);
         struct umbra_flat_ir *ir = umbra_flat_ir(b);
         umbra_builder_free(b);
         st->draw_prog = be->compile(be, ir);
@@ -491,8 +492,6 @@ static void slug_two_pass_draw(struct slide *s, double secs, int l, int t, int r
 
     struct umbra_buf rbuf[] = {
         {.ptr=buf, .count=w * h * st->fmt.planes, .stride=w},
-        st->cov->uniforms,
-        st->shader->uniforms,
     };
     st->draw_prog->queue(st->draw_prog, l, t, r, b, rbuf);
 }
@@ -502,7 +501,11 @@ static int slug_two_pass_get_builders(struct slide *s, struct umbra_fmt fmt,
     if (max < 2) { return 0; }
     out[0] = slug_build_acc();
     struct slug_two_pass_slide *st = (struct slug_two_pass_slide *)s;
-    out[1] = umbra_draw_builder(st->cov, st->shader, umbra_blend_srcover, fmt);
+    out[1] = umbra_draw_builder(
+        umbra_coverage_winding, &st->wind_uniform,
+        umbra_shader_solid,     &st->color,
+        umbra_blend_srcover,    NULL,
+        fmt);
     return 2;
 }
 
@@ -513,16 +516,12 @@ static void slug_two_pass_free(struct slide *s) {
     umbra_program_free(st->acc_prog);
     umbra_flat_ir_free(st->acc_ir);
     umbra_program_free(st->draw_prog);
-    umbra_shader_free  (st->shader);
-    umbra_coverage_free(st->cov);
     free(st);
 }
 
 SLIDE(slide_slug_wind) {
     struct slug_two_pass_slide *st = calloc(1, sizeof *st);
-    st->color  = (umbra_color){0.2f, 1.0f, 0.6f, 1.0f};
-    st->shader = umbra_shader_wrap(umbra_shader_solid, &st->color);
-    st->cov    = umbra_coverage_wrap(umbra_coverage_winding, &st->wind_uniform);
+    st->color = (umbra_color){0.2f, 1.0f, 0.6f, 1.0f};
     st->base = (struct slide){
         .title = "Slug (two-pass)",
         .bg = {0.12f, 0.04f, 0.04f, 1},
@@ -546,8 +545,6 @@ struct slug_slide {
 
     umbra_color                   color;
     struct umbra_buf              wind_uniform;
-    struct umbra_shader          *shader;
-    struct umbra_coverage        *cov;
     struct umbra_fmt              fmt;
     struct umbra_program         *draw_prog;
 };
@@ -575,8 +572,11 @@ static void slug_prepare(struct slide *s, struct umbra_backend *be,
     };
     st->fmt = fmt;
     {
-        struct umbra_builder *b = umbra_draw_builder(st->cov, st->shader,
-                                                     umbra_blend_srcover, fmt);
+        struct umbra_builder *b = umbra_draw_builder(
+            umbra_coverage_winding, &st->wind_uniform,
+            umbra_shader_solid,     &st->color,
+            umbra_blend_srcover,    NULL,
+            fmt);
         struct umbra_flat_ir *ir = umbra_flat_ir(b);
         umbra_builder_free(b);
         st->draw_prog = be->compile(be, ir);
@@ -613,8 +613,6 @@ static void slug_draw(struct slide *s, double secs, int l, int t, int r, int b, 
 
     struct umbra_buf rbuf[] = {
         {.ptr=buf, .count=w * h * st->fmt.planes, .stride=w},
-        st->cov->uniforms,
-        st->shader->uniforms,
     };
     st->draw_prog->queue(st->draw_prog, l, t, r, b, rbuf);
 }
@@ -626,8 +624,6 @@ static void slug_free_slide(struct slide *s) {
     umbra_program_free(st->acc_prog);
     umbra_flat_ir_free(st->acc_ir);
     umbra_program_free(st->draw_prog);
-    umbra_shader_free  (st->shader);
-    umbra_coverage_free(st->cov);
     free(st);
 }
 
@@ -642,9 +638,7 @@ static int slug_one_pass_get_builders(struct slide *s, struct umbra_fmt fmt,
 
 SLIDE(slide_slug_wind_loop) {
     struct slug_slide *st = calloc(1, sizeof *st);
-    st->color  = (umbra_color){0.2f, 1.0f, 0.6f, 1.0f};
-    st->shader = umbra_shader_wrap(umbra_shader_solid, &st->color);
-    st->cov    = umbra_coverage_wrap(umbra_coverage_winding, &st->wind_uniform);
+    st->color = (umbra_color){0.2f, 1.0f, 0.6f, 1.0f};
     st->base = (struct slide){
         .title = "Slug (one-pass)",
         .bg = {0.12f, 0.04f, 0.04f, 1},

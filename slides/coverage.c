@@ -123,15 +123,13 @@ struct text_slide {
 
     struct text_cov *tc;
     int              w, h;
-    int              is_sdf, :32;
 
-    umbra_color                color;
-    struct umbra_buf           buf;
-    struct umbra_shader       *shader;
-    struct umbra_coverage     *cov;
+    umbra_color       color;
+    struct umbra_buf  buf;
+    umbra_coverage    coverage_fn;
 
-    struct umbra_fmt            fmt;
-    struct umbra_program      *prog;
+    struct umbra_fmt      fmt;
+    struct umbra_program *prog;
 };
 
 static void text_init(struct slide *s, int w, int h) {
@@ -150,8 +148,11 @@ static void text_prepare(struct slide *s, struct umbra_backend *be,
         .stride = st->w,
     };
     st->fmt = fmt;
-    struct umbra_builder *b = umbra_draw_builder(st->cov, st->shader,
-                                                 umbra_blend_srcover, fmt);
+    struct umbra_builder *b = umbra_draw_builder(
+        st->coverage_fn,    &st->buf,
+        umbra_shader_solid, &st->color,
+        umbra_blend_srcover, NULL,
+        fmt);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
     st->prog = be->compile(be, ir);
@@ -165,8 +166,6 @@ static void text_draw(struct slide *s, double secs, int l, int t, int r, int b, 
     slide_bg_draw(s->bg, l, t, r, b, buf);
     struct umbra_buf ubuf[] = {
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
-        st->cov->uniforms,
-        st->shader->uniforms,
     };
     st->prog->queue(st->prog, l, t, r, b, ubuf);
 }
@@ -175,26 +174,25 @@ static int text_get_builders(struct slide *s, struct umbra_fmt fmt,
                              struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
     struct text_slide *st = (struct text_slide *)s;
-    out[0] = umbra_draw_builder(st->cov, st->shader,
-                                umbra_blend_srcover, fmt);
+    out[0] = umbra_draw_builder(
+        st->coverage_fn,    &st->buf,
+        umbra_shader_solid, &st->color,
+        umbra_blend_srcover, NULL,
+        fmt);
     return out[0] ? 1 : 0;
 }
 
 static void text_free(struct slide *s) {
     struct text_slide *st = (struct text_slide *)s;
     umbra_program_free(st->prog);
-    umbra_shader_free  (st->shader);
-    umbra_coverage_free(st->cov);
     free(st);
 }
 
 SLIDE(slide_coverage_bitmap) {
     struct text_slide *st = calloc(1, sizeof *st);
-    st->tc     = text_shared_bitmap();
-    st->is_sdf = 0;
-    st->color  = (umbra_color){1.0f, 1.0f, 1.0f, 1.0f};
-    st->shader = umbra_shader_wrap(umbra_shader_solid, &st->color);
-    st->cov    = umbra_coverage_wrap(umbra_coverage_bitmap, &st->buf);
+    st->tc          = text_shared_bitmap();
+    st->color       = (umbra_color){1.0f, 1.0f, 1.0f, 1.0f};
+    st->coverage_fn = umbra_coverage_bitmap;
     st->base = (struct slide){
         .title = "Coverage (8-bit bitmap)",
         .bg = {0.18f, 0.1f, 0.1f, 1},
@@ -209,11 +207,9 @@ SLIDE(slide_coverage_bitmap) {
 
 SLIDE(slide_coverage_sdf_bitmap) {
     struct text_slide *st = calloc(1, sizeof *st);
-    st->tc     = text_shared_sdf();
-    st->is_sdf = 1;
-    st->color  = (umbra_color){0.2f, 0.8f, 1.0f, 1.0f};
-    st->shader = umbra_shader_wrap(umbra_shader_solid, &st->color);
-    st->cov    = umbra_coverage_wrap(umbra_coverage_sdf, &st->buf);
+    st->tc          = text_shared_sdf();
+    st->color       = (umbra_color){0.2f, 0.8f, 1.0f, 1.0f};
+    st->coverage_fn = umbra_coverage_sdf;
     st->base = (struct slide){
         .title = "Coverage (SDF bitmap)",
         .bg = {0.18f, 0.1f, 0.1f, 1},
@@ -236,8 +232,6 @@ struct persp_slide {
 
     umbra_color                          color;
     struct umbra_coverage_bitmap_matrix  state;
-    struct umbra_shader                 *shader;
-    struct umbra_coverage               *cov;
 
     struct umbra_fmt                     fmt;
     struct umbra_program                *prog;
@@ -259,8 +253,11 @@ static void persp_prepare(struct slide *s, struct umbra_backend *be,
         .h   = st->bitmap->h,
     };
     st->fmt = fmt;
-    struct umbra_builder *b = umbra_draw_builder(st->cov, st->shader,
-                                                 umbra_blend_srcover, fmt);
+    struct umbra_builder *b = umbra_draw_builder(
+        umbra_coverage_bitmap_matrix, &st->state,
+        umbra_shader_solid,           &st->color,
+        umbra_blend_srcover,          NULL,
+        fmt);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
     st->prog = be->compile(be, ir);
@@ -275,8 +272,6 @@ static void persp_draw(struct slide *s, double secs, int l, int t, int r, int b,
                              st->bitmap->w, st->bitmap->h);
     struct umbra_buf ubuf[] = {
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
-        st->cov->uniforms,
-        st->shader->uniforms,
     };
     st->prog->queue(st->prog, l, t, r, b, ubuf);
 }
@@ -285,15 +280,17 @@ static int persp_get_builders(struct slide *s, struct umbra_fmt fmt,
                               struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
     struct persp_slide *st = (struct persp_slide *)s;
-    out[0] = umbra_draw_builder(st->cov, st->shader, umbra_blend_srcover, fmt);
+    out[0] = umbra_draw_builder(
+        umbra_coverage_bitmap_matrix, &st->state,
+        umbra_shader_solid,           &st->color,
+        umbra_blend_srcover,          NULL,
+        fmt);
     return out[0] ? 1 : 0;
 }
 
 static void persp_free(struct slide *s) {
     struct persp_slide *st = (struct persp_slide *)s;
     umbra_program_free(st->prog);
-    umbra_shader_free  (st->shader);
-    umbra_coverage_free(st->cov);
     free(st);
 }
 
@@ -301,8 +298,6 @@ SLIDE(slide_coverage_bitmap_matrix) {
     struct persp_slide *st = calloc(1, sizeof *st);
     st->bitmap = text_shared_bitmap();
     st->color  = (umbra_color){1.0f, 0.8f, 0.2f, 1.0f};
-    st->shader = umbra_shader_wrap(umbra_shader_solid, &st->color);
-    st->cov    = umbra_coverage_wrap(umbra_coverage_bitmap_matrix, &st->state);
     st->base = (struct slide){
         .title = "Coverage (8-bit bitmap + matrix)",
         .bg = {0.12f, 0.04f, 0.04f, 1},
@@ -323,7 +318,6 @@ struct cov_null_slide {
     int w, h;
 
     umbra_color           color;
-    struct umbra_shader  *shader;
     struct umbra_fmt      fmt;
     struct umbra_flat_ir *ir;
     struct umbra_program *prog;
@@ -340,8 +334,11 @@ static void cov_null_prepare(struct slide *s, struct umbra_backend *be, struct u
     if (st->fmt.name != fmt.name || !st->ir) {
         st->fmt = fmt;
         umbra_flat_ir_free(st->ir);
-        struct umbra_builder *b = umbra_draw_builder(NULL, st->shader,
-                                                     umbra_blend_srcover, fmt);
+        struct umbra_builder *b = umbra_draw_builder(
+            NULL,                NULL,
+            umbra_shader_solid,  &st->color,
+            umbra_blend_srcover, NULL,
+            fmt);
         st->ir = umbra_flat_ir(b);
         umbra_builder_free(b);
     }
@@ -356,8 +353,6 @@ static void cov_null_draw(struct slide *s, double secs, int l, int t, int r, int
     slide_bg_draw(s->bg, l, t, r, b, buf);
     struct umbra_buf ubuf[] = {
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
-        {0},
-        st->shader->uniforms,
     };
     st->prog->queue(st->prog, l, t, r, b, ubuf);
 }
@@ -366,7 +361,11 @@ static int cov_null_get_builders(struct slide *s, struct umbra_fmt fmt,
                                  struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
     struct cov_null_slide *st = (struct cov_null_slide *)s;
-    out[0] = umbra_draw_builder(NULL, st->shader, umbra_blend_srcover, fmt);
+    out[0] = umbra_draw_builder(
+        NULL,                NULL,
+        umbra_shader_solid,  &st->color,
+        umbra_blend_srcover, NULL,
+        fmt);
     return out[0] ? 1 : 0;
 }
 
@@ -374,14 +373,12 @@ static void cov_null_free(struct slide *s) {
     struct cov_null_slide *st = (struct cov_null_slide *)s;
     umbra_program_free(st->prog);
     umbra_flat_ir_free(st->ir);
-    umbra_shader_free (st->shader);
     free(st);
 }
 
 SLIDE(slide_coverage_null) {
     struct cov_null_slide *st = calloc(1, sizeof *st);
-    st->color  = (umbra_color){0.15f, 0.0f, 0.3f, 0.3f};
-    st->shader = umbra_shader_wrap(umbra_shader_solid, &st->color);
+    st->color = (umbra_color){0.15f, 0.0f, 0.3f, 0.3f};
     st->base = (struct slide){
         .title = "Coverage NULL",
         .bg = {1, 1, 1, 1},

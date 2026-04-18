@@ -157,77 +157,9 @@ struct umbra_fmt const umbra_fmt_fp16_planar = {
 
 // umbra_ptr32 .ix assignment for umbra_draw_builder:
 //   buf[0] = destination render target
-//   buf[1] = coverage uniforms  (even if no coverage)
-//   buf[2] = shader   uniforms  (even if no shader)
-enum { DRAW_DST_IX = 0, COVERAGE_IX = 1, SHADER_IX = 2 };
+enum { DRAW_DST_IX = 0 };
 
-struct umbra_builder* umbra_draw_builder(struct umbra_coverage *coverage,
-                                         struct umbra_shader *shader,
-                                         umbra_blend_fn blend,
-                                         struct umbra_fmt fmt) {
-    struct umbra_builder  *builder = umbra_builder();
-    umbra_val32 const x = umbra_x(builder);
-    umbra_val32 const y = umbra_y(builder);
-    umbra_val32 const xf = umbra_f32_from_i32(builder, x);
-    umbra_val32 const yf = umbra_f32_from_i32(builder, y);
-
-    umbra_val32 cov = {0};
-    if (coverage) {
-        cov = coverage->build(coverage, builder, (umbra_ptr32){.ix = COVERAGE_IX}, xf, yf);
-    }
-
-    umbra_color_val32 src = {
-        umbra_imm_f32(builder, 0.0f),
-        umbra_imm_f32(builder, 0.0f),
-        umbra_imm_f32(builder, 0.0f),
-        umbra_imm_f32(builder, 0.0f),
-    };
-    if (shader) {
-        src = shader->build(shader, builder, (umbra_ptr32){.ix = SHADER_IX}, xf, yf);
-    }
-
-    umbra_color_val32 dst = {
-        umbra_imm_f32(builder, 0.0f),
-        umbra_imm_f32(builder, 0.0f),
-        umbra_imm_f32(builder, 0.0f),
-        umbra_imm_f32(builder, 0.0f),
-    };
-    if (blend || coverage) {
-        dst = fmt.load(builder, DRAW_DST_IX);
-    }
-
-    umbra_color_val32 out;
-    if (blend) {
-        out = blend(NULL, builder, src, dst);
-    } else {
-        out = src;
-    }
-
-    if (coverage) {
-        out.r = umbra_add_f32(builder, dst.r,
-                              umbra_mul_f32(builder, umbra_sub_f32(builder, out.r, dst.r),
-                                            cov));
-        out.g = umbra_add_f32(builder, dst.g,
-                              umbra_mul_f32(builder, umbra_sub_f32(builder, out.g, dst.g),
-                                            cov));
-        out.b = umbra_add_f32(builder, dst.b,
-                              umbra_mul_f32(builder, umbra_sub_f32(builder, out.b, dst.b),
-                                            cov));
-        out.a = umbra_add_f32(builder, dst.a,
-                              umbra_mul_f32(builder, umbra_sub_f32(builder, out.a, dst.a),
-                                            cov));
-    }
-
-    fmt.store(builder, DRAW_DST_IX, out);
-
-    return builder;
-}
-
-// New middleware: identical composition to umbra_draw_builder above, but
-// takes flat (fn, ctx) pairs instead of struct-based effects.  Effects
-// register their own uniforms via umbra_uniforms() and ignore any inbound
-// ptr32 handle (there isn't one -- the flat fn signature doesn't carry one).
-struct umbra_builder* umbra_draw_builder2(
+struct umbra_builder* umbra_draw_builder(
     umbra_coverage coverage_fn, void *coverage_ctx,
     umbra_shader   shader_fn,   void *shader_ctx,
     umbra_blend    blend_fn,    void *blend_ctx,
@@ -264,22 +196,15 @@ struct umbra_builder* umbra_draw_builder2(
     return b;
 }
 
-struct sdf_coverage {
-    struct umbra_coverage base;
-    struct umbra_sdf     *sdf;
-    int                   hard_edge, :32;
-};
-
-static umbra_val32 sdf_as_coverage_build(struct umbra_coverage *s, struct umbra_builder *b,
-                                          umbra_ptr32 uniforms,
-                                          umbra_val32 x, umbra_val32 y) {
-    struct sdf_coverage *self = (struct sdf_coverage *)s;
+umbra_val32 umbra_coverage_from_sdf(void *ctx, struct umbra_builder *b,
+                                     umbra_val32 x, umbra_val32 y) {
+    struct umbra_coverage_from_sdf const *self = ctx;
     umbra_val32 const half = umbra_imm_f32(b, 0.5f);
     umbra_val32 const xc = umbra_add_f32(b, x, half),
                       yc = umbra_add_f32(b, y, half);
-    umbra_val32 const f = self->sdf->build(self->sdf, b, uniforms,
-                                           (umbra_interval){xc, xc},
-                                           (umbra_interval){yc, yc}).lo;
+    umbra_val32 const f = self->sdf_fn(self->sdf_ctx, b,
+                                       (umbra_interval){xc, xc},
+                                       (umbra_interval){yc, yc}).lo;
     if (self->hard_edge) {
         return umbra_sel_32(b, umbra_lt_f32(b, f, umbra_imm_f32(b, 0.0f)),
                             umbra_imm_f32(b, 1.0f), umbra_imm_f32(b, 0.0f));
@@ -288,34 +213,12 @@ static umbra_val32 sdf_as_coverage_build(struct umbra_coverage *s, struct umbra_
                          umbra_max_f32(b, umbra_imm_f32(b, 0.0f),
                                        umbra_sub_f32(b, umbra_imm_f32(b, 0.0f), f)));
 }
-static void sdf_as_coverage_free(struct umbra_coverage *s) { free(s); }
-
-struct umbra_coverage* umbra_sdf_coverage(struct umbra_sdf *sdf, _Bool hard_edge) {
-    struct sdf_coverage *s = malloc(sizeof *s);
-    *s = (struct sdf_coverage){
-        .base      = {.build    = sdf_as_coverage_build,
-                      .free     = sdf_as_coverage_free,
-                      .uniforms = sdf->uniforms},
-        .sdf       = sdf,
-        .hard_edge = hard_edge,
-    };
-    return &s->base;
-}
-
-void umbra_shader_free(struct umbra_shader *s) {
-    if (s && s->free) { s->free(s); }
-}
-void umbra_coverage_free(struct umbra_coverage *c) {
-    if (c && c->free) { c->free(c); }
-}
-void umbra_sdf_free(struct umbra_sdf *s) {
-    if (s && s->free) { s->free(s); }
-}
 
 struct umbra_sdf_draw {
-    struct umbra_program *draw;
-    struct umbra_program *bounds;
-    struct umbra_backend *bounds_be;
+    struct umbra_coverage_from_sdf cov_state;
+    struct umbra_program          *draw;
+    struct umbra_program          *bounds;
+    struct umbra_backend          *bounds_be;
 };
 
 // TODO: add a second `covered` program alongside `draw` for tiles where the
@@ -335,35 +238,40 @@ struct umbra_sdf_draw {
 enum { QUEUE_MIN_TILE = 512 };
 
 // Bounds program buf layout:
-//   buf[0] = SDF uniforms     (matches sdf_as_coverage_build's COVERAGE_IX=1)
-// wait, the draw program has SDF uniforms at COVERAGE_IX=1, SHADER_IX=2.
-// For the bounds program we only need the sdf.  We place them:
 //   buf[0] = tile-lo output
-//   buf[1] = sdf uniforms
-//   buf[2] = grid params (base_x, base_y, tile_w, tile_h)
-enum { BOUNDS_DST_IX = 0, BOUNDS_SDF_IX = 1, BOUNDS_GRID_IX = 2 };
+//   buf[1] = grid params (base_x, base_y, tile_w, tile_h)
+enum { BOUNDS_DST_IX = 0, BOUNDS_GRID_IX = 1 };
 
 struct grid_params {
     float base_x, base_y, tile_w, tile_h;
 };
 
 struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
-                                      struct umbra_sdf *sdf,
+                                      umbra_sdf sdf_fn, void *sdf_ctx,
                                       struct umbra_sdf_draw_config cfg,
-                                      struct umbra_shader *shader,
-                                      umbra_blend_fn blend,
+                                      umbra_shader shader_fn, void *shader_ctx,
+                                      umbra_blend blend_fn, void *blend_ctx,
                                       struct umbra_fmt fmt) {
+    struct umbra_sdf_draw *d = calloc(1, sizeof *d);
+    d->cov_state = (struct umbra_coverage_from_sdf){
+        .sdf_fn    = sdf_fn,
+        .sdf_ctx   = sdf_ctx,
+        .hard_edge = cfg.hard_edge,
+    };
+
     // Build the draw program (shader + SDF coverage + blend).
-    struct umbra_coverage *adapter = umbra_sdf_coverage(sdf, cfg.hard_edge);
-    struct umbra_builder *db = umbra_draw_builder(adapter, shader, blend, fmt);
-    umbra_coverage_free(adapter);
+    struct umbra_builder *db = umbra_draw_builder(
+        umbra_coverage_from_sdf, &d->cov_state,
+        shader_fn, shader_ctx,
+        blend_fn,  blend_ctx,
+        fmt);
     struct umbra_flat_ir *dir = umbra_flat_ir(db);
     umbra_builder_free(db);
-    struct umbra_program *draw = be->compile(be, dir);
+    d->draw = be->compile(be, dir);
     umbra_flat_ir_free(dir);
-    if (!draw) { return NULL; }
+    if (!d->draw) { free(d); return NULL; }
 
-    // Build the bounds program using sdf->build with tile-extent intervals.
+    // Build the bounds program: evaluate the sdf over tile-extent intervals.
     // x() and y() are tile indices.
     struct umbra_builder *bb = umbra_builder();
     umbra_ptr32 const g = {.ix = BOUNDS_GRID_IX};
@@ -382,7 +290,7 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
                                   umbra_mul_f32(bb, umbra_add_f32(bb, yf,
                                       umbra_imm_f32(bb, 1.0f)), tile_h))};
 
-    umbra_interval const f = sdf->build(sdf, bb, (umbra_ptr32){.ix = BOUNDS_SDF_IX}, x, y);
+    umbra_interval const f = sdf_fn(sdf_ctx, bb, x, y);
 
     umbra_store_32(bb, (umbra_ptr32){.ix = BOUNDS_DST_IX}, f.lo);
 
@@ -390,13 +298,10 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
     umbra_builder_free(bb);
     struct umbra_backend *bounds_be = umbra_backend_jit();
     if (!bounds_be) { bounds_be = umbra_backend_interp(); }
-    struct umbra_program *bounds = bounds_be->compile(bounds_be, bir);
+    d->bounds    = bounds_be->compile(bounds_be, bir);
+    d->bounds_be = bounds_be;
     umbra_flat_ir_free(bir);
 
-    struct umbra_sdf_draw *d = calloc(1, sizeof *d);
-    d->draw      = draw;
-    d->bounds    = bounds;
-    d->bounds_be = bounds_be;
     return d;
 }
 
@@ -418,7 +323,6 @@ void umbra_sdf_draw_queue(struct umbra_sdf_draw const *d,
     float *lo = calloc((size_t)tiles, sizeof(float));
     struct umbra_buf bounds_buf[] = {
         {.ptr = lo,    .count = tiles,                 .stride = xt},
-        buf[COVERAGE_IX],  // sdf uniforms (caller's coverage slot)
         {.ptr = &grid, .count = (int)(sizeof grid / 4)},
     };
     d->bounds->queue(d->bounds, 0, 0, xt, yt, bounds_buf);
@@ -618,38 +522,6 @@ umbra_color_val32 umbra_shader_solid(void *ctx, struct umbra_builder *b,
     };
 }
 
-// Bridge: wrap a flat umbra_shader fn + caller-owned ctx into a
-// struct umbra_shader* so it can be fed to old-middleware composers
-// (umbra_draw_builder, umbra_shader_supersample, umbra_sdf_draw ...).  The
-// caller retains ownership of ctx storage and must keep it alive until the
-// wrapper is freed via umbra_shader_free().  Removed once all composers
-// are migrated to the flat shape.
-struct shader_wrap {
-    struct umbra_shader  base;
-    umbra_shader         fn;
-    void                *ctx;
-};
-static umbra_color_val32 wrap_build(struct umbra_shader *s, struct umbra_builder *b,
-                                     umbra_ptr32 uniforms,
-                                     umbra_val32 x, umbra_val32 y) {
-    struct shader_wrap *self = (struct shader_wrap *)s;
-    (void)uniforms;
-    return self->fn(self->ctx, b, x, y);
-}
-static void wrap_free(struct umbra_shader *s) { free(s); }
-
-struct umbra_shader* umbra_shader_wrap(umbra_shader fn, void *ctx) {
-    struct shader_wrap *w = malloc(sizeof *w);
-    *w = (struct shader_wrap){
-        .base = {.build    = wrap_build,
-                 .free     = wrap_free,
-                 .uniforms = (struct umbra_buf){0}},
-        .fn   = fn,
-        .ctx  = ctx,
-    };
-    return &w->base;
-}
-
 umbra_color_val32 umbra_shader_gradient_two_stops(void *ctx, struct umbra_builder *b,
                                                    umbra_val32 x, umbra_val32 y) {
     struct umbra_shader_gradient_two_stops const *self = ctx;
@@ -787,35 +659,6 @@ umbra_val32 umbra_coverage_rect(void *ctx, struct umbra_builder *b,
     return umbra_sel_32(b, inside, one_f, zero_f);
 }
 
-// Bridge: wrap a flat coverage fn into a struct umbra_coverage* for
-// old-middleware composers (umbra_draw_builder) until they migrate.  Same
-// shape as umbra_shader_wrap.
-struct coverage_wrap {
-    struct umbra_coverage  base;
-    umbra_coverage         fn;
-    void                  *ctx;
-};
-static umbra_val32 coverage_wrap_build(struct umbra_coverage *s, struct umbra_builder *b,
-                                        umbra_ptr32 uniforms,
-                                        umbra_val32 x, umbra_val32 y) {
-    struct coverage_wrap *self = (struct coverage_wrap *)s;
-    (void)uniforms;
-    return self->fn(self->ctx, b, x, y);
-}
-static void coverage_wrap_free(struct umbra_coverage *s) { free(s); }
-
-struct umbra_coverage* umbra_coverage_wrap(umbra_coverage fn, void *ctx) {
-    struct coverage_wrap *w = malloc(sizeof *w);
-    *w = (struct coverage_wrap){
-        .base = {.build    = coverage_wrap_build,
-                 .free     = coverage_wrap_free,
-                 .uniforms = (struct umbra_buf){0}},
-        .fn   = fn,
-        .ctx  = ctx,
-    };
-    return &w->base;
-}
-
 umbra_interval umbra_sdf_rect(void *ctx, struct umbra_builder *b,
                               umbra_interval x, umbra_interval y) {
     umbra_rect const *self = ctx;
@@ -828,35 +671,6 @@ umbra_interval umbra_sdf_rect(void *ctx, struct umbra_builder *b,
                                                                umbra_interval_sub_f32(b, x, r)),
                                     umbra_interval_max_f32(b, umbra_interval_sub_f32(b, t, y),
                                                               umbra_interval_sub_f32(b, y, bo)));
-}
-
-// Bridge: wrap a flat sdf fn into a struct umbra_sdf* for old-middleware
-// composers (umbra_sdf_draw, umbra_sdf_coverage) until they migrate.  Same
-// shape as umbra_shader_wrap / umbra_coverage_wrap.
-struct sdf_wrap {
-    struct umbra_sdf  base;
-    umbra_sdf         fn;
-    void             *ctx;
-};
-static umbra_interval sdf_wrap_build(struct umbra_sdf *s, struct umbra_builder *b,
-                                      umbra_ptr32 uniforms,
-                                      umbra_interval x, umbra_interval y) {
-    struct sdf_wrap *self = (struct sdf_wrap *)s;
-    (void)uniforms;
-    return self->fn(self->ctx, b, x, y);
-}
-static void sdf_wrap_free(struct umbra_sdf *s) { free(s); }
-
-struct umbra_sdf* umbra_sdf_wrap(umbra_sdf fn, void *ctx) {
-    struct sdf_wrap *w = malloc(sizeof *w);
-    *w = (struct sdf_wrap){
-        .base = {.build    = sdf_wrap_build,
-                 .free     = sdf_wrap_free,
-                 .uniforms = (struct umbra_buf){0}},
-        .fn   = fn,
-        .ctx  = ctx,
-    };
-    return &w->base;
 }
 
 umbra_val32 umbra_coverage_bitmap(void *ctx, struct umbra_builder *b,

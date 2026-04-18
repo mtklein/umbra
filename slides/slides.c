@@ -79,7 +79,7 @@ void slide_bg_prepare(struct umbra_backend *be, struct umbra_fmt fmt, int w, int
         bg_fmt = fmt;
         bg_w   = w;
         bg_h   = h;
-        struct umbra_builder *b = umbra_draw_builder2(
+        struct umbra_builder *b = umbra_draw_builder(
             NULL,               NULL,
             umbra_shader_solid, &bg_color,
             NULL,               NULL,
