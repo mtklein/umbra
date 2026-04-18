@@ -468,10 +468,10 @@ static umbra_color_val32 walk_stops(struct umbra_builder *b, umbra_val32 t,
     umbra_val32 const n2 = umbra_add_i32(b, n_i, n_i);
     umbra_val32 const n3 = umbra_add_i32(b, n2, n_i);
 
-    struct umbra_var32 vr = umbra_var32(b),
-                       vg = umbra_var32(b),
-                       vb = umbra_var32(b),
-                       va = umbra_var32(b);
+    umbra_var32 vr = umbra_declare_var32(b),
+                       vg = umbra_declare_var32(b),
+                       vb = umbra_declare_var32(b),
+                       va = umbra_declare_var32(b);
 
     umbra_val32 i = umbra_loop(b, n_segs); {
         umbra_val32 i1 = umbra_add_i32(b, i, umbra_imm_i32(b, 1));

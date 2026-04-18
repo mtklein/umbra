@@ -26,7 +26,7 @@ TEST(resolve_simple_no_joins) {
 
 TEST(resolve_with_loop) {
     struct umbra_builder *b = umbra_builder();
-    struct umbra_var32 acc = umbra_var32(b);
+    umbra_var32 acc = umbra_declare_var32(b);
     umbra_val32 trip = umbra_uniform_32(b, (umbra_ptr32){0}, 0);
     umbra_val32 j = umbra_loop(b, trip); {
         umbra_val32 prev = umbra_load_var32(b, acc);

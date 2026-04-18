@@ -796,8 +796,8 @@ static umbra_interval sdf_text_build(void *ctx, struct umbra_builder *b,
     umbra_imm_i32(b, 5);
     umbra_imm_i32(b, 6);
 
-    struct umbra_var32 lo_var = umbra_var32(b);
-    struct umbra_var32 hi_var = umbra_var32(b);
+    umbra_var32 lo_var = umbra_declare_var32(b);
+    umbra_var32 hi_var = umbra_declare_var32(b);
     umbra_store_var32(b, lo_var, umbra_imm_f32(b, 1e9f));
     umbra_store_var32(b, hi_var, umbra_imm_f32(b, 1e9f));
 
@@ -963,8 +963,8 @@ static umbra_interval ngon_build(void *ctx, struct umbra_builder *b,
     umbra_ptr32 const data = umbra_deref_ptr32(b, u, SLOT(hp));
     umbra_val32 const n    = umbra_uniform_32(b, u, SLOT(n_sides));
 
-    struct umbra_var32 lo_var = umbra_var32(b);
-    struct umbra_var32 hi_var = umbra_var32(b);
+    umbra_var32 lo_var = umbra_declare_var32(b);
+    umbra_var32 hi_var = umbra_declare_var32(b);
     umbra_store_var32(b, lo_var, umbra_imm_f32(b, -1e9f));
     umbra_store_var32(b, hi_var, umbra_imm_f32(b, -1e9f));
 

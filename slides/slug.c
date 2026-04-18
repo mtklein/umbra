@@ -326,7 +326,7 @@ struct umbra_builder* slug_build(void) {
             umbra_lt_f32(b, gy, bh)));
 
     umbra_val32 count = umbra_uniform_32(b, u, UNI_SLOT(struct slug_uniforms, n_curves));
-    struct umbra_var32 wind = umbra_var32(b);
+    umbra_var32 wind = umbra_declare_var32(b);
 
     umbra_val32 j = umbra_loop(b, count); {
         umbra_val32 k = umbra_mul_i32(b, j, umbra_imm_i32(b, 6));

@@ -249,8 +249,8 @@ TEST(interval_loop) {
     umbra_interval const x = {umbra_uniform_32(bld, u, x_off),
                               umbra_uniform_32(bld, u, x_off + 1)};
 
-    struct umbra_var32 lo_var = umbra_var32(bld);
-    struct umbra_var32 hi_var = umbra_var32(bld);
+    umbra_var32 lo_var = umbra_declare_var32(bld);
+    umbra_var32 hi_var = umbra_declare_var32(bld);
     umbra_store_var32(bld, lo_var, umbra_imm_f32(bld, -1e9f));
     umbra_store_var32(bld, hi_var, umbra_imm_f32(bld, -1e9f));
 

@@ -1535,7 +1535,7 @@ TEST(test_metal_loop_gather) {
     umbra_ptr32 const data = umbra_deref_ptr32(b, u, data_slot);
     umbra_val32 const n    = umbra_uniform_32(b, u, n_slot);
 
-    struct umbra_var32 sum = umbra_var32(b);
+    umbra_var32 sum = umbra_declare_var32(b);
     umbra_store_var32(b, sum, umbra_imm_f32(b, 0.0f));
 
     umbra_val32 const j = umbra_loop(b, n); {
