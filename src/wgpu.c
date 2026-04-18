@@ -57,18 +57,12 @@ struct wgpu_backend {
     WGPUCommandEncoder        batch_enc;
     WGPUComputePassEncoder    batch_pass;
 
+    uint32_t                  max_dyn_storage, :32;
+
     WGPUSubmissionIndex       frame_submitted[WGPU_N_FRAMES];
     _Bool                     frame_has_work [WGPU_N_FRAMES]; int :16, :32;
 
     struct gpu_buf_cache          cache;
-
-    // Bind group cache: reuse across dispatches when data bindings don't change.
-    WGPUBindGroup             cached_bg;
-    WGPUBuffer                cached_bg_push_buf;  // ring chunk buf used for push binding
-    WGPUBuffer                cached_bg_bufs[32];
-    uint64_t                  cached_bg_off [32];
-    uint64_t                  cached_bg_sz  [32];
-    int                       cached_bg_n, :32;
 
     struct uniform_ring_pool  uni_pool;
     int                       total_dispatches; int :32;
@@ -91,15 +85,32 @@ struct wgpu_program {
 
     int max_ptr;
     int total_bufs;
-    int push_words, pad;
+    int push_words, :32;
     int caller_nptr, n_reg;
     struct umbra_uniform_reg *reg;
 
     uint8_t          *buf_rw;
     uint8_t          *buf_shift;
 
+    // When true, every read-only binding uses a dynamic offset so the
+    // bind group survives across dispatches whose offsets differ.  When
+    // false, only push data is dynamic -- the pipeline layout's dynamic
+    // slot budget wasn't enough to cover every read-only binding.
+    _Bool     dyn_uniforms, pad[3];
+    int       spirv_words;
     uint32_t *spirv;
-    int       spirv_words, :32;
+
+    // Bind group cache: reuse across dispatches when buffer handles are
+    // stable.  Per-program so alternating programs don't clobber each other,
+    // and per-ring (WGPU_N_FRAMES slots) so ring rotation doesn't either.
+    struct {
+        WGPUBindGroup bg;
+        WGPUBuffer    push_buf;
+        WGPUBuffer    bufs[32];
+        uint64_t      off [32];  // only read when dyn_uniforms=0
+        uint64_t      sz  [32];
+        int           n, :32;
+    } cached[WGPU_N_FRAMES];
 };
 
 struct wgpu_ring_chunk {
@@ -303,12 +314,6 @@ static void wgpu_flush(struct umbra_backend *base) {
     uniform_ring_pool_drain_all(&be->uni_pool);
     gpu_buf_cache_copyback (&be->cache);
     gpu_buf_cache_end_batch(&be->cache);
-
-    // Invalidate cached bind group — it references batch cache buffers.
-    if (be->cached_bg) {
-        wgpuBindGroupRelease(be->cached_bg);
-        be->cached_bg = NULL;
-    }
 }
 
 static struct umbra_program* wgpu_compile(struct umbra_backend *base,
@@ -333,19 +338,38 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
     int n_desc = sr.total_bufs + 1;
     WGPUBindGroupLayoutEntry *entries =
         calloc((size_t)n_desc, sizeof *entries);
-    // Binding 0 (user uniforms) and the last binding (push data) use dynamic
-    // offsets so we can reuse the bind group across dispatches that differ only
-    // in ring-allocated uniform/push data.
-    for (int i = 0; i < n_desc; i++) {
+
+    // Count the read-only bindings.  If they plus the always-dynamic push
+    // binding all fit within the adapter's max dynamic storage budget,
+    // mark every read-only binding as hasDynamicOffset=true -- the bind
+    // group cache then survives across dispatches whose offsets change.
+    // If the budget is too tight, fall back to only-push-is-dynamic; bg
+    // cache thrashes on this program but we stay within limits.
+    int n_ro = 0;
+    for (int i = 0; i < n_desc - 1; i++) {
+        if (!(sr.buf_rw[i] & BUF_WRITTEN)) { n_ro++; }
+    }
+    _Bool const dyn_uniforms = (uint32_t)(n_ro + 1) <= be->max_dyn_storage;
+
+    for (int i = 0; i < n_desc - 1; i++) {
+        _Bool const is_ring = dyn_uniforms && !(sr.buf_rw[i] & BUF_WRITTEN);
         entries[i] = (WGPUBindGroupLayoutEntry){
             .binding    = (uint32_t)i,
             .visibility = WGPUShaderStage_Compute,
             .buffer = {
                 .type             = WGPUBufferBindingType_Storage,
-                .hasDynamicOffset = i == 0 || i == n_desc - 1,
+                .hasDynamicOffset = is_ring,
             },
         };
     }
+    entries[n_desc - 1] = (WGPUBindGroupLayoutEntry){
+        .binding    = (uint32_t)(n_desc - 1),
+        .visibility = WGPUShaderStage_Compute,
+        .buffer = {
+            .type             = WGPUBufferBindingType_Storage,
+            .hasDynamicOffset = 1,
+        },
+    };
     WGPUBindGroupLayout bg_layout = wgpuDeviceCreateBindGroupLayout(be->device,
         &(WGPUBindGroupLayoutDescriptor){
             .entryCount = (size_t)n_desc,
@@ -385,8 +409,9 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
     p->max_ptr     = sr.max_ptr;
     p->total_bufs  = sr.total_bufs;
     p->push_words  = sr.push_words;
-    p->buf_rw    = sr.buf_rw;
-    p->buf_shift = sr.buf_shift;
+    p->buf_rw      = sr.buf_rw;
+    p->buf_shift   = sr.buf_shift;
+    p->dyn_uniforms = dyn_uniforms;
     free(sr.buf_row_shift);
     p->spirv       = sr.spirv;
     p->spirv_words = sr.spirv_words;
@@ -476,29 +501,33 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
         uniform_ring_pool_alloc(&be->uni_pool, push_data, push_sz);
     struct wgpu_ring_chunk *push_chunk = push_loc.handle;
 
-    // Reuse bind group if buffer bindings haven't changed.  Bindings 0 (user
-    // uniforms) and n (push data) use dynamic offsets, so only buffer handles
-    // matter for those — offsets are passed at SetBindGroup time.
-    _Bool bg_hit = be->cached_bg
-                && be->cached_bg_n == n
-                && be->cached_bg_bufs[0]    == bind_buf[0]
-                && be->cached_bg_sz  [0]    == bind_size[0]
-                && be->cached_bg_push_buf   == push_chunk->buf
-                && !memcmp(be->cached_bg_bufs + 1, bind_buf + 1,
-                           (size_t)(n - 1) * sizeof bind_buf[0])
-                && !memcmp(be->cached_bg_off  + 1, bind_offset + 1,
-                           (size_t)(n - 1) * sizeof bind_offset[0])
-                && !memcmp(be->cached_bg_sz   + 1, bind_size + 1,
-                           (size_t)(n - 1) * sizeof bind_size[0]);
+    // Reuse bind group if buffer handles haven't changed.  When dyn_uniforms
+    // is set, every ring-backed binding has hasDynamicOffset=true, so its
+    // offset is passed in dyn_offsets[] at SetBindGroup rather than baked
+    // into the bg -- the cache then survives offset changes.  When
+    // dyn_uniforms is false (budget too tight), offsets are baked and the
+    // cache falls back to comparing them too.
+    int const ring_ix = be->uni_pool.cur;
+    _Bool bg_hit = p->cached[ring_ix].bg
+                && p->cached[ring_ix].n == n
+                && p->cached[ring_ix].push_buf == push_chunk->buf
+                && !memcmp(p->cached[ring_ix].bufs, bind_buf,
+                           (size_t)n * sizeof bind_buf[0])
+                && !memcmp(p->cached[ring_ix].sz,   bind_size,
+                           (size_t)n * sizeof bind_size[0])
+                && (p->dyn_uniforms
+                    || !memcmp(p->cached[ring_ix].off, bind_offset,
+                               (size_t)n * sizeof bind_offset[0]));
     if (!bg_hit) {
-        if (be->cached_bg) { wgpuBindGroupRelease(be->cached_bg); }
+        if (p->cached[ring_ix].bg) { wgpuBindGroupRelease(p->cached[ring_ix].bg); }
         int n_bg = n + 1;
         WGPUBindGroupEntry bg_entries[33];
         for (int i = 0; i < n; i++) {
+            _Bool const is_ring = p->dyn_uniforms && !(p->buf_rw[i] & BUF_WRITTEN);
             bg_entries[i] = (WGPUBindGroupEntry){
                 .binding = (uint32_t)i,
                 .buffer  = bind_buf[i],
-                .offset  = i == 0 ? 0 : bind_offset[i],
+                .offset  = is_ring ? 0 : bind_offset[i],
                 .size    = bind_size[i],
             };
         }
@@ -509,17 +538,17 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
             .offset  = 0,
             .size    = push_sz_aligned,
         };
-        be->cached_bg = wgpuDeviceCreateBindGroup(be->device,
+        p->cached[ring_ix].bg = wgpuDeviceCreateBindGroup(be->device,
             &(WGPUBindGroupDescriptor){
                 .layout     = p->bg_layout,
                 .entryCount = (size_t)n_bg,
                 .entries    = bg_entries,
             });
-        be->cached_bg_n = n;
-        be->cached_bg_push_buf = push_chunk->buf;
-        memcpy(be->cached_bg_bufs, bind_buf,    (size_t)n * sizeof bind_buf[0]);
-        memcpy(be->cached_bg_off,  bind_offset, (size_t)n * sizeof bind_offset[0]);
-        memcpy(be->cached_bg_sz,   bind_size,   (size_t)n * sizeof bind_size[0]);
+        p->cached[ring_ix].n = n;
+        p->cached[ring_ix].push_buf = push_chunk->buf;
+        memcpy(p->cached[ring_ix].bufs, bind_buf,    (size_t)n * sizeof bind_buf[0]);
+        memcpy(p->cached[ring_ix].off,  bind_offset, (size_t)n * sizeof bind_offset[0]);
+        memcpy(p->cached[ring_ix].sz,   bind_size,   (size_t)n * sizeof bind_size[0]);
     }
 
     // No explicit barriers between dispatches: the WebGPU spec guarantees that
@@ -527,13 +556,20 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
     // semantics.  The runtime inserts any necessary barriers automatically.
     // https://github.com/gpuweb/gpuweb/discussions/4434
 
-    uint32_t dyn_offsets[2] = {
-        (uint32_t)bind_offset[0],   // uniform buffer offset
-        (uint32_t)push_loc.offset,  // push data offset
-    };
+    uint32_t dyn_offsets[33];
+    int n_dyn = 0;
+    if (p->dyn_uniforms) {
+        for (int i = 0; i < n; i++) {
+            if (!(p->buf_rw[i] & BUF_WRITTEN)) {
+                dyn_offsets[n_dyn++] = (uint32_t)bind_offset[i];
+            }
+        }
+    }
+    dyn_offsets[n_dyn++] = (uint32_t)push_loc.offset;
+
     wgpuComputePassEncoderSetPipeline(be->batch_pass, p->pipeline);
-    wgpuComputePassEncoderSetBindGroup(be->batch_pass, 0, be->cached_bg,
-                                       2, dyn_offsets);
+    wgpuComputePassEncoderSetBindGroup(be->batch_pass, 0, p->cached[ring_ix].bg,
+                                       (size_t)n_dyn, dyn_offsets);
 
     uint32_t gx = ((uint32_t)w + SPIRV_WG_SIZE - 1) / SPIRV_WG_SIZE;
     wgpuComputePassEncoderDispatchWorkgroups(be->batch_pass, gx, (uint32_t)h, 1);
@@ -568,6 +604,9 @@ static void wgpu_program_dump(struct umbra_program const *prog, FILE *f) {
 
 static void wgpu_program_free(struct umbra_program *prog) {
     struct wgpu_program *p = (struct wgpu_program *)prog;
+    for (int i = 0; i < WGPU_N_FRAMES; i++) {
+        if (p->cached[i].bg) { wgpuBindGroupRelease(p->cached[i].bg); }
+    }
     wgpuComputePipelineRelease(p->pipeline);
     wgpuPipelineLayoutRelease(p->pipe_layout);
     wgpuBindGroupLayoutRelease(p->bg_layout);
@@ -675,6 +714,7 @@ struct umbra_backend* umbra_backend_wgpu(void) {
     be->adapter  = adapter;
     be->device   = dev;
     be->queue    = queue;
+    be->max_dyn_storage = adapter_limits.maxDynamicStorageBuffersPerPipelineLayout;
     be->ts_query = wgpuDeviceCreateQuerySet(dev, &(WGPUQuerySetDescriptor){
         .type  = WGPUQueryType_Timestamp,
         .count = WGPU_N_FRAMES * 2,
