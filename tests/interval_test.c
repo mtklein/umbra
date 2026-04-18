@@ -13,14 +13,22 @@ static _Bool iv_equiv(iv a, iv b) {
 static iv eval_binary(umbra_interval (*op)(struct umbra_builder*,
                                            umbra_interval, umbra_interval),
                       iv a, iv b) {
+    float uniforms[] = {a.lo, a.hi, b.lo, b.hi};
+    float lo_out = 0, hi_out = 0;
+    struct umbra_buf lo_buf = {.ptr = &lo_out, .count = 1},
+                     hi_buf = {.ptr = &hi_out, .count = 1};
+
     struct umbra_builder *bld = umbra_builder();
-    umbra_interval const ia = {umbra_uniform_32(bld, (umbra_ptr32){0}, 0),
-                               umbra_uniform_32(bld, (umbra_ptr32){0}, 1)};
-    umbra_interval const ib = {umbra_uniform_32(bld, (umbra_ptr32){0}, 2),
-                               umbra_uniform_32(bld, (umbra_ptr32){0}, 3)};
+    umbra_ptr32 const u    = umbra_uniforms  (bld, uniforms, 4);
+    umbra_ptr32 const lop  = umbra_bind_buf32(bld, &lo_buf);
+    umbra_ptr32 const hip  = umbra_bind_buf32(bld, &hi_buf);
+    umbra_interval const ia = {umbra_uniform_32(bld, u, 0),
+                               umbra_uniform_32(bld, u, 1)};
+    umbra_interval const ib = {umbra_uniform_32(bld, u, 2),
+                               umbra_uniform_32(bld, u, 3)};
     umbra_interval const r = op(bld, ia, ib);
-    umbra_store_32(bld, (umbra_ptr32){.ix = 1}, r.lo);
-    umbra_store_32(bld, (umbra_ptr32){.ix = 2}, r.hi);
+    umbra_store_32(bld, lop, r.lo);
+    umbra_store_32(bld, hip, r.hi);
 
     struct umbra_flat_ir *ir = umbra_flat_ir(bld);
     umbra_builder_free(bld);
@@ -28,14 +36,7 @@ static iv eval_binary(umbra_interval (*op)(struct umbra_builder*,
     struct umbra_program *prog = be->compile(be, ir);
     umbra_flat_ir_free(ir);
 
-    float uniforms[] = {a.lo, a.hi, b.lo, b.hi};
-    float lo_out = 0, hi_out = 0;
-    struct umbra_buf buf[] = {
-        {.ptr = uniforms, .count = 4},
-        {.ptr = &lo_out,  .count = 1},
-        {.ptr = &hi_out,  .count = 1},
-    };
-    prog->queue(prog, 0, 0, 1, 1, buf);
+    prog->queue(prog, 0, 0, 1, 1, (struct umbra_buf[]){{0}});
     be->flush(be);
     umbra_program_free(prog);
     umbra_backend_free(be);
@@ -44,12 +45,20 @@ static iv eval_binary(umbra_interval (*op)(struct umbra_builder*,
 
 static iv eval_unary(umbra_interval (*op)(struct umbra_builder*, umbra_interval),
                      iv a) {
+    float uniforms[] = {a.lo, a.hi};
+    float lo_out = 0, hi_out = 0;
+    struct umbra_buf lo_buf = {.ptr = &lo_out, .count = 1},
+                     hi_buf = {.ptr = &hi_out, .count = 1};
+
     struct umbra_builder *bld = umbra_builder();
-    umbra_interval const ia = {umbra_uniform_32(bld, (umbra_ptr32){0}, 0),
-                               umbra_uniform_32(bld, (umbra_ptr32){0}, 1)};
+    umbra_ptr32 const u    = umbra_uniforms  (bld, uniforms, 2);
+    umbra_ptr32 const lop  = umbra_bind_buf32(bld, &lo_buf);
+    umbra_ptr32 const hip  = umbra_bind_buf32(bld, &hi_buf);
+    umbra_interval const ia = {umbra_uniform_32(bld, u, 0),
+                               umbra_uniform_32(bld, u, 1)};
     umbra_interval const r = op(bld, ia);
-    umbra_store_32(bld, (umbra_ptr32){.ix = 1}, r.lo);
-    umbra_store_32(bld, (umbra_ptr32){.ix = 2}, r.hi);
+    umbra_store_32(bld, lop, r.lo);
+    umbra_store_32(bld, hip, r.hi);
 
     struct umbra_flat_ir *ir = umbra_flat_ir(bld);
     umbra_builder_free(bld);
@@ -57,14 +66,7 @@ static iv eval_unary(umbra_interval (*op)(struct umbra_builder*, umbra_interval)
     struct umbra_program *prog = be->compile(be, ir);
     umbra_flat_ir_free(ir);
 
-    float uniforms[] = {a.lo, a.hi};
-    float lo_out = 0, hi_out = 0;
-    struct umbra_buf buf[] = {
-        {.ptr = uniforms, .count = 2},
-        {.ptr = &lo_out,  .count = 1},
-        {.ptr = &hi_out,  .count = 1},
-    };
-    prog->queue(prog, 0, 0, 1, 1, buf);
+    prog->queue(prog, 0, 0, 1, 1, (struct umbra_buf[]){{0}});
     be->flush(be);
     umbra_program_free(prog);
     umbra_backend_free(be);
@@ -118,12 +120,20 @@ TEST(interval_div) {
 }
 
 static iv eval_square(iv a) {
+    float uniforms[] = {a.lo, a.hi};
+    float lo_out = 0, hi_out = 0;
+    struct umbra_buf lo_buf = {.ptr = &lo_out, .count = 1},
+                     hi_buf = {.ptr = &hi_out, .count = 1};
+
     struct umbra_builder *bld = umbra_builder();
-    umbra_interval const ia = {umbra_uniform_32(bld, (umbra_ptr32){0}, 0),
-                               umbra_uniform_32(bld, (umbra_ptr32){0}, 1)};
+    umbra_ptr32 const u    = umbra_uniforms  (bld, uniforms, 2);
+    umbra_ptr32 const lop  = umbra_bind_buf32(bld, &lo_buf);
+    umbra_ptr32 const hip  = umbra_bind_buf32(bld, &hi_buf);
+    umbra_interval const ia = {umbra_uniform_32(bld, u, 0),
+                               umbra_uniform_32(bld, u, 1)};
     umbra_interval const r = umbra_interval_mul_f32(bld, ia, ia);
-    umbra_store_32(bld, (umbra_ptr32){.ix = 1}, r.lo);
-    umbra_store_32(bld, (umbra_ptr32){.ix = 2}, r.hi);
+    umbra_store_32(bld, lop, r.lo);
+    umbra_store_32(bld, hip, r.hi);
 
     struct umbra_flat_ir *ir = umbra_flat_ir(bld);
     umbra_builder_free(bld);
@@ -131,14 +141,7 @@ static iv eval_square(iv a) {
     struct umbra_program *prog = be->compile(be, ir);
     umbra_flat_ir_free(ir);
 
-    float uniforms[] = {a.lo, a.hi};
-    float lo_out = 0, hi_out = 0;
-    struct umbra_buf buf[] = {
-        {.ptr = uniforms, .count = 2},
-        {.ptr = &lo_out,  .count = 1},
-        {.ptr = &hi_out,  .count = 1},
-    };
-    prog->queue(prog, 0, 0, 1, 1, buf);
+    prog->queue(prog, 0, 0, 1, 1, (struct umbra_buf[]){{0}});
     be->flush(be);
     umbra_program_free(prog);
     umbra_backend_free(be);
@@ -154,14 +157,22 @@ TEST(interval_square) {
 static iv eval_exact_binary(umbra_interval (*op)(struct umbra_builder*,
                                                  umbra_interval, umbra_interval),
                             float a, float b) {
+    float uniforms[] = {a, b};
+    float lo_out = 0, hi_out = 0;
+    struct umbra_buf lo_buf = {.ptr = &lo_out, .count = 1},
+                     hi_buf = {.ptr = &hi_out, .count = 1};
+
     struct umbra_builder *bld = umbra_builder();
-    umbra_val32 const va = umbra_uniform_32(bld, (umbra_ptr32){0}, 0),
-                      vb = umbra_uniform_32(bld, (umbra_ptr32){0}, 1);
+    umbra_ptr32 const u    = umbra_uniforms  (bld, uniforms, 2);
+    umbra_ptr32 const lop  = umbra_bind_buf32(bld, &lo_buf);
+    umbra_ptr32 const hip  = umbra_bind_buf32(bld, &hi_buf);
+    umbra_val32 const va = umbra_uniform_32(bld, u, 0),
+                      vb = umbra_uniform_32(bld, u, 1);
     umbra_interval const ia = {va, va},
                          ib = {vb, vb};
     umbra_interval const r = op(bld, ia, ib);
-    umbra_store_32(bld, (umbra_ptr32){.ix = 1}, r.lo);
-    umbra_store_32(bld, (umbra_ptr32){.ix = 2}, r.hi);
+    umbra_store_32(bld, lop, r.lo);
+    umbra_store_32(bld, hip, r.hi);
 
     struct umbra_flat_ir *ir = umbra_flat_ir(bld);
     umbra_builder_free(bld);
@@ -169,14 +180,7 @@ static iv eval_exact_binary(umbra_interval (*op)(struct umbra_builder*,
     struct umbra_program *prog = be->compile(be, ir);
     umbra_flat_ir_free(ir);
 
-    float uniforms[] = {a, b};
-    float lo_out = 0, hi_out = 0;
-    struct umbra_buf buf[] = {
-        {.ptr = uniforms, .count = 2},
-        {.ptr = &lo_out,  .count = 1},
-        {.ptr = &hi_out,  .count = 1},
-    };
-    prog->queue(prog, 0, 0, 1, 1, buf);
+    prog->queue(prog, 0, 0, 1, 1, (struct umbra_buf[]){{0}});
     be->flush(be);
     umbra_program_free(prog);
     umbra_backend_free(be);
@@ -185,12 +189,20 @@ static iv eval_exact_binary(umbra_interval (*op)(struct umbra_builder*,
 
 static iv eval_exact_unary(umbra_interval (*op)(struct umbra_builder*, umbra_interval),
                            float a) {
+    float uniforms[] = {a};
+    float lo_out = 0, hi_out = 0;
+    struct umbra_buf lo_buf = {.ptr = &lo_out, .count = 1},
+                     hi_buf = {.ptr = &hi_out, .count = 1};
+
     struct umbra_builder *bld = umbra_builder();
-    umbra_val32 const va = umbra_uniform_32(bld, (umbra_ptr32){0}, 0);
+    umbra_ptr32 const u    = umbra_uniforms  (bld, uniforms, 1);
+    umbra_ptr32 const lop  = umbra_bind_buf32(bld, &lo_buf);
+    umbra_ptr32 const hip  = umbra_bind_buf32(bld, &hi_buf);
+    umbra_val32 const va = umbra_uniform_32(bld, u, 0);
     umbra_interval const ia = {va, va};
     umbra_interval const r = op(bld, ia);
-    umbra_store_32(bld, (umbra_ptr32){.ix = 1}, r.lo);
-    umbra_store_32(bld, (umbra_ptr32){.ix = 2}, r.hi);
+    umbra_store_32(bld, lop, r.lo);
+    umbra_store_32(bld, hip, r.hi);
 
     struct umbra_flat_ir *ir = umbra_flat_ir(bld);
     umbra_builder_free(bld);
@@ -198,14 +210,7 @@ static iv eval_exact_unary(umbra_interval (*op)(struct umbra_builder*, umbra_int
     struct umbra_program *prog = be->compile(be, ir);
     umbra_flat_ir_free(ir);
 
-    float uniforms[] = {a};
-    float lo_out = 0, hi_out = 0;
-    struct umbra_buf buf[] = {
-        {.ptr = uniforms, .count = 1},
-        {.ptr = &lo_out,  .count = 1},
-        {.ptr = &hi_out,  .count = 1},
-    };
-    prog->queue(prog, 0, 0, 1, 1, buf);
+    prog->queue(prog, 0, 0, 1, 1, (struct umbra_buf[]){{0}});
     be->flush(be);
     umbra_program_free(prog);
     umbra_backend_free(be);
@@ -243,8 +248,20 @@ TEST(interval_loop) {
     float ab[] = {1, 2, -1, 1, 0.5f, 3};
     struct umbra_buf ab_buf = {.ptr = ab, .count = 6};
 
+    struct uni uniforms = {
+        .x    = {0.0f, 4.0f},
+    };
+    { int const count = 3; __builtin_memcpy(&uniforms.n, &count, 4); }
+
+    float lo_out = 0, hi_out = 0;
+    struct umbra_buf lo_buf = {.ptr = &lo_out, .count = 1},
+                     hi_buf = {.ptr = &hi_out, .count = 1};
+
     struct umbra_builder *bld = umbra_builder();
-    umbra_ptr32 const u = {.ix = 0};
+    umbra_ptr32 const u    = umbra_uniforms  (bld, &uniforms,
+                                              (int)(sizeof uniforms / 4));
+    umbra_ptr32 const lop  = umbra_bind_buf32(bld, &lo_buf);
+    umbra_ptr32 const hip  = umbra_bind_buf32(bld, &hi_buf);
     umbra_ptr32 const data = umbra_bind_buf32(bld, &ab_buf);
     umbra_val32 const n    = umbra_uniform_32(bld, u, n_off);
     umbra_interval const x = {umbra_uniform_32(bld, u, x_off),
@@ -266,8 +283,8 @@ TEST(interval_loop) {
         umbra_store_var32(bld, hi_var, umbra_max_f32(bld, umbra_load_var32(bld, hi_var), val.hi));
     } umbra_end_loop(bld);
 
-    umbra_store_32(bld, (umbra_ptr32){.ix = 1}, umbra_load_var32(bld, lo_var));
-    umbra_store_32(bld, (umbra_ptr32){.ix = 2}, umbra_load_var32(bld, hi_var));
+    umbra_store_32(bld, lop, umbra_load_var32(bld, lo_var));
+    umbra_store_32(bld, hip, umbra_load_var32(bld, hi_var));
 
     struct umbra_flat_ir *ir = umbra_flat_ir(bld);
     umbra_builder_free(bld);
@@ -275,18 +292,7 @@ TEST(interval_loop) {
     struct umbra_program *prog = be->compile(be, ir);
     umbra_flat_ir_free(ir);
 
-    struct uni uniforms = {
-        .x    = {0.0f, 4.0f},
-    };
-    { int const count = 3; __builtin_memcpy(&uniforms.n, &count, 4); }
-
-    float lo_out = 0, hi_out = 0;
-    struct umbra_buf buf[] = {
-        {.ptr = &uniforms, .count = (int)(sizeof uniforms / 4)},
-        {.ptr = &lo_out,   .count = 1},
-        {.ptr = &hi_out,   .count = 1},
-    };
-    prog->queue(prog, 0, 0, 1, 1, buf);
+    prog->queue(prog, 0, 0, 1, 1, (struct umbra_buf[]){{0}});
     be->flush(be);
 
     equiv(lo_out, -2.0f) here;
