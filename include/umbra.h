@@ -57,23 +57,6 @@ typedef struct { int ix; } umbra_ptr16;
 typedef struct { int ix; } umbra_ptr32;
 typedef struct { int ix; } umbra_ptr64;
 
-// Register a span of uniform data, returning a ptr handle for use with
-// umbra_uniform_32() and/or umbra_gather_32().  The uniforms are not retained
-// and must outlive this umbra_builder and any derived umbra_flat_ir or
-// umbra_programs.
-//
-// `slot` should be 4-byte aligned, and `slots` counts those 4-byte slots.
-//
-// TODO: consider removing this sugar now that umbra_bind_buf32() exists.
-// It's implemented in src/builder.c as reserve_uniform() + setting .storage
-// = {slot, slots, 0}; callers could do the same themselves by owning a
-// struct umbra_buf and calling umbra_bind_buf32(b, &buf).  The main loss
-// is ergonomics -- callers who just want to register a plain state struct
-// would have to carry a side-by-side umbra_buf descriptor.  Worth checking
-// how many call sites this would uglify before removing.
-umbra_ptr32 umbra_uniforms(struct umbra_builder*, void const *slot, int slots);
-umbra_val32 umbra_uniform_32(struct umbra_builder*, umbra_ptr32, int slot);
-
 // Bind a caller-owned `struct umbra_buf` to a ptr handle.  At each dispatch
 // the backend reads the current contents of *buf, so callers may mutate
 // .ptr / .count / .stride between dispatches without rebuilding the program.
@@ -84,11 +67,24 @@ umbra_ptr16 umbra_bind_buf16(struct umbra_builder*, struct umbra_buf const*);
 umbra_ptr32 umbra_bind_buf32(struct umbra_builder*, struct umbra_buf const*);
 umbra_ptr64 umbra_bind_buf64(struct umbra_builder*, struct umbra_buf const*);
 
+// Register a span of uniform data, returning a ptr handle for use with
+// umbra_uniform_32() and/or umbra_gather_32().  The uniforms are not retained
+// and must outlive this umbra_builder and any derived umbra_flat_ir or
+// umbra_programs.
+//
+// `slot` should be 4-byte aligned, and `slots` counts those 4-byte slots.
+//
+// TODO: rename to umbra_bind_uniforms32(), and note that it can be more
+// efficient than umbra_bind_buf32() for small, fixed-location, fixed-size buffers
+umbra_ptr32 umbra_uniforms(struct umbra_builder*, void const *slot, int slots);
+
 umbra_val32 umbra_x(struct umbra_builder*);
 umbra_val32 umbra_y(struct umbra_builder*);
 
 umbra_val32 umbra_imm_i32(struct umbra_builder*, int);
 umbra_val32 umbra_imm_f32(struct umbra_builder*, float);
+
+umbra_val32 umbra_uniform_32(struct umbra_builder*, umbra_ptr32, int slot);
 
 umbra_val16 umbra_gather_16(struct umbra_builder*, umbra_ptr16, umbra_val32 ix);
 umbra_val32 umbra_gather_32(struct umbra_builder*, umbra_ptr32, umbra_val32 ix);
