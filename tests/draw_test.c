@@ -1526,19 +1526,20 @@ TEST(test_sdf_dispatch_tiling) {
 }
 
 TEST(test_metal_loop_gather) {
-    // Sum of a[i] for i=0..2 via loop + deref_ptr + gather.
+    // Sum of a[i] for i=0..2 via loop + bind_buf + gather.
     // a = {10, 20, 30}, expected sum = 60.
     struct uni {
-        struct umbra_buf data;
-        float            n;
-        int              :32;
+        float n;
+        int   :32;
     };
-    int const data_slot = (int)(__builtin_offsetof(struct uni, data) / 4),
-              n_slot    = (int)(__builtin_offsetof(struct uni, n)    / 4);
+    int const n_slot = (int)(__builtin_offsetof(struct uni, n) / 4);
+
+    float arr[] = {10, 20, 30};
+    struct umbra_buf arr_buf = {.ptr = arr, .count = 3};
 
     struct umbra_builder *b = umbra_builder();
     umbra_ptr32 const u    = {.ix = 0};
-    umbra_ptr32 const data = umbra_deref_ptr32(b, u, data_slot);
+    umbra_ptr32 const data = umbra_bind_buf32(b, &arr_buf);
     umbra_val32 const n    = umbra_uniform_32(b, u, n_slot);
 
     umbra_var32 sum = umbra_declare_var32(b);
@@ -1554,10 +1555,7 @@ TEST(test_metal_loop_gather) {
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
-    float arr[] = {10, 20, 30};
-    struct uni uniforms = {
-        .data = (struct umbra_buf){.ptr = arr, .count = 3},
-    };
+    struct uni uniforms = {0};
     { int const count = 3; __builtin_memcpy(&uniforms.n, &count, 4); }
 
     struct umbra_backend *bes[NUM_BACKENDS] = {

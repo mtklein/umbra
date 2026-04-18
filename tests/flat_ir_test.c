@@ -1650,13 +1650,6 @@ TEST(test_shift_imm) {
 }
 
 TEST(test_gather_deref_large) {
-    struct umbra_builder *b = umbra_builder();
-    umbra_val32            idx = umbra_load_32(b, (umbra_ptr32){0});
-    umbra_ptr16           src = umbra_deref_ptr16(b, (umbra_ptr32){.ix=1}, 0);
-    umbra_val32            val = umbra_i32_from_s16(b, umbra_gather_16(b, src, idx));
-    umbra_store_32(b, (umbra_ptr32){.ix=2}, val);
-    struct test_backends B = make(b);
-
     enum { N = 33000 };
     void *data = malloc((size_t)N * sizeof(int16_t));
     { int16_t v;
@@ -1665,18 +1658,23 @@ TEST(test_gather_deref_large) {
       v = 30; __builtin_memcpy((char*)data + 32800 * 2, &v, 2);
       v = 42; __builtin_memcpy((char*)data + (N-1) * 2, &v, 2);
     }
+    struct umbra_buf data_buf = {.ptr=data, .count=N};
+
+    struct umbra_builder *b = umbra_builder();
+    umbra_val32            idx = umbra_load_32(b, (umbra_ptr32){0});
+    umbra_ptr16            src = umbra_bind_buf16(b, &data_buf);
+    umbra_val32            val = umbra_i32_from_s16(b, umbra_gather_16(b, src, idx));
+    umbra_store_32(b, (umbra_ptr32){.ix=1}, val);
+    struct test_backends B = make(b);
 
     int32_t indices[4] = {0, 100, 32800, N - 1};
     int32_t dst[4] = {0};
-
-    struct umbra_buf deref = {.ptr=data, .count=N};
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
         if (run(&B, bi, 4, 1,
                  (struct umbra_buf[]){
                      {.ptr=indices, .count=count(indices)},
-                     {.ptr=&deref, .count=(int)(sizeof deref / 4)},
                      {.ptr=dst, .count=count(dst)},
                  })) {
             dst[0] == 10 here;
@@ -3813,26 +3811,24 @@ TEST(test_two_buffers_different_row_bytes) {
 }
 
 TEST(test_deref_row_bytes_l_gt_0) {
-    struct umbra_builder *b = umbra_builder();
-    umbra_ptr32           src = umbra_deref_ptr32(b, (umbra_ptr32){.ix=1}, 0);
-    umbra_val32            v   = umbra_load_32(b, src);
-    umbra_val32            one = umbra_imm_i32(b, 1);
-    umbra_store_32(b, (umbra_ptr32){.ix=2}, umbra_add_i32(b, v, one));
-    struct test_backends B = make(b);
-
     enum { S = 20, TH = 6, L = 3, T = 1, R = 15, BT = 5 };
     int32_t src_px[S * TH];
     for (int i = 0; i < S * TH; i++) { src_px[i] = i; }
     int32_t dst_px[S * TH];
+    struct umbra_buf src_buf = {.ptr=src_px, .count=S * TH, .stride=S};
 
-    struct umbra_buf deref = {.ptr=src_px, .count=S * TH, .stride=S};
+    struct umbra_builder *b = umbra_builder();
+    umbra_ptr32           src = umbra_bind_buf32(b, &src_buf);
+    umbra_val32            v   = umbra_load_32(b, src);
+    umbra_val32            one = umbra_imm_i32(b, 1);
+    umbra_store_32(b, (umbra_ptr32){.ix=0}, umbra_add_i32(b, v, one));
+    struct test_backends B = make(b);
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst_px, 0, sizeof dst_px);
         if (!B.p[bi]) { continue; }
         B.p[bi]->queue(B.p[bi], L, T, R, BT,
-                            (struct umbra_buf[]){{0},
-                                          {.ptr=&deref, .count=(int)(sizeof deref / 4)},
+                            (struct umbra_buf[]){
                                           {.ptr=dst_px, .count=count(dst_px), .stride=S}});
         B.be[bi]->flush(B.be[bi]);
         for (int row = T; row < BT; row++) {
@@ -3852,13 +3848,6 @@ TEST(test_deref_row_bytes_l_gt_0) {
 }
 
 TEST(test_deref_16bit_row_bytes_l_gt_0) {
-    struct umbra_builder *b = umbra_builder();
-    umbra_ptr16           src = umbra_deref_ptr16(b, (umbra_ptr32){.ix=1}, 0);
-    umbra_val32            v   = umbra_f32_from_f16(b, umbra_load_16(b, src));
-    umbra_val32            one = umbra_imm_f32(b, 1.0f);
-    umbra_store_32(b, (umbra_ptr32){.ix=2}, umbra_add_f32(b, v, one));
-    struct test_backends B = make(b);
-
     enum { S = 16, TH = 4, L = 2, T = 1, R = 10, BT = 3 };
     uint16_t src_px[S * TH];
     for (int i = 0; i < S * TH; i++) {
@@ -3867,15 +3856,20 @@ TEST(test_deref_16bit_row_bytes_l_gt_0) {
         __builtin_memcpy(&src_px[i], &h, 2);
     }
     float dst_px[S * TH];
+    struct umbra_buf src_buf = {.ptr=src_px, .count=S * TH, .stride=S};
 
-    struct umbra_buf deref = {.ptr=src_px, .count=S * TH, .stride=S};
+    struct umbra_builder *b = umbra_builder();
+    umbra_ptr16           src = umbra_bind_buf16(b, &src_buf);
+    umbra_val32            v   = umbra_f32_from_f16(b, umbra_load_16(b, src));
+    umbra_val32            one = umbra_imm_f32(b, 1.0f);
+    umbra_store_32(b, (umbra_ptr32){.ix=0}, umbra_add_f32(b, v, one));
+    struct test_backends B = make(b);
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst_px, 0, sizeof dst_px);
         if (!B.p[bi]) { continue; }
         B.p[bi]->queue(B.p[bi], L, T, R, BT,
-                            (struct umbra_buf[]){{0},
-                                          {.ptr=&deref, .count=(int)(sizeof deref / 4)},
+                            (struct umbra_buf[]){
                                           {.ptr=dst_px, .count=count(dst_px), .stride=S}});
         B.be[bi]->flush(B.be[bi]);
         for (int row = T; row < BT; row++) {
@@ -3888,42 +3882,35 @@ TEST(test_deref_16bit_row_bytes_l_gt_0) {
     cleanup(&B);
 }
 
-// Three derefs in one IR exercise the rb_gpr=0 branch in the JIT pointer
-// resolver: only the first two derefs get a row_bytes register, so the third
-// deref's per-pixel pointer is just a copy of the deref'd base. The flat
+// Three bound bufs exercise the rb_gpr=0 branch in the JIT pointer
+// resolver: only the first two bufs get a row_bytes register, so the third
+// buf's per-pixel pointer is just a copy of the base. The flat
 // source buffer makes this safe — every (x,y) reads bufC[x] regardless of y.
 TEST(test_deref_third_uses_else_branch) {
     enum { W = 8, H = 3 };
+    int32_t bufA[W * H], bufB[W * H], bufC[W];
+    for (int i = 0; i < W * H; i++) { bufA[i] = i;       bufB[i] = i * 10; }
+    for (int i = 0; i < W;     i++) { bufC[i] = 1000 + i; }
+    struct umbra_buf a = {.ptr=bufA, .count=count(bufA), .stride=W};
+    struct umbra_buf bb = {.ptr=bufB, .count=count(bufB), .stride=W};
+    // bufC is flat (row_bytes==0): broadcast the same row to every y.
+    struct umbra_buf c = {.ptr=bufC, .count=count(bufC)};
+
     struct umbra_builder         *b = umbra_builder();
-    struct {
-        struct umbra_buf a, b, c;
-    } uni = {0};
-    int const off1 = (int)(__builtin_offsetof(__typeof__(uni), a) / 4),
-              off2 = (int)(__builtin_offsetof(__typeof__(uni), b) / 4),
-              off3 = (int)(__builtin_offsetof(__typeof__(uni), c) / 4);
-    umbra_ptr32 d1  = umbra_deref_ptr32(b, (umbra_ptr32){0}, off1);
-    umbra_ptr32 d2  = umbra_deref_ptr32(b, (umbra_ptr32){0}, off2);
-    umbra_ptr32 d3  = umbra_deref_ptr32(b, (umbra_ptr32){0}, off3);
+    umbra_ptr32 d1  = umbra_bind_buf32(b, &a);
+    umbra_ptr32 d2  = umbra_bind_buf32(b, &bb);
+    umbra_ptr32 d3  = umbra_bind_buf32(b, &c);
     umbra_val32 v1  = umbra_load_32(b, d1);
     umbra_val32 v2  = umbra_load_32(b, d2);
     umbra_val32 v3  = umbra_load_32(b, d3);
     umbra_val32 sum = umbra_add_i32(b, umbra_add_i32(b, v1, v2), v3);
-    umbra_store_32(b, (umbra_ptr32){.ix=1}, sum);
+    umbra_store_32(b, (umbra_ptr32){.ix=0}, sum);
     struct test_backends B = make(b);
-
-    int32_t bufA[W * H], bufB[W * H], bufC[W];
-    for (int i = 0; i < W * H; i++) { bufA[i] = i;       bufB[i] = i * 10; }
-    for (int i = 0; i < W;     i++) { bufC[i] = 1000 + i; }
-    uni.a = (struct umbra_buf){.ptr=bufA, .count=count(bufA), .stride=W};
-    uni.b = (struct umbra_buf){.ptr=bufB, .count=count(bufB), .stride=W};
-    // bufC is flat (row_bytes==0): broadcast the same row to every y.
-    uni.c = (struct umbra_buf){.ptr=bufC, .count=count(bufC)};
 
     int32_t dst[W * H];
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
         if (run(&B, bi, W, H, (struct umbra_buf[]){
-                {.ptr=&uni, .count=(int)(sizeof uni / 4)},
                 {.ptr=dst, .count=count(dst), .stride=W}})) {
             for (int y = 0; y < H; y++) {
                 for (int x = 0; x < W; x++) {
@@ -4470,13 +4457,16 @@ TEST(test_loop_var_war_hazard) {
 }
 
 TEST(test_deref_ptr_r11_invalidation) {
+    int16_t cov_data[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    struct umbra_buf cov_buf = {.ptr = cov_data, .count = 8, .stride = 8};
+
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr16 deref = umbra_deref_ptr16(b, (umbra_ptr32){0}, 0);
+    umbra_ptr16 deref = umbra_bind_buf16(b, &cov_buf);
     umbra_val32 cov   = umbra_f32_from_i32(b, umbra_i32_from_s16(b, umbra_load_16(b, deref)));
     umbra_val32 r, g, bl, a;
-    umbra_load_8x4(b, (umbra_ptr32){.ix = 1}, &r, &g, &bl, &a);
+    umbra_load_8x4(b, (umbra_ptr32){.ix = 0}, &r, &g, &bl, &a);
     umbra_val32 c255 = umbra_imm_f32(b, 255.0f);
-    umbra_store_8x4(b, (umbra_ptr32){.ix = 1},
+    umbra_store_8x4(b, (umbra_ptr32){.ix = 0},
                     umbra_round_i32(b, umbra_min_f32(b,
                         umbra_add_f32(b, umbra_f32_from_i32(b, r), cov), c255)),
                     umbra_round_i32(b, umbra_min_f32(b,
@@ -4488,13 +4478,10 @@ TEST(test_deref_ptr_r11_invalidation) {
 
     struct test_backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-        int16_t cov_data[8] = {0, 0, 0, 0, 0, 0, 0, 0};
         uint32_t dst_data[8] = {0};
         dst_data[0] = 0x01020304u;
-        struct umbra_buf cov_buf = {.ptr = cov_data, .count = 8, .stride = 8};
         if (run(&B, bi, 8, 1,
                  (struct umbra_buf[]){
-                     {.ptr = &cov_buf, .count = 4},
                      {.ptr = dst_data, .count = 8, .stride = 8},
                  })) {
             dst_data[0] == 0x01020304u here;

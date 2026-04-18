@@ -773,7 +773,7 @@ static umbra_interval sdf_text_build(void *ctx, struct umbra_builder *b,
                                       umbra_interval x, umbra_interval y) {
     struct sdf_text_sdf const *self = ctx;
     umbra_ptr32 const u    = umbra_uniforms(b, self, sizeof *self / 4);
-    umbra_ptr32 const data = umbra_deref_ptr32(b, u, SLOT(curves));
+    umbra_ptr32 const data = umbra_bind_buf32(b, &self->curves);
     umbra_val32 const n    = umbra_uniform_32(b, u, SLOT(n_curves));
 
     umbra_interval const sx = umbra_interval_exact(
@@ -960,7 +960,7 @@ static umbra_interval ngon_build(void *ctx, struct umbra_builder *b,
                                   umbra_interval x, umbra_interval y) {
     struct ngon_sdf const *self = ctx;
     umbra_ptr32 const u    = umbra_uniforms(b, self, sizeof *self / 4);
-    umbra_ptr32 const data = umbra_deref_ptr32(b, u, SLOT(hp));
+    umbra_ptr32 const data = umbra_bind_buf32(b, &self->hp);
     umbra_val32 const n    = umbra_uniform_32(b, u, SLOT(n_sides));
 
     umbra_var32 lo_var = umbra_declare_var32(b);

@@ -316,7 +316,8 @@ int main(int argc, char *argv[]) {
 
     if (!match || strstr("slug accumulator (1 curve)", match)) {
         struct slug_curves       sc  = slug_extract("Slug", (float)H * 0.3125f);
-        struct umbra_builder    *bld = slug_build_acc();
+        struct umbra_buf         curves_buf = {.ptr=sc.data, .count=sc.count * 6};
+        struct umbra_builder    *bld = slug_build_acc(&curves_buf);
         struct umbra_flat_ir *ir = umbra_flat_ir(bld);
         umbra_builder_free(bld);
 
@@ -331,7 +332,6 @@ int main(int argc, char *argv[]) {
         slide_perspective_matrix(&au.mat, 0.0f, W, H, (int)sc.w, (int)sc.h);
         au.bw     = sc.w;
         au.bh     = sc.h;
-        au.curves = (struct umbra_buf){.ptr=sc.data, .count=sc.count * 6};
         { int32_t z = 0; __builtin_memcpy(&au.j, &z, 4); }
         struct umbra_buf abuf[] = {
             {.ptr=&au, .count=(int)(sizeof au / 4)},

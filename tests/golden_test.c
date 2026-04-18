@@ -112,7 +112,8 @@ TEST(test_slug_rect) {
         55, 5, 30, 5,  5, 5,
     };
 
-    struct umbra_builder *ab = slug_build_acc();
+    struct umbra_buf curves_buf = {.ptr=rect, .count=count(rect)};
+    struct umbra_builder *ab = slug_build_acc(&curves_buf);
     struct umbra_flat_ir *air =
         umbra_flat_ir(ab);
     umbra_builder_free(ab);
@@ -148,7 +149,6 @@ TEST(test_slug_rect) {
     struct slug_acc_uniforms au = {
         .mat    = {1,0,0, 0,1,0, 0,0,1},
         .bw     = 60, .bh = 40,
-        .curves = {.ptr=rect, .count=count(rect)},
     };
     struct umbra_buf abuf[] = {
         {.ptr=&au, .count=(int)(sizeof au / 4)},

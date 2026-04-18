@@ -13,8 +13,7 @@ umbra_val32 coverage_bitmap(void *ctx, struct umbra_builder *b,
                             umbra_val32 x, umbra_val32 y) {
     struct umbra_buf const *self = ctx;
     (void)x; (void)y;
-    umbra_ptr32 const u = umbra_uniforms(b, self, sizeof *self / 4);
-    umbra_ptr16 const bmp = umbra_deref_ptr16(b, u, 0);
+    umbra_ptr16 const bmp = umbra_bind_buf16(b, self);
     umbra_val32 const val = umbra_i32_from_s16(b, umbra_load_16(b, bmp));
     umbra_val32 const inv255 = umbra_imm_f32(b, 1.0f / 255.0f);
     return umbra_mul_f32(b, umbra_f32_from_i32(b, val), inv255);
@@ -24,8 +23,7 @@ umbra_val32 coverage_sdf(void *ctx, struct umbra_builder *b,
                          umbra_val32 x, umbra_val32 y) {
     struct umbra_buf const *self = ctx;
     (void)x; (void)y;
-    umbra_ptr32 const u = umbra_uniforms(b, self, sizeof *self / 4);
-    umbra_ptr16 const bmp = umbra_deref_ptr16(b, u, 0);
+    umbra_ptr16 const bmp = umbra_bind_buf16(b, self);
     umbra_val32 const raw = umbra_i32_from_s16(b, umbra_load_16(b, bmp));
     umbra_val32 const inv255 = umbra_imm_f32(b, 1.0f / 255.0f);
     umbra_val32 const dist = umbra_mul_f32(b, umbra_f32_from_i32(b, raw), inv255);

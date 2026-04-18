@@ -131,27 +131,24 @@ TEST(resolve_preserves_channels) {
 
 TEST(resolve_preserves_ptr) {
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr32 derived = umbra_deref_ptr32(b, (umbra_ptr32){0}, 0);
-    umbra_val32 v = umbra_gather_32(b, derived, umbra_x(b));
-    umbra_store_32(b, (umbra_ptr32){.ix = 1}, v);
+    struct umbra_buf dummy = {0};
+    umbra_ptr32 bound = umbra_bind_buf32(b, &dummy);
+    umbra_val32 v = umbra_gather_32(b, bound, umbra_x(b));
+    umbra_store_32(b, (umbra_ptr32){.ix = 0}, v);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
     struct umbra_flat_ir *r = flat_ir_resolve(ir, JOIN_PREFER_IMM);
 
-    _Bool found_deref = 0;
+    _Bool found_gather = 0;
     for (int i = 0; i < r->insts; i++) {
-        if (r->inst[i].op == op_deref_ptr) {
-            found_deref = 1;
-            r->inst[i].ptr.deref == 0 here;
-        }
         if (r->inst[i].op == op_gather_32) {
-            r->inst[i].ptr.deref != 0 here;
+            found_gather = 1;
             r->inst[i].ptr.ix >= 0 here;
-            r->inst[i].ptr.ix < r->insts here;
+            r->inst[i].ptr.ix < REG_BASE here;
         }
     }
-    found_deref here;
+    found_gather here;
 
     umbra_flat_ir_free(r);
     umbra_flat_ir_free(ir);

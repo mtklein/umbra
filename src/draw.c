@@ -454,7 +454,7 @@ umbra_val32 umbra_coverage_bitmap_matrix(void *ctx, struct umbra_builder *b,
                                           umbra_val32 x, umbra_val32 y) {
     struct umbra_coverage_bitmap_matrix const *self = ctx;
     umbra_ptr32 const u = umbra_uniforms(b, self, sizeof *self / 4);
-    umbra_ptr16 const bmp = umbra_deref_ptr16(b, u, SLOT(bmp.buf));
+    umbra_ptr16 const bmp = umbra_bind_buf16(b, &self->bmp.buf);
 
     umbra_val32 const m0 = umbra_uniform_32(b, u, SLOT(mat.sx));
     umbra_val32 const m1 = umbra_uniform_32(b, u, SLOT(mat.kx));

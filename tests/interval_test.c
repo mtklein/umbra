@@ -233,18 +233,19 @@ TEST(interval_loop) {
 
     // Fixed uniform layout: struct with {data: umbra_buf, n: float, x: float[2]}.
     struct uni {
-        struct umbra_buf data;
         float            n;
         int              :32;
         float            x[2];
     };
-    int const ptr_off = (int)(__builtin_offsetof(struct uni, data) / 4),
-              n_off   = (int)(__builtin_offsetof(struct uni, n)    / 4),
-              x_off   = (int)(__builtin_offsetof(struct uni, x)    / 4);
+    int const n_off   = (int)(__builtin_offsetof(struct uni, n) / 4),
+              x_off   = (int)(__builtin_offsetof(struct uni, x) / 4);
+
+    float ab[] = {1, 2, -1, 1, 0.5f, 3};
+    struct umbra_buf ab_buf = {.ptr = ab, .count = 6};
 
     struct umbra_builder *bld = umbra_builder();
     umbra_ptr32 const u = {.ix = 0};
-    umbra_ptr32 const data = umbra_deref_ptr32(bld, u, ptr_off);
+    umbra_ptr32 const data = umbra_bind_buf32(bld, &ab_buf);
     umbra_val32 const n    = umbra_uniform_32(bld, u, n_off);
     umbra_interval const x = {umbra_uniform_32(bld, u, x_off),
                               umbra_uniform_32(bld, u, x_off + 1)};
@@ -274,9 +275,7 @@ TEST(interval_loop) {
     struct umbra_program *prog = be->compile(be, ir);
     umbra_flat_ir_free(ir);
 
-    float ab[] = {1, 2, -1, 1, 0.5f, 3};
     struct uni uniforms = {
-        .data = (struct umbra_buf){.ptr = ab, .count = 6},
         .x    = {0.0f, 4.0f},
     };
     { int const count = 3; __builtin_memcpy(&uniforms.n, &count, 4); }
