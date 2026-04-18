@@ -82,7 +82,7 @@ static struct slide* make_grad(char const *title, struct umbra_shader *shader,
     return &st->base;
 }
 
-SLIDE(slide_gradient_linear_2) {
+SLIDE(slide_gradient_linear_two_stop) {
     return make_grad("Gradient Linear Two-Stop",
         umbra_shader_gradient_linear_two_stops((umbra_point){0, 0}, (umbra_point){640, 0},
                                               (umbra_color){1.0f, 0.4f, 0.0f, 1.0f},
@@ -90,18 +90,10 @@ SLIDE(slide_gradient_linear_2) {
         NULL, NULL, NULL);
 }
 
-SLIDE(slide_gradient_radial_2) {
-    return make_grad("Gradient Radial Two-Stop",
-        umbra_shader_gradient_radial_two_stops((umbra_point){320, 240}, 300.0f,
-                                              (umbra_color){1.0f, 1.0f, 0.9f, 1.0f},
-                                              (umbra_color){0.05f, 0.0f, 0.15f, 1.0f}),
-        NULL, NULL, NULL);
-}
-
 // Fixed: was ~131 µs Metal vs ~102 µs Vulkan.  Now ~62 and ~66 respectively,
 // thanks to umbra_if() wrapping the gathers+lerps so GPU backends can branch-skip
 // them when the pixel isn't in the current gradient segment.
-SLIDE(slide_gradient_linear_stops) {
+SLIDE(slide_gradient_linear) {
     static umbra_color const colors[] = {
         {1.2f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.8f, 0.0f, 1.0f}, {0.0f, 1.2f, 0.0f, 1.0f},
         {0.0f, 0.8f, 1.2f, 1.0f}, {0.0f, 0.0f, 1.2f, 1.0f}, {0.8f, 0.0f, 1.0f, 1.0f},
@@ -123,7 +115,48 @@ SLIDE(slide_gradient_linear_stops) {
         planar, pos, NULL);
 }
 
-SLIDE(slide_gradient_radial_stops) {
+SLIDE(slide_gradient_linear_lut) {
+    static umbra_color const colors[] = {
+        {1.2f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.8f, 0.0f, 1.0f}, {0.0f, 1.2f, 0.0f, 1.0f},
+        {0.0f, 0.8f, 1.2f, 1.0f}, {0.0f, 0.0f, 1.2f, 1.0f}, {0.8f, 0.0f, 1.0f, 1.0f},
+    };
+    enum { LUT_N = 64 };
+    float *lut = malloc(LUT_N * 4 * sizeof(float));
+    umbra_gradient_lut_even(lut, LUT_N, 6, colors);
+    return make_grad("Gradient Linear LUT",
+        umbra_shader_gradient_linear_lut((umbra_point){0, 0}, (umbra_point){640, 0},
+                                         (struct umbra_buf){.ptr=lut, .count=LUT_N * 4}),
+        NULL, NULL, lut);
+}
+
+SLIDE(slide_gradient_linear_evenly_spaced) {
+    static umbra_color const colors[] = {
+        {1.2f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.8f, 0.0f, 1.0f}, {0.0f, 1.2f, 0.0f, 1.0f},
+        {0.0f, 0.8f, 1.2f, 1.0f}, {0.0f, 0.0f, 1.2f, 1.0f}, {0.8f, 0.0f, 1.0f, 1.0f},
+    };
+    enum { N = 6 };
+    float *planar = malloc(N * 4 * sizeof(float));
+    for (int i = 0; i < N; i++) {
+        for (int c = 0; c < 4; c++) {
+            planar[c * N + i] = (&colors[i].r)[c];
+        }
+    }
+    return make_grad("Gradient Linear Evenly-Spaced",
+        umbra_shader_gradient_linear_evenly_spaced_stops(
+            (umbra_point){0, 0}, (umbra_point){640, 0},
+            (struct umbra_buf){.ptr=planar, .count=N * 4}),
+        planar, NULL, NULL);
+}
+
+SLIDE(slide_gradient_radial_two_stop) {
+    return make_grad("Gradient Radial Two-Stop",
+        umbra_shader_gradient_radial_two_stops((umbra_point){320, 240}, 300.0f,
+                                              (umbra_color){1.0f, 1.0f, 0.9f, 1.0f},
+                                              (umbra_color){0.05f, 0.0f, 0.15f, 1.0f}),
+        NULL, NULL, NULL);
+}
+
+SLIDE(slide_gradient_radial) {
     static umbra_color const colors[] = {
         {1.5f, 1.5f, 1.2f, 1.0f}, {1.2f, 0.8f, 0.0f, 1.0f},
         {0.8f, 0.0f, 0.2f, 1.0f}, {0.05f, 0.0f, 0.15f, 1.0f},
@@ -145,21 +178,7 @@ SLIDE(slide_gradient_radial_stops) {
         planar, pos, NULL);
 }
 
-SLIDE(slide_gradient_linear_wide) {
-    static umbra_color const colors[] = {
-        {1.2f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.8f, 0.0f, 1.0f}, {0.0f, 1.2f, 0.0f, 1.0f},
-        {0.0f, 0.8f, 1.2f, 1.0f}, {0.0f, 0.0f, 1.2f, 1.0f}, {0.8f, 0.0f, 1.0f, 1.0f},
-    };
-    enum { LUT_N = 64 };
-    float *lut = malloc(LUT_N * 4 * sizeof(float));
-    umbra_gradient_lut_even(lut, LUT_N, 6, colors);
-    return make_grad("Gradient Linear LUT",
-        umbra_shader_gradient_linear_lut((umbra_point){0, 0}, (umbra_point){640, 0},
-                                         (struct umbra_buf){.ptr=lut, .count=LUT_N * 4}),
-        NULL, NULL, lut);
-}
-
-SLIDE(slide_gradient_radial_wide) {
+SLIDE(slide_gradient_radial_lut) {
     static umbra_color const colors[] = {
         {1.5f, 1.5f, 1.2f, 1.0f}, {1.2f, 0.8f, 0.0f, 1.0f},
         {0.8f, 0.0f, 0.2f, 1.0f}, {0.05f, 0.0f, 0.15f, 1.0f},
@@ -173,26 +192,7 @@ SLIDE(slide_gradient_radial_wide) {
         NULL, NULL, lut);
 }
 
-SLIDE(slide_gradient_linear_even) {
-    static umbra_color const colors[] = {
-        {1.2f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.8f, 0.0f, 1.0f}, {0.0f, 1.2f, 0.0f, 1.0f},
-        {0.0f, 0.8f, 1.2f, 1.0f}, {0.0f, 0.0f, 1.2f, 1.0f}, {0.8f, 0.0f, 1.0f, 1.0f},
-    };
-    enum { N = 6 };
-    float *planar = malloc(N * 4 * sizeof(float));
-    for (int i = 0; i < N; i++) {
-        for (int c = 0; c < 4; c++) {
-            planar[c * N + i] = (&colors[i].r)[c];
-        }
-    }
-    return make_grad("Gradient Linear Evenly-Spaced",
-        umbra_shader_gradient_linear_evenly_spaced_stops(
-            (umbra_point){0, 0}, (umbra_point){640, 0},
-            (struct umbra_buf){.ptr=planar, .count=N * 4}),
-        planar, NULL, NULL);
-}
-
-SLIDE(slide_gradient_radial_even) {
+SLIDE(slide_gradient_radial_evenly_spaced) {
     static umbra_color const colors[] = {
         {1.5f, 1.5f, 1.2f, 1.0f}, {1.2f, 0.8f, 0.0f, 1.0f},
         {0.8f, 0.0f, 0.2f, 1.0f}, {0.05f, 0.0f, 0.15f, 1.0f},
