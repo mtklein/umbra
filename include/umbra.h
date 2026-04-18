@@ -46,7 +46,7 @@ struct umbra_program {
     void (*dump )(struct umbra_program const*, FILE*);
     void (*free )(struct umbra_program*);
     struct umbra_backend *backend;
-    _Bool                 threadsafe, pad[7];
+    _Bool                 queue_is_threadsafe, pad[7];
 };
 void umbra_program_free(struct umbra_program*);
 

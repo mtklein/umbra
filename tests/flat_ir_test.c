@@ -2430,14 +2430,14 @@ TEST(test_program_threadsafe) {
 
     struct umbra_backend *interp = umbra_backend_interp();
     { struct umbra_program *p = interp->compile(interp, ir);
-      p->threadsafe == 1 here;
+      p->queue_is_threadsafe == 1 here;
       umbra_program_free(p); }
     umbra_backend_free(interp);
 
     struct umbra_backend *jit = umbra_backend_jit();
     if (jit) {
         struct umbra_program *p = jit->compile(jit, ir);
-        p->threadsafe == 1 here;
+        p->queue_is_threadsafe == 1 here;
         umbra_program_free(p);
         umbra_backend_free(jit);
     }
@@ -2445,7 +2445,7 @@ TEST(test_program_threadsafe) {
     struct umbra_backend *metal = umbra_backend_metal();
     if (metal) {
         struct umbra_program *p = metal->compile(metal, ir);
-        p->threadsafe == 0 here;
+        p->queue_is_threadsafe == 0 here;
         umbra_program_free(p);
         umbra_backend_free(metal);
     }

@@ -1353,7 +1353,7 @@ static struct umbra_program* compile_interp(struct umbra_backend           *be,
         .dump       = 0,
         .free       = free_interp,
         .backend    = be,
-        .threadsafe = 1,
+        .queue_is_threadsafe = 1,
     };
     return &p->base;
 }

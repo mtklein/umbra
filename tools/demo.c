@@ -348,7 +348,7 @@ int main(void) {
                 int y1 = y0 + sh > H ? H : y0 + sh;
                 work[t] = (struct tile_work){s, secs, 0, y0, W, y1, pixbuf};
             }
-            if (nt <= 1 || !xtra_progs[1]->threadsafe) {
+            if (nt <= 1 || !xtra_progs[1]->queue_is_threadsafe) {
                 for (int t = 0; t < nt; t++) { tile_fn(&work[t]); }
             } else {
                 struct work_group wg = {.pool = pool};
