@@ -598,17 +598,20 @@ struct shader_solid {
     umbra_color color;
 };
 
-static umbra_color_val32 solid_build(struct umbra_shader *s, struct umbra_builder *builder,
+static umbra_color_val32 solid_build(struct umbra_shader *s, struct umbra_builder *b,
                                 umbra_ptr32 uniforms,
                                 umbra_val32 x, umbra_val32 y) {
     struct shader_solid *self = (struct shader_solid *)s;
+    (void)uniforms;
     (void)x;
     (void)y;
-    umbra_val32 const r = umbra_uniform_32(builder, uniforms, SLOT(color.r));
-    umbra_val32 const g = umbra_uniform_32(builder, uniforms, SLOT(color.g));
-    umbra_val32 const b = umbra_uniform_32(builder, uniforms, SLOT(color.b));
-    umbra_val32 const a = umbra_uniform_32(builder, uniforms, SLOT(color.a));
-    return (umbra_color_val32){r, g, b, a};
+    umbra_ptr32 const u = umbra_uniforms(b, &self->color, sizeof self->color / 4);
+    return (umbra_color_val32){
+        umbra_uniform_32(b, u, 0),
+        umbra_uniform_32(b, u, 1),
+        umbra_uniform_32(b, u, 2),
+        umbra_uniform_32(b, u, 3),
+    };
 }
 static void solid_free(struct umbra_shader *s) { free(s); }
 
@@ -621,6 +624,10 @@ struct umbra_shader* umbra_shader_solid(umbra_color color) {
         .color = color,
     };
     return &s->base;
+}
+
+void umbra_shader_solid_set_color(struct umbra_shader *s, umbra_color color) {
+    ((struct shader_solid *)s)->color = color;
 }
 
 struct shader_gradient_two_stops {

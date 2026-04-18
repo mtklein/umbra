@@ -128,7 +128,8 @@ void umbra_sdf_draw_queue(struct umbra_sdf_draw const*,
                               int l, int t, int r, int b, struct umbra_buf[]);
 void umbra_sdf_draw_free(struct umbra_sdf_draw*);
 
-struct umbra_shader* umbra_shader_solid(umbra_color color);
+struct umbra_shader* umbra_shader_solid          (umbra_color);
+void                 umbra_shader_solid_set_color(struct umbra_shader*, umbra_color);
 
 // A gradient is (x,y) -> t -> color.  umbra_gradient_coords is the first leg,
 // a first-class effect in the same shape as umbra_shader / umbra_coverage /

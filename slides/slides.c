@@ -91,8 +91,7 @@ void slide_bg_prepare(struct umbra_backend *be, struct umbra_fmt fmt, int w, int
 
 void slide_bg_draw(float const bg[4], int l, int t, int r, int b, void *buf) {
     umbra_color const c = {bg[0], bg[1], bg[2], bg[3]};
-    umbra_shader_free(bg_shader);
-    bg_shader = umbra_shader_solid(c);
+    umbra_shader_solid_set_color(bg_shader, c);
     struct umbra_buf ubuf[] = {
         {.ptr=buf, .count=bg_w * bg_h * bg_fmt.planes, .stride=bg_w},
         {0},

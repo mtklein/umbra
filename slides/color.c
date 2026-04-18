@@ -66,8 +66,7 @@ static void swatch_draw(struct slide *s, double secs, int l, int t, int r, int b
         int const xr = x1 < r ? x1 : r;
         if (xr <= xl) { continue; }
 
-        umbra_shader_free(st->shader);
-        st->shader = umbra_shader_solid(swatches[i]);
+        umbra_shader_solid_set_color(st->shader, swatches[i]);
         struct umbra_buf ubuf[] = {
             {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
             {0},
