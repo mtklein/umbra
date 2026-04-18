@@ -98,15 +98,19 @@ void umbra_sdf_free(struct umbra_sdf*);
 
 struct umbra_coverage* umbra_sdf_coverage(struct umbra_sdf*, _Bool hard_edge);
 
-typedef umbra_color_val32 (*umbra_blend_fn)(struct umbra_builder*,
+// Blend fns take void *ctx for the flat-effect convention.  Built-in blends
+// are stateless and ignore it; old callers of umbra_draw_builder still pass
+// them by name -- the old middleware just threads NULL as ctx through to
+// the underlying blend call.
+typedef umbra_color_val32 (*umbra_blend_fn)(void *ctx, struct umbra_builder*,
                                             umbra_color_val32 src, umbra_color_val32 dst);
-umbra_color_val32 umbra_blend_src     (struct umbra_builder*,
+umbra_color_val32 umbra_blend_src     (void *ctx, struct umbra_builder*,
                                        umbra_color_val32 src, umbra_color_val32 dst);
-umbra_color_val32 umbra_blend_srcover (struct umbra_builder*,
+umbra_color_val32 umbra_blend_srcover (void *ctx, struct umbra_builder*,
                                        umbra_color_val32 src, umbra_color_val32 dst);
-umbra_color_val32 umbra_blend_dstover (struct umbra_builder*,
+umbra_color_val32 umbra_blend_dstover (void *ctx, struct umbra_builder*,
                                        umbra_color_val32 src, umbra_color_val32 dst);
-umbra_color_val32 umbra_blend_multiply(struct umbra_builder*,
+umbra_color_val32 umbra_blend_multiply(void *ctx, struct umbra_builder*,
                                        umbra_color_val32 src, umbra_color_val32 dst);
 
 struct umbra_builder* umbra_draw_builder(struct umbra_coverage*,

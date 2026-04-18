@@ -199,7 +199,7 @@ struct umbra_builder* umbra_draw_builder(struct umbra_coverage *coverage,
 
     umbra_color_val32 out;
     if (blend) {
-        out = blend(builder, src, dst);
+        out = blend(NULL, builder, src, dst);
     } else {
         out = src;
     }
@@ -1189,13 +1189,17 @@ struct umbra_coverage* umbra_coverage_bitmap_matrix(struct umbra_matrix mat,
     return &c->base;
 }
 
-umbra_color_val32 umbra_blend_src(struct umbra_builder *builder, umbra_color_val32 src, umbra_color_val32 dst) {
+umbra_color_val32 umbra_blend_src(void *ctx, struct umbra_builder *builder,
+                                  umbra_color_val32 src, umbra_color_val32 dst) {
+    (void)ctx;
     (void)builder;
     (void)dst;
     return src;
 }
 
-umbra_color_val32 umbra_blend_srcover(struct umbra_builder *builder, umbra_color_val32 src, umbra_color_val32 dst) {
+umbra_color_val32 umbra_blend_srcover(void *ctx, struct umbra_builder *builder,
+                                      umbra_color_val32 src, umbra_color_val32 dst) {
+    (void)ctx;
     umbra_val32 const one = umbra_imm_f32(builder, 1.0f);
     umbra_val32 const inv_a = umbra_sub_f32(builder, one, src.a);
     return (umbra_color_val32){
@@ -1206,7 +1210,9 @@ umbra_color_val32 umbra_blend_srcover(struct umbra_builder *builder, umbra_color
     };
 }
 
-umbra_color_val32 umbra_blend_dstover(struct umbra_builder *builder, umbra_color_val32 src, umbra_color_val32 dst) {
+umbra_color_val32 umbra_blend_dstover(void *ctx, struct umbra_builder *builder,
+                                      umbra_color_val32 src, umbra_color_val32 dst) {
+    (void)ctx;
     umbra_val32 const one = umbra_imm_f32(builder, 1.0f);
     umbra_val32 const inv_a = umbra_sub_f32(builder, one, dst.a);
     return (umbra_color_val32){
@@ -1217,7 +1223,9 @@ umbra_color_val32 umbra_blend_dstover(struct umbra_builder *builder, umbra_color
     };
 }
 
-umbra_color_val32 umbra_blend_multiply(struct umbra_builder *builder, umbra_color_val32 src, umbra_color_val32 dst) {
+umbra_color_val32 umbra_blend_multiply(void *ctx, struct umbra_builder *builder,
+                                       umbra_color_val32 src, umbra_color_val32 dst) {
+    (void)ctx;
     umbra_val32 const one = umbra_imm_f32(builder, 1.0f);
     umbra_val32 const inv_sa = umbra_sub_f32(builder, one, src.a);
     umbra_val32 const inv_da = umbra_sub_f32(builder, one, dst.a);
