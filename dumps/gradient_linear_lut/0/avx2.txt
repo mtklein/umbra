@@ -31,7 +31,7 @@ Critical sequence based on the simulation:
  |
  |      0.    vmovd	%r10d, %xmm9
  |      1.    vbroadcastss	%xmm9, %ymm9
- |      2.    vpaddd	1620(%rip), %ymm9, %ymm9
+ |      2.    vpaddd	1621(%rip), %ymm9, %ymm9
  |      3.    vcvtdq2ps	%ymm9, %ymm9
  |      4.    vmovd	%r14d, %xmm10
  |      5.    vbroadcastss	%xmm10, %ymm10
@@ -39,8 +39,8 @@ Critical sequence based on the simulation:
  |      7.    vmulps	%ymm2, %ymm10, %ymm10
  |      8.    vfmadd231ps	%ymm1, %ymm9, %ymm10
  |      9.    vaddps	%ymm3, %ymm10, %ymm10
- +----> 10.   vmaxps	1609(%rip), %ymm10, %ymm10        ## RESOURCE interference:  Zn4FP1 [ probability: 95% ]
- +----> 11.   vminps	1504(%rip), %ymm10, %ymm10        ## REGISTER dependency:  %ymm10
+ +----> 10.   vmaxps	1610(%rip), %ymm10, %ymm10        ## RESOURCE interference:  Zn4FP1 [ probability: 95% ]
+ +----> 11.   vminps	1505(%rip), %ymm10, %ymm10        ## REGISTER dependency:  %ymm10
  +----> 12.   vmulps	%ymm5, %ymm10, %ymm10             ## REGISTER dependency:  %ymm10
  +----> 13.   vminps	%ymm10, %ymm6, %ymm9              ## REGISTER dependency:  %ymm10
  |      14.   vroundps	$1, %ymm9, %ymm11
@@ -62,7 +62,7 @@ Critical sequence based on the simulation:
  +----> 30.   vpandn	%ymm14, %ymm13, %ymm13            ## REGISTER dependency:  %ymm14
  |      31.   vpxor	%ymm12, %ymm12, %ymm12
  +----> 32.   vpgatherdd	%ymm13, (%r11,%ymm11,4), %ymm12   ## REGISTER dependency:  %ymm13
- |      33.   vpaddd	1522(%rip), %ymm9, %ymm11
+ |      33.   vpaddd	1523(%rip), %ymm9, %ymm11
  |      34.   vpaddd	%ymm8, %ymm11, %ymm13
  |      35.   vpaddd	%ymm4, %ymm11, %ymm14
  |      36.   vpaddd	%ymm7, %ymm11, %ymm15
@@ -215,7 +215,7 @@ Instruction Info:
 [1]    [2]    [3]    [4]    [5]    [6]    Instructions:
  1      1     1.00                        vmovd	%r10d, %xmm9
  1      2     1.00                        vbroadcastss	%xmm9, %ymm9
- 1      8     0.50    *                   vpaddd	1620(%rip), %ymm9, %ymm9
+ 1      8     0.50    *                   vpaddd	1621(%rip), %ymm9, %ymm9
  1      3     0.50                        vcvtdq2ps	%ymm9, %ymm9
  1      1     1.00                        vmovd	%r14d, %xmm10
  1      2     1.00                        vbroadcastss	%xmm10, %ymm10
@@ -223,8 +223,8 @@ Instruction Info:
  1      3     0.50                        vmulps	%ymm2, %ymm10, %ymm10
  1      4     0.50                        vfmadd231ps	%ymm1, %ymm9, %ymm10
  1      3     0.50                        vaddps	%ymm3, %ymm10, %ymm10
- 1      9     0.50    *                   vmaxps	1609(%rip), %ymm10, %ymm10
- 1      9     0.50    *                   vminps	1504(%rip), %ymm10, %ymm10
+ 1      9     0.50    *                   vmaxps	1610(%rip), %ymm10, %ymm10
+ 1      9     0.50    *                   vminps	1505(%rip), %ymm10, %ymm10
  1      3     0.50                        vmulps	%ymm5, %ymm10, %ymm10
  1      2     0.50                        vminps	%ymm10, %ymm6, %ymm9
  1      3     0.50                        vroundps	$1, %ymm9, %ymm11
@@ -246,7 +246,7 @@ Instruction Info:
  1      1     0.25                        vpandn	%ymm14, %ymm13, %ymm13
  1      0     0.17                        vpxor	%ymm12, %ymm12, %ymm12
  1      5     0.33    *                   vpgatherdd	%ymm13, (%r11,%ymm11,4), %ymm12
- 1      8     0.50    *                   vpaddd	1522(%rip), %ymm9, %ymm11
+ 1      8     0.50    *                   vpaddd	1523(%rip), %ymm9, %ymm11
  1      1     0.25                        vpaddd	%ymm8, %ymm11, %ymm13
  1      1     0.25                        vpaddd	%ymm4, %ymm11, %ymm14
  1      1     0.25                        vpaddd	%ymm7, %ymm11, %ymm15
@@ -422,7 +422,7 @@ Resource pressure by instruction:
 [0]    [1]    [2]    [3]    [4]    [5]    [6]    [7]    [8]    [9]    [10]   [11]   [12.0] [12.1] [13]   [14.0] [14.1] [14.2] [15.0] [15.1] [15.2] [16.0] [16.1] Instructions:
  -      -      -      -      -      -      -      -      -      -      -      -     1.98   0.02    -      -      -      -      -      -      -      -      -     vmovd	%r10d, %xmm9
  -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -     vbroadcastss	%xmm9, %ymm9
- -      -      -      -      -      -      -      -     0.02    -      -     0.98   0.02   0.98    -     0.33   0.33   0.34   0.33   0.34   0.33    -      -     vpaddd	1620(%rip), %ymm9, %ymm9
+ -      -      -      -      -      -      -      -     0.02    -      -     0.98   0.02   0.98    -     0.33   0.33   0.34   0.33   0.34   0.33    -      -     vpaddd	1621(%rip), %ymm9, %ymm9
  -      -      -      -      -      -      -      -      -      -     0.96   0.04    -      -      -      -      -      -      -      -      -      -      -     vcvtdq2ps	%ymm9, %ymm9
  -      -      -      -      -      -      -      -      -      -      -      -     0.08   1.92    -      -      -      -      -      -      -      -      -     vmovd	%r14d, %xmm10
  -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -     vbroadcastss	%xmm10, %ymm10
@@ -430,8 +430,8 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     vmulps	%ymm2, %ymm10, %ymm10
  -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm1, %ymm9, %ymm10
  -      -      -      -      -      -      -      -      -      -     0.05   0.95    -      -      -      -      -      -      -      -      -      -      -     vaddps	%ymm3, %ymm10, %ymm10
- -      -      -      -      -      -      -      -     0.03   0.97    -      -     0.02   0.98    -     0.33   0.33   0.34   0.32   0.35   0.33    -      -     vmaxps	1609(%rip), %ymm10, %ymm10
- -      -      -      -      -      -      -      -     1.00    -      -      -     0.04   0.96    -     0.34   0.33   0.33   0.34   0.33   0.33    -      -     vminps	1504(%rip), %ymm10, %ymm10
+ -      -      -      -      -      -      -      -     0.03   0.97    -      -     0.02   0.98    -     0.33   0.33   0.34   0.32   0.35   0.33    -      -     vmaxps	1610(%rip), %ymm10, %ymm10
+ -      -      -      -      -      -      -      -     1.00    -      -      -     0.04   0.96    -     0.34   0.33   0.33   0.34   0.33   0.33    -      -     vminps	1505(%rip), %ymm10, %ymm10
  -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -      -      -     vmulps	%ymm5, %ymm10, %ymm10
  -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     vminps	%ymm10, %ymm6, %ymm9
  -      -      -      -      -      -      -      -      -      -     0.02   0.98    -      -      -      -      -      -      -      -      -      -      -     vroundps	$1, %ymm9, %ymm11
@@ -453,7 +453,7 @@ Resource pressure by instruction:
  -      -      -      -      -      -      -      -     0.01   0.97   0.02    -      -      -      -      -      -      -      -      -      -      -      -     vpandn	%ymm14, %ymm13, %ymm13
  -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vpxor	%ymm12, %ymm12, %ymm12
 0.34   0.33   0.33    -      -      -      -      -      -      -      -      -      -      -      -     0.33   0.34   0.33   0.34   0.32   0.34    -      -     vpgatherdd	%ymm13, (%r11,%ymm11,4), %ymm12
- -      -      -      -      -      -      -      -     0.98   0.02    -      -     0.96   0.04    -     0.34   0.34   0.32   0.33   0.33   0.34    -      -     vpaddd	1522(%rip), %ymm9, %ymm11
+ -      -      -      -      -      -      -      -     0.98   0.02    -      -     0.96   0.04    -     0.34   0.34   0.32   0.33   0.33   0.34    -      -     vpaddd	1523(%rip), %ymm9, %ymm11
  -      -      -      -      -      -      -      -      -      -     0.97   0.03    -      -      -      -      -      -      -      -      -      -      -     vpaddd	%ymm8, %ymm11, %ymm13
  -      -      -      -      -      -      -      -     0.01   0.96   0.03    -      -      -      -      -      -      -      -      -      -      -      -     vpaddd	%ymm4, %ymm11, %ymm14
  -      -      -      -      -      -      -      -     0.02   0.03    -     0.95    -      -      -      -      -      -      -      -      -      -      -     vpaddd	%ymm7, %ymm11, %ymm15

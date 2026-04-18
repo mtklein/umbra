@@ -930,8 +930,9 @@ TEST(test_coverage_bitmap_matrix_oob) {
 
 TEST(test_linear_2) {
     struct umbra_shader *shader =
-        umbra_shader_gradient_linear_two_stops((umbra_point){0, 0}, (umbra_point){4, 0},
-                              (umbra_color){1, 0, 0, 1}, (umbra_color){0, 0, 1, 1});
+        umbra_shader_gradient_two_stops(
+            umbra_gradient_linear((umbra_point){0, 0}, (umbra_point){4, 0}),
+            (umbra_color){1, 0, 0, 1}, (umbra_color){0, 0, 1, 1});
     struct draw_backends     B =
         make_draw(umbra_draw_builder(NULL, shader, umbra_blend_src,
                                    umbra_fmt_8888));
@@ -959,8 +960,9 @@ TEST(test_linear_2) {
 
 TEST(test_radial_2) {
     struct umbra_shader *shader =
-        umbra_shader_gradient_radial_two_stops((umbra_point){0, 0}, 10.0f,
-                              (umbra_color){1, 1, 1, 1}, (umbra_color){0, 0, 0, 1});
+        umbra_shader_gradient_two_stops(
+            umbra_gradient_radial((umbra_point){0, 0}, 10.0f),
+            (umbra_color){1, 1, 1, 1}, (umbra_color){0, 0, 0, 1});
     struct draw_backends     B =
         make_draw(umbra_draw_builder(NULL, shader, umbra_blend_src,
                                    umbra_fmt_8888));
@@ -993,8 +995,9 @@ TEST(test_linear_grad) {
     umbra_gradient_lut_even(lut, 256, 3, stop_colors);
 
     struct umbra_shader *shader =
-        umbra_shader_gradient_linear_lut((umbra_point){0, 0}, (umbra_point){8, 0},
-                                 (struct umbra_buf){.ptr=lut, .count=256 * 4});
+        umbra_shader_gradient_lut(
+            umbra_gradient_linear((umbra_point){0, 0}, (umbra_point){8, 0}),
+            (struct umbra_buf){.ptr=lut, .count=256 * 4});
     struct draw_backends     B =
         make_draw(umbra_draw_builder(NULL, shader, umbra_blend_src,
                                    umbra_fmt_8888));
@@ -1029,8 +1032,9 @@ TEST(test_radial_grad) {
     umbra_gradient_lut_even(lut, 64, 4, stop_colors);
 
     struct umbra_shader *shader =
-        umbra_shader_gradient_radial_lut((umbra_point){0, 0}, 10.0f,
-                                 (struct umbra_buf){.ptr=lut, .count=64 * 4});
+        umbra_shader_gradient_lut(
+            umbra_gradient_radial((umbra_point){0, 0}, 10.0f),
+            (struct umbra_buf){.ptr=lut, .count=64 * 4});
     struct draw_backends     B =
         make_draw(umbra_draw_builder(NULL, shader, umbra_blend_src,
                                    umbra_fmt_8888));
@@ -1062,8 +1066,9 @@ TEST(test_lut_grad_last_pixel) {
     };
 
     struct umbra_shader *shader =
-        umbra_shader_gradient_linear_lut((umbra_point){0, 0}, (umbra_point){7, 0},
-                                 (struct umbra_buf){.ptr=lut, .count=3 * 4});
+        umbra_shader_gradient_lut(
+            umbra_gradient_linear((umbra_point){0, 0}, (umbra_point){7, 0}),
+            (struct umbra_buf){.ptr=lut, .count=3 * 4});
     struct draw_backends B =
         make_draw(umbra_draw_builder(NULL, shader, umbra_blend_src,
                                    umbra_fmt_8888));
@@ -1095,8 +1100,8 @@ TEST(test_linear_grad_evenly_spaced) {
     };
 
     struct umbra_shader *shader =
-        umbra_shader_gradient_linear_evenly_spaced_stops(
-            (umbra_point){0, 0}, (umbra_point){8, 0},
+        umbra_shader_gradient_evenly_spaced_stops(
+            umbra_gradient_linear((umbra_point){0, 0}, (umbra_point){8, 0}),
             (struct umbra_buf){.ptr=planar, .count=3 * 4});
     struct draw_backends B =
         make_draw(umbra_draw_builder(NULL, shader, umbra_blend_src,
@@ -1130,8 +1135,8 @@ TEST(test_radial_grad_evenly_spaced) {
     };
 
     struct umbra_shader *shader =
-        umbra_shader_gradient_radial_evenly_spaced_stops(
-            (umbra_point){0, 0}, 10.0f,
+        umbra_shader_gradient_evenly_spaced_stops(
+            umbra_gradient_radial((umbra_point){0, 0}, 10.0f),
             (struct umbra_buf){.ptr=planar, .count=4 * 4});
     struct draw_backends B =
         make_draw(umbra_draw_builder(NULL, shader, umbra_blend_src,
@@ -1164,8 +1169,9 @@ TEST(test_gradient_lut_nonuniform) {
     umbra_gradient_lut(lut, 64, 3, positions, stop_colors);
 
     struct umbra_shader *shader =
-        umbra_shader_gradient_linear_lut((umbra_point){0, 0}, (umbra_point){8, 0},
-                                 (struct umbra_buf){.ptr=lut, .count=64 * 4});
+        umbra_shader_gradient_lut(
+            umbra_gradient_linear((umbra_point){0, 0}, (umbra_point){8, 0}),
+            (struct umbra_buf){.ptr=lut, .count=64 * 4});
     struct draw_backends     B =
         make_draw(umbra_draw_builder(NULL, shader, umbra_blend_src,
                                    umbra_fmt_8888));
@@ -1193,9 +1199,10 @@ TEST(test_linear_stops) {
     float pos[3] = {0.0f, 0.5f, 1.0f};
 
     struct umbra_shader *shader =
-        umbra_shader_gradient_linear((umbra_point){0, 0}, (umbra_point){4, 0},
-                                  (struct umbra_buf){.ptr=colors_planar, .count=12},
-                                  (struct umbra_buf){.ptr=pos, .count=3});
+        umbra_shader_gradient(
+            umbra_gradient_linear((umbra_point){0, 0}, (umbra_point){4, 0}),
+            (struct umbra_buf){.ptr=colors_planar, .count=12},
+            (struct umbra_buf){.ptr=pos, .count=3});
     struct draw_backends B =
         make_draw(umbra_draw_builder(NULL, shader,
                                    umbra_blend_src, umbra_fmt_8888));
@@ -1223,9 +1230,10 @@ TEST(test_linear_stops_fp16_planar) {
     float pos[3] = {0.0f, 0.5f, 1.0f};
 
     struct umbra_shader *shader =
-        umbra_shader_gradient_linear((umbra_point){0, 0}, (umbra_point){8, 0},
-                                  (struct umbra_buf){.ptr=colors_planar, .count=12},
-                                  (struct umbra_buf){.ptr=pos, .count=3});
+        umbra_shader_gradient(
+            umbra_gradient_linear((umbra_point){0, 0}, (umbra_point){8, 0}),
+            (struct umbra_buf){.ptr=colors_planar, .count=12},
+            (struct umbra_buf){.ptr=pos, .count=3});
     struct draw_backends B =
         make_draw(umbra_draw_builder(NULL, shader,
                                    NULL, umbra_fmt_fp16_planar));
