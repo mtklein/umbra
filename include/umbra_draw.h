@@ -130,34 +130,42 @@ void umbra_sdf_draw_free(struct umbra_sdf_draw*);
 
 struct umbra_shader* umbra_shader_solid(umbra_color color);
 
-// A gradient is (x,y) -> t -> color.  umbra_gradient_coords supplies the
-// first leg: a pure builder-primitive callback that takes a val32 point
-// and three val32 coefficients and emits IR for t, clamped to [0, 1].
-// Built-in linear and radial geometries carry their coefficients as host
-// floats; they're baked in as immediates when the shader is built.
-typedef umbra_val32 (*umbra_gradient_t_fn)(struct umbra_builder*,
-                                           umbra_point_val32 xy,
-                                           umbra_val32 p0, umbra_val32 p1, umbra_val32 p2);
+// A gradient is (x,y) -> t -> color.  umbra_gradient_coords is the first leg,
+// a first-class effect in the same shape as umbra_shader / umbra_coverage /
+// umbra_sdf: a vtable + its own uniform buffer.  Colorizer shaders hold a
+// coords pointer and reference coords->uniforms through a buf-handle slot,
+// so the coords's uniform layout stays completely private to the coords
+// implementation -- the shader never touches it directly.
+//
+// The `t` callback emits IR for t (clamped to [0, 1]) from xy, reading
+// whatever state it needs out of `uniforms` at slots relative to its own
+// subclass layout.
+struct umbra_gradient_coords {
+    umbra_val32 (*t)(struct umbra_gradient_coords*,
+                     struct umbra_builder*,
+                     umbra_ptr32 uniforms,
+                     umbra_point_val32 xy);
+    void             (*free)(struct umbra_gradient_coords*);
+    struct umbra_buf   uniforms;
+};
+void umbra_gradient_coords_free(struct umbra_gradient_coords*);
 
-typedef struct {
-    umbra_gradient_t_fn t;
-    float               params[3];
-    int                 :32;
-} umbra_gradient_coords;
+struct umbra_gradient_coords* umbra_gradient_linear(umbra_point p0, umbra_point p1);
+struct umbra_gradient_coords* umbra_gradient_radial(umbra_point center, float radius);
 
-umbra_gradient_coords umbra_gradient_linear(umbra_point p0, umbra_point p1);
-umbra_gradient_coords umbra_gradient_radial(umbra_point center, float radius);
-
+// Colorizer constructors take ownership of the coords pointer; freeing the
+// returned shader also frees the coords.  Don't share one coords between
+// shaders -- each shader that needs one should get its own.
 struct umbra_shader* umbra_shader_gradient_two_stops(
-    umbra_gradient_coords, umbra_color c0, umbra_color c1);
+    struct umbra_gradient_coords*, umbra_color c0, umbra_color c1);
 
 struct umbra_shader* umbra_shader_gradient_evenly_spaced_stops(
-    umbra_gradient_coords, struct umbra_buf colors);
+    struct umbra_gradient_coords*, struct umbra_buf colors);
 
 struct umbra_shader* umbra_shader_gradient_lut(
-    umbra_gradient_coords, struct umbra_buf lut);
+    struct umbra_gradient_coords*, struct umbra_buf lut);
 
-struct umbra_shader* umbra_shader_gradient(umbra_gradient_coords,
+struct umbra_shader* umbra_shader_gradient(struct umbra_gradient_coords*,
                                            struct umbra_buf colors,
                                            struct umbra_buf pos);
 
