@@ -52,6 +52,8 @@ void umbra_program_free(struct umbra_program*);
 typedef struct { int id:30; unsigned chan:2; } umbra_val16;
 typedef struct { int id:30; unsigned chan:2; } umbra_val32;
 
+// TODO: explore what it'd take to remove the deref feature
+
 // Pointer handles.  `ix` indexes into the caller's buf[] at dispatch time;
 // `deref` marks pointers returned by umbra_deref_ptr16/32 as one-level
 // indirections, resolved per-backend at code gen.
