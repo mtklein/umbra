@@ -12,6 +12,9 @@ struct jit_program {
     size_t code_size;
     void (*entry)(int, int, int, int, struct umbra_buf*);
     int loop_start, loop_end;
+    int caller_nptr, n_reg;
+    struct umbra_uniform_reg *reg;
+    struct umbra_buf         *scratch;  // sized max_ptr+1; scratch target for run
 };
 struct jit_program* jit_program(struct jit_backend*, struct umbra_flat_ir const*);
 void   jit_program_run (struct jit_program*, int,int,int,int, struct umbra_buf[]);

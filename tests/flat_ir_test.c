@@ -2494,6 +2494,13 @@ TEST(test_umbra_uniforms_metal) {
     umbra_backend_free(be);
 }
 
+TEST(test_umbra_uniforms_jit) {
+    struct umbra_backend *be = umbra_backend_jit();
+    if (!be) { return; }
+    run_umbra_uniforms_test(be);
+    umbra_backend_free(be);
+}
+
 TEST(test_program_null_guards) {
 
     struct umbra_backend *be = umbra_backend_interp();
