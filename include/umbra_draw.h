@@ -168,42 +168,73 @@ struct umbra_shader* umbra_shader_wrap(umbra_shader fn, void *ctx);
 
 // A gradient is (x,y) -> t -> color.  umbra_gradient_coords is the first leg,
 // a first-class effect in the same shape as umbra_shader / umbra_coverage /
-// umbra_sdf: a vtable + its own uniform buffer.  Colorizer shaders hold a
-// coords pointer and reference coords->uniforms through a buf-handle slot,
-// so the coords's uniform layout stays completely private to the coords
-// implementation -- the shader never touches it directly.
-//
-// The `t` callback emits IR for t (clamped to [0, 1]) from xy, reading
-// whatever state it needs out of `uniforms` at slots relative to its own
-// subclass layout.
-struct umbra_gradient_coords {
-    umbra_val32 (*t)(struct umbra_gradient_coords*,
-                     struct umbra_builder*,
-                     umbra_ptr32 uniforms,
-                     umbra_point_val32 xy);
-    void             (*free)(struct umbra_gradient_coords*);
-    struct umbra_buf   uniforms;
+// umbra_sdf: a flat (void *ctx, builder, xy) -> val32 callback that maps
+// pixel coordinates to a clamped parameter t in [0, 1].  Colorizer shaders
+// hold a (coords_fn, coords_ctx) pair, read once at IR-emit time.
+typedef umbra_val32 (*umbra_gradient_coords)(void *ctx, struct umbra_builder*,
+                                              umbra_point_val32 xy);
+
+// Linear gradient: t = a*x + b*y + c, clamped.  Fill from two points via
+// umbra_gradient_linear_from().
+struct umbra_gradient_linear {
+    float a, b, c;
+    int   :32;
 };
-void umbra_gradient_coords_free(struct umbra_gradient_coords*);
+struct umbra_gradient_linear umbra_gradient_linear_from(umbra_point p0, umbra_point p1);
+umbra_val32 umbra_gradient_linear(void *ctx, struct umbra_builder*, umbra_point_val32 xy);
 
-struct umbra_gradient_coords* umbra_gradient_linear(umbra_point p0, umbra_point p1);
-struct umbra_gradient_coords* umbra_gradient_radial(umbra_point center, float radius);
+// Radial gradient: t = |xy - center| / radius, clamped.  Fill via
+// umbra_gradient_radial_from().
+struct umbra_gradient_radial {
+    float cx, cy, inv_r;
+    int   :32;
+};
+struct umbra_gradient_radial umbra_gradient_radial_from(umbra_point center, float radius);
+umbra_val32 umbra_gradient_radial(void *ctx, struct umbra_builder*, umbra_point_val32 xy);
 
-// Colorizer constructors take ownership of the coords pointer; freeing the
-// returned shader also frees the coords.  Don't share one coords between
-// shaders -- each shader that needs one should get its own.
-struct umbra_shader* umbra_shader_gradient_two_stops(
-    struct umbra_gradient_coords*, umbra_color c0, umbra_color c1);
+// Gradient colorizer shaders.  Each state struct holds the coords (fn, ctx)
+// it invokes to map xy to t, plus the data (colors / lut / positions) needed
+// to convert t to a color.  Callers own the state; pass &state as shader_ctx.
+// coords_fn / coords_ctx are baked at IR-emit time -- mutating them after
+// has no effect on a compiled program.  The colors/lut/pos *bytes* still
+// mutate freely via umbra_uniforms.
+struct umbra_shader_gradient_two_stops {
+    umbra_gradient_coords  coords_fn;
+    void                  *coords_ctx;
+    umbra_color            c0, c1;
+};
+umbra_color_val32 umbra_shader_gradient_two_stops(void *ctx, struct umbra_builder*,
+                                                   umbra_val32 x, umbra_val32 y);
 
-struct umbra_shader* umbra_shader_gradient_evenly_spaced_stops(
-    struct umbra_gradient_coords*, struct umbra_buf colors);
+struct umbra_shader_gradient_lut {
+    umbra_gradient_coords  coords_fn;
+    void                  *coords_ctx;
+    float                  N;
+    int                    :32;
+    struct umbra_buf       lut;
+};
+umbra_color_val32 umbra_shader_gradient_lut(void *ctx, struct umbra_builder*,
+                                             umbra_val32 x, umbra_val32 y);
 
-struct umbra_shader* umbra_shader_gradient_lut(
-    struct umbra_gradient_coords*, struct umbra_buf lut);
+struct umbra_shader_gradient_evenly_spaced_stops {
+    umbra_gradient_coords  coords_fn;
+    void                  *coords_ctx;
+    float                  N;
+    int                    :32;
+    struct umbra_buf       colors;
+};
+umbra_color_val32 umbra_shader_gradient_evenly_spaced_stops(
+    void *ctx, struct umbra_builder*, umbra_val32 x, umbra_val32 y);
 
-struct umbra_shader* umbra_shader_gradient(struct umbra_gradient_coords*,
-                                           struct umbra_buf colors,
-                                           struct umbra_buf pos);
+struct umbra_shader_gradient {
+    umbra_gradient_coords  coords_fn;
+    void                  *coords_ctx;
+    float                  N;
+    int                    :32;
+    struct umbra_buf       colors, pos;
+};
+umbra_color_val32 umbra_shader_gradient(void *ctx, struct umbra_builder*,
+                                         umbra_val32 x, umbra_val32 y);
 
 // Flat composer: supersamples an inner flat shader.  Caller owns the state;
 // pass &state as shader_ctx.  All three fields (samples, inner_fn, inner_ctx)

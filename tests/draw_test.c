@@ -1017,10 +1017,15 @@ TEST(test_coverage_bitmap_matrix_oob) {
 }
 
 TEST(test_linear_2) {
-    struct umbra_shader *shader =
-        umbra_shader_gradient_two_stops(
-            umbra_gradient_linear((umbra_point){0, 0}, (umbra_point){4, 0}),
-            (umbra_color){1, 0, 0, 1}, (umbra_color){0, 0, 1, 1});
+    struct umbra_gradient_linear coords =
+        umbra_gradient_linear_from((umbra_point){0, 0}, (umbra_point){4, 0});
+    struct umbra_shader_gradient_two_stops state = {
+        .coords_fn  = umbra_gradient_linear,
+        .coords_ctx = &coords,
+        .c0         = (umbra_color){1, 0, 0, 1},
+        .c1         = (umbra_color){0, 0, 1, 1},
+    };
+    struct umbra_shader *shader = umbra_shader_wrap(umbra_shader_gradient_two_stops, &state);
     struct draw_backends     B =
         make_draw(umbra_draw_builder(NULL, shader, umbra_blend_src,
                                    umbra_fmt_8888));
@@ -1047,10 +1052,15 @@ TEST(test_linear_2) {
 }
 
 TEST(test_radial_2) {
-    struct umbra_shader *shader =
-        umbra_shader_gradient_two_stops(
-            umbra_gradient_radial((umbra_point){0, 0}, 10.0f),
-            (umbra_color){1, 1, 1, 1}, (umbra_color){0, 0, 0, 1});
+    struct umbra_gradient_radial coords =
+        umbra_gradient_radial_from((umbra_point){0, 0}, 10.0f);
+    struct umbra_shader_gradient_two_stops state = {
+        .coords_fn  = umbra_gradient_radial,
+        .coords_ctx = &coords,
+        .c0         = (umbra_color){1, 1, 1, 1},
+        .c1         = (umbra_color){0, 0, 0, 1},
+    };
+    struct umbra_shader *shader = umbra_shader_wrap(umbra_shader_gradient_two_stops, &state);
     struct draw_backends     B =
         make_draw(umbra_draw_builder(NULL, shader, umbra_blend_src,
                                    umbra_fmt_8888));
@@ -1082,10 +1092,15 @@ TEST(test_linear_grad) {
     float lut[256 * 4];
     umbra_gradient_lut_even(lut, 256, 3, stop_colors);
 
-    struct umbra_shader *shader =
-        umbra_shader_gradient_lut(
-            umbra_gradient_linear((umbra_point){0, 0}, (umbra_point){8, 0}),
-            (struct umbra_buf){.ptr=lut, .count=256 * 4});
+    struct umbra_gradient_linear coords =
+        umbra_gradient_linear_from((umbra_point){0, 0}, (umbra_point){8, 0});
+    struct umbra_shader_gradient_lut state = {
+        .coords_fn  = umbra_gradient_linear,
+        .coords_ctx = &coords,
+        .N          = 256.0f,
+        .lut        = {.ptr=lut, .count=256 * 4},
+    };
+    struct umbra_shader *shader = umbra_shader_wrap(umbra_shader_gradient_lut, &state);
     struct draw_backends     B =
         make_draw(umbra_draw_builder(NULL, shader, umbra_blend_src,
                                    umbra_fmt_8888));
@@ -1119,10 +1134,15 @@ TEST(test_radial_grad) {
     float lut[64 * 4];
     umbra_gradient_lut_even(lut, 64, 4, stop_colors);
 
-    struct umbra_shader *shader =
-        umbra_shader_gradient_lut(
-            umbra_gradient_radial((umbra_point){0, 0}, 10.0f),
-            (struct umbra_buf){.ptr=lut, .count=64 * 4});
+    struct umbra_gradient_radial coords =
+        umbra_gradient_radial_from((umbra_point){0, 0}, 10.0f);
+    struct umbra_shader_gradient_lut state = {
+        .coords_fn  = umbra_gradient_radial,
+        .coords_ctx = &coords,
+        .N          = 64.0f,
+        .lut        = {.ptr=lut, .count=64 * 4},
+    };
+    struct umbra_shader *shader = umbra_shader_wrap(umbra_shader_gradient_lut, &state);
     struct draw_backends     B =
         make_draw(umbra_draw_builder(NULL, shader, umbra_blend_src,
                                    umbra_fmt_8888));
@@ -1153,10 +1173,15 @@ TEST(test_lut_grad_last_pixel) {
         1, 1, 1,
     };
 
-    struct umbra_shader *shader =
-        umbra_shader_gradient_lut(
-            umbra_gradient_linear((umbra_point){0, 0}, (umbra_point){7, 0}),
-            (struct umbra_buf){.ptr=lut, .count=3 * 4});
+    struct umbra_gradient_linear coords =
+        umbra_gradient_linear_from((umbra_point){0, 0}, (umbra_point){7, 0});
+    struct umbra_shader_gradient_lut state = {
+        .coords_fn  = umbra_gradient_linear,
+        .coords_ctx = &coords,
+        .N          = 3.0f,
+        .lut        = {.ptr=lut, .count=3 * 4},
+    };
+    struct umbra_shader *shader = umbra_shader_wrap(umbra_shader_gradient_lut, &state);
     struct draw_backends B =
         make_draw(umbra_draw_builder(NULL, shader, umbra_blend_src,
                                    umbra_fmt_8888));
@@ -1187,10 +1212,16 @@ TEST(test_linear_grad_evenly_spaced) {
         1, 1, 1,
     };
 
-    struct umbra_shader *shader =
-        umbra_shader_gradient_evenly_spaced_stops(
-            umbra_gradient_linear((umbra_point){0, 0}, (umbra_point){8, 0}),
-            (struct umbra_buf){.ptr=planar, .count=3 * 4});
+    struct umbra_gradient_linear coords =
+        umbra_gradient_linear_from((umbra_point){0, 0}, (umbra_point){8, 0});
+    struct umbra_shader_gradient_evenly_spaced_stops state = {
+        .coords_fn  = umbra_gradient_linear,
+        .coords_ctx = &coords,
+        .N          = 3.0f,
+        .colors     = {.ptr=planar, .count=3 * 4},
+    };
+    struct umbra_shader *shader = umbra_shader_wrap(
+        umbra_shader_gradient_evenly_spaced_stops, &state);
     struct draw_backends B =
         make_draw(umbra_draw_builder(NULL, shader, umbra_blend_src,
                                    umbra_fmt_8888));
@@ -1222,10 +1253,16 @@ TEST(test_radial_grad_evenly_spaced) {
         1, 1, 1, 1,
     };
 
-    struct umbra_shader *shader =
-        umbra_shader_gradient_evenly_spaced_stops(
-            umbra_gradient_radial((umbra_point){0, 0}, 10.0f),
-            (struct umbra_buf){.ptr=planar, .count=4 * 4});
+    struct umbra_gradient_radial coords =
+        umbra_gradient_radial_from((umbra_point){0, 0}, 10.0f);
+    struct umbra_shader_gradient_evenly_spaced_stops state = {
+        .coords_fn  = umbra_gradient_radial,
+        .coords_ctx = &coords,
+        .N          = 4.0f,
+        .colors     = {.ptr=planar, .count=4 * 4},
+    };
+    struct umbra_shader *shader = umbra_shader_wrap(
+        umbra_shader_gradient_evenly_spaced_stops, &state);
     struct draw_backends B =
         make_draw(umbra_draw_builder(NULL, shader, umbra_blend_src,
                                    umbra_fmt_8888));
@@ -1256,10 +1293,15 @@ TEST(test_gradient_lut_nonuniform) {
     float lut[64 * 4];
     umbra_gradient_lut(lut, 64, 3, positions, stop_colors);
 
-    struct umbra_shader *shader =
-        umbra_shader_gradient_lut(
-            umbra_gradient_linear((umbra_point){0, 0}, (umbra_point){8, 0}),
-            (struct umbra_buf){.ptr=lut, .count=64 * 4});
+    struct umbra_gradient_linear coords =
+        umbra_gradient_linear_from((umbra_point){0, 0}, (umbra_point){8, 0});
+    struct umbra_shader_gradient_lut state = {
+        .coords_fn  = umbra_gradient_linear,
+        .coords_ctx = &coords,
+        .N          = 64.0f,
+        .lut        = {.ptr=lut, .count=64 * 4},
+    };
+    struct umbra_shader *shader = umbra_shader_wrap(umbra_shader_gradient_lut, &state);
     struct draw_backends     B =
         make_draw(umbra_draw_builder(NULL, shader, umbra_blend_src,
                                    umbra_fmt_8888));
@@ -1286,11 +1328,16 @@ TEST(test_linear_stops) {
     float colors_planar[3 * 4] = {1,0,0, 0,1,0, 0,0,1, 1,1,1};
     float pos[3] = {0.0f, 0.5f, 1.0f};
 
-    struct umbra_shader *shader =
-        umbra_shader_gradient(
-            umbra_gradient_linear((umbra_point){0, 0}, (umbra_point){4, 0}),
-            (struct umbra_buf){.ptr=colors_planar, .count=12},
-            (struct umbra_buf){.ptr=pos, .count=3});
+    struct umbra_gradient_linear coords =
+        umbra_gradient_linear_from((umbra_point){0, 0}, (umbra_point){4, 0});
+    struct umbra_shader_gradient state = {
+        .coords_fn  = umbra_gradient_linear,
+        .coords_ctx = &coords,
+        .N          = 3.0f,
+        .colors     = {.ptr=colors_planar, .count=12},
+        .pos        = {.ptr=pos, .count=3},
+    };
+    struct umbra_shader *shader = umbra_shader_wrap(umbra_shader_gradient, &state);
     struct draw_backends B =
         make_draw(umbra_draw_builder(NULL, shader,
                                    umbra_blend_src, umbra_fmt_8888));
@@ -1317,11 +1364,16 @@ TEST(test_linear_stops_fp16_planar) {
     float colors_planar[3 * 4] = {1,0,0, 0,1,0, 0,0,1, 1,1,1};
     float pos[3] = {0.0f, 0.5f, 1.0f};
 
-    struct umbra_shader *shader =
-        umbra_shader_gradient(
-            umbra_gradient_linear((umbra_point){0, 0}, (umbra_point){8, 0}),
-            (struct umbra_buf){.ptr=colors_planar, .count=12},
-            (struct umbra_buf){.ptr=pos, .count=3});
+    struct umbra_gradient_linear coords =
+        umbra_gradient_linear_from((umbra_point){0, 0}, (umbra_point){8, 0});
+    struct umbra_shader_gradient state = {
+        .coords_fn  = umbra_gradient_linear,
+        .coords_ctx = &coords,
+        .N          = 3.0f,
+        .colors     = {.ptr=colors_planar, .count=12},
+        .pos        = {.ptr=pos, .count=3},
+    };
+    struct umbra_shader *shader = umbra_shader_wrap(umbra_shader_gradient, &state);
     struct draw_backends B =
         make_draw(umbra_draw_builder(NULL, shader,
                                    NULL, umbra_fmt_fp16_planar));
