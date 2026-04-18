@@ -51,8 +51,8 @@ static void blend_draw(struct slide *s, double secs, int l, int t, int r, int b,
     struct blend_slide *st = (struct blend_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
     double const ticks = secs * 60.0;
-    float rx = bounce(st->rx, st->vx, ticks, (float)st->w - st->rect_w);
-    float ry = bounce(st->ry, st->vy, ticks, (float)st->h - st->rect_h);
+    float const rx = bounce(st->rx, st->vx, ticks, (float)st->w - st->rect_w),
+                ry = bounce(st->ry, st->vy, ticks, (float)st->h - st->rect_h);
     umbra_sdf_free(st->sdf);
     st->sdf = umbra_sdf_rect((umbra_rect){rx, ry, rx + st->rect_w, ry + st->rect_h});
     struct umbra_buf ubuf[] = {

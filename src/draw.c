@@ -481,14 +481,14 @@ static umbra_color_val32 sample_lut(struct umbra_builder *b, umbra_val32 t,
     umbra_val32 const n2  = umbra_add_i32(b, N_i, N_i);
     umbra_val32 const n3  = umbra_add_i32(b, n2,  N_i);
 
-    umbra_val32 r0 = umbra_gather_32(b, lut, idx);
-    umbra_val32 r1 = umbra_gather_32(b, lut, idx1);
-    umbra_val32 g0 = umbra_gather_32(b, lut, umbra_add_i32(b, idx,  N_i));
-    umbra_val32 g1 = umbra_gather_32(b, lut, umbra_add_i32(b, idx1, N_i));
-    umbra_val32 b0 = umbra_gather_32(b, lut, umbra_add_i32(b, idx,  n2));
-    umbra_val32 b1 = umbra_gather_32(b, lut, umbra_add_i32(b, idx1, n2));
-    umbra_val32 a0 = umbra_gather_32(b, lut, umbra_add_i32(b, idx,  n3));
-    umbra_val32 a1 = umbra_gather_32(b, lut, umbra_add_i32(b, idx1, n3));
+    umbra_val32 const r0 = umbra_gather_32(b, lut, idx),
+                      r1 = umbra_gather_32(b, lut, idx1),
+                      g0 = umbra_gather_32(b, lut, umbra_add_i32(b, idx,  N_i)),
+                      g1 = umbra_gather_32(b, lut, umbra_add_i32(b, idx1, N_i)),
+                      b0 = umbra_gather_32(b, lut, umbra_add_i32(b, idx,  n2)),
+                      b1 = umbra_gather_32(b, lut, umbra_add_i32(b, idx1, n2)),
+                      a0 = umbra_gather_32(b, lut, umbra_add_i32(b, idx,  n3)),
+                      a1 = umbra_gather_32(b, lut, umbra_add_i32(b, idx1, n3));
 
     return (umbra_color_val32){
         lerp_f(b, r0, r1, frac),
@@ -756,18 +756,18 @@ static umbra_color_val32 gather_even_stops(struct umbra_builder *b, umbra_val32 
     umbra_val32 const idx1    = umbra_add_i32(b, idx, umbra_imm_i32(b, 1));
     umbra_val32 const frac    = umbra_sub_f32(b, seg, umbra_floor_f32(b, clamped));
 
-    umbra_val32 const N_i  = umbra_i32_from_f32(b, N_f);
-    umbra_val32 const n2   = umbra_add_i32(b, N_i, N_i);
-    umbra_val32 const n3   = umbra_add_i32(b, n2,  N_i);
+    umbra_val32 const N_i = umbra_i32_from_f32(b, N_f);
+    umbra_val32 const n2  = umbra_add_i32(b, N_i, N_i);
+    umbra_val32 const n3  = umbra_add_i32(b, n2,  N_i);
 
-    umbra_val32 r0 = umbra_gather_32(b, colors, idx);
-    umbra_val32 r1 = umbra_gather_32(b, colors, idx1);
-    umbra_val32 g0 = umbra_gather_32(b, colors, umbra_add_i32(b, idx,  N_i));
-    umbra_val32 g1 = umbra_gather_32(b, colors, umbra_add_i32(b, idx1, N_i));
-    umbra_val32 b0 = umbra_gather_32(b, colors, umbra_add_i32(b, idx,  n2));
-    umbra_val32 b1 = umbra_gather_32(b, colors, umbra_add_i32(b, idx1, n2));
-    umbra_val32 a0 = umbra_gather_32(b, colors, umbra_add_i32(b, idx,  n3));
-    umbra_val32 a1 = umbra_gather_32(b, colors, umbra_add_i32(b, idx1, n3));
+    umbra_val32 const r0 = umbra_gather_32(b, colors, idx),
+                      r1 = umbra_gather_32(b, colors, idx1),
+                      g0 = umbra_gather_32(b, colors, umbra_add_i32(b, idx,  N_i)),
+                      g1 = umbra_gather_32(b, colors, umbra_add_i32(b, idx1, N_i)),
+                      b0 = umbra_gather_32(b, colors, umbra_add_i32(b, idx,  n2)),
+                      b1 = umbra_gather_32(b, colors, umbra_add_i32(b, idx1, n2)),
+                      a0 = umbra_gather_32(b, colors, umbra_add_i32(b, idx,  n3)),
+                      a1 = umbra_gather_32(b, colors, umbra_add_i32(b, idx1, n3));
 
     return (umbra_color_val32){
         lerp_f(b, r0, r1, frac),
