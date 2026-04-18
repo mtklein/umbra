@@ -153,7 +153,7 @@ SLIDE(slide_gradient_linear_wide) {
     enum { LUT_N = 64 };
     float *lut = malloc(LUT_N * 4 * sizeof(float));
     umbra_gradient_lut_even(lut, LUT_N, 6, colors);
-    return make_grad("Linear Gradient (wide gamut)",
+    return make_grad("Linear Gradient (wide gamut, LUT)",
         umbra_shader_gradient_linear_lut((umbra_point){0, 0}, (umbra_point){640, 0},
                                          (struct umbra_buf){.ptr=lut, .count=LUT_N * 4}),
         NULL, NULL, lut);
@@ -167,8 +167,46 @@ SLIDE(slide_gradient_radial_wide) {
     enum { LUT_N = 64 };
     float *lut = malloc(LUT_N * 4 * sizeof(float));
     umbra_gradient_lut_even(lut, LUT_N, 4, colors);
-    return make_grad("Radial Gradient (wide gamut)",
+    return make_grad("Radial Gradient (wide gamut, LUT)",
         umbra_shader_gradient_radial_lut((umbra_point){320, 240}, 280.0f,
                                          (struct umbra_buf){.ptr=lut, .count=LUT_N * 4}),
         NULL, NULL, lut);
+}
+
+SLIDE(slide_gradient_linear_even) {
+    static umbra_color const colors[] = {
+        {1.2f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.8f, 0.0f, 1.0f}, {0.0f, 1.2f, 0.0f, 1.0f},
+        {0.0f, 0.8f, 1.2f, 1.0f}, {0.0f, 0.0f, 1.2f, 1.0f}, {0.8f, 0.0f, 1.0f, 1.0f},
+    };
+    enum { N = 6 };
+    float *planar = malloc(N * 4 * sizeof(float));
+    for (int i = 0; i < N; i++) {
+        for (int c = 0; c < 4; c++) {
+            planar[c * N + i] = (&colors[i].r)[c];
+        }
+    }
+    return make_grad("Linear Gradient (evenly-spaced)",
+        umbra_shader_gradient_linear_evenly_spaced_stops(
+            (umbra_point){0, 0}, (umbra_point){640, 0},
+            (struct umbra_buf){.ptr=planar, .count=N * 4}),
+        planar, NULL, NULL);
+}
+
+SLIDE(slide_gradient_radial_even) {
+    static umbra_color const colors[] = {
+        {1.5f, 1.5f, 1.2f, 1.0f}, {1.2f, 0.8f, 0.0f, 1.0f},
+        {0.8f, 0.0f, 0.2f, 1.0f}, {0.05f, 0.0f, 0.15f, 1.0f},
+    };
+    enum { N = 4 };
+    float *planar = malloc(N * 4 * sizeof(float));
+    for (int i = 0; i < N; i++) {
+        for (int c = 0; c < 4; c++) {
+            planar[c * N + i] = (&colors[i].r)[c];
+        }
+    }
+    return make_grad("Radial Gradient (evenly-spaced)",
+        umbra_shader_gradient_radial_evenly_spaced_stops(
+            (umbra_point){320, 240}, 280.0f,
+            (struct umbra_buf){.ptr=planar, .count=N * 4}),
+        planar, NULL, NULL);
 }

@@ -126,14 +126,6 @@ void umbra_sdf_draw_queue(struct umbra_sdf_draw const*,
                               int l, int t, int r, int b, struct umbra_buf[]);
 void umbra_sdf_draw_free(struct umbra_sdf_draw*);
 
-// TODO: add umbra_shader_gradient_{linear,radial}_evenly_spaced_stops specializations
-//       that share the general case's colors-buffer layout but skip the per-pixel stop
-//       search: with uniform spacing, the bracketing segment is just idx = floor(t*(N-1)),
-//       so the shader can gather the two neighboring colors directly.  No LUT, no pos
-//       buffer, no runtime loop.  Would replace today's "evenly-spaced via umbra_gradient_lut_even
-//       feeding _lut" pattern, which is the wrong shape: even spacing is a property the shader
-//       can exploit, not something that motivates preprocessing.
-
 struct umbra_shader* umbra_shader_solid(umbra_color color);
 
 struct umbra_shader* umbra_shader_gradient_linear_two_stops(
@@ -141,6 +133,12 @@ struct umbra_shader* umbra_shader_gradient_linear_two_stops(
 
 struct umbra_shader* umbra_shader_gradient_radial_two_stops(
     umbra_point center, float radius, umbra_color c0, umbra_color c1);
+
+struct umbra_shader* umbra_shader_gradient_linear_evenly_spaced_stops(
+    umbra_point p0, umbra_point p1, struct umbra_buf colors);
+
+struct umbra_shader* umbra_shader_gradient_radial_evenly_spaced_stops(
+    umbra_point center, float radius, struct umbra_buf colors);
 
 struct umbra_shader* umbra_shader_gradient_linear_lut(
     umbra_point p0, umbra_point p1, struct umbra_buf lut);

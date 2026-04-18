@@ -740,6 +740,107 @@ struct umbra_shader* umbra_shader_gradient_radial_lut(umbra_point center, float 
     return &s->base;
 }
 
+static umbra_color_val32 gather_even_stops(struct umbra_builder *b, umbra_val32 t,
+                                           umbra_ptr32 uniforms, int N_slot,
+                                           umbra_ptr32 colors) {
+    umbra_val32 const N_f     = umbra_uniform_32(b, uniforms, N_slot);
+    umbra_val32 const N_m1    = umbra_sub_f32(b, N_f, umbra_imm_f32(b, 1.0f));
+    umbra_val32 const N_m2    = umbra_sub_f32(b, N_f, umbra_imm_f32(b, 2.0f));
+    umbra_val32 const seg     = umbra_mul_f32(b, t, N_m1);
+    umbra_val32 const clamped = umbra_min_f32(b, seg, N_m2);
+    umbra_val32 const idx     = umbra_floor_i32(b, clamped);
+    umbra_val32 const idx1    = umbra_add_i32(b, idx, umbra_imm_i32(b, 1));
+    umbra_val32 const frac    = umbra_sub_f32(b, seg, umbra_floor_f32(b, clamped));
+
+    umbra_val32 const N_i  = umbra_i32_from_f32(b, N_f);
+    umbra_val32 const n2   = umbra_add_i32(b, N_i, N_i);
+    umbra_val32 const n3   = umbra_add_i32(b, n2,  N_i);
+
+    umbra_val32 r0 = umbra_gather_32(b, colors, idx);
+    umbra_val32 r1 = umbra_gather_32(b, colors, idx1);
+    umbra_val32 g0 = umbra_gather_32(b, colors, umbra_add_i32(b, idx,  N_i));
+    umbra_val32 g1 = umbra_gather_32(b, colors, umbra_add_i32(b, idx1, N_i));
+    umbra_val32 b0 = umbra_gather_32(b, colors, umbra_add_i32(b, idx,  n2));
+    umbra_val32 b1 = umbra_gather_32(b, colors, umbra_add_i32(b, idx1, n2));
+    umbra_val32 a0 = umbra_gather_32(b, colors, umbra_add_i32(b, idx,  n3));
+    umbra_val32 a1 = umbra_gather_32(b, colors, umbra_add_i32(b, idx1, n3));
+
+    return (umbra_color_val32){
+        lerp_f(b, r0, r1, frac),
+        lerp_f(b, g0, g1, frac),
+        lerp_f(b, b0, b1, frac),
+        lerp_f(b, a0, a1, frac),
+    };
+}
+
+struct shader_gradient_linear_evenly_spaced_stops {
+    struct umbra_shader base;
+    float               a, b, c, N;
+    struct umbra_buf    colors;
+};
+
+static umbra_color_val32 linear_evenly_spaced_stops_build(struct umbra_shader *s,
+                                                          struct umbra_builder *builder,
+                                                          umbra_ptr32 uniforms,
+                                                          umbra_val32 x, umbra_val32 y) {
+    struct shader_gradient_linear_evenly_spaced_stops *self =
+        (struct shader_gradient_linear_evenly_spaced_stops *)s;
+    umbra_ptr32 const colors = umbra_deref_ptr32(builder, uniforms, SLOT(colors));
+    umbra_val32 const t = linear_t_slot(builder, uniforms,
+                                         SLOT(a), SLOT(b), SLOT(c), x, y);
+    return gather_even_stops(builder, t, uniforms, SLOT(N), colors);
+}
+static void linear_evenly_spaced_stops_free(struct umbra_shader *s) { free(s); }
+
+struct umbra_shader* umbra_shader_gradient_linear_evenly_spaced_stops(
+        umbra_point p0, umbra_point p1, struct umbra_buf colors) {
+    struct shader_gradient_linear_evenly_spaced_stops *s = malloc(sizeof *s);
+    float a, b, c;
+    linear_coeffs(p0, p1, &a, &b, &c);
+    *s = (struct shader_gradient_linear_evenly_spaced_stops){
+        .base = {.build    = linear_evenly_spaced_stops_build,
+                 .free     = linear_evenly_spaced_stops_free,
+                 .uniforms = UMBRA_UNIFORMS_OF(s)},
+        .a = a, .b = b, .c = c,
+        .N = (float)(colors.count / 4),
+        .colors = colors,
+    };
+    return &s->base;
+}
+
+struct shader_gradient_radial_evenly_spaced_stops {
+    struct umbra_shader base;
+    float               cx, cy, inv_r, N;
+    struct umbra_buf    colors;
+};
+
+static umbra_color_val32 radial_evenly_spaced_stops_build(struct umbra_shader *s,
+                                                          struct umbra_builder *builder,
+                                                          umbra_ptr32 uniforms,
+                                                          umbra_val32 x, umbra_val32 y) {
+    struct shader_gradient_radial_evenly_spaced_stops *self =
+        (struct shader_gradient_radial_evenly_spaced_stops *)s;
+    umbra_ptr32 const colors = umbra_deref_ptr32(builder, uniforms, SLOT(colors));
+    umbra_val32 const t = radial_t_slot(builder, uniforms,
+                                         SLOT(cx), SLOT(cy), SLOT(inv_r), x, y);
+    return gather_even_stops(builder, t, uniforms, SLOT(N), colors);
+}
+static void radial_evenly_spaced_stops_free(struct umbra_shader *s) { free(s); }
+
+struct umbra_shader* umbra_shader_gradient_radial_evenly_spaced_stops(
+        umbra_point center, float radius, struct umbra_buf colors) {
+    struct shader_gradient_radial_evenly_spaced_stops *s = malloc(sizeof *s);
+    *s = (struct shader_gradient_radial_evenly_spaced_stops){
+        .base = {.build    = radial_evenly_spaced_stops_build,
+                 .free     = radial_evenly_spaced_stops_free,
+                 .uniforms = UMBRA_UNIFORMS_OF(s)},
+        .cx = center.x, .cy = center.y, .inv_r = 1.0f / radius,
+        .N = (float)(colors.count / 4),
+        .colors = colors,
+    };
+    return &s->base;
+}
+
 struct shader_gradient_linear {
     struct umbra_shader base;
     float               a, b, c, N;
