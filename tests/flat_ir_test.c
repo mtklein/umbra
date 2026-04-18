@@ -2453,7 +2453,7 @@ TEST(test_program_threadsafe) {
     umbra_flat_ir_free(ir);
 }
 
-TEST(test_umbra_uniforms_interp) {
+static void run_umbra_uniforms_test(struct umbra_backend *be) {
     // umbra_uniforms() captures only the pointer at IR-build time; the bytes
     // can be filled (and later mutated) any time before a queue() call.
     uint32_t u[4] = {0};
@@ -2464,20 +2464,33 @@ TEST(test_umbra_uniforms_interp) {
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
-    struct umbra_backend *be = umbra_backend_interp();
-    struct umbra_program *p  = be->compile(be, ir);
+    struct umbra_program *p = be->compile(be, ir);
 
     u[0] = 42; u[1] = 100; u[2] = 200; u[3] = 300;
     int32_t dst[1] = {0};
     p->queue(p, 0, 0, 1, 1, (struct umbra_buf[]){{.ptr=dst, .count=1}});
+    be->flush(be);
     dst[0] == 200 here;
 
     u[2] = 999;
     p->queue(p, 0, 0, 1, 1, (struct umbra_buf[]){{.ptr=dst, .count=1}});
+    be->flush(be);
     dst[0] == 999 here;
 
     umbra_program_free(p);
     umbra_flat_ir_free(ir);
+}
+
+TEST(test_umbra_uniforms_interp) {
+    struct umbra_backend *be = umbra_backend_interp();
+    run_umbra_uniforms_test(be);
+    umbra_backend_free(be);
+}
+
+TEST(test_umbra_uniforms_metal) {
+    struct umbra_backend *be = umbra_backend_metal();
+    if (!be) { return; }
+    run_umbra_uniforms_test(be);
     umbra_backend_free(be);
 }
 

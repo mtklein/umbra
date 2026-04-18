@@ -98,7 +98,9 @@ struct metal_program {
     int    max_ptr;
     int    total_bufs;
     int    n_deref;
-    int    :32;
+    int    caller_nptr, n_reg, :32;
+    struct umbra_uniform_reg *reg;
+    struct umbra_buf         *scratch;  // sized total_bufs; overlay target for queue()
 };
 
 typedef struct {
@@ -1159,6 +1161,14 @@ static struct metal_program* metal_program(
             p->n_deref       = n_deref;
             p->buf_rw        = buf_rw;
             p->buf_shift     = buf_shift;
+            p->n_reg         = ir->n_uniforms;
+            p->caller_nptr   = p->n_reg ? ir->uniforms[0].ix : max_ptr + 1;
+            if (p->n_reg) {
+                size_t const sz = (size_t)p->n_reg * sizeof *p->reg;
+                p->reg = malloc(sz);
+                __builtin_memcpy(p->reg, ir->uniforms, sz);
+            }
+            p->scratch = calloc((size_t)(max_ptr + 1), sizeof *p->scratch);
 
             free(deref_buf);
             umbra_flat_ir_free(resolved);
@@ -1305,12 +1315,23 @@ static void encode_dispatch(
 static void metal_submit_cmdbuf(struct metal_backend *be);
 
 static void metal_program_queue(
-    struct metal_program *p, int l, int t, int r, int b, struct umbra_buf buf[]
+    struct metal_program *p, int l, int t, int r, int b, struct umbra_buf caller_buf[]
 ) {
     int w = r - l, h = b - t;
     if (w <= 0 || h <= 0) { return; }
 
     struct metal_backend *be = (struct metal_backend*)p->base.backend;
+
+    // Overlay registered uniform bufs from the program into a scratch array;
+    // caller_buf only covers [0, caller_nptr).
+    struct umbra_buf *buf = p->scratch;
+    for (int i = 0; i < p->caller_nptr; i++) { buf[i] = caller_buf[i]; }
+    for (int i = 0; i < p->n_reg; i++) {
+        buf[p->reg[i].ix] = (struct umbra_buf){
+            .ptr   = (void*)(uintptr_t)p->reg[i].ptr,
+            .count = p->reg[i].slots,
+        };
+    }
 
     void *pool = objc_autoreleasePoolPush();
     {
@@ -1363,6 +1384,8 @@ static void metal_program_free(struct metal_program *p) {
     free(p->deref);
     free(p->buf_rw);
     free(p->buf_shift);
+    free(p->reg);
+    free(p->scratch);
     free(p->src);
     free(p);
 }
