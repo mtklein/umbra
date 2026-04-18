@@ -1341,8 +1341,12 @@ TEST(test_linear_stops_fp16_planar) {
 
 TEST(test_supersample) {
     umbra_color color = {1, 0, 0, 1};
-    struct umbra_shader *inner = umbra_shader_wrap(umbra_shader_solid, &color);
-    struct umbra_shader *shader = umbra_shader_supersample(inner, 4);
+    struct umbra_supersample ss = {
+        .inner_fn  = umbra_shader_solid,
+        .inner_ctx = &color,
+        .samples   = 4,
+    };
+    struct umbra_shader *shader = umbra_shader_wrap(umbra_shader_supersample, &ss);
     struct draw_backends B = make_draw(umbra_draw_builder(NULL, shader, umbra_blend_src,
                                                  umbra_fmt_8888));
 
@@ -1363,7 +1367,6 @@ TEST(test_supersample) {
         }
     }
     cleanup_draw(&B);
-    umbra_shader_free(inner);
     umbra_shader_free(shader);
 }
 

@@ -883,16 +883,9 @@ struct umbra_shader* umbra_shader_gradient(struct umbra_gradient_coords *coords,
     return &s->base;
 }
 
-struct shader_supersample {
-    struct umbra_shader  base;
-    struct umbra_shader *inner;
-    int                  samples, :32;
-};
-
-static umbra_color_val32 supersample_build(struct umbra_shader *s, struct umbra_builder *builder,
-                                      umbra_ptr32 uniforms,
-                                      umbra_val32 x, umbra_val32 y) {
-    struct shader_supersample *self = (struct shader_supersample *)s;
+umbra_color_val32 umbra_shader_supersample(void *ctx, struct umbra_builder *b,
+                                            umbra_val32 x, umbra_val32 y) {
+    struct umbra_supersample const *self = ctx;
     static float const jitter[][2] = {
         {-0.375f, -0.125f}, {0.125f, -0.375f}, {0.375f, 0.125f}, {-0.125f, 0.375f},
         {-0.250f, 0.375f},  {0.250f, -0.250f}, {0.375f, 0.250f}, {-0.375f, -0.250f},
@@ -901,42 +894,26 @@ static umbra_color_val32 supersample_build(struct umbra_shader *s, struct umbra_
     if (samples < 1) { samples = 1; }
     if (samples > 8) { samples = 8; }
 
-    umbra_color_val32 sum = self->inner->build(self->inner, builder, uniforms, x, y);
+    umbra_color_val32 sum = self->inner_fn(self->inner_ctx, b, x, y);
     for (int i = 1; i < samples; i++) {
-        umbra_val32 const sx = umbra_add_f32(builder, x,
-                                              umbra_imm_f32(builder, jitter[i - 1][0]));
-        umbra_val32 const sy = umbra_add_f32(builder, y,
-                                              umbra_imm_f32(builder, jitter[i - 1][1]));
-        umbra_color_val32 const c = self->inner->build(self->inner, builder, uniforms, sx, sy);
-        sum.r = umbra_add_f32(builder, sum.r, c.r);
-        sum.g = umbra_add_f32(builder, sum.g, c.g);
-        sum.b = umbra_add_f32(builder, sum.b, c.b);
-        sum.a = umbra_add_f32(builder, sum.a, c.a);
+        umbra_val32 const sx = umbra_add_f32(b, x,
+                                              umbra_imm_f32(b, jitter[i - 1][0])),
+                          sy = umbra_add_f32(b, y,
+                                              umbra_imm_f32(b, jitter[i - 1][1]));
+        umbra_color_val32 const c = self->inner_fn(self->inner_ctx, b, sx, sy);
+        sum.r = umbra_add_f32(b, sum.r, c.r);
+        sum.g = umbra_add_f32(b, sum.g, c.g);
+        sum.b = umbra_add_f32(b, sum.b, c.b);
+        sum.a = umbra_add_f32(b, sum.a, c.a);
     }
 
-    umbra_val32 const inv = umbra_imm_f32(builder, 1.0f / (float)samples);
+    umbra_val32 const inv = umbra_imm_f32(b, 1.0f / (float)samples);
     return (umbra_color_val32){
-        umbra_mul_f32(builder, sum.r, inv),
-        umbra_mul_f32(builder, sum.g, inv),
-        umbra_mul_f32(builder, sum.b, inv),
-        umbra_mul_f32(builder, sum.a, inv),
+        umbra_mul_f32(b, sum.r, inv),
+        umbra_mul_f32(b, sum.g, inv),
+        umbra_mul_f32(b, sum.b, inv),
+        umbra_mul_f32(b, sum.a, inv),
     };
-}
-static void supersample_free(struct umbra_shader *s) { free(s); }
-
-struct umbra_shader* umbra_shader_supersample(struct umbra_shader *inner, int samples) {
-    // supersample forwards its uniform buffer directly to inner, so we adopt
-    // inner's uniforms layout (there are no uniforms of our own).
-    assume(inner != NULL);
-    struct shader_supersample *s = malloc(sizeof *s);
-    *s = (struct shader_supersample){
-        .base    = {.build    = supersample_build,
-                    .free     = supersample_free,
-                    .uniforms = inner->uniforms},
-        .inner   = inner,
-        .samples = samples,
-    };
-    return &s->base;
 }
 
 umbra_val32 umbra_coverage_rect(void *ctx, struct umbra_builder *b,

@@ -203,7 +203,19 @@ struct umbra_shader* umbra_shader_gradient(struct umbra_gradient_coords*,
                                            struct umbra_buf colors,
                                            struct umbra_buf pos);
 
-struct umbra_shader* umbra_shader_supersample(struct umbra_shader *inner, int samples);
+// Flat composer: supersamples an inner flat shader.  Caller owns the state;
+// pass &state as shader_ctx.  All three fields (samples, inner_fn, inner_ctx)
+// are read once at IR-emit time and baked into the compiled program --
+// mutating them afterwards has no effect on already-compiled dispatches.
+// To change them, free the program and rebuild.  inner_ctx's *bytes* still
+// mutate freely via umbra_uniforms, as usual.
+struct umbra_supersample {
+    umbra_shader  inner_fn;
+    void         *inner_ctx;
+    int           samples, :32;
+};
+umbra_color_val32 umbra_shader_supersample(void *ctx, struct umbra_builder*,
+                                            umbra_val32 x, umbra_val32 y);
 
 // Flat coverage: caller owns an umbra_rect; pass &rect as coverage_ctx to
 // umbra_draw_builder2 (or wrap via umbra_coverage_wrap for old-middleware
