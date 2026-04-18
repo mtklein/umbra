@@ -126,7 +126,7 @@ struct text_slide {
 
     umbra_color       color;
     struct umbra_buf  buf;
-    umbra_coverage    coverage_fn;
+    umbra_coverage    *coverage_fn;
 
     struct umbra_fmt      fmt;
     struct umbra_program *prog;

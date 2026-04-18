@@ -17,7 +17,7 @@ struct grad_slide {
         struct umbra_shader_gradient_evenly_spaced_stops even;
         struct umbra_shader_gradient                     full;
     } colorizer;
-    umbra_shader          shader_fn;
+    umbra_shader          *shader_fn;
     void                 *shader_ctx;
 
     struct umbra_fmt      fmt;

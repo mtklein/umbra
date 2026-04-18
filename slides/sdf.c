@@ -53,7 +53,7 @@ struct csg_slide {
 
     umbra_color               color;
     struct two_circle_sdf     sdf;
-    umbra_sdf                 sdf_fn;
+    umbra_sdf                 *sdf_fn;
 
     struct umbra_fmt          fmt;
     struct umbra_sdf_draw    *disp;
@@ -158,7 +158,7 @@ static void csg_free(struct slide *s) {
 
 static struct slide* make_csg(char const *title, float const bg[4], float const color[4],
                               enum csg_op op) {
-    umbra_sdf build = NULL;
+    umbra_sdf *build = NULL;
     if (op == CSG_UNION)      { build = csg_union_build; }
     if (op == CSG_INTERSECT)  { build = csg_intersect_build; }
     if (op == CSG_DIFFERENCE) { build = csg_difference_build; }

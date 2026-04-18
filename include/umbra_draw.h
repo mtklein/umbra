@@ -47,33 +47,29 @@ void              umbra_store_fp16       (struct umbra_builder*, umbra_ptr64, um
 umbra_color_val32 umbra_load_fp16_planar (struct umbra_builder*, umbra_ptr16);
 void              umbra_store_fp16_planar(struct umbra_builder*, umbra_ptr16, umbra_color_val32);
 
-// TODO: typedef the effect function type, not the function pointer type?
-//       allows declaring blends as umbra_blend umbra_blend_src, umbra_blend_srcover, ...
-
 // Effects emit IR into a builder.  Any uniforms registered with
-// umbra_uniforms() must outlive the builder, flat_ir, and program.
-typedef umbra_color_val32 (*umbra_shader)  (void *ctx, struct umbra_builder*,
-                                            umbra_val32 x, umbra_val32 y);
-typedef umbra_val32       (*umbra_coverage)(void *ctx, struct umbra_builder*,
-                                            umbra_val32 x, umbra_val32 y);
-typedef umbra_interval    (*umbra_sdf)     (void *ctx, struct umbra_builder*,
-                                            umbra_interval x, umbra_interval y);
-typedef umbra_color_val32 (*umbra_blend)   (void *ctx, struct umbra_builder*,
-                                            umbra_color_val32 src,
-                                            umbra_color_val32 dst);
+// umbra_uniforms() must outlive the builder, flat_ir, and program.  These are
+// function types (not pointer types), so declarations read as
+// `umbra_blend umbra_blend_src, umbra_blend_srcover, ...;` and struct fields
+// carrying them write as `umbra_shader *inner_fn`.
+typedef umbra_color_val32 umbra_shader  (void *ctx, struct umbra_builder*,
+                                         umbra_val32 x, umbra_val32 y);
+typedef umbra_val32       umbra_coverage(void *ctx, struct umbra_builder*,
+                                         umbra_val32 x, umbra_val32 y);
+typedef umbra_interval    umbra_sdf     (void *ctx, struct umbra_builder*,
+                                         umbra_interval x, umbra_interval y);
+typedef umbra_color_val32 umbra_blend   (void *ctx, struct umbra_builder*,
+                                         umbra_color_val32 src,
+                                         umbra_color_val32 dst);
 
 // Shade a single color; ctx is an umbra_color*.
 umbra_color_val32 umbra_shader_color(void *umbra_color, struct umbra_builder*,
                                      umbra_val32 x, umbra_val32 y);
 
-umbra_color_val32 umbra_blend_src     (void*, struct umbra_builder*,
-                                       umbra_color_val32 src, umbra_color_val32 dst);
-umbra_color_val32 umbra_blend_srcover (void*, struct umbra_builder*,
-                                       umbra_color_val32 src, umbra_color_val32 dst);
-umbra_color_val32 umbra_blend_dstover (void*, struct umbra_builder*,
-                                       umbra_color_val32 src, umbra_color_val32 dst);
-umbra_color_val32 umbra_blend_multiply(void*, struct umbra_builder*,
-                                       umbra_color_val32 src, umbra_color_val32 dst);
+umbra_blend umbra_blend_src,
+            umbra_blend_srcover,
+            umbra_blend_dstover,
+            umbra_blend_multiply;
 
 // Compose coverage, shader, and blend into an IR builder that reads and writes
 // dst_fmt at ptr.ix=0.  Any of the effects may be NULL for default behavior:
@@ -99,7 +95,7 @@ void umbra_sdf_draw_free(struct umbra_sdf_draw*);
 
 // Adapt an umbra_sdf as umbra_coverage.
 struct umbra_coverage_from_sdf {
-    umbra_sdf  sdf_fn;
+    umbra_sdf *sdf_fn;
     void      *sdf_ctx;
     int        hard_edge, :32;
 };
@@ -115,8 +111,8 @@ umbra_val32 umbra_coverage_from_sdf(void *ctx, struct umbra_builder*,
 // umbra_sdf: a flat (void *ctx, builder, xy) -> val32 callback that maps
 // pixel coordinates to a clamped parameter t in [0, 1].  Colorizer shaders
 // hold a (coords_fn, coords_ctx) pair, read once at IR-emit time.
-typedef umbra_val32 (*umbra_gradient_coords)(void *ctx, struct umbra_builder*,
-                                              umbra_point_val32 xy);
+typedef umbra_val32 umbra_gradient_coords(void *ctx, struct umbra_builder*,
+                                           umbra_point_val32 xy);
 
 // Linear gradient: t = a*x + b*y + c, clamped.  Fill from two points via
 // umbra_gradient_linear_from().
@@ -143,7 +139,7 @@ umbra_val32 umbra_gradient_radial(void *ctx, struct umbra_builder*, umbra_point_
 // has no effect on a compiled program.  The colors/lut/pos *bytes* still
 // mutate freely via umbra_uniforms.
 struct umbra_shader_gradient_two_stops {
-    umbra_gradient_coords  coords_fn;
+    umbra_gradient_coords *coords_fn;
     void                  *coords_ctx;
     umbra_color            c0, c1;
 };
@@ -151,7 +147,7 @@ umbra_color_val32 umbra_shader_gradient_two_stops(void *ctx, struct umbra_builde
                                                    umbra_val32 x, umbra_val32 y);
 
 struct umbra_shader_gradient_lut {
-    umbra_gradient_coords  coords_fn;
+    umbra_gradient_coords *coords_fn;
     void                  *coords_ctx;
     float                  N;
     int                    :32;
@@ -161,7 +157,7 @@ umbra_color_val32 umbra_shader_gradient_lut(void *ctx, struct umbra_builder*,
                                              umbra_val32 x, umbra_val32 y);
 
 struct umbra_shader_gradient_evenly_spaced_stops {
-    umbra_gradient_coords  coords_fn;
+    umbra_gradient_coords *coords_fn;
     void                  *coords_ctx;
     float                  N;
     int                    :32;
@@ -171,7 +167,7 @@ umbra_color_val32 umbra_shader_gradient_evenly_spaced_stops(
     void *ctx, struct umbra_builder*, umbra_val32 x, umbra_val32 y);
 
 struct umbra_shader_gradient {
-    umbra_gradient_coords  coords_fn;
+    umbra_gradient_coords *coords_fn;
     void                  *coords_ctx;
     float                  N;
     int                    :32;
@@ -182,7 +178,7 @@ umbra_color_val32 umbra_shader_gradient(void *umbra_shader_gradient, struct umbr
 
 // Supersample a wrapped shader.
 struct umbra_supersample {
-    umbra_shader  inner_fn;
+    umbra_shader *inner_fn;
     void         *inner_ctx;
     int           samples, :32;
 };

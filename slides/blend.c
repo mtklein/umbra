@@ -11,7 +11,7 @@ struct blend_slide {
 
     umbra_color   color;
     umbra_rect    rect;
-    umbra_blend   blend_fn;
+    umbra_blend   *blend_fn;
 
     struct umbra_fmt       fmt;
     struct umbra_sdf_draw *qt;
