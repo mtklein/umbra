@@ -178,7 +178,6 @@ struct interp_program {
     struct sw_inst *inst;
     ival           *v;
     ival           *vars;
-    struct umbra_buf      *buf;
     int             preamble, nptr, caller_nptr, n_reg;
     int             n_deref, n_vars;
     struct umbra_uniform_reg *reg;
@@ -215,8 +214,6 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
     p->n_reg       = ir->n_uniforms;
     p->caller_nptr = p->n_reg ? ir->uniforms[0].ix : p->nptr;
     p->n_deref     = n_deref;
-    int const total_ptrs = p->nptr + n_deref;
-    p->buf = calloc((size_t)total_ptrs, sizeof *p->buf);
     if (p->n_reg) {
         size_t const sz = (size_t)p->n_reg * sizeof *p->reg;
         p->reg = malloc(sz);
@@ -515,20 +512,20 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
 static void interp_program_run(struct interp_program *p, int l, int t, int r, int b,
                                     struct umbra_buf caller_buf[]) {
     int const nall = p->nptr + p->n_deref;
-    // caller_buf covers the caller-provided prefix [0, caller_nptr).
-    // Registered uniform slots live in [caller_nptr, nptr), filled from p->reg.
-    // deref scratch lives in [nptr, nall) and must be zero.
-    for (int i = 0; i < p->caller_nptr; i++) { p->buf[i] = caller_buf[i]; }
+    // Thread-local scratch: caller-provided prefix [0, caller_nptr), then
+    // registered uniform slots from p->reg, then zeroed deref scratch past nptr.
+    assume(nall <= 64);
+    struct umbra_buf buf[64];
+    for (int i = 0; i < p->caller_nptr; i++) { buf[i] = caller_buf[i]; }
     for (int i = 0; i < p->n_reg; i++) {
-        p->buf[p->reg[i].ix] = (struct umbra_buf){
+        buf[p->reg[i].ix] = (struct umbra_buf){
             .ptr   = (void*)(uintptr_t)p->reg[i].ptr,
             .count = p->reg[i].slots,
         };
     }
-    for (int i = p->nptr; i < nall; i++) { p->buf[i] = (struct umbra_buf){0}; }
+    for (int i = p->nptr; i < nall; i++) { buf[i] = (struct umbra_buf){0}; }
 
     int const      P   = p->preamble;
-    struct umbra_buf     *buf = p->buf;
     ival                 *vars = p->vars;
     int const             n_vars = p->n_vars;
     I32                   if_mask_stack[8];
@@ -1333,7 +1330,6 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
 
 static void interp_program_free(struct interp_program *p) {
     if (p) {
-        free(p->buf);
         free(p->inst);
         free(p->v);
         free(p->vars);

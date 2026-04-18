@@ -468,19 +468,11 @@ struct jit_program* jit_program(struct jit_backend *be,
 
     struct jit_program *j = calloc(1, sizeof *j);
     if (ir->n_uniforms) {
-        int max_ptr = -1;
-        for (int i = 0; i < ir->insts; i++) {
-            if (op_has_ptr(ir->inst[i].op) && ir->inst[i].ptr.bits >= 0
-                                           && ir->inst[i].ptr.bits > max_ptr) {
-                max_ptr = ir->inst[i].ptr.bits;
-            }
-        }
         j->n_reg       = ir->n_uniforms;
         j->caller_nptr = ir->uniforms[0].ix;
         size_t const sz = (size_t)j->n_reg * sizeof *j->reg;
-        j->reg     = malloc(sz);
+        j->reg = malloc(sz);
         __builtin_memcpy(j->reg, ir->uniforms, sz);
-        j->scratch = calloc((size_t)(max_ptr + 1), sizeof *j->scratch);
     }
 
     ra_destroy(ra);

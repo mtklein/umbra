@@ -95,7 +95,6 @@ struct wgpu_program {
     int push_words;
     int caller_nptr, n_reg;
     struct umbra_uniform_reg *reg;
-    struct umbra_buf         *scratch;
 
     struct deref_info *deref;
     uint8_t          *buf_rw;
@@ -403,7 +402,6 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
         p->reg = malloc(sz);
         __builtin_memcpy(p->reg, ir->uniforms, sz);
     }
-    p->scratch = calloc((size_t)(p->max_ptr + 1), sizeof *p->scratch);
 
     return &p->base;
 }
@@ -415,9 +413,10 @@ static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
 
     int w = r - l, h = b - t;
 
-    // Overlay registered uniforms into the per-program scratch; caller_buf
-    // only covers [0, caller_nptr).
-    struct umbra_buf *buf = p->scratch;
+    // Thread-local scratch: caller-provided prefix [0, caller_nptr), then
+    // registered uniform slots overlaid from p->reg.
+    assume(p->max_ptr + 1 <= 32);
+    struct umbra_buf buf[32];
     for (int i = 0; i < p->caller_nptr; i++) { buf[i] = caller_buf[i]; }
     for (int i = 0; i < p->n_reg; i++) {
         buf[p->reg[i].ix] = (struct umbra_buf){
@@ -604,7 +603,6 @@ static void wgpu_program_free(struct umbra_program *prog) {
     free(p->buf_rw);
     free(p->buf_shift);
     free(p->reg);
-    free(p->scratch);
     free(p);
 }
 

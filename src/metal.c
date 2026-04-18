@@ -1,3 +1,4 @@
+#include "assume.h"
 #include "flat_ir.h"
 #include "gpu_buf_cache.h"
 #include "uniform_ring.h"
@@ -100,7 +101,6 @@ struct metal_program {
     int    n_deref;
     int    caller_nptr, n_reg, :32;
     struct umbra_uniform_reg *reg;
-    struct umbra_buf         *scratch;  // sized total_bufs; overlay target for queue()
 };
 
 typedef struct {
@@ -1168,7 +1168,6 @@ static struct metal_program* metal_program(
                 p->reg = malloc(sz);
                 __builtin_memcpy(p->reg, ir->uniforms, sz);
             }
-            p->scratch = calloc((size_t)(max_ptr + 1), sizeof *p->scratch);
 
             free(deref_buf);
             umbra_flat_ir_free(resolved);
@@ -1322,9 +1321,10 @@ static void metal_program_queue(
 
     struct metal_backend *be = (struct metal_backend*)p->base.backend;
 
-    // Overlay registered uniform bufs from the program into a scratch array;
-    // caller_buf only covers [0, caller_nptr).
-    struct umbra_buf *buf = p->scratch;
+    // Thread-local scratch: caller-provided prefix [0, caller_nptr), then
+    // registered uniform slots from p->reg.
+    assume(p->max_ptr + 1 <= 32);
+    struct umbra_buf buf[32];
     for (int i = 0; i < p->caller_nptr; i++) { buf[i] = caller_buf[i]; }
     for (int i = 0; i < p->n_reg; i++) {
         buf[p->reg[i].ix] = (struct umbra_buf){
@@ -1385,7 +1385,6 @@ static void metal_program_free(struct metal_program *p) {
     free(p->buf_rw);
     free(p->buf_shift);
     free(p->reg);
-    free(p->scratch);
     free(p->src);
     free(p);
 }

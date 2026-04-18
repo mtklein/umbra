@@ -98,7 +98,6 @@ struct vk_program {
     int push_words;
     int caller_nptr, n_reg;
     struct umbra_uniform_reg *reg;
-    struct umbra_buf         *scratch;
 
     struct deref_info *deref;
     uint8_t          *buf_rw;
@@ -270,9 +269,10 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     int w = r - l, h = b - t;
     if (w <= 0 || h <= 0) { return; }
 
-    // Overlay registered uniforms into the per-program scratch; caller_buf
-    // only covers [0, caller_nptr).
-    struct umbra_buf *buf = vp->scratch;
+    // Thread-local scratch: caller-provided prefix [0, caller_nptr), then
+    // registered uniform slots overlaid from vp->reg.
+    assume(vp->max_ptr + 1 <= 32);
+    struct umbra_buf buf[32];
     for (int i = 0; i < vp->caller_nptr; i++) { buf[i] = caller_buf[i]; }
     for (int i = 0; i < vp->n_reg; i++) {
         buf[vp->reg[i].ix] = (struct umbra_buf){
@@ -465,7 +465,6 @@ static void vk_program_free(struct umbra_program *p) {
     free(vp->buf_rw);
     free(vp->buf_shift);
     free(vp->reg);
-    free(vp->scratch);
     free(vp->spirv);
     free(vp);
 }
@@ -572,7 +571,6 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
         p->reg = malloc(sz);
         __builtin_memcpy(p->reg, ir->uniforms, sz);
     }
-    p->scratch = calloc((size_t)(p->max_ptr + 1), sizeof *p->scratch);
 
     p->base.queue   = vk_program_queue;
     p->base.dump    = vk_program_dump;
