@@ -461,7 +461,8 @@ static umbra_color_val32 sample_lut(struct umbra_builder *b, umbra_val32 t,
 }
 
 static umbra_color_val32 walk_stops(struct umbra_builder *b, umbra_val32 t,
-                               umbra_ptr32 uniforms, int N_slot, umbra_ptr32 colors, umbra_ptr32 pos) {
+                                    umbra_ptr32 uniforms, int N_slot,
+                                    umbra_ptr32 colors, umbra_ptr32 pos) {
     umbra_val32 const n_i = umbra_i32_from_f32(b,
                                 umbra_uniform_32(b, uniforms, N_slot));
     umbra_val32 const n_segs = umbra_sub_i32(b, n_i, umbra_imm_i32(b, 1));

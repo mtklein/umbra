@@ -83,6 +83,7 @@ struct umbra_builder* umbra_draw_builder(
     umbra_blend    blend_fn,    void *blend_ctx,
     struct umbra_fmt);
 
+// TODO: _Bool hard_edge -> int quality
 struct umbra_sdf_draw_config {
     _Bool hard_edge;
 };
