@@ -234,12 +234,13 @@ struct persp_slide {
     struct text_cov *bitmap;
     int              w, h;
 
-    umbra_color                 color;
-    struct umbra_shader        *shader;
-    struct umbra_coverage      *cov;
+    umbra_color                          color;
+    struct umbra_coverage_bitmap_matrix  state;
+    struct umbra_shader                 *shader;
+    struct umbra_coverage               *cov;
 
-    struct umbra_fmt            fmt;
-    struct umbra_program       *prog;
+    struct umbra_fmt                     fmt;
+    struct umbra_program                *prog;
 };
 
 static void persp_init(struct slide *s, int w, int h) {
@@ -252,13 +253,11 @@ static void persp_prepare(struct slide *s, struct umbra_backend *be,
                           struct umbra_fmt fmt) {
     struct persp_slide *st = (struct persp_slide *)s;
     umbra_program_free(st->prog);
-    umbra_coverage_free(st->cov);
-    struct umbra_bitmap bmp = {
+    st->state.bmp = (struct umbra_bitmap){
         .buf = {.ptr = st->bitmap->data, .count = st->bitmap->w * st->bitmap->h},
         .w   = st->bitmap->w,
         .h   = st->bitmap->h,
     };
-    st->cov = umbra_coverage_bitmap_matrix((struct umbra_matrix){0}, bmp);
     st->fmt = fmt;
     struct umbra_builder *b = umbra_draw_builder(st->cov, st->shader,
                                                  umbra_blend_srcover, fmt);
@@ -272,16 +271,8 @@ static void persp_prepare(struct slide *s, struct umbra_backend *be,
 static void persp_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct persp_slide *st = (struct persp_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
-    struct umbra_matrix mat;
-    slide_perspective_matrix(&mat, (float)secs, st->w, st->h,
+    slide_perspective_matrix(&st->state.mat, (float)secs, st->w, st->h,
                              st->bitmap->w, st->bitmap->h);
-    struct umbra_bitmap bmp = {
-        .buf = {.ptr = st->bitmap->data, .count = st->bitmap->w * st->bitmap->h},
-        .w   = st->bitmap->w,
-        .h   = st->bitmap->h,
-    };
-    umbra_coverage_free(st->cov);
-    st->cov = umbra_coverage_bitmap_matrix(mat, bmp);
     struct umbra_buf ubuf[] = {
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
         st->cov->uniforms,
@@ -311,7 +302,7 @@ SLIDE(slide_coverage_bitmap_matrix) {
     st->bitmap = text_shared_bitmap();
     st->color  = (umbra_color){1.0f, 0.8f, 0.2f, 1.0f};
     st->shader = umbra_shader_wrap(umbra_shader_solid, &st->color);
-    st->cov    = umbra_coverage_bitmap_matrix((struct umbra_matrix){0}, (struct umbra_bitmap){0});
+    st->cov    = umbra_coverage_wrap(umbra_coverage_bitmap_matrix, &st->state);
     st->base = (struct slide){
         .title = "Coverage (8-bit bitmap + matrix)",
         .bg = {0.12f, 0.04f, 0.04f, 1},

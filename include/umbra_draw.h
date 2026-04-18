@@ -251,7 +251,14 @@ umbra_val32 umbra_coverage_sdf    (void *ctx, struct umbra_builder*,
 umbra_val32 umbra_coverage_winding(void *ctx, struct umbra_builder*,
                                     umbra_val32 x, umbra_val32 y);
 
-struct umbra_coverage* umbra_coverage_bitmap_matrix(struct umbra_matrix, struct umbra_bitmap);
+// Flat coverage: sample a bitmap through a 3x3 perspective matrix.  Caller
+// owns a struct umbra_coverage_bitmap_matrix and passes &state as coverage_ctx.
+struct umbra_coverage_bitmap_matrix {
+    struct umbra_matrix mat; int :32;
+    struct umbra_bitmap bmp;
+};
+umbra_val32 umbra_coverage_bitmap_matrix(void *ctx, struct umbra_builder*,
+                                          umbra_val32 x, umbra_val32 y);
 
 void umbra_gradient_lut_even(float *out, int lut_n, int n_stops, umbra_color const *colors);
 void umbra_gradient_lut(float *out, int lut_n, int n_stops, float const positions[],

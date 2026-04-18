@@ -1045,88 +1045,70 @@ umbra_val32 umbra_coverage_winding(void *ctx, struct umbra_builder *b,
     return umbra_min_f32(b, umbra_abs_f32(b, raw), umbra_imm_f32(b, 1.0f));
 }
 
-struct coverage_bitmap_matrix {
-    struct umbra_coverage base;
-    struct umbra_matrix   mat; int :32;
-    struct umbra_bitmap   bmp;
-};
+#define FLAT_SLOT(field) ((int)(__builtin_offsetof(__typeof__(*self), field) / 4))
 
-static umbra_val32 bitmap_matrix_build(struct umbra_coverage *s, struct umbra_builder *builder,
-                                        umbra_ptr32 uniforms,
-                                        umbra_val32 x, umbra_val32 y) {
-    struct coverage_bitmap_matrix *self = (struct coverage_bitmap_matrix *)s;
-    umbra_ptr16 const bmp = umbra_deref_ptr16(builder, uniforms, SLOT(bmp.buf));
+umbra_val32 umbra_coverage_bitmap_matrix(void *ctx, struct umbra_builder *b,
+                                          umbra_val32 x, umbra_val32 y) {
+    struct umbra_coverage_bitmap_matrix const *self = ctx;
+    umbra_ptr32 const u = umbra_uniforms(b, self, sizeof *self / 4);
+    umbra_ptr16 const bmp = umbra_deref_ptr16(b, u, FLAT_SLOT(bmp.buf));
 
-    umbra_val32 const m0 = umbra_uniform_32(builder, uniforms, SLOT(mat.sx));
-    umbra_val32 const m1 = umbra_uniform_32(builder, uniforms, SLOT(mat.kx));
-    umbra_val32 const m2 = umbra_uniform_32(builder, uniforms, SLOT(mat.tx));
-    umbra_val32 const m3 = umbra_uniform_32(builder, uniforms, SLOT(mat.ky));
-    umbra_val32 const m4 = umbra_uniform_32(builder, uniforms, SLOT(mat.sy));
-    umbra_val32 const m5 = umbra_uniform_32(builder, uniforms, SLOT(mat.ty));
-    umbra_val32 const m6 = umbra_uniform_32(builder, uniforms, SLOT(mat.p0));
-    umbra_val32 const m7 = umbra_uniform_32(builder, uniforms, SLOT(mat.p1));
-    umbra_val32 const m8 = umbra_uniform_32(builder, uniforms, SLOT(mat.p2));
-    umbra_val32 const bw = umbra_f32_from_i32(builder,
-                                              umbra_uniform_32(builder, uniforms, SLOT(bmp.w)));
-    umbra_val32 const bh = umbra_f32_from_i32(builder,
-                                              umbra_uniform_32(builder, uniforms, SLOT(bmp.h)));
+    umbra_val32 const m0 = umbra_uniform_32(b, u, FLAT_SLOT(mat.sx));
+    umbra_val32 const m1 = umbra_uniform_32(b, u, FLAT_SLOT(mat.kx));
+    umbra_val32 const m2 = umbra_uniform_32(b, u, FLAT_SLOT(mat.tx));
+    umbra_val32 const m3 = umbra_uniform_32(b, u, FLAT_SLOT(mat.ky));
+    umbra_val32 const m4 = umbra_uniform_32(b, u, FLAT_SLOT(mat.sy));
+    umbra_val32 const m5 = umbra_uniform_32(b, u, FLAT_SLOT(mat.ty));
+    umbra_val32 const m6 = umbra_uniform_32(b, u, FLAT_SLOT(mat.p0));
+    umbra_val32 const m7 = umbra_uniform_32(b, u, FLAT_SLOT(mat.p1));
+    umbra_val32 const m8 = umbra_uniform_32(b, u, FLAT_SLOT(mat.p2));
+    umbra_val32 const bw = umbra_f32_from_i32(b, umbra_uniform_32(b, u, FLAT_SLOT(bmp.w)));
+    umbra_val32 const bh = umbra_f32_from_i32(b, umbra_uniform_32(b, u, FLAT_SLOT(bmp.h)));
 
-    umbra_val32 const w = umbra_add_f32(builder,
-                                      umbra_add_f32(builder, umbra_mul_f32(builder, m6, x),
-                                                    umbra_mul_f32(builder, m7, y)),
+    umbra_val32 const w = umbra_add_f32(b,
+                                      umbra_add_f32(b, umbra_mul_f32(b, m6, x),
+                                                    umbra_mul_f32(b, m7, y)),
                                       m8);
     umbra_val32 const xp =
-        umbra_div_f32(builder,
-                      umbra_add_f32(builder,
-                                    umbra_add_f32(builder, umbra_mul_f32(builder, m0, x),
-                                                  umbra_mul_f32(builder, m1, y)),
+        umbra_div_f32(b,
+                      umbra_add_f32(b,
+                                    umbra_add_f32(b, umbra_mul_f32(b, m0, x),
+                                                  umbra_mul_f32(b, m1, y)),
                                     m2),
                       w);
     umbra_val32 const yp =
-        umbra_div_f32(builder,
-                      umbra_add_f32(builder,
-                                    umbra_add_f32(builder, umbra_mul_f32(builder, m3, x),
-                                                  umbra_mul_f32(builder, m4, y)),
+        umbra_div_f32(b,
+                      umbra_add_f32(b,
+                                    umbra_add_f32(b, umbra_mul_f32(b, m3, x),
+                                                  umbra_mul_f32(b, m4, y)),
                                     m5),
                       w);
 
-    umbra_val32 const zero_f = umbra_imm_f32(builder, 0.0f);
-    umbra_val32 const in = umbra_and_32(builder,
-                                       umbra_and_32(builder, umbra_le_f32(builder, zero_f, xp),
-                                                     umbra_lt_f32(builder, xp, bw)),
-                                       umbra_and_32(builder, umbra_le_f32(builder, zero_f, yp),
-                                                     umbra_lt_f32(builder, yp, bh)));
+    umbra_val32 const zero_f = umbra_imm_f32(b, 0.0f);
+    umbra_val32 const in = umbra_and_32(b,
+                                       umbra_and_32(b, umbra_le_f32(b, zero_f, xp),
+                                                     umbra_lt_f32(b, xp, bw)),
+                                       umbra_and_32(b, umbra_le_f32(b, zero_f, yp),
+                                                     umbra_lt_f32(b, yp, bh)));
 
-    umbra_val32 const one_f = umbra_imm_f32(builder, 1.0f);
-    umbra_val32 const xc = umbra_min_f32(builder, umbra_max_f32(builder, xp, zero_f),
-                                       umbra_sub_f32(builder, bw, one_f));
-    umbra_val32 const yc = umbra_min_f32(builder, umbra_max_f32(builder, yp, zero_f),
-                                       umbra_sub_f32(builder, bh, one_f));
-    umbra_val32 const xi = umbra_floor_i32(builder, xc);
-    umbra_val32 const yi = umbra_floor_i32(builder, yc);
-    umbra_val32 const bwi = umbra_floor_i32(builder, bw);
-    umbra_val32 const idx = umbra_add_i32(builder, umbra_mul_i32(builder, yi, bwi), xi);
+    umbra_val32 const one_f = umbra_imm_f32(b, 1.0f);
+    umbra_val32 const xc = umbra_min_f32(b, umbra_max_f32(b, xp, zero_f),
+                                       umbra_sub_f32(b, bw, one_f));
+    umbra_val32 const yc = umbra_min_f32(b, umbra_max_f32(b, yp, zero_f),
+                                       umbra_sub_f32(b, bh, one_f));
+    umbra_val32 const xi = umbra_floor_i32(b, xc);
+    umbra_val32 const yi = umbra_floor_i32(b, yc);
+    umbra_val32 const bwi = umbra_floor_i32(b, bw);
+    umbra_val32 const idx = umbra_add_i32(b, umbra_mul_i32(b, yi, bwi), xi);
 
-    umbra_val32 const val = umbra_i32_from_s16(builder, umbra_gather_16(builder, bmp, idx));
-    umbra_val32 const inv255 = umbra_imm_f32(builder, 1.0f / 255.0f);
-    umbra_val32 const cov = umbra_mul_f32(builder, umbra_f32_from_i32(builder, val), inv255);
+    umbra_val32 const val = umbra_i32_from_s16(b, umbra_gather_16(b, bmp, idx));
+    umbra_val32 const inv255 = umbra_imm_f32(b, 1.0f / 255.0f);
+    umbra_val32 const cov = umbra_mul_f32(b, umbra_f32_from_i32(b, val), inv255);
 
-    return umbra_sel_32(builder, in, cov, umbra_imm_f32(builder, 0.0f));
+    return umbra_sel_32(b, in, cov, umbra_imm_f32(b, 0.0f));
 }
-static void bitmap_matrix_free(struct umbra_coverage *s) { free(s); }
 
-struct umbra_coverage* umbra_coverage_bitmap_matrix(struct umbra_matrix mat,
-                                                    struct umbra_bitmap bmp) {
-    struct coverage_bitmap_matrix *c = malloc(sizeof *c);
-    *c = (struct coverage_bitmap_matrix){
-        .base = {.build          = bitmap_matrix_build,
-                 .free           = bitmap_matrix_free,
-                 .uniforms = UMBRA_UNIFORMS_OF(c)},
-        .mat  = mat,
-        .bmp  = bmp,
-    };
-    return &c->base;
-}
+#undef FLAT_SLOT
 
 umbra_color_val32 umbra_blend_src(void *ctx, struct umbra_builder *builder,
                                   umbra_color_val32 src, umbra_color_val32 dst) {

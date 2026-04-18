@@ -920,9 +920,11 @@ TEST(test_coverage_bitmap_matrix) {
     umbra_color color = {1, 1, 1, 1};
     struct umbra_shader *shader = umbra_shader_wrap(umbra_shader_solid, &color);
     uint16_t bmp[8] = {0, 0, 255, 0, 0, 0, 0, 0};
-    struct umbra_coverage *cov = umbra_coverage_bitmap_matrix(
-        (struct umbra_matrix){1, 0, 0, 0, 1, 0, 0, 0, 1},
-        (struct umbra_bitmap){.buf={.ptr=bmp, .count=8}, .w=8, .h=1});
+    struct umbra_coverage_bitmap_matrix state = {
+        .mat = {1, 0, 0, 0, 1, 0, 0, 0, 1},
+        .bmp = {.buf={.ptr=bmp, .count=8}, .w=8, .h=1},
+    };
+    struct umbra_coverage *cov = umbra_coverage_wrap(umbra_coverage_bitmap_matrix, &state);
     struct draw_backends     B =
         make_draw(umbra_draw_builder(cov, shader,
                                    umbra_blend_srcover, umbra_fmt_8888));
@@ -953,9 +955,11 @@ TEST(test_coverage_bitmap_matrix_565) {
     struct umbra_shader *shader = umbra_shader_wrap(umbra_shader_solid, &color);
     uint16_t bmp[16];
     for (int i = 0; i < 16; i++) { bmp[i] = 255; }
-    struct umbra_coverage *cov = umbra_coverage_bitmap_matrix(
-        (struct umbra_matrix){1, 0, 0, 0, 1, 0, 0, 0, 1},
-        (struct umbra_bitmap){.buf={.ptr=bmp, .count=16}, .w=16, .h=1});
+    struct umbra_coverage_bitmap_matrix state = {
+        .mat = {1, 0, 0, 0, 1, 0, 0, 0, 1},
+        .bmp = {.buf={.ptr=bmp, .count=16}, .w=16, .h=1},
+    };
+    struct umbra_coverage *cov = umbra_coverage_wrap(umbra_coverage_bitmap_matrix, &state);
     struct draw_backends B =
         make_draw(umbra_draw_builder(cov, shader,
                                    umbra_blend_srcover, umbra_fmt_565));
@@ -984,9 +988,11 @@ TEST(test_coverage_bitmap_matrix_oob) {
     umbra_color color = {1, 1, 1, 1};
     struct umbra_shader *shader = umbra_shader_wrap(umbra_shader_solid, &color);
     uint16_t bmp[4] = {255, 0, 0, 0};
-    struct umbra_coverage *cov = umbra_coverage_bitmap_matrix(
-        (struct umbra_matrix){1, 0, 0, 0, 1, 0, 0.001f, 0, 1},
-        (struct umbra_bitmap){.buf={.ptr=bmp, .count=4}, .w=2, .h=2});
+    struct umbra_coverage_bitmap_matrix state = {
+        .mat = {1, 0, 0, 0, 1, 0, 0.001f, 0, 1},
+        .bmp = {.buf={.ptr=bmp, .count=4}, .w=2, .h=2},
+    };
+    struct umbra_coverage *cov = umbra_coverage_wrap(umbra_coverage_bitmap_matrix, &state);
     struct draw_backends     B =
         make_draw(umbra_draw_builder(cov, shader,
                                    umbra_blend_srcover, umbra_fmt_8888));
