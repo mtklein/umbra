@@ -733,15 +733,19 @@ TEST(test_coverage_sdf) {
 TEST(test_coverage_bitmap_matrix) {
     umbra_color color = {1, 1, 1, 1};
     uint16_t bmp[8] = {0, 0, 255, 0, 0, 0, 0, 0};
-    struct umbra_coverage_bitmap_matrix state = {
-        .mat = {1, 0, 0, 0, 1, 0, 0, 0, 1},
-        .bmp = {.buf={.ptr=bmp, .count=8}, .w=8, .h=1},
+    struct coverage_bitmap2d sampler = {
+        .buf = {.ptr=bmp, .count=8}, .w=8, .h=1,
+    };
+    struct coverage_matrix state = {
+        .mat       = {1, 0, 0, 0, 1, 0, 0, 0, 1},
+        .inner_fn  = coverage_bitmap2d,
+        .inner_ctx = &sampler,
     };
     struct draw_backends     B =
         make_draw(umbra_draw_builder(
-            umbra_coverage_bitmap_matrix, &state,
-            umbra_shader_color,           &color,
-            umbra_blend_srcover,          NULL,
+            coverage_matrix,     &state,
+            umbra_shader_color,  &color,
+            umbra_blend_srcover, NULL,
             umbra_fmt_8888));
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
@@ -761,15 +765,19 @@ TEST(test_coverage_bitmap_matrix_565) {
     umbra_color color = {1, 0, 0, 1};
     uint16_t bmp[16];
     for (int i = 0; i < 16; i++) { bmp[i] = 255; }
-    struct umbra_coverage_bitmap_matrix state = {
-        .mat = {1, 0, 0, 0, 1, 0, 0, 0, 1},
-        .bmp = {.buf={.ptr=bmp, .count=16}, .w=16, .h=1},
+    struct coverage_bitmap2d sampler = {
+        .buf = {.ptr=bmp, .count=16}, .w=16, .h=1,
+    };
+    struct coverage_matrix state = {
+        .mat       = {1, 0, 0, 0, 1, 0, 0, 0, 1},
+        .inner_fn  = coverage_bitmap2d,
+        .inner_ctx = &sampler,
     };
     struct draw_backends B =
         make_draw(umbra_draw_builder(
-            umbra_coverage_bitmap_matrix, &state,
-            umbra_shader_color,           &color,
-            umbra_blend_srcover,          NULL,
+            coverage_matrix,     &state,
+            umbra_shader_color,  &color,
+            umbra_blend_srcover, NULL,
             umbra_fmt_565));
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint16_t dst[16];
@@ -787,15 +795,19 @@ TEST(test_coverage_bitmap_matrix_565) {
 TEST(test_coverage_bitmap_matrix_oob) {
     umbra_color color = {1, 1, 1, 1};
     uint16_t bmp[4] = {255, 0, 0, 0};
-    struct umbra_coverage_bitmap_matrix state = {
-        .mat = {1, 0, 0, 0, 1, 0, 0.001f, 0, 1},
-        .bmp = {.buf={.ptr=bmp, .count=4}, .w=2, .h=2},
+    struct coverage_bitmap2d sampler = {
+        .buf = {.ptr=bmp, .count=4}, .w=2, .h=2,
+    };
+    struct coverage_matrix state = {
+        .mat       = {1, 0, 0, 0, 1, 0, 0.001f, 0, 1},
+        .inner_fn  = coverage_bitmap2d,
+        .inner_ctx = &sampler,
     };
     struct draw_backends     B =
         make_draw(umbra_draw_builder(
-            umbra_coverage_bitmap_matrix, &state,
-            umbra_shader_color,           &color,
-            umbra_blend_srcover,          NULL,
+            coverage_matrix,     &state,
+            umbra_shader_color,  &color,
+            umbra_blend_srcover, NULL,
             umbra_fmt_8888));
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {

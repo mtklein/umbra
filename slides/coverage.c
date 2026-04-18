@@ -36,6 +36,91 @@ umbra_val32 coverage_sdf(void *ctx, struct umbra_builder *b,
     return umbra_min_f32(b, umbra_max_f32(b, scaled, zero), one);
 }
 
+// Gather-based bitmap sampler for arbitrary (x, y) sample points.  Samples
+// outside [0, w) x [0, h) return 0.  w and h are baked at IR-build time
+// (read from self-> directly, emitted as imms).
+umbra_val32 coverage_bitmap2d(void *ctx, struct umbra_builder *b,
+                              umbra_val32 x, umbra_val32 y) {
+    struct coverage_bitmap2d const *self = ctx;
+    umbra_ptr16 const pixels = umbra_bind_buf16(b, &self->buf);
+
+    umbra_val32 const zero_f = umbra_imm_f32(b, 0.0f);
+    umbra_val32 const bw     = umbra_imm_f32(b, (float)self->w);
+    umbra_val32 const bh     = umbra_imm_f32(b, (float)self->h);
+
+    umbra_val32 const in = umbra_and_32(b,
+                                        umbra_and_32(b, umbra_le_f32(b, zero_f, x),
+                                                        umbra_lt_f32(b, x, bw)),
+                                        umbra_and_32(b, umbra_le_f32(b, zero_f, y),
+                                                        umbra_lt_f32(b, y, bh)));
+
+    umbra_val32 const one_f = umbra_imm_f32(b, 1.0f);
+    umbra_val32 const xc = umbra_min_f32(b, umbra_max_f32(b, x, zero_f),
+                                         umbra_sub_f32(b, bw, one_f));
+    umbra_val32 const yc = umbra_min_f32(b, umbra_max_f32(b, y, zero_f),
+                                         umbra_sub_f32(b, bh, one_f));
+    umbra_val32 const xi = umbra_floor_i32(b, xc);
+    umbra_val32 const yi = umbra_floor_i32(b, yc);
+    umbra_val32 const wi = umbra_imm_i32(b, self->w);
+    umbra_val32 const idx = umbra_add_i32(b, umbra_mul_i32(b, yi, wi), xi);
+
+    umbra_val32 const val    = umbra_i32_from_s16(b, umbra_gather_16(b, pixels, idx));
+    umbra_val32 const inv255 = umbra_imm_f32(b, 1.0f / 255.0f);
+    umbra_val32 const cov    = umbra_mul_f32(b, umbra_f32_from_i32(b, val), inv255);
+
+    return umbra_sel_32(b, in, cov, zero_f);
+}
+
+// Matrix combinator: apply self->mat to (x, y) and forward to self->inner_fn.
+umbra_val32 coverage_matrix(void *ctx, struct umbra_builder *b,
+                            umbra_val32 x, umbra_val32 y) {
+    struct coverage_matrix const *self = ctx;
+    umbra_ptr32 const u = umbra_uniforms(b, &self->mat, sizeof self->mat / 4);
+
+    enum {
+        M_SX = (int)(__builtin_offsetof(struct umbra_matrix, sx) / 4),
+        M_KX = (int)(__builtin_offsetof(struct umbra_matrix, kx) / 4),
+        M_TX = (int)(__builtin_offsetof(struct umbra_matrix, tx) / 4),
+        M_KY = (int)(__builtin_offsetof(struct umbra_matrix, ky) / 4),
+        M_SY = (int)(__builtin_offsetof(struct umbra_matrix, sy) / 4),
+        M_TY = (int)(__builtin_offsetof(struct umbra_matrix, ty) / 4),
+        M_P0 = (int)(__builtin_offsetof(struct umbra_matrix, p0) / 4),
+        M_P1 = (int)(__builtin_offsetof(struct umbra_matrix, p1) / 4),
+        M_P2 = (int)(__builtin_offsetof(struct umbra_matrix, p2) / 4),
+    };
+
+    umbra_val32 const sx = umbra_uniform_32(b, u, M_SX),
+                      kx = umbra_uniform_32(b, u, M_KX),
+                      tx = umbra_uniform_32(b, u, M_TX),
+                      ky = umbra_uniform_32(b, u, M_KY),
+                      sy = umbra_uniform_32(b, u, M_SY),
+                      ty = umbra_uniform_32(b, u, M_TY),
+                      p0 = umbra_uniform_32(b, u, M_P0),
+                      p1 = umbra_uniform_32(b, u, M_P1),
+                      p2 = umbra_uniform_32(b, u, M_P2);
+
+    umbra_val32 const w = umbra_add_f32(b,
+                                        umbra_add_f32(b, umbra_mul_f32(b, p0, x),
+                                                         umbra_mul_f32(b, p1, y)),
+                                        p2);
+    umbra_val32 const xp =
+        umbra_div_f32(b,
+                      umbra_add_f32(b,
+                                    umbra_add_f32(b, umbra_mul_f32(b, sx, x),
+                                                     umbra_mul_f32(b, kx, y)),
+                                    tx),
+                      w);
+    umbra_val32 const yp =
+        umbra_div_f32(b,
+                      umbra_add_f32(b,
+                                    umbra_add_f32(b, umbra_mul_f32(b, ky, x),
+                                                     umbra_mul_f32(b, sy, y)),
+                                    ty),
+                      w);
+
+    return self->inner_fn(self->inner_ctx, b, xp, yp);
+}
+
 static unsigned char* text_load_font(char const *path) {
     FILE *f = fopen(path, "rb");
     if (!f) { return NULL; }
@@ -250,41 +335,46 @@ SLIDE(slide_coverage_sdf_bitmap) {
     return &st->base;
 }
 
-// Coverage (8-bit bitmap + matrix): sample the glyph-mask through
-// umbra_coverage_bitmap_matrix with an animated perspective transform.
+// Coverage (8-bit bitmap + matrix): sample the glyph-mask through a
+// coverage_matrix combinator wrapping coverage_bitmap2d.
 struct persp_slide {
     struct slide base;
 
     struct text_cov *bitmap;
     int              w, h;
 
-    umbra_color                          color;
-    struct umbra_coverage_bitmap_matrix  state;
+    umbra_color               color;
+    struct coverage_bitmap2d  bmp;
+    struct coverage_matrix    mat;
 
-    struct umbra_fmt                     fmt;
-    struct umbra_program                *prog;
+    struct umbra_fmt          fmt;
+    struct umbra_program     *prog;
 };
 
 static void persp_init(struct slide *s, int w, int h) {
     struct persp_slide *st = (struct persp_slide *)s;
     st->w = w;
     st->h = h;
+    st->bmp = (struct coverage_bitmap2d){
+        .buf = {.ptr = st->bitmap->data, .count = st->bitmap->w * st->bitmap->h},
+        .w   = st->bitmap->w,
+        .h   = st->bitmap->h,
+    };
+    st->mat = (struct coverage_matrix){
+        .inner_fn  = coverage_bitmap2d,
+        .inner_ctx = &st->bmp,
+    };
 }
 
 static void persp_prepare(struct slide *s, struct umbra_backend *be,
                           struct umbra_fmt fmt) {
     struct persp_slide *st = (struct persp_slide *)s;
     umbra_program_free(st->prog);
-    st->state.bmp = (struct umbra_bitmap){
-        .buf = {.ptr = st->bitmap->data, .count = st->bitmap->w * st->bitmap->h},
-        .w   = st->bitmap->w,
-        .h   = st->bitmap->h,
-    };
     st->fmt = fmt;
     struct umbra_builder *b = umbra_draw_builder(
-        umbra_coverage_bitmap_matrix, &st->state,
-        umbra_shader_color,           &st->color,
-        umbra_blend_srcover,          NULL,
+        coverage_matrix,     &st->mat,
+        umbra_shader_color,  &st->color,
+        umbra_blend_srcover, NULL,
         fmt);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
@@ -296,7 +386,7 @@ static void persp_prepare(struct slide *s, struct umbra_backend *be,
 static void persp_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct persp_slide *st = (struct persp_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
-    slide_perspective_matrix(&st->state.mat, (float)secs, st->w, st->h,
+    slide_perspective_matrix(&st->mat.mat, (float)secs, st->w, st->h,
                              st->bitmap->w, st->bitmap->h);
     struct umbra_buf ubuf[] = {
         {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
@@ -309,9 +399,9 @@ static int persp_get_builders(struct slide *s, struct umbra_fmt fmt,
     if (max < 1) { return 0; }
     struct persp_slide *st = (struct persp_slide *)s;
     out[0] = umbra_draw_builder(
-        umbra_coverage_bitmap_matrix, &st->state,
-        umbra_shader_color,           &st->color,
-        umbra_blend_srcover,          NULL,
+        coverage_matrix,     &st->mat,
+        umbra_shader_color,  &st->color,
+        umbra_blend_srcover, NULL,
         fmt);
     return out[0] ? 1 : 0;
 }

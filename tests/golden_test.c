@@ -3,6 +3,7 @@
 #ifndef __wasm__
 
 #include "../slides/slide.h"
+#include "../slides/coverage.h"
 #include "../slides/text.h"
 #include "../slides/slug.h"
 #include "../src/count.h"
@@ -191,15 +192,19 @@ TEST(test_perspective_text) {
 
     umbra_color color = {1,1,1,1};
 
-    struct umbra_coverage_bitmap_matrix state = {
-        .mat = {1,0,0, 0,1,0, 0,0,1},
-        .bmp = {.buf={.ptr=bmp, .count=BW * BH}, .w=BW, .h=BH},
+    struct coverage_bitmap2d sampler = {
+        .buf = {.ptr=bmp, .count=BW * BH}, .w=BW, .h=BH,
+    };
+    struct coverage_matrix state = {
+        .mat       = {1,0,0, 0,1,0, 0,0,1},
+        .inner_fn  = coverage_bitmap2d,
+        .inner_ctx = &sampler,
     };
 
     struct umbra_builder *bld = umbra_draw_builder(
-        umbra_coverage_bitmap_matrix, &state,
-        umbra_shader_color,           &color,
-        umbra_blend_srcover,          NULL,
+        coverage_matrix,     &state,
+        umbra_shader_color,  &color,
+        umbra_blend_srcover, NULL,
         umbra_fmt_8888);
     struct umbra_flat_ir *ir =
         umbra_flat_ir(bld);
@@ -230,19 +235,21 @@ TEST(test_perspective_text) {
     slide_perspective_matrix(&mat2, 1.0f, W, H, tc.w, tc.h);
     umbra_color hc2 = {1,0.8f,0.2f,1};
 
-    struct umbra_coverage_bitmap_matrix state2 = {
-        .mat = mat2,
-        .bmp = {
-            .buf = {.ptr=tc.data, .count=tc.w * tc.h},
-            .w   = tc.w,
-            .h   = tc.h,
-        },
+    struct coverage_bitmap2d sampler2 = {
+        .buf = {.ptr=tc.data, .count=tc.w * tc.h},
+        .w   = tc.w,
+        .h   = tc.h,
+    };
+    struct coverage_matrix state2 = {
+        .mat       = mat2,
+        .inner_fn  = coverage_bitmap2d,
+        .inner_ctx = &sampler2,
     };
 
     bld = umbra_draw_builder(
-        umbra_coverage_bitmap_matrix, &state2,
-        umbra_shader_color,           &hc2,
-        umbra_blend_srcover,          NULL,
+        coverage_matrix,     &state2,
+        umbra_shader_color,  &hc2,
+        umbra_blend_srcover, NULL,
         umbra_fmt_8888);
     ir = umbra_flat_ir(bld);
     umbra_builder_free(bld);

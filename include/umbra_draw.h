@@ -119,12 +119,3 @@ umbra_val32 umbra_coverage_rect(void *umbra_rect, struct umbra_builder*,
 umbra_interval umbra_sdf_rect(void *umbra_rect, struct umbra_builder*,
                               umbra_interval x, umbra_interval y);
 
-// TODO: split this apart into a bitmap shader and a matrix shader combinator.
-struct umbra_coverage_bitmap_matrix {
-    struct umbra_matrix mat; int :32;
-    struct umbra_bitmap bmp;
-};
-umbra_val32 umbra_coverage_bitmap_matrix(void *umbra_coverage_bitmap_matrix,
-                                         struct umbra_builder*,
-                                         umbra_val32 x, umbra_val32 y);
-
