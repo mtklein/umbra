@@ -1549,8 +1549,15 @@ TEST(test_metal_loop_gather) {
     float arr[] = {10, 20, 30};
     struct umbra_buf arr_buf = {.ptr = arr, .count = 3};
 
+    struct uni uniforms = {0};
+    { int const count = 3; __builtin_memcpy(&uniforms.n, &count, 4); }
+
+    float out = 0;
+    struct umbra_buf out_buf = {.ptr = &out, .count = 1};
+
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr32 const u    = {.ix = 0};
+    umbra_ptr32 const u    = umbra_uniforms  (b, &uniforms, (int)(sizeof uniforms / 4));
+    umbra_ptr32 const dst  = umbra_bind_buf32(b, &out_buf);
     umbra_ptr32 const data = umbra_bind_buf32(b, &arr_buf);
     umbra_val32 const n    = umbra_uniform_32(b, u, n_slot);
 
@@ -1562,13 +1569,10 @@ TEST(test_metal_loop_gather) {
         umbra_store_var32(b, sum, umbra_add_f32(b, umbra_load_var32(b, sum), val));
     } umbra_end_loop(b);
 
-    umbra_store_32(b, (umbra_ptr32){.ix = 1}, umbra_load_var32(b, sum));
+    umbra_store_32(b, dst, umbra_load_var32(b, sum));
 
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
-
-    struct uni uniforms = {0};
-    { int const count = 3; __builtin_memcpy(&uniforms.n, &count, 4); }
 
     struct umbra_backend *bes[NUM_BACKENDS] = {
         umbra_backend_interp(), umbra_backend_jit(),
@@ -1579,12 +1583,8 @@ TEST(test_metal_loop_gather) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         if (!bes[bi]) { continue; }
         struct umbra_program *prog = bes[bi]->compile(bes[bi], ir);
-        float out = 0;
-        struct umbra_buf buf[] = {
-            {.ptr = &uniforms, .count = (int)(sizeof uniforms / 4)},
-            {.ptr = &out,      .count = 1},
-        };
-        prog->queue(prog, 0, 0, 1, 1, buf);
+        out = 0;
+        prog->queue(prog, 0, 0, 1, 1, (struct umbra_buf[]){{0}});
         bes[bi]->flush(bes[bi]);
         equiv(out, 60.0f) here;
         umbra_program_free(prog);
