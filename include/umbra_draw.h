@@ -114,24 +114,24 @@ struct umbra_builder* umbra_draw_builder(struct umbra_coverage*,
                                          umbra_blend_fn,
                                          struct umbra_fmt);
 
-// New middleware: flat effect fn pointers that take a caller-owned state
+// New middleware: flat effect fn pointers that take a caller-owned context
 // pointer as first arg, register their uniforms via umbra_uniforms(), and
 // compose via umbra_draw_builder2().  The old struct-based path above stays
 // in place; effects migrate over one at a time.  These typedefs live in the
 // ordinary-identifier namespace, coexistent with `struct umbra_shader` etc.
 // in the tag namespace.
-typedef umbra_color_val32 (*umbra_shader)  (void *self, struct umbra_builder*,
+typedef umbra_color_val32 (*umbra_shader)  (void *ctx, struct umbra_builder*,
                                             umbra_val32 x, umbra_val32 y);
-typedef umbra_val32       (*umbra_coverage)(void *self, struct umbra_builder*,
+typedef umbra_val32       (*umbra_coverage)(void *ctx, struct umbra_builder*,
                                             umbra_val32 x, umbra_val32 y);
-typedef umbra_color_val32 (*umbra_blend)   (void *self, struct umbra_builder*,
+typedef umbra_color_val32 (*umbra_blend)   (void *ctx, struct umbra_builder*,
                                             umbra_color_val32 src,
                                             umbra_color_val32 dst);
 
 struct umbra_builder* umbra_draw_builder2(
-    umbra_coverage cov, void *cov_self,
-    umbra_shader   sh,  void *sh_self,
-    umbra_blend    bl,  void *bl_self,
+    umbra_coverage cov, void *cov_ctx,
+    umbra_shader   sh,  void *sh_ctx,
+    umbra_blend    bl,  void *bl_ctx,
     struct umbra_fmt);
 
 struct umbra_sdf_draw_config {

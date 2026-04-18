@@ -29,13 +29,13 @@ static struct umbra_buf sh_u(struct umbra_shader const *s) {
 }
 
 // Flat-fn-style shader: the caller's state is the umbra_color pointed at by
-// self.  Registers the color with umbra_uniforms() so the program captures
+// ctx.  Registers the color with umbra_uniforms() so the program captures
 // the host pointer, and reads the four floats via umbra_uniform_32.
-static umbra_color_val32 solid_fn(void *self, struct umbra_builder *b,
+static umbra_color_val32 solid_fn(void *ctx, struct umbra_builder *b,
                                    umbra_val32 x, umbra_val32 y) {
+    umbra_color const *self = ctx;
     (void)x; (void)y;
-    umbra_color const *c = self;
-    umbra_ptr32 const u = umbra_uniforms(b, c, 4);
+    umbra_ptr32 const u = umbra_uniforms(b, self, 4);
     return (umbra_color_val32){
         umbra_uniform_32(b, u, 0),
         umbra_uniform_32(b, u, 1),
