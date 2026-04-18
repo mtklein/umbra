@@ -63,6 +63,14 @@ umbra_ptr16 umbra_deref_ptr16(struct umbra_builder*, umbra_ptr32 buf, int slot);
 umbra_ptr32 umbra_deref_ptr32(struct umbra_builder*, umbra_ptr32 buf, int slot);
 umbra_val32 umbra_uniform_32(struct umbra_builder*, umbra_ptr32, int slot);
 
+// Register a region of uniform storage with the builder and get back a ptr
+// handle the emitted IR can read from via umbra_uniform_32 / umbra_gather_32.
+// The captured `slot` pointer must stay valid (and 4-byte aligned) until the
+// compiled program is freed; its contents may be mutated freely between queue()
+// calls and the next dispatch will see the updated bytes.  `slots` counts 4-byte
+// units.
+umbra_ptr32 umbra_uniforms(struct umbra_builder*, void const *slot, int slots);
+
 umbra_val32 umbra_x(struct umbra_builder*);
 umbra_val32 umbra_y(struct umbra_builder*);
 

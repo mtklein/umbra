@@ -264,13 +264,19 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
         }
     }
 
-    struct umbra_flat_ir *result = malloc(sizeof *result);
+    struct umbra_flat_ir *result = calloc(1, sizeof *result);
     result->inst     = out;
     result->insts    = live;
     result->preamble = preamble;
     result->n_vars   = b->n_vars;
     result->loop_begin = -1;
     result->loop_end   = -1;
+    if (b->n_uniforms) {
+        size_t const sz = (size_t)b->n_uniforms * sizeof *b->uniforms;
+        result->uniforms   = malloc(sz);
+        result->n_uniforms = b->n_uniforms;
+        __builtin_memcpy(result->uniforms, b->uniforms, sz);
+    }
     {
         int if_stack[16];
         int if_sp = 0;
@@ -371,6 +377,12 @@ struct umbra_flat_ir* flat_ir_resolve(struct umbra_flat_ir const *ir,
     result->preamble   = new_preamble;
     result->loop_begin = ir->loop_begin >= 0 ? remap[ir->loop_begin] : -1;
     result->loop_end   = ir->loop_end   >= 0 ? remap[ir->loop_end]   : -1;
+    if (ir->n_uniforms) {
+        size_t const sz = (size_t)ir->n_uniforms * sizeof *ir->uniforms;
+        result->uniforms   = malloc(sz);
+        result->n_uniforms = ir->n_uniforms;
+        __builtin_memcpy(result->uniforms, ir->uniforms, sz);
+    }
 
     free(remap);
     free(live);
@@ -381,6 +393,7 @@ struct umbra_flat_ir* flat_ir_resolve(struct umbra_flat_ir const *ir,
 void umbra_flat_ir_free(struct umbra_flat_ir *ir) {
     if (ir) {
         free(ir->inst);
+        free(ir->uniforms);
         free(ir);
     }
 }

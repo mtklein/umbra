@@ -29,25 +29,37 @@ struct ir_inst {
     int   final_id;
 };
 
+// A region of caller-managed uniform storage that umbra_uniforms() registered,
+// pinned to a specific ptr handle (.ix).  Programs auto-populate buf[.ix] with
+// .ptr at dispatch time so callers don't thread these through queue() args.
+struct umbra_uniform_reg {
+    void const *ptr;
+    int         slots, ix;
+};
+
 struct umbra_builder {
-    struct ir_inst    *inst;
-    _Bool             *var_uniform;
-    int                insts, cap;
-    struct hash        ht;
-    int                n_vars;
-    _Bool              has_loop, loop_closed, pad0[2];
-    umbra_val32        loop_trip;
-    struct umbra_var32 loop_var;
-    int                if_depth, pad1;
+    struct ir_inst           *inst;
+    _Bool                    *var_uniform;
+    int                       insts, cap;
+    struct hash               ht;
+    int                       n_vars;
+    _Bool                     has_loop, loop_closed, pad0[2];
+    umbra_val32               loop_trip;
+    struct umbra_var32        loop_var;
+    int                       if_depth, pad1;
+    struct umbra_uniform_reg *uniforms;
+    int                       n_uniforms, cap_uniforms;
 };
 
 struct umbra_flat_ir {
-    struct ir_inst *inst;
-    int             insts,      // Total instruction count.
-                    preamble;   // Fence: inst[0..preamble) are uniform, [preamble..insts) vary.
-    int             loop_begin, // Instruction index of op_loop_begin, or -1 if no loop.
-                    loop_end;   // Instruction index of op_loop_end,   or -1 if no loop.
-    int             n_vars, pad;
+    struct ir_inst           *inst;
+    int                       insts,      // Total instruction count.
+                              preamble;   // Fence: inst[0..preamble) are uniform, [preamble..) vary.
+    int                       loop_begin, // Instruction index of op_loop_begin, or -1.
+                              loop_end;   // Instruction index of op_loop_end,   or -1.
+    int                       n_vars, pad;
+    struct umbra_uniform_reg *uniforms;
+    int                       n_uniforms, pad2;
 };
 
 enum join_policy { JOIN_KEEP_X, JOIN_PREFER_IMM };
